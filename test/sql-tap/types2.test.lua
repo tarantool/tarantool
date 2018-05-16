@@ -201,7 +201,7 @@ test_bool("types2-4.28", "o1='500'", "'500.0' > o1", 1)
 -- types2-5.* - The 'IN (x, y....)' operator with no index.
 -- 
 -- Compare literals against literals (no affinity applied)
-test_bool("types2-5.1", "", "(NULL IN ('10.0', 20)) ISNULL", 1)
+test_bool("types2-5.1", "", "(NULL IN ('10.0', 20)) IS NULL", 1)
 test_bool("types2-5.2", "", "10 IN ('10.0', 20)", 0)
 test_bool("types2-5.3", "", "'10' IN ('10.0', 20)", 0)
 test_bool("types2-5.4", "", "10 IN (10.0, 20)", 1)

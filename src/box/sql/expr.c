@@ -267,8 +267,7 @@ comparisonAffinity(Expr * pExpr)
 	char aff;
 	assert(pExpr->op == TK_EQ || pExpr->op == TK_IN || pExpr->op == TK_LT ||
 	       pExpr->op == TK_GT || pExpr->op == TK_GE || pExpr->op == TK_LE ||
-	       pExpr->op == TK_NE || pExpr->op == TK_IS
-	       || pExpr->op == TK_ISNOT);
+	       pExpr->op == TK_NE);
 	assert(pExpr->pLeft);
 	aff = sqlite3ExprAffinity(pExpr->pLeft);
 	if (pExpr->pRight) {
@@ -547,19 +546,11 @@ exprVectorRegister(Parse * pParse,	/* Parse context */
  * Expression pExpr is a comparison between two vector values. Compute
  * the result of the comparison (1, 0, or NULL) and write that
  * result into register dest.
- *
- * The caller must satisfy the following preconditions:
- *
- *    if pExpr->op==TK_IS:      op==TK_EQ and p5==SQLITE_NULLEQ
- *    if pExpr->op==TK_ISNOT:   op==TK_NE and p5==SQLITE_NULLEQ
- *    otherwise:                op==pExpr->op and p5==0
  */
 static void
 codeVectorCompare(Parse * pParse,	/* Code generator context */
 		  Expr * pExpr,	/* The comparison operation */
-		  int dest,	/* Write results into this register */
-		  u8 op,	/* Comparison operator */
-		  u8 p5		/* SQLITE_NULLEQ or zero */
+		  int dest	/* Write results into this register */
     )
 {
 	Vdbe *v = pParse->pVdbe;
@@ -569,7 +560,7 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 	int i;
 	int regLeft = 0;
 	int regRight = 0;
-	u8 opx = op;
+	u8 op = pExpr->op;
 	int addrDone = sqlite3VdbeMakeLabel(v);
 
 	if (nLeft != sqlite3ExprVectorSize(pRight)) {
@@ -577,19 +568,17 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 		return;
 	}
 	assert(pExpr->op == TK_EQ || pExpr->op == TK_NE
-	       || pExpr->op == TK_IS || pExpr->op == TK_ISNOT
 	       || pExpr->op == TK_LT || pExpr->op == TK_GT
 	       || pExpr->op == TK_LE || pExpr->op == TK_GE);
-	assert(pExpr->op == op || (pExpr->op == TK_IS && op == TK_EQ)
-	       || (pExpr->op == TK_ISNOT && op == TK_NE));
-	assert(p5 == 0 || pExpr->op != op);
-	assert(p5 == SQLITE_NULLEQ || pExpr->op == op);
 
-	p5 |= SQLITE_STOREP2;
-	if (opx == TK_LE)
+	u8 opx;
+	u8 p5 = SQLITE_STOREP2;
+	if (op == TK_LE)
 		opx = TK_LT;
-	if (opx == TK_GE)
+	else if (op == TK_GE)
 		opx = TK_GT;
+	else
+		opx = op;
 
 	regLeft = exprCodeSubselect(pParse, pLeft);
 	regRight = exprCodeSubselect(pParse, pRight);
@@ -3709,7 +3698,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	int regFree2 = 0;	/* If non-zero free this temporary register */
 	int r1, r2;		/* Various register numbers */
 	Expr tempX;		/* Temporary expression node */
-	int p5 = 0;
 
 	assert(target > 0 && target <= pParse->nMem);
 	if (v == 0) {
@@ -3830,11 +3818,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			return inReg;
 		}
 #endif				/* SQLITE_OMIT_CAST */
-	case TK_IS:
-	case TK_ISNOT:
-		op = (op == TK_IS) ? TK_EQ : TK_NE;
-		p5 = SQLITE_NULLEQ;
-		/* fall-through */
 	case TK_LT:
 	case TK_LE:
 	case TK_GT:
@@ -3843,15 +3826,14 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_EQ:{
 			Expr *pLeft = pExpr->pLeft;
 			if (sqlite3ExprIsVector(pLeft)) {
-				codeVectorCompare(pParse, pExpr, target, op,
-						  p5);
+				codeVectorCompare(pParse, pExpr, target);
 			} else {
 				r1 = sqlite3ExprCodeTemp(pParse, pLeft,
 							 &regFree1);
 				r2 = sqlite3ExprCodeTemp(pParse, pExpr->pRight,
 							 &regFree2);
 				codeCompare(pParse, pLeft, pExpr->pRight, op,
-					    r1, r2, inReg, SQLITE_STOREP2 | p5);
+					    r1, r2, inReg, SQLITE_STOREP2);
 				assert(TK_LT == OP_Lt);
 				testcase(op == OP_Lt);
 				VdbeCoverageIf(v, op == OP_Lt);
@@ -4748,13 +4730,6 @@ sqlite3ExprIfTrue(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 					   jumpIfNull);
 			break;
 		}
-	case TK_IS:
-	case TK_ISNOT:
-		testcase(op == TK_IS);
-		testcase(op == TK_ISNOT);
-		op = (op == TK_IS) ? TK_EQ : TK_NE;
-		jumpIfNull = SQLITE_NULLEQ;
-		/* Fall thru */
 	case TK_LT:
 	case TK_LE:
 	case TK_GT:
@@ -4873,36 +4848,42 @@ sqlite3ExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 	if (pExpr == 0)
 		return;
 
-	/* The value of pExpr->op and op are related as follows:
+	/*
+	 * The value of pExpr->op and op are related as follows:
 	 *
 	 *       pExpr->op            op
 	 *       ---------          ----------
-	 *       TK_ISNULL          OP_NotNull
-	 *       TK_NOTNULL         OP_IsNull
 	 *       TK_NE              OP_Eq
 	 *       TK_EQ              OP_Ne
 	 *       TK_GT              OP_Le
 	 *       TK_LE              OP_Gt
 	 *       TK_GE              OP_Lt
 	 *       TK_LT              OP_Ge
+	 *        ...                ...
+	 *       TK_ISNULL          OP_NotNull
+	 *       TK_NOTNULL         OP_IsNull
 	 *
 	 * For other values of pExpr->op, op is undefined and unused.
 	 * The value of TK_ and OP_ constants are arranged such that we
 	 * can compute the mapping above using the following expression.
 	 * Assert()s verify that the computation is correct.
 	 */
+
 	op = ((pExpr->op + (TK_ISNULL & 1)) ^ 1) - (TK_ISNULL & 1);
 
-	/* Verify correct alignment of TK_ and OP_ constants
+	/*
+	 * Verify correct alignment of TK_ and OP_ constants.
+	 * Tokens TK_ISNULL and TK_NE shoud have the same parity.
 	 */
-	assert(pExpr->op != TK_ISNULL || op == OP_NotNull);
-	assert(pExpr->op != TK_NOTNULL || op == OP_IsNull);
 	assert(pExpr->op != TK_NE || op == OP_Eq);
 	assert(pExpr->op != TK_EQ || op == OP_Ne);
 	assert(pExpr->op != TK_LT || op == OP_Ge);
 	assert(pExpr->op != TK_LE || op == OP_Gt);
 	assert(pExpr->op != TK_GT || op == OP_Le);
 	assert(pExpr->op != TK_GE || op == OP_Lt);
+
+	assert(pExpr->op != TK_ISNULL || op == OP_NotNull);
+	assert(pExpr->op != TK_NOTNULL || op == OP_IsNull);
 
 	switch (pExpr->op) {
 	case TK_AND:{
@@ -4933,13 +4914,6 @@ sqlite3ExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 					  jumpIfNull);
 			break;
 		}
-	case TK_IS:
-	case TK_ISNOT:
-		testcase(pExpr->op == TK_IS);
-		testcase(pExpr->op == TK_ISNOT);
-		op = (pExpr->op == TK_IS) ? TK_NE : TK_EQ;
-		jumpIfNull = SQLITE_NULLEQ;
-		/* Fall thru */
 	case TK_LT:
 	case TK_LE:
 	case TK_GT:
@@ -5197,7 +5171,7 @@ sqlite3ExprImpliesExpr(Expr * pE1, Expr * pE2, int iTab)
 	    ) {
 		return 1;
 	}
-	if (pE2->op == TK_NOTNULL && pE1->op != TK_ISNULL && pE1->op != TK_IS) {
+	if (pE2->op == TK_NOTNULL && pE1->op != TK_ISNULL) {
 		Expr *pX = sqlite3ExprSkipCollate(pE1->pLeft);
 		testcase(pX != pE1->pLeft);
 		if (sqlite3ExprCompare(pX, pE2->pLeft, iTab) == 0)

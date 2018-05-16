@@ -42,7 +42,7 @@ test:do_test(
 test:do_execsql_test(
     "cse-1.2",
     [[
-        SELECT b, b%b, b==b, b!=b, b<b, b<=b, b IS NULL, b NOT NULL, b FROM t1
+        SELECT b, b%b, b==b, b!=b, b<b, b<=b, b IS NULL, b IS NOT NULL, b FROM t1
     ]], {
         -- <cse-1.2>
         11, 0, 1, 0, 0, 1, 0, 1, 11, 21, 0, 1, 0, 0, 1, 0, 1, 21
@@ -142,7 +142,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.8",
     [[
-        SELECT a, a%a, a==a, a!=a, a<a, a<=a, a IS NULL, a NOT NULL, a FROM t1
+        SELECT a, a%a, a==a, a!=a, a<a, a<=a, a IS NULL, a IS NOT NULL, a FROM t1
     ]], {
         -- <cse-1.8>
         1, 0, 1, 0, 0, 1, 0, 1, 1, 2, 0, 1, 0, 0, 1, 0, 1, 2

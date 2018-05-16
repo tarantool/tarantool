@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(37)
+test:plan(45)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -468,6 +468,93 @@ test:do_execsql_test(
 -- do_execsql_test null-9.3 {
 --   SELECT * FROM t5 WHERE a IS NULL AND b = 'x';
 -- } {{} x two {} x ii}
+
+
+-- gh-2136: "IS" is only applicable when dealing with NULL
+
+test:do_execsql_test(
+    "null-10.1",
+    [[
+        SELECT 1 WHERE 1 IS NULL;
+    ]], {
+        -- <null-8.15>
+
+        -- </null-8.15>
+    })
+
+test:do_execsql_test(
+    "null-10.2",
+    [[
+        SELECT 1 WHERE 1 IS NOT NULL;
+    ]], {
+        -- <null-8.15>
+        1
+        -- </null-8.15>
+    })
+
+test:do_execsql_test(
+    "null-10.3",
+    [[
+        SELECT 1 WHERE NULL IS NULL;
+    ]], {
+        -- <null-8.15>
+        1
+        -- </null-8.15>
+    })
+
+test:do_execsql_test(
+    "null-10.4",
+    [[
+        SELECT 1 WHERE NULL IS NOT NULL;
+    ]], {
+        -- <null-8.15>
+
+        -- </null-8.15>
+    })
+
+test:do_catchsql_test(
+    "null-10.5",
+    [[
+        SELECT 1 WHERE 1 IS 1;
+    ]],
+    {
+    -- <index-1.3>
+    1, "near \"1\": syntax error"
+    -- <index-1.3>
+    })
+
+test:do_catchsql_test(
+    "null-10.6",
+    [[
+        SELECT 1 WHERE 1 IS NOT 1;
+    ]],
+    {
+    -- <index-1.3>
+    1, "near \"1\": syntax error"
+    -- <index-1.3>
+    })
+
+test:do_catchsql_test(
+    "null-10.7",
+    [[
+        SELECT 1 WHERE NULL IS 1;
+    ]],
+    {
+    -- <index-1.3>
+    1, "near \"1\": syntax error"
+    -- <index-1.3>
+    })
+
+test:do_catchsql_test(
+    "null-10.8",
+    [[
+        SELECT 1 WHERE NULL IS NOT 1;
+    ]],
+    {
+    -- <index-1.3>
+    1, "near \"1\": syntax error"
+    -- <index-1.3>
+    })
 
 
 test:finish_test()

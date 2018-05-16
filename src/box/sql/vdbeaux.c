@@ -1438,12 +1438,6 @@ displayP4Expr(StrAccum * p, Expr * pExpr)
 	case TK_EQ:
 		zOp = "EQ";
 		break;
-	case TK_IS:
-		zOp = "IS";
-		break;
-	case TK_ISNOT:
-		zOp = "ISNOT";
-		break;
 	case TK_AND:
 		zOp = "AND";
 		break;
@@ -1493,10 +1487,10 @@ displayP4Expr(StrAccum * p, Expr * pExpr)
 		zOp = "NOT";
 		break;
 	case TK_ISNULL:
-		zOp = "ISNULL";
+		zOp = "IS NULL";
 		break;
 	case TK_NOTNULL:
-		zOp = "NOTNULL";
+		zOp = "NOT NULL";
 		break;
 
 	default:

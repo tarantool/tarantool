@@ -65,7 +65,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "analyze-1.7",
     [[
-        SELECT * FROM "_sql_stat1" WHERE "idx" NOT NULL
+        SELECT * FROM "_sql_stat1" WHERE "idx" IS NOT NULL
     ]], {
         -- <analyze-1.7>
         -- </analyze-1.7>
@@ -84,7 +84,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "analyze-1.9",
     [[
-        SELECT * FROM "_sql_stat1" WHERE "idx" NOT NULL
+        SELECT * FROM "_sql_stat1" WHERE "idx" IS NOT NULL
     ]], {
         -- <analyze-1.9>
         -- </analyze-1.9>

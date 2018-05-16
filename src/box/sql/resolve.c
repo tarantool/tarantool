@@ -802,9 +802,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 	case TK_LT:
 	case TK_LE:
 	case TK_GT:
-	case TK_GE:
-	case TK_IS:
-	case TK_ISNOT:{
+	case TK_GE:{
 			int nLeft, nRight;
 			if (pParse->db->mallocFailed)
 				break;
@@ -831,8 +829,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				testcase(pExpr->op == TK_LE);
 				testcase(pExpr->op == TK_GT);
 				testcase(pExpr->op == TK_GE);
-				testcase(pExpr->op == TK_IS);
-				testcase(pExpr->op == TK_ISNOT);
 				testcase(pExpr->op == TK_BETWEEN);
 				sqlite3ErrorMsg(pParse, "row value misused");
 			}

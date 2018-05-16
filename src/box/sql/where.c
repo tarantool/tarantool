@@ -317,11 +317,10 @@ whereScanNext(WhereScan * pScan)
 									continue;
 							}
 						}
-						if ((pTerm->eOperator & (WO_EQ | WO_IS)) != 0
+						if ((pTerm->eOperator & WO_EQ) != 0
 						    && (pX = pTerm->pExpr->pRight)->op == TK_COLUMN
 						    && pX->iTable == pScan->aiCur[0]
 						    && pX->iColumn == pScan->aiColumn[0]) {
-							testcase(pTerm->eOperator & WO_IS);
 							continue;
 						}
 						pScan->pWC = pWC;
@@ -438,13 +437,11 @@ sqlite3WhereFindTerm(WhereClause * pWC,	/* The WHERE clause to be searched */
 	WhereScan scan;
 
 	p = whereScanInit(&scan, pWC, iCur, iColumn, op, pIdx);
-	op &= WO_EQ | WO_IS;
+	op &= WO_EQ;
 	while (p) {
 		if ((p->prereqRight & notReady) == 0) {
-			if (p->prereqRight == 0 && (p->eOperator & op) != 0) {
-				testcase(p->eOperator & WO_IS);
+			if (p->prereqRight == 0 && (p->eOperator & op) != 0)
 				return p;
-			}
 			if (pResult == 0)
 				pResult = p;
 		}
@@ -633,7 +630,7 @@ termCanDriveIndex(WhereTerm * pTerm,	/* WHERE clause term to check */
 	char aff;
 	if (pTerm->leftCursor != pSrc->iCursor)
 		return 0;
-	if ((pTerm->eOperator & (WO_EQ | WO_IS)) == 0)
+	if ((pTerm->eOperator & WO_EQ) == 0)
 		return 0;
 	if ((pTerm->prereqRight & notReady) != 0)
 		return 0;
@@ -642,7 +639,6 @@ termCanDriveIndex(WhereTerm * pTerm,	/* WHERE clause term to check */
 	aff = pSrc->pTab->aCol[pTerm->u.leftColumn].affinity;
 	if (!sqlite3IndexAffinityOk(pTerm->pExpr, aff))
 		return 0;
-	testcase(pTerm->pExpr->op == TK_IS);
 	return 1;
 }
 #endif
@@ -2195,9 +2191,8 @@ whereLoopOutputAdjust(WhereClause * pWC,	/* The WHERE clause */
 				 * guess a reasonable truth probability.
 				 */
 				pLoop->nOut--;
-				if (pTerm->eOperator & (WO_EQ | WO_IS)) {
+				if ((pTerm->eOperator & WO_EQ) != 0) {
 					Expr *pRight = pTerm->pExpr->pRight;
-					testcase(pTerm->pExpr->op == TK_IS);
 					if (sqlite3ExprIsInteger(pRight, &k)
 					    && k >= (-1) && k <= 1) {
 						k = 10;
@@ -2337,8 +2332,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	} else {
 		assert(pNew->nBtm == 0);
 		opMask =
-		    WO_EQ | WO_IN | WO_GT | WO_GE | WO_LT | WO_LE | WO_ISNULL |
-		    WO_IS;
+		    WO_EQ | WO_IN | WO_GT | WO_GE | WO_LT | WO_LE | WO_ISNULL;
 	}
 	struct space *space =
 		space_by_id(SQLITE_PAGENO_TO_SPACEID(pProbe->tnum));
@@ -2400,8 +2394,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		 */
 		if ((pSrc->fg.jointype & JT_LEFT) != 0
 		    && !ExprHasProperty(pTerm->pExpr, EP_FromJoin)
-		    && (eOp & (WO_IS | WO_ISNULL)) != 0) {
-			testcase(eOp & WO_IS);
+		    && (eOp & WO_ISNULL) != 0) {
 			testcase(eOp & WO_ISNULL);
 			continue;
 		}
@@ -2451,7 +2444,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 							 * changes "x IN (?)" into "x=?".
 							 */
 			}
-		} else if (eOp & (WO_EQ | WO_IS)) {
+		} else if (eOp & WO_EQ) {
 			int iCol = pProbe->aiColumn[saved_nEq];
 			pNew->wsFlags |= WHERE_COLUMN_EQ;
 			assert(saved_nEq == pNew->nEq);
@@ -2518,7 +2511,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 			whereRangeScanEst(pParse, pBuilder, pBtm, pTop, pNew);
 		} else {
 			int nEq = ++pNew->nEq;
-			assert(eOp & (WO_ISNULL | WO_EQ | WO_IN | WO_IS));
+			assert(eOp & (WO_ISNULL | WO_EQ | WO_IN));
 
 			assert(pNew->nOut == saved_nOut);
 			if (pTerm->truthProb <= 0
@@ -2537,10 +2530,9 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 							    EP_xIsSelect))
 				    ) {
 					Expr *pExpr = pTerm->pExpr;
-					if ((eOp & (WO_EQ | WO_ISNULL | WO_IS))
+					if ((eOp & (WO_EQ | WO_ISNULL))
 					    != 0) {
 						testcase(eOp & WO_EQ);
-						testcase(eOp & WO_IS);
 						testcase(eOp & WO_ISNULL);
 						rc = whereEqualScanEst(pParse,
 								       pBuilder,
@@ -3260,7 +3252,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 	obDone = MASKBIT(nOrderBy) - 1;
 	orderDistinctMask = 0;
 	ready = 0;
-	eqOpMask = WO_EQ | WO_IS | WO_ISNULL;
+	eqOpMask = WO_EQ | WO_ISNULL;
 	if (wctrlFlags & WHERE_ORDERBY_LIMIT)
 		eqOpMask |= WO_IN;
 	for (iLoop = 0; isOrderDistinct && obSat < obDone && iLoop <= nLoop;
@@ -3308,7 +3300,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				if (j >= pLoop->nLTerm)
 					continue;
 			}
-			if ((pTerm->eOperator & (WO_EQ | WO_IS)) != 0
+			if ((pTerm->eOperator & WO_EQ) != 0
 			    && pOBExpr->iColumn >= 0) {
 				struct coll *coll1, *coll2;
 				bool unused;
@@ -3321,7 +3313,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 						      &unused, &id);
 				if (coll1 != coll2)
 					continue;
-				testcase(pTerm->pExpr->op == TK_IS);
 			}
 			obSat |= MASKBIT(i);
 		}
@@ -3352,7 +3343,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				if (j < pLoop->nEq && j >= pLoop->nSkip) {
 					u16 eOp = pLoop->aLTerm[j]->eOperator;
 
-					/* Skip over == and IS and ISNULL terms.  (Also skip IN terms when
+					/* Skip over == and IS NULL terms.  (Also skip IN terms when
 					 * doing WHERE_ORDERBY_LIMIT processing).
 					 *
 					 * If the current term is a column of an ((?,?) IN (SELECT...))
@@ -4103,9 +4094,8 @@ whereShortCut(WhereLoopBuilder * pBuilder)
 	pLoop = pBuilder->pNew;
 	pLoop->wsFlags = 0;
 	pLoop->nSkip = 0;
-	pTerm = sqlite3WhereFindTerm(pWC, iCur, -1, 0, WO_EQ | WO_IS, 0);
+	pTerm = sqlite3WhereFindTerm(pWC, iCur, -1, 0, WO_EQ, 0);
 	if (pTerm) {
-		testcase(pTerm->eOperator & WO_IS);
 		pLoop->wsFlags = WHERE_COLUMN_EQ | WHERE_IPK | WHERE_ONEROW;
 		pLoop->aLTerm[0] = pTerm;
 		pLoop->nLTerm = 1;
@@ -4122,15 +4112,13 @@ whereShortCut(WhereLoopBuilder * pBuilder)
 			    || nIdxCol > ArraySize(pLoop->aLTermSpace)
 			    )
 				continue;
-			opMask = index_is_unique_not_null(pIdx) ?
-				 (WO_EQ | WO_IS) : WO_EQ;
+			opMask = WO_EQ;
 			for (j = 0; j < nIdxCol; j++) {
 				pTerm =
 				    sqlite3WhereFindTerm(pWC, iCur, j, 0,
 							 opMask, pIdx);
 				if (pTerm == 0)
 					break;
-				testcase(pTerm->eOperator & WO_IS);
 				pLoop->aLTerm[j] = pTerm;
 			}
 			if (j != nIdxCol)

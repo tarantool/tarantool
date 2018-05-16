@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(30)
+test:plan(26)
 
 --!./tcltestrunner.lua
 -- 2013 April 17
@@ -124,19 +124,6 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "transitive1-302",
-    [[
-        SELECT *
-          FROM t301 CROSS JOIN t302
-         WHERE w IS y AND y IS NOT NULL
-         ORDER BY w;
-    ]], {
-        -- <transitive1-302>
-        1, 2, 1, 3, 3, 4, 3, 6, 5, 6, 5, 7
-        -- </transitive1-302>
-    })
-
-test:do_execsql_test(
     "transitive1-310",
     [[
         SELECT *
@@ -232,36 +219,6 @@ test:do_execsql_test(
         -- <transitive1-400>
         "1-row"
         -- </transitive1-400>
-    })
-
-test:do_execsql_test(
-    "transitive1-401",
-    [[
-        SELECT '1-row' FROM t401 LEFT JOIN t402 ON b IS a JOIN t403 ON c=a;
-    ]], {
-        -- <transitive1-401>
-        "1-row"
-        -- </transitive1-401>
-    })
-
-test:do_execsql_test(
-    "transitive1-402",
-    [[
-        SELECT '1-row' FROM t401 LEFT JOIN t402 ON b=a JOIN t403 ON c IS a;
-    ]], {
-        -- <transitive1-402>
-        "1-row"
-        -- </transitive1-402>
-    })
-
-test:do_execsql_test(
-    "transitive1-403",
-    [[
-        SELECT '1-row' FROM t401 LEFT JOIN t402 ON b IS a JOIN t403 ON c IS a;
-    ]], {
-        -- <transitive1-403>
-        "1-row"
-        -- </transitive1-403>
     })
 
 -- The following is a script distilled from the XBMC project where the

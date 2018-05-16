@@ -426,7 +426,7 @@ updateRangeAffinityStr(Expr * pRight,	/* RHS of comparison */
  * The current value for the constraint is left in a register, the index
  * of which is returned.  An attempt is made store the result in iTarget but
  * this is only guaranteed for TK_ISNULL and TK_IN constraints.  If the
- * constraint is a TK_EQ or TK_IS, then the current value might be left in
+ * constraint is a TK_EQ, then the current value might be left in
  * some other register and it is the caller's responsibility to compensate.
  *
  * For a constraint of the form X=expr, the expression is evaluated in
@@ -448,7 +448,7 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 
 	assert(pLevel->pWLoop->aLTerm[iEq] == pTerm);
 	assert(iTarget > 0);
-	if (pX->op == TK_EQ || pX->op == TK_IS) {
+	if (pX->op == TK_EQ) {
 		iReg = sqlite3ExprCodeTarget(pParse, pX->pRight, iTarget);
 	} else if (pX->op == TK_ISNULL) {
 		iReg = iTarget;
@@ -758,8 +758,7 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 			}
 		} else if ((pTerm->eOperator & WO_ISNULL) == 0) {
 			Expr *pRight = pTerm->pExpr->pRight;
-			if ((pTerm->wtFlags & TERM_IS) == 0
-			    && sqlite3ExprCanBeNull(pRight)) {
+			if (sqlite3ExprCanBeNull(pRight)) {
 				sqlite3VdbeAddOp2(v, OP_IsNull, regBase + j,
 						  pLevel->addrBrk);
 				VdbeCoverage(v);
@@ -867,8 +866,7 @@ codeCursorHintCheckExpr(Walker * pWalker, Expr * pExpr)
 static int
 codeCursorHintIsOrFunction(Walker * pWalker, Expr * pExpr)
 {
-	if (pExpr->op == TK_IS
-	    || pExpr->op == TK_ISNULL || pExpr->op == TK_ISNOT
+	if (pExpr->op == TK_ISNULL
 	    || pExpr->op == TK_NOTNULL || pExpr->op == TK_CASE) {
 		pWalker->eCode = 1;
 	} else if (pExpr->op == TK_FUNCTION) {
@@ -1919,7 +1917,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		WhereTerm *pAlt;
 		if (pTerm->wtFlags & (TERM_VIRTUAL | TERM_CODED))
 			continue;
-		if ((pTerm->eOperator & (WO_EQ | WO_IS)) == 0)
+		if ((pTerm->eOperator & WO_EQ) == 0)
 			continue;
 		if ((pTerm->eOperator & WO_EQUIV) == 0)
 			continue;
@@ -1932,13 +1930,12 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		assert((pTerm->prereqRight & pLevel->notReady) != 0);
 		pAlt =
 		    sqlite3WhereFindTerm(pWC, iCur, pTerm->u.leftColumn,
-					 notReady, WO_EQ | WO_IN | WO_IS, 0);
+					 notReady, WO_EQ | WO_IN, 0);
 		if (pAlt == 0)
 			continue;
 		if (pAlt->wtFlags & (TERM_CODED))
 			continue;
 		testcase(pAlt->eOperator & WO_EQ);
-		testcase(pAlt->eOperator & WO_IS);
 		testcase(pAlt->eOperator & WO_IN);
 		VdbeModuleComment((v, "begin transitive constraint"));
 		sEAlt = *pAlt->pExpr;

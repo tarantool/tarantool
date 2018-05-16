@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 NULL = require('msgpack').NULL
-test:plan(25)
+test:plan(24)
 
 local function func1(a)
     return a
@@ -117,16 +117,6 @@ for i = 1, #from_lua_to_sql, 1 do
         "select "..from_lua_to_sql[i][1].." = check_from_lua_to_sql("..i..")",
         {1})
 end
-
-local function allways_nil()
-    return nil
-end
-box.internal.sql_create_function("allways_nil", allways_nil)
-
-test:do_execsql_test(
-    "lua_sql-2.4",
-    "select NULL is allways_nil()",
-    {1})
 
 local from_lua_to_sql_bad = {
     [1] = NULL,

@@ -494,7 +494,7 @@ for ii = 3, 6, 1 do
               SELECT a*10 + 0.1, f*10 + 0.1 FROM t1 LEFT JOIN t2 ON (c=d)
               UNION ALL
               SELECT a*100, b*100 FROM t1
-            ) WHERE y+x NOT NULL ORDER BY 1;
+            ) WHERE y+x IS NOT NULL ORDER BY 1;
         ]], {
             6, 18, 30, 260.2, 600, 1800, 3000
         })

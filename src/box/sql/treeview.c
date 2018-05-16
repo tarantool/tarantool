@@ -410,12 +410,6 @@ sqlite3TreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 	case TK_EQ:
 		zBinOp = "EQ";
 		break;
-	case TK_IS:
-		zBinOp = "IS";
-		break;
-	case TK_ISNOT:
-		zBinOp = "ISNOT";
-		break;
 	case TK_AND:
 		zBinOp = "AND";
 		break;
@@ -469,10 +463,10 @@ sqlite3TreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 		zUniOp = "NOT";
 		break;
 	case TK_ISNULL:
-		zUniOp = "ISNULL";
+		zUniOp = "IS NULL";
 		break;
 	case TK_NOTNULL:
-		zUniOp = "NOTNULL";
+		zUniOp = "NOT NULL";
 		break;
 
 	case TK_SPAN:{

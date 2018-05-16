@@ -1296,10 +1296,10 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 			/* For ON UPDATE, construct the next term of the WHEN clause.
 			 * The final WHEN clause will be like this:
 			 *
-			 *    WHEN NOT(old.col1 IS new.col1 AND ... AND old.colN IS new.colN)
+			 *    WHEN NOT(old.col1 = new.col1 AND ... AND old.colN = new.colN)
 			 */
 			if (pChanges) {
-				pEq = sqlite3PExpr(pParse, TK_IS,
+				pEq = sqlite3PExpr(pParse, TK_EQ,
 						   sqlite3PExpr(pParse, TK_DOT,
 								sqlite3ExprAlloc
 								(db, TK_ID,

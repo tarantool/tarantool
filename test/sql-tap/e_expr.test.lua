@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14745)
+test:plan(12431)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -96,7 +96,7 @@ operations = {
     {"+", "-"},
     {"<<", ">>", "&", "|"},
     {"<", "<=", ">", ">="},
-    {"=", "==", "!=", "<>", "IS", "IS NOT", "LIKE", "GLOB"}, --"MATCH", "REGEXP"},
+    {"=", "==", "!=", "<>", "LIKE", "GLOB"}, --"MATCH", "REGEXP"},
     {"AND"},
     {"OR"},
 }
@@ -515,26 +515,6 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-8.1.3",
     [[
-        SELECT NULL IS     'ab'
-    ]], {
-        -- <e_expr-8.1.3>
-        0
-        -- </e_expr-8.1.3>
-    })
-
-test:do_execsql_test(
-    "e_expr-8.1.4",
-    [[
-        SELECT 'ab' IS     'ab'
-    ]], {
-        -- <e_expr-8.1.4>
-        1
-        -- </e_expr-8.1.4>
-    })
-
-test:do_execsql_test(
-    "e_expr-8.1.5",
-    [[
         SELECT NULL ==     NULL
     ]], {
         -- <e_expr-8.1.5>
@@ -543,7 +523,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.6",
+    "e_expr-8.1.4",
     [[
         SELECT 'ab' ==     NULL
     ]], {
@@ -553,7 +533,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.7",
+    "e_expr-8.1.5",
     [[
         SELECT NULL ==     'ab'
     ]], {
@@ -563,7 +543,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.8",
+    "e_expr-8.1.6",
     [[
         SELECT 'ab' ==     'ab'
     ]], {
@@ -573,7 +553,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.9",
+    "e_expr-8.1.7",
     [[
         SELECT NULL IS NOT NULL
     ]], {
@@ -583,7 +563,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.10",
+    "e_expr-8.1.8",
     [[
         SELECT 'ab' IS NOT NULL
     ]], {
@@ -593,27 +573,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.11",
-    [[
-        SELECT NULL IS NOT 'ab'
-    ]], {
-        -- <e_expr-8.1.11>
-        1
-        -- </e_expr-8.1.11>
-    })
-
-test:do_execsql_test(
-    "e_expr-8.1.12",
-    [[
-        SELECT 'ab' IS NOT 'ab'
-    ]], {
-        -- <e_expr-8.1.12>
-        0
-        -- </e_expr-8.1.12>
-    })
-
-test:do_execsql_test(
-    "e_expr-8.1.13",
+    "e_expr-8.1.9",
     [[
         SELECT NULL !=     NULL
     ]], {
@@ -623,7 +583,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.14",
+    "e_expr-8.1.10",
     [[
         SELECT 'ab' !=     NULL
     ]], {
@@ -633,7 +593,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.15",
+    "e_expr-8.1.11",
     [[
         SELECT NULL !=     'ab'
     ]], {
@@ -643,7 +603,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-8.1.16",
+    "e_expr-8.1.12",
     [[
         SELECT 'ab' !=     'ab'
     ]], {
@@ -652,31 +612,6 @@ test:do_execsql_test(
         -- </e_expr-8.1.16>
     })
 
-for n1, rhs in ipairs(literals) do
-    for n2, lhs in ipairs(literals) do
-        local eq = ""
-        if ((rhs ~= "NULL") and (lhs ~= "NULL")) then
-            eq = test:execsql(string.format("SELECT %s = %s, %s != %s", lhs, rhs, lhs, rhs))
-        else
-            eq = { ((lhs == "NULL") and (rhs == "NULL")) and 1 or 0, ((lhs ~= "NULL") or (rhs ~= "NULL")) and 1 or 0}
-        end
-        local label = string.format("e_expr-8.2.%s.%s", n1, n2)
-        test:do_execsql_test(
-            label..".1",
-            string.format([[
-                SELECT %s IS %s, %s IS NOT %s
-            ]], lhs, rhs, lhs, rhs), eq)
-
-        test:do_execsql_test(
-            label..".2",
-            string.format([[
-                SELECT (%s IS %s) IS NULL, (%s IS NOT %s) IS NULL
-            ]], lhs, rhs, lhs, rhs), {
-                0, 0
-            })
-
-    end
-end
 ---------------------------------------------------------------------------
 -- Run some tests on the COLLATE "unary postfix operator".
 --
@@ -832,26 +767,6 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-9.14",
     [[
-        SELECT  'abcd' IS 'ABCD'  COLLATE "unicode_ci"
-    ]], {
-        -- <e_expr-9.14>
-        1
-        -- </e_expr-9.14>
-    })
-
-test:do_execsql_test(
-    "e_expr-9.15",
-    [[
-        SELECT ('abcd' IS 'ABCD') COLLATE "unicode_ci"
-    ]], {
-        -- <e_expr-9.15>
-        0
-        -- </e_expr-9.15>
-    })
-
-test:do_execsql_test(
-    "e_expr-9.16",
-    [[
         SELECT  'abcd' != 'ABCD'      COLLATE "unicode_ci"
     ]], {
         -- <e_expr-9.16>
@@ -860,7 +775,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-9.17",
+    "e_expr-9.15",
     [[
         SELECT ('abcd' != 'ABCD')     COLLATE "unicode_ci"
     ]], {
@@ -870,7 +785,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-9.18",
+    "e_expr-9.16",
     [[
         SELECT  'abcd' <> 'ABCD'      COLLATE "unicode_ci"
     ]], {
@@ -880,7 +795,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-9.19",
+    "e_expr-9.17",
     [[
         SELECT ('abcd' <> 'ABCD')     COLLATE "unicode_ci"
     ]], {
@@ -890,27 +805,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-9.20",
-    [[
-        SELECT  'abcd' IS NOT 'ABCD'  COLLATE "unicode_ci"
-    ]], {
-        -- <e_expr-9.20>
-        0
-        -- </e_expr-9.20>
-    })
-
-test:do_execsql_test(
-    "e_expr-9.21",
-    [[
-        SELECT ('abcd' IS NOT 'ABCD') COLLATE "unicode_ci"
-    ]], {
-        -- <e_expr-9.21>
-        1
-        -- </e_expr-9.21>
-    })
-
-test:do_execsql_test(
-    "e_expr-9.22",
+    "e_expr-9.19",
     [[
         SELECT 'bbb' BETWEEN 'AAA' AND 'CCC' COLLATE "unicode_ci"
     ]], {
@@ -920,7 +815,7 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "e_expr-9.23",
+    "e_expr-9.20",
     [[
         SELECT ('bbb' BETWEEN 'AAA' AND 'CCC') COLLATE "unicode_ci"
     ]], {
@@ -1418,133 +1313,95 @@ local test_cases12 ={
     {8, "CURRENT_TIMESTAMP"},
 
     {9, "?"},
-    {11, "@hello"},
-    {12, ":world"},
+    {10, "@hello"},
+    {11, ":world"},
 
-    {15, "cname"},
-    {16, "tblname.cname"},
+    {12, "cname"},
+    {13, "tblname.cname"},
 
-    {18, "+ EXPR"},
-    {19, "- EXPR"},
-    {20, "NOT EXPR"},
-    {21, "~ EXPR"},
+    {14, "+ EXPR"},
+    {15, "- EXPR"},
+    {16, "NOT EXPR"},
+    {17, "~ EXPR"},
 
-    {22, "EXPR1 || EXPR2"},
-    {23, "EXPR1 * EXPR2"},
-    {24, "EXPR1 / EXPR2"},
-    {25, "EXPR1 % EXPR2"},
-    {26, "EXPR1 + EXPR2"},
-    {27, "EXPR1 - EXPR2"},
-    {28, "EXPR1 << EXPR2"},
-    {29, "EXPR1 >> EXPR2"},
-    {30, "EXPR1 & EXPR2"},
+    {18, "EXPR1 || EXPR2"},
+    {19, "EXPR1 * EXPR2"},
+    {20, "EXPR1 / EXPR2"},
+    {21, "EXPR1 % EXPR2"},
+    {22, "EXPR1 + EXPR2"},
+    {23, "EXPR1 - EXPR2"},
+    {24, "EXPR1 << EXPR2"},
+    {25, "EXPR1 >> EXPR2"},
+    {26, "EXPR1 & EXPR2"},
 
-    {31, "EXPR1 | EXPR2"},
-    {32, "EXPR1 < EXPR2"},
-    {33, "EXPR1 <= EXPR2"},
-    {34, "EXPR1 > EXPR2"},
-    {35, "EXPR1 >= EXPR2"},
-    {36, "EXPR1 = EXPR2"},
-    {37, "EXPR1 == EXPR2"},
-    {38, "EXPR1 != EXPR2"},
-    {39, "EXPR1 <> EXPR2"},
-    {40, "EXPR1 IS EXPR2"},
-    {41, "EXPR1 IS NOT EXPR2"},
-    {42, "EXPR1 AND EXPR2"},
-    {43, "EXPR1 OR EXPR2"},
+    {27, "EXPR1 | EXPR2"},
+    {28, "EXPR1 < EXPR2"},
+    {29, "EXPR1 <= EXPR2"},
+    {30, "EXPR1 > EXPR2"},
+    {31, "EXPR1 >= EXPR2"},
+    {32, "EXPR1 = EXPR2"},
+    {33, "EXPR1 == EXPR2"},
+    {34, "EXPR1 != EXPR2"},
+    {35, "EXPR1 <> EXPR2"},
+    {36, "EXPR1 AND EXPR2"},
+    {37, "EXPR1 OR EXPR2"},
 
-    {44, "count(*)"},
-    {45, "count(DISTINCT EXPR)"},
-    {46, "substr(EXPR, 10, 20)"},
-    {47, "changes()"},
+    {38, "count(*)"},
+    {39, "count(DISTINCT EXPR)"},
+    {40, "substr(EXPR, 10, 20)"},
+    {41, "changes()"},
 
-    {48, "( EXPR )"},
+    {42, "( EXPR )"},
 
-    {49, "CAST ( EXPR AS integer )"},
-    {50, "CAST ( EXPR AS 'abcd' )"},
+    {43, "CAST ( EXPR AS integer )"},
+    {44, "CAST ( EXPR AS 'abcd' )"},
 
-    {52, "EXPR COLLATE \"unicode_ci\""},
-    {53, "EXPR COLLATE binary"},
+    {45, "EXPR COLLATE \"unicode_ci\""},
+    {46, "EXPR COLLATE binary"},
 
-    {54, "EXPR1 LIKE EXPR2"},
-    {55, "EXPR1 LIKE EXPR2 ESCAPE EXPR"},
-    {56, "EXPR1 GLOB EXPR2"},
-    {57, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
-    {58, "EXPR1 REGEXP EXPR2"},
-    {59, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
-    {60, "EXPR1 MATCH EXPR2"},
-    {61, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
-    {62, "EXPR1 NOT LIKE EXPR2"},
-    {63, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
-    {64, "EXPR1 NOT GLOB EXPR2"},
-    {65, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
-    {66, "EXPR1 NOT REGEXP EXPR2"},
-    {67, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
-    {68, "EXPR1 NOT MATCH EXPR2"},
-    {69, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
+    {47, "EXPR1 LIKE EXPR2"},
+    {48, "EXPR1 LIKE EXPR2 ESCAPE EXPR"},
+    {49, "EXPR1 GLOB EXPR2"},
+    {50, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
+    {51, "EXPR1 REGEXP EXPR2"},
+    {52, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
+    {53, "EXPR1 MATCH EXPR2"},
+    {54, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
+    {55, "EXPR1 NOT LIKE EXPR2"},
+    {56, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
+    {57, "EXPR1 NOT GLOB EXPR2"},
+    {58, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
+    {59, "EXPR1 NOT REGEXP EXPR2"},
+    {60, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
+    {61, "EXPR1 NOT MATCH EXPR2"},
+    {62, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
 
-    {70, "EXPR ISNULL"},
-    {71, "EXPR NOTNULL"},
-    {72, "EXPR NOT NULL"},
+    {63, "EXPR IS NULL"},
+    {64, "EXPR IS NOT NULL"},
 
-    {73, "EXPR1 IS EXPR2"},
-    {74, "EXPR1 IS NOT EXPR2"},
+    {65, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
+    {66, "EXPR BETWEEN EXPR1 AND EXPR2"},
 
-    {75, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
-    {76, "EXPR BETWEEN EXPR1 AND EXPR2"},
+    {67, "EXPR NOT IN (SELECT cname FROM tblname)"},
+    {68, "EXPR NOT IN (1)"},
+    {69, "EXPR NOT IN (1, 2, 3)"},
+    {70, "EXPR NOT IN tblname"},
+    {71, "EXPR IN (SELECT cname FROM tblname)"},
+    {72, "EXPR IN (1)"},
+    {73, "EXPR IN (1, 2, 3)"},
+    {74, "EXPR IN tblname"},
 
-    {77, "EXPR NOT IN (SELECT cname FROM tblname)"},
-    {78, "EXPR NOT IN (1)"},
-    {79, "EXPR NOT IN (1, 2, 3)"},
-    {80, "EXPR NOT IN tblname"},
-    {82, "EXPR IN (SELECT cname FROM tblname)"},
-    {83, "EXPR IN (1)"},
-    {84, "EXPR IN (1, 2, 3)"},
-    {85, "EXPR IN tblname"},
-    {57, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
-    {58, "EXPR1 REGEXP EXPR2"},
-    {59, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
-    {60, "EXPR1 MATCH EXPR2"},
-    {61, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
-    {62, "EXPR1 NOT LIKE EXPR2"},
-    {63, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
-    {64, "EXPR1 NOT GLOB EXPR2"},
-    {65, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
-    {66, "EXPR1 NOT REGEXP EXPR2"},
-    {67, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
-    {68, "EXPR1 NOT MATCH EXPR2"},
-    {69, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
+    {75, "EXISTS (SELECT cname FROM tblname)"},
+    {76, "NOT EXISTS (SELECT cname FROM tblname)"},
 
-    {70, "EXPR ISNULL"},
-    {71, "EXPR NOTNULL"},
-    {72, "EXPR NOT NULL"},
-
-    {73, "EXPR1 IS EXPR2"},
-    {74, "EXPR1 IS NOT EXPR2"},
-
-    {75, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
-    {76, "EXPR BETWEEN EXPR1 AND EXPR2"},
-
-    {77, "EXPR NOT IN (SELECT cname FROM tblname)"},
-    {78, "EXPR NOT IN (1)"},
-    {79, "EXPR NOT IN (1, 2, 3)"},
-    {80, "EXPR NOT IN tblname"},
-    {82, "EXPR IN (SELECT cname FROM tblname)"},
-    {83, "EXPR IN (1)"},
-    {84, "EXPR IN (1, 2, 3)"},
-    {85, "EXPR IN tblname"},
-
-    {87, "EXISTS (SELECT cname FROM tblname)"},
-    {88, "NOT EXISTS (SELECT cname FROM tblname)"},
-
-    {89, "CASE EXPR WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
-    {90, "CASE EXPR WHEN EXPR1 THEN EXPR2 END"},
-    {91, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
-    {92, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
-    {93, "CASE WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
-    {94, "CASE WHEN EXPR1 THEN EXPR2 END"},
-    {95, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
-    {96, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
+    {77, "CASE EXPR WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
+    {78, "CASE EXPR WHEN EXPR1 THEN EXPR2 END"},
+    {79, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
+    {80, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
+    {81, "CASE WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
+    {82, "CASE WHEN EXPR1 THEN EXPR2 END"},
+    {83, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
+    {84, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
 }
 
 for _, val in ipairs(test_cases12) do

@@ -306,7 +306,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "types-2.3.2",
     [[
-        SELECT a ISNULL FROM t3;
+        SELECT a IS NULL FROM t3;
     ]], {
         -- <types-2.3.2>
         1

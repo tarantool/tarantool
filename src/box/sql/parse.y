@@ -125,16 +125,15 @@ cmdx ::= cmd.
 // causes them to be assigned integer values that are close together,
 // which keeps parser tables smaller.
 //
-// The token values assigned to these symbols is determined by the order
-// in which lemon first sees them.  It must be the case that ISNULL/NOTNULL,
-// NE/EQ, GT/LE, and GE/LT are separated by only a single value.  See
-// the sqlite3ExprIfFalse() routine for additional information on this
-// constraint.
+// The token values assigned to these symbols is determined by the order in
+// which lemon first sees them.  It must be the case that NE/EQ, GT/LE, and
+// GE/LT are separated by only a single value.  See the sqlite3ExprIfFalse()
+// routine for additional information on this constraint.
 //
 %left OR.
 %left AND.
 %right NOT.
-%left IS MATCH LIKE_KW BETWEEN IN ISNULL NOTNULL NE EQ.
+%left IS MATCH LIKE_KW BETWEEN IN NE EQ.
 %left GT LE LT GE.
 %right ESCAPE.
 %left BITAND BITOR LSHIFT RSHIFT.
@@ -210,7 +209,7 @@ columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
 %fallback ID
   ABORT ACTION ADD AFTER AUTOINCREMENT BEFORE CASCADE
   CONFLICT DEFERRED END FAIL
-  IGNORE INITIALLY INSTEAD ISNULL NO NOTNULL  MATCH PLAN
+  IGNORE INITIALLY INSTEAD NO MATCH PLAN
   QUERY KEY OFFSET RAISE RELEASE REPLACE RESTRICT
 %ifdef SQLITE_OMIT_COMPOUND_SELECT
   INTERSECT 
@@ -1008,36 +1007,12 @@ expr(A) ::= expr(A) likeop(OP) expr(Y) ESCAPE expr(E).  [LIKE_KW]  {
   }                           
 }
 
-expr(A) ::= expr(A) ISNULL|NOTNULL(E).   {spanUnaryPostfix(pParse,@E,&A,&E);}
-expr(A) ::= expr(A) NOT NULL(E). {spanUnaryPostfix(pParse,TK_NOTNULL,&A,&E);}
+// Tokens TK_ISNULL and TK_NOTNULL defined in extra tokens and are identifiers
+// for operations IS NULL and IS NOT NULL.
 
-%include {
-  /* A routine to convert a binary TK_IS or TK_ISNOT expression into a
-  ** unary TK_ISNULL or TK_NOTNULL expression. */
-  static void binaryToUnaryIfNull(Parse *pParse, Expr *pY, Expr *pA, int op){
-    sqlite3 *db = pParse->db;
-    if( pA && pY && pY->op==TK_NULL ){
-      pA->op = (u8)op;
-      sql_expr_free(db, pA->pRight, false);
-      pA->pRight = 0;
-    }
-  }
-}
+expr(A) ::= expr(A) IS NULL(E).   {spanUnaryPostfix(pParse,TK_ISNULL,&A,&E);}
+expr(A) ::= expr(A) IS NOT NULL(E).   {spanUnaryPostfix(pParse,TK_NOTNULL,&A,&E);}
 
-//    expr1 IS expr2
-//    expr1 IS NOT expr2
-//
-// If expr2 is NULL then code as TK_ISNULL or TK_NOTNULL.  If expr2
-// is any other expression, code as TK_IS or TK_ISNOT.
-// 
-expr(A) ::= expr(A) IS expr(Y).     {
-  spanBinaryExpr(pParse,TK_IS,&A,&Y);
-  binaryToUnaryIfNull(pParse, Y.pExpr, A.pExpr, TK_ISNULL);
-}
-expr(A) ::= expr(A) IS NOT expr(Y). {
-  spanBinaryExpr(pParse,TK_ISNOT,&A,&Y);
-  binaryToUnaryIfNull(pParse, Y.pExpr, A.pExpr, TK_NOTNULL);
-}
 
 %include {
   /* Construct an expression node for a unary prefix operator

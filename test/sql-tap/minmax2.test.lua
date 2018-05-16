@@ -521,7 +521,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax2-10.5",
     [[
-        DELETE FROM t6 WHERE x NOT NULL;
+        DELETE FROM t6 WHERE x IS NOT NULL;
         SELECT count(*) FROM t6;
     ]], {
         -- <minmax2-10.5>

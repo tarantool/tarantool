@@ -136,8 +136,7 @@ allowedOp(int op)
 	assert(TK_LT > TK_EQ && TK_LT < TK_GE);
 	assert(TK_LE > TK_EQ && TK_LE < TK_GE);
 	assert(TK_GE == TK_EQ + 4);
-	return op == TK_IN || (op >= TK_EQ && op <= TK_GE) || op == TK_ISNULL
-	    || op == TK_IS;
+	return op == TK_IN || (op >= TK_EQ && op <= TK_GE) || op == TK_ISNULL;
 }
 
 /*
@@ -205,8 +204,6 @@ operatorMask(int op)
 		c = WO_IN;
 	} else if (op == TK_ISNULL) {
 		c = WO_ISNULL;
-	} else if (op == TK_IS) {
-		c = WO_IS;
 	} else {
 		assert((WO_EQ << (op - TK_EQ)) < 0x7fff);
 		c = (u16) (WO_EQ << (op - TK_EQ));
@@ -218,7 +215,6 @@ operatorMask(int op)
 	assert(op != TK_LE || c == WO_LE);
 	assert(op != TK_GT || c == WO_GT);
 	assert(op != TK_GE || c == WO_GE);
-	assert(op != TK_IS || c == WO_IS);
 	return c;
 }
 
@@ -830,7 +826,7 @@ termIsEquivalence(Parse * pParse, Expr * pExpr)
 	char aff1, aff2;
 	if (!OptimizationEnabled(pParse->db, SQLITE_Transitive))
 		return 0;
-	if (pExpr->op != TK_EQ && pExpr->op != TK_IS)
+	if (pExpr->op != TK_EQ)
 		return 0;
 	if (ExprHasProperty(pExpr, EP_FromJoin))
 		return 0;
@@ -917,9 +913,9 @@ exprMightBeIndexed(SrcList * pFrom,	/* The FROM clause */
 	 * on the first element of the vector.
 	 */
 	assert(TK_GT + 1 == TK_LE && TK_GT + 2 == TK_LT && TK_GT + 3 == TK_GE);
-	assert(TK_IS < TK_GE && TK_ISNULL < TK_GE && TK_IN < TK_GE);
-	assert(op <= TK_GE);
-	if (pExpr->op == TK_VECTOR && (op >= TK_GT && ALWAYS(op <= TK_GE))) {
+	assert(TK_IN < TK_GE);
+	assert(op <= TK_GE || op == TK_ISNULL || op == TK_NOTNULL);
+	if (pExpr->op == TK_VECTOR && (op >= TK_GT && op <= TK_GE)) {
 		pExpr = pExpr->x.pList->a[0].pExpr;
 	}
 
@@ -1048,8 +1044,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			pTerm->u.leftColumn = iColumn;
 			pTerm->eOperator = operatorMask(op) & opMask;
 		}
-		if (op == TK_IS)
-			pTerm->wtFlags |= TERM_IS;
 		if (pRight
 		    && exprMightBeIndexed(pSrc, op, pTerm->prereqRight, pRight,
 					  &iCur, &iColumn)
@@ -1073,8 +1067,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 					return;
 				pNew = &pWC->a[idxNew];
 				markTermAsChild(pWC, idxNew, idxTerm);
-				if (op == TK_IS)
-					pNew->wtFlags |= TERM_IS;
 				pTerm = &pWC->a[idxTerm];
 				pTerm->wtFlags |= TERM_COPIED;
 
@@ -1249,7 +1241,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	 * This is only required if at least one side of the comparison operation
 	 * is not a sub-select.
 	 */
-	if (pWC->op == TK_AND && (pExpr->op == TK_EQ || pExpr->op == TK_IS)
+	if (pWC->op == TK_AND && pExpr->op == TK_EQ
 	    && sqlite3ExprIsVector(pExpr->pLeft)
 	    && ((pExpr->pLeft->flags & EP_xIsSelect) == 0
 		|| (pExpr->pRight->flags & EP_xIsSelect) == 0)) {
