@@ -329,6 +329,17 @@ lbox_console_add_history(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_console_get_console_width(struct lua_State *L)
+{
+	int width = -1;
+	rl_get_screen_size(0, &width);
+	if (width == 0)
+		width = -1;
+	lua_pushinteger(L, width);
+	return 1;
+}
+
 void
 tarantool_lua_console_init(struct lua_State *L)
 {
@@ -336,6 +347,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		{"load_history",       lbox_console_load_history},
 		{"save_history",       lbox_console_save_history},
 		{"add_history",        lbox_console_add_history},
+		{"get_console_width",  lbox_console_get_console_width},
 		{"completion_handler", lbox_console_completion_handler},
 		{NULL, NULL}
 	};

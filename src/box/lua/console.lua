@@ -35,6 +35,7 @@ local function format(status, ...)
         for i=1,count,1 do
             table.insert(res, wrapnull(select(i, ...)))
         end
+        formatter.cfg{encode_best_width = (internal.get_console_width() - 10)}
         -- serializer can raise an exception
         status, err = pcall(formatter.encode, res)
         if status then

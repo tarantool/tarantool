@@ -208,6 +208,7 @@ static struct {
 	OPTION(LUA_TBOOLEAN, encode_load_metatables, 1),
 	OPTION(LUA_TBOOLEAN, encode_use_tostring, 0),
 	OPTION(LUA_TBOOLEAN, encode_invalid_as_nil, 0),
+	OPTION(LUA_TNUMBER,  encode_best_width, -1),
 	OPTION(LUA_TBOOLEAN, decode_invalid_numbers, 1),
 	OPTION(LUA_TBOOLEAN, decode_save_metatables, 1),
 	OPTION(LUA_TNUMBER,  decode_max_depth, 32),

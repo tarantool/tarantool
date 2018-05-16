@@ -641,7 +641,7 @@ static int l_dump(lua_State *L) {
 
    yaml_emitter_set_unicode(&dumper.emitter, 1);
    yaml_emitter_set_indent(&dumper.emitter, 2);
-   yaml_emitter_set_width(&dumper.emitter, 2);
+   yaml_emitter_set_width(&dumper.emitter, dumper.cfg->encode_best_width);
    yaml_emitter_set_break(&dumper.emitter, YAML_LN_BREAK);
    yaml_emitter_set_output(&dumper.emitter, &append_output, &dumper);
 
