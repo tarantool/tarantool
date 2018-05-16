@@ -60,7 +60,7 @@ cn:execute('select ?, :value1, @value2', parameters)
 
 parameters = {}
 parameters[1] = {}
-parameters[1]['$value3'] = 1
+parameters[1][':value3'] = 1
 parameters[2] = 2
 parameters[3] = {}
 parameters[3][':value1'] = 3
@@ -68,7 +68,7 @@ parameters[4] = 4
 parameters[5] = 5
 parameters[6] = {}
 parameters[6]['@value2'] = 6
-cn:execute('select $value3, ?, :value1, ?, ?, @value2, ?, $value3', parameters)
+cn:execute('select :value3, ?, :value1, ?, ?, @value2, ?, :value3', parameters)
 
 -- Try not-integer types.
 msgpack = require('msgpack')
@@ -160,6 +160,19 @@ cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;'
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 cn:execute('drop table test3')
 cn:execute('drop table if exists test3')
+
+--
+-- gh-2948: sql: remove unnecessary templates for binding
+-- parameters.
+--
+cn:execute('select ?1, ?2, ?3', {1, 2, 3})
+cn:execute('select $name, $name2', {1, 2})
+parameters = {}
+parameters[1] = 11
+parameters[2] = 22
+parameters[3] = 33
+cn:execute('select $2, $1, $3', parameters)
+cn:execute('select * from test where id = :1', {1})
 
 -- gh-2602 obuf_alloc breaks the tuple in different slabs
 _ = space:replace{1, 1, string.rep('a', 4 * 1024 * 1024)}

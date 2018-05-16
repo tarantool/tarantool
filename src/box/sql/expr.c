@@ -1053,20 +1053,20 @@ sqlite3ExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
 }
 
 /*
- * Assign a variable number to an expression that encodes a wildcard
- * in the original SQL statement.
+ * Assign a variable number to an expression that encodes a
+ * wildcard in the original SQL statement.
  *
- * Wildcards consisting of a single "?" are assigned the next sequential
- * variable number.
+ * Wildcards consisting of a single "?" are assigned the next
+ * sequential variable number.
  *
- * Wildcards of the form "?nnn" are assigned the number "nnn".  We make
- * sure "nnn" is not too big to avoid a denial of service attack when
- * the SQL statement comes from an external source.
+ * Wildcards of the form "$nnn" are assigned the number "nnn".
+ * We make sure "nnn" is not too big to avoid a denial of service
+ * attack when the SQL statement comes from an external source.
  *
- * Wildcards of the form ":aaa", "@aaa", or "$aaa" are assigned the same number
- * as the previous instance of the same wildcard.  Or if this is the first
- * instance of the wildcard, the next sequential variable number is
- * assigned.
+ * Wildcards of the form ":aaa", "@aaa", are assigned the same
+ * number as the previous instance of the same wildcard.  Or if
+ * this is the first instance of the wildcard, the next sequential variable
+ * number is assigned.
  */
 void
 sqlite3ExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
@@ -1089,9 +1089,12 @@ sqlite3ExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 		x = (ynVar) (++pParse->nVar);
 	} else {
 		int doAdd = 0;
-		if (z[0] == '?') {
-			/* Wildcard of the form "?nnn".  Convert "nnn" to an integer and
-			 * use it as the variable number
+		assert(z[0] != '?');
+		if (z[0] == '$') {
+			/*
+			 * Wildcard of the form "$nnn". Convert
+			 * "nnn" to an integer and use it as the
+			 * variable number
 			 */
 			i64 i;
 			int bOk =
@@ -1103,7 +1106,7 @@ sqlite3ExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			testcase(i == SQL_BIND_PARAMETER_MAX);
 			if (bOk == 0 || i < 1 || i > SQL_BIND_PARAMETER_MAX) {
 				sqlite3ErrorMsg(pParse,
-						"variable number must be between ?1 and ?%d",
+						"variable number must be between $1 and $%d",
 						SQL_BIND_PARAMETER_MAX);
 				return;
 			}
@@ -1115,7 +1118,7 @@ sqlite3ExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 				doAdd = 1;
 			}
 		} else {
-			/* Wildcards like ":aaa", "$aaa" or "@aaa".  Reuse the same variable
+			/* Wildcards like ":aaa", or "@aaa".  Reuse the same variable
 			 * number as the prior appearance of the same name, or if the name
 			 * has never appeared before, reuse the same variable number
 			 */
@@ -3800,7 +3803,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				const char *z =
 				    sqlite3VListNumToName(pParse->pVList,
 							  pExpr->iColumn);
-				assert(pExpr->u.zToken[0] == '?'
+				assert(pExpr->u.zToken[0] == '$'
 				       || strcmp(pExpr->u.zToken, z) == 0);
 				pParse->pVList[0] = 0;	/* Indicate VList may no longer be enlarged */
 				sqlite3VdbeAppendP4(v, (char *)z, P4_STATIC);

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14748)
+test:plan(14745)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -156,11 +156,11 @@ for _, op1 in ipairs(oplist) do
             local B = val[2]
             local C = val[3]
             local testname = string.format("e_expr-1.%s.%s.%s", opname[op1], opname[op2], tn)
-            -- If $op2 groups more tightly than $op1, then the result
-            -- of executing $sql1 whould be the same as executing $sql3.
-            -- If $op1 groups more tightly, or if $op1 and $op2 have
-            -- the same precedence, then executing $sql1 should return
-            -- the same value as $sql2.
+            -- If ?op2 groups more tightly than ?op1, then the result
+            -- of executing ?sql1 whould be the same as executing ?sql3.
+            -- If ?op1 groups more tightly, or if ?op1 and ?op2 have
+            -- the same precedence, then executing ?sql1 should return
+            -- the same value as ?sql2.
             --
             local sql1 = string.format("SELECT %s %s %s %s %s", A, op1, B, op2, C)
             local sql2 = string.format("SELECT (%s %s %s) %s %s", A, op1, B, op2, C)
@@ -1188,48 +1188,6 @@ if (0>0) then
         X(492, "X!cmd", [=[["do_test",[["tn"],".res"],[["list","set","",["res"]]],["result"]]]=])
     end
 
-    -- EVIDENCE-OF: R-33509-39458 A question mark followed by a number NNN
-    -- holds a spot for the NNN-th parameter. NNN must be between 1 and
-    -- SQLITE_MAX_VARIABLE_NUMBER.
-    --
-    mvn = SQLITE_MAX_VARIABLE_NUMBER
-    parameter_test("e_expr-11.1", string.format([[
-      SELECT ?1, ?123, ?%s, ?123, ?4
-    ]], SQLITE_MAX_VARIABLE_NUMBER), string.format("1 ?1  123 ?123 %s ?%s 4 ?4", mvn, mvn), "-1 -123 -"..mvn.." -123 -4")
-    errmsg = "variable number must be between ?1 and ?"..SQLITE_MAX_VARIABLE_NUMBER..""
-    for _ in X(0, "X!foreach", [=[["tn param_number",[["list","2","0","3",[["expr",[["SQLITE_MAX_VARIABLE_NUMBER"],"+1"]]],"4",[["expr",[["SQLITE_MAX_VARIABLE_NUMBER"],"+2"]]],"5","12345678903456789034567890234567890","6","2147483648","7","2147483649","8","4294967296","9","4294967297","10","9223372036854775808","11","9223372036854775809","12","18446744073709551616","13","18446744073709551617"]]]]=]) do
-        test:do_catchsql_test(
-            "e_expr-11.1."..tn,
-            "SELECT ?"..param_number.."", {
-                1, errmsg
-            })
-
-    end
-    -- EVIDENCE-OF: R-33670-36097 A question mark that is not followed by a
-    -- number creates a parameter with a number one greater than the largest
-    -- parameter number already assigned.
-    --
-    -- EVIDENCE-OF: R-42938-07030 If this means the parameter number is
-    -- greater than SQLITE_MAX_VARIABLE_NUMBER, it is an error.
-    --
-    parameter_test("e_expr-11.2.1", "SELECT ?", "1 {}", -1)
-    parameter_test("e_expr-11.2.2", "SELECT ?, ?", "1 {} 2 {}", "-1 -2")
-    parameter_test("e_expr-11.2.3", "SELECT ?5, ?", "5 ?5 6 {}", "-5 -6")
-    parameter_test("e_expr-11.2.4", "SELECT ?, ?5", "1 {} 5 ?5", "-1 -5")
-    parameter_test("e_expr-11.2.5", "SELECT ?, ?456, ?", [[
-      1 {} 456 ?456 457 {}
-    ]], "-1 -456 -457")
-    parameter_test("e_expr-11.2.5", "SELECT ?, ?456, ?4, ?", [[
-      1 {} 456 ?456 4 ?4 457 {}
-    ]], "-1 -456 -4 -457")
-    for _ in X(0, "X!foreach", [=[["tn sql",[["list","1",["SELECT ?",["mvn"],", ?"],"2",["SELECT ?",[["expr",[["mvn"],"-5"]]],", ?, ?, ?, ?, ?, ?"],"3",["SELECT ?",[["expr",["mvn"]]],", ?5, ?6, ?"]]]]]=]) do
-        test:do_catchsql_test(
-            "e_expr-11.3."..tn,
-            sql, {
-                1, "too many SQL variables"
-            })
-
-    end
     -- EVIDENCE-OF: R-11620-22743 A colon followed by an identifier name
     -- holds a spot for a named parameter with the name :AAAA.
     --
@@ -1256,56 +1214,13 @@ if (0>0) then
       SELECT @เอศขูเอล
     ]], "1 @เอศขูเอล", -1)
     parameter_test("e_expr-11.3.6", "SELECT @", "1 @", -1)
-    -- EVIDENCE-OF: R-62610-51329 A dollar-sign followed by an identifier
-    -- name also holds a spot for a named parameter with the name $AAAA.
-    --
-    -- EVIDENCE-OF: R-55025-21042 The identifier name in this case can
-    -- include one or more occurrences of "::" and a suffix enclosed in
-    -- "(...)" containing any text at all.
-    --
-    -- Note: Looks like an identifier cannot consist entirely of "::"
-    -- characters or just a suffix. Also, the other named variable characters
-    -- (: and @) work the same way internally. Why not just document it that way?
-    --
-    parameter_test("e_expr-11.4.1", "SELECT $AAAA", "1 $AAAA", -1)
-    parameter_test("e_expr-11.4.2", "SELECT $123", "1 $123", -1)
-    parameter_test("e_expr-11.4.3", "SELECT $__", "1 $__", -1)
-    parameter_test("e_expr-11.4.4", "SELECT $_$_", "1 $_$_", -1)
-    parameter_test("e_expr-11.4.5", [[
-      SELECT $เอศขูเอล
-    ]], "1 $เอศขูเอล", -1)
-    parameter_test("e_expr-11.4.6", "SELECT $", "1 $", -1)
-    parameter_test("e_expr-11.5.1", "SELECT $::::a(++--++)", "1 $::::a(++--++)", -1)
-    parameter_test("e_expr-11.5.2", "SELECT $::a()", "1 $::a()", -1)
-    parameter_test("e_expr-11.5.3", "SELECT $::1(::#$)", "1 $::1(::#$)", -1)
-    -- EVIDENCE-OF: R-11370-04520 Named parameters are also numbered. The
-    -- number assigned is one greater than the largest parameter number
-    -- already assigned.
-    --
-    -- EVIDENCE-OF: R-42620-22184 If this means the parameter would be
-    -- assigned a number greater than SQLITE_MAX_VARIABLE_NUMBER, it is an
-    -- error.
-    --
-    parameter_test("e_expr-11.6.1", "SELECT ?, @abc", "1 {} 2 @abc", "-1 -2")
-    parameter_test("e_expr-11.6.2", "SELECT ?123, :a1", "123 ?123 124 :a1", "-123 -124")
-    parameter_test("e_expr-11.6.3", "SELECT $a, ?8, ?, $b, ?2, $c", [[
-      1 $a 8 ?8 9 {} 10 $b 2 ?2 11 $c
-    ]], "-1 -8 -9 -10 -2 -11")
-    for _ in X(0, "X!foreach", [=[["tn sql",[["list","1",["SELECT ?",["mvn"],", $::a"],"2",["SELECT ?",["mvn"],", ?4, @a1"],"3",["SELECT ?",[["expr",[["mvn"],"-2"]]],", :bag, @123, $x"]]]]]=]) do
-        test:do_catchsql_test(
-            "e_expr-11.7."..tn,
-            sql, {
-                1, "too many SQL variables"
-            })
-
-    end
     -- EVIDENCE-OF: R-14068-49671 Parameters that are not assigned values
     -- using sqlite3_bind() are treated as NULL.
     --
     test:do_test(
         "e_expr-11.7.1",
         function()
-            stmt = sqlite3_prepare_v2("db", " SELECT ?, :a, @b, $d ", -1)
+            stmt = sqlite3_prepare_v2("db", " SELECT ?, :a, @b, ?d ", -1)
             sqlite3_step(stmt)
             return { sqlite3_column_type(stmt, 0), sqlite3_column_type(stmt, 1), sqlite3_column_type(stmt, 2), sqlite3_column_type(stmt, 3) }
         end, {
@@ -1503,7 +1418,6 @@ local test_cases12 ={
     {8, "CURRENT_TIMESTAMP"},
 
     {9, "?"},
-    {10, "?123"},
     {11, "@hello"},
     {12, ":world"},
 
@@ -1548,7 +1462,6 @@ local test_cases12 ={
 
     {49, "CAST ( EXPR AS integer )"},
     {50, "CAST ( EXPR AS 'abcd' )"},
-    {51, "CAST ( EXPR AS 'ab$ $cd' )"},
 
     {52, "EXPR COLLATE \"unicode_ci\""},
     {53, "EXPR COLLATE binary"},
@@ -1676,20 +1589,6 @@ for _, val in ipairs(test_cases12) do
 
     end
 end
--- # -- syntax diagram raise-function
--- #
--- foreach {tn raiseexpr} {
---   1 "RAISE(IGNORE)"
---   2 "RAISE(ROLLBACK, 'error message')"
---   3 "RAISE(ABORT, 'error message')"
---   4 "RAISE(FAIL, 'error message')"
--- } {
---   do_execsql_test e_expr-12.4.$tn "
---     CREATE TRIGGER dbname.tr$tn BEFORE DELETE ON tblname BEGIN
---       SELECT $raiseexpr ;
---     END;
---   " {}
--- }
 ---------------------------------------------------------------------------
 -- Test the statements related to the BETWEEN operator.
 --

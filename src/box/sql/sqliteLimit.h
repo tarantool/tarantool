@@ -39,7 +39,7 @@
 
 enum {
 	/*
-	 * The maximum value of a ?nnn wildcard that the parser will accept.
+	 * The maximum value of a $nnn wildcard that the parser will accept.
 	 */
 	SQL_BIND_PARAMETER_MAX = 65000,
 };
