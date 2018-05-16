@@ -119,7 +119,8 @@ struct wal_writer
 	struct rlist watchers;
 };
 
-struct wal_msg: public cmsg {
+struct wal_msg {
+	struct cmsg base;
 	/** Input queue, on output contains all committed requests. */
 	struct stailq commit;
 	/**
@@ -161,7 +162,7 @@ static struct cmsg_hop wal_request_route[] = {
 static void
 wal_msg_create(struct wal_msg *batch)
 {
-	cmsg_init(batch, wal_request_route);
+	cmsg_init(&batch->base, wal_request_route);
 	stailq_create(&batch->commit);
 	stailq_create(&batch->rollback);
 }
@@ -316,7 +317,7 @@ wal_thread_start()
  *        and/or existing WALs. All WALs opened in read-only
  *        mode are closed. WAL thread has been started.
  */
-void
+int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
 	 int64_t wal_max_rows, int64_t wal_max_size)
@@ -328,9 +329,11 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	wal_writer_create(writer, wal_mode, wal_dirname, instance_uuid,
 			  vclock, wal_max_rows, wal_max_size);
 
-	xdir_scan_xc(&writer->wal_dir);
+	if (xdir_scan(&writer->wal_dir))
+		return -1;
 
 	journal_set(&writer->base);
+	return 0;
 }
 
 /**
@@ -351,8 +354,9 @@ wal_thread_stop()
 		wal_writer_destroy(&wal_writer_singleton);
 }
 
-struct wal_checkpoint: public cmsg
+struct wal_checkpoint
 {
+	struct cmsg base;
 	struct vclock *vclock;
 	struct fiber *fiber;
 	bool rotate;
@@ -419,20 +423,21 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 	};
 	vclock_create(vclock);
 	struct wal_checkpoint msg;
-	cmsg_init(&msg, wal_checkpoint_route);
+	cmsg_init(&msg.base, wal_checkpoint_route);
 	msg.vclock = vclock;
 	msg.fiber = fiber();
 	msg.rotate = rotate;
 	msg.res = 0;
-	cpipe_push(&wal_thread.wal_pipe, &msg);
+	cpipe_push(&wal_thread.wal_pipe, &msg.base);
 	fiber_set_cancellable(false);
 	fiber_yield();
 	fiber_set_cancellable(true);
 	return msg.res;
 }
 
-struct wal_gc_msg: public cbus_call_msg
+struct wal_gc_msg
 {
+	struct cbus_call_msg base;
 	int64_t lsn;
 };
 
@@ -453,7 +458,7 @@ wal_collect_garbage(int64_t lsn)
 	struct wal_gc_msg msg;
 	msg.lsn = lsn;
 	bool cancellable = fiber_set_cancellable(false);
-	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg.base,
 		  wal_collect_garbage_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 }
@@ -586,6 +591,7 @@ wal_write_to_disk(struct cmsg *msg)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_msg *wal_msg = (struct wal_msg *) msg;
+	struct error *error;
 
 	struct errinj *inj = errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL);
 	while (inj != NULL && inj->bparam)
@@ -647,7 +653,7 @@ wal_write_to_disk(struct cmsg *msg)
 	last_committed = stailq_last(&wal_msg->commit);
 
 done:
-	struct error *error = diag_last_error(diag_get());
+	error = diag_last_error(diag_get());
 	if (error) {
 		/* Until we can pass the error to tx, log it and clear. */
 		error_log(error);
@@ -740,8 +746,12 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 		stailq_add_tail_entry(&batch->commit, entry, fifo);
 	} else {
 		batch = (struct wal_msg *)
-			region_alloc_xc(&fiber()->gc,
-					sizeof(struct wal_msg));
+			region_alloc(&fiber()->gc, sizeof(struct wal_msg));
+		if (batch == NULL) {
+			diag_set(OutOfMemory, sizeof(struct wal_msg),
+				 "region", "struct wal_msg");
+			return -1;
+		}
 		wal_msg_create(batch);
 		/*
 		 * Sic: first add a request, then push the batch,
@@ -749,7 +759,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 		 * thread right away.
 		 */
 		stailq_add_tail_entry(&batch->commit, entry, fifo);
-		cpipe_push(&wal_thread.wal_pipe, batch);
+		cpipe_push(&wal_thread.wal_pipe, &batch->base);
 	}
 	wal_thread.wal_pipe.n_input += entry->n_rows * XROW_IOVMAX;
 	cpipe_flush_input(&wal_thread.wal_pipe);
@@ -812,8 +822,9 @@ wal_init_vy_log()
 	xlog_clear(&vy_log_writer.xlog);
 }
 
-struct wal_write_vy_log_msg: public cbus_call_msg
+struct wal_write_vy_log_msg
 {
+	struct cbus_call_msg base;
 	struct journal_entry *entry;
 };
 
@@ -843,7 +854,7 @@ wal_write_vy_log(struct journal_entry *entry)
 	struct wal_write_vy_log_msg msg;
 	msg.entry= entry;
 	bool cancellable = fiber_set_cancellable(false);
-	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg.base,
 			   wal_write_vy_log_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 	return rc;
@@ -961,9 +972,10 @@ wal_set_watcher(struct wal_watcher *watcher, const char *name,
 	watcher->events = 0;
 
 	assert(lengthof(watcher->route) == 2);
-	watcher->route[0] = {wal_watcher_notify_perform, &watcher->wal_pipe};
-	watcher->route[1] = {wal_watcher_notify_complete, NULL};
-
+	watcher->route[0] = (struct cmsg_hop)
+		{ wal_watcher_notify_perform, &watcher->wal_pipe };
+	watcher->route[1] = (struct cmsg_hop)
+		{ wal_watcher_notify_complete, NULL };
 	cbus_pair("wal", name, &watcher->wal_pipe, &watcher->watcher_pipe,
 		  wal_watcher_attach, watcher, process_cb);
 }

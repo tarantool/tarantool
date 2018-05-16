@@ -39,6 +39,7 @@
 struct fiber;
 struct vclock;
 struct wal_writer;
+struct tt_uuid;
 
 enum wal_mode { WAL_NONE = 0, WAL_WRITE, WAL_FSYNC, WAL_MODE_MAX };
 
@@ -48,11 +49,13 @@ extern const char *wal_mode_STRS[];
 extern int wal_dir_lock;
 
 #if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
 
 void
 wal_thread_start();
 
-void
+int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
 	 int64_t wal_max_rows, int64_t wal_max_size);
@@ -137,9 +140,6 @@ wal_clear_watcher(struct wal_watcher *watcher,
 
 void
 wal_atfork();
-
-extern "C" {
-#endif /* defined(__cplusplus) */
 
 enum wal_mode
 wal_mode();

@@ -111,7 +111,7 @@ add_library(box STATIC
     applier.cc
     relay.cc
     journal.c
-    wal.cc
+    wal.c
     call.c
     ${lua_sources}
     lua/init.c
