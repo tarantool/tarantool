@@ -2215,13 +2215,7 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 		VdbeComment((v, "Orderby table"));
 		destQueue.pOrderBy = pOrderBy;
 	} else {
-		struct key_def *def = key_def_new(nCol + 1);
-		if (def == NULL) {
-			sqlite3OomFault(pParse->db);
-			goto end_of_recursive_query;
-		}
-		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iQueue, nCol + 1, 0,
-				  (char*)def, P4_KEYDEF);
+		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iQueue, nCol + 1);
 		VdbeComment((v, "Queue table"));
 	}
 	if (iDistinct) {
@@ -2422,13 +2416,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	if (dest.eDest == SRT_EphemTab) {
 		assert(p->pEList);
 		int nCols = p->pEList->nExpr;
-		struct key_def *def = key_def_new(nCols + 1);
-		if (def == NULL) {
-			sqlite3OomFault(db);
-			goto multi_select_end;
-		}
-		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, dest.iSDParm, nCols + 1,
-				  0, (char*)def, P4_KEYDEF);
+		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, dest.iSDParm, nCols + 1);
 		VdbeComment((v, "Destination temp"));
 		dest.eDest = SRT_Table;
 	}
@@ -5608,11 +5596,8 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	/* If the output is destined for a temporary table, open that table.
 	 */
 	if (pDest->eDest == SRT_EphemTab) {
-		struct key_def *def = key_def_new(pEList->nExpr + 1);
-		if (def == NULL)
-			sqlite3OomFault(db);
-		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, pDest->iSDParm,
-				  pEList->nExpr + 1, 0, (char*)def, P4_KEYDEF);
+		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, pDest->iSDParm,
+				  pEList->nExpr + 1);
 
 		VdbeComment((v, "Output table"));
 	}

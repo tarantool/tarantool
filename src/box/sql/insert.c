@@ -566,13 +566,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			regRec = sqlite3GetTempReg(pParse);
 			regCopy = sqlite3GetTempRange(pParse, nColumn);
 			regTempId = sqlite3GetTempReg(pParse);
-			struct key_def *def = key_def_new(nColumn + 1);
-			if (def == NULL) {
-				sqlite3OomFault(db);
-				goto insert_cleanup;
-			}
-			sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, srcTab, nColumn+1,
-					  0, (char*)def, P4_KEYDEF);
+			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, srcTab, nColumn+1);
 			/* Create counter for rowid */
 			sqlite3VdbeAddOp4Dup8(v, OP_Int64,
 					      0 /* unused */,

@@ -386,14 +386,9 @@ sqlite3DeleteFrom(Parse * pParse,	/* The parser context */
 			iPk = pParse->nMem + 1;
 			pParse->nMem += nPk;
 			iEphCur = pParse->nTab++;
-			struct key_def *def = key_def_new(nPk);
-			if (def == NULL) {
-				sqlite3OomFault(db);
-				goto delete_from_cleanup;
-			}
 			addrEphOpen =
-				sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iEphCur,
-						  nPk, 0, (char*)def, P4_KEYDEF);
+				sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEphCur,
+						  nPk);
 		} else {
 			pPk = sqlite3PrimaryKeyIndex(pTab);
 			assert(pPk != 0);

@@ -370,8 +370,9 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
  *
  * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
-int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
-				    struct key_def *def)
+int
+tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
+				struct key_def *def)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
@@ -381,7 +382,7 @@ int tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 		return SQL_TARANTOOL_ERROR;
 	for (uint32_t part = 0; part < field_count; ++part) {
 		struct coll *coll;
-		if (part < def->part_count)
+		if (def != NULL && part < def->part_count)
 			coll = def->parts[part].coll;
 		else
 			coll = NULL;

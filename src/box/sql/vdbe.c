@@ -3225,9 +3225,9 @@ open_cursor_set_hints:
 /**
  * Opcode: OpenTEphemeral P1 P2 * P4 *
  * Synopsis:
- * @param P1 index of new cursor to be created
- * @param P2 number of columns in a new table
- * @param P4 key def for new table
+ * @param P1 index of new cursor to be created.
+ * @param P2 number of columns in a new table.
+ * @param P4 key def for new table, NULL is allowed.
  *
  * This opcode creates Tarantool's ephemeral table and sets cursor P1 to it.
  */
@@ -3236,21 +3236,20 @@ case OP_OpenTEphemeral: {
 	BtCursor *pBtCur;
 	assert(pOp->p1 >= 0);
 	assert(pOp->p2 > 0);
-	assert(pOp->p4.key_def != NULL);
-	assert(pOp->p4type == P4_KEYDEF);
+	assert(pOp->p4type != P4_KEYDEF || pOp->p4.key_def != NULL);
 
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_TARANTOOL);
 	if (pCx == 0) goto no_mem;
 	pCx->nullRow = 1;
 
-	pCx->key_def  = pOp->p4.key_def;
 	pBtCur = pCx->uc.pCursor;
 	/* Ephemeral spaces don't have space_id */
 	pBtCur->eState = CURSOR_INVALID;
 	pBtCur->curFlags = BTCF_TEphemCursor;
 
 	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2,
-					     pCx->key_def);
+					     pOp->p4.key_def);
+	pCx->key_def = pCx->uc.pCursor->index->def->key_def;
 	if (rc) goto abort_due_to_error;
 	break;
 }
