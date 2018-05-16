@@ -478,9 +478,23 @@ t = s:on_replace(function () box.schema.user.create('newu') end, t)
 ...
 s:replace({3, 4})
 ---
-- error: Space _user does not support multi-statement transactions
+- error: A multi-statement transaction can not use multiple storage engines
 ...
 t = s:on_replace(function () box.schema.role.create('newr') end, t)
+---
+...
+s:replace({4, 5})
+---
+- error: A multi-statement transaction can not use multiple storage engines
+...
+t = s:on_replace(function () box.space._user:delete{box.schema.GUEST_ID} end, t)
+---
+...
+s:replace({4, 5})
+---
+- error: Space _user does not support multi-statement transactions
+...
+t = s:on_replace(function () box.space._user:delete{box.schema.SUPER_ROLE_ID} end, t)
 ---
 ...
 s:replace({4, 5})

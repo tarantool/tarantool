@@ -307,7 +307,7 @@ c:call('nosuchfunction')
 c:close()
 ---
 ...
--- Dropping a space recursively drops all grants - it's possible to 
+-- Dropping a space recursively drops all grants - it's possible to
 -- restore from a snapshot
 box.schema.user.create('testus')
 ---
@@ -1490,4 +1490,59 @@ box.schema.user.revoke("guest", "read", "universe", nil, {if_exists = true})
 box.schema.user.revoke("guest", "read", "universe", {}, {if_exists = true})
 ---
 - error: Illegal parameters, wrong object name type
+...
+--
+-- Check that box.schema.* api is available to non-super user
+-- In scope of gh-3250 "make sure grant/revoke does not require
+-- read access to universe"
+--
+box.session.su('guest')
+---
+...
+--
+--
+-- 1a. func.exists() works
+--
+-- No function: function not found but returns nothing if the user
+-- has no access to the function
+--
+box.schema.func.exists('test')
+---
+- false
+...
+--
+-- create an object, but 'guest' still has no access to it
+--
+box.session.su('admin', box.schema.func.create, 'test')
+---
+...
+box.schema.func.exists('test')
+---
+- false
+...
+--
+-- grant access, the object should become visible to guest
+--
+box.session.su('admin', box.schema.user.grant, 'guest', 'execute', 'function', 'test')
+---
+...
+box.schema.func.exists('test')
+---
+- true
+...
+--
+-- drop object
+--
+box.session.su('admin', box.schema.func.drop, 'test')
+---
+...
+box.schema.func.exists('test')
+---
+- false
+...
+--
+-- restore
+--
+box.session.su('admin')
+---
 ...

@@ -3879,6 +3879,7 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 	assert(it->lsm->index_id > 0);
 	struct tuple *tuple;
 
+next:
 	if (it->tx == NULL) {
 		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
 		goto fail;
@@ -3887,7 +3888,6 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 		diag_set(ClientError, ER_READ_VIEW_ABORTED);
 		goto fail;
 	}
-
 
 	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
 		goto fail;
@@ -3911,11 +3911,26 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 	 * Note, there's no need in vy_tx_track() as the
 	 * tuple is already tracked in the secondary index.
 	 */
+	struct tuple *full_tuple;
 	if (vy_point_lookup(it->lsm->pk, it->tx, vy_tx_read_view(it->tx),
-			    tuple, &tuple) != 0)
+			    tuple, &full_tuple) != 0)
 		goto fail;
-	*ret = tuple_bless(tuple);
-	tuple_unref(tuple);
+	if (full_tuple == NULL) {
+		/*
+		 * All indexes of a space must be consistent, i.e.
+		 * if a tuple is present in one index, it must be
+		 * present in all other indexes as well, so we can
+		 * get here only if there's a bug somewhere in vinyl.
+		 * Don't abort as core dump won't really help us in
+		 * this case. Just warn the user and proceed to the
+		 * next tuple.
+		 */
+		say_warn("%s: key %s missing in primary index",
+			 vy_lsm_name(it->lsm), vy_stmt_str(tuple));
+		goto next;
+	}
+	*ret = tuple_bless(full_tuple);
+	tuple_unref(full_tuple);
 	if (*ret != NULL)
 		return 0;
 fail:

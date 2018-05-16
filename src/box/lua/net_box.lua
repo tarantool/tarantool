@@ -27,7 +27,6 @@ local encode_auth     = internal.encode_auth
 local encode_select   = internal.encode_select
 local decode_greeting = internal.decode_greeting
 
-local sequence_mt      = { __serialize = 'sequence' }
 local TIMEOUT_INFINITY = 500 * 365 * 86400
 local VSPACE_ID        = 281
 local VINDEX_ID        = 289
@@ -54,38 +53,33 @@ local E_PROC_LUA             = box.error.PROC_LUA
 -- utility tables
 local is_final_state         = {closed = 1, error = 1}
 
-local function decode_nil(...) end
-local function decode_data(response_body)
-    return response_body[IPROTO_DATA_KEY]
+local function decode_nil(raw_data, raw_data_end)
+    return nil, raw_data_end
 end
-local function decode_tuple(response_body)
-    local data = response_body[IPROTO_DATA_KEY][1]
-    if data then
-        return box.tuple.new(data)
+local function decode_data(raw_data)
+    local response, raw_end = decode(raw_data)
+    return response[IPROTO_DATA_KEY], raw_end
+end
+local function decode_tuple(raw_data)
+    local response, raw_end = internal.decode_body(raw_data)
+    return response[1], raw_end
+end
+local function decode_get(raw_data)
+    local body, raw_end = internal.decode_body(raw_data)
+    if body[2] then
+        return nil, raw_end, box.error.MORE_THAN_ONE_TUPLE
     end
+    return body[1], raw_end
 end
-local function decode_get(response_body)
-    local data = response_body[IPROTO_DATA_KEY]
-    if data[2] then
-        return nil, box.error.MORE_THAN_ONE_TUPLE
-    end
-    if data[1] then
-        return box.tuple.new(data[1])
-    end
+local function decode_select(raw_data)
+    return internal.decode_body(raw_data)
 end
-local function decode_select(response_body)
-    local data = response_body[IPROTO_DATA_KEY]
-    setmetatable(data, sequence_mt)
-    local tnew = box.tuple.new
-    for i, v in pairs(data) do
-        data[i] = tnew(v)
-    end
-    return data
+local function decode_count(raw_data)
+    local response, raw_end = decode(raw_data)
+    return response[IPROTO_DATA_KEY][1], raw_end
 end
-local function decode_count(response_body)
-    return response_body[IPROTO_DATA_KEY][1]
-end
-local function decode_execute(response_body)
+local function decode_execute(raw_data, raw_data_end)
+    local response_body = decode(raw_data)
     local rows = response_body[IPROTO_DATA_KEY]
     local metadata = response_body[IPROTO_METADATA_KEY]
     local info = response_body[IPROTO_SQL_INFO_KEY]
@@ -93,7 +87,7 @@ local function decode_execute(response_body)
            (info ~= nil and metadata == nil and rows == nil))
     if info ~= nil then
         assert(info[SQL_INFO_ROW_COUNT_KEY] ~= nil)
-        return {rowcount = info[SQL_INFO_ROW_COUNT_KEY]}
+        return {rowcount = info[SQL_INFO_ROW_COUNT_KEY]}, raw_data_end
     end
     -- Set readable names for the metadata fields.
     for i, field_meta in pairs(metadata) do
@@ -104,8 +98,8 @@ local function decode_execute(response_body)
     for i, v in pairs(rows) do
         rows[i] = tnew(v)
     end
-    setmetatable(rows, sequence_mt)
-    return {metadata = metadata, rows = rows}
+    setmetatable(rows, { __serialize = 'sequence' })
+    return {metadata = metadata, rows = rows}, raw_data_end
 end
 
 local method_encoder = {
@@ -503,9 +497,10 @@ local function create_transport(host, port, user, password, callback,
         end
 
         -- Decode xrow.body[DATA] to Lua objects
-        body, body_end_check = decode(body_rpos)
-        assert(body_end == body_end_check, "invalid xrow length")
-        request.response, request.errno = method_decoder[request.method](body)
+        local real_end
+        request.response, real_end, request.errno =
+            method_decoder[request.method](body_rpos, body_end)
+        assert(real_end == body_end, "invalid body length")
         request.cond:broadcast()
     end
 

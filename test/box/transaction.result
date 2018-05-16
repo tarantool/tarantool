@@ -76,7 +76,7 @@ box.rollback();
 ...
 box.begin() box.schema.user.create('test');
 ---
-- error: Space _user does not support multi-statement transactions
+- error: A multi-statement transaction can not use multiple storage engines
 ...
 box.rollback();
 ---
@@ -84,6 +84,13 @@ box.rollback();
 box.begin() box.schema.user.grant('guest', 'read', 'space', '_priv');
 ---
 - error: Space _priv does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+box.begin() box.space._user:delete{box.schema.GUEST_ID};
+---
+- error: Space _user does not support multi-statement transactions
 ...
 box.rollback();
 ---

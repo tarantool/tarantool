@@ -33,6 +33,7 @@
 #include <small/mempool.h>
 #include "fiber.h"
 #include "schema.h"
+#include "sequence.h"
 #include "space.h"
 #include "func.h"
 #include "tuple.h"
@@ -201,9 +202,9 @@ vspace_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
-		return true; /* read access to unverse */
+		return true; /* read access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _space space */
 
 	uint32_t space_id;
 	if (tuple_field_u32(tuple, BOX_SPACE_FIELD_ID, &space_id) != 0)
@@ -211,7 +212,7 @@ vspace_filter(struct space *source, struct tuple *tuple)
 	struct space *space = space_cache_find(space_id);
 	if (space == NULL)
 		return false;
-	uint8_t effective = space->access[cr->auth_token].effective;
+	user_access_t effective = space->access[cr->auth_token].effective;
 	return ((PRIV_R | PRIV_W) & (cr->universal_access | effective) ||
 		space->def->uid == cr->uid);
 }
@@ -221,9 +222,9 @@ vuser_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
-		return true; /* read access to unverse */
+		return true; /* read access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _user space */
 
 	uint32_t uid;
 	if (tuple_field_u32(tuple, BOX_USER_FIELD_ID, &uid) != 0)
@@ -239,9 +240,9 @@ vpriv_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if (PRIV_R & cr->universal_access)
-		return true; /* read access to unverse */
+		return true; /* read access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _priv space */
 
 	uint32_t grantor_id;
 	if (tuple_field_u32(tuple, BOX_PRIV_FIELD_ID, &grantor_id) != 0)
@@ -257,9 +258,9 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 {
 	struct credentials *cr = effective_user();
 	if ((PRIV_R | PRIV_X) & cr->universal_access)
-		return true; /* read or execute access to unverse */
+		return true; /* read or execute access to universe */
 	if (PRIV_R & source->access[cr->auth_token].effective)
-		return true; /* read access to original space */
+		return true; /* read access to _func space */
 
 	const char *name = tuple_field_cstr(tuple, BOX_FUNC_FIELD_NAME);
 	if (name == NULL)
@@ -267,11 +268,33 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	uint32_t name_len = strlen(name);
 	struct func *func = func_by_name(name, name_len);
 	assert(func != NULL);
-	uint8_t effective = func->access[cr->auth_token].effective;
+	user_access_t effective = func->access[cr->auth_token].effective;
 	if (func->def->uid == cr->uid || (PRIV_X & effective))
 		return true;
 	return false;
 }
+
+static bool
+vsequence_filter(struct space *source, struct tuple *tuple)
+{
+	struct credentials *cr = effective_user();
+	if ((PRIV_R | PRIV_X) & cr->universal_access)
+		return true; /* read or execute access to universe */
+	if (PRIV_R & source->access[cr->auth_token].effective)
+		return true; /* read access to _sequence space */
+
+	uint32_t id;
+	if (tuple_field_u32(tuple, BOX_SEQUENCE_FIELD_ID, &id) != 0)
+		return false;
+	struct sequence *sequence = sequence_by_id(id);
+	if (sequence == NULL)
+		return false;
+	user_access_t effective = sequence->access[cr->auth_token].effective;
+	if (sequence->def->uid == cr->uid || ((PRIV_W | PRIV_R) & effective))
+		return true;
+	return false;
+}
+
 
 struct sysview_index *
 sysview_index_new(struct sysview_engine *sysview,
@@ -313,6 +336,11 @@ sysview_index_new(struct sysview_engine *sysview,
 		source_space_id = BOX_PRIV_ID;
 		source_index_id = def->iid;
 		filter = vpriv_filter;
+		break;
+	case BOX_VSEQUENCE_ID:
+		source_space_id = BOX_SEQUENCE_ID;
+		source_index_id = def->iid;
+		filter = vsequence_filter;
 		break;
 	default:
 		diag_set(ClientError, ER_MODIFY_INDEX,

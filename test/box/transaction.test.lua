@@ -36,6 +36,8 @@ box.begin() box.schema.user.create('test');
 box.rollback();
 box.begin() box.schema.user.grant('guest', 'read', 'space', '_priv');
 box.rollback();
+box.begin() box.space._user:delete{box.schema.GUEST_ID};
+box.rollback();
 box.begin() box.space._schema:insert{'test'};
 box.rollback();
 box.begin() box.space._cluster:insert{123456789, 'abc'};

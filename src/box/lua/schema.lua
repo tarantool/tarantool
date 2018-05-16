@@ -104,7 +104,7 @@ ffi.cdef[[
 ]]
 
 local function user_or_role_resolve(user)
-    local _user = box.space[box.schema.USER_ID]
+    local _user = box.space[box.schema.VUSER_ID]
     local tuple
     if type(user) == 'string' then
         tuple = _user.index.name:get{user}
@@ -1856,7 +1856,7 @@ box.schema.func.drop = function(name, opts)
 end
 
 function box.schema.func.exists(name_or_id)
-    local _func = box.space[box.schema.FUNC_ID]
+    local _func = box.space[box.schema.VFUNC_ID]
     local tuple = nil
     if type(name_or_id) == 'string' then
         tuple = _func.index.name:get{name_or_id}

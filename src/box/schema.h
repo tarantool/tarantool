@@ -95,6 +95,13 @@ schema_find_name(enum schema_object_type type, uint32_t object_id);
 bool
 space_is_system(struct space *space);
 
+/**
+ * Find a sequence by id. Return NULL if the sequence was
+ * not found.
+ */
+struct sequence *
+sequence_by_id(uint32_t id);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -171,13 +178,6 @@ func_cache_find(uint32_t fid)
  */
 bool
 schema_find_grants(const char *type, uint32_t id);
-
-/**
- * Find a sequence by id. Return NULL if the sequence was
- * not found.
- */
-struct sequence *
-sequence_by_id(uint32_t id);
 
 /**
  * A wrapper around sequence_by_id() that raises an exception

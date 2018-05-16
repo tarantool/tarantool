@@ -79,7 +79,7 @@ lua_pbkdf2(lua_State *L)
 	const char *salt = lua_tostring(L, 2);
 	int num_iterations = lua_tointeger(L, 3);
 	int digest_len = lua_tointeger(L, 4);
-	static __thread unsigned char digest[PBKDF2_MAX_DIGEST_SIZE];
+	unsigned char digest[PBKDF2_MAX_DIGEST_SIZE];
 
 	if (coio_call(digest_pbkdf2_f, password, strlen(password), salt,
 				  strlen(salt), digest, num_iterations, digest_len) < 0) {

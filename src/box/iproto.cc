@@ -1175,7 +1175,8 @@ net_discard_input(struct cmsg *m)
 	msg->p_ibuf->rpos += msg->len;
 	msg->len = 0;
 	con->long_poll_requests++;
-	if (! ev_is_active(&con->input) && rlist_empty(&con->in_stop_list))
+	if (evio_has_fd(&con->input) && !ev_is_active(&con->input) &&
+	    rlist_empty(&con->in_stop_list))
 		ev_feed_event(con->loop, &con->input, EV_READ);
 }
 

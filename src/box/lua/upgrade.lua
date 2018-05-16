@@ -98,18 +98,24 @@ local function erase()
     box.space._schema:delete('max_id')
 end
 
-local function create_sysview(def, target_id)
+local function create_sysview(source_id, target_id)
     --
     -- Create definitions for the system view, and grant
     -- privileges on system views to 'PUBLIC' role
     --
-    def = def:totable()
-    local source_id = def[1]
+    local def = box.space._space:get(source_id):totable()
     def[1] = target_id
     def[3] = "_v"..def[3]:sub(2)
     def[4] = 'sysview'
-    log.info("create view %s...", def[3])
-    box.space._space:replace(def)
+    local space_def = box.space._space:get(target_id)
+    if space_def == nil then
+        log.info("create view %s...", def[3])
+        box.space._space:replace(def)
+    elseif json.encode(space_def[7]) ~= json.encode(def[7]) then
+        -- sync box.space._vXXX format with box.space._XXX format
+        log.info("alter space %s set format", def[3])
+        box.space._space:update(def[1], {{ '=', 7, def[7] }})
+    end
     local idefs = {}
     for _, idef in box.space._index:pairs(source_id, { iterator = 'EQ'}) do
         idef = idef:totable()
@@ -117,12 +123,16 @@ local function create_sysview(def, target_id)
         table.insert(idefs, idef)
     end
     for _, idef in ipairs(idefs) do
-        log.info("create index %s on %s", idef[3], def[3])
-        box.space._index:replace(idef)
+        if box.space._index:get({idef[1], idef[2]}) == nil then
+            log.info("create index %s on %s", idef[3], def[3])
+            box.space._index:replace(idef)
+        end
     end
     -- public can read system views
-    log.info("grant read access to 'public' role for %s view", def[3])
-    box.space._priv:insert({ADMIN, PUBLIC, 'space', target_id, 1})
+    if box.space._priv.index.primary:count({PUBLIC, 'space', target_id}) == 0 then
+        log.info("grant read access to 'public' role for %s view", def[3])
+        box.space._priv:insert({1, PUBLIC, 'space', target_id, 1})
+    end
 end
 
 local function initial_1_7_5()
@@ -173,7 +183,7 @@ local function initial_1_7_5()
     _index:insert{_space.id, 1, 'owner', 'tree', {unique = false }, {{1, 'unsigned'}}}
     log.info("create index index name on _space")
     _index:insert{_space.id, 2, 'name', 'tree', { unique = true }, {{2, 'string'}}}
-    create_sysview(def, box.schema.VSPACE_ID)
+    create_sysview(box.schema.SPACE_ID, box.schema.VSPACE_ID)
 
     --
     -- _index
@@ -192,7 +202,7 @@ local function initial_1_7_5()
     _index:insert{_index.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}, {1, 'unsigned'}}}
     log.info("create index name on _index")
     _index:insert{_index.id, 2, 'name', 'tree', {unique = true}, {{0, 'unsigned'}, {2, 'string'}}}
-    create_sysview(def, box.schema.VINDEX_ID)
+    create_sysview(box.schema.INDEX_ID, box.schema.VINDEX_ID)
 
     --
     -- _func
@@ -211,7 +221,7 @@ local function initial_1_7_5()
     _index:insert{_func.id, 1, 'owner', 'tree', {unique = false}, {{1, 'unsigned'}}}
     log.info("create index _func:name")
     _index:insert{_func.id, 2, 'name', 'tree', {unique = true}, {{2, 'string'}}}
-    create_sysview(def, box.schema.VFUNC_ID)
+    create_sysview(box.schema.FUNC_ID, box.schema.VFUNC_ID)
 
     --
     -- _user
@@ -231,7 +241,7 @@ local function initial_1_7_5()
     _index:insert{_user.id, 1, 'owner', 'tree', {unique = false}, {{1, 'unsigned'}}}
     log.info("create index _func:name")
     _index:insert{_user.id, 2, 'name', 'tree', {unique = true}, {{2, 'string'}}}
-    create_sysview(def, box.schema.VUSER_ID)
+    create_sysview(box.schema.USER_ID, box.schema.VUSER_ID)
 
     --
     -- _priv
@@ -253,7 +263,7 @@ local function initial_1_7_5()
     -- object index - to quickly find all grants on a given object
     log.info("create index object on _priv")
     _index:insert{_priv.id, 2, 'object', 'tree', {unique = false}, {{2, 'string'}, {3, 'unsigned'}}}
-    create_sysview(def, box.schema.VPRIV_ID)
+    create_sysview(box.schema.PRIV_ID, box.schema.VPRIV_ID)
 
     --
     -- _cluster
@@ -329,6 +339,15 @@ local function initial_1_7_5()
     _schema:insert({'version', 1, 7, 5})
 end
 
+local sequence_format = {{name = 'id', type = 'unsigned'},
+                         {name = 'owner', type = 'unsigned'},
+                         {name = 'name', type = 'string'},
+                         {name = 'step', type = 'integer'},
+                         {name = 'min', type = 'integer'},
+                         {name = 'max', type = 'integer'},
+                         {name = 'start', type = 'integer'},
+                         {name = 'cache', type = 'integer'},
+                         {name = 'cycle', type = 'boolean'}}
 --------------------------------------------------------------------------------
 -- Tarantool 1.7.6
 --------------------------------------------------------------------------------
@@ -342,16 +361,7 @@ local function create_sequence_space()
     local MAP = setmap({})
 
     log.info("create space _sequence")
-    _space:insert{_sequence.id, ADMIN, '_sequence', 'memtx', 0, MAP,
-                  {{name = 'id', type = 'unsigned'},
-                   {name = 'owner', type = 'unsigned'},
-                   {name = 'name', type = 'string'},
-                   {name = 'step', type = 'integer'},
-                   {name = 'min', type = 'integer'},
-                   {name = 'max', type = 'integer'},
-                   {name = 'start', type = 'integer'},
-                   {name = 'cache', type = 'integer'},
-                   {name = 'cycle', type = 'boolean'}}}
+    _space:insert{_sequence.id, ADMIN, '_sequence', 'memtx', 0, MAP, sequence_format}
     log.info("create index _sequence:primary")
     _index:insert{_sequence.id, 0, 'primary', 'tree', {unique = true}, {{0, 'unsigned'}}}
     log.info("create index _sequence:owner")
@@ -443,6 +453,18 @@ local function upgrade_to_1_7_7()
 end
 
 --------------------------------------------------------------------------------
+--- Tarantool 1.10.0
+--------------------------------------------------------------------------------
+local function create_vsequence_space()
+    create_sysview(box.schema.SEQUENCE_ID, box.schema.VSEQUENCE_ID)
+    box.space._vsequence:format(sequence_format)
+end
+
+local function upgrade_to_1_10_0()
+    create_vsequence_space()
+end
+
+--------------------------------------------------------------------------------
 -- Tarantool 1.8.2
 --------------------------------------------------------------------------------
 
@@ -509,7 +531,12 @@ local function upgrade_to_1_8_4()
 end
 
 --------------------------------------------------------------------------------
+-- Tarantool 2.1.0
+--------------------------------------------------------------------------------
 
+local function upgrade_to_2_1_0()
+    upgrade_to_1_10_0()
+end
 
 local function get_version()
     local version = box.space._schema:get{'version'}
@@ -538,6 +565,7 @@ local function upgrade(options)
         {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
         {version = mkversion(1, 8, 2), func = upgrade_to_1_8_2, auto = true},
         {version = mkversion(1, 8, 4), func = upgrade_to_1_8_4, auto = true},
+        {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true}
     }
 
     for _, handler in ipairs(handlers) do

@@ -47,6 +47,7 @@ box.session.su('guest')
 #box.space._vuser:select{}
 #box.space._vpriv:select{}
 #box.space._vfunc:select{}
+#box.space._vsequence:select{}
 
 box.session.su('admin')
 box.schema.user.grant('guest', 'public')
@@ -105,6 +106,7 @@ box.session.su('guest')
 #box.space._vuser:select{}
 #box.space._vpriv:select{}
 #box.space._vfunc:select{}
+#box.space._vsequence:select{}
 
 box.session.su('admin')
 box.schema.user.revoke('guest', 'write', 'universe')
@@ -238,10 +240,34 @@ box.session.su('guest')
 #box.space._vfunc:select{} == cnt
 
 --
+-- _vsequence
+--
+
+box.session.su('admin')
+seq = box.schema.sequence.create('test')
+
+-- read access to original sequence also allow to read a view
+seq_cnt = #box.space._sequence:select{}
+box.schema.user.grant("guest", "read", "sequence", "test")
+box.session.su("guest")
+#box.space._vsequence:select{} == seq_cnt
+box.session.su('admin')
+
+box.schema.user.revoke("guest", "read", "sequence", "test")
+box.session.su("guest")
+cnt = #box.space._vsequence:select{}
+cnt < seq_cnt
+session.su('admin')
+box.schema.user.grant("guest", "write", "sequence", "test")
+box.session.su("guest")
+#box.space._vsequence:select{} == cnt + 1
+session.su('admin')
+seq:drop()
+
+--
 -- view:alter() tests
 --
 
-session.su('admin')
 box.space._vspace.index[1]:alter({parts = { 2, 'string' }})
 box.space._vspace.index[1]:select('xxx')
 box.space._vspace.index[1]:select(1)

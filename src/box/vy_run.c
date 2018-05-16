@@ -1316,6 +1316,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 {
 	const struct key_def *cmp_def = itr->cmp_def;
 	struct vy_slice *slice = itr->slice;
+	const struct tuple *check_eq_key = NULL;
 	int cmp;
 
 	if (slice->begin != NULL &&
@@ -1340,6 +1341,8 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 			return 0;
 		}
 		if (cmp < 0 || (cmp == 0 && iterator_type != ITER_GT)) {
+			if (iterator_type == ITER_EQ)
+				check_eq_key = key;
 			iterator_type = ITER_GE;
 			key = slice->begin;
 		}
@@ -1365,7 +1368,15 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 		}
 	}
 
-	return vy_run_iterator_do_seek(itr, iterator_type, key, ret);
+	if (vy_run_iterator_do_seek(itr, iterator_type, key, ret) != 0)
+		return -1;
+
+	if (check_eq_key != NULL && *ret != NULL &&
+	    vy_stmt_compare(check_eq_key, *ret, cmp_def) != 0) {
+		vy_run_iterator_stop(itr);
+		*ret = NULL;
+	}
+	return 0;
 }
 
 /* }}} vy_run_iterator vy_run_iterator support functions */

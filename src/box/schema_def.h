@@ -78,6 +78,8 @@ enum {
 	BOX_SEQUENCE_ID = 284,
 	/** Space id of _sequence_data. */
 	BOX_SEQUENCE_DATA_ID = 285,
+	/** Space id of _vsequence view. */
+	BOX_VSEQUENCE_ID = 286,
 	/** Space id of _index. */
 	BOX_INDEX_ID = 288,
 	/** Space id of _vindex view. */
