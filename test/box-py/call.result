@@ -292,8 +292,7 @@ error: {code: ER_TUPLE_FOUND, reason: Duplicate key exists in unique index 'prim
 
 space:update({3}, {{'=', 1, 4}, {'=', 2, 'new'}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    'tweedledum'
+- error: Attempt to modify a tuple field which is part of index 'primary' in space 'tweedledum'
 ...
 space:insert(space:get{3}:update{{'=', 1, 4}, {'=', 2, 'new'}}) space:delete{3}
 ---

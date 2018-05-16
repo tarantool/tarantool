@@ -209,8 +209,7 @@ uid = session.uid()
 --
 box.schema.user.drop('uniuser')
 ---
-- error: 'Failed to drop user or role ''uniuser'': the user is active in the current
-    session'
+- error: 'Failed to drop user or role ''uniuser'': the user is active in the current session'
 ...
 --
 --Check create, call and drop function
@@ -260,10 +259,7 @@ box.space._user:select(1)
 ...
 box.space._space:select(280)
 ---
-- - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
-        'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',
-        'type': 'map'}, {'name': 'format', 'type': 'array'}]]
+- - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine', 'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags', 'type': 'map'}, {'name': 'format', 'type': 'array'}]]
 ...
 us = box.schema.space.create('uniuser_space')
 ---
@@ -733,55 +729,22 @@ box.space._user:select()
 box.space._space:select()
 ---
 - - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}]]
-  - [276, 1, '_collation', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {
-        'name': 'name', 'type': 'string'}, {'name': 'owner', 'type': 'unsigned'},
-      {'name': 'type', 'type': 'string'}, {'name': 'locale', 'type': 'string'}, {
-        'name': 'opts', 'type': 'map'}]]
-  - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
-        'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',
-        'type': 'map'}, {'name': 'format', 'type': 'array'}]]
-  - [281, 1, '_vspace', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine',
-        'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags',
-        'type': 'map'}, {'name': 'format', 'type': 'array'}]]
-  - [284, 1, '_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'step',
-        'type': 'integer'}, {'name': 'min', 'type': 'integer'}, {'name': 'max', 'type': 'integer'},
-      {'name': 'start', 'type': 'integer'}, {'name': 'cache', 'type': 'integer'},
-      {'name': 'cycle', 'type': 'boolean'}]]
-  - [285, 1, '_sequence_data', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},
-      {'name': 'value', 'type': 'integer'}]]
-  - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
-        'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
-  - [289, 1, '_vindex', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
-        'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
-  - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
-        'type': 'unsigned'}]]
-  - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid',
-        'type': 'unsigned'}]]
-  - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
-        'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
-  - [305, 1, '_vuser', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner',
-        'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type',
-        'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
-  - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'unsigned'}, {
-        'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
-  - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'unsigned'},
-      {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
-  - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid',
-        'type': 'string'}]]
-  - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'count',
-        'type': 'unsigned'}]]
-  - [340, 1, '_space_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},
-      {'name': 'sequence_id', 'type': 'unsigned'}, {'name': 'is_generated', 'type': 'boolean'}]]
+  - [276, 1, '_collation', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'type', 'type': 'string'}, {'name': 'locale', 'type': 'string'}, {'name': 'opts', 'type': 'map'}]]
+  - [280, 1, '_space', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine', 'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags', 'type': 'map'}, {'name': 'format', 'type': 'array'}]]
+  - [281, 1, '_vspace', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'engine', 'type': 'string'}, {'name': 'field_count', 'type': 'unsigned'}, {'name': 'flags', 'type': 'map'}, {'name': 'format', 'type': 'array'}]]
+  - [284, 1, '_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'step', 'type': 'integer'}, {'name': 'min', 'type': 'integer'}, {'name': 'max', 'type': 'integer'}, {'name': 'start', 'type': 'integer'}, {'name': 'cache', 'type': 'integer'}, {'name': 'cycle', 'type': 'boolean'}]]
+  - [285, 1, '_sequence_data', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'value', 'type': 'integer'}]]
+  - [288, 1, '_index', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type', 'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
+  - [289, 1, '_vindex', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'iid', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type', 'type': 'string'}, {'name': 'opts', 'type': 'map'}, {'name': 'parts', 'type': 'array'}]]
+  - [296, 1, '_func', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid', 'type': 'unsigned'}]]
+  - [297, 1, '_vfunc', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'setuid', 'type': 'unsigned'}]]
+  - [304, 1, '_user', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type', 'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
+  - [305, 1, '_vuser', 'sysview', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'owner', 'type': 'unsigned'}, {'name': 'name', 'type': 'string'}, {'name': 'type', 'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
+  - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'unsigned'}, {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'}, {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+  - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'unsigned'}, {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'}, {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+  - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid', 'type': 'string'}]]
+  - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'count', 'type': 'unsigned'}]]
+  - [340, 1, '_space_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'sequence_id', 'type': 'unsigned'}, {'name': 'is_generated', 'type': 'boolean'}]]
 ...
 box.space._func:select()
 ---

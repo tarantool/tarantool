@@ -304,8 +304,7 @@ s:before_replace(ret_invalid) == ret_invalid
 ...
 s:insert{1, 1}
 ---
-- error: 'Invalid return value of space:before_replace trigger: expected tuple or
-    nil, got string'
+- error: 'Invalid return value of space:before_replace trigger: expected tuple or nil, got string'
 ...
 s:select()
 ---
@@ -325,8 +324,7 @@ s:before_replace(ret_update_pk) == ret_update_pk
 ...
 s:replace{1, 2}
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    'test'
+- error: Attempt to modify a tuple field which is part of index 'primary' in space 'test'
 ...
 s:before_replace(nil, ret_update_pk)
 ---

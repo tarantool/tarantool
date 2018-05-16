@@ -36,8 +36,7 @@ box.schema.sequence.create('test', {step = 0})
 ...
 box.schema.sequence.create('test', {min = 10, max = 1})
 ---
-- error: 'Failed to create sequence ''test'': max must be greater than or equal to
-    min'
+- error: 'Failed to create sequence ''test'': max must be greater than or equal to min'
 ...
 box.schema.sequence.create('test', {min = 10, max = 20, start = 1})
 ---
@@ -577,18 +576,15 @@ sq:set(123)
 ...
 s:create_index('pk', {parts = {1, 'string'}, sequence = 'test'}) -- error
 ---
-- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
-    be used with a non-integer key'
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot be used with a non-integer key'
 ...
 s:create_index('pk', {parts = {1, 'scalar'}, sequence = 'test'}) -- error
 ---
-- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
-    be used with a non-integer key'
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot be used with a non-integer key'
 ...
 s:create_index('pk', {parts = {1, 'number'}, sequence = 'test'}) -- error
 ---
-- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
-    be used with a non-integer key'
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot be used with a non-integer key'
 ...
 pk = s:create_index('pk', {parts = {1, 'integer'}, sequence = 'test'}) -- ok
 ---
@@ -607,26 +603,22 @@ pk = s:create_index('pk') -- ok
 ...
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = 'test'}) -- error
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
-    cannot be used with a secondary key'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence cannot be used with a secondary key'
 ...
 s:create_index('secondary', {parts = {2, 'unsigned'}, sequence = true}) -- error
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
-    cannot be used with a secondary key'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence cannot be used with a secondary key'
 ...
 sk = s:create_index('secondary', {parts = {2, 'unsigned'}}) -- ok
 ---
 ...
 sk:alter{sequence = 'test'} -- error
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
-    cannot be used with a secondary key'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence cannot be used with a secondary key'
 ...
 sk:alter{sequence = true} -- error
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
-    cannot be used with a secondary key'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence cannot be used with a secondary key'
 ...
 sk:alter{parts = {2, 'string'}} -- ok
 ---
@@ -643,13 +635,11 @@ s.index.pk.sequence_id == sq.id
 ...
 sk:alter{sequence = 'test'} -- error
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
-    cannot be used with a secondary key'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence cannot be used with a secondary key'
 ...
 sk:alter{sequence = true} -- error
 ---
-- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence
-    cannot be used with a secondary key'
+- error: 'Can''t create or modify index ''secondary'' in space ''test'': sequence cannot be used with a secondary key'
 ...
 sk:alter{parts = {2, 'unsigned'}} -- ok
 ---
@@ -676,18 +666,15 @@ pk = s:create_index('pk', {parts = {1, 'unsigned'}, sequence = 'test'}) -- ok
 ...
 pk:alter{parts = {1, 'string'}} -- error
 ---
-- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
-    be used with a non-integer key'
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot be used with a non-integer key'
 ...
 box.space._index:update({s.id, pk.id}, {{'=', 6, {{0, 'string'}}}}) -- error
 ---
-- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
-    be used with a non-integer key'
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot be used with a non-integer key'
 ...
 box.space._index:delete{s.id, pk.id} -- error
 ---
-- error: 'Can''t modify space ''test'': can not drop primary key while space sequence
-    exists'
+- error: 'Can''t modify space ''test'': can not drop primary key while space sequence exists'
 ...
 pk:alter{parts = {1, 'string'}, sequence = false} -- ok
 ---
@@ -697,13 +684,11 @@ sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 ...
 sk:alter{sequence = 'test'} -- error
 ---
-- error: 'Can''t create or modify index ''sk'' in space ''test'': sequence cannot
-    be used with a secondary key'
+- error: 'Can''t create or modify index ''sk'' in space ''test'': sequence cannot be used with a secondary key'
 ...
 box.space._space_sequence:insert{s.id, sq.id, false} -- error
 ---
-- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot
-    be used with a non-integer key'
+- error: 'Can''t create or modify index ''pk'' in space ''test'': sequence cannot be used with a non-integer key'
 ...
 sk:drop()
 ---
@@ -717,8 +702,7 @@ box.space._space_sequence:insert{s.id, sq.id, false} -- error
 ...
 s:create_index('pk', {sequence = {}}) -- error
 ---
-- error: 'Illegal parameters, options parameter ''sequence'' should be one of types:
-    boolean, number, string'
+- error: 'Illegal parameters, options parameter ''sequence'' should be one of types: boolean, number, string'
 ...
 s:create_index('pk', {sequence = 'abc'}) -- error
 ---
@@ -757,8 +741,7 @@ s.index.pk.sequence_id == nil
 ...
 pk:alter{sequence = {}} -- error
 ---
-- error: 'Illegal parameters, options parameter ''sequence'' should be one of types:
-    boolean, number, string'
+- error: 'Illegal parameters, options parameter ''sequence'' should be one of types: boolean, number, string'
 ...
 pk:alter{sequence = 'abc'} -- error
 ---

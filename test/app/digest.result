@@ -448,8 +448,7 @@ digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspa
 ...
 digest.aes256cbc.decrypt(digest.aes256cbc.encrypt('test123', 'passpasspasspasspasspasspasspass', 'iv12tras8712cvbh'), 'nosspasspasspasspasspasspasspass', 'iv12tras8712cvbh')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:error:06065064:digital envelope
-    routines:EVP_DecryptFinal_ex:bad decrypt'
+- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad decrypt'
 ...
 --
 -- Test base64 options. (gh-2479, gh-2478, gh-2777).

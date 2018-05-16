@@ -149,8 +149,7 @@ box.cfg{ checkpoint_count = 1 }
 ...
 box.cfg{ checkpoint_count = 0 }
 ---
-- error: 'Incorrect value for option ''checkpoint_count'': the value must not be less
-    than one'
+- error: 'Incorrect value for option ''checkpoint_count'': the value must not be less than one'
 ...
 box.cfg.checkpoint_count
 ---

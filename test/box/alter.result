@@ -87,13 +87,11 @@ _space:delete{_index.id}
 --
 _space:update({_space.id}, {{'-', 1, 1}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    '_space'
+- error: Attempt to modify a tuple field which is part of index 'primary' in space '_space'
 ...
 _space:update({_space.id}, {{'-', 1, 2}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    '_space'
+- error: Attempt to modify a tuple field which is part of index 'primary' in space '_space'
 ...
 --
 -- Create a space
@@ -210,12 +208,10 @@ _index:select{}
   - [305, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [305, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [305, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
-  - [312, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
-      [3, 'unsigned']]]
+  - [312, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'], [3, 'unsigned']]]
   - [312, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
   - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
-  - [313, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
-      [3, 'unsigned']]]
+  - [313, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'], [3, 'unsigned']]]
   - [313, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
   - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
   - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
@@ -893,8 +889,7 @@ pk = s:create_index('pk')
 ...
 sk1 = s:create_index('sk1', { parts = { 2, 'unsigned' } })
 ---
-- error: Field 'field2' has type 'string' in space format, but type 'unsigned' in
-    index definition
+- error: Field 'field2' has type 'string' in space format, but type 'unsigned' in index definition
 ...
 -- Check space format conflicting with index parts.
 sk3 = s:create_index('sk3', { parts = { 2, 'string' } })
@@ -905,13 +900,11 @@ format[2].type = 'unsigned'
 ...
 s:format(format)
 ---
-- error: Field 'field2' has type 'unsigned' in space format, but type 'string' in
-    index definition
+- error: Field 'field2' has type 'unsigned' in space format, but type 'string' in index definition
 ...
 s:format()
 ---
-- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'string'}, {
-    'name': 'field3', 'type': 'scalar'}]
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'string'}, {'name': 'field3', 'type': 'scalar'}]
 ...
 s.index.sk3.parts
 ---
@@ -928,8 +921,7 @@ s:format(format)
 ...
 s:format()
 ---
-- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'unsigned'},
-  {'name': 'field3', 'type': 'scalar'}]
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'unsigned'}, {'name': 'field3', 'type': 'scalar'}]
 ...
 -- Check deprecated field types.
 format[2].type = 'num'
@@ -957,8 +949,7 @@ s:format(format)
 ...
 s:format()
 ---
-- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'num'}, {'name': 'field3',
-    'type': 'str'}, {'name': 'field4', 'type': '*'}]
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'num'}, {'name': 'field3', 'type': 'str'}, {'name': 'field4', 'type': '*'}]
 ...
 s:replace{1, 2, '3', {4, 4, 4}}
 ---
@@ -1032,13 +1023,11 @@ s:replace{1, '2', {3, 3}, 4.4, -5, true, {7}, 8, 9}
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}}
 ---
-- error: Tuple field count 7 is less than required by space format or defined indexes
-    (expected at least 9)
+- error: Tuple field count 7 is less than required by space format or defined indexes (expected at least 9)
 ...
 s:replace{1, '2', {3, 3}, 4.4, -5, true, {value=7}, 8}
 ---
-- error: Tuple field count 8 is less than required by space format or defined indexes
-    (expected at least 9)
+- error: Tuple field count 8 is less than required by space format or defined indexes (expected at least 9)
 ...
 s:truncate()
 ---
@@ -1171,8 +1160,7 @@ s:create_index('test1', {parts = {'test1'}}).parts
 ...
 s:create_index('test2', {parts = {'test2'}}).parts
 ---
-- error: 'Can''t create or modify index ''test2'' in space ''test'': field type ''any''
-    is not supported'
+- error: 'Can''t create or modify index ''test2'' in space ''test'': field type ''any'' is not supported'
 ...
 s:create_index('test3', {parts = {{'test1', 'integer'}}}).parts
 ---
@@ -1244,8 +1232,7 @@ t[5] = 1
 ...
 box.space._space:replace(t)
 ---
-- error: 'Can''t modify space ''test'': can not change field count on a non-empty
-    space'
+- error: 'Can''t modify space ''test'': can not change field count on a non-empty space'
 ...
 s:drop()
 ---
@@ -1333,8 +1320,7 @@ ok_format_change(3, 'any')
 -- unsigned --X--> string
 fail_format_change(3, 'string')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from unsigned to string
-  on a not empty space'
+- 'Can''t modify space ''test'': Can not change a field type from unsigned to string on a not empty space'
 ...
 -- unsigned -----> number
 ok_format_change(3, 'number')
@@ -1351,8 +1337,7 @@ ok_format_change(3, 'scalar')
 -- unsigned --X--> map
 fail_format_change(3, 'map')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from unsigned to map
-  on a not empty space'
+- 'Can''t modify space ''test'': Can not change a field type from unsigned to map on a not empty space'
 ...
 -- string -----> any
 ok_format_change(4, 'any')
@@ -1365,8 +1350,7 @@ ok_format_change(4, 'scalar')
 -- string --X--> boolean
 fail_format_change(4, 'boolean')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from string to boolean
-  on a not empty space'
+- 'Can''t modify space ''test'': Can not change a field type from string to boolean on a not empty space'
 ...
 -- number -----> any
 ok_format_change(5, 'any')
@@ -1409,8 +1393,7 @@ ok_format_change(7, 'scalar')
 -- boolean --X--> string
 fail_format_change(7, 'string')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from boolean to string
-  on a not empty space'
+- 'Can''t modify space ''test'': Can not change a field type from boolean to string on a not empty space'
 ...
 -- scalar -----> any
 ok_format_change(8, 'any')
@@ -1428,8 +1411,7 @@ ok_format_change(9, 'any')
 -- array --X--> scalar
 fail_format_change(9, 'scalar')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from array to scalar
-  on a not empty space'
+- 'Can''t modify space ''test'': Can not change a field type from array to scalar on a not empty space'
 ...
 -- map -----> any
 ok_format_change(10, 'any')
@@ -1438,8 +1420,7 @@ ok_format_change(10, 'any')
 -- map --X--> scalar
 fail_format_change(10, 'scalar')
 ---
-- 'Can''t modify space ''test'': Can not change a field type from map to scalar on
-  a not empty space'
+- 'Can''t modify space ''test'': Can not change a field type from map to scalar on a not empty space'
 ...
 s:drop()
 ---
@@ -1524,8 +1505,7 @@ s:format(format)
 -- Fail, not enough fields.
 s:replace{2, 2, 2, 2, 2}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field count 5 is less than required by space format or defined indexes (expected at least 6)
 ...
 s:replace{2, 2, 2, 2, 2, 2, 2}
 ---
@@ -1537,8 +1517,7 @@ format[7] = {name = 'field7', type = 'unsigned'}
 -- Fail, the tuple {1, ... 1} is invalid for a new format.
 s:format(format)
 ---
-- error: Tuple field count 6 is less than required by space format or defined indexes
-    (expected at least 7)
+- error: Tuple field count 6 is less than required by space format or defined indexes (expected at least 7)
 ...
 s:drop()
 ---
@@ -1751,9 +1730,7 @@ test_run:cmd("setopt delimiter ''");
 ...
 s:format()
 ---
-- [{'name': 'id1', 'type': 'unsigned'}, {'name': 'id2', 'type': 'unsigned'}, {'name': 'id3',
-    'type': 'string'}, {'name': 'id4', 'type': 'string'}, {'name': 'id5', 'type': 'string'},
-  {'name': 'id6', 'type': 'string'}]
+- [{'name': 'id1', 'type': 'unsigned'}, {'name': 'id2', 'type': 'unsigned'}, {'name': 'id3', 'type': 'string'}, {'name': 'id4', 'type': 'string'}, {'name': 'id5', 'type': 'string'}, {'name': 'id6', 'type': 'string'}]
 ...
 _ = s:create_index('primary')
 ---
@@ -1981,8 +1958,7 @@ sk4 = s:create_index('sk4', {parts = {{3, 'number'}}})
 ...
 s:format()
 ---
-- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'scalar'}, {
-    'name': 'field3', 'type': 'integer'}]
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'scalar'}, {'name': 'field3', 'type': 'integer'}]
 ...
 s:replace{1, '100', -20.2}
 ---

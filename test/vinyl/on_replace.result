@@ -517,8 +517,7 @@ old_tuple, new_tuple
 ...
 index:update({2}, {{'#', 1, 1}}) -- must fail
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    'test_space'
+- error: Attempt to modify a tuple field which is part of index 'primary' in space 'test_space'
 ...
 old_tuple, new_tuple
 ---
@@ -607,8 +606,7 @@ old_tuple, new_tuple
 ...
 index:update({2}, {{'+', 1, 1}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    'test_space'
+- error: Attempt to modify a tuple field which is part of index 'primary' in space 'test_space'
 ...
 old_tuple, new_tuple
 ---

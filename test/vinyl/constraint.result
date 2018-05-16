@@ -83,13 +83,11 @@ index = space:create_index('primary', { type = 'tree', parts = {1,'unsigned',2,'
 ...
 space:insert{1}
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field count 1 is less than required by space format or defined indexes (expected at least 2)
 ...
 space:replace{1}
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field count 1 is less than required by space format or defined indexes (expected at least 2)
 ...
 space:delete{1}
 ---
@@ -101,8 +99,7 @@ space:update(1, {{'=', 1, 101}})
 ...
 space:upsert({1}, {{'+', 1, 10}})
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field count 1 is less than required by space format or defined indexes (expected at least 2)
 ...
 space:get{1}
 ---

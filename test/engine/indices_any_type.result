@@ -680,8 +680,7 @@ s2:select{}
 ...
 s2.index.my_space3_idx2:select{}
 ---
-- error: '[string "return s2.index.my_space3_idx2:select{} "]:1: attempt to index
-    field ''my_space3_idx2'' (a nil value)'
+- error: '[string "return s2.index.my_space3_idx2:select{} "]:1: attempt to index field ''my_space3_idx2'' (a nil value)'
 ...
 s2:drop()
 ---
@@ -863,8 +862,7 @@ space = box.schema.space.create('test', {engine = engine})
 ...
 pk = space:create_index('primary', { parts = {1, 'any'} }) --
 ---
-- error: 'Can''t create or modify index ''primary'' in space ''test'': field type
-    ''any'' is not supported'
+- error: 'Can''t create or modify index ''primary'' in space ''test'': field type ''any'' is not supported'
 ...
 space:insert({1})                                          -- must fail
 ---

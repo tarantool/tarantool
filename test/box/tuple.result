@@ -451,8 +451,7 @@ t:next(-1)
 ...
 t:next("fdsaf")
 ---
-- error: 'builtin/box/tuple.lua..."]:<line>: bad argument #2 to ''box_tuple_field'' (cannot
-    convert ''string'' to ''unsigned int'')'
+- error: 'builtin/box/tuple.lua..."]:<line>: bad argument #2 to ''box_tuple_field'' (cannot convert ''string'' to ''unsigned int'')'
 ...
 box.tuple.new({'x', 'y', 'z'}):next()
 ---
@@ -992,15 +991,11 @@ t = box.tuple.new({1, -2, 1.2, -1.2}, 'x', 'y', 'z', null, true, false,
 ...
 tostring(t);
 ---
-- '[[1, -2, 1.2, -1.2], ''x'', ''y'', ''z'', null, true, false, {''big_num'': 18446744073709551615,
-  ''double'': 1.0000000001, ''utf8'': ''Кудыкины горы'', ''bin'': !!binary CFzCgBIv,
-  ''map'': {''key'': ''value''}}]'
+- '[[1, -2, 1.2, -1.2], ''x'', ''y'', ''z'', null, true, false, {''big_num'': 18446744073709551615, ''double'': 1.0000000001, ''utf8'': ''Кудыкины горы'', ''bin'': !!binary CFzCgBIv, ''map'': {''key'': ''value''}}]'
 ...
 t;
 ---
-- [[1, -2, 1.2, -1.2], 'x', 'y', 'z', null, true, false, {'big_num': 18446744073709551615,
-    'double': 1.0000000001, 'utf8': 'Кудыкины горы', 'bin': !!binary CFzCgBIv, 'map': {
-      'key': 'value'}}]
+- [[1, -2, 1.2, -1.2], 'x', 'y', 'z', null, true, false, {'big_num': 18446744073709551615, 'double': 1.0000000001, 'utf8': 'Кудыкины горы', 'bin': !!binary CFzCgBIv, 'map': {'key': 'value'}}]
 ...
 test_run:cmd("setopt delimiter ''");
 ---

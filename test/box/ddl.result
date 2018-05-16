@@ -258,8 +258,7 @@ box.internal.collation.create('test', 'ICU', 'ru_RU', {ping='pong'})
 ...
 box.internal.collation.create('test', 'ICU', 'ru_RU', {french_collation='german'})
 ---
-- error: 'Failed to initialize collation: ICU wrong french_collation option setting,
-    expected ON | OFF.'
+- error: 'Failed to initialize collation: ICU wrong french_collation option setting, expected ON | OFF.'
 ...
 box.internal.collation.create('test', 'ICU', 'ru_RU', {french_collation='on'}) --ok
 ---
@@ -269,8 +268,7 @@ box.internal.collation.drop('test') --ok
 ...
 box.internal.collation.create('test', 'ICU', 'ru_RU', {strength='supervillian'})
 ---
-- error: 'Failed to initialize collation: ICU wrong strength option setting, expected
-    PRIMARY | SECONDARY | TERTIARY | QUATERNARY | IDENTICAL.'
+- error: 'Failed to initialize collation: ICU wrong strength option setting, expected PRIMARY | SECONDARY | TERTIARY | QUATERNARY | IDENTICAL.'
 ...
 box.internal.collation.create('test', 'ICU', 'ru_RU', {strength=42})
 ---
@@ -316,33 +314,27 @@ box.internal.collation.drop('test')
 ...
 box.space._collation:auto_increment{'test'}
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field count 2 is less than required by space format or defined indexes (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU'}
 ---
-- error: Tuple field count 4 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field count 4 is less than required by space format or defined indexes (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field count 5 is less than required by space format or defined indexes (expected at least 6)
 ...
 box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field count 5 is less than required by space format or defined indexes (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 42, 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field count 5 is less than required by space format or defined indexes (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 42}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field count 5 is less than required by space format or defined indexes (expected at least 6)
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
 ---
@@ -376,8 +368,7 @@ opts = {normalization_mode='NORMAL'}
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', opts}
 ---
-- error: 'Failed to initialize collation: ICU wrong normalization_mode option setting,
-    expected ON | OFF.'
+- error: 'Failed to initialize collation: ICU wrong normalization_mode option setting, expected ON | OFF.'
 ...
 opts.normalization_mode = 'OFF'
 ---
@@ -393,8 +384,7 @@ opts.numeric_collation = 'PERL'
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', opts}
 ---
-- error: 'Failed to initialize collation: ICU wrong numeric_collation option setting,
-    expected ON | OFF.'
+- error: 'Failed to initialize collation: ICU wrong numeric_collation option setting, expected ON | OFF.'
 ...
 opts.numeric_collation = 'ON'
 ---
@@ -420,8 +410,7 @@ opts.alternate_handling = 'ON'
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', opts}
 ---
-- error: 'Failed to initialize collation: ICU wrong alternate_handling option setting,
-    expected NON_IGNORABLE | SHIFTED.'
+- error: 'Failed to initialize collation: ICU wrong alternate_handling option setting, expected NON_IGNORABLE | SHIFTED.'
 ...
 opts.alternate_handling = 'SHIFTED'
 ---
@@ -437,8 +426,7 @@ opts.case_first = 'ON'
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', opts}
 ---
-- error: 'Failed to initialize collation: ICU wrong case_first option setting, expected
-    OFF | UPPER_FIRST | LOWER_FIRST.'
+- error: 'Failed to initialize collation: ICU wrong case_first option setting, expected OFF | UPPER_FIRST | LOWER_FIRST.'
 ...
 opts.case_first = 'OFF'
 ---
@@ -454,16 +442,14 @@ opts.case_level = 'UPPER'
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', opts}
 ---
-- error: 'Failed to initialize collation: ICU wrong case_level option setting, expected
-    ON | OFF.'
+- error: 'Failed to initialize collation: ICU wrong case_level option setting, expected ON | OFF.'
 ...
 opts.case_level = 'DEFAULT'
 ---
 ...
 _ = box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', opts} --ok
 ---
-- error: 'Failed to initialize collation: ICU wrong case_level option setting, expected
-    ON | OFF.'
+- error: 'Failed to initialize collation: ICU wrong case_level option setting, expected ON | OFF.'
 ...
 _ = box.space._collation.index.name:delete{'test'} -- ok
 ---

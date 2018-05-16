@@ -780,8 +780,7 @@ index = space:create_index('primary', { type = 'hash' })
 ...
 space:select({1}, {iterator = 'BITS_ALL_SET' } )
 ---
-- error: Index 'primary' (HASH) of space 'test' (memtx) does not support requested
-    iterator type
+- error: Index 'primary' (HASH) of space 'test' (memtx) does not support requested iterator type
 ...
 space:drop()
 ---

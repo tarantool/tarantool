@@ -489,18 +489,15 @@ function return_serialize1() return toarray({ [1] = 1, [20] = 1}) end
 ...
 conn:call("return_serialize1")
 ---
-- [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:eval("return return_serialize1()")
 ---
-- [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call_16("return_serialize1")
 ---
-- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]
+- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 function return_serialize2() return tomap({ 'a', 'b', 'c'}) end
 ---
@@ -522,18 +519,15 @@ function return_serialize3() return {'x', toarray({ [1] = 1, [20] = 1})} end
 ...
 conn:call("return_serialize3")
 ---
-- ['x', [1, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, 1]]
+- ['x', [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]]
 ...
 conn:eval("return return_serialize3()")
 ---
-- ['x', [1, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, 1]]
+- ['x', [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]]
 ...
 conn:call_16("return_serialize3")
 ---
-- - ['x', [1, null, null, null, null, null, null, null, null, null, null, null, null,
-      null, null, null, null, null, null, 1]]
+- - ['x', [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]]
 ...
 function return_serialize4() return {'x', tomap({ 'a', 'b', 'c'})} end
 ---
@@ -547,18 +541,15 @@ function return_serialize5() return {toarray({ [1] = 1, [20] = 1}), 'x'} end
 ...
 conn:call("return_serialize5")
 ---
-- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1], 'x']
+- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1], 'x']
 ...
 conn:eval("return return_serialize5()")
 ---
-- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1], 'x']
+- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1], 'x']
 ...
 conn:call_16("return_serialize5")
 ---
-- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]
+- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
   - ['x']
 ...
 function return_serialize6() return { tomap({ 'a', 'b', 'c'}), 'x'} end
@@ -581,18 +572,15 @@ function return_serialize7() return {toarray({ [1] = 1, [20] = 1})} end
 ...
 conn:call("return_serialize7")
 ---
-- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]]
+- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]]
 ...
 conn:eval("return return_serialize7()")
 ---
-- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]]
+- [[1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]]
 ...
 conn:call_16("return_serialize7")
 ---
-- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]
+- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 function return_serialize8() return { tomap({ 'a', 'b', 'c'})} end
 ---
@@ -684,63 +672,51 @@ require('msgpack').cfg { encode_sparse_safe = 50 }
 ...
 conn:call("return_sparse1")
 ---
-- [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:eval("return return_sparse1()")
 ---
-- [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call_16("return_sparse1")
 ---
-- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]
+- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call("return_sparse2")
 ---
-- [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:eval("return return_sparse2()")
 ---
-- [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call_16("return_sparse2")
 ---
-- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]
+- - [1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call("return_sparse3")
 ---
-- [null, null, null, null, 5, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [null, null, null, null, 5, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:eval("return return_sparse3()")
 ---
-- [null, null, null, null, 5, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [null, null, null, null, 5, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call_16("return_sparse3")
 ---
-- - [null, null, null, null, 5, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]
+- - [null, null, null, null, 5, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call("return_sparse4")
 ---
-- [null, null, null, null, 1, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [null, null, null, null, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:eval("return return_sparse4()")
 ---
-- [null, null, null, null, 1, null, null, null, null, null, null, null, null, null,
-  null, null, null, null, null, 1]
+- [null, null, null, null, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:call_16("return_sparse4")
 ---
-- - [null, null, null, null, 1, null, null, null, null, null, null, null, null, null,
-    null, null, null, null, null, 1]
+- - [null, null, null, null, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1]
 ...
 conn:close()
 ---
