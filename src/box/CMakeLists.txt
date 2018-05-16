@@ -40,7 +40,7 @@ add_library(tuple STATIC
     tuple_hash.cc
     tuple_bloom.c
     tuple_dictionary.c
-    key_def.cc
+    key_def.c
     coll_def.c
     coll.c
     coll_cache.c
