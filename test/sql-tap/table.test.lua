@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(58)
+test:plan(57)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -958,32 +958,6 @@ test:do_execsql_test(
         -- </table-13.1>
     })
 
--- MUST_WORK_TEST debug var sqlite_current_time #2646
-if (0 > 0) then
--- ["unset","-nocomplain","date","time","seconds"]
-local data = {
-    {"1976-07-04", "12:00:00", 205329600},
-    {"1994-04-16", "14:00:00", 766504800},
-    {"2000-01-01", "00:00:00", 946684800},
-    {"2003-12-31", "12:34:56", 1072874096},
-}
-for i ,val in ipairs(data) do
-    local date = val[1]
-    local time = val[2]
-    local seconds = val[3]
-    sqlite_current_time = seconds
-    test:do_execsql_test(
-        "table-13.2."..i,
-        string.format([[
-            INSERT INTO tablet8(a) VALUES(%s);
-            SELECT tm, dt, dttm FROM tablet8 WHERE a=%s;
-        ]], i, i), {
-            time, date, { date, time }
-        })
-
-end
-sqlite_current_time = 0
-end
 ----------------------------------------------------------------------
 -- Test cases table-14.*
 --
@@ -993,26 +967,6 @@ end
 -- But DROP TABLE is still prohibited because we do not want to
 -- delete a table out from under a running query.
 --
--- db eval {
---   pragma vdbe_trace = 0;
--- }
--- Try to create a table from within a callback:
--- ["unset","-nocomplain","result"]
-test:do_test(
-    "table-14.1",
-    function()
-        local rc = pcall(function()
-            test:execsql("SELECT * FROM tablet8 LIMIT 1")
-            test:execsql("CREATE TABLE t9(a primary key, b, c)")
-            end)
-        rc = rc == true and 0 or 1
-        return { rc }
-    end, {
-        -- <table-14.1>
-        0
-        -- </table-14.1>
-    })
-
 -- MUST_WORK_TEST database should be locked #2554
 if 0>0 then
 local function try_drop_t9()

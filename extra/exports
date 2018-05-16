@@ -350,6 +350,10 @@ luaJIT_profile_start
 luaJIT_profile_stop
 luaJIT_profile_dumpstack
 
+# SQL testing
+
+sql_current_time
+
 # Temporary
 
 # Important! This function will be removed from exports soon (in the scope of

@@ -127,9 +127,6 @@ datetest(2.36, "datetime('2003-10-22 12:24','+1 abcdef')", "NULL")
 datetest(2.37, "datetime('2003-10-22 12:24','+1 abcdefg')", "NULL")
 datetest(2.38, "datetime('2003-10-22 12:24','+1 abcdefgh')", "NULL")
 datetest(2.39, "datetime('2003-10-22 12:24','+1 abcdefghi')", "NULL")
---sqlite_current_time = 1199243045
---datetest(2.40, "datetime()", "2008-01-02 03:04:05")
---sqlite_current_time = 0
 datetest(2.41, "datetime('2003-10-22 12:24','23 seconds')", "2003-10-22 12:24:23")
 datetest(2.42, "datetime('2003-10-22 12:24','345 second')", "2003-10-22 12:29:45")
 datetest(2.43, "datetime('2003-10-22 12:24','4 second')", "2003-10-22 12:24:04")
@@ -211,10 +208,6 @@ end
 --
 datetest(3.20, "strftime('%d/%f/%H/%W/%j/%m/%M/%S/%Y','0421-01-02 03:04:05.006')", "02/05.006/03/00/002/01/04/05/0421")
 
--- TBI to be implemented sqlite_current_time
---sqlite_current_time = 1157124367
---datetest(4.1, "date('now')", "2006-09-01")
---sqlite_current_time = 0
 datetest(5.1, "datetime('1994-04-16 14:00:00 +05:00')", "1994-04-16 09:00:00")
 datetest(5.2, "datetime('1994-04-16 14:00:00 -05:15')", "1994-04-16 19:15:00")
 datetest(5.3, "datetime('1994-04-16 05:00:00 +08:30')", "1994-04-15 20:30:00")
@@ -349,32 +342,6 @@ datetest(7.13, "strftime(null,'now')", "NULL")
 datetest(7.14, "strftime('%s',null)", "NULL")
 datetest(7.15, "strftime('%s','now',null)", "NULL")
 datetest(7.16, "strftime('%s','now','localtime',null)", "NULL")
--- Test modifiers when the date begins as a julian day number - to
--- make sure the HH:MM:SS is preserved.  Ticket #551.
---
--- TBI to be implemented sqlite_current_time
---sqlite_current_time = test:execsql "SELECT strftime('%s','2003-10-22 12:34:00')"
---datetest(8.1, "datetime('now','weekday 0')", "2003-10-26 12:34:00")
---datetest(8.2, "datetime('now','weekday 1')", "2003-10-27 12:34:00")
---datetest(8.3, "datetime('now','weekday 2')", "2003-10-28 12:34:00")
---datetest(8.4, "datetime('now','weekday 3')", "2003-10-22 12:34:00")
---datetest(8.5, "datetime('now','start of month')", "2003-10-01 00:00:00")
---datetest(8.6, "datetime('now','start of year')", "2003-01-01 00:00:00")
---datetest(8.7, "datetime('now','start of day')", "2003-10-22 00:00:00")
---datetest(8.8, "datetime('now','1 day')", "2003-10-23 12:34:00")
---datetest(8.9, "datetime('now','+1 day')", "2003-10-23 12:34:00")
---datetest(8.10, "datetime('now','+1.25 day')", "2003-10-23 18:34:00")
---datetest(8.11, "datetime('now','-1.0 day')", "2003-10-21 12:34:00")
---datetest(8.12, "datetime('now','1 month')", "2003-11-22 12:34:00")
---datetest(8.13, "datetime('now','11 month')", "2004-09-22 12:34:00")
---datetest(8.14, "datetime('now','-13 month')", "2002-09-22 12:34:00")
---datetest(8.15, "datetime('now','1.5 months')", "2003-12-07 12:34:00")
---datetest(8.16, "datetime('now','-5 years')", "1998-10-22 12:34:00")
---datetest(8.17, "datetime('now','+10.5 minutes')", "2003-10-22 12:44:30")
---datetest(8.18, "datetime('now','-1.25 hours')", "2003-10-22 11:19:00")
---datetest(8.19, "datetime('now','11.25 seconds')", "2003-10-22 12:34:11")
---datetest(8.90, "datetime('now','abcdefghijklmnopqrstuvwyxzABCDEFGHIJLMNOP')", "NULL")
---sqlite_current_time = 0
 -- Negative years work.  Example:  '-4713-11-26' is JD 1.5.
 --
 datetest(9.1, "julianday('-4713-11-24 12:00:00')", "0")

@@ -4788,7 +4788,7 @@ unixSleep(sqlite3_vfs * NotUsed, int microseconds)
  * sqlite3OsCurrentTime() during testing.
  */
 #ifdef SQLITE_TEST
-int sqlite3_current_time = 0;	/* Fake system time in seconds since 1970. */
+int sql_current_time = 0;	/* Fake system time in seconds since 1970. */
 #endif
 
 /*
@@ -4820,9 +4820,9 @@ unixCurrentTimeInt64(sqlite3_vfs * NotUsed, sqlite3_int64 * piNow)
 #endif
 
 #ifdef SQLITE_TEST
-	if (sqlite3_current_time) {
+	if (sql_current_time) {
 		*piNow =
-		    1000 * (sqlite3_int64) sqlite3_current_time + unixEpoch;
+		    1000 * (sqlite3_int64) sql_current_time + unixEpoch;
 	}
 #endif
 	UNUSED_PARAMETER(NotUsed);

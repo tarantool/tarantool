@@ -1250,48 +1250,6 @@ test:do_execsql_test(
         -- </e_expr-12.2.5>
     })
 
--- MUST_WORK_TEST uses sqlite_current_time
-if 0>0 then
-    sqlite_current_time = 1
-    test:do_execsql_test(
-        "e_expr-12.2.6",
-        [[
-            SELECT CURRENT_TIME
-        ]], {
-            -- <e_expr-12.2.6>
-            "00:00:01"
-            -- </e_expr-12.2.6>
-        })
-
-    test:do_execsql_test(
-        "e_expr-12.2.7",
-        [[
-            SELECT CURRENT_DATE
-        ]], {
-            -- <e_expr-12.2.7>
-            "1970-01-01"
-            -- </e_expr-12.2.7>
-        })
-
-    test:do_execsql_test(
-        "e_expr-12.2.8",
-        [[
-            SELECT CURRENT_TIMESTAMP
-        ]], {
-            -- <e_expr-12.2.8>
-            "1970-01-01 00:00:01"
-            -- </e_expr-12.2.8>
-        })
-
-    sqlite_current_time = 0
-end
--- # -- syntax diagram expr
--- #
--- forcedelete test.db2
--- execsql {
---   ATTACH 'test.db2' AS dbname;
---   CREATE TABLE dbname.tblname(cname);
--- }
 test:execsql [[
     CREATE TABLE tblname(cname PRIMARY KEY);
 ]]
