@@ -2434,6 +2434,9 @@ int
 vy_run_remove_files(const char *dir, uint32_t space_id,
 		    uint32_t iid, int64_t run_id)
 {
+	ERROR_INJECT(ERRINJ_VY_GC,
+		     {say_error("error injection: vinyl run %lld not deleted",
+				(long long)run_id); return -1;});
 	int ret = 0;
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {

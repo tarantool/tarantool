@@ -61,3 +61,38 @@ files = ls_vylog()
 temp:drop()
 
 box.cfg{checkpoint_count = default_checkpoint_count}
+
+--
+-- Check that compacted run files that are not referenced
+-- by any checkpoint are deleted immediately (gh-3407).
+--
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+test_run:cmd("start server test with args='1048576'")
+test_run:cmd('switch test')
+
+box.cfg{checkpoint_count = 2}
+
+fio = require('fio')
+fiber = require('fiber')
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {run_count_per_level = 3})
+
+function count_runs() return #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, s.id, s.index.pk.id, '*.run')) end
+
+_ = s:replace{1}
+box.snapshot()
+_ = s:replace{2}
+box.snapshot()
+
+count_runs() -- 2
+
+for i = 1, 20 do s:replace{i, string.rep('x', 100 * 1024)} end
+while s.index.pk:info().disk.compact.count < 1 do fiber.sleep(0.001) end
+s.index.pk:info().disk.compact.count -- 1
+
+count_runs() -- 3 (compacted runs created after checkpoint are deleted)
+
+test_run:cmd('switch default')
+test_run:cmd("stop server test")
+test_run:cmd("cleanup server test")

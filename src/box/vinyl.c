@@ -3389,10 +3389,6 @@ vy_gc_cb(const struct vy_log_record *record, void *cb_arg)
 		goto out;
 	}
 
-	ERROR_INJECT(ERRINJ_VY_GC,
-		     {say_error("error injection: vinyl run %lld not deleted",
-				(long long)record->run_id); goto out;});
-
 	/* Try to delete files. */
 	if (vy_run_remove_files(arg->env->path, arg->space_id,
 				arg->index_id, record->run_id) != 0)
