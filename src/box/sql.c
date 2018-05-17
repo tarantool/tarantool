@@ -493,7 +493,7 @@ int tarantoolSqlite3EphemeralDelete(BtCursor *pCur)
 	char *key;
 	uint32_t key_size;
 	key = tuple_extract_key(pCur->last_tuple,
-				box_iterator_key_def(pCur->iter),
+				pCur->iter->index->def->key_def,
 				&key_size);
 	if (key == NULL)
 		return SQL_TARANTOOL_DELETE_FAIL;
@@ -519,7 +519,7 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 	int rc;
 
 	key = tuple_extract_key(pCur->last_tuple,
-				box_iterator_key_def(pCur->iter),
+				pCur->iter->index->def->key_def,
 				&key_size);
 	if (key == NULL)
 		return SQL_TARANTOOL_DELETE_FAIL;
@@ -580,7 +580,7 @@ int tarantoolSqlite3EphemeralClearTable(BtCursor *pCur)
 	uint32_t  key_size;
 
 	while (iterator_next(it, &tuple) == 0 && tuple != NULL) {
-		key = tuple_extract_key(tuple, box_iterator_key_def(it),
+		key = tuple_extract_key(tuple, it->index->def->key_def,
 					&key_size);
 		if (space_ephemeral_delete(pCur->space, key) != 0) {
 			iterator_delete(it);
@@ -952,7 +952,7 @@ tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
 	uint32_t key_size;
 #endif
 
-	key_def = box_iterator_key_def(cursor->iter);
+	key_def = cursor->iter->index->def->key_def;
 	n = MIN(unpacked->nField, key_def->part_count);
 	tuple = cursor->last_tuple;
 	base = tuple_data(tuple);

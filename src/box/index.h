@@ -90,12 +90,6 @@ void
 box_iterator_free(box_iterator_t *iterator);
 
 /**
- * @todo: delete, a hack added by @mejedi for sql
- */
-const box_key_def_t *
-box_iterator_key_def(box_iterator_t *iterator);
-
-/**
  * Return the number of element in the index.
  *
  * \param space_id space identifier
