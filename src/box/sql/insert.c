@@ -1613,7 +1613,8 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
 	assert(space != NULL);
 	int space_ptr_reg = ++pParse->nMem;
-	sqlite3VdbeAddOp4Ptr(v, OP_LoadPtr, 0, space_ptr_reg, 0, (void *) space);
+	sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
+			  P4_SPACEPTR);
 
 	/* One iteration of this cycle adds OpenRead/OpenWrite which
 	 * opens cursor for current index.

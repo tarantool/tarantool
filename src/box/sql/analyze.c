@@ -910,8 +910,8 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		struct space *space =
 			space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
 		assert(space != NULL);
-		sqlite3VdbeAddOp4Ptr(v, OP_LoadPtr, 0, space_ptr_reg, 0,
-				     (void *) space);
+		sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0,
+				  (void*)space, P4_SPACEPTR);
 		sqlite3VdbeAddOp3(v, OP_OpenRead, iIdxCur, pIdx->tnum,
 				  space_ptr_reg);
 		sql_vdbe_set_p4_key_def(pParse, pIdx);

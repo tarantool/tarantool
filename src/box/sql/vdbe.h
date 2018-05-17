@@ -86,6 +86,8 @@ struct VdbeOp {
 		int (*xAdvance) (BtCursor *, int *);
 		/** Used when p4type is P4_KEYDEF. */
 		struct key_def *key_def;
+		/** Used when p4type is P4_SPACEPTR. */
+		struct space *space;
 	} p4;
 #ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
 	char *zComment;		/* Comment to improve readability */
@@ -146,6 +148,7 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_BOOL     (-17)	/* P4 is a bool value */
 #define P4_PTR      (-18)	/* P4 is a generic pointer */
 #define P4_KEYDEF   (-19)       /* P4 is a pointer to key_def structure. */
+#define P4_SPACEPTR (-20)       /* P4 is a space pointer */
 
 /* Error message codes for OP_Halt */
 #define P5_ConstraintNotNull 1
@@ -224,7 +227,6 @@ int sqlite3VdbeAddOp3(Vdbe *, int, int, int, int);
 int sqlite3VdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
 int sqlite3VdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
 int sqlite3VdbeAddOp4Int(Vdbe *, int, int, int, int, int);
-int sqlite3VdbeAddOp4Ptr(Vdbe *, int, int, int, int, void *);
 void sqlite3VdbeEndCoroutine(Vdbe *, int);
 #if defined(SQLITE_DEBUG) && !defined(SQLITE_TEST_REALLOC_STRESS)
 void sqlite3VdbeVerifyNoMallocRequired(Vdbe * p, int N);

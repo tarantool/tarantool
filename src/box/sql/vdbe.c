@@ -1074,12 +1074,12 @@ case OP_Int64: {           /* out2 */
 /* Opcode: LoadPtr * P2 * P4 *
  * Synopsis: r[P2] = P4
  *
- * P4 is a generic pointer. Copy it into register P2.
+ * P4 is a generic or space pointer. Copy it into register P2.
  */
 case OP_LoadPtr: {
 	pOut = out2Prerelease(p, pOp);
-	assert(pOp->p4type == P4_PTR);
-	pOut->u.p = pOp->p4.p;
+	assert(pOp->p4type == P4_PTR || pOp->p4type == P4_SPACEPTR );
+	pOut->u.p = pOp->p4.space;
 	pOut->flags = MEM_Ptr;
 	break;
 }

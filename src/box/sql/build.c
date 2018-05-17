@@ -1222,8 +1222,8 @@ emit_open_cursor(Parse *parse_context, int cursor, int entity_id)
 	assert(space != NULL);
 	Vdbe *vdbe = parse_context->pVdbe;
 	int space_ptr_reg = ++parse_context->nMem;
-	sqlite3VdbeAddOp4Ptr(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0,
-			     (void *) space);
+	sqlite3VdbeAddOp4(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
+			  P4_SPACEPTR);
 	return sqlite3VdbeAddOp3(vdbe, OP_OpenWrite, cursor, entity_id,
 				 space_ptr_reg);
 }

@@ -444,16 +444,6 @@ sqlite3VdbeAddOp4Int(Vdbe * p,	/* Add the opcode to this VM */
 	return addr;
 }
 
-int
-sqlite3VdbeAddOp4Ptr(Vdbe *p, int op, int p1, int p2, int p3, void *ptr)
-{
-	int addr = sqlite3VdbeAddOp3(p, op, p1, p2, p3);
-	VdbeOp *pOp = &p->aOp[addr];
-	pOp->p4type = P4_PTR;
-	pOp->p4.p = ptr;
-	return addr;
-}
-
 /* Insert the end of a co-routine
  */
 void
@@ -1638,6 +1628,10 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			zTemp[0] = 0;
 			break;
 		}
+	case P4_SPACEPTR: {
+		sqlite3XPrintf(&x, "space<name=%s>", space_name(pOp->p4.space));
+		break;
+	}
 	default:{
 			zP4 = pOp->p4.z;
 			if (zP4 == 0) {
