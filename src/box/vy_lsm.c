@@ -1109,3 +1109,16 @@ fail_range:
 		  vy_lsm_name(lsm), vy_range_str(range));
 	return false;
 }
+
+void
+vy_lsm_force_compaction(struct vy_lsm *lsm)
+{
+	struct vy_range *range;
+	struct vy_range_tree_iterator it;
+
+	vy_range_tree_ifirst(lsm->tree, &it);
+	while ((range = vy_range_tree_inext(&it)) != NULL)
+		vy_range_force_compaction(range);
+
+	vy_range_heap_update_all(&lsm->range_heap);
+}

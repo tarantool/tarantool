@@ -1,5 +1,6 @@
 test_run = require('test_run').new()
 fiber = require('fiber')
+digest = require('digest')
 
 space = box.schema.space.create("vinyl", { engine = 'vinyl' })
 _= space:create_index('primary', { parts = { 1, 'unsigned' }, run_count_per_level = 2 })
@@ -39,5 +40,58 @@ test_run:grep_log('default', 'UPSERT operation failed') ~= nil
 
 space:drop()
 
-fiber = nil
-test_run = nil
+--
+-- gh-3139: index.compact forces major compaction for all ranges
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {run_count_per_level = 100, page_size = 128, range_size = 1024})
+
+test_run:cmd("setopt delimiter ';'")
+function dump()
+    for i = 1, 10 do
+        s:replace{i, digest.urandom(1000)}
+    end
+    box.snapshot()
+end;
+function info()
+    local info = s.index.pk:info()
+    return {range_count = info.range_count, run_count = info.run_count}
+end
+function compact()
+    s.index.pk:compact()
+    repeat
+        fiber.sleep(0.001)
+        local info = s.index.pk:info()
+    until info.range_count == info.run_count
+end;
+test_run:cmd("setopt delimiter ''");
+
+dump()
+dump()
+dump()
+info() -- 1 range, 3 runs
+
+compact()
+info() -- 1 range, 1 run
+
+compact() -- no-op
+
+dump()
+dump()
+dump()
+info() -- 1 range, 4 runs
+
+compact()
+info() -- 2 ranges, 2 runs
+
+compact() -- no-op
+
+dump()
+dump()
+dump()
+info() -- 2 ranges, 5 runs
+
+compact()
+info() -- 4 ranges, 4 runs
+
+s:drop()

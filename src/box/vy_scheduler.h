@@ -202,6 +202,13 @@ void
 vy_scheduler_trigger_dump(struct vy_scheduler *scheduler);
 
 /**
+ * Force major compaction of an LSM tree.
+ */
+void
+vy_scheduler_force_compaction(struct vy_scheduler *scheduler,
+			      struct vy_lsm *lsm);
+
+/**
  * Schedule a checkpoint. Please call vy_scheduler_wait_checkpoint()
  * after that.
  */
