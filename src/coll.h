@@ -47,12 +47,7 @@ typedef int (*coll_cmp_f)(const char *s, size_t s_len, const char *t,
 typedef uint32_t (*coll_hash_f)(const char *s, size_t s_len, uint32_t *ph,
 				uint32_t *pcarry, struct coll *coll);
 
-/** ICU collation specific data. */
 struct UCollator;
-
-struct coll_icu {
-	struct UCollator *collator;
-};
 
 /**
  * Collation. It has no unique features like name, id or owner.
@@ -61,8 +56,8 @@ struct coll_icu {
 struct coll {
 	/** Collation type. */
 	enum coll_type type;
-	/** Type specific data. */
-	struct coll_icu icu;
+	/** ICU collation specific data. */
+	struct UCollator *collator;
 	/** String comparator. */
 	coll_cmp_f cmp;
 	coll_hash_f hash;

@@ -41,6 +41,11 @@ enum coll_type {
 
 extern const char *coll_type_strs[];
 
+/** Maximal length of locale name. */
+enum {
+	COLL_LOCALE_LEN_MAX = 16,
+};
+
 /*
  * ICU collation options. See
  * http://icu-project.org/apiref/icu4c/ucol_8h.html#a583fbe7fc4a850e2fcc692e766d2826c
@@ -103,13 +108,12 @@ struct coll_icu_def {
 
 /** Collation definition. */
 struct coll_def {
-	/** Locale. */
-	size_t locale_len;
-	const char *locale;
 	/** Collation type. */
 	enum coll_type type;
 	/** Type specific options. */
 	struct coll_icu_def icu;
+	/** Locale. */
+	char locale[COLL_LOCALE_LEN_MAX + 1];
 };
 
 #endif /* TARANTOOL_COLL_DEF_H_INCLUDED */

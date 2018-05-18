@@ -66,11 +66,7 @@ struct mh_coll_node_t {
 /** Table fingerprint -> collation. */
 static struct mh_coll_t *coll_cache = NULL;
 
-enum {
-	MAX_LOCALE = 1024,
-};
-
-static_assert(MAX_LOCALE <= TT_STATIC_BUF_LEN,
+static_assert(COLL_LOCALE_LEN_MAX <= TT_STATIC_BUF_LEN,
 	      "static buf is used to 0-terminate locale name");
 
 /** Compare two string using ICU collation. */
@@ -78,19 +74,19 @@ static int
 coll_icu_cmp(const char *s, size_t slen, const char *t, size_t tlen,
 	     const struct coll *coll)
 {
-	assert(coll->icu.collator != NULL);
+	assert(coll->collator != NULL);
 
 	UErrorCode status = U_ZERO_ERROR;
 
 #ifdef HAVE_ICU_STRCOLLUTF8
-	UCollationResult result = ucol_strcollUTF8(coll->icu.collator,
-						   s, slen, t, tlen, &status);
+	UCollationResult result = ucol_strcollUTF8(coll->collator, s, slen, t,
+						   tlen, &status);
 #else
 	UCharIterator s_iter, t_iter;
 	uiter_setUTF8(&s_iter, s, slen);
 	uiter_setUTF8(&t_iter, t, tlen);
-	UCollationResult result = ucol_strcollIter(coll->icu.collator,
-						   &s_iter, &t_iter, &status);
+	UCollationResult result = ucol_strcollIter(coll->collator, &s_iter,
+						   &t_iter, &status);
 #endif
 	assert(!U_FAILURE(status));
 	return (int)result;
@@ -109,7 +105,7 @@ coll_icu_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
 	UErrorCode status = U_ZERO_ERROR;
 	int32_t got;
 	do {
-		got = ucol_nextSortKeyPart(coll->icu.collator, &itr, state, buf,
+		got = ucol_nextSortKeyPart(coll->collator, &itr, state, buf,
 					   TT_STATIC_BUF_LEN, &status);
 		PMurHash32_Process(ph, pcarry, buf, got);
 		total_size += got;
@@ -127,20 +123,13 @@ coll_icu_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
 static int
 coll_icu_init_cmp(struct coll *coll, const struct coll_def *def)
 {
-	if (def->locale_len >= MAX_LOCALE) {
-		diag_set(CollationError, "too long locale");
-		return -1;
-	}
-	char *locale = tt_static_buf();
-	memcpy(locale, def->locale, def->locale_len);
-	locale[def->locale_len] = '\0';
 	UErrorCode status = U_ZERO_ERROR;
-	struct UCollator *collator = ucol_open(locale, &status);
+	struct UCollator *collator = ucol_open(def->locale, &status);
 	if (U_FAILURE(status)) {
 		diag_set(CollationError, u_errorName(status));
 		return -1;
 	}
-	coll->icu.collator = collator;
+	coll->collator = collator;
 
 	if (def->icu.french_collation != COLL_ICU_DEFAULT) {
 		enum coll_icu_on_off w = def->icu.french_collation;
@@ -273,8 +262,8 @@ static int
 coll_def_snfingerprint(char *buffer, int size, const struct coll_def *def)
 {
 	int total = 0;
-	SNPRINT(total, snprintf, buffer, size, "{locale: %.*s, type = %d, "\
-	        "icu: ", (int) def->locale_len, def->locale, (int) def->type);
+	SNPRINT(total, snprintf, buffer, size, "{locale: %s, type = %d, "\
+	        "icu: ", def->locale, (int) def->type);
 	SNPRINT(total, coll_icu_def_snfingerprint, buffer, size, &def->icu);
 	SNPRINT(total, snprintf, buffer, size, "}");
 	return total;
@@ -331,7 +320,7 @@ coll_unref(struct coll *coll)
 			len, mh_strn_hash(coll->fingerprint, len), coll
 		};
 		mh_coll_remove(coll_cache, &node, NULL);
-		ucol_close(coll->icu.collator);
+		ucol_close(coll->collator);
 		free(coll);
 	}
 }

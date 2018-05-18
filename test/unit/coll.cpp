@@ -49,8 +49,7 @@ manual_test()
 	vector<const char *> strings;
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
-	def.locale = "ru_RU";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
 	def.type = COLL_TYPE_ICU;
 	struct coll *coll;
 
@@ -95,8 +94,7 @@ manual_test()
 	coll_unref(coll);
 
 	cout << " -- en_EN -- " << endl;
-	def.locale = "en_EN-EN";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "en_EN-EN");
 	coll = coll_new(&def);
 	assert(coll != NULL);
 	strings = {"aa", "bb", "cc", "ch", "dd", "gg", "hh", "ii" };
@@ -104,8 +102,7 @@ manual_test()
 	coll_unref(coll);
 
 	cout << " -- cs_CZ -- " << endl;
-	def.locale = "cs_CZ";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "cs_CZ");
 	coll = coll_new(&def);
 	assert(coll != NULL);
 	strings = {"aa", "bb", "cc", "ch", "dd", "gg", "hh", "ii" };
@@ -132,8 +129,7 @@ hash_test()
 
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
-	def.locale = "ru_RU";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
 	def.type = COLL_TYPE_ICU;
 	struct coll *coll;
 
@@ -167,8 +163,7 @@ cache_test()
 
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
-	def.locale = "ru_RU";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
 	def.type = COLL_TYPE_ICU;
 
 	struct coll *coll1 = coll_new(&def);
@@ -176,7 +171,7 @@ cache_test()
 	is(coll1, coll2,
 	   "collations with the same definition are not duplicated");
 	coll_unref(coll2);
-	def.locale = "en_EN";
+	snprintf(def.locale, sizeof(def.locale), "%s", "en_EN");
 	coll2 = coll_new(&def);
 	isnt(coll1, coll2,
 	     "collations with different definitions are different objects");

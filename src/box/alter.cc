@@ -2294,6 +2294,11 @@ coll_id_def_new_from_tuple(const struct tuple *tuple, struct coll_id_def *def)
 	def->id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_ID);
 	def->name = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_NAME, &name_len);
 	def->name_len = name_len;
+	if (name_len > BOX_NAME_MAX)
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "collation name is too long");
+	identifier_check_xc(def->name, name_len);
+
 	def->owner_id = tuple_field_u32_xc(tuple, BOX_COLLATION_FIELD_UID);
 	struct coll_def *base = &def->base;
 	const char *type = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_TYPE,
@@ -2302,23 +2307,19 @@ coll_id_def_new_from_tuple(const struct tuple *tuple, struct coll_id_def *def)
 	if (base->type == coll_type_MAX)
 		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
 			  "unknown collation type");
-	base->locale = tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_LOCALE,
-					  &locale_len);
-	base->locale_len = locale_len;
+	const char *locale =
+		tuple_field_str_xc(tuple, BOX_COLLATION_FIELD_LOCALE,
+				   &locale_len);
+	if (locale_len > COLL_LOCALE_LEN_MAX)
+		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
+			  "collation locale is too long");
+	if (locale_len > 0)
+		identifier_check_xc(locale, locale_len);
+	snprintf(base->locale, sizeof(base->locale), "%.*s", locale_len,
+		 locale);
 	const char *options =
 		tuple_field_with_type_xc(tuple, BOX_COLLATION_FIELD_OPTIONS,
 					 MP_MAP);
-
-	if (name_len > BOX_NAME_MAX)
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
-			  "collation name is too long");
-	if (locale_len > BOX_NAME_MAX)
-		tnt_raise(ClientError, ER_CANT_CREATE_COLLATION,
-			  "collation locale is too long");
-	/* Locale is an optional argument and can be NULL. */
-	if (locale_len > 0)
-		identifier_check_xc(base->locale, locale_len);
-	identifier_check_xc(def->name, name_len);
 
 	assert(base->type == COLL_TYPE_ICU);
 	if (opts_decode(&base->icu, coll_icu_opts_reg, &options,
