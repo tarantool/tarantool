@@ -2722,11 +2722,11 @@ sqlite3AllocateIndexObject(sqlite3 * db,	/* Database connection */
 	Index *p;		/* Allocated index object */
 	int nByte;		/* Bytes of space for Index object + arrays */
 
-	nByte = ROUND8(sizeof(Index)) +		    /* Index structure  */
-	    ROUND8(sizeof(char *) * nCol) +	    /* Index.azColl     */
-	    ROUND8(sizeof(LogEst) * (nCol + 1) +    /* Index.aiRowLogEst   */
-		   sizeof(i16) * nCol +		    /* Index.aiColumn   */
-		   sizeof(enum sort_order) * nCol); /* Index.sort_order */
+	nByte = ROUND8(sizeof(Index)) +		    /* Index structure   */
+	    ROUND8(sizeof(struct coll *) * nCol) +  /* Index.coll_array  */
+	    ROUND8(sizeof(LogEst) * (nCol + 1) +    /* Index.aiRowLogEst */
+		   sizeof(i16) * nCol +		    /* Index.aiColumn    */
+		   sizeof(enum sort_order) * nCol); /* Index.sort_order  */
 	p = sqlite3DbMallocZero(db, nByte + nExtra);
 	if (p) {
 		char *pExtra = ((char *)p) + ROUND8(sizeof(Index));
