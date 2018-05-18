@@ -27,7 +27,8 @@ fio = require('fio')
 -- all missing data from replica.
 -- Also check that there is no concurrency, i.e. master is
 -- in 'read-only' mode unless it receives all data.
-fio.unlink(fio.pathjoin(fio.abspath("."), string.format('autobootstrap1/%020d.xlog', 8)))
+list = fio.glob(fio.pathjoin(fio.abspath("."), 'autobootstrap1/*.xlog'))
+fio.unlink(list[#list])
 test_run:cmd("start server autobootstrap1")
 
 test_run:cmd("switch autobootstrap1")
