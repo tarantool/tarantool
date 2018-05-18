@@ -303,15 +303,9 @@ void sqlite3VdbeRecordUnpackMsgpack(struct key_def *key_def,
 
 int sqlite3VdbeRecordCompare(struct sqlite3 *db, int key_count,
 			     const void *key1, UnpackedRecord *key2);
-int sqlite3VdbeRecordCompareWithSkip(struct sqlite3 *db,
-				     int key_count, const void *key1,
-				     struct UnpackedRecord *key2, bool is_skip);
 UnpackedRecord *sqlite3VdbeAllocUnpackedRecord(struct sqlite3 *,
 					       struct key_def *);
 int sql_vdbe_mem_alloc_region(Mem *, uint32_t);
-
-typedef int (*RecordCompare) (const void *, UnpackedRecord *);
-RecordCompare sqlite3VdbeFindCompare(UnpackedRecord *);
 
 #ifndef SQLITE_OMIT_TRIGGER
 void sqlite3VdbeLinkSubProgram(Vdbe *, SubProgram *);
