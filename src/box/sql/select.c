@@ -4700,7 +4700,7 @@ selectExpander(Walker * pWalker, Select * p)
 #if !defined(SQLITE_OMIT_VIEW)
 			if (space_is_view(pTab)) {
 				i16 nCol;
-				if (sqlite3ViewGetColumnNames(pParse, pTab))
+				if (sql_view_column_names(pParse, pTab) != 0)
 					return WRC_Abort;
 				assert(pFrom->pSelect == 0);
 				pFrom->pSelect =

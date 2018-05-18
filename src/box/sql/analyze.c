@@ -169,7 +169,8 @@ openStatTable(Parse * pParse,	/* Parsing context */
 			 * The sql_stat[134] table already exists.
 			 * Delete all rows.
 			 */
-			sqlite3VdbeAddOp2(v, OP_Clear, aRoot[i], 0);
+			sqlite3VdbeAddOp2(v, OP_Clear,
+					  SQLITE_PAGENO_TO_SPACEID(aRoot[i]), 0);
 		}
 	}
 

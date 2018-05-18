@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+#include "box/box.h"
 #include "box/session.h"
 #include "box/schema.h"
 #include "sqliteInt.h"
@@ -86,35 +87,50 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	 * with multiple tables and expect an SrcList* parameter
 	 * instead of just a Table* parameter.
 	 */
-	struct Table *table = sql_list_lookup_table(parse, tab_list);
-	if (table == NULL)
-		goto delete_from_cleanup;
-
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(table->tnum));
-	assert(space != NULL);
+	struct Table *table = NULL;
+	struct space *space;
+	uint32_t space_id;
 	/* Figure out if we have any triggers and if the table
 	 * being deleted from is a view.
 	 */
-	struct Trigger *trigger_list = sqlite3TriggersExist(table, TK_DELETE,
-							    NULL, NULL);
-
-	bool is_view = space->def->opts.is_view;
+	struct Trigger *trigger_list = NULL;
 	/* True if there are triggers or FKs or subqueries in the
 	 * WHERE clause.
 	 */
-	bool is_complex = trigger_list != NULL ||
-			  sqlite3FkRequired(table, NULL);
+	bool is_complex = false;
+	const char *tab_name = tab_list->a->zName;
+	if (sqlite3LocateTable(parse, LOCATE_NOERR, tab_name) == NULL) {
+		space_id = box_space_id_by_name(tab_name,
+						strlen(tab_name));
+		if (space_id == BOX_ID_NIL)
+			goto delete_from_cleanup;
+	} else {
+		table = sql_list_lookup_table(parse, tab_list);
+		if (table == NULL)
+			goto delete_from_cleanup;
+		space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
+		trigger_list =sqlite3TriggersExist(table, TK_DELETE,
+						   NULL, NULL);
+		is_complex = trigger_list != NULL ||
+			     sqlite3FkRequired(table, NULL);
+	}
+	space = space_by_id(space_id);
+	assert(space != NULL);
+
+	bool is_view = space->def->opts.is_view;
 
 	/* If table is really a view, make sure it has been
 	 * initialized.
 	 */
-	if (sqlite3ViewGetColumnNames(parse, table))
-		goto delete_from_cleanup;
+	if (is_view) {
+		if (sql_view_column_names(parse, table) != 0)
+			goto delete_from_cleanup;
 
-	if (is_view && trigger_list == NULL) {
-		sqlite3ErrorMsg(parse, "cannot modify %s because it is a view",
-				space->def->name);
-		goto delete_from_cleanup;
+		if (trigger_list == NULL) {
+			sqlite3ErrorMsg(parse, "cannot modify %s because it is a"
+					" view", space->def->name);
+			goto delete_from_cleanup;
+		}
 	}
 
 	/* Assign cursor numbers to the table and all its indices.
@@ -139,14 +155,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 				     tab_cursor);
 	}
 
-	/* Resolve the column names in the WHERE clause. */
-	struct NameContext nc;
-	memset(&nc, 0, sizeof(nc));
-	nc.pParse = parse;
-	nc.pSrcList = tab_list;
-	if (sqlite3ResolveExprNames(&nc, where))
-		goto delete_from_cleanup;
-
 	/* Initialize the counter of the number of rows deleted,
 	 * if we are counting rows.
 	 */
@@ -162,7 +170,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	if (where == NULL && !is_complex) {
 		assert(!is_view);
 
-		sqlite3VdbeAddOp1(v, OP_Clear, table->tnum);
+		sqlite3VdbeAddOp1(v, OP_Clear, space_id);
 
 		/* Do not start Tarantool's transaction in case of
 		 * truncate optimization. This is workaround until
@@ -171,6 +179,13 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 */
 		parse->initiateTTrans = false;
 	} else {
+		/* Resolve the column names in the WHERE clause. */
+		struct NameContext nc;
+		memset(&nc, 0, sizeof(nc));
+		nc.pParse = parse;
+		nc.pSrcList = tab_list;
+		if (sqlite3ResolveExprNames(&nc, where))
+			goto delete_from_cleanup;
 		uint16_t wcf = WHERE_ONEPASS_DESIRED | WHERE_DUPLICATES_OK |
 			WHERE_SEEK_TABLE;
 		if (nc.ncFlags & NC_VarSelect)

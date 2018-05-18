@@ -349,11 +349,9 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	int *aRegIdx = 0;	/* One register allocated to each index */
 	uint32_t space_id = 0;
 
-#ifndef SQLITE_OMIT_TRIGGER
-	int isView;		/* True if attempting to insert into a view */
+	bool is_view;		/* True if attempting to insert into a view */
 	Trigger *pTrigger;	/* List of triggers on pTab, if required */
 	int tmask;		/* Mask of trigger times */
-#endif
 
 	db = pParse->db;
 	memset(&dest, 0, sizeof(dest));
@@ -389,28 +387,18 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* Figure out if we have any triggers and if the table being
 	 * inserted into is a view
 	 */
-#ifndef SQLITE_OMIT_TRIGGER
 	pTrigger = sqlite3TriggersExist(pTab, TK_INSERT, 0, &tmask);
-	isView = space_is_view(pTab);
-#else
-#define pTrigger 0
-#define tmask 0
-#define isView 0
-#endif
-#ifdef SQLITE_OMIT_VIEW
-#undef isView
-#define isView 0
-#endif
+	is_view = space_is_view(pTab);
 	assert((pTrigger && tmask) || (pTrigger == 0 && tmask == 0));
 
 	/* If pTab is really a view, make sure it has been initialized.
 	 * ViewGetColumnNames() is a no-op if pTab is not a view.
 	 */
-	if (sqlite3ViewGetColumnNames(pParse, pTab))
+	if (is_view && sql_view_column_names(pParse, pTab) != 0)
 		goto insert_cleanup;
 
 	/* Cannot insert into a read-only table. */
-	if (isView && tmask == 0) {
+	if (is_view && tmask == 0) {
 		sqlite3ErrorMsg(pParse, "cannot modify %s because it is a view",
 				pTab->zName);
 		goto insert_cleanup;
@@ -481,7 +469,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						bIdListInOrder = 0;
 					if (j == pTab->iPKey) {
 						ipkColumn = i;
-						assert(isView);
+						assert(is_view);
 					}
 					break;
 				}
@@ -637,7 +625,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	}
 
 	/* If this is not a view, open the table and and all indices */
-	if (!isView) {
+	if (!is_view) {
 		int nIdx;
 		nIdx =
 		    sqlite3OpenTableAndIndices(pParse, pTab, OP_OpenWrite, 0,
@@ -731,7 +719,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		 * If this is a real table, attempt conversions as required by the
 		 * table column affinities.
 		 */
-		if (!isView) {
+		if (!is_view) {
 			sqlite3TableAffinity(v, pTab, regCols + 1);
 		}
 
@@ -747,7 +735,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* Compute the content of the next row to insert into a range of
 	 * registers beginning at regIns.
 	 */
-	if (!isView) {
+	if (!is_view) {
 		if (ipkColumn >= 0) {
 			if (useTempTable) {
 				sqlite3VdbeAddOp3(v, OP_Column, srcTab,
@@ -929,20 +917,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	sqlite3IdListDelete(db, pColumn);
 	sqlite3DbFree(db, aRegIdx);
 }
-
-/* Make sure "isView" and other macros defined above are undefined. Otherwise
- * they may interfere with compilation of other functions in this file
- * (or in another file, if this file becomes part of the amalgamation).
- */
-#ifdef isView
-#undef isView
-#endif
-#ifdef pTrigger
-#undef pTrigger
-#endif
-#ifdef tmask
-#undef tmask
-#endif
 
 /*
  * Meanings of bits in of pWalker->eCode for checkConstraintUnchanged()

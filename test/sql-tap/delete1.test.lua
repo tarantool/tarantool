@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(7)
+test:plan(9)
 
 --!./tcltestrunner.lua
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -130,6 +130,27 @@ test:do_test(
         1, 5, 6
         -- </delete1-5.0>
     })
+
+-- Tests for data dictionary integration.
+s = box.schema.create_space('t')
+i = s:create_index('i', {parts={1, 'unsigned'}})
+test:do_test(
+    "delete1-6.0",
+    function()
+	s:replace({1})
+	s:replace({2})
+	s:replace({3})
+	return s:count()
+    end,
+    3)
+
+test:do_test(
+    "delete1-6.1",
+    function()
+        box.sql.execute([[delete from "t"]])
+	return s:count()
+    end,
+    0)
 
 test:finish_test()
 

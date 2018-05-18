@@ -4597,7 +4597,7 @@ case OP_IdxGE:  {       /* jump */
  */
 case OP_Clear: {
 	assert(pOp->p1 > 0);
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
+	uint32_t space_id = pOp->p1;
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	rc = tarantoolSqlite3ClearTable(space);

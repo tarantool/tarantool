@@ -3608,11 +3608,18 @@ int sqlite3FaultSim(int);
 
 void sqlite3CreateView(Parse *, Token *, Token *, ExprList *, Select *, int);
 
-#if !defined(SQLITE_OMIT_VIEW)
-int sqlite3ViewGetColumnNames(Parse *, Table *);
-#else
-#define sqlite3ViewGetColumnNames(A,B) 0
-#endif
+/**
+ * The Table structure pTable is really a VIEW.  Fill in the names
+ * of the columns of the view in the table structure.  Return the
+ * number of errors.  If an error is seen leave an error message
+ * in parse->zErrMsg.
+ *
+ * @param parse Parsing context.
+ * @param table Tables to process.
+ * @retval 0 if success, -1 in case of error.
+ */
+int
+sql_view_column_names(struct Parse *parse, struct Table *table);
 
 void
 sql_drop_table(struct Parse *, struct SrcList *, bool, bool);

@@ -137,11 +137,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	int labelContinue;	/* Jump here to continue next step of UPDATE loop */
 	struct session *user_session = current_session();
 
-#ifndef SQLITE_OMIT_TRIGGER
-	int isView;		/* True when updating a view (INSTEAD OF trigger) */
+	bool is_view;		/* True when updating a view (INSTEAD OF trigger) */
 	Trigger *pTrigger;	/* List of triggers on pTab, if required */
 	int tmask;		/* Mask of TRIGGER_BEFORE|TRIGGER_AFTER */
-#endif
 	int newmask;		/* Mask of NEW.* columns accessed by BEFORE triggers */
 	int iEph = 0;		/* Ephemeral table holding all primary key values */
 	int nKey = 0;		/* Number of elements in regKey */
@@ -170,24 +168,14 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* Figure out if we have any triggers and if the table being
 	 * updated is a view.
 	 */
-#ifndef SQLITE_OMIT_TRIGGER
 	pTrigger = sqlite3TriggersExist(pTab, TK_UPDATE, pChanges, &tmask);
-	isView = space_is_view(pTab);
+	is_view = space_is_view(pTab);
 	assert(pTrigger || tmask == 0);
-#else
-#define pTrigger 0
-#define isView 0
-#define tmask 0
-#endif
-#ifdef SQLITE_OMIT_VIEW
-#undef isView
-#define isView 0
-#endif
 
-	if (sqlite3ViewGetColumnNames(pParse, pTab)) {
+	if (is_view && sql_view_column_names(pParse, pTab) != 0) {
 		goto update_cleanup;
 	}
-	if (isView && tmask == 0) {
+	if (is_view && tmask == 0) {
 		sqlite3ErrorMsg(pParse, "cannot modify %s because it is a view",
 				pTab->zName);
 		goto update_cleanup;
@@ -200,7 +188,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	pTabList->a[0].iCursor = iBaseCur = iDataCur = pParse->nTab++;
 	iIdxCur = iDataCur + 1;
-	pPk = isView ? 0 : sqlite3PrimaryKeyIndex(pTab);
+	pPk = is_view ? 0 : sqlite3PrimaryKeyIndex(pTab);
 	for (nIdx = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, nIdx++) {
 		if (IsPrimaryKeyIndex(pIdx) && pPk != 0) {
 			iDataCur = pParse->nTab;
@@ -324,13 +312,11 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* If we are trying to update a view, realize that view into
 	 * an ephemeral table.
 	 */
-#if !defined(SQLITE_OMIT_VIEW) && !defined(SQLITE_OMIT_TRIGGER)
-	if (isView) {
+	if (is_view) {
 		sql_materialize_view(pParse, pTab->zName, pWhere, iDataCur);
 		/* Number of columns from SELECT plus ID.*/
 		nKey = pTab->nCol + 1;
 	}
-#endif
 
 	/* Resolve the column names in all the expressions in the
 	 * WHERE clause.
@@ -347,7 +333,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	i16 nPk;	/* Number of components of the PRIMARY KEY */
 	int addrOpen;	/* Address of the OpenEphemeral instruction */
 
-	if (isView) {
+	if (is_view) {
 		nPk = nKey;
 	} else {
 		assert(pPk != 0);
@@ -359,7 +345,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	iEph = pParse->nTab++;
 	sqlite3VdbeAddOp2(v, OP_Null, 0, iPk);
 
-	if (isView) {
+	if (is_view) {
 		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph,
 					     nKey);
 	} else {
@@ -372,7 +358,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	if (pWInfo == 0)
 		goto update_cleanup;
 	okOnePass = sqlite3WhereOkOnePass(pWInfo, aiCurOnePass);
-	if (isView){
+	if (is_view) {
 		for (i = 0; i < nPk; i++) {
 			sqlite3VdbeAddOp3(v, OP_Column, iDataCur, i, iPk + i);
 		}
@@ -390,7 +376,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		nKey = nPk;
 		regKey = iPk;
 	} else {
-		const char *zAff = isView ? 0 :
+		const char *zAff = is_view ? 0 :
 				   sqlite3IndexAffinityStr(pParse->db, pPk);
 		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, nPk, regKey,
 					  zAff, nPk);
@@ -412,7 +398,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	}
 
 	labelBreak = sqlite3VdbeMakeLabel(v);
-	if (!isView) {
+	if (!is_view) {
 		/*
 		 * Open every index that needs updating.  Note that if any
 		 * index could potentially invoke a REPLACE conflict resolution
@@ -445,7 +431,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		labelContinue = labelBreak;
 		sqlite3VdbeAddOp2(v, OP_IsNull, regKey,
 				  labelBreak);
-		if (aToOpen[iDataCur - iBaseCur] && !isView) {
+		if (aToOpen[iDataCur - iBaseCur] && !is_view) {
 			assert(pPk);
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur,
 					     labelBreak, regKey, nKey);
@@ -552,7 +538,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * is deleted or renamed by a BEFORE trigger - is left undefined in the
 		 * documentation.
 		 */
-		if (!isView) {
+		if (!is_view) {
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, iDataCur,
 					     labelContinue, regKey, nKey);
 			VdbeCoverage(v);
@@ -576,7 +562,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 	}
 
-	if (!isView) {
+	if (!is_view) {
 		int addr1 = 0;	/* Address of jump instruction */
 		int bReplace = 0;	/* True if REPLACE conflict resolution might happen */
 
@@ -691,15 +677,3 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	sql_expr_free(db, pWhere, false);
 	return;
 }
-
-/* Make sure "isView" and other macros defined above are undefined. Otherwise
- * they may interfere with compilation of other functions in this file
- * (or in another file, if this file becomes part of the amalgamation).
- */
-#ifdef isView
-#undef isView
-#endif
-#ifdef pTrigger
-#undef pTrigger
-#endif
-

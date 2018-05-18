@@ -357,7 +357,8 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				Column *pCol;
 				Index *pPk = sqlite3PrimaryKeyIndex(pTab);
 				pParse->nMem = 6;
-				sqlite3ViewGetColumnNames(pParse, pTab);
+				if (space_is_view(pTab))
+					sql_view_column_names(pParse, pTab);
 				for (i = 0, pCol = pTab->aCol; i < pTab->nCol;
 				     i++, pCol++) {
 					if (!table_column_is_in_pk(pTab, i)) {
