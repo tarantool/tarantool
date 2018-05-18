@@ -30,9 +30,9 @@
  */
 #include "tuple_compare.h"
 #include "tuple.h"
+#include "coll.h"
 #include "trivia/util.h" /* NOINLINE */
 #include <math.h>
-#include "coll_def.h"
 
 /* {{{ tuple_compare */
 
@@ -295,8 +295,7 @@ mp_compare_str(const char *field_a, const char *field_b)
 }
 
 static inline int
-mp_compare_str_coll(const char *field_a, const char *field_b,
-		    struct coll *coll)
+mp_compare_str_coll(const char *field_a, const char *field_b, struct coll *coll)
 {
 	uint32_t size_a = mp_decode_strl(&field_a);
 	uint32_t size_b = mp_decode_strl(&field_b);

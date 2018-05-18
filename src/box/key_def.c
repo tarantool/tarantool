@@ -34,7 +34,7 @@
 #include "tuple_hash.h"
 #include "column_mask.h"
 #include "schema_def.h"
-#include "coll_cache.h"
+#include "coll_id_cache.h"
 
 const char *sort_order_strs[] = { "asc", "desc", "undef" };
 
@@ -166,16 +166,18 @@ key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
 		struct key_part_def *part = &parts[i];
 		struct coll *coll = NULL;
 		if (part->coll_id != COLL_NONE) {
-			coll = coll_by_id(part->coll_id);
-			if (coll == NULL) {
+			struct coll_id *coll_id = coll_by_id(part->coll_id);
+			if (coll_id == NULL) {
 				diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
 					 i + 1, "collation was not found by ID");
 				key_def_delete(def);
 				return NULL;
 			}
+			coll = coll_id->coll;
 		}
 		key_def_set_part(def, i, part->fieldno, part->type,
-				 part->nullable_action, coll, part->sort_order);
+				 part->nullable_action, coll, part->coll_id,
+				 part->sort_order);
 	}
 	return def;
 }
@@ -190,8 +192,7 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts)
 		part_def->type = part->type;
 		part_def->is_nullable = key_part_is_nullable(part);
 		part_def->nullable_action = part->nullable_action;
-		part_def->coll_id = (part->coll != NULL ?
-				     part->coll->id : COLL_NONE);
+		part_def->coll_id = part->coll_id;
 	}
 }
 
@@ -206,7 +207,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 		key_def_set_part(key_def, item, fields[item],
 				 (enum field_type)types[item],
 				 key_part_def_default.nullable_action,
-				 NULL, SORT_ORDER_ASC);
+				 NULL, COLL_NONE, SORT_ORDER_ASC);
 	}
 	return key_def;
 }
@@ -259,7 +260,8 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 void
 key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 		 enum field_type type, enum on_conflict_action nullable_action,
-		 struct coll *coll, enum sort_order sort_order)
+		 struct coll *coll, uint32_t coll_id,
+		 enum sort_order sort_order)
 {
 	assert(part_no < def->part_count);
 	assert(type < field_type_MAX);
@@ -268,6 +270,7 @@ key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
 	def->parts[part_no].fieldno = fieldno;
 	def->parts[part_no].type = type;
 	def->parts[part_no].coll = coll;
+	def->parts[part_no].coll_id = coll_id;
 	def->parts[part_no].sort_order = sort_order;
 	column_mask_set_fieldno(&def->column_mask, fieldno);
 	/**
@@ -587,7 +590,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	for (; part != end; part++) {
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
 				 part->nullable_action, part->coll,
-				 part->sort_order);
+				 part->coll_id, part->sort_order);
 	}
 
 	/* Set-append second key def's part to the new key def. */
@@ -598,7 +601,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
 				 part->nullable_action, part->coll,
-				 part->sort_order);
+				 part->coll_id, part->sort_order);
 	}
 	return new_def;
 }

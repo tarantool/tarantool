@@ -3361,10 +3361,6 @@ vy_gc_run(struct vy_env *env,
 	  struct vy_lsm_recovery_info *lsm_info,
 	  struct vy_run_recovery_info *run_info)
 {
-	ERROR_INJECT(ERRINJ_VY_GC,
-		     {say_error("error injection: vinyl run %lld not deleted",
-				(long long)run_info->id); return;});
-
 	/* Try to delete files. */
 	if (vy_run_remove_files(env->path, lsm_info->space_id,
 				lsm_info->index_id, run_info->id) != 0)

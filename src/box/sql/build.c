@@ -52,6 +52,7 @@
 #include "box/identifier.h"
 #include "box/schema.h"
 #include "box/tuple_format.h"
+#include "box/coll_id_cache.h"
 
 /*
  * This routine is called after a single SQL statement has been
@@ -739,6 +740,7 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	pCol = &p->aCol[p->nCol];
 	memset(pCol, 0, sizeof(p->aCol[0]));
 	pCol->zName = z;
+	pCol->coll_id = COLL_NONE;
 
 	if (pType->n == 0) {
 		/* If there is no type specified, columns have the default affinity
@@ -1057,47 +1059,37 @@ sqlite3AddCheckConstraint(Parse * pParse,	/* Parsing context */
 void
 sqlite3AddCollateType(Parse * pParse, Token * pToken)
 {
-	Table *p;
-	int i;
-	char *zColl;		/* Dequoted name of collation sequence */
-	sqlite3 *db;
-
-	if ((p = pParse->pNewTable) == 0)
+	Table *p = pParse->pNewTable;
+	if (p == NULL)
 		return;
-	i = p->nCol - 1;
-	db = pParse->db;
-	zColl = sqlite3NameFromToken(db, pToken);
+	int i = p->nCol - 1;
+	sqlite3 *db = pParse->db;
+	char *zColl = sqlite3NameFromToken(db, pToken);
 	if (!zColl)
 		return;
-
-	struct coll *coll = sqlite3GetCollSeq(pParse, zColl);
-	if (coll != NULL) {
+	uint32_t *id = &p->aCol[i].coll_id;
+	p->aCol[i].coll = sql_get_coll_seq(pParse, zColl, id);
+	if (p->aCol[i].coll != NULL) {
 		Index *pIdx;
-		p->aCol[i].coll = coll;
-
 		/* If the column is declared as "<name> PRIMARY KEY COLLATE <type>",
 		 * then an index may have been created on this column before the
 		 * collation type was added. Correct this if it is the case.
 		 */
 		for (pIdx = p->pIndex; pIdx; pIdx = pIdx->pNext) {
 			assert(pIdx->nColumn == 1);
-			if (pIdx->aiColumn[0] == i)
-				pIdx->coll_array[0] = sql_column_collation(p, i);
+			if (pIdx->aiColumn[0] == i) {
+				id = &pIdx->coll_id_array[0];
+				pIdx->coll_array[0] =
+					sql_column_collation(p, i, id);
+			}
 		}
 	} else {
 		sqlite3DbFree(db, zColl);
 	}
 }
 
-/**
- * Return collation of given column from table.
- *
- * @param table Table which is used to fetch column.
- * @param column Number of column.
- * @retval Pointer to collation.
- */
 struct coll *
-sql_column_collation(Table *table, uint32_t column)
+sql_column_collation(Table *table, uint32_t column, uint32_t *coll_id)
 {
 	assert(table != NULL);
 	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
@@ -1116,9 +1108,10 @@ sql_column_collation(Table *table, uint32_t column)
 	 */
 	if (space == NULL || space_index(space, 0) == NULL) {
 		assert(column < (uint32_t)table->nCol);
+		*coll_id = table->aCol[column].coll_id;
 		return table->aCol[column].coll;
 	}
-
+	*coll_id = space->format->fields[column].coll_id;
 	return space->format->fields[column].coll;
 }
 
@@ -1134,15 +1127,8 @@ sql_index_key_def(struct Index *idx)
 	return index->def->key_def;
 }
 
-/**
- * Return name of given column collation from index.
- *
- * @param idx Index which is used to fetch column.
- * @param column Number of column.
- * @retval Pointer to collation.
- */
 struct coll *
-sql_index_collation(Index *idx, uint32_t column)
+sql_index_collation(Index *idx, uint32_t column, uint32_t *coll_id)
 {
 	assert(idx != NULL);
 	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(idx->pTable->tnum);
@@ -1156,11 +1142,13 @@ sql_index_collation(Index *idx, uint32_t column)
 	 */
 	if (space == NULL) {
 		assert(column < idx->nColumn);
+		*coll_id = idx->coll_id_array[column];
 		return idx->coll_array[column];
 	}
 
 	struct key_def *key_def = sql_index_key_def(idx);
 	assert(key_def != NULL && key_def->part_count >= column);
+	*coll_id = key_def->parts[column].coll_id;
 	return key_def->parts[column].coll;
 }
 
@@ -2686,6 +2674,7 @@ sqlite3AllocateIndexObject(sqlite3 * db,	/* Database connection */
 
 	nByte = ROUND8(sizeof(Index)) +		    /* Index structure   */
 	    ROUND8(sizeof(struct coll *) * nCol) +  /* Index.coll_array  */
+	    ROUND8(sizeof(uint32_t) * nCol) +       /* Index.coll_id_array*/
 	    ROUND8(sizeof(LogEst) * (nCol + 1) +    /* Index.aiRowLogEst */
 		   sizeof(i16) * nCol +		    /* Index.aiColumn    */
 		   sizeof(enum sort_order) * nCol); /* Index.sort_order  */
@@ -2693,7 +2682,9 @@ sqlite3AllocateIndexObject(sqlite3 * db,	/* Database connection */
 	if (p) {
 		char *pExtra = ((char *)p) + ROUND8(sizeof(Index));
 		p->coll_array = (struct coll **)pExtra;
-		pExtra += ROUND8(sizeof(char *) * nCol);
+		pExtra += ROUND8(sizeof(struct coll **) * nCol);
+		p->coll_id_array = (uint32_t *) pExtra;
+		pExtra += ROUND8(sizeof(uint32_t) * nCol);
 		p->aiRowLogEst = (LogEst *) pExtra;
 		pExtra += sizeof(LogEst) * (nCol + 1);
 		p->aiColumn = (i16 *) pExtra;
@@ -3026,20 +3017,23 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			pIndex->aiColumn[i] = (i16) j;
 		}
 		struct coll *coll;
+		uint32_t id;
 		if (col_listItem->pExpr->op == TK_COLLATE) {
 			const char *coll_name = col_listItem->pExpr->u.zToken;
-			coll = sqlite3GetCollSeq(parse, coll_name);
+			coll = sql_get_coll_seq(parse, coll_name, &id);
 
 			if (coll == NULL &&
 			    sqlite3StrICmp(coll_name, "binary") != 0) {
 				goto exit_create_index;
 			}
 		} else if (j >= 0) {
-			coll = sql_column_collation(pTab, j);
+			coll = sql_column_collation(pTab, j, &id);
 		} else {
+			id = COLL_NONE;
 			coll = NULL;
 		}
 		pIndex->coll_array[i] = coll;
+		pIndex->coll_id_array[i] = id;
 
 		/* Tarantool: DESC indexes are not supported so far.
 		 * See gh-3016.
@@ -3082,8 +3076,9 @@ sql_create_index(struct Parse *parse, struct Token *token,
 				if (pIdx->aiColumn[k] != pIndex->aiColumn[k])
 					break;
 				struct coll *coll1, *coll2;
-				coll1 = sql_index_collation(pIdx, k);
-				coll2 = sql_index_collation(pIndex, k);
+				uint32_t id;
+				coll1 = sql_index_collation(pIdx, k, &id);
+				coll2 = sql_index_collation(pIndex, k, &id);
 				if (coll1 != coll2)
 					break;
 			}
@@ -3919,7 +3914,8 @@ collationMatch(struct coll *coll, struct Index *index)
 {
 	assert(coll != NULL);
 	for (int i = 0; i < index->nColumn; i++) {
-		struct coll *idx_coll = sql_index_collation(index, i);
+		uint32_t id;
+		struct coll *idx_coll = sql_index_collation(index, i, &id);
 		assert(idx_coll != 0 || index->aiColumn[i] < 0);
 		if (index->aiColumn[i] >= 0 && coll == idx_coll)
 			return true;
@@ -3986,7 +3982,6 @@ reindexDatabases(Parse * pParse, struct coll *coll)
 void
 sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 {
-	struct coll *pColl;		/* Collating sequence to be reindexed, or NULL */
 	char *z = 0;		/* Name of index */
 	char *zTable = 0;	/* Name of indexed table */
 	Table *pTab;		/* A table in the database */
@@ -3999,16 +3994,18 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 		reindexDatabases(pParse, 0);
 		return;
 	} else if (NEVER(pName2 == 0) || pName2->z == 0) {
-		char *zColl;
 		assert(pName1->z);
-		zColl = sqlite3NameFromToken(pParse->db, pName1);
-		if (!zColl)
+		char *zColl = sqlite3NameFromToken(pParse->db, pName1);
+		if (zColl == NULL)
 			return;
-		pColl = sqlite3FindCollSeq(zColl);
-		if (pColl) {
-			reindexDatabases(pParse, pColl);
-			sqlite3DbFree(db, zColl);
-			return;
+		if (strcasecmp(zColl, "binary") != 0) {
+			struct coll_id *coll_id =
+				coll_by_name(zColl, strlen(zColl));
+			if (coll_id != NULL) {
+				reindexDatabases(pParse, coll_id->coll);
+				sqlite3DbFree(db, zColl);
+				return;
+			}
 		}
 		sqlite3DbFree(db, zColl);
 	}

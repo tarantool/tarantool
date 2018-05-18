@@ -1,14 +1,15 @@
-#include "box/coll.h"
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <string.h>
-#include <box/coll_def.h>
 #include <assert.h>
 #include <msgpuck.h>
 #include <diag.h>
 #include <fiber.h>
 #include <memory.h>
+#include "coll_def.h"
+#include "coll.h"
+#include "unit.h"
 #include "third_party/PMurHash.h"
 
 using namespace std;
@@ -43,16 +44,13 @@ test_sort_strings(vector<const char *> &strings, struct coll *coll)
 void
 manual_test()
 {
-	cout << "\t*** " << __func__ << " ***" << endl;
+	header();
 
 	vector<const char *> strings;
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
-	def.locale = "ru_RU";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
 	def.type = COLL_TYPE_ICU;
-	def.name = "test";
-	def.name_len = strlen(def.name);
 	struct coll *coll;
 
 	cout << " -- default ru_RU -- " << endl;
@@ -96,8 +94,7 @@ manual_test()
 	coll_unref(coll);
 
 	cout << " -- en_EN -- " << endl;
-	def.locale = "en_EN-EN";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "en_EN-EN");
 	coll = coll_new(&def);
 	assert(coll != NULL);
 	strings = {"aa", "bb", "cc", "ch", "dd", "gg", "hh", "ii" };
@@ -105,15 +102,14 @@ manual_test()
 	coll_unref(coll);
 
 	cout << " -- cs_CZ -- " << endl;
-	def.locale = "cs_CZ";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "cs_CZ");
 	coll = coll_new(&def);
 	assert(coll != NULL);
 	strings = {"aa", "bb", "cc", "ch", "dd", "gg", "hh", "ii" };
 	test_sort_strings(strings, coll);
 	coll_unref(coll);
 
-	cout << "\t*** " << __func__ << ": done ***" << endl;
+	footer();
 }
 
 unsigned calc_hash(const char *str, struct coll *coll)
@@ -129,15 +125,12 @@ unsigned calc_hash(const char *str, struct coll *coll)
 void
 hash_test()
 {
-	cout << "\t*** " << __func__ << " ***" << endl;
+	header();
 
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
-	def.locale = "ru_RU";
-	def.locale_len = strlen(def.locale);
+	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
 	def.type = COLL_TYPE_ICU;
-	def.name = "test";
-	def.name_len = strlen(def.name);
 	struct coll *coll;
 
 	/* Case sensitive */
@@ -159,17 +152,46 @@ hash_test()
 	cout << (calc_hash("аЕ", coll) != calc_hash("аё", coll) ? "OK" : "Fail") << endl;
 	coll_unref(coll);
 
-	cout << "\t*** " << __func__ << ": done ***" << endl;
+	footer();
 }
 
+void
+cache_test()
+{
+	header();
+	plan(2);
+
+	struct coll_def def;
+	memset(&def, 0, sizeof(def));
+	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
+	def.type = COLL_TYPE_ICU;
+
+	struct coll *coll1 = coll_new(&def);
+	struct coll *coll2 = coll_new(&def);
+	is(coll1, coll2,
+	   "collations with the same definition are not duplicated");
+	coll_unref(coll2);
+	snprintf(def.locale, sizeof(def.locale), "%s", "en_EN");
+	coll2 = coll_new(&def);
+	isnt(coll1, coll2,
+	     "collations with different definitions are different objects");
+	coll_unref(coll2);
+	coll_unref(coll1);
+
+	check_plan();
+	footer();
+}
 
 int
 main(int, const char**)
 {
+	coll_init();
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	manual_test();
 	hash_test();
+	cache_test();
 	fiber_free();
 	memory_free();
+	coll_free();
 }

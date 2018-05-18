@@ -83,3 +83,8 @@ OK
 OK
 OK
 	*** hash_test: done ***
+	*** cache_test ***
+1..2
+ok 1 - collations with the same definition are not duplicated
+ok 2 - collations with different definitions are different objects
+	*** cache_test: done ***

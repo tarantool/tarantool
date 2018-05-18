@@ -33,7 +33,7 @@
  * This file contains routines used for analyzing expressions and
  * for generating VDBE code that evaluates expressions in SQLite.
  */
-#include <box/coll.h>
+#include "coll.h"
 #include "sqliteInt.h"
 #include "box/session.h"
 
@@ -159,10 +159,11 @@ sqlite3ExprSkipCollate(Expr * pExpr)
 }
 
 struct coll *
-sql_expr_coll(Parse *parse, Expr *p, bool *is_found)
+sql_expr_coll(Parse *parse, Expr *p, bool *is_found, uint32_t *coll_id)
 {
 	struct coll *coll = NULL;
 	*is_found = false;
+	*coll_id = COLL_NONE;
 	while (p != NULL) {
 		int op = p->op;
 		if (p->flags & EP_Generic)
@@ -173,7 +174,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found)
 		}
 		if (op == TK_COLLATE ||
 		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
-			coll = sqlite3GetCollSeq(parse, p->u.zToken);
+			coll = sql_get_coll_seq(parse, p->u.zToken, coll_id);
 			*is_found = true;
 			break;
 		}
@@ -185,7 +186,8 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found)
 			 */
 			int j = p->iColumn;
 			if (j >= 0) {
-				coll = sql_column_collation(p->pTab, j);
+				coll = sql_column_collation(p->pTab, j,
+							    coll_id);
 				*is_found = true;
 			}
 			break;
@@ -313,32 +315,23 @@ binaryCompareP5(Expr * pExpr1, Expr * pExpr2, int jumpIfNull)
 	return aff;
 }
 
-/*
- * Return a pointer to the collation sequence that should be used by
- * a binary comparison operator comparing pLeft and pRight.
- *
- * If the left hand expression has a collating sequence type, then it is
- * used. Otherwise the collation sequence for the right hand expression
- * is used, or the default (BINARY) if neither expression has a collating
- * type.
- *
- * Argument pRight (but not pLeft) may be a null pointer. In this case,
- * it is not considered.
- */
 struct coll *
-sqlite3BinaryCompareCollSeq(Parse * pParse, Expr * pLeft, Expr * pRight)
+sql_binary_compare_coll_seq(Parse *parser, Expr *left, Expr *right,
+			    uint32_t *coll_id)
 {
 	struct coll *coll;
 	bool is_found;
-	assert(pLeft);
-	if (pLeft->flags & EP_Collate) {
-		coll = sql_expr_coll(pParse, pLeft, &is_found);
-	} else if (pRight && (pRight->flags & EP_Collate) != 0) {
-		coll = sql_expr_coll(pParse, pRight, &is_found);
+	assert(left != NULL);
+	if ((left->flags & EP_Collate) != 0) {
+		coll = sql_expr_coll(parser, left, &is_found, coll_id);
+	} else if (right != NULL && (right->flags & EP_Collate) != 0) {
+		coll = sql_expr_coll(parser, right, &is_found, coll_id);
 	} else {
-		coll = sql_expr_coll(pParse, pLeft, &is_found);
-		if (!is_found)
-			coll = sql_expr_coll(pParse, pRight, &is_found);
+		coll = sql_expr_coll(parser, left, &is_found, coll_id);
+		if (! is_found) {
+			coll = sql_expr_coll(parser, right, &is_found,
+					     coll_id);
+		}
 	}
 	return coll;
 }
@@ -356,14 +349,12 @@ codeCompare(Parse * pParse,	/* The parsing (and code generating) context */
 	    int jumpIfNull	/* If true, jump if either operand is NULL */
     )
 {
-	int p5;
-	int addr;
-	struct coll *p4;
-
-	p4 = sqlite3BinaryCompareCollSeq(pParse, pLeft, pRight);
-	p5 = binaryCompareP5(pLeft, pRight, jumpIfNull);
-	addr = sqlite3VdbeAddOp4(pParse->pVdbe, opcode, in2, dest, in1,
-				 (void *)p4, P4_COLLSEQ);
+	uint32_t id;
+	struct coll *p4 =
+		sql_binary_compare_coll_seq(pParse, pLeft, pRight, &id);
+	int p5 = binaryCompareP5(pLeft, pRight, jumpIfNull);
+	int addr = sqlite3VdbeAddOp4(pParse->pVdbe, opcode, in2, dest, in1,
+				     (void *)p4, P4_COLLSEQ);
 	sqlite3VdbeChangeP5(pParse->pVdbe, (u8) p5);
 	return addr;
 }
@@ -2471,8 +2462,9 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 				for (i = 0; i < nExpr; i++) {
 					Expr *pLhs = sqlite3VectorFieldSubexpr(pX->pLeft, i);
 					Expr *pRhs = pEList->a[i].pExpr;
-					struct coll *pReq = sqlite3BinaryCompareCollSeq
-						    (pParse, pLhs, pRhs);
+					uint32_t id;
+					struct coll *pReq = sql_binary_compare_coll_seq
+						    (pParse, pLhs, pRhs, &id);
 					int j;
 
 					for (j = 0; j < nExpr; j++) {
@@ -2481,7 +2473,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							continue;
 						}
 						struct coll *idx_coll;
-						idx_coll = sql_index_collation(pIdx, j);
+						idx_coll = sql_index_collation(pIdx, j, &id);
 						if (pReq != NULL &&
 						    pReq != idx_coll) {
 							continue;
@@ -2798,15 +2790,17 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 						    sqlite3VectorFieldSubexpr
 						    (pLeft, i);
 
-						struct coll *coll;
-						coll = sqlite3BinaryCompareCollSeq
-							(pParse, p,
-							 pEList->a[i].pExpr);
+						uint32_t id;
+						struct coll *coll =
+							sql_binary_compare_coll_seq(
+								pParse, p,
+								pEList->a[i].pExpr,
+								&id);
 
 						key_def_set_part(key_def, i, i,
 								 FIELD_TYPE_SCALAR,
 								 ON_CONFLICT_ACTION_ABORT,
-								 coll,
+								 coll, id,
 								 SORT_ORDER_ASC);
 					}
 				}
@@ -2829,14 +2823,15 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					affinity = SQLITE_AFF_BLOB;
 				}
 				bool unused;
-				struct coll *coll;
-				coll = sql_expr_coll(pParse, pExpr->pLeft,
-						     &unused);
+				uint32_t id;
+				struct coll *coll =
+					sql_expr_coll(pParse, pExpr->pLeft,
+						      &unused, &id);
 
 				key_def_set_part(key_def, 0, 0,
 						 FIELD_TYPE_SCALAR,
 						 ON_CONFLICT_ACTION_ABORT, coll,
-						 SORT_ORDER_ASC);
+						 id, SORT_ORDER_ASC);
 
 				/* Loop through each expression in <exprlist>. */
 				r1 = sqlite3GetTempReg(pParse);
@@ -3087,9 +3082,10 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 */
 	if (eType == IN_INDEX_NOOP) {
 		bool unused;
+		uint32_t id;
 		ExprList *pList = pExpr->x.pList;
 		struct coll *coll = sql_expr_coll(pParse, pExpr->pLeft,
-						   &unused);
+						   &unused, &id);
 		int labelOk = sqlite3VdbeMakeLabel(v);
 		int r2, regToFree;
 		int regCkNull = 0;
@@ -3223,12 +3219,11 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		destNotNull = destIfFalse;
 	}
 	for (i = 0; i < nVector; i++) {
-		Expr *p;
-		struct coll *pColl;
 		bool unused;
+		uint32_t id;
 		int r3 = sqlite3GetTempReg(pParse);
-		p = sqlite3VectorFieldSubexpr(pLeft, i);
-		pColl = sql_expr_coll(pParse, p, &unused);
+		Expr *p = sqlite3VectorFieldSubexpr(pLeft, i);
+		struct coll *pColl = sql_expr_coll(pParse, p, &unused, &id);
 		/* Tarantool: Replace i -> aiMap [i], since original order of columns
 		 * is preserved.
 		 */
@@ -4083,9 +4078,10 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				if ((pDef->funcFlags & SQLITE_FUNC_NEEDCOLL) !=
 				    0 && coll == NULL) {
 					bool unused;
+					uint32_t id;
 					coll = sql_expr_coll(pParse,
 							     pFarg->a[i].pExpr,
-							     &unused);
+							     &unused, &id);
 				}
 			}
 			if (pFarg) {

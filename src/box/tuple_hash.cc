@@ -30,7 +30,6 @@
  */
 
 #include "tuple_hash.h"
-
 #include "third_party/PMurHash.h"
 #include "coll.h"
 

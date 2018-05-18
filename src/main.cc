@@ -58,6 +58,7 @@
 #include <say.h>
 #include <rmean.h>
 #include <limits.h>
+#include "coll.h"
 #include "trivia/util.h"
 #include "backtrace.h"
 #include "tt_pthread.h"
@@ -581,6 +582,7 @@ tarantool_free(void)
 	memory_free();
 	random_free();
 #endif
+	coll_free();
 	systemd_free();
 	say_logger_free();
 }
@@ -732,6 +734,7 @@ main(int argc, char **argv)
 	coio_enable();
 	signal_init();
 	cbus_init();
+	coll_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	start_time = ev_monotonic_time();

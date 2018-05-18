@@ -1455,7 +1455,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 					      regIdx : regR);
 
 				for (i = 0; i < nPkCol; i++) {
-					char *p4 = (char *)sql_index_collation(pPk, i);
+					uint32_t id;
+					char *p4 = (char *)sql_index_collation(pPk, i, &id);
 					x = pPk->aiColumn[i];
 					assert(x >= 0);
 					if (i == (nPkCol - 1)) {
@@ -1714,8 +1715,9 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 		    sql_index_column_sort_order(pDest, i)) {
 			return 0;	/* Different sort orders */
 		}
-		if (sql_index_collation(pSrc, i) !=
-		    sql_index_collation(pDest, i)) {
+		uint32_t id;
+		if (sql_index_collation(pSrc, i, &id) !=
+		    sql_index_collation(pDest, i, &id)) {
 			return 0;	/* Different collating sequences */
 		}
 	}
@@ -1854,8 +1856,9 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		if (pDestCol->affinity != pSrcCol->affinity) {
 			return 0;	/* Affinity must be the same on all columns */
 		}
-		if (sql_column_collation(pDest, i) !=
-		    sql_column_collation(pSrc, i)) {
+		uint32_t id;
+		if (sql_column_collation(pDest, i, &id) !=
+		    sql_column_collation(pSrc, i, &id)) {
 			return 0;	/* Collating sequence must be the same on all columns */
 		}
 		if (!table_column_is_nullable(pDest, i)

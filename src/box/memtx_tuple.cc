@@ -90,6 +90,7 @@ memtx_tuple_free(void)
 
 struct tuple_format_vtab memtx_tuple_format_vtab = {
 	memtx_tuple_delete,
+	memtx_tuple_new,
 };
 
 struct tuple *

@@ -37,7 +37,7 @@
  * readability and editabiliity.  This file contains utility routines for
  * analyzing Expr objects in the WHERE clause.
  */
-#include <box/coll.h>
+#include "coll.h"
 #include "sqliteInt.h"
 #include "whereInt.h"
 
@@ -167,7 +167,8 @@ exprCommute(Parse * pParse, Expr * pExpr)
 			pExpr->pRight->flags &= ~EP_Collate;
 		} else {
 			bool is_found;
-			sql_expr_coll(pParse, pExpr->pLeft, &is_found);
+			uint32_t id;
+			sql_expr_coll(pParse, pExpr->pLeft, &is_found, &id);
 			if (is_found) {
 				/*
 				 * Neither X nor Y have COLLATE
@@ -830,7 +831,6 @@ static int
 termIsEquivalence(Parse * pParse, Expr * pExpr)
 {
 	char aff1, aff2;
-	const char *zColl1, *zColl2;
 	if (!OptimizationEnabled(pParse->db, SQLITE_Transitive))
 		return 0;
 	if (pExpr->op != TK_EQ && pExpr->op != TK_IS)
@@ -845,16 +845,16 @@ termIsEquivalence(Parse * pParse, Expr * pExpr)
 	    ) {
 		return 0;
 	}
-	struct coll *coll =
-	    sqlite3BinaryCompareCollSeq(pParse, pExpr->pLeft, pExpr->pRight);
-	if (coll == NULL || sqlite3StrICmp(coll->name, "BINARY") == 0)
+	uint32_t id;
+	struct coll *coll1 =
+	    sql_binary_compare_coll_seq(pParse, pExpr->pLeft, pExpr->pRight,
+					&id);
+	if (coll1 == NULL)
 		return 1;
 	bool unused;
-	coll = sql_expr_coll(pParse, pExpr->pLeft, &unused);
-	zColl1 = coll ? coll->name : NULL;
-	coll = sql_expr_coll(pParse, pExpr->pRight, &unused);
-	zColl2 = coll ? coll->name : NULL;
-	return sqlite3_stricmp(zColl1, zColl2) == 0;
+	coll1 = sql_expr_coll(pParse, pExpr->pLeft, &unused, &id);
+	struct coll *coll2 = sql_expr_coll(pParse, pExpr->pRight, &unused, &id);
+	return coll1 != NULL && coll1 == coll2;
 }
 
 /*

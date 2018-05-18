@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "box/lua/tuple.h"
+#include "box/tuple_update.h"
 
 #include "lua/utils.h" /* luaT_error() */
 #include "lua/msgpack.h" /* luamp_encode_XXX() */
@@ -409,12 +410,31 @@ lbox_tuple_transform(struct lua_State *L)
 	}
 	mpstream_flush(&stream);
 
-	/* Execute tuple_update */
-	struct tuple *new_tuple =
-		box_tuple_update(tuple, buf->buf, buf->buf + ibuf_used(buf));
-	if (tuple == NULL)
+	uint32_t new_size = 0, bsize;
+	const char *old_data = tuple_data_range(tuple, &bsize);
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	struct tuple *new_tuple = NULL;
+	/*
+	 * Can't use box_tuple_update() since transform must reset
+	 * the tuple format to default. The new tuple most likely
+	 * won't coerce into the original space format, so we have
+	 * to use the default one with no restrictions on field
+	 * count or types.
+	 */
+	const char *new_data = tuple_update_execute(region_aligned_alloc_cb,
+						    region, buf->buf,
+						    buf->buf + ibuf_used(buf),
+						    old_data, old_data + bsize,
+						    &new_size, 1, NULL);
+	if (new_data != NULL)
+		new_tuple = tuple_new(box_tuple_format_default(),
+				      new_data, new_data + new_size);
+	region_truncate(region, used);
+
+	if (new_tuple == NULL)
 		luaT_error(L);
-	/* box_tuple_update() doesn't leak on exception, see public API doc */
+
 	luaT_pushtuple(L, new_tuple);
 	ibuf_reset(buf);
 	return 1;

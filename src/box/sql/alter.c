@@ -300,6 +300,7 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 		Column *pCol = &pNew->aCol[i];
 		pCol->zName = sqlite3DbStrDup(db, pCol->zName);
 		pCol->coll = NULL;
+		pCol->coll_id = COLL_NONE;
 	}
 	pNew->pSchema = db->pSchema;
 	pNew->addColOffset = pTab->addColOffset;

@@ -94,3 +94,31 @@ space:select{}
 space:update({2}, {})
 space:select{}
 space:drop()
+
+--
+-- gh-3051 Lost format while tuple update
+--
+format = {}
+format[1] = {name = 'KEY', type = 'unsigned'}
+format[2] = {name = 'VAL', type = 'string'}
+s = box.schema.space.create('tst_sample', {engine = engine, format = format})
+pk = s:create_index('pk')
+s:insert({1, 'sss', '3', '4', '5', '6', '7'})
+aa = box.space.tst_sample:get(1)
+aa.VAL
+aa = aa:update({{'=',2,'ssss'}})
+aa.VAL
+-- invalid update
+aa:update({{'=',2, 666}})
+-- test transform integrity
+aa:transform(-1, 1)
+aa:transform(1, 6)
+aa = nil
+
+s:upsert({2, 'wwwww'}, {{'=', 2, 'wwwww'}})
+box.space.tst_sample:get(2).VAL
+s:upsert({2, 'wwwww2'}, {{'=', 2, 'wwwww2'}})
+box.space.tst_sample:get(2).VAL
+-- invalid upsert
+s:upsert({2, 666}, {{'=', 2, 666}})
+s:drop()

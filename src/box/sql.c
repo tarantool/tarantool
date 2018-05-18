@@ -382,12 +382,17 @@ tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 		return SQL_TARANTOOL_ERROR;
 	for (uint32_t part = 0; part < field_count; ++part) {
 		struct coll *coll;
-		if (def != NULL && part < def->part_count)
+		uint32_t id;
+		if (def != NULL && part < def->part_count) {
 			coll = def->parts[part].coll;
-		else
+			id = def->parts[part].coll_id;
+		} else {
 			coll = NULL;
+			id = COLL_NONE;
+		}
 		key_def_set_part(ephemer_key_def, part, part, FIELD_TYPE_SCALAR,
-				 ON_CONFLICT_ACTION_NONE, coll, SORT_ORDER_ASC);
+				 ON_CONFLICT_ACTION_NONE, coll, id,
+				 SORT_ORDER_ASC);
 	}
 
 	struct index_def *ephemer_index_def =
@@ -1444,11 +1449,11 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 
 	for (i = 0; i < n; i++) {
 		const char *t;
-		struct coll *coll = aCol[i].coll;
+		uint32_t cid = aCol[i].coll_id;
 		struct field_def *field = &pTable->def->fields[i];
 		struct Expr *def = field->default_value_expr;
 		int base_len = 4;
-		if (coll != NULL)
+		if (cid != COLL_NONE)
 			base_len += 1;
 		if (def != NULL)
 			base_len += 1;
@@ -1470,9 +1475,9 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		assert(aCol[i].notNull < on_conflict_action_MAX);
 		const char *action = on_conflict_action_strs[aCol[i].notNull];
 		p = enc->encode_str(p, action, strlen(action));
-		if (coll != NULL) {
+		if (cid != COLL_NONE) {
 			p = enc->encode_str(p, "collation", strlen("collation"));
-			p = enc->encode_uint(p, coll->id);
+			p = enc->encode_uint(p, cid);
 		}
 		if (def != NULL) {
 		        assert((def->flags & EP_IntValue) == 0);
@@ -1552,14 +1557,15 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 		else
 			t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
 		/* do not decode default collation */
-		p = enc->encode_map(p, pIndex->coll_array[i] == NULL ? 5 : 6);
+		uint32_t cid = pIndex->coll_id_array[i];
+		p = enc->encode_map(p, cid == COLL_NONE ? 5 : 6);
 		p = enc->encode_str(p, "type", sizeof("type")-1);
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "field", sizeof("field")-1);
 		p = enc->encode_uint(p, col);
-		if (pIndex->coll_array[i] != NULL) {
+		if (cid != COLL_NONE) {
 			p = enc->encode_str(p, "collation", sizeof("collation")-1);
-			p = enc->encode_uint(p, pIndex->coll_array[i]->id);
+			p = enc->encode_uint(p, cid);
 		}
 		p = enc->encode_str(p, "is_nullable", 11);
 		p = enc->encode_bool(p, aCol[col].notNull == ON_CONFLICT_ACTION_NONE);

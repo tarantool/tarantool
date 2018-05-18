@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_COLL_H_INCLUDED
-#define TARANTOOL_BOX_COLL_H_INCLUDED
+#ifndef TARANTOOL_BOX_COLL_ID_DEF_H_INCLUDED
+#define TARANTOOL_BOX_COLL_ID_DEF_H_INCLUDED
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -31,84 +31,24 @@
  * SUCH DAMAGE.
  */
 
-#include "coll_def.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <coll_def.h>
+#include "opt_def.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-struct coll;
-
-typedef int (*coll_cmp_f)(const char *s, size_t s_len,
-			  const char *t, size_t t_len,
-			  const struct coll *coll);
-
-typedef uint32_t (*coll_hash_f)(const char *s, size_t s_len,
-				uint32_t *ph, uint32_t *pcarry,
-				struct coll *coll);
-
-/**
- * ICU collation specific data.
- */
-struct UCollator;
-
-struct coll_icu {
-	struct UCollator *collator;
-};
-
-/**
- * A collation.
- */
-struct coll {
-	/** Personal ID */
+/** Collation identifier definition. */
+struct coll_id_def {
+	/** Perconal ID */
 	uint32_t id;
 	/** Owner ID */
 	uint32_t owner_id;
-	/** Collation type. */
-	enum coll_type type;
-	/** Type specific data. */
-	struct coll_icu icu;
-	/** String comparator. */
-	coll_cmp_f cmp;
-	coll_hash_f hash;
-	/** Reference counter. */
-	int refs;
 	/** Collation name. */
 	size_t name_len;
-	char name[0];
+	const char *name;
+	/** Core collation definition. */
+	struct coll_def base;
 };
 
-/**
- * Return true, if a collation is case sensitive.
- * @param coll Collation to check.
- * @retval Case sensitivity.
- */
-bool
-coll_is_case_sensitive(const struct coll *coll);
+extern const struct opt_def coll_icu_opts_reg[];
 
-/**
- * Create a collation by definition.
- * @param def - collation definition.
- * @return - the collation OR NULL on memory error (diag is set).
- */
-struct coll *
-coll_new(const struct coll_def *def);
-
-/** Increment reference counter. */
-static inline void
-coll_ref(struct coll *coll)
-{
-	++coll->refs;
-}
-
-/** Decrement reference counter. Delete when 0. */
-void
-coll_unref(struct coll *coll);
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_BOX_COLL_H_INCLUDED */
+#endif /* TARANTOOL_BOX_COLL_ID_DEF_H_INCLUDED */

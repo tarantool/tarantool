@@ -30,7 +30,7 @@
  */
 #include "json/path.h"
 #include "tuple_format.h"
-#include "coll_cache.h"
+#include "coll_id_cache.h"
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
@@ -40,7 +40,7 @@ static uint32_t formats_size = 0, formats_capacity = 0;
 
 static const struct tuple_field tuple_field_default = {
 	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false,
-	ON_CONFLICT_ACTION_DEFAULT, NULL
+	ON_CONFLICT_ACTION_DEFAULT, NULL, COLL_NONE,
 };
 
 /**
@@ -66,16 +66,18 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
 		format->fields[i].nullable_action = fields[i].nullable_action;
 		struct coll *coll = NULL;
-		uint32_t coll_id = fields[i].coll_id;
-		if (coll_id != COLL_NONE) {
-			coll = coll_by_id(coll_id);
-			if (coll == NULL) {
+		uint32_t cid = fields[i].coll_id;
+		if (cid != COLL_NONE) {
+			struct coll_id *coll_id = coll_by_id(cid);
+			if (coll_id == NULL) {
 				diag_set(ClientError,ER_WRONG_COLLATION_OPTIONS,
 					 i + 1, "collation was not found by ID");
 				return -1;
 			}
+			coll = coll_id->coll;
 		}
 		format->fields[i].coll = coll;
+		format->fields[i].coll_id = cid;
 	}
 	/* Initialize remaining fields */
 	for (uint32_t i = field_count; i < format->field_count; i++)

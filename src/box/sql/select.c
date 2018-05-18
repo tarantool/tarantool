@@ -33,9 +33,10 @@
  * This file contains C code routines that are called by the parser
  * to handle SELECT statements in SQLite.
  */
-#include <box/coll.h>
+#include "coll.h"
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
+#include "box/coll_id_cache.h"
 #include "box/schema.h"
 #include "box/session.h"
 
@@ -933,11 +934,11 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				iJump = sqlite3VdbeCurrentAddr(v) + nResultCol;
 				for (i = 0; i < nResultCol; i++) {
 					bool is_found;
+					uint32_t id;
 					struct coll *coll =
 					    sql_expr_coll(pParse,
-							  pEList->a[i].
-							  pExpr,
-							  &is_found);
+							  pEList->a[i].pExpr,
+							  &is_found, &id);
 					if (i < nResultCol - 1) {
 						sqlite3VdbeAddOp3(v, OP_Ne,
 								  regResult + i,
@@ -1229,9 +1230,11 @@ sql_expr_list_to_key_def(struct Parse *parse, struct ExprList *list, int start)
 	struct ExprList_item *item = list->a + start;
 	for (int i = start; i < expr_count; ++i, ++item) {
 		bool unused;
-		struct coll *coll = sql_expr_coll(parse, item->pExpr, &unused);
+		uint32_t id;
+		struct coll *coll =
+			sql_expr_coll(parse, item->pExpr, &unused, &id);
 		key_def_set_part(def, i-start, i-start, FIELD_TYPE_SCALAR,
-				 ON_CONFLICT_ACTION_ABORT, coll,
+				 ON_CONFLICT_ACTION_ABORT, coll, id,
 				 item->sort_order);
 	}
 	return def;
@@ -1865,9 +1868,12 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 		if (pCol->affinity == 0)
 			pCol->affinity = SQLITE_AFF_BLOB;
 		bool unused;
-		struct coll *coll = sql_expr_coll(pParse, p, &unused);
-		if (coll != NULL && pCol->coll == NULL)
+		uint32_t id;
+		struct coll *coll = sql_expr_coll(pParse, p, &unused, &id);
+		if (coll != NULL && pCol->coll == NULL) {
 			pCol->coll = coll;
+			pCol->coll_id = id;
+		}
 	}
 }
 
@@ -2023,33 +2029,47 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 }
 
 #ifndef SQLITE_OMIT_COMPOUND_SELECT
-/*
- * Return the appropriate collating sequence for the iCol-th column of
- * the result set for the compound-select statement "p".  Return NULL if
- * the column has no default collating sequence.
- *
- * The collating sequence for the compound select is taken from the
- * left-most term of the select that has a collating sequence.
- */
 static struct coll *
-multiSelectCollSeq(Parse * pParse, Select * p, int iCol, bool *is_found)
+multi_select_coll_seq_r(Parse *parser, Select *p, int n, bool *is_found,
+			uint32_t *coll_id)
 {
 	struct coll *coll;
-	if (p->pPrior != NULL)
-		coll = multiSelectCollSeq(pParse, p->pPrior, iCol, is_found);
-	else
+	if (p->pPrior != NULL) {
+		coll = multi_select_coll_seq_r(parser, p->pPrior, n, is_found,
+					       coll_id);
+	} else {
 		coll = NULL;
-	assert(iCol >= 0);
+		*coll_id = COLL_NONE;
+	}
+	assert(n >= 0);
 	/* iCol must be less than p->pEList->nExpr.  Otherwise an error would
 	 * have been thrown during name resolution and we would not have gotten
 	 * this far
 	 */
-	if (!(*is_found) && ALWAYS(iCol < p->pEList->nExpr)) {
-		coll = sql_expr_coll(pParse,
-				     p->pEList->a[iCol].pExpr,
-				     is_found);
+	if (!*is_found && ALWAYS(n < p->pEList->nExpr)) {
+		coll = sql_expr_coll(parser, p->pEList->a[n].pExpr, is_found,
+				     coll_id);
 	}
 	return coll;
+}
+
+/**
+ * The collating sequence for the compound select is taken from the
+ * left-most term of the select that has a collating sequence.
+ * @param parser Parser.
+ * @param p Select.
+ * @param n Column number.
+ * @param[out] coll_id Collation identifer.
+ * @retval The appropriate collating sequence for the n-th column
+ *         of the result set for the compound-select statement
+ *         "p".
+ * @retval NULL The column has no default collating sequence.
+ */
+static inline struct coll *
+multi_select_coll_seq(Parse *parser, Select *p, int n, uint32_t *coll_id)
+{
+	bool is_found = false;
+	return multi_select_coll_seq_r(parser, p, n, &is_found, coll_id);
 }
 
 /**
@@ -2084,18 +2104,19 @@ sql_multiselect_orderby_to_key_def(struct Parse *parse, struct Select *s,
 		struct ExprList_item *item = &order_by->a[i];
 		struct Expr *term = item->pExpr;
 		struct coll *coll;
-		bool is_found = false;
-
-		if (term->flags & EP_Collate) {
-			coll = sql_expr_coll(parse, term, &is_found);
+		uint32_t id;
+		if ((term->flags & EP_Collate) != 0) {
+			bool is_found = false;
+			coll = sql_expr_coll(parse, term, &is_found, &id);
 		} else {
-			coll = multiSelectCollSeq(parse, s,
-						  item->u.x.iOrderByCol - 1,
-						  &is_found);
+			coll = multi_select_coll_seq(parse, s,
+						     item->u.x.iOrderByCol - 1,
+						     &id);
 			if (coll != NULL) {
+				const char *name = coll_by_id(id)->name;
 				order_by->a[i].pExpr =
 					sqlite3ExprAddCollateString(parse, term,
-								    coll->name);
+								    name);
 			} else {
 				order_by->a[i].pExpr =
 					sqlite3ExprAddCollateString(parse, term,
@@ -2103,7 +2124,7 @@ sql_multiselect_orderby_to_key_def(struct Parse *parse, struct Select *s,
 			}
 		}
 		key_def_set_part(key_def, i, i, FIELD_TYPE_SCALAR,
-				 ON_CONFLICT_ACTION_ABORT, coll,
+				 ON_CONFLICT_ACTION_ABORT, coll, id,
 				 order_by->a[i].sort_order);
 	}
 
@@ -2740,12 +2761,12 @@ multiSelect(Parse * pParse,	/* Parsing context */
 			goto multi_select_end;
 		}
 		for (int i = 0; i < nCol; i++) {
-			bool unused = false;
+			uint32_t id;
+			struct coll *coll = multi_select_coll_seq(pParse, p, i,
+								  &id);
 			key_def_set_part(key_def, i, i,
 					 FIELD_TYPE_SCALAR,
-					 ON_CONFLICT_ACTION_ABORT,
-					 multiSelectCollSeq(pParse, p, i,
-							    &unused),
+					 ON_CONFLICT_ACTION_ABORT, coll, id,
 					 SORT_ORDER_ASC);
 		}
 
@@ -3183,15 +3204,14 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		def_dup = key_def_new(expr_count);
 		if (def_dup != NULL) {
 			for (int i = 0; i < expr_count; i++) {
-				bool is_found = false;
-				struct coll *coll;
-				coll = multiSelectCollSeq(pParse, p, i,
-							  &is_found);
+				uint32_t id;
+				struct coll *coll =
+					multi_select_coll_seq(pParse, p, i,
+							      &id);
 				key_def_set_part(def_dup, i, i,
 						 FIELD_TYPE_SCALAR,
-						 ON_CONFLICT_ACTION_ABORT,
-						 coll,
-						 SORT_ORDER_ASC);
+						 ON_CONFLICT_ACTION_ABORT, coll,
+						 id, SORT_ORDER_ASC);
 			}
 		} else {
 			sqlite3OomFault(db);
@@ -5169,10 +5189,11 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			int j;
 			assert(pList != 0);	/* pList!=0 if pF->pFunc has NEEDCOLL */
 			bool is_found = false;
+			uint32_t id;
 			for (j = 0, pItem = pList->a; !is_found && j < nArg;
 			     j++, pItem++) {
 				coll = sql_expr_coll(pParse, pItem->pExpr,
-						     &is_found);
+						     &is_found, &id);
 			}
 			if (regHit == 0 && pAggInfo->nAccumulator)
 				regHit = ++pParse->nMem;

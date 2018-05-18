@@ -57,6 +57,7 @@
 #include "lua/pickle.h"
 #include "lua/fio.h"
 #include "lua/httpc.h"
+#include "lua/utf8.h"
 #include "digest.h"
 #include <small/ibuf.h>
 
@@ -399,6 +400,7 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_call(L, 0, 0);
 	lua_register(L, "tonumber64", lbox_tonumber64);
 
+	tarantool_lua_utf8_init(L);
 	tarantool_lua_utils_init(L);
 	tarantool_lua_fiber_init(L);
 	tarantool_lua_fiber_cond_init(L);
@@ -629,6 +631,7 @@ tarantool_lua_run_script(char *path, bool interactive,
 void
 tarantool_lua_free()
 {
+	tarantool_lua_utf8_free();
 	/*
 	 * Some part of the start script panicked, and called
 	 * exit().  The call stack in this case leads us back to

@@ -1957,8 +1957,10 @@ box_cfg_xc(void)
 	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
-		 &replicaset.vclock, wal_max_rows, wal_max_size);
+	if (wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
+		      &replicaset.vclock, wal_max_rows, wal_max_size)) {
+		diag_raise();
+	}
 
 	rmean_cleanup(rmean_box);
 

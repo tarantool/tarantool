@@ -33,7 +33,7 @@
  * This file contains code used by the compiler to add foreign key
  * support to compiled SQL statements.
  */
-#include <box/coll.h>
+#include "coll.h"
 #include "sqliteInt.h"
 #include "box/session.h"
 #include "tarantoolInt.h"
@@ -298,10 +298,13 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 					 * unusable. Bail out early in this case.
 					 */
 					struct coll *def_coll;
+					uint32_t id;
 					def_coll = sql_column_collation(pParent,
-									iCol);
-					struct coll *coll;
-					coll = sql_index_collation(pIdx, i);
+									iCol,
+									&id);
+					struct coll *coll =
+						sql_index_collation(pIdx, i,
+								    &id);
 					if (def_coll != coll)
 						break;
 
@@ -535,13 +538,8 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 			pCol = &pTab->aCol[iCol];
 			pExpr->iTable = regBase + iCol + 1;
 			pExpr->affinity = pCol->affinity;
-			const char *coll_name;
-			if (pCol->coll == NULL && pCol->coll != NULL)
-				coll_name = pCol->coll->name;
-			else
-				coll_name = "binary";
 			pExpr = sqlite3ExprAddCollateString(pParse, pExpr,
-							    coll_name);
+							    "binary");
 		} else {
 			pExpr->iTable = regBase;
 			pExpr->affinity = SQLITE_AFF_INTEGER;

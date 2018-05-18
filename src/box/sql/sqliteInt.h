@@ -1888,6 +1888,8 @@ struct Savepoint {
 struct Column {
 	char *zName;		/* Name of this column */
 	enum field_type type;	/* Column type. */
+	/** Collation identifier. */
+	uint32_t coll_id;
 	/** Collating sequence. */
 	struct coll *coll;
 	/**
@@ -2152,6 +2154,8 @@ struct Index {
 	enum sort_order *sort_order;
 	/** Array of collation sequences for index. */
 	struct coll **coll_array;
+	/** Array of collation identifiers. */
+	uint32_t *coll_id_array;
 	Expr *pPartIdxWhere;	/* WHERE clause for partial indices */
 	ExprList *aColExpr;	/* Column expressions */
 	int tnum;		/* DB Page containing root of this index */
@@ -3548,14 +3552,26 @@ void sqlite3AddCheckConstraint(Parse *, Expr *);
 void sqlite3AddDefaultValue(Parse *, ExprSpan *);
 void sqlite3AddCollateType(Parse *, Token *);
 
-const char *
-column_collation_name(Table *, uint32_t);
+/**
+ * Return collation of given column from table.
+ * @param table Table which is used to fetch column.
+ * @param column Number of column.
+ * @param[out] coll_id Collation identifier.
+ *
+ * @retval Pointer to collation.
+ */
 struct coll *
-sql_column_collation(Table *, uint32_t);
-const char *
-index_collation_name(Index *, uint32_t);
+sql_column_collation(Table *table, uint32_t column, uint32_t *coll_id);
+/**
+ * Return name of given column collation from index.
+ *
+ * @param idx Index which is used to fetch column.
+ * @param column Number of column.
+ * @param[out] coll_id Collation identifier.
+ * @retval Pointer to collation.
+ */
 struct coll *
-sql_index_collation(Index *idx, uint32_t column);
+sql_index_collation(Index *idx, uint32_t column, uint32_t *id);
 bool
 space_is_view(Table *);
 
@@ -4082,7 +4098,6 @@ const char *sqlite3ErrName(int);
 #endif
 
 const char *sqlite3ErrStr(int);
-struct coll *sqlite3FindCollSeq(const char *);
 
 /**
  * Return the collation sequence for the expression pExpr. If
@@ -4096,11 +4111,12 @@ struct coll *sqlite3FindCollSeq(const char *);
  * @param parse Parsing context.
  * @param expr Expression to scan.
  * @param[out] is_found Flag set if collation was found.
+ * @param[out] coll_id Collation identifier.
  *
  * @retval Pointer to collation.
  */
 struct coll *
-sql_expr_coll(Parse * pParse, Expr * pExpr, bool *is_found);
+sql_expr_coll(Parse * pParse, Expr * pExpr, bool *is_found, uint32_t *coll_id);
 
 Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
 Expr *sqlite3ExprAddCollateString(Parse *, Expr *, const char *);
@@ -4170,7 +4186,16 @@ char* rename_table(sqlite3 *, const char *, const char *, bool *);
 char* rename_parent_table(sqlite3 *, const char *, const char *, const char *,
 			  uint32_t *, uint32_t *);
 char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
-struct coll *sqlite3GetCollSeq(Parse *, const char *);
+/**
+ * Find a collation by name. Set error in @a parser if not found.
+ * @param parser Parser.
+ * @param name Collation name.
+ * @param[out] Collation identifier.
+ *
+ * @retval Collation object. NULL on error or not found.
+ */
+struct coll *
+sql_get_coll_seq(Parse *parser, const char *name, uint32_t *coll_id);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
 
@@ -4257,7 +4282,27 @@ int sqlite3TransferBindings(sqlite3_stmt *, sqlite3_stmt *);
 void sqlite3ParserReset(Parse *);
 int sqlite3Reprepare(Vdbe *);
 void sqlite3ExprListCheckLength(Parse *, ExprList *, const char *);
-struct coll *sqlite3BinaryCompareCollSeq(Parse *, Expr *, Expr *);
+/**
+ * Return a pointer to the collation sequence that should be used
+ * by a binary comparison operator comparing left and right.
+ *
+ * If the left hand expression has a collating sequence type, then
+ * it is used. Otherwise the collation sequence for the right hand
+ * expression is used, or the default (BINARY) if neither
+ * expression has a collating type.
+ *
+ * Argument right (but not left) may be a null pointer. In this
+ * case, it is not considered.
+ * @param parser Parser.
+ * @param left Left expression.
+ * @param right Right expression. Can be NULL.
+ * @param[out] coll_id Collation identifier.
+ *
+ * @retval Collation object.
+ */
+struct coll *
+sql_binary_compare_coll_seq(Parse *parser, Expr *left, Expr *right,
+			    uint32_t *coll_id);
 int sqlite3TempInMemory(const sqlite3 *);
 #ifndef SQLITE_OMIT_CTE
 With *sqlite3WithAdd(Parse *, With *, Token *, ExprList *, Select *);

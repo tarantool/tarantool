@@ -49,6 +49,7 @@ extern const struct type_info type_ChannelIsClosed;
 extern const struct type_info type_LuajitError;
 extern const struct type_info type_IllegalParams;
 extern const struct type_info type_SystemError;
+extern const struct type_info type_CollationError;
 
 const char *
 exception_get_string(struct error *e, const struct method_info *method);
@@ -139,6 +140,14 @@ public:
 	IllegalParams(const char *file, unsigned line, const char *format, ...);
 	virtual void raise() { throw this; }
 };
+
+class CollationError: public Exception {
+public:
+	CollationError(const char *file, unsigned line, const char *format,
+		       ...);
+	virtual void raise() { throw this; }
+};
+
 /**
  * Initialize the exception subsystem.
  */

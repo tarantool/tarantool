@@ -977,7 +977,9 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 				VdbeCoverage(v);
 			}
 			for (i = 0; i < nColTest; i++) {
-				struct coll *coll = sql_index_collation(pIdx, i);
+				uint32_t id;
+				struct coll *coll =
+					sql_index_collation(pIdx, i, &id);
 				sqlite3VdbeAddOp2(v, OP_Integer, i, regChng);
 				sqlite3VdbeAddOp3(v, OP_Column, iIdxCur,
 						  pIdx->aiColumn[i], regTemp);

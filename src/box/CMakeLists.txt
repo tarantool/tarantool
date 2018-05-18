@@ -43,10 +43,10 @@ add_library(tuple STATIC
     tuple_hash.cc
     tuple_bloom.c
     tuple_dictionary.c
-    key_def.cc
-    coll_def.c
-    coll.c
-    coll_cache.c
+    key_def.c
+    coll_id_def.c
+    coll_id.c
+    coll_id_cache.c
     field_def.c
     opt_def.c
 )
@@ -104,7 +104,7 @@ add_library(box STATIC
     txn.c
     box.cc
     gc.c
-    checkpoint.cc
+    checkpoint.c
     user_def.c
     user.cc
     authentication.cc
@@ -114,9 +114,9 @@ add_library(box STATIC
     applier.cc
     relay.cc
     journal.c
-    wal.cc
     sql.c
     execute.c
+    wal.c
     call.c
     ${lua_sources}
     lua/init.c

@@ -37,7 +37,7 @@
  * so is applicable.  Because this module is responsible for selecting
  * indices, you might also think of this module as the "query optimizer".
  */
-#include <box/coll.h>
+#include "coll.h"
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
@@ -307,11 +307,12 @@ whereScanNext(WhereScan * pScan)
 							if (pScan->is_column_seen) {
 								Parse *pParse =
 									pWC->pWInfo->pParse;
-								struct coll *coll;
 								assert(pX->pLeft);
-								coll = sqlite3BinaryCompareCollSeq
-									(pParse, pX->pLeft,
-									 pX->pRight);
+								uint32_t id;
+								struct coll *coll =
+									sql_binary_compare_coll_seq(
+										pParse, pX->pLeft,
+										pX->pRight, &id);
 								if (coll != pScan->coll)
 									continue;
 							}
@@ -381,7 +382,8 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 			pScan->pIdxExpr = pIdx->aColExpr->a[j].pExpr;
 		} else if (iColumn >= 0) {
 			pScan->idxaff = pIdx->pTable->aCol[iColumn].affinity;
-			pScan->coll = sql_index_collation(pIdx, j);
+			uint32_t id;
+			pScan->coll = sql_index_collation(pIdx, j, &id);
 			pScan->is_column_seen = true;
 		}
 	} else if (iColumn == XN_EXPR) {
@@ -469,11 +471,12 @@ findIndexCol(Parse * pParse,	/* Parse context */
 		    p->iColumn == pIdx->aiColumn[iCol] &&
 		    p->iTable == iBase) {
 			bool is_found;
+			uint32_t id;
 			struct coll *coll = sql_expr_coll(pParse,
 							  pList->a[i].pExpr,
-							  &is_found);
+							  &is_found, &id);
 			if (is_found &&
-			    coll == sql_index_collation(pIdx, iCol)) {
+			    coll == sql_index_collation(pIdx, iCol, &id)) {
 				return i;
 			}
 		}
@@ -777,10 +780,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 				Expr *pX = pTerm->pExpr;
 				idxCols |= cMask;
 				pIdx->aiColumn[n] = pTerm->u.leftColumn;
-				pColl =
-				    sqlite3BinaryCompareCollSeq(pParse,
-								pX->pLeft,
-								pX->pRight);
 				n++;
 			}
 		}
@@ -1172,13 +1171,13 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	int nUpper = index->def->opts.stat->sample_count + 1;
 	int rc = SQLITE_OK;
 	u8 aff = sqlite3IndexColumnAffinity(db, p, nEq);
-	struct coll *pColl;
+	uint32_t id;
 
 	sqlite3_value *p1 = 0;	/* Value extracted from pLower */
 	sqlite3_value *p2 = 0;	/* Value extracted from pUpper */
 	sqlite3_value *pVal = 0;	/* Value extracted from record */
 
-	pColl = sql_index_collation(p, nEq);
+	struct coll *pColl = sql_index_collation(p, nEq, &id);
 	if (pLower) {
 		rc = sqlite3Stat4ValueFromExpr(pParse, pLower->pExpr->pRight,
 					       aff, &p1);
@@ -2274,11 +2273,11 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		    sqlite3TableColumnAffinity(pIdx->pTable, pLhs->iColumn);
 		if (aff != idxaff)
 			break;
-
-		pColl = sqlite3BinaryCompareCollSeq(pParse, pLhs, pRhs);
+		uint32_t id;
+		pColl = sql_binary_compare_coll_seq(pParse, pLhs, pRhs, &id);
 		if (pColl == 0)
 			break;
-	        if (sql_index_collation(pIdx, i + nEq) != pColl)
+	        if (sql_index_collation(pIdx, i + nEq, &id) != pColl)
 			break;
 	}
 	return i;
@@ -3310,12 +3309,13 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 			    && pOBExpr->iColumn >= 0) {
 				struct coll *coll1, *coll2;
 				bool unused;
+				uint32_t id;
 				coll1 = sql_expr_coll(pWInfo->pParse,
 						      pOrderBy->a[i].pExpr,
-						      &unused);
+						      &unused, &id);
 				coll2 = sql_expr_coll(pWInfo->pParse,
 						      pTerm->pExpr,
-						      &unused);
+						      &unused, &id);
 				if (coll1 != coll2)
 					continue;
 				testcase(pTerm->pExpr->op == TK_IS);
@@ -3442,13 +3442,14 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 					}
 					if (iColumn >= 0) {
 						bool is_found;
+						uint32_t id;
 						struct coll *coll =
 							sql_expr_coll(pWInfo->pParse,
 								      pOrderBy->a[i].pExpr,
-								      &is_found);
+								      &is_found, &id);
 						struct coll *idx_coll =
 							sql_index_collation(pIndex,
-									    j);
+									    j, &id);
 						if (is_found &&
 						    coll != idx_coll)
 							continue;

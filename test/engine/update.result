@@ -683,3 +683,78 @@ space:select{}
 space:drop()
 ---
 ...
+--
+-- gh-3051 Lost format while tuple update
+--
+format = {}
+---
+...
+format[1] = {name = 'KEY', type = 'unsigned'}
+---
+...
+format[2] = {name = 'VAL', type = 'string'}
+---
+...
+s = box.schema.space.create('tst_sample', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:insert({1, 'sss', '3', '4', '5', '6', '7'})
+---
+- [1, 'sss', '3', '4', '5', '6', '7']
+...
+aa = box.space.tst_sample:get(1)
+---
+...
+aa.VAL
+---
+- sss
+...
+aa = aa:update({{'=',2,'ssss'}})
+---
+...
+aa.VAL
+---
+- ssss
+...
+-- invalid update
+aa:update({{'=',2, 666}})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+-- test transform integrity
+aa:transform(-1, 1)
+---
+- [1, 'ssss', '3', '4', '5', '6']
+...
+aa:transform(1, 6)
+---
+- ['7']
+...
+aa = nil
+---
+...
+s:upsert({2, 'wwwww'}, {{'=', 2, 'wwwww'}})
+---
+...
+box.space.tst_sample:get(2).VAL
+---
+- wwwww
+...
+s:upsert({2, 'wwwww2'}, {{'=', 2, 'wwwww2'}})
+---
+...
+box.space.tst_sample:get(2).VAL
+---
+- wwwww2
+...
+-- invalid upsert
+s:upsert({2, 666}, {{'=', 2, 666}})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+s:drop()
+---
+...

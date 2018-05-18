@@ -35,48 +35,27 @@
  * of user defined functions and collation sequences.
  */
 
-#include <box/coll_cache.h>
+#include "box/coll_id_cache.h"
 #include "sqliteInt.h"
 #include "box/session.h"
 
-/*
- * This function is responsible for invoking the collation factory callback
- * or substituting a collation sequence of a different encoding when the
- * requested collation sequence is not available in the desired encoding.
- *
- * If it is not NULL, then pColl must point to the database native encoding
- * collation sequence with name zName, length nName.
- *
- * The return value is either the collation sequence to be used in database
- * db for collation type name zName, length nName, or NULL, if no collation
- * sequence can be found.  If no collation is found, leave an error message.
- */
 struct coll *
-sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
-		  const char *zName	/* Collating sequence name */
-    )
+sql_get_coll_seq(Parse *parser, const char *name, uint32_t *coll_id)
 {
-	if (zName == NULL || strcasecmp(zName, "binary") == 0)
-		return 0;
-	struct coll *p = coll_by_name(zName, strlen(zName));
-	if (p == NULL) {
-		sqlite3ErrorMsg(pParse, "no such collation sequence: %s",
-				zName);
+	if (name == NULL || strcasecmp(name, "binary") == 0) {
+		*coll_id = COLL_NONE;
+		return NULL;
 	}
-	return p;
-}
-
-/**
- * Return the coll* pointer for the collation sequence named zName.
- * @param zName Name of collation to be found.
- * @retval Pointer for the collation sequence named zName.
- */
-struct coll *
-sqlite3FindCollSeq(const char *zName)
-{
-	if (zName == NULL || strcasecmp(zName, "binary") == 0)
-		return 0;
-	return coll_by_name(zName, strlen(zName));
+	struct coll_id *p = coll_by_name(name, strlen(name));
+	if (p == NULL) {
+		*coll_id = COLL_NONE;
+		sqlite3ErrorMsg(parser, "no such collation sequence: %s",
+				name);
+		return NULL;
+	} else {
+		*coll_id = p->id;
+		return p->coll;
+	}
 }
 
 /* During the search for the best function definition, this procedure

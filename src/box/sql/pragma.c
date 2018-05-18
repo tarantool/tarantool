@@ -32,11 +32,11 @@
 /*
  * This file contains code used to implement the PRAGMA command.
  */
-#include <box/coll.h>
 #include <box/index.h>
 #include <box/box.h>
 #include <box/tuple.h>
 #include "box/schema.h"
+#include "box/coll_id_cache.h"
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
@@ -469,10 +469,11 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 								     zName);
 						if (pPragma->iArg) {
 							const char *c_n;
-							struct coll *coll;
-							coll = sql_index_collation(pIdx, i);
+							uint32_t id;
+							struct coll *coll =
+								sql_index_collation(pIdx, i, &id);
 							if (coll != NULL)
-								c_n = coll->name;
+								c_n = coll_by_id(id)->name;
 							else
 								c_n = "BINARY";
 							enum sort_order sort_order;

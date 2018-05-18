@@ -235,6 +235,18 @@ IllegalParams::IllegalParams(const char *file, unsigned line,
 	va_end(ap);
 }
 
+const struct type_info type_CollationError =
+	make_type("CollationError", &type_Exception);
+
+CollationError::CollationError(const char *file, unsigned line,
+			       const char *format, ...)
+	: Exception(&type_CollationError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
 
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
@@ -296,6 +308,18 @@ BuildSystemError(const char *file, unsigned line, const char *format, ...)
 {
 	BuildAlloc(SystemError);
 	SystemError *e = new (p) SystemError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildCollationError(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(CollationError);
+	CollationError *e =  new (p) CollationError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);

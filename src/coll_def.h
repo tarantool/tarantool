@@ -1,7 +1,7 @@
-#ifndef TARANTOOL_BOX_COLL_DEF_H_INCLUDED
-#define TARANTOOL_BOX_COLL_DEF_H_INCLUDED
+#ifndef TARANTOOL_COLL_DEF_H_INCLUDED
+#define TARANTOOL_COLL_DEF_H_INCLUDED
 /*
- * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,24 +30,21 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <stddef.h>
 #include <stdint.h>
-#include "opt_def.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif /* defined(__cplusplus) */
-
-/**
- * The supported collation types
- */
+/** The supported collation types */
 enum coll_type {
 	COLL_TYPE_ICU = 0,
 	coll_type_MAX,
 };
 
 extern const char *coll_type_strs[];
+
+/** Maximal length of locale name. */
+enum {
+	COLL_LOCALE_LEN_MAX = 16,
+};
 
 /*
  * ICU collation options. See
@@ -109,30 +106,14 @@ struct coll_icu_def {
 	enum coll_icu_on_off numeric_collation;
 };
 
-/**
- * Definition of a collation.
- */
+/** Collation definition. */
 struct coll_def {
-	/** Perconal ID */
-	uint32_t id;
-	/** Owner ID */
-	uint32_t owner_id;
-	/** Collation name. */
-	size_t name_len;
-	const char *name;
-	/** Locale. */
-	size_t locale_len;
-	const char *locale;
 	/** Collation type. */
 	enum coll_type type;
 	/** Type specific options. */
 	struct coll_icu_def icu;
+	/** Locale. */
+	char locale[COLL_LOCALE_LEN_MAX + 1];
 };
 
-extern const struct opt_def coll_icu_opts_reg[];
-
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
-#endif /* TARANTOOL_BOX_COLL_DEF_H_INCLUDED */
+#endif /* TARANTOOL_COLL_DEF_H_INCLUDED */

@@ -34,6 +34,7 @@
  * a VDBE (or an "sqlite3_stmt" as it is known to the outside world.)
  */
 #include "fiber.h"
+#include "coll.h"
 #include "box/session.h"
 #include "box/schema.h"
 #include "box/tuple_format.h"
@@ -1536,10 +1537,11 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 				sqlite3XPrintf(&x, "k(%d", def->part_count);
 				for (int j = 0; j < (int)def->part_count; j++) {
 					struct coll *coll = def->parts[j].coll;
-					const char *coll_str =
-					    coll != NULL ? coll->name : "";
-					if (strcmp(coll_str, "BINARY") == 0)
+					const char *coll_str;
+					if (coll == NULL)
 						coll_str = "B";
+					else
+						coll_str = coll->fingerprint;
 					const char *sort_order = "";
 					if (def->parts[j].sort_order ==
 					    SORT_ORDER_DESC) {
@@ -1562,7 +1564,8 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 	case P4_COLLSEQ:{
 			struct coll *pColl = pOp->p4.pColl;
 			if (pColl != NULL)
-				sqlite3XPrintf(&x, "(%.20s)", pColl->name);
+				sqlite3XPrintf(&x, "(%.100s)",
+					       pColl->fingerprint);
 			else
 				sqlite3XPrintf(&x, "(binary)");
 			break;
