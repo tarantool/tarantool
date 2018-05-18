@@ -75,32 +75,6 @@ sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
 	return p;
 }
 
-/*
- * This routine is called on a collation sequence before it is used to
- * check that it is defined. An undefined collation sequence exists when
- * a database is loaded that contains references to collation sequences
- * that have not been defined by sqlite3_create_collation() etc.
- *
- * If required, this routine calls the 'collation needed' callback to
- * request a definition of the collating sequence. If this doesn't work,
- * an equivalent collating sequence that uses a text encoding different
- * from the main database is substituted, if one is available.
- */
-int
-sqlite3CheckCollSeq(Parse * pParse, struct coll * pColl)
-{
-	if (pColl) {
-		const char *zName = pColl->name;
-		struct coll *p =
-		    sqlite3GetCollSeq(pParse, pColl, zName);
-		if (!p) {
-			return SQLITE_ERROR;
-		}
-		assert(p == pColl);
-	}
-	return SQLITE_OK;
-}
-
 /**
  * Return the coll* pointer for the collation sequence named zName.
  *

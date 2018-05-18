@@ -221,12 +221,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found)
 			break;
 		}
 	}
-	if (sqlite3CheckCollSeq(parse, coll) != 0) {
-		*is_found = false;
-		return NULL;
-	} else {
-		return coll;
-	}
+	return coll;
 }
 
 /*
