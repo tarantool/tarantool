@@ -4083,7 +4083,6 @@ const char *sqlite3ErrName(int);
 
 const char *sqlite3ErrStr(int);
 struct coll *sqlite3FindCollSeq(const char *);
-struct coll *sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName);
 
 /**
  * Return the collation sequence for the expression pExpr. If
@@ -4171,7 +4170,7 @@ char* rename_table(sqlite3 *, const char *, const char *, bool *);
 char* rename_parent_table(sqlite3 *, const char *, const char *, const char *,
 			  uint32_t *, uint32_t *);
 char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
-struct coll *sqlite3GetCollSeq(Parse *, struct coll *, const char *);
+struct coll *sqlite3GetCollSeq(Parse *, const char *);
 char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
 

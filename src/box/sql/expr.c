@@ -173,7 +173,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found)
 		}
 		if (op == TK_COLLATE ||
 		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
-			coll = sqlite3GetCollSeq(parse, NULL, p->u.zToken);
+			coll = sqlite3GetCollSeq(parse, p->u.zToken);
 			*is_found = true;
 			break;
 		}

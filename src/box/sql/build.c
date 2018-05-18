@@ -1070,7 +1070,7 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 	if (!zColl)
 		return;
 
-	struct coll *coll = sqlite3LocateCollSeq(pParse, db, zColl);
+	struct coll *coll = sqlite3GetCollSeq(pParse, zColl);
 	if (coll != NULL) {
 		Index *pIdx;
 		p->aCol[i].coll = coll;
@@ -1226,44 +1226,6 @@ emit_open_cursor(Parse *parse_context, int cursor, int entity_id)
 			  P4_SPACEPTR);
 	return sqlite3VdbeAddOp3(vdbe, OP_OpenWrite, cursor, entity_id,
 				 space_ptr_reg);
-}
-
-/*
- * This function returns the collation sequence for database native text
- * encoding identified by the string zName, length nName.
- *
- * If the requested collation sequence is not available, or not available
- * in the database native encoding, the collation factory is invoked to
- * request it. If the collation factory does not supply such a sequence,
- * and the sequence is available in another text encoding, then that is
- * returned instead.
- *
- * If no versions of the requested collations sequence are available, or
- * another error occurs, NULL is returned and an error message written into
- * pParse.
- *
- * This routine is a wrapper around sqlite3FindCollSeq().  This routine
- * invokes the collation factory if the named collation cannot be found
- * and generates an error message.
- *
- * See also: sqlite3FindCollSeq(), sqlite3GetCollSeq()
- */
-struct coll *
-sqlite3LocateCollSeq(Parse * pParse, sqlite3 * db, const char *zName)
-{
-	u8 initbusy;
-	struct coll *pColl;
-	initbusy = db->init.busy;
-
-	if (strcasecmp(zName, "binary") == 0)
-		return NULL;
-
-	pColl = sqlite3FindCollSeq(zName);
-	if (!initbusy && (!pColl)) {
-		pColl = sqlite3GetCollSeq(pParse, pColl, zName);
-	}
-
-	return pColl;
 }
 
 /*
@@ -3066,7 +3028,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		struct coll *coll;
 		if (col_listItem->pExpr->op == TK_COLLATE) {
 			const char *coll_name = col_listItem->pExpr->u.zToken;
-			coll = sqlite3GetCollSeq(parse, 0, coll_name);
+			coll = sqlite3GetCollSeq(parse, coll_name);
 
 			if (coll == NULL &&
 			    sqlite3StrICmp(coll_name, "binary") != 0) {

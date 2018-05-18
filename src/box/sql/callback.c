@@ -50,38 +50,24 @@
  * The return value is either the collation sequence to be used in database
  * db for collation type name zName, length nName, or NULL, if no collation
  * sequence can be found.  If no collation is found, leave an error message.
- *
- * See also: sqlite3LocateCollSeq(), sqlite3FindCollSeq()
  */
 struct coll *
 sqlite3GetCollSeq(Parse * pParse,	/* Parsing context */
-		  struct coll * pColl,	/* Collating sequence with native encoding, or NULL */
 		  const char *zName	/* Collating sequence name */
     )
 {
-	struct coll *p;
-
-	p = pColl;
-	if (p == NULL)
-		p = sqlite3FindCollSeq(zName);
-	if (p == NULL && (strcasecmp(zName, "binary") != 0)) {
-		if (pParse)
-			sqlite3ErrorMsg(pParse,
-					"no such collation sequence: %s",
-					zName);
-		else {
-		}		/* Assert will be triggered.  */
+	if (zName == NULL || strcasecmp(zName, "binary") == 0)
+		return 0;
+	struct coll *p = coll_by_name(zName, strlen(zName));
+	if (p == NULL) {
+		sqlite3ErrorMsg(pParse, "no such collation sequence: %s",
+				zName);
 	}
 	return p;
 }
 
 /**
  * Return the coll* pointer for the collation sequence named zName.
- *
- * A separate function sqlite3LocateCollSeq() is a wrapper around
- * this routine.  sqlite3LocateCollSeq() generates an error
- * message if the collating sequence cannot be found.
- *
  * @param zName Name of collation to be found.
  * @retval Pointer for the collation sequence named zName.
  */
