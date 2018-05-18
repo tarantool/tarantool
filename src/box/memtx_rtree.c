@@ -320,6 +320,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,
+	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,

@@ -410,7 +410,7 @@ box_iterator_free(box_iterator_t *it)
 
 /* }}} */
 
-/* {{{ Introspection */
+/* {{{ Other index functions */
 
 int
 box_index_info(uint32_t space_id, uint32_t index_id,
@@ -421,6 +421,17 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
 	index_info(index, info);
+	return 0;
+}
+
+int
+box_index_compact(uint32_t space_id, uint32_t index_id)
+{
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	index_compact(index);
 	return 0;
 }
 
@@ -663,6 +674,12 @@ generic_index_info(struct index *index, struct info_handler *handler)
 	(void)index;
 	info_begin(handler);
 	info_end(handler);
+}
+
+void
+generic_index_compact(struct index *index)
+{
+	(void)index;
 }
 
 void

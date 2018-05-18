@@ -1288,6 +1288,10 @@ base_index_mt.info = function(index)
     return internal.info(index.space_id, index.id);
 end
 
+base_index_mt.compact = function(index)
+    return internal.compact(index.space_id, index.id)
+end
+
 base_index_mt.drop = function(index)
     check_index_arg(index, 'drop')
     return box.schema.index.drop(index.space_id, index.id)

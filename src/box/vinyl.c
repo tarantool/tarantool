@@ -4060,6 +4060,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ vinyl_index_info,
+	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ vinyl_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,
