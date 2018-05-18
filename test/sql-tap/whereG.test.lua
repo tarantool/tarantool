@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(20)
+test:plan(23)
 
 --!./tcltestrunner.lua
 -- 2013-09-05
@@ -388,5 +388,71 @@ test:do_execsql_test(
         -- </7.3>
     })
 
+-- gh-2860 skip-scan plan
+test:execsql([[
+    CREATE TABLE people(name TEXT PRIMARY KEY, role TEXT NOT NULL,
+        height INT NOT NULL, CHECK(role IN ('student','teacher')));
+    CREATE INDEX people_idx1 ON people(role, height);
+    INSERT INTO people VALUES('Alice','student',156);
+    INSERT INTO people VALUES('Bob','student',161);
+    INSERT INTO people VALUES('Cindy','student',155);
+    INSERT INTO people VALUES('David','student',181);
+    INSERT INTO people VALUES('Emily','teacher',158);
+    INSERT INTO people VALUES('Fred','student',163);
+    INSERT INTO people VALUES('Ginny','student',169);
+    INSERT INTO people VALUES('Harold','student',172);
+    INSERT INTO people VALUES('Imma','student',179);
+    INSERT INTO people VALUES('Jack','student',181);
+    INSERT INTO people VALUES('Karen','student',163);
+    INSERT INTO people VALUES('Logan','student',177);
+    INSERT INTO people VALUES('Megan','teacher',159);
+    INSERT INTO people VALUES('Nathan','student',163);
+    INSERT INTO people VALUES('Olivia','student',161);
+    INSERT INTO people VALUES('Patrick','teacher',180);
+    INSERT INTO people VALUES('Quiana','student',182);
+    INSERT INTO people VALUES('Robert','student',159);
+    INSERT INTO people VALUES('Sally','student',166);
+    INSERT INTO people VALUES('Tom','student',171);
+    INSERT INTO people VALUES('Ursula','student',170);
+    INSERT INTO people VALUES('Vance','student',179);
+    INSERT INTO people VALUES('Willma','student',175);
+    INSERT INTO people VALUES('Xavier','teacher',185);
+    INSERT INTO people VALUES('Yvonne','student',149);
+    INSERT INTO people VALUES('Zach','student',170);
+    INSERT INTO people VALUES('Angie','student',166);
+    INSERT INTO people VALUES('Brad','student',176);
+    INSERT INTO people VALUES('Claire','student',168);
+    INSERT INTO people VALUES('Donald','student',162);
+    INSERT INTO people VALUES('Elaine','student',177);
+    INSERT INTO people VALUES('Frazier','student',159);
+    INSERT INTO people VALUES('Grace','student',179);
+    INSERT INTO people VALUES('Horace','student',166);
+    INSERT INTO people VALUES('Ingrad','student',155);
+    INSERT INTO people VALUES('Jacob','student',179);
+    INSERT INTO people VALUES('John', 'student', 154);
+]])
+
+test:do_execsql_test(
+    "7.1",
+    [[
+        SELECT name FROM people WHERE height>=180 order by name;
+    ]],
+    {"David","Jack","Patrick","Quiana","Xavier"})
+
+test:do_execsql_test(
+    "7.2",
+    [[
+        EXPLAIN QUERY PLAN SELECT name FROM people WHERE height>=180;
+    ]],
+    {0,0,0,"SCAN TABLE PEOPLE"})
+
+test:do_execsql_test(
+    "7.3",
+    [[
+        ANALYZE;
+        EXPLAIN QUERY PLAN SELECT name FROM people WHERE height>=180;
+    ]],
+    {0,0,0,"SEARCH TABLE PEOPLE USING COVERING INDEX PEOPLE_IDX1" ..
+        " (ANY(ROLE) AND HEIGHT>?)"})
 
 test:finish_test()

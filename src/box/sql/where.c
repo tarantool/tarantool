@@ -1270,8 +1270,8 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 		struct index_sample *samples = index->def->opts.stat->samples;
 		uint32_t sample_count = index->def->opts.stat->sample_count;
 		for (i = 0; rc == SQLITE_OK && i < (int) sample_count; i++) {
-			rc = sqlite3Stat4Column(db, samples[i].sample_key,
-						samples[i].key_size, nEq, &pVal);
+			rc = sql_stat4_column(db, samples[i].sample_key, nEq,
+					      &pVal);
 			if (rc == SQLITE_OK && p1) {
 				int res = sqlite3MemCompare(p1, pVal, pColl);
 				if (res >= 0)

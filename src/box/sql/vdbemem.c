@@ -1588,56 +1588,29 @@ sqlite3Stat4ValueFromExpr(Parse * pParse,	/* Parse context */
 	return stat4ValueFromExpr(pParse, pExpr, affinity, 0, ppVal);
 }
 
-/*
- * Extract the iCol-th column from the nRec-byte record in pRec.  Write
- * the column value into *ppVal.  If *ppVal is initially NULL then a new
- * sqlite3_value object is allocated.
- *
- * If *ppVal is initially NULL then the caller is responsible for
- * ensuring that the value written into *ppVal is eventually freed.
- */
 int
-sqlite3Stat4Column(sqlite3 * db,	/* Database handle */
-		   const void *pRec,	/* Pointer to buffer containing record */
-		   int nRec,	/* Size of buffer pRec in bytes */
-		   int iCol,	/* Column to extract */
-		   sqlite3_value ** ppVal	/* OUT: Extracted value */
-    )
+sql_stat4_column(struct sqlite3 *db, const char *record, uint32_t col_num,
+		 sqlite3_value **res)
 {
-	u32 t;			/* a column type code */
-	int nHdr;		/* Size of the header in the record */
-	int iHdr;		/* Next unread header byte */
-	int iField;		/* Next unread data byte */
-	int szField = 0;	/* Size of the current data field */
-	int i;			/* Column index */
-	u8 *a = (u8 *) pRec;	/* Typecast byte array */
-	Mem *pMem = *ppVal;	/* Write result into this Mem object */
-
-	assert(iCol > 0);
-	iHdr = getVarint32(a, nHdr);
-	if (nHdr > nRec || iHdr >= nHdr)
-		return SQLITE_CORRUPT_BKPT;
-	iField = nHdr;
-	for (i = 0; i <= iCol; i++) {
-		iHdr += getVarint32(&a[iHdr], t);
-		testcase(iHdr == nHdr);
-		testcase(iHdr == nHdr + 1);
-		if (iHdr > nHdr)
-			return SQLITE_CORRUPT_BKPT;
-		szField = sqlite3VdbeSerialTypeLen(t);
-		iField += szField;
+	/* Write result into this Mem object. */
+	struct Mem *mem = *res;
+	const char *a = record;
+	assert(mp_typeof(a[0]) == MP_ARRAY);
+	uint32_t col_cnt = mp_decode_array(&a);
+	assert(col_cnt > col_num);
+	for (uint32_t i = 0; i < col_num; i++)
+		mp_next(&a);
+	if (mem == NULL) {
+		mem = sqlite3ValueNew(db);
+		*res = mem;
+		if (mem == NULL) {
+			diag_set(OutOfMemory, sizeof(struct Mem),
+				 "sqlite3ValueNew", "mem");
+			return -1;
+		}
 	}
-	testcase(iField == nRec);
-	testcase(iField == nRec + 1);
-	if (iField > nRec)
-		return SQLITE_CORRUPT_BKPT;
-	if (pMem == 0) {
-		pMem = *ppVal = sqlite3ValueNew(db);
-		if (pMem == 0)
-			return SQLITE_NOMEM_BKPT;
-	}
-	sqlite3VdbeSerialGet(&a[iField - szField], t, pMem);
-	return SQLITE_OK;
+	sqlite3VdbeMsgpackGet((const unsigned char *) a, mem);
+	return 0;
 }
 
 /*

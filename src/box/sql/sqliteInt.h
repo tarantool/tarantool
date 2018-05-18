@@ -4564,7 +4564,26 @@ int sqlite3Stat4ProbeSetValue(Parse *, Index *, UnpackedRecord **, Expr *, int,
 			      int, int *);
 int sqlite3Stat4ValueFromExpr(Parse *, Expr *, u8, sqlite3_value **);
 void sqlite3Stat4ProbeFree(UnpackedRecord *);
-int sqlite3Stat4Column(sqlite3 *, const void *, int, int, sqlite3_value **);
+
+/**
+ * Extract the col_num-th column from the record.  Write
+ * the column value into *res.  If *res is initially NULL
+ * then a new sqlite3_value object is allocated.
+ *
+ * If *res is initially NULL then the caller is responsible for
+ * ensuring that the value written into *res is eventually
+ * freed.
+ *
+ * @param db Database handle.
+ * @param record Pointer to buffer containing record.
+ * @param col_num Column to extract.
+ * @param[out] res Extracted value.
+ *
+ * @retval -1 on error or 0.
+ */
+int
+sql_stat4_column(struct sqlite3 *db, const char *record, uint32_t col_num,
+		 sqlite3_value **res);
 char sqlite3IndexColumnAffinity(sqlite3 *, Index *, int);
 
 /*
