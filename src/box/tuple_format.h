@@ -35,7 +35,6 @@
 #include "field_def.h"
 #include "errinj.h"
 #include "tuple_dictionary.h"
-#include "coll_cache.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -64,6 +63,7 @@ enum { TUPLE_OFFSET_SLOT_NIL = INT32_MAX };
 
 struct tuple;
 struct tuple_format;
+struct coll;
 
 /** Engine-specific tuple format methods. */
 struct tuple_format_vtab {

@@ -30,6 +30,7 @@
  */
 #include "json/path.h"
 #include "tuple_format.h"
+#include "coll_cache.h"
 
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
