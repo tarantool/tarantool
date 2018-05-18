@@ -76,20 +76,24 @@ coll_cache_replace(struct coll *coll, struct coll **replaced)
 	const struct mh_i32ptr_node_t id_node = {coll->id, coll};
 	struct mh_i32ptr_node_t repl_id_node = {0, NULL};
 	struct mh_i32ptr_node_t *prepl_id_node = &repl_id_node;
-	if (mh_i32ptr_put(coll_cache_id, &id_node, &prepl_id_node, NULL) ==
-	    mh_end(coll_cache_id)) {
-		diag_set(OutOfMemory, sizeof(id_node), "malloc", "coll_cache_id");
+	mh_int_t i =
+		mh_i32ptr_put(coll_cache_id, &id_node, &prepl_id_node, NULL);
+	if (i == mh_end(coll_cache_id)) {
+		diag_set(OutOfMemory, sizeof(id_node), "malloc",
+			 "coll_cache_id");
 		return -1;
 	}
+
 	uint32_t hash = mh_strn_hash(coll->name, coll->name_len);
-	const struct mh_strnptr_node_t name_node = {coll->name, coll->name_len, hash, coll};
-	struct mh_strnptr_node_t repl_name_node = {NULL, 0, 0, NULL};
+	const struct mh_strnptr_node_t name_node =
+		{ coll->name, coll->name_len, hash, coll };
+	struct mh_strnptr_node_t repl_name_node = { NULL, 0, 0, NULL };
 	struct mh_strnptr_node_t *prepl_node_name = &repl_name_node;
-	if (mh_strnptr_put(coll_cache_name, &name_node, &prepl_node_name, NULL) ==
-	    mh_end(coll_cache_id)) {
-		diag_set(OutOfMemory, sizeof(name_node), "malloc", "coll_cache_name");
-		/* would not fail if delete only node_id */
-		coll_cache_delete(coll);
+	if (mh_strnptr_put(coll_cache_name, &name_node, &prepl_node_name,
+			   NULL) == mh_end(coll_cache_id)) {
+		diag_set(OutOfMemory, sizeof(name_node), "malloc",
+			 "coll_cache_name");
+		mh_i32ptr_del(coll_cache_id, i, NULL);
 		return -1;
 	}
 	assert(repl_id_node.val == repl_name_node.val);
@@ -106,12 +110,9 @@ void
 coll_cache_delete(const struct coll *coll)
 {
 	mh_int_t id_i = mh_i32ptr_find(coll_cache_id, coll->id, NULL);
-	if (id_i == mh_end(coll_cache_id))
-		return;
 	mh_i32ptr_del(coll_cache_id, id_i, NULL);
-	mh_int_t name_i = mh_strnptr_find_inp(coll_cache_name, coll->name, coll->name_len);
-	if (name_i == mh_end(coll_cache_name))
-		return;
+	mh_int_t name_i = mh_strnptr_find_inp(coll_cache_name, coll->name,
+					      coll->name_len);
 	mh_strnptr_del(coll_cache_name, name_i, NULL);
 }
 
@@ -131,7 +132,7 @@ coll_by_id(uint32_t id)
  * Find a collation object by its name.
  */
 struct coll *
-coll_by_name(const char *name, size_t len)
+coll_by_name(const char *name, uint32_t len)
 {
 	mh_int_t pos = mh_strnptr_find_inp(coll_cache_name, name, len);
 	if (pos == mh_end(coll_cache_name))
