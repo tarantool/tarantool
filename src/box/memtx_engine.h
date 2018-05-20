@@ -37,12 +37,14 @@
 
 #include "engine.h"
 #include "xlog.h"
+#include "salad/stailq.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct index;
+struct fiber;
 
 /**
  * The state of memtx recovery process.
@@ -101,7 +103,35 @@ struct memtx_engine {
 	struct mempool hash_iterator_pool;
 	/** Memory pool for bitset index iterator. */
 	struct mempool bitset_iterator_pool;
+	/**
+	 * Garbage collection fiber. Used for asynchronous
+	 * destruction of dropped indexes.
+	 */
+	struct fiber *gc_fiber;
+	/**
+	 * Scheduled garbage collection tasks, linked by
+	 * memtx_gc_task::link.
+	 */
+	struct stailq gc_queue;
 };
+
+struct memtx_gc_task;
+typedef void (*memtx_gc_func)(struct memtx_gc_task *);
+
+/** Garbage collection task. */
+struct memtx_gc_task {
+	/** Link in memtx_engine::gc_queue. */
+	struct stailq_entry link;
+	/** Function that will perform the task. */
+	memtx_gc_func func;
+};
+
+/**
+ * Schedule a garbage collection task for execution.
+ */
+void
+memtx_engine_schedule_gc(struct memtx_engine *memtx,
+			 struct memtx_gc_task *task);
 
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
@@ -150,16 +180,6 @@ memtx_index_extent_free(void *ctx, void *extent);
  */
 int
 memtx_index_extent_reserve(int num);
-
-/*
- * The following two methods are used by all kinds of memtx indexes
- * to delete tuples stored in the space when the primary index is
- * destroyed.
- */
-void
-memtx_index_abort_create(struct index *index);
-void
-memtx_index_commit_drop(struct index *index);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,

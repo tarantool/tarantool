@@ -35,6 +35,7 @@
 #include <small/small.h>
 #include <small/mempool.h>
 
+#include "fiber.h"
 #include "coio_file.h"
 #include "tuple.h"
 #include "txn.h"
@@ -928,6 +929,23 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .check_space_def = */ memtx_engine_check_space_def,
 };
 
+static int
+memtx_engine_gc_f(va_list va)
+{
+	struct memtx_engine *memtx = va_arg(va, struct memtx_engine *);
+	while (!fiber_is_cancelled()) {
+		if (stailq_empty(&memtx->gc_queue)) {
+			fiber_yield_timeout(TIMEOUT_INFINITY);
+			continue;
+		}
+		struct memtx_gc_task *task;
+		task = stailq_shift_entry(&memtx->gc_queue,
+					  struct memtx_gc_task, link);
+		task->func(task);
+	}
+	return 0;
+}
+
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
@@ -945,18 +963,34 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	xdir_create(&memtx->snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	memtx->snap_dir.force_recovery = force_recovery;
 
-	if (xdir_scan(&memtx->snap_dir) != 0) {
-		xdir_destroy(&memtx->snap_dir);
-		free(memtx);
-		return NULL;
-	}
+	if (xdir_scan(&memtx->snap_dir) != 0)
+		goto fail;
+
+	stailq_create(&memtx->gc_queue);
+	memtx->gc_fiber = fiber_new("memtx.gc", memtx_engine_gc_f);
+	if (memtx->gc_fiber == NULL)
+		goto fail;
 
 	memtx->state = MEMTX_INITIALIZED;
 	memtx->force_recovery = force_recovery;
 
 	memtx->base.vtab = &memtx_engine_vtab;
 	memtx->base.name = "memtx";
+
+	fiber_start(memtx->gc_fiber, memtx);
 	return memtx;
+fail:
+	xdir_destroy(&memtx->snap_dir);
+	free(memtx);
+	return NULL;
+}
+
+void
+memtx_engine_schedule_gc(struct memtx_engine *memtx,
+			 struct memtx_gc_task *task)
+{
+	stailq_add_tail_entry(&memtx->gc_queue, task, link);
+	fiber_wakeup(memtx->gc_fiber);
 }
 
 void
@@ -1061,53 +1095,6 @@ memtx_index_extent_reserve(int num)
 		memtx_index_num_reserved_extents++;
 	}
 	return 0;
-}
-
-static void
-memtx_index_prune(struct index *index)
-{
-	if (index->def->iid > 0)
-		return;
-
-	/*
-	 * Tuples stored in a memtx space are referenced by the
-	 * primary index so when the primary index is dropped we
-	 * should delete them.
-	 */
-	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
-	if (it == NULL)
-		goto fail;
-	int rc;
-	struct tuple *tuple;
-	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
-		tuple_unref(tuple);
-	iterator_delete(it);
-	if (rc != 0)
-		goto fail;
-
-	return;
-fail:
-	/*
-	 * This function is called after WAL write so we have no
-	 * other choice but panic in case of any error. The good
-	 * news is memtx iterators do not fail so we should not
-	 * normally get here.
-	 */
-	diag_log();
-	unreachable();
-	panic("failed to drop index");
-}
-
-void
-memtx_index_abort_create(struct index *index)
-{
-	memtx_index_prune(index);
-}
-
-void
-memtx_index_commit_drop(struct index *index)
-{
-	memtx_index_prune(index);
 }
 
 bool

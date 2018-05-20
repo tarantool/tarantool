@@ -129,12 +129,62 @@ hash_iterator_eq(struct iterator *it, struct tuple **ret)
 /* {{{ MemtxHash -- implementation of all hashes. **********************/
 
 static void
-memtx_hash_index_destroy(struct index *base)
+memtx_hash_index_free(struct memtx_hash_index *index)
 {
-	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	light_index_destroy(index->hash_table);
 	free(index->hash_table);
 	free(index);
+}
+
+static void
+memtx_hash_index_destroy_f(struct memtx_gc_task *task)
+{
+	/*
+	 * Yield every 1K tuples to keep latency < 0.1 ms.
+	 * Yield more often in debug mode.
+	 */
+#ifdef NDEBUG
+	enum { YIELD_LOOPS = 1000 };
+#else
+	enum { YIELD_LOOPS = 10 };
+#endif
+
+	struct memtx_hash_index *index = container_of(task,
+			struct memtx_hash_index, gc_task);
+	struct light_index_core *hash = index->hash_table;
+
+	struct light_index_iterator itr;
+	light_index_iterator_begin(hash, &itr);
+
+	struct tuple **res;
+	unsigned int loops = 0;
+	while ((res = light_index_iterator_get_and_next(hash, &itr)) != NULL) {
+		tuple_unref(*res);
+		if (++loops % YIELD_LOOPS == 0)
+			fiber_sleep(0);
+	}
+	memtx_hash_index_free(index);
+}
+
+static void
+memtx_hash_index_destroy(struct index *base)
+{
+	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	if (index->gc_task.func != NULL) {
+		/*
+		 * Primary index. We need to free all tuples stored
+		 * in the index, which may take a while. Schedule a
+		 * background task in order not to block tx thread.
+		 */
+		memtx_engine_schedule_gc(memtx, &index->gc_task);
+	} else {
+		/*
+		 * Secondary index. Destruction is fast, no need to
+		 * hand over to background fiber.
+		 */
+		memtx_hash_index_free(index);
+	}
 }
 
 static void
@@ -381,9 +431,9 @@ memtx_hash_index_create_snapshot_iterator(struct index *base)
 static const struct index_vtab memtx_hash_index_vtab = {
 	/* .destroy = */ memtx_hash_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ memtx_index_abort_create,
+	/* .abort_create = */ generic_index_abort_create,
 	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ memtx_index_commit_drop,
+	/* .commit_drop = */ generic_index_commit_drop,
 	/* .update_def = */ memtx_hash_index_update_def,
 	/* .depends_on_pk = */ generic_index_depends_on_pk,
 	/* .def_change_requires_rebuild = */
@@ -444,6 +494,9 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 			   memtx_index_extent_alloc, memtx_index_extent_free,
 			   NULL, index->base.def->key_def);
 	index->hash_table = hash_table;
+
+	if (def->iid == 0)
+		index->gc_task.func = memtx_hash_index_destroy_f;
 	return index;
 }
 

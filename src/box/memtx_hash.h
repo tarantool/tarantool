@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "index.h"
+#include "memtx_engine.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -42,6 +43,7 @@ struct light_index_core;
 struct memtx_hash_index {
 	struct index base;
 	struct light_index_core *hash_table;
+	struct memtx_gc_task gc_task;
 };
 
 struct memtx_hash_index *
