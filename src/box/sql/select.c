@@ -1937,10 +1937,6 @@ allocVdbe(Parse * pParse)
 	    ) {
 		pParse->okConstFactor = 1;
 	}
-	if (sql_vdbe_prepare(v) != 0) {
-		sqlite3DbFree(pParse->db, v);
-		return NULL;
-	}
 	return v;
 }
 

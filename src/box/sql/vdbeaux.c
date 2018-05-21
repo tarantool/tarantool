@@ -55,7 +55,7 @@ sqlite3VdbeCreate(Parse * pParse)
 	p = sqlite3DbMallocRawNN(db, sizeof(Vdbe));
 	if (p == 0)
 		return 0;
-	memset(&p->aOp, 0, sizeof(Vdbe) - offsetof(Vdbe, aOp));
+	memset(p, 0, sizeof(Vdbe));
 	p->db = db;
 	if (db->pVdbe) {
 		db->pVdbe->pPrev = p;

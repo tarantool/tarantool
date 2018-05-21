@@ -5351,6 +5351,19 @@ case OP_Init: {          /* jump */
 	 */
 	assert(pOp->p4.z==0 || strncmp(pOp->p4.z, "-" "- ", 3)==0);
 	assert(pOp==p->aOp);  /* Always instruction 0 */
+	/*
+	 * Once per execution time prepare the program: detect
+	 * autocommit, create SQL specific transaction things. To
+	 * guarantee the single call of this function the
+	 * preparation is done in the parent frame only. Child
+	 * programs like triggers must use the information
+	 * received from the parent.
+	 */
+	if (p->pFrame == NULL && sql_vdbe_prepare(p) != 0) {
+		sqlite3DbFree(db, p);
+		rc = SQL_TARANTOOL_ERROR;
+		break;
+	}
 
 #ifndef SQLITE_OMIT_TRACE
 	if ((db->mTrace & SQLITE_TRACE_STMT)!=0
