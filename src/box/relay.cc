@@ -140,6 +140,12 @@ struct relay {
 	} tx;
 };
 
+struct diag*
+relay_get_diag(struct relay *relay)
+{
+	return &relay->diag;
+}
+
 enum relay_state
 relay_get_state(const struct relay *relay)
 {
@@ -542,6 +548,8 @@ relay_subscribe_f(va_list ap)
 	if (!diag_is_empty(&relay->diag)) {
 		/* An error has occurred while reading ACKs of xlog. */
 		diag_move(&relay->diag, diag_get());
+		/* Reference the diag in the status. */
+		diag_add_error(&relay->diag, diag_last_error(diag_get()));
 	}
 	struct errinj *inj = errinj(ERRINJ_RELAY_EXIT_DELAY, ERRINJ_DOUBLE);
 	if (inj != NULL && inj->dparam > 0)

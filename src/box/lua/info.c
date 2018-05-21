@@ -145,9 +145,25 @@ lbox_pushreplica(lua_State *L, struct replica *replica)
 		lua_settable(L, -3);
 	}
 
-	if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
+	if (relay_get_state(relay) == RELAY_FOLLOW) {
 		lua_pushstring(L, "downstream");
 		lbox_pushrelay(L, relay);
+		lua_settable(L, -3);
+	} else if (relay_get_state(relay) == RELAY_STOPPED) {
+		lua_pushstring(L, "downstream");
+
+		lua_newtable(L);
+		lua_pushstring(L, "status");
+		lua_pushstring(L, "stopped");
+		lua_settable(L, -3);
+
+		struct error *e = diag_last_error(relay_get_diag(relay));
+		if (e != NULL) {
+			lua_pushstring(L, "message");
+			lua_pushstring(L, e->errmsg);
+			lua_settable(L, -3);
+		}
+
 		lua_settable(L, -3);
 	}
 }
