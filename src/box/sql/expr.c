@@ -48,7 +48,7 @@ static int exprCodeVector(Parse * pParse, Expr * p, int *piToFree);
 char
 sqlite3TableColumnAffinity(Table * pTab, int iCol)
 {
-	assert(iCol < pTab->nCol);
+	assert(iCol < (int)pTab->def->field_count);
 	return iCol >= 0 ? pTab->aCol[iCol].affinity : SQLITE_AFF_INTEGER;
 }
 
@@ -2116,7 +2116,7 @@ sqlite3ExprCanBeNull(const Expr * p)
 		assert(p->pTab != 0);
 		return ExprHasProperty(p, EP_CanBeNull) ||
 		       (p->iColumn >= 0
-		        && table_column_is_nullable(p->pTab, p->iColumn));
+		        && p->pTab->def->fields[p->iColumn].is_nullable);
 	default:
 		return 1;
 	}
@@ -2214,7 +2214,9 @@ isCandidateForInOpt(Expr * pX)
 		return 0;	/* FROM is not a subquery or view */
 	pTab = pSrc->a[0].pTab;
 	assert(pTab != 0);
-	assert(pTab->pSelect == 0);	/* FROM clause is not a view */
+	assert(pTab->def->opts.is_view == (pTab->pSelect != NULL));
+	/* FROM clause is not a view */
+	assert(!pTab->def->opts.is_view);
 	pEList = p->pEList;
 	assert(pEList != 0);
 	/* All SELECT results must be columns. */
@@ -4233,20 +4235,21 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 */
 			Table *pTab = pExpr->pTab;
 			int p1 =
-			    pExpr->iTable * (pTab->nCol + 1) + 1 +
+			    pExpr->iTable * (pTab->def->field_count + 1) + 1 +
 			    pExpr->iColumn;
 
 			assert(pExpr->iTable == 0 || pExpr->iTable == 1);
 			assert(pExpr->iColumn >= 0
-			       && pExpr->iColumn < pTab->nCol);
+			       && pExpr->iColumn < (int)pTab->def->field_count);
 			assert(pTab->iPKey < 0
 			       || pExpr->iColumn != pTab->iPKey);
-			assert(p1 >= 0 && p1 < (pTab->nCol * 2 + 2));
+			assert(p1 >= 0 && p1 <
+					  ((int)pTab->def->field_count * 2 + 2));
 
 			sqlite3VdbeAddOp2(v, OP_Param, p1, target);
 			VdbeComment((v, "%s.%s -> $%d",
 				    (pExpr->iTable ? "new" : "old"),
-				    pExpr->pTab->aCol[pExpr->iColumn].zName,
+				    pExpr->pTab->def->fields[pExpr->iColumn].name,
 				    target));
 
 #ifndef SQLITE_OMIT_FLOATING_POINT

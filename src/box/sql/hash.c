@@ -68,6 +68,7 @@ sqlite3HashClear(Hash * pH)
 	pH->htsize = 0;
 	while (elem) {
 		HashElem *next_elem = elem->next;
+		free(elem->pKey);
 		sqlite3_free(elem);
 		elem = next_elem;
 	}
@@ -292,7 +293,8 @@ sqlite3HashInsert(Hash * pH, const char *pKey, void *data)
 			removeElementGivenHash(pH, elem, h);
 		} else {
 			elem->data = data;
-			elem->pKey = pKey;
+			assert(elem->pKey != NULL);
+			assert(strcmp(elem->pKey, pKey) == 0);
 		}
 		return old_data;
 	}
@@ -301,7 +303,11 @@ sqlite3HashInsert(Hash * pH, const char *pKey, void *data)
 	new_elem = (HashElem *) sqlite3Malloc(sizeof(HashElem));
 	if (new_elem == 0)
 		return data;
-	new_elem->pKey = pKey;
+	new_elem->pKey = strdup(pKey);
+	if (new_elem->pKey == NULL) {
+		sqlite3_free(new_elem);
+		return data;
+	}
 	new_elem->data = data;
 	pH->count++;
 	if (pH->count >= 10 && pH->count > 2 * pH->htsize) {

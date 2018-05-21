@@ -1886,17 +1886,8 @@ struct Savepoint {
  * of this structure.
  */
 struct Column {
-	char *zName;		/* Name of this column */
-	enum field_type type;	/* Column type. */
-	/** Collation identifier. */
-	uint32_t coll_id;
 	/** Collating sequence. */
 	struct coll *coll;
-	/**
-	 * An ON_CONFLICT_ACTION code for handling a NOT NULL
-	 * constraint.
-	 */
-	enum on_conflict_action notNull;
 	char affinity;		/* One of the SQLITE_AFF_... values */
 	u8 is_primkey;		/* Boolean propertie for being PK */
 };
@@ -1949,7 +1940,6 @@ struct Column {
  * by an instance of the following structure.
  */
 struct Table {
-	char *zName;		/* Name of the table or view */
 	Column *aCol;		/* Information about each column */
 	Index *pIndex;		/* List of SQL indexes on this table. */
 	Select *pSelect;	/* NULL for tables.  Points to definition if a view. */
@@ -1963,7 +1953,6 @@ struct Table {
 	i16 iPKey;		/* If not negative, use aCol[iPKey] as the rowid */
 	i16 iAutoIncPKey;	/* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
 				   column number here, -1 otherwise Tarantool specifics */
-	i16 nCol;		/* Number of columns in this table */
 	/**
 	 * Estimated number of entries in table.
 	 * Used only when table represents temporary objects,
@@ -2953,6 +2942,8 @@ struct Parse {
 	u8 eTriggerOp;		/* TK_UPDATE, TK_INSERT or TK_DELETE */
 	u8 eOrconf;		/* Default ON CONFLICT policy for trigger steps */
 	u8 disableTriggers;	/* True to disable triggers */
+	/** Region size at the Parser launch. */
+	size_t region_initial_size;
 
   /**************************************************************************
   * Fields above must be initialized to zero.  The fields that follow,
@@ -3407,7 +3398,6 @@ int sqlite3IoerrnomemError(int);
  */
 int sqlite3StrICmp(const char *, const char *);
 unsigned sqlite3Strlen30(const char *);
-enum field_type sqlite3ColumnType(Column *);
 #define sqlite3StrNICmp sqlite3_strnicmp
 
 void sqlite3MallocInit(void);
@@ -3540,7 +3530,22 @@ void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
 void sqlite3CommitInternalChanges();
 void sqlite3DeleteColumnNames(sqlite3 *, Table *);
 bool table_column_is_in_pk(Table *, uint32_t);
-int sqlite3ColumnsFromExprList(Parse *, ExprList *, i16 *, Column **);
+
+/**
+ * Given an expression list (which is really the list of expressions
+ * that form the result set of a SELECT statement) compute appropriate
+ * column names for a table that would hold the expression list.
+ * All column names will be unique.
+ * Initialize fields and field_count.
+ *
+ * @param parse Parsing context.
+ * @param expr_list  Expr list from which to derive column names.
+ * @param table Destination table.
+ * @retval SQLITE_OK on success.
+ * @retval error codef on error.
+ */
+int sqlite3ColumnsFromExprList(Parse *parse, ExprList *expr_list, Table *table);
+
 void sqlite3SelectAddColumnTypeAndCollation(Parse *, Table *, Select *);
 Table *sqlite3ResultSetOfSelect(Parse *, Select *);
 Index *sqlite3PrimaryKeyIndex(Table *);
@@ -4286,7 +4291,6 @@ void sqlite3InvalidFunction(sqlite3_context *, int, sqlite3_value **);
 sqlite3_int64 sqlite3StmtCurrentTime(sqlite3_context *);
 int sqlite3VdbeParameterIndex(Vdbe *, const char *, int);
 int sqlite3TransferBindings(sqlite3_stmt *, sqlite3_stmt *);
-void sqlite3ParserReset(Parse *);
 int sqlite3Reprepare(Vdbe *);
 void sqlite3ExprListCheckLength(Parse *, ExprList *, const char *);
 /**
@@ -4481,7 +4485,27 @@ extern int sqlite3InitDatabase(sqlite3 * db);
 enum on_conflict_action
 table_column_nullable_action(struct Table *tab, uint32_t column);
 
-bool
-table_column_is_nullable(struct Table *tab, uint32_t column);
+/**
+ * Initialize a new parser object.
+ * A number of service allocations are performed on the region, which is also
+ * cleared in the destroy function.
+ * @param parser object to initialize.
+ * @param db SQLite object.
+ */
+static inline void
+sql_parser_create(struct Parse *parser, sqlite3 *db)
+{
+	memset(parser, 0, sizeof(struct Parse));
+	parser->db = db;
+	struct region *region = &fiber()->gc;
+	parser->region_initial_size = region_used(region);
+}
+
+/**
+ * Release the parser object resources.
+ * @param parser object to release.
+ */
+void
+sql_parser_destroy(struct Parse *parser);
 
 #endif				/* SQLITEINT_H */

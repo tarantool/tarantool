@@ -1500,13 +1500,13 @@ sqlite3WhereTabFuncArgs(Parse * pParse,	/* Parsing context */
 	if (pArgs == 0)
 		return;
 	for (j = k = 0; j < pArgs->nExpr; j++) {
-		while (k < pTab->nCol) {
+		while (k < (int)pTab->def->field_count) {
 			k++;
 		}
-		if (k >= pTab->nCol) {
+		if (k >= (int)pTab->def->field_count) {
 			sqlite3ErrorMsg(pParse,
 					"too many arguments on %s() - max %d",
-					pTab->zName, j);
+					pTab->def->name, j);
 			return;
 		}
 		pColRef = sqlite3ExprAlloc(pParse->db, TK_COLUMN, 0, 0);

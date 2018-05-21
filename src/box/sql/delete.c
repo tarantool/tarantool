@@ -202,7 +202,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		int eph_cursor = parse->nTab++;
 		int addr_eph_open = sqlite3VdbeCurrentAddr(v);
 		if (is_view) {
-			pk_len = table->nCol;
+			pk_len = table->def->field_count;
 			parse->nMem += pk_len;
 			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
 					  eph_cursor, pk_len);
@@ -433,14 +433,14 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 					  onconf);
 		mask |= sqlite3FkOldmask(parse, table);
 		first_old_reg = parse->nMem + 1;
-		parse->nMem += (1 + table->nCol);
+		parse->nMem += (1 + (int)table->def->field_count);
 
 		/* Populate the OLD.* pseudo-table register array.
 		 * These values will be used by any BEFORE and
 		 * AFTER triggers that exist.
 		 */
 		sqlite3VdbeAddOp2(v, OP_Copy, reg_pk, first_old_reg);
-		for (int i = 0; i < table->nCol; i++) {
+		for (int i = 0; i < (int)table->def->field_count; i++) {
 			testcase(mask != 0xffffffff && iCol == 31);
 			testcase(mask != 0xffffffff && iCol == 32);
 			if (mask == 0xffffffff

@@ -496,7 +496,7 @@ indexColumnNotNull(Index * pIdx, int iCol)
 	assert(iCol >= 0 && iCol < (int)index_column_count(pIdx));
 	j = pIdx->aiColumn[iCol];
 	if (j >= 0) {
-		return !table_column_is_nullable(pIdx->pTable, j);
+		return !pIdx->pTable->def->fields[j].is_nullable;
 	} else if (j == (-1)) {
 		return 1;
 	} else {
@@ -720,7 +720,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 			if (!sentWarning) {
 				sqlite3_log(SQLITE_WARNING_AUTOINDEX,
 					    "automatic index on %s(%s)",
-					    pTable->zName,
+					    pTable->def->name,
 					    pTable->aCol[iCol].zName);
 				sentWarning = 1;
 			}
@@ -748,15 +748,15 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	 * if they go out of sync.
 	 */
 	extraCols = pSrc->colUsed & (~idxCols | MASKBIT(BMS - 1));
-	mxBitCol = MIN(BMS - 1, pTable->nCol);
-	testcase(pTable->nCol == BMS - 1);
-	testcase(pTable->nCol == BMS - 2);
+	mxBitCol = MIN(BMS - 1, pTable->def->field_count);
+	testcase(pTable->def->field_count == BMS - 1);
+	testcase(pTable->def->field_count == BMS - 2);
 	for (i = 0; i < mxBitCol; i++) {
 		if (extraCols & MASKBIT(i))
 			nKeyCol++;
 	}
 	if (pSrc->colUsed & MASKBIT(BMS - 1)) {
-		nKeyCol += pTable->nCol - BMS + 1;
+		nKeyCol += pTable->def->field_count - BMS + 1;
 	}
 
 	/* Construct the Index object to describe this index */
@@ -796,7 +796,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 		}
 	}
 	if (pSrc->colUsed & MASKBIT(BMS - 1)) {
-		for (i = BMS - 1; i < pTable->nCol; i++) {
+		for (i = BMS - 1; i < (int)pTable->def->field_count; i++) {
 			pIdx->aiColumn[n] = i;
 			n++;
 		}
@@ -809,7 +809,7 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	pLevel->iIdxCur = pParse->nTab++;
 	sqlite3VdbeAddOp2(v, OP_OpenAutoindex, pLevel->iIdxCur, nKeyCol + 1);
 	sql_vdbe_set_p4_key_def(pParse, pIdx);
-	VdbeComment((v, "for %s", pTable->zName));
+	VdbeComment((v, "for %s", pTable->def->name));
 
 	/* Fill the automatic index with content */
 	sqlite3ExprCachePush(pParse);
@@ -1673,7 +1673,7 @@ whereLoopPrint(WhereLoop * p, WhereClause * pWC)
 	sqlite3DebugPrintf("%c%2d.%0*llx.%0*llx", p->cId,
 			   p->iTab, nb, p->maskSelf, nb, p->prereq & mAll);
 	sqlite3DebugPrintf(" %12s",
-			   pItem->zAlias ? pItem->zAlias : pTab->zName);
+			   pItem->zAlias ? pItem->zAlias : pTab->def->name);
 #endif
 	const char *zName;
 	if (p->pIndex && (zName = p->pIndex->zName) != 0) {
@@ -3409,8 +3409,8 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				if (isOrderDistinct
 				    && iColumn >= 0
 				    && j >= pLoop->nEq
-				    && table_column_is_nullable(pIndex->pTable,
-								iColumn)) {
+				    && pIndex->pTable->def->fields[
+					iColumn].is_nullable) {
 					isOrderDistinct = 0;
 				}
 
@@ -4829,7 +4829,7 @@ sqlite3WhereEnd(WhereInfo * pWInfo)
 		}
 		VdbeModuleComment((v, "End WHERE-loop%d: %s", i,
 				   pWInfo->pTabList->a[pLevel->iFrom].pTab->
-				   zName));
+				   def->name));
 	}
 
 	/* The "break" point is here, just past the end of the outer loop.

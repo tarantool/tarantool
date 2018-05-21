@@ -224,7 +224,7 @@ sqlite3TreeViewSelect(TreeView * pView, const Select * p, u8 moreToFollow)
 				}
 				if (pItem->pTab) {
 					sqlite3XPrintf(&x, " tabname=%Q",
-						       pItem->pTab->zName);
+						       pItem->pTab->def->name);
 				}
 				if (pItem->zAlias) {
 					sqlite3XPrintf(&x, " (AS %s)",

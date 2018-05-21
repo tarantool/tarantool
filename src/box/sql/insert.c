@@ -56,7 +56,7 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	assert(pPk->tnum == pTab->tnum);
 	emit_open_cursor(pParse, iCur, pPk->tnum);
 	sql_vdbe_set_p4_key_def(pParse, pPk);
-	VdbeComment((v, "%s", pTab->zName));
+	VdbeComment((v, "%s", pTab->def->name));
 }
 
 /*
@@ -146,13 +146,15 @@ sqlite3TableAffinity(Vdbe * v, Table * pTab, int iReg)
 	char *zColAff = pTab->zColAff;
 	if (zColAff == 0) {
 		sqlite3 *db = sqlite3VdbeDb(v);
-		zColAff = (char *)sqlite3DbMallocRaw(0, pTab->nCol + 1);
+		zColAff =
+			(char *)sqlite3DbMallocRaw(0,
+						   pTab->def->field_count + 1);
 		if (!zColAff) {
 			sqlite3OomFault(db);
 			return;
 		}
 
-		for (i = 0; i < pTab->nCol; i++) {
+		for (i = 0; i < (int)pTab->def->field_count; i++) {
 			zColAff[i] = pTab->aCol[i].affinity;
 		}
 		do {
@@ -400,7 +402,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* Cannot insert into a read-only table. */
 	if (is_view && tmask == 0) {
 		sqlite3ErrorMsg(pParse, "cannot modify %s because it is a view",
-				pTab->zName);
+				pTab->def->name);
 		goto insert_cleanup;
 	}
 
@@ -434,7 +436,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 * the content of the new row, and the assembled row record.
 	 */
 	regTupleid = regIns = pParse->nMem + 1;
-	pParse->nMem += pTab->nCol + 1;
+	pParse->nMem += pTab->def->field_count + 1;
 	regData = regTupleid + 1;
 
 	/* If the INSERT statement included an IDLIST term, then make sure
@@ -453,17 +455,17 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* The size of used_columns buffer is checked during compilation time
 	 * using SQLITE_MAX_COLUMN constant.
 	 */
-	memset(used_columns, 0, (pTab->nCol + 7) / 8);
+	memset(used_columns, 0, (pTab->def->field_count + 7) / 8);
 	bIdListInOrder = 1;
 	if (pColumn) {
 		for (i = 0; i < pColumn->nId; i++) {
 			pColumn->a[i].idx = -1;
 		}
 		for (i = 0; i < pColumn->nId; i++) {
-			for (j = 0; j < pTab->nCol; j++) {
+			for (j = 0; j < (int)pTab->def->field_count; j++) {
 				if (strcmp
 				    (pColumn->a[i].zName,
-				     pTab->aCol[j].zName) == 0) {
+				     pTab->def->fields[j].name) == 0) {
 					pColumn->a[i].idx = j;
 					if (i != j)
 						bIdListInOrder = 0;
@@ -474,7 +476,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 					break;
 				}
 			}
-			if (j >= pTab->nCol) {
+			if (j >= (int)pTab->def->field_count) {
 				sqlite3ErrorMsg(pParse,
 						"table %S has no column named %s",
 						pTabList, 0, pColumn->a[i].zName);
@@ -510,7 +512,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		sqlite3VdbeAddOp3(v, OP_InitCoroutine, regYield, 0, addrTop);
 		sqlite3SelectDestInit(&dest, SRT_Coroutine, regYield);
 		dest.iSdst = bIdListInOrder ? regData : 0;
-		dest.nSdst = pTab->nCol;
+		dest.nSdst = pTab->def->field_count;
 		rc = sqlite3Select(pParse, pSelect, &dest);
 		regFromSelect = dest.iSdst;
 		if (rc || db->mallocFailed || pParse->nErr)
@@ -605,10 +607,11 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		ipkColumn = pTab->iPKey;
 	}
 
-	if (pColumn == 0 && nColumn && nColumn != (pTab->nCol)) {
+	if (pColumn == 0 && nColumn && nColumn !=
+				       (int)pTab->def->field_count) {
 		sqlite3ErrorMsg(pParse,
 				"table %S has %d columns but %d values were supplied",
-				pTabList, 0, pTab->nCol, nColumn);
+				pTabList, 0, pTab->def->field_count, nColumn);
 		goto insert_cleanup;
 	}
 	if (pColumn != 0 && nColumn != pColumn->nId) {
@@ -676,11 +679,12 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 */
 	endOfLoop = sqlite3VdbeMakeLabel(v);
 	if (tmask & TRIGGER_BEFORE) {
-		int regCols = sqlite3GetTempRange(pParse, pTab->nCol + 1);
+		int regCols =
+			sqlite3GetTempRange(pParse, pTab->def->field_count + 1);
 
 		/* Create the new column data
 		 */
-		for (i = j = 0; i < pTab->nCol; i++) {
+		for (i = j = 0; i < (int)pTab->def->field_count; i++) {
 			if (pColumn) {
 				for (j = 0; j < pColumn->nId; j++) {
 					if (pColumn->a[j].idx == i)
@@ -726,10 +730,11 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		/* Fire BEFORE or INSTEAD OF triggers */
 		sqlite3CodeRowTrigger(pParse, pTrigger, TK_INSERT, 0,
 				      TRIGGER_BEFORE, pTab,
-				      regCols - pTab->nCol - 1, on_error,
-				      endOfLoop);
+				      regCols - pTab->def->field_count - 1,
+				      on_error, endOfLoop);
 
-		sqlite3ReleaseTempRange(pParse, regCols, pTab->nCol + 1);
+		sqlite3ReleaseTempRange(pParse, regCols,
+					pTab->def->field_count + 1);
 	}
 
 	/* Compute the content of the next row to insert into a range of
@@ -752,7 +757,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		/* Compute data for all columns of the new entry, beginning
 		 * with the first column.
 		 */
-		for (i = 0; i < pTab->nCol; i++) {
+		for (i = 0; i < (int)pTab->def->field_count; i++) {
 			int iRegStore = regData + i;
 			if (pColumn == 0) {
 				j = i;
@@ -877,8 +882,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		/* Code AFTER triggers */
 		sqlite3CodeRowTrigger(pParse, pTrigger, TK_INSERT, 0,
 				      TRIGGER_AFTER, pTab,
-				      regData - 2 - pTab->nCol, on_error,
-				      endOfLoop);
+				      regData - 2 - pTab->def->field_count,
+				      on_error, endOfLoop);
 	}
 
 	/* The bottom of the main insertion loop, if the data source
@@ -971,8 +976,8 @@ checkConstraintUnchanged(Expr * pExpr, int *aiChng)
  *
  * The regNewData parameter is the first register in a range that contains
  * the data to be inserted or the data after the update.  There will be
- * pTab->nCol+1 registers in this range.  The first register (the one
- * that regNewData points to) will contain NULL.  The second register
+ * pTab->def->field_count+1 registers in this range.  The first register (the
+ * one that regNewData points to) will contain NULL.  The second register
  * in the range will contain the content of the first table column.
  * The third register will contain the content of the second table column.
  * And so forth.
@@ -1078,7 +1083,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	assert(v != 0);
 	/* This table is not a VIEW */
 	assert(!space_is_view(pTab));
-	nCol = pTab->nCol;
+	nCol = pTab->def->field_count;
 
 	pPk = sqlite3PrimaryKeyIndex(pTab);
 	nPkField = index_column_count(pPk);
@@ -1099,7 +1104,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			/* Don't bother checking for NOT NULL on columns that do not change */
 			continue;
 		}
-		if (table_column_is_nullable(pTab, i)
+		if (pTab->def->fields[i].is_nullable
 		    || (pTab->tabFlags & TF_Autoincrement
 			&& pTab->iAutoIncPKey == i))
 			continue;	/* This column is allowed to be NULL */
@@ -1126,8 +1131,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		case ON_CONFLICT_ACTION_ROLLBACK:
 		case ON_CONFLICT_ACTION_FAIL: {
 				char *zMsg =
-				    sqlite3MPrintf(db, "%s.%s", pTab->zName,
-						   pTab->aCol[i].zName);
+				    sqlite3MPrintf(db, "%s.%s", pTab->def->name,
+						   pTab->def->fields[i].name);
 				sqlite3VdbeAddOp3(v, OP_HaltIfNull,
 						  SQLITE_CONSTRAINT_NOTNULL,
 						  on_error, regNewData + 1 + i);
@@ -1183,7 +1188,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			} else {
 				char *zName = pCheck->a[i].zName;
 				if (zName == 0)
-					zName = pTab->zName;
+					zName = pTab->def->name;
 				if (on_error == ON_CONFLICT_ACTION_REPLACE)
 					on_error = ON_CONFLICT_ACTION_ABORT;
 				sqlite3HaltConstraint(pParse,
@@ -1273,7 +1278,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 					sqlite3VdbeAddOp2(v, OP_SCopy,
 							  x, regIdx + i);
 					VdbeComment((v, "%s",
-						     pTab->aCol[iField].zName));
+						     pTab->def->fields[
+							iField].name));
 				}
 			}
 		}
@@ -1301,7 +1307,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			}
 
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regNewData + 1,
-					pTab->nCol, aRegIdx[ix]);
+					pTab->def->field_count, aRegIdx[ix]);
 			VdbeComment((v, "for %s", pIdx->zName));
 		}
 
@@ -1410,8 +1416,9 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 					x = pPk->aiColumn[i];
 					sqlite3VdbeAddOp3(v, OP_Column,
 							  iThisCur, x, regR + i);
-					VdbeComment((v, "%s.%s", pTab->zName,
-						pTab->aCol[pPk->aiColumn[i]].zName));
+					VdbeComment((v, "%s.%s", pTab->def->name,
+						pTab->def->fields[
+							pPk->aiColumn[i]].name));
 				}
 			}
 			if (isUpdate && uniqueByteCodeNeeded) {
@@ -1818,13 +1825,13 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if (space_is_view(pSrc)) {
 		return 0;	/* tab2 may not be a view */
 	}
-	if (pDest->nCol != pSrc->nCol) {
+	if (pDest->def->field_count != pSrc->def->field_count) {
 		return 0;	/* Number of columns must be the same in tab1 and tab2 */
 	}
 	if (pDest->iPKey != pSrc->iPKey) {
 		return 0;	/* Both tables must have the same INTEGER PRIMARY KEY */
 	}
-	for (i = 0; i < pDest->nCol; i++) {
+	for (i = 0; i < (int)pDest->def->field_count; i++) {
 		Column *pDestCol = &pDest->aCol[i];
 		Column *pSrcCol = &pSrc->aCol[i];
 		if (pDestCol->affinity != pSrcCol->affinity) {
@@ -1835,8 +1842,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		    sql_column_collation(pSrc, i, &id)) {
 			return 0;	/* Collating sequence must be the same on all columns */
 		}
-		if (!table_column_is_nullable(pDest, i)
-		    && table_column_is_nullable(pSrc, i)) {
+		if (!pDest->def->fields[i].is_nullable
+		    && pSrc->def->fields[i].is_nullable) {
 			return 0;	/* tab2 must be NOT NULL if tab1 is */
 		}
 		/* Default values for second and subsequent columns need to match. */

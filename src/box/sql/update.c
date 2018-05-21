@@ -72,11 +72,12 @@ void
 sqlite3ColumnDefault(Vdbe * v, Table * pTab, int i, int iReg)
 {
 	assert(pTab != 0);
-	if (!pTab->pSelect) {
+	if (!pTab->def->opts.is_view) {
 		sqlite3_value *pValue = 0;
 		Column *pCol = &pTab->aCol[i];
-		VdbeComment((v, "%s.%s", pTab->zName, pCol->zName));
-		assert(i < pTab->nCol);
+		VdbeComment((v, "%s.%s", pTab->def->name,
+			pTab->def->fields[i].name));
+		assert(i < (int)pTab->def->field_count);
 
 		Expr *expr = NULL;
 		struct space *space =
@@ -177,7 +178,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	}
 	if (is_view && tmask == 0) {
 		sqlite3ErrorMsg(pParse, "cannot modify %s because it is a view",
-				pTab->zName);
+				pTab->def->name);
 		goto update_cleanup;
 	}
 
@@ -202,14 +203,15 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	aXRef =
 	    sqlite3DbMallocRawNN(db,
-				 sizeof(int) * (pTab->nCol + nIdx) + nIdx + 2);
+				 sizeof(int) *
+				 (pTab->def->field_count + nIdx) + nIdx + 2);
 	if (aXRef == 0)
 		goto update_cleanup;
-	aRegIdx = aXRef + pTab->nCol;
+	aRegIdx = aXRef + pTab->def->field_count;
 	aToOpen = (u8 *) (aRegIdx + nIdx);
 	memset(aToOpen, 1, nIdx + 1);
 	aToOpen[nIdx + 1] = 0;
-	for (i = 0; i < pTab->nCol; i++)
+	for (i = 0; i < (int)pTab->def->field_count; i++)
 		aXRef[i] = -1;
 
 	/* Initialize the name-context */
@@ -226,8 +228,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		if (sqlite3ResolveExprNames(&sNC, pChanges->a[i].pExpr)) {
 			goto update_cleanup;
 		}
-		for (j = 0; j < pTab->nCol; j++) {
-			if (strcmp(pTab->aCol[j].zName,
+		for (j = 0; j < (int)pTab->def->field_count; j++) {
+			if (strcmp(pTab->def->fields[j].name,
 				   pChanges->a[i].zName) == 0) {
 				if (pPk && table_column_is_in_pk(pTab, j)) {
 					chngPk = 1;
@@ -243,7 +245,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				break;
 			}
 		}
-		if (j >= pTab->nCol) {
+		if (j >= (int)pTab->def->field_count) {
 			sqlite3ErrorMsg(pParse, "no such column: %s",
 					pChanges->a[i].zName);
 			pParse->checkSchema = 1;
@@ -301,21 +303,21 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 	if (chngPk || pTrigger || hasFK) {
 		regOld = pParse->nMem + 1;
-		pParse->nMem += pTab->nCol;
+		pParse->nMem += pTab->def->field_count;
 	}
 	if (chngPk || pTrigger || hasFK) {
 		regNewPk = ++pParse->nMem;
 	}
 	regNew = pParse->nMem + 1;
-	pParse->nMem += pTab->nCol;
+	pParse->nMem += pTab->def->field_count;
 
 	/* If we are trying to update a view, realize that view into
 	 * an ephemeral table.
 	 */
 	if (is_view) {
-		sql_materialize_view(pParse, pTab->zName, pWhere, iDataCur);
+		sql_materialize_view(pParse, pTab->def->name, pWhere, iDataCur);
 		/* Number of columns from SELECT plus ID.*/
-		nKey = pTab->nCol + 1;
+		nKey = pTab->def->field_count + 1;
 	}
 
 	/* Resolve the column names in all the expressions in the
@@ -466,7 +468,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 						 pTrigger, pChanges, 0,
 						 TRIGGER_BEFORE | TRIGGER_AFTER,
 						 pTab, on_error);
-		for (i = 0; i < pTab->nCol; i++) {
+		for (i = 0; i < (int)pTab->def->field_count; i++) {
 			if (oldmask == 0xffffffff
 			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0)
 			    || table_column_is_in_pk(pTab, i)) {
@@ -497,7 +499,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	newmask =
 	    sqlite3TriggerColmask(pParse, pTrigger, pChanges, 1, TRIGGER_BEFORE,
 				  pTab, on_error);
-	for (i = 0; i < pTab->nCol; i++) {
+	for (i = 0; i < (int)pTab->def->field_count; i++) {
 		if (i == pTab->iPKey) {
 			sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
 		} else {
@@ -553,7 +555,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * all columns not modified by the update statement into their
 		 * registers in case this has happened.
 		 */
-		for (i = 0; i < pTab->nCol; i++) {
+		for (i = 0; i < (int)pTab->def->field_count; i++) {
 			if (aXRef[i] < 0 && i != pTab->iPKey) {
 				sqlite3ExprCodeGetColumnOfTable(v, pTab,
 								iDataCur, i,

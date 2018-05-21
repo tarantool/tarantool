@@ -1432,10 +1432,12 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 {
 	struct Column *aCol = pTable->aCol;
 	const struct Enc *enc = get_enc(buf);
+	const struct space_def *def = pTable->def;
+	assert(def != NULL);
 	struct SqliteIndex *pk_idx = sqlite3PrimaryKeyIndex(pTable);
 	int pk_forced_int = -1;
 	char *base = buf, *p;
-	int i, n = pTable->nCol;
+	int i, n = def->field_count;
 
 	p = enc->encode_array(base, n);
 
@@ -1443,47 +1445,49 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 	 * treat it as strict type, not affinity.  */
 	if (pk_idx && pk_idx->nColumn == 1) {
 		int pk = pk_idx->aiColumn[0];
-		if (pTable->aCol[pk].type == FIELD_TYPE_INTEGER)
+		if (def->fields[pk].type == FIELD_TYPE_INTEGER)
 			pk_forced_int = pk;
 	}
 
 	for (i = 0; i < n; i++) {
 		const char *t;
-		uint32_t cid = aCol[i].coll_id;
-		struct field_def *field = &pTable->def->fields[i];
-		struct Expr *def = field->default_value_expr;
+		uint32_t cid = def->fields[i].coll_id;
+		struct field_def *field = &def->fields[i];
+		const char *default_str = field->default_value;
 		int base_len = 4;
 		if (cid != COLL_NONE)
 			base_len += 1;
-		if (def != NULL)
+		if (default_str != NULL)
 			base_len += 1;
 		p = enc->encode_map(p, base_len);
 		p = enc->encode_str(p, "name", 4);
-		p = enc->encode_str(p, aCol[i].zName, strlen(aCol[i].zName));
+		p = enc->encode_str(p, field->name, strlen(field->name));
 		p = enc->encode_str(p, "type", 4);
 		if (i == pk_forced_int) {
 			t = "integer";
 		} else {
 			t = aCol[i].affinity == SQLITE_AFF_BLOB ? "scalar" :
-				convertSqliteAffinity(aCol[i].affinity, aCol[i].notNull == 0);
+				convertSqliteAffinity(aCol[i].affinity,
+						      def->fields[i].is_nullable);
 		}
+
+		assert(def->fields[i].is_nullable ==
+			       action_is_nullable(def->fields[i].nullable_action));
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "is_nullable", 11);
-		p = enc->encode_bool(p, aCol[i].notNull ==
-				     ON_CONFLICT_ACTION_NONE);
+		p = enc->encode_bool(p, def->fields[i].is_nullable);
 		p = enc->encode_str(p, "nullable_action", 15);
-		assert(aCol[i].notNull < on_conflict_action_MAX);
-		const char *action = on_conflict_action_strs[aCol[i].notNull];
+		assert(def->fields[i].nullable_action < on_conflict_action_MAX);
+		const char *action =
+			on_conflict_action_strs[def->fields[i].nullable_action];
 		p = enc->encode_str(p, action, strlen(action));
 		if (cid != COLL_NONE) {
 			p = enc->encode_str(p, "collation", strlen("collation"));
 			p = enc->encode_uint(p, cid);
 		}
-		if (def != NULL) {
-		        assert((def->flags & EP_IntValue) == 0);
-			assert(def->u.zToken != NULL);
-			p = enc->encode_str(p, "default", strlen("default"));
-			p = enc->encode_str(p, def->u.zToken, strlen(def->u.zToken));
+		if (default_str != NULL) {
+		        p = enc->encode_str(p, "default", strlen("default"));
+			p = enc->encode_str(p, default_str, strlen(default_str));
 		}
 	}
 	return (int)(p - base);
@@ -1498,13 +1502,12 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
  */
 int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf)
 {
-	(void)pTable;
 	const struct Enc *enc = get_enc(buf);
 	char *base = buf, *p;
 
 	bool is_view = false;
 	if (pTable != NULL)
-		is_view = pTable->pSelect != NULL;
+		is_view = pTable->def->opts.is_view;
 	p = enc->encode_map(base, is_view ? 2 : 1);
 	p = enc->encode_str(p, "sql", 3);
 	p = enc->encode_str(p, zSql, strlen(zSql));
@@ -1525,6 +1528,8 @@ int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf)
 int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 {
 	struct Column *aCol = pIndex->pTable->aCol;
+	struct space_def *def = pIndex->pTable->def;
+	assert(def != NULL);
 	const struct Enc *enc = get_enc(buf);
 	struct SqliteIndex *primary_index;
 	char *base = buf, *p;
@@ -1536,7 +1541,7 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	 * treat it as strict type, not affinity.  */
 	if (primary_index->nColumn == 1) {
 		int pk = primary_index->aiColumn[0];
-		if (aCol[pk].type == FIELD_TYPE_INTEGER)
+		if (def->fields[pk].type == FIELD_TYPE_INTEGER)
 			pk_forced_int = pk;
 	}
 
@@ -1551,11 +1556,15 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	p = enc->encode_array(base, n);
 	for (i = 0; i < n; i++) {
 		int col = pIndex->aiColumn[i];
+		assert(def->fields[col].is_nullable ==
+		       action_is_nullable(def->fields[col].nullable_action));
 		const char *t;
-		if (pk_forced_int == col)
+		if (pk_forced_int == col) {
 			t = "integer";
-		else
-			t = convertSqliteAffinity(aCol[col].affinity, aCol[col].notNull == 0);
+		} else {
+			t = convertSqliteAffinity(aCol[col].affinity,
+						  def->fields[col].is_nullable);
+		}
 		/* do not decode default collation */
 		uint32_t cid = pIndex->coll_id_array[i];
 		p = enc->encode_map(p, cid == COLL_NONE ? 5 : 6);
@@ -1568,9 +1577,10 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 			p = enc->encode_uint(p, cid);
 		}
 		p = enc->encode_str(p, "is_nullable", 11);
-		p = enc->encode_bool(p, aCol[col].notNull == ON_CONFLICT_ACTION_NONE);
+		p = enc->encode_bool(p, def->fields[col].is_nullable);
 		p = enc->encode_str(p, "nullable_action", 15);
-		const char *action_str = on_conflict_action_strs[aCol[col].notNull];
+		const char *action_str =
+			on_conflict_action_strs[def->fields[col].nullable_action];
 		p = enc->encode_str(p, action_str, strlen(action_str));
 
 		p = enc->encode_str(p, "sort_order", 10);
@@ -1690,4 +1700,64 @@ space_column_default_expr(uint32_t space_id, uint32_t fieldno)
 	assert(space->def->field_count > fieldno);
 
 	return space->def->fields[fieldno].default_value_expr;
+}
+
+struct space_def *
+sql_ephemeral_space_def_new(Parse *parser, const char *name)
+{
+	struct space_def *def = NULL;
+	struct region *region = &fiber()->gc;
+	size_t name_len = name != NULL ? strlen(name) : 0;
+	uint32_t dummy;
+	size_t size = space_def_sizeof(name_len, NULL, 0, &dummy, &dummy, &dummy);
+	def = (struct space_def *)region_alloc(region, size);
+	if (def == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc",
+			 "sql_ephemeral_space_def_new");
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
+		return NULL;
+	}
+
+	memset(def, 0, size);
+	memcpy(def->name, name, name_len);
+	def->name[name_len] = '\0';
+	def->opts.temporary = true;
+	return def;
+}
+
+Table *
+sql_ephemeral_table_new(Parse *parser, const char *name)
+{
+	sqlite3 *db = parser->db;
+	struct space_def *def = NULL;
+	Table *table = sqlite3DbMallocZero(db, sizeof(Table));
+	if (table != NULL)
+		def = sql_ephemeral_space_def_new(parser, name);
+	if (def == NULL) {
+		sqlite3DbFree(db, table);
+		return NULL;
+	}
+
+	table->def = def;
+	return table;
+}
+
+int
+sql_table_def_rebuild(struct sqlite3 *db, struct Table *pTable)
+{
+	struct space_def *old_def = pTable->def;
+	struct space_def *new_def = NULL;
+	new_def = space_def_new(old_def->id, old_def->uid,
+				old_def->field_count, old_def->name,
+				strlen(old_def->name), old_def->engine_name,
+				strlen(old_def->engine_name), &old_def->opts,
+				old_def->fields, old_def->field_count);
+	if (new_def == NULL) {
+		sqlite3OomFault(db);
+		return -1;
+	}
+	pTable->def = new_def;
+	pTable->def->opts.temporary = false;
+	return 0;
 }

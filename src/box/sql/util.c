@@ -130,15 +130,6 @@ sqlite3Strlen30(const char *z)
 }
 
 /*
- * Return the declared type of a column.
- */
-inline enum field_type
-sqlite3ColumnType(Column * pCol)
-{
-	return pCol->type;
-}
-
-/*
  * Helper function for sqlite3Error() - called rarely.  Broken out into
  * a separate routine to avoid unnecessary register saves on entry to
  * sqlite3Error().

@@ -50,7 +50,7 @@ explainIndexColumnName(Index * pIdx, int i)
 	i = pIdx->aiColumn[i];
 	if (i == XN_EXPR)
 		return "<expr>";
-	return pIdx->pTable->aCol[i].zName;
+	return pIdx->pTable->def->fields[i].name;
 }
 
 /*
@@ -1159,7 +1159,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 				  pTabItem->addrFillSub);
 		pLevel->p2 = sqlite3VdbeAddOp2(v, OP_Yield, regYield, addrBrk);
 		VdbeCoverage(v);
-		VdbeComment((v, "next row of \"%s\"", pTabItem->pTab->zName));
+		VdbeComment((v, "next row of \"%s\"", pTabItem->pTab->def->name));
 		pLevel->op = OP_Goto;
 	} else if (pLoop->wsFlags & WHERE_INDEXED) {
 		/* Case 4: A scan using an index.
@@ -1261,7 +1261,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			 * FYI: entries in an index are ordered as follows:
 			 *      NULL, ... NULL, min_value, ...
 			 */
-			if ((j >= 0 && table_column_is_nullable(pIdx->pTable, j))
+			if ((j >= 0 && pIdx->pTable->def->fields[j].is_nullable)
 			    || j == XN_EXPR) {
 				assert(pLoop->nSkip == 0);
 				bSeekPastNull = 1;
@@ -1307,8 +1307,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 #endif
 			if (pRangeStart == 0) {
 				j = pIdx->aiColumn[nEq];
-				if ((j >= 0
-				     && table_column_is_nullable(pIdx->pTable, j)) || j == XN_EXPR) {
+				if ((j >= 0 &&
+				     pIdx->pTable->def->fields[j].is_nullable)||
+				    j == XN_EXPR) {
 					bSeekPastNull = 1;
 				}
 			}

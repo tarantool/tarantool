@@ -47,6 +47,8 @@ struct space_opts {
 	 * - it is empty at server start
 	 * - changes are not written to WAL
 	 * - changes are not part of a snapshot
+         * - in SQL: space_def memory is allocated on region and
+         *   does not require manual release.
 	 */
 	bool temporary;
 	/**
@@ -156,6 +158,24 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      const char *engine_name, uint32_t engine_len,
 	      const struct space_opts *opts, const struct field_def *fields,
 	      uint32_t field_count);
+
+/**
+ * Size of the space_def.
+ * @param name_len Length of the space name.
+ * @param fields Fields array of space format.
+ * @param field_count Space field count.
+ * @param[out] names_offset Offset from the beginning of a def to
+ *             a field names memory.
+ * @param[out] fields_offset Offset from the beginning of a def to
+ *             a fields array.
+ * @param[out] def_expr_offset Offset from the beginning of a def
+ *             to a def_value_expr array.
+ * @retval Size in bytes.
+ */
+size_t
+space_def_sizeof(uint32_t name_len, const struct field_def *fields,
+		 uint32_t field_count, uint32_t *names_offset,
+		 uint32_t *fields_offset, uint32_t *def_expr_offset);
 
 #if defined(__cplusplus)
 } /* extern "C" */

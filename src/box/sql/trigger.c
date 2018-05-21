@@ -134,7 +134,7 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	}
 
 	/* Do not create a trigger on a system table */
-	if (sqlite3StrNICmp(pTab->zName, "sqlite_", 7) == 0) {
+	if (sqlite3StrNICmp(pTab->def->name, "sqlite_", 7) == 0) {
 		sqlite3ErrorMsg(pParse,
 				"cannot create trigger on system table");
 		goto trigger_cleanup;
@@ -718,7 +718,6 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 		 */
 		pParse->eOrconf =
 		    (orconf == ON_CONFLICT_ACTION_DEFAULT) ? pStep->orconf : (u8) orconf;
-		assert(pParse->okConstFactor == 0);
 
 		switch (pStep->op) {
 		case TK_UPDATE:{
@@ -866,9 +865,9 @@ codeRowTrigger(Parse * pParse,	/* Current parse context */
 	pSubParse = sqlite3StackAllocZero(db, sizeof(Parse));
 	if (!pSubParse)
 		return 0;
+	sql_parser_create(pSubParse, db);
 	memset(&sNC, 0, sizeof(sNC));
 	sNC.pParse = pSubParse;
-	pSubParse->db = db;
 	pSubParse->pTriggerTab = pTab;
 	pSubParse->pToplevel = pTop;
 	pSubParse->eTriggerOp = pTrigger->op;
@@ -883,7 +882,7 @@ codeRowTrigger(Parse * pParse,	/* Current parse context */
 			     (pTrigger->op == TK_UPDATE ? "UPDATE" : ""),
 			     (pTrigger->op == TK_INSERT ? "INSERT" : ""),
 			     (pTrigger->op == TK_DELETE ? "DELETE" : ""),
-			     pTab->zName));
+			     pTab->def->name));
 #ifndef SQLITE_OMIT_TRACE
 		sqlite3VdbeChangeP4(v, -1,
 				    sqlite3MPrintf(db, "-- TRIGGER %s",
@@ -934,7 +933,7 @@ codeRowTrigger(Parse * pParse,	/* Current parse context */
 
 	assert(!pSubParse->pZombieTab);
 	assert(!pSubParse->pTriggerPrg && !pSubParse->nMaxArg);
-	sqlite3ParserReset(pSubParse);
+	sql_parser_destroy(pSubParse);
 	sqlite3StackFree(db, pSubParse);
 
 	return pPrg;

@@ -203,25 +203,6 @@ sqlite3InitDatabase(sqlite3 * db)
 
 
 /*
- * Free all memory allocations in the pParse object
- */
-void
-sqlite3ParserReset(Parse * pParse)
-{
-	if (pParse) {
-		sqlite3 *db = pParse->db;
-		sqlite3DbFree(db, pParse->aLabel);
-		sqlite3ExprListDelete(db, pParse->pConstExpr);
-		if (db) {
-			assert(db->lookaside.bDisable >=
-			       pParse->disableLookaside);
-			db->lookaside.bDisable -= pParse->disableLookaside;
-		}
-		pParse->disableLookaside = 0;
-	}
-}
-
-/*
  * Compile the UTF-8 encoded SQL statement zSql into a statement handle.
  */
 static int
@@ -238,9 +219,7 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 	int rc = SQLITE_OK;	/* Result code */
 	int i;			/* Loop counter */
 	Parse sParse;		/* Parsing context */
-
-	memset(&sParse, 0, PARSE_HDR_SZ);
-	memset(PARSE_TAIL(&sParse), 0, PARSE_TAIL_SZ);
+	sql_parser_create(&sParse, db);
 	sParse.pReprepare = pReprepare;
 	assert(ppStmt && *ppStmt == 0);
 	/* assert( !db->mallocFailed ); // not true with SQLITE_USE_ALLOCA */
@@ -261,7 +240,6 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 	 * but it does *not* override schema lock detection, so this all still
 	 * works even if READ_UNCOMMITTED is set.
 	 */
-	sParse.db = db;
 	if (nBytes >= 0 && (nBytes == 0 || zSql[nBytes - 1] != 0)) {
 		char *zSqlCopy;
 		int mxLen = db->aLimit[SQLITE_LIMIT_SQL_LENGTH];
@@ -347,7 +325,7 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 
  end_prepare:
 
-	sqlite3ParserReset(&sParse);
+	sql_parser_destroy(&sParse);
 	rc = sqlite3ApiExit(db, rc);
 	assert((rc & db->errMask) == rc);
 	return rc;
@@ -452,4 +430,21 @@ sqlite3_prepare_v2(sqlite3 * db,	/* Database handle. */
 	rc = sqlite3LockAndPrepare(db, zSql, nBytes, 1, 0, ppStmt, pzTail);
 	assert(rc == SQLITE_OK || ppStmt == 0 || *ppStmt == 0);	/* VERIFY: F13021 */
 	return rc;
+}
+
+void
+sql_parser_destroy(Parse *parser)
+{
+	assert(parser != NULL);
+	sqlite3 *db = parser->db;
+	sqlite3DbFree(db, parser->aLabel);
+	sqlite3ExprListDelete(db, parser->pConstExpr);
+	if (db != NULL) {
+		assert(db->lookaside.bDisable >=
+		       parser->disableLookaside);
+		db->lookaside.bDisable -= parser->disableLookaside;
+	}
+	parser->disableLookaside = 0;
+	struct region *region = &fiber()->gc;
+	region_truncate(region, parser->region_initial_size);
 }

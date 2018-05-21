@@ -109,7 +109,7 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 #ifndef SQLITE_OMIT_VIEW
 	if (space_is_view(pTab)) {
 		sqlite3ErrorMsg(pParse, "view %s may not be altered",
-				pTab->zName);
+				pTab->def->name);
 		goto exit_rename_table;
 	}
 #endif
@@ -144,6 +144,9 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 void
 sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 {
+	/* This function is not implemented yet #3075. */
+	unreachable();
+
 	Table *pNew;		/* Copy of pParse->pNewTable */
 	Table *pTab;		/* Table being altered */
 	const char *zTab;	/* Table name */
@@ -160,11 +163,12 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	pNew = pParse->pNewTable;
 	assert(pNew);
 
-	zTab = &pNew->zName[16];	/* Skip the "sqlite_altertab_" prefix on the name */
-	pCol = &pNew->aCol[pNew->nCol - 1];
+	/* Skip the "sqlite_altertab_" prefix on the name. */
+	zTab = &pNew->def->name[16];
+	pCol = &pNew->aCol[pNew->def->field_count - 1];
 	assert(pNew->def != NULL);
 	pDflt = space_column_default_expr(SQLITE_PAGENO_TO_SPACEID(pNew->tnum),
-					  pNew->nCol - 1);
+					  pNew->def->field_count - 1);
 	pTab = sqlite3HashFind(&db->pSchema->tblHash, zTab);;
 	assert(pTab);
 
@@ -195,7 +199,11 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 				"Cannot add a REFERENCES column with non-NULL default value");
 		return;
 	}
-	if (pCol->notNull && !pDflt) {
+	assert(pNew->def->fields[pNew->def->field_count - 1].is_nullable ==
+	       action_is_nullable(pNew->def->fields[
+		pNew->def->field_count - 1].nullable_action));
+	if (!pNew->def->fields[pNew->def->field_count - 1].is_nullable &&
+	    pDflt == NULL) {
 		sqlite3ErrorMsg(pParse,
 				"Cannot add a NOT NULL column with default value NULL");
 		return;
@@ -227,7 +235,7 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	(void)pColDef;
 
 	/* Reload the schema of the modified table. */
-	reloadTableSchema(pParse, pTab, pTab->zName);
+	reloadTableSchema(pParse, pTab, pTab->def->name);
 }
 
 /*
@@ -248,10 +256,13 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 void
 sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 {
+	/* This function is not implemented yet #3075. */
+	unreachable();
+
 	Table *pNew;
 	Table *pTab;
 	Vdbe *v;
-	int i;
+	uint32_t i;
 	int nAlloc;
 	sqlite3 *db = pParse->db;
 
@@ -281,26 +292,31 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	pNew = (Table *) sqlite3DbMallocZero(db, sizeof(Table));
 	if (!pNew)
 		goto exit_begin_add_column;
+	pNew->def = space_def_dup(pTab->def);
+	if (pNew->def == NULL) {
+		sqlite3DbFree(db, pNew);
+		sqlite3OomFault(db);
+		goto exit_begin_add_column;
+	}
 	pParse->pNewTable = pNew;
-	pNew->nTabRef = 1;
-	pNew->nCol = pTab->nCol;
-	assert(pNew->nCol > 0);
-	nAlloc = (((pNew->nCol - 1) / 8) * 8) + 8;
-	assert(nAlloc >= pNew->nCol && nAlloc % 8 == 0
-	       && nAlloc - pNew->nCol < 8);
+	assert(pNew->def->field_count > 0);
+	nAlloc = (((pNew->def->field_count - 1) / 8) * 8) + 8;
+	assert((uint32_t)nAlloc >= pNew->def->field_count && nAlloc % 8 == 0 &&
+	       nAlloc - pNew->def->field_count < 8);
 	pNew->aCol =
 	    (Column *) sqlite3DbMallocZero(db, sizeof(Column) * nAlloc);
-	pNew->zName = sqlite3MPrintf(db, "sqlite_altertab_%s", pTab->zName);
-	if (!pNew->aCol || !pNew->zName) {
+	/* FIXME: pNew->zName = sqlite3MPrintf(db, "sqlite_altertab_%s", pTab->zName); */
+	/* FIXME: if (!pNew->aCol || !pNew->zName) { */
+	if (!pNew->aCol) {
 		assert(db->mallocFailed);
 		goto exit_begin_add_column;
 	}
-	memcpy(pNew->aCol, pTab->aCol, sizeof(Column) * pNew->nCol);
-	for (i = 0; i < pNew->nCol; i++) {
+	memcpy(pNew->aCol, pTab->aCol, sizeof(Column) * pNew->def->field_count);
+	for (i = 0; i < pNew->def->field_count; i++) {
 		Column *pCol = &pNew->aCol[i];
-		pCol->zName = sqlite3DbStrDup(db, pCol->zName);
+		/* FIXME: pNew->def->name = sqlite3DbStrDup(db, pCol->zName); */
 		pCol->coll = NULL;
-		pCol->coll_id = COLL_NONE;
+		pNew->def->fields[i].coll_id = COLL_NONE;
 	}
 	pNew->pSchema = db->pSchema;
 	pNew->addColOffset = pTab->addColOffset;

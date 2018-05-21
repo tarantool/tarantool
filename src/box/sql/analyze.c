@@ -829,7 +829,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		return;
 	}
 	assert(pTab->tnum != 0);
-	if (sqlite3_strlike("\\_%", pTab->zName, '\\') == 0) {
+	if (sqlite3_strlike("\\_%", pTab->def->name, '\\') == 0) {
 		/* Do not gather statistics on system tables */
 		return;
 	}
@@ -843,7 +843,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	iIdxCur = iTab++;
 	pParse->nTab = MAX(pParse->nTab, iTab);
 	sqlite3OpenTable(pParse, iTabCur, pTab, OP_OpenRead);
-	sqlite3VdbeLoadString(v, regTabname, pTab->zName);
+	sqlite3VdbeLoadString(v, regTabname, pTab->def->name);
 
 	for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
 		int addrRewind;	/* Address of "OP_Rewind iIdxCur" */
@@ -858,7 +858,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * instead more familiar table name.
 		 */
 		if (IsPrimaryKeyIndex(pIdx)) {
-			zIdxName = pTab->zName;
+			zIdxName = pTab->def->name;
 		} else {
 			zIdxName = pIdx->zName;
 		}
@@ -866,7 +866,8 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 
 		/* Populate the register containing the index name. */
 		sqlite3VdbeLoadString(v, regIdxname, zIdxName);
-		VdbeComment((v, "Analysis for %s.%s", pTab->zName, zIdxName));
+		VdbeComment((v, "Analysis for %s.%s", pTab->def->name,
+			zIdxName));
 
 		/*
 		 * Pseudo-code for loop that calls stat_push():
@@ -1026,9 +1027,10 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		regKeyStat = sqlite3GetTempRange(pParse, nPkColumn);
 		for (j = 0; j < nPkColumn; j++) {
 			k = pPk->aiColumn[j];
-			assert(k >= 0 && k < pTab->nCol);
+			assert(k >= 0 && k < (int)pTab->def->field_count);
 			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k, regKeyStat + j);
-			VdbeComment((v, "%s", pTab->aCol[pPk->aiColumn[j]].zName));
+			VdbeComment((v, "%s",
+				pTab->def->fields[pPk->aiColumn[j]].name));
 		}
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regKeyStat,
 				  nPkColumn, regKey);
@@ -1150,7 +1152,7 @@ analyzeTable(Parse * pParse, Table * pTab, Index * pOnlyIdx)
 	if (pOnlyIdx) {
 		openStatTable(pParse, iStatCur, pOnlyIdx->zName, "idx");
 	} else {
-		openStatTable(pParse, iStatCur, pTab->zName, "tbl");
+		openStatTable(pParse, iStatCur, pTab->def->name, "tbl");
 	}
 	analyzeOneTable(pParse, pTab, pOnlyIdx, iStatCur, pParse->nMem + 1,
 			pParse->nTab);

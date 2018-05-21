@@ -47,20 +47,7 @@ const struct opt_def space_opts_reg[] = {
 	OPT_END,
 };
 
-/**
- * Size of the space_def.
- * @param name_len Length of the space name.
- * @param fields Fields array of space format.
- * @param field_count Space field count.
- * @param[out] names_offset Offset from the beginning of a def to
- *             a field names memory.
- * @param[out] fields_offset Offset from the beginning of a def to
- *             a fields array.
- * @param[out] def_expr_offset Offset from the beginning of a def
- *             to a def_value_expr array.
- * @retval Size in bytes.
- */
-static inline size_t
+size_t
 space_def_sizeof(uint32_t name_len, const struct field_def *fields,
 		 uint32_t field_count, uint32_t *names_offset,
 		 uint32_t *fields_offset, uint32_t *def_expr_offset)
@@ -70,11 +57,12 @@ space_def_sizeof(uint32_t name_len, const struct field_def *fields,
 	for (uint32_t i = 0; i < field_count; ++i) {
 		field_strs_size += strlen(fields[i].name) + 1;
 		if (fields[i].default_value != NULL) {
-			assert(fields[i].default_value_expr != NULL);
 			int len = strlen(fields[i].default_value);
 			field_strs_size += len + 1;
-			struct Expr *e = fields[i].default_value_expr;
-			def_exprs_size += sql_expr_sizeof(e, 0);
+			if (fields[i].default_value_expr != NULL) {
+				struct Expr *e = fields[i].default_value_expr;
+				def_exprs_size += sql_expr_sizeof(e, 0);
+			}
 		}
 	}
 
@@ -116,10 +104,9 @@ space_def_dup(const struct space_def *src)
 			if (src->fields[i].default_value != NULL) {
 				ret->fields[i].default_value = strs_pos;
 				strs_pos += strlen(strs_pos) + 1;
-
-				struct Expr *e =
-					src->fields[i].default_value_expr;
-				assert(e != NULL);
+			}
+			struct Expr *e = src->fields[i].default_value_expr;
+			if (e != NULL) {
 				char *expr_pos_old = expr_pos;
 				e = sql_expr_dup(sql_get(), e, 0, &expr_pos);
 				assert(e != NULL);
@@ -201,10 +188,9 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 				       fields[i].default_value, len);
 				def->fields[i].default_value[len] = 0;
 				strs_pos += len + 1;
-
-				struct Expr *e =
-					fields[i].default_value_expr;
-				assert(e != NULL);
+			}
+			struct Expr *e = def->fields[i].default_value_expr;
+			if (e != NULL) {
 				char *expr_pos_old = expr_pos;
 				e = sql_expr_dup(sql_get(), e, 0, &expr_pos);
 				assert(e != NULL);

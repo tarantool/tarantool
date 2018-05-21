@@ -65,6 +65,7 @@ sql_get();
 struct Expr;
 struct Parse;
 struct Select;
+struct Table;
 
 /**
  * Perform parsing of provided expression. This is done by
@@ -142,6 +143,37 @@ sql_expr_dup(struct sqlite3 *db, struct Expr *p, int flags, char **buffer);
  */
 void
 sql_expr_free(struct sqlite3 *db, struct Expr *expr, bool extern_alloc);
+
+/**
+ * Create and initialize a new ephemeral SQL Table object.
+ * @param parser SQL Parser object.
+ * @param name Table to create name.
+ * @retval NULL on memory allocation error, Parser state changed.
+ * @retval not NULL on success.
+ */
+struct Table *
+sql_ephemeral_table_new(struct Parse *parser, const char *name);
+
+/**
+ * Create and initialize a new ephemeral space_def object.
+ * @param parser SQL Parser object.
+ * @param name Table to create name.
+ * @retval NULL on memory allocation error, Parser state changed.
+ * @retval not NULL on success.
+ */
+struct space_def *
+sql_ephemeral_space_def_new(struct Parse *parser, const char *name);
+
+/**
+ * Rebuild struct def in Table with memory allocated on a single
+ * malloc.
+ * @param db The database connection.
+ * @param table The Table with fragmented def to rebuild.
+ * @retval 1 on memory allocation error.
+ * @retval 0 on success.
+ */
+int
+sql_table_def_rebuild(struct sqlite3 *db, struct Table *table);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

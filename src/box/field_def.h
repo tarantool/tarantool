@@ -116,6 +116,12 @@ struct field_def {
 	struct Expr *default_value_expr;
 };
 
+static inline bool
+action_is_nullable(enum on_conflict_action nullable_action)
+{
+	return nullable_action == ON_CONFLICT_ACTION_NONE;
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -80,7 +80,8 @@ struct Hash {
 struct HashElem {
 	HashElem *next, *prev;	/* Next and previous elements in the table */
 	void *data;		/* Data associated with this element */
-	const char *pKey;	/* Key associated with this element */
+	/** Key associated with this element */
+	char *pKey;
 };
 
 /*

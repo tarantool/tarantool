@@ -4781,7 +4781,7 @@ case OP_RenameTable: {
 		sqlite3HashInsert(&db->pSchema->fkeyHash, zNewTableName, pFKey);
 	}
 
-	sqlite3UnlinkAndDeleteTable(db, pTab->zName);
+	sqlite3UnlinkAndDeleteTable(db, pTab->def->name);
 
 	initData.db = db;
 	initData.pzErrMsg = &p->zErrMsg;

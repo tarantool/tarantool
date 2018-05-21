@@ -661,8 +661,7 @@ sql_expr_compile(sqlite3 *db, const char *expr, struct Expr **result)
 	sprintf(stmt, "%s%s", outer, expr);
 
 	struct Parse parser;
-	memset(&parser, 0, sizeof(parser));
-	parser.db = db;
+	sql_parser_create(&parser, db);
 	parser.parse_only = true;
 	char *unused;
 	if (sqlite3RunParser(&parser, stmt, &unused) != SQLITE_OK) {
@@ -670,6 +669,6 @@ sql_expr_compile(sqlite3 *db, const char *expr, struct Expr **result)
 		return -1;
 	}
 	*result = parser.parsed_expr;
-	sqlite3ParserReset(&parser);
+	sql_parser_destroy(&parser);
 	return 0;
 }
