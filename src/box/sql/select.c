@@ -1989,6 +1989,13 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 	sqlite3ExprCacheClear(pParse);
 	assert(p->pOffset == 0 || p->pLimit != 0);
 	if (p->pLimit) {
+		if((p->pLimit->flags & EP_Collate) != 0 ||
+		   (p->pOffset != NULL &&
+		   (p->pOffset->flags & EP_Collate) != 0)) {
+			sqlite3ErrorMsg(pParse, "near \"COLLATE\": "\
+						"syntax error");
+			return;
+		}
 		p->iLimit = iLimit = ++pParse->nMem;
 		v = sqlite3GetVdbe(pParse);
 		assert(v != 0);
