@@ -45,6 +45,8 @@ extern "C" {
 
 struct index;
 struct fiber;
+struct tuple;
+struct tuple_format;
 
 /**
  * The state of memtx recovery process.
@@ -147,6 +149,17 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
 
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
+
+/** Allocate a memtx tuple. @sa tuple_new(). */
+struct tuple *
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+/** Free a memtx tuple. @sa tuple_delete(). */
+void
+memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+
+/** Tuple format vtab for memtx engine. */
+extern struct tuple_format_vtab memtx_tuple_format_vtab;
 
 enum {
 	MEMTX_EXTENT_SIZE = 16 * 1024,

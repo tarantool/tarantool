@@ -30,12 +30,14 @@
  */
 #include "memtx_engine.h"
 #include "memtx_space.h"
-#include "memtx_tuple.h"
 
+#include <small/quota.h>
 #include <small/small.h>
 #include <small/mempool.h>
 
 #include "fiber.h"
+#include "clock.h"
+#include "errinj.h"
 #include "coio_file.h"
 #include "tuple.h"
 #include "txn.h"
@@ -48,16 +50,25 @@
 #include "schema.h"
 #include "gc.h"
 
-/** For all memory used by all indexes.
- * If you decide to use memtx_index_arena or
- * memtx_index_slab_cache for anything other than
- * memtx_index_extent_pool, make sure this is reflected in
- * box.slab.info(), @sa lua/slab.cc
+/*
+ * If you decide to use memtx_arena for anything other than
+ * memtx_alloc or memtx_index_extent_pool, make sure this
+ * is reflected in box.slab.info(), @sa lua/slab.c.
  */
-extern struct quota memtx_quota;
-struct slab_arena memtx_arena; /* used by memtx_tuple.cc */
+
+/** Common quota for memtx tuples and indexes. */
+static struct quota memtx_quota;
+/** Common slab arena for memtx tuples and indexes. */
+static struct slab_arena memtx_arena;
+/** Slab cache for allocating memtx tuples. */
+static struct slab_cache memtx_slab_cache;
+/** Memtx tuple allocator. */
+struct small_alloc memtx_alloc; /* used by box.slab.info() */
+/** Slab cache for allocating memtx index extents. */
 static struct slab_cache memtx_index_slab_cache;
-struct mempool memtx_index_extent_pool;
+/** Memtx index extent allocator. */
+struct mempool memtx_index_extent_pool; /* used by box.slab.info() */
+
 /**
  * To ensure proper statement-level rollback in case
  * of out of memory conditions, we maintain a number
@@ -68,6 +79,12 @@ struct mempool memtx_index_extent_pool;
 static int memtx_index_num_reserved_extents;
 static void *memtx_index_reserved_extents;
 
+/** Maximal allowed tuple size, box.cfg.memtx_max_tuple_size. */
+static size_t memtx_max_tuple_size = 1 * 1024 * 1024;
+
+/** Incremented with each next snapshot. */
+uint32_t snapshot_version;
+
 static void
 txn_on_yield_or_stop(struct trigger *trigger, void *event)
 {
@@ -75,6 +92,23 @@ txn_on_yield_or_stop(struct trigger *trigger, void *event)
 	(void)event;
 	txn_rollback(); /* doesn't throw */
 }
+
+struct memtx_tuple {
+	/*
+	 * sic: the header of the tuple is used
+	 * to store a free list pointer in smfree_delayed.
+	 * Please don't change it without understanding
+	 * how smfree_delayed and snapshotting COW works.
+	 */
+	/** Snapshot generation version. */
+	uint32_t version;
+	struct tuple base;
+};
+
+enum {
+	OBJSIZE_MIN = 16,
+	SLAB_SIZE = 16 * 1024 * 1024,
+};
 
 static int
 memtx_end_build_primary_key(struct space *space, void *param)
@@ -140,7 +174,6 @@ memtx_engine_shutdown(struct engine *engine)
 		mempool_destroy(&memtx->bitset_iterator_pool);
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
-	memtx_tuple_free();
 }
 
 static int
@@ -668,7 +701,8 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 	}
 
 	/* increment snapshot version; set tuple deletion to delayed mode */
-	memtx_tuple_begin_snapshot();
+	snapshot_version++;
+	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, true);
 	return 0;
 }
 
@@ -714,7 +748,7 @@ memtx_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
 	/* waitCheckpoint() must have been done. */
 	assert(!memtx->checkpoint->waiting_for_snap_thread);
 
-	memtx_tuple_end_snapshot();
+	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, false);
 
 	if (!memtx->checkpoint->touch) {
 		int64_t lsn = vclock_sum(memtx->checkpoint->vclock);
@@ -757,7 +791,7 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 		memtx->checkpoint->waiting_for_snap_thread = false;
 	}
 
-	memtx_tuple_end_snapshot();
+	small_alloc_setopt(&memtx_alloc, SMALL_DELAYED_FREE_MODE, false);
 
 	/** Remove garbage .inprogress file. */
 	char *filename =
@@ -950,8 +984,6 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 float alloc_factor)
 {
-	memtx_tuple_init(tuple_arena_max_size, objsize_min, alloc_factor);
-
 	struct memtx_engine *memtx = calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
 		diag_set(OutOfMemory, sizeof(*memtx),
@@ -969,6 +1001,18 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	memtx->gc_fiber = fiber_new("memtx.gc", memtx_engine_gc_f);
 	if (memtx->gc_fiber == NULL)
 		goto fail;
+
+	/* Apply lowest allowed objsize bound. */
+	if (objsize_min < OBJSIZE_MIN)
+		objsize_min = OBJSIZE_MIN;
+
+	/* Initialize tuple allocator. */
+	quota_init(&memtx_quota, tuple_arena_max_size);
+	tuple_arena_create(&memtx_arena, &memtx_quota, tuple_arena_max_size,
+			   SLAB_SIZE, "memtx");
+	slab_cache_create(&memtx_slab_cache, &memtx_arena);
+	small_alloc_create(&memtx_alloc, &memtx_slab_cache,
+			   objsize_min, alloc_factor);
 
 	/* Initialize index extent allocator. */
 	slab_cache_create(&memtx_index_slab_cache, &memtx_arena);
@@ -1011,6 +1055,84 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 	(void)memtx;
 	memtx_max_tuple_size = max_size;
 }
+
+struct tuple *
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
+{
+	assert(mp_typeof(*data) == MP_ARRAY);
+	size_t tuple_len = end - data;
+	size_t meta_size = tuple_format_meta_size(format);
+	size_t total = sizeof(struct memtx_tuple) + meta_size + tuple_len;
+
+	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
+		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
+		return NULL;
+	});
+	if (unlikely(total > memtx_max_tuple_size)) {
+		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total);
+		error_log(diag_last_error(diag_get()));
+		return NULL;
+	}
+
+	struct memtx_tuple *memtx_tuple = smalloc(&memtx_alloc, total);
+	if (memtx_tuple == NULL) {
+		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
+		return NULL;
+	}
+	struct tuple *tuple = &memtx_tuple->base;
+	tuple->refs = 0;
+	memtx_tuple->version = snapshot_version;
+	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
+	tuple->bsize = tuple_len;
+	tuple->format_id = tuple_format_id(format);
+	tuple_format_ref(format);
+	/*
+	 * Data offset is calculated from the begin of the struct
+	 * tuple base, not from memtx_tuple, because the struct
+	 * tuple is not the first field of the memtx_tuple.
+	 */
+	tuple->data_offset = sizeof(struct tuple) + meta_size;
+	char *raw = (char *) tuple + tuple->data_offset;
+	uint32_t *field_map = (uint32_t *) raw;
+	memcpy(raw, data, tuple_len);
+	if (tuple_init_field_map(format, field_map, raw)) {
+		memtx_tuple_delete(format, tuple);
+		return NULL;
+	}
+	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
+	return tuple;
+}
+
+void
+memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
+{
+	say_debug("%s(%p)", __func__, tuple);
+	assert(tuple->refs == 0);
+#ifndef NDEBUG
+	struct errinj *delay = errinj(ERRINJ_MEMTX_TUPLE_DELETE_DELAY,
+				      ERRINJ_DOUBLE);
+	if (delay != NULL && delay->dparam > 0) {
+		double start = clock_monotonic();
+		while (clock_monotonic() < start + delay->dparam)
+			/* busy loop */ ;
+	}
+#endif
+	size_t total = sizeof(struct memtx_tuple) +
+		       tuple_format_meta_size(format) + tuple->bsize;
+	tuple_format_unref(format);
+	struct memtx_tuple *memtx_tuple =
+		container_of(tuple, struct memtx_tuple, base);
+	if (memtx_alloc.free_mode != SMALL_DELAYED_FREE ||
+	    memtx_tuple->version == snapshot_version)
+		smfree(&memtx_alloc, memtx_tuple, total);
+	else
+		smfree_delayed(&memtx_alloc, memtx_tuple, total);
+}
+
+struct tuple_format_vtab memtx_tuple_format_vtab = {
+	memtx_tuple_delete,
+	memtx_tuple_new,
+};
 
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
