@@ -1059,6 +1059,8 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 struct tuple *
 memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
+	(void)memtx;
 	assert(mp_typeof(*data) == MP_ARRAY);
 	size_t tuple_len = end - data;
 	size_t meta_size = tuple_format_meta_size(format);
@@ -1106,6 +1108,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 void
 memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
+	(void)memtx;
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
 #ifndef NDEBUG
@@ -1140,7 +1144,8 @@ struct tuple_format_vtab memtx_tuple_format_vtab = {
 void *
 memtx_index_extent_alloc(void *ctx)
 {
-	(void)ctx;
+	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
+	(void)memtx;
 	if (memtx_index_reserved_extents) {
 		assert(memtx_index_num_reserved_extents > 0);
 		memtx_index_num_reserved_extents--;
@@ -1168,7 +1173,8 @@ memtx_index_extent_alloc(void *ctx)
 void
 memtx_index_extent_free(void *ctx, void *extent)
 {
-	(void)ctx;
+	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
+	(void)memtx;
 	return mempool_free(&memtx_index_extent_pool, extent);
 }
 
@@ -1177,8 +1183,9 @@ memtx_index_extent_free(void *ctx, void *extent)
  * Ensure that next num extent_alloc will succeed w/o an error
  */
 int
-memtx_index_extent_reserve(int num)
+memtx_index_extent_reserve(struct memtx_engine *memtx, int num)
 {
+	(void)memtx;
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
 		/* same error as in mempool_alloc */
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,

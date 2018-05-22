@@ -229,13 +229,14 @@ int
 memtx_space_replace_all_keys(struct space *space, struct txn_stmt *stmt,
 			     enum dup_replace_mode mode)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
 	struct tuple *old_tuple = stmt->old_tuple;
 	struct tuple *new_tuple = stmt->new_tuple;
 	/*
 	 * Ensure we have enough slack memory to guarantee
 	 * successful statement-level rollback.
 	 */
-	if (memtx_index_extent_reserve(new_tuple ?
+	if (memtx_index_extent_reserve(memtx, new_tuple != NULL ?
 				       RESERVE_EXTENTS_BEFORE_REPLACE :
 				       RESERVE_EXTENTS_BEFORE_DELETE) != 0)
 		return -1;
@@ -894,6 +895,7 @@ memtx_space_new(struct memtx_engine *memtx,
 		free(memtx_space);
 		return NULL;
 	}
+	format->engine = memtx;
 	format->exact_field_count = def->exact_field_count;
 	tuple_format_ref(format);
 

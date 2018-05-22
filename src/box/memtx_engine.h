@@ -168,12 +168,14 @@ enum {
 
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
+ * @ctx must point to memtx engine
  */
 void *
 memtx_index_extent_alloc(void *ctx);
 
 /**
  * Free a block previously allocated by memtx_index_extent_alloc
+ * @ctx must point to memtx engine
  */
 void
 memtx_index_extent_free(void *ctx, void *extent);
@@ -183,7 +185,7 @@ memtx_index_extent_free(void *ctx, void *extent);
  * Ensure that next num extent_alloc will succeed w/o an error
  */
 int
-memtx_index_extent_reserve(int num);
+memtx_index_extent_reserve(struct memtx_engine *memtx, int num);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,

@@ -490,7 +490,7 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 
 	light_index_create(hash_table, HASH_INDEX_EXTENT_SIZE,
 			   memtx_index_extent_alloc, memtx_index_extent_free,
-			   NULL, index->base.def->key_def);
+			   memtx, index->base.def->key_def);
 	index->hash_table = hash_table;
 
 	if (def->iid == 0)

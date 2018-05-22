@@ -514,7 +514,7 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	if (index->id_to_tuple == NULL)
 		panic("failed to allocate memtx bitset index");
 	matras_create(index->id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
-		      memtx_index_extent_alloc, memtx_index_extent_free, NULL);
+		      memtx_index_extent_alloc, memtx_index_extent_free, memtx);
 
 	index->tuple_to_id = mh_bitset_index_new();
 	if (index->tuple_to_id == NULL)

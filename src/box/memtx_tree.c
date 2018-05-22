@@ -688,9 +688,8 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	}
 
 	struct key_def *cmp_def = memtx_tree_index_cmp_def(index);
-	memtx_tree_create(&index->tree, cmp_def,
-			  memtx_index_extent_alloc,
-			  memtx_index_extent_free, NULL);
+	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
+			  memtx_index_extent_free, memtx);
 
 	if (def->iid == 0)
 		index->gc_task.func = memtx_tree_index_destroy_f;
