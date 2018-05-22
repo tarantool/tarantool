@@ -1404,17 +1404,17 @@ static const char *convertSqliteAffinity(int affinity, bool allow_nulls)
 	switch (affinity) {
 	default:
 		assert(false);
-	case SQLITE_AFF_BLOB:
+	case AFFINITY_BLOB:
 		return "scalar";
-	case SQLITE_AFF_TEXT:
+	case AFFINITY_TEXT:
 		return "string";
-	case SQLITE_AFF_NUMERIC:
-	case SQLITE_AFF_REAL:
+	case AFFINITY_NUMERIC:
+	case AFFINITY_REAL:
 	  /* Tarantool workaround: to make comparators able to compare, e.g.
 	     double and int use generic type. This might be a performance issue.  */
 	  /* return "number"; */
 		return "scalar";
-	case SQLITE_AFF_INTEGER:
+	case AFFINITY_INTEGER:
 	  /* See comment above.  */
 	  /* return "integer"; */
 		return "scalar";
@@ -1430,7 +1430,6 @@ static const char *convertSqliteAffinity(int affinity, bool allow_nulls)
  */
 int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 {
-	struct Column *aCol = pTable->aCol;
 	const struct Enc *enc = get_enc(buf);
 	const struct space_def *def = pTable->def;
 	assert(def != NULL);
@@ -1466,9 +1465,10 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		if (i == pk_forced_int) {
 			t = "integer";
 		} else {
-			t = aCol[i].affinity == SQLITE_AFF_BLOB ? "scalar" :
-				convertSqliteAffinity(aCol[i].affinity,
-						      def->fields[i].is_nullable);
+			enum affinity_type affinity = def->fields[i].affinity;
+			t = affinity == AFFINITY_BLOB ? "scalar" :
+			    convertSqliteAffinity(affinity,
+						  def->fields[i].is_nullable);
 		}
 
 		assert(def->fields[i].is_nullable ==
@@ -1527,7 +1527,6 @@ int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf)
  */
 int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 {
-	struct Column *aCol = pIndex->pTable->aCol;
 	struct space_def *def = pIndex->pTable->def;
 	assert(def != NULL);
 	const struct Enc *enc = get_enc(buf);
@@ -1562,7 +1561,8 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 		if (pk_forced_int == col) {
 			t = "integer";
 		} else {
-			t = convertSqliteAffinity(aCol[col].affinity,
+			enum affinity_type affinity = def->fields[col].affinity;
+			t = convertSqliteAffinity(affinity,
 						  def->fields[col].is_nullable);
 		}
 		/* do not decode default collation */

@@ -381,7 +381,9 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 		if (iColumn == XN_EXPR) {
 			pScan->pIdxExpr = pIdx->aColExpr->a[j].pExpr;
 		} else if (iColumn >= 0) {
-			pScan->idxaff = pIdx->pTable->aCol[iColumn].affinity;
+			char affinity =
+				pIdx->pTable->def->fields[iColumn].affinity;
+			pScan->idxaff = affinity;
 			uint32_t id;
 			pScan->coll = sql_index_collation(pIdx, j, &id);
 			pScan->is_column_seen = true;
@@ -1112,7 +1114,7 @@ sqlite3IndexColumnAffinity(sqlite3 * db, Index * pIdx, int iCol)
 	assert(iCol >= 0 && iCol < (int)index_column_count(pIdx));
 	if (!pIdx->zColAff) {
 		if (sqlite3IndexAffinityStr(db, pIdx) == 0)
-			return SQLITE_AFF_BLOB;
+			return AFFINITY_BLOB;
 	}
 	return pIdx->zColAff[iCol];
 }
@@ -2270,7 +2272,8 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 
 		aff = sqlite3CompareAffinity(pRhs, sqlite3ExprAffinity(pLhs));
 		idxaff =
-		    sqlite3TableColumnAffinity(pIdx->pTable, pLhs->iColumn);
+		    sqlite3TableColumnAffinity(pIdx->pTable->def,
+					       pLhs->iColumn);
 		if (aff != idxaff)
 			break;
 		uint32_t id;

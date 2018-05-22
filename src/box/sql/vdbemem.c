@@ -588,9 +588,9 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff)
 	if (pMem->flags & MEM_Null)
 		return;
 	switch (aff) {
-	case SQLITE_AFF_BLOB:{	/* Really a cast to BLOB */
+	case AFFINITY_BLOB:{	/* Really a cast to BLOB */
 			if ((pMem->flags & MEM_Blob) == 0) {
-				sqlite3ValueApplyAffinity(pMem, SQLITE_AFF_TEXT);
+				sqlite3ValueApplyAffinity(pMem, AFFINITY_TEXT);
 				assert(pMem->flags & MEM_Str
 				       || pMem->db->mallocFailed);
 				if (pMem->flags & MEM_Str)
@@ -600,23 +600,23 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff)
 			}
 			break;
 		}
-	case SQLITE_AFF_NUMERIC:{
+	case AFFINITY_NUMERIC:{
 			sqlite3VdbeMemNumerify(pMem);
 			break;
 		}
-	case SQLITE_AFF_INTEGER:{
+	case AFFINITY_INTEGER:{
 			sqlite3VdbeMemIntegerify(pMem);
 			break;
 		}
-	case SQLITE_AFF_REAL:{
+	case AFFINITY_REAL:{
 			sqlite3VdbeMemRealify(pMem);
 			break;
 		}
 	default:{
-			assert(aff == SQLITE_AFF_TEXT);
+			assert(aff == AFFINITY_TEXT);
 			assert(MEM_Str == (MEM_Blob >> 3));
 			pMem->flags |= (pMem->flags & MEM_Blob) >> 3;
-			sqlite3ValueApplyAffinity(pMem, SQLITE_AFF_TEXT);
+			sqlite3ValueApplyAffinity(pMem, AFFINITY_TEXT);
 			assert(pMem->flags & MEM_Str || pMem->db->mallocFailed);
 			pMem->flags &=
 			    ~(MEM_Int | MEM_Real | MEM_Blob | MEM_Zero);
@@ -1295,8 +1295,8 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 			sqlite3ValueSetStr(pVal, -1, zVal, SQLITE_DYNAMIC);
 		}
 		if ((op == TK_INTEGER || op == TK_FLOAT)
-		    && affinity == SQLITE_AFF_BLOB) {
-			sqlite3ValueApplyAffinity(pVal, SQLITE_AFF_NUMERIC);
+		    && affinity == AFFINITY_BLOB) {
+			sqlite3ValueApplyAffinity(pVal, AFFINITY_NUMERIC);
 		} else {
 			sqlite3ValueApplyAffinity(pVal, affinity);
 		}

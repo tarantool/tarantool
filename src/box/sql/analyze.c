@@ -1045,7 +1045,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 
 		/* Add the entry to the stat1 table. */
 		callStatGet(v, regStat4, STAT_GET_STAT1, regStat1);
-		assert("BBB"[0] == SQLITE_AFF_TEXT);
+		assert("BBB"[0] == AFFINITY_TEXT);
 		sqlite3VdbeAddOp4(v, OP_MakeRecord, regTabname, 3, regTemp,
 				  "BBB", 0);
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, iStatCur, regTemp);

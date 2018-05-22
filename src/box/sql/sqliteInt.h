@@ -1888,37 +1888,16 @@ struct Savepoint {
 struct Column {
 	/** Collating sequence. */
 	struct coll *coll;
-	char affinity;		/* One of the SQLITE_AFF_... values */
 	u8 is_primkey;		/* Boolean propertie for being PK */
 };
 
-/*
- * Column affinity types.
- *
- * These used to have mnemonic name like 'i' for SQLITE_AFF_INTEGER and
- * 't' for SQLITE_AFF_TEXT.  But we can save a little space and improve
- * the speed a little by numbering the values consecutively.
- *
- * But rather than start with 0 or 1, we begin with 'A'.  That way,
- * when multiple affinity types are concatenated into a string and
- * used as the P4 operand, they will be more readable.
- *
- * Note also that the numeric types are grouped together so that testing
- * for a numeric type is a single comparison.  And the BLOB type is first.
- */
-#define SQLITE_AFF_BLOB     'A'
-#define SQLITE_AFF_TEXT     'B'
-#define SQLITE_AFF_NUMERIC  'C'
-#define SQLITE_AFF_INTEGER  'D'
-#define SQLITE_AFF_REAL     'E'
-
-#define sqlite3IsNumericAffinity(X)  ((X)>=SQLITE_AFF_NUMERIC)
+#define sqlite3IsNumericAffinity(X)  ((X)>=AFFINITY_NUMERIC)
 
 /*
- * The SQLITE_AFF_MASK values masks off the significant bits of an
+ * The AFFINITY_MASK values masks off the significant bits of an
  * affinity value.
  */
-#define SQLITE_AFF_MASK     0x47
+#define AFFINITY_MASK     0x47
 
 /*
  * Additional bit values that can be ORed with an affinity without
@@ -2243,7 +2222,8 @@ struct AggInfo {
 	int mnReg, mxReg;	/* Range of registers allocated for aCol and aFunc */
 	ExprList *pGroupBy;	/* The group by clause */
 	struct AggInfo_col {	/* For each column used in source tables */
-		Table *pTab;	/* Source table */
+		/** Pointer to space definition. */
+		struct space_def *space_def;
 		int iTable;	/* Cursor number of the source table */
 		int iColumn;	/* Column number within the source table */
 		int iSorterColumn;	/* Column number in the sorting index */
@@ -2378,7 +2358,8 @@ struct Expr {
 				 * TK_AGG_FUNCTION: nesting depth
 				 */
 	AggInfo *pAggInfo;	/* Used by TK_AGG_COLUMN and TK_AGG_FUNCTION */
-	Table *pTab;		/* Table for TK_COLUMN expressions. */
+	/** Pointer for table relative definition. */
+	struct space_def *space_def;
 };
 
 /*
@@ -3559,14 +3540,14 @@ void sqlite3AddCollateType(Parse *, Token *);
 
 /**
  * Return collation of given column from table.
- * @param table Table which is used to fetch column.
+ * @param def space definition which is used to fetch column.
  * @param column Number of column.
  * @param[out] coll_id Collation identifier.
  *
  * @retval Pointer to collation.
  */
 struct coll *
-sql_column_collation(Table *table, uint32_t column, uint32_t *coll_id);
+sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id);
 /**
  * Return name of given column collation from index.
  *
@@ -3755,9 +3736,50 @@ int sqlite3WhereOkOnePass(WhereInfo *, int *);
 #define ONEPASS_SINGLE   1	/* ONEPASS valid for a single row update */
 #define ONEPASS_MULTI    2	/* ONEPASS is valid for multiple rows */
 void sqlite3ExprCodeLoadIndexColumn(Parse *, Index *, int, int, int);
-int sqlite3ExprCodeGetColumn(Parse *, Table *, int, int, int, u8);
-void sqlite3ExprCodeGetColumnToReg(Parse *, Table *, int, int, int);
-void sqlite3ExprCodeGetColumnOfTable(Vdbe *, Table *, int, int, int);
+
+/**
+ * Generate code that will extract the iColumn-th column from
+ * table pTab and store the column value in a register.
+ *
+ * An effort is made to store the column value in register iReg.
+ * This is not garanteeed for GetColumn() - the result can be
+ * stored in any register.  But the result is guaranteed to land
+ * in register iReg for GetColumnToReg().
+ * @param pParse Parsing and code generating context.
+ * @param space_def Space definition.
+ * @param iColumn Index of the table column.
+ * @param iTable The cursor pointing to the table.
+ * @param iReg Store results here.
+ * @param p5 P5 value for OP_Column + FLAGS.
+ * @return iReg value.
+ */
+int
+sqlite3ExprCodeGetColumn(Parse *, struct space_def *, int, int, int, u8);
+
+/**
+ * Generate code that will extract the iColumn-th column from
+ * table pTab and store the column value in a register, copy the
+ * result.
+ * @param pParse Parsing and code generating context.
+ * @param space_def Space definition.
+ * @param iColumn Index of the table column.
+ * @param iTable The cursor pointing to the table.
+ * @param iReg Store results here.
+ */
+void
+sqlite3ExprCodeGetColumnToReg(Parse *, struct space_def *, int, int, int);
+
+/**
+ * Generate code to extract the value of the iCol-th column of a table.
+ * @param v  The VDBE under construction.
+ * @param space_def Space definition.
+ * @param iTabCur The PK cursor.
+ * @param iCol Index of the column to extract.
+ * @param regOut  Extract the value into this register.
+ */
+void
+sqlite3ExprCodeGetColumnOfTable(Vdbe *, struct space_def *, int, int, int);
+
 void sqlite3ExprCodeMove(Parse *, int, int, int);
 void sqlite3ExprCacheStore(Parse *, int, int, int);
 void sqlite3ExprCachePush(Parse *);
@@ -4095,7 +4117,16 @@ const char *sqlite3IndexAffinityStr(sqlite3 *, Index *);
 void sqlite3TableAffinity(Vdbe *, Table *, int);
 char sqlite3CompareAffinity(Expr * pExpr, char aff2);
 int sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity);
-char sqlite3TableColumnAffinity(Table *, int);
+
+/**
+ * Return the affinity character for a single column of a table.
+ * @param def space definition.
+ * @param idx column index.
+ * @retval AFFINITY
+ */
+char
+sqlite3TableColumnAffinity(struct space_def *def, int idx);
+
 char sqlite3ExprAffinity(Expr * pExpr);
 int sqlite3Atoi64(const char *, i64 *, int);
 int sqlite3DecOrHexToI64(const char *, i64 *);
@@ -4191,7 +4222,45 @@ int sqlite3ResolveExprListNames(NameContext *, ExprList *);
 void sqlite3ResolveSelectNames(Parse *, Select *, NameContext *);
 void sqlite3ResolveSelfReference(Parse *, Table *, int, Expr *, ExprList *);
 int sqlite3ResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
-void sqlite3ColumnDefault(Vdbe *, Table *, int, int);
+
+/**
+ * Generate code for default value.
+ * The most recently coded instruction was an OP_Column to retrieve the
+ * i-th column of table pTab. This routine sets the P4 parameter of the
+ * OP_Column to the default value, if any.
+ *
+ * The default value of a column is specified by a DEFAULT clause in the
+ * column definition. This was either supplied by the user when the table
+ * was created, or added later to the table definition by an ALTER TABLE
+ * command. If the latter, then the row-records in the table btree on disk
+ * may not contain a value for the column and the default value, taken
+ * from the P4 parameter of the OP_Column instruction, is returned instead.
+ * If the former, then all row-records are guaranteed to include a value
+ * for the column and the P4 value is not required.
+ *
+ * Column definitions created by an ALTER TABLE command may only have
+ * literal default values specified: a number, null or a string. (If a more
+ * complicated default expression value was provided, it is evaluated
+ * when the ALTER TABLE is executed and one of the literal values written
+ * into the schema.)
+ *
+ * Therefore, the P4 parameter is only required if the default value for
+ * the column is a literal number, string or null. The sqlite3ValueFromExpr()
+ * function is capable of transforming these types of expressions into
+ * sqlite3_value objects.
+ *
+ * If parameter iReg is not negative, code an OP_RealAffinity instruction
+ * on register iReg. This is used when an equivalent integer value is
+ * stored in place of an 8-byte floating point value in order to save
+ * space.
+ * @param v Vdbe object.
+ * @param def space definition object.
+ * @param i column index.
+ * @param iReg register index.
+ */
+void
+sqlite3ColumnDefault(Vdbe *v, struct space_def *def, int i, int ireg);
+
 void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
 char* rename_table(sqlite3 *, const char *, const char *, bool *);

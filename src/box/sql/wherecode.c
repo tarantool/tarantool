@@ -357,9 +357,9 @@ disableTerm(WhereLevel * pLevel, WhereTerm * pTerm)
  * Code an OP_Affinity opcode to apply the column affinity string zAff
  * to the n registers starting at base.
  *
- * As an optimization, SQLITE_AFF_BLOB entries (which are no-ops) at the
+ * As an optimization, AFFINITY_BLOB entries (which are no-ops) at the
  * beginning and end of zAff are ignored.  If all entries in zAff are
- * SQLITE_AFF_BLOB, then no code gets generated.
+ * AFFINITY_BLOB, then no code gets generated.
  *
  * This routine makes its own copy of zAff so that the caller is free
  * to modify zAff after this routine returns.
@@ -374,15 +374,15 @@ codeApplyAffinity(Parse * pParse, int base, int n, char *zAff)
 	}
 	assert(v != 0);
 
-	/* Adjust base and n to skip over SQLITE_AFF_BLOB entries at the beginning
+	/* Adjust base and n to skip over AFFINITY_BLOB entries at the beginning
 	 * and end of the affinity string.
 	 */
-	while (n > 0 && zAff[0] == SQLITE_AFF_BLOB) {
+	while (n > 0 && zAff[0] == AFFINITY_BLOB) {
 		n--;
 		base++;
 		zAff++;
 	}
-	while (n > 1 && zAff[n - 1] == SQLITE_AFF_BLOB) {
+	while (n > 1 && zAff[n - 1] == AFFINITY_BLOB) {
 		n--;
 	}
 
@@ -398,7 +398,7 @@ codeApplyAffinity(Parse * pParse, int base, int n, char *zAff)
  * either a vector of n elements or, if n==1, a scalar expression.
  * Before the comparison operation, affinity zAff is to be applied
  * to the pRight values. This function modifies characters within the
- * affinity string to SQLITE_AFF_BLOB if either:
+ * affinity string to AFFINITY_BLOB if either:
  *
  *   * the comparison will be performed with no affinity, or
  *   * the affinity change in zAff is guaranteed not to change the value.
@@ -411,9 +411,9 @@ updateRangeAffinityStr(Expr * pRight,	/* RHS of comparison */
 	int i;
 	for (i = 0; i < n; i++) {
 		Expr *p = sqlite3VectorFieldSubexpr(pRight, i);
-		if (sqlite3CompareAffinity(p, zAff[i]) == SQLITE_AFF_BLOB
+		if (sqlite3CompareAffinity(p, zAff[i]) == AFFINITY_BLOB
 		    || sqlite3ExprNeedsNoAffinityChange(p, zAff[i])) {
-			zAff[i] = SQLITE_AFF_BLOB;
+			zAff[i] = AFFINITY_BLOB;
 		}
 	}
 }
@@ -656,7 +656,7 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
  * copy of the column affinity string of the index allocated using
  * sqlite3DbMalloc(). Except, entries in the copy of the string associated
  * with equality constraints that use BLOB or NONE affinity are set to
- * SQLITE_AFF_BLOB. This is to deal with SQL such as the following:
+ * AFFINITY_BLOB. This is to deal with SQL such as the following:
  *
  *   CREATE TABLE t1(a TEXT PRIMARY KEY, b);
  *   SELECT ... FROM t1 AS t2, t1 WHERE t1.a = t2.b;
@@ -665,7 +665,7 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
  * the right hand side of the equality constraint (t2.b) has BLOB/NONE affinity,
  * no conversion should be attempted before using a t2.b value as part of
  * a key to search the index. Hence the first byte in the returned affinity
- * string in this example would be set to SQLITE_AFF_BLOB.
+ * string in this example would be set to AFFINITY_BLOB.
  */
 static int
 codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
@@ -754,7 +754,7 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 				 * affinity of the comparison has been applied to the value.
 				 */
 				if (zAff)
-					zAff[j] = SQLITE_AFF_BLOB;
+					zAff[j] = AFFINITY_BLOB;
 			}
 		} else if ((pTerm->eOperator & WO_ISNULL) == 0) {
 			Expr *pRight = pTerm->pExpr->pRight;
@@ -766,12 +766,12 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 			}
 			if (zAff) {
 				if (sqlite3CompareAffinity(pRight, zAff[j]) ==
-				    SQLITE_AFF_BLOB) {
-					zAff[j] = SQLITE_AFF_BLOB;
+				    AFFINITY_BLOB) {
+					zAff[j] = AFFINITY_BLOB;
 				}
 				if (sqlite3ExprNeedsNoAffinityChange
 				    (pRight, zAff[j])) {
-					zAff[j] = SQLITE_AFF_BLOB;
+					zAff[j] = AFFINITY_BLOB;
 				}
 			}
 		}
@@ -910,7 +910,7 @@ codeCursorHintFixExpr(Walker * pWalker, Expr * pExpr)
 		if (pExpr->iTable != pHint->iTabCur) {
 			Vdbe *v = pWalker->pParse->pVdbe;
 			int reg = ++pWalker->pParse->nMem;	/* Register for column value */
-			sqlite3ExprCodeGetColumnOfTable(v, pExpr->pTab,
+			sqlite3ExprCodeGetColumnOfTable(v, pExpr->pTab->def,
 							pExpr->iTable,
 							pExpr->iColumn, reg);
 			pExpr->op = TK_REGISTER;
@@ -1389,8 +1389,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		struct Index *pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
 		assert(pk);
 		int nPkCol = index_column_count(pk);
-		if (nPkCol == 1
-		    && pIdx->pTable->aCol[pk->aiColumn[0]].affinity == 'D') {
+		char affinity =
+			pIdx->pTable->def->fields[pk->aiColumn[0]].affinity;
+		if (nPkCol == 1 && affinity == AFFINITY_INTEGER) {
 			/* Right now INTEGER PRIMARY KEY is the only option to
 			 * get Tarantool's INTEGER column type. Need special handling
 			 * here: try to loosely convert FLOAT to INT. If RHS type
@@ -1727,7 +1728,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 						for (iPk = 0; iPk < nPk; iPk++) {
 							int iCol = pPk->aiColumn[iPk];
 							sqlite3ExprCodeGetColumnToReg
-								(pParse, pTab,
+								(pParse, pTab->def,
 								 iCol, iCur,
 								 r + iPk);
 						}

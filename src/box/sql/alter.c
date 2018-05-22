@@ -216,7 +216,7 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 		sqlite3_value *pVal = 0;
 		int rc;
 		rc = sqlite3ValueFromExpr(db, pDflt,
-					  SQLITE_AFF_BLOB, &pVal);
+					  AFFINITY_BLOB, &pVal);
 		assert(rc == SQLITE_OK || rc == SQLITE_NOMEM);
 		if (rc != SQLITE_OK) {
 			assert(db->mallocFailed == 1);

@@ -38,61 +38,28 @@
 #include "tarantoolInt.h"
 #include "box/schema.h"
 
-/*
- * The most recently coded instruction was an OP_Column to retrieve the
- * i-th column of table pTab. This routine sets the P4 parameter of the
- * OP_Column to the default value, if any.
- *
- * The default value of a column is specified by a DEFAULT clause in the
- * column definition. This was either supplied by the user when the table
- * was created, or added later to the table definition by an ALTER TABLE
- * command. If the latter, then the row-records in the table btree on disk
- * may not contain a value for the column and the default value, taken
- * from the P4 parameter of the OP_Column instruction, is returned instead.
- * If the former, then all row-records are guaranteed to include a value
- * for the column and the P4 value is not required.
- *
- * Column definitions created by an ALTER TABLE command may only have
- * literal default values specified: a number, null or a string. (If a more
- * complicated default expression value was provided, it is evaluated
- * when the ALTER TABLE is executed and one of the literal values written
- * into the schema.)
- *
- * Therefore, the P4 parameter is only required if the default value for
- * the column is a literal number, string or null. The sqlite3ValueFromExpr()
- * function is capable of transforming these types of expressions into
- * sqlite3_value objects.
- *
- * If parameter iReg is not negative, code an OP_RealAffinity instruction
- * on register iReg. This is used when an equivalent integer value is
- * stored in place of an 8-byte floating point value in order to save
- * space.
- */
 void
-sqlite3ColumnDefault(Vdbe * v, Table * pTab, int i, int iReg)
+sqlite3ColumnDefault(Vdbe *v, struct space_def *def, int i, int ireg)
 {
-	assert(pTab != 0);
-	if (!pTab->def->opts.is_view) {
+	assert(def != 0);
+	if (!def->opts.is_view) {
 		sqlite3_value *pValue = 0;
-		Column *pCol = &pTab->aCol[i];
-		VdbeComment((v, "%s.%s", pTab->def->name,
-			pTab->def->fields[i].name));
-		assert(i < (int)pTab->def->field_count);
+		char affinity = def->fields[i].affinity;
+		VdbeComment((v, "%s.%s", def->name, def->fields[i].name));
+		assert(i < (int)def->field_count);
 
 		Expr *expr = NULL;
-		struct space *space =
-			space_cache_find(SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
-		if (space != NULL && space->def->fields != NULL)
-			expr = space->def->fields[i].default_value_expr;
-		sqlite3ValueFromExpr(sqlite3VdbeDb(v),
-				     expr,
-				     pCol->affinity, &pValue);
+		assert(def->fields != NULL && i < (int)def->field_count);
+		if (def->fields != NULL)
+			expr = def->fields[i].default_value_expr;
+		sqlite3ValueFromExpr(sqlite3VdbeDb(v), expr, affinity,
+				     &pValue);
 		if (pValue) {
 			sqlite3VdbeAppendP4(v, pValue, P4_MEM);
 		}
 #ifndef SQLITE_OMIT_FLOATING_POINT
-		if (pTab->aCol[i].affinity == SQLITE_AFF_REAL) {
-			sqlite3VdbeAddOp1(v, OP_RealAffinity, iReg);
+		if (affinity == AFFINITY_REAL) {
+			sqlite3VdbeAddOp1(v, OP_RealAffinity, ireg);
 		}
 #endif
 	}
@@ -367,7 +334,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	} else {
 		for (i = 0; i < nPk; i++) {
 			assert(pPk->aiColumn[i] >= 0);
-			sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur,
+			sqlite3ExprCodeGetColumnOfTable(v, pTab->def, iDataCur,
 							pPk->aiColumn[i],
 							iPk + i);
 		}
@@ -473,7 +440,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0)
 			    || table_column_is_in_pk(pTab, i)) {
 				testcase(oldmask != 0xffffffff && i == 31);
-				sqlite3ExprCodeGetColumnOfTable(v, pTab,
+				sqlite3ExprCodeGetColumnOfTable(v, pTab->def,
 								iDataCur, i,
 								regOld + i);
 			} else {
@@ -516,8 +483,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				 */
 				testcase(i == 31);
 				testcase(i == 32);
-				sqlite3ExprCodeGetColumnToReg(pParse, pTab, i,
-							      iDataCur,
+				sqlite3ExprCodeGetColumnToReg(pParse, pTab->def,
+							      i, iDataCur,
 							      regNew + i);
 			} else {
 				sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
@@ -557,7 +524,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 */
 		for (i = 0; i < (int)pTab->def->field_count; i++) {
 			if (aXRef[i] < 0 && i != pTab->iPKey) {
-				sqlite3ExprCodeGetColumnOfTable(v, pTab,
+				sqlite3ExprCodeGetColumnOfTable(v, pTab->def,
 								iDataCur, i,
 								regNew + i);
 			}

@@ -227,7 +227,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 
 	/* Initialize the node to no-match */
 	pExpr->iTable = -1;
-	pExpr->pTab = 0;
+	pExpr->space_def = NULL;
 	ExprSetVVAProperty(pExpr, EP_NoReduce);
 
 	/* Start at the inner-most context and move outward until a match is found */
@@ -300,7 +300,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 			}
 			if (pMatch) {
 				pExpr->iTable = pMatch->iCursor;
-				pExpr->pTab = pMatch->pTab;
+				pExpr->space_def = pMatch->pTab->def;
 				/* RIGHT JOIN not (yet) supported */
 				assert((pMatch->fg.jointype & JT_RIGHT) == 0);
 				if ((pMatch->fg.jointype & JT_LEFT) != 0) {
@@ -347,7 +347,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 					cnt++;
 					if (iCol < 0) {
 						pExpr->affinity =
-						    SQLITE_AFF_INTEGER;
+							AFFINITY_INTEGER;
 					} else if (pExpr->iTable == 0) {
 						testcase(iCol == 31);
 						testcase(iCol == 32);
@@ -364,7 +364,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 						     : (((u32) 1) << iCol));
 					}
 					pExpr->iColumn = (i16) iCol;
-					pExpr->pTab = pTab;
+					pExpr->space_def = pTab->def;
 					isTrigger = 1;
 				}
 			}
@@ -498,9 +498,9 @@ sqlite3CreateColumnExpr(sqlite3 * db, SrcList * pSrc, int iSrc, int iCol)
 	Expr *p = sqlite3ExprAlloc(db, TK_COLUMN, 0, 0);
 	if (p) {
 		struct SrcList_item *pItem = &pSrc->a[iSrc];
-		p->pTab = pItem->pTab;
+		p->space_def = pItem->pTab->def;
 		p->iTable = pItem->iCursor;
-		if (p->pTab->iPKey == iCol) {
+		if (pItem->pTab->iPKey == iCol) {
 			p->iColumn = -1;
 		} else {
 			p->iColumn = (ynVar) iCol;
@@ -607,7 +607,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			pExpr->pTab = pItem->pTab;
 			pExpr->iTable = pItem->iCursor;
 			pExpr->iColumn = -1;
-			pExpr->affinity = SQLITE_AFF_INTEGER;
+			pExpr->affinity = AFFINITY_INTEGER;
 			break;
 		}
 #endif				/* defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) */

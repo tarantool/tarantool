@@ -70,6 +70,14 @@ enum on_conflict_action {
 	on_conflict_action_MAX
 };
 
+enum affinity_type {
+    AFFINITY_UNDEFINED = 0,
+    AFFINITY_BLOB = 'A',
+    AFFINITY_TEXT = 'B',
+    AFFINITY_NUMERIC = 'C',
+    AFFINITY_INTEGER = 'D',
+    AFFINITY_REAL = 'E',
+};
 /** \endcond public */
 
 extern const char *field_type_strs[];
@@ -102,6 +110,11 @@ struct field_def {
 	 * then UNKNOWN is stored for it.
 	 */
 	enum field_type type;
+	/**
+	* Affinity type for comparations in SQL.
+	* FIXME: Remove affinity after types redesign in SQL.
+	*/
+	enum affinity_type affinity;
 	/** 0-terminated field name. */
 	char *name;
 	/** True, if a field can store NULL. */

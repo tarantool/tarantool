@@ -33,6 +33,7 @@
  * This file contains routines used for analyzing expressions and
  * for generating VDBE code that evaluates expressions in SQLite.
  */
+#include "box/coll_id_cache.h"
 #include "coll.h"
 #include "sqliteInt.h"
 #include "box/session.h"
@@ -42,14 +43,12 @@ static void exprCodeBetween(Parse *, Expr *, int,
 			    void (*)(Parse *, Expr *, int, int), int);
 static int exprCodeVector(Parse * pParse, Expr * p, int *piToFree);
 
-/*
- * Return the affinity character for a single column of a table.
- */
 char
-sqlite3TableColumnAffinity(Table * pTab, int iCol)
+sqlite3TableColumnAffinity(struct space_def *def, int idx)
 {
-	assert(iCol < (int)pTab->def->field_count);
-	return iCol >= 0 ? pTab->aCol[iCol].affinity : SQLITE_AFF_INTEGER;
+	assert(idx < (int)def->field_count);
+	return idx >= 0 ? def->fields[idx].affinity :
+	       AFFINITY_INTEGER;
 }
 
 /*
@@ -90,7 +89,8 @@ sqlite3ExprAffinity(Expr * pExpr)
 	}
 #endif
 	if (op == TK_AGG_COLUMN || op == TK_COLUMN) {
-		return sqlite3TableColumnAffinity(pExpr->pTab, pExpr->iColumn);
+		return sqlite3TableColumnAffinity(pExpr->space_def,
+						  pExpr->iColumn);
 	}
 	if (op == TK_SELECT_COLUMN) {
 		assert(pExpr->pLeft->flags & EP_xIsSelect);
@@ -180,13 +180,13 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found, uint32_t *coll_id)
 		}
 		if ((op == TK_AGG_COLUMN || op == TK_COLUMN ||
 		     op == TK_REGISTER || op == TK_TRIGGER) &&
-		    p->pTab != 0) {
+		    p->space_def != NULL) {
 			/* op==TK_REGISTER && p->pTab!=0 happens when pExpr was originally
 			 * a TK_COLUMN but was previously evaluated and cached in a register
 			 */
 			int j = p->iColumn;
 			if (j >= 0) {
-				coll = sql_column_collation(p->pTab, j,
+				coll = sql_column_collation(p->space_def, j,
 							    coll_id);
 				*is_found = true;
 			}
@@ -241,15 +241,15 @@ sqlite3CompareAffinity(Expr * pExpr, char aff2)
 		 */
 		if (sqlite3IsNumericAffinity(aff1)
 		    || sqlite3IsNumericAffinity(aff2)) {
-			return SQLITE_AFF_NUMERIC;
+			return AFFINITY_NUMERIC;
 		} else {
-			return SQLITE_AFF_BLOB;
+			return AFFINITY_BLOB;
 		}
 	} else if (!aff1 && !aff2) {
 		/* Neither side of the comparison is a column.  Compare the
 		 * results directly.
 		 */
-		return SQLITE_AFF_BLOB;
+		return AFFINITY_BLOB;
 	} else {
 		/* One side is a column, the other is not. Use the columns affinity. */
 		assert(aff1 == 0 || aff2 == 0);
@@ -278,7 +278,7 @@ comparisonAffinity(Expr * pExpr)
 		    sqlite3CompareAffinity(pExpr->x.pSelect->pEList->a[0].pExpr,
 					   aff);
 	} else if (NEVER(aff == 0)) {
-		aff = SQLITE_AFF_BLOB;
+		aff = AFFINITY_BLOB;
 	}
 	return aff;
 }
@@ -294,10 +294,10 @@ sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity)
 {
 	char aff = comparisonAffinity(pExpr);
 	switch (aff) {
-	case SQLITE_AFF_BLOB:
+	case AFFINITY_BLOB:
 		return 1;
-	case SQLITE_AFF_TEXT:
-		return idx_affinity == SQLITE_AFF_TEXT;
+	case AFFINITY_TEXT:
+		return idx_affinity == AFFINITY_TEXT;
 	default:
 		return sqlite3IsNumericAffinity(idx_affinity);
 	}
@@ -2113,10 +2113,10 @@ sqlite3ExprCanBeNull(const Expr * p)
 	case TK_BLOB:
 		return 0;
 	case TK_COLUMN:
-		assert(p->pTab != 0);
+		assert(p->space_def != 0);
 		return ExprHasProperty(p, EP_CanBeNull) ||
 		       (p->iColumn >= 0
-		        && p->pTab->def->fields[p->iColumn].is_nullable);
+		        && p->space_def->fields[p->iColumn].is_nullable);
 	default:
 		return 1;
 	}
@@ -2136,7 +2136,7 @@ int
 sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
 {
 	u8 op;
-	if (aff == SQLITE_AFF_BLOB)
+	if (aff == AFFINITY_BLOB)
 		return 1;
 	while (p->op == TK_UPLUS || p->op == TK_UMINUS) {
 		p = p->pLeft;
@@ -2146,15 +2146,15 @@ sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
 		op = p->op2;
 	switch (op) {
 	case TK_INTEGER:{
-			return aff == SQLITE_AFF_INTEGER
-			    || aff == SQLITE_AFF_NUMERIC;
+			return aff == AFFINITY_INTEGER
+			    || aff == AFFINITY_NUMERIC;
 		}
 	case TK_FLOAT:{
-			return aff == SQLITE_AFF_REAL
-			    || aff == SQLITE_AFF_NUMERIC;
+			return aff == AFFINITY_REAL
+			    || aff == AFFINITY_NUMERIC;
 		}
 	case TK_STRING:{
-			return aff == SQLITE_AFF_TEXT;
+			return aff == AFFINITY_TEXT;
 		}
 	case TK_BLOB:{
 			return 1;
@@ -2162,8 +2162,8 @@ sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
 	case TK_COLUMN:{
 			assert(p->iTable >= 0);	/* p cannot be part of a CHECK constraint */
 			return p->iColumn < 0
-			    && (aff == SQLITE_AFF_INTEGER
-				|| aff == SQLITE_AFF_NUMERIC);
+			    && (aff == AFFINITY_INTEGER
+				|| aff == AFFINITY_NUMERIC);
 		}
 	default:{
 			return 0;
@@ -2417,20 +2417,22 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		for (i = 0; i < nExpr && affinity_ok; i++) {
 			Expr *pLhs = sqlite3VectorFieldSubexpr(pX->pLeft, i);
 			int iCol = pEList->a[i].pExpr->iColumn;
-			char idxaff = sqlite3TableColumnAffinity(pTab, iCol);	/* RHS table */
+			/* RHS table */
+			char idxaff =
+				sqlite3TableColumnAffinity(pTab->def, iCol);
 			char cmpaff = sqlite3CompareAffinity(pLhs, idxaff);
-			testcase(cmpaff == SQLITE_AFF_BLOB);
-			testcase(cmpaff == SQLITE_AFF_TEXT);
+			testcase(cmpaff == AFFINITY_BLOB);
+			testcase(cmpaff == AFFINITY_TEXT);
 			switch (cmpaff) {
-			case SQLITE_AFF_BLOB:
+			case AFFINITY_BLOB:
 				break;
-			case SQLITE_AFF_TEXT:
+			case AFFINITY_TEXT:
 				/* sqlite3CompareAffinity() only returns TEXT if one side or the
 				 * other has no affinity and the other side is TEXT.  Hence,
 				 * the only way for cmpaff to be TEXT is for idxaff to be TEXT
 				 * and for the term on the LHS of the IN to have no affinity.
 				 */
-				assert(idxaff == SQLITE_AFF_TEXT);
+				assert(idxaff == AFFINITY_TEXT);
 				break;
 			default:
 				affinity_ok = sqlite3IsNumericAffinity(idxaff);
@@ -2822,7 +2824,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 
 				affinity = sqlite3ExprAffinity(pLeft);
 				if (!affinity) {
-					affinity = SQLITE_AFF_BLOB;
+					affinity = AFFINITY_BLOB;
 				}
 				bool unused;
 				uint32_t id;
@@ -3167,8 +3169,10 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		struct Index *pk = sqlite3PrimaryKeyIndex(tab);
 		assert(pk);
 
+		enum affinity_type affinity =
+			tab->def->fields[pk->aiColumn[0]].affinity;
 		if (pk->nColumn == 1
-		    && tab->aCol[pk->aiColumn[0]].affinity == 'D'
+		    && affinity == AFFINITY_INTEGER
 		    && pk->aiColumn[0] < nVector) {
 			int reg_pk = rLhs + pk->aiColumn[0];
 			sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
@@ -3510,45 +3514,24 @@ sqlite3ExprCodeLoadIndexColumn(Parse * pParse,	/* The parsing context */
 		sqlite3ExprCodeCopy(pParse, pIdx->aColExpr->a[iIdxCol].pExpr,
 				    regOut);
 	} else {
-		sqlite3ExprCodeGetColumnOfTable(pParse->pVdbe, pIdx->pTable,
+		sqlite3ExprCodeGetColumnOfTable(pParse->pVdbe, pIdx->pTable->def,
 						iTabCur, iTabCol, regOut);
 	}
 }
 
-/*
- * Generate code to extract the value of the iCol-th column of a table.
- */
 void
-sqlite3ExprCodeGetColumnOfTable(Vdbe * v,	/* The VDBE under construction */
-				Table * pTab,	/* The table containing the value */
-				int iTabCur,	/* The PK cursor */
-				int iCol,	/* Index of the column to extract */
-				int regOut	/* Extract the value into this register */
-    )
+sqlite3ExprCodeGetColumnOfTable(Vdbe *v, struct space_def *space_def,
+				int iTabCur, int iCol, int regOut)
 {
 	sqlite3VdbeAddOp3(v, OP_Column, iTabCur, iCol, regOut);
 	if (iCol >= 0) {
-		sqlite3ColumnDefault(v, pTab, iCol, regOut);
+		sqlite3ColumnDefault(v, space_def, iCol, regOut);
 	}
 }
 
-/*
- * Generate code that will extract the iColumn-th column from
- * table pTab and store the column value in a register.
- *
- * An effort is made to store the column value in register iReg.  This
- * is not garanteeed for GetColumn() - the result can be stored in
- * any register.  But the result is guaranteed to land in register iReg
- * for GetColumnToReg().
- */
 int
-sqlite3ExprCodeGetColumn(Parse * pParse,	/* Parsing and code generating context */
-			 Table * pTab,	/* Description of the table we are reading from */
-			 int iColumn,	/* Index of the table column */
-			 int iTable,	/* The cursor pointing to the table */
-			 int iReg,	/* Store results here */
-			 u8 p5	/* P5 value for OP_Column + FLAGS */
-    )
+sqlite3ExprCodeGetColumn(Parse *pParse, struct space_def *space_def,
+			 int iColumn, int iTable, int iReg, u8 p5)
 {
 	Vdbe *v = pParse->pVdbe;
 	int i;
@@ -3563,7 +3546,7 @@ sqlite3ExprCodeGetColumn(Parse * pParse,	/* Parsing and code generating context 
 		}
 	}
 	assert(v != 0);
-	sqlite3ExprCodeGetColumnOfTable(v, pTab, iTable, iColumn, iReg);
+	sqlite3ExprCodeGetColumnOfTable(v, space_def, iTable, iColumn, iReg);
 	if (p5) {
 		sqlite3VdbeChangeP5(v, p5);
 	} else {
@@ -3573,15 +3556,12 @@ sqlite3ExprCodeGetColumn(Parse * pParse,	/* Parsing and code generating context 
 }
 
 void
-sqlite3ExprCodeGetColumnToReg(Parse * pParse,	/* Parsing and code generating context */
-			      Table * pTab,	/* Description of the table we are reading from */
-			      int iColumn,	/* Index of the table column */
-			      int iTable,	/* The cursor pointing to the table */
-			      int iReg	/* Store results here */
-    )
+sqlite3ExprCodeGetColumnToReg(Parse * pParse, struct space_def * space_def,
+			      int iColumn, int iTable, int iReg)
 {
 	int r1 =
-	    sqlite3ExprCodeGetColumn(pParse, pTab, iColumn, iTable, iReg, 0);
+		sqlite3ExprCodeGetColumn(pParse, space_def, iColumn, iTable,
+					 iReg, 0);
 	if (r1 != iReg)
 		sqlite3VdbeAddOp2(pParse->pVdbe, OP_SCopy, r1, iReg);
 }
@@ -3768,7 +3748,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					iTab = pParse->iSelfTab;
 				}
 			}
-			return sqlite3ExprCodeGetColumn(pParse, pExpr->pTab,
+			return sqlite3ExprCodeGetColumn(pParse, pExpr->space_def,
 							pExpr->iColumn, iTab,
 							target, pExpr->op2);
 		}
@@ -4233,24 +4213,21 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 *   p1==1   ->    old.a         p1==4   ->    new.a
 			 *   p1==2   ->    old.b         p1==5   ->    new.b
 			 */
-			Table *pTab = pExpr->pTab;
+			struct space_def *def = pExpr->space_def;
 			int p1 =
-			    pExpr->iTable * (pTab->def->field_count + 1) + 1 +
+			    pExpr->iTable * (def->field_count + 1) + 1 +
 			    pExpr->iColumn;
 
 			assert(pExpr->iTable == 0 || pExpr->iTable == 1);
 			assert(pExpr->iColumn >= 0
-			       && pExpr->iColumn < (int)pTab->def->field_count);
-			assert(pTab->iPKey < 0
-			       || pExpr->iColumn != pTab->iPKey);
-			assert(p1 >= 0 && p1 <
-					  ((int)pTab->def->field_count * 2 + 2));
+			       && pExpr->iColumn < (int)def->field_count);
+			assert(p1 >= 0 && p1 < ((int)def->field_count * 2 + 2));
 
 			sqlite3VdbeAddOp2(v, OP_Param, p1, target);
 			VdbeComment((v, "%s.%s -> $%d",
 				    (pExpr->iTable ? "new" : "old"),
-				    pExpr->pTab->def->fields[pExpr->iColumn].name,
-				    target));
+				    pExpr->space_def->fields[
+					pExpr->iColumn].name, target));
 
 #ifndef SQLITE_OMIT_FLOATING_POINT
 			/* If the column has REAL affinity, it may currently be stored as an
@@ -4259,9 +4236,8 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 * EVIDENCE-OF: R-60985-57662 SQLite will convert the value back to
 			 * floating point when extracting it from the record.
 			 */
-			if (pExpr->iColumn >= 0
-			    && pTab->aCol[pExpr->iColumn].affinity ==
-			    SQLITE_AFF_REAL) {
+			if (pExpr->iColumn >= 0 && def->fields[
+				pExpr->iColumn].affinity == AFFINITY_REAL) {
 				sqlite3VdbeAddOp1(v, OP_RealAffinity, target);
 			}
 #endif
@@ -5432,8 +5408,8 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 							 pAggInfo)) >= 0) {
 							pCol =
 							    &pAggInfo->aCol[k];
-							pCol->pTab =
-							    pExpr->pTab;
+							pCol->space_def =
+							    pExpr->space_def;
 							pCol->iTable =
 							    pExpr->iTable;
 							pCol->iColumn =

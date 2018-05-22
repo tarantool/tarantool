@@ -739,7 +739,7 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 		 * TODO: since SQL standard prohibits column creation without
 		 * specified type, the code below should emit an error.
 		 */
-		pCol->affinity = SQLITE_AFF_BLOB;
+		column_def->affinity = AFFINITY_BLOB;
 		column_def->type = FIELD_TYPE_SCALAR;
 	} else {
 		/* TODO: convert string of type into runtime
@@ -750,13 +750,13 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 		    (sqlite3StrNICmp(pType->z, "INT", 3) == 0 &&
 		     pType->n == 3)) {
 			column_def->type = FIELD_TYPE_INTEGER;
-			pCol->affinity = SQLITE_AFF_INTEGER;
+			column_def->affinity = AFFINITY_INTEGER;
 		} else {
 			zType = sqlite3_malloc(pType->n + 1);
 			memcpy(zType, pType->z, pType->n);
 			zType[pType->n] = 0;
 			sqlite3Dequote(zType);
-			pCol->affinity = sqlite3AffinityType(zType, 0);
+			column_def->affinity = sqlite3AffinityType(zType, 0);
 			column_def->type = FIELD_TYPE_SCALAR;
 			sqlite3_free(zType);
 		}
@@ -792,27 +792,27 @@ sqlite3AddNotNull(Parse * pParse, int onError)
  * found, the corresponding affinity is returned. If zType contains
  * more than one of the substrings, entries toward the top of
  * the table take priority. For example, if zType is 'BLOBINT',
- * SQLITE_AFF_INTEGER is returned.
+ * AFFINITY_INTEGER is returned.
  *
  * Substring     | Affinity
  * --------------------------------
- * 'INT'         | SQLITE_AFF_INTEGER
- * 'CHAR'        | SQLITE_AFF_TEXT
- * 'CLOB'        | SQLITE_AFF_TEXT
- * 'TEXT'        | SQLITE_AFF_TEXT
- * 'BLOB'        | SQLITE_AFF_BLOB
- * 'REAL'        | SQLITE_AFF_REAL
- * 'FLOA'        | SQLITE_AFF_REAL
- * 'DOUB'        | SQLITE_AFF_REAL
+ * 'INT'         | AFFINITY_INTEGER
+ * 'CHAR'        | AFFINITY_TEXT
+ * 'CLOB'        | AFFINITY_TEXT
+ * 'TEXT'        | AFFINITY_TEXT
+ * 'BLOB'        | AFFINITY_BLOB
+ * 'REAL'        | AFFINITY_REAL
+ * 'FLOA'        | AFFINITY_REAL
+ * 'DOUB'        | AFFINITY_REAL
  *
  * If none of the substrings in the above table are found,
- * SQLITE_AFF_NUMERIC is returned.
+ * AFFINITY_NUMERIC is returned.
  */
 char
 sqlite3AffinityType(const char *zIn, u8 * pszEst)
 {
 	u32 h = 0;
-	char aff = SQLITE_AFF_NUMERIC;
+	char aff = AFFINITY_NUMERIC;
 	const char *zChar = 0;
 
 	assert(zIn != 0);
@@ -820,31 +820,31 @@ sqlite3AffinityType(const char *zIn, u8 * pszEst)
 		h = (h << 8) + sqlite3UpperToLower[(*zIn) & 0xff];
 		zIn++;
 		if (h == (('c' << 24) + ('h' << 16) + ('a' << 8) + 'r')) {	/* CHAR */
-			aff = SQLITE_AFF_TEXT;
+			aff = AFFINITY_TEXT;
 			zChar = zIn;
 		} else if (h == (('c' << 24) + ('l' << 16) + ('o' << 8) + 'b')) {	/* CLOB */
-			aff = SQLITE_AFF_TEXT;
+			aff = AFFINITY_TEXT;
 		} else if (h == (('t' << 24) + ('e' << 16) + ('x' << 8) + 't')) {	/* TEXT */
-			aff = SQLITE_AFF_TEXT;
+			aff = AFFINITY_TEXT;
 		} else if (h == (('b' << 24) + ('l' << 16) + ('o' << 8) + 'b')	/* BLOB */
-			   &&(aff == SQLITE_AFF_NUMERIC
-			      || aff == SQLITE_AFF_REAL)) {
-			aff = SQLITE_AFF_BLOB;
+			   &&(aff == AFFINITY_NUMERIC
+			      || aff == AFFINITY_REAL)) {
+			aff = AFFINITY_BLOB;
 			if (zIn[0] == '(')
 				zChar = zIn;
 #ifndef SQLITE_OMIT_FLOATING_POINT
 		} else if (h == (('r' << 24) + ('e' << 16) + ('a' << 8) + 'l')	/* REAL */
-			   &&aff == SQLITE_AFF_NUMERIC) {
-			aff = SQLITE_AFF_REAL;
+			   &&aff == AFFINITY_NUMERIC) {
+			aff = AFFINITY_REAL;
 		} else if (h == (('f' << 24) + ('l' << 16) + ('o' << 8) + 'a')	/* FLOA */
-			   &&aff == SQLITE_AFF_NUMERIC) {
-			aff = SQLITE_AFF_REAL;
+			   &&aff == AFFINITY_NUMERIC) {
+			aff = AFFINITY_REAL;
 		} else if (h == (('d' << 24) + ('o' << 16) + ('u' << 8) + 'b')	/* DOUB */
-			   &&aff == SQLITE_AFF_NUMERIC) {
-			aff = SQLITE_AFF_REAL;
+			   &&aff == AFFINITY_NUMERIC) {
+			aff = AFFINITY_REAL;
 #endif
 		} else if ((h & 0x00FFFFFF) == (('i' << 16) + ('n' << 8) + 't')) {	/* INT */
-			aff = SQLITE_AFF_INTEGER;
+			aff = AFFINITY_INTEGER;
 			break;
 		}
 	}
@@ -855,7 +855,7 @@ sqlite3AffinityType(const char *zIn, u8 * pszEst)
 	if (pszEst) {
 		*pszEst = 1;	/* default size is approx 4 bytes
 		*/
-		if (aff < SQLITE_AFF_NUMERIC) {
+		if (aff < AFFINITY_NUMERIC) {
 			if (zChar) {
 				while (zChar[0]) {
 					if (sqlite3Isdigit(zChar[0])) {
@@ -1069,7 +1069,7 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 			if (pIdx->aiColumn[0] == i) {
 				id = &pIdx->coll_id_array[0];
 				pIdx->coll_array[0] =
-					sql_column_collation(p, i, id);
+					sql_column_collation(p->def, i, id);
 			}
 		}
 	} else {
@@ -1078,11 +1078,10 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 }
 
 struct coll *
-sql_column_collation(Table *table, uint32_t column, uint32_t *coll_id)
+sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id)
 {
-	assert(table != NULL);
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
-	struct space *space = space_by_id(space_id);
+	assert(def != NULL);
+	struct space *space = space_by_id(def->id);
 	/*
 	 * It is not always possible to fetch collation directly
 	 * from struct space. To be more precise when:
@@ -1096,9 +1095,10 @@ sql_column_collation(Table *table, uint32_t column, uint32_t *coll_id)
 	 * SQL specific structures.
 	 */
 	if (space == NULL || space_index(space, 0) == NULL) {
-		assert(column < (uint32_t)table->def->field_count);
-		*coll_id = table->def->fields[column].coll_id;
-		return table->aCol[column].coll;
+		assert(column < (uint32_t)def->field_count);
+		*coll_id = def->fields[column].coll_id;
+		struct coll_id *collation = coll_by_id(*coll_id);
+		return collation != NULL ? collation->coll : NULL;
 	}
 	*coll_id = space->format->fields[column].coll_id;
 	return space->format->fields[column].coll;
@@ -1332,11 +1332,11 @@ createTableStmt(sqlite3 * db, Table * p)
 	zStmt[k++] = '(';
 	for (pCol = p->aCol, i = 0; i < (int)p->def->field_count; i++, pCol++) {
 		static const char *const azType[] = {
-			/* SQLITE_AFF_BLOB    */ "",
-			/* SQLITE_AFF_TEXT    */ " TEXT",
-			/* SQLITE_AFF_NUMERIC */ " NUM",
-			/* SQLITE_AFF_INTEGER */ " INT",
-			/* SQLITE_AFF_REAL    */ " REAL"
+			/* AFFINITY_BLOB    */ "",
+			/* AFFINITY_TEXT    */ " TEXT",
+			/* AFFINITY_NUMERIC */ " NUM",
+			/* AFFINITY_INTEGER */ " INT",
+			/* AFFINITY_REAL    */ " REAL"
 		};
 		int len;
 		const char *zType;
@@ -1345,18 +1345,19 @@ createTableStmt(sqlite3 * db, Table * p)
 		k += sqlite3Strlen30(&zStmt[k]);
 		zSep = zSep2;
 		identPut(zStmt, &k, p->def->fields[i].name);
-		assert(pCol->affinity - SQLITE_AFF_BLOB >= 0);
-		assert(pCol->affinity - SQLITE_AFF_BLOB < ArraySize(azType));
-		testcase(pCol->affinity == SQLITE_AFF_BLOB);
-		testcase(pCol->affinity == SQLITE_AFF_TEXT);
-		testcase(pCol->affinity == SQLITE_AFF_NUMERIC);
-		testcase(pCol->affinity == SQLITE_AFF_INTEGER);
-		testcase(pCol->affinity == SQLITE_AFF_REAL);
+		char affinity = p->def->fields[i].affinity;
+		assert(affinity - AFFINITY_BLOB >= 0);
+		assert(affinity - AFFINITY_BLOB < ArraySize(azType));
+		testcase(affinity == AFFINITY_BLOB);
+		testcase(affinity == AFFINITY_TEXT);
+		testcase(affinity == AFFINITY_NUMERIC);
+		testcase(affinity == AFFINITY_INTEGER);
+		testcase(affinity == AFFINITY_REAL);
 
-		zType = azType[pCol->affinity - SQLITE_AFF_BLOB];
+		zType = azType[affinity - AFFINITY_BLOB];
 		len = sqlite3Strlen30(zType);
-		assert(pCol->affinity == SQLITE_AFF_BLOB
-		       || pCol->affinity == sqlite3AffinityType(zType, 0));
+		assert(affinity == AFFINITY_BLOB ||
+		       affinity == sqlite3AffinityType(zType, 0));
 		memcpy(&zStmt[k], zType, len);
 		k += len;
 		assert(k <= n);
@@ -3054,7 +3055,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 				goto exit_create_index;
 			}
 		} else if (j >= 0) {
-			coll = sql_column_collation(pTab, j, &id);
+			coll = sql_column_collation(pTab->def, j, &id);
 		} else {
 			id = COLL_NONE;
 			coll = NULL;

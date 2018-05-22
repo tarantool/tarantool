@@ -299,7 +299,7 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 					 */
 					struct coll *def_coll;
 					uint32_t id;
-					def_coll = sql_column_collation(pParent,
+					def_coll = sql_column_collation(pParent->def,
 									iCol,
 									&id);
 					struct coll *coll =
@@ -530,41 +530,42 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
     )
 {
 	Expr *pExpr;
-	Column *pCol;
 	sqlite3 *db = pParse->db;
 
 	pExpr = sqlite3Expr(db, TK_REGISTER, 0);
 	if (pExpr) {
 		if (iCol >= 0 && iCol != pTab->iPKey) {
-			pCol = &pTab->aCol[iCol];
 			pExpr->iTable = regBase + iCol + 1;
-			pExpr->affinity = pCol->affinity;
+			char affinity = pTab->def->fields[iCol].affinity;
+			pExpr->affinity = affinity;
 			pExpr = sqlite3ExprAddCollateString(pParse, pExpr,
 							    "binary");
 		} else {
 			pExpr->iTable = regBase;
-			pExpr->affinity = SQLITE_AFF_INTEGER;
+			pExpr->affinity = AFFINITY_INTEGER;
 		}
 	}
 	return pExpr;
 }
 
-/*
- * Return an Expr object that refers to column iCol of table pTab which
- * has cursor iCur.
+/**
+ * Return an Expr object that refers to column of space_def which
+ * has cursor cursor.
+ * @param db The database connection.
+ * @param def space definition.
+ * @param cursor The open cursor on the table.
+ * @param column The column that is wanted.
+ * @retval not NULL on success.
+ * @retval NULL on error.
  */
 static Expr *
-exprTableColumn(sqlite3 * db,	/* The database connection */
-		Table * pTab,	/* The table whose column is desired */
-		int iCursor,	/* The open cursor on the table */
-		i16 iCol	/* The column that is wanted */
-    )
+exprTableColumn(sqlite3 * db, struct space_def *def, int cursor, i16 column)
 {
 	Expr *pExpr = sqlite3Expr(db, TK_COLUMN, 0);
 	if (pExpr) {
-		pExpr->pTab = pTab;
-		pExpr->iTable = iCursor;
-		pExpr->iColumn = iCol;
+		pExpr->space_def = def;
+		pExpr->iTable = cursor;
+		pExpr->iColumn = column;
 	}
 	return pExpr;
 }
@@ -675,8 +676,9 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 			i16 iCol = pIdx->aiColumn[i];
 			assert(iCol >= 0);
 			pLeft = exprTableRegister(pParse, pTab, regData, iCol);
-			pRight = exprTableColumn(db, pTab, pSrc->a[0].iCursor,
-						 iCol);
+			pRight =
+				exprTableColumn(db, pTab->def,
+						pSrc->a[0].iCursor, iCol);
 			pEq = sqlite3PExpr(pParse, TK_EQ, pLeft, pRight);
 			pAll = sqlite3ExprAnd(db, pAll, pEq);
 		}

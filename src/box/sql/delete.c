@@ -253,7 +253,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (!is_view) {
 			for (int i = 0; i < pk_len; i++) {
 				assert(pk->aiColumn[i] >= 0);
-				sqlite3ExprCodeGetColumnOfTable(v, table,
+				sqlite3ExprCodeGetColumnOfTable(v, table->def,
 								tab_cursor,
 								pk->
 								aiColumn[i],
@@ -445,7 +445,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 			testcase(mask != 0xffffffff && iCol == 32);
 			if (mask == 0xffffffff
 			    || (i <= 31 && (mask & MASKBIT32(i)) != 0)) {
-				sqlite3ExprCodeGetColumnOfTable(v, table,
+				sqlite3ExprCodeGetColumnOfTable(v, table->def,
 								cursor, i,
 								first_old_reg +
 								i + 1);

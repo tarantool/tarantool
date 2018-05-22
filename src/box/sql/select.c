@@ -1577,7 +1577,7 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr
 				break;
 			}
 
-			assert(pTab && pExpr->pTab == pTab);
+			assert(pTab && pExpr->space_def == pTab->def);
 			if (pS) {
 				/* The "table" is actually a sub-select or a view in the FROM clause
 				 * of the SELECT statement. Return the declaration type and origin
@@ -1786,19 +1786,23 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 			/* If the column contains an "AS <name>" phrase, use <name> as the name */
 		} else {
 			Expr *pColExpr = p;	/* The expression that is the result column name */
-			Table *pTab;	/* Table associated with this expression */
+			struct space_def *space_def = NULL;
 			while (pColExpr->op == TK_DOT) {
 				pColExpr = pColExpr->pRight;
 				assert(pColExpr != 0);
 			}
 			if (pColExpr->op == TK_COLUMN
-			    && ALWAYS(pColExpr->pTab != 0)) {
+			    && ALWAYS(pColExpr->space_def != NULL)) {
 				/* For columns use the column name name */
 				int iCol = pColExpr->iColumn;
-				pTab = pColExpr->pTab;
+				space_def = pColExpr->space_def;
+				Table *pTable =
+					sqlite3LocateTable(parse, 0,
+							   space_def->name);
+				assert(pTable != NULL);
 				if (iCol < 0)
-					iCol = pTab->iPKey;
-				zName = pTab->def->fields[iCol].name;
+					iCol = pTable->iPKey;
+				zName = space_def->fields[iCol].name;
 			} else if (pColExpr->op == TK_ID) {
 				assert(!ExprHasProperty(pColExpr, EP_IntValue));
 				zName = pColExpr->u.zToken;
@@ -1895,11 +1899,12 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 		enum field_type type;
 		p = a[i].pExpr;
 		type = columnType(&sNC, p, 0, 0);
-		pCol->affinity = sqlite3ExprAffinity(p);
 		pTab->def->fields[i].type = type;
 
-		if (pCol->affinity == 0)
-			pCol->affinity = SQLITE_AFF_BLOB;
+		char affinity = sqlite3ExprAffinity(p);
+		if (affinity == 0)
+			affinity = AFFINITY_BLOB;
+		pTab->def->fields[i].affinity = affinity;
 		bool unused;
 		uint32_t id;
 		struct coll *coll = sql_expr_coll(pParse, p, &unused, &id);
@@ -5926,7 +5931,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 					if (pCol->iSorterColumn >= j) {
 						int r1 = j + regBase;
 						sqlite3ExprCodeGetColumnToReg
-						    (pParse, pCol->pTab,
+						    (pParse, pCol->space_def,
 						     pCol->iColumn,
 						     pCol->iTable, r1);
 						j++;

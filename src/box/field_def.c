@@ -100,6 +100,7 @@ const struct opt_def field_def_reg[] = {
 
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
+	.affinity = AFFINITY_UNDEFINED,
 	.name = NULL,
 	.is_nullable = false,
 	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,

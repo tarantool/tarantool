@@ -262,8 +262,9 @@ isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
 #endif
 	pList = pExpr->x.pList;
 	pLeft = pList->a[1].pExpr;
-	if (pLeft->op != TK_COLUMN || sqlite3ExprAffinity(pLeft) != SQLITE_AFF_TEXT	/* Value might be numeric */
-	    ) {
+	/* Value might be numeric */
+	if (pLeft->op != TK_COLUMN ||
+	    sqlite3ExprAffinity(pLeft) != AFFINITY_TEXT) {
 		/* IMP: R-02065-49465 The left-hand side of the LIKE or GLOB operator must
 		 * be the name of an indexed column with TEXT affinity.
 		 */
@@ -277,7 +278,7 @@ isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
 		Vdbe *pReprepare = pParse->pReprepare;
 		int iCol = pRight->iColumn;
 		pVal =
-		    sqlite3VdbeGetBoundValue(pReprepare, iCol, SQLITE_AFF_BLOB);
+		    sqlite3VdbeGetBoundValue(pReprepare, iCol, AFFINITY_BLOB);
 		if (pVal && sqlite3_value_type(pVal) == SQLITE_TEXT) {
 			z = (char *)sqlite3_value_text(pVal);
 		}
@@ -1514,7 +1515,7 @@ sqlite3WhereTabFuncArgs(Parse * pParse,	/* Parsing context */
 			return;
 		pColRef->iTable = pItem->iCursor;
 		pColRef->iColumn = k++;
-		pColRef->pTab = pTab;
+		pColRef->space_def = pTab->def;
 		pTerm = sqlite3PExpr(pParse, TK_EQ, pColRef,
 				     sqlite3ExprDup(pParse->db,
 						    pArgs->a[j].pExpr, 0));

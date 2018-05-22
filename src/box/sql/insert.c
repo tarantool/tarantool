@@ -90,7 +90,6 @@ sqlite3IndexAffinityStr(sqlite3 * db, Index * pIdx)
 		 */
 		int n;
 		int nColumn = index_column_count(pIdx);
-		Table *pTab = pIdx->pTable;
 		pIdx->zColAff =
 		    (char *)sqlite3DbMallocRaw(0, nColumn + 1);
 		if (!pIdx->zColAff) {
@@ -100,7 +99,9 @@ sqlite3IndexAffinityStr(sqlite3 * db, Index * pIdx)
 		for (n = 0; n < nColumn; n++) {
 			i16 x = pIdx->aiColumn[n];
 			if (x >= 0) {
-				pIdx->zColAff[n] = pTab->aCol[x].affinity;
+				char affinity = pIdx->pTable->
+					def->fields[x].affinity;
+				pIdx->zColAff[n] = affinity;
 			} else {
 				char aff;
 				assert(x == XN_EXPR);
@@ -109,7 +110,7 @@ sqlite3IndexAffinityStr(sqlite3 * db, Index * pIdx)
 				    sqlite3ExprAffinity(pIdx->aColExpr->a[n].
 							pExpr);
 				if (aff == 0)
-					aff = SQLITE_AFF_BLOB;
+					aff = AFFINITY_BLOB;
 				pIdx->zColAff[n] = aff;
 			}
 		}
@@ -121,9 +122,9 @@ sqlite3IndexAffinityStr(sqlite3 * db, Index * pIdx)
 
 /*
  * Compute the affinity string for table pTab, if it has not already been
- * computed.  As an optimization, omit trailing SQLITE_AFF_BLOB affinities.
+ * computed.  As an optimization, omit trailing AFFINITY_BLOB affinities.
  *
- * If the affinity exists (if it is no entirely SQLITE_AFF_BLOB values) and
+ * If the affinity exists (if it is no entirely AFFINITY_BLOB values) and
  * if iReg>0 then code an OP_Affinity opcode that will set the affinities
  * for register iReg and following.  Or if affinities exists and iReg==0,
  * then just set the P4 operand of the previous opcode (which should  be
@@ -155,11 +156,12 @@ sqlite3TableAffinity(Vdbe * v, Table * pTab, int iReg)
 		}
 
 		for (i = 0; i < (int)pTab->def->field_count; i++) {
-			zColAff[i] = pTab->aCol[i].affinity;
+			char affinity = pTab->def->fields[i].affinity;
+			zColAff[i] = affinity;
 		}
 		do {
 			zColAff[i--] = 0;
-		} while (i >= 0 && zColAff[i] == SQLITE_AFF_BLOB);
+		} while (i >= 0 && zColAff[i] == AFFINITY_BLOB);
 		pTab->zColAff = zColAff;
 	}
 	i = sqlite3Strlen30(zColAff);
@@ -1291,7 +1293,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			 * not as affinity. Emit code for type checking */
 			if (nIdxCol == 1) {
 				reg_pk = regNewData + 1 + pIdx->aiColumn[0];
-				if (pTab->zColAff[pIdx->aiColumn[0]] == 'D') {
+				if (pTab->zColAff[pIdx->aiColumn[0]] ==
+				    AFFINITY_INTEGER) {
 					int skip_if_null = sqlite3VdbeMakeLabel(v);
 					if ((pTab->tabFlags & TF_Autoincrement) != 0) {
 						sqlite3VdbeAddOp2(v, OP_IsNull,
@@ -1832,14 +1835,16 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		return 0;	/* Both tables must have the same INTEGER PRIMARY KEY */
 	}
 	for (i = 0; i < (int)pDest->def->field_count; i++) {
-		Column *pDestCol = &pDest->aCol[i];
-		Column *pSrcCol = &pSrc->aCol[i];
-		if (pDestCol->affinity != pSrcCol->affinity) {
-			return 0;	/* Affinity must be the same on all columns */
-		}
+		enum affinity_type dest_affinity =
+			pDest->def->fields[i].affinity;
+		enum affinity_type src_affinity =
+			pSrc->def->fields[i].affinity;
+		/* Affinity must be the same on all columns. */
+		if (dest_affinity != src_affinity)
+			return 0;
 		uint32_t id;
-		if (sql_column_collation(pDest, i, &id) !=
-		    sql_column_collation(pSrc, i, &id)) {
+		if (sql_column_collation(pDest->def, i, &id) !=
+		    sql_column_collation(pSrc->def, i, &id)) {
 			return 0;	/* Collating sequence must be the same on all columns */
 		}
 		if (!pDest->def->fields[i].is_nullable

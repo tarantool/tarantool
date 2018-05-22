@@ -304,19 +304,19 @@ applyNumericAffinity(Mem *pRec, int bTryForInt)
 /*
  * Processing is determine by the affinity parameter:
  *
- * SQLITE_AFF_INTEGER:
- * SQLITE_AFF_REAL:
- * SQLITE_AFF_NUMERIC:
+ * AFFINITY_INTEGER:
+ * AFFINITY_REAL:
+ * AFFINITY_NUMERIC:
  *    Try to convert pRec to an integer representation or a
  *    floating-point representation if an integer representation
  *    is not possible.  Note that the integer representation is
  *    always preferred, even if the affinity is REAL, because
  *    an integer representation is more space efficient on disk.
  *
- * SQLITE_AFF_TEXT:
+ * AFFINITY_TEXT:
  *    Convert pRec to a text representation.
  *
- * SQLITE_AFF_BLOB:
+ * AFFINITY_BLOB:
  *    No-op.  pRec is unchanged.
  */
 static void
@@ -325,9 +325,9 @@ applyAffinity(
 	char affinity       /* The affinity to be applied */
 	)
 {
-	if (affinity>=SQLITE_AFF_NUMERIC) {
-		assert(affinity==SQLITE_AFF_INTEGER || affinity==SQLITE_AFF_REAL
-			|| affinity==SQLITE_AFF_NUMERIC);
+	if (affinity>=AFFINITY_NUMERIC) {
+		assert(affinity==AFFINITY_INTEGER || affinity==AFFINITY_REAL
+			|| affinity==AFFINITY_NUMERIC);
 		if ((pRec->flags & MEM_Int)==0) { /*OPTIMIZATION-IF-FALSE*/
 			if ((pRec->flags & MEM_Real)==0) {
 				if (pRec->flags & MEM_Str) applyNumericAffinity(pRec,1);
@@ -335,7 +335,7 @@ applyAffinity(
 				sqlite3VdbeIntegerAffinity(pRec);
 			}
 		}
-	} else if (affinity==SQLITE_AFF_TEXT) {
+	} else if (affinity==AFFINITY_TEXT) {
 		/* Only attempt the conversion to TEXT if there is an integer or real
 		 * representation (blob and NULL do not get converted) but no string
 		 * representation.  It would be harmless to repeat the conversion if
@@ -1886,7 +1886,7 @@ case OP_AddImm: {            /* in1 */
 case OP_MustBeInt: {            /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
 	if ((pIn1->flags & MEM_Int)==0) {
-		applyAffinity(pIn1, SQLITE_AFF_NUMERIC);
+		applyAffinity(pIn1, AFFINITY_NUMERIC);
 		VdbeBranchTaken((pIn1->flags&MEM_Int)==0, 2);
 		if ((pIn1->flags & MEM_Int)==0) {
 			if (pOp->p2==0) {
@@ -1937,12 +1937,12 @@ case OP_RealAffinity: {                  /* in1 */
  * A NULL value is not changed by this routine.  It remains NULL.
  */
 case OP_Cast: {                  /* in1 */
-	assert(pOp->p2>=SQLITE_AFF_BLOB && pOp->p2<=SQLITE_AFF_REAL);
-	testcase( pOp->p2==SQLITE_AFF_TEXT);
-	testcase( pOp->p2==SQLITE_AFF_BLOB);
-	testcase( pOp->p2==SQLITE_AFF_NUMERIC);
-	testcase( pOp->p2==SQLITE_AFF_INTEGER);
-	testcase( pOp->p2==SQLITE_AFF_REAL);
+	assert(pOp->p2>=AFFINITY_BLOB && pOp->p2<=AFFINITY_REAL);
+	testcase( pOp->p2==AFFINITY_TEXT);
+	testcase( pOp->p2==AFFINITY_BLOB);
+	testcase( pOp->p2==AFFINITY_NUMERIC);
+	testcase( pOp->p2==AFFINITY_INTEGER);
+	testcase( pOp->p2==AFFINITY_REAL);
 	pIn1 = &aMem[pOp->p1];
 	memAboutToChange(p, pIn1);
 	rc = ExpandBlob(pIn1);
@@ -1960,10 +1960,10 @@ case OP_Cast: {                  /* in1 */
  * jump to address P2.  Or if the SQLITE_STOREP2 flag is set in P5, then
  * store the result of comparison in register P2.
  *
- * The SQLITE_AFF_MASK portion of P5 must be an affinity character -
- * SQLITE_AFF_TEXT, SQLITE_AFF_INTEGER, and so forth. An attempt is made
+ * The AFFINITY_MASK portion of P5 must be an affinity character -
+ * AFFINITY_TEXT, AFFINITY_INTEGER, and so forth. An attempt is made
  * to coerce both inputs according to this affinity before the
- * comparison is made. If the SQLITE_AFF_MASK is 0x00, then numeric
+ * comparison is made. If the AFFINITY_MASK is 0x00, then numeric
  * affinity is used. Note that the affinity conversions are stored
  * back into the input registers P1 and P3.  So this opcode can cause
  * persistent changes to registers P1 and P3.
@@ -2010,10 +2010,10 @@ case OP_Cast: {                  /* in1 */
  * reg(P3) is NULL then the take the jump.  If the SQLITE_JUMPIFNULL
  * bit is clear then fall through if either operand is NULL.
  *
- * The SQLITE_AFF_MASK portion of P5 must be an affinity character -
- * SQLITE_AFF_TEXT, SQLITE_AFF_INTEGER, and so forth. An attempt is made
+ * The AFFINITY_MASK portion of P5 must be an affinity character -
+ * AFFINITY_TEXT, AFFINITY_INTEGER, and so forth. An attempt is made
  * to coerce both inputs according to this affinity before the
- * comparison is made. If the SQLITE_AFF_MASK is 0x00, then numeric
+ * comparison is made. If the AFFINITY_MASK is 0x00, then numeric
  * affinity is used. Note that the affinity conversions are stored
  * back into the input registers P1 and P3.  So this opcode can cause
  * persistent changes to registers P1 and P3.
@@ -2102,8 +2102,8 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 		}
 	} else {
 		/* Neither operand is NULL.  Do a comparison. */
-		affinity = pOp->p5 & SQLITE_AFF_MASK;
-		if (affinity>=SQLITE_AFF_NUMERIC) {
+		affinity = pOp->p5 & AFFINITY_MASK;
+		if (affinity>=AFFINITY_NUMERIC) {
 			if ((flags1 | flags3)&MEM_Str) {
 				if ((flags1 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
 					applyNumericAffinity(pIn1,0);
@@ -2123,7 +2123,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 				res = 0;
 				goto compare_op;
 			}
-		} else if (affinity==SQLITE_AFF_TEXT) {
+		} else if (affinity==AFFINITY_TEXT) {
 			if ((flags1 & MEM_Str)==0 && (flags1 & (MEM_Int|MEM_Real))!=0) {
 				testcase( pIn1->flags & MEM_Int);
 				testcase( pIn1->flags & MEM_Real);
@@ -2721,7 +2721,7 @@ case OP_Affinity: {
  * string indicates the column affinity that should be used for the nth
  * field of the index key.
  *
- * The mapping from character to affinity is given by the SQLITE_AFF_
+ * The mapping from character to affinity is given by the AFFINITY_
  * macros defined in sqliteInt.h.
  *
  * If P4 is NULL then all index fields have the affinity BLOB.

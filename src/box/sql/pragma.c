@@ -708,7 +708,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 									  iKey,
 									  regRow);
 							sqlite3ColumnDefault(v,
-									     pTab,
+									     pTab->def,
 									     iKey,
 									     regRow);
 							sqlite3VdbeAddOp2(v,
@@ -725,7 +725,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					} else {
 						for (j = 0; j < pFK->nCol; j++) {
 							sqlite3ExprCodeGetColumnOfTable
-							    (v, pTab, 0,
+							    (v, pTab->def, 0,
 							     aiCols ? aiCols[j]
 							     : pFK->aCol[j].
 							     iFrom, regRow + j);

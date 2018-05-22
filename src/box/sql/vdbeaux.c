@@ -3740,7 +3740,7 @@ sqlite3VdbeDb(Vdbe * v)
 /*
  * Return a pointer to an sqlite3_value structure containing the value bound
  * parameter iVar of VM v. Except, if the value is an SQL NULL, return
- * 0 instead. Unless it is NULL, apply affinity aff (one of the SQLITE_AFF_*
+ * 0 instead. Unless it is NULL, apply affinity aff (one of the AFFINITY_*
  * constants) to the value before returning it.
  *
  * The returned value must be freed by the caller using sqlite3ValueFree().
