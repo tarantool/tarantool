@@ -708,16 +708,24 @@ struct replica *
 replicaset_leader(void)
 {
 	struct replica *leader = NULL;
+	bool skip_ro = true;
+	/**
+	 * Two loops, first prefers read-write replicas among others.
+	 * Second for backward compatibility, if there is no such
+	 * replicas at all.
+	 */
+loop:
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
 		/**
-		 * While bootstrapping a new cluster,
-		 * read-only replicas shouldn't be considered
-		 * as a leader.
+		 * While bootstrapping a new cluster, read-only
+		 * replicas shouldn't be considered as a leader.
+		 * The only exception if there is no read-write
+		 * replicas since there is still a possibility
+		 * that all replicas exist in cluster table.
 		 */
-		if (replica->applier->remote_is_ro &&
-		    replica->applier->vclock.signature == 0)
+		if (skip_ro && replica->applier->remote_is_ro)
 			continue;
 		if (leader == NULL) {
 			leader = replica;
@@ -737,6 +745,10 @@ replicaset_leader(void)
 						&leader->uuid) > 0)
 			continue;
 		leader = replica;
+	}
+	if (skip_ro && leader == NULL) {
+		skip_ro = false;
+		goto loop;
 	}
 	return leader;
 }
