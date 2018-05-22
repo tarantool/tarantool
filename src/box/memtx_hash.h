@@ -72,6 +72,7 @@ struct memtx_hash_index {
 	struct index base;
 	struct light_index_core hash_table;
 	struct memtx_gc_task gc_task;
+	struct light_index_iterator gc_iterator;
 };
 
 struct memtx_hash_index *

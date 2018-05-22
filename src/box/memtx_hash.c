@@ -110,7 +110,7 @@ memtx_hash_index_free(struct memtx_hash_index *index)
 }
 
 static void
-memtx_hash_index_destroy_f(struct memtx_gc_task *task)
+memtx_hash_index_gc_run(struct memtx_gc_task *task, bool *done)
 {
 	/*
 	 * Yield every 1K tuples to keep latency < 0.1 ms.
@@ -125,31 +125,47 @@ memtx_hash_index_destroy_f(struct memtx_gc_task *task)
 	struct memtx_hash_index *index = container_of(task,
 			struct memtx_hash_index, gc_task);
 	struct light_index_core *hash = &index->hash_table;
-
-	struct light_index_iterator itr;
-	light_index_iterator_begin(hash, &itr);
+	struct light_index_iterator *itr = &index->gc_iterator;
 
 	struct tuple **res;
 	unsigned int loops = 0;
-	while ((res = light_index_iterator_get_and_next(hash, &itr)) != NULL) {
+	while ((res = light_index_iterator_get_and_next(hash, itr)) != NULL) {
 		tuple_unref(*res);
-		if (++loops % YIELD_LOOPS == 0)
-			fiber_sleep(0);
+		if (++loops >= YIELD_LOOPS) {
+			*done = false;
+			return;
+		}
 	}
+	*done = true;
+}
+
+static void
+memtx_hash_index_gc_free(struct memtx_gc_task *task)
+{
+	struct memtx_hash_index *index = container_of(task,
+			struct memtx_hash_index, gc_task);
 	memtx_hash_index_free(index);
 }
+
+static const struct memtx_gc_task_vtab memtx_hash_index_gc_vtab = {
+	.run = memtx_hash_index_gc_run,
+	.free = memtx_hash_index_gc_free,
+};
 
 static void
 memtx_hash_index_destroy(struct index *base)
 {
 	struct memtx_hash_index *index = (struct memtx_hash_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	if (index->gc_task.func != NULL) {
+	if (base->def->iid == 0) {
 		/*
 		 * Primary index. We need to free all tuples stored
 		 * in the index, which may take a while. Schedule a
 		 * background task in order not to block tx thread.
 		 */
+		index->gc_task.vtab = &memtx_hash_index_gc_vtab;
+		light_index_iterator_begin(&index->hash_table,
+					   &index->gc_iterator);
 		memtx_engine_schedule_gc(memtx, &index->gc_task);
 	} else {
 		/*
@@ -456,9 +472,6 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 	light_index_create(&index->hash_table, MEMTX_EXTENT_SIZE,
 			   memtx_index_extent_alloc, memtx_index_extent_free,
 			   memtx, index->base.def->key_def);
-
-	if (def->iid == 0)
-		index->gc_task.func = memtx_hash_index_destroy_f;
 	return index;
 }
 

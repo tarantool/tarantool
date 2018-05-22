@@ -309,7 +309,7 @@ memtx_tree_index_free(struct memtx_tree_index *index)
 }
 
 static void
-memtx_tree_index_destroy_f(struct memtx_gc_task *task)
+memtx_tree_index_gc_run(struct memtx_gc_task *task, bool *done)
 {
 	/*
 	 * Yield every 1K tuples to keep latency < 0.1 ms.
@@ -320,34 +320,51 @@ memtx_tree_index_destroy_f(struct memtx_gc_task *task)
 #else
 	enum { YIELD_LOOPS = 10 };
 #endif
+
 	struct memtx_tree_index *index = container_of(task,
 			struct memtx_tree_index, gc_task);
 	struct memtx_tree *tree = &index->tree;
+	struct memtx_tree_iterator *itr = &index->gc_iterator;
 
 	unsigned int loops = 0;
-	struct memtx_tree_iterator itr;
-	for (itr = memtx_tree_iterator_first(tree);
-	     !memtx_tree_iterator_is_invalid(&itr);
-	     memtx_tree_iterator_next(tree, &itr)) {
-		struct tuple *tuple = *memtx_tree_iterator_get_elem(tree, &itr);
+	while (!memtx_tree_iterator_is_invalid(itr)) {
+		struct tuple *tuple = *memtx_tree_iterator_get_elem(tree, itr);
+		memtx_tree_iterator_next(tree, itr);
 		tuple_unref(tuple);
-		if (++loops % YIELD_LOOPS == 0)
-			fiber_sleep(0);
+		if (++loops >= YIELD_LOOPS) {
+			*done = false;
+			return;
+		}
 	}
+	*done = true;
+}
+
+static void
+memtx_tree_index_gc_free(struct memtx_gc_task *task)
+{
+	struct memtx_tree_index *index = container_of(task,
+			struct memtx_tree_index, gc_task);
 	memtx_tree_index_free(index);
 }
+
+static const struct memtx_gc_task_vtab memtx_tree_index_gc_vtab = {
+	.run = memtx_tree_index_gc_run,
+	.free = memtx_tree_index_gc_free,
+};
 
 static void
 memtx_tree_index_destroy(struct index *base)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
-	if (index->gc_task.func != NULL) {
+	if (base->def->iid == 0) {
 		/*
 		 * Primary index. We need to free all tuples stored
 		 * in the index, which may take a while. Schedule a
 		 * background task in order not to block tx thread.
 		 */
+		index->gc_task.vtab = &memtx_tree_index_gc_vtab;
+		index->gc_iterator = memtx_tree_iterator_first(&index->tree);
 		memtx_engine_schedule_gc(memtx, &index->gc_task);
 	} else {
 		/*
@@ -690,8 +707,5 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	struct key_def *cmp_def = memtx_tree_index_cmp_def(index);
 	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
 			  memtx_index_extent_free, memtx);
-
-	if (def->iid == 0)
-		index->gc_task.func = memtx_tree_index_destroy_f;
 	return index;
 }

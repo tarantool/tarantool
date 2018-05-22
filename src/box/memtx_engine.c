@@ -933,19 +933,43 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .check_space_def = */ memtx_engine_check_space_def,
 };
 
+/**
+ * Run one iteration of garbage collection. Set @stop if
+ * there is no more objects to free.
+ */
+static void
+memtx_engine_run_gc(struct memtx_engine *memtx, bool *stop)
+{
+	*stop = stailq_empty(&memtx->gc_queue);
+	if (*stop)
+		return;
+
+	struct memtx_gc_task *task = stailq_first_entry(&memtx->gc_queue,
+					struct memtx_gc_task, link);
+	bool task_done;
+	task->vtab->run(task, &task_done);
+	if (task_done) {
+		stailq_shift(&memtx->gc_queue);
+		task->vtab->free(task);
+	}
+}
+
 static int
 memtx_engine_gc_f(va_list va)
 {
 	struct memtx_engine *memtx = va_arg(va, struct memtx_engine *);
 	while (!fiber_is_cancelled()) {
-		if (stailq_empty(&memtx->gc_queue)) {
+		bool stop;
+		memtx_engine_run_gc(memtx, &stop);
+		if (stop) {
 			fiber_yield_timeout(TIMEOUT_INFINITY);
 			continue;
 		}
-		struct memtx_gc_task *task;
-		task = stailq_shift_entry(&memtx->gc_queue,
-					  struct memtx_gc_task, link);
-		task->func(task);
+		/*
+		 * Yield after each iteration so as not to block
+		 * tx thread for too long.
+		 */
+		fiber_sleep(0);
 	}
 	return 0;
 }

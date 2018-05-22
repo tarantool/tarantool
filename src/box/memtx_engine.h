@@ -150,14 +150,25 @@ struct memtx_engine {
 };
 
 struct memtx_gc_task;
-typedef void (*memtx_gc_func)(struct memtx_gc_task *);
+
+struct memtx_gc_task_vtab {
+	/**
+	 * Free some objects associated with @task. If @task has
+	 * no more objects to free, set flag @done.
+	 */
+	void (*run)(struct memtx_gc_task *task, bool *done);
+	/**
+	 * Destroy @task.
+	 */
+	void (*free)(struct memtx_gc_task *task);
+};
 
 /** Garbage collection task. */
 struct memtx_gc_task {
 	/** Link in memtx_engine::gc_queue. */
 	struct stailq_entry link;
-	/** Function that will perform the task. */
-	memtx_gc_func func;
+	/** Virtual function table. */
+	const struct memtx_gc_task_vtab *vtab;
 };
 
 /**
