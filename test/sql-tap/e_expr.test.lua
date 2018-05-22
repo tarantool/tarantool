@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14750)
+test:plan(14748)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -1506,8 +1506,6 @@ local test_cases12 ={
     {10, "?123"},
     {11, "@hello"},
     {12, ":world"},
-    {13, "$tcl"},
-    {14, "$tcl(array)"},
 
     {15, "cname"},
     {16, "tblname.cname"},

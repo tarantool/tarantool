@@ -623,12 +623,7 @@ struct compareInfo {
  * macro for fast reading of the next character in the common case where
  * the next character is ASCII.
  */
-#if defined(SQLITE_EBCDIC)
-#define sqlite3Utf8Read(A)        (*((*A)++))
-#define Utf8Read(A)               (*(A++))
-#else
 #define Utf8Read(s, e)    ucnv_getNextUChar(pUtf8conv, &s, e, &status)
-#endif
 
 static const struct compareInfo globInfo = { '*', '?', '[', 0 };
 

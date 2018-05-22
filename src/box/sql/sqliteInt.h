@@ -36,6 +36,8 @@
 #ifndef SQLITEINT_H
 #define SQLITEINT_H
 
+#define IdChar(C)  ((sqlite3CtypeMap[(unsigned char)C]&0x46)!=0)
+
 /* Special Comments:
  *
  * Some comments have special meaning to the tools that measure test
@@ -1127,16 +1129,6 @@ sqlite3_bind_parameter_lindex(sqlite3_stmt * pStmt, const char *zName,
 #endif
 #ifndef MAX
 #define MAX(A,B) ((A)>(B)?(A):(B))
-#endif
-
-/*
- * Check to see if this machine uses EBCDIC.  (Yes, believe it or
- * not, there are still machines out there that use EBCDIC.)
- */
-#if 'A' == '\301'
-#define SQLITE_EBCDIC 1
-#else
-#define SQLITE_ASCII 1
 #endif
 
 /*
@@ -3341,20 +3333,10 @@ int sqlite3IoerrnomemError(int);
 #endif
 
 /*
- * The ctype.h header is needed for non-ASCII systems.  It is also
- * needed by FTS3 when FTS3 is included in the amalgamation.
- */
-#if !defined(SQLITE_ASCII) || \
-    (defined(SQLITE_ENABLE_FTS3) && defined(SQLITE_AMALGAMATION))
-#include <ctype.h>
-#endif
-
-/*
  * The following macros mimic the standard library functions toupper(),
  * isspace(), isalnum(), isdigit() and isxdigit(), respectively. The
  * sqlite versions only work for ASCII characters, regardless of locale.
  */
-#ifdef SQLITE_ASCII
 #define sqlite3Toupper(x)  ((x)&~(sqlite3CtypeMap[(unsigned char)(x)]&0x20))
 #define sqlite3Isspace(x)   (sqlite3CtypeMap[(unsigned char)(x)]&0x01)
 #define sqlite3Isalnum(x)   (sqlite3CtypeMap[(unsigned char)(x)]&0x06)
@@ -3363,16 +3345,6 @@ int sqlite3IoerrnomemError(int);
 #define sqlite3Isxdigit(x)  (sqlite3CtypeMap[(unsigned char)(x)]&0x08)
 #define sqlite3Tolower(x)   (sqlite3UpperToLower[(unsigned char)(x)])
 #define sqlite3Isquote(x)   (sqlite3CtypeMap[(unsigned char)(x)]&0x80)
-#else
-#define sqlite3Toupper(x)   toupper((unsigned char)(x))
-#define sqlite3Isspace(x)   isspace((unsigned char)(x))
-#define sqlite3Isalnum(x)   isalnum((unsigned char)(x))
-#define sqlite3Isalpha(x)   isalpha((unsigned char)(x))
-#define sqlite3Isdigit(x)   isdigit((unsigned char)(x))
-#define sqlite3Isxdigit(x)  isxdigit((unsigned char)(x))
-#define sqlite3Tolower(x)   tolower((unsigned char)(x))
-#define sqlite3Isquote(x)   ((x)=='"'||(x)=='\''||(x)=='['||(x)=='`')
-#endif
 
 /*
  * Internal function prototypes
@@ -4200,7 +4172,18 @@ extern int sqlite3PendingByte;
 #endif
 void sqlite3Reindex(Parse *, Token *, Token *);
 void sqlite3AlterRenameTable(Parse *, SrcList *, Token *);
-int sqlite3GetToken(const unsigned char *, int *, bool *);
+
+/**
+ * Return the length (in bytes) of the token that begins at z[0].
+ * Store the token type in *type before returning.
+ *
+ * @param z Input stream.
+ * @param[out] type Detected type of token.
+ * @param[out] is_reserved True if reserved word.
+ */
+int
+sql_token(const char *z, int *type, bool *is_reserved);
+
 void sqlite3NestedParse(Parse *, const char *, ...);
 void sqlite3ExpirePreparedStatements(sqlite3 *);
 int sqlite3CodeSubselect(Parse *, Expr *, int);

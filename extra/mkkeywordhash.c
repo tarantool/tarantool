@@ -611,12 +611,7 @@ int main(int argc, char **argv){
   printf("      if( aLen[i]!=n ) continue;\n");
   printf("      j = 0;\n");
   printf("      zKW = &zText[aOffset[i]];\n");
-  printf("#ifdef SQLITE_ASCII\n");
   printf("      while( j<n && (z[j]&~0x20)==zKW[j] ){ j++; }\n");
-  printf("#endif\n");
-  printf("#ifdef SQLITE_EBCDIC\n");
-  printf("      while( j<n && toupper(z[j])==zKW[j] ){ j++; }\n");
-  printf("#endif\n");
   printf("      if( j<n ) continue;\n");
   for(i=0; i<nKeyword; i++){
     printf("      testcase( i==%d ); /* %s */\n",

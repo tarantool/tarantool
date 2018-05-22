@@ -256,10 +256,6 @@ isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
 	if (!sqlite3IsLikeFunction(db, pExpr, pnoCase, wc)) {
 		return 0;
 	}
-#ifdef SQLITE_EBCDIC
-	if (*pnoCase)
-		return 0;
-#endif
 	pList = pExpr->x.pList;
 	pLeft = pList->a[1].pExpr;
 	/* Value might be numeric */

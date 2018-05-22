@@ -367,7 +367,7 @@ rename_table(sqlite3 *db, const char *sql_stmt, const char *table_name,
 
 	int token;
 	Token old_name;
-	unsigned char const *csr = (unsigned const char *)sql_stmt;
+	const char *csr = sql_stmt;
 	int len = 0;
 	char *new_sql_stmt;
 	bool unused;
@@ -390,7 +390,7 @@ rename_table(sqlite3 *db, const char *sql_stmt, const char *table_name,
 		 */
 		do {
 			csr += len;
-			len = sqlite3GetToken(csr, &token, &unused);
+			len = sql_token(csr, &token, &unused);
 		} while (token == TK_SPACE);
 		assert(len > 0);
 	} while (token != TK_LP && token != TK_USING);
@@ -446,13 +446,12 @@ rename_parent_table(sqlite3 *db, const char *sql_stmt, const char *old_name,
 	bool is_quoted;
 
 	for (csr = sql_stmt; *csr; csr = csr + n) {
-		n = sqlite3GetToken((const unsigned char *)csr, &token, &unused);
+		n = sql_token(csr, &token, &unused);
 		if (token == TK_REFERENCES) {
 			char *zParent;
 			do {
 				csr += n;
-				n = sqlite3GetToken((const unsigned char *)csr,
-						    &token, &unused);
+				n = sql_token(csr, &token, &unused);
 			} while (token == TK_SPACE);
 			if (token == TK_ILLEGAL)
 				break;
@@ -498,7 +497,7 @@ rename_trigger(sqlite3 *db, char const *sql_stmt, char const *table_name,
 	int token;
 	Token tname;
 	int dist = 3;
-	unsigned char const *csr = (unsigned char const*)sql_stmt;
+	char const *csr = (char const*)sql_stmt;
 	int len = 0;
 	char *new_sql_stmt;
 	bool unused;
@@ -521,7 +520,7 @@ rename_trigger(sqlite3 *db, char const *sql_stmt, char const *table_name,
 		 */
 		do {
 			csr += len;
-			len = sqlite3GetToken(csr, &token, &unused);
+			len = sql_token(csr, &token, &unused);
 		} while (token == TK_SPACE);
 		assert(len > 0);
 		/* Variable 'dist' stores the number of tokens read since the most
