@@ -350,8 +350,6 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	enum rtree_distance_type distance_type =
 		(enum rtree_distance_type)def->opts.distance;
 
-	memtx_index_arena_init();
-
 	if (!mempool_is_initialized(&memtx->rtree_iterator_pool)) {
 		mempool_create(&memtx->rtree_iterator_pool, cord_slab_cache(),
 			       sizeof(struct index_rtree_iterator));

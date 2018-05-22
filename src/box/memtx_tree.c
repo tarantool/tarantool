@@ -669,8 +669,6 @@ static const struct index_vtab memtx_tree_index_vtab = {
 struct memtx_tree_index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
-	memtx_index_arena_init();
-
 	if (!mempool_is_initialized(&memtx->tree_iterator_pool)) {
 		mempool_create(&memtx->tree_iterator_pool, cord_slab_cache(),
 			       sizeof(struct tree_iterator));

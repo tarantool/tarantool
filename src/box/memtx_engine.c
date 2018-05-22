@@ -55,7 +55,6 @@
  * box.slab.info(), @sa lua/slab.cc
  */
 extern struct quota memtx_quota;
-static bool memtx_index_arena_initialized = false;
 struct slab_arena memtx_arena; /* used by memtx_tuple.cc */
 static struct slab_cache memtx_index_slab_cache;
 struct mempool memtx_index_extent_pool;
@@ -971,6 +970,13 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	if (memtx->gc_fiber == NULL)
 		goto fail;
 
+	/* Initialize index extent allocator. */
+	slab_cache_create(&memtx_index_slab_cache, &memtx_arena);
+	mempool_create(&memtx_index_extent_pool, &memtx_index_slab_cache,
+		       MEMTX_EXTENT_SIZE);
+	memtx_index_num_reserved_extents = 0;
+	memtx_index_reserved_extents = NULL;
+
 	memtx->state = MEMTX_INITIALIZED;
 	memtx->force_recovery = force_recovery;
 
@@ -1004,32 +1010,6 @@ memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 {
 	(void)memtx;
 	memtx_max_tuple_size = max_size;
-}
-
-/**
- * Initialize arena for indexes.
- * The arena is used for memtx_index_extent_alloc
- *  and memtx_index_extent_free.
- * Can be called several times, only first call do the work.
- */
-void
-memtx_index_arena_init(void)
-{
-	if (memtx_index_arena_initialized) {
-		/* already done.. */
-		return;
-	}
-	/* Creating slab cache */
-	slab_cache_create(&memtx_index_slab_cache, &memtx_arena);
-	/* Creating mempool */
-	mempool_create(&memtx_index_extent_pool,
-		       &memtx_index_slab_cache,
-		       MEMTX_EXTENT_SIZE);
-	/* Empty reserved list */
-	memtx_index_num_reserved_extents = 0;
-	memtx_index_reserved_extents = 0;
-	/* Done */
-	memtx_index_arena_initialized = true;
 }
 
 /**

@@ -490,8 +490,6 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	assert(def->iid > 0);
 	assert(!def->opts.is_unique);
 
-	memtx_index_arena_init();
-
 	if (!mempool_is_initialized(&memtx->bitset_iterator_pool)) {
 		mempool_create(&memtx->bitset_iterator_pool, cord_slab_cache(),
 			       sizeof(struct bitset_index_iterator));

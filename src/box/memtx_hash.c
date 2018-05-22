@@ -461,8 +461,6 @@ static const struct index_vtab memtx_hash_index_vtab = {
 struct memtx_hash_index *
 memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
-	memtx_index_arena_init();
-
 	if (!mempool_is_initialized(&memtx->hash_iterator_pool)) {
 		mempool_create(&memtx->hash_iterator_pool, cord_slab_cache(),
 			       sizeof(struct hash_iterator));

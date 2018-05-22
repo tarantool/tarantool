@@ -154,15 +154,6 @@ enum {
 };
 
 /**
- * Initialize arena for indexes.
- * The arena is used for memtx_index_extent_alloc
- *  and memtx_index_extent_free.
- * Can be called several times, only first call do the work.
- */
-void
-memtx_index_arena_init(void);
-
-/**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
  */
 void *
