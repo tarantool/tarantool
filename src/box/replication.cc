@@ -704,17 +704,19 @@ replicaset_next(struct replica *replica)
 	return replica_hash_next(&replicaset.hash, replica);
 }
 
-struct replica *
-replicaset_leader(void)
+/**
+ * Compare vclock and read only mode of all connected
+ * replicas and elect a leader.
+ * Initiallly, skip read-only replicas, since they
+ * can not properly act as bootstrap masters (register
+ * new nodes in _cluster table). If there are no read-write
+ * replicas, choose a read-only replica with biggest vclock
+ * as a leader, in hope it will become read-write soon.
+ */
+static struct replica *
+replicaset_round(bool skip_ro)
 {
 	struct replica *leader = NULL;
-	bool skip_ro = true;
-	/**
-	 * Two loops, first prefers read-write replicas among others.
-	 * Second for backward compatibility, if there is no such
-	 * replicas at all.
-	 */
-loop:
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
@@ -746,10 +748,24 @@ loop:
 			continue;
 		leader = replica;
 	}
-	if (skip_ro && leader == NULL) {
+	return leader;
+}
+
+struct replica *
+replicaset_leader(void)
+{
+	bool skip_ro = true;
+	/**
+	 * Two loops, first prefers read-write replicas among others.
+	 * Second for backward compatibility, if there is no such
+	 * replicas at all.
+	 */
+	struct replica *leader = replicaset_round(skip_ro);
+	if (leader == NULL) {
 		skip_ro = false;
-		goto loop;
+		leader = replicaset_round(skip_ro);
 	}
+
 	return leader;
 }
 
