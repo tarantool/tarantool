@@ -41,9 +41,8 @@
 #include "small/small.h"
 #include "small/quota.h"
 #include "memory.h"
-
-extern struct small_alloc memtx_alloc;
-extern struct mempool memtx_index_extent_pool;
+#include "box/engine.h"
+#include "box/memtx_engine.h"
 
 static int
 small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
@@ -106,15 +105,18 @@ small_stats_lua_cb(const struct mempool_stats *stats, void *cb_ctx)
 static int
 lbox_slab_stats(struct lua_State *L)
 {
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+
 	struct small_stats totals;
 	lua_newtable(L);
 	/*
 	 * List all slabs used for tuples and slabs used for
 	 * indexes, with their stats.
 	 */
-	small_stats(&memtx_alloc, &totals, small_stats_lua_cb, L);
+	small_stats(&memtx->alloc, &totals, small_stats_lua_cb, L);
 	struct mempool_stats index_stats;
-	mempool_stats(&memtx_index_extent_pool, &index_stats);
+	mempool_stats(&memtx->index_extent_pool, &index_stats);
 	small_stats_lua_cb(&index_stats, L);
 
 	return 1;
@@ -123,6 +125,9 @@ lbox_slab_stats(struct lua_State *L)
 static int
 lbox_slab_info(struct lua_State *L)
 {
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+
 	struct small_stats totals;
 
 	/*
@@ -130,12 +135,10 @@ lbox_slab_info(struct lua_State *L)
 	 * indexes, with their stats.
 	 */
 	lua_newtable(L);
-	small_stats(&memtx_alloc, &totals, small_stats_noop_cb, L);
+	small_stats(&memtx->alloc, &totals, small_stats_noop_cb, L);
 	struct mempool_stats index_stats;
-	mempool_stats(&memtx_index_extent_pool, &index_stats);
+	mempool_stats(&memtx->index_extent_pool, &index_stats);
 
-	struct slab_arena *tuple_arena = memtx_alloc.cache->arena;
-	struct quota *memtx_quota = tuple_arena->quota;
 	double ratio;
 	char ratio_buf[32];
 
@@ -176,7 +179,7 @@ lbox_slab_info(struct lua_State *L)
 	 * quota_used_ratio > 0.9 work as an indicator
 	 * for reaching Tarantool memory limit.
 	 */
-	size_t arena_size = tuple_arena->used;
+	size_t arena_size = memtx->arena.used;
 	luaL_pushuint64(L, arena_size);
 	lua_settable(L, -3);
 	/**
@@ -200,7 +203,7 @@ lbox_slab_info(struct lua_State *L)
 	 * box.cfg.slab_alloc_arena, but in bytes
 	 */
 	lua_pushstring(L, "quota_size");
-	luaL_pushuint64(L, quota_total(memtx_quota));
+	luaL_pushuint64(L, quota_total(&memtx->quota));
 	lua_settable(L, -3);
 
 	/*
@@ -208,7 +211,7 @@ lbox_slab_info(struct lua_State *L)
 	 * size of slabs in various slab caches.
 	 */
 	lua_pushstring(L, "quota_used");
-	luaL_pushuint64(L, quota_used(memtx_quota));
+	luaL_pushuint64(L, quota_used(&memtx->quota));
 	lua_settable(L, -3);
 
 	/**
@@ -217,8 +220,8 @@ lbox_slab_info(struct lua_State *L)
 	 * factor, it's the quota that give you OOM error in the
 	 * end of the day.
 	 */
-	ratio = 100 * ((double) quota_used(memtx_quota) /
-		 ((double) quota_total(memtx_quota) + 0.0001));
+	ratio = 100 * ((double) quota_used(&memtx->quota) /
+		 ((double) quota_total(&memtx->quota) + 0.0001));
 	snprintf(ratio_buf, sizeof(ratio_buf), "%0.2lf%%", ratio);
 
 	lua_pushstring(L, "quota_used_ratio");
@@ -254,7 +257,9 @@ lbox_runtime_info(struct lua_State *L)
 static int
 lbox_slab_check(MAYBE_UNUSED struct lua_State *L)
 {
-	slab_cache_check(memtx_alloc.cache);
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	slab_cache_check(memtx->alloc.cache);
 	return 0;
 }
 

@@ -33,6 +33,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <small/quota.h>
+#include <small/small.h>
 #include <small/mempool.h>
 
 #include "engine.h"
@@ -97,6 +99,36 @@ struct memtx_engine {
 	uint64_t snap_io_rate_limit;
 	/** Skip invalid snapshot records if this flag is set. */
 	bool force_recovery;
+	/** Common quota for tuples and indexes. */
+	struct quota quota;
+	/**
+	 * Common slab arena for tuples and indexes.
+	 * If you decide to use it for anything other than
+	 * tuple_alloc or index_extent_pool, make sure this
+	 * is reflected in box.slab.info(), @sa lua/slab.c.
+	 */
+	struct slab_arena arena;
+	/** Slab cache for allocating tuples. */
+	struct slab_cache slab_cache;
+	/** Tuple allocator. */
+	struct small_alloc alloc;
+	/** Slab cache for allocating index extents. */
+	struct slab_cache index_slab_cache;
+	/** Index extent allocator. */
+	struct mempool index_extent_pool;
+	/**
+	 * To ensure proper statement-level rollback in case
+	 * of out of memory conditions, we maintain a number
+	 * of slack memory extents reserved before a statement
+	 * is begun. If there isn't enough slack memory,
+	 * we don't begin the statement.
+	 */
+	int num_reserved_extents;
+	void *reserved_extents;
+	/** Maximal allowed tuple size, box.cfg.memtx_max_tuple_size. */
+	size_t max_tuple_size;
+	/** Incremented with each next snapshot. */
+	uint32_t snapshot_version;
 	/** Memory pool for tree index iterator. */
 	struct mempool tree_iterator_pool;
 	/** Memory pool for rtree index iterator. */
