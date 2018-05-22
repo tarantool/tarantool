@@ -1070,7 +1070,13 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 		return NULL;
 	}
 
-	struct memtx_tuple *memtx_tuple = smalloc(&memtx->alloc, total);
+	struct memtx_tuple *memtx_tuple;
+	while ((memtx_tuple = smalloc(&memtx->alloc, total)) == NULL) {
+		bool stop;
+		memtx_engine_run_gc(memtx, &stop);
+		if (stop)
+			break;
+	}
 	if (memtx_tuple == NULL) {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
 		return NULL;
@@ -1151,7 +1157,13 @@ memtx_index_extent_alloc(void *ctx)
 			 "mempool", "new slab");
 		return NULL;
 	});
-	void *ret = mempool_alloc(&memtx->index_extent_pool);
+	void *ret;
+	while ((ret = mempool_alloc(&memtx->index_extent_pool)) == NULL) {
+		bool stop;
+		memtx_engine_run_gc(memtx, &stop);
+		if (stop)
+			break;
+	}
 	if (ret == NULL)
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
 			 "mempool", "new slab");
@@ -1181,8 +1193,15 @@ memtx_index_extent_reserve(struct memtx_engine *memtx, int num)
 			 "mempool", "new slab");
 		return -1;
 	});
+	struct mempool *pool = &memtx->index_extent_pool;
 	while (memtx->num_reserved_extents < num) {
-		void *ext = mempool_alloc(&memtx->index_extent_pool);
+		void *ext;
+		while ((ext = mempool_alloc(pool)) == NULL) {
+			bool stop;
+			memtx_engine_run_gc(memtx, &stop);
+			if (stop)
+				break;
+		}
 		if (ext == NULL) {
 			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
 				 "mempool", "new slab");
