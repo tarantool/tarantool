@@ -138,6 +138,11 @@ memtx_engine_shutdown(struct engine *engine)
 		mempool_destroy(&memtx->hash_iterator_pool);
 	if (mempool_is_initialized(&memtx->bitset_iterator_pool))
 		mempool_destroy(&memtx->bitset_iterator_pool);
+	mempool_destroy(&memtx->index_extent_pool);
+	slab_cache_destroy(&memtx->index_slab_cache);
+	small_alloc_destroy(&memtx->alloc);
+	slab_cache_destroy(&memtx->slab_cache);
+	tuple_arena_destroy(&memtx->arena);
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
 }
