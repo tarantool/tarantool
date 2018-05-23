@@ -929,8 +929,9 @@ vy_log_lsm_prune(struct vy_lsm *lsm, int64_t gc_lsn)
 }
 
 static void
-vinyl_index_commit_drop(struct index *index)
+vinyl_index_commit_drop(struct index *index, int64_t lsn)
 {
+	(void)lsn;
 	struct vy_env *env = vy_env(index->engine);
 	struct vy_lsm *lsm = vy_lsm(index);
 
