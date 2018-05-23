@@ -931,7 +931,6 @@ vy_log_lsm_prune(struct vy_lsm *lsm, int64_t gc_lsn)
 static void
 vinyl_index_commit_drop(struct index *index, int64_t lsn)
 {
-	(void)lsn;
 	struct vy_env *env = vy_env(index->engine);
 	struct vy_lsm *lsm = vy_lsm(index);
 
@@ -952,7 +951,7 @@ vinyl_index_commit_drop(struct index *index, int64_t lsn)
 
 	vy_log_tx_begin();
 	vy_log_lsm_prune(lsm, checkpoint_last(NULL));
-	vy_log_drop_lsm(lsm->id);
+	vy_log_drop_lsm(lsm->id, lsn);
 	vy_log_tx_try_commit();
 }
 
@@ -3138,7 +3137,7 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 {
 	int rc = -1;
 
-	if (lsm_info->is_dropped)
+	if (lsm_info->drop_lsn >= 0)
 		return 0;
 
 	/*
@@ -3429,7 +3428,7 @@ vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
 	int loops = 0;
 	struct vy_lsm_recovery_info *lsm_info;
 	rlist_foreach_entry(lsm_info, &recovery->lsms, in_recovery) {
-		if (lsm_info->is_dropped)
+		if (lsm_info->drop_lsn >= 0)
 			continue;
 		struct vy_run_recovery_info *run_info;
 		rlist_foreach_entry(run_info, &lsm_info->runs, in_lsm) {

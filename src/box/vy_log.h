@@ -71,7 +71,7 @@ enum vy_log_record_type {
 	VY_LOG_CREATE_LSM		= 0,
 	/**
 	 * Drop an LSM tree.
-	 * Requires vy_log_record::lsm_id.
+	 * Requires vy_log_record::lsm_id, drop_lsn.
 	 */
 	VY_LOG_DROP_LSM			= 1,
 	/**
@@ -209,6 +209,11 @@ struct vy_log_record {
 	int64_t create_lsn;
 	/** LSN of the WAL row that last modified the LSM tree. */
 	int64_t modify_lsn;
+	/**
+	 * LSN of the WAL row that dropped the LSM tree or -1
+	 * if the tree is still active.
+	 */
+	int64_t drop_lsn;
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
@@ -258,12 +263,15 @@ struct vy_lsm_recovery_info {
 	struct key_part_def *key_parts;
 	/** Number of key parts. */
 	uint32_t key_part_count;
-	/** True if the LSM tree was dropped. */
-	bool is_dropped;
 	/** LSN of the WAL row that created the LSM tree. */
 	int64_t create_lsn;
 	/** LSN of the WAL row that last modified the LSM tree. */
 	int64_t modify_lsn;
+	/**
+	 * LSN of the WAL row that dropped the LSM tree or -1
+	 * if the tree is still active.
+	 */
+	int64_t drop_lsn;
 	/** LSN of the last LSM tree dump. */
 	int64_t dump_lsn;
 	/**
@@ -540,12 +548,13 @@ vy_log_modify_lsm(int64_t id, const struct key_def *key_def, int64_t modify_lsn)
 
 /** Helper to log a vinyl LSM tree drop. */
 static inline void
-vy_log_drop_lsm(int64_t id)
+vy_log_drop_lsm(int64_t id, int64_t drop_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_DROP_LSM;
 	record.lsm_id = id;
+	record.drop_lsn = drop_lsn;
 	vy_log_write(&record);
 }
 

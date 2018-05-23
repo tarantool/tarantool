@@ -543,7 +543,7 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 	lsm->id = lsm_info->id;
 	lsm->commit_lsn = lsm_info->modify_lsn;
 
-	if (lsn < lsm_info->create_lsn || lsm_info->is_dropped) {
+	if (lsn < lsm_info->create_lsn || lsm_info->drop_lsn >= 0) {
 		/*
 		 * Loading a past incarnation of the LSM tree, i.e.
 		 * the LSM tree is going to dropped during final

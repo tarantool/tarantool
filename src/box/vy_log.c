@@ -82,6 +82,7 @@ enum vy_log_key {
 	VY_LOG_KEY_TRUNCATE_COUNT	= 11,
 	VY_LOG_KEY_CREATE_LSN		= 12,
 	VY_LOG_KEY_MODIFY_LSN		= 13,
+	VY_LOG_KEY_DROP_LSN		= 14,
 };
 
 /** vy_log_key -> human readable name. */
@@ -100,6 +101,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_TRUNCATE_COUNT]	= "truncate_count",
 	[VY_LOG_KEY_CREATE_LSN]		= "create_lsn",
 	[VY_LOG_KEY_MODIFY_LSN]		= "modify_lsn",
+	[VY_LOG_KEY_DROP_LSN]		= "drop_lsn",
 };
 
 /** vy_log_type -> human readable name. */
@@ -258,6 +260,10 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_MODIFY_LSN],
 			record->modify_lsn);
+	if (record->drop_lsn > 0)
+		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
+			vy_log_key_name[VY_LOG_KEY_DROP_LSN],
+			record->drop_lsn);
 	if (record->dump_lsn > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIi64", ",
 			vy_log_key_name[VY_LOG_KEY_DUMP_LSN],
@@ -372,6 +378,11 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->modify_lsn);
 		n_keys++;
 	}
+	if (record->drop_lsn > 0) {
+		size += mp_sizeof_uint(VY_LOG_KEY_DROP_LSN);
+		size += mp_sizeof_uint(record->drop_lsn);
+		n_keys++;
+	}
 	if (record->dump_lsn > 0) {
 		size += mp_sizeof_uint(VY_LOG_KEY_DUMP_LSN);
 		size += mp_sizeof_uint(record->dump_lsn);
@@ -447,6 +458,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (record->modify_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_MODIFY_LSN);
 		pos = mp_encode_uint(pos, record->modify_lsn);
+	}
+	if (record->drop_lsn > 0) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_DROP_LSN);
+		pos = mp_encode_uint(pos, record->drop_lsn);
 	}
 	if (record->dump_lsn > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DUMP_LSN);
@@ -570,6 +585,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_MODIFY_LSN:
 			record->modify_lsn = mp_decode_uint(&pos);
+			break;
+		case VY_LOG_KEY_DROP_LSN:
+			record->drop_lsn = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_DUMP_LSN:
 			record->dump_lsn = mp_decode_uint(&pos);
@@ -1242,9 +1260,9 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->index_id = index_id;
 	lsm->key_parts = NULL;
 	lsm->key_part_count = 0;
-	lsm->is_dropped = false;
 	lsm->create_lsn = -1;
 	lsm->modify_lsn = -1;
+	lsm->drop_lsn = -1;
 	lsm->dump_lsn = -1;
 	rlist_create(&lsm->ranges);
 	rlist_create(&lsm->runs);
@@ -1286,7 +1304,7 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 	}
 	struct vy_lsm_recovery_info *lsm;
 	lsm = vy_recovery_lsm_by_index_id(recovery, space_id, index_id);
-	if (lsm != NULL && !lsm->is_dropped) {
+	if (lsm != NULL && lsm->drop_lsn < 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("LSM tree %u/%u created twice",
 				    (unsigned)space_id, (unsigned)index_id));
@@ -1329,7 +1347,7 @@ vy_recovery_modify_lsm(struct vy_recovery *recovery, int64_t id,
 				    (long long)id));
 		return -1;
 	}
-	if (lsm->is_dropped) {
+	if (lsm->drop_lsn >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Update of deleted LSM tree %lld",
 				    (long long)id));
@@ -1355,7 +1373,7 @@ vy_recovery_modify_lsm(struct vy_recovery *recovery, int64_t id,
  * Returns 0 on success, -1 if ID not found or LSM tree is already marked.
  */
 static int
-vy_recovery_drop_lsm(struct vy_recovery *recovery, int64_t id)
+vy_recovery_drop_lsm(struct vy_recovery *recovery, int64_t id, int64_t drop_lsn)
 {
 	struct vy_lsm_recovery_info *lsm;
 	lsm = vy_recovery_lookup_lsm(recovery, id);
@@ -1365,7 +1383,7 @@ vy_recovery_drop_lsm(struct vy_recovery *recovery, int64_t id)
 				    (long long)id));
 		return -1;
 	}
-	if (lsm->is_dropped) {
+	if (lsm->drop_lsn >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("LSM tree %lld deleted twice",
 				    (long long)id));
@@ -1386,7 +1404,8 @@ vy_recovery_drop_lsm(struct vy_recovery *recovery, int64_t id)
 			return -1;
 		}
 	}
-	lsm->is_dropped = true;
+	assert(drop_lsn >= 0);
+	lsm->drop_lsn = drop_lsn;
 	return 0;
 }
 
@@ -1408,7 +1427,7 @@ vy_recovery_dump_lsm(struct vy_recovery *recovery,
 				    (long long)id));
 		return -1;
 	}
-	if (lsm->is_dropped) {
+	if (lsm->drop_lsn >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Dump of deleted LSM tree %lld",
 				    (long long)id));
@@ -1508,7 +1527,7 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t lsm_id,
 				    (long long)lsm_id));
 		return -1;
 	}
-	if (lsm->is_dropped) {
+	if (lsm->drop_lsn >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Run %lld created for deleted "
 				    "LSM tree %lld", (long long)run_id,
@@ -1829,7 +1848,8 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 				record->modify_lsn);
 		break;
 	case VY_LOG_DROP_LSM:
-		rc = vy_recovery_drop_lsm(recovery, record->lsm_id);
+		rc = vy_recovery_drop_lsm(recovery, record->lsm_id,
+					  record->drop_lsn);
 		break;
 	case VY_LOG_INSERT_RANGE:
 		rc = vy_recovery_insert_range(recovery, record->lsm_id,
@@ -2132,10 +2152,11 @@ vy_log_append_lsm(struct xlog *xlog, struct vy_lsm_recovery_info *lsm)
 		}
 	}
 
-	if (lsm->is_dropped) {
+	if (lsm->drop_lsn >= 0) {
 		vy_log_record_init(&record);
 		record.type = VY_LOG_DROP_LSM;
 		record.lsm_id = lsm->id;
+		record.drop_lsn = lsm->drop_lsn;
 		if (vy_log_append_record(xlog, &record) != 0)
 			return -1;
 	}
@@ -2162,7 +2183,7 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 		 * (and thus not needed for garbage collection) from the
 		 * log on rotation.
 		 */
-		if (lsm->is_dropped && rlist_empty(&lsm->runs))
+		if (lsm->drop_lsn >= 0 && rlist_empty(&lsm->runs))
 			continue;
 
 		/* Create the log file on the first write. */
