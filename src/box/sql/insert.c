@@ -77,47 +77,31 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
  * released when sqlite3DeleteIndex() is called.
  */
 const char *
-sqlite3IndexAffinityStr(sqlite3 * db, Index * pIdx)
+sqlite3IndexAffinityStr(sqlite3 *db, Index *index)
 {
-	if (!pIdx->zColAff) {
-		/* The first time a column affinity string for a particular index is
-		 * required, it is allocated and populated here. It is then stored as
-		 * a member of the Index structure for subsequent use.
-		 *
-		 * The column affinity string will eventually be deleted by
-		 * sqliteDeleteIndex() when the Index structure itself is cleaned
-		 * up.
-		 */
-		int n;
-		int nColumn = index_column_count(pIdx);
-		pIdx->zColAff =
-		    (char *)sqlite3DbMallocRaw(0, nColumn + 1);
-		if (!pIdx->zColAff) {
-			sqlite3OomFault(db);
-			return 0;
-		}
-		for (n = 0; n < nColumn; n++) {
-			i16 x = pIdx->aiColumn[n];
-			if (x >= 0) {
-				char affinity = pIdx->pTable->
-					def->fields[x].affinity;
-				pIdx->zColAff[n] = affinity;
-			} else {
-				char aff;
-				assert(x == XN_EXPR);
-				assert(pIdx->aColExpr != 0);
-				aff =
-				    sqlite3ExprAffinity(pIdx->aColExpr->a[n].
-							pExpr);
-				if (aff == 0)
-					aff = AFFINITY_BLOB;
-				pIdx->zColAff[n] = aff;
-			}
-		}
-		pIdx->zColAff[n] = 0;
+	if (index->zColAff != NULL)
+		return index->zColAff;
+	/*
+	 * The first time a column affinity string for a
+	 * particular index is required, it is allocated and
+	 * populated here. It is then stored as a member of the
+	 * Index structure for subsequent use. The column affinity
+	 * string will eventually be deleted by
+	 * sqliteDeleteIndex() when the Index structure itself is
+	 * cleaned up.
+	 */
+	int column_count = index_column_count(index);
+	index->zColAff = (char *) sqlite3DbMallocRaw(0, column_count + 1);
+	if (index->zColAff == NULL) {
+		sqlite3OomFault(db);
+		return NULL;
 	}
-
-	return pIdx->zColAff;
+	for (int n = 0; n < column_count; n++) {
+		uint16_t x = index->aiColumn[n];
+		index->zColAff[n] = index->pTable->def->fields[x].affinity;
+	}
+	index->zColAff[column_count] = 0;
+	return index->zColAff;
 }
 
 /*
@@ -1252,38 +1236,28 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		 * the insert or update.  Store that record in the aRegIdx[ix] register
 		 */
 		regIdx = aRegIdx[ix] + 1;
-		int nIdxCol = (int)index_column_count(pIdx);
-		for (i = 0; i < nIdxCol; i++) {
-			int iField = pIdx->aiColumn[i];
-			int x;
-			if (iField == XN_EXPR) {
-				pParse->ckBase = regNewData + 1;
-				sqlite3ExprCodeCopy(pParse,
-						    pIdx->aColExpr->a[i].pExpr,
-						    regIdx + i);
-				pParse->ckBase = 0;
-				VdbeComment((v, "%s column %d", pIdx->zName,
-					     i));
-			} else {
-				/* OP_SCopy copies value in separate register,
-				 * which later will be used by OP_NoConflict.
-				 * But OP_NoConflict is necessary only in cases
-				 * when bytecode is needed for proper UNIQUE
+		int nIdxCol = (int) index_column_count(pIdx);
+		if (uniqueByteCodeNeeded) {
+			for (i = 0; i < nIdxCol; ++i) {
+				int fieldno = pIdx->aiColumn[i];
+				int reg;
+				/*
+				 * OP_SCopy copies value in
+				 * separate register, which later
+				 * will be used by OP_NoConflict.
+				 * But OP_NoConflict is necessary
+				 * only in cases when bytecode is
+				 * needed for proper UNIQUE
 				 * constraint handling.
 				 */
-				if (uniqueByteCodeNeeded) {
-					if (iField == pTab->iPKey)
-						x = regNewData;
-					else
-						x = iField + regNewData + 1;
-
-					assert(iField >= 0);
-					sqlite3VdbeAddOp2(v, OP_SCopy,
-							  x, regIdx + i);
-					VdbeComment((v, "%s",
-						     pTab->def->fields[
-							iField].name));
-				}
+				if (fieldno == pTab->iPKey)
+					reg = regNewData;
+				else
+					reg = fieldno + regNewData + 1;
+				assert(fieldno >= 0);
+				sqlite3VdbeAddOp2(v, OP_SCopy, reg, regIdx + i);
+				VdbeComment((v, "%s",
+					     pTab->def->fields[fieldno].name));
 			}
 		}
 
@@ -1475,7 +1449,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		switch (on_error) {
 		case ON_CONFLICT_ACTION_FAIL:
 		case ON_CONFLICT_ACTION_ROLLBACK:
-			sqlite3UniqueConstraint(pParse, on_error, pIdx);
+			parser_emit_unique_constraint(pParse, on_error, pIdx);
 			break;
 		case ON_CONFLICT_ACTION_ABORT:
 			break;
@@ -1687,14 +1661,6 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 	for (i = 0; i < nSrcCol; i++) {
 		if (pSrc->aiColumn[i] != pDest->aiColumn[i]) {
 			return 0;	/* Different columns indexed */
-		}
-		if (pSrc->aiColumn[i] == XN_EXPR) {
-			assert(pSrc->aColExpr != 0 && pDest->aColExpr != 0);
-			if (sqlite3ExprCompare(pSrc->aColExpr->a[i].pExpr,
-					       pDest->aColExpr->a[i].pExpr,
-					       -1) != 0) {
-				return 0;	/* Different expressions in the index */
-			}
 		}
 		if (sql_index_column_sort_order(pSrc, i) !=
 		    sql_index_column_sort_order(pDest, i)) {

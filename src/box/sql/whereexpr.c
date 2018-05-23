@@ -887,26 +887,19 @@ exprSelectUsage(WhereMaskSet * pMaskSet, Select * pS)
  * in any index.  Return TRUE (1) if pExpr is an indexed term and return
  * FALSE (0) if not.  If TRUE is returned, also set *piCur to the cursor
  * number of the table that is indexed and *piColumn to the column number
- * of the column that is indexed, or XN_EXPR (-2) if an expression is being
- * indexed.
+ * of the column that is indexed.
  *
  * If pExpr is a TK_COLUMN column reference, then this routine always returns
  * true even if that particular column is not indexed, because the column
  * might be added to an automatic index later.
  */
 static int
-exprMightBeIndexed(SrcList * pFrom,	/* The FROM clause */
-		   int op,	/* The specific comparison operator */
-		   Bitmask mPrereq,	/* Bitmask of FROM clause terms referenced by pExpr */
+exprMightBeIndexed(int op,	/* The specific comparison operator */
 		   Expr * pExpr,	/* An operand of a comparison operator */
 		   int *piCur,	/* Write the referenced table cursor number here */
 		   int *piColumn	/* Write the referenced table column number here */
     )
 {
-	Index *pIdx;
-	int i;
-	int iCur;
-
 	/* If this expression is a vector to the left or right of a
 	 * inequality constraint (>, <, >= or <=), perform the processing
 	 * on the first element of the vector.
@@ -922,27 +915,6 @@ exprMightBeIndexed(SrcList * pFrom,	/* The FROM clause */
 		*piCur = pExpr->iTable;
 		*piColumn = pExpr->iColumn;
 		return 1;
-	}
-	if (mPrereq == 0)
-		return 0;	/* No table references */
-	if ((mPrereq & (mPrereq - 1)) != 0)
-		return 0;	/* Refs more than one table */
-	for (i = 0; mPrereq > 1; i++, mPrereq >>= 1) {
-	}
-	iCur = pFrom->a[i].iCursor;
-	for (pIdx = pFrom->a[i].pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
-		if (pIdx->aColExpr == 0)
-			continue;
-		for (i = 0; i < pIdx->nColumn; i++) {
-			if (pIdx->aiColumn[i] != XN_EXPR)
-				continue;
-			if (sqlite3ExprCompare
-			    (pExpr, pIdx->aColExpr->a[i].pExpr, iCur) == 0) {
-				*piCur = iCur;
-				*piColumn = XN_EXPR;
-				return 1;
-			}
-		}
 	}
 	return 0;
 }
@@ -1037,16 +1009,13 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			pLeft = pLeft->x.pList->a[pTerm->iField - 1].pExpr;
 		}
 
-		if (exprMightBeIndexed
-		    (pSrc, op, prereqLeft, pLeft, &iCur, &iColumn)) {
+		if (exprMightBeIndexed(op, pLeft, &iCur, &iColumn)) {
 			pTerm->leftCursor = iCur;
 			pTerm->u.leftColumn = iColumn;
 			pTerm->eOperator = operatorMask(op) & opMask;
 		}
-		if (pRight
-		    && exprMightBeIndexed(pSrc, op, pTerm->prereqRight, pRight,
-					  &iCur, &iColumn)
-		    ) {
+		if (pRight != NULL &&
+		    exprMightBeIndexed(op, pRight, &iCur, &iColumn)) {
 			WhereTerm *pNew;
 			Expr *pDup;
 			u16 eExtraOp = 0;	/* Extra bits for pNew->eOperator */

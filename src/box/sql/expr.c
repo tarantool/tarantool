@@ -3484,16 +3484,8 @@ sqlite3ExprCodeLoadIndexColumn(Parse * pParse,	/* The parsing context */
     )
 {
 	i16 iTabCol = pIdx->aiColumn[iIdxCol];
-	if (iTabCol == XN_EXPR) {
-		assert(pIdx->aColExpr);
-		assert(pIdx->aColExpr->nExpr > iIdxCol);
-		pParse->iSelfTab = iTabCur;
-		sqlite3ExprCodeCopy(pParse, pIdx->aColExpr->a[iIdxCol].pExpr,
-				    regOut);
-	} else {
-		sqlite3ExprCodeGetColumnOfTable(pParse->pVdbe, pIdx->pTable->def,
-						iTabCur, iTabCol, regOut);
-	}
+	sqlite3ExprCodeGetColumnOfTable(pParse->pVdbe, pIdx->pTable->def,
+					iTabCur, iTabCol, regOut);
 }
 
 void

@@ -48,8 +48,6 @@ static const char *
 explainIndexColumnName(Index * pIdx, int i)
 {
 	i = pIdx->aiColumn[i];
-	if (i == XN_EXPR)
-		return "<expr>";
 	return pIdx->pTable->def->fields[i].name;
 }
 
@@ -719,7 +717,6 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 		for (j = 0; j < nSkip; j++) {
 			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur,
 					  pIdx->aiColumn[j], regBase + j);
-			testcase(pIdx->aiColumn[j] == XN_EXPR);
 			VdbeComment((v, "%s", explainIndexColumnName(pIdx, j)));
 		}
 	}
@@ -1259,8 +1256,8 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			 * FYI: entries in an index are ordered as follows:
 			 *      NULL, ... NULL, min_value, ...
 			 */
-			if ((j >= 0 && pIdx->pTable->def->fields[j].is_nullable)
-			    || j == XN_EXPR) {
+			if (j >= 0 &&
+			    pIdx->pTable->def->fields[j].is_nullable) {
 				assert(pLoop->nSkip == 0);
 				bSeekPastNull = 1;
 				nExtraReg = 1;
@@ -1305,11 +1302,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 #endif
 			if (pRangeStart == 0) {
 				j = pIdx->aiColumn[nEq];
-				if ((j >= 0 &&
-				     pIdx->pTable->def->fields[j].is_nullable)||
-				    j == XN_EXPR) {
+				if (j >= 0 &&
+				    pIdx->pTable->def->fields[j].is_nullable)
 					bSeekPastNull = 1;
-				}
 			}
 		}
 		assert(pRangeEnd == 0

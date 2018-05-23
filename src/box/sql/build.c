@@ -252,7 +252,6 @@ static void
 freeIndex(sqlite3 * db, Index * p)
 {
 	sql_expr_delete(db, p->pPartIdxWhere, false);
-	sql_expr_list_delete(db, p->aColExpr);
 	sqlite3DbFree(db, p->zColAff);
 	sqlite3DbFree(db, p);
 }
@@ -2694,8 +2693,8 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 		sqlite3VdbeAddOp4Int(v, OP_SorterCompare, iSorter, j2,
 				     regRecord, pIndex->nColumn);
 		VdbeCoverage(v);
-		sqlite3UniqueConstraint(pParse, ON_CONFLICT_ACTION_ABORT,
-					pIndex);
+		parser_emit_unique_constraint(pParse, ON_CONFLICT_ACTION_ABORT,
+					      pIndex);
 	} else {
 		addr2 = sqlite3VdbeCurrentAddr(v);
 	}
@@ -3047,8 +3046,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 
 	/* Analyze the list of expressions that form the terms of the index and
 	 * report any errors.  In the common case where the expression is exactly
-	 * a table column, store that column in aiColumn[].  For general expressions,
-	 * populate pIndex->aColExpr and store XN_EXPR (-2) in aiColumn[].
+	 * a table column, store that column in aiColumn[].
 	 *
 	 * TODO: Issue a warning if two or more columns of the index are identical.
 	 * TODO: Issue a warning if the table primary key is used as part of the
@@ -3928,38 +3926,25 @@ sqlite3HaltConstraint(Parse * pParse,	/* Parsing context */
 	sqlite3VdbeChangeP5(v, p5Errmsg);
 }
 
-/*
- * Code an OP_Halt due to UNIQUE or PRIMARY KEY constraint violation.
- */
 void
-sqlite3UniqueConstraint(Parse * pParse,	/* Parsing context */
-			int onError,	/* Constraint type */
-			Index * pIdx	/* The index that triggers the constraint */
-    )
+parser_emit_unique_constraint(struct Parse *parser,
+			      enum on_conflict_action on_error,
+			      const struct Index *index)
 {
-	char *zErr;
-	int j;
-	StrAccum errMsg;
-	Table *pTab = pIdx->pTable;
-
-	sqlite3StrAccumInit(&errMsg, pParse->db, 0, 0, 200);
-	if (pIdx->aColExpr) {
-		sqlite3XPrintf(&errMsg, "index '%q'", pIdx->zName);
-	} else {
-		for (j = 0; j < pIdx->nColumn; j++) {
-			char *zCol;
-			assert(pIdx->aiColumn[j] >= 0);
-			zCol = pTab->def->fields[pIdx->aiColumn[j]].name;
-			if (j)
-				sqlite3StrAccumAppend(&errMsg, ", ", 2);
-			sqlite3XPrintf(&errMsg, "%s.%s", pTab->def->name, zCol);
-		}
+	const struct space_def *def = index->pTable->def;
+	StrAccum err_accum;
+	sqlite3StrAccumInit(&err_accum, parser->db, 0, 0, 200);
+	for (int j = 0; j < index->nColumn; ++j) {
+		assert(index->aiColumn[j] >= 0);
+		const char *col_name = def->fields[index->aiColumn[j]].name;
+		if (j != 0)
+			sqlite3StrAccumAppend(&err_accum, ", ", 2);
+		sqlite3XPrintf(&err_accum, "%s.%s", def->name, col_name);
 	}
-	zErr = sqlite3StrAccumFinish(&errMsg);
-	sqlite3HaltConstraint(pParse,
-			      IsPrimaryKeyIndex(pIdx) ?
+	char *err_msg = sqlite3StrAccumFinish(&err_accum);
+	sqlite3HaltConstraint(parser, IsPrimaryKeyIndex(index) ?
 			      SQLITE_CONSTRAINT_PRIMARYKEY :
-			      SQLITE_CONSTRAINT_UNIQUE, onError, zErr,
+			      SQLITE_CONSTRAINT_UNIQUE, on_error, err_msg,
 			      P4_DYNAMIC, P5_ConstraintUnique);
 }
 

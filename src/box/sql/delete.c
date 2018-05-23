@@ -542,8 +542,7 @@ sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
 			     prev->pPartIdxWhere != NULL))
 		prev = NULL;
 	for (int j = 0; j < col_cnt; j++) {
-		if (prev != NULL && prev->aiColumn[j] == index->aiColumn[j]
-		    && prev->aiColumn[j] != XN_EXPR) {
+		if (prev != NULL && prev->aiColumn[j] == index->aiColumn[j]) {
 			/*
 			 * This column was already computed by the
 			 * previous index.

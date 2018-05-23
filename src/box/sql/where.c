@@ -265,11 +265,6 @@ whereScanNext(WhereScan * pScan)
 			for (pTerm = pWC->a + k; k < pWC->nTerm; k++, pTerm++) {
 				if (pTerm->leftCursor == iCur
 				    && pTerm->u.leftColumn == iColumn
-				    && (iColumn != XN_EXPR
-					|| sqlite3ExprCompare(pTerm->pExpr->
-							      pLeft,
-							      pScan->pIdxExpr,
-							      iCur) == 0)
 				    && (pScan->iEquiv <= 1
 					|| !ExprHasProperty(pTerm->pExpr,
 							    EP_FromJoin))
@@ -377,9 +372,7 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 	if (pIdx) {
 		int j = iColumn;
 		iColumn = pIdx->aiColumn[j];
-		if (iColumn == XN_EXPR) {
-			pScan->pIdxExpr = pIdx->aColExpr->a[j].pExpr;
-		} else if (iColumn >= 0) {
+		if (iColumn >= 0) {
 			char affinity =
 				pIdx->pTable->def->fields[iColumn].affinity;
 			pScan->idxaff = affinity;
@@ -387,8 +380,6 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 			pScan->coll = sql_index_collation(pIdx, j, &id);
 			pScan->is_column_seen = true;
 		}
-	} else if (iColumn == XN_EXPR) {
-		return 0;
 	}
 	pScan->opMask = opMask;
 	pScan->k = 0;
@@ -2713,7 +2704,6 @@ indexMightHelpWithOrderBy(WhereLoopBuilder * pBuilder,
 			  Index * pIndex, int iCursor)
 {
 	ExprList *pOB;
-	ExprList *aColExpr;
 	int ii, jj;
 	int nIdxCol = index_column_count(pIndex);
 	if (index_is_unordered(pIndex))
@@ -2728,16 +2718,6 @@ indexMightHelpWithOrderBy(WhereLoopBuilder * pBuilder,
 			for (jj = 0; jj < nIdxCol; jj++) {
 				if (pExpr->iColumn == pIndex->aiColumn[jj])
 					return 1;
-			}
-		} else if ((aColExpr = pIndex->aColExpr) != 0) {
-			for (jj = 0; jj < nIdxCol; jj++) {
-				if (pIndex->aiColumn[jj] != XN_EXPR)
-					continue;
-				if (sqlite3ExprCompare
-				    (pExpr, aColExpr->a[jj].pExpr,
-				     iCursor) == 0) {
-					return 1;
-				}
 			}
 		}
 	}
@@ -3429,10 +3409,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 						if (pOBExpr->iColumn != iColumn)
 							continue;
 					} else {
-						if (sqlite3ExprCompare(pOBExpr,
-								       pIndex->aColExpr->a[j].pExpr, iCur)) {
-							continue;
-						}
+						continue;
 					}
 					if (iColumn >= 0) {
 						bool is_found;
