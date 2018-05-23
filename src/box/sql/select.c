@@ -95,12 +95,12 @@ clearSelect(sqlite3 * db, Select * p, int bFree)
 {
 	while (p) {
 		Select *pPrior = p->pPrior;
-		sqlite3ExprListDelete(db, p->pEList);
+		sql_expr_list_delete(db, p->pEList);
 		sqlite3SrcListDelete(db, p->pSrc);
 		sql_expr_delete(db, p->pWhere, false);
-		sqlite3ExprListDelete(db, p->pGroupBy);
+		sql_expr_list_delete(db, p->pGroupBy);
 		sql_expr_delete(db, p->pHaving, false);
-		sqlite3ExprListDelete(db, p->pOrderBy);
+		sql_expr_list_delete(db, p->pOrderBy);
 		sql_expr_delete(db, p->pLimit, false);
 		sql_expr_delete(db, p->pOffset, false);
 		if (p->pWith)
@@ -150,9 +150,8 @@ sqlite3SelectNew(Parse * pParse,	/* Parsing context */
 		pNew = &standin;
 	}
 	if (pEList == 0) {
-		pEList =
-		    sqlite3ExprListAppend(pParse, 0,
-					  sqlite3Expr(db, TK_ASTERISK, 0));
+		pEList = sql_expr_list_append(pParse->db, NULL,
+					      sqlite3Expr(db, TK_ASTERISK, 0));
 	}
 	struct session MAYBE_UNUSED *user_session;
 	user_session = current_session();
@@ -2336,7 +2335,7 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	sqlite3VdbeResolveLabel(v, addrBreak);
 
  end_of_recursive_query:
-	sqlite3ExprListDelete(pParse->db, p->pOrderBy);
+	sql_expr_list_delete(pParse->db, p->pOrderBy);
 	p->pOrderBy = pOrderBy;
 	p->pLimit = pLimit;
 	p->pOffset = pOffset;
@@ -2629,7 +2628,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				/* Query flattening in sqlite3Select() might refill p->pOrderBy.
 				 * Be sure to delete p->pOrderBy, therefore, to avoid a memory leak.
 				 */
-				sqlite3ExprListDelete(db, p->pOrderBy);
+				sql_expr_list_delete(db, p->pOrderBy);
 				pDelete = p->pPrior;
 				p->pPrior = pPrior;
 				p->pOrderBy = 0;
@@ -3190,9 +3189,8 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 					return SQLITE_NOMEM_BKPT;
 				pNew->flags |= EP_IntValue;
 				pNew->u.iValue = i;
-				pOrderBy =
-				    sqlite3ExprListAppend(pParse, pOrderBy,
-							  pNew);
+				pOrderBy = sql_expr_list_append(pParse->db,
+								pOrderBy, pNew);
 				if (pOrderBy)
 					pOrderBy->a[nOrderBy++].u.x.
 					    iOrderByCol = (u16) i;
@@ -3224,7 +3222,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	/* Reattach the ORDER BY clause to the query.
 	 */
 	p->pOrderBy = pOrderBy;
-	pPrior->pOrderBy = sqlite3ExprListDup(pParse->db, pOrderBy, 0);
+	pPrior->pOrderBy = sql_expr_list_dup(pParse->db, pOrderBy, 0);
 
 	/* Allocate a range of temporary registers and the key_def needed
 	 * for the logic that removes duplicate result rows when the
@@ -4086,7 +4084,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 							  pParent->pHaving);
 			assert(pParent->pGroupBy == 0);
 			pParent->pGroupBy =
-			    sqlite3ExprListDup(db, pSub->pGroupBy, 0);
+			    sql_expr_list_dup(db, pSub->pGroupBy, 0);
 		} else {
 			pParent->pWhere =
 			    sqlite3ExprAnd(db, pWhere, pParent->pWhere);
@@ -4375,8 +4373,8 @@ convertCompoundSelectToSubquery(Walker * pWalker, Select * p)
 		return WRC_Abort;
 	*pNew = *p;
 	p->pSrc = pNewSrc;
-	p->pEList =
-	    sqlite3ExprListAppend(pParse, 0, sqlite3Expr(db, TK_ASTERISK, 0));
+	p->pEList = sql_expr_list_append(pParse->db, NULL,
+					 sqlite3Expr(db, TK_ASTERISK, 0));
 	p->op = TK_SELECT;
 	p->pWhere = 0;
 	pNew->pGroupBy = 0;
@@ -4816,10 +4814,9 @@ selectExpander(Walker * pWalker, Select * p)
 			    ) {
 				/* This particular expression does not need to be expanded.
 				 */
-				pNew =
-				    sqlite3ExprListAppend(pParse, pNew,
-							  a[k].pExpr);
-				if (pNew) {
+				pNew = sql_expr_list_append(pParse->db, pNew,
+							    a[k].pExpr);
+				if (pNew != NULL) {
 					pNew->a[pNew->nExpr - 1].zName =
 					    a[k].zName;
 					pNew->a[pNew->nExpr - 1].zSpan =
@@ -4922,13 +4919,14 @@ selectExpander(Walker * pWalker, Select * p)
 						} else {
 							pExpr = pRight;
 						}
-						pNew = sqlite3ExprListAppend(pParse, pNew, pExpr);
+						pNew = sql_expr_list_append(
+							pParse->db, pNew, pExpr);
 						sqlite3TokenInit(&sColname, zColname);
 						sqlite3ExprListSetName(pParse,
 								       pNew,
 								       &sColname,
 								       0);
-						if (pNew
+						if (pNew != NULL
 						    && (p->
 							selFlags &
 							SF_NestedFrom) != 0) {
@@ -4964,7 +4962,7 @@ selectExpander(Walker * pWalker, Select * p)
 				}
 			}
 		}
-		sqlite3ExprListDelete(db, pEList);
+		sql_expr_list_delete(db, pEList);
 		p->pEList = pNew;
 	}
 #if SQLITE_MAX_COLUMN
@@ -5367,7 +5365,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		/* If ORDER BY makes no difference in the output then neither does
 		 * DISTINCT so it can be removed too.
 		 */
-		sqlite3ExprListDelete(db, p->pOrderBy);
+		sql_expr_list_delete(db, p->pOrderBy);
 		p->pOrderBy = 0;
 		p->selFlags &= ~SF_Distinct;
 	}
@@ -5614,7 +5612,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	if ((p->selFlags & (SF_Distinct | SF_Aggregate)) == SF_Distinct
 	    && sqlite3ExprListCompare(sSort.pOrderBy, pEList, -1) == 0) {
 		p->selFlags &= ~SF_Distinct;
-		pGroupBy = p->pGroupBy = sqlite3ExprListDup(db, pEList, 0);
+		pGroupBy = p->pGroupBy = sql_expr_list_dup(db, pEList, 0);
 		/* Notice that even thought SF_Distinct has been cleared from p->selFlags,
 		 * the sDistinct.isTnct is still set.  Hence, isTnct represents the
 		 * original setting of the SF_Distinct flag, not the current setting
@@ -6165,7 +6163,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 
 				if (flag) {
 					pMinMax =
-					    sqlite3ExprListDup(db, pMinMax, 0);
+					    sql_expr_list_dup(db, pMinMax, 0);
 					pDel = pMinMax;
 					assert(db->mallocFailed
 					       || pMinMax != 0);
@@ -6187,7 +6185,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				    sqlite3WhereBegin(pParse, pTabList, pWhere,
 						      pMinMax, 0, flag, 0);
 				if (pWInfo == 0) {
-					sqlite3ExprListDelete(db, pDel);
+					sql_expr_list_delete(db, pDel);
 					goto select_end;
 				}
 				updateAccumulator(pParse, &sAggInfo);
@@ -6203,7 +6201,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				}
 				sqlite3WhereEnd(pWInfo);
 				finalizeAggFunctions(pParse, &sAggInfo);
-				sqlite3ExprListDelete(db, pDel);
+				sql_expr_list_delete(db, pDel);
 			}
 
 			sSort.pOrderBy = 0;

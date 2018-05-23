@@ -775,9 +775,8 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				pDup =
 				    sqlite3ExprDup(db, pOrTerm->pExpr->pRight,
 						   0);
-				pList =
-				    sqlite3ExprListAppend(pWInfo->pParse, pList,
-							  pDup);
+				pList = sql_expr_list_append(pWInfo->pParse->db,
+							     pList, pDup);
 				pLeft = pOrTerm->pExpr->pLeft;
 			}
 			assert(pLeft != 0);
@@ -797,7 +796,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				pTerm = &pWC->a[idxTerm];
 				markTermAsChild(pWC, idxNew, idxTerm);
 			} else {
-				sqlite3ExprListDelete(db, pList);
+				sql_expr_list_delete(db, pList);
 			}
 			pTerm->eOperator = WO_NOOP;	/* case 1 trumps case 3 */
 		}

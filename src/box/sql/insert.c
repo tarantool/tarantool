@@ -919,7 +919,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 
  insert_cleanup:
 	sqlite3SrcListDelete(db, pTabList);
-	sqlite3ExprListDelete(db, pList);
+	sql_expr_list_delete(db, pList);
 	sqlite3SelectDelete(db, pSelect);
 	sqlite3IdListDelete(db, pColumn);
 	sqlite3DbFree(db, aRegIdx);

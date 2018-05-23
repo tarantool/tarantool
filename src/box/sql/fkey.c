@@ -743,7 +743,7 @@ fkTriggerDelete(sqlite3 * dbMem, Trigger * p)
 	if (p) {
 		TriggerStep *pStep = p->step_list;
 		sql_expr_delete(dbMem, pStep->pWhere, false);
-		sqlite3ExprListDelete(dbMem, pStep->pExprList);
+		sql_expr_list_delete(dbMem, pStep->pExprList);
 		sqlite3SelectDelete(dbMem, pStep->pSelect);
 		sql_expr_delete(dbMem, p->pWhen, false);
 		sqlite3DbFree(dbMem, p);
@@ -1353,7 +1353,8 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 					    sqlite3ExprAlloc(db, TK_NULL, 0, 0);
 				}
 				pList =
-				    sqlite3ExprListAppend(pParse, pList, pNew);
+				    sql_expr_list_append(pParse->db, pList,
+							 pNew);
 				sqlite3ExprListSetName(pParse, pList, &tFromCol,
 						       0);
 			}
@@ -1376,9 +1377,9 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 				pRaise->affinity = ON_CONFLICT_ACTION_ABORT;
 			}
 			pSelect = sqlite3SelectNew(pParse,
-						   sqlite3ExprListAppend(pParse,
-									 0,
-									 pRaise),
+						   sql_expr_list_append(pParse->db,
+									NULL,
+									pRaise),
 						   sqlite3SrcListAppend(db, 0,
 									&tFrom),
 						   pWhere, 0, 0, 0, 0, 0, 0);
@@ -1401,7 +1402,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 			pStep->pWhere =
 			    sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
 			pStep->pExprList =
-			    sqlite3ExprListDup(db, pList, EXPRDUP_REDUCE);
+			    sql_expr_list_dup(db, pList, EXPRDUP_REDUCE);
 			pStep->pSelect =
 			    sqlite3SelectDup(db, pSelect, EXPRDUP_REDUCE);
 			if (pWhen) {
@@ -1416,7 +1417,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 
 		sql_expr_delete(db, pWhere, false);
 		sql_expr_delete(db, pWhen, false);
-		sqlite3ExprListDelete(db, pList);
+		sql_expr_list_delete(db, pList);
 		sqlite3SelectDelete(db, pSelect);
 		if (db->mallocFailed == 1) {
 			fkTriggerDelete(db, pTrigger);

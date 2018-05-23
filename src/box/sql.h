@@ -178,6 +178,61 @@ int
 sql_table_def_rebuild(struct sqlite3 *db, struct Table *table);
 
 /**
+ * Duplicate Expr list.
+ * The flags parameter contains a combination of the EXPRDUP_XXX
+ * flags. If the EXPRDUP_REDUCE flag is set, then the structure
+ * returned is a truncated version of the usual Expr structure
+ * that will be stored as part of the in-memory representation of
+ * the database schema.
+ * @param db The database connection.
+ * @param p The ExprList to duplicate.
+ * @param flags EXPRDUP_XXX flags.
+ * @retval NULL on memory allocation error.
+ * @retval not NULL on success.
+ */
+struct ExprList *
+sql_expr_list_dup(struct sqlite3 *db, struct ExprList *p, int flags);
+
+/**
+ * Free AST pointed by expr list.
+ * @param db SQL handle.
+ * @param expr_list Root pointer of ExprList.
+ */
+void
+sql_expr_list_delete(struct sqlite3 *db, struct ExprList *expr_list);
+
+/**
+ * Add a new element to the end of an expression list.
+ * @param db SQL handle.
+ * @param expr_list List to which to append. Might be NULL.
+ * @param expr Expression to be appended. Might be NULL.
+ * @retval NULL on memory allocation error. The list is freed.
+ * @retval not NULL on success.
+ */
+struct ExprList *
+sql_expr_list_append(struct sqlite3 *db, struct ExprList *expr_list,
+		     struct Expr *expr);
+
+/**
+ * Resolve names in expressions that can only reference a single
+ * table:
+ * *   CHECK constraints
+ * *   WHERE clauses on partial indices
+ * The Expr.iTable value for Expr.op==TK_COLUMN nodes of the
+ * expression is set to -1 and the Expr.iColumn value is set to
+ * the column number. Any errors cause an error message to be set
+ * in parser.
+ * @param parser Parsing context.
+ * @param table The table being referenced.
+ * @param type NC_IsCheck or NC_PartIdx or NC_IdxExpr.
+ * @param expr Expression to resolve.  May be NULL.
+ * @param expr_list Expression list to resolve.  May be NUL.
+ */
+void
+sql_resolve_self_reference(struct Parse *parser, struct Table *table, int type,
+			   struct Expr *expr, struct ExprList *expr_list);
+
+/**
  * Initialize a new parser object.
  * A number of service allocations are performed on the region,
  * which is also cleared in the destroy function.

@@ -252,7 +252,7 @@ static void
 freeIndex(sqlite3 * db, Index * p)
 {
 	sql_expr_delete(db, p->pPartIdxWhere, false);
-	sqlite3ExprListDelete(db, p->aColExpr);
+	sql_expr_list_delete(db, p->aColExpr);
 	sqlite3DbFree(db, p->zColAff);
 	sqlite3DbFree(db, p);
 }
@@ -406,7 +406,7 @@ deleteTable(sqlite3 * db, Table * pTable)
 	sqlite3DbFree(db, pTable->aCol);
 	sqlite3DbFree(db, pTable->zColAff);
 	sqlite3SelectDelete(db, pTable->pSelect);
-	sqlite3ExprListDelete(db, pTable->pCheck);
+	sql_expr_list_delete(db, pTable->pCheck);
 	assert(pTable->def != NULL);
 	/* Do not delete pTable->def allocated on region. */
 	if (!pTable->def->opts.temporary)
@@ -1015,7 +1015,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	}
 
  primary_key_exit:
-	sqlite3ExprListDelete(pParse->db, pList);
+	sql_expr_list_delete(pParse->db, pList);
 	return;
 }
 
@@ -1026,14 +1026,13 @@ sql_add_check_constraint(struct Parse *parser, struct ExprSpan *span)
 	struct Table *table = parser->pNewTable;
 	if (table != NULL) {
 		table->pCheck =
-			sqlite3ExprListAppend(parser, table->pCheck, expr);
+			sql_expr_list_append(parser->db, table->pCheck, expr);
 		if (parser->constraintName.n != 0) {
 			sqlite3ExprListSetName(parser, table->pCheck,
 					       &parser->constraintName, 1);
 		}
 	} else {
 		sql_expr_delete(parser->db, expr, false);
-
 	}
 }
 
@@ -1411,9 +1410,9 @@ convertToWithoutRowidTable(Parse * pParse, Table * pTab)
 		ExprList *pList;
 		Token ipkToken;
 		sqlite3TokenInit(&ipkToken, pTab->def->fields[pTab->iPKey].name);
-		pList = sqlite3ExprListAppend(pParse, 0,
-					      sqlite3ExprAlloc(db, TK_ID,
-							       &ipkToken, 0));
+		pList = sql_expr_list_append(pParse->db, NULL,
+					     sqlite3ExprAlloc(db, TK_ID,
+							      &ipkToken, 0));
 		if (pList == 0)
 			return;
 		pList->a[0].sort_order = pParse->iPkSortOrder;
@@ -1854,9 +1853,9 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 #ifndef SQLITE_OMIT_CHECK
 	/* Resolve names in all CHECK constraint expressions.
 	 */
-	if (p->pCheck) {
-		sqlite3ResolveSelfReference(pParse, p, NC_IsCheck, 0,
-					    p->pCheck);
+	if (p->pCheck != NULL) {
+		sql_resolve_self_reference(pParse, p, NC_IsCheck, NULL,
+					   p->pCheck);
 	}
 #endif				/* !defined(SQLITE_OMIT_CHECK) */
 
@@ -2020,7 +2019,7 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 	 */
 	p->pSelect = sqlite3SelectDup(db, pSelect, EXPRDUP_REDUCE);
 	p->def->opts.is_view = true;
-	p->pCheck = sqlite3ExprListDup(db, pCNames, EXPRDUP_REDUCE);
+	p->pCheck = sql_expr_list_dup(db, pCNames, EXPRDUP_REDUCE);
 	if (db->mallocFailed)
 		goto create_view_fail;
 
@@ -2047,7 +2046,7 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 
  create_view_fail:
 	sqlite3SelectDelete(db, pSelect);
-	sqlite3ExprListDelete(db, pCNames);
+	sql_expr_list_delete(db, pCNames);
 	return;
 }
 #endif				/* SQLITE_OMIT_VIEW */
@@ -2561,8 +2560,8 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
  fk_end:
 	sqlite3DbFree(db, pFKey);
 #endif				/* !defined(SQLITE_OMIT_FOREIGN_KEY) */
-	sqlite3ExprListDelete(db, pFromCol);
-	sqlite3ExprListDelete(db, pToCol);
+	sql_expr_list_delete(db, pFromCol);
+	sql_expr_list_delete(db, pToCol);
 }
 
 /*
@@ -2950,11 +2949,11 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	 */
 	if (col_list == NULL) {
 		Token prevCol;
-		sqlite3TokenInit(&prevCol, pTab->def->fields[
-			pTab->def->field_count - 1].name);
-		col_list = sqlite3ExprListAppend(parse, 0,
-						 sqlite3ExprAlloc(db, TK_ID,
-								  &prevCol, 0));
+		uint32_t last_field = pTab->def->field_count - 1;
+		sqlite3TokenInit(&prevCol, pTab->def->fields[last_field].name);
+		col_list = sql_expr_list_append(parse->db, NULL,
+						sqlite3ExprAlloc(db, TK_ID,
+								 &prevCol, 0));
 		if (col_list == NULL)
 			goto exit_create_index;
 		assert(col_list->nExpr == 1);
@@ -3005,7 +3004,8 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	pIndex->nColumn = col_list->nExpr;
 	/* Tarantool have access to each column by any index */
 	if (where) {
-		sqlite3ResolveSelfReference(parse, pTab, NC_PartIdx, where, 0);
+		sql_resolve_self_reference(parse, pTab, NC_PartIdx, where,
+					   NULL);
 		pIndex->pPartIdxWhere = where;
 		where = NULL;
 	}
@@ -3022,8 +3022,8 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	for (i = 0, col_listItem = col_list->a; i < col_list->nExpr;
 	     i++, col_listItem++) {
 		Expr *pCExpr;	/* The i-th index expression */
-		sqlite3ResolveSelfReference(parse, pTab, NC_IdxExpr,
-					    col_listItem->pExpr, 0);
+		sql_resolve_self_reference(parse, pTab, NC_IdxExpr,
+					   col_listItem->pExpr, NULL);
 		if (parse->nErr > 0)
 			goto exit_create_index;
 		pCExpr = sqlite3ExprSkipCollate(col_listItem->pExpr);
@@ -3236,7 +3236,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	if (pIndex)
 		freeIndex(db, pIndex);
 	sql_expr_delete(db, where, false);
-	sqlite3ExprListDelete(db, col_list);
+	sql_expr_list_delete(db, col_list);
 	sqlite3SrcListDelete(db, tbl_name);
 	sqlite3DbFree(db, zName);
 }
@@ -3648,7 +3648,7 @@ sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
 		if (pItem->fg.isIndexedBy)
 			sqlite3DbFree(db, pItem->u1.zIndexedBy);
 		if (pItem->fg.isTabFunc)
-			sqlite3ExprListDelete(db, pItem->u1.pFuncArg);
+			sql_expr_list_delete(db, pItem->u1.pFuncArg);
 		sqlite3DeleteTable(db, pItem->pTab);
 		sqlite3SelectDelete(db, pItem->pSelect);
 		sql_expr_delete(db, pItem->pOn, false);
@@ -3754,7 +3754,7 @@ sqlite3SrcListFuncArgs(Parse * pParse, SrcList * p, ExprList * pList)
 		pItem->u1.pFuncArg = pList;
 		pItem->fg.isTabFunc = 1;
 	} else {
-		sqlite3ExprListDelete(pParse->db, pList);
+		sql_expr_list_delete(pParse->db, pList);
 	}
 }
 
@@ -4110,7 +4110,7 @@ sqlite3WithAdd(Parse * pParse,	/* Parsing context */
 	assert((pNew != 0 && zName != 0) || db->mallocFailed);
 
 	if (db->mallocFailed) {
-		sqlite3ExprListDelete(db, pArglist);
+		sql_expr_list_delete(db, pArglist);
 		sqlite3SelectDelete(db, pQuery);
 		sqlite3DbFree(db, zName);
 		pNew = pWith;
@@ -4135,7 +4135,7 @@ sqlite3WithDelete(sqlite3 * db, With * pWith)
 		int i;
 		for (i = 0; i < pWith->nCte; i++) {
 			struct Cte *pCte = &pWith->a[i];
-			sqlite3ExprListDelete(db, pCte->pCols);
+			sql_expr_list_delete(db, pCte->pCols);
 			sqlite3SelectDelete(db, pCte->pSelect);
 			sqlite3DbFree(db, pCte->zName);
 		}

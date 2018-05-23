@@ -1032,7 +1032,7 @@ sqlite3ExprFunction(Parse * pParse, ExprList * pList, Token * pToken)
 	assert(pToken);
 	pNew = sqlite3ExprAlloc(db, TK_FUNCTION, pToken, 1);
 	if (pNew == 0) {
-		sqlite3ExprListDelete(db, pList);	/* Avoid memory leak when malloc fails */
+		sql_expr_list_delete(db, pList);	/* Avoid memory leak when malloc fails */
 		return 0;
 	}
 	pNew->x.pList = pList;
@@ -1154,7 +1154,7 @@ sqlite3ExprDeleteNN(sqlite3 * db, Expr * p, bool extern_alloc)
 		if (ExprHasProperty(p, EP_xIsSelect)) {
 			sqlite3SelectDelete(db, p->x.pSelect);
 		} else {
-			sqlite3ExprListDelete(db, p->x.pList);
+			sql_expr_list_delete(db, p->x.pList);
 		}
 	}
 	if (ExprHasProperty(p, EP_MemToken))
@@ -1342,8 +1342,7 @@ sql_expr_dup(struct sqlite3 *db, struct Expr *p, int flags, char **buffer)
 						     flags);
 			} else {
 				pNew->x.pList =
-				    sqlite3ExprListDup(db, p->x.pList,
-						       flags);
+					sql_expr_list_dup(db, p->x.pList, flags);
 			}
 		}
 
@@ -1400,7 +1399,7 @@ withDup(sqlite3 * db, With * p)
 				pRet->a[i].pSelect =
 				    sqlite3SelectDup(db, p->a[i].pSelect, 0);
 				pRet->a[i].pCols =
-				    sqlite3ExprListDup(db, p->a[i].pCols, 0);
+				    sql_expr_list_dup(db, p->a[i].pCols, 0);
 				pRet->a[i].zName =
 				    sqlite3DbStrDup(db, p->a[i].zName);
 			}
@@ -1418,7 +1417,7 @@ withDup(sqlite3 * db, With * p)
  * be deleted (by being passed to their respective ...Delete() routines)
  * without effecting the originals.
  *
- * The expression list, ID, and source lists return by sqlite3ExprListDup(),
+ * The expression list, ID, and source lists return by sql_expr_list_dup(),
  * sqlite3IdListDup(), and sqlite3SrcListDup() can not be further expanded
  * by subsequent calls to sqlite*ListAppend() routines.
  *
@@ -1436,41 +1435,40 @@ sqlite3ExprDup(sqlite3 * db, Expr * p, int flags)
 	return p ? sql_expr_dup(db, p, flags, 0) : 0;
 }
 
-ExprList *
-sqlite3ExprListDup(sqlite3 * db, ExprList * p, int flags)
+struct ExprList *
+sql_expr_list_dup(struct sqlite3 *db, struct ExprList *p, int flags)
 {
-	ExprList *pNew;
 	struct ExprList_item *pItem, *pOldItem;
 	int i;
-	Expr *pPriorSelectCol = 0;
-	assert(db != 0);
-	if (p == 0)
-		return 0;
-	pNew = sqlite3DbMallocRawNN(db, sizeof(*pNew));
-	if (pNew == 0)
-		return 0;
+	Expr *pPriorSelectCol = NULL;
+	assert(db != NULL);
+	if (p == NULL)
+		return NULL;
+	ExprList *pNew = sqlite3DbMallocRawNN(db, sizeof(*pNew));
+	if (pNew == NULL)
+		return NULL;
 	pNew->nExpr = i = p->nExpr;
-	if ((flags & EXPRDUP_REDUCE) == 0)
+	if ((flags & EXPRDUP_REDUCE) == 0) {
 		for (i = 1; i < p->nExpr; i += i) {
 		}
+	}
 	pNew->a = pItem = sqlite3DbMallocRawNN(db, i * sizeof(p->a[0]));
-	if (pItem == 0) {
+	if (pItem == NULL) {
 		sqlite3DbFree(db, pNew);
-		return 0;
+		return NULL;
 	}
 	pOldItem = p->a;
 	for (i = 0; i < p->nExpr; i++, pItem++, pOldItem++) {
 		Expr *pOldExpr = pOldItem->pExpr;
 		Expr *pNewExpr;
 		pItem->pExpr = sqlite3ExprDup(db, pOldExpr, flags);
-		if (pOldExpr
-		    && pOldExpr->op == TK_SELECT_COLUMN
-		    && (pNewExpr = pItem->pExpr) != 0) {
+		if (pOldExpr != NULL && pOldExpr->op == TK_SELECT_COLUMN &&
+		    (pNewExpr = pItem->pExpr) != NULL) {
 			assert(pNewExpr->iColumn == 0 || i > 0);
 			if (pNewExpr->iColumn == 0) {
 				assert(pOldExpr->pLeft == pOldExpr->pRight);
 				pPriorSelectCol = pNewExpr->pLeft =
-				    pNewExpr->pRight;
+					pNewExpr->pRight;
 			} else {
 				assert(i > 0);
 				assert(pItem[-1].pExpr != 0);
@@ -1530,8 +1528,7 @@ sqlite3SrcListDup(sqlite3 * db, SrcList * p, int flags)
 		pNewItem->pIBIndex = pOldItem->pIBIndex;
 		if (pNewItem->fg.isTabFunc) {
 			pNewItem->u1.pFuncArg =
-			    sqlite3ExprListDup(db, pOldItem->u1.pFuncArg,
-					       flags);
+			    sql_expr_list_dup(db, pOldItem->u1.pFuncArg, flags);
 		}
 		pTab = pNewItem->pTab = pOldItem->pTab;
 		if (pTab) {
@@ -1586,12 +1583,12 @@ sqlite3SelectDup(sqlite3 * db, Select * p, int flags)
 	pNew = sqlite3DbMallocRawNN(db, sizeof(*p));
 	if (pNew == 0)
 		return 0;
-	pNew->pEList = sqlite3ExprListDup(db, p->pEList, flags);
+	pNew->pEList = sql_expr_list_dup(db, p->pEList, flags);
 	pNew->pSrc = sqlite3SrcListDup(db, p->pSrc, flags);
 	pNew->pWhere = sqlite3ExprDup(db, p->pWhere, flags);
-	pNew->pGroupBy = sqlite3ExprListDup(db, p->pGroupBy, flags);
+	pNew->pGroupBy = sql_expr_list_dup(db, p->pGroupBy, flags);
 	pNew->pHaving = sqlite3ExprDup(db, p->pHaving, flags);
-	pNew->pOrderBy = sqlite3ExprListDup(db, p->pOrderBy, flags);
+	pNew->pOrderBy = sql_expr_list_dup(db, p->pOrderBy, flags);
 	pNew->op = p->op;
 	pNew->pPrior = pPrior = sqlite3SelectDup(db, p->pPrior, flags);
 	if (pPrior)
@@ -1610,52 +1607,40 @@ sqlite3SelectDup(sqlite3 * db, Select * p, int flags)
 	return pNew;
 }
 
-/*
- * Add a new element to the end of an expression list.  If pList is
- * initially NULL, then create a new expression list.
- *
- * If a memory allocation error occurs, the entire list is freed and
- * NULL is returned.  If non-NULL is returned, then it is guaranteed
- * that the new entry was successfully appended.
- */
-ExprList *
-sqlite3ExprListAppend(Parse * pParse,	/* Parsing context */
-		      ExprList * pList,	/* List to which to append. Might be NULL */
-		      Expr * pExpr	/* Expression to be appended. Might be NULL */
-    )
+struct ExprList *
+sql_expr_list_append(struct sqlite3 *db, struct ExprList *expr_list,
+		     struct Expr *expr)
 {
-	sqlite3 *db = pParse->db;
-	assert(db != 0);
-	if (pList == 0) {
-		pList = sqlite3DbMallocRawNN(db, sizeof(ExprList));
-		if (pList == 0) {
+	assert(db != NULL);
+	if (expr_list == NULL) {
+		expr_list = sqlite3DbMallocRawNN(db, sizeof(ExprList));
+		if (expr_list == NULL)
 			goto no_mem;
-		}
-		pList->nExpr = 0;
-		pList->a = sqlite3DbMallocRawNN(db, sizeof(pList->a[0]));
-		if (pList->a == 0)
+		expr_list->nExpr = 0;
+		expr_list->a =
+			sqlite3DbMallocRawNN(db, sizeof(expr_list->a[0]));
+		if (expr_list->a == NULL)
 			goto no_mem;
-	} else if ((pList->nExpr & (pList->nExpr - 1)) == 0) {
+	} else if ((expr_list->nExpr & (expr_list->nExpr - 1)) == 0) {
 		struct ExprList_item *a;
-		assert(pList->nExpr > 0);
-		a = sqlite3DbRealloc(db, pList->a,
-				     pList->nExpr * 2 * sizeof(pList->a[0]));
-		if (a == 0) {
+		assert(expr_list->nExpr > 0);
+		a = sqlite3DbRealloc(db, expr_list->a, expr_list->nExpr * 2 *
+				     sizeof(expr_list->a[0]));
+		if (a == NULL)
 			goto no_mem;
-		}
-		pList->a = a;
+		expr_list->a = a;
 	}
-	assert(pList->a != 0);
-	struct ExprList_item *pItem = &pList->a[pList->nExpr++];
+	assert(expr_list->a != NULL);
+	struct ExprList_item *pItem = &expr_list->a[expr_list->nExpr++];
 	memset(pItem, 0, sizeof(*pItem));
-	pItem->pExpr = pExpr;
-	return pList;
+	pItem->pExpr = expr;
+	return expr_list;
 
  no_mem:
 	/* Avoid leaking memory if malloc has failed. */
-	sql_expr_delete(db, pExpr, false);
-	sqlite3ExprListDelete(db, pList);
-	return 0;
+	sql_expr_delete(db, expr, false);
+	sql_expr_list_delete(db, expr_list);
+	return NULL;
 }
 
 /*
@@ -1702,7 +1687,7 @@ sqlite3ExprListAppendVector(Parse * pParse,	/* Parsing context */
 
 	for (i = 0; i < pColumns->nId; i++) {
 		Expr *pSubExpr = sqlite3ExprForVectorField(pParse, pExpr, i);
-		pList = sqlite3ExprListAppend(pParse, pList, pSubExpr);
+		pList = sql_expr_list_append(pParse->db, pList, pSubExpr);
 		if (pList) {
 			assert(pList->nExpr == iFirst + i + 1);
 			pList->a[pList->nExpr - 1].zName = pColumns->a[i].zName;
@@ -1716,7 +1701,7 @@ sqlite3ExprListAppendVector(Parse * pParse,	/* Parsing context */
 			assert(pFirst->op == TK_SELECT_COLUMN);
 
 			/* Store the SELECT statement in pRight so it will be deleted when
-			 * sqlite3ExprListDelete() is called
+			 * sql_expr_list_delete() is called
 			 */
 			pFirst->pRight = pExpr;
 			pExpr = 0;
@@ -1839,10 +1824,10 @@ exprListDeleteNN(sqlite3 * db, ExprList * pList)
 }
 
 void
-sqlite3ExprListDelete(sqlite3 * db, ExprList * pList)
+sql_expr_list_delete(sqlite3 *db, ExprList *expr_list)
 {
-	if (pList)
-		exprListDeleteNN(db, pList);
+	if (expr_list != NULL)
+		exprListDeleteNN(db, expr_list);
 }
 
 /*
@@ -4379,7 +4364,7 @@ sqlite3ExprCodeAtInit(Parse * pParse,	/* Parsing context */
 	assert(ConstFactorOk(pParse));
 	p = pParse->pConstExpr;
 	pExpr = sqlite3ExprDup(pParse->db, pExpr, 0);
-	p = sqlite3ExprListAppend(pParse, p, pExpr);
+	p = sql_expr_list_append(pParse->db, p, pExpr);
 	if (p) {
 		struct ExprList_item *pItem = &p->a[p->nExpr - 1];
 		pItem->u.iConstExprReg = regDest;

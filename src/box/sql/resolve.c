@@ -1574,40 +1574,27 @@ sqlite3ResolveSelectNames(Parse * pParse,	/* The parser context */
 	sqlite3WalkSelect(&w, p);
 }
 
-/*
- * Resolve names in expressions that can only reference a single table:
- *
- *    *   CHECK constraints
- *    *   WHERE clauses on partial indices
- *
- * The Expr.iTable value for Expr.op==TK_COLUMN nodes of the expression
- * is set to -1 and the Expr.iColumn value is set to the column number.
- *
- * Any errors cause an error message to be set in pParse.
- */
 void
-sqlite3ResolveSelfReference(Parse * pParse,	/* Parsing context */
-			    Table * pTab,	/* The table being referenced */
-			    int type,	/* NC_IsCheck or NC_PartIdx or NC_IdxExpr */
-			    Expr * pExpr,	/* Expression to resolve.  May be NULL. */
-			    ExprList * pList	/* Expression list to resolve.  May be NUL. */
-    )
+sql_resolve_self_reference(struct Parse *parser, struct Table *table, int type,
+			   struct Expr *expr, struct ExprList *expr_list)
 {
-	SrcList sSrc;		/* Fake SrcList for pParse->pNewTable */
-	NameContext sNC;	/* Name context for pParse->pNewTable */
+	/* Fake SrcList for parser->pNewTable */
+	SrcList sSrc;
+	/* Name context for parser->pNewTable */
+	NameContext sNC;
 
 	assert(type == NC_IsCheck || type == NC_PartIdx || type == NC_IdxExpr);
 	memset(&sNC, 0, sizeof(sNC));
 	memset(&sSrc, 0, sizeof(sSrc));
 	sSrc.nSrc = 1;
-	sSrc.a[0].zName = pTab->def->name;
-	sSrc.a[0].pTab = pTab;
+	sSrc.a[0].zName = table->def->name;
+	sSrc.a[0].pTab = table;
 	sSrc.a[0].iCursor = -1;
-	sNC.pParse = pParse;
+	sNC.pParse = parser;
 	sNC.pSrcList = &sSrc;
 	sNC.ncFlags = type;
-	if (sqlite3ResolveExprNames(&sNC, pExpr))
+	if (sqlite3ResolveExprNames(&sNC, expr) != 0)
 		return;
-	if (pList)
-		sqlite3ResolveExprListNames(&sNC, pList);
+	if (expr_list != NULL)
+		sqlite3ResolveExprListNames(&sNC, expr_list);
 }

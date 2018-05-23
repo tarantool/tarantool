@@ -53,7 +53,7 @@ sqlite3DeleteTriggerStep(sqlite3 * db, TriggerStep * pTriggerStep)
 		pTriggerStep = pTriggerStep->pNext;
 
 		sql_expr_delete(db, pTmp->pWhere, false);
-		sqlite3ExprListDelete(db, pTmp->pExprList);
+		sql_expr_list_delete(db, pTmp->pExprList);
 		sqlite3SelectDelete(db, pTmp->pSelect);
 		sqlite3IdListDelete(db, pTmp->pIdList);
 
@@ -438,12 +438,12 @@ sqlite3TriggerUpdateStep(sqlite3 * db,	/* The database connection */
 	pTriggerStep = triggerStepAllocate(db, TK_UPDATE, pTableName);
 	if (pTriggerStep) {
 		pTriggerStep->pExprList =
-		    sqlite3ExprListDup(db, pEList, EXPRDUP_REDUCE);
+		    sql_expr_list_dup(db, pEList, EXPRDUP_REDUCE);
 		pTriggerStep->pWhere =
 		    sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
 		pTriggerStep->orconf = orconf;
 	}
-	sqlite3ExprListDelete(db, pEList);
+	sql_expr_list_delete(db, pEList);
 	sql_expr_delete(db, pWhere, false);
 	return pTriggerStep;
 }
@@ -723,9 +723,9 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 		case TK_UPDATE:{
 				sqlite3Update(pParse,
 					      targetSrcList(pParse, pStep),
-					      sqlite3ExprListDup(db,
-								 pStep->
-								 pExprList, 0),
+					      sql_expr_list_dup(db,
+								pStep->pExprList,
+								0),
 					      sqlite3ExprDup(db, pStep->pWhere,
 							     0),
 					      pParse->eOrconf);

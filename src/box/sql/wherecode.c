@@ -511,11 +511,11 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 							   pExpr, 0);
 
 					pRhs =
-					    sqlite3ExprListAppend(pParse, pRhs,
-								  pNewRhs);
+					    sql_expr_list_append(pParse->db,
+								 pRhs, pNewRhs);
 					pLhs =
-					    sqlite3ExprListAppend(pParse, pLhs,
-								  pNewLhs);
+					    sql_expr_list_append(pParse->db,
+								 pLhs, pNewLhs);
 				}
 			}
 			if (!db->mallocFailed) {
@@ -562,8 +562,8 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 				pLeft->x.pList = pOrigLhs;
 				pX->pLeft = pLeft;
 			}
-			sqlite3ExprListDelete(pParse->db, pLhs);
-			sqlite3ExprListDelete(pParse->db, pRhs);
+			sql_expr_list_delete(pParse->db, pLhs);
+			sql_expr_list_delete(pParse->db, pRhs);
 		}
 
 		if (eType == IN_INDEX_INDEX_DESC) {

@@ -3459,7 +3459,6 @@ void sqlite3PExprAddSelect(Parse *, Expr *, Select *);
 Expr *sqlite3ExprAnd(sqlite3 *, Expr *, Expr *);
 Expr *sqlite3ExprFunction(Parse *, ExprList *, Token *);
 void sqlite3ExprAssignVarNumber(Parse *, Expr *, u32);
-ExprList *sqlite3ExprListAppend(Parse *, ExprList *, Expr *);
 ExprList *sqlite3ExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
 
 /**
@@ -3472,7 +3471,6 @@ void sqlite3ExprListSetSortOrder(ExprList *, enum sort_order sort_order);
 
 void sqlite3ExprListSetName(Parse *, ExprList *, Token *, int);
 void sqlite3ExprListSetSpan(Parse *, ExprList *, ExprSpan *);
-void sqlite3ExprListDelete(sqlite3 *, ExprList *);
 u32 sqlite3ExprListFlags(const ExprList *);
 int sqlite3Init(sqlite3 *);
 int sqlite3InitCallback(void *, int, char **, char **);
@@ -3978,7 +3976,6 @@ void sqlite3MayAbort(Parse *);
 void sqlite3HaltConstraint(Parse *, int, int, char *, i8, u8);
 void sqlite3UniqueConstraint(Parse *, int, Index *);
 Expr *sqlite3ExprDup(sqlite3 *, Expr *, int);
-ExprList *sqlite3ExprListDup(sqlite3 *, ExprList *, int);
 SrcList *sqlite3SrcListDup(sqlite3 *, SrcList *, int);
 IdList *sqlite3IdListDup(sqlite3 *, IdList *);
 Select *sqlite3SelectDup(sqlite3 *, Select *, int);
@@ -4210,7 +4207,6 @@ int sqlite3MatchSpanName(const char *, const char *, const char *);
 int sqlite3ResolveExprNames(NameContext *, Expr *);
 int sqlite3ResolveExprListNames(NameContext *, ExprList *);
 void sqlite3ResolveSelectNames(Parse *, Select *, NameContext *);
-void sqlite3ResolveSelfReference(Parse *, Table *, int, Expr *, ExprList *);
 int sqlite3ResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
 
 /**

@@ -527,25 +527,25 @@ distinct(A) ::= .           {A = 0;}
 // opcode of TK_ASTERISK.
 //
 %type selcollist {ExprList*}
-%destructor selcollist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor selcollist {sql_expr_list_delete(pParse->db, $$);}
 %type sclp {ExprList*}
-%destructor sclp {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor sclp {sql_expr_list_delete(pParse->db, $$);}
 sclp(A) ::= selcollist(A) COMMA.
 sclp(A) ::= .                                {A = 0;}
 selcollist(A) ::= sclp(A) expr(X) as(Y).     {
-   A = sqlite3ExprListAppend(pParse, A, X.pExpr);
+   A = sql_expr_list_append(pParse->db, A, X.pExpr);
    if( Y.n>0 ) sqlite3ExprListSetName(pParse, A, &Y, 1);
    sqlite3ExprListSetSpan(pParse,A,&X);
 }
 selcollist(A) ::= sclp(A) STAR. {
   Expr *p = sqlite3Expr(pParse->db, TK_ASTERISK, 0);
-  A = sqlite3ExprListAppend(pParse, A, p);
+  A = sql_expr_list_append(pParse->db, A, p);
 }
 selcollist(A) ::= sclp(A) nm(X) DOT STAR. {
   Expr *pRight = sqlite3PExpr(pParse, TK_ASTERISK, 0, 0);
   Expr *pLeft = sqlite3ExprAlloc(pParse->db, TK_ID, &X, 1);
   Expr *pDot = sqlite3PExpr(pParse, TK_DOT, pLeft, pRight);
-  A = sqlite3ExprListAppend(pParse,A, pDot);
+  A = sql_expr_list_append(pParse->db,A, pDot);
 }
 
 // An option "AS <id>" phrase that can follow one of the expressions that
@@ -660,23 +660,24 @@ using_opt(U) ::= .                        {U = 0;}
 
 
 %type orderby_opt {ExprList*}
-%destructor orderby_opt {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor orderby_opt {sql_expr_list_delete(pParse->db, $$);}
 
 // the sortlist non-terminal stores a list of expression where each
 // expression is optionally followed by ASC or DESC to indicate the
 // sort order.
 //
 %type sortlist {ExprList*}
-%destructor sortlist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor sortlist {sql_expr_list_delete(pParse->db, $$);}
 
 orderby_opt(A) ::= .                          {A = 0;}
 orderby_opt(A) ::= ORDER BY sortlist(X).      {A = X;}
 sortlist(A) ::= sortlist(A) COMMA expr(Y) sortorder(Z). {
-  A = sqlite3ExprListAppend(pParse,A,Y.pExpr);
+  A = sql_expr_list_append(pParse->db,A,Y.pExpr);
   sqlite3ExprListSetSortOrder(A,Z);
 }
 sortlist(A) ::= expr(Y) sortorder(Z). {
-  A = sqlite3ExprListAppend(pParse,0,Y.pExpr); /*A-overwrites-Y*/
+  /* A-overwrites-Y. */
+  A = sql_expr_list_append(pParse->db,NULL,Y.pExpr);
   sqlite3ExprListSetSortOrder(A,Z);
 }
 
@@ -687,7 +688,7 @@ sortorder(A) ::= DESC.          {A = SORT_ORDER_DESC;}
 sortorder(A) ::= .              {A = SORT_ORDER_UNDEF;}
 
 %type groupby_opt {ExprList*}
-%destructor groupby_opt {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor groupby_opt {sql_expr_list_delete(pParse->db, $$);}
 groupby_opt(A) ::= .                      {A = 0;}
 groupby_opt(A) ::= GROUP BY nexprlist(X). {A = X;}
 
@@ -749,17 +750,17 @@ cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
 %endif
 
 %type setlist {ExprList*}
-%destructor setlist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor setlist {sql_expr_list_delete(pParse->db, $$);}
 
 setlist(A) ::= setlist(A) COMMA nm(X) EQ expr(Y). {
-  A = sqlite3ExprListAppend(pParse, A, Y.pExpr);
+  A = sql_expr_list_append(pParse->db, A, Y.pExpr);
   sqlite3ExprListSetName(pParse, A, &X, 1);
 }
 setlist(A) ::= setlist(A) COMMA LP idlist(X) RP EQ expr(Y). {
   A = sqlite3ExprListAppendVector(pParse, A, X, Y.pExpr);
 }
 setlist(A) ::= nm(X) EQ expr(Y). {
-  A = sqlite3ExprListAppend(pParse, 0, Y.pExpr);
+  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
   sqlite3ExprListSetName(pParse, A, &X, 1);
 }
 setlist(A) ::= LP idlist(X) RP EQ expr(Y). {
@@ -944,13 +945,13 @@ term(A) ::= CTIME_KW(OP). {
 }
 
 expr(A) ::= LP(L) nexprlist(X) COMMA expr(Y) RP(R). {
-  ExprList *pList = sqlite3ExprListAppend(pParse, X, Y.pExpr);
+  ExprList *pList = sql_expr_list_append(pParse->db, X, Y.pExpr);
   A.pExpr = sqlite3PExpr(pParse, TK_VECTOR, 0, 0);
   if( A.pExpr ){
     A.pExpr->x.pList = pList;
     spanSet(&A, &L, &R);
   }else{
-    sqlite3ExprListDelete(pParse->db, pList);
+    sql_expr_list_delete(pParse->db, pList);
   }
 }
 
@@ -973,8 +974,8 @@ expr(A) ::= expr(A) likeop(OP) expr(Y).  [LIKE_KW]  {
   ExprList *pList;
   int bNot = OP.n & 0x80000000;
   OP.n &= 0x7fffffff;
-  pList = sqlite3ExprListAppend(pParse,0, Y.pExpr);
-  pList = sqlite3ExprListAppend(pParse,pList, A.pExpr);
+  pList = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
+  pList = sql_expr_list_append(pParse->db,pList, A.pExpr);
   A.pExpr = sqlite3ExprFunction(pParse, pList, &OP);
   exprNot(pParse, bNot, &A);
   A.zEnd = Y.zEnd;
@@ -984,9 +985,9 @@ expr(A) ::= expr(A) likeop(OP) expr(Y) ESCAPE expr(E).  [LIKE_KW]  {
   ExprList *pList;
   int bNot = OP.n & 0x80000000;
   OP.n &= 0x7fffffff;
-  pList = sqlite3ExprListAppend(pParse,0, Y.pExpr);
-  pList = sqlite3ExprListAppend(pParse,pList, A.pExpr);
-  pList = sqlite3ExprListAppend(pParse,pList, E.pExpr);
+  pList = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
+  pList = sql_expr_list_append(pParse->db,pList, A.pExpr);
+  pList = sql_expr_list_append(pParse->db,pList, E.pExpr);
   A.pExpr = sqlite3ExprFunction(pParse, pList, &OP);
   exprNot(pParse, bNot, &A);
   A.zEnd = E.zEnd;
@@ -1045,13 +1046,13 @@ expr(A) ::= PLUS(B) expr(X). [BITNOT]
 between_op(A) ::= BETWEEN.     {A = 0;}
 between_op(A) ::= NOT BETWEEN. {A = 1;}
 expr(A) ::= expr(A) between_op(N) expr(X) AND expr(Y). [BETWEEN] {
-  ExprList *pList = sqlite3ExprListAppend(pParse,0, X.pExpr);
-  pList = sqlite3ExprListAppend(pParse,pList, Y.pExpr);
+  ExprList *pList = sql_expr_list_append(pParse->db,NULL, X.pExpr);
+  pList = sql_expr_list_append(pParse->db,pList, Y.pExpr);
   A.pExpr = sqlite3PExpr(pParse, TK_BETWEEN, A.pExpr, 0);
   if( A.pExpr ){
     A.pExpr->x.pList = pList;
   }else{
-    sqlite3ExprListDelete(pParse->db, pList);
+    sql_expr_list_delete(pParse->db, pList);
   } 
   exprNot(pParse, N, &A);
   A.zEnd = Y.zEnd;
@@ -1090,7 +1091,7 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
     */
     Expr *pRHS = Y->a[0].pExpr;
     Y->a[0].pExpr = 0;
-    sqlite3ExprListDelete(pParse->db, Y);
+    sql_expr_list_delete(pParse->db, Y);
     /* pRHS cannot be NULL because a malloc error would have been detected
     ** before now and control would have never reached this point */
     if( ALWAYS(pRHS) ){
@@ -1104,7 +1105,7 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
       A.pExpr->x.pList = Y;
       sqlite3ExprSetHeightAndFlags(pParse, A.pExpr);
     }else{
-      sqlite3ExprListDelete(pParse->db, Y);
+      sql_expr_list_delete(pParse->db, Y);
     }
     exprNot(pParse, N, &A);
   }
@@ -1142,22 +1143,22 @@ expr(A) ::= CASE(C) case_operand(X) case_exprlist(Y) case_else(Z) END(E). {
   spanSet(&A,&C,&E);  /*A-overwrites-C*/
   A.pExpr = sqlite3PExpr(pParse, TK_CASE, X, 0);
   if( A.pExpr ){
-    A.pExpr->x.pList = Z ? sqlite3ExprListAppend(pParse,Y,Z) : Y;
+    A.pExpr->x.pList = Z ? sql_expr_list_append(pParse->db,Y,Z) : Y;
     sqlite3ExprSetHeightAndFlags(pParse, A.pExpr);
   }else{
-    sqlite3ExprListDelete(pParse->db, Y);
+    sql_expr_list_delete(pParse->db, Y);
     sql_expr_delete(pParse->db, Z, false);
   }
 }
 %type case_exprlist {ExprList*}
-%destructor case_exprlist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor case_exprlist {sql_expr_list_delete(pParse->db, $$);}
 case_exprlist(A) ::= case_exprlist(A) WHEN expr(Y) THEN expr(Z). {
-  A = sqlite3ExprListAppend(pParse,A, Y.pExpr);
-  A = sqlite3ExprListAppend(pParse,A, Z.pExpr);
+  A = sql_expr_list_append(pParse->db,A, Y.pExpr);
+  A = sql_expr_list_append(pParse->db,A, Z.pExpr);
 }
 case_exprlist(A) ::= WHEN expr(Y) THEN expr(Z). {
-  A = sqlite3ExprListAppend(pParse,0, Y.pExpr);
-  A = sqlite3ExprListAppend(pParse,A, Z.pExpr);
+  A = sql_expr_list_append(pParse->db,NULL, Y.pExpr);
+  A = sql_expr_list_append(pParse->db,A, Z.pExpr);
 }
 %type case_else {Expr*}
 %destructor case_else {sql_expr_delete(pParse->db, $$, false);}
@@ -1169,21 +1170,21 @@ case_operand(A) ::= expr(X).            {A = X.pExpr; /*A-overwrites-X*/}
 case_operand(A) ::= .                   {A = 0;} 
 
 %type exprlist {ExprList*}
-%destructor exprlist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor exprlist {sql_expr_list_delete(pParse->db, $$);}
 %type nexprlist {ExprList*}
-%destructor nexprlist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor nexprlist {sql_expr_list_delete(pParse->db, $$);}
 
 exprlist(A) ::= nexprlist(A).
 exprlist(A) ::= .                            {A = 0;}
 nexprlist(A) ::= nexprlist(A) COMMA expr(Y).
-    {A = sqlite3ExprListAppend(pParse,A,Y.pExpr);}
+    {A = sql_expr_list_append(pParse->db,A,Y.pExpr);}
 nexprlist(A) ::= expr(Y).
-    {A = sqlite3ExprListAppend(pParse,0,Y.pExpr); /*A-overwrites-Y*/}
+    {A = sql_expr_list_append(pParse->db,NULL,Y.pExpr); /*A-overwrites-Y*/}
 
 /* A paren_exprlist is an optional expression list contained inside
 ** of parenthesis */
 %type paren_exprlist {ExprList*}
-%destructor paren_exprlist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor paren_exprlist {sql_expr_list_delete(pParse->db, $$);}
 paren_exprlist(A) ::= .   {A = 0;}
 paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 
@@ -1210,9 +1211,9 @@ uniqueflag(A) ::= .        {A = ON_CONFLICT_ACTION_NONE;}
 // used for the arguments to an index.  That is just an historical accident.
 //
 %type eidlist {ExprList*}
-%destructor eidlist {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor eidlist {sql_expr_list_delete(pParse->db, $$);}
 %type eidlist_opt {ExprList*}
-%destructor eidlist_opt {sqlite3ExprListDelete(pParse->db, $$);}
+%destructor eidlist_opt {sql_expr_list_delete(pParse->db, $$);}
 
 %include {
   /* Add a single new term to an ExprList that is used to store a
@@ -1227,7 +1228,7 @@ uniqueflag(A) ::= .        {A = ON_CONFLICT_ACTION_NONE;}
     int hasCollate,
     int sortOrder
   ){
-    ExprList *p = sqlite3ExprListAppend(pParse, pPrior, 0);
+    ExprList *p = sql_expr_list_append(pParse->db, pPrior, NULL);
     if( (hasCollate || sortOrder != SORT_ORDER_UNDEF)
         && pParse->db->init.busy==0
     ){

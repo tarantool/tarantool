@@ -446,7 +446,7 @@ sql_parser_destroy(Parse *parser)
 	assert(parser != NULL);
 	sqlite3 *db = parser->db;
 	sqlite3DbFree(db, parser->aLabel);
-	sqlite3ExprListDelete(db, parser->pConstExpr);
+	sql_expr_list_delete(db, parser->pConstExpr);
 	if (db != NULL) {
 		assert(db->lookaside.bDisable >=
 		       parser->disableLookaside);
