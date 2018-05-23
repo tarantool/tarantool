@@ -169,6 +169,16 @@ enum vy_log_record_type {
 	 * Requires vy_log_record::lsm_id, key_def, modify_lsn.
 	 */
 	VY_LOG_MODIFY_LSM		= 13,
+	/**
+	 * Forget an LSM tree.
+	 * Requires vy_log_record::lsm_id.
+	 *
+	 * A record of this type indicates that all objects associated
+	 * with the given LSM tree have been cleaned up from vylog and
+	 * so the LSM tree is not needed any longer and can be removed
+	 * from vylog on the next rotation.
+	 */
+	VY_LOG_FORGET_LSM		= 14,
 
 	vy_log_record_type_MAX
 };
@@ -543,6 +553,17 @@ vy_log_modify_lsm(int64_t id, const struct key_def *key_def, int64_t modify_lsn)
 	record.lsm_id = id;
 	record.key_def = key_def;
 	record.modify_lsn = modify_lsn;
+	vy_log_write(&record);
+}
+
+/** Helper to log  a vinyl LSM tree cleanup. */
+static inline void
+vy_log_forget_lsm(int64_t id)
+{
+	struct vy_log_record record;
+	vy_log_record_init(&record);
+	record.type = VY_LOG_FORGET_LSM;
+	record.lsm_id = id;
 	vy_log_write(&record);
 }
 

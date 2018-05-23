@@ -903,31 +903,6 @@ vinyl_index_commit_modify(struct index *index, int64_t lsn)
 	vy_log_tx_try_commit();
 }
 
-/*
- * Delete all runs, ranges, and slices of a given LSM tree
- * from the metadata log.
- */
-static void
-vy_log_lsm_prune(struct vy_lsm *lsm, int64_t gc_lsn)
-{
-	int loops = 0;
-	for (struct vy_range *range = vy_range_tree_first(lsm->tree);
-	     range != NULL; range = vy_range_tree_next(lsm->tree, range)) {
-		struct vy_slice *slice;
-		rlist_foreach_entry(slice, &range->slices, in_range)
-			vy_log_delete_slice(slice->id);
-		vy_log_delete_range(range->id);
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0);
-	}
-	struct vy_run *run;
-	rlist_foreach_entry(run, &lsm->runs, in_lsm) {
-		vy_log_drop_run(run->id, gc_lsn);
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0);
-	}
-}
-
 static void
 vinyl_index_commit_drop(struct index *index, int64_t lsn)
 {
@@ -950,7 +925,6 @@ vinyl_index_commit_drop(struct index *index, int64_t lsn)
 	lsm->is_dropped = true;
 
 	vy_log_tx_begin();
-	vy_log_lsm_prune(lsm, checkpoint_last(NULL));
 	vy_log_drop_lsm(lsm->id, lsn);
 	vy_log_tx_try_commit();
 }
@@ -3352,6 +3326,38 @@ vy_gc_run(struct vy_env *env,
 }
 
 /**
+ * Given a dropped LSM tree, delete all its ranges and slices and
+ * mark all its runs as dropped. Forget the LSM tree if it has no
+ * associated objects.
+ */
+static void
+vy_gc_lsm(struct vy_lsm_recovery_info *lsm_info)
+{
+	assert(lsm_info->drop_lsn >= 0);
+
+	vy_log_tx_begin();
+	struct vy_range_recovery_info *range_info;
+	rlist_foreach_entry(range_info, &lsm_info->ranges, in_lsm) {
+		struct vy_slice_recovery_info *slice_info;
+		rlist_foreach_entry(slice_info, &range_info->slices, in_range)
+			vy_log_delete_slice(slice_info->id);
+		vy_log_delete_range(range_info->id);
+	}
+	struct vy_run_recovery_info *run_info;
+	rlist_foreach_entry(run_info, &lsm_info->runs, in_lsm) {
+		if (!run_info->is_dropped) {
+			run_info->is_dropped = true;
+			run_info->gc_lsn = lsm_info->drop_lsn;
+			vy_log_drop_run(run_info->id, run_info->gc_lsn);
+		}
+	}
+	if (rlist_empty(&lsm_info->ranges) &&
+	    rlist_empty(&lsm_info->runs))
+		vy_log_forget_lsm(lsm_info->id);
+	vy_log_tx_try_commit();
+}
+
+/**
  * Delete unused run files stored in the recovery context.
  * @param env      Vinyl environment.
  * @param recovery Recovery context.
@@ -3365,6 +3371,10 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 	int loops = 0;
 	struct vy_lsm_recovery_info *lsm_info;
 	rlist_foreach_entry(lsm_info, &recovery->lsms, in_recovery) {
+		if ((gc_mask & VY_GC_DROPPED) != 0 &&
+		    lsm_info->drop_lsn >= 0)
+			vy_gc_lsm(lsm_info);
+
 		struct vy_run_recovery_info *run_info;
 		rlist_foreach_entry(run_info, &lsm_info->runs, in_lsm) {
 			if ((run_info->is_dropped &&

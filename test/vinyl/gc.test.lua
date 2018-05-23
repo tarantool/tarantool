@@ -44,6 +44,9 @@ files = ls_data()
 -- Check that vylog files are removed if vinyl is not used.
 --
 
+-- This purges records corresponding to dropped runs, but
+-- dropped index records are still stored in vylog.
+gc()
 files = ls_vylog()
 #files == 2 or {files, gc_info()}
 

@@ -120,6 +120,7 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_SNAPSHOT]		= "snapshot",
 	[VY_LOG_TRUNCATE_LSM]		= "truncate_lsm",
 	[VY_LOG_MODIFY_LSM]		= "modify_lsm",
+	[VY_LOG_FORGET_LSM]		= "forget_lsm",
 };
 
 /** Metadata log object. */
@@ -1173,6 +1174,21 @@ vy_recovery_hash_index_id(struct vy_recovery *recovery,
 	return 0;
 }
 
+/**
+ * Remove the entry corresponding to the space_id/index_id
+ * from vy_recovery::index_id_hash.
+ */
+static void
+vy_recovery_unhash_index_id(struct vy_recovery *recovery,
+			    uint32_t space_id, uint32_t index_id)
+{
+	struct mh_i64ptr_t *h = recovery->index_id_hash;
+	int64_t key = vy_recovery_index_id_hash(space_id, index_id);
+	mh_int_t k = mh_i64ptr_find(h, key, NULL);
+	if (k != mh_end(h))
+		mh_i64ptr_del(h, k, NULL);
+}
+
 /** Lookup an LSM tree in vy_recovery::index_id_hash map. */
 struct vy_lsm_recovery_info *
 vy_recovery_lsm_by_index_id(struct vy_recovery *recovery,
@@ -1369,7 +1385,6 @@ vy_recovery_modify_lsm(struct vy_recovery *recovery, int64_t id,
 /**
  * Handle a VY_LOG_DROP_LSM log record.
  * This function marks the LSM tree with ID @id as dropped.
- * All ranges and runs of the LSM tree must have been deleted by now.
  * Returns 0 on success, -1 if ID not found or LSM tree is already marked.
  */
 static int
@@ -1389,23 +1404,44 @@ vy_recovery_drop_lsm(struct vy_recovery *recovery, int64_t id, int64_t drop_lsn)
 				    (long long)id));
 		return -1;
 	}
-	if (!rlist_empty(&lsm->ranges)) {
+	assert(drop_lsn >= 0);
+	lsm->drop_lsn = drop_lsn;
+	return 0;
+}
+
+/**
+ * Handle a VY_LOG_FORGET_LSM log record.
+ * This function removes the LSM tree with ID @id from the context.
+ * All ranges and runs of the LSM tree must have been deleted by now.
+ * Returns 0 on success, -1 if ID was not found or there are objects
+ * associated with the LSM tree.
+ */
+static int
+vy_recovery_forget_lsm(struct vy_recovery *recovery, int64_t id)
+{
+	struct mh_i64ptr_t *h = recovery->lsm_hash;
+	mh_int_t k = mh_i64ptr_find(h, id, NULL);
+	if (k == mh_end(h)) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Dropped LSM tree %lld has ranges",
+			 tt_sprintf("LSM tree %lld forgotten but not registered",
 				    (long long)id));
 		return -1;
 	}
-	struct vy_run_recovery_info *run;
-	rlist_foreach_entry(run, &lsm->runs, in_lsm) {
-		if (!run->is_dropped && !run->is_incomplete) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("Dropped LSM tree %lld has active "
-					    "runs", (long long)id));
-			return -1;
-		}
+	struct vy_lsm_recovery_info *lsm = mh_i64ptr_node(h, k)->val;
+	if (!rlist_empty(&lsm->ranges) || !rlist_empty(&lsm->runs)) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Forgotten LSM tree %lld has ranges/runs",
+				    (long long)id));
+		return -1;
 	}
-	assert(drop_lsn >= 0);
-	lsm->drop_lsn = drop_lsn;
+	mh_i64ptr_del(h, k, NULL);
+	rlist_del_entry(lsm, in_recovery);
+	if (lsm == vy_recovery_lsm_by_index_id(recovery,
+				lsm->space_id, lsm->index_id))
+		vy_recovery_unhash_index_id(recovery,
+				lsm->space_id, lsm->index_id);
+	free(lsm->key_parts);
+	free(lsm);
 	return 0;
 }
 
@@ -1424,12 +1460,6 @@ vy_recovery_dump_lsm(struct vy_recovery *recovery,
 	if (lsm == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Dump of unregistered LSM tree %lld",
-				    (long long)id));
-		return -1;
-	}
-	if (lsm->drop_lsn >= 0) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Dump of deleted LSM tree %lld",
 				    (long long)id));
 		return -1;
 	}
@@ -1523,13 +1553,6 @@ vy_recovery_create_run(struct vy_recovery *recovery, int64_t lsm_id,
 	if (lsm == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Run %lld created for unregistered "
-				    "LSM tree %lld", (long long)run_id,
-				    (long long)lsm_id));
-		return -1;
-	}
-	if (lsm->drop_lsn >= 0) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Run %lld created for deleted "
 				    "LSM tree %lld", (long long)run_id,
 				    (long long)lsm_id));
 		return -1;
@@ -1850,6 +1873,9 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_DROP_LSM:
 		rc = vy_recovery_drop_lsm(recovery, record->lsm_id,
 					  record->drop_lsn);
+		break;
+	case VY_LOG_FORGET_LSM:
+		rc = vy_recovery_forget_lsm(recovery, record->lsm_id);
 		break;
 	case VY_LOG_INSERT_RANGE:
 		rc = vy_recovery_insert_range(recovery, record->lsm_id,
@@ -2178,14 +2204,6 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 
 	struct vy_lsm_recovery_info *lsm;
 	rlist_foreach_entry(lsm, &recovery->lsms, in_recovery) {
-		/*
-		 * Purge dropped LSM trees that are not referenced by runs
-		 * (and thus not needed for garbage collection) from the
-		 * log on rotation.
-		 */
-		if (lsm->drop_lsn >= 0 && rlist_empty(&lsm->runs))
-			continue;
-
 		/* Create the log file on the first write. */
 		if (!xlog_is_open(&xlog) &&
 		    xdir_create_xlog(&vy_log.dir, &xlog, vclock) != 0)
