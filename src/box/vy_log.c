@@ -1130,6 +1130,31 @@ vy_recovery_index_id_hash(uint32_t space_id, uint32_t index_id)
 	return ((uint64_t)space_id << 32) + index_id;
 }
 
+/**
+ * Insert an LSM tree into vy_recovery::index_id_hash.
+ *
+ * If there is an LSM tree with the same space_id/index_id
+ * present in the hash table, it will be silently replaced.
+ *
+ * Returns 0 on success, -1 on error.
+ */
+static int
+vy_recovery_hash_index_id(struct vy_recovery *recovery,
+			  struct vy_lsm_recovery_info *lsm)
+{
+	struct mh_i64ptr_t *h = recovery->index_id_hash;
+	struct mh_i64ptr_node_t node;
+
+	node.key = vy_recovery_index_id_hash(lsm->space_id, lsm->index_id);
+	node.val = lsm;
+
+	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
+		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
+		return -1;
+	}
+	return 0;
+}
+
 /** Lookup an LSM tree in vy_recovery::index_id_hash map. */
 struct vy_lsm_recovery_info *
 vy_recovery_lsm_by_index_id(struct vy_recovery *recovery,
@@ -1188,6 +1213,53 @@ vy_recovery_lookup_slice(struct vy_recovery *recovery, int64_t slice_id)
 }
 
 /**
+ * Allocate a new LSM tree with the given ID and add it to
+ * the recovery context.
+ *
+ * Returns the new LSM tree on success, NULL on error.
+ */
+static struct vy_lsm_recovery_info *
+vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
+			  uint32_t space_id, uint32_t index_id)
+{
+	struct vy_lsm_recovery_info *lsm = malloc(sizeof(*lsm));
+	if (lsm == NULL) {
+		diag_set(OutOfMemory, sizeof(*lsm),
+			 "malloc", "struct vy_lsm_recovery_info");
+		return NULL;
+	}
+	struct mh_i64ptr_t *h = recovery->lsm_hash;
+	struct mh_i64ptr_node_t node = { id, lsm };
+	struct mh_i64ptr_node_t *old_node = NULL;
+	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
+		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
+		free(lsm);
+		return NULL;
+	}
+	assert(old_node == NULL);
+	lsm->id = id;
+	lsm->space_id = space_id;
+	lsm->index_id = index_id;
+	lsm->key_parts = NULL;
+	lsm->key_part_count = 0;
+	lsm->is_dropped = false;
+	lsm->create_lsn = -1;
+	lsm->modify_lsn = -1;
+	lsm->dump_lsn = -1;
+	rlist_create(&lsm->ranges);
+	rlist_create(&lsm->runs);
+	/*
+	 * Keep newer LSM trees closer to the tail of the list
+	 * so that on log rotation we create/drop past incarnations
+	 * before the final version.
+	 */
+	rlist_add_tail_entry(&recovery->lsms, lsm, in_recovery);
+	if (recovery->max_id < id)
+		recovery->max_id = id;
+	return lsm;
+}
+
+/**
  * Handle a VY_LOG_CREATE_LSM log record.
  * This function allocates a new vinyl LSM tree with ID @id
  * and inserts it to the hash.
@@ -1200,116 +1272,43 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 		       uint32_t key_part_count, int64_t create_lsn,
 		       int64_t modify_lsn, int64_t dump_lsn)
 {
-	struct vy_lsm_recovery_info *lsm;
-	struct key_part_def *key_parts_copy;
-	struct mh_i64ptr_node_t node;
-	struct mh_i64ptr_t *h;
-	mh_int_t k;
-
-	/*
-	 * Make a copy of the key definition to be used for
-	 * the new LSM tree incarnation.
-	 */
 	if (key_parts == NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Missing key definition for LSM tree %lld",
 				    (long long)id));
 		return -1;
 	}
-	key_parts_copy = malloc(sizeof(*key_parts) * key_part_count);
-	if (key_parts_copy == NULL) {
-		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
-			 "malloc", "struct key_part_def");
-		return -1;
-	}
-	memcpy(key_parts_copy, key_parts, sizeof(*key_parts) * key_part_count);
-
-	/*
-	 * Look up the LSM tree in the hash.
-	 */
-	h = recovery->index_id_hash;
-	node.key = vy_recovery_index_id_hash(space_id, index_id);
-	k = mh_i64ptr_find(h, node.key, NULL);
-	lsm = (k != mh_end(h)) ? mh_i64ptr_node(h, k)->val : NULL;
-
-	if (lsm == NULL) {
-		/*
-		 * This is the first time the LSM tree is created
-		 * (there's no previous incarnation in the context).
-		 * Allocate a node for the LSM tree and add it to
-		 * the hash.
-		 */
-		lsm = malloc(sizeof(*lsm));
-		if (lsm == NULL) {
-			diag_set(OutOfMemory, sizeof(*lsm),
-				 "malloc", "struct vy_lsm_recovery_info");
-			free(key_parts_copy);
-			return -1;
-		}
-		lsm->index_id = index_id;
-		lsm->space_id = space_id;
-		rlist_create(&lsm->ranges);
-		rlist_create(&lsm->runs);
-
-		node.val = lsm;
-		if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-			diag_set(OutOfMemory, 0, "mh_i64ptr_put",
-				 "mh_i64ptr_node_t");
-			free(key_parts_copy);
-			free(lsm);
-			return -1;
-		}
-		rlist_add_entry(&recovery->lsms, lsm, in_recovery);
-	} else {
-		/*
-		 * The LSM tree was dropped and recreated with the
-		 * same ID. Update its key definition (because it
-		 * could have changed since the last time it was
-		 * used) and reset its state.
-		 */
-		if (!lsm->is_dropped) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("LSM tree %u/%u created twice",
-					    (unsigned)space_id,
-					    (unsigned)index_id));
-			free(key_parts_copy);
-			return -1;
-		}
-		assert(lsm->index_id == index_id);
-		assert(lsm->space_id == space_id);
-		free(lsm->key_parts);
-	}
-
-	lsm->id = id;
-	lsm->key_parts = key_parts_copy;
-	lsm->key_part_count = key_part_count;
-	lsm->is_dropped = false;
-	lsm->create_lsn = create_lsn;
-	lsm->modify_lsn = modify_lsn;
-	lsm->dump_lsn = dump_lsn;
-
-	/*
-	 * Add the LSM tree to the hash.
-	 */
-	h = recovery->lsm_hash;
-	node.key = id;
-	node.val = lsm;
-	if (mh_i64ptr_find(h, id, NULL) != mh_end(h)) {
+	if (vy_recovery_lookup_lsm(recovery, id) != NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Duplicate LSM tree id %lld",
 				    (long long)id));
 		return -1;
 	}
-	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put",
-			 "mh_i64ptr_node_t");
+	struct vy_lsm_recovery_info *lsm;
+	lsm = vy_recovery_lsm_by_index_id(recovery, space_id, index_id);
+	if (lsm != NULL && !lsm->is_dropped) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("LSM tree %u/%u created twice",
+				    (unsigned)space_id, (unsigned)index_id));
 		return -1;
 	}
+	lsm = vy_recovery_do_create_lsm(recovery, id, space_id, index_id);
+	if (lsm == NULL)
+		return -1;
 
-	if (recovery->max_id < id)
-		recovery->max_id = id;
+	lsm->key_parts = malloc(sizeof(*key_parts) * key_part_count);
+	if (lsm->key_parts == NULL) {
+		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
+			 "malloc", "struct key_part_def");
+		return -1;
+	}
+	memcpy(lsm->key_parts, key_parts, sizeof(*key_parts) * key_part_count);
+	lsm->key_part_count = key_part_count;
+	lsm->create_lsn = create_lsn;
+	lsm->modify_lsn = modify_lsn;
+	lsm->dump_lsn = dump_lsn;
 
-	return 0;
+	return vy_recovery_hash_index_id(recovery, lsm);
 }
 
 /**
