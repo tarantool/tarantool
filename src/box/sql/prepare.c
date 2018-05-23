@@ -433,6 +433,15 @@ sqlite3_prepare_v2(sqlite3 * db,	/* Database handle. */
 }
 
 void
+sql_parser_create(struct Parse *parser, sqlite3 *db)
+{
+	memset(parser, 0, sizeof(struct Parse));
+	parser->db = db;
+	struct region *region = &fiber()->gc;
+	parser->region_initial_size = region_used(region);
+}
+
+void
 sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);

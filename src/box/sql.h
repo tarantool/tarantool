@@ -175,6 +175,23 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name);
 int
 sql_table_def_rebuild(struct sqlite3 *db, struct Table *table);
 
+/**
+ * Initialize a new parser object.
+ * A number of service allocations are performed on the region,
+ * which is also cleared in the destroy function.
+ * @param parser object to initialize.
+ * @param db SQLite object.
+ */
+void
+sql_parser_create(struct Parse *parser, struct sqlite3 *db);
+
+/**
+ * Release the parser object resources.
+ * @param parser object to release.
+ */
+void
+sql_parser_destroy(struct Parse *parser);
+
 #if defined(__cplusplus)
 } /* extern "C" { */
 #endif

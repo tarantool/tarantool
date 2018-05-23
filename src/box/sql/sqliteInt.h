@@ -2903,10 +2903,8 @@ struct Parse {
 	Token constraintName;	/* Name of the constraint currently being parsed */
 	int regRoot;		/* Register holding root page number for new objects */
 	int nMaxArg;		/* Max args passed to user function by sub-program */
-#ifdef SELECTTRACE_ENABLED
 	int nSelect;		/* Number of SELECT statements seen */
 	int nSelectIndent;	/* How far to indent SELECTTRACE() output */
-#endif
 	Parse *pToplevel;	/* Parse structure for main program (or NULL) */
 	Table *pTriggerTab;	/* Table triggers are being coded for */
 	u32 nQueryLoop;		/* Est number of iterations of a query (10*log2(N)) */
@@ -4536,28 +4534,5 @@ extern int sqlite3InitDatabase(sqlite3 * db);
 
 enum on_conflict_action
 table_column_nullable_action(struct Table *tab, uint32_t column);
-
-/**
- * Initialize a new parser object.
- * A number of service allocations are performed on the region, which is also
- * cleared in the destroy function.
- * @param parser object to initialize.
- * @param db SQLite object.
- */
-static inline void
-sql_parser_create(struct Parse *parser, sqlite3 *db)
-{
-	memset(parser, 0, sizeof(struct Parse));
-	parser->db = db;
-	struct region *region = &fiber()->gc;
-	parser->region_initial_size = region_used(region);
-}
-
-/**
- * Release the parser object resources.
- * @param parser object to release.
- */
-void
-sql_parser_destroy(struct Parse *parser);
 
 #endif				/* SQLITEINT_H */
