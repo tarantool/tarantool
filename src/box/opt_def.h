@@ -47,12 +47,34 @@ enum opt_type {
 	OPT_STR,	/* char[] */
 	OPT_STRPTR,	/* char*  */
 	OPT_ENUM,	/* enum */
+	OPT_ARRAY,	/* array */
 	opt_type_MAX,
 };
 
 extern const char *opt_type_strs[];
 
+/**
+ * Decode enum stored in MsgPack.
+ * @param str encoded data pointer (next to MsgPack ENUM header).
+ * @param len str length.
+ * @retval string index or hmax if the string is not found.
+ */
 typedef int64_t (*opt_def_to_enum_cb)(const char *str, uint32_t len);
+
+/**
+ * Decode MsgPack array callback.
+ * All memory allocations returned by opt_def_to_array_cb with opt
+ * [out] argument should be managed manually.
+ * @param str encoded data pointer (next to MsgPack ARRAY header).
+ * @param len array length (items count).
+ * @param [out] opt pointer to store resulting value.
+ * @param errcode Code of error to set if something is wrong.
+ * @param field_no Field number of an option in a parent element.
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+typedef int (*opt_def_to_array_cb)(const char **str, uint32_t len, char *opt,
+				   uint32_t errcode, uint32_t field_no);
 
 struct opt_def {
 	const char *name;
@@ -64,19 +86,27 @@ struct opt_def {
 	int enum_size;
 	const char **enum_strs;
 	uint32_t enum_max;
-	/** If not NULL, used to get a enum value by a string. */
-	opt_def_to_enum_cb to_enum;
+	/** MsgPack data decode callbacks. */
+	union {
+		opt_def_to_enum_cb to_enum;
+		opt_def_to_array_cb to_array;
+	};
 };
 
 #define OPT_DEF(key, type, opts, field) \
 	{ key, type, offsetof(opts, field), sizeof(((opts *)0)->field), \
-	  NULL, 0, NULL, 0, NULL }
+	  NULL, 0, NULL, 0, {NULL} }
 
 #define OPT_DEF_ENUM(key, enum_name, opts, field, to_enum) \
 	{ key, OPT_ENUM, offsetof(opts, field), sizeof(int), #enum_name, \
-	  sizeof(enum enum_name), enum_name##_strs, enum_name##_MAX, to_enum }
+	  sizeof(enum enum_name), enum_name##_strs, enum_name##_MAX, \
+	  {(void *)to_enum} }
 
-#define OPT_END {NULL, opt_type_MAX, 0, 0, NULL, 0, NULL, 0, NULL}
+#define OPT_DEF_ARRAY(key, opts, field, to_array) \
+	 { key, OPT_ARRAY, offsetof(opts, field), sizeof(((opts *)0)->field), \
+	   NULL, 0, NULL, 0, {(void *)to_array} }
+
+#define OPT_END {NULL, opt_type_MAX, 0, 0, NULL, 0, NULL, 0, {NULL}}
 
 struct region;
 

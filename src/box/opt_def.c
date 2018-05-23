@@ -44,14 +44,16 @@ const char *opt_type_strs[] = {
 	/* [OPT_STR]	= */ "string",
 	/* [OPT_STRPTR] = */ "string",
 	/* [OPT_ENUM]   = */ "enum",
+	/* [OPT_ARRAY]  = */ "array",
 };
 
 static int
 opt_set(void *opts, const struct opt_def *def, const char **val,
-	struct region *region)
+	struct region *region, uint32_t errcode, uint32_t field_no)
 {
 	int64_t ival;
 	uint64_t uval;
+	char *errmsg = tt_static_buf();
 	double dval;
 	uint32_t str_len;
 	const char *str;
@@ -60,30 +62,30 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 	switch (def->type) {
 	case OPT_BOOL:
 		if (mp_typeof(**val) != MP_BOOL)
-			return -1;
+			goto type_mismatch_err;
 		store_bool(opt, mp_decode_bool(val));
 		break;
 	case OPT_UINT32:
 		if (mp_typeof(**val) != MP_UINT)
-			return -1;
+			goto type_mismatch_err;
 		uval = mp_decode_uint(val);
 		if (uval > UINT32_MAX)
-			return -1;
+			goto type_mismatch_err;
 		store_u32(opt, uval);
 		break;
 	case OPT_INT64:
 		if (mp_read_int64(val, &ival) != 0)
-			return -1;
+			goto type_mismatch_err;
 		store_u64(opt, ival);
 		break;
 	case OPT_FLOAT:
 		if (mp_read_double(val, &dval) != 0)
-			return -1;
+			goto type_mismatch_err;
 		store_double(opt, dval);
 		break;
 	case OPT_STR:
 		if (mp_typeof(**val) != MP_STR)
-			return -1;
+			goto type_mismatch_err;
 		str = mp_decode_str(val, &str_len);
 		str_len = MIN(str_len, def->len - 1);
 		memcpy(opt, str, str_len);
@@ -91,7 +93,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 		break;
 	case OPT_STRPTR:
 		if (mp_typeof(**val) != MP_STR)
-			return -1;
+			goto type_mismatch_err;
 		str = mp_decode_str(val, &str_len);
 		if (str_len > 0) {
 			ptr = (char *) region_alloc(region, str_len + 1);
@@ -110,7 +112,7 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 		break;
 	case OPT_ENUM:
 		if (mp_typeof(**val) != MP_STR)
-			return -1;
+			goto type_mismatch_err;
 		str = mp_decode_str(val, &str_len);
 		if (def->to_enum == NULL) {
 			ival = strnindex(def->enum_strs, str, str_len,
@@ -135,10 +137,24 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 			unreachable();
 		};
 		break;
+	case OPT_ARRAY:
+		if (mp_typeof(**val) != MP_ARRAY)
+			goto type_mismatch_err;
+		ival = mp_decode_array(val);
+		assert(def->to_array != NULL);
+		if (def->to_array(val, ival, opt, errcode, field_no) != 0)
+			return -1;
+		break;
 	default:
 		unreachable();
 	}
 	return 0;
+
+type_mismatch_err:
+	snprintf(errmsg, TT_STATIC_BUF_LEN, "'%s' must be %s", def->name,
+		 opt_type_strs[def->type]);
+	diag_set(ClientError, errcode, field_no, errmsg);
+	return -1;
 }
 
 int
@@ -147,32 +163,21 @@ opts_parse_key(void *opts, const struct opt_def *reg, const char *key,
 	       uint32_t field_no, struct region *region,
 	       bool skip_unknown_options)
 {
-	char errmsg[DIAG_ERRMSG_MAX];
-	bool found = false;
 	for (const struct opt_def *def = reg; def->name != NULL; def++) {
 		if (key_len != strlen(def->name) ||
 		    memcmp(key, def->name, key_len) != 0)
 			continue;
 
-		if (opt_set(opts, def, data, region) != 0) {
-			snprintf(errmsg, sizeof(errmsg), "'%.*s' must be %s",
-				 key_len, key, opt_type_strs[def->type]);
-			diag_set(ClientError, errcode, field_no, errmsg);
-			return -1;
-		}
-		found = true;
-		break;
+		return opt_set(opts, def, data, region, errcode, field_no);
 	}
-	if (!found) {
-		if (skip_unknown_options) {
-			mp_next(data);
-		} else {
-			snprintf(errmsg, sizeof(errmsg),
-				 "unexpected option '%.*s'", key_len, key);
-			diag_set(ClientError, errcode, field_no, errmsg);
-			return -1;
-		}
+	if (! skip_unknown_options) {
+		char *errmsg = tt_static_buf();
+		snprintf(errmsg, TT_STATIC_BUF_LEN, "unexpected option '%.*s'",
+			 key_len, key);
+		diag_set(ClientError, errcode, field_no, errmsg);
+		return -1;
 	}
+	mp_next(data);
 	return 0;
 }
 
