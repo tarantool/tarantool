@@ -1019,26 +1019,22 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	return;
 }
 
-/*
- * Add a new CHECK constraint to the table currently under construction.
- */
 void
-sqlite3AddCheckConstraint(Parse * pParse,	/* Parsing context */
-			  Expr * pCheckExpr	/* The check expression */
-    )
+sql_add_check_constraint(struct Parse *parser, struct ExprSpan *span)
 {
-#ifndef SQLITE_OMIT_CHECK
-	Table *pTab = pParse->pNewTable;
-	if (pTab) {
-		pTab->pCheck =
-		    sqlite3ExprListAppend(pParse, pTab->pCheck, pCheckExpr);
-		if (pParse->constraintName.n) {
-			sqlite3ExprListSetName(pParse, pTab->pCheck,
-					       &pParse->constraintName, 1);
+	struct Expr *expr = span->pExpr;
+	struct Table *table = parser->pNewTable;
+	if (table != NULL) {
+		table->pCheck =
+			sqlite3ExprListAppend(parser, table->pCheck, expr);
+		if (parser->constraintName.n != 0) {
+			sqlite3ExprListSetName(parser, table->pCheck,
+					       &parser->constraintName, 1);
 		}
-	} else
-#endif
-		sql_expr_delete(pParse->db, pCheckExpr, false);
+	} else {
+		sql_expr_delete(parser->db, expr, false);
+
+	}
 }
 
 /*

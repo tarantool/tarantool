@@ -3504,7 +3504,16 @@ void sqlite3StartTable(Parse *, Token *, int);
 void sqlite3AddColumn(Parse *, Token *, Token *);
 void sqlite3AddNotNull(Parse *, int);
 void sqlite3AddPrimaryKey(Parse *, ExprList *, int, int, enum sort_order);
-void sqlite3AddCheckConstraint(Parse *, Expr *);
+
+/**
+ * Add a new CHECK constraint to the table currently under
+ * construction.
+ * @param parser Parsing context.
+ * @param span Expression span object.
+ */
+void
+sql_add_check_constraint(Parse *parser, ExprSpan *span);
+
 void sqlite3AddDefaultValue(Parse *, ExprSpan *);
 void sqlite3AddCollateType(Parse *, Token *);
 

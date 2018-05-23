@@ -283,7 +283,7 @@ ccons ::= PRIMARY KEY sortorder(Z) onconf(R) autoinc(I).
 ccons ::= UNIQUE onconf(R).      {sql_create_index(pParse,0,0,0,R,0,0,
 						   SORT_ORDER_ASC, false,
 						   SQLITE_IDXTYPE_UNIQUE);}
-ccons ::= CHECK LP expr(X) RP.   {sqlite3AddCheckConstraint(pParse,X.pExpr);}
+ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
 ccons ::= REFERENCES nm(T) eidlist_opt(TA) refargs(R).
                                  {sqlite3CreateForeignKey(pParse,0,&T,TA,R);}
 ccons ::= defer_subclause(D).    {sqlite3DeferForeignKey(pParse,D);}
@@ -335,7 +335,7 @@ tcons ::= UNIQUE LP sortlist(X) RP onconf(R).
 						   SORT_ORDER_ASC,false,
 						   SQLITE_IDXTYPE_UNIQUE);}
 tcons ::= CHECK LP expr(E) RP onconf.
-                                 {sqlite3AddCheckConstraint(pParse,E.pExpr);}
+                                 {sql_add_check_constraint(pParse,&E);}
 tcons ::= FOREIGN KEY LP eidlist(FA) RP
           REFERENCES nm(T) eidlist_opt(TA) refargs(R) defer_subclause_opt(D). {
     sqlite3CreateForeignKey(pParse, FA, &T, TA, R);
