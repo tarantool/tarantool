@@ -272,6 +272,77 @@ local function create_transport(host, port, user, password, callback,
         end
     end
     --
+    -- Get the next message or the final result.
+    -- @param iterator Iterator object.
+    -- @param i Index to get a next message from.
+    --
+    -- @retval nil, nil The request is finished.
+    -- @retval i + 1, object A message/response and its index.
+    -- @retval box.NULL, error An error occured. When this
+    --         function is called in 'for k, v in future:pairs()',
+    --         `k` becomes box.NULL, and `v` becomes error object.
+    --         On error the key becomes exactly box.NULL instead
+    --         of nil, because nil is treated by Lua as iteration
+    --         end marker. Nil does not participate in iteration,
+    --         and does not allow to continue it.
+    --
+    local function request_iterator_next(iterator, i)
+        if i == box.NULL then
+            return nil, nil
+        else
+            i = i + 1
+        end
+        local request = iterator.request
+        local messages = request.on_push_ctx
+    ::retry::
+        if i <= #messages then
+            return i, messages[i]
+        end
+        if request:is_ready() then
+            -- After all the messages are iterated, `i` is equal
+            -- to #messages + 1. After response reading `i`
+            -- becomes #messages + 2. It is the trigger to finish
+            -- the iteration.
+            if i > #messages + 1 then
+                return nil, nil
+            end
+            local response, err = request:result()
+            if err then
+                return box.NULL, err
+            end
+            return i, response
+        end
+        local old_message_count = #messages
+        local timeout = iterator.timeout
+        repeat
+            local ts = fiber_clock()
+            request.cond:wait(timeout)
+            timeout = timeout - (fiber_clock() - ts)
+            if request:is_ready() or old_message_count ~= #messages then
+                goto retry
+            end
+        until timeout <= 0
+        return box.NULL, box.error.new(E_TIMEOUT)
+    end
+    --
+    -- Iterate over all messages, received by a request. @Sa
+    -- request_iterator_next for details what to expect in `for`
+    -- key/value pairs.
+    -- @param timeout One iteration timeout.
+    -- @retval next() callback, iterator, zero key.
+    --
+    function request_index:pairs(timeout)
+        if timeout then
+            if type(timeout) ~= 'number' or timeout < 0 then
+                error('Usage: future:pairs(timeout)')
+            end
+        else
+            timeout = TIMEOUT_INFINITY
+        end
+        local iterator = {request = self, timeout = timeout}
+        return request_iterator_next, iterator, 0
+    end
+    --
     -- Wait for a response or error max timeout seconds.
     -- @param timeout Max seconds to wait.
     -- @retval result, nil Success, the response is returned.

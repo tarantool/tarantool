@@ -165,11 +165,60 @@ s:select{}
 c:close()
 s:drop()
 
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
-
 --
 -- Ensure can not push in background.
 --
 f = fiber.create(function() ok, err = box.session.push(100) end)
 while f:status() ~= 'dead' do fiber.sleep(0.01) end
 ok, err
+
+--
+-- Async iterable pushes.
+--
+c = netbox.connect(box.cfg.listen)
+cond = fiber.cond()
+test_run:cmd("setopt delimiter ';'")
+function do_pushes()
+    local sync = box.session.sync()
+    for i = 1, 5 do
+        box.session.push(i + 100, sync)
+        cond:wait()
+    end
+    return true
+end;
+test_run:cmd("setopt delimiter ''");
+
+-- Can not combine callback and async mode.
+ok, err = pcall(c.call, c, 'do_pushes', {}, {is_async = true, on_push = function() end})
+ok
+err:find('use future:pairs()') ~= nil
+future = c:call('do_pushes', {}, {is_async = true})
+-- Try to ignore pushes.
+while not future:wait_result(0.01) do cond:signal() end
+future:result()
+
+-- Even if pushes are ignored, they still are available via pairs.
+messages = {}
+keys = {}
+for i, message in future:pairs() do table.insert(messages, message) table.insert(keys, i) end
+messages
+keys
+
+-- Test error.
+s = box.schema.create_space('test')
+pk = s:create_index('pk')
+s:replace{1}
+
+function do_push_and_duplicate() box.session.push(100) s:insert{1} end
+future = c:call('do_push_and_duplicate', {}, {is_async = true})
+future:wait_result(1000)
+messages = {}
+keys = {}
+for i, message in future:pairs() do table.insert(messages, message) table.insert(keys, i) end
+messages
+keys
+
+s:drop()
+c:close()
+
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
