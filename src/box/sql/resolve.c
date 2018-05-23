@@ -115,7 +115,7 @@ resolveAlias(Parse * pParse,	/* Parsing context */
 	}
 	ExprSetProperty(pDup, EP_Alias);
 
-	/* Before calling sql_expr_free(), set the EP_Static flag. This
+	/* Before calling sql_expr_delete(), set the EP_Static flag. This
 	 * prevents ExprDelete() from deleting the Expr structure itself,
 	 * allowing it to be repopulated by the memcpy() on the following line.
 	 * The pExpr->u.zToken might point into memory that will be freed by the
@@ -123,7 +123,7 @@ resolveAlias(Parse * pParse,	/* Parsing context */
 	 * make a copy of the token before doing the sqlite3DbFree().
 	 */
 	ExprSetProperty(pExpr, EP_Static);
-	sql_expr_free(db, pExpr, false);
+	sql_expr_delete(db, pExpr, false);
 	memcpy(pExpr, pDup, sizeof(*pExpr));
 	if (!ExprHasProperty(pExpr, EP_IntValue) && pExpr->u.zToken != 0) {
 		assert((pExpr->flags & (EP_Reduced | EP_TokenOnly)) == 0);
@@ -464,9 +464,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 
 	/* Clean up and return
 	 */
-	sql_expr_free(db, pExpr->pLeft, false);
+	sql_expr_delete(db, pExpr->pLeft, false);
 	pExpr->pLeft = 0;
-	sql_expr_free(db, pExpr->pRight, false);
+	sql_expr_delete(db, pExpr->pRight, false);
 	pExpr->pRight = 0;
 	pExpr->op = (isTrigger ? TK_TRIGGER : TK_COLUMN);
  lookupname_end:
@@ -1025,7 +1025,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 						    resolveOrderByTermToExprList
 						    (pParse, pSelect, pDup);
 					}
-					sql_expr_free(db, pDup, false);
+					sql_expr_delete(db, pDup, false);
 				}
 			}
 			if (iCol > 0) {
@@ -1047,7 +1047,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 					assert(pParent->pLeft == pE);
 					pParent->pLeft = pNew;
 				}
-				sql_expr_free(db, pE, false);
+				sql_expr_delete(db, pE, false);
 				pItem->u.x.iOrderByCol = (u16) iCol;
 				pItem->done = 1;
 			} else {

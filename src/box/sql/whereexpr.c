@@ -97,7 +97,7 @@ whereClauseInsert(WhereClause * pWC, Expr * p, u16 wtFlags)
 					 sizeof(pWC->a[0]) * pWC->nSlot * 2);
 		if (pWC->a == 0) {
 			if (wtFlags & TERM_DYNAMIC) {
-				sql_expr_free(db, p, false);
+				sql_expr_delete(db, p, false);
 			}
 			pWC->a = pOld;
 			return 0;
@@ -1056,7 +1056,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 				int idxNew;
 				pDup = sqlite3ExprDup(db, pExpr, 0);
 				if (db->mallocFailed) {
-					sql_expr_free(db, pDup, false);
+					sql_expr_delete(db, pDup, false);
 					return;
 				}
 				idxNew =
@@ -1393,7 +1393,7 @@ sqlite3WhereClauseClear(WhereClause * pWC)
 	sqlite3 *db = pWC->pWInfo->pParse->db;
 	for (i = pWC->nTerm - 1, a = pWC->a; i >= 0; i--, a++) {
 		if (a->wtFlags & TERM_DYNAMIC) {
-			sql_expr_free(db, a->pExpr, false);
+			sql_expr_delete(db, a->pExpr, false);
 		}
 		if (a->wtFlags & TERM_ORINFO) {
 			whereOrInfoDelete(db, a->u.pOrInfo);

@@ -251,7 +251,7 @@ sqlite3LocateIndex(sqlite3 * db, const char *zName, const char *zTable)
 static void
 freeIndex(sqlite3 * db, Index * p)
 {
-	sql_expr_free(db, p->pPartIdxWhere, false);
+	sql_expr_delete(db, p->pPartIdxWhere, false);
 	sqlite3ExprListDelete(db, p->aColExpr);
 	sqlite3DbFree(db, p->zColAff);
 	sqlite3DbFree(db, p);
@@ -923,7 +923,7 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			field->default_value[default_length] = '\0';
 		}
 	}
-	sql_expr_free(db, pSpan->pExpr, false);
+	sql_expr_delete(db, pSpan->pExpr, false);
 }
 
 
@@ -1038,7 +1038,7 @@ sqlite3AddCheckConstraint(Parse * pParse,	/* Parsing context */
 		}
 	} else
 #endif
-		sql_expr_free(pParse->db, pCheckExpr, false);
+		sql_expr_delete(pParse->db, pCheckExpr, false);
 }
 
 /*
@@ -3239,7 +3239,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
  exit_create_index:
 	if (pIndex)
 		freeIndex(db, pIndex);
-	sql_expr_free(db, where, false);
+	sql_expr_delete(db, where, false);
 	sqlite3ExprListDelete(db, col_list);
 	sqlite3SrcListDelete(db, tbl_name);
 	sqlite3DbFree(db, zName);
@@ -3655,7 +3655,7 @@ sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
 			sqlite3ExprListDelete(db, pItem->u1.pFuncArg);
 		sqlite3DeleteTable(db, pItem->pTab);
 		sqlite3SelectDelete(db, pItem->pSelect);
-		sql_expr_free(db, pItem->pOn, false);
+		sql_expr_delete(db, pItem->pOn, false);
 		sqlite3IdListDelete(db, pItem->pUsing);
 	}
 	sqlite3DbFree(db, pList);
@@ -3711,7 +3711,7 @@ sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 
  append_from_error:
 	assert(p == 0);
-	sql_expr_free(db, pOn, false);
+	sql_expr_delete(db, pOn, false);
 	sqlite3IdListDelete(db, pUsing);
 	sqlite3SelectDelete(db, pSubquery);
 	return 0;

@@ -703,7 +703,7 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 	}
 
 	/* Clean up the WHERE clause constructed above. */
-	sql_expr_free(db, pWhere, false);
+	sql_expr_delete(db, pWhere, false);
 	if (iFkIfZero)
 		sqlite3VdbeJumpHere(v, iFkIfZero);
 }
@@ -742,10 +742,10 @@ fkTriggerDelete(sqlite3 * dbMem, Trigger * p)
 {
 	if (p) {
 		TriggerStep *pStep = p->step_list;
-		sql_expr_free(dbMem, pStep->pWhere, false);
+		sql_expr_delete(dbMem, pStep->pWhere, false);
 		sqlite3ExprListDelete(dbMem, pStep->pExprList);
 		sqlite3SelectDelete(dbMem, pStep->pSelect);
-		sql_expr_free(dbMem, p->pWhen, false);
+		sql_expr_delete(dbMem, p->pWhen, false);
 		sqlite3DbFree(dbMem, p);
 	}
 }
@@ -1414,8 +1414,8 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 		/* Re-enable the lookaside buffer, if it was disabled earlier. */
 		db->lookaside.bDisable--;
 
-		sql_expr_free(db, pWhere, false);
-		sql_expr_free(db, pWhen, false);
+		sql_expr_delete(db, pWhere, false);
+		sql_expr_delete(db, pWhen, false);
 		sqlite3ExprListDelete(db, pList);
 		sqlite3SelectDelete(db, pSelect);
 		if (db->mallocFailed == 1) {

@@ -391,7 +391,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
  delete_from_cleanup:
 	sqlite3SrcListDelete(db, tab_list);
-	sql_expr_free(db, where, false);
+	sql_expr_delete(db, where, false);
 }
 
 void

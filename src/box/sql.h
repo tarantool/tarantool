@@ -144,7 +144,7 @@ sql_expr_dup(struct sqlite3 *db, struct Expr *p, int flags, char **buffer);
  * @param extern_alloc True if skeleton was allocated externally.
  */
 void
-sql_expr_free(struct sqlite3 *db, struct Expr *expr, bool extern_alloc);
+sql_expr_delete(struct sqlite3 *db, struct Expr *expr, bool extern_alloc);
 
 /**
  * Create and initialize a new ephemeral SQL Table object.

@@ -463,7 +463,7 @@ sqlite3ExprForVectorField(Parse * pParse,	/* Parsing context */
 		 * pLeft->iTable:   First in an array of register holding result, or 0
 		 *                  if the result is not yet computed.
 		 *
-		 * sql_expr_free() specifically skips the recursive delete of
+		 * sql_expr_delete() specifically skips the recursive delete of
 		 * pLeft on TK_SELECT_COLUMN nodes.  But pRight is followed, so pVector
 		 * can be attached to pRight to cause this node to take ownership of
 		 * pVector.  Typically there will be multiple TK_SELECT_COLUMN nodes
@@ -892,8 +892,8 @@ sqlite3ExprAttachSubtrees(sqlite3 * db,
 {
 	if (pRoot == 0) {
 		assert(db->mallocFailed);
-		sql_expr_free(db, pLeft, false);
-		sql_expr_free(db, pRight, false);
+		sql_expr_delete(db, pLeft, false);
+		sql_expr_delete(db, pRight, false);
 	} else {
 		if (pRight) {
 			pRoot->pRight = pRight;
@@ -1009,8 +1009,8 @@ sqlite3ExprAnd(sqlite3 * db, Expr * pLeft, Expr * pRight)
 	} else if (pRight == 0) {
 		return pLeft;
 	} else if (exprAlwaysFalse(pLeft) || exprAlwaysFalse(pRight)) {
-		sql_expr_free(db, pLeft, false);
-		sql_expr_free(db, pRight, false);
+		sql_expr_delete(db, pLeft, false);
+		sql_expr_delete(db, pRight, false);
 		return sqlite3ExprAlloc(db, TK_INTEGER, &sqlite3IntTokens[0],
 					0);
 	} else {
@@ -1150,7 +1150,7 @@ sqlite3ExprDeleteNN(sqlite3 * db, Expr * p, bool extern_alloc)
 		if (p->pLeft && p->op != TK_SELECT_COLUMN && !extern_alloc)
 			sqlite3ExprDeleteNN(db, p->pLeft, extern_alloc);
 		if (!extern_alloc)
-			sql_expr_free(db, p->pRight, extern_alloc);
+			sql_expr_delete(db, p->pRight, extern_alloc);
 		if (ExprHasProperty(p, EP_xIsSelect)) {
 			sqlite3SelectDelete(db, p->x.pSelect);
 		} else {
@@ -1165,7 +1165,7 @@ sqlite3ExprDeleteNN(sqlite3 * db, Expr * p, bool extern_alloc)
 }
 
 void
-sql_expr_free(sqlite3 *db, Expr *expr, bool extern_alloc)
+sql_expr_delete(sqlite3 *db, Expr *expr, bool extern_alloc)
 {
 	if (expr != NULL)
 		sqlite3ExprDeleteNN(db, expr, extern_alloc);
@@ -1653,7 +1653,7 @@ sqlite3ExprListAppend(Parse * pParse,	/* Parsing context */
 
  no_mem:
 	/* Avoid leaking memory if malloc has failed. */
-	sql_expr_free(db, pExpr, false);
+	sql_expr_delete(db, pExpr, false);
 	sqlite3ExprListDelete(db, pList);
 	return 0;
 }
@@ -1729,7 +1729,7 @@ sqlite3ExprListAppendVector(Parse * pParse,	/* Parsing context */
 	}
 
  vector_append_error:
-	sql_expr_free(db, pExpr, false);
+	sql_expr_delete(db, pExpr, false);
 	sqlite3IdListDelete(db, pColumns);
 	return pList;
 }
@@ -1830,7 +1830,7 @@ exprListDeleteNN(sqlite3 * db, ExprList * pList)
 	struct ExprList_item *pItem;
 	assert(pList->a != 0 || pList->nExpr == 0);
 	for (pItem = pList->a, i = 0; i < pList->nExpr; i++, pItem++) {
-		sql_expr_free(db, pItem->pExpr, false);
+		sql_expr_delete(db, pItem->pExpr, false);
 		sqlite3DbFree(db, pItem->zName);
 		sqlite3DbFree(db, pItem->zSpan);
 	}
@@ -2905,7 +2905,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 						  dest.iSDParm);
 				VdbeComment((v, "Init EXISTS result"));
 			}
-			sql_expr_free(pParse->db, pSel->pLimit, false);
+			sql_expr_delete(pParse->db, pSel->pLimit, false);
 			pSel->pLimit = sqlite3ExprAlloc(pParse->db, TK_INTEGER,
 							&sqlite3IntTokens[1],
 							0);
@@ -4473,7 +4473,7 @@ sqlite3ExprCodeCopy(Parse * pParse, Expr * pExpr, int target)
 	pExpr = sqlite3ExprDup(db, pExpr, 0);
 	if (!db->mallocFailed)
 		sqlite3ExprCode(pParse, pExpr, target);
-	sql_expr_free(db, pExpr, false);
+	sql_expr_delete(db, pExpr, false);
 }
 
 /*
@@ -5021,7 +5021,7 @@ sqlite3ExprIfFalseDup(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 	if (db->mallocFailed == 0) {
 		sqlite3ExprIfFalse(pParse, pCopy, dest, jumpIfNull);
 	}
-	sql_expr_free(db, pCopy, false);
+	sql_expr_delete(db, pCopy, false);
 }
 
 /*

@@ -1816,7 +1816,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			pLevel->iIdxCur = iCovCur;
 		if (pAndExpr) {
 			pAndExpr->pLeft = 0;
-			sql_expr_free(db, pAndExpr, false);
+			sql_expr_delete(db, pAndExpr, false);
 		}
 		sqlite3VdbeChangeP1(v, iRetInit, sqlite3VdbeCurrentAddr(v));
 		sqlite3VdbeGoto(v, pLevel->addrBrk);
