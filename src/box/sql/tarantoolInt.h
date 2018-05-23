@@ -152,7 +152,7 @@ int tarantoolSqlite3MakeTableFormat(Table * pTable, void *buf);
  * Returns result size.
  * If buf==NULL estimate result size.
  */
-int tarantoolSqlite3MakeTableOpts(Table * pTable, const char *zSql, void *buf);
+int tarantoolSqlite3MakeTableOpts(Table * pTable, const char *zSql, char *buf);
 
 /*
  * Format "parts" array for _index entry.

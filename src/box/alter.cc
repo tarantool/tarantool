@@ -522,6 +522,17 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		space_def_new_xc(id, uid, exact_field_count, name, name_len,
 				 engine_name, engine_name_len, &opts, fields,
 				 field_count);
+	if (def->opts.checks != NULL &&
+	    sql_checks_resolve_space_def_reference(def->opts.checks,
+						   def) != 0) {
+		box_error_t *err = box_error_last();
+		if (box_error_code(err) != ENOMEM) {
+			tnt_raise(ClientError, errcode, def->name,
+				  box_error_message(err));
+		} else {
+			diag_raise();
+		}
+	}
 	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct engine *engine = engine_find_xc(def->engine_name);
 	engine_check_space_def_xc(engine, def);

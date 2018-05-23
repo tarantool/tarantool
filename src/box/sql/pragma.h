@@ -166,13 +166,11 @@ static const PragmaName aPragmaName[] = {
 	 /* iArg:      */ SQLITE_FullColNames},
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-#if !defined(SQLITE_OMIT_CHECK)
 	{ /* zName:     */ "ignore_check_constraints",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ SQLITE_IgnoreChecks},
-#endif
 #endif
 #if !defined(SQLITE_OMIT_SCHEMA_PRAGMAS)
 	{ /* zName:     */ "index_info",

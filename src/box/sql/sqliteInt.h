@@ -1916,7 +1916,6 @@ struct Table {
 	Select *pSelect;	/* NULL for tables.  Points to definition if a view. */
 	FKey *pFKey;		/* Linked list of all foreign keys in this table */
 	char *zColAff;		/* String defining the affinity of each column */
-	ExprList *pCheck;	/* All CHECK constraints */
 	/*   ... also used as column name list in a VIEW */
 	Hash idxHash;		/* All (named) indices indexed by name */
 	int tnum;		/* Root BTree page for this table */
@@ -3243,6 +3242,8 @@ struct Walker {
 		struct CCurHint *pCCurHint;	/* Used by codeCursorHint() */
 		int *aiCol;	/* array of column indexes */
 		struct IdxCover *pIdxCover;	/* Check for index coverage */
+		/** Space definition. */
+		struct space_def *space_def;
 	} u;
 };
 

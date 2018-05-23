@@ -1500,22 +1500,47 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
  *
  * Ex: {"temporary": true, "sql": "CREATE TABLE student (name, grade)"}
  */
-int tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, void *buf)
+int
+tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, char *buf)
 {
 	const struct Enc *enc = get_enc(buf);
-	char *base = buf, *p;
+	bool is_view = pTable != NULL && pTable->def->opts.is_view;
+	bool has_checks = pTable != NULL && pTable->def->opts.checks != NULL;
+	int checks_cnt = has_checks ? pTable->def->opts.checks->nExpr : 0;
+	char *p = enc->encode_map(buf, 1 + is_view + (checks_cnt > 0));
 
-	bool is_view = false;
-	if (pTable != NULL)
-		is_view = pTable->def->opts.is_view;
-	p = enc->encode_map(base, is_view ? 2 : 1);
 	p = enc->encode_str(p, "sql", 3);
 	p = enc->encode_str(p, zSql, strlen(zSql));
 	if (is_view) {
 		p = enc->encode_str(p, "view", 4);
 		p = enc->encode_bool(p, true);
 	}
-	return (int)(p - base);
+	if (checks_cnt == 0)
+		return p - buf;
+	/* Encode checks. */
+	struct ExprList_item *a = pTable->def->opts.checks->a;
+	p = enc->encode_str(p, "checks", 6);
+	p = enc->encode_array(p, checks_cnt);
+	for (int i = 0; i < checks_cnt; ++i) {
+		int items = (a[i].pExpr != NULL) + (a[i].zName != NULL);
+		p = enc->encode_map(p, items);
+		/*
+		 * a[i].pExpr could be NULL for VIEW column names
+		 * represented as checks.
+		 */
+		if (a[i].pExpr != NULL) {
+			Expr *pExpr = a[i].pExpr;
+			assert(pExpr->u.zToken != NULL);
+			p = enc->encode_str(p, "expr", 4);
+			p = enc->encode_str(p, pExpr->u.zToken,
+					    strlen(pExpr->u.zToken));
+		}
+		if (a[i].zName != NULL) {
+			p = enc->encode_str(p, "name", 4);
+			p = enc->encode_str(p, a[i].zName, strlen(a[i].zName));
+		}
+	}
+	return p - buf;
 }
 
 /*
@@ -1759,5 +1784,75 @@ sql_table_def_rebuild(struct sqlite3 *db, struct Table *pTable)
 	}
 	pTable->def = new_def;
 	pTable->def->opts.temporary = false;
+	return 0;
+}
+
+int
+sql_check_list_item_init(struct ExprList *expr_list, int column,
+			 const char *expr_name, uint32_t expr_name_len,
+			 const char *expr_str, uint32_t expr_str_len)
+{
+	assert(column < expr_list->nExpr);
+	struct ExprList_item *item = &expr_list->a[column];
+	memset(item, 0, sizeof(*item));
+	if (expr_name != NULL) {
+		item->zName = sqlite3DbStrNDup(db, expr_name, expr_name_len);
+		if (item->zName == NULL) {
+			diag_set(OutOfMemory, expr_name_len, "sqlite3DbStrNDup",
+				 "item->zName");
+			return -1;
+		}
+	}
+	if (expr_str != NULL && sql_expr_compile(db, expr_str, expr_str_len,
+						 &item->pExpr) != 0) {
+		sqlite3DbFree(db, item->zName);
+		return -1;
+	}
+	return 0;
+}
+
+static int
+update_space_def_callback(Walker *walker, Expr *expr)
+{
+	if (expr->op == TK_COLUMN && ExprHasProperty(expr, EP_Resolved))
+		expr->space_def = walker->u.space_def;
+	return WRC_Continue;
+}
+
+void
+sql_checks_update_space_def_reference(ExprList *expr_list,
+				      struct space_def *def)
+{
+	assert(expr_list != NULL);
+	Walker w;
+	memset(&w, 0, sizeof(w));
+	w.xExprCallback = update_space_def_callback;
+	w.u.space_def = def;
+	for (int i = 0; i < expr_list->nExpr; i++)
+		sqlite3WalkExpr(&w, expr_list->a[i].pExpr);
+}
+
+int
+sql_checks_resolve_space_def_reference(ExprList *expr_list,
+				       struct space_def *def)
+{
+	Parse parser;
+	sql_parser_create(&parser, sql_get());
+	parser.parse_only = true;
+
+	Table dummy_table;
+	memset(&dummy_table, 0, sizeof(dummy_table));
+	dummy_table.def = def;
+
+	sql_resolve_self_reference(&parser, &dummy_table, NC_IsCheck, NULL,
+				   expr_list);
+
+	sql_parser_destroy(&parser);
+	if (parser.rc != SQLITE_OK) {
+		/* Tarantool error may be already set with diag. */
+		if (parser.rc != SQL_TARANTOOL_ERROR)
+			diag_set(ClientError, ER_SQL, parser.zErrMsg);
+		return -1;
+	}
 	return 0;
 }

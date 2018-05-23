@@ -1,0 +1,105 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
+---
+- true
+...
+--
+-- gh-3272: Move SQL CHECK into server
+--
+-- invalid expression
+opts = {checks = {{expr = 'X><5'}}}
+---
+...
+format = {{name = 'X', type = 'unsigned'}}
+---
+...
+t = {513, 1, 'test', 'memtx', 0, opts, format}
+---
+...
+s = box.space._space:insert(t)
+---
+- error: 'Wrong space options (field 5): invalid expression specified'
+...
+opts = {checks = {{expr = 'X>5'}}}
+---
+...
+format = {{name = 'X', type = 'unsigned'}}
+---
+...
+t = {513, 1, 'test', 'memtx', 0, opts, format}
+---
+...
+s = box.space._space:insert(t)
+---
+...
+box.space._space:delete(513)
+---
+- [513, 1, 'test', 'memtx', 0, {'checks': [{'expr': 'X>5'}]}, [{'name': 'X', 'type': 'unsigned'}]]
+...
+opts = {checks = {{expr = 'X>5', name = 'ONE'}}}
+---
+...
+format = {{name = 'X', type = 'unsigned'}}
+---
+...
+t = {513, 1, 'test', 'memtx', 0, opts, format}
+---
+...
+s = box.space._space:insert(t)
+---
+...
+box.space._space:delete(513)
+---
+- [513, 1, 'test', 'memtx', 0, {'checks': [{'name': 'ONE', 'expr': 'X>5'}]}, [{'name': 'X',
+      'type': 'unsigned'}]]
+...
+-- extra invlalid field name
+opts = {checks = {{expr = 'X>5', name = 'ONE', extra = 'TWO'}}}
+---
+...
+format = {{name = 'X', type = 'unsigned'}}
+---
+...
+t = {513, 1, 'test', 'memtx', 0, opts, format}
+---
+...
+s = box.space._space:insert(t)
+---
+- error: 'Wrong space options (field 5): invalid MsgPack map field ''extra'''
+...
+opts = {checks = {{expr_invalid_label = 'X>5'}}}
+---
+...
+format = {{name = 'X', type = 'unsigned'}}
+---
+...
+t = {513, 1, 'test', 'memtx', 0, opts, format}
+---
+...
+s = box.space._space:insert(t)
+---
+- error: 'Wrong space options (field 5): invalid MsgPack map field ''expr_invalid_label'''
+...
+-- invalid field type
+opts = {checks = {{name = 123}}}
+---
+...
+format = {{name = 'X', type = 'unsigned'}}
+---
+...
+t = {513, 1, 'test', 'memtx', 0, opts, format}
+---
+...
+s = box.space._space:insert(t)
+---
+- error: 'Wrong space options (field 5): invalid MsgPack map field ''name'' type'
+...
+test_run:cmd("clear filter")
+---
+- true
+...

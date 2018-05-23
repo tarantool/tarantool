@@ -103,6 +103,14 @@ struct Expr*
 space_column_default_expr(uint32_t space_id, uint32_t fieldno);
 
 /**
+ * Get server checks list by space_id.
+ * @param space_id Space ID.
+ * @retval Checks list.
+ */
+struct ExprList *
+space_checks_expr_list(uint32_t space_id);
+
+/**
  * Return the number of bytes required to create a duplicate of the
  * expression passed as the first argument. The second argument is a
  * mask containing EXPRDUP_XXX flags.
@@ -231,6 +239,42 @@ sql_expr_list_append(struct sqlite3 *db, struct ExprList *expr_list,
 void
 sql_resolve_self_reference(struct Parse *parser, struct Table *table, int type,
 			   struct Expr *expr, struct ExprList *expr_list);
+
+/**
+ * Initialize check_list_item.
+ * @param expr_list ExprList with item.
+ * @param column index.
+ * @param expr_name expression name (optional).
+ * @param expr_name_len expresson name length (optional).
+ * @param expr_str expression to build string.
+ * @param expr_str_len expression to build string length.
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+int
+sql_check_list_item_init(struct ExprList *expr_list, int column,
+			 const char *expr_name, uint32_t expr_name_len,
+			 const char *expr_str, uint32_t expr_str_len);
+
+/**
+ * Resolve space_def references checks for expr_list.
+ * @param expr_list to modify.
+ * @param def to refer to.
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+int
+sql_checks_resolve_space_def_reference(struct ExprList *expr_list,
+				       struct space_def *def);
+
+/**
+ * Update space_def references for expr_list.
+ * @param expr_list to modify.
+ * @param def to refer to.
+ */
+void
+sql_checks_update_space_def_reference(struct ExprList *expr_list,
+				      struct space_def *def);
 
 /**
  * Initialize a new parser object.

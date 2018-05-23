@@ -406,11 +406,12 @@ deleteTable(sqlite3 * db, Table * pTable)
 	sqlite3DbFree(db, pTable->aCol);
 	sqlite3DbFree(db, pTable->zColAff);
 	sqlite3SelectDelete(db, pTable->pSelect);
-	sql_expr_list_delete(db, pTable->pCheck);
 	assert(pTable->def != NULL);
 	/* Do not delete pTable->def allocated on region. */
 	if (!pTable->def->opts.temporary)
 		space_def_delete(pTable->def);
+	else
+		sql_expr_list_delete(db, pTable->def->opts.checks);
 	sqlite3DbFree(db, pTable);
 
 	/* Verify that no lookaside memory was used by schema tables */
@@ -1025,13 +1026,24 @@ sql_add_check_constraint(struct Parse *parser, struct ExprSpan *span)
 	struct Expr *expr = span->pExpr;
 	struct Table *table = parser->pNewTable;
 	if (table != NULL) {
-		table->pCheck =
-			sql_expr_list_append(parser->db, table->pCheck, expr);
-		if (parser->constraintName.n != 0) {
-			sqlite3ExprListSetName(parser, table->pCheck,
+		expr->u.zToken =
+			sqlite3DbStrNDup(parser->db, (char *)span->zStart,
+					 (int)(span->zEnd - span->zStart));
+		if (expr->u.zToken == NULL)
+			goto release_expr;
+		table->def->opts.checks =
+			sql_expr_list_append(parser->db,
+					     table->def->opts.checks, expr);
+		if (table->def->opts.checks == NULL) {
+			sqlite3DbFree(parser->db, expr->u.zToken);
+			goto release_expr;
+		}
+		if (parser->constraintName.n) {
+			sqlite3ExprListSetName(parser, table->def->opts.checks,
 					       &parser->constraintName, 1);
 		}
 	} else {
+release_expr:
 		sql_expr_delete(parser->db, expr, false);
 	}
 }
@@ -1174,6 +1186,16 @@ space_is_view(Table *table) {
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	return space->def->opts.is_view;
+}
+
+struct ExprList *
+space_checks_expr_list(uint32_t space_id)
+{
+	struct space *space;
+	space = space_by_id(space_id);
+	assert(space != NULL);
+	assert(space->def != NULL);
+	return space->def->opts.checks;
 }
 
 /**
@@ -1847,17 +1869,14 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		return;
 	}
 
+	/*
+	 * As rebuild creates a new ExpList tree and old_def
+	 * is allocated on region release old tree manually.
+	 */
+	struct ExprList *old_checks = p->def->opts.checks;
 	if (sql_table_def_rebuild(db, p) != 0)
 		return;
-
-#ifndef SQLITE_OMIT_CHECK
-	/* Resolve names in all CHECK constraint expressions.
-	 */
-	if (p->pCheck != NULL) {
-		sql_resolve_self_reference(pParse, p, NC_IsCheck, NULL,
-					   p->pCheck);
-	}
-#endif				/* !defined(SQLITE_OMIT_CHECK) */
+	sql_expr_list_delete(db, old_checks);
 
 	/* If not initializing, then create new Tarantool space.
 	 *
@@ -1978,6 +1997,15 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		}
 #endif
 	}
+
+	/*
+	 * Checks are useless for now as all operations process with
+	 * the server checks instance. Remove to do not consume extra memory,
+	 * don't require make a copy on space_def_dup and to improve
+	 * debuggability.
+	 */
+	sql_expr_list_delete(db, p->def->opts.checks);
+	p->def->opts.checks = NULL;
 }
 
 #ifndef SQLITE_OMIT_VIEW
@@ -2019,7 +2047,7 @@ sqlite3CreateView(Parse * pParse,	/* The parsing context */
 	 */
 	p->pSelect = sqlite3SelectDup(db, pSelect, EXPRDUP_REDUCE);
 	p->def->opts.is_view = true;
-	p->pCheck = sql_expr_list_dup(db, pCNames, EXPRDUP_REDUCE);
+	p->def->opts.checks = sql_expr_list_dup(db, pCNames, EXPRDUP_REDUCE);
 	if (db->mallocFailed)
 		goto create_view_fail;
 
@@ -2105,7 +2133,9 @@ sql_view_column_names(struct Parse *parse, struct Table *table)
 	struct Table *sel_tab = sqlite3ResultSetOfSelect(parse, select);
 	parse->nTab = n;
 	int rc = 0;
-	if (table->pCheck != NULL) {
+	/* Get server checks. */
+	ExprList *checks = space_checks_expr_list(table->def->id);
+	if (checks != NULL) {
 		/* CREATE VIEW name(arglist) AS ...
 		 * The names of the columns in the table are taken
 		 * from arglist which is stored in table->pCheck.
@@ -2114,7 +2144,7 @@ sql_view_column_names(struct Parse *parse, struct Table *table)
 		 * VIEW it holds the list of column names.
 		 */
 		struct space_def *old_def = table->def;
-		sqlite3ColumnsFromExprList(parse, table->pCheck, table);
+		sqlite3ColumnsFromExprList(parse, checks, table);
 		if (sql_table_def_rebuild(db, table) != 0) {
 			rc = -1;
 		} else {

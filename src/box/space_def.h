@@ -40,6 +40,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct ExprList;
+
 /** Space options */
 struct space_opts {
         /**
@@ -57,10 +59,10 @@ struct space_opts {
 	 * this flag can't be changed after space creation.
 	 */
 	bool is_view;
-	/**
-	 * SQL statement that produced this space.
-	 */
+	/** SQL statement that produced this space. */
 	char *sql;
+	/** SQL Checks expressions list. */
+	struct ExprList *checks;
 };
 
 extern const struct space_opts space_opts_default;
@@ -79,12 +81,8 @@ space_opts_create(struct space_opts *opts)
 /**
  * Destroy space options
  */
-static inline void
-space_opts_destroy(struct space_opts *opts)
-{
-	free(opts->sql);
-	TRASH(opts);
-}
+void
+space_opts_destroy(struct space_opts *opts);
 
 /** Space metadata. */
 struct space_def {

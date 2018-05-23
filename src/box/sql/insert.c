@@ -1164,21 +1164,23 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		}
 	}
 
-	/* Test all CHECK constraints
+	/*
+	 * Get server checks.
+	 * Test all CHECK constraints.
 	 */
-#ifndef SQLITE_OMIT_CHECK
-	if (pTab->pCheck && (user_session->sql_flags &
-			     SQLITE_IgnoreChecks) == 0) {
-		ExprList *pCheck = pTab->pCheck;
+	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
+	ExprList *checks = space_checks_expr_list(space_id);
+	if (checks != NULL &&
+	    (user_session->sql_flags & SQLITE_IgnoreChecks) == 0) {
 		pParse->ckBase = regNewData + 1;
 		if (override_error != ON_CONFLICT_ACTION_DEFAULT)
 			on_error = override_error;
 		else
 			on_error = ON_CONFLICT_ACTION_ABORT;
 
-		for (i = 0; i < pCheck->nExpr; i++) {
+		for (i = 0; i < checks->nExpr; i++) {
 			int allOk;
-			Expr *pExpr = pCheck->a[i].pExpr;
+			Expr *pExpr = checks->a[i].pExpr;
 			if (aiChng
 			    && checkConstraintUnchanged(pExpr, aiChng))
 				continue;
@@ -1188,7 +1190,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			if (on_error == ON_CONFLICT_ACTION_IGNORE) {
 				sqlite3VdbeGoto(v, ignoreDest);
 			} else {
-				char *zName = pCheck->a[i].zName;
+				char *zName = checks->a[i].zName;
 				if (zName == 0)
 					zName = pTab->def->name;
 				if (on_error == ON_CONFLICT_ACTION_REPLACE)
@@ -1202,7 +1204,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			sqlite3VdbeResolveLabel(v, allOk);
 		}
 	}
-#endif				/* !defined(SQLITE_OMIT_CHECK) */
 
 	/* Test all UNIQUE constraints by creating entries for each UNIQUE
 	 * index and making sure that duplicate entries do not already exist.
@@ -1886,12 +1887,16 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			return 0;	/* pDestIdx has no corresponding index in pSrc */
 		}
 	}
-#ifndef SQLITE_OMIT_CHECK
-	if (pDest->pCheck
-	    && sqlite3ExprListCompare(pSrc->pCheck, pDest->pCheck, -1)) {
-		return 0;	/* Tables have different CHECK constraints.  Ticket #2252 */
+	/* Get server checks. */
+	ExprList *pCheck_src = space_checks_expr_list(
+		SQLITE_PAGENO_TO_SPACEID(pSrc->tnum));
+	ExprList *pCheck_dest = space_checks_expr_list(
+		SQLITE_PAGENO_TO_SPACEID(pDest->tnum));
+	if (pCheck_dest != NULL &&
+	    sqlite3ExprListCompare(pCheck_src, pCheck_dest, -1) != 0) {
+		/* Tables have different CHECK constraints.  Ticket #2252 */
+		return 0;
 	}
-#endif
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 	/* Disallow the transfer optimization if the destination table constains
 	 * any foreign key constraints.  This is more restrictive than necessary.

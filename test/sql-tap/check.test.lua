@@ -345,7 +345,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.1>
-        1, "subqueries prohibited in CHECK constraints"
+        1, "Failed to create space 'T3': SQL error: subqueries prohibited in CHECK constraints"
         -- </check-3.1>
     })
 
@@ -370,7 +370,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.3>
-        1, "no such column: Q"
+        1, "Failed to create space 'T3': SQL error: no such column: Q"
         -- </check-3.3>
     })
 
@@ -394,7 +394,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.5>
-        1, "no such column: T2.X"
+        1, "Failed to create space 'T3': SQL error: no such column: T2.X"
         -- </check-3.5>
     })
 
@@ -555,7 +555,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.1>
-        1, "parameters prohibited in CHECK constraints"
+        1, "Failed to create space 'T5': SQL error: parameters prohibited in CHECK constraints"
         -- </check-5.1>
     })
 
@@ -567,7 +567,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.2>
-        1, "parameters prohibited in CHECK constraints"
+        1, "Failed to create space 'T5': SQL error: parameters prohibited in CHECK constraints"
         -- </check-5.2>
     })
 
