@@ -74,12 +74,14 @@ struct Table;
  * stuct Select and return it.
  * @param db SQL context handle.
  * @param expr Expression to parse.
+ * @param expr_len Length of @an expr.
  * @param[out] result Result: AST structure.
  *
  * @retval Error code if any.
  */
 int
-sql_expr_compile(struct sqlite3 *db, const char *expr, struct Expr **result);
+sql_expr_compile(struct sqlite3 *db, const char *expr, int expr_len,
+		 struct Expr **result);
 
 /**
  * Store duplicate of a parsed expression into @a parser.

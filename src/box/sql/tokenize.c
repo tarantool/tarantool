@@ -540,10 +540,11 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 }
 
 int
-sql_expr_compile(sqlite3 *db, const char *expr, struct Expr **result)
+sql_expr_compile(sqlite3 *db, const char *expr, int expr_len,
+		 struct Expr **result)
 {
 	const char *outer = "SELECT ";
-	int len = strlen(outer) + strlen(expr);
+	int len = strlen(outer) + expr_len;
 
 	struct Parse parser;
 	sql_parser_create(&parser, db);
@@ -554,7 +555,7 @@ sql_expr_compile(sqlite3 *db, const char *expr, struct Expr **result)
 		diag_set(OutOfMemory, len + 1, "region_alloc", "stmt");
 		return -1;
 	}
-	sprintf(stmt, "%s%s", outer, expr);
+	sprintf(stmt, "%s%.*s", outer, expr_len, expr);
 
 	char *unused;
 	if (sqlite3RunParser(&parser, stmt, &unused) != SQLITE_OK) {

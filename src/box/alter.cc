@@ -407,6 +407,7 @@ field_def_decode(struct field_def *field, const char **data,
 
 	if (field->default_value != NULL &&
 	    sql_expr_compile(sql_get(), field->default_value,
+			     strlen(field->default_value),
 			     &field->default_value_expr) != 0)
 		diag_raise();
 }
