@@ -466,6 +466,12 @@ bool
 vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range);
 
 /**
+ * Mark all ranges of an LSM tree for major compaction.
+ */
+void
+vy_lsm_force_compaction(struct vy_lsm *lsm);
+
+/**
  * Insert a statement into the in-memory index of an LSM tree. If
  * the region_stmt is NULL and the statement is successfully inserted
  * then the new lsregion statement is returned via @a region_stmt.

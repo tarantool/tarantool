@@ -31,17 +31,48 @@
  * SUCH DAMAGE.
  */
 #include "index.h"
+#include "memtx_engine.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct memtx_engine;
-struct light_index_core;
+static inline bool
+memtx_hash_equal(struct tuple *tuple_a, struct tuple *tuple_b,
+		 const struct key_def *key_def)
+{
+	return tuple_compare(tuple_a, tuple_b, key_def) == 0;
+}
+
+static inline bool
+memtx_hash_equal_key(struct tuple *tuple, const char *key,
+		     const struct key_def *key_def)
+{
+	return tuple_compare_with_key(tuple, key, key_def->part_count,
+				      key_def) == 0;
+}
+
+#define LIGHT_NAME _index
+#define LIGHT_DATA_TYPE struct tuple *
+#define LIGHT_KEY_TYPE const char *
+#define LIGHT_CMP_ARG_TYPE struct key_def *
+#define LIGHT_EQUAL(a, b, c) memtx_hash_equal(a, b, c)
+#define LIGHT_EQUAL_KEY(a, b, c) memtx_hash_equal_key(a, b, c)
+
+#include "salad/light.h"
+
+#undef LIGHT_NAME
+#undef LIGHT_DATA_TYPE
+#undef LIGHT_KEY_TYPE
+#undef LIGHT_CMP_ARG_TYPE
+#undef LIGHT_EQUAL
+#undef LIGHT_EQUAL_KEY
 
 struct memtx_hash_index {
 	struct index base;
-	struct light_index_core *hash_table;
+	struct light_index_core hash_table;
+	struct memtx_gc_task gc_task;
+	struct light_index_iterator gc_iterator;
 };
 
 struct memtx_hash_index *

@@ -410,7 +410,7 @@ box_iterator_free(box_iterator_t *it)
 
 /* }}} */
 
-/* {{{ Introspection */
+/* {{{ Other index functions */
 
 int
 box_index_info(uint32_t space_id, uint32_t index_id,
@@ -421,6 +421,17 @@ box_index_info(uint32_t space_id, uint32_t index_id,
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
 	index_info(index, info);
+	return 0;
+}
+
+int
+box_index_compact(uint32_t space_id, uint32_t index_id)
+{
+	struct space *space;
+	struct index *index;
+	if (check_index(space_id, index_id, &space, &index) != 0)
+		return -1;
+	index_compact(index);
 	return 0;
 }
 
@@ -488,8 +499,14 @@ index_create(struct index *index, struct engine *engine,
 void
 index_delete(struct index *index)
 {
-	index_def_delete(index->def);
+	/*
+	 * Free index_def after destroying the index as
+	 * engine might still need it, e.g. to check if
+	 * the index is primary or secondary.
+	 */
+	struct index_def *def = index->def;
 	index->vtab->destroy(index);
+	index_def_delete(def);
 }
 
 int
@@ -666,6 +683,12 @@ generic_index_info(struct index *index, struct info_handler *handler)
 	(void)index;
 	info_begin(handler);
 	info_end(handler);
+}
+
+void
+generic_index_compact(struct index *index)
+{
+	(void)index;
 }
 
 void

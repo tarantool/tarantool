@@ -301,12 +301,78 @@ memtx_tree_index_cmp_def(struct memtx_tree_index *index)
 }
 
 static void
-memtx_tree_index_destroy(struct index *base)
+memtx_tree_index_free(struct memtx_tree_index *index)
 {
-	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
 	memtx_tree_destroy(&index->tree);
 	free(index->build_array);
 	free(index);
+}
+
+static void
+memtx_tree_index_gc_run(struct memtx_gc_task *task, bool *done)
+{
+	/*
+	 * Yield every 1K tuples to keep latency < 0.1 ms.
+	 * Yield more often in debug mode.
+	 */
+#ifdef NDEBUG
+	enum { YIELD_LOOPS = 1000 };
+#else
+	enum { YIELD_LOOPS = 10 };
+#endif
+
+	struct memtx_tree_index *index = container_of(task,
+			struct memtx_tree_index, gc_task);
+	struct memtx_tree *tree = &index->tree;
+	struct memtx_tree_iterator *itr = &index->gc_iterator;
+
+	unsigned int loops = 0;
+	while (!memtx_tree_iterator_is_invalid(itr)) {
+		struct tuple *tuple = *memtx_tree_iterator_get_elem(tree, itr);
+		memtx_tree_iterator_next(tree, itr);
+		tuple_unref(tuple);
+		if (++loops >= YIELD_LOOPS) {
+			*done = false;
+			return;
+		}
+	}
+	*done = true;
+}
+
+static void
+memtx_tree_index_gc_free(struct memtx_gc_task *task)
+{
+	struct memtx_tree_index *index = container_of(task,
+			struct memtx_tree_index, gc_task);
+	memtx_tree_index_free(index);
+}
+
+static const struct memtx_gc_task_vtab memtx_tree_index_gc_vtab = {
+	.run = memtx_tree_index_gc_run,
+	.free = memtx_tree_index_gc_free,
+};
+
+static void
+memtx_tree_index_destroy(struct index *base)
+{
+	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
+	struct memtx_engine *memtx = (struct memtx_engine *)base->engine;
+	if (base->def->iid == 0) {
+		/*
+		 * Primary index. We need to free all tuples stored
+		 * in the index, which may take a while. Schedule a
+		 * background task in order not to block tx thread.
+		 */
+		index->gc_task.vtab = &memtx_tree_index_gc_vtab;
+		index->gc_iterator = memtx_tree_iterator_first(&index->tree);
+		memtx_engine_schedule_gc(memtx, &index->gc_task);
+	} else {
+		/*
+		 * Secondary index. Destruction is fast, no need to
+		 * hand over to background fiber.
+		 */
+		memtx_tree_index_free(index);
+	}
 }
 
 static void
@@ -590,9 +656,9 @@ memtx_tree_index_create_snapshot_iterator(struct index *base)
 static const struct index_vtab memtx_tree_index_vtab = {
 	/* .destroy = */ memtx_tree_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ memtx_index_abort_create,
+	/* .abort_create = */ generic_index_abort_create,
 	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ memtx_index_commit_drop,
+	/* .commit_drop = */ generic_index_commit_drop,
 	/* .update_def = */ memtx_tree_index_update_def,
 	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
 	/* .def_change_requires_rebuild = */
@@ -609,6 +675,7 @@ static const struct index_vtab memtx_tree_index_vtab = {
 	/* .create_snapshot_iterator = */
 		memtx_tree_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,
+	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
 	/* .begin_build = */ memtx_tree_index_begin_build,
 	/* .reserve = */ memtx_tree_index_reserve,
@@ -619,8 +686,6 @@ static const struct index_vtab memtx_tree_index_vtab = {
 struct memtx_tree_index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
-	memtx_index_arena_init();
-
 	if (!mempool_is_initialized(&memtx->tree_iterator_pool)) {
 		mempool_create(&memtx->tree_iterator_pool, cord_slab_cache(),
 			       sizeof(struct tree_iterator));
@@ -640,8 +705,7 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	}
 
 	struct key_def *cmp_def = memtx_tree_index_cmp_def(index);
-	memtx_tree_create(&index->tree, cmp_def,
-			  memtx_index_extent_alloc,
-			  memtx_index_extent_free, NULL);
+	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
+			  memtx_index_extent_free, memtx);
 	return index;
 }

@@ -32,13 +32,14 @@
 #include "space.h"
 #include "iproto_constants.h"
 #include "txn.h"
+#include "tuple.h"
 #include "tuple_update.h"
 #include "xrow.h"
 #include "memtx_hash.h"
 #include "memtx_tree.h"
 #include "memtx_rtree.h"
 #include "memtx_bitset.h"
-#include "memtx_tuple.h"
+#include "memtx_engine.h"
 #include "column_mask.h"
 #include "sequence.h"
 
@@ -237,11 +238,12 @@ memtx_space_replace_all_keys(struct space *space, struct tuple *old_tuple,
 			     enum dup_replace_mode mode,
 			     struct tuple **result)
 {
+	struct memtx_engine *memtx = (struct memtx_engine *)space->engine;
 	/*
 	 * Ensure we have enough slack memory to guarantee
 	 * successful statement-level rollback.
 	 */
-	if (memtx_index_extent_reserve(new_tuple ?
+	if (memtx_index_extent_reserve(memtx, new_tuple != NULL ?
 				       RESERVE_EXTENTS_BEFORE_REPLACE :
 				       RESERVE_EXTENTS_BEFORE_DELETE) != 0)
 		return -1;
@@ -916,7 +918,7 @@ memtx_space_build_index(struct space *src_space, struct index *new_index,
 static void
 memtx_space_ephemeral_cleanup(struct space *space)
 {
-	memtx_index_prune(space->index[0]);
+	(void)space;
 }
 
 static int
@@ -995,6 +997,7 @@ memtx_space_new(struct memtx_engine *memtx,
 		free(memtx_space);
 		return NULL;
 	}
+	format->engine = memtx;
 	format->exact_field_count = def->exact_field_count;
 	tuple_format_ref(format);
 

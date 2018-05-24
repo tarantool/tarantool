@@ -33,16 +33,22 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <small/quota.h>
+#include <small/small.h>
 #include <small/mempool.h>
 
 #include "engine.h"
 #include "xlog.h"
+#include "salad/stailq.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct index;
+struct fiber;
+struct tuple;
+struct tuple_format;
 
 /**
  * The state of memtx recovery process.
@@ -93,6 +99,36 @@ struct memtx_engine {
 	uint64_t snap_io_rate_limit;
 	/** Skip invalid snapshot records if this flag is set. */
 	bool force_recovery;
+	/** Common quota for tuples and indexes. */
+	struct quota quota;
+	/**
+	 * Common slab arena for tuples and indexes.
+	 * If you decide to use it for anything other than
+	 * tuple_alloc or index_extent_pool, make sure this
+	 * is reflected in box.slab.info(), @sa lua/slab.c.
+	 */
+	struct slab_arena arena;
+	/** Slab cache for allocating tuples. */
+	struct slab_cache slab_cache;
+	/** Tuple allocator. */
+	struct small_alloc alloc;
+	/** Slab cache for allocating index extents. */
+	struct slab_cache index_slab_cache;
+	/** Index extent allocator. */
+	struct mempool index_extent_pool;
+	/**
+	 * To ensure proper statement-level rollback in case
+	 * of out of memory conditions, we maintain a number
+	 * of slack memory extents reserved before a statement
+	 * is begun. If there isn't enough slack memory,
+	 * we don't begin the statement.
+	 */
+	int num_reserved_extents;
+	void *reserved_extents;
+	/** Maximal allowed tuple size, box.cfg.memtx_max_tuple_size. */
+	size_t max_tuple_size;
+	/** Incremented with each next snapshot. */
+	uint32_t snapshot_version;
 	/** Memory pool for tree index iterator. */
 	struct mempool tree_iterator_pool;
 	/** Memory pool for rtree index iterator. */
@@ -101,7 +137,46 @@ struct memtx_engine {
 	struct mempool hash_iterator_pool;
 	/** Memory pool for bitset index iterator. */
 	struct mempool bitset_iterator_pool;
+	/**
+	 * Garbage collection fiber. Used for asynchronous
+	 * destruction of dropped indexes.
+	 */
+	struct fiber *gc_fiber;
+	/**
+	 * Scheduled garbage collection tasks, linked by
+	 * memtx_gc_task::link.
+	 */
+	struct stailq gc_queue;
 };
+
+struct memtx_gc_task;
+
+struct memtx_gc_task_vtab {
+	/**
+	 * Free some objects associated with @task. If @task has
+	 * no more objects to free, set flag @done.
+	 */
+	void (*run)(struct memtx_gc_task *task, bool *done);
+	/**
+	 * Destroy @task.
+	 */
+	void (*free)(struct memtx_gc_task *task);
+};
+
+/** Garbage collection task. */
+struct memtx_gc_task {
+	/** Link in memtx_engine::gc_queue. */
+	struct stailq_entry link;
+	/** Virtual function table. */
+	const struct memtx_gc_task_vtab *vtab;
+};
+
+/**
+ * Schedule a garbage collection task for execution.
+ */
+void
+memtx_engine_schedule_gc(struct memtx_engine *memtx,
+			 struct memtx_gc_task *task);
 
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
@@ -118,28 +193,32 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
 
+/** Allocate a memtx tuple. @sa tuple_new(). */
+struct tuple *
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end);
+
+/** Free a memtx tuple. @sa tuple_delete(). */
+void
+memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple);
+
+/** Tuple format vtab for memtx engine. */
+extern struct tuple_format_vtab memtx_tuple_format_vtab;
+
 enum {
 	MEMTX_EXTENT_SIZE = 16 * 1024,
 	MEMTX_SLAB_SIZE = 4 * 1024 * 1024
 };
 
 /**
- * Initialize arena for indexes.
- * The arena is used for memtx_index_extent_alloc
- *  and memtx_index_extent_free.
- * Can be called several times, only first call do the work.
- */
-void
-memtx_index_arena_init(void);
-
-/**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
+ * @ctx must point to memtx engine
  */
 void *
 memtx_index_extent_alloc(void *ctx);
 
 /**
  * Free a block previously allocated by memtx_index_extent_alloc
+ * @ctx must point to memtx engine
  */
 void
 memtx_index_extent_free(void *ctx, void *extent);
@@ -149,23 +228,7 @@ memtx_index_extent_free(void *ctx, void *extent);
  * Ensure that next num extent_alloc will succeed w/o an error
  */
 int
-memtx_index_extent_reserve(int num);
-
-/**
- * Free all tuples referenced by the given index.
- */
-void
-memtx_index_prune(struct index *index);
-
-/*
- * The following two methods are used by all kinds of memtx indexes
- * to delete tuples stored in the space when the primary index is
- * destroyed.
- */
-void
-memtx_index_abort_create(struct index *index);
-void
-memtx_index_commit_drop(struct index *index);
+memtx_index_extent_reserve(struct memtx_engine *memtx, int num);
 
 /**
  * Generic implementation of index_vtab::def_change_requires_rebuild,

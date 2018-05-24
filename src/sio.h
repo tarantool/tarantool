@@ -104,16 +104,6 @@ public:
 	}
 };
 
-/** Close a file descriptor on exception or end of scope. */
-struct FDGuard {
-	int fd;
-	explicit FDGuard(int fd_arg):fd(fd_arg) {}
-	~FDGuard() { if (fd >= 0) close(fd); }
-private:
-	explicit FDGuard(const FDGuard&) = delete;
-	FDGuard& operator=(const FDGuard&) = delete;
-};
-
 const char *sio_socketname(int fd);
 int sio_socket(int domain, int type, int protocol);
 

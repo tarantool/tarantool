@@ -97,6 +97,8 @@ struct memtx_tree_index {
 	struct memtx_tree tree;
 	struct tuple **build_array;
 	size_t build_array_size, build_array_alloc_size;
+	struct memtx_gc_task gc_task;
+	struct memtx_tree_iterator gc_iterator;
 };
 
 struct memtx_tree_index *

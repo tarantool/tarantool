@@ -458,6 +458,15 @@ vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
 	fiber_cond_signal(&scheduler->scheduler_cond);
 }
 
+void
+vy_scheduler_force_compaction(struct vy_scheduler *scheduler,
+			      struct vy_lsm *lsm)
+{
+	vy_lsm_force_compaction(lsm);
+	vy_scheduler_update_lsm(scheduler, lsm);
+	fiber_cond_signal(&scheduler->scheduler_cond);
+}
+
 /**
  * Check whether the current dump round is complete.
  * If it is, free memory and proceed to the next dump round.

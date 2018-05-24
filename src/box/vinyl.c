@@ -1273,6 +1273,14 @@ vinyl_index_bsize(struct index *index)
 	return bsize;
 }
 
+static void
+vinyl_index_compact(struct index *index)
+{
+	struct vy_lsm *lsm = vy_lsm(index);
+	struct vy_env *env = vy_env(index->engine);
+	vy_scheduler_force_compaction(&env->scheduler, lsm);
+}
+
 /* {{{ Public API of transaction control: start/end transaction,
  * read, write data in the context of a transaction.
  */
@@ -4099,6 +4107,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ vinyl_index_info,
+	/* .compact = */ vinyl_index_compact,
 	/* .reset_stat = */ vinyl_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,

@@ -457,9 +457,9 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .destroy = */ memtx_bitset_index_destroy,
 	/* .commit_create = */ generic_index_commit_create,
-	/* .abort_create = */ memtx_index_abort_create,
+	/* .abort_create = */ generic_index_abort_create,
 	/* .commit_modify = */ generic_index_commit_modify,
-	/* .commit_drop = */ memtx_index_commit_drop,
+	/* .commit_drop = */ generic_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ generic_index_depends_on_pk,
 	/* .def_change_requires_rebuild = */
@@ -476,6 +476,7 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
 	/* .info = */ generic_index_info,
+	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,
 	/* .reserve = */ generic_index_reserve,
@@ -486,9 +487,8 @@ static const struct index_vtab memtx_bitset_index_vtab = {
 struct memtx_bitset_index *
 memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
+	assert(def->iid > 0);
 	assert(!def->opts.is_unique);
-
-	memtx_index_arena_init();
 
 	if (!mempool_is_initialized(&memtx->bitset_iterator_pool)) {
 		mempool_create(&memtx->bitset_iterator_pool, cord_slab_cache(),
@@ -514,7 +514,7 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 	if (index->id_to_tuple == NULL)
 		panic("failed to allocate memtx bitset index");
 	matras_create(index->id_to_tuple, MEMTX_EXTENT_SIZE, sizeof(struct tuple *),
-		      memtx_index_extent_alloc, memtx_index_extent_free, NULL);
+		      memtx_index_extent_alloc, memtx_index_extent_free, memtx);
 
 	index->tuple_to_id = mh_bitset_index_new();
 	if (index->tuple_to_id == NULL)

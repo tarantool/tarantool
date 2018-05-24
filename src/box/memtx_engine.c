@@ -30,11 +30,14 @@
  */
 #include "memtx_engine.h"
 #include "memtx_space.h"
-#include "memtx_tuple.h"
 
+#include <small/quota.h>
 #include <small/small.h>
 #include <small/mempool.h>
 
+#include "fiber.h"
+#include "clock.h"
+#include "errinj.h"
 #include "coio_file.h"
 #include "tuple.h"
 #include "txn.h"
@@ -47,27 +50,6 @@
 #include "schema.h"
 #include "gc.h"
 
-/** For all memory used by all indexes.
- * If you decide to use memtx_index_arena or
- * memtx_index_slab_cache for anything other than
- * memtx_index_extent_pool, make sure this is reflected in
- * box.slab.info(), @sa lua/slab.cc
- */
-extern struct quota memtx_quota;
-static bool memtx_index_arena_initialized = false;
-struct slab_arena memtx_arena; /* used by memtx_tuple.cc */
-static struct slab_cache memtx_index_slab_cache;
-struct mempool memtx_index_extent_pool;
-/**
- * To ensure proper statement-level rollback in case
- * of out of memory conditions, we maintain a number
- * of slack memory extents reserved before a statement
- * is begun. If there isn't enough slack memory,
- * we don't begin the statement.
- */
-static int memtx_index_num_reserved_extents;
-static void *memtx_index_reserved_extents;
-
 static void
 txn_on_yield_or_stop(struct trigger *trigger, void *event)
 {
@@ -75,6 +57,24 @@ txn_on_yield_or_stop(struct trigger *trigger, void *event)
 	(void)event;
 	txn_rollback(); /* doesn't throw */
 }
+
+struct memtx_tuple {
+	/*
+	 * sic: the header of the tuple is used
+	 * to store a free list pointer in smfree_delayed.
+	 * Please don't change it without understanding
+	 * how smfree_delayed and snapshotting COW works.
+	 */
+	/** Snapshot generation version. */
+	uint32_t version;
+	struct tuple base;
+};
+
+enum {
+	OBJSIZE_MIN = 16,
+	SLAB_SIZE = 16 * 1024 * 1024,
+	MAX_TUPLE_SIZE = 1 * 1024 * 1024,
+};
 
 static int
 memtx_end_build_primary_key(struct space *space, void *param)
@@ -138,9 +138,13 @@ memtx_engine_shutdown(struct engine *engine)
 		mempool_destroy(&memtx->hash_iterator_pool);
 	if (mempool_is_initialized(&memtx->bitset_iterator_pool))
 		mempool_destroy(&memtx->bitset_iterator_pool);
+	mempool_destroy(&memtx->index_extent_pool);
+	slab_cache_destroy(&memtx->index_slab_cache);
+	small_alloc_destroy(&memtx->alloc);
+	slab_cache_destroy(&memtx->slab_cache);
+	tuple_arena_destroy(&memtx->arena);
 	xdir_destroy(&memtx->snap_dir);
 	free(memtx);
-	memtx_tuple_free();
 }
 
 static int
@@ -668,7 +672,8 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 	}
 
 	/* increment snapshot version; set tuple deletion to delayed mode */
-	memtx_tuple_begin_snapshot();
+	memtx->snapshot_version++;
+	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, true);
 	return 0;
 }
 
@@ -714,7 +719,7 @@ memtx_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
 	/* waitCheckpoint() must have been done. */
 	assert(!memtx->checkpoint->waiting_for_snap_thread);
 
-	memtx_tuple_end_snapshot();
+	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, false);
 
 	if (!memtx->checkpoint->touch) {
 		int64_t lsn = vclock_sum(memtx->checkpoint->vclock);
@@ -757,7 +762,7 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 		memtx->checkpoint->waiting_for_snap_thread = false;
 	}
 
-	memtx_tuple_end_snapshot();
+	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, false);
 
 	/** Remove garbage .inprogress file. */
 	char *filename =
@@ -881,11 +886,11 @@ small_stats_noop_cb(const struct mempool_stats *stats, void *cb_ctx)
 static void
 memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
-	(void)engine;
+	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	struct small_stats data_stats;
 	struct mempool_stats index_stats;
-	mempool_stats(&memtx_index_extent_pool, &index_stats);
-	small_stats(&memtx_alloc, &data_stats, small_stats_noop_cb, NULL);
+	mempool_stats(&memtx->index_extent_pool, &index_stats);
+	small_stats(&memtx->alloc, &data_stats, small_stats_noop_cb, NULL);
 	stat->data += data_stats.used;
 	stat->index += index_stats.totals.used;
 }
@@ -928,13 +933,52 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .check_space_def = */ memtx_engine_check_space_def,
 };
 
+/**
+ * Run one iteration of garbage collection. Set @stop if
+ * there is no more objects to free.
+ */
+static void
+memtx_engine_run_gc(struct memtx_engine *memtx, bool *stop)
+{
+	*stop = stailq_empty(&memtx->gc_queue);
+	if (*stop)
+		return;
+
+	struct memtx_gc_task *task = stailq_first_entry(&memtx->gc_queue,
+					struct memtx_gc_task, link);
+	bool task_done;
+	task->vtab->run(task, &task_done);
+	if (task_done) {
+		stailq_shift(&memtx->gc_queue);
+		task->vtab->free(task);
+	}
+}
+
+static int
+memtx_engine_gc_f(va_list va)
+{
+	struct memtx_engine *memtx = va_arg(va, struct memtx_engine *);
+	while (!fiber_is_cancelled()) {
+		bool stop;
+		memtx_engine_run_gc(memtx, &stop);
+		if (stop) {
+			fiber_yield_timeout(TIMEOUT_INFINITY);
+			continue;
+		}
+		/*
+		 * Yield after each iteration so as not to block
+		 * tx thread for too long.
+		 */
+		fiber_sleep(0);
+	}
+	return 0;
+}
+
 struct memtx_engine *
 memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		 uint64_t tuple_arena_max_size, uint32_t objsize_min,
 		 float alloc_factor)
 {
-	memtx_tuple_init(tuple_arena_max_size, objsize_min, alloc_factor);
-
 	struct memtx_engine *memtx = calloc(1, sizeof(*memtx));
 	if (memtx == NULL) {
 		diag_set(OutOfMemory, sizeof(*memtx),
@@ -945,18 +989,54 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	xdir_create(&memtx->snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	memtx->snap_dir.force_recovery = force_recovery;
 
-	if (xdir_scan(&memtx->snap_dir) != 0) {
-		xdir_destroy(&memtx->snap_dir);
-		free(memtx);
-		return NULL;
-	}
+	if (xdir_scan(&memtx->snap_dir) != 0)
+		goto fail;
+
+	stailq_create(&memtx->gc_queue);
+	memtx->gc_fiber = fiber_new("memtx.gc", memtx_engine_gc_f);
+	if (memtx->gc_fiber == NULL)
+		goto fail;
+
+	/* Apply lowest allowed objsize bound. */
+	if (objsize_min < OBJSIZE_MIN)
+		objsize_min = OBJSIZE_MIN;
+
+	/* Initialize tuple allocator. */
+	quota_init(&memtx->quota, tuple_arena_max_size);
+	tuple_arena_create(&memtx->arena, &memtx->quota, tuple_arena_max_size,
+			   SLAB_SIZE, "memtx");
+	slab_cache_create(&memtx->slab_cache, &memtx->arena);
+	small_alloc_create(&memtx->alloc, &memtx->slab_cache,
+			   objsize_min, alloc_factor);
+
+	/* Initialize index extent allocator. */
+	slab_cache_create(&memtx->index_slab_cache, &memtx->arena);
+	mempool_create(&memtx->index_extent_pool, &memtx->index_slab_cache,
+		       MEMTX_EXTENT_SIZE);
+	memtx->num_reserved_extents = 0;
+	memtx->reserved_extents = NULL;
 
 	memtx->state = MEMTX_INITIALIZED;
+	memtx->max_tuple_size = MAX_TUPLE_SIZE;
 	memtx->force_recovery = force_recovery;
 
 	memtx->base.vtab = &memtx_engine_vtab;
 	memtx->base.name = "memtx";
+
+	fiber_start(memtx->gc_fiber, memtx);
 	return memtx;
+fail:
+	xdir_destroy(&memtx->snap_dir);
+	free(memtx);
+	return NULL;
+}
+
+void
+memtx_engine_schedule_gc(struct memtx_engine *memtx,
+			 struct memtx_gc_task *task)
+{
+	stailq_add_tail_entry(&memtx->gc_queue, task, link);
+	fiber_wakeup(memtx->gc_fiber);
 }
 
 void
@@ -968,35 +1048,94 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit)
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 {
-	(void)memtx;
-	memtx_max_tuple_size = max_size;
+	memtx->max_tuple_size = max_size;
 }
 
-/**
- * Initialize arena for indexes.
- * The arena is used for memtx_index_extent_alloc
- *  and memtx_index_extent_free.
- * Can be called several times, only first call do the work.
- */
-void
-memtx_index_arena_init(void)
+struct tuple *
+memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
-	if (memtx_index_arena_initialized) {
-		/* already done.. */
-		return;
+	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
+	assert(mp_typeof(*data) == MP_ARRAY);
+	size_t tuple_len = end - data;
+	size_t meta_size = tuple_format_meta_size(format);
+	size_t total = sizeof(struct memtx_tuple) + meta_size + tuple_len;
+
+	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
+		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
+		return NULL;
+	});
+	if (unlikely(total > memtx->max_tuple_size)) {
+		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total);
+		error_log(diag_last_error(diag_get()));
+		return NULL;
 	}
-	/* Creating slab cache */
-	slab_cache_create(&memtx_index_slab_cache, &memtx_arena);
-	/* Creating mempool */
-	mempool_create(&memtx_index_extent_pool,
-		       &memtx_index_slab_cache,
-		       MEMTX_EXTENT_SIZE);
-	/* Empty reserved list */
-	memtx_index_num_reserved_extents = 0;
-	memtx_index_reserved_extents = 0;
-	/* Done */
-	memtx_index_arena_initialized = true;
+
+	struct memtx_tuple *memtx_tuple;
+	while ((memtx_tuple = smalloc(&memtx->alloc, total)) == NULL) {
+		bool stop;
+		memtx_engine_run_gc(memtx, &stop);
+		if (stop)
+			break;
+	}
+	if (memtx_tuple == NULL) {
+		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
+		return NULL;
+	}
+	struct tuple *tuple = &memtx_tuple->base;
+	tuple->refs = 0;
+	memtx_tuple->version = memtx->snapshot_version;
+	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
+	tuple->bsize = tuple_len;
+	tuple->format_id = tuple_format_id(format);
+	tuple_format_ref(format);
+	/*
+	 * Data offset is calculated from the begin of the struct
+	 * tuple base, not from memtx_tuple, because the struct
+	 * tuple is not the first field of the memtx_tuple.
+	 */
+	tuple->data_offset = sizeof(struct tuple) + meta_size;
+	char *raw = (char *) tuple + tuple->data_offset;
+	uint32_t *field_map = (uint32_t *) raw;
+	memcpy(raw, data, tuple_len);
+	if (tuple_init_field_map(format, field_map, raw)) {
+		memtx_tuple_delete(format, tuple);
+		return NULL;
+	}
+	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
+	return tuple;
 }
+
+void
+memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
+{
+	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
+	say_debug("%s(%p)", __func__, tuple);
+	assert(tuple->refs == 0);
+#ifndef NDEBUG
+	struct errinj *delay = errinj(ERRINJ_MEMTX_TUPLE_DELETE_DELAY,
+				      ERRINJ_DOUBLE);
+	if (delay != NULL && delay->dparam > 0) {
+		double start = clock_monotonic();
+		while (clock_monotonic() < start + delay->dparam)
+			/* busy loop */ ;
+	}
+#endif
+	size_t total = sizeof(struct memtx_tuple) +
+		       tuple_format_meta_size(format) + tuple->bsize;
+	tuple_format_unref(format);
+	struct memtx_tuple *memtx_tuple =
+		container_of(tuple, struct memtx_tuple, base);
+	if (memtx->alloc.free_mode != SMALL_DELAYED_FREE ||
+	    memtx_tuple->version == memtx->snapshot_version)
+		smfree(&memtx->alloc, memtx_tuple, total);
+	else
+		smfree_delayed(&memtx->alloc, memtx_tuple, total);
+}
+
+struct tuple_format_vtab memtx_tuple_format_vtab = {
+	memtx_tuple_delete,
+	memtx_tuple_new,
+};
 
 /**
  * Allocate a block of size MEMTX_EXTENT_SIZE for memtx index
@@ -1004,13 +1143,12 @@ memtx_index_arena_init(void)
 void *
 memtx_index_extent_alloc(void *ctx)
 {
-	(void)ctx;
-	if (memtx_index_reserved_extents) {
-		assert(memtx_index_num_reserved_extents > 0);
-		memtx_index_num_reserved_extents--;
-		void *result = memtx_index_reserved_extents;
-		memtx_index_reserved_extents = *(void **)
-			memtx_index_reserved_extents;
+	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
+	if (memtx->reserved_extents) {
+		assert(memtx->num_reserved_extents > 0);
+		memtx->num_reserved_extents--;
+		void *result = memtx->reserved_extents;
+		memtx->reserved_extents = *(void **)memtx->reserved_extents;
 		return result;
 	}
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
@@ -1019,7 +1157,13 @@ memtx_index_extent_alloc(void *ctx)
 			 "mempool", "new slab");
 		return NULL;
 	});
-	void *ret = mempool_alloc(&memtx_index_extent_pool);
+	void *ret;
+	while ((ret = mempool_alloc(&memtx->index_extent_pool)) == NULL) {
+		bool stop;
+		memtx_engine_run_gc(memtx, &stop);
+		if (stop)
+			break;
+	}
 	if (ret == NULL)
 		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
 			 "mempool", "new slab");
@@ -1032,8 +1176,8 @@ memtx_index_extent_alloc(void *ctx)
 void
 memtx_index_extent_free(void *ctx, void *extent)
 {
-	(void)ctx;
-	return mempool_free(&memtx_index_extent_pool, extent);
+	struct memtx_engine *memtx = (struct memtx_engine *)ctx;
+	return mempool_free(&memtx->index_extent_pool, extent);
 }
 
 /**
@@ -1041,7 +1185,7 @@ memtx_index_extent_free(void *ctx, void *extent)
  * Ensure that next num extent_alloc will succeed w/o an error
  */
 int
-memtx_index_extent_reserve(int num)
+memtx_index_extent_reserve(struct memtx_engine *memtx, int num)
 {
 	ERROR_INJECT(ERRINJ_INDEX_ALLOC, {
 		/* same error as in mempool_alloc */
@@ -1049,65 +1193,25 @@ memtx_index_extent_reserve(int num)
 			 "mempool", "new slab");
 		return -1;
 	});
-	while (memtx_index_num_reserved_extents < num) {
-		void *ext = mempool_alloc(&memtx_index_extent_pool);
+	struct mempool *pool = &memtx->index_extent_pool;
+	while (memtx->num_reserved_extents < num) {
+		void *ext;
+		while ((ext = mempool_alloc(pool)) == NULL) {
+			bool stop;
+			memtx_engine_run_gc(memtx, &stop);
+			if (stop)
+				break;
+		}
 		if (ext == NULL) {
 			diag_set(OutOfMemory, MEMTX_EXTENT_SIZE,
 				 "mempool", "new slab");
 			return -1;
 		}
-		*(void **)ext = memtx_index_reserved_extents;
-		memtx_index_reserved_extents = ext;
-		memtx_index_num_reserved_extents++;
+		*(void **)ext = memtx->reserved_extents;
+		memtx->reserved_extents = ext;
+		memtx->num_reserved_extents++;
 	}
 	return 0;
-}
-
-void
-memtx_index_prune(struct index *index)
-{
-	if (index->def->iid > 0)
-		return;
-
-	/*
-	 * Tuples stored in a memtx space are referenced by the
-	 * primary index so when the primary index is dropped we
-	 * should delete them.
-	 */
-	struct iterator *it = index_create_iterator(index, ITER_ALL, NULL, 0);
-	if (it == NULL)
-		goto fail;
-	int rc;
-	struct tuple *tuple;
-	while ((rc = iterator_next(it, &tuple)) == 0 && tuple != NULL)
-		tuple_unref(tuple);
-	iterator_delete(it);
-	if (rc != 0)
-		goto fail;
-
-	return;
-fail:
-	/*
-	 * This function is called after WAL write so we have no
-	 * other choice but panic in case of any error. The good
-	 * news is memtx iterators do not fail so we should not
-	 * normally get here.
-	 */
-	diag_log();
-	unreachable();
-	panic("failed to drop index");
-}
-
-void
-memtx_index_abort_create(struct index *index)
-{
-	memtx_index_prune(index);
-}
-
-void
-memtx_index_commit_drop(struct index *index)
-{
-	memtx_index_prune(index);
 }
 
 bool

@@ -134,6 +134,8 @@ tuple_field_is_nullable(const struct tuple_field *tuple_field)
 struct tuple_format {
 	/** Virtual function table */
 	struct tuple_format_vtab vtab;
+	/** Pointer to engine-specific data. */
+	void *engine;
 	/** Identifier */
 	uint16_t id;
 	/** Reference counter */

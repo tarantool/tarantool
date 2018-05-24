@@ -41,7 +41,7 @@
 #include "xrow.h"
 #include "schema.h"
 #include "port.h"
-#include "memtx_tuple.h"
+#include "tuple.h"
 
 const char *sql_type_strs[] = {
 	NULL,
