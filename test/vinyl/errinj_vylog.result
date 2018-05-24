@@ -67,7 +67,7 @@ s:drop()
 ---
 ...
 --
--- Check that an index drop/truncate/create record we failed to
+-- Check that an index drop/create record we failed to
 -- write to vylog is flushed along with the next record.
 --
 fiber = require 'fiber'
@@ -76,62 +76,57 @@ fiber = require 'fiber'
 s1 = box.schema.space.create('test1', {engine = 'vinyl'})
 ---
 ...
-_ = s1:create_index('pk')
----
-...
-_ = s1:insert{1, 'a'}
----
-...
 s2 = box.schema.space.create('test2', {engine = 'vinyl'})
 ---
 ...
 _ = s2:create_index('pk')
 ---
 ...
-_ = s2:insert{2, 'b'}
+_ = s2:insert{1, 'a'}
 ---
 ...
 box.snapshot()
 ---
 - ok
+...
+_ = s2:insert{2, 'b'}
+---
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+---
+- ok
+...
+-- VY_LOG_PREPARE_LSM written, but VY_LOG_CREATE_LSM missing
+ch = fiber.channel(1)
+---
+...
+_ = fiber.create(function() s1:create_index('pk') ch:put(true) end)
+---
+...
+fiber.sleep(0.001)
+---
+...
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true)
+---
+- ok
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+---
+- ok
+...
+ch:get()
+---
+- true
 ...
 _ = s1:insert{3, 'c'}
 ---
 ...
-_ = s2:insert{4, 'd'}
----
-...
-SCHED_TIMEOUT = 0.01
----
-...
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', SCHED_TIMEOUT)
----
-- ok
-...
-box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
----
-- ok
-...
-s1:drop()
----
-...
-s2:truncate()
----
-...
-_ = s2:insert{5, 'e'}
----
-...
-s3 = box.schema.space.create('test3', {engine = 'vinyl'})
----
-...
-_ = s3:create_index('pk')
----
-...
-_ = s3:insert{6, 'f'}
+-- VY_LOG_DROP_LSM missing
+s2.index.pk:drop()
 ---
 ...
 -- pending records must not be rolled back on error
-box.snapshot()
+s2:create_index('pk') -- error
 ---
 - error: Error injection 'vinyl log flush'
 ...
@@ -139,65 +134,46 @@ box.error.injection.set('ERRINJ_VY_LOG_FLUSH', false);
 ---
 - ok
 ...
-fiber.sleep(2 * SCHED_TIMEOUT) -- wait for scheduler to unthrottle
+_ = s1:insert{4, 'd'}
 ---
 ...
-box.error.injection.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
----
-- ok
-...
-box.snapshot()
----
-- ok
-...
-_ = s2:insert{7, 'g'}
+_ = s2:create_index('pk')
 ---
 ...
-_ = s3:insert{8, 'h'}
+_ = s2:insert{5, 'e'}
 ---
 ...
 test_run:cmd('restart server default')
 s1 = box.space.test1
 ---
 ...
-s1 == nil
----
-- true
-...
 s2 = box.space.test2
 ---
+...
+s1:select()
+---
+- - [3, 'c']
+  - [4, 'd']
 ...
 s2:select()
 ---
 - - [5, 'e']
-  - [7, 'g']
+...
+s1:drop()
+---
 ...
 s2:drop()
 ---
 ...
-s3 = box.space.test3
----
-...
-s3:select()
----
-- - [6, 'f']
-  - [8, 'h']
-...
-s3:drop()
----
-...
 --
--- Check that if a buffered index drop/truncate/create record
--- does not make it to the vylog before restart, it will be
--- replayed on recovery.
+-- Check that if a buffered index drop/create record does not
+-- make it to the vylog before restart, it will be replayed on
+-- recovery.
 --
+fiber = require 'fiber'
+---
+...
 s1 = box.schema.space.create('test1', {engine = 'vinyl'})
----
-...
-_ = s1:create_index('pk')
----
-...
-_ = s1:insert{111, 'aaa'}
 ---
 ...
 s2 = box.schema.space.create('test2', {engine = 'vinyl'})
@@ -206,82 +182,97 @@ s2 = box.schema.space.create('test2', {engine = 'vinyl'})
 _ = s2:create_index('pk')
 ---
 ...
-_ = s2:insert{222, 'bbb'}
+_ = s2:insert{111, 'aaa'}
 ---
 ...
 box.snapshot()
 ---
 - ok
 ...
-_ = s1:insert{333, 'ccc'}
+_ = s2:insert{222, 'bbb'}
 ---
 ...
-_ = s2:insert{444, 'ddd'}
----
-...
-box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
 ---
 - ok
 ...
-s1:drop()
+-- VY_LOG_PREPARE_LSM written, but VY_LOG_CREATE_LSM missing
+ch = fiber.channel(1)
 ---
 ...
-s2:truncate()
+_ = fiber.create(function() s1:create_index('pk') ch:put(true) end)
 ---
 ...
-_ = s2:insert{555, 'eee'}
+fiber.sleep(0.001)
 ---
 ...
-s3 = box.schema.space.create('test3', {engine = 'vinyl'})
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true)
 ---
+- ok
 ...
-_ = s3:create_index('pk')
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
 ---
+- ok
 ...
-_ = s3:insert{666, 'fff'}
----
-...
--- gh-2532: replaying create/drop from xlog crashes tarantool
-test_run:cmd("setopt delimiter ';'")
+ch:get()
 ---
 - true
 ...
-for i = 1, 10 do
-    s = box.schema.space.create('test', {engine = 'vinyl'})
-    s:create_index('primary')
-    s:create_index('secondary', {unique = false, parts = {2, 'string'}})
-    s:insert{i, 'test' .. i}
-    s:truncate()
-    s:drop()
-end
-test_run:cmd("setopt delimiter ''");
+_ = s1:insert{333, 'ccc'}
+---
+...
+-- VY_LOG_DROP_LSM missing
+s2.index.pk:drop()
 ---
 ...
 test_run:cmd('restart server default')
 s1 = box.space.test1
 ---
 ...
-s1 == nil
----
-- true
-...
 s2 = box.space.test2
 ---
+...
+_ = s1:insert{444, 'ddd'}
+---
+...
+_ = s2:create_index('pk')
+---
+...
+_ = s2:insert{555, 'eee'}
+---
+...
+s1:select()
+---
+- - [333, 'ccc']
+  - [444, 'ddd']
 ...
 s2:select()
 ---
 - - [555, 'eee']
 ...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd('restart server default')
+s1 = box.space.test1
+---
+...
+s2 = box.space.test2
+---
+...
+s1:select()
+---
+- - [333, 'ccc']
+  - [444, 'ddd']
+...
+s2:select()
+---
+- - [555, 'eee']
+...
+s1:drop()
+---
+...
 s2:drop()
----
-...
-s3 = box.space.test3
----
-...
-s3:select()
----
-- - [666, 'fff']
-...
-s3:drop()
 ---
 ...

@@ -65,8 +65,9 @@ struct mh_i64ptr_t;
 enum vy_log_record_type {
 	/**
 	 * Create a new LSM tree.
-	 * Requires vy_log_record::lsm_id, index_id, space_id,
-	 * key_def, create_lsn.
+	 * Requires vy_log_record::lsm_id, create_lsn.
+	 * After rotation, it also stores space_id, index_id, key_def,
+	 * create_lsn, modify_lsn, dump_lsn.
 	 */
 	VY_LOG_CREATE_LSM		= 0,
 	/**
@@ -179,6 +180,21 @@ enum vy_log_record_type {
 	 * from vylog on the next rotation.
 	 */
 	VY_LOG_FORGET_LSM		= 14,
+	/**
+	 * Prepare a new LSM tree for building.
+	 * Requires vy_log_record::lsm_id, index_id, space_id.
+	 *
+	 * Index ALTER operation consists of two stages. First, we
+	 * build a new LSM tree, checking constraints if necessary.
+	 * This is done before writing the operation to WAL. Then,
+	 * provided the first stage succeeded, we commit the LSM
+	 * tree to the metadata log.
+	 *
+	 * The following record is used to prepare a new LSM tree
+	 * for building. Once the index has been built, we write
+	 * a VY_LOG_CREATE_LSM record to commit it.
+	 */
+	VY_LOG_PREPARE_LSM		= 15,
 
 	vy_log_record_type_MAX
 };
@@ -273,7 +289,12 @@ struct vy_lsm_recovery_info {
 	struct key_part_def *key_parts;
 	/** Number of key parts. */
 	uint32_t key_part_count;
-	/** LSN of the WAL row that created the LSM tree. */
+	/**
+	 * LSN of the WAL row that created the LSM tree,
+	 * or -1 if the LSM tree was not committed to WAL
+	 * (that is there was an VY_LOG_PREPARE_LSM record
+	 * but no VY_LOG_CREATE_LSM).
+	 */
 	int64_t create_lsn;
 	/** LSN of the WAL row that last modified the LSM tree. */
 	int64_t modify_lsn;
@@ -295,6 +316,11 @@ struct vy_lsm_recovery_info {
 	 * vy_run_recovery_info::in_lsm.
 	 */
 	struct rlist runs;
+	/**
+	 * Pointer to an LSM tree that is going to replace
+	 * this one after successful ALTER.
+	 */
+	struct vy_lsm_recovery_info *prepared;
 };
 
 /** Vinyl range info stored in a recovery context. */
@@ -533,18 +559,29 @@ vy_log_record_init(struct vy_log_record *record)
 	memset(record, 0, sizeof(*record));
 }
 
+/** Helper to log a vinyl LSM tree preparation. */
+static inline void
+vy_log_prepare_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
+		   const struct key_def *key_def)
+{
+	struct vy_log_record record;
+	vy_log_record_init(&record);
+	record.type = VY_LOG_PREPARE_LSM;
+	record.lsm_id = id;
+	record.space_id = space_id;
+	record.index_id = index_id;
+	record.key_def = key_def;
+	vy_log_write(&record);
+}
+
 /** Helper to log a vinyl LSM tree creation. */
 static inline void
-vy_log_create_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
-		  const struct key_def *key_def, int64_t create_lsn)
+vy_log_create_lsm(int64_t id, int64_t create_lsn)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
 	record.type = VY_LOG_CREATE_LSM;
 	record.lsm_id = id;
-	record.space_id = space_id;
-	record.index_id = index_id;
-	record.key_def = key_def;
 	record.create_lsn = create_lsn;
 	vy_log_write(&record);
 }

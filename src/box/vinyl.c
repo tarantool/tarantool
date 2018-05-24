@@ -803,6 +803,8 @@ vinyl_index_open(struct index *index)
 	default:
 		unreachable();
 	}
+	if (rc == 0)
+		vy_scheduler_add_lsm(&env->scheduler, lsm);
 	return rc;
 }
 
@@ -824,10 +826,8 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 		 * the index isn't in the recovery context and we
 		 * need to retry to log it now.
 		 */
-		if (lsm->commit_lsn >= 0) {
-			vy_scheduler_add_lsm(&env->scheduler, lsm);
+		if (lsm->commit_lsn >= 0)
 			return;
-		}
 	}
 
 	if (env->status == VINYL_INITIAL_RECOVERY_REMOTE) {
@@ -852,9 +852,6 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 	assert(lsm->commit_lsn < 0);
 	lsm->commit_lsn = lsn;
 
-	assert(lsm->range_count == 1);
-	struct vy_range *range = vy_range_tree_first(lsm->tree);
-
 	/*
 	 * Since it's too late to fail now, in case of vylog write
 	 * failure we leave the records we attempted to write in
@@ -864,15 +861,36 @@ vinyl_index_commit_create(struct index *index, int64_t lsn)
 	 * recovery.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_lsm(lsm->id, lsm->space_id, lsm->index_id,
-			  lsm->key_def, lsn);
-	vy_log_insert_range(lsm->id, range->id, NULL, NULL);
+	vy_log_create_lsm(lsm->id, lsn);
 	vy_log_tx_try_commit();
-	/*
-	 * After we committed the index in the log, we can schedule
-	 * a task for it.
-	 */
-	vy_scheduler_add_lsm(&env->scheduler, lsm);
+}
+
+static void
+vinyl_index_abort_create(struct index *index)
+{
+	struct vy_env *env = vy_env(index->engine);
+	struct vy_lsm *lsm = vy_lsm(index);
+
+	if (env->status != VINYL_ONLINE) {
+		/* Failure during recovery. Nothing to do. */
+		return;
+	}
+	if (lsm->id < 0) {
+		/*
+		 * ALTER failed before we wrote information about
+		 * the new LSM tree to vylog, see vy_lsm_create().
+		 * Nothing to do.
+		 */
+		return;
+	}
+
+	vy_scheduler_remove_lsm(&env->scheduler, lsm);
+
+	lsm->is_dropped = true;
+
+	vy_log_tx_begin();
+	vy_log_drop_lsm(lsm->id, 0);
+	vy_log_tx_try_commit();
 }
 
 static void
@@ -3131,8 +3149,10 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 {
 	int rc = -1;
 
-	if (lsm_info->drop_lsn >= 0)
+	if (lsm_info->drop_lsn >= 0 || lsm_info->create_lsn < 0) {
+		/* Dropped or not yet built LSM tree. */
 		return 0;
+	}
 
 	/*
 	 * We are only interested in the primary index LSM tree.
@@ -3346,16 +3366,21 @@ vy_gc_run(struct vy_env *env,
 }
 
 /**
- * Given a dropped LSM tree, delete all its ranges and slices and
- * mark all its runs as dropped. Forget the LSM tree if it has no
- * associated objects.
+ * Given a dropped or not fully built LSM tree, delete all its
+ * ranges and slices and mark all its runs as dropped. Forget
+ * the LSM tree if it has no associated objects.
  */
 static void
 vy_gc_lsm(struct vy_lsm_recovery_info *lsm_info)
 {
-	assert(lsm_info->drop_lsn >= 0);
+	assert(lsm_info->drop_lsn >= 0 ||
+	       lsm_info->create_lsn < 0);
 
 	vy_log_tx_begin();
+	if (lsm_info->drop_lsn < 0) {
+		lsm_info->drop_lsn = 0;
+		vy_log_drop_lsm(lsm_info->id, 0);
+	}
 	struct vy_range_recovery_info *range_info;
 	rlist_foreach_entry(range_info, &lsm_info->ranges, in_lsm) {
 		struct vy_slice_recovery_info *slice_info;
@@ -3391,8 +3416,10 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 	int loops = 0;
 	struct vy_lsm_recovery_info *lsm_info;
 	rlist_foreach_entry(lsm_info, &recovery->lsms, in_recovery) {
-		if ((gc_mask & VY_GC_DROPPED) != 0 &&
-		    lsm_info->drop_lsn >= 0)
+		if ((lsm_info->drop_lsn >= 0 &&
+		     (gc_mask & VY_GC_DROPPED) != 0) ||
+		    (lsm_info->create_lsn < 0 &&
+		     (gc_mask & VY_GC_INCOMPLETE) != 0))
 			vy_gc_lsm(lsm_info);
 
 		struct vy_run_recovery_info *run_info;
@@ -3458,8 +3485,10 @@ vinyl_engine_backup(struct engine *engine, const struct vclock *vclock,
 	int loops = 0;
 	struct vy_lsm_recovery_info *lsm_info;
 	rlist_foreach_entry(lsm_info, &recovery->lsms, in_recovery) {
-		if (lsm_info->drop_lsn >= 0)
+		if (lsm_info->drop_lsn >= 0 || lsm_info->create_lsn < 0) {
+			/* Dropped or not yet built LSM tree. */
 			continue;
+		}
 		struct vy_run_recovery_info *run_info;
 		rlist_foreach_entry(run_info, &lsm_info->runs, in_lsm) {
 			if (run_info->is_dropped || run_info->is_incomplete)
@@ -4079,7 +4108,7 @@ static const struct space_vtab vinyl_space_vtab = {
 static const struct index_vtab vinyl_index_vtab = {
 	/* .destroy = */ vinyl_index_destroy,
 	/* .commit_create = */ vinyl_index_commit_create,
-	/* .abort_create = */ generic_index_abort_create,
+	/* .abort_create = */ vinyl_index_abort_create,
 	/* .commit_modify = */ vinyl_index_commit_modify,
 	/* .commit_drop = */ vinyl_index_commit_drop,
 	/* .update_def = */ generic_index_update_def,
