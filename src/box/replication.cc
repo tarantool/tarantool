@@ -651,18 +651,10 @@ replicaset_sync(void)
 {
 	int quorum = replicaset_quorum();
 
-	if (quorum > 0)
-		say_verbose("synchronizing with %d replicas", quorum);
-
-	if (replicaset.applier.connected < quorum) {
-		/*
-		 * Not enough replicas connected to form a quorum.
-		 * Do not stall configuration, leave the instance
-		 * in 'orphan' state.
-		 */
-		say_crit("entering orphan mode");
+	if (quorum == 0)
 		return;
-	}
+
+	say_verbose("synchronizing with %d replicas", quorum);
 
 	/*
 	 * Wait until all connected replicas synchronize up to
@@ -673,10 +665,18 @@ replicaset_sync(void)
 	       replicaset.applier.loading >= quorum)
 		fiber_cond_wait(&replicaset.applier.cond);
 
-	if (quorum > 0) {
-		say_crit("replica set sync complete, quorum of %d "
-			 "replicas formed", quorum);
+	if (replicaset.applier.synced < quorum) {
+		/*
+		 * Not enough replicas connected to form a quorum.
+		 * Do not stall configuration, leave the instance
+		 * in 'orphan' state.
+		 */
+		say_crit("entering orphan mode");
+		return;
 	}
+
+	say_crit("replica set sync complete, quorum of %d "
+		 "replicas formed", quorum);
 }
 
 void
