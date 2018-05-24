@@ -594,18 +594,22 @@ applier_f(va_list ap)
 			} else if (e->errcode() == ER_LOADING) {
 				/* Autobootstrap */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
 			} else if (e->errcode() == ER_ACCESS_DENIED) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else if (e->errcode() == ER_SYSTEM) {
 				/* System error from master instance. */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else if (e->errcode() == ER_CFG) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else {
 				/* Unrecoverable errors */
@@ -618,13 +622,12 @@ applier_f(va_list ap)
 			break;
 		} catch (SocketError *e) {
 			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (SystemError *e) {
 			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
-		} catch (ChannelIsClosed *e) {
-			applier_disconnect(applier, APPLIER_OFF);
-			break;
 		} catch (Exception *e) {
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_STOPPED);
@@ -643,7 +646,6 @@ applier_f(va_list ap)
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
 reconnect:
-		applier_disconnect(applier, APPLIER_DISCONNECTED);
 		fiber_sleep(replication_reconnect_interval());
 	}
 	return 0;

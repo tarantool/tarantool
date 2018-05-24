@@ -1,0 +1,45 @@
+test_run = require('test_run').new()
+---
+...
+SERVERS = {'rebootstrap1', 'rebootstrap2'}
+---
+...
+test_run:create_cluster(SERVERS)
+---
+...
+test_run:wait_fullmesh(SERVERS)
+---
+...
+--
+-- gh-3422: If quorum can't be formed, because some replicas are
+-- re-bootstrapping, box.cfg{} must wait for bootstrap to complete
+-- instead of stopping synchronization and leaving the instance
+-- in 'orphan' mode.
+--
+test_run:cmd('stop server rebootstrap1')
+---
+- true
+...
+test_run:cmd('restart server rebootstrap2 with cleanup=True, wait=False, wait_load=False')
+---
+- true
+...
+test_run:cmd('start server rebootstrap1')
+---
+- true
+...
+test_run:cmd('switch rebootstrap1')
+---
+- true
+...
+box.info.status -- running
+---
+- running
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:drop_cluster(SERVERS)
+---
+...

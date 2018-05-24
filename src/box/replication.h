@@ -196,6 +196,11 @@ struct replicaset {
 		 */
 		int connected;
 		/**
+		 * Number of appliers that are disconnected,
+		 * because replica is loading.
+		 */
+		int loading;
+		/**
 		 * Number of appliers that have successfully
 		 * synchronized and hence contribute to the
 		 * quorum.
