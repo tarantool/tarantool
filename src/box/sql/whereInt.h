@@ -141,6 +141,8 @@ struct WhereLoop {
 	u16 nBtm;	/* Size of BTM vector */
 	u16 nTop;	/* Size of TOP vector */
 	Index *pIndex;	/* Index used, or NULL */
+	/** Index definition, if there's no pIndex. */
+	struct index_def *index_def;
 	u32 wsFlags;		/* WHERE_* flags describing the plan */
 	u16 nLTerm;		/* Number of entries in aLTerm[] */
 	u16 nSkip;		/* Number of NULL aLTerm[] entries */

@@ -1453,7 +1453,7 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		uint32_t cid = def->fields[i].coll_id;
 		struct field_def *field = &def->fields[i];
 		const char *default_str = field->default_value;
-		int base_len = 4;
+		int base_len = 5;
 		if (cid != COLL_NONE)
 			base_len += 1;
 		if (default_str != NULL)
@@ -1474,6 +1474,8 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 		assert(def->fields[i].is_nullable ==
 			       action_is_nullable(def->fields[i].nullable_action));
 		p = enc->encode_str(p, t, strlen(t));
+		p = enc->encode_str(p, "affinity", 8);
+		p = enc->encode_uint(p, def->fields[i].affinity);
 		p = enc->encode_str(p, "is_nullable", 11);
 		p = enc->encode_bool(p, def->fields[i].is_nullable);
 		p = enc->encode_str(p, "nullable_action", 15);

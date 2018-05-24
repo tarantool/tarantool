@@ -349,54 +349,36 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		 * the column, if any.
 		 */
 	case PragTyp_TABLE_INFO:
-		if (zRight) {
-			Table *pTab;
-			pTab = sqlite3LocateTable(pParse, LOCATE_NOERR, zRight);
-			if (pTab) {
-				int i, k;
-				Column *pCol;
-				Index *pPk = sqlite3PrimaryKeyIndex(pTab);
-				pParse->nMem = 6;
-				if (space_is_view(pTab))
-					sql_view_column_names(pParse, pTab);
-				for (i = 0, pCol = pTab->aCol;
-					i < (int)pTab->def->field_count;
-					i++, pCol++) {
-					if (!table_column_is_in_pk(pTab, i)) {
-						k = 0;
-					} else if (pPk == 0) {
-						k = 1;
-					} else {
-						for (k = 1;
-						     k <=
-						     (int)pTab->def->field_count
-						     && pPk->aiColumn[k - 1] !=
-						     i; k++) {
-						}
-					}
-					bool nullable =
-						pTab->def->fields[i].is_nullable;
-					uint32_t space_id =
-						SQLITE_PAGENO_TO_SPACEID(
-							pTab->tnum);
-					struct space *space =
-						space_cache_find(space_id);
-					char *expr_str = space->
-						def->fields[i].default_value;
-					const char *name =
-						pTab->def->fields[i].name;
-					enum field_type type =
-						pTab->def->fields[i].type;
-					sqlite3VdbeMultiLoad(v, 1, "issisi",
-							     i, name,
-							     field_type_strs[
-								type],
-							     !nullable,
-							     expr_str, k);
-					sqlite3VdbeAddOp2(v, OP_ResultRow, 1,
-							  6);
+		if (zRight == NULL)
+			break;
+		struct Table *table =
+			sqlite3LocateTable(pParse, LOCATE_NOERR, zRight);
+		if (table == NULL)
+			break;
+		struct space *space = space_cache_find(table->def->id);
+		struct space_def *def = space->def;
+		struct Index *pk = sqlite3PrimaryKeyIndex(table);
+		pParse->nMem = 6;
+		if (def->opts.is_view)
+			sql_view_column_names(pParse, table);
+		for (uint32_t i = 0, k; i < def->field_count; ++i) {
+			if (!table_column_is_in_pk(table, i)) {
+				k = 0;
+			} else if (pk == NULL) {
+				k = 1;
+			} else {
+				for (k = 1; k <= def->field_count &&
+				     pk->aiColumn[k - 1] != (int) i; ++k) {
 				}
 			}
+			bool is_nullable = def->fields[i].is_nullable;
+			char *expr_str = def->fields[i].default_value;
+			const char *name = def->fields[i].name;
+			enum field_type type = def->fields[i].type;
+			sqlite3VdbeMultiLoad(v, 1, "issisi", i, name,
+					     field_type_strs[type],
+					     !is_nullable, expr_str, k);
+			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 6);
 		}
 		break;
 

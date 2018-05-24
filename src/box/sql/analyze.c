@@ -1111,28 +1111,24 @@ loadAnalysis(Parse * pParse)
  * Generate code that will do an analysis of an entire database
  */
 static void
-analyzeDatabase(Parse * pParse)
+sql_analyze_database(Parse *parser)
 {
-	sqlite3 *db = pParse->db;
-	Schema *pSchema = db->pSchema;	/* Schema of database */
-	HashElem *k;
-	int iStatCur;
-	int iMem;
-	int iTab;
-
-	sql_set_multi_write(pParse, false);
-	iStatCur = pParse->nTab;
-	pParse->nTab += 3;
-	openStatTable(pParse, iStatCur, 0, 0);
-	iMem = pParse->nMem + 1;
-	iTab = pParse->nTab;
-	for (k = sqliteHashFirst(&pSchema->tblHash); k; k = sqliteHashNext(k)) {
-		Table *pTab = (Table *) sqliteHashData(k);
-		if (space_is_view(pTab))
-			continue;
-		analyzeOneTable(pParse, pTab, 0, iStatCur, iMem, iTab);
+	struct Schema *schema = parser->db->pSchema;
+	sql_set_multi_write(parser, false);
+	int stat_cursor = parser->nTab;
+	parser->nTab += 3;
+	openStatTable(parser, stat_cursor, NULL, NULL);
+	int reg = parser->nMem + 1;
+	int tab_cursor = parser->nTab;
+	for (struct HashElem *k = sqliteHashFirst(&schema->tblHash); k != NULL;
+	     k = sqliteHashNext(k)) {
+		struct Table *table = (struct Table *) sqliteHashData(k);
+		if (! table->def->opts.is_view) {
+			analyzeOneTable(parser, table, NULL, stat_cursor, reg,
+					tab_cursor);
+		}
 	}
-	loadAnalysis(pParse);
+	loadAnalysis(parser);
 }
 
 /*
@@ -1173,32 +1169,29 @@ void
 sqlite3Analyze(Parse * pParse, Token * pName)
 {
 	sqlite3 *db = pParse->db;
-	char *z;
-	Table *pTab;
-	Vdbe *v;
-
 	assert(db->pSchema != NULL);
-
-	if (pName == 0) {
+	if (pName == NULL) {
 		/* Form 1:  Analyze everything */
-		analyzeDatabase(pParse);
+		sql_analyze_database(pParse);
 	} else {
 		/* Form 2:  Analyze table named */
-		z = sqlite3NameFromToken(db, pName);
-		if (z) {
-			if ((pTab = sqlite3LocateTable(pParse, 0, z)) != NULL) {
-				if (space_is_view(pTab))
-					sqlite3ErrorMsg(pParse, "VIEW isn't "
-					"allowed to be analyzed");
-				else
-					analyzeTable(pParse, pTab, 0);
+		char *z = sqlite3NameFromToken(db, pName);
+		if (z != NULL) {
+			Table *pTab = sqlite3LocateTable(pParse, 0, z);
+			if (pTab != NULL) {
+				if (pTab->def->opts.is_view) {
+					sqlite3ErrorMsg(pParse, "VIEW isn't "\
+							"allowed to be "\
+							"analyzed");
+				} else {
+					analyzeTable(pParse, pTab, NULL);
+				}
 			}
+			sqlite3DbFree(db, z);
 		}
-		sqlite3DbFree(db, z);
 	}
-
-	v = sqlite3GetVdbe(pParse);
-	if (v)
+	Vdbe *v = sqlite3GetVdbe(pParse);
+	if (v != NULL)
 		sqlite3VdbeAddOp0(v, OP_Expire);
 }
 

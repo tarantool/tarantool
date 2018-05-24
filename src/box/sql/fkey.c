@@ -765,40 +765,29 @@ fkTriggerDelete(sqlite3 * dbMem, Trigger * p)
  * actions are not.
  */
 void
-sqlite3FkDropTable(Parse * pParse, SrcList * pName, Table * pTab)
+sqlite3FkDropTable(Parse *parser, SrcList *name, Table *table)
 {
-	sqlite3 *db = pParse->db;
 	struct session *user_session = current_session();
-
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) &&
-	    !space_is_view(pTab)) {
-		Vdbe *v = sqlite3GetVdbe(pParse);
-		assert(v != NULL);
-		/*
-		 * Search for a foreign key constraint for which
-		 * this table is the parent table. If one can't be
-		 * found, return without generating any VDBE code,
-		 * since it makes no sense starting transaction
-		 * to test FK violations.
-		 */
-		if (sqlite3FkReferences(pTab) == NULL)
-				return;
-		pParse->disableTriggers = 1;
-		/* Staring new transaction before DELETE FROM <tbl> */
-		sqlite3VdbeAddOp0(v, OP_TTransaction);
-		sql_table_delete_from(pParse, sqlite3SrcListDup(db, pName, 0),
-				      NULL);
-		pParse->disableTriggers = 0;
-
-		/* If the DELETE has generated immediate foreign key constraint
-		 * violations, rollback, halt the VDBE and return
-		 * an error at this point, before any modifications of
-		 * the _space and _index spaces. This is because these spaces
-		 * don't support multistatement transactions. Otherwise, just
-		 * commit changes.
-		 */
-		sqlite3VdbeAddOp0(v, OP_FkCheckCommit);
-	}
+	if ((user_session->sql_flags & SQLITE_ForeignKeys) == 0 ||
+	    table->def->opts.is_view || sqlite3FkReferences(table) == NULL)
+		return;
+	struct Vdbe *v = sqlite3GetVdbe(parser);
+	assert(v != NULL);
+	parser->disableTriggers = 1;
+	/* Staring new transaction before DELETE FROM <tbl> */
+	sqlite3VdbeAddOp0(v, OP_TTransaction);
+	sql_table_delete_from(parser, sqlite3SrcListDup(parser->db, name, 0),
+			      NULL);
+	parser->disableTriggers = 0;
+	/*
+	 * If the DELETE has generated immediate foreign key
+	 * constraint violations, rollback, halt the VDBE and
+	 * return an error at this point, before any modifications
+	 * of the _space and _index spaces. This is because these
+	 * spaces don't support multistatement transactions.
+	 * Otherwise, just commit changes.
+	 */
+	sqlite3VdbeAddOp0(v, OP_FkCheckCommit);
 }
 
 /*

@@ -130,14 +130,14 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* Locate the table which we want to update.
 	 */
 	pTab = sql_list_lookup_table(pParse, pTabList);
-	if (pTab == 0)
+	if (pTab == NULL)
 		goto update_cleanup;
 
 	/* Figure out if we have any triggers and if the table being
 	 * updated is a view.
 	 */
 	pTrigger = sqlite3TriggersExist(pTab, TK_UPDATE, pChanges, &tmask);
-	is_view = space_is_view(pTab);
+	is_view = pTab->def->opts.is_view;
 	assert(pTrigger || tmask == 0);
 
 	if (is_view && sql_view_column_names(pParse, pTab) != 0) {
@@ -148,6 +148,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				pTab->def->name);
 		goto update_cleanup;
 	}
+
+	struct space_def *def = pTab->def;
 
 	/* Allocate a cursors for the main database table and for all indices.
 	 * The index cursors might not be used, but if they are used they
@@ -168,17 +170,15 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* Allocate space for aXRef[], aRegIdx[], and aToOpen[].
 	 * Initialize aXRef[] and aToOpen[] to their default values.
 	 */
-	aXRef =
-	    sqlite3DbMallocRawNN(db,
-				 sizeof(int) *
-				 (pTab->def->field_count + nIdx) + nIdx + 2);
+	aXRef = sqlite3DbMallocRawNN(db, sizeof(int) *
+				     (def->field_count + nIdx) + nIdx + 2);
 	if (aXRef == 0)
 		goto update_cleanup;
-	aRegIdx = aXRef + pTab->def->field_count;
+	aRegIdx = aXRef + def->field_count;
 	aToOpen = (u8 *) (aRegIdx + nIdx);
 	memset(aToOpen, 1, nIdx + 1);
 	aToOpen[nIdx + 1] = 0;
-	for (i = 0; i < (int)pTab->def->field_count; i++)
+	for (i = 0; i < (int)def->field_count; i++)
 		aXRef[i] = -1;
 
 	/* Initialize the name-context */
@@ -195,8 +195,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		if (sqlite3ResolveExprNames(&sNC, pChanges->a[i].pExpr)) {
 			goto update_cleanup;
 		}
-		for (j = 0; j < (int)pTab->def->field_count; j++) {
-			if (strcmp(pTab->def->fields[j].name,
+		for (j = 0; j < (int)def->field_count; j++) {
+			if (strcmp(def->fields[j].name,
 				   pChanges->a[i].zName) == 0) {
 				if (pPk && table_column_is_in_pk(pTab, j)) {
 					chngPk = 1;
@@ -212,7 +212,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				break;
 			}
 		}
-		if (j >= (int)pTab->def->field_count) {
+		if (j >= (int)def->field_count) {
 			sqlite3ErrorMsg(pParse, "no such column: %s",
 					pChanges->a[i].zName);
 			pParse->checkSchema = 1;
@@ -270,21 +270,21 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 	if (chngPk || pTrigger || hasFK) {
 		regOld = pParse->nMem + 1;
-		pParse->nMem += pTab->def->field_count;
+		pParse->nMem += def->field_count;
 	}
 	if (chngPk || pTrigger || hasFK) {
 		regNewPk = ++pParse->nMem;
 	}
 	regNew = pParse->nMem + 1;
-	pParse->nMem += pTab->def->field_count;
+	pParse->nMem += def->field_count;
 
 	/* If we are trying to update a view, realize that view into
 	 * an ephemeral table.
 	 */
 	if (is_view) {
-		sql_materialize_view(pParse, pTab->def->name, pWhere, iDataCur);
+		sql_materialize_view(pParse, def->name, pWhere, iDataCur);
 		/* Number of columns from SELECT plus ID.*/
-		nKey = pTab->def->field_count + 1;
+		nKey = def->field_count + 1;
 	}
 
 	/* Resolve the column names in all the expressions in the
@@ -334,7 +334,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	} else {
 		for (i = 0; i < nPk; i++) {
 			assert(pPk->aiColumn[i] >= 0);
-			sqlite3ExprCodeGetColumnOfTable(v, pTab->def, iDataCur,
+			sqlite3ExprCodeGetColumnOfTable(v, def, iDataCur,
 							pPk->aiColumn[i],
 							iPk + i);
 		}
@@ -435,12 +435,12 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 						 pTrigger, pChanges, 0,
 						 TRIGGER_BEFORE | TRIGGER_AFTER,
 						 pTab, on_error);
-		for (i = 0; i < (int)pTab->def->field_count; i++) {
+		for (i = 0; i < (int)def->field_count; i++) {
 			if (oldmask == 0xffffffff
 			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0)
 			    || table_column_is_in_pk(pTab, i)) {
 				testcase(oldmask != 0xffffffff && i == 31);
-				sqlite3ExprCodeGetColumnOfTable(v, pTab->def,
+				sqlite3ExprCodeGetColumnOfTable(v, def,
 								iDataCur, i,
 								regOld + i);
 			} else {
@@ -466,7 +466,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	newmask =
 	    sqlite3TriggerColmask(pParse, pTrigger, pChanges, 1, TRIGGER_BEFORE,
 				  pTab, on_error);
-	for (i = 0; i < (int)pTab->def->field_count; i++) {
+	for (i = 0; i < (int)def->field_count; i++) {
 		if (i == pTab->iPKey) {
 			sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
 		} else {
@@ -483,8 +483,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 				 */
 				testcase(i == 31);
 				testcase(i == 32);
-				sqlite3ExprCodeGetColumnToReg(pParse, pTab->def,
-							      i, iDataCur,
+				sqlite3ExprCodeGetColumnToReg(pParse, def, i,
+							      iDataCur,
 							      regNew + i);
 			} else {
 				sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
@@ -522,9 +522,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * all columns not modified by the update statement into their
 		 * registers in case this has happened.
 		 */
-		for (i = 0; i < (int)pTab->def->field_count; i++) {
+		for (i = 0; i < (int)def->field_count; i++) {
 			if (aXRef[i] < 0 && i != pTab->iPKey) {
-				sqlite3ExprCodeGetColumnOfTable(v, pTab->def,
+				sqlite3ExprCodeGetColumnOfTable(v, def,
 								iDataCur, i,
 								regNew + i);
 			}

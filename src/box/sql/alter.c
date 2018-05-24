@@ -105,15 +105,11 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 				zName);
 		goto exit_rename_table;
 	}
-
-#ifndef SQLITE_OMIT_VIEW
-	if (space_is_view(pTab)) {
+	if (pTab->def->opts.is_view) {
 		sqlite3ErrorMsg(pParse, "view %s may not be altered",
 				pTab->def->name);
 		goto exit_rename_table;
 	}
-#endif
-
 	/* Begin a transaction for database.
 	 * Then modify the schema cookie (since the ALTER TABLE modifies the
 	 * schema).
@@ -275,7 +271,7 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 		goto exit_begin_add_column;
 
 	/* Make sure this is not an attempt to ALTER a view. */
-	if (space_is_view(pTab)) {
+	if (pTab->def->opts.is_view) {
 		sqlite3ErrorMsg(pParse, "Cannot add a column to a view");
 		goto exit_begin_add_column;
 	}

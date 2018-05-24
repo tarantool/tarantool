@@ -2536,6 +2536,8 @@ struct SrcList {
 		char *zName;	/* Name of the table */
 		char *zAlias;	/* The "B" part of a "A AS B" phrase.  zName is the "A" */
 		Table *pTab;	/* An SQL table corresponding to zName */
+		/* A temporary hack: need to store eph. space.  */
+		struct space *space;
 		Select *pSelect;	/* A SELECT statement used in place of a table name */
 		int addrFillSub;	/* Address of subroutine to manifest a subquery */
 		int regReturn;	/* Register holding return address of addrFillSub */
@@ -3530,8 +3532,6 @@ sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id);
  */
 struct coll *
 sql_index_collation(Index *idx, uint32_t column, uint32_t *id);
-bool
-space_is_view(Table *);
 
 /**
  * Return key_def of provided struct Index.
@@ -3552,8 +3552,36 @@ enum sort_order
 sql_index_column_sort_order(Index *idx, uint32_t column);
 
 void sqlite3EndTable(Parse *, Token *, Token *, Select *);
+
+/**
+ * DEPRECATED. All calls to be replaced w/ sql_emit_open_cursor.
+ * Create cursor which will be positioned to the space/index.
+ * It makes space lookup and loads pointer to it into register,
+ * which is passes to OP_OpenWrite as an argument.
+ *
+ * @param parse Parse context.
+ * @param cursor Number of cursor to be created.
+ * @param entity_id Encoded space and index ids.
+ * @retval address of last opcode.
+ */
 int
-emit_open_cursor(Parse *, int, int);
+emit_open_cursor(struct Parse *parse, int cursor, int entity_id);
+
+/**
+ * Create cursor which will be positioned to the space/index.
+ * It makes space lookup and loads pointer to it into register,
+ * which is passes to OP_OpenWrite as an argument.
+ *
+ * @param parse_context Parse context.
+ * @param cursor Number of cursor to be created.
+ * @param index_id Encoded index id (encoding is void actually, so
+ *        pas it as is). In future will be replaced with pointer
+ *        to struct index.
+ * @retval address of last opcode.
+ */
+int
+sql_emit_open_cursor(struct Parse *parse, int cursor, int index_id,
+		     struct space *space);
 
 int sqlite3ParseUri(const char *, const char *, unsigned int *,
 		    sqlite3_vfs **, char **, char **);
@@ -4095,6 +4123,31 @@ int sqlite3VarintLen(u64 v);
 #define putVarint    sqlite3PutVarint
 
 const char *sqlite3IndexAffinityStr(sqlite3 *, Index *);
+
+/**
+ * Return a pointer to the column affinity string associated with index
+ * pIdx. A column affinity string has one character for each column in
+ * the table, according to the affinity of the column:
+ *
+ *  Character      Column affinity
+ *  ------------------------------
+ *  'A'            BLOB
+ *  'B'            TEXT
+ *  'C'            NUMERIC
+ *  'D'            INTEGER
+ *  'F'            REAL
+ *
+ * Memory for the buffer containing the column index affinity string
+ * is managed along with the rest of the Index structure. It will be
+ * released when sqlite3DeleteIndex() is called.
+ *
+ * @param db Database handle.
+ * @param def index_def where from affinity to be extracted.
+ * @retval Affinity string.
+ */
+char *
+sql_index_affinity_str(struct sqlite3 *db, struct index_def *def);
+
 void sqlite3TableAffinity(Vdbe *, Table *, int);
 char sqlite3CompareAffinity(Expr * pExpr, char aff2);
 int sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity);

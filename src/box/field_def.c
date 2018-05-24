@@ -95,6 +95,7 @@ const struct opt_def field_def_reg[] = {
 		     nullable_action, NULL),
 	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
 	OPT_DEF("default", OPT_STRPTR, struct field_def, default_value),
+	OPT_DEF("affinity", OPT_UINT32, struct field_def, affinity),
 	OPT_END,
 };
 

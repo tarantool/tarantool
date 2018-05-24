@@ -4733,11 +4733,9 @@ selectExpander(Walker * pWalker, Select * p)
 				return WRC_Abort;
 			}
 			pTab->nTabRef++;
-			if (cannotBeFunction(pParse, pFrom)) {
+			if (cannotBeFunction(pParse, pFrom))
 				return WRC_Abort;
-			}
-#if !defined(SQLITE_OMIT_VIEW)
-			if (space_is_view(pTab)) {
+			if (pTab->def->opts.is_view) {
 				if (sql_view_column_names(pParse, pTab) != 0)
 					return WRC_Abort;
 				assert(pFrom->pSelect == 0);
@@ -4752,7 +4750,6 @@ selectExpander(Walker * pWalker, Select * p)
 				sqlite3WalkSelect(pWalker, pFrom->pSelect);
 				pTab->def->field_count = columns;
 			}
-#endif
 		}
 
 		/* Locate the index named by the INDEXED BY clause, if any. */

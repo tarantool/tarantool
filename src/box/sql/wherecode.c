@@ -38,6 +38,7 @@
  * that actually generate the bulk of the WHERE loop code.  The original where.c
  * file retains the code that does query planning and analysis.
  */
+#include "box/schema.h"
 #include "sqliteInt.h"
 #include "whereInt.h"
 
@@ -62,6 +63,7 @@ explainIndexColumnName(Index * pIdx, int i)
 static void
 explainAppendTerm(StrAccum * pStr,	/* The text expression being built */
 		  Index * pIdx,		/* Index to read column names from */
+		  struct index_def *def,
 		  int nTerm,		/* Number of terms */
 		  int iTerm,		/* Zero-based index of first term. */
 		  int bAnd,		/* Non-zero to append " AND " */
@@ -78,9 +80,16 @@ explainAppendTerm(StrAccum * pStr,	/* The text expression being built */
 	for (i = 0; i < nTerm; i++) {
 		if (i)
 			sqlite3StrAccumAppend(pStr, ",", 1);
-		sqlite3StrAccumAppendAll(pStr,
-					 explainIndexColumnName(pIdx,
-								iTerm + i));
+		const char *name;
+		if (pIdx != NULL) {
+			name = explainIndexColumnName(pIdx, iTerm + i);
+		} else {
+			assert(def != NULL);
+                        struct space *space = space_cache_find(def->space_id);
+                        assert(space != NULL);
+                        name = space->def->fields[i].name;
+		}
+		sqlite3StrAccumAppendAll(pStr, name);
 	}
 	if (nTerm > 1)
 		sqlite3StrAccumAppend(pStr, ")", 1);
@@ -116,16 +125,26 @@ static void
 explainIndexRange(StrAccum * pStr, WhereLoop * pLoop)
 {
 	Index *pIndex = pLoop->pIndex;
+	struct index_def *def = pLoop->index_def;
 	u16 nEq = pLoop->nEq;
 	u16 nSkip = pLoop->nSkip;
 	int i, j;
+
+	assert(pIndex != NULL || def != NULL);
 
 	if (nEq == 0
 	    && (pLoop->wsFlags & (WHERE_BTM_LIMIT | WHERE_TOP_LIMIT)) == 0)
 		return;
 	sqlite3StrAccumAppend(pStr, " (", 2);
 	for (i = 0; i < nEq; i++) {
-		const char *z = explainIndexColumnName(pIndex, i);
+		const char *z;
+		if (pIndex != NULL) {
+			z = explainIndexColumnName(pIndex, i);
+		} else {
+			struct space *space = space_cache_find(def->space_id);
+			assert(space != NULL);
+			z = space->def->fields[i].name;
+		}
 		if (i)
 			sqlite3StrAccumAppend(pStr, " AND ", 5);
 		sqlite3XPrintf(pStr, i >= nSkip ? "%s=?" : "ANY(%s)", z);
@@ -133,11 +152,11 @@ explainIndexRange(StrAccum * pStr, WhereLoop * pLoop)
 
 	j = i;
 	if (pLoop->wsFlags & WHERE_BTM_LIMIT) {
-		explainAppendTerm(pStr, pIndex, pLoop->nBtm, j, i, ">");
+		explainAppendTerm(pStr, pIndex, def, pLoop->nBtm, j, i, ">");
 		i = 1;
 	}
 	if (pLoop->wsFlags & WHERE_TOP_LIMIT) {
-		explainAppendTerm(pStr, pIndex, pLoop->nTop, j, i, "<");
+		explainAppendTerm(pStr, pIndex, def, pLoop->nTop, j, i, "<");
 	}
 	sqlite3StrAccumAppend(pStr, ")", 1);
 }
@@ -199,13 +218,15 @@ sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
 		}
 		if ((flags & WHERE_IPK) == 0) {
 			const char *zFmt = 0;
-			Index *pIdx;
+			Index *pIdx = pLoop->pIndex;
+			struct index_def *idx_def = pLoop->index_def;
+			if (pIdx == NULL && idx_def == NULL) return 0;
 
-			assert(pLoop->pIndex != 0);
-			pIdx = pLoop->pIndex;
+			assert(pIdx != NULL || idx_def != NULL);
 			assert(!(flags & WHERE_AUTO_INDEX)
 			       || (flags & WHERE_IDX_ONLY));
-			if (IsPrimaryKeyIndex(pIdx)) {
+			if ((pIdx != NULL && IsPrimaryKeyIndex(pIdx)) ||
+			    (idx_def != NULL && idx_def->iid == 0)) {
 				if (isSearch) {
 					zFmt = "PRIMARY KEY";
 				}
@@ -220,7 +241,12 @@ sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
 			}
 			if (zFmt) {
 				sqlite3StrAccumAppend(&str, " USING ", 7);
-				sqlite3XPrintf(&str, zFmt, pIdx->zName);
+				if (pIdx != NULL)
+					sqlite3XPrintf(&str, zFmt, pIdx->zName);
+				else if (idx_def != NULL)
+					sqlite3XPrintf(&str, zFmt, idx_def->name);
+				else
+					sqlite3XPrintf(&str, zFmt, "EPHEMERAL INDEX");
 				explainIndexRange(&str, pLoop);
 			}
 		} else if ((flags & WHERE_IPK) != 0
@@ -675,20 +701,19 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 	u16 nEq;		/* The number of == or IN constraints to code */
 	u16 nSkip;		/* Number of left-most columns to skip */
 	Vdbe *v = pParse->pVdbe;	/* The vm under construction */
-	Index *pIdx;		/* The index being used for this loop */
 	WhereTerm *pTerm;	/* A single constraint term */
 	WhereLoop *pLoop;	/* The WhereLoop object */
 	int j;			/* Loop counter */
 	int regBase;		/* Base register */
 	int nReg;		/* Number of registers to allocate */
-	char *zAff;		/* Affinity string to return */
 
 	/* This module is only called on query plans that use an index. */
 	pLoop = pLevel->pWLoop;
 	nEq = pLoop->nEq;
 	nSkip = pLoop->nSkip;
-	pIdx = pLoop->pIndex;
-	assert(pIdx != 0);
+	struct Index *pIdx = pLoop->pIndex;
+	struct index_def *idx_def = pLoop->index_def;
+	assert(pIdx != NULL || idx_def != NULL);
 
 	/* Figure out how many memory cells we will need then allocate them.
 	 */
@@ -696,9 +721,13 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 	nReg = pLoop->nEq + nExtraReg;
 	pParse->nMem += nReg;
 
-	zAff =
-	    sqlite3DbStrDup(pParse->db,
-			    sqlite3IndexAffinityStr(pParse->db, pIdx));
+	char *zAff;
+	if (pIdx != NULL) {
+		zAff = sqlite3DbStrDup(pParse->db,
+				       sqlite3IndexAffinityStr(pParse->db, pIdx));
+	} else {
+		zAff = sql_index_affinity_str(pParse->db, idx_def);
+	}
 	assert(zAff != 0 || pParse->db->mallocFailed);
 
 	if (nSkip) {
@@ -1214,7 +1243,6 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		int endEq;	/* True if range end uses ==, >= or <= */
 		int start_constraints;	/* Start of range is constrained */
 		int nConstraint;	/* Number of constraint terms */
-		Index *pIdx;	/* The index we will be using */
 		int iIdxCur;	/* The VDBE cursor for the index */
 		int nExtraReg = 0;	/* Number of extra registers needed */
 		int op;		/* Instruction opcode */
@@ -1227,7 +1255,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 					      * to integer type, used for IPK.
 					      */
 
-		pIdx = pLoop->pIndex;
+		struct Index *pIdx = pLoop->pIndex;
+		struct index_def *idx_def = pLoop->index_def;
+		assert(pIdx != NULL || idx_def != NULL);
 		iIdxCur = pLevel->iIdxCur;
 		assert(nEq >= pLoop->nSkip);
 
@@ -1242,7 +1272,11 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		assert(pWInfo->pOrderBy == 0
 		       || pWInfo->pOrderBy->nExpr == 1
 		       || (pWInfo->wctrlFlags & WHERE_ORDERBY_MIN) == 0);
-		int nIdxCol = index_column_count(pIdx);
+		int nIdxCol;
+		if (pIdx != NULL)
+			nIdxCol = index_column_count(pIdx);
+		else
+			nIdxCol = idx_def->key_def->part_count;
 		if ((pWInfo->wctrlFlags & WHERE_ORDERBY_MIN) != 0
 		    && pWInfo->nOBSat > 0 && (nIdxCol > nEq)) {
 			j = pIdx->aiColumn[nEq];
@@ -1379,11 +1413,34 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			startEq = 0;
 			start_constraints = 1;
 		}
-		struct Index *pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
-		assert(pk);
-		int nPkCol = index_column_count(pk);
-		char affinity =
-			pIdx->pTable->def->fields[pk->aiColumn[0]].affinity;
+		struct Index *pk = NULL;
+		struct index_def *idx_pk = NULL;
+		char affinity;
+		if (pIdx == NULL) {
+			struct space *space = space_cache_find(idx_def->space_id);
+			assert(space != NULL);
+			idx_pk = space->index[0]->def;
+			int fieldno = idx_pk->key_def->parts[0].fieldno;
+			affinity = space->def->fields[fieldno].affinity;
+			if (affinity == AFFINITY_UNDEFINED) {
+				if (idx_pk->key_def->part_count == 1 &&
+				    space->def->fields[fieldno].type ==
+				    FIELD_TYPE_INTEGER)
+					affinity = AFFINITY_INTEGER;
+				else
+					affinity = AFFINITY_BLOB;
+			}
+		} else {
+			pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
+			affinity =
+				pIdx->pTable->def->fields[pk->aiColumn[0]].affinity;
+		}
+
+		int nPkCol;
+		if (pk != NULL)
+			nPkCol = index_column_count(pk);
+		else
+			nPkCol = idx_pk->key_def->part_count;
 		if (nPkCol == 1 && affinity == AFFINITY_INTEGER) {
 			/* Right now INTEGER PRIMARY KEY is the only option to
 			 * get Tarantool's INTEGER column type. Need special handling
@@ -1392,7 +1449,11 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			 */
 			int limit = pRangeStart == NULL ? nEq : nEq + 1;
 			for (int i = 0; i < limit; i++) {
-				if (pIdx->aiColumn[i] == pk->aiColumn[0]) {
+				if ((pIdx != NULL && pIdx->aiColumn[i] ==
+				     pk->aiColumn[0]) ||
+				    (idx_pk != NULL &&
+				     idx_def->key_def->parts[i].fieldno ==
+				     idx_pk->key_def->parts[0].fieldno)) {
 					/* Here: we know for sure that table has INTEGER
 					   PRIMARY KEY, single column, and Index we're
 					   trying to use for scan contains this column. */

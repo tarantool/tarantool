@@ -1170,23 +1170,6 @@ sql_index_column_sort_order(Index *idx, uint32_t column)
 	return key_def->parts[column].sort_order;
 }
 
-/**
- * Return true if space which corresponds to
- * given table has view option.
- *
- * FIXME: this is temporary wrapper around SQL specific struct.
- * It will be removed after data dictionary integration
- * into SQL is finished.
- */
-bool
-space_is_view(Table *table) {
-	assert(table != NULL);
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
-	return space->def->opts.is_view;
-}
-
 struct ExprList *
 space_checks_expr_list(uint32_t space_id)
 {
@@ -1197,23 +1180,13 @@ space_checks_expr_list(uint32_t space_id)
 	return space->def->opts.checks;
 }
 
-/**
- * Create cursor which will be positioned to the space/index.
- * It makes space lookup and loads pointer to it into register,
- * which is passes to OP_OpenWrite as an argument.
- *
- * @param parse_context Parse context.
- * @param cursor Number of cursor to be created.
- * @param entity_id Encoded space and index ids.
- * @retval address of last opcode.
- */
 int
-emit_open_cursor(Parse *parse_context, int cursor, int entity_id)
+emit_open_cursor(struct Parse *parse_context, int cursor, int entity_id)
 {
 	assert(entity_id > 0);
 	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(entity_id));
 	assert(space != NULL);
-	Vdbe *vdbe = parse_context->pVdbe;
+	struct Vdbe *vdbe = parse_context->pVdbe;
 	int space_ptr_reg = ++parse_context->nMem;
 	sqlite3VdbeAddOp4(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
 			  P4_SPACEPTR);
@@ -1221,6 +1194,22 @@ emit_open_cursor(Parse *parse_context, int cursor, int entity_id)
 				 space_ptr_reg);
 }
 
+int
+sql_emit_open_cursor(struct Parse *parse, int cursor, int index_id, struct space *space)
+{
+	assert(space != NULL);
+	Vdbe *vdbe = parse->pVdbe;
+	int space_ptr_reg = ++parse->nMem;
+	sqlite3VdbeAddOp4(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
+			  P4_SPACEPTR);
+	struct key_def *def = key_def_dup(space->index[index_id]->def->key_def);
+	if (def == NULL)
+		return 0;
+	return sqlite3VdbeAddOp4(vdbe, OP_OpenWrite, cursor, index_id,
+				 space_ptr_reg,
+				 (char*)def,
+				 P4_KEYDEF);
+}
 /*
  * Generate code that will increment the schema cookie.
  *
@@ -2087,7 +2076,7 @@ int
 sql_view_column_names(struct Parse *parse, struct Table *table)
 {
 	assert(table != NULL);
-	assert(space_is_view(table));
+	assert(table->def->opts.is_view);
 	/* A positive nCol means the columns names for this view
 	 * are already known.
 	 */

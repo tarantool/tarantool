@@ -183,6 +183,16 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		struct NameContext nc;
 		memset(&nc, 0, sizeof(nc));
 		nc.pParse = parse;
+		if (tab_list->a[0].pTab == NULL) {
+			struct Table *t = calloc(sizeof(struct Table), 1);
+			if (t == NULL) {
+				sqlite3OomFault(parse->db);
+				goto delete_from_cleanup;
+			}
+			assert(space != NULL);
+			t->def = space->def;
+			tab_list->a[0].pTab = t;
+		}
 		nc.pSrcList = tab_list;
 		if (sqlite3ResolveExprNames(&nc, where))
 			goto delete_from_cleanup;
@@ -196,7 +206,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 * is held in ephemeral table, there is no PK for
 		 * it, so columns should be loaded manually.
 		 */
-		struct Index *pk = NULL;
+		struct key_def *pk_def = NULL;
 		int reg_pk = parse->nMem + 1;
 		int pk_len;
 		int eph_cursor = parse->nTab++;
@@ -207,13 +217,17 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
 					  eph_cursor, pk_len);
 		} else {
-			pk = sqlite3PrimaryKeyIndex(table);
-			assert(pk != NULL);
-			pk_len = index_column_count(pk);
-			parse->nMem += pk_len;
-			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, eph_cursor,
-					  pk_len);
-			sql_vdbe_set_p4_key_def(parse, pk);
+                        assert(space->index_count > 0);
+                        pk_def = key_def_dup(space->index[0]->def->key_def);
+                        if(pk_def == NULL) {
+                                sqlite3OomFault(parse->db);
+                                goto delete_from_cleanup;
+                        }
+                        pk_len = pk_def->part_count;
+                        parse->nMem += pk_len;
+                        sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, eph_cursor,
+                                          pk_len, 0,
+                                          (char *)pk_def, P4_KEYDEF);
 		}
 
 		/* Construct a query to find the primary key for
@@ -252,11 +266,14 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		/* Extract the primary key for the current row */
 		if (!is_view) {
 			for (int i = 0; i < pk_len; i++) {
-				assert(pk->aiColumn[i] >= 0);
-				sqlite3ExprCodeGetColumnOfTable(v, table->def,
+				struct space_def *def;
+				if (table != NULL)
+					def = table->def;
+				else
+					def = space->def;
+				sqlite3ExprCodeGetColumnOfTable(v, def,
 								tab_cursor,
-								pk->
-								aiColumn[i],
+								pk_def->parts[i].fieldno,
 								reg_pk + i);
 			}
 		} else {
@@ -287,6 +304,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			 * key.
 			 */
 			key_len = 0;
+			struct Index *pk = sqlite3PrimaryKeyIndex(table);
 			const char *zAff = is_view ? NULL :
 					  sqlite3IndexAffinityStr(parse->db, pk);
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, reg_pk, pk_len,
@@ -323,10 +341,26 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			int space_ptr_reg = ++parse->nMem;
 			sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0,
 					  (void *)space, P4_SPACEPTR);
+
+			int tnum;
+			if (table != NULL) {
+				tnum = table->tnum;
+			}
+			else {
+				/* index id is 0 for PK.  */
+				tnum = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(space->def->id,
+									      0);
+			}
 			sqlite3VdbeAddOp3(v, OP_OpenWrite, tab_cursor,
-					  table->tnum, space_ptr_reg);
-			sql_vdbe_set_p4_key_def(parse, pk);
-			VdbeComment((v, "%s", pk->zName));
+					  tnum, space_ptr_reg);
+			struct key_def *def = key_def_dup(pk_def);
+			if (def == NULL) {
+				sqlite3OomFault(parse->db);
+				goto delete_from_cleanup;
+			}
+			sqlite3VdbeAppendP4(v, def, P4_KEYDEF);
+
+			VdbeComment((v, "%s", space->index[0]->def->name));
 
 			if (one_pass == ONEPASS_MULTI)
 				sqlite3VdbeJumpHere(v, iAddrOnce);
@@ -339,7 +373,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (one_pass != ONEPASS_OFF) {
 			/* OP_Found will use an unpacked key. */
 			assert(key_len == pk_len);
-			assert(pk != NULL || table->pSelect != NULL);
+			assert(pk_def != NULL || table->pSelect != NULL);
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
 
@@ -424,7 +458,8 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	/* If there are any triggers to fire, allocate a range of registers to
 	 * use for the old.* references in the triggers.
 	 */
-	if (sqlite3FkRequired(table, NULL) || trigger_list != NULL) {
+	if (table != NULL &&
+	    (sqlite3FkRequired(table, NULL) || trigger_list != NULL)) {
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
 		uint32_t mask =
@@ -483,7 +518,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	 * of the DELETE statement is to fire the INSTEAD OF
 	 * triggers).
 	 */
-	if (table->pSelect == NULL) {
+	if (table == NULL || table->pSelect == NULL) {
 		uint8_t p5 = 0;
 		sqlite3VdbeAddOp2(v, OP_Delete, cursor,
 				  (need_update_count ? OPFLAG_NCHANGE : 0));
@@ -498,16 +533,20 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		sqlite3VdbeChangeP5(v, p5);
 	}
 
-	/* Do any ON CASCADE, SET NULL or SET DEFAULT operations
-	 * required to handle rows (possibly in other tables) that
-	 * refer via a foreign key to the row just deleted.
-	 */
-	sqlite3FkActions(parse, table, 0, first_old_reg, 0);
+	if (table != NULL) {
+		/* Do any ON CASCADE, SET NULL or SET DEFAULT
+		 * operations required to handle rows (possibly
+		 * in other tables) that refer via a foreign
+		 * key to the row just deleted.
+		 */
 
-	/* Invoke AFTER DELETE trigger programs. */
-	sqlite3CodeRowTrigger(parse, trigger_list,
-			      TK_DELETE, 0, TRIGGER_AFTER, table, first_old_reg,
-			      onconf, label);
+		sqlite3FkActions(parse, table, 0, first_old_reg, 0);
+
+		/* Invoke AFTER DELETE trigger programs. */
+		sqlite3CodeRowTrigger(parse, trigger_list,
+				      TK_DELETE, 0, TRIGGER_AFTER, table,
+				      first_old_reg, onconf, label);
+	}
 
 	/* Jump here if the row had already been deleted before
 	 * any BEFORE trigger programs were invoked. Or if a trigger program
