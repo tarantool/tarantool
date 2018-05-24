@@ -444,12 +444,12 @@ int tarantoolSqlite3EphemeralInsert(struct space *space, const char *tuple,
 	return SQLITE_OK;
 }
 
-/* Simply delete ephemeral space calling space_delete_ephemeral(). */
+/* Simply delete ephemeral space by calling space_delete(). */
 int tarantoolSqlite3EphemeralDrop(BtCursor *pCur)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
-	space_delete_ephemeral(pCur->space);
+	space_delete(pCur->space);
 	pCur->space = NULL;
 	return SQLITE_OK;
 }
