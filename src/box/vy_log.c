@@ -177,6 +177,10 @@ static struct vy_log vy_log;
 static struct vy_recovery *
 vy_recovery_new_locked(int64_t signature, bool only_checkpoint);
 
+static int
+vy_recovery_process_record(struct vy_recovery *recovery,
+			   const struct vy_log_record *record);
+
 /**
  * Return the name of the vylog file that has the given signature.
  */
@@ -889,6 +893,14 @@ int
 vy_log_end_recovery(void)
 {
 	assert(vy_log.recovery != NULL);
+
+	/*
+	 * Update the recovery context with records written during
+	 * recovery - we will need them for garbage collection.
+	 */
+	struct vy_log_record *record;
+	stailq_foreach_entry(record, &vy_log.tx, in_tx)
+		vy_recovery_process_record(vy_log.recovery, record);
 
 	/* Flush all pending records. */
 	if (vy_log_flush() < 0) {
