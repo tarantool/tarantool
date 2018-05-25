@@ -422,9 +422,12 @@ box.cfg{net_msg_max = 'invalid'}
 ---
 - error: 'Incorrect value for option ''net_msg_max'': should be of type number'
 ...
+--
+-- gh-3425: incorrect error message: must not contain 'iproto'.
+--
 box.cfg{net_msg_max = 0}
 ---
-- error: 'Incorrect value for option ''iproto_msg_max'': minimal value is 2'
+- error: 'Incorrect value for option ''net_msg_max'': minimal value is 2'
 ...
 old = box.cfg.net_msg_max
 ---

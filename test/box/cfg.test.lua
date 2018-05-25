@@ -85,6 +85,9 @@ test_run:cmd("cleanup server cfg_tester")
 -- gh-3320: box.cfg{net_msg_max}.
 --
 box.cfg{net_msg_max = 'invalid'}
+--
+-- gh-3425: incorrect error message: must not contain 'iproto'.
+--
 box.cfg{net_msg_max = 0}
 old = box.cfg.net_msg_max
 box.cfg{net_msg_max = 2}
