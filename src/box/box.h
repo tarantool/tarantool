@@ -174,6 +174,7 @@ void box_set_vinyl_max_tuple_size(void);
 void box_set_vinyl_cache(void);
 void box_set_vinyl_timeout(void);
 void box_set_replication_timeout(void);
+void box_set_replication_connect_timeout(void);
 void box_set_replication_connect_quorum(void);
 
 extern "C" {

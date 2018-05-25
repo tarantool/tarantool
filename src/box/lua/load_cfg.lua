@@ -182,6 +182,7 @@ local dynamic_cfg = {
     end,
     force_recovery          = function() end,
     replication_timeout     = private.cfg_set_replication_timeout,
+    replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
 }
 
@@ -190,6 +191,7 @@ local dynamic_cfg_skip_at_load = {
     listen                  = true,
     replication             = true,
     replication_timeout     = true,
+    replication_connect_timeout = true,
     replication_connect_quorum = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
