@@ -20,6 +20,7 @@ box.cfg({
         instance_uri(2);
         instance_uri(3);
     };
+    replication_connect_timeout = 0.5,
 })
 
 box.once("bootstrap", function()

@@ -40,6 +40,7 @@
 #include <small/mempool.h>
 #include "fiber_cond.h"
 #include "vclock.h"
+#include "latch.h"
 
 /**
  * @module replication - global state of multi-master
@@ -136,7 +137,7 @@ extern bool replication_skip_conflict;
  * to a master.
  */
 static inline double
-replication_reconnect_timeout(void)
+replication_reconnect_interval(void)
 {
 	return replication_timeout;
 }
@@ -201,6 +202,11 @@ struct replicaset {
 		 */
 		int connected;
 		/**
+		 * Number of appliers that are disconnected,
+		 * because replica is loading.
+		 */
+		int loading;
+		/**
 		 * Number of appliers that have successfully
 		 * synchronized and hence contribute to the
 		 * quorum.
@@ -211,7 +217,16 @@ struct replicaset {
 		 * state.
 		 */
 		struct fiber_cond cond;
+		/*
+		 * The latch is used to order replication requests
+		 * running on behalf of all dead replicas
+		 * (replicas which have a server id but don't have
+		 * struct replica object).
+		 */
+		struct latch order_latch;
 	} applier;
+	/** Map of all known replica_id's to correspponding replica's. */
+	struct replica **replica_by_id;
 };
 extern struct replicaset replicaset;
 
@@ -254,6 +269,8 @@ struct replica {
 	 * separate from applier.
 	 */
 	enum applier_state applier_sync_state;
+	/* The latch is used to order replication requests. */
+	struct latch order_latch;
 };
 
 enum {
@@ -269,6 +286,12 @@ enum {
  */
 struct replica *
 replica_by_uuid(const struct tt_uuid *uuid);
+
+/**
+ * Find a replica by ID
+ */
+struct replica *
+replica_by_id(uint32_t replica_id);
 
 /**
  * Return the replica set leader.

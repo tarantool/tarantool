@@ -6,9 +6,10 @@ box.schema.user.grant('guest', 'replication')
 -- gh-2991 - Tarantool asserts on box.cfg.replication update if one of
 -- servers is dead
 replication_timeout = box.cfg.replication_timeout
-box.cfg{replication_timeout=0.05, replication={}}
+replication_connect_timeout = box.cfg.replication_connect_timeout
+box.cfg{replication_timeout=0.05, replication_connect_timeout=0.05, replication={}}
 box.cfg{replication = {'127.0.0.1:12345', box.cfg.listen}}
-box.cfg{replication_timeout = replication_timeout}
+box.cfg{replication_timeout = replication_timeout, replication_connect_timeout = replication_connect_timeout}
 
 -- gh-3111 - Allow to rebootstrap a replica from a read-only master
 replica_uuid = uuid.new()
@@ -30,14 +31,14 @@ test_run:create_cluster(SERVERS)
 test_run:wait_fullmesh(SERVERS)
 test_run:cmd("switch autobootstrap1")
 test_run = require('test_run').new()
-box.cfg{replication_timeout = 0.01}
+box.cfg{replication_timeout = 0.01, replication_connect_timeout=0.01}
 test_run:cmd("switch autobootstrap2")
 test_run = require('test_run').new()
-box.cfg{replication_timeout = 0.01}
+box.cfg{replication_timeout = 0.01, replication_connect_timeout=0.01}
 test_run:cmd("switch autobootstrap3")
 test_run = require('test_run').new()
 fiber=require('fiber')
-box.cfg{replication_timeout = 0.01}
+box.cfg{replication_timeout = 0.01, replication_connect_timeout=0.01}
 _ = box.schema.space.create('test_timeout'):create_index('pk')
 test_run:cmd("setopt delimiter ';'")
 function test_timeout()

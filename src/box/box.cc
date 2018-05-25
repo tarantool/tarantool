@@ -1944,13 +1944,13 @@ box_cfg_xc(void)
 	/* Follow replica */
 	replicaset_follow();
 
-	say_info("ready to accept requests");
-
 	fiber_gc();
 	is_box_configured = true;
 
 	if (!is_bootstrap_leader)
 		replicaset_sync();
+
+	say_info("ready to accept requests");
 }
 
 void

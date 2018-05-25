@@ -22,6 +22,7 @@ box.cfg({
         USER..':'..PASSWORD..'@'..instance_uri(2);
     };
     read_only = (INSTANCE_ID ~= '1' and true or false);
+    replication_connect_timeout = 0.5,
 })
 
 box.once("bootstrap", function()

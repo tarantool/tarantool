@@ -93,7 +93,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	error_log(e);
 	if (type_cast(SocketError, e) || type_cast(SystemError, e))
 		say_info("will retry every %.2lf second",
-			 replication_reconnect_timeout());
+			 replication_reconnect_interval());
 	applier->last_logged_errcode = errcode;
 }
 
@@ -507,7 +507,25 @@ applier_subscribe(struct applier *applier)
 			 */
 			vclock_follow(&replicaset.vclock, row.replica_id,
 				      row.lsn);
-			if (xstream_write(applier->subscribe_stream, &row) != 0) {
+			struct replica *replica = replica_by_id(row.replica_id);
+			struct latch *latch = (replica ? &replica->order_latch :
+					       &replicaset.applier.order_latch);
+			/*
+			 * In a full mesh topology, the same set
+			 * of changes may arrive via two
+			 * concurrently running appliers. Thanks
+			 * to vclock_follow() above, the first row
+			 * in the set will be skipped - but the
+			 * remaining may execute out of order,
+			 * when the following xstream_write()
+			 * yields on WAL. Hence we need a latch to
+			 * strictly order all changes which belong
+			 * to the same server id.
+			 */
+			latch_lock(latch);
+			int res = xstream_write(applier->subscribe_stream, &row);
+			latch_unlock(latch);
+			if (res != 0) {
 				struct error *e = diag_last_error(diag_get());
 				/**
 				 * Silently skip ER_TUPLE_FOUND error if such
@@ -584,18 +602,22 @@ applier_f(va_list ap)
 			} else if (e->errcode() == ER_LOADING) {
 				/* Autobootstrap */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
 			} else if (e->errcode() == ER_ACCESS_DENIED) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else if (e->errcode() == ER_SYSTEM) {
 				/* System error from master instance. */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else if (e->errcode() == ER_CFG) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
+				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;
 			} else {
 				/* Unrecoverable errors */
@@ -608,13 +630,12 @@ applier_f(va_list ap)
 			break;
 		} catch (SocketError *e) {
 			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
 		} catch (SystemError *e) {
 			applier_log_error(applier, e);
+			applier_disconnect(applier, APPLIER_DISCONNECTED);
 			goto reconnect;
-		} catch (ChannelIsClosed *e) {
-			applier_disconnect(applier, APPLIER_OFF);
-			break;
 		} catch (Exception *e) {
 			applier_log_error(applier, e);
 			applier_disconnect(applier, APPLIER_STOPPED);
@@ -633,8 +654,7 @@ applier_f(va_list ap)
 		 * See: https://github.com/tarantool/tarantool/issues/136
 		*/
 reconnect:
-		applier_disconnect(applier, APPLIER_DISCONNECTED);
-		fiber_sleep(replication_reconnect_timeout());
+		fiber_sleep(replication_reconnect_interval());
 	}
 	return 0;
 }
