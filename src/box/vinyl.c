@@ -1353,7 +1353,9 @@ vy_lsm_get(struct vy_lsm *lsm, struct vy_tx *tx,
  * a duplicate key error in the diagnostics area.
  * @param env        Vinyl environment.
  * @param tx         Current transaction.
- * @param space      Target space.
+ * @param rv         Read view.
+ * @param space_name Space name.
+ * @param index_name Index name.
  * @param lsm        LSM tree in which to search.
  * @param key        Key statement.
  *
@@ -1361,7 +1363,9 @@ vy_lsm_get(struct vy_lsm *lsm, struct vy_tx *tx,
  * @retval -1 Memory error or the key is found.
  */
 static inline int
-vy_check_is_unique(struct vy_env *env, struct vy_tx *tx, struct space *space,
+vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
+		   const struct vy_read_view **rv,
+		   const char *space_name, const char *index_name,
 		   struct vy_lsm *lsm, struct tuple *key)
 {
 	struct tuple *found;
@@ -1371,15 +1375,52 @@ vy_check_is_unique(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	if (vy_lsm_get(lsm, tx, vy_tx_read_view(tx), key, &found))
+	if (vy_lsm_get(lsm, tx, rv, key, &found))
 		return -1;
 
 	if (found) {
 		tuple_unref(found);
 		diag_set(ClientError, ER_TUPLE_FOUND,
-			 index_name_by_id(space, lsm->index_id),
-			 space_name(space));
+			 index_name, space_name);
 		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Check if insertion of a new tuple violates unique constraint
+ * of a secondary index.
+ * @param env        Vinyl environment.
+ * @param tx         Current transaction.
+ * @param rv         Read view.
+ * @param space_name Space name.
+ * @param index_name Index name.
+ * @param lsm        LSM tree corresponding to the index.
+ * @param stmt       New tuple.
+ *
+ * @retval  0 Success, unique constraint is satisfied.
+ * @retval -1 Duplicate is found or read error occurred.
+ */
+static int
+vy_check_is_unique_secondary(struct vy_env *env, struct vy_tx *tx,
+			     const struct vy_read_view **rv,
+			     const char *space_name, const char *index_name,
+			     struct vy_lsm *lsm, const struct tuple *stmt)
+{
+	assert(lsm->index_id > 0);
+	struct key_def *def = lsm->key_def;
+	if (lsm->check_is_unique &&
+	    !key_update_can_be_skipped(def->column_mask,
+				       vy_stmt_column_mask(stmt)) &&
+	    (!def->is_nullable || !vy_tuple_key_contains_null(stmt, def))) {
+		struct tuple *key = vy_stmt_extract_key(stmt, def,
+							lsm->env->key_format);
+		if (key == NULL)
+			return -1;
+		int rc = vy_check_is_unique(env, tx, rv, space_name,
+					    index_name, lsm, key);
+		tuple_unref(key);
+		return rc;
 	}
 	return 0;
 }
@@ -1407,7 +1448,9 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * conflict with existing tuples.
 	 */
 	if (pk->check_is_unique &&
-	    vy_check_is_unique(env, tx, space, pk, stmt) != 0)
+	    vy_check_is_unique(env, tx, vy_tx_read_view(tx), space_name(space),
+			       index_name_by_id(space, pk->index_id),
+			       pk, stmt) != 0)
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
@@ -1431,25 +1474,13 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	       vy_stmt_type(stmt) == IPROTO_REPLACE);
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	assert(lsm->index_id > 0);
-	/*
-	 * If the index is unique then the new tuple must not
-	 * conflict with existing tuples. If the index is not
-	 * unique a conflict is impossible.
-	 */
-	if (lsm->check_is_unique &&
-	    !key_update_can_be_skipped(lsm->key_def->column_mask,
-				       vy_stmt_column_mask(stmt)) &&
-	    (!lsm->key_def->is_nullable ||
-	     !vy_tuple_key_contains_null(stmt, lsm->key_def))) {
-		struct tuple *key = vy_stmt_extract_key(stmt, lsm->key_def,
-							lsm->env->key_format);
-		if (key == NULL)
-			return -1;
-		int rc = vy_check_is_unique(env, tx, space, lsm, key);
-		tuple_unref(key);
-		if (rc != 0)
-			return -1;
-	}
+
+	if (vy_check_is_unique_secondary(env, tx, vy_tx_read_view(tx),
+					 space_name(space),
+					 index_name_by_id(space, lsm->index_id),
+					 lsm, stmt) != 0)
+		return -1;
+
 	/*
 	 * We must always append the statement to transaction write set
 	 * of each LSM tree, even if operation itself does not update
