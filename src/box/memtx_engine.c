@@ -36,7 +36,6 @@
 #include <small/mempool.h>
 
 #include "fiber.h"
-#include "clock.h"
 #include "errinj.h"
 #include "coio_file.h"
 #include "tuple.h"
@@ -1111,15 +1110,6 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-#ifndef NDEBUG
-	struct errinj *delay = errinj(ERRINJ_MEMTX_TUPLE_DELETE_DELAY,
-				      ERRINJ_DOUBLE);
-	if (delay != NULL && delay->dparam > 0) {
-		double start = clock_monotonic();
-		while (clock_monotonic() < start + delay->dparam)
-			/* busy loop */ ;
-	}
-#endif
 	size_t total = sizeof(struct memtx_tuple) +
 		       tuple_format_meta_size(format) + tuple->bsize;
 	tuple_format_unref(format);

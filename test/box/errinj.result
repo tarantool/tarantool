@@ -64,8 +64,6 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_MEMTX_TUPLE_DELETE_DELAY:
-    state: 0
   ERRINJ_LOG_ROTATE:
     state: false
   ERRINJ_RELAY_EXIT_DELAY:
@@ -1306,74 +1304,4 @@ s:select()
 ...
 s:drop()
 ---
-...
---
--- gh-3408: space drop frees tuples asynchronously.
---
-clock = require('clock')
----
-...
-function mem_used() local info = box.info.memory() return info.data + info.index end
----
-...
-_ = collectgarbage('collect')
----
-...
-mem_before = mem_used()
----
-...
-s1 = box.schema.space.create('test1')
----
-...
-_ = s1:create_index('pk', {type = 'tree'})
----
-...
-s2 = box.schema.space.create('test2')
----
-...
-_ = s2:create_index('pk', {type = 'hash'})
----
-...
-box.begin() for i = 1, 1000 do s1:insert{i} s2:insert{i} end box.commit()
----
-...
-_ = collectgarbage('collect')
----
-...
-errinj.set('ERRINJ_MEMTX_TUPLE_DELETE_DELAY', 0.001)
----
-- ok
-...
-start = clock.monotonic()
----
-...
-s1:drop()
----
-...
-s2:drop()
----
-...
-delay = clock.monotonic() - start
----
-...
-errinj.set('ERRINJ_MEMTX_TUPLE_DELETE_DELAY', 0)
----
-- ok
-...
-fiber.sleep(0.01)
----
-...
-delay < 0.1 or delay
----
-- true
-...
-_ = collectgarbage('collect')
----
-...
-mem_after = mem_used()
----
-...
-mem_after - mem_before -- 0
----
-- 0
 ...
