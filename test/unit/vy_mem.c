@@ -51,9 +51,9 @@ test_basic(void)
 
 	/* Check version  */
 	stmt = vy_mem_insert_template(mem, &stmts[4]);
-	is(mem->version, 6, "vy_mem->version")
+	is(mem->version, 8, "vy_mem->version")
 	vy_mem_commit_stmt(mem, stmt);
-	is(mem->version, 6, "vy_mem->version")
+	is(mem->version, 9, "vy_mem->version")
 
 	/* Clean up */
 	vy_mem_delete(mem);

@@ -250,6 +250,7 @@ vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt)
 	assert(mem->min_lsn <= lsn);
 	if (mem->max_lsn < lsn)
 		mem->max_lsn = lsn;
+	mem->version++;
 }
 
 void
