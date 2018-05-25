@@ -226,6 +226,21 @@ box.cfg{vinyl_write_threads = "threads"}
 ---
 - error: 'Incorrect value for option ''vinyl_write_threads'': should be of type number'
 ...
+box.cfg{instance_uuid = box.info.uuid}
+---
+...
+box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
+---
+- error: 'Incorrect value for option ''instance_uuid'': Can''t change instance uuid'
+...
+box.cfg{replicaset_uuid = box.info.cluster.uuid}
+---
+...
+box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
+---
+- error: 'Incorrect value for option ''replicaset_uuid'': Can''t change replicaset
+    uuid'
+...
 --------------------------------------------------------------------------------
 -- Test of default cfg options
 --------------------------------------------------------------------------------

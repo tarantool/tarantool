@@ -27,6 +27,12 @@ box.cfg{vinyl = "vinyl"}
 box.cfg{vinyl_write_threads = "threads"}
 
 
+box.cfg{instance_uuid = box.info.uuid}
+box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
+
+box.cfg{replicaset_uuid = box.info.cluster.uuid}
+box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
+
 --------------------------------------------------------------------------------
 -- Test of default cfg options
 --------------------------------------------------------------------------------

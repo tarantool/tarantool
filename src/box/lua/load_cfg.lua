@@ -184,6 +184,18 @@ local dynamic_cfg = {
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
+    instance_uuid           = function()
+        if box.cfg.instance_uuid ~= box.info.uuid then
+            box.error(box.error.CFG, 'instance_uuid',
+                      'Can\'t change instance uuid')
+        end
+    end,
+    replicaset_uuid           = function(new_value)
+        if box.cfg.replicaset_uuid ~= box.info.cluster.uuid then
+            box.error(box.error.CFG, 'replicaset_uuid',
+                      'Can\'t change replicaset uuid')
+        end
+    end,
 }
 
 local dynamic_cfg_skip_at_load = {
@@ -196,6 +208,8 @@ local dynamic_cfg_skip_at_load = {
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,
+    instance_uuid           = true,
+    replicaset_uuid         = true,
 }
 
 local function convert_gb(size)
