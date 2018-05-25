@@ -130,7 +130,7 @@ extern double replication_sync_lag;
  * to a master.
  */
 static inline double
-replication_reconnect_timeout(void)
+replication_reconnect_interval(void)
 {
 	return replication_timeout;
 }

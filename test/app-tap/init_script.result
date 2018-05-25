@@ -21,7 +21,7 @@ box.cfg
 16	pid_file:box.pid
 17	read_only:false
 18	readahead:16320
-19	replication_connect_timeout:4
+19	replication_connect_timeout:30
 20	replication_sync_lag:10
 21	replication_timeout:1
 22	rows_per_wal:500000

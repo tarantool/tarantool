@@ -92,7 +92,7 @@ applier_log_error(struct applier *applier, struct error *e)
 	error_log(e);
 	if (type_cast(SocketError, e) || type_cast(SystemError, e))
 		say_info("will retry every %.2lf second",
-			 replication_reconnect_timeout());
+			 replication_reconnect_interval());
 	applier->last_logged_errcode = errcode;
 }
 
@@ -644,7 +644,7 @@ applier_f(va_list ap)
 		*/
 reconnect:
 		applier_disconnect(applier, APPLIER_DISCONNECTED);
-		fiber_sleep(replication_reconnect_timeout());
+		fiber_sleep(replication_reconnect_interval());
 	}
 	return 0;
 }
