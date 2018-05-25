@@ -20,6 +20,7 @@ box.cfg({
         USER..':'..PASSWORD..'@'..instance_uri(1);
         USER..':'..PASSWORD..'@'..instance_uri(2);
     };
+    replication_connect_timeout = 0.5,
 })
 
 env = require('test_run')

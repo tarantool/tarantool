@@ -22,6 +22,7 @@ box.cfg({
         USER..':'..PASSWORD..'@'..instance_uri(3);
         USER..':'..PASSWORD..'@'..instance_uri(4);
     };
+    replication_connect_timeout = 0.5,
 })
 
 box.once("bootstrap", function()

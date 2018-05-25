@@ -12,9 +12,10 @@ end
 require('console').listen(os.getenv('ADMIN'))
 
 box.cfg({
-    listen = instance_uri(INSTANCE_ID);
+    listen = instance_uri(INSTANCE_ID),
     instance_uuid = '12345678-abcd-1234-abcd-123456789ef' .. INSTANCE_ID,
-    replication_timeout = 0.1;
+    replication_timeout = 0.1,
+    replication_connect_timeout = 0.5,
     replication = {
         instance_uri(1);
         instance_uri(2);
