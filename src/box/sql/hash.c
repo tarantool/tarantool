@@ -238,6 +238,7 @@ removeElementGivenHash(Hash * pH,	/* The pH containing "elem" */
 		pEntry->count--;
 		assert(pEntry->count >= 0);
 	}
+	free(elem->pKey);
 	sqlite3_free(elem);
 	pH->count--;
 	if (pH->count == 0) {

@@ -4804,6 +4804,7 @@ case OP_RenameTable: {
 
 	/* Rename all trigger created on this table.*/
 	for (; pTrig; pTrig = pTrig->pNext) {
+		sqlite3DbFree(db, pTrig->table);
 		pTrig->table = sqlite3DbStrNDup(db, zNewTableName,
 						sqlite3Strlen30(zNewTableName));
 		pTrig->pTabSchema = pTab->pSchema;
