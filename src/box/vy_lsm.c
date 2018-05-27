@@ -773,11 +773,20 @@ int
 vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	   const struct tuple *stmt, const struct tuple **region_stmt)
 {
+	uint32_t format_id = stmt->format_id;
+
 	assert(vy_stmt_is_refable(stmt));
 	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
 
-	/* Allocate region_stmt on demand. */
-	if (*region_stmt == NULL) {
+	/*
+	 * Allocate region_stmt on demand.
+	 *
+	 * Also, reallocate region_stmt if it uses a different tuple
+	 * format. This may happen during ALTER, when the LSM tree
+	 * that is currently being built uses the new space format
+	 * while other LSM trees still use the old space format.
+	 */
+	if (*region_stmt == NULL || (*region_stmt)->format_id != format_id) {
 		*region_stmt = vy_stmt_dup_lsregion(stmt, &mem->env->allocator,
 						    mem->generation);
 		if (*region_stmt == NULL)
@@ -788,7 +797,6 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	lsm->stat.memory.count.bytes += tuple_size(stmt);
 
 	/* Abort transaction if format was changed by DDL */
-	uint32_t format_id = stmt->format_id;
 	if (format_id != tuple_format_id(mem->format_with_colmask) &&
 	    format_id != tuple_format_id(mem->format)) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);

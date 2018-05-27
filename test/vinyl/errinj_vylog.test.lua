@@ -130,3 +130,32 @@ s1:select()
 s2:select()
 s1:drop()
 s2:drop()
+
+--
+-- Check that an index that was prepared, but not committed,
+-- is recovered properly.
+--
+fiber = require('fiber')
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+_ = s:insert{1, 1}
+
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+ch = fiber.channel(1)
+_ = fiber.create(function() s:create_index('sk', {parts = {2, 'unsigned'}}) ch:put(true) end)
+
+-- wait for ALTER to stall on WAL after preparing the new index
+while s.index.pk:stat().disk.dump.count == 0 do fiber.sleep(0.001) end
+
+box.error.injection.set('ERRINJ_VY_LOG_FLUSH', true);
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+ch:get()
+
+test_run:cmd('restart server default')
+
+s = box.space.test
+s.index.pk:select()
+s.index.sk:select()
+
+s:drop()

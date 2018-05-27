@@ -1164,52 +1164,6 @@ vinyl_space_drop_primary_key(struct space *space)
 	(void)space;
 }
 
-static int
-vinyl_space_build_index(struct space *src_space, struct index *new_index,
-			struct tuple_format *new_format)
-{
-	(void)new_format;
-
-	struct vy_env *env = vy_env(src_space->engine);
-	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
-
-	/*
-	 * During local recovery we are loading existing indexes
-	 * from disk, not building new ones.
-	 */
-	if (env->status != VINYL_INITIAL_RECOVERY_LOCAL &&
-	    env->status != VINYL_FINAL_RECOVERY_LOCAL) {
-		if (pk->stat.disk.count.rows != 0 ||
-		    pk->stat.memory.count.rows != 0) {
-			diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
-				 "building an index for a non-empty space");
-			return -1;
-		}
-	}
-
-	/*
-	 * Unlike Memtx, Vinyl does not need building of a secondary index.
-	 * This is true because of two things:
-	 * 1) Vinyl does not support alter of non-empty spaces
-	 * 2) During recovery a Vinyl index already has all needed data on disk.
-	 * And there are 3 cases:
-	 * I. The secondary index is added in snapshot. Then Vinyl was
-	 * snapshotted too and all necessary for that moment data is on disk.
-	 * II. The secondary index is added in WAL. That means that vinyl
-	 * space had no data at that point and had nothing to build. The
-	 * index actually could contain recovered data, but it will handle it
-	 * by itself during WAL recovery.
-	 * III. Vinyl is online. The space is definitely empty and there's
-	 * nothing to build.
-	 */
-	if (vinyl_index_open(new_index) != 0)
-		return -1;
-
-	/* Set pointer to the primary key for the new index. */
-	vy_lsm_update_pk(vy_lsm(new_index), pk);
-	return 0;
-}
-
 static size_t
 vinyl_space_bsize(struct space *space)
 {
@@ -4091,6 +4045,410 @@ vinyl_index_get(struct index *index, const char *key,
 }
 
 /*** }}} Cursor */
+
+/* {{{ Index build */
+
+/** Argument passed to vy_build_on_replace(). */
+struct vy_build_ctx {
+	/** Vinyl environment. */
+	struct vy_env *env;
+	/** LSM tree under construction. */
+	struct vy_lsm *lsm;
+	/** Format to check new tuples against. */
+	struct tuple_format *format;
+	/**
+	 * Names of the altered space and the new index.
+	 * Used for error reporting.
+	 */
+	const char *space_name;
+	const char *index_name;
+	/** Set in case a build error occurred. */
+	bool is_failed;
+	/** Container for storing errors. */
+	struct diag diag;
+};
+
+/**
+ * This is an on_replace trigger callback that forwards DML requests
+ * to the index that is currently being built.
+ */
+static void
+vy_build_on_replace(struct trigger *trigger, void *event)
+{
+	struct txn *txn = event;
+	struct txn_stmt *stmt = txn_current_stmt(txn);
+	struct vy_build_ctx *ctx = trigger->data;
+	struct vy_tx *tx = txn->engine_tx;
+	struct tuple_format *format = ctx->format;
+	struct vy_lsm *lsm = ctx->lsm;
+
+	if (ctx->is_failed)
+		return; /* already failed, nothing to do */
+
+	/* Check new tuples for conformity to the new format. */
+	if (stmt->new_tuple != NULL &&
+	    tuple_validate(format, stmt->new_tuple) != 0)
+		goto err;
+
+	/* Check key uniqueness if necessary. */
+	if (stmt->new_tuple != NULL &&
+	    vy_check_is_unique_secondary(ctx->env, tx, vy_tx_read_view(tx),
+					 ctx->space_name, ctx->index_name,
+					 lsm, stmt->new_tuple) != 0)
+		goto err;
+
+	/* Forward the statement to the new LSM tree. */
+	if (stmt->old_tuple != NULL) {
+		struct tuple *delete = vy_stmt_new_surrogate_delete(format,
+							stmt->old_tuple);
+		if (delete == NULL)
+			goto err;
+		int rc = vy_tx_set(tx, lsm, delete);
+		tuple_unref(delete);
+		if (rc != 0)
+			goto err;
+	}
+	if (stmt->new_tuple != NULL) {
+		uint32_t data_len;
+		const char *data = tuple_data_range(stmt->new_tuple, &data_len);
+		struct tuple *insert = vy_stmt_new_insert(format, data,
+							  data + data_len);
+		if (insert == NULL)
+			goto err;
+		int rc = vy_tx_set(tx, lsm, insert);
+		tuple_unref(insert);
+		if (rc != 0)
+			goto err;
+	}
+	return;
+err:
+	ctx->is_failed = true;
+	diag_move(diag_get(), &ctx->diag);
+}
+
+/**
+ * Insert a single statement into the LSM tree that is currently
+ * being built.
+ */
+static int
+vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
+		     const struct tuple *stmt, int64_t lsn)
+{
+	const struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt,
+				&mem->env->allocator, mem->generation);
+	if (region_stmt == NULL)
+		return -1;
+	vy_stmt_set_lsn((struct tuple *)region_stmt, lsn);
+	if (vy_mem_insert(mem, region_stmt) != 0)
+		return -1;
+	vy_mem_commit_stmt(mem, region_stmt);
+	vy_stmt_counter_acct_tuple(&lsm->stat.memory.count, region_stmt);
+	return 0;
+}
+
+/**
+ * Insert a tuple fetched from the space into the LSM tree that
+ * is currently being built.
+ */
+static int
+vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
+		      const char *space_name, const char *index_name,
+		      struct tuple_format *new_format, struct tuple *tuple)
+{
+	int rc;
+	struct vy_mem *mem = lsm->mem;
+	int64_t lsn = vy_stmt_lsn(tuple);
+
+	/* Check the tuple against the new space format. */
+	if (tuple_validate(new_format, tuple) != 0)
+		return -1;
+
+	/*
+	 * Check unique constraint if necessary.
+	 *
+	 * Note, this operation may yield, which opens a time
+	 * window for a concurrent fiber to insert a newer tuple
+	 * version. It's OK - we won't overwrite it, because the
+	 * LSN we use is less. However, we do need to make sure
+	 * we insert the tuple into the in-memory index that was
+	 * active before the yield, otherwise we might break the
+	 * invariant according to which newer in-memory indexes
+	 * store statements with greater LSNs. So we pin the
+	 * in-memory index that is active now and insert the tuple
+	 * into it after the yield.
+	 */
+	vy_mem_pin(mem);
+	rc = vy_check_is_unique_secondary(env, NULL,
+			&env->xm->p_committed_read_view,
+			space_name, index_name, lsm, tuple);
+	vy_mem_unpin(mem);
+	if (rc != 0)
+		return -1;
+
+	/* Reallocate the new tuple using the new space format. */
+	uint32_t data_len;
+	const char *data = tuple_data_range(tuple, &data_len);
+	struct tuple *stmt = vy_stmt_new_replace(new_format, data,
+						 data + data_len);
+	if (stmt == NULL)
+		return -1;
+
+	/* Insert the new tuple into the in-memory index. */
+	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
+	rc = vy_build_insert_stmt(lsm, mem, stmt, lsn);
+	tuple_unref(stmt);
+
+	/* Consume memory quota. Throttle if it is exceeded. */
+	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
+	assert(mem_used_after >= mem_used_before);
+	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_quota_wait(&env->quota);
+	return rc;
+}
+
+/**
+ * Recover a single statement that was inserted into the space
+ * while the newly built index was dumped to disk.
+ */
+static int
+vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
+		      const struct tuple *mem_stmt)
+{
+	int64_t lsn = vy_stmt_lsn(mem_stmt);
+	if (lsn <= lsm->dump_lsn)
+		return 0; /* statement was dumped, nothing to do */
+
+	/* Lookup the tuple that was affected by this statement. */
+	const struct vy_read_view rv = { .vlsn = lsn - 1 };
+	const struct vy_read_view *p_rv = &rv;
+	struct tuple *old_tuple;
+	if (vy_point_lookup(pk, NULL, &p_rv, (struct tuple *)mem_stmt,
+			    &old_tuple) != 0)
+		return -1;
+	/*
+	 * Create DELETE + INSERT statements corresponding to
+	 * the given statement in the secondary index.
+	 */
+	struct tuple *delete = NULL;
+	struct tuple *insert = NULL;
+	if (old_tuple != NULL) {
+		delete = vy_stmt_new_surrogate_delete(lsm->mem_format,
+						      old_tuple);
+		if (delete == NULL)
+			return -1;
+	}
+	enum iproto_type type = vy_stmt_type(mem_stmt);
+	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
+		uint32_t data_len;
+		const char *data = tuple_data_range(mem_stmt, &data_len);
+		insert = vy_stmt_new_insert(lsm->mem_format,
+					    data, data + data_len);
+		if (insert == NULL)
+			return -1;
+	} else if (type == IPROTO_UPSERT) {
+		struct tuple *new_tuple = vy_apply_upsert(mem_stmt, old_tuple,
+					pk->cmp_def, pk->mem_format, true);
+		if (new_tuple == NULL)
+			return -1;
+		uint32_t data_len;
+		const char *data = tuple_data_range(new_tuple, &data_len);
+		insert = vy_stmt_new_insert(lsm->mem_format,
+					    data, data + data_len);
+		tuple_unref(new_tuple);
+		if (insert == NULL)
+			return -1;
+	}
+
+	/* Insert DELETE + INSERT into the LSM tree. */
+	if (delete != NULL) {
+		int rc = vy_build_insert_stmt(lsm, lsm->mem, delete, lsn);
+		tuple_unref(delete);
+		if (rc != 0)
+			return -1;
+	}
+	if (insert != NULL) {
+		int rc = vy_build_insert_stmt(lsm, lsm->mem, insert, lsn);
+		tuple_unref(insert);
+		if (rc != 0)
+			return -1;
+	}
+	return 0;
+}
+
+/**
+ * Recover all statements stored in the given in-memory index
+ * that were inserted into the space while the newly built index
+ * was dumped to disk.
+ */
+static int
+vy_build_recover_mem(struct vy_lsm *lsm, struct vy_lsm *pk, struct vy_mem *mem)
+{
+	/*
+	 * Recover statements starting from the oldest one.
+	 * Key order doesn't matter so we simply iterate over
+	 * the in-memory index in reverse order.
+	 */
+	struct vy_mem_tree_iterator itr;
+	itr = vy_mem_tree_iterator_last(&mem->tree);
+	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
+		const struct tuple *mem_stmt;
+		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
+		if (vy_build_recover_stmt(lsm, pk, mem_stmt) != 0)
+			return -1;
+		vy_mem_tree_iterator_prev(&mem->tree, &itr);
+	}
+	return 0;
+}
+
+/**
+ * Recover the memory level of a newly built index.
+ *
+ * During the final dump of a newly built index, new statements may
+ * be inserted into the space. If those statements are not dumped to
+ * disk before restart, they won't be recovered from WAL, because at
+ * the time they were generated the new index didn't exist. In order
+ * to recover them, we replay all statements stored in the memory
+ * level of the primary index.
+ */
+static int
+vy_build_recover(struct vy_env *env, struct vy_lsm *lsm, struct vy_lsm *pk)
+{
+	int rc = 0;
+	struct vy_mem *mem;
+	size_t mem_used_before, mem_used_after;
+
+	mem_used_before = lsregion_used(&env->mem_env.allocator);
+	rlist_foreach_entry_reverse(mem, &pk->sealed, in_sealed) {
+		rc = vy_build_recover_mem(lsm, pk, mem);
+		if (rc != 0)
+			break;
+	}
+	if (rc == 0)
+		rc = vy_build_recover_mem(lsm, pk, pk->mem);
+
+	mem_used_after = lsregion_used(&env->mem_env.allocator);
+	assert(mem_used_after >= mem_used_before);
+	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	return rc;
+}
+
+static int
+vinyl_space_build_index(struct space *src_space, struct index *new_index,
+			struct tuple_format *new_format)
+{
+	struct vy_env *env = vy_env(src_space->engine);
+	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
+	bool is_empty = (pk->stat.disk.count.rows == 0 &&
+			 pk->stat.memory.count.rows == 0);
+
+	if (new_index->def->iid == 0 && !is_empty) {
+		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
+			 "rebuilding the primary index of a non-empty space");
+		return -1;
+	}
+
+	if (vinyl_index_open(new_index) != 0)
+		return -1;
+
+	/* Set pointer to the primary key for the new index. */
+	struct vy_lsm *new_lsm = vy_lsm(new_index);
+	vy_lsm_update_pk(new_lsm, pk);
+
+	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
+	    env->status == VINYL_FINAL_RECOVERY_LOCAL)
+		return vy_build_recover(env, new_lsm, pk);
+
+	if (is_empty)
+		return 0;
+
+	/*
+	 * Iterate over all tuples stored in the space and insert
+	 * each of them into the new LSM tree. Since read iterator
+	 * may yield, we install an on_replace trigger to forward
+	 * DML requests issued during the build.
+	 */
+	struct tuple *key = vy_stmt_new_select(pk->env->key_format, NULL, 0);
+	if (key == NULL)
+		return -1;
+
+	struct trigger on_replace;
+	struct vy_build_ctx ctx;
+	ctx.env = env;
+	ctx.lsm = new_lsm;
+	ctx.format = new_format;
+	ctx.space_name = space_name(src_space);
+	ctx.index_name = new_index->def->name;
+	ctx.is_failed = false;
+	diag_create(&ctx.diag);
+	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
+	trigger_add(&src_space->on_replace, &on_replace);
+
+	struct vy_read_iterator itr;
+	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
+			      &env->xm->p_committed_read_view);
+	int rc;
+	int loops = 0;
+	struct tuple *tuple;
+	int64_t build_lsn = env->xm->lsn;
+	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
+		if (tuple == NULL)
+			break;
+		/*
+		 * Insert the tuple into the new index unless it
+		 * was inserted into the space after we started
+		 * building the new index - in the latter case
+		 * the new tuple has already been inserted by the
+		 * on_replace trigger.
+		 *
+		 * Note, yield is not allowed between reading the
+		 * tuple from the primary index and inserting it
+		 * into the new index. If we yielded, the tuple
+		 * could be overwritten by a concurrent transaction,
+		 * in which case we would insert an outdated tuple.
+		 */
+		if (vy_stmt_lsn(tuple) <= build_lsn) {
+			rc = vy_build_insert_tuple(env, new_lsm,
+						   space_name(src_space),
+						   new_index->def->name,
+						   new_format, tuple);
+			if (rc != 0)
+				break;
+		}
+		/*
+		 * Read iterator yields only when it reads runs.
+		 * Yield periodically in order not to stall the
+		 * tx thread in case there are a lot of tuples in
+		 * mems or cache.
+		 */
+		if (++loops % VY_YIELD_LOOPS == 0)
+			fiber_sleep(0);
+		if (ctx.is_failed) {
+			diag_move(&ctx.diag, diag_get());
+			rc = -1;
+			break;
+		}
+	}
+	vy_read_iterator_close(&itr);
+	tuple_unref(key);
+
+	/*
+	 * Dump the new index upon build completion so that we don't
+	 * have to rebuild it on recovery.
+	 */
+	if (rc == 0)
+		rc = vy_scheduler_dump(&env->scheduler);
+
+	if (rc == 0 && ctx.is_failed) {
+		diag_move(&ctx.diag, diag_get());
+		rc = -1;
+	}
+
+	diag_destroy(&ctx.diag);
+	trigger_clear(&on_replace);
+	return rc;
+}
+
+/* }}} Index build */
 
 static const struct engine_vtab vinyl_engine_vtab = {
 	/* .shutdown = */ vinyl_engine_shutdown,

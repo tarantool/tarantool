@@ -177,6 +177,16 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 	return 0;
 }
 
+/**
+ * Block the caller until the quota is not exceeded.
+ */
+static inline void
+vy_quota_wait(struct vy_quota *q)
+{
+	while (q->used > q->limit)
+		fiber_cond_wait(&q->cond);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

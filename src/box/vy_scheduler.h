@@ -202,6 +202,13 @@ void
 vy_scheduler_trigger_dump(struct vy_scheduler *scheduler);
 
 /**
+ * Trigger dump of all currently existing in-memory trees
+ * and wait until it is complete. Returns 0 on success.
+ */
+int
+vy_scheduler_dump(struct vy_scheduler *scheduler);
+
+/**
  * Force major compaction of an LSM tree.
  */
 void

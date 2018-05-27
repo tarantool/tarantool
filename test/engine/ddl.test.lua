@@ -498,3 +498,224 @@ s:format(format)
 s:format()
 s:select()
 s:drop()
+
+--
+-- gh-1557: NULL in indexes.
+--
+
+NULL = require('msgpack').NULL
+
+format = {}
+format[1] = { name = 'field1', type = 'unsigned', is_nullable = true }
+format[2] = { name = 'field2', type = 'unsigned', is_nullable = true }
+s = box.schema.space.create('test', {engine = engine, format = format})
+s:create_index('primary', { parts = { 'field1' } })
+s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
+format[1].is_nullable = false
+s:format(format)
+s:create_index('primary', { parts = {{'field1', is_nullable = true}} })
+
+i = s:create_index('primary', { parts = {'field1'} })
+i.parts
+
+-- Check that is_nullable can't be set to false on non-empty space
+s:insert({1, NULL})
+format[1].is_nullable = true
+s:format(format)
+format[1].is_nullable = false
+format[2].is_nullable = false
+s:format(format)
+_ = s:delete(1)
+-- Disable is_nullable on empty space
+s:format(format)
+-- Disable is_nullable on a non-empty space.
+format[2].is_nullable = true
+s:format(format)
+s:replace{1, 1}
+format[2].is_nullable = false
+s:format(format)
+-- Enable is_nullable on a non-empty space.
+format[2].is_nullable = true
+s:format(format)
+s:replace{1, box.NULL}
+_ = s:delete{1}
+s:format({})
+
+i = s:create_index('secondary', { parts = {{2, 'string', is_nullable = true}} })
+i.parts
+
+s:insert({1, NULL})
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+_ = s:delete({1})
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+s:insert({1, NULL})
+s:insert({2, 'xxx'})
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = true} }})
+s:insert({1, NULL})
+
+s:drop()
+
+s = box.schema.space.create('test', {engine = engine})
+inspector:cmd("setopt delimiter ';'")
+s:format({
+    [1] = { name = 'id1', type = 'unsigned'},
+    [2] = { name = 'id2', type = 'unsigned'},
+    [3] = { name = 'id3', type = 'string'},
+    [4] = { name = 'id4', type = 'string'},
+    [5] = { name = 'id5', type = 'string'},
+    [6] = { name = 'id6', type = 'string'},
+});
+inspector:cmd("setopt delimiter ''");
+s:format()
+_ = s:create_index('primary')
+s:insert({1, 1, 'a', 'b', 'c', 'd'})
+s:drop()
+
+s = box.schema.space.create('test', {engine = engine})
+idx = s:create_index('idx')
+box.space.test == s
+s:drop()
+
+--
+-- gh-3000: index modifying must change key_def parts and
+-- comparators. They can be changed, if there was compatible index
+-- parts change. For example, a part type was changed from
+-- unsigned to number. In such a case comparators must be reset
+-- and part types updated.
+--
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk')
+s:replace{1}
+pk:alter{parts = {{1, 'integer'}}}
+s:replace{-2}
+s:select{}
+s:drop()
+
+--
+-- Allow to change is_nullable in index definition on non-empty
+-- space.
+--
+s = box.schema.space.create('test', {engine = engine})
+pk = s:create_index('pk')
+sk1 = s:create_index('sk1', {parts = {{2, 'unsigned', is_nullable = true}}})
+sk2 = s:create_index('sk2', {parts = {{3, 'unsigned', is_nullable = false}}})
+s:replace{1, box.NULL, 1}
+sk1:alter({parts = {{2, 'unsigned', is_nullable = false}}})
+s:replace{1, 1, 1}
+sk1:alter({parts = {{2, 'unsigned', is_nullable = false}}})
+s:replace{1, 1, box.NULL}
+sk2:alter({parts = {{3, 'unsigned', is_nullable = true}}})
+s:replace{1, 1, box.NULL}
+s:replace{2, 10, 100}
+s:replace{3, 0, 20}
+s:replace{4, 15, 150}
+s:replace{5, 9, box.NULL}
+sk1:select{}
+sk2:select{}
+s:drop()
+
+--
+-- gh-3008: allow multiple types on the same field.
+--
+format = {}
+format[1] = {name = 'field1', type = 'unsigned'}
+format[2] = {name = 'field2', type = 'scalar'}
+format[3] = {name = 'field3', type = 'integer'}
+s = box.schema.space.create('test', {engine = engine, format = format})
+pk = s:create_index('pk')
+sk1 = s:create_index('sk1', {parts = {{2, 'number'}}})
+sk2 = s:create_index('sk2', {parts = {{2, 'integer'}}})
+sk3 = s:create_index('sk3', {parts = {{2, 'unsigned'}}})
+sk4 = s:create_index('sk4', {parts = {{3, 'number'}}})
+s:format()
+s:replace{1, '100', -20.2}
+s:replace{1, 100, -20.2}
+s:replace{1, 100, -20}
+s:replace{2, 50, 0}
+s:replace{3, 150, -60}
+s:replace{4, 0, 120}
+pk:select{}
+sk1:select{}
+sk2:select{}
+sk3:select{}
+sk4:select{}
+
+sk1:alter{parts = {{2, 'unsigned'}}}
+sk2:alter{parts = {{2, 'unsigned'}}}
+sk4:alter{parts = {{3, 'integer'}}}
+s:replace{1, 50.5, 1.5}
+s:replace{1, 50, 1.5}
+s:replace{5, 5, 5}
+sk1:select{}
+sk2:select{}
+sk3:select{}
+sk4:select{}
+
+sk1:drop()
+sk2:drop()
+sk3:drop()
+-- Remove 'unsigned' constraints from indexes, and 'scalar' now
+-- can be inserted in the second field.
+s:replace{1, true, 100}
+s:select{}
+sk4:select{}
+s:drop()
+
+--
+-- Creating/altering a secondary index of a non-empty space.
+--
+s = box.schema.space.create('test', {engine = engine})
+_ = s:create_index('pk')
+
+_ = s:insert{1, 'zzz', 'aaa', 999}
+_ = s:insert{2, 'yyy', 'bbb', 888}
+_ = s:insert{3, 'xxx', 'ccc', 777}
+
+box.snapshot()
+
+_ = s:update(1, {{'!', -1, 'eee'}})
+_ = s:upsert({2, '2', '2', -2}, {{'=', 4, -888}})
+_ = s:replace(s:get(3):update{{'=', 3, box.NULL}})
+_ = s:upsert({4, 'zzz', 'ddd', -666}, {{'!', -1, 'abc'}})
+
+box.snapshot()
+
+_ = s:update(1, {{'=', 5, 'fff'}})
+_ = s:upsert({3, '3', '3', -3}, {{'=', 5, 'ggg'}})
+_ = s:insert{5, 'xxx', 'eee', 555, 'hhh'}
+_ = s:replace{6, 'yyy', box.NULL, -444}
+
+s:select()
+
+s:create_index('sk', {parts = {2, 'string'}}) -- error: unique constraint
+s:create_index('sk', {parts = {3, 'string'}}) -- error: nullability constraint
+s:create_index('sk', {parts = {4, 'unsigned'}}) -- error: field type
+s:create_index('sk', {parts = {4, 'integer', 5, 'string'}}) -- error: field missing
+
+i1 = s:create_index('i1', {parts = {2, 'string'}, unique = false})
+i2 = s:create_index('i2', {parts = {{3, 'string', is_nullable = true}}})
+i3 = s:create_index('i3', {parts = {4, 'integer'}})
+
+i1:select()
+i2:select()
+i3:select()
+
+i1:alter{unique = true} -- error: unique contraint
+i2:alter{parts = {3, 'string'}} -- error: nullability contraint
+i3:alter{parts = {4, 'unsigned'}} -- error: field type
+i3:alter{parts = {4, 'integer', 5, 'string'}} -- error: field missing
+
+i3:alter{parts = {2, 'string', 4, 'integer'}} -- ok
+i3:select()
+
+-- Check that recovery works.
+inspector:cmd("restart server default")
+
+s = box.space.test
+s.index.i1:select()
+s.index.i2:select()
+s.index.i3:select()
+
+box.snapshot()
+
+s:drop()

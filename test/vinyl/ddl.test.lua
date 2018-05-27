@@ -23,76 +23,23 @@ space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', {type = 'hash'})
 space:drop()
 
--- creation of a new index and altering the definition of an existing
--- index are unsupported for non-empty spaces
+-- rebuild of the primary index is not supported
 space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary')
-space:insert({1})
--- fail because of wrong tuple format {1}, but need {1, ...}
-index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
-space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-#box.space._index:select({space.id})
-box.space._index:get{space.id, 0}[6]
-space:drop()
-
-space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary')
-space:insert({1, 2})
-index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
-space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-#box.space._index:select({space.id})
-box.space._index:get{space.id, 0}[6]
-space:drop()
-
-space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary')
-space:insert({1, 2})
-index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
-space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-#box.space._index:select({space.id})
-box.space._index:get{space.id, 0}[6]
-space:delete({1})
-
--- must fail because vy_mems have data
-index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
-space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
+pk = space:create_index('pk', {run_count_per_level = 1, run_size_ratio = 10})
+space:replace{1, 1}
+pk:alter{parts = {2, 'unsigned'}} -- error: mem not empty
 box.snapshot()
-while space.index.primary:stat().rows ~= 0 do fiber.sleep(0.01) end
-
--- after a dump REPLACE + DELETE = nothing, so the space is empty now and
--- can be altered.
-index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
-space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-#box.space._index:select({space.id})
-box.space._index:get{space.id, 0}[6]
-space:insert({1, 2})
-index:select{}
-index2:select{}
-space:drop()
-
-space = box.schema.space.create('test', { engine = 'vinyl' })
-index = space:create_index('primary', { run_count_per_level = 2 })
-space:insert({1, 2})
+pk:alter{parts = {2, 'unsigned'}} -- error: run not empty
+space:replace{2, 2}
+space:delete{1}
+space:delete{2}
+pk:alter{parts = {2, 'unsigned'}} -- error: mem/run not empty
 box.snapshot()
-space:delete({1})
-box.snapshot()
-while space.index.primary:stat().run_count ~= 2 do fiber.sleep(0.01) end
--- must fail because vy_runs have data
-index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
-space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-
--- After compaction the REPLACE + DELETE + DELETE = nothing, so
--- the space is now empty and can be altered.
-space:delete({1})
--- Make sure the run is big enough to trigger compaction.
-space:replace({2, 3})
-space:delete({2})
-box.snapshot()
--- Wait until the dump is finished.
-while space.index.primary:stat().rows ~= 0 do fiber.sleep(0.01) end
-index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
-space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
-
+-- wait for compaction to complete
+while pk:stat().disk.compact.count == 0 do fiber.sleep(0.01) end
+pk:alter{parts = {2, 'unsigned'}} -- success: space is empty now
+space:replace{1, 2}
+space:get(2)
 space:drop()
 
 --
@@ -266,26 +213,136 @@ box.space._index:insert{512, 0, 'pk', 'tree', {unique = true}, {{0, 'unsigned'}}
 box.space.test.index.pk
 box.space.test:drop()
 
--- gh-2449 change 'unique' index property from true to false
-s = box.schema.space.create('test', { engine = 'vinyl' })
-_ = s:create_index('primary')
-_ = s:create_index('secondary', {unique = true, parts = {2, 'unsigned'}})
-s:insert{1, 10}
-s.index.secondary:alter{unique = false} -- ok
-s.index.secondary.unique
-s.index.secondary:alter{unique = true} -- error
-s.index.secondary.unique
-s:insert{2, 10}
-s.index.secondary:select(10)
-s:drop()
-
 -- Narrowing indexed field type entails index rebuild.
 s = box.schema.space.create('test', {engine = 'vinyl'})
-_ = s:create_index('i1')
-_ = s:create_index('i2', {parts = {2, 'integer'}})
-_ = s:create_index('i3', {parts = {{3, 'string', is_nullable = true}}})
-_ = s:replace{1, 1, 'test'}
--- Should fail with 'Vinyl does not support building an index for a non-empty space'.
-s.index.i2:alter{parts = {2, 'unsigned'}}
-s.index.i3:alter{parts = {{3, 'string', is_nullable = false}}}
+pk = s:create_index('pk', {parts = {1, 'unsigned'}})
+s:replace{1}
+-- Extending field type is allowed without rebuild.
+pk:alter{parts = {1, 'integer'}}
+-- Should fail as we do not support rebuilding the primary index of a non-empty space.
+pk:alter{parts = {1, 'unsigned'}}
+s:replace{-1}
 s:drop()
+
+--
+-- Check that all modifications done to the space during index build
+-- are reflected in the new index.
+--
+math.randomseed(os.time())
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+
+test_run:cmd("setopt delimiter ';'")
+
+box.begin();
+for i = 1, 1000 do
+    if (i % 100 == 0) then
+        box.commit()
+        box.begin()
+    end
+    if i % 300 == 0 then
+        box.snapshot()
+    end
+    box.space.test:replace{i, i, i}
+end;
+box.commit();
+
+last_val = 1000;
+
+function gen_load()
+    fiber.sleep(0.001)
+    local s = box.space.test
+    for i = 1, 200 do
+        local op = math.random(4)
+        local key = math.random(1000)
+        local val1 = math.random(1000)
+        local val2 = last_val + 1
+        last_val = val2
+        if op == 1 then
+            pcall(s.insert, s, {key, val1, val2})
+        elseif op == 2 then
+            pcall(s.replace, s, {key, val1, val2})
+        elseif op == 3 then
+            pcall(s.delete, s, {key})
+        elseif op == 4 then
+            pcall(s.upsert, s, {key, val1, val2}, {{'=', 2, val1}, {'=', 3, val2}})
+        end
+    end
+end;
+
+test_run:cmd("setopt delimiter ''");
+
+ch = fiber.channel(1)
+
+_ = fiber.create(function() gen_load() ch:put(true) end)
+_ = box.space.test:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
+ch:get()
+
+_ = fiber.create(function() gen_load() ch:put(true) end)
+_ = box.space.test:create_index('tk', {unique = true, parts = {3, 'unsigned'}})
+ch:get()
+
+box.space.test.index.pk:count() == box.space.test.index.sk:count()
+box.space.test.index.pk:count() == box.space.test.index.tk:count()
+
+test_run:cmd("restart server default")
+
+box.space.test.index.pk:count() == box.space.test.index.sk:count()
+box.space.test.index.pk:count() == box.space.test.index.tk:count()
+box.snapshot()
+box.space.test.index.pk:count() == box.space.test.index.sk:count()
+box.space.test.index.pk:count() == box.space.test.index.tk:count()
+box.space.test:drop()
+
+--
+-- Check that creation of a secondary index triggers dump
+-- if memory quota is exceeded.
+--
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+test_run:cmd("start server test with args='1048576'")
+test_run:cmd("switch test")
+
+_ = box.schema.space.create('test', {engine = 'vinyl'})
+_ = box.space.test:create_index('pk')
+
+pad = string.rep('x', 1000)
+
+test_run:cmd("setopt delimiter ';'")
+box.begin();
+for i = 1, 1000 do
+    if (i % 100 == 0) then
+        box.commit()
+        box.begin()
+    end
+    box.space.test:replace{i, i, pad}
+end;
+box.commit();
+test_run:cmd("setopt delimiter ''");
+
+_ = box.space.test:create_index('sk', {parts = {2, 'unsigned', 3, 'string'}})
+box.space.test.index.sk:stat().disk.dump.count > 1
+box.space.test.index.sk:count()
+
+test_run:cmd("restart server test with args='1048576'")
+
+box.space.test.index.sk:count()
+box.space.test.index.sk:drop()
+box.snapshot()
+
+--
+-- Check that run files left from an index we failed to build
+-- are removed by garbage collection.
+--
+fio = require('fio')
+box.cfg{checkpoint_count = 1}
+_ = box.space.test:replace{1001, 1, string.rep('x', 1000)}
+box.space.test:create_index('sk', {parts = {2, 'unsigned', 3, 'string'}})
+#fio.listdir(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 1)) > 0
+box.snapshot()
+#fio.listdir(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 1)) == 0
+box.space.test:drop()
+
+test_run:cmd("switch default")
+test_run:cmd("stop server test")
+test_run:cmd("cleanup server test")

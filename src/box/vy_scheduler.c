@@ -448,6 +448,35 @@ vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
 	fiber_cond_signal(&scheduler->scheduler_cond);
 }
 
+int
+vy_scheduler_dump(struct vy_scheduler *scheduler)
+{
+	/*
+	 * We must not start dump if checkpoint is in progress
+	 * so first wait for checkpoint to complete.
+	 */
+	while (scheduler->checkpoint_in_progress)
+		fiber_cond_wait(&scheduler->dump_cond);
+
+	/* Trigger dump. */
+	if (scheduler->generation == scheduler->dump_generation)
+		scheduler->dump_start = ev_monotonic_now(loop());
+	int64_t generation = ++scheduler->generation;
+	fiber_cond_signal(&scheduler->scheduler_cond);
+
+	/* Wait for dump to complete. */
+	while (scheduler->dump_generation < generation) {
+		if (scheduler->is_throttled) {
+			/* Dump error occurred. */
+			struct error *e = diag_last_error(&scheduler->diag);
+			diag_add_error(diag_get(), e);
+			return -1;
+		}
+		fiber_cond_wait(&scheduler->dump_cond);
+	}
+	return 0;
+}
+
 void
 vy_scheduler_force_compaction(struct vy_scheduler *scheduler,
 			      struct vy_lsm *lsm)

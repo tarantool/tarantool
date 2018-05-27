@@ -602,3 +602,137 @@ for _, f in pairs(files) do if not fio.path.exists(f) then table.insert(missing,
 missing
 box.backup.stop()
 s:drop()
+
+--
+-- gh-2449: change 'unique' index property from true to false
+-- is done without index rebuild.
+--
+s = box.schema.space.create('test', { engine = 'vinyl' })
+_ = s:create_index('primary')
+_ = s:create_index('secondary', {unique = true, parts = {2, 'unsigned'}})
+s:insert{1, 10}
+box.snapshot()
+errinj.set("ERRINJ_VY_READ_PAGE", true);
+s.index.secondary:alter{unique = false} -- ok
+s.index.secondary.unique
+s.index.secondary:alter{unique = true} -- error
+s.index.secondary.unique
+errinj.set("ERRINJ_VY_READ_PAGE", false);
+s:insert{2, 10}
+s.index.secondary:select(10)
+s:drop()
+
+--
+-- Check that ALTER is aborted if a tuple inserted during index build
+-- doesn't conform to the new format.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {page_size = 16})
+
+pad = string.rep('x', 16)
+for i = 101, 200 do s:replace{i, i, pad} end
+box.snapshot()
+
+ch = fiber.channel(1)
+test_run:cmd("setopt delimiter ';'")
+_ = fiber.create(function()
+    fiber.sleep(0.01)
+    for i = 1, 100 do
+        s:replace{i}
+    end
+    ch:put(true)
+end);
+test_run:cmd("setopt delimiter ''");
+
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
+s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0)
+
+ch:get()
+
+s:count() -- 200
+s:drop()
+
+--
+-- Check that ALTER is aborted if a tuple inserted during index build
+-- violates unique constraint.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {page_size = 16})
+
+pad = string.rep('x', 16)
+for i = 101, 200 do s:replace{i, i, pad} end
+box.snapshot()
+
+ch = fiber.channel(1)
+test_run:cmd("setopt delimiter ';'")
+_ = fiber.create(function()
+    fiber.sleep(0.01)
+    for i = 1, 100 do
+        s:replace{i, i + 1}
+    end
+    ch:put(true)
+end);
+test_run:cmd("setopt delimiter ''");
+
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
+s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0)
+
+ch:get()
+
+s:count() -- 200
+s:drop()
+
+--
+-- Check that modifications done to the space during the final dump
+-- of a newly built index are recovered properly.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+
+for i = 1, 5 do s:replace{i, i} end
+
+errinj.set("ERRINJ_VY_RUN_WRITE_TIMEOUT", 0.1)
+ch = fiber.channel(1)
+_ = fiber.create(function() s:create_index('sk', {parts = {2, 'integer'}}) ch:put(true) end)
+errinj.set("ERRINJ_VY_RUN_WRITE_TIMEOUT", 0)
+
+fiber.sleep(0.01)
+
+_ = s:delete{1}
+_ = s:replace{2, -2}
+_ = s:delete{2}
+_ = s:replace{3, -3}
+_ = s:replace{3, -2}
+_ = s:replace{3, -1}
+_ = s:delete{3}
+_ = s:upsert({3, 3}, {{'=', 2, 1}})
+_ = s:upsert({3, 3}, {{'=', 2, 2}})
+_ = s:delete{3}
+_ = s:replace{4, -1}
+_ = s:replace{4, -2}
+_ = s:replace{4, -4}
+_ = s:upsert({5, 1}, {{'=', 2, 1}})
+_ = s:upsert({5, 2}, {{'=', 2, -5}})
+_ = s:replace{6, -6}
+_ = s:upsert({7, -7}, {{'=', 2, -7}})
+
+ch:get()
+
+s.index.sk:select()
+s.index.sk:stat().memory.rows
+
+test_run:cmd('restart server default')
+
+s = box.space.test
+
+s.index.sk:select()
+s.index.sk:stat().memory.rows
+
+box.snapshot()
+
+s.index.sk:select()
+s.index.sk:stat().memory.rows
+
+s:drop()
