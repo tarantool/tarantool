@@ -87,11 +87,14 @@ replication_init(void)
 	rlist_create(&replicaset.anon);
 	vclock_create(&replicaset.vclock);
 	fiber_cond_create(&replicaset.applier.cond);
+	replicaset.replica_by_id = (struct replica **)calloc(VCLOCK_MAX, sizeof(struct replica *));
+	latch_create(&replicaset.applier.order_latch);
 }
 
 void
 replication_free(void)
 {
+	free(replicaset.replica_by_id);
 	mempool_destroy(&replicaset.pool);
 	fiber_cond_destroy(&replicaset.applier.cond);
 }
@@ -138,6 +141,7 @@ replica_new(void)
 	trigger_create(&replica->on_applier_state,
 		       replica_on_applier_state_f, NULL, NULL);
 	replica->applier_sync_state = APPLIER_DISCONNECTED;
+	latch_create(&replica->order_latch);
 	return replica;
 }
 
@@ -176,6 +180,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		assert(instance_id == REPLICA_ID_NIL);
 		instance_id = replica_id;
 	}
+	replicaset.replica_by_id[replica_id] = replica;
 }
 
 void
@@ -191,6 +196,7 @@ replica_clear_id(struct replica *replica)
 	 * Some records may arrive later on due to asynchronous nature of
 	 * replication.
 	 */
+	replicaset.replica_by_id[replica->id] = NULL;
 	replica->id = REPLICA_ID_NIL;
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
@@ -275,7 +281,13 @@ replica_on_applier_reconnect(struct replica *replica)
 
 	assert(!tt_uuid_is_nil(&replica->uuid));
 	assert(!tt_uuid_is_nil(&applier->uuid));
-	assert(replica->applier_sync_state == APPLIER_DISCONNECTED);
+	assert(replica->applier_sync_state == APPLIER_LOADING ||
+	       replica->applier_sync_state == APPLIER_DISCONNECTED);
+
+	if (replica->applier_sync_state == APPLIER_LOADING) {
+		assert(replicaset.applier.loading > 0);
+		replicaset.applier.loading--;
+	}
 
 	if (!tt_uuid_is_equal(&replica->uuid, &applier->uuid)) {
 		/*
@@ -322,7 +334,9 @@ replica_on_applier_disconnect(struct replica *replica)
 	default:
 		unreachable();
 	}
-	replica->applier_sync_state = APPLIER_DISCONNECTED;
+	replica->applier_sync_state = replica->applier->state;
+	if (replica->applier_sync_state == APPLIER_LOADING)
+		replicaset.applier.loading++;
 }
 
 static void
@@ -338,6 +352,7 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 		else
 			replica_on_applier_reconnect(replica);
 		break;
+	case APPLIER_LOADING:
 	case APPLIER_DISCONNECTED:
 		replica_on_applier_disconnect(replica);
 		break;
@@ -439,6 +454,7 @@ replicaset_update(struct applier **appliers, int count)
 	/* Save new appliers */
 	replicaset.applier.total = count;
 	replicaset.applier.connected = 0;
+	replicaset.applier.loading = 0;
 	replicaset.applier.synced = 0;
 
 	replica_hash_foreach_safe(&uniq, replica, next) {
@@ -520,6 +536,7 @@ replicaset_connect(struct applier **appliers, int count,
 		replicaset_update(appliers, count);
 		return;
 	}
+	say_verbose("connecting to %d replicas", count);
 
 	/*
 	 * Simultaneously connect to remote peers to receive their UUIDs
@@ -564,9 +581,13 @@ replicaset_connect(struct applier **appliers, int count,
 		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
 	if (state.connected < count) {
+		say_crit("failed to connect to %d out of %d replicas",
+			 count - state.connected, count);
 		/* Timeout or connection failure. */
 		if (connect_all)
 			goto error;
+	} else {
+		say_verbose("connected to %d replicas", state.connected);
 	}
 
 	for (int i = 0; i < count; i++) {
@@ -631,29 +652,42 @@ replicaset_sync(void)
 {
 	int quorum = replicaset_quorum();
 
-	if (replicaset.applier.connected < quorum) {
+	if (quorum == 0)
+		return;
+
+	say_verbose("synchronizing with %d replicas", quorum);
+
+	/*
+	 * Wait until all connected replicas synchronize up to
+	 * replication_sync_lag
+	 */
+	while (replicaset.applier.synced < quorum &&
+	       replicaset.applier.connected +
+	       replicaset.applier.loading >= quorum)
+		fiber_cond_wait(&replicaset.applier.cond);
+
+	if (replicaset.applier.synced < quorum) {
 		/*
 		 * Not enough replicas connected to form a quorum.
 		 * Do not stall configuration, leave the instance
 		 * in 'orphan' state.
 		 */
+		say_crit("entering orphan mode");
 		return;
 	}
 
-	/*
-	 * Wait until a quorum is formed. Abort waiting if
-	 * a quorum cannot be formed because of errors.
-	 */
-	while (replicaset.applier.synced < quorum &&
-	       replicaset.applier.connected >= quorum)
-		fiber_cond_wait(&replicaset.applier.cond);
+	say_crit("replica set sync complete, quorum of %d "
+		 "replicas formed", quorum);
 }
 
 void
 replicaset_check_quorum(void)
 {
-	if (replicaset.applier.synced >= replicaset_quorum())
+	if (replicaset.applier.synced >= replicaset_quorum()) {
+		if (replicaset_quorum() > 0)
+			say_crit("leaving orphan mode");
 		box_clear_orphan();
+	}
 }
 
 void
@@ -687,20 +721,30 @@ replicaset_next(struct replica *replica)
 	return replica_hash_next(&replicaset.hash, replica);
 }
 
-struct replica *
-replicaset_leader(void)
+/**
+ * Compare vclock and read only mode of all connected
+ * replicas and elect a leader.
+ * Initiallly, skip read-only replicas, since they
+ * can not properly act as bootstrap masters (register
+ * new nodes in _cluster table). If there are no read-write
+ * replicas, choose a read-only replica with biggest vclock
+ * as a leader, in hope it will become read-write soon.
+ */
+static struct replica *
+replicaset_round(bool skip_ro)
 {
 	struct replica *leader = NULL;
 	replicaset_foreach(replica) {
 		if (replica->applier == NULL)
 			continue;
 		/**
-		 * While bootstrapping a new cluster,
-		 * read-only replicas shouldn't be considered
-		 * as a leader.
+		 * While bootstrapping a new cluster, read-only
+		 * replicas shouldn't be considered as a leader.
+		 * The only exception if there is no read-write
+		 * replicas since there is still a possibility
+		 * that all replicas exist in cluster table.
 		 */
-		if (replica->applier->remote_is_ro &&
-		    replica->applier->vclock.signature == 0)
+		if (skip_ro && replica->applier->remote_is_ro)
 			continue;
 		if (leader == NULL) {
 			leader = replica;
@@ -725,9 +769,33 @@ replicaset_leader(void)
 }
 
 struct replica *
+replicaset_leader(void)
+{
+	bool skip_ro = true;
+	/**
+	 * Two loops, first prefers read-write replicas among others.
+	 * Second for backward compatibility, if there is no such
+	 * replicas at all.
+	 */
+	struct replica *leader = replicaset_round(skip_ro);
+	if (leader == NULL) {
+		skip_ro = false;
+		leader = replicaset_round(skip_ro);
+	}
+
+	return leader;
+}
+
+struct replica *
 replica_by_uuid(const struct tt_uuid *uuid)
 {
 	struct replica key;
 	key.uuid = *uuid;
 	return replica_hash_search(&replicaset.hash, &key);
+}
+
+struct replica *
+replica_by_id(uint32_t replica_id)
+{
+	return replicaset.replica_by_id[replica_id];
 }

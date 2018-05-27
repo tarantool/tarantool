@@ -53,6 +53,26 @@ create_cluster_uuid(SERVERS, UUID)
 test_run:wait_fullmesh(SERVERS)
 ---
 ...
+-- Add third replica
+name = 'replica_uuid_ro3'
+---
+...
+test_run:cmd(create_cluster_cmd1:format(name, name))
+---
+- true
+...
+test_run:cmd(create_cluster_cmd2:format(name, uuid.new()))
+---
+- true
+...
+test_run:cmd('switch replica_uuid_ro3')
+---
+- true
+...
+test_run:cmd('switch default')
+---
+- true
+...
 -- Cleanup.
 test_run:drop_cluster(SERVERS)
 ---

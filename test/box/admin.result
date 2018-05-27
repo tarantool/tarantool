@@ -69,7 +69,7 @@ cfg_filter(box.cfg)
   - - readahead
     - 16320
   - - replication_connect_timeout
-    - 4
+    - 30
   - - replication_skip_conflict
     - false
   - - replication_sync_lag

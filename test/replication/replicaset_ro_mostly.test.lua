@@ -26,5 +26,13 @@ test_run:cmd("setopt delimiter ''");
 -- Deploy a cluster.
 create_cluster_uuid(SERVERS, UUID)
 test_run:wait_fullmesh(SERVERS)
+
+-- Add third replica
+name = 'replica_uuid_ro3'
+test_run:cmd(create_cluster_cmd1:format(name, name))
+test_run:cmd(create_cluster_cmd2:format(name, uuid.new()))
+test_run:cmd('switch replica_uuid_ro3')
+test_run:cmd('switch default')
+
 -- Cleanup.
 test_run:drop_cluster(SERVERS)

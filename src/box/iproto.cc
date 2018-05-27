@@ -1889,7 +1889,7 @@ void
 iproto_set_msg_max(int new_iproto_msg_max)
 {
 	if (new_iproto_msg_max < IPROTO_MSG_MAX_MIN) {
-		tnt_raise(ClientError, ER_CFG, "iproto_msg_max",
+		tnt_raise(ClientError, ER_CFG, "net_msg_max",
 			  tt_sprintf("minimal value is %d",
 				     IPROTO_MSG_MAX_MIN));
 	}

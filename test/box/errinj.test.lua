@@ -447,35 +447,3 @@ errinj.set('ERRINJ_WAL_IO', false)
 for i = 1, 10 do s:replace{i + 10} end
 s:select()
 s:drop()
-
---
--- gh-3408: space drop frees tuples asynchronously.
---
-clock = require('clock')
-
-function mem_used() local info = box.info.memory() return info.data + info.index end
-
-_ = collectgarbage('collect')
-mem_before = mem_used()
-
-s1 = box.schema.space.create('test1')
-_ = s1:create_index('pk', {type = 'tree'})
-s2 = box.schema.space.create('test2')
-_ = s2:create_index('pk', {type = 'hash'})
-
-box.begin() for i = 1, 1000 do s1:insert{i} s2:insert{i} end box.commit()
-_ = collectgarbage('collect')
-
-errinj.set('ERRINJ_MEMTX_TUPLE_DELETE_DELAY', 0.001)
-start = clock.monotonic()
-s1:drop()
-s2:drop()
-delay = clock.monotonic() - start
-errinj.set('ERRINJ_MEMTX_TUPLE_DELETE_DELAY', 0)
-fiber.sleep(0.01)
-
-delay < 0.1 or delay
-
-_ = collectgarbage('collect')
-mem_after = mem_used()
-mem_after - mem_before -- 0

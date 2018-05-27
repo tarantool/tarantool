@@ -9,5 +9,6 @@ box.cfg({
     memtx_dir           = "master",
     vinyl_dir           = "master",
     hot_standby         = true,
+    replication_connect_timeout = 0.5,
 })
 

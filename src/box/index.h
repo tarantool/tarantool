@@ -377,8 +377,11 @@ struct index_vtab {
 	/**
 	 * Called after WAL write to commit index drop.
 	 * Must not fail.
+	 *
+	 * @signature is the LSN that was assigned to the row
+	 * that dropped the index.
 	 */
-	void (*commit_drop)(struct index *);
+	void (*commit_drop)(struct index *index, int64_t signature);
 	/**
 	 * Called after index definition update that did not
 	 * require index rebuild.
@@ -522,9 +525,9 @@ index_commit_modify(struct index *index, int64_t signature)
 }
 
 static inline void
-index_commit_drop(struct index *index)
+index_commit_drop(struct index *index, int64_t signature)
 {
-	index->vtab->commit_drop(index);
+	index->vtab->commit_drop(index, signature);
 }
 
 static inline void
@@ -661,7 +664,7 @@ index_end_build(struct index *index)
 void generic_index_commit_create(struct index *, int64_t);
 void generic_index_abort_create(struct index *);
 void generic_index_commit_modify(struct index *, int64_t);
-void generic_index_commit_drop(struct index *);
+void generic_index_commit_drop(struct index *, int64_t);
 void generic_index_update_def(struct index *);
 bool generic_index_depends_on_pk(struct index *);
 ssize_t generic_index_size(struct index *);

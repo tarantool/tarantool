@@ -997,12 +997,12 @@ DropIndex::prepare(struct alter_space *alter)
 }
 
 void
-DropIndex::commit(struct alter_space *alter, int64_t /* signature */)
+DropIndex::commit(struct alter_space *alter, int64_t signature)
 {
 	struct index *index = space_index(alter->old_space,
 					  old_index_def->iid);
 	assert(index != NULL);
-	index_commit_drop(index);
+	index_commit_drop(index, signature);
 }
 
 /**
@@ -1258,7 +1258,7 @@ RebuildIndex::commit(struct alter_space *alter, int64_t signature)
 	struct index *old_index = space_index(alter->old_space,
 					      old_index_def->iid);
 	assert(old_index != NULL);
-	index_commit_drop(old_index);
+	index_commit_drop(old_index, signature);
 	assert(new_index != NULL);
 	index_commit_create(new_index, signature);
 	new_index = NULL;
@@ -1315,7 +1315,7 @@ TruncateIndex::commit(struct alter_space *alter, int64_t signature)
 	struct index *old_index = space_index(alter->old_space, iid);
 	struct index *new_index = space_index(alter->new_space, iid);
 
-	index_commit_drop(old_index);
+	index_commit_drop(old_index, signature);
 	index_commit_create(new_index, signature);
 }
 
