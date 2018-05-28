@@ -105,8 +105,7 @@ typedef struct tuple box_tuple_t;
  * tuple will leak.
  *
  * \param tuple a tuple
- * \retval -1 on error (check box_error_last())
- * \retval 0 on success
+ * \retval 0 always
  * \sa box_tuple_unref()
  */
 int
@@ -269,8 +268,7 @@ box_tuple_next(box_tuple_iterator_t *it);
  * Use box_tuple_format_default() to create space-independent tuple.
  * \param data tuple data in MsgPack Array format ([field1, field2, ...]).
  * \param end the end of \a data
- * \retval NULL on out of memory
- * \retval tuple otherwise
+ * \retval tuple
  * \pre data, end is valid MsgPack Array
  * \sa \code box.tuple.new(data) \endcode
  */
@@ -307,9 +305,17 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
  */
 struct PACKED tuple
 {
-	/** reference counter */
-	uint16_t refs;
-	/** format identifier */
+	union {
+		/** Reference counter. */
+		uint16_t refs;
+		struct {
+			/** Index of big reference counter. */
+			uint16_t ref_index : 15;
+			/** Big reference flag. */
+			bool is_bigref : 1;
+		};
+	};
+	/** Format identifier. */
 	uint16_t format_id;
 	/**
 	 * Length of the MessagePack data in raw part of the
@@ -774,24 +780,34 @@ tuple_field_uuid(const struct tuple *tuple, int fieldno,
 	return 0;
 }
 
-enum { TUPLE_REF_MAX = UINT16_MAX };
+enum { TUPLE_REF_MAX = UINT16_MAX >> 1 };
+
+/**
+ * Increase tuple big reference counter.
+ * @param tuple Tuple to reference.
+ */
+void
+tuple_ref_slow(struct tuple *tuple);
 
 /**
  * Increment tuple reference counter.
  * @param tuple Tuple to reference.
- * @retval  0 Success.
- * @retval -1 Too many refs error.
  */
-static inline int
+static inline void
 tuple_ref(struct tuple *tuple)
 {
-	if (tuple->refs + 1 > TUPLE_REF_MAX) {
-		diag_set(ClientError, ER_TUPLE_REF_OVERFLOW);
-		return -1;
-	}
-	tuple->refs++;
-	return 0;
+	if (unlikely(tuple->refs >= TUPLE_REF_MAX))
+		tuple_ref_slow(tuple);
+	else
+		tuple->refs++;
 }
+
+/**
+ * Decrease tuple big reference counter.
+ * @param tuple Tuple to reference.
+ */
+void
+tuple_unref_slow(struct tuple *tuple);
 
 /**
  * Decrement tuple reference counter. If it has reached zero, free the tuple.
@@ -802,10 +818,9 @@ static inline void
 tuple_unref(struct tuple *tuple)
 {
 	assert(tuple->refs - 1 >= 0);
-
-	tuple->refs--;
-
-	if (tuple->refs == 0)
+	if (unlikely(tuple->is_bigref))
+		tuple_unref_slow(tuple);
+	else if (--tuple->refs == 0)
 		tuple_delete(tuple);
 }
 
@@ -813,25 +828,18 @@ extern struct tuple *box_tuple_last;
 
 /**
  * Convert internal `struct tuple` to public `box_tuple_t`.
- * \retval tuple on success
- * \retval NULL on error, check diag
+ * \retval tuple
  * \post \a tuple ref counted until the next call.
- * \post tuple_ref() doesn't fail at least once
  * \sa tuple_ref
  */
 static inline box_tuple_t *
 tuple_bless(struct tuple *tuple)
 {
 	assert(tuple != NULL);
-	/* Ensure tuple can be referenced at least once after return */
-	if (tuple->refs + 2 > TUPLE_REF_MAX) {
-		diag_set(ClientError, ER_TUPLE_REF_OVERFLOW);
-		return NULL;
-	}
-	tuple->refs++;
+	tuple_ref(tuple);
 	/* Remove previous tuple */
 	if (likely(box_tuple_last != NULL))
-		tuple_unref(box_tuple_last); /* do not throw */
+		tuple_unref(box_tuple_last);
 	/* Remember current tuple */
 	box_tuple_last = tuple;
 	return tuple;
@@ -848,41 +856,6 @@ tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
 
 #include "tuple_update.h"
 #include "errinj.h"
-
-/**
- * \copydoc tuple_ref()
- * \throws if overflow detected.
- */
-static inline void
-tuple_ref_xc(struct tuple *tuple)
-{
-	if (tuple_ref(tuple))
-		diag_raise();
-}
-
-/**
- * \copydoc tuple_bless
- * \throw ER_TUPLE_REF_OVERFLOW
- */
-static inline box_tuple_t *
-tuple_bless_xc(struct tuple *tuple)
-{
-	box_tuple_t *blessed = tuple_bless(tuple);
-	if (blessed == NULL)
-		diag_raise();
-	return blessed;
-}
-
-/** Make tuple references exception-friendly in absence of @finally. */
-struct TupleRefNil {
-	struct tuple *tuple;
-	TupleRefNil (struct tuple *arg) :tuple(arg)
-	{ if (tuple) tuple_ref_xc(tuple); }
-	~TupleRefNil() { if (tuple) tuple_unref(tuple); }
-
-	TupleRefNil(const TupleRefNil&) = delete;
-	void operator=(const TupleRefNil&) = delete;
-};
 
 /* @copydoc tuple_field_with_type() */
 static inline const char *

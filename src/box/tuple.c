@@ -48,6 +48,26 @@ enum {
 	OBJSIZE_MIN = 16,
 };
 
+/**
+ * Container for big reference counters. Contains array of big
+ * reference counters, size of this array and number of non-zero
+ * big reference counters. When reference counter of tuple becomes
+ * more than 32767, field refs of this tuple becomes index of big
+ * reference counter in big reference counter array and field
+ * is_bigref is set true. The moment big reference becomes equal
+ * 32767 it is set to 0, refs of the tuple becomes 32767 and
+ * is_bigref becomes false. Big reference counter can be equal to
+ * 0 or be more than 32767.
+ */
+static struct bigref_list {
+	/** Free-list of big reference counters. */
+	uint32_t *refs;
+	/** Capacity of the array. */
+	uint16_t capacity;
+	/** Index of first free element. */
+	uint16_t vacant_index;
+} bigref_list;
+
 static const double ALLOC_FACTOR = 1.05;
 
 /**
@@ -151,6 +171,13 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 	return 0;
 }
 
+/** Initialize big references container. */
+static inline void
+bigref_list_create(void)
+{
+	memset(&bigref_list, 0, sizeof(bigref_list));
+}
+
 /**
  * Incremented on every snapshot and is used to distinguish tuples
  * which were created after start of a snapshot (these tuples can
@@ -211,6 +238,8 @@ tuple_init(field_name_hash_f hash)
 
 	box_tuple_last = NULL;
 
+	bigref_list_create();
+
 	if (coll_id_cache_init() != 0)
 		return -1;
 
@@ -244,6 +273,92 @@ tuple_arena_create(struct slab_arena *arena, struct quota *quota,
 	}
 }
 
+enum {
+	BIGREF_FACTOR = 2,
+	BIGREF_MAX = UINT32_MAX,
+	BIGREF_MIN_CAPACITY = 16,
+	/**
+	 * Only 15 bits are available for bigref list index in
+	 * struct tuple.
+	 */
+	BIGREF_MAX_CAPACITY = UINT16_MAX >> 1
+};
+
+/** Destroy big references and free memory that was allocated. */
+static inline void
+bigref_list_destroy(void)
+{
+	free(bigref_list.refs);
+}
+
+/**
+ * Increase capacity of bigref_list.
+ */
+static inline void
+bigref_list_increase_capacity(void)
+{
+	assert(bigref_list.capacity == bigref_list.vacant_index);
+	uint32_t *refs = bigref_list.refs;
+	uint16_t capacity = bigref_list.capacity;
+	if (capacity == 0)
+		capacity = BIGREF_MIN_CAPACITY;
+	else if (capacity < BIGREF_MAX_CAPACITY)
+		capacity = MIN(capacity * BIGREF_FACTOR, BIGREF_MAX_CAPACITY);
+	else
+		panic("Too many big references");
+	refs = (uint32_t *) realloc(refs, capacity * sizeof(*refs));
+	if (refs == NULL) {
+		panic("failed to reallocate %zu bytes: Cannot allocate "\
+		      "memory.", capacity * sizeof(*refs));
+	}
+	for (uint16_t i = bigref_list.capacity; i < capacity; ++i)
+		refs[i] = i + 1;
+	bigref_list.refs = refs;
+	bigref_list.capacity = capacity;
+}
+
+/**
+ * Return index for new big reference counter and allocate memory
+ * if needed.
+ * @retval index for new big reference counter.
+ */
+static inline uint16_t
+bigref_list_new_index(void)
+{
+	if (bigref_list.vacant_index == bigref_list.capacity)
+		bigref_list_increase_capacity();
+	uint16_t vacant_index = bigref_list.vacant_index;
+	bigref_list.vacant_index = bigref_list.refs[vacant_index];
+	return vacant_index;
+}
+
+void
+tuple_ref_slow(struct tuple *tuple)
+{
+	assert(tuple->is_bigref || tuple->refs == TUPLE_REF_MAX);
+	if (! tuple->is_bigref) {
+		tuple->ref_index = bigref_list_new_index();
+		tuple->is_bigref = true;
+		bigref_list.refs[tuple->ref_index] = TUPLE_REF_MAX;
+	} else if (bigref_list.refs[tuple->ref_index] == BIGREF_MAX) {
+		panic("Tuple big reference counter overflow");
+	}
+	bigref_list.refs[tuple->ref_index]++;
+}
+
+void
+tuple_unref_slow(struct tuple *tuple)
+{
+	assert(tuple->is_bigref &&
+	       bigref_list.refs[tuple->ref_index] > TUPLE_REF_MAX);
+	if(--bigref_list.refs[tuple->ref_index] == TUPLE_REF_MAX) {
+		bigref_list.refs[tuple->ref_index] = bigref_list.vacant_index;
+		bigref_list.vacant_index = tuple->ref_index;
+		tuple->ref_index = TUPLE_REF_MAX;
+		tuple->is_bigref = false;
+	}
+}
+
 void
 tuple_arena_destroy(struct slab_arena *arena)
 {
@@ -265,6 +380,8 @@ tuple_free(void)
 	tuple_format_free();
 
 	coll_id_cache_destroy();
+
+	bigref_list_destroy();
 }
 
 box_tuple_format_t *
@@ -288,7 +405,8 @@ int
 box_tuple_ref(box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
-	return tuple_ref(tuple);
+	tuple_ref(tuple);
+	return 0;
 }
 
 void
@@ -357,10 +475,7 @@ box_tuple_iterator(box_tuple_t *tuple)
 			 "mempool", "new slab");
 		return NULL;
 	}
-	if (tuple_ref(tuple) != 0) {
-		mempool_free(&tuple_iterator_pool, it);
-		return NULL;
-	}
+	tuple_ref(tuple);
 	tuple_rewind(it, tuple);
 	return it;
 }
@@ -451,7 +566,6 @@ box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 	struct tuple *ret = tuple_new(format, data, end);
 	if (ret == NULL)
 		return NULL;
-	/* Can't fail on zero refs. */
 	return tuple_bless(ret);
 }
 

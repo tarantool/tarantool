@@ -3856,7 +3856,6 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 	assert(base->next = vinyl_iterator_primary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	assert(it->lsm->index_id == 0);
-	struct tuple *tuple;
 
 	if (it->tx == NULL) {
 		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
@@ -3867,18 +3866,15 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 		goto fail;
 	}
 
-	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
+	if (vy_read_iterator_next(&it->iterator, ret) != 0)
 		goto fail;
-
-	if (tuple == NULL) {
+	if (*ret == NULL) {
 		/* EOF. Close the iterator immediately. */
 		vinyl_iterator_close(it);
-		*ret = NULL;
-		return 0;
+	} else {
+		tuple_bless(*ret);
 	}
-	*ret = tuple_bless(tuple);
-	if (*ret != NULL)
-		return 0;
+	return 0;
 fail:
 	vinyl_iterator_close(it);
 	return -1;
@@ -3924,11 +3920,10 @@ next:
 	 * Note, there's no need in vy_tx_track() as the
 	 * tuple is already tracked in the secondary index.
 	 */
-	struct tuple *full_tuple;
 	if (vy_point_lookup(it->lsm->pk, it->tx, vy_tx_read_view(it->tx),
-			    tuple, &full_tuple) != 0)
+			    tuple, ret) != 0)
 		goto fail;
-	if (full_tuple == NULL) {
+	if (*ret == NULL) {
 		/*
 		 * All indexes of a space must be consistent, i.e.
 		 * if a tuple is present in one index, it must be
@@ -3942,10 +3937,9 @@ next:
 			 vy_lsm_name(it->lsm), vy_stmt_str(tuple));
 		goto next;
 	}
-	*ret = tuple_bless(full_tuple);
-	tuple_unref(full_tuple);
-	if (*ret != NULL)
-		return 0;
+	tuple_bless(*ret);
+	tuple_unref(*ret);
+	return 0;
 fail:
 	vinyl_iterator_close(it);
 	return -1;
@@ -4031,16 +4025,12 @@ vinyl_index_get(struct index *index, const char *key,
 	const struct vy_read_view **rv = (tx != NULL ? vy_tx_read_view(tx) :
 					  &env->xm->p_global_read_view);
 
-	struct tuple *tuple;
-	if (vy_lsm_full_by_key(lsm, tx, rv, key, part_count, &tuple) != 0)
+	if (vy_lsm_full_by_key(lsm, tx, rv, key, part_count, ret) != 0)
 		return -1;
-
-	if (tuple != NULL) {
-		*ret = tuple_bless(tuple);
-		tuple_unref(tuple);
-		return *ret == NULL ? -1 : 0;
+	if (*ret != NULL) {
+		tuple_bless(*ret);
+		tuple_unref(*ret);
 	}
-	*ret = NULL;
 	return 0;
 }
 

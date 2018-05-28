@@ -220,8 +220,8 @@ box_index_random(uint32_t space_id, uint32_t index_id, uint32_t rnd,
 	/* No tx management, random() is for approximation anyway. */
 	if (index_random(index, rnd, result) != 0)
 		return -1;
-	if (*result != NULL && tuple_bless(*result) == NULL)
-		return -1;
+	if (*result != NULL)
+		tuple_bless(*result);
 	return 0;
 }
 
@@ -253,8 +253,8 @@ box_index_get(uint32_t space_id, uint32_t index_id, const char *key,
 	txn_commit_ro_stmt(txn);
 	/* Count statistics. */
 	rmean_collect(rmean_box, IPROTO_SELECT, 1);
-	if (*result != NULL && tuple_bless(*result) == NULL)
-		return -1;
+	if (*result != NULL)
+		tuple_bless(*result);
 	return 0;
 }
 
@@ -285,8 +285,8 @@ box_index_min(uint32_t space_id, uint32_t index_id, const char *key,
 		return -1;
 	}
 	txn_commit_ro_stmt(txn);
-	if (*result != NULL && tuple_bless(*result) == NULL)
-		return -1;
+	if (*result != NULL)
+		tuple_bless(*result);
 	return 0;
 }
 
@@ -317,8 +317,8 @@ box_index_max(uint32_t space_id, uint32_t index_id, const char *key,
 		return -1;
 	}
 	txn_commit_ro_stmt(txn);
-	if (*result != NULL && tuple_bless(*result) == NULL)
-		return -1;
+	if (*result != NULL)
+		tuple_bless(*result);
 	return 0;
 }
 
@@ -397,8 +397,8 @@ box_iterator_next(box_iterator_t *itr, box_tuple_t **result)
 	assert(result != NULL);
 	if (iterator_next(itr, result) != 0)
 		return -1;
-	if (*result != NULL && tuple_bless(*result) == NULL)
-		return -1;
+	if (*result != NULL)
+		tuple_bless(*result);
 	return 0;
 }
 
