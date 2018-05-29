@@ -2799,6 +2799,12 @@ vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 	vinyl->env->lsm_env.too_long_threshold = too_long_threshold;
 }
 
+void
+vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit)
+{
+	vinyl->env->run_env.snap_io_rate_limit = limit * 1024 * 1024;
+}
+
 /** }}} Environment */
 
 /* {{{ Checkpoint */

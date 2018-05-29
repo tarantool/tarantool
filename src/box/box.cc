@@ -721,6 +721,11 @@ box_set_snap_io_rate_limit(void)
 	assert(memtx != NULL);
 	memtx_engine_set_snap_io_rate_limit(memtx,
 			cfg_getd("snap_io_rate_limit"));
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_snap_io_rate_limit(vinyl,
+			cfg_getd("snap_io_rate_limit"));
 }
 
 void

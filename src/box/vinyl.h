@@ -82,6 +82,12 @@ void
 vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 				    double too_long_threshold);
 
+/**
+ * Update snap_io_rate_limit.
+ */
+void
+vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit);
+
 #ifdef __cplusplus
 } /* extern "C" */
 

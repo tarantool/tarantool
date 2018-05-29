@@ -1956,6 +1956,8 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 	if (xlog_create(&index_xlog, path, 0, &meta) < 0)
 		return -1;
 
+	index_xlog.rate_limit = run->env->snap_io_rate_limit;
+
 	xlog_tx_begin(&index_xlog);
 
 	struct xrow_header xrow;
@@ -2035,7 +2037,10 @@ vy_run_writer_create_xlog(struct vy_run_writer *writer)
 		.filetype = XLOG_META_TYPE_RUN,
 		.instance_uuid = INSTANCE_UUID,
 	};
-	return xlog_create(&writer->data_xlog, path, 0, &meta);
+	if (xlog_create(&writer->data_xlog, path, 0, &meta) != 0)
+		return -1;
+	writer->data_xlog.rate_limit = writer->run->env->snap_io_rate_limit;
+	return 0;
 }
 
 /**
