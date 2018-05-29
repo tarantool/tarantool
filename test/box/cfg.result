@@ -251,15 +251,14 @@ box.cfg{instance_uuid = box.info.uuid}
 ...
 box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
 ---
-- error: 'Incorrect value for option ''instance_uuid'': Can''t change instance UUID'
+- error: Can't set option 'instance_uuid' dynamically
 ...
 box.cfg{replicaset_uuid = box.info.cluster.uuid}
 ---
 ...
 box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
 ---
-- error: 'Incorrect value for option ''replicaset_uuid'': Can''t change replica set
-    UUID'
+- error: Can't set option 'replicaset_uuid' dynamically
 ...
 --------------------------------------------------------------------------------
 -- Test of default cfg options

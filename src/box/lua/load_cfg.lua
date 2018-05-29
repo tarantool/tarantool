@@ -170,15 +170,13 @@ local log_cfg_option = {
 
 local function check_instance_uuid()
     if box.cfg.instance_uuid ~= box.info.uuid then
-        box.error(box.error.CFG, 'instance_uuid',
-                  'Can\'t change instance UUID')
+        box.error(box.error.RELOAD_CFG, 'instance_uuid')
     end
 end
 
 local function check_replicaset_uuid()
     if box.cfg.replicaset_uuid ~= box.info.cluster.uuid then
-        box.error(box.error.CFG, 'replicaset_uuid',
-                  'Can\'t change replica set UUID')
+        box.error(box.error.RELOAD_CFG, 'replicaset_uuid')
     end
 end
 
