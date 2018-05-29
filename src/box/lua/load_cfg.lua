@@ -167,6 +167,21 @@ local log_cfg_option = {
     replication = purge_password_from_uris,
 }
 
+
+local function check_instance_uuid()
+    if box.cfg.instance_uuid ~= box.info.uuid then
+        box.error(box.error.CFG, 'instance_uuid',
+                  'Can\'t change instance UUID')
+    end
+end
+
+local function check_replicaset_uuid()
+    if box.cfg.replicaset_uuid ~= box.info.cluster.uuid then
+        box.error(box.error.CFG, 'replicaset_uuid',
+                  'Can\'t change replica set UUID')
+    end
+end
+
 -- dynamically settable options
 local dynamic_cfg = {
     listen                  = private.cfg_set_listen,
@@ -197,6 +212,8 @@ local dynamic_cfg = {
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
+    instance_uuid           = check_instance_uuid,
+    replicaset_uuid         = check_replicaset_uuid,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     net_msg_max             = private.cfg_set_net_msg_max,
 }
@@ -211,6 +228,8 @@ local dynamic_cfg_skip_at_load = {
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,
+    instance_uuid           = true,
+    replicaset_uuid         = true,
 }
 
 local function convert_gb(size)
