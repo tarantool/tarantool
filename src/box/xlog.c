@@ -1090,7 +1090,7 @@ xlog_tx_write(struct xlog *log)
 			throttle_time = (double)sync_len / log->rate_limit -
 					(ev_monotonic_time() - log->sync_time);
 			if (throttle_time > 0)
-				fiber_sleep(throttle_time);
+				ev_sleep(throttle_time);
 		}
 		/** sync data from cache to disk */
 #ifdef HAVE_SYNC_FILE_RANGE
