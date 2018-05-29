@@ -2821,7 +2821,8 @@ vinyl_engine_begin_checkpoint(struct engine *engine)
 }
 
 static int
-vinyl_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
+vinyl_engine_wait_checkpoint(struct engine *engine,
+			     const struct vclock *vclock)
 {
 	struct vy_env *env = vy_env(engine);
 	assert(env->status == VINYL_ONLINE);
@@ -2833,7 +2834,8 @@ vinyl_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
 }
 
 static void
-vinyl_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
+vinyl_engine_commit_checkpoint(struct engine *engine,
+			       const struct vclock *vclock)
 {
 	(void)vclock;
 	struct vy_env *env = vy_env(engine);
@@ -3186,7 +3188,7 @@ vy_join_f(va_list ap)
 }
 
 static int
-vinyl_engine_join(struct engine *engine, struct vclock *vclock,
+vinyl_engine_join(struct engine *engine, const struct vclock *vclock,
 		  struct xstream *stream)
 {
 	struct vy_env *env = vy_env(engine);
@@ -3427,7 +3429,7 @@ vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 /* {{{ Backup */
 
 static int
-vinyl_engine_backup(struct engine *engine, struct vclock *vclock,
+vinyl_engine_backup(struct engine *engine, const struct vclock *vclock,
 		    engine_backup_cb cb, void *cb_arg)
 {
 	struct vy_env *env = vy_env(engine);

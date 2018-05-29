@@ -76,7 +76,7 @@ struct engine_vtab {
 	/**
 	 * Write statements stored in checkpoint @vclock to @stream.
 	 */
-	int (*join)(struct engine *engine, struct vclock *vclock,
+	int (*join)(struct engine *engine, const struct vclock *vclock,
 		    struct xstream *stream);
 	/**
 	 * Begin a new single or multi-statement transaction.
@@ -144,12 +144,12 @@ struct engine_vtab {
 	/**
 	 * Wait for a checkpoint to complete.
 	 */
-	int (*wait_checkpoint)(struct engine *, struct vclock *);
+	int (*wait_checkpoint)(struct engine *, const struct vclock *);
 	/**
 	 * All engines prepared their checkpoints,
 	 * fix up the changes.
 	 */
-	void (*commit_checkpoint)(struct engine *, struct vclock *);
+	void (*commit_checkpoint)(struct engine *, const struct vclock *);
 	/**
 	 * An error in one of the engines, abort checkpoint.
 	 */
@@ -172,7 +172,7 @@ struct engine_vtab {
 	 * that needs to be backed up in order to restore from the
 	 * checkpoint @vclock.
 	 */
-	int (*backup)(struct engine *engine, struct vclock *vclock,
+	int (*backup)(struct engine *engine, const struct vclock *vclock,
 		      engine_backup_cb cb, void *cb_arg);
 	/**
 	 * Accumulate engine memory statistics.
@@ -310,7 +310,7 @@ engine_end_recovery(void);
  * (called on the master).
  */
 int
-engine_join(struct vclock *vclock, struct xstream *stream);
+engine_join(const struct vclock *vclock, struct xstream *stream);
 
 int
 engine_begin_checkpoint(void);
@@ -319,7 +319,7 @@ engine_begin_checkpoint(void);
  * Create a checkpoint.
  */
 int
-engine_commit_checkpoint(struct vclock *vclock);
+engine_commit_checkpoint(const struct vclock *vclock);
 
 void
 engine_abort_checkpoint(void);
@@ -328,7 +328,7 @@ int
 engine_collect_garbage(int64_t lsn);
 
 int
-engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
+engine_backup(const struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
 
 void
 engine_memory_stat(struct engine_memory_stat *stat);
@@ -415,7 +415,7 @@ engine_end_recovery_xc(void)
 }
 
 static inline void
-engine_join_xc(struct vclock *vclock, struct xstream *stream)
+engine_join_xc(const struct vclock *vclock, struct xstream *stream)
 {
 	if (engine_join(vclock, stream) != 0)
 		diag_raise();

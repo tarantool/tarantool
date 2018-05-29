@@ -286,7 +286,7 @@ sysview_engine_end_recovery(struct engine *engine)
 }
 
 static int
-sysview_engine_join(struct engine *engine, struct vclock *vclock,
+sysview_engine_join(struct engine *engine, const struct vclock *vclock,
 		    struct xstream *stream)
 {
 	(void)engine;
@@ -303,7 +303,8 @@ sysview_engine_begin_checkpoint(struct engine *engine)
 }
 
 static int
-sysview_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
+sysview_engine_wait_checkpoint(struct engine *engine,
+			       const struct vclock *vclock)
 {
 	(void)engine;
 	(void)vclock;
@@ -311,7 +312,8 @@ sysview_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
 }
 
 static void
-sysview_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
+sysview_engine_commit_checkpoint(struct engine *engine,
+				 const struct vclock *vclock)
 {
 	(void)engine;
 	(void)vclock;
@@ -332,7 +334,7 @@ sysview_engine_collect_garbage(struct engine *engine, int64_t lsn)
 }
 
 static int
-sysview_engine_backup(struct engine *engine, struct vclock *vclock,
+sysview_engine_backup(struct engine *engine, const struct vclock *vclock,
 		      engine_backup_cb cb, void *cb_arg)
 {
 	(void)engine;

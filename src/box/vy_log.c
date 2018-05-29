@@ -1035,7 +1035,7 @@ vy_log_collect_garbage(int64_t signature)
 }
 
 const char *
-vy_log_backup_path(struct vclock *vclock)
+vy_log_backup_path(const struct vclock *vclock)
 {
 	/*
 	 * Use the previous log file, because the current one

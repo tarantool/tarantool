@@ -677,7 +677,8 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 }
 
 static int
-memtx_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
+memtx_engine_wait_checkpoint(struct engine *engine,
+			     const struct vclock *vclock)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
@@ -708,7 +709,8 @@ memtx_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
 }
 
 static void
-memtx_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
+memtx_engine_commit_checkpoint(struct engine *engine,
+			       const struct vclock *vclock)
 {
 	(void) vclock;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
@@ -793,7 +795,7 @@ memtx_engine_collect_garbage(struct engine *engine, int64_t lsn)
 }
 
 static int
-memtx_engine_backup(struct engine *engine, struct vclock *vclock,
+memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 		    engine_backup_cb cb, void *cb_arg)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
@@ -854,7 +856,7 @@ memtx_initial_join_f(va_list ap)
 }
 
 static int
-memtx_engine_join(struct engine *engine, struct vclock *vclock,
+memtx_engine_join(struct engine *engine, const struct vclock *vclock,
 		  struct xstream *stream)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;

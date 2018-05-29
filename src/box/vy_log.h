@@ -405,7 +405,7 @@ vy_log_collect_garbage(int64_t signature);
  * in order to recover to checkpoint @vclock.
  */
 const char *
-vy_log_backup_path(struct vclock *vclock);
+vy_log_backup_path(const struct vclock *vclock);
 
 /** Allocate a unique ID for a vinyl object. */
 int64_t
