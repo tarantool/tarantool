@@ -388,15 +388,16 @@ memtx_space_execute_update(struct space *space, struct txn *txn,
 
 	/* Update the tuple; legacy, request ops are in request->tuple */
 	uint32_t new_size = 0, bsize;
+	struct tuple_format *format = space->format;
 	const char *old_data = tuple_data_range(old_tuple, &bsize);
 	const char *new_data =
 		tuple_update_execute(request->tuple, request->tuple_end,
-				     old_data, old_data + bsize,
+				     old_data, old_data + bsize, format->dict,
 				     &new_size, request->index_base, NULL);
 	if (new_data == NULL)
 		return -1;
 
-	stmt->new_tuple = memtx_tuple_new(space->format, new_data,
+	stmt->new_tuple = memtx_tuple_new(format, new_data,
 					  new_data + new_size);
 	if (stmt->new_tuple == NULL)
 		return -1;
@@ -442,6 +443,7 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	if (index_get(index, key, part_count, &old_tuple) != 0)
 		return -1;
 
+	struct tuple_format *format = space->format;
 	if (old_tuple == NULL) {
 		/**
 		 * Old tuple was not found. A write optimized
@@ -460,11 +462,11 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		 * @sa https://github.com/tarantool/tarantool/issues/1156
 		 */
 		if (tuple_update_check_ops(request->ops, request->ops_end,
+					   format->dict,
 					   request->index_base) != 0) {
 			return -1;
 		}
-		stmt->new_tuple = memtx_tuple_new(space->format,
-						  request->tuple,
+		stmt->new_tuple = memtx_tuple_new(format, request->tuple,
 						  request->tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
@@ -482,12 +484,13 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		const char *new_data =
 			tuple_upsert_execute(request->ops, request->ops_end,
 					     old_data, old_data + bsize,
-					     &new_size, request->index_base,
-					     false, &column_mask);
+					     format->dict, &new_size,
+					     request->index_base, false,
+					     &column_mask);
 		if (new_data == NULL)
 			return -1;
 
-		stmt->new_tuple = memtx_tuple_new(space->format, new_data,
+		stmt->new_tuple = memtx_tuple_new(format, new_data,
 						  new_data + new_size);
 		if (stmt->new_tuple == NULL)
 			return -1;

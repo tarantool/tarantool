@@ -205,7 +205,7 @@ struct errcode_record {
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
 	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of space '%s' can not contain nullable parts") \
-	/*153 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' was not found in space '%s' format") \
+	/*153 */_(ER_NO_SUCH_FIELD_NAME_IN_SPACE,	"Field '%s' was not found in space '%s' format") \
 	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 	/*155 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
 	/*156 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
@@ -253,6 +253,7 @@ struct errcode_record {
 	/*198 */_(ER_FUNC_INDEX_FUNC,		"Failed to build a key for functional index '%s' of space '%s': %s") \
 	/*199 */_(ER_FUNC_INDEX_FORMAT,		"Key format doesn't match one defined in functional index '%s' of space '%s': %s") \
 	/*200 */_(ER_FUNC_INDEX_PARTS,		"Wrong functional index definition: %s") \
+	/*201 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' was not found in the tuple") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

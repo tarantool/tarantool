@@ -167,7 +167,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			}
 		}
 		if (j >= (int)def->field_count) {
-			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME,
+			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME_IN_SPACE,
 				 pChanges->a[i].zName, def->name);
 			pParse->is_aborted = true;
 			goto update_cleanup;

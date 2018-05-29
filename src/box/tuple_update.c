@@ -43,6 +43,8 @@
 #include "mp_extension_types.h"
 #include "mp_decimal.h"
 #include "fiber.h"
+#include "tuple_dictionary.h"
+#include "tt_static.h"
 
 /** UPDATE request implementation.
  * UPDATE request is represented by a sequence of operations, each
@@ -1007,11 +1009,86 @@ update_op_by(char opcode)
 }
 
 /**
+ * Decode an update operation from MessagePack.
+ * @param[out] op Update operation.
+ * @param index_base Field numbers base: 0 or 1.
+ * @param dict Dictionary to lookup field number by a name.
+ * @param expr MessagePack.
+ *
+ * @retval 0 Success.
+ * @retval -1 Client error.
+ */
+static inline int
+update_op_decode(struct update_op *op, int index_base,
+		 struct tuple_dictionary *dict, const char **expr)
+{
+	if (mp_typeof(**expr) != MP_ARRAY) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS, "update operation "
+			 "must be an array {op,..}");
+		return -1;
+	}
+	uint32_t len, args = mp_decode_array(expr);
+	if (args < 1) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS, "update operation "\
+			 "must be an array {op,..}, got empty array");
+		return -1;
+	}
+	if (mp_typeof(**expr) != MP_STR) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "update operation name must be a string");
+		return -1;
+	}
+	op->opcode = *mp_decode_str(expr, &len);
+	op->meta = update_op_by(op->opcode);
+	if (op->meta == NULL)
+		return -1;
+	if (args != op->meta->args) {
+		diag_set(ClientError, ER_UNKNOWN_UPDATE_OP);
+		return -1;
+	}
+	int32_t field_no;
+	switch(mp_typeof(**expr)) {
+	case MP_INT:
+	case MP_UINT: {
+		if (mp_read_i32(index_base, op, expr, &field_no) != 0)
+			return -1;
+		if (field_no - index_base >= 0) {
+			op->field_no = field_no - index_base;
+		} else if (field_no < 0) {
+			op->field_no = field_no;
+		} else {
+			diag_set(ClientError, ER_NO_SUCH_FIELD_NO, field_no);
+			return -1;
+		}
+		break;
+	}
+	case MP_STR: {
+		const char *path = mp_decode_str(expr, &len);
+		uint32_t field_no, hash = field_name_hash(path, len);
+		if (tuple_fieldno_by_name(dict, path, len, hash,
+					  &field_no) != 0) {
+			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME,
+				 tt_cstr(path, len));
+			return -1;
+		}
+		op->field_no = (int32_t) field_no;
+		break;
+	}
+	default:
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "field id must be a number or a string");
+		return -1;
+	}
+	return op->meta->read_arg(index_base, op, expr);
+}
+
+/**
  * Read and check update operations and fill column mask.
  *
  * @param[out] update Update meta.
  * @param expr MessagePack array of operations.
  * @param expr_end End of the @expr.
+ * @param dict Dictionary to lookup field number by a name.
  * @param field_count_hint Field count in the updated tuple. If
  *        there is no tuple at hand (for example, when we are
  *        reading UPSERT operations), then 0 for field count will
@@ -1025,7 +1102,8 @@ update_op_by(char opcode)
  */
 static int
 update_read_ops(struct tuple_update *update, const char *expr,
-		const char *expr_end, int32_t field_count_hint)
+		const char *expr_end, struct tuple_dictionary *dict,
+		int32_t field_count_hint)
 {
 	if (mp_typeof(*expr) != MP_ARRAY) {
 		diag_set(ClientError, ER_ILLEGAL_PARAMS,
@@ -1051,59 +1129,14 @@ update_read_ops(struct tuple_update *update, const char *expr,
 	struct update_op *op = update->ops;
 	struct update_op *ops_end = op + update->op_count;
 	for (; op < ops_end; op++) {
-		if (mp_typeof(*expr) != MP_ARRAY) {
-			diag_set(ClientError, ER_ILLEGAL_PARAMS,
-				 "update operation"
-				 " must be an array {op,..}");
+		if (update_op_decode(op, update->index_base, dict, &expr) != 0)
 			return -1;
-		}
-		/* Read operation */
-		uint32_t args, len;
-		args = mp_decode_array(&expr);
-		if (args < 1) {
-			diag_set(ClientError, ER_ILLEGAL_PARAMS,
-				 "update operation must be an "
-				 "array {op,..}, got empty array");
-			return -1;
-		}
-		if (mp_typeof(*expr) != MP_STR) {
-			diag_set(ClientError, ER_ILLEGAL_PARAMS,
-				 "update operation name must be a string");
-			return -1;
-		}
-
-		op->opcode = *mp_decode_str(&expr, &len);
-		op->meta = update_op_by(op->opcode);
-		if (op->meta == NULL)
-			return -1;
-		if (args != op->meta->args) {
-			diag_set(ClientError, ER_UNKNOWN_UPDATE_OP);
-			return -1;
-		}
-		if (mp_typeof(*expr) != MP_INT && mp_typeof(*expr) != MP_UINT) {
-			diag_set(ClientError, ER_ILLEGAL_PARAMS,
-				 "field id must be a number");
-			return -1;
-		}
-		int32_t field_no = 0;
-		if (mp_read_i32(update->index_base, op, &expr, &field_no))
-			return -1;
-		if (field_no - update->index_base >= 0) {
-			op->field_no = field_no - update->index_base;
-		} else if (field_no < 0) {
-			op->field_no = field_no;
-		} else {
-			diag_set(ClientError, ER_NO_SUCH_FIELD_NO, field_no);
-			return -1;
-		}
-		if (op->meta->read_arg(update->index_base, op, &expr))
-			return -1;
-
 		/*
 		 * Continue collecting the changed columns
 		 * only if there are unset bits in the mask.
 		 */
 		if (column_mask != COLUMN_MASK_FULL) {
+			int32_t field_no;
 			if (op->field_no >= 0)
 				field_no = op->field_no;
 			else if (op->opcode != '!')
@@ -1261,24 +1294,25 @@ update_finish(struct tuple_update *update, uint32_t *p_tuple_len)
 }
 
 int
-tuple_update_check_ops(const char *expr, const char *expr_end, int index_base)
+tuple_update_check_ops(const char *expr, const char *expr_end,
+		       struct tuple_dictionary *dict, int index_base)
 {
 	struct tuple_update update;
 	update_init(&update, index_base);
-	return update_read_ops(&update, expr, expr_end, 0);
+	return update_read_ops(&update, expr, expr_end, dict, 0);
 }
 
 const char *
 tuple_update_execute(const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_tuple_len, int index_base,
-		     uint64_t *column_mask)
+		     struct tuple_dictionary *dict, uint32_t *p_tuple_len,
+		     int index_base, uint64_t *column_mask)
 {
 	struct tuple_update update;
 	update_init(&update, index_base);
 	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (update_read_ops(&update, expr, expr_end, field_count) != 0)
+	if (update_read_ops(&update, expr, expr_end, dict, field_count) != 0)
 		return NULL;
 	if (update_do_ops(&update, old_data, old_data_end, field_count))
 		return NULL;
@@ -1291,14 +1325,14 @@ tuple_update_execute(const char *expr,const char *expr_end,
 const char *
 tuple_upsert_execute(const char *expr,const char *expr_end,
 		     const char *old_data, const char *old_data_end,
-		     uint32_t *p_tuple_len, int index_base, bool suppress_error,
-		     uint64_t *column_mask)
+		     struct tuple_dictionary *dict, uint32_t *p_tuple_len,
+		     int index_base, bool suppress_error, uint64_t *column_mask)
 {
 	struct tuple_update update;
 	update_init(&update, index_base);
 	uint32_t field_count = mp_decode_array(&old_data);
 
-	if (update_read_ops(&update, expr, expr_end, field_count) != 0)
+	if (update_read_ops(&update, expr, expr_end, dict, field_count) != 0)
 		return NULL;
 	if (upsert_do_ops(&update, old_data, old_data_end, field_count,
 			  suppress_error))
@@ -1312,14 +1346,16 @@ tuple_upsert_execute(const char *expr,const char *expr_end,
 const char *
 tuple_upsert_squash(const char *expr1, const char *expr1_end,
 		    const char *expr2, const char *expr2_end,
-		    size_t *result_size, int index_base)
+		    struct tuple_dictionary *dict, size_t *result_size,
+		    int index_base)
 {
 	const char *expr[2] = {expr1, expr2};
 	const char *expr_end[2] = {expr1_end, expr2_end};
 	struct tuple_update update[2];
 	for (int j = 0; j < 2; j++) {
 		update_init(&update[j], index_base);
-		if (update_read_ops(&update[j], expr[j], expr_end[j], 0))
+		if (update_read_ops(&update[j], expr[j], expr_end[j],
+				    dict, 0) != 0)
 			return NULL;
 		mp_decode_array(&expr[j]);
 		int32_t prev_field_no = index_base - 1;

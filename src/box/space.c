@@ -397,7 +397,8 @@ space_before_replace(struct space *space, struct txn *txn,
 		old_data_end = old_data + old_size;
 		new_data = tuple_update_execute(request->tuple,
 						request->tuple_end, old_data,
-						old_data_end, &new_size,
+						old_data_end,
+						space->format->dict, &new_size,
 						request->index_base, NULL);
 		if (new_data == NULL)
 			return -1;
@@ -420,6 +421,7 @@ space_before_replace(struct space *space, struct txn *txn,
 			new_data_end = request->tuple_end;
 			if (tuple_update_check_ops(request->ops,
 						   request->ops_end,
+						   space->format->dict,
 						   request->index_base) != 0)
 				return -1;
 			break;
@@ -428,8 +430,9 @@ space_before_replace(struct space *space, struct txn *txn,
 		old_data_end = old_data + old_size;
 		new_data = tuple_upsert_execute(request->ops, request->ops_end,
 						old_data, old_data_end,
-						&new_size, request->index_base,
-						false, NULL);
+						space->format->dict, &new_size,
+						request->index_base, false,
+						NULL);
 		new_data_end = new_data + new_size;
 		break;
 	default:

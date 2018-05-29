@@ -707,15 +707,15 @@ box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end)
 	const char *old_data = tuple_data_range(tuple, &bsize);
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
+	struct tuple_format *format = tuple_format(tuple);
 	const char *new_data =
 		tuple_update_execute(expr, expr_end, old_data, old_data + bsize,
-				     &new_size, 1, NULL);
+				     format->dict, &new_size, 1, NULL);
 	if (new_data == NULL) {
 		region_truncate(region, used);
 		return NULL;
 	}
-	struct tuple *ret = tuple_new(tuple_format(tuple), new_data,
-				      new_data + new_size);
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
 		return tuple_bless(ret);
@@ -729,16 +729,16 @@ box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end)
 	const char *old_data = tuple_data_range(tuple, &bsize);
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
+	struct tuple_format *format = tuple_format(tuple);
 	const char *new_data =
 		tuple_upsert_execute(expr, expr_end, old_data, old_data + bsize,
-				     &new_size, 1, false, NULL);
+				     format->dict, &new_size, 1, false, NULL);
 	if (new_data == NULL) {
 		region_truncate(region, used);
 		return NULL;
 	}
 
-	struct tuple *ret = tuple_new(tuple_format(tuple),
-				      new_data, new_data + new_size);
+	struct tuple *ret = tuple_new(format, new_data, new_data + new_size);
 	region_truncate(region, used);
 	if (ret != NULL)
 		return tuple_bless(ret);

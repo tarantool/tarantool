@@ -134,3 +134,31 @@ box.begin() s:update(1, {{'=', 2, 2}}) s:update(1, {{'=', 3, 2}}) box.commit()
 pk:select()
 sk:select()
 s:drop()
+
+--
+-- gh-1261: tuple update by JSON.
+-- At first, test tuple update by field names.
+--
+format = {}
+format[1] = {'field1', 'unsigned'}
+format[2] = {'field2', 'array'}
+format[3] = {'field3', 'map'}
+format[4] = {'field4', 'string'}
+format[5] = {'field5', 'any'}
+format[6] = {'field6', 'integer'}
+format[7] = {'[1]', 'unsigned'}
+s = box.schema.create_space('test', {format = format})
+pk = s:create_index('pk')
+t = s:replace{1, {10, 11, 12}, {a = 20, b = 21, c = 22}, 'abcdefgh', true, -100, 200}
+t:update({{'+', 'field1', 1}})
+t:update({{'=', 'field2', {13, 14, 15}}})
+t:update({{':', 'field4', 3, 3, 'bbccdd'}, {'+', 'field6', 50}, {'!', 7, 300}})
+-- Any path is interpreted as a field name first. And only then
+-- as JSON.
+t:update({{'+', '[1]', 50}})
+-- JSON paths are not allowed yet.
+t:update({{'=', 'field2[1]', 13}})
+
+s:update({1}, {{'=', 'field3', {d = 30, e = 31, f = 32}}})
+
+s:drop()

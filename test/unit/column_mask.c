@@ -129,8 +129,9 @@ check_update_result(const struct tuple_template *original,
 	uint64_t column_mask;
 	struct region *region = &fiber()->gc;
 	const char *actual =
-		tuple_update_execute(ops, ops_end, old, old_end, &actual_len, 1,
-				     &column_mask);
+		tuple_update_execute(ops, ops_end, old, old_end,
+				     box_tuple_format_default()->dict,
+				     &actual_len, 1, &column_mask);
 	fail_if(actual == NULL);
 	is((int32_t)actual_len, new_end - new, "check result length");
 	is(memcmp(actual, new, actual_len), 0, "tuple update is correct");

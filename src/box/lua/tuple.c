@@ -439,6 +439,7 @@ lbox_tuple_transform(struct lua_State *L)
 	const char *old_data = tuple_data_range(tuple, &bsize);
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
+	struct tuple_format *format = tuple_format(tuple);
 	struct tuple *new_tuple = NULL;
 	/*
 	 * Can't use box_tuple_update() since transform must reset
@@ -449,8 +450,8 @@ lbox_tuple_transform(struct lua_State *L)
 	 */
 	const char *new_data =
 		tuple_update_execute(buf->buf, buf->buf + ibuf_used(buf),
-				     old_data, old_data + bsize, &new_size, 1,
-				     NULL);
+				     old_data, old_data + bsize, format->dict,
+				     &new_size, 1, NULL);
 	if (new_data != NULL)
 		new_tuple = tuple_new(box_tuple_format_default(),
 				      new_data, new_data + new_size);

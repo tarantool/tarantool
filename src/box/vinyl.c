@@ -1885,7 +1885,8 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	const char *old_tuple = tuple_data_range(stmt->old_tuple, &old_size);
 	const char *old_tuple_end = old_tuple + old_size;
 	new_tuple = tuple_update_execute(request->tuple, request->tuple_end,
-					 old_tuple, old_tuple_end, &new_size,
+					 old_tuple, old_tuple_end,
+					 pk->mem_format->dict, &new_size,
 					 request->index_base, &column_mask);
 	if (new_tuple == NULL)
 		return -1;
@@ -2064,7 +2065,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		return 0;
 	/* Check update operations. */
 	if (tuple_update_check_ops(request->ops, request->ops_end,
-				   request->index_base)) {
+				   pk->mem_format->dict,
+				   request->index_base) != 0) {
 		return -1;
 	}
 	if (request->index_base != 0) {
@@ -2122,7 +2124,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	/* Apply upsert operations to the old tuple. */
 	new_tuple = tuple_upsert_execute(ops, ops_end, old_tuple, old_tuple_end,
-					 &new_size, 0, false, &column_mask);
+					 pk->mem_format->dict, &new_size, 0,
+					 false, &column_mask);
 	if (new_tuple == NULL)
 		return -1;
 	/*

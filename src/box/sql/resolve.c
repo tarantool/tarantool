@@ -431,8 +431,8 @@ lookupName(Parse * pParse,	/* The parsing context */
 		if (zTab == NULL) {
 			diag_set(ClientError, ER_SQL_CANT_RESOLVE_FIELD, zCol);
 		} else {
-			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME, zCol,
-				 zTab);
+			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME_IN_SPACE,
+				 zCol, zTab);
 		}
 		pParse->is_aborted = true;
 		pTopNC->nErr++;

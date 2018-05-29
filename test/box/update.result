@@ -834,7 +834,7 @@ s:update({0}, {{'+', 0}})
 ...
 s:update({0}, {{'+', '+', '+'}})
 ---
-- error: Illegal parameters, field id must be a number
+- error: Field '+' was not found in the tuple
 ...
 s:update({0}, {{0, 0, 0}})
 ---

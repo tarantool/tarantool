@@ -373,7 +373,8 @@ sqlInsert(Parse * pParse,	/* Parser context */
 				}
 			}
 			if (j >= (int) space_def->field_count) {
-				diag_set(ClientError, ER_NO_SUCH_FIELD_NAME,
+				diag_set(ClientError,
+					 ER_NO_SUCH_FIELD_NAME_IN_SPACE,
 					 pColumn->a[i].zName,
 					 pTabList->a[0].zName);
 				pParse->is_aborted = true;

@@ -483,7 +483,7 @@ t;
   150: box.error.CANT_CREATE_COLLATION
   151: box.error.WRONG_COLLATION_OPTIONS
   152: box.error.NULLABLE_PRIMARY
-  153: box.error.NO_SUCH_FIELD_NAME
+  153: box.error.NO_SUCH_FIELD_NAME_IN_SPACE
   154: box.error.TRANSACTION_YIELD
   155: box.error.NO_SUCH_GROUP
   156: box.error.SQL_BIND_VALUE
@@ -530,6 +530,7 @@ t;
   198: box.error.FUNC_INDEX_FUNC
   199: box.error.FUNC_INDEX_FORMAT
   200: box.error.FUNC_INDEX_PARTS
+  201: box.error.NO_SUCH_FIELD_NAME
 ...
 test_run:cmd("setopt delimiter ''");
 ---
