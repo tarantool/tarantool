@@ -54,6 +54,8 @@ errinj.info()
     state: false
   ERRINJ_VY_RUN_WRITE:
     state: false
+  ERRINJ_VY_LOG_FLUSH_DELAY:
+    state: false
   ERRINJ_RELAY_FINAL_SLEEP:
     state: false
   ERRINJ_VY_RUN_DISCARD:
@@ -68,24 +70,24 @@ errinj.info()
     state: 0
   ERRINJ_IPROTO_TX_DELAY:
     state: false
+  ERRINJ_BUILD_SECONDARY:
+    state: -1
   ERRINJ_TUPLE_FIELD:
-    state: false
-  ERRINJ_INDEX_ALLOC:
     state: false
   ERRINJ_XLOG_GARBAGE:
     state: false
-  ERRINJ_VY_RUN_WRITE_TIMEOUT:
-    state: 0
+  ERRINJ_INDEX_ALLOC:
+    state: false
   ERRINJ_RELAY_TIMEOUT:
     state: 0
   ERRINJ_TESTING:
     state: false
-  ERRINJ_VY_LOG_FLUSH:
-    state: false
+  ERRINJ_VY_RUN_WRITE_TIMEOUT:
+    state: 0
   ERRINJ_VY_SQUASH_TIMEOUT:
     state: 0
-  ERRINJ_BUILD_SECONDARY:
-    state: -1
+  ERRINJ_VY_LOG_FLUSH:
+    state: false
   ERRINJ_VY_INDEX_DUMP:
     state: -1
 ...

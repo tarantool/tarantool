@@ -770,6 +770,11 @@ vy_log_flush(void)
 		diag_set(ClientError, ER_INJECTION, "vinyl log flush");
 		return -1;
 	});
+	struct errinj *delay = errinj(ERRINJ_VY_LOG_FLUSH_DELAY, ERRINJ_BOOL);
+	if (delay != NULL && delay->bparam) {
+		while (delay->bparam)
+			fiber_sleep(0.001);
+	}
 
 	struct journal_entry *entry = journal_entry_new(vy_log.tx_size);
 	if (entry == NULL)
@@ -815,7 +820,6 @@ void
 vy_log_free(void)
 {
 	xdir_destroy(&vy_log.dir);
-	latch_destroy(&vy_log.latch);
 	region_destroy(&vy_log.pool);
 	diag_destroy(&vy_log.tx_diag);
 }
