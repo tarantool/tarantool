@@ -1747,9 +1747,9 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		 */
 		return 0;
 	}
-	if (pDest->pTrigger) {
-		return 0;	/* tab1 must not have triggers */
-	}
+	/* The pDest must not have triggers. */
+	if (space_trigger_list(pDest->def->id) != NULL)
+		return 0;
 	if (onError == ON_CONFLICT_ACTION_DEFAULT) {
 		if (pDest->iPKey >= 0)
 			onError = pDest->keyConf;

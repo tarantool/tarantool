@@ -502,6 +502,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     check_param_table(opts, { if_exists = 'boolean' })
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
+    local _trigger = box.space[box.schema.TRIGGER_ID]
     local _vindex = box.space[box.schema.VINDEX_ID]
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
@@ -509,6 +510,9 @@ box.schema.space.drop = function(space_id, space_name, opts)
     if sequence_tuple ~= nil and sequence_tuple[3] == true then
         -- Delete automatically generated sequence.
         box.schema.sequence.drop(sequence_tuple[2])
+    end
+    for _, t in _trigger.index.space_id:pairs({space_id}) do
+        _trigger:delete({t.name})
     end
     local keys = _vindex:select(space_id)
     for i = #keys, 1, -1 do

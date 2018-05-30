@@ -170,8 +170,8 @@ test:do_execsql_test(
 
 data = {
     { 1,  [[ trigger1 ]], {0}},
-    { 2,  [[ Trigger1 ]], {1, "trigger TRIGGER1 already exists"}},
-    { 3,  [["TRIGGER1"]], {1, "trigger TRIGGER1 already exists"}},
+    { 2,  [[ Trigger1 ]], {1, "Trigger 'TRIGGER1' already exists"}},
+    { 3,  [["TRIGGER1"]], {1, "Trigger 'TRIGGER1' already exists"}},
     { 4,  [["trigger1" ]], {0}}
 }
 

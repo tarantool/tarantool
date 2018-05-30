@@ -211,6 +211,11 @@ space_delete(struct space *space)
 	trigger_destroy(&space->on_replace);
 	trigger_destroy(&space->on_stmt_begin);
 	space_def_delete(space->def);
+	/*
+	 * SQL Triggers should be deleted with
+	 * on_replace_dd_trigger on deletion from _trigger.
+	 */
+	assert(space->sql_triggers == NULL);
 	space->vtab->destroy(space);
 }
 

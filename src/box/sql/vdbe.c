@@ -4705,46 +4705,6 @@ case OP_ParseSchema2: {
 	break;
 }
 
-/* Opcode: ParseSchema3 P1 * * * *
- * Synopsis: name=r[P1] sql=r[P1+1]
- *
- * Create trigger named r[P1] w/ DDL SQL stored in r[P1+1]
- * in database P2
- */
-case OP_ParseSchema3: {
-	InitData initData;
-	Mem *pRec;
-	char zPgnoBuf[16];
-	char *argv[4] = {NULL, zPgnoBuf, NULL, NULL};
-	assert(db->pSchema != NULL);
-
-	initData.db = db;
-	initData.pzErrMsg = &p->zErrMsg;
-
-	assert(db->init.busy==0);
-	db->init.busy = 1;
-	initData.rc = SQLITE_OK;
-	assert(!db->mallocFailed);
-
-	pRec = &aMem[pOp->p1];
-	argv[0] = pRec[0].z;
-	argv[1] = "0";
-	argv[2] = pRec[1].z;
-	sqlite3InitCallback(&initData, 3, argv, NULL);
-
-	rc = initData.rc;
-	db->init.busy = 0;
-
-	if (rc) {
-		sqlite3ResetAllSchemasOfConnection(db);
-		if (rc==SQLITE_NOMEM) {
-			goto no_mem;
-		}
-		goto abort_due_to_error;
-	}
-	break;
-}
-
 /* Opcode: RenameTable P1 * * P4 *
  * Synopsis: P1 = root, P4 = name
  *
@@ -4764,7 +4724,6 @@ case OP_RenameTable: {
 	const char *zNewTableName;
 	Table *pTab;
 	FKey *pFKey;
-	Trigger *pTrig;
 	int iRootPage;
 	InitData initData;
 	char *argv[4] = {NULL, NULL, NULL, NULL};
@@ -4773,11 +4732,12 @@ case OP_RenameTable: {
 	space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
 	space = space_by_id(space_id);
 	assert(space);
+	/* Rename space op doesn't change triggers. */
+	struct Trigger *triggers = space->sql_triggers;
 	zOldTableName = space_name(space);
 	assert(zOldTableName);
 	pTab = sqlite3HashFind(&db->pSchema->tblHash, zOldTableName);
 	assert(pTab);
-	pTrig = pTab->pTrigger;
 	iRootPage = pTab->tnum;
 	zNewTableName = pOp->p4.z;
 	zOldTableName = sqlite3DbStrNDup(db, zOldTableName,
@@ -4814,22 +4774,35 @@ case OP_RenameTable: {
 	db->init.busy = 0;
 	rc = initData.rc;
 	if (rc) {
-		sqlite3ResetAllSchemasOfConnection(db);
+		sqlite3CommitInternalChanges();
 		goto abort_due_to_error;
 	}
 
-	pTab = sqlite3HashFind(&db->pSchema->tblHash, zNewTableName);
-	pTab->pTrigger = pTrig;
-
-	/* Rename all trigger created on this table.*/
-	for (; pTrig; pTrig = pTrig->pNext) {
-		sqlite3DbFree(db, pTrig->table);
-		pTrig->table = sqlite3DbStrNDup(db, zNewTableName,
-						sqlite3Strlen30(zNewTableName));
-		pTrig->pTabSchema = pTab->pSchema;
-		rc = tarantoolSqlite3RenameTrigger(pTrig->zName,
+	/*
+	 * Rebuild 'CREATE TRIGGER' expressions of all triggers
+	 * created on this table. Sure, this action is not atomic
+	 * due to lack of transactional DDL, but just do the best
+	 * effort.
+	 */
+	for (struct Trigger *trigger = triggers; trigger != NULL; ) {
+		/* Store pointer as trigger will be destructed. */
+		struct Trigger *next_trigger = trigger->pNext;
+		rc = tarantoolSqlite3RenameTrigger(trigger->zName,
 						   zOldTableName, zNewTableName);
-		if (rc) goto abort_due_to_error;
+		if (rc != SQLITE_OK) {
+			/*
+			 * FIXME: In the case of error,
+			 * part of triggers would have invalid
+			 * space name in tuple so can not been
+			 * persisted.
+			 * Server could be restarted.
+			 * In this case, rename table back and
+			 * try again.
+			 */
+			sqlite3CommitInternalChanges();
+			goto abort_due_to_error;
+		}
+		trigger = next_trigger;
 	}
 	sqlite3DbFree(db, (void*)zOldTableName);
 	sqlite3DbFree(db, (void*)zSqlStmt);
@@ -4876,18 +4849,6 @@ case OP_DropIndex: {
 	break;
 }
 
-/* Opcode: DropTrigger P1 * * P4 *
- *
- * Remove the internal (in-memory) data structures that describe
- * the trigger named P4 in database P1.  This is called after a trigger
- * is dropped from disk (using the Destroy opcode) in order to keep
- * the internal representation of the
- * schema consistent with what is on disk.
- */
-case OP_DropTrigger: {
-	sqlite3UnlinkAndDeleteTrigger(db, pOp->p4.z);
-	break;
-}
 #ifndef SQLITE_OMIT_TRIGGER
 
 /* Opcode: Program P1 P2 P3 P4 P5

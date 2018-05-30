@@ -1429,8 +1429,6 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 			pStep->op = TK_UPDATE;
 		}
 		pStep->pTrig = pTrigger;
-		pTrigger->pSchema = pTab->pSchema;
-		pTrigger->pTabSchema = pTab->pSchema;
 		pFKey->apTrigger[iAction] = pTrigger;
 		pTrigger->op = (pChanges ? TK_UPDATE : TK_DELETE);
 	}

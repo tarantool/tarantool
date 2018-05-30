@@ -410,15 +410,6 @@ sqlite3VdbeAddParseSchema2Op(Vdbe * p, int iRec, int n)
 	sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, 0);
 }
 
-/*
- * Add an OP_ParseSchema3 opcode which in turn will create a trigger
- */
-void
-sqlite3VdbeAddParseSchema3Op(Vdbe * p, int iRec)
-{
-	sqlite3VdbeAddOp2(p, OP_ParseSchema3, iRec, 0);
-}
-
 void
 sqlite3VdbeAddRenameTableOp(Vdbe * p, int iTab, char* zNewName)
 {

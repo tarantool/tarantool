@@ -95,12 +95,62 @@ struct Select *
 sql_view_compile(struct sqlite3 *db, const char *view_stmt);
 
 /**
+ * Perform parsing of provided SQL request and construct trigger AST.
+ * @param db SQL context handle.
+ * @param sql request to parse.
+ *
+ * @retval NULL on error
+ * @retval not NULL Trigger AST pointer on success.
+ */
+struct Trigger *
+sql_trigger_compile(struct sqlite3 *db, const char *sql);
+
+/**
  * Free AST pointed by trigger.
  * @param db SQL handle.
  * @param trigger AST object.
  */
 void
 sql_trigger_delete(struct sqlite3 *db, struct Trigger *trigger);
+
+/**
+ * Get server triggers list by space_id.
+ * @param space_id valid Space ID.
+ *
+ * @retval trigger AST list.
+ */
+struct Trigger *
+space_trigger_list(uint32_t space_id);
+
+/**
+ * Perform replace trigger in SQL internals with new AST object.
+ * @param db SQL handle.
+ * @param name a name of the trigger.
+ * @param trigger AST object to insert.
+ * @param[out] old_trigger Old object if exists.
+ *
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+int
+sql_trigger_replace(struct sqlite3 *db, const char *name,
+		    struct Trigger *trigger, struct Trigger **old_trigger);
+
+/**
+ * Get trigger name by trigger AST object.
+ * @param trigger AST object.
+ * @return trigger name string.
+ */
+const char *
+sql_trigger_name(struct Trigger *trigger);
+
+/**
+ * Get space_id of the space that trigger has been built for.
+ * @param trigger AST object.
+ * @return space identifier.
+ */
+uint32_t
+sql_trigger_space_id(struct Trigger *trigger);
 
 /**
  * Store duplicate of a parsed expression into @a parser.

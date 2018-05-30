@@ -44,3 +44,27 @@ errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
 
 box.sql.execute('DROP TABLE test')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
+----
+---- gh-3273: Move SQL TRIGGERs into server.
+----
+box.sql.execute("CREATE TABLE t1(id INTEGER PRIMARY KEY, a INTEGER);");
+box.sql.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY, a INTEGER);");
+box.error.injection.set("ERRINJ_WAL_IO", true)
+box.sql.execute("CREATE TRIGGER t1t INSERT ON t1 BEGIN INSERT INTO t2 VALUES (1, 1); END;")
+box.sql.execute("CREATE INDEX t1a ON t1(a);")
+box.error.injection.set("ERRINJ_WAL_IO", false)
+box.sql.execute("CREATE TRIGGER t1t INSERT ON t1 BEGIN INSERT INTO t2 VALUES (1, 1); END;")
+box.sql.execute("INSERT INTO t1 VALUES (3, 3);")
+box.sql.execute("SELECT * from t1");
+box.sql.execute("SELECT * from t2");
+box.error.injection.set("ERRINJ_WAL_IO", true)
+box.sql.execute("DROP TRIGGER t1t;")
+box.error.injection.set("ERRINJ_WAL_IO", false)
+box.sql.execute("DELETE FROM t1;")
+box.sql.execute("DELETE FROM t2;")
+box.sql.execute("INSERT INTO t1 VALUES (3, 3);")
+box.sql.execute("SELECT * from t1");
+box.sql.execute("SELECT * from t2");
+box.sql.execute("DROP TABLE t1;")
+box.sql.execute("DROP TABLE t2;")

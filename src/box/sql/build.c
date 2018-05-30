@@ -2099,16 +2099,14 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	/*
 	 * Drop all triggers associated with the table being
 	 * dropped. Code is generated to remove entries from
-	 * _trigger. OP_DropTrigger will remove it from internal
-	 * SQL structures.
+	 * _trigger. on_replace_dd_trigger will remove it from
+	 * internal SQL structures.
 	 *
 	 * Do not account triggers deletion - they will be
 	 * accounted in DELETE from _space below.
 	 */
 	parse_context->nested++;
-	Table *table = sqlite3HashFind(&parse_context->db->pSchema->tblHash,
-				       space->def->name);
-	struct Trigger *trigger = table->pTrigger;
+	struct Trigger *trigger = space->sql_triggers;
 	while (trigger != NULL) {
 		sqlite3DropTriggerPtr(parse_context, trigger);
 		trigger = trigger->pNext;

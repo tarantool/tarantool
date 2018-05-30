@@ -1917,7 +1917,6 @@ struct Table {
 #ifndef SQLITE_OMIT_ALTERTABLE
 	int addColOffset;	/* Offset in CREATE TABLE stmt to add a new column */
 #endif
-	Trigger *pTrigger;	/* List of triggers stored in pSchema */
 	Schema *pSchema;	/* Schema that contains this table */
 	Table *pNextZombie;	/* Next on the Parse.pZombieTab list */
 	/** Space definition with Tarantool metadata. */
@@ -2838,6 +2837,7 @@ enum ast_type {
 	AST_TYPE_UNDEFINED = 0,
 	AST_TYPE_SELECT,
 	AST_TYPE_EXPR,
+	AST_TYPE_TRIGGER,
 	ast_type_MAX
 };
 
@@ -2932,7 +2932,6 @@ struct Parse {
 	Vdbe *pReprepare;	/* VM being reprepared (sqlite3Reprepare()) */
 	const char *zTail;	/* All SQL text past the last semicolon parsed */
 	Table *pNewTable;	/* A table being constructed by CREATE TABLE */
-	Trigger *pNewTrigger;	/* Trigger under construct by a CREATE TRIGGER */
 	Table *pZombieTab;	/* List of Table objects to delete after code gen */
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
@@ -2950,6 +2949,7 @@ struct Parse {
 	union {
 		struct Expr *expr;
 		struct Select *select;
+		struct Trigger *trigger;
 	} parsed_ast;
 };
 
@@ -3020,14 +3020,11 @@ struct Trigger {
 	char *zName;		/* The name of the trigger                        */
 	/** The ID of space the trigger refers to. */
 	uint32_t space_id;
-	char *table;		/* The table or view to which the trigger applies */
 	u8 op;			/* One of TK_DELETE, TK_UPDATE, TK_INSERT         */
 	u8 tr_tm;		/* One of TRIGGER_BEFORE, TRIGGER_AFTER */
 	Expr *pWhen;		/* The WHEN clause of the expression (may be NULL) */
 	IdList *pColumns;	/* If this is an UPDATE OF <column-list> trigger,
 				   the <column-list> is stored here */
-	Schema *pSchema;	/* Schema containing the trigger */
-	Schema *pTabSchema;	/* Schema containing the table */
 	TriggerStep *step_list;	/* Link list of trigger program steps             */
 	Trigger *pNext;		/* Next trigger associated with the table */
 };
@@ -4069,7 +4066,6 @@ TriggerStep *sqlite3TriggerInsertStep(sqlite3 *, Token *, IdList *,
 TriggerStep *sqlite3TriggerUpdateStep(sqlite3 *, Token *, ExprList *, Expr *,
 				      u8);
 TriggerStep *sqlite3TriggerDeleteStep(sqlite3 *, Token *, Expr *);
-void sqlite3UnlinkAndDeleteTrigger(sqlite3 *, const char *);
 u32 sqlite3TriggerColmask(Parse *, Trigger *, ExprList *, int, int, Table *,
 			  int);
 #define sqlite3ParseToplevel(p) ((p)->pToplevel ? (p)->pToplevel : (p))

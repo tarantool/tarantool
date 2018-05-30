@@ -43,7 +43,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.1>
-        1, "no such table: NO_SUCH_TABLE"
+        1, "Space 'NO_SUCH_TABLE' does not exist"
         -- </trigger1-1.1.1>
     })
 
@@ -55,7 +55,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.2>
-        1, "no such table: NO_SUCH_TABLE"
+        1, "Space 'NO_SUCH_TABLE' does not exist"
         -- </trigger1-1.1.2>
     })
 
@@ -101,7 +101,7 @@ test:do_catchsql_test(
          END
     ]], {
         -- <trigger1-1.2.1>
-        1, "trigger TR1 already exists"
+        1, "Trigger 'TR1' already exists"
         -- </trigger1-1.2.1>
     })
 
@@ -113,7 +113,7 @@ test:do_catchsql_test(
          END
     ]], {
         -- <trigger1-1.2.2>
-        1, [[trigger TR1 already exists]]
+        1, [[Trigger 'TR1' already exists]]
         -- </trigger1-1.2.2>
     })
 
@@ -251,7 +251,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.12>
-        1, "cannot create INSTEAD OF trigger on table: T1"
+        1, "SQL error: cannot create INSTEAD OF trigger on space: T1"
         -- </trigger1-1.12>
     })
 
@@ -265,7 +265,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.13>
-        1, "cannot create BEFORE trigger on view: V1"
+        1, "SQL error: cannot create BEFORE trigger on view: V1"
         -- </trigger1-1.13>
     })
 
@@ -280,7 +280,7 @@ test:do_catchsql_test(
         end;
     ]], {
         -- <trigger1-1.14>
-        1, "cannot create AFTER trigger on view: V1"
+        1, "SQL error: cannot create AFTER trigger on view: V1"
         -- </trigger1-1.14>
     })
 

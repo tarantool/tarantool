@@ -450,7 +450,7 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		return SQLITE_NOMEM_BKPT;
 	}
 	assert(pParse->pNewTable == 0);
-	assert(pParse->pNewTrigger == 0);
+	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
 	while (1) {
@@ -534,7 +534,6 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 
 	if (pParse->pWithToFree)
 		sqlite3WithDelete(db, pParse->pWithToFree);
-	sql_trigger_delete(db, pParse->pNewTrigger);
 	sqlite3DbFree(db, pParse->pVList);
 	while (pParse->pZombieTab) {
 		Table *p = pParse->pZombieTab;
@@ -596,4 +595,25 @@ sql_view_compile(struct sqlite3 *db, const char *view_stmt)
 
 	sql_parser_destroy(&parser);
 	return select;
+}
+
+struct Trigger *
+sql_trigger_compile(struct sqlite3 *db, const char *sql)
+{
+	struct Parse parser;
+	sql_parser_create(&parser, db);
+	parser.parse_only = true;
+	char *sql_error;
+	struct Trigger *trigger = NULL;
+	if (sqlite3RunParser(&parser, sql, &sql_error) != SQLITE_OK ||
+	    parser.parsed_ast_type != AST_TYPE_TRIGGER) {
+	    if (parser.rc != SQL_TARANTOOL_ERROR)
+		diag_set(ClientError, ER_SQL, sql_error);
+	} else {
+		trigger = parser.parsed_ast.trigger;
+		parser.parsed_ast.trigger = NULL;
+	}
+
+	sql_parser_destroy(&parser);
+	return trigger;
 }
