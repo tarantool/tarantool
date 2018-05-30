@@ -18,6 +18,8 @@ errinj.info()
     state: false
   ERRINJ_VYRUN_DATA_READ:
     state: false
+  ERRINJ_SNAP_WRITE_ROW_TIMEOUT:
+    state: 0
   ERRINJ_VY_SCHED_TIMEOUT:
     state: 0
   ERRINJ_WAL_WRITE_PARTIAL:
@@ -1106,4 +1108,98 @@ s:drop()
 ...
 box.schema.user.revoke('guest', 'read,write,execute','universe')
 ---
+...
+--
+-- gh-3432: check that deletion of temporary tuples is not delayed
+-- if snapshot is in progress.
+--
+test_run:cmd("create server test with script='box/lua/cfg_memory.lua'")
+---
+- true
+...
+test_run:cmd(string.format("start server test with args='%d'", 100 * 1024 * 1024))
+---
+- true
+...
+test_run:cmd("switch test")
+---
+- true
+...
+fiber = require('fiber')
+---
+...
+-- Create a persistent space.
+_ = box.schema.space.create('test')
+---
+...
+_ = box.space.test:create_index('pk')
+---
+...
+for i = 1, 100 do box.space.test:insert{i} end
+---
+...
+-- Create a temporary space.
+count = 500
+---
+...
+pad = string.rep('x', 100 * 1024)
+---
+...
+_ = box.schema.space.create('tmp', {temporary = true})
+---
+...
+_ = box.space.tmp:create_index('pk')
+---
+...
+for i = 1, count do box.space.tmp:insert{i, pad} end
+---
+...
+-- Start background snapshot.
+c = fiber.channel(1)
+---
+...
+box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0.01)
+---
+- ok
+...
+_ = fiber.create(function() box.snapshot() c:put(true) end)
+---
+...
+-- Overwrite data stored in the temporary space while snapshot
+-- is in progress to make sure that tuples stored in it are freed
+-- immediately.
+for i = 1, count do box.space.tmp:delete{i} end
+---
+...
+_ = collectgarbage('collect')
+---
+...
+for i = 1, count do box.space.tmp:insert{i, pad} end
+---
+...
+box.error.injection.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 0)
+---
+- ok
+...
+c:get()
+---
+- true
+...
+box.space.tmp:drop()
+---
+...
+box.space.test:drop()
+---
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server test")
+---
+- true
+...
+test_run:cmd("cleanup server test")
+---
+- true
 ...

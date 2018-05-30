@@ -947,6 +947,7 @@ memtx_space_new(struct memtx_engine *memtx,
 		free(memtx_space);
 		return NULL;
 	}
+	format->temporary = def->opts.temporary;
 	format->exact_field_count = def->exact_field_count;
 	tuple_format_ref(format);
 

@@ -161,7 +161,8 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
 	if (memtx_alloc.free_mode != SMALL_DELAYED_FREE ||
-	    memtx_tuple->version == snapshot_version)
+	    memtx_tuple->version == snapshot_version ||
+	    format->temporary)
 		smfree(&memtx_alloc, memtx_tuple, total);
 	else
 		smfree_delayed(&memtx_alloc, memtx_tuple, total);
