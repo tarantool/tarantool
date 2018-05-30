@@ -393,7 +393,6 @@ deleteTable(sqlite3 * db, Table * pTable)
 	sqlite3HashClear(&pTable->idxHash);
 	sqlite3DbFree(db, pTable->aCol);
 	sqlite3DbFree(db, pTable->zColAff);
-	sqlite3SelectDelete(db, pTable->pSelect);
 	assert(pTable->def != NULL);
 	/* Do not delete pTable->def allocated on region. */
 	if (!pTable->def->opts.temporary)
@@ -1804,7 +1803,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		p->def->id = SQLITE_PAGENO_TO_SPACEID(p->tnum);
 	}
 
-	assert(p->def->opts.is_view == (p->pSelect != NULL));
 	if (!p->def->opts.is_view) {
 		if ((p->tabFlags & TF_HasPrimaryKey) == 0) {
 			sqlite3ErrorMsg(pParse,
@@ -1969,230 +1967,100 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 }
 
 #ifndef SQLITE_OMIT_VIEW
-/*
- * The parser calls this routine in order to create a new VIEW
- */
 void
-sqlite3CreateView(Parse * pParse,	/* The parsing context */
-		  Token * pBegin,	/* The CREATE token that begins the statement */
-		  Token * pName,	/* The token that holds the name of the view */
-		  ExprList * pCNames,	/* Optional list of view column names */
-		  Select * pSelect,	/* A SELECT statement that will become the new view */
-		  int noErr	/* Suppress error messages if VIEW already exists */
-    )
+sql_create_view(struct Parse *parse_context, struct Token *begin,
+		struct Token *name, struct ExprList *aliases,
+		struct Select *select, bool if_exists)
 {
-	Table *p;
-	int n;
-	const char *z;
-	Token sEnd;
-	DbFixer sFix;
-	sqlite3 *db = pParse->db;
-
-	if (pParse->nVar > 0) {
-		sqlite3ErrorMsg(pParse, "parameters are not allowed in views");
+	struct sqlite3 *db = parse_context->db;
+	if (parse_context->nVar > 0) {
+		sqlite3ErrorMsg(parse_context,
+				"parameters are not allowed in views");
 		goto create_view_fail;
 	}
-	sqlite3StartTable(pParse, pName, noErr);
-	p = pParse->pNewTable;
-	if (p == 0 || pParse->nErr)
+	sqlite3StartTable(parse_context, name, if_exists);
+	struct Table *p = parse_context->pNewTable;
+	if (p == NULL || parse_context->nErr != 0)
 		goto create_view_fail;
-	sqlite3FixInit(&sFix, pParse, "view", pName);
-	if (sqlite3FixSelect(&sFix, pSelect))
+	struct Table *sel_tab =	sqlite3ResultSetOfSelect(parse_context, select);
+	if (sel_tab == NULL)
 		goto create_view_fail;
-
-	/* Make a copy of the entire SELECT statement that defines the view.
-	 * This will force all the Expr.token.z values to be dynamically
-	 * allocated rather than point to the input string - which means that
-	 * they will persist after the current sqlite3_exec() call returns.
-	 */
-	p->pSelect = sqlite3SelectDup(db, pSelect, EXPRDUP_REDUCE);
+	if (aliases != NULL) {
+		if ((int)sel_tab->def->field_count != aliases->nExpr) {
+			sqlite3ErrorMsg(parse_context, "expected %d columns "\
+					"for '%s' but got %d", aliases->nExpr,
+					p->def->name,
+					sel_tab->def->field_count);
+			goto create_view_fail;
+		}
+		sqlite3ColumnsFromExprList(parse_context, aliases, p);
+		sqlite3SelectAddColumnTypeAndCollation(parse_context, p,
+						       select);
+	} else {
+		assert(p->aCol == NULL);
+		assert(sel_tab->def->opts.temporary);
+		p->def->fields = sel_tab->def->fields;
+		p->def->field_count = sel_tab->def->field_count;
+		p->aCol = sel_tab->aCol;
+		sel_tab->aCol = NULL;
+		sel_tab->def->fields = NULL;
+		sel_tab->def->field_count = 0;
+	}
 	p->def->opts.is_view = true;
-	p->def->opts.checks = sql_expr_list_dup(db, pCNames, EXPRDUP_REDUCE);
-	if (db->mallocFailed)
-		goto create_view_fail;
-
-	/* Locate the end of the CREATE VIEW statement.  Make sEnd point to
-	 * the end.
+	/*
+	 * Locate the end of the CREATE VIEW statement.
+	 * Make sEnd point to the end.
 	 */
-	sEnd = pParse->sLastToken;
-	assert(sEnd.z[0] != 0);
-	if (sEnd.z[0] != ';') {
-		sEnd.z += sEnd.n;
-	}
-	sEnd.n = 0;
-	n = (int)(sEnd.z - pBegin->z);
+	struct Token end = parse_context->sLastToken;
+	assert(end.z[0] != 0);
+	if (end.z[0] != ';')
+		end.z += end.n;
+	end.n = 0;
+	int n = end.z - begin->z;
 	assert(n > 0);
-	z = pBegin->z;
-	while (sqlite3Isspace(z[n - 1])) {
+	const char *z = begin->z;
+	while (sqlite3Isspace(z[n - 1]))
 		n--;
+	end.z = &z[n - 1];
+	end.n = 1;
+	p->def->opts.sql = strndup(begin->z, n);
+	if (p->def->opts.sql == NULL) {
+		diag_set(OutOfMemory, n, "strndup", "opts.sql");
+		parse_context->rc = SQL_TARANTOOL_ERROR;
+		parse_context->nErr++;
+		goto create_view_fail;
 	}
-	sEnd.z = &z[n - 1];
-	sEnd.n = 1;
 
 	/* Use sqlite3EndTable() to add the view to the Tarantool.  */
-	sqlite3EndTable(pParse, 0, &sEnd, 0);
+	sqlite3EndTable(parse_context, 0, &end, 0);
 
  create_view_fail:
-	sqlite3SelectDelete(db, pSelect);
-	sql_expr_list_delete(db, pCNames);
+	sql_expr_list_delete(db, aliases);
+	sql_select_delete(db, select);
 	return;
 }
 #endif				/* SQLITE_OMIT_VIEW */
 
 int
-sql_view_column_names(struct Parse *parse, struct Table *table)
+sql_view_assign_cursors(struct Parse *parse, const char *view_stmt)
 {
-	assert(table != NULL);
-	assert(table->def->opts.is_view);
-	/* A positive nCol means the columns names for this view
-	 * are already known.
-	 */
-	if (table->def->field_count > 0)
-		return 0;
-
-	/* A negative nCol is a special marker meaning that we are
-	 * currently trying to compute the column names.  If we
-	 * enter this routine with a negative nCol, it means two
-	 * or more views form a loop, like this:
-	 *
-	 *     CREATE VIEW one AS SELECT * FROM two;
-	 *     CREATE VIEW two AS SELECT * FROM one;
-	 *
-	 * Actually, the error above is now caught prior to
-	 * reaching this point. But the following test is still
-	 * important as it does come up in the following:
-	 *
-	 *     CREATE TABLE main.ex1(a);
-	 *     CREATE TEMP VIEW ex1 AS SELECT a FROM ex1;
-	 *     SELECT * FROM temp.ex1;
-	 */
-	if ((int)table->def->field_count < 0) {
-		sqlite3ErrorMsg(parse, "view %s is circularly defined",
-				table->def->name);
-		return -1;
-	}
-
-	/* If we get this far, it means we need to compute the
-	 * table names. Note that the call to
-	 * sqlite3ResultSetOfSelect() will expand any "*" elements
-	 * in the results set of the view and will assign cursors
-	 * to the elements of the FROM clause.  But we do not want
-	 * these changes to be permanent.  So the computation is
-	 * done on a copy of the SELECT statement that defines the
-	 * view.
-	 */
-	assert(table->pSelect != NULL);
-	sqlite3 *db = parse->db;
-	struct Select *select = sqlite3SelectDup(db, table->pSelect, 0);
+	assert(view_stmt != NULL);
+	struct sqlite3 *db = parse->db;
+	struct Select *select = sql_view_compile(db, view_stmt);
 	if (select == NULL)
 		return -1;
-	int n = parse->nTab;
 	sqlite3SrcListAssignCursors(parse, select->pSrc);
-	table->def->field_count = -1;
-	db->lookaside.bDisable++;
-	struct Table *sel_tab = sqlite3ResultSetOfSelect(parse, select);
-	parse->nTab = n;
-	int rc = 0;
-	/* Get server checks. */
-	ExprList *checks = space_checks_expr_list(table->def->id);
-	if (checks != NULL) {
-		/* CREATE VIEW name(arglist) AS ...
-		 * The names of the columns in the table are taken
-		 * from arglist which is stored in table->pCheck.
-		 * The pCheck field normally holds CHECK
-		 * constraints on an ordinary table, but for a
-		 * VIEW it holds the list of column names.
-		 */
-		struct space_def *old_def = table->def;
-		sqlite3ColumnsFromExprList(parse, checks, table);
-		if (sql_table_def_rebuild(db, table) != 0) {
-			rc = -1;
-		} else {
-			space_def_delete(old_def);
-		}
-		if (db->mallocFailed == 0 && parse->nErr == 0
-		    && (int)table->def->field_count == select->pEList->nExpr) {
-			sqlite3SelectAddColumnTypeAndCollation(parse, table,
-							       select);
-		}
-	} else if (sel_tab != NULL) {
-		/* CREATE VIEW name AS...  without an argument
-		 * list.  Construct the column names from the
-		 * SELECT statement that defines the view.
-		 */
-		assert(table->aCol == NULL);
-		assert(sel_tab->def->opts.temporary);
-		struct space_def *old_def = table->def;
-		struct space_def *new_def =
-			sql_ephemeral_space_def_new(parse,
-						    old_def->name);
-		if (new_def == NULL) {
-			rc = -1;
-		} else {
-			memcpy(new_def, old_def,
-			       sizeof(struct space_def));
-			new_def->dict = NULL;
-			new_def->opts.temporary = true;
-			new_def->fields = sel_tab->def->fields;
-			new_def->field_count =
-				sel_tab->def->field_count;
-			table->def = new_def;
-			if (sql_table_def_rebuild(db, table) != 0)
-				rc = -1;
-		}
-		table->aCol = sel_tab->aCol;
-		sel_tab->aCol = NULL;
-		sel_tab->def = old_def;
-		sel_tab->def->fields = NULL;
-		sel_tab->def->field_count = 0;
-	} else {
-		table->def->field_count = 0;
-		rc = -1;
-	}
-	sqlite3DeleteTable(db, sel_tab);
-	sqlite3SelectDelete(db, select);
-	db->lookaside.bDisable--;
-
-	return rc;
+	sql_select_delete(db, select);
+	return 0;
 }
 
-#ifndef SQLITE_OMIT_VIEW
-/*
- * Clear the column names from every VIEW in database idx.
- */
-static void
-sqliteViewResetAll(sqlite3 * db)
+void
+sql_store_select(struct Parse *parse_context, struct Select *select)
 {
-	HashElem *i;
-	for (i = sqliteHashFirst(&db->pSchema->tblHash); i;
-	     i = sqliteHashNext(i)) {
-		Table *pTab = sqliteHashData(i);
-		assert(pTab->def->opts.is_view == (pTab->pSelect != NULL));
-		if (pTab->def->opts.is_view) {
-			sqlite3DbFree(db, pTab->aCol);
-			struct space_def *old_def = pTab->def;
-			assert(old_def->opts.temporary == false);
-			pTab->def = space_def_new(old_def->id, old_def->uid,
-						  0, old_def->name,
-						  strlen(old_def->name),
-						  old_def->engine_name,
-						  strlen(old_def->engine_name),
-						  &old_def->opts,
-						  NULL, 0);
-			if (pTab->def == NULL) {
-				sqlite3OomFault(db);
-				pTab->def = old_def;
-			} else {
-				space_def_delete(old_def);
-			}
-			pTab->aCol = NULL;
-			pTab->def->field_count = 0;
-		}
-	}
+	Select *select_copy = sqlite3SelectDup(parse_context->db, select, 0);
+	parse_context->parsed_ast_type = AST_TYPE_SELECT;
+	parse_context->parsed_ast.select = select_copy;
 }
-#else
-#define sqliteViewResetAll(A,B)
-#endif				/* SQLITE_OMIT_VIEW */
 
 /**
  * Remove entries from the _sql_stat1 and _sql_stat4
@@ -2243,7 +2111,6 @@ static void
 sql_code_drop_table(struct Parse *parse_context, struct space *space,
 		    bool is_view)
 {
-	struct sqlite3 *db = parse_context->db;
 	struct Vdbe *v = sqlite3GetVdbe(parse_context);
 	assert(v != NULL);
 	/*
@@ -2273,6 +2140,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	int space_id_reg = ++parse_context->nMem;
 	int space_id = space->def->id;
 	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
+	sqlite3VdbeAddOp1(v, OP_CheckViewReferences, space_id_reg);
 	if (space->sequence != NULL) {
 		/* Delete entry from _space_sequence. */
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1,
@@ -2331,14 +2199,6 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	VdbeComment((v, "Delete entry from _space"));
 	/* Remove the table entry from SQLite's internal schema. */
 	sqlite3VdbeAddOp4(v, OP_DropTable, 0, 0, 0, space->def->name, 0);
-
-	/*
-	 * Replace to _space/_index will fail if active
-	 * transaction. So, don't pretend, that we are able to
-	 * anything back. To be fixed when transactions
-	 * DDL are enabled.
-	 */
-	sqliteViewResetAll(db);
 }
 
 /**
@@ -2875,7 +2735,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	assert(pTab != 0);
 	assert(parse->nErr == 0);
 #ifndef SQLITE_OMIT_VIEW
-	if (pTab->pSelect) {
+	if (pTab->def->opts.is_view) {
 		sqlite3ErrorMsg(parse, "views may not be indexed");
 		goto exit_create_index;
 	}
@@ -3640,7 +3500,7 @@ sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
 		if (pItem->fg.isTabFunc)
 			sql_expr_list_delete(db, pItem->u1.pFuncArg);
 		sqlite3DeleteTable(db, pItem->pTab);
-		sqlite3SelectDelete(db, pItem->pSelect);
+		sql_select_delete(db, pItem->pSelect);
 		sql_expr_delete(db, pItem->pOn, false);
 		sqlite3IdListDelete(db, pItem->pUsing);
 	}
@@ -3699,7 +3559,7 @@ sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 	assert(p == 0);
 	sql_expr_delete(db, pOn, false);
 	sqlite3IdListDelete(db, pUsing);
-	sqlite3SelectDelete(db, pSubquery);
+	sql_select_delete(db, pSubquery);
 	return 0;
 }
 
@@ -4088,7 +3948,7 @@ sqlite3WithAdd(Parse * pParse,	/* Parsing context */
 
 	if (db->mallocFailed) {
 		sql_expr_list_delete(db, pArglist);
-		sqlite3SelectDelete(db, pQuery);
+		sql_select_delete(db, pQuery);
 		sqlite3DbFree(db, zName);
 		pNew = pWith;
 	} else {
@@ -4113,7 +3973,7 @@ sqlite3WithDelete(sqlite3 * db, With * pWith)
 		for (i = 0; i < pWith->nCte; i++) {
 			struct Cte *pCte = &pWith->a[i];
 			sql_expr_list_delete(db, pCte->pCols);
-			sqlite3SelectDelete(db, pCte->pSelect);
+			sql_select_delete(db, pCte->pSelect);
 			sqlite3DbFree(db, pCte->zName);
 		}
 		sqlite3DbFree(db, pWith);

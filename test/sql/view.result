@@ -73,7 +73,7 @@ raw_sp = box.space._space:get(sp.id):totable();
 sp:drop();
 ---
 ...
-raw_sp[6].sql = 'fake';
+raw_sp[6].sql = 'CREATE VIEW v as SELECT * FROM t1;';
 ---
 ...
 raw_sp[6].view = true;
@@ -86,13 +86,66 @@ box.space._space:select(sp['id'])[1]['name']
 ---
 - test
 ...
--- Cleanup
+-- Can't create view with incorrect SELECT statement.
 box.space.test:drop();
 ---
 ...
-box.sql.execute("DROP TABLE t1;");
+-- This case must fail since parser converts it to expr AST.
+raw_sp[6].sql = 'SELECT 1;';
 ---
 ...
+sp = box.space._space:replace(raw_sp);
+---
+- error: 'Failed to execute SQL statement: SELECT 1;'
+...
+-- Can't drop space via Lua if at least one view refers to it.
+box.sql.execute('CREATE TABLE t2(id INT PRIMARY KEY);');
+---
+...
+box.sql.execute('CREATE VIEW v2 AS SELECT * FROM t2;');
+---
+...
+box.space.T2:drop();
+---
+- error: 'Can''t drop space ''T2'': other views depend on this space'
+...
+box.sql.execute('DROP VIEW v2;');
+---
+...
+box.sql.execute('DROP TABLE t2;');
+---
+...
+-- Check that alter transfers reference counter.
+box.sql.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY);");
+---
+...
+box.sql.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
+---
+...
+box.sql.execute("DROP TABLE t2;");
+---
+- error: 'Can''t drop table T2: other views depend on this space'
+...
+sp = box.space._space:get{box.space.T2.id};
+---
+...
+sp = box.space._space:replace(sp);
+---
+...
+box.sql.execute("DROP TABLE t2;");
+---
+- error: 'Can''t drop table T2: other views depend on this space'
+...
+box.sql.execute("DROP VIEW v2;");
+---
+...
+box.sql.execute("DROP TABLE t2;");
+---
+...
+-- Cleanup
 box.sql.execute("DROP VIEW v1;");
+---
+...
+box.sql.execute("DROP TABLE t1;");
 ---
 ...

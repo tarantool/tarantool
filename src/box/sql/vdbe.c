@@ -2983,6 +2983,30 @@ case OP_FkCheckCommit: {
 	break;
 }
 
+/* Opcode: CheckViewReferences P1 * * * *
+ * Synopsis: r[P1] = space id
+ *
+ * Check that space to be dropped doesn't have any view
+ * references. This opcode is needed since Tarantool lacks
+ * DDL transaction. On the other hand, to drop space, we must
+ * firstly drop secondary indexes from _index system space,
+ * clear _truncate table etc.
+ */
+case OP_CheckViewReferences: {
+	assert(pOp->p1 > 0);
+	pIn1 = &aMem[pOp->p1];
+	uint32_t space_id = pIn1->u.i;
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	if (space->def->view_ref_count > 0) {
+		sqlite3VdbeError(p,"Can't drop table %s: other views depend "
+				 "on this space",  space->def->name);
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+	break;
+}
+
 /* Opcode: TransactionBegin * * * * *
  *
  * Start Tarantool's transaction.

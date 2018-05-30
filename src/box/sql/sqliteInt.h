@@ -1913,7 +1913,6 @@ struct Column {
 struct Table {
 	Column *aCol;		/* Information about each column */
 	Index *pIndex;		/* List of SQL indexes on this table. */
-	Select *pSelect;	/* NULL for tables.  Points to definition if a view. */
 	FKey *pFKey;		/* Linked list of all foreign keys in this table */
 	char *zColAff;		/* String defining the affinity of each column */
 	/*   ... also used as column name list in a VIEW */
@@ -2682,9 +2681,7 @@ struct Select {
 	LogEst nSelectRow;	/* Estimated number of result rows */
 	u32 selFlags;		/* Various SF_* values */
 	int iLimit, iOffset;	/* Memory registers holding LIMIT & OFFSET counters */
-#ifdef SELECTTRACE_ENABLED
 	char zSelName[12];	/* Symbolic name of this SELECT use for debugging */
-#endif
 	int addrOpenEphm[2];	/* OP_OpenEphem opcodes related to this select */
 	SrcList *pSrc;		/* The FROM clause */
 	Expr *pWhere;		/* The WHERE clause */
@@ -2854,6 +2851,12 @@ struct TriggerPrg {
 	u32 aColmask[2];	/* Masks of old.*, new.* columns accessed */
 };
 
+enum ast_type {
+	AST_TYPE_SELECT = 0,
+	AST_TYPE_EXPR,
+	ast_type_MAX
+};
+
 /*
  * An SQL parser context.  A copy of this structure is passed through
  * the parser and down into all the parser action routine in order to
@@ -2954,8 +2957,16 @@ struct Parse {
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
-	/** If parse_only is set to true, store parsed expression. */
-	struct Expr *parsed_expr;
+	/** Type of parsed_ast member. */
+	enum ast_type parsed_ast_type;
+	/**
+	 * Members of this union are valid only
+	 * if parse_only is set to true.
+	 */
+	union {
+		struct Expr *expr;
+		struct Select *select;
+	} parsed_ast;
 };
 
 /*
@@ -3591,20 +3602,42 @@ int sqlite3ParseUri(const char *, const char *, unsigned int *,
 int sqlite3FaultSim(int);
 #endif
 
-void sqlite3CreateView(Parse *, Token *, Token *, ExprList *, Select *, int);
+/**
+ * The parser calls this routine in order to create a new VIEW.
+ *
+ * @param parse_context Current parsing context.
+ * @param begin The CREATE token that begins the statement.
+ * @param name The token that holds the name of the view.
+ * @param aliases Optional list of view column names.
+ * @param select A SELECT statement that will become the new view.
+ * @param if_exists Suppress error messages if VIEW already exists.
+ */
+void
+sql_create_view(struct Parse *parse_context, struct Token *begin,
+		struct Token *name, struct ExprList *aliases,
+		struct Select *select, bool if_exists);
 
 /**
- * The Table structure pTable is really a VIEW.  Fill in the names
- * of the columns of the view in the table structure.  Return the
- * number of errors.  If an error is seen leave an error message
- * in parse->zErrMsg.
+ * Compile view, i.e. create struct Select from
+ * 'CREATE VIEW...' string, and assign cursors to each table from
+ * 'FROM' clause.
  *
  * @param parse Parsing context.
- * @param table Tables to process.
+ * @param view_stmt String containing 'CREATE VIEW' statement.
  * @retval 0 if success, -1 in case of error.
  */
 int
-sql_view_column_names(struct Parse *parse, struct Table *table);
+sql_view_assign_cursors(struct Parse *parse, const char *view_stmt);
+
+/**
+ * Store duplicate of SELECT into parsing context.
+ * This routine is called during parsing.
+ *
+ * @param parse_context Current parsing context.
+ * @param select Select to be stored.
+ */
+void
+sql_store_select(struct Parse *parse_context, struct Select *select);
 
 void
 sql_drop_table(struct Parse *, struct SrcList *, bool, bool);
@@ -3677,7 +3710,6 @@ sql_drop_index(struct Parse *, struct SrcList *, struct Token *, bool);
 int sqlite3Select(Parse *, Select *, SelectDest *);
 Select *sqlite3SelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
 			 Expr *, ExprList *, u32, Expr *, Expr *);
-void sqlite3SelectDelete(sqlite3 *, Select *);
 
 /**
  * While a SrcList can in general represent multiple tables and

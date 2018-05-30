@@ -184,7 +184,7 @@ create_table_args ::= LP columnlist conslist_opt(X) RP(E). {
 }
 create_table_args ::= AS select(S). {
   sqlite3EndTable(pParse,0,0,S);
-  sqlite3SelectDelete(pParse->db, S);
+  sql_select_delete(pParse->db, S);
 }
 columnlist ::= columnlist COMMA columnname carglist.
 columnlist ::= columnname carglist.
@@ -373,7 +373,10 @@ ifexists(A) ::= .            {A = 0;}
 %ifndef SQLITE_OMIT_VIEW
 cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
           AS select(S). {
-  sqlite3CreateView(pParse, &X, &Y, C, S, E);
+  if (!pParse->parse_only)
+    sql_create_view(pParse, &X, &Y, C, S, E);
+  else
+    sql_store_select(pParse, S);
 }
 cmd ::= DROP VIEW ifexists(E) fullname(X). {
   sql_drop_table(pParse, X, 1, E);
@@ -388,15 +391,15 @@ cmd ::= select(X).  {
 	  sqlite3Select(pParse, X, &dest);
   else
 	  sql_expr_extract_select(pParse, X);
-  sqlite3SelectDelete(pParse->db, X);
+  sql_select_delete(pParse->db, X);
 }
 
 %type select {Select*}
-%destructor select {sqlite3SelectDelete(pParse->db, $$);}
+%destructor select {sql_select_delete(pParse->db, $$);}
 %type selectnowith {Select*}
-%destructor selectnowith {sqlite3SelectDelete(pParse->db, $$);}
+%destructor selectnowith {sql_select_delete(pParse->db, $$);}
 %type oneselect {Select*}
-%destructor oneselect {sqlite3SelectDelete(pParse->db, $$);}
+%destructor oneselect {sql_select_delete(pParse->db, $$);}
 
 %include {
   /*
@@ -453,7 +456,7 @@ selectnowith(A) ::= selectnowith(A) multiselect_op(Y) oneselect(Z).  {
     pRhs->selFlags &= ~SF_MultiValue;
     if( Y!=TK_ALL ) pParse->hasCompound = 1;
   }else{
-    sqlite3SelectDelete(pParse->db, pLhs);
+    sql_select_delete(pParse->db, pLhs);
   }
   A = pRhs;
 }
@@ -496,7 +499,7 @@ oneselect(A) ::= SELECT(S) distinct(D) selcollist(W) from(X) where_opt(Y)
 oneselect(A) ::= values(A).
 
 %type values {Select*}
-%destructor values {sqlite3SelectDelete(pParse->db, $$);}
+%destructor values {sql_select_delete(pParse->db, $$);}
 values(A) ::= VALUES LP nexprlist(X) RP. {
   A = sqlite3SelectNew(pParse,X,0,0,0,0,0,SF_Values,0,0);
 }

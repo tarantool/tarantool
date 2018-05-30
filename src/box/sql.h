@@ -84,6 +84,17 @@ sql_expr_compile(struct sqlite3 *db, const char *expr, int expr_len,
 		 struct Expr **result);
 
 /**
+ * This routine executes parser on 'CREATE VIEW ...' statement
+ * and loads content of SELECT into internal structs as result.
+ *
+ * @param db Current SQL context.
+ * @param view_stmt String containing 'CREATE VIEW' statement.
+ * @retval AST of SELECT statement on success, NULL otherwise.
+ */
+struct Select *
+sql_view_compile(struct sqlite3 *db, const char *view_stmt);
+
+/**
  * Store duplicate of a parsed expression into @a parser.
  * @param parser Parser context.
  * @param select Select to extract from.
@@ -292,6 +303,47 @@ sql_parser_create(struct Parse *parser, struct sqlite3 *db);
  */
 void
 sql_parser_destroy(struct Parse *parser);
+
+/**
+ * Release memory allocated for given SELECT and all of its
+ * substructures. It accepts NULL pointers.
+ *
+ * @param db Database handler.
+ * @param select Select to be freed.
+ */
+void
+sql_select_delete(struct sqlite3 *db, struct Select *select);
+
+/**
+ * Expand all spaces names from 'FROM' clause, including
+ * ones from subqueries, and add those names to the original
+ * select.
+ *
+ * @param select Select to be expanded.
+ */
+void
+sql_select_expand_from_tables(struct Select *select);
+
+/**
+ * Temporary getter in order to avoid including sqliteInt.h
+ * in alter.cc.
+ *
+ * @param select Select to be examined.
+ * @retval Count of 'FROM' tables in given select.
+ */
+int
+sql_select_from_table_count(const struct Select *select);
+
+/**
+ * Temporary getter in order to avoid including sqliteInt.h
+ * in alter.cc.
+ *
+ * @param select Select to be examined.
+ * @param i Ordinal number of 'FROM' table.
+ * @retval Name of i-th 'FROM' table.
+ */
+const char *
+sql_select_from_table_name(const struct Select *select, int i);
 
 #if defined(__cplusplus)
 } /* extern "C" { */

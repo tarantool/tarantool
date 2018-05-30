@@ -204,6 +204,7 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	memcpy(def->engine_name, engine_name, engine_len);
 	def->engine_name[engine_len] = 0;
 
+	def->view_ref_count = 0;
 	def->field_count = field_count;
 	if (field_count == 0) {
 		def->fields = NULL;

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(65)
+test:plan(74)
 
 --!./tcltestrunner.lua
 -- 2002 February 26
@@ -125,11 +125,21 @@ test:do_catchsql_test(
     "view-1.6",
     [[
         DROP TABLE t1;
-        SELECT * FROM v1 ORDER BY a;
     ]], {
         -- <view-1.6>
-        1, "no such table: T1"
+        1, "Can't drop table T1: other views depend on this space"
         -- </view-1.6>
+    })
+
+test:do_catchsql_test(
+    "view-1.7",
+    [[
+        DROP VIEW v1;
+        DROP TABLE t1;
+    ]], {
+        -- <view-1.7>
+        0
+        -- </view-1.7>
     })
 
 -- ORIGINAL_TEST
@@ -143,12 +153,13 @@ test:do_catchsql_test(
 --   }
 -- } {2 3 5 6 8 9}
 test:do_execsql_test(
-    "view-1.7",
+    "view-1.8",
     [[
         CREATE TABLE t1(x primary key,a,b,c);
         INSERT INTO t1 VALUES(1,2,3,4);
         INSERT INTO t1 VALUES(4,5,6,7);
         INSERT INTO t1 VALUES(7,8,9,10);
+        CREATE VIEW v1 AS SELECT a,b FROM t1;
         SELECT * FROM v1 ORDER BY a;
     ]], {
         -- <view-1.7>
@@ -156,24 +167,6 @@ test:do_execsql_test(
         -- </view-1.7>
     })
 
--- MUST_WORK_TEST reopen db
-if (0 > 0)
- then
-    test:do_test(
-        "view-1.8",
-        function()
-            db("close")
-            sqlite3("db", "test.db")
-            return test:execsql [[
-                SELECT * FROM v1 ORDER BY a;
-            ]]
-        end, {
-            -- <view-1.8>
-            2, 3, 5, 6, 8, 9
-            -- </view-1.8>
-        })
-
-end
 test:do_test(
     "view-2.1",
     function()
@@ -1065,10 +1058,9 @@ end
 test:do_execsql_test(
     "view-20.1",
     [[
-        DROP TABLE IF EXISTS t1;
-        DROP VIEW IF EXISTS v1;
-        CREATE TABLE t1(c1 primary key);
-        CREATE VIEW v1 AS SELECT c1 FROM (SELECT t1.c1 FROM t1);
+        DROP VIEW v10;
+        CREATE TABLE t10(c1 primary key);
+        CREATE VIEW v10 AS SELECT c1 FROM (SELECT t10.c1 FROM t10);
     ]], {
         -- <view-20.1>
         
@@ -1078,10 +1070,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-20.1",
     [[
-        DROP TABLE IF EXISTS t1;
-        DROP VIEW IF EXISTS v1;
-        CREATE TABLE t1(c1 primary key);
-        CREATE VIEW v1 AS SELECT c1 FROM (SELECT t1.c1 FROM t1);
+        DROP VIEW IF EXISTS v10;
+        DROP TABLE IF EXISTS t10;
+        CREATE TABLE t10(c1 primary key);
+        CREATE VIEW v10 AS SELECT c1 FROM (SELECT t10.c1 FROM t10);
     ]], {
         -- <view-20.1>
         
@@ -1171,5 +1163,90 @@ if (0 > 0)
 
 end
 
+-- Make sure that VIEW with several internal selects works.
+test:do_catchsql_test(
+    "view-23.1",
+    [[
+        CREATE TABLE t11(a INT PRIMARY KEY);
+        CREATE TABLE t12(b INT PRIMARY KEY);
+        CREATE TABLE t13(c INT PRIMARY KEY);
+        CREATE VIEW v11 AS SELECT * FROM
+            (SELECT a FROM (SELECT a, b FROM t11, t12)),
+            (SELECT * FROM (SELECT a, c FROM t11, t13));
+    ]], {
+        -- <view-23.1>
+        0
+        -- </view-23.1>
+    })
+
+test:do_catchsql_test(
+    "view-23.2",
+    [[
+        DROP TABLE t11;
+    ]], {
+        -- <view-23.2>
+        1, "Can't drop table T11: other views depend on this space"
+        -- </view-23.2>
+    })
+
+test:do_catchsql_test(
+    "view-23.3",
+    [[
+        DROP TABLE t12;
+    ]], {
+        -- <view-23.3>
+        1, "Can't drop table T12: other views depend on this space"
+        -- </view-23.3>
+    })
+
+test:do_catchsql_test(
+    "view-23.4",
+    [[
+        DROP TABLE t13;
+    ]], {
+        -- <view-23.4>
+        1, "Can't drop table T13: other views depend on this space"
+        -- </view-23.4>
+    })
+
+test:do_catchsql_test(
+    "view-23.5",
+    [[
+        DROP VIEW v11;
+    ]], {
+        -- <view-23.5>
+        0
+        -- </view-23.5>
+    })
+
+test:do_catchsql_test(
+    "view-23.6",
+    [[
+        DROP TABLE t11;
+    ]], {
+        -- <view-23.6>
+        0
+        -- </view-23.6>
+    })
+
+test:do_catchsql_test(
+    "view-23.7",
+    [[
+        DROP TABLE t12;
+    ]], {
+        -- <view-23.7>
+        0
+        -- </view-23.7>
+    })
+
+test:do_catchsql_test(
+    "view-23.8",
+    [[
+        DROP TABLE t13;
+    ]], {
+        -- <view-23.8>
+        0
+        -- </view-23.8>
+    })
 
 test:finish_test()

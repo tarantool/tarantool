@@ -944,6 +944,7 @@ ModifySpace::alter_def(struct alter_space *alter)
 	new_dict = new_def->dict;
 	new_def->dict = alter->old_space->def->dict;
 	tuple_dictionary_ref(new_def->dict);
+	new_def->view_ref_count = alter->old_space->def->view_ref_count;
 
 	space_def_delete(alter->space_def);
 	alter->space_def = new_def;
@@ -1441,6 +1442,101 @@ alter_space_move_indexes(struct alter_space *alter, uint32_t begin,
 }
 
 /**
+ * Walk through all spaces from 'FROM' clause of given select,
+ * and update their view reference counters.
+ *
+ * @param select Tables from this select to be updated.
+ * @param update_value +1 on view creation, -1 on drop.
+ * @param suppress_error If true, silently skip nonexistent
+ *                       spaces from 'FROM' clause.
+ * @param[out] not_found_space Name of a disappeared space.
+ * @retval 0 on success, -1 if suppress_error is false and space
+ *         from 'FROM' clause doesn't exist.
+ */
+static int
+update_view_references(struct Select *select, int update_value,
+		       bool suppress_error, const char **not_found_space)
+{
+	assert(update_value == 1 || update_value == -1);
+	sql_select_expand_from_tables(select);
+	int from_tables_count = sql_select_from_table_count(select);
+	for (int i = 0; i < from_tables_count; ++i) {
+		const char *space_name = sql_select_from_table_name(select, i);
+		if (space_name == NULL)
+			continue;
+		uint32_t space_id;
+		if (schema_find_id(BOX_SPACE_ID, 2, space_name,
+				   strlen(space_name), &space_id) != 0)
+			return -1;
+		if (space_id == BOX_ID_NIL) {
+			if (! suppress_error) {
+				assert(not_found_space != NULL);
+				*not_found_space = space_name;
+				return -1;
+			}
+			continue;
+		}
+		struct space *space = space_by_id(space_id);
+		assert(space->def->view_ref_count > 0 || update_value > 0);
+		space->def->view_ref_count += update_value;
+	}
+	return 0;
+}
+
+/**
+ * Trigger which is fired to commit creation of new SQL view.
+ * Its purpose is to release memory of SELECT.
+ */
+static void
+on_create_view_commit(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct Select *select = (struct Select *)trigger->data;
+	sql_select_delete(sql_get(), select);
+}
+
+/**
+ * Trigger which is fired to rollback creation of new SQL view.
+ * Decrements view reference counters of dependent spaces and
+ * releases memory for SELECT.
+ */
+static void
+on_create_view_rollback(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct Select *select = (struct Select *)trigger->data;
+	update_view_references(select, -1, true, NULL);
+	sql_select_delete(sql_get(), select);
+}
+
+/**
+ * Trigger which is fired to commit drop of SQL view.
+ * Its purpose is to decrement view reference counters of
+ * dependent spaces and release memory for SELECT.
+ */
+static void
+on_drop_view_commit(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct Select *select = (struct Select *)trigger->data;
+	update_view_references(select, -1, true, NULL);
+	sql_select_delete(sql_get(), select);
+}
+
+/**
+ * This trigger is invoked to rollback drop of SQL view.
+ * Release memory for struct SELECT compiled in
+ * on_replace_dd_space trigger.
+ */
+static void
+on_drop_view_rollback(struct trigger *trigger, void *event)
+{
+	(void) event;
+	struct Select *select = (struct Select *)trigger->data;
+	sql_select_delete(sql_get(), select);
+}
+
+/**
  * A trigger which is invoked on replace in a data dictionary
  * space _space.
  *
@@ -1542,6 +1638,36 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * so it's safe to simply drop the space on
 		 * rollback.
 		 */
+		if (def->opts.is_view) {
+			struct Select *select = sql_view_compile(sql_get(),
+								 def->opts.sql);
+			if (select == NULL)
+				diag_raise();
+			auto select_guard = make_scoped_guard([=] {
+				sql_select_delete(sql_get(), select);
+			});
+			const char *disappeared_space;
+			if (update_view_references(select, 1, false,
+						   &disappeared_space) != 0) {
+				/*
+				 * Decrement counters which have
+				 * been increased by previous call.
+				 */
+				update_view_references(select, -1, false,
+						       &disappeared_space);
+				tnt_raise(ClientError, ER_NO_SUCH_SPACE,
+					  disappeared_space);
+			}
+			struct trigger *on_commit_view =
+				txn_alter_trigger_new(on_create_view_commit,
+						      select);
+			txn_on_commit(txn, on_commit_view);
+			struct trigger *on_rollback_view =
+				txn_alter_trigger_new(on_create_view_rollback,
+						      select);
+			txn_on_rollback(txn, on_rollback_view);
+			select_guard.is_active = false;
+		}
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_create_space_commit, space);
 		txn_on_commit(txn, on_commit);
@@ -1566,6 +1692,11 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			tnt_raise(ClientError, ER_DROP_SPACE,
 				  space_name(old_space),
 				  "the space has truncate record");
+		if (old_space->def->view_ref_count > 0) {
+			tnt_raise(ClientError, ER_DROP_SPACE,
+				  space_name(old_space),
+				  "other views depend on this space");
+		}
 		/**
 		 * The space must be deleted from the space
 		 * cache right away to achieve linearisable
@@ -1575,6 +1706,25 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_space_commit, space);
 		txn_on_commit(txn, on_commit);
+		if (old_space->def->opts.is_view) {
+			struct Select *select =
+				sql_view_compile(sql_get(),
+						 old_space->def->opts.sql);
+			if (select == NULL)
+				diag_raise();
+			auto select_guard = make_scoped_guard([=] {
+				sql_select_delete(sql_get(), select);
+			});
+			struct trigger *on_commit_view =
+				txn_alter_trigger_new(on_drop_view_commit,
+						      select);
+			txn_on_commit(txn, on_commit_view);
+			struct trigger *on_rollback_view =
+				txn_alter_trigger_new(on_drop_view_rollback,
+						      select);
+			txn_on_rollback(txn, on_rollback_view);
+			select_guard.is_active = false;
+		}
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(on_drop_space_rollback, space);
 		txn_on_rollback(txn, on_rollback);

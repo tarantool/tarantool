@@ -68,7 +68,7 @@ sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 	struct SelectDest dest;
 	sqlite3SelectDestInit(&dest, SRT_EphemTab, cursor);
 	sqlite3Select(parse, select, &dest);
-	sqlite3SelectDelete(db, select);
+	sql_select_delete(db, select);
 }
 
 void
@@ -137,7 +137,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	 * initialized.
 	 */
 	if (is_view) {
-		if (sql_view_column_names(parse, table) != 0)
+		if (sql_view_assign_cursors(parse, table->def->opts.sql) != 0)
 			goto delete_from_cleanup;
 
 		if (trigger_list == NULL) {
@@ -367,7 +367,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (one_pass != ONEPASS_OFF) {
 			/* OP_Found will use an unpacked key. */
 			assert(key_len == pk_len);
-			assert(pk_def != NULL || table->pSelect != NULL);
+			assert(pk_def != NULL || table->def->opts.is_view);
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
 

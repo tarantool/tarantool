@@ -623,14 +623,14 @@ end
 test:do_test(
     "colname-11.0.1",
     function ()
-        test:drop_all_tables()
+        test:drop_all_views()
     end,
     nil)
 
 test:do_test(
     "colname-11.0.2",
     function ()
-        test:drop_all_views()
+        test:drop_all_tables()
     end,
     nil)
 

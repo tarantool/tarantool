@@ -745,7 +745,7 @@ fkTriggerDelete(sqlite3 * dbMem, Trigger * p)
 		TriggerStep *pStep = p->step_list;
 		sql_expr_delete(dbMem, pStep->pWhere, false);
 		sql_expr_list_delete(dbMem, pStep->pExprList);
-		sqlite3SelectDelete(dbMem, pStep->pSelect);
+		sql_select_delete(dbMem, pStep->pSelect);
 		sql_expr_delete(dbMem, p->pWhen, false);
 		sqlite3DbFree(dbMem, p);
 	}
@@ -1408,7 +1408,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 		sql_expr_delete(db, pWhere, false);
 		sql_expr_delete(db, pWhen, false);
 		sql_expr_list_delete(db, pList);
-		sqlite3SelectDelete(db, pSelect);
+		sql_select_delete(db, pSelect);
 		if (db->mallocFailed == 1) {
 			fkTriggerDelete(db, pTrigger);
 			return 0;

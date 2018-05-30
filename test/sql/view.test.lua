@@ -35,12 +35,34 @@ box.schema.create_space('view', {view = true})
 sp = box.schema.create_space('test');
 raw_sp = box.space._space:get(sp.id):totable();
 sp:drop();
-raw_sp[6].sql = 'fake';
+raw_sp[6].sql = 'CREATE VIEW v as SELECT * FROM t1;';
 raw_sp[6].view = true;
 sp = box.space._space:replace(raw_sp);
 box.space._space:select(sp['id'])[1]['name']
 
--- Cleanup
+-- Can't create view with incorrect SELECT statement.
 box.space.test:drop();
-box.sql.execute("DROP TABLE t1;");
+-- This case must fail since parser converts it to expr AST.
+raw_sp[6].sql = 'SELECT 1;';
+sp = box.space._space:replace(raw_sp);
+
+-- Can't drop space via Lua if at least one view refers to it.
+box.sql.execute('CREATE TABLE t2(id INT PRIMARY KEY);');
+box.sql.execute('CREATE VIEW v2 AS SELECT * FROM t2;');
+box.space.T2:drop();
+box.sql.execute('DROP VIEW v2;');
+box.sql.execute('DROP TABLE t2;');
+
+-- Check that alter transfers reference counter.
+box.sql.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY);");
+box.sql.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
+box.sql.execute("DROP TABLE t2;");
+sp = box.space._space:get{box.space.T2.id};
+sp = box.space._space:replace(sp);
+box.sql.execute("DROP TABLE t2;");
+box.sql.execute("DROP VIEW v2;");
+box.sql.execute("DROP TABLE t2;");
+
+-- Cleanup
 box.sql.execute("DROP VIEW v1;");
+box.sql.execute("DROP TABLE t1;");

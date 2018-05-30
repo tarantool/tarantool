@@ -107,6 +107,8 @@ struct space_def {
 	struct field_def *fields;
 	/** Length of @a fields. */
 	uint32_t field_count;
+	/** Number of SQL views which refer to this space. */
+	uint32_t view_ref_count;
 	struct space_opts opts;
 	char name[0];
 };

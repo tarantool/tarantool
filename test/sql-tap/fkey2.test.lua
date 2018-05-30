@@ -743,6 +743,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-7.3",
     [[
+        DROP VIEW v;
         DROP TABLE IF EXISTS c;
         CREATE TABLE p(a COLLATE binary, b PRIMARY KEY);
         CREATE UNIQUE INDEX idx ON p(a COLLATE "unicode_ci");

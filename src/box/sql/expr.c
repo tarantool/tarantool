@@ -955,7 +955,7 @@ sqlite3PExprAddSelect(Parse * pParse, Expr * pExpr, Select * pSelect)
 		sqlite3ExprSetHeightAndFlags(pParse, pExpr);
 	} else {
 		assert(pParse->db->mallocFailed);
-		sqlite3SelectDelete(pParse->db, pSelect);
+		sql_select_delete(pParse->db, pSelect);
 	}
 }
 
@@ -1154,7 +1154,7 @@ sqlite3ExprDeleteNN(sqlite3 * db, Expr * p, bool extern_alloc)
 		if (!extern_alloc)
 			sql_expr_delete(db, p->pRight, extern_alloc);
 		if (ExprHasProperty(p, EP_xIsSelect)) {
-			sqlite3SelectDelete(db, p->x.pSelect);
+			sql_select_delete(db, p->x.pSelect);
 		} else {
 			sql_expr_list_delete(db, p->x.pList);
 		}
@@ -2193,7 +2193,6 @@ isCandidateForInOpt(Expr * pX)
 		return 0;	/* FROM is not a subquery or view */
 	pTab = pSrc->a[0].pTab;
 	assert(pTab != 0);
-	assert(pTab->def->opts.is_view == (pTab->pSelect != NULL));
 	/* FROM clause is not a view */
 	assert(!pTab->def->opts.is_view);
 	pEList = p->pEList;

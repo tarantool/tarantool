@@ -207,14 +207,26 @@ sqlite3SelectSetName(Select * p, const char *zName)
 }
 #endif
 
-/*
- * Delete the given Select structure and all of its substructures.
- */
 void
-sqlite3SelectDelete(sqlite3 * db, Select * p)
+sql_select_delete(sqlite3 *db, Select *p)
 {
 	if (p)
 		clearSelect(db, p, 1);
+}
+
+int
+sql_select_from_table_count(const struct Select *select)
+{
+	assert(select != NULL && select->pSrc != NULL);
+	return select->pSrc->nSrc;
+}
+
+const char *
+sql_select_from_table_name(const struct Select *select, int i)
+{
+	assert(select != NULL && select->pSrc != NULL);
+	assert(i >= 0 && i < select->pSrc->nSrc);
+	return select->pSrc->a[i].zName;
 }
 
 /*
@@ -226,6 +238,70 @@ findRightmost(Select * p)
 	while (p->pNext)
 		p = p->pNext;
 	return p;
+}
+
+
+/**
+ * Work the same as sqlite3SrcListAppend(), but before adding to
+ * list provide check on name duplicates: only values with unique
+ * names are appended.
+ *
+ * @param db Database handler.
+ * @param list List of entries.
+ * @param new_name Name of entity to be added.
+ * @retval @list with new element on success, old one otherwise.
+ */
+static struct SrcList *
+src_list_append_unique(struct sqlite3 *db, struct SrcList *list,
+		       const char *new_name)
+{
+	assert(list != NULL);
+	assert(new_name != NULL);
+
+	for (int i = 0; i < list->nSrc; ++i) {
+		const char *name = list->a[i].zName;
+		if (name != NULL && strcmp(new_name, name) == 0)
+			return list;
+	}
+	struct Token token = { new_name, strlen(new_name), 0 };
+	return sqlite3SrcListAppend(db, list, &token);
+}
+
+/**
+ * This function is an inner call of recursive traverse through
+ * select AST starting from interface function
+ * sql_select_expand_from_tables().
+ *
+ * @param top_select The root of AST.
+ * @param sub_select sub-select of current level recursion.
+ */
+static void
+expand_names_sub_select(struct Select *top_select, struct Select *sub_select)
+{
+	assert(top_select != NULL);
+	assert(sub_select != NULL);
+	struct SrcList_item *sub_src = sub_select->pSrc->a;
+	for (int i = 0; i < sub_select->pSrc->nSrc; ++i, ++sub_src) {
+		if (sub_src->zName == NULL) {
+			expand_names_sub_select(top_select, sub_src->pSelect);
+		} else {
+			top_select->pSrc =
+				src_list_append_unique(sql_get(),
+						       top_select->pSrc,
+						       sub_src->zName);
+		}
+	}
+}
+
+void
+sql_select_expand_from_tables(struct Select *select)
+{
+	assert(select != NULL);
+	struct SrcList_item *src = select->pSrc->a;
+	for (int i = 0; i < select->pSrc->nSrc; ++i, ++src) {
+		if (select->pSrc->a[i].zName == NULL)
+			expand_names_sub_select(select, src->pSelect);
+	}
 }
 
 /*
@@ -2830,7 +2906,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
  multi_select_end:
 	pDest->iSdst = dest.iSdst;
 	pDest->nSdst = dest.nSdst;
-	sqlite3SelectDelete(db, pDelete);
+	sql_select_delete(db, pDelete);
 	return rc;
 }
 #endif				/* SQLITE_OMIT_COMPOUND_SELECT */
@@ -3432,7 +3508,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	 * by the calling function
 	 */
 	if (p->pPrior) {
-		sqlite3SelectDelete(db, p->pPrior);
+		sql_select_delete(db, p->pPrior);
 	}
 	p->pPrior = pPrior;
 	pPrior->pNext = p;
@@ -4106,7 +4182,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 	/* Finially, delete what is left of the subquery and return
 	 * success.
 	 */
-	sqlite3SelectDelete(db, pSub1);
+	sql_select_delete(db, pSub1);
 
 #ifdef SELECTTRACE_ENABLED
 	if (sqlite3SelectTrace & 0x100) {
@@ -4736,13 +4812,15 @@ selectExpander(Walker * pWalker, Select * p)
 			if (cannotBeFunction(pParse, pFrom))
 				return WRC_Abort;
 			if (pTab->def->opts.is_view) {
-				if (sql_view_column_names(pParse, pTab) != 0)
+				struct Select *select =
+					sql_view_compile(db,
+							 pTab->def->opts.sql);
+				if (select == NULL)
 					return WRC_Abort;
+				sqlite3SrcListAssignCursors(pParse,
+							    select->pSrc);
 				assert(pFrom->pSelect == 0);
-				assert(pTab->def->opts.is_view ==
-				       (pTab->pSelect != NULL));
-				pFrom->pSelect =
-				    sqlite3SelectDup(db, pTab->pSelect, 0);
+				pFrom->pSelect = select;
 				sqlite3SelectSetName(pFrom->pSelect,
 						     pTab->def->name);
 				int columns = pTab->def->field_count;
@@ -4751,7 +4829,6 @@ selectExpander(Walker * pWalker, Select * p)
 				pTab->def->field_count = columns;
 			}
 		}
-
 		/* Locate the index named by the INDEXED BY clause, if any. */
 		if (sqlite3IndexedByLookup(pParse, pFrom)) {
 			return WRC_Abort;
@@ -6256,7 +6333,8 @@ sql_expr_extract_select(struct Parse *parser, struct Select *select)
 {
 	struct ExprList *expr_list = select->pEList;
 	assert(expr_list->nExpr == 1);
-	parser->parsed_expr = sqlite3ExprDup(parser->db,
-					     expr_list->a->pExpr,
-					     EXPRDUP_REDUCE);
+	parser->parsed_ast_type = AST_TYPE_EXPR;
+	parser->parsed_ast.expr = sqlite3ExprDup(parser->db,
+						 expr_list->a->pExpr,
+						 EXPRDUP_REDUCE);
 }

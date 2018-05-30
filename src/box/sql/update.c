@@ -140,7 +140,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	is_view = pTab->def->opts.is_view;
 	assert(pTrigger || tmask == 0);
 
-	if (is_view && sql_view_column_names(pParse, pTab) != 0) {
+	if (is_view &&
+	    sql_view_assign_cursors(pParse,pTab->def->opts.sql) != 0) {
 		goto update_cleanup;
 	}
 	if (is_view && tmask == 0) {

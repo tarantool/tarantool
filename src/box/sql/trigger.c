@@ -54,7 +54,7 @@ sqlite3DeleteTriggerStep(sqlite3 * db, TriggerStep * pTriggerStep)
 
 		sql_expr_delete(db, pTmp->pWhere, false);
 		sql_expr_list_delete(db, pTmp->pExprList);
-		sqlite3SelectDelete(db, pTmp->pSelect);
+		sql_select_delete(db, pTmp->pSelect);
 		sqlite3IdListDelete(db, pTmp->pIdList);
 
 		sqlite3DbFree(db, pTmp);
@@ -346,7 +346,7 @@ sqlite3TriggerSelectStep(sqlite3 * db, Select * pSelect)
 	TriggerStep *pTriggerStep =
 	    sqlite3DbMallocZero(db, sizeof(TriggerStep));
 	if (pTriggerStep == 0) {
-		sqlite3SelectDelete(db, pSelect);
+		sql_select_delete(db, pSelect);
 		return 0;
 	}
 	pTriggerStep->op = TK_SELECT;
@@ -412,7 +412,7 @@ sqlite3TriggerInsertStep(sqlite3 * db,	/* The database connection */
 	} else {
 		sqlite3IdListDelete(db, pColumn);
 	}
-	sqlite3SelectDelete(db, pSelect);
+	sql_select_delete(db, pSelect);
 
 	return pTriggerStep;
 }
@@ -758,7 +758,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 				    sqlite3SelectDup(db, pStep->pSelect, 0);
 				sqlite3SelectDestInit(&sDest, SRT_Discard, 0);
 				sqlite3Select(pParse, pSelect, &sDest);
-				sqlite3SelectDelete(db, pSelect);
+				sql_select_delete(db, pSelect);
 				break;
 			}
 		}

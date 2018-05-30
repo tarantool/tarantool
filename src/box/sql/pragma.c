@@ -359,8 +359,10 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		struct space_def *def = space->def;
 		struct Index *pk = sqlite3PrimaryKeyIndex(table);
 		pParse->nMem = 6;
-		if (def->opts.is_view)
-			sql_view_column_names(pParse, table);
+		if (def->opts.is_view) {
+			const char *sql = table->def->opts.sql;
+			sql_view_assign_cursors(pParse, sql);
+		}
 		for (uint32_t i = 0, k; i < def->field_count; ++i) {
 			if (!table_column_is_in_pk(table, i)) {
 				k = 0;

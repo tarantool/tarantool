@@ -374,7 +374,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	    && pSelect->pPrior == 0) {
 		pList = pSelect->pEList;
 		pSelect->pEList = 0;
-		sqlite3SelectDelete(db, pSelect);
+		sql_select_delete(db, pSelect);
 		pSelect = 0;
 	}
 
@@ -400,7 +400,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* If pTab is really a view, make sure it has been initialized.
 	 * ViewGetColumnNames() is a no-op if pTab is not a view.
 	 */
-	if (is_view && sql_view_column_names(pParse, pTab) != 0)
+	if (is_view &&
+	    sql_view_assign_cursors(pParse, pTab->def->opts.sql) != 0)
 		goto insert_cleanup;
 
 	struct space_def *def = pTab->def;
@@ -919,7 +920,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
  insert_cleanup:
 	sqlite3SrcListDelete(db, pTabList);
 	sql_expr_list_delete(db, pList);
-	sqlite3SelectDelete(db, pSelect);
+	sql_select_delete(db, pSelect);
 	sqlite3IdListDelete(db, pColumn);
 	sqlite3DbFree(db, aRegIdx);
 }

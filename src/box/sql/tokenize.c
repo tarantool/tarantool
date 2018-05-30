@@ -558,11 +558,30 @@ sql_expr_compile(sqlite3 *db, const char *expr, int expr_len,
 	sprintf(stmt, "%s%.*s", outer, expr_len, expr);
 
 	char *unused;
-	if (sqlite3RunParser(&parser, stmt, &unused) != SQLITE_OK) {
+	if (sqlite3RunParser(&parser, stmt, &unused) != SQLITE_OK ||
+	    parser.parsed_ast_type != AST_TYPE_EXPR) {
 		diag_set(ClientError, ER_SQL_EXECUTE, expr);
 		return -1;
 	}
-	*result = parser.parsed_expr;
+	*result = parser.parsed_ast.expr;
 	sql_parser_destroy(&parser);
 	return 0;
+}
+
+struct Select *
+sql_view_compile(struct sqlite3 *db, const char *view_stmt)
+{
+	struct Parse parser;
+	sql_parser_create(&parser, db);
+	parser.parse_only = true;
+	char *unused;
+	if (sqlite3RunParser(&parser, view_stmt, &unused) != SQLITE_OK ||
+	    parser.parsed_ast_type != AST_TYPE_SELECT) {
+		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
+		sql_parser_destroy(&parser);
+		return NULL;
+	}
+	struct Select *result = parser.parsed_ast.select;
+	sql_parser_destroy(&parser);
+	return result;
 }
