@@ -2766,6 +2766,18 @@ vinyl_engine_set_cache(struct vinyl_engine *vinyl, size_t quota)
 	vy_cache_env_set_quota(&vinyl->env->cache_env, quota);
 }
 
+int
+vinyl_engine_set_memory(struct vinyl_engine *vinyl, size_t size)
+{
+	if (size < vinyl->env->quota.limit) {
+		diag_set(ClientError, ER_CFG, "vinyl_memory",
+			 "cannot decrease memory size at runtime");
+		return -1;
+	}
+	vy_quota_set_limit(&vinyl->env->quota, size);
+	return 0;
+}
+
 void
 vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size)
 {

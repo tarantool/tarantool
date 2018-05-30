@@ -29,6 +29,17 @@ _ = s:auto_increment{pad}
 s:count()
 box.info.vinyl().quota.used
 
+--
+-- Check that increasing box.cfg.vinyl_memory wakes up fibers
+-- waiting for memory.
+--
+box.cfg{vinyl_timeout=5}
+c = fiber.channel(1)
+_ = fiber.create(function() local ok = pcall(s.auto_increment, s, {pad}) c:put(ok) end)
+fiber.sleep(0.01)
+box.cfg{vinyl_memory = 3 * box.cfg.vinyl_memory / 2}
+c:get(1)
+
 box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
 fiber.sleep(0.01) -- wait for scheduler to unthrottle
 
@@ -41,6 +52,7 @@ box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0.01)
 box.cfg{vinyl_timeout=60}
 box.cfg{too_long_threshold=0.01}
 
+pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
 _ = s:auto_increment{pad}
 

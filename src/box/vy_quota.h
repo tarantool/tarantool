@@ -110,6 +110,7 @@ vy_quota_set_limit(struct vy_quota *q, size_t limit)
 	q->limit = q->watermark = limit;
 	if (q->used >= limit)
 		q->quota_exceeded_cb(q);
+	fiber_cond_broadcast(&q->cond);
 }
 
 /**

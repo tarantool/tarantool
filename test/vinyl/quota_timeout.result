@@ -65,6 +65,29 @@ box.info.vinyl().quota.used
 ---
 - 748241
 ...
+--
+-- Check that increasing box.cfg.vinyl_memory wakes up fibers
+-- waiting for memory.
+--
+box.cfg{vinyl_timeout=5}
+---
+...
+c = fiber.channel(1)
+---
+...
+_ = fiber.create(function() local ok = pcall(s.auto_increment, s, {pad}) c:put(ok) end)
+---
+...
+fiber.sleep(0.01)
+---
+...
+box.cfg{vinyl_memory = 3 * box.cfg.vinyl_memory / 2}
+---
+...
+c:get(1)
+---
+- true
+...
 box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
 ---
 - ok
@@ -86,6 +109,9 @@ box.cfg{vinyl_timeout=60}
 box.cfg{too_long_threshold=0.01}
 ---
 ...
+pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
+---
+...
 _ = s:auto_increment{pad}
 ---
 ...
@@ -98,7 +124,7 @@ test_run:cmd("push filter '[0-9.]+ sec' to '<sec> sec'")
 ...
 test_run:grep_log('test', 'waited for .* quota for too long.*')
 ---
-- 'waited for 699089 bytes of vinyl memory quota for too long: <sec> sec'
+- 'waited for 1048615 bytes of vinyl memory quota for too long: <sec> sec'
 ...
 test_run:cmd("clear filter")
 ---
@@ -134,7 +160,7 @@ pad = string.rep('x', box.cfg.vinyl_memory)
 ...
 _ = s:auto_increment{pad}
 ---
-- error: Failed to allocate 1048615 bytes in lsregion for vinyl transaction
+- error: Failed to allocate 1572903 bytes in lsregion for vinyl transaction
 ...
 s:drop()
 ---

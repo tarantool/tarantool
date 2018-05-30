@@ -701,6 +701,15 @@ box_set_snap_io_rate_limit(void)
 }
 
 void
+box_set_memtx_memory(void)
+{
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	memtx_engine_set_memory_xc(memtx, cfg_geti("memtx_memory"));
+}
+
+void
 box_set_memtx_max_tuple_size(void)
 {
 	struct memtx_engine *memtx;
@@ -735,6 +744,15 @@ box_set_checkpoint_count(void)
 	int checkpoint_count = cfg_geti("checkpoint_count");
 	box_check_checkpoint_count(checkpoint_count);
 	gc_set_checkpoint_count(checkpoint_count);
+}
+
+void
+box_set_vinyl_memory(void)
+{
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_memory_xc(vinyl, cfg_geti("vinyl_memory"));
 }
 
 void

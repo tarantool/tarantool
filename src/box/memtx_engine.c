@@ -1044,6 +1044,18 @@ memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit)
 	memtx->snap_io_rate_limit = limit * 1024 * 1024;
 }
 
+int
+memtx_engine_set_memory(struct memtx_engine *memtx, size_t size)
+{
+	if (size < quota_total(&memtx->quota)) {
+		diag_set(ClientError, ER_CFG, "memtx_memory",
+			 "cannot decrease memory size at runtime");
+		return -1;
+	}
+	quota_set(&memtx->quota, size);
+	return 0;
+}
+
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size)
 {

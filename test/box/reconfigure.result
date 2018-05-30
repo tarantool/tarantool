@@ -1,3 +1,6 @@
+test_run = require('test_run').new()
+---
+...
 too_long_threshold_default = box.cfg.too_long_threshold
 ---
 ...
@@ -95,7 +98,8 @@ box.cfg{log="new logger"}
 -- bad1
 box.cfg{memtx_memory=53687091}
 ---
-- error: Can't set option 'memtx_memory' dynamically
+- error: 'Incorrect value for option ''memtx_memory'': cannot decrease memory size
+    at runtime'
 ...
 box.cfg.memtx_memory
 ---
@@ -124,4 +128,81 @@ box.cfg { too_long_threshold = too_long_threshold_default }
 ...
 box.cfg { io_collect_interval = io_collect_interval_default }
 ---
+...
+--
+-- gh-2634: check that box.cfg.memtx_memory can be increased
+--
+test_run:cmd("create server test with script='box/lua/cfg_memory.lua'")
+---
+- true
+...
+test_run:cmd(string.format("start server test with args='%d'", 48 * 1024 * 1024))
+---
+- true
+...
+test_run:cmd("switch test")
+---
+- true
+...
+box.slab.info().quota_size
+---
+- 50331648
+...
+s = box.schema.space.create('test')
+---
+...
+_ = s:create_index('pk')
+---
+...
+count = 200
+---
+...
+pad = string.rep('x', 100 * 1024)
+---
+...
+for i = 1, count do s:replace{i, pad} end -- error: not enough memory
+---
+- error: Failed to allocate 102424 bytes in slab allocator for memtx_tuple
+...
+s:count() < count
+---
+- true
+...
+box.cfg{memtx_memory = 64 * 1024 * 1024}
+---
+...
+box.slab.info().quota_size
+---
+- 67108864
+...
+for i = s:count() + 1, count do s:replace{i, pad} end -- ok
+---
+...
+s:count() == count
+---
+- true
+...
+s:drop()
+---
+...
+box.cfg{memtx_memory = 48 * 1024 * 1024} -- error: decreasing memtx_memory is not allowed
+---
+- error: 'Incorrect value for option ''memtx_memory'': cannot decrease memory size
+    at runtime'
+...
+box.slab.info().quota_size
+---
+- 67108864
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server test")
+---
+- true
+...
+test_run:cmd("cleanup server test")
+---
+- true
 ...

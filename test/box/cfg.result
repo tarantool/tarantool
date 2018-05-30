@@ -260,6 +260,12 @@ box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
 ---
 - error: Can't set option 'replicaset_uuid' dynamically
 ...
+box.cfg{memtx_memory = box.cfg.memtx_memory}
+---
+...
+box.cfg{vinyl_memory = box.cfg.vinyl_memory}
+---
+...
 --------------------------------------------------------------------------------
 -- Test of default cfg options
 --------------------------------------------------------------------------------

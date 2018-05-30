@@ -190,6 +190,9 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 void
 memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit);
 
+int
+memtx_engine_set_memory(struct memtx_engine *memtx, size_t size);
+
 void
 memtx_engine_set_max_tuple_size(struct memtx_engine *memtx, size_t max_size);
 
@@ -255,6 +258,13 @@ memtx_engine_new_xc(const char *snap_dirname, bool force_recovery,
 	if (memtx == NULL)
 		diag_raise();
 	return memtx;
+}
+
+static inline void
+memtx_engine_set_memory_xc(struct memtx_engine *memtx, size_t size)
+{
+	if (memtx_engine_set_memory(memtx, size) != 0)
+		diag_raise();
 }
 
 static inline void

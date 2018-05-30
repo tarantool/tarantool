@@ -49,3 +49,36 @@ _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 box.info.vinyl().quota.used
 
 space:drop()
+
+--
+-- gh-2634: check that box.cfg.vinyl_memory can be increased
+--
+test_run:cmd("create server test with script='vinyl/low_quota.lua'")
+test_run:cmd(string.format("start server test with args='%d'", 1024 * 1024))
+test_run:cmd('switch test')
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+
+count = 20
+pad = string.rep('x', 100 * 1024)
+
+box.info.vinyl().quota.limit
+
+for i = 1, count do s:replace{i, pad} end -- triggers dump
+box.info.vinyl().quota.used < count * pad:len()
+
+box.snapshot()
+
+box.cfg{vinyl_memory = 8 * 1024 * 1024}
+box.info.vinyl().quota.limit
+
+for i = 1, count do s:replace{i, pad} end -- does not trigger dump
+box.info.vinyl().quota.used > count * pad:len()
+
+box.cfg{vinyl_memory = 4 * 1024 * 1024} -- error: decreasing vinyl_memory is not allowed
+box.info.vinyl().quota.limit
+
+test_run:cmd('switch default')
+test_run:cmd("stop server test")
+test_run:cmd("cleanup server test")
