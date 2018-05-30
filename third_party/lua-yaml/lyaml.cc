@@ -631,8 +631,8 @@ static void find_references(struct lua_yaml_dumper *dumper) {
 }
 
 /**
- * Encode an object or objects on Lua stack into YAML stream.
- * @param L Lua stack to get arguments and push result.
+ * Encode an object on Lua stack into YAML stream.
+ * @param L Lua stack to get an argument and push the result.
  * @param serializer Lua YAML serializer.
  * @param tag_handle NULL, or a global tag handle. For global tags
  *        details see the standard:
@@ -651,12 +651,11 @@ static void find_references(struct lua_yaml_dumper *dumper) {
  *         object.
  */
 static int
-lua_yaml_encode_impl(lua_State *L, struct luaL_serializer *serializer,
-                     const char *tag_handle, const char *tag_prefix)
+lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
+                const char *tag_handle, const char *tag_prefix)
 {
    struct lua_yaml_dumper dumper;
    yaml_event_t ev;
-   int argcount;
 
    dumper.L = L;
    dumper.begin_tag.handle = (yaml_char_t *) tag_handle;
@@ -666,15 +665,10 @@ lua_yaml_encode_impl(lua_State *L, struct luaL_serializer *serializer,
     * If a tag is specified, then tag list is not empty and
     * consists of a single tag.
     */
-   if (tag_prefix != NULL) {
+   if (tag_prefix != NULL)
       dumper.end_tag = &dumper.begin_tag + 1;
-      /* Only one object can be encoded with a tag. */
-      argcount = 1;
-   } else {
+   else
       dumper.end_tag = &dumper.begin_tag;
-      /* When no tags - encode all the stack. */
-      argcount = lua_gettop(L);
-   }
    dumper.cfg = serializer;
    dumper.error = 0;
    /* create thread to use for YAML buffer */
@@ -694,17 +688,15 @@ lua_yaml_encode_impl(lua_State *L, struct luaL_serializer *serializer,
        !yaml_emitter_emit(&dumper.emitter, &ev))
       goto error;
 
-   for (int i = 0; i < argcount; i++) {
-      lua_newtable(L);
-      dumper.anchortable_index = lua_gettop(L);
-      dumper.anchor_number = 0;
-      lua_pushvalue(L, i + 1); /* push copy of arg we're processing */
-      find_references(&dumper);
-      dump_document(&dumper);
-      if (dumper.error)
-         goto error;
-      lua_pop(L, 2); /* pop copied arg and anchor table */
-   }
+   lua_newtable(L);
+   dumper.anchortable_index = lua_gettop(L);
+   dumper.anchor_number = 0;
+   lua_pushvalue(L, 1); /* push copy of arg we're processing */
+   find_references(&dumper);
+   dump_document(&dumper);
+   if (dumper.error)
+      goto error;
+   lua_pop(L, 2); /* pop copied arg and anchor table */
 
    if (!yaml_stream_end_event_initialize(&ev) ||
        !yaml_emitter_emit(&dumper.emitter, &ev) ||
@@ -736,40 +728,42 @@ error:
 }
 
 /**
- * Dump Lua objects into YAML string. It takes any argument count,
- * and dumps each in a separate document.
- * @retval 1 Pushes one value: string with dumped documents.
- */
-static int l_dump(lua_State *L) {
-   return lua_yaml_encode_impl(L, luaL_checkserializer(L), NULL, NULL);
-}
-
-/**
  * Serialize a Lua object as YAML string, taking into account a
- * global tag.
+ * global tag if specified.
  * @param object Lua object to dump under the global tag.
  * @param options Table with two options: tag prefix and tag
  *        handle.
  * @retval 1 Pushes Lua string with dumped object.
  * @retval 2 Pushes nil and error message.
  */
-static int l_dump_tagged(lua_State *L)
-{
+static int l_dump(lua_State *L) {
    struct luaL_serializer *serializer = luaL_checkserializer(L);
-   if (lua_gettop(L) != 2 || !lua_istable(L, 2)) {
+   int top = lua_gettop(L);
+   if (top > 2) {
 usage_error:
-      return luaL_error(L, "Usage: encode_tagged(object, {prefix = <string>, "\
-                        "handle = <string>})");
+      return luaL_error(L, "Usage: encode(object, {tag_prefix = <string>, "\
+                        "tag_handle = <string>})");
    }
-   lua_getfield(L, 2, "prefix");
-   if (! lua_isstring(L, -1))
-      goto usage_error;
-   const char *prefix = lua_tostring(L, -1);
-   lua_getfield(L, 2, "handle");
-   if (! lua_isstring(L, -1))
-      goto usage_error;
-   const char *handle = lua_tostring(L, -1);
-   return lua_yaml_encode_impl(L, serializer, handle, prefix);
+   const char *prefix = NULL, *handle = NULL;
+   if (top == 2 && !lua_isnil(L, 2)) {
+      if (! lua_istable(L, 2))
+         goto usage_error;
+      lua_getfield(L, 2, "tag_prefix");
+      if (lua_isstring(L, -1))
+         prefix = lua_tostring(L, -1);
+      else if (! lua_isnil(L, -1))
+         goto usage_error;
+
+      lua_getfield(L, 2, "tag_handle");
+      if (lua_isstring(L, -1))
+         handle = lua_tostring(L, -1);
+      else if (! lua_isnil(L, -1))
+         goto usage_error;
+
+      if ((prefix == NULL) != (handle == NULL))
+         goto usage_error;
+   }
+   return lua_yaml_encode(L, serializer, handle, prefix);
 }
 
 static int
@@ -777,7 +771,6 @@ l_new(lua_State *L);
 
 static const luaL_Reg yamllib[] = {
    { "encode", l_dump },
-   { "encode_tagged", l_dump_tagged },
    { "decode", l_load },
    { "new",    l_new },
    { NULL, NULL}
