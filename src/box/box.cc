@@ -2052,21 +2052,27 @@ end:
 }
 
 int
-box_backup_start(box_backup_cb cb, void *cb_arg)
+box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 {
+	assert(checkpoint_idx >= 0);
 	if (backup_gc != NULL) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	struct vclock vclock;
-	if (checkpoint_last(&vclock) < 0) {
-		diag_set(ClientError, ER_MISSING_SNAPSHOT);
-		return -1;
-	}
-	backup_gc = gc_consumer_register("backup", vclock_sum(&vclock));
+	const struct vclock *vclock;
+	struct checkpoint_iterator it;
+	checkpoint_iterator_init(&it);
+	do {
+		vclock = checkpoint_iterator_prev(&it);
+		if (vclock == NULL) {
+			diag_set(ClientError, ER_MISSING_SNAPSHOT);
+			return -1;
+		}
+	} while (checkpoint_idx-- > 0);
+	backup_gc = gc_consumer_register("backup", vclock_sum(vclock));
 	if (backup_gc == NULL)
 		return -1;
-	int rc = engine_backup(&vclock, cb, cb_arg);
+	int rc = engine_backup(vclock, cb, cb_arg);
 	if (rc != 0) {
 		gc_consumer_unregister(backup_gc);
 		backup_gc = NULL;

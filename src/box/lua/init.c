@@ -131,11 +131,17 @@ lbox_backup_cb(const char *path, void *cb_arg)
 static int
 lbox_backup_start(struct lua_State *L)
 {
+	int checkpoint_idx = 0;
+	if (lua_gettop(L) > 0) {
+		checkpoint_idx = luaL_checkint(L, 1);
+		if (checkpoint_idx < 0)
+			return luaL_error(L, "invalid checkpoint index");
+	}
 	lua_newtable(L);
 	struct lbox_backup_arg arg = {
 		.L = L,
 	};
-	if (box_backup_start(lbox_backup_cb, &arg) != 0)
+	if (box_backup_start(checkpoint_idx, lbox_backup_cb, &arg) != 0)
 		return luaT_error(L);
 	return 1;
 }

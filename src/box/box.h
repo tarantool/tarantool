@@ -122,12 +122,17 @@ typedef int (*box_backup_cb)(const char *path, void *arg);
 
 /**
  * Start a backup. This function calls @cb for each file that
- * needs to be backed up to recover from the last checkpoint.
+ * needs to be backed up to recover from the specified checkpoint.
+ *
+ * The checkpoint is given by @checkpoint_idx. If @checkpoint_idx
+ * is 0, the last checkpoint will be backed up; if it is 1, next
+ * to last, and so on.
+ *
  * The caller is supposed to call box_backup_stop() after he's
  * done copying the files.
  */
 int
-box_backup_start(box_backup_cb cb, void *cb_arg);
+box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg);
 
 /**
  * Finish backup started with box_backup_start().
