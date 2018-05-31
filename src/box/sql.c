@@ -690,8 +690,8 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	bool is_quoted = false;
 	trigger_stmt = rename_trigger(db, trigger_stmt, new_table_name, &is_quoted);
 
-	uint32_t trigger_stmt_new_len = trigger_stmt_len + old_table_name_len -
-					new_table_name_len + 2 * (!is_quoted);
+	uint32_t trigger_stmt_new_len = trigger_stmt_len + new_table_name_len -
+					old_table_name_len + 2 * (!is_quoted);
 	assert(trigger_stmt_new_len > 0);
 	key_len = mp_sizeof_array(2) + mp_sizeof_str(trig_name_len) +
 		  mp_sizeof_map(1) + mp_sizeof_str(3) +
