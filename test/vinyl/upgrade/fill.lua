@@ -17,7 +17,7 @@ dump_trigger:create_index('pk')
 function dump()
     pcall(dump_trigger.insert, dump_trigger,
           {1, string.rep('x', 1024 * 1024)})
-    while box.info.vinyl().quota.used > 0 do
+    while box.stat.vinyl().quota.used > 0 do
         fiber.sleep(0.1)
     end
 end

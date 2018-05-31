@@ -98,7 +98,7 @@ end;
 -- Note, quota watermark checking is beyond the scope of this
 -- test so we just filter out related statistics.
 function gstat()
-    local st = box.info.vinyl()
+    local st = box.stat.vinyl()
     st.quota.use_rate = nil
     st.quota.dump_bandwidth = nil
     st.quota.watermark = nil

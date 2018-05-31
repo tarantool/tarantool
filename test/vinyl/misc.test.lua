@@ -40,11 +40,11 @@ s:drop()
 --
 s = box.schema.create_space('test', { engine = 'vinyl' })
 _ = s:create_index('pk')
-tx1 = box.info.vinyl().tx
+tx1 = box.stat.vinyl().tx
 ch = fiber.channel(1)
 _ = fiber.create(function() box.begin() s:insert{1} ch:put(true) end)
 ch:get()
-tx2 = box.info.vinyl().tx
+tx2 = box.stat.vinyl().tx
 tx2.commit - tx1.commit -- 0
 tx2.rollback - tx1.rollback -- 1
 s:drop()

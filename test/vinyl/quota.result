@@ -12,7 +12,7 @@ test_run:cmd('restart server default')
 --
 -- gh-1863 add BPS tree extents to memory quota
 --
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 0
 ...
@@ -29,7 +29,7 @@ space:insert({1, 1})
 ---
 - [1, 1]
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 98343
 ...
@@ -37,7 +37,7 @@ space:insert({1, 1})
 ---
 - error: Duplicate key exists in unique index 'pk' in space 'test'
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 98343
 ...
@@ -45,7 +45,7 @@ space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 ---
 - error: Attempt to modify a tuple field which is part of index 'pk' in space 'test'
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 98343
 ...
@@ -61,7 +61,7 @@ space:insert({4, 4})
 ---
 - [4, 4]
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 98460
 ...
@@ -69,7 +69,7 @@ box.snapshot()
 ---
 - ok
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 0
 ...
@@ -80,14 +80,14 @@ space:select{}
   - [3, 3]
   - [4, 4]
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 0
 ...
 _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 ---
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 5341228
 ...
@@ -121,14 +121,14 @@ count = 20
 pad = string.rep('x', 100 * 1024)
 ---
 ...
-box.info.vinyl().quota.limit
+box.stat.vinyl().quota.limit
 ---
 - 1048576
 ...
 for i = 1, count do s:replace{i, pad} end -- triggers dump
 ---
 ...
-box.info.vinyl().quota.used < count * pad:len()
+box.stat.vinyl().quota.used < count * pad:len()
 ---
 - true
 ...
@@ -139,14 +139,14 @@ box.snapshot()
 box.cfg{vinyl_memory = 8 * 1024 * 1024}
 ---
 ...
-box.info.vinyl().quota.limit
+box.stat.vinyl().quota.limit
 ---
 - 8388608
 ...
 for i = 1, count do s:replace{i, pad} end -- does not trigger dump
 ---
 ...
-box.info.vinyl().quota.used > count * pad:len()
+box.stat.vinyl().quota.used > count * pad:len()
 ---
 - true
 ...
@@ -155,7 +155,7 @@ box.cfg{vinyl_memory = 4 * 1024 * 1024} -- error: decreasing vinyl_memory is not
 - error: 'Incorrect value for option ''vinyl_memory'': cannot decrease memory size
     at runtime'
 ...
-box.info.vinyl().quota.limit
+box.stat.vinyl().quota.limit
 ---
 - 8388608
 ...

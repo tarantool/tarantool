@@ -57,7 +57,7 @@ _ = var:insert{'dump', stat.disk.dump.out.rows}
 ...
 test_run:cmd('restart server test with args="2097152"')
 -- Check that we do not exceed quota.
-stat = box.info.vinyl()
+stat = box.stat.vinyl()
 ---
 ...
 stat.quota.used <= stat.quota.limit or {stat.quota.used, stat.quota.limit}
@@ -109,7 +109,7 @@ for i = 1, box.cfg.vinyl_memory / pad_size do box.space.test:replace{i, pad} end
 ---
 - error: Timed out waiting for Vinyl memory quota
 ...
-box.info.vinyl().quota.used > 1024 * 1024
+box.stat.vinyl().quota.used > 1024 * 1024
 ---
 - true
 ...
@@ -122,7 +122,7 @@ fiber = require 'fiber'
 while box.space.test.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.001) end
 ---
 ...
-stat = box.info.vinyl()
+stat = box.stat.vinyl()
 ---
 ...
 stat.quota.used <= stat.quota.limit or {stat.quota.used, stat.quota.limit}

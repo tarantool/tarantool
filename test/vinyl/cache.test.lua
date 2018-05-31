@@ -366,17 +366,17 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')
 for i = 1, 100 do s:replace{i, string.rep('x', 1000)} end
 for i = 1, 100 do s:get{i} end
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 box.cfg{vinyl_cache = 50 * 1000}
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 box.cfg{vinyl_cache = 0}
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 -- Make sure cache is not populated if box.cfg.vinyl_cache is set to 0
 st1 = s.index.pk:info().cache
 #s:select()
 for i = 1, 100 do s:get{i} end
 st2 = s.index.pk:info().cache
 st2.put.rows - st1.put.rows
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 s:drop()
 box.cfg{vinyl_cache = vinyl_cache}

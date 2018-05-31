@@ -1031,21 +1031,21 @@ for i = 1, 100 do s:replace{i, string.rep('x', 1000)} end
 for i = 1, 100 do s:get{i} end
 ---
 ...
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 ---
 - 107700
 ...
 box.cfg{vinyl_cache = 50 * 1000}
 ---
 ...
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 ---
 - 49542
 ...
 box.cfg{vinyl_cache = 0}
 ---
 ...
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 ---
 - 0
 ...
@@ -1067,7 +1067,7 @@ st2.put.rows - st1.put.rows
 ---
 - 0
 ...
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 ---
 - 0
 ...

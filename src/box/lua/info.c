@@ -503,7 +503,7 @@ lbox_info_vinyl_call(struct lua_State *L)
 	struct vinyl_engine *vinyl;
 	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
 	assert(vinyl != NULL);
-	vinyl_engine_info(vinyl, &h);
+	vinyl_engine_stat(vinyl, &h);
 	return 1;
 }
 

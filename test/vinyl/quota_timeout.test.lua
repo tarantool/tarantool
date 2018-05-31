@@ -21,13 +21,13 @@ _ = s:create_index('pk')
 pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
 s:count()
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 -- Since the following operation requires more memory than configured
 -- and dump is disabled, it should fail with ER_VY_QUOTA_TIMEOUT.
 _ = s:auto_increment{pad}
 s:count()
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 --
 -- Check that increasing box.cfg.vinyl_memory wakes up fibers
@@ -72,7 +72,7 @@ box.snapshot()
 -- The following operation should fail instantly irrespective
 -- of the value of 'vinyl_timeout' (gh-3291).
 --
-box.info.vinyl().quota.used == 0
+box.stat.vinyl().quota.used == 0
 box.cfg{vinyl_timeout = 9000}
 pad = string.rep('x', box.cfg.vinyl_memory)
 _ = s:auto_increment{pad}

@@ -46,10 +46,10 @@ vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery);
 
 /**
- * Engine introspection (box.info.vinyl())
+ * Vinyl engine statistics (box.stat.vinyl()).
  */
 void
-vinyl_engine_info(struct vinyl_engine *vinyl, struct info_handler *handler);
+vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *handler);
 
 /**
  * Update vinyl cache size.

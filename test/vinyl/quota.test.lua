@@ -12,7 +12,7 @@ test_run:cmd('restart server default')
 -- gh-1863 add BPS tree extents to memory quota
 --
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 space = box.schema.space.create('test', { engine = 'vinyl' })
 pk = space:create_index('pk')
@@ -20,33 +20,33 @@ sec = space:create_index('sec', { parts = {2, 'unsigned'} })
 
 space:insert({1, 1})
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 space:insert({1, 1})
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 space:update({1}, {{'!', 1, 100}}) -- try to modify the primary key
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 space:insert({2, 2})
 space:insert({3, 3})
 space:insert({4, 4})
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 box.snapshot()
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 space:select{}
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 space:drop()
 
@@ -63,21 +63,21 @@ _ = s:create_index('pk')
 count = 20
 pad = string.rep('x', 100 * 1024)
 
-box.info.vinyl().quota.limit
+box.stat.vinyl().quota.limit
 
 for i = 1, count do s:replace{i, pad} end -- triggers dump
-box.info.vinyl().quota.used < count * pad:len()
+box.stat.vinyl().quota.used < count * pad:len()
 
 box.snapshot()
 
 box.cfg{vinyl_memory = 8 * 1024 * 1024}
-box.info.vinyl().quota.limit
+box.stat.vinyl().quota.limit
 
 for i = 1, count do s:replace{i, pad} end -- does not trigger dump
-box.info.vinyl().quota.used > count * pad:len()
+box.stat.vinyl().quota.used > count * pad:len()
 
 box.cfg{vinyl_memory = 4 * 1024 * 1024} -- error: decreasing vinyl_memory is not allowed
-box.info.vinyl().quota.limit
+box.stat.vinyl().quota.limit
 
 test_run:cmd('switch default')
 test_run:cmd("stop server test")

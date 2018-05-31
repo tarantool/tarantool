@@ -26,7 +26,7 @@ _ = var:insert{'put', stat.put.rows}
 _ = var:insert{'dump', stat.disk.dump.out.rows}
 test_run:cmd('restart server test with args="2097152"')
 -- Check that we do not exceed quota.
-stat = box.info.vinyl()
+stat = box.stat.vinyl()
 stat.quota.used <= stat.quota.limit or {stat.quota.used, stat.quota.limit}
 -- Check that we did not replay statements dumped before restart.
 stat = box.space.test.index.pk:info()
@@ -43,13 +43,13 @@ box.cfg{vinyl_timeout=0.001}
 pad_size = 1000
 pad = string.rep('x', pad_size)
 for i = 1, box.cfg.vinyl_memory / pad_size do box.space.test:replace{i, pad} end
-box.info.vinyl().quota.used > 1024 * 1024
+box.stat.vinyl().quota.used > 1024 * 1024
 -- Check that tarantool can recover with a smaller memory limit.
 test_run:cmd('restart server test with args="1048576"')
 fiber = require 'fiber'
 -- All memory above the limit must be dumped after recovery.
 while box.space.test.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.001) end
-stat = box.info.vinyl()
+stat = box.stat.vinyl()
 stat.quota.used <= stat.quota.limit or {stat.quota.used, stat.quota.limit}
 _ = test_run:cmd('switch default')
 

@@ -347,7 +347,7 @@ vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 }
 
 void
-vinyl_engine_info(struct vinyl_engine *vinyl, struct info_handler *h)
+vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 {
 	struct vy_env *env = vinyl->env;
 
