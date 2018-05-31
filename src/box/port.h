@@ -38,6 +38,7 @@ extern "C" {
 
 struct tuple;
 struct obuf;
+struct lua_State;
 
 /**
  * A single port represents a destination of box_process output.
@@ -137,6 +138,26 @@ port_tuple_create(struct port *port);
  */
 int
 port_tuple_add(struct port *port, struct tuple *tuple);
+
+/** Port for storing the result of a Lua CALL/EVAL. */
+struct port_lua {
+	const struct port_vtab *vtab;
+	/** Lua state that stores the result. */
+	struct lua_State *L;
+	/** Reference to L in tarantool_L. */
+	int ref;
+	/** The argument of port_dump */
+	struct obuf *out;
+	/** Number of entries dumped to the port. */
+	int size;
+};
+
+static_assert(sizeof(struct port_lua) <= sizeof(struct port),
+	      "sizeof(struct port_lua) must be <= sizeof(struct port)");
+
+/** Initialize a port to dump from Lua. */
+void
+port_lua_create(struct port *port, struct lua_State *L);
 
 /**
  * Destroy an abstract port instance.

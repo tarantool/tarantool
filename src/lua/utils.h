@@ -439,6 +439,13 @@ struct error *
 luaL_iserror(struct lua_State *L, int narg);
 
 /**
+ * Convert the last value on the stack into Tarantool error and
+ * set diagnostics.
+ */
+int
+luaT_toerror(lua_State *L);
+
+/**
  * Push Lua Table with __serialize = 'map' hint onto the stack.
  * Tables with __serialize hint are properly handled by all serializers.
  * @param L stack

@@ -126,19 +126,6 @@ lbox_call_loadproc(struct lua_State *L)
 }
 
 /*
- * Encode CALL/EVAL result.
- */
-static inline uint32_t
-luamp_encode_call(lua_State *L, struct luaL_serializer *cfg,
-		  struct mpstream *stream)
-{
-	int count = lua_gettop(L);
-	for (int i = 1; i <= count; ++i)
-		luamp_encode(L, cfg, stream, i);
-	return count;
-}
-
-/*
  * Encode CALL_16 result.
  *
  * To allow clients to understand a complex return from
@@ -274,6 +261,22 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 	return root.size;
 }
 
+static const struct port_vtab port_lua_vtab;
+
+void
+port_lua_create(struct port *port, struct lua_State *L)
+{
+	struct port_lua *port_lua = (struct port_lua *) port;
+	memset(port_lua, 0, sizeof(*port_lua));
+	port_lua->vtab = &port_lua_vtab;
+	port_lua->L = L;
+	/*
+	 * Allow to destroy the port even if no ref.
+	 * @Sa luaL_unref.
+	 */
+	port_lua->ref = -1;
+}
+
 static int
 execute_lua_call(lua_State *L)
 {
@@ -319,91 +322,86 @@ execute_lua_eval(lua_State *L)
 	const char *args = request->args;
 	uint32_t arg_count = mp_decode_array(&args);
 	luaL_checkstack(L, arg_count, "eval: out of stack");
-	for (uint32_t i = 0; i < arg_count; i++) {
+	for (uint32_t i = 0; i < arg_count; i++)
 		luamp_decode(L, luaL_msgpack_default, &args);
-	}
 
 	/* Call compiled code */
 	lua_call(L, arg_count, LUA_MULTRET);
 	return lua_gettop(L);
 }
 
-struct encode_lua_call_ctx {
-	/** Buffer to append the call result to. */
-	struct obuf *out;
-	/** If set, use Tarantool 1.6 output format. */
-	bool call_16;
-	/** Number of values in the output. */
-	int count;
-};
-
 static int
 encode_lua_call(lua_State *L)
 {
-	struct encode_lua_call_ctx *ctx = (struct encode_lua_call_ctx *)
-		lua_topointer(L, -1);
-	lua_pop(L, 1);
-
+	struct port_lua *port = (struct port_lua *) lua_topointer(L, -1);
 	/*
 	 * Add all elements from Lua stack to the buffer.
 	 *
 	 * TODO: forbid explicit yield from __serialize or __index here
 	 */
-
 	struct mpstream stream;
-	mpstream_init(&stream, ctx->out, obuf_reserve_cb, obuf_alloc_cb,
-		      luamp_error, L);
+	mpstream_init(&stream, port->out, obuf_reserve_cb, obuf_alloc_cb,
+		      luamp_error, port->L);
 
 	struct luaL_serializer *cfg = luaL_msgpack_default;
-	if (ctx->call_16)
-		ctx->count = luamp_encode_call_16(L, cfg, &stream);
-	else
-		ctx->count = luamp_encode_call(L, cfg, &stream);
-
+	int size = lua_gettop(port->L);
+	for (int i = 1; i <= size; ++i)
+		luamp_encode(port->L, cfg, &stream, i);
+	port->size = size;
 	mpstream_flush(&stream);
 	return 0;
 }
 
-/**
- * Port for storing the result of a Lua CALL/EVAL.
- */
-struct port_lua {
-	const struct port_vtab *vtab;
-	/** Lua state that stores the result. */
-	struct lua_State *L;
-	/** Reference to L in tarantool_L. */
-	int ref;
-};
-static_assert(sizeof(struct port_lua) <= sizeof(struct port),
-	      "sizeof(struct port_lua) must be <= sizeof(struct port)");
+static int
+encode_lua_call_16(lua_State *L)
+{
+	struct port_lua *port = (struct port_lua *) lua_topointer(L, -1);
+	/*
+	 * Add all elements from Lua stack to the buffer.
+	 *
+	 * TODO: forbid explicit yield from __serialize or __index here
+	 */
+	struct mpstream stream;
+	mpstream_init(&stream, port->out, obuf_reserve_cb, obuf_alloc_cb,
+		      luamp_error, port->L);
 
-static const struct port_vtab port_lua_vtab;
+	struct luaL_serializer *cfg = luaL_msgpack_default;
+	port->size = luamp_encode_call_16(port->L, cfg, &stream);
+	mpstream_flush(&stream);
+	return 0;
+}
 
 static inline int
-port_lua_do_dump(struct port *base, bool call_16, struct obuf *out)
+port_lua_do_dump(struct port *base, struct obuf *out, lua_CFunction handler)
 {
 	struct port_lua *port = (struct port_lua *)base;
 	assert(port->vtab == &port_lua_vtab);
-
-	struct lua_State *L = port->L;
-	struct encode_lua_call_ctx ctx = { out, call_16, 0 };
-	lua_pushlightuserdata(L, &ctx);
-	if (luaT_call(L, lua_gettop(L) - 1, 0) != 0)
+	/* Use port to pass arguments to encoder quickly. */
+	port->out = out;
+	/*
+	 * Use the same global state, assuming the encoder doesn't
+	 * yield.
+	 */
+	struct lua_State *L = tarantool_L;
+	int top = lua_gettop(L);
+	if (lua_cpcall(L, handler, port) != 0) {
+		luaT_toerror(port->L);
 		return -1;
-
-	return ctx.count;
+	}
+	lua_settop(L, top);
+	return port->size;
 }
 
 static int
 port_lua_dump(struct port *base, struct obuf *out)
 {
-	return port_lua_do_dump(base, false, out);
+	return port_lua_do_dump(base, out, encode_lua_call);
 }
 
 static int
 port_lua_dump_16(struct port *base, struct obuf *out)
 {
-	return port_lua_do_dump(base, true, out);
+	return port_lua_do_dump(base, out, encode_lua_call_16);
 }
 
 static void
@@ -411,7 +409,6 @@ port_lua_destroy(struct port *base)
 {
 	struct port_lua *port = (struct port_lua *)base;
 	assert(port->vtab == &port_lua_vtab);
-
 	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, port->ref);
 }
 
@@ -427,25 +424,15 @@ box_process_lua(struct call_request *request, struct port *base,
 {
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-
-	/*
-	 * Push the encoder function first - values returned by
-	 * the handler will be passed to it as arguments, see
-	 * port_lua_dump().
-	 */
-	lua_pushcfunction(L, encode_lua_call);
+	port_lua_create(base, L);
+	((struct port_lua *) base)->ref = coro_ref;
 
 	lua_pushcfunction(L, handler);
 	lua_pushlightuserdata(L, request);
 	if (luaT_call(L, 1, LUA_MULTRET) != 0) {
-		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
+		port_lua_destroy(base);
 		return -1;
 	}
-
-	struct port_lua *port = (struct port_lua *)base;
-	port->vtab = &port_lua_vtab;
-	port->L = L;
-	port->ref = coro_ref;
 	return 0;
 }
 
