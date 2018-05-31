@@ -19,7 +19,7 @@ path = fio.pathjoin(box.cfg.vinyl_dir, tostring(s.id), tostring(s.index.pk.id))
 
 function ls_data() return fio.glob(fio.pathjoin(path, '*')) end
 function ls_vylog() return fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')) end
-function gc_info() return box.internal.gc.info() end
+function gc_info() return box.info.gc() end
 function gc() temp:auto_increment{} box.snapshot() end
 
 -- Check that run files are deleted by gc.

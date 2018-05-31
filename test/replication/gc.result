@@ -20,7 +20,7 @@ default_checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 ---
 ...
-function wait_gc(n) while #box.internal.gc.info().checkpoints > n do fiber.sleep(0.01) end end
+function wait_gc(n) while #box.info.gc().checkpoints > n do fiber.sleep(0.01) end end
 ---
 ...
 -- Grant permissions needed for replication.
@@ -111,7 +111,7 @@ test_run:cmd("switch default")
 wait_gc(1)
 ---
 ...
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 ---
 - true
 ...
@@ -131,7 +131,7 @@ box.snapshot()
 ---
 - ok
 ...
-#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+#box.info.gc().checkpoints == 2 or box.info.gc()
 ---
 - true
 ...
@@ -162,7 +162,7 @@ test_run:cmd("switch default")
 wait_gc(1)
 ---
 ...
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 ---
 - true
 ...
@@ -201,7 +201,7 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- Garbage collection must not delete the old xlog file
 -- (and the corresponding snapshot), because it is still
 -- needed by the replica.
-#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+#box.info.gc().checkpoints == 2 or box.info.gc()
 ---
 - true
 ...
@@ -261,7 +261,7 @@ test_run:cmd("switch default")
 wait_gc(1)
 ---
 ...
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 ---
 - true
 ...
@@ -283,7 +283,7 @@ box.snapshot()
 ---
 - ok
 ...
-#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+#box.info.gc().checkpoints == 2 or box.info.gc()
 ---
 - true
 ...
@@ -292,7 +292,7 @@ box.snapshot()
 test_run:cleanup_cluster()
 ---
 ...
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 ---
 - true
 ...

@@ -42,7 +42,7 @@ local function process(self)
         return false
     end
 
-    local checkpoints = box.internal.gc.info().checkpoints
+    local checkpoints = box.info.gc().checkpoints
     local last_checkpoint = checkpoints[#checkpoints]
 
     local last_snap = fio.pathjoin(box.cfg.memtx_dir,

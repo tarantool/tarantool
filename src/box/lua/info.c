@@ -46,6 +46,8 @@
 #include "box/wal.h"
 #include "box/replication.h"
 #include "box/info.h"
+#include "box/gc.h"
+#include "box/checkpoint.h"
 #include "box/engine.h"
 #include "box/vinyl.h"
 #include "main.h"
@@ -352,6 +354,73 @@ lbox_info_memory(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_info_gc_call(struct lua_State *L)
+{
+	int count;
+	const struct vclock *vclock;
+
+	lua_newtable(L);
+
+	lua_pushstring(L, "checkpoints");
+	lua_newtable(L);
+
+	struct checkpoint_iterator checkpoints;
+	checkpoint_iterator_init(&checkpoints);
+
+	count = 0;
+	while ((vclock = checkpoint_iterator_next(&checkpoints)) != NULL) {
+		lua_createtable(L, 0, 1);
+
+		lua_pushstring(L, "signature");
+		luaL_pushint64(L, vclock_sum(vclock));
+		lua_settable(L, -3);
+
+		lua_rawseti(L, -2, ++count);
+	}
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "consumers");
+	lua_newtable(L);
+
+	struct gc_consumer_iterator consumers;
+	gc_consumer_iterator_init(&consumers);
+
+	count = 0;
+	struct gc_consumer *consumer;
+	while ((consumer = gc_consumer_iterator_next(&consumers)) != NULL) {
+		lua_createtable(L, 0, 2);
+
+		lua_pushstring(L, "name");
+		lua_pushstring(L, gc_consumer_name(consumer));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "signature");
+		luaL_pushint64(L, gc_consumer_signature(consumer));
+		lua_settable(L, -3);
+
+		lua_rawseti(L, -2, ++count);
+	}
+	lua_settable(L, -3);
+
+	return 1;
+}
+
+static int
+lbox_info_gc(struct lua_State *L)
+{
+	lua_newtable(L);
+
+	lua_newtable(L); /* metatable */
+
+	lua_pushstring(L, "__call");
+	lua_pushcfunction(L, lbox_info_gc_call);
+	lua_settable(L, -3);
+
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
 static void
 luaT_info_begin(struct info_handler *info)
 {
@@ -467,6 +536,7 @@ static const struct luaL_Reg lbox_info_dynamic_meta[] = {
 	{"pid", lbox_info_pid},
 	{"cluster", lbox_info_cluster},
 	{"memory", lbox_info_memory},
+	{"gc", lbox_info_gc},
 	{"vinyl", lbox_info_vinyl},
 	{NULL, NULL}
 };

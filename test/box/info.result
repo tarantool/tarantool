@@ -75,6 +75,7 @@ table.sort(t)
 t
 ---
 - - cluster
+  - gc
   - id
   - lsn
   - memory
