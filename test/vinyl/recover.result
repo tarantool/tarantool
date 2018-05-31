@@ -86,7 +86,7 @@ s5:insert{55}
 - [55]
 ...
 -- Remember stats before restarting the server.
-_ = var:insert{'vyinfo', s3.index.primary:info()}
+_ = var:insert{'vyinfo', s3.index.primary:stat()}
 ---
 ...
 test_run:cmd('restart server default')
@@ -163,7 +163,7 @@ s5.index.i2:select()
 vyinfo1 = var:get('vyinfo')[2]
 ---
 ...
-vyinfo2 = s3.index.primary:info()
+vyinfo2 = s3.index.primary:stat()
 ---
 ...
 vyinfo1.memory.rows == vyinfo2.memory.rows
@@ -267,7 +267,7 @@ _ = box.schema.space.create('info')
 _ = box.space.info:create_index('pk')
 ---
 ...
-_ = box.space.info:insert{1, box.space.test.index.pk:info()}
+_ = box.space.info:insert{1, box.space.test.index.pk:stat()}
 ---
 ...
 test2 = box.schema.space.create('test2', {engine = 'vinyl'})
@@ -339,7 +339,7 @@ sum
 old_info = box.space.info:get(1)[2]
 ---
 ...
-new_info = box.space.test.index.pk:info()
+new_info = box.space.test.index.pk:stat()
 ---
 ...
 new_info.disk.index_size == old_info.disk.index_size

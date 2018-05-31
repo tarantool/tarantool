@@ -171,7 +171,7 @@ box.snapshot()
 ---
 - ok
 ...
-while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:stat().rows ~= 0 do fiber.sleep(0.01) end
 ---
 ...
 -- after a dump REPLACE + DELETE = nothing, so the space is empty now and
@@ -226,7 +226,7 @@ box.snapshot()
 ---
 - ok
 ...
-while space.index.primary:info().run_count ~= 2 do fiber.sleep(0.01) end
+while space.index.primary:stat().run_count ~= 2 do fiber.sleep(0.01) end
 ---
 ...
 -- must fail because vy_runs have data
@@ -256,7 +256,7 @@ box.snapshot()
 - ok
 ...
 -- Wait until the dump is finished.
-while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:stat().rows ~= 0 do fiber.sleep(0.01) end
 ---
 ...
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
@@ -370,7 +370,7 @@ box.snapshot()
 ---
 - ok
 ...
-pk:info().disk.pages
+pk:stat().disk.pages
 ---
 - 4
 ...
@@ -378,7 +378,7 @@ space.index.pk.options.page_size
 ---
 - 8192
 ...
-pk:info().run_count
+pk:stat().run_count
 ---
 - 1
 ...
@@ -414,10 +414,10 @@ box.snapshot()
 - ok
 ...
 -- Wait for compaction
-while pk:info().run_count ~= 1 do fiber.sleep(0.01) end
+while pk:stat().run_count ~= 1 do fiber.sleep(0.01) end
 ---
 ...
-pk:info().disk.pages
+pk:stat().disk.pages
 ---
 - 6
 ...
@@ -425,7 +425,7 @@ space.index.pk.options.page_size
 ---
 - 16384
 ...
-pk:info().run_count
+pk:stat().run_count
 ---
 - 1
 ...
@@ -433,7 +433,7 @@ space.index.pk.options.bloom_fpr
 ---
 - 0.2
 ...
-est_bsize / page_size == pk:info().disk.pages
+est_bsize / page_size == pk:stat().disk.pages
 ---
 - true
 ...
@@ -472,7 +472,7 @@ box.snapshot()
 pk:alter({range_size = page_size * 2})
 ---
 ...
-while pk:info().range_count < 2 do space:replace{1, pad} box.snapshot() fiber.sleep(0.01) end
+while pk:stat().range_count < 2 do space:replace{1, pad} box.snapshot() fiber.sleep(0.01) end
 ---
 ...
 space:drop()

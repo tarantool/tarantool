@@ -5,7 +5,7 @@ digest = require('digest')
 space = box.schema.space.create("vinyl", { engine = 'vinyl' })
 _= space:create_index('primary', { parts = { 1, 'unsigned' }, run_count_per_level = 2 })
 
-function vyinfo() return box.space.vinyl.index.primary:info() end
+function vyinfo() return box.space.vinyl.index.primary:stat() end
 
 vyinfo().run_count == 0
 
@@ -54,14 +54,14 @@ function dump()
     box.snapshot()
 end;
 function info()
-    local info = s.index.pk:info()
+    local info = s.index.pk:stat()
     return {range_count = info.range_count, run_count = info.run_count}
 end
 function compact()
     s.index.pk:compact()
     repeat
         fiber.sleep(0.001)
-        local info = s.index.pk:info()
+        local info = s.index.pk:stat()
     until info.range_count == info.run_count
 end;
 test_run:cmd("setopt delimiter ''");

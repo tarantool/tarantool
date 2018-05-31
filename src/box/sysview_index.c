@@ -189,7 +189,7 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .create_iterator = */ sysview_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
-	/* .info = */ generic_index_info,
+	/* .stat = */ generic_index_stat,
 	/* .compact = */ generic_index_compact,
 	/* .reset_stat = */ generic_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,

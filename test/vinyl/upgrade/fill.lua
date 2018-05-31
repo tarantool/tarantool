@@ -119,7 +119,7 @@ for i = 1, 4 do
     end
     dump()
 end
-assert(s.index.pk:info().range_count >= 2)
+assert(s.index.pk:stat().range_count >= 2)
 
 dump_trigger:drop()
 

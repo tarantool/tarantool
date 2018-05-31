@@ -57,7 +57,7 @@ space:delete({1})
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 box.snapshot()
-while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:stat().rows ~= 0 do fiber.sleep(0.01) end
 
 -- after a dump REPLACE + DELETE = nothing, so the space is empty now and
 -- can be altered.
@@ -76,7 +76,7 @@ space:insert({1, 2})
 box.snapshot()
 space:delete({1})
 box.snapshot()
-while space.index.primary:info().run_count ~= 2 do fiber.sleep(0.01) end
+while space.index.primary:stat().run_count ~= 2 do fiber.sleep(0.01) end
 -- must fail because vy_runs have data
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
@@ -89,7 +89,7 @@ space:replace({2, 3})
 space:delete({2})
 box.snapshot()
 -- Wait until the dump is finished.
-while space.index.primary:info().rows ~= 0 do fiber.sleep(0.01) end
+while space.index.primary:stat().rows ~= 0 do fiber.sleep(0.01) end
 index2 = space:create_index('secondary', { parts = {2, 'unsigned'} })
 space.index.primary:alter({parts = {1, 'unsigned', 2, 'unsigned'}})
 
@@ -136,9 +136,9 @@ pad = string.rep('I', pad_size)
 for i = 1, 20 do space:replace{i, pad} end
 est_bsize = pad_size * 20
 box.snapshot()
-pk:info().disk.pages
+pk:stat().disk.pages
 space.index.pk.options.page_size
-pk:info().run_count
+pk:stat().run_count
 space.index.pk.options.bloom_fpr
 
 -- Change page_size and trigger compaction
@@ -152,12 +152,12 @@ for i = 1, 20 do space:replace{i + 20, pad} end
 est_bsize = est_bsize + pad_size * 20
 box.snapshot()
 -- Wait for compaction
-while pk:info().run_count ~= 1 do fiber.sleep(0.01) end
-pk:info().disk.pages
+while pk:stat().run_count ~= 1 do fiber.sleep(0.01) end
+pk:stat().disk.pages
 space.index.pk.options.page_size
-pk:info().run_count
+pk:stat().run_count
 space.index.pk.options.bloom_fpr
-est_bsize / page_size == pk:info().disk.pages
+est_bsize / page_size == pk:stat().disk.pages
 space:drop()
 
 --
@@ -174,7 +174,7 @@ box.snapshot()
 
 -- Decrease the range_size and dump many runs to trigger split.
 pk:alter({range_size = page_size * 2})
-while pk:info().range_count < 2 do space:replace{1, pad} box.snapshot() fiber.sleep(0.01) end
+while pk:stat().range_count < 2 do space:replace{1, pad} box.snapshot() fiber.sleep(0.01) end
 
 space:drop()
 

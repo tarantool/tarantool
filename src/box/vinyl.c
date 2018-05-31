@@ -396,7 +396,7 @@ vy_info_append_compact_stat(struct info_handler *h, const char *name,
 }
 
 static void
-vinyl_index_info(struct index *index, struct info_handler *h)
+vinyl_index_stat(struct index *index, struct info_handler *h)
 {
 	char buf[1024];
 	struct vy_lsm *lsm = vy_lsm(index);
@@ -4091,7 +4091,7 @@ static const struct index_vtab vinyl_index_vtab = {
 	/* .create_iterator = */ vinyl_index_create_iterator,
 	/* .create_snapshot_iterator = */
 		generic_index_create_snapshot_iterator,
-	/* .info = */ vinyl_index_info,
+	/* .stat = */ vinyl_index_stat,
 	/* .compact = */ vinyl_index_compact,
 	/* .reset_stat = */ vinyl_index_reset_stat,
 	/* .begin_build = */ generic_index_begin_build,

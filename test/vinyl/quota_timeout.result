@@ -190,7 +190,7 @@ pad = string.rep('x', 64)
 _ = s1:auto_increment{pad}
 ---
 ...
-s1.index.pk:info().memory.bytes > 0
+s1.index.pk:stat().memory.bytes > 0
 ---
 - true
 ...
@@ -200,10 +200,10 @@ pad = string.rep('x', box.cfg.vinyl_memory - string.len(pad))
 _ = s2:auto_increment{pad}
 ---
 ...
-while s1.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.01) end
+while s1.index.pk:stat().disk.dump.count == 0 do fiber.sleep(0.01) end
 ---
 ...
-s1.index.pk:info().memory.bytes == 0
+s1.index.pk:stat().memory.bytes == 0
 ---
 - true
 ...

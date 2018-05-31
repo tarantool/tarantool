@@ -28,7 +28,7 @@ function gc() temp:auto_increment{} box.snapshot() end
 errinj.set('ERRINJ_VY_GC', true)
 s:insert{12345, 'abcdef'} box.snapshot() -- dump
 s:insert{67890, 'ghijkl'} box.snapshot() -- dump + compaction
-while s.index.pk:info().run_count > 1 do fiber.sleep(0.01) end -- wait for compaction
+while s.index.pk:stat().run_count > 1 do fiber.sleep(0.01) end -- wait for compaction
 file_count()
 gc()
 file_count()

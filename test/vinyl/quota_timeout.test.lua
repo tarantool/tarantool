@@ -90,13 +90,13 @@ _ = s2:create_index('pk')
 
 pad = string.rep('x', 64)
 _ = s1:auto_increment{pad}
-s1.index.pk:info().memory.bytes > 0
+s1.index.pk:stat().memory.bytes > 0
 
 pad = string.rep('x', box.cfg.vinyl_memory - string.len(pad))
 _ = s2:auto_increment{pad}
 
-while s1.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.01) end
-s1.index.pk:info().memory.bytes == 0
+while s1.index.pk:stat().disk.dump.count == 0 do fiber.sleep(0.01) end
+s1.index.pk:stat().memory.bytes == 0
 
 test_run:cmd('switch default')
 test_run:cmd("stop server test")

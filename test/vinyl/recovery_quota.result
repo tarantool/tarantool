@@ -46,7 +46,7 @@ var = box.schema.space.create('var')
 _ = var:create_index('pk', {parts = {1, 'string'}})
 ---
 ...
-stat = box.space.test.index.pk:info()
+stat = box.space.test.index.pk:stat()
 ---
 ...
 _ = var:insert{'put', stat.put.rows}
@@ -65,7 +65,7 @@ stat.quota.used <= stat.quota.limit or {stat.quota.used, stat.quota.limit}
 - true
 ...
 -- Check that we did not replay statements dumped before restart.
-stat = box.space.test.index.pk:info()
+stat = box.space.test.index.pk:stat()
 ---
 ...
 var = box.space.var
@@ -119,7 +119,7 @@ fiber = require 'fiber'
 ---
 ...
 -- All memory above the limit must be dumped after recovery.
-while box.space.test.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.001) end
+while box.space.test.index.pk:stat().disk.dump.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 stat = box.stat.vinyl()

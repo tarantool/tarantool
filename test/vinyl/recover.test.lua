@@ -40,7 +40,7 @@ s4:insert{44}
 s5:insert{55}
 
 -- Remember stats before restarting the server.
-_ = var:insert{'vyinfo', s3.index.primary:info()}
+_ = var:insert{'vyinfo', s3.index.primary:stat()}
 
 test_run:cmd('restart server default')
 
@@ -63,7 +63,7 @@ s5.index.i2:select()
 
 -- Check that stats didn't change after recovery.
 vyinfo1 = var:get('vyinfo')[2]
-vyinfo2 = s3.index.primary:info()
+vyinfo2 = s3.index.primary:stat()
 
 vyinfo1.memory.rows == vyinfo2.memory.rows
 vyinfo1.memory.bytes == vyinfo2.memory.bytes
@@ -99,7 +99,7 @@ for _, f in pairs(fio.glob(box.cfg.vinyl_dir .. '/' .. test.id .. '/0/*.index'))
 
 _ = box.schema.space.create('info')
 _ = box.space.info:create_index('pk')
-_ = box.space.info:insert{1, box.space.test.index.pk:info()}
+_ = box.space.info:insert{1, box.space.test.index.pk:stat()}
 
 test2 = box.schema.space.create('test2', {engine = 'vinyl'})
 _ = test2:create_index('pk')
@@ -124,7 +124,7 @@ sum
 
 -- Check that disk stats are restored after index rebuild (gh-3173).
 old_info = box.space.info:get(1)[2]
-new_info = box.space.test.index.pk:info()
+new_info = box.space.test.index.pk:stat()
 new_info.disk.index_size == old_info.disk.index_size
 new_info.disk.bloom_size == old_info.disk.bloom_size
 new_info.disk.rows == old_info.disk.rows

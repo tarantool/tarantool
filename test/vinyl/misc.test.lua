@@ -64,12 +64,12 @@ i7 = s:create_index('i7', {unique = true, parts = {6, 'unsigned'}})
 
 s:insert{1, 1, 1, 1, 1, 1}
 
-i1:info().lookup -- 1
-i2:info().lookup -- 0
-i3:info().lookup -- 0
-i4:info().lookup -- 1
-i5:info().lookup -- 0
-i6:info().lookup -- 0
-i7:info().lookup -- 1
+i1:stat().lookup -- 1
+i2:stat().lookup -- 0
+i3:stat().lookup -- 0
+i4:stat().lookup -- 1
+i5:stat().lookup -- 0
+i6:stat().lookup -- 0
+i7:stat().lookup -- 1
 
 s:drop()

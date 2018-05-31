@@ -25,7 +25,7 @@ function gc() temp:auto_increment{} box.snapshot() end
 -- Check that run files are deleted by gc.
 s:insert{1} box.snapshot() -- dump
 s:insert{2} box.snapshot() -- dump + compaction
-while s.index.pk:info().run_count > 1 do fiber.sleep(0.01) end -- wait for compaction
+while s.index.pk:stat().run_count > 1 do fiber.sleep(0.01) end -- wait for compaction
 gc()
 files = ls_data()
 #files == 2 or {files, gc_info()}
@@ -91,8 +91,8 @@ box.snapshot()
 count_runs() -- 2
 
 for i = 1, 20 do s:replace{i, string.rep('x', 100 * 1024)} end
-while s.index.pk:info().disk.compact.count < 1 do fiber.sleep(0.001) end
-s.index.pk:info().disk.compact.count -- 1
+while s.index.pk:stat().disk.compact.count < 1 do fiber.sleep(0.001) end
+s.index.pk:stat().disk.compact.count -- 1
 
 count_runs() -- 3 (compacted runs created after checkpoint are deleted)
 

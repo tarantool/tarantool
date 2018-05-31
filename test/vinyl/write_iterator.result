@@ -833,27 +833,27 @@ box.snapshot()
 - ok
 ...
 -- Wait for compaction.
-while pk:info().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
 ---
 ...
-while sk:info().disk.compact.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
 ---
 ...
-pk:info().disk.compact.count -- 1
+pk:stat().disk.compact.count -- 1
 ---
 - 1
 ...
-sk:info().disk.compact.count -- 1
+sk:stat().disk.compact.count -- 1
 ---
 - 1
 ...
 -- All INSERT+DELETE pairs should have been annihilated,
 -- only padding is left.
-pk:info().disk.compact.out.rows - PAD2 -- 0
+pk:stat().disk.compact.out.rows - PAD2 -- 0
 ---
 - 0
 ...
-sk:info().disk.compact.out.rows - PAD2 -- 0
+sk:stat().disk.compact.out.rows - PAD2 -- 0
 ---
 - 0
 ...
@@ -980,17 +980,17 @@ box.snapshot()
 - ok
 ...
 -- Wait for compaction.
-while pk:info().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
 ---
 ...
-while sk:info().disk.compact.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
 ---
 ...
-pk:info().disk.compact.count -- 1
+pk:stat().disk.compact.count -- 1
 ---
 - 1
 ...
-sk:info().disk.compact.count -- 1
+sk:stat().disk.compact.count -- 1
 ---
 - 1
 ...

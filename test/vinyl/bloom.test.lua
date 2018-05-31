@@ -8,7 +8,7 @@ _ = s:create_index('pk', {bloom_fpr = 1})
 for i = 1, 10, 2 do s:insert{i} end
 box.snapshot()
 for i = 1, 10 do s:get{i} end
-stat = s.index.pk:info()
+stat = s.index.pk:stat()
 stat.disk.bloom_size -- 0
 stat.disk.iterator.bloom.hit -- 0
 stat.disk.iterator.bloom.miss -- 0
@@ -21,10 +21,10 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {parts = {1, 'unsigned', 2, 'unsigned', 3, 'unsigned', 4, 'unsigned'}})
 
 reflects = 0
-function cur_reflects() return box.space.test.index.pk:info().disk.iterator.bloom.hit end
+function cur_reflects() return box.space.test.index.pk:stat().disk.iterator.bloom.hit end
 function new_reflects() local o = reflects reflects = cur_reflects() return reflects - o end
 seeks = 0
-function cur_seeks() return box.space.test.index.pk:info().disk.iterator.lookup end
+function cur_seeks() return box.space.test.index.pk:stat().disk.iterator.lookup end
 function new_seeks() local o = seeks seeks = cur_seeks() return seeks - o end
 
 for i = 1, 1000 do s:replace{math.ceil(i / 10), math.ceil(i / 2), i, i * 2} end
@@ -44,7 +44,7 @@ box.snapshot()
 -- or 1172 bytes, and after rounding up to the block size (128 byte)
 -- we have 1280 bytes plus the header overhead.
 --
-s.index.pk:info().disk.bloom_size
+s.index.pk:stat().disk.bloom_size
 
 _ = new_reflects()
 _ = new_seeks()
@@ -89,10 +89,10 @@ box.cfg{vinyl_cache = 0}
 s = box.space.test
 
 reflects = 0
-function cur_reflects() return box.space.test.index.pk:info().disk.iterator.bloom.hit end
+function cur_reflects() return box.space.test.index.pk:stat().disk.iterator.bloom.hit end
 function new_reflects() local o = reflects reflects = cur_reflects() return reflects - o end
 seeks = 0
-function cur_seeks() return box.space.test.index.pk:info().disk.iterator.lookup end
+function cur_seeks() return box.space.test.index.pk:stat().disk.iterator.lookup end
 function new_seeks() local o = seeks seeks = cur_seeks() return seeks - o end
 
 _ = new_reflects()

@@ -1284,8 +1284,8 @@ base_index_mt.delete = function(index, key)
     return internal.delete(index.space_id, index.id, keify(key));
 end
 
-base_index_mt.info = function(index)
-    return internal.info(index.space_id, index.id);
+base_index_mt.stat = function(index)
+    return internal.stat(index.space_id, index.id);
 end
 
 base_index_mt.compact = function(index)
