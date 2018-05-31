@@ -437,8 +437,7 @@ sql_parser_create(struct Parse *parser, sqlite3 *db)
 {
 	memset(parser, 0, sizeof(struct Parse));
 	parser->db = db;
-	struct region *region = &fiber()->gc;
-	parser->region_initial_size = region_used(region);
+	region_create(&parser->region, &cord()->slabc);
 }
 
 void
@@ -454,6 +453,5 @@ sql_parser_destroy(Parse *parser)
 		db->lookaside.bDisable -= parser->disableLookaside;
 	}
 	parser->disableLookaside = 0;
-	struct region *region = &fiber()->gc;
-	region_truncate(region, parser->region_initial_size);
+	region_destroy(&parser->region);
 }

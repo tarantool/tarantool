@@ -636,7 +636,7 @@ sql_field_retrieve(Parse *parser, Table *table, uint32_t id)
 	if (id >= table->def->exact_field_count) {
 		uint32_t columns_new = table->def->exact_field_count;
 		columns_new = (columns_new > 0) ? 2 * columns_new : 1;
-		struct region *region = &fiber()->gc;
+		struct region *region = &parser->region;
 		field = region_alloc(region, columns_new *
 				     sizeof(table->def->fields[0]));
 		if (field == NULL) {
@@ -698,7 +698,7 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	if (sql_field_retrieve(pParse, p,
 			       (uint32_t) p->def->field_count) == NULL)
 		return;
-	struct region *region = &fiber()->gc;
+	struct region *region = &pParse->region;
 	z = region_alloc(region, pName->n + 1);
 	if (z == NULL) {
 		diag_set(OutOfMemory, pName->n + 1,
@@ -906,7 +906,7 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 			assert(p->def != NULL);
 			struct field_def *field =
 				&p->def->fields[p->def->field_count - 1];
-			struct region *region = &fiber()->gc;
+			struct region *region = &pParse->region;
 			uint32_t default_length = (int)(pSpan->zEnd - pSpan->zStart);
 			field->default_value = region_alloc(region,
 							    default_length + 1);

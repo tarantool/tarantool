@@ -544,16 +544,18 @@ sql_expr_compile(sqlite3 *db, const char *expr, struct Expr **result)
 {
 	const char *outer = "SELECT ";
 	int len = strlen(outer) + strlen(expr);
-	char *stmt = (char *) region_alloc(&fiber()->gc, len + 1);
+
+	struct Parse parser;
+	sql_parser_create(&parser, db);
+	parser.parse_only = true;
+
+	char *stmt = (char *)region_alloc(&parser.region, len + 1);
 	if (stmt == NULL) {
 		diag_set(OutOfMemory, len + 1, "region_alloc", "stmt");
 		return -1;
 	}
 	sprintf(stmt, "%s%s", outer, expr);
 
-	struct Parse parser;
-	sql_parser_create(&parser, db);
-	parser.parse_only = true;
 	char *unused;
 	if (sqlite3RunParser(&parser, stmt, &unused) != SQLITE_OK) {
 		diag_set(ClientError, ER_SQL_EXECUTE, expr);

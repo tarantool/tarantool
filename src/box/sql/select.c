@@ -1762,7 +1762,7 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 	 * names for existing table.
 	 */
 	assert(table->def->fields == NULL);
-	struct region *region = &fiber()->gc;
+	struct region *region = &parse->region;
 	table->def->fields =
 		region_alloc(region, nCol * sizeof(table->def->fields[0]));
 	if (table->def->fields == NULL) {
