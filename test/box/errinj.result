@@ -56,6 +56,8 @@ errinj.info()
     state: false
   ERRINJ_VY_LOG_FLUSH_DELAY:
     state: false
+  ERRINJ_SNAP_COMMIT_DELAY:
+    state: false
   ERRINJ_RELAY_FINAL_SLEEP:
     state: false
   ERRINJ_VY_RUN_DISCARD:

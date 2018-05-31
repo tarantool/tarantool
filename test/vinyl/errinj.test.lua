@@ -2,6 +2,7 @@
 -- gh-1681: vinyl: crash in vy_rollback on ER_WAL_WRITE
 --
 test_run = require('test_run').new()
+fio = require('fio')
 fiber = require('fiber')
 errinj = box.error.injection
 errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0.040)
@@ -538,3 +539,31 @@ repeat fiber.sleep(0.001) q = box.info.vinyl().quota until q.limit - q.used < pa
 test_run:cmd('switch default')
 test_run:cmd("stop server low_quota")
 test_run:cmd("cleanup server low_quota")
+
+--
+-- gh-3437: if compaction races with checkpointing, it may remove
+-- files needed for backup.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {run_count_per_level = 1})
+-- Create a run file.
+_ = s:replace{1}
+box.snapshot()
+-- Create another run file. This will trigger compaction
+-- as run_count_per_level is set to 1. Due to the error
+-- injection compaction will finish before snapshot.
+_ = s:replace{2}
+errinj.set('ERRINJ_SNAP_COMMIT_DELAY', true)
+c = fiber.channel(1)
+_ = fiber.create(function() box.snapshot() c:put(true) end)
+while s.index.pk:info().disk.compact.count == 0 do fiber.sleep(0.001) end
+errinj.set('ERRINJ_SNAP_COMMIT_DELAY', false)
+c:get()
+-- Check that all files corresponding to the last checkpoint
+-- are present.
+files = box.backup.start()
+missing = {}
+for _, f in pairs(files) do if not fio.path.exists(f) then table.insert(missing, f) end end
+missing
+box.backup.stop()
+s:drop()

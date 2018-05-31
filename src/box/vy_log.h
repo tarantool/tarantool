@@ -253,6 +253,12 @@ void
 vy_log_collect_garbage(int64_t signature);
 
 /**
+ * Return the signature of the newest vylog to the time.
+ */
+int64_t
+vy_log_signature(void);
+
+/**
  * Return the path to the log file that needs to be backed up
  * in order to recover to checkpoint @vclock.
  */

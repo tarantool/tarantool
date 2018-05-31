@@ -1158,6 +1158,12 @@ vy_log_collect_garbage(int64_t signature)
 	xdir_collect_garbage(&vy_log.dir, signature, true);
 }
 
+int64_t
+vy_log_signature(void)
+{
+	return vclock_sum(&vy_log.last_checkpoint);
+}
+
 const char *
 vy_log_backup_path(struct vclock *vclock)
 {
