@@ -450,7 +450,9 @@ user_find(uint32_t uid)
 struct user *
 user_find_by_name(const char *name, uint32_t len)
 {
-	uint32_t uid = schema_find_id(BOX_USER_ID, 2, name, len);
+	uint32_t uid;
+	if (schema_find_id(BOX_USER_ID, 2, name, len, &uid) != 0)
+		diag_raise();
 	struct user *user = user_by_id(uid);
 	if (user == NULL || user->def->type != SC_USER) {
 		diag_set(ClientError, ER_NO_SUCH_USER, tt_cstr(name, len));

@@ -222,30 +222,52 @@ sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
 	trigger_run_xc(&on_alter_space, space);
 }
 
-uint32_t
+int
 schema_find_id(uint32_t system_space_id, uint32_t index_id,
-	       const char *name, uint32_t len)
+	       const char *name, uint32_t len, uint32_t *object_id)
 {
-	if (len > BOX_NAME_MAX)
-		return BOX_ID_NIL;
-	struct space *space = space_cache_find_xc(system_space_id);
-	struct index *index = index_find_system_xc(space, index_id);
+	if (len > BOX_NAME_MAX) {
+		diag_set(SystemError,
+			 "name length %d is greater than BOX_NAME_MAX", len);
+		return -1;
+	}
+	struct space *space = space_cache_find(system_space_id);
+	if (space == NULL)
+		return -1;
+	if (!space_is_memtx(space)) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 space->engine->name, "system data");
+		return -1;
+	}
+	struct index *index = index_find(space, index_id);
+	if (index == NULL)
+		return -1;
 	uint32_t size = mp_sizeof_str(len);
 	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
-	char *key = (char *) region_alloc_xc(region, size);
-	auto guard = make_scoped_guard([=] { region_truncate(region, used); });
-	mp_encode_str(key, name, len);
-
-	struct iterator *it = index_create_iterator_xc(index, ITER_EQ, key, 1);
-	IteratorGuard iter_guard(it);
-
-	struct tuple *tuple = iterator_next_xc(it);
-	if (tuple) {
-		/* id is always field #1 */
-		return tuple_field_u32_xc(tuple, 0);
+	char *key = (char *)region_alloc(region, size);
+	if (key == NULL) {
+		diag_set(OutOfMemory, size, "region", "key");
+		return -1;
 	}
-	return BOX_ID_NIL;
+	mp_encode_str(key, name, len);
+	struct iterator *it = index_create_iterator(index, ITER_EQ, key, 1);
+	if (it == NULL) {
+		region_truncate(region, used);
+		return -1;
+	}
+	struct tuple *tuple;
+	int rc = iterator_next(it, &tuple);
+	if (rc == 0) {
+		/* id is always field #1 */
+		if (tuple == NULL)
+			*object_id = BOX_ID_NIL;
+		else if (tuple_field_u32(tuple, 0, object_id) != 0)
+			rc = -1;
+	}
+	iterator_delete(it);
+	region_truncate(region, used);
+	return rc;
 }
 
 /**

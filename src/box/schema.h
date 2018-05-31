@@ -102,6 +102,22 @@ space_is_system(struct space *space);
 struct sequence *
 sequence_by_id(uint32_t id);
 
+/**
+ * Find object id by name in specified system space with index.
+ *
+ * @param system_space_id identifier of the system object.
+ * @param index_id identifier of the index to lookup.
+ * @param name of object to lookup.
+ * @param len length of a name.
+ * @param object_id[out] object_id or BOX_ID_NIL - not found.
+ *
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+int
+schema_find_id(uint32_t system_space_id, uint32_t index_id, const char *name,
+	       uint32_t len, uint32_t *object_id);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
@@ -133,13 +149,6 @@ void
 schema_free();
 
 struct space *schema_space(uint32_t id);
-
-/*
- * Find object id by object name.
- */
-uint32_t
-schema_find_id(uint32_t system_space_id, uint32_t index_id,
-	       const char *name, uint32_t len);
 
 /**
  * Insert a new function or update the old one.
