@@ -591,7 +591,7 @@ _ = s:replace{2}
 errinj.set('ERRINJ_SNAP_COMMIT_DELAY', true)
 c = fiber.channel(1)
 _ = fiber.create(function() box.snapshot() c:put(true) end)
-while s.index.pk:info().disk.compact.count == 0 do fiber.sleep(0.001) end
+while s.index.pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
 errinj.set('ERRINJ_SNAP_COMMIT_DELAY', false)
 c:get()
 -- Check that all files corresponding to the last checkpoint
