@@ -490,6 +490,26 @@ box_check_wal_max_size(int64_t wal_max_size)
 	return wal_max_size;
 }
 
+static int64_t
+box_check_memtx_memory(int64_t memory)
+{
+	if (memory <= 0) {
+		tnt_raise(ClientError, ER_CFG, "memtx_memory",
+			  "must be greater than 0");
+	}
+	return memory;
+}
+
+static int64_t
+box_check_vinyl_memory(int64_t memory)
+{
+	if (memory <= 0) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_memory",
+			  "must be greater than 0");
+	}
+	return memory;
+}
+
 static void
 box_check_vinyl_options(void)
 {
@@ -500,6 +520,8 @@ box_check_vinyl_options(void)
 	int run_count_per_level = cfg_geti("vinyl_run_count_per_level");
 	double run_size_ratio = cfg_getd("vinyl_run_size_ratio");
 	double bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+
+	box_check_vinyl_memory(cfg_geti64("vinyl_memory"));
 
 	if (read_threads < 1) {
 		tnt_raise(ClientError, ER_CFG, "vinyl_read_threads",
@@ -551,6 +573,7 @@ box_check_config()
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
+	box_check_memtx_memory(cfg_geti64("memtx_memory"));
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
 	box_check_vinyl_options();
 }
@@ -706,7 +729,8 @@ box_set_memtx_memory(void)
 	struct memtx_engine *memtx;
 	memtx = (struct memtx_engine *)engine_by_name("memtx");
 	assert(memtx != NULL);
-	memtx_engine_set_memory_xc(memtx, cfg_geti("memtx_memory"));
+	memtx_engine_set_memory_xc(memtx,
+		box_check_memtx_memory(cfg_geti64("memtx_memory")));
 }
 
 void
@@ -752,7 +776,8 @@ box_set_vinyl_memory(void)
 	struct vinyl_engine *vinyl;
 	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
 	assert(vinyl != NULL);
-	vinyl_engine_set_memory_xc(vinyl, cfg_geti("vinyl_memory"));
+	vinyl_engine_set_memory_xc(vinyl,
+		box_check_vinyl_memory(cfg_geti64("vinyl_memory")));
 }
 
 void

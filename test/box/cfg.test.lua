@@ -23,6 +23,8 @@ box.cfg{replication = {}}
 --------------------------------------------------------------------------------
 
 box.cfg{memtx_memory = "100500"}
+box.cfg{memtx_memory = -1}
+box.cfg{vinyl_memory = -1}
 box.cfg{vinyl = "vinyl"}
 box.cfg{vinyl_write_threads = "threads"}
 
