@@ -730,6 +730,14 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 		snprintf(to, sizeof(to), "%s",
 			 xdir_format_filename(dir, lsn, NONE));
 		char *from = xdir_format_filename(dir, lsn, INPROGRESS);
+#ifndef NDEBUG
+		struct errinj *delay = errinj(ERRINJ_SNAP_COMMIT_DELAY,
+					       ERRINJ_BOOL);
+		if (delay != NULL && delay->bparam) {
+			while (delay->bparam)
+				fiber_sleep(0.001);
+		}
+#endif
 		int rc = coio_rename(from, to);
 		if (rc != 0)
 			panic("can't rename .snap.inprogress");

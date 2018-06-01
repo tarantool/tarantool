@@ -1118,7 +1118,7 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		if (slice == last_slice)
 			break;
 	}
-	int64_t gc_lsn = checkpoint_last(NULL);
+	int64_t gc_lsn = vy_log_signature();
 	rlist_foreach_entry(run, &unused_runs, in_unused)
 		vy_log_drop_run(run->id, gc_lsn);
 	if (new_slice != NULL) {
