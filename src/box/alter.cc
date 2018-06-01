@@ -405,11 +405,13 @@ field_def_decode(struct field_def *field, const char **data,
 				     "string, scalar and any fields"));
 	}
 
-	if (field->default_value != NULL &&
-	    sql_expr_compile(sql_get(), field->default_value,
-			     strlen(field->default_value),
-			     &field->default_value_expr) != 0)
-		diag_raise();
+	const char *dv = field->default_value;
+	if (dv != NULL) {
+		field->default_value_expr = sql_expr_compile(sql_get(), dv,
+							     strlen(dv));
+		if (field->default_value_expr == NULL)
+			diag_raise();
+	}
 }
 
 /**

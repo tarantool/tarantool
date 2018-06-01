@@ -1815,10 +1815,12 @@ sql_check_list_item_init(struct ExprList *expr_list, int column,
 			return -1;
 		}
 	}
-	if (expr_str != NULL && sql_expr_compile(db, expr_str, expr_str_len,
-						 &item->pExpr) != 0) {
-		sqlite3DbFree(db, item->zName);
-		return -1;
+	if (expr_str != NULL) {
+		item->pExpr = sql_expr_compile(db, expr_str, expr_str_len);
+		if (item->pExpr == NULL) {
+			sqlite3DbFree(db, item->zName);
+			return -1;
+		}
 	}
 	return 0;
 }

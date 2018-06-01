@@ -454,5 +454,15 @@ sql_parser_destroy(Parse *parser)
 	}
 	parser->disableLookaside = 0;
 	sqlite3DbFree(db, parser->zErrMsg);
+	switch (parser->parsed_ast_type) {
+	case AST_TYPE_SELECT:
+		sql_select_delete(db, parser->parsed_ast.select);
+		break;
+	case AST_TYPE_EXPR:
+		sql_expr_delete(db, parser->parsed_ast.expr, false);
+		break;
+	default:
+		assert(parser->parsed_ast_type == AST_TYPE_UNDEFINED);
+	}
 	region_destroy(&parser->region);
 }

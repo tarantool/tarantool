@@ -75,13 +75,12 @@ struct Table;
  * @param db SQL context handle.
  * @param expr Expression to parse.
  * @param expr_len Length of @an expr.
- * @param[out] result Result: AST structure.
  *
- * @retval Error code if any.
+ * @retval NULL on error.
+ * @retval not NULL Expr AST pointer on success.
  */
-int
-sql_expr_compile(struct sqlite3 *db, const char *expr, int expr_len,
-		 struct Expr **result);
+struct Expr *
+sql_expr_compile(struct sqlite3 *db, const char *expr, int expr_len);
 
 /**
  * This routine executes parser on 'CREATE VIEW ...' statement
