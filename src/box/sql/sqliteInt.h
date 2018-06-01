@@ -4067,7 +4067,6 @@ TriggerStep *sqlite3TriggerInsertStep(sqlite3 *, Token *, IdList *,
 TriggerStep *sqlite3TriggerUpdateStep(sqlite3 *, Token *, ExprList *, Expr *,
 				      u8);
 TriggerStep *sqlite3TriggerDeleteStep(sqlite3 *, Token *, Expr *);
-void sqlite3DeleteTrigger(sqlite3 *, Trigger *);
 void sqlite3UnlinkAndDeleteTrigger(sqlite3 *, const char *);
 u32 sqlite3TriggerColmask(Parse *, Trigger *, ExprList *, int, int, Table *,
 			  int);
@@ -4075,7 +4074,7 @@ u32 sqlite3TriggerColmask(Parse *, Trigger *, ExprList *, int, int, Table *,
 #define sqlite3IsToplevel(p) ((p)->pToplevel==0)
 #else
 #define sqlite3TriggersExist(C,D,E,F) 0
-#define sqlite3DeleteTrigger(A,B)
+#define sql_trigger_delete(A,B)
 #define sqlite3DropTriggerPtr(A,B)
 #define sqlite3UnlinkAndDeleteTrigger(A,B,C)
 #define sqlite3CodeRowTrigger(A,B,C,D,E,F,G,H,I)

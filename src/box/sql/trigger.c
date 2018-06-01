@@ -185,11 +185,10 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	sqlite3SrcListDelete(db, pTableName);
 	sqlite3IdListDelete(db, pColumns);
 	sql_expr_delete(db, pWhen, false);
-	if (!pParse->pNewTrigger) {
-		sqlite3DeleteTrigger(db, pTrigger);
-	} else {
+	if (pParse->pNewTrigger == NULL)
+		sql_trigger_delete(db, pTrigger);
+	else
 		assert(pParse->pNewTrigger == pTrigger);
-	}
 }
 
 /*
@@ -328,7 +327,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 		/* No need to free zName sinceif we reach this point
 		   alloc for it either wasn't called at all or failed.  */
 	}
-	sqlite3DeleteTrigger(db, pTrig);
+	sql_trigger_delete(db, pTrig);
 	assert(!pParse->pNewTrigger);
 	sqlite3DeleteTriggerStep(db, pStepList);
 }
@@ -471,20 +470,17 @@ sqlite3TriggerDeleteStep(sqlite3 * db,	/* Database connection */
 	return pTriggerStep;
 }
 
-/*
- * Recursively delete a Trigger structure
- */
 void
-sqlite3DeleteTrigger(sqlite3 * db, Trigger * pTrigger)
+sql_trigger_delete(struct sqlite3 *db, struct Trigger *trigger)
 {
-	if (pTrigger == 0)
+	if (trigger == NULL)
 		return;
-	sqlite3DeleteTriggerStep(db, pTrigger->step_list);
-	sqlite3DbFree(db, pTrigger->zName);
-	sqlite3DbFree(db, pTrigger->table);
-	sql_expr_delete(db, pTrigger->pWhen, false);
-	sqlite3IdListDelete(db, pTrigger->pColumns);
-	sqlite3DbFree(db, pTrigger);
+	sqlite3DeleteTriggerStep(db, trigger->step_list);
+	sqlite3DbFree(db, trigger->zName);
+	sqlite3DbFree(db, trigger->table);
+	sql_expr_delete(db, trigger->pWhen, false);
+	sqlite3IdListDelete(db, trigger->pColumns);
+	sqlite3DbFree(db, trigger);
 }
 
 /*
@@ -593,7 +589,7 @@ sqlite3UnlinkAndDeleteTrigger(sqlite3 * db, const char *zName)
 			     pp = &((*pp)->pNext)) ;
 			*pp = (*pp)->pNext;
 		}
-		sqlite3DeleteTrigger(db, pTrigger);
+		sql_trigger_delete(db, pTrigger);
 		user_session->sql_flags |= SQLITE_InternChanges;
 	}
 }

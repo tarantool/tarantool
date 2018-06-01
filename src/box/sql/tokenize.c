@@ -534,7 +534,7 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 
 	if (pParse->pWithToFree)
 		sqlite3WithDelete(db, pParse->pWithToFree);
-	sqlite3DeleteTrigger(db, pParse->pNewTrigger);
+	sql_trigger_delete(db, pParse->pNewTrigger);
 	sqlite3DbFree(db, pParse->pVList);
 	while (pParse->pZombieTab) {
 		Table *p = pParse->pZombieTab;
