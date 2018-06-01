@@ -1794,13 +1794,8 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 			    && ALWAYS(pColExpr->space_def != NULL)) {
 				/* For columns use the column name name */
 				int iCol = pColExpr->iColumn;
+				assert(iCol >= 0);
 				space_def = pColExpr->space_def;
-				Table *pTable =
-					sqlite3LocateTable(parse, 0,
-							   space_def->name);
-				assert(pTable != NULL);
-				if (iCol < 0)
-					iCol = pTable->iPKey;
 				zName = space_def->fields[iCol].name;
 			} else if (pColExpr->op == TK_ID) {
 				assert(!ExprHasProperty(pColExpr, EP_IntValue));

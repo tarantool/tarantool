@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(2)
+test:plan(3)
 
 --!./tcltestrunner.lua
 -- 2005 September 19
@@ -266,6 +266,16 @@ test:do_execsql_test(
         -- <tkt1449-1.2>
 
         -- </tkt1449-1.2>
+    })
+
+test:do_execsql_test(
+    "tkt1449-1.3",
+    [[
+        SELECT * FROM CRITICALISSUES;
+    ]], {
+        -- <tkt1449-1.3>
+
+        -- </tkt1449-1.3>
     })
 
 test:finish_test()
