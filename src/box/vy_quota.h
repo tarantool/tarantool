@@ -97,6 +97,7 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 static inline void
 vy_quota_destroy(struct vy_quota *q)
 {
+	fiber_cond_broadcast(&q->cond);
 	fiber_cond_destroy(&q->cond);
 }
 
