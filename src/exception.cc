@@ -348,6 +348,24 @@ BuildCollationError(const char *file, unsigned line, const char *format, ...)
 	return e;
 }
 
+struct error *
+BuildSocketError(const char *file, unsigned line, const char *socketname,
+		 const char *format, ...)
+{
+	int save_errno = errno;
+	BuildAlloc(SocketError);
+	SocketError *e =  new (p) SocketError(file, line, socketname, "");
+
+	char buf[DIAG_ERRMSG_MAX];
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
+	error_format_msg(e, "%s, called on %s", buf, socketname);
+	errno = save_errno;
+	return e;
+}
+
 void
 exception_init()
 {

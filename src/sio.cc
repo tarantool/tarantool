@@ -106,7 +106,7 @@ sio_shutdown(int fd, int how)
 {
 	int rc = shutdown(fd, how);
 	if (rc < 0)
-		tnt_raise(SocketError, sio_socketname(fd), "shutdown");
+		diag_set(SocketError, sio_socketname(fd), "shutdown");
 	return rc;
 }
 

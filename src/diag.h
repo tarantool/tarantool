@@ -257,6 +257,9 @@ struct index_def;
 struct error *
 BuildUnsupportedIndexFeature(const char *file, unsigned line,
 			     struct index_def *index_def, const char *what);
+struct error *
+BuildSocketError(const char *file, unsigned line, const char *socketname,
+		 const char *format, ...);
 
 #define diag_set(class, ...) do {					\
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
