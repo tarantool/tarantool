@@ -39,6 +39,7 @@
 #include <arpa/inet.h>
 
 #include <trivia/util.h>
+#include "exception.h"
 
 static void
 evio_setsockopt_server(int fd, int family, int type);
@@ -242,7 +243,7 @@ evio_service_bind_addr(struct evio_service *service)
 		assert(errno == EADDRINUSE);
 		if (!evio_service_reuse_addr(service) ||
 			sio_bind(fd, &service->addr, service->addr_len)) {
-			tnt_raise(SocketError, fd, "bind");
+			tnt_raise(SocketError, sio_socketname(fd), "bind");
 		}
 	}
 
@@ -269,7 +270,7 @@ evio_service_listen(struct evio_service *service)
 	int fd = service->ev.fd;
 	if (sio_listen(fd)) {
 		/* raise for addr in use to */
-		tnt_raise(SocketError, fd, "listen");
+		tnt_raise(SocketError, sio_socketname(fd), "listen");
 	}
 	ev_io_start(service->loop, &service->ev);
 }
@@ -305,7 +306,8 @@ evio_service_bind(struct evio_service *service, const char *uri)
 {
 	struct uri u;
 	if (uri_parse(&u, uri) || u.service == NULL)
-		tnt_raise(SocketError, -1, "invalid uri for bind: %s", uri);
+		tnt_raise(SocketError, sio_socketname(-1),
+			  "invalid uri for bind: %s", uri);
 
 	snprintf(service->serv, sizeof(service->serv), "%.*s",
 		 (int) u.service_len, u.service);
@@ -336,7 +338,8 @@ evio_service_bind(struct evio_service *service, const char *uri)
 	/* make no difference between empty string and NULL for host */
 	if (getaddrinfo(*service->host ? service->host : NULL, service->serv,
 			&hints, &res) != 0 || res == NULL)
-		tnt_raise(SocketError, -1, "can't resolve uri for bind");
+		tnt_raise(SocketError, sio_socketname(-1),
+			  "can't resolve uri for bind");
 	auto addrinfo_guard = make_scoped_guard([=]{ freeaddrinfo(res); });
 
 	for (struct addrinfo *ai = res; ai != NULL; ai = ai->ai_next) {
@@ -352,7 +355,7 @@ evio_service_bind(struct evio_service *service, const char *uri)
 			/* ignore */
 		}
 	}
-	tnt_raise(SocketError, -1, "%s: failed to bind",
+	tnt_raise(SocketError, sio_socketname(-1), "%s: failed to bind",
 		  evio_service_name(service));
 }
 

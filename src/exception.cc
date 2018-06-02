@@ -163,6 +163,27 @@ SystemError::log() const
 		      "SystemError %s", errmsg);
 }
 
+const struct type_info type_SocketError =
+	make_type("SocketError", &type_SystemError);
+
+SocketError::SocketError(const char *file, unsigned line,
+			 const char *socketname,
+			 const char *format, ...)
+	: SystemError(&type_SocketError, file, line)
+{
+	int save_errno = errno;
+
+	char buf[DIAG_ERRMSG_MAX];
+
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
+	error_format_msg(this, "%s, called on %s", buf, socketname);
+	errno = save_errno;
+}
+
+
 const struct type_info type_OutOfMemory =
 	make_type("OutOfMemory", &type_SystemError);
 

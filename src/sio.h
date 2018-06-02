@@ -90,19 +90,7 @@ sio_add_to_iov(struct iovec *iov, size_t size)
 #if defined(__cplusplus)
 } /* extern "C" */
 
-#include "exception.h"
 enum { SERVICE_NAME_MAXLEN = 32 };
-
-extern const struct type_info type_SocketError;
-class SocketError: public SystemError {
-public:
-	SocketError(const char *file, unsigned line, int fd,
-		    const char *format, ...);
-	virtual void raise()
-	{
-		throw this;
-	}
-};
 
 const char *sio_socketname(int fd);
 int sio_socket(int domain, int type, int protocol);

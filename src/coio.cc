@@ -101,7 +101,7 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 		       &error, &sz);
 	if (error != 0) {
 		errno = error;
-		tnt_raise(SocketError, coio->fd, "connect");
+		tnt_raise(SocketError, sio_socketname(coio->fd), "connect");
 	}
 	coio_guard.is_active = false;
 	return 0;
@@ -231,7 +231,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		coio_timeout_update(start, &delay);
 	}
 
-	tnt_raise(SocketError, coio->fd, "connection failed");
+	tnt_raise(SocketError, sio_socketname(coio->fd), "connection failed");
 }
 
 /**
@@ -344,8 +344,8 @@ coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz)
 	ssize_t nrd = coio_read_ahead(coio, buf, sz, bufsiz);
 	if (nrd < (ssize_t)sz) {
 		errno = EPIPE;
-		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
-			  "from socket");
+		tnt_raise(SocketError, sio_socketname(coio->fd),
+			  "unexpected EOF when reading from socket");
 	}
 	return nrd;
 }
@@ -364,8 +364,8 @@ coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz
 	ssize_t nrd = coio_read_ahead_timeout(coio, buf, sz, bufsiz, timeout);
 	if (nrd < (ssize_t)sz && errno == 0) { /* EOF. */
 		errno = EPIPE;
-		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
-			  "from socket");
+		tnt_raise(SocketError, sio_socketname(coio->fd),
+			  "unexpected EOF when reading from socket");
 	}
 	return nrd;
 }
