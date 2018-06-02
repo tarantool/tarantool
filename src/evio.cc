@@ -66,6 +66,8 @@ evio_socket(struct ev_io *coio, int domain, int type, int protocol)
 	assert(coio->fd == -1);
 	/* Don't leak fd if setsockopt fails. */
 	coio->fd = sio_socket(domain, type, protocol);
+	if (coio->fd < 0)
+		diag_raise();
 	evio_setsockopt_client(coio->fd, domain, type);
 }
 
@@ -202,7 +204,9 @@ evio_service_reuse_addr(struct evio_service *service)
 		return false;
 	int save_errno = errno;
 	int cl_fd = sio_socket(service->addr.sa_family,
-		SOCK_STREAM, 0);
+			       SOCK_STREAM, 0);
+	if (cl_fd < 0)
+		diag_raise();
 
 	if (connect(cl_fd, &service->addr, service->addr_len) == 0)
 		goto err;
@@ -233,7 +237,9 @@ evio_service_bind_addr(struct evio_service *service)
 		  sio_strfaddr(&service->addr, service->addr_len));
 	/* Create a socket. */
 	int fd = sio_socket(service->addr.sa_family,
-		SOCK_STREAM, IPPROTO_TCP);
+			    SOCK_STREAM, IPPROTO_TCP);
+	if (fd < 0)
+		diag_raise();
 
 	auto fd_guard = make_scoped_guard([=]{ close(fd); });
 

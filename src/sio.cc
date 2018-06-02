@@ -140,7 +140,7 @@ sio_socket(int domain, int type, int protocol)
 		protocol = 0;
 	int fd = socket(domain, type, protocol);
 	if (fd < 0)
-		tnt_raise(SocketError, sio_socketname(fd), "socket");
+		diag_set(SocketError, sio_socketname(fd), "socket");
 	return fd;
 }
 
