@@ -83,7 +83,8 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 		coio_guard.is_active = false;
 		return 0;
 	}
-	assert(errno == EINPROGRESS);
+	if (errno != EINPROGRESS)
+		diag_raise();
 	/*
 	 * Wait until socket is ready for writing or
 	 * timed out.
