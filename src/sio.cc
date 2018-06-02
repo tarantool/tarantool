@@ -150,8 +150,8 @@ sio_getfl(int fd)
 {
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags < 0)
-		tnt_raise(SocketError, sio_socketname(fd),
-			  "fcntl(..., F_GETFL, ...)");
+		diag_set(SocketError, sio_socketname(fd),
+			 "fcntl(..., F_GETFL, ...)");
 	return flags;
 }
 
@@ -160,10 +160,12 @@ int
 sio_setfl(int fd, int flag, int on)
 {
 	int flags = sio_getfl(fd);
+	if (flags < 0)
+		return flags;
 	flags = fcntl(fd, F_SETFL, on ? flags | flag : flags & ~flag);
 	if (flags < 0)
-		tnt_raise(SocketError, sio_socketname(fd),
-			  "fcntl(..., F_SETFL, ...)");
+		diag_set(SocketError, sio_socketname(fd),
+			 "fcntl(..., F_SETFL, ...)");
 	return flags;
 }
 

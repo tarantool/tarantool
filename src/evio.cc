@@ -107,7 +107,8 @@ evio_setsockopt_client(int fd, int family, int type)
 {
 	int on = 1;
 	/* In case this throws, the socket is not leaked. */
-	sio_setfl(fd, O_NONBLOCK, on);
+	if (sio_setfl(fd, O_NONBLOCK, on))
+		diag_raise();
 	if (type == SOCK_STREAM && family != AF_UNIX) {
 		/*
 		 * SO_KEEPALIVE to ensure connections don't hang
@@ -129,7 +130,8 @@ evio_setsockopt_server(int fd, int family, int type)
 {
 	int on = 1;
 	/* In case this throws, the socket is not leaked. */
-	sio_setfl(fd, O_NONBLOCK, on);
+	if (sio_setfl(fd, O_NONBLOCK, on))
+		diag_raise();
 	/* Allow reuse local adresses. */
 	sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
 		       &on, sizeof(on));
