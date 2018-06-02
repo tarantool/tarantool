@@ -79,8 +79,9 @@ evio_setsockopt_keepalive(int fd)
 	 * SO_KEEPALIVE to ensure connections don't hang
 	 * around for too long when a link goes away.
 	 */
-	sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
-		       &on, sizeof(on));
+	if (sio_setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE,
+		       &on, sizeof(on)))
+		diag_raise();
 #ifdef __linux__
 	/*
 	 * On Linux, we are able to fine-tune keepalive
@@ -88,16 +89,19 @@ evio_setsockopt_keepalive(int fd)
 	 * defaults are in days.
 	 */
 	int keepcnt = 5;
-	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt,
-		       sizeof(int));
+	if (sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt,
+		       sizeof(int)))
+		diag_raise();
 	int keepidle = 30;
 
-	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle,
-		       sizeof(int));
+	if (sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle,
+		       sizeof(int)))
+		diag_raise();
 
 	int keepintvl = 60;
-	sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl,
-		       sizeof(int));
+	if (sio_setsockopt(fd, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl,
+		       sizeof(int)))
+		diag_raise();
 #endif
 }
 
@@ -120,7 +124,9 @@ evio_setsockopt_client(int fd, int family, int type)
 		 * bandwidth, and we usually write entire
 		 * request/response in a single syscall.
 		 */
-		sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+		if (sio_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY,
+				   &on, sizeof(on)))
+			diag_raise();
 	}
 }
 
@@ -133,15 +139,17 @@ evio_setsockopt_server(int fd, int family, int type)
 	if (sio_setfl(fd, O_NONBLOCK, on))
 		diag_raise();
 	/* Allow reuse local adresses. */
-	sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
-		       &on, sizeof(on));
+	if (sio_setsockopt(fd, SOL_SOCKET, SO_REUSEADDR,
+		       &on, sizeof(on)))
+		diag_raise();
 
 	/* Send all buffered messages on socket before take
 	 * control out from close(2) or shutdown(2). */
 	struct linger linger = { 0, 0 };
 
-	sio_setsockopt(fd, SOL_SOCKET, SO_LINGER,
-		       &linger, sizeof(linger));
+	if (sio_setsockopt(fd, SOL_SOCKET, SO_LINGER,
+		       &linger, sizeof(linger)))
+		diag_raise();
 	if (type == SOCK_STREAM && family != AF_UNIX)
 		evio_setsockopt_keepalive(fd);
 }

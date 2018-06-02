@@ -169,28 +169,32 @@ sio_setfl(int fd, int flag, int on)
 	return flags;
 }
 
-/** Set an option on a socket. */
-void
+/** Set an option on a socket.
+ * @retval -1 on error
+ * */
+int
 sio_setsockopt(int fd, int level, int optname,
 	       const void *optval, socklen_t optlen)
 {
 	int rc = setsockopt(fd, level, optname, optval, optlen);
 	if (rc) {
-		tnt_raise(SocketError, sio_socketname(fd),
+		diag_set(SocketError, sio_socketname(fd),
 			  "setsockopt(%s)", sio_option_name(optname));
 	}
+	return rc;
 }
 
 /** Get a socket option value. */
-void
+int
 sio_getsockopt(int fd, int level, int optname,
 	       void *optval, socklen_t *optlen)
 {
 	int rc = getsockopt(fd, level, optname, optval, optlen);
 	if (rc) {
-		tnt_raise(SocketError, sio_socketname(fd), "getsockopt(%s)",
-			  sio_option_name(optname));
+		diag_set(SocketError, sio_socketname(fd), "getsockopt(%s)",
+			 sio_option_name(optname));
 	}
+	return rc;
 }
 
 /** Connect a client socket to a server. */

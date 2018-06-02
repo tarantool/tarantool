@@ -97,8 +97,9 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 		tnt_raise(TimedOut);
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
-	sio_getsockopt(coio->fd, SOL_SOCKET, SO_ERROR,
-		       &error, &sz);
+	if (sio_getsockopt(coio->fd, SOL_SOCKET, SO_ERROR,
+		       &error, &sz))
+		diag_raise();
 	if (error != 0) {
 		errno = error;
 		tnt_raise(SocketError, sio_socketname(coio->fd), "connect");

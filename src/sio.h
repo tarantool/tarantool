@@ -100,10 +100,10 @@ int sio_shutdown(int fd, int how);
 int sio_getfl(int fd);
 int sio_setfl(int fd, int flag, int on);
 
-void
+int
 sio_setsockopt(int fd, int level, int optname,
 	       const void *optval, socklen_t optlen);
-void
+int
 sio_getsockopt(int fd, int level, int optname,
 	       void *optval, socklen_t *optlen);
 
