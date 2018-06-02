@@ -204,19 +204,22 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 }
 
 /*
- * Check if the unix socket which we file to create exists and
+ * Check if the UNIX socket which we failed to create exists and
  * no one is listening on it. Unlink the file if it's the case.
+ * Set an error and return -1 otherwise.
  */
-static bool
-evio_service_reuse_addr(struct evio_service *service)
+static int
+evio_service_reuse_addr(struct evio_service *service, int fd)
 {
-	if ((service->addr.sa_family != AF_UNIX) || (errno != EADDRINUSE))
-		return false;
+	if ((service->addr.sa_family != AF_UNIX) || (errno != EADDRINUSE)) {
+		diag_set(SocketError, sio_socketname(fd),
+			 "evio_service_reuse_addr");
+		return -1;
+	}
 	int save_errno = errno;
-	int cl_fd = sio_socket(service->addr.sa_family,
-			       SOCK_STREAM, 0);
+	int cl_fd = sio_socket(service->addr.sa_family, SOCK_STREAM, 0);
 	if (cl_fd < 0)
-		diag_raise();
+		return -1;
 
 	if (connect(cl_fd, &service->addr, service->addr_len) == 0)
 		goto err;
@@ -228,11 +231,12 @@ evio_service_reuse_addr(struct evio_service *service)
 		goto err;
 	close(cl_fd);
 
-	return true;
+	return 0;
 err:
 	errno = save_errno;
 	close(cl_fd);
-	return false;
+	diag_set(SocketError, sio_socketname(fd), "unlink");
+	return -1;
 }
 
 /**
@@ -256,10 +260,16 @@ evio_service_bind_addr(struct evio_service *service)
 	evio_setsockopt_server(fd, service->addr.sa_family, SOCK_STREAM);
 
 	if (sio_bind(fd, &service->addr, service->addr_len)) {
-		assert(errno == EADDRINUSE);
-		if (!evio_service_reuse_addr(service) ||
-			sio_bind(fd, &service->addr, service->addr_len)) {
-			tnt_raise(SocketError, sio_socketname(fd), "bind");
+		if (errno != EADDRINUSE)
+			diag_raise();
+		if (evio_service_reuse_addr(service, fd))
+			diag_raise();
+		if (sio_bind(fd, &service->addr, service->addr_len)) {
+			if (errno == EADDRINUSE) {
+				diag_set(SocketError, sio_socketname(fd),
+					 "bind");
+			}
+			diag_raise();
 		}
 	}
 
