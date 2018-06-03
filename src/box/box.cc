@@ -1887,16 +1887,17 @@ box_cfg_xc(void)
 				&last_checkpoint_vclock);
 
 		engine_begin_final_recovery_xc();
-		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
-				      cfg_getd("wal_dir_rescan_delay"));
-		title("hot_standby");
-
+		recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
 		/*
 		 * Leave hot standby mode, if any, only
 		 * after acquiring the lock.
 		 */
 		if (wal_dir_lock < 0) {
+			title("hot_standby");
 			say_info("Entering hot standby mode");
+			recovery_follow_local(recovery, &wal_stream.base,
+					      "hot_standby",
+					      cfg_getd("wal_dir_rescan_delay"));
 			while (true) {
 				if (path_lock(cfg_gets("wal_dir"),
 					      &wal_dir_lock))
@@ -1905,9 +1906,12 @@ box_cfg_xc(void)
 					break;
 				fiber_sleep(0.1);
 			}
+			recovery_stop_local(recovery);
+			recover_remaining_wals(recovery, &wal_stream.base,
+					       NULL, true);
 			box_bind();
 		}
-		recovery_finalize(recovery, &wal_stream.base);
+		recovery_finalize(recovery);
 		engine_end_recovery_xc();
 
 		/* Check replica set UUID. */
