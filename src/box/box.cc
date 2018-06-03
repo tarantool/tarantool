@@ -703,17 +703,11 @@ box_set_replication_skip_conflict(void)
 }
 
 void
-box_bind(void)
+box_listen(void)
 {
 	const char *uri = cfg_gets("listen");
 	box_check_uri(uri, "listen");
-	iproto_bind(uri);
-}
-
-void
-box_listen(void)
-{
-	iproto_listen();
+	iproto_listen(uri);
 }
 
 void
@@ -1853,13 +1847,6 @@ box_cfg_xc(void)
 		 */
 		if (!cfg_geti("hot_standby") || last_checkpoint_lsn < 0)
 			tnt_raise(ClientError, ER_ALREADY_RUNNING, cfg_gets("wal_dir"));
-	} else {
-		/*
-		 * Try to bind the port before recovery, to fail
-		 * early if the port is busy. In hot standby mode,
-		 * the port is most likely busy.
-		 */
-		box_bind();
 	}
 	bool is_bootstrap_leader = false;
 	if (last_checkpoint_lsn >= 0) {
@@ -1888,6 +1875,9 @@ box_cfg_xc(void)
 		 * not attempt to apply these rows twice.
 		 */
 		recovery_end_vclock(recovery, &replicaset.vclock);
+
+		if (wal_dir_lock >= 0)
+			box_listen();
 
 		/*
 		 * recovery->vclock is needed by Vinyl to filter
@@ -1946,7 +1936,7 @@ box_cfg_xc(void)
 			 * applied in hot standby mode.
 			 */
 			vclock_copy(&replicaset.vclock, &recovery->vclock);
-			box_bind();
+			box_listen();
 		}
 		recovery_finalize(recovery);
 		engine_end_recovery_xc();
@@ -1961,9 +1951,6 @@ box_cfg_xc(void)
 
 		/* Clear the pointer to journal before it goes out of scope */
 		journal_set(NULL);
-
-		/** Begin listening only when the local recovery is complete. */
-		box_listen();
 
 		title("orphan");
 
