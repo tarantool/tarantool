@@ -124,7 +124,7 @@ test:do_catchsql_test(
           DROP TABLE cc1;
     ]], {
         -- <3.2>
-        1, "FOREIGN KEY constraint failed"
+        1, "Can't drop space 'PP1': other objects depend on it"
         -- </3.2>
     })
 

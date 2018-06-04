@@ -730,6 +730,7 @@ test:do_catchsql_test(
     "table-10.2",
     [[
         DROP TABLE t6;
+        CREATE TABLE t4(a INT PRIMARY KEY);
         CREATE TABLE t6(a REFERENCES t4(a) MATCH PARTIAL primary key);
     ]], {
         -- <table-10.2>

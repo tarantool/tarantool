@@ -7,6 +7,15 @@ test:plan(19)
 test:do_execsql_test(
     "fkey1-1.1",
     [[
+        CREATE TABLE t2(x PRIMARY KEY, y TEXT);
+    ]], {
+        -- <fkey1-1.1>
+        -- </fkey1-1.1>
+    })
+
+test:do_execsql_test(
+    "fkey1-1.2",
+    [[
         CREATE TABLE t1(
             a INTEGER PRIMARY KEY,
             b INTEGER
@@ -17,15 +26,6 @@ test:do_execsql_test(
     ]], {
         -- <fkey1-1.1>
         -- </fkey1-1.1>
-    })
-
-test:do_execsql_test(
-    "fkey1-1.2",
-    [[
-        CREATE TABLE t2(x PRIMARY KEY, y TEXT);
-    ]], {
-        -- <fkey1-1.2>
-        -- </fkey1-1.2>
     })
 
 test:do_execsql_test(

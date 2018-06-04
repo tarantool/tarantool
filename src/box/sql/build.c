@@ -2072,10 +2072,16 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	 *    removing indexes from _index space and eventually
 	 *    tuple with corresponding space_id from _space.
 	 */
-
-	sql_clear_stat_spaces(parse_context, space_name, NULL);
 	struct Table *tab = sqlite3HashFind(&db->pSchema->tblHash, space_name);
-	sqlite3FkDropTable(parse_context, table_name_list, tab);
+	struct FKey *fk = sqlite3FkReferences(tab);
+	if (fk != NULL && fk->pFrom->def->id != tab->def->id) {
+		diag_set(ClientError, ER_DROP_SPACE, space_name,
+			 "other objects depend on it");
+		parse_context->rc = SQL_TARANTOOL_ERROR;
+		parse_context->nErr++;
+		goto exit_drop_table;
+	}
+	sql_clear_stat_spaces(parse_context, space_name, NULL);
 	sql_code_drop_table(parse_context, space, is_view);
 
  exit_drop_table:
@@ -2117,6 +2123,26 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 	char *z;
 
 	assert(pTo != 0);
+	char *normalized_name = strndup(pTo->z, pTo->n);
+	if (normalized_name == NULL) {
+		diag_set(OutOfMemory, pTo->n, "strndup", "normalized name");
+		goto fk_end;
+	}
+	sqlite3NormalizeName(normalized_name);
+	uint32_t parent_id = box_space_id_by_name(normalized_name,
+						  strlen(normalized_name));
+	if (parent_id == BOX_ID_NIL &&
+	    strcmp(normalized_name, p->def->name) != 0) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE, normalized_name);
+		pParse->rc = SQL_TARANTOOL_ERROR;
+		pParse->nErr++;
+		goto fk_end;
+	}
+	struct space *parent_space = space_by_id(parent_id);
+	if (parent_space != NULL && parent_space->def->opts.is_view) {
+		sqlite3ErrorMsg(pParse, "referenced table can't be view");
+		goto fk_end;
+	}
 	if (p == 0)
 		goto fk_end;
 	if (pFromCol == 0) {
@@ -2138,8 +2164,8 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 	} else {
 		nCol = pFromCol->nExpr;
 	}
-	nByte =
-	    sizeof(*pFKey) + (nCol - 1) * sizeof(pFKey->aCol[0]) + pTo->n + 1;
+	nByte = sizeof(*pFKey) + (nCol - 1) * sizeof(pFKey->aCol[0]) +
+		strlen(normalized_name) + 1;
 	if (pToCol) {
 		for (i = 0; i < pToCol->nExpr; i++) {
 			nByte += sqlite3Strlen30(pToCol->a[i].zName) + 1;
@@ -2153,10 +2179,8 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 	pFKey->pNextFrom = p->pFKey;
 	z = (char *)&pFKey->aCol[nCol];
 	pFKey->zTo = z;
-	memcpy(z, pTo->z, pTo->n);
-	z[pTo->n] = 0;
-	sqlite3NormalizeName(z);
-	z += pTo->n + 1;
+	memcpy(z, normalized_name, strlen(normalized_name) + 1);
+	z += strlen(normalized_name) + 1;
 	pFKey->nCol = nCol;
 	if (pFromCol == 0) {
 		pFKey->aCol[0].iFrom = p->def->field_count - 1;
@@ -2210,6 +2234,7 @@ sqlite3CreateForeignKey(Parse * pParse,	/* Parsing context */
 
  fk_end:
 	sqlite3DbFree(db, pFKey);
+	free(normalized_name);
 #endif				/* !defined(SQLITE_OMIT_FOREIGN_KEY) */
 	sql_expr_list_delete(db, pFromCol);
 	sql_expr_list_delete(db, pToCol);

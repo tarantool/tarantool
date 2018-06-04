@@ -318,11 +318,9 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 	}
 
 	if (index == NULL) {
-		if (!pParse->disableTriggers) {
-			sqlite3ErrorMsg(pParse,
-					"foreign key mismatch - \"%w\" referencing \"%w\"",
-					pFKey->pFrom->def->name, pFKey->zTo);
-		}
+		sqlite3ErrorMsg(pParse, "foreign key mismatch - "
+					"\"%w\" referencing \"%w\"",
+				pFKey->pFrom->def->name, pFKey->zTo);
 		sqlite3DbFree(pParse->db, aiCol);
 		return 1;
 	}
@@ -736,46 +734,6 @@ sql_fk_trigger_delete(struct sqlite3 *db, struct sql_trigger *trigger)
 	sqlite3DbFree(db, trigger);
 }
 
-/**
- * This function is called to generate code that runs when table
- * pTab is being dropped from the database. The SrcList passed as
- * the second argument to this function contains a single entry
- * guaranteed to resolve to table pTab.
- *
- * Normally, no code is required. However, if the table is
- * parent table of a FK constraint, then the equivalent
- * of "DELETE FROM <tbl>" is executed in a single transaction
- * before dropping the table from the database. If any FK
- * violations occur, rollback transaction and halt VDBE. Triggers
- * are disabled while running this DELETE, but foreign key
- * actions are not.
- */
-void
-sqlite3FkDropTable(Parse *parser, SrcList *name, Table *table)
-{
-	struct session *user_session = current_session();
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) == 0 ||
-	    table->def->opts.is_view || sqlite3FkReferences(table) == NULL)
-		return;
-	struct Vdbe *v = sqlite3GetVdbe(parser);
-	assert(v != NULL);
-	parser->disableTriggers = 1;
-	/* Staring new transaction before DELETE FROM <tbl> */
-	sqlite3VdbeAddOp0(v, OP_TTransaction);
-	sql_table_delete_from(parser, sqlite3SrcListDup(parser->db, name, 0),
-			      NULL);
-	parser->disableTriggers = 0;
-	/*
-	 * If the DELETE has generated immediate foreign key
-	 * constraint violations, rollback, halt the VDBE and
-	 * return an error at this point, before any modifications
-	 * of the _space and _index spaces. This is because these
-	 * spaces don't support multistatement transactions.
-	 * Otherwise, just commit changes.
-	 */
-	sqlite3VdbeAddOp0(v, OP_FkCheckCommit);
-}
-
 /*
  * The second argument points to an FKey object representing a foreign key
  * for which pTab is the child table. An UPDATE statement against pTab
@@ -884,7 +842,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 {
 	sqlite3 *db = pParse->db;	/* Database handle */
 	FKey *pFKey;		/* Used to iterate through FKs */
-	int isIgnoreErrors = pParse->disableTriggers;
 	struct session *user_session = current_session();
 
 	/* Exactly one of regOld and regNew should be non-zero. */
@@ -903,7 +860,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 		int *aiFree = 0;
 		int *aiCol;
 		int iCol;
-		int i;
 		int bIgnore = 0;
 
 		if (aChange
@@ -917,42 +873,10 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 		 * schema items cannot be located, set an error in pParse and return
 		 * early.
 		 */
-		if (pParse->disableTriggers) {
-			pTo = sqlite3HashFind(&db->pSchema->tblHash,
-					      pFKey->zTo);
-		} else {
-			pTo = sqlite3LocateTable(pParse, 0, pFKey->zTo);
-		}
-		if (!pTo
-		    || sqlite3FkLocateIndex(pParse, pTo, pFKey, &pIdx,
-					    &aiFree)) {
-			assert(isIgnoreErrors == 0
-			       || (regOld != 0 && regNew == 0));
-			if (!isIgnoreErrors || db->mallocFailed)
+		pTo = sqlite3LocateTable(pParse, 0, pFKey->zTo);
+		if (pTo == NULL || sqlite3FkLocateIndex(pParse, pTo, pFKey,
+							&pIdx, &aiFree) != 0)
 				return;
-			if (pTo == 0) {
-				/* If isIgnoreErrors is true, then a table is being dropped. In this
-				 * case SQLite runs a "DELETE FROM xxx" on the table being dropped
-				 * before actually dropping it in order to check FK constraints.
-				 * If the parent table of an FK constraint on the current table is
-				 * missing, behave as if it is empty. i.e. decrement the relevant
-				 * FK counter for each row of the current table with non-NULL keys.
-				 */
-				Vdbe *v = sqlite3GetVdbe(pParse);
-				int iJump =
-				    sqlite3VdbeCurrentAddr(v) + pFKey->nCol + 1;
-				for (i = 0; i < pFKey->nCol; i++) {
-					int iReg =
-					    pFKey->aCol[i].iFrom + regOld + 1;
-					sqlite3VdbeAddOp2(v, OP_IsNull, iReg,
-							  iJump);
-					VdbeCoverage(v);
-				}
-				sqlite3VdbeAddOp2(v, OP_FkCounter,
-						  pFKey->isDeferred, -1);
-			}
-			continue;
-		}
 		assert(pFKey->nCol == 1 || (aiFree && pIdx));
 
 		if (aiFree) {
@@ -1012,11 +936,9 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 			continue;
 		}
 
-		if (sqlite3FkLocateIndex(pParse, pTab, pFKey, &pIdx, &aiCol)) {
-			if (!isIgnoreErrors || db->mallocFailed)
-				return;
-			continue;
-		}
+		if (sqlite3FkLocateIndex(pParse, pTab, pFKey, &pIdx,
+					 &aiCol) != 0)
+			return;
 		assert(aiCol || pFKey->nCol == 1);
 
 		/* Create a SrcList structure containing the child table.  We need the

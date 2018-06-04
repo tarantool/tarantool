@@ -2857,7 +2857,6 @@ struct Parse {
 	u32 newmask;		/* Mask of new.* columns referenced */
 	u8 eTriggerOp;		/* TK_UPDATE, TK_INSERT or TK_DELETE */
 	u8 eOrconf;		/* Default ON CONFLICT policy for trigger steps */
-	u8 disableTriggers;	/* True to disable triggers */
 	/** Region to make SQL temp allocations. */
 	struct region region;
 
@@ -4633,7 +4632,6 @@ void sqlite3WithPush(Parse *, With *, u8);
  */
 #if !defined(SQLITE_OMIT_FOREIGN_KEY)
 void sqlite3FkCheck(Parse *, Table *, int, int, int *);
-void sqlite3FkDropTable(Parse *, SrcList *, Table *);
 void sqlite3FkActions(Parse *, Table *, ExprList *, int, int *);
 int sqlite3FkRequired(Table *, int *);
 u32 sqlite3FkOldmask(Parse *, Table *);
@@ -4641,7 +4639,6 @@ FKey *sqlite3FkReferences(Table *);
 #else
 #define sqlite3FkActions(a,b,c,d,e)
 #define sqlite3FkCheck(a,b,c,d,e,f)
-#define sqlite3FkDropTable(a,b,c)
 #define sqlite3FkOldmask(a,b)         0
 #define sqlite3FkRequired(b,c)    0
 #endif
