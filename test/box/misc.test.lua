@@ -111,7 +111,9 @@ type(require('yaml').encode(box.slab.info()));
 ----------------
 t = {}
 for k,v in pairs(box.error) do
-   table.insert(t, 'box.error.'..tostring(k)..' : '..tostring(v))
+   if type(v) == 'number' then
+    t[v] = 'box.error.'..tostring(k)
+   end
 end;
 t;
 
