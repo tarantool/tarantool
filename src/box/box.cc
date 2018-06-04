@@ -1876,8 +1876,10 @@ box_cfg_xc(void)
 		 */
 		recovery_end_vclock(recovery, &replicaset.vclock);
 
-		if (wal_dir_lock >= 0)
+		if (wal_dir_lock >= 0) {
 			box_listen();
+			box_sync_replication(replication_connect_timeout, false);
+		}
 
 		/*
 		 * recovery->vclock is needed by Vinyl to filter
@@ -1937,6 +1939,7 @@ box_cfg_xc(void)
 			 */
 			vclock_copy(&replicaset.vclock, &recovery->vclock);
 			box_listen();
+			box_sync_replication(replication_connect_timeout, false);
 		}
 		recovery_finalize(recovery);
 		engine_end_recovery_xc();
@@ -1951,11 +1954,6 @@ box_cfg_xc(void)
 
 		/* Clear the pointer to journal before it goes out of scope */
 		journal_set(NULL);
-
-		title("orphan");
-
-		/* Wait for the cluster to start up */
-		box_sync_replication(replication_connect_timeout, false);
 	} else {
 		if (!tt_uuid_is_nil(&instance_uuid))
 			INSTANCE_UUID = instance_uuid;
@@ -1966,8 +1964,6 @@ box_cfg_xc(void)
 		 * master-master replication leader election.
 		 */
 		box_listen();
-
-		title("orphan");
 
 		/*
 		 * Wait for the cluster to start up.
@@ -2003,6 +1999,8 @@ box_cfg_xc(void)
 	}
 
 	rmean_cleanup(rmean_box);
+
+	title("orphan");
 
 	/*
 	 * If this instance is a leader of a newly bootstrapped
