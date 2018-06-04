@@ -169,14 +169,6 @@ recovery_delete(struct recovery *r)
 	free(r);
 }
 
-void
-recovery_exit(struct recovery *r)
-{
-	/* Avoid fibers, there is no event loop */
-	r->watcher = NULL;
-	recovery_delete(r);
-}
-
 /**
  * Read all rows in a file starting from the last position.
  * Advance the position. If end of file is reached,

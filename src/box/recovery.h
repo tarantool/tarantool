@@ -68,10 +68,6 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 void
 recovery_delete(struct recovery *r);
 
-/* to be called at exit */
-void
-recovery_exit(struct recovery *r);
-
 void
 recovery_follow_local(struct recovery *r, struct xstream *stream,
 		      const char *name, ev_tstamp wal_dir_rescan_delay);
