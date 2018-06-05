@@ -33,6 +33,7 @@
 
 #include <inttypes.h>
 #include <assert.h>
+#include <stdbool.h>
 
 /**
  * 96-bit signed integer.
