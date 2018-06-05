@@ -41,6 +41,8 @@ add_library(tuple STATIC
     field_map.c
     tuple_format.c
     xrow_update.c
+    xrow_update_field.c
+    xrow_update_array.c
     tuple_compare.cc
     tuple_extract_key.cc
     tuple_hash.cc

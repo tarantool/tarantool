@@ -1371,13 +1371,13 @@ d:update{{'-', 1, ffi.new('float', 635)}}
 d:update{{'+', 1, 0/0}}
 ---
 - error: 'Argument type in operation ''+'' on field 1 does not match field type: expected
-    a number convertible to decimal.'
+    a number convertible to decimal'
 ...
 -- inf
 d:update{{'-', 1, 1/0}}
 ---
 - error: 'Argument type in operation ''-'' on field 1 does not match field type: expected
-    a number convertible to decimal.'
+    a number convertible to decimal'
 ...
 -- decimal overflow
 d = box.tuple.new(dec.new('9e37'))
