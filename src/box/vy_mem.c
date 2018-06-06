@@ -250,6 +250,12 @@ vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt)
 	assert(mem->min_lsn <= lsn);
 	if (mem->max_lsn < lsn)
 		mem->max_lsn = lsn;
+	/*
+	 * If we don't bump mem version after assigning LSN to
+	 * a mem statement, a read iterator which uses
+	 * committed_read_view and yields might not see it after
+	 * yield finishes and return a stale tuple.
+	 */
 	mem->version++;
 }
 
