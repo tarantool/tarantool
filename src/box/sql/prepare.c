@@ -453,5 +453,6 @@ sql_parser_destroy(Parse *parser)
 		db->lookaside.bDisable -= parser->disableLookaside;
 	}
 	parser->disableLookaside = 0;
+	sqlite3DbFree(db, parser->zErrMsg);
 	region_destroy(&parser->region);
 }

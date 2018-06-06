@@ -1858,13 +1858,13 @@ sql_checks_resolve_space_def_reference(ExprList *expr_list,
 
 	sql_resolve_self_reference(&parser, &dummy_table, NC_IsCheck, NULL,
 				   expr_list);
-
-	sql_parser_destroy(&parser);
+	int rc = 0;
 	if (parser.rc != SQLITE_OK) {
 		/* Tarantool error may be already set with diag. */
 		if (parser.rc != SQL_TARANTOOL_ERROR)
 			diag_set(ClientError, ER_SQL, parser.zErrMsg);
-		return -1;
+		rc = -1;
 	}
-	return 0;
+	sql_parser_destroy(&parser);
+	return rc;
 }

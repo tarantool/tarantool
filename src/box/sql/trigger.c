@@ -815,6 +815,7 @@ transferParseError(Parse * pTo, Parse * pFrom)
 	} else {
 		sqlite3DbFree(pFrom->db, pFrom->zErrMsg);
 	}
+	pFrom->zErrMsg = NULL;
 }
 
 /*

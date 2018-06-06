@@ -564,7 +564,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	 */
 	if (!pParse->nested) {
 		if ((v = sqlite3GetVdbe(pParse)) == NULL)
-			goto begin_table_error;
+			goto cleanup;
 		sqlite3VdbeCountChanges(v);
 	}
 
@@ -574,7 +574,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	if (zName == 0)
 		return;
 	if (sqlite3CheckIdentifierName(pParse, zName) != SQLITE_OK)
-		goto begin_table_error;
+		goto cleanup;
 
 	assert(db->pSchema != NULL);
 	pTable = sqlite3HashFind(&db->pSchema->tblHash, zName);
@@ -586,12 +586,12 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 		} else {
 			assert(!db->init.busy || CORRUPT_DB);
 		}
-		goto begin_table_error;
+		goto cleanup;
 	}
 
 	pTable = sql_table_new(pParse, zName);
 	if (pTable == NULL)
-		goto begin_table_error;
+		goto cleanup;
 
 	assert(pParse->pNewTable == 0);
 	pParse->pNewTable = pTable;
@@ -607,11 +607,7 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	if (!db->init.busy && (v = sqlite3GetVdbe(pParse)) != 0)
 		sql_set_multi_write(pParse, true);
 
-	/* Normal (non-error) return. */
-	return;
-
-	/* If an error occurs, we jump here */
- begin_table_error:
+ cleanup:
 	sqlite3DbFree(db, zName);
 	return;
 }
