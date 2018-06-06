@@ -1668,6 +1668,11 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 
 	/* Set UUID of a new replica set */
 	box_set_replicaset_uuid(replicaset_uuid);
+
+	/* Make the initial checkpoint */
+	if (engine_begin_checkpoint() ||
+	    engine_commit_checkpoint(&replicaset.vclock))
+		panic("failed to create a checkpoint");
 }
 
 /**
@@ -1722,6 +1727,11 @@ bootstrap_from_master(struct replica *master)
 	/* Switch applier to initial state */
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
 	assert(applier->state == APPLIER_READY);
+
+	/* Make the initial checkpoint */
+	if (engine_begin_checkpoint() ||
+	    engine_commit_checkpoint(&replicaset.vclock))
+		panic("failed to create a checkpoint");
 }
 
 /**
@@ -1732,8 +1742,31 @@ bootstrap_from_master(struct replica *master)
  *                                  the leader of a new cluster
  */
 static void
-bootstrap(const struct tt_uuid *replicaset_uuid, bool *is_bootstrap_leader)
+bootstrap(const struct tt_uuid *instance_uuid,
+	  const struct tt_uuid *replicaset_uuid,
+	  bool *is_bootstrap_leader)
 {
+	/* Initialize instance UUID. */
+	assert(tt_uuid_is_nil(&INSTANCE_UUID));
+	if (!tt_uuid_is_nil(instance_uuid))
+		INSTANCE_UUID = *instance_uuid;
+	else
+		tt_uuid_create(&INSTANCE_UUID);
+	/*
+	 * Begin listening on the socket to enable
+	 * master-master replication leader election.
+	 */
+	box_listen();
+	/*
+	 * Wait for the cluster to start up.
+	 *
+	 * Note, when bootstrapping a new instance, we have to
+	 * connect to all masters to make sure all replicas
+	 * receive the same replica set UUID when a new cluster
+	 * is deployed.
+	 */
+	box_sync_replication(TIMEOUT_INFINITY, true);
+
 	/* Use the first replica by URI as a bootstrap leader */
 	struct replica *master = replicaset_leader();
 	assert(master == NULL || master->applier != NULL);
@@ -1751,9 +1784,117 @@ bootstrap(const struct tt_uuid *replicaset_uuid, bool *is_bootstrap_leader)
 		bootstrap_master(replicaset_uuid);
 		*is_bootstrap_leader = true;
 	}
-	if (engine_begin_checkpoint() ||
-	    engine_commit_checkpoint(&replicaset.vclock))
-		panic("failed to create a checkpoint");
+}
+
+/**
+ * Recover the instance from the local directory.
+ * Enter hot standby if the directory is locked.
+ */
+static void
+local_recovery(const struct tt_uuid *instance_uuid,
+	       const struct tt_uuid *replicaset_uuid,
+	       const struct vclock *checkpoint_vclock)
+{
+	/* Check instance UUID. */
+	assert(!tt_uuid_is_nil(&INSTANCE_UUID));
+	if (!tt_uuid_is_nil(instance_uuid) &&
+	    !tt_uuid_is_equal(instance_uuid, &INSTANCE_UUID)) {
+		tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
+			  tt_uuid_str(instance_uuid),
+			  tt_uuid_str(&INSTANCE_UUID));
+	}
+
+	struct wal_stream wal_stream;
+	wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
+
+	struct recovery *recovery;
+	recovery = recovery_new(cfg_gets("wal_dir"),
+				cfg_geti("force_recovery"),
+				checkpoint_vclock);
+	auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
+
+	/*
+	 * Initialize the replica set vclock from recovery.
+	 * The local WAL may contain rows from remote masters,
+	 * so we must reflect this in replicaset vclock to
+	 * not attempt to apply these rows twice.
+	 */
+	recovery_end_vclock(recovery, &replicaset.vclock);
+
+	if (wal_dir_lock >= 0) {
+		box_listen();
+		box_sync_replication(replication_connect_timeout, false);
+	}
+
+	/*
+	 * recovery->vclock is needed by Vinyl to filter
+	 * WAL rows that were dumped before restart.
+	 *
+	 * XXX: Passing an internal member of the recovery
+	 * object to an engine is an ugly hack. Instead we
+	 * should introduce space_vtab::apply_wal_row method
+	 * and explicitly pass the statement LSN to it.
+	 */
+	engine_begin_initial_recovery_xc(&recovery->vclock);
+
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+
+	struct recovery_journal journal;
+	recovery_journal_create(&journal, &recovery->vclock);
+	journal_set(&journal.base);
+
+	/*
+	 * We explicitly request memtx to recover its
+	 * snapshot as a separate phase since it contains
+	 * data for system spaces, and triggers on
+	 * recovery of system spaces issue DDL events in
+	 * other engines.
+	 */
+	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
+
+	engine_begin_final_recovery_xc();
+	recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
+	/*
+	 * Leave hot standby mode, if any, only after
+	 * acquiring the lock.
+	 */
+	if (wal_dir_lock < 0) {
+		title("hot_standby");
+		say_info("Entering hot standby mode");
+		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
+				      cfg_getd("wal_dir_rescan_delay"));
+		while (true) {
+			if (path_lock(cfg_gets("wal_dir"), &wal_dir_lock))
+				diag_raise();
+			if (wal_dir_lock >= 0)
+				break;
+			fiber_sleep(0.1);
+		}
+		recovery_stop_local(recovery);
+		recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
+		/*
+		 * Advance replica set vclock to reflect records
+		 * applied in hot standby mode.
+		 */
+		vclock_copy(&replicaset.vclock, &recovery->vclock);
+		box_listen();
+		box_sync_replication(replication_connect_timeout, false);
+	}
+	recovery_finalize(recovery);
+	engine_end_recovery_xc();
+
+	/* Check replica set UUID. */
+	if (!tt_uuid_is_nil(replicaset_uuid) &&
+	    !tt_uuid_is_equal(replicaset_uuid, &REPLICASET_UUID)) {
+		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+			  tt_uuid_str(replicaset_uuid),
+			  tt_uuid_str(&REPLICASET_UUID));
+	}
+
+	/* Clear the pointer to journal before it goes out of scope */
+	journal_set(NULL);
 }
 
 static void
@@ -1850,132 +1991,13 @@ box_cfg_xc(void)
 	}
 	bool is_bootstrap_leader = false;
 	if (last_checkpoint_lsn >= 0) {
-		/* Check instance UUID. */
-		assert(!tt_uuid_is_nil(&INSTANCE_UUID));
-		if (!tt_uuid_is_nil(&instance_uuid) &&
-		    !tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID)) {
-			tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
-				  tt_uuid_str(&instance_uuid),
-				  tt_uuid_str(&INSTANCE_UUID));
-		}
-
-		struct wal_stream wal_stream;
-		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
-
-		struct recovery *recovery;
-		recovery = recovery_new(cfg_gets("wal_dir"),
-					cfg_geti("force_recovery"),
-					&last_checkpoint_vclock);
-		auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
-
-		/*
-		 * Initialize the replica set vclock from recovery.
-		 * The local WAL may contain rows from remote masters,
-		 * so we must reflect this in replicaset vclock to
-		 * not attempt to apply these rows twice.
-		 */
-		recovery_end_vclock(recovery, &replicaset.vclock);
-
-		if (wal_dir_lock >= 0) {
-			box_listen();
-			box_sync_replication(replication_connect_timeout, false);
-		}
-
-		/*
-		 * recovery->vclock is needed by Vinyl to filter
-		 * WAL rows that were dumped before restart.
-		 *
-		 * XXX: Passing an internal member of the recovery
-		 * object to an engine is an ugly hack. Instead we
-		 * should introduce Engine::applyWALRow method and
-		 * explicitly pass the statement LSN to it.
-		 */
-		engine_begin_initial_recovery_xc(&recovery->vclock);
-
-		struct memtx_engine *memtx;
-		memtx = (struct memtx_engine *)engine_by_name("memtx");
-		assert(memtx != NULL);
-
-		struct recovery_journal journal;
-		recovery_journal_create(&journal, &recovery->vclock);
-		journal_set(&journal.base);
-
-		/**
-		 * We explicitly request memtx to recover its
-		 * snapshot as a separate phase since it contains
-		 * data for system spaces, and triggers on
-		 * recovery of system spaces issue DDL events in
-		 * other engines.
-		 */
-		memtx_engine_recover_snapshot_xc(memtx,
-				&last_checkpoint_vclock);
-
-		engine_begin_final_recovery_xc();
-		recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
-		/*
-		 * Leave hot standby mode, if any, only
-		 * after acquiring the lock.
-		 */
-		if (wal_dir_lock < 0) {
-			title("hot_standby");
-			say_info("Entering hot standby mode");
-			recovery_follow_local(recovery, &wal_stream.base,
-					      "hot_standby",
-					      cfg_getd("wal_dir_rescan_delay"));
-			while (true) {
-				if (path_lock(cfg_gets("wal_dir"),
-					      &wal_dir_lock))
-					diag_raise();
-				if (wal_dir_lock >= 0)
-					break;
-				fiber_sleep(0.1);
-			}
-			recovery_stop_local(recovery);
-			recover_remaining_wals(recovery, &wal_stream.base,
-					       NULL, true);
-			/*
-			 * Advance replica set vclock to reflect records
-			 * applied in hot standby mode.
-			 */
-			vclock_copy(&replicaset.vclock, &recovery->vclock);
-			box_listen();
-			box_sync_replication(replication_connect_timeout, false);
-		}
-		recovery_finalize(recovery);
-		engine_end_recovery_xc();
-
-		/* Check replica set UUID. */
-		if (!tt_uuid_is_nil(&replicaset_uuid) &&
-		    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
-			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-				  tt_uuid_str(&replicaset_uuid),
-				  tt_uuid_str(&REPLICASET_UUID));
-		}
-
-		/* Clear the pointer to journal before it goes out of scope */
-		journal_set(NULL);
+		/* Recover the instance from the local directory */
+		local_recovery(&instance_uuid, &replicaset_uuid,
+			       &last_checkpoint_vclock);
 	} else {
-		if (!tt_uuid_is_nil(&instance_uuid))
-			INSTANCE_UUID = instance_uuid;
-		else
-			tt_uuid_create(&INSTANCE_UUID);
-		/*
-		 * Begin listening on the socket to enable
-		 * master-master replication leader election.
-		 */
-		box_listen();
-
-		/*
-		 * Wait for the cluster to start up.
-		 *
-		 * Note, when bootstrapping a new instance, we have to
-		 * connect to all masters to make sure all replicas
-		 * receive the same replica set UUID when a new cluster
-		 * is deployed.
-		 */
-		box_sync_replication(TIMEOUT_INFINITY, true);
 		/* Bootstrap a new master */
-		bootstrap(&replicaset_uuid, &is_bootstrap_leader);
+		bootstrap(&instance_uuid, &replicaset_uuid,
+			  &is_bootstrap_leader);
 	}
 	fiber_gc();
 
