@@ -1172,46 +1172,6 @@ vy_recovery_index_id_hash(uint32_t space_id, uint32_t index_id)
 	return ((uint64_t)space_id << 32) + index_id;
 }
 
-/**
- * Insert an LSM tree into vy_recovery::index_id_hash.
- *
- * If there is an LSM tree with the same space_id/index_id
- * present in the hash table, it will be silently replaced.
- *
- * Returns 0 on success, -1 on error.
- */
-static int
-vy_recovery_hash_index_id(struct vy_recovery *recovery,
-			  struct vy_lsm_recovery_info *lsm)
-{
-	struct mh_i64ptr_t *h = recovery->index_id_hash;
-	struct mh_i64ptr_node_t node;
-
-	node.key = vy_recovery_index_id_hash(lsm->space_id, lsm->index_id);
-	node.val = lsm;
-
-	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
-		return -1;
-	}
-	return 0;
-}
-
-/**
- * Remove the entry corresponding to the space_id/index_id
- * from vy_recovery::index_id_hash.
- */
-static void
-vy_recovery_unhash_index_id(struct vy_recovery *recovery,
-			    uint32_t space_id, uint32_t index_id)
-{
-	struct mh_i64ptr_t *h = recovery->index_id_hash;
-	int64_t key = vy_recovery_index_id_hash(space_id, index_id);
-	mh_int_t k = mh_i64ptr_find(h, key, NULL);
-	if (k != mh_end(h))
-		mh_i64ptr_del(h, k, NULL);
-}
-
 /** Lookup an LSM tree in vy_recovery::index_id_hash map. */
 struct vy_lsm_recovery_info *
 vy_recovery_lsm_by_index_id(struct vy_recovery *recovery,
@@ -1362,38 +1322,9 @@ vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
 				    (long long)id));
 		return -1;
 	}
-	struct vy_lsm_recovery_info *new_lsm;
-	new_lsm = vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
-					    key_parts, key_part_count);
-	if (new_lsm == NULL)
+	if (vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
+				      key_parts, key_part_count) == NULL)
 		return -1;
-
-	struct vy_lsm_recovery_info *lsm;
-	lsm = vy_recovery_lsm_by_index_id(recovery, space_id, index_id);
-	if (lsm == NULL) {
-		/*
-		 * There's no LSM tree for these space_id/index_id
-		 * in the recovery context. Insert the new LSM tree
-		 * into the index_id_hash.
-		 */
-		return vy_recovery_hash_index_id(recovery, new_lsm);
-	}
-
-	/*
-	 * If there's an LSM tree for the given space_id/index_id,
-	 * it can't be incomplete (i.e. it must be committed albeit
-	 * it may be dropped), neither can it have a prepared LSM
-	 * tree associated with it.
-	 */
-	if (lsm->create_lsn < 0 || lsm->prepared != NULL) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("LSM tree %u/%u prepared twice",
-				    (unsigned)space_id, (unsigned)index_id));
-		return -1;
-	}
-
-	/* Link the new LSM tree to the existing one. */
-	lsm->prepared = new_lsm;
 	return 0;
 }
 
@@ -1437,39 +1368,7 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 	/* Mark the LSM tree committed by assigning LSN. */
 	lsm->create_lsn = create_lsn;
 	lsm->modify_lsn = modify_lsn;
-
-	/*
-	 * Hash the new LSM tree under the given space_id/index_id.
-	 * First, look up the LSM tree that is presently in the hash.
-	 */
-	struct vy_lsm_recovery_info *old_lsm;
-	old_lsm = vy_recovery_lsm_by_index_id(recovery, space_id, index_id);
-	if (old_lsm == lsm) {
-		/*
-		 * The new LSM tree is already hashed, nothing to do
-		 * (it was hashed on prepare).
-		 */
-		return 0;
-	}
-
-	/* Unlink the new LSM tree from the old one, if any. */
-	if (old_lsm != NULL) {
-		assert(old_lsm->create_lsn >= 0);
-		if (old_lsm->drop_lsn < 0) {
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("LSM tree %u/%u created twice",
-					    (unsigned)space_id,
-					    (unsigned)index_id));
-			return -1;
-		}
-		if (old_lsm->prepared != NULL) {
-			assert(old_lsm->prepared == lsm);
-			old_lsm->prepared = NULL;
-		}
-	}
-
-	/* Update the hash with the new LSM tree. */
-	return vy_recovery_hash_index_id(recovery, lsm);
+	return 0;
 }
 
 /**
@@ -1533,35 +1432,6 @@ vy_recovery_drop_lsm(struct vy_recovery *recovery, int64_t id, int64_t drop_lsn)
 	}
 	assert(drop_lsn >= 0);
 	lsm->drop_lsn = drop_lsn;
-
-	if (lsm->create_lsn >= 0)
-		return 0;
-	/*
-	 * If the dropped LSM tree has never been committed,
-	 * it means that ALTER for the corresponding index was
-	 * aborted, hence we don't need to keep it in the
-	 * index_id_hash, because the LSM tree is pure garbage
-	 * and will never be recovered. Unlink it now.
-	 */
-	struct vy_lsm_recovery_info *hashed_lsm;
-	hashed_lsm = vy_recovery_lsm_by_index_id(recovery,
-				lsm->space_id, lsm->index_id);
-	if (hashed_lsm == lsm) {
-		/*
-		 * The LSM tree is linked to the index_id_hash
-		 * directly. Remove the corresponding hash entry.
-		 */
-		vy_recovery_unhash_index_id(recovery,
-				lsm->space_id, lsm->index_id);
-	} else {
-		/*
-		 * The LSM tree was linked to an existing LSM
-		 * tree via vy_lsm_recovery_info::prepared.
-		 * Clear the reference.
-		 */
-		assert(hashed_lsm->prepared == lsm);
-		hashed_lsm->prepared = NULL;
-	}
 	return 0;
 }
 
@@ -1592,10 +1462,6 @@ vy_recovery_forget_lsm(struct vy_recovery *recovery, int64_t id)
 	}
 	mh_i64ptr_del(h, k, NULL);
 	rlist_del_entry(lsm, in_recovery);
-	if (lsm == vy_recovery_lsm_by_index_id(recovery,
-				lsm->space_id, lsm->index_id))
-		vy_recovery_unhash_index_id(recovery,
-				lsm->space_id, lsm->index_id);
 	free(lsm->key_parts);
 	free(lsm);
 	return 0;
@@ -2085,6 +1951,74 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	return rc;
 }
 
+/**
+ * Fill index_id_hash with LSM trees recovered from vylog.
+ */
+static int
+vy_recovery_build_index_id_hash(struct vy_recovery *recovery)
+{
+	struct mh_i64ptr_t *h = recovery->index_id_hash;
+	struct vy_lsm_recovery_info *lsm;
+
+	rlist_foreach_entry(lsm, &recovery->lsms, in_recovery) {
+		/*
+		 * If an LSM tree was dropped but was not committed,
+		 * it must be a product of aborted ALTER, in which
+		 * case it won't be recovered and hence shouldn't be
+		 * inserted into the hash.
+		 */
+		if (lsm->create_lsn < 0 && lsm->drop_lsn >= 0)
+			continue;
+
+		uint32_t space_id = lsm->space_id;
+		uint32_t index_id = lsm->index_id;
+		struct vy_lsm_recovery_info *hashed_lsm;
+		hashed_lsm = vy_recovery_lsm_by_index_id(recovery,
+						space_id, index_id);
+		/*
+		 * If there's no LSM tree for these space_id/index_id
+		 * or it was dropped, simply replace it with the latest
+		 * LSM tree version.
+		 */
+		if (hashed_lsm == NULL || hashed_lsm->drop_lsn >= 0) {
+			struct mh_i64ptr_node_t node;
+			node.key = vy_recovery_index_id_hash(space_id, index_id);
+			node.val = lsm;
+			if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
+				diag_set(OutOfMemory, 0, "mh_i64ptr_put",
+					 "mh_i64ptr_node_t");
+				return -1;
+			}
+			continue;
+		}
+		/*
+		 * If there's an LSM tree with the same space_id/index_id
+		 * and it isn't dropped, the new LSM tree must have been
+		 * prepared by ALTER but not committed. In this case the
+		 * old LSM tree must be committed and not have a prepared
+		 * LSM tree. Check that and link the new LSM tree to the
+		 * old one.
+		 */
+		if (lsm->create_lsn >= 0) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("LSM tree %u/%u created twice",
+					    (unsigned)space_id,
+					    (unsigned)index_id));
+			return -1;
+		}
+		if (hashed_lsm->create_lsn < 0 ||
+		    hashed_lsm->prepared != NULL) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("LSM tree %u/%u prepared twice",
+					    (unsigned)space_id,
+					    (unsigned)index_id));
+			return -1;
+		}
+		hashed_lsm->prepared = lsm;
+	}
+	return 0;
+}
+
 static ssize_t
 vy_recovery_new_f(va_list ap)
 {
@@ -2160,6 +2094,9 @@ vy_recovery_new_f(va_list ap)
 		goto fail_close;
 
 	xlog_cursor_close(&cursor, false);
+
+	if (vy_recovery_build_index_id_hash(recovery) != 0)
+		goto fail_free;
 out:
 	say_verbose("done loading vylog");
 	*p_recovery = recovery;
