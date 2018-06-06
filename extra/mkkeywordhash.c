@@ -96,16 +96,8 @@ struct Keyword {
 #  define REINDEX    0x00000800
 #endif
 #define SUBQUERY     0x00001000
-#ifdef SQLITE_OMIT_TRIGGER
-#  define TRIGGER    0
-#else
 #  define TRIGGER    0x00002000
-#endif
-#ifdef SQLITE_OMIT_VIEW
-#  define VIEW       0
-#else
 #  define VIEW       0x00008000
-#endif
 #ifdef SQLITE_OMIT_CTE
 #  define CTE        0
 #else

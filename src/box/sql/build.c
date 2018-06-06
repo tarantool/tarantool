@@ -1858,11 +1858,9 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		if (!p->def->opts.is_view) {
 			/* A regular table */
 			zType = "TABLE";
-#ifndef SQLITE_OMIT_VIEW
 		} else {
 			/* A view */
 			zType = "VIEW";
-#endif
 		}
 
 		/* If this is a CREATE TABLE xx AS SELECT ..., execute the SELECT
@@ -1966,7 +1964,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	p->def->opts.checks = NULL;
 }
 
-#ifndef SQLITE_OMIT_VIEW
 void
 sql_create_view(struct Parse *parse_context, struct Token *begin,
 		struct Token *name, struct ExprList *aliases,
@@ -2039,7 +2036,6 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	sql_select_delete(db, select);
 	return;
 }
-#endif				/* SQLITE_OMIT_VIEW */
 
 int
 sql_view_assign_cursors(struct Parse *parse, const char *view_stmt)
@@ -2734,12 +2730,10 @@ sql_create_index(struct Parse *parse, struct Token *token,
 
 	assert(pTab != 0);
 	assert(parse->nErr == 0);
-#ifndef SQLITE_OMIT_VIEW
 	if (pTab->def->opts.is_view) {
 		sqlite3ErrorMsg(parse, "views may not be indexed");
 		goto exit_create_index;
 	}
-#endif
 	/*
 	 * Find the name of the index.  Make sure there is not
 	 * already another index or table with the same name.

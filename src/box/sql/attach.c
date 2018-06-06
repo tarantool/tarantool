@@ -83,17 +83,14 @@ sqlite3FixSrcList(DbFixer * pFix,	/* Context of the fixation */
 		if (pFix->bVarOnly == 0) {
 			pItem->pSchema = pFix->pSchema;
 		}
-#if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_TRIGGER)
 		if (sqlite3FixSelect(pFix, pItem->pSelect))
 			return 1;
 		if (sqlite3FixExpr(pFix, pItem->pOn))
 			return 1;
-#endif
 	}
 	return 0;
 }
 
-#if !defined(SQLITE_OMIT_VIEW) || !defined(SQLITE_OMIT_TRIGGER)
 int
 sqlite3FixSelect(DbFixer * pFix,	/* Context of the fixation */
 		 Select * pSelect	/* The SELECT statement to be fixed to one database */
@@ -178,9 +175,7 @@ sqlite3FixExprList(DbFixer * pFix,	/* Context of the fixation */
 	}
 	return 0;
 }
-#endif
 
-#ifndef SQLITE_OMIT_TRIGGER
 int
 sqlite3FixTriggerStep(DbFixer * pFix,	/* Context of the fixation */
 		      TriggerStep * pStep	/* The trigger step be fixed to one database */
@@ -200,4 +195,3 @@ sqlite3FixTriggerStep(DbFixer * pFix,	/* Context of the fixation */
 	}
 	return 0;
 }
-#endif

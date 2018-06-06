@@ -370,7 +370,6 @@ ifexists(A) ::= .            {A = 0;}
 
 ///////////////////// The CREATE VIEW statement /////////////////////////////
 //
-%ifndef SQLITE_OMIT_VIEW
 cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
           AS select(S). {
   if (!pParse->parse_only)
@@ -381,7 +380,6 @@ cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
 cmd ::= DROP VIEW ifexists(E) fullname(X). {
   sql_drop_table(pParse, X, 1, E);
 }
-%endif  SQLITE_OMIT_VIEW
 
 //////////////////////// The SELECT statement /////////////////////////////////
 //
