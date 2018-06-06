@@ -53,6 +53,8 @@
 const char *
 sio_socketname(int fd)
 {
+	/* Preserve errno */
+	int save_errno = errno;
 	static __thread char name[2 * SERVICE_NAME_MAXLEN];
 	int n = snprintf(name, sizeof(name), "fd %d", fd);
 	if (fd >= 0) {
@@ -74,6 +76,11 @@ sio_socketname(int fd)
 								addrlen));
 		}
 	}
+	/*
+	 * Restore the original errno, it might have been reset by
+	 * snprintf() or getsockname().
+	 */
+	errno = save_errno;
 	return name;
 }
 
