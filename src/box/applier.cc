@@ -198,7 +198,7 @@ applier_connect(struct applier *applier)
 	}
 
 	if (applier->version_id != greeting.version_id) {
-		say_info("remote master is %u.%u.%u at %s\r\n",
+		say_info("remote master is %u.%u.%u at %s",
 			 version_id_major(greeting.version_id),
 			 version_id_minor(greeting.version_id),
 			 version_id_patch(greeting.version_id),
