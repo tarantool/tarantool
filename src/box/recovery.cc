@@ -102,7 +102,7 @@ struct XlogGapError: public XlogError {
  */
 struct recovery *
 recovery_new(const char *wal_dirname, bool force_recovery,
-	     struct vclock *vclock)
+	     const struct vclock *vclock)
 {
 	struct recovery *r = (struct recovery *)
 			calloc(1, sizeof(*r));
@@ -178,7 +178,7 @@ recovery_delete(struct recovery *r)
  */
 static void
 recover_xlog(struct recovery *r, struct xstream *stream,
-	     struct vclock *stop_vclock)
+	     const struct vclock *stop_vclock)
 {
 	struct xrow_header row;
 	uint64_t row_count = 0;
@@ -238,7 +238,7 @@ recover_xlog(struct recovery *r, struct xstream *stream,
  */
 void
 recover_remaining_wals(struct recovery *r, struct xstream *stream,
-		       struct vclock *stop_vclock, bool scan_dir)
+		       const struct vclock *stop_vclock, bool scan_dir)
 {
 	struct vclock *clock;
 
