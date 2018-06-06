@@ -43,6 +43,27 @@
 #include "scramble.h"
 #include "iproto_constants.h"
 
+static inline uint32_t
+mp_sizeof_vclock(const struct vclock *vclock)
+{
+	uint32_t size = vclock_size(vclock);
+	return mp_sizeof_map(size) + size * (mp_sizeof_uint(UINT32_MAX) +
+					     mp_sizeof_uint(UINT64_MAX));
+}
+
+static inline char *
+mp_encode_vclock(char *data, const struct vclock *vclock)
+{
+	data = mp_encode_map(data, vclock_size(vclock));
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, vclock);
+	vclock_foreach(&it, replica) {
+		data = mp_encode_uint(data, replica.id);
+		data = mp_encode_uint(data, replica.lsn);
+	}
+	return data;
+}
+
 int
 xrow_header_decode(struct xrow_header *header, const char **pos,
 		   const char *end)
@@ -265,11 +286,8 @@ iproto_reply_request_vote(struct obuf *out, uint64_t sync,
 			  uint32_t schema_version, const struct vclock *vclock,
 			  bool read_only)
 {
-	uint32_t replicaset_size = vclock_size(vclock);
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(2) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(replicaset_size) +
-		replicaset_size * (mp_sizeof_uint(UINT32_MAX) +
-				   mp_sizeof_uint(UINT64_MAX)) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(vclock) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(true);
 
 	char *buf = obuf_reserve(out, max_size);
@@ -284,13 +302,7 @@ iproto_reply_request_vote(struct obuf *out, uint64_t sync,
 	data = mp_encode_uint(data, IPROTO_SERVER_IS_RO);
 	data = mp_encode_bool(data, read_only);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, replicaset_size);
-	struct vclock_iterator it;
-	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, replica) {
-		data = mp_encode_uint(data, replica.id);
-		data = mp_encode_uint(data, replica.lsn);
-	}
+	data = mp_encode_vclock(data, vclock);
 	size_t size = data - buf;
 	assert(size <= max_size);
 
@@ -806,9 +818,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 		      const struct vclock *vclock)
 {
 	memset(row, 0, sizeof(*row));
-	uint32_t replicaset_size = vclock_size(vclock);
-	size_t size = XROW_BODY_LEN_MAX + replicaset_size *
-		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
+	size_t size = XROW_BODY_LEN_MAX + mp_sizeof_vclock(vclock);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "buf");
@@ -821,13 +831,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 	data = mp_encode_uint(data, IPROTO_INSTANCE_UUID);
 	data = xrow_encode_uuid(data, instance_uuid);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, replicaset_size);
-	struct vclock_iterator it;
-	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, replica) {
-		data = mp_encode_uint(data, replica.id);
-		data = mp_encode_uint(data, replica.lsn);
-	}
+	data = mp_encode_vclock(data, vclock);
 	data = mp_encode_uint(data, IPROTO_SERVER_VERSION);
 	data = mp_encode_uint(data, tarantool_version_id());
 	assert(data <= buf + size);
@@ -971,9 +975,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	memset(row, 0, sizeof(*row));
 
 	/* Add vclock to response body */
-	uint32_t replicaset_size = vclock_size(vclock);
-	size_t size = 8 + replicaset_size *
-		(mp_sizeof_uint(UINT32_MAX) + mp_sizeof_uint(UINT64_MAX));
+	size_t size = 8 + mp_sizeof_vclock(vclock);
 	char *buf = (char *) region_alloc(&fiber()->gc, size);
 	if (buf == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "buf");
@@ -982,13 +984,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	char *data = buf;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
-	data = mp_encode_map(data, replicaset_size);
-	struct vclock_iterator it;
-	vclock_iterator_init(&it, vclock);
-	vclock_foreach(&it, replica) {
-		data = mp_encode_uint(data, replica.id);
-		data = mp_encode_uint(data, replica.lsn);
-	}
+	data = mp_encode_vclock(data, vclock);
 	assert(data <= buf + size);
 	row->body[0].iov_base = buf;
 	row->body[0].iov_len = (data - buf);
