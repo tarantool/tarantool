@@ -136,7 +136,7 @@ enum vy_log_record_type {
 	 */
 	VY_LOG_DELETE_SLICE		= 9,
 	/**
-	 * Update LSN of the last LSM tree dump.
+	 * Log LSM tree dump. Used to update max LSN stored on disk.
 	 * Requires vy_log_record::lsm_id, dump_lsn.
 	 */
 	VY_LOG_DUMP_LSM			= 10,
@@ -303,7 +303,7 @@ struct vy_lsm_recovery_info {
 	 * if the tree is still active.
 	 */
 	int64_t drop_lsn;
-	/** LSN of the last LSM tree dump. */
+	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
 	 * List of all ranges in the LSM tree, linked by

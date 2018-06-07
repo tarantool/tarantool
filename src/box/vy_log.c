@@ -1485,7 +1485,7 @@ vy_recovery_dump_lsm(struct vy_recovery *recovery,
 				    (long long)id));
 		return -1;
 	}
-	lsm->dump_lsn = dump_lsn;
+	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
 	return 0;
 }
 

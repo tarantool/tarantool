@@ -253,7 +253,7 @@ struct vy_lsm {
 	 */
 	uint32_t range_tree_version;
 	/**
-	 * LSN of the last dump or -1 if the LSM tree has not
+	 * Max LSN stored on disk or -1 if the LSM tree has not
 	 * been dumped yet.
 	 */
 	int64_t dump_lsn;

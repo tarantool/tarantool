@@ -721,7 +721,6 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		goto delete_mems;
 	}
 
-	assert(new_run->info.min_lsn > lsm->dump_lsn);
 	assert(new_run->info.max_lsn <= dump_lsn);
 
 	/*
@@ -828,7 +827,7 @@ delete_mems:
 		vy_stmt_counter_add(&lsm->stat.disk.dump.in, &mem->count);
 		vy_lsm_delete_mem(lsm, mem);
 	}
-	lsm->dump_lsn = dump_lsn;
+	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
 	lsm->stat.disk.dump.count++;
 
 	/* The iterator has been cleaned up in a worker thread. */
