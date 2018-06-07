@@ -57,16 +57,6 @@
 #include "trivia/util.h"
 #include "tt_pthread.h"
 
-/**
- * Yield after iterating over this many objects (e.g. ranges).
- * Yield more often in debug mode.
- */
-#if defined(NDEBUG)
-enum { VY_YIELD_LOOPS = 128 };
-#else
-enum { VY_YIELD_LOOPS = 2 };
-#endif
-
 /* Min and max values for vy_scheduler::timeout. */
 #define VY_SCHEDULER_TIMEOUT_MIN	1
 #define VY_SCHEDULER_TIMEOUT_MAX	60
@@ -712,7 +702,7 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 	struct vy_slice **new_slices, *slice;
 	struct vy_range *range, *begin_range, *end_range;
 	struct tuple *min_key, *max_key;
-	int i, loops = 0;
+	int i;
 
 	assert(lsm->is_dumping);
 
@@ -777,12 +767,6 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 
 		assert(i < lsm->range_count);
 		new_slices[i] = slice;
-		/*
-		 * It's OK to yield here for the range tree can only
-		 * be changed from the scheduler fiber.
-		 */
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0);
 	}
 
 	/*
@@ -797,9 +781,6 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 		vy_log_insert_slice(range->id, new_run->id, slice->id,
 				    tuple_data_or_null(slice->begin),
 				    tuple_data_or_null(slice->end));
-
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0); /* see comment above */
 	}
 	vy_log_dump_lsm(lsm->id, dump_lsn);
 	if (vy_log_tx_commit() < 0)
@@ -816,6 +797,11 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 
 	/*
 	 * Add new slices to ranges.
+	 *
+	 * Note, we must not yield after this point, because if we
+	 * do, a concurrent read iterator may see an inconsistent
+	 * LSM tree state, when the same statement is present twice,
+	 * in memory and on disk.
 	 */
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(lsm->tree, range), i++) {
@@ -829,17 +815,6 @@ vy_task_dump_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 			vy_range_heap_update(&lsm->range_heap,
 					     &range->heap_node);
 		range->version++;
-		/*
-		 * If we yield here, a concurrent fiber will see
-		 * a range with a run slice containing statements
-		 * present in the in-memory indexes of the LSM tree.
-		 * This is OK, because read iterator won't use the
-		 * new run slice until lsm->dump_lsn is bumped,
-		 * which is only done after in-memory trees are
-		 * removed (see vy_read_iterator_add_disk()).
-		 */
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0);
 	}
 	free(new_slices);
 
@@ -878,8 +853,6 @@ fail_free_slices:
 		slice = new_slices[i];
 		if (slice != NULL)
 			vy_slice_delete(slice);
-		if (++loops % VY_YIELD_LOOPS == 0)
-			fiber_sleep(0);
 	}
 	free(new_slices);
 fail:
