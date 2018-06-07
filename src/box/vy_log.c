@@ -184,6 +184,12 @@ static int
 vy_recovery_process_record(struct vy_recovery *recovery,
 			   const struct vy_log_record *record);
 
+static int
+vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery);
+
+int
+vy_log_rotate(const struct vclock *vclock);
+
 /**
  * Return the name of the vylog file that has the given signature.
  */
@@ -883,10 +889,11 @@ vy_log_begin_recovery(const struct vclock *vclock)
 	if (xdir_scan(&vy_log.dir) < 0 && errno != ENOENT)
 		return NULL;
 
-	struct vclock vy_log_vclock;
-	vclock_create(&vy_log_vclock);
-	if (xdir_last_vclock(&vy_log.dir, &vy_log_vclock) >= 0 &&
-	    vclock_compare(&vy_log_vclock, vclock) > 0) {
+	if (xdir_last_vclock(&vy_log.dir, &vy_log.last_checkpoint) < 0)
+		vclock_copy(&vy_log.last_checkpoint, vclock);
+
+	int cmp = vclock_compare(&vy_log.last_checkpoint, vclock);
+	if (cmp > 0) {
 		/*
 		 * Last vy_log log is newer than the last snapshot.
 		 * This can't normally happen, as vy_log is rotated
@@ -896,20 +903,26 @@ vy_log_begin_recovery(const struct vclock *vclock)
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return NULL;
 	}
+	if (cmp < 0) {
+		/*
+		 * Last vy_log log is older than the last snapshot.
+		 * This happens if we are recovering from a backup.
+		 * Rotate the log to keep its signature in sync with
+		 * checkpoint.
+		 */
+		if (vy_log_rotate(vclock) != 0)
+			return NULL;
+	}
 
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(&vy_log_vclock), 0);
+	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint), 0);
 	if (recovery == NULL)
 		return NULL;
 
 	vy_log.next_id = recovery->max_id + 1;
 	vy_log.recovery = recovery;
-	vclock_copy(&vy_log.last_checkpoint, vclock);
 	return recovery;
 }
-
-static int
-vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery);
 
 int
 vy_log_end_recovery(void)
@@ -931,34 +944,6 @@ vy_log_end_recovery(void)
 		return -1;
 	}
 
-	/*
-	 * On backup we copy files corresponding to the most recent
-	 * checkpoint. Since vy_log does not create snapshots of its log
-	 * files, but instead appends records written after checkpoint
-	 * to the most recent log file, the signature of the vy_log file
-	 * corresponding to the last checkpoint equals the signature
-	 * of the previous checkpoint. So upon successful recovery
-	 * from a backup we need to rotate the log to keep checkpoint
-	 * and vy_log signatures in sync.
-	 */
-	struct vclock *vclock = vclockset_last(&vy_log.dir.index);
-	if (vclock == NULL ||
-	    vclock_compare(vclock, &vy_log.last_checkpoint) != 0) {
-		vclock = malloc(sizeof(*vclock));
-		if (vclock == NULL) {
-			diag_set(OutOfMemory, sizeof(*vclock),
-				 "malloc", "struct vclock");
-			return -1;
-		}
-		vclock_copy(vclock, &vy_log.last_checkpoint);
-		xdir_add_vclock(&vy_log.dir, vclock);
-		if (vy_log_create(vclock, vy_log.recovery) < 0) {
-			diag_log();
-			say_error("failed to write `%s'",
-				  vy_log_filename(vclock_sum(vclock)));
-			return -1;
-		}
-	}
 	xdir_collect_inprogress(&vy_log.dir);
 	vy_log.recovery = NULL;
 	return 0;
