@@ -1869,14 +1869,19 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		return;
 	}
 
-	/*
-	 * As rebuild creates a new ExpList tree and old_def
-	 * is allocated on region release old tree manually.
-	 */
-	struct ExprList *old_checks = p->def->opts.checks;
-	if (sql_table_def_rebuild(db, p) != 0)
-		return;
-	sql_expr_list_delete(db, old_checks);
+	if (db->init.busy) {
+		/*
+		 * As rebuild creates a new ExpList tree and
+		 * old_def is allocated on region release old
+		 * tree manually. This procedure is necessary
+		 * only at second stage of table creation, i.e.
+		 * before adding to table hash.
+		 */
+		struct ExprList *old_checks = p->def->opts.checks;
+		if (sql_table_def_rebuild(db, p) != 0)
+			return;
+		sql_expr_list_delete(db, old_checks);
+	}
 
 	/* If not initializing, then create new Tarantool space.
 	 *
