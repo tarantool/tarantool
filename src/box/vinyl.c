@@ -3226,7 +3226,8 @@ vinyl_engine_join(struct engine *engine, const struct vclock *vclock,
 	 * Send all runs stored in it to the replica.
 	 */
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(vclock), true);
+	recovery = vy_recovery_new(vclock_sum(vclock),
+				   VY_RECOVERY_LOAD_CHECKPOINT);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog to join a replica");
 		goto out_join_cord;
@@ -3429,7 +3430,7 @@ vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 
 	/* Cleanup run files. */
 	int64_t signature = checkpoint_last(NULL);
-	struct vy_recovery *recovery = vy_recovery_new(signature, false);
+	struct vy_recovery *recovery = vy_recovery_new(signature, 0);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog for garbage collection");
 		return 0;
@@ -3458,7 +3459,8 @@ vinyl_engine_backup(struct engine *engine, const struct vclock *vclock,
 
 	/* Backup run files. */
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(vclock), true);
+	recovery = vy_recovery_new(vclock_sum(vclock),
+				   VY_RECOVERY_LOAD_CHECKPOINT);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog for backup");
 		return -1;

@@ -525,18 +525,26 @@ vy_log_begin_recovery(const struct vclock *vclock);
 int
 vy_log_end_recovery(void);
 
+/** Flags passed to vy_recovery_new(). */
+enum vy_recovery_flag {
+	/**
+	 * Do not load records written to the log after checkpoint,
+	 * i.e. get a consistent view of vinyl database at the time
+	 * of the last checkpoint.
+	 */
+	VY_RECOVERY_LOAD_CHECKPOINT	= 1 << 0,
+};
+
 /**
  * Create a recovery context from the metadata log created
  * by checkpoint with the given signature.
  *
- * If @only_checkpoint is set, do not load records appended to
- * the log after checkpoint (i.e. get a consistent view of
- * Vinyl at the time of the checkpoint).
+ * For valid values of @flags, see vy_recovery_flag.
  *
  * Returns NULL on failure.
  */
 struct vy_recovery *
-vy_recovery_new(int64_t signature, bool only_checkpoint);
+vy_recovery_new(int64_t signature, int flags);
 
 /**
  * Free a recovery context created by vy_recovery_new().
