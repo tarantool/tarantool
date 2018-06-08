@@ -60,13 +60,15 @@ errinj.info()
     state: false
   ERRINJ_WAL_WRITE_DISK:
     state: false
+  ERRINJ_VY_LOG_FILE_RENAME:
+    state: false
   ERRINJ_VY_RUN_WRITE:
     state: false
-  ERRINJ_VY_LOG_FILE_RENAME:
+  ERRINJ_HTTP_RESPONSE_ADD_WAIT:
     state: false
   ERRINJ_VY_LOG_FLUSH_DELAY:
     state: false
-  ERRINJ_HTTP_RESPONSE_ADD_WAIT:
+  ERRINJ_RELAY_FINAL_JOIN:
     state: false
   ERRINJ_SNAP_COMMIT_DELAY:
     state: false

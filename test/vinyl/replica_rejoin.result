@@ -1,0 +1,257 @@
+env = require('test_run')
+---
+...
+test_run = env.new()
+---
+...
+--
+-- gh-461: check that garbage collection works as expected
+-- after rebootstrap.
+--
+box.schema.user.grant('guest', 'replication')
+---
+...
+_ = box.schema.space.create('test', { id = 9000, engine = 'vinyl' })
+---
+...
+_ = box.space.test:create_index('pk')
+---
+...
+pad = string.rep('x', 15 * 1024)
+---
+...
+for i = 1, 100 do box.space.test:replace{i, pad} end
+---
+...
+box.snapshot()
+---
+- ok
+...
+-- Join a replica. Check its files.
+test_run:cmd("create server replica with rpl_master=default, script='vinyl/replica_rejoin.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+fio = require('fio')
+---
+...
+fio.chdir(box.cfg.vinyl_dir)
+---
+- true
+...
+fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
+---
+- - 9000/0/00000000000000000002.index
+  - 9000/0/00000000000000000002.run
+  - 9000/0/00000000000000000004.index
+  - 9000/0/00000000000000000004.run
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+-- Invoke garbage collector on the master.
+test_run:cmd("restart server default")
+checkpoint_count = box.cfg.checkpoint_count
+---
+...
+box.cfg{checkpoint_count = 1}
+---
+...
+box.space.test:delete(1)
+---
+...
+box.snapshot()
+---
+- ok
+...
+box.cfg{checkpoint_count = checkpoint_count}
+---
+...
+-- Rebootstrap the replica. Check that old files are removed
+-- by garbage collector.
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.cfg{checkpoint_count = 1}
+---
+...
+box.snapshot()
+---
+- ok
+...
+fio = require('fio')
+---
+...
+fio.chdir(box.cfg.vinyl_dir)
+---
+- true
+...
+fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
+---
+- - 9000/0/00000000000000000008.index
+  - 9000/0/00000000000000000008.run
+  - 9000/0/00000000000000000010.index
+  - 9000/0/00000000000000000010.run
+...
+box.space.test:count() -- 99
+---
+- 99
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+-- Invoke garbage collector on the master.
+test_run:cmd("restart server default")
+checkpoint_count = box.cfg.checkpoint_count
+---
+...
+box.cfg{checkpoint_count = 1}
+---
+...
+box.space.test:delete(2)
+---
+...
+box.snapshot()
+---
+- ok
+...
+box.cfg{checkpoint_count = checkpoint_count}
+---
+...
+-- Make the master fail join after sending data. Check that
+-- files written during failed rebootstrap attempt are removed
+-- by garbage collector.
+box.error.injection.set('ERRINJ_RELAY_FINAL_JOIN', true)
+---
+- ok
+...
+test_run:cmd("start server replica with crash_expected=True") -- fail
+---
+- false
+...
+test_run:cmd("start server replica with crash_expected=True") -- fail again
+---
+- false
+...
+test_run:cmd("start server replica with args='disable_replication'")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.cfg{checkpoint_count = 1}
+---
+...
+box.snapshot()
+---
+- ok
+...
+fio = require('fio')
+---
+...
+fio.chdir(box.cfg.vinyl_dir)
+---
+- true
+...
+fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
+---
+- - 9000/0/00000000000000000008.index
+  - 9000/0/00000000000000000008.run
+  - 9000/0/00000000000000000010.index
+  - 9000/0/00000000000000000010.run
+...
+box.space.test:count() -- 99
+---
+- 99
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+box.error.injection.set('ERRINJ_RELAY_FINAL_JOIN', false)
+---
+- ok
+...
+-- Rebootstrap after several failed attempts and make sure
+-- old files are removed.
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.cfg{checkpoint_count = 1}
+---
+...
+box.snapshot()
+---
+- ok
+...
+fio = require('fio')
+---
+...
+fio.chdir(box.cfg.vinyl_dir)
+---
+- true
+...
+fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
+---
+- - 9000/0/00000000000000000022.index
+  - 9000/0/00000000000000000022.run
+  - 9000/0/00000000000000000024.index
+  - 9000/0/00000000000000000024.run
+...
+box.space.test:count() -- 98
+---
+- 98
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+-- Cleanup.
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+box.space.test:drop()
+---
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...

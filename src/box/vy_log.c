@@ -124,6 +124,8 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_MODIFY_LSM]		= "modify_lsm",
 	[VY_LOG_FORGET_LSM]		= "forget_lsm",
 	[VY_LOG_PREPARE_LSM]		= "prepare_lsm",
+	[VY_LOG_REBOOTSTRAP]		= "rebootstrap",
+	[VY_LOG_ABORT_REBOOTSTRAP]	= "abort_rebootstrap",
 };
 
 /** Metadata log object. */
@@ -852,17 +854,43 @@ vy_log_next_id(void)
 	return vy_log.next_id++;
 }
 
+/**
+ * If a vylog file already exists, we are doing a rebootstrap:
+ * - Load the vylog to find out the id to start indexing new
+ *   objects with.
+ * - Mark the beginning of a new rebootstrap attempt by writing
+ *   VY_LOG_REBOOTSTRAP record.
+ */
+static int
+vy_log_rebootstrap(void)
+{
+	struct vy_recovery *recovery;
+	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint),
+				   VY_RECOVERY_ABORT_REBOOTSTRAP);
+	if (recovery == NULL)
+		return -1;
+
+	vy_log.next_id = recovery->max_id + 1;
+	vy_recovery_delete(recovery);
+
+	struct vy_log_record record;
+	vy_log_record_init(&record);
+	record.type = VY_LOG_REBOOTSTRAP;
+	vy_log_tx_begin();
+	vy_log_write(&record);
+	if (vy_log_tx_commit() != 0)
+		return -1;
+
+	return 0;
+}
+
 int
 vy_log_bootstrap(void)
 {
-	/*
-	 * Scan the directory to make sure there is no
-	 * vylog files left from previous setups.
-	 */
 	if (xdir_scan(&vy_log.dir) < 0 && errno != ENOENT)
 		return -1;
-	if (xdir_last_vclock(&vy_log.dir, NULL) >= 0)
-		panic("vinyl directory is not empty");
+	if (xdir_last_vclock(&vy_log.dir, &vy_log.last_checkpoint) >= 0)
+		return vy_log_rebootstrap();
 
 	/* Add initial vclock to the xdir. */
 	struct vclock *vclock = malloc(sizeof(*vclock));
@@ -914,10 +942,28 @@ vy_log_begin_recovery(const struct vclock *vclock)
 			return NULL;
 	}
 
+	/*
+	 * If we are recovering from a vylog that has an unfinished
+	 * rebootstrap section, checkpoint (and hence rebootstrap)
+	 * failed, and we need to mark rebootstrap as aborted.
+	 */
 	struct vy_recovery *recovery;
-	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint), 0);
+	recovery = vy_recovery_new(vclock_sum(&vy_log.last_checkpoint),
+				   VY_RECOVERY_ABORT_REBOOTSTRAP);
 	if (recovery == NULL)
 		return NULL;
+
+	if (recovery->in_rebootstrap) {
+		struct vy_log_record record;
+		vy_log_record_init(&record);
+		record.type = VY_LOG_ABORT_REBOOTSTRAP;
+		vy_log_tx_begin();
+		vy_log_write(&record);
+		if (vy_log_tx_commit() != 0) {
+			vy_recovery_delete(recovery);
+			return NULL;
+		}
+	}
 
 	vy_log.next_id = recovery->max_id + 1;
 	vy_log.recovery = recovery;
@@ -1292,6 +1338,7 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 	 * before the final version.
 	 */
 	rlist_add_tail_entry(&recovery->lsms, lsm, in_recovery);
+	lsm->in_rebootstrap = recovery->in_rebootstrap;
 	if (recovery->max_id < id)
 		recovery->max_id = id;
 	return lsm;
@@ -1875,6 +1922,42 @@ vy_recovery_delete_slice(struct vy_recovery *recovery, int64_t slice_id)
 }
 
 /**
+ * Mark all LSM trees created during rebootstrap as dropped so
+ * that they will be purged on the next garbage collection.
+ */
+static void
+vy_recovery_do_abort_rebootstrap(struct vy_recovery *recovery)
+{
+	struct vy_lsm_recovery_info *lsm;
+	rlist_foreach_entry(lsm, &recovery->lsms, in_recovery) {
+		if (lsm->in_rebootstrap) {
+			lsm->in_rebootstrap = false;
+			lsm->create_lsn = -1;
+			lsm->modify_lsn = -1;
+			lsm->drop_lsn = 0;
+		}
+	}
+}
+
+/** Handle a VY_LOG_REBOOTSTRAP log record. */
+static void
+vy_recovery_rebootstrap(struct vy_recovery *recovery)
+{
+	if (recovery->in_rebootstrap)
+		vy_recovery_do_abort_rebootstrap(recovery);
+	recovery->in_rebootstrap = true;
+}
+
+/** Handle VY_LOG_ABORT_REBOOTSTRAP record. */
+static void
+vy_recovery_abort_rebootstrap(struct vy_recovery *recovery)
+{
+	if (recovery->in_rebootstrap)
+		vy_recovery_do_abort_rebootstrap(recovery);
+	recovery->in_rebootstrap = false;
+}
+
+/**
  * Update a recovery context with a new log record.
  * Return 0 on success, -1 on failure.
  *
@@ -1885,7 +1968,7 @@ static int
 vy_recovery_process_record(struct vy_recovery *recovery,
 			   const struct vy_log_record *record)
 {
-	int rc;
+	int rc = 0;
 	switch (record->type) {
 	case VY_LOG_PREPARE_LSM:
 		rc = vy_recovery_prepare_lsm(recovery, record->lsm_id,
@@ -1950,6 +2033,12 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		/* Not used anymore, ignore. */
 		rc = 0;
 		break;
+	case VY_LOG_REBOOTSTRAP:
+		vy_recovery_rebootstrap(recovery);
+		break;
+	case VY_LOG_ABORT_REBOOTSTRAP:
+		vy_recovery_abort_rebootstrap(recovery);
+		break;
 	default:
 		unreachable();
 	}
@@ -1957,6 +2046,26 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		say_error("failed to process vylog record: %s",
 			  vy_log_record_str(record));
 	return rc;
+}
+
+/**
+ * Commit the last rebootstrap attempt - drop all objects created
+ * before rebootstrap.
+ */
+static void
+vy_recovery_commit_rebootstrap(struct vy_recovery *recovery)
+{
+	assert(recovery->in_rebootstrap);
+	struct vy_lsm_recovery_info *lsm;
+	rlist_foreach_entry(lsm, &recovery->lsms, in_recovery) {
+		if (!lsm->in_rebootstrap && lsm->drop_lsn < 0) {
+			/*
+			 * The files will be removed when the current
+			 * checkpoint is purged by garbage collector.
+			 */
+			lsm->drop_lsn = vy_log_signature();
+		}
+	}
 }
 
 /**
@@ -2050,6 +2159,7 @@ vy_recovery_new_f(va_list ap)
 	recovery->run_hash = NULL;
 	recovery->slice_hash = NULL;
 	recovery->max_id = -1;
+	recovery->in_rebootstrap = false;
 
 	recovery->index_id_hash = mh_i64ptr_new();
 	recovery->lsm_hash = mh_i64ptr_new();
@@ -2102,6 +2212,13 @@ vy_recovery_new_f(va_list ap)
 		goto fail_close;
 
 	xlog_cursor_close(&cursor, false);
+
+	if (recovery->in_rebootstrap) {
+		if ((flags & VY_RECOVERY_ABORT_REBOOTSTRAP) != 0)
+			vy_recovery_do_abort_rebootstrap(recovery);
+		else
+			vy_recovery_commit_rebootstrap(recovery);
+	}
 
 	if (vy_recovery_build_index_id_hash(recovery) != 0)
 		goto fail_free;

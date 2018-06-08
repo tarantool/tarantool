@@ -1,16 +1,15 @@
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
 
--- Cleanup the instance to remove vylog files left from previous
--- tests, since vinyl doesn't support rebootstrap yet.
-test_run:cmd('restart server default with cleanup=1')
+test_run:cleanup_cluster()
 
 --
 -- gh-461: check that a replica refetches the last checkpoint
 -- in case it fell behind the master.
 --
 box.schema.user.grant('guest', 'replication')
-_ = box.schema.space.create('test')
+_ = box.schema.space.create('test', {engine = engine})
 _ = box.space.test:create_index('pk')
 _ = box.space.test:insert{1}
 _ = box.space.test:insert{2}
