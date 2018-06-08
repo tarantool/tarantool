@@ -210,11 +210,11 @@ unw_getcontext_f(unw_context_t *unw_context, void *stack)
  * @param @unw_context unwind context to store execution state.
  * @param @coro_ctx fiber context to unwind.
  */
-void
+static void
 coro_unwcontext(unw_context_t *unw_context, struct coro_context *coro_ctx)
 {
 #if __amd64
-__asm__(
+__asm__ volatile(
 	/* Preserve current context */
 	"\tpushq %%rbp\n"
 	"\tpushq %%rbx\n"
@@ -249,11 +249,11 @@ __asm__(
 	"\tpopq %%rbp\n"
 	:
 	: "r" (unw_context), "r" (coro_ctx), "i" (unw_getcontext_f)
-	: "rdi", "rsi", "rax"
+	: "rdi", "rsi", "rax"//, "r8"//"rsp", "r11", "r10", "r9", "r8"
 	);
 
 #elif __i386
-__asm__(
+__asm__ volatile(
 	/* Save current context */
 	"\tpushl %%ebp\n"
 	"\tpushl %%ebx\n"
@@ -284,7 +284,7 @@ __asm__(
 	);
 
 #elif __ARM_ARCH==7
-__asm__(
+__asm__ volatile(
 	/* Save current context */
 	".syntax unified\n"
 	"\tvpush {d8-d15}\n"
@@ -314,7 +314,7 @@ __asm__(
 	);
 
 #elif __aarch64__
-__asm__(
+__asm__ volatile(
 	/* Save current context */
 	"\tsub x1, sp, #8 * 20\n"
 	"\tstp x19, x20, [x1, #16 * 0]\n"
