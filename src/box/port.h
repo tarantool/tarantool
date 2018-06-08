@@ -38,6 +38,7 @@ extern "C" {
 
 struct tuple;
 struct obuf;
+struct lua_State;
 
 /**
  * A single port represents a destination of box_process output.
@@ -70,12 +71,17 @@ struct port_vtab {
 	 * On success returns number of entries dumped.
 	 * On failure sets diag and returns -1.
 	 */
-	int (*dump)(struct port *port, struct obuf *out);
+	int (*dump_msgpack)(struct port *port, struct obuf *out);
 	/**
-	 * Same as dump(), but use the legacy Tarantool 1.6
-	 * format.
+	 * Same as dump_msgpack(), but use the legacy Tarantool
+	 * 1.6 format.
 	 */
-	int (*dump_16)(struct port *port, struct obuf *out);
+	int (*dump_msgpack_16)(struct port *port, struct obuf *out);
+	/**
+	 * Dump a port content as a plain text into a buffer,
+	 * allocated inside.
+	 */
+	const char *(*dump_plain)(struct port *port, uint32_t *size);
 	/**
 	 * Destroy a port and release associated resources.
 	 */
@@ -138,6 +144,26 @@ port_tuple_create(struct port *port);
 int
 port_tuple_add(struct port *port, struct tuple *tuple);
 
+/** Port for storing the result of a Lua CALL/EVAL. */
+struct port_lua {
+	const struct port_vtab *vtab;
+	/** Lua state that stores the result. */
+	struct lua_State *L;
+	/** Reference to L in tarantool_L. */
+	int ref;
+	/** The argument of port_dump */
+	struct obuf *out;
+	/** Number of entries dumped to the port. */
+	int size;
+};
+
+static_assert(sizeof(struct port_lua) <= sizeof(struct port),
+	      "sizeof(struct port_lua) must be <= sizeof(struct port)");
+
+/** Initialize a port to dump from Lua. */
+void
+port_lua_create(struct port *port, struct lua_State *L);
+
 /**
  * Destroy an abstract port instance.
  */
@@ -149,14 +175,26 @@ port_destroy(struct port *port);
  * Return number of entries dumped on success, -1 on error.
  */
 int
-port_dump(struct port *port, struct obuf *out);
+port_dump_msgpack(struct port *port, struct obuf *out);
 
 /**
  * Same as port_dump(), but use the legacy Tarantool 1.6
  * format.
  */
 int
-port_dump_16(struct port *port, struct obuf *out);
+port_dump_msgpack_16(struct port *port, struct obuf *out);
+
+/**
+ * Dump a port content as a plain text into a buffer,
+ * allocated inside.
+ * @param port Port with data to dump.
+ * @param[out] size Length of a result plain text.
+ *
+ * @retval nil Error.
+ * @retval not nil Plain text.
+ */
+const char *
+port_dump_plain(struct port *port, uint32_t *size);
 
 void
 port_init(void);

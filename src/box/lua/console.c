@@ -30,10 +30,14 @@
  */
 
 #include "box/lua/console.h"
+#include "box/session.h"
+#include "box/port.h"
+#include "box/error.h"
 #include "lua/utils.h"
 #include "lua/fiber.h"
 #include "fiber.h"
 #include "coio.h"
+#include "lua-yaml/lyaml.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -41,6 +45,8 @@
 #include <readline/history.h>
 #include <stdlib.h>
 #include <ctype.h>
+
+static struct luaL_serializer *luaL_yaml_default = NULL;
 
 /*
  * Completion engine (Mike Paul's).
@@ -329,6 +335,93 @@ lbox_console_add_history(struct lua_State *L)
 	return 0;
 }
 
+/**
+ * Encode Lua object into YAML documents. Gets variable count of
+ * parameters.
+ * @retval 1 Pushes string with YAML documents - one per
+ *         parameter.
+ */
+static int
+lbox_console_format(struct lua_State *L)
+{
+	int arg_count = lua_gettop(L);
+	if (arg_count == 0) {
+		lua_pushstring(L, "---\n...\n");
+		return 1;
+	}
+	lua_createtable(L, arg_count, 0);
+	for (int i = 0; i < arg_count; ++i) {
+		if (lua_isnil(L, i + 1))
+			luaL_pushnull(L);
+		else
+			lua_pushvalue(L, i + 1);
+		lua_rawseti(L, -2, i + 1);
+	}
+	lua_replace(L, 1);
+	lua_settop(L, 1);
+	return lua_yaml_encode(L, luaL_yaml_default, NULL, NULL);
+}
+
+int
+console_session_fd(struct session *session)
+{
+	return session->meta.fd;
+}
+
+/**
+ * Dump port lua data as a YAML document tagged with !push! global
+ * tag.
+ * @param port Port lua.
+ * @param[out] size Size of the result.
+ *
+ * @retval not NULL Tagged YAML document.
+ * @retval NULL Error.
+ */
+const char *
+port_lua_dump_plain(struct port *port, uint32_t *size)
+{
+	struct port_lua *port_lua = (struct port_lua *) port;
+	struct lua_State *L = port_lua->L;
+	int rc = lua_yaml_encode(L, luaL_yaml_default, "!push!",
+				 "tag:tarantool.io/push,2018");
+	if (rc == 2) {
+		/*
+		 * Nil and error object are pushed onto the stack.
+		 */
+		assert(lua_isnil(L, -2));
+		assert(lua_isstring(L, -1));
+		diag_set(ClientError, ER_PROC_LUA, lua_tostring(L, -1));
+		return NULL;
+	}
+	assert(rc == 1);
+	assert(lua_isstring(L, -1));
+	size_t len;
+	const char *result = lua_tolstring(L, -1, &len);
+	*size = (uint32_t) len;
+	return result;
+}
+
+/**
+ * Push a tagged YAML document into a console socket.
+ * @param session Console session.
+ * @param port Port with YAML to push.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
+static int
+console_session_push(struct session *session, struct port *port)
+{
+	assert(session_vtab_registry[session->type].push ==
+	       console_session_push);
+	uint32_t text_len;
+	const char *text = port_dump_plain(port, &text_len);
+	if (text == NULL)
+		return -1;
+	return coio_write_fd_timeout(session_fd(session), text, text_len,
+				     TIMEOUT_INFINITY);
+}
+
 void
 tarantool_lua_console_init(struct lua_State *L)
 {
@@ -337,6 +430,7 @@ tarantool_lua_console_init(struct lua_State *L)
 		{"save_history",       lbox_console_save_history},
 		{"add_history",        lbox_console_add_history},
 		{"completion_handler", lbox_console_completion_handler},
+		{"format",             lbox_console_format},
 		{NULL, NULL}
 	};
 	luaL_register_module(L, "console", consolelib);
@@ -345,6 +439,29 @@ tarantool_lua_console_init(struct lua_State *L)
 	lua_getfield(L, -1, "completion_handler");
 	lua_pushcclosure(L, lbox_console_readline, 1);
 	lua_setfield(L, -2, "readline");
+
+	luaL_yaml_default = lua_yaml_new_serializer(L);
+	luaL_yaml_default->encode_invalid_numbers = 1;
+	luaL_yaml_default->encode_load_metatables = 1;
+	luaL_yaml_default->encode_use_tostring = 1;
+	luaL_yaml_default->encode_invalid_as_nil = 1;
+	/*
+	 * Hold reference to the formatter in module local
+	 * variable.
+	 *
+	 * This member is not visible to a user, because
+	 * console.lua modifies itself, holding the formatter in
+	 * module local variable. Add_history, save_history,
+	 * load_history work the same way.
+	 */
+	lua_setfield(L, -2, "formatter");
+	struct session_vtab console_session_vtab = {
+		/* .push = */ console_session_push,
+		/* .fd = */ console_session_fd,
+		/* .sync = */ generic_session_sync,
+	};
+	session_vtab_registry[SESSION_TYPE_CONSOLE] = console_session_vtab;
+	session_vtab_registry[SESSION_TYPE_REPL] = console_session_vtab;
 }
 
 /*

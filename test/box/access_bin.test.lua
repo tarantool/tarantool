@@ -131,5 +131,5 @@ box.schema.func.drop('f2')
 --
 box.session.su('admin', box.session.user)
 box.session.su('admin', box.session.user())
--- clenaup
+-- cleanup
 box.session.su('admin')

@@ -662,7 +662,7 @@ box.session.su('john')
 -- error
 box.schema.user.grant('grantee', 'role')
 ---
-- error: Read access to space '_user' is denied for user 'john'
+- error: User 'grantee' is not found
 ...
 --
 box.session.su('admin')

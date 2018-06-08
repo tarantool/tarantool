@@ -253,7 +253,7 @@ struct vy_lsm {
 	 */
 	uint32_t range_tree_version;
 	/**
-	 * LSN of the last dump or -1 if the LSM tree has not
+	 * Max LSN stored on disk or -1 if the LSM tree has not
 	 * been dumped yet.
 	 */
 	int64_t dump_lsn;
@@ -355,8 +355,8 @@ vy_lsm_update_pk(struct vy_lsm *lsm, struct vy_lsm *pk)
  *
  * This function is called when an LSM tree is created
  * after recovery is complete or during remote recovery.
- * It initializes the range tree and makes the LSM tree
- * directory.
+ * It initializes the range tree, makes the LSM tree
+ * directory, and writes the LSM tree record to vylog.
  */
 int
 vy_lsm_create(struct vy_lsm *lsm);

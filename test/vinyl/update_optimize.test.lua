@@ -8,19 +8,19 @@ fiber = require('fiber')
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', { run_count_per_level = 20 })
 index2 = space:create_index('secondary', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
-function dumped_stmt_count() return index:info().disk.dump.out.rows + index2:info().disk.dump.out.rows end
+function dumped_stmt_count() return index:stat().disk.dump.out.rows + index2:stat().disk.dump.out.rows end
 box.snapshot()
 test_run:cmd("setopt delimiter ';'")
 function wait_for_dump(index, old_count)
-	while index:info().run_count == old_count do
+	while index:stat().run_count == old_count do
 		fiber.sleep(0)
 	end
-	return index:info().run_count
+	return index:stat().run_count
 end;
 test_run:cmd("setopt delimiter ''");
 
-index_run_count = index:info().run_count
-index2_run_count = index2:info().run_count
+index_run_count = index:stat().run_count
+index2_run_count = index2:stat().run_count
 old_stmt_count = dumped_stmt_count()
 space:insert({1, 2, 3, 4, 5})
 space:insert({2, 3, 4, 5, 6})
@@ -76,11 +76,11 @@ space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', { parts = {2, 'unsigned'}, run_count_per_level = 20 } )
 index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'}, run_count_per_level = 20 })
 index3 = space:create_index('third', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
-function dumped_stmt_count() return index:info().disk.dump.out.rows + index2:info().disk.dump.out.rows + index3:info().disk.dump.out.rows end
+function dumped_stmt_count() return index:stat().disk.dump.out.rows + index2:stat().disk.dump.out.rows + index3:stat().disk.dump.out.rows end
 box.snapshot()
-index_run_count = index:info().run_count
-index2_run_count = index2:info().run_count
-index3_run_count = index3:info().run_count
+index_run_count = index:stat().run_count
+index2_run_count = index2:stat().run_count
+index3_run_count = index3:stat().run_count
 old_stmt_count = dumped_stmt_count()
 space:insert({1, 2, 3, 4, 5})
 space:insert({2, 3, 4, 5, 6})
@@ -213,7 +213,7 @@ test_run:cmd("setopt delimiter ';'")
 function lookups()
     local ret = {}
     for i = 1, #LOOKUPS_BASE do
-        local info = space.index[i - 1]:info()
+        local info = space.index[i - 1]:stat()
         table.insert(ret, info.lookup - LOOKUPS_BASE[i])
     end
     return ret

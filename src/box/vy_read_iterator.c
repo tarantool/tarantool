@@ -635,19 +635,6 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 	 * format in vy_mem.
 	 */
 	rlist_foreach_entry(slice, &itr->curr_range->slices, in_range) {
-		/*
-		 * vy_task_dump_complete() may yield after adding
-		 * a new run slice to a range and before removing
-		 * dumped in-memory trees. We must not add both
-		 * the slice and the trees in this case, because
-		 * the read iterator can't deal with duplicates.
-		 * Since lsm->dump_lsn is bumped after deletion
-		 * of dumped in-memory trees, we can filter out
-		 * the run slice containing duplicates by LSN.
-		 */
-		if (slice->run->info.min_lsn > lsm->dump_lsn)
-			continue;
-		assert(slice->run->info.max_lsn <= lsm->dump_lsn);
 		struct vy_read_src *sub_src = vy_read_iterator_add_src(itr);
 		vy_run_iterator_open(&sub_src->run_iterator,
 				     &lsm->stat.disk.iterator, slice,

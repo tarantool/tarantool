@@ -11,35 +11,13 @@ local yaml = require('yaml')
 local net_box = require('net.box')
 
 local YAML_TERM = '\n...\n'
-
--- admin formatter must be able to encode any Lua variable
-local formatter = yaml.new()
-formatter.cfg{
-    encode_invalid_numbers = true;
-    encode_load_metatables = true;
-    encode_use_tostring    = true;
-    encode_invalid_as_nil  = true;
-}
+local PUSH_TAG_HANDLE = '!push!'
 
 local function format(status, ...)
-    -- When storing a nil in a Lua table, there is no way to
-    -- distinguish nil value from no value. This is a trick to
-    -- make sure yaml converter correctly
-    local function wrapnull(v)
-        return v == nil and formatter.NULL or v
-    end
     local err
     if status then
-        local count = select('#', ...)
-        if count == 0 then
-            return "---\n...\n"
-        end
-        local res = {}
-        for i=1,count,1 do
-            table.insert(res, wrapnull(select(i, ...)))
-        end
         -- serializer can raise an exception
-        status, err = pcall(formatter.encode, res)
+        status, err = pcall(internal.format, ...)
         if status then
             return err
         else
@@ -47,9 +25,12 @@ local function format(status, ...)
                 tostring(err)
         end
     else
-        err = wrapnull(...)
+        err = ...
+        if err == nil then
+            err = box.NULL
+        end
     end
-    return formatter.encode({{error = err }})
+    return internal.format({ error = err })
 end
 
 --
@@ -210,13 +191,25 @@ local text_connection_mt = {
         --
         eval = function(self, text)
             text = text..'$EOF$\n'
-            if self:write(text) then
+            if not self:write(text) then
+                error(self:set_error())
+            end
+            while true do
                 local rc = self:read()
-                if rc then
+                if not rc then
+                    break
+                end
+                local handle, prefix = yaml.decode(rc, {tag_only = true})
+                if not handle then
+                    -- Can not fail - tags are encoded with no
+                    -- user participation and are correct always.
                     return rc
                 end
+                if handle == PUSH_TAG_HANDLE and self.print_f then
+                    self.print_f(rc)
+                end
             end
-            error(self:set_error())
+            return rc
         end,
         --
         -- Make the connection be in error state, set error
@@ -239,15 +232,18 @@ local text_connection_mt = {
 -- netbox-like object.
 -- @param connection Socket to wrap.
 -- @param url Parsed destination URL.
+-- @param print_f Function to print push messages.
+--
 -- @retval nil, err Error, and err contains an error message.
 -- @retval  not nil Netbox-like object.
 --
-local function wrap_text_socket(connection, url)
+local function wrap_text_socket(connection, url, print_f)
     local conn = setmetatable({
         _socket = connection,
         state = 'active',
         host = url.host or 'localhost',
         port = url.service,
+        print_f = print_f,
     }, text_connection_mt)
     if not conn:write('require("console").delimiter("$EOF$")\n') or
        not conn:read() then
@@ -452,7 +448,7 @@ local function start()
         self.history_file = home_dir .. '/.tarantool_history'
         internal.load_history(self.history_file)
     end
-    session_internal.create(-1, "repl")
+    session_internal.create(1, "repl") -- stdin fileno
     repl(self)
     started = false
 end
@@ -484,7 +480,8 @@ local function connect(uri, opts)
     end
     local remote
     if greeting.protocol == 'Lua console' then
-        remote = wrap_text_socket(connection, u)
+        remote = wrap_text_socket(connection, u,
+                                  function(msg) self:print(msg) end)
     else
         opts = {
             connect_timeout = opts.timeout,

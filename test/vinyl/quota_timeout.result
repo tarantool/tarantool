@@ -47,7 +47,7 @@ s:count()
 ---
 - 1
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 748241
 ...
@@ -61,9 +61,32 @@ s:count()
 ---
 - 1
 ...
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 ---
 - 748241
+...
+--
+-- Check that increasing box.cfg.vinyl_memory wakes up fibers
+-- waiting for memory.
+--
+box.cfg{vinyl_timeout=5}
+---
+...
+c = fiber.channel(1)
+---
+...
+_ = fiber.create(function() local ok = pcall(s.auto_increment, s, {pad}) c:put(ok) end)
+---
+...
+fiber.sleep(0.01)
+---
+...
+box.cfg{vinyl_memory = 3 * box.cfg.vinyl_memory / 2}
+---
+...
+c:get(1)
+---
+- true
 ...
 box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
 ---
@@ -86,6 +109,9 @@ box.cfg{vinyl_timeout=60}
 box.cfg{too_long_threshold=0.01}
 ---
 ...
+pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
+---
+...
 _ = s:auto_increment{pad}
 ---
 ...
@@ -98,7 +124,7 @@ test_run:cmd("push filter '[0-9.]+ sec' to '<sec> sec'")
 ...
 test_run:grep_log('test', 'waited for .* quota for too long.*')
 ---
-- 'waited for 699089 bytes of vinyl memory quota for too long: <sec> sec'
+- 'waited for 1048615 bytes of vinyl memory quota for too long: <sec> sec'
 ...
 test_run:cmd("clear filter")
 ---
@@ -122,7 +148,7 @@ box.snapshot()
 -- The following operation should fail instantly irrespective
 -- of the value of 'vinyl_timeout' (gh-3291).
 --
-box.info.vinyl().quota.used == 0
+box.stat.vinyl().quota.used == 0
 ---
 - true
 ...
@@ -134,7 +160,7 @@ pad = string.rep('x', box.cfg.vinyl_memory)
 ...
 _ = s:auto_increment{pad}
 ---
-- error: Failed to allocate 1048615 bytes in lsregion for vinyl transaction
+- error: Failed to allocate 1572903 bytes in lsregion for vinyl transaction
 ...
 s:drop()
 ---
@@ -164,7 +190,7 @@ pad = string.rep('x', 64)
 _ = s1:auto_increment{pad}
 ---
 ...
-s1.index.pk:info().memory.bytes > 0
+s1.index.pk:stat().memory.bytes > 0
 ---
 - true
 ...
@@ -174,10 +200,10 @@ pad = string.rep('x', box.cfg.vinyl_memory - string.len(pad))
 _ = s2:auto_increment{pad}
 ---
 ...
-while s1.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.01) end
+while s1.index.pk:stat().disk.dump.count == 0 do fiber.sleep(0.01) end
 ---
 ...
-s1.index.pk:info().memory.bytes == 0
+s1.index.pk:stat().memory.bytes == 0
 ---
 - true
 ...

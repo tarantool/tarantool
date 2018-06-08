@@ -265,6 +265,8 @@ test_latch:create_index("sec2", {unique = true, parts = {2, 'unsigned'}})
 box.commit();
 
 test_run:cmd("setopt delimiter ''");
+-- finish transaction
+box.rollback()
 
 _ = c:get()
 test_latch:drop() -- this is where everything stops

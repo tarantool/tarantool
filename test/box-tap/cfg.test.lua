@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(91)
+test:plan(93)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -19,6 +19,7 @@ local function invalid(name, val)
     test:ok(not status and result:match('Incorrect'), 'invalid '..name)
 end
 
+invalid('memtx_memory', -1)
 invalid('memtx_min_tuple_size', 7)
 invalid('memtx_min_tuple_size', 0)
 invalid('memtx_min_tuple_size', -1)
@@ -38,6 +39,7 @@ invalid('listen', '//!')
 invalid('log', ':')
 invalid('log', 'syslog:xxx=')
 invalid('log_level', 'unknown')
+invalid('vinyl_memory', -1)
 invalid('vinyl_read_threads', 0)
 invalid('vinyl_write_threads', 1)
 invalid('vinyl_range_size', 0)

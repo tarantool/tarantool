@@ -6,7 +6,7 @@ test_run:cmd("setopt delimiter ';'")
 stat = nil
 function stat_changed()
     local old_stat = stat
-    local new_stat = box.space.test.index.pk:info()
+    local new_stat = box.space.test.index.pk:stat()
     stat = new_stat
     return (old_stat == nil or
             old_stat.memory.iterator.lookup ~= new_stat.memory.iterator.lookup or
@@ -346,15 +346,15 @@ s:replace{5}
 box.snapshot()
 -- Cache is not updated in autocommit mode.
 box.begin() s:select{} box.commit()
-info = pk:info().cache
+info = pk:stat().cache
 info.lookup
 info.get.rows
-pk:info().disk.iterator.lookup
+pk:stat().disk.iterator.lookup
 s:get{3}
-info = pk:info().cache
+info = pk:stat().cache
 info.lookup
 info.get.rows
-pk:info().disk.iterator.lookup
+pk:stat().disk.iterator.lookup
 s:drop()
 
 --
@@ -366,17 +366,17 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')
 for i = 1, 100 do s:replace{i, string.rep('x', 1000)} end
 for i = 1, 100 do s:get{i} end
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 box.cfg{vinyl_cache = 50 * 1000}
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 box.cfg{vinyl_cache = 0}
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 -- Make sure cache is not populated if box.cfg.vinyl_cache is set to 0
-st1 = s.index.pk:info().cache
+st1 = s.index.pk:stat().cache
 #s:select()
 for i = 1, 100 do s:get{i} end
-st2 = s.index.pk:info().cache
+st2 = s.index.pk:stat().cache
 st2.put.rows - st1.put.rows
-box.info.vinyl().cache.used
+box.stat.vinyl().cache.used
 s:drop()
 box.cfg{vinyl_cache = vinyl_cache}

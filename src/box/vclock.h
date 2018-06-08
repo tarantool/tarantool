@@ -109,7 +109,7 @@ vclock_iterator_next(struct vclock_iterator *it)
 
 
 #define vclock_foreach(it, var) \
-	for (struct vclock_c (var) = vclock_iterator_next(it); \
+	for (struct vclock_c var = vclock_iterator_next(it); \
 	     (var).id < VCLOCK_MAX; (var) = vclock_iterator_next(it))
 
 static inline void

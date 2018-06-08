@@ -257,12 +257,19 @@ struct index_def;
 struct error *
 BuildUnsupportedIndexFeature(const char *file, unsigned line,
 			     struct index_def *index_def, const char *what);
+struct error *
+BuildSocketError(const char *file, unsigned line, const char *socketname,
+		 const char *format, ...);
 
 #define diag_set(class, ...) do {					\
+	/* Preserve the original errno. */                              \
+	int save_errno = errno;                                         \
 	say_debug("%s at %s:%i", #class, __FILE__, __LINE__);		\
 	struct error *e;						\
 	e = Build##class(__FILE__, __LINE__, ##__VA_ARGS__);		\
 	diag_add_error(diag_get(), e);					\
+	/* Restore the errno which might have been reset.  */           \
+	errno = save_errno;                                             \
 } while (0)
 
 #if defined(__cplusplus)

@@ -126,7 +126,7 @@ engine_begin_checkpoint(void)
 }
 
 int
-engine_commit_checkpoint(struct vclock *vclock)
+engine_commit_checkpoint(const struct vclock *vclock)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -159,7 +159,7 @@ engine_collect_garbage(int64_t lsn)
 }
 
 int
-engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
+engine_backup(const struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
@@ -170,7 +170,7 @@ engine_backup(struct vclock *vclock, engine_backup_cb cb, void *cb_arg)
 }
 
 int
-engine_join(struct vclock *vclock, struct xstream *stream)
+engine_join(const struct vclock *vclock, struct xstream *stream)
 {
 	struct engine *engine;
 	engine_foreach(engine) {

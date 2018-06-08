@@ -203,14 +203,14 @@ test_run:cmd("setopt delimiter ''");
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary')
 
-stat1 = index:info()
+stat1 = index:stat()
 
 -- separate upserts w/o on disk data
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
 space:upsert({1, 1, 1}, {{'-', 2, 20}})
 space:upsert({1, 1, 1}, {{'=', 2, 20}})
 
-stat2 = index:info()
+stat2 = index:stat()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
@@ -223,7 +223,7 @@ space:upsert({2, 1, 1}, {{'-', 2, 20}})
 space:upsert({2, 1, 1}, {{'=', 2, 20}})
 box.commit()
 
-stat2 = index:info()
+stat2 = index:stat()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
@@ -231,13 +231,13 @@ stat1.rows
 
 box.snapshot()
 
-index:info().rows
+index:stat().rows
 
 -- upsert with on disk data
 space:upsert({1, 1, 1}, {{'+', 2, 10}})
 space:upsert({1, 1, 1}, {{'-', 2, 20}})
 
-stat2 = index:info()
+stat2 = index:stat()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
@@ -245,23 +245,23 @@ stat1.rows
 
 -- count of applied apserts
 space:get({1})
-stat2 = index:info()
+stat2 = index:stat()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
 space:get({2})
-stat2 = index:info()
+stat2 = index:stat()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
 space:select({})
-stat2 = index:info()
+stat2 = index:stat()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 
 -- start upsert optimizer
 for i = 0, 999 do space:upsert({3, 0, 0}, {{'+', 2, 1}}) end
-stat2 = index:info()
+stat2 = index:stat()
 upsert_stat_diff(stat2, stat1)
 stat1 = stat2
 space:get{3}
@@ -283,7 +283,7 @@ s:select()
 --
 -- gh-2520 use cache as a hint when applying upserts.
 --
-old_stat = s.index.test:info()
+old_stat = s.index.test:stat()
 -- insert the first upsert
 s:upsert({100}, {{'=', 2, 200}})
 -- force a dump, the inserted upsert is now on disk
@@ -291,7 +291,7 @@ box.snapshot()
 -- populate the cache
 s:get{100}
 -- a lookup in a run was done to populate the cache
-new_stat = s.index.test:info()
+new_stat = s.index.test:stat()
 upsert_stat_diff(new_stat, old_stat)
 new_stat.disk.iterator.lookup - old_stat.disk.iterator.lookup
 old_stat = new_stat
@@ -307,7 +307,7 @@ s:get{100}
 -- go no further than the latest dump to locate the latest
 -- value of the key
 --
-new_stat = s.index.test:info()
+new_stat = s.index.test:stat()
 upsert_stat_diff(new_stat, old_stat)
 new_stat.disk.iterator.lookup - old_stat.disk.iterator.lookup
 

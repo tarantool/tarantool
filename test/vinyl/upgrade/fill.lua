@@ -22,7 +22,7 @@ dump_trigger:create_index('pk')
 function dump()
     pcall(dump_trigger.insert, dump_trigger,
           {1, string.rep('x', 1024 * 1024)})
-    while box.info.vinyl().quota.used > 0 do
+    while box.stat.vinyl().quota.used > 0 do
         fiber.sleep(0.1)
     end
 end
@@ -124,7 +124,7 @@ for i = 1, 4 do
     end
     dump()
 end
-assert(s.index.pk:info().range_count >= 2)
+assert(s.index.pk:stat().range_count >= 2)
 
 dump_trigger:drop()
 

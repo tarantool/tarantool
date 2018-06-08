@@ -83,7 +83,8 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 		coio_guard.is_active = false;
 		return 0;
 	}
-	assert(errno == EINPROGRESS);
+	if (errno != EINPROGRESS)
+		diag_raise();
 	/*
 	 * Wait until socket is ready for writing or
 	 * timed out.
@@ -97,11 +98,12 @@ coio_connect_addr(struct ev_io *coio, struct sockaddr *addr,
 		tnt_raise(TimedOut);
 	int error = EINPROGRESS;
 	socklen_t sz = sizeof(error);
-	sio_getsockopt(coio->fd, SOL_SOCKET, SO_ERROR,
-		       &error, &sz);
+	if (sio_getsockopt(coio->fd, SOL_SOCKET, SO_ERROR,
+		       &error, &sz))
+		diag_raise();
 	if (error != 0) {
 		errno = error;
-		tnt_raise(SocketError, coio->fd, "connect");
+		tnt_raise(SocketError, sio_socketname(coio->fd), "connect");
 	}
 	coio_guard.is_active = false;
 	return 0;
@@ -231,7 +233,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		coio_timeout_update(start, &delay);
 	}
 
-	tnt_raise(SocketError, coio->fd, "connection failed");
+	tnt_raise(SocketError, sio_socketname(coio->fd), "connection failed");
 }
 
 /**
@@ -344,8 +346,8 @@ coio_readn_ahead(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz)
 	ssize_t nrd = coio_read_ahead(coio, buf, sz, bufsiz);
 	if (nrd < (ssize_t)sz) {
 		errno = EPIPE;
-		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
-			  "from socket");
+		tnt_raise(SocketError, sio_socketname(coio->fd),
+			  "unexpected EOF when reading from socket");
 	}
 	return nrd;
 }
@@ -364,8 +366,8 @@ coio_readn_ahead_timeout(struct ev_io *coio, void *buf, size_t sz, size_t bufsiz
 	ssize_t nrd = coio_read_ahead_timeout(coio, buf, sz, bufsiz, timeout);
 	if (nrd < (ssize_t)sz && errno == 0) { /* EOF. */
 		errno = EPIPE;
-		tnt_raise(SocketError, coio->fd, "unexpected EOF when reading "
-			  "from socket");
+		tnt_raise(SocketError, sio_socketname(coio->fd),
+			  "unexpected EOF when reading from socket");
 	}
 	return nrd;
 }
@@ -728,4 +730,32 @@ int coio_close(int fd)
 {
 	ev_io_closing(loop(), fd, EV_CUSTOM);
 	return close(fd);
+}
+
+int
+coio_write_fd_timeout(int fd, const void *data, size_t size, ev_tstamp timeout)
+{
+	ev_loop *loop = loop();
+	ev_tstamp start, delay;
+	evio_timeout_init(loop, &start, &delay, timeout);
+	while (size > 0) {
+		ssize_t rc = write(fd, data, size);
+		if (rc >= 0) {
+			size -= (size_t) rc;
+			data = (char *) data + rc;
+			continue;
+		}
+		if (delay <= 0) {
+			diag_set(TimedOut);
+			return -1;
+		}
+		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			coio_wait(fd, COIO_WRITE, delay);
+			evio_timeout_update(loop, start, &delay);
+		} else if (errno != EINTR) {
+			diag_set(SocketError, sio_socketname(fd), "write");
+			return -1;
+		}
+	}
+	return 0;
 }

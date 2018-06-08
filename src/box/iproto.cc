@@ -47,6 +47,7 @@
 #include "coio.h"
 #include "scoped_guard.h"
 #include "memory.h"
+#include "random.h"
 
 #include "port.h"
 #include "box.h"
@@ -62,6 +63,8 @@
 #include "errinj.h"
 #include "applier.h"
 #include "cfg.h"
+
+enum { IPROTO_SALT_SIZE = 32 };
 
 /**
  * Network readahead. A signed integer to avoid
@@ -364,6 +367,8 @@ struct iproto_connection
 		/** Pointer to the current output buffer. */
 		struct obuf *p_obuf;
 	} tx;
+	/** Authentication salt. */
+	char salt[IPROTO_SALT_SIZE];
 };
 
 static struct mempool iproto_connection_pool;
@@ -1096,7 +1101,7 @@ error:
 static void
 tx_fiber_init(struct session *session, uint64_t sync)
 {
-	session->sync = sync;
+	session->meta.sync = sync;
 	/*
 	 * We do not cleanup fiber keys at the end of each request.
 	 * This does not lead to privilege escalation as long as
@@ -1123,11 +1128,6 @@ tx_process_disconnect(struct cmsg *m)
 		container_of(m, struct iproto_connection, disconnect);
 	if (con->session) {
 		tx_fiber_init(con->session, 0);
-		/*
-		 * The socket is already closed in iproto thread,
-		 * prevent box.session.peer() from using it.
-		 */
-		con->session->fd = -1;
 		if (! rlist_empty(&session_on_disconnect))
 			session_run_on_disconnect_triggers(con->session);
 		session_destroy(con->session);
@@ -1325,7 +1325,7 @@ tx_process_select(struct cmsg *m)
 	/*
 	 * SELECT output format has not changed since Tarantool 1.6
 	 */
-	count = port_dump_16(&port, out);
+	count = port_dump_msgpack_16(&port, out);
 	port_destroy(&port);
 	if (count < 0) {
 		/* Discard the prepared select. */
@@ -1415,9 +1415,9 @@ tx_process_call(struct cmsg *m)
 	}
 
 	if (msg->header.type == IPROTO_CALL_16)
-		count = port_dump_16(&port, out);
+		count = port_dump_msgpack_16(&port, out);
 	else
-		count = port_dump(&port, out);
+		count = port_dump_msgpack(&port, out);
 	port_destroy(&port);
 	if (count < 0) {
 		obuf_rollback_to_svp(out, &svp);
@@ -1436,9 +1436,10 @@ static void
 tx_process_misc(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-	struct obuf *out = msg->connection->tx.p_obuf;
+	struct iproto_connection *con = msg->connection;
+	struct obuf *out = con->tx.p_obuf;
 
-	tx_fiber_init(msg->connection->session, msg->header.sync);
+	tx_fiber_init(con->session, msg->header.sync);
 
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
@@ -1446,7 +1447,7 @@ tx_process_misc(struct cmsg *m)
 	try {
 		switch (msg->header.type) {
 		case IPROTO_AUTH:
-			box_process_auth(&msg->auth);
+			box_process_auth(&msg->auth, con->salt);
 			iproto_reply_ok_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
@@ -1620,15 +1621,17 @@ tx_process_connect(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = msg->connection->tx.p_obuf;
 	try {              /* connect. */
-		con->session = session_create(con->input.fd, SESSION_TYPE_BINARY);
+		con->session = session_create(SESSION_TYPE_BINARY);
 		if (con->session == NULL)
 			diag_raise();
+		con->session->meta.connection = con;
 		tx_fiber_init(con->session, 0);
 		static __thread char greeting[IPROTO_GREETING_SIZE];
 		/* TODO: dirty read from tx thread */
 		struct tt_uuid uuid = INSTANCE_UUID;
-		greeting_encode(greeting, tarantool_version_id(),
-				&uuid, con->session->salt, SESSION_SEED_SIZE);
+		random_bytes(con->salt, IPROTO_SALT_SIZE);
+		greeting_encode(greeting, tarantool_version_id(), &uuid,
+				con->salt, IPROTO_SALT_SIZE);
 		obuf_dup_xc(out, greeting, IPROTO_GREETING_SIZE);
 		if (! rlist_empty(&session_on_connect)) {
 			if (session_run_on_connect_triggers(con->session) != 0)
@@ -1767,6 +1770,20 @@ net_cord_f(va_list /* ap */)
 	return 0;
 }
 
+int
+iproto_session_fd(struct session *session)
+{
+	struct iproto_connection *con =
+		(struct iproto_connection *) session->meta.connection;
+	return con->output.fd;
+}
+
+int64_t
+iproto_session_sync(struct session *session)
+{
+	return session->meta.sync;
+}
+
 /** Initialize the iproto subsystem and start network io thread */
 void
 iproto_init()
@@ -1779,6 +1796,12 @@ iproto_init()
 	/* Create a pipe to "net" thread. */
 	cpipe_create(&net_pipe, "net");
 	cpipe_set_max_input(&net_pipe, iproto_msg_max / 2);
+	struct session_vtab iproto_session_vtab = {
+		/* .push = */ generic_session_push,
+		/* .fd = */ iproto_session_fd,
+		/* .sync = */ iproto_session_sync,
+	};
+	session_vtab_registry[SESSION_TYPE_BINARY] = iproto_session_vtab;
 }
 
 /** Available IProto configuration changes. */

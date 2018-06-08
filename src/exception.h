@@ -97,6 +97,17 @@ protected:
 	int m_errno;
 };
 
+extern const struct type_info type_SocketError;
+class SocketError: public SystemError {
+public:
+	SocketError(const char *file, unsigned line, const char *socketname,
+		    const char *format, ...);
+	virtual void raise()
+	{
+		throw this;
+	}
+};
+
 class OutOfMemory: public SystemError {
 public:
 	OutOfMemory(const char *file, unsigned line,

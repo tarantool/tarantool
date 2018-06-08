@@ -9,7 +9,7 @@ test_run:cleanup_cluster()
 default_checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 
-function wait_gc(n) while #box.internal.gc.info().checkpoints > n do fiber.sleep(0.01) end end
+function wait_gc(n) while #box.info.gc().checkpoints > n do fiber.sleep(0.01) end end
 
 -- Grant permissions needed for replication.
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
@@ -59,7 +59,7 @@ test_run:cmd("switch default")
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
 wait_gc(1)
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 
 -- Make sure the replica will receive data it is subscribed
 -- to long enough for us to invoke garbage collection.
@@ -71,7 +71,7 @@ for i = 1, 100 do s:auto_increment{} end
 -- Invoke garbage collection. Check that it doesn't remove
 -- xlogs needed by the replica.
 box.snapshot()
-#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+#box.info.gc().checkpoints == 2 or box.info.gc()
 
 -- Remove the timeout injection so that the replica catches
 -- up quickly.
@@ -86,7 +86,7 @@ test_run:cmd("switch default")
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
 wait_gc(1)
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 
 --
 -- Check that the master doesn't delete xlog files sent to the
@@ -105,7 +105,7 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- Garbage collection must not delete the old xlog file
 -- (and the corresponding snapshot), because it is still
 -- needed by the replica.
-#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+#box.info.gc().checkpoints == 2 or box.info.gc()
 test_run:cmd("switch replica")
 -- Unblock the replica and make it fail to apply a row.
 box.info.replication[1].upstream.message == nil
@@ -124,7 +124,7 @@ box.space.test:count()
 test_run:cmd("switch default")
 -- Now it's safe to drop the old xlog.
 wait_gc(1)
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 
 -- Stop the replica.
 test_run:cmd("stop server replica")
@@ -134,12 +134,12 @@ test_run:cmd("cleanup server replica")
 -- the checkpoint last used by the replica.
 _ = s:auto_increment{}
 box.snapshot()
-#box.internal.gc.info().checkpoints == 2 or box.internal.gc.info()
+#box.info.gc().checkpoints == 2 or box.info.gc()
 
 -- The checkpoint should only be deleted after the replica
 -- is unregistered.
 test_run:cleanup_cluster()
-#box.internal.gc.info().checkpoints == 1 or box.internal.gc.info()
+#box.info.gc().checkpoints == 1 or box.info.gc()
 
 --
 -- Test that concurrent invocation of the garbage collector works fine.

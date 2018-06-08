@@ -46,16 +46,22 @@ vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery);
 
 /**
- * Engine introspection (box.info.vinyl())
+ * Vinyl engine statistics (box.stat.vinyl()).
  */
 void
-vinyl_engine_info(struct vinyl_engine *vinyl, struct info_handler *handler);
+vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *handler);
 
 /**
  * Update vinyl cache size.
  */
 void
 vinyl_engine_set_cache(struct vinyl_engine *vinyl, size_t quota);
+
+/**
+ * Update vinyl memory size.
+ */
+int
+vinyl_engine_set_memory(struct vinyl_engine *vinyl, size_t size);
 
 /**
  * Update max tuple size.
@@ -76,6 +82,12 @@ void
 vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 				    double too_long_threshold);
 
+/**
+ * Update snap_io_rate_limit.
+ */
+void
+vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit);
+
 #ifdef __cplusplus
 } /* extern "C" */
 
@@ -91,6 +103,13 @@ vinyl_engine_new_xc(const char *dir, size_t memory,
 	if (vinyl == NULL)
 		diag_raise();
 	return vinyl;
+}
+
+static inline void
+vinyl_engine_set_memory_xc(struct vinyl_engine *vinyl, size_t size)
+{
+	if (vinyl_engine_set_memory(vinyl, size) != 0)
+		diag_raise();
 }
 
 #endif /* defined(__plusplus) */

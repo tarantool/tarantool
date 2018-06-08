@@ -40,6 +40,10 @@
 
 #include "box/box.h"
 #include "box/iproto.h"
+#include "box/engine.h"
+#include "box/vinyl.h"
+#include "box/info.h"
+#include "box/lua/info.h"
 #include "lua/utils.h"
 
 extern struct rmean *rmean_box;
@@ -112,6 +116,18 @@ lbox_stat_call(struct lua_State *L)
 }
 
 static int
+lbox_stat_vinyl(struct lua_State *L)
+{
+	struct info_handler h;
+	luaT_info_handler_create(&h, L);
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_stat(vinyl, &h);
+	return 1;
+}
+
+static int
 lbox_stat_reset(struct lua_State *L)
 {
 	(void)L;
@@ -152,6 +168,7 @@ void
 box_lua_stat_init(struct lua_State *L)
 {
 	static const struct luaL_Reg statlib [] = {
+		{"vinyl", lbox_stat_vinyl},
 		{"reset", lbox_stat_reset},
 		{NULL, NULL}
 	};
@@ -163,8 +180,11 @@ box_lua_stat_init(struct lua_State *L)
 	lua_setmetatable(L, -2);
 	lua_pop(L, 1); /* stat module */
 
+	static const struct luaL_Reg netstatlib [] = {
+		{NULL, NULL}
+	};
 
-	luaL_register_module(L, "box.stat.net", statlib);
+	luaL_register_module(L, "box.stat.net", netstatlib);
 
 	lua_newtable(L);
 	luaL_register(L, NULL, lbox_stat_net_meta);

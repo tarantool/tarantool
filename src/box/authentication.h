@@ -45,6 +45,7 @@ struct on_auth_trigger_ctx {
 
 
 void
-authenticate(const char *user_name, uint32_t len, const char *tuple);
+authenticate(const char *user_name, uint32_t len, const char *salt,
+	     const char *tuple);
 
 #endif /* INCLUDES_TARANTOOL_BOX_AUTHENTICATION_H */

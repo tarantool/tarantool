@@ -677,7 +677,8 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 }
 
 static int
-memtx_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
+memtx_engine_wait_checkpoint(struct engine *engine,
+			     const struct vclock *vclock)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
@@ -708,7 +709,8 @@ memtx_engine_wait_checkpoint(struct engine *engine, struct vclock *vclock)
 }
 
 static void
-memtx_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
+memtx_engine_commit_checkpoint(struct engine *engine,
+			       const struct vclock *vclock)
 {
 	(void) vclock;
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
@@ -728,6 +730,14 @@ memtx_engine_commit_checkpoint(struct engine *engine, struct vclock *vclock)
 		snprintf(to, sizeof(to), "%s",
 			 xdir_format_filename(dir, lsn, NONE));
 		char *from = xdir_format_filename(dir, lsn, INPROGRESS);
+#ifndef NDEBUG
+		struct errinj *delay = errinj(ERRINJ_SNAP_COMMIT_DELAY,
+					       ERRINJ_BOOL);
+		if (delay != NULL && delay->bparam) {
+			while (delay->bparam)
+				fiber_sleep(0.001);
+		}
+#endif
 		int rc = coio_rename(from, to);
 		if (rc != 0)
 			panic("can't rename .snap.inprogress");
@@ -793,7 +803,7 @@ memtx_engine_collect_garbage(struct engine *engine, int64_t lsn)
 }
 
 static int
-memtx_engine_backup(struct engine *engine, struct vclock *vclock,
+memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 		    engine_backup_cb cb, void *cb_arg)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
@@ -854,7 +864,7 @@ memtx_initial_join_f(va_list ap)
 }
 
 static int
-memtx_engine_join(struct engine *engine, struct vclock *vclock,
+memtx_engine_join(struct engine *engine, const struct vclock *vclock,
 		  struct xstream *stream)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
@@ -1042,6 +1052,18 @@ void
 memtx_engine_set_snap_io_rate_limit(struct memtx_engine *memtx, double limit)
 {
 	memtx->snap_io_rate_limit = limit * 1024 * 1024;
+}
+
+int
+memtx_engine_set_memory(struct memtx_engine *memtx, size_t size)
+{
+	if (size < quota_total(&memtx->quota)) {
+		diag_set(ClientError, ER_CFG, "memtx_memory",
+			 "cannot decrease memory size at runtime");
+		return -1;
+	}
+	quota_set(&memtx->quota, size);
+	return 0;
 }
 
 void

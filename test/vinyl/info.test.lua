@@ -70,7 +70,7 @@ end;
 -- Note, latency measurement is beyond the scope of this test
 -- so we just filter it out.
 function istat()
-    local st = box.space.test.index.pk:info()
+    local st = box.space.test.index.pk:stat()
     st.latency = nil
     return st
 end;
@@ -80,7 +80,7 @@ end;
 -- Note, quota watermark checking is beyond the scope of this
 -- test so we just filter out related statistics.
 function gstat()
-    local st = box.info.vinyl()
+    local st = box.stat.vinyl()
     st.quota.use_rate = nil
     st.quota.dump_bandwidth = nil
     st.quota.watermark = nil
@@ -329,8 +329,8 @@ i1:len(), i2:len()
 i1:bsize(), i2:bsize()
 
 for i = 1, 100, 2 do s:replace{i, i, pad()} end
-st1 = i1:info()
-st2 = i2:info()
+st1 = i1:stat()
+st2 = i2:stat()
 s:bsize()
 i1:len(), i2:len()
 i1:bsize(), i2:bsize()
@@ -341,8 +341,8 @@ i1:bsize() == st1.memory.index_size
 i2:bsize() == st2.memory.index_size
 
 box.snapshot()
-st1 = i1:info()
-st2 = i2:info()
+st1 = i1:stat()
+st2 = i2:stat()
 s:bsize()
 i1:len(), i2:len()
 i1:bsize(), i2:bsize()
@@ -354,8 +354,8 @@ i2:bsize() == st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
 
 for i = 1, 100, 2 do s:delete(i) end
 for i = 2, 100, 2 do s:replace{i, i, pad()} end
-st1 = i1:info()
-st2 = i2:info()
+st1 = i1:stat()
+st2 = i2:stat()
 s:bsize()
 i1:len(), i2:len()
 i1:bsize(), i2:bsize()
@@ -366,10 +366,10 @@ i1:bsize() == st1.memory.index_size + st1.disk.index_size + st1.disk.bloom_size
 i2:bsize() == st2.memory.index_size + st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
 
 box.snapshot()
-wait(function() return i1:info() end, st1, 'disk.compact.count', 1)
-wait(function() return i2:info() end, st2, 'disk.compact.count', 1)
-st1 = i1:info()
-st2 = i2:info()
+wait(function() return i1:stat() end, st1, 'disk.compact.count', 1)
+wait(function() return i2:stat() end, st2, 'disk.compact.count', 1)
+st1 = i1:stat()
+st2 = i2:stat()
 s:bsize()
 i1:len(), i2:len()
 i1:bsize(), i2:bsize()

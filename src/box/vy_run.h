@@ -54,6 +54,8 @@ struct vy_run_reader;
 
 /** Part of vinyl environment for run read/write */
 struct vy_run_env {
+	/** Write rate limit, in bytes per second. */
+	uint64_t snap_io_rate_limit;
 	/** Mempool for struct vy_page_read_task */
 	struct mempool read_task_pool;
 	/** Key for thread-local ZSTD context */

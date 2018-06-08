@@ -234,6 +234,14 @@ box.cfg{memtx_memory = "100500"}
 ---
 - error: 'Incorrect value for option ''memtx_memory'': should be of type number'
 ...
+box.cfg{memtx_memory = -1}
+---
+- error: 'Incorrect value for option ''memtx_memory'': must be greater than 0'
+...
+box.cfg{vinyl_memory = -1}
+---
+- error: 'Incorrect value for option ''vinyl_memory'': must be greater than 0'
+...
 box.cfg{vinyl = "vinyl"}
 ---
 - error: 'Incorrect value for option ''vinyl'': unexpected option'
@@ -241,6 +249,26 @@ box.cfg{vinyl = "vinyl"}
 box.cfg{vinyl_write_threads = "threads"}
 ---
 - error: 'Incorrect value for option ''vinyl_write_threads'': should be of type number'
+...
+box.cfg{instance_uuid = box.info.uuid}
+---
+...
+box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
+---
+- error: Can't set option 'instance_uuid' dynamically
+...
+box.cfg{replicaset_uuid = box.info.cluster.uuid}
+---
+...
+box.cfg{replicaset_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
+---
+- error: Can't set option 'replicaset_uuid' dynamically
+...
+box.cfg{memtx_memory = box.cfg.memtx_memory}
+---
+...
+box.cfg{vinyl_memory = box.cfg.vinyl_memory}
+---
 ...
 --------------------------------------------------------------------------------
 -- Test of default cfg options

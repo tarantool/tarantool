@@ -167,6 +167,19 @@ local log_cfg_option = {
     replication = purge_password_from_uris,
 }
 
+
+local function check_instance_uuid()
+    if box.cfg.instance_uuid ~= box.info.uuid then
+        box.error(box.error.RELOAD_CFG, 'instance_uuid')
+    end
+end
+
+local function check_replicaset_uuid()
+    if box.cfg.replicaset_uuid ~= box.info.cluster.uuid then
+        box.error(box.error.RELOAD_CFG, 'replicaset_uuid')
+    end
+end
+
 -- dynamically settable options
 local dynamic_cfg = {
     listen                  = private.cfg_set_listen,
@@ -178,7 +191,9 @@ local dynamic_cfg = {
     too_long_threshold      = private.cfg_set_too_long_threshold,
     snap_io_rate_limit      = private.cfg_set_snap_io_rate_limit,
     read_only               = private.cfg_set_read_only,
+    memtx_memory            = private.cfg_set_memtx_memory,
     memtx_max_tuple_size    = private.cfg_set_memtx_max_tuple_size,
+    vinyl_memory            = private.cfg_set_vinyl_memory,
     vinyl_max_tuple_size    = private.cfg_set_vinyl_max_tuple_size,
     vinyl_cache             = private.cfg_set_vinyl_cache,
     vinyl_timeout           = private.cfg_set_vinyl_timeout,
@@ -197,6 +212,8 @@ local dynamic_cfg = {
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
+    instance_uuid           = check_instance_uuid,
+    replicaset_uuid         = check_replicaset_uuid,
     replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     net_msg_max             = private.cfg_set_net_msg_max,
 }
@@ -204,6 +221,8 @@ local dynamic_cfg = {
 local dynamic_cfg_skip_at_load = {
     wal_mode                = true,
     listen                  = true,
+    memtx_memory            = true,
+    vinyl_memory            = true,
     replication             = true,
     replication_timeout     = true,
     replication_connect_timeout = true,
@@ -211,6 +230,8 @@ local dynamic_cfg_skip_at_load = {
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,
+    instance_uuid           = true,
+    replicaset_uuid         = true,
 }
 
 local function convert_gb(size)

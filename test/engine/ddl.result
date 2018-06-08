@@ -1352,3 +1352,675 @@ s:select()
 s:drop()
 ---
 ...
+--
+-- gh-1557: NULL in indexes.
+--
+NULL = require('msgpack').NULL
+---
+...
+format = {}
+---
+...
+format[1] = { name = 'field1', type = 'unsigned', is_nullable = true }
+---
+...
+format[2] = { name = 'field2', type = 'unsigned', is_nullable = true }
+---
+...
+s = box.schema.space.create('test', {engine = engine, format = format})
+---
+...
+s:create_index('primary', { parts = { 'field1' } })
+---
+- error: Primary index of the space 'test' can not contain nullable parts
+...
+s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
+---
+- error: Field 1 is nullable in space format, but not nullable in index parts
+...
+format[1].is_nullable = false
+---
+...
+s:format(format)
+---
+...
+s:create_index('primary', { parts = {{'field1', is_nullable = true}} })
+---
+- error: Primary index of the space 'test' can not contain nullable parts
+...
+i = s:create_index('primary', { parts = {'field1'} })
+---
+...
+i.parts
+---
+- - type: unsigned
+    is_nullable: false
+    fieldno: 1
+...
+-- Check that is_nullable can't be set to false on non-empty space
+s:insert({1, NULL})
+---
+- [1, null]
+...
+format[1].is_nullable = true
+---
+...
+s:format(format)
+---
+- error: Field 1 is nullable in space format, but not nullable in index parts
+...
+format[1].is_nullable = false
+---
+...
+format[2].is_nullable = false
+---
+...
+s:format(format)
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+_ = s:delete(1)
+---
+...
+-- Disable is_nullable on empty space
+s:format(format)
+---
+...
+-- Disable is_nullable on a non-empty space.
+format[2].is_nullable = true
+---
+...
+s:format(format)
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+format[2].is_nullable = false
+---
+...
+s:format(format)
+---
+...
+-- Enable is_nullable on a non-empty space.
+format[2].is_nullable = true
+---
+...
+s:format(format)
+---
+...
+s:replace{1, box.NULL}
+---
+- [1, null]
+...
+_ = s:delete{1}
+---
+...
+s:format({})
+---
+...
+i = s:create_index('secondary', { parts = {{2, 'string', is_nullable = true}} })
+---
+...
+i.parts
+---
+- - type: string
+    is_nullable: true
+    fieldno: 2
+...
+s:insert({1, NULL})
+---
+- [1, null]
+...
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+_ = s:delete({1})
+---
+...
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = false} }})
+---
+...
+s:insert({1, NULL})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+s:insert({2, 'xxx'})
+---
+- [2, 'xxx']
+...
+s.index.secondary:alter({ parts = {{2, 'string', is_nullable = true} }})
+---
+...
+s:insert({1, NULL})
+---
+- [1, null]
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+inspector:cmd("setopt delimiter ';'")
+---
+- true
+...
+s:format({
+    [1] = { name = 'id1', type = 'unsigned'},
+    [2] = { name = 'id2', type = 'unsigned'},
+    [3] = { name = 'id3', type = 'string'},
+    [4] = { name = 'id4', type = 'string'},
+    [5] = { name = 'id5', type = 'string'},
+    [6] = { name = 'id6', type = 'string'},
+});
+---
+...
+inspector:cmd("setopt delimiter ''");
+---
+- true
+...
+s:format()
+---
+- [{'name': 'id1', 'type': 'unsigned'}, {'name': 'id2', 'type': 'unsigned'}, {'name': 'id3',
+    'type': 'string'}, {'name': 'id4', 'type': 'string'}, {'name': 'id5', 'type': 'string'},
+  {'name': 'id6', 'type': 'string'}]
+...
+_ = s:create_index('primary')
+---
+...
+s:insert({1, 1, 'a', 'b', 'c', 'd'})
+---
+- [1, 1, 'a', 'b', 'c', 'd']
+...
+s:drop()
+---
+...
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+idx = s:create_index('idx')
+---
+...
+box.space.test == s
+---
+- true
+...
+s:drop()
+---
+...
+--
+-- gh-3000: index modifying must change key_def parts and
+-- comparators. They can be changed, if there was compatible index
+-- parts change. For example, a part type was changed from
+-- unsigned to number. In such a case comparators must be reset
+-- and part types updated.
+--
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+s:replace{1}
+---
+- [1]
+...
+pk:alter{parts = {{1, 'integer'}}}
+---
+...
+s:replace{-2}
+---
+- [-2]
+...
+s:select{}
+---
+- - [-2]
+  - [1]
+...
+s:drop()
+---
+...
+--
+-- Allow to change is_nullable in index definition on non-empty
+-- space.
+--
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk1 = s:create_index('sk1', {parts = {{2, 'unsigned', is_nullable = true}}})
+---
+...
+sk2 = s:create_index('sk2', {parts = {{3, 'unsigned', is_nullable = false}}})
+---
+...
+s:replace{1, box.NULL, 1}
+---
+- [1, null, 1]
+...
+sk1:alter({parts = {{2, 'unsigned', is_nullable = false}}})
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:replace{1, 1, 1}
+---
+- [1, 1, 1]
+...
+sk1:alter({parts = {{2, 'unsigned', is_nullable = false}}})
+---
+...
+s:replace{1, 1, box.NULL}
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected unsigned'
+...
+sk2:alter({parts = {{3, 'unsigned', is_nullable = true}}})
+---
+...
+s:replace{1, 1, box.NULL}
+---
+- [1, 1, null]
+...
+s:replace{2, 10, 100}
+---
+- [2, 10, 100]
+...
+s:replace{3, 0, 20}
+---
+- [3, 0, 20]
+...
+s:replace{4, 15, 150}
+---
+- [4, 15, 150]
+...
+s:replace{5, 9, box.NULL}
+---
+- [5, 9, null]
+...
+sk1:select{}
+---
+- - [3, 0, 20]
+  - [1, 1, null]
+  - [5, 9, null]
+  - [2, 10, 100]
+  - [4, 15, 150]
+...
+sk2:select{}
+---
+- - [1, 1, null]
+  - [5, 9, null]
+  - [3, 0, 20]
+  - [2, 10, 100]
+  - [4, 15, 150]
+...
+s:drop()
+---
+...
+--
+-- gh-3008: allow multiple types on the same field.
+--
+format = {}
+---
+...
+format[1] = {name = 'field1', type = 'unsigned'}
+---
+...
+format[2] = {name = 'field2', type = 'scalar'}
+---
+...
+format[3] = {name = 'field3', type = 'integer'}
+---
+...
+s = box.schema.space.create('test', {engine = engine, format = format})
+---
+...
+pk = s:create_index('pk')
+---
+...
+sk1 = s:create_index('sk1', {parts = {{2, 'number'}}})
+---
+...
+sk2 = s:create_index('sk2', {parts = {{2, 'integer'}}})
+---
+...
+sk3 = s:create_index('sk3', {parts = {{2, 'unsigned'}}})
+---
+...
+sk4 = s:create_index('sk4', {parts = {{3, 'number'}}})
+---
+...
+s:format()
+---
+- [{'name': 'field1', 'type': 'unsigned'}, {'name': 'field2', 'type': 'scalar'}, {
+    'name': 'field3', 'type': 'integer'}]
+...
+s:replace{1, '100', -20.2}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:replace{1, 100, -20.2}
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected integer'
+...
+s:replace{1, 100, -20}
+---
+- [1, 100, -20]
+...
+s:replace{2, 50, 0}
+---
+- [2, 50, 0]
+...
+s:replace{3, 150, -60}
+---
+- [3, 150, -60]
+...
+s:replace{4, 0, 120}
+---
+- [4, 0, 120]
+...
+pk:select{}
+---
+- - [1, 100, -20]
+  - [2, 50, 0]
+  - [3, 150, -60]
+  - [4, 0, 120]
+...
+sk1:select{}
+---
+- - [4, 0, 120]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk2:select{}
+---
+- - [4, 0, 120]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk3:select{}
+---
+- - [4, 0, 120]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk4:select{}
+---
+- - [3, 150, -60]
+  - [1, 100, -20]
+  - [2, 50, 0]
+  - [4, 0, 120]
+...
+sk1:alter{parts = {{2, 'unsigned'}}}
+---
+...
+sk2:alter{parts = {{2, 'unsigned'}}}
+---
+...
+sk4:alter{parts = {{3, 'integer'}}}
+---
+...
+s:replace{1, 50.5, 1.5}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:replace{1, 50, 1.5}
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected integer'
+...
+s:replace{5, 5, 5}
+---
+- [5, 5, 5]
+...
+sk1:select{}
+---
+- - [4, 0, 120]
+  - [5, 5, 5]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk2:select{}
+---
+- - [4, 0, 120]
+  - [5, 5, 5]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk3:select{}
+---
+- - [4, 0, 120]
+  - [5, 5, 5]
+  - [2, 50, 0]
+  - [1, 100, -20]
+  - [3, 150, -60]
+...
+sk4:select{}
+---
+- - [3, 150, -60]
+  - [1, 100, -20]
+  - [2, 50, 0]
+  - [5, 5, 5]
+  - [4, 0, 120]
+...
+sk1:drop()
+---
+...
+sk2:drop()
+---
+...
+sk3:drop()
+---
+...
+-- Remove 'unsigned' constraints from indexes, and 'scalar' now
+-- can be inserted in the second field.
+s:replace{1, true, 100}
+---
+- [1, true, 100]
+...
+s:select{}
+---
+- - [1, true, 100]
+  - [2, 50, 0]
+  - [3, 150, -60]
+  - [4, 0, 120]
+  - [5, 5, 5]
+...
+sk4:select{}
+---
+- - [3, 150, -60]
+  - [2, 50, 0]
+  - [5, 5, 5]
+  - [1, true, 100]
+  - [4, 0, 120]
+...
+s:drop()
+---
+...
+--
+-- Creating/altering a secondary index of a non-empty space.
+--
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:insert{1, 'zzz', 'aaa', 999}
+---
+...
+_ = s:insert{2, 'yyy', 'bbb', 888}
+---
+...
+_ = s:insert{3, 'xxx', 'ccc', 777}
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s:update(1, {{'!', -1, 'eee'}})
+---
+...
+_ = s:upsert({2, '2', '2', -2}, {{'=', 4, -888}})
+---
+...
+_ = s:replace(s:get(3):update{{'=', 3, box.NULL}})
+---
+...
+_ = s:upsert({4, 'zzz', 'ddd', -666}, {{'!', -1, 'abc'}})
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s:update(1, {{'=', 5, 'fff'}})
+---
+...
+_ = s:upsert({3, '3', '3', -3}, {{'=', 5, 'ggg'}})
+---
+...
+_ = s:insert{5, 'xxx', 'eee', 555, 'hhh'}
+---
+...
+_ = s:replace{6, 'yyy', box.NULL, -444}
+---
+...
+s:select()
+---
+- - [1, 'zzz', 'aaa', 999, 'fff']
+  - [2, 'yyy', 'bbb', -888]
+  - [3, 'xxx', null, 777, 'ggg']
+  - [4, 'zzz', 'ddd', -666]
+  - [5, 'xxx', 'eee', 555, 'hhh']
+  - [6, 'yyy', null, -444]
+...
+s:create_index('sk', {parts = {2, 'string'}}) -- error: unique constraint
+---
+- error: Duplicate key exists in unique index 'sk' in space 'test'
+...
+s:create_index('sk', {parts = {3, 'string'}}) -- error: nullability constraint
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected string'
+...
+s:create_index('sk', {parts = {4, 'unsigned'}}) -- error: field type
+---
+- error: 'Tuple field 4 type does not match one required by operation: expected unsigned'
+...
+s:create_index('sk', {parts = {4, 'integer', 5, 'string'}}) -- error: field missing
+---
+- error: Tuple field count 4 is less than required by space format or defined indexes
+    (expected at least 5)
+...
+i1 = s:create_index('i1', {parts = {2, 'string'}, unique = false})
+---
+...
+i2 = s:create_index('i2', {parts = {{3, 'string', is_nullable = true}}})
+---
+...
+i3 = s:create_index('i3', {parts = {4, 'integer'}})
+---
+...
+i1:select()
+---
+- - [3, 'xxx', null, 777, 'ggg']
+  - [5, 'xxx', 'eee', 555, 'hhh']
+  - [2, 'yyy', 'bbb', -888]
+  - [6, 'yyy', null, -444]
+  - [1, 'zzz', 'aaa', 999, 'fff']
+  - [4, 'zzz', 'ddd', -666]
+...
+i2:select()
+---
+- - [3, 'xxx', null, 777, 'ggg']
+  - [6, 'yyy', null, -444]
+  - [1, 'zzz', 'aaa', 999, 'fff']
+  - [2, 'yyy', 'bbb', -888]
+  - [4, 'zzz', 'ddd', -666]
+  - [5, 'xxx', 'eee', 555, 'hhh']
+...
+i3:select()
+---
+- - [2, 'yyy', 'bbb', -888]
+  - [4, 'zzz', 'ddd', -666]
+  - [6, 'yyy', null, -444]
+  - [5, 'xxx', 'eee', 555, 'hhh']
+  - [3, 'xxx', null, 777, 'ggg']
+  - [1, 'zzz', 'aaa', 999, 'fff']
+...
+i1:alter{unique = true} -- error: unique contraint
+---
+- error: Duplicate key exists in unique index 'i1' in space 'test'
+...
+i2:alter{parts = {3, 'string'}} -- error: nullability contraint
+---
+- error: 'Tuple field 3 type does not match one required by operation: expected string'
+...
+i3:alter{parts = {4, 'unsigned'}} -- error: field type
+---
+- error: 'Tuple field 4 type does not match one required by operation: expected unsigned'
+...
+i3:alter{parts = {4, 'integer', 5, 'string'}} -- error: field missing
+---
+- error: Tuple field count 4 is less than required by space format or defined indexes
+    (expected at least 5)
+...
+i3:alter{parts = {2, 'string', 4, 'integer'}} -- ok
+---
+...
+i3:select()
+---
+- - [5, 'xxx', 'eee', 555, 'hhh']
+  - [3, 'xxx', null, 777, 'ggg']
+  - [2, 'yyy', 'bbb', -888]
+  - [6, 'yyy', null, -444]
+  - [4, 'zzz', 'ddd', -666]
+  - [1, 'zzz', 'aaa', 999, 'fff']
+...
+-- Check that recovery works.
+inspector:cmd("restart server default")
+s = box.space.test
+---
+...
+s.index.i1:select()
+---
+- - [3, 'xxx', null, 777, 'ggg']
+  - [5, 'xxx', 'eee', 555, 'hhh']
+  - [2, 'yyy', 'bbb', -888]
+  - [6, 'yyy', null, -444]
+  - [1, 'zzz', 'aaa', 999, 'fff']
+  - [4, 'zzz', 'ddd', -666]
+...
+s.index.i2:select()
+---
+- - [3, 'xxx', null, 777, 'ggg']
+  - [6, 'yyy', null, -444]
+  - [1, 'zzz', 'aaa', 999, 'fff']
+  - [2, 'yyy', 'bbb', -888]
+  - [4, 'zzz', 'ddd', -666]
+  - [5, 'xxx', 'eee', 555, 'hhh']
+...
+s.index.i3:select()
+---
+- - [5, 'xxx', 'eee', 555, 'hhh']
+  - [3, 'xxx', null, 777, 'ggg']
+  - [2, 'yyy', 'bbb', -888]
+  - [6, 'yyy', null, -444]
+  - [4, 'zzz', 'ddd', -666]
+  - [1, 'zzz', 'aaa', 999, 'fff']
+...
+box.snapshot()
+---
+- ok
+...
+s:drop()
+---
+...

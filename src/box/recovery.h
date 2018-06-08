@@ -63,14 +63,10 @@ struct recovery {
 
 struct recovery *
 recovery_new(const char *wal_dirname, bool force_recovery,
-	     struct vclock *vclock);
+	     const struct vclock *vclock);
 
 void
 recovery_delete(struct recovery *r);
-
-/* to be called at exit */
-void
-recovery_exit(struct recovery *r);
 
 void
 recovery_follow_local(struct recovery *r, struct xstream *stream,
@@ -98,6 +94,6 @@ recovery_finalize(struct recovery *r, struct xstream *stream);
  */
 void
 recover_remaining_wals(struct recovery *r, struct xstream *stream,
-		       struct vclock *stop_vclock, bool scan_dir);
+		       const struct vclock *stop_vclock, bool scan_dir);
 
 #endif /* TARANTOOL_RECOVERY_H_INCLUDED */

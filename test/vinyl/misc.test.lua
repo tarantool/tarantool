@@ -40,11 +40,11 @@ s:drop()
 --
 s = box.schema.create_space('test', { engine = 'vinyl' })
 _ = s:create_index('pk')
-tx1 = box.info.vinyl().tx
+tx1 = box.stat.vinyl().tx
 ch = fiber.channel(1)
 _ = fiber.create(function() box.begin() s:insert{1} ch:put(true) end)
 ch:get()
-tx2 = box.info.vinyl().tx
+tx2 = box.stat.vinyl().tx
 tx2.commit - tx1.commit -- 0
 tx2.rollback - tx1.rollback -- 1
 s:drop()
@@ -64,12 +64,12 @@ i7 = s:create_index('i7', {unique = true, parts = {6, 'unsigned'}})
 
 s:insert{1, 1, 1, 1, 1, 1}
 
-i1:info().lookup -- 1
-i2:info().lookup -- 0
-i3:info().lookup -- 0
-i4:info().lookup -- 1
-i5:info().lookup -- 0
-i6:info().lookup -- 0
-i7:info().lookup -- 1
+i1:stat().lookup -- 1
+i2:stat().lookup -- 0
+i3:stat().lookup -- 0
+i4:stat().lookup -- 1
+i5:stat().lookup -- 0
+i6:stat().lookup -- 0
+i7:stat().lookup -- 1
 
 s:drop()

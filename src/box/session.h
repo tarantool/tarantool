@@ -41,13 +41,14 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct port;
+struct session_vtab;
+
 void
 session_init();
 
 void
 session_free();
-
-enum {	SESSION_SEED_SIZE = 32, SESSION_DELIM_SIZE = 16 };
 
 enum session_type {
 	SESSION_TYPE_BACKGROUND = 0,
@@ -68,6 +69,23 @@ extern const char *session_type_strs[];
 extern uint32_t default_flags;
 
 /**
+ * Session meta is used in different ways by sessions of different
+ * types, and allows to do not store attributes in struct session,
+ * that are used only by a session of particular type.
+ */
+struct session_meta {
+	union {
+		/** IProto connection meta. */
+		struct {
+			uint64_t sync;
+			void *connection;
+		};
+		/** Only by console is used. */
+		int fd;
+	};
+};
+
+/**
  * Abstraction of a single user session:
  * for now, only provides accounting of established
  * sessions and on-connect/on-disconnect event
@@ -79,30 +97,49 @@ extern uint32_t default_flags;
 struct session {
 	/** Session id. */
 	uint64_t id;
-	/** File descriptor - socket of the connected peer.
-	 * Only if the session has a peer.
-	 */
-	int fd;
-
 	/** SQL Connection flag for current user session */
 	uint32_t sql_flags;
-	/**
-	 * For iproto requests, we set this field
-	 * to the value of packet sync. Since the
-	 * session may be reused between many requests,
-	 * the value is true only at the beginning
-	 * of the request, and gets distorted after
-	 * the first yield.
-	 */
-	uint64_t sync;
 	enum session_type type;
-	/** Authentication salt. */
-	char salt[SESSION_SEED_SIZE];
+	/** Session metadata. */
+	struct session_meta meta;
 	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
 	struct trigger fiber_on_stop;
 };
+
+struct session_vtab {
+	/**
+	 * Push a port data into a session data channel - socket,
+	 * console or something.
+	 * @param session Session to push into.
+	 * @param port Port with data to push.
+	 *
+	 * @retval  0 Success.
+	 * @retval -1 Error.
+	 */
+	int
+	(*push)(struct session *session, struct port *port);
+	/**
+	 * Get session file descriptor if exists.
+	 * @param session Session to get descriptor from.
+	 * @retval  -1 No fd.
+	 * @retval >=0 Found fd.
+	 */
+	int
+	(*fd)(struct session *session);
+	/**
+	 * For iproto requests, we set sync to the value of packet
+	 * sync. Since the session may be reused between many
+	 * requests, the value is true only at the beginning
+	 * of the request, and gets distorted after the first
+	 * yield. For other sessions it is 0.
+	 */
+	int64_t
+	(*sync)(struct session *session);
+};
+
+extern struct session_vtab session_vtab_registry[];
 
 /**
  * Find a session by id.
@@ -164,7 +201,7 @@ extern struct credentials admin_credentials;
  * trigger to destroy it when this fiber ends.
  */
 struct session *
-session_create_on_demand(int fd);
+session_create_on_demand();
 
 /*
  * When creating a new fiber, the database (box)
@@ -181,7 +218,7 @@ current_session()
 {
 	struct session *session = fiber_get_session(fiber());
 	if (session == NULL) {
-		session = session_create_on_demand(-1);
+		session = session_create_on_demand();
 		if (session == NULL)
 			diag_raise();
 	}
@@ -201,7 +238,7 @@ effective_user()
 		(struct credentials *) fiber_get_key(fiber(),
 						     FIBER_KEY_USER);
 	if (u == NULL) {
-		session_create_on_demand(-1);
+		session_create_on_demand();
 		u = (struct credentials *) fiber_get_key(fiber(),
 							 FIBER_KEY_USER);
 	}
@@ -226,7 +263,7 @@ session_storage_cleanup(int sid);
  * trigger fails or runs out of resources.
  */
 struct session *
-session_create(int fd, enum session_type type);
+session_create(enum session_type type);
 
 /**
  * Destroy a session.
@@ -264,6 +301,39 @@ access_check_session(struct user *user);
  */
 int
 access_check_universe(user_access_t access);
+
+static inline int
+session_push(struct session *session, struct port *port)
+{
+	return session_vtab_registry[session->type].push(session, port);
+}
+
+static inline int
+session_fd(struct session *session)
+{
+	return session_vtab_registry[session->type].fd(session);
+}
+
+static inline int
+session_sync(struct session *session)
+{
+	return session_vtab_registry[session->type].sync(session);
+}
+
+/**
+ * In a common case, a session does not support push. This
+ * function always returns -1 and sets ER_UNSUPPORTED error.
+ */
+int
+generic_session_push(struct session *session, struct port *port);
+
+/** Return -1 from any session. */
+int
+generic_session_fd(struct session *session);
+
+/** Return 0 from any session. */
+int64_t
+generic_session_sync(struct session *session);
 
 #if defined(__cplusplus)
 } /* extern "C" */

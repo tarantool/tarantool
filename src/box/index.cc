@@ -413,14 +413,14 @@ box_iterator_free(box_iterator_t *it)
 /* {{{ Other index functions */
 
 int
-box_index_info(uint32_t space_id, uint32_t index_id,
+box_index_stat(uint32_t space_id, uint32_t index_id,
 	       struct info_handler *info)
 {
 	struct space *space;
 	struct index *index;
 	if (check_index(space_id, index_id, &space, &index) != 0)
 		return -1;
-	index_info(index, info);
+	index_stat(index, info);
 	return 0;
 }
 
@@ -678,7 +678,7 @@ generic_index_create_snapshot_iterator(struct index *index)
 }
 
 void
-generic_index_info(struct index *index, struct info_handler *handler)
+generic_index_stat(struct index *index, struct info_handler *handler)
 {
 	(void)index;
 	info_begin(handler);

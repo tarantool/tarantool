@@ -163,6 +163,27 @@ SystemError::log() const
 		      "SystemError %s", errmsg);
 }
 
+const struct type_info type_SocketError =
+	make_type("SocketError", &type_SystemError);
+
+SocketError::SocketError(const char *file, unsigned line,
+			 const char *socketname,
+			 const char *format, ...)
+	: SystemError(&type_SocketError, file, line)
+{
+	int save_errno = errno;
+
+	char buf[DIAG_ERRMSG_MAX];
+
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
+	error_format_msg(this, "%s, called on %s", buf, socketname);
+	errno = save_errno;
+}
+
+
 const struct type_info type_OutOfMemory =
 	make_type("OutOfMemory", &type_SystemError);
 
@@ -324,6 +345,24 @@ BuildCollationError(const char *file, unsigned line, const char *format, ...)
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);
 	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildSocketError(const char *file, unsigned line, const char *socketname,
+		 const char *format, ...)
+{
+	int save_errno = errno;
+	BuildAlloc(SocketError);
+	SocketError *e =  new (p) SocketError(file, line, socketname, "");
+
+	char buf[DIAG_ERRMSG_MAX];
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(buf, sizeof(buf), format, ap);
+	va_end(ap);
+	error_format_msg(e, "%s, called on %s", buf, socketname);
+	errno = save_errno;
 	return e;
 }
 

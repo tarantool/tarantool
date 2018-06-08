@@ -630,7 +630,7 @@ err:
 		 * Just like SELECT, SQL uses output format compatible
 		 * with Tarantool 1.6
 		 */
-		if (port_dump_16(&response->port, out) < 0) {
+		if (port_dump_msgpack_16(&response->port, out) < 0) {
 			/* Failed port dump destroyes the port. */
 			goto err;
 		}

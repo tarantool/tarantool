@@ -134,7 +134,7 @@ box.session.su('guest')
 --
 
 -- a guest user can read information about itself
-t = box.space._vuser:select(); return #t == 1 and t[1][3] == 'guest'
+t = box.space._vuser:select(); for i = 1, #t do if t[i][3] == 'guest' then return true end end return false
 
 -- read access to original space also allow to read a view
 box.session.su('admin')
@@ -218,7 +218,7 @@ box.session.su('admin')
 box.schema.user.grant('guest', 'execute', 'function', 'test')
 box.session.su('guest')
 
-#box.space._vfunc:select{} = cnt + 1
+#box.space._vfunc:select{} == func_cnt
 
 box.session.su('admin')
 box.schema.user.revoke('guest', 'execute', 'function', 'test')
@@ -230,7 +230,7 @@ box.session.su('admin')
 box.schema.user.grant('guest', 'execute', 'universe')
 box.session.su('guest')
 
-#box.space._vfunc:select{} == cnt + 1
+#box.space._vfunc:select{} == func_cnt
 
 box.session.su('admin')
 box.schema.user.revoke('guest', 'execute', 'universe')

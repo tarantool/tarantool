@@ -121,6 +121,7 @@ static const char *vy_log_type_name[] = {
 	[VY_LOG_TRUNCATE_LSM]		= "truncate_lsm",
 	[VY_LOG_MODIFY_LSM]		= "modify_lsm",
 	[VY_LOG_FORGET_LSM]		= "forget_lsm",
+	[VY_LOG_PREPARE_LSM]		= "prepare_lsm",
 };
 
 /** Metadata log object. */
@@ -176,6 +177,10 @@ static struct vy_log vy_log;
 
 static struct vy_recovery *
 vy_recovery_new_locked(int64_t signature, bool only_checkpoint);
+
+static int
+vy_recovery_process_record(struct vy_recovery *recovery,
+			   const struct vy_log_record *record);
 
 /**
  * Return the name of the vylog file that has the given signature.
@@ -720,6 +725,11 @@ vy_log_flush(void)
 		diag_set(ClientError, ER_INJECTION, "vinyl log flush");
 		return -1;
 	});
+	struct errinj *delay = errinj(ERRINJ_VY_LOG_FLUSH_DELAY, ERRINJ_BOOL);
+	if (delay != NULL && delay->bparam) {
+		while (delay->bparam)
+			fiber_sleep(0.001);
+	}
 
 	int tx_size = 0;
 	struct vy_log_record *record;
@@ -768,7 +778,6 @@ void
 vy_log_free(void)
 {
 	xdir_destroy(&vy_log.dir);
-	latch_destroy(&vy_log.latch);
 	region_destroy(&vy_log.pool);
 	diag_destroy(&vy_log.tx_diag);
 }
@@ -889,6 +898,14 @@ int
 vy_log_end_recovery(void)
 {
 	assert(vy_log.recovery != NULL);
+
+	/*
+	 * Update the recovery context with records written during
+	 * recovery - we will need them for garbage collection.
+	 */
+	struct vy_log_record *record;
+	stailq_foreach_entry(record, &vy_log.tx, in_tx)
+		vy_recovery_process_record(vy_log.recovery, record);
 
 	/* Flush all pending records. */
 	if (vy_log_flush() < 0) {
@@ -1022,8 +1039,14 @@ vy_log_collect_garbage(int64_t signature)
 	xdir_collect_garbage(&vy_log.dir, signature, true);
 }
 
+int64_t
+vy_log_signature(void)
+{
+	return vclock_sum(&vy_log.last_checkpoint);
+}
+
 const char *
-vy_log_backup_path(struct vclock *vclock)
+vy_log_backup_path(const struct vclock *vclock)
 {
 	/*
 	 * Use the previous log file, because the current one
@@ -1149,46 +1172,6 @@ vy_recovery_index_id_hash(uint32_t space_id, uint32_t index_id)
 	return ((uint64_t)space_id << 32) + index_id;
 }
 
-/**
- * Insert an LSM tree into vy_recovery::index_id_hash.
- *
- * If there is an LSM tree with the same space_id/index_id
- * present in the hash table, it will be silently replaced.
- *
- * Returns 0 on success, -1 on error.
- */
-static int
-vy_recovery_hash_index_id(struct vy_recovery *recovery,
-			  struct vy_lsm_recovery_info *lsm)
-{
-	struct mh_i64ptr_t *h = recovery->index_id_hash;
-	struct mh_i64ptr_node_t node;
-
-	node.key = vy_recovery_index_id_hash(lsm->space_id, lsm->index_id);
-	node.val = lsm;
-
-	if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
-		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
-		return -1;
-	}
-	return 0;
-}
-
-/**
- * Remove the entry corresponding to the space_id/index_id
- * from vy_recovery::index_id_hash.
- */
-static void
-vy_recovery_unhash_index_id(struct vy_recovery *recovery,
-			    uint32_t space_id, uint32_t index_id)
-{
-	struct mh_i64ptr_t *h = recovery->index_id_hash;
-	int64_t key = vy_recovery_index_id_hash(space_id, index_id);
-	mh_int_t k = mh_i64ptr_find(h, key, NULL);
-	if (k != mh_end(h))
-		mh_i64ptr_del(h, k, NULL);
-}
-
 /** Lookup an LSM tree in vy_recovery::index_id_hash map. */
 struct vy_lsm_recovery_info *
 vy_recovery_lsm_by_index_id(struct vy_recovery *recovery,
@@ -1254,12 +1237,27 @@ vy_recovery_lookup_slice(struct vy_recovery *recovery, int64_t slice_id)
  */
 static struct vy_lsm_recovery_info *
 vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
-			  uint32_t space_id, uint32_t index_id)
+			  uint32_t space_id, uint32_t index_id,
+			  const struct key_part_def *key_parts,
+			  uint32_t key_part_count)
 {
+	if (key_parts == NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Missing key definition for LSM tree %lld",
+				    (long long)id));
+		return NULL;
+	}
 	struct vy_lsm_recovery_info *lsm = malloc(sizeof(*lsm));
 	if (lsm == NULL) {
 		diag_set(OutOfMemory, sizeof(*lsm),
 			 "malloc", "struct vy_lsm_recovery_info");
+		return NULL;
+	}
+	lsm->key_parts = malloc(sizeof(*key_parts) * key_part_count);
+	if (lsm->key_parts == NULL) {
+		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
+			 "malloc", "struct key_part_def");
+		free(lsm);
 		return NULL;
 	}
 	struct mh_i64ptr_t *h = recovery->lsm_hash;
@@ -1267,6 +1265,7 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 	struct mh_i64ptr_node_t *old_node = NULL;
 	if (mh_i64ptr_put(h, &node, &old_node, NULL) == mh_end(h)) {
 		diag_set(OutOfMemory, 0, "mh_i64ptr_put", "mh_i64ptr_node_t");
+		free(lsm->key_parts);
 		free(lsm);
 		return NULL;
 	}
@@ -1274,12 +1273,13 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->id = id;
 	lsm->space_id = space_id;
 	lsm->index_id = index_id;
-	lsm->key_parts = NULL;
-	lsm->key_part_count = 0;
+	memcpy(lsm->key_parts, key_parts, sizeof(*key_parts) * key_part_count);
+	lsm->key_part_count = key_part_count;
 	lsm->create_lsn = -1;
 	lsm->modify_lsn = -1;
 	lsm->drop_lsn = -1;
 	lsm->dump_lsn = -1;
+	lsm->prepared = NULL;
 	rlist_create(&lsm->ranges);
 	rlist_create(&lsm->runs);
 	/*
@@ -1294,10 +1294,48 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 }
 
 /**
+ * Handle a VY_LOG_PREPARE_LSM log record.
+ *
+ * This function allocates a new LSM tree with the given ID and
+ * either associates it with the existing LSM tree hashed under
+ * the same space_id/index_id or inserts it into the hash if
+ * there's none.
+ *
+ * Note, we link incomplete LSM trees to index_id_hash (either
+ * directly or indirectly via vy_lsm_recovery_info::prepared),
+ * because an LSM tree may have been fully built and logged in
+ * WAL, but not committed to vylog. We need to be able to identify
+ * such LSM trees during local recovery so that instead of
+ * rebuilding them we can simply retry vylog write.
+ *
+ * Returns 0 on success, -1 on error.
+ */
+static int
+vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
+			uint32_t space_id, uint32_t index_id,
+			const struct key_part_def *key_parts,
+			uint32_t key_part_count)
+{
+	if (vy_recovery_lookup_lsm(recovery, id) != NULL) {
+		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+			 tt_sprintf("Duplicate LSM tree id %lld",
+				    (long long)id));
+		return -1;
+	}
+	if (vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
+				      key_parts, key_part_count) == NULL)
+		return -1;
+	return 0;
+}
+
+/**
  * Handle a VY_LOG_CREATE_LSM log record.
- * This function allocates a new vinyl LSM tree with ID @id
- * and inserts it to the hash.
- * Return 0 on success, -1 on failure (ID collision or OOM).
+ *
+ * Depending on whether the LSM tree was previously prepared,
+ * this function either commits it or allocates a new one and
+ * inserts it into the recovery hash.
+ *
+ * Returns 0 on success, -1 on error.
  */
 static int
 vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
@@ -1306,43 +1344,31 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 		       uint32_t key_part_count, int64_t create_lsn,
 		       int64_t modify_lsn, int64_t dump_lsn)
 {
-	if (key_parts == NULL) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Missing key definition for LSM tree %lld",
-				    (long long)id));
-		return -1;
-	}
-	if (vy_recovery_lookup_lsm(recovery, id) != NULL) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("Duplicate LSM tree id %lld",
-				    (long long)id));
-		return -1;
-	}
 	struct vy_lsm_recovery_info *lsm;
-	lsm = vy_recovery_lsm_by_index_id(recovery, space_id, index_id);
-	if (lsm != NULL && lsm->drop_lsn < 0) {
-		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-			 tt_sprintf("LSM tree %u/%u created twice",
-				    (unsigned)space_id, (unsigned)index_id));
-		return -1;
+	lsm = vy_recovery_lookup_lsm(recovery, id);
+	if (lsm != NULL) {
+		/*
+		 * If the LSM tree already exists, it must be in
+		 * the prepared state (i.e. not committed or dropped).
+		 */
+		if (lsm->create_lsn >= 0 || lsm->drop_lsn >= 0) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("Duplicate LSM tree id %lld",
+					    (long long)id));
+			return -1;
+		}
+	} else {
+		lsm = vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
+						key_parts, key_part_count);
+		if (lsm == NULL)
+			return -1;
+		lsm->dump_lsn = dump_lsn;
 	}
-	lsm = vy_recovery_do_create_lsm(recovery, id, space_id, index_id);
-	if (lsm == NULL)
-		return -1;
 
-	lsm->key_parts = malloc(sizeof(*key_parts) * key_part_count);
-	if (lsm->key_parts == NULL) {
-		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
-			 "malloc", "struct key_part_def");
-		return -1;
-	}
-	memcpy(lsm->key_parts, key_parts, sizeof(*key_parts) * key_part_count);
-	lsm->key_part_count = key_part_count;
+	/* Mark the LSM tree committed by assigning LSN. */
 	lsm->create_lsn = create_lsn;
 	lsm->modify_lsn = modify_lsn;
-	lsm->dump_lsn = dump_lsn;
-
-	return vy_recovery_hash_index_id(recovery, lsm);
+	return 0;
 }
 
 /**
@@ -1436,10 +1462,6 @@ vy_recovery_forget_lsm(struct vy_recovery *recovery, int64_t id)
 	}
 	mh_i64ptr_del(h, k, NULL);
 	rlist_del_entry(lsm, in_recovery);
-	if (lsm == vy_recovery_lsm_by_index_id(recovery,
-				lsm->space_id, lsm->index_id))
-		vy_recovery_unhash_index_id(recovery,
-				lsm->space_id, lsm->index_id);
 	free(lsm->key_parts);
 	free(lsm);
 	return 0;
@@ -1463,7 +1485,7 @@ vy_recovery_dump_lsm(struct vy_recovery *recovery,
 				    (long long)id));
 		return -1;
 	}
-	lsm->dump_lsn = dump_lsn;
+	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
 	return 0;
 }
 
@@ -1858,6 +1880,11 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 {
 	int rc;
 	switch (record->type) {
+	case VY_LOG_PREPARE_LSM:
+		rc = vy_recovery_prepare_lsm(recovery, record->lsm_id,
+				record->space_id, record->index_id,
+				record->key_parts, record->key_part_count);
+		break;
 	case VY_LOG_CREATE_LSM:
 		rc = vy_recovery_create_lsm(recovery, record->lsm_id,
 				record->space_id, record->index_id,
@@ -1922,6 +1949,74 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 		say_error("failed to process vylog record: %s",
 			  vy_log_record_str(record));
 	return rc;
+}
+
+/**
+ * Fill index_id_hash with LSM trees recovered from vylog.
+ */
+static int
+vy_recovery_build_index_id_hash(struct vy_recovery *recovery)
+{
+	struct mh_i64ptr_t *h = recovery->index_id_hash;
+	struct vy_lsm_recovery_info *lsm;
+
+	rlist_foreach_entry(lsm, &recovery->lsms, in_recovery) {
+		/*
+		 * If an LSM tree was dropped but was not committed,
+		 * it must be a product of aborted ALTER, in which
+		 * case it won't be recovered and hence shouldn't be
+		 * inserted into the hash.
+		 */
+		if (lsm->create_lsn < 0 && lsm->drop_lsn >= 0)
+			continue;
+
+		uint32_t space_id = lsm->space_id;
+		uint32_t index_id = lsm->index_id;
+		struct vy_lsm_recovery_info *hashed_lsm;
+		hashed_lsm = vy_recovery_lsm_by_index_id(recovery,
+						space_id, index_id);
+		/*
+		 * If there's no LSM tree for these space_id/index_id
+		 * or it was dropped, simply replace it with the latest
+		 * LSM tree version.
+		 */
+		if (hashed_lsm == NULL || hashed_lsm->drop_lsn >= 0) {
+			struct mh_i64ptr_node_t node;
+			node.key = vy_recovery_index_id_hash(space_id, index_id);
+			node.val = lsm;
+			if (mh_i64ptr_put(h, &node, NULL, NULL) == mh_end(h)) {
+				diag_set(OutOfMemory, 0, "mh_i64ptr_put",
+					 "mh_i64ptr_node_t");
+				return -1;
+			}
+			continue;
+		}
+		/*
+		 * If there's an LSM tree with the same space_id/index_id
+		 * and it isn't dropped, the new LSM tree must have been
+		 * prepared by ALTER but not committed. In this case the
+		 * old LSM tree must be committed and not have a prepared
+		 * LSM tree. Check that and link the new LSM tree to the
+		 * old one.
+		 */
+		if (lsm->create_lsn >= 0) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("LSM tree %u/%u created twice",
+					    (unsigned)space_id,
+					    (unsigned)index_id));
+			return -1;
+		}
+		if (hashed_lsm->create_lsn < 0 ||
+		    hashed_lsm->prepared != NULL) {
+			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
+				 tt_sprintf("LSM tree %u/%u prepared twice",
+					    (unsigned)space_id,
+					    (unsigned)index_id));
+			return -1;
+		}
+		hashed_lsm->prepared = lsm;
+	}
+	return 0;
 }
 
 static ssize_t
@@ -1999,6 +2094,9 @@ vy_recovery_new_f(va_list ap)
 		goto fail_close;
 
 	xlog_cursor_close(&cursor, false);
+
+	if (vy_recovery_build_index_id_hash(recovery) != 0)
+		goto fail_free;
 out:
 	say_verbose("done loading vylog");
 	*p_recovery = recovery;
@@ -2115,7 +2213,8 @@ vy_log_append_lsm(struct xlog *xlog, struct vy_lsm_recovery_info *lsm)
 	struct vy_log_record record;
 
 	vy_log_record_init(&record);
-	record.type = VY_LOG_CREATE_LSM;
+	record.type = lsm->create_lsn < 0 ?
+		VY_LOG_PREPARE_LSM : VY_LOG_CREATE_LSM;
 	record.lsm_id = lsm->id;
 	record.index_id = lsm->index_id;
 	record.space_id = lsm->space_id;

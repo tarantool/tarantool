@@ -21,13 +21,24 @@ _ = s:create_index('pk')
 pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
 s:count()
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
 
 -- Since the following operation requires more memory than configured
 -- and dump is disabled, it should fail with ER_VY_QUOTA_TIMEOUT.
 _ = s:auto_increment{pad}
 s:count()
-box.info.vinyl().quota.used
+box.stat.vinyl().quota.used
+
+--
+-- Check that increasing box.cfg.vinyl_memory wakes up fibers
+-- waiting for memory.
+--
+box.cfg{vinyl_timeout=5}
+c = fiber.channel(1)
+_ = fiber.create(function() local ok = pcall(s.auto_increment, s, {pad}) c:put(ok) end)
+fiber.sleep(0.01)
+box.cfg{vinyl_memory = 3 * box.cfg.vinyl_memory / 2}
+c:get(1)
 
 box.error.injection.set('ERRINJ_VY_RUN_WRITE', false)
 fiber.sleep(0.01) -- wait for scheduler to unthrottle
@@ -41,6 +52,7 @@ box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0.01)
 box.cfg{vinyl_timeout=60}
 box.cfg{too_long_threshold=0.01}
 
+pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
 _ = s:auto_increment{pad}
 _ = s:auto_increment{pad}
 
@@ -60,7 +72,7 @@ box.snapshot()
 -- The following operation should fail instantly irrespective
 -- of the value of 'vinyl_timeout' (gh-3291).
 --
-box.info.vinyl().quota.used == 0
+box.stat.vinyl().quota.used == 0
 box.cfg{vinyl_timeout = 9000}
 pad = string.rep('x', box.cfg.vinyl_memory)
 _ = s:auto_increment{pad}
@@ -78,13 +90,13 @@ _ = s2:create_index('pk')
 
 pad = string.rep('x', 64)
 _ = s1:auto_increment{pad}
-s1.index.pk:info().memory.bytes > 0
+s1.index.pk:stat().memory.bytes > 0
 
 pad = string.rep('x', box.cfg.vinyl_memory - string.len(pad))
 _ = s2:auto_increment{pad}
 
-while s1.index.pk:info().disk.dump.count == 0 do fiber.sleep(0.01) end
-s1.index.pk:info().memory.bytes == 0
+while s1.index.pk:stat().disk.dump.count == 0 do fiber.sleep(0.01) end
+s1.index.pk:stat().memory.bytes == 0
 
 test_run:cmd('switch default')
 test_run:cmd("stop server test")

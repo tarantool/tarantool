@@ -521,6 +521,26 @@ box_check_wal_max_size(int64_t wal_max_size)
 	return wal_max_size;
 }
 
+static int64_t
+box_check_memtx_memory(int64_t memory)
+{
+	if (memory <= 0) {
+		tnt_raise(ClientError, ER_CFG, "memtx_memory",
+			  "must be greater than 0");
+	}
+	return memory;
+}
+
+static int64_t
+box_check_vinyl_memory(int64_t memory)
+{
+	if (memory <= 0) {
+		tnt_raise(ClientError, ER_CFG, "vinyl_memory",
+			  "must be greater than 0");
+	}
+	return memory;
+}
+
 static void
 box_check_vinyl_options(void)
 {
@@ -531,6 +551,8 @@ box_check_vinyl_options(void)
 	int run_count_per_level = cfg_geti("vinyl_run_count_per_level");
 	double run_size_ratio = cfg_getd("vinyl_run_size_ratio");
 	double bloom_fpr = cfg_getd("vinyl_bloom_fpr");
+
+	box_check_vinyl_memory(cfg_geti64("vinyl_memory"));
 
 	if (read_threads < 1) {
 		tnt_raise(ClientError, ER_CFG, "vinyl_read_threads",
@@ -581,6 +603,7 @@ box_check_config()
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	box_check_wal_mode(cfg_gets("wal_mode"));
+	box_check_memtx_memory(cfg_geti64("memtx_memory"));
 	box_check_memtx_min_tuple_size(cfg_geti64("memtx_min_tuple_size"));
 	box_check_vinyl_options();
 }
@@ -728,6 +751,21 @@ box_set_snap_io_rate_limit(void)
 	assert(memtx != NULL);
 	memtx_engine_set_snap_io_rate_limit(memtx,
 			cfg_getd("snap_io_rate_limit"));
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_snap_io_rate_limit(vinyl,
+			cfg_getd("snap_io_rate_limit"));
+}
+
+void
+box_set_memtx_memory(void)
+{
+	struct memtx_engine *memtx;
+	memtx = (struct memtx_engine *)engine_by_name("memtx");
+	assert(memtx != NULL);
+	memtx_engine_set_memory_xc(memtx,
+		box_check_memtx_memory(cfg_geti64("memtx_memory")));
 }
 
 void
@@ -765,6 +803,16 @@ box_set_checkpoint_count(void)
 	int checkpoint_count = cfg_geti("checkpoint_count");
 	box_check_checkpoint_count(checkpoint_count);
 	gc_set_checkpoint_count(checkpoint_count);
+}
+
+void
+box_set_vinyl_memory(void)
+{
+	struct vinyl_engine *vinyl;
+	vinyl = (struct vinyl_engine *)engine_by_name("vinyl");
+	assert(vinyl != NULL);
+	vinyl_engine_set_memory_xc(vinyl,
+		box_check_vinyl_memory(cfg_geti64("vinyl_memory")));
 }
 
 void
@@ -1279,7 +1327,7 @@ box_on_join(const tt_uuid *instance_uuid)
 }
 
 void
-box_process_auth(struct auth_request *request)
+box_process_auth(struct auth_request *request, const char *salt)
 {
 	rmean_collect(rmean_box, IPROTO_AUTH, 1);
 
@@ -1289,7 +1337,7 @@ box_process_auth(struct auth_request *request)
 
 	const char *user = request->user_name;
 	uint32_t len = mp_decode_strl(&user);
-	authenticate(user, len, request->scramble);
+	authenticate(user, len, salt, request->scramble);
 }
 
 void
@@ -1431,7 +1479,8 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 * Final stage: feed replica with WALs in range
 	 * (start_vclock, stop_vclock).
 	 */
-	relay_final_join(io->fd, header->sync, &start_vclock, &stop_vclock);
+	relay_final_join(replica, io->fd, header->sync,
+			 &start_vclock, &stop_vclock);
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
@@ -1523,7 +1572,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * a stall in updates (in this case replica may hang
 	 * indefinitely).
 	 */
-	relay_subscribe(io->fd, header->sync, replica, &replica_clock,
+	relay_subscribe(replica, io->fd, header->sync, &replica_clock,
 			replica_version_id);
 }
 
@@ -2042,21 +2091,27 @@ end:
 }
 
 int
-box_backup_start(box_backup_cb cb, void *cb_arg)
+box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 {
+	assert(checkpoint_idx >= 0);
 	if (backup_gc != NULL) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	struct vclock vclock;
-	if (checkpoint_last(&vclock) < 0) {
-		diag_set(ClientError, ER_MISSING_SNAPSHOT);
-		return -1;
-	}
-	backup_gc = gc_consumer_register("backup", vclock_sum(&vclock));
+	const struct vclock *vclock;
+	struct checkpoint_iterator it;
+	checkpoint_iterator_init(&it);
+	do {
+		vclock = checkpoint_iterator_prev(&it);
+		if (vclock == NULL) {
+			diag_set(ClientError, ER_MISSING_SNAPSHOT);
+			return -1;
+		}
+	} while (checkpoint_idx-- > 0);
+	backup_gc = gc_consumer_register("backup", vclock_sum(vclock));
 	if (backup_gc == NULL)
 		return -1;
-	int rc = engine_backup(&vclock, cb, cb_arg);
+	int rc = engine_backup(vclock, cb, cb_arg);
 	if (rc != 0) {
 		gc_consumer_unregister(backup_gc);
 		backup_gc = NULL;

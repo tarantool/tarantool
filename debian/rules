@@ -21,8 +21,8 @@ DEB_CMAKE_EXTRA_FLAGS := \
 	-DWITH_SYSTEMD=$(WITH_SYSTEMD)
 
 DEB_DH_INSTALLINIT_ARGS    := --name=tarantool
-DEB_DH_SYSTEMD_ENABLE_ARGS := --name=tarantool tarantool.service
-DEB_DH_SYSTEMD_START_ARGS  := --no-restart-on-upgrade tarantool.service
+DEB_DH_SYSTEMD_ENABLE_ARGS_tarantool-common := --name=tarantool tarantool.service
+DEB_DH_SYSTEMD_START_ARGS_tarantool-common := --no-restart-on-upgrade tarantool.service
 
 # Needed for proper backtraces in fiber.info()
 DEB_DH_STRIP_ARGS	        := -X/usr/bin/tarantool

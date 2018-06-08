@@ -78,6 +78,17 @@ struct lua_yaml_dumper {
    unsigned int anchor_number;
    yaml_emitter_t emitter;
    char error;
+   /** Global tag to label the result document by. */
+   yaml_tag_directive_t begin_tag;
+   /**
+    * - end_tag == &begin_tag - a document is not labeld with a
+    * global tag.
+    * - end_tag == &begin_tag + 1 - a document is labeled with a
+    * global tag specified in begin_tag attribute. End_tag pointer
+    * is used instead of tag count because of libyaml API - it
+    * takes begin and end pointers of tags array.
+    */
+   yaml_tag_directive_t *end_tag;
 
    lua_State *outputL;
    luaL_Buffer yamlbuf;
@@ -298,6 +309,53 @@ static int load_node(struct lua_yaml_loader *loader) {
    }
 }
 
+/**
+ * Decode YAML document global tag onto Lua stack.
+ * @param loader Initialized loader to load tag from.
+ * @retval 2 Tag handle and prefix are pushed. Both are not nil.
+ * @retval 2 If an error occurred during decoding. Nil and error
+ *         string are pushed.
+ */
+static int load_tag(struct lua_yaml_loader *loader) {
+   yaml_tag_directive_t *start, *end;
+   /* Initial parser step. Detect the documents start position. */
+   if (do_parse(loader) == 0)
+      goto parse_error;
+   if (loader->event.type != YAML_STREAM_START_EVENT) {
+      lua_pushnil(loader->L);
+      lua_pushstring(loader->L, "expected STREAM_START_EVENT");
+      return 2;
+   }
+   /* Parse a document start. */
+   if (do_parse(loader) == 0)
+      goto parse_error;
+   if (loader->event.type == YAML_STREAM_END_EVENT)
+      goto no_tags;
+   assert(loader->event.type == YAML_DOCUMENT_START_EVENT);
+   start = loader->event.data.document_start.tag_directives.start;
+   end = loader->event.data.document_start.tag_directives.end;
+   if (start == end)
+      goto no_tags;
+   if (end - start > 1) {
+      lua_pushnil(loader->L);
+      lua_pushstring(loader->L, "can not decode multiple tags");
+      return 2;
+   }
+   lua_pushstring(loader->L, (const char *) start->handle);
+   lua_pushstring(loader->L, (const char *) start->prefix);
+   return 2;
+
+parse_error:
+   lua_pushnil(loader->L);
+   /* Make nil be before an error message. */
+   lua_insert(loader->L, -2);
+   return 2;
+
+no_tags:
+   lua_pushnil(loader->L);
+   return 1;
+}
+
 static void load(struct lua_yaml_loader *loader) {
    if (!do_parse(loader))
       return;
@@ -329,34 +387,59 @@ static void load(struct lua_yaml_loader *loader) {
    }
 }
 
+/**
+ * Decode YAML documents onto Lua stack. First value on stack
+ * is string with YAML document. Second value is options:
+ * {tag_only = boolean}. Options are not required.
+ * @retval N Pushed document count, if tag_only option is not
+ *         specified, or equals to false.
+ * @retval 2 If tag_only option is true. Tag handle and prefix
+ *         are pushed.
+ * @retval 2 If an error occurred during decoding. Nil and error
+ *         string are pushed.
+ */
 static int l_load(lua_State *L) {
    struct lua_yaml_loader loader;
-
-   luaL_argcheck(L, lua_isstring(L, 1), 1, "must provide a string argument");
-
+   if (! lua_isstring(L, 1)) {
+usage_error:
+      return luaL_error(L, "Usage: yaml.decode(document, "\
+                        "[{tag_only = boolean}])");
+   }
+   size_t len;
+   const char *document = lua_tolstring(L, 1, &len);
    loader.L = L;
    loader.cfg = luaL_checkserializer(L);
    loader.validevent = 0;
    loader.error = 0;
    loader.document_count = 0;
-
-   /* create table used to track anchors */
-   lua_newtable(L);
-   loader.anchortable_index = lua_gettop(L);
-
    if (!yaml_parser_initialize(&loader.parser))
-      luaL_error(L, OOM_ERRMSG);
-   yaml_parser_set_input_string(&loader.parser,
-      (const unsigned char *)lua_tostring(L, 1), lua_strlen(L, 1));
-   load(&loader);
+      return luaL_error(L, OOM_ERRMSG);
+   yaml_parser_set_input_string(&loader.parser, (yaml_char_t *) document, len);
+   bool tag_only;
+   if (lua_gettop(L) > 1) {
+      if (! lua_istable(L, 2))
+         goto usage_error;
+      lua_getfield(L, 2, "tag_only");
+      tag_only = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+   } else {
+      tag_only = false;
+   }
 
+   int rc;
+   if (! tag_only) {
+      /* create table used to track anchors */
+      lua_newtable(L);
+      loader.anchortable_index = lua_gettop(L);
+      load(&loader);
+      if (loader.error)
+         lua_error(L);
+      rc = loader.document_count;
+   } else {
+      rc = load_tag(&loader);
+   }
    delete_event(&loader);
    yaml_parser_delete(&loader.parser);
-
-   if (loader.error)
-      lua_error(L);
-
-   return loader.document_count;
+   return rc;
 }
 
 static int dump_node(struct lua_yaml_dumper *dumper);
@@ -571,7 +654,8 @@ static int dump_node(struct lua_yaml_dumper *dumper)
 static void dump_document(struct lua_yaml_dumper *dumper) {
    yaml_event_t ev;
 
-   if (!yaml_document_start_event_initialize(&ev, NULL, NULL, NULL, 0) ||
+   if (!yaml_document_start_event_initialize(&ev, NULL, &dumper->begin_tag,
+                                             dumper->end_tag, 0) ||
        !yaml_emitter_emit(&dumper->emitter, &ev))
       return;
 
@@ -618,13 +702,26 @@ static void find_references(struct lua_yaml_dumper *dumper) {
    }
 }
 
-static int l_dump(lua_State *L) {
+int
+lua_yaml_encode(lua_State *L, struct luaL_serializer *serializer,
+                const char *tag_handle, const char *tag_prefix)
+{
    struct lua_yaml_dumper dumper;
-   int i, argcount = lua_gettop(L);
    yaml_event_t ev;
 
    dumper.L = L;
-   dumper.cfg = luaL_checkserializer(L);
+   dumper.begin_tag.handle = (yaml_char_t *) tag_handle;
+   dumper.begin_tag.prefix = (yaml_char_t *) tag_prefix;
+   assert((tag_handle == NULL) == (tag_prefix == NULL));
+   /*
+    * If a tag is specified, then tag list is not empty and
+    * consists of a single tag.
+    */
+   if (tag_prefix != NULL)
+      dumper.end_tag = &dumper.begin_tag + 1;
+   else
+      dumper.end_tag = &dumper.begin_tag;
+   dumper.cfg = serializer;
    dumper.error = 0;
    /* create thread to use for YAML buffer */
    dumper.outputL = lua_newthread(L);
@@ -643,17 +740,15 @@ static int l_dump(lua_State *L) {
        !yaml_emitter_emit(&dumper.emitter, &ev))
       goto error;
 
-   for (i = 0; i < argcount; i++) {
-      lua_newtable(L);
-      dumper.anchortable_index = lua_gettop(L);
-      dumper.anchor_number = 0;
-      lua_pushvalue(L, i + 1); /* push copy of arg we're processing */
-      find_references(&dumper);
-      dump_document(&dumper);
-      if (dumper.error)
-         goto error;
-      lua_pop(L, 2); /* pop copied arg and anchor table */
-   }
+   lua_newtable(L);
+   dumper.anchortable_index = lua_gettop(L);
+   dumper.anchor_number = 0;
+   lua_pushvalue(L, 1); /* push copy of arg we're processing */
+   find_references(&dumper);
+   dump_document(&dumper);
+   if (dumper.error)
+      goto error;
+   lua_pop(L, 2); /* pop copied arg and anchor table */
 
    if (!yaml_stream_end_event_initialize(&ev) ||
        !yaml_emitter_emit(&dumper.emitter, &ev) ||
@@ -684,8 +779,51 @@ error:
    }
 }
 
+/**
+ * Serialize a Lua object as YAML string, taking into account a
+ * global tag if specified.
+ * @param object Lua object to dump under the global tag.
+ * @param options Table with two options: tag prefix and tag
+ *        handle.
+ * @retval 1 Pushes Lua string with dumped object.
+ * @retval 2 Pushes nil and error message.
+ */
+static int l_dump(lua_State *L) {
+   struct luaL_serializer *serializer = luaL_checkserializer(L);
+   int top = lua_gettop(L);
+   if (top > 2) {
+usage_error:
+      return luaL_error(L, "Usage: encode(object, {tag_prefix = <string>, "\
+                        "tag_handle = <string>})");
+   }
+   const char *prefix = NULL, *handle = NULL;
+   if (top == 2 && !lua_isnil(L, 2)) {
+      if (! lua_istable(L, 2))
+         goto usage_error;
+      lua_getfield(L, 2, "tag_prefix");
+      if (lua_isstring(L, -1))
+         prefix = lua_tostring(L, -1);
+      else if (! lua_isnil(L, -1))
+         goto usage_error;
+
+      lua_getfield(L, 2, "tag_handle");
+      if (lua_isstring(L, -1))
+         handle = lua_tostring(L, -1);
+      else if (! lua_isnil(L, -1))
+         goto usage_error;
+
+      if ((prefix == NULL) != (handle == NULL))
+         goto usage_error;
+   }
+   return lua_yaml_encode(L, serializer, handle, prefix);
+}
+
 static int
-l_new(lua_State *L);
+l_new(lua_State *L)
+{
+   lua_yaml_new_serializer(L);
+   return 1;
+}
 
 static const luaL_Reg yamllib[] = {
    { "encode", l_dump },
@@ -694,12 +832,12 @@ static const luaL_Reg yamllib[] = {
    { NULL, NULL}
 };
 
-static int
-l_new(lua_State *L)
+struct luaL_serializer *
+lua_yaml_new_serializer(lua_State *L)
 {
    struct luaL_serializer *s = luaL_newserializer(L, NULL, yamllib);
    s->has_compact = 1;
-   return 1;
+   return s;
 }
 
 int

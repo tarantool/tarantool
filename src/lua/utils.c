@@ -911,8 +911,8 @@ luaT_error(lua_State *L)
 	return 0;
 }
 
-static inline int
-lbox_catch(lua_State *L)
+int
+luaT_toerror(lua_State *L)
 {
 	struct error *e = luaL_iserror(L, -1);
 	if (e != NULL) {
@@ -929,7 +929,7 @@ int
 luaT_call(struct lua_State *L, int nargs, int nreturns)
 {
 	if (lua_pcall(L, nargs, nreturns, 0))
-		return lbox_catch(L);
+		return luaT_toerror(L);
 	return 0;
 }
 
@@ -937,7 +937,7 @@ int
 luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 {
 	if (lua_cpcall(L, func, ud))
-		return lbox_catch(L);
+		return luaT_toerror(L);
 	return 0;
 }
 

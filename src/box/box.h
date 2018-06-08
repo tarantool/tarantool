@@ -123,12 +123,17 @@ typedef int (*box_backup_cb)(const char *path, void *arg);
 
 /**
  * Start a backup. This function calls @cb for each file that
- * needs to be backed up to recover from the last checkpoint.
+ * needs to be backed up to recover from the specified checkpoint.
+ *
+ * The checkpoint is given by @checkpoint_idx. If @checkpoint_idx
+ * is 0, the last checkpoint will be backed up; if it is 1, next
+ * to last, and so on.
+ *
  * The caller is supposed to call box_backup_stop() after he's
  * done copying the files.
  */
 int
-box_backup_start(box_backup_cb cb, void *cb_arg);
+box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg);
 
 /**
  * Finish backup started with box_backup_start().
@@ -151,7 +156,7 @@ box_reset_stat(void);
 } /* extern "C" */
 
 void
-box_process_auth(struct auth_request *request);
+box_process_auth(struct auth_request *request, const char *salt);
 
 void
 box_process_join(struct ev_io *io, struct xrow_header *header);
@@ -176,7 +181,9 @@ void box_set_snap_io_rate_limit(void);
 void box_set_too_long_threshold(void);
 void box_set_readahead(void);
 void box_set_checkpoint_count(void);
+void box_set_memtx_memory(void);
 void box_set_memtx_max_tuple_size(void);
+void box_set_vinyl_memory(void);
 void box_set_vinyl_max_tuple_size(void);
 void box_set_vinyl_cache(void);
 void box_set_vinyl_timeout(void);

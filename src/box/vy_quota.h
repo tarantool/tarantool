@@ -97,6 +97,7 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 static inline void
 vy_quota_destroy(struct vy_quota *q)
 {
+	fiber_cond_broadcast(&q->cond);
 	fiber_cond_destroy(&q->cond);
 }
 
@@ -110,6 +111,7 @@ vy_quota_set_limit(struct vy_quota *q, size_t limit)
 	q->limit = q->watermark = limit;
 	if (q->used >= limit)
 		q->quota_exceeded_cb(q);
+	fiber_cond_broadcast(&q->cond);
 }
 
 /**
@@ -173,6 +175,16 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 	if (q->used >= q->watermark)
 		q->quota_exceeded_cb(q);
 	return 0;
+}
+
+/**
+ * Block the caller until the quota is not exceeded.
+ */
+static inline void
+vy_quota_wait(struct vy_quota *q)
+{
+	while (q->used > q->limit)
+		fiber_cond_wait(&q->cond);
 }
 
 #if defined(__cplusplus)

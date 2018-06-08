@@ -212,7 +212,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
 /** \endcond public */
 
 /**
- * Index introspection (index:info())
+ * Index statistics (index:stat())
  *
  * \param space_id space identifier
  * \param index_id index identifier
@@ -221,7 +221,7 @@ box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
  * \retval >=0 on success
  */
 int
-box_index_info(uint32_t space_id, uint32_t index_id,
+box_index_stat(uint32_t space_id, uint32_t index_id,
 	       struct info_handler *info);
 
 /**
@@ -424,8 +424,8 @@ struct index_vtab {
 	 * Must be destroyed by iterator_delete() after usage.
 	 */
 	struct snapshot_iterator *(*create_snapshot_iterator)(struct index *);
-	/** Introspection (index:info()) */
-	void (*info)(struct index *, struct info_handler *);
+	/** Introspection (index:stat()) */
+	void (*stat)(struct index *, struct info_handler *);
 	/**
 	 * Trigger asynchronous index compaction. What exactly
 	 * is implied under 'compaction' depends on the engine.
@@ -617,9 +617,9 @@ index_create_snapshot_iterator(struct index *index)
 }
 
 static inline void
-index_info(struct index *index, struct info_handler *handler)
+index_stat(struct index *index, struct info_handler *handler)
 {
-	index->vtab->info(index, handler);
+	index->vtab->stat(index, handler);
 }
 
 static inline void
@@ -677,7 +677,7 @@ int generic_index_get(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_replace(struct index *, struct tuple *, struct tuple *,
 			  enum dup_replace_mode, struct tuple **);
 struct snapshot_iterator *generic_index_create_snapshot_iterator(struct index *);
-void generic_index_info(struct index *, struct info_handler *);
+void generic_index_stat(struct index *, struct info_handler *);
 void generic_index_compact(struct index *);
 void generic_index_reset_stat(struct index *);
 void generic_index_begin_build(struct index *);

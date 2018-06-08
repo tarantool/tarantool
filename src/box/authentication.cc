@@ -37,7 +37,7 @@
 static char zero_hash[SCRAMBLE_SIZE];
 
 void
-authenticate(const char *user_name, uint32_t len,
+authenticate(const char *user_name, uint32_t len, const char *salt,
 	     const char *tuple)
 {
 	struct user *user = user_find_by_name_xc(user_name, len);
@@ -84,7 +84,7 @@ authenticate(const char *user_name, uint32_t len,
 			   "invalid scramble size");
 	}
 
-	if (scramble_check(scramble, session->salt, user->def->hash2)) {
+	if (scramble_check(scramble, salt, user->def->hash2)) {
 		auth_res.is_authenticated = false;
 		if (session_run_on_auth_triggers(&auth_res) != 0)
 			diag_raise();

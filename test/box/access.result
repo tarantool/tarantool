@@ -386,7 +386,8 @@ session.su('grantee')
 -- fails - can't suicide - ask the creator to kill you
 box.schema.user.drop('grantee')
 ---
-- error: Read access to space '_user' is denied for user 'grantee'
+- error: 'Failed to drop user or role ''grantee'': the user is active in the current
+    session'
 ...
 session.su('grantor')
 ---
@@ -471,7 +472,7 @@ session.su('user1')
 -- permission denied
 box.schema.user.passwd('admin', 'xxx')
 ---
-- error: Read access to space '_user' is denied for user 'user1'
+- error: User 'admin' is not found
 ...
 session.su('admin')
 ---
@@ -1048,7 +1049,7 @@ session.su("test1")
 ...
 box.schema.user.disable("test")
 ---
-- error: Read access to space '_user' is denied for user 'test1'
+- error: User 'test' is not found
 ...
 session.su("admin")
 ---
@@ -1080,7 +1081,7 @@ session.su("test1")
 ...
 box.schema.user.grant("test", "usage", "universe")
 ---
-- error: Read access to space '_user' is denied for user 'test1'
+- error: User 'test' is not found
 ...
 session.su('admin')
 ---
@@ -1357,27 +1358,58 @@ box.schema.user.create("tester")
 s = box.schema.space.create("test")
 ---
 ...
+_ = s:create_index("primary")
+---
+...
+seq = box.schema.sequence.create("test")
+---
+...
 u = box.schema.user.create("test")
 ---
 ...
 f = box.schema.func.create("test")
 ---
 ...
-box.schema.user.grant("tester", "read,execute", "universe")
+-- failed create, auto_increment requires read.
+box.session.su("tester")
 ---
 ...
--- failed create
-box.session.su("tester", box.schema.space.create, "test_space")
+box.schema.space.create("test_space")
 ---
 - error: Write access to space '_schema' is denied for user 'tester'
 ...
-box.session.su("tester", box.schema.user.create, 'test_user')
+box.schema.user.create('test_user')
+---
+- error: Read access to space '_user' is denied for user 'tester'
+...
+box.schema.func.create('test_func')
+---
+- error: Read access to space '_func' is denied for user 'tester'
+...
+box.session.su("admin")
+---
+...
+box.schema.user.grant("tester", "read", "universe")
+---
+...
+-- failed create
+box.session.su("tester")
+---
+...
+box.schema.space.create("test_space")
+---
+- error: Write access to space '_schema' is denied for user 'tester'
+...
+box.schema.user.create('test_user')
 ---
 - error: Write access to space '_user' is denied for user 'tester'
 ...
-box.session.su("tester", box.schema.func.create, 'test_func')
+box.schema.func.create('test_func')
 ---
 - error: Write access to space '_func' is denied for user 'tester'
+...
+box.session.su("admin")
+---
 ...
 --
 -- FIXME 2.0: we still need to grant 'write' on universe
@@ -1387,24 +1419,36 @@ box.session.su("tester", box.schema.func.create, 'test_func')
 box.schema.user.grant("tester", "create,write", "universe")
 ---
 ...
+box.session.su("tester")
+---
+...
 -- successful create
-s1 = box.session.su("tester", box.schema.space.create, "test_space")
+s1 = box.schema.space.create("test_space")
 ---
 ...
-_ = box.session.su("tester", box.schema.user.create, 'test_user')
+_ = s1:create_index("primary")
 ---
 ...
-_ = box.session.su("tester", box.schema.func.create, 'test_func')
+_ = box.schema.user.create('test_user')
+---
+...
+_ = box.schema.func.create('test_func')
+---
+...
+seq1 = box.schema.sequence.create('test_seq')
 ---
 ...
 -- successful drop of owned objects
-_ = box.session.su("tester", s1.drop, s1)
+s1:drop()
 ---
 ...
-_ = box.session.su("tester", box.schema.user.drop, 'test_user')
+seq1:drop()
 ---
 ...
-_ = box.session.su("tester", box.schema.func.drop, 'test_func')
+box.schema.user.drop('test_user')
+---
+...
+box.schema.func.drop('test_func')
 ---
 ...
 -- failed alter
@@ -1414,28 +1458,33 @@ _ = box.session.su("tester", box.schema.func.drop, 'test_func')
 -- box.session.su("tester", s.format, s, {name="id", type="unsigned"})
 -- failed drop
 -- box.session.su("tester", s.drop, s)
--- can't use here sudo
--- because drop use sudo inside
--- and currently sudo can't be performed nested
-box.session.su("tester")
+s:drop()
 ---
+- error: Drop access to space 'test' is denied for user 'tester'
+...
+seq:drop()
+---
+- error: Drop access to sequence 'test' is denied for user 'tester'
 ...
 box.schema.user.drop("test")
 ---
 - error: Revoke access to role 'public' is denied for user 'tester'
 ...
-box.session.su("admin")
----
-...
-box.session.su("tester", box.schema.func.drop, "test")
+box.schema.func.drop("test")
 ---
 - error: Drop access to function 'test' is denied for user 'tester'
+...
+box.session.su("admin")
+---
 ...
 box.schema.user.grant("tester", "drop", "universe")
 ---
 ...
 -- successful drop
 box.session.su("tester", s.drop, s)
+---
+...
+box.session.su("tester", seq.drop, seq)
 ---
 ...
 box.session.su("tester", box.schema.user.drop, "test")
@@ -1510,13 +1559,35 @@ box.schema.func.exists('test')
 ---
 - false
 ...
+box.space._vspace.index.name:get{"test"} ~= nil
+---
+- false
+...
+box.space._vsequence.index.name:get{"test"} ~= nil
+---
+- false
+...
 --
--- create an object, but 'guest' still has no access to it
+-- create an objects, but 'guest' still has no access to them
 --
 box.session.su('admin', box.schema.func.create, 'test')
 ---
 ...
+s = box.session.su('admin', box.schema.space.create, 'test')
+---
+...
+_ = box.session.su('admin', box.schema.sequence.create, 'test')
+---
+...
 box.schema.func.exists('test')
+---
+- false
+...
+box.space._vspace.index.name:get{"test"} ~= nil
+---
+- false
+...
+box.space._vsequence.index.name:get{"test"} ~= nil
 ---
 - false
 ...
@@ -1526,17 +1597,45 @@ box.schema.func.exists('test')
 box.session.su('admin', box.schema.user.grant, 'guest', 'execute', 'function', 'test')
 ---
 ...
+box.session.su('admin', box.schema.user.grant, 'guest', 'read', 'space', 'test')
+---
+...
+box.session.su('admin', box.schema.user.grant, 'guest', 'read', 'sequence', 'test')
+---
+...
 box.schema.func.exists('test')
 ---
 - true
 ...
+box.space._vspace.index.name:get{"test"} ~= nil
+---
+- true
+...
+box.space._vsequence.index.name:get{"test"} ~= nil
+---
+- true
+...
 --
--- drop object
+-- drop objects
 --
 box.session.su('admin', box.schema.func.drop, 'test')
 ---
 ...
+box.session.su('admin', s.drop, s)
+---
+...
+box.session.su('admin', box.schema.sequence.drop, 'test')
+---
+...
 box.schema.func.exists('test')
+---
+- false
+...
+box.space._vspace.index.name:get{"test"} ~= nil
+---
+- false
+...
+box.space._vsequence.index.name:get{"test"} ~= nil
 ---
 - false
 ...
