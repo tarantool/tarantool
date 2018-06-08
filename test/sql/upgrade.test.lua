@@ -25,9 +25,17 @@ box.space._index:get({box.space._space.index['name']:get('T1').id, 0})
 box.sql.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
 box.sql.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
 box.sql.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
+box.sql.execute("CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2); END;")
 box.space._space.index['name']:get('T')
 box.space._space.index['name']:get('T_OUT')
-box.space._trigger:get('T1T')
+t1t = box.space._trigger:get('T1T')
+t2t = box.space._trigger:get('T2T')
+t1t.name
+t1t.opts
+t2t.name
+t2t.opts
+assert(t1t.space_id == t2t.space_id)
+assert(t1t.space_id == box.space.T.id)
 
 box.sql.execute("INSERT INTO T VALUES(1);")
 box.space.T:select()

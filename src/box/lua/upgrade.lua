@@ -471,12 +471,16 @@ local function upgrade_to_2_1_0()
 
     log.info("create space _trigger")
     local format = {{name='name', type='string'},
+                    {name='space_id', type='unsigned'},
                     {name='opts', type='map'}}
     _space:insert{_trigger.id, ADMIN, '_trigger', 'memtx', 0, MAP, format}
 
     log.info("create index primary on _trigger")
     _index:insert{_trigger.id, 0, 'primary', 'tree', { unique = true },
                   {{0, 'string'}}}
+    log.info("create index secondary on _trigger")
+    _index:insert{_trigger.id, 1, 'space_id', 'tree', { unique = false },
+                  {{1, 'unsigned'}}}
 
     local stat1_ft = {{name='tbl', type='string'},
                       {name='idx', type='string'},

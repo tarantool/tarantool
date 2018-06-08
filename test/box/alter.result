@@ -224,6 +224,7 @@ _index:select{}
   - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [320, 1, 'uuid', 'tree', {'unique': true}, [[1, 'string']]]
   - [328, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+  - [328, 1, 'space_id', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [330, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [340, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [340, 1, 'sequence', 'tree', {'unique': false}, [[1, 'unsigned']]]

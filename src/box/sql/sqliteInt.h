@@ -3018,6 +3018,8 @@ struct Parse {
  */
 struct Trigger {
 	char *zName;		/* The name of the trigger                        */
+	/** The ID of space the trigger refers to. */
+	uint32_t space_id;
 	char *table;		/* The table or view to which the trigger applies */
 	u8 op;			/* One of TK_DELETE, TK_UPDATE, TK_INSERT         */
 	u8 tr_tm;		/* One of TRIGGER_BEFORE, TRIGGER_AFTER */

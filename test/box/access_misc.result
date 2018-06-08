@@ -798,8 +798,8 @@ box.space._space:select()
       {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid',
         'type': 'string'}]]
-  - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'opts',
-        'type': 'map'}]]
+  - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'space_id',
+        'type': 'unsigned'}, {'name': 'opts', 'type': 'map'}]]
   - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'count',
         'type': 'unsigned'}]]
   - [340, 1, '_space_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},

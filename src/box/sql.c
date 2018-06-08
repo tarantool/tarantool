@@ -669,8 +669,11 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	if (box_index_get(BOX_TRIGGER_ID, 0, key_begin, key, &tuple) != 0)
 		return SQL_TARANTOOL_ERROR;
 	assert(tuple != NULL);
-	assert(tuple_field_count(tuple) == 2);
-	const char *field = box_tuple_field(tuple, 1);
+	assert(tuple_field_count(tuple) == 3);
+	const char *field = box_tuple_field(tuple, BOX_TRIGGER_FIELD_SPACE_ID);
+	assert(mp_typeof(*field) == MP_UINT);
+	uint32_t space_id = mp_decode_uint(&field);
+	field = box_tuple_field(tuple, BOX_TRIGGER_FIELD_OPTS);
 	assert(mp_typeof(*field) == MP_MAP);
 	mp_decode_map(&field);
 	const char *sql_str = mp_decode_str(&field, &key_len);
@@ -693,16 +696,18 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 	uint32_t trigger_stmt_new_len = trigger_stmt_len + new_table_name_len -
 					old_table_name_len + 2 * (!is_quoted);
 	assert(trigger_stmt_new_len > 0);
-	key_len = mp_sizeof_array(2) + mp_sizeof_str(trig_name_len) +
+	key_len = mp_sizeof_array(3) + mp_sizeof_str(trig_name_len) +
 		  mp_sizeof_map(1) + mp_sizeof_str(3) +
-		  mp_sizeof_str(trigger_stmt_new_len);
+		  mp_sizeof_str(trigger_stmt_new_len) +
+		  mp_sizeof_uint(space_id);
 	char *new_tuple = (char*)region_alloc(&fiber()->gc, key_len);
 	if (new_tuple == NULL) {
 		diag_set(OutOfMemory, key_len, "region_alloc", "new_tuple");
 		return SQL_TARANTOOL_ERROR;
 	}
-	char *new_tuple_end = mp_encode_array(new_tuple, 2);
+	char *new_tuple_end = mp_encode_array(new_tuple, 3);
 	new_tuple_end = mp_encode_str(new_tuple_end, trig_name, trig_name_len);
+	new_tuple_end = mp_encode_uint(new_tuple_end, space_id);
 	new_tuple_end = mp_encode_map(new_tuple_end, 1);
 	new_tuple_end = mp_encode_str(new_tuple_end, "sql", 3);
 	new_tuple_end = mp_encode_str(new_tuple_end, trigger_stmt,
@@ -1253,7 +1258,7 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		init, TARANTOOL_SYS_TRIGGER_NAME,
 		BOX_TRIGGER_ID, 0,
 		"CREATE TABLE \""TARANTOOL_SYS_TRIGGER_NAME"\" ("
-		"\"name\" TEXT PRIMARY KEY, \"opts\")"
+		"\"name\" TEXT PRIMARY KEY, \"space_id\" INT, \"opts\")"
 	);
 
 	sql_schema_put(
@@ -1308,14 +1313,14 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		const char *field, *ptr;
 		char *name, *sql;
 		unsigned len;
-		assert(tuple_field_count(tuple) == 2);
+		assert(tuple_field_count(tuple) == 3);
 
 		field = tuple_field(tuple, 0);
 		assert (field != NULL);
 		ptr = mp_decode_str(&field, &len);
 		name = strndup(ptr, len);
 
-		field = tuple_field(tuple, 1);
+		field = tuple_field(tuple, BOX_TRIGGER_FIELD_OPTS);
 		assert (field != NULL);
 		mp_decode_array(&field);
 		ptr = mp_decode_str(&field, &len);

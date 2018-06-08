@@ -19,8 +19,8 @@ test_run:switch('upgrade')
 -- test system tables
 box.space._space.index['name']:get('_trigger')
 ---
-- [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'opts',
-      'type': 'map'}]]
+- [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'space_id',
+      'type': 'unsigned'}, {'name': 'opts', 'type': 'map'}]]
 ...
 box.space._space.index['name']:get('_sql_stat1')
 ---
@@ -69,6 +69,9 @@ box.sql.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
 box.sql.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
 ---
 ...
+box.sql.execute("CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2); END;")
+---
+...
 box.space._space.index['name']:get('T')
 ---
 - [513, 1, 'T', 'memtx', 1, {'sql': 'CREATE TABLE t(x INTEGER PRIMARY KEY)'}, [{'affinity': 68,
@@ -79,10 +82,37 @@ box.space._space.index['name']:get('T_OUT')
 - [514, 1, 'T_OUT', 'memtx', 1, {'sql': 'CREATE TABLE t_out(x INTEGER PRIMARY KEY)'},
   [{'affinity': 68, 'type': 'integer', 'nullable_action': 'abort', 'name': 'X', 'is_nullable': false}]]
 ...
-box.space._trigger:get('T1T')
+t1t = box.space._trigger:get('T1T')
 ---
-- ['T1T', {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1);
-      END;'}]
+...
+t2t = box.space._trigger:get('T2T')
+---
+...
+t1t.name
+---
+- T1T
+...
+t1t.opts
+---
+- {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1);
+    END;'}
+...
+t2t.name
+---
+- T2T
+...
+t2t.opts
+---
+- {'sql': 'CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2);
+    END;'}
+...
+assert(t1t.space_id == t2t.space_id)
+---
+- true
+...
+assert(t1t.space_id == box.space.T.id)
+---
+- true
 ...
 box.sql.execute("INSERT INTO T VALUES(1);")
 ---
@@ -94,6 +124,7 @@ box.space.T:select()
 box.space.T_OUT:select()
 ---
 - - [1]
+  - [2]
 ...
 box.sql.execute("SELECT * FROM T")
 ---

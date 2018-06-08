@@ -217,6 +217,13 @@ enum {
 	BOX_SPACE_SEQUENCE_FIELD_IS_GENERATED = 2,
 };
 
+/** _trigger fields. */
+enum {
+	BOX_TRIGGER_FIELD_NAME = 0,
+	BOX_TRIGGER_FIELD_SPACE_ID = 1,
+	BOX_TRIGGER_FIELD_OPTS = 2,
+};
+
 /*
  * Different objects which can be subject to access
  * control.

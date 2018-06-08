@@ -169,6 +169,7 @@ sqlite3BeginTrigger(Parse * pParse,	/* The parse context of the CREATE TRIGGER s
 	if (pTrigger == 0)
 		goto trigger_cleanup;
 	pTrigger->zName = zName;
+	pTrigger->space_id = pTab->def->id;
 	zName = 0;
 	pTrigger->table = sqlite3DbStrDup(db, pTableName->a[0].zName);
 	pTrigger->pSchema = db->pSchema;
@@ -255,7 +256,7 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 
 		/* makerecord(cursor(iRecord), [reg(iFirstCol), reg(iFirstCol+1)])  */
 		iFirstCol = pParse->nMem + 1;
-		pParse->nMem += 2;
+		pParse->nMem += 3;
 		iRecord = ++pParse->nMem;
 
 		zOpts = sqlite3DbMallocRaw(pParse->db,
@@ -275,9 +276,10 @@ sqlite3FinishTrigger(Parse * pParse,	/* Parser context */
 		sqlite3VdbeAddOp4(v,
 				  OP_String8, 0, iFirstCol, 0,
 				  zName, P4_DYNAMIC);
-		sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 1,
+		sqlite3VdbeAddOp2(v, OP_Integer, pTrig->space_id, iFirstCol + 1);
+		sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 2,
 				  MSGPACK_SUBTYPE, zOpts, P4_DYNAMIC);
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 2, iRecord);
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 3, iRecord);
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, iCursor, iRecord);
 		/* Do not account nested operations: the count of such
 		 * operations depends on Tarantool data dictionary internals,
