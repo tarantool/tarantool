@@ -67,6 +67,46 @@
 enum { IPROTO_SALT_SIZE = 32 };
 
 /**
+ * A position in connection output buffer.
+ * Since we use rotating buffers to recycle memory,
+ * it includes not only a position in obuf, but also
+ * a pointer to obuf the position is for.
+ */
+struct iproto_wpos {
+	struct obuf *obuf;
+	struct obuf_svp svp;
+};
+
+static void
+iproto_wpos_create(struct iproto_wpos *wpos, struct obuf *out)
+{
+	wpos->obuf = out;
+	wpos->svp = obuf_create_svp(out);
+}
+
+/**
+ * In Greek mythology, Kharon is the ferryman who carries souls
+ * of the newly deceased across the river Styx that divided the
+ * world of the living from the world of the dead. Here Kharon is
+ * a cbus message and does similar work. It notifies the iproto
+ * thread about new data in a connection output buffer and carries
+ * back to tx thread the position in the output buffer which has
+ * been successfully flushed to the socket. Styx here is cpipe,
+ * and the boat is cbus message.
+ */
+struct iproto_kharon {
+	struct cmsg base;
+	/**
+	 * Tx thread sets wpos to the current position in the
+	 * output buffer and sends the message to iproto thread.
+	 * Iproto returns the message to tx after setting wpos
+	 * to the last flushed position (similarly to
+	 * iproto_msg.wpos).
+	 */
+	struct iproto_wpos wpos;
+};
+
+/**
  * Network readahead. A signed integer to avoid
  * automatic type coercion to an unsigned type.
  * We assign it without locks in txn thread and
@@ -111,24 +151,6 @@ iproto_reset_input(struct ibuf *ibuf)
 		ibuf_destroy(ibuf);
 		ibuf_create(ibuf, slabc, iproto_readahead);
 	}
-}
-
-/**
- * This structure represents a position in the output.
- * Since we use rotating buffers to recycle memory,
- * it includes not only a position in obuf, but also
- * a pointer to obuf the position is for.
- */
-struct iproto_wpos {
-	struct obuf *obuf;
-	struct obuf_svp svp;
-};
-
-static void
-iproto_wpos_create(struct iproto_wpos *wpos, struct obuf *out)
-{
-	wpos->obuf = out;
-	wpos->svp = obuf_create_svp(out);
 }
 
 /* {{{ iproto_msg - declaration */
@@ -260,6 +282,29 @@ static const struct cmsg_hop disconnect_route[] = {
 	{ net_finish_disconnect, NULL },
 };
 
+/**
+ * Kharon is in the dead world (iproto). Schedule an event to
+ * flush new obuf as reflected in the fresh wpos.
+ * @param m Kharon.
+ */
+static void
+iproto_process_push(struct cmsg *m);
+
+/**
+ * Kharon returns to the living world (tx) back from the dead one
+ * (iproto). Check if a new push is pending and make a new trip
+ * to iproto if necessary.
+ * @param m Kharon.
+ */
+static void
+tx_end_push(struct cmsg *m);
+
+static const struct cmsg_hop push_route[] = {
+	{ iproto_process_push, &tx_pipe },
+	{ tx_end_push, NULL }
+};
+
+
 /* }}} */
 
 /* {{{ iproto_connection - declaration and definition */
@@ -271,7 +316,7 @@ static const struct cmsg_hop disconnect_route[] = {
  *  Receive from the network.
  *     |
  * +---|---------------------+   +------------+
- * |   |      IPROTO thread  |   | TX thread  |
+ * |   |      iproto thread  |   | tx thread  |
  * |   v                     |   |            |
  * | ibuf[0]- - - - - - - - -|- -|- - >+      |
  * |                         |   |     |      |
@@ -347,7 +392,7 @@ struct iproto_connection
 	 * discarded their arguments in order not to stall other
 	 * connections.
 	 */
-	int long_poll_requests;
+	int long_poll_count;
 	struct ev_io input;
 	struct ev_io output;
 	/** Logical session. */
@@ -359,6 +404,37 @@ struct iproto_connection
 	bool is_disconnected;
 	struct rlist in_stop_list;
 	/**
+	 * Kharon is used to implement box.session.push().
+	 * When a new push is ready, tx uses kharon to notify
+	 * iproto about new data in connection output buffer.
+	 *
+	 * Kharon can not be in two places at the time. When
+	 * kharon leaves tx, is_push_sent is set to true. After
+	 * that new pushes can not use it. Instead, they set
+	 * is_push_pending flag. When Kharon is back to tx it
+	 * clears is_push_sent, checks is_push_pending and departs
+	 * immediately back to iproto if it is set.
+	 *
+	 * This design makes it easy to use a single message per
+	 * connection for pushes while new pushes do not wait for
+	 * the message to become available.
+	 *
+	 * iproto                                               tx
+	 * -------------------------------------------------------
+	 *                                        + [push message]
+	 *                 <--- notification ----
+	 *                                        + [push message]
+	 * [feed event]
+	 *             --- kharon travels back ---->
+	 * [write to socket]
+	 *                                        + [push message]
+	 *                                        [new push found]
+	 *                 <--- notification ----
+	 * [write ends]
+	 *                          ...
+	 */
+	struct iproto_kharon kharon;
+	/**
 	 * The following fields are used exclusively by the tx thread.
 	 * Align them to prevent false-sharing.
 	 */
@@ -366,6 +442,13 @@ struct iproto_connection
 		alignas(CACHELINE_SIZE)
 		/** Pointer to the current output buffer. */
 		struct obuf *p_obuf;
+		/** True if Kharon is in use/travelling. */
+		bool is_push_sent;
+		/**
+		 * True if new pushes are waiting for Kharon
+		 * return.
+		 */
+		bool is_push_pending;
 	} tx;
 	/** Authentication salt. */
 	char salt[IPROTO_SALT_SIZE];
@@ -422,7 +505,7 @@ iproto_msg_new(struct iproto_connection *con)
 static inline bool
 iproto_connection_is_idle(struct iproto_connection *con)
 {
-	return con->long_poll_requests == 0 &&
+	return con->long_poll_count == 0 &&
 	       ibuf_used(&con->ibuf[0]) == 0 &&
 	       ibuf_used(&con->ibuf[1]) == 0;
 }
@@ -897,12 +980,14 @@ iproto_connection_new(int fd)
 	iproto_wpos_create(&con->wpos, con->tx.p_obuf);
 	iproto_wpos_create(&con->wend, con->tx.p_obuf);
 	con->parse_size = 0;
-	con->long_poll_requests = 0;
+	con->long_poll_count = 0;
 	con->session = NULL;
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->disconnect, disconnect_route);
 	con->is_disconnected = false;
+	con->tx.is_push_pending = false;
+	con->tx.is_push_sent = false;
 	return con;
 }
 
@@ -1174,7 +1259,7 @@ net_discard_input(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	msg->p_ibuf->rpos += msg->len;
 	msg->len = 0;
-	con->long_poll_requests++;
+	con->long_poll_count++;
 	if (evio_has_fd(&con->input) && !ev_is_active(&con->input) &&
 	    rlist_empty(&con->in_stop_list))
 		ev_feed_event(con->loop, &con->input, EV_READ);
@@ -1200,15 +1285,16 @@ tx_discard_input(struct iproto_msg *msg)
  *   not, the empty buffer is selected.
  * - if neither of the buffers are empty, the function
  *   does not rotate the buffer.
+ *
+ * @param con iproto connection.
+ * @param wpos Last flushed write position, received from iproto
+ *        thread.
  */
-static struct iproto_msg *
-tx_accept_msg(struct cmsg *m)
+static void
+tx_accept_wpos(struct iproto_connection *con, const struct iproto_wpos *wpos)
 {
-	struct iproto_msg *msg = (struct iproto_msg *) m;
-	struct iproto_connection *con = msg->connection;
-
 	struct obuf *prev = &con->obuf[con->tx.p_obuf == con->obuf];
-	if (msg->wpos.obuf == con->tx.p_obuf) {
+	if (wpos->obuf == con->tx.p_obuf) {
 		/*
 		 * We got a message advancing the buffer which
 		 * is being appended to. The previous buffer is
@@ -1226,6 +1312,14 @@ tx_accept_msg(struct cmsg *m)
 		 */
 		con->tx.p_obuf = prev;
 	}
+}
+
+static inline struct iproto_msg *
+tx_accept_msg(struct cmsg *m)
+{
+	struct iproto_msg *msg = (struct iproto_msg *) m;
+	tx_accept_wpos(msg->connection, &msg->wpos);
+	tx_fiber_init(msg->connection->session, msg->header.sync);
 	return msg;
 }
 
@@ -1270,8 +1364,6 @@ static void
 tx_process1(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-
-	tx_fiber_init(msg->connection->session, msg->header.sync);
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
@@ -1304,9 +1396,6 @@ tx_process_select(struct cmsg *m)
 	int count;
 	int rc;
 	struct request *req = &msg->dml;
-
-	tx_fiber_init(msg->connection->session, msg->header.sync);
-
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
@@ -1354,9 +1443,6 @@ static void
 tx_process_call(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
-
-	tx_fiber_init(msg->connection->session, msg->header.sync);
-
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
@@ -1438,9 +1524,6 @@ tx_process_misc(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
 	struct obuf *out = con->tx.p_obuf;
-
-	tx_fiber_init(con->session, msg->header.sync);
-
 	if (tx_check_schema(msg->header.schema_version))
 		goto error;
 
@@ -1506,9 +1589,6 @@ tx_process_join_subscribe(struct cmsg *m)
 {
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct iproto_connection *con = msg->connection;
-
-	tx_fiber_init(con->session, msg->header.sync);
-
 	try {
 		switch (msg->header.type) {
 		case IPROTO_JOIN:
@@ -1550,8 +1630,8 @@ net_send_msg(struct cmsg *m)
 		msg->p_ibuf->rpos += msg->len;
 	} else {
 		/* Already discarded by net_discard_input(). */
-		assert(con->long_poll_requests > 0);
-		con->long_poll_requests--;
+		assert(con->long_poll_count > 0);
+		con->long_poll_count--;
 	}
 	con->wend = msg->wpos;
 
@@ -1784,6 +1864,80 @@ iproto_session_sync(struct session *session)
 	return session->meta.sync;
 }
 
+/** {{{ IPROTO_PUSH implementation. */
+
+static void
+iproto_process_push(struct cmsg *m)
+{
+	struct iproto_kharon *kharon = (struct iproto_kharon *) m;
+	struct iproto_connection *con =
+		container_of(kharon, struct iproto_connection, kharon);
+	con->wend = kharon->wpos;
+	kharon->wpos = con->wpos;
+	if (evio_has_fd(&con->output) && !ev_is_active(&con->output))
+		ev_feed_event(con->loop, &con->output, EV_WRITE);
+}
+
+/**
+ * Send to iproto thread a notification about new pushes.
+ * @param con iproto connection.
+ */
+static void
+tx_begin_push(struct iproto_connection *con)
+{
+	assert(! con->tx.is_push_sent);
+	cmsg_init(&con->kharon.base, push_route);
+	iproto_wpos_create(&con->kharon.wpos, con->tx.p_obuf);
+	con->tx.is_push_pending = false;
+	con->tx.is_push_sent = true;
+	cpipe_push(&net_pipe, (struct cmsg *) &con->kharon);
+}
+
+static void
+tx_end_push(struct cmsg *m)
+{
+	struct iproto_kharon *kharon = (struct iproto_kharon *) m;
+	struct iproto_connection *con =
+		container_of(kharon, struct iproto_connection, kharon);
+	tx_accept_wpos(con, &kharon->wpos);
+	con->tx.is_push_sent = false;
+	if (con->tx.is_push_pending)
+		tx_begin_push(con);
+}
+
+/**
+ * Push a message from @a port to a remote client.
+ * @param session iproto session.
+ * @param sync Request sync in scope of which to send the push.
+ * @param port Port with data to send.
+ *
+ * @retval -1 Memory error.
+ * @retval  0 Success, a message is written to the output buffer.
+ *            We don't wait here that the push has reached the
+ *            client: the output buffer is flushed asynchronously.
+ */
+static int
+iproto_session_push(struct session *session, uint64_t sync, struct port *port)
+{
+	struct iproto_connection *con =
+		(struct iproto_connection *) session->meta.connection;
+	struct obuf_svp svp;
+	if (iproto_prepare_select(con->tx.p_obuf, &svp) != 0)
+		return -1;
+	if (port_dump_msgpack(port, con->tx.p_obuf) < 0) {
+		obuf_rollback_to_svp(con->tx.p_obuf, &svp);
+		return -1;
+	}
+	iproto_reply_chunk(con->tx.p_obuf, &svp, sync, ::schema_version);
+	if (! con->tx.is_push_sent)
+		tx_begin_push(con);
+	else
+		con->tx.is_push_pending = true;
+	return 0;
+}
+
+/** }}} */
+
 /** Initialize the iproto subsystem and start network io thread */
 void
 iproto_init()
@@ -1797,14 +1951,14 @@ iproto_init()
 	cpipe_create(&net_pipe, "net");
 	cpipe_set_max_input(&net_pipe, iproto_msg_max / 2);
 	struct session_vtab iproto_session_vtab = {
-		/* .push = */ generic_session_push,
+		/* .push = */ iproto_session_push,
 		/* .fd = */ iproto_session_fd,
 		/* .sync = */ iproto_session_sync,
 	};
 	session_vtab_registry[SESSION_TYPE_BINARY] = iproto_session_vtab;
 }
 
-/** Available IProto configuration changes. */
+/** Available iproto configuration changes. */
 enum iproto_cfg_op {
 	IPROTO_CFG_BIND,
 	IPROTO_CFG_MSG_MAX,
@@ -1814,18 +1968,18 @@ enum iproto_cfg_op {
 /**
  * Since there is no way to "synchronously" change the
  * state of the io thread, to change the listen port or max
- * message count in flight send a special message to IProto
+ * message count in flight send a special message to iproto
  * thread.
  */
 struct iproto_cfg_msg: public cbus_call_msg
 {
-	/** Operation to execute in IProto thread. */
+	/** Operation to execute in iproto thread. */
 	enum iproto_cfg_op op;
 	union {
 		/** New URI to bind to. */
 		const char *uri;
 
-		/** New IProto max message count. */
+		/** New iproto max message count. */
 		int iproto_msg_max;
 	};
 };

@@ -68,6 +68,7 @@ t
   - info
   - internal
   - once
+  - priv
   - rollback
   - rollback_to_savepoint
   - runtime

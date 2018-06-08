@@ -43,6 +43,8 @@ local IPROTO_FIELD_NAME_KEY = 0
 local IPROTO_DATA_KEY      = 0x30
 local IPROTO_ERROR_KEY     = 0x31
 local IPROTO_GREETING_SIZE = 128
+local IPROTO_CHUNK_KEY     = 128
+local IPROTO_OK_KEY        = 0
 
 -- select errors from box.error
 local E_UNKNOWN              = box.error.UNKNOWN
@@ -72,6 +74,10 @@ local function decode_get(raw_data)
     return body[1], raw_end
 end
 local function decode_count(raw_data)
+    local response, raw_end = decode(raw_data)
+    return response[IPROTO_DATA_KEY][1], raw_end
+end
+local function decode_push(raw_data)
     local response, raw_end = decode(raw_data)
     return response[IPROTO_DATA_KEY][1], raw_end
 end
@@ -117,6 +123,7 @@ local method_decoder = {
     max     = decode_get,
     count   = decode_count,
     inject  = decode_data,
+    push    = decode_push,
 }
 
 local function next_id(id) return band(id + 1, 0x7FFFFFFF) end
@@ -151,6 +158,12 @@ local function establish_connection(host, port, timeout)
     end
     return s, greeting
 end
+
+--
+-- Default action on push during a synchronous request -
+-- ignore.
+--
+local function on_push_sync_default(...) end
 
 --
 -- Basically, *transport* is a TCP connection speaking one of
@@ -260,6 +273,77 @@ local function create_transport(host, port, user, password, callback,
             return nil, box.error.new(box.error.PROC_LUA,
                                       'Response is not ready')
         end
+    end
+    --
+    -- Get the next message or the final result.
+    -- @param iterator Iterator object.
+    -- @param i Index to get a next message from.
+    --
+    -- @retval nil, nil The request is finished.
+    -- @retval i + 1, object A message/response and its index.
+    -- @retval box.NULL, error An error occured. When this
+    --         function is called in 'for k, v in future:pairs()',
+    --         `k` becomes box.NULL, and `v` becomes error object.
+    --         On error the key becomes exactly box.NULL instead
+    --         of nil, because nil is treated by Lua as iteration
+    --         end marker. Nil does not participate in iteration,
+    --         and does not allow to continue it.
+    --
+    local function request_iterator_next(iterator, i)
+        if i == box.NULL then
+            return nil, nil
+        else
+            i = i + 1
+        end
+        local request = iterator.request
+        local messages = request.on_push_ctx
+    ::retry::
+        if i <= #messages then
+            return i, messages[i]
+        end
+        if request:is_ready() then
+            -- After all the messages are iterated, `i` is equal
+            -- to #messages + 1. After response reading `i`
+            -- becomes #messages + 2. It is the trigger to finish
+            -- the iteration.
+            if i > #messages + 1 then
+                return nil, nil
+            end
+            local response, err = request:result()
+            if err then
+                return box.NULL, err
+            end
+            return i, response
+        end
+        local old_message_count = #messages
+        local timeout = iterator.timeout
+        repeat
+            local ts = fiber_clock()
+            request.cond:wait(timeout)
+            timeout = timeout - (fiber_clock() - ts)
+            if request:is_ready() or old_message_count ~= #messages then
+                goto retry
+            end
+        until timeout <= 0
+        return box.NULL, box.error.new(E_TIMEOUT)
+    end
+    --
+    -- Iterate over all messages, received by a request. @Sa
+    -- request_iterator_next for details what to expect in `for`
+    -- key/value pairs.
+    -- @param timeout One iteration timeout.
+    -- @retval next() callback, iterator, zero key.
+    --
+    function request_index:pairs(timeout)
+        if timeout then
+            if type(timeout) ~= 'number' or timeout < 0 then
+                error('Usage: future:pairs(timeout)')
+            end
+        else
+            timeout = TIMEOUT_INFINITY
+        end
+        local iterator = {request = self, timeout = timeout}
+        return request_iterator_next, iterator, 0
     end
     --
     -- Wait for a response or error max timeout seconds.
@@ -400,7 +484,8 @@ local function create_transport(host, port, user, password, callback,
     -- @retval nil, error Error occured.
     -- @retval not nil Future object.
     --
-    local function perform_async_request(buffer, method, ...)
+    local function perform_async_request(buffer, method, on_push, on_push_ctx,
+                                         ...)
         if state ~= 'active' and state ~= 'fetch_schema' then
             return nil, box.error.new({code = last_errno or E_NO_CONNECTION,
                                        reason = last_error})
@@ -413,14 +498,17 @@ local function create_transport(host, port, user, password, callback,
         local id = next_request_id
         method_encoder[method](send_buf, id, ...)
         next_request_id = next_id(id)
-        -- Request has maximum 6 members:
-        -- method, buffer, id, cond, errno, response.
-        local request = setmetatable(table_new(0, 6), request_mt)
+        -- Request in most cases has maximum 8 members:
+        -- method, buffer, id, cond, errno, response, on_push,
+        -- on_push_ctx.
+        local request = setmetatable(table_new(0, 8), request_mt)
         request.method = method
         request.buffer = buffer
         request.id = id
         request.cond = fiber.cond()
         requests[id] = request
+        request.on_push = on_push
+        request.on_push_ctx = on_push_ctx
         return request
     end
 
@@ -429,9 +517,10 @@ local function create_transport(host, port, user, password, callback,
     -- @retval nil, error Error occured.
     -- @retval not nil Response object.
     --
-    local function perform_request(timeout, buffer, method, ...)
+    local function perform_request(timeout, buffer, method, on_push,
+                                   on_push_ctx, ...)
         local request, err =
-            perform_async_request(buffer, method, ...)
+            perform_async_request(buffer, method, on_push, on_push_ctx, ...)
         if not request then
             return nil, err
         end
@@ -444,13 +533,13 @@ local function create_transport(host, port, user, password, callback,
         if request == nil then -- nobody is waiting for the response
             return
         end
-        requests[id] = nil
-        request.id = nil
         local status = hdr[IPROTO_STATUS_KEY]
         local body, body_end_check
 
-        if status ~= 0 then
+        if status > IPROTO_CHUNK_KEY then
             -- Handle errors
+            requests[id] = nil
+            request.id = nil
             body, body_end_check = decode(body_rpos)
             assert(body_end == body_end_check, "invalid xrow length")
             request.errno = band(status, IPROTO_ERRNO_MASK)
@@ -465,16 +554,33 @@ local function create_transport(host, port, user, password, callback,
             local body_len = body_end - body_rpos
             local wpos = buffer:alloc(body_len)
             ffi.copy(wpos, body_rpos, body_len)
-            request.response = tonumber(body_len)
+            body_len = tonumber(body_len)
+            if status == IPROTO_OK_KEY then
+                request.response = body_len
+                requests[id] = nil
+                request.id = nil
+            else
+                request.on_push(request.on_push_ctx, body_len)
+            end
             request.cond:broadcast()
             return
         end
 
-        -- Decode xrow.body[DATA] to Lua objects
         local real_end
-        request.response, real_end, request.errno =
-            method_decoder[request.method](body_rpos, body_end)
-        assert(real_end == body_end, "invalid body length")
+        -- Decode xrow.body[DATA] to Lua objects
+        if status == IPROTO_OK_KEY then
+            request.response, real_end, request.errno =
+                method_decoder[request.method](body_rpos, body_end)
+            assert(real_end == body_end, "invalid body length")
+            requests[id] = nil
+            request.id = nil
+        else
+            local msg
+            msg, real_end, request.errno =
+                method_decoder.push(body_rpos, body_end)
+            assert(real_end == body_end, "invalid body length")
+            request.on_push(request.on_push_ctx, msg)
+        end
         request.cond:broadcast()
     end
 
@@ -950,25 +1056,40 @@ end
 
 function remote_methods:_request(method, opts, ...)
     local transport = self._transport
-    local buffer = opts and opts.buffer
-    if opts and opts.is_async then
-        return transport.perform_async_request(buffer, method, ...)
-    end
-    local deadline
-    if opts and opts.timeout then
-        -- conn.space:request(, { timeout = timeout })
-        deadline = fiber_clock() + opts.timeout
+    local on_push, on_push_ctx, buffer, deadline
+    -- Extract options, set defaults, check if the request is
+    -- async.
+    if opts then
+        buffer = opts.buffer
+        if opts.is_async then
+            if opts.on_push or opts.on_push_ctx then
+                error('To handle pushes in an async request use future:pairs()')
+            end
+            return transport.perform_async_request(buffer, method, table.insert,
+                                                   {}, ...)
+        end
+        if opts.timeout then
+            -- conn.space:request(, { timeout = timeout })
+            deadline = fiber_clock() + opts.timeout
+        else
+            -- conn:timeout(timeout).space:request()
+            -- @deprecated since 1.7.4
+            deadline = self._deadlines[fiber_self()]
+        end
+        on_push = opts.on_push or on_push_sync_default
+        on_push_ctx = opts.on_push_ctx
     else
-        -- conn:timeout(timeout).space:request()
-        -- @deprecated since 1.7.4
         deadline = self._deadlines[fiber_self()]
+        on_push = on_push_sync_default
     end
+    -- Execute synchronous request.
     local timeout = deadline and max(0, deadline - fiber_clock())
     if self.state ~= 'active' then
         transport.wait_state('active', timeout)
         timeout = deadline and max(0, deadline - fiber_clock())
     end
-    local res, err = transport.perform_request(timeout, buffer, method, ...)
+    local res, err = transport.perform_request(timeout, buffer, method,
+                                               on_push, on_push_ctx, ...)
     if err then
         box.error(err)
     end
@@ -1171,10 +1292,10 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        res, err = pr(timeout, nil, 'eval', loader, {line})
+        res, err = pr(timeout, nil, 'eval', nil, nil, loader, {line})
     else
         assert(self.protocol == 'Lua console')
-        res, err = pr(timeout, nil, 'inject', line..'$EOF$\n')
+        res, err = pr(timeout, nil, 'inject', nil, nil, line..'$EOF$\n')
     end
     if err then
         box.error(err)

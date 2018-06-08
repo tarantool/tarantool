@@ -454,6 +454,18 @@ iproto_reply_sql(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 	*(pos + IPROTO_HEADER_LEN) = 0x80 | keys;
 }
 
+void
+iproto_reply_chunk(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
+		   uint32_t schema_version)
+{
+	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
+	iproto_header_encode(pos, IPROTO_CHUNK, sync, schema_version,
+			     obuf_size(buf) - svp->used - IPROTO_HEADER_LEN);
+	struct iproto_body_bin body = iproto_body_bin;
+	body.v_data_len = mp_bswap_u32(1);
+	memcpy(pos + IPROTO_HEADER_LEN, &body, sizeof(body));
+}
+
 int
 xrow_decode_dml(struct xrow_header *row, struct request *request,
 		uint64_t key_map)
