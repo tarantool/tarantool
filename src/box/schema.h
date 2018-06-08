@@ -235,4 +235,30 @@ struct on_access_denied_ctx {
 	const char *object_name;
 };
 
+/** Global grants to classes of objects. */
+struct entity_access {
+       struct access space[BOX_USER_MAX];
+       struct access function[BOX_USER_MAX];
+       struct access sequence[BOX_USER_MAX];
+};
+
+/** A single instance of the global entities. */
+extern struct entity_access entity_access;
+
+static inline
+struct access *
+entity_access_get(enum schema_object_type type)
+{
+       switch (type) {
+       case SC_SPACE:
+               return entity_access.space;
+       case SC_FUNCTION:
+               return entity_access.function;
+       case SC_SEQUENCE:
+               return entity_access.sequence;
+       default:
+               return NULL;
+       }
+}
+
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

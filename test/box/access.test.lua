@@ -640,3 +640,32 @@ box.schema.user.grant("guest", "alter", "function")
 box.schema.user.grant("guest", "execute", "sequence")
 box.schema.user.grant("guest", "read,execute", "sequence")
 box.schema.user.grant("guest", "read,write,execute", "role")
+
+-- Check entities DML
+box.schema.user.create("tester", { password  = '123' })
+s = box.schema.space.create("test")
+_ = s:create_index("primary", {parts={1, "unsigned"}})
+seq = box.schema.sequence.create("test")
+box.schema.func.create("func")
+c = (require 'net.box').connect(LISTEN.host, LISTEN.service, {user='tester', password = '123'})
+
+box.session.su("tester", s.select, s)
+box.session.su("tester", seq.set, seq, 1)
+c:call("func")
+box.schema.user.grant("tester", "read", "space")
+box.schema.user.grant("tester", "write", "sequence")
+box.schema.user.grant("tester", "execute", "function")
+box.session.su("tester", s.select, s)
+box.session.su("tester", seq.next, seq)
+c:call("func")
+
+box.session.su("tester", s.insert, s, {1})
+box.schema.user.grant("tester", "write", "space")
+box.session.su("tester", s.insert, s, {1})
+
+box.schema.user.drop("tester")
+s:drop()
+seq:drop()
+box.schema.func.drop("func")
+c:close()
+

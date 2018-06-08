@@ -222,6 +222,9 @@ vspace_filter(struct space *source, struct tuple *tuple)
 	 */
 	if (PRIV_WRDA & cr->universal_access)
 		return true;
+	/* Allow access for a user with space privileges. */
+	if (PRIV_WRDA & entity_access_get(SC_SPACE)[cr->auth_token].effective)
+		return true;
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to _space space */
 	uint32_t space_id;
@@ -295,6 +298,10 @@ vfunc_filter(struct space *source, struct tuple *tuple)
 	 */
 	if ((PRIV_WRDA | PRIV_X) & cr->universal_access)
 		return true;
+	/* Allow access for a user with function privileges. */
+	if ((PRIV_WRDA | PRIV_X) &
+	    entity_access_get(SC_FUNCTION)[cr->auth_token].effective)
+		return true;
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to _func space */
 
@@ -319,6 +326,10 @@ vsequence_filter(struct space *source, struct tuple *tuple)
 	 * drop, alter or execute privileges for universe.
 	 */
 	if ((PRIV_WRDA | PRIV_X) & cr->universal_access)
+		return true;
+	/* Allow access for a user with sequence privileges. */
+	if ((PRIV_WRDA | PRIV_X) &
+	    entity_access_get(SC_SEQUENCE)[cr->auth_token].effective)
 		return true;
 	if (PRIV_R & source->access[cr->auth_token].effective)
 		return true; /* read access to _sequence space */
