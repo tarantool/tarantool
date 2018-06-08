@@ -1150,7 +1150,7 @@ sql_vdbe_set_p4_key_def(struct Parse *parse, struct Index *idx)
 	struct Vdbe *v = parse->pVdbe;
 	assert(v != NULL);
 	assert(idx != NULL);
-	struct key_def *def = key_def_dup(sql_index_key_def(idx));
+	struct key_def *def = key_def_dup(idx->def->key_def);
 	if (def == NULL)
 		sqlite3OomFault(parse->db);
 	else

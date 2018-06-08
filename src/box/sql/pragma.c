@@ -411,9 +411,8 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			} else if (pk == NULL) {
 				k = 1;
 			} else {
-				for (k = 1; k <= def->field_count &&
-				     pk->aiColumn[k - 1] != (int) i; ++k) {
-				}
+				struct key_def *kdef = pk->def->key_def;
+				k = key_def_find(kdef, i) - kdef->parts + 1;
 			}
 			bool is_nullable = def->fields[i].is_nullable;
 			char *expr_str = def->fields[i].default_value;
@@ -456,7 +455,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					size_t avg_tuple_size_idx =
 						sql_index_tuple_size(space, idx);
 					sqlite3VdbeMultiLoad(v, 2, "sii",
-							     pIdx->zName,
+							     pIdx->def->name,
 							     avg_tuple_size_idx,
 							     index_field_tuple_est(pIdx, 0));
 					sqlite3VdbeAddOp2(v, OP_ResultRow, 1,
@@ -485,11 +484,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						 */
 						pParse->nMem = 3;
 					}
-					mx = index_column_count(pIdx);
+					mx = pIdx->def->key_def->part_count;
 					assert(pParse->nMem <=
 					       pPragma->nPragCName);
-					for (i = 0; i < mx; i++) {
-						i16 cnum = pIdx->aiColumn[i];
+					struct key_part *part =
+						pIdx->def->key_def->parts;
+					for (i = 0; i < mx; i++, part++) {
+						i16 cnum = (int) part->fieldno;
 						assert(pIdx->pTable);
 						sqlite3VdbeMultiLoad(v, 1,
 								     "iis", i,
@@ -503,19 +504,18 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 								     name);
 						if (pPragma->iArg) {
 							const char *c_n;
-							uint32_t id;
+							uint32_t id =
+								part->coll_id;
 							struct coll *coll =
-								sql_index_collation(pIdx, i, &id);
+								part->coll;
 							if (coll != NULL)
 								c_n = coll_by_id(id)->name;
 							else
 								c_n = "BINARY";
-							enum sort_order sort_order;
-							sort_order = sql_index_column_sort_order(pIdx,
-												 i);
 							sqlite3VdbeMultiLoad(v,
 									     4,
 									     "isi",
+									     part->
 									     sort_order,
 									     c_n,
 									     i <
@@ -542,16 +542,14 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					for (pIdx = pTab->pIndex, i = 0; pIdx;
 					     pIdx = pIdx->pNext, i++) {
 						const char *azOrigin[] =
-						    { "c", "u", "pk" };
+						    { "c", "u", "u", "pk" };
 						sqlite3VdbeMultiLoad(v, 1,
 								     "isisi", i,
-								     pIdx->
-								     zName,
-								     index_is_unique
-								     (pIdx),
+								     pIdx->def->name,
+								     pIdx->def->opts.is_unique,
 								     azOrigin
 								     [pIdx->
-								      idxType],
+								      index_type],
 								     pIdx->
 								     pPartIdxWhere
 								     != 0);

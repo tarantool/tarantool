@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(79)
+test:plan(78)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -374,24 +374,14 @@ test:do_catchsql_test(
         -- </index-6.1c>
     })
 
-test:do_catchsql_test(
-    "index-6.2",
-    [[
-        CREATE INDEX test1 ON test2(g1)
-    ]], {
-        -- <index-6.2>
-        1, "there is already a table named TEST1"
-        -- </index-6.2>
-    })
-
 test:do_execsql_test(
-    "index-6.2b",
+    "index-6.2",
     [[
         SELECT "name" FROM "_index" WHERE "name"='INDEX1' union SELECT "name" FROM "_space" WHERE "name"='TEST1' OR "name"='TEST2'
     ]], {
-        -- <index-6.2b>
+        -- <index-6.2>
         "INDEX1", "TEST1", "TEST2"
-        -- </index-6.2b>
+        -- </index-6.2>
     })
 
 test:do_test(
@@ -454,10 +444,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index-7.3",
     [[
-        SELECT "name" FROM "_index" WHERE "name"='sqlite_autoindex_TEST1_1'
+        SELECT "name" FROM "_index" WHERE "name"='sql_autoindex_TEST1_1'
     ]], {
         -- <index-7.3>
-        "sqlite_autoindex_TEST1_1"
+        "sql_autoindex_TEST1_1"
         -- </index-7.3>
     })
 
@@ -1015,7 +1005,7 @@ test:do_execsql_test(
     })
 
 -- Test that automatically create indices are named correctly. The current
--- convention is: "sqlite_autoindex_<table name>_<integer>"
+-- convention is: "sql_autoindex_<table name>_<integer>"
 --
 -- Then check that it is an error to try to drop any automtically created
 -- indices.
@@ -1027,18 +1017,18 @@ test:do_execsql_test(
         SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-17.1>
-        "sqlite_autoindex_T7_3", "sqlite_autoindex_T7_2", "sqlite_autoindex_T7_1"
+        "sql_autoindex_T7_3", "sql_autoindex_T7_2", "sql_autoindex_T7_1"
         -- </index-17.1>
     })
 
 -- do_test index-17.2 {
 --   catchsql {
---     DROP INDEX sqlite_autoindex_t7_1;
+--     DROP INDEX sql_autoindex_t7_1;
 --   }
 -- } {1 {index associated with UNIQUE or PRIMARY KEY constraint cannot be dropped}}
 -- do_test index-17.3 {
 --   catchsql {
---     DROP INDEX IF EXISTS sqlite_autoindex_t7_1;
+--     DROP INDEX IF EXISTS sql_autoindex_t7_1;
 --   }
 -- } {1 {index associated with UNIQUE or PRIMARY KEY constraint cannot be dropped}}
 test:do_catchsql_test(
@@ -1081,7 +1071,7 @@ test:do_execsql_test(
             INSERT INTO t7 VALUES(1);
         ]], {
             -- <index-19.2>
-            1, "Duplicate key exists in unique index 'sqlite_autoindex_T7_1' in space 'T7'"
+            1, "Duplicate key exists in unique index 'sql_autoindex_T7_1' in space 'T7'"
             -- </index-19.2>
         })
 

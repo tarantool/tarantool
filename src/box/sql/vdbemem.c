@@ -1087,15 +1087,15 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 			Index *pIdx = p->pIdx;	/* Index being probed */
 			int nByte;	/* Bytes of space to allocate */
 			int i;	/* Counter variable */
-			int nCol = index_column_count(pIdx);
+			int part_count = pIdx->def->key_def->part_count;
 
-			nByte = sizeof(Mem) * nCol +
+			nByte = sizeof(Mem) * part_count +
 				ROUND8(sizeof(UnpackedRecord));
 			pRec =
 			    (UnpackedRecord *) sqlite3DbMallocZero(db, nByte);
 			if (pRec == NULL)
 				return NULL;
-			pRec->key_def = key_def_dup(sql_index_key_def(pIdx));
+			pRec->key_def = key_def_dup(pIdx->def->key_def);
 			if (pRec->key_def == NULL) {
 				sqlite3DbFree(db, pRec);
 				sqlite3OomFault(db);
@@ -1103,7 +1103,7 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 			}
 			pRec->aMem = (Mem *)((char *) pRec +
 					     ROUND8(sizeof(UnpackedRecord)));
-			for (i = 0; i < nCol; i++) {
+			for (i = 0; i < (int) part_count; i++) {
 				pRec->aMem[i].flags = MEM_Null;
 				pRec->aMem[i].db = db;
 			}
@@ -1621,15 +1621,12 @@ sql_stat4_column(struct sqlite3 *db, const char *record, uint32_t col_num,
 void
 sqlite3Stat4ProbeFree(UnpackedRecord * pRec)
 {
-	if (pRec) {
-		int i;
-		int nCol = pRec->key_def->part_count;
-		Mem *aMem = pRec->aMem;
-		sqlite3 *db = aMem[0].db;
-		for (i = 0; i < nCol; i++) {
+	if (pRec != NULL) {
+		int part_count = pRec->key_def->part_count;
+		struct Mem *aMem = pRec->aMem;
+		for (int i = 0; i < part_count; i++)
 			sqlite3VdbeMemRelease(&aMem[i]);
-		}
-		sqlite3DbFree(db, pRec);
+		sqlite3DbFree(aMem[0].db, pRec);
 	}
 }
 

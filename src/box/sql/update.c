@@ -239,17 +239,18 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	for (j = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, j++) {
 		int reg;
-		int nIdxCol = index_column_count(pIdx);
+		uint32_t part_count = pIdx->def->key_def->part_count;
 		if (chngPk || hasFK || pIdx->pPartIdxWhere || pIdx == pPk) {
 			reg = ++pParse->nMem;
-			pParse->nMem += nIdxCol;
+			pParse->nMem += part_count;
 		} else {
 			reg = 0;
-			for (i = 0; i < nIdxCol; i++) {
-				i16 iIdxCol = pIdx->aiColumn[i];
-				if (iIdxCol < 0 || aXRef[iIdxCol] >= 0) {
+			for (uint32_t i = 0; i < part_count; i++) {
+				uint32_t fieldno =
+					pIdx->def->key_def->parts[i].fieldno;
+				if (aXRef[fieldno] >= 0) {
 					reg = ++pParse->nMem;
-					pParse->nMem += nIdxCol;
+					pParse->nMem += part_count;
 					break;
 				}
 			}
@@ -298,17 +299,18 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 * In this case we have to manually load columns in order to make tuple.
 	 */
 	int iPk;	/* First of nPk memory cells holding PRIMARY KEY value */
-	i16 nPk;	/* Number of components of the PRIMARY KEY */
+	/* Number of components of the PRIMARY KEY.  */
+	uint32_t pk_part_count;
 	int addrOpen;	/* Address of the OpenEphemeral instruction */
 
 	if (is_view) {
-		nPk = nKey;
+		pk_part_count = nKey;
 	} else {
 		assert(pPk != 0);
-		nPk = index_column_count(pPk);
+		pk_part_count = pPk->def->key_def->part_count;
 	}
 	iPk = pParse->nMem + 1;
-	pParse->nMem += nPk;
+	pParse->nMem += pk_part_count;
 	regKey = ++pParse->nMem;
 	iEph = pParse->nTab++;
 	sqlite3VdbeAddOp2(v, OP_Null, 0, iPk);
@@ -317,7 +319,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph,
 					     nKey);
 	} else {
-		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph, nPk);
+		addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph,
+					     pk_part_count);
 		sql_vdbe_set_p4_key_def(pParse, pPk);
 	}
 
@@ -327,27 +330,27 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		goto update_cleanup;
 	okOnePass = sqlite3WhereOkOnePass(pWInfo, aiCurOnePass);
 	if (is_view) {
-		for (i = 0; i < nPk; i++) {
+		for (i = 0; i < (int) pk_part_count; i++) {
 			sqlite3VdbeAddOp3(v, OP_Column, iDataCur, i, iPk + i);
 		}
 	} else {
-		for (i = 0; i < nPk; i++) {
-			assert(pPk->aiColumn[i] >= 0);
+		for (i = 0; i < (int) pk_part_count; i++) {
 			sqlite3ExprCodeGetColumnOfTable(v, def, iDataCur,
-							pPk->aiColumn[i],
+							pPk->def->key_def->
+								parts[i].fieldno,
 							iPk + i);
 		}
 	}
 
 	if (okOnePass) {
 		sqlite3VdbeChangeToNoop(v, addrOpen);
-		nKey = nPk;
+		nKey = pk_part_count;
 		regKey = iPk;
 	} else {
 		const char *zAff = is_view ? 0 :
 				   sqlite3IndexAffinityStr(pParse->db, pPk);
-		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, nPk, regKey,
-					  zAff, nPk);
+		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, pk_part_count,
+				  regKey, zAff, pk_part_count);
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, iEph, regKey);
 		/* Set flag to save memory allocating one by malloc. */
 		sqlite3VdbeChangeP5(v, 1);

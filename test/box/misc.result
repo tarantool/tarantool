@@ -490,6 +490,7 @@ t;
   163: box.error.TRANSACTION_YIELD
   164: box.error.NO_SUCH_GROUP
   165: box.error.NO_SUCH_MODULE
+  166: box.error.NO_SUCH_COLLATION
 ...
 test_run:cmd("setopt delimiter ''");
 ---

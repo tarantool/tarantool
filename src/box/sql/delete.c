@@ -267,11 +267,12 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 		/* Extract the primary key for the current row */
 		if (!is_view) {
-			for (int i = 0; i < pk_len; i++) {
+			struct key_part *part = pk_def->parts;
+			for (int i = 0; i < pk_len; i++, part++) {
 				struct space_def *def = space->def;
 				sqlite3ExprCodeGetColumnOfTable(v, def,
 								tab_cursor,
-								pk_def->parts[i].fieldno,
+								part->fieldno,
 								reg_pk + i);
 			}
 		} else {
@@ -548,13 +549,14 @@ sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
 			*part_idx_label = 0;
 		}
 	}
-	int col_cnt = index_column_count(index);
+	int col_cnt = index->def->key_def->part_count;
 	int reg_base = sqlite3GetTempRange(parse, col_cnt);
 	if (prev != NULL && (reg_base != reg_prev ||
 			     prev->pPartIdxWhere != NULL))
 		prev = NULL;
 	for (int j = 0; j < col_cnt; j++) {
-		if (prev != NULL && prev->aiColumn[j] == index->aiColumn[j]) {
+		if (prev != NULL && prev->def->key_def->parts[j].fieldno ==
+				    index->def->key_def->parts[j].fieldno) {
 			/*
 			 * This column was already computed by the
 			 * previous index.

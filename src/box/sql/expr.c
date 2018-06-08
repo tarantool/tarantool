@@ -2405,21 +2405,28 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 			     pIdx = pIdx->pNext) {
 				Bitmask colUsed; /* Columns of the index used */
 				Bitmask mCol;	/* Mask for the current column */
-				if (pIdx->nColumn < nExpr)
+				uint32_t part_count =
+					pIdx->def->key_def->part_count;
+				struct key_part *parts =
+					pIdx->def->key_def->parts;
+				if ((int)part_count < nExpr)
 					continue;
 				/* Maximum nColumn is BMS-2, not BMS-1, so that we can compute
 				 * BITMASK(nExpr) without overflowing
 				 */
-				testcase(pIdx->nColumn == BMS - 2);
-				testcase(pIdx->nColumn == BMS - 1);
-				if (pIdx->nColumn >= BMS - 1)
+				testcase(part_count == BMS - 2);
+				testcase(part_count == BMS - 1);
+				if (part_count >= BMS - 1)
 					continue;
-				if (mustBeUnique) {
-					if (pIdx->nColumn > nExpr
-					    || (pIdx->nColumn > nExpr
-					    && !index_is_unique(pIdx))) {
-							continue;	/* This index is not unique over the IN RHS columns */
-					}
+				if (mustBeUnique &&
+				    ((int)part_count > nExpr ||
+				     !pIdx->def->opts.is_unique)) {
+					/*
+					 * This index is not
+					 * unique over the IN RHS
+					 * columns.
+					 */
+					continue;
 				}
 
 				colUsed = 0;	/* Columns of index used so far */
@@ -2432,16 +2439,15 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 					int j;
 
 					for (j = 0; j < nExpr; j++) {
-						if (pIdx->aiColumn[j] !=
-						    pRhs->iColumn) {
+						if ((int) parts[j].fieldno !=
+						    pRhs->iColumn)
 							continue;
-						}
-						struct coll *idx_coll;
-						idx_coll = sql_index_collation(pIdx, j, &id);
+
+						struct coll *idx_coll =
+							     parts[j].coll;
 						if (pReq != NULL &&
-						    pReq != idx_coll) {
+						    pReq != idx_coll)
 							continue;
-						}
 						break;
 					}
 					if (j == nExpr)
@@ -2466,7 +2472,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							  0, 0, 0,
 							  sqlite3MPrintf(db,
 							  "USING INDEX %s FOR IN-OPERATOR",
-							  pIdx->zName),
+							  pIdx->def->name),
 							  P4_DYNAMIC);
 					struct space *space =
 						space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
@@ -2475,12 +2481,11 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 									 tnum);
 					vdbe_emit_open_cursor(pParse, iTab,
 							      idx_id, space);
-					VdbeComment((v, "%s", pIdx->zName));
+					VdbeComment((v, "%s", pIdx->def->name));
 					assert(IN_INDEX_INDEX_DESC ==
 					       IN_INDEX_INDEX_ASC + 1);
 					eType = IN_INDEX_INDEX_ASC +
-						sql_index_column_sort_order(pIdx,
-									    0);
+						parts[0].sort_order;
 
 					if (prRhsHasNull) {
 #ifdef SQLITE_ENABLE_COLUMN_USED_MASK
@@ -2502,7 +2507,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							/* Tarantool: Check for null is performed on first key of the index.  */
 							sqlite3SetHasNullFlag(v,
 									      iTab,
-									      pIdx->aiColumn[0],
+									      parts[0].fieldno,
 									      *prRhsHasNull);
 						}
 					}
@@ -3140,12 +3145,12 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		struct Index *pk = sqlite3PrimaryKeyIndex(tab);
 		assert(pk);
 
+		uint32_t fieldno = pk->def->key_def->parts[0].fieldno;
 		enum affinity_type affinity =
-			tab->def->fields[pk->aiColumn[0]].affinity;
-		if (pk->nColumn == 1
-		    && affinity == AFFINITY_INTEGER
-		    && pk->aiColumn[0] < nVector) {
-			int reg_pk = rLhs + pk->aiColumn[0];
+			tab->def->fields[fieldno].affinity;
+		if (pk->def->key_def->part_count == 1 &&
+		    affinity == AFFINITY_INTEGER && (int)fieldno < nVector) {
+			int reg_pk = rLhs + (int)fieldno;
 			sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
 		}
 	}
@@ -3477,7 +3482,7 @@ sqlite3ExprCodeLoadIndexColumn(Parse * pParse,	/* The parsing context */
 			       int regOut	/* Store the index column value in this register */
     )
 {
-	i16 iTabCol = pIdx->aiColumn[iIdxCol];
+	i16 iTabCol = pIdx->def->key_def->parts[iIdxCol].fieldno;
 	sqlite3ExprCodeGetColumnOfTable(pParse->pVdbe, pIdx->pTable->def,
 					iTabCur, iTabCol, regOut);
 }

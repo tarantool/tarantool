@@ -553,7 +553,7 @@ future1:wait_result()
 future2:wait_result()
 ---
 - null
-- 'Failed to execute SQL statement: Duplicate key exists in unique index ''sqlite_autoindex_TEST_1''
+- 'Failed to execute SQL statement: Duplicate key exists in unique index ''sql_autoindex_TEST_1''
   in space ''TEST'''
 ...
 future3:wait_result()

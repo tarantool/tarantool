@@ -213,7 +213,6 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 		     int **paiCol	/* OUT: Map of index columns in pFKey */
     )
 {
-	Index *pIdx = 0;	/* Value to return via *ppIdx */
 	int *aiCol = 0;		/* Value to return via *paiCol */
 	int nCol = pFKey->nCol;	/* Number of columns in parent key */
 	char *zKey = pFKey->aCol[0].zCol;	/* Name of left-most parent key column */
@@ -255,83 +254,86 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 		*paiCol = aiCol;
 	}
 
-	for (pIdx = pParent->pIndex; pIdx; pIdx = pIdx->pNext) {
-		int nIdxCol = index_column_count(pIdx);
-		if (nIdxCol == nCol && index_is_unique(pIdx)
-		    && pIdx->pPartIdxWhere == 0) {
-			/* pIdx is a UNIQUE index (or a PRIMARY KEY) and has the right number
-			 * of columns. If each indexed column corresponds to a foreign key
-			 * column of pFKey, then this index is a winner.
+	struct Index *index = NULL;
+	for (index = pParent->pIndex; index != NULL; index = index->pNext) {
+		int part_count = index->def->key_def->part_count;
+		if (part_count != nCol || !index->def->opts.is_unique ||
+		    index->pPartIdxWhere != NULL)
+			continue;
+		/*
+		 * Index is a UNIQUE index (or a PRIMARY KEY) and
+		 * has the right number of columns. If each
+		 * indexed column corresponds to a foreign key
+		 * column of pFKey, then this index is a winner.
+		 */
+		if (zKey == NULL) {
+			/*
+			 * If zKey is NULL, then this foreign key
+			 * is implicitly mapped to the PRIMARY KEY
+			 * of table pParent. The PRIMARY KEY index
+			 * may be identified by the test.
 			 */
-
-			if (zKey == 0) {
-				/* If zKey is NULL, then this foreign key is implicitly mapped to
-				 * the PRIMARY KEY of table pParent. The PRIMARY KEY index may be
-				 * identified by the test.
+			if (IsPrimaryKeyIndex(index)) {
+				if (aiCol != NULL) {
+					for (int i = 0; i < nCol; i++)
+						aiCol[i] = pFKey->aCol[i].iFrom;
+				}
+				break;
+			}
+		} else {
+			/*
+			 * If zKey is non-NULL, then this foreign
+			 * key was declared to map to an explicit
+			 * list of columns in table pParent. Check
+			 * if this index matches those columns.
+			 * Also, check that the index uses the
+			 * default collation sequences for each
+			 * column.
+			 */
+			int i, j;
+			struct key_part *part = index->def->key_def->parts;
+			for (i = 0; i < nCol; i++, part++) {
+				/*
+				 * Index of column in parent
+				 * table.
 				 */
-				if (IsPrimaryKeyIndex(pIdx)) {
-					if (aiCol) {
-						int i;
-						for (i = 0; i < nCol; i++)
-							aiCol[i] =
-							    pFKey->aCol[i].
-							    iFrom;
-					}
+				i16 iCol = (int) part->fieldno;
+				/*
+				 * If the index uses a collation
+				 * sequence that is different from
+				 * the default collation sequence
+				 * for the column, this index is
+				 * unusable. Bail out early in
+				 * this case.
+				 */
+				uint32_t id;
+				struct coll *def_coll =
+					sql_column_collation(pParent->def,
+							     iCol, &id);
+				struct coll *coll = part->coll;
+				if (def_coll != coll)
+					break;
+
+				char *zIdxCol = pParent->def->fields[iCol].name;
+				for (j = 0; j < nCol; j++) {
+					if (strcmp(pFKey->aCol[j].zCol,
+						   zIdxCol) != 0)
+						continue;
+					if (aiCol)
+						aiCol[i] = pFKey->aCol[j].iFrom;
 					break;
 				}
-			} else {
-				/* If zKey is non-NULL, then this foreign key was declared to
-				 * map to an explicit list of columns in table pParent. Check if this
-				 * index matches those columns. Also, check that the index uses
-				 * the default collation sequences for each column.
-				 */
-				int i, j;
-				for (i = 0; i < nCol; i++) {
-					i16 iCol = pIdx->aiColumn[i];	/* Index of column in parent tbl */
-					char *zIdxCol;	/* Name of indexed column */
-
-					if (iCol < 0)
-						break;	/* No foreign keys against expression indexes */
-
-					/* If the index uses a collation sequence that is different from
-					 * the default collation sequence for the column, this index is
-					 * unusable. Bail out early in this case.
-					 */
-					struct coll *def_coll;
-					uint32_t id;
-					def_coll = sql_column_collation(pParent->def,
-									iCol,
-									&id);
-					struct coll *coll =
-						sql_index_collation(pIdx, i,
-								    &id);
-					if (def_coll != coll)
-						break;
-
-					zIdxCol =
-						pParent->def->fields[iCol].name;
-					for (j = 0; j < nCol; j++) {
-						if (strcmp
-						    (pFKey->aCol[j].zCol,
-						     zIdxCol) == 0) {
-							if (aiCol)
-								aiCol[i] =
-								    pFKey->
-								    aCol[j].
-								    iFrom;
-							break;
-						}
-					}
-					if (j == nCol)
-						break;
-				}
-				if (i == nCol)
-					break;	/* pIdx is usable */
+				if (j == nCol)
+					break;
+			}
+			if (i == nCol) {
+				/* Index is usable. */
+				break;
 			}
 		}
 	}
 
-	if (!pIdx) {
+	if (index == NULL) {
 		if (!pParse->disableTriggers) {
 			sqlite3ErrorMsg(pParse,
 					"foreign key mismatch - \"%w\" referencing \"%w\"",
@@ -341,7 +343,7 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 		return 1;
 	}
 
-	*ppIdx = pIdx;
+	*ppIdx = index;
 	return 0;
 }
 
@@ -461,14 +463,15 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			 */
 			if (pTab == pFKey->pFrom && nIncr == 1) {
 				int iJump =
-				    sqlite3VdbeCurrentAddr(v) + nCol + 1;
-				for (i = 0; i < nCol; i++) {
+					sqlite3VdbeCurrentAddr(v) + nCol + 1;
+				struct key_part *part =
+					pIdx->def->key_def->parts;
+				for (i = 0; i < nCol; ++i, ++part) {
 					int iChild = aiCol[i] + 1 + regData;
-					int iParent =
-					    pIdx->aiColumn[i] + 1 + regData;
-					assert(pIdx->aiColumn[i] >= 0);
+					int iParent = 1 + regData +
+						      (int)part->fieldno;
 					assert(aiCol[i] != pTab->iPKey);
-					if (pIdx->aiColumn[i] == pTab->iPKey) {
+					if ((int)part->fieldno == pTab->iPKey) {
 						/* The parent key is a composite key that includes the IPK column */
 						iParent = regData;
 					}
@@ -615,16 +618,15 @@ fkScanChildren(Parse * pParse,	/* Parse context */
     )
 {
 	sqlite3 *db = pParse->db;	/* Database handle */
-	int i;			/* Iterator variable */
 	Expr *pWhere = 0;	/* WHERE clause to scan with */
 	NameContext sNameContext;	/* Context used to resolve WHERE clause */
 	WhereInfo *pWInfo;	/* Context used by sqlite3WhereXXX() */
 	int iFkIfZero = 0;	/* Address of OP_FkIfZero */
 	Vdbe *v = sqlite3GetVdbe(pParse);
 
-	assert(pIdx == 0 || pIdx->pTable == pTab);
-	assert(pIdx == 0 || (int)index_column_count(pIdx) == pFKey->nCol);
-	assert(pIdx != 0);
+	assert(pIdx == NULL || pIdx->pTable == pTab);
+	assert(pIdx == NULL || (int) pIdx->def->key_def->part_count == pFKey->nCol);
+	assert(pIdx != NULL);
 
 	if (nIncr < 0) {
 		iFkIfZero =
@@ -640,19 +642,20 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 	 * the parent key columns. The affinity of the parent key column should
 	 * be applied to each child key value before the comparison takes place.
 	 */
-	for (i = 0; i < pFKey->nCol; i++) {
+	for (int i = 0; i < pFKey->nCol; i++) {
 		Expr *pLeft;	/* Value from parent table row */
 		Expr *pRight;	/* Column ref to child table */
 		Expr *pEq;	/* Expression (pLeft = pRight) */
 		i16 iCol;	/* Index of column in child table */
-		const char *zCol;	/* Name of column in child table */
+		const char *column_name;
 
-		iCol = pIdx ? pIdx->aiColumn[i] : -1;
+		iCol = pIdx != NULL ?
+		       (int) pIdx->def->key_def->parts[i].fieldno : -1;
 		pLeft = exprTableRegister(pParse, pTab, regData, iCol);
 		iCol = aiCol ? aiCol[i] : pFKey->aCol[0].iFrom;
 		assert(iCol >= 0);
-		zCol = pFKey->pFrom->def->fields[iCol].name;
-		pRight = sqlite3Expr(db, TK_ID, zCol);
+		column_name = pFKey->pFrom->def->fields[iCol].name;
+		pRight = sqlite3Expr(db, TK_ID, column_name);
 		pEq = sqlite3PExpr(pParse, TK_EQ, pLeft, pRight);
 		pWhere = sqlite3ExprAnd(db, pWhere, pEq);
 	}
@@ -671,15 +674,14 @@ fkScanChildren(Parse * pParse,	/* Parse context */
 
 		Expr *pEq, *pAll = 0;
 		Index *pPk = sqlite3PrimaryKeyIndex(pTab);
-		assert(pIdx != 0);
-		int col_count = index_column_count(pPk);
-		for (i = 0; i < col_count; i++) {
-			i16 iCol = pIdx->aiColumn[i];
-			assert(iCol >= 0);
-			pLeft = exprTableRegister(pParse, pTab, regData, iCol);
-			pRight =
-				exprTableColumn(db, pTab->def,
-						pSrc->a[0].iCursor, iCol);
+		assert(pIdx != NULL);
+		uint32_t part_count = pPk->def->key_def->part_count;
+		for (uint32_t i = 0; i < part_count; i++) {
+			uint32_t fieldno = pIdx->def->key_def->parts[i].fieldno;
+			pLeft = exprTableRegister(pParse, pTab, regData,
+						  fieldno);
+			pRight = exprTableColumn(db, pTab->def,
+						 pSrc->a[0].iCursor, fieldno);
 			pEq = sqlite3PExpr(pParse, TK_EQ, pLeft, pRight);
 			pAll = sqlite3ExprAnd(db, pAll, pEq);
 		}
@@ -984,7 +986,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 			if (aiCol[i] == pTab->iPKey) {
 				aiCol[i] = -1;
 			}
-			assert(pIdx == 0 || pIdx->aiColumn[i] >= 0);
 		}
 
 		pParse->nTab++;
@@ -1109,19 +1110,19 @@ sqlite3FkOldmask(Parse * pParse,	/* Parse context */
 
 	if (user_session->sql_flags & SQLITE_ForeignKeys) {
 		FKey *p;
-		int i;
 		for (p = pTab->pFKey; p; p = p->pNextFrom) {
-			for (i = 0; i < p->nCol; i++)
+			for (int i = 0; i < p->nCol; i++)
 				mask |= COLUMN_MASK(p->aCol[i].iFrom);
 		}
 		for (p = sqlite3FkReferences(pTab); p; p = p->pNextTo) {
 			Index *pIdx = 0;
 			sqlite3FkLocateIndex(pParse, pTab, p, &pIdx, 0);
-			if (pIdx) {
-				int nIdxCol = index_column_count(pIdx);
-				for (i = 0; i < nIdxCol; i++) {
-					assert(pIdx->aiColumn[i] >= 0);
-					mask |= COLUMN_MASK(pIdx->aiColumn[i]);
+			if (pIdx != NULL) {
+				uint32_t part_count =
+					pIdx->def->key_def->part_count;
+				for (uint32_t i = 0; i < part_count; i++) {
+					mask |= COLUMN_MASK(pIdx->def->
+						key_def->parts[i].fieldno);
 				}
 			}
 		}
@@ -1265,11 +1266,12 @@ fkActionTrigger(struct Parse *pParse, struct Table *pTab, struct FKey *pFKey,
 			       || (pTab->iPKey >= 0
 				   && pTab->iPKey <
 				      (int)pTab->def->field_count));
-			assert(pIdx == 0 || pIdx->aiColumn[i] >= 0);
+
+			uint32_t fieldno = pIdx != NULL ?
+					   pIdx->def->key_def->parts[i].fieldno :
+					   (uint32_t)pTab->iPKey;
 			sqlite3TokenInit(&tToCol,
-					 pTab->def->fields[pIdx ? pIdx->
-						    aiColumn[i] : pTab->iPKey].
-					 name);
+					 pTab->def->fields[fieldno].name);
 			sqlite3TokenInit(&tFromCol,
 					 pFKey->pFrom->def->fields[
 						iFromCol].name);

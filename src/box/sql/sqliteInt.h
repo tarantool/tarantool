@@ -2066,30 +2066,29 @@ struct UnpackedRecord {
 };
 
 /*
+ * Possible SQL index types. Note that PK and UNIQUE constraints
+ * are implemented as indexes and have their own types:
+ * SQL_INDEX_TYPE_CONSTRAINT_PK and
+ * SQL_INDEX_TYPE_CONSTRAINT_UNIQUE.
+ */
+enum sql_index_type {
+    SQL_INDEX_TYPE_NON_UNIQUE = 0,
+    SQL_INDEX_TYPE_UNIQUE,
+    SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
+    SQL_INDEX_TYPE_CONSTRAINT_PK,
+};
+
+/* Return true if index X is a PRIMARY KEY index */
+#define IsPrimaryKeyIndex(X)  ((X)->index_type==SQL_INDEX_TYPE_CONSTRAINT_PK)
+
+/* Return true if index X is a UNIQUE index */
+#define IsUniqueIndex(X)  (((X)->index_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE) || \
+			   ((X)->index_type == SQL_INDEX_TYPE_CONSTRAINT_PK) || \
+			   ((X)->index_type == SQL_INDEX_TYPE_UNIQUE))
+
+/*
  * Each SQL index is represented in memory by an
  * instance of the following structure.
- *
- * The columns of the table that are to be indexed are described
- * by the aiColumn[] field of this structure.  For example, suppose
- * we have the following table and index:
- *
- *     CREATE TABLE Ex1(c1 int, c2 int, c3 text);
- *     CREATE INDEX Ex2 ON Ex1(c3,c1);
- *
- * In the Table structure describing Ex1, nCol==3 because there are
- * three columns in the table.  In the Index structure describing
- * Ex2, nColumn==2 since 2 of the 3 columns of Ex1 are indexed.
- * The value of aiColumn is {2, 0}.  aiColumn[0]==2 because the
- * first column to be indexed (c3) has an index of 2 in Ex1.aCol[].
- * The second column to be indexed (c1) has an index of 0 in
- * Ex1.aCol[], hence Ex2.aiColumn[1]==0.
- *
- * The Index.onError field determines whether or not the indexed columns
- * must be unique and what to do if they are not.  When Index.onError=
- * ON_CONFLICT_ACTION_NONE, it means this is not a unique index.
- * Otherwise it is a unique index and the value of Index.onError indicate
- * the which conflict resolution algorithm to employ whenever an attempt
- * is made to insert a non-unique element.
  *
  * While parsing a CREATE TABLE or CREATE INDEX statement in order to
  * generate VDBE code (as opposed to reading from Tarantool's _space
@@ -2100,26 +2099,32 @@ struct UnpackedRecord {
  * program is executed). See convertToWithoutRowidTable() for details.
  */
 struct Index {
-	char *zName;		/* Name of this index */
-	i16 *aiColumn;		/* Which columns are used by this index.  1st is 0 */
-	LogEst *aiRowLogEst;	/* From ANALYZE: Est. rows selected by each column */
-	Table *pTable;		/* The SQL table being indexed */
-	char *zColAff;		/* String defining the affinity of each column */
-	Index *pNext;		/* The next index associated with the same table */
-	Schema *pSchema;	/* Schema containing this index */
-	/** Sorting order for each column. */
-	enum sort_order *sort_order;
-	/** Array of collation sequences for index. */
-	struct coll **coll_array;
-	/** Array of collation identifiers. */
-	uint32_t *coll_id_array;
-	Expr *pPartIdxWhere;	/* WHERE clause for partial indices */
-	int tnum;		/* DB Page containing root of this index */
-	u16 nColumn;		/* Number of columns stored in the index */
-	u8 onError;		/* ON_CONFLICT_ACTION_ABORT, _IGNORE, _REPLACE,
-				 * or _NONE
-				 */
-	unsigned idxType:2;	/* 1==UNIQUE, 2==PRIMARY KEY, 0==CREATE INDEX */
+	/** The SQL table being indexed. */
+	Table *pTable;
+	/** String defining the affinity of each column. */
+	char *zColAff;
+	/** The next index associated with the same table. */
+	Index *pNext;
+	/** Schema containing this index. */
+	Schema *pSchema;
+	/** WHERE clause for partial indices. */
+	Expr *pPartIdxWhere;
+	/** DB Page containing root of this index. */
+	int tnum;
+	/**
+	 * Conflict resolution algorithm to employ whenever an
+	 * attempt is made to insert a non-unique element in
+	 * unique index.
+	 */
+	u8 onError;
+	/**
+	 * Index type: non-unique index, unique index, index
+	 * implementing UNIQUE constraint or index implementing
+	 * PK constraint.
+	 */
+	enum sql_index_type index_type;
+	/** Index definition. */
+	struct index_def *def;
 };
 
 /**
@@ -2143,20 +2148,6 @@ struct Index {
  */
 log_est_t
 index_field_tuple_est(struct Index *idx, uint32_t field);
-
-/*
- * Allowed values for Index.idxType
- */
-#define SQLITE_IDXTYPE_APPDEF      0	/* Created using CREATE INDEX */
-#define SQLITE_IDXTYPE_UNIQUE      1	/* Implements a UNIQUE constraint */
-#define SQLITE_IDXTYPE_PRIMARYKEY  2	/* Is the PRIMARY KEY for the table */
-
-/* Return true if index X is a PRIMARY KEY index */
-#define IsPrimaryKeyIndex(X)  ((X)->idxType==SQLITE_IDXTYPE_PRIMARYKEY)
-
-/* Return true if index X is a UNIQUE index */
-#define IsUniqueIndex(X)      (((X)->idxType == SQLITE_IDXTYPE_UNIQUE) || \
-				((X)->idxType == SQLITE_IDXTYPE_PRIMARYKEY))
 
 #ifdef DEFAULT_TUPLE_COUNT
 #undef DEFAULT_TUPLE_COUNT
@@ -3540,34 +3531,6 @@ void sqlite3AddCollateType(Parse *, Token *);
  */
 struct coll *
 sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id);
-/**
- * Return name of given column collation from index.
- *
- * @param idx Index which is used to fetch column.
- * @param column Number of column.
- * @param[out] coll_id Collation identifier.
- * @retval Pointer to collation.
- */
-struct coll *
-sql_index_collation(Index *idx, uint32_t column, uint32_t *id);
-
-/**
- * Return key_def of provided struct Index.
- * @param idx Pointer to `struct Index` object.
- * @retval Pointer to `struct key_def`.
- */
-struct key_def*
-sql_index_key_def(struct Index *idx);
-
-/**
- * Return sort order of given column from index.
- *
- * @param idx Index which is used to fetch column.
- * @param column Number of column.
- * @retval Sort order of requested column.
- */
-enum sort_order
-sql_index_column_sort_order(Index *idx, uint32_t column);
 
 void sqlite3EndTable(Parse *, Token *, Token *, Select *);
 
@@ -3654,9 +3617,6 @@ void sqlite3SrcListShiftJoinType(SrcList *);
 void sqlite3SrcListAssignCursors(Parse *, SrcList *);
 void sqlite3IdListDelete(sqlite3 *, IdList *);
 void sqlite3SrcListDelete(sqlite3 *, SrcList *);
-Index *sqlite3AllocateIndexObject(sqlite3 *, i16, int, char **);
-bool
-index_is_unique(Index *);
 
 /**
  * Create a new index for an SQL table.  name is the name of the
@@ -3678,7 +3638,7 @@ index_is_unique(Index *);
  * @param on_error One of ON_CONFLICT_ACTION_ABORT, _IGNORE,
  *        _REPLACE, or _NONE.
  * @param start The CREATE token that begins this statement.
- * @param pi_where WHERE clause for partial indices.
+ * @param where WHERE clause for partial indices.
  * @param sort_order Sort order of primary key when pList==NULL.
  * @param if_not_exist Omit error if index already exists.
  * @param idx_type The index type.
@@ -3686,8 +3646,9 @@ index_is_unique(Index *);
 void
 sql_create_index(struct Parse *parse, struct Token *token,
 		 struct SrcList *tbl_name, struct ExprList *col_list,
-		 int on_error, struct Token *start, struct Expr *pi_where,
-		 enum sort_order sort_order, bool if_not_exist, u8 idx_type);
+		 enum on_conflict_action on_error, struct Token *start,
+		 struct Expr *where, enum sort_order sort_order,
+		 bool if_not_exist, enum sql_index_type idx_type);
 
 /**
  * This routine will drop an existing named index.  This routine
@@ -4541,10 +4502,6 @@ int sqlite3InvokeBusyHandler(BusyHandler *);
 int
 sql_analysis_load(struct sqlite3 *db);
 
-uint32_t
-index_column_count(const Index *);
-bool
-index_is_unique_not_null(const Index *);
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
 void sqlite3SchemaClear(sqlite3 *);

@@ -388,7 +388,7 @@ test:do_catchsql_test(
         CREATE INDEX i1v1 ON v1(xyz);
     ]], {
         -- <view-4.5>
-        1, "views may not be indexed"
+        1, "views can not be indexed"
         -- </view-4.5>
     })
 

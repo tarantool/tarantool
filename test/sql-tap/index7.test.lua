@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(5)
+test:plan(11)
 
 --!./tcltestrunner.lua
 -- 2013-11-04
@@ -48,7 +48,7 @@ end
 -- do_test index7-1.1a {
 --   capture_pragma db out {PRAGMA index_list(t1)}
 --   db eval {SELECT "name", "partial", '|' FROM out ORDER BY "name"}
--- } {sqlite_autoindex_t1_1 0 | t1a 1 | t1b 1 |}
+-- } {sql_autoindex_t1_1 0 | t1a 1 | t1b 1 |}
 -- # Make sure the count(*) optimization works correctly with
 -- # partial indices.  Ticket [a5c8ed66cae16243be6] 2013-10-03.
 -- #
@@ -302,5 +302,105 @@ test:do_catchsql_test(
     ]], {
         1, "keyword \"WHERE\" is reserved"
     })
+
+-- Currently, when a user tries to create index (or primary key,
+-- since we implement them as indexes underhood) with duplicated
+-- fields (like 'CREATE INDEX i1 ON t(a, a, a, a, b, c, b)')
+-- tarantool would silently remove duplicated fields and
+-- execute 'CREATE INDEX i1 ON t(a, b, c)'.
+-- This test checks that duplicates are removed correctly.
+--
+test:do_catchsql_test(
+        "index7-8.1",
+        [[
+            CREATE TABLE t(a,b,c, PRIMARY KEY(a));
+            CREATE INDEX i1 ON t(a, a, b, c, c, b, b, b, c, b, c);
+            pragma index_info = t.i1;
+        ]],
+        {0, {0,0,"A",1,1,"B",2,2,"C"}}
+)
+
+-- There was the following bug:
+-- > CREATE TABLE t1(a,b,c,d, PRIMARY KEY(a,a,a,b,c));
+-- ...
+-- > CREATE INDEX i1 ON t1(b,c,a,c)
+-- ...
+-- But index 'i1' was not actually created and no error was raised.
+-- This test checks that this does not happen anymore (and index is
+-- created successfully).
+--
+test:do_catchsql_test(
+        "index7-8.2",
+        [[
+            CREATE TABLE test4(a,b,c,d, PRIMARY KEY(a,a,a,b,c));
+            CREATE INDEX index1 on test4(b,c,a,c);
+            SELECT "_index"."name"
+            FROM "_index" JOIN "_space" WHERE
+                "_index"."id" = "_space"."id" AND
+                "_space"."name"='TEST4'       AND
+                "_index"."name"='INDEX1';
+        ]],
+        {0, {'INDEX1'}})
+
+-- This test checks that CREATE TABLE statement with PK constraint
+-- and NON-NAMED UNIQUE constraint (declared on THE SAME COLUMNS)
+-- creates only one index - for PK constraint.
+--
+test:do_catchsql_test(
+        "index7-8.3",
+        [[
+            CREATE TABLE test5(a,b,c,d, PRIMARY KEY(a), UNIQUE(a));
+            SELECT "_index"."name", "_index"."iid"
+            FROM "_index" JOIN "_space" WHERE
+                "_index"."id" = "_space"."id" AND
+                "_space"."name"='TEST5';
+        ]],
+        {0, {"sql_autoindex_TEST5_1",0}})
+
+-- This test checks that CREATE TABLE statement with PK constraint
+-- and NAMED UNIQUE constraint (declared on THE SAME COLUMNS)
+-- creates two indexes - for PK constraint and for UNIQUE
+-- constraint.
+--
+test:do_catchsql_test(
+        "index7-8.4",
+        [[
+            CREATE TABLE test6(a,b,c,d, PRIMARY KEY(a), CONSTRAINT c1 UNIQUE(a));
+            SELECT "_index"."name", "_index"."iid"
+            FROM "_index" JOIN "_space" WHERE
+                "_index"."id" = "_space"."id" AND
+                "_space"."name"='TEST6';
+        ]],
+        {0, {"sql_autoindex_TEST6_1",0,"unique_constraint_C1",1}})
+
+-- This test checks that CREATE TABLE statement with PK constraint
+-- and UNIQUE constraint is executed correctly
+-- (no matter if UNIQUE precedes PK or not).
+--
+test:do_catchsql_test(
+        "index7-8.5",
+        [[
+            CREATE TABLE test7(a,b,c,d, UNIQUE(a), PRIMARY KEY(a));
+            SELECT "_index"."name", "_index"."iid"
+            FROM "_index" JOIN "_space" WHERE
+                "_index"."id" = "_space"."id" AND
+                "_space"."name"='TEST7';
+        ]],
+        {0, {"sql_autoindex_TEST7_1",0}})
+
+
+-- This test is the same as previous, but with named UNIQUE
+-- constraint.
+--
+test:do_catchsql_test(
+        "index7-8.6",
+        [[
+            CREATE TABLE test8(a,b,c,d, CONSTRAINT c1 UNIQUE(a), PRIMARY KEY(a));
+            SELECT "_index"."name", "_index"."iid"
+            FROM "_index" JOIN "_space" WHERE
+                "_index"."id" = "_space"."id" AND
+                "_space"."name"='TEST8';
+        ]],
+        {0, {"sql_autoindex_TEST8_2",0,"unique_constraint_C1",1}})
 
 test:finish_test()

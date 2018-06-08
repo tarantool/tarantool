@@ -4399,7 +4399,7 @@ sqlite3IndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 		char *zIndexedBy = pFrom->u1.zIndexedBy;
 		Index *pIdx;
 		for (pIdx = pTab->pIndex;
-		     pIdx && strcmp(pIdx->zName, zIndexedBy);
+		     pIdx && strcmp(pIdx->def->name, zIndexedBy);
 		     pIdx = pIdx->pNext) ;
 		if (!pIdx) {
 			sqlite3ErrorMsg(pParse, "no such index: %s", zIndexedBy,

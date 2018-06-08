@@ -13,7 +13,7 @@ test:do_catchsql_test(
     "CREATE TABLE t2 (a int primary key);")
 
 local insert_err = {1, "UNIQUE constraint failed: T2.A"}
-local insert_err_PK = {1, "Duplicate key exists in unique index 'sqlite_autoindex_T2_1' in space 'T2'"}
+local insert_err_PK = {1, "Duplicate key exists in unique index 'sql_autoindex_T2_1' in space 'T2'"}
 local data = {
 --id|TRIG TYPE|INSERT TYPE|insert error|commit error| result
  {1, "AFTER", "or abort",   insert_err_PK, {0},          {1,1,2}},

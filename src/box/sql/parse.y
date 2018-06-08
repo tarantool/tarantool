@@ -282,7 +282,7 @@ ccons ::= PRIMARY KEY sortorder(Z) onconf(R) autoinc(I).
                                  {sqlite3AddPrimaryKey(pParse,0,R,I,Z);}
 ccons ::= UNIQUE onconf(R).      {sql_create_index(pParse,0,0,0,R,0,0,
 						   SORT_ORDER_ASC, false,
-						   SQLITE_IDXTYPE_UNIQUE);}
+						   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
 ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
 ccons ::= REFERENCES nm(T) eidlist_opt(TA) refargs(R).
                                  {sqlite3CreateForeignKey(pParse,0,&T,TA,R);}
@@ -333,7 +333,7 @@ tcons ::= PRIMARY KEY LP sortlist(X) autoinc(I) RP onconf(R).
 tcons ::= UNIQUE LP sortlist(X) RP onconf(R).
                                  {sql_create_index(pParse,0,0,X,R,0,0,
 						   SORT_ORDER_ASC,false,
-						   SQLITE_IDXTYPE_UNIQUE);}
+						   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
 tcons ::= CHECK LP expr(E) RP onconf.
                                  {sql_add_check_constraint(pParse,&E);}
 tcons ::= FOREIGN KEY LP eidlist(FA) RP
@@ -1186,13 +1186,15 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 //
 cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP. {
-  sql_create_index(pParse, &X, sqlite3SrcListAppend(pParse->db,0,&Y), Z, U, &S,
-                   NULL, SORT_ORDER_ASC, NE, SQLITE_IDXTYPE_APPDEF);
+  enum on_conflict_action on_error =
+          U ? ON_CONFLICT_ACTION_ABORT : ON_CONFLICT_ACTION_NONE;
+  sql_create_index(pParse, &X, sqlite3SrcListAppend(pParse->db,0,&Y), Z,
+                   on_error, &S, NULL, SORT_ORDER_ASC, NE, U);
 }
 
 %type uniqueflag {int}
-uniqueflag(A) ::= UNIQUE.  {A = ON_CONFLICT_ACTION_ABORT;}
-uniqueflag(A) ::= .        {A = ON_CONFLICT_ACTION_NONE;}
+uniqueflag(A) ::= UNIQUE.  {A = SQL_INDEX_TYPE_UNIQUE;}
+uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
 
 
 // The eidlist non-terminal (Expression Id List) generates an ExprList

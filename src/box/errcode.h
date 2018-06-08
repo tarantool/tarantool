@@ -218,6 +218,7 @@ struct errcode_record {
 	/*163 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 	/*164 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
 	/*165 */_(ER_NO_SUCH_MODULE,		"Module '%s' does not exist") \
+	/*166 */_(ER_NO_SUCH_COLLATION,		"Collation '%s' does not exist") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

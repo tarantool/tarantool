@@ -823,8 +823,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	for (pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext) {
 		int addrRewind;	/* Address of "OP_Rewind iIdxCur" */
 		int addrNextRow;	/* Address of "next_row:" */
-		const char *zIdxName;	/* Name of the index */
-		int nColTest;	/* Number of columns to test for changes */
+		const char *idx_name;	/* Name of the index */
 
 		if (pOnlyIdx && pOnlyIdx != pIdx)
 			continue;
@@ -832,17 +831,16 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * names. Thus, for the sake of clarity, use
 		 * instead more familiar table name.
 		 */
-		if (IsPrimaryKeyIndex(pIdx)) {
-			zIdxName = pTab->def->name;
-		} else {
-			zIdxName = pIdx->zName;
-		}
-		nColTest = index_column_count(pIdx);
+		if (IsPrimaryKeyIndex(pIdx))
+			idx_name = pTab->def->name;
+		else
+			idx_name = pIdx->def->name;
+		int part_count = pIdx->def->key_def->part_count;
 
 		/* Populate the register containing the index name. */
-		sqlite3VdbeLoadString(v, regIdxname, zIdxName);
+		sqlite3VdbeLoadString(v, regIdxname, idx_name);
 		VdbeComment((v, "Analysis for %s.%s", pTab->def->name,
-			zIdxName));
+			    idx_name));
 
 		/*
 		 * Pseudo-code for loop that calls stat_push():
@@ -881,7 +879,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * when building a record to insert into the sample column of
 		 * the _sql_stat4 table).
 		 */
-		pParse->nMem = MAX(pParse->nMem, regPrev + nColTest);
+		pParse->nMem = MAX(pParse->nMem, regPrev + part_count);
 
 		/* Open a read-only cursor on the index being analyzed. */
 		struct space *space =
@@ -890,7 +888,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		assert(space != NULL);
 		sqlite3VdbeAddOp4(v, OP_OpenRead, iIdxCur, idx_id, 0,
 				  (void *) space, P4_SPACEPTR);
-		VdbeComment((v, "%s", pIdx->zName));
+		VdbeComment((v, "%s", pIdx->def->name));
 
 		/* Invoke the stat_init() function. The arguments are:
 		 *
@@ -903,8 +901,8 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * The third argument is only used for STAT4
 		 */
 		sqlite3VdbeAddOp2(v, OP_Count, iIdxCur, regStat4 + 3);
-		sqlite3VdbeAddOp2(v, OP_Integer, nColTest, regStat4 + 1);
-		sqlite3VdbeAddOp2(v, OP_Integer, nColTest, regStat4 + 2);
+		sqlite3VdbeAddOp2(v, OP_Integer, part_count, regStat4 + 1);
+		sqlite3VdbeAddOp2(v, OP_Integer, part_count, regStat4 + 2);
 		sqlite3VdbeAddOp4(v, OP_Function0, 0, regStat4 + 1, regStat4,
 				  (char *)&statInitFuncdef, P4_FUNCDEF);
 		sqlite3VdbeChangeP5(v, 3);
@@ -922,11 +920,11 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		sqlite3VdbeAddOp2(v, OP_Integer, 0, regChng);
 		addrNextRow = sqlite3VdbeCurrentAddr(v);
 
-		if (nColTest > 0) {
+		if (part_count > 0) {
 			int endDistinctTest = sqlite3VdbeMakeLabel(v);
 			int *aGotoChng;	/* Array of jump instruction addresses */
 			aGotoChng =
-			    sqlite3DbMallocRawNN(db, sizeof(int) * nColTest);
+			    sqlite3DbMallocRawNN(db, sizeof(int) * part_count);
 			if (aGotoChng == 0)
 				continue;
 
@@ -942,7 +940,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 			 */
 			sqlite3VdbeAddOp0(v, OP_Goto);
 			addrNextRow = sqlite3VdbeCurrentAddr(v);
-			if (nColTest == 1 && index_is_unique(pIdx)) {
+			if (part_count == 1 && pIdx->def->opts.is_unique) {
 				/* For a single-column UNIQUE index, once we have found a non-NULL
 				 * row, we know that all the rest will be distinct, so skip
 				 * subsequent distinctness tests.
@@ -951,13 +949,12 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 						  endDistinctTest);
 				VdbeCoverage(v);
 			}
-			for (i = 0; i < nColTest; i++) {
-				uint32_t id;
-				struct coll *coll =
-					sql_index_collation(pIdx, i, &id);
+			struct key_part *part = pIdx->def->key_def->parts;
+			for (i = 0; i < part_count; ++i, ++part) {
+				struct coll *coll = part->coll;
 				sqlite3VdbeAddOp2(v, OP_Integer, i, regChng);
 				sqlite3VdbeAddOp3(v, OP_Column, iIdxCur,
-						  pIdx->aiColumn[i], regTemp);
+						  part->fieldno, regTemp);
 				aGotoChng[i] =
 				    sqlite3VdbeAddOp4(v, OP_Ne, regTemp, 0,
 						      regPrev + i, (char *)coll,
@@ -965,7 +962,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 				sqlite3VdbeChangeP5(v, SQLITE_NULLEQ);
 				VdbeCoverage(v);
 			}
-			sqlite3VdbeAddOp2(v, OP_Integer, nColTest, regChng);
+			sqlite3VdbeAddOp2(v, OP_Integer, part_count, regChng);
 			sqlite3VdbeGoto(v, endDistinctTest);
 
 			/*
@@ -976,11 +973,11 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 			 *  ...
 			 */
 			sqlite3VdbeJumpHere(v, addrNextRow - 1);
-			for (i = 0; i < nColTest; i++) {
+			part = pIdx->def->key_def->parts;
+			for (i = 0; i < part_count; ++i, ++part) {
 				sqlite3VdbeJumpHere(v, aGotoChng[i]);
 				sqlite3VdbeAddOp3(v, OP_Column, iIdxCur,
-						  pIdx->aiColumn[i],
-						  regPrev + i);
+						  part->fieldno, regPrev + i);
 			}
 			sqlite3VdbeResolveLabel(v, endDistinctTest);
 			sqlite3DbFree(db, aGotoChng);
@@ -995,21 +992,20 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 */
 		assert(regKey == (regStat4 + 2));
 		Index *pPk = sqlite3PrimaryKeyIndex(pIdx->pTable);
-		int j, k, regKeyStat;
-		int nPkColumn = (int)index_column_count(pPk);
+		int pk_part_count = pPk->def->key_def->part_count;
 		/* Allocate memory for array. */
-		pParse->nMem = MAX(pParse->nMem, regPrev + nColTest + nPkColumn);
-		regKeyStat = regPrev + nColTest;
-
-		for (j = 0; j < nPkColumn; j++) {
-			k = pPk->aiColumn[j];
-			assert(k >= 0 && k < (int)pTab->def->field_count);
-			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k, regKeyStat + j);
-			VdbeComment((v, "%s",
-				pTab->def->fields[pPk->aiColumn[j]].name));
+		pParse->nMem = MAX(pParse->nMem,
+				   regPrev + part_count + pk_part_count);
+		int regKeyStat = regPrev + part_count;
+		for (int j = 0; j < pk_part_count; ++j) {
+			uint32_t k = pPk->def->key_def->parts[j].fieldno;
+			assert(k < pTab->def->field_count);
+			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k,
+					  regKeyStat + j);
+			VdbeComment((v, "%s", pTab->def->fields[k].name));
 		}
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regKeyStat,
-				  nPkColumn, regKey);
+				  pk_part_count, regKey);
 
 		assert(regChng == (regStat4 + 1));
 		sqlite3VdbeAddOp4(v, OP_Function0, 1, regStat4, regTemp,
@@ -1032,11 +1028,11 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		int regDLt = regStat1 + 2;
 		int regSample = regStat1 + 3;
 		int regCol = regStat1 + 4;
-		int regSampleKey = regCol + nColTest;
+		int regSampleKey = regCol + part_count;
 		int addrNext;
 		int addrIsNull;
 
-		pParse->nMem = MAX(pParse->nMem, regCol + nColTest);
+		pParse->nMem = MAX(pParse->nMem, regCol + part_count);
 
 		addrNext = sqlite3VdbeCurrentAddr(v);
 		callStatGet(v, regStat4, STAT_GET_KEY, regSampleKey);
@@ -1052,12 +1048,11 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * be taken
 		 */
 		VdbeCoverageNeverTaken(v);
-		for (i = 0; i < nColTest; i++) {
-			sqlite3ExprCodeLoadIndexColumn(pParse, pIdx,
-									 iTabCur, i,
-									 regCol + i);
+		for (i = 0; i < part_count; i++) {
+			sqlite3ExprCodeLoadIndexColumn(pParse, pIdx, iTabCur, i,
+						       regCol + i);
 		}
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, regCol, nColTest,
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, regCol, part_count,
 				  regSample);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regTabname, 6, regTemp);
 		sqlite3VdbeAddOp2(v, OP_IdxReplace, iStatCur + 1, regTemp);
@@ -1645,7 +1640,7 @@ index_field_tuple_est(struct Index *idx, uint32_t field)
 {
 	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(idx->tnum));
 	if (space == NULL)
-		return idx->aiRowLogEst[field];
+		return idx->def->opts.stat->tuple_log_est[field];
 	struct index *tnt_idx =
 		space_index(space, SQLITE_PAGENO_TO_INDEXID(idx->tnum));
 	assert(tnt_idx != NULL);

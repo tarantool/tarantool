@@ -48,7 +48,7 @@
 static const char *
 explainIndexColumnName(Index * pIdx, int i)
 {
-	i = pIdx->aiColumn[i];
+	i = pIdx->def->key_def->parts[i].fieldno;
 	return pIdx->pTable->def->fields[i].name;
 }
 
@@ -243,7 +243,7 @@ sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
 			if (zFmt) {
 				sqlite3StrAccumAppend(&str, " USING ", 7);
 				if (pIdx != NULL)
-					sqlite3XPrintf(&str, zFmt, pIdx->zName);
+					sqlite3XPrintf(&str, zFmt, pIdx->def->name);
 				else if (idx_def != NULL)
 					sqlite3XPrintf(&str, zFmt, idx_def->name);
 				else
@@ -488,7 +488,7 @@ codeEqualityTerm(Parse * pParse,	/* The parsing context */
 		int *aiMap = 0;
 
 		if (pLoop->pIndex != 0 &&
-		    sql_index_column_sort_order(pLoop->pIndex, iEq)) {
+		    pLoop->pIndex->def->key_def->parts[iEq].sort_order) {
 			testcase(iEq == 0);
 			testcase(bRev);
 			bRev = !bRev;
@@ -736,7 +736,7 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 		sqlite3VdbeAddOp1(v, (bRev ? OP_Last : OP_Rewind), iIdxCur);
 		VdbeCoverageIf(v, bRev == 0);
 		VdbeCoverageIf(v, bRev != 0);
-		VdbeComment((v, "begin skip-scan on %s", pIdx->zName));
+		VdbeComment((v, "begin skip-scan on %s", pIdx->def->name));
 		j = sqlite3VdbeAddOp0(v, OP_Goto);
 		pLevel->addrSkip =
 		    sqlite3VdbeAddOp4Int(v, (bRev ? OP_SeekLT : OP_SeekGT),
@@ -746,7 +746,8 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 		sqlite3VdbeJumpHere(v, j);
 		for (j = 0; j < nSkip; j++) {
 			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur,
-					  pIdx->aiColumn[j], regBase + j);
+					  pIdx->def->key_def->parts[j].fieldno,
+					  regBase + j);
 			VdbeComment((v, "%s", explainIndexColumnName(pIdx, j)));
 		}
 	}
@@ -1037,14 +1038,14 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		assert(pWInfo->pOrderBy == 0
 		       || pWInfo->pOrderBy->nExpr == 1
 		       || (pWInfo->wctrlFlags & WHERE_ORDERBY_MIN) == 0);
-		int nIdxCol;
+		uint32_t part_count;
 		if (pIdx != NULL)
-			nIdxCol = index_column_count(pIdx);
+			part_count = pIdx->def->key_def->part_count;
 		else
-			nIdxCol = idx_def->key_def->part_count;
-		if ((pWInfo->wctrlFlags & WHERE_ORDERBY_MIN) != 0
-		    && pWInfo->nOBSat > 0 && (nIdxCol > nEq)) {
-			j = pIdx->aiColumn[nEq];
+			part_count = idx_def->key_def->part_count;
+		if ((pWInfo->wctrlFlags & WHERE_ORDERBY_MIN) != 0 &&
+		    pWInfo->nOBSat > 0 && part_count > nEq) {
+			j = pIdx->def->key_def->parts[nEq].fieldno;
 			/* Allow seek for column with `NOT NULL` == false attribute.
 			 * If a column may contain NULL-s, the comparator installed
 			 * by Tarantool is prepared to seek using a NULL value.
@@ -1055,8 +1056,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			 * FYI: entries in an index are ordered as follows:
 			 *      NULL, ... NULL, min_value, ...
 			 */
-			if (j >= 0 &&
-			    pIdx->pTable->def->fields[j].is_nullable) {
+			if (pIdx->pTable->def->fields[j].is_nullable) {
 				assert(pLoop->nSkip == 0);
 				bSeekPastNull = 1;
 				nExtraReg = 1;
@@ -1093,16 +1093,16 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 				testcase(pIdx->aSortOrder[nEq] ==
 					 SORT_ORDER_DESC);
 				assert((bRev & ~1) == 0);
+				struct key_def *def = pIdx->def->key_def;
 				pLevel->iLikeRepCntr <<= 1;
 				pLevel->iLikeRepCntr |=
-					bRev ^ (sql_index_column_sort_order(pIdx, nEq) ==
+					bRev ^ (def->parts[nEq].sort_order ==
 						SORT_ORDER_DESC);
 			}
 #endif
 			if (pRangeStart == 0) {
-				j = pIdx->aiColumn[nEq];
-				if (j >= 0 &&
-				    pIdx->pTable->def->fields[j].is_nullable)
+				j = pIdx->def->key_def->parts[nEq].fieldno;
+				if (pIdx->pTable->def->fields[j].is_nullable)
 					bSeekPastNull = 1;
 			}
 		}
@@ -1113,10 +1113,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		 * a forward order scan on a descending index, interchange the
 		 * start and end terms (pRangeStart and pRangeEnd).
 		 */
-		if ((nEq < nIdxCol &&
-		     bRev == (sql_index_column_sort_order(pIdx, nEq) ==
-			      SORT_ORDER_ASC)) ||
-		    (bRev && nIdxCol == nEq)) {
+		if ((nEq < part_count &&
+		     bRev == (pIdx->def->key_def->parts[nEq].sort_order ==
+			      SORT_ORDER_ASC)) || (bRev && part_count == nEq)) {
 			SWAP(pRangeEnd, pRangeStart);
 			SWAP(bSeekPastNull, bStopAtNull);
 			SWAP(nBtm, nTop);
@@ -1196,16 +1195,16 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			}
 		} else {
 			pk = sqlite3PrimaryKeyIndex(pIdx->pTable);
-			affinity =
-				pIdx->pTable->def->fields[pk->aiColumn[0]].affinity;
+			uint32_t fieldno = pk->def->key_def->parts[0].fieldno;
+			affinity = pIdx->pTable->def->fields[fieldno].affinity;
 		}
 
-		int nPkCol;
+		uint32_t pk_part_count;
 		if (pk != NULL)
-			nPkCol = index_column_count(pk);
+			pk_part_count = pk->def->key_def->part_count;
 		else
-			nPkCol = idx_pk->key_def->part_count;
-		if (nPkCol == 1 && affinity == AFFINITY_INTEGER) {
+			pk_part_count = idx_pk->key_def->part_count;
+		if (pk_part_count == 1 && affinity == AFFINITY_INTEGER) {
 			/* Right now INTEGER PRIMARY KEY is the only option to
 			 * get Tarantool's INTEGER column type. Need special handling
 			 * here: try to loosely convert FLOAT to INT. If RHS type
@@ -1213,8 +1212,9 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			 */
 			int limit = pRangeStart == NULL ? nEq : nEq + 1;
 			for (int i = 0; i < limit; i++) {
-				if ((pIdx != NULL && pIdx->aiColumn[i] ==
-				     pk->aiColumn[0]) ||
+				if ((pIdx != NULL &&
+				     pIdx->def->key_def->parts[i].fieldno ==
+				     pk->def->key_def->parts[0].fieldno) ||
 				    (idx_pk != NULL &&
 				     idx_def->key_def->parts[i].fieldno ==
 				     idx_pk->key_def->parts[0].fieldno)) {
@@ -1326,17 +1326,17 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 			/* pIdx is a covering index.  No need to access the main table. */
 		}  else if (iCur != iIdxCur) {
 			Index *pPk = sqlite3PrimaryKeyIndex(pIdx->pTable);
-			int nPkCol = index_column_count(pPk);
-			int iKeyReg = sqlite3GetTempRange(pParse, nPkCol);
-			for (j = 0; j < nPkCol; j++) {
-				k = pPk->aiColumn[j];
+			int pk_part_count = pPk->def->key_def->part_count;
+			int iKeyReg = sqlite3GetTempRange(pParse, pk_part_count);
+			for (j = 0; j < pk_part_count; j++) {
+				k = pPk->def->key_def->parts[j].fieldno;
 				sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k,
 						  iKeyReg + j);
 			}
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, iCur, addrCont,
-					     iKeyReg, nPkCol);
+					     iKeyReg, pk_part_count);
 			VdbeCoverage(v);
-			sqlite3ReleaseTempRange(pParse, iKeyReg, nPkCol);
+			sqlite3ReleaseTempRange(pParse, iKeyReg, pk_part_count);
 		}
 
 		/* Record the instruction used to terminate the loop. */
@@ -1434,10 +1434,10 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		 */
 		if ((pWInfo->wctrlFlags & WHERE_DUPLICATES_OK) == 0) {
 			Index *pPk = sqlite3PrimaryKeyIndex(pTab);
-			int nPkCol = index_column_count(pPk);
+			int pk_part_count = pPk->def->key_def->part_count;
 			regRowset = pParse->nTab++;
 			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
-					  regRowset, nPkCol);
+					  regRowset, pk_part_count);
 			sql_vdbe_set_p4_key_def(pParse, pPk);
 			regPk = ++pParse->nMem;
 		}
@@ -1538,16 +1538,23 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 						int iSet =
 						    ((ii == pOrWc->nTerm - 1) ? -1 : ii);
 						Index *pPk = sqlite3PrimaryKeyIndex (pTab);
-						int nPk = index_column_count(pPk);
-						int iPk;
+						struct key_def *def =
+							pPk->def->key_def;
 
 						/* Read the PK into an array of temp registers. */
-						r = sqlite3GetTempRange(pParse, nPk);
-						for (iPk = 0; iPk < nPk; iPk++) {
-							int iCol = pPk->aiColumn[iPk];
+						r = sqlite3GetTempRange(pParse,
+									def->part_count);
+						for (uint32_t iPk = 0;
+						     iPk < def->part_count;
+						     iPk++) {
+							uint32_t fieldno =
+								def->parts[iPk].
+								fieldno;
 							sqlite3ExprCodeGetColumnToReg
-								(pParse, pTab->def,
-								 iCol, iCur,
+								(pParse,
+								 pTab->def,
+								 fieldno,
+								 iCur,
 								 r + iPk);
 						}
 
@@ -1567,20 +1574,21 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 							jmp1 = sqlite3VdbeAddOp4Int
 								(v, OP_Found,
 								 regRowset, 0,
-								 r, nPk);
+								 r,
+								 def->part_count);
 							VdbeCoverage(v);
 						}
 						if (iSet >= 0) {
 							sqlite3VdbeAddOp3
 								(v, OP_MakeRecord,
-								 r, nPk, regPk);
+								 r, def->part_count, regPk);
 							sqlite3VdbeAddOp2
 								(v, OP_IdxInsert,
 								 regRowset, regPk);
 						}
 
 						/* Release the array of temp registers */
-						sqlite3ReleaseTempRange(pParse, r, nPk);
+						sqlite3ReleaseTempRange(pParse, r, def->part_count);
 					}
 
 					/* Invoke the main loop body as a subroutine */

@@ -1420,8 +1420,8 @@ int tarantoolSqlite3MakeTableFormat(Table *pTable, void *buf)
 
 	/* If table's PK is single column which is INTEGER, then
 	 * treat it as strict type, not affinity.  */
-	if (pk_idx && pk_idx->nColumn == 1) {
-		int pk = pk_idx->aiColumn[0];
+	if (pk_idx != NULL && pk_idx->def->key_def->part_count == 1) {
+		int pk = pk_idx->def->key_def->parts[0].fieldno;
 		if (def->fields[pk].type == FIELD_TYPE_INTEGER)
 			pk_forced_int = pk;
 	}
@@ -1532,20 +1532,19 @@ tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, char *buf)
  */
 int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 {
-	struct space_def *def = pIndex->pTable->def;
-	assert(def != NULL);
+	struct field_def *fields = pIndex->pTable->def->fields;
+	struct key_def *key_def = pIndex->def->key_def;
 	const struct Enc *enc = get_enc(buf);
-	struct SqliteIndex *primary_index;
-	char *base = buf, *p;
-	int pk_forced_int = -1;
-
-	primary_index = sqlite3PrimaryKeyIndex(pIndex->pTable);
+	char *base = buf;
+	uint32_t pk_forced_int = UINT32_MAX;
+	struct SqliteIndex *primary_index =
+		sqlite3PrimaryKeyIndex(pIndex->pTable);
 
 	/* If table's PK is single column which is INTEGER, then
 	 * treat it as strict type, not affinity.  */
-	if (primary_index->nColumn == 1) {
-		int pk = primary_index->aiColumn[0];
-		if (def->fields[pk].type == FIELD_TYPE_INTEGER)
+	if (primary_index->def->key_def->part_count == 1) {
+		int pk = primary_index->def->key_def->parts[0].fieldno;
+		if (fields[pk].type == FIELD_TYPE_INTEGER)
 			pk_forced_int = pk;
 	}
 
@@ -1555,46 +1554,45 @@ int tarantoolSqlite3MakeIdxParts(SqliteIndex *pIndex, void *buf)
 	 * primary key columns. Query planner depends on this particular
 	 * data layout.
 	 */
-	int i, n = pIndex->nColumn;
-
-	p = enc->encode_array(base, n);
-	for (i = 0; i < n; i++) {
-		int col = pIndex->aiColumn[i];
-		assert(def->fields[col].is_nullable ==
-		       action_is_nullable(def->fields[col].nullable_action));
+	struct key_part *part = key_def->parts;
+	char *p = enc->encode_array(base, key_def->part_count);
+	for (uint32_t i = 0; i < key_def->part_count; ++i, ++part) {
+		uint32_t col = part->fieldno;
+		assert(fields[col].is_nullable ==
+		       action_is_nullable(fields[col].nullable_action));
 		const char *t;
 		if (pk_forced_int == col) {
 			t = "integer";
 		} else {
-			enum affinity_type affinity = def->fields[col].affinity;
-			t = convertSqliteAffinity(affinity,
-						  def->fields[col].is_nullable);
+			t = convertSqliteAffinity(fields[col].affinity,
+						  fields[col].is_nullable);
 		}
 		/* do not decode default collation */
-		uint32_t cid = pIndex->coll_id_array[i];
+		uint32_t cid = part->coll_id;
 		p = enc->encode_map(p, cid == COLL_NONE ? 5 : 6);
 		p = enc->encode_str(p, "type", sizeof("type")-1);
 		p = enc->encode_str(p, t, strlen(t));
 		p = enc->encode_str(p, "field", sizeof("field")-1);
 		p = enc->encode_uint(p, col);
 		if (cid != COLL_NONE) {
-			p = enc->encode_str(p, "collation", sizeof("collation")-1);
+			p = enc->encode_str(p, "collation",
+					    sizeof("collation") - 1);
 			p = enc->encode_uint(p, cid);
 		}
 		p = enc->encode_str(p, "is_nullable", 11);
-		p = enc->encode_bool(p, def->fields[col].is_nullable);
+		p = enc->encode_bool(p, fields[col].is_nullable);
 		p = enc->encode_str(p, "nullable_action", 15);
 		const char *action_str =
-			on_conflict_action_strs[def->fields[col].nullable_action];
+			on_conflict_action_strs[fields[col].nullable_action];
 		p = enc->encode_str(p, action_str, strlen(action_str));
 
 		p = enc->encode_str(p, "sort_order", 10);
-		enum sort_order sort_order = pIndex->sort_order[i];
+		enum sort_order sort_order = part->sort_order;
 		assert(sort_order < sort_order_MAX);
 		const char *sort_order_str = sort_order_strs[sort_order];
 		p = enc->encode_str(p, sort_order_str, strlen(sort_order_str));
 	}
-	return (int)(p - base);
+	return p - base;
 }
 
 /*

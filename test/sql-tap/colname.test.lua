@@ -643,13 +643,13 @@ test:do_catchsql_test(
     "colname-11.2",
     [[CREATE TABLE t1(a, b, c, d, e, 
       PRIMARY KEY(a), UNIQUE('b' COLLATE "unicode_ci" DESC));]],
-    {1, "/functional indexes aren't supported in the current version/"})
+    {1, "/Tarantool does not support functional indexes/"})
 
 test:execsql("create table table1(a primary key, b, c)")
 
 test:do_catchsql_test(
     "colname-11.3",
     [[ CREATE INDEX t1c ON table1('c'); ]],
-    {1, "/functional indexes aren't supported in the current version/"})
+    {1, "/Tarantool does not support functional indexes/"})
 
 test:finish_test()
