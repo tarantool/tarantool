@@ -127,7 +127,7 @@ test:do_catchsql_test(
         DROP TABLE t1;
     ]], {
         -- <view-1.6>
-        1, "Can't drop table T1: other views depend on this space"
+        1, "Can't drop space 'T1': other views depend on this space"
         -- </view-1.6>
     })
 
@@ -1185,7 +1185,7 @@ test:do_catchsql_test(
         DROP TABLE t11;
     ]], {
         -- <view-23.2>
-        1, "Can't drop table T11: other views depend on this space"
+        1, "Can't drop space 'T11': other views depend on this space"
         -- </view-23.2>
     })
 
@@ -1195,7 +1195,7 @@ test:do_catchsql_test(
         DROP TABLE t12;
     ]], {
         -- <view-23.3>
-        1, "Can't drop table T12: other views depend on this space"
+        1, "Can't drop space 'T12': other views depend on this space"
         -- </view-23.3>
     })
 
@@ -1205,7 +1205,7 @@ test:do_catchsql_test(
         DROP TABLE t13;
     ]], {
         -- <view-23.4>
-        1, "Can't drop table T13: other views depend on this space"
+        1, "Can't drop space 'T13': other views depend on this space"
         -- </view-23.4>
     })
 

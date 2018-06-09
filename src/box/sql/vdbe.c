@@ -949,18 +949,22 @@ case OP_HaltIfNull: {      /* in3 */
  * Exit immediately.  All open cursors, etc are closed
  * automatically.
  *
- * P1 is the result code returned by sqlite3_exec(), sqlite3_reset(),
- * or sqlite3_finalize().  For a normal halt, this should be SQLITE_OK (0).
- * For errors, it can be some other value.  If P1!=0 then P2 will determine
- * whether or not to rollback the current transaction.  Do not rollback
- * if P2==ON_CONFLICT_ACTION_FAIL. Do the rollback if
- * P2==ON_CONFLICT_ACTION_ROLLBACK.  If P2==ON_CONFLICT_ACTION_ABORT,
- * then back out all changes that have occurred during this execution of the
- * VDBE, but do not rollback the transaction.
+ * P1 is the result code returned by sqlite3_exec(),
+ * sqlite3_reset(), or sqlite3_finalize().  For a normal halt,
+ * this should be SQLITE_OK (0).
+ * For errors, it can be some other value.  If P1!=0 then P2 will
+ * determine whether or not to rollback the current transaction.
+ * Do not rollback if P2==ON_CONFLICT_ACTION_FAIL. Do the rollback
+ * if P2==ON_CONFLICT_ACTION_ROLLBACK.  If
+ * P2==ON_CONFLICT_ACTION_ABORT, then back out all changes that
+ * have occurred during this execution of the VDBE, but do not
+ * rollback the transaction.
  *
  * If P4 is not null then it is an error message string.
  *
- * P5 is a value between 0 and 4, inclusive, that modifies the P4 string.
+ * If P1 is SQL_TARANTOOL_ERROR then P5 is a ClientError code and
+ * P4 is error message to set. Else P5 is a value between 0 and 4,
+ * inclusive, that modifies the P4 string.
  *
  *    0:  (no change)
  *    1:  NOT NULL contraint failed: P4
@@ -968,12 +972,12 @@ case OP_HaltIfNull: {      /* in3 */
  *    3:  CHECK constraint failed: P4
  *    4:  FOREIGN KEY constraint failed: P4
  *
- * If P5 is not zero and P4 is NULL, then everything after the ":" is
- * omitted.
+ * If P5 is not zero and  P4 is  NULL, then everything after the
+ * ":" is omitted.
  *
- * There is an implied "Halt 0 0 0" instruction inserted at the very end of
- * every program.  So a jump past the last instruction of the program
- * is the same as executing Halt.
+ * There is an implied "Halt 0 0 0" instruction inserted at the
+ * very end of every program.  So a jump past the last instruction
+ * of the program is the same as executing Halt.
  */
 case OP_Halt: {
 	VdbeFrame *pFrame;
@@ -1005,9 +1009,11 @@ case OP_Halt: {
 	p->rc = pOp->p1;
 	p->errorAction = (u8)pOp->p2;
 	p->pc = pcx;
-	assert(pOp->p5<=4);
 	if (p->rc) {
-		if (pOp->p5) {
+		if (p->rc == SQL_TARANTOOL_ERROR) {
+			assert(pOp->p4.z != NULL);
+			box_error_set(__FILE__, __LINE__, pOp->p5, pOp->p4.z);
+		} else if (pOp->p5 != 0) {
 			static const char * const azType[] = { "NOT NULL", "UNIQUE", "CHECK",
 							       "FOREIGN KEY" };
 			testcase( pOp->p5==1);
@@ -2999,8 +3005,8 @@ case OP_CheckViewReferences: {
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
 	if (space->def->view_ref_count > 0) {
-		sqlite3VdbeError(p,"Can't drop table %s: other views depend "
-				 "on this space",  space->def->name);
+		diag_set(ClientError, ER_DROP_SPACE, space->def->name,
+			 "other views depend on this space");
 		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}

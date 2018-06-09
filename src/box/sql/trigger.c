@@ -111,18 +111,6 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	if (sqlite3CheckIdentifierName(parse, trigger_name) != SQLITE_OK)
 		goto trigger_cleanup;
 
-	if (!parse->parse_only &&
-	    sqlite3HashFind(&db->pSchema->trigHash, trigger_name) != NULL) {
-		if (!no_err) {
-			diag_set(ClientError, ER_TRIGGER_EXISTS, trigger_name);
-			parse->rc = SQL_TARANTOOL_ERROR;
-			parse->nErr++;
-		} else {
-			assert(!db->init.busy);
-		}
-		goto trigger_cleanup;
-	}
-
 	const char *table_name = table->a[0].zName;
 	uint32_t space_id;
 	if (schema_find_id(BOX_SPACE_ID, 2, table_name, strlen(table_name),
@@ -131,6 +119,18 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	if (space_id == BOX_ID_NIL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
 		goto set_tarantool_error_and_cleanup;
+	}
+
+	if (!parse->parse_only) {
+		const char *error_msg =
+			tt_sprintf(tnt_errcode_desc(ER_TRIGGER_EXISTS),
+				   trigger_name);
+		if (vdbe_emit_halt_if_exists(parse, BOX_TRIGGER_ID,
+					     0, trigger_name,
+					     ER_TRIGGER_EXISTS,
+					     error_msg,
+					     (no_err != 0)) != 0)
+			goto trigger_cleanup;
 	}
 
 	/* Build the Trigger object. */

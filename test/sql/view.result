@@ -124,7 +124,7 @@ box.sql.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
 ...
 box.sql.execute("DROP TABLE t2;");
 ---
-- error: 'Can''t drop table T2: other views depend on this space'
+- error: 'Can''t drop space ''T2'': other views depend on this space'
 ...
 sp = box.space._space:get{box.space.T2.id};
 ---
@@ -134,7 +134,7 @@ sp = box.space._space:replace(sp);
 ...
 box.sql.execute("DROP TABLE t2;");
 ---
-- error: 'Can''t drop table T2: other views depend on this space'
+- error: 'Can''t drop space ''T2'': other views depend on this space'
 ...
 box.sql.execute("DROP VIEW v2;");
 ---

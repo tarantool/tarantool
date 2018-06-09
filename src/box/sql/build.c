@@ -3956,4 +3956,41 @@ sqlite3WithDelete(sqlite3 * db, With * pWith)
 		sqlite3DbFree(db, pWith);
 	}
 }
+
 #endif				/* !defined(SQLITE_OMIT_CTE) */
+
+int
+vdbe_emit_halt_if_exists(struct Parse *parser, int space_id, int index_id,
+			 const char *name_src, int tarantool_error_code,
+			 const char *error_src, bool no_error)
+{
+	struct Vdbe *v = sqlite3GetVdbe(parser);
+	assert(v != NULL);
+
+	struct sqlite3 *db = parser->db;
+	char *name = sqlite3DbStrDup(db, name_src);
+	if (name == NULL)
+		return -1;
+	char *error = sqlite3DbStrDup(db, error_src);
+	if (error == NULL) {
+		sqlite3DbFree(db, name);
+		return -1;
+	}
+
+	int cursor = parser->nTab++;
+	vdbe_emit_open_cursor(parser, cursor, index_id, space_by_id(space_id));
+
+	int name_reg = parser->nMem++;
+	int label = sqlite3VdbeAddOp4(v, OP_String8, 0, name_reg, 0, name,
+				      P4_DYNAMIC);
+	sqlite3VdbeAddOp4Int(v, OP_NoConflict, cursor, label + 3, name_reg, 1);
+	if (no_error) {
+		sqlite3VdbeAddOp0(v, OP_Halt);
+	} else {
+		sqlite3VdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,0, 0, error,
+				  P4_DYNAMIC);
+		sqlite3VdbeChangeP5(v, tarantool_error_code);
+	}
+	sqlite3VdbeAddOp1(v, OP_Close, cursor);
+	return 0;
+}

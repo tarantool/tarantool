@@ -4771,4 +4771,26 @@ extern int sqlite3InitDatabase(sqlite3 * db);
 enum on_conflict_action
 table_column_nullable_action(struct Table *tab, uint32_t column);
 
+/**
+ * Generate VDBE code to halt execution with correct error if
+ * the object with specified name is already present in
+ * specified space.
+ * The function allocates error and name resources for VDBE itself.
+ *
+ * @param parser Parsing context.
+ * @param space_id Space to lookup identifier.
+ * @param index_id Index identifier of key.
+ * @param name_src Name of object to test on existence.
+ * @param tarantool_error_code to set on halt.
+ * @param error_src Error message to display on VDBE halt.
+ * @param no_error Do not raise error flag.
+ *
+ * @retval -1 on memory allocation error.
+ * @retval 0 on success.
+ */
+int
+vdbe_emit_halt_if_exists(struct Parse *parser, int space_id, int index_id,
+			 const char *name_src, int tarantool_error_code,
+			 const char *error_src, bool no_error);
+
 #endif				/* SQLITEINT_H */
