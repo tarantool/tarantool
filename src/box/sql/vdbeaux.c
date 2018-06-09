@@ -972,12 +972,6 @@ freeP4(sqlite3 * db, int p4type, void *p4)
 	case P4_KEYDEF:
 		key_def_delete(p4);
 		break;
-#ifdef SQLITE_ENABLE_CURSOR_HINTS
-	case P4_EXPR:{
-			sqlite3ExprDelete(db, (Expr *) p4);
-			break;
-		}
-#endif
 	case P4_FUNCDEF:{
 			freeEphemeralFunction(db, (FuncDef *) p4);
 			break;
@@ -1389,127 +1383,6 @@ displayComment(const Op * pOp,	/* The opcode to be commented */
 }
 #endif				/* SQLITE_DEBUG */
 
-#if defined(SQLITE_ENABLE_CURSOR_HINTS)
-/*
- * Translate the P4.pExpr value for an OP_CursorHint opcode into text
- * that can be displayed in the P4 column of EXPLAIN output.
- */
-static void
-displayP4Expr(StrAccum * p, Expr * pExpr)
-{
-	const char *zOp = 0;
-	switch (pExpr->op) {
-	case TK_STRING:
-		sqlite3XPrintf(p, "%Q", pExpr->u.zToken);
-		break;
-	case TK_INTEGER:
-		sqlite3XPrintf(p, "%d", pExpr->u.iValue);
-		break;
-	case TK_NULL:
-		sqlite3XPrintf(p, "NULL");
-		break;
-	case TK_REGISTER:{
-			sqlite3XPrintf(p, "r[%d]", pExpr->iTable);
-			break;
-		}
-	case TK_COLUMN:{
-			if (pExpr->iColumn < 0) {
-				sqlite3XPrintf(p, "rowid");
-			} else {
-				sqlite3XPrintf(p, "c%d", (int)pExpr->iColumn);
-			}
-			break;
-		}
-	case TK_LT:
-		zOp = "LT";
-		break;
-	case TK_LE:
-		zOp = "LE";
-		break;
-	case TK_GT:
-		zOp = "GT";
-		break;
-	case TK_GE:
-		zOp = "GE";
-		break;
-	case TK_NE:
-		zOp = "NE";
-		break;
-	case TK_EQ:
-		zOp = "EQ";
-		break;
-	case TK_AND:
-		zOp = "AND";
-		break;
-	case TK_OR:
-		zOp = "OR";
-		break;
-	case TK_PLUS:
-		zOp = "ADD";
-		break;
-	case TK_STAR:
-		zOp = "MUL";
-		break;
-	case TK_MINUS:
-		zOp = "SUB";
-		break;
-	case TK_REM:
-		zOp = "REM";
-		break;
-	case TK_BITAND:
-		zOp = "BITAND";
-		break;
-	case TK_BITOR:
-		zOp = "BITOR";
-		break;
-	case TK_SLASH:
-		zOp = "DIV";
-		break;
-	case TK_LSHIFT:
-		zOp = "LSHIFT";
-		break;
-	case TK_RSHIFT:
-		zOp = "RSHIFT";
-		break;
-	case TK_CONCAT:
-		zOp = "CONCAT";
-		break;
-	case TK_UMINUS:
-		zOp = "MINUS";
-		break;
-	case TK_UPLUS:
-		zOp = "PLUS";
-		break;
-	case TK_BITNOT:
-		zOp = "BITNOT";
-		break;
-	case TK_NOT:
-		zOp = "NOT";
-		break;
-	case TK_ISNULL:
-		zOp = "IS NULL";
-		break;
-	case TK_NOTNULL:
-		zOp = "NOT NULL";
-		break;
-
-	default:
-		sqlite3XPrintf(p, "%s", "expr");
-		break;
-	}
-
-	if (zOp) {
-		sqlite3XPrintf(p, "%s(", zOp);
-		displayP4Expr(p, pExpr->pLeft);
-		if (pExpr->pRight) {
-			sqlite3StrAccumAppend(p, ",", 1);
-			displayP4Expr(p, pExpr->pRight);
-		}
-		sqlite3StrAccumAppend(p, ")", 1);
-	}
-}
-#endif				/* defined(SQLITE_ENABLE_CURSOR_HINTS) */
-
 /*
  * Compute a string that describes the P4 parameter for an opcode.
  * Use zTemp for any required temporary buffer space.
@@ -1549,12 +1422,6 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 			}
 			break;
 		}
-#ifdef SQLITE_ENABLE_CURSOR_HINTS
-	case P4_EXPR:{
-			displayP4Expr(&x, pOp->p4.pExpr);
-			break;
-		}
-#endif
 	case P4_COLLSEQ:{
 			struct coll *pColl = pOp->p4.pColl;
 			if (pColl != NULL)

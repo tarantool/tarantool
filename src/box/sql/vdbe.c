@@ -3230,14 +3230,7 @@ case OP_OpenWrite:
 	pCur->key_def = index->def->key_def;
 
 open_cursor_set_hints:
-	assert(OPFLAG_BULKCSR==BTREE_BULKLOAD);
-	assert(OPFLAG_SEEKEQ==BTREE_SEEK_EQ);
-	testcase( pOp->p5 & OPFLAG_BULKCSR);
-#ifdef SQLITE_ENABLE_CURSOR_HINTS
-	testcase( pOp->p2 & OPFLAG_SEEKEQ);
-#endif
-	sqlite3CursorHintFlags(pCur->uc.pCursor,
-				    (pOp->p5 & (OPFLAG_BULKCSR|OPFLAG_SEEKEQ)));
+	pCur->uc.pCursor->hints = pOp->p5 & OPFLAG_SEEKEQ;
 	if (rc) goto abort_due_to_error;
 	break;
 }
@@ -3551,11 +3544,13 @@ case OP_SeekGT: {       /* jump, in3 */
 			}
 		}
 	}
-	/* For a cursor with the BTREE_SEEK_EQ hint, only the OP_SeekGE and
-	 * OP_SeekLE opcodes are allowed, and these must be immediately followed
-	 * by an OP_IdxGT or OP_IdxLT opcode, respectively, with the same key.
+	/*
+	 * For a cursor with the OPFLAG_SEEKEQ hint, only the
+	 * OP_SeekGE and OP_SeekLE opcodes are allowed, and these
+	 * must be immediately followed by an OP_IdxGT or
+	 * OP_IdxLT opcode, respectively, with the same key.
 	 */
-	if (sqlite3CursorHasHint(pC->uc.pCursor, BTREE_SEEK_EQ)) {
+	if ((pC->uc.pCursor->hints & OPFLAG_SEEKEQ) != 0) {
 		eqOnly = 1;
 		assert(pOp->opcode==OP_SeekGE || pOp->opcode==OP_SeekLE);
 		assert(pOp[1].opcode==OP_IdxLT || pOp[1].opcode==OP_IdxGT);

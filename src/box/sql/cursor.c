@@ -48,16 +48,6 @@ sql_cursor_cleanup(struct BtCursor *cursor)
 }
 
 /*
- * Provide flag hints to the cursor.
- */
-void
-sqlite3CursorHintFlags(BtCursor * pCur, unsigned x)
-{
-	assert(x == BTREE_SEEK_EQ || x == BTREE_BULKLOAD || x == 0);
-	pCur->hints = x;
-}
-
-/*
  * Initialize memory that will be converted into a BtCursor object.
  */
 void
@@ -184,14 +174,4 @@ sqlite3CursorPrevious(BtCursor *pCur, int *pRes)
 
 	*pRes = 0;
 	return tarantoolSqlite3Previous(pCur, pRes);
-}
-
-/*
- * Return true if the cursor has a hint specified.  This routine is
- * only used from within assert() statements
- */
-int
-sqlite3CursorHasHint(BtCursor *pCsr, unsigned int mask)
-{
-	return (pCsr->hints & mask) != 0;
 }

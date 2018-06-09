@@ -1696,7 +1696,6 @@ struct sqlite3 {
 #define SQLITE_SubqCoroutine  0x0100	/* Evaluate subqueries as coroutines */
 #define SQLITE_Transitive     0x0200	/* Transitive constraints */
 #define SQLITE_OmitNoopJoin   0x0400	/* Omit unused tables in joins */
-#define SQLITE_CursorHints    0x2000	/* Add OP_CursorHint opcodes */
 #define SQLITE_AllOpts        0xffff	/* All optimizations */
 
 /*
@@ -2983,8 +2982,6 @@ struct Parse {
  * Value constraints (enforced via assert()):
  *    OPFLAG_LENGTHARG    == SQLITE_FUNC_LENGTH
  *    OPFLAG_TYPEOFARG    == SQLITE_FUNC_TYPEOF
- *    OPFLAG_BULKCSR      == BTREE_BULKLOAD
- *    OPFLAG_SEEKEQ       == BTREE_SEEK_EQ
  *    OPFLAG_FORDELETE    == BTREE_FORDELETE
  *    OPFLAG_SAVEPOSITION == BTREE_SAVEPOSITION
  *    OPFLAG_AUXDELETE    == BTREE_AUXDELETE
@@ -3000,7 +2997,6 @@ struct Parse {
 #endif
 #define OPFLAG_LENGTHARG     0x40	/* OP_Column only used for length() */
 #define OPFLAG_TYPEOFARG     0x80	/* OP_Column only used for typeof() */
-#define OPFLAG_BULKCSR       0x01	/* OP_Open** used to open bulk cursor */
 #define OPFLAG_SEEKEQ        0x02	/* OP_Open** cursor uses EQ seek only */
 #define OPFLAG_FORDELETE     0x08	/* OP_Open should use BTREE_FORDELETE */
 #define OPFLAG_P2ISREG       0x10	/* P2 to OP_Open** is a register number */
@@ -3244,7 +3240,6 @@ struct Walker {
 		int iCur;	/* A cursor number */
 		SrcList *pSrcList;	/* FROM clause */
 		struct SrcCount *pSrcCount;	/* Counting column references */
-		struct CCurHint *pCCurHint;	/* Used by codeCursorHint() */
 		int *aiCol;	/* array of column indexes */
 		struct IdxCover *pIdxCover;	/* Check for index coverage */
 		/** Space definition. */
@@ -3887,9 +3882,6 @@ int sqlite3ExprIsConstant(Expr *);
 int sqlite3ExprIsConstantNotJoin(Expr *);
 int sqlite3ExprIsConstantOrFunction(Expr *, u8);
 int sqlite3ExprIsTableConstant(Expr *, int);
-#ifdef SQLITE_ENABLE_CURSOR_HINTS
-int sqlite3ExprContainsSubquery(Expr *);
-#endif
 int sqlite3ExprIsInteger(Expr *, int *);
 int sqlite3ExprCanBeNull(const Expr *);
 int sqlite3ExprNeedsNoAffinityChange(const Expr *, char);

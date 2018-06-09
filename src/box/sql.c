@@ -302,12 +302,12 @@ int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 		res_success = -1; /* item<key */
 		break;
 	case OP_SeekLE:
-		pCur->iter_type = (pCur->hints & BTREE_SEEK_EQ) ?
+		pCur->iter_type = (pCur->hints & OPFLAG_SEEKEQ) != 0 ?
 				  ITER_REQ : ITER_LE;
 		res_success = 0; /* item==key */
 		break;
 	case OP_SeekGE:
-		pCur->iter_type = (pCur->hints & BTREE_SEEK_EQ) ?
+		pCur->iter_type = (pCur->hints & OPFLAG_SEEKEQ) != 0 ?
 				  ITER_EQ : ITER_GE;
 		res_success = 0; /* item==key */
 		break;

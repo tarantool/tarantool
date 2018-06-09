@@ -35,22 +35,6 @@
 typedef struct BtCursor BtCursor;
 
 /*
- * Values that may be OR'd together to form the argument to the
- * BTREE_HINT_FLAGS hint for sqlite3BtreeCursorHint():
- *
- * The BTREE_BULKLOAD flag is set on index cursors when the index is going
- * to be filled with content that is already in sorted order.
- *
- * The BTREE_SEEK_EQ flag is set on cursors that will get OP_SeekGE or
- * OP_SeekLE opcodes for a range search, but where the range of entries
- * selected will all have the same key.  In other words, the cursor will
- * be used only for equality key searches.
- *
- */
-#define BTREE_BULKLOAD 0x00000001	/* Used to full index in sorted order */
-#define BTREE_SEEK_EQ  0x00000002	/* EQ seeks only - no range seeks */
-
-/*
  * A cursor contains a particular entry either from Tarantrool or
  * Sorter. Tarantool cursor is able to point to ordinary table or
  * ephemeral one. To distinguish them curFlags is set to TaCursor
@@ -70,7 +54,6 @@ struct BtCursor {
 };
 
 void sqlite3CursorZero(BtCursor *);
-void sqlite3CursorHintFlags(BtCursor *, unsigned);
 
 /**
  * Close a cursor and invalidate its state. In case of
@@ -92,7 +75,6 @@ int sqlite3CursorPayload(BtCursor *, u32 offset, u32 amt, void *);
  */
 void
 sql_cursor_cleanup(struct BtCursor *cursor);
-int sqlite3CursorHasHint(BtCursor *, unsigned int mask);
 
 #ifndef NDEBUG
 int sqlite3CursorIsValid(BtCursor *);

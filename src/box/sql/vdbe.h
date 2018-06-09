@@ -80,9 +80,6 @@ struct VdbeOp {
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */
 		Index *pIndex;	/* Used when p4type is P4_INDEX */
-#ifdef SQLITE_ENABLE_CURSOR_HINTS
-		Expr *pExpr;	/* Used when p4type is P4_EXPR */
-#endif
 		int (*xAdvance) (BtCursor *, int *);
 		/** Used when p4type is P4_KEYDEF. */
 		struct key_def *key_def;
@@ -134,7 +131,6 @@ typedef struct VdbeOpList VdbeOpList;
 #define P4_STATIC   (-2)	/* Pointer to a static string */
 #define P4_COLLSEQ  (-3)	/* P4 is a pointer to a CollSeq structure */
 #define P4_FUNCDEF  (-4)	/* P4 is a pointer to a FuncDef structure */
-#define P4_EXPR     (-6)	/* P4 is a pointer to an Expr tree */
 #define P4_MEM      (-7)	/* P4 is a pointer to a Mem*    structure */
 #define P4_TRANSIENT  0		/* P4 is a pointer to a transient string */
 #define P4_REAL     (-9)	/* P4 is a 64-bit floating point value */

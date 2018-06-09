@@ -4679,15 +4679,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 				 && pTab->nCol == BMS - 1);
 			testcase(pWInfo->eOnePass == ONEPASS_OFF
 				 && pTab->nCol == BMS);
-#ifdef SQLITE_ENABLE_CURSOR_HINTS
-			if (pLoop->pIndex != 0) {
-				sqlite3VdbeChangeP5(v,
-						    OPFLAG_SEEKEQ | bFordelete);
-			} else
-#endif
-			{
-				sqlite3VdbeChangeP5(v, bFordelete);
-			}
+			sqlite3VdbeChangeP5(v, bFordelete);
 #ifdef SQLITE_ENABLE_COLUMN_USED_MASK
 			sqlite3VdbeAddOp4Dup8(v, OP_ColumnsUsed,
 					      pTabItem->iCursor, 0, 0,

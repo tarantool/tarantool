@@ -1947,7 +1947,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		struct space *dest_space =
 			space_by_id(SQLITE_PAGENO_TO_SPACEID(pDestIdx->tnum));
 		vdbe_emit_open_cursor(pParse, iDest, pDestIdx->tnum, dest_space);
-		sqlite3VdbeChangeP5(v, OPFLAG_BULKCSR);
 		VdbeComment((v, "%s", pDestIdx->zName));
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 		VdbeCoverage(v);
