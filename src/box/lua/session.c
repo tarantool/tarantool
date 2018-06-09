@@ -379,7 +379,7 @@ lbox_session_push(struct lua_State *L)
 			lua_pop(L, 1);
 			break;
 		}
-		FALLTHROUGH
+		FALLTHROUGH;
 	default:
 		return luaL_error(L, "Usage: box.session.push(data, sync)");
 	}
