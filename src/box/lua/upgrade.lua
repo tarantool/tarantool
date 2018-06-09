@@ -23,14 +23,6 @@ local function setmap(tab)
     return setmetatable(tab, { __serialize = 'map' })
 end
 
-local function ismap(tab)
-    if type(tab) ~= 'table' then
-        return false
-    end
-    local mt = getmetatable(tab)
-    return mt and (mt.__serialize == 'map' or mt.__serialize == 'mapping')
-end
-
 local mkversion = {}
 mkversion.__index = mkversion
 setmetatable(mkversion, {__call = function(c, ...) return c.new(...) end})
