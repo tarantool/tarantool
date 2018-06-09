@@ -66,16 +66,11 @@ extern const char *session_type_strs[];
  * types, and allows to do not store attributes in struct session,
  * that are used only by a session of particular type.
  */
-struct session_meta {
-	union {
-		/** IProto connection meta. */
-		struct {
-			uint64_t sync;
-			void *connection;
-		};
-		/** Only by console is used. */
-		int fd;
-	};
+union session_meta {
+	/** IProto connection. */
+	void *connection;
+	/** Console file/socket descriptor. */
+	int fd;
 };
 
 /**
@@ -92,7 +87,7 @@ struct session {
 	uint64_t id;
 	enum session_type type;
 	/** Session metadata. */
-	struct session_meta meta;
+	union session_meta meta;
 	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */

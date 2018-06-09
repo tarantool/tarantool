@@ -15,7 +15,7 @@ session = box.session
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
-test:plan(53)
+test:plan(55)
 
 ---
 --- Check that Tarantool creates ADMIN session for #! script
@@ -182,6 +182,33 @@ conn:eval("box.session.su(\"admin\", box.schema.create_space, \"sp1\")")
 local sp = conn:eval("return box.space._space.index.name:get{\"sp1\"}[2]")
 test:is(sp, 1, "effective ddl owner")
 conn:close()
+
+--
+-- gh-3450: box.session.sync() becomes request local.
+--
+cond = fiber.cond()
+local sync1, sync2
+local started = 0
+function f1()
+	started = started + 1
+	cond:wait()
+	sync1 = box.session.sync()
+end
+function f2()
+	started = started + 1
+	sync2 = box.session.sync()
+	cond:signal()
+end
+box.schema.user.grant('guest', 'read,write,execute', 'universe')
+conn = net.box.connect(box.cfg.listen)
+test:ok(conn:ping(), 'connect to self')
+_ = fiber.create(function() conn:call('f1') end)
+while started ~= 1 do fiber.sleep(0.01) end
+_ = fiber.create(function() conn:call('f2') end)
+while started ~= 2 do fiber.sleep(0.01) end
+test:isnt(sync1, sync2, 'session.sync() is request local')
+conn:close()
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 
 inspector:cmd('stop server session with cleanup=1')
 session = nil

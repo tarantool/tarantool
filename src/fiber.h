@@ -398,15 +398,24 @@ struct fiber {
 		struct session *session;
 		struct credentials *credentials;
 		struct txn *txn;
-		/**
-		 * Fields used by a fiber created in Lua: Lua
-		 * stack and the optional fiber.storage Lua
-		 * reference.
-		 */
-		struct {
-			struct lua_State *stack;
-			int ref;
-		} lua;
+		union {
+			/**
+			 * Fields used by a fiber created in Lua:
+			 * Lua stack and the optional
+			 * fiber.storage Lua reference.
+			 */
+			struct {
+				struct lua_State *stack;
+				int ref;
+			} lua;
+			/**
+			 * Fields used by a fiber created to
+			 * process an iproto request.
+			 */
+			struct {
+				uint64_t sync;
+			} net;
+		};
 	} storage;
 	/** An object to wait for incoming message or a reader. */
 	struct ipc_wait_pad *wait_pad;
