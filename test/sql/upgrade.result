@@ -1,0 +1,123 @@
+test_run = require('test_run').new()
+---
+...
+work_dir = 'sql/upgrade/1.10/'
+---
+...
+test_run:cmd('create server upgrade with script="sql/upgrade/upgrade.lua", workdir="' .. work_dir .. '"')
+---
+- true
+...
+test_run:cmd('start server upgrade')
+---
+- true
+...
+test_run:switch('upgrade')
+---
+- true
+...
+-- test system tables
+box.space._space.index['name']:get('_trigger')
+---
+- [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'opts',
+      'type': 'map'}]]
+...
+box.space._space.index['name']:get('_sql_stat1')
+---
+- [348, 1, '_sql_stat1', 'memtx', 0, {}, [{'name': 'tbl', 'type': 'string'}, {'name': 'idx',
+      'type': 'string'}, {'name': 'stat', 'type': 'string'}]]
+...
+box.space._space.index['name']:get('_sql_stat4')
+---
+- [349, 1, '_sql_stat4', 'memtx', 0, {}, [{'name': 'tbl', 'type': 'string'}, {'name': 'idx',
+      'type': 'string'}, {'name': 'neq', 'type': 'string'}, {'name': 'nlt', 'type': 'string'},
+    {'name': 'ndlt', 'type': 'string'}, {'name': 'sample', 'type': 'scalar'}]]
+...
+box.space._index:get({box.space._space.index['name']:get('_trigger').id, 0})
+---
+- [328, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
+...
+box.space._index:get({box.space._space.index['name']:get('_sql_stat1').id, 0})
+---
+- [348, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'string']]]
+...
+box.space._index:get({box.space._space.index['name']:get('_sql_stat4').id, 0})
+---
+- [349, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'string'], [5,
+      'scalar']]]
+...
+box.space._schema:format()
+---
+- [{'type': 'string', 'name': 'key'}, {'type': 'any', 'name': 'value', 'is_nullable': true}]
+...
+-- test data migration
+box.space._space.index['name']:get('T1')
+---
+- [512, 1, 'T1', 'memtx', 0, {}, [{'name': 'x', 'type': 'unsigned'}]]
+...
+box.space._index:get({box.space._space.index['name']:get('T1').id, 0})
+---
+- [512, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
+...
+-- test system tables functionality
+box.sql.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
+---
+...
+box.space._space.index['name']:get('T')
+---
+- [513, 1, 'T', 'memtx', 1, {'sql': 'CREATE TABLE t(x INTEGER PRIMARY KEY)'}, [{'type': 'integer',
+      'nullable_action': 'abort', 'name': 'X', 'is_nullable': false}]]
+...
+box.space._space.index['name']:get('T_OUT')
+---
+- [514, 1, 'T_OUT', 'memtx', 1, {'sql': 'CREATE TABLE t_out(x INTEGER PRIMARY KEY)'},
+  [{'type': 'integer', 'nullable_action': 'abort', 'name': 'X', 'is_nullable': false}]]
+...
+box.space._trigger:get('T1T')
+---
+- ['T1T', {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1);
+      END;'}]
+...
+box.sql.execute("INSERT INTO T VALUES(1);")
+---
+...
+box.space.T:select()
+---
+- - [1]
+...
+box.space.T_OUT:select()
+---
+- - [1]
+...
+box.sql.execute("SELECT * FROM T")
+---
+- - [1]
+...
+box.sql.execute("SELECT * FROM T")
+---
+- - [1]
+...
+box.sql.execute("DROP TABLE T;")
+---
+...
+box.sql.execute("DROP TABLE T_OUT;")
+---
+...
+test_run:switch('default')
+---
+- true
+...
+test_run:cmd('stop server upgrade')
+---
+- true
+...
+test_run:cmd('cleanup server upgrade')
+---
+- true
+...

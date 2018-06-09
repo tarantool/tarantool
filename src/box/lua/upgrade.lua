@@ -69,6 +69,7 @@ local function set_system_triggers(val)
     box.space._user:run_triggers(val)
     box.space._func:run_triggers(val)
     box.space._priv:run_triggers(val)
+    box.space._trigger:run_triggers(val)
 end
 
 --------------------------------------------------------------------------------
@@ -85,6 +86,7 @@ local function erase()
     truncate(box.space._sequence)
     truncate(box.space._truncate)
     truncate(box.space._collation)
+    truncate(box.space._trigger)
     --truncate(box.space._schema)
     box.space._schema:delete('version')
     box.space._schema:delete('max_id')
@@ -458,43 +460,33 @@ local function upgrade_to_1_10_0()
 end
 
 --------------------------------------------------------------------------------
--- Tarantool 1.8.2
+-- Tarantool 2.1.0
 --------------------------------------------------------------------------------
 
-local function upgrade_to_1_8_2()
+local function upgrade_to_2_1_0()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
     local _trigger = box.space[box.schema.TRIGGER_ID]
-    local format = {{name='name', type='string'},
-                    {name='opts', type='map'}}
+    local MAP = setmap({})
 
     log.info("create space _trigger")
-    _space:insert{_trigger.id, ADMIN, '_trigger', 'memtx', 0, setmap({}), {}}
+    local format = {{name='name', type='string'},
+                    {name='opts', type='map'}}
+    _space:insert{_trigger.id, ADMIN, '_trigger', 'memtx', 0, MAP, format}
+
     log.info("create index primary on _trigger")
     _index:insert{_trigger.id, 0, 'primary', 'tree', { unique = true },
-        {{0, 'string'}}}
+                  {{0, 'string'}}}
 
-    log.info("alter space _trigger set format")
-    _trigger:format(format)
-end
-
---------------------------------------------------------------------------------
--- Tarantool 1.8.4
---------------------------------------------------------------------------------
-
-local function upgrade_to_1_8_4()
-    local _space = box.space[box.schema.SPACE_ID]
-    local _index = box.space[box.schema.INDEX_ID]
     local stat1_ft = {{name='tbl', type='string'},
                       {name='idx', type='string'},
-	              {name='stat', type='string'}}
+                      {name='stat', type='string'}}
     local stat4_ft = {{name='tbl', type='string'},
                       {name='idx', type='string'},
                       {name='neq', type='string'},
                       {name='nlt', type='string'},
                       {name='ndlt', type='string'},
                       {name='sample', type='scalar'}}
-    local MAP = setmap({})
 
     log.info("create space _sql_stat1")
     _space:insert{box.schema.SQL_STAT1_ID, ADMIN, '_sql_stat1', 'memtx', 0,
@@ -511,7 +503,7 @@ local function upgrade_to_1_8_4()
     log.info("create index primary on _sql_stat4")
     _index:insert{box.schema.SQL_STAT4_ID, 0, 'primary', 'tree',
                   {unique = true}, {{0, 'string'}, {1, 'string'},
-                  {5, 'scalar'}}}
+                                    {5, 'scalar'}}}
 
     -- Nullability wasn't skipable. This was fixed in 1-7.
     -- Now, abscent field means NULL, so we can safely set second
@@ -521,14 +513,6 @@ local function upgrade_to_1_8_4()
     format[1] = {type='string', name='key'}
     format[2] = {type='any', name='value', is_nullable=true}
     box.space._schema:format(format)
-end
-
---------------------------------------------------------------------------------
--- Tarantool 2.1.0
---------------------------------------------------------------------------------
-
-local function upgrade_to_2_1_0()
-    upgrade_to_1_10_0()
 end
 
 local function get_version()
@@ -556,8 +540,7 @@ local function upgrade(options)
     local handlers = {
         {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
         {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
-        {version = mkversion(1, 8, 2), func = upgrade_to_1_8_2, auto = true},
-        {version = mkversion(1, 8, 4), func = upgrade_to_1_8_4, auto = true},
+        {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
         {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true}
     }
 
