@@ -154,7 +154,7 @@ extern struct rlist session_on_auth;
 static inline struct session *
 fiber_get_session(struct fiber *fiber)
 {
-	return (struct session *) fiber_get_key(fiber, FIBER_KEY_SESSION);
+	return fiber->storage.session;
 }
 
 /**
@@ -165,13 +165,13 @@ fiber_get_session(struct fiber *fiber)
 static inline void
 fiber_set_user(struct fiber *fiber, struct credentials *cr)
 {
-	fiber_set_key(fiber, FIBER_KEY_USER, cr);
+	fiber->storage.credentials = cr;
 }
 
 static inline void
 fiber_set_session(struct fiber *fiber, struct session *session)
 {
-	fiber_set_key(fiber, FIBER_KEY_SESSION, session);
+	fiber->storage.session = session;
 }
 
 static inline void
@@ -227,13 +227,11 @@ current_session()
 static inline struct credentials *
 effective_user()
 {
-	struct credentials *u =
-		(struct credentials *) fiber_get_key(fiber(),
-						     FIBER_KEY_USER);
+	struct fiber *f = fiber();
+	struct credentials *u = f->storage.credentials;
 	if (u == NULL) {
 		session_create_on_demand();
-		u = (struct credentials *) fiber_get_key(fiber(),
-							 FIBER_KEY_USER);
+		u = f->storage.credentials;
 	}
 	return u;
 }

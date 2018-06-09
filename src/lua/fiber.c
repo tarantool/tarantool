@@ -294,15 +294,14 @@ static int
 lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 {
 	int result;
-	struct lua_State *L = (struct lua_State *)
-		fiber_get_key(fiber(), FIBER_KEY_LUA_STACK);
+	struct fiber *f = fiber();
+	struct lua_State *L = f->storage.lua.stack;
 	int coro_ref = lua_tointeger(L, -1);
 	lua_pop(L, 1);
 	result = luaT_call(L, lua_gettop(L) - 1, LUA_MULTRET);
 
 	/* Destroy local storage */
-	int storage_ref = (int)(intptr_t)
-		fiber_get_key(fiber(), FIBER_KEY_LUA_STORAGE);
+	int storage_ref = f->storage.lua.ref;
 	if (storage_ref > 0)
 		luaL_unref(L, LUA_REGISTRYINDEX, storage_ref);
 	/*
@@ -310,7 +309,7 @@ lua_fiber_run_f(MAYBE_UNUSED va_list ap)
 	 * We can unref child stack here,
 	 * otherwise we have to unref child stack in join
 	 */
-	if (fiber()->flags & FIBER_IS_JOINABLE)
+	if (f->flags & FIBER_IS_JOINABLE)
 		lua_pushinteger(L, coro_ref);
 	else
 		luaL_unref(L, LUA_REGISTRYINDEX, coro_ref);
@@ -343,7 +342,7 @@ fiber_create(struct lua_State *L)
 	 * At that time we can pop coro_ref from stack
 	 */
 	lua_pushinteger(child_L, coro_ref);
-	fiber_set_key(f, FIBER_KEY_LUA_STACK, child_L);
+	f->storage.lua.stack = child_L;
 	return f;
 }
 
@@ -467,13 +466,11 @@ static int
 lbox_fiber_storage(struct lua_State *L)
 {
 	struct fiber *f = lbox_checkfiber(L, 1);
-	int storage_ref = (int)(intptr_t)
-		fiber_get_key(f, FIBER_KEY_LUA_STORAGE);
+	int storage_ref = f->storage.lua.ref;
 	if (storage_ref <= 0) {
 		lua_newtable(L); /* create local storage on demand */
 		storage_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-		fiber_set_key(f, FIBER_KEY_LUA_STORAGE,
-			      (void *)(intptr_t) storage_ref);
+		f->storage.lua.ref = storage_ref;
 	}
 	lua_rawgeti(L, LUA_REGISTRYINDEX, storage_ref);
 	return 1;
@@ -613,7 +610,7 @@ static int
 lbox_fiber_join(struct lua_State *L)
 {
 	struct fiber *fiber = lbox_checkfiber(L, 1);
-	struct lua_State *child_L = fiber_get_key(fiber, FIBER_KEY_LUA_STACK);
+	struct lua_State *child_L = fiber->storage.lua.stack;
 	fiber_join(fiber);
 	struct error *e = NULL;
 	int num_ret = 0;
