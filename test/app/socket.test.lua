@@ -565,6 +565,29 @@ end);
 test_run:cmd("setopt delimiter ''");
 f:cancel()
 
+-- gh-3168: a stopped tcp server removes the unix socket created
+-- and used by a newly started one.
+test_run:cmd("setopt delimiter ';'")
+err = nil;
+path = '/tmp/tarantool-test-socket';
+for i = 1, 10 do
+    local server = socket.tcp_server('unix/', path, function() end)
+    if not server then
+        err = 'tcp_server: ' .. errno.strerror()
+        break
+    end
+    local client = socket.tcp_connect("unix/", path)
+    if not client then
+        err = 'tcp_connect: ' .. errno.strerror()
+        break
+    end
+    client:close()
+    server:close()
+end;
+err == nil or err;
+test_run:cmd("setopt delimiter ''");
+
+
 --------------------------------------------------------------------------------
 -- Lua Socket Emulation
 --------------------------------------------------------------------------------

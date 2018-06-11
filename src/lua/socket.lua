@@ -1021,9 +1021,6 @@ local function tcp_server_loop(server, s, addr)
         end
     end
     -- Socket was closed
-    if addr.family == 'AF_UNIX' and addr.port then
-        fio.unlink(addr.port) -- remove unix socket
-    end
     log.info("stopped")
 end
 
@@ -1031,8 +1028,25 @@ local function tcp_server_usage()
     error('Usage: socket.tcp_server(host, port, handler | opts)')
 end
 
-local function tcp_server_bind_addr(s, addr)
+local function tcp_server_do_bind(s, addr)
     if socket_bind(s, addr.host, addr.port) then
+        if addr.family == 'AF_UNIX' then
+            -- Make close() remove the unix socket file created
+            -- by bind(). Note, this must be done before closing
+            -- the socket fd so that no other tcp server can
+            -- reuse the same path before we remove the file.
+            s.close = function(self)
+                fio.unlink(addr.port)
+                return socket_close(self)
+            end
+        end
+        return true
+    end
+    return false
+end
+
+local function tcp_server_bind_addr(s, addr)
+    if tcp_server_do_bind(s, addr) then
         return true
     end
 
@@ -1064,7 +1078,7 @@ local function tcp_server_bind_addr(s, addr)
         boxerrno(save_errno)
         return false
     end
-    return socket_bind(s, addr.host, addr.port)
+    return tcp_server_do_bind(s, addr)
 end
 
 
