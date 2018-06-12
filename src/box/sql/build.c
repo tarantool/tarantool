@@ -54,76 +54,65 @@
 #include "box/tuple_format.h"
 #include "box/coll_id_cache.h"
 
-/*
- * This routine is called after a single SQL statement has been
- * parsed and a VDBE program to execute that statement has been
- * prepared.  This routine puts the finishing touches on the
- * VDBE program and resets the pParse structure for the next
- * parse.
- *
- * Note that if an error occurred, it might be the case that
- * no VDBE code was generated.
- */
 void
-sqlite3FinishCoding(Parse * pParse)
+sql_finish_coding(struct Parse *parse_context)
 {
-	sqlite3 *db;
-	Vdbe *v;
-
-	assert(pParse->pToplevel == 0);
-	db = pParse->db;
-	if (pParse->nested)
+	if (parse_context->nested)
 		return;
-	if (db->mallocFailed || pParse->nErr) {
-		if (pParse->rc == SQLITE_OK)
-			pParse->rc = SQLITE_ERROR;
+	assert(parse_context->pToplevel == NULL);
+	struct sqlite3 *db = parse_context->db;
+	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	sqlite3VdbeAddOp0(v, OP_Halt);
+	if (db->mallocFailed || parse_context->nErr != 0) {
+		if (parse_context->rc == SQLITE_OK)
+			parse_context->rc = SQLITE_ERROR;
 		return;
 	}
-
-	/* Begin by generating some termination code at the end of the
-	 * vdbe program
+	/*
+	 * Begin by generating some termination code at the end
+	 * of the vdbe program
 	 */
-	v = sqlite3GetVdbe(pParse);
-	assert(!pParse->isMultiWrite
-	       || sqlite3VdbeAssertMayAbort(v, pParse->mayAbort));
-	if (v) {
-		sqlite3VdbeAddOp0(v, OP_Halt);
-		if (db->mallocFailed == 0 || pParse->pConstExpr) {
-			int i;
-			assert(sqlite3VdbeGetOp(v, 0)->opcode == OP_Init);
-			sqlite3VdbeJumpHere(v, 0);
-			if (pParse->initiateTTrans)
-				sqlite3VdbeAddOp0(v, OP_TTransaction);
-			if (db->init.busy == 0)
-				sqlite3VdbeChangeP5(v, 1);
-
-			/* Code constant expressions that where factored out of inner loops */
-			if (pParse->pConstExpr) {
-				ExprList *pEL = pParse->pConstExpr;
-				pParse->okConstFactor = 0;
-				for (i = 0; i < pEL->nExpr; i++) {
-					sqlite3ExprCode(pParse, pEL->a[i].pExpr,
-							pEL->a[i].u.
-							iConstExprReg);
-				}
-			}
-
-			/* Finally, jump back to the beginning of the executable code. */
-			sqlite3VdbeGoto(v, 1);
+	assert(!parse_context->isMultiWrite ||
+	       sqlite3VdbeAssertMayAbort(v, parse_context->mayAbort));
+	int last_instruction = v->nOp;
+	if (parse_context->initiateTTrans)
+		sqlite3VdbeAddOp0(v, OP_TTransaction);
+	if (parse_context->pConstExpr != NULL) {
+		assert(sqlite3VdbeGetOp(v, 0)->opcode == OP_Init);
+		/*
+		 * Code constant expressions that where
+		 * factored out of inner loops.
+		 */
+		struct ExprList *exprs = parse_context->pConstExpr;
+		parse_context->okConstFactor = 0;
+		for (int i = 0; i < exprs->nExpr; ++i) {
+			sqlite3ExprCode(parse_context, exprs->a[i].pExpr,
+					exprs->a[i].u. iConstExprReg);
 		}
 	}
-
-	/* Get the VDBE program ready for execution
+	/*
+	 * Finally, jump back to the beginning of
+	 * the executable code. In fact, it is required
+	 * only if some additional opcodes are generated.
+	 * Otherwise, it would be useless jump:
+	 *
+	 * 0:        OP_Init 0 vdbe_end ...
+	 * 1: ...
+	 *    ...
+	 * vdbe_end: OP_Goto 0 1 ...
 	 */
-	if (v && pParse->nErr == 0 && !db->mallocFailed) {
-		assert(pParse->iCacheLevel == 0);	/* Disables and re-enables match */
-		/* A minimum of one cursor is required if autoincrement is used
-		 *  See ticket [a696379c1f08866]
-		 */
-		sqlite3VdbeMakeReady(v, pParse);
-		pParse->rc = SQLITE_DONE;
+	if (parse_context->initiateTTrans ||
+	    parse_context->pConstExpr != NULL) {
+		sqlite3VdbeChangeP2(v, 0, last_instruction);
+		sqlite3VdbeGoto(v, 1);
+	}
+	/* Get the VDBE program ready for execution. */
+	if (parse_context->nErr == 0 && !db->mallocFailed) {
+		assert(parse_context->iCacheLevel == 0);
+		sqlite3VdbeMakeReady(v, parse_context);
+		parse_context->rc = SQLITE_DONE;
 	} else {
-		pParse->rc = SQLITE_ERROR;
+		parse_context->rc = SQLITE_ERROR;
 	}
 }
 

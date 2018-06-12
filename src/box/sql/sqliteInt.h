@@ -3436,7 +3436,22 @@ void sqlite3NormalizeName(char *z);
 void sqlite3TokenInit(Token *, char *);
 int sqlite3KeywordCode(const unsigned char *, int);
 int sqlite3RunParser(Parse *, const char *, char **);
-void sqlite3FinishCoding(Parse *);
+
+/**
+ * This routine is called after a single SQL statement has been
+ * parsed and a VDBE program to execute that statement has been
+ * prepared.  This routine puts the finishing touches on the
+ * VDBE program and resets the pParse structure for the next
+ * parse.
+ *
+ * Note that if an error occurred, it might be the case that
+ * no VDBE code was generated.
+ *
+ * @param parse_context Current parsing context.
+ */
+void
+sql_finish_coding(struct Parse *parse_context);
+
 int sqlite3GetTempReg(Parse *);
 void sqlite3ReleaseTempReg(Parse *, int);
 int sqlite3GetTempRange(Parse *, int);

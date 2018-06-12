@@ -110,7 +110,7 @@ static void disableLookaside(Parse *pParse){
 input ::= ecmd.
 ecmd ::= explain cmdx SEMI. {
 	if (!pParse->parse_only)
-		sqlite3FinishCoding(pParse);
+		sql_finish_coding(pParse);
 }
 ecmd ::= SEMI. {
   sqlite3ErrorMsg(pParse, "syntax error: empty request");
