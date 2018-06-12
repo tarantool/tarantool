@@ -509,6 +509,27 @@ local function upgrade_to_2_1_0()
                   {unique = true}, {{0, 'string'}, {1, 'string'},
                                     {5, 'scalar'}}}
 
+    local fk_constr_ft = {{name='name', type='string'},
+                          {name='child_id', type='unsigned'},
+                          {name='parent_id', type='unsigned'},
+                          {name='is_deferred', type='boolean'},
+                          {name='match', type='string'},
+                          {name='on_delete', type='string'},
+                          {name='on_update', type='string'},
+                          {name='child_cols', type='array'},
+                          {name='parent_cols', type='array'}}
+    log.info("create space _fk_constraint")
+    _space:insert{box.schema.FK_CONSTRAINT_ID, ADMIN, '_fk_constraint', 'memtx',
+                  0, setmap({}), fk_constr_ft}
+
+    log.info("create index primary on _fk_constraint")
+    _index:insert{box.schema.FK_CONSTRAINT_ID, 0, 'primary', 'tree',
+                  {unique = true}, {{0, 'string'}, {1, 'unsigned'}}}
+
+    log.info("create secondary index child_id on _fk_constraint")
+    _index:insert{box.schema.FK_CONSTRAINT_ID, 1, 'child_id', 'tree',
+                  {unique = false}, {{1, 'unsigned'}}}
+
     -- Nullability wasn't skipable. This was fixed in 1-7.
     -- Now, abscent field means NULL, so we can safely set second
     -- field in format, marking it nullable.

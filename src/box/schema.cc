@@ -412,6 +412,22 @@ schema_init()
 			 COLL_NONE, SORT_ORDER_ASC);
 	/* _sql_stat4 - extensive statistics on space, seen in SQL. */
 	sc_space_new(BOX_SQL_STAT4_ID, "_sql_stat4", key_def, NULL, NULL);
+
+	key_def_delete(key_def);
+	key_def = key_def_new(2);
+	if (key_def == NULL)
+		diag_raise();
+	/* Constraint name. */
+	key_def_set_part(key_def, 0, BOX_FK_CONSTRAINT_FIELD_NAME,
+			 FIELD_TYPE_STRING, ON_CONFLICT_ACTION_ABORT, NULL,
+			 COLL_NONE, SORT_ORDER_ASC);
+	/* Child space. */
+	key_def_set_part(key_def, 1, BOX_FK_CONSTRAINT_FIELD_CHILD_ID,
+			 FIELD_TYPE_UNSIGNED, ON_CONFLICT_ACTION_ABORT, NULL,
+			 COLL_NONE, SORT_ORDER_ASC);
+	/* _fk_сonstraint - foreign keys constraints. */
+	sc_space_new(BOX_FK_CONSTRAINT_ID, "_fk_constraint", key_def,
+		     &on_replace_fk_constraint, NULL);
 }
 
 void

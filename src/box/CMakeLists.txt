@@ -93,6 +93,7 @@ add_library(box STATIC
     space.c
     space_def.c
     sequence.c
+    fkey.c
     func.c
     func_def.c
     alter.cc

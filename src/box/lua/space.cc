@@ -551,6 +551,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_setfield(L, -2, "SQL_STAT1_ID");
 	lua_pushnumber(L, BOX_SQL_STAT4_ID);
 	lua_setfield(L, -2, "SQL_STAT4_ID");
+	lua_pushnumber(L, BOX_FK_CONSTRAINT_ID);
+	lua_setfield(L, -2, "FK_CONSTRAINT_ID");
 	lua_pushnumber(L, BOX_TRUNCATE_ID);
 	lua_setfield(L, -2, "TRUNCATE_ID");
 	lua_pushnumber(L, BOX_SEQUENCE_ID);

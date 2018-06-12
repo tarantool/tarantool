@@ -183,6 +183,15 @@ struct space {
 	 * of index id.
 	 */
 	struct index **index;
+	/**
+	 * Lists of foreign key constraints. In SQL terms child
+	 * space is the "from" table i.e. the table that contains
+	 * the REFERENCES clause. Parent space is "to" table, in
+	 * other words the table that is named in the REFERENCES
+	 * clause.
+	 */
+	struct rlist parent_fkey;
+	struct rlist child_fkey;
 };
 
 /** Initialize a base space instance. */

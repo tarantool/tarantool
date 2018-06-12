@@ -163,6 +163,8 @@ space_create(struct space *space, struct engine *engine,
 		space->index_map[index_def->iid] = index;
 	}
 	space_fill_index_map(space);
+	rlist_create(&space->parent_fkey);
+	rlist_create(&space->child_fkey);
 	return 0;
 
 fail_free_indexes:
@@ -220,6 +222,8 @@ space_delete(struct space *space)
 	 * on_replace_dd_trigger on deletion from _trigger.
 	 */
 	assert(space->sql_triggers == NULL);
+	assert(rlist_empty(&space->parent_fkey));
+	assert(rlist_empty(&space->child_fkey));
 	space->vtab->destroy(space);
 }
 

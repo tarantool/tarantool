@@ -20,6 +20,7 @@
 #define TARANTOOL_SYS_TRUNCATE_NAME "_truncate"
 #define TARANTOOL_SYS_SQL_STAT1_NAME "_sql_stat1"
 #define TARANTOOL_SYS_SQL_STAT4_NAME "_sql_stat4"
+#define TARANTOOL_SYS_FK_CONSTRAINT_NAME "_fk_constraint"
 
 /* Max space id seen so far. */
 #define TARANTOOL_SYS_SCHEMA_MAXID_KEY "max_id"

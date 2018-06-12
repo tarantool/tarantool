@@ -1260,6 +1260,14 @@ void tarantoolSqlite3LoadSchema(struct init_data *init)
 			       "\"sample\","
 			       "PRIMARY KEY(\"tbl\", \"idx\", \"sample\"))");
 
+	sql_init_callback(init, TARANTOOL_SYS_FK_CONSTRAINT_NAME,
+			  BOX_FK_CONSTRAINT_ID, 0,
+			  "CREATE TABLE \""TARANTOOL_SYS_FK_CONSTRAINT_NAME
+			  "\"(\"name\" TEXT, \"parent_id\" INT, \"child_id\" INT,"
+			  "\"deferred\" INT, \"match\" TEXT, \"on_delete\" TEXT,"
+			  "\"on_update\" TEXT, \"child_cols\", \"parent_cols\","
+			  "PRIMARY KEY(\"name\", \"child_id\"))");
+
 	/* Read _space */
 	if (space_foreach(space_foreach_put_cb, init) != 0) {
 		init->rc = SQL_TARANTOOL_ERROR;

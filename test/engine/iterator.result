@@ -4211,9 +4211,15 @@ s:replace{35}
 ---
 - [35]
 ...
-state, value = gen(param,state)
+f = function() return gen(param, state) end
 ---
-- error: 'builtin/box/schema.lua:1051: usage: next(param, state)'
+...
+_, errmsg = pcall(f)
+---
+...
+errmsg:match('usage: next%(param, state%)')
+---
+- 'usage: next(param, state)'
 ...
 value
 ---

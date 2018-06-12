@@ -35,6 +35,7 @@
  */
 #include "coll.h"
 #include "sqliteInt.h"
+#include "box/fkey.h"
 #include "box/schema.h"
 #include "box/session.h"
 #include "tarantoolInt.h"
@@ -709,31 +710,6 @@ sqlite3FkReferences(Table * pTab)
 					pTab->def->name);
 }
 
-/**
- * The second argument is a Trigger structure allocated by the
- * fkActionTrigger() routine. This function deletes the sql_trigger
- * structure and all of its sub-components.
- *
- * The Trigger structure or any of its sub-components may be
- * allocated from the lookaside buffer belonging to database
- * handle dbMem.
- *
- * @param db Database connection.
- * @param trigger AST object.
- */
-static void
-sql_fk_trigger_delete(struct sqlite3 *db, struct sql_trigger *trigger)
-{
-	if (trigger == NULL)
-		return;
-	struct TriggerStep *trigger_step = trigger->step_list;
-	sql_expr_delete(db, trigger_step->pWhere, false);
-	sql_expr_list_delete(db, trigger_step->pExprList);
-	sql_select_delete(db, trigger_step->pSelect);
-	sql_expr_delete(db, trigger->pWhen, false);
-	sqlite3DbFree(db, trigger);
-}
-
 /*
  * The second argument points to an FKey object representing a foreign key
  * for which pTab is the child table. An UPDATE statement against pTab
@@ -1277,20 +1253,14 @@ fkActionTrigger(struct Parse *pParse, struct Table *pTab, struct FKey *pFKey,
 						   pWhere, 0, 0, 0, 0, 0, 0);
 			pWhere = 0;
 		}
-
-		/* Disable lookaside memory allocation */
-		db->lookaside.bDisable++;
-
-		size_t trigger_size = sizeof(struct sql_trigger) +
-				      sizeof(TriggerStep) + nFrom + 1;
-		trigger =
-			(struct sql_trigger *)sqlite3DbMallocZero(db,
-								  trigger_size);
+		trigger = (struct sql_trigger *)sqlite3DbMallocZero(db,
+								    sizeof(*trigger));
 		if (trigger != NULL) {
-			pStep = trigger->step_list = (TriggerStep *)&trigger[1];
+			size_t step_size = sizeof(TriggerStep) + nFrom + 1;
+			trigger->step_list = sqlite3DbMallocZero(db, step_size);
+			pStep = trigger->step_list;
 			pStep->zTarget = (char *)&pStep[1];
-			memcpy((char *)pStep->zTarget, zFrom, nFrom);
-
+			memcpy(pStep->zTarget, zFrom, nFrom);
 			pStep->pWhere =
 			    sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
 			pStep->pExprList =
@@ -1304,15 +1274,12 @@ fkActionTrigger(struct Parse *pParse, struct Table *pTab, struct FKey *pFKey,
 			}
 		}
 
-		/* Re-enable the lookaside buffer, if it was disabled earlier. */
-		db->lookaside.bDisable--;
-
 		sql_expr_delete(db, pWhere, false);
 		sql_expr_delete(db, pWhen, false);
 		sql_expr_list_delete(db, pList);
 		sql_select_delete(db, pSelect);
 		if (db->mallocFailed == 1) {
-			sql_fk_trigger_delete(db, trigger);
+			sql_trigger_delete(db, trigger);
 			return 0;
 		}
 		assert(pStep != 0);
@@ -1410,8 +1377,8 @@ sqlite3FkDelete(sqlite3 * db, Table * pTab)
 		assert(pFKey->isDeferred == 0 || pFKey->isDeferred == 1);
 
 		/* Delete any triggers created to implement actions for this FK. */
-		sql_fk_trigger_delete(db, pFKey->apTrigger[0]);
-		sql_fk_trigger_delete(db, pFKey->apTrigger[1]);
+		sql_trigger_delete(db, pFKey->apTrigger[0]);
+		sql_trigger_delete(db, pFKey->apTrigger[1]);
 
 		pNext = pFKey->pNextFrom;
 		sqlite3DbFree(db, pFKey);

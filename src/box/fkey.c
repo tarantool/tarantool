@@ -1,7 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_BOX_ALTER_H
-#define INCLUDES_TARANTOOL_BOX_ALTER_H
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -30,24 +28,29 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trigger.h"
+#include "fkey.h"
+#include "sql.h"
+#include "sql/sqliteInt.h"
 
-extern struct trigger alter_space_on_replace_space;
-extern struct trigger alter_space_on_replace_index;
-extern struct trigger on_replace_truncate;
-extern struct trigger on_replace_schema;
-extern struct trigger on_replace_user;
-extern struct trigger on_replace_func;
-extern struct trigger on_replace_collation;
-extern struct trigger on_replace_priv;
-extern struct trigger on_replace_cluster;
-extern struct trigger on_replace_sequence;
-extern struct trigger on_replace_sequence_data;
-extern struct trigger on_replace_space_sequence;
-extern struct trigger on_replace_trigger;
-extern struct trigger on_replace_fk_constraint;
-extern struct trigger on_stmt_begin_space;
-extern struct trigger on_stmt_begin_index;
-extern struct trigger on_stmt_begin_truncate;
+const char *fkey_action_strs[] = {
+	/* [FKEY_ACTION_RESTRICT]    = */ "no_action",
+	/* [FKEY_ACTION_SET_NULL]    = */ "set_null",
+	/* [FKEY_ACTION_SET_DEFAULT] = */ "set_default",
+	/* [FKEY_ACTION_CASCADE]     = */ "cascade",
+	/* [FKEY_ACTION_NO_ACTION]   = */ "restrict"
+};
 
-#endif /* INCLUDES_TARANTOOL_BOX_ALTER_H */
+const char *fkey_match_strs[] = {
+	/* [FKEY_MATCH_SIMPLE]  = */ "simple",
+	/* [FKEY_MATCH_PARTIAL] = */ "partial",
+	/* [FKEY_MATCH_FULL]    = */ "full"
+};
+
+void
+fkey_delete(struct fkey *fkey)
+{
+	sql_trigger_delete(sql_get(), fkey->on_delete_trigger);
+	sql_trigger_delete(sql_get(), fkey->on_update_trigger);
+	free(fkey->def);
+	free(fkey);
+}
