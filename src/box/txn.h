@@ -370,31 +370,6 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *savepoint);
 
 #include "diag.h"
 
-static inline struct txn *
-txn_begin_stmt_xc(struct space *space)
-{
-	struct txn *txn = txn_begin_stmt(space);
-	if (txn == NULL)
-		diag_raise();
-	return txn;
-}
-
-static inline struct txn *
-txn_begin_ro_stmt_xc(struct space *space)
-{
-	struct txn *txn;
-	if (txn_begin_ro_stmt(space, &txn) != 0)
-		diag_raise();
-	return txn;
-}
-
-static inline void
-txn_commit_stmt_xc(struct txn *txn, struct request *request)
-{
-	if (txn_commit_stmt(txn, request) != 0)
-		diag_raise();
-}
-
 static inline void
 txn_check_singlestatement_xc(struct txn *txn, const char *where)
 {
