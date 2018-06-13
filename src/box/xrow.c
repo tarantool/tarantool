@@ -408,7 +408,7 @@ xrow_decode_dml(struct xrow_header *row, struct request *request,
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "missing request body");
-		return 1;
+		return -1;
 	}
 
 	assert(row->bodycnt == 1);
@@ -601,7 +601,7 @@ xrow_decode_call(const struct xrow_header *row, struct call_request *request)
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "missing request body");
-		return 1;
+		return -1;
 	}
 
 	assert(row->bodycnt == 1);
@@ -612,7 +612,7 @@ xrow_decode_call(const struct xrow_header *row, struct call_request *request)
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
-		return 1;
+		return -1;
 	}
 
 	memset(request, 0, sizeof(*request));
@@ -651,20 +651,20 @@ error:
 	}
 	if (data != end) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
-		return 1;
+		return -1;
 	}
 	if (row->type == IPROTO_EVAL) {
 		if (request->expr == NULL) {
 			diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
 				 iproto_key_name(IPROTO_EXPR));
-			return 1;
+			return -1;
 		}
 	} else if (request->name == NULL) {
 		assert(row->type == IPROTO_CALL_16 ||
 		       row->type == IPROTO_CALL);
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
 			 iproto_key_name(IPROTO_FUNCTION_NAME));
-		return 1;
+		return -1;
 	}
 	if (request->args == NULL) {
 		static const char empty_args[] = { (char)0x90 };
@@ -680,7 +680,7 @@ xrow_decode_auth(const struct xrow_header *row, struct auth_request *request)
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK,
 			 "missing request body");
-		return 1;
+		return -1;
 	}
 
 	assert(row->bodycnt == 1);
@@ -691,7 +691,7 @@ xrow_decode_auth(const struct xrow_header *row, struct auth_request *request)
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
 error:
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
-		return 1;
+		return -1;
 	}
 
 	memset(request, 0, sizeof(*request));
@@ -723,17 +723,17 @@ error:
 	}
 	if (data != end) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
-		return 1;
+		return -1;
 	}
 	if (request->user_name == NULL) {
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
 			  iproto_key_name(IPROTO_USER_NAME));
-		return 1;
+		return -1;
 	}
 	if (request->scramble == NULL) {
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
 			 iproto_key_name(IPROTO_TUPLE));
-		return 1;
+		return -1;
 	}
 	return 0;
 }
