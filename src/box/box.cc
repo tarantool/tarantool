@@ -291,7 +291,6 @@ recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 static inline void
 apply_row(struct xstream *stream, struct xrow_header *row)
 {
-	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
 	struct request request;
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));

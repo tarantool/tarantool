@@ -660,9 +660,9 @@ row.HEADER.type
 ---
 - NOP
 ...
-#row.BODY
+row.BODY == nil
 ---
-- 0
+- true
 ...
 -- gh-3128 before_replace with run_triggers
 s2 = box.schema.space.create("test2")

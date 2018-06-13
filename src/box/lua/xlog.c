@@ -219,13 +219,14 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 
 	lua_settable(L, -3); /* HEADER */
 
-	assert(row.bodycnt == 1); /* always 1 for read */
-	lua_pushstring(L, "BODY");
-	lua_newtable(L);
-	lbox_xlog_parse_body(L, row.type, (char *)row.body[0].iov_base,
-			     row.body[0].iov_len);
-	lua_settable(L, -3);  /* BODY */
-
+	if (row.bodycnt > 0) {
+		assert(row.bodycnt == 1);
+		lua_pushstring(L, "BODY");
+		lua_newtable(L);
+		lbox_xlog_parse_body(L, row.type, row.body[0].iov_base,
+				     row.body[0].iov_len);
+		lua_settable(L, -3);  /* BODY */
+	}
 	return 2;
 }
 
