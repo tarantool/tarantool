@@ -124,6 +124,12 @@ struct tuple_format {
 	/** Reference counter */
 	int refs;
 	/**
+	 * Tuples of this format belong to a temporary space and
+	 * hence can be freed immediately while checkpointing is
+	 * in progress.
+	 */
+	bool temporary;
+	/**
 	 * The number of extra bytes to reserve in tuples before
 	 * field map.
 	 * \sa struct tuple
