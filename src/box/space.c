@@ -201,13 +201,6 @@ space_delete(struct space *space)
 	space->vtab->destroy(space);
 }
 
-/** Do nothing if the space is already recovered. */
-void
-space_noop(struct space *space)
-{
-	(void)space;
-}
-
 void
 space_dump_def(const struct space *space, struct rlist *key_list)
 {
