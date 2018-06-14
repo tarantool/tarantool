@@ -164,7 +164,6 @@ memtx_engine_recover_snapshot(struct memtx_engine *memtx,
 	struct xlog_cursor cursor;
 	if (xlog_cursor_open(&cursor, filename) < 0)
 		return -1;
-	INSTANCE_UUID = cursor.meta.instance_uuid;
 
 	int rc;
 	struct xrow_header row;
@@ -463,6 +462,11 @@ memtx_engine_bootstrap(struct engine *engine)
 static int
 checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 {
+	struct errinj *errinj = errinj(ERRINJ_SNAP_WRITE_ROW_TIMEOUT,
+				       ERRINJ_DOUBLE);
+	if (errinj != NULL && errinj->dparam > 0)
+		usleep(errinj->dparam * 1000000);
+
 	static ev_tstamp last = 0;
 	if (last == 0) {
 		ev_now_update(loop());
@@ -1001,6 +1005,26 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	if (xdir_scan(&memtx->snap_dir) != 0)
 		goto fail;
 
+	/*
+	 * To check if the instance needs to be rebootstrapped, we
+	 * need to connect it to remote peers before proceeding to
+	 * local recovery. In order to do that, we have to start
+	 * listening for incoming connections, because one of remote
+	 * peers may be self. This, in turn, requires us to know the
+	 * instance UUID, as it is a part of a greeting message.
+	 * So if the local directory isn't empty, read the snapshot
+	 * signature right now to initialize the instance UUID.
+	 */
+	int64_t snap_signature = xdir_last_vclock(&memtx->snap_dir, NULL);
+	if (snap_signature >= 0) {
+		struct xlog_cursor cursor;
+		if (xdir_open_cursor(&memtx->snap_dir,
+				     snap_signature, &cursor) != 0)
+			goto fail;
+		INSTANCE_UUID = cursor.meta.instance_uuid;
+		xlog_cursor_close(&cursor, false);
+	}
+
 	stailq_create(&memtx->gc_queue);
 	memtx->gc_fiber = fiber_new("memtx.gc", memtx_engine_gc_f);
 	if (memtx->gc_fiber == NULL)
@@ -1138,7 +1162,8 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
 	if (memtx->alloc.free_mode != SMALL_DELAYED_FREE ||
-	    memtx_tuple->version == memtx->snapshot_version)
+	    memtx_tuple->version == memtx->snapshot_version ||
+	    format->temporary)
 		smfree(&memtx->alloc, memtx_tuple, total);
 	else
 		smfree_delayed(&memtx->alloc, memtx_tuple, total);

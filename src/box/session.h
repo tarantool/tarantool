@@ -73,16 +73,11 @@ extern uint32_t default_flags;
  * types, and allows to do not store attributes in struct session,
  * that are used only by a session of particular type.
  */
-struct session_meta {
-	union {
-		/** IProto connection meta. */
-		struct {
-			uint64_t sync;
-			void *connection;
-		};
-		/** Only by console is used. */
-		int fd;
-	};
+union session_meta {
+	/** IProto connection. */
+	void *connection;
+	/** Console file/socket descriptor. */
+	int fd;
 };
 
 /**
@@ -101,7 +96,7 @@ struct session {
 	uint32_t sql_flags;
 	enum session_type type;
 	/** Session metadata. */
-	struct session_meta meta;
+	union session_meta meta;
 	/** Session user id and global grants */
 	struct credentials credentials;
 	/** Trigger for fiber on_stop to cleanup created on-demand session */
@@ -163,7 +158,7 @@ extern struct rlist session_on_auth;
 static inline struct session *
 fiber_get_session(struct fiber *fiber)
 {
-	return (struct session *) fiber_get_key(fiber, FIBER_KEY_SESSION);
+	return fiber->storage.session;
 }
 
 /**
@@ -174,13 +169,13 @@ fiber_get_session(struct fiber *fiber)
 static inline void
 fiber_set_user(struct fiber *fiber, struct credentials *cr)
 {
-	fiber_set_key(fiber, FIBER_KEY_USER, cr);
+	fiber->storage.credentials = cr;
 }
 
 static inline void
 fiber_set_session(struct fiber *fiber, struct session *session)
 {
-	fiber_set_key(fiber, FIBER_KEY_SESSION, session);
+	fiber->storage.session = session;
 }
 
 static inline void
@@ -236,13 +231,11 @@ current_session()
 static inline struct credentials *
 effective_user()
 {
-	struct credentials *u =
-		(struct credentials *) fiber_get_key(fiber(),
-						     FIBER_KEY_USER);
+	struct fiber *f = fiber();
+	struct credentials *u = f->storage.credentials;
 	if (u == NULL) {
 		session_create_on_demand();
-		u = (struct credentials *) fiber_get_key(fiber(),
-							 FIBER_KEY_USER);
+		u = f->storage.credentials;
 	}
 	return u;
 }

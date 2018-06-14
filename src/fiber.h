@@ -92,24 +92,6 @@ enum {
 	FIBER_DEFAULT_FLAGS = FIBER_IS_CANCELLABLE
 };
 
-/**
- * \brief Pre-defined key for fiber local storage
- */
-enum fiber_key {
-	/** box.session */
-	FIBER_KEY_SESSION = 0,
-	/** Lua fiber.storage */
-	FIBER_KEY_LUA_STORAGE = 1,
-	/** transaction */
-	FIBER_KEY_TXN = 2,
-	/** User global privilege and authentication token */
-	FIBER_KEY_USER = 3,
-	FIBER_KEY_MSG = 4,
-	/** Storage for lua stack */
-	FIBER_KEY_LUA_STACK = 5,
-	FIBER_KEY_MAX = 6
-};
-
 /** \cond public */
 
 /**
@@ -349,6 +331,17 @@ struct fiber_attr {
 void
 fiber_attr_create(struct fiber_attr *fiber_attr);
 
+/**
+ * Under no circumstances this header file is allowed to include
+ * application-specific headers like session.h or txn.h. One only
+ * is allowed to announce a struct and add opaque pointer to it.
+ */
+struct session;
+struct txn;
+struct credentials;
+struct lua_State;
+struct ipc_wait_pad;
+
 struct fiber {
 	coro_context ctx;
 	/** Coro stack slab. */
@@ -395,8 +388,37 @@ struct fiber {
 	fiber_func f;
 	va_list f_data;
 	int f_ret;
-	/** Fiber local storage */
-	void *fls[FIBER_KEY_MAX];
+	/** Fiber local storage. */
+	struct {
+		/**
+		 * Current transaction, session and the active
+		 * user credentials are shared among multiple
+		 * requests and valid even out of a former.
+		 */
+		struct session *session;
+		struct credentials *credentials;
+		struct txn *txn;
+		union {
+			/**
+			 * Fields used by a fiber created in Lua:
+			 * Lua stack and the optional
+			 * fiber.storage Lua reference.
+			 */
+			struct {
+				struct lua_State *stack;
+				int ref;
+			} lua;
+			/**
+			 * Fields used by a fiber created to
+			 * process an iproto request.
+			 */
+			struct {
+				uint64_t sync;
+			} net;
+		};
+	} storage;
+	/** An object to wait for incoming message or a reader. */
+	struct ipc_wait_pad *wait_pad;
 	/** Exception which caused this fiber's death. */
 	struct diag diag;
 	char name[FIBER_NAME_MAX];
@@ -577,44 +599,12 @@ fiber_find(uint32_t fid);
 void
 fiber_schedule_cb(ev_loop * /* loop */, ev_watcher *watcher, int revents);
 
-/**
- * \brief Associate \a value with \a key in fiber local storage
- * \param fiber fiber
- * \param key pre-defined key
- * \param value value to set
- */
-inline void
-fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value)
-{
-	assert(key < FIBER_KEY_MAX);
-	fiber->fls[key] = value;
-}
-
-
 static inline bool
 fiber_is_dead(struct fiber *f)
 {
 	return f->flags & FIBER_IS_DEAD;
 }
 
-/**
- * \brief Retrieve value by \a key from fiber local storage
- * \param fiber fiber
- * \param key pre-defined key
- * \return value from from fiber local storage
- */
-inline void *
-fiber_get_key(struct fiber *fiber, enum fiber_key key)
-{
-	assert(key < FIBER_KEY_MAX);
-	return fiber->fls[key];
-}
-
-/**
- * Finalizer callback
- * \sa fiber_key_on_gc()
- */
-typedef void (*fiber_key_gc_cb)(enum fiber_key key, void *arg);
 typedef int (*fiber_stat_cb)(struct fiber *f, void *ctx);
 
 int

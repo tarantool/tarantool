@@ -310,6 +310,7 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 	format->vtab = *vtab;
 	format->engine = NULL;
 	format->extra_size = extra_size;
+	format->temporary = false;
 	if (tuple_format_register(format) < 0) {
 		tuple_format_destroy(format);
 		free(format);

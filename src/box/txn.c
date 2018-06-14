@@ -40,7 +40,7 @@ double too_long_threshold;
 static inline void
 fiber_set_txn(struct fiber *fiber, struct txn *txn)
 {
-	fiber_set_key(fiber, FIBER_KEY_TXN, (void *) txn);
+	fiber->storage.txn = txn;
 }
 
 static int

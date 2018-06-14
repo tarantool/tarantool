@@ -1871,6 +1871,15 @@ box_cfg_xc(void)
 	}
 	bool is_bootstrap_leader = false;
 	if (last_checkpoint_lsn >= 0) {
+		/* Check instance UUID. */
+		assert(!tt_uuid_is_nil(&INSTANCE_UUID));
+		if (!tt_uuid_is_nil(&instance_uuid) &&
+		    !tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID)) {
+			tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
+				  tt_uuid_str(&instance_uuid),
+				  tt_uuid_str(&INSTANCE_UUID));
+		}
+
 		struct wal_stream wal_stream;
 		wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
@@ -1910,17 +1919,17 @@ box_cfg_xc(void)
 				&last_checkpoint_vclock);
 
 		engine_begin_final_recovery_xc();
-		recovery_follow_local(recovery, &wal_stream.base, "hot_standby",
-				      cfg_getd("wal_dir_rescan_delay"));
-		title("hot_standby");
-
-		assert(!tt_uuid_is_nil(&INSTANCE_UUID));
+		recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
 		/*
 		 * Leave hot standby mode, if any, only
 		 * after acquiring the lock.
 		 */
 		if (wal_dir_lock < 0) {
+			title("hot_standby");
 			say_info("Entering hot standby mode");
+			recovery_follow_local(recovery, &wal_stream.base,
+					      "hot_standby",
+					      cfg_getd("wal_dir_rescan_delay"));
 			while (true) {
 				if (path_lock(cfg_gets("wal_dir"),
 					      &wal_dir_lock))
@@ -1929,18 +1938,15 @@ box_cfg_xc(void)
 					break;
 				fiber_sleep(0.1);
 			}
+			recovery_stop_local(recovery);
+			recover_remaining_wals(recovery, &wal_stream.base,
+					       NULL, true);
 			box_bind();
 		}
-		recovery_finalize(recovery, &wal_stream.base);
+		recovery_finalize(recovery);
 		engine_end_recovery_xc();
 
-		/* Check replica set and instance UUID. */
-		if (!tt_uuid_is_nil(&instance_uuid) &&
-		    !tt_uuid_is_equal(&instance_uuid, &INSTANCE_UUID)) {
-			tnt_raise(ClientError, ER_INSTANCE_UUID_MISMATCH,
-				  tt_uuid_str(&instance_uuid),
-				  tt_uuid_str(&INSTANCE_UUID));
-		}
+		/* Check replica set UUID. */
 		if (!tt_uuid_is_nil(&replicaset_uuid) &&
 		    !tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
 			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,

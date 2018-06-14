@@ -76,7 +76,7 @@ void
 recovery_stop_local(struct recovery *r);
 
 void
-recovery_finalize(struct recovery *r, struct xstream *stream);
+recovery_finalize(struct recovery *r);
 
 #if defined(__cplusplus)
 } /* extern "C" */

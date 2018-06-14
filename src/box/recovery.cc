@@ -313,12 +313,8 @@ recover_current_wal:
 }
 
 void
-recovery_finalize(struct recovery *r, struct xstream *stream)
+recovery_finalize(struct recovery *r)
 {
-	recovery_stop_local(r);
-
-	recover_remaining_wals(r, stream, NULL, true);
-
 	recovery_close_log(r);
 
 	/*
@@ -497,11 +493,6 @@ void
 recovery_follow_local(struct recovery *r, struct xstream *stream,
 		      const char *name, ev_tstamp wal_dir_rescan_delay)
 {
-	/*
-	 * Scan wal_dir and recover all existing at the moment xlogs.
-	 * Blocks until finished.
-	 */
-	recover_remaining_wals(r, stream, NULL, true);
 	/*
 	 * Start 'hot_standby' background fiber to follow xlog changes.
 	 * It will pick up from the position of the currently open

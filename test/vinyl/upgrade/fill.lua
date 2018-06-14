@@ -4,26 +4,31 @@
 --
 fiber = require 'fiber'
 
-box.cfg{
-    vinyl_memory = 1024 * 1024,
-    vinyl_max_tuple_size = 1024 * 1024 * 2,
-    vinyl_timeout = 0.1,
-    checkpoint_count = 1,
-}
+box.cfg{vinyl_memory = 1024 * 1024, vinyl_timeout = 1e-9, checkpoint_count = 1}
 
 dump_trigger = box.schema.space.create('dump_trigger', {engine = 'vinyl'})
-dump_trigger:create_index('pk')
+dump_trigger:create_index('pk', {run_count_per_level = 1})
 
 -- Trigger dump of all indexes and wait for it to finish.
 --
--- We trigger dump by attempting to insert a huge (> memory limit)
--- tuple into a vinyl memory space. Before failing on timeout this
--- makes the scheduler force dump.
+-- On hitting memory limit, vinyl dumps all existing spaces, so
+-- to trigger system-wide memory dump, it is enough to insert a
+-- huge tuple into one space.
+--
 function dump()
-    pcall(dump_trigger.insert, dump_trigger,
-          {1, string.rep('x', 1024 * 1024)})
+    local pad = string.rep('x', box.cfg.vinyl_memory / 2)
+    dump_trigger:replace{1, pad}
+    -- Must fail due to quota timeout, but still trigger dump.
+    if pcall(dump_trigger.replace, dump_trigger, {1, pad}) then
+        assert(false)
+    end
+    -- Wait for dump to complete.
     while box.stat.vinyl().quota.used > 0 do
-        fiber.sleep(0.1)
+        fiber.sleep(0.01)
+    end
+    -- Wait for compaction to collect garbage.
+    while dump_trigger.index.pk:stat().run_count > 1 do
+        fiber.sleep(0.01)
     end
 end
 

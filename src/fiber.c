@@ -612,7 +612,8 @@ fiber_recycle(struct fiber *fiber)
 	fiber_reset(fiber);
 	fiber->name[0] = '\0';
 	fiber->f = NULL;
-	memset(fiber->fls, 0, sizeof(fiber->fls));
+	fiber->wait_pad = NULL;
+	memset(&fiber->storage, 0, sizeof(fiber->storage));
 	unregister_fid(fiber);
 	fiber->fid = 0;
 	region_free(&fiber->gc);
@@ -681,12 +682,6 @@ fiber_set_name(struct fiber *fiber, const char *name)
 	assert(name != NULL);
 	snprintf(fiber->name, sizeof(fiber->name), "%s", name);
 }
-
-extern inline void
-fiber_set_key(struct fiber *fiber, enum fiber_key key, void *value);
-
-extern inline void *
-fiber_get_key(struct fiber *fiber, enum fiber_key key);
 
 static inline void *
 page_align_down(void *ptr)

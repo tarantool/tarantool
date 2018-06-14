@@ -88,10 +88,8 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 	 * after the trigger and its memory is long gone.
 	 */
 	trigger_clear(trigger);
-	struct session *session = (struct session *)
-		fiber_get_key(fiber(), FIBER_KEY_SESSION);
 	/* Destroy the session */
-	session_destroy(session);
+	session_destroy(fiber_get_session(fiber()));
 }
 
 struct session *

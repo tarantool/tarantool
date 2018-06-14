@@ -164,7 +164,7 @@ struct txn {
 static inline struct txn *
 in_txn()
 {
-	return (struct txn *) fiber_get_key(fiber(), FIBER_KEY_TXN);
+	return fiber()->storage.txn;
 }
 
 /**

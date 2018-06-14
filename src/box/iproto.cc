@@ -1186,7 +1186,8 @@ error:
 static void
 tx_fiber_init(struct session *session, uint64_t sync)
 {
-	session->meta.sync = sync;
+	struct fiber *f = fiber();
+	f->storage.net.sync = sync;
 	/*
 	 * We do not cleanup fiber keys at the end of each request.
 	 * This does not lead to privilege escalation as long as
@@ -1197,8 +1198,8 @@ tx_fiber_init(struct session *session, uint64_t sync)
 	 * background tasks clean up their session in on_stop
 	 * trigger as well.
 	 */
-	fiber_set_session(fiber(), session);
-	fiber_set_user(fiber(), &session->credentials);
+	fiber_set_session(f, session);
+	fiber_set_user(f, &session->credentials);
 }
 
 /**
@@ -1861,7 +1862,9 @@ iproto_session_fd(struct session *session)
 int64_t
 iproto_session_sync(struct session *session)
 {
-	return session->meta.sync;
+	(void) session;
+	assert(session == fiber()->storage.session);
+	return fiber()->storage.net.sync;
 }
 
 /** {{{ IPROTO_PUSH implementation. */
