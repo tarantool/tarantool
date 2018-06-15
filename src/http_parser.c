@@ -220,6 +220,8 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 
 	enum {
 		sw_start = 0,
+		skip_status_line,
+		skipped_status_line_almost_done,
 		sw_name,
 		sw_space_before_value,
 		sw_value,
@@ -271,6 +273,25 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 				break;
 			}
 			break;
+		case skip_status_line:
+			switch (ch) {
+			case LF:
+				goto skipped_status;
+			case CR:
+				state = skipped_status_line_almost_done;
+			default:
+				break;
+			}
+			break;
+		case skipped_status_line_almost_done:
+			switch (ch) {
+			case LF:
+				goto skipped_status;
+			case CR:
+				break;
+			default:
+				return HTTP_PARSE_INVALID;
+			}
 		/* http_header name */
 		case sw_name:
 			c = lowcase[ch];
@@ -304,8 +325,11 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 				if (rc == HTTP_PARSE_INVALID) {
 					parser->http_minor = -1;
 					parser->http_major = -1;
+					state = sw_start;
+				} else {
+					/* Skip it till end of line. */
+					state = skip_status_line;
 				}
-				state = sw_start;
 				break;
 			}
 			if (ch == '\0')
@@ -388,6 +412,10 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 				return HTTP_PARSE_INVALID;
 		}
 	}
+
+skipped_status:
+	*bufp = p + 1;
+	return HTTP_PARSE_CONTINUE;
 
 done:
 	*bufp = p + 1;
