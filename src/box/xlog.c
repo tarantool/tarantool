@@ -787,10 +787,7 @@ xlog_open(struct xlog *xlog, const char *name)
 		goto err_read;
 	}
 
-	/*
-	 * If the file has eof marker, reposition the file pointer so
-	 * that the next write will overwrite it.
-	 */
+	/* Check if the file has EOF marker. */
 	xlog->offset = fio_lseek(xlog->fd, -(off_t)sizeof(magic), SEEK_END);
 	if (xlog->offset < 0)
 		goto no_eof;
@@ -806,6 +803,13 @@ no_eof:
 		xlog->offset = fio_lseek(xlog->fd, 0, SEEK_END);
 		if (xlog->offset < 0) {
 			diag_set(SystemError, "failed to seek file '%s'",
+				 xlog->filename);
+			goto err_read;
+		}
+	} else {
+		/* Truncate the file to erase the EOF marker. */
+		if (ftruncate(xlog->fd, xlog->offset) != 0) {
+			diag_set(SystemError, "failed to truncate file '%s'",
 				 xlog->filename);
 			goto err_read;
 		}
