@@ -206,7 +206,7 @@ local function test_errors(test)
 end
 
 local function test_headers(test, url, opts)
-    test:plan(16)
+    test:plan(19)
     local http = client:new()
     local r = http:get(url .. 'headers', opts)
     test:is(type(r.headers["set-cookie"]), 'string', "set-cookie check")
@@ -225,6 +225,12 @@ local function test_headers(test, url, opts)
     test:ok(r.cookies["bad@name"] == nil , "cookie name check")
     test:ok(r.cookies["badname"] == nil , "cookie name check")
     test:ok(r.cookies["badcookie"] == nil , "cookie name check")
+    test:isnil(r.headers["very_very_very_long_headers_name1"], "no long header name")
+    test:is(r.headers["very_very_very_long_headers_name"], "true", "truncated name")
+    opts["max_header_name_length"] = 64
+    local r = http:get(url .. 'headers', opts)
+    test:is(r.headers["very_very_very_long_headers_name1"], "true", "truncated max_header_name_length")
+    opts["max_header_name_length"] = nil
 end
 
 local function test_special_methods(test, url, opts)

@@ -32,7 +32,7 @@
 #ifndef TARANTOOL_HTTP_PARSER_H
 #define TARANTOOL_HTTP_PARSER_H
 
-#define HEADER_LEN 32
+#define HEADER_NAME_LEN 32
 
 enum {
 	HTTP_PARSE_OK,
@@ -42,14 +42,14 @@ enum {
 };
 
 struct http_parser {
-	char *header_value_start;
-	char *header_value_end;
+	char *hdr_value_start;
+	char *hdr_value_end;
 
 	int http_major;
 	int http_minor;
 
-	char header_name[HEADER_LEN];
-	int header_name_idx;
+	char *hdr_name;
+	int hdr_name_idx;
 };
 
 /*
@@ -62,6 +62,7 @@ struct http_parser {
  * 		HTTP_PARSE_INVALID - error during parsing
  */
 int
-http_parse_header_line(struct http_parser *parser, char **bufp, const char *end_buf);
+http_parse_header_line(struct http_parser *prsr, char **bufp,
+		       const char *end_buf, int max_hname_len);
 
 #endif //TARANTOOL_HTTP_PARSER_H
