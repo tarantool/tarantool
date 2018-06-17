@@ -1177,34 +1177,16 @@ space_checks_expr_list(uint32_t space_id)
 }
 
 int
-emit_open_cursor(struct Parse *parse_context, int cursor, int entity_id)
+vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
+		      struct space *space)
 {
-	assert(entity_id > 0);
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(entity_id));
 	assert(space != NULL);
 	struct Vdbe *vdbe = parse_context->pVdbe;
 	int space_ptr_reg = ++parse_context->nMem;
 	sqlite3VdbeAddOp4(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
 			  P4_SPACEPTR);
-	return sqlite3VdbeAddOp3(vdbe, OP_OpenWrite, cursor, entity_id,
+	return sqlite3VdbeAddOp3(vdbe, OP_OpenWrite, cursor, index_id,
 				 space_ptr_reg);
-}
-
-int
-sql_emit_open_cursor(struct Parse *parse, int cursor, int index_id, struct space *space)
-{
-	assert(space != NULL);
-	Vdbe *vdbe = parse->pVdbe;
-	int space_ptr_reg = ++parse->nMem;
-	sqlite3VdbeAddOp4(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
-			  P4_SPACEPTR);
-	struct key_def *def = key_def_dup(space->index[index_id]->def->key_def);
-	if (def == NULL)
-		return 0;
-	return sqlite3VdbeAddOp4(vdbe, OP_OpenWrite, cursor, index_id,
-				 space_ptr_reg,
-				 (char*)def,
-				 P4_KEYDEF);
 }
 /*
  * Generate code that will increment the schema cookie.
@@ -2664,7 +2646,8 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	if (memRootPage < 0)
 		sqlite3VdbeAddOp2(v, OP_Clear, SQLITE_PAGENO_TO_SPACEID(tnum),
 				  0);
-	emit_open_cursor(pParse, iIdx, tnum);
+	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(tnum));
+	vdbe_emit_open_cursor(pParse, iIdx, tnum, space);
 	sqlite3VdbeChangeP5(v,
 			    OPFLAG_BULKCSR | ((memRootPage >= 0) ?
 					      OPFLAG_P2ISREG : 0));

@@ -36,6 +36,8 @@
 #include "box/coll_id_cache.h"
 #include "coll.h"
 #include "sqliteInt.h"
+#include "tarantoolInt.h"
+#include "box/schema.h"
 #include "box/session.h"
 
 /* Forward declarations */
@@ -2485,9 +2487,10 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							  "USING INDEX %s FOR IN-OPERATOR",
 							  pIdx->zName),
 							  P4_DYNAMIC);
-					emit_open_cursor(pParse, iTab,
-							 pIdx->tnum);
-					sql_vdbe_set_p4_key_def(pParse, pIdx);
+					struct space *space =
+						space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
+					vdbe_emit_open_cursor(pParse, iTab,
+							      pIdx->tnum, space);
 					VdbeComment((v, "%s", pIdx->zName));
 					assert(IN_INDEX_INDEX_DESC ==
 					       IN_INDEX_INDEX_ASC + 1);

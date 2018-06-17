@@ -88,7 +88,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	 * instead of just a Table* parameter.
 	 */
 	struct Table *table = NULL;
-	struct space *space;
+	struct space *space = NULL;
 	uint32_t space_id;
 	/* Figure out if we have any triggers and if the table
 	 * being deleted from is a view.
@@ -99,22 +99,36 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	 */
 	bool is_complex = false;
 	const char *tab_name = tab_list->a->zName;
+	struct Table tmp_tab;
 	if (sqlite3LocateTable(parse, LOCATE_NOERR, tab_name) == NULL) {
 		space_id = box_space_id_by_name(tab_name,
 						strlen(tab_name));
 		if (space_id == BOX_ID_NIL)
 			goto delete_from_cleanup;
+		/*
+		 * In this case space has been created via Lua
+		 * facilities, so there is no corresponding entry
+		 * in table hash. Thus, lets create simple
+		 * wrapper around space_def to support interface.
+		 */
+		space = space_by_id(space_id);
+		memset(&tmp_tab, 0, sizeof(tmp_tab));
+		tmp_tab.def = space->def;
+		/* Prevent from freeing memory in DeleteTable. */
+		tmp_tab.nTabRef = 2;
+		tab_list->a[0].pTab = &tmp_tab;
 	} else {
 		table = sql_list_lookup_table(parse, tab_list);
 		if (table == NULL)
 			goto delete_from_cleanup;
 		space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
+		space = space_by_id(space_id);
+		assert(space != NULL);
 		trigger_list =sqlite3TriggersExist(table, TK_DELETE,
 						   NULL, NULL);
 		is_complex = trigger_list != NULL ||
 			     sqlite3FkRequired(table, NULL);
 	}
-	space = space_by_id(space_id);
 	assert(space != NULL);
 
 	bool is_view = space->def->opts.is_view;
@@ -183,16 +197,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		struct NameContext nc;
 		memset(&nc, 0, sizeof(nc));
 		nc.pParse = parse;
-		if (tab_list->a[0].pTab == NULL) {
-			struct Table *t = calloc(sizeof(struct Table), 1);
-			if (t == NULL) {
-				sqlite3OomFault(parse->db);
-				goto delete_from_cleanup;
-			}
-			assert(space != NULL);
-			t->def = space->def;
-			tab_list->a[0].pTab = t;
-		}
 		nc.pSrcList = tab_list;
 		if (sqlite3ResolveExprNames(&nc, where))
 			goto delete_from_cleanup;
@@ -266,11 +270,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		/* Extract the primary key for the current row */
 		if (!is_view) {
 			for (int i = 0; i < pk_len; i++) {
-				struct space_def *def;
-				if (table != NULL)
-					def = table->def;
-				else
-					def = space->def;
+				struct space_def *def = space->def;
 				sqlite3ExprCodeGetColumnOfTable(v, def,
 								tab_cursor,
 								pk_def->parts[i].fieldno,
@@ -342,15 +342,9 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0,
 					  (void *)space, P4_SPACEPTR);
 
-			int tnum;
-			if (table != NULL) {
-				tnum = table->tnum;
-			}
-			else {
-				/* index id is 0 for PK.  */
-				tnum = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(space->def->id,
-									      0);
-			}
+			int tnum =
+				SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(space_id,
+								       0);
 			sqlite3VdbeAddOp3(v, OP_OpenWrite, tab_cursor,
 					  tnum, space_ptr_reg);
 			struct key_def *def = key_def_dup(pk_def);
@@ -518,7 +512,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	 * of the DELETE statement is to fire the INSTEAD OF
 	 * triggers).
 	 */
-	if (table == NULL || table->pSelect == NULL) {
+	if (table == NULL || !table->def->opts.is_view) {
 		uint8_t p5 = 0;
 		sqlite3VdbeAddOp2(v, OP_Delete, cursor,
 				  (need_update_count ? OPFLAG_NCHANGE : 0));

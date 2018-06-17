@@ -35,6 +35,7 @@
  */
 #include "coll.h"
 #include "sqliteInt.h"
+#include "box/schema.h"
 #include "box/session.h"
 #include "tarantoolInt.h"
 
@@ -439,9 +440,9 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			int nCol = pFKey->nCol;
 			int regTemp = sqlite3GetTempRange(pParse, nCol);
 			int regRec = sqlite3GetTempReg(pParse);
-
-			emit_open_cursor(pParse, iCur, pIdx->tnum);
-			sql_vdbe_set_p4_key_def(pParse, pIdx);
+			struct space *space =
+				space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
+			vdbe_emit_open_cursor(pParse, iCur, pIdx->tnum, space);
 			for (i = 0; i < nCol; i++) {
 				sqlite3VdbeAddOp2(v, OP_Copy,
 						  aiCol[i] + 1 + regData,

@@ -176,9 +176,9 @@ openStatTable(Parse * pParse,	/* Parsing context */
 
 	/* Open the sql_stat[134] tables for writing. */
 	for (i = 0; aTable[i]; i++) {
-		int addr = emit_open_cursor(pParse, iStatCur + i, aRoot[i]);
-		v->aOp[addr].p4.key_def = NULL;
-		v->aOp[addr].p4type = P4_KEYDEF;
+		struct space *space =
+			space_by_id(SQLITE_PAGENO_TO_SPACEID(aRoot[i]));
+		vdbe_emit_open_cursor(pParse, iStatCur + i, aRoot[i], space);
 		sqlite3VdbeChangeP5(v, aCreateTbl[i]);
 		VdbeComment((v, aTable[i]));
 	}

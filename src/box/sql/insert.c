@@ -54,8 +54,8 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	Index *pPk = sqlite3PrimaryKeyIndex(pTab);
 	assert(pPk != 0);
 	assert(pPk->tnum == pTab->tnum);
-	emit_open_cursor(pParse, iCur, pPk->tnum);
-	sql_vdbe_set_p4_key_def(pParse, pPk);
+	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(pPk->tnum));
+	vdbe_emit_open_cursor(pParse, iCur, pPk->tnum, space);
 	VdbeComment((v, "%s", pTab->def->name));
 }
 
@@ -105,34 +105,22 @@ sqlite3IndexAffinityStr(sqlite3 *db, Index *index)
 }
 
 char *
-sql_index_affinity_str(struct sqlite3 * db, struct index_def *def)
+sql_index_affinity_str(struct sqlite3 *db, struct index_def *def)
 {
-	char *aff;
-	/* The first time a column affinity string for a particular index is
-	 * required, it is allocated and populated here. It is then stored as
-	 * a member of the Index structure for subsequent use.
-	 *
-	 * The column affinity string will eventually be deleted by
-	 * sqliteDeleteIndex() when the Index structure itself is cleaned
-	 * up.
-	 */
-	int nColumn = def->key_def->part_count;
-	aff = (char *)sqlite3DbMallocRaw(0, nColumn + 1);
-	if (aff == NULL) {
-		sqlite3OomFault(db);
-		return 0;
-	}
-	int i;
-	struct space *space = space_cache_find(def->space_id);
+	uint32_t column_count = def->key_def->part_count;
+	char *aff = (char *)sqlite3DbMallocRaw(db, column_count + 1);
+	if (aff == NULL)
+		return NULL;
+	struct space *space = space_by_id(def->space_id);
 	assert(space != NULL);
 
-	for (i = 0; i < nColumn; i++) {
+	for (uint32_t i = 0; i < column_count; i++) {
 		uint32_t x = def->key_def->parts[i].fieldno;
 		aff[i] = space->def->fields[x].affinity;
 		if (aff[i] == AFFINITY_UNDEFINED)
 			aff[i] = 'A';
 	}
-	aff[i] = 0;
+	aff[column_count] = '\0';
 
 	return aff;
 }
@@ -1951,11 +1939,13 @@ xferOptimization(Parse * pParse,	/* Parser context */
 				break;
 		}
 		assert(pSrcIdx);
-		emit_open_cursor(pParse, iSrc, pSrcIdx->tnum);
-		sql_vdbe_set_p4_key_def(pParse, pSrcIdx);
+		struct space *src_space =
+			space_by_id(SQLITE_PAGENO_TO_SPACEID(pSrcIdx->tnum));
+		vdbe_emit_open_cursor(pParse, iSrc, pSrcIdx->tnum, src_space);
 		VdbeComment((v, "%s", pSrcIdx->zName));
-		emit_open_cursor(pParse, iDest, pDestIdx->tnum);
-		sql_vdbe_set_p4_key_def(pParse, pDestIdx);
+		struct space *dest_space =
+			space_by_id(SQLITE_PAGENO_TO_SPACEID(pDestIdx->tnum));
+		vdbe_emit_open_cursor(pParse, iDest, pDestIdx->tnum, dest_space);
 		sqlite3VdbeChangeP5(v, OPFLAG_BULKCSR);
 		VdbeComment((v, "%s", pDestIdx->zName));
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);

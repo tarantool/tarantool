@@ -87,7 +87,7 @@ explainAppendTerm(StrAccum * pStr,	/* The text expression being built */
 			assert(def != NULL);
                         struct space *space = space_cache_find(def->space_id);
                         assert(space != NULL);
-                        name = space->def->fields[i].name;
+                        name = space->def->fields[i + iTerm].name;
 		}
 		sqlite3StrAccumAppendAll(pStr, name);
 	}
@@ -143,7 +143,8 @@ explainIndexRange(StrAccum * pStr, WhereLoop * pLoop)
 		} else {
 			struct space *space = space_cache_find(def->space_id);
 			assert(space != NULL);
-			z = space->def->fields[i].name;
+			uint32_t fieldno = def->key_def->parts[i].fieldno;
+			z = space->def->fields[fieldno].name;
 		}
 		if (i)
 			sqlite3StrAccumAppend(pStr, " AND ", 5);

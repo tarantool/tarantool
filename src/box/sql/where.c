@@ -42,6 +42,7 @@
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
 #include "whereInt.h"
+#include "box/coll_id_cache.h"
 #include "box/session.h"
 #include "box/schema.h"
 
@@ -371,10 +372,7 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 	pScan->is_column_seen = false;
 	if (pIdx) {
 		int j = iColumn;
-		if (j >= pIdx->nColumn)
-			iColumn = -1;
-		else
-			iColumn = pIdx->aiColumn[j];
+		iColumn = pIdx->aiColumn[j];
 		if (iColumn >= 0) {
 			char affinity =
 				pIdx->pTable->def->fields[iColumn].affinity;
@@ -393,12 +391,30 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 	return whereScanNext(pScan);
 }
 
+/**
+ * Analogue of whereScanInit() but also can be called for spaces
+ * created via Lua interface. This function doesn't rely on
+ * regular SQLite structures representing data dictionary.
+ *
+ * @param scan The WhereScan object being initialized.
+ * @param clause The WHERE clause to be scanned.
+ * @param cursor Cursor to scan for.
+ * @param column Column to scan for.
+ * @param op_mask Operator(s) to scan for.
+ * @param space_def Def of the space related to WHERE clause.
+ * @param key_def Def of the index to be used to satisfy WHERE
+ *                clause. May be NULL.
+ *
+ * @retval Return a pointer to the first match. Return NULL if
+ *         there are no matches.
+ */
 static WhereTerm *
-sql_where_scan_init(struct WhereScan *scan, struct WhereClause *clause,
+where_scan_init(struct WhereScan *scan, struct WhereClause *clause,
 		    int cursor, int column, uint32_t op_mask,
 		    struct space_def *space_def, struct key_def *key_def)
 {
-	scan->pOrigWC = scan->pWC = clause;
+	scan->pOrigWC = clause;
+	scan->pWC = clause;
 	scan->pIdxExpr = NULL;
 	scan->idxaff = 0;
 	scan->coll = NULL;
@@ -406,11 +422,11 @@ sql_where_scan_init(struct WhereScan *scan, struct WhereClause *clause,
 	if (key_def != NULL) {
 		int j = column;
 		column = key_def->parts[j].fieldno;
-		if (column >= 0) {
-			scan->idxaff = space_def->fields[column].affinity;
-			scan->coll = key_def->parts[column].coll;
-			scan->is_column_seen = true;
-		}
+		scan->idxaff = space_def->fields[column].affinity;
+		uint32_t coll_id = space_def->fields[column].coll_id;
+		struct coll_id *coll = coll_by_id(coll_id);
+		scan->coll = coll != NULL ? coll->coll : NULL;
+		scan->is_column_seen = true;
 	}
 	scan->opMask = op_mask;
 	scan->k = 0;
@@ -472,34 +488,43 @@ sqlite3WhereFindTerm(WhereClause * pWC,	/* The WHERE clause to be searched */
 	return pResult;
 }
 
-WhereTerm *
-sql_where_find_term(WhereClause * pWC,	/* The WHERE clause to be searched */
-		    int iCur,		/* Cursor number of LHS */
-		    int iColumn,	/* Column number of LHS */
-		    Bitmask notReady,	/* RHS must not overlap with this mask */
-		    u32 op,		/* Mask of WO_xx values describing operator */
-		    struct space_def *space_def,
-		    struct key_def *key_def)	/* Must be compatible with this index, if not NULL */
+/**
+ * Analogue of sqlite3WhereFindTerm() but also can be called
+ * for spaces created via Lua interface. This function doesn't
+ * rely on regular SQLite structures representing data
+ * dictionary.
+ *
+ * @param where_clause The WHERE clause to be examined.
+ * @param cursor Cursor number of LHS.
+ * @param column Column number of LHS
+ * @param is_ready RHS must not overlap with this mask.
+ * @param op Mask of WO_xx values describing operator.
+ * @param space_def Def of the space related to WHERE clause.
+ * @param key_def Def of the index to be used to satisfy WHERE
+ *                clause. May be NULL.
+ *
+ * @retval New struct describing WHERE term.
+ */
+static inline struct WhereTerm *
+where_clause_find_term(struct WhereClause *where_clause, int cursor, int column,
+		       Bitmask is_ready, u32 op, struct space_def *space_def,
+		       struct key_def *key_def)
 {
-	WhereTerm *pResult = 0;
-	WhereTerm *p;
-	WhereScan scan;
-
-	p = sql_where_scan_init(&scan, pWC, iCur, iColumn, op, space_def,
-				key_def);
+	struct WhereTerm *result = NULL;
+	struct WhereScan scan;
+	struct WhereTerm *p = where_scan_init(&scan, where_clause, cursor,
+					      column, op, space_def, key_def);
 	op &= WO_EQ;
-	while (p) {
-		if ((p->prereqRight & notReady) == 0) {
-			if (p->prereqRight == 0 && (p->eOperator & op) != 0) {
-				testcase(p->eOperator & WO_IS);
+	while (p != NULL) {
+		if ((p->prereqRight & is_ready) == 0) {
+			if (p->prereqRight == 0 && (p->eOperator & op) != 0)
 				return p;
-			}
-			if (pResult == 0)
-				pResult = p;
+			if (result == NULL)
+				result = p;
 		}
 		p = whereScanNext(&scan);
 	}
-	return pResult;
+	return result;
 }
 
 /*
@@ -3428,7 +3453,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				/* Get the column number in the table (iColumn) and sort order
 				 * (revIdx) for the j-th column of the index.
 				 */
-				if (pIndex && j < pIndex->nColumn) {
+				if (pIndex != NULL) {
 					iColumn = pIndex->aiColumn[j];
 					revIdx = sql_index_column_sort_order(pIndex,
 									     j);
@@ -4096,135 +4121,125 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 	return SQLITE_OK;
 }
 
-/*
- * Most queries use only a single table (they are not joins) and have
- * simple == constraints against indexed fields.  This routine attempts
- * to plan those simple cases using much less ceremony than the
- * general-purpose query planner, and thereby yield faster sqlite3_prepare()
- * times for the common case.
+/**
+ * Attempt at finding appropriate terms in WHERE clause.
  *
- * Return non-zero on success, if this query can be handled by this
- * no-frills query planner.  Return zero if this query needs the
- * general-purpose query planner.
+ * @param loop The loop @where belongs to.
+ * @param where The WHERE clause to be examined..
+ * @param cursor Cursor number of LHS.
+ * @param space_def Def of the space related to WHERE clause.
+ * @param index_def Def of the index to be used to satisfy WHERE
+ *                  clause. May be NULL.
+ * @retval 0 on success, -1 otherwise.
  */
 static int
-sql_where_shortcut(struct WhereLoopBuilder *builder)
+where_loop_assign_terms(struct WhereLoop *loop, struct WhereClause *where,
+			int cursor, struct space_def *space_def,
+			struct index_def *idx_def)
 {
-	WhereInfo *pWInfo;
-	struct SrcList_item *pItem;
-	WhereClause *pWC;
-	WhereTerm *pTerm;
-	WhereLoop *pLoop;
-	int iCur;
-	int j;
+	uint32_t column_count = idx_def != NULL ? idx_def->key_def->part_count :
+				space_def->field_count;
+	if (column_count > ArraySize(loop->aLTermSpace))
+		return -1;
+	uint32_t i;
+	for (i = 0; i < column_count; ++i) {
+		struct WhereTerm *term =
+			where_clause_find_term(where, cursor, i, 0, WO_EQ,
+					       space_def, idx_def != NULL ?
+					       idx_def->key_def : NULL);
+		if (term == NULL)
+			break;
+		testcase(pTerm->eOperator & WO_IS);
+		loop->aLTerm[i] = term;
+	}
+	if (i != column_count)
+		return -1;
+	loop->wsFlags = WHERE_COLUMN_EQ | WHERE_ONEROW | WHERE_INDEXED |
+			WHERE_IDX_ONLY;
+	loop->nLTerm = i;
+	loop->nEq = i;
+	loop->index_def = idx_def;
+	/* TUNING: Cost of a unique index lookup is 15. */
+	assert(39 == sqlite3LogEst(15));
+	loop->rRun = 39;
+	return 0;
+}
 
-	pWInfo = builder->pWInfo;
-	if (pWInfo->wctrlFlags & WHERE_OR_SUBCLAUSE)
+/**
+ * Most queries use only a single table (they are not joins) and
+ * have simple == constraints against indexed fields. This
+ * routine attempts to plan those simple cases using much less
+ * ceremony than the general-purpose query planner, and thereby
+ * yield faster sqlite3_prepare() times for the common case.
+ *
+ * @param builder Where-Loop Builder.
+ * @retval Return non-zero on success, i.e. if this query can be
+ *         handled by this no-frills query planner. Return zero
+ *         if this query needs the general-purpose query planner.
+ */
+static int
+where_loop_builder_shortcut(struct WhereLoopBuilder *builder)
+{
+	struct WhereInfo *where_info = builder->pWInfo;
+	if (where_info->wctrlFlags & WHERE_OR_SUBCLAUSE)
 		return 0;
-	assert(pWInfo->pTabList->nSrc >= 1);
-	pItem = pWInfo->pTabList->a;
-	struct space_def *space_def = pItem->pTab->def;
+	assert(where_info->pTabList->nSrc >= 1);
+	struct SrcList_item *item = where_info->pTabList->a;
+	struct space_def *space_def = item->pTab->def;
 	assert(space_def != NULL);
-
-	if (pItem->fg.isIndexedBy)
+	if (item->fg.isIndexedBy)
 		return 0;
-	iCur = pItem->iCursor;
-	pWC = &pWInfo->sWC;
-	pLoop = builder->pNew;
-	pLoop->wsFlags = 0;
-	pLoop->nSkip = 0;
-	pTerm = sqlite3WhereFindTerm(pWC, iCur, -1, 0, WO_EQ, 0);
-	if (pTerm) {
-		pLoop->wsFlags = WHERE_COLUMN_EQ | WHERE_IPK | WHERE_ONEROW;
-		pLoop->aLTerm[0] = pTerm;
-		pLoop->nLTerm = 1;
-		pLoop->nEq = 1;
-		/* TUNING: Cost of a PK lookup is 10 */
-		pLoop->rRun = 33;	/* 33==sqlite3LogEst(10) */
+	int cursor = item->iCursor;
+	struct WhereClause *clause = &where_info->sWC;
+	struct WhereLoop *loop = builder->pNew;
+	loop->wsFlags = 0;
+	loop->nSkip = 0;
+	loop->pIndex = NULL;
+	struct WhereTerm *term = sqlite3WhereFindTerm(clause, cursor, -1, 0,
+						      WO_EQ, 0);
+	if (term != NULL) {
+		loop->wsFlags = WHERE_COLUMN_EQ | WHERE_IPK | WHERE_ONEROW;
+		loop->aLTerm[0] = term;
+		loop->nLTerm = 1;
+		loop->nEq = 1;
+		/* TUNING: Cost of a PK lookup is 10. */
+		assert(33 == sqlite3LogEst(10));
+		loop->rRun = 33;
 	} else {
-		struct space *space = space_cache_find(space_def->id);
+		assert(loop->aLTermSpace == loop->aLTerm);
+		struct space *space = space_by_id(space_def->id);
 		if (space != NULL) {
 			for (uint32_t i = 0; i < space->index_count; ++i) {
-				struct index_def *idx_def;
-				idx_def = space->index[i]->def;
-				int opMask;
-				int nIdxCol = idx_def->key_def->part_count;
-				assert(pLoop->aLTermSpace == pLoop->aLTerm);
-				if (!idx_def->opts.is_unique
-				    /* || pIdx->pPartIdxWhere != 0 */
-				    || nIdxCol > ArraySize(pLoop->aLTermSpace)
-					)
+				struct index_def *idx_def =
+					space->index[i]->def;
+				if (!idx_def->opts.is_unique)
 					continue;
-				opMask = WO_EQ;
-				for (j = 0; j < nIdxCol; j++) {
-					pTerm = sql_where_find_term(pWC, iCur,
-								    j, 0,
-								    opMask,
-								    space_def,
-								    idx_def->
-								    key_def);
-					if (pTerm == 0)
-						break;
-					testcase(pTerm->eOperator & WO_IS);
-					pLoop->aLTerm[j] = pTerm;
-				}
-				if (j != nIdxCol)
-					continue;
-				pLoop->wsFlags = WHERE_COLUMN_EQ |
-					WHERE_ONEROW | WHERE_INDEXED |
-					WHERE_IDX_ONLY;
-				pLoop->nLTerm = j;
-				pLoop->nEq = j;
-				pLoop->pIndex = NULL;
-				pLoop->index_def = idx_def;
-				/* TUNING: Cost of a unique index lookup is 15 */
-				pLoop->rRun = 39;	/* 39==sqlite3LogEst(15) */
-				break;
+				if (where_loop_assign_terms(loop, clause,
+							    cursor, space_def,
+							    idx_def) == 0)
+					break;
 			}
 		} else {
-			/* Space is ephemeral.  */
+			/* Space is ephemeral. */
 			assert(space_def->id == 0);
-			int opMask;
-			int nIdxCol = space_def->field_count;
-			assert(pLoop->aLTermSpace == pLoop->aLTerm);
-			if ( nIdxCol > ArraySize(pLoop->aLTermSpace))
-				return 0;
-			opMask = WO_EQ;
-			for (j = 0; j < nIdxCol; j++) {
-				pTerm = sql_where_find_term(pWC, iCur,
-							    j, 0,
-							    opMask,
-							    space_def,
-							    NULL);
-				if (pTerm == NULL)
-					break;
-				pLoop->aLTerm[j] = pTerm;
-			}
-			if (j != nIdxCol)
-				return 0;
-			pLoop->wsFlags = WHERE_COLUMN_EQ | WHERE_ONEROW |
-					 WHERE_INDEXED | WHERE_IDX_ONLY;
-			pLoop->nLTerm = j;
-			pLoop->nEq = j;
-			pLoop->pIndex = NULL;
-			pLoop->index_def = NULL;
-			/* TUNING: Cost of a unique index lookup is 15 */
-			pLoop->rRun = 39;	/* 39==sqlite3LogEst(15) */
+			where_loop_assign_terms(loop, clause, cursor,
+						space_def, NULL);
 		}
 	}
-	if (pLoop->wsFlags) {
-		pLoop->nOut = (LogEst) 1;
-		pWInfo->a[0].pWLoop = pLoop;
-		pLoop->maskSelf = sqlite3WhereGetMask(&pWInfo->sMaskSet, iCur);
-		pWInfo->a[0].iTabCur = iCur;
-		pWInfo->nRowOut = 1;
-		if (pWInfo->pOrderBy)
-			pWInfo->nOBSat = pWInfo->pOrderBy->nExpr;
-		if (pWInfo->wctrlFlags & WHERE_WANT_DISTINCT) {
-			pWInfo->eDistinct = WHERE_DISTINCT_UNIQUE;
+	if (loop->wsFlags) {
+		loop->nOut = (LogEst) 1;
+		where_info->a[0].pWLoop = loop;
+		loop->maskSelf = sqlite3WhereGetMask(&where_info->sMaskSet,
+						     cursor);
+		where_info->a[0].iTabCur = cursor;
+		where_info->nRowOut = 1;
+		if (where_info->pOrderBy)
+			where_info->nOBSat = where_info->pOrderBy->nExpr;
+		if (where_info->wctrlFlags & WHERE_WANT_DISTINCT) {
+			where_info->eDistinct = WHERE_DISTINCT_UNIQUE;
 		}
 #ifdef SQLITE_DEBUG
-		pLoop->cId = '0';
+		loop->cId = '0';
 #endif
 		return 1;
 	}
@@ -4522,7 +4537,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 	}
 #endif
 
-	if (nTabList != 1 || sql_where_shortcut(&sWLB) == 0) {
+	if (nTabList != 1 || where_loop_builder_shortcut(&sWLB) == 0) {
 		rc = whereLoopAddAll(&sWLB);
 		if (rc)
 			goto whereBeginError;
@@ -4702,10 +4717,10 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			 *    It is something w/ defined space_def
 			 *    and nothing else. Skip such loops.
 			 */
-			if (idx_def == NULL && pIx == NULL) continue;
+			if (idx_def == NULL && pIx == NULL)
+				continue;
 			bool is_primary = (pIx != NULL && IsPrimaryKeyIndex(pIx)) ||
-					   (idx_def != NULL && (idx_def->iid == 0)) |
-				(idx_def == NULL && pIx == NULL);
+					  (idx_def != NULL && (idx_def->iid == 0));
 			if (is_primary
 			    && (wctrlFlags & WHERE_OR_SUBCLAUSE) != 0) {
 				/* This is one term of an OR-optimization using
@@ -4752,13 +4767,14 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			assert(iIndexCur >= 0);
 			if (op) {
 				if (pIx != NULL) {
-					emit_open_cursor(pParse, iIndexCur,
-							 pIx->tnum);
-					sql_vdbe_set_p4_key_def(pParse, pIx);
+					struct space *space =
+						space_by_id(SQLITE_PAGENO_TO_SPACEID(pIx->tnum));
+					vdbe_emit_open_cursor(pParse, iIndexCur,
+							      pIx->tnum, space);
 				} else {
-					sql_emit_open_cursor(pParse, iIndexCur,
-							     idx_def->iid,
-							     space);
+					vdbe_emit_open_cursor(pParse, iIndexCur,
+							      idx_def->iid,
+							      space);
 				}
 				if ((pLoop->wsFlags & WHERE_CONSTRAINT) != 0
 				    && (pLoop->
