@@ -64,7 +64,10 @@
 #include "cfg.h"
 
 /* The number of iproto messages in flight */
-enum { IPROTO_MSG_MAX = 768 };
+enum {
+	IPROTO_MSG_MAX = 768,
+	IPROTO_PACKET_SIZE_MAX = 2UL * 1024 * 1024 * 1024,
+};
 
 /**
  * Network readahead. A signed integer to avoid
@@ -581,18 +584,26 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 {
 	int n_requests = 0;
 	bool stop_input = false;
+	const char *errmsg;
 	while (con->parse_size && stop_input == false) {
 		const char *reqstart = in->wpos - con->parse_size;
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
+			errmsg = "packet length";
+err_msgpack:
 			cpipe_flush_input(&tx_pipe);
-			tnt_raise(ClientError, ER_INVALID_MSGPACK,
-				  "packet length");
+			tnt_raise(ClientError, ER_INVALID_MSGPACK, errmsg);
 		}
 		if (mp_check_uint(pos, in->wpos) >= 0)
 			break;
-		uint32_t len = mp_decode_uint(&pos);
+		uint64_t len = mp_decode_uint(&pos);
+		if (len > IPROTO_PACKET_SIZE_MAX) {
+			errmsg = tt_sprintf("too big packet size in the "\
+					    "header: %llu",
+					    (unsigned long long) len);
+			goto err_msgpack;
+		}
 		const char *reqend = pos + len;
 		if (reqend > in->wpos)
 			break;
