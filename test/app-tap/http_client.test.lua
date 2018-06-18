@@ -79,19 +79,28 @@ local function test_http_client(test, url, opts)
     test:is(r.status, 200, 'request')
 end
 
-local function test_cancel_and_timeout(test, url, opts)
-    test:plan(2)
+local function test_cancel_and_errinj(test, url, opts)
+    test:plan(3)
     local ch = fiber.channel(1)
     local http = client:new()
-    local f = fiber.create(function()
-                ch:put(http:get(url, opts)) end)
+    local func  = function(fopts)
+        ch:put(http:get(url, fopts))
+    end
+    local f = fiber.create(func, opts)
     f:cancel()
     local r = ch:get()
     test:ok(r.status == 408 and string.find(r.reason, "Timeout"),
                     "After cancel fiber timeout is returned")
-    local r = http:get(url, merge(opts, {timeout = 0.0001}))
+    r = http:get(url, merge(opts, {timeout = 0.0001}))
     test:ok(r.status == 408 and string.find(r.reason, "Timeout"),
                                                        "Timeout check")
+    local errinj = box.error.injection
+    errinj.set('ERRINJ_HTTP_RESPONSE_ADD_WAIT', true)
+    local topts = merge(opts, {timeout = 1200})
+    f = fiber.create(func, topts)
+    r = ch:get()
+    test:is(r.status, 200, "No hangs in errinj")
+    errinj.set('ERRINJ_HTTP_RESPONSE_ADD_WAIT', false)
 end
 
 local function test_post_and_get(test, url, opts)
@@ -384,7 +393,7 @@ function run_tests(test, sock_family, sock_addr)
     test:plan(9)
     local server, url, opts = start_server(test, sock_family, sock_addr)
     test:test("http.client", test_http_client, url, opts)
-    test:test("cancel and timeout", test_cancel_and_timeout, url, opts)
+    test:test("cancel and errinj", test_cancel_and_errinj, url, opts)
     test:test("basic http post/get", test_post_and_get, url, opts)
     test:test("errors", test_errors)
     test:test("headers", test_headers, url, opts)
