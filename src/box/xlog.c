@@ -603,18 +603,22 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio)
 	       vclock_sum(vclock) < signature) {
 		char *filename = xdir_format_filename(dir, vclock_sum(vclock),
 						      NONE);
-		say_info("removing %s", filename);
 		int rc;
 		if (use_coio)
 			rc = coio_unlink(filename);
 		else
 			rc = unlink(filename);
-		if (rc < 0 && errno != ENOENT) {
-			say_syserror("error while removing %s", filename);
-			diag_set(SystemError, "failed to unlink file '%s'",
-				 filename);
-			return -1;
-		}
+		if (rc < 0) {
+			if (errno != ENOENT) {
+				say_syserror("error while removing %s",
+					     filename);
+				diag_set(SystemError,
+					 "failed to unlink file '%s'",
+					 filename);
+				return -1;
+			}
+		} else
+			say_info("removed %s", filename);
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
 	}
