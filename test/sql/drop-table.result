@@ -1,6 +1,12 @@
 test_run = require('test_run').new()
 ---
 ...
+engine = test_run:get_cfg('engine')
+---
+...
+box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+---
+...
 -- box.cfg()
 -- create space
 box.sql.execute("CREATE TABLE zzzoobar (c1, c2 PRIMARY KEY, c3, c4)")

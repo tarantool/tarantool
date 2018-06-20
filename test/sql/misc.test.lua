@@ -1,3 +1,7 @@
+test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
+box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+
 -- Forbid multistatement queries.
 box.sql.execute('select 1;')
 box.sql.execute('select 1; select 2;')

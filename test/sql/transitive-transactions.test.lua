@@ -1,4 +1,6 @@
 test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
+box.sql.execute("pragma sql_default_engine=\'"..engine.."\'")
 test_run:cmd("setopt delimiter ';'")
 
 -- These tests are aimed at checking transitive transactions
@@ -56,6 +58,7 @@ fk_defer();
 box.space.CHILD:select();
 box.space.PARENT:select();
 box.sql.execute('PRAGMA defer_foreign_keys = 1;')
+box.rollback()
 fk_defer();
 box.space.CHILD:select();
 box.space.PARENT:select();

@@ -20,6 +20,7 @@ testprefix = "analyze9"
 -- functionality is working.
 --
 
+-- SQL Analyze is working correctly only with memtx now.
 test:do_execsql_test(
     1.0,
     [[

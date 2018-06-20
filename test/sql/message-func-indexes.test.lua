@@ -1,4 +1,6 @@
 test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
+box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- Creating tables.
 box.sql.execute("CREATE TABLE t1(id INTEGER PRIMARY KEY, a INTEGER)")

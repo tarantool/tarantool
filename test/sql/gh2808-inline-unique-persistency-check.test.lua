@@ -1,6 +1,8 @@
 -- Regression test for gh-2483
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
+box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- Create a table and insert a datum
 box.sql.execute([[CREATE TABLE t1(a PRIMARY KEY, b, UNIQUE(b));]])

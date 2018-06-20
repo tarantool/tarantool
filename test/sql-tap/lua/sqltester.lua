@@ -411,11 +411,18 @@ test.do_eqp_test = function (self, label, sql, result)
 end
 
 setmetatable(_G, nil)
-os.execute("rm -f *.snap *.xlog*")
+os.execute("rm -rf $(ls -d */)")
+os.execute("rm -f *.snap *.xlog* *.vylog* *.run*")
 
 -- start the database
 box.cfg{
     memtx_max_tuple_size=4996109;
+    vinyl_max_tuple_size=4996109;
     log="tarantool.log";
 }
+
+test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
+box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+
 return test

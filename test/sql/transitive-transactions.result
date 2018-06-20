@@ -1,6 +1,12 @@
 test_run = require('test_run').new()
 ---
 ...
+engine = test_run:get_cfg('engine')
+---
+...
+box.sql.execute("pragma sql_default_engine=\'"..engine.."\'")
+---
+...
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
@@ -105,6 +111,7 @@ box.space.PARENT:select();
 - - [1, 1]
 ...
 box.sql.execute('PRAGMA defer_foreign_keys = 1;')
+box.rollback()
 fk_defer();
 ---
 ...

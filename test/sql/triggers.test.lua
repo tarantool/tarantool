@@ -1,5 +1,7 @@
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
+box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- Get invariant part of the tuple; name and opts don't change.
  function immutable_part(data) local r = {} for i, l in pairs(data) do table.insert(r, {l.name, l.opts}) end return r end

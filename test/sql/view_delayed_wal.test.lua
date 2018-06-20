@@ -1,4 +1,6 @@
 test_run = require('test_run').new()
+engine = test_run:get_cfg('engine')
+box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 fiber = require('fiber')
 
 -- View reference counters are incremented before firing
