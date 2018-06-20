@@ -867,11 +867,28 @@ local function play()
     remote:close()
 end
 
+local function find_arg(name_arg)
+    for i, key in ipairs(arg) do
+        if key:find(name_arg) ~= nil then
+            return key
+        end
+    end
+    return nil
+end
+
 local function rocks()
     local cfg = require("luarocks.cfg")
     local util = require("luarocks.util")
     local loader = require("luarocks.loader")
     local command_line = require("luarocks.command_line")
+    local options = keyword_arguments
+    local key = nil
+    if options["only-server"] ~= nil then
+        key = find_arg("only%-server")
+    else
+        key = find_arg("server")
+    end
+    table.insert(positional_arguments, key)
 
     -- Tweak help messages
     util.see_help = function(command, program)
@@ -893,7 +910,6 @@ local function rocks()
     if keyword_arguments.chdir then
         ffi.C.chdir(keyword_arguments.chdir)
     end
-
     -- Call LuaRocks
     command_line.run_command(unpack(positional_arguments))
 end
@@ -1260,6 +1276,8 @@ do
         { 'format',      'string'  },
         { 'replica',     'number+' },
         { 'chdir',       'string'  },
+        { 'only-server', 'string'  },
+        { 'server',      'string'  },
     })
 
     local cmd_name
