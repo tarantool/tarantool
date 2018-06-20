@@ -60,6 +60,8 @@ fk_defer();
 box.space.CHILD:select();
 box.space.PARENT:select();
 
+box.sql.execute('PRAGMA defer_foreign_keys = 0;')
+
 -- Cleanup
 box.sql.execute('DROP TABLE child;');
 box.sql.execute('DROP TABLE parent;');

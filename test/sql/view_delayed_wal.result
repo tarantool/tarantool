@@ -100,4 +100,4 @@ box.space.V2
 -- Since deletion via Lua doesn't remove entry from
 -- SQL data dictionary we have to restart instance to clean up.
 --
-test_run:cmd('restart server default')
+test_run:cmd('restart server default with cleanup=1')

@@ -118,6 +118,8 @@ box.space.PARENT:select();
   - [2, 2]
 ...
 -- Cleanup
+box.sql.execute('PRAGMA defer_foreign_keys = 0;')
+
 box.sql.execute('DROP TABLE child;');
 ---
 ...
