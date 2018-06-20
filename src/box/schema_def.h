@@ -243,6 +243,15 @@ enum schema_object_type {
 	schema_object_type_MAX = 8
 };
 
+/** SQL Storage engine. */
+enum sql_storage_engine {
+    SQL_STORAGE_ENGINE_MEMTX = 0,
+    SQL_STORAGE_ENGINE_VINYL = 1,
+    sql_storage_engine_MAX = 2
+};
+
+extern const char *sql_storage_engine_strs[];
+
 enum schema_object_type
 schema_object_type(const char *name);
 

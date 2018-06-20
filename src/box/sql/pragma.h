@@ -17,6 +17,7 @@
 #define PragTyp_STATS                         15
 #define PragTyp_TABLE_INFO                    17
 #define PragTyp_PARSER_TRACE                  24
+#define PragTyp_DEFAULT_ENGINE                25
 
 /* Property flags associated with various pragma. */
 #define PragFlg_NeedSchema 0x01	/* Force schema load before running */
@@ -247,6 +248,11 @@ static const PragmaName aPragmaName[] = {
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ SQLITE_ShortColNames},
 #endif
+	{ /* zName:     */ "sql_default_engine",
+	 /* ePragTyp:  */ PragTyp_DEFAULT_ENGINE,
+	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
+	 /* ColNames:  */ 0, 0,
+	 /* iArg:      */ 0},
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 #if defined(SQLITE_DEBUG)
 	{ /* zName:     */ "sql_trace",

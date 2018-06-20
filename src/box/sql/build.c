@@ -495,6 +495,9 @@ sql_table_new(Parse *parser, char *name)
 	if (table == NULL)
 		return NULL;
 
+	strcpy(table->def->engine_name,
+	       sql_storage_engine_strs[current_session()->sql_default_engine]);
+
 	table->iPKey = -1;
 	table->iAutoIncPKey = -1;
 	table->pSchema = db->pSchema;
@@ -1587,7 +1590,8 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 2 /* name */ , 0,
 			  sqlite3DbStrDup(pParse->db, p->def->name), P4_DYNAMIC);
 	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 3 /* engine */ , 0,
-			  "memtx", P4_STATIC);
+			  sqlite3DbStrDup(pParse->db, p->def->engine_name),
+			  P4_DYNAMIC);
 	sqlite3VdbeAddOp2(v, OP_Integer, p->def->field_count,
 			  iFirstCol + 4 /* field_count */ );
 	sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 5, MSGPACK_SUBTYPE,

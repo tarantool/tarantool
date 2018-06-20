@@ -92,6 +92,8 @@ union session_meta {
 struct session {
 	/** Session id. */
 	uint64_t id;
+	/** SQL Tarantool Default storage engine. */
+	uint8_t sql_default_engine;
 	/** SQL Connection flag for current user session */
 	uint32_t sql_flags;
 	enum session_type type;

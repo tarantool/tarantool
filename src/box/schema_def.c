@@ -30,6 +30,11 @@
  */
 #include "schema_def.h"
 
+const char *sql_storage_engine_strs[] = {
+	[SQL_STORAGE_ENGINE_MEMTX] = "memtx",
+	[SQL_STORAGE_ENGINE_VINYL] = "vinyl",
+};
+
 static const char *object_type_strs[] = {
 	/* [SC_UKNNOWN]         = */ "unknown",
 	/* [SC_UNIVERSE]        = */ "universe",

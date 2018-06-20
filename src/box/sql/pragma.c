@@ -219,13 +219,30 @@ pragmaLocate(const char *zName)
 	}								       \
 } while (0)
 
+#define PRINT_STR_PRAGMA(pragma_name, str_value) do {			       \
+	int nCoolSpaces = 30 - strlen(pragma_name);			       \
+	printf("%s %*c --  '%s' \n", pragma_name, nCoolSpaces, ' ', str_value);\
+} while (0)
+
 static void
 printActivePragmas(struct session *user_session)
 {
 	int i;
 	for (i = 0; i < ArraySize(aPragmaName); ++i) {
-		if (aPragmaName[i].ePragTyp == PragTyp_FLAG)
-			PRINT_PRAGMA(aPragmaName[i].zName, aPragmaName[i].iArg);
+		switch (aPragmaName[i].ePragTyp) {
+			case PragTyp_FLAG:
+				PRINT_PRAGMA(aPragmaName[i].zName, aPragmaName[i].iArg);
+				break;
+			case PragTyp_DEFAULT_ENGINE: {
+				const char *engine_name =
+					sql_storage_engine_strs[
+						current_session()->
+							sql_default_engine];
+				PRINT_STR_PRAGMA(aPragmaName[i].zName,
+						 engine_name);
+				break;
+			}
+		}
 	}
 
 	printf("Other available pragmas: \n");
@@ -234,6 +251,31 @@ printActivePragmas(struct session *user_session)
 			printf("-- %s \n", aPragmaName[i].zName);
 	}
 }
+
+/**
+ * Set tarantool backend default engine for SQL interface.
+ * @param engine_name to set default.
+ * @retval -1 on error.
+ * @retval 0 on success.
+ */
+static int
+sql_default_engine_set(const char *engine_name)
+{
+	if (engine_name == NULL) {
+		diag_set(ClientError, ER_ILLEGAL_PARAMS,
+			 "'sql_default_engine' was not specified");
+		return -1;
+	}
+	enum sql_storage_engine engine =
+		STR2ENUM(sql_storage_engine, engine_name);
+	if (engine == sql_storage_engine_MAX) {
+		diag_set(ClientError, ER_NO_SUCH_ENGINE, engine_name);
+		return -1;
+	}
+	current_session()->sql_default_engine = engine;
+	return 0;
+}
+
 
 /*
  * Process a pragma statement.
@@ -866,6 +908,15 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				aOp[1].p3 = iCookie;
 				sqlite3VdbeReusable(v);
 			}
+			break;
+		}
+		case PragTyp_DEFAULT_ENGINE: {
+			if (sql_default_engine_set(zRight) != 0) {
+				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->nErr++;
+				goto pragma_out;
+			}
+			sqlite3VdbeAddOp0(v, OP_Expire);
 			break;
 		}
 
