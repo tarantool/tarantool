@@ -203,10 +203,13 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 	int rc = 0;
 
 	lsm->stat.lookup++;
+
 	/* History list */
-	struct vy_history history;
+	struct vy_history history, mem_history, disk_history;
 	vy_history_create(&history, &lsm->env->history_node_pool);
-restart:
+	vy_history_create(&mem_history, &lsm->env->history_node_pool);
+	vy_history_create(&disk_history, &lsm->env->history_node_pool);
+
 	rc = vy_point_lookup_scan_txw(lsm, tx, key, &history);
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
@@ -215,14 +218,16 @@ restart:
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
-	rc = vy_point_lookup_scan_mems(lsm, rv, key, &history);
-	if (rc != 0 || vy_history_is_terminal(&history))
+restart:
+	rc = vy_point_lookup_scan_mems(lsm, rv, key, &mem_history);
+	if (rc != 0 || vy_history_is_terminal(&mem_history))
 		goto done;
 
 	/* Save version before yield */
+	uint32_t mem_version = lsm->mem->version;
 	uint32_t mem_list_version = lsm->mem_list_version;
 
-	rc = vy_point_lookup_scan_slices(lsm, rv, key, &history);
+	rc = vy_point_lookup_scan_slices(lsm, rv, key, &disk_history);
 	if (rc != 0)
 		goto done;
 
@@ -241,11 +246,29 @@ restart:
 		 * This in unnecessary in case of rotation but since we
 		 * cannot distinguish these two cases we always restart.
 		 */
-		vy_history_cleanup(&history);
+		vy_history_cleanup(&mem_history);
+		vy_history_cleanup(&disk_history);
 		goto restart;
 	}
 
+	if (mem_version != lsm->mem->version) {
+		/*
+		 * Rescan the memory level if its version changed while we
+		 * were reading disk, because there may be new statements
+		 * matching the search key.
+		 */
+		vy_history_cleanup(&mem_history);
+		rc = vy_point_lookup_scan_mems(lsm, rv, key, &mem_history);
+		if (rc != 0)
+			goto done;
+		if (vy_history_is_terminal(&mem_history))
+			vy_history_cleanup(&disk_history);
+	}
+
 done:
+	vy_history_splice(&history, &mem_history);
+	vy_history_splice(&history, &disk_history);
+
 	if (rc == 0) {
 		int upserts_applied;
 		rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
