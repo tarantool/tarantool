@@ -134,9 +134,8 @@ local function local_eval(storage, line)
     if line:sub(1, 1) == '\\' then
         return preprocess(storage, line:sub(2))
     end
-    if storage ~= nil and storage.language == 'sql' then
-        local wrapper = function(...) return box.sql.execute(...) end
-        return format(pcall(wrapper, line))
+    if storage.language == 'sql' then
+        return format(pcall(box.sql.execute, line))
     end
     --
     -- Attempt to append 'return ' before the chunk: if the chunk is
@@ -307,7 +306,7 @@ local function local_read(self)
             break
         end
         if delim == "" then
-            if (box.session.language or 'lua') == 'lua' then
+            if box.session.language == 'lua' then
                 -- stop once a complete Lua statement is entered
                 if local_check_lua(buf) then
                     break
