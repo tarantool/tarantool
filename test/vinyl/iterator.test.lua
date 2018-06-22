@@ -759,3 +759,25 @@ value
 box.commit()
 
 s:drop()
+
+--
+-- gh-3477: read iterator skips a source after reading cache.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+for i = 1, 5 do s:insert{i} end
+
+-- Start iteration.
+t = {}
+gen, param, state = s:pairs({})
+_, v = gen(param, state)
+table.insert(t, v)
+
+-- Add chain {1}..{3} to the cache
+box.space.test:select({}, {limit = 3})
+
+-- Continue iteration.
+for k, v in gen, param, state do table.insert(t, v) end
+t
+
+s:drop()
