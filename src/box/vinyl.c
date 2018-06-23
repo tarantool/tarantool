@@ -1563,47 +1563,6 @@ vy_unique_key_validate(struct vy_lsm *lsm, const char *key,
 }
 
 /**
- * Delete the tuple from all LSM trees of the vinyl space.
- * @param env        Vinyl environment.
- * @param tx         Current transaction.
- * @param space      Vinyl space.
- * @param tuple      Tuple to delete.
- *
- * @retval  0 Success
- * @retval -1 Memory error or the index is not found.
- */
-static inline int
-vy_delete_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
-	       const struct tuple *tuple)
-{
-	struct vy_lsm *pk = vy_lsm_find(space, 0);
-	if (pk == NULL)
-		return -1;
-	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, pk));
-	struct tuple *delete =
-		vy_stmt_new_surrogate_delete(pk->mem_format, tuple);
-	if (delete == NULL)
-		return -1;
-	if (vy_tx_set(tx, pk, delete) != 0)
-		goto error;
-
-	/* At second, delete from seconary indexes. */
-	for (uint32_t i = 1; i < space->index_count; ++i) {
-		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (vy_is_committed_one(env, lsm))
-			continue;
-		if (vy_tx_set(tx, lsm, delete) != 0)
-			goto error;
-	}
-	tuple_unref(delete);
-	return 0;
-error:
-	tuple_unref(delete);
-	return -1;
-}
-
-/**
  * Execute DELETE in a vinyl space.
  * @param env     Vinyl environment.
  * @param tx      Current transaction.
@@ -1650,21 +1609,32 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		if (stmt->old_tuple == NULL)
 			return 0;
 	}
+	int rc = 0;
+	struct tuple *delete;
 	if (has_secondary) {
 		assert(stmt->old_tuple != NULL);
-		return vy_delete_impl(env, tx, space, stmt->old_tuple);
-	} else { /* Primary is the single index in the space. */
-		assert(lsm->index_id == 0);
-		struct tuple *delete =
-			vy_stmt_new_surrogate_delete_from_key(request->key,
-							      pk->key_def,
-							      pk->mem_format);
+		delete = vy_stmt_new_surrogate_delete(pk->mem_format,
+						      stmt->old_tuple);
 		if (delete == NULL)
 			return -1;
-		int rc = vy_tx_set(tx, pk, delete);
-		tuple_unref(delete);
-		return rc;
+		for (uint32_t i = 0; i < space->index_count; i++) {
+			struct vy_lsm *lsm = vy_lsm(space->index[i]);
+			if (vy_is_committed_one(env, lsm))
+				continue;
+			rc = vy_tx_set(tx, lsm, delete);
+			if (rc != 0)
+				break;
+		}
+	} else { /* Primary is the single index in the space. */
+		assert(lsm->index_id == 0);
+		delete = vy_stmt_new_surrogate_delete_from_key(request->key,
+						pk->key_def, pk->mem_format);
+		if (delete == NULL)
+			return -1;
+		rc = vy_tx_set(tx, pk, delete);
 	}
+	tuple_unref(delete);
+	return rc;
 }
 
 /**
