@@ -1385,36 +1385,39 @@ vy_get_by_raw_key(struct vy_lsm *lsm, struct vy_tx *tx,
 }
 
 /**
- * Check if the LSM tree contains the key. If true, then set
- * a duplicate key error in the diagnostics area.
+ * Check if insertion of a new tuple violates unique constraint
+ * of the primary index.
  * @param env        Vinyl environment.
  * @param tx         Current transaction.
  * @param rv         Read view.
  * @param space_name Space name.
  * @param index_name Index name.
- * @param lsm        LSM tree in which to search.
- * @param key        Key statement.
+ * @param lsm        LSM tree corresponding to the index.
+ * @param stmt       New tuple.
  *
- * @retval  0 Success, the key isn't found.
- * @retval -1 Memory error or the key is found.
+ * @retval  0 Success, unique constraint is satisfied.
+ * @retval -1 Duplicate is found or read error occurred.
  */
 static inline int
-vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
-		   const struct vy_read_view **rv,
-		   const char *space_name, const char *index_name,
-		   struct vy_lsm *lsm, struct tuple *key)
+vy_check_is_unique_primary(struct vy_env *env, struct vy_tx *tx,
+			   const struct vy_read_view **rv,
+			   const char *space_name, const char *index_name,
+			   struct vy_lsm *lsm, struct tuple *stmt)
 {
-	struct tuple *found;
+	assert(lsm->index_id == 0);
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	/*
 	 * During recovery we apply rows that were successfully
 	 * applied before restart so no conflict is possible.
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	if (vy_get(lsm, tx, rv, key, &found))
+	if (!lsm->check_is_unique)
+		return 0;
+	struct tuple *found;
+	if (vy_get(lsm, tx, rv, stmt, &found))
 		return -1;
-
-	if (found) {
+	if (found != NULL) {
 		tuple_unref(found);
 		diag_set(ClientError, ER_TUPLE_FOUND,
 			 index_name, space_name);
@@ -1444,19 +1447,36 @@ vy_check_is_unique_secondary(struct vy_env *env, struct vy_tx *tx,
 			     struct vy_lsm *lsm, const struct tuple *stmt)
 {
 	assert(lsm->index_id > 0);
-	struct key_def *def = lsm->key_def;
-	if (lsm->check_is_unique &&
-	    !key_update_can_be_skipped(def->column_mask,
-				       vy_stmt_column_mask(stmt)) &&
-	    (!def->is_nullable || !vy_tuple_key_contains_null(stmt, def))) {
-		struct tuple *key = vy_stmt_extract_key(stmt, def,
-							lsm->env->key_format);
-		if (key == NULL)
-			return -1;
-		int rc = vy_check_is_unique(env, tx, rv, space_name,
-					    index_name, lsm, key);
-		tuple_unref(key);
-		return rc;
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(stmt) == IPROTO_REPLACE);
+	/*
+	 * During recovery we apply rows that were successfully
+	 * applied before restart so no conflict is possible.
+	 */
+	if (env->status != VINYL_ONLINE)
+		return 0;
+	if (!lsm->check_is_unique)
+		return 0;
+	if (key_update_can_be_skipped(lsm->key_def->column_mask,
+				      vy_stmt_column_mask(stmt)))
+		return 0;
+	if (lsm->key_def->is_nullable &&
+	    vy_tuple_key_contains_null(stmt, lsm->key_def))
+		return 0;
+	struct tuple *key = vy_stmt_extract_key(stmt, lsm->key_def,
+						lsm->env->key_format);
+	if (key == NULL)
+		return -1;
+	struct tuple *found;
+	int rc = vy_get(lsm, tx, rv, key, &found);
+	tuple_unref(key);
+	if (rc != 0)
+		return -1;
+	if (found != NULL) {
+		tuple_unref(found);
+		diag_set(ClientError, ER_TUPLE_FOUND,
+			 index_name, space_name);
+		return -1;
 	}
 	return 0;
 }
@@ -1483,10 +1503,10 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
-	if (pk->check_is_unique &&
-	    vy_check_is_unique(env, tx, vy_tx_read_view(tx), space_name(space),
-			       index_name_by_id(space, pk->index_id),
-			       pk, stmt) != 0)
+	if (vy_check_is_unique_primary(env, tx, vy_tx_read_view(tx),
+				       space_name(space),
+				       index_name_by_id(space, pk->index_id),
+				       pk, stmt) != 0)
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
