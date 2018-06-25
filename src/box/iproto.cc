@@ -64,7 +64,10 @@
 #include "applier.h"
 #include "cfg.h"
 
-enum { IPROTO_SALT_SIZE = 32 };
+enum {
+	IPROTO_SALT_SIZE = 32,
+	IPROTO_PACKET_SIZE_MAX = 2UL * 1024 * 1024 * 1024,
+};
 
 /**
  * A position in connection output buffer.
@@ -688,6 +691,7 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 	assert(rlist_empty(&con->in_stop_list));
 	int n_requests = 0;
 	bool stop_input = false;
+	const char *errmsg;
 	while (con->parse_size != 0 && !stop_input) {
 		if (iproto_check_msg_max()) {
 			iproto_connection_stop_msg_max_limit(con);
@@ -698,14 +702,22 @@ iproto_enqueue_batch(struct iproto_connection *con, struct ibuf *in)
 		const char *pos = reqstart;
 		/* Read request length. */
 		if (mp_typeof(*pos) != MP_UINT) {
+			errmsg = "packet length";
+err_msgpack:
 			cpipe_flush_input(&tx_pipe);
 			diag_set(ClientError, ER_INVALID_MSGPACK,
-				 "packet length");
+				 errmsg);
 			return -1;
 		}
 		if (mp_check_uint(pos, in->wpos) >= 0)
 			break;
-		uint32_t len = mp_decode_uint(&pos);
+		uint64_t len = mp_decode_uint(&pos);
+		if (len > IPROTO_PACKET_SIZE_MAX) {
+			errmsg = tt_sprintf("too big packet size in the "\
+					    "header: %llu",
+					    (unsigned long long) len);
+			goto err_msgpack;
+		}
 		const char *reqend = pos + len;
 		if (reqend > in->wpos)
 			break;
