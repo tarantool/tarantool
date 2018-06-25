@@ -1478,7 +1478,6 @@ typedef struct StrAccum StrAccum;
 typedef struct Table Table;
 typedef struct Token Token;
 typedef struct TreeView TreeView;
-typedef struct Trigger Trigger;
 typedef struct TriggerPrg TriggerPrg;
 typedef struct TriggerStep TriggerStep;
 typedef struct UnpackedRecord UnpackedRecord;
@@ -1978,7 +1977,8 @@ struct FKey {
 	/* EV: R-30323-21917 */
 	u8 isDeferred;		/* True if constraint checking is deferred till COMMIT */
 	u8 aAction[2];		/* ON DELETE and ON UPDATE actions, respectively */
-	Trigger *apTrigger[2];	/* Triggers for aAction[] actions */
+	/** Triggers for aAction[] actions. */
+	struct sql_trigger *apTrigger[2];
 	struct sColMap {	/* Mapping of columns in pFrom to columns in zTo */
 		int iFrom;	/* Index of column in pFrom */
 		char *zCol;	/* Name of column in zTo.  If NULL use PRIMARY KEY */
@@ -2826,7 +2826,8 @@ struct SelectDest {
  * a mask of new.* columns used by the program.
  */
 struct TriggerPrg {
-	Trigger *pTrigger;	/* Trigger this program was coded from */
+	/** Trigger this program was coded from. */
+	struct sql_trigger *trigger;
 	TriggerPrg *pNext;	/* Next entry in Parse.pTriggerPrg list */
 	SubProgram *pProgram;	/* Program implementing pTrigger/orconf */
 	int orconf;		/* Default ON CONFLICT policy */
@@ -2949,7 +2950,7 @@ struct Parse {
 	union {
 		struct Expr *expr;
 		struct Select *select;
-		struct Trigger *trigger;
+		struct sql_trigger *trigger;
 	} parsed_ast;
 };
 
@@ -3002,31 +3003,37 @@ struct Parse {
 					 */
 
 /*
- * Each trigger present in the database schema is stored as an instance of
- * struct Trigger.
+ * Each trigger present in the database schema is stored as an
+ * instance of struct sql_trigger.
+ * Pointers to instances of struct sql_trigger are stored in a
+ * linked list, using the next member of struct sql_trigger. A
+ * pointer to the first element of the linked list is stored as
+ * sql_triggers member of the associated space.
  *
- * Pointers to instances of struct Trigger are stored in two ways.
- * 1. In the "trigHash" hash table (part of the sqlite3* that represents the
- *    database). This allows Trigger structures to be retrieved by name.
- * 2. All triggers associated with a single table form a linked list, using the
- *    pNext member of struct Trigger. A pointer to the first element of the
- *    linked list is stored as the "pTrigger" member of the associated
- *    struct Table.
- *
- * The "step_list" member points to the first element of a linked list
- * containing the SQL statements specified as the trigger program.
+ * The "step_list" member points to the first element of a linked
+ * list containing the SQL statements specified as the trigger
+ * program.
  */
-struct Trigger {
-	char *zName;		/* The name of the trigger                        */
+struct sql_trigger {
+	/** The name of the trigger. */
+	char *zName;
 	/** The ID of space the trigger refers to. */
 	uint32_t space_id;
-	u8 op;			/* One of TK_DELETE, TK_UPDATE, TK_INSERT         */
-	u8 tr_tm;		/* One of TRIGGER_BEFORE, TRIGGER_AFTER */
-	Expr *pWhen;		/* The WHEN clause of the expression (may be NULL) */
-	IdList *pColumns;	/* If this is an UPDATE OF <column-list> trigger,
-				   the <column-list> is stored here */
-	TriggerStep *step_list;	/* Link list of trigger program steps             */
-	Trigger *pNext;		/* Next trigger associated with the table */
+	/** One of TK_DELETE, TK_UPDATE, TK_INSERT. */
+	u8 op;
+	/** One of TRIGGER_BEFORE, TRIGGER_AFTER. */
+	u8 tr_tm;
+	/** The WHEN clause of the expression (may be NULL). */
+	Expr *pWhen;
+	/**
+	 * If this is an UPDATE OF <column-list> trigger,
+	 * the <column-list> is stored here
+	 */
+	IdList *pColumns;
+	/** Link list of trigger program steps. */
+	TriggerStep *step_list;
+	/** Next trigger associated with the table. */
+	struct sql_trigger *next;
 };
 
 /*
@@ -3045,8 +3052,8 @@ struct Trigger {
  *
  * Instances of struct TriggerStep are stored in a singly linked list (linked
  * using the "pNext" member) referenced by the "step_list" member of the
- * associated struct Trigger instance. The first element of the linked list is
- * the first step of the trigger-program.
+ * associated struct sql_trigger instance. The first element of the linked list
+ * is the first step of the trigger-program.
  *
  * The "op" member indicates whether this is a "DELETE", "INSERT", "UPDATE" or
  * "SELECT" statement. The meanings of the other members is determined by the
@@ -3080,7 +3087,8 @@ struct Trigger {
 struct TriggerStep {
 	u8 op;			/* One of TK_DELETE, TK_UPDATE, TK_INSERT, TK_SELECT */
 	u8 orconf;		/* ON_CONFLICT_ACTION_ROLLBACK etc. */
-	Trigger *pTrig;		/* The trigger that this step is a part of */
+	/** The trigger that this step is a part of */
+	struct sql_trigger *trigger;
 	Select *pSelect;	/* SELECT statement or RHS of INSERT INTO SELECT ... */
 	char *zTarget;		/* Target table for DELETE, UPDATE, INSERT */
 	Expr *pWhere;		/* The WHERE clause for DELETE or UPDATE steps */
@@ -3917,8 +3925,8 @@ int sqlite3ExprNeedsNoAffinityChange(const Expr *, char);
  */
 void
 sql_generate_row_delete(struct Parse *parse, struct Table *table,
-			struct Trigger *trigger_list, int cursor, int reg_pk,
-			short npk, bool need_update_count,
+			struct sql_trigger *trigger_list, int cursor,
+			int reg_pk, short npk, bool need_update_count,
 			enum on_conflict_action onconf, u8 mode,
 			int idx_noseek);
 
@@ -4048,17 +4056,145 @@ void
 sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 		     int cursor);
 
-#ifndef SQLITE_OMIT_TRIGGER
-void sqlite3BeginTrigger(Parse *, Token *, int, int, IdList *, SrcList *,
-			 Expr *, int);
-void sqlite3FinishTrigger(Parse *, TriggerStep *, Token *);
+/**
+ * This is called by the parser when it sees a CREATE TRIGGER
+ * statement up to the point of the BEGIN before the trigger
+ * actions.  A sql_trigger structure is generated based on the
+ * information available and stored in parse->parsed_ast.trigger.
+ * After the trigger actions have been parsed, the
+ * sql_trigger_finish() function is called to complete the trigger
+ * construction process.
+ *
+ * @param parse The parse context of the CREATE TRIGGER statement.
+ * @param name The name of the trigger.
+ * @param tr_tm One of TK_BEFORE, TK_AFTER, TK_INSTEAD.
+ * @param op One of TK_INSERT, TK_UPDATE, TK_DELETE.
+ * @param columns column list if this is an UPDATE OF trigger.
+ * @param table The name of the table/view the trigger applies to.
+ * @param when  WHEN clause.
+ * @param no_err Suppress errors if the trigger already exists.
+ */
+void
+sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
+		  int op, struct IdList *columns, struct SrcList *table,
+		  struct Expr *when, int no_err);
+
+/**
+ * This routine is called after all of the trigger actions have
+ * been parsed in order to complete the process of building the
+ * trigger.
+ *
+ * @param parse Parser context.
+ * @param step_list The triggered program.
+ * @param token Token that describes the complete CREATE TRIGGER.
+ */
+void
+sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
+		   struct Token *token);
+
 void sqlite3DropTrigger(Parse *, SrcList *, int);
-void sqlite3DropTriggerPtr(Parse *, Trigger *);
-Trigger *sqlite3TriggersExist(Table *, int, ExprList *, int *pMask);
-void sqlite3CodeRowTrigger(Parse *, Trigger *, int, ExprList *, int, Table *,
-			   int, int, int);
-void sqlite3CodeRowTriggerDirect(Parse *, Trigger *, Table *, int, int, int);
-void sqliteViewTriggers(Parse *, Table *, Expr *, int, ExprList *);
+
+/**
+ * Drop a trigger given a pointer to that trigger.
+ *
+ * @param parser Parse context.
+ * @param trigger sql_trigger to drop.
+ */
+void
+vdbe_code_drop_trigger_ptr(struct Parse *parser, struct sql_trigger *trigger);
+
+/**
+ * Return a list of all triggers on table pTab if there exists at
+ * least one trigger that must be fired when an operation of type
+ * 'op' is performed on the table, and, if that operation is an
+ * UPDATE, if at least one of the columns in changes_list is being
+ * modified.
+ *
+ * @param table The table the contains the triggers.
+ * @param op operation one of TK_DELETE, TK_INSERT, TK_UPDATE.
+ * @param changes_list Columns that change in an UPDATE statement.
+ * @param[out] pMask Mask of TRIGGER_BEFORE|TRIGGER_AFTER
+ */
+struct sql_trigger *
+sql_triggers_exist(struct Table *table, int op, struct ExprList *changes_list,
+		   int *mask_ptr);
+
+/**
+ * This is called to code the required FOR EACH ROW triggers for
+ * an operation on table. The operation to code triggers for
+ * (INSERT, UPDATE or DELETE) is given by the op parameter. The
+ * tr_tm parameter determines whether the BEFORE or AFTER triggers
+ * are coded. If the operation is an UPDATE, then parameter
+ * changes_list is passed the list of columns being modified.
+ *
+ * If there are no triggers that fire at the specified time for
+ * the specified operation on table, this function is a no-op.
+ *
+ * The reg argument is the address of the first in an array of
+ * registers that contain the values substituted for the new.*
+ * and old.* references in the trigger program. If N is the number
+ * of columns in table table, then registers are populated as
+ * follows:
+ *
+ *   Register       Contains
+ *   ------------------------------------------------------
+ *   reg+0          OLD.PK
+ *   reg+1          OLD.* value of left-most column of pTab
+ *   ...            ...
+ *   reg+N          OLD.* value of right-most column of pTab
+ *   reg+N+1        NEW.PK
+ *   reg+N+2        OLD.* value of left-most column of pTab
+ *   ...            ...
+ *   reg+N+N+1      NEW.* value of right-most column of pTab
+ *
+ * For ON DELETE triggers, the registers containing the NEW.*
+ * values will never be accessed by the trigger program, so they
+ * are not allocated or populated by the caller (there is no data
+ * to populate them with anyway). Similarly, for ON INSERT
+ * triggers the values stored in the OLD.* registers are never
+ * accessed, and so are not allocated by the caller. So, for an
+ * ON INSERT trigger, the value passed to this function as
+ * parameter reg is not a readable register, although registers
+ * (reg+N) through (reg+N+N+1) are.
+ *
+ * Parameter orconf is the default conflict resolution algorithm
+ * for the trigger program to use (REPLACE, IGNORE etc.).
+ * Parameter ignoreJump is the instruction that control should
+ * jump to if a trigger program raises an IGNORE exception.
+ *
+ * @param parser Parse context.
+ * @param trigger List of triggers on table.
+ * @param op operation, one of TK_UPDATE, TK_INSERT, TK_DELETE.
+ * @param changes_list Changes list for any UPDATE OF triggers.
+ * @param tr_tm One of TRIGGER_BEFORE, TRIGGER_AFTER.
+ * @param table The table to code triggers from.
+ * @param reg The first in an array of registers.
+ * @param orconf ON CONFLICT policy.
+ * @param ignore_jump Instruction to jump to for RAISE(IGNORE).
+ */
+void
+vdbe_code_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
+		      int op, struct ExprList *changes_list, int tr_tm,
+		      struct Table *table, int reg, int orconf, int ignore_jump);
+
+/**
+ * Generate code for the trigger program associated with trigger
+ * p on table table. The reg, orconf and ignoreJump parameters
+ * passed to this function are the same as those described in the
+ * header function for sql_code_row_trigger().
+ *
+ * @param parser Parse context.
+ * @param trigger Trigger to code.
+ * @param table The table to code triggers from.
+ * @param reg Reg array containing OLD.* and NEW.* values.
+ * @param orconf ON CONFLICT policy.
+ * @param ignore_jump Instruction to jump to for RAISE(IGNORE).
+ */
+void
+vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
+			     struct Table *table, int reg, int orconf,
+			     int ignore_jump);
+
 void sqlite3DeleteTriggerStep(sqlite3 *, TriggerStep *);
 TriggerStep *sqlite3TriggerSelectStep(sqlite3 *, Select *);
 TriggerStep *sqlite3TriggerInsertStep(sqlite3 *, Token *, IdList *,
@@ -4066,21 +4202,53 @@ TriggerStep *sqlite3TriggerInsertStep(sqlite3 *, Token *, IdList *,
 TriggerStep *sqlite3TriggerUpdateStep(sqlite3 *, Token *, ExprList *, Expr *,
 				      u8);
 TriggerStep *sqlite3TriggerDeleteStep(sqlite3 *, Token *, Expr *);
-u32 sqlite3TriggerColmask(Parse *, Trigger *, ExprList *, int, int, Table *,
-			  int);
+
+/**
+ * Triggers may access values stored in the old.* or new.*
+ * pseudo-table.
+ * This function returns a 32-bit bitmask indicating which columns
+ * of the old.* or new.* tables actually are used by triggers.
+ * This information may be used by the caller, for example, to
+ * avoid having to load the entire old.* record into memory when
+ * executing an UPDATE or DELETE command.
+ *
+ * Bit 0 of the returned mask is set if the left-most column of
+ * the table may be accessed using an [old|new].<col> reference.
+ * Bit 1 is set if the second leftmost column value is required,
+ * and so on. If there are more than 32 columns in the table, and
+ * at least one of the columns with an index greater than 32 may
+ * be accessed, 0xffffffff is returned.
+ *
+ * It is not possible to determine if the old.PK or new.PK column
+ * is accessed by triggers. The caller must always assume that it
+ * is.
+ *
+ * Parameter isNew must be either 1 or 0. If it is 0, then the
+ * mask returned applies to the old.* table. If 1, the new.* table.
+ *
+ * Parameter tr_tm must be a mask with one or both of the
+ * TRIGGER_BEFORE and TRIGGER_AFTER bits set. Values accessed by
+ * BEFORE triggers are only included in the returned mask if the
+ * TRIGGER_BEFORE bit is set in the tr_tm parameter. Similarly,
+ * values accessed by AFTER triggers are only included in the
+ * returned mask if the TRIGGER_AFTER bit is set in tr_tm.
+ *
+ * @param parser  Parse context.
+ * @param trigger List of triggers on table.
+ * @param changes_list Changes list for any UPDATE OF triggers.
+ * @param new  1 for new.* ref mask, 0 for old.* ref mask.
+ * @param tr_tm Mask of TRIGGER_BEFORE|TRIGGER_AFTER.
+ * @param table The table to code triggers from.
+ * @param orconf Default ON CONFLICT policy for trigger steps.
+ *
+ * @retval mask value.
+ */
+u32
+sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
+		    ExprList *changes_list, int new, int tr_tm,
+		    Table *table, int orconf);
 #define sqlite3ParseToplevel(p) ((p)->pToplevel ? (p)->pToplevel : (p))
 #define sqlite3IsToplevel(p) ((p)->pToplevel==0)
-#else
-#define sqlite3TriggersExist(C,D,E,F) 0
-#define sql_trigger_delete(A,B)
-#define sqlite3DropTriggerPtr(A,B)
-#define sqlite3UnlinkAndDeleteTrigger(A,B,C)
-#define sqlite3CodeRowTrigger(A,B,C,D,E,F,G,H,I)
-#define sqlite3CodeRowTriggerDirect(A,B,C,D,E,F)
-#define sqlite3ParseToplevel(p) p
-#define sqlite3IsToplevel(p) 1
-#define sqlite3TriggerColmask(A,B,C,D,E,F,G) 0
-#endif
 
 int sqlite3JoinType(Parse *, Token *, Token *, Token *);
 void sqlite3CreateForeignKey(Parse *, ExprList *, Token *, ExprList *, int);
@@ -4449,7 +4617,7 @@ void sqlite3WithPush(Parse *, With *, u8);
  * this case foreign keys are parsed, but no other functionality is
  * provided (enforcement of FK constraints requires the triggers sub-system).
  */
-#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
+#if !defined(SQLITE_OMIT_FOREIGN_KEY)
 void sqlite3FkCheck(Parse *, Table *, int, int, int *);
 void sqlite3FkDropTable(Parse *, SrcList *, Table *);
 void sqlite3FkActions(Parse *, Table *, ExprList *, int, int *);

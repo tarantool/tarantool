@@ -40,7 +40,6 @@
 #include "tarantoolInt.h"
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY
-#ifndef SQLITE_OMIT_TRIGGER
 
 /*
  * Deferred and Immediate FKs
@@ -730,25 +729,29 @@ sqlite3FkReferences(Table * pTab)
 					pTab->def->name);
 }
 
-/*
+/**
  * The second argument is a Trigger structure allocated by the
- * fkActionTrigger() routine. This function deletes the Trigger structure
- * and all of its sub-components.
+ * fkActionTrigger() routine. This function deletes the sql_trigger
+ * structure and all of its sub-components.
  *
- * The Trigger structure or any of its sub-components may be allocated from
- * the lookaside buffer belonging to database handle dbMem.
+ * The Trigger structure or any of its sub-components may be
+ * allocated from the lookaside buffer belonging to database
+ * handle dbMem.
+ *
+ * @param db Database connection.
+ * @param trigger AST object.
  */
 static void
-fkTriggerDelete(sqlite3 * dbMem, Trigger * p)
+sql_fk_trigger_delete(struct sqlite3 *db, struct sql_trigger *trigger)
 {
-	if (p) {
-		TriggerStep *pStep = p->step_list;
-		sql_expr_delete(dbMem, pStep->pWhere, false);
-		sql_expr_list_delete(dbMem, pStep->pExprList);
-		sql_select_delete(dbMem, pStep->pSelect);
-		sql_expr_delete(dbMem, p->pWhen, false);
-		sqlite3DbFree(dbMem, p);
-	}
+	if (trigger == NULL)
+		return;
+	struct TriggerStep *trigger_step = trigger->step_list;
+	sql_expr_delete(db, trigger_step->pWhere, false);
+	sql_expr_list_delete(db, trigger_step->pExprList);
+	sql_select_delete(db, trigger_step->pSelect);
+	sql_expr_delete(db, trigger->pWhen, false);
+	sqlite3DbFree(db, trigger);
 }
 
 /**
@@ -858,15 +861,13 @@ static int
 isSetNullAction(Parse * pParse, FKey * pFKey)
 {
 	Parse *pTop = sqlite3ParseToplevel(pParse);
-	if (pTop->pTriggerPrg) {
-		Trigger *p = pTop->pTriggerPrg->pTrigger;
-		if ((p == pFKey->apTrigger[0]
-		     && pFKey->aAction[0] == OE_SetNull)
-		    || (p == pFKey->apTrigger[1]
-			&& pFKey->aAction[1] == OE_SetNull)
-		    ) {
+	if (pTop->pTriggerPrg != NULL) {
+		struct sql_trigger *trigger = pTop->pTriggerPrg->trigger;
+		if ((trigger == pFKey->apTrigger[0] &&
+		     pFKey->aAction[0] == OE_SetNull) ||
+		    (trigger == pFKey->apTrigger[1]
+			&& pFKey->aAction[1] == OE_SetNull))
 			return 1;
-		}
 	}
 	return 0;
 }
@@ -1175,21 +1176,24 @@ sqlite3FkRequired(Table * pTab,	/* Table being modified */
 	return 0;
 }
 
-/*
- * This function is called when an UPDATE or DELETE operation is being
- * compiled on table pTab, which is the parent table of foreign-key pFKey.
- * If the current operation is an UPDATE, then the pChanges parameter is
- * passed a pointer to the list of columns being modified. If it is a
- * DELETE, pChanges is passed a NULL pointer.
+/**
+ * This function is called when an UPDATE or DELETE operation is
+ * being compiled on table pTab, which is the parent table of
+ * foreign-key pFKey.
+ * If the current operation is an UPDATE, then the pChanges
+ * parameter is passed a pointer to the list of columns being
+ * modified. If it is a DELETE, pChanges is passed a NULL pointer.
  *
- * It returns a pointer to a Trigger structure containing a trigger
- * equivalent to the ON UPDATE or ON DELETE action specified by pFKey.
- * If the action is "NO ACTION" or "RESTRICT", then a NULL pointer is
- * returned (these actions require no special handling by the triggers
- * sub-system, code for them is created by fkScanChildren()).
+ * It returns a pointer to a sql_trigger structure containing a
+ * trigger equivalent to the ON UPDATE or ON DELETE action
+ * specified by pFKey.
+ * If the action is "NO ACTION" or "RESTRICT", then a NULL pointer
+ * is returned (these actions require no special handling by the
+ * triggers sub-system, code for them is created by
+ * fkScanChildren()).
  *
- * For example, if pFKey is the foreign key and pTab is table "p" in
- * the following schema:
+ * For example, if pFKey is the foreign key and pTab is table "p"
+ * in the following schema:
  *
  *   CREATE TABLE p(pk PRIMARY KEY);
  *   CREATE TABLE c(ck REFERENCES p ON DELETE CASCADE);
@@ -1200,20 +1204,26 @@ sqlite3FkRequired(Table * pTab,	/* Table being modified */
  *     DELETE FROM c WHERE ck = old.pk;
  *   END;
  *
- * The returned pointer is cached as part of the foreign key object. It
- * is eventually freed along with the rest of the foreign key object by
- * sqlite3FkDelete().
+ * The returned pointer is cached as part of the foreign key
+ * object. It is eventually freed along with the rest of the
+ * foreign key object by sqlite3FkDelete().
+ *
+ * @param pParse Parse context.
+ * @param pTab Table being updated or deleted from.
+ * @param pFKey Foreign key to get action for.
+ * @param pChanges Change-list for UPDATE, NULL for DELETE.
+ *
+ * @retval not NULL on success.
+ * @retval NULL on failure.
  */
-static Trigger *
-fkActionTrigger(Parse * pParse,	/* Parse context */
-		Table * pTab,	/* Table being updated or deleted from */
-		FKey * pFKey,	/* Foreign key to get action for */
-		ExprList * pChanges	/* Change-list for UPDATE, NULL for DELETE */
-    )
+static struct sql_trigger *
+fkActionTrigger(struct Parse *pParse, struct Table *pTab, struct FKey *pFKey,
+		struct ExprList * pChanges)
 {
 	sqlite3 *db = pParse->db;	/* Database handle */
 	int action;		/* One of OE_None, OE_Cascade etc. */
-	Trigger *pTrigger;	/* Trigger definition to return */
+	/* Trigger definition to return. */
+	struct sql_trigger *trigger;
 	int iAction = (pChanges != 0);	/* 1 for UPDATE, 0 for DELETE */
 	struct session *user_session = current_session();
 
@@ -1222,9 +1232,9 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 	    && (user_session->sql_flags & SQLITE_DeferFKs)) {
 		return 0;
 	}
-	pTrigger = pFKey->apTrigger[iAction];
+	trigger = pFKey->apTrigger[iAction];
 
-	if (action != ON_CONFLICT_ACTION_NONE && !pTrigger) {
+	if (action != ON_CONFLICT_ACTION_NONE && trigger == NULL) {
 		char const *zFrom;	/* Name of child table */
 		int nFrom;	/* Length in bytes of zFrom */
 		Index *pIdx = 0;	/* Parent key index for this FK */
@@ -1379,13 +1389,13 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 		/* Disable lookaside memory allocation */
 		db->lookaside.bDisable++;
 
-		pTrigger = (Trigger *) sqlite3DbMallocZero(db, sizeof(Trigger) +	/* struct Trigger */
-							   sizeof(TriggerStep) +	/* Single step in trigger program */
-							   nFrom + 1	/* Space for pStep->zTarget */
-		    );
-		if (pTrigger) {
-			pStep = pTrigger->step_list =
-			    (TriggerStep *) & pTrigger[1];
+		size_t trigger_size = sizeof(struct sql_trigger) +
+				      sizeof(TriggerStep) + nFrom + 1;
+		trigger =
+			(struct sql_trigger *)sqlite3DbMallocZero(db,
+								  trigger_size);
+		if (trigger != NULL) {
+			pStep = trigger->step_list = (TriggerStep *)&trigger[1];
 			pStep->zTarget = (char *)&pStep[1];
 			memcpy((char *)pStep->zTarget, zFrom, nFrom);
 
@@ -1397,7 +1407,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 			    sqlite3SelectDup(db, pSelect, EXPRDUP_REDUCE);
 			if (pWhen) {
 				pWhen = sqlite3PExpr(pParse, TK_NOT, pWhen, 0);
-				pTrigger->pWhen =
+				trigger->pWhen =
 				    sqlite3ExprDup(db, pWhen, EXPRDUP_REDUCE);
 			}
 		}
@@ -1410,7 +1420,7 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 		sql_expr_list_delete(db, pList);
 		sql_select_delete(db, pSelect);
 		if (db->mallocFailed == 1) {
-			fkTriggerDelete(db, pTrigger);
+			sql_fk_trigger_delete(db, trigger);
 			return 0;
 		}
 		assert(pStep != 0);
@@ -1428,12 +1438,12 @@ fkActionTrigger(Parse * pParse,	/* Parse context */
 		default:
 			pStep->op = TK_UPDATE;
 		}
-		pStep->pTrig = pTrigger;
-		pFKey->apTrigger[iAction] = pTrigger;
-		pTrigger->op = (pChanges ? TK_UPDATE : TK_DELETE);
+		pStep->trigger = trigger;
+		pFKey->apTrigger[iAction] = trigger;
+		trigger->op = pChanges ? TK_UPDATE : TK_DELETE;
 	}
 
-	return pTrigger;
+	return trigger;
 }
 
 /*
@@ -1460,22 +1470,19 @@ sqlite3FkActions(Parse * pParse,	/* Parse context */
 		     pFKey = pFKey->pNextTo) {
 			if (aChange == 0
 			    || fkParentIsModified(pTab, pFKey, aChange)) {
-				Trigger *pAct =
-				    fkActionTrigger(pParse, pTab, pFKey,
-						    pChanges);
-				if (pAct) {
-					sqlite3CodeRowTriggerDirect(pParse,
-								    pAct, pTab,
-								    regOld,
-								    ON_CONFLICT_ACTION_ABORT,
-								    0);
-				}
+				struct sql_trigger *pAct =
+					fkActionTrigger(pParse, pTab, pFKey,
+							pChanges);
+				if (pAct == NULL)
+					continue;
+				vdbe_code_row_trigger_direct(pParse, pAct, pTab,
+							     regOld,
+							     ON_CONFLICT_ACTION_ABORT,
+							     0);
 			}
 		}
 	}
 }
-
-#endif				/* ifndef SQLITE_OMIT_TRIGGER */
 
 /*
  * Free all memory associated with foreign key definitions attached to
@@ -1511,10 +1518,8 @@ sqlite3FkDelete(sqlite3 * db, Table * pTab)
 		assert(pFKey->isDeferred == 0 || pFKey->isDeferred == 1);
 
 		/* Delete any triggers created to implement actions for this FK. */
-#ifndef SQLITE_OMIT_TRIGGER
-		fkTriggerDelete(db, pFKey->apTrigger[0]);
-		fkTriggerDelete(db, pFKey->apTrigger[1]);
-#endif
+		sql_fk_trigger_delete(db, pFKey->apTrigger[0]);
+		sql_fk_trigger_delete(db, pFKey->apTrigger[1]);
 
 		pNext = pFKey->pNextFrom;
 		sqlite3DbFree(db, pFKey);

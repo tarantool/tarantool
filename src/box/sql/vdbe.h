@@ -302,9 +302,7 @@ UnpackedRecord *sqlite3VdbeAllocUnpackedRecord(struct sqlite3 *,
 					       struct key_def *);
 int sql_vdbe_mem_alloc_region(Mem *, uint32_t);
 
-#ifndef SQLITE_OMIT_TRIGGER
 void sqlite3VdbeLinkSubProgram(Vdbe *, SubProgram *);
-#endif
 
 /* Use SQLITE_ENABLE_COMMENTS to enable generation of extra comments on
  * each VDBE opcode.

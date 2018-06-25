@@ -1300,20 +1300,18 @@ plus_num(A) ::= number(A).
 minus_num(A) ::= MINUS number(X).     {A = X;}
 //////////////////////////// The CREATE TRIGGER command /////////////////////
 
-%ifndef SQLITE_OMIT_TRIGGER
-
 cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
   Token all;
   all.z = A.z;
   all.n = (int)(Z.z - A.z) + Z.n;
   pParse->initiateTTrans = false;
-  sqlite3FinishTrigger(pParse, S, &all);
+  sql_trigger_finish(pParse, S, &all);
 }
 
 trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
                     trigger_time(C) trigger_event(D)
                     ON fullname(E) foreach_clause when_clause(G). {
-  sqlite3BeginTrigger(pParse, &B, C, D.a, D.b, E, G, NOERR);
+  sql_trigger_begin(pParse, &B, C, D.a, D.b, E, G, NOERR);
   A = B; /*A-overwrites-T*/
 }
 
@@ -1414,7 +1412,6 @@ expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
     A.pExpr->affinity = (char)T;
   }
 }
-%endif  !SQLITE_OMIT_TRIGGER
 
 %type raisetype {int}
 raisetype(A) ::= ROLLBACK.  {A = ON_CONFLICT_ACTION_ROLLBACK;}
@@ -1423,11 +1420,9 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////
-%ifndef SQLITE_OMIT_TRIGGER
 cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
   sqlite3DropTrigger(pParse,X,NOERR);
 }
-%endif  !SQLITE_OMIT_TRIGGER
 
 ////////////////////////// REINDEX collation //////////////////////////////////
 /* gh-2174: Commended until REINDEX is implemented in scope of gh-3195 */

@@ -257,7 +257,7 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 				for (p = sqliteHashFirst(&pSchema->trigHash); p;
 				     p = sqliteHashNext(p)) {
 					sql_trigger_delete(db,
-							   (Trigger *)
+							   (struct sql_trigger *)
 							   sqliteHashData(p));
 				}
 				for (p = sqliteHashFirst(&pSchema->tblHash); p;

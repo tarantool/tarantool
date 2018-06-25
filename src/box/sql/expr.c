@@ -4289,7 +4289,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlite3VdbeResolveLabel(v, endLabel);
 			break;
 		}
-#ifndef SQLITE_OMIT_TRIGGER
 	case TK_RAISE:{
 			assert(pExpr->affinity == ON_CONFLICT_ACTION_ROLLBACK
 			       || pExpr->affinity == ON_CONFLICT_ACTION_ABORT
@@ -4319,7 +4318,6 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 
 			break;
 		}
-#endif
 	}
 	sqlite3ReleaseTempReg(pParse, regFree1);
 	sqlite3ReleaseTempReg(pParse, regFree2);

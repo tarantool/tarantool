@@ -93,7 +93,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	/* Figure out if we have any triggers and if the table
 	 * being deleted from is a view.
 	 */
-	struct Trigger *trigger_list = NULL;
+	struct sql_trigger *trigger_list = NULL;
 	/* True if there are triggers or FKs or subqueries in the
 	 * WHERE clause.
 	 */
@@ -124,8 +124,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
 		space = space_by_id(space_id);
 		assert(space != NULL);
-		trigger_list =sqlite3TriggersExist(table, TK_DELETE,
-						   NULL, NULL);
+		trigger_list = sql_triggers_exist(table, TK_DELETE, NULL, NULL);
 		is_complex = trigger_list != NULL ||
 			     sqlite3FkRequired(table, NULL);
 	}
@@ -424,8 +423,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 void
 sql_generate_row_delete(struct Parse *parse, struct Table *table,
-			struct Trigger *trigger_list, int cursor, int reg_pk,
-			short npk, bool need_update_count,
+			struct sql_trigger *trigger_list, int cursor,
+			int reg_pk, short npk, bool need_update_count,
 			enum on_conflict_action onconf, u8 mode,
 			int idx_noseek)
 {
@@ -457,9 +456,9 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
 		uint32_t mask =
-		    sqlite3TriggerColmask(parse, trigger_list, 0, 0,
-					  TRIGGER_BEFORE | TRIGGER_AFTER, table,
-					  onconf);
+			sql_trigger_colmask(parse, trigger_list, 0, 0,
+					    TRIGGER_BEFORE | TRIGGER_AFTER,
+					    table, onconf);
 		mask |= sqlite3FkOldmask(parse, table);
 		first_old_reg = parse->nMem + 1;
 		parse->nMem += (1 + (int)table->def->field_count);
@@ -483,7 +482,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 
 		/* Invoke BEFORE DELETE trigger programs. */
 		int addr_start = sqlite3VdbeCurrentAddr(v);
-		sqlite3CodeRowTrigger(parse, trigger_list, TK_DELETE, NULL,
+		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, NULL,
 				      TRIGGER_BEFORE, table, first_old_reg,
 				      onconf, label);
 
@@ -537,9 +536,9 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		sqlite3FkActions(parse, table, 0, first_old_reg, 0);
 
 		/* Invoke AFTER DELETE trigger programs. */
-		sqlite3CodeRowTrigger(parse, trigger_list,
-				      TK_DELETE, 0, TRIGGER_AFTER, table,
-				      first_old_reg, onconf, label);
+		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, 0,
+				      TRIGGER_AFTER, table, first_old_reg,
+				      onconf, label);
 	}
 
 	/* Jump here if the row had already been deleted before

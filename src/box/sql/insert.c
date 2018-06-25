@@ -356,7 +356,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	int regData;		/* register holding first column to insert */
 	int *aRegIdx = 0;	/* One register allocated to each index */
 	uint32_t space_id = 0;
-	Trigger *pTrigger;	/* List of triggers on pTab, if required */
+	/* List of triggers on pTab, if required. */
+	struct sql_trigger *trigger;
 	int tmask;		/* Mask of trigger times */
 
 	db = pParse->db;
@@ -392,9 +393,10 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* Figure out if we have any triggers and if the table being
 	 * inserted into is a view
 	 */
-	pTrigger = sqlite3TriggersExist(pTab, TK_INSERT, 0, &tmask);
+	trigger = sql_triggers_exist(pTab, TK_INSERT, NULL, &tmask);
 	bool is_view = pTab->def->opts.is_view;
-	assert((pTrigger && tmask) || (pTrigger == 0 && tmask == 0));
+	assert((trigger != NULL && tmask != 0) ||
+	       (trigger == NULL && tmask == 0));
 
 	/* If pTab is really a view, make sure it has been initialized.
 	 * ViewGetColumnNames() is a no-op if pTab is not a view.
@@ -418,7 +420,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		goto insert_cleanup;
 	if (pParse->nested == 0)
 		sqlite3VdbeCountChanges(v);
-	sql_set_multi_write(pParse, pSelect || pTrigger);
+	sql_set_multi_write(pParse, pSelect != NULL || trigger != NULL);
 
 #ifndef SQLITE_OMIT_XFER_OPT
 	/* If the statement is of the form
@@ -431,7 +433,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 * This is the 2nd template.
 	 */
 	if (pColumn == 0 && xferOptimization(pParse, pTab, pSelect, on_error)) {
-		assert(!pTrigger);
+		assert(trigger == NULL);
 		assert(pList == 0);
 		goto insert_end;
 	}
@@ -535,9 +537,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		 * of the tables being read by the SELECT statement.  Also use a
 		 * temp table in the case of row triggers.
 		 */
-		if (pTrigger || readsTable(pParse, pTab)) {
+		if (trigger != NULL || readsTable(pParse, pTab))
 			useTempTable = 1;
-		}
 
 		if (useTempTable) {
 			/* Invoke the coroutine to extract information from the SELECT
@@ -730,7 +731,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		}
 
 		/* Fire BEFORE or INSTEAD OF triggers */
-		sqlite3CodeRowTrigger(pParse, pTrigger, TK_INSERT, 0,
+		vdbe_code_row_trigger(pParse, trigger, TK_INSERT, 0,
 				      TRIGGER_BEFORE, pTab,
 				      regCols - def->field_count - 1, on_error,
 				      endOfLoop);
@@ -879,9 +880,9 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		sqlite3VdbeAddOp2(v, OP_AddImm, regRowCount, 1);
 	}
 
-	if (pTrigger) {
+	if (trigger != NULL) {
 		/* Code AFTER triggers */
-		sqlite3CodeRowTrigger(pParse, pTrigger, TK_INSERT, 0,
+		vdbe_code_row_trigger(pParse, trigger, TK_INSERT, 0,
 				      TRIGGER_AFTER, pTab,
 				      regData - 2 - def->field_count, on_error,
 				      endOfLoop);
@@ -1359,9 +1360,8 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		bool no_delete_triggers =
 			(0 == (user_session->sql_flags &
 			       SQLITE_RecTriggers) ||
-			 0 == sqlite3TriggersExist(pTab,
-						   TK_DELETE,
-						   0, 0));
+			 sql_triggers_exist(pTab, TK_DELETE, NULL, NULL) ==
+			 NULL);
 		bool no_foreign_keys =
 			(0 == (user_session->sql_flags &
 			       SQLITE_ForeignKeys) ||
@@ -1472,15 +1472,14 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			sqlite3VdbeGoto(v, ignoreDest);
 			break;
 		default: {
-			Trigger *pTrigger = NULL;
+			struct sql_trigger *trigger = NULL;
 			assert(on_error == ON_CONFLICT_ACTION_REPLACE);
 			sql_set_multi_write(pParse, true);
-			if (user_session->
-			    sql_flags & SQLITE_RecTriggers) {
-				pTrigger = sqlite3TriggersExist(pTab, TK_DELETE,
-								NULL, NULL);
+			if (user_session->sql_flags & SQLITE_RecTriggers) {
+				trigger = sql_triggers_exist(pTab, TK_DELETE,
+							      NULL, NULL);
 			}
-			sql_generate_row_delete(pParse, pTab, pTrigger,
+			sql_generate_row_delete(pParse, pTab, trigger,
 						iDataCur, regR, nPkField, false,
 						ON_CONFLICT_ACTION_REPLACE,
 						pIdx == pPk ? ONEPASS_SINGLE :

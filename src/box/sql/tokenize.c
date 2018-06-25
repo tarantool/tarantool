@@ -597,14 +597,14 @@ sql_view_compile(struct sqlite3 *db, const char *view_stmt)
 	return select;
 }
 
-struct Trigger *
+struct sql_trigger *
 sql_trigger_compile(struct sqlite3 *db, const char *sql)
 {
 	struct Parse parser;
 	sql_parser_create(&parser, db);
 	parser.parse_only = true;
 	char *sql_error;
-	struct Trigger *trigger = NULL;
+	struct sql_trigger *trigger = NULL;
 	if (sqlite3RunParser(&parser, sql, &sql_error) != SQLITE_OK ||
 	    parser.parsed_ast_type != AST_TYPE_TRIGGER) {
 	    if (parser.rc != SQL_TARANTOOL_ERROR)

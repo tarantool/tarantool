@@ -106,7 +106,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	struct session *user_session = current_session();
 
 	bool is_view;		/* True when updating a view (INSTEAD OF trigger) */
-	Trigger *pTrigger;	/* List of triggers on pTab, if required */
+	/* List of triggers on pTab, if required. */
+	struct sql_trigger *trigger;
 	int tmask;		/* Mask of TRIGGER_BEFORE|TRIGGER_AFTER */
 	int newmask;		/* Mask of NEW.* columns accessed by BEFORE triggers */
 	int iEph = 0;		/* Ephemeral table holding all primary key values */
@@ -136,9 +137,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* Figure out if we have any triggers and if the table being
 	 * updated is a view.
 	 */
-	pTrigger = sqlite3TriggersExist(pTab, TK_UPDATE, pChanges, &tmask);
+	trigger = sql_triggers_exist(pTab, TK_UPDATE, pChanges, &tmask);
 	is_view = pTab->def->opts.is_view;
-	assert(pTrigger || tmask == 0);
+	assert(trigger != NULL || tmask == 0);
 
 	if (is_view &&
 	    sql_view_assign_cursors(pParse,pTab->def->opts.sql) != 0) {
@@ -269,11 +270,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* Allocate required registers. */
 	regOldPk = regNewPk = ++pParse->nMem;
 
-	if (chngPk || pTrigger || hasFK) {
+	if (chngPk != 0 || trigger != NULL || hasFK != 0) {
 		regOld = pParse->nMem + 1;
 		pParse->nMem += def->field_count;
-	}
-	if (chngPk || pTrigger || hasFK) {
 		regNewPk = ++pParse->nMem;
 	}
 	regNew = pParse->nMem + 1;
@@ -424,18 +423,18 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 * then regNewPk is the same register as regOldPk, which is
 	 * already populated.
 	 */
-	assert(chngPk || pTrigger || hasFK || regOldPk == regNewPk);
+	assert(chngPk != 0 || trigger != NULL || hasFK != 0 ||
+	       regOldPk == regNewPk);
 
 
 	/* Compute the old pre-UPDATE content of the row being changed, if that
 	 * information is needed
 	 */
-	if (chngPk || hasFK || pTrigger) {
+	if (chngPk != 0 || hasFK != 0 || trigger != NULL) {
 		u32 oldmask = (hasFK ? sqlite3FkOldmask(pParse, pTab) : 0);
-		oldmask |= sqlite3TriggerColmask(pParse,
-						 pTrigger, pChanges, 0,
-						 TRIGGER_BEFORE | TRIGGER_AFTER,
-						 pTab, on_error);
+		oldmask |= sql_trigger_colmask(pParse, trigger, pChanges, 0,
+					       TRIGGER_BEFORE | TRIGGER_AFTER,
+					       pTab, on_error);
 		for (i = 0; i < (int)def->field_count; i++) {
 			if (oldmask == 0xffffffff
 			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0)
@@ -464,9 +463,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 * may have modified them). So not loading those that are not going to
 	 * be used eliminates some redundant opcodes.
 	 */
-	newmask =
-	    sqlite3TriggerColmask(pParse, pTrigger, pChanges, 1, TRIGGER_BEFORE,
-				  pTab, on_error);
+	newmask = sql_trigger_colmask(pParse, trigger, pChanges, 1,
+				      TRIGGER_BEFORE, pTab, on_error);
 	for (i = 0; i < (int)def->field_count; i++) {
 		if (i == pTab->iPKey) {
 			sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
@@ -498,7 +496,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	if (tmask & TRIGGER_BEFORE) {
 		sqlite3TableAffinity(v, pTab, regNew);
-		sqlite3CodeRowTrigger(pParse, pTrigger, TK_UPDATE, pChanges,
+		vdbe_code_row_trigger(pParse, trigger, TK_UPDATE, pChanges,
 				      TRIGGER_BEFORE, pTab, regOldPk,
 				      on_error, labelContinue);
 
@@ -611,7 +609,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		sqlite3VdbeAddOp2(v, OP_AddImm, regRowCount, 1);
 	}
 
-	sqlite3CodeRowTrigger(pParse, pTrigger, TK_UPDATE, pChanges,
+	vdbe_code_row_trigger(pParse, trigger, TK_UPDATE, pChanges,
 			      TRIGGER_AFTER, pTab, regOldPk, on_error,
 			      labelContinue);
 

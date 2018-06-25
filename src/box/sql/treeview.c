@@ -565,7 +565,6 @@ sqlite3TreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			sqlite3TreeViewExprList(pView, pExpr->x.pList, 0, 0);
 			break;
 		}
-#ifndef SQLITE_OMIT_TRIGGER
 	case TK_RAISE:{
 			const char *zType = "unk";
 			switch (pExpr->affinity) {
@@ -586,7 +585,6 @@ sqlite3TreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 					    pExpr->u.zToken);
 			break;
 		}
-#endif
 	case TK_MATCH:{
 			sqlite3TreeViewLine(pView, "MATCH {%d:%d}%s",
 					    pExpr->iTable, pExpr->iColumn,

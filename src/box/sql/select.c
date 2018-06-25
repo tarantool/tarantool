@@ -1271,7 +1271,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 		}
 #endif				/* SQLITE_OMIT_CTE */
 
-#if !defined(SQLITE_OMIT_TRIGGER)
 		/* Discard the results.  This is used for SELECT statements inside
 		 * the body of a TRIGGER.  The purpose of such selects is to call
 		 * user-defined functions that have side effects.  We do not care
@@ -1281,7 +1280,6 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			assert(eDest == SRT_Discard);
 			break;
 		}
-#endif
 	}
 
 	/* Jump to the end of the loop if the LIMIT is reached.  Except, if

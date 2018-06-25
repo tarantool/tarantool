@@ -147,7 +147,7 @@ struct space {
 	/** Triggers fired before space statement */
 	struct rlist on_stmt_begin;
 	/** SQL Trigger list. */
-	struct Trigger *sql_triggers;
+	struct sql_trigger *sql_triggers;
 	/**
 	 * The number of *enabled* indexes in the space.
 	 *

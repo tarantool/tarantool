@@ -292,7 +292,8 @@ sqlite3SchemaClear(sqlite3 * db)
 	sqlite3HashInit(&pSchema->trigHash);
 	for (pElem = sqliteHashFirst(&temp2); pElem != NULL;
 	     pElem = sqliteHashNext(pElem))
-		sql_trigger_delete(NULL, (Trigger *) sqliteHashData(pElem));
+		sql_trigger_delete(NULL,
+				   (struct sql_trigger *)sqliteHashData(pElem));
 	sqlite3HashClear(&temp2);
 	sqlite3HashInit(&pSchema->tblHash);
 	for (pElem = sqliteHashFirst(&temp1); pElem;

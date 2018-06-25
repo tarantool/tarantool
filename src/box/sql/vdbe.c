@@ -4733,7 +4733,7 @@ case OP_RenameTable: {
 	space = space_by_id(space_id);
 	assert(space);
 	/* Rename space op doesn't change triggers. */
-	struct Trigger *triggers = space->sql_triggers;
+	struct sql_trigger *triggers = space->sql_triggers;
 	zOldTableName = space_name(space);
 	assert(zOldTableName);
 	pTab = sqlite3HashFind(&db->pSchema->tblHash, zOldTableName);
@@ -4784,9 +4784,9 @@ case OP_RenameTable: {
 	 * due to lack of transactional DDL, but just do the best
 	 * effort.
 	 */
-	for (struct Trigger *trigger = triggers; trigger != NULL; ) {
+	for (struct sql_trigger *trigger = triggers; trigger != NULL; ) {
 		/* Store pointer as trigger will be destructed. */
-		struct Trigger *next_trigger = trigger->pNext;
+		struct sql_trigger *next_trigger = trigger->next;
 		rc = tarantoolSqlite3RenameTrigger(trigger->zName,
 						   zOldTableName, zNewTableName);
 		if (rc != SQLITE_OK) {
@@ -4848,8 +4848,6 @@ case OP_DropIndex: {
 	sqlite3UnlinkAndDeleteIndex(db, pOp->p4.pIndex);
 	break;
 }
-
-#ifndef SQLITE_OMIT_TRIGGER
 
 /* Opcode: Program P1 P2 P3 P4 P5
  *
@@ -5005,8 +5003,6 @@ case OP_Param: {           /* out2 */
 	sqlite3VdbeMemShallowCopy(pOut, pIn, MEM_Ephem);
 	break;
 }
-
-#endif /* #ifndef SQLITE_OMIT_TRIGGER */
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY
 /* Opcode: FkCounter P1 P2 * * *

@@ -554,7 +554,7 @@ space_swap_triggers(struct space *new_space, struct space *old_space)
 	rlist_swap(&new_space->on_replace, &old_space->on_replace);
 	rlist_swap(&new_space->on_stmt_begin, &old_space->on_stmt_begin);
 	/** Swap SQL Triggers pointer. */
-	struct Trigger *new_value = new_space->sql_triggers;
+	struct sql_trigger *new_value = new_space->sql_triggers;
 	new_space->sql_triggers = old_space->sql_triggers;
 	old_space->sql_triggers = new_value;
 }
@@ -3263,8 +3263,8 @@ static void
 on_replace_trigger_rollback(struct trigger *trigger, void *event)
 {
 	struct txn_stmt *stmt = txn_last_stmt((struct txn*) event);
-	struct Trigger *old_trigger = (struct Trigger *)trigger->data;
-	struct Trigger *new_trigger;
+	struct sql_trigger *old_trigger = (struct sql_trigger *)trigger->data;
+	struct sql_trigger *new_trigger;
 
 	if (stmt->old_tuple != NULL && stmt->new_tuple == NULL) {
 		/* Rollback DELETE trigger. */
@@ -3301,7 +3301,7 @@ on_replace_trigger_rollback(struct trigger *trigger, void *event)
 static void
 on_replace_trigger_commit(struct trigger *trigger, void * /* event */)
 {
-	struct Trigger *old_trigger = (struct Trigger *)trigger->data;
+	struct sql_trigger *old_trigger = (struct sql_trigger *)trigger->data;
 	sql_trigger_delete(sql_get(), old_trigger);
 }
 
@@ -3335,7 +3335,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		memcpy(trigger_name, trigger_name_src, trigger_name_len);
 		trigger_name[trigger_name_len] = 0;
 
-		struct Trigger *old_trigger;
+		struct sql_trigger *old_trigger;
 		int rc = sql_trigger_replace(sql_get(), trigger_name, NULL,
 					     &old_trigger);
 		(void)rc;
@@ -3357,7 +3357,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		struct space_opts opts;
 		struct region *region = &fiber()->gc;
 		space_opts_decode(&opts, space_opts, region);
-		struct Trigger *new_trigger =
+		struct sql_trigger *new_trigger =
 			sql_trigger_compile(sql_get(), opts.sql);
 		if (new_trigger == NULL)
 			diag_raise();
@@ -3383,7 +3383,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 				  "resolved on AST building from SQL");
 		}
 
-		struct Trigger *old_trigger;
+		struct sql_trigger *old_trigger;
 		if (sql_trigger_replace(sql_get(), trigger_name, new_trigger,
 					&old_trigger) != 0)
 			diag_raise();

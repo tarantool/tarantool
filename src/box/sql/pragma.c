@@ -583,7 +583,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 #endif				/* !defined(SQLITE_OMIT_FOREIGN_KEY) */
 
 #ifndef SQLITE_OMIT_FOREIGN_KEY
-#ifndef SQLITE_OMIT_TRIGGER
 	case PragTyp_FOREIGN_KEY_CHECK:{
 			FKey *pFK;	/* A foreign key constraint */
 			Table *pTab;	/* Child table contain "REFERENCES"
@@ -755,7 +754,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			}
 			break;
 		}
-#endif				/* !defined(SQLITE_OMIT_TRIGGER) */
 #endif				/* !defined(SQLITE_OMIT_FOREIGN_KEY) */
 
 #ifndef NDEBUG

@@ -126,7 +126,7 @@ static const PragmaName aPragmaName[] = {
 	 /* iArg:      */ SQLITE_CountRows},
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
+#if !defined(SQLITE_OMIT_FOREIGN_KEY)
 	{ /* zName:     */ "defer_foreign_keys",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
@@ -134,7 +134,7 @@ static const PragmaName aPragmaName[] = {
 	 /* iArg:      */ SQLITE_DeferFKs},
 #endif
 #endif
-#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
+#if !defined(SQLITE_OMIT_FOREIGN_KEY)
 	{ /* zName:     */ "foreign_key_check",
 	 /* ePragTyp:  */ PragTyp_FOREIGN_KEY_CHECK,
 	 /* ePragFlg:  */ PragFlg_NeedSchema,
@@ -150,7 +150,7 @@ static const PragmaName aPragmaName[] = {
 	 /* iArg:      */ 0},
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-#if !defined(SQLITE_OMIT_FOREIGN_KEY) && !defined(SQLITE_OMIT_TRIGGER)
+#if !defined(SQLITE_OMIT_FOREIGN_KEY)
 	{ /* zName:     */ "foreign_keys",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,

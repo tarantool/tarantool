@@ -2106,10 +2106,10 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	 * accounted in DELETE from _space below.
 	 */
 	parse_context->nested++;
-	struct Trigger *trigger = space->sql_triggers;
+	struct sql_trigger *trigger = space->sql_triggers;
 	while (trigger != NULL) {
-		sqlite3DropTriggerPtr(parse_context, trigger);
-		trigger = trigger->pNext;
+		vdbe_code_drop_trigger_ptr(parse_context, trigger);
+		trigger = trigger->next;
 	}
 	parse_context->nested--;
 	/*
