@@ -51,11 +51,10 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	Vdbe *v;
 	v = sqlite3GetVdbe(pParse);
 	assert(opcode == OP_OpenWrite || opcode == OP_OpenRead);
-	Index *pPk = sqlite3PrimaryKeyIndex(pTab);
-	assert(pPk != 0);
-	assert(pPk->tnum == pTab->tnum);
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(pPk->tnum));
-	vdbe_emit_open_cursor(pParse, iCur, pPk->tnum, space);
+
+	struct space *space = space_by_id(pTab->def->id);
+	assert(space->index_count > 0);
+	vdbe_emit_open_cursor(pParse, iCur, 0, space);
 	VdbeComment((v, "%s", pTab->def->name));
 }
 

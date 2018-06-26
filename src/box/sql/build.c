@@ -358,18 +358,6 @@ static void SQLITE_NOINLINE
 deleteTable(sqlite3 * db, Table * pTable)
 {
 	Index *pIndex, *pNext;
-	TESTONLY(int nLookaside;
-	    )
-
-	    /* Used to verify lookaside not used for schema */
-	    /* Record the number of outstanding lookaside allocations in schema Tables
-	     * prior to doing any free() operations.  Since schema Tables do not use
-	     * lookaside, this number should not change.
-	     */
-	    TESTONLY(nLookaside =
-		     (db
-		      && (pTable->tabFlags & TF_Ephemeral) ==
-		      0) ? db->lookaside.nOut : 0);
 
 	/* Delete all indices associated with this table. */
 	for (pIndex = pTable->pIndex; pIndex; pIndex = pNext) {
@@ -400,9 +388,6 @@ deleteTable(sqlite3 * db, Table * pTable)
 	else
 		sql_expr_list_delete(db, pTable->def->opts.checks);
 	sqlite3DbFree(db, pTable);
-
-	/* Verify that no lookaside memory was used by schema tables */
-	assert(nLookaside == 0 || nLookaside == db->lookaside.nOut);
 }
 
 void
@@ -1970,6 +1955,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 		struct Select *select, bool if_exists)
 {
 	struct sqlite3 *db = parse_context->db;
+	struct Table *sel_tab = NULL;
 	if (parse_context->nVar > 0) {
 		sqlite3ErrorMsg(parse_context,
 				"parameters are not allowed in views");
@@ -1979,7 +1965,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	struct Table *p = parse_context->pNewTable;
 	if (p == NULL || parse_context->nErr != 0)
 		goto create_view_fail;
-	struct Table *sel_tab =	sqlite3ResultSetOfSelect(parse_context, select);
+	sel_tab = sqlite3ResultSetOfSelect(parse_context, select);
 	if (sel_tab == NULL)
 		goto create_view_fail;
 	if (aliases != NULL) {
@@ -2032,6 +2018,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	sqlite3EndTable(parse_context, 0, &end, 0);
 
  create_view_fail:
+	sqlite3DbFree(db, sel_tab);
 	sql_expr_list_delete(db, aliases);
 	sql_select_delete(db, select);
 	return;

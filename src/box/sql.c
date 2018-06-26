@@ -1740,14 +1740,14 @@ space_column_default_expr(uint32_t space_id, uint32_t fieldno)
 }
 
 struct space_def *
-sql_ephemeral_space_def_new(Parse *parser, const char *name)
+sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 {
 	struct space_def *def = NULL;
-	struct region *region = &fiber()->gc;
 	size_t name_len = name != NULL ? strlen(name) : 0;
 	uint32_t dummy;
-	size_t size = space_def_sizeof(name_len, NULL, 0, &dummy, &dummy, &dummy);
-	def = (struct space_def *)region_alloc(region, size);
+	size_t size = space_def_sizeof(name_len, NULL, 0, &dummy, &dummy,
+				       &dummy);
+	def = (struct space_def *)region_alloc(&parser->region, size);
 	if (def == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc",
 			 "sql_ephemeral_space_def_new");
