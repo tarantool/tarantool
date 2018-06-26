@@ -4712,75 +4712,6 @@ unixFullPathname(sqlite3_vfs * pVfs,	/* Pointer to vfs object */
 #endif				/* HAVE_READLINK && HAVE_LSTAT */
 }
 
-#ifndef SQLITE_OMIT_LOAD_EXTENSION
-/*
- * Interfaces for opening a shared library, finding entry points
- * within the shared library, and closing the shared library.
- */
-#include <dlfcn.h>
-static void *
-unixDlOpen(sqlite3_vfs * NotUsed, const char *zFilename)
-{
-	UNUSED_PARAMETER(NotUsed);
-	return dlopen(zFilename, RTLD_NOW | RTLD_GLOBAL);
-}
-
-/*
- * SQLite calls this function immediately after a call to unixDlSym() or
- * unixDlOpen() fails (returns a null pointer). If a more detailed error
- * message is available, it is written to zBufOut. If no error message
- * is available, zBufOut is left unmodified and SQLite uses a default
- * error message.
- */
-static void
-unixDlError(sqlite3_vfs * NotUsed, int nBuf, char *zBufOut)
-{
-	const char *zErr;
-	UNUSED_PARAMETER(NotUsed);
-	zErr = dlerror();
-	if (zErr) {
-		sqlite3_snprintf(nBuf, zBufOut, "%s", zErr);
-	}
-}
-
-static
-    void (*unixDlSym(sqlite3_vfs * NotUsed, void *p, const char *zSym)) (void) {
-	/*
-	 * GCC with -pedantic-errors says that C90 does not allow a void* to be
-	 * cast into a pointer to a function.  And yet the library dlsym() routine
-	 * returns a void* which is really a pointer to a function.  So how do we
-	 * use dlsym() with -pedantic-errors?
-	 *
-	 * Variable x below is defined to be a pointer to a function taking
-	 * parameters void* and const char* and returning a pointer to a function.
-	 * We initialize x by assigning it a pointer to the dlsym() function.
-	 * (That assignment requires a cast.)  Then we call the function that
-	 * x points to.
-	 *
-	 * This work-around is unlikely to work correctly on any system where
-	 * you really cannot cast a function pointer into void*.  But then, on the
-	 * other hand, dlsym() will not work on such a system either, so we have
-	 * not really lost anything.
-	 */
-	void (*(*x) (void *, const char *)) (void);
-	UNUSED_PARAMETER(NotUsed);
-	x = (void (*(*)(void *, const char *))(void))dlsym;
-	return (*x) (p, zSym);
-}
-
-static void
-unixDlClose(sqlite3_vfs * NotUsed, void *pHandle)
-{
-	UNUSED_PARAMETER(NotUsed);
-	dlclose(pHandle);
-}
-#else				/* if SQLITE_OMIT_LOAD_EXTENSION is defined: */
-#define unixDlOpen  0
-#define unixDlError 0
-#define unixDlSym   0
-#define unixDlClose 0
-#endif
-
 /*
  * Write nBuf bytes of random data to the supplied buffer zBuf.
  */
@@ -6252,10 +6183,6 @@ sqlite3_os_init(void)
     unixDelete,           /* xDelete */                     \
     unixAccess,           /* xAccess */                     \
     unixFullPathname,     /* xFullPathname */               \
-    unixDlOpen,           /* xDlOpen */                     \
-    unixDlError,          /* xDlError */                    \
-    unixDlSym,            /* xDlSym */                      \
-    unixDlClose,          /* xDlClose */                    \
     unixRandomness,       /* xRandomness */                 \
     unixSleep,            /* xSleep */                      \
     0,			  /* xCurrentTime */                \

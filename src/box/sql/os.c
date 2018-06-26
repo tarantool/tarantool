@@ -319,29 +319,6 @@ sqlite3OsFullPathname(sqlite3_vfs * pVfs,
 	return pVfs->xFullPathname(pVfs, zPath, nPathOut, zPathOut);
 }
 
-#ifndef SQLITE_OMIT_LOAD_EXTENSION
-void *
-sqlite3OsDlOpen(sqlite3_vfs * pVfs, const char *zPath)
-{
-	return pVfs->xDlOpen(pVfs, zPath);
-}
-
-void
-sqlite3OsDlError(sqlite3_vfs * pVfs, int nByte, char *zBufOut)
-{
-	pVfs->xDlError(pVfs, nByte, zBufOut);
-}
-
-void (*sqlite3OsDlSym(sqlite3_vfs * pVfs, void *pHdle, const char *zSym)) (void) {
-	return pVfs->xDlSym(pVfs, pHdle, zSym);
-}
-
-void
-sqlite3OsDlClose(sqlite3_vfs * pVfs, void *pHandle)
-{
-	pVfs->xDlClose(pVfs, pHandle);
-}
-#endif				/* SQLITE_OMIT_LOAD_EXTENSION */
 int
 sqlite3OsRandomness(sqlite3_vfs * pVfs, int nByte, char *zBufOut)
 {

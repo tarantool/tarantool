@@ -357,11 +357,6 @@ struct sqlite3_vfs {
 			int *pResOut);
 	int (*xFullPathname) (sqlite3_vfs *, const char *zName,
 			      int nOut, char *zOut);
-	void *(*xDlOpen) (sqlite3_vfs *, const char *zFilename);
-	void (*xDlError) (sqlite3_vfs *, int nByte, char *zErrMsg);
-	void (*(*xDlSym) (sqlite3_vfs *, void *, const char *zSymbol))
-	(void);
-	void (*xDlClose) (sqlite3_vfs *, void *);
 	int (*xRandomness) (sqlite3_vfs *, int nByte, char *zOut);
 	int (*xSleep) (sqlite3_vfs *, int microseconds);
 	int (*xCurrentTime) (sqlite3_vfs *, double *);
