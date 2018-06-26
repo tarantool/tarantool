@@ -126,6 +126,7 @@ space_trigger_list(uint32_t space_id);
  * Perform replace trigger in SQL internals with new AST object.
  * @param db SQL handle.
  * @param name a name of the trigger.
+ * @param space_id of the space to insert trigger.
  * @param trigger AST object to insert.
  * @param[out] old_trigger Old object if exists.
  *
@@ -133,7 +134,7 @@ space_trigger_list(uint32_t space_id);
  * @retval -1 on error.
  */
 int
-sql_trigger_replace(struct sqlite3 *db, const char *name,
+sql_trigger_replace(struct sqlite3 *db, const char *name, uint32_t space_id,
 		    struct sql_trigger *trigger,
 		    struct sql_trigger **old_trigger);
 

@@ -86,7 +86,7 @@ struct errcode_record {
 	/* 31 */_(ER_KEY_PART_COUNT,		"Invalid key part count (expected [0..%u], got %u)") \
 	/* 32 */_(ER_PROC_LUA,			"%s") \
 	/* 33 */_(ER_NO_SUCH_PROC,		"Procedure '%.*s' is not defined") \
-	/* 34 */_(ER_NO_SUCH_TRIGGER,		"Trigger is not found") \
+	/* 34 */_(ER_NO_SUCH_TRIGGER,		"Trigger '%s' doesn't exist") \
 	/* 35 */_(ER_NO_SUCH_INDEX,		"No index #%u is defined in space '%s'") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		"Space '%s' does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		"Field %d was not found in the tuple") \

@@ -3272,6 +3272,7 @@ on_replace_trigger_rollback(struct trigger *trigger, void *event)
 			return;
 		if (sql_trigger_replace(sql_get(),
 					sql_trigger_name(old_trigger),
+					sql_trigger_space_id(old_trigger),
 					old_trigger, &new_trigger) != 0)
 			panic("Out of memory on insertion into trigger hash");
 		assert(new_trigger == NULL);
@@ -3279,6 +3280,7 @@ on_replace_trigger_rollback(struct trigger *trigger, void *event)
 		/* Rollback INSERT trigger. */
 		int rc = sql_trigger_replace(sql_get(),
 					     sql_trigger_name(old_trigger),
+					     sql_trigger_space_id(old_trigger),
 					     NULL, &new_trigger);
 		(void)rc;
 		assert(rc == 0);
@@ -3288,6 +3290,7 @@ on_replace_trigger_rollback(struct trigger *trigger, void *event)
 		/* Rollback REPLACE trigger. */
 		if (sql_trigger_replace(sql_get(),
 					sql_trigger_name(old_trigger),
+					sql_trigger_space_id(old_trigger),
 					old_trigger, &new_trigger) != 0)
 			panic("Out of memory on insertion into trigger hash");
 		sql_trigger_delete(sql_get(), new_trigger);
@@ -3329,6 +3332,9 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		const char *trigger_name_src =
 			tuple_field_str_xc(old_tuple, BOX_TRIGGER_FIELD_NAME,
 					   &trigger_name_len);
+		uint32_t space_id =
+			tuple_field_u32_xc(old_tuple,
+					   BOX_TRIGGER_FIELD_SPACE_ID);
 		char *trigger_name =
 			(char *)region_alloc_xc(&fiber()->gc,
 						trigger_name_len + 1);
@@ -3336,8 +3342,8 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		trigger_name[trigger_name_len] = 0;
 
 		struct sql_trigger *old_trigger;
-		int rc = sql_trigger_replace(sql_get(), trigger_name, NULL,
-					     &old_trigger);
+		int rc = sql_trigger_replace(sql_get(), trigger_name, space_id,
+					     NULL, &old_trigger);
 		(void)rc;
 		assert(rc == 0);
 
@@ -3384,8 +3390,9 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		}
 
 		struct sql_trigger *old_trigger;
-		if (sql_trigger_replace(sql_get(), trigger_name, new_trigger,
-					&old_trigger) != 0)
+		if (sql_trigger_replace(sql_get(), trigger_name,
+					sql_trigger_space_id(new_trigger),
+					new_trigger, &old_trigger) != 0)
 			diag_raise();
 
 		on_commit->data = old_trigger;

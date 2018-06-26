@@ -159,7 +159,7 @@ test:do_catchsql_test(
         DROP TRIGGER biggles;
     ]], {
         -- <trigger1-1.6.2>
-        1, "no such trigger: BIGGLES"
+        1, "Trigger 'BIGGLES' doesn't exist"
         -- </trigger1-1.6.2>
     })
 
@@ -170,7 +170,7 @@ test:do_catchsql_test(
         DROP TRIGGER tr1;
     ]], {
         -- <trigger1-1.7>
-        1, "no such trigger: TR1"
+        1, "Trigger 'TR1' doesn't exist"
         -- </trigger1-1.7>
     })
 

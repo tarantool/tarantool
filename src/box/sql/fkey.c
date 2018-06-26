@@ -1218,7 +1218,7 @@ sqlite3FkRequired(Table * pTab,	/* Table being modified */
  */
 static struct sql_trigger *
 fkActionTrigger(struct Parse *pParse, struct Table *pTab, struct FKey *pFKey,
-		struct ExprList * pChanges)
+		struct ExprList *pChanges)
 {
 	sqlite3 *db = pParse->db;	/* Database handle */
 	int action;		/* One of OE_None, OE_Cascade etc. */

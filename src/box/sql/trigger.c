@@ -125,11 +125,11 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 		const char *error_msg =
 			tt_sprintf(tnt_errcode_desc(ER_TRIGGER_EXISTS),
 				   trigger_name);
-		if (vdbe_emit_halt_if_exists(parse, BOX_TRIGGER_ID,
-					     0, trigger_name,
-					     ER_TRIGGER_EXISTS,
-					     error_msg,
-					     (no_err != 0)) != 0)
+		if (vdbe_emit_halt_with_presence_test(parse, BOX_TRIGGER_ID, 0,
+						      trigger_name,
+						      ER_TRIGGER_EXISTS,
+						      error_msg, (no_err != 0),
+						      OP_NoConflict) != 0)
 			goto trigger_cleanup;
 	}
 
@@ -439,58 +439,11 @@ sql_trigger_delete(struct sqlite3 *db, struct sql_trigger *trigger)
 	sqlite3DbFree(db, trigger);
 }
 
-/*
- * This function is called to drop a trigger from the database
- * schema.
- *
- * This may be called directly from the parser and therefore
- * identifies the trigger by name.  The sql_drop_trigger_ptr()
- * routine does the same job as this routine except it takes a
- * pointer to the trigger instead of the trigger name.
- */
 void
-sqlite3DropTrigger(Parse * pParse, SrcList * pName, int noErr)
+vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name)
 {
-	struct sql_trigger *trigger = NULL;
-	const char *zName;
-	sqlite3 *db = pParse->db;
-
-	if (db->mallocFailed)
-		goto drop_trigger_cleanup;
+	sqlite3 *db = parser->db;
 	assert(db->pSchema != NULL);
-
-	/* Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary internals,
-	 * such as data layout in system spaces. Activate the counter
-	 * here to account DROP TRIGGER IF EXISTS case if the trigger
-	 * actually does not exist.
-	 */
-	if (!pParse->nested) {
-		Vdbe *v = sqlite3GetVdbe(pParse);
-		if (v != NULL)
-			sqlite3VdbeCountChanges(v);
-	}
-
-	assert(pName->nSrc == 1);
-	zName = pName->a[0].zName;
-	trigger = sqlite3HashFind(&(db->pSchema->trigHash), zName);
-	if (trigger == NULL) {
-		if (!noErr) {
-			sqlite3ErrorMsg(pParse, "no such trigger: %S", pName,
-					0);
-		}
-		pParse->checkSchema = 1;
-		goto drop_trigger_cleanup;
-	}
-	vdbe_code_drop_trigger_ptr(pParse, trigger);
-
- drop_trigger_cleanup:
-	sqlite3SrcListDelete(db, pName);
-}
-
-void
-vdbe_code_drop_trigger_ptr(struct Parse *parser, struct sql_trigger *trigger)
-{
 	struct Vdbe *v = sqlite3GetVdbe(parser);
 	if (v == NULL)
 		return;
@@ -501,32 +454,64 @@ vdbe_code_drop_trigger_ptr(struct Parse *parser, struct sql_trigger *trigger)
 	int trig_name_reg = ++parser->nMem;
 	int record_to_delete = ++parser->nMem;
 	sqlite3VdbeAddOp4(v, OP_String8, 0, trig_name_reg, 0,
-			  trigger->zName, P4_STATIC);
+			  sqlite3DbStrDup(db, trigger_name), P4_DYNAMIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, trig_name_reg, 1,
 			  record_to_delete);
 	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_TRIGGER_ID,
 			  record_to_delete);
-	if (!parser->nested)
+	if (parser->nested == 0)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
-
 	sqlite3ChangeCookie(parser);
 }
 
+void
+sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
+{
+
+	sqlite3 *db = parser->db;
+	if (db->mallocFailed)
+		goto drop_trigger_cleanup;
+	assert(db->pSchema != NULL);
+
+	/* Do not account nested operations: the count of such
+	 * operations depends on Tarantool data dictionary internals,
+	 * such as data layout in system spaces. Activate the counter
+	 * here to account DROP TRIGGER IF EXISTS case if the trigger
+	 * actually does not exist.
+	 */
+	if (!parser->nested) {
+		Vdbe *v = sqlite3GetVdbe(parser);
+		if (v != NULL)
+			sqlite3VdbeCountChanges(v);
+	}
+
+	assert(name->nSrc == 1);
+	const char *trigger_name = name->a[0].zName;
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_TRIGGER),
+			   trigger_name);
+	if (vdbe_emit_halt_with_presence_test(parser, BOX_TRIGGER_ID, 0,
+					      trigger_name, ER_NO_SUCH_TRIGGER,
+					      error_msg, no_err, OP_Found) != 0)
+		goto drop_trigger_cleanup;
+
+	vdbe_code_drop_trigger(parser, trigger_name);
+
+ drop_trigger_cleanup:
+	sqlite3SrcListDelete(db, name);
+}
+
 int
-sql_trigger_replace(struct sqlite3 *db, const char *name,
+sql_trigger_replace(struct sqlite3 *db, const char *name, uint32_t space_id,
 		    struct sql_trigger *trigger,
 		    struct sql_trigger **old_trigger)
 {
 	assert(db->pSchema != NULL);
 	assert(trigger == NULL || strcmp(name, trigger->zName) == 0);
 
-	struct Hash *hash = &db->pSchema->trigHash;
-
-	struct sql_trigger *src_trigger =
-		trigger != NULL ? trigger : sqlite3HashFind(hash, name);
-	assert(src_trigger != NULL);
-	struct space *space = space_cache_find(src_trigger->space_id);
+	struct space *space = space_cache_find(space_id);
 	assert(space != NULL);
+	*old_trigger = NULL;
 
 	if (trigger != NULL) {
 		/* Do not create a trigger on a system space. */
@@ -560,20 +545,14 @@ sql_trigger_replace(struct sqlite3 *db, const char *name,
 			trigger->tr_tm = TRIGGER_AFTER;
 	}
 
-
-	*old_trigger = sqlite3HashInsert(hash, name, trigger);
-	if (*old_trigger == trigger) {
-		diag_set(OutOfMemory, sizeof(struct HashElem),
-			 "sqlite3HashInsert", "ret");
-		return -1;
+	struct sql_trigger **ptr = &space->sql_triggers;
+	while (*ptr != NULL && strcmp((*ptr)->zName, name) != 0)
+		ptr = &((*ptr)->next);
+	if (*ptr != NULL) {
+		*old_trigger = *ptr;
+		*ptr = (*ptr)->next;
 	}
 
-	if (*old_trigger != NULL) {
-		struct sql_trigger **pp;
-		for (pp = &space->sql_triggers; *pp != *old_trigger;
-		     pp = &((*pp)->next));
-		*pp = (*pp)->next;
-	}
 	if (trigger != NULL) {
 		trigger->next = space->sql_triggers;
 		space->sql_triggers = trigger;

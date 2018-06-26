@@ -2108,7 +2108,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	parse_context->nested++;
 	struct sql_trigger *trigger = space->sql_triggers;
 	while (trigger != NULL) {
-		vdbe_code_drop_trigger_ptr(parse_context, trigger);
+		vdbe_code_drop_trigger(parse_context, trigger->zName);
 		trigger = trigger->next;
 	}
 	parse_context->nested--;
@@ -3960,10 +3960,13 @@ sqlite3WithDelete(sqlite3 * db, With * pWith)
 #endif				/* !defined(SQLITE_OMIT_CTE) */
 
 int
-vdbe_emit_halt_if_exists(struct Parse *parser, int space_id, int index_id,
-			 const char *name_src, int tarantool_error_code,
-			 const char *error_src, bool no_error)
+vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
+				  int index_id, const char *name_src,
+				  int tarantool_error_code,
+				  const char *error_src, bool no_error,
+				  int cond_opcode)
 {
+	assert(cond_opcode == OP_NoConflict || cond_opcode == OP_Found);
 	struct Vdbe *v = sqlite3GetVdbe(parser);
 	assert(v != NULL);
 
@@ -3983,7 +3986,7 @@ vdbe_emit_halt_if_exists(struct Parse *parser, int space_id, int index_id,
 	int name_reg = parser->nMem++;
 	int label = sqlite3VdbeAddOp4(v, OP_String8, 0, name_reg, 0, name,
 				      P4_DYNAMIC);
-	sqlite3VdbeAddOp4Int(v, OP_NoConflict, cursor, label + 3, name_reg, 1);
+	sqlite3VdbeAddOp4Int(v, cond_opcode, cursor, label + 3, name_reg, 1);
 	if (no_error) {
 		sqlite3VdbeAddOp0(v, OP_Halt);
 	} else {

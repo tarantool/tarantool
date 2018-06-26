@@ -1421,7 +1421,7 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////
 cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
-  sqlite3DropTrigger(pParse,X,NOERR);
+  sql_drop_trigger(pParse,X,NOERR);
 }
 
 ////////////////////////// REINDEX collation //////////////////////////////////

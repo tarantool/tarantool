@@ -283,18 +283,10 @@ sqlite3SchemaClear(sqlite3 * db)
 	assert(db->pSchema != NULL);
 
 	Hash temp1;
-	Hash temp2;
 	HashElem *pElem;
 	Schema *pSchema = db->pSchema;
 
 	temp1 = pSchema->tblHash;
-	temp2 = pSchema->trigHash;
-	sqlite3HashInit(&pSchema->trigHash);
-	for (pElem = sqliteHashFirst(&temp2); pElem != NULL;
-	     pElem = sqliteHashNext(pElem))
-		sql_trigger_delete(NULL,
-				   (struct sql_trigger *)sqliteHashData(pElem));
-	sqlite3HashClear(&temp2);
 	sqlite3HashInit(&pSchema->tblHash);
 	for (pElem = sqliteHashFirst(&temp1); pElem;
 	     pElem = sqliteHashNext(pElem)) {
@@ -317,7 +309,6 @@ sqlite3SchemaCreate(sqlite3 * db)
 		sqlite3OomFault(db);
 	} else {
 		sqlite3HashInit(&p->tblHash);
-		sqlite3HashInit(&p->trigHash);
 		sqlite3HashInit(&p->fkeyHash);
 	}
 	return p;

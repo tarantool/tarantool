@@ -1508,7 +1508,6 @@ typedef int VList;
 struct Schema {
 	int schema_cookie;      /* Database schema version number for this file */
 	Hash tblHash;		/* All tables indexed by name */
-	Hash trigHash;		/* All triggers indexed by name */
 	Hash fkeyHash;		/* All foreign keys by referenced table name */
 };
 
@@ -4092,16 +4091,25 @@ void
 sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		   struct Token *token);
 
-void sqlite3DropTrigger(Parse *, SrcList *, int);
+/**
+ * This function is called from parser to generate drop trigger
+ * VDBE code.
+ *
+ * @param parser Parser context.
+ * @param name The name of trigger to drop.
+ * @param no_err Suppress errors if the trigger already exists.
+ */
+void
+sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err);
 
 /**
  * Drop a trigger given a pointer to that trigger.
  *
- * @param parser Parse context.
- * @param trigger sql_trigger to drop.
+ * @param parser Parser context.
+ * @param trigger_name The name of trigger to drop.
  */
 void
-vdbe_code_drop_trigger_ptr(struct Parse *parser, struct sql_trigger *trigger);
+vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name);
 
 /**
  * Return a list of all triggers on table pTab if there exists at
@@ -4773,9 +4781,10 @@ table_column_nullable_action(struct Table *tab, uint32_t column);
 
 /**
  * Generate VDBE code to halt execution with correct error if
- * the object with specified name is already present in
- * specified space.
- * The function allocates error and name resources for VDBE itself.
+ * the object with specified name is already present (or doesn't
+ * present - configure with cond_opcodeq) in specified space.
+ * The function allocates error and name resources for VDBE
+ * itself.
  *
  * @param parser Parsing context.
  * @param space_id Space to lookup identifier.
@@ -4784,13 +4793,17 @@ table_column_nullable_action(struct Table *tab, uint32_t column);
  * @param tarantool_error_code to set on halt.
  * @param error_src Error message to display on VDBE halt.
  * @param no_error Do not raise error flag.
+ * @param cond_opcode Condition to raise - OP_NoConflict or
+ *        OP_Found.
  *
  * @retval -1 on memory allocation error.
  * @retval 0 on success.
  */
 int
-vdbe_emit_halt_if_exists(struct Parse *parser, int space_id, int index_id,
-			 const char *name_src, int tarantool_error_code,
-			 const char *error_src, bool no_error);
+vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
+				  int index_id, const char *name_src,
+				  int tarantool_error_code,
+				  const char *error_src, bool no_error,
+				  int cond_opcode);
 
 #endif				/* SQLITEINT_H */

@@ -190,7 +190,7 @@ box.sql.execute("DROP TRIGGER tfoobar")
 -- Should error
 box.sql.execute("DROP TRIGGER tfoobar")
 ---
-- error: 'no such trigger: TFOOBAR'
+- error: Trigger 'TFOOBAR' doesn't exist
 ...
 -- Should be empty
 box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")

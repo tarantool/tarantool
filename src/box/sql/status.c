@@ -248,18 +248,10 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 				nByte +=
 				    ROUND8(sizeof(HashElem)) *
 				    (pSchema->tblHash.count +
-				     pSchema->trigHash.count +
 				     pSchema->fkeyHash.count);
 				nByte += sqlite3_msize(pSchema->tblHash.ht);
-				nByte += sqlite3_msize(pSchema->trigHash.ht);
 				nByte += sqlite3_msize(pSchema->fkeyHash.ht);
 
-				for (p = sqliteHashFirst(&pSchema->trigHash); p;
-				     p = sqliteHashNext(p)) {
-					sql_trigger_delete(db,
-							   (struct sql_trigger *)
-							   sqliteHashData(p));
-				}
 				for (p = sqliteHashFirst(&pSchema->tblHash); p;
 				     p = sqliteHashNext(p)) {
 					sqlite3DeleteTable(db,
