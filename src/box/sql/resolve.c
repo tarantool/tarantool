@@ -706,8 +706,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 				if ((pDef->funcFlags & SQLITE_FUNC_CONSTANT) ==
 				    0) {
-					/* Date/time functions that use 'now', and other functions like
-					 * sqlite_version() that might change over time cannot be used
+					/* Date/time functions that use 'now', and other functions
+					 * that might change over time cannot be used
 					 * in an index.
 					 */
 					notValid(pParse, pNC,

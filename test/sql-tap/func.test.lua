@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14533)
+test:plan(14534)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -2641,6 +2641,9 @@ test:do_execsql_test(
         -- </func-31.1>
     })
 
-
+test:do_execsql_test(
+    "func-32",
+    [[SELECT version()]],
+    {_TARANTOOL})
 
 test:finish_test()

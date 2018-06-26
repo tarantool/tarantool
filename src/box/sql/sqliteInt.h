@@ -716,12 +716,6 @@ sqlite3_total_changes(sqlite3 *);
 void *
 sqlite3_user_data(sqlite3_context *);
 
-const char *
-sqlite3_libversion(void);
-
-const char *
-sqlite3_sourceid(void);
-
 void
 sqlite3_log(int iErrCode, const char *zFormat, ...);
 
@@ -741,10 +735,6 @@ sqlite3_errmsg(sqlite3 *);
 
 int
 sqlite3_initialize(void);
-
-#define SQLITE_VERSION        "3.16.2"
-#define SQLITE_VERSION_NUMBER 3016002
-#define SQLITE_SOURCE_ID      "D 1970-01-01 00:00:00 00000000-0000-0000-0000-000000000000"
 
 int
 sqlite3_os_end(void);
@@ -1809,9 +1799,8 @@ struct FuncDestructor {
  *
  *   DFUNCTION(zName, nArg, iArg, bNC, xFunc)
  *     Like FUNCTION except it omits the SQLITE_FUNC_CONSTANT flag and
- *     adds the SQLITE_FUNC_SLOCHNG flag.  Used for date & time functions
- *     and functions like sqlite_version() that can change, but not during
- *     a single query.
+ *     adds the SQLITE_FUNC_SLOCHNG flag.  Used for date & time functions,
+ *     but not during a single query.
  *
  *   AGGREGATE(zName, nArg, iArg, bNC, xStep, xFinal)
  *     Used to create an aggregate function definition implemented by

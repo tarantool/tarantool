@@ -36,6 +36,7 @@
  */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "version.h"
 #include <unicode/ustring.h>
 #include <unicode/ucasemap.h>
 #include <unicode/ucnv.h>
@@ -530,7 +531,7 @@ ICU_CASE_CONVERT(Upper);
  * noopFunc will never be called so it doesn't matter what the implementation
  * is.  We might as well use the "version()" function as a substitute.
  */
-#define noopFunc versionFunc	/* Substitute function - never called */
+#define noopFunc sql_func_version /* Substitute function - never called */
 
 /*
  * Implementation of random().  Return a random integer.
@@ -966,47 +967,20 @@ nullifFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** argv)
 	}
 }
 
-/*
- * Implementation of the sqlite_version() function.  The result is the version
- * of the SQLite library that is running.
+/**
+ * Implementation of the version() function.  The result is the
+ * version of the Tarantool that is running.
+ *
+ * @param context Context being used.
+ * @param unused1 Unused.
+ * @param unused2 Unused.
  */
 static void
-versionFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** NotUsed2)
+sql_func_version(struct sqlite3_context *context,
+		 MAYBE_UNUSED int unused1,
+		 MAYBE_UNUSED sqlite3_value **unused2)
 {
-	UNUSED_PARAMETER2(NotUsed, NotUsed2);
-	/* IMP: R-48699-48617 This function is an SQL wrapper around the
-	 * sqlite3_libversion() C-interface.
-	 */
-	sqlite3_result_text(context, sqlite3_libversion(), -1, SQLITE_STATIC);
-}
-
-/*
- * Implementation of the sqlite_source_id() function. The result is a string
- * that identifies the particular version of the source code used to build
- * SQLite.
- */
-static void
-sourceidFunc(sqlite3_context * context, int NotUsed, sqlite3_value ** NotUsed2)
-{
-	UNUSED_PARAMETER2(NotUsed, NotUsed2);
-	/* IMP: R-24470-31136 This function is an SQL wrapper around the
-	 * sqlite3_sourceid() C interface.
-	 */
-	sqlite3_result_text(context, sqlite3_sourceid(), -1, SQLITE_STATIC);
-}
-
-/*
- * Implementation of the sqlite_log() function.  This is a wrapper around
- * sqlite3_log().  The return value is NULL.  The function exists purely for
- * its side-effects.
- */
-static void
-errlogFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
-{
-	UNUSED_PARAMETER(argc);
-	UNUSED_PARAMETER(context);
-	sqlite3_log(sqlite3_value_int(argv[0]), "%s",
-		    sqlite3_value_text(argv[1]));
+	sqlite3_result_text(context, tarantool_version(), -1, SQLITE_STATIC);
 }
 
 /* Array for converting from half-bytes (nybbles) into ASCII hex
@@ -1871,9 +1845,7 @@ sqlite3RegisterBuiltinFunctions(void)
 		VFUNCTION(random, 0, 0, 0, randomFunc),
 		VFUNCTION(randomblob, 1, 0, 0, randomBlob),
 		FUNCTION(nullif, 2, 0, 1, nullifFunc),
-		DFUNCTION(sqlite_version, 0, 0, 0, versionFunc),
-		DFUNCTION(sqlite_source_id, 0, 0, 0, sourceidFunc),
-		FUNCTION(sqlite_log, 2, 0, 0, errlogFunc),
+		FUNCTION(version, 0, 0, 0, sql_func_version),
 		FUNCTION(quote, 1, 0, 0, quoteFunc),
 		VFUNCTION(changes, 0, 0, 0, changes),
 		VFUNCTION(total_changes, 0, 0, 0, total_changes),

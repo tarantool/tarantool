@@ -37,6 +37,7 @@
  */
 #include "sqliteInt.h"
 #include "vdbeInt.h"
+#include "version.h"
 #include "box/session.h"
 
 #ifdef SQLITE_ENABLE_FTS3
@@ -54,41 +55,6 @@ int sqlite3Json1Init(sqlite3 *);
 #ifdef SQLITE_ENABLE_FTS5
 int sqlite3Fts5Init(sqlite3 *);
 #endif
-
-#ifndef SQLITE_AMALGAMATION
-/* IMPLEMENTATION-OF: R-46656-45156 The sqlite3_version[] string constant
- * contains the text of SQLITE_VERSION macro.
- */
-const char sqlite3_version[] = SQLITE_VERSION;
-#endif
-
-/* IMPLEMENTATION-OF: R-53536-42575 The sqlite3_libversion() function returns
- * a pointer to the to the sqlite3_version[] string constant.
- */
-const char *
-sqlite3_libversion(void)
-{
-	return sqlite3_version;
-}
-
-/* IMPLEMENTATION-OF: R-63124-39300 The sqlite3_sourceid() function returns a
- * pointer to a string constant whose value is the same as the
- * SQLITE_SOURCE_ID C preprocessor macro.
- */
-const char *
-sqlite3_sourceid(void)
-{
-	return SQLITE_SOURCE_ID;
-}
-
-/* IMPLEMENTATION-OF: R-35210-63508 The sqlite3_libversion_number() function
- * returns an integer equal to SQLITE_VERSION_NUMBER.
- */
-int
-sqlite3_libversion_number(void)
-{
-	return SQLITE_VERSION_NUMBER;
-}
 
 #if !defined(SQLITE_OMIT_TRACE) && defined(SQLITE_ENABLE_IOTRACE)
 /*
@@ -2056,7 +2022,7 @@ static int
 reportError(int iErr, int lineno, const char *zType)
 {
 	sqlite3_log(iErr, "%s at line %d of [%.10s]",
-		    zType, lineno, 20 + sqlite3_sourceid());
+		    zType, lineno, 20 + tarantool_version());
 	return iErr;
 }
 
