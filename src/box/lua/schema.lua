@@ -1693,43 +1693,43 @@ local function privilege_resolve(privilege)
     if type(privilege) == 'string' then
         privilege = string.lower(privilege)
         if string.find(privilege, 'read') then
-            numeric = numeric + 1
+            numeric = numeric + box.priv.R
         end
         if string.find(privilege, 'write') then
-            numeric = numeric + 2
+            numeric = numeric + box.priv.W
         end
         if string.find(privilege, 'execute') then
-            numeric = numeric + 4
+            numeric = numeric + box.priv.X
         end
         if string.find(privilege, 'session') then
-            numeric = numeric + 8
+            numeric = numeric + box.priv.S
         end
         if string.find(privilege, 'usage') then
-            numeric = numeric + 16
+            numeric = numeric + box.priv.U
         end
         if string.find(privilege, 'create') then
-            numeric = numeric + 32
+            numeric = numeric + box.priv.C
         end
         if string.find(privilege, 'drop') then
-            numeric = numeric + 64
+            numeric = numeric + box.priv.D
         end
         if string.find(privilege, 'alter') then
-            numeric = numeric + 128
+            numeric = numeric + box.priv.A
         end
         if string.find(privilege, 'reference') then
-            numeric = numeric + 256
+            numeric = numeric + box.priv.REFERENCE
         end
         if string.find(privilege, 'trigger') then
-            numeric = numeric + 512
+            numeric = numeric + box.priv.TRIGGER
         end
         if string.find(privilege, 'insert') then
-            numeric = numeric + 1024
+            numeric = numeric + box.priv.INSERT
         end
         if string.find(privilege, 'update') then
-            numeric = numeric + 2048
+            numeric = numeric + box.priv.UPDATE
         end
         if string.find(privilege, 'delete') then
-            numeric = numeric + 4096
+            numeric = numeric + box.priv.DELETE
         end
     else
         numeric = privilege
@@ -1737,10 +1737,29 @@ local function privilege_resolve(privilege)
     return numeric
 end
 
-local function checked_privilege(privilege, object_type)
+-- allowed combination of privilege bits for object
+local priv_object_combo = {
+    ["universe"] = box.priv.ALL,
+-- sic: we allow to grant 'execute' on space. This is a legacy
+-- bug, please fix it in 2.0
+    ["space"]    = bit.bxor(box.priv.ALL, box.priv.S,
+                            box.priv.REVOKE, box.priv.GRANT),
+    ["sequence"] = bit.bor(box.priv.R, box.priv.W, box.priv.U,
+                           box.priv.C, box.priv.A, box.priv.D),
+    ["function"] = bit.bor(box.priv.X, box.priv.U,
+                           box.priv.C, box.priv.D),
+    ["role"]     = bit.bor(box.priv.X, box.priv.U,
+                           box.priv.C, box.priv.D),
+}
+
+--
+-- Resolve privilege hex by name and check
+-- that bits are allowed for this object type
+--
+local function privilege_check(privilege, object_type)
     local priv_hex = privilege_resolve(privilege)
-    if object_type == 'role' and priv_hex ~= box.priv.X then
-        box.error(box.error.UNSUPPORTED_ROLE_PRIV, privilege)
+    if bit.band(priv_hex, priv_object_combo[object_type] or 0) ~= priv_hex then
+        box.error(box.error.UNSUPPORTED_PRIV, object_type, privilege)
     end
     return priv_hex
 end
@@ -1798,6 +1817,9 @@ local function object_resolve(object_type, object_name)
         return 0
     end
     if object_type == 'space' then
+        if object_name == nil or object_name == 0 then
+            return 0
+        end
         local space = box.space[object_name]
         if  space == nil then
             box.error(box.error.NO_SUCH_SPACE, object_name)
@@ -1805,6 +1827,9 @@ local function object_resolve(object_type, object_name)
         return space.id
     end
     if object_type == 'function' then
+        if object_name == nil or object_name == 0 then
+            return 0
+        end
         local _vfunc = box.space[box.schema.VFUNC_ID]
         local func
         if type(object_name) == 'string' then
@@ -1819,6 +1844,9 @@ local function object_resolve(object_type, object_name)
         end
     end
     if object_type == 'sequence' then
+        if object_name == nil or object_name == 0 then
+            return 0
+        end
         local seq = sequence_resolve(object_name)
         if seq == nil then
             box.error(box.error.NO_SUCH_SEQUENCE, object_name)
@@ -2059,7 +2087,7 @@ local function grant(uid, name, privilege, object_type,
         object_name = privilege
         privilege = 'execute'
     end
-    local privilege_hex = checked_privilege(privilege, object_type)
+    local privilege_hex = privilege_check(privilege, object_type)
 
     local oid = object_resolve(object_type, object_name)
     options = options or {}
@@ -2102,7 +2130,7 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
         object_name = privilege
         privilege = 'execute'
     end
-    local privilege_hex = checked_privilege(privilege, object_type)
+    local privilege_hex = privilege_check(privilege, object_type)
     options = options or {}
     local oid = object_resolve(object_type, object_name)
     local _priv = box.space[box.schema.PRIV_ID]

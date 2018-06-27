@@ -71,6 +71,8 @@ access_check_func(const char *name, uint32_t name_len, struct func **funcp)
 		return 0;
 	}
 	user_access_t access = PRIV_X | PRIV_U;
+	/* Check access for all functions. */
+	access &= ~entity_access_get(SC_FUNCTION)[credentials->auth_token].effective;
 	user_access_t func_access = access & ~credentials->universal_access;
 	if (func == NULL ||
 	    /* Check for missing Usage access, ignore owner rights. */

@@ -496,10 +496,7 @@ luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 		luaL_pushcdata(L, CTID_CONST_STRUCT_TUPLE_REF);
 	*ptr = tuple;
 	/* The order is important - first reference tuple, next set gc */
-	if (box_tuple_ref(tuple) != 0) {
-		luaT_error(L);
-		return;
-	}
+	box_tuple_ref(tuple);
 	lua_pushcfunction(L, lbox_tuple_gc);
 	luaL_setcdatagc(L, -2);
 }

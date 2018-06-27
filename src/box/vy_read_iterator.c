@@ -244,24 +244,6 @@ vy_read_iterator_evaluate_src(struct vy_read_iterator *itr,
 	}
 }
 
-/**
- * Check if a read iterator source is behind the current read
- * iterator position and hence needs to be fast-forwarded.
- */
-static inline bool
-vy_read_src_is_behind(struct vy_read_iterator *itr, struct vy_read_src *src)
-{
-	uint32_t src_id = src - itr->src;
-	if (!src->is_started)
-		return true;
-	if (src_id < itr->skipped_src)
-		return false;
-	struct tuple *stmt = vy_history_last_stmt(&src->history);
-	if (vy_read_iterator_cmp_stmt(itr, stmt, itr->last_stmt) > 0)
-		return false;
-	return true;
-}
-
 /*
  * Each of the functions from the vy_read_iterator_scan_* family
  * is used by vy_read_iterator_advance() to:
@@ -327,7 +309,7 @@ vy_read_iterator_scan_cache(struct vy_read_iterator *itr,
 	int rc = vy_cache_iterator_restore(src_itr, itr->last_stmt,
 					   &src->history, &is_interval);
 	if (rc == 0) {
-		if (vy_read_src_is_behind(itr, src)) {
+		if (!src->is_started || itr->cache_src >= itr->skipped_src) {
 			rc = vy_cache_iterator_skip(src_itr, itr->last_stmt,
 						&src->history, &is_interval);
 		} else if (src->front_id == itr->prev_front_id) {
@@ -359,7 +341,7 @@ vy_read_iterator_scan_mem(struct vy_read_iterator *itr, uint32_t mem_src,
 
 	rc = vy_mem_iterator_restore(src_itr, itr->last_stmt, &src->history);
 	if (rc == 0) {
-		if (vy_read_src_is_behind(itr, src)) {
+		if (!src->is_started || mem_src >= itr->skipped_src) {
 			rc = vy_mem_iterator_skip(src_itr, itr->last_stmt,
 						  &src->history);
 		} else if (src->front_id == itr->prev_front_id) {
@@ -384,7 +366,7 @@ vy_read_iterator_scan_disk(struct vy_read_iterator *itr, uint32_t disk_src,
 
 	assert(disk_src >= itr->disk_src && disk_src < itr->src_count);
 
-	if (vy_read_src_is_behind(itr, src))
+	if (!src->is_started || disk_src >= itr->skipped_src)
 		rc = vy_run_iterator_skip(src_itr, itr->last_stmt,
 					  &src->history);
 	else if (src->front_id == itr->prev_front_id)

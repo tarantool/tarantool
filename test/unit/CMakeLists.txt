@@ -192,3 +192,6 @@ target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS})
 
 add_executable(coll.test coll.cpp)
 target_link_libraries(coll.test core unit ${ICU_LIBRARIES} misc)
+
+add_executable(tuple_bigref.test tuple_bigref.c)
+target_link_libraries(tuple_bigref.test tuple unit)

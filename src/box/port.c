@@ -45,8 +45,7 @@ port_tuple_add(struct port *base, struct tuple *tuple)
 	struct port_tuple *port = port_tuple(base);
 	struct port_tuple_entry *e;
 	if (port->size == 0) {
-		if (tuple_ref(tuple) != 0)
-			return -1;
+		tuple_ref(tuple);
 		e = &port->first_entry;
 		port->first = port->last = e;
 	} else {
@@ -55,10 +54,7 @@ port_tuple_add(struct port *base, struct tuple *tuple)
 			diag_set(OutOfMemory, sizeof(*e), "mempool_alloc", "e");
 			return -1;
 		}
-		if (tuple_ref(tuple) != 0) {
-			mempool_free(&port_tuple_entry_pool, e);
-			return -1;
-		}
+		tuple_ref(tuple);
 		port->last->next = e;
 		port->last = e;
 	}

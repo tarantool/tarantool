@@ -546,6 +546,17 @@ vy_mem_iterator_skip(struct vy_mem_iterator *itr,
 {
 	assert(!itr->search_started || itr->version == itr->mem->version);
 
+	/*
+	 * Check if the iterator is already positioned
+	 * at the statement following last_stmt.
+	 */
+	if (itr->search_started &&
+	    (itr->curr_stmt == NULL || last_stmt == NULL ||
+	     iterator_direction(itr->iterator_type) *
+	     vy_tuple_compare(itr->curr_stmt, last_stmt,
+			      itr->mem->cmp_def) > 0))
+		return 0;
+
 	vy_history_cleanup(history);
 
 	const struct tuple *key = itr->key;

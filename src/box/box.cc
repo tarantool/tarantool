@@ -176,20 +176,22 @@ box_process_rw(struct request *request, struct space *space,
 		txn_rollback_stmt();
 		return -1;
 	}
+	if (result == NULL)
+		return txn_commit_stmt(txn, request);
+	*result = tuple;
+	if (tuple == NULL)
+		return txn_commit_stmt(txn, request);
 	/*
 	 * Pin the tuple locally before the commit,
 	 * otherwise it may go away during yield in
 	 * when WAL is written in autocommit mode.
 	 */
-	TupleRefNil ref(tuple);
-	if (txn_commit_stmt(txn, request) != 0)
-		return -1;
-	if (result != NULL) {
-		if (tuple != NULL && tuple_bless(tuple) == NULL)
-			return -1;
-		*result = tuple;
-	}
-	return 0;
+	tuple_ref(tuple);
+	int rc = txn_commit_stmt(txn, request);
+	if (rc == 0)
+		tuple_bless(tuple);
+	tuple_unref(tuple);
+	return rc;
 }
 
 void

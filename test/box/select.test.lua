@@ -124,12 +124,25 @@ test.random(s.index[0], 48)
 s:drop()
 
 collectgarbage('collect')
+
+-- gh-3224 resurrect tuple bigrefs
+
+collectgarbage('stop')
 s = box.schema.space.create('select', { temporary = true })
 index = s:create_index('primary', { type = 'tree' })
-a = s:insert{0}
-lots_of_links = {}
+_ = s:insert{0}
+_ = s:insert{1}
+_ = s:insert{2}
+_ = s:insert{3}
+lots_of_links = setmetatable({}, {__mode = 'v'})
+i = 0
+while (i < 33000) do table.insert(lots_of_links, s:get{0}) i = i + 1 end
+while (i < 66000) do table.insert(lots_of_links, s:get{1}) i = i + 1 end
+while (i < 100000) do table.insert(lots_of_links, s:get{2}) i = i + 1 end
 ref_count = 0
-while (true) do table.insert(lots_of_links, s:get{0}) ref_count = ref_count + 1 end
+for k, v in pairs(lots_of_links) do ref_count = ref_count + 1 end
 ref_count
-lots_of_links = {}
+-- check that tuples are deleted after gc is activated
+collectgarbage('collect')
+lots_of_links
 s:drop()

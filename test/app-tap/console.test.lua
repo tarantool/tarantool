@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(61)
+test:plan(53)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -235,6 +235,10 @@ while triggers_ran < 4 do fiber.yield() end
 test:is(triggers_ran, 4, "on_connect -> on_auth_error order")
 box.session.on_auth(nil, console_on_auth_error)
 
+box.session.on_connect(nil, console_on_connect)
+box.session.on_disconnect(nil, console_on_disconnect)
+box.session.on_auth(nil, console_on_auth)
+
 --
 -- gh-2642 "box.session.type()"
 --
@@ -246,9 +250,6 @@ client:close()
 
 server:close()
 
-box.session.on_connect(nil, console_on_connect)
-box.session.on_disconnect(nil, console_on_disconnect)
-box.session.on_auth(nil, console_on_auth)
 box.schema.user.drop('test')
 box.schema.user.drop('test2')
 session_id = nil

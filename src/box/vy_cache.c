@@ -700,10 +700,21 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 		       const struct tuple *last_stmt,
 		       struct vy_history *history, bool *stop)
 {
+	assert(!itr->search_started || itr->version == itr->cache->version);
+
+	/*
+	 * Check if the iterator is already positioned
+	 * at the statement following last_stmt.
+	 */
+	if (itr->search_started &&
+	    (itr->curr_stmt == NULL || last_stmt == NULL ||
+	     iterator_direction(itr->iterator_type) *
+	     vy_tuple_compare(itr->curr_stmt, last_stmt,
+			      itr->cache->cmp_def) > 0))
+		return 0;
+
 	*stop = false;
 	vy_history_cleanup(history);
-
-	assert(!itr->search_started || itr->version == itr->cache->version);
 
 	itr->search_started = true;
 	itr->version = itr->cache->version;

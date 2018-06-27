@@ -67,6 +67,8 @@ struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);
  */
 struct latch schema_lock = LATCH_INITIALIZER(schema_lock);
 
+struct entity_access entity_access;
+
 bool
 space_is_system(struct space *space)
 {
@@ -589,6 +591,8 @@ schema_find_name(enum schema_object_type type, uint32_t object_id)
 		return "";
 	case SC_SPACE:
 		{
+			if (object_id == 0)
+				return "SPACE";
 			struct space *space = space_by_id(object_id);
 			if (space == NULL)
 				break;
@@ -596,6 +600,8 @@ schema_find_name(enum schema_object_type type, uint32_t object_id)
 		}
 	case SC_FUNCTION:
 		{
+			if (object_id == 0)
+				return "FUNCTION";
 			struct func *func = func_by_id(object_id);
 			if (func == NULL)
 				break;
@@ -603,6 +609,8 @@ schema_find_name(enum schema_object_type type, uint32_t object_id)
 		}
 	case SC_SEQUENCE:
 		{
+			if (object_id == 0)
+				return "SEQUENCE";
 			struct sequence *seq = sequence_by_id(object_id);
 			if (seq == NULL)
 				break;

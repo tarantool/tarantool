@@ -138,7 +138,7 @@ struct errcode_record {
 	/* 83 */_(ER_ROLE_EXISTS,		"Role '%s' already exists") \
 	/* 84 */_(ER_CREATE_ROLE,		"Failed to create role '%s': %s") \
 	/* 85 */_(ER_INDEX_EXISTS,		"Index '%s' already exists") \
-	/* 86 */_(ER_TUPLE_REF_OVERFLOW,	"Tuple reference counter overflow") \
+	/* 86 */_(ER_UNUSED6,			"") \
 	/* 87 */_(ER_ROLE_LOOP,			"Granting role '%s' to role '%s' would create a loop") \
 	/* 88 */_(ER_GRANT,			"Incorrect grant arguments: %s") \
 	/* 89 */_(ER_PRIV_GRANTED,		"User '%s' already has %s access on %s '%s'") \
@@ -150,7 +150,7 @@ struct errcode_record {
 	/* 95 */_(ER_UPDATE_INTEGER_OVERFLOW,   "Integer overflow when performing '%c' operation on field %u") \
 	/* 96 */_(ER_GUEST_USER_PASSWORD,       "Setting password for guest user has no effect") \
 	/* 97 */_(ER_TRANSACTION_CONFLICT,      "Transaction has been aborted by conflict") \
-	/* 98 */_(ER_UNSUPPORTED_ROLE_PRIV,     "Unsupported role privilege '%s'") \
+	/* 98 */_(ER_UNSUPPORTED_PRIV,		"Unsupported %s privilege '%s'") \
 	/* 99 */_(ER_LOAD_FUNCTION,		"Failed to dynamically load function '%s': %s") \
 	/*100 */_(ER_FUNCTION_LANGUAGE,		"Unsupported language '%s' specified for function '%s'") \
 	/*101 */_(ER_RTREE_RECT,		"RTree: %s must be an array with %u (point) or %u (rectangle/box) numeric coordinates") \

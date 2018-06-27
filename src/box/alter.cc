@@ -2648,8 +2648,10 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		break;
 	case SC_SPACE:
 	{
-		struct space *space = space_cache_find_xc(priv->object_id);
-		if (space->def->uid != grantor->def->uid &&
+		struct space *space = NULL;
+		if (priv->object_id != 0)
+			space = space_cache_find_xc(priv->object_id);
+		if ((space == NULL || space->def->uid != grantor->def->uid) &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
@@ -2660,8 +2662,10 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_FUNCTION:
 	{
-		struct func *func = func_cache_find(priv->object_id);
-		if (func->def->uid != grantor->def->uid &&
+		struct func *func = NULL;
+		if (priv->object_id != 0)
+			func = func_cache_find(priv->object_id);
+		if ((func == NULL || func->def->uid != grantor->def->uid) &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
@@ -2672,8 +2676,10 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_SEQUENCE:
 	{
-		struct sequence *seq = sequence_cache_find(priv->object_id);
-		if (seq->def->uid != grantor->def->uid &&
+		struct sequence *seq = NULL;
+		if (priv->object_id != 0)
+			seq = sequence_cache_find(priv->object_id);
+		if ((seq == NULL || seq->def->uid != grantor->def->uid) &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
