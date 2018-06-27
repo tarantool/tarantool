@@ -1,3 +1,6 @@
+fio = require 'fio'
+---
+...
 test_run = require('test_run').new()
 ---
 ...
@@ -115,6 +118,10 @@ wait_gc(1)
 ---
 - true
 ...
+#fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
+---
+- true
+...
 -- Make sure the replica will receive data it is subscribed
 -- to long enough for us to invoke garbage collection.
 box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.05)
@@ -122,8 +129,22 @@ box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.05)
 - ok
 ...
 -- Send more data to the replica.
-for i = 1, 100 do s:auto_increment{} end
+-- Need to do 2 snapshots here, otherwise the replica would
+-- only require 1 xlog and that case would be
+-- indistinguishable from wrong operation.
+for i = 1, 50 do s:auto_increment{} end
 ---
+...
+box.snapshot()
+---
+- ok
+...
+for i = 1, 50 do s:auto_increment{} end
+---
+...
+box.snapshot()
+---
+- ok
 ...
 -- Invoke garbage collection. Check that it doesn't remove
 -- xlogs needed by the replica.
@@ -131,7 +152,11 @@ box.snapshot()
 ---
 - ok
 ...
-#box.info.gc().checkpoints == 2 or box.info.gc()
+#box.info.gc().checkpoints == 1 or box.info.gc()
+---
+- true
+...
+#fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
 ---
 - true
 ...
@@ -163,6 +188,10 @@ wait_gc(1)
 ---
 ...
 #box.info.gc().checkpoints == 1 or box.info.gc()
+---
+- true
+...
+#fio.glob('./master/*.xlog') == 0 or fio.listdir('./master')
 ---
 - true
 ...
@@ -199,9 +228,13 @@ fiber.sleep(0.1) -- wait for master to relay data
 ---
 ...
 -- Garbage collection must not delete the old xlog file
--- (and the corresponding snapshot), because it is still
--- needed by the replica.
-#box.info.gc().checkpoints == 2 or box.info.gc()
+-- because it is still needed by the replica, but remove
+-- the old snapshot.
+#box.info.gc().checkpoints == 1 or box.info.gc()
+---
+- true
+...
+#fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
 ---
 - true
 ...
@@ -265,6 +298,10 @@ wait_gc(1)
 ---
 - true
 ...
+#fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
+---
+- true
+...
 -- Stop the replica.
 test_run:cmd("stop server replica")
 ---
@@ -274,8 +311,11 @@ test_run:cmd("cleanup server replica")
 ---
 - true
 ...
--- Invoke garbage collection. Check that it doesn't remove
--- the checkpoint last used by the replica.
+-- Invoke garbage collection. Check that it removes the old
+-- checkpoint, but keeps the xlog last used by the replica.
+-- once again, need 2 snapshots because after 1 snapshot
+-- with no insertions after it the replica would need only
+-- 1 xlog, which is stored anyways.
 _ = s:auto_increment{}
 ---
 ...
@@ -283,16 +323,31 @@ box.snapshot()
 ---
 - ok
 ...
-#box.info.gc().checkpoints == 2 or box.info.gc()
+_ = s:auto_increment{}
+---
+...
+box.snapshot()
+---
+- ok
+...
+#box.info.gc().checkpoints == 1 or box.info.gc()
 ---
 - true
 ...
--- The checkpoint should only be deleted after the replica
+#fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
+---
+- true
+...
+-- The xlog should only be deleted after the replica
 -- is unregistered.
 test_run:cleanup_cluster()
 ---
 ...
 #box.info.gc().checkpoints == 1 or box.info.gc()
+---
+- true
+...
+#fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
 ---
 - true
 ...

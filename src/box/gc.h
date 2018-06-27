@@ -33,12 +33,20 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct gc_consumer;
+
+/** Consumer type: WAL consumer, or SNAP */
+enum gc_consumer_type {
+	GC_CONSUMER_WAL = 1,
+	GC_CONSUMER_SNAP = 2,
+	GC_CONSUMER_ALL = 3,
+};
 
 /**
  * Initialize the garbage collection state.
@@ -74,12 +82,15 @@ gc_set_checkpoint_count(int checkpoint_count);
  * @signature until the consumer is unregistered or advanced.
  * @name is a human-readable name of the consumer, it will
  * be used for reporting the consumer to the user.
+ * @type consumer type, reporting whether consumer only depends
+ * on WAL files.
  *
  * Returns a pointer to the new consumer object or NULL on
  * memory allocation failure.
  */
 struct gc_consumer *
-gc_consumer_register(const char *name, int64_t signature);
+gc_consumer_register(const char *name, int64_t signature,
+		     enum gc_consumer_type type);
 
 /**
  * Unregister a consumer and invoke garbage collection

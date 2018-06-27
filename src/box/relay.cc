@@ -578,7 +578,7 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 	if (replica->gc == NULL) {
 		replica->gc = gc_consumer_register(
 			tt_sprintf("replica %s", tt_uuid_str(&replica->uuid)),
-			vclock_sum(replica_clock));
+			vclock_sum(replica_clock), GC_CONSUMER_WAL);
 		if (replica->gc == NULL)
 			diag_raise();
 	}

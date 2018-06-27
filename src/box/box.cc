@@ -1406,7 +1406,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Register the replica with the garbage collector. */
 	struct gc_consumer *gc = gc_consumer_register(
 		tt_sprintf("replica %s", tt_uuid_str(&instance_uuid)),
-		vclock_sum(&start_vclock));
+		vclock_sum(&start_vclock), GC_CONSUMER_WAL);
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([=]{
@@ -2082,7 +2082,8 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 			return -1;
 		}
 	} while (checkpoint_idx-- > 0);
-	backup_gc = gc_consumer_register("backup", vclock_sum(vclock));
+	backup_gc = gc_consumer_register("backup", vclock_sum(vclock),
+					 GC_CONSUMER_ALL);
 	if (backup_gc == NULL)
 		return -1;
 	int rc = engine_backup(vclock, cb, cb_arg);
