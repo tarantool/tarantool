@@ -3024,7 +3024,7 @@ case OP_TransactionBegin: {
 		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
-	p->auto_commit = false;
+	p->auto_commit = false	;
 	break;
 }
 

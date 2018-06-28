@@ -1145,7 +1145,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectA-2.93",
     [[
-        SELECT upper((SELECT c FROM t1 UNION SELECT z FROM t2 ORDER BY 1));
+        SELECT upper((SELECT c FROM t1 UNION SELECT z FROM t2 ORDER BY 1 LIMIT 1));
     ]], {
         -- <selectA-2.93>
         "A"
@@ -1155,7 +1155,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectA-2.94",
     [[
-        SELECT lower((SELECT c FROM t1 UNION ALL SELECT z FROM t2 ORDER BY 1));
+        SELECT lower((SELECT c FROM t1 UNION ALL SELECT z FROM t2 ORDER BY 1 LIMIT 1));
     ]], {
         -- <selectA-2.94>
         "a"
@@ -1165,7 +1165,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectA-2.95",
     [[
-        SELECT lower((SELECT c FROM t1 INTERSECT SELECT z FROM t2 ORDER BY 1));
+        SELECT lower((SELECT c FROM t1 INTERSECT SELECT z FROM t2 ORDER BY 1 LIMIT 1));
     ]], {
         -- <selectA-2.95>
         ""
@@ -1175,7 +1175,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectA-2.96",
     [[
-        SELECT lower((SELECT z FROM t2 EXCEPT SELECT c FROM t1 ORDER BY 1));
+        SELECT lower((SELECT z FROM t2 EXCEPT SELECT c FROM t1 ORDER BY 1 LIMIT 1));
     ]], {
         -- <selectA-2.96>
         "m"
@@ -2302,7 +2302,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectA-3.96",
     [[
-        SELECT lower((SELECT z FROM t2 EXCEPT SELECT c FROM t1 ORDER BY 1));
+        SELECT lower((SELECT z FROM t2 EXCEPT SELECT c FROM t1 ORDER BY 1 LIMIT 1));
     ]], {
         -- <selectA-3.96>
         "m"
@@ -2320,7 +2320,7 @@ test:do_execsql_test(
           INTERSECT SELECT a,b,c FROM t3
           EXCEPT SELECT c,b,a FROM t1
           UNION SELECT a,b,c FROM t3
-          ORDER BY y COLLATE "unicode_ci" DESC,x,z)))
+          ORDER BY y COLLATE "unicode_ci" DESC,x,z) LIMIT 1))
     ]], {
         -- <selectA-3.97>
         "MAD"
@@ -2340,7 +2340,7 @@ test:do_execsql_test(
               INTERSECT SELECT a,b,c FROM t3
               EXCEPT SELECT c,b,a FROM t1
               UNION SELECT a,b,c FROM t3
-              ORDER BY y COLLATE "unicode_ci" DESC,x,z)))
+              ORDER BY y COLLATE "unicode_ci" DESC,x,z LIMIT 1)))
             UNION ALL
             SELECT n || '+' FROM xyz WHERE length(n)<5
           )

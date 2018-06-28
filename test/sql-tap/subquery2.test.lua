@@ -70,7 +70,7 @@ test:do_execsql_test(
     "subquery2-1.11",
     [[
         SELECT a FROM t1
-         WHERE +b=(SELECT x+1 FROM (SELECT DISTINCT f/(a*a) AS x FROM t3));
+         WHERE +b IN (SELECT x+1 FROM (SELECT DISTINCT f/(a*a) AS x FROM t3 LIMIT 1));
     ]], {
         -- <subquery2-1.11>
         1
@@ -81,7 +81,7 @@ test:do_execsql_test(
     "subquery2-1.12",
     [[
         SELECT a FROM t1
-         WHERE b=(SELECT x+1 FROM (SELECT DISTINCT f/(a*a) AS x FROM t3));
+         WHERE b IN (SELECT x+1 FROM (SELECT DISTINCT f/(a*a) AS x FROM t3 LIMIT 1));
     ]], {
         -- <subquery2-1.12>
         1

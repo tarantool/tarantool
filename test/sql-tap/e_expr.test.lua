@@ -3340,11 +3340,11 @@ test:do_execsql_test(
 -- more rows, then the EXISTS operator evaluates to 1.
 --
 local data = {
-   {1, "EXISTS ( SELECT a FROM t1 )"},
-   {2, "EXISTS ( SELECT b FROM t1 )"},
+   {1, "EXISTS ( SELECT a FROM t1 LIMIT 1 )"},
+   {2, "EXISTS ( SELECT b FROM t1 LIMIT 1 )"},
    {3, "EXISTS ( SELECT 24 )"},
    {4, "EXISTS ( SELECT NULL )"},
-   {5, "EXISTS ( SELECT a FROM t1 WHERE a IS NULL )"},
+   {5, "EXISTS ( SELECT a FROM t1 WHERE a IS NULL LIMIT 1 )"},
 }
 for _, val in ipairs(data) do
     local tn = val[1]
@@ -3370,13 +3370,13 @@ end
 -- no effect on the results of the EXISTS operator.
     --
 data = {
-    {1, "EXISTS ( SELECT a,b FROM t1 )", 1},
-    {2, "EXISTS ( SELECT a,b, a,b, a,b FROM t1 )", 1},
+    {1, "EXISTS ( SELECT a,b FROM t1 LIMIT 1 )", 1},
+    {2, "EXISTS ( SELECT a,b, a,b, a,b FROM t1  LIMIT 1 )", 1},
     {3, "EXISTS ( SELECT 24, 25 )", 1},
     {4, "EXISTS ( SELECT NULL, NULL, NULL )", 1},
-    {5, "EXISTS ( SELECT a,b,a||b FROM t1 WHERE a IS NULL )", 1},
-    {6, "EXISTS ( SELECT a, a FROM t1 WHERE 0)", 0},
-    {7, "EXISTS ( SELECT b, b, a FROM t1 WHERE a = 5)", 0},
+    {5, "EXISTS ( SELECT a,b,a||b FROM t1 WHERE a IS NULL  LIMIT 1 )", 1},
+    {6, "EXISTS ( SELECT a, a FROM t1 WHERE 0 LIMIT 1 )", 0},
+    {7, "EXISTS ( SELECT b, b, a FROM t1 WHERE a = 5  LIMIT 1 )", 0},
     {8, "EXISTS ( SELECT 24, 46, 89 WHERE 0)", 0},
     {9, "EXISTS ( SELECT NULL, NULL WHERE 1=2)", 0},
 }
@@ -3391,7 +3391,7 @@ end
 --
 data = {
     {1, "EXISTS (SELECT 'not null')", "EXISTS (SELECT NULL)"},
-    {2, "EXISTS (SELECT NULL FROM t1)", "EXISTS (SELECT 'bread' FROM t1)"},
+    {2, "EXISTS (SELECT NULL FROM t1 LIMIT 1)", "EXISTS (SELECT 'bread' FROM t1 LIMIT 1)"},
 }
 
 for _, val in ipairs(data) do
@@ -3432,12 +3432,12 @@ test:do_execsql_test(
 do_expr_test("e_expr-35.1.1", " (SELECT 35)   ", "integer", 35)
 do_expr_test("e_expr-35.1.2", " (SELECT NULL) ", "null", "")
 do_expr_test("e_expr-35.1.3", " (SELECT count(*) FROM t22) ", "integer", 3)
-do_expr_test("e_expr-35.1.4", " (SELECT 4 FROM t22) ", "integer", 4)
+do_expr_test("e_expr-35.1.4", " (SELECT 4 FROM t22 LIMIT 1) ", "integer", 4)
 do_expr_test("e_expr-35.1.5", [[ 
-  (SELECT b FROM t22 UNION SELECT a+1 FROM t22)
+  (SELECT b FROM t22 UNION SELECT a+1 FROM t22 LIMIT 1)
 ]], "null", "")
 do_expr_test("e_expr-35.1.6", [[ 
-  (SELECT a FROM t22 UNION SELECT COALESCE(b, 55) FROM t22 ORDER BY 1)
+  (SELECT a FROM t22 UNION SELECT COALESCE(b, 55) FROM t22 ORDER BY 1 LIMIT 1)
 ]], "integer", 4)
 -- EVIDENCE-OF: R-46899-53765 A SELECT used as a scalar quantity must
 -- return a result set with a single column.
@@ -3446,12 +3446,12 @@ do_expr_test("e_expr-35.1.6", [[
 -- where a subquery returns more than one column.
 --
 data = {
-    {1, "SELECT (SELECT * FROM t22 UNION SELECT a+1, b+1 FROM t22)"},
-    {2, "SELECT (SELECT * FROM t22 UNION SELECT a+1, b+1 FROM t22 ORDER BY 1)"},
+    {1, "SELECT (SELECT * FROM t22 UNION SELECT a+1, b+1 FROM t22 LIMIT 1)"},
+    {2, "SELECT (SELECT * FROM t22 UNION SELECT a+1, b+1 FROM t22 ORDER BY 1 LIMIT 1)"},
     {3, "SELECT (SELECT 1, 2)"},
     {4, "SELECT (SELECT NULL, NULL, NULL)"},
-    {5, "SELECT (SELECT * FROM t22)"},
-    {6, "SELECT (SELECT * FROM (SELECT 1, 2, 3))"},
+    {5, "SELECT (SELECT * FROM t22 LIMIT 1)"},
+    {6, "SELECT (SELECT * FROM (SELECT 1, 2, 3) LIMIT 1)"},
 }
 local M = {1, "/sub--select returns [23] columns -- expected 1/"}
 for _, val in ipairs(data) do
@@ -3482,11 +3482,11 @@ test:do_execsql_test(
     })
 
 data = {
-    {2, "( SELECT x FROM t4 ORDER BY x )     ", "integer", 1},
-    {3, "( SELECT x FROM t4 ORDER BY y )     ", "integer", 1},
-    {4, "( SELECT x FROM t4 ORDER BY x DESC )", "integer", 3},
-    {5, "( SELECT x FROM t4 ORDER BY y DESC )", "integer", 2},
-    {6, "( SELECT y FROM t4 ORDER BY y DESC )", "text", "two"},
+    {2, "( SELECT x FROM t4 ORDER BY x LIMIT 1 )     ", "integer", 1},
+    {3, "( SELECT x FROM t4 ORDER BY y LIMIT 1 )     ", "integer", 1},
+    {4, "( SELECT x FROM t4 ORDER BY x DESC LIMIT 1)", "integer", 3},
+    {5, "( SELECT x FROM t4 ORDER BY y DESC LIMIT 1 )", "integer", 2},
+    {6, "( SELECT y FROM t4 ORDER BY y DESC LIMIT 1 )", "text", "two"},
     {7, "( SELECT sum(x) FROM t4 )          ", "integer", 6},
     {8, "( SELECT group_concat(y,'') FROM t4 )", "text", "onetwothree"},
     {9, "( SELECT max(x) FROM t4 WHERE y LIKE '___')", "integer", 2 },

@@ -112,7 +112,7 @@ test:do_execsql_test(
         SELECT P.pk from PHOTO P WHERE NOT EXISTS (
              SELECT T2.pk from TAG T2 WHERE T2.fk = P.pk
              EXCEPT
-             SELECT T3.pk from TAG T3 WHERE T3.fk = P.pk AND T3.name LIKE '%foo%'
+             SELECT T3.pk from TAG T3 WHERE T3.fk = P.pk AND T3.name LIKE '%foo%' LIMIT 1
         );
     ]], {
         -- <select7-4.2>

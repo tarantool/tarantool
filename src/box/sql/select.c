@@ -2120,6 +2120,39 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 			sqlite3VdbeAddOp2(v, OP_IfNot, iLimit, iBreak);
 			VdbeCoverage(v);
 		}
+		if ((p->selFlags & SF_SingleRow) != 0) {
+			if (ExprHasProperty(p->pLimit, EP_System)) {
+				/*
+				 * Indirect LIMIT 1 is allowed only for
+				 * requests returning only 1 row.
+				 * To test this, we change LIMIT 1 to
+				 * LIMIT 2 and will look up LIMIT 1 overflow
+				 * at the sqlite3Select end.
+				 */
+				sqlite3VdbeAddOp2(v, OP_Integer, 2, iLimit);
+			} else {
+				/*
+				 * User-defined complex limit for subquery
+				 * could be only 1 as resulting value.
+				 */
+				int r1 = sqlite3GetTempReg(pParse);
+				sqlite3VdbeAddOp2(v, OP_Integer, 1, r1);
+				int no_err = sqlite3VdbeMakeLabel(v);
+				sqlite3VdbeAddOp3(v, OP_Eq, iLimit, no_err, r1);
+				const char *error =
+					"SQL error: Expression subquery could "
+					"be limited only with 1";
+				sqlite3VdbeAddOp4(v, OP_Halt,
+						  SQL_TARANTOOL_ERROR,
+						  0, 0, error, P4_STATIC);
+				sqlite3VdbeChangeP5(v, ER_SQL_EXECUTE);
+				sqlite3VdbeResolveLabel(v, no_err);
+				sqlite3ReleaseTempReg(pParse, r1);
+
+				/* Runtime checks are no longer needed. */
+				p->selFlags &= ~SF_SingleRow;
+			}
+		}
 		if (p->pOffset) {
 			p->iOffset = iOffset = ++pParse->nMem;
 			pParse->nMem++;	/* Allocate an extra register for limit+offset */
@@ -5398,6 +5431,32 @@ explain_simple_count(struct Parse *parse_context, const char *table_name)
 	}
 }
 
+/**
+ * Generate VDBE code that HALT program when subselect returned
+ * more than one row (determined as LIMIT 1 overflow).
+ * @param parser Current parsing context.
+ * @param limit_reg LIMIT register.
+ * @param end_mark mark to jump if select returned distinct one
+ *                 row as expected.
+ */
+static void
+vdbe_code_raise_on_multiple_rows(struct Parse *parser, int limit_reg, int end_mark)
+{
+	assert(limit_reg != 0);
+	struct Vdbe *v = sqlite3GetVdbe(parser);
+	assert(v != NULL);
+
+	int r1 = sqlite3GetTempReg(parser);
+	sqlite3VdbeAddOp2(v, OP_Integer, 0, r1);
+	sqlite3VdbeAddOp3(v, OP_Ne, r1, end_mark, limit_reg);
+	const char *error =
+		"SQL error: Expression subquery returned more than 1 row";
+	sqlite3VdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR, 0, 0, error,
+			  P4_STATIC);
+	sqlite3VdbeChangeP5(v, ER_SQL_EXECUTE);
+	sqlite3ReleaseTempReg(parser, r1);
+}
+
 /*
  * Generate code for the SELECT statement given in the p argument.
  *
@@ -5534,6 +5593,14 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	if (p->pPrior) {
 		rc = multiSelect(pParse, p, pDest);
 		pParse->iSelectId = iRestoreSelectId;
+
+		int end = sqlite3VdbeMakeLabel(v);
+		if ((p->selFlags & SF_SingleRow) != 0 && p->iLimit != 0) {
+			vdbe_code_raise_on_multiple_rows(pParse, p->iLimit,
+							 end);
+		}
+		sqlite3VdbeResolveLabel(v, end);
+
 #ifdef SELECTTRACE_ENABLED
 		SELECTTRACE(1, pParse, p, ("end compound-select processing\n"));
 		pParse->nSelectIndent--;
@@ -6326,8 +6393,10 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		generateSortTail(pParse, p, &sSort, pEList->nExpr, pDest);
 	}
 
-	/* Jump here to skip this query
-	 */
+	/* Generate code that prevent returning multiple rows. */
+	if ((p->selFlags & SF_SingleRow) != 0 && p->iLimit != 0)
+		vdbe_code_raise_on_multiple_rows(pParse, p->iLimit, iEnd);
+	/* Jump here to skip this query. */
 	sqlite3VdbeResolveLabel(v, iEnd);
 
 	/* The SELECT has been coded. If there is an error in the Parse structure,

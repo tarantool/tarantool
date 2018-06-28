@@ -167,11 +167,7 @@ test:do_execsql_test(
          WHERE songid IN (    
           SELECT songid    
           FROM songs    
-          WHERE LOWER(artist) = (    
-            -- This sub-query is indeterminate. Because there is no ORDER BY,
-            -- it may return 'one', 'two' or 'three'. Because of this, the
-        -- outermost parent query may correctly return any of 'one', 'two' 
-            -- or 'three' as well.
+          WHERE LOWER(artist) IN (
             SELECT DISTINCT LOWER(artist)    
             FROM (      
               -- This sub-query returns the table:
@@ -186,14 +182,15 @@ test:do_execsql_test(
               ORDER BY total DESC      
               LIMIT 10    
             )    
-            WHERE artist <> '' 
-          )  
-         )       
+            WHERE artist <> ''
+          )
+         )
+         LIMIT 1
         )  
         ORDER BY LOWER(artist) ASC;
     ]], {
         -- <misc5-3.1>
-        "two"
+        "one"
         -- </misc5-3.1>
     })
 

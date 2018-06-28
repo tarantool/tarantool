@@ -659,7 +659,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-4.1.1",
     [[
-        SELECT (SELECT a FROM t1);
+        SELECT (SELECT a FROM t1 LIMIT 1);
     ]], {
         -- <subquery-4.1.1>
         1
@@ -811,7 +811,7 @@ test:do_execsql_test(
         INSERT INTO t9 VALUES(20000);
         INSERT INTO t9 VALUES(30000);
 
-        SELECT (SELECT c7+c8 FROM t7) FROM t8;
+        SELECT (SELECT c7+c8 FROM t7 LIMIT 1) FROM t8;
     ]], {
         -- <subquery-7.1>
         101, 201, 301
@@ -852,7 +852,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.6",
     [[
-        SELECT (SELECT (SELECT max(c7+c8+c9) FROM t9) FROM t8) FROM t7
+        SELECT (SELECT (SELECT max(c7+c8+c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.6>
         30101, 30102, 30103
@@ -862,7 +862,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.7",
     [[
-        SELECT (SELECT (SELECT c7+max(c8+c9) FROM t9) FROM t8) FROM t7
+        SELECT (SELECT (SELECT c7+max(c8+c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.7>
         30101, 30102, 30103
@@ -872,7 +872,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.8",
     [[
-        SELECT (SELECT (SELECT max(c7)+c8+c9 FROM t9) FROM t8) FROM t7
+        SELECT (SELECT (SELECT max(c7)+c8+c9 FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.8>
         10103
@@ -882,7 +882,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.9",
     [[
-        SELECT (SELECT (SELECT c7+max(c8)+c9 FROM t9) FROM t8) FROM t7
+        SELECT (SELECT (SELECT c7+max(c8)+c9 FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.9>
         10301, 10302, 10303
@@ -892,7 +892,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-7.10",
     [[
-        SELECT (SELECT (SELECT c7+c8+max(c9) FROM t9) FROM t8) FROM t7
+        SELECT (SELECT (SELECT c7+c8+max(c9) FROM t9 LIMIT 1) FROM t8 LIMIT 1) FROM t7
     ]], {
         -- <subquery-7.10>
         30101, 30102, 30103

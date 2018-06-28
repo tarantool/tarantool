@@ -2874,10 +2874,17 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 						  dest.iSDParm);
 				VdbeComment((v, "Init EXISTS result"));
 			}
-			sql_expr_delete(pParse->db, pSel->pLimit, false);
-			pSel->pLimit = sqlite3ExprAlloc(pParse->db, TK_INTEGER,
-							&sqlite3IntTokens[1],
-							0);
+			if (pSel->pLimit == NULL) {
+				pSel->pLimit =
+					sqlite3ExprAlloc(pParse->db, TK_INTEGER,
+							 &sqlite3IntTokens[1],
+							 0);
+				if (pSel->pLimit != NULL) {
+					ExprSetProperty(pSel->pLimit,
+							EP_System);
+				}
+			}
+			pSel->selFlags |= SF_SingleRow;
 			pSel->iLimit = 0;
 			pSel->selFlags &= ~SF_MultiValue;
 			if (sqlite3Select(pParse, pSel, &dest)) {

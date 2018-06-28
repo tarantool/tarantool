@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(26)
+test:plan(30)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -99,7 +99,7 @@ test:do_execsql_test(
     "subselect-1.3e",
     [[
         SELECT b FROM t1
-         WHERE a = (SELECT a FROM t1 UNION SELECT b FROM t1 ORDER BY 1);
+         WHERE a = (SELECT a FROM t1 UNION SELECT b FROM t1 ORDER BY 1 LIMIT 1);
     ]], {
         -- <subselect-1.3e>
         2
@@ -162,7 +162,7 @@ test:do_test(
 test:do_execsql_test(
     "subselect-2.1",
     [[
-        SELECT (SELECT a FROM t1 ORDER BY a), (SELECT a FROM t1 ORDER BY a DESC)
+        SELECT (SELECT a FROM t1 ORDER BY a LIMIT 1), (SELECT a FROM t1 ORDER BY a DESC LIMIT 1)
     ]], {
         -- <subselect-2.1>
         1, 5
@@ -232,7 +232,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subselect-3.4",
     [[
-        SELECT (SELECT x FROM t3 ORDER BY x);
+        SELECT (SELECT x FROM t3 ORDER BY x LIMIT 1);
     ]], {
         -- <subselect-3.4>
         1
@@ -242,7 +242,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subselect-3.5",
     [[
-        SELECT (SELECT x FROM t3 ORDER BY x DESC);
+        SELECT (SELECT x FROM t3 ORDER BY x DESC LIMIT 1);
     ]], {
         -- <subselect-3.5>
         6
@@ -338,6 +338,50 @@ test:do_execsql_test(
         -- </subselect-4.3>
     })
 
+-- gh-2366 dissallow subselects returning multiple values
+test:do_catchsql_test(
+    "subselect-5.1",
+    [[
+        CREATE TABLE t5(a INT PRIMARY KEY, b INT);
+        INSERT INTO t5 VALUES(1,2);
+        INSERT INTO t5 VALUES(3,4);
+        INSERT INTO t5 VALUES(5,6);
+        INSERT INTO t5 VALUES(6,6);
+        SELECT (SELECT a FROM t5);
+    ]], {
+    -- <subselect-5.1>
+    1, "SQL error: Expression subquery returned more than 1 row"
+    -- </subselect-5.1>
+})
 
+test:do_catchsql_test(
+    "subselect-5.2",
+    [[
+        SELECT b FROM t5 WHERE a = (SELECT a FROM t5 WHERE b=6);
+    ]], {
+    -- <subselect-5.2>
+    1, "SQL error: Expression subquery returned more than 1 row"
+    -- </subselect-5.2>
+})
+
+test:do_execsql_test(
+    "subselect-5.3",
+    [[
+        SELECT b FROM t1 WHERE a = (SELECT a FROM t1 WHERE b=6 LIMIT (SELECT b-1 FROM t1 WHERE a =1));
+    ]], {
+    -- <subselect-5.2>
+    6
+    -- </subselect-5.2>
+})
+
+test:do_catchsql_test(
+    "subselect-5.3",
+    [[
+        SELECT b FROM t1 WHERE a = (SELECT a FROM t1 WHERE b=6 LIMIT (SELECT b FROM t1 WHERE a =1));
+    ]], {
+    -- <subselect-5.2>
+    1, "SQL error: Expression subquery could be limited only with 1"
+    -- </subselect-5.2>
+})
 
 test:finish_test()

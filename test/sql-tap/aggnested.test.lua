@@ -28,7 +28,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(1), (2), (3);
         CREATE TABLE t2(b1 INTEGER PRIMARY KEY);
         INSERT INTO t2 VALUES(4), (5);
-        SELECT (SELECT group_concat(a1,'x') FROM t2) FROM t1;
+        SELECT (SELECT group_concat(a1,'x') FROM t2 LIMIT 1) FROM t1;
     ]],
     {
         -- <aggnested-1.1>

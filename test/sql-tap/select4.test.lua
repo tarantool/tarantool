@@ -1378,23 +1378,23 @@ test:do_execsql_test(
         -- </select4-14.9>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "select4-14.10",
     [[
         SELECT (VALUES(1),(2),(3),(4))
     ]], {
         -- <select4-14.10>
-        1
+        1, "SQL error: Expression subquery returned more than 1 row"
         -- </select4-14.10>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "select4-14.11",
     [[
         SELECT (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4)
     ]], {
         -- <select4-14.11>
-        1
+        1, "SQL error: Expression subquery returned more than 1 row"
         -- </select4-14.11>
     })
 

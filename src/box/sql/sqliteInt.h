@@ -2354,6 +2354,8 @@ struct Expr {
 #define EP_Subquery  0x200000	/* Tree contains a TK_SELECT operator */
 #define EP_Alias     0x400000	/* Is an alias for a result set column */
 #define EP_Leaf      0x800000	/* Expr.pLeft, .pRight, .u.pSelect all NULL */
+/** Expression is system-defined. */
+#define EP_System    0x1000000
 
 /*
  * Combinations of two or more EP_* flags
@@ -2702,6 +2704,8 @@ struct Select {
 #define SF_FixedLimit     0x04000	/* nSelectRow set by a constant LIMIT */
 #define SF_MaybeConvert   0x08000	/* Need convertCompoundSelectToSubquery() */
 #define SF_Converted      0x10000	/* By convertCompoundSelectToSubquery() */
+/** Abort subquery if its output contains more than one row. */
+#define SF_SingleRow      0x20000
 
 /*
  * The results of a SELECT can be distributed in several ways, as defined

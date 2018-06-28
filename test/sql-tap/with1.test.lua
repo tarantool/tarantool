@@ -609,7 +609,7 @@ test:do_execsql_test("8.2-soduko", [[
                   OR z.z = substr(s, ((ind-1)%9) + (lp-1)*9 + 1, 1)
                   OR z.z = substr(s, (((ind-1)/3) % 3) * 3
                           + ((ind-1)/27) * 27 + lp
-                          + ((lp-1) / 3) * 6, 1)
+                          + ((lp-1) / 3) * 6, 1) LIMIT 1
            )
     )
   SELECT s FROM x WHERE ind=0;
