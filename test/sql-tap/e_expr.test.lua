@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(12425)
+test:plan(10661)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -77,8 +77,10 @@ local operations = {
     {"<>", "ne1"},
     {"!=", "ne2"},
     {"IS", "is"},
-    {"LIKE", "like"},
-    {"GLOB", "glob"},
+-- NOTE: This test needs refactoring after deletion of GLOB &
+--	 type restrictions for LIKE. (See #3572)
+--    {"LIKE", "like"},
+--    {"GLOB", "glob"},
     {"AND", "and"},
     {"OR", "or"},
     {"MATCH", "match"},
@@ -96,7 +98,12 @@ operations = {
     {"+", "-"},
     {"<<", ">>", "&", "|"},
     {"<", "<=", ">", ">="},
-    {"=", "==", "!=", "<>", "LIKE", "GLOB"}, --"MATCH", "REGEXP"},
+-- NOTE: This test needs refactoring after deletion of GLOB &
+-- type restrictions for LIKE. (See #3572)
+-- Also, MATCH & REGEXP aren't supported in Tarantool &
+-- are waiting for their hour, don't confuse them
+-- being commented with ticket above.
+    {"=", "==", "!=", "<>"}, --"LIKE", "GLOB"}, --"MATCH", "REGEXP"},
     {"AND"},
     {"OR"},
 }
@@ -1955,6 +1962,22 @@ test:do_catchsql_test(
         0, {1}
         -- </e_expr-14.6.4>
     })
+
+test:do_catchsql_test(
+    "e_expr-14.6.5",
+    "SELECT 'ab%' LIKE 'abё%' ESCAPE 'ё';", {
+        -- <e_expr-14.6.5>
+        0, {1}
+        -- </e_expr-14.6.5>
+    })
+
+test:do_catchsql_test(
+    "e_expr-14.6.6",
+    "SELECT 'abc' LIKE 'abё%' ESCAPE 'ё';", {
+        -- <e_expr-14.6.6>
+        0, {0}
+        -- </e_expr-14.6.6>
+})
 
 -- EVIDENCE-OF: R-02045-23762 This character may be used in the LIKE
 -- pattern to include literal percent or underscore characters.
