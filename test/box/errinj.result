@@ -42,7 +42,11 @@ errinj.info()
     state: false
   ERRINJ_WAL_IO:
     state: false
+  ERRINJ_VY_INDEX_FILE_RENAME:
+    state: false
   ERRINJ_TUPLE_ALLOC:
+    state: false
+  ERRINJ_VY_RUN_FILE_RENAME:
     state: false
   ERRINJ_VY_READ_PAGE:
     state: false
@@ -55,6 +59,8 @@ errinj.info()
   ERRINJ_WAL_WRITE_DISK:
     state: false
   ERRINJ_VY_RUN_WRITE:
+    state: false
+  ERRINJ_VY_LOG_FILE_RENAME:
     state: false
   ERRINJ_VY_LOG_FLUSH_DELAY:
     state: false
@@ -1204,4 +1210,146 @@ test_run:cmd("stop server test")
 test_run:cmd("cleanup server test")
 ---
 - true
+...
+--
+-- gh-3406: check that incomplete files got cleaned up after restart.
+--
+fio = require('fio')
+---
+...
+fiber = require('fiber')
+---
+...
+-- Check that snap.inprogress files are removed.
+_ = box.schema.space.create('test')
+---
+...
+_ = box.space.test:create_index('primary')
+---
+...
+for i = 1, 10 do box.space.test:insert{i} end
+---
+...
+errinj.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 9000)
+---
+- ok
+...
+_ = fiber.create(function() box.snapshot() end)
+---
+...
+path = fio.pathjoin(box.cfg.memtx_dir, '*.snap.inprogress')
+---
+...
+while #fio.glob(path) == 0 do fiber.sleep(0.001) end
+---
+...
+#fio.glob(path) > 0
+---
+- true
+...
+test_run:cmd('restart server default')
+fio = require('fio')
+---
+...
+fiber = require('fiber')
+---
+...
+errinj = box.error.injection
+---
+...
+#fio.glob(fio.pathjoin(box.cfg.memtx_dir, "*.snap.inprogress")) == 0
+---
+- true
+...
+box.space.test:drop()
+---
+...
+-- Check that run.inprogress, index.inprogress, and vylog.inprogress
+-- files are removed.
+_ = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = box.space.test:create_index('primary')
+---
+...
+errinj.set('ERRINJ_VY_LOG_FILE_RENAME', true)
+---
+- ok
+...
+box.snapshot()
+---
+- error: Error injection 'vinyl log file rename'
+...
+errinj.set('ERRINJ_VY_LOG_FILE_RENAME', false)
+---
+- ok
+...
+for i = 1, 10 do box.space.test:insert{i} end
+---
+...
+errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.001)
+---
+- ok
+...
+errinj.set('ERRINJ_VY_RUN_FILE_RENAME', true)
+---
+- ok
+...
+box.snapshot() -- error
+---
+- error: Error injection 'vinyl run file rename'
+...
+errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', true)
+---
+- ok
+...
+errinj.set('ERRINJ_VY_RUN_FILE_RENAME', false)
+---
+- ok
+...
+fiber.sleep(0.01)
+---
+...
+box.snapshot() -- error
+---
+- error: Error injection 'vinyl index file rename'
+...
+errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', false)
+---
+- ok
+...
+errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
+---
+- ok
+...
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog.inprogress')) > 0
+---
+- true
+...
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.run.inprogress')) > 0
+---
+- true
+...
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.index.inprogress')) > 0
+---
+- true
+...
+test_run:cmd('restart server default')
+fio = require('fio')
+---
+...
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog.inprogress')) == 0
+---
+- true
+...
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.run.inprogress')) == 0
+---
+- true
+...
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.index.inprogress')) == 0
+---
+- true
+...
+box.space.test:drop()
+---
 ...

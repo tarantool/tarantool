@@ -113,6 +113,9 @@ struct errinj {
 	_(ERRINJ_SNAP_COMMIT_DELAY, ERRINJ_BOOL, {.bparam = 0}) \
 	_(ERRINJ_SNAP_WRITE_ROW_TIMEOUT, ERRINJ_DOUBLE, {.dparam = 0}) \
 	_(ERRINJ_HTTP_RESPONSE_ADD_WAIT, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_LOG_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_RUN_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
+	_(ERRINJ_VY_INDEX_FILE_RENAME, ERRINJ_BOOL, {.bparam = false}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];

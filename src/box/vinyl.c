@@ -3481,6 +3481,9 @@ vy_backup_cb(const struct vy_log_record *record, void *cb_arg)
 
 	char path[PATH_MAX];
 	for (int type = 0; type < vy_file_MAX; type++) {
+		if (type == VY_FILE_RUN_INPROGRESS ||
+		    type == VY_FILE_INDEX_INPROGRESS)
+			continue;
 		vy_run_snprint_path(path, sizeof(path), arg->env->path,
 				    arg->space_id, arg->index_id,
 				    record->run_id, type);

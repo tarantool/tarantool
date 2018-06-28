@@ -378,7 +378,9 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 
 enum vy_file_type {
 	VY_FILE_INDEX,
+	VY_FILE_INDEX_INPROGRESS,
 	VY_FILE_RUN,
+	VY_FILE_RUN_INPROGRESS,
 	vy_file_MAX,
 };
 

@@ -66,8 +66,10 @@ enum { VY_BLOOM_VERSION = 0 };
 #define XLOG_META_TYPE_INDEX "INDEX"
 
 const char *vy_file_suffix[] = {
-	"index",	/* VY_FILE_INDEX */
-	"run",		/* VY_FILE_RUN */
+	"index",			/* VY_FILE_INDEX */
+	"index" inprogress_suffix, 	/* VY_FILE_INDEX_INPROGRESS */
+	"run",				/* VY_FILE_RUN */
+	"run" inprogress_suffix, 	/* VY_FILE_RUN_INPROGRESS */
 };
 
 /**
@@ -1988,9 +1990,6 @@ static int
 vy_run_write_index(struct vy_run *run, const char *dirpath,
 		   uint32_t space_id, uint32_t iid)
 {
-	struct region *region = &fiber()->gc;
-	size_t mem_used = region_used(region);
-
 	char path[PATH_MAX];
 	vy_run_snprint_path(path, sizeof(path), dirpath,
 			    space_id, iid, run->id, VY_FILE_INDEX);
@@ -2006,31 +2005,44 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 		return -1;
 
 	xlog_tx_begin(&index_xlog);
+	struct region *region = &fiber()->gc;
+	size_t mem_used = region_used(region);
 
 	struct xrow_header xrow;
 	if (vy_run_info_encode(&run->info, &xrow) != 0 ||
 	    xlog_write_row(&index_xlog, &xrow) < 0)
-		goto fail;
+		goto fail_rollback;
 
 	for (uint32_t page_no = 0; page_no < run->info.page_count; ++page_no) {
 		struct vy_page_info *page_info = vy_run_page_info(run, page_no);
 		if (vy_page_info_encode(page_info, &xrow) < 0) {
-			goto fail;
+			goto fail_rollback;
 		}
 		if (xlog_write_row(&index_xlog, &xrow) < 0)
-			goto fail;
+			goto fail_rollback;
 	}
 
-	if (xlog_tx_commit(&index_xlog) < 0 ||
-	    xlog_flush(&index_xlog) < 0 ||
+	region_truncate(region, mem_used);
+	if (xlog_tx_commit(&index_xlog) < 0)
+		goto fail;
+
+	ERROR_INJECT(ERRINJ_VY_INDEX_FILE_RENAME, {
+		diag_set(ClientError, ER_INJECTION, "vinyl index file rename");
+		xlog_close(&index_xlog, false);
+		return -1;
+	});
+
+	if (xlog_flush(&index_xlog) < 0 ||
 	    xlog_rename(&index_xlog) < 0)
 		goto fail;
+
 	xlog_close(&index_xlog, false);
-	region_truncate(region, mem_used);
 	return 0;
-fail:
+
+fail_rollback:
 	region_truncate(region, mem_used);
 	xlog_tx_rollback(&index_xlog);
+fail:
 	xlog_close(&index_xlog, false);
 	unlink(path);
 	return -1;
@@ -2263,6 +2275,11 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 	run->info.max_key = vy_key_dup(key);
 	if (run->info.max_key == NULL)
 		goto out;
+
+	ERROR_INJECT(ERRINJ_VY_RUN_FILE_RENAME, {
+		diag_set(ClientError, ER_INJECTION, "vinyl run file rename");
+		goto out;
+	});
 
 	/* Sync data and link the file to the final name. */
 	if (xlog_sync(&writer->data_xlog) < 0 ||

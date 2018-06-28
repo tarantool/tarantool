@@ -58,7 +58,6 @@ typedef uint32_t log_magic_t;
 static const log_magic_t row_marker = mp_bswap_u32(0xd5ba0bab); /* host byte order */
 static const log_magic_t zrow_marker = mp_bswap_u32(0xd5ba0bba); /* host byte order */
 static const log_magic_t eof_marker = mp_bswap_u32(0xd510aded); /* host byte order */
-static const char inprogress_suffix[] = ".inprogress";
 
 enum {
 	/**
@@ -623,6 +622,31 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio)
 		free(vclock);
 	}
 	return 0;
+}
+
+void
+xdir_collect_inprogress(struct xdir *xdir)
+{
+	const char *dirname = xdir->dirname;
+	DIR *dh = opendir(dirname);
+	if (dh == NULL) {
+		if (errno != ENOENT)
+			say_syserror("error reading directory '%s'", dirname);
+		return;
+	}
+	struct dirent *dent;
+	while ((dent = readdir(dh)) != NULL) {
+		char *ext = strrchr(dent->d_name, '.');
+		if (ext == NULL || strcmp(ext, inprogress_suffix) != 0)
+			continue;
+
+		char path[PATH_MAX];
+		snprintf(path, sizeof(path), "%s/%s", dirname, dent->d_name);
+		if (unlink(path) < 0)
+			say_syserror("error while removing %s", path);
+		else
+			say_info("removed %s", path);
+	}
 }
 
 /* }}} */
