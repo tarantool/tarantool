@@ -41,13 +41,6 @@
 #ifndef _SQLITE_OS_H_
 #define _SQLITE_OS_H_
 
-/* If the SET_FULLSYNC macro is not defined above, then make it
- * a no-op
- */
-#ifndef SET_FULLSYNC
-#define SET_FULLSYNC(x,y)
-#endif
-
 /*
  * The default size of a disk sector
  */
@@ -81,8 +74,7 @@
 #endif
 
 /*
- * The following values may be passed as the second argument to
- * sqlite3OsLock(). The various locks exhibit the following semantics:
+ * The various locks exhibit the following semantics:
  *
  * SHARED:    Any number of processes may hold a SHARED lock simultaneously.
  * RESERVED:  A single process may hold a RESERVED lock on a file at
@@ -92,10 +84,9 @@
  *            SHARED locks may be obtained by other processes.
  * EXCLUSIVE: An EXCLUSIVE lock precludes all other locks.
  *
- * PENDING_LOCK may not be passed directly to sqlite3OsLock(). Instead, a
- * process that requests an EXCLUSIVE lock may actually obtain a PENDING
- * lock. This can be upgraded to an EXCLUSIVE lock by a subsequent call to
- * sqlite3OsLock().
+ * PENDING_LOCK A process that requests an EXCLUSIVE lock may
+ * actually obtain a PENDING lock. This can be upgraded to an
+ * EXCLUSIVE lock.
  */
 #define NO_LOCK         0
 #define SHARED_LOCK     1
@@ -130,11 +121,7 @@
  * 1GB boundary.
  *
  */
-#ifdef SQLITE_OMIT_WSD
-#define PENDING_BYTE     (0x40000000)
-#else
 #define PENDING_BYTE      sqlite3PendingByte
-#endif
 #define RESERVED_BYTE     (PENDING_BYTE+1)
 #define SHARED_FIRST      (PENDING_BYTE+2)
 #define SHARED_SIZE       510
@@ -150,21 +137,7 @@ int sqlite3OsInit(void);
 void sqlite3OsClose(sqlite3_file *);
 int sqlite3OsRead(sqlite3_file *, void *, int amt, i64 offset);
 int sqlite3OsWrite(sqlite3_file *, const void *, int amt, i64 offset);
-int sqlite3OsTruncate(sqlite3_file *, i64 size);
-int sqlite3OsSync(sqlite3_file *, int);
-int sqlite3OsFileSize(sqlite3_file *, i64 * pSize);
-int sqlite3OsLock(sqlite3_file *, int);
-int sqlite3OsUnlock(sqlite3_file *, int);
-int sqlite3OsCheckReservedLock(sqlite3_file * id, int *pResOut);
-int sqlite3OsFileControl(sqlite3_file *, int, void *);
 void sqlite3OsFileControlHint(sqlite3_file *, int, void *);
-#define SQLITE_FCNTL_DB_UNCHANGED 0xca093fa0
-int sqlite3OsSectorSize(sqlite3_file * id);
-int sqlite3OsDeviceCharacteristics(sqlite3_file * id);
-int sqlite3OsShmMap(sqlite3_file *, int, int, int, void volatile **);
-int sqlite3OsShmLock(sqlite3_file * id, int, int, int);
-void sqlite3OsShmBarrier(sqlite3_file * id);
-int sqlite3OsShmUnmap(sqlite3_file * id, int);
 int sqlite3OsFetch(sqlite3_file * id, i64, int, void **);
 int sqlite3OsUnfetch(sqlite3_file *, i64, void *);
 
@@ -172,9 +145,6 @@ int sqlite3OsUnfetch(sqlite3_file *, i64, void *);
  * Functions for accessing sqlite3_vfs methods
  */
 int sqlite3OsOpen(sqlite3_vfs *, const char *, sqlite3_file *, int, int *);
-int sqlite3OsDelete(sqlite3_vfs *, const char *, int);
-int sqlite3OsAccess(sqlite3_vfs *, const char *, int, int *pResOut);
-int sqlite3OsFullPathname(sqlite3_vfs *, const char *, int, char *);
 int sqlite3OsRandomness(sqlite3_vfs *, int, char *);
 int sqlite3OsSleep(sqlite3_vfs *, int);
 int sqlite3OsGetLastError(sqlite3_vfs *);

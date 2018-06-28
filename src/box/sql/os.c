@@ -37,64 +37,6 @@
 #include "sqliteInt.h"
 
 /*
- * If we compile with the SQLITE_TEST macro set, then the following block
- * of code will give us the ability to simulate a disk I/O error.  This
- * is used for testing the I/O recovery logic.
- */
-#if defined(SQLITE_TEST)
-int sqlite3_io_error_hit = 0;	/* Total number of I/O Errors */
-int sqlite3_io_error_hardhit = 0;	/* Number of non-benign errors */
-int sqlite3_io_error_pending = 0;	/* Count down to first I/O error */
-int sqlite3_io_error_persist = 0;	/* True if I/O errors persist */
-int sqlite3_io_error_benign = 0;	/* True if errors are benign */
-int sqlite3_diskfull_pending = 0;
-int sqlite3_diskfull = 0;
-#endif				/* defined(SQLITE_TEST) */
-
-/*
- * When testing, also keep a count of the number of open files.
- */
-#if defined(SQLITE_TEST)
-int sqlite3_open_file_count = 0;
-#endif				/* defined(SQLITE_TEST) */
-
-/*
- * The default SQLite sqlite3_vfs implementations do not allocate
- * memory (actually, os_unix.c allocates a small amount of memory
- * from within OsOpen()), but some third-party implementations may.
- * So we test the effects of a malloc() failing and the sqlite3OsXXX()
- * function returning SQLITE_IOERR_NOMEM using the DO_OS_MALLOC_TEST macro.
- *
- * The following functions are instrumented for malloc() failure
- * testing:
- *
- *     sqlite3OsRead()
- *     sqlite3OsWrite()
- *     sqlite3OsSync()
- *     sqlite3OsFileSize()
- *     sqlite3OsLock()
- *     sqlite3OsCheckReservedLock()
- *     sqlite3OsFileControl()
- *     sqlite3OsShmMap()
- *     sqlite3OsOpen()
- *     sqlite3OsDelete()
- *     sqlite3OsAccess()
- *     sqlite3OsFullPathname()
- *
- */
-#if defined(SQLITE_TEST)
-int sqlite3_memdebug_vfs_oom_test = 1;
-#define DO_OS_MALLOC_TEST(x)                                       \
-  if (sqlite3_memdebug_vfs_oom_test && !x) { \
-    void *pTstAlloc = sqlite3Malloc(10);                             \
-    if (!pTstAlloc) return SQLITE_IOERR_NOMEM_BKPT;                  \
-    sqlite3_free(pTstAlloc);                                         \
-  }
-#else
-#define DO_OS_MALLOC_TEST(x)
-#endif
-
-/*
  * The following routines are convenience wrappers around methods
  * of the sqlite3_file object.  This is mostly just syntactic sugar. All
  * of this would be completely automatic if SQLite were coded using
@@ -112,85 +54,13 @@ sqlite3OsClose(sqlite3_file * pId)
 int
 sqlite3OsRead(sqlite3_file * id, void *pBuf, int amt, i64 offset)
 {
-	DO_OS_MALLOC_TEST(id);
 	return id->pMethods->xRead(id, pBuf, amt, offset);
 }
 
 int
 sqlite3OsWrite(sqlite3_file * id, const void *pBuf, int amt, i64 offset)
 {
-	DO_OS_MALLOC_TEST(id);
 	return id->pMethods->xWrite(id, pBuf, amt, offset);
-}
-
-int
-sqlite3OsTruncate(sqlite3_file * id, i64 size)
-{
-	return id->pMethods->xTruncate(id, size);
-}
-
-int
-sqlite3OsSync(sqlite3_file * id, int flags)
-{
-	DO_OS_MALLOC_TEST(id);
-	return id->pMethods->xSync(id, flags);
-}
-
-int
-sqlite3OsFileSize(sqlite3_file * id, i64 * pSize)
-{
-	DO_OS_MALLOC_TEST(id);
-	return id->pMethods->xFileSize(id, pSize);
-}
-
-int
-sqlite3OsLock(sqlite3_file * id, int lockType)
-{
-	DO_OS_MALLOC_TEST(id);
-	return id->pMethods->xLock(id, lockType);
-}
-
-int
-sqlite3OsUnlock(sqlite3_file * id, int lockType)
-{
-	return id->pMethods->xUnlock(id, lockType);
-}
-
-int
-sqlite3OsCheckReservedLock(sqlite3_file * id, int *pResOut)
-{
-	DO_OS_MALLOC_TEST(id);
-	return id->pMethods->xCheckReservedLock(id, pResOut);
-}
-
-/*
- * Use sqlite3OsFileControl() when we are doing something that might fail
- * and we need to know about the failures.  Use sqlite3OsFileControlHint()
- * when simply tossing information over the wall to the VFS and we do not
- * really care if the VFS receives and understands the information since it
- * is only a hint and can be safely ignored.  The sqlite3OsFileControlHint()
- * routine has no return value since the return value would be meaningless.
- */
-int
-sqlite3OsFileControl(sqlite3_file * id, int op, void *pArg)
-{
-#ifdef SQLITE_TEST
-	if (op != SQLITE_FCNTL_COMMIT_PHASETWO) {
-		/* Faults are not injected into COMMIT_PHASETWO because, assuming SQLite
-		 * is using a regular VFS, it is called after the corresponding
-		 * transaction has been committed. Injecting a fault at this point
-		 * confuses the test scripts - the COMMIT comand returns SQLITE_NOMEM
-		 * but the transaction is committed anyway.
-		 *
-		 * The core must call OsFileControl() though, not OsFileControlHint(),
-		 * as if a custom VFS (e.g. zipvfs) returns an error here, it probably
-		 * means the commit really has failed and an error should be returned
-		 * to the user.
-		 */
-		DO_OS_MALLOC_TEST(id);
-	}
-#endif
-	return id->pMethods->xFileControl(id, op, pArg);
 }
 
 void
@@ -199,53 +69,11 @@ sqlite3OsFileControlHint(sqlite3_file * id, int op, void *pArg)
 	(void)id->pMethods->xFileControl(id, op, pArg);
 }
 
-int
-sqlite3OsSectorSize(sqlite3_file * id)
-{
-	int (*xSectorSize) (sqlite3_file *) = id->pMethods->xSectorSize;
-	return (xSectorSize ? xSectorSize(id) : SQLITE_DEFAULT_SECTOR_SIZE);
-}
-
-int
-sqlite3OsDeviceCharacteristics(sqlite3_file * id)
-{
-	return id->pMethods->xDeviceCharacteristics(id);
-}
-
-int
-sqlite3OsShmLock(sqlite3_file * id, int offset, int n, int flags)
-{
-	return id->pMethods->xShmLock(id, offset, n, flags);
-}
-
-void
-sqlite3OsShmBarrier(sqlite3_file * id)
-{
-	id->pMethods->xShmBarrier(id);
-}
-
-int
-sqlite3OsShmUnmap(sqlite3_file * id, int deleteFlag)
-{
-	return id->pMethods->xShmUnmap(id, deleteFlag);
-}
-
-int
-sqlite3OsShmMap(sqlite3_file * id,	/* Database file handle */
-		int iPage, int pgsz, int bExtend,	/* True to extend file if necessary */
-		void volatile **pp	/* OUT: Pointer to mapping */
-    )
-{
-	DO_OS_MALLOC_TEST(id);
-	return id->pMethods->xShmMap(id, iPage, pgsz, bExtend, pp);
-}
-
 #if SQLITE_MAX_MMAP_SIZE>0
 /* The real implementation of xFetch and xUnfetch */
 int
 sqlite3OsFetch(sqlite3_file * id, i64 iOff, int iAmt, void **pp)
 {
-	DO_OS_MALLOC_TEST(id);
 	return id->pMethods->xFetch(id, iOff, iAmt, pp);
 }
 
@@ -284,7 +112,6 @@ sqlite3OsOpen(sqlite3_vfs * pVfs,
 	      sqlite3_file * pFile, int flags, int *pFlagsOut)
 {
 	int rc;
-	DO_OS_MALLOC_TEST(0);
 	/* 0x87f7f is a mask of SQLITE_OPEN_ flags that are valid to be passed
 	 * down into the VFS layer.  Some SQLITE_OPEN_ flags (for example,
 	 * SQLITE_OPEN_SHAREDCACHE) are blocked before
@@ -293,30 +120,6 @@ sqlite3OsOpen(sqlite3_vfs * pVfs,
 	rc = pVfs->xOpen(pVfs, zPath, pFile, flags & 0x87f7f, pFlagsOut);
 	assert(rc == SQLITE_OK || pFile->pMethods == 0);
 	return rc;
-}
-
-int
-sqlite3OsDelete(sqlite3_vfs * pVfs, const char *zPath, int dirSync)
-{
-	DO_OS_MALLOC_TEST(0);
-	assert(dirSync == 0 || dirSync == 1);
-	return pVfs->xDelete(pVfs, zPath, dirSync);
-}
-
-int
-sqlite3OsAccess(sqlite3_vfs * pVfs, const char *zPath, int flags, int *pResOut)
-{
-	DO_OS_MALLOC_TEST(0);
-	return pVfs->xAccess(pVfs, zPath, flags, pResOut);
-}
-
-int
-sqlite3OsFullPathname(sqlite3_vfs * pVfs,
-		      const char *zPath, int nPathOut, char *zPathOut)
-{
-	DO_OS_MALLOC_TEST(0);
-	zPathOut[0] = 0;
-	return pVfs->xFullPathname(pVfs, zPath, nPathOut, zPathOut);
 }
 
 int
@@ -478,15 +281,5 @@ sqlite3_vfs_register(sqlite3_vfs * pVfs, int makeDflt)
 		vfsList->pNext = pVfs;
 	}
 	assert(vfsList);
-	return SQLITE_OK;
-}
-
-/*
- * Unregister a VFS so that it is no longer accessible.
- */
-int
-sqlite3_vfs_unregister(sqlite3_vfs * pVfs)
-{
-	vfsUnlink(pVfs);
 	return SQLITE_OK;
 }

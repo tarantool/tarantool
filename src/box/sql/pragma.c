@@ -44,14 +44,6 @@
 #include "box/schema.h"
 #include "box/session.h"
 
-#if !defined(SQLITE_ENABLE_LOCKING_STYLE)
-#if defined(__APPLE__)
-#define SQLITE_ENABLE_LOCKING_STYLE 1
-#else
-#define SQLITE_ENABLE_LOCKING_STYLE 0
-#endif
-#endif
-
 /*
  ************************************************************************
  * pragma.h contains several pragmas, including utf's pragmas.
