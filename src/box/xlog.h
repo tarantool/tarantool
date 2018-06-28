@@ -240,6 +240,14 @@ struct xlog_meta {
 	 * is vector clock *at the time the snapshot is taken*.
 	 */
 	struct vclock vclock;
+	/**
+	 * Text file header: vector clock of the previous
+	 * file at the directory. Used for checking the
+	 * directory for missing WALs.
+	 */
+	struct vclock prev_vclock;
+	/** Set if @prev_vclock is present. */
+	bool has_prev_vclock;
 };
 
 /* }}} */

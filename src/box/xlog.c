@@ -93,6 +93,7 @@ enum {
 #define INSTANCE_UUID_KEY_V12 "Server"
 #define VCLOCK_KEY "VClock"
 #define VERSION_KEY "Version"
+#define PREV_VCLOCK_KEY "PrevVClock"
 
 static const char v13[] = "0.13";
 static const char v12[] = "0.12";
@@ -116,16 +117,47 @@ xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 	if (vstr == NULL)
 		return -1;
 	char *instance_uuid = tt_uuid_str(&meta->instance_uuid);
-	int total = snprintf(buf, size,
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size,
 		"%s\n"
 		"%s\n"
 		VERSION_KEY ": %s\n"
 		INSTANCE_UUID_KEY ": %s\n"
-		VCLOCK_KEY ": %s\n\n",
+		VCLOCK_KEY ": %s\n",
 		meta->filetype, v13, PACKAGE_VERSION, instance_uuid, vstr);
-	assert(total > 0);
 	free(vstr);
+	if (meta->has_prev_vclock) {
+		vstr = vclock_to_string(&meta->prev_vclock);
+		SNPRINT(total, snprintf, buf, size,
+			PREV_VCLOCK_KEY ": %s\n", vstr);
+		free(vstr);
+	}
+	SNPRINT(total, snprintf, buf, size, "\n");
+	assert(total > 0);
 	return total;
+}
+
+/**
+ * Parse vclock from xlog meta.
+ */
+static int
+parse_vclock(const char *val, const char *val_end, struct vclock *vclock)
+{
+	if (val_end - val > VCLOCK_STR_LEN_MAX) {
+		diag_set(XlogError, "can't parse vclock");
+		return -1;
+	}
+	char str[VCLOCK_STR_LEN_MAX + 1];
+	memcpy(str, val, val_end - val);
+	str[val_end - val] = '\0';
+	size_t off = vclock_from_string(vclock, str);
+	ERROR_INJECT(ERRINJ_XLOG_META, { off = 1; });
+	if (off != 0) {
+		diag_set(XlogError, "invalid vclock at "
+			 "offset %zd", off);
+		return -1;
+	}
+	return 0;
 }
 
 /**
@@ -223,21 +255,15 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			/*
 			 * VClock: <vclock>
 			 */
-			if (val_end - val > VCLOCK_STR_LEN_MAX) {
-				diag_set(XlogError, "can't parse vclock");
+			if (parse_vclock(val, val_end, &meta->vclock) != 0)
 				return -1;
-			}
-			char vclock[VCLOCK_STR_LEN_MAX + 1];
-			memcpy(vclock, val, val_end - val);
-			vclock[val_end - val] = '\0';
-			size_t off = vclock_from_string(&meta->vclock, vclock);
-			ERROR_INJECT(ERRINJ_XLOG_META, {
-				off = 1;});
-			if (off != 0) {
-				diag_set(XlogError, "invalid vclock at "
-					  "offset %zd", off);
+		} else if (memcmp(key, PREV_VCLOCK_KEY, key_end - key) == 0) {
+			/*
+			 * PrevVClock: <vclock>
+			 */
+			if (parse_vclock(val, val_end, &meta->prev_vclock) != 0)
 				return -1;
-			}
+			meta->has_prev_vclock = true;
 		} else if (memcmp(key, VERSION_KEY, key_end - key) == 0) {
 			/* Ignore Version: for now */
 		} else {
@@ -895,6 +921,18 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	snprintf(meta.filetype, sizeof(meta.filetype), "%s", dir->filetype);
 	meta.instance_uuid = *dir->instance_uuid;
 	vclock_copy(&meta.vclock, vclock);
+
+	/*
+	 * For WAL dir: store vclock of the previous xlog file
+	 * to check for gaps on recovery.
+	 */
+	if (dir->type == XLOG && !vclockset_empty(&dir->index)) {
+		vclock_copy(&meta.prev_vclock, vclockset_last(&dir->index));
+		meta.has_prev_vclock = true;
+	} else {
+		vclock_create(&meta.prev_vclock);
+		meta.has_prev_vclock = false;
+	}
 
 	if (xlog_create(xlog, filename, dir->open_wflags, &meta) != 0)
 		return -1;

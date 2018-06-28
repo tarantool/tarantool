@@ -44,4 +44,17 @@ xlog_name = string.format("%020d.xlog", checkpoint_lsn)
 dump_header(fio.pathjoin(box.cfg.wal_dir, xlog_name))
 box.space._schema:delete({"layout_test"})
 
+box.snapshot()
+checkpoint_lsn = box.info.lsn
+
+-- SNAP files
+snap_name = string.format("%020d.snap", checkpoint_lsn)
+dump_header(fio.pathjoin(box.cfg.memtx_dir, snap_name))
+
+-- XLOG files
+box.space._schema:insert({"layout_test"})
+xlog_name = string.format("%020d.xlog", checkpoint_lsn)
+dump_header(fio.pathjoin(box.cfg.wal_dir, xlog_name))
+box.space._schema:delete({"layout_test"})
+
 test_run:cmd("clear filter")
