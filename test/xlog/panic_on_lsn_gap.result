@@ -309,10 +309,57 @@ box.space._schema:replace{'key', 'test 5'} -- creates new WAL
 ---
 - ['key', 'test 5']
 ...
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", true)
+---
+- ok
+...
+box.space._schema:replace{'key', 'test 6'} -- fails, makes gap
+---
+- error: Failed to write to disk
+...
+box.snapshot() -- fails, rotates WAL
+---
+- error: Error injection 'xlog write injection'
+...
+box.space._schema:replace{'key', 'test 6'} -- fails, creates empty WAL
+---
+- error: Failed to write to disk
+...
+name = string.match(arg[0], "([^,]+)%.lua")
+---
+...
+require('fio').glob(name .. "/*.xlog")
+---
+- - panic/00000000000000000000.xlog
+  - panic/00000000000000000001.xlog
+  - panic/00000000000000000012.xlog
+  - panic/00000000000000000022.xlog
+  - panic/00000000000000000025.xlog
+  - panic/00000000000000000027.xlog
+  - panic/00000000000000000029.xlog
+...
 test_run:cmd("restart server panic")
 box.space._schema:select{'key'}
 ---
 - - ['key', 'test 5']
+...
+-- Check that we don't create a WAL in the gap between the last two.
+box.space._schema:replace{'key', 'test 6'}
+---
+- ['key', 'test 6']
+...
+name = string.match(arg[0], "([^,]+)%.lua")
+---
+...
+require('fio').glob(name .. "/*.xlog")
+---
+- - panic/00000000000000000000.xlog
+  - panic/00000000000000000001.xlog
+  - panic/00000000000000000012.xlog
+  - panic/00000000000000000022.xlog
+  - panic/00000000000000000025.xlog
+  - panic/00000000000000000027.xlog
+  - panic/00000000000000000029.xlog
 ...
 test_run:cmd('switch default')
 ---

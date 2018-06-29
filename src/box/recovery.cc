@@ -183,6 +183,17 @@ recovery_open_log(struct recovery *r, const struct vclock *vclock)
 		 */
 		goto gap_error;
 	}
+out:
+	/*
+	 * We must promote recovery clock even if we don't recover
+	 * anything from the next WAL. Otherwise if the last WAL
+	 * in the directory is corrupted or empty and the previous
+	 * one has an LSN gap at the end (due to a write error),
+	 * we will create the next WAL between two existing ones,
+	 * thus breaking the file order.
+	 */
+	if (vclock_compare(&r->vclock, vclock) < 0)
+		vclock_copy(&r->vclock, vclock);
 	return;
 
 gap_error:
@@ -192,6 +203,7 @@ gap_error:
 	/* Ignore missing WALs if force_recovery is set. */
 	e->log();
 	say_warn("ignoring a gap in LSN");
+	goto out;
 }
 
 void

@@ -119,8 +119,18 @@ box.space._schema:replace{'key', 'test 5'} -- fails, makes gap
 box.snapshot() -- fails, rotates WAL
 box.error.injection.set("ERRINJ_WAL_WRITE_DISK", false)
 box.space._schema:replace{'key', 'test 5'} -- creates new WAL
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", true)
+box.space._schema:replace{'key', 'test 6'} -- fails, makes gap
+box.snapshot() -- fails, rotates WAL
+box.space._schema:replace{'key', 'test 6'} -- fails, creates empty WAL
+name = string.match(arg[0], "([^,]+)%.lua")
+require('fio').glob(name .. "/*.xlog")
 test_run:cmd("restart server panic")
 box.space._schema:select{'key'}
+-- Check that we don't create a WAL in the gap between the last two.
+box.space._schema:replace{'key', 'test 6'}
+name = string.match(arg[0], "([^,]+)%.lua")
+require('fio').glob(name .. "/*.xlog")
 test_run:cmd('switch default')
 test_run:cmd("stop server panic")
 test_run:cmd("cleanup server panic")
