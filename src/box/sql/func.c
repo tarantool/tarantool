@@ -422,8 +422,6 @@ roundFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 		if (SQLITE_NULL == sqlite3_value_type(argv[1]))
 			return;
 		n = sqlite3_value_int(argv[1]);
-		if (n > 30)
-			n = 30;
 		if (n < 0)
 			n = 0;
 	}
@@ -568,9 +566,8 @@ randomBlob(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	n = sqlite3_value_int(argv[0]);
-	if (n < 1) {
-		n = 1;
-	}
+	if (n < 1)
+		return;
 	p = contextMalloc(context, n);
 	if (p) {
 		sqlite3_randomness(n, p);

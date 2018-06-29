@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14534)
+test:plan(14538)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -989,7 +989,7 @@ test:do_execsql_test(
                length(randomblob(2000))
     ]], {
         -- <func-9.5>
-        32, 1, 2000
+        32, "", 2000
         -- </func-9.5>
     })
 
@@ -2645,5 +2645,25 @@ test:do_execsql_test(
     "func-32",
     [[SELECT version()]],
     {_TARANTOOL})
+
+test:do_execsql_test(
+    "func-33",
+    [[VALUES (ROUND(1e-31,30))]],
+    {0})
+
+test:do_execsql_test(
+    "func-34",
+    [[VALUES (ROUND(1e-31,31))]],
+    {1e-31})
+
+test:do_execsql_test(
+    "func-35",
+    [[VALUES (ROUND(1e-31, 100))]],
+    {1e-31})
+
+test:do_execsql_test(
+    "func-36",
+    [[VALUES (LENGTH(RANDOMBLOB(0)))]],
+    {""})
 
 test:finish_test()
