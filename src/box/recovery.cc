@@ -152,6 +152,48 @@ recovery_close_log(struct recovery *r)
 	trigger_run_xc(&r->on_close_log, NULL);
 }
 
+static void
+recovery_open_log(struct recovery *r, const struct vclock *vclock)
+{
+	XlogGapError *e;
+	struct xlog_meta meta = r->cursor.meta;
+	enum xlog_cursor_state state = r->cursor.state;
+
+	recovery_close_log(r);
+
+	xdir_open_cursor_xc(&r->wal_dir, vclock_sum(vclock), &r->cursor);
+
+	if (state == XLOG_CURSOR_NEW &&
+	    vclock_compare(vclock, &r->vclock) > 0) {
+		/*
+		 * This is the first WAL we are about to scan
+		 * and the best clock we could find is greater
+		 * or is incomparable with the initial recovery
+		 * position.
+		 */
+		goto gap_error;
+	}
+
+	if (state != XLOG_CURSOR_NEW &&
+	    r->cursor.meta.has_prev_vclock &&
+	    vclock_compare(&r->cursor.meta.prev_vclock, &meta.vclock) != 0) {
+		/*
+		 * WALs are missing between the last scanned WAL
+		 * and the next one.
+		 */
+		goto gap_error;
+	}
+	return;
+
+gap_error:
+	e = tnt_error(XlogGapError, &r->vclock, vclock);
+	if (!r->wal_dir.force_recovery)
+		throw e;
+	/* Ignore missing WALs if force_recovery is set. */
+	e->log();
+	say_warn("ignoring a gap in LSN");
+}
+
 void
 recovery_delete(struct recovery *r)
 {
@@ -277,25 +319,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 			continue;
 		}
 
-		if (vclock_compare(clock, &r->vclock) > 0) {
-			/**
-			 * The best clock we could find is
-			 * greater or is incomparable with the
-			 * current state of recovery.
-			 */
-			XlogGapError *e =
-				tnt_error(XlogGapError, &r->vclock, clock);
-
-			if (!r->wal_dir.force_recovery)
-				throw e;
-			e->log();
-			/* Ignore missing WALs */
-			say_warn("ignoring a gap in LSN");
-		}
-
-		recovery_close_log(r);
-
-		xdir_open_cursor_xc(&r->wal_dir, vclock_sum(clock), &r->cursor);
+		recovery_open_log(r, clock);
 
 		say_info("recover from `%s'", r->cursor.name);
 

@@ -280,6 +280,40 @@ box.space._schema:select{'key'}
 ---
 - - ['key', 'test 4']
 ...
+--
+-- Check that if there's an LSN gap between two WALs
+-- that appeared due to a disk error and no files is
+-- actually missing, we won't panic on recovery.
+--
+box.space._schema:replace{'key', 'test 4'} -- creates new WAL
+---
+- ['key', 'test 4']
+...
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", true)
+---
+- ok
+...
+box.space._schema:replace{'key', 'test 5'} -- fails, makes gap
+---
+- error: Failed to write to disk
+...
+box.snapshot() -- fails, rotates WAL
+---
+- error: Error injection 'xlog write injection'
+...
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", false)
+---
+- ok
+...
+box.space._schema:replace{'key', 'test 5'} -- creates new WAL
+---
+- ['key', 'test 5']
+...
+test_run:cmd("restart server panic")
+box.space._schema:select{'key'}
+---
+- - ['key', 'test 5']
+...
 test_run:cmd('switch default')
 ---
 - true

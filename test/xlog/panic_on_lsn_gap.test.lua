@@ -108,6 +108,19 @@ require('fio').glob(name .. "/*.xlog")
 -- restart is ok
 test_run:cmd("restart server panic")
 box.space._schema:select{'key'}
+--
+-- Check that if there's an LSN gap between two WALs
+-- that appeared due to a disk error and no files is
+-- actually missing, we won't panic on recovery.
+--
+box.space._schema:replace{'key', 'test 4'} -- creates new WAL
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", true)
+box.space._schema:replace{'key', 'test 5'} -- fails, makes gap
+box.snapshot() -- fails, rotates WAL
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", false)
+box.space._schema:replace{'key', 'test 5'} -- creates new WAL
+test_run:cmd("restart server panic")
+box.space._schema:select{'key'}
 test_run:cmd('switch default')
 test_run:cmd("stop server panic")
 test_run:cmd("cleanup server panic")
