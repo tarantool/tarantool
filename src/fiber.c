@@ -190,12 +190,17 @@ fiber_call_impl(struct fiber *callee)
 void
 fiber_call(struct fiber *callee)
 {
-	callee->caller = fiber();
-	assert(! (callee->caller->flags & FIBER_IS_READY));
+	struct fiber *caller = fiber();
+	assert(! (caller->flags & FIBER_IS_READY));
 	assert(rlist_empty(&callee->state));
 	assert(! (callee->flags & FIBER_IS_READY));
+
+	/** By convention, these triggers must not throw. */
+	if (! rlist_empty(&caller->on_yield))
+		trigger_run(&caller->on_yield, NULL);
+	callee->caller = caller;
 	callee->flags |= FIBER_IS_READY;
-	callee->caller->flags |= FIBER_IS_READY;
+	caller->flags |= FIBER_IS_READY;
 	fiber_call_impl(callee);
 }
 
