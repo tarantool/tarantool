@@ -83,8 +83,9 @@ t
   - Failed to write to disk
 ...
 --
--- Before restart: oops, our LSN is 11,
--- even though we didn't insert anything.
+-- Before restart: our LSN is 1, because
+-- LSN is promoted in tx only on successful
+-- WAL write.
 --
 name = string.match(arg[0], "([^,]+)%.lua")
 ---
@@ -99,13 +100,12 @@ require('fio').glob(name .. "/*.xlog")
 ...
 test_run:cmd("restart server panic")
 --
--- after restart: our LSN is the LSN of the
--- last *written* row, all the failed
--- rows are gone from lsn counter.
+-- After restart: our LSN is the LSN of the
+-- last empty WAL created on shutdown, i.e. 11.
 --
 box.info.vclock
 ---
-- {1: 1}
+- {1: 11}
 ...
 box.space._schema:select{'key'}
 ---
@@ -153,7 +153,7 @@ t
 ...
 box.info.vclock
 ---
-- {1: 1}
+- {1: 11}
 ...
 box.error.injection.set("ERRINJ_WAL_WRITE", false)
 ---
@@ -176,12 +176,12 @@ s:replace{'key', 'test 2'}
 --
 box.info.vclock
 ---
-- {1: 12}
+- {1: 22}
 ...
 test_run:cmd("restart server panic")
 box.info.vclock
 ---
-- {1: 12}
+- {1: 22}
 ...
 box.space._schema:select{'key'}
 ---
@@ -194,7 +194,8 @@ name = string.match(arg[0], "([^,]+)%.lua")
 require('fio').glob(name .. "/*.xlog")
 ---
 - - panic/00000000000000000000.xlog
-  - panic/00000000000000000001.xlog
+  - panic/00000000000000000011.xlog
+  - panic/00000000000000000022.xlog
 ...
 -- now insert 10 rows - so that the next
 -- row will need to switch the WAL
@@ -216,8 +217,8 @@ test_run:cmd("setopt delimiter ''");
 require('fio').glob(name .. "/*.xlog")
 ---
 - - panic/00000000000000000000.xlog
-  - panic/00000000000000000001.xlog
-  - panic/00000000000000000012.xlog
+  - panic/00000000000000000011.xlog
+  - panic/00000000000000000022.xlog
 ...
 box.error.injection.set("ERRINJ_WAL_WRITE", true)
 ---
@@ -229,14 +230,14 @@ box.space._schema:replace{"key", 'test 3'}
 ...
 box.info.vclock
 ---
-- {1: 22}
+- {1: 32}
 ...
 require('fio').glob(name .. "/*.xlog")
 ---
 - - panic/00000000000000000000.xlog
-  - panic/00000000000000000001.xlog
-  - panic/00000000000000000012.xlog
+  - panic/00000000000000000011.xlog
   - panic/00000000000000000022.xlog
+  - panic/00000000000000000032.xlog
 ...
 -- and the next one (just to be sure
 box.space._schema:replace{"key", 'test 3'}
@@ -245,14 +246,14 @@ box.space._schema:replace{"key", 'test 3'}
 ...
 box.info.vclock
 ---
-- {1: 22}
+- {1: 32}
 ...
 require('fio').glob(name .. "/*.xlog")
 ---
 - - panic/00000000000000000000.xlog
-  - panic/00000000000000000001.xlog
-  - panic/00000000000000000012.xlog
+  - panic/00000000000000000011.xlog
   - panic/00000000000000000022.xlog
+  - panic/00000000000000000032.xlog
 ...
 box.error.injection.set("ERRINJ_WAL_WRITE", false)
 ---
@@ -265,14 +266,14 @@ box.space._schema:replace{"key", 'test 4'}
 ...
 box.info.vclock
 ---
-- {1: 25}
+- {1: 35}
 ...
 require('fio').glob(name .. "/*.xlog")
 ---
 - - panic/00000000000000000000.xlog
-  - panic/00000000000000000001.xlog
-  - panic/00000000000000000012.xlog
+  - panic/00000000000000000011.xlog
   - panic/00000000000000000022.xlog
+  - panic/00000000000000000032.xlog
 ...
 -- restart is ok
 test_run:cmd("restart server panic")
@@ -331,12 +332,12 @@ name = string.match(arg[0], "([^,]+)%.lua")
 require('fio').glob(name .. "/*.xlog")
 ---
 - - panic/00000000000000000000.xlog
-  - panic/00000000000000000001.xlog
-  - panic/00000000000000000012.xlog
+  - panic/00000000000000000011.xlog
   - panic/00000000000000000022.xlog
-  - panic/00000000000000000025.xlog
-  - panic/00000000000000000027.xlog
-  - panic/00000000000000000029.xlog
+  - panic/00000000000000000032.xlog
+  - panic/00000000000000000035.xlog
+  - panic/00000000000000000037.xlog
+  - panic/00000000000000000039.xlog
 ...
 test_run:cmd("restart server panic")
 box.space._schema:select{'key'}
@@ -354,12 +355,13 @@ name = string.match(arg[0], "([^,]+)%.lua")
 require('fio').glob(name .. "/*.xlog")
 ---
 - - panic/00000000000000000000.xlog
-  - panic/00000000000000000001.xlog
-  - panic/00000000000000000012.xlog
+  - panic/00000000000000000011.xlog
   - panic/00000000000000000022.xlog
-  - panic/00000000000000000025.xlog
-  - panic/00000000000000000027.xlog
-  - panic/00000000000000000029.xlog
+  - panic/00000000000000000032.xlog
+  - panic/00000000000000000035.xlog
+  - panic/00000000000000000037.xlog
+  - panic/00000000000000000039.xlog
+  - panic/00000000000000000040.xlog
 ...
 test_run:cmd('switch default')
 ---

@@ -284,6 +284,14 @@ _select(11, 20)
   - [19, 'the tuple 19']
   - [20, 'the tuple 20']
 ...
+test_run:cmd("stop server hot_standby")
+---
+- true
+...
+test_run:cmd("cleanup server hot_standby")
+---
+- true
+...
 test_run:cmd("deploy server default")
 ---
 - true
@@ -296,15 +304,7 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server hot_standby")
----
-- true
-...
 test_run:cmd("stop server replica")
----
-- true
-...
-test_run:cmd("cleanup server hot_standby")
 ---
 - true
 ...

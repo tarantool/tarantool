@@ -116,13 +116,9 @@ fiber.sleep(0.1) -- wait for master to relay data
 #box.info.gc().checkpoints == 1 or box.info.gc()
 #fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
 test_run:cmd("switch replica")
--- Unblock the replica and make it fail to apply a row.
-box.info.replication[1].upstream.message == nil
-box.error.injection.set("ERRINJ_WAL_WRITE", true)
+-- Unblock the replica and break replication.
 box.error.injection.set("ERRINJ_WAL_DELAY", false)
-while box.info.replication[1].upstream.message == nil do fiber.sleep(0.01) end
-box.info.replication[1].upstream.message
-test_run:cmd("switch default")
+box.cfg{replication = {}}
 -- Restart the replica to reestablish replication.
 test_run:cmd("restart server replica")
 -- Wait for the replica to catch up.
@@ -149,7 +145,7 @@ box.snapshot()
 _ = s:auto_increment{}
 box.snapshot()
 #box.info.gc().checkpoints == 1 or box.info.gc()
-#fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
+#fio.glob('./master/*.xlog') == 3 or fio.listdir('./master')
 
 -- The xlog should only be deleted after the replica
 -- is unregistered.

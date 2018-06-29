@@ -34,17 +34,17 @@ end;
 test_run:cmd("setopt delimiter ''");
 t
 --
--- Before restart: oops, our LSN is 11,
--- even though we didn't insert anything.
+-- Before restart: our LSN is 1, because
+-- LSN is promoted in tx only on successful
+-- WAL write.
 --
 name = string.match(arg[0], "([^,]+)%.lua")
 box.info.vclock
 require('fio').glob(name .. "/*.xlog")
 test_run:cmd("restart server panic")
 --
--- after restart: our LSN is the LSN of the
--- last *written* row, all the failed
--- rows are gone from lsn counter.
+-- After restart: our LSN is the LSN of the
+-- last empty WAL created on shutdown, i.e. 11.
 --
 box.info.vclock
 box.space._schema:select{'key'}

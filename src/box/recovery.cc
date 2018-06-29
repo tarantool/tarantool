@@ -352,29 +352,6 @@ void
 recovery_finalize(struct recovery *r)
 {
 	recovery_close_log(r);
-
-	/*
-	 * Check if next xlog exists. If it's true this xlog is
-	 * corrupted and we should rename it (to avoid getting
-	 * problem on the next xlog write with the same name).
-	 * Possible reasons are:
-	 *  - last xlog has corrupted rows
-	 *  - last xlog has corrupted header
-	 *  - last xlog has zero size
-	 */
-	char *name = xdir_format_filename(&r->wal_dir,
-					  vclock_sum(&r->vclock),
-					  NONE);
-	if (access(name, F_OK) == 0) {
-		say_info("rename corrupted xlog %s", name);
-		char to[PATH_MAX];
-		snprintf(to, sizeof(to), "%s.corrupted", name);
-		if (rename(name, to) != 0) {
-			tnt_raise(SystemError,
-				  "%s: can't rename corrupted xlog",
-				  name);
-		}
-	}
 }
 
 
