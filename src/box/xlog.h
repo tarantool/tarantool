@@ -556,8 +556,8 @@ xlog_tx_decode(const char *data, const char *data_end,
 /* {{{ xlog_cursor - read rows from a log file */
 
 enum xlog_cursor_state {
-	/* Cursor is closed */
-	XLOG_CURSOR_CLOSED = 0,
+	/* The cursor was never opened. */
+	XLOG_CURSOR_NEW = 0,
 	/* The cursor is open but no tx is read */
 	XLOG_CURSOR_ACTIVE = 1,
 	/* The Cursor is open and a tx is read */
@@ -566,6 +566,8 @@ enum xlog_cursor_state {
 	XLOG_CURSOR_EOF = 3,
 	/* The cursor was closed after reaching EOF. */
 	XLOG_CURSOR_EOF_CLOSED = 4,
+	/* The cursor was closed before reaching EOF. */
+	XLOG_CURSOR_CLOSED = 5,
 };
 
 /**
@@ -597,7 +599,8 @@ struct xlog_cursor
 static inline bool
 xlog_cursor_is_open(const struct xlog_cursor *cursor)
 {
-	return (cursor->state != XLOG_CURSOR_CLOSED &&
+	return (cursor->state != XLOG_CURSOR_NEW &&
+		cursor->state != XLOG_CURSOR_CLOSED &&
 		cursor->state != XLOG_CURSOR_EOF_CLOSED);
 }
 
