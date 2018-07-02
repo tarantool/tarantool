@@ -59,7 +59,6 @@ enum iproto_key {
 	IPROTO_TIMESTAMP = 0x04,
 	IPROTO_SCHEMA_VERSION = 0x05,
 	IPROTO_SERVER_VERSION = 0x06,
-	IPROTO_SERVER_IS_RO = 0x07,
 	/* Leave a gap for other keys in the header. */
 	IPROTO_SPACE_ID = 0x10,
 	IPROTO_INDEX_ID = 0x11,
@@ -88,7 +87,8 @@ enum iproto_key {
 	/* Also request keys. See the comment above. */
 	IPROTO_EXPR = 0x27, /* EVAL */
 	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
-	IPROTO_OPTIONS = 0x29,
+	IPROTO_SERVER_IS_RO = 0x29,
+	IPROTO_OPTIONS = 0x2a,
 
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,

@@ -79,19 +79,28 @@ local function test_http_client(test, url, opts)
     test:is(r.status, 200, 'request')
 end
 
-local function test_cancel_and_timeout(test, url, opts)
-    test:plan(2)
+local function test_cancel_and_errinj(test, url, opts)
+    test:plan(3)
     local ch = fiber.channel(1)
     local http = client:new()
-    local f = fiber.create(function()
-                ch:put(http:get(url, opts)) end)
+    local func  = function(fopts)
+        ch:put(http:get(url, fopts))
+    end
+    local f = fiber.create(func, opts)
     f:cancel()
     local r = ch:get()
     test:ok(r.status == 408 and string.find(r.reason, "Timeout"),
                     "After cancel fiber timeout is returned")
-    local r = http:get(url, merge(opts, {timeout = 0.0001}))
+    r = http:get(url, merge(opts, {timeout = 0.0001}))
     test:ok(r.status == 408 and string.find(r.reason, "Timeout"),
                                                        "Timeout check")
+    local errinj = box.error.injection
+    errinj.set('ERRINJ_HTTP_RESPONSE_ADD_WAIT', true)
+    local topts = merge(opts, {timeout = 1200})
+    f = fiber.create(func, topts)
+    r = ch:get()
+    test:is(r.status, 200, "No hangs in errinj")
+    errinj.set('ERRINJ_HTTP_RESPONSE_ADD_WAIT', false)
 end
 
 local function test_post_and_get(test, url, opts)
@@ -197,7 +206,7 @@ local function test_errors(test)
 end
 
 local function test_headers(test, url, opts)
-    test:plan(15)
+    test:plan(19)
     local http = client:new()
     local r = http:get(url .. 'headers', opts)
     test:is(type(r.headers["set-cookie"]), 'string', "set-cookie check")
@@ -205,6 +214,7 @@ local function test_headers(test, url, opts)
     test:ok(r.headers["set-cookie"]:match("age = 17"), "set-cookie check")
     test:is(r.headers["content-type"], "application/json", "content-type check")
     test:is(r.headers["my_header"], "value1,value2", "other header check")
+    test:isnil(r.headers["11200ok"], "http status line not included in headers")
     test:is(r.cookies["likes"][1], "cheese", "cookie value check")
     test:ok(r.cookies["likes"][2][1]:match("Expires"), "cookie option check")
     test:ok(r.cookies["likes"][2][3]:match("HttpOnly"), "cookie option check")
@@ -215,6 +225,12 @@ local function test_headers(test, url, opts)
     test:ok(r.cookies["bad@name"] == nil , "cookie name check")
     test:ok(r.cookies["badname"] == nil , "cookie name check")
     test:ok(r.cookies["badcookie"] == nil , "cookie name check")
+    test:isnil(r.headers["very_very_very_long_headers_name1"], "no long header name")
+    test:is(r.headers["very_very_very_long_headers_name"], "true", "truncated name")
+    opts["max_header_name_length"] = 64
+    local r = http:get(url .. 'headers', opts)
+    test:is(r.headers["very_very_very_long_headers_name1"], "true", "truncated max_header_name_length")
+    opts["max_header_name_length"] = nil
 end
 
 local function test_special_methods(test, url, opts)
@@ -384,7 +400,7 @@ function run_tests(test, sock_family, sock_addr)
     test:plan(9)
     local server, url, opts = start_server(test, sock_family, sock_addr)
     test:test("http.client", test_http_client, url, opts)
-    test:test("cancel and timeout", test_cancel_and_timeout, url, opts)
+    test:test("cancel and errinj", test_cancel_and_errinj, url, opts)
     test:test("basic http post/get", test_post_and_get, url, opts)
     test:test("errors", test_errors)
     test:test("headers", test_headers, url, opts)

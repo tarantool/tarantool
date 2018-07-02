@@ -931,7 +931,7 @@ local commands = setmetatable({
             linkmode = "%s start",
             description =
 [=[
-        Start a Tarantool instance (if not started; fail otherwise).
+        Start a Tarantool instance.
 ]=],
             weight = 10,
             deprecated = false,
@@ -942,7 +942,7 @@ local commands = setmetatable({
             linkmode = "%s stop",
             description =
 [=[
-        Stop a Tarantool instance (if not stopped; fail otherwise).
+        Stop a Tarantool instance.
 ]=],
             weight = 20,
             deprecated = false,
@@ -993,8 +993,7 @@ local commands = setmetatable({
             linkmode = "%s restart",
             description =
 [=[
-        Stop and start a Tarantool instance (if started;
-        fail otherwise).
+        Stop and start a Tarantool instance.
 ]=],
             weight = 40,
             deprecated = false,

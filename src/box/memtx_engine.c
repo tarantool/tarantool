@@ -305,6 +305,7 @@ memtx_engine_end_recovery(struct engine *engine)
 		if (space_foreach(memtx_build_secondary_keys, memtx) != 0)
 			return -1;
 	}
+	xdir_collect_inprogress(&memtx->snap_dir);
 	return 0;
 }
 

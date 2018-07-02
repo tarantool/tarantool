@@ -33,6 +33,7 @@ def headers():
                ('Set-Cookie', 'age = 17; NOSuchOption; EmptyOption=Value;Secure'),
                ('my_header', 'value1'),
                ('my_header', 'value2'),
+               ('very_very_very_long_headers_name1', 'true'),
                ]
     return code, body, headers
 
