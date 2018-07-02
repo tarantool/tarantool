@@ -3926,14 +3926,14 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 	 * queries.
 	 */
 	if (pSub->pPrior) {
-		if (pSub->pOrderBy) {
-			return 0;	/* Restriction 20 */
-		}
 		if (isAgg || (p->selFlags & SF_Distinct) != 0
 		    || pSrc->nSrc != 1) {
 			return 0;
 		}
 		for (pSub1 = pSub; pSub1; pSub1 = pSub1->pPrior) {
+			/* Restriction 20 */
+			if (pSub1->pOrderBy != NULL)
+				return 0;
 			testcase((pSub1->
 				  selFlags & (SF_Distinct | SF_Aggregate)) ==
 				 SF_Distinct);

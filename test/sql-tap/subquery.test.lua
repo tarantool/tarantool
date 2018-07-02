@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(69)
+test:plan(73)
 
 --!./tcltestrunner.lua
 -- 2005 January 19
@@ -926,6 +926,52 @@ test:do_execsql_test(
         -- </subquery-8.1>
     })
 
+test:do_catchsql_test(
+	"subquery-9.0",
+	[[
+		DROP TABLE IF EXISTS table1;
+		CREATE TABLE table1 (id VARCHAR(100) PRIMARY KEY);
+		INSERT INTO table1 VALUES ('abc'), ('abd');
+	]], {
+		-- <subquery-9.0>
+		0
+		-- <subquery-9.0>
+	})
 
+test:do_catchsql_test(
+	"subquery-9.1",
+	[[
+		SELECT * FROM (SELECT * FROM table1 UNION ALL
+                               SELECT * FROM table1 ORDER BY 1 UNION ALL
+			       SELECT * FROM table1);
+	]], {
+		-- <subquery-9.1>
+		1, 'ORDER BY clause should come after UNION ALL not before'
+		-- <subquery-9.1>
+	})
+
+test:do_execsql_test(
+	"subquery-9.2",
+	[[
+		SELECT * FROM (SELECT * FROM table1 UNION ALL
+                                   SELECT * FROM table1 UNION ALL
+				   SELECT * FROM table1 ORDER BY 1);
+	]], {
+		-- <subquery-9.2>
+		'abc', 'abc', 'abc', 'abd', 'abd', 'abd'
+		-- <subquery-9.2>
+	})
+
+test:do_catchsql_test(
+	"subquery-9.3",
+	[[
+		SELECT * FROM (SELECT * FROM table1 ORDER BY 1 UNION ALL
+                               SELECT * FROM table1 UNION ALL
+			       SELECT * FROM table1);
+	]], {
+             -- <subquery-9.3>
+             1, 'ORDER BY clause should come after UNION ALL not before'
+             -- <subquery-9.3>
+	})
 
 test:finish_test()
