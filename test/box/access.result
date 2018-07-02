@@ -1414,18 +1414,81 @@ _ = box.session.su("tester", box.schema.func.drop, 'test_func')
 -- box.session.su("tester", s.format, s, {name="id", type="unsigned"})
 -- failed drop
 -- box.session.su("tester", s.drop, s)
--- can't use here sudo
--- because drop use sudo inside
--- and currently sudo can't be performed nested
-box.session.su("tester")
+-- gh-3090: nested su unexpected behaviour.
+-- gh-3492: su doesn't grant effective privileges
+-- should print guest
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function f()
+    box.session.su("admin", function() end)
+    return box.session.effective_user()
+end;
 ---
 ...
-box.schema.user.drop("test")
+box.session.su("guest", f);
 ---
-- error: Revoke access to role 'public' is denied for user 'tester'
+- guest
+...
+-- the call of test_admin below shouldn't fail
+function test_admin()
+    box.schema.user.create('storage', {password = 'storage', if_not_exists=true})
+
+    box.schema.user.grant('storage', 'replication', nil, nil, {if_not_exists=true})
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+box.session.su("guest")
+---
+...
+box.session.user()
+---
+- guest
+...
+box.session.effective_user()
+---
+- guest
+...
+box.session.su("admin", test_admin)
+---
+...
+box.session.user()
+---
+- guest
+...
+box.session.effective_user()
+---
+- guest
 ...
 box.session.su("admin")
 ---
+...
+box.session.user()
+---
+- admin
+...
+box.session.effective_user()
+---
+- admin
+...
+box.schema.user.drop("storage")
+---
+...
+test_admin = nil
+---
+...
+f = nil
+---
+...
+-- now sudo can be used here since nested sudo is fixed
+box.session.su("tester", box.schema.user.drop, "test")
+---
+- error: Drop access to user 'test' is denied for user 'tester'
 ...
 box.session.su("tester", box.schema.func.drop, "test")
 ---

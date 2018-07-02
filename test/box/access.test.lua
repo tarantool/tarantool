@@ -544,13 +544,42 @@ _ = box.session.su("tester", box.schema.func.drop, 'test_func')
 -- failed drop
 -- box.session.su("tester", s.drop, s)
 
--- can't use here sudo
--- because drop use sudo inside
--- and currently sudo can't be performed nested
-box.session.su("tester")
-box.schema.user.drop("test")
-box.session.su("admin")
 
+-- gh-3090: nested su unexpected behaviour.
+-- gh-3492: su doesn't grant effective privileges
+
+-- should print guest
+test_run:cmd("setopt delimiter ';'")
+function f()
+    box.session.su("admin", function() end)
+    return box.session.effective_user()
+end;
+box.session.su("guest", f);
+
+-- the call of test_admin below shouldn't fail
+function test_admin()
+    box.schema.user.create('storage', {password = 'storage', if_not_exists=true})
+
+    box.schema.user.grant('storage', 'replication', nil, nil, {if_not_exists=true})
+end;
+test_run:cmd("setopt delimiter ''");
+
+box.session.su("guest")
+box.session.user()
+box.session.effective_user()
+box.session.su("admin", test_admin)
+box.session.user()
+box.session.effective_user()
+box.session.su("admin")
+box.session.user()
+box.session.effective_user()
+
+box.schema.user.drop("storage")
+test_admin = nil
+f = nil
+
+-- now sudo can be used here since nested sudo is fixed
+box.session.su("tester", box.schema.user.drop, "test")
 box.session.su("tester", box.schema.func.drop, "test")
 
 box.schema.user.grant("tester", "drop", "universe")

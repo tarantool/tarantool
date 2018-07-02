@@ -190,6 +190,8 @@ lbox_session_su(struct lua_State *L)
 	}
 
 	struct credentials su_credentials;
+	struct credentials *old_credentials =
+		(struct credentials *)fiber_get_key(fiber(), FIBER_KEY_USER);
 	credentials_init(&su_credentials, user->auth_token, user->def->uid);
 	fiber_set_user(fiber(), &su_credentials);
 
@@ -197,7 +199,7 @@ lbox_session_su(struct lua_State *L)
 	luaL_checktype(L, 2, LUA_TFUNCTION);
 	int error = lua_pcall(L, top - 2, LUA_MULTRET, 0);
 	/* Restore the original credentials. */
-	fiber_set_user(fiber(), &session->credentials);
+	fiber_set_user(fiber(), old_credentials);
 
 	if (error)
 		luaT_error(L);
