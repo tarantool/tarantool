@@ -514,6 +514,11 @@ local function start()
         script_name = instance_path,
         __defer_update = true
     }
+
+    -- an env variable to tell when we the
+    -- instance is run under tarantoolctl
+    os.setenv('TARANTOOLCTL', 'true')
+
     shift_argv(arg, 0, 2)
     local success, data = pcall(dofile, instance_path)
     -- if load fails - show last 10 lines of the log file and exit
@@ -593,6 +598,9 @@ local function restart()
     end
     stop()
     fiber.sleep(1)
+    -- an env variable to tell when
+    -- the instance was restarted
+    os.setenv('TARANTOOL_RESTARTED', 'true')
     start()
     return 0
 end
