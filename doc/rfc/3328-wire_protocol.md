@@ -120,7 +120,7 @@ _A non formatted response with metadata_ has only `IPROTO_SQL_INFO` and it is al
 _A formatted response_ always has `IPROTO_DATA`, and can have both `IPROTO_SQL_INFO` and `IPROTO_METADATA`. It is a result of SQL DQL (`SELECT`) or SQL DML (`INSERT`). The response can be part of a stream. The first message of the stream always contains `IPROTO_METADATA` in the body and sets `IPROTO_PUSH_ID` in the header, should there be multiple messages sharing the same metadata. All other messasges in the stream contain `IPROTO_PUSH_ID` with the same value.
 
 On the picture the state machine of the protocol is showed:
-![alt text](https://raw.githubusercontent.com/tarantool/tarantool/gerold103/gh-3328-new-iproto/doc/rfc/3328-wire_protocol_img1.svg?sanitize=true)
+![alt text](https://raw.githubusercontent.com/tarantool/tarantool/6b171db229cd6f6acf74599039879e6f5acf35db/doc/rfc/3328-wire_protocol_img1.svg?sanitize=true)
 
 For a call to `FUNCTION my_sql_func` the following responses are sent:
 ```
