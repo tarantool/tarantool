@@ -219,10 +219,11 @@ _ = fiber.create(function()
 end);
 
 box.begin()
-test_latch:create_index("sec2", {unique = true, parts = {2, 'unsigned'}})
+    test_latch:create_index("sec2", {unique = true, parts = {2, 'unsigned'}})
 box.commit();
-
 test_run:cmd("setopt delimiter ''");
-
 _ = c:get()
+-- Explicitly roll back the transaction in multi-statement,
+-- which hasn't finished due to DDL error
+box.rollback()
 test_latch:drop() -- this is where everything stops

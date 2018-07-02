@@ -68,12 +68,59 @@ struct mempool memtx_index_extent_pool;
 static int memtx_index_num_reserved_extents;
 static void *memtx_index_reserved_extents;
 
+/*
+ * Memtx yield-in-transaction trigger: roll back the effects
+ * of the transaction and mark the transaction as aborted.
+ */
 static void
-txn_on_yield_or_stop(struct trigger *trigger, void *event)
+txn_on_yield(struct trigger *trigger, void *event)
 {
-	(void)trigger;
-	(void)event;
-	txn_rollback(); /* doesn't throw */
+	(void) trigger;
+	(void) event;
+
+	struct txn *txn = in_txn();
+	assert(txn && txn->engine_tx);
+	if (txn == NULL || txn->engine_tx == NULL)
+		return;
+	txn_abort(txn);                 /* doesn't yield or fail */
+}
+
+/**
+ * Initialize context for yield triggers.
+ * In case of a yield inside memtx multi-statement transaction
+ * we must, first of all, roll back the effects of the transaction
+ * so that concurrent transactions won't see dirty, uncommitted
+ * data.
+ * Second, we must abort the transaction, since it has been rolled
+ * back implicitly. The transaction can not be rolled back
+ * completely from within a yield trigger, since a yield trigger
+ * can't fail. Instead, we mark the transaction as aborted and
+ * raise an error on attempt to commit it.
+ *
+ * So much hassle to be user-friendly until we have a true
+ * interactive transaction support in memtx.
+ */
+void
+memtx_init_txn(struct txn *txn)
+{
+	struct fiber *fiber = fiber();
+
+	trigger_create(&txn->fiber_on_yield, txn_on_yield,
+		       NULL, NULL);
+	trigger_create(&txn->fiber_on_stop, txn_on_stop,
+		       NULL, NULL);
+	/*
+	 * Memtx doesn't allow yields between statements of
+	 * a transaction. Set a trigger which would roll
+	 * back the transaction if there is a yield.
+	 */
+	trigger_add(&fiber->on_yield, &txn->fiber_on_yield);
+	trigger_add(&fiber->on_stop, &txn->fiber_on_stop);
+	/*
+	 * This serves as a marker that the triggers are
+	 * initialized.
+	 */
+	txn->engine_tx = txn;
 }
 
 static int
@@ -319,7 +366,7 @@ static int
 memtx_engine_prepare(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	if (txn->is_autocommit)
+	if (txn->engine_tx == 0)
 		return 0;
 	/*
 	 * These triggers are only used for memtx and only
@@ -328,6 +375,11 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 	 */
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
+	if (txn->is_aborted) {
+		diag_set(ClientError, ER_TRANSACTION_YIELD);
+		diag_log();
+		return -1;
+	}
 	return 0;
 }
 
@@ -342,18 +394,7 @@ memtx_engine_begin(struct engine *engine, struct txn *txn)
 	 * to match with trigger_clear() in rollbackStatement().
 	 */
 	if (txn->is_autocommit == false) {
-
-		trigger_create(&txn->fiber_on_yield, txn_on_yield_or_stop,
-				NULL, NULL);
-		trigger_create(&txn->fiber_on_stop, txn_on_yield_or_stop,
-				NULL, NULL);
-		/*
-		 * Memtx doesn't allow yields between statements of
-		 * a transaction. Set a trigger which would roll
-		 * back the transaction if there is a yield.
-		 */
-		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
-		trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+		memtx_init_txn(txn);
 	}
 	return 0;
 }
@@ -363,6 +404,15 @@ memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	(void)txn;
+	if (txn->engine_tx == NULL &&
+	    ! rlist_empty(&txn_last_stmt(txn)->space->on_replace)) {
+		/**
+		 * A space on_replace trigger may initiate
+		 * a yield.
+		 */
+		assert(txn->is_autocommit);
+		memtx_init_txn(txn);
+	}
 	return 0;
 }
 
@@ -414,7 +464,10 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 static void
 memtx_engine_rollback(struct engine *engine, struct txn *txn)
 {
-	memtx_engine_prepare(engine, txn);
+	if (txn->engine_tx != NULL) {
+		trigger_clear(&txn->fiber_on_yield);
+		trigger_clear(&txn->fiber_on_stop);
+	}
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);
 	stailq_foreach_entry(stmt, &txn->stmts, next)

@@ -429,7 +429,7 @@ fiber.name(f)
 _ = box.schema.space.create('test')
 _ = box.space.test:create_index('pk')
 --
--- check that derived fiber does not see changes of the transaction
+-- Check that derived fiber does not see changes of the transaction
 -- it must be rolled back before call
 --
 l = nil
@@ -443,6 +443,65 @@ while f:status() ~= 'dead' do fiber.sleep(0.01) end
 l
 f = nil
 l = nil
-box.schema.space.drop('test')
+box.space.test:drop()
+--
+-- Check that yield trigger is installed for a sub-statement
+-- in autocommit mode
+--
+_ = box.schema.space.create('test')
+_ = box.space.test:create_index('pk')
+test_run:cmd("setopt delimiter ';'")
+l = nil
+function yield()
+    f = fiber.create(function() l = box.space.test:get{1} end)
+    while f:status() ~= 'dead' do fiber.sleep(0.01) end
+end;
+test_run:cmd("setopt delimiter ''");
+_ = box.space.test:on_replace(yield)
+box.space.test:insert{1}
+l
+box.space.test:get{1}
+f = nil
+l = nil
+box.space.test:drop()
+--
+-- Check that rollback trigger is not left behind in the fiber in
+-- case of user rollback.
+--
+-- Begin a multi-statement transaction in memtx and roll it back.
+-- Then begin a multi-statement transaction in vinyl and yield.
+-- Observe vinyl transaction being implicitly rolled back by
+-- yield.
+--
+_ = box.schema.space.create('m')
+_ = box.space.m:create_index('pk')
+_ = box.schema.space.create('v', {engine='vinyl'})
+_ = box.space.v:create_index('pk')
+l = nil
+l1 = nil
+test_run:cmd("setopt delimiter ';'")
+function f()
+    box.begin()
+    box.space.m:insert{1}
+    box.rollback()
+    box.begin()
+    box.space.v:insert{1}
+    local f = fiber.create(function() l = box.space.v:get{1} end)
+    while f:status() ~= 'dead' do
+       fiber.sleep(0.01)
+    end
+    box.commit()
+    l1 = box.space.v:get{1}
+end;
+test_run:cmd("setopt delimiter ''");
+f()
+l
+l1
+box.space.m:drop()
+box.space.v:drop()
+f = nil
+l = nil
+l1 = nil
 
+-- cleanup
 test_run:cmd("clear filter")

@@ -208,6 +208,7 @@ box.begin() s:insert{1, 'Must be rolled back'};
 while s:get{1} ~= nil do fiber.sleep(0) end
 box.commit();
 ---
+- error: Transaction has been aborted by a fiber yield
 ...
 -- Test background fiber
 --

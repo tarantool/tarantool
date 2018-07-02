@@ -2385,14 +2385,6 @@ txn_stmt_unref_tuples(struct txn_stmt *stmt)
 	stmt->new_tuple = NULL;
 }
 
-static void
-txn_on_stop(struct trigger *trigger, void *event)
-{
-	(void)trigger;
-	(void)event;
-	txn_rollback();
-}
-
 static int
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
