@@ -35,6 +35,7 @@
 #include <curl/curl.h>
 
 #include "fiber.h"
+#include "errinj.h"
 
 /**
  * Process events
@@ -82,6 +83,13 @@ curl_multi_process(CURLM *multi, curl_socket_t sockfd, int events)
 		struct curl_request *request = NULL;
 		curl_easy_getinfo(easy, CURLINFO_PRIVATE, (void *) &request);
 		request->code = (int) code;
+		request->in_progress = false;
+#ifndef NDEBUG
+		struct errinj *errinj = errinj(ERRINJ_HTTP_RESPONSE_ADD_WAIT,
+					       ERRINJ_BOOL);
+		if (errinj != NULL)
+			errinj->bparam = false;
+#endif
 		fiber_cond_signal(&request->cond);
 	}
 }
@@ -270,6 +278,7 @@ curl_request_create(struct curl_request *curl_request)
 		diag_set(OutOfMemory, 0, "curl", "easy");
 		return -1;
 	}
+	curl_request->in_progress = false;
 	curl_request->code = CURLE_OK;
 	fiber_cond_create(&curl_request->cond);
 	return 0;
@@ -288,13 +297,18 @@ curl_execute(struct curl_request *curl_request, struct curl_env *env,
 	     double timeout)
 {
 	CURLMcode mcode;
-
+	curl_request->in_progress = true;
 	mcode = curl_multi_add_handle(env->multi, curl_request->easy);
 	if (mcode != CURLM_OK)
 		goto curl_merror;
-
-	/* Don't wait on a cond if request has already failed */
-	if (curl_request->code == CURLE_OK) {
+#ifndef NDEBUG
+	struct errinj *errinj = errinj(ERRINJ_HTTP_RESPONSE_ADD_WAIT,
+				       ERRINJ_BOOL);
+	while (errinj != NULL && errinj->bparam)
+		fiber_sleep(0.001);
+#endif
+	/* Don't wait on a cond if request has already failed or finished. */
+	if (curl_request->code == CURLE_OK && curl_request->in_progress) {
 		++env->stat.active_requests;
 		int rc = fiber_cond_wait_timeout(&curl_request->cond, timeout);
 		if (rc < 0 || fiber_is_cancelled())

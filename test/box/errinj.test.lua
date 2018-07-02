@@ -194,7 +194,6 @@ _ = space:insert{1, require'digest'.urandom(192 * 1024)}
 errinj.set("ERRINJ_WAL_WRITE_DISK", false)
 
 _ = space:insert{1}
-
 errinj.set("ERRINJ_WAL_WRITE", true)
 box.snapshot()
 errinj.set("ERRINJ_WAL_WRITE", false)
@@ -491,3 +490,63 @@ box.space.test:drop()
 test_run:cmd("switch default")
 test_run:cmd("stop server test")
 test_run:cmd("cleanup server test")
+
+--
+-- gh-3406: check that incomplete files got cleaned up after restart.
+--
+fio = require('fio')
+fiber = require('fiber')
+
+-- Check that snap.inprogress files are removed.
+_ = box.schema.space.create('test')
+_ = box.space.test:create_index('primary')
+for i = 1, 10 do box.space.test:insert{i} end
+
+errinj.set('ERRINJ_SNAP_WRITE_ROW_TIMEOUT', 9000)
+_ = fiber.create(function() box.snapshot() end)
+path = fio.pathjoin(box.cfg.memtx_dir, '*.snap.inprogress')
+while #fio.glob(path) == 0 do fiber.sleep(0.001) end
+#fio.glob(path) > 0
+
+test_run:cmd('restart server default')
+
+fio = require('fio')
+fiber = require('fiber')
+errinj = box.error.injection
+
+#fio.glob(fio.pathjoin(box.cfg.memtx_dir, "*.snap.inprogress")) == 0
+box.space.test:drop()
+
+-- Check that run.inprogress, index.inprogress, and vylog.inprogress
+-- files are removed.
+_ = box.schema.space.create('test', {engine = 'vinyl'})
+_ = box.space.test:create_index('primary')
+
+errinj.set('ERRINJ_VY_LOG_FILE_RENAME', true)
+box.snapshot()
+errinj.set('ERRINJ_VY_LOG_FILE_RENAME', false)
+
+for i = 1, 10 do box.space.test:insert{i} end
+
+errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.001)
+errinj.set('ERRINJ_VY_RUN_FILE_RENAME', true)
+box.snapshot() -- error
+errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', true)
+errinj.set('ERRINJ_VY_RUN_FILE_RENAME', false)
+fiber.sleep(0.01)
+box.snapshot() -- error
+errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', false)
+errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
+
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog.inprogress')) > 0
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.run.inprogress')) > 0
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.index.inprogress')) > 0
+
+test_run:cmd('restart server default')
+
+fio = require('fio')
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog.inprogress')) == 0
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.run.inprogress')) == 0
+#fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.index.inprogress')) == 0
+
+box.space.test:drop()

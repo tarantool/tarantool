@@ -70,6 +70,11 @@ enum xdir_type {
 enum log_suffix { NONE, INPROGRESS };
 
 /**
+ * Suffix added to path of inprogress files.
+ */
+#define inprogress_suffix ".inprogress"
+
+/**
  * A handle for a data directory with write ahead logs, snapshots,
  * vylogs.
  * Can be used to find the last log in the directory, scan
@@ -179,6 +184,12 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
  */
 int
 xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio);
+
+/**
+ * Remove inprogress files in the specified directory.
+ */
+void
+xdir_collect_inprogress(struct xdir *xdir);
 
 /**
  * Return LSN and vclock (unless @vclock is NULL) of the newest

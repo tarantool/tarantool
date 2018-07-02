@@ -210,16 +210,18 @@ done:
 }
 
 int
-http_parse_header_line(struct http_parser *parser, char **bufp,
-		       const char *end_buf)
+http_parse_header_line(struct http_parser *prsr, char **bufp,
+		       const char *end_buf, int max_hname_len)
 {
 	char c, ch;
 	char *p = *bufp;
 	char *header_name_start = p;
-	parser->header_name_idx = 0;
+	prsr->hdr_name_idx = 0;
 
 	enum {
 		sw_start = 0,
+		skip_status_line,
+		skipped_status_line_almost_done,
 		sw_name,
 		sw_space_before_value,
 		sw_value,
@@ -250,19 +252,19 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 		case sw_start:
 			switch (ch) {
 			case CR:
-				parser->header_value_end = p;
+				prsr->hdr_value_end = p;
 				state = sw_header_almost_done;
 				break;
 			case LF:
-				parser->header_value_end = p;
+				prsr->hdr_value_end = p;
 				goto header_done;
 			default:
 				state = sw_name;
 
 				c = lowcase[ch];
 				if (c != 0) {
-					parser->header_name[0] = c;
-					parser->header_name_idx = 1;
+					prsr->hdr_name[0] = c;
+					prsr->hdr_name_idx = 1;
 					break;
 				}
 				if (ch == '\0') {
@@ -271,13 +273,33 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 				break;
 			}
 			break;
+		case skip_status_line:
+			switch (ch) {
+			case LF:
+				goto skipped_status;
+			case CR:
+				state = skipped_status_line_almost_done;
+			default:
+				break;
+			}
+			break;
+		case skipped_status_line_almost_done:
+			switch (ch) {
+			case LF:
+				goto skipped_status;
+			case CR:
+				break;
+			default:
+				return HTTP_PARSE_INVALID;
+			}
 		/* http_header name */
 		case sw_name:
 			c = lowcase[ch];
 			if (c != 0) {
-				parser->header_name[parser->header_name_idx] = c;
-				parser->header_name_idx++;
-				parser->header_name_idx &= (HEADER_LEN - 1);
+				if (prsr->hdr_name_idx < max_hname_len) {
+					prsr->hdr_name[prsr->hdr_name_idx] = c;
+					prsr->hdr_name_idx++;
+				}
 				break;
 			}
 			if (ch == ':') {
@@ -285,27 +307,30 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 				break;
 			}
 			if (ch == CR) {
-				parser->header_value_start = p;
-				parser->header_value_end = p;
+				prsr->hdr_value_start = p;
+				prsr->hdr_value_end = p;
 				state = sw_almost_done;
 				break;
 			}
 			if (ch == LF) {
-				parser->header_value_start = p;
-				parser->header_value_end = p;
+				prsr->hdr_value_start = p;
+				prsr->hdr_value_end = p;
 				goto done;
 			}
 			/* handle "HTTP/1.1 ..." lines */
 			if (ch == '/' && p - header_name_start == 4 &&
 				strncmp(header_name_start, "HTTP", 4) == 0) {
-				int rc = http_parse_status_line(parser,
+				int rc = http_parse_status_line(prsr,
 							&header_name_start,
 							end_buf);
 				if (rc == HTTP_PARSE_INVALID) {
-					parser->http_minor = -1;
-					parser->http_major = -1;
+					prsr->http_minor = -1;
+					prsr->http_major = -1;
+					state = sw_start;
+				} else {
+					/* Skip it till end of line. */
+					state = skip_status_line;
 				}
-				state = sw_start;
 				break;
 			}
 			if (ch == '\0')
@@ -317,18 +342,18 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 			case ' ':
 				break;
 			case CR:
-				parser->header_value_start = p;
-				parser->header_value_end = p;
+				prsr->hdr_value_start = p;
+				prsr->hdr_value_end = p;
 				state = sw_almost_done;
 				break;
 			case LF:
-				parser->header_value_start = p;
-				parser->header_value_end = p;
+				prsr->hdr_value_start = p;
+				prsr->hdr_value_end = p;
 				goto done;
 			case '\0':
 				return HTTP_PARSE_INVALID;
 			default:
-				parser->header_value_start = p;
+				prsr->hdr_value_start = p;
 				state = sw_value;
 				break;
 			}
@@ -338,15 +363,15 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 		case sw_value:
 			switch (ch) {
 			case ' ':
-				parser->header_value_end = p;
+				prsr->hdr_value_end = p;
 				state = sw_space_after_value;
 				break;
 			case CR:
-				parser->header_value_end = p;
+				prsr->hdr_value_end = p;
 				state = sw_almost_done;
 				break;
 			case LF:
-				parser->header_value_end = p;
+				prsr->hdr_value_end = p;
 				goto done;
 			case '\0':
 				return HTTP_PARSE_INVALID;
@@ -388,6 +413,10 @@ http_parse_header_line(struct http_parser *parser, char **bufp,
 				return HTTP_PARSE_INVALID;
 		}
 	}
+
+skipped_status:
+	*bufp = p + 1;
+	return HTTP_PARSE_CONTINUE;
 
 done:
 	*bufp = p + 1;

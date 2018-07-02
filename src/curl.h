@@ -68,6 +68,8 @@ struct curl_env {
 struct curl_request {
 	/** Internal libcurl status code. */
 	int code;
+	/** States that request is running. */
+	bool in_progress;
 	/** Information associated with a specific easy handle. */
 	CURL *easy;
 	/**

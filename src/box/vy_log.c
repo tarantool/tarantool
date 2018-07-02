@@ -942,7 +942,7 @@ vy_log_end_recovery(void)
 			return -1;
 		}
 	}
-
+	xdir_collect_inprogress(&vy_log.dir);
 	vy_log.recovery = NULL;
 	return 0;
 }
@@ -2320,6 +2320,12 @@ vy_log_create(const struct vclock *vclock, struct vy_recovery *recovery)
 	record.type = VY_LOG_SNAPSHOT;
 	if (vy_log_append_record(&xlog, &record) != 0)
 		goto err_write_xlog;
+
+	ERROR_INJECT(ERRINJ_VY_LOG_FILE_RENAME, {
+		diag_set(ClientError, ER_INJECTION, "vinyl log file rename");
+		xlog_close(&xlog, false);
+		return -1;
+	});
 
 	/* Finalize the new xlog. */
 	if (xlog_flush(&xlog) < 0 ||

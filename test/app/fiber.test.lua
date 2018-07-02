@@ -123,9 +123,9 @@ end;
 test_run:cmd("setopt delimiter ''");
 result
 --
--- 
+--
 --  Test fiber.create()
--- 
+--
 --  This should try to infinitely create fibers,
 --  but hit the fiber stack size limit and fail
 --  with an error.
@@ -139,17 +139,17 @@ result
 --
 -- f = function() fiber.create(f) end
 -- f()
--- 
+--
 -- Test argument passing
--- 
+--
 f = function(a, b) fiber.create(function(arg) result = arg end, a..b) end
 f('hello ', 'world')
 result
 f('bye ', 'world')
 result
--- 
+--
 -- Test that the created fiber is detached
--- 
+--
 local f = fiber.create(function() result = fiber.status() end)
 result
 -- A test case for Bug#933487
@@ -346,7 +346,7 @@ zombie
 f =  fiber.create(function() end)
 id = f:id()
 fiber.sleep(0)
-f:status() 
+f:status()
 id == f:id()
 
 --
@@ -504,5 +504,27 @@ fiber.name(f, long_name)
 fiber.name(f)
 fiber.name(f, long_name, {truncate = true})
 fiber.name(f)
+
+--
+-- gh-3493 fiber.create() does not roll back memtx transaction
+--
+_ = box.schema.space.create('test')
+_ = box.space.test:create_index('pk')
+--
+-- check that derived fiber does not see changes of the transaction
+-- it must be rolled back before call
+--
+l = nil
+test_run:cmd("setopt delimiter ';'")
+box.begin()
+    box.space.test:insert{1}
+    f = fiber.create(function() l = box.space.test:get{1} end)
+box.rollback();
+test_run:cmd("setopt delimiter ''");
+while f:status() ~= 'dead' do fiber.sleep(0.01) end
+l
+f = nil
+l = nil
+box.schema.space.drop('test')
 
 test_run:cmd("clear filter")
