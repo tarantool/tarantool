@@ -522,7 +522,7 @@ memTracePrint(Mem *p)
 		sqlite3VdbeMemPrettyPrint(p, zBuf);
 		printf(" %s", zBuf);
 	}
-	if (p->flags & MEM_Subtype) printf(" subtype=0x%02x", p->eSubtype);
+	if (p->flags & MEM_Subtype) printf(" subtype=0x%02x", p->subtype);
 }
 static void
 registerTrace(int iReg, Mem *p) {
@@ -1250,7 +1250,7 @@ case OP_Blob: {                /* out2 */
 	sqlite3VdbeMemSetStr(pOut, pOp->p4.z, pOp->p1, 0, 0);
 	if (pOp->p3!=0) {
 		pOut->flags |= MEM_Subtype;
-		pOut->eSubtype = pOp->p3;
+		pOut->subtype = pOp->p3;
 	}
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;
@@ -2661,7 +2661,7 @@ case OP_Column: {
 		pDest->n = aOffset[p2+1]-aOffset[p2];
 		pDest->z = (char *)zData+aOffset[p2];
 		pDest->flags = MEM_Blob|MEM_Ephem|MEM_Subtype;
-		pDest->eSubtype = MSGPACK_SUBTYPE;
+		pDest->subtype = SQL_SUBTYPE_MSGPACK;
 	}
 	/*
 	 * Add 0 termination (at most for strings)

@@ -3707,7 +3707,7 @@ sqlite3VdbeMsgpackRecordPut(u8 * pBuf, Mem * pRec, u32 n)
 		} else {
 			/* Emit BIN header iff the BLOB doesn't store MsgPack content */
 			if ((pRec->flags & MEM_Subtype) == 0
-			    || pRec->eSubtype != MSGPACK_SUBTYPE) {
+			    || pRec->subtype != SQL_SUBTYPE_MSGPACK) {
 				zNewRecord =
 				    mp_encode_binl(zNewRecord,
 						   pRec->n +

@@ -482,6 +482,15 @@ sqlite3_value_double(sqlite3_value *);
 int
 sqlite3_value_int(sqlite3_value *);
 
+/**
+ * Get row column subtype.
+ * @param stmt row data to process.
+ * @param i column index.
+ * @retval SQL subtype if any, 0 else.
+ */
+enum sql_subtype
+sql_column_subtype(struct sqlite3_stmt *stmt, int i);
+
 sqlite3_int64
 sqlite3_value_int64(sqlite3_value *);
 
@@ -670,6 +679,15 @@ enum sql_type {
 	SQLITE_TEXT = 3,
 	SQLITE_BLOB = 4,
 	SQLITE_NULL = 5,
+};
+
+/**
+ * Subtype of a main type. Allows to do some subtype specific
+ * things: serialization, unpacking etc.
+ */
+enum sql_subtype {
+	SQL_SUBTYPE_NO = 0,
+	SQL_SUBTYPE_MSGPACK = 77,
 };
 
 /**

@@ -1,5 +1,6 @@
 #include "sql.h"
 #include "box/sql.h"
+#include "lua/msgpack.h"
 
 #include "box/sql/sqliteInt.h"
 #include "box/info.h"
@@ -44,8 +45,13 @@ lua_push_row(struct lua_State *L, struct sqlite3_stmt *stmt)
 		}
 		case SQLITE_BLOB: {
 			const void *blob = sqlite3_column_blob(stmt, i);
-			lua_pushlstring(L, blob,
+			if (sql_column_subtype(stmt,i) == SQL_SUBTYPE_MSGPACK) {
+				luamp_decode(L, luaL_msgpack_default,
+					     (const char **)&blob);
+			} else {
+				lua_pushlstring(L, blob,
 					sqlite3_column_bytes(stmt, i));
+			}
 			break;
 		}
 		case SQLITE_NULL:

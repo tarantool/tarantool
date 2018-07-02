@@ -258,7 +258,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		sqlite3VdbeAddOp2(v, OP_Integer, trigger->space_id,
 				  first_col + 1);
 		sqlite3VdbeAddOp4(v, OP_Blob, opts_buff_sz, first_col + 2,
-				  MSGPACK_SUBTYPE, opts_buff, P4_DYNAMIC);
+				  SQL_SUBTYPE_MSGPACK, opts_buff, P4_DYNAMIC);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, cursor, record);
 		/*

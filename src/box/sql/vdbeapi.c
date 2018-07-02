@@ -221,11 +221,10 @@ sqlite3_value_int64(sqlite3_value * pVal)
 	return sqlite3VdbeIntValue((Mem *) pVal);
 }
 
-unsigned int
+enum sql_subtype
 sqlite3_value_subtype(sqlite3_value * pVal)
 {
-	Mem *pMem = (Mem *) pVal;
-	return ((pMem->flags & MEM_Subtype) ? pMem->eSubtype : 0);
+	return (pVal->flags & MEM_Subtype) != 0 ? pVal->subtype : SQL_SUBTYPE_NO;
 }
 
 const unsigned char *
@@ -409,14 +408,6 @@ void
 sqlite3_result_null(sqlite3_context * pCtx)
 {
 	sqlite3VdbeMemSetNull(pCtx->pOut);
-}
-
-void
-sqlite3_result_subtype(sqlite3_context * pCtx, unsigned int eSubtype)
-{
-	Mem *pOut = pCtx->pOut;
-	pOut->eSubtype = eSubtype & 0xff;
-	pOut->flags |= MEM_Subtype;
 }
 
 void
@@ -1045,6 +1036,12 @@ sqlite3_column_type(sqlite3_stmt * pStmt, int i)
 	int iType = sqlite3_value_type(columnMem(pStmt, i));
 	columnMallocFailure(pStmt);
 	return iType;
+}
+
+enum sql_subtype
+sql_column_subtype(struct sqlite3_stmt *stmt, int i)
+{
+	return sqlite3_value_subtype(columnMem(stmt, i));
 }
 
 /*

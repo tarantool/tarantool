@@ -1489,11 +1489,11 @@ createIndex(Parse * pParse, Index * pIndex, int iSpaceId, int iIndexId,
 			  P4_DYNAMIC);
 	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 3, 0, "tree",
 			  P4_STATIC);
-	sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 4, MSGPACK_SUBTYPE,
-			  zOpts, P4_DYNAMIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 4,
+			  SQL_SUBTYPE_MSGPACK, zOpts, P4_DYNAMIC);
 	/* zOpts and zParts are co-located, hence STATIC */
-	sqlite3VdbeAddOp4(v, OP_Blob, zPartsSz, iFirstCol + 5, MSGPACK_SUBTYPE,
-			  zParts, P4_STATIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, zPartsSz, iFirstCol + 5,
+			  SQL_SUBTYPE_MSGPACK,zParts, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 6, iRecord);
 	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_INDEX_ID, iRecord);
 	/* Do not account nested operations: the count of such
@@ -1594,11 +1594,11 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 			  P4_DYNAMIC);
 	sqlite3VdbeAddOp2(v, OP_Integer, p->def->field_count,
 			  iFirstCol + 4 /* field_count */ );
-	sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 5, MSGPACK_SUBTYPE,
-			  zOpts, P4_DYNAMIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 5,
+			  SQL_SUBTYPE_MSGPACK, zOpts, P4_DYNAMIC);
 	/* zOpts and zFormat are co-located, hence STATIC */
-	sqlite3VdbeAddOp4(v, OP_Blob, zFormatSz, iFirstCol + 6, MSGPACK_SUBTYPE,
-			  zFormat, P4_STATIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, zFormatSz, iFirstCol + 6,
+			  SQL_SUBTYPE_MSGPACK, zFormat, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
 	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SPACE_ID, iRecord);
 	/* Do not account nested operations: the count of such
