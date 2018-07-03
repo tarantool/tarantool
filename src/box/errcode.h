@@ -206,6 +206,7 @@ struct errcode_record {
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
 	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of the space '%s' can not contain nullable parts") \
 	/*153 */_(ER_NULLABLE_MISMATCH,		"Field %d is %s in space format, but %s in index parts") \
+	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

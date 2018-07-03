@@ -114,10 +114,15 @@ struct txn {
 	 * (statement end causes an automatic transaction commit).
 	 */
 	bool is_autocommit;
+	/**
+	 * True if the transaction was aborted so should be
+	 * rolled back at commit.
+	 */
+	bool is_aborted;
 	/** True if on_commit and on_rollback lists are non-empty. */
 	bool has_triggers;
 	/** The number of active nested statement-level transactions. */
-	int in_sub_stmt;
+	int8_t in_sub_stmt;
 	/**
 	 * First statement at each statement-level.
 	 * Needed to rollback sub statements.
@@ -130,10 +135,15 @@ struct txn {
 	/** Engine-specific transaction data */
 	void *engine_tx;
 	/**
-	 * Triggers on fiber yield and stop to abort transaction
+	 * Triggers on fiber yield to abort transaction for
 	 * for in-memory engine.
 	 */
-	struct trigger fiber_on_yield, fiber_on_stop;
+	struct trigger fiber_on_yield;
+	/**
+	 * Trigger on fiber stop, to rollback transaction
+	 * in case a fiber stops (all engines).
+	 */
+	struct trigger fiber_on_stop;
 	 /** Commit and rollback triggers */
 	struct rlist on_commit, on_rollback;
 };
@@ -165,6 +175,17 @@ txn_commit(struct txn *txn);
 /** Rollback a transaction, if any. */
 void
 txn_rollback();
+
+/**
+ * Roll back the transaction but keep the object around.
+ * A special case for memtx transaction abort on yield. In this
+ * case we need to abort the transaction to avoid dirty reads but
+ * need to keep it around to ensure a new one is not implicitly
+ * started and committed by the user program. Later, at
+ * transaction commit we will raise an exception.
+ */
+void
+txn_abort(struct txn *txn);
 
 /**
  * Most txns don't have triggers, and txn objects
@@ -277,6 +298,13 @@ txn_last_stmt(struct txn *txn)
 {
 	return stailq_last_entry(&txn->stmts, struct txn_stmt, next);
 }
+
+/**
+ * Fiber-stop trigger: roll back the transaction.
+ */
+void
+txn_on_stop(struct trigger *trigger, void *event);
+
 
 /**
  * FFI bindings: do not throw exceptions, do not accept extra

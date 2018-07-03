@@ -131,6 +131,7 @@ txn_begin(bool is_autocommit)
 	txn->n_rows = 0;
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
+	txn->is_aborted = false;
 	txn->in_sub_stmt = 0;
 	txn->id = ++txn_id;
 	txn->signature = -1;
@@ -356,6 +357,13 @@ txn_rollback()
 	fiber_set_txn(fiber(), NULL);
 }
 
+void
+txn_abort(struct txn *txn)
+{
+	txn_rollback_to_svp(txn, NULL);
+	txn->is_aborted = true;
+}
+
 int
 txn_check_singlestatement(struct txn *txn, const char *where)
 {
@@ -485,3 +493,12 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 	txn_rollback_to_svp(txn, svp->stmt);
 	return 0;
 }
+
+void
+txn_on_stop(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	(void) event;
+	txn_rollback();                 /* doesn't yield or fail */
+}
+

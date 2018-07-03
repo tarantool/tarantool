@@ -400,6 +400,7 @@ t;
   - 'box.error.FORMAT_MISMATCH_INDEX_PART : 27'
   - 'box.error.FUNCTION_TX_ACTIVE : 30'
   - 'box.error.injection : table: <address>
+  - 'box.error.TRANSACTION_YIELD : 154'
   - 'box.error.NO_SUCH_ENGINE : 57'
   - 'box.error.COMMIT_IN_SUB_STMT : 122'
   - 'box.error.NULLABLE_MISMATCH : 153'
