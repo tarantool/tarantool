@@ -69,7 +69,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /** @cond false **/
-struct bitset_expr_conj {
+struct tt_bitset_expr_conj {
 	size_t size;
 	size_t capacity;
 	size_t *bitset_ids;
@@ -80,14 +80,14 @@ struct bitset_expr_conj {
 /**
  * @brief Bitset Expression
  */
-struct bitset_expr {
+struct tt_bitset_expr {
 	/** @cond false **/
 	/** Size of \a conjs array **/
 	size_t size;
 	/** Capacity of \a conjs array **/
 	size_t capacity;
 	/** Array of conjunctions **/
-	struct bitset_expr_conj *conjs;
+	struct tt_bitset_expr_conj *conjs;
 	/** Memory allocator **/
 	void *(*realloc)(void *ptr, size_t size);
 	/** @endcond **/
@@ -99,15 +99,15 @@ struct bitset_expr {
  * @param realloc memory allocator to use
  */
 void
-bitset_expr_create(struct bitset_expr *expr,
-		   void *(*realloc)(void *ptr, size_t size));
+tt_bitset_expr_create(struct tt_bitset_expr *expr,
+		      void *(*realloc)(void *ptr, size_t size));
 
 /**
  * @brief Destruct bitset expression \a expr
  * @param expr bitset expression
  */
 void
-bitset_expr_destroy(struct bitset_expr *expr);
+tt_bitset_expr_destroy(struct tt_bitset_expr *expr);
 
 /**
  * @brief Clear @a expr (remove all conjunctions from it)
@@ -117,7 +117,7 @@ bitset_expr_destroy(struct bitset_expr *expr);
  * the object completely.
  */
 void
-bitset_expr_clear(struct bitset_expr *expr);
+tt_bitset_expr_clear(struct tt_bitset_expr *expr);
 
 /**
  * @brief Add a new conjunction to \a expr.
@@ -126,7 +126,7 @@ bitset_expr_clear(struct bitset_expr *expr);
  * @retval -1 on memory error
  */
 int
-bitset_expr_add_conj(struct bitset_expr *expr);
+tt_bitset_expr_add_conj(struct tt_bitset_expr *expr);
 
 /**
  * @brief Add a new placeholder for a bitset to the current conjunction.
@@ -138,7 +138,8 @@ bitset_expr_add_conj(struct bitset_expr *expr);
  * @retval -1 on memory error
  */
 int
-bitset_expr_add_param(struct bitset_expr *expr, size_t bitset_id, bool pre_not);
+tt_bitset_expr_add_param(struct tt_bitset_expr *expr, size_t bitset_id,
+			 bool pre_not);
 
 #if defined(__cplusplus)
 } /* extern "C" */

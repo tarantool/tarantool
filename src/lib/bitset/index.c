@@ -39,8 +39,8 @@
 const size_t INDEX_DEFAULT_CAPACITY = 32;
 
 void
-bitset_index_create(struct bitset_index *index,
-		    void *(*realloc)(void *ptr, size_t size))
+tt_bitset_index_create(struct tt_bitset_index *index,
+		       void *(*realloc)(void *ptr, size_t size))
 {
 	assert(index != NULL);
 	memset(index, 0, sizeof(*index));
@@ -48,7 +48,7 @@ bitset_index_create(struct bitset_index *index,
 }
 
 void
-bitset_index_destroy(struct bitset_index *index)
+tt_bitset_index_destroy(struct tt_bitset_index *index)
 {
 	assert(index != NULL);
 
@@ -56,7 +56,7 @@ bitset_index_destroy(struct bitset_index *index)
 		if (index->bitsets[b] == NULL)
 			break;
 
-		bitset_destroy(index->bitsets[b]);
+		tt_bitset_destroy(index->bitsets[b]);
 		index->realloc(index->bitsets[b], 0);
 		index->bitsets[b] = NULL;
 	}
@@ -69,7 +69,7 @@ bitset_index_destroy(struct bitset_index *index)
 }
 
 static int
-bitset_index_reserve(struct bitset_index *index, size_t size)
+tt_bitset_index_reserve(struct tt_bitset_index *index, size_t size)
 {
 	if (size <= index->capacity)
 		return 0;
@@ -82,7 +82,7 @@ bitset_index_reserve(struct bitset_index *index, size_t size)
 		capacity *= 2;
 	}
 
-	struct bitset **bitsets = index->realloc(index->bitsets,
+	struct tt_bitset **bitsets = index->realloc(index->bitsets,
 					capacity * sizeof(*index->bitsets));
 	if (bitsets == NULL)
 		goto error_1;
@@ -108,7 +108,7 @@ bitset_index_reserve(struct bitset_index *index, size_t size)
 		if (index->bitsets[b] == NULL)
 			goto error_2;
 
-		bitset_create(index->bitsets[b], index->realloc);
+		tt_bitset_create(index->bitsets[b], index->realloc);
 	}
 
 	index->capacity = capacity;
@@ -120,7 +120,7 @@ error_2:
 		if (index->bitsets[b] == NULL)
 			break;
 
-		bitset_destroy(index->bitsets[b]);
+		tt_bitset_destroy(index->bitsets[b]);
 		index->realloc(index->bitsets[b], 0);
 		index->bitsets[b] = NULL;
 	}
@@ -129,8 +129,8 @@ error_1:
 }
 
 int
-bitset_index_insert(struct bitset_index *index, const void *key,
-		    size_t key_size, size_t value)
+tt_bitset_index_insert(struct tt_bitset_index *index, const void *key,
+		       size_t key_size, size_t value)
 {
 	assert(index != NULL);
 	assert(key != NULL);
@@ -138,20 +138,20 @@ bitset_index_insert(struct bitset_index *index, const void *key,
 	/*
 	 * Step 0: allocate enough number of bitsets
 	 *
-	 * bitset_index_reserve could fail on realloc and return -1.
+	 * tt_bitset_index_reserve could fail on realloc and return -1.
 	 * Do not change anything and return the error to the caller.
 	 */
 	const size_t size = 1 + key_size * CHAR_BIT;
-	if (bitset_index_reserve(index, size) != 0)
+	if (tt_bitset_index_reserve(index, size) != 0)
 		return -1;
 
 	/*
 	 * Step 1: set the 'flag' bitset
 	 *
-	 * bitset_set for 'falg' bitset could fail on realloc.
+	 * tt_bitset_set for 'falg' bitset could fail on realloc.
 	 * Do not change anything. Do not shrink buffers allocated on step 1.
 	 */
-	int rc = bitset_set(index->bitsets[0], value);
+	int rc = tt_bitset_set(index->bitsets[0], value);
 	if (rc < 0)
 		return -1;
 
@@ -167,7 +167,7 @@ bitset_index_insert(struct bitset_index *index, const void *key,
 	 * A bitset_set somewhere in the middle also could fail on realloc.
 	 * If this happens, we stop processing and jump to the rollback code.
 	 * Rollback uses index->rollback_buf buffer to restore previous values
-	 * of all bitsets on given position. Remember, that bitset_set
+	 * of all bitsets on given position. Remember, that tt_bitset_set
 	 * returns 1 if a previous value was 'true' and 0 if it was 'false'.
 	 * The buffer is indexed by bytes (char *) instead of bits (bit_set)
 	 * because it is a little bit faster here.
@@ -177,7 +177,7 @@ bitset_index_insert(struct bitset_index *index, const void *key,
 	size_t pos = 0;
 	while ((pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
 		size_t b = pos + 1;
-		rc = bitset_set(index->bitsets[b], value);
+		rc = tt_bitset_set(index->bitsets[b], value);
 		if (rc < 0)
 			goto rollback;
 
@@ -196,9 +196,9 @@ rollback:
 		size_t b = rpos + 1;
 
 		if (index->rollback_buf[b] == 1) {
-			bitset_set(index->bitsets[b], value);
+			tt_bitset_set(index->bitsets[b], value);
 		} else {
-			bitset_clear(index->bitsets[b], value);
+			tt_bitset_clear(index->bitsets[b], value);
 		}
 	}
 
@@ -206,16 +206,16 @@ rollback:
 	 * Rollback changes done by Step 1.
 	 */
 	if (index->rollback_buf[0] == 1) {
-		bitset_set(index->bitsets[0], value);
+		tt_bitset_set(index->bitsets[0], value);
 	} else {
-		bitset_clear(index->bitsets[0], value);
+		tt_bitset_clear(index->bitsets[0], value);
 	}
 
 	return -1;
 }
 
 void
-bitset_index_remove_value(struct bitset_index *index, size_t value)
+tt_bitset_index_remove_value(struct tt_bitset_index *index, size_t value)
 {
 	assert(index != NULL);
 
@@ -227,51 +227,51 @@ bitset_index_remove_value(struct bitset_index *index, size_t value)
 			continue;
 
 		/* Ignore all errors here */
-		bitset_clear(index->bitsets[b], value);
+		tt_bitset_clear(index->bitsets[b], value);
 	}
-	bitset_clear(index->bitsets[0], value);
+	tt_bitset_clear(index->bitsets[0], value);
 }
 
 bool
-bitset_index_contains_value(struct bitset_index *index, size_t value)
+tt_bitset_index_contains_value(struct tt_bitset_index *index, size_t value)
 {
 	assert(index != NULL);
 
-	return bitset_test(index->bitsets[0], value);
+	return tt_bitset_test(index->bitsets[0], value);
 }
 
 int
-bitset_index_expr_all(struct bitset_expr *expr)
+tt_bitset_index_expr_all(struct tt_bitset_expr *expr)
 {
 	(void) index;
 
-	bitset_expr_clear(expr);
-	if (bitset_expr_add_conj(expr) != 0)
+	tt_bitset_expr_clear(expr);
+	if (tt_bitset_expr_add_conj(expr) != 0)
 		return -1;
 
-	if (bitset_expr_add_param(expr, 0, false) != 0)
+	if (tt_bitset_expr_add_param(expr, 0, false) != 0)
 		return -1;
 
 	return 0;
 }
 
 int
-bitset_index_expr_equals(struct bitset_expr *expr, const void *key,
-			 size_t key_size)
+tt_bitset_index_expr_equals(struct tt_bitset_expr *expr, const void *key,
+			    size_t key_size)
 {
-	bitset_expr_clear(expr);
+	tt_bitset_expr_clear(expr);
 
-	if (bitset_expr_add_conj(expr) != 0)
+	if (tt_bitset_expr_add_conj(expr) != 0)
 		return -1;
 
 	for (size_t pos = 0; pos < key_size * CHAR_BIT; pos++) {
 		size_t b = pos + 1;
 		bool bit_exist = bit_test(key, pos);
-		if (bitset_expr_add_param(expr, b, !bit_exist) != 0)
+		if (tt_bitset_expr_add_param(expr, b, !bit_exist) != 0)
 			return -1;
 	}
 
-	if (bitset_expr_add_param(expr, 0, false) != 0) {
+	if (tt_bitset_expr_add_param(expr, 0, false) != 0) {
 		return -1;
 	}
 
@@ -279,12 +279,12 @@ bitset_index_expr_equals(struct bitset_expr *expr, const void *key,
 }
 
 int
-bitset_index_expr_all_set(struct bitset_expr *expr, const void *key,
-			  size_t key_size)
+tt_bitset_index_expr_all_set(struct tt_bitset_expr *expr, const void *key,
+			     size_t key_size)
 {
-	bitset_expr_clear(expr);
+	tt_bitset_expr_clear(expr);
 
-	if (bitset_expr_add_conj(expr) != 0)
+	if (tt_bitset_expr_add_conj(expr) != 0)
 		return -1;
 
 	if (key_size == 0)
@@ -295,7 +295,7 @@ bitset_index_expr_all_set(struct bitset_expr *expr, const void *key,
 	size_t pos;
 	while ( (pos = bit_iterator_next(&bit_it)) != SIZE_MAX ) {
 		size_t b = pos + 1;
-		if (bitset_expr_add_param(expr, b, false) != 0)
+		if (tt_bitset_expr_add_param(expr, b, false) != 0)
 			return -1;
 	}
 
@@ -303,10 +303,10 @@ bitset_index_expr_all_set(struct bitset_expr *expr, const void *key,
 }
 
 int
-bitset_index_expr_any_set(struct bitset_expr *expr, const void *key,
-			  size_t key_size)
+tt_bitset_index_expr_any_set(struct tt_bitset_expr *expr, const void *key,
+			     size_t key_size)
 {
-	bitset_expr_clear(expr);
+	tt_bitset_expr_clear(expr);
 
 	if (key_size == 0)
 		return 0; /* optimization for empty key */
@@ -316,9 +316,9 @@ bitset_index_expr_any_set(struct bitset_expr *expr, const void *key,
 	size_t pos;
 	while ( (pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
 		size_t b = pos + 1;
-		if (bitset_expr_add_conj(expr) != 0)
+		if (tt_bitset_expr_add_conj(expr) != 0)
 			return -1;
-		if (bitset_expr_add_param(expr, b, false) != 0)
+		if (tt_bitset_expr_add_param(expr, b, false) != 0)
 			return -1;
 	}
 
@@ -326,14 +326,14 @@ bitset_index_expr_any_set(struct bitset_expr *expr, const void *key,
 }
 
 int
-bitset_index_expr_all_not_set(struct bitset_expr *expr, const void *key,
-			      size_t key_size) {
-	bitset_expr_clear(expr);
+tt_bitset_index_expr_all_not_set(struct tt_bitset_expr *expr, const void *key,
+				 size_t key_size) {
+	tt_bitset_expr_clear(expr);
 
-	if (bitset_expr_add_conj(expr) != 0)
+	if (tt_bitset_expr_add_conj(expr) != 0)
 		return -1;
 
-	if (bitset_expr_add_param(expr, 0, false) != 0)
+	if (tt_bitset_expr_add_param(expr, 0, false) != 0)
 		return -1;
 
 	if (key_size == 0)
@@ -344,7 +344,7 @@ bitset_index_expr_all_not_set(struct bitset_expr *expr, const void *key,
 	size_t pos;
 	while ( (pos = bit_iterator_next(&bit_it)) != SIZE_MAX) {
 		size_t b = pos + 1;
-		if (bitset_expr_add_param(expr, b, true) != 0)
+		if (tt_bitset_expr_add_param(expr, b, true) != 0)
 			return -1;
 	}
 
@@ -352,8 +352,9 @@ bitset_index_expr_all_not_set(struct bitset_expr *expr, const void *key,
 }
 
 int
-bitset_index_init_iterator(struct bitset_index *index,
-			   struct bitset_iterator *it, struct bitset_expr *expr)
+tt_bitset_index_init_iterator(struct tt_bitset_index *index,
+			      struct tt_bitset_iterator *it,
+			      struct tt_bitset_expr *expr)
 {
 	assert(index != NULL);
 	assert(it != NULL);
@@ -369,28 +370,29 @@ bitset_index_init_iterator(struct bitset_index *index,
 	}
 
 	/* Resize the index with empty bitsets */
-	if (bitset_index_reserve(index, max + 1) != 0)
+	if (tt_bitset_index_reserve(index, max + 1) != 0)
 		return -1;
 
-	return bitset_iterator_init(it, expr, index->bitsets, index->capacity);
+	return tt_bitset_iterator_init(it, expr, index->bitsets,
+				       index->capacity);
 }
 
 size_t
-bitset_index_bsize(const struct bitset_index *index)
+tt_bitset_index_bsize(const struct tt_bitset_index *index)
 {
 	size_t result = 0;
 	for (size_t b = 0; b < index->capacity; b++) {
 		if (index->bitsets[b] == NULL)
 			continue;
-		struct bitset_info info;
-		bitset_info(index->bitsets[b], &info);
+		struct tt_bitset_info info;
+		tt_bitset_info(index->bitsets[b], &info);
 		result += info.page_total_size * info.pages;
 	}
 	return result;
 }
 
 extern inline size_t
-bitset_index_size(const struct bitset_index *index);
+tt_bitset_index_size(const struct tt_bitset_index *index);
 
 extern inline size_t
-bitset_index_count(const struct bitset_index *index, size_t bit);
+tt_bitset_index_count(const struct tt_bitset_index *index, size_t bit);

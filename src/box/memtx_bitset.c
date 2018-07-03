@@ -154,7 +154,7 @@ value_to_tuple(size_t value)
 
 struct bitset_index_iterator {
 	struct iterator base; /* Must be the first member. */
-	struct bitset_iterator bitset_it;
+	struct tt_bitset_iterator bitset_it;
 #ifndef OLD_GOOD_BITSET
 	struct memtx_bitset_index *bitset_index;
 #endif /* #ifndef OLD_GOOD_BITSET */
@@ -174,7 +174,7 @@ bitset_index_iterator_free(struct iterator *iterator)
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
-	bitset_iterator_destroy(&it->bitset_it);
+	tt_bitset_iterator_destroy(&it->bitset_it);
 	mempool_free(it->pool, it);
 }
 
@@ -184,7 +184,7 @@ bitset_index_iterator_next(struct iterator *iterator, struct tuple **ret)
 	assert(iterator->free == bitset_index_iterator_free);
 	struct bitset_index_iterator *it = bitset_index_iterator(iterator);
 
-	size_t value = bitset_iterator_next(&it->bitset_it);
+	size_t value = tt_bitset_iterator_next(&it->bitset_it);
 	if (value == SIZE_MAX) {
 		*ret = NULL;
 		return 0;
@@ -202,7 +202,7 @@ static void
 memtx_bitset_index_destroy(struct index *base)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
-	bitset_index_destroy(&index->index);
+	tt_bitset_index_destroy(&index->index);
 #ifndef OLD_GOOD_BITSET
 	mh_bitset_index_delete(index->tuple_to_id);
 	matras_destroy(index->id_to_tuple);
@@ -215,7 +215,7 @@ static ssize_t
 memtx_bitset_index_size(struct index *base)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
-	return bitset_index_size(&index->index);
+	return tt_bitset_index_size(&index->index);
 }
 
 static ssize_t
@@ -223,7 +223,7 @@ memtx_bitset_index_bsize(struct index *base)
 {
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 	size_t result = 0;
-	result += bitset_index_bsize(&index->index);
+	result += tt_bitset_index_bsize(&index->index);
 #ifndef OLD_GOOD_BITSET
 	result += matras_extent_count(index->id_to_tuple) * MEMTX_EXTENT_SIZE;
 	result += mh_bitset_index_memsize(index->tuple_to_id);
@@ -270,11 +270,12 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 #else /* #ifndef OLD_GOOD_BITSET */
 		size_t value = tuple_to_value(old_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		if (bitset_index_contains_value(&index->index, (size_t)value)) {
+		if (tt_bitset_index_contains_value(&index->index,
+						   (size_t) value)) {
 			*result = old_tuple;
 
 			assert(old_tuple != new_tuple);
-			bitset_index_remove_value(&index->index, value);
+			tt_bitset_index_remove_value(&index->index, value);
 #ifndef OLD_GOOD_BITSET
 			memtx_bitset_index_unregister_tuple(index, old_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
@@ -293,7 +294,8 @@ memtx_bitset_index_replace(struct index *base, struct tuple *old_tuple,
 #else /* #ifndef OLD_GOOD_BITSET */
 		uint32_t value = tuple_to_value(new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
-		if (bitset_index_insert(&index->index, key, key_len, value) < 0) {
+		if (tt_bitset_index_insert(&index->index, key, key_len,
+					   value) < 0) {
 #ifndef OLD_GOOD_BITSET
 			memtx_bitset_index_unregister_tuple(index, new_tuple);
 #endif /* #ifndef OLD_GOOD_BITSET */
@@ -327,7 +329,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	it->base.next = bitset_index_iterator_next;
 	it->base.free = bitset_index_iterator_free;
 
-	bitset_iterator_create(&it->bitset_it, realloc);
+	tt_bitset_iterator_create(&it->bitset_it, realloc);
 #ifndef OLD_GOOD_BITSET
 	it->bitset_index = index;
 #endif
@@ -339,29 +341,29 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 		bitset_key = make_key(key, &bitset_key_size);
 	}
 
-	struct bitset_expr expr;
-	bitset_expr_create(&expr, realloc);
+	struct tt_bitset_expr expr;
+	tt_bitset_expr_create(&expr, realloc);
 
 	int rc = 0;
 	switch (type) {
 	case ITER_ALL:
-		rc = bitset_index_expr_all(&expr);
+		rc = tt_bitset_index_expr_all(&expr);
 		break;
 	case ITER_EQ:
-		rc = bitset_index_expr_equals(&expr, bitset_key,
-					      bitset_key_size);
+		rc = tt_bitset_index_expr_equals(&expr, bitset_key,
+						 bitset_key_size);
 		break;
 	case ITER_BITS_ALL_SET:
-		rc = bitset_index_expr_all_set(&expr, bitset_key,
-					       bitset_key_size);
+		rc = tt_bitset_index_expr_all_set(&expr, bitset_key,
+						  bitset_key_size);
 		break;
 	case ITER_BITS_ALL_NOT_SET:
-		rc = bitset_index_expr_all_not_set(&expr, bitset_key,
-						   bitset_key_size);
+		rc = tt_bitset_index_expr_all_not_set(&expr, bitset_key,
+						      bitset_key_size);
 		break;
 	case ITER_BITS_ANY_SET:
-		rc = bitset_index_expr_any_set(&expr, bitset_key,
-					       bitset_key_size);
+		rc = tt_bitset_index_expr_any_set(&expr, bitset_key,
+						  bitset_key_size);
 		break;
 	default:
 		diag_set(UnsupportedIndexFeature, base->def,
@@ -375,17 +377,17 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 		goto fail;
 	}
 
-	if (bitset_index_init_iterator(&index->index, &it->bitset_it,
-				       &expr) != 0) {
+	if (tt_bitset_index_init_iterator(&index->index, &it->bitset_it,
+					  &expr) != 0) {
 		diag_set(OutOfMemory, 0, "memtx_bitset_index",
 			 "iterator state");
 		goto fail;
 	}
 
-	bitset_expr_destroy(&expr);
+	tt_bitset_expr_destroy(&expr);
 	return (struct iterator *)it;
 fail:
-	bitset_expr_destroy(&expr);
+	tt_bitset_expr_destroy(&expr);
 	mempool_free(&memtx->bitset_iterator_pool, it);
 	return NULL;
 }
@@ -397,7 +399,7 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 	struct memtx_bitset_index *index = (struct memtx_bitset_index *)base;
 
 	if (type == ITER_ALL)
-		return bitset_index_size(&index->index);
+		return tt_bitset_index_size(&index->index);
 
 	assert(part_count == 1); /* checked by key_validate() */
 	uint32_t bitset_key_size = 0;
@@ -417,7 +419,7 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 		 * bitset_index_count().
 		 */
 		if (bit_iterator_next(&bit_it) == SIZE_MAX)
-			return bitset_index_count(&index->index, bit);
+			return tt_bitset_index_count(&index->index, bit);
 	} else if (type == ITER_BITS_ALL_SET) {
 		/**
 		 * Optimization: for an empty key return 0.
@@ -431,7 +433,7 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 		 * bitset_index_count().
 		 */
 		if (bit_iterator_next(&bit_it) == SIZE_MAX)
-			return bitset_index_count(&index->index, bit);
+			return tt_bitset_index_count(&index->index, bit);
 	} else if (type == ITER_BITS_ALL_NOT_SET) {
 		/**
 		 * Optimization: for an empty key return the number of items
@@ -440,14 +442,14 @@ memtx_bitset_index_count(struct index *base, enum iterator_type type,
 		bit_iterator_init(&bit_it, bitset_key, bitset_key_size, true);
 		bit = bit_iterator_next(&bit_it);
 		if (bit == SIZE_MAX)
-			return bitset_index_size(&index->index);
+			return tt_bitset_index_size(&index->index);
 		/**
 		 * Optimiation: for the single bit key use
 		 * bitset_index_count().
 		 */
 		if (bit_iterator_next(&bit_it) == SIZE_MAX)
-			return bitset_index_size(&index->index) -
-				bitset_index_count(&index->index, bit);
+			return tt_bitset_index_size(&index->index) -
+				tt_bitset_index_count(&index->index, bit);
 	}
 
 	/* Call generic method */
@@ -515,6 +517,6 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 		panic("failed to allocate memtx bitset index");
 #endif /* #ifndef OLD_GOOD_BITSET */
 
-	bitset_index_create(&index->index, realloc);
+	tt_bitset_index_create(&index->index, realloc);
 	return index;
 }
