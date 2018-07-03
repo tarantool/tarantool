@@ -655,13 +655,19 @@ local function stdin_isatty()
 end
 
 local function execute_remote(uri, code)
-    local remote = netbox.connect(uri, {
-        console = true, connect_timeout = TIMEOUT_INFINITY
-    })
-    if remote == nil then
-        return nil
-    end
-    return true, remote:eval(code)
+    local status, ret
+    console.on_start(function(self)
+        status, ret = pcall(console.connect, uri,
+                            {connect_timeout = TIMEOUT_INFINITY})
+        if status then
+            status, ret = pcall(self.eval, self, code)
+        end
+        self.running = false
+    end)
+    console.on_client_disconnect(function(self) self.running = false end)
+
+    console.start()
+    return status, ret
 end
 
 local function connect()
