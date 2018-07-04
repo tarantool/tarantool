@@ -2880,7 +2880,6 @@ struct Parse {
 	int rc;			/* Return code from execution */
 	u8 colNamesSet;		/* TRUE after OP_ColumnName has been issued to pVdbe */
 	u8 checkSchema;		/* Causes schema cookie check after an error */
-	u8 nested;		/* Number of nested calls to the parser/code generator */
 	u8 nTempReg;		/* Number of temporary registers in aTempReg[] */
 	u8 isMultiWrite;	/* True if statement may modify/insert multiple rows */
 	u8 mayAbort;		/* True if statement may throw an ABORT exception */
@@ -2974,14 +2973,6 @@ struct Parse {
 		struct sql_trigger *trigger;
 	} parsed_ast;
 };
-
-/*
- * Sizes and pointers of various parts of the Parse object.
- */
-#define PARSE_HDR_SZ offsetof(Parse,aColCache)	/* Recursive part w/o aColCache */
-#define PARSE_RECURSE_SZ offsetof(Parse,sLastToken)	/* Recursive part */
-#define PARSE_TAIL_SZ (sizeof(Parse)-PARSE_RECURSE_SZ)	/* Non-recursive part */
-#define PARSE_TAIL(X) (((char*)(X))+PARSE_RECURSE_SZ)	/* Pointer to tail */
 
 /*
  * Bitfield flags for P5 value in various opcodes.
@@ -4129,9 +4120,12 @@ sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err);
  *
  * @param parser Parser context.
  * @param trigger_name The name of trigger to drop.
+ * @param account_changes Increase number of db changes made since
+ *        last reset.
  */
 void
-vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name);
+vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
+		       bool account_changes);
 
 /**
  * Return a list of all triggers on table pTab if there exists at
@@ -4449,7 +4443,6 @@ void sqlite3AlterRenameTable(Parse *, SrcList *, Token *);
 int
 sql_token(const char *z, int *type, bool *is_reserved);
 
-void sqlite3NestedParse(Parse *, const char *, ...);
 void sqlite3ExpirePreparedStatements(sqlite3 *);
 int sqlite3CodeSubselect(Parse *, Expr *, int);
 void sqlite3SelectPrep(Parse *, Select *, NameContext *);

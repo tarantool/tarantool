@@ -57,8 +57,6 @@
 void
 sql_finish_coding(struct Parse *parse_context)
 {
-	if (parse_context->nested)
-		return;
 	assert(parse_context->pToplevel == NULL);
 	struct sqlite3 *db = parse_context->db;
 	struct Vdbe *v = sqlite3GetVdbe(parse_context);
@@ -114,46 +112,6 @@ sql_finish_coding(struct Parse *parse_context)
 	} else {
 		parse_context->rc = SQLITE_ERROR;
 	}
-}
-
-/*
- * Run the parser and code generator recursively in order to generate
- * code for the SQL statement given onto the end of the pParse context
- * currently under construction.  When the parser is run recursively
- * this way, the final OP_Halt is not appended and other initialization
- * and finalization steps are omitted because those are handling by the
- * outermost parser.
- *
- * Not everything is nestable.  This facility is designed to perform
- * basic DDL operations.  Use care if you decide to try to use this routine
- * for some other purposes.
- */
-void
-sqlite3NestedParse(Parse * pParse, const char *zFormat, ...)
-{
-	va_list ap;
-	char *zSql;
-	char *zErrMsg = 0;
-	sqlite3 *db = pParse->db;
-	char saveBuf[PARSE_TAIL_SZ];
-
-	if (pParse->nErr)
-		return;
-	assert(pParse->nested < 10);	/* Nesting should only be of limited depth */
-	va_start(ap, zFormat);
-	zSql = sqlite3VMPrintf(db, zFormat, ap);
-	va_end(ap);
-	if (zSql == 0) {
-		return;		/* A malloc must have failed */
-	}
-	pParse->nested++;
-	memcpy(saveBuf, PARSE_TAIL(pParse), PARSE_TAIL_SZ);
-	memset(PARSE_TAIL(pParse), 0, PARSE_TAIL_SZ);
-	sqlite3RunParser(pParse, zSql, &zErrMsg);
-	sqlite3DbFree(db, zErrMsg);
-	sqlite3DbFree(db, zSql);
-	memcpy(PARSE_TAIL(pParse), saveBuf, PARSE_TAIL_SZ);
-	pParse->nested--;
 }
 
 /**
@@ -532,17 +490,10 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	Table *pTable;
 	char *zName = 0;	/* The name of the new table */
 	sqlite3 *db = pParse->db;
-	Vdbe *v;
-
-	/* Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary internals,
-	 * such as data layout in system spaces.
-	 */
-	if (!pParse->nested) {
-		if ((v = sqlite3GetVdbe(pParse)) == NULL)
-			goto cleanup;
-		sqlite3VdbeCountChanges(v);
-	}
+	struct Vdbe *v = sqlite3GetVdbe(pParse);
+	if (v == NULL)
+		goto cleanup;
+	sqlite3VdbeCountChanges(v);
 
 	zName = sqlite3NameFromToken(db, pName);
 
@@ -1496,13 +1447,7 @@ createIndex(Parse * pParse, Index * pIndex, int iSpaceId, int iIndexId,
 			  SQL_SUBTYPE_MSGPACK,zParts, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 6, iRecord);
 	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_INDEX_ID, iRecord);
-	/* Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary internals,
-	 * such as data layout in system spaces. Also do not account
-	 * autoindexes - they had been accounted as a part of
-	 * CREATE TABLE already.
-	 */
-	if (!pParse->nested && pIndex->idxType == SQLITE_IDXTYPE_APPDEF)
+	if (pIndex->idxType == SQLITE_IDXTYPE_APPDEF)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 }
 
@@ -1601,12 +1546,7 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 			  SQL_SUBTYPE_MSGPACK, zFormat, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
 	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SPACE_ID, iRecord);
-	/* Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary internals,
-	 * such as data layout in system spaces.
-	 */
-	if (!pParse->nested)
-		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 }
 
 /*
@@ -2144,13 +2084,11 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	 * Do not account triggers deletion - they will be
 	 * accounted in DELETE from _space below.
 	 */
-	parse_context->nested++;
 	struct sql_trigger *trigger = space->sql_triggers;
 	while (trigger != NULL) {
-		vdbe_code_drop_trigger(parse_context, trigger->zName);
+		vdbe_code_drop_trigger(parse_context, trigger->zName, false);
 		trigger = trigger->next;
 	}
-	parse_context->nested--;
 	/*
 	 * Remove any entries of the _sequence and _space_sequence
 	 * space associated with the table being dropped. This is
@@ -2238,13 +2176,7 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	if (v == NULL || db->mallocFailed) {
 		goto exit_drop_table;
 	}
-	/*
-	 * Activate changes counting here to account
-	 * DROP TABLE IF NOT EXISTS, if the table really does not
-	 * exist.
-	 */
-	if (!parse_context->nested)
-		sqlite3VdbeCountChanges(v);
+	sqlite3VdbeCountChanges(v);
 	assert(parse_context->nErr == 0);
 	assert(table_name_list->nSrc == 1);
 	assert(is_view == 0 || is_view == LOCATE_VIEW);
@@ -2705,13 +2637,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	if (db->mallocFailed || parse->nErr > 0) {
 		goto exit_create_index;
 	}
-	/* Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary internals,
-	 * such as data layout in system spaces. Also do not account
-	 * PRIMARY KEY and UNIQUE constraint - they had been accounted
-	 * in CREATE TABLE already.
-	 */
-	if (!parse->nested && idx_type == SQLITE_IDXTYPE_APPDEF) {
+	if (idx_type == SQLITE_IDXTYPE_APPDEF) {
 		Vdbe *v = sqlite3GetVdbe(parse);
 		if (v == NULL)
 			goto exit_create_index;
@@ -3158,13 +3084,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	if (db->mallocFailed) {
 		goto exit_drop_index;
 	}
-	/*
-	 * Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary internals,
-	 * such as data layout in system spaces.
-	 */
-	if (!parse_context->nested)
-		sqlite3VdbeCountChanges(v);
+	sqlite3VdbeCountChanges(v);
 	assert(index_name_list->nSrc == 1);
 	assert(table_token->n > 0);
 	uint32_t space_id = box_space_id_by_name(table_name,

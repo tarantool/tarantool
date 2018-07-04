@@ -75,16 +75,10 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	/* The name of the Trigger. */
 	char *trigger_name = NULL;
 
-	/*
-	 * Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary
-	 * internals, such as data layout in system spaces.
-	 */
-	if (!parse->nested) {
-		struct Vdbe *v = sqlite3GetVdbe(parse);
-		if (v != NULL)
-			sqlite3VdbeCountChanges(v);
-	}
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	if (v != NULL)
+		sqlite3VdbeCountChanges(v);
+
 	/* pName->z might be NULL, but not pName itself. */
 	assert(name != NULL);
 	assert(op == TK_INSERT || op == TK_UPDATE || op == TK_DELETE);
@@ -261,14 +255,8 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 				  SQL_SUBTYPE_MSGPACK, opts_buff, P4_DYNAMIC);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, cursor, record);
-		/*
-		 * Do not account nested operations: the count of
-		 * such operations depends on Tarantool data
-		 * dictionary internals, such as data layout in
-		 * system spaces.
-		 */
-		if (!parse->nested)
-			sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+
+		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 		sqlite3VdbeAddOp1(v, OP_Close, cursor);
 
 		sql_set_multi_write(parse, false);
@@ -440,7 +428,8 @@ sql_trigger_delete(struct sqlite3 *db, struct sql_trigger *trigger)
 }
 
 void
-vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name)
+vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
+		       bool account_changes)
 {
 	sqlite3 *db = parser->db;
 	assert(db->pSchema != NULL);
@@ -459,7 +448,7 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name)
 			  record_to_delete);
 	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_TRIGGER_ID,
 			  record_to_delete);
-	if (parser->nested == 0)
+	if (account_changes)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 	sqlite3ChangeCookie(parser);
 }
@@ -473,17 +462,9 @@ sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
 		goto drop_trigger_cleanup;
 	assert(db->pSchema != NULL);
 
-	/* Do not account nested operations: the count of such
-	 * operations depends on Tarantool data dictionary internals,
-	 * such as data layout in system spaces. Activate the counter
-	 * here to account DROP TRIGGER IF EXISTS case if the trigger
-	 * actually does not exist.
-	 */
-	if (!parser->nested) {
-		Vdbe *v = sqlite3GetVdbe(parser);
-		if (v != NULL)
-			sqlite3VdbeCountChanges(v);
-	}
+	struct Vdbe *v = sqlite3GetVdbe(parser);
+	if (v != NULL)
+		sqlite3VdbeCountChanges(v);
 
 	assert(name->nSrc == 1);
 	const char *trigger_name = name->a[0].zName;
@@ -495,7 +476,7 @@ sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
 					      error_msg, no_err, OP_Found) != 0)
 		goto drop_trigger_cleanup;
 
-	vdbe_code_drop_trigger(parser, trigger_name);
+	vdbe_code_drop_trigger(parser, trigger_name, true);
 
  drop_trigger_cleanup:
 	sqlite3SrcListDelete(db, name);

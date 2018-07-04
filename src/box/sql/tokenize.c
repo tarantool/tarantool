@@ -526,7 +526,7 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		pParse->zErrMsg = 0;
 		nErr++;
 	}
-	if (pParse->pVdbe && pParse->nErr > 0 && pParse->nested == 0) {
+	if (pParse->pVdbe != NULL && pParse->nErr > 0) {
 		sqlite3VdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}

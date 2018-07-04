@@ -413,13 +413,11 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		goto insert_cleanup;
 	}
 
-	/* Allocate a VDBE
-	 */
+	/* Allocate a VDBE. */
 	v = sqlite3GetVdbe(pParse);
-	if (v == 0)
+	if (v == NULL)
 		goto insert_cleanup;
-	if (pParse->nested == 0)
-		sqlite3VdbeCountChanges(v);
+	sqlite3VdbeCountChanges(v);
 	sql_set_multi_write(pParse, pSelect != NULL || trigger != NULL);
 
 #ifndef SQLITE_OMIT_XFER_OPT
@@ -904,13 +902,9 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 
  insert_end:
 
-	/*
-	 * Return the number of rows inserted. If this routine is
-	 * generating code because of a call to sqlite3NestedParse(), do not
-	 * invoke the callback function.
-	 */
-	if ((user_session->sql_flags & SQLITE_CountRows) && !pParse->nested
-	    && !pParse->pTriggerTab) {
+	/* Return the number of rows inserted. */
+	if ((user_session->sql_flags & SQLITE_CountRows) != 0 &&
+	    pParse->pTriggerTab == NULL) {
 		sqlite3VdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
 		sqlite3VdbeSetNumCols(v, 1);
 		sqlite3VdbeSetColName(v, 0, COLNAME_NAME, "rows inserted",

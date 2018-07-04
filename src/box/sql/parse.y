@@ -877,18 +877,10 @@ expr(A) ::= VARIABLE(X).     {
     else
         sqlite3ExprAssignVarNumber(pParse, A.pExpr, n);
   }else{
-    /* When doing a nested parse, one can include terms in an expression
-    ** that look like this:   #1 #2 ...  These terms refer to registers
-    ** in the virtual machine.  #N is the N-th register. */
     assert( t.n>=2 );
     spanSet(&A, &t, &t);
-    if( pParse->nested==0 ){
-      sqlite3ErrorMsg(pParse, "near \"%T\": syntax error", &t);
-      A.pExpr = 0;
-    }else{
-      A.pExpr = sqlite3PExpr(pParse, TK_REGISTER, 0, 0);
-      if( A.pExpr ) sqlite3GetInt32(&t.z[1], &A.pExpr->iTable);
-    }
+    sqlite3ErrorMsg(pParse, "near \"%T\": syntax error", &t);
+    A.pExpr = NULL;
   }
 }
 expr(A) ::= expr(A) COLLATE id(C). {

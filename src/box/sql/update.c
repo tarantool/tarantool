@@ -261,10 +261,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 	/* Begin generating code. */
 	v = sqlite3GetVdbe(pParse);
-	if (v == 0)
+	if (v == NULL)
 		goto update_cleanup;
-	if (pParse->nested == 0)
-		sqlite3VdbeCountChanges(v);
+	sqlite3VdbeCountChanges(v);
 	sql_set_multi_write(pParse, true);
 
 	/* Allocate required registers. */
@@ -625,13 +624,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	}
 	sqlite3VdbeResolveLabel(v, labelBreak);
 
-	/*
-	 * Return the number of rows that were changed. If this routine is
-	 * generating code because of a call to sqlite3NestedParse(), do not
-	 * invoke the callback function.
-	 */
-	if ((user_session->sql_flags & SQLITE_CountRows) &&
-	    !pParse->pTriggerTab && !pParse->nested) {
+	/* Return the number of rows that were changed. */
+	if (user_session->sql_flags & SQLITE_CountRows &&
+	    pParse->pTriggerTab == NULL) {
 		sqlite3VdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
 		sqlite3VdbeSetNumCols(v, 1);
 		sqlite3VdbeSetColName(v, 0, COLNAME_NAME, "rows updated",

@@ -156,8 +156,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	if (v == NULL)
 		goto delete_from_cleanup;
 
-	if (parse->nested == 0)
-		sqlite3VdbeCountChanges(v);
+	sqlite3VdbeCountChanges(v);
 	sql_set_multi_write(parse, true);
 
 	/* If we are trying to delete from a view, realize that
@@ -387,7 +386,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			idx_noseek = one_pass_cur[1];
 
 		sql_generate_row_delete(parse, table, trigger_list, tab_cursor,
-					reg_key, key_len, parse->nested == 0,
+					reg_key, key_len, true,
 					ON_CONFLICT_ACTION_DEFAULT, one_pass,
 					idx_noseek);
 
@@ -403,13 +402,9 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		}
 	}
 
-	/* Return the number of rows that were deleted. If this
-	 * routine is generating code because of a call to
-	 * sqlite3NestedParse(), do not invoke the callback
-	 * function.
-	 */
+	/* Return the number of rows that were deleted. */
 	if ((user_session->sql_flags & SQLITE_CountRows) != 0 &&
-	    parse->nested == 0 && parse->pTriggerTab != NULL) {
+	    parse->pTriggerTab != NULL) {
 		sqlite3VdbeAddOp2(v, OP_ResultRow, reg_count, 1);
 		sqlite3VdbeSetNumCols(v, 1);
 		sqlite3VdbeSetColName(v, 0, COLNAME_NAME, "rows deleted",
