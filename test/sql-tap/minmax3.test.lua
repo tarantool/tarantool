@@ -52,7 +52,7 @@ test:do_test(
         -- set_file_format 4
         -- sqlite3 db test.db
         return test:execsql [[
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t1 VALUES(1, '1', 'I',   'one');
             INSERT INTO t1 VALUES(2, '2', 'IV',  'four');
             INSERT INTO t1 VALUES(3, '2', NULL,  'three');

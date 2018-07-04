@@ -66,7 +66,7 @@ test:do_execsql_test(
 test:do_test(
     "index2-1.4",
     function()
-        test:execsql("BEGIN")
+        test:execsql("START TRANSACTION")
         for j = 1, ROW_NUM, 1 do
             local sql_parts = {"INSERT INTO t1 VALUES(".. ((j * 10000) + 1)}
             for i = 2, COL_NUM+1, 1 do

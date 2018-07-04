@@ -601,7 +601,7 @@ end
 test:do_execsql_test(
     "intpkey-6.1",
     [[
-        BEGIN;
+        START TRANSACTION;
         INSERT INTO t1 VALUES(20,'b-20','c-20');
         INSERT INTO t1 VALUES(21,'b-21','c-21');
         INSERT INTO t1 VALUES(22,'b-22','c-22');

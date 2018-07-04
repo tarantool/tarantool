@@ -637,7 +637,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "check-6.7",
     [[
-        BEGIN;
+        START TRANSACTION;
         INSERT INTO t1 VALUES(1,30.0, 9);
         INSERT OR ROLLBACK INTO t1 VALUES(8,40.0, 10);
     ]], {

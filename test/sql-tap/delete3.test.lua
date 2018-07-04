@@ -25,7 +25,7 @@ test:do_execsql_test(
     "delete3-1.1",
     [[
         CREATE TABLE t1(x integer primary key);
-        BEGIN;
+        START TRANSACTION;
         INSERT INTO t1 VALUES(1);
         INSERT INTO t1 VALUES(2);
         INSERT INTO t1 SELECT x+2 FROM t1;

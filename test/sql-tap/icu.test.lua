@@ -32,7 +32,7 @@ if (0 > 0)
             name,
             function ()
                 return test:execsql(string.format([[
-                    BEGIN;
+                    START TRANSACTION;
                     UPDATE test1 SET %s;
                     SELECT %s FROM test1;
                     ROLLBACK;

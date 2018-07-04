@@ -429,7 +429,7 @@ if (0 > 0)
                 CREATE TABLE t0(a,b);
                 CREATE INDEX t ON t0(a);
                 UPDATE sqlite_master SET sql='CREATE TABLE a.b(a UNIQUE';
-                --BEGIN;
+                --START TRANSACTION;
                 --CREATE TABLE t1(x);
                 --ROLLBACK;
                 DROP TABLE IF EXISTS t99;

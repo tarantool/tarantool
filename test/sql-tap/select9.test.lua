@@ -138,7 +138,7 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t2;
         CREATE TABLE t1(id primary key, a, b, c);
         CREATE TABLE t2(id primary key, d, e, f);
-        BEGIN;
+        START TRANSACTION;
           INSERT INTO t1 VALUES(0, 1,  'one',   'I');
           INSERT INTO t1 VALUES(1, 3,  NULL,    NULL);
           INSERT INTO t1 VALUES(2, 5,  'five',  'V');

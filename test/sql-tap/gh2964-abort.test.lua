@@ -45,7 +45,7 @@ for _, val in ipairs(data) do
 
     test:do_catchsql_test(
         local_test_prefix.."1",
-        "begin;")
+        "START TRANSACTION;")
 
     test:do_catchsql_test(
         local_test_prefix.."2",

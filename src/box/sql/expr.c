@@ -4827,23 +4827,32 @@ sqlite3ExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 	 *       TK_EQ              OP_Ne
 	 *       TK_GT              OP_Le
 	 *       TK_LE              OP_Gt
-	 *       TK_GE              OP_Lt
 	 *       TK_LT              OP_Ge
+	 *       TK_GE              OP_Lt
 	 *        ...                ...
 	 *       TK_ISNULL          OP_NotNull
 	 *       TK_NOTNULL         OP_IsNull
 	 *
-	 * For other values of pExpr->op, op is undefined and unused.
-	 * The value of TK_ and OP_ constants are arranged such that we
-	 * can compute the mapping above using the following expression.
+	 * For other values of pExpr->op, op is undefined
+	 * and unused. The value of TK_ and OP_ constants
+	 * are arranged such that we can compute the mapping
+	 * above using the following expression. The idea
+	 * is that both for OP_'s and TK_'s the first elements
+	 * in the given mapping ranges of codes and tokens are
+	 * 'Not equal' and 'Is null'. Moreover the 'excluding'
+	 * ones (like 'Greater than' and 'Lower than or Equal')
+	 * are paired and follow one each other, hence have n
+	 * and n + 1 numbers.
 	 * Assert()s verify that the computation is correct.
 	 */
 
-	op = ((pExpr->op + (TK_ISNULL & 1)) ^ 1) - (TK_ISNULL & 1);
+	if (pExpr->op >= TK_NE && pExpr->op <= TK_GE)
+		op = ((pExpr->op + (TK_NE & 1)) ^ 1) - (TK_NE & 1);
+	if (pExpr->op == TK_ISNULL || pExpr->op == TK_NOTNULL)
+		op = ((pExpr->op + (TK_ISNULL & 1)) ^ 1) - (TK_ISNULL & 1);
 
 	/*
 	 * Verify correct alignment of TK_ and OP_ constants.
-	 * Tokens TK_ISNULL and TK_NE shoud have the same parity.
 	 */
 	assert(pExpr->op != TK_NE || op == OP_Eq);
 	assert(pExpr->op != TK_EQ || op == OP_Ne);

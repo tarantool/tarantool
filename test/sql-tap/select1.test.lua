@@ -1985,7 +1985,7 @@ test:do_test(
         test:execsql [[
             drop table if exists abc;
             create TABLE abc(a, b, c, PRIMARY KEY(a, b));
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO abc VALUES(1, 1, 1);
         ]]
         for i = 0,9,1 do

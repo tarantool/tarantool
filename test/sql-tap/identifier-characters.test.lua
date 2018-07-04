@@ -60,7 +60,7 @@ local testcases = {
 	end},
 	{"savepoint name",
 	function (id)
-		test:execsql("begin")
+		test:execsql("START TRANSACTION")
 		local ok, res = pcall(test.execsql, test, string.format("savepoint \"%s\"", id))
 		test:execsql("commit")
 		if ok == false then error(res) end

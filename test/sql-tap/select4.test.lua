@@ -28,7 +28,7 @@ test:plan(103)
 test:execsql [[
     DROP TABLE IF EXISTS t1;
     CREATE TABLE t1(n int primary key, log int);
-    BEGIN;
+    START TRANSACTION;
 ]]
 local i, j
 for i = 1, 31, 1 do
@@ -760,7 +760,7 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE t3(a text primary key, b float, c text);
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t3 VALUES(1, 1.1, '1.1');
             INSERT INTO t3 VALUES(2, 1.10, '1.10');
             INSERT INTO t3 VALUES(3, 1.10, '1.1');

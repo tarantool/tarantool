@@ -102,9 +102,9 @@ sql_tokenizer.split_sql('select 1; -- test comment\n; select 2;')
 - - select 1;
   - ' select 2;'
 ...
-sql_tokenizer.split_sql("begin; insert into table values ('example kek--'); commit;")
+sql_tokenizer.split_sql("START TRANSACTION; insert into table values ('example kek--'); commit;")
 ---
-- - begin;
+- - START TRANSACTION;
   - ' insert into table values (''example kek--'');'
   - ' commit;'
 ...

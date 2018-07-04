@@ -10,8 +10,8 @@ test_run:cmd("setopt delimiter ';'")
 
 box.begin() box.sql.execute('COMMIT');
 box.begin() box.sql.execute('ROLLBACK');
-box.sql.execute('BEGIN;') box.commit();
-box.sql.execute('BEGIN;') box.rollback();
+box.sql.execute('START TRANSACTION;') box.commit();
+box.sql.execute('START TRANSACTION;') box.rollback();
 
 box.sql.execute('pragma foreign_keys = 1;');
 box.sql.execute('CREATE TABLE parent(id INT PRIMARY KEY, y INT UNIQUE);');
@@ -26,7 +26,7 @@ fk_violation_1();
 box.space.CHILD:select();
 
 fk_violation_2 = function()
-    box.sql.execute('BEGIN;')
+    box.sql.execute('START TRANSACTION;')
     box.sql.execute('INSERT INTO child VALUES (1, 1);')
     box.commit()
 end;

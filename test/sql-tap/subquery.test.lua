@@ -28,7 +28,7 @@ test:do_test(
         test:execsql [[
             CREATE TABLE t1(a PRIMARY KEY,b);
             CREATE TABLE t2(x PRIMARY KEY,y);
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t1 VALUES(1,2);
             INSERT INTO t1 VALUES(3,4);
             INSERT INTO t1 VALUES(5,6);

@@ -24,7 +24,7 @@ test:plan(103)
 --
 test:execsql [[
     CREATE TABLE t1(id primary key, x int, y int);
-    BEGIN;
+    START TRANSACTION;
 ]]
 for i=1,32 do
     --for _ in X(0, "X!for", [=[["set i 1","$i<=32","incr i"]]=]) do
@@ -234,7 +234,7 @@ test:do_test(
     function()
         return test:execsql [[
             CREATE TABLE t3(x primary KEY);
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t3 SELECT x FROM t1 ORDER BY x LIMIT 10 OFFSET 1;
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
@@ -246,7 +246,7 @@ test:do_test(
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
-            END;
+            COMMIT;
             SELECT count(*) FROM t3;
         ]]
 
@@ -347,7 +347,7 @@ test:do_execsql_test(
     "limit-6.1",
     [[
         CREATE TABLE t6(a primary key);
-        BEGIN;
+        START TRANSACTION;
         INSERT INTO t6 VALUES(1);
         INSERT INTO t6 VALUES(2);
         INSERT INTO t6 SELECT a+2 FROM t6;

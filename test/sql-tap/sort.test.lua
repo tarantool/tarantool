@@ -831,7 +831,7 @@ test:do_execsql_test(
 test:do_test(
     "sort-13.1",
     function()
-        test:execsql("BEGIN;")
+        test:execsql("START TRANSACTION;")
         for i = 0, 100000 -1 , 1 do
             test:execsql( string.format("INSERT INTO t10 VALUES(%s +1, %s/10, %s%%10)",i, i, i))
         end

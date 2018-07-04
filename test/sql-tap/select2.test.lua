@@ -23,7 +23,7 @@ test:plan(16)
 --
 test:execsql "DROP TABLE IF EXISTS tbl1"
 test:execsql "CREATE TABLE tbl1(id int, f1 int, f2 int, primary key(id))"
-test:execsql "BEGIN"
+test:execsql "START TRANSACTION"
 for i = 0, 30, 1 do
     test:execsql(string.format("INSERT INTO tbl1 VALUES(%s, %s,%s)", i, i%9, i%10))
 end
@@ -74,7 +74,7 @@ test:execsql "DROP TABLE if exists tbl2"
 test:do_test(
     "select2-2.0.2",
     function()
-        test:execsql "CREATE TABLE tbl2(f1 int primary key, f2 int, f3 int); BEGIN;"
+        test:execsql "CREATE TABLE tbl2(f1 int primary key, f2 int, f3 int); START TRANSACTION;"
         for i = 1, 30000, 1 do
             test:execsql( string.format("INSERT INTO tbl2 VALUES(%s,%s,%s)",i, i*2, i*3))
         end

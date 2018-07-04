@@ -117,7 +117,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     3.2,
     [[
-        -- BEGIN;
+        -- START TRANSACTION;
           DELETE FROM pp2;
         -- COMMIT;
           DROP TABLE pp1;

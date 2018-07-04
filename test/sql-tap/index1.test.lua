@@ -1067,7 +1067,7 @@ test:do_execsql_test(
     test:do_catchsql_test(
         "index-19.2",
         [[
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t7 VALUES(1);
         ]], {
             -- <index-19.2>
@@ -1078,7 +1078,7 @@ test:do_execsql_test(
     test:do_catchsql_test(
         "index-19.3",
         [[
-            BEGIN;
+            START TRANSACTION;
         ]], {
             -- <index-19.3>
             1, "Operation is not permitted when there is an active transaction "
@@ -1098,7 +1098,7 @@ test:do_execsql_test(
     test:do_catchsql_test(
         "index-19.5",
         [[
-            BEGIN;
+            START TRANSACTION;
             COMMIT;
         ]], {
             -- <index-19.5>

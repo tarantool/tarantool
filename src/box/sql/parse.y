@@ -147,13 +147,9 @@ cmdx ::= cmd.
 ///////////////////// Begin and end transactions. ////////////////////////////
 //
 
-cmd ::= BEGIN trans_opt.  {sql_transaction_begin(pParse);}
-trans_opt ::= .
-trans_opt ::= TRANSACTION.
-trans_opt ::= TRANSACTION nm.
-cmd ::= COMMIT trans_opt.      {sql_transaction_commit(pParse);}
-cmd ::= END trans_opt.         {sql_transaction_commit(pParse);}
-cmd ::= ROLLBACK trans_opt.    {sql_transaction_rollback(pParse);}
+cmd ::= START TRANSACTION.  {sql_transaction_begin(pParse);}
+cmd ::= COMMIT.      {sql_transaction_commit(pParse);}
+cmd ::= ROLLBACK.    {sql_transaction_rollback(pParse);}
 
 savepoint_opt ::= SAVEPOINT.
 savepoint_opt ::= .
@@ -163,7 +159,7 @@ cmd ::= SAVEPOINT nm(X). {
 cmd ::= RELEASE savepoint_opt nm(X). {
   sqlite3Savepoint(pParse, SAVEPOINT_RELEASE, &X);
 }
-cmd ::= ROLLBACK trans_opt TO savepoint_opt nm(X). {
+cmd ::= ROLLBACK TO savepoint_opt nm(X). {
   sqlite3Savepoint(pParse, SAVEPOINT_ROLLBACK, &X);
 }
 

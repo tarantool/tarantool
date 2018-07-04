@@ -43,7 +43,7 @@ test:do_test(
             table.insert(rows, string.format('INSERT INTO a VALUES(%d, 0x%x)', 4001 + i, i))
         end
 
-        test:execsql('BEGIN')
+        test:execsql('START TRANSACTION')
         for _, v in ipairs(rows) do
             test:execsql(v)
         end

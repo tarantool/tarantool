@@ -32,7 +32,7 @@ test:do_test(
             INSERT INTO t1 VALUES(2, 2);
         ]]
         return test:catchsql [[
-            BEGIN;
+            START TRANSACTION;
               INSERT INTO t1 VALUES(1, 2);
             COMMIT;
         ]]

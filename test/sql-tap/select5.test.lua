@@ -25,7 +25,7 @@ test:plan(32)
 test:execsql [[
     DROP TABLE IF EXISTS t1;
     CREATE TABLE t1(x int primary key, y int);
-    BEGIN;
+    START TRANSACTION;
 ]]
 local i, j
 for i = 1, 31, 1 do

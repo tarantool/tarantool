@@ -73,7 +73,7 @@ test:do_execsql_test(
     [[
         create table t2(x primary key);
         create table t2_temp(id primary key, x);
-        BEGIN;
+        START TRANSACTION;
         insert into t2_temp values(1, 1);
         insert into t2_temp select id+1,x*2 from t2_temp;
         insert into t2_temp select id+2,x*4 from t2_temp;

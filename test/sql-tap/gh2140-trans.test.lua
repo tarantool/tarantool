@@ -12,7 +12,7 @@ box.sql.execute("INSERT INTO t1 VALUES (1,1);")
 box.sql.execute("INSERT INTO t2 VALUES (1,1);")
 
 test:do_execsql_test('commit1_check',
-                     [[BEGIN;
+                     [[START TRANSACTION;
                          INSERT INTO t1 VALUES (2,2);
                        COMMIT;
 
@@ -20,7 +20,7 @@ test:do_execsql_test('commit1_check',
                      {1, 1, 2, 2})
 
 test:do_execsql_test('rollback1_check',
-                     [[BEGIN;
+                     [[START TRANSACTION;
                          INSERT INTO t1 VALUES (3,3);
                        ROLLBACK;
 
@@ -35,7 +35,7 @@ for _, verb in ipairs({'ROLLBACK', 'ABORT'}) do
 		answer = "Duplicate key exists in unique index 'sql_autoindex_T1_1' in space 'T1'"
 	end
         test:do_catchsql_test('insert1_'..verb,
-                              [[BEGIN;
+                              [[START TRANSACTION;
                                   INSERT INTO t2 VALUES (2, 2);
                                   INSERT OR ]]..verb..[[ INTO t1 VALUES (1,1);
                               ]],
@@ -52,7 +52,7 @@ for _, verb in ipairs({'ROLLBACK', 'ABORT'}) do
 
         box.sql.execute('DELETE FROM t2')
         test:do_catchsql_test('update1_'..verb,
-                       [[BEGIN;
+                       [[START TRANSACTION;
                            INSERT INTO t2 VALUES (2, 2);
                            UPDATE OR ]]..verb..[[ t1 SET s1 = 1 WHERE s1 = 2;
                          ]],

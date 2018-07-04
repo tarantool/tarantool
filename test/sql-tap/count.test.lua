@@ -93,7 +93,7 @@ for _, zIndex in ipairs(queries) do
     test:do_execsql_test(
         "count-1."..iTest..".5",
         [[
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t1 SELECT a+4096, b FROM t1;          --  8192
             INSERT INTO t1 SELECT a+8192, b FROM t1;          -- 16384
             INSERT INTO t1 SELECT a+16384, b FROM t1;          -- 32768

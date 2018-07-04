@@ -39,7 +39,7 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE t1(w int PRIMARY KEY, x int, y int, z int);
-            BEGIN;
+            START TRANSACTION;
         ]]
         for i=1,100 do
             w = i
@@ -1214,7 +1214,7 @@ test:do_execsql_test(
         function()
             test:execsql [[
                 CREATE TABLE t10(id int PRIMARY KEY,a,b,c);
-                BEGIN;
+                START TRANSACTION;
                 INSERT INTO t10 VALUES(1, 1,1,1);
                 INSERT INTO t10 VALUES(2, 1,2,2);
                 INSERT INTO t10 VALUES(3, 1,3,3);

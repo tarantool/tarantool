@@ -69,7 +69,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
-        BEGIN;
+        START TRANSACTION;
           DELETE FROM t1;
           SELECT * FROM t2;
     ]], {
@@ -105,7 +105,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
-        BEGIN;
+        START TRANSACTION;
           DELETE FROM t1;
           SELECT * FROM t2;
     ]], {
@@ -141,7 +141,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 BEFORE DELETE ON t1 WHEN old.x='1' BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
-        BEGIN;
+        START TRANSACTION;
           DELETE FROM t1;
           SELECT * FROM t2;
     ]], {
@@ -177,7 +177,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
-        BEGIN;
+        START TRANSACTION;
           UPDATE t1 SET y = '';
           SELECT * FROM t2;
     ]], {
@@ -213,7 +213,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
-        BEGIN;
+        START TRANSACTION;
           UPDATE t1 SET y = '';
           SELECT * FROM t2;
     ]], {
@@ -249,7 +249,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 BEFORE UPDATE ON t1 WHEN old.x>='2' BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
-        BEGIN;
+        START TRANSACTION;
           UPDATE t1 SET y = '';
           SELECT * FROM t2;
     ]], {
@@ -299,7 +299,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
-        BEGIN;
+        START TRANSACTION;
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;
         ROLLBACK;
@@ -324,7 +324,7 @@ test:do_test(
             CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
               INSERT INTO t2 VALUES(old.a);
             END;
-            BEGIN;
+            START TRANSACTION;
               UPDATE v1 SET c = 'hello';
               SELECT * FROM t2;
             ROLLBACK;
@@ -344,7 +344,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
-        BEGIN;
+        START TRANSACTION;
           INSERT INTO t3 VALUES(4, 3, 'three');
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;
@@ -364,7 +364,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
-        BEGIN;
+        START TRANSACTION;
           INSERT INTO t3 VALUES(5, 1, 'uno');
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;
@@ -385,7 +385,7 @@ test:do_execsql_test(
         CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
-        BEGIN;
+        START TRANSACTION;
           INSERT INTO t3 VALUES(6, 1, 'zero');
           UPDATE v1 SET b = 'hello';
           SELECT * FROM t2;

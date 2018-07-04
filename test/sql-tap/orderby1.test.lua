@@ -40,7 +40,7 @@ test:do_test(
               name TEXT,
               UNIQUE(aid, tn)
             );
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO album VALUES(1, '1-one'), (2, '2-two'), (3, '3-three');
             INSERT INTO track VALUES
                 (1, 1, 1, 'one-a'),
@@ -427,7 +427,7 @@ test:do_test(
               name TEXT,
               UNIQUE(aid ASC, tn DESC)
             );
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO album VALUES(1, '1-one'), (2, '2-two'), (3, '3-three');
             INSERT INTO track VALUES
                 (1, 1, 1, 'one-a'),

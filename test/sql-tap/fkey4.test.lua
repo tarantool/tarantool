@@ -222,11 +222,11 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey8-3.2",
     [[
-        BEGIN;
+        START TRANSACTION;
             INSERT INTO c2 VALUES(13, 13);
             INSERT OR REPLACE INTO c2 VALUES(13, 13);
             DELETE FROM c2;
-        END;
+        COMMIT;
     ]], {
         -- <fkey8-3.2>
         0

@@ -177,7 +177,7 @@ test:do_test(
     function()
         test:execsql([[
             CREATE TABLE agger(one text primary key, two text, three text, four text);
-            BEGIN TRANSACTION;
+            START TRANSACTION;
             INSERT INTO agger VALUES(1, 'one', 'hello', 'yes');
             INSERT INTO agger VALUES(2, 'two', 'howdy', 'no');
             INSERT INTO agger VALUES(3, 'thr', 'howareya', 'yes');
@@ -238,7 +238,7 @@ test:do_execsql_test(
     "misc1-4.1",
     [[
         CREATE TABLE t2(a primary key);
-        BEGIN;
+        START TRANSACTION;
         INSERT INTO t2 VALUES('This is a long string to use up a lot of disk -');
         UPDATE t2 SET a=a||a||a||a;
         INSERT INTO t2 SELECT '1 - ' || a FROM t2;
@@ -567,7 +567,7 @@ if (0 > 0) then
     test:do_test(
         "misc1-11.1",
         function()
-            test:execsql("BEGIN")
+            test:execsql("START TRANSACTION")
             test:execsql("UPDATE t1 SET a=0 WHERE 0")
             sqlite3("db2", "test.db")
             rc = X(371, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
@@ -940,7 +940,7 @@ if (0 > 0) then
     test:do_execsql_test(
         "misc1-17.1",
         [[
-            BEGIN;
+            START TRANSACTION;
             CREATE TABLE RealTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
             CREATE TABLE TempTable(TestID INTEGER PRIMARY KEY, TestString TEXT);
             CREATE TRIGGER trigTest_1 AFTER UPDATE ON TempTable BEGIN

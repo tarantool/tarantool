@@ -40,7 +40,7 @@ test:do_test(
             INSERT INTO t1 VALUES(2,'x');
             UPDATE t1 SET b=substr(b,1,500);
             CREATE TABLE t2(x PRIMARY KEY,y);
-            BEGIN;
+            START TRANSACTION;
         ]])
         test:catchsql("UPDATE t1 SET a=CASE a WHEN 2 THEN 1 ELSE a END, b='y';")
         return test:execsql([[
@@ -73,7 +73,7 @@ test:do_test(
             INSERT INTO t1 SELECT a+16, b FROM t1;
             INSERT INTO t1 SELECT a+32, b FROM t1;
             INSERT INTO t1 SELECT a+64, b FROM t1;
-            BEGIN;
+            START TRANSACTION;
         ]])
         test:catchsql("UPDATE t1 SET a=CASE a WHEN 128 THEN 127 ELSE a END, b='';")
         return test:execsql([[
@@ -408,13 +408,13 @@ test:do_execsql_test(
 
 
 
--- Ticket #626:  make sure EXPLAIN prevents BEGIN and COMMIT from working.
+-- Ticket #626:  make sure EXPLAIN prevents START TRANSACTION and COMMIT from working.
 --
 test:do_test(
     "misc3-6.1",
     function()
-        test:execsql("EXPLAIN BEGIN")
-        return test:catchsql("BEGIN")
+        test:execsql("EXPLAIN START TRANSACTION")
+        return test:catchsql("START TRANSACTION")
     end, {
         -- <misc3-6.1>
         0
@@ -435,7 +435,7 @@ test:do_test(
 test:do_test(
     "misc3-6.3",
     function()
-        test:execsql("BEGIN; EXPLAIN ROLLBACK")
+        test:execsql("START TRANSACTION; EXPLAIN ROLLBACK")
         return test:catchsql("ROLLBACK")
     end, {
         -- <misc3-6.3>
@@ -494,7 +494,7 @@ if (0 > 0) then
             CREATE TABLE y1(a primary key);
             CREATE TABLE y2(b primary key);
             CREATE TABLE y3(c primary key);
-            BEGIN;
+            START TRANSACTION;
             CREATE TRIGGER r1 AFTER DELETE ON y1 FOR EACH ROW BEGIN
               INSERT INTO y3(c) SELECT b FROM y2 ORDER BY b LIMIT 1;
             END;

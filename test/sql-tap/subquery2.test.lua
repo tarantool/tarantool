@@ -29,7 +29,7 @@ test:do_test(
             CREATE TABLE t1(a PRIMARY KEY,b);
             CREATE TABLE t2(c PRIMARY KEY,d);
             CREATE TABLE t3(e PRIMARY KEY,f);
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t1 VALUES(1,2);
             INSERT INTO t1 VALUES(3,4);
             INSERT INTO t1 VALUES(5,6);

@@ -26,7 +26,7 @@ test:do_test("select3-1.0", function()
   test:execsql [[
     DROP TABLE IF EXISTS t1;
     CREATE TABLE t1(n int primary key, log int);
-    BEGIN;
+    START TRANSACTION;
   ]]
   for i = 1, 32-1 do -- in X(0, "X!for", [=[["set i 1","$i<32","incr i"]]=]) do
      j = 0

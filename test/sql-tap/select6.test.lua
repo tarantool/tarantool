@@ -32,7 +32,7 @@ test:do_test(
         return test:execsql [[
             DROP TABLE IF EXISTS t1;
             CREATE TABLE t1 (x int PRIMARY KEY, y int);
-            BEGIN;
+            START TRANSACTION;
             INSERT INTO t1 VALUES(1,1);
             INSERT INTO t1 VALUES(2,2);
             INSERT INTO t1 VALUES(3,2);
@@ -680,7 +680,7 @@ test:do_execsql_test(
         CREATE TABLE t3 (p primary key, q);
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(q primary key, r);
-        BEGIN;
+        START TRANSACTION;
         INSERT INTO t3 VALUES(1,11);
         INSERT INTO t3 VALUES(2,22);
         INSERT INTO t4 VALUES(11,111);

@@ -336,8 +336,8 @@ void *ParseAlloc(void *(*mallocProc)(YYMALLOCARGTYPE)){
   if( pParser ){
 #ifdef YYTRACKMAXSTACKDEPTH
     pParser->yyhwm = 0;
-    pParser->is_fallback_failed = false;
 #endif
+    pParser->is_fallback_failed = false;
 #if YYSTACKDEPTH<=0
     pParser->yytos = NULL;
     pParser->yystack = NULL;

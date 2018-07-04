@@ -27,7 +27,7 @@ local testcases = {
 		select * from t1 union all select * from t2;]],
 		{0,{1,1}} },
 	{"3",
-		[[begin;
+		[[START TRANSACTION;
 		savepoint s1_1;
 		savepoint s1_2;]],
 		{0} },
