@@ -77,13 +77,13 @@ struct vy_scheduler {
 	/** Total number of worker threads. */
 	int worker_pool_size;
 	/** Number worker threads that are currently idle. */
-	int workers_available;
+	int idle_worker_count;
 	/** Memory pool used for allocating vy_task objects. */
 	struct mempool task_pool;
-	/** Queue of pending tasks, linked by vy_task::link. */
-	struct stailq input_queue;
-	/** Queue of processed tasks, linked by vy_task::link. */
-	struct stailq output_queue;
+	/** Queue of pending tasks, linked by vy_task::in_pending. */
+	struct stailq pending_tasks;
+	/** Queue of processed tasks, linked by vy_task::in_processed. */
+	struct stailq processed_tasks;
 	/**
 	 * Signaled to wake up a worker when there is
 	 * a pending task in the input queue. Also used
