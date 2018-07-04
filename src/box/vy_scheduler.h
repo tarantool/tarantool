@@ -42,16 +42,15 @@
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
 #include "salad/stailq.h"
-#include "tt_pthread.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct cord;
 struct fiber;
 struct vy_lsm;
 struct vy_run_env;
+struct vy_worker;
 struct vy_scheduler;
 
 typedef void
@@ -61,41 +60,25 @@ typedef void
 struct vy_scheduler {
 	/** Scheduler fiber. */
 	struct fiber *scheduler_fiber;
-	/** Scheduler event loop. */
-	struct ev_loop *scheduler_loop;
 	/** Used to wake up the scheduler fiber from TX. */
 	struct fiber_cond scheduler_cond;
-	/** Used to wake up the scheduler from a worker thread. */
-	struct ev_async scheduler_async;
 	/**
 	 * Array of worker threads used for performing
 	 * dump/compaction tasks.
 	 */
-	struct cord *worker_pool;
+	struct vy_worker *worker_pool;
 	/** Set if the worker threads are running. */
 	bool is_worker_pool_running;
 	/** Total number of worker threads. */
 	int worker_pool_size;
 	/** Number worker threads that are currently idle. */
 	int idle_worker_count;
+	/** List of idle workers, linked by vy_worker::in_idle. */
+	struct stailq idle_workers;
 	/** Memory pool used for allocating vy_task objects. */
 	struct mempool task_pool;
-	/** Queue of pending tasks, linked by vy_task::in_pending. */
-	struct stailq pending_tasks;
 	/** Queue of processed tasks, linked by vy_task::in_processed. */
 	struct stailq processed_tasks;
-	/**
-	 * Signaled to wake up a worker when there is
-	 * a pending task in the input queue. Also used
-	 * to stop worker threads on shutdown.
-	 */
-	pthread_cond_t worker_cond;
-	/**
-	 * Mutex protecting input and output queues and
-	 * the condition variable used to wake up worker
-	 * threads.
-	 */
-	pthread_mutex_t mutex;
 	/**
 	 * Heap of LSM trees, ordered by dump priority,
 	 * linked by vy_lsm::in_dump.
