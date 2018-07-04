@@ -495,9 +495,9 @@ box_check_wal_max_size(int64_t wal_max_size)
 static int64_t
 box_check_memtx_memory(int64_t memory)
 {
-	if (memory <= 0) {
+	if (memory < 0) {
 		tnt_raise(ClientError, ER_CFG, "memtx_memory",
-			  "must be greater than 0");
+			  "must not be less than 0");
 	}
 	return memory;
 }
@@ -505,9 +505,9 @@ box_check_memtx_memory(int64_t memory)
 static int64_t
 box_check_vinyl_memory(int64_t memory)
 {
-	if (memory <= 0) {
+	if (memory < 0) {
 		tnt_raise(ClientError, ER_CFG, "vinyl_memory",
-			  "must be greater than 0");
+			  "must not be less than 0");
 	}
 	return memory;
 }
