@@ -274,11 +274,10 @@ vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
 static void
 vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 {
-	assert(!scheduler->is_worker_pool_running);
+	assert(scheduler->worker_pool == NULL);
 	/* One thread is reserved for dumps, see vy_schedule(). */
 	assert(scheduler->worker_pool_size >= 2);
 
-	scheduler->is_worker_pool_running = true;
 	scheduler->idle_worker_count = scheduler->worker_pool_size;
 	scheduler->worker_pool = calloc(scheduler->worker_pool_size,
 					sizeof(*scheduler->worker_pool));
@@ -300,9 +299,7 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 static void
 vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 {
-	assert(scheduler->is_worker_pool_running);
-	scheduler->is_worker_pool_running = false;
-
+	assert(scheduler->worker_pool != NULL);
 	for (int i = 0; i < scheduler->worker_pool_size; i++) {
 		struct vy_worker *worker = &scheduler->worker_pool[i];
 		cbus_stop_loop(&worker->worker_pipe);
@@ -355,7 +352,7 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 	fiber_cond_signal(&scheduler->dump_cond);
 	fiber_cond_signal(&scheduler->scheduler_cond);
 
-	if (scheduler->is_worker_pool_running)
+	if (scheduler->worker_pool != NULL)
 		vy_scheduler_stop_workers(scheduler);
 
 	diag_destroy(&scheduler->diag);

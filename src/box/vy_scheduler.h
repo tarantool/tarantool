@@ -67,8 +67,6 @@ struct vy_scheduler {
 	 * dump/compaction tasks.
 	 */
 	struct vy_worker *worker_pool;
-	/** Set if the worker threads are running. */
-	bool is_worker_pool_running;
 	/** Total number of worker threads. */
 	int worker_pool_size;
 	/** Number worker threads that are currently idle. */
