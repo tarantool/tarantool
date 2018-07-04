@@ -406,14 +406,18 @@ memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	(void)txn;
-	if (txn->engine_tx == NULL &&
-	    ! rlist_empty(&txn_last_stmt(txn)->space->on_replace)) {
-		/**
-		 * A space on_replace trigger may initiate
-		 * a yield.
-		 */
-		assert(txn->is_autocommit);
-		memtx_init_txn(txn);
+	if (txn->engine_tx == NULL) {
+		struct space *space = txn_last_stmt(txn)->space;
+
+		if (space->def->id > BOX_SYSTEM_ID_MAX &&
+		    ! rlist_empty(&space->on_replace)) {
+			/**
+			 * A space on_replace trigger may initiate
+			 * a yield.
+			 */
+			assert(txn->is_autocommit);
+			memtx_init_txn(txn);
+		}
 	}
 	return 0;
 }
