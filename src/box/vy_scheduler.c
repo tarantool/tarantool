@@ -84,12 +84,8 @@ struct vy_task_ops {
 	 * This function is called by the scheduler if either ->execute
 	 * or ->complete failed. It may be used to undo changes done to
 	 * the LSM tree when preparing the task.
-	 *
-	 * If @in_shutdown is set, the callback is invoked from the
-	 * engine destructor.
 	 */
-	void (*abort)(struct vy_scheduler *scheduler, struct vy_task *task,
-		      bool in_shutdown);
+	void (*abort)(struct vy_scheduler *scheduler, struct vy_task *task);
 };
 
 struct vy_task {
@@ -279,15 +275,11 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 static void
 vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 {
-	struct stailq task_queue;
-	stailq_create(&task_queue);
-
 	assert(scheduler->is_worker_pool_running);
 	scheduler->is_worker_pool_running = false;
 
-	/* Clear the input queue and wake up worker threads. */
+	/* Wake up worker threads. */
 	tt_pthread_mutex_lock(&scheduler->mutex);
-	stailq_concat(&task_queue, &scheduler->input_queue);
 	pthread_cond_broadcast(&scheduler->worker_cond);
 	tt_pthread_mutex_unlock(&scheduler->mutex);
 
@@ -298,15 +290,6 @@ vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
 
 	free(scheduler->worker_pool);
 	scheduler->worker_pool = NULL;
-
-	/* Abort all pending tasks. */
-	struct vy_task *task, *next;
-	stailq_concat(&task_queue, &scheduler->output_queue);
-	stailq_foreach_entry_safe(task, next, &task_queue, link) {
-		if (task->ops->abort != NULL)
-			task->ops->abort(scheduler, task, true);
-		vy_task_delete(&scheduler->task_pool, task);
-	}
 }
 
 void
@@ -888,8 +871,7 @@ fail:
 }
 
 static void
-vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task,
-		   bool in_shutdown)
+vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task)
 {
 	struct vy_lsm *lsm = task->lsm;
 
@@ -902,17 +884,13 @@ vy_task_dump_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	 * It's no use alerting the user if the server is
 	 * shutting down or the LSM tree was dropped.
 	 */
-	if (!in_shutdown && !lsm->is_dropped) {
+	if (!lsm->is_dropped) {
 		struct error *e = diag_last_error(&task->diag);
 		error_log(e);
 		say_error("%s: dump failed", vy_lsm_name(lsm));
 	}
 
-	/* The metadata log is unavailable on shutdown. */
-	if (!in_shutdown)
-		vy_run_discard(task->new_run);
-	else
-		vy_run_unref(task->new_run);
+	vy_run_discard(task->new_run);
 
 	lsm->is_dumping = false;
 	vy_scheduler_update_lsm(scheduler, lsm);
@@ -1213,8 +1191,7 @@ vy_task_compact_complete(struct vy_scheduler *scheduler, struct vy_task *task)
 }
 
 static void
-vy_task_compact_abort(struct vy_scheduler *scheduler, struct vy_task *task,
-		      bool in_shutdown)
+vy_task_compact_abort(struct vy_scheduler *scheduler, struct vy_task *task)
 {
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_range *range = task->range;
@@ -1226,18 +1203,14 @@ vy_task_compact_abort(struct vy_scheduler *scheduler, struct vy_task *task,
 	 * It's no use alerting the user if the server is
 	 * shutting down or the LSM tree was dropped.
 	 */
-	if (!in_shutdown && !lsm->is_dropped) {
+	if (!lsm->is_dropped) {
 		struct error *e = diag_last_error(&task->diag);
 		error_log(e);
 		say_error("%s: failed to compact range %s",
 			  vy_lsm_name(lsm), vy_range_str(range));
 	}
 
-	/* The metadata log is unavailable on shutdown. */
-	if (!in_shutdown)
-		vy_run_discard(task->new_run);
-	else
-		vy_run_unref(task->new_run);
+	vy_run_discard(task->new_run);
 
 	assert(range->heap_node.pos == UINT32_MAX);
 	vy_range_heap_insert(&lsm->range_heap, &range->heap_node);
@@ -1476,7 +1449,7 @@ vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 {
 	if (task->lsm->is_dropped) {
 		if (task->ops->abort)
-			task->ops->abort(scheduler, task, false);
+			task->ops->abort(scheduler, task);
 		return 0;
 	}
 
@@ -1499,7 +1472,7 @@ vy_scheduler_complete_task(struct vy_scheduler *scheduler,
 	return 0;
 fail:
 	if (task->ops->abort)
-		task->ops->abort(scheduler, task, false);
+		task->ops->abort(scheduler, task);
 	diag_move(diag, &scheduler->diag);
 	return -1;
 }
