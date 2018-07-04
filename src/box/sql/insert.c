@@ -1572,7 +1572,6 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		     overrideError == ON_CONFLICT_ACTION_ROLLBACK) {
 
 			int iIdxCur = iBase++;
-			assert(pIdx->pSchema == pTab->pSchema);
 			if (IsPrimaryKeyIndex(pIdx)) {
 				if (piDataCur)
 					*piDataCur = iIdxCur;

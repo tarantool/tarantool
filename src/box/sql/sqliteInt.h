@@ -2103,8 +2103,6 @@ struct Index {
 	char *zColAff;
 	/** The next index associated with the same table. */
 	Index *pNext;
-	/** Schema containing this index. */
-	Schema *pSchema;
 	/** WHERE clause for partial indices. */
 	Expr *pPartIdxWhere;
 	/** DB Page containing root of this index. */

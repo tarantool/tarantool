@@ -323,7 +323,6 @@ deleteTable(sqlite3 * db, Table * pTable)
 	/* Delete all indices associated with this table. */
 	for (pIndex = pTable->pIndex; pIndex; pIndex = pNext) {
 		pNext = pIndex->pNext;
-		assert(pIndex->pSchema == pTable->pSchema);
 		if ((db == 0 || db->pnBytesFreed == 0)) {
 			char *zName = pIndex->def->name;
 			TESTONLY(Index *
@@ -2683,7 +2682,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	index->pTable = table;
 	index->onError = (u8) on_error;
 	index->index_type = idx_type;
-	index->pSchema = db->pSchema;
 	/* Tarantool have access to each column by any index. */
 	if (where != NULL) {
 		sql_resolve_self_reference(parse, table, NC_PartIdx, where,
