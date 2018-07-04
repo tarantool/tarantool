@@ -116,71 +116,48 @@
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
 
-/*
- * This routine generates code that opens the sql_statN tables.
- * The _sql_stat1 table is always relevant. _sql_stat4 is only opened when
- * appropriate compile-time options are provided.
+/**
+ * This routine generates code that opens the sql_stat1/4 tables.
+ * If the sql_statN tables do not previously exist, they are
+ * created.
  *
- * If the sql_statN tables do not previously exist, it is created.
- *
- * Argument zWhere may be a pointer to a buffer containing a table name,
- * or it may be a NULL pointer. If it is not NULL, then all entries in
- * the sql_statN tables associated with the named table are deleted.
- * If zWhere==0, then code is generated to delete all stat table entries.
+ * @param parse Parsing context.
+ * @param stat_cursor Open the _sql_stat1 table on this cursor.
+ *        you should allocate |stat_names| cursors before call.
+ * @param table_name Delete records of this index if specified.
  */
 static void
-openStatTable(Parse * pParse,	/* Parsing context */
-	      int iStatCur,	/* Open the _sql_stat1 table on this cursor */
-	      const char *zWhere,	/* Delete entries for this table or index */
-	      const char *zWhereType	/* Either "tbl" or "idx" */
-    )
+vdbe_emit_stat_space_open(struct Parse *parse, int stat_cursor,
+			  const char *table_name)
 {
-	const char *aTable[] = {
-		"_sql_stat1",
-		"_sql_stat4",
-		NULL};
-	int i;
-	sqlite3 *db = pParse->db;
-	Vdbe *v = sqlite3GetVdbe(pParse);
-	int aRoot[ArraySize(aTable)];
-	u8 aCreateTbl[ArraySize(aTable)];
-
-	if (v == 0)
-		return;
-	assert(sqlite3VdbeDb(v) == db);
-
-	/* Create new statistic tables if they do not exist, or clear them
-	 * if they do already exist.
-	 */
-	for (i = 0; aTable[i]; i++) {
-		const char *zTab = aTable[i];
-		Table *pStat;
-		/* The table already exists, because it is a system space */
-		pStat = sqlite3HashFind(&db->pSchema->tblHash, zTab);
-		assert(pStat != NULL);
-		aRoot[i] = pStat->tnum;
-		aCreateTbl[i] = 0;
-		if (zWhere) {
-			sqlite3NestedParse(pParse,
-					   "DELETE FROM \"%s\" WHERE \"%s\"=%Q",
-					   zTab, zWhereType, zWhere);
+	const char *stat_names[] = {"_sql_stat1", "_sql_stat4"};
+	const uint32_t stat_ids[] = {BOX_SQL_STAT1_ID, BOX_SQL_STAT4_ID};
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	assert(v != NULL);
+	assert(sqlite3VdbeDb(v) == parse->db);
+	for (uint i = 0; i < lengthof(stat_names); ++i) {
+		const char *space_name = stat_names[i];
+		/*
+		 * The table already exists, because it is a
+		 * system space.
+		 */
+		assert(sqlite3HashFind(&parse->db->pSchema->tblHash,
+				       space_name) != NULL);
+		if (table_name != NULL) {
+			vdbe_emit_stat_space_clear(parse, space_name, NULL,
+						   table_name);
 		} else {
-			/*
-			 * The sql_stat[134] table already exists.
-			 * Delete all rows.
-			 */
-			sqlite3VdbeAddOp2(v, OP_Clear,
-					  SQLITE_PAGENO_TO_SPACEID(aRoot[i]), 0);
+			sqlite3VdbeAddOp1(v, OP_Clear, stat_ids[i]);
 		}
 	}
 
-	/* Open the sql_stat[134] tables for writing. */
-	for (i = 0; aTable[i]; i++) {
-		struct space *space =
-			space_by_id(SQLITE_PAGENO_TO_SPACEID(aRoot[i]));
-		vdbe_emit_open_cursor(pParse, iStatCur + i, aRoot[i], space);
-		sqlite3VdbeChangeP5(v, aCreateTbl[i]);
-		VdbeComment((v, aTable[i]));
+	/* Open the sql_stat tables for writing. */
+	for (uint i = 0; i < lengthof(stat_names); ++i) {
+		uint32_t id = stat_ids[i];
+		int tnum = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(id, 0);
+		vdbe_emit_open_cursor(parse, stat_cursor + i, tnum,
+				      space_by_id(id));
+		VdbeComment((v, stat_names[i]));
 	}
 }
 
@@ -1117,7 +1094,7 @@ sql_analyze_database(Parse *parser)
 	sql_set_multi_write(parser, false);
 	int stat_cursor = parser->nTab;
 	parser->nTab += 3;
-	openStatTable(parser, stat_cursor, NULL, NULL);
+	vdbe_emit_stat_space_open(parser, stat_cursor, NULL);
 	int reg = parser->nMem + 1;
 	int tab_cursor = parser->nTab;
 	for (struct HashElem *k = sqliteHashFirst(&schema->tblHash); k != NULL;
@@ -1131,28 +1108,24 @@ sql_analyze_database(Parse *parser)
 	loadAnalysis(parser);
 }
 
-/*
+/**
  * Generate code that will do an analysis of a single table in
- * a database.  If pOnlyIdx is not NULL then it is a single index
- * in pTab that should be analyzed.
+ * a database.
+ *
+ * @param parse Parser context.
+ * @param table Target table to analyze.
  */
 static void
-analyzeTable(Parse * pParse, Table * pTab, Index * pOnlyIdx)
+vdbe_emit_analyze_table(struct Parse *parse, struct Table *table)
 {
-	int iStatCur;
-
-	assert(pTab != 0);
-	sql_set_multi_write(pParse, false);
-	iStatCur = pParse->nTab;
-	pParse->nTab += 3;
-	if (pOnlyIdx) {
-		openStatTable(pParse, iStatCur, pOnlyIdx->zName, "idx");
-	} else {
-		openStatTable(pParse, iStatCur, pTab->def->name, "tbl");
-	}
-	analyzeOneTable(pParse, pTab, pOnlyIdx, iStatCur, pParse->nMem + 1,
-			pParse->nTab);
-	loadAnalysis(pParse);
+	assert(table != NULL);
+	sql_set_multi_write(parse, false);
+	int stat_cursor = parse->nTab;
+	parse->nTab += 3;
+	vdbe_emit_stat_space_open(parse, stat_cursor, table->def->name);
+	analyzeOneTable(parse, table, NULL, stat_cursor, parse->nMem + 1,
+			parse->nTab);
+	loadAnalysis(parse);
 }
 
 /*
@@ -1184,7 +1157,7 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 							"allowed to be "\
 							"analyzed");
 				} else {
-					analyzeTable(pParse, pTab, NULL);
+					vdbe_emit_analyze_table(pParse, pTab);
 				}
 			}
 			sqlite3DbFree(db, z);

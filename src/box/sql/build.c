@@ -2050,6 +2050,60 @@ sql_store_select(struct Parse *parse_context, struct Select *select)
 }
 
 /**
+ * Create expression record "@col_name = '@col_value'".
+ *
+ * @param parse The parsing context.
+ * @param col_name Name of column.
+ * @param col_value Name of row.
+ * @retval not NULL on success.
+ * @retval NULL on failure.
+ */
+static struct Expr *
+sql_id_eq_str_expr(struct Parse *parse, const char *col_name,
+		   const char *col_value)
+{
+	struct sqlite3 *db = parse->db;
+
+	struct Expr *col_name_expr = sqlite3Expr(db, TK_ID, col_name);
+	if (col_name_expr == NULL)
+		return NULL;
+	struct Expr *col_value_expr = sqlite3Expr(db, TK_STRING, col_value);
+	if (col_value_expr == NULL) {
+		sql_expr_delete(db, col_name_expr, false);
+		return NULL;
+	}
+	return sqlite3PExpr(parse, TK_EQ, col_name_expr, col_value_expr);
+}
+
+void
+vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
+			   const char *idx_name, const char *table_name)
+{
+	assert(idx_name != NULL || table_name != NULL);
+	struct sqlite3 *db = parse->db;
+	assert(!db->mallocFailed);
+	struct SrcList *src_list = sql_alloc_src_list(db);
+	if (src_list != NULL)
+		src_list->a[0].zName = sqlite3DbStrDup(db, stat_table_name);
+	struct Expr *where = NULL;
+	if (idx_name != NULL) {
+		struct Expr *expr = sql_id_eq_str_expr(parse, "idx", idx_name);
+		if (expr != NULL)
+			where = sqlite3ExprAnd(db, expr, where);
+	}
+	if (table_name != NULL) {
+		struct Expr *expr = sql_id_eq_str_expr(parse, "tbl", table_name);
+		if (expr != NULL)
+			where = sqlite3ExprAnd(db, expr, where);
+	}
+	/**
+	 * On memory allocation error sql_table delete_from
+	 * releases memory for its own.
+	 */
+	sql_table_delete_from(parse, src_list, where);
+}
+
+/**
  * Remove entries from the _sql_stat1 and _sql_stat4
  * system spaces after a DROP INDEX or DROP TABLE command.
  *
@@ -2059,30 +2113,11 @@ sql_store_select(struct Parse *parse_context, struct Select *select)
  * @param idx_name   Index to be dropped.
  */
 static void
-sql_clear_stat_spaces(Parse *parse, const char *table_name,
+sql_clear_stat_spaces(struct Parse *parse, const char *table_name,
 		      const char *idx_name)
 {
-	if (idx_name != NULL) {
-		sqlite3NestedParse(parse,
-				   "DELETE FROM \"_sql_stat1\" "
-				   "WHERE (\"idx\"=%Q AND "
-				   "\"tbl\"=%Q)",
-				   idx_name, table_name);
-		sqlite3NestedParse(parse,
-				   "DELETE FROM \"_sql_stat4\" "
-				   "WHERE (\"idx\"=%Q AND "
-				   "\"tbl\"=%Q)",
-				   idx_name, table_name);
-	} else {
-		sqlite3NestedParse(parse,
-				   "DELETE FROM \"_sql_stat1\" "
-				   "WHERE \"tbl\"=%Q",
-				   table_name);
-		sqlite3NestedParse(parse,
-				   "DELETE FROM \"_sql_stat4\" "
-				   "WHERE \"tbl\"=%Q",
-				   table_name);
-	}
+	vdbe_emit_stat_space_clear(parse, "_sql_stat4", idx_name, table_name);
+	vdbe_emit_stat_space_clear(parse, "_sql_stat1", idx_name, table_name);
 }
 
 /**

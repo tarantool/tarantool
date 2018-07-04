@@ -4847,4 +4847,17 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 				  const char *error_src, bool no_error,
 				  int cond_opcode);
 
+/**
+ * Generate VDBE code to delete records from system _sql_stat1 or
+ * _sql_stat4 table.
+ *
+ * @param parse The parsing context.
+ * @param stat_table_name System stat table name.
+ * @param idx_name Index name.
+ * @param table_name Table name.
+ */
+void
+vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
+			   const char *idx_name, const char *table_name);
+
 #endif				/* SQLITEINT_H */
