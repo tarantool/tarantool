@@ -126,9 +126,9 @@ struct vy_task {
 	 * a worker thread.
 	 */
 	struct fiber *fiber;
-	/** Return code of ->execute. */
-	int status;
-	/** If ->execute fails, the error is stored here. */
+	/** Set if the task failed. */
+	bool is_failed;
+	/** In case of task failure the error is stored here. */
 	struct diag diag;
 	/** LSM tree this task is for. */
 	struct vy_lsm *lsm;
@@ -1336,10 +1336,10 @@ static int
 vy_task_f(va_list va)
 {
 	struct vy_task *task = va_arg(va, struct vy_task *);
-	task->status = task->ops->execute(task);
-	if (task->status != 0) {
+	if (task->ops->execute(task) != 0) {
 		struct diag *diag = diag_get();
 		assert(!diag_is_empty(diag));
+		task->is_failed = true;
 		diag_move(diag, &task->diag);
 	}
 	cmsg_init(&task->cmsg, vy_task_complete_route);
@@ -1360,7 +1360,7 @@ vy_task_execute_f(struct cmsg *cmsg)
 	assert(task->fiber == NULL);
 	task->fiber = fiber_new("task", vy_task_f);
 	if (task->fiber == NULL) {
-		task->status = -1;
+		task->is_failed = true;
 		diag_move(diag_get(), &task->diag);
 		cmsg_init(&task->cmsg, vy_task_complete_route);
 		cpipe_push(&task->worker->tx_pipe, &task->cmsg);
@@ -1526,7 +1526,7 @@ vy_task_complete(struct vy_task *task)
 	}
 
 	struct diag *diag = &task->diag;
-	if (task->status != 0) {
+	if (task->is_failed) {
 		assert(!diag_is_empty(diag));
 		goto fail; /* ->execute fialed */
 	}
