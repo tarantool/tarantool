@@ -375,9 +375,9 @@ box_check_say()
 				tnt_raise(ClientError, ER_CFG, "log",
 					  diag_last_error(diag_get())->errmsg);
 			}
+			diag_raise();
 		}
 		say_free_syslog_opts(&opts);
-		diag_raise();
 	}
 
 	const char *log_format = cfg_gets("log_format");
