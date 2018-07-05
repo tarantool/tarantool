@@ -45,7 +45,7 @@ s:select(1)
 session.su('admin')
 --
 -- Check write access on space
--- 
+--
 box.schema.user.grant('testus', 'write', 'space', 'admin_space')
 
 session.su('testus')
@@ -185,7 +185,7 @@ box.schema.user.grant('testuser', 'usage,session', 'universe')
 --
 -- Check that itertors check privileges
 --
-s = box.schema.space.create('glade') 
+s = box.schema.space.create('glade')
 box.schema.user.grant('testuser', 'read', 'space', 'glade')
 index = s:create_index('primary', {unique = true, parts = {1, 'unsigned', 2, 'string'}})
 s:insert({1, 'A'})
@@ -194,12 +194,12 @@ s:insert({3, 'C'})
 s:insert({4, 'D'})
 
 t = {}
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 session.su('testuser')
 s:select()
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 session.su('admin')
@@ -207,26 +207,26 @@ box.schema.user.revoke('testuser', 'read', 'space', 'glade')
 box.schema.user.grant('testuser', 'write', 'space', 'glade')
 session.su('testuser')
 s:select()
-for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 session.su('admin')
 box.schema.user.grant('testuser', 'read, write, execute', 'space', 'glade')
 session.su('testuser')
 s:select()
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 
 session.su('guest')
 s:select()
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 t = {}
 
 session.su('guest')
 s:select()
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 t
 
 --
@@ -295,3 +295,17 @@ box.space._space:select()
 box.space._func:select()
 
 session = nil
+
+--  produce an error if revoking a non-granted privilege
+box.schema.user.create("tester")
+box.schema.user.grant('tester', 'read', 'universe')
+-- error: the privilege is not granted
+box.schema.user.revoke('tester', 'create', 'universe')
+-- no error: if_exists clause
+box.schema.user.revoke('tester', 'create', 'universe', nil, { if_exists = true })
+-- no error: the privilege is granted
+box.schema.user.revoke('tester', 'read', 'universe')
+box.schema.user.grant('tester', 'read', 'universe')
+-- no error: some privileges are revoked
+box.schema.user.revoke('tester', 'read,create', 'universe')
+box.schema.user.drop('tester')

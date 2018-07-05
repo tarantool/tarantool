@@ -2142,6 +2142,14 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
     -- (erroneous user input)
     --
     privilege_hex = bit.band(old_privilege, bit.bnot(privilege_hex))
+    -- give an error if we're not revoking anything
+    if privilege_hex == old_privilege then
+        if options.if_exists then
+            return
+        end
+        box.error(box.error.PRIV_NOT_GRANTED, name, privilege,
+                  object_type, object_name)
+    end
     if privilege_hex ~= 0 then
         _priv:replace{grantor, uid, object_type, oid, privilege_hex}
     else
