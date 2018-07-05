@@ -877,6 +877,7 @@ box.session.on_disconnect(nil, on_disconnect)
 --
 box.schema.user.grant('guest', 'write', 'space', '_space')
 box.schema.user.grant('guest', 'write', 'space', '_schema')
+box.schema.user.grant('guest', 'create', 'universe')
 count = 0
 function create_space(name) count = count + 1 box.schema.create_space(name) return true end
 c = net.connect(box.cfg.listen)
@@ -891,6 +892,7 @@ box.space.test2:drop()
 box.space.test3:drop()
 box.schema.user.revoke('guest', 'write', 'space', '_space')
 box.schema.user.revoke('guest', 'write', 'space', '_schema')
+box.schema.user.revoke('guest', 'create', 'universe')
 c:close()
 
 --

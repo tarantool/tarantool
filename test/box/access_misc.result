@@ -350,6 +350,9 @@ maxuid = box.space._user.index.primary:max()[1]
 box.schema.user.grant('testuser', 'write', 'space', '_user')
 ---
 ...
+box.schema.user.grant('testuser', 'create', 'universe')
+---
+...
 session.su('testuser')
 ---
 ...
@@ -434,6 +437,9 @@ box.schema.user.revoke('testuser', 'usage,session', 'universe')
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 ---
 - error: User 'testuser' does not have read, write, execute access on universe 'nil'
+...
+box.schema.user.revoke('testuser', 'create', 'universe')
+---
 ...
 box.schema.user.grant('testuser', 'usage,session', 'universe')
 ---

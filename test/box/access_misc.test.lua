@@ -147,6 +147,7 @@ box.schema.user.create('testuser')
 maxuid = box.space._user.index.primary:max()[1]
 
 box.schema.user.grant('testuser', 'write', 'space', '_user')
+box.schema.user.grant('testuser', 'create', 'universe')
 session.su('testuser')
 testuser_uid = session.uid()
 _ = box.space._user:delete(2)
@@ -181,6 +182,7 @@ box.space._index:insert{512, 1,'owner','tree', 1, 1, 0,'unsigned'}
 session.su('admin')
 box.schema.user.revoke('testuser', 'usage,session', 'universe')
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
+box.schema.user.revoke('testuser', 'create', 'universe')
 box.schema.user.grant('testuser', 'usage,session', 'universe')
 --
 -- Check that itertors check privileges

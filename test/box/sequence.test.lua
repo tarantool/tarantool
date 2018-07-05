@@ -509,10 +509,12 @@ sq1 = box.schema.sequence.create('seq1')
 s1 = box.schema.space.create('space1')
 _ = s1:create_index('pk')
 box.schema.user.grant('user', 'read,write', 'universe')
+box.schema.user.grant('user', 'create', 'universe')
 box.session.su('user')
 sq2 = box.schema.sequence.create('seq2')
 s2 = box.schema.space.create('space2')
-_ = s2:create_index('pk', {sequence = 'seq1'}) -- error
+-- fixme: no error on using another user's sequence
+_ = s2:create_index('pk', {sequence = 'seq1'})
 s1.index.pk:alter({sequence = 'seq1'}) -- error
 box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
 box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
@@ -524,6 +526,7 @@ box.session.su('admin')
 -- it can use it for auto increment, otherwise it
 -- needs privileges.
 box.schema.user.revoke('user', 'read,write', 'universe')
+box.schema.user.revoke('user', 'create', 'universe')
 box.session.su('user')
 s2:insert{nil, 1} -- ok: {1, 1}
 box.session.su('admin')

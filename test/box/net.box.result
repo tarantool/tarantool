@@ -2146,6 +2146,9 @@ box.schema.user.grant('guest', 'write', 'space', '_space')
 box.schema.user.grant('guest', 'write', 'space', '_schema')
 ---
 ...
+box.schema.user.grant('guest', 'create', 'universe')
+---
+...
 count = 0
 ---
 ...
@@ -2192,6 +2195,9 @@ box.schema.user.revoke('guest', 'write', 'space', '_space')
 ---
 ...
 box.schema.user.revoke('guest', 'write', 'space', '_schema')
+---
+...
+box.schema.user.revoke('guest', 'create', 'universe')
 ---
 ...
 c:close()
