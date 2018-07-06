@@ -45,7 +45,7 @@
 #include "iproto_constants.h"
 #include "iterator_type.h"
 #include "salad/stailq.h"
-#include "schema.h" /* schema_version */
+#include "schema.h" /* space_cache_version */
 #include "trigger.h"
 #include "trivia/util.h"
 #include "tuple.h"
@@ -414,11 +414,11 @@ vy_tx_write_prepare(struct txv *v)
 	 *   In this case we need to dump the tree as is in order to
 	 *   guarantee dump consistency.
 	 *
-	 * - Schema version has increased after the tree was created.
+	 * - Schema state has increased after the tree was created.
 	 *   We have to seal the tree, because we don't support mixing
 	 *   statements of different formats in the same tree.
 	 */
-	if (unlikely(index->mem->schema_version != schema_version ||
+	if (unlikely(index->mem->space_cache_version != space_cache_version ||
 		     index->mem->generation != *index->env->p_generation)) {
 		if (vy_index_rotate_mem(index) != 0)
 			return -1;

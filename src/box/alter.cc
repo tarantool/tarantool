@@ -1305,6 +1305,27 @@ RebuildIndex::~RebuildIndex()
 		index_def_delete(new_index_def);
 }
 
+
+/**
+ * UpdateSchemaVersion - increment schema_version. Used on
+ * in alter_space_do(), i.e. when creating or dropping
+ * an index, altering a space.
+ */
+class UpdateSchemaVersion: public AlterSpaceOp
+{
+public:
+	UpdateSchemaVersion(struct alter_space * alter)
+		:AlterSpaceOp(alter) {}
+	virtual void alter(struct alter_space *alter);
+};
+
+void
+UpdateSchemaVersion::alter(struct alter_space *alter)
+{
+    (void)alter;
+    ++schema_version;
+}
+
 /* }}} */
 
 /**
@@ -1509,6 +1530,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		(void) space_cache_replace(space);
 		/*
+		 * Do not forget to update schema_version right after
+		 * inserting the space to the space_cache, since no
+		 * AlterSpaceOps are registered in case of space
+		 * create.
+		 */
+		++schema_version;
+		/*
 		 * So may happen that until the DDL change record
 		 * is written to the WAL, the space is used for
 		 * insert/update/delete. All these updates are
@@ -1552,6 +1580,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * execution on a replica.
 		 */
 		struct space *space = space_cache_delete(space_id(old_space));
+		/*
+		 * Do not forget to update schema_version right after
+		 * deleting the space from the space_cache, since no
+		 * AlterSpaceOps are registered in case of space drop.
+		 */
+		++schema_version;
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_space_commit, space);
 		txn_on_commit(txn, on_commit);
@@ -1603,6 +1637,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		def_guard.is_active = false;
 		/* Create MoveIndex ops for all space indexes. */
 		alter_space_move_indexes(alter, 0, old_space->index_id_max + 1);
+		/* Remember to update schema_version. */
+		(void) new UpdateSchemaVersion(alter);
 		alter_space_do(txn, alter);
 		alter_guard.is_active = false;
 	}
@@ -1800,6 +1836,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	 * old space.
 	 */
 	alter_space_move_indexes(alter, iid + 1, old_space->index_id_max + 1);
+	/* Add an op to update schema_version on commit. */
+	(void) new UpdateSchemaVersion(alter);
 	alter_space_do(txn, alter);
 	scoped_guard.is_active = false;
 }

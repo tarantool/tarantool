@@ -217,7 +217,7 @@ vy_index_new(struct vy_index_env *index_env, struct vy_cache_env *cache_env,
 
 	index->mem = vy_mem_new(mem_env, *index->env->p_generation,
 				cmp_def, format, index->mem_format_with_colmask,
-				index->upsert_format, schema_version);
+				index->upsert_format, space_cache_version);
 	if (index->mem == NULL)
 		goto fail_mem;
 
@@ -764,7 +764,7 @@ vy_index_rotate_mem(struct vy_index *index)
 	mem = vy_mem_new(index->mem->env, *index->env->p_generation,
 			 index->cmp_def, index->mem_format,
 			 index->mem_format_with_colmask,
-			 index->upsert_format, schema_version);
+			 index->upsert_format, space_cache_version);
 	if (mem == NULL)
 		return -1;
 

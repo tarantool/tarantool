@@ -98,7 +98,7 @@ struct vy_mem *
 vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	   const struct key_def *cmp_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
-	   struct tuple_format *upsert_format, uint32_t schema_version)
+	   struct tuple_format *upsert_format, uint32_t space_cache_version)
 {
 	struct vy_mem *index = calloc(1, sizeof(*index));
 	if (!index) {
@@ -111,7 +111,7 @@ vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	index->max_lsn = -1;
 	index->cmp_def = cmp_def;
 	index->generation = generation;
-	index->schema_version = schema_version;
+	index->space_cache_version = space_cache_version;
 	index->format = format;
 	tuple_format_ref(format);
 	index->format_with_colmask = format_with_colmask;
