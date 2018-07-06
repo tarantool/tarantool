@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(34)
+test:plan(38)
 
 --!./tcltestrunner.lua
 -- 2005 July 22
@@ -489,6 +489,63 @@ test:do_execsql_test(
         "T4"
         -- </analyze-5.5>
     })
+
+test:do_test(
+    "analyze-6.1.1",
+    function()
+        test:execsql("DROP TABLE IF EXISTS t1 ")
+        test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b, c, d, e);")
+        test:execsql("CREATE INDEX i1 ON t1(a, b, c, d);")
+        test:execsql("CREATE INDEX i2 ON t1(e);")
+
+        for i = 0, 100 do
+            box.sql.execute(string.format("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', %s, %s);", i, math.floor(i / 2)))
+        end;
+        for i = 0, 20 do
+            box.sql.execute("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', 101, "..i..");")
+        end;
+        for i = 102, 200 do
+            box.sql.execute(string.format("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', %s, %s);", i, math.floor(i / 2)))
+        end;
+
+        test:execsql("ANALYZE;")
+        return test:execsql("SELECT COUNT(* )FROM t1 WHERE a='x' AND b='y' AND c='z' AND d=101;;")
+    end, {
+    -- <analyze-6.1.1>
+    21
+    -- </analyze-6.1.1>
+})
+
+test:do_execsql_test(
+    "analyze-6.1.2",
+    [[
+            SELECT * FROM "_sql_stat1" where "tbl"='T1' and "idx"='I1' LIMIT 1;
+    ]], {
+    -- <analyze-6.1.2>
+    "T1", "I1", "221 221 221 221 2"
+    -- </analyze-6.1.2>
+})
+
+test:do_execsql_test(
+    "analyze-6.1.3",
+    [[
+            SELECT "tbl", "idx", "neq", "nlt", "ndlt" FROM "_sql_stat4" where "tbl"='T1' and "idx"='I1' ORDER BY "nlt" LIMIT 1;
+    ]], {
+    -- <analyze-6.1.3>
+    "T1", "I1", "221 221 221 1", "0 0 0 10", "0 0 0 10"
+    -- </analyze-6.1.3>
+})
+
+test:do_execsql_test(
+    "analyze-6.1.4",
+    [[
+            SELECT "tbl", "idx", "neq", "nlt", "ndlt" FROM "_sql_stat4" where "tbl"='T1' and "idx"='I1' ORDER BY "nlt" DESC LIMIT 1;
+    ]], {
+    -- <analyze-6.1.4>
+    "T1", "I1", "221 221 221 1", "0 0 0 99", "0 0 0 99"
+    -- </analyze-6.1.4>
+})
+
 -- # This test corrupts the database file so it must be the last test
 -- # in the series.
 -- #

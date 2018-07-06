@@ -997,7 +997,10 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		Index *pPk = sqlite3PrimaryKeyIndex(pIdx->pTable);
 		int j, k, regKeyStat;
 		int nPkColumn = (int)index_column_count(pPk);
-		regKeyStat = sqlite3GetTempRange(pParse, nPkColumn);
+		/* Allocate memory for array. */
+		pParse->nMem = MAX(pParse->nMem, regPrev + nColTest + nPkColumn);
+		regKeyStat = regPrev + nColTest;
+
 		for (j = 0; j < nPkColumn; j++) {
 			k = pPk->aiColumn[j];
 			assert(k >= 0 && k < (int)pTab->def->field_count);
@@ -1007,7 +1010,6 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		}
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regKeyStat,
 				  nPkColumn, regKey);
-		sqlite3ReleaseTempRange(pParse, regKeyStat, nPkColumn);
 
 		assert(regChng == (regStat4 + 1));
 		sqlite3VdbeAddOp4(v, OP_Function0, 1, regStat4, regTemp,
