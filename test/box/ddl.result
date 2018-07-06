@@ -580,16 +580,12 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
--- finish transaction
+-- Explicitly roll back the transaction in multi-statement,
+-- which hasn't finished due to DDL error
 box.rollback()
 ---
 ...
 _ = c:get()
----
-...
--- Explicitly roll back the transaction in multi-statement,
--- which hasn't finished due to DDL error
-box.rollback()
 ---
 ...
 test_latch:drop() -- this is where everything stops
