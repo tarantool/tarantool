@@ -340,7 +340,7 @@ c:close()
 
 session = box.session
 box.schema.user.create('test')
-box.schema.user.grant('test', 'read,write', 'universe')
+box.schema.user.grant('test', 'read,write,create', 'universe')
 session.su('test')
 box.internal.collation.create('test', 'ICU', 'ru_RU')
 session.su('admin')
@@ -668,4 +668,15 @@ s:drop()
 seq:drop()
 box.schema.func.drop("func")
 c:close()
+
+--
+-- A user with read/write access to sequence was able
+-- to create a sequence
+--
+box.schema.user.create('tester')
+box.schema.user.grant('tester', 'read,write', 'space', '_sequence')
+box.session.su('tester')
+_  = box.schema.sequence.create('test_sequence')
+box.session.su('admin')
+box.schema.user.drop('tester')
 

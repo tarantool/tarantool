@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(91)
+test:plan(92)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -163,6 +163,13 @@ function run_script(code)
     fio.rmdir(dir)
     return res
 end
+
+-- gh-3468: should allow box.cfg with vinyl_memory=0
+code =[[
+box.cfg{vinyl_memory=0}
+os.exit(box.cfg.vinyl_memory == 0 and 0 or 1)
+]]
+test:is(run_script(code), 0, "actually set vinyl_memory to 0")
 
 -- gh-715: Cannot switch to/from 'fsync'
 code = [[ box.cfg{ log="tarantool.log", wal_mode = 'fsync' }; ]]

@@ -21,7 +21,7 @@ set_property(DIRECTORY PROPERTY ADDITIONAL_MAKE_CLEAN_FILES ${lua_sources})
 
 include_directories(${ZSTD_INCLUDE_DIRS})
 
-add_library(box_error STATIC error.cc errcode.c)
+add_library(box_error STATIC error.cc errcode.c vclock.c)
 target_link_libraries(box_error core stat)
 
 add_library(vclock STATIC vclock.c)

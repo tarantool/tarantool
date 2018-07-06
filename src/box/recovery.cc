@@ -74,27 +74,6 @@
  * IRR -> RR        # recovery_follow_local()
  */
 
-const struct type_info type_XlogGapError =
-	make_type("XlogGapError", &type_XlogError);
-
-struct XlogGapError: public XlogError {
-	/** Used by BuildXlogGapError() */
-	XlogGapError(const char *file, unsigned line,
-		     const struct vclock *from, const struct vclock *to)
-		:XlogError(&type_XlogGapError, file, line)
-	{
-		char *s_from = vclock_to_string(from);
-		char *s_to = vclock_to_string(to);
-		snprintf(errmsg, sizeof(errmsg),
-			 "Missing .xlog file between LSN %lld %s and %lld %s",
-			 (long long) vclock_sum(from), s_from ? s_from : "",
-			 (long long) vclock_sum(to), s_to ? s_to : "");
-		free(s_from);
-		free(s_to);
-	}
-	virtual void raise() { throw this; }
-};
-
 /* {{{ Initial recovery */
 
 /**
@@ -150,6 +129,60 @@ recovery_close_log(struct recovery *r)
 	}
 	xlog_cursor_close(&r->cursor, false);
 	trigger_run_xc(&r->on_close_log, NULL);
+}
+
+static void
+recovery_open_log(struct recovery *r, const struct vclock *vclock)
+{
+	XlogGapError *e;
+	struct xlog_meta meta = r->cursor.meta;
+	enum xlog_cursor_state state = r->cursor.state;
+
+	recovery_close_log(r);
+
+	xdir_open_cursor_xc(&r->wal_dir, vclock_sum(vclock), &r->cursor);
+
+	if (state == XLOG_CURSOR_NEW &&
+	    vclock_compare(vclock, &r->vclock) > 0) {
+		/*
+		 * This is the first WAL we are about to scan
+		 * and the best clock we could find is greater
+		 * or is incomparable with the initial recovery
+		 * position.
+		 */
+		goto gap_error;
+	}
+
+	if (state != XLOG_CURSOR_NEW &&
+	    r->cursor.meta.has_prev_vclock &&
+	    vclock_compare(&r->cursor.meta.prev_vclock, &meta.vclock) != 0) {
+		/*
+		 * WALs are missing between the last scanned WAL
+		 * and the next one.
+		 */
+		goto gap_error;
+	}
+out:
+	/*
+	 * We must promote recovery clock even if we don't recover
+	 * anything from the next WAL. Otherwise if the last WAL
+	 * in the directory is corrupted or empty and the previous
+	 * one has an LSN gap at the end (due to a write error),
+	 * we will create the next WAL between two existing ones,
+	 * thus breaking the file order.
+	 */
+	if (vclock_compare(&r->vclock, vclock) < 0)
+		vclock_copy(&r->vclock, vclock);
+	return;
+
+gap_error:
+	e = tnt_error(XlogGapError, &r->vclock, vclock);
+	if (!r->wal_dir.force_recovery)
+		throw e;
+	/* Ignore missing WALs if force_recovery is set. */
+	e->log();
+	say_warn("ignoring a gap in LSN");
+	goto out;
 }
 
 void
@@ -277,25 +310,7 @@ recover_remaining_wals(struct recovery *r, struct xstream *stream,
 			continue;
 		}
 
-		if (vclock_compare(clock, &r->vclock) > 0) {
-			/**
-			 * The best clock we could find is
-			 * greater or is incomparable with the
-			 * current state of recovery.
-			 */
-			XlogGapError *e =
-				tnt_error(XlogGapError, &r->vclock, clock);
-
-			if (!r->wal_dir.force_recovery)
-				throw e;
-			e->log();
-			/* Ignore missing WALs */
-			say_warn("ignoring a gap in LSN");
-		}
-
-		recovery_close_log(r);
-
-		xdir_open_cursor_xc(&r->wal_dir, vclock_sum(clock), &r->cursor);
+		recovery_open_log(r, clock);
 
 		say_info("recover from `%s'", r->cursor.name);
 
@@ -316,29 +331,6 @@ void
 recovery_finalize(struct recovery *r)
 {
 	recovery_close_log(r);
-
-	/*
-	 * Check if next xlog exists. If it's true this xlog is
-	 * corrupted and we should rename it (to avoid getting
-	 * problem on the next xlog write with the same name).
-	 * Possible reasons are:
-	 *  - last xlog has corrupted rows
-	 *  - last xlog has corrupted header
-	 *  - last xlog has zero size
-	 */
-	char *name = xdir_format_filename(&r->wal_dir,
-					  vclock_sum(&r->vclock),
-					  NONE);
-	if (access(name, F_OK) == 0) {
-		say_info("rename corrupted xlog %s", name);
-		char to[PATH_MAX];
-		snprintf(to, sizeof(to), "%s.corrupted", name);
-		if (rename(name, to) != 0) {
-			tnt_raise(SystemError,
-				  "%s: can't rename corrupted xlog",
-				  name);
-		}
-	}
 }
 
 

@@ -34,6 +34,8 @@
 #include "fiber.h"
 #include "fio.h"
 #include "errinj.h"
+#include "error.h"
+#include "exception.h"
 
 #include "xlog.h"
 #include "xrow.h"
@@ -310,6 +312,75 @@ wal_thread_start()
 	cpipe_set_max_input(&wal_thread.wal_pipe, IOV_MAX);
 }
 
+static int
+wal_open_f(struct cbus_call_msg *msg)
+{
+	(void)msg;
+	struct wal_writer *writer = &wal_writer_singleton;
+	const char *path = xdir_format_filename(&writer->wal_dir,
+				vclock_sum(&writer->vclock), NONE);
+	assert(!xlog_is_open(&writer->current_wal));
+	return xlog_open(&writer->current_wal, path);
+}
+
+/**
+ * Try to open the current WAL file for appending if it exists.
+ */
+static int
+wal_open(struct wal_writer *writer)
+{
+	const char *path = xdir_format_filename(&writer->wal_dir,
+				vclock_sum(&writer->vclock), NONE);
+	if (access(path, F_OK) != 0) {
+		if (errno == ENOENT) {
+			/* No WAL, nothing to do. */
+			return 0;
+		}
+		diag_set(SystemError, "failed to access %s", path);
+		return -1;
+	}
+
+	/*
+	 * The WAL file exists, try to open it.
+	 *
+	 * Note, an xlog object cannot be opened and used in
+	 * different threads (because it uses slab arena), so
+	 * we have to call xlog_open() on behalf of the WAL
+	 * thread.
+	 */
+	struct cbus_call_msg msg;
+	if (cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+		      wal_open_f, NULL, TIMEOUT_INFINITY) == 0) {
+		/*
+		 * Success: we can now append to
+		 * the existing WAL file.
+		 */
+		return 0;
+	}
+	struct error *e = diag_last_error(diag_get());
+	if (!type_assignable(&type_XlogError, e->type)) {
+		/*
+		 * Out of memory or system error.
+		 * Nothing we can do.
+		 */
+		return -1;
+	}
+	diag_log();
+
+	/*
+	 * Looks like the WAL file is corrupted.
+	 * Rename it so that we can proceed.
+	 */
+	say_warn("renaming corrupted %s", path);
+	char new_path[PATH_MAX];
+	snprintf(new_path, sizeof(new_path), "%s.corrupted", path);
+	if (rename(path, new_path) != 0) {
+		diag_set(SystemError, "failed to rename %s", path);
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * Initialize WAL writer.
  *
@@ -330,6 +401,9 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 			  vclock, wal_max_rows, wal_max_size);
 
 	if (xdir_scan(&writer->wal_dir))
+		return -1;
+
+	if (wal_open(writer) != 0)
 		return -1;
 
 	journal_set(&writer->base);
@@ -382,8 +456,7 @@ wal_checkpoint_f(struct cmsg *data)
 
 		xlog_close(&writer->current_wal, false);
 		/*
-		 * Avoid creating an empty xlog if this is the
-		 * last snapshot before shutdown.
+		 * The next WAL will be created on the first write.
 		 */
 	}
 	vclock_copy(msg->vclock, &writer->vclock);
@@ -702,6 +775,23 @@ wal_thread_f(va_list ap)
 	cbus_loop(&endpoint);
 
 	struct wal_writer *writer = &wal_writer_singleton;
+
+	/*
+	 * Create a new empty WAL on shutdown so that we don't
+	 * have to rescan the last WAL to find the instance vclock.
+	 * Don't create a WAL if the last one is empty.
+	 */
+	if (writer->wal_mode != WAL_NONE &&
+	    (!xlog_is_open(&writer->current_wal) ||
+	     vclock_compare(&writer->vclock,
+			    &writer->current_wal.meta.vclock) > 0)) {
+		struct xlog l;
+		if (xdir_create_xlog(&writer->wal_dir, &l,
+				     &writer->vclock) == 0)
+			xlog_close(&l, false);
+		else
+			diag_log();
+	}
 
 	if (xlog_is_open(&writer->current_wal))
 		xlog_close(&writer->current_wal, false);

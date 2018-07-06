@@ -4,6 +4,10 @@ space = box.schema.space.create('test')
 index = box.space.test:create_index('primary')
 ---
 ...
+box.snapshot()
+---
+- ok
+...
 box.space.test:insert{1, 'first tuple'}
 ---
 - [1, 'first tuple']
@@ -13,20 +17,6 @@ box.space.test:insert{2, 'second tuple'}
 - [2, 'second tuple']
 ...
 .xlog exists
-space = box.schema.space.create('test')
----
-...
-index = box.space.test:create_index('primary')
----
-...
-box.space.test:insert{1, 'first tuple'}
----
-- [1, 'first tuple']
-...
-box.space.test:delete{1}
----
-- [1, 'first tuple']
-...
 box.space.test:insert{1, 'third tuple'}
 ---
 - [1, 'third tuple']
@@ -35,7 +25,7 @@ box.space.test:insert{2, 'fourth tuple'}
 ---
 - [2, 'fourth tuple']
 ...
-.xlog exists
+.xlog does not exist
 check log line for 'Duplicate key'
 
 'Duplicate key' exists in server log

@@ -36,6 +36,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct vclock;
+
 struct error *
 BuildClientError(const char *file, unsigned line, uint32_t errcode, ...);
 
@@ -44,6 +46,12 @@ BuildAccessDeniedError(const char *file, unsigned int line,
 		       const char *access_type, const char *object_type,
 		       const char *object_name, const char *user_name);
 
+struct error *
+BuildXlogError(const char *file, unsigned line, const char *format, ...);
+
+struct error *
+BuildXlogGapError(const char *file, unsigned line,
+		  const struct vclock *from, const struct vclock *to);
 
 /** \cond public */
 
@@ -246,6 +254,14 @@ struct XlogError: public Exception
 		:Exception(type, file, line)
 	{
 	}
+
+	virtual void raise() { throw this; }
+};
+
+struct XlogGapError: public XlogError
+{
+	XlogGapError(const char *file, unsigned line,
+		     const struct vclock *from, const struct vclock *to);
 
 	virtual void raise() { throw this; }
 };

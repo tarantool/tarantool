@@ -248,8 +248,6 @@ BuildIllegalParams(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildSystemError(const char *file, unsigned line, const char *format, ...);
 struct error *
-BuildXlogError(const char *file, unsigned line, const char *format, ...);
-struct error *
 BuildCollationError(const char *file, unsigned line, const char *format, ...);
 
 struct index_def;

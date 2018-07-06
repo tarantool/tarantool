@@ -90,24 +90,27 @@ access_check_ddl(const char *name, uint32_t owner_uid,
 	 * specific DDL privilege on the object can execute
 	 * DDL. If a user has no USAGE access and is owner,
 	 * deny access as well.
+	 * If a user wants to CREATE an object, they're of course
+	 * the owner of the object, but this should be ignored --
+	 * CREATE privilege is required.
 	 */
-	if (access == 0 || (is_owner && !(access & PRIV_U)))
+	if (access == 0 || (is_owner && !(access & (PRIV_U|PRIV_C))))
 		return; /* Access granted. */
 
+	/* Create a meaningful error message. */
 	struct user *user = user_find_xc(cr->uid);
-	if (is_owner) {
-		tnt_raise(AccessDeniedError,
-			  priv_name(PRIV_U),
-			  schema_object_name(SC_UNIVERSE),
-			  "",
-			  user->def->name);
+	const char *object_name;
+	const char *pname;
+	if (access & PRIV_U) {
+		object_name = schema_object_name(SC_UNIVERSE);
+		pname = priv_name(PRIV_U);
+		name = "";
 	} else {
-		tnt_raise(AccessDeniedError,
-			  priv_name(access),
-			  schema_object_name(type),
-			  name,
-			  user->def->name);
+		object_name = schema_object_name(type);
+		pname = priv_name(access);
 	}
+	tnt_raise(AccessDeniedError, pname, object_name, name,
+		  user->def->name);
 }
 
 /**

@@ -240,11 +240,11 @@ box.cfg{memtx_memory = "100500"}
 ...
 box.cfg{memtx_memory = -1}
 ---
-- error: 'Incorrect value for option ''memtx_memory'': must be greater than 0'
+- error: 'Incorrect value for option ''memtx_memory'': must not be less than 0'
 ...
 box.cfg{vinyl_memory = -1}
 ---
-- error: 'Incorrect value for option ''vinyl_memory'': must be greater than 0'
+- error: 'Incorrect value for option ''vinyl_memory'': must not be less than 0'
 ...
 box.cfg{vinyl = "vinyl"}
 ---
