@@ -123,10 +123,10 @@ extern "C" {
 /**
  * @brief BitsetIndex
  */
-struct bitset_index {
+struct tt_bitset_index {
 	/** @cond false **/
 	/* Used bitsets */
-	struct bitset **bitsets;
+	struct tt_bitset **bitsets;
 	/* Capacity of bitsets array */
 	size_t capacity;
 	/* Memory allocator to use */
@@ -142,15 +142,15 @@ struct bitset_index {
  * @param realloc memory allocator to use
  */
 void
-bitset_index_create(struct bitset_index *index,
-		    void *(*realloc)(void *ptr, size_t size));
+tt_bitset_index_create(struct tt_bitset_index *index,
+		       void *(*realloc)(void *ptr, size_t size));
 
 /**
  * @brief Destruct \a index
  * @param index bitset index
  */
 void
-bitset_index_destroy(struct bitset_index *index);
+tt_bitset_index_destroy(struct tt_bitset_index *index);
 
 /**
  * @brief Insert (\a key, \a value) pair into \a index.
@@ -166,8 +166,8 @@ bitset_index_destroy(struct bitset_index *index);
  * @retval -1 on memory error
  */
 int
-bitset_index_insert(struct bitset_index *index, const void *key, size_t key_size,
-		    size_t value);
+tt_bitset_index_insert(struct tt_bitset_index *index, const void *key,
+		       size_t key_size, size_t value);
 
 /**
  * @brief Remove a pair with \a value (*, \a value) from \a index.
@@ -175,7 +175,7 @@ bitset_index_insert(struct bitset_index *index, const void *key, size_t key_size
  * @param value value
  */
 void
-bitset_index_remove_value(struct bitset_index *index, size_t value);
+tt_bitset_index_remove_value(struct tt_bitset_index *index, size_t value);
 
 /**
  * @brief Initialize \a expr to iterate over a bitset index.
@@ -190,7 +190,7 @@ bitset_index_remove_value(struct bitset_index *index, size_t value);
  * @see expr.h
  */
 int
-bitset_index_expr_all(struct bitset_expr *expr);
+tt_bitset_index_expr_all(struct tt_bitset_expr *expr);
 
 /**
  * @brief Initialize \a expr to iterate over a bitset index.
@@ -208,8 +208,8 @@ bitset_index_expr_all(struct bitset_expr *expr);
  * @see expr.h
  */
 int
-bitset_index_expr_equals(struct bitset_expr *expr, const void *key,
-			 size_t key_size);
+tt_bitset_index_expr_equals(struct tt_bitset_expr *expr, const void *key,
+			    size_t key_size);
 
 /**
  * @brief Initialize \a expr to iterate over a bitset index.
@@ -225,8 +225,8 @@ bitset_index_expr_equals(struct bitset_expr *expr, const void *key,
  * @see expr.h
  */
 int
-bitset_index_expr_all_set(struct bitset_expr *expr, const void *key,
-			  size_t key_size);
+tt_bitset_index_expr_all_set(struct tt_bitset_expr *expr, const void *key,
+			     size_t key_size);
 
 /**
  * @brief Initialize \a expr to iterate over a bitset index.
@@ -242,8 +242,8 @@ bitset_index_expr_all_set(struct bitset_expr *expr, const void *key,
  * @see expr.h
  */
 int
-bitset_index_expr_any_set(struct bitset_expr *expr, const void *key,
-			  size_t key_size);
+tt_bitset_index_expr_any_set(struct tt_bitset_expr *expr, const void *key,
+			     size_t key_size);
 
 /**
  * @brief Initialize \a expr to iterate over a bitset index.
@@ -259,8 +259,8 @@ bitset_index_expr_any_set(struct bitset_expr *expr, const void *key,
  * @see expr.h
  */
 int
-bitset_index_expr_all_not_set(struct bitset_expr *expr, const void *key,
-			      size_t key_size);
+tt_bitset_index_expr_all_not_set(struct tt_bitset_expr *expr, const void *key,
+				 size_t key_size);
 
 /**
  * @brief Initialize \a it using \a expr and bitsets used in \a index.
@@ -272,9 +272,9 @@ bitset_index_expr_all_not_set(struct bitset_expr *expr, const void *key,
  * @retval 1 on memory error
  */
 int
-bitset_index_init_iterator(struct bitset_index *index,
-			   struct bitset_iterator *it,
-			   struct bitset_expr *expr);
+tt_bitset_index_init_iterator(struct tt_bitset_index *index,
+			      struct tt_bitset_iterator *it,
+			      struct tt_bitset_expr *expr);
 
 /**
  * @brief Checks if a (*, \a value) pair exists in \a index
@@ -284,7 +284,7 @@ bitset_index_init_iterator(struct bitset_index *index,
  * @retval false otherwise
  */
 bool
-bitset_index_contains_value(struct bitset_index *index, size_t value);
+tt_bitset_index_contains_value(struct tt_bitset_index *index, size_t value);
 
 /**
  * @brief Return the number of pairs in \a index.
@@ -292,9 +292,9 @@ bitset_index_contains_value(struct bitset_index *index, size_t value);
  * @return number of pairs in \a index
  */
 inline size_t
-bitset_index_size(const struct bitset_index *index)
+tt_bitset_index_size(const struct tt_bitset_index *index)
 {
-	return bitset_cardinality(index->bitsets[0]);
+	return tt_bitset_cardinality(index->bitsets[0]);
 }
 
 /**
@@ -304,11 +304,11 @@ bitset_index_size(const struct bitset_index *index)
  * @retval the number of (key, value ) pairs where (@a bit & key) != 0
  */
 inline size_t
-bitset_index_count(const struct bitset_index *index, size_t bit)
+tt_bitset_index_count(const struct tt_bitset_index *index, size_t bit)
 {
 	if (bit + 1 >= index->capacity)
 		return 0;
-	return bitset_cardinality(index->bitsets[bit + 1]);
+	return tt_bitset_cardinality(index->bitsets[bit + 1]);
 }
 
 /**
@@ -318,11 +318,11 @@ bitset_index_count(const struct bitset_index *index, size_t bit)
  * @return number of bytes used by index.
  */
 size_t
-bitset_index_bsize(const struct bitset_index *index);
+tt_bitset_index_bsize(const struct tt_bitset_index *index);
 
 #if defined(DEBUG)
 void
-bitset_index_dump(struct bitset_index *index, int verbose, FILE *stream);
+tt_bitset_index_dump(struct tt_bitset_index *index, int verbose, FILE *stream);
 #endif /* defined(DEBUG) */
 
 #if defined(__cplusplus)

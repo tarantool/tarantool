@@ -33,38 +33,38 @@
 #include "bitset/bitset.h"
 
 extern inline size_t
-bitset_page_alloc_size(void *(*realloc_arg)(void *ptr, size_t size));
+tt_bitset_page_alloc_size(void *(*realloc_arg)(void *ptr, size_t size));
 
 extern inline void *
-bitset_page_data(struct bitset_page *page);
+tt_bitset_page_data(struct tt_bitset_page *page);
 
 extern inline void
-bitset_page_create(struct bitset_page *page);
+tt_bitset_page_create(struct tt_bitset_page *page);
 
 extern inline void
-bitset_page_destroy(struct bitset_page *page);
+tt_bitset_page_destroy(struct tt_bitset_page *page);
 
 extern inline size_t
-bitset_page_first_pos(size_t pos);
+tt_bitset_page_first_pos(size_t pos);
 
 extern inline void
-bitset_page_set_zeros(struct bitset_page *page);
+tt_bitset_page_set_zeros(struct tt_bitset_page *page);
 
 extern inline void
-bitset_page_set_ones(struct bitset_page *page);
+tt_bitset_page_set_ones(struct tt_bitset_page *page);
 
 extern inline void
-bitset_page_and(struct bitset_page *dst, struct bitset_page *src);
+tt_bitset_page_and(struct tt_bitset_page *dst, struct tt_bitset_page *src);
 
 extern inline void
-bitset_page_nand(struct bitset_page *dst, struct bitset_page *src);
+tt_bitset_page_nand(struct tt_bitset_page *dst, struct tt_bitset_page *src);
 
 extern inline void
-bitset_page_or(struct bitset_page *dst, struct bitset_page *src);
+tt_bitset_page_or(struct tt_bitset_page *dst, struct tt_bitset_page *src);
 
 #if defined(DEBUG)
 void
-bitset_page_dump(struct bitset_page *page, FILE *stream)
+tt_bitset_page_dump(struct tt_bitset_page *page, FILE *stream)
 {
 	fprintf(stream, "Page %zu:\n", page->first_pos);
 	char *d = bitset_page_data(page);
@@ -77,7 +77,7 @@ bitset_page_dump(struct bitset_page *page, FILE *stream)
 #endif /* defined(DEBUG) */
 
 static inline int
-page_cmp(const struct bitset_page *a, const struct bitset_page *b)
+page_cmp(const struct tt_bitset_page *a, const struct tt_bitset_page *b)
 {
 	if (a->first_pos < b->first_pos) {
 		return -1;
@@ -88,4 +88,5 @@ page_cmp(const struct bitset_page *a, const struct bitset_page *b)
 	}
 }
 
-rb_gen(, bitset_pages_, bitset_pages_t, struct bitset_page, node, page_cmp)
+rb_gen(, tt_bitset_pages_, tt_bitset_pages_t, struct tt_bitset_page, node,
+	page_cmp)

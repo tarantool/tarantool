@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(92)
+test:plan(93)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -143,6 +143,7 @@ local status, reason = pcall(function()
     box.space._schema:insert({'read_only', 'test'})
 end)
 test:ok(status, "read_only = false")
+test:ok(box.space._schema:delete{'read_only'}, "drop read_only")
 
 -- gh-2663: box.cfg() parameter to set the number of coio threads
 box.cfg({ worker_pool_threads = 1})

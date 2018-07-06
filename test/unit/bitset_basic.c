@@ -11,43 +11,43 @@ void test_cardinality()
 {
 	header();
 
-	struct bitset bm;
-	bitset_create(&bm, realloc);
+	struct tt_bitset bm;
+	tt_bitset_create(&bm, realloc);
 
-	fail_unless(bitset_cardinality(&bm) == 0);
+	fail_unless(tt_bitset_cardinality(&bm) == 0);
 
 	size_t cnt = 0;
-	fail_if(bitset_set(&bm, 10) < 0);
+	fail_if(tt_bitset_set(&bm, 10) < 0);
 	cnt++;
-	fail_if(bitset_set(&bm, 15) < 0);
+	fail_if(tt_bitset_set(&bm, 15) < 0);
 	cnt++;
-	fail_if(bitset_set(&bm, 20) < 0);
+	fail_if(tt_bitset_set(&bm, 20) < 0);
 	cnt++;
 
-	fail_unless(bitset_cardinality(&bm) == cnt);
+	fail_unless(tt_bitset_cardinality(&bm) == cnt);
 
-	fail_if(bitset_set(&bm, 10) < 0);
-	fail_unless(bitset_cardinality(&bm) == cnt);
+	fail_if(tt_bitset_set(&bm, 10) < 0);
+	fail_unless(tt_bitset_cardinality(&bm) == cnt);
 
-	fail_if(bitset_clear(&bm, 20) < 0);
+	fail_if(tt_bitset_clear(&bm, 20) < 0);
 	cnt--;
-	fail_unless(bitset_cardinality(&bm) == cnt);
+	fail_unless(tt_bitset_cardinality(&bm) == cnt);
 
-	fail_if(bitset_clear(&bm, 20) < 0);
-	fail_unless(bitset_cardinality(&bm) == cnt);
+	fail_if(tt_bitset_clear(&bm, 20) < 0);
+	fail_unless(tt_bitset_cardinality(&bm) == cnt);
 
-	fail_if(bitset_clear(&bm, 666) < 0);
-	fail_unless(bitset_cardinality(&bm) == cnt);
+	fail_if(tt_bitset_clear(&bm, 666) < 0);
+	fail_unless(tt_bitset_cardinality(&bm) == cnt);
 
-	fail_if(bitset_clear(&bm, 10) < 0);
+	fail_if(tt_bitset_clear(&bm, 10) < 0);
 	cnt--;
-	fail_unless(bitset_cardinality(&bm) == cnt);
+	fail_unless(tt_bitset_cardinality(&bm) == cnt);
 
-	fail_if(bitset_clear(&bm, 15) < 0);
+	fail_if(tt_bitset_clear(&bm, 15) < 0);
 	cnt--;
-	fail_unless(bitset_cardinality(&bm) == cnt);
+	fail_unless(tt_bitset_cardinality(&bm) == cnt);
 
-	bitset_destroy(&bm);
+	tt_bitset_destroy(&bm);
 
 	footer();
 }
@@ -87,8 +87,8 @@ void test_get_set()
 {
 	header();
 
-	struct bitset bm;
-	bitset_create(&bm, realloc);
+	struct tt_bitset bm;
+	tt_bitset_create(&bm, realloc);
 
 	const size_t NUM_SIZE = (size_t) 1 << 14;
 	size_t *nums = malloc(NUM_SIZE * sizeof(size_t));
@@ -114,7 +114,7 @@ void test_get_set()
 	for(size_t i = 0; i < NUM_SIZE; i++) {
 		if (nums[i] == SIZE_MAX)
 			continue;
-		fail_if(bitset_set(&bm, nums[i]) < 0);
+		fail_if(tt_bitset_set(&bm, nums[i]) < 0);
 	}
 	printf("ok\n");
 
@@ -123,7 +123,7 @@ void test_get_set()
 	for(size_t i = 0; i < NUM_SIZE; i++) {
 		if (nums[i] == SIZE_MAX)
 			continue;
-		fail_unless(bitset_test(&bm, nums[i]));
+		fail_unless(tt_bitset_test(&bm, nums[i]));
 	}
 	printf("ok\n");
 
@@ -132,8 +132,8 @@ void test_get_set()
 		size_t i = rand() % NUM_SIZE;
 		if (nums[i] == SIZE_MAX)
 			continue;
-		fail_if(bitset_clear(&bm, nums[i]) < 0);
-		fail_if(bitset_test(&bm, nums[i]));
+		fail_if(tt_bitset_clear(&bm, nums[i]) < 0);
+		fail_if(tt_bitset_test(&bm, nums[i]));
 		nums[i] = SIZE_MAX;
 	}
 	printf("ok\n");
@@ -145,10 +145,10 @@ void test_get_set()
 			continue;
 		}
 
-		if (!bitset_test(&bm, nums[i])) {
+		if (!tt_bitset_test(&bm, nums[i])) {
 			printf("Fail :%zu\n", nums[i]);
 		}
-		fail_unless(bitset_test(&bm, nums[i]));
+		fail_unless(tt_bitset_test(&bm, nums[i]));
 	}
 	printf("ok\n");
 
@@ -161,10 +161,10 @@ void test_get_set()
 
 	for(size_t i = 0; i < i_max; i++) {
 		if (*pn < SIZE_MAX && *pn == i) {
-			fail_unless(bitset_test(&bm, *pn));
+			fail_unless(tt_bitset_test(&bm, *pn));
 			pn++;
 		} else {
-			fail_if(bitset_test(&bm, i));
+			fail_if(tt_bitset_test(&bm, i));
 		}
 	}
 	printf("ok\n");
@@ -177,20 +177,20 @@ void test_get_set()
 			continue;
 		}
 
-		fail_if(bitset_clear(&bm, nums[i]) < 0);
+		fail_if(tt_bitset_clear(&bm, nums[i]) < 0);
 	}
 	printf("ok\n");
 
 
 	printf("Checking all bits... ");
 	for(size_t i = 0; i < i_max; i++) {
-		fail_if(bitset_test(&bm, i));
+		fail_if(tt_bitset_test(&bm, i));
 	}
 	printf("ok\n");
 
 	free(nums);
 
-	bitset_destroy(&bm);
+	tt_bitset_destroy(&bm);
 
 	footer();
 }

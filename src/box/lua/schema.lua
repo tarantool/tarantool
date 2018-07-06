@@ -2185,8 +2185,11 @@ local function drop(uid, opts)
                        'session,usage', 'universe', nil, {if_exists = true})
     end
     local privs = _vpriv.index.primary:select{uid}
+
     for k, tuple in pairs(privs) do
-        revoke(uid, uid, tuple[5], tuple[3], tuple[4])
+	-- we need an additional box.session.su() here, because of
+	-- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+        box.session.su("admin", revoke, uid, uid, tuple[5], tuple[3], tuple[4])
     end
     box.space[box.schema.USER_ID]:delete{uid}
 end
