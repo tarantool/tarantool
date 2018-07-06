@@ -86,7 +86,7 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 		return NULL;
 	}
 	def->key_def = key_def_dup(key_def);
-	if (pk_def != NULL) {
+	if (iid != 0) {
 		def->cmp_def = key_def_merge(key_def, pk_def);
 		if (! opts->is_unique) {
 			def->cmp_def->unique_part_count =

@@ -120,9 +120,14 @@ space:replace{1, 2}
 ---
 - [1, 2]
 ...
-space:get(2)
+-- gh-3508 - Altering primary index of a vinyl space doesn't work as expected
+space:replace{2, 2}
 ---
-- [1, 2]
+- [2, 2]
+...
+space:select()
+---
+- - [2, 2]
 ...
 space:drop()
 ---
