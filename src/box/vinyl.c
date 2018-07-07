@@ -1290,6 +1290,10 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		say_warn("%s: key %s missing in primary index",
 			 vy_lsm_name(lsm), vy_stmt_str(tuple));
 	}
+
+	if ((*rv)->vlsn == INT64_MAX)
+		vy_cache_add(&lsm->pk->cache, *result, NULL, tuple, ITER_EQ);
+
 	return 0;
 }
 
@@ -1336,6 +1340,8 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		} else {
 			*result = tuple;
 		}
+		if ((*rv)->vlsn == INT64_MAX)
+			vy_cache_add(&lsm->cache, *result, NULL, key, ITER_EQ);
 		return 0;
 	}
 
@@ -1352,6 +1358,8 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 		if (rc != 0 || *result != NULL)
 			break;
 	}
+	if (rc == 0)
+		vy_read_iterator_cache_add(&itr, *result);
 	vy_read_iterator_close(&itr);
 	return rc;
 }
@@ -3719,6 +3727,7 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 		goto fail;
 	if (vy_read_iterator_next(&it->iterator, ret) != 0)
 		goto fail;
+	vy_read_iterator_cache_add(&it->iterator, *ret);
 	if (*ret == NULL) {
 		/* EOF. Close the iterator immediately. */
 		vinyl_iterator_close(it);
@@ -3748,6 +3757,7 @@ next:
 
 	if (tuple == NULL) {
 		/* EOF. Close the iterator immediately. */
+		vy_read_iterator_cache_add(&it->iterator, NULL);
 		vinyl_iterator_close(it);
 		*ret = NULL;
 		return 0;
@@ -3767,6 +3777,7 @@ next:
 		goto fail;
 	if (*ret == NULL)
 		goto next;
+	vy_read_iterator_cache_add(&it->iterator, *ret);
 	tuple_bless(*ret);
 	tuple_unref(*ret);
 	return 0;

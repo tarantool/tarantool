@@ -280,11 +280,8 @@ done:
 	if (rc != 0)
 		return -1;
 
-	if (*ret != NULL) {
+	if (*ret != NULL)
 		vy_stmt_counter_acct_tuple(&lsm->stat.get, *ret);
-		if ((*rv)->vlsn == INT64_MAX)
-			vy_cache_add(&lsm->cache, *ret, NULL, key, ITER_EQ);
-	}
 
 	double latency = ev_monotonic_now(loop()) - start_time;
 	latency_collect(&lsm->stat.latency, latency);
