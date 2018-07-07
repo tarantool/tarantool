@@ -87,6 +87,16 @@ enum {
 	 * DELETE statements for them during compaction.
 	 */
 	VY_STMT_DEFERRED_DELETE		= 1 << 0,
+	/**
+	 * Statements that have this flag set are ignored by the
+	 * read iterator.
+	 *
+	 * We set this flag for deferred DELETE statements, because
+	 * they may violate the invariant which the read relies upon:
+	 * the older a source, the older statements it stores for a
+	 * particular key.
+	 */
+	VY_STMT_SKIP_READ		= 1 << 1,
 };
 
 /**
