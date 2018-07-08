@@ -2,8 +2,14 @@ find_path(LIBYAML_INCLUDE_DIR
   NAMES yaml.h
 )
 
+if(BUILD_STATIC)
+    set(YAML_LIB_NAME libyaml.a)
+else()
+    set(YAML_LIB_NAME yaml)
+endif()
+
 find_library(LIBYAML_LIBRARY
-  NAMES yaml
+    NAMES ${YAML_LIB_NAME}
 )
 
 set(LIBYAML_INCLUDE_DIRS "${LIBYAML_INCLUDE_DIR}")

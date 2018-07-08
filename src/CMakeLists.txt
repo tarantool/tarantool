@@ -67,6 +67,8 @@ add_custom_target(ragel
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND ragel -G2 src/uri.rl -o src/uri.c)
 
+set (generic_libraries pthread dl)
+
 set (core_sources
      diag.c
      say.c
@@ -108,18 +110,18 @@ endif ()
 
 add_library(core STATIC ${core_sources})
 target_link_libraries(core
-    salad small pthread
+    salad small
     ${LIBEV_LIBRARIES}
     ${LIBEIO_LIBRARIES}
     ${LIBCORO_LIBRARIES}
     ${MSGPUCK_LIBRARIES}
-)
+    ${generic_libraries})
 
 add_library(stat STATIC rmean.c latency.c histogram.c)
 target_link_libraries(stat core)
 
 if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
-	target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})
+    target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})
 endif()
 
 if (CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
@@ -224,9 +226,9 @@ set (common_libraries
     ${reexport_libraries}
     ${LIBYAML_LIBRARIES}
     ${READLINE_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
     ${CURL_LIBRARIES}
     ${ICONV_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
 )
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
@@ -252,6 +254,31 @@ add_subdirectory(box)
 set(TARANTOOL_C_FLAGS ${CMAKE_C_FLAGS} PARENT_SCOPE)
 set(TARANTOOL_CXX_FLAGS ${CMAKE_CXX_FLAGS} PARENT_SCOPE)
 
+set(EXPORT_LIST)
+if(BUILD_STATIC)
+    # for each static library we should find a corresponding shared library to
+    # parse and reexport library api functions
+    foreach(libstatic
+            ${READLINE_LIBRARIES}
+            ${CURL_LIBRARIES}
+            ${OPENSSL_LIBRARIES}
+            ${ICU_LIBRARIES})
+        if (${libstatic} MATCHES "lib[^/]+.a")
+            string(REGEX MATCH "lib[^/]+.a" libname ${libstatic})
+            string(REGEX REPLACE "\\.a$" "" libname ${libname})
+            string(REGEX REPLACE "^lib" "" libname ${libname})
+            find_library(SYMBOLS_LIB NAMES ${libname})
+            # add found library to export list
+            list(APPEND EXPORT_LIST ${SYMBOLS_LIB})
+            # set variable to allow rescan (CMake depended)
+            set(SYMBOLS_LIB "SYMBOLS_LIB-NOTFOUND")
+        else()
+            message(WARNING "${libstatic} should be a static")
+        endif()
+    endforeach(libstatic)
+    string(REPLACE ";" " " EXPORT_LIST "${EXPORT_LIST}")
+endif()
+
 # Exports syntax is toolchain-dependent, preprocessing is necessary
 set(exports_file ${CMAKE_BINARY_DIR}/extra/exports.${CMAKE_SYSTEM_NAME})
 add_custom_target(preprocess_exports
@@ -261,12 +288,14 @@ add_custom_command(
     DEPENDS ${CMAKE_SOURCE_DIR}/extra/exports
     COMMAND ${CMAKE_SOURCE_DIR}/extra/mkexports
             ${CMAKE_SOURCE_DIR}/extra/exports
-            ${exports_file} ${CMAKE_SYSTEM_NAME})
+            ${exports_file} ${CMAKE_SYSTEM_NAME}
+            ${EXPORT_LIST}
+)
 
 add_executable(
-	tarantool main.cc
-	${LIBUTIL_FREEBSD_SRC}/flopen.c
-	${LIBUTIL_FREEBSD_SRC}/pidfile.c)
+    tarantool main.cc
+    ${LIBUTIL_FREEBSD_SRC}/flopen.c
+    ${LIBUTIL_FREEBSD_SRC}/pidfile.c)
 
 add_dependencies(tarantool build_bundled_libs preprocess_exports)
 
@@ -294,7 +323,8 @@ else ()
     target_link_libraries(tarantool
                           -Wl,--whole-archive box ${reexport_libraries}
                           salad -Wl,--no-whole-archive
-                          ${common_libraries})
+                          ${common_libraries}
+                          ${generic_libraries})
     set_target_properties(tarantool PROPERTIES
         LINK_FLAGS "-Wl,--dynamic-list,${exports_file}")
     # get rid of -rdynamic

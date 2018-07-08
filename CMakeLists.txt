@@ -286,6 +286,40 @@ find_package_message(MODULE_LIBPATH "Lua package.cpath: ${MODULE_LIBPATH}"
 
 add_custom_target(build_bundled_libs)
 
+# Debian: missing zstd_static.h in libzstd-dev
+# Fedora: not found
+# => use bundled version by default
+
+option(ENABLE_BUNDLED_ZSTD "Enable building of the bundled zstd" ON)
+if (ENABLE_BUNDLED_ZSTD)
+    include(BuildZSTD)
+    zstd_build()
+    add_dependencies(build_bundled_libs zstd)
+else()
+    set(ZSTD_FIND_REQUIRED ON)
+    find_package(ZSTD)
+endif()
+
+#
+# OpenSSL
+#
+find_package(OpenSSL)
+if (OPENSSL_FOUND)
+    message(STATUS "OpenSSL ${OPENSSL_VERSION} found")
+    include_directories(${OPENSSL_INCLUDE_DIR})
+else()
+    message(FATAL_ERROR "Could NOT find OpenSSL development files (libssl-dev/openssl-devel package)")
+endif()
+
+#
+# OpenSSL can require Z library (depending on build time options), so we add
+# it to libraries list in case of static build.
+#
+if(BUILD_STATIC)
+    find_library(Z_LIBRARY libz.a)
+    set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} ${Z_LIBRARY})
+endif()
+
 #
 # Curl
 #
@@ -403,32 +437,6 @@ endif()
 #
 # zstd
 #
-
-# Debian: missing zstd_static.h in libzstd-dev
-# Fedora: not found
-# => use bundled version by default
-
-option(ENABLE_BUNDLED_ZSTD "Enable building of the bundled zstd" ON)
-if (ENABLE_BUNDLED_ZSTD)
-    include(BuildZSTD)
-    zstd_build()
-    add_dependencies(build_bundled_libs zstd)
-else()
-    set(ZSTD_FIND_REQUIRED ON)
-    find_package(ZSTD)
-endif()
-
-#
-# OpenSSL
-#
-
-find_package(OpenSSL)
-if (OPENSSL_FOUND)
-    message(STATUS "OpenSSL ${OPENSSL_VERSION} found")
-    include_directories(${OPENSSL_INCLUDE_DIR})
-else()
-    message(FATAL_ERROR "Could NOT find OpenSSL development files (libssl-dev/openssl-devel package)")
-endif()
 
 #
 # Third-Party misc

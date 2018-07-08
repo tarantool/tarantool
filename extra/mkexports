@@ -2,6 +2,7 @@
 # $1 - in  file
 # $2 - out file
 # $3 - os
+# $4 - export templates
 if [ "x$3x" = xDarwinx ]; then
     # _func1
     # _func2
@@ -11,5 +12,16 @@ else
     #   func1;
     #   func2;
     # };
-    ( echo "{" && sed -e '/^\s*$/d;s/$/;/;' $1 && echo "};" ) > $2
+    echo "$4"
+    ( echo "{" && {
+      # combine static defined list of functions
+      cat $1 ;
+      # with list of exported functions of bundled libraries
+      for so in $4 ; do {
+        # exported names from shared object
+        nm -D $so ||
+        # or follow patch from shared object script
+        nm -D `cat $so | grep GROUP | awk '{print $3}'` ;
+      } | awk '{print $3}' ; done ;
+    } | sed '/^\s*$/d;s/$/;/;' && echo "};" ) > $2
 fi

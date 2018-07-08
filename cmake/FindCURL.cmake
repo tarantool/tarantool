@@ -16,6 +16,18 @@
 #   CURL_FOUND          - True if curl found.
 #   CURL_VERSION_STRING - the version of curl found (since CMake 2.8.8)
 
+if(BUILD_STATIC)
+    set(CURL_LIB_NAME libcurl.a)
+    set(NGHTTP2_LIB_NAME libnghttp2.a)
+else()
+    set(CURL_LIB_NAME curl)
+    set(NGHTTP2_LIB_NAME nghttp2)
+endif()
+
+# Curl may require nghttp library, search for it and add to dependicies if
+# found
+find_library(NGHTTP2_LIBRARY NAMES ${NGHTTP2_LIB_NAME})
+
 if(DEFINED CURL_ROOT)
     set(CURL_FIND_OPTS NO_CMAKE NO_CMAKE_SYSTEM_PATH)
     set(CURL_FIND_LIBRARY_HINTS "${CURL_ROOT}/lib")
@@ -36,7 +48,7 @@ mark_as_advanced(CURL_INCLUDE_DIR)
 
 # Look for the library (sorted from most current/relevant entry to least).
 find_library(CURL_LIBRARY NAMES
-    curl
+    ${CURL_LIB_NAME}
   # Windows MSVC prebuilts:
     curllib
     libcurl_imp
@@ -67,8 +79,14 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(CURL
 
 if(CURL_FOUND)
   set(CURL_LIBRARIES ${CURL_LIBRARY})
+  if(BUILD_STATIC)
+    # in case of a static build we have to add curl dependencies
+    if(NOT "${NGHTTP2_LIBRARY}" STREQUAL "NGHTTP2_LIBRARY-NOTFOUND")
+      set(CURL_LIBRARIES ${CURL_LIBRARIES} ${NGHTTP2_LIBRARY})
+    endif()
+  endif()
   set(CURL_INCLUDE_DIRS ${CURL_INCLUDE_DIR})
-  set(CMAKE_REQUIRED_LIBRARIES ${CURL_LIBRARIES})
+  set(CMAKE_REQUIRED_LIBRARIES ${CURL_LIBRARIES} ${OPENSSL_LIBRARIES} pthread dl)
   set(CMAKE_REQUIRED_INCLUDES ${CURL_INCLUDE_DIRS})
   check_c_source_runs("
     #include <curl/curl.h>

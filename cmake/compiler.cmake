@@ -116,7 +116,12 @@ set (CMAKE_CXX_FLAGS_RELWITHDEBINFO
 unset(CC_DEBUG_OPT)
 
 check_include_file(libunwind.h HAVE_LIBUNWIND_H)
-find_library(UNWIND_LIBRARY PATH_SUFFIXES system NAMES unwind)
+if(BUILD_STATIC)
+    set(UNWIND_LIB_NAME libunwind.a)
+else()
+    set(UNWIND_LIB_NAME unwind)
+endif()
+find_library(UNWIND_LIBRARY PATH_SUFFIXES system NAMES ${UNWIND_LIB_NAME})
 
 set(ENABLE_BACKTRACE_DEFAULT OFF)
 if (UNWIND_LIBRARY AND HAVE_LIBUNWIND_H)
@@ -137,18 +142,34 @@ if (ENABLE_BACKTRACE)
     else()
         if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" OR
             CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-            find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
-                         NAMES "unwind-${CMAKE_SYSTEM_PROCESSOR}")
+            if(BUILD_STATIC)
+                set(UNWIND_PLATFORM_LIB_NAME "libunwind-${CMAKE_SYSTEM_PROCESSOR}.a")
+            else()
+                set(UNWIND_PLATFORM_LIB_NAME "unwind-${CMAKE_SYSTEM_PROCESSOR}")
+            endif()
         elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "i686")
-            find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
-                         NAMES "unwind-x86")
+            if(BUILD_STATIC)
+                set(UNWIND_PLATFORM_LIB_NAME "libunwind-x86.a")
+            else()
+                set(UNWIND_PLATFORM_LIB_NAME "unwind-x86")
+            endif()
         elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
-            find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
-                         NAMES "unwind-arm")
+            if(BUILD_STATIC)
+                set(UNWIND_PLATFORM_LIB_NAME "libunwind-arm.a")
+            else()
+                set(UNWIND_PLATFORM_LIB_NAME "unwind-arm")
+            endif()
         endif()
-        set (UNWIND_LIBRARIES ${UNWIND_LIBRARY} ${UNWIND_PLATFORM_LIBRARY})
+        find_library(UNWIND_PLATFORM_LIBRARY PATH_SUFFIXES system
+            NAMES ${UNWIND_PLATFORM_LIB_NAME})
+        set(UNWIND_LIBRARIES ${UNWIND_PLATFORM_LIBRARY} ${UNWIND_LIBRARY})
     endif()
     find_package_message(UNWIND_LIBRARIES "Found unwind" "${UNWIND_LIBRARIES}")
+endif()
+
+if(BUILD_STATIC)
+    # Static linking for c++ routines
+    add_compile_flags("C;CXX" "-static-libstdc++")
 endif()
 
 #
@@ -258,11 +279,6 @@ macro(enable_tnt_compile_flags)
         add_compile_flags("C;CXX" "-Werror")
     endif()
 endmacro(enable_tnt_compile_flags)
-
-if (HAVE_OPENMP)
-    add_compile_flags("C;CXX" "-fopenmp")
-endif()
-
 
 if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCC)
     set(HAVE_BUILTIN_CTZ 1)
