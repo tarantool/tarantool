@@ -792,8 +792,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		/* Not the first statement. */
 		return 0;
 	}
-	struct tuple *tuple = rv->tuple;
-	if (is_first_insert && vy_stmt_type(tuple) == IPROTO_DELETE) {
+	if (is_first_insert && vy_stmt_type(rv->tuple) == IPROTO_DELETE) {
 		/*
 		 * Optimization 6: discard the first DELETE if
 		 * the oldest statement for the current key among
@@ -801,11 +800,12 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		 * statements for this key in older runs or the
 		 * last statement is a DELETE.
 		 */
-		vy_stmt_unref_if_possible(tuple);
+		vy_stmt_unref_if_possible(rv->tuple);
 		rv->tuple = NULL;
-	}
-	if ((is_first_insert && vy_stmt_type(tuple) == IPROTO_REPLACE) ||
-	    (!is_first_insert && vy_stmt_type(tuple) == IPROTO_INSERT)) {
+	} else if ((is_first_insert &&
+		    vy_stmt_type(rv->tuple) == IPROTO_REPLACE) ||
+		   (!is_first_insert &&
+		    vy_stmt_type(rv->tuple) == IPROTO_INSERT)) {
 		/*
 		 * If the oldest statement among all sources is an
 		 * INSERT, convert the first REPLACE to an INSERT
@@ -818,14 +818,14 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		 * compaction.
 		 */
 		uint32_t size;
-		const char *data = tuple_data_range(tuple, &size);
+		const char *data = tuple_data_range(rv->tuple, &size);
 		struct tuple *copy = is_first_insert ?
 			vy_stmt_new_insert(stream->format, data, data + size) :
 			vy_stmt_new_replace(stream->format, data, data + size);
 		if (copy == NULL)
 			return -1;
-		vy_stmt_set_lsn(copy, vy_stmt_lsn(tuple));
-		vy_stmt_unref_if_possible(tuple);
+		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->tuple));
+		vy_stmt_unref_if_possible(rv->tuple);
 		rv->tuple = copy;
 	}
 	return 0;
