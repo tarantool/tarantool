@@ -12,6 +12,7 @@
 #include "identifier.h"
 
 uint32_t schema_version;
+uint32_t space_cache_version;
 
 static int
 write_run(struct vy_run *run, const char *dir_name,

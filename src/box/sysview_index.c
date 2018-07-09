@@ -67,7 +67,7 @@ sysview_iterator_next(struct iterator *iterator, struct tuple **ret)
 	assert(iterator->free == sysview_iterator_free);
 	struct sysview_iterator *it = sysview_iterator(iterator);
 	*ret = NULL;
-	if (it->source->schema_version != schema_version)
+	if (it->source->space_cache_version != space_cache_version)
 		return 0; /* invalidate iterator */
 	struct sysview_index *index = (struct sysview_index *)iterator->index;
 	int rc;

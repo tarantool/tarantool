@@ -58,7 +58,15 @@ static struct mh_i32ptr_t *spaces;
 static struct mh_i32ptr_t *funcs;
 static struct mh_strnptr_t *funcs_by_name;
 static struct mh_i32ptr_t *sequences;
+/** Public change counter. On its update clients need to fetch
+ *  new space data from the instance. */
 uint32_t schema_version = 0;
+/**
+ * Internal change counter. Grows faster, than the public one,
+ * because we need to remember when to update pointers to already
+ * non-existent space objects on space:truncate() operation.
+ */
+uint32_t space_cache_version = 0;
 uint32_t dd_version_id = version_id(1, 6, 4);
 
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
@@ -159,7 +167,7 @@ space_cache_delete(uint32_t id)
 	assert(k != mh_end(spaces));
 	struct space *space = (struct space *)mh_i32ptr_node(spaces, k)->val;
 	mh_i32ptr_del(spaces, k, NULL);
-	schema_version++;
+	space_cache_version++;
 	return space;
 }
 
@@ -177,7 +185,7 @@ space_cache_replace(struct space *space)
 		panic_syserror("Out of memory for the data "
 			       "dictionary cache.");
 	}
-	schema_version++;
+	space_cache_version++;
 	return p_old ? (struct space *) p_old->val : NULL;
 }
 

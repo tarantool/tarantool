@@ -180,7 +180,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 
 	lsm->mem = vy_mem_new(mem_env, *lsm->env->p_generation,
 			      cmp_def, format, lsm->mem_format_with_colmask,
-			      schema_version);
+			      space_cache_version);
 	if (lsm->mem == NULL)
 		goto fail_mem;
 
@@ -749,7 +749,7 @@ vy_lsm_rotate_mem(struct vy_lsm *lsm)
 	assert(lsm->mem != NULL);
 	mem = vy_mem_new(lsm->mem->env, *lsm->env->p_generation,
 			 lsm->cmp_def, lsm->mem_format,
-			 lsm->mem_format_with_colmask, schema_version);
+			 lsm->mem_format_with_colmask, space_cache_version);
 	if (mem == NULL)
 		return -1;
 
