@@ -390,7 +390,7 @@ space_opts_decode(struct space_opts *opts, const char *data)
 			while (isspace(*flags)) /* skip space */
 				flags++;
 			if (strncmp(flags, "temporary", strlen("temporary")) == 0)
-				opts->temporary = true;
+				opts->is_temporary = true;
 			flags = strchr(flags, ',');
 			if (flags)
 				flags++;

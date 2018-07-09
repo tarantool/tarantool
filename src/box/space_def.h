@@ -47,7 +47,7 @@ struct space_opts {
 	 * - changes are not written to WAL
 	 * - changes are not part of a snapshot
 	 */
-	bool temporary;
+	bool is_temporary;
 };
 
 extern const struct space_opts space_opts_default;

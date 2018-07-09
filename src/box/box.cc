@@ -976,7 +976,7 @@ box_process1(struct request *request, box_tuple_t **result)
 	struct space *space = space_cache_find(request->space_id);
 	if (space == NULL)
 		return -1;
-	if (!space->def->opts.temporary && box_check_writable() != 0)
+	if (!space_is_temporary(space) && box_check_writable() != 0)
 		return -1;
 	return process_rw(request, space, result);
 }

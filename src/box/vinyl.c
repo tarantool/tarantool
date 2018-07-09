@@ -590,7 +590,7 @@ vy_lsm_find_unique(struct space *space, uint32_t index_id)
 static int
 vinyl_engine_check_space_def(struct space_def *def)
 {
-	if (def->opts.temporary) {
+	if (def->opts.is_temporary) {
 		diag_set(ClientError, ER_ALTER_SPACE,
 			 def->name, "engine does not support temporary flag");
 		return -1;
