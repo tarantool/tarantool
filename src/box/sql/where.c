@@ -4759,10 +4759,16 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			assert(iIndexCur >= 0);
 			if (op) {
 				if (pIx != NULL) {
+					uint32_t space_id =
+						SQLITE_PAGENO_TO_SPACEID(pIx->
+									 tnum);
 					struct space *space =
-						space_by_id(SQLITE_PAGENO_TO_SPACEID(pIx->tnum));
+						space_by_id(space_id);
+					uint32_t idx_id =
+						SQLITE_PAGENO_TO_INDEXID(pIx->
+									 tnum);
 					vdbe_emit_open_cursor(pParse, iIndexCur,
-							      pIx->tnum, space);
+							      idx_id, space);
 				} else {
 					vdbe_emit_open_cursor(pParse, iIndexCur,
 							      idx_def->iid,

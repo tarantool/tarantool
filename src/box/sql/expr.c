@@ -2470,8 +2470,11 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							  P4_DYNAMIC);
 					struct space *space =
 						space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
+					uint32_t idx_id =
+						SQLITE_PAGENO_TO_INDEXID(pIdx->
+									 tnum);
 					vdbe_emit_open_cursor(pParse, iTab,
-							      pIdx->tnum, space);
+							      idx_id, space);
 					VdbeComment((v, "%s", pIdx->zName));
 					assert(IN_INDEX_INDEX_DESC ==
 					       IN_INDEX_INDEX_ASC + 1);

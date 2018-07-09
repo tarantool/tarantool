@@ -3583,9 +3583,9 @@ void sqlite3EndTable(Parse *, Token *, Token *, Select *);
  *
  * @param parse_context Parse context.
  * @param cursor Number of cursor to be created.
- * @param index_id Encoded index id (encoding is void actually, so
- *        pas it as is). In future will be replaced with pointer
- *        to struct index.
+ * @param index_id index id. In future will be replaced with
+ *        pointer to struct index.
+ * @param space Pointer to space object.
  * @retval address of last opcode.
  */
 int

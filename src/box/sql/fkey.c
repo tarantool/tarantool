@@ -441,7 +441,8 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			int regRec = sqlite3GetTempReg(pParse);
 			struct space *space =
 				space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
-			vdbe_emit_open_cursor(pParse, iCur, pIdx->tnum, space);
+			uint32_t idx_id = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
+			vdbe_emit_open_cursor(pParse, iCur, idx_id, space);
 			for (i = 0; i < nCol; i++) {
 				sqlite3VdbeAddOp2(v, OP_Copy,
 						  aiCol[i] + 1 + regData,

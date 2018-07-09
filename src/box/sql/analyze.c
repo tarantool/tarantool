@@ -154,8 +154,7 @@ vdbe_emit_stat_space_open(struct Parse *parse, int stat_cursor,
 	/* Open the sql_stat tables for writing. */
 	for (uint i = 0; i < lengthof(stat_names); ++i) {
 		uint32_t id = stat_ids[i];
-		int tnum = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(id, 0);
-		vdbe_emit_open_cursor(parse, stat_cursor + i, tnum,
+		vdbe_emit_open_cursor(parse, stat_cursor + i, 0,
 				      space_by_id(id));
 		VdbeComment((v, stat_names[i]));
 	}
@@ -888,10 +887,11 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		/* Open a read-only cursor on the index being analyzed. */
 		struct space *space =
 			space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
+		int idx_id = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
 		assert(space != NULL);
 		sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0,
 				  (void*)space, P4_SPACEPTR);
-		sqlite3VdbeAddOp3(v, OP_OpenRead, iIdxCur, pIdx->tnum,
+		sqlite3VdbeAddOp3(v, OP_OpenRead, iIdxCur, idx_id,
 				  space_ptr_reg);
 		sql_vdbe_set_p4_key_def(pParse, pIdx);
 		VdbeComment((v, "%s", pIdx->zName));

@@ -179,41 +179,43 @@ sqlite3TableAffinity(Vdbe * v, Table * pTab, int iReg)
 	}
 }
 
-/*
- * Return non-zero if the table pTab in database or any of its indices
- * have been opened at any point in the VDBE program. This is used to see if
- * a statement of the form  "INSERT INTO <pTab> SELECT ..." can
- * run for the results of the SELECT.
+/**
+ * This routine is used to see if a statement of the form
+ * "INSERT INTO <table> SELECT ..." can run for the results of the
+ * SELECT.
+ *
+ * @param parser Parse context.
+ * @param table Table AST object.
+ * @retval  true if the table table in database or any of its
+ *          indices have been opened at any point in the VDBE
+ *          program.
+ * @retval  false else.
  */
-static int
-readsTable(Parse * p, Table * pTab)
+static bool
+vdbe_has_table_read(struct Parse *parser, const struct Table *table)
 {
-	Vdbe *v = sqlite3GetVdbe(p);
-	int i;
-	int iEnd = sqlite3VdbeCurrentAddr(v);
-
-	for (i = 1; i < iEnd; i++) {
-		VdbeOp *pOp = sqlite3VdbeGetOp(v, i);
-		assert(pOp != 0);
-		/* Currently, there is no difference between
-		 * Read and Write cursors.
+	struct Vdbe *v = sqlite3GetVdbe(parser);
+	int last_instr = sqlite3VdbeCurrentAddr(v);
+	for (int i = 1; i < last_instr; i++) {
+		struct VdbeOp *op = sqlite3VdbeGetOp(v, i);
+		assert(op != NULL);
+		/*
+		 * Currently, there is no difference between Read
+		 * and Write cursors.
 		 */
-		if (pOp->opcode == OP_OpenRead ||
-		    pOp->opcode == OP_OpenWrite) {
-			Index *pIndex;
-			int tnum = pOp->p2;
-			if (tnum == pTab->tnum) {
-				return 1;
-			}
-			for (pIndex = pTab->pIndex; pIndex;
-			     pIndex = pIndex->pNext) {
-				if (tnum == pIndex->tnum) {
-					return 1;
-				}
-			}
+		if (op->opcode == OP_OpenRead || op->opcode == OP_OpenWrite) {
+			assert(i > 1);
+			struct VdbeOp *space_var_op =
+				sqlite3VdbeGetOp(v, i - 1);
+			assert(space_var_op != NULL);
+			assert(space_var_op->opcode == OP_LoadPtr);
+			struct space *space = space_var_op->p4.space;
+
+			if (space->def->id == table->def->id)
+				return true;
 		}
 	}
-	return 0;
+	return false;
 }
 
 
@@ -526,16 +528,20 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		assert(pSelect->pEList);
 		nColumn = pSelect->pEList->nExpr;
 
-		/* Set useTempTable to TRUE if the result of the SELECT statement
-		 * should be written into a temporary table (template 4).  Set to
-		 * FALSE if each output row of the SELECT can be written directly into
-		 * the destination table (template 3).
+		/*
+		 * Set useTempTable to TRUE if the result of the
+		 * SELECT statement should be written into a
+		 * temporary table (template 4). Set to FALSE if
+		 * each output row of the SELECT can be written
+		 * directly into the destination table
+		 * (template 3).
 		 *
-		 * A temp table must be used if the table being updated is also one
-		 * of the tables being read by the SELECT statement.  Also use a
-		 * temp table in the case of row triggers.
+		 * A temp table must be used if the table being
+		 * updated is also one of the tables being read by
+		 * the SELECT statement. Also use a temp table in
+		 * the case of row triggers.
 		 */
-		if (trigger != NULL || readsTable(pParse, pTab))
+		if (trigger != NULL || vdbe_has_table_read(pParse, pTab))
 			useTempTable = 1;
 
 		if (useTempTable) {
@@ -1617,7 +1623,9 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 				p5 = 0;
 			}
 			if (aToOpen == 0 || aToOpen[i + 1]) {
-				sqlite3VdbeAddOp3(v, op, iIdxCur, pIdx->tnum,
+				int idx_id =
+					SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
+				sqlite3VdbeAddOp3(v, op, iIdxCur, idx_id,
 						  space_ptr_reg);
 				sql_vdbe_set_p4_key_def(pParse, pIdx);
 				sqlite3VdbeChangeP5(v, p5);
@@ -1934,11 +1942,15 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		assert(pSrcIdx);
 		struct space *src_space =
 			space_by_id(SQLITE_PAGENO_TO_SPACEID(pSrcIdx->tnum));
-		vdbe_emit_open_cursor(pParse, iSrc, pSrcIdx->tnum, src_space);
+		vdbe_emit_open_cursor(pParse, iSrc,
+				      SQLITE_PAGENO_TO_INDEXID(pSrcIdx->tnum),
+				      src_space);
 		VdbeComment((v, "%s", pSrcIdx->zName));
 		struct space *dest_space =
 			space_by_id(SQLITE_PAGENO_TO_SPACEID(pDestIdx->tnum));
-		vdbe_emit_open_cursor(pParse, iDest, pDestIdx->tnum, dest_space);
+		vdbe_emit_open_cursor(pParse, iDest,
+				      SQLITE_PAGENO_TO_INDEXID(pDestIdx->tnum),
+				      dest_space);
 		VdbeComment((v, "%s", pDestIdx->zName));
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 		VdbeCoverage(v);

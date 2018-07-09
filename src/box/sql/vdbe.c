@@ -3185,9 +3185,8 @@ case OP_ReopenIdx: {
 	pIn3 = &aMem[pOp->p3];
 	assert(pIn3->flags & MEM_Ptr);
 	if (pCur && pCur->uc.pCursor->space == (struct space *) pIn3->u.p &&
-	    pCur->uc.pCursor->index->def->iid == SQLITE_PAGENO_TO_INDEXID(p2)) {
+	    pCur->uc.pCursor->index->def->iid == (uint32_t)p2)
 		goto open_cursor_set_hints;
-	}
 	/* If the cursor is not currently open or is open on a different
 	 * index, then fall through into OP_OpenRead to force a reopen
 	 */
@@ -3213,7 +3212,7 @@ case OP_OpenWrite:
 	assert(pIn3->flags & MEM_Ptr);
 	struct space *space = ((struct space *) pIn3->u.p);
 	assert(space != NULL);
-	struct index *index = space_index(space, SQLITE_PAGENO_TO_INDEXID(p2));
+	struct index *index = space_index(space, p2);
 	assert(index != NULL);
 	/*
 	 * Since Tarantool iterator provides the full tuple,

@@ -2448,7 +2448,8 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 		sqlite3VdbeAddOp2(v, OP_Clear, SQLITE_PAGENO_TO_SPACEID(tnum),
 				  0);
 	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(tnum));
-	vdbe_emit_open_cursor(pParse, iIdx, tnum, space);
+	vdbe_emit_open_cursor(pParse, iIdx, SQLITE_PAGENO_TO_INDEXID(tnum),
+			      space);
 	sqlite3VdbeChangeP5(v, memRootPage >= 0 ? OPFLAG_P2ISREG : 0);
 
 	addr1 = sqlite3VdbeAddOp2(v, OP_SorterSort, iSorter, 0);

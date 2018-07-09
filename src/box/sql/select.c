@@ -6279,9 +6279,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				 * Open the cursor, execute the OP_Count,
 				 * close the cursor.
 				 */
-				vdbe_emit_open_cursor(pParse, cursor,
-						      space->def->id << 10,
-						      space);
+				vdbe_emit_open_cursor(pParse, cursor, 0, space);
 				sqlite3VdbeAddOp2(v, OP_Count, cursor,
 						  sAggInfo.aFunc[0].iMem);
 				sqlite3VdbeAddOp1(v, OP_Close, cursor);

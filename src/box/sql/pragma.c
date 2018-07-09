@@ -685,11 +685,14 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 									 pParent,
 									 OP_OpenRead);
 						} else {
+							int idx_id =
+								SQLITE_PAGENO_TO_INDEXID(
+									pIdx->
+									tnum);
 							sqlite3VdbeAddOp3(v,
 									  OP_OpenRead,
 									  i,
-									  pIdx->
-									  tnum,
+									  idx_id,
 									  0);
 							sql_vdbe_set_p4_key_def(pParse,
 										pIdx);
