@@ -192,6 +192,22 @@ process_rw(struct request *request, struct space *space, struct tuple **result)
 	return rc;
 }
 
+/**
+ * Process a no-op request.
+ *
+ * A no-op request does not affect any space, but it
+ * promotes vclock and is written to WAL.
+ */
+static int
+process_nop(struct request *request)
+{
+	assert(request->type == IPROTO_NOP);
+	struct txn *txn = txn_begin_stmt(NULL);
+	if (txn == NULL)
+		return -1;
+	return txn_commit_stmt(txn, request);
+}
+
 void
 box_set_ro(bool ro)
 {
@@ -279,6 +295,11 @@ apply_row(struct xstream *stream, struct xrow_header *row)
 	(void) stream;
 	struct request request;
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
+	if (request.type == IPROTO_NOP) {
+		if (process_nop(&request) != 0)
+			diag_raise();
+		return;
+	}
 	struct space *space = space_cache_find_xc(request.space_id);
 	if (process_rw(&request, space, NULL) != 0) {
 		say_error("error applying row: %s", request_str(&request));

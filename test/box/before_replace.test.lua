@@ -221,7 +221,7 @@ path = fio.pathjoin(box.cfg.wal_dir, string.format('%020d.xlog', box.info.lsn - 
 fun, param, state = xlog.pairs(path)
 state, row = fun(param, state)
 row.HEADER.type
-row.BODY.space_id == s.id
+#row.BODY
 
 -- gh-3128 before_replace with run_triggers
 s2 = box.schema.space.create("test2")

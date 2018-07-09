@@ -527,14 +527,14 @@ t = s:on_replace(function () s:rename('newname') end, t)
 ...
 s:replace({8, 9})
 ---
-- error: Space _space does not support multi-statement transactions
+- error: DDL does not support multi-statement transactions
 ...
 t = s:on_replace(function () s.index.pk:rename('newname') end, t)
 ---
 ...
 s:replace({9, 10})
 ---
-- error: Space _index does not support multi-statement transactions
+- error: DDL does not support multi-statement transactions
 ...
 s:select()
 ---
