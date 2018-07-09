@@ -61,6 +61,7 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	/* Initialize members explicitly to save time on memset() */
 	row->type = request->type;
 	row->replica_id = 0;
+	row->group_id = stmt->space != NULL ? space_group_id(stmt->space) : 0;
 	row->lsn = 0;
 	row->sync = 0;
 	row->tm = 0;

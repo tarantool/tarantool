@@ -418,6 +418,7 @@ box.schema.space.create = function(name, options)
         field_count = 'number',
         user = 'string, number',
         format = 'table',
+        is_local = 'boolean',
         temporary = 'boolean',
     }
     local options_defaults = {
@@ -461,6 +462,7 @@ box.schema.space.create = function(name, options)
     format = update_format(format)
     -- filter out global parameters from the options array
     local space_options = setmap({
+        group_id = options.is_local and 1 or nil,
         temporary = options.temporary and true or nil,
     })
     _space:insert{id, uid, name, options.engine, options.field_count,
@@ -2369,7 +2371,11 @@ local function box_space_mt(tab)
     for k,v in pairs(tab) do
         -- skip system spaces and views
         if type(k) == 'string' and #k > 0 and k:sub(1,1) ~= '_' then
-            t[k] = { engine = v.engine, temporary = v.temporary }
+            t[k] = {
+                engine = v.engine,
+                is_local = v.is_local,
+                temporary = v.temporary,
+            }
         end
     end
     return t

@@ -560,6 +560,15 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	}
 	struct space_opts opts;
 	space_opts_decode(&opts, space_opts);
+	/*
+	 * Currently, only predefined replication groups
+	 * are supported.
+	 */
+	if (opts.group_id != GROUP_DEFAULT &&
+	    opts.group_id != GROUP_LOCAL) {
+		tnt_raise(ClientError, ER_NO_SUCH_GROUP,
+			  int2str(opts.group_id));
+	}
 	struct space_def *def =
 		space_def_new_xc(id, uid, exact_field_count, name, name_len,
 				 engine_name, engine_name_len, &opts, fields,
@@ -1664,6 +1673,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not change space engine");
+		if (def->opts.group_id != space_group_id(old_space))
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "replication group is immutable");
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.

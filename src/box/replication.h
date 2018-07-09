@@ -96,6 +96,20 @@ extern "C" {
 
 struct gc_consumer;
 
+/** Predefined replication group identifiers. */
+enum {
+	/**
+	 * Default replication group: changes made to the space
+	 * are replicated throughout the entire cluster.
+	 */
+	GROUP_DEFAULT = 0,
+	/**
+	 * Replica local space: changes made to the space are
+	 * not replicated.
+	 */
+	GROUP_LOCAL = 1,
+};
+
 static const int REPLICATION_CONNECT_QUORUM_ALL = INT_MAX;
 
 /**

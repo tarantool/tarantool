@@ -198,6 +198,13 @@ space_is_temporary(struct space *space)
 	return space->def->opts.is_temporary;
 }
 
+/** Return replication group id of a space. */
+static inline bool
+space_group_id(struct space *space)
+{
+	return space->def->opts.group_id;
+}
+
 void
 space_run_triggers(struct space *space, bool yesno);
 

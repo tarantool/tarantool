@@ -41,6 +41,11 @@ extern "C" {
 
 /** Space options */
 struct space_opts {
+	/**
+	 * Replication group identifier. Defines how changes
+	 * made to a space are replicated.
+	 */
+	uint32_t group_id;
         /**
 	 * The space is a temporary:
 	 * - it is empty at server start

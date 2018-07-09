@@ -620,7 +620,12 @@ static void
 relay_send_initial_join_row(struct xstream *stream, struct xrow_header *row)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
-	relay_send(relay, row);
+	/*
+	 * Ignore replica local requests as we don't need to promote
+	 * vclock while sending a snapshot.
+	 */
+	if (row->group_id != GROUP_LOCAL)
+		relay_send(relay, row);
 }
 
 /** Send a single row to the client. */
@@ -629,6 +634,16 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 {
 	struct relay *relay = container_of(stream, struct relay, stream);
 	assert(iproto_type_is_dml(packet->type));
+	/*
+	 * Transform replica local requests to IPROTO_NOP so as to
+	 * promote vclock on the replica without actually modifying
+	 * any data.
+	 */
+	if (packet->group_id == GROUP_LOCAL) {
+		packet->type = IPROTO_NOP;
+		packet->group_id = GROUP_DEFAULT;
+		packet->bodycnt = 0;
+	}
 	/*
 	 * We're feeding a WAL, thus responding to SUBSCRIBE request.
 	 * In that case, only send a row if it is not from the same replica

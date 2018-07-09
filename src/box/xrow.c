@@ -97,6 +97,9 @@ error:
 		case IPROTO_REPLICA_ID:
 			header->replica_id = mp_decode_uint(pos);
 			break;
+		case IPROTO_GROUP_ID:
+			header->group_id = mp_decode_uint(pos);
+			break;
 		case IPROTO_LSN:
 			header->lsn = mp_decode_uint(pos);
 			break;
@@ -175,6 +178,12 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	if (header->replica_id) {
 		d = mp_encode_uint(d, IPROTO_REPLICA_ID);
 		d = mp_encode_uint(d, header->replica_id);
+		map_size++;
+	}
+
+	if (header->group_id) {
+		d = mp_encode_uint(d, IPROTO_GROUP_ID);
+		d = mp_encode_uint(d, header->group_id);
 		map_size++;
 	}
 

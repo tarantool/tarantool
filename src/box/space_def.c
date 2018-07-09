@@ -34,10 +34,12 @@
 #include "error.h"
 
 const struct space_opts space_opts_default = {
+	/* .group_id = */ 0,
 	/* .is_temporary = */ false,
 };
 
 const struct opt_def space_opts_reg[] = {
+	OPT_DEF("group_id", OPT_UINT32, struct space_opts, group_id),
 	OPT_DEF("temporary", OPT_BOOL, struct space_opts, is_temporary),
 	OPT_END,
 };

@@ -555,19 +555,20 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 }
 
 static int
-checkpoint_write_tuple(struct xlog *l, uint32_t space_id,
+checkpoint_write_tuple(struct xlog *l, struct space *space,
 		       const char *data, uint32_t size)
 {
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
 	body.k_space_id = IPROTO_SPACE_ID;
 	body.m_space_id = 0xce; /* uint32 */
-	body.v_space_id = mp_bswap_u32(space_id);
+	body.v_space_id = mp_bswap_u32(space_id(space));
 	body.k_tuple = IPROTO_TUPLE;
 
 	struct xrow_header row;
 	memset(&row, 0, sizeof(struct xrow_header));
 	row.type = IPROTO_INSERT;
+	row.group_id = space_group_id(space);
 
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
@@ -692,8 +693,7 @@ checkpoint_f(va_list ap)
 		struct snapshot_iterator *it = entry->iterator;
 		for (data = it->next(it, &size); data != NULL;
 		     data = it->next(it, &size)) {
-			if (checkpoint_write_tuple(&snap,
-					space_id(entry->space),
+			if (checkpoint_write_tuple(&snap, entry->space,
 					data, size) != 0) {
 				xlog_close(&snap, false);
 				return -1;

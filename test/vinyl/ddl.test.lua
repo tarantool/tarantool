@@ -12,6 +12,9 @@ space:create_index('pk', {bloom_fpr = 0})
 space:create_index('pk', {bloom_fpr = 1.1})
 space:drop()
 
+-- vinyl does not support replica local spaces
+space = box.schema.space.create('test', {engine = 'vinyl', is_local = true})
+
 -- space secondary index create
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index1 = space:create_index('primary')

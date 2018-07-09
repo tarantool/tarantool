@@ -595,6 +595,11 @@ vinyl_engine_check_space_def(struct space_def *def)
 			 def->name, "engine does not support temporary flag");
 		return -1;
 	}
+	if (def->opts.group_id != 0) {
+		diag_set(ClientError, ER_ALTER_SPACE, def->name,
+			 "engine does not support replication groups");
+		return -1;
+	}
 	return 0;
 }
 
