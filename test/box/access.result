@@ -1804,8 +1804,9 @@ c:close()
 ---
 ...
 --
--- A user with read/write access to sequence was able
--- to create a sequence
+-- A user with read/write access to sequence shouldn't
+-- be able to create a sequence. It also needs a create privilege
+-- on universe.
 --
 box.schema.user.create('tester')
 ---
@@ -1817,6 +1818,19 @@ box.session.su('tester')
 ---
 ...
 _  = box.schema.sequence.create('test_sequence')
+---
+- error: Create access to sequence 'test_sequence' is denied for user 'tester'
+...
+box.session.su('admin')
+---
+...
+box.schema.user.grant('tester', 'create', 'universe')
+---
+...
+box.session.su('tester')
+---
+...
+_ = box.schema.sequence.create('test_sequence')
 ---
 ...
 box.session.su('admin')

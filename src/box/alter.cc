@@ -3018,6 +3018,8 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 		new_def = sequence_def_new_from_tuple(new_tuple,
 						      ER_CREATE_SEQUENCE);
 		assert(sequence_by_id(new_def->id) == NULL);
+		access_check_ddl(new_def->name, new_def->uid, SC_SEQUENCE,
+			PRIV_C, false);
 		sequence_cache_replace(new_def);
 		alter->new_def = new_def;
 	} else if (old_tuple != NULL && new_tuple == NULL) {	/* DELETE */

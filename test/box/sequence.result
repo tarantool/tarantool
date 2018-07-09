@@ -1472,6 +1472,9 @@ sq:drop()
 ---
 ...
 -- A user can alter/use sequences that he owns.
+box.schema.user.grant('user', 'create', 'universe')
+---
+...
 box.session.su('user')
 ---
 ...
@@ -1490,13 +1493,13 @@ sq = box.schema.sequence.create('seq')
 box.session.su('admin')
 ---
 ...
-box.schema.user.revoke('user', 'read,write', 'universe')
+box.schema.user.revoke('user', 'read,write,create', 'universe')
 ---
 ...
 box.session.su('user')
 ---
 ...
-sq:set(100) -- ok
+sq:set(100) -- ok - user owns the sequence
 ---
 ...
 sq:next() -- ok
@@ -1677,7 +1680,7 @@ s:drop()
 ---
 ...
 -- When a user is dropped, all his sequences are dropped as well.
-box.schema.user.grant('user', 'read,write', 'universe')
+box.schema.user.grant('user', 'read,write,create', 'universe')
 ---
 ...
 box.session.su('user')
@@ -1707,10 +1710,10 @@ box.schema.user.create('user1')
 box.schema.user.create('user2')
 ---
 ...
-box.schema.user.grant('user1', 'read,write', 'universe')
+box.schema.user.grant('user1', 'read,write,create', 'universe')
 ---
 ...
-box.schema.user.grant('user2', 'read,write', 'universe')
+box.schema.user.grant('user2', 'read,write,create', 'universe')
 ---
 ...
 box.session.su('user1')

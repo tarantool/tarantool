@@ -703,13 +703,18 @@ box.schema.func.drop("func")
 c:close()
 
 --
--- A user with read/write access to sequence was able
--- to create a sequence
+-- A user with read/write access to sequence shouldn't
+-- be able to create a sequence. It also needs a create privilege
+-- on universe.
 --
 box.schema.user.create('tester')
 box.schema.user.grant('tester', 'read,write', 'space', '_sequence')
 box.session.su('tester')
 _  = box.schema.sequence.create('test_sequence')
+box.session.su('admin')
+box.schema.user.grant('tester', 'create', 'universe')
+box.session.su('tester')
+_ = box.schema.sequence.create('test_sequence')
 box.session.su('admin')
 box.schema.user.drop('tester')
 
