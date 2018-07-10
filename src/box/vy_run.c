@@ -1960,10 +1960,9 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 	say_info("writing `%s'", path);
 
 	struct xlog index_xlog;
-	struct xlog_meta meta = {
-		.filetype = XLOG_META_TYPE_INDEX,
-		.instance_uuid = INSTANCE_UUID,
-	};
+	struct xlog_meta meta;
+	xlog_meta_create(&meta, XLOG_META_TYPE_INDEX, &INSTANCE_UUID,
+			 NULL, NULL);
 	if (xlog_create(&index_xlog, path, 0, &meta) < 0)
 		return -1;
 
@@ -2057,10 +2056,9 @@ vy_run_writer_create_xlog(struct vy_run_writer *writer)
 			    writer->space_id, writer->iid, writer->run->id,
 			    VY_FILE_RUN);
 	say_info("writing `%s'", path);
-	const struct xlog_meta meta = {
-		.filetype = XLOG_META_TYPE_RUN,
-		.instance_uuid = INSTANCE_UUID,
-	};
+	struct xlog_meta meta;
+	xlog_meta_create(&meta, XLOG_META_TYPE_RUN, &INSTANCE_UUID,
+			 NULL, NULL);
 	if (xlog_create(&writer->data_xlog, path, 0, &meta) != 0)
 		return -1;
 	writer->data_xlog.rate_limit = writer->run->env->snap_io_rate_limit;

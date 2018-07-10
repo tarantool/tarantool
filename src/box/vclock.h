@@ -132,6 +132,27 @@ vclock_create(struct vclock *vclock)
 	memset(vclock, 0, sizeof(*vclock));
 }
 
+/**
+ * Reset a vclock object. After this function is called,
+ * vclock_is_set() will return false.
+ */
+static inline void
+vclock_clear(struct vclock *vclock)
+{
+	memset(vclock, 0, sizeof(*vclock));
+	vclock->signature = -1;
+}
+
+/**
+ * Returns false if the vclock was cleared with vclock_clear(),
+ * true otherwise.
+ */
+static inline bool
+vclock_is_set(const struct vclock *vclock)
+{
+	return vclock->signature >= 0;
+}
+
 static inline int64_t
 vclock_get(const struct vclock *vclock, uint32_t replica_id)
 {

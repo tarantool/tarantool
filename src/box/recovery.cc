@@ -154,7 +154,7 @@ recovery_open_log(struct recovery *r, const struct vclock *vclock)
 	}
 
 	if (state != XLOG_CURSOR_NEW &&
-	    r->cursor.meta.has_prev_vclock &&
+	    vclock_is_set(&r->cursor.meta.prev_vclock) &&
 	    vclock_compare(&r->cursor.meta.prev_vclock, &meta.vclock) != 0) {
 		/*
 		 * WALs are missing between the last scanned WAL

@@ -98,6 +98,24 @@ enum {
 static const char v13[] = "0.13";
 static const char v12[] = "0.12";
 
+void
+xlog_meta_create(struct xlog_meta *meta, const char *filetype,
+		 const struct tt_uuid *instance_uuid,
+		 const struct vclock *vclock,
+		 const struct vclock *prev_vclock)
+{
+	snprintf(meta->filetype, sizeof(meta->filetype), "%s", filetype);
+	meta->instance_uuid = *instance_uuid;
+	if (vclock != NULL)
+		vclock_copy(&meta->vclock, vclock);
+	else
+		vclock_clear(&meta->vclock);
+	if (prev_vclock != NULL)
+		vclock_copy(&meta->prev_vclock, prev_vclock);
+	else
+		vclock_clear(&meta->prev_vclock);
+}
+
 /**
  * Format xlog metadata into @a buf of size @a size
  *
@@ -113,21 +131,26 @@ static const char v12[] = "0.12";
 static int
 xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 {
-	char *vstr = vclock_to_string(&meta->vclock);
-	if (vstr == NULL)
-		return -1;
-	char *instance_uuid = tt_uuid_str(&meta->instance_uuid);
 	int total = 0;
 	SNPRINT(total, snprintf, buf, size,
 		"%s\n"
 		"%s\n"
 		VERSION_KEY ": %s\n"
-		INSTANCE_UUID_KEY ": %s\n"
-		VCLOCK_KEY ": %s\n",
-		meta->filetype, v13, PACKAGE_VERSION, instance_uuid, vstr);
-	free(vstr);
-	if (meta->has_prev_vclock) {
-		vstr = vclock_to_string(&meta->prev_vclock);
+		INSTANCE_UUID_KEY ": %s\n",
+		meta->filetype, v13, PACKAGE_VERSION,
+		tt_uuid_str(&meta->instance_uuid));
+	if (vclock_is_set(&meta->vclock)) {
+		char *vstr = vclock_to_string(&meta->vclock);
+		if (vstr == NULL)
+			return -1;
+		SNPRINT(total, snprintf, buf, size,
+			VCLOCK_KEY ": %s\n", vstr);
+		free(vstr);
+	}
+	if (vclock_is_set(&meta->prev_vclock)) {
+		char *vstr = vclock_to_string(&meta->prev_vclock);
+		if (vstr == NULL)
+			return -1;
 		SNPRINT(total, snprintf, buf, size,
 			PREV_VCLOCK_KEY ": %s\n", vstr);
 		free(vstr);
@@ -214,6 +237,9 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 		return -1;
 	}
 
+	vclock_clear(&meta->vclock);
+	vclock_clear(&meta->prev_vclock);
+
 	/*
 	 * Parse "key: value" pairs
 	 */
@@ -263,7 +289,6 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 			 */
 			if (parse_vclock(val, val_end, &meta->prev_vclock) != 0)
 				return -1;
-			meta->has_prev_vclock = true;
 		} else if (memcmp(key, VERSION_KEY, key_end - key) == 0) {
 			/* Ignore Version: for now */
 		} else {
@@ -748,7 +773,8 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 	int meta_len;
 
 	/*
-	 * Check that the file without .inprogress suffix doesn't exist.
+	 * Check whether a file with this name already exists.
+	 * We don't overwrite existing files.
 	 */
 	if (access(name, F_OK) == 0) {
 		errno = EEXIST;
@@ -905,35 +931,23 @@ int
 xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 		 const struct vclock *vclock)
 {
-	char *filename;
 	int64_t signature = vclock_sum(vclock);
-	struct xlog_meta meta;
 	assert(signature >= 0);
 	assert(!tt_uuid_is_nil(dir->instance_uuid));
-
-	/*
-	* Check whether a file with this name already exists.
-	* We don't overwrite existing files.
-	*/
-	filename = xdir_format_filename(dir, signature, NONE);
-
-	/* Setup inherited values */
-	snprintf(meta.filetype, sizeof(meta.filetype), "%s", dir->filetype);
-	meta.instance_uuid = *dir->instance_uuid;
-	vclock_copy(&meta.vclock, vclock);
 
 	/*
 	 * For WAL dir: store vclock of the previous xlog file
 	 * to check for gaps on recovery.
 	 */
-	if (dir->type == XLOG && !vclockset_empty(&dir->index)) {
-		vclock_copy(&meta.prev_vclock, vclockset_last(&dir->index));
-		meta.has_prev_vclock = true;
-	} else {
-		vclock_create(&meta.prev_vclock);
-		meta.has_prev_vclock = false;
-	}
+	const struct vclock *prev_vclock = NULL;
+	if (dir->type == XLOG && !vclockset_empty(&dir->index))
+		prev_vclock = vclockset_last(&dir->index);
 
+	struct xlog_meta meta;
+	xlog_meta_create(&meta, dir->filetype, dir->instance_uuid,
+			 vclock, prev_vclock);
+
+	char *filename = xdir_format_filename(dir, signature, NONE);
 	if (xlog_create(xlog, filename, dir->open_wflags, &meta) != 0)
 		return -1;
 
