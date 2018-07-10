@@ -1150,7 +1150,7 @@ test:do_execsql_test(
         PRAGMA foreign_keys='false';
         PRAGMA recursive_triggers = 1;
         CREATE TABLE node(
-            id int not null primary key,
+            id not null primary key,
             pid int not null default 0 references node,
             key varchar not null,
             path varchar default '',

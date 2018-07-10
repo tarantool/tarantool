@@ -836,7 +836,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						iIdxCur, regIns, 0,
 						true, &on_conflict,
 						endOfLoop, &isReplace, 0);
-		sqlite3FkCheck(pParse, pTab, 0, regIns, 0);
+		fkey_emit_check(pParse, pTab, 0, regIns, 0);
 		vdbe_emit_insertion_completion(v, iIdxCur, aRegIdx[0],
 					       &on_conflict);
 	}
@@ -1312,15 +1312,14 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			(on_error == ON_CONFLICT_ACTION_REPLACE ||
 			 on_error == ON_CONFLICT_ACTION_IGNORE);
 		bool no_delete_triggers =
-			(0 == (user_session->sql_flags &
-			       SQLITE_RecTriggers) ||
-			 sql_triggers_exist(pTab, TK_DELETE, NULL, NULL) ==
-			 NULL);
+			(user_session->sql_flags & SQLITE_RecTriggers) == 0 ||
+			sql_triggers_exist(pTab, TK_DELETE, NULL, NULL) == NULL;
+		struct space *space = space_by_id(pTab->def->id);
+		assert(space != NULL);
 		bool no_foreign_keys =
-			(0 == (user_session->sql_flags &
-			       SQLITE_ForeignKeys) ||
-			 (0 == pTab->pFKey &&
-			  0 == sqlite3FkReferences(pTab)));
+			(user_session->sql_flags & SQLITE_ForeignKeys) == 0 ||
+			(rlist_empty(&space->child_fkey) &&
+			 ! rlist_empty(&space->parent_fkey));
 
 		if (no_secondary_indexes && no_foreign_keys &&
 		    proper_error_action && no_delete_triggers) {
@@ -1558,7 +1557,7 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 
 		if (isUpdate || 			/* Condition 1 */
 		    IsPrimaryKeyIndex(pIdx) ||		/* Condition 2 */
-		    sqlite3FkReferences(pTab) ||	/* Condition 3 */
+		    ! rlist_empty(&space->parent_fkey) ||
 		    /* Condition 4 */
 		    (pIdx->def->opts.is_unique &&
 		     pIdx->onError != ON_CONFLICT_ACTION_DEFAULT &&
@@ -1819,10 +1818,11 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 * So the extra complication to make this rule less restrictive is probably
 	 * not worth the effort.  Ticket [6284df89debdfa61db8073e062908af0c9b6118e]
 	 */
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) != 0
-	    && pDest->pFKey != 0) {
+	struct space *dest = space_by_id(pDest->def->id);
+	assert(dest != NULL);
+	if ((user_session->sql_flags & SQLITE_ForeignKeys) != 0 &&
+	    !rlist_empty(&dest->child_fkey))
 		return 0;
-	}
 #endif
 	if ((user_session->sql_flags & SQLITE_CountRows) != 0) {
 		return 0;	/* xfer opt does not play well with PRAGMA count_changes */

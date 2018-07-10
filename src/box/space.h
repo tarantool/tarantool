@@ -192,6 +192,12 @@ struct space {
 	 */
 	struct rlist parent_fkey;
 	struct rlist child_fkey;
+	/**
+	 * Mask indicates which fields are involved in foreign
+	 * key constraint checking routine. Includes fields
+	 * of parent constraints as well as child ones.
+	 */
+	uint64_t fkey_mask;
 };
 
 /** Initialize a base space instance. */

@@ -23,11 +23,11 @@ test:do_execsql_test(
     "whereG-1.0",
     [[
         CREATE TABLE composer(
-          cid INTEGER PRIMARY KEY,
+          cid PRIMARY KEY,
           cname TEXT
         );
         CREATE TABLE album(
-          aid INTEGER PRIMARY KEY,
+          aid PRIMARY KEY,
           aname TEXT
         );
         CREATE TABLE track(

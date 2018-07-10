@@ -294,7 +294,6 @@ sqlite3SchemaClear(sqlite3 * db)
 		sqlite3DeleteTable(0, pTab);
 	}
 	sqlite3HashClear(&temp1);
-	sqlite3HashClear(&pSchema->fkeyHash);
 
 	db->pSchema = NULL;
 }
@@ -303,13 +302,11 @@ sqlite3SchemaClear(sqlite3 * db)
 Schema *
 sqlite3SchemaCreate(sqlite3 * db)
 {
-	Schema *p;
-	p = (Schema *) sqlite3DbMallocZero(0, sizeof(Schema));
-	if (!p) {
+	struct Schema *p =
+		(struct Schema *) sqlite3DbMallocZero(0, sizeof(Schema));
+	if (p == NULL)
 		sqlite3OomFault(db);
-	} else {
+	else
 		sqlite3HashInit(&p->tblHash);
-		sqlite3HashInit(&p->fkeyHash);
-	}
 	return p;
 }

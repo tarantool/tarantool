@@ -228,7 +228,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 */
 	pTabList->a[0].colUsed = 0;
 
-	hasFK = sqlite3FkRequired(pTab, aXRef);
+	hasFK = fkey_is_required(pTab->def->id, aXRef);
 
 	/* There is one entry in the aRegIdx[] array for each index on the table
 	 * being updated.  Fill in aRegIdx[] with a register number that will hold
@@ -432,7 +432,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 * information is needed
 	 */
 	if (chngPk != 0 || hasFK != 0 || trigger != NULL) {
-		u32 oldmask = (hasFK ? sqlite3FkOldmask(pParse, pTab) : 0);
+		struct space *space = space_by_id(pTab->def->id);
+		assert(space != NULL);
+		u32 oldmask = hasFK ? space->fkey_mask : 0;
 		oldmask |= sql_trigger_colmask(pParse, trigger, pChanges, 0,
 					       TRIGGER_BEFORE | TRIGGER_AFTER,
 					       pTab, on_error);
@@ -544,9 +546,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 						aXRef);
 
 		/* Do FK constraint checks. */
-		if (hasFK) {
-			sqlite3FkCheck(pParse, pTab, regOldPk, 0, aXRef);
-		}
+		if (hasFK)
+			fkey_emit_check(pParse, pTab, regOldPk, 0, aXRef);
 
 		/* Delete the index entries associated with the current record.  */
 		if (bReplace || chngPk) {
@@ -568,9 +569,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 			sqlite3VdbeJumpHere(v, addr1);
 		}
 
-		if (hasFK) {
-			sqlite3FkCheck(pParse, pTab, 0, regNewPk, aXRef);
-		}
+		if (hasFK)
+			fkey_emit_check(pParse, pTab, 0, regNewPk, aXRef);
 
 		/* Insert the new index entries and the new record. */
 		vdbe_emit_insertion_completion(v, iIdxCur, aRegIdx[0],
@@ -580,9 +580,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * handle rows (possibly in other tables) that refer via a foreign key
 		 * to the row just updated.
 		 */
-		if (hasFK) {
-			sqlite3FkActions(pParse, pTab, pChanges, regOldPk, aXRef);
-		}
+		if (hasFK)
+			fkey_emit_actions(pParse, pTab, regOldPk, aXRef);
 	}
 
 	/* Increment the row counter

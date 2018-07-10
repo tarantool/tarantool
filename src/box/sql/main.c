@@ -730,11 +730,6 @@ sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
 {
 	sqlite3 *db = pVdbe->db;
 	(void)tripCode;
-	struct session *user_session = current_session();
-
-	/* DDL is impossible inside a transaction.  */
-	assert((user_session->sql_flags & SQLITE_InternChanges) == 0
-	       || db->init.busy == 1);
 
 	/* If one has been configured, invoke the rollback-hook callback */
 	if (db->xRollbackCallback && (!pVdbe->auto_commit)) {

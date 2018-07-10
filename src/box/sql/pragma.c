@@ -32,9 +32,10 @@
 /*
  * This file contains code used to implement the PRAGMA command.
  */
-#include <box/index.h>
-#include <box/box.h>
-#include <box/tuple.h>
+#include "box/index.h"
+#include "box/box.h"
+#include "box/tuple.h"
+#include "box/fkey.h"
 #include "box/schema.h"
 #include "box/coll_id_cache.h"
 #include "sqliteInt.h"
@@ -151,36 +152,6 @@ returnSingleInt(Vdbe * v, i64 value)
 			      P4_INT64);
 	sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 1);
 }
-
-/*
- * Return a human-readable name for a constraint resolution action.
- */
-#ifndef SQLITE_OMIT_FOREIGN_KEY
-static const char *
-actionName(u8 action)
-{
-	const char *zName;
-	switch (action) {
-	case OE_SetNull:
-		zName = "SET NULL";
-		break;
-	case OE_SetDflt:
-		zName = "SET DEFAULT";
-		break;
-	case OE_Cascade:
-		zName = "CASCADE";
-		break;
-	case OE_Restrict:
-		zName = "RESTRICT";
-		break;
-	default:
-		zName = "NO ACTION";
-		assert(action == ON_CONFLICT_ACTION_NONE);
-		break;
-	}
-	return zName;
-}
-#endif
 
 /*
  * Locate a pragma in the aPragmaName[] array.
@@ -586,206 +557,39 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	case PragTyp_FOREIGN_KEY_LIST:{
 		if (zRight == NULL)
 			break;
-		Table *table = sqlite3HashFind(&db->pSchema->tblHash, zRight);
-		if (table == NULL)
+		uint32_t space_id = box_space_id_by_name(zRight,
+							 strlen(zRight));
+		if (space_id == BOX_ID_NIL)
 			break;
-		FKey *fkey = table->pFKey;
-		if (fkey == NULL)
-			break;
+		struct space *space = space_by_id(space_id);
 		int i = 0;
 		pParse->nMem = 8;
-		while (fkey != NULL) {
-			for (int j = 0; j < fkey->nCol; j++) {
-				const char *name =
-					table->def->fields[
-						fkey->aCol[j].iFrom].name;
+		struct fkey *fkey;
+		rlist_foreach_entry(fkey, &space->child_fkey, child_link) {
+			struct fkey_def *fdef = fkey->def;
+			for (uint32_t j = 0; j < fdef->field_count; j++) {
+				struct space *parent =
+					space_by_id(fdef->parent_id);
+				assert(parent != NULL);
+				uint32_t ch_fl = fdef->links[j].child_field;
+				const char *child_col =
+					space->def->fields[ch_fl].name;
+				uint32_t pr_fl = fdef->links[j].parent_field;
+				const char *parent_col =
+					parent->def->fields[pr_fl].name;
 				sqlite3VdbeMultiLoad(v, 1, "iissssss", i, j,
-						     fkey->zTo, name,
-						     fkey->aCol[j].zCol,
-						     actionName(
-							     fkey->aAction[1]),
-						     actionName(
-							     fkey->aAction[0]),
+						     parent->def->name,
+						     child_col, parent_col,
+						     fkey_action_strs[fdef->on_delete],
+						     fkey_action_strs[fdef->on_update],
 						     "NONE");
 				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 8);
 			}
 			++i;
-			fkey = fkey->pNextFrom;
 		}
 		break;
 	}
 #endif				/* !defined(SQLITE_OMIT_FOREIGN_KEY) */
-
-#ifndef SQLITE_OMIT_FOREIGN_KEY
-	case PragTyp_FOREIGN_KEY_CHECK:{
-			FKey *pFK;	/* A foreign key constraint */
-			Table *pTab;	/* Child table contain "REFERENCES"
-					 * keyword
-					 */
-			Table *pParent;	/* Parent table that child points to */
-			Index *pIdx;	/* Index in the parent table */
-			int i;	/* Loop counter:  Foreign key number for pTab */
-			int j;	/* Loop counter:  Field of the foreign key */
-			HashElem *k;	/* Loop counter:  Next table in schema */
-			int x;	/* result variable */
-			int regResult;	/* 3 registers to hold a result row */
-			int regKey;	/* Register to hold key for checking
-					 * the FK
-					 */
-			int regRow;	/* Registers to hold a row from pTab */
-			int addrTop;	/* Top of a loop checking foreign keys */
-			int addrOk;	/* Jump here if the key is OK */
-			int *aiCols;	/* child to parent column mapping */
-
-			regResult = pParse->nMem + 1;
-			pParse->nMem += 4;
-			regKey = ++pParse->nMem;
-			regRow = ++pParse->nMem;
-			k = sqliteHashFirst(&db->pSchema->tblHash);
-			while (k) {
-				if (zRight) {
-					pTab =
-					    sqlite3LocateTable(pParse, 0,
-							       zRight);
-					k = 0;
-				} else {
-					pTab = (Table *) sqliteHashData(k);
-					k = sqliteHashNext(k);
-				}
-				if (pTab == 0 || pTab->pFKey == 0)
-					continue;
-				if ((int)pTab->def->field_count + regRow > pParse->nMem)
-					pParse->nMem = pTab->def->field_count + regRow;
-				sqlite3OpenTable(pParse, 0, pTab, OP_OpenRead);
-				sqlite3VdbeLoadString(v, regResult,
-						      pTab->def->name);
-				for (i = 1, pFK = pTab->pFKey; pFK;
-				     i++, pFK = pFK->pNextFrom) {
-					pParent =
-						sqlite3HashFind(&db->pSchema->tblHash,
-								pFK->zTo);
-					if (pParent == NULL)
-						continue;
-					pIdx = 0;
-					x = sqlite3FkLocateIndex(pParse,
-								 pParent, pFK,
-								 &pIdx, 0);
-					if (x != 0) {
-						k = 0;
-						break;
-					}
-					if (pIdx == NULL) {
-						sqlite3OpenTable(pParse, i,
-								 pParent,
-								 OP_OpenRead);
-						continue;
-					}
-					struct space *space =
-						space_cache_find(pIdx->pTable->
-								 def->id);
-					assert(space != NULL);
-					sqlite3VdbeAddOp4(v, OP_OpenRead, i,
-							  pIdx->def->iid, 0,
-							  (void *) space,
-							  P4_SPACEPTR);
-
-				}
-				assert(pParse->nErr > 0 || pFK == 0);
-				if (pFK)
-					break;
-				if (pParse->nTab < i)
-					pParse->nTab = i;
-				addrTop = sqlite3VdbeAddOp1(v, OP_Rewind, 0);
-				VdbeCoverage(v);
-				for (i = 1, pFK = pTab->pFKey; pFK;
-				     i++, pFK = pFK->pNextFrom) {
-					pParent =
-						sqlite3HashFind(&db->pSchema->tblHash,
-								pFK->zTo);
-					pIdx = 0;
-					aiCols = 0;
-					if (pParent) {
-						x = sqlite3FkLocateIndex(pParse,
-									 pParent,
-									 pFK,
-									 &pIdx,
-									 &aiCols);
-						assert(x == 0);
-					}
-					addrOk = sqlite3VdbeMakeLabel(v);
-					if (pParent && pIdx == 0) {
-						int iKey = pFK->aCol[0].iFrom;
-						assert(iKey >= 0 && iKey <
-						       (int)pTab->def->field_count);
-						sqlite3VdbeAddOp3(v,
-								  OP_Column,
-								  0,
-								  iKey,
-								  regRow);
-						sqlite3ColumnDefault(v,
-								     pTab->def,
-								     iKey,
-								     regRow);
-						sqlite3VdbeAddOp2(v,
-								  OP_IsNull,
-								  regRow,
-								  addrOk);
-						VdbeCoverage(v);
-						sqlite3VdbeGoto(v, addrOk);
-						sqlite3VdbeJumpHere(v,
-								    sqlite3VdbeCurrentAddr
-								    (v) - 2);
-					} else {
-						for (j = 0; j < pFK->nCol; j++) {
-							sqlite3ExprCodeGetColumnOfTable
-							    (v, pTab->def, 0,
-							     aiCols ? aiCols[j]
-							     : pFK->aCol[j].
-							     iFrom, regRow + j);
-							sqlite3VdbeAddOp2(v,
-									  OP_IsNull,
-									  regRow
-									  + j,
-									  addrOk);
-							VdbeCoverage(v);
-						}
-						if (pParent) {
-							sqlite3VdbeAddOp4(v,
-									  OP_MakeRecord,
-									  regRow,
-									  pFK->
-									  nCol,
-									  regKey,
-									  sqlite3IndexAffinityStr
-									  (db,
-									   pIdx),
-									  pFK->
-									  nCol);
-							sqlite3VdbeAddOp4Int(v,
-									     OP_Found,
-									     i,
-									     addrOk,
-									     regKey,
-									     0);
-							VdbeCoverage(v);
-						}
-					}
-					sqlite3VdbeMultiLoad(v, regResult + 2,
-							     "si", pFK->zTo,
-							     i - 1);
-					sqlite3VdbeAddOp2(v, OP_ResultRow,
-							  regResult, 4);
-					sqlite3VdbeResolveLabel(v, addrOk);
-					sqlite3DbFree(db, aiCols);
-				}
-				sqlite3VdbeAddOp2(v, OP_Next, 0, addrTop + 1);
-				VdbeCoverage(v);
-				sqlite3VdbeJumpHere(v, addrTop);
-			}
-			break;
-		}
-#endif				/* !defined(SQLITE_OMIT_FOREIGN_KEY) */
-
 #ifndef NDEBUG
 	case PragTyp_PARSER_TRACE:{
 			if (zRight) {

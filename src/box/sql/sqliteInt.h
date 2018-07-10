@@ -1457,7 +1457,6 @@ typedef struct Schema Schema;
 typedef struct Expr Expr;
 typedef struct ExprList ExprList;
 typedef struct ExprSpan ExprSpan;
-typedef struct FKey FKey;
 typedef struct FuncDestructor FuncDestructor;
 typedef struct FuncDef FuncDef;
 typedef struct FuncDefHash FuncDefHash;
@@ -1508,7 +1507,6 @@ typedef int VList;
  */
 struct Schema {
 	Hash tblHash;		/* All tables indexed by name */
-	Hash fkeyHash;		/* All foreign keys by referenced table name */
 };
 
 /*
@@ -1876,7 +1874,6 @@ struct Savepoint {
  */
 struct Table {
 	Index *pIndex;		/* List of SQL indexes on this table. */
-	FKey *pFKey;		/* Linked list of all foreign keys in this table */
 	char *zColAff;		/* String defining the affinity of each column */
 	/*   ... also used as column name list in a VIEW */
 	Hash idxHash;		/* All (named) indices indexed by name */
@@ -1939,42 +1936,7 @@ sql_space_tuple_log_count(struct Table *tab);
  * Each REFERENCES clause generates an instance of the following structure
  * which is attached to the from-table.  The to-table need not exist when
  * the from-table is created.  The existence of the to-table is not checked.
- *
- * The list of all parents for child Table X is held at X.pFKey.
- *
- * A list of all children for a table named Z (which might not even exist)
- * is held in Schema.fkeyHash with a hash key of Z.
  */
-struct FKey {
-	Table *pFrom;		/* Table containing the REFERENCES clause (aka: Child) */
-	FKey *pNextFrom;	/* Next FKey with the same in pFrom. Next parent of pFrom */
-	char *zTo;		/* Name of table that the key points to (aka: Parent) */
-	FKey *pNextTo;		/* Next with the same zTo. Next child of zTo. */
-	FKey *pPrevTo;		/* Previous with the same zTo */
-	int nCol;		/* Number of columns in this key */
-	/* EV: R-30323-21917 */
-	u8 isDeferred;		/* True if constraint checking is deferred till COMMIT */
-	u8 aAction[2];		/* ON DELETE and ON UPDATE actions, respectively */
-	/** Triggers for aAction[] actions. */
-	struct sql_trigger *apTrigger[2];
-	struct sColMap {	/* Mapping of columns in pFrom to columns in zTo */
-		int iFrom;	/* Index of column in pFrom */
-		char *zCol;	/* Name of column in zTo.  If NULL use PRIMARY KEY */
-	} aCol[1];		/* One entry for each of nCol columns */
-};
-
-/*
- * RESTRICT, SETNULL, and CASCADE actions apply only to foreign keys.
- * RESTRICT is the same as ABORT for IMMEDIATE foreign keys and the
- * same as ROLLBACK for DEFERRED keys.  SETNULL means that the foreign
- * key is set to NULL.  CASCADE means that a DELETE or UPDATE of the
- * referenced table row is propagated into the row that holds the
- * foreign key.
- */
-#define OE_Restrict 6		/* OE_Abort for IMMEDIATE, OE_Rollback for DEFERRED */
-#define OE_SetNull  7		/* Set the foreign key value to NULL */
-#define OE_SetDflt  8		/* Set the foreign key value to its default */
-#define OE_Cascade  9		/* Cascade the changes */
 
 /*
  * This object holds a record which has been parsed out into individual
@@ -2808,6 +2770,33 @@ enum ast_type {
 	ast_type_MAX
 };
 
+/**
+ * Structure representing foreign keys constraints appeared
+ * within CREATE TABLE statement. Used only during parsing.
+ */
+struct fkey_parse {
+	/**
+	 * Foreign keys constraint declared in <CREATE TABLE ...>
+	 * statement. They must be coded after space creation.
+	 */
+	struct fkey_def *fkey;
+	/**
+	 * If inside CREATE TABLE statement we want to declare
+	 * self-referenced FK constraint, we must delay their
+	 * resolution until the end of parsing of all columns.
+	 * E.g.: CREATE TABLE t1(id REFERENCES t1(b), b);
+	 */
+	struct ExprList *selfref_cols;
+	/**
+	 * Still, self-referenced columns might be NULL, if
+	 * we declare FK constraints referencing PK:
+	 * CREATE TABLE t1(id REFERENCES t1) - it is a valid case.
+	 */
+	bool is_self_referenced;
+	/** Organize these structs into linked list. */
+	struct rlist link;
+};
+
 /*
  * An SQL parser context.  A copy of this structure is passed through
  * the parser and down into all the parser action routine in order to
@@ -2899,7 +2888,15 @@ struct Parse {
 	TriggerPrg *pTriggerPrg;	/* Linked list of coded triggers */
 	With *pWith;		/* Current WITH clause, or NULL */
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
-
+	/**
+	 * Number of FK constraints declared within
+	 * CREATE TABLE statement.
+	 */
+	uint32_t fkey_count;
+	/**
+	 * Foreign key constraint appeared in CREATE TABLE stmt.
+	 */
+	struct rlist new_fkey;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
@@ -4208,8 +4205,57 @@ sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
 #define sqlite3IsToplevel(p) ((p)->pToplevel==0)
 
 int sqlite3JoinType(Parse *, Token *, Token *, Token *);
-void sqlite3CreateForeignKey(Parse *, ExprList *, Token *, ExprList *, int);
-void sqlite3DeferForeignKey(Parse *, int);
+
+/**
+ * Change defer mode of last FK constraint processed during
+ * <CREATE TABLE> statement.
+ *
+ * @param parse_context Current parsing context.
+ * @param is_deferred Change defer mode to this value.
+ */
+void
+fkey_change_defer_mode(struct Parse *parse_context, bool is_deferred);
+
+/**
+ * Function called from parser to handle
+ * <ALTER TABLE child ADD CONSTRAINT constraint
+ *     FOREIGN KEY (child_cols) REFERENCES parent (parent_cols)>
+ * OR to handle <CREATE TABLE ...>
+ *
+ * @param parse_context Parsing context.
+ * @param child Name of table to be altered. NULL on CREATE TABLE
+ *              statement processing.
+ * @param constraint Name of the constraint to be created. May be
+ *                   NULL on CREATE TABLE statement processing.
+ *                   Then, auto-generated name is used.
+ * @param child_cols Columns of child table involved in FK.
+ *                   May be NULL on CREATE TABLE statement processing.
+ *                   If so, the last column added is used.
+ * @param parent Name of referenced table.
+ * @param parent_cols List of referenced columns. If NULL, columns
+ *                    which make up PK of referenced table are used.
+ * @param is_deferred Is FK constraint initially deferred.
+ * @param actions ON DELETE, UPDATE and INSERT resolution
+ *                algorithms (e.g. CASCADE, RESTRICT etc).
+ */
+void
+sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
+		       struct Token *constraint, struct ExprList *child_cols,
+		       struct Token *parent, struct ExprList *parent_cols,
+		       bool is_deferred, int actions);
+
+/**
+ * Function called from parser to handle
+ * <ALTER TABLE table DROP CONSTRAINT constraint> SQL statement.
+ *
+ * @param parse_context Parsing context.
+ * @param table Table to be altered.
+ * @param constraint Name of constraint to be dropped.
+ */
+void
+sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
+		     struct Token *constraint);
+
 void sqlite3Detach(Parse *, Expr *);
 int sqlite3AtoF(const char *z, double *, int);
 int sqlite3GetInt32(const char *, int *);
@@ -4479,8 +4525,6 @@ sqlite3ColumnDefault(Vdbe *v, struct space_def *def, int i, int ireg);
 void sqlite3AlterFinishAddColumn(Parse *, Token *);
 void sqlite3AlterBeginAddColumn(Parse *, SrcList *);
 char* rename_table(sqlite3 *, const char *, const char *, bool *);
-char* rename_parent_table(sqlite3 *, const char *, const char *, const char *,
-			  uint32_t *, uint32_t *);
 char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
 /**
  * Find a collation by name. Set error in @a parser if not found.
@@ -4623,32 +4667,67 @@ void sqlite3WithPush(Parse *, With *, u8);
 #define sqlite3WithDelete(x,y)
 #endif
 
-/* Declarations for functions in fkey.c. All of these are replaced by
- * no-op macros if OMIT_FOREIGN_KEY is defined. In this case no foreign
- * key functionality is available. If OMIT_TRIGGER is defined but
- * OMIT_FOREIGN_KEY is not, only some of the functions are no-oped. In
- * this case foreign keys are parsed, but no other functionality is
- * provided (enforcement of FK constraints requires the triggers sub-system).
+/*
+ * This function is called when inserting, deleting or updating a
+ * row of table tab to generate VDBE code to perform foreign key
+ * constraint processing for the operation.
+ *
+ * For a DELETE operation, parameter reg_old is passed the index
+ * of the first register in an array of (tab->def->field_count +
+ * 1) registers containing the PK of the row being deleted,
+ * followed by each of the column values of the row being deleted,
+ * from left to right. Parameter reg_new is passed zero in this
+ * case.
+ *
+ * For an INSERT operation, reg_old is passed zero and reg_new is
+ * passed the first register of an array of
+ * (tab->def->field_count + 1) registers containing the new row
+ * data.
+ *
+ * For an UPDATE operation, this function is called twice. Once
+ * before the original record is deleted from the table using the
+ * calling convention described for DELETE. Then again after the
+ * original record is deleted but before the new record is
+ * inserted using the INSERT convention.
+ *
+ * @param parser SQL parser.
+ * @param tab Table from which the row is deleted.
+ * @param reg_old Register with deleted row.
+ * @param reg_new Register with inserted row.
+ * @param changed_cols Array of updated columns. Can be NULL.
  */
-#if !defined(SQLITE_OMIT_FOREIGN_KEY)
-void sqlite3FkCheck(Parse *, Table *, int, int, int *);
-void sqlite3FkActions(Parse *, Table *, ExprList *, int, int *);
-int sqlite3FkRequired(Table *, int *);
-u32 sqlite3FkOldmask(Parse *, Table *);
-FKey *sqlite3FkReferences(Table *);
-#else
-#define sqlite3FkActions(a,b,c,d,e)
-#define sqlite3FkCheck(a,b,c,d,e,f)
-#define sqlite3FkOldmask(a,b)         0
-#define sqlite3FkRequired(b,c)    0
-#endif
-#ifndef SQLITE_OMIT_FOREIGN_KEY
-void sqlite3FkDelete(sqlite3 *, Table *);
-int sqlite3FkLocateIndex(Parse *, Table *, FKey *, Index **, int **);
-#else
-#define sqlite3FkDelete(a,b)
-#define sqlite3FkLocateIndex(a,b,c,d,e)
-#endif
+void
+fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
+		int reg_new, const int *changed_cols);
+
+/**
+ * Emit VDBE code to do CASCADE, SET NULL or SET DEFAULT actions
+ * when deleting or updating a row.
+ * @param parser SQL parser.
+ * @param tab Table being updated or deleted from.
+ * @param reg_old Register of the old record.
+ * param changes Array of numbers of changed columns.
+ */
+void
+fkey_emit_actions(struct Parse *parser, struct Table *tab, int reg_old,
+		  const int *changes);
+
+/**
+ * This function is called before generating code to update or
+ * delete a row contained in given space. If the operation is
+ * a DELETE, then parameter changes is passed a NULL value.
+ * For an UPDATE, changes points to an array of size N, where N
+ * is the number of columns in table. If the i'th column is not
+ * modified by the UPDATE, then the corresponding entry in the
+ * changes[] array is set to -1. If the column is modified,
+ * the value is 0 or greater.
+ *
+ * @param space_id Id of space to be modified.
+ * @param changes Array of modified fields for UPDATE.
+ * @retval True, if any foreign key processing will be required.
+ */
+bool
+fkey_is_required(uint32_t space_id, const int *changes);
 
 /*
  * Available fault injectors.  Should be numbered beginning with 0.

@@ -40,6 +40,7 @@
  * commenting and indentation practices when changing or adding code.
  */
 #include "box/box.h"
+#include "box/fkey.h"
 #include "box/txn.h"
 #include "box/session.h"
 #include "sqliteInt.h"
@@ -4597,7 +4598,6 @@ case OP_RenameTable: {
 	const char *zOldTableName;
 	const char *zNewTableName;
 	Table *pTab;
-	FKey *pFKey;
 	struct init_data init;
 	char *zSqlStmt;
 
@@ -4615,20 +4615,6 @@ case OP_RenameTable: {
 					 sqlite3Strlen30(zOldTableName));
 	rc = sql_rename_table(space_id, zNewTableName, &zSqlStmt);
 	if (rc) goto abort_due_to_error;
-
-	/* If it is parent table, all children statements should be updated. */
-	for (pFKey = sqlite3FkReferences(pTab); pFKey; pFKey = pFKey->pNextTo) {
-		assert(pFKey->zTo != NULL);
-		assert(pFKey->pFrom != NULL);
-		rc = tarantoolSqlite3RenameParentTable(pFKey->pFrom->def->id,
-						       pFKey->zTo,
-						       zNewTableName);
-		if (rc) goto abort_due_to_error;
-		pFKey->zTo = sqlite3DbStrNDup(db, zNewTableName,
-					      sqlite3Strlen30(zNewTableName));
-		sqlite3HashInsert(&db->pSchema->fkeyHash, zOldTableName, 0);
-		sqlite3HashInsert(&db->pSchema->fkeyHash, zNewTableName, pFKey);
-	}
 
 	sqlite3UnlinkAndDeleteTable(db, pTab->def->name);
 

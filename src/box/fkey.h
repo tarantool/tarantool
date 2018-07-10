@@ -57,14 +57,28 @@ enum fkey_match {
 	fkey_match_MAX
 };
 
+enum {
+	FIELD_LINK_PARENT = 0,
+	FIELD_LINK_CHILD = 1,
+};
+
 extern const char *fkey_action_strs[];
 
 extern const char *fkey_match_strs[];
 
 /** Structure describing field dependencies for foreign keys. */
 struct field_link {
-	uint32_t parent_field;
-	uint32_t child_field;
+	/**
+	 * There are two ways to access parent/child fields -
+	 * as array of two elements and as named fields.
+	 */
+	union {
+		struct {
+			uint32_t parent_field;
+			uint32_t child_field;
+		};
+		uint32_t fields[2];
+	};
 };
 
 /** Definition of foreign key constraint. */

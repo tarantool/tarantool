@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(117)
+test:plan(116)
 
 -- This file implements regression tests for foreign keys.
 
@@ -14,7 +14,7 @@ test:do_execsql_test(
         CREATE TABLE t4(c PRIMARY KEY REFERENCES t3, d);
 
         CREATE TABLE t7(a, b INTEGER PRIMARY KEY);
-        CREATE TABLE t8(c PRIMARY KEY REFERENCES t7, d);
+        CREATE TABLE t8(c INTEGER PRIMARY KEY REFERENCES t7, d);
     ]], {
         -- <fkey2-1.1>
         -- </fkey2-1.1>
@@ -317,13 +317,13 @@ test:do_execsql_test(
     "fkey2-2.1",
     [[
         CREATE TABLE i(i INTEGER PRIMARY KEY);
-        CREATE TABLE j(j PRIMARY KEY REFERENCES i);
+        CREATE TABLE j(j INT PRIMARY KEY REFERENCES i);
         INSERT INTO i VALUES(35);
-        INSERT INTO j VALUES('35.0');
+        INSERT INTO j VALUES(35);
         SELECT j, typeof(j) FROM j;
     ]], {
         -- <fkey2-2.1>
-        "35.0", "text"
+        35, "integer"
         -- </fkey2-2.1>
     })
 
@@ -524,7 +524,7 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t1(a PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
         CREATE TABLE t2(c INTEGER PRIMARY KEY REFERENCES t1, b);
     ]], {
         -- <fkey2-5.1>
@@ -600,10 +600,10 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a PRIMARY KEY, b);
         CREATE TABLE t2(
             c INTEGER PRIMARY KEY,
-            d INTEGER DEFAULT 1 REFERENCES t1 ON DELETE SET DEFAULT);
+            d DEFAULT 1 REFERENCES t1 ON DELETE SET DEFAULT);
         DELETE FROM t1;
     ]], {
         -- <fkey2-6.1>
@@ -714,10 +714,9 @@ test:do_catchsql_test(
     [[
         CREATE TABLE p(a PRIMARY KEY, b);
         CREATE TABLE c(x PRIMARY KEY REFERENCES p(c));
-        INSERT INTO c DEFAULT VALUES;
     ]], {
         -- <fkey2-7.1>
-        1, "foreign key mismatch - \"C\" referencing \"P\""
+        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': foreign key refers to nonexistent field C"
         -- </fkey2-7.1>
     })
 
@@ -725,7 +724,7 @@ test:do_catchsql_test(
     "fkey2-7.2",
     [[
         CREATE VIEW v AS SELECT b AS y FROM p;
-        CREATE TABLE d(x PRIMARY KEY REFERENCES v(y));
+        CREATE TABLE c(x PRIMARY KEY REFERENCES v(y));
     ]], {
         -- <fkey2-7.2>
         1, "referenced table can't be view"
@@ -738,13 +737,12 @@ test:do_catchsql_test(
         DROP VIEW v;
         DROP TABLE IF EXISTS c;
         DROP TABLE IF EXISTS p;
-        CREATE TABLE p(a COLLATE binary, b PRIMARY KEY);
-        CREATE UNIQUE INDEX idx ON p(a COLLATE "unicode_ci");
+        CREATE TABLE p(a COLLATE "unicode_ci", b PRIMARY KEY);
+        CREATE UNIQUE INDEX idx ON p(a);
         CREATE TABLE c(x PRIMARY KEY REFERENCES p(a));
-        INSERT INTO c DEFAULT VALUES;
     ]], {
         -- <fkey2-7.3>
-        1, "foreign key mismatch - \"C\" referencing \"P\""
+        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': field collation mismatch"
         -- </fkey2-7.3>
     })
 
@@ -755,10 +753,9 @@ test:do_catchsql_test(
         DROP TABLE IF EXISTS p;
         CREATE TABLE p(a, b, PRIMARY KEY(a, b));
         CREATE TABLE c(x PRIMARY KEY REFERENCES p);
-        INSERT INTO c DEFAULT VALUES;
     ]], {
         -- <fkey2-7.4>
-        1, "foreign key mismatch - \"C\" referencing \"P\""
+        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
         -- </fkey2-7.4>
     })
 
@@ -769,7 +766,7 @@ test:do_execsql_test(
     "fkey2-8.1",
     [[
         CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(c PRIMARY KEY, d, FOREIGN KEY(c) REFERENCES t1(a) ON UPDATE CASCADE);
+        CREATE TABLE t2(c INTEGER PRIMARY KEY, d, FOREIGN KEY(c) REFERENCES t1(a) ON UPDATE CASCADE);
 
         INSERT INTO t1 VALUES(10, 100);
         INSERT INTO t2 VALUES(10, 100);
@@ -792,8 +789,7 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(a, b PRIMARY KEY);
         CREATE TABLE t2(
-            x PRIMARY KEY REFERENCES t1
-                ON UPDATE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+            x PRIMARY KEY REFERENCES t1 ON UPDATE RESTRICT);
         INSERT INTO t1 VALUES(1, 'one');
         INSERT INTO t1 VALUES(2, 'two');
         INSERT INTO t1 VALUES(3, 'three');
@@ -845,7 +841,7 @@ test:do_execsql_test(
         BEGIN
             INSERT INTO t1 VALUES(old.x);
         END;
-        CREATE TABLE t2(y PRIMARY KEY REFERENCES t1);
+        CREATE TABLE t2(y COLLATE "unicode_ci" PRIMARY KEY REFERENCES t1);
         INSERT INTO t1 VALUES('A');
         INSERT INTO t1 VALUES('B');
         INSERT INTO t2 VALUES('A');
@@ -873,7 +869,7 @@ test:do_execsql_test(
     "fkey2-9.7",
     [[
         DROP TABLE t2;
-        CREATE TABLE t2(y PRIMARY KEY REFERENCES t1 ON DELETE RESTRICT);
+        CREATE TABLE t2(y COLLATE "unicode_ci" PRIMARY KEY REFERENCES t1 ON DELETE RESTRICT);
         INSERT INTO t2 VALUES('A');
         INSERT INTO t2 VALUES('B');
     ]], {
@@ -1088,7 +1084,7 @@ test:do_execsql_test(
         -- </fkey2-10.9>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "fkey2-10.14",
     [[
         DROP TABLE IF EXISTS cc;
@@ -1097,23 +1093,13 @@ test:do_execsql_test(
         CREATE TABLE cc(a PRIMARY KEY, b, FOREIGN KEY(a, b) REFERENCES pp(x, z));
     ]], {
         -- <fkey2-10.14>
+        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_CC': foreign key refers to nonexistent field Z"
         -- </fkey2-10.14>
-    })
-
-test:do_catchsql_test(
-    "fkey2-10.15",
-    [[
-        INSERT INTO cc VALUES(1, 2);
-    ]], {
-        -- <fkey2-10.15>
-        1, "foreign key mismatch - \"CC\" referencing \"PP\""
-        -- </fkey2-10.15>
     })
 
 test:do_execsql_test(
     "fkey2-10.16",
     [[
-        DROP TABLE cc;
         CREATE TABLE cc(
             a PRIMARY KEY, b,
             FOREIGN KEY(a, b) REFERENCES pp DEFERRABLE INITIALLY DEFERRED);
@@ -1181,7 +1167,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-11.1",
     [[
-        CREATE TABLE self(a INTEGER PRIMARY KEY, b REFERENCES self(a));
+        CREATE TABLE self(a PRIMARY KEY, b REFERENCES self(a));
         INSERT INTO self VALUES(13, 13);
         UPDATE self SET a = 14, b = 14;
     ]], {
@@ -1251,7 +1237,7 @@ test:do_execsql_test(
     "fkey2-11.8",
     [[
         DROP TABLE IF EXISTS self;
-        CREATE TABLE self(a UNIQUE, b INTEGER PRIMARY KEY REFERENCES self(a));
+        CREATE TABLE self(a UNIQUE, b PRIMARY KEY REFERENCES self(a));
         INSERT INTO self VALUES(13, 13);
         UPDATE self SET a = 14, b = 14;
     ]], {
@@ -1323,7 +1309,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-12.1",
     [[
-        CREATE TABLE tdd08(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE tdd08(a PRIMARY KEY, b);
         CREATE UNIQUE INDEX idd08 ON tdd08(a,b);
         INSERT INTO tdd08 VALUES(200,300);
 
@@ -1387,7 +1373,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-13.1",
     [[
-        CREATE TABLE tce71(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE tce71(a PRIMARY KEY, b);
         CREATE UNIQUE INDEX ice71 ON tce71(a,b);
         INSERT INTO tce71 VALUES(100,200);
         CREATE TABLE tce72(w PRIMARY KEY, x, y, FOREIGN KEY(x,y) REFERENCES tce71(a,b));
@@ -1423,9 +1409,9 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-14.1",
     [[
-        CREATE TABLE tce73(a INTEGER PRIMARY KEY, b, UNIQUE(a,b));
+        CREATE TABLE tce73(a PRIMARY KEY, b, UNIQUE(a,b));
         INSERT INTO tce73 VALUES(100,200);
-        CREATE TABLE tce74(w INTEGER PRIMARY KEY, x, y, FOREIGN KEY(x,y) REFERENCES tce73(a,b));
+        CREATE TABLE tce74(w PRIMARY KEY, x, y, FOREIGN KEY(x,y) REFERENCES tce73(a,b));
         INSERT INTO tce74 VALUES(300,100,200);
         UPDATE tce73 set b = 200 where a = 100;
         SELECT * FROM tce73, tce74;

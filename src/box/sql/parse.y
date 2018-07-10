@@ -51,6 +51,7 @@
 //
 %include {
 #include "sqliteInt.h"
+#include "box/fkey.h"
 
 /*
 ** Disable all error recovery processing in the parser push-down
@@ -286,8 +287,8 @@ ccons ::= UNIQUE index_onconf(R). {sql_create_index(pParse,0,0,0,R,0,0,
 						   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
 ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
 ccons ::= REFERENCES nm(T) eidlist_opt(TA) refargs(R).
-                                 {sqlite3CreateForeignKey(pParse,0,&T,TA,R);}
-ccons ::= defer_subclause(D).    {sqlite3DeferForeignKey(pParse,D);}
+                                 {sql_create_foreign_key(pParse, NULL, NULL, NULL, &T, TA, false, R);}
+ccons ::= defer_subclause(D).    {fkey_change_defer_mode(pParse, D);}
 ccons ::= COLLATE id(C).        {sqlite3AddCollateType(pParse, &C);}
 
 // The optional AUTOINCREMENT keyword
@@ -301,19 +302,23 @@ autoinc(X) ::= AUTOINCR.  {X = 1;}
 // check fails.
 //
 %type refargs {int}
-refargs(A) ::= .                  { A = ON_CONFLICT_ACTION_NONE*0x0101; /* EV: R-19803-45884 */}
+refargs(A) ::= .                  { A = FKEY_NO_ACTION; }
 refargs(A) ::= refargs(A) refarg(Y). { A = (A & ~Y.mask) | Y.value; }
 %type refarg {struct {int value; int mask;}}
-refarg(A) ::= MATCH nm.              { A.value = 0;     A.mask = 0x000000; }
+refarg(A) ::= MATCH matcharg(X).     { A.value = X<<16; A.mask = 0xff0000; }
 refarg(A) ::= ON INSERT refact.      { A.value = 0;     A.mask = 0x000000; }
 refarg(A) ::= ON DELETE refact(X).   { A.value = X;     A.mask = 0x0000ff; }
 refarg(A) ::= ON UPDATE refact(X).   { A.value = X<<8;  A.mask = 0x00ff00; }
+%type matcharg {int}
+matcharg(A) ::= SIMPLE.  { A = FKEY_MATCH_SIMPLE; }
+matcharg(A) ::= PARTIAL. { A = FKEY_MATCH_PARTIAL; }
+matcharg(A) ::= FULL.    { A = FKEY_MATCH_FULL; }
 %type refact {int}
-refact(A) ::= SET NULL.              { A = OE_SetNull;  /* EV: R-33326-45252 */}
-refact(A) ::= SET DEFAULT.           { A = OE_SetDflt;  /* EV: R-33326-45252 */}
-refact(A) ::= CASCADE.               { A = OE_Cascade;  /* EV: R-33326-45252 */}
-refact(A) ::= RESTRICT.              { A = OE_Restrict; /* EV: R-33326-45252 */}
-refact(A) ::= NO ACTION.             { A = ON_CONFLICT_ACTION_NONE;     /* EV: R-33326-45252 */}
+refact(A) ::= SET NULL.              { A = FKEY_ACTION_SET_NULL; }
+refact(A) ::= SET DEFAULT.           { A = FKEY_ACTION_SET_DEFAULT; }
+refact(A) ::= CASCADE.               { A = FKEY_ACTION_CASCADE; }
+refact(A) ::= RESTRICT.              { A = FKEY_ACTION_RESTRICT; }
+refact(A) ::= NO ACTION.             { A = FKEY_NO_ACTION; }
 %type defer_subclause {int}
 defer_subclause(A) ::= NOT DEFERRABLE init_deferred_pred_opt.     {A = 0;}
 defer_subclause(A) ::= DEFERRABLE init_deferred_pred_opt(X).      {A = X;}
@@ -339,8 +344,7 @@ tcons ::= CHECK LP expr(E) RP onconf.
                                  {sql_add_check_constraint(pParse,&E);}
 tcons ::= FOREIGN KEY LP eidlist(FA) RP
           REFERENCES nm(T) eidlist_opt(TA) refargs(R) defer_subclause_opt(D). {
-    sqlite3CreateForeignKey(pParse, FA, &T, TA, R);
-    sqlite3DeferForeignKey(pParse, D);
+    sql_create_foreign_key(pParse, NULL, NULL, FA, &T, TA, D, R);
 }
 %type defer_subclause_opt {int}
 defer_subclause_opt(A) ::= .                    {A = 0;}
@@ -1443,6 +1447,17 @@ cmd ::= ANALYZE nm(X).          {sqlite3Analyze(pParse, &X);}
 cmd ::= ALTER TABLE fullname(X) RENAME TO nm(Z). {
   sqlite3AlterRenameTable(pParse,X,&Z);
 }
+
+cmd ::= ALTER TABLE fullname(X) ADD CONSTRAINT nm(Z) FOREIGN KEY
+        LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA) refargs(R)
+        defer_subclause_opt(D). {
+    sql_create_foreign_key(pParse, X, &Z, FA, &T, TA, D, R);
+}
+
+cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
+    sql_drop_foreign_key(pParse, X, &Z);
+}
+
 /* gh-3075: Commented until ALTER ADD COLUMN is implemeneted.  */
 /* cmd ::= ALTER TABLE add_column_fullname */
 /*         ADD kwcolumn_opt columnname(Y) carglist. { */

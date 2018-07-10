@@ -89,8 +89,7 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 	struct space *space = space_cache_find(space_id);
 	assert(space != NULL);
 
-	struct Table *table = sqlite3LocateTable(parse, LOCATE_NOERR, tab_name);
-	if (table != NULL && sqlite3FkReferences(table) != NULL) {
+	if (! rlist_empty(&space->parent_fkey)) {
 		const char *err_msg =
 			tt_sprintf("can not truncate space '%s' because other "
 				   "objects depend on it", space->def->name);
@@ -174,7 +173,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		assert(space != NULL);
 		trigger_list = sql_triggers_exist(table, TK_DELETE, NULL, NULL);
 		is_complex = trigger_list != NULL ||
-			     sqlite3FkRequired(table, NULL);
+			     fkey_is_required(table->def->id, NULL);
 	}
 	assert(space != NULL);
 
@@ -481,14 +480,16 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	 * use for the old.* references in the triggers.
 	 */
 	if (table != NULL &&
-	    (sqlite3FkRequired(table, NULL) || trigger_list != NULL)) {
+	    (fkey_is_required(table->def->id, NULL) || trigger_list != NULL)) {
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
 		uint32_t mask =
 			sql_trigger_colmask(parse, trigger_list, 0, 0,
 					    TRIGGER_BEFORE | TRIGGER_AFTER,
 					    table, onconf);
-		mask |= sqlite3FkOldmask(parse, table);
+		struct space *space = space_by_id(table->def->id);
+		assert(space != NULL);
+		mask |= space->fkey_mask;
 		first_old_reg = parse->nMem + 1;
 		parse->nMem += (1 + (int)table->def->field_count);
 
@@ -532,7 +533,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		 * constraints attached to other tables) are not
 		 * violated by deleting this row.
 		 */
-		sqlite3FkCheck(parse, table, first_old_reg, 0, NULL);
+		fkey_emit_check(parse, table, first_old_reg, 0, NULL);
 	}
 
 	/* Delete the index and table entries. Skip this step if
@@ -562,7 +563,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		 * key to the row just deleted.
 		 */
 
-		sqlite3FkActions(parse, table, 0, first_old_reg, 0);
+		fkey_emit_actions(parse, table, first_old_reg, NULL);
 
 		/* Invoke AFTER DELETE trigger programs. */
 		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, 0,

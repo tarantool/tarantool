@@ -65,7 +65,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.1,
     [[
-        CREATE TABLE pp(x PRIMARY KEY);
+        CREATE TABLE pp(x INTEGER PRIMARY KEY);
         CREATE TABLE cc(
           y INTEGER PRIMARY KEY REFERENCES pp DEFERRABLE INITIALLY DEFERRED
         );
@@ -83,7 +83,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.3,
     [[
-        CREATE TABLE pp(x PRIMARY KEY);
+        CREATE TABLE pp(x INTEGER PRIMARY KEY);
         CREATE TABLE cc(
           y INTEGER PRIMARY KEY REFERENCES pp DEFERRABLE INITIALLY DEFERRED
         );

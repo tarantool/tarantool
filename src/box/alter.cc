@@ -3677,6 +3677,46 @@ fkey_grab_by_name(struct rlist *list, const char *fkey_name)
 }
 
 /**
+ * FIXME: as SQLite legacy temporary we use such mask throught
+ * SQL code. It should be replaced later with regular
+ * mask from column_mask.h
+ */
+#define FKEY_MASK(x) (((x)>31) ? 0xffffffff : ((uint64_t)1<<(x)))
+
+/**
+ * Set bits of @mask which correspond to fields involved in
+ * given foreign key constraint.
+ *
+ * @param fk Links of this FK constraint are used to update mask.
+ * @param[out] mask Mask to be updated.
+ * @param type Type of links to be used to update mask:
+ *             parent or child.
+ */
+static inline void
+fkey_set_mask(const struct fkey *fk, uint64_t *mask, int type)
+{
+	for (uint32_t i = 0; i < fk->def->field_count; ++i)
+		*mask |= FKEY_MASK(fk->def->links[i].fields[type]);
+}
+
+/**
+ * When we discard FK constraint (due to drop or rollback
+ * trigger), we can't simply unset appropriate bits in mask,
+ * since other constraints may refer to them as well. Thus,
+ * we have nothing left to do but completely rebuild mask.
+ */
+static void
+space_reset_fkey_mask(struct space *space)
+{
+	space->fkey_mask = 0;
+	struct fkey *fk;
+	rlist_foreach_entry(fk, &space->child_fkey, child_link)
+		fkey_set_mask(fk, &space->fkey_mask, FIELD_LINK_CHILD);
+	rlist_foreach_entry(fk, &space->parent_fkey, parent_link)
+		fkey_set_mask(fk, &space->fkey_mask, FIELD_LINK_PARENT);
+}
+
+/**
  * On rollback of creation we remove FK constraint from DD, i.e.
  * from parent's and child's lists of constraints and
  * release memory.
@@ -3688,6 +3728,8 @@ on_create_fkey_rollback(struct trigger *trigger, void *event)
 	struct fkey *fk = (struct fkey *)trigger->data;
 	rlist_del_entry(fk, parent_link);
 	rlist_del_entry(fk, child_link);
+	space_reset_fkey_mask(space_by_id(fk->def->parent_id));
+	space_reset_fkey_mask(space_by_id(fk->def->child_id));
 	fkey_delete(fk);
 }
 
@@ -3704,6 +3746,8 @@ on_replace_fkey_rollback(struct trigger *trigger, void *event)
 	fkey_delete(new_fkey);
 	rlist_add_entry(&child->child_fkey, old_fk, child_link);
 	rlist_add_entry(&parent->parent_fkey, old_fk, parent_link);
+	space_reset_fkey_mask(parent);
+	space_reset_fkey_mask(child);
 }
 
 /** On rollback of drop simply return back FK to DD. */
@@ -3716,6 +3760,8 @@ on_drop_fkey_rollback(struct trigger *trigger, void *event)
 	struct space *child = space_by_id(fk_to_restore->def->child_id);
 	rlist_add_entry(&child->child_fkey, fk_to_restore, child_link);
 	rlist_add_entry(&parent->parent_fkey, fk_to_restore, parent_link);
+	fkey_set_mask(fk_to_restore, &child->fkey_mask, FIELD_LINK_CHILD);
+	fkey_set_mask(fk_to_restore, &parent->fkey_mask, FIELD_LINK_PARENT);
 }
 
 /**
@@ -3880,6 +3926,10 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 				txn_alter_trigger_new(on_create_fkey_rollback,
 						      fkey);
 			txn_on_rollback(txn, on_rollback);
+			fkey_set_mask(fkey, &parent_space->fkey_mask,
+				      FIELD_LINK_PARENT);
+			fkey_set_mask(fkey, &child_space->fkey_mask,
+				      FIELD_LINK_CHILD);
 		} else {
 			struct fkey *old_fk =
 				fkey_grab_by_name(&child_space->child_fkey,
@@ -3896,6 +3946,8 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 				txn_alter_trigger_new(on_drop_or_replace_fkey_commit,
 						      old_fk);
 			txn_on_commit(txn, on_commit);
+			space_reset_fkey_mask(child_space);
+			space_reset_fkey_mask(parent_space);
 		}
 		fkey_def_guard.is_active = false;
 		fkey_guard.is_active = false;
@@ -3907,6 +3959,8 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		auto fkey_guard = make_scoped_guard([=] { free(fk_def); });
 		struct space *child_space =
 			space_cache_find_xc(fk_def->child_id);
+		struct space *parent_space =
+			space_cache_find_xc(fk_def->parent_id);
 		struct fkey *old_fkey =
 			fkey_grab_by_name(&child_space->child_fkey,
 					  fk_def->name);
@@ -3917,6 +3971,8 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		struct trigger *on_rollback =
 			txn_alter_trigger_new(on_drop_fkey_rollback, old_fkey);
 		txn_on_rollback(txn, on_rollback);
+		space_reset_fkey_mask(child_space);
+		space_reset_fkey_mask(parent_space);
 	}
 }
 

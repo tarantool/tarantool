@@ -71,3 +71,29 @@ box.sql.execute("SELECT * from t1");
 box.sql.execute("SELECT * from t2");
 box.sql.execute("DROP TABLE t1;")
 box.sql.execute("DROP TABLE t2;")
+
+-- Tests which are aimed at verifying work of commit/rollback
+-- triggers on _fk_constraint space.
+--
+box.sql.execute("CREATE TABLE t3 (id PRIMARY KEY, a REFERENCES t3, b INT UNIQUE);")
+t = box.space._fk_constraint:select{}[1]:totable()
+errinj = box.error.injection
+errinj.set("ERRINJ_WAL_IO", true)
+-- Make constraint reference B field instead of id.
+t[9] = {2}
+box.space._fk_constraint:replace(t)
+errinj.set("ERRINJ_WAL_IO", false)
+box.sql.execute("INSERT INTO t3 VALUES (1, 2, 2);")
+errinj.set("ERRINJ_WAL_IO", true)
+box.sql.execute("ALTER TABLE t3 ADD CONSTRAINT fk1 FOREIGN KEY (b) REFERENCES t3;")
+errinj.set("ERRINJ_WAL_IO", false)
+box.sql.execute("INSERT INTO t3 VALUES(1, 1, 3);")
+box.sql.execute("DELETE FROM t3;")
+box.snapshot()
+box.sql.execute("ALTER TABLE t3 ADD CONSTRAINT fk1 FOREIGN KEY (b) REFERENCES t3;")
+box.sql.execute("INSERT INTO t3 VALUES(1, 1, 3);")
+errinj.set("ERRINJ_WAL_IO", true)
+box.sql.execute("ALTER TABLE t3 DROP CONSTRAINT fk1;")
+box.sql.execute("INSERT INTO t3 VALUES(1, 1, 3);")
+errinj.set("ERRINJ_WAL_IO", false)
+box.sql.execute("DROP TABLE t3;")

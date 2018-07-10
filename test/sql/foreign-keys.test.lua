@@ -150,5 +150,15 @@ box.space._fk_constraint:select({'fk_1', child_id})[1]['is_deferred']
 box.space.CHILD:drop()
 box.space.PARENT:drop()
 
--- Clean-up SQL DD hash.
-test_run:cmd('restart server default with cleanup=1')
+-- Check that parser correctly handles MATCH, ON DELETE and
+-- ON UPDATE clauses.
+--
+box.sql.execute('CREATE TABLE tp (id INT PRIMARY KEY, a INT UNIQUE)')
+box.sql.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) ON DELETE SET NULL MATCH FULL)')
+box.sql.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id) MATCH PARTIAL ON DELETE CASCADE ON UPDATE SET NULL')
+box.space._fk_constraint:select{}
+box.sql.execute('DROP TABLE tc')
+box.sql.execute('DROP TABLE tp')
+
+--- Clean-up SQL DD hash.
+-test_run:cmd('restart server default with cleanup=1')

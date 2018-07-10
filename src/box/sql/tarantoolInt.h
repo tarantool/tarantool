@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+struct fkey_def;
+
 /*
  * Tarantool system spaces.
  */
@@ -91,11 +93,6 @@ sql_rename_table(uint32_t space_id, const char *new_name, char **sql_stmt);
 int tarantoolSqlite3RenameTrigger(const char *zTriggerName,
 				  const char *zOldName, const char *zNewName);
 
-/* Alter create table statement of child foreign key table by
- * replacing parent table name in create table statement.*/
-int tarantoolSqlite3RenameParentTable(int iTab, const char *zOldParentName,
-				      const char *zNewParentName);
-
 /* Interface for ephemeral tables. */
 int tarantoolSqlite3EphemeralCreate(BtCursor * pCur, uint32_t filed_count,
 				    struct key_def *def);
@@ -153,6 +150,19 @@ int tarantoolSqlite3MakeTableFormat(Table * pTable, void *buf);
  * If buf==NULL estimate result size.
  */
 int tarantoolSqlite3MakeTableOpts(Table * pTable, const char *zSql, char *buf);
+
+/**
+ * Encode links of given foreign key constraint into MsgPack.
+ *
+ * @param def FK def to encode links of.
+ * @param type Links type to encode.
+ * @param buf Buffer to hold encoded links. Can be NULL. In this
+ *            case function would simply calculate memory required
+ *            for such buffer.
+ * @retval Length of encoded array.
+ */
+int
+fkey_encode_links(const struct fkey_def *def, int type, char *buf);
 
 /*
  * Format "parts" array for _index entry.

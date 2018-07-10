@@ -29,7 +29,7 @@ test:do_test(
     function()
         return test:execsql [[
             CREATE TABLE album(
-              aid INTEGER PRIMARY KEY,
+              aid PRIMARY KEY,
               title TEXT UNIQUE NOT NULL
             );
             CREATE TABLE track(
@@ -417,7 +417,7 @@ test:do_test(
             DROP TABLE track;
             DROP TABLE album;
             CREATE TABLE album(
-              aid INTEGER PRIMARY KEY,
+              aid PRIMARY KEY,
               title TEXT UNIQUE NOT NULL
             );
             CREATE TABLE track(
@@ -664,7 +664,7 @@ test:do_test(
     4.0,
     function()
         return test:execsql [[
-            CREATE TABLE t41(a INTEGER PRIMARY KEY, b INT NOT NULL);
+            CREATE TABLE t41(a PRIMARY KEY, b INT NOT NULL);
             CREATE INDEX t41ba ON t41(b,a);
             CREATE TABLE t42(id INTEGER PRIMARY KEY, x INT NOT NULL REFERENCES t41(a), y INT NOT NULL);
             CREATE UNIQUE INDEX t42xy ON t42(x,y);

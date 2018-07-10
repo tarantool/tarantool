@@ -147,7 +147,6 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	Expr *pDflt;		/* Default value for the new column */
 	sqlite3 *db;		/* The database connection; */
 	Vdbe *v = pParse->pVdbe;	/* The prepared statement under construction */
-	struct session *user_session = current_session();
 
 	db = pParse->db;
 	if (pParse->nErr || db->mallocFailed)
@@ -186,12 +185,6 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	}
 	if (pNew->pIndex) {
 		sqlite3ErrorMsg(pParse, "Cannot add a UNIQUE column");
-		return;
-	}
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) && pNew->pFKey
-	    && pDflt) {
-		sqlite3ErrorMsg(pParse,
-				"Cannot add a REFERENCES column with non-NULL default value");
 		return;
 	}
 	assert(pNew->def->fields[pNew->def->field_count - 1].is_nullable ==
@@ -380,81 +373,6 @@ rename_table(sqlite3 *db, const char *sql_stmt, const char *table_name,
 	new_sql_stmt = sqlite3MPrintf(db, "%.*s\"%w\"%s",
 				      (int)((old_name.z) - sql_stmt), sql_stmt,
 				      table_name, old_name.z + old_name.n);
-	return new_sql_stmt;
-}
-
-/*
- * This function is used by the ALTER TABLE ... RENAME command to modify the
- * definition of any foreign key constraints that used the table being renamed
- * as the parent table. All substituted occurrences will be quoted.
- * It returns the new CREATE TABLE statement. Memory for the new statement
- * will be automatically freed by VDBE.
- *
- * Usage example:
- *
- *   sqlite_rename_parent('CREATE TABLE t1(a REFERENCES t2)', 't2', 't3')
- *       -> 'CREATE TABLE t1(a REFERENCES "t3")'
- *
- * @param sql_stmt text of a child CREATE TABLE statement being modified
- * @param old_name old name of the table being renamed
- * @param new_name new name of the table being renamed
- * @param[out] numb_of_occurrences number of occurrences of old_name in sql_stmt
- * @param[out] numb_of_unquoted number of unquoted occurrences of old_name
- *
- * @retval new SQL statement on success, empty string otherwise.
- */
-char*
-rename_parent_table(sqlite3 *db, const char *sql_stmt, const char *old_name,
-		    const char *new_name, uint32_t *numb_of_occurrences,
-		    uint32_t *numb_of_unquoted)
-{
-	assert(sql_stmt);
-	assert(old_name);
-	assert(new_name);
-	assert(numb_of_occurrences);
-	assert(numb_of_unquoted);
-
-	char *output = NULL;
-	char *new_sql_stmt;
-	const char *csr;	/* Pointer to token */
-	int n;		/* Length of token z */
-	int token;	/* Type of token */
-	bool unused;
-	bool is_quoted;
-
-	for (csr = sql_stmt; *csr; csr = csr + n) {
-		n = sql_token(csr, &token, &unused);
-		if (token == TK_REFERENCES) {
-			char *zParent;
-			do {
-				csr += n;
-				n = sql_token(csr, &token, &unused);
-			} while (token == TK_SPACE);
-			if (token == TK_ILLEGAL)
-				break;
-			zParent = sqlite3DbStrNDup(db, csr, n);
-			if (zParent == 0)
-				break;
-			is_quoted = *zParent == '"' ? true : false;
-			sqlite3NormalizeName(zParent);
-			if (0 == strcmp(old_name, zParent)) {
-				(*numb_of_occurrences)++;
-				if (!is_quoted)
-					(*numb_of_unquoted)++;
-				char *zOut = sqlite3MPrintf(db, "%s%.*s\"%w\"",
-							    (output ? output : ""),
-							    (int)((char*)csr - sql_stmt),
-							    sql_stmt, new_name);
-				sqlite3DbFree(db, output);
-				output = zOut;
-				sql_stmt = &csr[n];
-			}
-			sqlite3DbFree(db, zParent);
-		}
-	}
-
-	new_sql_stmt = sqlite3MPrintf(db, "%s%s", (output ? output : ""), sql_stmt);
-	sqlite3DbFree(db, output);
 	return new_sql_stmt;
 }
 

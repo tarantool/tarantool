@@ -55,6 +55,7 @@
 #include "session.h"
 #include "xrow.h"
 #include "iproto_constants.h"
+#include "fkey.h"
 
 static sqlite3 *db = NULL;
 
@@ -839,103 +840,6 @@ rename_fail:
 	return SQL_TARANTOOL_ERROR;
 }
 
-/*
- * Acts almost as tarantoolSqlite3RenameTable, but doesn't change
- * name of table, only statement.
- */
-int tarantoolSqlite3RenameParentTable(int space_id, const char *old_parent_name,
-				      const char *new_parent_name)
-{
-	assert(space_id != 0);
-	assert(old_parent_name != NULL);
-	assert(new_parent_name != NULL);
-
-	box_tuple_t *tuple;
-	uint32_t key_len = mp_sizeof_uint(space_id) + mp_sizeof_array(1);
-
-	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
-	if (key_begin == NULL) {
-		diag_set(OutOfMemory, key_len, "region_alloc", "key_begin");
-		return SQL_TARANTOOL_ERROR;
-	}
-	char *key = mp_encode_array(key_begin, 1);
-	key = mp_encode_uint(key, space_id);
-	if (box_index_get(BOX_SPACE_ID, 0, key_begin, key, &tuple) != 0)
-		return SQL_TARANTOOL_ERROR;
-	assert(tuple != NULL);
-
-	assert(tuple_field_count(tuple) == 7);
-	const char *sql_stmt_map = box_tuple_field(tuple, 5);
-
-	if (sql_stmt_map == NULL || mp_typeof(*sql_stmt_map) != MP_MAP)
-		goto rename_fail;
-	uint32_t map_size = mp_decode_map(&sql_stmt_map);
-	if (map_size != 1)
-		goto rename_fail;
-	const char *sql_str = mp_decode_str(&sql_stmt_map, &key_len);
-	if (sqlite3StrNICmp(sql_str, "sql", 3) != 0)
-		goto rename_fail;
-	uint32_t create_stmt_decoded_len;
-	const char *create_stmt_old = mp_decode_str(&sql_stmt_map,
-						    &create_stmt_decoded_len);
-	uint32_t old_name_len = strlen(old_parent_name);
-	uint32_t new_name_len = strlen(new_parent_name);
-	char *create_stmt_new = (char*) region_alloc(&fiber()->gc,
-						     create_stmt_decoded_len + 1);
-	if (create_stmt_new == NULL) {
-		diag_set(OutOfMemory, create_stmt_decoded_len + 1,
-			 "region_alloc", "create_stmt_new");
-		return SQL_TARANTOOL_ERROR;
-	}
-	memcpy(create_stmt_new, create_stmt_old, create_stmt_decoded_len);
-	create_stmt_new[create_stmt_decoded_len] = '\0';
-	uint32_t numb_of_quotes = 0;
-	uint32_t numb_of_occurrences = 0;
-	create_stmt_new = rename_parent_table(db, create_stmt_new, old_parent_name,
-					      new_parent_name, &numb_of_occurrences,
-					      &numb_of_quotes);
-	uint32_t create_stmt_new_len = create_stmt_decoded_len -
-				       numb_of_occurrences *
-				       (old_name_len - new_name_len) +
-				       2 * numb_of_quotes;
-	assert(create_stmt_new_len > 0);
-
-	key_len = tuple->bsize + mp_sizeof_str(create_stmt_new_len);
-	char *new_tuple = (char*)region_alloc(&fiber()->gc, key_len);
-	if (new_tuple == NULL) {
-		sqlite3DbFree(db, create_stmt_new);
-		diag_set(OutOfMemory, key_len, "region_alloc", "new_tuple");
-		return SQL_TARANTOOL_ERROR;
-	}
-
-	char *new_tuple_end = new_tuple;
-	const char *data_begin = tuple_data(tuple);
-	const char *data_end = tuple_field(tuple, 5);
-	uint32_t data_size = data_end - data_begin;
-	memcpy(new_tuple, data_begin, data_size);
-	new_tuple_end += data_size;
-	new_tuple_end = mp_encode_map(new_tuple_end, 1);
-	new_tuple_end = mp_encode_str(new_tuple_end, "sql", 3);
-	new_tuple_end = mp_encode_str(new_tuple_end, create_stmt_new,
-				      create_stmt_new_len);
-	sqlite3DbFree(db, create_stmt_new);
-	data_begin = tuple_field(tuple, 6);
-	data_end = (char*) tuple + tuple_size(tuple);
-	data_size = data_end - data_begin;
-	memcpy(new_tuple_end, data_begin, data_size);
-	new_tuple_end += data_size;
-
-	if (box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, NULL) != 0)
-		return SQL_TARANTOOL_ERROR;
-	else
-		return SQLITE_OK;
-
-rename_fail:
-	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
-		"created not via SQL facilities");
-	return SQL_TARANTOOL_ERROR;
-}
-
 int
 tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
 			      struct UnpackedRecord *unpacked)
@@ -1495,6 +1399,16 @@ tarantoolSqlite3MakeTableOpts(Table *pTable, const char *zSql, char *buf)
 			p = enc->encode_str(p, a[i].zName, strlen(a[i].zName));
 		}
 	}
+	return p - buf;
+}
+
+int
+fkey_encode_links(const struct fkey_def *def, int type, char *buf)
+{
+	const struct Enc *enc = get_enc(buf);
+	char *p = enc->encode_array(buf, def->field_count);
+	for (uint32_t i = 0; i < def->field_count; ++i)
+		p = enc->encode_uint(p, def->links[i].fields[type]);
 	return p - buf;
 }
 
