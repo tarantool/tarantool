@@ -40,6 +40,7 @@ box.space.test1.is_local
 box.space.test2.is_local
 box.space.test1:select()
 box.space.test2:select()
+box.cfg{read_only = true} -- local spaces ignore read_only
 for i = 1, 3 do box.space.test2:insert{i, i} end
 
 test_run:cmd("switch default")
