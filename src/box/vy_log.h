@@ -66,8 +66,8 @@ enum vy_log_record_type {
 	/**
 	 * Create a new LSM tree.
 	 * Requires vy_log_record::lsm_id, create_lsn.
-	 * After rotation, it also stores space_id, index_id, key_def,
-	 * create_lsn, modify_lsn, dump_lsn.
+	 * After rotation, it also stores space_id, index_id, group_id,
+	 * key_def, create_lsn, modify_lsn, dump_lsn.
 	 */
 	VY_LOG_CREATE_LSM		= 0,
 	/**
@@ -182,7 +182,8 @@ enum vy_log_record_type {
 	VY_LOG_FORGET_LSM		= 14,
 	/**
 	 * Prepare a new LSM tree for building.
-	 * Requires vy_log_record::lsm_id, index_id, space_id.
+	 * Requires vy_log_record::lsm_id, index_id, space_id, group_id,
+	 * key_def.
 	 *
 	 * Index ALTER operation consists of two stages. First, we
 	 * build a new LSM tree, checking constraints if necessary.
@@ -225,6 +226,8 @@ struct vy_log_record {
 	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
+	/** Replication group ID. */
+	uint32_t group_id;
 	/** Index key definition, as defined by the user. */
 	const struct key_def *key_def;
 	/** Array of key part definitions. */
@@ -285,6 +288,8 @@ struct vy_lsm_recovery_info {
 	uint32_t index_id;
 	/** Space ID. */
 	uint32_t space_id;
+	/** Replication group ID. */
+	uint32_t group_id;
 	/** Array of key part definitions. */
 	struct key_part_def *key_parts;
 	/** Number of key parts. */
@@ -562,7 +567,7 @@ vy_log_record_init(struct vy_log_record *record)
 /** Helper to log a vinyl LSM tree preparation. */
 static inline void
 vy_log_prepare_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
-		   const struct key_def *key_def)
+		   uint32_t group_id, const struct key_def *key_def)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
@@ -570,6 +575,7 @@ vy_log_prepare_lsm(int64_t id, uint32_t space_id, uint32_t index_id,
 	record.lsm_id = id;
 	record.space_id = space_id;
 	record.index_id = index_id;
+	record.group_id = group_id;
 	record.key_def = key_def;
 	vy_log_write(&record);
 }

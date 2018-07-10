@@ -158,6 +158,8 @@ struct vy_lsm {
 	uint32_t index_id;
 	/** ID of the space this LSM tree is for. */
 	uint32_t space_id;
+	/** Replication group ID. */
+	uint32_t group_id;
 	/** Index options. */
 	struct index_opts opts;
 	/** Key definition used to compare tuples. */
@@ -301,8 +303,8 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm);
 /** Allocate a new LSM tree object. */
 struct vy_lsm *
 vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
-	     struct vy_mem_env *mem_env, struct index_def *index_def,
-	     struct tuple_format *format, struct vy_lsm *pk);
+	   struct vy_mem_env *mem_env, struct index_def *index_def,
+	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id);
 
 /** Free an LSM tree object. */
 void

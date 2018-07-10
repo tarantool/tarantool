@@ -93,7 +93,7 @@ test_basic()
 			      &index_opts, key_def, NULL);
 
 	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &cache_env, &mem_env,
-				       index_def, format, NULL);
+				       index_def, format, NULL, 0);
 	isnt(pk, NULL, "lsm is not NULL")
 
 	struct vy_range *range = vy_range_new(1, NULL, NULL, pk->cmp_def);

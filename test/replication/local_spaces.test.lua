@@ -1,14 +1,15 @@
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
 
 --
 -- gh-3443: Check that changes done to spaces marked as local
 -- are not replicated, but vclock is still promoted.
 --
 
-s1 = box.schema.space.create('test1')
+s1 = box.schema.space.create('test1', {engine = engine})
 _ = s1:create_index('pk')
-s2 = box.schema.space.create('test2', {is_local = true})
+s2 = box.schema.space.create('test2', {engine = engine, is_local = true})
 _ = s2:create_index('pk')
 s1.is_local
 s2.is_local
@@ -23,7 +24,7 @@ box.space._space:update(s2.id, {{'=', 6, {group_id = 0}}}) -- error
 
 -- Currently, there are only two replication groups:
 -- 0 (global) and 1 (local)
-box.space._space:insert{9000, 1, 'test', 'memtx', 0, {group_id = 2}, {}} -- error
+box.space._space:insert{9000, 1, 'test', engine, 0, {group_id = 2}, {}} -- error
 
 -- Temporary local spaces should behave in the same fashion as
 -- plain temporary spaces, i.e. neither replicated nor persisted.

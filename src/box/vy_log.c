@@ -83,6 +83,7 @@ enum vy_log_key {
 	VY_LOG_KEY_CREATE_LSN		= 12,
 	VY_LOG_KEY_MODIFY_LSN		= 13,
 	VY_LOG_KEY_DROP_LSN		= 14,
+	VY_LOG_KEY_GROUP_ID		= 15,
 };
 
 /** vy_log_key -> human readable name. */
@@ -102,6 +103,7 @@ static const char *vy_log_key_name[] = {
 	[VY_LOG_KEY_CREATE_LSN]		= "create_lsn",
 	[VY_LOG_KEY_MODIFY_LSN]		= "modify_lsn",
 	[VY_LOG_KEY_DROP_LSN]		= "drop_lsn",
+	[VY_LOG_KEY_GROUP_ID]		= "group_id",
 };
 
 /** vy_log_type -> human readable name. */
@@ -247,6 +249,9 @@ vy_log_record_snprint(char *buf, int size, const struct vy_log_record *record)
 	if (record->space_id > 0)
 		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
 			vy_log_key_name[VY_LOG_KEY_SPACE_ID], record->space_id);
+	if (record->group_id > 0)
+		SNPRINT(total, snprintf, buf, size, "%s=%"PRIu32", ",
+			vy_log_key_name[VY_LOG_KEY_GROUP_ID], record->group_id);
 	if (record->key_parts != NULL) {
 		SNPRINT(total, snprintf, buf, size, "%s=",
 			vy_log_key_name[VY_LOG_KEY_DEF]);
@@ -362,6 +367,11 @@ vy_log_record_encode(const struct vy_log_record *record,
 		size += mp_sizeof_uint(record->space_id);
 		n_keys++;
 	}
+	if (record->group_id > 0) {
+		size += mp_sizeof_uint(VY_LOG_KEY_GROUP_ID);
+		size += mp_sizeof_uint(record->group_id);
+		n_keys++;
+	}
 	if (record->key_parts != NULL) {
 		size += mp_sizeof_uint(VY_LOG_KEY_DEF);
 		size += mp_sizeof_array(record->key_part_count);
@@ -446,6 +456,10 @@ vy_log_record_encode(const struct vy_log_record *record,
 	if (record->space_id > 0) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_SPACE_ID);
 		pos = mp_encode_uint(pos, record->space_id);
+	}
+	if (record->group_id > 0) {
+		pos = mp_encode_uint(pos, VY_LOG_KEY_GROUP_ID);
+		pos = mp_encode_uint(pos, record->group_id);
 	}
 	if (record->key_parts != NULL) {
 		pos = mp_encode_uint(pos, VY_LOG_KEY_DEF);
@@ -560,6 +574,9 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_SPACE_ID:
 			record->space_id = mp_decode_uint(&pos);
+			break;
+		case VY_LOG_KEY_GROUP_ID:
+			record->group_id = mp_decode_uint(&pos);
 			break;
 		case VY_LOG_KEY_DEF: {
 			uint32_t part_count = mp_decode_array(&pos);
@@ -1238,6 +1255,7 @@ vy_recovery_lookup_slice(struct vy_recovery *recovery, int64_t slice_id)
 static struct vy_lsm_recovery_info *
 vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 			  uint32_t space_id, uint32_t index_id,
+			  uint32_t group_id,
 			  const struct key_part_def *key_parts,
 			  uint32_t key_part_count)
 {
@@ -1273,6 +1291,7 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->id = id;
 	lsm->space_id = space_id;
 	lsm->index_id = index_id;
+	lsm->group_id = group_id;
 	memcpy(lsm->key_parts, key_parts, sizeof(*key_parts) * key_part_count);
 	lsm->key_part_count = key_part_count;
 	lsm->create_lsn = -1;
@@ -1313,6 +1332,7 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 static int
 vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
 			uint32_t space_id, uint32_t index_id,
+			uint32_t group_id,
 			const struct key_part_def *key_parts,
 			uint32_t key_part_count)
 {
@@ -1323,7 +1343,8 @@ vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
 		return -1;
 	}
 	if (vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
-				      key_parts, key_part_count) == NULL)
+				      group_id, key_parts,
+				      key_part_count) == NULL)
 		return -1;
 	return 0;
 }
@@ -1339,7 +1360,7 @@ vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
  */
 static int
 vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
-		       uint32_t space_id, uint32_t index_id,
+		       uint32_t space_id, uint32_t index_id, uint32_t group_id,
 		       const struct key_part_def *key_parts,
 		       uint32_t key_part_count, int64_t create_lsn,
 		       int64_t modify_lsn, int64_t dump_lsn)
@@ -1358,7 +1379,8 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 			return -1;
 		}
 	} else {
-		lsm = vy_recovery_do_create_lsm(recovery, id, space_id, index_id,
+		lsm = vy_recovery_do_create_lsm(recovery, id, space_id,
+						index_id, group_id,
 						key_parts, key_part_count);
 		if (lsm == NULL)
 			return -1;
@@ -1883,14 +1905,15 @@ vy_recovery_process_record(struct vy_recovery *recovery,
 	case VY_LOG_PREPARE_LSM:
 		rc = vy_recovery_prepare_lsm(recovery, record->lsm_id,
 				record->space_id, record->index_id,
-				record->key_parts, record->key_part_count);
+				record->group_id, record->key_parts,
+				record->key_part_count);
 		break;
 	case VY_LOG_CREATE_LSM:
 		rc = vy_recovery_create_lsm(recovery, record->lsm_id,
 				record->space_id, record->index_id,
-				record->key_parts, record->key_part_count,
-				record->create_lsn, record->modify_lsn,
-				record->dump_lsn);
+				record->group_id, record->key_parts,
+				record->key_part_count, record->create_lsn,
+				record->modify_lsn, record->dump_lsn);
 		break;
 	case VY_LOG_MODIFY_LSM:
 		rc = vy_recovery_modify_lsm(recovery, record->lsm_id,
@@ -2218,6 +2241,7 @@ vy_log_append_lsm(struct xlog *xlog, struct vy_lsm_recovery_info *lsm)
 	record.lsm_id = lsm->id;
 	record.index_id = lsm->index_id;
 	record.space_id = lsm->space_id;
+	record.group_id = lsm->group_id;
 	record.key_parts = lsm->key_parts;
 	record.key_part_count = lsm->key_part_count;
 	record.create_lsn = lsm->create_lsn;
