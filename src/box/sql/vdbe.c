@@ -3099,6 +3099,11 @@ case OP_IteratorOpen:
 	else
 		space = aMem[pOp->p3].u.p;
 	assert(space != NULL);
+	if (access_check_space(space, PRIV_R) != 0) {
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+
 	struct index *index = space_index(space, pOp->p2);
 	assert(index != NULL);
 	assert(pOp->p1 >= 0);
