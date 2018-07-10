@@ -204,13 +204,8 @@ vdbe_has_table_read(struct Parse *parser, const struct Table *table)
 		 * and Write cursors.
 		 */
 		if (op->opcode == OP_OpenRead || op->opcode == OP_OpenWrite) {
-			assert(i > 1);
-			struct VdbeOp *space_var_op =
-				sqlite3VdbeGetOp(v, i - 1);
-			assert(space_var_op != NULL);
-			assert(space_var_op->opcode == OP_LoadPtr);
-			struct space *space = space_var_op->p4.space;
-
+			assert(op->p4type == P4_SPACEPTR);
+			struct space *space = op->p4.space;
 			if (space->def->id == table->def->id)
 				return true;
 		}
@@ -1573,10 +1568,6 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		*piIdxCur = iBase;
 	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
 	assert(space != NULL);
-	int space_ptr_reg = ++pParse->nMem;
-	sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
-			  P4_SPACEPTR);
-
 	/* One iteration of this cycle adds OpenRead/OpenWrite which
 	 * opens cursor for current index.
 	 *
@@ -1625,9 +1616,8 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 			if (aToOpen == 0 || aToOpen[i + 1]) {
 				int idx_id =
 					SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
-				sqlite3VdbeAddOp3(v, op, iIdxCur, idx_id,
-						  space_ptr_reg);
-				sql_vdbe_set_p4_key_def(pParse, pIdx);
+				sqlite3VdbeAddOp4(v, op, iIdxCur, idx_id, 0,
+						  (void *) space, P4_SPACEPTR);
 				sqlite3VdbeChangeP5(v, p5);
 				VdbeComment((v, "%s", pIdx->zName));
 			}

@@ -335,19 +335,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 				iAddrOnce = sqlite3VdbeAddOp0(v, OP_Once);
 				VdbeCoverage(v);
 			}
-
-			int space_ptr_reg = ++parse->nMem;
-			sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0,
-					  (void *)space, P4_SPACEPTR);
-
-			sqlite3VdbeAddOp3(v, OP_OpenWrite, tab_cursor, 0,
-					  space_ptr_reg);
-			struct key_def *def = key_def_dup(pk_def);
-			if (def == NULL) {
-				sqlite3OomFault(parse->db);
-				goto delete_from_cleanup;
-			}
-			sqlite3VdbeAppendP4(v, def, P4_KEYDEF);
+			sqlite3VdbeAddOp4(v, OP_OpenWrite, tab_cursor, 0, 0,
+					  (void *) space, P4_SPACEPTR);
 			VdbeComment((v, "%s", space->index[0]->def->name));
 
 			if (one_pass == ONEPASS_MULTI)

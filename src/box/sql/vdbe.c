@@ -1077,19 +1077,6 @@ case OP_Int64: {           /* out2 */
 	break;
 }
 
-/* Opcode: LoadPtr * P2 * P4 *
- * Synopsis: r[P2] = P4
- *
- * P4 is a generic or space pointer. Copy it into register P2.
- */
-case OP_LoadPtr: {
-	pOut = out2Prerelease(p, pOp);
-	assert(pOp->p4type == P4_PTR || pOp->p4type == P4_SPACEPTR );
-	pOut->u.p = pOp->p4.space;
-	pOut->flags = MEM_Ptr;
-	break;
-}
-
 #ifndef SQLITE_OMIT_FLOATING_POINT
 /* Opcode: Real * P2 * P4 *
  * Synopsis: r[P2]=P4
@@ -3137,26 +3124,15 @@ case OP_SetCookie: {
 }
 
 /* Opcode: OpenRead P1 P2 P3 P4 P5
- * Synopsis: index id = P2, space ptr = P3
+ * Synopsis: index id = P2, space ptr = P4
  *
- * Open a cursor for a space specified by pointer in P3 and index
+ * Open a cursor for a space specified by pointer in P4 and index
  * id in P2. Give the new cursor an identifier of P1. The P1
  * values need not be contiguous but all P1 values should be
  * small integers. It is an error for P1 to be negative.
- *
- * The P4 value may be a pointer to a key_def structure.
- * If it is a pointer to a key_def structure, then said structure
- * defines the content and collatining sequence of the index
- * being opened. Otherwise, P4 is NULL.
- *
- * If schema has changed since compile time, VDBE ends execution
- * with appropriate error message. The only exception is
- * when P5 is set to OPFLAG_FRESH_PTR, which means that
- * space pointer has been fetched in runtime right before
- * this opcode.
  */
 /* Opcode: ReopenIdx P1 P2 P3 P4 P5
- * Synopsis: index id = P2, space ptr = P3
+ * Synopsis: index id = P2, space ptr = P4
  *
  * The ReopenIdx opcode works exactly like OpenRead except that
  * it first checks to see if the cursor on P1 is already open
@@ -3166,7 +3142,7 @@ case OP_SetCookie: {
  * The ReopenIdx opcode may only be used with P5 == 0.
  */
 /* Opcode: OpenWrite P1 P2 P3 P4 P5
- * Synopsis: index id = P2, space ptr = P3
+ * Synopsis: index id = P2, space ptr = P4
  *
  * For now, OpenWrite is an alias for OpenRead.
  * It exists just due legacy reasons and should be removed:
@@ -3182,9 +3158,7 @@ case OP_ReopenIdx: {
 	assert(pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
 	pCur = p->apCsr[pOp->p1];
 	p2 = pOp->p2;
-	pIn3 = &aMem[pOp->p3];
-	assert(pIn3->flags & MEM_Ptr);
-	if (pCur && pCur->uc.pCursor->space == (struct space *) pIn3->u.p &&
+	if (pCur && pCur->uc.pCursor->space == pOp->p4.space &&
 	    pCur->uc.pCursor->index->def->iid == (uint32_t)p2)
 		goto open_cursor_set_hints;
 	/* If the cursor is not currently open or is open on a different
@@ -3194,13 +3168,7 @@ case OP_OpenRead:
 case OP_OpenWrite:
 
 	assert(pOp->opcode==OP_OpenWrite || pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
-	/*
-	 * Even if schema has changed, pointer can come from
-	 * OP_SIDtoPtr opcode, which converts space id to pointer
-	 * during runtime.
-	 */
-	if (box_schema_version() != p->schema_ver &&
-	    (pOp->p5 & OPFLAG_FRESH_PTR) == 0) {
+	if (box_schema_version() != p->schema_ver) {
 		p->expired = 1;
 		rc = SQLITE_ERROR;
 		sqlite3VdbeError(p, "schema version has changed: " \
@@ -3208,9 +3176,7 @@ case OP_OpenWrite:
 		goto abort_due_to_error;
 	}
 	p2 = pOp->p2;
-	pIn3 = &aMem[pOp->p3];
-	assert(pIn3->flags & MEM_Ptr);
-	struct space *space = ((struct space *) pIn3->u.p);
+	struct space *space = pOp->p4.space;
 	assert(space != NULL);
 	struct index *index = space_index(space, p2);
 	assert(index != NULL);
@@ -4458,26 +4424,6 @@ case OP_SDelete: {
 		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
-	break;
-}
-
-/* Opcode: SIDtoPtr P1 P2 * * *
- * Synopsis: space id = P1, space[out] = r[P2]
- *
- * This opcode makes look up by space id and save found space
- * into register, specified by the content of register P2.
- * Such trick is needed during DLL routine, since schema may
- * change and pointers become expired.
- */
-case OP_SIDtoPtr: {
-	assert(pOp->p1 > 0);
-	assert(pOp->p2 >= 0);
-
-	pIn2 = out2Prerelease(p, pOp);
-	struct space *space = space_by_id(pOp->p1);
-	assert(space != NULL);
-	pIn2->u.p = (void *) space;
-	pIn2->flags = MEM_Ptr;
 	break;
 }
 

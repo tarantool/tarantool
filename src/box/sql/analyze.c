@@ -789,7 +789,6 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	int iTabCur;		/* Table cursor */
 	Vdbe *v;		/* The virtual machine being built up */
 	int i;			/* Loop counter */
-	int space_ptr_reg = iMem++;
 	int regStat4 = iMem++;	/* Register to hold Stat4Accum object */
 	int regChng = iMem++;	/* Index of changed index field */
 	int regKey = iMem++;	/* Key argument passed to stat_push() */
@@ -889,11 +888,8 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 			space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
 		int idx_id = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
 		assert(space != NULL);
-		sqlite3VdbeAddOp4(v, OP_LoadPtr, 0, space_ptr_reg, 0,
-				  (void*)space, P4_SPACEPTR);
-		sqlite3VdbeAddOp3(v, OP_OpenRead, iIdxCur, idx_id,
-				  space_ptr_reg);
-		sql_vdbe_set_p4_key_def(pParse, pIdx);
+		sqlite3VdbeAddOp4(v, OP_OpenRead, iIdxCur, idx_id, 0,
+				  (void *) space, P4_SPACEPTR);
 		VdbeComment((v, "%s", pIdx->zName));
 
 		/* Invoke the stat_init() function. The arguments are:

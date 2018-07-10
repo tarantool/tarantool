@@ -1108,12 +1108,8 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 		      struct space *space)
 {
 	assert(space != NULL);
-	struct Vdbe *vdbe = parse_context->pVdbe;
-	int space_ptr_reg = ++parse_context->nMem;
-	sqlite3VdbeAddOp4(vdbe, OP_LoadPtr, 0, space_ptr_reg, 0, (void*)space,
-			  P4_SPACEPTR);
-	return sqlite3VdbeAddOp3(vdbe, OP_OpenWrite, cursor, index_id,
-				 space_ptr_reg);
+	return sqlite3VdbeAddOp4(parse_context->pVdbe, OP_OpenWrite, cursor,
+				 index_id, 0, (void *) space, P4_SPACEPTR);
 }
 /*
  * Generate code that will increment the schema cookie.
@@ -2961,7 +2957,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		Vdbe *v;
 		char *zStmt;
 		int iCursor = parse->nTab++;
-		int index_space_ptr_reg = parse->nTab++;
 		int iSpaceId, iIndexId, iFirstSchemaCol;
 
 		v = sqlite3GetVdbe(parse);
@@ -2969,12 +2964,9 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			goto exit_create_index;
 
 		sql_set_multi_write(parse, true);
-
-
-		sqlite3VdbeAddOp2(v, OP_SIDtoPtr, BOX_INDEX_ID,
-				  index_space_ptr_reg);
-		sqlite3VdbeAddOp4Int(v, OP_OpenWrite, iCursor, 0,
-				     index_space_ptr_reg, 6);
+		sqlite3VdbeAddOp4(v, OP_OpenWrite, iCursor, 0, 0,
+				  (void *)space_by_id(BOX_INDEX_ID),
+				  P4_SPACEPTR);
 		sqlite3VdbeChangeP5(v, OPFLAG_SEEKEQ);
 
 		/*
@@ -3943,7 +3935,7 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 	int cursor = parser->nTab++;
 	vdbe_emit_open_cursor(parser, cursor, index_id, space_by_id(space_id));
 
-	int name_reg = parser->nMem++;
+	int name_reg = ++parser->nMem;
 	int label = sqlite3VdbeAddOp4(v, OP_String8, 0, name_reg, 0, name,
 				      P4_DYNAMIC);
 	sqlite3VdbeAddOp4Int(v, cond_opcode, cursor, label + 3, name_reg, 1);

@@ -678,29 +678,28 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					x = sqlite3FkLocateIndex(pParse,
 								 pParent, pFK,
 								 &pIdx, 0);
-					if (x == 0) {
-						if (pIdx == 0) {
-							sqlite3OpenTable(pParse,
-									 i,
-									 pParent,
-									 OP_OpenRead);
-						} else {
-							int idx_id =
-								SQLITE_PAGENO_TO_INDEXID(
-									pIdx->
-									tnum);
-							sqlite3VdbeAddOp3(v,
-									  OP_OpenRead,
-									  i,
-									  idx_id,
-									  0);
-							sql_vdbe_set_p4_key_def(pParse,
-										pIdx);
-						}
-					} else {
+					if (x != 0) {
 						k = 0;
 						break;
 					}
+					if (pIdx == NULL) {
+						sqlite3OpenTable(pParse, i,
+								 pParent,
+								 OP_OpenRead);
+						continue;
+					}
+					struct space *space =
+						space_cache_find(pIdx->pTable->
+								 def->id);
+					int idx_id =
+						SQLITE_PAGENO_TO_INDEXID(pIdx->
+									 tnum);
+					assert(space != NULL);
+					sqlite3VdbeAddOp4(v, OP_OpenRead, i,
+							  idx_id, 0,
+							  (void *) space,
+							  P4_SPACEPTR);
+
 				}
 				assert(pParse->nErr > 0 || pFK == 0);
 				if (pFK)
