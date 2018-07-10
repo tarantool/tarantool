@@ -56,19 +56,19 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /** @cond false **/
-struct bitset_iterator_conj;
+struct tt_bitset_iterator_conj;
 /** @endcond **/
 
 /**
  * @brief Bitset Iterator
  */
-struct bitset_iterator {
+struct tt_bitset_iterator {
 	/** @cond false **/
 	size_t size;
 	size_t capacity;
-	struct bitset_iterator_conj *conjs;
-	struct bitset_page *page;
-	struct bitset_page *page_tmp;
+	struct tt_bitset_iterator_conj *conjs;
+	struct tt_bitset_page *page;
+	struct tt_bitset_page *page_tmp;
 	void *(*realloc)(void *ptr, size_t size);
 	struct bit_iterator page_it;
 	/** @endcond **/
@@ -83,15 +83,15 @@ struct bitset_iterator {
  * @param realloc memory allocator to use
  */
 void
-bitset_iterator_create(struct bitset_iterator *it,
-		       void *(*realloc)(void *ptr, size_t size));
+tt_bitset_iterator_create(struct tt_bitset_iterator *it,
+			  void *(*realloc)(void *ptr, size_t size));
 
 /**
  * @brief Destruct \a it.
  * @param it bitset iterator
  */
 void
-bitset_iterator_destroy(struct bitset_iterator *it);
+tt_bitset_iterator_destroy(struct tt_bitset_iterator *it);
 
 /**
  * @brief Initialize the \a it using \a expr and \a bitsets and rewind the
@@ -114,8 +114,9 @@ bitset_iterator_destroy(struct bitset_iterator *it);
  * @see expr.h
  */
 int
-bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
-		     struct bitset **bitsets, size_t bitsets_size);
+tt_bitset_iterator_init(struct tt_bitset_iterator *it,
+			struct tt_bitset_expr *expr, struct tt_bitset **bitsets,
+			size_t bitsets_size);
 
 /**
  * @brief Rewind the \a it to the start position.
@@ -123,7 +124,7 @@ bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
  * @see @link bitset_iterator_init @endlink
  */
 void
-bitset_iterator_rewind(struct bitset_iterator *it);
+tt_bitset_iterator_rewind(struct tt_bitset_iterator *it);
 
 /**
  * @brief Move \a it to a next position
@@ -133,7 +134,7 @@ bitset_iterator_rewind(struct bitset_iterator *it);
  * @see @link bitset_iterator_init @endlink
  */
 size_t
-bitset_iterator_next(struct bitset_iterator *it);
+tt_bitset_iterator_next(struct tt_bitset_iterator *it);
 
 #if defined(__cplusplus)
 }

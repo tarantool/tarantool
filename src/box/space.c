@@ -58,17 +58,21 @@ access_check_space(struct space *space, user_access_t access)
 	 * since ADMIN has universal access.
 	 */
 	user_access_t space_access = access & ~cr->universal_access;
+	/*
+	 * Similarly to global access, subtract entity-level access
+	 * (access to all spaces) if it is present.
+	 */
 	space_access &= ~entity_access_get(SC_SPACE)[cr->auth_token].effective;
 
 	if (space_access &&
-	    /* Check for missing Usage access, ignore owner rights. */
+	    /* Check for missing USAGE access, ignore owner rights. */
 	    (space_access & PRIV_U ||
 	     /* Check for missing specific access, respect owner rights. */
 	    (space->def->uid != cr->uid &&
 	     space_access & ~space->access[cr->auth_token].effective))) {
 		/*
 		 * Report access violation. Throw "no such user"
-		 * error if there is  no user with this id.
+		 * error if there is no user with this id.
 		 * It is possible that the user was dropped
 		 * from a different connection.
 		 */
@@ -191,7 +195,7 @@ space_new_ephemeral(struct space_def *def, struct rlist *key_list)
 	struct space *space = space_new(def, key_list);
 	if (space == NULL)
 		return NULL;
-	space->def->opts.temporary = true;
+	space->def->opts.is_temporary = true;
 	space->vtab->init_ephemeral_space(space);
 	return space;
 }

@@ -211,6 +211,11 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 		lua_pushinteger(L, row.replica_id);
 		lua_settable(L, -3); /* replica_id */
 	}
+	if (row.group_id != 0) {
+		lbox_xlog_pushkey(L, iproto_key_name(IPROTO_GROUP_ID));
+		lua_pushinteger(L, row.group_id);
+		lua_settable(L, -3); /* group_id */
+	}
 	if (row.tm != 0) {
 		lbox_xlog_pushkey(L, iproto_key_name(IPROTO_TIMESTAMP));
 		lua_pushnumber(L, row.tm);
@@ -219,13 +224,14 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 
 	lua_settable(L, -3); /* HEADER */
 
-	assert(row.bodycnt == 1); /* always 1 for read */
-	lua_pushstring(L, "BODY");
-	lua_newtable(L);
-	lbox_xlog_parse_body(L, row.type, (char *)row.body[0].iov_base,
-			     row.body[0].iov_len);
-	lua_settable(L, -3);  /* BODY */
-
+	if (row.bodycnt > 0) {
+		assert(row.bodycnt == 1);
+		lua_pushstring(L, "BODY");
+		lua_newtable(L);
+		lbox_xlog_parse_body(L, row.type, row.body[0].iov_base,
+				     row.body[0].iov_len);
+		lua_settable(L, -3);  /* BODY */
+	}
 	return 2;
 }
 

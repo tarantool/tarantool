@@ -44,6 +44,11 @@ struct ExprList;
 
 /** Space options */
 struct space_opts {
+	/**
+	 * Replication group identifier. Defines how changes
+	 * made to a space are replicated.
+	 */
+	uint32_t group_id;
         /**
 	 * The space is a temporary:
 	 * - it is empty at server start
@@ -52,7 +57,7 @@ struct space_opts {
          * - in SQL: space_def memory is allocated on region and
          *   does not require manual release.
 	 */
-	bool temporary;
+	bool is_temporary;
 	/**
 	 * If the space is a view, then it can't feature any
 	 * indexes, and must have SQL statement. Moreover,

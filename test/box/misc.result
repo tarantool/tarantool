@@ -487,6 +487,8 @@ t;
   160: box.error.ACTION_MISMATCH
   161: box.error.VIEW_MISSING_SQL
   162: box.error.FOREIGN_KEY_CONSTRAINT
+  163: box.error.TRANSACTION_YIELD
+  164: box.error.NO_SUCH_GROUP
 ...
 test_run:cmd("setopt delimiter ''");
 ---

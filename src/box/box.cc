@@ -194,6 +194,22 @@ box_process_rw(struct request *request, struct space *space,
 	return rc;
 }
 
+/**
+ * Process a no-op request.
+ *
+ * A no-op request does not affect any space, but it
+ * promotes vclock and is written to WAL.
+ */
+static int
+process_nop(struct request *request)
+{
+	assert(request->type == IPROTO_NOP);
+	struct txn *txn = txn_begin_stmt(NULL);
+	if (txn == NULL)
+		return -1;
+	return txn_commit_stmt(txn, request);
+}
+
 void
 box_set_ro(bool ro)
 {
@@ -277,10 +293,14 @@ recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 static inline void
 apply_row(struct xstream *stream, struct xrow_header *row)
 {
-	assert(row->bodycnt == 1); /* always 1 for read */
 	(void) stream;
 	struct request request;
 	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
+	if (request.type == IPROTO_NOP) {
+		if (process_nop(&request) != 0)
+			diag_raise();
+		return;
+	}
 	struct space *space = space_cache_find_xc(request.space_id);
 	if (box_process_rw(&request, space, NULL) != 0) {
 		say_error("error applying row: %s", request_str(&request));
@@ -526,9 +546,9 @@ box_check_wal_max_size(int64_t wal_max_size)
 static int64_t
 box_check_memtx_memory(int64_t memory)
 {
-	if (memory <= 0) {
+	if (memory < 0) {
 		tnt_raise(ClientError, ER_CFG, "memtx_memory",
-			  "must be greater than 0");
+			  "must not be less than 0");
 	}
 	return memory;
 }
@@ -536,9 +556,9 @@ box_check_memtx_memory(int64_t memory)
 static int64_t
 box_check_vinyl_memory(int64_t memory)
 {
-	if (memory <= 0) {
+	if (memory < 0) {
 		tnt_raise(ClientError, ER_CFG, "vinyl_memory",
-			  "must be greater than 0");
+			  "must not be less than 0");
 	}
 	return memory;
 }
@@ -986,7 +1006,7 @@ box_process1(struct request *request, box_tuple_t **result)
 	struct space *space = space_cache_find(request->space_id);
 	if (space == NULL)
 		return -1;
-	if (!space->def->opts.temporary && box_check_writable() != 0)
+	if (!space_is_temporary(space) && box_check_writable() != 0)
 		return -1;
 	return box_process_rw(request, space, result);
 }
@@ -1436,7 +1456,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Register the replica with the garbage collector. */
 	struct gc_consumer *gc = gc_consumer_register(
 		tt_sprintf("replica %s", tt_uuid_str(&instance_uuid)),
-		vclock_sum(&start_vclock));
+		vclock_sum(&start_vclock), GC_CONSUMER_WAL);
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([=]{
@@ -2116,7 +2136,8 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 			return -1;
 		}
 	} while (checkpoint_idx-- > 0);
-	backup_gc = gc_consumer_register("backup", vclock_sum(vclock));
+	backup_gc = gc_consumer_register("backup", vclock_sum(vclock),
+					 GC_CONSUMER_ALL);
 	if (backup_gc == NULL)
 		return -1;
 	int rc = engine_backup(vclock, cb, cb_arg);

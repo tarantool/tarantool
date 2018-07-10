@@ -145,7 +145,7 @@ struct tuple_format {
 	 * hence can be freed immediately while checkpointing is
 	 * in progress.
 	 */
-	bool temporary;
+	bool is_temporary;
 	/**
 	 * The number of extra bytes to reserve in tuples before
 	 * field map.

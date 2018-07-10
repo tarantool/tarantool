@@ -101,6 +101,9 @@ error:
 		case IPROTO_REPLICA_ID:
 			header->replica_id = mp_decode_uint(pos);
 			break;
+		case IPROTO_GROUP_ID:
+			header->group_id = mp_decode_uint(pos);
+			break;
 		case IPROTO_LSN:
 			header->lsn = mp_decode_uint(pos);
 			break;
@@ -179,6 +182,12 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 	if (header->replica_id) {
 		d = mp_encode_uint(d, IPROTO_REPLICA_ID);
 		d = mp_encode_uint(d, header->replica_id);
+		map_size++;
+	}
+
+	if (header->group_id) {
+		d = mp_encode_uint(d, IPROTO_GROUP_ID);
+		d = mp_encode_uint(d, header->group_id);
 		map_size++;
 	}
 
@@ -470,11 +479,12 @@ int
 xrow_decode_dml(struct xrow_header *row, struct request *request,
 		uint64_t key_map)
 {
-	if (row->bodycnt == 0) {
-		diag_set(ClientError, ER_INVALID_MSGPACK,
-			 "missing request body");
-		return -1;
-	}
+	memset(request, 0, sizeof(*request));
+	request->header = row;
+	request->type = row->type;
+
+	if (row->bodycnt == 0)
+		goto done;
 
 	assert(row->bodycnt == 1);
 	const char *data = (const char *) row->body[0].iov_base;
@@ -486,10 +496,6 @@ error:
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
 		return -1;
 	}
-
-	memset(request, 0, sizeof(*request));
-	request->header = row;
-	request->type = row->type;
 
 	uint32_t size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < size; i++) {
@@ -545,6 +551,7 @@ error:
 		diag_set(ClientError, ER_INVALID_MSGPACK, "packet end");
 		return -1;
 	}
+done:
 	if (key_map) {
 		enum iproto_key key = (enum iproto_key) bit_ctz_u64(key_map);
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
@@ -631,6 +638,9 @@ xrow_encode_dml(const struct request *request, struct iovec *iov)
 		iovcnt++;
 		map_size++;
 	}
+
+	if (map_size == 0)
+		return 0;
 
 	assert(pos <= begin + len);
 	mp_encode_map(begin, map_size);

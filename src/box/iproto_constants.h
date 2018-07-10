@@ -59,6 +59,7 @@ enum iproto_key {
 	IPROTO_TIMESTAMP = 0x04,
 	IPROTO_SCHEMA_VERSION = 0x05,
 	IPROTO_SERVER_VERSION = 0x06,
+	IPROTO_GROUP_ID = 0x07,
 	/* Leave a gap for other keys in the header. */
 	IPROTO_SPACE_ID = 0x10,
 	IPROTO_INDEX_ID = 0x11,

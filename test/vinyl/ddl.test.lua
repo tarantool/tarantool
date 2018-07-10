@@ -12,6 +12,9 @@ space:create_index('pk', {bloom_fpr = 0})
 space:create_index('pk', {bloom_fpr = 1.1})
 space:drop()
 
+-- vinyl does not support replica local spaces
+space = box.schema.space.create('test', {engine = 'vinyl', is_local = true})
+
 -- space secondary index create
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index1 = space:create_index('primary')
@@ -39,7 +42,9 @@ box.snapshot()
 while pk:stat().disk.compact.count == 0 do fiber.sleep(0.01) end
 pk:alter{parts = {2, 'unsigned'}} -- success: space is empty now
 space:replace{1, 2}
-space:get(2)
+-- gh-3508 - Altering primary index of a vinyl space doesn't work as expected
+space:replace{2, 2}
+space:select()
 space:drop()
 
 --

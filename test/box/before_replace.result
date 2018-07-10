@@ -660,7 +660,7 @@ row.HEADER.type
 ---
 - NOP
 ...
-row.BODY.space_id == s.id
+row.BODY == nil
 ---
 - true
 ...

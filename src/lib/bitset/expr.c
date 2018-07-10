@@ -39,15 +39,15 @@ const size_t EXPR_DEFAULT_CAPACITY = 2;
 const size_t EXPR_CONJ_DEFAULT_CAPACITY = 32;
 
 void
-bitset_expr_create(struct bitset_expr *expr,
-		  void *(*realloc)(void *ptr, size_t size))
+tt_bitset_expr_create(struct tt_bitset_expr *expr,
+		      void *(*realloc)(void *ptr, size_t size))
 {
 	memset(expr, 0, sizeof(*expr));
 	expr->realloc = realloc;
 }
 
 void
-bitset_expr_destroy(struct bitset_expr *expr)
+tt_bitset_expr_destroy(struct tt_bitset_expr *expr)
 {
 	for (size_t c = 0; c < expr->size; c++) {
 		if (expr->conjs[c].capacity == 0)
@@ -65,7 +65,7 @@ bitset_expr_destroy(struct bitset_expr *expr)
 }
 
 void
-bitset_expr_clear(struct bitset_expr *expr)
+tt_bitset_expr_clear(struct tt_bitset_expr *expr)
 {
 	for (size_t c = 0; c < expr->size; c++) {
 		memset(expr->conjs[c].bitset_ids, 0, expr->conjs[c].size *
@@ -79,7 +79,7 @@ bitset_expr_clear(struct bitset_expr *expr)
 }
 
 static int
-bitset_expr_reserve(struct bitset_expr *expr, size_t size)
+tt_bitset_expr_reserve(struct tt_bitset_expr *expr, size_t size)
 {
 	if (size <= expr->capacity)
 		return 0;
@@ -92,7 +92,7 @@ bitset_expr_reserve(struct bitset_expr *expr, size_t size)
 		capacity *= 2;
 	}
 
-	struct bitset_expr_conj *conjs =
+	struct tt_bitset_expr_conj *conjs =
 		expr->realloc(expr->conjs, capacity * sizeof(*expr->conjs));
 
 	if (conjs == NULL)
@@ -107,9 +107,9 @@ bitset_expr_reserve(struct bitset_expr *expr, size_t size)
 }
 
 int
-bitset_expr_add_conj(struct bitset_expr *expr)
+tt_bitset_expr_add_conj(struct tt_bitset_expr *expr)
 {
-	if (bitset_expr_reserve(expr, expr->size + 1) != 0)
+	if (tt_bitset_expr_reserve(expr, expr->size + 1) != 0)
 		return -1;
 
 	expr->size++;
@@ -118,8 +118,8 @@ bitset_expr_add_conj(struct bitset_expr *expr)
 }
 
 static int
-bitset_expr_conj_reserve(struct bitset_expr *expr,
-			 struct bitset_expr_conj *conj, size_t size)
+tt_bitset_expr_conj_reserve(struct tt_bitset_expr *expr,
+			    struct tt_bitset_expr_conj *conj, size_t size)
 {
 	if (size <= conj->capacity)
 		return 0;
@@ -159,13 +159,13 @@ error_1:
 }
 
 int
-bitset_expr_add_param(struct bitset_expr *expr, size_t bitset_id,
-		      bool pre_not)
+tt_bitset_expr_add_param(struct tt_bitset_expr *expr, size_t bitset_id,
+			 bool pre_not)
 {
 	assert(expr->size > 0);
-	struct bitset_expr_conj *conj = &expr->conjs[expr->size - 1];
+	struct tt_bitset_expr_conj *conj = &expr->conjs[expr->size - 1];
 
-	if (bitset_expr_conj_reserve(expr, conj, conj->size + 1) != 0)
+	if (tt_bitset_expr_conj_reserve(expr, conj, conj->size + 1) != 0)
 		return -1;
 
 	conj->bitset_ids[conj->size] = bitset_id;

@@ -48,6 +48,7 @@ extern "C" {
 #include "box/vclock.h" /* VCLOCK_MAX */
 #include "box/sequence.h"
 #include "box/coll_id_cache.h"
+#include "box/replication.h" /* GROUP_LOCAL */
 
 /**
  * Trigger function for all spaces
@@ -159,6 +160,11 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	/* space.n */
 	lua_pushstring(L, "id");
 	lua_pushnumber(L, space_id(space));
+	lua_settable(L, i);
+
+	/* space.group_id */
+	lua_pushstring(L, "is_local");
+	lua_pushboolean(L, space_group_id(space) == GROUP_LOCAL);
 	lua_settable(L, i);
 
 	/* space.is_temp */

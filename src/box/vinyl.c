@@ -590,9 +590,14 @@ vy_lsm_find_unique(struct space *space, uint32_t index_id)
 static int
 vinyl_engine_check_space_def(struct space_def *def)
 {
-	if (def->opts.temporary) {
+	if (def->opts.is_temporary) {
 		diag_set(ClientError, ER_ALTER_SPACE,
 			 def->name, "engine does not support temporary flag");
+		return -1;
+	}
+	if (def->opts.group_id != 0) {
+		diag_set(ClientError, ER_ALTER_SPACE, def->name,
+			 "engine does not support replication groups");
 		return -1;
 	}
 	return 0;
@@ -2375,14 +2380,6 @@ txn_stmt_unref_tuples(struct txn_stmt *stmt)
 	stmt->new_tuple = NULL;
 }
 
-static void
-txn_on_stop(struct trigger *trigger, void *event)
-{
-	(void)trigger;
-	(void)event;
-	txn_rollback();
-}
-
 static int
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
@@ -3881,6 +3878,32 @@ vinyl_iterator_close(struct vinyl_iterator *it)
 	it->base.next = vinyl_iterator_last;
 }
 
+/**
+ * Check if the transaction associated with the iterator is
+ * still valid.
+ */
+static int
+vinyl_iterator_check_tx(struct vinyl_iterator *it)
+{
+	bool no_transaction =
+		/* Transaction ended or cursor was closed. */
+		it->tx == NULL ||
+		/* Iterator was passed to another fiber. */
+		(it->tx != &it->tx_autocommit &&
+		 (in_txn() == NULL || it->tx != in_txn()->engine_tx));
+
+	if (no_transaction) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		return -1;
+	}
+	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
+		/* Transaction read view was aborted. */
+		diag_set(ClientError, ER_READ_VIEW_ABORTED);
+		return -1;
+	}
+	return 0;
+}
+
 static int
 vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 {
@@ -3888,15 +3911,8 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	assert(it->lsm->index_id == 0);
 
-	if (it->tx == NULL) {
-		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+	if (vinyl_iterator_check_tx(it) != 0)
 		goto fail;
-	}
-	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
-		diag_set(ClientError, ER_READ_VIEW_ABORTED);
-		goto fail;
-	}
-
 	if (vy_read_iterator_next(&it->iterator, ret) != 0)
 		goto fail;
 	if (*ret == NULL) {
@@ -3920,14 +3936,8 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 	struct tuple *tuple;
 
 next:
-	if (it->tx == NULL) {
-		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+	if (vinyl_iterator_check_tx(it) != 0)
 		goto fail;
-	}
-	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
-		diag_set(ClientError, ER_READ_VIEW_ABORTED);
-		goto fail;
-	}
 
 	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
 		goto fail;

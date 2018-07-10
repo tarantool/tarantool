@@ -42,6 +42,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 extern uint32_t schema_version;
+extern uint32_t space_cache_version;
 
 /**
  * Lock of schema modification
@@ -63,14 +64,14 @@ box_schema_version();
 static inline struct space *
 space_cache_find(uint32_t id)
 {
-	static uint32_t prev_schema_version = 0;
+	static uint32_t prev_space_cache_version = 0;
 	static struct space *space = NULL;
-	if (prev_schema_version != schema_version)
+	if (prev_space_cache_version != space_cache_version)
 		space = NULL;
 	if (space && space->def->id == id)
 		return space;
 	if ((space = space_by_id(id))) {
-		prev_schema_version = schema_version;
+		prev_space_cache_version = space_cache_version;
 		return space;
 	}
 	diag_set(ClientError, ER_NO_SUCH_SPACE, int2str(id));

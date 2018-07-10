@@ -444,7 +444,7 @@ iterator_create(struct iterator *it, struct index *index)
 {
 	it->next = NULL;
 	it->free = NULL;
-	it->schema_version = schema_version;
+	it->space_cache_version = space_cache_version;
 	it->space_id = index->def->space_id;
 	it->index_id = index->def->iid;
 	it->index = index;
@@ -457,15 +457,15 @@ iterator_next(struct iterator *it, struct tuple **ret)
 	/* In case of ephemeral space there is no need to check schema version */
 	if (it->space_id == 0)
 		return it->next(it, ret);
-	if (unlikely(it->schema_version != schema_version)) {
+	if (unlikely(it->space_cache_version != space_cache_version)) {
 		struct space *space = space_by_id(it->space_id);
 		if (space == NULL)
 			goto invalidate;
 		struct index *index = space_index(space, it->index_id);
 		if (index != it->index ||
-		    index->schema_version > it->schema_version)
+		    index->space_cache_version > it->space_cache_version)
 			goto invalidate;
-		it->schema_version = schema_version;
+		it->space_cache_version = space_cache_version;
 	}
 	return it->next(it, ret);
 
@@ -492,7 +492,7 @@ index_create(struct index *index, struct engine *engine,
 	index->vtab = vtab;
 	index->engine = engine;
 	index->def = def;
-	index->schema_version = schema_version;
+	index->space_cache_version = space_cache_version;
 	return 0;
 }
 

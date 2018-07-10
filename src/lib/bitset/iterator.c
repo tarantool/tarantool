@@ -38,13 +38,13 @@
 const size_t ITERATOR_DEFAULT_CAPACITY = 2;
 const size_t ITERATOR_CONJ_DEFAULT_CAPACITY = 32;
 
-struct bitset_iterator_conj {
+struct tt_bitset_iterator_conj {
 	size_t page_first_pos;
 	size_t size;
 	size_t capacity;
-	struct bitset **bitsets;
+	struct tt_bitset **bitsets;
 	bool *pre_nots;
-	struct bitset_page **pages;
+	struct tt_bitset_page **pages;
 };
 
 /**
@@ -53,8 +53,8 @@ struct bitset_iterator_conj {
  * @param realloc memory allocator to use
  */
 void
-bitset_iterator_create(struct bitset_iterator *it,
-		       void *(*realloc)(void *ptr, size_t size))
+tt_bitset_iterator_create(struct tt_bitset_iterator *it,
+			  void *(*realloc)(void *ptr, size_t size))
 {
 	memset(it, 0, sizeof(*it));
 	it->realloc = realloc;
@@ -66,7 +66,7 @@ bitset_iterator_create(struct bitset_iterator *it,
  * @see bitset_iterator_new
  */
 void
-bitset_iterator_destroy(struct bitset_iterator *it)
+tt_bitset_iterator_destroy(struct tt_bitset_iterator *it)
 {
 	for (size_t c = 0; c < it->size; c++) {
 		if (it->conjs[c].capacity == 0)
@@ -82,12 +82,12 @@ bitset_iterator_destroy(struct bitset_iterator *it)
 	}
 
 	if (it->page != NULL) {
-		bitset_page_destroy(it->page);
+		tt_bitset_page_destroy(it->page);
 		it->realloc(it->page, 0);
 	}
 
 	if (it->page_tmp != NULL) {
-		bitset_page_destroy(it->page_tmp);
+		tt_bitset_page_destroy(it->page_tmp);
 		it->realloc(it->page_tmp, 0);
 	}
 
@@ -96,7 +96,7 @@ bitset_iterator_destroy(struct bitset_iterator *it)
 
 
 static int
-bitset_iterator_reserve(struct bitset_iterator *it, size_t size)
+tt_bitset_iterator_reserve(struct tt_bitset_iterator *it, size_t size)
 {
 	if (size <= it->capacity)
 		return 0;
@@ -109,7 +109,7 @@ bitset_iterator_reserve(struct bitset_iterator *it, size_t size)
 		capacity *= 2;
 	}
 
-	struct bitset_iterator_conj *conjs =
+	struct tt_bitset_iterator_conj *conjs =
 			it->realloc(it->conjs, capacity * sizeof(*it->conjs));
 	if (conjs == NULL)
 		return -1;
@@ -124,8 +124,9 @@ bitset_iterator_reserve(struct bitset_iterator *it, size_t size)
 }
 
 static int
-bitset_iterator_conj_reserve(struct bitset_iterator *it,
-			     struct bitset_iterator_conj *conj, size_t size)
+tt_bitset_iterator_conj_reserve(struct tt_bitset_iterator *it,
+				struct tt_bitset_iterator_conj *conj,
+				size_t size)
 {
 	if (size <= conj->capacity)
 		return 0;
@@ -138,7 +139,7 @@ bitset_iterator_conj_reserve(struct bitset_iterator *it,
 		capacity *= 2;
 	}
 
-	struct bitset **bitsets = it->realloc(conj->bitsets,
+	struct tt_bitset **bitsets = it->realloc(conj->bitsets,
 					capacity * sizeof(*conj->bitsets));
 	if (bitsets == NULL)
 		goto error_1;
@@ -146,7 +147,7 @@ bitset_iterator_conj_reserve(struct bitset_iterator *it,
 					capacity * sizeof(*conj->pre_nots));
 	if (pre_nots == NULL)
 		goto error_2;
-	struct bitset_page **pages = it->realloc(conj->pages,
+	struct tt_bitset_page **pages = it->realloc(conj->pages,
 					capacity * sizeof(*conj->pages));
 	if (pages == NULL)
 		goto error_3;
@@ -174,8 +175,9 @@ error_1:
 }
 
 int
-bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
-		     struct bitset **p_bitsets, size_t bitsets_size)
+tt_bitset_iterator_init(struct tt_bitset_iterator *it,
+			struct tt_bitset_expr *expr,
+			struct tt_bitset **p_bitsets, size_t bitsets_size)
 {
 	assert(it != NULL);
 	assert(expr != NULL);
@@ -183,34 +185,35 @@ bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
 		assert(p_bitsets != NULL);
 	}
 
-	size_t page_alloc_size = bitset_page_alloc_size(it->realloc);
+	size_t page_alloc_size = tt_bitset_page_alloc_size(it->realloc);
 	if (it->page != NULL) {
-		bitset_page_destroy(it->page);
+		tt_bitset_page_destroy(it->page);
 	} else {
 		it->page = it->realloc(NULL, page_alloc_size);
 	}
 
-	bitset_page_create(it->page);
+	tt_bitset_page_create(it->page);
 
 	if (it->page_tmp != NULL) {
-		bitset_page_destroy(it->page_tmp);
+		tt_bitset_page_destroy(it->page_tmp);
 	} else {
 		it->page_tmp = it->realloc(NULL, page_alloc_size);
 		if (it->page_tmp == NULL)
 			return -1;
 	}
 
-	bitset_page_create(it->page_tmp);
+	tt_bitset_page_create(it->page_tmp);
 
-	if (bitset_iterator_reserve(it, expr->size) != 0)
+	if (tt_bitset_iterator_reserve(it, expr->size) != 0)
 		return -1;
 
 	for (size_t c = 0; c < expr->size; c++) {
-		struct bitset_expr_conj *exconj = &expr->conjs[c];
-		struct bitset_iterator_conj *itconj = &it->conjs[c];
+		struct tt_bitset_expr_conj *exconj = &expr->conjs[c];
+		struct tt_bitset_iterator_conj *itconj = &it->conjs[c];
 		itconj->page_first_pos = 0;
 
-		if (bitset_iterator_conj_reserve(it, itconj, exconj->size) != 0)
+		if (tt_bitset_iterator_conj_reserve(it, itconj,
+						    exconj->size) != 0)
 			return -1;
 
 		for (size_t b = 0; b < exconj->size; b++) {
@@ -226,13 +229,14 @@ bitset_iterator_init(struct bitset_iterator *it, struct bitset_expr *expr,
 
 	it->size = expr->size;
 
-	bitset_iterator_rewind(it);
+	tt_bitset_iterator_rewind(it);
 
 	return 0;
 }
 
 static void
-bitset_iterator_conj_rewind(struct bitset_iterator_conj *conj, size_t pos)
+tt_bitset_iterator_conj_rewind(struct tt_bitset_iterator_conj *conj,
+			       size_t pos)
 {
 	assert(conj != NULL);
 	assert(pos % (BITSET_PAGE_DATA_SIZE * CHAR_BIT) == 0);
@@ -243,13 +247,13 @@ bitset_iterator_conj_rewind(struct bitset_iterator_conj *conj, size_t pos)
 		return;
 	}
 
-	struct bitset_page key;
+	struct tt_bitset_page key;
 	key.first_pos = pos;
 
 	restart:
 	for (size_t b = 0; b < conj->size; b++) {
-		conj->pages[b] = bitset_pages_nsearch(&conj->bitsets[b]->pages,
-						      &key);
+		conj->pages[b] =
+			tt_bitset_pages_nsearch(&conj->bitsets[b]->pages, &key);
 #if 0
 		if (conj->pages[b] != NULL) {
 			fprintf(stderr, "rewind [%zu] => %zu (%p)\n", b,
@@ -280,12 +284,14 @@ bitset_iterator_conj_rewind(struct bitset_iterator_conj *conj, size_t pos)
 }
 
 static int
-bitset_iterator_conj_cmp(const void *p1, const void *p2)
+tt_bitset_iterator_conj_cmp(const void *p1, const void *p2)
 {
 	assert(p1 != NULL && p2 != NULL);
 
-	struct bitset_iterator_conj *conj1 = (struct bitset_iterator_conj *) p1;
-	struct bitset_iterator_conj *conj2 = (struct bitset_iterator_conj *) p2;
+	struct tt_bitset_iterator_conj *conj1 =
+		(struct tt_bitset_iterator_conj *) p1;
+	struct tt_bitset_iterator_conj *conj2 =
+		(struct tt_bitset_iterator_conj *) p2;
 
 	if (conj1->page_first_pos < conj2->page_first_pos) {
 		return -1;
@@ -297,20 +303,20 @@ bitset_iterator_conj_cmp(const void *p1, const void *p2)
 }
 
 static void
-bitset_iterator_conj_prepare_page(struct bitset_iterator_conj *conj,
-				  struct bitset_page *dst)
+tt_bitset_iterator_conj_prepare_page(struct tt_bitset_iterator_conj *conj,
+				     struct tt_bitset_page *dst)
 {
 	assert(conj != NULL);
 	assert(dst != NULL);
 	assert(conj->size > 0);
 	assert(conj->page_first_pos != SIZE_MAX);
 
-	bitset_page_set_ones(dst);
+	tt_bitset_page_set_ones(dst);
 	for (size_t b = 0; b < conj->size; b++) {
 		if (!conj->pre_nots[b]) {
 			/* conj->pages[b] is rewinded to conj->page_first_pos */
 			assert(conj->pages[b]->first_pos == conj->page_first_pos);
-			bitset_page_and(dst, conj->pages[b]);
+			tt_bitset_page_and(dst, conj->pages[b]);
 		} else {
 			/*
 			 * If page is NULL or its position is not equal
@@ -324,18 +330,18 @@ bitset_iterator_conj_prepare_page(struct bitset_iterator_conj *conj,
 			    conj->pages[b]->first_pos != conj->page_first_pos)
 				continue;
 
-			bitset_page_nand(dst, conj->pages[b]);
+			tt_bitset_page_nand(dst, conj->pages[b]);
 		}
 	}
 }
 
 static void
-bitset_iterator_prepare_page(struct bitset_iterator *it)
+tt_bitset_iterator_prepare_page(struct tt_bitset_iterator *it)
 {
 	qsort(it->conjs, it->size, sizeof(*it->conjs),
-	      bitset_iterator_conj_cmp);
+	      tt_bitset_iterator_conj_cmp);
 
-	bitset_page_set_zeros(it->page);
+	tt_bitset_page_set_zeros(it->page);
 	if (it->size > 0) {
 		it->page->first_pos = it->conjs[0].page_first_pos;
 	} else {
@@ -352,32 +358,33 @@ bitset_iterator_prepare_page(struct bitset_iterator *it)
 			break;
 
 		/* Get result from conj */
-		bitset_iterator_conj_prepare_page(&it->conjs[c], it->page_tmp);
+		tt_bitset_iterator_conj_prepare_page(&it->conjs[c],
+						     it->page_tmp);
 		/* OR page from conjunction with it->page */
-		bitset_page_or(it->page, it->page_tmp);
+		tt_bitset_page_or(it->page, it->page_tmp);
 	}
 
 	/* Init the bit iterator on it->page */
-	bit_iterator_init(&it->page_it, bitset_page_data(it->page),
+	bit_iterator_init(&it->page_it, tt_bitset_page_data(it->page),
 		      BITSET_PAGE_DATA_SIZE, true);
 }
 
 static void
-bitset_iterator_first_page(struct bitset_iterator *it)
+tt_bitset_iterator_first_page(struct tt_bitset_iterator *it)
 {
 	assert(it != NULL);
 
 	/* Rewind all conjunctions to first positions */
 	for (size_t c = 0; c < it->size; c++) {
-		bitset_iterator_conj_rewind(&it->conjs[c], 0);
+		tt_bitset_iterator_conj_rewind(&it->conjs[c], 0);
 	}
 
 	/* Prepare the result page */
-	bitset_iterator_prepare_page(it);
+	tt_bitset_iterator_prepare_page(it);
 }
 
 static void
-bitset_iterator_next_page(struct bitset_iterator *it)
+tt_bitset_iterator_next_page(struct tt_bitset_iterator *it)
 {
 	assert(it != NULL);
 
@@ -390,26 +397,26 @@ bitset_iterator_next_page(struct bitset_iterator *it)
 		if (it->conjs[c].page_first_pos > pos)
 			break;
 
-		bitset_iterator_conj_rewind(&it->conjs[c], pos + PAGE_BIT);
+		tt_bitset_iterator_conj_rewind(&it->conjs[c], pos + PAGE_BIT);
 		assert(pos + PAGE_BIT <= it->conjs[c].page_first_pos);
 	}
 
 	/* Prepare the result page */
-	bitset_iterator_prepare_page(it);
+	tt_bitset_iterator_prepare_page(it);
 }
 
 
 void
-bitset_iterator_rewind(struct bitset_iterator *it)
+tt_bitset_iterator_rewind(struct tt_bitset_iterator *it)
 {
 	assert(it != NULL);
 
 	/* Prepare first page */
-	bitset_iterator_first_page(it);
+	tt_bitset_iterator_first_page(it);
 }
 
 size_t
-bitset_iterator_next(struct bitset_iterator *it)
+tt_bitset_iterator_next(struct tt_bitset_iterator *it)
 {
 	assert(it != NULL);
 
@@ -422,6 +429,6 @@ bitset_iterator_next(struct bitset_iterator *it)
 			return it->page->first_pos + pos;
 		}
 
-		bitset_iterator_next_page(it);
+		tt_bitset_iterator_next_page(it);
 	}
 }

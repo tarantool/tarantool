@@ -70,6 +70,7 @@ struct xrow_header {
 
 	uint32_t type;
 	uint32_t replica_id;
+	uint32_t group_id;
 	uint64_t sync;
 	int64_t lsn; /* LSN must be signed for correct comparison */
 	double tm;

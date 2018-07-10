@@ -6,6 +6,8 @@
 env = require('test_run')
 test_run = env.new()
 
+fiber = require('fiber')
+
 create_iterator = require('utils').create_iterator
 iterator_next = function(iter) return iter.next() end
 iterate_over = function(iter) return iter.iterate_over() end
@@ -779,5 +781,36 @@ box.space.test:select({}, {limit = 3})
 -- Continue iteration.
 for k, v in gen, param, state do table.insert(t, v) end
 t
+
+s:drop()
+
+--
+-- gh-3394: vinyl iterator is aborted if passed to another transactions.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+_ = s:replace{1}
+_ = s:replace{2}
+
+c = fiber.channel(1)
+
+i = create_iterator(s)
+iterator_next(i)
+_ = fiber.create(function() local _, v = pcall(iterator_next, i) c:put(v) end)
+c:get() -- ok as the iterator isn't bound to any transaction
+
+box.begin()
+i = create_iterator(s)
+iterator_next(i)
+_ = fiber.create(function() local _, v = pcall(iterator_next, i) c:put(v) end)
+c:get() -- error
+box.commit()
+
+box.begin()
+i = create_iterator(s)
+iterator_next(i)
+_ = fiber.create(function() box.begin() local _, v = pcall(iterator_next, i) c:put(v) box.commit() end)
+c:get() -- error
+box.commit()
 
 s:drop()

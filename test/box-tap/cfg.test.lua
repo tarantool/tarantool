@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(93)
+test:plan(95)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -152,6 +152,7 @@ local status, reason = pcall(function()
     box.space._schema:insert({'read_only', 'test'})
 end)
 test:ok(status, "read_only = false")
+test:ok(box.space._schema:delete{'read_only'}, "drop read_only")
 
 -- gh-2663: box.cfg() parameter to set the number of coio threads
 box.cfg({ worker_pool_threads = 1})
@@ -172,6 +173,13 @@ function run_script(code)
     fio.rmdir(dir)
     return res
 end
+
+-- gh-3468: should allow box.cfg with vinyl_memory=0
+code =[[
+box.cfg{vinyl_memory=0}
+os.exit(box.cfg.vinyl_memory == 0 and 0 or 1)
+]]
+test:is(run_script(code), 0, "actually set vinyl_memory to 0")
 
 -- gh-715: Cannot switch to/from 'fsync'
 code = [[ box.cfg{ log="tarantool.log", log_nonblock = false, wal_mode = 'fsync' }; ]]

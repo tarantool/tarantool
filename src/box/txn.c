@@ -61,6 +61,7 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 	/* Initialize members explicitly to save time on memset() */
 	row->type = request->type;
 	row->replica_id = 0;
+	row->group_id = stmt->space != NULL ? space_group_id(stmt->space) : 0;
 	row->lsn = 0;
 	row->sync = 0;
 	row->tm = 0;
@@ -106,13 +107,15 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
 	stailq_reverse(&rollback);
 	stailq_foreach_entry(stmt, &rollback, next) {
-		engine_rollback_statement(txn->engine, txn, stmt);
+		if (stmt->space != NULL) {
+			engine_rollback_statement(txn->engine, txn, stmt);
+			stmt->space = NULL;
+		}
 		if (stmt->row != NULL) {
 			assert(txn->n_rows > 0);
 			txn->n_rows--;
 			stmt->row = NULL;
 		}
-		stmt->space = NULL;
 	}
 }
 
@@ -131,6 +134,7 @@ txn_begin(bool is_autocommit)
 	txn->n_rows = 0;
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
+	txn->is_aborted = false;
 	txn->in_sub_stmt = 0;
 	txn->id = ++txn_id;
 	txn->signature = -1;
@@ -146,7 +150,6 @@ int
 txn_begin_in_engine(struct engine *engine, struct txn *txn)
 {
 	if (txn->engine == NULL) {
-		assert(stailq_empty(&txn->stmts));
 		txn->engine = engine;
 		return engine_begin(engine, txn);
 	} else if (txn->engine != engine) {
@@ -173,6 +176,15 @@ txn_begin_stmt(struct space *space)
 		return NULL;
 	}
 
+	struct txn_stmt *stmt = txn_stmt_new(txn);
+	if (stmt == NULL) {
+		if (txn->is_autocommit && txn->in_sub_stmt == 0)
+			txn_rollback();
+		return NULL;
+	}
+	if (space == NULL)
+		return txn;
+
 	if (trigger_run(&space->on_stmt_begin, txn) != 0)
 		goto fail;
 
@@ -180,19 +192,13 @@ txn_begin_stmt(struct space *space)
 	if (txn_begin_in_engine(engine, txn) != 0)
 		goto fail;
 
-	struct txn_stmt *stmt = txn_stmt_new(txn);
-	if (stmt == NULL)
-		goto fail;
 	stmt->space = space;
+	if (engine_begin_statement(engine, txn) != 0)
+		goto fail;
 
-	if (engine_begin_statement(engine, txn) != 0) {
-		txn_rollback_stmt();
-		return NULL;
-	}
 	return txn;
 fail:
-	if (txn->is_autocommit && txn->in_sub_stmt == 0)
-		txn_rollback();
+	txn_rollback_stmt();
 	return NULL;
 }
 
@@ -210,8 +216,10 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
-	/* Create WAL record for the write requests in non-temporary spaces */
-	if (!space_is_temporary(stmt->space)) {
+	/* Create WAL record for the write requests in non-temporary spaces.
+	 * stmt->space can be NULL for IRPOTO_NOP.
+	 */
+	if (stmt->space == NULL || !space_is_temporary(stmt->space)) {
 		if (txn_add_redo(stmt, request) != 0)
 			goto fail;
 		++txn->n_rows;
@@ -225,7 +233,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * - perhaps we should run triggers even for deletes which
 	 *   doesn't find any rows
 	 */
-	if (!rlist_empty(&stmt->space->on_replace) &&
+	if (stmt->space != NULL && !rlist_empty(&stmt->space->on_replace) &&
 	    stmt->space->run_triggers && (stmt->old_tuple || stmt->new_tuple)) {
 		if (trigger_run(&stmt->space->on_replace, txn) != 0)
 			goto fail;
@@ -238,7 +246,6 @@ fail:
 	txn_rollback_stmt();
 	return -1;
 }
-
 
 static int64_t
 txn_write_to_wal(struct txn *txn)
@@ -287,8 +294,6 @@ int
 txn_commit(struct txn *txn)
 {
 	assert(txn == in_txn());
-
-	assert(stailq_empty(&txn->stmts) || txn->engine);
 	/*
 	 * If transaction has been started in SQL, deferred
 	 * foreign key constraints must not be violated.
@@ -301,30 +306,38 @@ txn_commit(struct txn *txn)
 			goto fail;
 		}
 	}
-	/* Do transaction conflict resolving */
-	if (txn->engine) {
+	/*
+	 * Perform transaction conflict resolution. Engine == NULL when
+	 * we have a bunch of IPROTO_NOP statements.
+	 */
+	if (txn->engine != NULL) {
 		if (engine_prepare(txn->engine, txn) != 0)
 			goto fail;
-
-		if (txn->n_rows > 0) {
-			txn->signature = txn_write_to_wal(txn);
-			if (txn->signature < 0)
-				goto fail;
-		}
-		/*
-		 * The transaction is in the binary log. No action below
-		 * may throw. In case an error has happened, there is
-		 * no other option but terminate.
-		 */
-		if (txn->has_triggers &&
-		    trigger_run(&txn->on_commit, txn) != 0) {
-			diag_log();
-			unreachable();
-			panic("commit trigger failed");
-		}
-
-		engine_commit(txn->engine, txn);
 	}
+
+	if (txn->n_rows > 0) {
+		txn->signature = txn_write_to_wal(txn);
+		if (txn->signature < 0)
+			goto fail;
+	}
+	/*
+	 * The transaction is in the binary log. No action below
+	 * may throw. In case an error has happened, there is
+	 * no other option but terminate.
+	 */
+	if (txn->has_triggers &&
+	    trigger_run(&txn->on_commit, txn) != 0) {
+		diag_log();
+		unreachable();
+		panic("commit trigger failed");
+	}
+	/*
+	 * Engine can be NULL if transaction contains IPROTO_NOP
+	 * statements only.
+	 */
+	if (txn->engine != NULL)
+		engine_commit(txn->engine, txn);
+
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
@@ -366,6 +379,13 @@ txn_rollback()
 	/** Free volatile txn memory. */
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
+}
+
+void
+txn_abort(struct txn *txn)
+{
+	txn_rollback_to_svp(txn, NULL);
+	txn->is_aborted = true;
 }
 
 int
@@ -484,7 +504,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 	}
 	struct txn_stmt *stmt = svp->stmt == NULL ? NULL :
 			stailq_entry(svp->stmt, struct txn_stmt, next);
-	if (stmt != NULL && stmt->space == NULL) {
+	if (stmt != NULL && stmt->space == NULL && stmt->row == NULL) {
 		/*
 		 * The statement at which this savepoint was
 		 * created has been rolled back.
@@ -501,3 +521,12 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 		txn->psql_txn->fk_deferred_count = svp->fk_deferred_count;
 	return 0;
 }
+
+void
+txn_on_stop(struct trigger *trigger, void *event)
+{
+	(void) trigger;
+	(void) event;
+	txn_rollback();                 /* doesn't yield or fail */
+}
+

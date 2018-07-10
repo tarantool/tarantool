@@ -383,7 +383,7 @@ deleteTable(sqlite3 * db, Table * pTable)
 	sqlite3DbFree(db, pTable->zColAff);
 	assert(pTable->def != NULL);
 	/* Do not delete pTable->def allocated on region. */
-	if (!pTable->def->opts.temporary)
+	if (!pTable->def->opts.is_temporary)
 		space_def_delete(pTable->def);
 	else
 		sql_expr_list_delete(db, pTable->def->opts.checks);
@@ -666,7 +666,7 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	 * ensure that p->def is also temporal and would be rebuilded or
 	 * dropped.
 	 */
-	assert(p->def->opts.temporary);
+	assert(p->def->opts.is_temporary);
 	if (sql_field_retrieve(pParse, p,
 			       (uint32_t) p->def->field_count) == NULL)
 		return;
@@ -867,7 +867,7 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 	Table *p;
 	sqlite3 *db = pParse->db;
 	p = pParse->pNewTable;
-	assert(p->def->opts.temporary);
+	assert(p->def->opts.is_temporary);
 	if (p != 0) {
 		if (!sqlite3ExprIsConstantOrFunction
 		    (pSpan->pExpr, db->init.busy)) {
@@ -1985,7 +1985,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 						       select);
 	} else {
 		assert(p->aCol == NULL);
-		assert(sel_tab->def->opts.temporary);
+		assert(sel_tab->def->opts.is_temporary);
 		p->def->fields = sel_tab->def->fields;
 		p->def->field_count = sel_tab->def->field_count;
 		p->aCol = sel_tab->aCol;

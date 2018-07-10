@@ -61,6 +61,7 @@ connection:close()
 
 box.schema.user.create('underprivileged')
 box.schema.user.grant('underprivileged', 'read,write', 'space', '_func')
+box.schema.user.grant('underprivileged', 'create', 'universe')
 box.session.su('underprivileged')
 box.schema.func.create('setuid', {setuid=true})
 box.session.su('admin')

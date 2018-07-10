@@ -2,14 +2,7 @@
 env = require('test_run')
 test_run = env.new()
 
-fio = require('fio')
-glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
-for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
-glob = fio.pathjoin(box.cfg.vinyl_dir, '*.vylog')
-for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
-glob = fio.pathjoin(box.cfg.memtx_dir, '*.snap')
-for _, file in pairs(fio.glob(glob)) do fio.unlink(file) end
-test_run:cmd("restart server default")
+test_run:cmd("restart server default with cleanup=True")
 box.schema.user.grant('guest', 'replication')
 _ = box.schema.space.create('test')
 _ = box.space.test:create_index('pk')

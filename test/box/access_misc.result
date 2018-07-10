@@ -105,7 +105,7 @@ session.su('admin')
 ...
 --
 -- Check write access on space
--- 
+--
 box.schema.user.grant('testus', 'write', 'space', 'admin_space')
 ---
 ...
@@ -350,6 +350,9 @@ maxuid = box.space._user.index.primary:max()[1]
 box.schema.user.grant('testuser', 'write', 'space', '_user')
 ---
 ...
+box.schema.user.grant('testuser', 'create', 'universe')
+---
+...
 session.su('testuser')
 ---
 ...
@@ -435,13 +438,16 @@ box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 ---
 - error: User 'testuser' does not have read, write, execute access on universe 'nil'
 ...
+box.schema.user.revoke('testuser', 'create', 'universe')
+---
+...
 box.schema.user.grant('testuser', 'usage,session', 'universe')
 ---
 ...
 --
 -- Check that itertors check privileges
 --
-s = box.schema.space.create('glade') 
+s = box.schema.space.create('glade')
 ---
 ...
 box.schema.user.grant('testuser', 'read', 'space', 'glade')
@@ -469,7 +475,7 @@ s:insert({4, 'D'})
 t = {}
 ---
 ...
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 ---
 ...
 t
@@ -490,7 +496,7 @@ s:select()
   - [3, 'C']
   - [4, 'D']
 ...
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 ---
 ...
 t
@@ -517,7 +523,7 @@ s:select()
 ---
 - error: Read access to space 'glade' is denied for user 'testuser'
 ...
-for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(1, {iterator = 'GE'}) do table.insert (t, v) end
 ---
 - error: Read access to space 'glade' is denied for user 'testuser'
 ...
@@ -544,7 +550,7 @@ s:select()
   - [3, 'C']
   - [4, 'D']
 ...
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 ---
 ...
 t
@@ -562,7 +568,7 @@ s:select()
 ---
 - error: Read access to space 'glade' is denied for user 'guest'
 ...
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 ---
 - error: Read access to space 'glade' is denied for user 'guest'
 ...
@@ -580,7 +586,7 @@ s:select()
 ---
 - error: Read access to space 'glade' is denied for user 'guest'
 ...
-for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end 
+for key, v in s.index.primary:pairs(3, {iterator = 'GE'}) do table.insert (t, v) end
 ---
 - error: Read access to space 'glade' is denied for user 'guest'
 ...
@@ -815,5 +821,35 @@ box.space._func:select()
 - - [1, 1, 'box.schema.user.info', 1, 'LUA']
 ...
 session = nil
+---
+...
+--  produce an error if revoking a non-granted privilege
+box.schema.user.create("tester")
+---
+...
+box.schema.user.grant('tester', 'read', 'universe')
+---
+...
+-- error: the privilege is not granted
+box.schema.user.revoke('tester', 'create', 'universe')
+---
+- error: User 'tester' does not have create access on universe 'nil'
+...
+-- no error: if_exists clause
+box.schema.user.revoke('tester', 'create', 'universe', nil, { if_exists = true })
+---
+...
+-- no error: the privilege is granted
+box.schema.user.revoke('tester', 'read', 'universe')
+---
+...
+box.schema.user.grant('tester', 'read', 'universe')
+---
+...
+-- no error: some privileges are revoked
+box.schema.user.revoke('tester', 'read,create', 'universe')
+---
+...
+box.schema.user.drop('tester')
 ---
 ...

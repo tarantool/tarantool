@@ -700,7 +700,7 @@ static void json_next_number_token(json_parse_t *json, json_token_t *token)
         token->type = T_UINT;
         token->value.ival = strtoull(json->ptr, &endptr, 10);
     }
-    if (*endptr == '.' || *endptr == 'e') {
+    if (*endptr == '.' || *endptr == 'e' || *endptr == 'E') {
         token->type = T_NUMBER;
         token->value.number = fpconv_strtod(json->ptr, &endptr);
     }

@@ -34,17 +34,17 @@ end;
 test_run:cmd("setopt delimiter ''");
 t
 --
--- Before restart: oops, our LSN is 11,
--- even though we didn't insert anything.
+-- Before restart: our LSN is 1, because
+-- LSN is promoted in tx only on successful
+-- WAL write.
 --
 name = string.match(arg[0], "([^,]+)%.lua")
 box.info.vclock
 require('fio').glob(name .. "/*.xlog")
 test_run:cmd("restart server panic")
 --
--- after restart: our LSN is the LSN of the
--- last *written* row, all the failed
--- rows are gone from lsn counter.
+-- After restart: our LSN is the LSN of the
+-- last empty WAL created on shutdown, i.e. 11.
 --
 box.info.vclock
 box.space._schema:select{'key'}
@@ -108,6 +108,29 @@ require('fio').glob(name .. "/*.xlog")
 -- restart is ok
 test_run:cmd("restart server panic")
 box.space._schema:select{'key'}
+--
+-- Check that if there's an LSN gap between two WALs
+-- that appeared due to a disk error and no files is
+-- actually missing, we won't panic on recovery.
+--
+box.space._schema:replace{'key', 'test 4'} -- creates new WAL
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", true)
+box.space._schema:replace{'key', 'test 5'} -- fails, makes gap
+box.snapshot() -- fails, rotates WAL
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", false)
+box.space._schema:replace{'key', 'test 5'} -- creates new WAL
+box.error.injection.set("ERRINJ_WAL_WRITE_DISK", true)
+box.space._schema:replace{'key', 'test 6'} -- fails, makes gap
+box.snapshot() -- fails, rotates WAL
+box.space._schema:replace{'key', 'test 6'} -- fails, creates empty WAL
+name = string.match(arg[0], "([^,]+)%.lua")
+require('fio').glob(name .. "/*.xlog")
+test_run:cmd("restart server panic")
+box.space._schema:select{'key'}
+-- Check that we don't create a WAL in the gap between the last two.
+box.space._schema:replace{'key', 'test 6'}
+name = string.match(arg[0], "([^,]+)%.lua")
+require('fio').glob(name .. "/*.xlog")
 test_run:cmd('switch default')
 test_run:cmd("stop server panic")
 test_run:cmd("cleanup server panic")

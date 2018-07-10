@@ -244,8 +244,8 @@ struct iterator {
 	int (*next)(struct iterator *it, struct tuple **ret);
 	/** Destroy the iterator. */
 	void (*free)(struct iterator *);
-	/** Schema version at the time of the last index lookup. */
-	uint32_t schema_version;
+	/** Space cache version at the time of the last index lookup. */
+	uint32_t space_cache_version;
 	/** ID of the space the iterator is for. */
 	uint32_t space_id;
 	/** ID of the index the iterator is for. */
@@ -253,7 +253,7 @@ struct iterator {
 	/**
 	 * Pointer to the index the iterator is for.
 	 * Guaranteed to be valid only if the schema
-	 * version has not changed since the last lookup.
+	 * state has not changed since the last lookup.
 	 */
 	struct index *index;
 };
@@ -454,8 +454,8 @@ struct index {
 	struct engine *engine;
 	/* Description of a possibly multipart key. */
 	struct index_def *def;
-	/* Schema version at the time of construction. */
-	uint32_t schema_version;
+	/* Space cache version at the time of construction. */
+	uint32_t space_cache_version;
 };
 
 /**

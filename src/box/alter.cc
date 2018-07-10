@@ -91,24 +91,27 @@ access_check_ddl(const char *name, uint32_t owner_uid,
 	 * specific DDL privilege on the object can execute
 	 * DDL. If a user has no USAGE access and is owner,
 	 * deny access as well.
+	 * If a user wants to CREATE an object, they're of course
+	 * the owner of the object, but this should be ignored --
+	 * CREATE privilege is required.
 	 */
-	if (access == 0 || (is_owner && !(access & PRIV_U)))
+	if (access == 0 || (is_owner && !(access & (PRIV_U|PRIV_C))))
 		return; /* Access granted. */
 
+	/* Create a meaningful error message. */
 	struct user *user = user_find_xc(cr->uid);
-	if (is_owner) {
-		tnt_raise(AccessDeniedError,
-			  priv_name(PRIV_U),
-			  schema_object_name(SC_UNIVERSE),
-			  "",
-			  user->def->name);
+	const char *object_name;
+	const char *pname;
+	if (access & PRIV_U) {
+		object_name = schema_object_name(SC_UNIVERSE);
+		pname = priv_name(PRIV_U);
+		name = "";
 	} else {
-		tnt_raise(AccessDeniedError,
-			  priv_name(access),
-			  schema_object_name(type),
-			  name,
-			  user->def->name);
+		object_name = schema_object_name(type);
+		pname = priv_name(access);
 	}
+	tnt_raise(AccessDeniedError, pname, object_name, name,
+		  user->def->name);
 }
 
 /**
@@ -518,6 +521,15 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	}
 	struct space_opts opts;
 	space_opts_decode(&opts, space_opts, region);
+	/*
+	 * Currently, only predefined replication groups
+	 * are supported.
+	 */
+	if (opts.group_id != GROUP_DEFAULT &&
+	    opts.group_id != GROUP_LOCAL) {
+		tnt_raise(ClientError, ER_NO_SUCH_GROUP,
+			  int2str(opts.group_id));
+	}
 	if (opts.is_view && opts.sql == NULL)
 		tnt_raise(ClientError, ER_VIEW_MISSING_SQL);
 	struct space_def *def =
@@ -1338,6 +1350,26 @@ TruncateIndex::commit(struct alter_space *alter, int64_t signature)
 	index_commit_create(new_index, signature);
 }
 
+/**
+ * UpdateSchemaVersion - increment schema_version. Used on
+ * in alter_space_do(), i.e. when creating or dropping
+ * an index, altering a space.
+ */
+class UpdateSchemaVersion: public AlterSpaceOp
+{
+public:
+	UpdateSchemaVersion(struct alter_space * alter)
+		:AlterSpaceOp(alter) {}
+	virtual void alter(struct alter_space *alter);
+};
+
+void
+UpdateSchemaVersion::alter(struct alter_space *alter)
+{
+    (void)alter;
+    ++schema_version;
+}
+
 /* }}} */
 
 /**
@@ -1637,6 +1669,13 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		(void) space_cache_replace(space);
 		/*
+		 * Do not forget to update schema_version right after
+		 * inserting the space to the space_cache, since no
+		 * AlterSpaceOps are registered in case of space
+		 * create.
+		 */
+		++schema_version;
+		/*
 		 * So may happen that until the DDL change record
 		 * is written to the WAL, the space is used for
 		 * insert/update/delete. All these updates are
@@ -1709,6 +1748,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * execution on a replica.
 		 */
 		struct space *space = space_cache_delete(space_id(old_space));
+		/*
+		 * Do not forget to update schema_version right after
+		 * deleting the space from the space_cache, since no
+		 * AlterSpaceOps are registered in case of space drop.
+		 */
+		++schema_version;
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_space_commit, space);
 		txn_on_commit(txn, on_commit);
@@ -1750,6 +1795,10 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
 				  "can not change space engine");
+		if (def->opts.group_id != space_group_id(old_space))
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "replication group is immutable");
 		if (def->opts.is_view != old_space->def->opts.is_view)
 			tnt_raise(ClientError, ER_ALTER_SPACE,
 				  space_name(old_space),
@@ -1786,6 +1835,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		def_guard.is_active = false;
 		/* Create MoveIndex ops for all space indexes. */
 		alter_space_move_indexes(alter, 0, old_space->index_id_max + 1);
+		/* Remember to update schema_version. */
+		(void) new UpdateSchemaVersion(alter);
 		alter_space_do(txn, alter);
 		alter_guard.is_active = false;
 	}
@@ -1989,6 +2040,8 @@ on_replace_dd_index(struct trigger * /* trigger */, void *event)
 	 * old space.
 	 */
 	alter_space_move_indexes(alter, iid + 1, old_space->index_id_max + 1);
+	/* Add an op to update schema_version on commit. */
+	(void) new UpdateSchemaVersion(alter);
 	alter_space_do(txn, alter);
 	scoped_guard.is_active = false;
 }
@@ -3072,6 +3125,8 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 		new_def = sequence_def_new_from_tuple(new_tuple,
 						      ER_CREATE_SEQUENCE);
 		assert(sequence_by_id(new_def->id) == NULL);
+		access_check_ddl(new_def->name, new_def->uid, SC_SEQUENCE,
+			PRIV_C, false);
 		sequence_cache_replace(new_def);
 		alter->new_def = new_def;
 	} else if (old_tuple != NULL && new_tuple == NULL) {	/* DELETE */

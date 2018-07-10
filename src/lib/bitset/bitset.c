@@ -37,73 +37,78 @@
 #include <assert.h>
 
 void
-bitset_create(struct bitset *bitset, void *(*realloc)(void *ptr, size_t size))
+tt_bitset_create(struct tt_bitset *bitset,
+		 void *(*realloc)(void *ptr, size_t size))
 {
 	memset(bitset, 0, sizeof(*bitset));
 	bitset->realloc = realloc;
 
 	/* Initialize pages tree */
-	bitset_pages_new(&bitset->pages);
+	tt_bitset_pages_new(&bitset->pages);
 }
 
-static struct bitset_page *
-bitset_destroy_iter_cb(bitset_pages_t *t, struct bitset_page *page, void *arg)
+static struct tt_bitset_page *
+tt_bitset_destroy_iter_cb(tt_bitset_pages_t *t, struct tt_bitset_page *page,
+			  void *arg)
 {
 	(void) t;
-	struct bitset *bitset = (struct bitset *) arg;
-	bitset_page_destroy(page);
+	struct tt_bitset *bitset = (struct tt_bitset *) arg;
+	tt_bitset_page_destroy(page);
 	bitset->realloc(page, 0);
 	return NULL;
 }
 
 void
-bitset_destroy(struct bitset *bitset)
+tt_bitset_destroy(struct tt_bitset *bitset)
 {
-	bitset_pages_iter(&bitset->pages, NULL, bitset_destroy_iter_cb, bitset);
+	tt_bitset_pages_iter(&bitset->pages, NULL, tt_bitset_destroy_iter_cb,
+			     bitset);
 	memset(&bitset->pages, 0, sizeof(bitset->pages));
 }
 
 bool
-bitset_test(struct bitset *bitset, size_t pos)
+tt_bitset_test(struct tt_bitset *bitset, size_t pos)
 {
-	struct bitset_page key;
-	key.first_pos = bitset_page_first_pos(pos);
+	struct tt_bitset_page key;
+	key.first_pos = tt_bitset_page_first_pos(pos);
 
 	/* Find a page in pages tree */
-	struct bitset_page *page = bitset_pages_search(&bitset->pages, &key);
+	struct tt_bitset_page *page =
+		tt_bitset_pages_search(&bitset->pages, &key);
 	if (page == NULL)
 		return false;
 
 	assert(page->first_pos <= pos && pos < page->first_pos +
 	       BITSET_PAGE_DATA_SIZE * CHAR_BIT);
-	return bit_test(bitset_page_data(page), pos - page->first_pos);
+	return bit_test(tt_bitset_page_data(page), pos - page->first_pos);
 }
 
 int
-bitset_set(struct bitset *bitset, size_t pos)
+tt_bitset_set(struct tt_bitset *bitset, size_t pos)
 {
-	struct bitset_page key;
-	key.first_pos = bitset_page_first_pos(pos);
+	struct tt_bitset_page key;
+	key.first_pos = tt_bitset_page_first_pos(pos);
 
 	/* Find a page in pages tree */
-	struct bitset_page *page = bitset_pages_search(&bitset->pages, &key);
+	struct tt_bitset_page *page =
+		tt_bitset_pages_search(&bitset->pages, &key);
 	if (page == NULL) {
 		/* Allocate a new page */
-		size_t size = bitset_page_alloc_size(bitset->realloc);
+		size_t size = tt_bitset_page_alloc_size(bitset->realloc);
 		page = bitset->realloc(NULL, size);
 		if (page == NULL)
 			return -1;
 
-		bitset_page_create(page);
+		tt_bitset_page_create(page);
 		page->first_pos = key.first_pos;
 
 		/* Insert the page into pages tree */
-		bitset_pages_insert(&bitset->pages, page);
+		tt_bitset_pages_insert(&bitset->pages, page);
 	}
 
 	assert(page->first_pos <= pos && pos < page->first_pos +
 	       BITSET_PAGE_DATA_SIZE * CHAR_BIT);
-	bool prev = bit_set(bitset_page_data(page), pos - page->first_pos);
+	bool prev = bit_set(tt_bitset_page_data(page), pos - page->first_pos);
 	if (prev) {
 		/* Value has not changed */
 		return 1;
@@ -116,19 +121,20 @@ bitset_set(struct bitset *bitset, size_t pos)
 }
 
 int
-bitset_clear(struct bitset *bitset, size_t pos)
+tt_bitset_clear(struct tt_bitset *bitset, size_t pos)
 {
-	struct bitset_page key;
-	key.first_pos = bitset_page_first_pos(pos);
+	struct tt_bitset_page key;
+	key.first_pos = tt_bitset_page_first_pos(pos);
 
 	/* Find a page in the pages tree */
-	struct bitset_page *page = bitset_pages_search(&bitset->pages, &key);
+	struct tt_bitset_page *page =
+		tt_bitset_pages_search(&bitset->pages, &key);
 	if (page == NULL)
 		return 0;
 
 	assert(page->first_pos <= pos && pos < page->first_pos +
 	       BITSET_PAGE_DATA_SIZE * CHAR_BIT);
-	bool prev = bit_clear(bitset_page_data(page), pos - page->first_pos);
+	bool prev = bit_clear(tt_bitset_page_data(page), pos - page->first_pos);
 	if (!prev) {
 		return 0;
 	}
@@ -140,9 +146,9 @@ bitset_clear(struct bitset *bitset, size_t pos)
 
 	if (page->cardinality == 0) {
 		/* Remove the page from the pages tree */
-		bitset_pages_remove(&bitset->pages, page);
+		tt_bitset_pages_remove(&bitset->pages, page);
 		/* Free the page */
-		bitset_page_destroy(page);
+		tt_bitset_page_destroy(page);
 		bitset->realloc(page, 0);
 	}
 
@@ -150,33 +156,33 @@ bitset_clear(struct bitset *bitset, size_t pos)
 }
 
 extern inline size_t
-bitset_cardinality(const struct bitset *bitset);
+tt_bitset_cardinality(const struct tt_bitset *bitset);
 
 void
-bitset_info(struct bitset *bitset, struct bitset_info *info)
+tt_bitset_info(struct tt_bitset *bitset, struct tt_bitset_info *info)
 {
 	memset(info, 0, sizeof(*info));
 	info->page_data_size = BITSET_PAGE_DATA_SIZE;
-	info->page_total_size = bitset_page_alloc_size(bitset->realloc);
+	info->page_total_size = tt_bitset_page_alloc_size(bitset->realloc);
 	info->page_data_alignment = BITSET_PAGE_DATA_ALIGNMENT;
 
 	size_t cardinality_check = 0;
-	struct bitset_page *page = bitset_pages_first(&bitset->pages);
+	struct tt_bitset_page *page = tt_bitset_pages_first(&bitset->pages);
 	while (page != NULL) {
 		info->pages++;
 		cardinality_check += page->cardinality;
-		page = bitset_pages_next(&bitset->pages, page);
+		page = tt_bitset_pages_next(&bitset->pages, page);
 	}
 
-	assert(bitset_cardinality(bitset) == cardinality_check);
+	assert(tt_bitset_cardinality(bitset) == cardinality_check);
 }
 
 #if defined(DEBUG)
 void
-bitset_dump(struct bitset *bitset, int verbose, FILE *stream)
+tt_bitset_dump(struct tt_bitset *bitset, int verbose, FILE *stream)
 {
-	struct bitset_info info;
-	bitset_info(bitset, &info);
+	struct tt_bitset_info info;
+	tt_bitset_info(bitset, &info);
 
 	size_t PAGE_BIT = (info.page_data_size * CHAR_BIT);
 
@@ -225,8 +231,8 @@ bitset_dump(struct bitset *bitset, int verbose, FILE *stream)
 
 	fprintf(stream, "    " "pages = {\n");
 
-	for (struct bitset_page *page = bitset_pages_first(&bitset->pages);
-	     page != NULL; page = bitset_pages_next(&bitset->pages, page)) {
+	for (struct tt_bitset_page *page = tt_bitset_pages_first(&bitset->pages);
+	     page != NULL; page = tt_bitset_pages_next(&bitset->pages, page)) {
 
 		size_t page_last_pos = page->first_pos
 				+ BITSET_PAGE_DATA_SIZE * CHAR_BIT;

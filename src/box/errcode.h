@@ -215,6 +215,8 @@ struct errcode_record {
 	/*160 */_(ER_ACTION_MISMATCH,		"Field %d contains %s on conflict action, but %s in index parts") \
 	/*161 */_(ER_VIEW_MISSING_SQL,		"Space declared as a view must have SQL statement") \
 	/*162 */_(ER_FOREIGN_KEY_CONSTRAINT,	"Can not commit transaction: deferred foreign keys violations are not resolved") \
+	/*163 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
+	/*164 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

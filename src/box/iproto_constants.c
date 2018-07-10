@@ -40,10 +40,10 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 		/* 0x04 */	MP_DOUBLE, /* IPROTO_TIMESTAMP */
 		/* 0x05 */	MP_UINT,   /* IPROTO_SCHEMA_VERSION */
 		/* 0x06 */	MP_UINT,   /* IPROTO_SERVER_VERSION */
+		/* 0x07 */	MP_UINT,   /* IPROTO_GROUP_ID */
 	/* }}} */
 
 	/* {{{ unused */
-		/* 0x07 */	MP_UINT,
 		/* 0x08 */	MP_UINT,
 		/* 0x09 */	MP_UINT,
 		/* 0x0a */	MP_UINT,
@@ -122,7 +122,7 @@ const uint64_t iproto_body_key_map[IPROTO_TYPE_STAT_MAX] = {
 	bit(SPACE_ID) | bit(OPS) | bit(TUPLE),                 /* UPSERT */
 	0,                                                     /* CALL */
 	0,                                                     /* EXECUTE */
-	bit(SPACE_ID),                                         /* NOP */
+	0,                                                     /* NOP */
 };
 #undef bit
 
@@ -134,7 +134,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"timestamp",        /* 0x04 */
 	"schema version",   /* 0x05 */
 	"server version",   /* 0x06 */
-	NULL,               /* 0x07 */
+	"group id",         /* 0x07 */
 	NULL,               /* 0x08 */
 	NULL,               /* 0x09 */
 	NULL,               /* 0x0a */

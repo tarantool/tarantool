@@ -49,12 +49,59 @@
 #include "schema.h"
 #include "gc.h"
 
+/*
+ * Memtx yield-in-transaction trigger: roll back the effects
+ * of the transaction and mark the transaction as aborted.
+ */
 static void
-txn_on_yield_or_stop(struct trigger *trigger, void *event)
+txn_on_yield(struct trigger *trigger, void *event)
 {
-	(void)trigger;
-	(void)event;
-	txn_rollback(); /* doesn't throw */
+	(void) trigger;
+	(void) event;
+
+	struct txn *txn = in_txn();
+	assert(txn && txn->engine_tx);
+	if (txn == NULL || txn->engine_tx == NULL)
+		return;
+	txn_abort(txn);                 /* doesn't yield or fail */
+}
+
+/**
+ * Initialize context for yield triggers.
+ * In case of a yield inside memtx multi-statement transaction
+ * we must, first of all, roll back the effects of the transaction
+ * so that concurrent transactions won't see dirty, uncommitted
+ * data.
+ * Second, we must abort the transaction, since it has been rolled
+ * back implicitly. The transaction can not be rolled back
+ * completely from within a yield trigger, since a yield trigger
+ * can't fail. Instead, we mark the transaction as aborted and
+ * raise an error on attempt to commit it.
+ *
+ * So much hassle to be user-friendly until we have a true
+ * interactive transaction support in memtx.
+ */
+void
+memtx_init_txn(struct txn *txn)
+{
+	struct fiber *fiber = fiber();
+
+	trigger_create(&txn->fiber_on_yield, txn_on_yield,
+		       NULL, NULL);
+	trigger_create(&txn->fiber_on_stop, txn_on_stop,
+		       NULL, NULL);
+	/*
+	 * Memtx doesn't allow yields between statements of
+	 * a transaction. Set a trigger which would roll
+	 * back the transaction if there is a yield.
+	 */
+	trigger_add(&fiber->on_yield, &txn->fiber_on_yield);
+	trigger_add(&fiber->on_stop, &txn->fiber_on_stop);
+	/*
+	 * This serves as a marker that the triggers are
+	 * initialized.
+	 */
+	txn->engine_tx = txn;
 }
 
 struct memtx_tuple {
@@ -321,7 +368,7 @@ static int
 memtx_engine_prepare(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	if (txn->is_autocommit)
+	if (txn->engine_tx == 0)
 		return 0;
 	/*
 	 * These triggers are only used for memtx and only
@@ -330,6 +377,11 @@ memtx_engine_prepare(struct engine *engine, struct txn *txn)
 	 */
 	trigger_clear(&txn->fiber_on_yield);
 	trigger_clear(&txn->fiber_on_stop);
+	if (txn->is_aborted) {
+		diag_set(ClientError, ER_TRANSACTION_YIELD);
+		diag_log();
+		return -1;
+	}
 	return 0;
 }
 
@@ -344,18 +396,7 @@ memtx_engine_begin(struct engine *engine, struct txn *txn)
 	 * to match with trigger_clear() in rollbackStatement().
 	 */
 	if (txn->is_autocommit == false) {
-
-		trigger_create(&txn->fiber_on_yield, txn_on_yield_or_stop,
-				NULL, NULL);
-		trigger_create(&txn->fiber_on_stop, txn_on_yield_or_stop,
-				NULL, NULL);
-		/*
-		 * Memtx doesn't allow yields between statements of
-		 * a transaction. Set a trigger which would roll
-		 * back the transaction if there is a yield.
-		 */
-		trigger_add(&fiber()->on_yield, &txn->fiber_on_yield);
-		trigger_add(&fiber()->on_stop, &txn->fiber_on_stop);
+		memtx_init_txn(txn);
 	}
 	return 0;
 }
@@ -365,6 +406,19 @@ memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	(void)txn;
+	if (txn->engine_tx == NULL) {
+		struct space *space = txn_last_stmt(txn)->space;
+
+		if (space->def->id > BOX_SYSTEM_ID_MAX &&
+		    ! rlist_empty(&space->on_replace)) {
+			/**
+			 * A space on_replace trigger may initiate
+			 * a yield.
+			 */
+			assert(txn->is_autocommit);
+			memtx_init_txn(txn);
+		}
+	}
 	return 0;
 }
 
@@ -416,7 +470,10 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 static void
 memtx_engine_rollback(struct engine *engine, struct txn *txn)
 {
-	memtx_engine_prepare(engine, txn);
+	if (txn->engine_tx != NULL) {
+		trigger_clear(&txn->fiber_on_yield);
+		trigger_clear(&txn->fiber_on_stop);
+	}
 	struct txn_stmt *stmt;
 	stailq_reverse(&txn->stmts);
 	stailq_foreach_entry(stmt, &txn->stmts, next)
@@ -498,19 +555,20 @@ checkpoint_write_row(struct xlog *l, struct xrow_header *row)
 }
 
 static int
-checkpoint_write_tuple(struct xlog *l, uint32_t space_id,
+checkpoint_write_tuple(struct xlog *l, struct space *space,
 		       const char *data, uint32_t size)
 {
 	struct request_replace_body body;
 	body.m_body = 0x82; /* map of two elements. */
 	body.k_space_id = IPROTO_SPACE_ID;
 	body.m_space_id = 0xce; /* uint32 */
-	body.v_space_id = mp_bswap_u32(space_id);
+	body.v_space_id = mp_bswap_u32(space_id(space));
 	body.k_tuple = IPROTO_TUPLE;
 
 	struct xrow_header row;
 	memset(&row, 0, sizeof(struct xrow_header));
 	row.type = IPROTO_INSERT;
+	row.group_id = space_group_id(space);
 
 	row.bodycnt = 2;
 	row.body[0].iov_base = &body;
@@ -635,8 +693,7 @@ checkpoint_f(va_list ap)
 		struct snapshot_iterator *it = entry->iterator;
 		for (data = it->next(it, &size); data != NULL;
 		     data = it->next(it, &size)) {
-			if (checkpoint_write_tuple(&snap,
-					space_id(entry->space),
+			if (checkpoint_write_tuple(&snap, entry->space,
 					data, size) != 0) {
 				xlog_close(&snap, false);
 				return -1;
@@ -1164,7 +1221,7 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 		container_of(tuple, struct memtx_tuple, base);
 	if (memtx->alloc.free_mode != SMALL_DELAYED_FREE ||
 	    memtx_tuple->version == memtx->snapshot_version ||
-	    format->temporary)
+	    format->is_temporary)
 		smfree(&memtx->alloc, memtx_tuple, total);
 	else
 		smfree_delayed(&memtx->alloc, memtx_tuple, total);

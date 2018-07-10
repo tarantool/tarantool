@@ -103,6 +103,47 @@ dump_header(fio.pathjoin(box.cfg.wal_dir, xlog_name))
   - 'Version: <version>'
   - 'Instance: <instance_uuid>'
   - 'VClock: {1: 2}'
+  - 'PrevVClock: {}'
+...
+box.space._schema:delete({"layout_test"})
+---
+- ['layout_test']
+...
+box.snapshot()
+---
+- ok
+...
+checkpoint_lsn = box.info.lsn
+---
+...
+-- SNAP files
+snap_name = string.format("%020d.snap", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.memtx_dir, snap_name))
+---
+- - SNAP
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {1: 4}'
+...
+-- XLOG files
+box.space._schema:insert({"layout_test"})
+---
+- ['layout_test']
+...
+xlog_name = string.format("%020d.xlog", checkpoint_lsn)
+---
+...
+dump_header(fio.pathjoin(box.cfg.wal_dir, xlog_name))
+---
+- - XLOG
+  - '0.13'
+  - 'Version: <version>'
+  - 'Instance: <instance_uuid>'
+  - 'VClock: {1: 4}'
+  - 'PrevVClock: {1: 2}'
 ...
 box.space._schema:delete({"layout_test"})
 ---

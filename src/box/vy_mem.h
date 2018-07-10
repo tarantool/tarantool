@@ -176,8 +176,8 @@ struct vy_mem {
 	const struct key_def *cmp_def;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
-	/** Schema version at the time of creation. */
-	uint32_t schema_version;
+	/** Data dictionary cache version at the time of creation. */
+	uint32_t space_cache_version;
 	/**
 	 * Generation of statements stored in the tree.
 	 * Used as lsregion allocator identifier.
@@ -249,14 +249,15 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  * @param format Format for REPLACE and DELETE tuples.
  * @param format_with_colmask Format for tuples, which have
  *        column mask.
- * @param schema_version Schema version.
+ * @param space_cache_version Data dictionary cache version
  * @retval new vy_mem instance on success.
  * @retval NULL on error, check diag.
  */
 struct vy_mem *
 vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	   const struct key_def *cmp_def, struct tuple_format *format,
-	   struct tuple_format *format_with_colmask, uint32_t schema_version);
+	   struct tuple_format *format_with_colmask,
+	   uint32_t space_cache_version);
 
 /**
  * Delete in-memory level.

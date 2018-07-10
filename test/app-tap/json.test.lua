@@ -22,7 +22,7 @@ end
 
 tap.test("json", function(test)
     local serializer = require('json')
-    test:plan(9)
+    test:plan(13)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -32,4 +32,12 @@ tap.test("json", function(test)
     test:test("table", common.test_table, serializer, is_array, is_map)
     test:test("ucdata", common.test_ucdata, serializer)
     test:test("misc", test_misc, serializer)
+
+    --
+    -- gh-3514: fix parsing integers with exponent in json
+    --
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
+    test:is(serializer.decode('{"var":2.0e+3}')["var"], 2000)
 end)

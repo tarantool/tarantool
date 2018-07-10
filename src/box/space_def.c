@@ -51,14 +51,16 @@ checks_array_decode(const char **str, uint32_t len, char *opt, uint32_t errcode,
 		    uint32_t field_no);
 
 const struct space_opts space_opts_default = {
-	/* .temporary = */ false,
+	/* .group_id = */ 0,
+	/* .is_temporary = */ false,
 	/* .view = */ false,
 	/* .sql        = */ NULL,
 	/* .checks     = */ NULL,
 };
 
 const struct opt_def space_opts_reg[] = {
-	OPT_DEF("temporary", OPT_BOOL, struct space_opts, temporary),
+	OPT_DEF("group_id", OPT_UINT32, struct space_opts, group_id),
+	OPT_DEF("temporary", OPT_BOOL, struct space_opts, is_temporary),
 	OPT_DEF("view", OPT_BOOL, struct space_opts, is_view),
 	OPT_DEF("sql", OPT_STRPTR, struct space_opts, sql),
 	OPT_DEF_ARRAY("checks", struct space_opts, checks,

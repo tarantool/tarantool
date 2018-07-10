@@ -51,7 +51,7 @@ struct mh_bitset_index_t;
 
 struct memtx_bitset_index {
 	struct index base;
-	struct bitset_index index;
+	struct tt_bitset_index index;
 #ifndef OLD_GOOD_BITSET
 	struct matras *id_to_tuple;
 	struct mh_bitset_index_t *tuple_to_id;

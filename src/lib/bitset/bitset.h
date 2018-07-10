@@ -66,22 +66,22 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 /** @cond false */
-struct bitset_page {
+struct tt_bitset_page {
 	size_t first_pos;
-	rb_node(struct bitset_page) node;
+	rb_node(struct tt_bitset_page) node;
 	size_t cardinality;
 	uint8_t data[0];
 };
 
-typedef rb_tree(struct bitset_page) bitset_pages_t;
+typedef rb_tree(struct tt_bitset_page) tt_bitset_pages_t;
 /** @endcond */
 
 /**
  * Bitset
  */
-struct bitset {
+struct tt_bitset {
 	/** @cond false */
-	bitset_pages_t pages;
+	tt_bitset_pages_t pages;
 	size_t cardinality;
 	void *(*realloc)(void *ptr, size_t size);
 	/** @endcond */
@@ -93,14 +93,15 @@ struct bitset {
  * @param realloc memory allocator to use
  */
 void
-bitset_create(struct bitset *bitset, void *(*realloc)(void *ptr, size_t size));
+tt_bitset_create(struct tt_bitset *bitset, void *(*realloc)(void *ptr,
+							    size_t size));
 
 /**
  * @brief Destruct \a bitset
  * @param bitset bitset
  */
 void
-bitset_destroy(struct bitset *bitset);
+tt_bitset_destroy(struct tt_bitset *bitset);
 
 /**
  * @brief Test bit \a pos in \a bitset
@@ -110,7 +111,7 @@ bitset_destroy(struct bitset *bitset);
  * @retval false if \a pos is not set in \a bitset
  */
 bool
-bitset_test(struct bitset *bitset, size_t pos);
+tt_bitset_test(struct tt_bitset *bitset, size_t pos);
 
 /**
  * @brief Set bit \a pos in \a bitset
@@ -121,7 +122,7 @@ bitset_test(struct bitset *bitset, size_t pos);
  * @retval -1 on memory error
  */
 int
-bitset_set(struct bitset *bitset, size_t pos);
+tt_bitset_set(struct tt_bitset *bitset, size_t pos);
 
 /**
  * @brief Clear bit \a pos in \a bitset
@@ -132,7 +133,7 @@ bitset_set(struct bitset *bitset, size_t pos);
  * @retval -1 on memory error
  */
 int
-bitset_clear(struct bitset *bitset, size_t pos);
+tt_bitset_clear(struct tt_bitset *bitset, size_t pos);
 
 /**
  * @brief Return the number of bits set to \a true in \a bitset.
@@ -140,7 +141,7 @@ bitset_clear(struct bitset *bitset, size_t pos);
  * @return returns the number of bits set to \a true in \a bitset.
  */
 inline size_t
-bitset_cardinality(const struct bitset *bitset) {
+tt_bitset_cardinality(const struct tt_bitset *bitset) {
 	return bitset->cardinality;
 }
 
@@ -148,7 +149,7 @@ bitset_cardinality(const struct bitset *bitset) {
  * @brief Bitset Information structure
  * @see bitset_info
  */
-struct bitset_info {
+struct tt_bitset_info {
 	/** Number of allocated pages */
 	size_t pages;
 	/** Data (payload) size of one page (in bytes) */
@@ -165,11 +166,11 @@ struct bitset_info {
  * @param stat structure to fill
  */
 void
-bitset_info(struct bitset *bitset, struct bitset_info *info);
+tt_bitset_info(struct tt_bitset *bitset, struct tt_bitset_info *info);
 
 #if defined(DEBUG)
 void
-bitset_dump(struct bitset *bitset, int verbose, FILE *stream);
+tt_bitset_dump(struct tt_bitset *bitset, int verbose, FILE *stream);
 #endif /* defined(DEBUG) */
 
 #if defined(__cplusplus)

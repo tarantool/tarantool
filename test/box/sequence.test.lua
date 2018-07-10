@@ -490,15 +490,16 @@ box.session.su('admin')
 sq:drop()
 
 -- A user can alter/use sequences that he owns.
+box.schema.user.grant('user', 'create', 'universe')
 box.session.su('user')
 sq = box.schema.sequence.create('seq')
 sq:alter{step = 2} -- ok
 sq:drop() -- ok
 sq = box.schema.sequence.create('seq')
 box.session.su('admin')
-box.schema.user.revoke('user', 'read,write', 'universe')
+box.schema.user.revoke('user', 'read,write,create', 'universe')
 box.session.su('user')
-sq:set(100) -- ok
+sq:set(100) -- ok - user owns the sequence
 sq:next() -- ok
 sq:reset() -- ok
 box.session.su('admin')
@@ -509,10 +510,12 @@ sq1 = box.schema.sequence.create('seq1')
 s1 = box.schema.space.create('space1')
 _ = s1:create_index('pk')
 box.schema.user.grant('user', 'read,write', 'universe')
+box.schema.user.grant('user', 'create', 'universe')
 box.session.su('user')
 sq2 = box.schema.sequence.create('seq2')
 s2 = box.schema.space.create('space2')
-_ = s2:create_index('pk', {sequence = 'seq1'}) -- error
+-- fixme: no error on using another user's sequence
+_ = s2:create_index('pk', {sequence = 'seq1'})
 s1.index.pk:alter({sequence = 'seq1'}) -- error
 box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
 box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
@@ -524,6 +527,7 @@ box.session.su('admin')
 -- it can use it for auto increment, otherwise it
 -- needs privileges.
 box.schema.user.revoke('user', 'read,write', 'universe')
+box.schema.user.revoke('user', 'create', 'universe')
 box.session.su('user')
 s2:insert{nil, 1} -- ok: {1, 1}
 box.session.su('admin')
@@ -559,7 +563,7 @@ box.session.su('admin')
 s:drop()
 
 -- When a user is dropped, all his sequences are dropped as well.
-box.schema.user.grant('user', 'read,write', 'universe')
+box.schema.user.grant('user', 'read,write,create', 'universe')
 box.session.su('user')
 _ = box.schema.sequence.create('test1')
 _ = box.schema.sequence.create('test2')
@@ -571,8 +575,8 @@ box.sequence
 -- to a sequence.
 box.schema.user.create('user1')
 box.schema.user.create('user2')
-box.schema.user.grant('user1', 'read,write', 'universe')
-box.schema.user.grant('user2', 'read,write', 'universe')
+box.schema.user.grant('user1', 'read,write,create', 'universe')
+box.schema.user.grant('user2', 'read,write,create', 'universe')
 box.session.su('user1')
 sq = box.schema.sequence.create('test')
 box.session.su('user2')

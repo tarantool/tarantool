@@ -61,6 +61,10 @@ struct gc_consumer {
 	char *name;
 	/** The vclock signature tracked by this consumer. */
 	int64_t signature;
+	/** Consumer type, indicating that consumer only consumes
+	 * WAL files, or both - SNAP and WAL.
+	 */
+	enum gc_consumer_type type;
 };
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
@@ -69,8 +73,10 @@ typedef rb_tree(struct gc_consumer) gc_tree_t;
 struct gc_state {
 	/** Number of checkpoints to maintain. */
 	int checkpoint_count;
-	/** Max signature garbage collection has been called for. */
-	int64_t signature;
+	/** Max signature WAL garbage collection has been called for. */
+	int64_t wal_signature;
+	/** Max signature checkpoint garbage collection has been called for. */
+	int64_t checkpoint_signature;
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
 	/**
@@ -104,7 +110,8 @@ rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
 
 /** Allocate a consumer object. */
 static struct gc_consumer *
-gc_consumer_new(const char *name, int64_t signature)
+gc_consumer_new(const char *name, int64_t signature,
+		enum gc_consumer_type type)
 {
 	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
 	if (consumer == NULL) {
@@ -120,6 +127,7 @@ gc_consumer_new(const char *name, int64_t signature)
 		return NULL;
 	}
 	consumer->signature = signature;
+	consumer->type = type;
 	return consumer;
 }
 
@@ -135,7 +143,8 @@ gc_consumer_delete(struct gc_consumer *consumer)
 void
 gc_init(void)
 {
-	gc.signature = -1;
+	gc.wal_signature = -1;
+	gc.checkpoint_signature = -1;
 	gc_tree_new(&gc.consumers);
 	latch_create(&gc.latch);
 }
@@ -155,21 +164,34 @@ gc_free(void)
 	latch_destroy(&gc.latch);
 }
 
+/** Find the consumer that uses the oldest checkpoint. */
+struct gc_consumer *
+gc_tree_first_checkpoint(gc_tree_t *consumers)
+{
+	struct gc_consumer *consumer = gc_tree_first(consumers);
+	while (consumer != NULL && consumer->type == GC_CONSUMER_WAL)
+		consumer = gc_tree_next(consumers, consumer);
+	return consumer;
+}
+
 void
 gc_run(void)
 {
 	int checkpoint_count = gc.checkpoint_count;
 	assert(checkpoint_count > 0);
 
-	/* Look up the consumer that uses the oldest snapshot. */
+	/* Look up the consumer that uses the oldest WAL. */
 	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
+	/* Look up the consumer that uses the oldest checkpoint. */
+	struct gc_consumer *leftmost_checkpoint =
+		gc_tree_first_checkpoint(&gc.consumers);
 
 	/*
 	 * Find the oldest checkpoint that must be preserved.
-	 * We have to maintain @checkpoint_count oldest snapshots,
-	 * plus we can't remove snapshots that are still in use.
+	 * We have to maintain @checkpoint_count oldest checkpoints,
+	 * plus we can't remove checkpoints that are still in use.
 	 */
-	int64_t gc_signature = -1;
+	int64_t gc_checkpoint_signature = -1;
 
 	struct checkpoint_iterator checkpoints;
 	checkpoint_iterator_init(&checkpoints);
@@ -178,17 +200,20 @@ gc_run(void)
 	while ((vclock = checkpoint_iterator_prev(&checkpoints)) != NULL) {
 		if (--checkpoint_count > 0)
 			continue;
-		if (leftmost != NULL &&
-		    leftmost->signature < vclock_sum(vclock))
+		if (leftmost_checkpoint != NULL &&
+		    leftmost_checkpoint->signature < vclock_sum(vclock))
 			continue;
-		gc_signature = vclock_sum(vclock);
+		gc_checkpoint_signature = vclock_sum(vclock);
 		break;
 	}
 
-	if (gc_signature <= gc.signature)
-		return; /* nothing to do */
+	int64_t gc_wal_signature = MIN(gc_checkpoint_signature,
+				       leftmost != NULL ?
+				       leftmost->signature : INT64_MAX);
 
-	gc.signature = gc_signature;
+	if (gc_wal_signature <= gc.wal_signature &&
+	    gc_checkpoint_signature <= gc.checkpoint_signature)
+		return; /* nothing to do */
 
 	/*
 	 * Engine callbacks may sleep, because they use coio for
@@ -204,8 +229,17 @@ gc_run(void)
 	 * collection for memtx snapshots first and abort if it
 	 * fails - see comment to memtx_engine_collect_garbage().
 	 */
-	if (engine_collect_garbage(gc_signature) == 0)
-		wal_collect_garbage(gc_signature);
+	int rc = 0;
+
+	if (gc_checkpoint_signature > gc.checkpoint_signature) {
+		gc.checkpoint_signature = gc_checkpoint_signature;
+		rc = engine_collect_garbage(gc_checkpoint_signature);
+	}
+	if (gc_wal_signature > gc.wal_signature) {
+		gc.wal_signature = gc_wal_signature;
+		if (rc == 0)
+			wal_collect_garbage(gc_wal_signature);
+	}
 
 	latch_unlock(&gc.latch);
 }
@@ -217,9 +251,11 @@ gc_set_checkpoint_count(int checkpoint_count)
 }
 
 struct gc_consumer *
-gc_consumer_register(const char *name, int64_t signature)
+gc_consumer_register(const char *name, int64_t signature,
+		     enum gc_consumer_type type)
 {
-	struct gc_consumer *consumer = gc_consumer_new(name, signature);
+	struct gc_consumer *consumer = gc_consumer_new(name, signature,
+						       type);
 	if (consumer != NULL)
 		gc_tree_insert(&gc.consumers, consumer);
 	return consumer;

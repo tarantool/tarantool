@@ -922,7 +922,7 @@ memtx_space_prepare_alter(struct space *old_space, struct space *new_space)
 	struct memtx_space *new_memtx_space = (struct memtx_space *)new_space;
 
 	if (old_memtx_space->bsize != 0 &&
-	    old_space->def->opts.temporary != new_space->def->opts.temporary) {
+	    space_is_temporary(old_space) != space_is_temporary(new_space)) {
 		diag_set(ClientError, ER_ALTER_SPACE, old_space->def->name,
 			 "can not switch temporary flag on a non-empty space");
 		return -1;
@@ -991,7 +991,7 @@ memtx_space_new(struct memtx_engine *memtx,
 		return NULL;
 	}
 	format->engine = memtx;
-	format->temporary = def->opts.temporary;
+	format->is_temporary = def->opts.is_temporary;
 	format->exact_field_count = def->exact_field_count;
 	tuple_format_ref(format);
 
