@@ -214,7 +214,9 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 */
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 
-	/* Create WAL record for the write requests in non-temporary spaces */
+	/* Create WAL record for the write requests in non-temporary spaces.
+	 * stmt->space can be NULL for IRPOTO_NOP.
+	 */
 	if (stmt->space == NULL || !space_is_temporary(stmt->space)) {
 		if (txn_add_redo(stmt, request) != 0)
 			goto fail;
@@ -290,11 +292,14 @@ int
 txn_commit(struct txn *txn)
 {
 	assert(txn == in_txn());
-
-	/* Do transaction conflict resolving */
-	if (txn->engine != NULL &&
-	    engine_prepare(txn->engine, txn) != 0)
-		goto fail;
+	/*
+	 * Perform transaction conflict resolution. Engine == NULL when
+	 * we have a bunch of IPROTO_NOP statements.
+	 */
+	if (txn->engine != NULL) {
+		if (engine_prepare(txn->engine, txn) != 0)
+			goto fail;
+	}
 
 	if (txn->n_rows > 0) {
 		txn->signature = txn_write_to_wal(txn);
@@ -312,7 +317,10 @@ txn_commit(struct txn *txn)
 		unreachable();
 		panic("commit trigger failed");
 	}
-
+	/*
+	 * Engine can be NULL if transaction contains IPROTO_NOP
+	 * statements only.
+	 */
 	if (txn->engine != NULL)
 		engine_commit(txn->engine, txn);
 
