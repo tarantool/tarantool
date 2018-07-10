@@ -1471,8 +1471,17 @@ box.session.su('admin')
 sq:drop()
 ---
 ...
+box.schema.user.revoke('user', 'read,write', 'universe')
+---
+...
 -- A user can alter/use sequences that he owns.
-box.schema.user.grant('user', 'create', 'universe')
+box.schema.user.grant('user', 'create', 'sequence')
+---
+...
+box.schema.user.grant('user', 'write', 'space', '_sequence')
+---
+...
+box.schema.user.grant('user', 'write', 'space', '_sequence_data')
 ---
 ...
 box.session.su('user')
@@ -1493,7 +1502,13 @@ sq = box.schema.sequence.create('seq')
 box.session.su('admin')
 ---
 ...
-box.schema.user.revoke('user', 'read,write,create', 'universe')
+box.schema.user.revoke('user', 'create', 'sequence')
+---
+...
+box.schema.user.revoke('user', 'write', 'space', '_sequence')
+---
+...
+box.schema.user.revoke('user', 'write', 'space', '_sequence_data')
 ---
 ...
 box.session.su('user')
@@ -1515,7 +1530,8 @@ box.session.su('admin')
 sq:drop()
 ---
 ...
--- A sequence can be attached to a space only if the user owns both.
+-- A sequence can be attached to a space only if the user has
+-- create privilege on space and read/write on sequence.
 sq1 = box.schema.sequence.create('seq1')
 ---
 ...
@@ -1525,10 +1541,22 @@ s1 = box.schema.space.create('space1')
 _ = s1:create_index('pk')
 ---
 ...
-box.schema.user.grant('user', 'read,write', 'universe')
+box.schema.user.grant('user', 'write', 'space', '_sequence')
 ---
 ...
-box.schema.user.grant('user', 'create', 'universe')
+box.schema.user.grant('user', 'write', 'space', '_sequence_data')
+---
+...
+box.schema.user.grant('user', 'write', 'space', '_schema')
+---
+...
+box.schema.user.grant('user', 'write', 'space', '_space')
+---
+...
+box.schema.user.grant('user', 'create', 'space')
+---
+...
+box.schema.user.grant('user', 'create', 'sequence')
 ---
 ...
 box.session.su('user')
@@ -1540,9 +1568,42 @@ sq2 = box.schema.sequence.create('seq2')
 s2 = box.schema.space.create('space2')
 ---
 ...
--- fixme: no error on using another user's sequence
-_ = s2:create_index('pk', {sequence = 'seq1'})
+box.session.su('admin')
 ---
+...
+box.schema.user.revoke('user', 'create', 'sequence')
+---
+...
+box.schema.user.revoke('user', 'write', 'space', '_sequence')
+---
+...
+box.schema.user.revoke('user', 'write', 'space', '_sequence_data')
+---
+...
+box.schema.user.revoke('user', 'write', 'space', '_schema')
+---
+...
+box.schema.user.revoke('user', 'write', 'space', '_space')
+---
+...
+box.schema.user.grant('user', 'write', 'space', '_index')
+---
+...
+box.schema.user.grant('user', 'write', 'space', '_space_sequence')
+---
+...
+box.schema.user.grant('user', 'read', 'space', '_index')
+---
+...
+box.schema.user.grant('user', 'read', 'space', '_space_sequence')
+---
+...
+box.session.su('user')
+---
+...
+_ = s2:create_index('pk', {sequence = 'seq1'}) -- error
+---
+- error: Read access to sequence 'seq1' is denied for user 'user'
 ...
 s1.index.pk:alter({sequence = 'seq1'}) -- error
 ---
@@ -1550,7 +1611,7 @@ s1.index.pk:alter({sequence = 'seq1'}) -- error
 ...
 box.space._space_sequence:replace{s1.id, sq1.id, false} -- error
 ---
-- error: Alter access to space 'space1' is denied for user 'user'
+- error: Read access to sequence 'seq1' is denied for user 'user'
 ...
 box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
 ---
@@ -1558,7 +1619,7 @@ box.space._space_sequence:replace{s1.id, sq2.id, false} -- error
 ...
 box.space._space_sequence:replace{s2.id, sq1.id, false} -- error
 ---
-- error: Alter access to sequence 'seq1' is denied for user 'user'
+- error: Read access to sequence 'seq1' is denied for user 'user'
 ...
 s2.index.pk:alter({sequence = 'seq2'}) -- ok
 ---
@@ -1569,10 +1630,22 @@ box.session.su('admin')
 -- If the user owns a sequence attached to a space,
 -- it can use it for auto increment, otherwise it
 -- needs privileges.
-box.schema.user.revoke('user', 'read,write', 'universe')
+box.schema.user.revoke('user', 'write', 'space', '_index')
 ---
 ...
-box.schema.user.revoke('user', 'create', 'universe')
+box.schema.user.revoke('user', 'write', 'space', '_space_sequence')
+---
+...
+box.schema.user.revoke('user', 'read', 'space', '_space')
+---
+...
+box.schema.user.revoke('user', 'read', 'space', '_sequence')
+---
+...
+box.schema.user.revoke('user', 'read', 'space', '_index')
+---
+...
+box.schema.user.revoke('user', 'read', 'space', '_space_sequence')
 ---
 ...
 box.session.su('user')
@@ -1680,7 +1753,16 @@ s:drop()
 ---
 ...
 -- When a user is dropped, all his sequences are dropped as well.
-box.schema.user.grant('user', 'read,write,create', 'universe')
+box.schema.user.grant('user', 'write', 'space', '_sequence')
+---
+...
+box.schema.user.grant('user', 'read', 'space', '_sequence')
+---
+...
+box.schema.user.grant('user', 'write', 'space', '_space_sequence')
+---
+...
+box.schema.user.grant('user', 'create', 'sequence')
 ---
 ...
 box.session.su('user')
@@ -1710,10 +1792,25 @@ box.schema.user.create('user1')
 box.schema.user.create('user2')
 ---
 ...
-box.schema.user.grant('user1', 'read,write,create', 'universe')
+box.schema.user.grant('user1', 'create', 'sequence')
 ---
 ...
-box.schema.user.grant('user2', 'read,write,create', 'universe')
+box.schema.user.grant('user1', 'write', 'space', '_sequence')
+---
+...
+box.schema.user.grant('user1', 'read', 'space', '_sequence')
+---
+...
+box.schema.user.grant('user1', 'read', 'space', '_user')
+---
+...
+box.schema.user.grant('user1', 'write', 'space', '_sequence_data')
+---
+...
+box.schema.user.grant('user1', 'write', 'space', '_priv')
+---
+...
+box.schema.user.grant('user2', 'read,write', 'universe')
 ---
 ...
 box.session.su('user1')
