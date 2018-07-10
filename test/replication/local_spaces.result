@@ -52,10 +52,29 @@ box.space._space:insert{9000, 1, 'test', 'memtx', 0, {group_id = 2}, {}} -- erro
 ---
 - error: Replication group '2' does not exist
 ...
+-- Temporary local spaces should behave in the same fashion as
+-- plain temporary spaces, i.e. neither replicated nor persisted.
+s3 = box.schema.space.create('test3', {is_local = true, temporary = true})
+---
+...
+_ = s3:create_index('pk')
+---
+...
+s3.is_local
+---
+- true
+...
+s3.temporary
+---
+- true
+...
 _ = s1:insert{1}
 ---
 ...
 _ = s2:insert{1}
+---
+...
+_ = s3:insert{1}
 ---
 ...
 box.snapshot()
@@ -66,6 +85,9 @@ _ = s1:insert{2}
 ---
 ...
 _ = s2:insert{2}
+---
+...
+_ = s3:insert{2}
 ---
 ...
 box.schema.user.grant('guest', 'replication')
@@ -91,6 +113,14 @@ box.space.test2.is_local
 ---
 - true
 ...
+box.space.test3.is_local
+---
+- true
+...
+box.space.test3.temporary
+---
+- true
+...
 box.space.test1:select()
 ---
 - - [1]
@@ -100,10 +130,17 @@ box.space.test2:select()
 ---
 - []
 ...
+box.space.test3:select()
+---
+- []
+...
 box.cfg{read_only = true} -- local spaces ignore read_only
 ---
 ...
 for i = 1, 3 do box.space.test2:insert{i, i} end
+---
+...
+for i = 1, 3 do box.space.test3:insert{i, i, i} end
 ---
 ...
 test_run:cmd("switch default")
@@ -114,6 +151,9 @@ _ = s1:insert{3}
 ---
 ...
 _ = s2:insert{3}
+---
+...
+_ = s3:insert{3}
 ---
 ...
 vclock = test_run:get_vclock('default')
@@ -138,6 +178,12 @@ box.space.test2:select()
   - [2, 2]
   - [3, 3]
 ...
+box.space.test3:select()
+---
+- - [1, 1, 1]
+  - [2, 2, 2]
+  - [3, 3, 3]
+...
 test_run:cmd("restart server replica")
 box.space.test1:select()
 ---
@@ -150,6 +196,10 @@ box.space.test2:select()
 - - [1, 1]
   - [2, 2]
   - [3, 3]
+...
+box.space.test3:select()
+---
+- []
 ...
 test_run:cmd("switch default")
 ---
@@ -178,9 +228,18 @@ s2:select()
   - [2]
   - [3]
 ...
+s3:select()
+---
+- - [1]
+  - [2]
+  - [3]
+...
 s1:drop()
 ---
 ...
 s2:drop()
+---
+...
+s3:drop()
 ---
 ...
