@@ -149,7 +149,7 @@ xlog_count = #fio.glob('./master/*.xlog')
 -- the replica may have managed to download all data
 -- from xlog #1 before it was stopped, in which case
 -- it's OK to collect xlog #1
-xlog_count == 3 xlog_count == 2 or fio.listdir('./master')
+xlog_count == 3 or xlog_count == 2 or fio.listdir('./master')
 
 -- The xlog should only be deleted after the replica
 -- is unregistered.
