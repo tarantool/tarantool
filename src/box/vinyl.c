@@ -71,7 +71,6 @@
 #include "trigger.h"
 #include "checkpoint.h"
 #include "session.h"
-#include "replication.h" /* GROUP_LOCAL */
 #include "wal.h" /* wal_mode() */
 
 /**

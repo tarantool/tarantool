@@ -66,6 +66,20 @@ enum {
 	VCLOCK_STR_LEN_MAX = 1 + VCLOCK_MAX * (2 + 2 + 20 + 2) + 1
 };
 
+/** Predefined replication group identifiers. */
+enum {
+	/**
+	 * Default replication group: changes made to the space
+	 * are replicated throughout the entire cluster.
+	 */
+	GROUP_DEFAULT = 0,
+	/**
+	 * Replica local space: changes made to the space are
+	 * not replicated.
+	 */
+	GROUP_LOCAL = 1,
+};
+
 /** Cluster vector clock */
 struct vclock {
 	/** Map of used components in lsn array */
