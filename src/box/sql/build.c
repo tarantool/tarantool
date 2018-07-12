@@ -915,7 +915,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 			}
 		}
 	}
-	assert(pCol == &pTab->aCol[iCol]);
+	assert(pCol == NULL || pCol == &pTab->aCol[iCol]);
 	if (nTerm == 1 && pCol != NULL &&
 	    (pTab->def->fields[iCol].type == FIELD_TYPE_INTEGER) &&
 	    sortOrder != SORT_ORDER_DESC) {

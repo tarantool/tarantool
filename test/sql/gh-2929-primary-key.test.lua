@@ -16,3 +16,8 @@ box.sql.execute("CREATE TABLE t4(a, b)")
 box.sql.execute("CREATE TABLE t5(a, b UNIQUE)")
 
 box.sql.execute("DROP TABLE t1")
+
+--
+-- gh-3522: invalid primary key name
+--
+box.sql.execute("CREATE TABLE tx (a INT, PRIMARY KEY (b));")
