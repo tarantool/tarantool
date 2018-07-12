@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(53)
+test:plan(57)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -66,6 +66,14 @@ client:write("require('console').delimiter();\n")
 test:is(yaml.decode(client:read(EOL))[1], ';', "get delimiter is ';'")
 client:write("require('console').delimiter('');\n")
 test:is(yaml.decode(client:read(EOL)), '', "clear delimiter")
+
+--
+-- gh-3476: yaml.encode encodes 'false' and 'true' incorrectly.
+--
+test:is(type(yaml.decode(yaml.encode('false'))), 'string')
+test:is(type(yaml.decode(yaml.encode('true'))), 'string')
+test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string')
+test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string')
 
 box.cfg{
     listen=IPROTO_SOCKET;
