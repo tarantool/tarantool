@@ -2115,7 +2115,7 @@ c:receive("*a", "Message: ")
 ---
 - 'Message: Pong
 
-'
+  '
 ...
 c:receive("*a", "Message: ")
 ---
