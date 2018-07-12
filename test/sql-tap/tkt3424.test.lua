@@ -25,7 +25,7 @@ test:do_execsql_test(
         INSERT INTO names VALUES(1,'E1','AAA');
         INSERT INTO names VALUES(2,NULL,'BBB');
 
-        CREATE TABLE orig(id primary key, code TEXT, data TEXT);
+        CREATE TABLE orig(id INT primary key, code TEXT, data TEXT);
         INSERT INTO orig VALUES(1, 'AAA','E1');
         INSERT INTO orig VALUES(2, 'AAA','E2');
         INSERT INTO orig VALUES(3, 'AAA','E3');

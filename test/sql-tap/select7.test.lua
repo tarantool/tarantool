@@ -24,7 +24,7 @@ test:do_execsql_test(
     "select7-1.1",
     [[
         drop table if exists t1;
-        create table t1(x primary key);
+        create table t1(x TEXT primary key);
         insert into t1 values('amx');
         insert into t1 values('anx');
         insert into t1 values('amy');
@@ -86,8 +86,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS photo;
         DROP TABLE IF EXISTS tag;
-        CREATE TABLE IF NOT EXISTS photo(pk integer primary key, x);
-        CREATE TABLE IF NOT EXISTS tag(pk integer primary key, fk int, name);
+        CREATE TABLE IF NOT EXISTS photo(pk integer primary key, x INT);
+        CREATE TABLE IF NOT EXISTS tag(pk integer primary key, fk int, name TEXT);
 
         SELECT P.pk from PHOTO P WHERE NOT EXISTS (
              SELECT T2.pk from TAG T2 WHERE T2.fk = P.pk
@@ -126,7 +126,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "select7-5.1",
     [[
-        CREATE TABLE t2(a primary key,b);
+        CREATE TABLE t2(a  INT primary key,b INT );
         SELECT 5 IN (SELECT a,b FROM t2);
     ]], {
         -- <select7-5.1>
@@ -266,8 +266,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     8.0,
     [[
-        CREATE TABLE t01(x primary key, y);
-        CREATE TABLE t02(x primary key, y);
+        CREATE TABLE t01(x  INT primary key, y INT );
+        CREATE TABLE t02(x  INT primary key, y INT );
     ]])
 
 test:do_catchsql_test(

@@ -13,22 +13,22 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 box.cfg{}
 ---
 ...
-box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY, b UNIQUE)")
+box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE)")
 ---
 ...
-box.sql.execute("CREATE TABLE t2(a UNIQUE, b)")
+box.sql.execute("CREATE TABLE t2(a INT UNIQUE, b INT)")
 ---
 - error: PRIMARY KEY missing on table T2
 ...
-box.sql.execute("CREATE TABLE t3(a)")
+box.sql.execute("CREATE TABLE t3(a NUM)")
 ---
 - error: PRIMARY KEY missing on table T3
 ...
-box.sql.execute("CREATE TABLE t4(a, b)")
+box.sql.execute("CREATE TABLE t4(a DECIMAL, b TEXT)")
 ---
 - error: PRIMARY KEY missing on table T4
 ...
-box.sql.execute("CREATE TABLE t5(a, b UNIQUE)")
+box.sql.execute("CREATE TABLE t5(a DECIMAL, b NUM UNIQUE)")
 ---
 - error: PRIMARY KEY missing on table T5
 ...

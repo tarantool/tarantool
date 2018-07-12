@@ -24,10 +24,10 @@ test:plan(3)
 test:do_execsql_test(
     "tkt-b351d95.1",
     [[
-        CREATE table t1(a primary key,b);
+        CREATE table t1(a text primary key,b text);
         INSERT INTO t1 VALUES('name1','This is a test');
         INSERT INTO t1 VALUES('name2','xyz');
-        CREATE TABLE t2(x primary key,y);
+        CREATE TABLE t2(x TEXT primary key,y TEXT);
         INSERT INTO t2 SELECT a, CASE b WHEN 'xyz' THEN null ELSE b END FROM t1;
         SELECT x, y FROM t2 ORDER BY x;
     ]], {

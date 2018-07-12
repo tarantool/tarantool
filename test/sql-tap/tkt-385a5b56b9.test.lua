@@ -21,7 +21,7 @@ testprefix = "tkt-385a5b56b9"
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t1(id primary key, x, y);
+        CREATE TABLE t1(id INT primary key, x INT, y INT);
         INSERT INTO t1 VALUES(1, 1, NULL);
         INSERT INTO t1 VALUES(2, 2, NULL);
         INSERT INTO t1 VALUES(3, 1, NULL);
@@ -57,7 +57,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.0,
     [[
-        CREATE TABLE t2(x primary key, y NOT NULL);
+        CREATE TABLE t2(x INT primary key, y INT NOT NULL);
         CREATE UNIQUE INDEX t2x ON t2(x);
         CREATE UNIQUE INDEX t2y ON t2(y);
     ]])

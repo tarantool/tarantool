@@ -25,7 +25,7 @@ test:plan(1)
 test:do_execsql_test(
     "tkt1501-1.1",
     [[
-        CREATE TABLE t1(a primary key,b);
+        CREATE TABLE t1(a INT primary key,b INT);
         INSERT INTO t1 VALUES(1,2);
         SELECT a, b, 'abc' FROM t1
           UNION

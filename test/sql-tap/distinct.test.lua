@@ -92,15 +92,15 @@ end
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t1(id INTEGER PRIMARY KEY, a, b, c, d);
+        CREATE TABLE t1(id INTEGER PRIMARY KEY, a TEXT , b TEXT , c TEXT , d TEXT );
         CREATE UNIQUE INDEX i2 ON t1(d COLLATE "unicode_ci");
 
-        CREATE TABLE t2(x INTEGER PRIMARY KEY, y);
+        CREATE TABLE t2(x INTEGER PRIMARY KEY, y INT );
 
-        CREATE TABLE t3(c1 PRIMARY KEY NOT NULL, c2 NOT NULL);
+        CREATE TABLE t3(c1  INT PRIMARY KEY NOT NULL, c2  INT NOT NULL);
         CREATE INDEX i3 ON t3(c2);
 
-        CREATE TABLE t4(id INTEGER PRIMARY KEY, a, b NOT NULL, c NOT NULL, d NOT NULL);
+        CREATE TABLE t4(id INTEGER PRIMARY KEY, a INT , b  INT NOT NULL, c  INT NOT NULL, d TEXT NOT NULL);
         CREATE UNIQUE INDEX t4i1 ON t4(b, c);
         CREATE UNIQUE INDEX t4i2 ON t4(d COLLATE "unicode_ci");
     ]])
@@ -157,7 +157,7 @@ test:execsql([[
 test:do_execsql_test(
     2.0,
     [[
-        CREATE TABLE t1(id INTEGER PRIMARY KEY, a, b, c);
+        CREATE TABLE t1(id INTEGER PRIMARY KEY, a TEXT, b TEXT, c TEXT );
         CREATE INDEX i1 ON t1(a, b);
         CREATE INDEX i2 ON t1(b COLLATE "unicode_ci", c COLLATE "unicode_ci");
 
@@ -201,7 +201,7 @@ test:do_execsql_test(
 
 -- do_test 3.0 {
 --   db eval {
---     CREATE TABLE t3(a INTEGER, b INTEGER, c, UNIQUE(a,b));
+--     CREATE TABLE t3(a INTEGER, b INTEGER, c INT , UNIQUE(a,b));
 --     INSERT INTO t3 VALUES
 --         (null, null, 1),
 --         (null, null, 2),
@@ -229,14 +229,14 @@ if (1 > 0) then
         [[
             DROP TABLE IF EXISTS t1;
             DROP TABLE IF EXISTS t2;
-            CREATE TABLE t1(id primary key, a INTEGER);
+            CREATE TABLE t1(id  INT primary key, a INTEGER);
             INSERT INTO t1 VALUES(1,3);
             INSERT INTO t1 VALUES(2,2);
             INSERT INTO t1 VALUES(3,1);
             INSERT INTO t1 VALUES(4,2);
             INSERT INTO t1 VALUES(5,3);
             INSERT INTO t1 VALUES(6,1);
-            CREATE TABLE t2(x primary key);
+            CREATE TABLE t2(x BLOB primary key);
             INSERT INTO t2
               SELECT DISTINCT
                 CASE a WHEN 1 THEN x'0000000000'
@@ -259,7 +259,7 @@ if (1 > 0) then
         5.1,
         [[
             DROP TABLE IF EXISTS t1;
-            CREATE TABLE t1(id primary key,x);
+            CREATE TABLE t1(id  INT primary key,x INT );
             INSERT INTO t1(id,x) VALUES(1,3),(2,1),(3,5),
                                     (4,2),(5,6),(6,4),
                                     (7,5),(8,1),(9,3);

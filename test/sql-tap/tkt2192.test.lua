@@ -109,7 +109,7 @@ test:do_test(
 test:do_execsql_test(
     "tkt2192-2.1",
     [[
-        CREATE TABLE t1(a,b primary key);
+        CREATE TABLE t1(a INT ,b  INT primary key);
         CREATE VIEW v1 AS
           SELECT * FROM t1 WHERE b%7=0 UNION SELECT * FROM t1 WHERE b%5=0;
         INSERT INTO t1 VALUES(1,7);

@@ -27,17 +27,17 @@ if (1 > 0)
     test:do_execsql_test(
         1.1,
         [[
-            CREATE TABLE t1(id primary key, a, b);
+            CREATE TABLE t1(id  INT primary key, a INT , b TEXT);
             INSERT INTO t1 VALUES(1, 1, 'one');
             INSERT INTO t1 VALUES(2, 2, 'two');
             INSERT INTO t1 VALUES(3, 3, 'three');
 
-            CREATE TABLE t2(id primary key, c, d);
+            CREATE TABLE t2(id  INT primary key, c TEXT, d TEXT);
             INSERT INTO t2 VALUES(1, 'one', 'I');
             INSERT INTO t2 VALUES(2, 'two', 'II');
             INSERT INTO t2 VALUES(3, 'three', 'III');
 
-            CREATE TABLE t3(t3_a PRIMARY KEY, t3_d);
+            CREATE TABLE t3(t3_a  INT PRIMARY KEY, t3_d TEXT);
             CREATE TRIGGER t3t AFTER INSERT ON t3 WHEN new.t3_d IS NULL BEGIN
               UPDATE t3 SET t3_d = (
                 SELECT d FROM 
@@ -93,7 +93,7 @@ if (1 > 0)
               Variant INTEGER NOT NULL DEFAULT 0,
               ControlDate DATE NOT NULL,
               ControlState INTEGER NOT NULL DEFAULT -1,
-              DeliveredQty VARCHAR(30)
+              DeliveredQty TEXT
             );
 
             CREATE TRIGGER TGR_InventoryControl_AfterInsert
@@ -161,7 +161,7 @@ if (1 > 0)
 
 
             INSERT INTO InventoryControl(SKU, Variant, ControlDate) SELECT 
-                II.SKU AS SKU, II.Variant AS Variant, '2011-08-30' AS ControlDate 
+                II.SKU AS SKU, II.Variant AS Variant, julianday('2011-08-30') AS ControlDate
                 FROM InventoryItem II;
         ]])
 

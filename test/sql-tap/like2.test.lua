@@ -25,7 +25,7 @@ test:do_test(
     "like2-1.1",
     function()
         return test:execsql [=[
-            CREATE TABLE t1(x INT PRIMARY KEY, y COLLATE "unicode_ci");
+            CREATE TABLE t1(x INT PRIMARY KEY, y  TEXT COLLATE "unicode_ci");
             INSERT INTO t1(x,y) VALUES(1,CAST(x'01' AS TEXT));
             INSERT INTO t1(x,y) VALUES(2,CAST(x'02' AS TEXT));
             INSERT INTO t1(x,y) VALUES(3,CAST(x'03' AS TEXT));
@@ -165,7 +165,7 @@ test:do_test(
     "like2-1.2",
     function()
         return test:execsql [[
-            CREATE TABLE t2(x INT PRIMARY KEY, y COLLATE "unicode_ci");
+            CREATE TABLE t2(x INT PRIMARY KEY, y  TEXT COLLATE "unicode_ci");
             INSERT INTO t2 SELECT * FROM t1;
             CREATE INDEX i2 ON t2(y);
             SELECT count(*) FROM t2;
@@ -180,7 +180,7 @@ test:do_test(
     "like2-1.3",
     function()
         return test:execsql [[
-            CREATE TABLE t3(x INT PRIMARY KEY, y COLLATE "unicode_ci");
+            CREATE TABLE t3(x INT PRIMARY KEY, y  TEXT COLLATE "unicode_ci");
             INSERT INTO t3 SELECT x, 'abc' || y || 'xyz' FROM t1;
             CREATE INDEX i3 ON t3(y);
             SELECT count(*) FROM t2;

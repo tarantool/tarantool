@@ -26,7 +26,7 @@ test:plan(49)
 test:do_execsql_test(
     "minmax2-1.0",
     [[
-        CREATE TABLE t1(id PRIMARY KEY, x, y);
+        CREATE TABLE t1(id  INT PRIMARY KEY, x INT , y INT );
         START TRANSACTION;
         INSERT INTO t1 VALUES(1, 1,1);
         INSERT INTO t1 VALUES(2, 2,2);
@@ -146,7 +146,7 @@ test:do_test(
     "minmax2-2.0",
     function()
         test:execsql [[
-            CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+            CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT );
             INSERT INTO t2 SELECT x, y FROM t1;
         ]]
         sql_search_count = box.sql.debug().sql_search_count
@@ -476,7 +476,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax2-10.1",
     [[
-        CREATE TABLE t6(id primary key, x);
+        CREATE TABLE t6(id  INT primary key, x INT );
         INSERT INTO t6 VALUES(1, 1);
         INSERT INTO t6 VALUES(2, 2);
         INSERT INTO t6 VALUES(3, NULL);

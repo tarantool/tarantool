@@ -350,7 +350,7 @@ test:do_execsql_test("select3-6.8", [[
 --
 test:do_execsql_test("select3-7.1", [[
   DROP TABLE IF EXISTS t2;
-  CREATE TABLE t2(a primary key,b);
+  CREATE TABLE t2(a  INT primary key,b INT );
   INSERT INTO t2 VALUES(1,2);
   SELECT a, sum(b) FROM t2 WHERE b=5 GROUP BY a;
 ]], {
@@ -377,7 +377,7 @@ test:do_execsql_test("select3-8.1", [[
   DROP TABLE IF EXISTS A;
   CREATE TABLE A (
     A1 DOUBLE,
-    A2 VARCHAR COLLATE "unicode_ci",
+    A2 TEXT,
     A3 DOUBLE,
     id int primary key
   );

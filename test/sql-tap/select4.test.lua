@@ -711,7 +711,7 @@ INSERT INTO t2 VALUES (0, 1), (1, 1), (2, 2), (3, 4), (4, 8), (5, 15);]]
 -- #
 -- do_test select4-7.1 {
 --   execsql {
---     CREATE TABLE t2 AS SELECT log AS 'x', count(*) AS 'y' FROM t1 GROUP BY log;
+--     CREATE TABLE t2 AS SELECT log AS 'x', count INT (*) AS 'y' FROM t1 GROUP BY log;
 --     SELECT * FROM t2 ORDER BY x;
 --   }
 -- } {0 1 1 1 2 2 3 4 4 8 5 15}  
@@ -1045,7 +1045,7 @@ test:do_execsql_test(
     })
 
 test:execsql [[DROP TABLE IF EXISTS t2;
-CREATE TABLE t2 (rowid int primary key, x, y);]]
+CREATE TABLE t2 (rowid int primary key, x INT, y INT);]]
 -- Make sure compound SELECTs with wildly different numbers of columns
 -- do not cause assertion faults due to register allocation issues.
 --
@@ -1261,7 +1261,7 @@ test:do_test(
     "select4-13.1",
     function()
         return test:execsql [[
-            CREATE TABLE t13(id int primary key,a,b);
+            CREATE TABLE t13(id int primary key,a INT,b INT);
             INSERT INTO t13 VALUES(0, 1,1);
             INSERT INTO t13 VALUES(1, 2,1);
             INSERT INTO t13 VALUES(2, 3,1);
@@ -1282,7 +1282,7 @@ test:do_test(
 test:do_execsql_test(
     "select4-14.1",
     [[
-        CREATE TABLE t14(a primary key,b,c);
+        CREATE TABLE t14(a INT primary key,b INT,c INT);
         INSERT INTO t14 VALUES(1,2,3),(4,5,6);
         SELECT * FROM t14 INTERSECT VALUES(3,2,1),(2,3,1),(1,2,3),(2,1,3);
     ]], {

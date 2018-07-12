@@ -201,8 +201,8 @@ test:do_catchsql_xfer_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
         INSERT INTO t2 VALUES (2, 2), (3, 4);
         START TRANSACTION;
@@ -236,8 +236,8 @@ test:do_catchsql_xfer_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
         INSERT INTO t2 VALUES (2, 2), (3, 4);
         START TRANSACTION;
@@ -271,8 +271,8 @@ test:do_catchsql_xfer_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
         START TRANSACTION;
             INSERT OR ROLLBACK INTO t2 SELECT * FROM t1;
@@ -304,8 +304,8 @@ test:do_catchsql_xfer_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
         INSERT INTO t2 VALUES (2, 2), (3, 4);
         START TRANSACTION;
@@ -337,8 +337,8 @@ test:do_catchsql_xfer_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
         INSERT INTO t2 VALUES (2, 2), (3, 4);
         START TRANSACTION;
@@ -372,8 +372,8 @@ test:do_catchsql_xfer_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
         INSERT INTO t2 VALUES (2, 2), (3, 4);
         START TRANSACTION;
@@ -407,8 +407,8 @@ test:do_catchsql_xfer_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
         INSERT INTO t2 VALUES (2, 2), (3, 4);
         START TRANSACTION;

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(37)
+test:plan(36)
 
 --!./tcltestrunner.lua
 -- 2007 Dec 4
@@ -62,8 +62,8 @@ test:plan(37)
 test:do_execsql_test(
     "tkt2822-0.1",
     [[
-        CREATE TABLE t1(a primary key, b, c);
-        CREATE TABLE t2(a primary key, b, c);
+        CREATE TABLE t1(a  INT primary key, b INT , c INT );
+        CREATE TABLE t2(a  INT primary key, b INT , c INT );
 
         INSERT INTO t1 VALUES(1, 3, 9);
         INSERT INTO t1 VALUES(3, 9, 27);
@@ -217,19 +217,6 @@ test:do_catchsql_test(
         -- </tkt2822-4.1>
     })
 
-test:do_catchsql_test(
-    "tkt2822-4.2",
-    [[
-        SELECT a, CAST (b AS TEXT) AS x, c FROM t1 
-          UNION ALL 
-        SELECT a, b, c FROM t2 
-          ORDER BY CAST (b AS INTEGER);
-    ]], {
-        -- <tkt2822-4.2>
-        1, "1st ORDER BY term does not match any column in the result set"
-        -- </tkt2822-4.2>
-    })
-
 -- Tests for rule (2).
 --
 -- The "ORDER BY b" should match the column alias (rule 2), not the
@@ -238,7 +225,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "tkt2822-5.1",
     [[
-        CREATE TABLE t3(a primary key,b);
+        CREATE TABLE t3(a  INT primary key,b INT );
         INSERT INTO t3 VALUES(1,8);
         INSERT INTO t3 VALUES(9,2);
 
@@ -294,10 +281,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2822-6.1",
     [[
-        CREATE TABLE t6a(p primary key,q);
+        CREATE TABLE t6a(p  INT primary key,q INT );
         INSERT INTO t6a VALUES(1,8);
         INSERT INTO t6a VALUES(9,2);
-        CREATE TABLE t6b(x primary key,y);
+        CREATE TABLE t6b(x  INT primary key,y INT );
         INSERT INTO t6b VALUES(1,7);
         INSERT INTO t6b VALUES(7,2);
 
@@ -371,8 +358,8 @@ test:do_test(
     "tkt2822-7.1",
     function()
         test:execsql [[
-            CREATE TABLE t7(a1 primary key,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11,a12,a13,a14,
-                            a15,a16,a17,a18,a19,a20,a21,a22,a23,a24,a25);
+            CREATE TABLE t7(a1  INT primary key,a2 INT ,a3 INT ,a4 INT ,a5 INT ,a6 INT ,a7 INT ,a8 INT ,a9 INT ,a10 INT ,a11 INT ,a12 INT ,a13 INT ,a14 INT ,
+                            a15 INT ,a16 INT ,a17 INT ,a18 INT ,a19 INT ,a20 INT ,a21 INT ,a22 INT ,a23 INT ,a24 INT ,a25 INT );
         ]]
         return test:catchsql [[
             SELECT * FROM t7 ORDER BY 0;

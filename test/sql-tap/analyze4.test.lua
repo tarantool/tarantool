@@ -28,7 +28,7 @@ test:do_test(
     "analyze4-1.0",
     function()
         test:execsql([[
-            CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a,b);
+            CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b TEXT);
             CREATE INDEX t1a ON t1(a);
             CREATE INDEX t1b ON t1(b);
             INSERT INTO t1 (a,b) VALUES(1,NULL);
@@ -94,7 +94,7 @@ test:do_execsql_test(
             --ALTER TABLE t1 ADD COLUMN d;
             -- So, re-create the table and its contents
             DROP TABLE t1;
-            CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a,b,c DEFAULT NULL,d DEFAULT NULL);
+            CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c  INT DEFAULT NULL,d  INT DEFAULT NULL);
             CREATE INDEX t1a ON t1(a);
             CREATE INDEX t1b ON t1(b);
             INSERT INTO t1 (a,b) VALUES(1,NULL);

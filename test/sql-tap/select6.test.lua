@@ -28,7 +28,7 @@ test:do_test(
     "select6-1.0",
     function()
         -- MUST_WORK_TEST
-        -- CREATE TABLE t1(x, y);
+        -- CREATE TABLE t1(x INT , y INT );
         return test:execsql [[
             DROP TABLE IF EXISTS t1;
             CREATE TABLE t1 (x int PRIMARY KEY, y int);
@@ -168,7 +168,7 @@ test:do_test(
     "select6-2.0",
     function()
         -- MUST_WORK_TEST
-        -- CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+        -- CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT );
         return test:execsql [[
             DROP TABLE IF EXISTS t2;
             CREATE TABLE t2(a INTEGER PRIMARY KEY, b int);
@@ -677,9 +677,9 @@ test:do_execsql_test(
     "select6-8.1",
     [[
         DROP TABLE IF EXISTS t3;
-        CREATE TABLE t3 (p primary key, q);
+        CREATE TABLE t3 (p  INT primary key, q INT );
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(q primary key, r);
+        CREATE TABLE t4(q  INT primary key, r INT );
         START TRANSACTION;
         INSERT INTO t3 VALUES(1,11);
         INSERT INTO t3 VALUES(2,22);
@@ -900,9 +900,9 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t;
         DROP TABLE IF EXISTS j;
         DROP TABLE IF EXISTS k;
-        CREATE TABLE t(i primary key,j,k);
-        CREATE TABLE j(l primary key,m);
-        CREATE TABLE k(o primary key);
+        CREATE TABLE t(i  INT primary key,j INT ,k INT );
+        CREATE TABLE j(l  INT primary key,m INT );
+        CREATE TABLE k(o  INT primary key);
     ]])
 
 err = { 1, "SELECTs to the left and right of UNION ALL do not have the same number of result columns" }
@@ -1042,8 +1042,8 @@ test:do_execsql_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(x primary key);
-        CREATE TABLE t2(y primary key, z);
+        CREATE TABLE t1(x  INT primary key);
+        CREATE TABLE t2(y  INT primary key, z INT );
         SELECT ( SELECT y FROM t2 WHERE z = cnt )
           FROM ( SELECT count(*) AS cnt FROM t1 );
     ]], {

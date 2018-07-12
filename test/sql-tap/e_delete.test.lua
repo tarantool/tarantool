@@ -25,7 +25,7 @@ test.do_delete_tests = test.do_select_tests
 test:do_execsql_test(
     "e_delete-0.0",
     [[
-        CREATE TABLE t1(a PRIMARY KEY, b);
+        CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
         CREATE INDEX i1 ON t1(a);
     ]], {
         -- <e_delete-0.0>
@@ -56,7 +56,7 @@ test:do_test(
             "t1", "t2", "t3", "t4", "t5", "t6"
         }
         for _, t in ipairs(tables) do
-            local sql = 'CREATE TABLE '..t..'(x PRIMARY KEY, y);'
+            local sql = 'CREATE TABLE '..t..'(x INT PRIMARY KEY, y TEXT);'
             test:execsql(sql)
         end
 
@@ -114,16 +114,16 @@ if (0 > 0) then
 --   ATTACH 'test.db2' AS aux;
 --   ATTACH 'test.db3' AS aux2;
     [[
-       CREATE TABLE temp.t7(a primary key, b);   INSERT INTO temp.t7 VALUES(1, 2);
-       CREATE TABLE main.t7(a primary key, b);   INSERT INTO main.t7 VALUES(3, 4);
-       CREATE TABLE aux.t7(a primary key, b);    INSERT INTO aux.t7 VALUES(5, 6);
-       CREATE TABLE aux2.t7(a primary key, b);   INSERT INTO aux2.t7 VALUES(7, 8);
-       CREATE TABLE main.t8(a primary key, b);   INSERT INTO main.t8 VALUES(1, 2);
-       CREATE TABLE aux.t8(a primary key, b);    INSERT INTO aux.t8 VALUES(3, 4);
-       CREATE TABLE aux2.t8(a primary key, b);   INSERT INTO aux2.t8 VALUES(5, 6);
-       CREATE TABLE aux.t9(a primary key, b);    INSERT INTO aux.t9 VALUES(1, 2);
-       CREATE TABLE aux2.t9(a primary key, b);   INSERT INTO aux2.t9 VALUES(3, 4);
-       CREATE TABLE aux2.t10(a primary key, b);  INSERT INTO aux2.t10 VALUES(1, 2);]]
+       CREATE TABLE temp.t7(a INT primary key, b INT);   INSERT INTO temp.t7 VALUES(1, 2);
+       CREATE TABLE main.t7(a INT primary key, b INT);   INSERT INTO main.t7 VALUES(3, 4);
+       CREATE TABLE aux.t7(a INT primary key, b INT);    INSERT INTO aux.t7 VALUES(5, 6);
+       CREATE TABLE aux2.t7(a INT primary key, b INT);   INSERT INTO aux2.t7 VALUES(7, 8);
+       CREATE TABLE main.t8(a INT primary key, b INT);   INSERT INTO main.t8 VALUES(1, 2);
+       CREATE TABLE aux.t8(a INT primary key, b INT);    INSERT INTO aux.t8 VALUES(3, 4);
+       CREATE TABLE aux2.t8(a INT primary key, b INT);   INSERT INTO aux2.t8 VALUES(5, 6);
+       CREATE TABLE aux.t9(a INT primary key, b INT);    INSERT INTO aux.t9 VALUES(1, 2);
+       CREATE TABLE aux2.t9(a INT primary key, b INT);   INSERT INTO aux2.t9 VALUES(3, 4);
+       CREATE TABLE aux2.t10(a INT primary key, b INT);  INSERT INTO aux2.t10 VALUES(1, 2);]]
     , {})
 
     -- EVIDENCE-OF: R-09681-58560 The table-name specified as part of a
@@ -349,7 +349,7 @@ if (0 > 0) then
     local function rebuild_t1()
         test:catchsql " DROP TABLE t1 "
         test:execsql [[
-        CREATE TABLE t1(a PRIMARY KEY, b);
+        CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
         INSERT INTO t1 VALUES(1, 'one');
         INSERT INTO t1 VALUES(2, 'two');
         INSERT INTO t1 VALUES(3, 'three');
@@ -479,7 +479,7 @@ if (0 > 0) then
  rebuild_t1 
  catchsql { DROP TABLE t1log }
  execsql {
-   CREATE TABLE t1log(x);
+   CREATE TABLE t1log(x INT );
    CREATE TRIGGER tr1 AFTER DELETE ON t1 BEGIN
      INSERT INTO t1log VALUES(old.a);
    END;

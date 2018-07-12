@@ -23,8 +23,8 @@ test:plan(10)
 test:do_execsql_test(
     "tkt3935.1",
     [[
-        CREATE TABLE t1(a primary key, b);
-        CREATE TABLE t2(c primary key, d);
+        CREATE TABLE t1(a INT primary key, b INT);
+        CREATE TABLE t2(c INT primary key, d INT);
     ]], {
         -- <tkt3935.1>
         

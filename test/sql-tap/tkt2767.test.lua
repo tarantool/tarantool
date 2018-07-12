@@ -31,7 +31,7 @@ if (1 > 0)
         "tkt2767-1.1",
         [[
             -- Construct a table with many rows of data
-            CREATE TABLE t1(x primary key);
+            CREATE TABLE t1(x  INT primary key);
             INSERT INTO t1 VALUES(1);
             INSERT INTO t1 VALUES(2);
             INSERT INTO t1 SELECT x+2 FROM t1;

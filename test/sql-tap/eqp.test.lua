@@ -32,11 +32,11 @@ local testprefix = "eqp"
 test:do_execsql_test(
     1.1,
     [[
-        CREATE TABLE t1(idt1 primary key, a INT, b INT, ex TEXT);
+        CREATE TABLE t1(idt1  INT primary key, a INT, b INT, ex TEXT);
         CREATE INDEX i1 ON t1(a);
         CREATE INDEX i2 ON t1(b);
-        CREATE TABLE t2(idt2 primary key, a INT, b INT, ex TEXT);
-        CREATE TABLE t3(idt3 primary key, a INT, b INT, ex TEXT);
+        CREATE TABLE t2(idt2  INT primary key, a INT, b INT, ex TEXT);
+        CREATE TABLE t3(idt3  INT primary key, a INT, b INT, ex TEXT);
     ]])
 
 test:do_eqp_test(
@@ -181,9 +181,9 @@ test:drop_all_tables()
 test:do_execsql_test(
     2.1,
     [[
-        CREATE TABLE t1(idt1 primary key, x INT, y INT, ex TEXT);
+        CREATE TABLE t1(idt1  INT primary key, x INT, y INT, ex TEXT);
 
-        CREATE TABLE t2(idt2 primary key, x INT, y INT, ex TEXT);
+        CREATE TABLE t2(idt2  INT primary key, x INT, y INT, ex TEXT);
         CREATE INDEX t2i1 ON t2(x);
     ]])
 
@@ -519,7 +519,7 @@ test:drop_all_tables()
 test:do_execsql_test(
     "5.1.0",
     [[
-        CREATE TABLE t1(idt1 PRIMARY KEY, a INT, b INT, ex TEXT) 
+        CREATE TABLE t1(idt1  INT PRIMARY KEY, a INT, b INT, ex TEXT)
     ]])
 
 test:do_eqp_test("5.1.1", "SELECT a, b FROM t1 WHERE a=1", {
@@ -562,7 +562,7 @@ test:do_eqp_test("5.3.1", "SELECT a, b FROM t1 WHERE a=1", {
 test:do_execsql_test(
     "5.4.0",
     [[
-        CREATE TABLE t2(idt2 primary key, c INT, d INT, ex TEXT)
+        CREATE TABLE t2(idt2  INT primary key, c INT, d INT, ex TEXT)
     ]])
 
 test:do_eqp_test("5.4.1", "SELECT t1.a, t2.c FROM t1, t2 WHERE t1.a=1 AND t1.b>2", {
@@ -727,8 +727,8 @@ test:drop_all_tables()
 test:do_execsql_test(
     7.0,
     [[
-        CREATE TABLE t1(idt1 primary key, a INT, b INT, ex CHAR(100));
-        CREATE TABLE t2(idt2 primary key, a INT, b INT, ex CHAR(100));
+        CREATE TABLE t1(idt1  INT primary key, a INT, b INT, ex CHAR(100));
+        CREATE TABLE t2(idt2  INT primary key, a INT, b INT, ex CHAR(100));
         CREATE INDEX i1 ON t2(a);
     ]])
 
@@ -770,8 +770,8 @@ test:drop_all_tables()
 test:do_execsql_test(
     8.0,
     [[
-        CREATE TABLE t1(a, b, c, PRIMARY KEY(b, c));
-        CREATE TABLE t2(id primary key, a, b, c);
+        CREATE TABLE t1(a INT , b INT , c INT , PRIMARY KEY(b, c));
+        CREATE TABLE t2(id  INT primary key, a INT , b INT , c INT );
     ]])
 
 test:do_eqp_test("8.1.1", "SELECT * FROM t2", {

@@ -5,14 +5,14 @@ test:plan(41)
 test:do_execsql_test(
     "alter-1.1",
     [[
-        CREATE TABLE t1(id PRIMARY KEY, a, b);
+        CREATE TABLE t1(id  INT PRIMARY KEY, a INT , b INT );
         INSERT INTO t1 VALUES(1, 1, 2);
-        CREATE TABLE "t1x1"(c UNIQUE, b PRIMARY KEY);
+        CREATE TABLE "t1x1"(c  INT UNIQUE, b  INT PRIMARY KEY);
         INSERT INTO "t1x1" VALUES(3, 4);
         CREATE INDEX t1i1 ON T1(B);
         CREATE INDEX t1i2 ON t1(a, b);
         CREATE INDEX i3 ON "t1x1"(b, c);
-        CREATE TABLE "Space_Table"(id PRIMARY KEY, e, f, g UNIQUE);
+        CREATE TABLE "Space_Table"(id  INT PRIMARY KEY, e INT , f INT , g  INT UNIQUE);
         INSERT INTO "Space_Table" VALUES(1, 5, 6, 7);
         SELECT 't1', * FROM t1;
         SELECT 't1x1', * FROM "t1x1";
@@ -79,7 +79,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "alter-2.2",
     [[
-        CREATE TABLE t3(id PRIMARY KEY, p, q, r);
+        CREATE TABLE t3(id  INT PRIMARY KEY, p INT , q INT , r INT );
         ALTER TABLE t2 RENAME TO t3;
     ]], {
         -- <alter-2.2>
@@ -100,8 +100,8 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "alter-3.1",
     [[
-        CREATE TABLE t6(id PRIMARY KEY, a, b, c);
-        CREATE TABLE tab(id PRIMARY KEY);
+        CREATE TABLE t6(id  INT PRIMARY KEY, a INT , b INT , c INT );
+        CREATE TABLE tab(id  INT PRIMARY KEY);
         CREATE TRIGGER trig1 AFTER INSERT ON T6 BEGIN INSERT INTO tab VALUES(new.id); END;
         INSERT INTO t6 VALUES(1, 1, 2, 3);
         SELECT * FROM tab;
@@ -230,7 +230,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-5.1",
     [[
-        CREATE TABLE xyz(x PRIMARY KEY);
+        CREATE TABLE xyz(x  INT PRIMARY KEY);
         ALTER TABLE xyz RENAME TO "xyz1234abc";
         SELECT "name" FROM "_space" WHERE "name" GLOB 'xyz*';
     ]], {
@@ -256,9 +256,9 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
         DROP TRIGGER trig3;
-        CREATE TABLE t1(id PRIMARY KEY, b, c);
+        CREATE TABLE t1(id  INT PRIMARY KEY, b INT , c INT );
         INSERT INTO t1 VALUES(1,2,3), (3,2,1);
-        CREATE TABLE t2(id PRIMARY KEY);
+        CREATE TABLE t2(id  INT PRIMARY KEY);
         CREATE TRIGGER on_t1 AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(new.id + 100); END;
         CREATE TRIGGER on_t2 AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(new.id + 101); END;
         CREATE TRIGGER on_t3 AFTER INSERT ON t1 BEGIN INSERT INTO t2 values(new.id + 102); END;
@@ -313,9 +313,9 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t3;
-        CREATE TABLE t2(id PRIMARY KEY);
-        CREATE TABLE t3(id PRIMARY KEY);
-        CREATE TABLE t1(a PRIMARY KEY, b, c, FOREIGN KEY(b) REFERENCES t2(id), FOREIGN KEY(c) REFERENCES t3(id));
+        CREATE TABLE t2(id  INT PRIMARY KEY);
+        CREATE TABLE t3(id  INT PRIMARY KEY);
+        CREATE TABLE t1(a  INT PRIMARY KEY, b INT , c INT , FOREIGN KEY(b) REFERENCES t2(id), FOREIGN KEY(c) REFERENCES t3(id));
         INSERT INTO t2 VALUES(1);
         INSERT INTO t3 VALUES(2);
         INSERT INTO t1 VALUES(1, 1, 2);

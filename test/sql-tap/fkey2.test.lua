@@ -7,14 +7,15 @@ test:plan(116)
 test:do_execsql_test(
     "fkey2-1.1",
     [[
-        CREATE TABLE t1(a PRIMARY KEY, b);
-        CREATE TABLE t2(c PRIMARY KEY REFERENCES t1(a), d);
+        CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
+        CREATE TABLE t2(c  INT PRIMARY KEY REFERENCES t1(a), d INT);
 
-        CREATE TABLE t3(a PRIMARY KEY, b);
-        CREATE TABLE t4(c PRIMARY KEY REFERENCES t3, d);
+        CREATE TABLE t3(a  INT PRIMARY KEY, b INT );
+        CREATE TABLE t4(c  INT PRIMARY KEY REFERENCES t3, d INT );
 
-        CREATE TABLE t7(a, b INTEGER PRIMARY KEY);
-        CREATE TABLE t8(c INTEGER PRIMARY KEY REFERENCES t7, d);
+        CREATE TABLE t7(a INT , b INTEGER PRIMARY KEY);
+        CREATE TABLE t8(c  INT PRIMARY KEY REFERENCES t7, d INT );
+
     ]], {
         -- <fkey2-1.1>
         -- </fkey2-1.1>
@@ -298,7 +299,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.29",
     [[
-        CREATE TABLE t9(a PRIMARY KEY REFERENCES nosuchtable, b);
+        CREATE TABLE t9(a INT PRIMARY KEY REFERENCES nosuchtable, b);
     ]], {
         1, "Space 'NOSUCHTABLE' does not exist"
     })
@@ -340,13 +341,13 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-3.1",
     [[
-        CREATE TABLE ab(a PRIMARY KEY, b);
+        CREATE TABLE ab(a  INT PRIMARY KEY, b TEXT);
         CREATE TABLE cd(
-            c PRIMARY KEY REFERENCES ab ON UPDATE CASCADE ON DELETE CASCADE,
-            d);
+            c  INT PRIMARY KEY REFERENCES ab ON UPDATE CASCADE ON DELETE CASCADE,
+            d TEXT);
         CREATE TABLE ef(
-            e PRIMARY KEY REFERENCES cd ON UPDATE CASCADE,
-            f, CHECK (e!=5));
+            e  INT PRIMARY KEY REFERENCES cd ON UPDATE CASCADE,
+            f TEXT , CHECK (e!=5));
 
         INSERT INTO ab VALUES(1, 'b');
         INSERT INTO cd VALUES(1, 'd');
@@ -423,9 +424,9 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(
-            node PRIMARY KEY,
-            parent REFERENCES t1 ON DELETE CASCADE);
-        CREATE TABLE t2(node PRIMARY KEY, parent);
+            node  INT PRIMARY KEY,
+            parent  INT REFERENCES t1 ON DELETE CASCADE);
+        CREATE TABLE t2(node  INT PRIMARY KEY, parent INT );
         CREATE TRIGGER t2t AFTER DELETE ON t2 BEGIN
             DELETE FROM t2 WHERE parent = old.node;
         END;
@@ -472,9 +473,9 @@ test:do_execsql_test(
         DROP TABLE t2;
         DROP TABLE t1;
         CREATE TABLE t1(
-            node PRIMARY KEY,
-            parent REFERENCES t1 ON DELETE CASCADE);
-        CREATE TABLE t2(node PRIMARY KEY, parent);
+            node  INT PRIMARY KEY,
+            parent  INT REFERENCES t1 ON DELETE CASCADE);
+        CREATE TABLE t2(node  INT PRIMARY KEY, parent INT );
         CREATE TRIGGER t2t AFTER DELETE ON t2 BEGIN
             DELETE FROM t2 WHERE parent = old.node;
         END;
@@ -524,8 +525,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(c INTEGER PRIMARY KEY REFERENCES t1, b);
+        CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
+        CREATE TABLE t2(c INTEGER PRIMARY KEY REFERENCES t1, b TEXT);
     ]], {
         -- <fkey2-5.1>
         -- </fkey2-5.1>
@@ -600,10 +601,10 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a PRIMARY KEY, b);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT);
         CREATE TABLE t2(
             c INTEGER PRIMARY KEY,
-            d DEFAULT 1 REFERENCES t1 ON DELETE SET DEFAULT);
+            d INTEGER DEFAULT 1 REFERENCES t1 ON DELETE SET DEFAULT);
         DELETE FROM t1;
     ]], {
         -- <fkey2-6.1>
@@ -660,8 +661,8 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-6.6",
     [[
-        CREATE TABLE pp(a, b, c, PRIMARY KEY(b, c));
-        CREATE TABLE cc(d DEFAULT 3, e DEFAULT 1, f DEFAULT 2, id PRIMARY KEY,
+        CREATE TABLE pp(a INT , b INT , c INT , PRIMARY KEY(b, c));
+        CREATE TABLE cc(d  INT DEFAULT 3, e TEXT DEFAULT '1', f  INT DEFAULT 2, id  INT PRIMARY KEY,
             FOREIGN KEY(f, d) REFERENCES pp
             ON UPDATE SET DEFAULT
             ON DELETE SET NULL);
@@ -696,7 +697,7 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         DROP TABLE IF EXISTS t3;
-        CREATE TABLE t3(x PRIMARY KEY REFERENCES t3 ON DELETE SET NULL);
+        CREATE TABLE t3(x  INT PRIMARY KEY REFERENCES t3 ON DELETE SET NULL);
         INSERT INTO t3(x) VALUES(12345);
         DROP TABLE t3;
         DROP TABLE IF EXISTS t2;
@@ -712,8 +713,8 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey2-7.1",
     [[
-        CREATE TABLE p(a PRIMARY KEY, b);
-        CREATE TABLE c(x PRIMARY KEY REFERENCES p(c));
+        CREATE TABLE p(a INT PRIMARY KEY, b INT);
+        CREATE TABLE c(x INT PRIMARY KEY REFERENCES p(c));
     ]], {
         -- <fkey2-7.1>
         1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': foreign key refers to nonexistent field C"
@@ -724,7 +725,7 @@ test:do_catchsql_test(
     "fkey2-7.2",
     [[
         CREATE VIEW v AS SELECT b AS y FROM p;
-        CREATE TABLE c(x PRIMARY KEY REFERENCES v(y));
+        CREATE TABLE c(x  INT PRIMARY KEY REFERENCES v(y));
     ]], {
         -- <fkey2-7.2>
         1, "referenced table can't be view"
@@ -737,9 +738,9 @@ test:do_catchsql_test(
         DROP VIEW v;
         DROP TABLE IF EXISTS c;
         DROP TABLE IF EXISTS p;
-        CREATE TABLE p(a COLLATE "unicode_ci", b PRIMARY KEY);
+        CREATE TABLE p(a TEXT COLLATE "unicode_ci", b INT PRIMARY KEY);
         CREATE UNIQUE INDEX idx ON p(a);
-        CREATE TABLE c(x PRIMARY KEY REFERENCES p(a));
+        CREATE TABLE c(x TEXT PRIMARY KEY REFERENCES p(a));
     ]], {
         -- <fkey2-7.3>
         1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': field collation mismatch"
@@ -751,8 +752,8 @@ test:do_catchsql_test(
     [[
         DROP TABLE IF EXISTS c;
         DROP TABLE IF EXISTS p;
-        CREATE TABLE p(a, b, PRIMARY KEY(a, b));
-        CREATE TABLE c(x PRIMARY KEY REFERENCES p);
+        CREATE TABLE p(a INT, b INT, PRIMARY KEY(a, b));
+        CREATE TABLE c(x INT PRIMARY KEY REFERENCES p);
     ]], {
         -- <fkey2-7.4>
         1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': number of columns in foreign key does not match the number of columns in the primary index of referenced table"
@@ -765,8 +766,8 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-8.1",
     [[
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
-        CREATE TABLE t2(c INTEGER PRIMARY KEY, d, FOREIGN KEY(c) REFERENCES t1(a) ON UPDATE CASCADE);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t2(c INTEGER PRIMARY KEY, d INT, FOREIGN KEY(c) REFERENCES t1(a) ON UPDATE CASCADE);
 
         INSERT INTO t1 VALUES(10, 100);
         INSERT INTO t2 VALUES(10, 100);
@@ -787,9 +788,9 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a, b PRIMARY KEY);
+        CREATE TABLE t1(a INT , b TEXT PRIMARY KEY);
         CREATE TABLE t2(
-            x PRIMARY KEY REFERENCES t1 ON UPDATE RESTRICT);
+            x TEXT PRIMARY KEY REFERENCES t1 ON UPDATE RESTRICT);
         INSERT INTO t1 VALUES(1, 'one');
         INSERT INTO t1 VALUES(2, 'two');
         INSERT INTO t1 VALUES(3, 'three');
@@ -835,13 +836,13 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(x COLLATE "unicode_ci" PRIMARY KEY);
+        CREATE TABLE t1(x  TEXT COLLATE "unicode_ci" PRIMARY KEY);
         CREATE TRIGGER tt1 AFTER DELETE ON t1
             WHEN EXISTS ( SELECT 1 FROM t2 WHERE old.x = y )
         BEGIN
             INSERT INTO t1 VALUES(old.x);
         END;
-        CREATE TABLE t2(y COLLATE "unicode_ci" PRIMARY KEY REFERENCES t1);
+        CREATE TABLE t2(y TEXT COLLATE "unicode_ci" PRIMARY KEY REFERENCES t1);
         INSERT INTO t1 VALUES('A');
         INSERT INTO t1 VALUES('B');
         INSERT INTO t2 VALUES('A');
@@ -869,7 +870,7 @@ test:do_execsql_test(
     "fkey2-9.7",
     [[
         DROP TABLE t2;
-        CREATE TABLE t2(y COLLATE "unicode_ci" PRIMARY KEY REFERENCES t1 ON DELETE RESTRICT);
+        CREATE TABLE t2(y TEXT COLLATE "unicode_ci" PRIMARY KEY REFERENCES t1 ON DELETE RESTRICT);
         INSERT INTO t2 VALUES('A');
         INSERT INTO t2 VALUES('B');
     ]], {
@@ -911,16 +912,16 @@ test:do_execsql_test(
     "fkey2-9.11",
     [[
         CREATE TABLE up(
-            c00, c01, c02, c03, c04, c05, c06, c07, c08, c09,
-            c10, c11, c12, c13, c14, c15, c16, c17, c18, c19,
-            c20, c21, c22, c23, c24, c25, c26, c27, c28, c29,
-            c30, c31, c32, c33, c34, c35, c36, c37, c38, c39,
+            c00 TEXT , c01 TEXT , c02 TEXT , c03 TEXT , c04 TEXT , c05 TEXT , c06 TEXT , c07 TEXT , c08 TEXT , c09 TEXT ,
+            c10 TEXT , c11 TEXT , c12 TEXT , c13 TEXT , c14 TEXT , c15 TEXT , c16 TEXT , c17 TEXT , c18 TEXT , c19 TEXT ,
+            c20 TEXT , c21 TEXT , c22 TEXT , c23 TEXT , c24 TEXT , c25 TEXT , c26 TEXT , c27 TEXT , c28 TEXT , c29 TEXT ,
+            c30 TEXT , c31 TEXT , c32 TEXT , c33 TEXT , c34 TEXT , c35 TEXT , c36 TEXT , c37 TEXT , c38 TEXT , c39 TEXT ,
             PRIMARY KEY(c34, c35));
         CREATE TABLE down(
-            c00, c01, c02, c03, c04, c05, c06, c07, c08, c09,
-            c10, c11, c12, c13, c14, c15, c16, c17, c18, c19,
-            c20, c21, c22, c23, c24, c25, c26, c27, c28, c29,
-            c30, c31, c32, c33, c34, c35, c36, c37, c38, c39,
+            c00 TEXT , c01 TEXT , c02 TEXT , c03 TEXT , c04 TEXT , c05 TEXT , c06 TEXT , c07 TEXT , c08 TEXT , c09 TEXT ,
+            c10 TEXT , c11 TEXT , c12 TEXT , c13 TEXT , c14 TEXT , c15 TEXT , c16 TEXT , c17 TEXT , c18 TEXT , c19 TEXT ,
+            c20 TEXT , c21 TEXT , c22 TEXT , c23 TEXT , c24 TEXT , c25 TEXT , c26 TEXT , c27 TEXT , c28 TEXT , c29 TEXT ,
+            c30 TEXT , c31 TEXT , c32 TEXT , c33 TEXT , c34 TEXT , c35 TEXT , c36 TEXT , c37 TEXT , c38 TEXT , c39 TEXT ,
             PRIMARY KEY(c39, c38),
             FOREIGN KEY(c39, c38) REFERENCES up ON UPDATE CASCADE);
         INSERT INTO up(c34, c35) VALUES('yes', 'no');
@@ -986,9 +987,9 @@ test:do_execsql_test(
 -- test:do_execsql_test(
 --     "fkey2-10.1",
 --     [[
---         CREATE TABLE t1(a PRIMARY KEY, b REFERENCES t1);
---         CREATE TABLE t2(a PRIMARY KEY, b REFERENCES t1, c REFERENCES t2);
---         CREATE TABLE t3(a PRIMARY KEY REFERENCES t1, b REFERENCES t2, c REFERENCES t1);
+--         CREATE TABLE t1(a  INT PRIMARY KEY, b  INT REFERENCES t1);
+--         CREATE TABLE t2(a  INT PRIMARY KEY, b  INT REFERENCES t1, c  INT REFERENCES t2);
+--         CREATE TABLE t3(a  INT PRIMARY KEY REFERENCES t1, b  INT REFERENCES t2, c  INT REFERENCES t1);
 --         INSERT INTO t1 VALUES(1, 1);
 --         ALTER TABLE t1 RENAME TO t4;
 --         SELECT * FROM t4;
@@ -1044,7 +1045,7 @@ test:do_catchsql_test(
     [[
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a PRIMARY KEY, b REFERENCES nosuchtable);
+        CREATE TABLE t1(a INT PRIMARY KEY, b INT REFERENCES nosuchtable);
     ]], {
         -- <fkey2-10.6>
         1, "Space 'NOSUCHTABLE' does not exist"
@@ -1054,10 +1055,10 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-10.7",
     [[
-        CREATE TABLE t1(a PRIMARY KEY, b);
+        CREATE TABLE t1(a TEXT PRIMARY KEY, b INT );
         INSERT INTO t1 VALUES('a', 1);
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t2(x PRIMARY KEY REFERENCES t1);
+        CREATE TABLE t2(x TEXT PRIMARY KEY REFERENCES t1);
         INSERT INTO t2 VALUES('a');
     ]], {
         -- <fkey2-10.7>
@@ -1089,8 +1090,8 @@ test:do_catchsql_test(
     [[
         DROP TABLE IF EXISTS cc;
         DROP TABLE IF EXISTS pp;
-        CREATE TABLE pp(x, y, PRIMARY KEY(x, y));
-        CREATE TABLE cc(a PRIMARY KEY, b, FOREIGN KEY(a, b) REFERENCES pp(x, z));
+        CREATE TABLE pp(x TEXT, y TEXT, PRIMARY KEY(x, y));
+        CREATE TABLE cc(a  INT PRIMARY KEY, b INT , FOREIGN KEY(a, b) REFERENCES pp(x, z));
     ]], {
         -- <fkey2-10.14>
         1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_CC': foreign key refers to nonexistent field Z"
@@ -1101,14 +1102,14 @@ test:do_execsql_test(
     "fkey2-10.16",
     [[
         CREATE TABLE cc(
-            a PRIMARY KEY, b,
+            a  TEXT PRIMARY KEY, b TEXT,
             FOREIGN KEY(a, b) REFERENCES pp DEFERRABLE INITIALLY DEFERRED);
 
         INSERT INTO pp VALUES('a', 'b');
         INSERT INTO cc VALUES('a', 'b');
         DROP TABLE cc;
         DROP TABLE pp;
-        CREATE TABLE pp(a, b, c, PRIMARY KEY(b, c));
+        CREATE TABLE pp(a INT , b TEXT, c TEXT, PRIMARY KEY(b, c));
         INSERT INTO pp VALUES(1, 'a', 'b');
     ]], {
         -- <fkey2-10.16>
@@ -1127,8 +1128,8 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey2-10.18",
     [[
-        CREATE TABLE b1(a PRIMARY KEY, b);
-        CREATE TABLE b2(a PRIMARY KEY, b REFERENCES b1);
+        CREATE TABLE b1(a  INT PRIMARY KEY, b INT );
+        CREATE TABLE b2(a  INT PRIMARY KEY, b  INT REFERENCES b1);
         DROP TABLE b1;
     ]], {
         -- <fkey2-10.18>
@@ -1139,7 +1140,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-10.19",
     [[
-        CREATE TABLE b3(a PRIMARY KEY, b REFERENCES b2 DEFERRABLE INITIALLY DEFERRED);
+        CREATE TABLE b3(a  INT PRIMARY KEY, b  INT REFERENCES b2 DEFERRABLE INITIALLY DEFERRED);
         DROP TABLE b2;
     ]], {
         -- <fkey2-10.19>
@@ -1152,7 +1153,7 @@ test:do_catchsql_test(
     [[
         DROP VIEW IF EXISTS v;
         CREATE VIEW v AS SELECT * FROM b1;
-        CREATE TABLE t1(x PRIMARY KEY REFERENCES v);
+        CREATE TABLE t1(x INT PRIMARY KEY REFERENCES v);
     ]], {
         -- <fkey2-10.20>
         1, "referenced table can't be view"
@@ -1167,7 +1168,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-11.1",
     [[
-        CREATE TABLE self(a PRIMARY KEY, b REFERENCES self(a));
+        CREATE TABLE self(a INT PRIMARY KEY, b INT REFERENCES self(a));
         INSERT INTO self VALUES(13, 13);
         UPDATE self SET a = 14, b = 14;
     ]], {
@@ -1237,7 +1238,7 @@ test:do_execsql_test(
     "fkey2-11.8",
     [[
         DROP TABLE IF EXISTS self;
-        CREATE TABLE self(a UNIQUE, b PRIMARY KEY REFERENCES self(a));
+        CREATE TABLE self(a INT UNIQUE, b INT PRIMARY KEY REFERENCES self(a));
         INSERT INTO self VALUES(13, 13);
         UPDATE self SET a = 14, b = 14;
     ]], {
@@ -1309,11 +1310,11 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-12.1",
     [[
-        CREATE TABLE tdd08(a PRIMARY KEY, b);
+        CREATE TABLE tdd08(a INT PRIMARY KEY, b INT);
         CREATE UNIQUE INDEX idd08 ON tdd08(a,b);
         INSERT INTO tdd08 VALUES(200,300);
 
-        CREATE TABLE tdd08_b(w PRIMARY KEY,x,y, FOREIGN KEY(x,y) REFERENCES tdd08(a,b));
+        CREATE TABLE tdd08_b(w  INT PRIMARY KEY,x INT ,y INT , FOREIGN KEY(x,y) REFERENCES tdd08(a,b));
         INSERT INTO tdd08_b VALUES(100,200,300);
     ]], {
         -- <fkey2-12.1>
@@ -1373,10 +1374,10 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-13.1",
     [[
-        CREATE TABLE tce71(a PRIMARY KEY, b);
+        CREATE TABLE tce71(a INT PRIMARY KEY, b INT);
         CREATE UNIQUE INDEX ice71 ON tce71(a,b);
         INSERT INTO tce71 VALUES(100,200);
-        CREATE TABLE tce72(w PRIMARY KEY, x, y, FOREIGN KEY(x,y) REFERENCES tce71(a,b));
+        CREATE TABLE tce72(w  INT PRIMARY KEY, x INT , y INT , FOREIGN KEY(x,y) REFERENCES tce71(a,b));
         INSERT INTO tce72 VALUES(300,100,200);
         UPDATE tce71 set b = 200 where a = 100;
         SELECT * FROM tce71, tce72;
@@ -1409,9 +1410,9 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-14.1",
     [[
-        CREATE TABLE tce73(a PRIMARY KEY, b, UNIQUE(a,b));
+        CREATE TABLE tce73(a INTEGER PRIMARY KEY, b INT , UNIQUE(a,b));
         INSERT INTO tce73 VALUES(100,200);
-        CREATE TABLE tce74(w PRIMARY KEY, x, y, FOREIGN KEY(x,y) REFERENCES tce73(a,b));
+        CREATE TABLE tce74(w INTEGER PRIMARY KEY, x INT , y INT , FOREIGN KEY(x,y) REFERENCES tce73(a,b));
         INSERT INTO tce74 VALUES(300,100,200);
         UPDATE tce73 set b = 200 where a = 100;
         SELECT * FROM tce73, tce74;

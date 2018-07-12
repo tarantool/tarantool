@@ -5,7 +5,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 -- box.cfg()
 
 -- Create space.
-box.sql.execute("CREATE TABLE t3(id primary key,x,y);");
+box.sql.execute("CREATE TABLE t3(id INT primary key,x INT,y INT);");
 box.sql.execute("CREATE UNIQUE INDEX t3y ON t3(y);");
 
 -- Debug.

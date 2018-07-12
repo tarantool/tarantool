@@ -118,8 +118,8 @@ test:do_test(
     "tkt3201-4.0",
     function()
         return test:execsql [[
-            CREATE TABLE t4(x primary key);
-            CREATE TABLE t4_log(x primary key);
+            CREATE TABLE t4(x  INT primary key);
+            CREATE TABLE t4_log(x  INT primary key);
             CREATE TRIGGER r4_1 AFTER INSERT ON t4 WHEN new.x=1 BEGIN
               INSERT INTO t4_log(x) VALUES(new.x);
             END;

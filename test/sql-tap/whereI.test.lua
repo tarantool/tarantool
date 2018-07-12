@@ -22,7 +22,7 @@ test:plan(7)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 testprefix = "whereI"
 test:do_execsql_test(1.0, [[
-    CREATE TABLE t1(a, b, c, PRIMARY KEY(a));
+    CREATE TABLE t1(a INT, b TEXT, c TEXT, PRIMARY KEY(a));
     INSERT INTO t1 VALUES(1, 'a', 'z');
     INSERT INTO t1 VALUES(2, 'b', 'y');
     INSERT INTO t1 VALUES(3, 'c', 'x');
@@ -57,7 +57,7 @@ test:do_execsql_test(1.3, [[
 -- Try that again, this time with non integer PRIMARY KEY values.
 --
 test:do_execsql_test(2.0, [[
-    CREATE TABLE t2(a, b, c, PRIMARY KEY(a));
+    CREATE TABLE t2(a TEXT, b TEXT, c TEXT, PRIMARY KEY(a));
     INSERT INTO t2 VALUES('i', 'a', 'z');
     INSERT INTO t2 VALUES('ii', 'b', 'y');
     INSERT INTO t2 VALUES('iii', 'c', 'x');
@@ -92,7 +92,7 @@ test:do_execsql_test(2.3, [[
 -- On a table with a multi-column PK.
 --
 test:do_execsql_test(3.0, [[
-    CREATE TABLE t3(a, b, c, d, PRIMARY KEY(c, b));
+    CREATE TABLE t3(a TEXT, b INT, c INT, d TEXT, PRIMARY KEY(c, b));
 
     INSERT INTO t3 VALUES('f', 1, 1, 'o');
     INSERT INTO t3 VALUES('o', 2, 1, 't');
@@ -102,7 +102,7 @@ test:do_execsql_test(3.0, [[
     CREATE INDEX t3i1 ON t3(d);
     CREATE INDEX t3i2 ON t3(a);
 
-    SELECT c||'.'||b FROM t3 WHERE a='t' OR d='t'
+    SELECT CAST(c AS TEXT)||'.'||CAST(b AS TEXT) FROM t3 WHERE a='t' OR d='t'
 ]], {
     -- <3.0>
     '2.1', '2.2', '1.2'

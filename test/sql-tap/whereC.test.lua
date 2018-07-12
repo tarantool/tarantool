@@ -21,7 +21,7 @@ testprefix = "whereC"
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t1(i INTEGER PRIMARY KEY, a, b INTEGER);
+        CREATE TABLE t1(i INTEGER PRIMARY KEY, a INT, b INTEGER);
 
         INSERT INTO t1 VALUES(1, 1, 1);
         INSERT INTO t1 VALUES(2, 1, 1);

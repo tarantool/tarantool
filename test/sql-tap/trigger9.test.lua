@@ -52,11 +52,11 @@ box.internal.sql_create_function('randstr', 'TEXT', test.randstr, 1)
 test:do_execsql_test(
     "trigger9-1.1",
     [[
-        CREATE TABLE t1(x PRIMARY KEY, y, z);
+        CREATE TABLE t1(x TEXT PRIMARY KEY, y TEXT, z TEXT);
         INSERT INTO t1 VALUES('1', randstr(10000), '2');
         INSERT INTO t1 VALUES('2', randstr(10000), '4');
         INSERT INTO t1 VALUES('3', randstr(10000), '6');
-        CREATE TABLE t2(x PRIMARY KEY);
+        CREATE TABLE t2(x TEXT PRIMARY KEY);
     ]], {
         -- <trigger9-1.1>
 
@@ -281,10 +281,12 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-3.1",
     [[
-        CREATE TABLE t3(id INTEGER PRIMARY KEY, a, b);
+        CREATE TABLE t3(id INTEGER PRIMARY KEY, a INT, b TEXT);
         INSERT INTO t3 VALUES(1, 1, 'one');
         INSERT INTO t3 VALUES(2, 2, 'two');
         INSERT INTO t3 VALUES(3, 3, 'three');
+        DROP TABLE t2;
+        CREATE TABLE t2(x INT PRIMARY KEY);
     ]], {
         -- <trigger9-3.1>
 
@@ -406,8 +408,8 @@ test:do_execsql_test(
         DROP TABLE t1;
         DROP TABLE t2;
         DROP TABLE t3;
-        CREATE TABLE t1(a PRIMARY KEY, b);
-        CREATE TABLE log(x PRIMARY KEY);
+        CREATE TABLE t1(a INT PRIMARY KEY, b INT);
+        CREATE TABLE log(x TEXT PRIMARY KEY);
         INSERT INTO t1 VALUES(1, 2);
         INSERT INTO t1 VALUES(3, 4);
         CREATE VIEW v1 AS SELECT a, b FROM t1;

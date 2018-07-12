@@ -21,7 +21,7 @@ test:plan(26)
 test:do_execsql_test(
     "transitive1-100",
     [[
-        CREATE TABLE t1(id primary key, a TEXT, b TEXT, c TEXT COLLATE "unicode_ci");
+        CREATE TABLE t1(id  INT primary key, a TEXT, b TEXT, c TEXT COLLATE "unicode_ci");
         INSERT INTO t1 VALUES(1, 'abc','abc','Abc');
         INSERT INTO t1 VALUES(2, 'def','def','def');
         INSERT INTO t1 VALUES(3, 'ghi','ghi','GHI');
@@ -58,10 +58,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-200",
     [[
-        CREATE TABLE t2(id primary key, a INTEGER, b INTEGER, c TEXT);
-        INSERT INTO t2 VALUES(1, 100,100,100);
-        INSERT INTO t2 VALUES(2, 20,20,20);
-        INSERT INTO t2 VALUES(3, 3,3,3);
+        CREATE TABLE t2(id  INT primary key, a INTEGER, b INTEGER, c TEXT);
+        INSERT INTO t2 VALUES(1, 100,100,'100');
+        INSERT INTO t2 VALUES(2, 20,20,'20');
+        INSERT INTO t2 VALUES(3, 3,3,'3');
 
         SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c=20;
     ]], {
@@ -73,7 +73,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-210",
     [[
-        SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c>=20 ORDER BY +a;
+        SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c>='20' ORDER BY +a;
     ]], {
         -- <transitive1-210>
         3, 3, "3", 20, 20, "20"
@@ -83,7 +83,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-220",
     [[
-        SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c<=20 ORDER BY +a;
+        SELECT a,b,c FROM t2 WHERE a=b AND c=b AND c<='20' ORDER BY +a;
     ]], {
         -- <transitive1-220>
         20, 20, "20", 100, 100, "100"
@@ -96,8 +96,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-300",
     [[
-        CREATE TABLE t301(w INTEGER PRIMARY KEY, x);
-        CREATE TABLE t302(y INTEGER PRIMARY KEY, z);
+        CREATE TABLE t301(w INTEGER PRIMARY KEY, x INT );
+        CREATE TABLE t302(y INTEGER PRIMARY KEY, z INT );
         INSERT INTO t301 VALUES(1,2),(3,4),(5,6);
         INSERT INTO t302 VALUES(1,3),(3,6),(5,7);
         SELECT *
@@ -209,8 +209,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-400",
     [[
-        CREATE TABLE t401(a PRIMARY KEY);
-        CREATE TABLE t402(b PRIMARY KEY);
+        CREATE TABLE t401(a  INT PRIMARY KEY);
+        CREATE TABLE t402(b  INT PRIMARY KEY);
         CREATE TABLE t403(c INTEGER PRIMARY KEY);
         INSERT INTO t401 VALUES(1);
         INSERT INTO t403 VALUES(1);
@@ -229,7 +229,7 @@ test:do_execsql_test(
     "transitive1-410",
     [[
         CREATE TABLE bookmark ( idBookmark integer primary key, idFile integer, timeInSeconds double, totalTimeInSeconds double, thumbNailImage text, player text, playerState text, type integer);
-        CREATE TABLE path ( idPath integer primary key, strPath text, strContent text, strScraper text, strHash text, scanRecursive integer, useFolderNames bool, strSettings text, noUpdate bool, exclude bool, dateAdded text);
+        CREATE TABLE path ( idPath integer primary key, strPath text, strContent text, strScraper text, strHash text, scanRecursive integer, useFolderNames  INT , strSettings text, noUpdate  INT , exclude  INT , dateAdded text);
         INSERT INTO path VALUES(1,'/tmp/tvshows/','tvshows','metadata.tvdb.com','989B1CE5680A14F5F86123F751169B49',0,0,'<settings><setting id="absolutenumber" value="false" /><setting id="dvdorder" value="false" /><setting id="fanart" value="true" /><setting id="language" value="en" /></settings>',0,0,NULL);
         INSERT INTO path VALUES(2,'/tmp/tvshows/The.Big.Bang.Theory/','','','85E1DAAB2F5FF6EAE8AEDF1B5C882D1E',NULL,NULL,NULL,NULL,NULL,'2013-10-23 18:58:43');
         CREATE TABLE files ( idFile integer primary key, idPath integer, strFilename text, playCount integer, lastPlayed text, dateAdded text);
@@ -453,7 +453,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-540",
     [[
-        CREATE TABLE b1(x PRIMARY KEY, y);
+        CREATE TABLE b1(x TEXT PRIMARY KEY, y TEXT);
         INSERT INTO b1 VALUES('abc', 'ABC');
         CREATE INDEX b1x ON b1(x);
         SELECT * FROM b1 WHERE (x=y COLLATE "unicode_ci") AND y='ABC';
@@ -466,7 +466,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "transitive1-550",
     [[
-        CREATE TABLE c1(id PRIMARY KEY, x, y COLLATE "unicode_ci", z);
+        CREATE TABLE c1(id  INT PRIMARY KEY, x TEXT, y  TEXT COLLATE "unicode_ci", z TEXT);
         INSERT INTO c1 VALUES(1, 'ABC', 'ABC', 'abc');
         SELECT x, y, z FROM c1 WHERE x=y AND y=z AND z='abc';
     ]], {

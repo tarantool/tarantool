@@ -28,9 +28,9 @@ testprefix = "orderby4"
 test:do_execsql_test(
     "1.1",
     [[
-        CREATE TABLE t1(a, b, PRIMARY KEY(a,b));
+        CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a,b));
         INSERT INTO t1 VALUES(1,1),(1,2);
-        CREATE TABLE t2(x, y, PRIMARY KEY(x,y));
+        CREATE TABLE t2(x INT, y INT, PRIMARY KEY(x,y));
         INSERT INTO t2 VALUES(3,3),(4,4);
         SELECT a, x FROM t1, t2 ORDER BY 1, 2;
     ]], {
@@ -62,10 +62,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "2.1",
     [[
-        CREATE TABLE t3(id primary key, a);
+        CREATE TABLE t3(id INT primary key, a INT);
         INSERT INTO t3 VALUES(1, 1),(2, 1);
         CREATE INDEX t3a ON t3(a);
-        CREATE TABLE t4(id primary key, x);
+        CREATE TABLE t4(id INT primary key, x INT);
         INSERT INTO t4 VALUES(1, 3),(2, 4);
         CREATE INDEX t4x ON t4(x);
         SELECT a, x FROM t3, t4 ORDER BY 1, 2;

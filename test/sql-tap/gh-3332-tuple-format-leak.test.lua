@@ -5,7 +5,7 @@ test:plan(2)
 test:do_test(
     "format-leak-prep",
     function()
-        box.sql.execute("CREATE TABLE t1(id UNSIGNED BIG INT PRIMARY KEY,\
+        box.sql.execute("CREATE TABLE t1(id INTEGER PRIMARY KEY,\
                          max_players INTEGER, n_players INTEGER, flags INTEGER);");
         box.sql.execute("CREATE INDEX IDX_MAX_PLAYERS ON t1(max_players);");
         box.sql.execute("CREATE INDEX IDX_N_PLAYERS ON t1(n_players);");

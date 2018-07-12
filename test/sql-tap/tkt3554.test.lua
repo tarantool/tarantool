@@ -26,7 +26,7 @@ test:plan(4)
 test:do_execsql_test(
     "tkt3544-1.1",
     [[
-        CREATE TABLE test ( obj, t1, t2, PRIMARY KEY(obj, t1, t2) );
+        CREATE TABLE test ( obj TEXT, t1 INT , t2 INT , PRIMARY KEY(obj, t1, t2) );
 
         CREATE TRIGGER test_insert BEFORE INSERT ON test BEGIN
           UPDATE test SET t1 = new.t1

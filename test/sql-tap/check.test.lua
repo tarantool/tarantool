@@ -30,7 +30,7 @@ test:do_execsql_test(
         CREATE TABLE t1(
           x INTEGER CHECK( x<5 ),
           y REAL CHECK( y>x ),
-          z primary key
+          z  INT primary key
         );
     ]], {
         -- <check-1.1>
@@ -205,7 +205,7 @@ test:do_execsql_test(
     "check-2.1",
     [[
         CREATE TABLE t2(
-          id primary key,
+          id  INT primary key,
           x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
           y REAL CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='real' ),
           z TEXT CONSTRAINT three CHECK( typeof(coalesce(z,''))=='text' )
@@ -340,7 +340,7 @@ test:do_catchsql_test(
     "check-3.1",
     [[
         CREATE TABLE t3(
-          x primary key, y, z,
+          x  INT primary key, y INT , z INT ,
           CHECK( x<(SELECT min(x) FROM t1) )
         );
     ]], {
@@ -365,7 +365,7 @@ test:do_catchsql_test(
     "check-3.3",
     [[
         CREATE TABLE t3(
-          x primary key, y, z,
+          x  INT primary key, y INT , z INT ,
           CHECK( q<x )
         );
     ]], {
@@ -389,7 +389,7 @@ test:do_catchsql_test(
     "check-3.5",
     [[
         CREATE TABLE t3(
-          x primary key, y, z,
+          x  INT primary key, y INT , z INT ,
           CHECK( t2.x<x )
         );
     ]], {
@@ -413,7 +413,7 @@ test:do_catchsql_test(
     "check-3.7",
     [[
         CREATE TABLE t3(
-          x primary key, y, z,
+          x  INT primary key, y INT , z INT ,
           CHECK( t3.x<25 )
         );
     ]], {
@@ -446,7 +446,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "check-4.1",
     [[
-        CREATE TABLE t4(x primary key, y,
+        CREATE TABLE t4(x  INT primary key, y INT ,
           CHECK (
                x+y==11
             OR x*y==12
@@ -537,7 +537,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "check-5.1",
     [[
-        CREATE TABLE t5(x primary key, y,
+        CREATE TABLE t5(x  INT primary key, y INT ,
           CHECK( x*y<:abc )
         );
     ]], {
@@ -549,7 +549,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "check-5.2",
     [[
-        CREATE TABLE t5(x primary key, y,
+        CREATE TABLE t5(x  INT primary key, y INT ,
           CHECK( x*y<? )
         );
     ]], {
@@ -713,7 +713,7 @@ box.internal.sql_create_function("myfunc", "INT", myfunc)
 test:do_execsql_test(
     7.1,
     [[
-        CREATE TABLE t6(a CHECK (myfunc(a)) primary key)
+        CREATE TABLE t6(a  INT CHECK (myfunc(a)) primary key)
     ]])
 
 test:do_execsql_test(
@@ -756,7 +756,7 @@ test:do_test(
 test:do_test(
     7.6,
     function()
-        return test:catchsql(" CREATE TABLE t7(a CHECK (myfunc(a))) ") --, "db2")
+        return test:catchsql(" CREATE TABLE t7(a  INT CHECK (myfunc(a))) ") --, "db2 INT ")
     end, {
         -- <7.6>
         1, "no such function: MYFUNC"
@@ -791,7 +791,7 @@ end
 test:do_execsql_test(
     8.1,
     [[
-        CREATE TABLE t810(a primary key, CHECK( t810.a>0 ));
+        CREATE TABLE t810(a  INT primary key, CHECK( t810.a>0 ));
     ]], {
         -- <8.1>
 

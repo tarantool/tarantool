@@ -23,7 +23,7 @@ test:plan(103)
 -- Build some test data
 --
 test:execsql [[
-    CREATE TABLE t1(id primary key, x int, y int);
+    CREATE TABLE t1(id INT primary key, x int, y int);
     START TRANSACTION;
 ]]
 for i=1,32 do
@@ -233,7 +233,7 @@ test:do_test(
     "limit-4.1",
     function()
         return test:execsql [[
-            CREATE TABLE t3(x primary KEY);
+            CREATE TABLE t3(x INT primary KEY);
             START TRANSACTION;
             INSERT INTO t3 SELECT x FROM t1 ORDER BY x LIMIT 10 OFFSET 1;
             INSERT INTO t3 SELECT x+(SELECT max(x) FROM t3) FROM t3;
@@ -282,7 +282,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "limit-5.1",
     [[
-        CREATE TABLE t5(id primary key, x, y);
+        CREATE TABLE t5(id INT primary key, x INT, y INT);
         INSERT INTO t5 SELECT id, x-y, x+y FROM t1 WHERE x BETWEEN 10 AND 15
             ORDER BY x LIMIT 2;
         SELECT x, y FROM t5 ORDER BY x;
@@ -346,7 +346,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "limit-6.1",
     [[
-        CREATE TABLE t6(a primary key);
+        CREATE TABLE t6(a INT primary key);
         START TRANSACTION;
         INSERT INTO t6 VALUES(1);
         INSERT INTO t6 VALUES(2);
@@ -568,7 +568,7 @@ test:do_execsql_test(
     "limit-9.2.1",
     [[
         --CREATE TABLE t7 AS SELECT * FROM t6;
-        CREATE TABLE t7 (a primary key);
+        CREATE TABLE t7 (a INT primary key);
         INSERT INTO t7 SELECT * FROM t6;
     ]], {
         -- <limit-9.2.1>
@@ -757,7 +757,7 @@ test:do_test(
     "limit-13.1",
     function()
         return test:execsql [[
-            CREATE TABLE t13(x primary key);
+            CREATE TABLE t13(x INT primary key);
             INSERT INTO t13 VALUES(1),(2);
             CREATE VIEW v13a AS SELECT x AS y FROM t13;
             CREATE VIEW v13b AS SELECT y AS z FROM v13a UNION ALL SELECT y+10 FROM v13a;

@@ -30,7 +30,7 @@ end
 -- do_test index7-1.1 {
 --   # Able to parse and manage partial indices
 --   execsql {
---     CREATE TABLE t1(a,b,c PRIMARY KEY) WITHOUT rowid;
+--     CREATE TABLE t1(a INT,b INT,c INT PRIMARY KEY) WITHOUT rowid;
 --     CREATE INDEX t1a ON t1(a) WHERE a IS NOT NULL;
 --     CREATE INDEX t1b ON t1(b) WHERE b>10;
 --     CREATE VIRTUAL TABLE nums USING wholenumber;
@@ -138,7 +138,7 @@ end
 -- #
 -- do_test index7-2.1 {
 --   execsql {
---     CREATE TABLE t2(a,b PRIMARY KEY) without rowid;
+--     CREATE TABLE t2(a INT,b INT PRIMARY KEY) without rowid;
 --     INSERT INTO t2(a,b) SELECT value, value FROM nums WHERE value<1000;
 --     UPDATE t2 SET a=NULL WHERE b%5==0;
 --     CREATE INDEX t2a1 ON t2(a) WHERE a IS NOT NULL;
@@ -203,7 +203,7 @@ end
 -- # Partial UNIQUE indices
 -- #
 -- do_execsql_test index7-3.1 {
---   CREATE TABLE t3(a,b PRIMARY KEY) without rowid;
+--   CREATE TABLE t3(a INT,b INT PRIMARY KEY) without rowid;
 --   INSERT INTO t3 SELECT value, value FROM nums WHERE value<200;
 --   UPDATE t3 SET a=999 WHERE b%5!=0;
 --   CREATE UNIQUE INDEX t3a ON t3(a) WHERE a<>999;
@@ -239,8 +239,8 @@ end
 test:do_execsql_test(
     "index7-6.1",
     [[
-        CREATE TABLE t5(id primary key, a, b);
-        CREATE TABLE t4(id primary key, c, d);
+        CREATE TABLE t5(id INT primary key, a INT, b TEXT);
+        CREATE TABLE t4(id INT primary key, c TEXT, d TEXT);
         INSERT INTO t5 VALUES(1, 1, 'xyz');
         INSERT INTO t4 VALUES(1, 'abc', 'not xyz');
         SELECT a,b,c,d FROM (SELECT a,b FROM t5 WHERE a=1 AND b='xyz'), t4 WHERE c='abc';
@@ -305,7 +305,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
         "index7-8.1",
         [[
-            CREATE TABLE t(a,b,c, PRIMARY KEY(a));
+            CREATE TABLE t(a INT,b INT,c INT, PRIMARY KEY(a));
             CREATE INDEX i1 ON t(a, a, b, c, c, b, b, b, c, b, c);
             pragma index_info = t.i1;
         ]],
@@ -324,7 +324,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
         "index7-8.2",
         [[
-            CREATE TABLE test4(a,b,c,d, PRIMARY KEY(a,a,a,b,c));
+            CREATE TABLE test4(a INT,b INT, c INT, d INT, PRIMARY KEY(a,a,a,b,c));
             CREATE INDEX index1 on test4(b,c,a,c);
             SELECT "_index"."name"
             FROM "_index" JOIN "_space" WHERE
@@ -341,7 +341,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
         "index7-8.3",
         [[
-            CREATE TABLE test5(a,b,c,d, PRIMARY KEY(a), UNIQUE(a));
+            CREATE TABLE test5(a INT,b INT,c INT,d INT, PRIMARY KEY(a), UNIQUE(a));
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
@@ -357,7 +357,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
         "index7-8.4",
         [[
-            CREATE TABLE test6(a,b,c,d, PRIMARY KEY(a), CONSTRAINT c1 UNIQUE(a));
+            CREATE TABLE test6(a INT,b INT,c INT,d INT, PRIMARY KEY(a), CONSTRAINT c1 UNIQUE(a));
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
@@ -372,7 +372,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
         "index7-8.5",
         [[
-            CREATE TABLE test7(a,b,c,d, UNIQUE(a), PRIMARY KEY(a));
+            CREATE TABLE test7(a INT,b INT,c INT,d INT, UNIQUE(a), PRIMARY KEY(a));
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND
@@ -387,7 +387,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
         "index7-8.6",
         [[
-            CREATE TABLE test8(a,b,c,d, CONSTRAINT c1 UNIQUE(a), PRIMARY KEY(a));
+            CREATE TABLE test8(a INT,b INT,c INT,d INT, CONSTRAINT c1 UNIQUE(a), PRIMARY KEY(a));
             SELECT "_index"."name", "_index"."iid"
             FROM "_index" JOIN "_space" WHERE
                 "_index"."id" = "_space"."id" AND

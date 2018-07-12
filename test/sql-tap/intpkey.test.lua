@@ -27,7 +27,7 @@ test:plan(39)
 test:do_execsql_test(
     "intpkey-1.0",
     [[
-        CREATE TABLE t1(a TEXT PRIMARY KEY, b, c);
+        CREATE TABLE t1(a TEXT PRIMARY KEY, b INT, c INT);
     ]], {
         -- <intpkey-1.0>
         
@@ -53,7 +53,7 @@ test:do_execsql_test(
     "intpkey-1.2",
     [[
         DROP TABLE t1;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT, c TEXT);
         --SELECT name FROM sqlite_master
         --  WHERE type='index' AND tbl_name='t1';
     ]], {
@@ -660,7 +660,7 @@ if (0 > 0) then
 test:do_execsql_test(
     "intpkey-8.1",
     [[
-        CREATE TABLE t2(x INTEGER PRIMARY KEY, y, z);
+        CREATE TABLE t2(x INTEGER PRIMARY KEY, y INT, z INT);
         INSERT INTO t2 SELECT * FROM t1;
         --SELECT rowid FROM t2;
         SELECT x FROM t2;
@@ -701,7 +701,7 @@ if (0 > 0)
         "intpkey-10.1",
         [[
             DROP TABLE t2;
-            CREATE TABLE t2(x INTEGER PRIMARY KEY, y, z);
+            CREATE TABLE t2(x INTEGER PRIMARY KEY, y INT, z INT);
             INSERT INTO t2 VALUES(NULL, 1, 2);
             SELECT * from t2;
         ]], {
@@ -777,7 +777,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE a=1;
     ]], {
         -- <intpkey-13.2>
-        1, 2, 3
+        1, "2", "3"
         -- </intpkey-13.2>
     })
 

@@ -72,11 +72,11 @@ test:do_test(
     "colname-2.1",
     function()
         test:execsql [[
-            CREATE TABLE tabc(a PRIMARY KEY,b,c);
+            CREATE TABLE tabc(a INT PRIMARY KEY,b INT,c INT);
             INSERT INTO tabc VALUES(1,2,3);
-            CREATE TABLE txyz(x PRIMARY KEY,y,z);
+            CREATE TABLE txyz(x INT PRIMARY KEY,y INT,z INT);
             INSERT INTO txyz VALUES(4,5,6);
-            CREATE TABLE tboth(a PRIMARY KEY,b,c,x,y,z);
+            CREATE TABLE tboth(a INT PRIMARY KEY,b INT,c INT,x INT,y INT,z INT);
             INSERT INTO tboth VALUES(11,12,13,14,15,16);
             CREATE VIEW v1 AS SELECT tabC.a, txyZ.x, * 
               FROM tabc, txyz ORDER BY 1 LIMIT 1;
@@ -442,7 +442,7 @@ test:do_execsql2_test(
 --            return lreplace( test:execsql("SELECT x.* FROM sqlite_master X LIMIT 1;"), 3, 3,"x")
 --        end, {
 --            -- <colname-5.1>
---            "table", "tabc", "tabc", "x", "CREATE TABLE tabc(a,b,c)"
+--            "table", "tabc", "tabc", "x", "CREATE TABLE tabc(a INT,b INT,c INT)"
 --            -- </colname-5.1>
 --        })
 
@@ -460,7 +460,7 @@ test:do_test(
             PRAGMA full_column_names='OFF';
             ]])
         test:execsql [=[
-            CREATE TABLE t6(a primary key, "'a'", """a""", "[a]", "`a`");
+            CREATE TABLE t6(a INT primary key, "'a'" INT, """a""" INT, "[a]" INT,  "`a`" INT);
             INSERT INTO t6 VALUES(1,2,3,4,5);
         ]=]
         return test:execsql2 "SELECT * FROM t6"
@@ -537,7 +537,7 @@ test:do_test(
     "colname-7.1",
     function()
         test:execsql [[
-            CREATE TABLE t7(x INTEGER PRIMARY KEY, y);
+            CREATE TABLE t7(x INTEGER PRIMARY KEY, y INT);
             INSERT INTO t7 VALUES(1,2);
         ]]
         return test:execsql2 "SELECT x, * FROM t7"
@@ -553,7 +553,7 @@ test:do_test(
     "colname-8.1",
     function()
         return test:execsql [[
-            CREATE TABLE t3893("x" PRIMARY KEY);
+            CREATE TABLE t3893("x" INT PRIMARY KEY);
             INSERT INTO t3893 VALUES(123);
             SELECT "y"."x" FROM (SELECT "x" FROM t3893) AS "y";
         ]]
@@ -597,7 +597,7 @@ for i, val in ipairs(data2) do
     )
 end
 
-test:execsql([[ create table table1("a" primary key, "b") ]])
+test:execsql([[ create table table1("a" TEXT primary key, "b" TEXT) ]])
 test:execsql("insert into table1 values('a1', 'a1')")
 
 -- " is used for identifiers
@@ -636,16 +636,16 @@ test:do_test(
 
 test:do_catchsql_test(
     "colname-11.1",
-    [[ create table t1(a, b, c, primary key('A'))]],
+    [[ create table t1(a INT, b INT, c INT, primary key('A'))]],
     {1, "expressions prohibited in PRIMARY KEY"})
 
 test:do_catchsql_test(
     "colname-11.2",
-    [[CREATE TABLE t1(a, b, c, d, e, 
+    [[CREATE TABLE t1(a INT, b INT, c INT, d INT, e INT,
       PRIMARY KEY(a), UNIQUE('b' COLLATE "unicode_ci" DESC));]],
     {1, "/Tarantool does not support functional indexes/"})
 
-test:execsql("create table table1(a primary key, b, c)")
+test:execsql("create table table1(a  INT primary key, b INT, c INT)")
 
 test:do_catchsql_test(
     "colname-11.3",

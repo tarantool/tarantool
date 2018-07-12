@@ -25,9 +25,9 @@ test:plan(22)
 test:do_execsql_test(
     "offset1-1.1",
     [[
-        CREATE TABLE t1(a primary key,b);
+        CREATE TABLE t1(a INT primary key,b TEXT);
         INSERT INTO t1 VALUES(1,'a'),(2,'b'),(3,'c'),(4,'d'),(5,'e');
-        CREATE TABLE t2(id primary key, x,y);
+        CREATE TABLE t2(id INT primary key, x INT,y TEXT);
         INSERT INTO t2 VALUES(1, 8,'y'),(2, 9,'z'),(3, 6,'w'),(4, 7,'x');
         SELECT count(*) FROM t1, t2;
     ]], {

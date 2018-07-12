@@ -23,11 +23,11 @@ test:do_execsql_test(
     "whereG-1.0",
     [[
         CREATE TABLE composer(
-          cid PRIMARY KEY,
+          cid INT PRIMARY KEY,
           cname TEXT
         );
         CREATE TABLE album(
-          aid PRIMARY KEY,
+          aid INT PRIMARY KEY,
           aname TEXT
         );
         CREATE TABLE track(
@@ -230,8 +230,8 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "whereG-3.0",
     [[
-        CREATE TABLE a(a1 PRIMARY KEY, a2);
-        CREATE TABLE b(b1 PRIMARY KEY, b2);
+        CREATE TABLE a(a1  INT PRIMARY KEY, a2 INT );
+        CREATE TABLE b(b1  INT PRIMARY KEY, b2 INT );
     ]], {
         -- <whereG-3.0>
         
@@ -257,7 +257,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "whereG-4.0",
     [[
-        CREATE TABLE t4(x PRIMARY key);
+        CREATE TABLE t4(x TEXT PRIMARY key);
         INSERT INTO t4 VALUES('right'),('wrong');
         SELECT DISTINCT x
          FROM (SELECT x FROM t4 GROUP BY x)
@@ -281,7 +281,7 @@ test:do_execsql_test(
     5.1,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a, b, c, PRIMARY KEY (a,b));
+        CREATE TABLE t1(a INT , b INT , c INT , PRIMARY KEY (a,b));
     ]])
 
 -- do_eqp_test 5.1.2 {
@@ -326,10 +326,10 @@ test:do_execsql_test(
     6.0,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(i int PRIMARY KEY, x, y, z);
+        CREATE TABLE t1(i int PRIMARY KEY, x INT , y INT , z INT );
         INSERT INTO t1 VALUES (1,1,1,1), (2,2,2,2), (3,3,3,3), (4,4,4,4);
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t2(i int PRIMARY KEY, bool char);
+        CREATE TABLE t2(i int PRIMARY KEY, bool TEXT);
         INSERT INTO t2 VALUES(1,'T'), (2,'F');
         SELECT count(*) FROM t1 LEFT JOIN t2 ON t1.i=t2.i AND bool='T' union all
         SELECT count(*) FROM t1 LEFT JOIN t2 ON likely(t1.i=t2.i) AND bool='T';
@@ -346,10 +346,10 @@ test:do_execsql_test(
     7.0,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a, b, PRIMARY KEY(a,b));
+        CREATE TABLE t1(a INT , b INT , PRIMARY KEY(a,b));
         INSERT INTO t1 VALUES(9,1),(1,2);
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t2(x, y, PRIMARY KEY(x,y));
+        CREATE TABLE t2(x INT , y INT , PRIMARY KEY(x,y));
         INSERT INTO t2 VALUES(3,3),(4,4);
         SELECT likely(a), x FROM t1, t2 ORDER BY 1, 2;
     ]], {

@@ -5,7 +5,7 @@ engine = test_run:get_cfg('engine')
 box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- Create a table and insert a datum
-box.sql.execute([[CREATE TABLE t1(a PRIMARY KEY, b, UNIQUE(b));]])
+box.sql.execute([[CREATE TABLE t1(a INT PRIMARY KEY, b INT, UNIQUE(b));]])
 box.sql.execute([[INSERT INTO t1 VALUES(1,2);]])
 
 -- Sanity check

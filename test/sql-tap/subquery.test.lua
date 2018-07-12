@@ -26,8 +26,8 @@ test:do_test(
     "subquery-1.1",
     function()
         test:execsql [[
-            CREATE TABLE t1(a PRIMARY KEY,b);
-            CREATE TABLE t2(x PRIMARY KEY,y);
+            CREATE TABLE t1(a  INT PRIMARY KEY,b INT );
+            CREATE TABLE t2(x  INT PRIMARY KEY,y INT );
             START TRANSACTION;
             INSERT INTO t1 VALUES(1,2);
             INSERT INTO t1 VALUES(3,4);
@@ -244,7 +244,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-2.2.1",
     [[
-        CREATE TABLE t3(a PRIMARY KEY, b);
+        CREATE TABLE t3(a  INT PRIMARY KEY, b INT );
         INSERT INTO t3 VALUES(1, 2);
         INSERT INTO t3 VALUES(3, 1);
     ]], {
@@ -355,7 +355,7 @@ test:do_test(
         -- In the expr "x IN (SELECT a FROM t3)" the RHS of the IN operator
         -- has text affinity and the LHS has integer affinity.  The rule is
         -- that we try to convert both sides to an integer before doing the
-        -- comparision.  Hence, the integer value 10 in t3 will compare equal
+        -- comparision. Hence, the integer value 10 in t3 will compare equal
         -- to the string value '10.0' in t4 because the t4 value will be
         -- converted into an integer.
         return test:execsql [[
@@ -413,10 +413,10 @@ test:do_test(
         test:catchsql " DROP TABLE t1; "
         test:catchsql " DROP TABLE t2; "
         return test:execsql [[
-            CREATE TABLE t1(a PRIMARY KEY,b);
+            CREATE TABLE t1(a  INT PRIMARY KEY,b INT );
             INSERT INTO t1 VALUES(1,2);
             CREATE VIEW v1 AS SELECT b FROM t1 WHERE a>0;
-            CREATE TABLE t2(p PRIMARY KEY,q);
+            CREATE TABLE t2(p  INT PRIMARY KEY,q INT );
             INSERT INTO t2 VALUES(2,9);
             SELECT * FROM v1 WHERE EXISTS(SELECT * FROM t2 WHERE p=v1.b);
         ]]
@@ -443,7 +443,7 @@ test:do_test(
     "subquery-3.2",
     function()
         test:catchsql [[
-            CREATE TABLE t1(a PRIMARY KEY,b);
+            CREATE TABLE t1(a  INT PRIMARY KEY,b INT );
             INSERT INTO t1 VALUES(1,2);
         ]]
         return test:execsql [[
@@ -474,7 +474,7 @@ test:do_test(
     function()
         test:catchsql "DROP TABLE t2"
         return test:execsql [[
-            CREATE TABLE t2(c PRIMARY KEY, d);
+            CREATE TABLE t2(c  INT PRIMARY KEY, d TEXT);
             INSERT INTO t2 VALUES(1, 'one');
             INSERT INTO t2 VALUES(2, 'two');
             SELECT a, (SELECT d FROM t2 WHERE a=c) FROM t1 GROUP BY a;
@@ -522,7 +522,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-3.4.1",
     [[
-        CREATE TABLE t34(id primary key, x,y);
+        CREATE TABLE t34(id  INT primary key, x INT ,y INT );
         INSERT INTO t34 VALUES(1, 106,4), (2, 107,3), (3, 106,5), (4, 107,5);
         SELECT a.x, avg(a.y)
           FROM t34 AS a
@@ -579,8 +579,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-3.5.1",
     [[
-        CREATE TABLE t35a(x PRIMARY KEY); INSERT INTO t35a VALUES(1),(2),(3);
-        CREATE TABLE t35b(y PRIMARY KEY); INSERT INTO t35b VALUES(98), (99);
+        CREATE TABLE t35a(x  INT PRIMARY KEY); INSERT INTO t35a VALUES(1),(2),(3);
+        CREATE TABLE t35b(y  INT PRIMARY KEY); INSERT INTO t35b VALUES(98), (99);
         SELECT max((SELECT avg(y) FROM t35b)) FROM t35a;
     ]], {
         -- <subquery-3.5.1>
@@ -681,7 +681,7 @@ test:do_test(
     "subquery-4.2.1",
     function()
         test:execsql [[
-            CREATE TABLE t3(a PRIMARY KEY);
+            CREATE TABLE t3(a  INT PRIMARY KEY);
             INSERT INTO t3 VALUES(10);
         ]]
         return test:execsql "INSERT INTO t3 VALUES((SELECT max(a) FROM t3)+1)"
@@ -722,12 +722,12 @@ test:do_test(
         callcnt = 0
         box.internal.sql_create_function("callcnt", "INT", callcntproc)
         return test:execsql [[
-            CREATE TABLE t4(x,y PRIMARY KEY);
+            CREATE TABLE t4(x TEXT,y  INT PRIMARY KEY);
             INSERT INTO t4 VALUES('one',1);
             INSERT INTO t4 VALUES('two',2);
             INSERT INTO t4 VALUES('three',3);
             INSERT INTO t4 VALUES('four',4);
-            CREATE TABLE t5(a PRIMARY KEY,b);
+            CREATE TABLE t5(a  INT PRIMARY KEY,b INT );
             INSERT INTO t5 VALUES(1,11);
             INSERT INTO t5 VALUES(2,22);
             INSERT INTO t5 VALUES(3,33);
@@ -798,15 +798,15 @@ test:do_test(
 test:do_execsql_test(
     "subquery-7.1",
     [[
-        CREATE TABLE t7(c7 PRIMARY KEY);
+        CREATE TABLE t7(c7  INT PRIMARY KEY);
         INSERT INTO t7 VALUES(1);
         INSERT INTO t7 VALUES(2);
         INSERT INTO t7 VALUES(3);
-        CREATE TABLE t8(c8 PRIMARY KEY);
+        CREATE TABLE t8(c8  INT PRIMARY KEY);
         INSERT INTO t8 VALUES(100);
         INSERT INTO t8 VALUES(200);
         INSERT INTO t8 VALUES(300);
-        CREATE TABLE t9(c9 PRIMARY KEY);
+        CREATE TABLE t9(c9  INT PRIMARY KEY);
         INSERT INTO t9 VALUES(10000);
         INSERT INTO t9 VALUES(20000);
         INSERT INTO t9 VALUES(30000);

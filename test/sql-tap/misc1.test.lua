@@ -28,7 +28,7 @@ test:plan(59)
 test:do_test(
     "misc1-1.1",
     function()
-        local cmd = "CREATE TABLE manycol(id primary key, x0 text"
+        local cmd = "CREATE TABLE manycol(id  INT primary key, x0 text"
         for i = 1, 99, 1 do
             cmd = cmd .. ",x"..i.." text"
         end
@@ -217,7 +217,7 @@ test:do_test(
     "misc1-3.1",
     function()
         local r = test:execsql([[
-            CREATE TABLE t1(a primary KEY);
+            CREATE TABLE t1(a TEXT primary KEY);
             INSERT INTO t1 VALUES('hi');
             PRAGMA full_column_names=on;
             --SELECT rowid, * FROM t1;
@@ -237,7 +237,7 @@ test:do_test(
 test:do_execsql_test(
     "misc1-4.1",
     [[
-        CREATE TABLE t2(a primary key);
+        CREATE TABLE t2(a TEXT primary key);
         START TRANSACTION;
         INSERT INTO t2 VALUES('This is a long string to use up a lot of disk -');
         UPDATE t2 SET a=a||a||a||a;
@@ -262,7 +262,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "misc1-5.1",
     [[
-        CREATE TABLE t3(a primary key,b);
+        CREATE TABLE t3(a  INT primary key,b INT );
         INSERT INTO t3 VALUES(1,2);
         INSERT INTO t3 VALUES(3,4);
         UPDATE t3 SET a=0 WHEREwww b=2;
@@ -294,8 +294,8 @@ test:do_catchsql_test(
     "misc1-6.1",
     [[
         CREATE TABLE t4(
-          abort primary key, "asc", beginn, cluster, conflict, copy, delimiters, "desc", endd,
-          "explain", fail, ignore, key, offset, "pragma", "replace", temp, "view"
+          abort  INT primary key, "asc" INT, beginn INT , cluster INT , conflict INT , copy INT , delimiters INT , "desc" INT, endd INT ,
+          "explain" INT, fail INT , ignore INT , key INT , offset INT , "pragma" INT, "replace" INT, temp INT , "view" INT
         );
     ]], {
         -- <misc1-6.1>
@@ -340,8 +340,8 @@ test:do_catchsql_test(
     "misc1-7.1",
     [[
         CREATE TABLE error1(
-          a TYPE PRIMARY KEY,
-          b TYPE PRIMARY KEY
+          a  INT PRIMARY KEY,
+          b  INT PRIMARY KEY
         );
     ]], {
         -- <misc1-7.1>
@@ -354,7 +354,7 @@ test:do_catchsql_test(
     [[
         CREATE TABLE error1(
           a INTEGER PRIMARY KEY,
-          b TYPE PRIMARY KEY
+          b  INT PRIMARY KEY
         );
     ]], {
         -- <misc1-7.2>
@@ -365,7 +365,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "misc1-7.3",
     [[
-        CREATE TABLE t5(a,b,c,PRIMARY KEY(a,b));
+        CREATE TABLE t5(a INT ,b INT ,c INT ,PRIMARY KEY(a,b));
         INSERT INTO t5 VALUES(1,2,3);
         SELECT * FROM t5 ORDER BY a;
     ]], {
@@ -435,7 +435,7 @@ test:execsql([[
 test:do_catchsql_test(
     "misc1-9.1",
     [[
-        CREATE TABLE t1(a primary key not null, b unique not null);
+        CREATE TABLE t1(a  TEXT primary key not null, b  INT unique not null);
         INSERT INTO t1 VALUES('a',1234567890123456789);
         INSERT INTO t1 VALUES('b',1234567891123456789);
         INSERT INTO t1 VALUES('c',1234567892123456789);
@@ -612,7 +612,7 @@ test:do_execsql_test(
         SELECT '0'==0.0
     ]], {
         -- <misc1-12.2>
-        0
+        1
         -- </misc1-12.2>
     })
 
@@ -629,23 +629,23 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-12.4",
     [[
-        CREATE TABLE t6(a INT UNIQUE, b TEXT primary key);
+        CREATE TABLE t6(a TEXT UNIQUE, b TEXT primary key);
         INSERT INTO t6 VALUES('0','0.0');
         SELECT * FROM t6;
     ]], {
         -- <misc1-12.4>
-    0,"0.0"
+    "0","0.0"
         -- </misc1-12.4>
     })
 
 test:do_execsql_test(
     "misc1-12.5",
     [[
-        INSERT OR IGNORE INTO t6 VALUES(0.0,'x');
+        INSERT OR IGNORE INTO t6 VALUES('0','x');
         SELECT * FROM t6;
     ]], {
         -- <misc1-12.5>
-        0, "0.0"
+        "0", "0.0"
         -- </misc1-12.5>
     })
 
@@ -656,7 +656,7 @@ test:do_execsql_test(
         SELECT * FROM t6;
     ]], {
         -- <misc1-12.6>
-    "y","0",0,"0.0"
+    "y","0","0","0.0"
         -- </misc1-12.6>
     })
 
@@ -665,7 +665,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc1-12.7",
     [[
-        CREATE TABLE t7(x INTEGER, y TEXT, z primary key);
+        CREATE TABLE t7(x INTEGER, y TEXT, z  INT primary key);
         INSERT INTO t7 VALUES(0,0,1);
         INSERT INTO t7 VALUES(0.0,0,2);
         INSERT INTO t7 VALUES(0,0.0,3);
@@ -730,7 +730,7 @@ if 0>0 then
 test:do_execsql_test(
     "misc1-12.11",
     [[
-        CREATE TABLE t8(x TEXT COLLATE numeric, y INTEGER COLLATE text, z primary key);
+        CREATE TABLE t8(x TEXT COLLATE numeric, y INTEGER COLLATE text, z  INT primary key);
         INSERT INTO t8 VALUES(0,0,1);
         INSERT INTO t8 VALUES(0.0,0,2);
         INSERT INTO t8 VALUES(0,0.0,3);
@@ -771,7 +771,7 @@ end
 test:do_execsql_test(
     "misc1-13.1",
     [[
-        CREATE TABLE t9(x,y primary key);
+        CREATE TABLE t9(x TEXT,y  INT primary key);
         INSERT INTO t9 VALUES('one',1);
         INSERT INTO t9 VALUES('two',2);
         INSERT INTO t9 VALUES('three',3);
@@ -983,7 +983,7 @@ end
 --   CREATE TABLE t19b AS SELECT 4 AS '', 5 AS '',  6 AS '';
 --   SELECT * FROM t19b;
 -- } {4 5 6}
--- # 2015-05-20:  CREATE TABLE AS should not store INT value is a TEXT
+-- # 2015-05-20:  CREATE TABLE AS should not store value is a TEXT
 -- # column.
 -- #
 -- do_execsql_test misc1-19.3 {
@@ -1063,10 +1063,10 @@ test:do_execsql_test(
 -- db close
 -- sqlite3 db :memory:
 -- do_execsql_test misc1-23.1 {
---   CREATE TABLE t1(x);
+--   CREATE TABLE t1(x INT );
 --   UPDATE sqlite_master SET sql='CREATE table t(d CHECK(T(#0)';
 --   BEGIN;
---   CREATE TABLE t2(y);
+--   CREATE TABLE t2(y INT );
 --   ROLLBACK;
 --   DROP TABLE IF EXISTS t3;
 -- } {}
@@ -1076,20 +1076,20 @@ test:do_execsql_test(
 -- database_may_be_corrupt
 -- sqlite3 db :memory:
 -- do_catchsql_test misc1-23.2 {
---   CREATE TABLE t1(x UNIQUE);
+--   CREATE TABLE t1(x  INT UNIQUE);
 --   UPDATE sqlite_master SET sql='CREATE TABLE IF not EXISTS t(c)';
 --   BEGIN;
---   CREATE TABLE t2(x);
+--   CREATE TABLE t2(x INT );
 --   ROLLBACK;
 --   DROP TABLE F;
 -- } {1 {no such table: F}}
 -- db close
 -- sqlite3 db :memory:
 -- do_catchsql_test misc1-23.3 {
---   CREATE TABLE t1(x UNIQUE);
+--   CREATE TABLE t1(x  INT UNIQUE);
 --   UPDATE sqlite_master SET sql='CREATE table y(a TEXT, a TEXT)';
 --   BEGIN;
---   CREATE TABLE t2(y);
+--   CREATE TABLE t2(y INT );
 --   ROLLBACK;
 --   DROP TABLE IF EXISTS t;
 -- } {0 {}}

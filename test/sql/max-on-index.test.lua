@@ -6,7 +6,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- create space
 -- scalar affinity
-box.sql.execute("CREATE TABLE test1 (f1, f2 INT, PRIMARY KEY(f1))")
+box.sql.execute("CREATE TABLE test1 (f1 INT, f2 INT, PRIMARY KEY(f1))")
 box.sql.execute("CREATE INDEX test1_index ON test1 (f2)")
 
 -- integer affinity

@@ -25,10 +25,10 @@ test:do_test(
     "tkt3581-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c);
+            CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT, c INT);
             INSERT INTO t1 VALUES(0,544,846);
             INSERT INTO t1 VALUES(1,345,51);
-            CREATE TABLE t2(a INTEGER PRIMARY KEY, b, c);
+            CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT, c INT);
             INSERT INTO t2 SELECT * FROM t1;
             CREATE INDEX i2 on t2(c);
         ]]

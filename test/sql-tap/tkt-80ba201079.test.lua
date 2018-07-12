@@ -27,11 +27,11 @@ test:do_test(
     "tkt-80ba2-100",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a primary key);
+            CREATE TABLE t1(a TEXT primary key);
             INSERT INTO t1 VALUES('A');
-            CREATE TABLE t2(b primary key);
+            CREATE TABLE t2(b TEXT primary key);
             INSERT INTO t2 VALUES('B');
-            CREATE TABLE t3(c primary key);
+            CREATE TABLE t3(c TEXT primary key);
             INSERT INTO t3 VALUES('C');
             SELECT * FROM t1, t2
              WHERE (a='A' AND b='X')
@@ -176,10 +176,10 @@ test:execsql([[
 test:do_execsql_test(
     301,
     [[
-        CREATE TABLE t1(a primary key, b, c);
+        CREATE TABLE t1(a TEXT primary key, b TEXT , c TEXT);
         CREATE INDEX i1 ON t1(a);
         CREATE INDEX i2 ON t1(b);
-        CREATE TABLE t2(d primary key, e);
+        CREATE TABLE t2(d TEXT primary key, e TEXT);
 
         INSERT INTO t1 VALUES('A', 'B', 'C');
         INSERT INTO t2 VALUES('D', 'E');

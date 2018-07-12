@@ -25,7 +25,7 @@ test:do_test(
     "tkt3541-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(x primary key);
+            CREATE TABLE t1(x INT primary key);
             INSERT INTO t1 VALUES(123);
             SELECT CASE ~max(x) WHEN min(x) THEN 1 ELSE max(x) END FROM t1;
         ]]

@@ -29,7 +29,7 @@ test:do_test(
     "misc3-1.1",
     function()
         test:execsql([[
-            CREATE TABLE t1(a PRIMARY KEY,b);
+            CREATE TABLE t1(a INT PRIMARY KEY,b TEXT);
             INSERT INTO t1
               VALUES(1,'a23456789_b23456789_c23456789_d23456789_e23456789_');
             UPDATE t1 SET b=b||b;
@@ -39,7 +39,7 @@ test:do_test(
             UPDATE t1 SET b=b||b;
             INSERT INTO t1 VALUES(2,'x');
             UPDATE t1 SET b=substr(b,1,500);
-            CREATE TABLE t2(x PRIMARY KEY,y);
+            CREATE TABLE t2(x  INT PRIMARY KEY,y INT );
             START TRANSACTION;
         ]])
         test:catchsql("UPDATE t1 SET a=CASE a WHEN 2 THEN 1 ELSE a END, b='y';")
@@ -63,7 +63,7 @@ test:do_test(
             DROP TABLE t2;
         ]])
         test:execsql([[
-            CREATE TABLE t1(a PRIMARY KEY,b);
+            CREATE TABLE t1(a INT PRIMARY KEY,b TEXT);
             INSERT INTO t1
             VALUES(1,'a23456789_b23456789_c23456789_d23456789_e23456789_');
             INSERT INTO t1 SELECT a+1, b||b FROM t1;
@@ -329,7 +329,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-4.1",
     [[
-        CREATE TABLE t3(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t3(a INTEGER PRIMARY KEY, b TEXT);
         INSERT INTO t3 VALUES(1, 'abc');
         INSERT INTO t3 VALUES(2, 'xyz');
         INSERT INTO t3 VALUES(3, NULL);
@@ -374,11 +374,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc3-5.1",
     [[
-        CREATE TABLE x1 (id primary key, b, c);
+        CREATE TABLE x1 (id INT primary key, b TEXT, c INT);
         INSERT INTO x1 VALUES(1, 'dog',3);
         INSERT INTO x1 VALUES(2, 'cat',1);
         INSERT INTO x1 VALUES(3, 'dog',4);
-        CREATE TABLE x2 (c primary key, e);
+        CREATE TABLE x2 (c INT primary key, e TEXT);
         INSERT INTO x2 VALUES(1,'one');
         INSERT INTO x2 VALUES(2,'two');
         INSERT INTO x2 VALUES(3,'three');
@@ -451,9 +451,9 @@ if (0 > 0) then
     test:do_execsql_test(
         "misc3-7.1",
         [[
-            CREATE TABLE y1(a primary key);
-            CREATE TABLE y2(b primary key);
-            CREATE TABLE y3(c primary key);
+            CREATE TABLE y1(a  INT primary key);
+            CREATE TABLE y2(b  INT primary key);
+            CREATE TABLE y3(c  INT primary key);
             START TRANSACTION;
             CREATE TRIGGER r1 AFTER DELETE ON y1 FOR EACH ROW BEGIN
               INSERT INTO y3(c) SELECT b FROM y2 ORDER BY b LIMIT 1;

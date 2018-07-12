@@ -8,7 +8,7 @@ test:plan(21)
 test:do_catchsql_test(
     "alter2-1.1",
     [[
-        CREATE TABLE t1(id PRIMARY KEY, a, b);
+        CREATE TABLE t1(id INT PRIMARY KEY, a INT, b INT);
         ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY (a) REFERENCES t1(id);
         ALTER TABLE t1 ADD CONSTRAINT fk2 FOREIGN KEY (a) REFERENCES t1;
         INSERT INTO t1 VALUES(1, 1, 2);
@@ -136,8 +136,8 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "alter2-2.1",
     [[
-        CREATE TABLE child (id PRIMARY KEY, a, b);
-        CREATE TABLE parent (id PRIMARY KEY, c UNIQUE, d);
+        CREATE TABLE child (id INT PRIMARY KEY, a INT, b INT);
+        CREATE TABLE parent (id INT PRIMARY KEY, c INT UNIQUE, d INT);
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent(c);
         ALTER TABLE parent ADD CONSTRAINT fk FOREIGN KEY (c) REFERENCES parent;
         INSERT INTO parent VALUES(1, 2, 3);
@@ -186,8 +186,8 @@ test:do_execsql_test(
     [[
         DROP TABLE child;
         DROP TABLE parent;
-        CREATE TABLE child (id PRIMARY KEY, a, b);
-        CREATE TABLE parent (id PRIMARY KEY, c, d);
+        CREATE TABLE child (id INT PRIMARY KEY, a INT, b INT);
+        CREATE TABLE parent (id INT PRIMARY KEY, c INT, d INT);
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent ON DELETE CASCADE MATCH FULL;
         INSERT INTO parent VALUES(1, 2, 3), (3, 4, 5), (6, 7, 8);
         INSERT INTO child VALUES(1, 1, 1), (3, 2, 2);
@@ -204,8 +204,8 @@ test:do_execsql_test(
     [[
         DROP TABLE child;
         DROP TABLE parent;
-        CREATE TABLE child (id PRIMARY KEY, a, b);
-        CREATE TABLE parent (id PRIMARY KEY, c, d);
+        CREATE TABLE child (id INT PRIMARY KEY, a INT, b INT);
+        CREATE TABLE parent (id INT PRIMARY KEY, c INT, d INT);
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent ON UPDATE CASCADE MATCH PARTIAL;
         INSERT INTO parent VALUES(1, 2, 3), (3, 4, 5), (6, 7, 8);
         INSERT INTO child VALUES(1, 1, 1), (3, 2, 2);
@@ -241,7 +241,7 @@ test:do_catchsql_test(
     "alter2-5.1",
     [[
         DROP TABLE child;
-        CREATE TABLE child (id PRIMARY KEY, a UNIQUE);
+        CREATE TABLE child (id INT PRIMARY KEY, a INT UNIQUE);
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES child;
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (a) REFERENCES child;
     ]], {

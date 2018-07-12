@@ -28,7 +28,7 @@ test:plan(4)
 test:do_execsql_test(
     "tkt1444-1.1",
     [[
-        CREATE TABLE DemoTable (id primary key, x INTEGER, TextKey TEXT, DKey Real);
+        CREATE TABLE DemoTable (id  INT primary key, x INTEGER, TextKey TEXT, DKey NUM);
         CREATE INDEX DemoTableIdx ON DemoTable (TextKey);
         INSERT INTO DemoTable VALUES(1, 9,8,7);
         INSERT INTO DemoTable VALUES(2, 1,2,3);

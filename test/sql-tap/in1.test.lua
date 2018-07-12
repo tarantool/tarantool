@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(83)
+test:plan(80)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -25,7 +25,7 @@ test:do_test(
     "in-1.0",
     function()
         test:execsql [[
-            CREATE TABLE t1(a PRIMARY KEY, b);
+            CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
             START TRANSACTION;
         ]]
         -- for _ in X(0, "X!for", [=[["set i 1","$i<=10","incr i"]]=]) do
@@ -309,16 +309,16 @@ test:do_test(
 test:do_execsql_test(
     "in-5.1",
     [[
-        INSERT INTO t1 VALUES('hello', 'world');
+        INSERT INTO t1 VALUES(19, 21);
         SELECT * FROM t1
         WHERE a IN (
-           'Do','an','IN','with','a','constant','RHS','but','where','the',
-           'has','many','elements','We','need','to','test','that',
-           'collisions','hash','table','are','resolved','properly',
-           'This','in-set','contains','thirty','one','entries','hello');
+           100,104,1092,1234,19,456,544,324,476,632,
+           231,987,79879,657,546,33,555432,44433,
+           234,3453,633,12341,5675,67854,
+           12123,345,3453,5553,3241,56751,9845);
     ]], {
         -- <in-5.1>
-        "hello", "world"
+        19, 21
         -- </in-5.1>
     })
 
@@ -327,15 +327,14 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-6.1",
     [[
-        CREATE TABLE ta(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE ta(a INTEGER PRIMARY KEY, b INT );
         INSERT INTO ta VALUES(1,1);
         INSERT INTO ta VALUES(2,2);
         INSERT INTO ta VALUES(3,3);
         INSERT INTO ta VALUES(4,4);
         INSERT INTO ta VALUES(6,6);
         INSERT INTO ta VALUES(8,8);
-        INSERT INTO ta VALUES(10,
-           'This is a key that is long enough to require a malloc in the VDBE');
+        INSERT INTO ta VALUES(10, 10);
         SELECT * FROM ta WHERE a<10;
     ]], {
         -- <in-6.1>
@@ -346,15 +345,14 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-6.2",
     [[
-        CREATE TABLE tb(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE tb(a INTEGER PRIMARY KEY, b INT );
         INSERT INTO tb VALUES(1,1);
         INSERT INTO tb VALUES(2,2);
         INSERT INTO tb VALUES(3,3);
         INSERT INTO tb VALUES(5,5);
         INSERT INTO tb VALUES(7,7);
         INSERT INTO tb VALUES(9,9);
-        INSERT INTO tb VALUES(11,
-           'This is a key that is long enough to require a malloc in the VDBE');
+        INSERT INTO tb VALUES(11,10);
         SELECT * FROM tb WHERE a<10;
     ]], {
         -- <in-6.2>
@@ -428,7 +426,7 @@ test:do_execsql_test(
         SELECT a FROM ta WHERE a IN (SELECT b FROM tb);
     ]], {
         -- <in-6.9>
-        1, 2, 3
+        1, 2, 3, 10
         -- </in-6.9>
     })
 
@@ -438,7 +436,7 @@ test:do_execsql_test(
         SELECT a FROM ta WHERE a NOT IN (SELECT b FROM tb);
     ]], {
         -- <in-6.10>
-        4, 6, 8, 10
+        4, 6, 8
         -- </in-6.10>
     })
 
@@ -470,7 +468,7 @@ test:do_execsql_test(
         SELECT a FROM t1 WHERE a NOT IN () ORDER BY a;
     ]], {
         -- <in-7.3>
-        5, 6, 7, 8, "hello"
+        5, 6, 7, 8, 19
         -- </in-7.3>
     })
 
@@ -549,10 +547,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in-8.1",
     [[
-        SELECT b FROM t1 WHERE a IN ('hello','there')
+        SELECT b FROM t1 WHERE a IN (19,88)
     ]], {
         -- <in-8.1>
-        "world"
+        21
         -- </in-8.1>
     })
 
@@ -586,7 +584,7 @@ test:do_execsql_test(
         SELECT b FROM t1 WHERE a NOT IN t4;
     ]], {
         -- <in-9.3>
-        64, 256, "world"
+        64, 256, 21
         -- </in-9.3>
     })
 
@@ -625,7 +623,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "in-11.1",
     [[
-        CREATE TABLE t6(a PRIMARY KEY,b NUMERIC);
+        CREATE TABLE t6(a  INT PRIMARY KEY,b NUMERIC);
         INSERT INTO t6 VALUES(1,2);
         INSERT INTO t6 VALUES(2,3);
         SELECT * FROM t6 WHERE b IN (2);
@@ -648,32 +646,6 @@ test:do_test(
         -- </in-11.2>
     })
 
-test:do_test(
-    "in-11.3",
-    function()
-        -- No coercion should occur here because of the unary + before b.
-        return test:execsql [[
-            SELECT * FROM t6 WHERE +b IN ('2');
-        ]]
-    end, {
-        -- <in-11.3>
-        
-        -- </in-11.3>
-    })
-
-test:do_test(
-    "in-11.4",
-    function()
-        -- No coercion because column a as affinity NONE
-        return test:execsql [[
-            SELECT * FROM t6 WHERE a IN ('2');
-        ]]
-    end, {
-        -- <in-11.4>
-        
-        -- </in-11.4>
-    })
-
 test:do_execsql_test(
     "in-11.5",
     [[
@@ -684,26 +656,13 @@ test:do_execsql_test(
         -- </in-11.5>
     })
 
-test:do_test(
-    "in-11.6",
-    function()
-        -- No coercion because column a as affinity NONE
-        return test:execsql [[
-            SELECT * FROM t6 WHERE +a IN ('2');
-        ]]
-    end, {
-        -- <in-11.6>
-        
-        -- </in-11.6>
-    })
-
 -- Test error conditions with expressions of the form IN(<compound select>).
 --
 test:do_execsql_test(
     "in-12.1",
     [[
-        CREATE TABLE t2(a PRIMARY KEY, b, c);
-        CREATE TABLE t3(a PRIMARY KEY, b, c);
+        CREATE TABLE t2(a  INT PRIMARY KEY, b INT , c INT );
+        CREATE TABLE t3(a  INT PRIMARY KEY, b INT , c INT );
     ]], {
         -- <in-12.1>
         
@@ -913,7 +872,7 @@ test:do_test(
 test:do_execsql_test(
     "in-13.2",
     [[
-        CREATE TABLE t7(id primary key, a, b, c NOT NULL);
+        CREATE TABLE t7(id  INT primary key, a INT , b INT , c  INT NOT NULL);
         INSERT INTO t7 VALUES(1, 1,    1, 1);
         INSERT INTO t7 VALUES(2, 2,    2, 2);
         INSERT INTO t7 VALUES(3, 3,    3, 3);

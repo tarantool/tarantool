@@ -34,7 +34,7 @@ box.sql.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
 ...
 -- gh-3052: upper/lower support only default locale
 -- For tr-TR result depends on collation
-box.sql.execute([[CREATE TABLE tu (descriptor CHAR(50) PRIMARY KEY, letter CHAR)]]);
+box.sql.execute([[CREATE TABLE tu (descriptor CHAR(50) PRIMARY KEY, letter CHAR(50))]]);
 ---
 ...
 box.internal.collation.create('TURKISH', 'ICU', 'tr-TR', {strength='primary'});

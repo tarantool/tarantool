@@ -7,7 +7,7 @@ test:plan(13)
 -- statement is correct.
 
 test:execsql [[
-    CREATE TABLE t1(a INT PRIMARY KEY, b);
+    CREATE TABLE t1(a INT PRIMARY KEY, b INT);
     CREATE INDEX t1ix2 on t1(b);
     CREATE INDEX t1ix1 on t1(b);
 ]]

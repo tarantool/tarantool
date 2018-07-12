@@ -30,7 +30,7 @@ test:plan(1)
 test:do_execsql_test(
     "tkt-fa7bf5ec-1",
     [[
-        CREATE TABLE t1(id primary key, x);
+        CREATE TABLE t1(id INT primary key, x TEXT);
         INSERT INTO t1 VALUES (1, 'a');
         INSERT INTO t1 VALUES (2, 'A');
         INSERT INTO t1 VALUES (3, 'A');

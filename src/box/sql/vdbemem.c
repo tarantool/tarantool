@@ -1257,7 +1257,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 	assert((pExpr->flags & EP_TokenOnly) == 0 || pCtx == 0);
 
 	if (op == TK_CAST) {
-		u8 aff = sqlite3AffinityType(pExpr->u.zToken, 0);
+		u8 aff = pExpr->affinity;
 		rc = valueFromExpr(db, pExpr->pLeft, aff, ppVal, pCtx);
 		testcase(rc != SQLITE_OK);
 		if (*ppVal) {

@@ -34,7 +34,7 @@ for N=1, bitmask_size do
     test:do_test(
         "join3-1."..N,
         function()
-            test:execsql("CREATE TABLE t"..N.."(x primary key);")
+            test:execsql("CREATE TABLE t"..N.."(x INT primary key);")
             test:execsql(string.format("INSERT INTO t%s VALUES(%s)", N, N))
             sql = "SELECT * FROM t1"
             -- for _ in X(0, "X!for", [=[["set i 2","$i<=$N","incr i"]]=]) do

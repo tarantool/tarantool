@@ -28,7 +28,7 @@ test:do_execsql_test(
     1.0,
     [[
     	DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(id PRIMARY KEY, x INTEGER, y INTEGER);
+        CREATE TABLE t1(id  INT PRIMARY KEY, x INTEGER, y INTEGER);
         WITH data(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM data) INSERT INTO t1 SELECT i, isqrt(i), isqrt(i) FROM data LIMIT 500;
         CREATE INDEX t1y ON t1(y);
         CREATE INDEX t1x ON t1(x);

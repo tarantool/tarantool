@@ -34,7 +34,7 @@ local time_quota =
 test:do_test(
     100,
     function()
-        local sql_arr = {[[CREATE TABLE t1(x primary key);
+        local sql_arr = {[[CREATE TABLE t1(x INT primary key);
             INSERT INTO t1(x) VALUES]]}
         local i
         for i = 1, 100000-1, 1 do

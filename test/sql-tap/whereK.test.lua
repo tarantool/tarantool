@@ -25,7 +25,7 @@ test:plan(10)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 testprefix = "whereK"
 test:do_execsql_test(1.1, [[
-  CREATE TABLE t1(a,b,c, primary key (a,b,c));
+  CREATE TABLE t1(a INT ,b INT ,c INT , primary key (a,b,c));
   WITH RECURSIVE c(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM c WHERE x<99)
     INSERT INTO t1(a,b,c) SELECT x, x/10, x%10 FROM c;
   CREATE INDEX t1bc ON t1(b,c);

@@ -33,7 +33,7 @@ test:do_test(
     1.0,
     function()
         test:execsql([[
-            CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a,b,c,d);
+            CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT ,d INT );
             CREATE INDEX t1a ON t1(a);
             CREATE INDEX t1b ON t1(b);
             CREATE INDEX t1c ON t1(c);

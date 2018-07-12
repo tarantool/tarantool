@@ -26,9 +26,9 @@ local ROW_NUM = 100 -- was 100
 test:do_test(
     "index2-1.1",
     function()
-        local sql_parts = {"CREATE TABLE t1(id primary key"}
+        local sql_parts = {"CREATE TABLE t1(id  INT primary key"}
         for i = 1, COL_NUM, 1 do
-            table.insert(sql_parts, "c"..i)
+            table.insert(sql_parts, "c"..i .. ' INT')
         end
         local sql = table.concat(sql_parts, ",")..");"
         return test:execsql(sql)

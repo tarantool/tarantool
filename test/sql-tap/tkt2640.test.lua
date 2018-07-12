@@ -35,16 +35,16 @@ test:plan(6)
 test:do_execsql_test(
     "tkt2640-1.1",
     [[
-        CREATE TABLE persons(person_id primary key, name);
+        CREATE TABLE persons(person_id  INT primary key, name TEXT);
         INSERT INTO persons VALUES(1,'fred');
         INSERT INTO persons VALUES(2,'barney');
         INSERT INTO persons VALUES(3,'wilma');
         INSERT INTO persons VALUES(4,'pebbles');
         INSERT INTO persons VALUES(5,'bambam');
-        CREATE TABLE directors(id primary key, person_id);
+        CREATE TABLE directors(id  INT primary key, person_id INT );
         INSERT INTO directors VALUES(1, 5);
         INSERT INTO directors VALUES(2, 3);
-        CREATE TABLE writers(person_id primary key);
+        CREATE TABLE writers(person_id  INT primary key);
         INSERT INTO writers VALUES(2);
         INSERT INTO writers VALUES(3);
         INSERT INTO writers VALUES(4);

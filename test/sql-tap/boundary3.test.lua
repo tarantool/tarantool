@@ -26,10 +26,10 @@ test:do_test(
     "boundary3-1.1",
     function()
         return test:execsql([[
-            CREATE TABLE t1(rowid primary key, a,x);
+            CREATE TABLE t1(rowid  INT primary key, a FLOAT ,x BLOB);
             INSERT INTO t1(rowid,a,x) VALUES(-8388609,1,'ffffffffff7fffff');
             INSERT INTO t1(rowid,a,x) VALUES(-36028797018963969,2,'ff7fffffffffffff');
-            INSERT INTO t1(rowid,a,x) VALUES(9223372036854775807,3,'7fffffffffffffff');
+            INSERT INTO t1(rowid,a,x) VALUES(9223372036854775806,3,'7fffffffffffffff');
             INSERT INTO t1(rowid,a,x) VALUES(127,4,'000000000000007f');
             INSERT INTO t1(rowid,a,x) VALUES(3,5,'0000000000000003');
             INSERT INTO t1(rowid,a,x) VALUES(16777216,6,'0000000001000000');
@@ -81,7 +81,7 @@ test:do_test(
             INSERT INTO t1(rowid,a,x) VALUES(-3,52,'fffffffffffffffd');
             INSERT INTO t1(rowid,a,x) VALUES(-128,53,'ffffffffffffff80');
             INSERT INTO t1(rowid,a,x) VALUES(-129,54,'ffffffffffffff7f');
-            INSERT INTO t1(rowid,a,x) VALUES(-9223372036854775808,55,'8000000000000000');
+            INSERT INTO t1(rowid,a,x) VALUES(-9223372036854775807,55,'8000000000000000');
             INSERT INTO t1(rowid,a,x) VALUES(4398046511104,56,'0000040000000000');
             INSERT INTO t1(rowid,a,x) VALUES(1099511627775,57,'000000ffffffffff');
             INSERT INTO t1(rowid,a,x) VALUES(-549755813889,58,'ffffff7fffffffff');
@@ -109,14 +109,14 @@ test:do_test(
     "boundary3-1.3",
     function()
         return test:execsql([[
-            CREATE TABLE t2(r primary key,a);
+            CREATE TABLE t2(r INT primary key, a REAL);
             INSERT INTO t2 SELECT rowid, a FROM t1;
             CREATE INDEX t2i1 ON t2(r);
             CREATE INDEX t2i2 ON t2(a);
             ---INSERT INTO t2 VALUES(100000,9.22337303685477580800e+18,65);
             ---INSERT INTO t2 VALUES(100001,-9.22337303685477580800e+18,66);
-            INSERT INTO t2 VALUES(9.22337303685477580800e+18,65);
-            INSERT INTO t2 VALUES(-9.22337303685477580800e+18,66);
+            INSERT INTO t2 VALUES(9223372036854775807, 65);
+            INSERT INTO t2 VALUES(-9223372036854775808, 66);
             SELECT count(*) FROM t2;
         ]])
     end, {
@@ -2318,12 +2318,12 @@ test:do_execsql_test(
 test:do_execsql_test(
     "boundary3-2.16.ge.1",
     "SELECT t2.a FROM t1 JOIN t2 USING(a) WHERE t1.rowid >= 9223372036854775807 ORDER BY t2.a"
-    ,{3})
+    ,{})
 
 test:do_execsql_test(
     "boundary3-2.16.ge.2",
     "SELECT t2.a FROM t2 NATURAL JOIN t1 WHERE t1.rowid >= 9223372036854775807 ORDER BY t1.a DESC"
-    ,{3})
+    ,{})
 
 test:do_execsql_test(
     "boundary3-2.16.ge.3",
@@ -2343,12 +2343,12 @@ test:do_execsql_test(
 test:do_execsql_test(
     "boundary3-2.16.lt.1",
     "SELECT t2.a FROM t1 JOIN t2 USING(a) WHERE t1.rowid < 9223372036854775807 ORDER BY t2.a"
-    ,{1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64})
+    ,{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64})
 
 test:do_execsql_test(
     "boundary3-2.16.lt.2",
     "SELECT t2.a FROM t2 NATURAL JOIN t1 WHERE t1.rowid < 9223372036854775807 ORDER BY t1.a DESC"
-    ,{64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 2, 1})
+    ,{64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1})
 
 test:do_execsql_test(
     "boundary3-2.16.lt.3",
@@ -6768,27 +6768,27 @@ test:do_execsql_test(
 test:do_execsql_test(
     "boundary3-2.46.1",
     "SELECT t1.a, t1.x FROM  t1, t2 WHERE t1.rowid=-9223372036854775808 AND t2.a=t1.a"
-    ,{55, "8000000000000000"})
+    ,{})
 
 test:do_execsql_test(
     "boundary3-2.46.2",
     "SELECT t2.* FROM t1 JOIN t2 USING(a) WHERE x='8000000000000000'"
-    ,{-9223372036854775808LL, 55})
+    ,{-9223372036854775807LL,55})
 
 test:do_execsql_test(
     "boundary3-2.46.3",
     "SELECT t1.rowid, t1.x FROM  t1 JOIN t2 ON t2.r=t1.rowid WHERE t2.a=55"
-    ,{-9223372036854775808LL, "8000000000000000"})
+    ,{-9223372036854775807LL, "8000000000000000"})
 
 test:do_execsql_test(
     "boundary3-2.46.gt.1",
     "SELECT t2.a FROM t1 JOIN t2 USING(a) WHERE t1.rowid > -9223372036854775808 ORDER BY t2.a"
-    ,{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 56, 57, 58, 59, 60, 61, 62, 63, 64})
+    ,{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64})
 
 test:do_execsql_test(
     "boundary3-2.46.gt.2",
     "SELECT t2.a FROM t2 NATURAL JOIN t1 WHERE t1.rowid > -9223372036854775808 ORDER BY t1.a DESC"
-    ,{64, 63, 62, 61, 60, 59, 58, 57, 56, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1})
+    ,{64, 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1})
 
 test:do_execsql_test(
     "boundary3-2.46.gt.3",
@@ -6858,12 +6858,12 @@ test:do_execsql_test(
 test:do_execsql_test(
     "boundary3-2.46.le.1",
     "SELECT t2.a FROM t1 JOIN t2 USING(a) WHERE t1.rowid <= -9223372036854775808 ORDER BY t2.a"
-    ,{55})
+    ,{})
 
 test:do_execsql_test(
     "boundary3-2.46.le.2",
     "SELECT t2.a FROM t2 NATURAL JOIN t1 WHERE t1.rowid <= -9223372036854775808 ORDER BY t1.a DESC"
-    ,{55})
+    ,{})
 
 test:do_execsql_test(
     "boundary3-2.46.le.3",

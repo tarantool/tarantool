@@ -24,7 +24,7 @@ test:plan(92)
 test:do_execsql_test(
     "join-1.1",
     [[
-        CREATE TABLE t1(a primary key,b,c);
+        CREATE TABLE t1(a INT primary key,b INT,c INT);
         INSERT INTO t1 VALUES(1,2,3);
         INSERT INTO t1 VALUES(2,3,4);
         INSERT INTO t1 VALUES(3,4,5);
@@ -38,7 +38,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-1.2",
     [[
-        CREATE TABLE t2(b primary key,c,d);
+        CREATE TABLE t2(b INT primary key,c INT,d INT);
         INSERT INTO t2 VALUES(1,2,3);
         INSERT INTO t2 VALUES(2,3,4);
         INSERT INTO t2 VALUES(3,4,5);
@@ -348,7 +348,7 @@ test:do_execsql2_test(
 test:do_execsql_test(
     "join-1.15",
     [[
-        CREATE TABLE t3(c primary key,d,e);
+        CREATE TABLE t3(c INT primary key,d INT,e INT);
         INSERT INTO t3 VALUES(2,3,4);
         INSERT INTO t3 VALUES(3,4,5);
         INSERT INTO t3 VALUES(4,5,6);
@@ -382,7 +382,7 @@ test:do_execsql2_test(
 test:do_execsql_test(
     "join-1.18",
     [[
-        CREATE TABLE t4(d primary key,e,f);
+        CREATE TABLE t4(d INT primary key,e INT,f INT);
         INSERT INTO t4 VALUES(2,3,4);
         INSERT INTO t4 VALUES(3,4,5);
         INSERT INTO t4 VALUES(4,5,6);
@@ -708,8 +708,8 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "join-5.1",
     [[
-        create table centros (id integer primary key, centro);
-        create table usuarios (id integer primary key, nombre, apellidos,
+        create table centros (id integer primary key, centro TEXT);
+        create table usuarios (id integer primary key, nombre TEXT, apellidos TEXT,
         idcentro integer);
         START TRANSACTION;
         INSERT INTO centros VALUES(1,'xxx');
@@ -733,7 +733,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-7.1",
     [[
-        CREATE TABLE t7 (id primary key, x, y);
+        CREATE TABLE t7 (id INT primary key, x TEXT, y INT);
         INSERT INTO t7 VALUES (1, 'pa1', 1);
         INSERT INTO t7 VALUES (2, 'pa2', NULL);
         INSERT INTO t7 VALUES (3, 'pa3', NULL);
@@ -742,7 +742,7 @@ test:do_execsql_test(
         INSERT INTO t7 VALUES (6, 'pa31', 130);
         INSERT INTO t7 VALUES (7, 'pa28', NULL);
 
-        CREATE TABLE t8 (a integer primary key, b);
+        CREATE TABLE t8 (a integer primary key, b TEXT);
         INSERT INTO t8 VALUES (1, 'pa1');
         INSERT INTO t8 VALUES (2, 'pa4');
         INSERT INTO t8 VALUES (3, NULL);
@@ -765,13 +765,13 @@ test:do_execsql_test(
 -- do_test join-8.1 {
 --   execsql {
 --     BEGIN;
---     CREATE TABLE t9(a INTEGER PRIMARY KEY, b);
+--     CREATE TABLE t9(a INTEGER PRIMARY KEY, b INT);
 --     INSERT INTO t9 VALUES(1,11);
 --     INSERT INTO t9 VALUES(2,22);
---     CREATE TABLE t10(x INTEGER PRIMARY KEY, y);
+--     CREATE TABLE t10(x INTEGER PRIMARY KEY, y INT);
 --     INSERT INTO t10 VALUES(1,2);
 --     INSERT INTO t10 VALUES(3,3);    
---     CREATE TABLE t11(p INTEGER PRIMARY KEY, q);
+--     CREATE TABLE t11(p INTEGER PRIMARY KEY, q INT);
 --     INSERT INTO t11 VALUES(2,111);
 --     INSERT INTO t11 VALUES(3,333);    
 --     CREATE VIEW v10_11 AS SELECT x, q FROM t10, t11 WHERE t10.y=t11.p;
@@ -816,8 +816,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-9.1",
     [[
-        CREATE TABLE t12(a primary key,b);
-        CREATE TABLE t13(b primary key,c);
+        CREATE TABLE t12(a INT primary key,b INT);
+        CREATE TABLE t13(b INT primary key,c INT);
         START TRANSACTION;
         INSERT INTO t12 VALUES(1,11);
         INSERT INTO t12 VALUES(2,22);
@@ -863,8 +863,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-10.1",
     [[
-        CREATE TABLE t21(a primary key,b,c);
-        CREATE TABLE t22(p primary key,q);
+        CREATE TABLE t21(a INT primary key,b INT,c INT);
+        CREATE TABLE t22(p INT primary key,q INT);
         CREATE INDEX i22 ON t22(q);
         SELECT a FROM t21 LEFT JOIN t22 ON b=p WHERE q=
            (SELECT max(m.q) FROM t22 m JOIN t21 n ON n.b=m.p WHERE n.c=1);
@@ -881,8 +881,8 @@ test:do_test(
     "join-10.2",
     function()
         test:execsql [[
-            CREATE TABLE t23(a primary key, b, c);
-            CREATE TABLE t24(a primary key, b, c);
+            CREATE TABLE t23(a INT primary key, b INT, c INT);
+            CREATE TABLE t24(a INT primary key, b INT, c INT);
             INSERT INTO t23 VALUES(1, 2, 3);
         ]]
         return test:execsql [[
@@ -980,8 +980,8 @@ test:do_test(
             DROP TABLE IF EXISTS t2;
         ]]
         return test:execsql [[
-            CREATE TABLE t1(id primary key, a COLLATE "unicode_ci", b);
-            CREATE TABLE t2(id primary key, a, b);
+            CREATE TABLE t1(id INT primary key, a TEXT COLLATE "unicode_ci", b INT);
+            CREATE TABLE t2(id INT primary key, a TEXT, b INT);
             INSERT INTO t1 VALUES(1, 'ONE', 1);
             INSERT INTO t1 VALUES(2, 'two', 2);
             INSERT INTO t2 VALUES(1, 'one', 1);
@@ -1015,8 +1015,8 @@ test:do_test(
             DROP TABLE IF EXISTS t2;
         ]]
         return test:execsql [[
-            CREATE TABLE t1(a primary key, b TEXT);
-            CREATE TABLE t2(b INTEGER primary key, a);
+            CREATE TABLE t1(a TEXT primary key, b TEXT);
+            CREATE TABLE t2(b INTEGER primary key, a TEXT);
             INSERT INTO t1 VALUES('one', '1.0');
             INSERT INTO t1 VALUES('two', '2');
             INSERT INTO t2 VALUES(1, 'one');
@@ -1054,7 +1054,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join-12.1",
     [[
-        CREATE TABLE t14(x primary key);
+        CREATE TABLE t14(x TEXT primary key);
         INSERT INTO t14 VALUES('abcdefghij');
     ]])
 
@@ -1092,9 +1092,9 @@ jointest("join-12.13", 65537, {1, 'at most 64 tables in a join'})
 test:do_execsql_test(
     "join-13.0",
     [[
-        CREATE TABLE aa(a primary key);
-        CREATE TABLE bb(b primary key);
-        CREATE TABLE cc(id primary key, c);
+        CREATE TABLE aa(a INT primary key);
+        CREATE TABLE bb(b INT primary key);
+        CREATE TABLE cc(id INT primary key, c INT);
 
         INSERT INTO aa VALUES(45);
         INSERT INTO cc VALUES(1, 45);

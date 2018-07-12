@@ -32,7 +32,7 @@ test:do_execsql_test(
 	"truncate-1.3",
 	[[
 		DROP TABLE IF EXISTS t1;
-		CREATE TABLE t1(id PRIMARY KEY, a, b);
+		CREATE TABLE t1(id INT PRIMARY KEY, a INT, b INT);
 		INSERT INTO t1 VALUES(1, 1, 1), (2, 1, 3), (3, 2, 3);
 		DELETE FROM t1;
 		SELECT * FROM t1;

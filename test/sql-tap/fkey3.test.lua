@@ -107,7 +107,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "fkey3-3.1",
     [[
-        CREATE TABLE t3(a PRIMARY KEY, b, c, d,
+        CREATE TABLE t3(a INT PRIMARY KEY, b INT, c INT, d INT,
             UNIQUE(a, b),
             FOREIGN KEY(c, d) REFERENCES t3(a, b));
         INSERT INTO t3 VALUES(1, 2, 1, 2);
@@ -139,7 +139,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey3-3.4",
     [[
-        CREATE TABLE t4(a PRIMARY KEY, b REFERENCES t4(a));
+        CREATE TABLE t4(a INT PRIMARY KEY, b INT REFERENCES t4(a));
     ]], {
         -- <fkey3-3.4>
         -- </fkey3-3.4>
@@ -158,7 +158,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey3-3.6",
     [[
-        CREATE TABLE t6(a PRIMARY KEY, b, c, d, UNIQUE (a, b),
+        CREATE TABLE t6(a INTEGER PRIMARY KEY, b TEXT, c INT, d TEXT, UNIQUE(a, b),
             FOREIGN KEY(c, d) REFERENCES t6(a, b));
         INSERT INTO t6 VALUES(1, 'a', 1, 'a');
         INSERT INTO t6 VALUES(2, 'a', 2, 'a');
@@ -205,7 +205,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "fkey3-3.10",
     [[
-        CREATE TABLE t7(a, b, c, d PRIMARY KEY, UNIQUE(a, b),
+        CREATE TABLE t7(a TEXT, b INT, c TEXT, d INTEGER PRIMARY KEY, UNIQUE(a, b),
             FOREIGN KEY(c, d) REFERENCES t7(a, b));
         INSERT INTO t7 VALUES('x', 1, 'x', 1);
         INSERT INTO t7 VALUES('x', 2, 'x', 2);
@@ -237,7 +237,8 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey3-6.1",
     [[
-        CREATE TABLE t8(a PRIMARY KEY, b, c, d, e);
+        CREATE TABLE t8(a INT PRIMARY KEY, b INT, c INT, d INT, e INT, UNIQUE(a, b),
+                        FOREIGN KEY(c, d) REFERENCES t8(a, b));
         CREATE UNIQUE INDEX t8i1 ON t8(a, b);
         CREATE UNIQUE INDEX t8i2 ON t8(c);
         ALTER TABLE t8 ADD CONSTRAINT fk1 FOREIGN KEY (c, d) REFERENCES t8(a, b);
@@ -271,7 +272,7 @@ test:do_catchsql_test(
     "fkey3-6.4",
     [[
         CREATE TABLE TestTable (
-            id PRIMARY KEY,
+            id INT PRIMARY KEY,
             name TEXT,
             source_id INTEGER NOT NULL,
             parent_id INTEGER);

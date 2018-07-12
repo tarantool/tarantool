@@ -29,9 +29,9 @@ test:plan(7)
 -- easily tell where the output of one query ends and the next query
 -- begins. 
 -- 
---     CREATE TABLE t1(a);
+--     CREATE TABLE t1(a TEXT);
 --     INSERT INTO t1 VALUES('abc'),('def');
---     CREATE TABLE t2(a);
+--     CREATE TABLE t2(a TEXT);
 --     INSERT INTO t2 VALUES('DEF');
 -- 
 --     SELECT a FROM t1 EXCEPT SELECT a FROM t2 ORDER BY a;
@@ -50,11 +50,11 @@ test:do_test(
     "selectE-1.0",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a primary key);
+            CREATE TABLE t1(a TEXT primary key);
             INSERT INTO t1 VALUES('abc'),('def'),('ghi');
-            CREATE TABLE t2(a primary key);
+            CREATE TABLE t2(a TEXT primary key);
             INSERT INTO t2 VALUES('DEF'),('abc');
-            CREATE TABLE t3(a primary key);
+            CREATE TABLE t3(a TEXT primary key);
             INSERT INTO t3 VALUES('def'),('jkl');
 
             SELECT a FROM t1 EXCEPT SELECT a FROM t2

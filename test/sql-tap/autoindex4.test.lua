@@ -23,9 +23,9 @@ test:plan(7)
 test:do_execsql_test(
     "autoindex4-1.0",
     [[
-        CREATE TABLE t1(a,b, primary key(a,b));
+        CREATE TABLE t1(a INT,b TEXT, primary key(a,b));
         INSERT INTO t1 VALUES(123,'abc'),(234,'def'),(234,'ghi'),(345,'jkl');
-        CREATE TABLE t2(x,y, primary key(x,y));
+        CREATE TABLE t2(x INT,y TEXT, primary key(x,y));
         INSERT INTO t2 VALUES(987,'zyx'),(654,'wvu'),(987,'rqp');
 
         SELECT *, '|' FROM t1, t2 WHERE a=234 AND x=987 ORDER BY +b;
@@ -76,7 +76,7 @@ test:do_execsql_test(
     })
 
 -- do_execsql_test autoindex4-2.0 {
---   CREATE TABLE t3(e,f);
+--   CREATE TABLE t3(e INT,f INT);
 --   INSERT INTO t3 VALUES(123,654),(555,444),(234,987);
 --   SELECT (SELECT count(*) FROM t1, t2 WHERE a=e AND x=f), e, f, '|'
 --     FROM t3

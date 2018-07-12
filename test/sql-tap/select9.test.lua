@@ -136,8 +136,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t1(id primary key, a, b, c);
-        CREATE TABLE t2(id primary key, d, e, f);
+        CREATE TABLE t1(id INT primary key, a INT, b TEXT, c TEXT);
+        CREATE TABLE t2(id INT primary key, d INT, e TEXT, f TEXT);
         START TRANSACTION;
           INSERT INTO t1 VALUES(0, 1,  'one',   'I');
           INSERT INTO t1 VALUES(1, 3,  NULL,    NULL);
@@ -484,8 +484,8 @@ test:do_test(
     "select9-5.1",
     function()
         return test:execsql [[
-            CREATE TABLE t51(x primary key, y);
-            CREATE TABLE t52(x primary key, y);
+            CREATE TABLE t51(x INT primary key, y INT);
+            CREATE TABLE t52(x INT primary key, y INT);
             CREATE VIEW v5 as
                SELECT x, y FROM t51
                UNION ALL
@@ -536,8 +536,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t61;
         DROP TABLE IF EXISTS t62;
-        CREATE TABLE t61(a primary key);
-        CREATE TABLE t62(b primary key);
+        CREATE TABLE t61(a INT primary key);
+        CREATE TABLE t62(b INT primary key);
         INSERT INTO t61 VALUES(111);
         INSERT INTO t62 VALUES(222);
         SELECT a FROM t61 WHERE 0 UNION SELECT b FROM t62;

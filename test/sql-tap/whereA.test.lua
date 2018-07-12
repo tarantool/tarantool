@@ -23,15 +23,15 @@ test:do_test(
     "whereA-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a INTEGER PRIMARY KEY, b UNIQUE, c);
-            INSERT INTO t1 VALUES(1,2,3);
-            INSERT INTO t1 values(2,'hello','world');
+            CREATE TABLE t1(a INTEGER PRIMARY KEY, b REAL UNIQUE, c TEXT);
+            INSERT INTO t1 VALUES(1,2,'3');
+            INSERT INTO t1 values(2,55,'world');
             INSERT INTO t1 VALUES(3,4.53,NULL);
             SELECT * FROM t1
         ]]
     end, {
         -- <whereA-1.1>
-        1, 2, 3, 2, "hello", "world", 3, 4.53, ""
+        1, 2, '3', 2, 55, "world", 3, 4.53, ""
         -- </whereA-1.1>
     })
 
@@ -44,7 +44,7 @@ test:do_test(
         ]]
     end, {
         -- <whereA-1.2>
-        3, 4.53, "", 2, "hello", "world", 1, 2, 3
+        3, 4.53, "", 2, 55, "world", 1, 2, '3'
         -- </whereA-1.2>
     })
 
@@ -60,7 +60,7 @@ test:do_test(
         ]]
     end, {
         -- <whereA-1.3>
-        3, 4.53, "", 2, "hello", "world", 1, 2, 3
+        3, 4.53, "", 2, 55, "world", 1, 2, '3'
         -- </whereA-1.3>
     })
 
@@ -100,7 +100,7 @@ test:do_execsql_test(
         SELECT * FROM t1 WHERE b=2 AND a IS NOT NULL;
     ]], {
         -- <whereA-1.9>
-        1, 2, 3
+        1, 2, '3'
         -- </whereA-1.9>
     })
 
@@ -113,7 +113,7 @@ test:do_test(
         ]]
     end, {
         -- <whereA-2.1>
-        1, 2, 3, 2, "hello", "world", 3, 4.53, ""
+        1, 2, '3', 2, 55, "world", 3, 4.53, ""
         -- </whereA-2.1>
     })
 
@@ -126,7 +126,7 @@ test:do_test(
         ]]
     end, {
         -- <whereA-2.2>
-        3, 4.53, "", 2, "hello", "world", 1, 2, 3
+        3, 4.53, "", 2, 55, "world", 1, 2, '3'
         -- </whereA-2.2>
     })
 
@@ -137,7 +137,7 @@ test:do_test(
 --   }
 -- } {1 2 3 2 hello world 3 4.53 {}}
 test:do_test(
-    "whereA-3.1",
+    "whe:reA-3.1",
     function()
         return test:execsql [[
             PRAGMA reverse_unordered_selects=0;
@@ -145,7 +145,7 @@ test:do_test(
         ]]
     end, {
         -- <whereA-3.1>
-        1, 2, 3, 3, 4.53, "", 2, "hello", "world"
+        1, 2, '3', 3, 4.53, "", 2, 55, "world"
         -- </whereA-3.1>
     })
 
@@ -158,7 +158,7 @@ test:do_test(
         ]]
     end, {
         -- <whereA-3.2>
-        2, "hello", "world", 3, 4.53, "", 1, 2, 3
+        2, 55, "world", 3, 4.53, "", 1, 2, '3'
         -- </whereA-3.2>
     })
 
@@ -171,7 +171,7 @@ test:do_test(
         ]]
     end, {
         -- <whereA-3.3>
-        1, 2, 3, 3, 4.53, "", 2, "hello", "world"
+        1, 2, '3', 3, 4.53, "", 2, 55, "world"
         -- </whereA-3.3>
     })
 
@@ -179,7 +179,7 @@ test:do_test(
     "whereA-4.1",
     function()
         return test:execsql [[
-            CREATE TABLE t2(id int primary key, x);
+            CREATE TABLE t2(id int primary key, x INT);
             INSERT INTO t2 VALUES(1, 1);
             INSERT INTO t2 VALUES(2, 2);
             SELECT x FROM t2;

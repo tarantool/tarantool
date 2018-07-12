@@ -23,8 +23,8 @@ test:plan(4)
 test:do_execsql_test(
     "tkt3357-1.1",
     [[
-        create table a(id integer primary key, b_id integer, myvalue varchar);
-        create table b(id integer primary key, bvalue varchar);
+        create table a(id integer primary key, b_id integer, myvalue text);
+        create table b(id integer primary key, bvalue text);
         insert into a values(1, 1,'Test');
         insert into a values(2, 1,'Test2');
         insert into a values(3, 1,'Test3');

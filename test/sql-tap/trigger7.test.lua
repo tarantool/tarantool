@@ -40,7 +40,7 @@ test:do_test(
     "trigger7-2.1",
     function()
         test:execsql [[
-			CREATE TABLE t1(x PRIMARY KEY, y);
+			CREATE TABLE t1(x INT PRIMARY KEY, y INT);
             CREATE TRIGGER r1 AFTER UPDATE OF x ON t1 BEGIN
               SELECT '___update_t1.x___';
             END;
@@ -109,7 +109,7 @@ test:do_test(
 test:do_execsql_test(
     "trigger7-3.1",
     [[
-        CREATE TABLE t2(x PRIMARY KEY,y,z);
+        CREATE TABLE t2(x INT PRIMARY KEY,y INT,z INT);
         CREATE TRIGGER t2r1 AFTER INSERT ON t2 BEGIN SELECT 1; END;
         CREATE TRIGGER t2r2 BEFORE INSERT ON t2 BEGIN SELECT 1; END;
         CREATE TRIGGER t2r3 AFTER UPDATE ON t2 BEGIN SELECT 1; END;

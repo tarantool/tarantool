@@ -61,10 +61,10 @@ test:plan(26)
 test:catchsql " pragma recursive_triggers = off "
 -- 1.
 ii = 0
-tbl_definitions = { "CREATE TABLE tbl (a INTEGER PRIMARY KEY, b);",
-                    "CREATE TABLE tbl (a PRIMARY KEY, b);",
-                    "CREATE TABLE tbl (a, b PRIMARY KEY);",
-                    "CREATE TABLE tbl (a, b INTEGER PRIMARY KEY);" }
+tbl_definitions = { "CREATE TABLE tbl (a INTEGER PRIMARY KEY, b INT );",
+                    "CREATE TABLE tbl (a  INT PRIMARY KEY, b INT );",
+                    "CREATE TABLE tbl (a INT , b  INT PRIMARY KEY);",
+                    "CREATE TABLE tbl (a INT , b INTEGER PRIMARY KEY);" }
 -- Tarantool: temporary tables are not supported so far. #2119
 -- table.insert(tbl_definitions,"CREATE TEMP TABLE tbl (a, b INTEGER PRIMARY KEY);")
 -- table.insert(tbl_definitions,"CREATE TEMP TABLE tbl (a INTEGER PRIMARY KEY, b);")
@@ -85,8 +85,8 @@ for _, tbl_defn in ipairs(tbl_definitions) do
         INSERT INTO tbl VALUES(3, 4);
     ]]
     test:execsql [[
-        CREATE TABLE rlog (idx INTEGER PRIMARY KEY, old_a, old_b, db_sum_a, db_sum_b, new_a, new_b);
-        CREATE TABLE clog (idx INTEGER PRIMARY KEY, old_a, old_b, db_sum_a, db_sum_b, new_a, new_b);
+        CREATE TABLE rlog (idx INTEGER PRIMARY KEY, old_a INT , old_b INT , db_sum_a INT , db_sum_b INT , new_a INT , new_b INT );
+        CREATE TABLE clog (idx INTEGER PRIMARY KEY, old_a INT , old_b INT , db_sum_a INT , db_sum_b INT , new_a INT , new_b INT );
     ]]
     test:execsql [[
         CREATE TRIGGER before_update_row BEFORE UPDATE ON tbl FOR EACH ROW
@@ -199,7 +199,7 @@ for _, tbl_defn in ipairs(tbl_definitions) do
         "trigger2-1."..ii..".3",
         [[
 
-            CREATE TABLE other_tbl(a PRIMARY KEY, b);
+            CREATE TABLE other_tbl(a  INT PRIMARY KEY, b INT );
             INSERT INTO other_tbl VALUES(1, 2);
             INSERT INTO other_tbl VALUES(3, 4);
             -- INSERT INTO tbl SELECT * FROM other_tbl;
@@ -293,8 +293,8 @@ test:catchsql [[
 --       DROP TABLE log;
 --     }
 --     execsql {
---       CREATE TABLE tbl(a PRIMARY KEY, b, c);
---       CREATE TABLE log(a, b, c);
+--       CREATE TABLE tbl(a  INT PRIMARY KEY, b INT , c INT );
+--       CREATE TABLE log(a INT , b INT , c INT );
 --     }
 --     set query {SELECT * FROM tbl; SELECT * FROM log;}
 --     set prep "$prep; INSERT INTO log VALUES(1, 2, 3);\
@@ -325,8 +325,8 @@ test:catchsql [[
 -- MUST_WORK_TEST
 -- trigger2-3.1: UPDATE OF triggers
 -- execsql {
---   CREATE TABLE tbl (a PRIMARY KEY, b, c, d);
---   CREATE TABLE log (a PRIMARY KEY);
+--   CREATE TABLE tbl (a  INT PRIMARY KEY, b INT , c INT , d INT );
+--   CREATE TABLE log (a  INT PRIMARY KEY);
 --   INSERT INTO log VALUES (0);
 --   INSERT INTO tbl VALUES (0, 0, 0, 0);
 --   INSERT INTO tbl VALUES (1, 0, 0, 0);
@@ -354,8 +354,8 @@ table.insert(when_triggers,"t2 BEFORE INSERT ON tbl WHEN (SELECT count(*) FROM t
 
 
 test:execsql [[
-    CREATE TABLE tbl (a , b PRIMARY KEY, c, d);
-    CREATE TABLE log (a PRIMARY KEY);
+    CREATE TABLE tbl (a  INT , b  INT PRIMARY KEY, c INT , d INT );
+    CREATE TABLE log (a  INT PRIMARY KEY);
     INSERT INTO log VALUES (0);
 ]]
 for _, trig in ipairs(when_triggers) do
@@ -396,9 +396,9 @@ test:execsql [[
 -- integrity_check trigger2-3.3
 -- # Simple cascaded trigger
 test:execsql [[
-    CREATE TABLE tblA(a PRIMARY KEY, b);
-    CREATE TABLE tblB(a PRIMARY KEY, b);
-    CREATE TABLE tblC(a PRIMARY KEY, b);
+    CREATE TABLE tblA(a  INT PRIMARY KEY, b INT );
+    CREATE TABLE tblB(a  INT PRIMARY KEY, b INT );
+    CREATE TABLE tblC(a  INT PRIMARY KEY, b INT );
 
     CREATE TRIGGER tr1 BEFORE INSERT ON tblA BEGIN
       INSERT INTO tblB values(new.a, new.b);
@@ -444,7 +444,7 @@ test:execsql [[
 ]]
 -- Simple recursive trigger
 test:execsql [[
-    CREATE TABLE tbl(a PRIMARY KEY, b, c);
+    CREATE TABLE tbl(a  INT PRIMARY KEY, b INT , c INT );
     CREATE TRIGGER tbl_trig BEFORE INSERT ON tbl
       BEGIN
         INSERT INTO tbl VALUES (new.a + 1, new.b + 1, new.c + 1);
@@ -467,7 +467,7 @@ test:execsql [[
 -- MUST_WORK_TEST
 -- 5.
 -- execsql {
---   CREATE TABLE tbl(a PRIMARY KEY, b, c);
+--   CREATE TABLE tbl(a  INT PRIMARY KEY, b INT , c INT );
 --   CREATE TRIGGER tbl_trig BEFORE INSERT ON tbl
 --     BEGIN
 --       INSERT INTO tbl VALUES (1, 2, 3);
@@ -490,7 +490,7 @@ test:execsql [[
 -- ifcapable conflict {
 --   # Handling of ON CONFLICT by INSERT statements inside triggers
 --   execsql {
---     CREATE TABLE tbl (a primary key, b, c);
+--     CREATE TABLE tbl (a  INT primary key, b INT , c INT );
 --     CREATE TRIGGER ai_tbl AFTER INSERT ON tbl BEGIN
 --       INSERT OR IGNORE INTO tbl values (new.a, 0, 0);
 --     END;
@@ -604,14 +604,14 @@ test:execsql [[
 test:do_execsql_test(
     "trigger2-7.1",
     [[
-        CREATE TABLE ab(a PRIMARY KEY, b);
-        CREATE TABLE cd(c PRIMARY KEY, d);
+        CREATE TABLE ab(a  INT PRIMARY KEY, b INT );
+        CREATE TABLE cd(c  INT PRIMARY KEY, d INT );
         INSERT INTO ab VALUES (1, 2);
         INSERT INTO ab VALUES (0, 0);
         INSERT INTO cd VALUES (3, 4);
 
         CREATE TABLE tlog(ii INTEGER PRIMARY KEY,
-            olda, oldb, oldc, oldd, newa, newb, newc, newd);
+            olda INT , oldb INT , oldc INT , oldd INT , newa INT , newb INT , newc INT , newd INT );
 
         CREATE VIEW abcd AS SELECT a, b, c, d FROM ab, cd;
 
@@ -691,7 +691,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger2-8.1",
     [[
-        CREATE TABLE t1(a PRIMARY KEY,b,c);
+        CREATE TABLE t1(a  INT PRIMARY KEY,b INT ,c INT );
         INSERT INTO t1 VALUES(1,2,3);
         CREATE VIEW v1 AS
           SELECT a+b AS x, b+c AS y, a+c AS z FROM t1;
@@ -705,7 +705,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger2-8.2",
     [[
-        CREATE TABLE v1log(id PRIMARY KEY, a,b,c,d,e,f);
+        CREATE TABLE v1log(id  INT PRIMARY KEY, a INT ,b INT ,c INT ,d INT ,e INT ,f INT );
         CREATE TRIGGER r1 INSTEAD OF DELETE ON v1 BEGIN
           INSERT INTO v1log VALUES(OLD.x, OLD.x,NULL,OLD.y,NULL,OLD.z,NULL);
         END;

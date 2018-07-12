@@ -206,7 +206,7 @@ test:do_test(
     "where2-2.4",
     function()
         test:execsql [[
-            CREATE TABLE x1(a INTEGER PRIMARY KEY, b DEFAULT 1);
+            CREATE TABLE x1(a INTEGER PRIMARY KEY, b INT DEFAULT 1);
             WITH RECURSIVE
                cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<50)
             INSERT INTO x1 SELECT x, 1 FROM cnt;
@@ -880,10 +880,10 @@ test:do_test(
         "where2-7.1",
         function()
             return cksort([[
-    create table t8(a PRIMARY KEY, b, c);
+    create table t8(a INT PRIMARY KEY, b INT, c INT);
     insert into t8 values(1,2,3);
     insert into t8 values(2,3,4);
-    create table t9(x,y, PRIMARY key (x, y));
+    create table t9(x INT,y INT, PRIMARY key (x, y));
     insert into t9 values(2,4);
     insert into t9 values(2,3);
     select y from t8, t9 where a=1 order by a, y;
@@ -1213,7 +1213,7 @@ test:do_execsql_test(
         "where2-9.1",
         function()
             test:execsql [[
-                CREATE TABLE t10(id int PRIMARY KEY,a,b,c);
+                CREATE TABLE t10(id int PRIMARY KEY,a INT,b INT,c INT);
                 START TRANSACTION;
                 INSERT INTO t10 VALUES(1, 1,1,1);
                 INSERT INTO t10 VALUES(2, 1,2,2);
@@ -1316,7 +1316,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "where2-13.1",
     [[
-        CREATE TABLE t13(a primary key,b);
+        CREATE TABLE t13(a INT primary key,b INT);
         INSERT INTO t13 VALUES(4,5);
         SELECT * FROM t13 WHERE (1=2 AND a=3) OR a=4;
     ]], {

@@ -206,7 +206,7 @@ test:do_execsql_test(
     "select5-5.1",
     [[
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t2(id int primary key, a, b, c);
+        CREATE TABLE t2(id int primary key, a INT, b INT, c INT);
         INSERT INTO t2 VALUES(0, 1, 2, 3);
         INSERT INTO t2 VALUES(1, 1, 4, 5);
         INSERT INTO t2 VALUES(2, 6, 4, 7);
@@ -276,7 +276,7 @@ test:do_execsql_test(
     "select5-6.1",
     [[
         DROP TABLE IF EXISTS t3;
-        CREATE TABLE t3(x primary key,y);
+        CREATE TABLE t3(x INT primary key,y INT);
         INSERT INTO t3 VALUES(1,NULL);
         INSERT INTO t3 VALUES(2,NULL);
         INSERT INTO t3 VALUES(3,4);
@@ -291,7 +291,7 @@ test:do_execsql_test(
     "select5-6.2",
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(id int primary key, x,y,z);
+        CREATE TABLE t4(id int primary key, x INT,y INT,z INT);
         INSERT INTO t4 VALUES(0,1,2,NULL);
         INSERT INTO t4 VALUES(1,2,3,NULL);
         INSERT INTO t4 VALUES(2,3,NULL,5);
@@ -324,8 +324,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t8a;
         DROP TABLE IF EXISTS t8b;
-        CREATE TABLE t8a(id int primary key,a,b);
-        CREATE TABLE t8b(rowid int primary key, x);
+        CREATE TABLE t8a(id int primary key,a TEXT,b INT);
+        CREATE TABLE t8b(rowid int primary key, x INT);
         INSERT INTO t8a VALUES(0, 'one', 1);
         INSERT INTO t8a VALUES(1, 'one', 2);
         INSERT INTO t8a VALUES(2, 'two', 3);

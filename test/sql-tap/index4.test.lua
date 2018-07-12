@@ -22,7 +22,7 @@ testprefix = "index4"
 test:do_execsql_test(
     1.1,
     [[
-          CREATE TABLE t1(x primary key);
+        CREATE TABLE t1(x BLOB primary key);
         START TRANSACTION;
           INSERT INTO t1 VALUES(randomblob(102));
           INSERT INTO t1 SELECT randomblob(102) FROM t1;     --     2
@@ -78,7 +78,7 @@ test:do_execsql_test(
     1.6,
     [[
           DROP TABLE t1;
-          CREATE TABLE t1(x primary key);
+          CREATE TABLE t1(x BLOB primary key);
         START TRANSACTION;
           INSERT INTO t1 VALUES('a');
           INSERT INTO t1 VALUES('b');
@@ -107,7 +107,7 @@ test:do_execsql_test(
     [[
         --START TRANSACTION;
           DROP TABLE t1;
-          CREATE TABLE t1(x primary key);
+          CREATE TABLE t1(x TEXT primary key);
           INSERT INTO t1 VALUES('a');
         --COMMIT;
         CREATE INDEX i1 ON t1(x); 
@@ -126,7 +126,7 @@ if (1 > 0)
         [[
             --START TRANSACTION;
               DROP TABLE t1;
-              CREATE TABLE t1(x primary key);
+              CREATE TABLE t1(x INT primary key);
             --COMMIT;
             CREATE INDEX i1 ON t1(x); 
             --PRAGMA integrity_check
@@ -140,7 +140,7 @@ end
 test:do_execsql_test(
     2.1,
     [[
-          CREATE TABLE t2(id primary key, x);
+          CREATE TABLE t2(id INT primary key, x INT);
         START TRANSACTION;
           INSERT INTO t2 VALUES(1, 14);
           INSERT INTO t2 VALUES(2, 35);

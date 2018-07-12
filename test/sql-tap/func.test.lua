@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14538)
+test:plan(14535)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -38,7 +38,7 @@ test:do_test(
 test:do_execsql_test(
     "func-0.1",
     [[
-        CREATE TABLE t2(id integer primary key, a);
+        CREATE TABLE t2(id integer primary key, a INT);
         INSERT INTO t2(id,a) VALUES(1, 1);
         INSERT INTO t2(id,a) VALUES(2, NULL);
         INSERT INTO t2(id,a) VALUES(3, 345);
@@ -357,7 +357,7 @@ test:do_test(
     "func-4.1",
     function()
         test:execsql([[
-            CREATE TABLE t1(id integer primary key, a,b,c);
+            CREATE TABLE t1(id integer primary key, a INT,b REAL,c REAL);
             INSERT INTO t1(id, a,b,c) VALUES(1, 1,2,3);
             INSERT INTO t1(id, a,b,c) VALUES(2, 2,1.2345678901234,-12345.67890);
             INSERT INTO t1(id, a,b,c) VALUES(3, 3,-2,-5);
@@ -1201,7 +1201,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-12.5",
     [[
-        CREATE TABLE t4(id integer primary key, x);
+        CREATE TABLE t4(id integer primary key, x INT);
         INSERT INTO t4 VALUES(1, test_destructor('hello'));
         INSERT INTO t4 VALUES(2, test_destructor('world'));
         SELECT min(test_destructor(x)), max(test_destructor(x)) FROM t4;
@@ -1247,7 +1247,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-13.2",
     [[
-        CREATE TABLE t4(id integer primary key, a, b);
+        CREATE TABLE t4(id integer primary key, a INT, b INT);
         INSERT INTO t4 VALUES(1, 'abc', 'def');
         INSERT INTO t4 VALUES(2, 'ghi', 'jkl');
     ]], {
@@ -1452,7 +1452,7 @@ test:do_test(
     "func-16.1",
     function()
         test:execsql([[
-            CREATE TABLE tbl2(id integer primary key, a, b);
+            CREATE TABLE tbl2(id integer primary key, a INT, b INT);
         ]])
         STMT = sqlite3_prepare(DB, "INSERT INTO tbl2 VALUES(1, ?, ?)", -1, "TAIL")
         sqlite3_bind_blob(STMT, 1, "abc", 3)
@@ -1492,7 +1492,7 @@ end
 test:do_execsql_test(
     "func-18.1",
     [[
-        CREATE TABLE t5(id int primary key, x);
+        CREATE TABLE t5(id int primary key, x INT);
         INSERT INTO t5 VALUES(1, 1);
         INSERT INTO t5 VALUES(2, -99);
         INSERT INTO t5 VALUES(3, 10000);
@@ -1571,7 +1571,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-18.10",
     [[
-        CREATE TABLE t6(id primary key, x INTEGER);
+        CREATE TABLE t6(id INT primary key, x INTEGER);
         INSERT INTO t6 VALUES(1, 1);
         INSERT INTO t6 VALUES(2, 1<<62);
         SELECT sum(x) - ((1<<62)+1) from t6;
@@ -2421,7 +2421,7 @@ test:do_test(
     "func-28.1",
     function()
         test:execsql([[
-            CREATE TABLE t28(id primary key, x, y DEFAULT(nosuchfunc(1)));
+            CREATE TABLE t28(id INT primary key, x INT, y INT DEFAULT(nosuchfunc(1)));
         ]])
         return test:catchsql([[
             INSERT INTO t28(id, x) VALUES(1, 1);
@@ -2430,130 +2430,6 @@ test:do_test(
         -- <func-28.1>
         1, "unknown function: NOSUCHFUNC()"
         -- </func-28.1>
-    })
-
--- Verify that the length() and typeof() functions do not actually load
--- the content of their argument.
---
-
--- MUST_WORK_TEST cache_miss
-if 0>0 then
-test:do_test(
-    "func-29.1",
-    function()
-        test:execsql([[
-            CREATE TABLE t29(id INTEGER PRIMARY KEY, x, y);
-            INSERT INTO t29 VALUES(1, 2, 3), (2, NULL, 4), (3, 4.5, 5);
-            INSERT INTO t29 VALUES(4, randomblob(1000000), 6);
-            INSERT INTO t29 VALUES(5, 'hello', 7);
-        ]])
-        db("close")
-        sqlite3("db", "test.db")
-        sqlite3_db_status("db", "CACHE_MISS", 1)
-        return test:execsql("SELECT typeof(x), length(x), typeof(y) FROM t29 ORDER BY id")
-    end, {
-        -- <func-29.1>
-        "integer", 1, "integer", "null", "", "integer", "real", 3, "integer", "blob", 1000000, "integer", "text", 5, "integer"
-        -- </func-29.1>
-    })
-
-test:do_test(
-    "func-29.2",
-    function()
-        local x = test.lindex(sqlite3_db_status("db", "CACHE_MISS", 1), 1)
-        if (x < 5) then
-            x = 1
-        end
-        return x
-    end, {
-        -- <func-29.2>
-        1
-        -- </func-29.2>
-    })
-
-test:do_test(
-    "func-29.3",
-    function()
-        db("close")
-        sqlite3("db", "test.db")
-        sqlite3_db_status("db", "CACHE_MISS", 1)
-        return test:execsql("SELECT typeof(+x) FROM t29 ORDER BY id")
-    end, {
-        -- <func-29.3>
-        "integer", "null", "real", "blob", "text"
-        -- </func-29.3>
-    })
-
-if X(1339, "X!cmd", [=[["expr","[permutation] != \"mmap\""]]=])
- then
-    
-
-end
-test:do_test(
-    "func-29.5",
-    function()
-        db("close")
-        sqlite3("db", "test.db")
-        sqlite3_db_status("db", "CACHE_MISS", 1)
-        return test:execsql("SELECT sum(length(x)) FROM t29")
-    end, {
-        -- <func-29.5>
-        1000009
-        -- </func-29.5>
-    })
-
-test:do_test(
-    "func-29.6",
-    function()
-        x = test.lindex(sqlite3_db_status("db", "CACHE_MISS", 1), 1)
-        if (x < 5)
- then
-            x = 1
-        end
-        return x
-    end, {
-        -- <func-29.6>
-        1
-        -- </func-29.6>
-    })
-end
-
--- The OP_Column opcode has an optimization that avoids loading content
--- for fields with content-length=0 when the content offset is on an overflow
--- page.  Make sure the optimization works.
---
-test:do_execsql_test(
-    "func-29.10",
-    [[
-        CREATE TABLE t29b(a primary key,b,c,d,e,f,g,h,i);
-        INSERT INTO t29b 
-         VALUES(1, hex(randomblob(2000)), null, 0, 1, '', zeroblob(0),'x',x'01');
-        SELECT typeof(c), typeof(d), typeof(e), typeof(f),
-               typeof(g), typeof(h), typeof(i) FROM t29b;
-    ]], {
-        -- <func-29.10>
-        "null", "integer", "integer", "text", "blob", "text", "blob"
-        -- </func-29.10>
-    })
-
-test:do_execsql_test(
-    "func-29.11",
-    [[
-        SELECT length(f), length(g), length(h), length(i) FROM t29b;
-    ]], {
-        -- <func-29.11>
-        0, 0, 1, 1
-        -- </func-29.11>
-    })
-
-test:do_execsql_test(
-    "func-29.12",
-    [[
-        SELECT quote(f), quote(g), quote(h), quote(i) FROM t29b;
-    ]], {
-        -- <func-29.12>
-        "''", "X''", "'x'", "X'01'"
-        -- </func-29.12>
     })
 
 -- EVIDENCE-OF: R-29701-50711 The unicode(X) function returns the numeric

@@ -32,7 +32,7 @@ testprefix = "analyzeD"
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t1(id PRIMARY KEY, a, b, c);
+        CREATE TABLE t1(id  INT PRIMARY KEY, a INT , b INT , c INT );
     ]])
 
 
@@ -41,7 +41,7 @@ test:do_test(
 	function()
 		for i = 1, 999 do
 			local c = math.floor(i % 200);
-			test:execsql(string.format(" INSERT INTO t1(id, a, b, c) VALUES(%s, 2*(%s/100), %s%%10, %s ); ", i, i, i, c))
+			test:execsql(string.format(" INSERT INTO t1(id, a, b, c) VALUES(%s, 2*(%s + 100), %s%%10, %s ); ", i, i, i, c))
 		end
 	return test:execsql([[
 			INSERT INTO t1 VALUES(1001, 3001, 3001, 3001);

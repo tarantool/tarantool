@@ -29,9 +29,9 @@ test:plan(83)
 test:do_execsql_test(
     "where3-1.1",
     [[
-        CREATE TABLE t1(a primary key, b);
-        CREATE TABLE t2(p primary key, q);
-        CREATE TABLE t3(x primary key, y);
+        CREATE TABLE t1(a  INT primary key, b TEXT);
+        CREATE TABLE t2(p  INT primary key, q INT );
+        CREATE TABLE t3(x  INT primary key, y TEXT);
 
         INSERT INTO t1 VALUES(111,'one');
         INSERT INTO t1 VALUES(222,'two');
@@ -65,9 +65,9 @@ test:do_test(
 test:do_execsql_test(
     "where3-1.2",
     [[
-        CREATE TABLE test1(parent1key primary key, child1key, Child2key, child3key);
-        CREATE TABLE child1 ( child1key NVARCHAR primary key, value NVARCHAR );
-        CREATE TABLE child2 ( child2key NVARCHAR primary key, value NVARCHAR );
+        CREATE TABLE test1(parent1key  INT primary key, child1key TEXT, Child2key TEXT , child3key INT );
+        CREATE TABLE child1 ( child1key  TEXT primary key, value  TEXT );
+        CREATE TABLE child2 ( child2key  TEXT primary key, value  TEXT );
 
         INSERT INTO test1(parent1key,child1key,child2key)
            VALUES ( 1, 'C1.1', 'C2.1' );
@@ -181,10 +181,10 @@ test:do_test(
     "where3-2.1",
     function()
         test:execsql [[
-            CREATE TABLE tA(apk integer primary key, ax);
-            CREATE TABLE tB(bpk integer primary key, bx);
-            CREATE TABLE tC(cpk integer primary key, cx);
-            CREATE TABLE tD(dpk integer primary key, dx);
+            CREATE TABLE tA(apk integer primary key, ax INT );
+            CREATE TABLE tB(bpk integer primary key, bx INT );
+            CREATE TABLE tC(cpk integer primary key, cx INT );
+            CREATE TABLE tD(dpk integer primary key, dx INT );
         ]]
         return queryplan([[
     SELECT * FROM tA, tB, tC LEFT JOIN tD ON dpk=cx
@@ -347,11 +347,11 @@ test:do_test(
 test:do_execsql_test(
     "where3-3.0",
     [[
-        CREATE TABLE t301(a INTEGER PRIMARY KEY,b,c);
+        CREATE TABLE t301(a INTEGER PRIMARY KEY,b INT ,c INT );
         CREATE INDEX t301c ON t301(c);
         INSERT INTO t301 VALUES(1,2,3);
         INSERT INTO t301 VALUES(2,2,3);
-        CREATE TABLE t302(x primary key, y);
+        CREATE TABLE t302(x  INT primary key, y INT );
         INSERT INTO t302 VALUES(4,5);
         SELECT * FROM t302, t301 WHERE t302.x=5 AND t301.a=t302.y;
     ]], {
@@ -400,9 +400,9 @@ if 0
     test:do_execsql_test(
         "where3-4.0",
         [[
-            CREATE TABLE t400(a INTEGER PRIMARY KEY, b, c);
-            CREATE TABLE t401(p INTEGER PRIMARY KEY, q, r);
-            CREATE TABLE t402(x INTEGER PRIMARY KEY, y, z);
+            CREATE TABLE t400(a INTEGER PRIMARY KEY, b INT , c INT );
+            CREATE TABLE t401(p INTEGER PRIMARY KEY, q INT , r INT );
+            CREATE TABLE t402(x INTEGER PRIMARY KEY, y INT , z INT );
             EXPLAIN QUERY PLAN
             SELECT * FROM t400, t401, t402 WHERE t402.z GLOB 'abc*';
         ]], {
@@ -442,16 +442,16 @@ test:do_execsql_test(
     "where3-5.0",
     [[
         CREATE TABLE aaa (id INTEGER PRIMARY KEY, type INTEGER,
-                          fk INTEGER DEFAULT NULL, parent INTEGER,
-                          position INTEGER, title LONGVARCHAR,
+                          fk TEXT DEFAULT NULL, parent INTEGER,
+                          position INTEGER, title TEXT,
                           keyword_id INTEGER, folder_type TEXT,
                           dateAdded INTEGER, lastModified INTEGER);
         CREATE INDEX aaa_111 ON aaa (fk, type);
         CREATE INDEX aaa_222 ON aaa (parent, position);
         CREATE INDEX aaa_333 ON aaa (fk, lastModified);
         CREATE TABLE bbb (id INTEGER PRIMARY KEY, type INTEGER,
-                          fk INTEGER DEFAULT NULL, parent INTEGER,
-                          position INTEGER, title LONGVARCHAR,
+                          fk TEXT DEFAULT NULL, parent INTEGER,
+                          position INTEGER, title TEXT,
                           keyword_id INTEGER, folder_type TEXT,
                           dateAdded INTEGER, lastModified INTEGER);
         CREATE INDEX bbb_111 ON bbb (fk, type);
@@ -515,19 +515,19 @@ test:do_test(
     "where3-6.setup",
     function()
         return test:execsql [[
-            CREATE TABLE t6w(a primary key, w);
+            CREATE TABLE t6w(a  INT primary key, w TEXT);
             INSERT INTO t6w VALUES(1, 'w-one');
             INSERT INTO t6w VALUES(2, 'w-two');
             INSERT INTO t6w VALUES(9, 'w-nine');
-            CREATE TABLE t6x(a primary key, x);
+            CREATE TABLE t6x(a  INT primary key, x TEXT);
             INSERT INTO t6x VALUES(1, 'x-one');
             INSERT INTO t6x VALUES(3, 'x-three');
             INSERT INTO t6x VALUES(9, 'x-nine');
-            CREATE TABLE t6y(a primary key, y);
+            CREATE TABLE t6y(a  INT primary key, y TEXT);
             INSERT INTO t6y VALUES(1, 'y-one');
             INSERT INTO t6y VALUES(4, 'y-four');
             INSERT INTO t6y VALUES(9, 'y-nine');
-            CREATE TABLE t6z(a primary key, z);
+            CREATE TABLE t6z(a  INT primary key, z TEXT);
             INSERT INTO t6z VALUES(1, 'z-one');
             INSERT INTO t6z VALUES(5, 'z-five');
             INSERT INTO t6z VALUES(9, 'z-nine');
@@ -637,10 +637,10 @@ end
 test:do_execsql_test(
     "where3-7-setup",
     [[
-        CREATE TABLE t71(x1 INTEGER PRIMARY KEY, y1);
-        CREATE TABLE t72(x2 INTEGER PRIMARY KEY, y2);
-        CREATE TABLE t73(x3 primary key, y3);
-        CREATE TABLE t74(x4, y4 primary key);
+        CREATE TABLE t71(x1 INTEGER PRIMARY KEY, y1 INT );
+        CREATE TABLE t72(x2 INTEGER PRIMARY KEY, y2 INT );
+        CREATE TABLE t73(x3  INT primary key, y3 INT );
+        CREATE TABLE t74(x4 INT , y4  INT primary key);
         INSERT INTO t71 VALUES(123,234);
         INSERT INTO t72 VALUES(234,345);
         INSERT INTO t73 VALUES(123,234);

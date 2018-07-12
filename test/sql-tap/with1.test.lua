@@ -68,7 +68,7 @@ test:do_execsql_test(1.4, [[
 ----------------------------------------------------------------------------
 test:do_execsql_test(2.1, [[
   DROP TABLE IF EXISTS t1;
-  CREATE TABLE t1(x PRIMARY KEY);
+  CREATE TABLE t1(x INT PRIMARY KEY);
   INSERT INTO t1 VALUES(1);
   INSERT INTO t1 VALUES(2);
   WITH tmp AS ( SELECT * FROM t1 ) SELECT x FROM tmp;
@@ -139,8 +139,8 @@ test:do_catchsql_test(3.2, [[
 })
 
 test:do_execsql_test(3.3, [[
-  CREATE TABLE t3(x PRIMARY KEY);
-  CREATE TABLE t4(x PRIMARY KEY);
+  CREATE TABLE t3(x TEXT PRIMARY KEY);
+  CREATE TABLE t4(x TEXT PRIMARY KEY);
 
   INSERT INTO t3 VALUES('T3');
   INSERT INTO t4 VALUES('T4');
@@ -185,7 +185,7 @@ test:do_catchsql_test(3.6, [[
 ---------------------------------------------------------------------------
 test:do_execsql_test(4.1, [[
   DROP TABLE IF EXISTS t1;
-  CREATE TABLE t1(x PRIMARY KEY);
+  CREATE TABLE t1(x INT PRIMARY KEY);
   INSERT INTO t1 VALUES(1);
   INSERT INTO t1 VALUES(2);
   INSERT INTO t1 VALUES(3);
@@ -241,7 +241,7 @@ test:do_catchsql_test(5.2, [[
 })
 
 test:do_execsql_test("5.2.1", [[
-  CREATE TABLE edge(xfrom, xto, seq, PRIMARY KEY(xfrom, xto));
+  CREATE TABLE edge(xfrom INT, xto INT, seq INT, PRIMARY KEY(xfrom, xto));
   INSERT INTO edge VALUES(0, 1, 10);
   INSERT INTO edge VALUES(1, 2, 20);
   INSERT INTO edge VALUES(0, 3, 30);
@@ -348,7 +348,7 @@ test:do_catchsql_test("5.6.2", [[
 })
 
 test:do_catchsql_test("5.6.3", [[
-  CREATE TABLE t5(a PRIMARY KEY, b);
+  CREATE TABLE t5(a  INT PRIMARY KEY, b INT );
   WITH i(x) AS ( SELECT * FROM t5 )
   SELECT * FROM i;
 ]], {
@@ -397,7 +397,7 @@ test:do_catchsql_test("5.6.7", [[
 --
 test:do_execsql_test(6.1, [[
   CREATE TABLE f(
-      id PRIMARY KEY, parentid REFERENCES f, name TEXT
+      id INTEGER PRIMARY KEY, parentid  INT REFERENCES f, name TEXT
   );
 
   INSERT INTO f VALUES(0, NULL, '');
@@ -458,7 +458,7 @@ test:do_execsql_test(6.4, [[
 
 ---------------------------------------------------------------------------
 test:do_execsql_test(7.1, [[
-  CREATE TABLE tree(i PRIMARY KEY, p);
+  CREATE TABLE tree(i  INT PRIMARY KEY, p INT );
   INSERT INTO tree VALUES(1, NULL);
   INSERT INTO tree VALUES(2, 1);
   INSERT INTO tree VALUES(3, 1);
@@ -470,7 +470,7 @@ test:do_execsql_test(7.2, [[
   WITH t(id, path) AS (
     SELECT i, '' FROM tree WHERE p IS NULL
     UNION ALL
-    SELECT i, path || '/' || i FROM tree, t WHERE p = id
+    SELECT i, path || '/' || CAST(i as TEXT) FROM tree, t WHERE p = id
   ) 
   SELECT path FROM t;
 ]], {
@@ -670,7 +670,7 @@ limit_test(9.9, -1, -1)
 -- #
 -- do_execsql_test 10.1 {
 --   DROP TABLE IF EXISTS tree;
---   CREATE TABLE tree(id INTEGER PRIMARY KEY, parentid, payload);
+--   CREATE TABLE tree(id INTEGER PRIMARY KEY, parentid INT , payload INT );
 -- }
 -- proc insert_into_tree {L} {
 --   db eval { DELETE FROM tree }
@@ -864,7 +864,7 @@ test:do_execsql_test("10.7.3", [[
 --   /a/b /a/C /a/d /B/e /B/F /B/g /c/h /c/I /c/j
 -- }
 test:do_execsql_test("10.8.4.1", [[
-  CREATE TABLE tst(a PRIMARY KEY,b);
+  CREATE TABLE tst(a  TEXT PRIMARY KEY,b TEXT );
   INSERT INTO tst VALUES('a', 'A');
   INSERT INTO tst VALUES('b', 'B');
   INSERT INTO tst VALUES('c', 'C');

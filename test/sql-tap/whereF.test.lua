@@ -52,8 +52,8 @@ testprefix = "whereF"
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t1(a PRIMARY KEY, b, c);
-        CREATE TABLE t2(d PRIMARY KEY, e, f);
+        CREATE TABLE t1(a INT PRIMARY KEY, b INT, c INT);
+        CREATE TABLE t2(d INT PRIMARY KEY, e INT, f INT);
     ]], {
         -- <1.0>
         
@@ -78,8 +78,8 @@ test:do_execsql_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a PRIMARY KEY, b, c);
-        CREATE TABLE t2(d PRIMARY KEY, e, f);
+        CREATE TABLE t1(a INT PRIMARY KEY, b INT, c INT);
+        CREATE TABLE t2(d INT PRIMARY KEY, e INT, f INT);
 
         CREATE UNIQUE INDEX i2 ON t1(b);
     ]], {
@@ -107,8 +107,8 @@ test:do_execsql_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1(a, b, c, PRIMARY KEY(a,b));
-        CREATE TABLE t2(d PRIMARY KEY, e, f);
+        CREATE TABLE t1(a INT, b INT, c INT, PRIMARY KEY(a,b));
+        CREATE TABLE t2(d INT PRIMARY KEY, e INT, f INT);
     ]], {
         -- <3.0>
         
@@ -145,7 +145,7 @@ test:do_test(
 test:do_execsql_test(
     4.0,
     [[
-        CREATE TABLE t4(a,b,c,d,e, PRIMARY KEY(a,b,c));
+        CREATE TABLE t4(a INT,b INT,c INT,d INT,e INT, PRIMARY KEY(a,b,c));
         CREATE INDEX t4adc ON t4(a,d,c);
         CREATE UNIQUE INDEX t4aebc ON t4(a,e,b,c);
         EXPLAIN QUERY PLAN SELECT a FROM t4 WHERE a=? AND b=?;

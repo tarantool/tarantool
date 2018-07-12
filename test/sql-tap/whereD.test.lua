@@ -23,7 +23,7 @@ testprefix = "whereD"
 test:do_execsql_test(
     1.1,
     [[
-        CREATE TABLE t(i int PRIMARY key,j int,k,m,n);
+        CREATE TABLE t(i int PRIMARY key,j int,k TEXT, m INT, n TEXT);
         CREATE INDEX ijk ON t(i,j,k);
         CREATE INDEX jmn ON t(j,m,n);
 
@@ -186,11 +186,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.0,
     [[
-        CREATE TABLE t1(a PRIMARY KEY,b,c,d);
+        CREATE TABLE t1(a  INT PRIMARY KEY,b INT ,c INT ,d INT );
         CREATE INDEX t1b ON t1(b);
         CREATE INDEX t1c ON t1(c);
         CREATE INDEX t1d ON t1(d);
-        CREATE TABLE t2(x PRIMARY KEY,y);
+        CREATE TABLE t2(x  INT PRIMARY KEY,y INT );
         CREATE INDEX t2y ON t2(y);
 
         INSERT INTO t1 VALUES(1,2,3,4);
@@ -247,7 +247,7 @@ end
 test:do_execsql_test(
     3.0,
     [[
-        CREATE TABLE t3(a PRIMARY KEY, b, c);
+        CREATE TABLE t3(a  INT PRIMARY KEY, b TEXT, c TEXT);
         CREATE UNIQUE INDEX i3 ON t3(a, b);
         INSERT INTO t3 VALUES(1, 'one', 'i');
         INSERT INTO t3 VALUES(3, 'three', 'iii');
@@ -256,7 +256,7 @@ test:do_execsql_test(
         INSERT INTO t3 VALUES(4, 'four', 'iv');
         INSERT INTO t3 VALUES(5, 'five', 'v');
 
-        CREATE TABLE t4(x PRIMARY KEY, y);
+        CREATE TABLE t4(x  TEXT PRIMARY KEY, y TEXT);
         INSERT INTO t4 VALUES('a', 'one');
         INSERT INTO t4 VALUES('b', 'two');
     ]])
@@ -307,9 +307,9 @@ test:do_test(
     4.1,
     function()
         return test:execsql [[
-            CREATE TABLE t41(a PRIMARY KEY,b,c);
+            CREATE TABLE t41(a  INT PRIMARY KEY,b INT ,c INT );
             INSERT INTO t41 VALUES(1,2,3), (4,5,6);
-            CREATE TABLE t42(d PRIMARY KEY,e,f);
+            CREATE TABLE t42(d  INT PRIMARY KEY,e INT ,f INT );
             INSERT INTO t42 VALUES(3,6,9), (4,8,12);
             SELECT * FROM t41 AS x LEFT JOIN t42 AS y ON (y.d=x.c) OR (y.e=x.b);
         ]]
@@ -408,7 +408,7 @@ test:do_execsql_test(
     5.1,
     [[
         DROP TABLE IF EXISTS t;
-        CREATE TABLE t(c0 PRIMARY key,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,c13,c14,c15,c16,c17);
+        CREATE TABLE t(c0  INT PRIMARY key,c1 INT ,c2 INT ,c3 INT ,c4 INT ,c5 INT ,c6 INT ,c7 INT ,c8 INT ,c9 INT ,c10 INT ,c11 INT ,c12 INT ,c13 INT ,c14 INT ,c15 INT ,c16 INT ,c17 INT );
         CREATE INDEX tc1 ON t(c1);
         CREATE INDEX tc2 ON t(c2);
         CREATE INDEX tc3 ON t(c3);

@@ -22,7 +22,7 @@ test:plan(1999)
 test:do_execsql_test(
     "in2-1",
     [[
-        CREATE TABLE a(i INTEGER PRIMARY KEY, a);
+        CREATE TABLE a(i INTEGER PRIMARY KEY, a INT);
     ]], {
         -- <in2-1>
         

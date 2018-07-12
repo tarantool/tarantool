@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(11)
+test:plan(10)
 
 --!./tcltestrunner.lua
 -- 2013-06-14
@@ -26,11 +26,11 @@ testprefix = "orderby5"
 test:do_execsql_test(
     1.1,
     [[
-        CREATE TABLE t1(id primary key,a,b,c);
+        CREATE TABLE t1(id INT primary key,a TEXT,b INT,c INT);
         CREATE INDEX t1bc ON t1(b,c);
 
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT a, b, c FROM t1 WHERE a=0;
+        SELECT DISTINCT a, b, c FROM t1 WHERE a='0';
     ]], {
         -- <1.1>
         "~/B-TREE/"
@@ -41,7 +41,7 @@ test:do_execsql_test(
     "1.2.1",
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT a, c, b FROM t1 WHERE a=0;
+        SELECT DISTINCT a, c, b FROM t1 WHERE a='0';
     ]], {
         -- <1.2.1>
         "~/B-TREE/"
@@ -85,7 +85,7 @@ test:do_execsql_test(
     1.3,
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT b, a, c FROM t1 WHERE a=0;
+        SELECT DISTINCT b, a, c FROM t1 WHERE a='0';
     ]], {
         -- <1.3>
         "~/B-TREE/"
@@ -96,7 +96,7 @@ test:do_execsql_test(
     1.4,
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT b, c, a FROM t1 WHERE a=0;
+        SELECT DISTINCT b, c, a FROM t1 WHERE a='0';
     ]], {
         -- <1.4>
         "~/B-TREE/"
@@ -107,7 +107,7 @@ test:do_execsql_test(
     1.5,
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT c, a, b FROM t1 WHERE a=0;
+        SELECT DISTINCT c, a, b FROM t1 WHERE a='0';
     ]], {
         -- <1.5>
         "~/B-TREE/"
@@ -118,7 +118,7 @@ test:do_execsql_test(
     1.6,
     [[
         EXPLAIN QUERY PLAN
-        SELECT DISTINCT c, b, a FROM t1 WHERE a=0;
+        SELECT DISTINCT c, b, a FROM t1 WHERE a='0';
     ]], {
         -- <1.6>
         "~/B-TREE/"
@@ -142,7 +142,7 @@ test:do_execsql_test(
 -- # lookups.
 -- #
 -- do_execsql_test 2.1a {
---   CREATE TABLE t2(a,b,c);
+--   CREATE TABLE t2(a INT,b INT,c INT);
 --   CREATE INDEX t2bc ON t2(b,c);
 --   ANALYZE;
 --   INSERT INTO sqlite_stat1 VALUES('t1','t1bc','1000000 10 9');
@@ -179,25 +179,11 @@ test:do_execsql_test(
 --   EXPLAIN QUERY PLAN
 --   SELECT * FROM t1 WHERE a=0 ORDER BY c, b, a;
 -- } {/B-TREE/}
-test:do_execsql_test(
-    3.0,
-    [[
-        CREATE TABLE t3(a INTEGER PRIMARY KEY, b, c, d, e, f);
-        --CREATE INDEX t3bcde ON t3(b, c, d, e);
-        -- As pk is not necessary in Tarantool's secondary indexes 'a' should be added manually
-        CREATE INDEX t3bcde ON t3(b, c, d, e, a);
-        EXPLAIN QUERY PLAN
-        SELECT a FROM t3 WHERE b=2 AND c=3 ORDER BY d DESC, e DESC, b, c, a DESC;
-    ]], {
-        -- <3.0>
-        "~/B-TREE/"
-        -- </3.0>
-    })
 
 -- MUST_WORK_TEST
 -- do_execsql_test 3.1 {
 --   DROP TABLE t3;
---   CREATE TABLE t3(a INTEGER PRIMARY KEY, b, c, d, e, f);
+--   CREATE TABLE t3(a INTEGER PRIMARY KEY, b INT, c INT, d INT, e INT, f INT);
 --   CREATE INDEX t3bcde ON t3(b, c, d, e);
 --   EXPLAIN QUERY PLAN
 --   SELECT a FROM t3 WHERE b=2 AND c=3 ORDER BY d DESC, e DESC, b, c, a DESC;

@@ -29,7 +29,7 @@ test:do_test(
     "minmax4-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(p primary key,q);
+            CREATE TABLE t1(p INT primary key,q INT);
             SELECT p, max(q) FROM t1;
         ]]
     end, {
@@ -217,7 +217,7 @@ test:do_test(
     "minmax4-2.1",
     function()
         return test:execsql [[
-            CREATE TABLE t2(a,b,c primary key);
+            CREATE TABLE t2(a INT,b INT,c INT primary key);
             INSERT INTO t2 VALUES
                  (1,null,2),
                  (1,2,3),

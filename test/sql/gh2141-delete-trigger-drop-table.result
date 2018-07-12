@@ -8,7 +8,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
 ...
 -- create space
-box.sql.execute("CREATE TABLE t(id PRIMARY KEY)")
+box.sql.execute("CREATE TABLE t(id INT PRIMARY KEY)")
 ---
 ...
 box.sql.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t BEGIN SELECT 1; END")

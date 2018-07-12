@@ -25,7 +25,7 @@ test:plan(6)
 test:do_execsql_test(
     "tkt2832-1.1",
     [[
-        CREATE TABLE t1(a PRIMARY KEY);
+        CREATE TABLE t1(a INT PRIMARY KEY);
         INSERT INTO t1 VALUES(2);
         INSERT INTO t1 VALUES(1);
         INSERT INTO t1 VALUES(3);
@@ -50,7 +50,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2832-2.1",
     [[
-        CREATE TABLE t2(a primary key, b);
+        CREATE TABLE t2(a INT primary key, b INT);
         CREATE TRIGGER t2_t AFTER UPDATE ON t2 BEGIN
           DELETE FROM t2 WHERE a = new.a + 1;
         END;
@@ -75,7 +75,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2832-3.1",
     [[
-        CREATE TABLE t3(a primary key, b);
+        CREATE TABLE t3(a INT primary key, b INT);
         CREATE TRIGGER t3_t AFTER DELETE ON t3 BEGIN
           DELETE FROM t3 WHERE a = old.a + 1;
         END;

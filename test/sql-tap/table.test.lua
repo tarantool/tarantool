@@ -148,7 +148,7 @@ test:do_test(
 test:do_catchsql_test(
     "table-2.1d",
     [[
-        CREATE TABLE IF NOT EXISTS test2(x primary key,y)
+        CREATE TABLE IF NOT EXISTS test2(x INT primary key,y INT)
     ]], {
         -- <table-2.1d>
         0
@@ -158,7 +158,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "table-2.1e",
     [[
-        CREATE TABLE IF NOT EXISTS test2(x UNIQUE, y TEXT PRIMARY KEY)
+        CREATE TABLE IF NOT EXISTS test2(x INT UNIQUE, y TEXT PRIMARY KEY)
     ]], {
         -- <table-2.1e>
         0
@@ -180,7 +180,7 @@ test:do_execsql_test(
 test:do_test(
     "table-2.2a",
     function()
-        test:execsql "CREATE TABLE test2(id primary key, one text)"
+        test:execsql "CREATE TABLE test2(id INT primary key, one text)"
         return test:execsql "CREATE INDEX test3 ON test2(one)"
         --catchsql {CREATE TABLE test3(id primary key, two text)}
     end, {
@@ -263,7 +263,7 @@ test:do_test(
 test:do_catchsql_test(
     "table-3.2",
     [[
-        CREATE TABLE BIG(xyz foo primary key)
+        CREATE TABLE BIG(xyz int primary key)
     ]], {
         -- <table-3.2>
         1, "table BIG already exists"
@@ -273,7 +273,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "table-3.3",
     [[
-        CREATE TABLE biG(xyz foo primary key)
+        CREATE TABLE biG(xyz int primary key)
     ]], {
         -- <table-3.3>
         1, "table BIG already exists"
@@ -283,7 +283,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "table-3.4",
     [[
-        CREATE TABLE bIg(xyz foo primary key)
+        CREATE TABLE bIg(xyz int primary key)
     ]], {
         -- <table-3.4>
         1, "table BIG already exists"
@@ -317,7 +317,7 @@ test:do_test(
     "table-4.1",
     function()
         for i = 1, 100, 1 do
-            local sql = "CREATE TABLE "..string.format("test%03d", i).." (id primary key, "
+            local sql = "CREATE TABLE "..string.format("test%03d", i).." (id INT primary key, "
             for k = 1, i-1, 1 do
                 sql = sql .. "field"..k.." text,"
             end
@@ -489,14 +489,14 @@ test:do_catchsql_test(
     "table-7.1",
     [=[
         CREATE TABLE weird(
-          id primary key,
+          id int primary key,
           "desc" text,
           "asc" text,
           key int,
-          "14_vac" boolean,
+          "14_vac" int,
           fuzzy_dog_12 varchar(10),
           beginn blob,
-          endd clob
+          endd blob
         )
     ]=], {
         -- <table-7.1>
@@ -528,7 +528,7 @@ test:do_execsql2_test(
 test:do_execsql_test(
     "table-7.3",
     [[
-        CREATE TABLE savepoint_t(release_t primary key);
+        CREATE TABLE savepoint_t(release_t int primary key);
         INSERT INTO savepoint_t(release_t) VALUES(10);
         UPDATE savepoint_t SET release_t = 5;
         SELECT release_t FROM savepoint_t;
@@ -545,14 +545,14 @@ test:do_execsql2_test(
     [=[
         --CREATE TABLE t2 AS SELECT * FROM weird;
         CREATE TABLE t2(
-          id primary key,
+          id int primary key,
           "desc" text,
           "asc" text,
           key int,
-          "14_vac" boolean,
+          "14_vac" int,
           fuzzy_dog_12 varchar(10),
           beginn blob,
-          endd clob
+          endd blob
         );
         INSERT INTO t2 SELECT * from weird;
         SELECT * FROM t2;
@@ -694,7 +694,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "table-9.1",
     [[
-        CREATE TABLE t6(a primary key,b,a);
+        CREATE TABLE t6(a int primary key,b int,a int);
     ]], {
         -- <table-9.1>
         1, "duplicate column name: A"
@@ -718,7 +718,7 @@ test:do_catchsql_test(
     [[
         -- there is no t4 table
         --CREATE TABLE t6(a REFERENCES t4(a) NOT NULL primary key);
-        CREATE TABLE t6(a REFERENCES t2(id) NOT NULL primary key);
+        CREATE TABLE t6(a INT REFERENCES t2(id) NOT NULL primary key);
         INSERT INTO t6 VALUES(NULL);
     ]], {
         -- <table-10.1>
@@ -764,7 +764,7 @@ test:do_catchsql_test(
     "table-10.5",
     [[
         DROP TABLE t6;
-        CREATE TABLE t6(a NOT NULL NOT DEFERRABLE INITIALLY IMMEDIATE primary key);
+        CREATE TABLE t6(a int NOT NULL NOT DEFERRABLE INITIALLY IMMEDIATE primary key);
     ]], {
         -- <table-10.5>
         0
@@ -775,7 +775,7 @@ test:do_catchsql_test(
     "table-10.6",
     [[
         DROP TABLE t6;
-        CREATE TABLE t6(a NOT NULL DEFERRABLE INITIALLY DEFERRED primary key);
+        CREATE TABLE t6(a int NOT NULL DEFERRABLE INITIALLY DEFERRED primary key);
     ]], {
         -- <table-10.6>
         0
@@ -786,7 +786,7 @@ test:do_catchsql_test(
     "table-10.7",
     [[
         DROP TABLE t6;
-        CREATE TABLE t6(a primary key,
+        CREATE TABLE t6(a int primary key,
           FOREIGN KEY (a) REFERENCES t4(b) DEFERRABLE INITIALLY DEFERRED
         );
     ]], {
@@ -800,8 +800,8 @@ test:do_catchsql_test(
     [[
         DROP TABLE IF EXISTS t6;
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(x UNIQUE, y, PRIMARY KEY (x, y));
-        CREATE TABLE t6(a primary key,b,c,
+        CREATE TABLE t4(x INT UNIQUE, y INT, PRIMARY KEY (x, y));
+        CREATE TABLE t6(a INT primary key,b INT,c INT,
           FOREIGN KEY (b,c) REFERENCES t4(x,y) MATCH PARTIAL
             ON UPDATE SET NULL ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
         );
@@ -815,7 +815,7 @@ test:do_catchsql_test(
     "table-10.9",
     [[
         DROP TABLE t6;
-        CREATE TABLE t6(a primary key,b,c,
+        CREATE TABLE t6(a int primary key,b int,c int,
           FOREIGN KEY (b,c) REFERENCES t4(x)
         );
     ]], {
@@ -829,7 +829,7 @@ test:do_test(
     function()
         test:catchsql "DROP TABLE t6"
         return test:catchsql [[
-            CREATE TABLE t6(a primary key,b,c,
+            CREATE TABLE t6(a int primary key,b int,c int,
               FOREIGN KEY (b,c) REFERENCES t4(x,y,z)
             );
         ]]
@@ -844,7 +844,7 @@ test:do_test(
     function()
         test:catchsql "DROP TABLE t6"
         return test:catchsql [[
-            CREATE TABLE t6(a,b, c REFERENCES t4(x,y));
+            CREATE TABLE t6(a int,b int, c int REFERENCES t4(x,y));
         ]]
     end, {
         -- <table-10.11>
@@ -857,7 +857,7 @@ test:do_test(
     function()
         test:catchsql "DROP TABLE t6"
         return test:catchsql [[
-            CREATE TABLE t6(a,b,c,
+            CREATE TABLE t6(a int,b int,c int,
               FOREIGN KEY (b,x) REFERENCES t4(x,y)
             );
         ]]
@@ -872,7 +872,7 @@ test:do_test(
     function()
         test:catchsql "DROP TABLE t6"
         return test:catchsql [[
-            CREATE TABLE t6(a,b,c,
+            CREATE TABLE t6(a int,b int,c int,
               FOREIGN KEY (x,b) REFERENCES t4(x,y)
             );
         ]]
@@ -892,13 +892,13 @@ test:do_execsql_test(
     [[
         CREATE TABLE t7(
            a integer primary key,
-           b number(5,10),
-           c character varying (8),
+           b numeric(5,10),
+           c char(8),
            d VARCHAR(9),
-           e clob,
+           e blob,
            f BLOB,
            g Text,
-           h
+           h text
         );
         INSERT INTO t7(a) VALUES(1);
         SELECT typeof(a), typeof(b), typeof(c), typeof(d),
@@ -1042,7 +1042,7 @@ test:do_test(
     function()
         --test:execsql "BEGIN"
         for i = 0, 2000-1, 1 do
-            test:execsql("CREATE TABLE tbl"..i.." (a primary key, b, c)")
+            test:execsql("CREATE TABLE tbl"..i.." (a int primary key, b int, c int)")
         end
         --return test:execsql "COMMIT"
         return
@@ -1159,10 +1159,10 @@ test:do_test(
     function()
         local columns = {}
         for i = 0, 1000-1, 1 do
-            table.insert(columns, "c"..i)
+            table.insert(columns, "c"..i .. ' int')
         end
         columns = table.concat(columns, ",")
-        test:execsql("CREATE TABLE t(c primary key, "..columns..")")
+        test:execsql("CREATE TABLE t(c int primary key, "..columns..")")
         return
     end, {
     -- <table-15.1>

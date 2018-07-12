@@ -100,7 +100,7 @@ test:do_test(
     "analyze6-2.1",
     function()
         test:execsql([[
-            CREATE TABLE t201(x INTEGER PRIMARY KEY, y UNIQUE, z);
+            CREATE TABLE t201(x INTEGER PRIMARY KEY, y  INT UNIQUE, z INT );
             CREATE INDEX t201z ON t201(z);
             ANALYZE;
         ]])

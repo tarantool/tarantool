@@ -72,32 +72,52 @@ sqlite3TableColumnAffinity(struct space_def *def, int idx)
 char
 sqlite3ExprAffinity(Expr * pExpr)
 {
-	int op;
 	pExpr = sqlite3ExprSkipCollate(pExpr);
 	if (pExpr->flags & EP_Generic)
 		return 0;
-	op = pExpr->op;
-	if (op == TK_SELECT) {
-		assert(pExpr->flags & EP_xIsSelect);
-		return sqlite3ExprAffinity(pExpr->x.pSelect->pEList->a[0].
-					   pExpr);
-	}
+	uint8_t op = pExpr->op;
+	struct ExprList *el;
 	if (op == TK_REGISTER)
 		op = pExpr->op2;
-#ifndef SQLITE_OMIT_CAST
-	if (op == TK_CAST) {
+	switch (op) {
+	case TK_SELECT:
+		assert(pExpr->flags & EP_xIsSelect);
+		el = pExpr->x.pSelect->pEList;
+		return sqlite3ExprAffinity(el->a[0].pExpr);
+	case TK_CAST:
 		assert(!ExprHasProperty(pExpr, EP_IntValue));
-		return sqlite3AffinityType(pExpr->u.zToken, 0);
-	}
-#endif
-	if (op == TK_AGG_COLUMN || op == TK_COLUMN) {
+		return pExpr->affinity;
+	case TK_AGG_COLUMN:
+	case TK_COLUMN:
+		assert(pExpr->iColumn >= 0);
 		return sqlite3TableColumnAffinity(pExpr->space_def,
 						  pExpr->iColumn);
-	}
-	if (op == TK_SELECT_COLUMN) {
+	case TK_SELECT_COLUMN:
 		assert(pExpr->pLeft->flags & EP_xIsSelect);
-		return sqlite3ExprAffinity(pExpr->pLeft->x.pSelect->pEList->
-					   a[pExpr->iColumn].pExpr);
+		el = pExpr->pLeft->x.pSelect->pEList;
+		return sqlite3ExprAffinity(el->a[pExpr->iColumn].pExpr);
+	case TK_PLUS:
+	case TK_MINUS:
+	case TK_STAR:
+	case TK_SLASH:
+		assert(pExpr->pRight != NULL && pExpr->pLeft != NULL);
+		enum affinity_type lhs_aff = sqlite3ExprAffinity(pExpr->pLeft);
+		enum affinity_type rhs_aff = sqlite3ExprAffinity(pExpr->pRight);
+		return sql_affinity_result(rhs_aff, lhs_aff);
+	case TK_LT:
+	case TK_GT:
+	case TK_EQ:
+	case TK_LE:
+	case TK_NE:
+	case TK_NOT:
+	case TK_AND:
+	case TK_OR:
+		/*
+		 * FIXME: should be changed to BOOL type or
+		 * affinity when it is implemented. Now simply
+		 * return INTEGER.
+		 */
+		return AFFINITY_INTEGER;
 	}
 	return pExpr->affinity;
 }
@@ -228,15 +248,9 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found, uint32_t *coll_id)
 	return coll;
 }
 
-/*
- * pExpr is an operand of a comparison operator.  aff2 is the
- * type affinity of the other operand.  This routine returns the
- * type affinity that should be used for the comparison operator.
- */
-char
-sqlite3CompareAffinity(Expr * pExpr, char aff2)
+enum affinity_type
+sql_affinity_result(enum affinity_type aff1, enum affinity_type aff2)
 {
-	char aff1 = sqlite3ExprAffinity(pExpr);
 	if (aff1 && aff2) {
 		/* Both sides of the comparison are columns. If one has numeric
 		 * affinity, use that. Otherwise use no affinity.
@@ -273,11 +287,12 @@ comparisonAffinity(Expr * pExpr)
 	assert(pExpr->pLeft);
 	aff = sqlite3ExprAffinity(pExpr->pLeft);
 	if (pExpr->pRight) {
-		aff = sqlite3CompareAffinity(pExpr->pRight, aff);
+		enum affinity_type rhs_aff = sqlite3ExprAffinity(pExpr->pRight);
+		aff = sql_affinity_result(rhs_aff, aff);
 	} else if (ExprHasProperty(pExpr, EP_xIsSelect)) {
-		aff =
-		    sqlite3CompareAffinity(pExpr->x.pSelect->pEList->a[0].pExpr,
-					   aff);
+		enum affinity_type rhs_aff =
+			sqlite3ExprAffinity(pExpr->x.pSelect->pEList->a[0].pExpr);
+		aff = sql_affinity_result(rhs_aff, aff);
 	} else {
 		aff = AFFINITY_BLOB;
 	}
@@ -311,8 +326,10 @@ sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity)
 static u8
 binaryCompareP5(Expr * pExpr1, Expr * pExpr2, int jumpIfNull)
 {
-	u8 aff = (char)sqlite3ExprAffinity(pExpr2);
-	aff = (u8) sqlite3CompareAffinity(pExpr1, aff) | (u8) jumpIfNull;
+	enum affinity_type aff2 = sqlite3ExprAffinity(pExpr2);
+	enum affinity_type aff1 = sqlite3ExprAffinity(pExpr1);
+	enum affinity_type aff = sql_affinity_result(aff1, aff2) |
+				 (u8) jumpIfNull;
 	return aff;
 }
 
@@ -2375,25 +2392,15 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 			Expr *pLhs = sqlite3VectorFieldSubexpr(pX->pLeft, i);
 			int iCol = pEList->a[i].pExpr->iColumn;
 			/* RHS table */
-			char idxaff =
+			enum affinity_type idxaff =
 				sqlite3TableColumnAffinity(pTab->def, iCol);
-			char cmpaff = sqlite3CompareAffinity(pLhs, idxaff);
-			testcase(cmpaff == AFFINITY_BLOB);
-			testcase(cmpaff == AFFINITY_TEXT);
-			switch (cmpaff) {
-			case AFFINITY_BLOB:
-				break;
-			case AFFINITY_TEXT:
-				/* sqlite3CompareAffinity() only returns TEXT if one side or the
-				 * other has no affinity and the other side is TEXT.  Hence,
-				 * the only way for cmpaff to be TEXT is for idxaff to be TEXT
-				 * and for the term on the LHS of the IN to have no affinity.
-				 */
-				assert(idxaff == AFFINITY_TEXT);
-				break;
-			default:
-				affinity_ok = sqlite3IsNumericAffinity(idxaff);
-			}
+			enum affinity_type lhs_aff = sqlite3ExprAffinity(pLhs);
+			/*
+			 * Index search is possible only if types
+			 * of columns match.
+			 */
+			if (lhs_aff != idxaff)
+				affinity_ok = 0;
 		}
 
 		if (affinity_ok) {
@@ -2584,9 +2591,9 @@ exprINAffinity(Parse * pParse, Expr * pExpr)
 			Expr *pA = sqlite3VectorFieldSubexpr(pLeft, i);
 			char a = sqlite3ExprAffinity(pA);
 			if (pSelect) {
-				zRet[i] =
-				    sqlite3CompareAffinity(pSelect->pEList->
-							   a[i].pExpr, a);
+				struct Expr *e = pSelect->pEList->a[i].pExpr;
+				enum affinity_type aff = sqlite3ExprAffinity(e);
+				zRet[i] = sql_affinity_result(aff, a);
 			} else {
 				zRet[i] = a;
 			}
@@ -3115,27 +3122,7 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 * of the RHS using the LHS as a probe.  If found, the result is
 	 * true.
 	 */
-	sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff,
-			  nVector);
-	if ((pExpr->flags & EP_xIsSelect)
-	    && !pExpr->is_ephemeral) {
-		struct SrcList *src_list = pExpr->x.pSelect->pSrc;
-		assert(src_list->nSrc == 1);
-
-		struct Table *tab = src_list->a[0].pTab;
-		assert(tab != NULL);
-		struct index *pk = space_index(tab->space, 0);
-		assert(pk != NULL);
-
-		uint32_t fieldno = pk->def->key_def->parts[0].fieldno;
-		enum affinity_type affinity =
-			tab->def->fields[fieldno].affinity;
-		if (pk->def->key_def->part_count == 1 &&
-		    affinity == AFFINITY_INTEGER && (int)fieldno < nVector) {
-			int reg_pk = rLhs + (int)fieldno;
-			sqlite3VdbeAddOp2(v, OP_MustBeInt, reg_pk, destIfFalse);
-		}
-	}
+	sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff, nVector);
 	if (destIfFalse == destIfNull) {
 		/* Combine Step 3 and Step 5 into a single opcode */
 		sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
@@ -3749,9 +3736,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlite3VdbeAddOp2(v, OP_SCopy, inReg, target);
 				inReg = target;
 			}
-			sqlite3VdbeAddOp2(v, OP_Cast, target,
-					  sqlite3AffinityType(pExpr->u.zToken,
-							      0));
+			sqlite3VdbeAddOp2(v, OP_Cast, target, pExpr->affinity);
 			testcase(usedAsColumnCache(pParse, inReg, inReg));
 			sqlite3ExprCacheAffinityChange(pParse, inReg, 1);
 			return inReg;

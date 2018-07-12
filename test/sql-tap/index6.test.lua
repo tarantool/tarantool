@@ -24,7 +24,7 @@ test:plan(14)
 -- do_test index6-1.1 {
 --   # Able to parse and manage partial indices
 --   execsql {
---     CREATE TABLE t1(a,b,c);
+--     CREATE TABLE t1(a INT ,b INT ,c INT );
 --     CREATE INDEX t1a ON t1(a) WHERE a IS NOT NULL;
 --     CREATE INDEX t1b ON t1(b) WHERE b>10;
 --     CREATE VIRTUAL TABLE nums USING wholenumber;
@@ -117,7 +117,7 @@ test:plan(14)
 -- #
 -- do_test index6-2.1 {
 --   execsql {
---     CREATE TABLE t2(a,b);
+--     CREATE TABLE t2(a INT ,b INT );
 --     INSERT INTO t2(a,b) SELECT value, value FROM nums WHERE value<1000;
 --     UPDATE t2 SET a=NULL WHERE b%2==0;
 --     CREATE INDEX t2a1 ON t2(a) WHERE a IS NOT NULL;
@@ -182,7 +182,7 @@ test:plan(14)
 -- # Partial UNIQUE indices
 -- #
 -- do_execsql_test index6-3.1 {
---   CREATE TABLE t3(a,b);
+--   CREATE TABLE t3(a INT ,b INT );
 --   INSERT INTO t3 SELECT value, value FROM nums WHERE value<200;
 --   UPDATE t3 SET a=999 WHERE b%5!=0;
 --   CREATE UNIQUE INDEX t3a ON t3(a) WHERE a<>999;
@@ -227,7 +227,7 @@ test:do_execsql_test(
         -- </index6-6.0>
     })
 else
-    test:execsql("CREATE TABLE t6(a,b, PRIMARY KEY (a,b));")
+    test:execsql("CREATE TABLE t6(a INT ,b INT , PRIMARY KEY (a,b));")
     test:execsql("INSERT INTO t6(a,b) VALUES(123,456);")
 end
 
@@ -252,8 +252,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index6-7.0",
     [[
-        CREATE TABLE t7a(id primary key, x);
-        CREATE TABLE t7b(id primary key, y);
+        CREATE TABLE t7a(id  INT primary key, x INT );
+        CREATE TABLE t7b(id  INT primary key, y INT );
         INSERT INTO t7a VALUES(1, 1);
         CREATE INDEX t7ax ON t7a(x);
         SELECT x,y FROM t7a LEFT JOIN t7b ON (x=99) ORDER BY x;
@@ -309,8 +309,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index6-8.0",
     [[
-        CREATE TABLE t8a(id primary key, a,b);
-        CREATE TABLE t8b(id primary key, x,y);
+        CREATE TABLE t8a(id INT primary key, a INT,b TEXT);
+        CREATE TABLE t8b(id INT primary key, x TEXT,y INT);
         CREATE INDEX i8c ON t8b(y);
 
         INSERT INTO t8a VALUES(1, 1, 'one');
@@ -387,7 +387,7 @@ end
 test:do_execsql_test(
     "index6-10.1",
     [[
-        CREATE TABLE t10(a,b,c,d,e INTEGER PRIMARY KEY);
+        CREATE TABLE t10(a INT ,b INT ,c INT ,d INT ,e INTEGER PRIMARY KEY);
         INSERT INTO t10 VALUES
           (1,2,3,4,5),
           (2,3,4,5,6),

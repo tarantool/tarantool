@@ -22,12 +22,12 @@ test:do_test(
 	function()
 		return test:execsql([[
 		    DROP TABLE IF EXISTS t1;
-			CREATE TABLE t1(id PRIMARY KEY, a, b, c, d);
+			CREATE TABLE t1(id  INT PRIMARY KEY, a INT , b INT , c INT , d INT );
 			CREATE INDEX t1a ON t1(a);
 			CREATE INDEX t1b ON t1(b);
 			CREATE INDEX t1cd ON t1(c, d);
 		    DROP TABLE IF EXISTS nums;
-			CREATE TABLE nums(n PRIMARY KEY);
+			CREATE TABLE nums(n  INT PRIMARY KEY);
 			INSERT into nums WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<256) SELECT x FROM cnt;
  			INSERT INTO t1 SELECT n, n, n, n/100, n FROM nums;
  			EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=123;

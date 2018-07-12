@@ -27,9 +27,9 @@ test:do_test(
     1.0,
     function()
         return test:execsql [[
-            CREATE TABLE t1(a INTEGER PRIMARY KEY, b);
+            CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT );
             INSERT INTO t1 VALUES(1,11), (2,22);
-            CREATE TABLE t2(d, e, PRIMARY KEY(d,e));
+            CREATE TABLE t2(d INT , e TEXT , PRIMARY KEY(d,e));
             INSERT INTO t2 VALUES(10, 'ten'), (11,'eleven'), (12,'twelve'),
                                  (11, 'oneteen');
         ]]
@@ -119,17 +119,17 @@ test:do_test(
     2.0,
     function()
         return test:execsql [[
-            CREATE TABLE t31(a,b, PRIMARY KEY(a,b));
-            CREATE TABLE t32(c,d, PRIMARY KEY(c,d));
-            CREATE TABLE t33(e,f, PRIMARY KEY(e,f));
-            CREATE TABLE t34(g,h, PRIMARY KEY(g,h));
+            CREATE TABLE t31(a INT ,b INT , PRIMARY KEY(a,b));
+            CREATE TABLE t32(c INT ,d INT , PRIMARY KEY(c,d));
+            CREATE TABLE t33(e INT ,f INT , PRIMARY KEY(e,f));
+            CREATE TABLE t34(g INT ,h INT , PRIMARY KEY(g,h));
 
             INSERT INTO t31 VALUES(1,4), (2,3), (1,3);
             INSERT INTO t32 VALUES(4,5), (3,6), (3,7), (4,8);
             INSERT INTO t33 VALUES(5,9), (7,10), (6,11), (8,12), (8,13), (7,14);
             INSERT INTO t34 VALUES(11,20), (10,21), (12,22), (9,23), (13,24),
                                   (14,25), (12,26);
-            SELECT a||','||c||','||e||','||g FROM t31, t32, t33, t34
+            SELECT CAST(a AS TEXT)||','||CAST(c AS TEXT)||','||CAST(e AS TEXT)||','||CAST(g as TEXT) FROM t31, t32, t33, t34
              WHERE c=b AND e=d AND g=f
              ORDER BY a ASC, c ASC, e DESC, g ASC;
         ]]
@@ -143,7 +143,7 @@ test:do_test(
     2.1,
     function()
         return test:execsql [[
-            SELECT a||','||c||','||e||','||g FROM t31, t32, t33, t34
+            SELECT CAST(a AS TEXT)||','||CAST(c AS TEXT)||','||CAST(e AS TEXT)||','||CAST(g AS TEXT) FROM t31, t32, t33, t34
              WHERE c=b AND e=d AND g=f
              ORDER BY +a ASC, +c ASC, +e DESC, +g ASC;
         ]]
@@ -157,7 +157,7 @@ test:do_test(
     2.2,
     function()
         return test:execsql [[
-            SELECT a||','||c||','||e||','||g FROM t31, t32, t33, t34
+            SELECT CAST(a AS TEXT)||','||CAST(c AS TEXT)||','||CAST(e AS TEXT)||','||CAST(g AS TEXT) FROM t31, t32, t33, t34
              WHERE c=b AND e=d AND g=f
              ORDER BY a ASC, c ASC, e ASC, g ASC;
         ]]

@@ -23,7 +23,7 @@ test:do_execsql_test(
     "selectC-1.1",
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(id PRIMARY KEY, a, b, c);
+        CREATE TABLE t1(id  INT PRIMARY KEY, a INT, b TEXT, c TEXT);
         INSERT INTO t1 VALUES(1, 1,'aaa','bbb');
         INSERT INTO t1 VALUES(2, 1, 'aaa', 'bbb');
         INSERT INTO t1 VALUES(3, 2,'ccc','ddd');
@@ -254,9 +254,9 @@ test:do_execsql_test(
 -- ifcapable trigger&&compound {
 --   do_test selectC-2.1 {
 --     catchsql {
---       CREATE TABLE t21a(a,b);
+--       CREATE TABLE t21a(a INT ,b INT );
 --       INSERT INTO t21a VALUES(1,2);
---       CREATE TABLE t21b(n);
+--       CREATE TABLE t21b(n INT );
 --       CREATE TRIGGER r21 AFTER INSERT ON t21b BEGIN
 --         SELECT a FROM t21a WHERE a>new.x UNION ALL
 --         SELECT b FROM t21a WHERE b>new.x ORDER BY 1 LIMIT 2;
@@ -275,7 +275,7 @@ test:do_execsql_test(
 --         org_id          TEXT NOT NULL,
 --         nickname        TEXT NOT NULL,
 --         license         TEXT,
---         CONSTRAINT person_pk PRIMARY KEY (org_id, nickname),
+--         CONSTRAINT person_pk PRIMARY KEY (org_id, nickname INT ),
 --         CONSTRAINT person_license_uk UNIQUE (license)
 --     );
 --     INSERT INTO person VALUES('meyers', 'jack', '2GAT123');
@@ -300,7 +300,7 @@ test:do_execsql_test(
     "selectC-3.2",
     [[
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t2(a PRIMARY KEY, b);
+        CREATE TABLE t2(a  TEXT PRIMARY KEY, b TEXT);
         INSERT INTO t2 VALUES('abc', 'xxx');
         INSERT INTO t2 VALUES('def', 'yyy');
         SELECT a, max(b || a) FROM t2 WHERE (b||b||b)!='value' GROUP BY a;
@@ -331,7 +331,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "selectC-4.1",
     [[
-        create table t_distinct_bug (id int primary key, a, b, c);
+        create table t_distinct_bug (id int primary key, a TEXT, b TEXT, c TEXT);
         insert into t_distinct_bug values (0, '1', '1', 'a');
         insert into t_distinct_bug values (1, '1', '2', 'b');
         insert into t_distinct_bug values (2, '1', '3', 'c');

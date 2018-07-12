@@ -22,11 +22,11 @@ test:plan(5)
 test:do_execsql_test(
     "tkt3911.1",
     [[
-        CREATE TABLE t1(a primary key,b);
+        CREATE TABLE t1(a INT primary key,b INT);
         INSERT INTO t1 VALUES(1,2);
         INSERT INTO t1 VALUES(11,12);
 
-        CREATE TABLE t2(b primary key,c);
+        CREATE TABLE t2(b INT primary key,c INT);
         INSERT INTO t2 VALUES(2,3);
         INSERT INTO t2 VALUES(22,23);
 
@@ -65,7 +65,7 @@ test:do_test(
     "tkt3911.4",
     function()
         return test:execsql [[
-            CREATE TABLE t3(m,a primary key);
+            CREATE TABLE t3(m TEXT,a INT primary key);
             INSERT INTO t3 VALUES('one',1);
             INSERT INTO t3 VALUES('two',2);
 

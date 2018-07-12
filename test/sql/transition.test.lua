@@ -3,7 +3,7 @@ engine = test_run:get_cfg('engine')
 box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- create space
-box.sql.execute("CREATE TABLE foobar (foo PRIMARY KEY, bar)")
+box.sql.execute("CREATE TABLE foobar (foo INT PRIMARY KEY, bar TEXT)")
 
 -- prepare data
 box.sql.execute("INSERT INTO foobar VALUES (1, 'foo')")
@@ -40,7 +40,7 @@ box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 -- multi-index
 
 -- create space
-box.sql.execute("CREATE TABLE barfoo (bar, foo NUM PRIMARY KEY)")
+box.sql.execute("CREATE TABLE barfoo (bar TEXT, foo NUM PRIMARY KEY)")
 box.sql.execute("CREATE UNIQUE INDEX barfoo2 ON barfoo(bar)")
 
 -- prepare data
@@ -63,11 +63,8 @@ box.sql.execute("DROP TABLE foobar")
 box.sql.execute("DROP TABLE barfoo")
 
 -- attempt to create a table lacking PRIMARY KEY
-box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x)")
-
--- attempt to create a table lacking WITHOUT ROWID clause
-box.sql.execute("CREATE TABLE rowid(x)")
+box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x BLOB)")
 
 -- create a table with implicit indices (used to SEGFAULT)
-box.sql.execute("CREATE TABLE implicit_indices(a PRIMARY KEY,b,c,d UNIQUE)")
+box.sql.execute("CREATE TABLE implicit_indices(a INT PRIMARY KEY,b INT,c INT,d TEXT UNIQUE)")
 box.sql.execute("DROP TABLE implicit_indices")

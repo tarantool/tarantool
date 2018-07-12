@@ -11,7 +11,7 @@ for id = 1, N do
     fiber.create(
         function ()
             local table_name = "table2723"..id
-            box.sql.execute("create table "..table_name.."(id primary key, a integer unique, b)")
+            box.sql.execute("create table "..table_name.."(id INT primary key, a integer unique, b INT)")
             box.sql.execute("insert into "..table_name.." values(1, 2, 3)")
             box.sql.execute("insert into "..table_name.." values(3, 4, 3)")
             pcall( function() box.sql.execute("insert into "..table_name.." values(3, 4, 3)") end)
@@ -32,7 +32,7 @@ test:do_test(
     0)
 
 ch = fiber.channel(N)
-box.sql.execute("create table t1(id primary key, a integer unique, b);")
+box.sql.execute("create table t1(id INT primary key, a integer unique, b INT);")
 box.sql.execute("create index i1 on t1(b);")
 for id = 1, N do
     fiber.create(
@@ -59,7 +59,7 @@ box.sql.execute("drop table t1;")
 
 
 ch = fiber.channel(N)
-box.sql.execute("create table t1(id primary key, a integer unique, b);")
+box.sql.execute("create table t1(id INT primary key, a integer unique, b INT);")
 box.sql.execute("create index i1 on t1(b);")
 for id = 1, N*N do
     box.sql.execute(string.format("insert into t1 values(%s, %s, 3)", id, id))

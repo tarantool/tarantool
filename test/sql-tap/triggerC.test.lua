@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(59)
+test:plan(48)
 
 --!./tcltestrunner.lua
 -- 2009 August 24
@@ -52,8 +52,8 @@ test:execsql " PRAGMA recursive_triggers = on "
 test:do_execsql_test(
     "triggerC-1.1",
     [[
-        CREATE TABLE t1(a PRIMARY KEY, b, c);
-        CREATE TABLE log(t PRIMARY KEY, a1, b1, c1, a2, b2, c2);
+        CREATE TABLE t1(a TEXT PRIMARY KEY, b TEXT, c TEXT);
+        CREATE TABLE log(t TEXT PRIMARY KEY, a1 TEXT, b1 TEXT, c1 TEXT, a2 TEXT, b2 TEXT, c2 TEXT);
         CREATE TRIGGER trig1 BEFORE INSERT ON t1 BEGIN
           INSERT INTO log VALUES('before', NULL, NULL, NULL, new.a, new.b, new.c);
         END;
@@ -148,7 +148,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "triggerC-1.8",
     [[
-        CREATE TABLE t4(a PRIMARY KEY, b);
+        CREATE TABLE t4(a INT PRIMARY KEY, b INT);
         CREATE TRIGGER t4t AFTER DELETE ON t4 BEGIN
           SELECT RAISE(ABORT, 'delete is not supported');
         END;
@@ -182,7 +182,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "triggerC-1.11",
     [[
-        CREATE TABLE t5 (a primary key, b, c);
+        CREATE TABLE t5 (a INT primary key, b INT, c INT);
         INSERT INTO t5 values (1, 2, 3);
         CREATE TRIGGER au_tbl AFTER UPDATE ON t5 BEGIN
           UPDATE OR IGNORE t5 SET a = new.a, c = 10;
@@ -206,7 +206,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "triggerC-1.13",
     [[
-        CREATE TABLE t6(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t6(a INTEGER PRIMARY KEY, b INT);
         INSERT INTO t6 VALUES(1, 2);
         create trigger r1 after update on t6 for each row begin
           SELECT 1;
@@ -222,9 +222,9 @@ test:do_execsql_test(
     "triggerC-1.14",
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE cnt(n PRIMARY KEY);
+        CREATE TABLE cnt(n INT PRIMARY KEY);
         INSERT INTO cnt VALUES(0);
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b UNIQUE, c, d, e);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT UNIQUE, c INT, d INT, e INT);
         CREATE INDEX t1cd ON t1(c,d);
         CREATE TRIGGER t1r1 AFTER UPDATE ON t1 BEGIN UPDATE cnt SET n=n+1; END;
         INSERT INTO t1 VALUES(1,2,3,4,5);
@@ -253,7 +253,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "triggerC-2.1.0",
     [[
-        CREATE TABLE t2(a PRIMARY KEY);
+        CREATE TABLE t2(a INT PRIMARY KEY);
     ]], {
         -- <triggerC-2.1.0>
 
@@ -361,7 +361,7 @@ end
 test:do_execsql_test(
     "triggerC-3.1.1",
     [[
-        CREATE TABLE t3(a PRIMARY KEY, b);
+        CREATE TABLE t3(a INT PRIMARY KEY, b INT);
         CREATE TRIGGER t3i AFTER INSERT ON t3 BEGIN
           DELETE FROM t3 WHERE a = new.a;
         END;
@@ -397,7 +397,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "triggerC-3.2.1",
     [[
-        CREATE TABLE t3b(x PRIMARY KEY);
+        CREATE TABLE t3b(x INT PRIMARY KEY);
         CREATE TRIGGER t3bi AFTER INSERT ON t3b BEGIN INSERT INTO t3b VALUES(new.x+1); END;
     ]], {
         -- <triggerC-3.2.1>
@@ -423,180 +423,7 @@ test:do_execsql_test(
         -- </triggerC-3.2.3>
     })
 
--------------------------------------------------------------------------
--- This next block of tests, triggerC-4.*, checks that affinity
--- transformations and constraint processing is performed at the correct
--- times relative to BEFORE and AFTER triggers.
---
--- For an INSERT statement, for each row to be inserted:
---
---   1. Apply affinities to non-rowid values to be inserted.
---   2. Fire BEFORE triggers.
---   3. Process constraints.
---   4. Insert new record.
---   5. Fire AFTER triggers.
---
--- If the value of the rowid field is to be automatically assigned, it is
--- set to -1 in the new.* record. Even if it is explicitly set to NULL
--- by the INSERT statement.
---
--- For an UPDATE statement, for each row to be deleted:
---
---   1. Apply affinities to non-rowid values to be inserted.
---   2. Fire BEFORE triggers.
---   3. Process constraints.
---   4. Insert new record.
---   5. Fire AFTER triggers.
---
--- For a DELETE statement, for each row to be deleted:
---
---   1. Fire BEFORE triggers.
---   2. Remove database record.
---   3. Fire AFTER triggers.
---
--- When a numeric value that as an exact integer representation is stored
--- in a column with REAL affinity, it is actually stored as an integer.
--- These tests check that the typeof() such values is always 'real',
--- not 'integer'.
---
--- triggerC-4.1.*: Check that affinity transformations are made before
---                 triggers are invoked.
---
-test:do_test(
-    "triggerC-4.1.1",
-    function()
-        test:catchsql " DROP TABLE log "
-        test:catchsql " DROP TABLE t4 "
-        return test:execsql [[
-            CREATE TABLE log(id PRIMARY KEY, t);
-            CREATE TABLE t4(a TEXT PRIMARY KEY,b INTEGER,c REAL);
-            CREATE TRIGGER t4bi BEFORE INSERT ON t4 BEGIN
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     new.a     || ' ' || typeof(new.a)     || ' ' ||
-                                     new.b     || ' ' || typeof(new.b)     || ' ' ||
-                                     new.c     || ' ' || typeof(new.c)
-              );
-            END;
-            CREATE TRIGGER t4ai AFTER INSERT ON t4 BEGIN
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     new.a     || ' ' || typeof(new.a)     || ' ' ||
-                                     new.b     || ' ' || typeof(new.b)     || ' ' ||
-                                     new.c     || ' ' || typeof(new.c)
-              );
-            END;
-            CREATE TRIGGER t4bd BEFORE DELETE ON t4 BEGIN
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     old.a     || ' ' || typeof(old.a)     || ' ' ||
-                                     old.b     || ' ' || typeof(old.b)     || ' ' ||
-                                     old.c     || ' ' || typeof(old.c)
-              );
-            END;
-            CREATE TRIGGER t4ad AFTER DELETE ON t4 BEGIN
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     old.a     || ' ' || typeof(old.a)     || ' ' ||
-                                     old.b     || ' ' || typeof(old.b)     || ' ' ||
-                                     old.c     || ' ' || typeof(old.c)
-              );
-            END;
-            CREATE TRIGGER t4bu BEFORE UPDATE ON t4 BEGIN
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     old.a     || ' ' || typeof(old.a)     || ' ' ||
-                                     old.b     || ' ' || typeof(old.b)     || ' ' ||
-                                     old.c     || ' ' || typeof(old.c)
-              );
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     new.a     || ' ' || typeof(new.a)     || ' ' ||
-                                     new.b     || ' ' || typeof(new.b)     || ' ' ||
-                                     new.c     || ' ' || typeof(new.c)
-              );
-            END;
-            CREATE TRIGGER t4au AFTER UPDATE ON t4 BEGIN
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     old.a     || ' ' || typeof(old.a)     || ' ' ||
-                                     old.b     || ' ' || typeof(old.b)     || ' ' ||
-                                     old.c     || ' ' || typeof(old.c)
-              );
-              INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
-                                     new.a     || ' ' || typeof(new.a)     || ' ' ||
-                                     new.b     || ' ' || typeof(new.b)     || ' ' ||
-                                     new.c     || ' ' || typeof(new.c)
-              );
-            END;
-        ]]
-    end, {
-        -- <triggerC-4.1.1>
-
-        -- </triggerC-4.1.1>
-    })
-
-local
-tests4 = {{ [[INSERT INTO t4 VALUES('1', '1', '1');
-              DELETE FROM t4;]], {
-                 "1 text 1 integer 1.0 real",
-                 "1 text 1 integer 1.0 real",
-                 "1 text 1 integer 1.0 real",
-                 "1 text 1 integer 1.0 real"}},
-
-          { [[INSERT INTO t4(a,b,c) VALUES(45, 45, 45);
-              DELETE FROM t4;]], {
-                  "45 text 45 integer 45.0 real",
-                  "45 text 45 integer 45.0 real",
-                  "45 text 45 integer 45.0 real",
-                  "45 text 45 integer 45.0 real"}},
-
-          { [[INSERT INTO t4(a,b,c) VALUES(-42.0, -42.0, -42.0);
-              DELETE FROM t4;]], {
-                  "-42.0 text -42 integer -42.0 real",
-                  "-42.0 text -42 integer -42.0 real",
-                  "-42.0 text -42 integer -42.0 real",
-                  "-42.0 text -42 integer -42.0 real"}},
-
-          { [[INSERT INTO t4(a,b,c) VALUES(-42.4, -42.4, -42.4);
-              DELETE FROM t4;]], {
-                  "-42.4 text -42.4 real -42.4 real",
-                  "-42.4 text -42.4 real -42.4 real",
-                  "-42.4 text -42.4 real -42.4 real",
-                  "-42.4 text -42.4 real -42.4 real"}},
-
-          { [[INSERT INTO t4 VALUES(7, 7, 7);
-              UPDATE t4 SET a=8, b=8, c=8;]], {
-                  "7 text 7 integer 7.0 real",
-                  "7 text 7 integer 7.0 real",
-                  "7 text 7 integer 7.0 real",
-                  "8 text 8 integer 8.0 real",
-                  "7 text 7 integer 7.0 real",
-                  "8 text 8 integer 8.0 real"}},
-
-          { [[UPDATE t4 SET a=8;]], {
-                  "8 text 8 integer 8.0 real",
-                  "8 text 8 integer 8.0 real",
-                  "8 text 8 integer 8.0 real",
-                  "8 text 8 integer 8.0 real"}},
-
-          { [[UPDATE t4 SET a='9', b='9', c='9';]], {
-                  "8 text 8 integer 8.0 real",
-                  "9 text 9 integer 9.0 real",
-                  "8 text 8 integer 8.0 real",
-                  "9 text 9 integer 9.0 real"}},
-
-          { [[UPDATE t4 SET a='9.1', b='9.1', c='9.1';]], {
-                  "9 text 9 integer 9.0 real",
-                  "9.1 text 9.1 real 9.1 real",
-                  "9 text 9 integer 9.0 real",
-                  "9.1 text 9.1 real 9.1 real"}}}
-
-              -- MUST_WORK_TEST
--- for _ in X(0, "X!foreach", [=[["n insert log","\n\n  2 {\n   INSERT INTO t4 VALUES('1', '1', '1');\n   DELETE FROM t4;\n  } {\n     1 integer 1 text 1 integer 1.0 real\n     1 integer 1 text 1 integer 1.0 real\n     1 integer 1 text 1 integer 1.0 real\n  }\n\n  3 {\n   INSERT INTO t4(a,b,c) VALUES(45, 45, 45);\n   DELETE FROM t4;\n  } {\n    45 integer 45 text 45 integer 45.0 real\n    45 integer 45 text 45 integer 45.0 real\n    45 integer 45 text 45 integer 45.0 real\n  }\n\n  4 {\n   INSERT INTO t4(a,b,c) VALUES(-42.0, -42.0, -42.0);\n   DELETE FROM t4;\n  } {\n    -42 integer -42.0 text -42 integer -42.0 real\n    -42 integer -42.0 text -42 integer -42.0 real\n    -42 integer -42.0 text -42 integer -42.0 real\n  }\n\n  5 {\n   INSERT INTO t4(a,b,c) VALUES(-42.4, -42.4, -42.4);\n   DELETE FROM t4;\n  } {\n     1 integer -42.4 text -42.4 real -42.4 real\n     1 integer -42.4 text -42.4 real -42.4 real\n     1 integer -42.4 text -42.4 real -42.4 real\n  }\n\n  6 {\n   INSERT INTO t4 VALUES(7, 7, 7);\n   UPDATE t4 SET a=8, b=8, c=8;\n  } {\n    -1 integer 7 text 7 integer 7.0 real\n     1 integer 7 text 7 integer 7.0 real\n     1 integer 7 text 7 integer 7.0 real\n     1 integer 8 text 8 integer 8.0 real\n     1 integer 7 text 7 integer 7.0 real\n     1 integer 8 text 8 integer 8.0 real\n  }\n\n  8 {\n   UPDATE t4 SET a='9', b='9', c='9';\n  } {\n     2 integer 9 text 9 integer 9.0 real\n     2 integer 8 text 8 integer 8.0 real\n     2 integer 9 text 9 integer 9.0 real\n  }\n\n  9 {\n   UPDATE t4 SET a='9.1', b='9.1', c='9.1';\n  } {\n     2 integer 9.1 text 9.1 real    9.1 real\n     2 integer 9   text 9   integer 9.0 real\n     2 integer 9.1 text 9.1 real    9.1 real\n  }\n"]]=]) do
-
-for n, v in ipairs(tests4) do
-    test:do_execsql_test(
-        "triggerC-4.1."..(n+1),
-        string.format([[ DELETE FROM log;
-                         %s ;
-                         SELECT t FROM log ORDER BY id;]], v[1]),
-        v[2])
-end
----------------------------------------------------------------------------
+--------------------------------------------------------------------------
 -- This block of tests, triggerC-5.*, test that DELETE triggers are fired
 -- if a row is deleted as a result of OR REPLACE conflict resolution.
 --
@@ -604,13 +431,13 @@ test:do_execsql_test(
     "triggerC-5.1.0",
     [[
         DROP TABLE IF EXISTS t5;
-        CREATE TABLE t5(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t5(a INTEGER PRIMARY KEY, b TEXT);
         CREATE UNIQUE INDEX t5i ON t5(b);
         INSERT INTO t5 VALUES(1, 'a');
         INSERT INTO t5 VALUES(2, 'b');
         INSERT INTO t5 VALUES(3, 'c');
 
-        CREATE TABLE t5g(a PRIMARY KEY, b, c);
+        CREATE TABLE t5g(a INT PRIMARY KEY, b TEXT, c INT);
         CREATE TRIGGER t5t BEFORE DELETE ON t5 BEGIN
           INSERT INTO t5g VALUES(old.a, old.b, (SELECT count(*) FROM t5));
         END;
@@ -885,7 +712,7 @@ test:do_test(
     "triggerC-10.1",
     function()
         test:execsql [[
-            CREATE TABLE t10(a PRIMARY KEY, updatecnt DEFAULT 0);
+            CREATE TABLE t10(a TEXT PRIMARY KEY, updatecnt INT DEFAULT 0);
             CREATE TRIGGER t10_bu BEFORE UPDATE OF a ON t10 BEGIN
               UPDATE t10 SET updatecnt = updatecnt+1 WHERE a = old.a;
             END;
@@ -921,10 +748,10 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE t11(
-              c1 PRIMARY KEY,   c2,  c3,  c4,  c5,  c6,  c7,  c8,  c9, c10,
-              c11, c12, c13, c14, c15, c16, c17, c18, c19, c20,
-              c21, c22, c23, c24, c25, c26, c27, c28, c29, c30,
-              c31, c32, c33, c34, c35, c36, c37, c38, c39, c40
+              c1 INT PRIMARY KEY,   c2 INT,  c3 INT,  c4 INT,  c5 INT,  c6 INT,  c7 INT,  c8 INT,  c9 INT, c10 INT,
+              c11 INT, c12 INT, c13 INT, c14 INT, c15 INT, c16 INT, c17 INT, c18 INT, c19 INT, c20 INT,
+              c21 INT, c22 INT, c23 INT, c24 INT, c25 INT, c26 INT, c27 INT, c28 INT, c29 INT, c30 INT,
+              c31 INT, c32 INT, c33 INT, c34 INT, c35 INT, c36 INT, c37 INT, c38 INT, c39 INT, c40 INT
             );
 
             CREATE TRIGGER t11_bu BEFORE UPDATE OF c1 ON t11 BEGIN
@@ -960,7 +787,7 @@ test:do_test(
     "triggerC-11.0",
     function()
         test:catchsql " DROP TABLE IF EXISTS log "
-        return test:execsql " CREATE TABLE log(id INTEGER PRIMARY KEY, a, b) "
+        return test:execsql " CREATE TABLE log(id INTEGER PRIMARY KEY, a INT, b TEXT) "
     end, {
         -- <triggerC-11.0>
 
@@ -970,8 +797,7 @@ test:do_test(
 -- MUST_WORK_TEST
 local
 tests11 = {-- {"CREATE TABLE t1(a PRIMARY KEY, b)",                         {{}, {}}},
-           {"CREATE TABLE t1(a PRIMARY KEY DEFAULT 1, b DEFAULT 'abc')", {1, "abc"}},
-           {"CREATE TABLE t1(a, b PRIMARY KEY DEFAULT 4.5)",             {"", 4.5}}}
+           {"CREATE TABLE t1(a INT PRIMARY KEY DEFAULT 1, b TEXT DEFAULT 'abc')", {1, "abc"}}}
 
 --for _ in X(0, "X!foreach", [=[["testno tbl defaults","\n  1 \"CREATE TABLE t1(a PRIMARY KEY, b)\"                          {{} {}}\n  2 \"CREATE TABLE t1(a PRIMARY KEY DEFAULT 1, b DEFAULT 'abc')\"  {1 abc}\n  3 \"CREATE TABLE t1(a PRIMARY KEY, b DEFAULT 4.5)\"              {{} 4.5}\n"]]=]) do
 for testno, v in ipairs(tests11) do
@@ -1030,7 +856,7 @@ test:do_test(
         test:catchsql " DROP TABLE t2 "
         return test:execsql [[
             DELETE FROM log;
-            CREATE TABLE t2(a PRIMARY KEY, b);
+            CREATE TABLE t2(a INT PRIMARY KEY, b INT);
             CREATE VIEW v2 AS SELECT * FROM t2;
             CREATE TRIGGER tv2 INSTEAD OF INSERT ON v2 BEGIN
               INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
@@ -1052,7 +878,7 @@ test:do_test(
 test:execsql(
     [[
     DROP TABLE t1;
-    CREATE TABLE t1(id INTEGER PRIMARY KEY, a, b);
+    CREATE TABLE t1(id INTEGER PRIMARY KEY, a INT, b INT);
     INSERT INTO t1 VALUES(1, 1, 2);
     INSERT INTO t1 VALUES(2, 3, 4);
     INSERT INTO t1 VALUES(3, 5, 6);
@@ -1062,7 +888,7 @@ test:do_execsql_test(
     "triggerC-13.1",
     [[
         PRAGMA recursive_triggers = 'ON';
-        CREATE TABLE t12(id INTEGER PRIMARY KEY, a, b);
+        CREATE TABLE t12(id INTEGER PRIMARY KEY, a INT, b INT);
         INSERT INTO t12 VALUES(1, 1, 2);
         CREATE TRIGGER tr12 AFTER UPDATE ON t12 BEGIN
           UPDATE t12 SET a=new.a+1, b=new.b+1;
@@ -1100,21 +926,21 @@ SQL = [[
   DROP TABLE IF EXISTS t2;
   DROP TABLE IF EXISTS t4;
   DROP TABLE IF EXISTS t5;
-  CREATE TABLE t1(a PRIMARY KEY, b, c);
+  CREATE TABLE t1(a INT PRIMARY KEY, b INT, c INT);
   CREATE INDEX i1 ON t1(a, c);
   CREATE INDEX i2 ON t1(b, c);
   INSERT INTO t1 VALUES(1, 2, 3);
 
-  CREATE TABLE t2(e PRIMARY KEY, f);
+  CREATE TABLE t2(e INT PRIMARY KEY, f INT);
   CREATE INDEX i3 ON t2(e);
   INSERT INTO t2 VALUES(1234567, 3);
 
-  CREATE TABLE empty(x PRIMARY KEY);
-  CREATE TABLE not_empty(x PRIMARY KEY);
+  CREATE TABLE empty(x INT PRIMARY KEY);
+  CREATE TABLE not_empty(x INT PRIMARY KEY);
   INSERT INTO not_empty VALUES(2);
 
-  CREATE TABLE t4(x PRIMARY KEY);
-  CREATE TABLE t5(g PRIMARY KEY, h, i);
+  CREATE TABLE t4(x INT PRIMARY KEY);
+  CREATE TABLE t5(g INT PRIMARY KEY, h INT, i INT);
 
   CREATE TRIGGER trig BEFORE INSERT ON t4 BEGIN
     INSERT INTO t5 SELECT * FROM t1 WHERE
@@ -1147,10 +973,10 @@ test:do_execsql_test(
     [[
         PRAGMA recursive_triggers = 1;
         CREATE TABLE node(
-            id not null primary key,
-            pid int not null default 0,
-            key varchar not null,
-            path varchar default '',
+            id int not null primary key,
+            pid int not null default 0 references node,
+            key TEXT not null,
+            path TEXT default '',
             unique(pid, key)
             );
         CREATE TRIGGER node_delete_referencing AFTER DELETE ON node

@@ -32,7 +32,7 @@ testprefix = "orderby6"
     test:do_test(
         "1.1",
         function()
-            test:execsql "CREATE TABLE t1(a,b,c,PRIMARY KEY(b,c));"
+            test:execsql "CREATE TABLE t1(a INT ,b INT ,c INT ,PRIMARY KEY(b,c));"
             return test:execsql [[
                 WITH RECURSIVE
                  cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000)
@@ -207,7 +207,7 @@ testprefix = "orderby6"
     test:do_test(
         "1.31",
         function()
-            test:execsql "CREATE TABLE t2(a,b,c,d,e,f,PRIMARY KEY(b,c,d,e,f));"
+            test:execsql "CREATE TABLE t2(a INT ,b INT ,c INT ,d INT ,e INT ,f INT ,PRIMARY KEY(b,c,d,e,f));"
             return test:execsql [[
                 WITH RECURSIVE
                  cnt(x) AS (VALUES(0) UNION ALL SELECT x+1 FROM cnt WHERE x<242)

@@ -29,7 +29,7 @@ test:do_test(
     1.0,
     function()
         test:execsql [[
-            CREATE TABLE t1(x primary key);
+            CREATE TABLE t1(x INT primary key);
             INSERT INTO t1(x) VALUES(1),(5),(9),(7),(3),(2),(4),(6),(8);
         ]]
         rs = "x"

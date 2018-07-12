@@ -24,8 +24,8 @@ testprefix = "selectF"
 test:do_execsql_test(
     1,
     [[
-        CREATE TABLE t1(a primary key, b, c);
-        CREATE TABLE t2(d primary key, e, f);
+        CREATE TABLE t1(a INT primary key, b TEXT, c TEXT);
+        CREATE TABLE t2(d INT primary key, e TEXT, f TEXT);
         START TRANSACTION;
         INSERT INTO t1 VALUES(1,'one','I');
         INSERT INTO t2 VALUES(5,'ten','XX');

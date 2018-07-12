@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 NULL = require('msgpack').NULL
-test:plan(51)
+test:plan(14)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -39,99 +39,6 @@ test:plan(51)
 -- types-2.5.*: Records with a few different storage classes.
 --
 -- types-3.*: Test that the '=' operator respects manifest types.
---
--- Disable encryption on the database for this test.
---db("close")
---DB = X(44, "X!expr", [=[[["sqlite3","db","test.db"],["sqlite3_connection_pointer","db"]]]=])
---sqlite3_rekey $DB {}
--- Create a table with one column for each type of affinity
-test:do_execsql_test(
-    "types-1.1.0",
-    [[
-        CREATE TABLE t1(id primary key, i integer, n numeric, t text, o blob);
-    ]], {
-        -- <types-1.1.0>
-        
-        -- </types-1.1.0>
-    })
-
--- Each element of the following list represents one test case.
---
--- The first value of each sub-list is an SQL literal. The following
--- four value are the storage classes that would be used if the
--- literal were inserted into a column with affinity INTEGER, NUMERIC, TEXT
--- or NONE, respectively.
-local values = {
-      {1, '5.0', {"integer", "integer", "text", "real"}},
-      {2, '5.1', {"real", "real", "text", "real"}},
-      {3, '5', {"integer", "integer", "text", "integer"}},
-      {4, "'5.0'", {"integer", "integer", "text", "text"}},
-      {5, "'5.1'", {"real", "real", "text", "text"}},
-      {6, "'-5.0'", {"integer", "integer", "text", "text"}},
-      {7, "'-5.0'", {"integer", "integer", "text", "text"}},
-      {8, "'5'", {"integer", "integer", "text", "text"}},
-      {9, "'abc'", {"text", "text", "text", "text"}},
-      {10, 'NULL', {"null", "null", "null", "null"}},
-      {11, "X'00'",  {"blob", "blob", "blob", "blob"}},
-}
-
-
--- This code tests that the storage classes specified above (in the $values
--- table) are correctly assigned when values are inserted using a statement
--- of the form:
---
--- INSERT INTO <table> VALUE(<values>);
-
-for _, val in ipairs(values) do
-    local tnum = val[1]
-    local lit = test.lindex(val, 1)
-    test:execsql "DELETE FROM t1;"
-    test:execsql(string.format("INSERT INTO t1 VALUES(1, %s, %s, %s, %s);", lit, lit, lit, lit))
-    test:do_execsql_test(
-        "types-1.1."..tnum,
-        [[
-            SELECT typeof(i), typeof(n), typeof(t), typeof(o) FROM t1;
-        ]], val[3])
-end
--- This code tests that the storage classes specified above (in the $values
--- table) are correctly assigned when values are inserted using a statement
--- of the form:
---
--- INSERT INTO t1 SELECT ....
---
-for _, val in ipairs(values) do
-    local tnum = val[1]
-    local lit = test.lindex(val, 1)
-    test:execsql "DELETE FROM t1;"
-    test:execsql(string.format("INSERT INTO t1 SELECT 1, %s, %s, %s, %s;", lit, lit, lit, lit))
-    test:do_execsql_test(
-        "types-1.2."..tnum,
-        [[
-            SELECT typeof(i), typeof(n), typeof(t), typeof(o) FROM t1;
-        ]], val[3])
-
-end
--- This code tests that the storage classes specified above (in the $values
--- table) are correctly assigned when values are inserted using a statement
--- of the form:
---
--- UPDATE <table> SET <column> = <value>;
---
-for _, val in ipairs(values) do
-    local tnum = val[1]
-    local lit = test.lindex(val, 1)
-    test:execsql(string.format("UPDATE t1 SET id = 1, i = %s, n = %s, t = %s, o = %s;", lit, lit, lit, lit))
-    test:do_execsql_test(
-        "types-1.3."..tnum,
-        [[
-            SELECT typeof(i), typeof(n), typeof(t), typeof(o) FROM t1;
-        ]], val[3])
-
-    tnum = tnum + 1
-end
-test:execsql [[
-    DROP TABLE t1;
-]]
 ---- Open the table with root-page $rootpage at the btree
 ---- level. Return a list that is the length of each record
 ---- in the table, in the tables default scanning order.
@@ -158,7 +65,7 @@ test:execsql [[
 test:do_execsql_test(
     "types-2.1.1",
     [[
-        CREATE TABLE t1(id primary key, a integer);
+        CREATE TABLE t1(id  INT primary key, a integer);
         INSERT INTO t1 VALUES(1, 0);
         INSERT INTO t1 VALUES(2, 120);
         INSERT INTO t1 VALUES(3, -120);
@@ -259,7 +166,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "types-2.2.1",
     [[
-        CREATE TABLE t2(id primary key, a float);
+        CREATE TABLE t2(id  INT primary key, a float);
         INSERT INTO t2 VALUES(1, 0.0);
         INSERT INTO t2 VALUES(2, 12345.678);
         INSERT INTO t2 VALUES(3, -12345.678);
@@ -295,7 +202,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "types-2.3.1",
     [[
-        CREATE TABLE t3(id primary key, a nullvalue);
+        CREATE TABLE t3(id  INT primary key, a INT null);
         INSERT INTO t3 VALUES(1, NULL);
     ]], {
         -- <types-2.3.1>
@@ -333,7 +240,7 @@ test:do_test(
     "types-2.4.1",
     function()
         return test:execsql(string.format([[
-            CREATE TABLE t4(id primary key, a string);
+            CREATE TABLE t4(id  INT primary key, a TEXT);
             INSERT INTO t4 VALUES(1, '%s');
             INSERT INTO t4 VALUES(2, '%s');
             INSERT INTO t4 VALUES(3, '%s');
@@ -353,43 +260,5 @@ test:do_execsql_test(
         string10, string500, string500000
         -- </types-2.4.2>
     })
-
-test:do_execsql_test(
-    "types-2.5.1",
-    [[
-        DROP TABLE t1;
-        DROP TABLE t2;
-        DROP TABLE t3;
-        DROP TABLE t4;
-        CREATE TABLE t1(id primary key, a, b, c);
-    ]], {
-        -- <types-2.5.1>
-
-        -- </types-2.5.1>
-    })
-
-test:do_test(
-    "types-2.5.2",
-    function()
-        test:execsql("INSERT INTO t1 VALUES(1, NULL, '"..string10.."', 4000);")
-        test:execsql("INSERT INTO t1 VALUES(2, '"..string500.."', 4000, NULL);")
-        return test:execsql("INSERT INTO t1 VALUES(3, 4000, NULL, '"..string500000.."');")
-    end, {
-        -- <types-2.5.2>
-
-        -- </types-2.5.2>
-    })
-
-test:do_execsql_test(
-    "types-2.5.3",
-    [[
-        SELECT a,b,c FROM t1;
-    ]], {
-        -- <types-2.5.3>
-        "", string10, 4000, string500, 4000, "", 4000, "", string500000
-        -- </types-2.5.3>
-    })
-
-
 
 test:finish_test()

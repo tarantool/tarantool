@@ -25,8 +25,8 @@ test:do_execsql_test(
     "join5-1.1",
     [[
         CREATE TABLE t1(a integer primary key, b integer, c integer);
-        CREATE TABLE t2(x integer primary key, y);
-        CREATE TABLE t3(p integer primary key, q);
+        CREATE TABLE t2(x integer primary key, y TEXT);
+        CREATE TABLE t3(p integer primary key, q TEXT);
         START TRANSACTION;
         INSERT INTO t3 VALUES(11,'t3-11');
         INSERT INTO t3 VALUES(12,'t3-12');
@@ -90,11 +90,11 @@ test:do_test(
     "join5-2.1",
     function()
         test:execsql [[
-            CREATE TABLE ab(a primary key,b);
+            CREATE TABLE ab(a  INT primary key,b INT );
             INSERT INTO ab VALUES(1,2);
             INSERT INTO ab VALUES(3,NULL);
 
-            CREATE TABLE xy(x,y primary key);
+            CREATE TABLE xy(x INT ,y  INT primary key);
             INSERT INTO xy VALUES(2,3);
             INSERT INTO xy VALUES(NULL,1);
         ]]
@@ -224,10 +224,10 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t3;
-        CREATE TABLE x1(a primary key);
+        CREATE TABLE x1(a  INT primary key);
         INSERT INTO x1 VALUES(1);
-        CREATE TABLE x2(b NOT NULL primary key);
-        CREATE TABLE x3(c primary key, d);
+        CREATE TABLE x2(b TEXT NOT NULL primary key);
+        CREATE TABLE x3(c TEXT primary key, d TEXT);
         INSERT INTO x3 VALUES('a', NULL);
         INSERT INTO x3 VALUES('b', NULL);
         INSERT INTO x3 VALUES('c', NULL);
@@ -276,10 +276,10 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS x1;
         DROP TABLE IF EXISTS x2;
         DROP TABLE IF EXISTS x3;
-        CREATE TABLE x1(a primary key);
+        CREATE TABLE x1(a  INT primary key);
         INSERT INTO x1 VALUES(1);
-        CREATE TABLE x2(b NOT NULL primary key);
-        CREATE TABLE x3(c primary key, d);
+        CREATE TABLE x2(b TEXT NOT NULL primary key);
+        CREATE TABLE x3(c TEXT primary key, d INT );
         INSERT INTO x3 VALUES('a', NULL);
         INSERT INTO x3 VALUES('b', NULL);
         INSERT INTO x3 VALUES('c', NULL);

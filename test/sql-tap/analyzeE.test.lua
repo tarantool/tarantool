@@ -26,7 +26,7 @@ test:do_execsql_test(
     "analyzeE-1.0",
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(id INTEGER PRIMARY KEY, a, b);
+        CREATE TABLE t1(id INTEGER PRIMARY KEY, a INT , b INT );
         WITH RECURSIVE cnt(x) AS (VALUES(1000) UNION ALL SELECT x+1 FROM cnt WHERE x<2000) INSERT INTO t1(id, a, b) SELECT x, x, x FROM cnt;
         CREATE INDEX t1a ON t1(a);
         CREATE INDEX t1b ON t1(b);
@@ -277,7 +277,7 @@ test:do_execsql_test(
     "analyzeE-3.0",
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(id PRIMARY KEY,a,b,c);
+        CREATE TABLE t1(id  INT PRIMARY KEY,a INT ,b INT ,c INT );
         WITH RECURSIVE cnt(x) AS (VALUES(1000) UNION ALL SELECT x+1 FROM cnt WHERE x<2000) INSERT INTO t1(id,a,b,c) SELECT x, x, x, 123 FROM cnt;
         CREATE INDEX t1ca ON t1(c,a);
         ANALYZE;

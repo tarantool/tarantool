@@ -1665,162 +1665,6 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 }
 
 /*
- * Return a pointer to a string containing the 'declaration type' of the
- * expression pExpr. The string may be treated as static by the caller.
- *
- * Also try to estimate the size of the returned value and return that
- * result in *pEstWidth.
- *
- * The declaration type is the exact datatype definition extracted from the
- * original CREATE TABLE statement if the expression is a column.
- * Exactly when an expression is considered a column can be complex
- * in the presence of subqueries. The result-set expression in all
- * of the following SELECT statements is considered a column by this function.
- *
- *   SELECT col FROM tbl;
- *   SELECT (SELECT col FROM tbl;
- *   SELECT (SELECT col FROM tbl);
- *   SELECT abc FROM (SELECT col AS abc FROM tbl);
- *
- * The declaration type for any expression other than a column is NULL.
- *
- * This routine has either 3 or 6 parameters depending on whether or not
- * the SQLITE_ENABLE_COLUMN_METADATA compile-time option is used.
- */
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
-#define columnType(A,B,C,D) columnTypeImpl(A,B,C,D)
-#else				/* if !defined(SQLITE_ENABLE_COLUMN_METADATA) */
-#define columnType(A,B,C,D) columnTypeImpl(A,B)
-#endif
-static enum field_type
-columnTypeImpl(NameContext * pNC, Expr * pExpr
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
-	       , const char **pzOrigCol,
-#endif
-)
-{
-	enum field_type column_type = FIELD_TYPE_SCALAR;
-	int j;
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
-	char const *zOrigTab = 0;
-	char const *zOrigCol = 0;
-#endif
-
-	assert(pExpr != 0);
-	assert(pNC->pSrcList != 0);
-	switch (pExpr->op) {
-	case TK_AGG_COLUMN:
-	case TK_COLUMN:{
-			/* The expression is a column. Locate the table the column is being
-			 * extracted from in NameContext.pSrcList. This table may be real
-			 * database table or a subquery.
-			 */
-			Table *pTab = 0;	/* Table structure column is extracted from */
-			Select *pS = 0;	/* Select the column is extracted from */
-			int iCol = pExpr->iColumn;	/* Index of column in pTab */
-			testcase(pExpr->op == TK_AGG_COLUMN);
-			testcase(pExpr->op == TK_COLUMN);
-			while (pNC && !pTab) {
-				SrcList *pTabList = pNC->pSrcList;
-				for (j = 0;
-				     j < pTabList->nSrc
-				     && pTabList->a[j].iCursor != pExpr->iTable;
-				     j++) ;
-				if (j < pTabList->nSrc) {
-					pTab = pTabList->a[j].pTab;
-					pS = pTabList->a[j].pSelect;
-				} else {
-					pNC = pNC->pNext;
-				}
-			}
-
-			if (pTab == 0) {
-				/* At one time, code such as "SELECT new.x" within a trigger would
-				 * cause this condition to run.  Since then, we have restructured how
-				 * trigger code is generated and so this condition is no longer
-				 * possible. However, it can still be true for statements like
-				 * the following:
-				 *
-				 *   CREATE TABLE t1(col INTEGER);
-				 *   SELECT (SELECT t1.col) FROM FROM t1;
-				 *
-				 * when columnType() is called on the expression "t1.col" in the
-				 * sub-select. In this case, set the column type to NULL, even
-				 * though it should really be "INTEGER".
-				 *
-				 * This is not a problem, as the column type of "t1.col" is never
-				 * used. When columnType() is called on the expression
-				 * "(SELECT t1.col)", the correct type is returned (see the TK_SELECT
-				 * branch below.
-				 */
-				break;
-			}
-
-			assert(pTab && pExpr->space_def == pTab->def);
-			if (pS) {
-				/* The "table" is actually a sub-select or a view in the FROM clause
-				 * of the SELECT statement. Return the declaration type and origin
-				 * data for the result-set column of the sub-select.
-				 */
-				assert(iCol >= 0);
-				if (ALWAYS(iCol < pS->pEList->nExpr)) {
-					/* The ALWAYS() is because
-					 * iCol>=pS->pEList->nExpr will have been
-					 * caught already by name resolution.
-					 */
-					NameContext sNC;
-					Expr *p = pS->pEList->a[iCol].pExpr;
-					sNC.pSrcList = pS->pSrc;
-					sNC.pNext = pNC;
-					sNC.pParse = pNC->pParse;
-					column_type =
-					    columnType(&sNC, p, &zOrigTab,
-						       &zOrigCol);
-				}
-			} else {
-				/* A real table */
-				assert(!pS);
-				assert(iCol >= 0 &&
-				       iCol < (int)pTab->def->field_count);
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
-				zOrigCol = pTab->def->fields[iCol].name;
-				zType = pTab->def->fields[iCol].type;
-				zOrigTab = pTab->zName;
-#else
-				column_type = pTab->def->fields[iCol].type;
-#endif
-			}
-			break;
-		}
-	case TK_SELECT:{
-			/* The expression is a sub-select. Return the declaration type and
-			 * origin info for the single column in the result set of the SELECT
-			 * statement.
-			 */
-			NameContext sNC;
-			Select *pS = pExpr->x.pSelect;
-			Expr *p = pS->pEList->a[0].pExpr;
-			assert(ExprHasProperty(pExpr, EP_xIsSelect));
-			sNC.pSrcList = pS->pSrc;
-			sNC.pNext = pNC;
-			sNC.pParse = pNC->pParse;
-			column_type =
-			    columnType(&sNC, p, &zOrigTab, &zOrigCol);
-			break;
-		}
-	}
-
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
-	if (pzOrigTab) {
-		assert(pzOrigTab && pzOrigCol);
-		*pzOrigTab = zOrigTab;
-		*pzOrigCol = zOrigCol;
-	}
-#endif
-	return column_type;
-}
-
-/*
  * Generate code that will tell the VDBE the names of columns
  * in the result set.  This information is used to provide the
  * azCol[] values in the callback.
@@ -2055,15 +1899,12 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	sNC.pSrcList = pSelect->pSrc;
 	a = pSelect->pEList->a;
 	for (uint32_t i = 0; i < pTab->def->field_count; i++) {
-		enum field_type type;
 		p = a[i].pExpr;
-		type = columnType(&sNC, p, 0, 0);
-		pTab->def->fields[i].type = type;
-
 		char affinity = sqlite3ExprAffinity(p);
 		if (affinity == 0)
 			affinity = AFFINITY_BLOB;
 		pTab->def->fields[i].affinity = affinity;
+		pTab->def->fields[i].type = sql_affinity_to_field_type(affinity);
 		bool is_found;
 		uint32_t coll_id;
 		if (pTab->def->fields[i].coll_id == COLL_NONE &&

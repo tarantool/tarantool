@@ -20,7 +20,7 @@ test:plan(21)
 test:do_execsql_test(
     "tkt-f973c7ac3-1.0",
     [[
-        CREATE TABLE t(id primary key, c1 INTEGER, c2 INTEGER);
+        CREATE TABLE t(id INT primary key, c1 INTEGER, c2 INTEGER);
         INSERT INTO t VALUES(1, 5, 5);
         INSERT INTO t VALUES(2, 5, 4);
     ]], {

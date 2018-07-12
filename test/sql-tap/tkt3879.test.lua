@@ -22,16 +22,16 @@ test:plan(3)
 test:do_execsql_test(
     "tkt3879.1.1",
     [[
-        CREATE TABLE t1 (a PRIMARY KEY, b);
+        CREATE TABLE t1 (a TEXT PRIMARY KEY, b INT );
         INSERT INTO t1 VALUES ('w',  1);
         INSERT INTO t1 VALUES ('z', -1);
 
-        CREATE TABLE t2 (m INTEGER PRIMARY KEY, n, a, p);
+        CREATE TABLE t2 (m INTEGER PRIMARY KEY, n INT , a TEXT, p INT );
         INSERT INTO t2 VALUES (25, 13, 'w', 1);
         INSERT INTO t2 VALUES (26, 25, 'z', 153);
         INSERT INTO t2 VALUES (27, 25, 'z', 68);
 
-        CREATE TABLE t3 (m PRIMARY KEY);
+        CREATE TABLE t3 (m  INT PRIMARY KEY);
         INSERT INTO t3 VALUES (25);
     ]], {
         -- <tkt3879.1.1>

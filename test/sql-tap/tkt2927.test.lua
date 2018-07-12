@@ -28,7 +28,7 @@ test:do_test(
     "tkt2927-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a primary key, b);
+            CREATE TABLE t1(a  INT primary key, b INT );
             INSERT INTO t1 VALUES(1,11);
             INSERT INTO t1 VALUES(2,22);
             INSERT INTO t1 VALUES(3,33);
@@ -1204,12 +1204,12 @@ test:do_test(
             CREATE TABLE host (
              hostname text not null primary key,
              consoleHost text,
-             consolePort text
+             consolePort int
             );
-            INSERT INTO host VALUES('aald04','aalp03','4');
-            INSERT INTO host VALUES('aald17','aalp01','1');
+            INSERT INTO host VALUES('aald04','aalp03',4);
+            INSERT INTO host VALUES('aald17','aalp01',1);
             CREATE VIEW consolemap1a as
-              select hostname, consolehost, '/dev/cuaD0.' || (consoleport-1) consoleport
+              select hostname, consolehost, '/dev/cuaD0.' || cast(consoleport-1 as text) consoleport
                 from host where consolehost='aalp01';
             CREATE VIEW consolemap1b as
               select hostname hostname, consolehost consolehost, '/dev/cuaD' ||

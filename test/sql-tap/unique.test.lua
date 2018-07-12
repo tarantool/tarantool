@@ -131,7 +131,7 @@ test:do_execsql_test(
     "unique-2.0",
     [[
         DROP TABLE t1;
-        CREATE TABLE t2(id primary key, a int, b int);
+        CREATE TABLE t2(id int primary key, a int, b int);
         INSERT INTO t2(id, a,b) VALUES(1, 1,2);
         INSERT INTO t2(id, a,b) VALUES(2, 3,4);
         SELECT a,b FROM t2 ORDER BY a;
@@ -245,7 +245,7 @@ test:do_catchsql_test(
     "unique-3.1",
     [[
         CREATE TABLE t3(
-          id primary key,
+          id int primary key,
            a int,
            b int,
            c int,
@@ -299,7 +299,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "unique-4.1",
     [[
-        CREATE TABLE t4(id primary key,a UNIQUE, b, c, UNIQUE(b,c));
+        CREATE TABLE t4(id int primary key,a int UNIQUE, b int, c int, UNIQUE(b,c));
         INSERT INTO t4 VALUES(1,1,2,3);
         INSERT INTO t4 VALUES(2, NULL, 2, NULL);
         SELECT a,b,c FROM t4;
@@ -414,13 +414,13 @@ test:do_execsql_test(
     "unique-5.1",
     [[
         CREATE TABLE t5(
-          id primary key,
-          first_column_with_long_name,
-          second_column_with_long_name,
-          third_column_with_long_name,
-          fourth_column_with_long_name,
-          fifth_column_with_long_name,
-          sixth_column_with_long_name,
+          id  INT primary key,
+          first_column_with_long_name INT ,
+          second_column_with_long_name INT ,
+          third_column_with_long_name INT ,
+            fourth_column_with_long_name INT ,
+          fifth_column_with_long_name INT ,
+          sixth_column_with_long_name INT ,
           UNIQUE(
             first_column_with_long_name,
             second_column_with_long_name,

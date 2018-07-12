@@ -26,7 +26,7 @@ test:do_test(
         test:execsql [[
             CREATE TABLE t1(
               a INTEGER PRIMARY KEY,
-              b UNIQUE
+              b INTEGER UNIQUE
             );
             INSERT INTO t1 VALUES(1, 1);
             INSERT INTO t1 VALUES(2, 2);

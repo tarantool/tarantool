@@ -24,11 +24,11 @@ testprefix = "tkt-8c63ff0ec"
 test:do_execsql_test(
     1.1,
     [[
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c, d, e);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT, c INT, d INT, e INT);
         INSERT INTO t1 VALUES(1,20,30,40,50),(3,60,70,80,90);
         CREATE TABLE t2(x INTEGER PRIMARY KEY);
         INSERT INTO t2 VALUES(2);
-        CREATE TABLE t3(id primary key, z);
+        CREATE TABLE t3(id INT primary key, z INT);
         INSERT INTO t3 VALUES(1, 2),(2, 2),(3, 2),(4, 2);
 
         SELECT a, b+c FROM t1

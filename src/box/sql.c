@@ -1121,35 +1121,6 @@ cursor_advance(BtCursor *pCur, int *pRes)
  * format data for certain fields in _space and _index.
  */
 
-/*
- * Convert SQLite affinity value to the corresponding Tarantool type
- * string which is suitable for _index.parts field.
- */
-static const char *convertSqliteAffinity(int affinity, bool allow_nulls)
-{
-	if (allow_nulls || 1) {
-		return "scalar";
-	}
-	switch (affinity) {
-	default:
-		assert(false);
-	case AFFINITY_BLOB:
-		return "scalar";
-	case AFFINITY_TEXT:
-		return "string";
-	case AFFINITY_NUMERIC:
-	case AFFINITY_REAL:
-	  /* Tarantool workaround: to make comparators able to compare, e.g.
-	     double and int use generic type. This might be a performance issue.  */
-	  /* return "number"; */
-		return "scalar";
-	case AFFINITY_INTEGER:
-	  /* See comment above.  */
-	  /* return "integer"; */
-		return "scalar";
-	}
-}
-
 char *
 sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 {
@@ -1161,21 +1132,9 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 
 	const struct space_def *def = table->def;
 	assert(def != NULL);
-	/*
-	 * If table's PK is single column which is INTEGER, then
-	 * treat it as strict type, not affinity.
-	 */
-	struct index *pk_idx = sql_table_primary_key(table);
-	uint32_t pk_forced_int = UINT32_MAX;
-	if (pk_idx != NULL && pk_idx->def->key_def->part_count == 1) {
-		int pk = pk_idx->def->key_def->parts[0].fieldno;
-		if (def->fields[pk].type == FIELD_TYPE_INTEGER)
-			pk_forced_int = pk;
-	}
 	uint32_t field_count = def->field_count;
 	mpstream_encode_array(&stream, field_count);
 	for (uint32_t i = 0; i < field_count && !is_error; i++) {
-		const char *t;
 		uint32_t cid = def->fields[i].coll_id;
 		struct field_def *field = &def->fields[i];
 		const char *default_str = field->default_value;
@@ -1188,22 +1147,15 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 		mpstream_encode_str(&stream, "name");
 		mpstream_encode_str(&stream, field->name);
 		mpstream_encode_str(&stream, "type");
-		if (i == pk_forced_int) {
-			t = "integer";
-		} else {
-			enum affinity_type affinity = def->fields[i].affinity;
-			t = affinity == AFFINITY_BLOB ? "scalar" :
-			    convertSqliteAffinity(affinity,
-						  def->fields[i].is_nullable);
-		}
 		assert(def->fields[i].is_nullable ==
 		       action_is_nullable(def->fields[i].nullable_action));
-		mpstream_encode_str(&stream, t);
+		mpstream_encode_str(&stream, field_type_strs[field->type]);
 		mpstream_encode_str(&stream, "affinity");
 		mpstream_encode_uint(&stream, def->fields[i].affinity);
 		mpstream_encode_str(&stream, "is_nullable");
 		mpstream_encode_bool(&stream, def->fields[i].is_nullable);
 		mpstream_encode_str(&stream, "nullable_action");
+
 		assert(def->fields[i].nullable_action < on_conflict_action_MAX);
 		const char *action =
 			on_conflict_action_strs[def->fields[i].nullable_action];
@@ -1317,31 +1269,13 @@ fkey_encode_links(struct region *region, const struct fkey_def *def, int type,
 
 char *
 sql_encode_index_parts(struct region *region, const struct field_def *fields,
-		       const struct index_def *idx_def,
-		       const struct index_def *pk_def, uint32_t *size)
+		       const struct index_def *idx_def, uint32_t *size)
 {
 	size_t used = region_used(region);
 	struct mpstream stream;
 	bool is_error = false;
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
 		      set_encode_error, &is_error);
-	/*
-	 * If table's PK is single column which is INTEGER, then
-	 * treat it as strict type, not affinity.
-	 */
-	uint32_t pk_forced_int = UINT32_MAX;
-	if (pk_def->key_def->part_count == 1) {
-		int pk = pk_def->key_def->parts[0].fieldno;
-		if (fields[pk].type == FIELD_TYPE_INTEGER)
-			pk_forced_int = pk;
-	}
-
-	/* gh-2187
-	 *
-	 * Include all index columns, i.e. "key" columns followed by the
-	 * primary key columns. Query planner depends on this particular
-	 * data layout.
-	 */
 	struct key_def *key_def = idx_def->key_def;
 	struct key_part *part = key_def->parts;
 	mpstream_encode_array(&stream, key_def->part_count);
@@ -1349,20 +1283,14 @@ sql_encode_index_parts(struct region *region, const struct field_def *fields,
 		uint32_t col = part->fieldno;
 		assert(fields[col].is_nullable ==
 		       action_is_nullable(fields[col].nullable_action));
-		const char *t;
-		if (pk_forced_int == col) {
-			t = "integer";
-		} else {
-			t = convertSqliteAffinity(fields[col].affinity,
-						  fields[col].is_nullable);
-		}
 		/* Do not decode default collation. */
 		uint32_t cid = part->coll_id;
 		mpstream_encode_map(&stream, 5 + (cid != COLL_NONE));
 		mpstream_encode_str(&stream, "type");
-		mpstream_encode_str(&stream, t);
+		mpstream_encode_str(&stream, field_type_strs[fields[col].type]);
 		mpstream_encode_str(&stream, "field");
 		mpstream_encode_uint(&stream, col);
+
 		if (cid != COLL_NONE) {
 			mpstream_encode_str(&stream, "collation");
 			mpstream_encode_uint(&stream, cid);

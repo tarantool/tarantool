@@ -8,12 +8,12 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 box.cfg{}
 
-box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY, b UNIQUE)")
-box.sql.execute("CREATE TABLE t2(a UNIQUE, b)")
+box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE)")
+box.sql.execute("CREATE TABLE t2(a INT UNIQUE, b INT)")
 
-box.sql.execute("CREATE TABLE t3(a)")
-box.sql.execute("CREATE TABLE t4(a, b)")
-box.sql.execute("CREATE TABLE t5(a, b UNIQUE)")
+box.sql.execute("CREATE TABLE t3(a NUM)")
+box.sql.execute("CREATE TABLE t4(a DECIMAL, b TEXT)")
+box.sql.execute("CREATE TABLE t5(a DECIMAL, b NUM UNIQUE)")
 
 box.sql.execute("DROP TABLE t1")
 

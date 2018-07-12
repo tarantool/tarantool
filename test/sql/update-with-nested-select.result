@@ -9,7 +9,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 ...
 -- box.cfg()
 -- create space
-box.sql.execute("CREATE TABLE t1(a integer primary key, b UNIQUE, e);");
+box.sql.execute("CREATE TABLE t1(a integer primary key, b INT UNIQUE, e INT);");
 ---
 ...
 -- Debug

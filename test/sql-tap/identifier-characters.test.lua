@@ -14,7 +14,7 @@ local testcases = {
 		if string.len(id) == box.schema.NAME_MAX then
 			id = string.sub(id, string.len(id))
 		end
-		test:execsql(string.format("create table \"%s\" (a primary key);", id))
+		test:execsql(string.format("create table \"%s\" (a INT primary key);", id))
 	end,
 	-- cleanup
 	function (id)
@@ -25,7 +25,7 @@ local testcases = {
 	end},
 	{"column name",
 	function (id)
-		test:execsql(string.format("create table table1(a primary key, \"%s\");", id))
+		test:execsql(string.format("create table table1(a INT primary key, \"%s\" INT);", id))
 	end,
 	function (id)
 		test:execsql(string.format("drop table table1;", id))
@@ -81,7 +81,7 @@ local testcases = {
 
 test:do_execsql_test(
 	test_prefix.."preparition",
-	"create table test(a primary key, b, c)")
+	"create table test(a  INT primary key, b INT, c INT)")
 
 for _, testcase in ipairs(testcases) do
 	test:do_test(

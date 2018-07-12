@@ -25,7 +25,7 @@ test:plan(57)
 test:do_execsql_test(
     "tkt1473-1.1",
     [[
-        CREATE TABLE t1(a primary key,b);
+        CREATE TABLE t1(a INT primary key,b INT);
         INSERT INTO t1 VALUES(1,2);
         INSERT INTO t1 VALUES(3,4);
         SELECT * FROM t1
@@ -290,7 +290,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt1473-4.1",
     [[
-        CREATE TABLE t2(x primary key,y);
+        CREATE TABLE t2(x INT primary key,y INT);
         INSERT INTO t2 VALUES(1,2);
         INSERT INTO t2 SELECT x+2, y+2 FROM t2;
         INSERT INTO t2 SELECT x+4, y+4 FROM t2;

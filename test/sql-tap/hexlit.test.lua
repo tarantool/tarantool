@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(130)
+test:plan(128)
 
 --!./tcltestrunner.lua
 -- 2014-07-23
@@ -98,29 +98,6 @@ for n = 1, 0x10 -1, 1 do
     hexlit1("200."..n..".3", "0X"..string.format("%03X",n), n)
     hexlit1("200."..n..".4", "0x"..string.format("%03X",n), n)
 end
--- String literals that look like hex do not get cast or coerced.
---
-test:do_execsql_test(
-    "hexlit-300",
-    [[
-        CREATE TABLE t1(id primary key, x INT, y REAL);
-        INSERT INTO t1 VALUES(1, '1234','4567'),(2, '0x1234','0x4567');
-        SELECT typeof(x), x, typeof(y), y, '#' FROM t1 ORDER BY id;
-    ]], {
-        -- <hexlit-300>
-        "integer", 1234, "real", 4567.0, "#", "text", "0x1234", "text", "0x4567", "#"
-        -- </hexlit-300>
-    })
-
-test:do_execsql_test(
-    "hexlit-301",
-    [[
-        SELECT CAST('0x1234' AS INTEGER);
-    ]], {
-        -- <hexlit-301>
-        0
-        -- </hexlit-301>
-    })
 
 -- Oversized hex literals are rejected
 --
@@ -138,7 +115,7 @@ test:do_catchsql_test(
     "hexlist-410",
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(x primary key);
+        CREATE TABLE t1(x INT primary key);
         INSERT INTO t1 VALUES(1+0x10000000000000000);
     ]], {
         -- <hexlist-410>

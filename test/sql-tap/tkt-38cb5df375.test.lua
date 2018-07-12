@@ -35,7 +35,7 @@ local ii
 test:do_execsql_test(
     "tkt-38cb5df375.0",
     [[
-        CREATE TABLE t1(a primary key);
+        CREATE TABLE t1(a  INT primary key);
         INSERT INTO t1 VALUES(1);
         INSERT INTO t1 VALUES(2);
         INSERT INTO t1 SELECT a+2 FROM t1;

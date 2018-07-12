@@ -26,9 +26,9 @@ test:do_test(
     "subquery2-1.1",
     function()
         test:execsql [[
-            CREATE TABLE t1(a PRIMARY KEY,b);
-            CREATE TABLE t2(c PRIMARY KEY,d);
-            CREATE TABLE t3(e PRIMARY KEY,f);
+            CREATE TABLE t1(a  INT PRIMARY KEY,b INT );
+            CREATE TABLE t2(c  INT PRIMARY KEY,d INT );
+            CREATE TABLE t3(e  INT PRIMARY KEY,f INT );
             START TRANSACTION;
             INSERT INTO t1 VALUES(1,2);
             INSERT INTO t1 VALUES(3,4);
@@ -117,8 +117,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     2.1,
     [[
-        CREATE TABLE t4(a PRIMARY KEY, b);
-        CREATE TABLE t5(a PRIMARY KEY, b);
+        CREATE TABLE t4(a  INT PRIMARY KEY, b INT );
+        CREATE TABLE t5(a  INT PRIMARY KEY, b INT );
         INSERT INTO t5 VALUES(3, 5);
 
         INSERT INTO t4 VALUES(1, 1);

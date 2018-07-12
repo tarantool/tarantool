@@ -25,7 +25,7 @@ test:do_test(
     "tkt-3998683a16.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(x primary key, y REAL);
+            CREATE TABLE t1(x  INT primary key, y REAL);
             INSERT INTO t1 VALUES(1, '1.0');
             INSERT INTO t1 VALUES(2, '.125');
             INSERT INTO t1 VALUES(3, '123.');

@@ -20,7 +20,7 @@ test:plan(61)
 test:do_execsql_test(
     "in4-1.1",
     [[
-        CREATE TABLE t1(a, b PRIMARY KEY);
+        CREATE TABLE t1(a TEXT , b  INT PRIMARY KEY);
         CREATE INDEX i1 ON t1(a);
     ]], {
         -- <in4-1.1>
@@ -172,8 +172,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t1(pk primary key, x, id);
-        CREATE TABLE t2(pk primary key, x, id);
+        CREATE TABLE t1(pk  INT primary key, x INT , id INT );
+        CREATE TABLE t2(pk  INT primary key, x INT , id INT );
         INSERT INTO t1 VALUES(1, NULL, NULL);
         INSERT INTO t1 VALUES(2, 0, NULL);
         INSERT INTO t1 VALUES(3, 1, 3);
@@ -204,7 +204,7 @@ test:do_test(
     "in4-3.3",
     function()
         test:execsql [[
-            CREATE TABLE t3(x PRIMARY KEY, y, z);
+            CREATE TABLE t3(x  INT PRIMARY KEY, y INT , z INT );
             CREATE INDEX t3i1 ON t3(x, y);
             INSERT INTO t3 VALUES(1, 1, 1);
             INSERT INTO t3 VALUES(10, 10, 10);
@@ -524,7 +524,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-4.1",
     [[
-        CREATE TABLE t4a(a TEXT, b TEXT COLLATE "unicode_ci", c PRIMARY KEY);
+        CREATE TABLE t4a(a TEXT, b TEXT COLLATE "unicode_ci", c  INT PRIMARY KEY);
         INSERT INTO t4a VALUES('ABC','abc',1);
         INSERT INTO t4a VALUES('def','xyz',2);
         INSERT INTO t4a VALUES('ghi','ghi',3);
@@ -588,7 +588,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-4.11",
     [[
-        CREATE TABLE t4b(a TEXT, b NUMERIC, c PRIMARY KEY);
+        CREATE TABLE t4b(a TEXT, b NUMERIC, c  INT PRIMARY KEY);
         INSERT INTO t4b VALUES('1.0',1,4);
         SELECT c FROM t4b WHERE a=b;
     ]], {
@@ -623,7 +623,7 @@ test:do_execsql_test(
         SELECT c FROM t4b WHERE a=+b;
     ]], {
         -- <in4-4.14>
-        
+        4
         -- </in4-4.14>
     })
 
@@ -633,7 +633,7 @@ test:do_execsql_test(
         SELECT c FROM t4b WHERE +b=a;
     ]], {
         -- <in4-4.15>
-        
+        4
         -- </in4-4.15>
     })
 
@@ -653,7 +653,7 @@ test:do_execsql_test(
         SELECT c FROM t4b WHERE a IN (b);
     ]], {
         -- <in4-4.17>
-        
+        4
         -- </in4-4.17>
     })
 
@@ -701,9 +701,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-6.1",
     [[
-        CREATE TABLE t6a(a INTEGER PRIMARY KEY, b);
+        CREATE TABLE t6a(a INTEGER PRIMARY KEY, b INT );
         INSERT INTO t6a VALUES(1,2),(3,4),(5,6);
-        CREATE TABLE t6b(c INTEGER PRIMARY KEY, d);
+        CREATE TABLE t6b(c INTEGER PRIMARY KEY, d INT );
         INSERT INTO t6b VALUES(4,44),(5,55),(6,66);
 
         SELECT * FROM t6a, t6b WHERE a=3 AND b IN (c);

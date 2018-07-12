@@ -5,7 +5,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 -- box.cfg()
 
 -- create space
-box.sql.execute("CREATE TABLE t1(a, b, PRIMARY KEY(a, b));");
+box.sql.execute("CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a, b));");
 
 -- Debug
 -- box.sql.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
@@ -46,7 +46,7 @@ box.sql.execute("DROP TABLE t2;")
 -- can't truncate system table.
 box.sql.execute("TRUNCATE TABLE \"_sql_stat1\";")
 
-box.sql.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b STR);")
+box.sql.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b TEXT);")
 box.sql.execute("INSERT INTO t1 VALUES(1, 1, 'one');")
 box.sql.execute("INSERT INTO t1 VALUES(2, 2, 'two');")
 

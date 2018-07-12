@@ -34,7 +34,7 @@ test:do_execsql_test(
     1.0,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a PRIMARY KEY, b, c, d);
+        CREATE TABLE t1(a  INT PRIMARY KEY, b INT , c INT , d INT );
         INSERT INTO t1(a,b,c,d) VALUES(1,1,2,3),(2,7,8,9),(3,4,5,6),(4,10,11,12),(5,4,8,12),(6,1,11,111);
         CREATE INDEX t1b ON t1(b);
         CREATE INDEX t1c ON t1(c);

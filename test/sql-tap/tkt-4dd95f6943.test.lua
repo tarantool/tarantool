@@ -21,7 +21,7 @@ testprefix = "tkt-4dd95f6943"
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t1(id primary key, x);
+        CREATE TABLE t1(id INT primary key, x INT);
         INSERT INTO t1 VALUES (1, 3), (2, 4), (3, 2), (4, 1), (5, 5), (6, 6);
     ]])
 
@@ -62,7 +62,7 @@ end
 test:do_execsql_test(
     2.0,
     [[
-        CREATE TABLE t2(id primary key, x, y);
+        CREATE TABLE t2(id INT primary key, x INT, y INT);
         INSERT INTO t2 VALUES (1, 5, 3), (2, 5, 4), (3, 5, 2), (4, 5, 1), (5, 5, 5), (6, 5, 6);
         INSERT INTO t2 VALUES (7, 1, 3), (8, 1, 4), (9, 1, 2), (10, 1, 1), (11, 1, 5), (12, 1, 6);
         INSERT INTO t2 VALUES (13, 3, 3), (14, 3, 4), (15, 3, 2), (16, 3, 1), (17, 3, 5), (18, 3, 6);
@@ -70,7 +70,7 @@ test:do_execsql_test(
         INSERT INTO t2 VALUES (25, 4, 3), (26, 4, 4), (27, 4, 2), (28, 4, 1), (29, 4, 5), (30, 4, 6);
         INSERT INTO t2 VALUES (31, 6, 3), (32, 6, 4), (33, 6, 2), (34, 6, 1), (35, 6, 5), (36, 6, 6);
 
-        CREATE TABLE t3(a primary key, b);
+        CREATE TABLE t3(a INT primary key, b INT);
         INSERT INTO t3 VALUES (2, 2), (4, 4), (5, 5);
         CREATE UNIQUE INDEX t3i1 ON t3(a ASC);
         CREATE UNIQUE INDEX t3i2 ON t3(b DESC);
@@ -214,11 +214,11 @@ end
 test:do_execsql_test(
     3.0,
     [[
-        CREATE TABLE t7(x primary key);
+        CREATE TABLE t7(x INT primary key);
         INSERT INTO t7 VALUES (1), (2), (3);
         CREATE INDEX i7 ON t7(x);
 
-        CREATE TABLE t8(y primary key);
+        CREATE TABLE t8(y INT primary key);
         INSERT INTO t8 VALUES (1), (2), (3);
     ]])
 

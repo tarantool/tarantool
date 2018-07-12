@@ -25,7 +25,7 @@ if (0 > 0)
  then
     -- Create a table to work with.
     --
-    test:execsql "CREATE TABLE test1(i1 int primary key, i2 int, r1 real, r2 real, t1 text, t2 text)"
+    test:execsql "CREATE TABLE test1(i1 int primary key, i2 int, r1 INT real, r2 INT real, t1 text, t2 text)"
     test:execsql "INSERT INTO test1 VALUES(1,2,1.1,2.2,'hello','world')"
     local function test_expr(name, settings, expr, result)
         test:do_test(
@@ -87,7 +87,7 @@ if (0 > 0)
     test:do_execsql_test(
         "icu-4.1",
         [[
-            CREATE TABLE fruit(name);
+            CREATE TABLE fruit(name INT);
             INSERT INTO fruit VALUES('plum');
             INSERT INTO fruit VALUES('cherry');
             INSERT INTO fruit VALUES('apricot');

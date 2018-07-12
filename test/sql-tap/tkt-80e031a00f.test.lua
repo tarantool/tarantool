@@ -120,7 +120,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt-80e031a00f.5",
     [[
-        CREATE TABLE t1(x PRIMARY key);
+        CREATE TABLE t1(x  INT PRIMARY key);
         SELECT 1 IN t1;
     ]], {
         -- <tkt-80e031a00f.5>
@@ -340,23 +340,23 @@ test:do_execsql_test(
         -- </tkt-80e031a00f.26>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt-80e031a00f.27",
     [[
         SELECT 'hello' IN t1
     ]], {
         -- <tkt-80e031a00f.27>
-        0
+        1, 'Type mismatch: can not convert hello to numeric'
         -- </tkt-80e031a00f.27>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "tkt-80e031a00f.28",
     [[
         SELECT 'hello' NOT IN t1
     ]], {
         -- <tkt-80e031a00f.28>
-        1
+        1, 'Type mismatch: can not convert hello to numeric'
         -- </tkt-80e031a00f.28>
     })
 
@@ -453,29 +453,29 @@ test:do_test(
     "tkt-80e031a00f.104",
     function()
         test:execsql [[
-            CREATE TABLE t4(a PRIMARY KEY);
+            CREATE TABLE t4(a  INT PRIMARY KEY);
             CREATE TABLE t5(b INTEGER PRIMARY KEY);
-            CREATE TABLE t6(c PRIMARY KEY);
+            CREATE TABLE t6(c  INT PRIMARY KEY);
             INSERT INTO t4 VALUES(2);
             INSERT INTO t4 VALUES(3);
             INSERT INTO t4 VALUES(4);
             INSERT INTO t5 SELECT * FROM t4;
             INSERT INTO t6 SELECT * FROM t4;
-            CREATE TABLE t4n(a, b PRIMARY KEY);
+            CREATE TABLE t4n(a INT , b  INT PRIMARY KEY);
             INSERT INTO t4n VALUES(2, 1),
                             (3, 2),
                             (4, 3),
                             (null, 4);
-            CREATE TABLE t6n(c, b PRIMARY KEY);
+            CREATE TABLE t6n(c INT , b  INT PRIMARY KEY);
             INSERT INTO t6n select * from t4n;
-            CREATE TABLE t7(a PRIMARY KEY);
-            CREATE TABLE t8(c PRIMARY KEY);
+            CREATE TABLE t7(a TEXT PRIMARY KEY);
+            CREATE TABLE t8(c TEXT PRIMARY KEY);
             INSERT INTO t7 VALUES('b');
             INSERT INTO t7 VALUES('c');
             INSERT INTO t7 VALUES('d');
             INSERT INTO t8 SELECT * FROM t7;
-            CREATE TABLE t7n(a, b PRIMARY KEY);
-            CREATE TABLE t8n(c, b PRIMARY KEY);
+            CREATE TABLE t7n(a TEXT, b  INT PRIMARY KEY);
+            CREATE TABLE t8n(c TEXT, b  INT PRIMARY KEY);
             INSERT INTO t7n VALUES('b', 1),
                                   ('c', 2),
                                   ('d', 3),

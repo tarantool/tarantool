@@ -25,7 +25,7 @@ test:do_test(
     "tkt-a7b7803e.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a primary key,b);
+            CREATE TABLE t1(a INT primary key,b TEXT);
             INSERT INTO t1 VALUES(0,'first'),(99,'fuzzy');
             SELECT (t1.a==0) AS x, b
               FROM t1

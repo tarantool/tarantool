@@ -30,7 +30,7 @@ test:plan(47)
 test:do_execsql_test(
     "autoinc-1.2",
     [[
-        CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT, y);
+        CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT, y INT );
     ]], {
         -- <autoinc-1.2>
 
@@ -269,7 +269,7 @@ test:do_test(
             DROP TABLE t2;
         ]])
         return test:execsql([[
-            CREATE TABLE t2(d, e INTEGER PRIMARY KEY AUTOINCREMENT, f);
+            CREATE TABLE t2(d INT , e INTEGER PRIMARY KEY AUTOINCREMENT, f INT );
             INSERT INTO t2(d) VALUES(1);
         ]])
     end, {
@@ -302,7 +302,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-2.73",
     [[
-        CREATE TABLE t3(g INTEGER PRIMARY KEY AUTOINCREMENT, h);
+        CREATE TABLE t3(g INTEGER PRIMARY KEY AUTOINCREMENT, h INT );
         INSERT INTO t3(h) VALUES(1);
         SELECT max(x) FROM t1 UNION SELECT max(e) FROM t2
           UNION SELECT max(g) FROM t3;
@@ -388,7 +388,7 @@ test:do_execsql_test(
 -- test:do_execsql_test(
 --     "autoinc-4.2",
 --     [[
---         CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT, y);
+--         CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT, y INT );
 --         CREATE TEMP TABLE t3(a INTEGER PRIMARY KEY AUTOINCREMENT, b);
 --         SELECT 1, name FROM sqlite_master WHERE type='table';
 --         SELECT 2, name FROM sqlite_temp_master WHERE type='table';
@@ -516,7 +516,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "autoinc-6.1",
     [[
-        CREATE TABLE t6(v INTEGER PRIMARY KEY AUTOINCREMENT, w);
+        CREATE TABLE t6(v INTEGER PRIMARY KEY AUTOINCREMENT, w INT );
         INSERT INTO t6 VALUES(9223372036854775807,1);
         SELECT max(v) FROM t6;
     ]], {
@@ -574,9 +574,9 @@ test:do_test(
     "autoinc-9.1",
     function()
         return test:execsql([[
-            CREATE TABLE t2(x INTEGER PRIMARY KEY AUTOINCREMENT, y);
+            CREATE TABLE t2(x INTEGER PRIMARY KEY AUTOINCREMENT, y INT );
             INSERT INTO t2 VALUES(NULL, 1);
-            CREATE TABLE t3(a INTEGER PRIMARY KEY AUTOINCREMENT, b);
+            CREATE TABLE t3(a INTEGER PRIMARY KEY AUTOINCREMENT, b INT );
             INSERT INTO t3 SELECT * FROM t2 WHERE y>1;
 
             SELECT max(a) FROM t3;
@@ -648,7 +648,7 @@ test:do_test(
     "autoinc-3928.1",
     function()
         return test:execsql([[
-            CREATE TABLE t3928(a INTEGER PRIMARY KEY AUTOINCREMENT, b);
+            CREATE TABLE t3928(a INTEGER PRIMARY KEY AUTOINCREMENT, b TEXT);
             CREATE TRIGGER t3928r1 BEFORE INSERT ON t3928 BEGIN
               INSERT INTO t3928(b) VALUES('before1');
               INSERT INTO t3928(b) VALUES('before2');
@@ -685,11 +685,11 @@ test:do_test(
             DROP TRIGGER t3928r1;
             DROP TRIGGER t3928r2;
             CREATE TRIGGER t3928r3 BEFORE UPDATE ON t3928
-              WHEN typeof(new.b)=='integer' BEGIN
+              WHEN new.b=='456' BEGIN
                  INSERT INTO t3928(b) VALUES('before-int-' || new.b);
             END;
             CREATE TRIGGER t3928r4 AFTER UPDATE ON t3928
-              WHEN typeof(new.b)=='integer' BEGIN
+              WHEN new.b=='456' BEGIN
                  INSERT INTO t3928(b) VALUES('after-int-' || new.b);
             END;
             DELETE FROM t3928 WHERE a!=1;
@@ -698,7 +698,7 @@ test:do_test(
         ]])
     end, {
         -- <autoinc-3928.3>
-        1, 456, 14, "before-int-456", 15, "after-int-456"
+        1, '456', 14, "before-int-456", 15, "after-int-456"
         -- </autoinc-3928.3>
     })
 
@@ -723,7 +723,7 @@ test:do_test(
             INSERT INTO t3928b VALUES(200);
             INSERT INTO t3928b VALUES(300);
             DELETE FROM t3928;
-            CREATE TABLE t3928c(y INTEGER PRIMARY KEY AUTOINCREMENT, z);
+            CREATE TABLE t3928c(y INTEGER PRIMARY KEY AUTOINCREMENT, z TEXT);
             CREATE TRIGGER t3928br1 BEFORE DELETE ON t3928b BEGIN
               INSERT INTO t3928(b) VALUES('before-del-'||old.x);
               INSERT INTO t3928c(z) VALUES('before-del-'||old.x);
@@ -770,7 +770,7 @@ test:do_test(
     "autoinc-a69637.1",
     function()
         return test:execsql([[
-            CREATE TABLE ta69637_1(x INTEGER PRIMARY KEY AUTOINCREMENT, y);
+            CREATE TABLE ta69637_1(x INTEGER PRIMARY KEY AUTOINCREMENT, y INT );
             CREATE TABLE ta69637_2(z INTEGER PRIMARY KEY);
             CREATE TRIGGER ra69637_1 AFTER INSERT ON ta69637_2 BEGIN
               INSERT INTO ta69637_1(y) VALUES(new.z+1);
@@ -805,7 +805,7 @@ test:do_test(
 test:do_catchsql_test(
     "autoinc-gh-3670",
     [[
-        CREATE TABLE t1 (s1 INT PRIMARY KEY AUTOINCREMENT, s2 CHAR);
+        CREATE TABLE t1 (s1 INT PRIMARY KEY AUTOINCREMENT, s2 CHAR(10));
         INSERT INTO t1 VALUES (1, 'a');
         INSERT INTO t1 SELECT s2, s2 FROM t1;
     ]], {

@@ -24,7 +24,7 @@ testprefix = "tkt-4ef7e3cfca"
 test:do_catchsql_test(
     1.1,
     [[
-        CREATE TABLE x(a primary key);
+        CREATE TABLE x(a  INT primary key);
         CREATE TRIGGER t AFTER INSERT ON x BEGIN
           SELECT * FROM x WHERE abc.a = 1;
         END;
@@ -40,10 +40,10 @@ test:execsql("DROP TABLE x;");
 test:do_execsql_test(
     2.1,
     [[
-        CREATE TABLE w(a primary key);
-        CREATE TABLE x(a primary key);
-        CREATE TABLE y(a primary key);
-        CREATE TABLE z(a primary key);
+        CREATE TABLE w(a  INT primary key);
+        CREATE TABLE x(a  INT primary key);
+        CREATE TABLE y(a  INT primary key);
+        CREATE TABLE z(a  INT primary key);
 
         INSERT INTO x(a) VALUES(5);
         INSERT INTO y(a) VALUES(10);
@@ -52,7 +52,7 @@ test:do_execsql_test(
           INSERT INTO z
           SELECT (SELECT x.a + y.a FROM y) FROM x;
         END;
-        INSERT INTO w VALUES('incorrect');
+        INSERT INTO w VALUES(1);
     ]])
 
 test:do_execsql_test(
@@ -75,10 +75,10 @@ test:execsql([[
 test:do_execsql_test(
     3.1,
     [[
-        CREATE TABLE w(a primary key);
-        CREATE TABLE x(b primary key);
-        CREATE TABLE y(a primary key);
-        CREATE TABLE z(a primary key);
+        CREATE TABLE w(a  INT primary key);
+        CREATE TABLE x(b  INT primary key);
+        CREATE TABLE y(a  INT primary key);
+        CREATE TABLE z(a  INT primary key);
 
         INSERT INTO x(b) VALUES(5);
         INSERT INTO y(a) VALUES(10);
@@ -87,7 +87,7 @@ test:do_execsql_test(
           INSERT INTO z
           SELECT (SELECT x.b + y.a FROM y) FROM x;
         END;
-        INSERT INTO w VALUES('assert');
+        INSERT INTO w VALUES(2);
     ]])
 
 test:do_execsql_test(

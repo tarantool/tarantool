@@ -5,8 +5,8 @@ test:plan(5)
 test:execsql " DROP TABLE IF EXISTS t1 "
 test:execsql " DROP TABLE IF EXISTS t2 "
 
-test:execsql " CREATE TABLE t1(a INT PRIMARY KEY, b, c) "
-test:execsql " CREATE TABLE t2(a INT PRIMARY KEY, b, c) "
+test:execsql " CREATE TABLE t1(a INT PRIMARY KEY, b INT, c INT) "
+test:execsql " CREATE TABLE t2(a INT PRIMARY KEY, b INT, c INT) "
 
 test:do_execsql_test(
 	"index-1.1",

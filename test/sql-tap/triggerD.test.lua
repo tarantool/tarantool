@@ -36,8 +36,8 @@ test:do_test(
     "triggerD-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(rowid PRIMARY KEY, oid, _rowid_, x);
-            CREATE TABLE log(a PRIMARY KEY,b,c,d,e);
+            CREATE TABLE t1(rowid INT PRIMARY KEY, oid INT, _rowid_ INT, x INT);
+            CREATE TABLE log(a TEXT PRIMARY KEY,b INT,c INT,d INT,e INT);
             CREATE TRIGGER r1 BEFORE INSERT ON t1 BEGIN
               INSERT INTO log VALUES('r1', new.rowid, new.oid, new._rowid_, new.x);
             END;
@@ -112,7 +112,7 @@ test:do_test(
 -- do_test triggerD-2.1 {
 --   db eval {
 --     DROP TABLE t1;
---     CREATE TABLE t1(w PRIMARY KEY,x,y,z);
+--     CREATE TABLE t1(w INT PRIMARY KEY,x INT,y INT,z INT);
 --     CREATE TRIGGER r1 BEFORE INSERT ON t1 BEGIN
 --       INSERT INTO log VALUES('r1', new.rowid, new.oid, new._rowid_, new.x);
 --     END;
@@ -165,9 +165,9 @@ test:do_test(
 -- # and a main database trigge is created on the main table, the trigger
 -- # is incorrectly bound to the TEMP table. For example:
 -- #
--- #   CREATE TABLE t1(x);
+-- #   CREATE TABLE t1(x INT);
 -- #   CREATE TEMP TABLE t1(x);
--- #   CREATE TABLE t2(z);
+-- #   CREATE TABLE t2(z INT);
 -- #   CREATE TRIGGER main.r1 AFTER INSERT ON t1 BEGIN
 -- #     INSERT INTO t2 VALUES(10000 + new.x);
 -- #   END;
@@ -180,9 +180,9 @@ test:do_test(
 -- #
 -- do_test triggerD-3.1 {
 --   db eval {
---     CREATE TABLE t300(x);
+--     CREATE TABLE t300(x INT );
 --     CREATE TEMP TABLE t300(x);
---     CREATE TABLE t301(y);
+--     CREATE TABLE t301(y INT );
 --     CREATE TRIGGER main.r300 AFTER INSERT ON t300 BEGIN
 --       INSERT INTO t301 VALUES(10000 + new.x);
 --     END;
@@ -221,10 +221,10 @@ test:do_test(
 --   forcedelete test.db test2.db
 --   sqlite3 db test.db
 --   db eval {
---     CREATE TABLE t1(x);
+--     CREATE TABLE t1(x INT);
 --     ATTACH 'test2.db' AS db2;
---     CREATE TABLE db2.t2(y);
---     CREATE TABLE db2.log(z);
+--     CREATE TABLE db2.t2(y INT);
+--     CREATE TABLE db2.log(z INT);
 --     CREATE TRIGGER db2.trig AFTER INSERT ON db2.t2 BEGIN
 --       INSERT INTO log(z) VALUES(new.y);
 --     END;

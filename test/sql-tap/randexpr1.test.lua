@@ -34,7 +34,7 @@ test:do_test(
     "randexpr1-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a PRIMARY KEY,b,c,d,e,f);
+            CREATE TABLE t1(a  INT PRIMARY KEY,b INT ,c INT ,d INT ,e INT ,f INT );
             INSERT INTO t1 VALUES(100,200,300,400,500,600);
             SELECT * FROM t1
         ]]

@@ -72,10 +72,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.5,
     [[
-        CREATE TABLE t5(id primary key, x, y);
-        INSERT INTO t5 VALUES(1, '1', 'one');
+        CREATE TABLE t5(id  INT primary key, x INT , y TEXT);
+        INSERT INTO t5 VALUES(1, 1, 'one');
         INSERT INTO t5 VALUES(2, 1, 'two');
-        INSERT INTO t5 VALUES(3, '1.0', 'three');
+        INSERT INTO t5 VALUES(3, 1.0, 'three');
         INSERT INTO t5 VALUES(4, 1.0, 'four');
     ]], {
         -- <1.5>
@@ -139,7 +139,7 @@ test:do_execsql_test(
         SELECT x FROM t1 WHERE 1.0 IN (x);
     ]], {
         -- <2.6>
-        
+        "1"
         -- </2.6>
     })
 
@@ -239,7 +239,7 @@ test:do_execsql_test(
         SELECT x FROM t2 WHERE '1.0' IN (x);
     ]], {
         -- <3.8>
-        1
+
         -- </3.8>
     })
 
@@ -309,7 +309,7 @@ test:do_execsql_test(
         SELECT x FROM t3 WHERE '1' IN (x);
     ]], {
         -- <4.7>
-        1
+
         -- </4.7>
     })
 
@@ -449,7 +449,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE x IN (1);
     ]], {
         -- <6.1>
-        1, "two", 1.0, "four"
+        1, "one", 1, "two", 1, "three", 1.0, "four"
         -- </6.1>
     })
 
@@ -459,7 +459,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE x IN (1.0);
     ]], {
         -- <6.2>
-        1, "two", 1.0, "four"
+        1, "one", 1, "two", 1, "three", 1.0, "four"
         -- </6.2>
     })
 
@@ -469,7 +469,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE x IN ('1');
     ]], {
         -- <6.3>
-        "1", "one"
+        1, "one", 1, "two", 1, "three", 1.0, "four"
         -- </6.3>
     })
 
@@ -479,7 +479,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE x IN ('1.0');
     ]], {
         -- <6.4>
-        "1.0", "three"
+        1, "one", 1, "two", 1, "three", 1.0, "four"
         -- </6.4>
     })
 
@@ -489,7 +489,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE 1 IN (x);
     ]], {
         -- <6.5>
-        1, "two", 1.0, "four"
+        1, "one", 1, "two", 1, "three", 1.0, "four"
         -- </6.5>
     })
 
@@ -499,7 +499,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE 1.0 IN (x);
     ]], {
         -- <6.6>
-        1, "two", 1.0, "four"
+        1, "one", 1, "two", 1, "three", 1.0, "four"
         -- </6.6>
     })
 
@@ -509,7 +509,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE '1' IN (x);
     ]], {
         -- <6.7>
-        "1", "one"
+        1, "one", 1, "two", 1, "three", 1.0, "four"
         -- </6.7>
     })
 
@@ -519,7 +519,6 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE '1.0' IN (x);
     ]], {
         -- <6.8>
-        "1.0", "three"
         -- </6.8>
     })
 

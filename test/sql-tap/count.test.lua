@@ -45,7 +45,7 @@ for _, zIndex in ipairs(queries) do
         function()
             test:execsql [[
                 DROP TABLE IF EXISTS t1;
-                CREATE TABLE t1(a, b, PRIMARY KEY(a,b));
+                CREATE TABLE t1(a INT , b INT , PRIMARY KEY(a,b));
             ]]
             test:execsql(zIndex)
             return test:execsql(" SELECT count(*) FROM t1 ")
@@ -117,7 +117,7 @@ test:do_test(
     "count-2.1",
     function()
         test:execsql [[
-            CREATE TABLE t2(a, b, PRIMARY KEY(a,b));
+            CREATE TABLE t2(a INT , b INT , PRIMARY KEY(a,b));
         ]]
         return uses_op_count("SELECT count(*) FROM t2")
     end,1)
@@ -217,7 +217,7 @@ test:do_test(
 test:do_execsql_test(
     "count-3.1",
     [[
-        CREATE TABLE t3(a, b, PRIMARY KEY(a,b));
+        CREATE TABLE t3(a INT , b INT , PRIMARY KEY(a,b));
         SELECT a FROM (SELECT count(*) AS a FROM t3) WHERE a==0;
     ]], {
         -- <count-3.1>
@@ -238,7 +238,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "count-4.1",
     [[
-        CREATE TABLE t4(a PRIMARY KEY, b);
+        CREATE TABLE t4(a TEXT PRIMARY KEY, b TEXT );
         INSERT INTO t4 VALUES('a', 'b');
         CREATE INDEX t4i1 ON t4(b, a);
         SELECT count(*) FROM t4;
@@ -286,7 +286,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "count-6.1",
     [[
-        CREATE TABLE t6(x PRIMARY KEY);
+        CREATE TABLE t6(x  INT PRIMARY KEY);
         SELECT count(DISTINCT) FROM t6 GROUP BY x;
     ]], {
         -- <count-6.1>

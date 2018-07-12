@@ -21,7 +21,7 @@ test:do_test(
     "coalesce-1.0",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c, d);
+            CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT, c INT, d INT);
             INSERT INTO t1 VALUES(1, null, null, null);
             INSERT INTO t1 VALUES(2, 2, 99, 99);
             INSERT INTO t1 VALUES(3, null, 3, 99);

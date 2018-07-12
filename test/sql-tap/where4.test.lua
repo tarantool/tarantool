@@ -33,14 +33,10 @@ test:do_execsql_test(
     [[
         -- Tarantool. As far as rowid was replaced w/ PK - no NULLs allowed anymore.
         -- Comment those lines.
-            CREATE TABLE t1(w, x, y, primary key (w,x,y));
-            INSERT INTO t1 VALUES(1,2,3);
-        --    INSERT INTO t1 VALUES(1,NULL,3);
+            CREATE TABLE t1(w TEXT, x TEXT, y TEXT, primary key (w,x,y));
+            INSERT INTO t1 VALUES('1','2','3');
             INSERT INTO t1 VALUES('a','b','c');
-        --    INSERT INTO t1 VALUES('a',NULL,'c');
-            INSERT INTO t1 VALUES(X'78',x'79',x'7a');
-        --    INSERT INTO t1 VALUES(X'78',NULL,X'7A');
-        --    INSERT INTO t1 VALUES(NULL,NULL,NULL);
+            INSERT INTO t1 VALUES('78','79','7a');
             SELECT count(*) FROM t1;
     ]], {
         -- <where4-1.0>
@@ -134,11 +130,11 @@ test:do_execsql_test(
 -- Tarantool. As far as NULLs are prohibited for PKs (was UNIQUE + rowid) - block 4-3.* completely
 -- do_test where4-3.1 {
 --   execsql {
---     CREATE TABLE t2(a primary key);
+--     CREATE TABLE t2(a INT primary key);
 --     INSERT INTO t2 VALUES(1);
 --     INSERT INTO t2 VALUES(2);
 --     INSERT INTO t2 VALUES(3);
---     CREATE TABLE t3(x,y, primary key("x", 'y')); -- Goofy syntax allowed
+--     CREATE TABLE t3(x INT,y INT, primary key("x", 'y')); -- Goofy syntax allowed
 --     INSERT INTO t3 VALUES(1,11);
 --     INSERT INTO t3 VALUES(2,NULL);
 --     SELECT * FROM t2 LEFT JOIN t3 ON a=x WHERE +y IS NULL;
@@ -216,17 +212,17 @@ test:do_execsql_test(
 
 -- Ticket #2273.  Problems with IN operators and NULLs.
 --
--- X(203, "X!cmd", [=[["ifcapable","subquery","\ndo_test where4-5.1 {\n  execsql {\n    -- Allow the 'x' syntax for backwards compatibility\n    CREATE TABLE t4(x,y,z,PRIMARY KEY('x' ASC, \"y\" ASC));\n  } } {}\n# execsql {\n#   SELECT *\n#     FROM t2 LEFT JOIN t4 b1\n#             LEFT JOIN t4 b2 ON b2.x=b1.x AND b2.y IN (b1.y);\n# }\n# ","1 {} {} {} {} {} {} 2 {} {} {} {} {} {} 3 {} {} {} {} {} {}"]]=])
+-- X(203, "X!cmd", [=[["ifcapable","subquery","\ndo_test where4-5.1 {\n  execsql {\n    -- Allow the 'x' syntax for backwards compatibility\n    CREATE TABLE t4(x INT,y INT,z INT,PRIMARY KEY('x' ASC, \"y\" ASC));\n  } } {}\n# execsql {\n#   SELECT *\n#     FROM t2 LEFT JOIN t4 b1\n#             LEFT JOIN t4 b2 ON b2.x=b1.x AND b2.y IN (b1.y);\n# }\n# ","1 {} {} {} {} {} {} 2 {} {} {} {} {} {} 3 {} {} {} {} {} {}"]]=])
 test:do_execsql_test(
     "where4-5.1",
     [[
-        CREATE TABLE t2(a primary key);
+        CREATE TABLE t2(a INT primary key);
         INSERT INTO t2 VALUES(1);
         INSERT INTO t2 VALUES(2);
         INSERT INTO t2 VALUES(3);
 
         -- Allow the 'x' syntax for backwards compatibility
-        CREATE TABLE t4(x,y,z,PRIMARY KEY(x ASC, y ASC));
+        CREATE TABLE t4(x INT,y INT,z INT,PRIMARY KEY(x ASC, y ASC));
 
         SELECT *
           FROM t2 LEFT JOIN t4 b1
@@ -259,7 +255,7 @@ test:do_execsql_test(
 -- } {1 2 4}
 -- do_test where4-6.1 {
 --   execsql {
---     CREATE TABLE t5(a,b,c,d,e,f,UNIQUE(a,b,c,d,e,f));
+--     CREATE TABLE t5(a INT,b INT,c INT,d INT,e INT,f INT,UNIQUE INT (a,b INT,c INT,d INT,e INT,f INT));
 --     INSERT INTO t5 VALUES(1,1,1,1,1,11111);
 --     INSERT INTO t5 VALUES(2,2,2,2,2,22222);
 --     INSERT INTO t5 VALUES(1,2,3,4,5,12345);
@@ -280,7 +276,7 @@ test:do_test(
     "where4-7.1",
     function()
         test:execsql [[
-            CREATE TABLE t6(y,z,PRIMARY KEY(y,z));
+            CREATE TABLE t6(y INT,z INT,PRIMARY KEY(y,z));
         ]]
         return test:execsql [[
             SELECT * FROM t6 WHERE y=NULL AND z IN ('hello');
@@ -295,9 +291,9 @@ test:do_test(
 -- do_test where4-7.1 {
 --   execsql {
 --     BEGIN;
---     CREATE TABLE t8(a primary key, b, c, d);
+--     CREATE TABLE t8(a INT primary key, b INT, c INT, d INT);
 --     CREATE INDEX t8_i ON t8(a, b, c);
---     CREATE TABLE t7(i primary key);
+--     CREATE TABLE t7(i INT primary key);
 --     INSERT INTO t7 VALUES(1);
 --     INSERT INTO t7 SELECT i*2 FROM t7;
 --     INSERT INTO t7 SELECT i*2 FROM t7;
@@ -326,7 +322,7 @@ test:do_test(
 -- # correctly.
 -- unset -nocomplain null
 -- do_execsql_test 8.1 {
---   CREATE TABLE u9(a UNIQUE, b);
+--   CREATE TABLE u9(a INT UNIQUE, b INT);
 --   INSERT INTO u9 VALUES(NULL, 1);
 --   INSERT INTO u9 VALUES(NULL, 2);
 -- }

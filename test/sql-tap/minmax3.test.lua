@@ -46,7 +46,7 @@ test:do_test(
     "minmax3-1.0",
     function()
         test:execsql [[
-            CREATE TABLE t1(id primary key, x, y, z)
+            CREATE TABLE t1(id  INT primary key, x TEXT, y TEXT, z TEXT)
         ]]
         -- db close
         -- set_file_format 4
@@ -284,7 +284,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-2.1",
     [[
-        CREATE TABLE t2(id primary key, a, b);
+        CREATE TABLE t2(id  INT primary key, a INT , b INT );
         CREATE INDEX i3 ON t2(a, b);
         INSERT INTO t2 VALUES(1, 1, NULL);
         INSERT INTO t2 VALUES(2, 1, 1);
@@ -377,7 +377,7 @@ test:do_execsql_test(
     "minmax3-3.1",
     [[
         DROP TABLE t2;
-        CREATE TABLE t2(id primary key, a, b);
+        CREATE TABLE t2(id  INT primary key, a INT , b INT );
         CREATE INDEX i3 ON t2(a, b DESC);
         INSERT INTO t2 VALUES(1, 1, NULL);
         INSERT INTO t2 VALUES(2, 1, 1);
@@ -469,7 +469,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.1",
     [[
-        CREATE TABLE t4(x primary key);
+        CREATE TABLE t4(x TEXT primary key);
         INSERT INTO t4 VALUES('abc');
         INSERT INTO t4 VALUES('BCD');
         SELECT max(x) FROM t4;

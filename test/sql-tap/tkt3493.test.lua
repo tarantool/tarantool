@@ -246,7 +246,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-3.1",
     [[
-        CREATE TABLE t2(a COLLATE "unicode_ci" PRIMARY KEY, b COLLATE BINARY);
+        CREATE TABLE t2(a  TEXT COLLATE "unicode_ci" PRIMARY KEY, b  TEXT COLLATE BINARY);
         INSERT INTO t2 VALUES('aBc', 'DeF');
     ]], {
         -- <tkt3493-3.1>

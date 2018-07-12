@@ -23,7 +23,7 @@ testprefix = "with2"
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t1(a PRIMARY KEY);
+        CREATE TABLE t1(a  INT PRIMARY KEY);
         INSERT INTO t1 VALUES(1);
         INSERT INTO t1 VALUES(2);
     ]])
@@ -64,7 +64,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     1.4,
     [[
-        CREATE TABLE t2(i PRIMARY KEY);
+        CREATE TABLE t2(i  INT PRIMARY KEY);
         INSERT INTO t2 VALUES(2);
         INSERT INTO t2 VALUES(3);
         INSERT INTO t2 VALUES(5);
@@ -98,8 +98,8 @@ test:do_execsql_test(
     [[
         --CREATE TABLE t3 AS SELECT 3 AS x;
         --CREATE TABLE t4 AS SELECT 4 AS x;
-        CREATE TABLE t3(x PRIMARY KEY); INSERT INTO t3 VALUES(3);
-        CREATE TABLE t4(x PRIMARY KEY); INSERT INTO t4 VALUES(4);
+        CREATE TABLE t3(x  INT PRIMARY KEY); INSERT INTO t3 VALUES(3);
+        CREATE TABLE t4(x  INT PRIMARY KEY); INSERT INTO t4 VALUES(4);
 
         WITH x1 AS (SELECT * FROM t3),
              x2 AS (
@@ -409,8 +409,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t1(a PRIMARY KEY, b);
-        CREATE TABLE t2(a PRIMARY KEY, b);
+        CREATE TABLE t1(a INT PRIMARY KEY, b INT);
+        CREATE TABLE t2(a INT PRIMARY KEY, b INT);
         INSERT INTO t2 VALUES (1, 1), (2, 2);
     ]], {
         -- <5.1>
@@ -510,8 +510,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t1(a PRIMARY KEY, b);
-        CREATE TABLE t2(a PRIMARY KEY, b);
+        CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
+        CREATE TABLE t2(a  INT PRIMARY KEY, b INT );
     ]])
 
 test:do_catchsql_test(6.2, [[
@@ -674,7 +674,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     8.1,
     [[
-        CREATE TABLE t7(id PRIMARY KEY, y);
+        CREATE TABLE t7(id  INT PRIMARY KEY, y INT );
         INSERT INTO t7 VALUES(1, NULL);
         CREATE VIEW v AS SELECT y FROM t7 ORDER BY y;
     ]])

@@ -51,7 +51,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt-4c86b126f2-2.1",
     [[
-        CREATE TABLE t1(x TEXT PRIMARY KEY, y TEXT UNIQUE, z);
+        CREATE TABLE t1(x TEXT PRIMARY KEY, y TEXT UNIQUE, z TEXT);
         INSERT INTO t1 VALUES('ghi','jkl','y');
         SELECT * FROM t1 WHERE (x='ghi' OR y='jkl') AND z IS NOT NULL;
     ]], {

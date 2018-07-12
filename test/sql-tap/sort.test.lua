@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(69)
+test:plan(62)
 
 --!./tcltestrunner.lua
 -- 2001 September 15.
@@ -294,7 +294,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-3.1",
     [[
-        CREATE TABLE t2(a,b PRIMARY KEY);
+        CREATE TABLE t2(a TEXT ,b  INT PRIMARY KEY);
         INSERT INTO t2 VALUES('AGLIENTU',1);
         INSERT INTO t2 VALUES('AGLIE`',2);
         INSERT INTO t2 VALUES('AGNA',3);
@@ -433,7 +433,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-5.1",
     [[
-        create table t3(id primary key, a,b);
+        create table t3(id  INT primary key, a INT ,b TEXT);
         insert into t3 values(1, 5,NULL);
         insert into t3 values(2, 6,NULL);
         insert into t3 values(3, 3,NULL);
@@ -663,84 +663,6 @@ test:do_execsql_test(
         -- </sort-8.1>
     })
 
--- BLOBs should sort after TEXT
---
-test:do_execsql_test(
-    "sort-9.1",
-    [[
-        CREATE TABLE t6(x PRIMARY KEY, y);
-        INSERT INTO t6 VALUES(1,1);
-        INSERT INTO t6 VALUES(2,'1');
-        INSERT INTO t6 VALUES(3,x'31');
-        INSERT INTO t6 VALUES(4,NULL);
-        SELECT x FROM t6 ORDER BY y;
-    ]], {
-        -- <sort-9.1>
-        4, 1, 2, 3
-        -- </sort-9.1>
-    })
-
-test:do_execsql_test(
-    "sort-9.2",
-    [[
-        SELECT x FROM t6 ORDER BY y DESC;
-    ]], {
-        -- <sort-9.2>
-        3, 2, 1, 4
-        -- </sort-9.2>
-    })
-
-test:do_execsql_test(
-    "sort-9.3",
-    [[
-        SELECT x FROM t6 WHERE y<1
-    ]], {
-        -- <sort-9.3>
-        
-        -- </sort-9.3>
-    })
-
-test:do_execsql_test(
-    "sort-9.4",
-    [[
-        SELECT x FROM t6 WHERE y<'1'
-    ]], {
-        -- <sort-9.4>
-        1
-        -- </sort-9.4>
-    })
-
-test:do_execsql_test(
-    "sort-9.5",
-    [[
-        SELECT x FROM t6 WHERE y<x'31'
-    ]], {
-        -- <sort-9.5>
-        1, 2
-        -- </sort-9.5>
-    })
-
-test:do_execsql_test(
-    "sort-9.6",
-    [[
-        SELECT x FROM t6 WHERE y>1
-    ]], {
-        -- <sort-9.6>
-        2, 3
-        -- </sort-9.6>
-    })
-
-test:do_execsql_test(
-    "sort-9.7",
-    [[
-        SELECT x FROM t6 WHERE y>'1'
-    ]], {
-        -- <sort-9.7>
-        3
-        -- </sort-9.7>
-    })
-
-
 
 -- endif bloblit
 -- Ticket #1092 - ORDER BY on rowid fields.
@@ -785,10 +707,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-11.1",
     [[
-        create table t8(a PRIMARY KEY, b, c);
+        create table t8(a  INT PRIMARY KEY, b INT , c INT );
         insert into t8 values(1,2,3);
         insert into t8 values(2,3,4);
-        create table t9(id primary key, x,y);
+        create table t9(id  INT primary key, x INT ,y INT );
         insert into t9 values(1, 2,4);
         insert into t9 values(2, 2,3);
         select y from t8, t9 where a=1 order by a, y;
@@ -806,13 +728,13 @@ test:do_execsql_test(
     "sort-12.1",
     [[
         create table a (id integer primary key);
-        create table b (id integer primary key, aId integer, text);
+        create table b (id integer primary key, aId integer, "text" text);
         insert into a values (1);
         insert into b values (2, 1, 'xxx');
         insert into b values (1, 1, 'zzz');
         insert into b values (3, 1, 'yyy');
-        select a.id, b.id, b.text from a join b on (a.id = b.aId)
-          order by a.id, b.text;
+        select a.id, b.id, b."text" from a join b on (a.id = b.aId)
+          order by a.id, b."text";
     ]], {
         -- <sort-12.1>
         1, 2, "xxx", 1, 3, "yyy", 1, 1, "zzz"
@@ -825,7 +747,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-13.0",
     [[
-        CREATE TABLE t10(id primary key, a, b);
+        CREATE TABLE t10(id  INT primary key, a INT , b INT );
     ]])
 
 test:do_test(
@@ -874,7 +796,7 @@ box.internal.sql_create_function("cksum", cksum)
     test:do_execsql_test(
         "sort-14.0",
         [[
-            CREATE TABLE t11(a, b);
+            CREATE TABLE t11(a INT , b INT );
             INSERT INTO t11 VALUES(randomblob(5000), NULL);
             INSERT INTO t11 SELECT randomblob(5000), NULL FROM t11; --2
             INSERT INTO t11 SELECT randomblob(5000), NULL FROM t11; --3
@@ -940,7 +862,7 @@ box.internal.sql_create_function("cksum", cksum)
         test:do_execsql_test(
             "15."..tn..".2",
             [[
-                CREATE TABLE t1(a primary key);
+                CREATE TABLE t1(a  INT primary key);
                 INSERT INTO t1 VALUES(4);
                 INSERT INTO t1 VALUES(5);
                 INSERT INTO t1 VALUES(3);
@@ -979,7 +901,7 @@ box.internal.sql_create_function("cksum", cksum)
     test:do_catchsql_test(
         16.1,
         [[
-            CREATE TABLE t1(a, b, c);
+            CREATE TABLE t1(a INT , b INT , c INT );
             INSERT INTO t1 VALUES(1, 2, 3);
             INSERT INTO t1 VALUES(1, NULL, 3);
             INSERT INTO t1 VALUES(NULL, 2, 3);
@@ -996,7 +918,7 @@ box.internal.sql_create_function("cksum", cksum)
     test:do_catchsql_test(
         16.2,
         [[
-            CREATE TABLE t1(a, b, c);
+            CREATE TABLE t1(a INT , b INT , c INT );
             INSERT INTO t1 VALUES(1, 2, 3);
             INSERT INTO t1 VALUES(1, NULL, 3);
             INSERT INTO t1 VALUES(1, 2, 3);

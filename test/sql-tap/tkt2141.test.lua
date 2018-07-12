@@ -27,11 +27,11 @@ test:plan(3)
 test:do_execsql_test(
     "tkt2141-1.1",
     [[
-        CREATE TABLE tab1 (t1_id integer PRIMARY KEY, t1_desc);
+        CREATE TABLE tab1 (t1_id integer PRIMARY KEY, t1_desc TEXT);
         INSERT INTO tab1 VALUES(1,'rec 1 tab 1');
-        CREATE TABLE tab2 (t2_id integer PRIMARY KEY, t2_id_t1, t2_desc);
+        CREATE TABLE tab2 (t2_id integer PRIMARY KEY, t2_id_t1 INT , t2_desc TEXT);
         INSERT INTO tab2 VALUES(1,1,'rec 1 tab 2');
-        CREATE TABLE tab3 (t3_id integer PRIMARY KEY, t3_id_t2, t3_desc);
+        CREATE TABLE tab3 (t3_id integer PRIMARY KEY, t3_id_t2 INT , t3_desc TEXT);
         INSERT INTO tab3 VALUES(1,1,'aa');
         SELECT *
         FROM tab1 t1 LEFT JOIN tab2 t2 ON t1.t1_id = t2.t2_id_t1

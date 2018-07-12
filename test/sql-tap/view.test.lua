@@ -25,7 +25,7 @@ test:plan(74)
 -- ORIGINAL_TEST
 -- do_test view-1.0 {
 --   execsql {
---     CREATE TABLE t1(a,b,c);
+--     CREATE TABLE t1(a INT,b INT,c INT);
 --     INSERT INTO t1 VALUES(1,2,3);
 --     INSERT INTO t1 VALUES(4,5,6);
 --     INSERT INTO t1 VALUES(7,8,9);
@@ -36,7 +36,7 @@ test:plan(74)
 test:do_execsql_test(
     "view-1.0",
     [[
-        CREATE TABLE t1(a primary key,b,c);
+        CREATE TABLE t1(a INT primary key,b INT,c INT);
         INSERT INTO t1 VALUES(1,2,3);
         INSERT INTO t1 VALUES(4,5,6);
         INSERT INTO t1 VALUES(7,8,9);
@@ -145,7 +145,7 @@ test:do_catchsql_test(
 -- ORIGINAL_TEST
 -- do_test view-1.7 {
 --   execsql {
---     CREATE TABLE t1(x,a,b,c);
+--     CREATE TABLE t1(x INT,a INT,b INT,c INT);
 --     INSERT INTO t1 VALUES(1,2,3,4);
 --     INSERT INTO t1 VALUES(4,5,6,7);
 --     INSERT INTO t1 VALUES(7,8,9,10);
@@ -155,7 +155,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "view-1.8",
     [[
-        CREATE TABLE t1(x primary key,a,b,c);
+        CREATE TABLE t1(x INT primary key,a INT,b INT,c INT);
         INSERT INTO t1 VALUES(1,2,3,4);
         INSERT INTO t1 VALUES(4,5,6,7);
         INSERT INTO t1 VALUES(7,8,9,10);
@@ -395,7 +395,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "view-5.1",
     [[
-        CREATE TABLE t2(y primary key,a);
+        CREATE TABLE t2(y INT primary key,a INT);
         INSERT INTO t2 VALUES(22,2);
         INSERT INTO t2 VALUES(33,3);
         INSERT INTO t2 VALUES(44,4);
@@ -504,8 +504,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "view-7.1",
     [[
-        CREATE TABLE test1(id integer primary key, a);
-        CREATE TABLE test2(id integer primary key, b);
+        CREATE TABLE test1(id integer primary key, a INT);
+        CREATE TABLE test2(id integer primary key, b INT);
         INSERT INTO test1 VALUES(1,2);
         INSERT INTO test2 VALUES(1,3);
         CREATE VIEW test AS
@@ -799,7 +799,7 @@ if (0 > 0)
     test:do_execsql_test(
         "view-11.1",
         [[
-            CREATE TABLE t4(a COLLATE "unicode_ci" primary key);
+            CREATE TABLE t4(a TEXT COLLATE "unicode_ci" primary key);
             INSERT INTO t4 VALUES('This');
             INSERT INTO t4 VALUES('this');
             INSERT INTO t4 VALUES('THIS');
@@ -814,7 +814,7 @@ if (0 > 0)
     test:do_execsql_test(
         "view-11.1",
         [[
-            CREATE TABLE t4(a COLLATE "unicode_ci" primary key);
+            CREATE TABLE t4(a TEXT COLLATE "unicode_ci" primary key);
             INSERT INTO t4 VALUES('This');
             INSERT INTO t4 VALUES('this');
             INSERT INTO t4 VALUES('THIS');
@@ -878,7 +878,7 @@ test:do_catchsql_test(
 --     forcedelete test2.db
 --     catchsql {
 --       ATTACH 'test2.db' AS two;
---       CREATE TABLE two.t2(x,y);
+--       CREATE TABLE two.t2(x INT,y INT);
 --       CREATE VIEW v13 AS SELECT y FROM two.t2;
 --     }
 --   } {1 {view v13 cannot reference objects in database two}}
@@ -888,7 +888,7 @@ test:do_catchsql_test(
 --    forcedelete test2.db
 --    catchsql {
 --      ATTACH 'test2.db' AS two;
---      CREATE TABLE two.t2(x primary key,y);
+--      CREATE TABLE two.t2(x INT primary key,y INT);
 --      CREATE VIEW v13 AS SELECT y FROM two.t2;
 --    }
 --  } {1 {view v13 cannot reference objects in database two}}
@@ -989,7 +989,7 @@ if (0 > 0)
         [[
             DROP VIEW t1;
             DROP TABLE t1;
-            CREATE TABLE t1(a, b, c);
+            CREATE TABLE t1(a INT, b INT, c INT);
             INSERT INTO t1 VALUES(1, 2, 3);
             INSERT INTO t1 VALUES(4, 5, 6);
 
@@ -1059,7 +1059,7 @@ test:do_execsql_test(
     "view-20.1",
     [[
         DROP VIEW v10;
-        CREATE TABLE t10(c1 primary key);
+        CREATE TABLE t10(c1 INT primary key);
         CREATE VIEW v10 AS SELECT c1 FROM (SELECT t10.c1 FROM t10);
     ]], {
         -- <view-20.1>
@@ -1072,7 +1072,7 @@ test:do_execsql_test(
     [[
         DROP VIEW IF EXISTS v10;
         DROP TABLE IF EXISTS t10;
-        CREATE TABLE t10(c1 primary key);
+        CREATE TABLE t10(c1 INT primary key);
         CREATE VIEW v10 AS SELECT c1 FROM (SELECT t10.c1 FROM t10);
     ]], {
         -- <view-20.1>
@@ -1096,7 +1096,7 @@ if (0 > 0)
     test:do_catchsql_test(
         "view-21.1",
         [[
-            CREATE TABLE t1(x primary key);
+            CREATE TABLE t1(x INT primary key);
             INSERT INTO t1 VALUES(5);
             CREATE VIEW v1 AS SELECT x*2 FROM t1;
             CREATE VIEW v2 AS SELECT * FROM v1 UNION SELECT * FROM v1;

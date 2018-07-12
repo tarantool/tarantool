@@ -4,7 +4,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 -- box.cfg()
 
 -- create space
-box.sql.execute("CREATE TABLE t1(a,b,c,PRIMARY KEY(b,c));")
+box.sql.execute("CREATE TABLE t1(a INT,b INT,c INT,PRIMARY KEY(b,c));")
 
 -- Debug
 -- box.sql.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")

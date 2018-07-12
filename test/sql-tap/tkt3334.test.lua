@@ -24,7 +24,7 @@ test:plan(11)
 test:do_execsql_test(
     "tkt3334-1.0",
     [[
-        CREATE TABLE t1(id primary key, a,b);
+        CREATE TABLE t1(id  INT primary key, a INT ,b INT );
         INSERT INTO t1 VALUES(1, 1,934);
         INSERT INTO t1 VALUES(2, 2,221);
         INSERT INTO t1 VALUES(3, 1,372);

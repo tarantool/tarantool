@@ -23,7 +23,7 @@ test:plan(7)
 test:do_execsql_test(
     "join2-1.1",
     [[
-        CREATE TABLE t1(a primary key,b);
+        CREATE TABLE t1(a INT primary key,b INT);
         INSERT INTO t1 VALUES(1,11);
         INSERT INTO t1 VALUES(2,22);
         INSERT INTO t1 VALUES(3,33);
@@ -37,7 +37,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join2-1.2",
     [[
-        CREATE TABLE t2(b primary key,c);
+        CREATE TABLE t2(b INT primary key,c INT);
         INSERT INTO t2 VALUES(11,111);
         INSERT INTO t2 VALUES(33,333);
         INSERT INTO t2 VALUES(44,444);
@@ -51,7 +51,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join2-1.3",
     [[
-        CREATE TABLE t3(c primary key,d);
+        CREATE TABLE t3(c INT primary key,d INT);
         INSERT INTO t3 VALUES(111,1111);
         INSERT INTO t3 VALUES(444,4444);
         INSERT INTO t3 VALUES(555,5555);

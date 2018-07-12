@@ -213,7 +213,7 @@ end, {
 -- Test of expressions in the VALUES clause
 --
 test:do_execsql_test("insert-4.1", [[
-  CREATE TABLE t3(a PRIMARY KEY,b,c);
+  CREATE TABLE t3(a INT PRIMARY KEY,b INT,c INT);
   INSERT INTO t3 VALUES(1+2+3,4,5);
   SELECT * FROM t3;
 ]], {
@@ -286,7 +286,7 @@ test:do_execsql_test("insert-4.7", [[
 --
 -- if X(0, "X!capable", [["tempdb"]]) then
   test:do_execsql_test("insert-5.1", [[
-    CREATE TABLE t4(x PRIMARY KEY);
+    CREATE TABLE t4(x INT PRIMARY KEY);
     INSERT INTO t4 VALUES(1);
     SELECT * FROM t4;
   ]], {
@@ -362,7 +362,7 @@ test:do_execsql_test("insert-4.7", [[
   -- The REPLACE command is not available if SQLITE_OMIT_CONFLICT is 
   -- defined at compilation time.
   test:do_execsql_test("insert-6.1", [[
-    CREATE TABLE t1(a INTEGER PRIMARY KEY, b UNIQUE);
+    CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT UNIQUE);
     INSERT INTO t1 VALUES(1,2);
     INSERT INTO t1 VALUES(2,3);
     SELECT b FROM t1 WHERE b=2;
@@ -402,7 +402,7 @@ test:do_execsql_test("insert-4.7", [[
 -- # INSERT statments.
 -- do_test insert-7.1 {
 --   execsql {
---     CREATE TABLE t1(a);
+--     CREATE TABLE t1(a INT);
 --     INSERT INTO t1 VALUES(1);
 --     INSERT INTO t1 VALUES(2);
 --     CREATE INDEX i1 ON t1(a);
@@ -434,7 +434,7 @@ test:do_execsql_test("insert-4.7", [[
 -- #
 -- do_test insert-9.1 {
 --   execsql {
---     CREATE TABLE t5(x);
+--     CREATE TABLE t5(x INT);
 --     INSERT INTO t5 VALUES(1);
 --     INSERT INTO t5 VALUES(2);
 --     INSERT INTO t5 VALUES(3);
@@ -445,7 +445,7 @@ test:do_execsql_test("insert-4.7", [[
 -- MUST_WORK_TEST
 -- do_test insert-9.2 {
 --   execsql {
---     CREATE TABLE t6(x INTEGER PRIMARY KEY, y);
+--     CREATE TABLE t6(x INTEGER PRIMARY KEY, y INT);
 --     INSERT INTO t6 VALUES(1,1);
 --     INSERT INTO t6 VALUES(2,2);
 --     INSERT INTO t6 VALUES(3,3);
@@ -457,7 +457,7 @@ test:do_execsql_test("insert-4.7", [[
 --
 -- if X(0, "X!capable", [["compound"]]) then
   test:do_execsql_test("insert-10.1", [[
-    CREATE TABLE t10(a PRIMARY KEY,b,c);
+    CREATE TABLE t10(a  INT PRIMARY KEY,b INT,c INT);
     INSERT INTO t10 VALUES(1,2,3), (4,5,6), (7,8,9);
     SELECT * FROM t10;
   ]], {
@@ -480,7 +480,7 @@ test:do_execsql_test("insert-4.7", [[
 -- #
 -- do_execsql_test insert-11.1 {
 --   CREATE TABLE t11a AS SELECT '123456789' AS x;
---   CREATE TABLE t11b (a INTEGER PRIMARY KEY, b, c);
+--   CREATE TABLE t11b (a INTEGER PRIMARY KEY, b INT, c INT);
 --   INSERT INTO t11b SELECT x, x, x FROM t11a;
 --   SELECT quote(a), quote(b), quote(c) FROM t11b;
 -- } {123456789 '123456789' '123456789'}
@@ -488,9 +488,9 @@ test:do_execsql_test("insert-4.7", [[
 -- # Ticket http://www.sqlite.org/src/info/e9654505cfda9361
 -- #
 -- do_execsql_test insert-12.1 {
---   CREATE TABLE t12a(a,b,c,d,e,f,g);
+--   CREATE TABLE t12a(a INT,b INT,c INT,d INT,e INT,f INT,g INT);
 --   INSERT INTO t12a VALUES(101,102,103,104,105,106,107);
---   CREATE TABLE t12b(x);
+--   CREATE TABLE t12b(x INT);
 --   INSERT INTO t12b(x,rowid,x,x,x,x,x) SELECT * FROM t12a;
 --   SELECT rowid, x FROM t12b;
 -- } {102 101}
@@ -501,7 +501,7 @@ test:do_execsql_test("insert-4.7", [[
 --   SELECT * FROM tab1;
 -- } {11 22}
 -- do_execsql_test insert-12.3 {
---   CREATE TABLE t12c(a, b DEFAULT 'xyzzy', c);
+--   CREATE TABLE t12c(a INT, b INT DEFAULT 'xyzzy', c INT);
 --   INSERT INTO t12c(a, rowid, c) SELECT 'one', 999, 'two';
 --   SELECT * FROM t12c;
 -- } {one xyzzy two}
@@ -511,7 +511,7 @@ test:do_execsql_test("insert-4.7", [[
 test:do_execsql_test(
     "insert-13.0",
     [[
-        create table test(a primary key, b)
+        create table test(a  INT primary key, b INT )
     ]])
 
 test:do_catchsql_test(

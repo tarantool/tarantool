@@ -34,8 +34,8 @@ test:do_test(
     "trigger8-1.1",
     function()
         test:execsql [[
-            CREATE TABLE t1(x PRIMARY KEY);
-            CREATE TABLE t2(y PRIMARY KEY);
+            CREATE TABLE t1(x INT PRIMARY KEY);
+            CREATE TABLE t2(y INT PRIMARY KEY);
         ]]
         sql = string.format([[CREATE TRIGGER r%s AFTER INSERT ON t1 BEGIN
 ]], nStatement)

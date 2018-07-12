@@ -80,7 +80,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(x'616263' AS numeric))
     ]], {
         -- <cast-1.6>
-        "integer"
+        "real"
         -- </cast-1.6>
     })
 
@@ -282,7 +282,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123 AS numeric))
     ]], {
         -- <cast-1.26>
-        "integer"
+        "real"
         -- </cast-1.26>
     })
 
@@ -482,7 +482,7 @@ test:do_execsql_test(
         SELECT typeof(CAST('123abc' AS numeric))
     ]], {
         -- <cast-1.46>
-        "integer"
+        "real"
         -- </cast-1.46>
     })
 
@@ -689,7 +689,7 @@ test:do_execsql_test(
         SELECT CAST(9223372036854774800 AS numeric)
     ]], {
         -- <cast-3.2>
-        9223372036854774800LL
+        9223372036854774784
         -- </cast-3.2>
     })
 
@@ -724,7 +724,7 @@ test:do_execsql_test(
         SELECT CAST(-9223372036854774800 AS numeric)
     ]], {
         -- <cast-3.6>
-        -9223372036854774800LL
+        -9223372036854774784
         -- </cast-3.6>
     })
 
@@ -759,7 +759,7 @@ test:do_execsql_test(
         SELECT CAST('9223372036854774800' AS numeric)
     ]], {
         -- <cast-3.12>
-        9223372036854774800LL
+        9223372036854774784
         -- </cast-3.12>
     })
 
@@ -796,7 +796,7 @@ test:do_execsql_test(
         SELECT CAST('-9223372036854774800' AS numeric)
     ]], {
         -- <cast-3.16>
-        -9223372036854774800LL
+        -9223372036854774784
         -- </cast-3.16>
     })
 
@@ -834,7 +834,7 @@ if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
             SELECT CAST(x'39323233333732303336383534373734383030' AS numeric)
         ]], {
             -- <cast-3.22>
-            9223372036854774800LL
+            9223372036854774784
             -- </cast-3.22>
         })
     test:do_execsql_test(
@@ -906,7 +906,7 @@ test:do_test(
     "cast-4.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a primary key);
+            CREATE TABLE t1(a TEXT primary key);
             INSERT INTO t1 VALUES('abc');
             SELECT a, CAST(a AS integer) FROM t1;
         ]]

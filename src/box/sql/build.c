@@ -485,6 +485,22 @@ sql_field_retrieve(Parse *parser, Table *table, uint32_t id)
 	return field;
 }
 
+enum field_type
+sql_affinity_to_field_type(enum affinity_type affinity)
+{
+	switch (affinity) {
+		case AFFINITY_INTEGER:
+			return FIELD_TYPE_INTEGER;
+		case AFFINITY_REAL:
+		case AFFINITY_NUMERIC:
+			return FIELD_TYPE_NUMBER;
+		case AFFINITY_TEXT:
+			return FIELD_TYPE_STRING;
+		default:
+			return FIELD_TYPE_SCALAR;
+	}
+}
+
 /*
  * Add a new column to the table currently being constructed.
  *
@@ -494,12 +510,12 @@ sql_field_retrieve(Parse *parser, Table *table, uint32_t id)
  * column.
  */
 void
-sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
+sqlite3AddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 {
+	assert(type_def != NULL);
 	Table *p;
 	int i;
 	char *z;
-	char *zType;
 	sqlite3 *db = pParse->db;
 	if ((p = pParse->pNewTable) == 0)
 		return;
@@ -547,35 +563,8 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	 */
 	column_def->nullable_action = ON_CONFLICT_ACTION_DEFAULT;
 	column_def->is_nullable = true;
-
-	if (pType->n == 0) {
-		/* If there is no type specified, columns have the default affinity
-		 * 'BLOB' and type SCALAR.
-		 * TODO: since SQL standard prohibits column creation without
-		 * specified type, the code below should emit an error.
-		 */
-		column_def->affinity = AFFINITY_BLOB;
-		column_def->type = FIELD_TYPE_SCALAR;
-	} else {
-		/* TODO: convert string of type into runtime
-		 * FIELD_TYPE value for other types.
-		 */
-		if ((sqlite3StrNICmp(pType->z, "INTEGER", 7) == 0 &&
-		     pType->n == 7) ||
-		    (sqlite3StrNICmp(pType->z, "INT", 3) == 0 &&
-		     pType->n == 3)) {
-			column_def->type = FIELD_TYPE_INTEGER;
-			column_def->affinity = AFFINITY_INTEGER;
-		} else {
-			zType = sqlite3_malloc(pType->n + 1);
-			memcpy(zType, pType->z, pType->n);
-			zType[pType->n] = 0;
-			sqlite3Dequote(zType);
-			column_def->affinity = sqlite3AffinityType(zType, 0);
-			column_def->type = FIELD_TYPE_SCALAR;
-			sqlite3_free(zType);
-		}
-	}
+	column_def->affinity = type_def->type;
+	column_def->type = sql_affinity_to_field_type(column_def->affinity);
 	p->def->field_count++;
 	pParse->constraintName.n = 0;
 }
@@ -1128,8 +1117,7 @@ getNewSpaceId(Parse * pParse)
  */
 static void
 vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
-		       const struct index_def *idx_def,
-		       const struct index_def *pk_def, int space_id_reg,
+		       const struct index_def *idx_def, int space_id_reg,
 		       int index_id_reg)
 {
 	struct Vdbe *v = sqlite3GetVdbe(parse);
@@ -1148,7 +1136,7 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 		goto error;
 	uint32_t index_parts_sz = 0;
 	char *index_parts = sql_encode_index_parts(region, def->fields, idx_def,
-						   pk_def, &index_parts_sz);
+						   &index_parts_sz);
 	if (index_parts == NULL)
 		goto error;
 	char *raw = sqlite3DbMallocRaw(parse->db,
@@ -1553,12 +1541,10 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	createSpace(pParse, reg_space_id, stmt);
 	/* Indexes aren't required for VIEW's.. */
 	if (!p->def->opts.is_view) {
-		struct index *pk = sql_table_primary_key(p);
 		for (uint32_t i = 0; i < p->space->index_count; ++i) {
 			struct index *idx = p->space->index[i];
 			vdbe_emit_create_index(pParse, p->def, idx->def,
-					       pk->def, reg_space_id,
-					       idx->def->iid);
+					       reg_space_id, idx->def->iid);
 		}
 	}
 
@@ -2785,8 +2771,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		assert(start != NULL);
 		int index_id = getNewIid(parse, def->id, cursor);
 		sqlite3VdbeAddOp1(vdbe, OP_Close, cursor);
-		struct index *pk = space_index(space, 0);
-		vdbe_emit_create_index(parse, def, index->def, pk->def,
+		vdbe_emit_create_index(parse, def, index->def,
 				       def->id, index_id);
 		sqlite3VdbeAddOp0(vdbe, OP_Expire);
 	}

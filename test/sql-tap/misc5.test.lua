@@ -32,11 +32,11 @@ for i = 120, 140 - 1, 1 do
         "misc5-1."..i,
         function()
             test:catchsql("DROP TABLE t1")
-            local sql1 = "CREATE TABLE t1 (id primary key,"
+            local sql1 = "CREATE TABLE t1 (id  INT primary key,"
             local sql2 = "INSERT INTO t1 VALUES (1, "
             local sep = ""
             for j = 0, i - 1, 1 do
-                sql1 = sql1 .. string.format("%sa%s", sep, j)
+                sql1 = sql1 .. string.format("%sa%s INT", sep, j)
                 sql2 = sql2 .. string.format("%s%s", sep, j)
                 sep = ","
             end
@@ -53,7 +53,7 @@ end
 -- ifcapable conflict {
 --   do_test misc5-2.1 {
 --     execsql {
---       create table t2(x primary key);
+--       create table t2(x  INT primary key);
 --       insert into t2 values(1);
 --       insert or ignore into t2 select x*2 from t2;
 --       insert or ignore into t2 select x*4 from t2;
@@ -71,8 +71,8 @@ end
 test:do_execsql_test(
     "misc5-2.1",
     [[
-        create table t2(x primary key);
-        create table t2_temp(id primary key, x);
+        create table t2(x  INT primary key);
+        create table t2_temp(id  INT primary key, x INT );
         START TRANSACTION;
         insert into t2_temp values(1, 1);
         insert into t2_temp select id+1,x*2 from t2_temp;
@@ -153,7 +153,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "misc5-3.1",
     [[
-        CREATE TABLE songs(songid primary key, artist, timesplayed);
+        CREATE TABLE songs(songid  INT primary key, artist TEXT, timesplayed INT );
         INSERT INTO songs VALUES(1,'one',1);
         INSERT INTO songs VALUES(2,'one',2);
         INSERT INTO songs VALUES(3,'two',3);
@@ -208,7 +208,7 @@ test:do_execsql_test(
 --     close $fd
 --     sqlite3 db test.db
 --     catchsql {
---       CREATE TABLE t1(a,b,c);
+--       CREATE TABLE t1(a INT ,b INT ,c INT );
 --     }
 --   } {1 {file is encrypted or is not a database}}
 -- }
@@ -288,7 +288,7 @@ test:drop_all_tables()
 test:do_test(
     "misc5-7.1",
     function()
-        test:execsql "CREATE TABLE t1(x primary key)"
+        test:execsql "CREATE TABLE t1(x  INT primary key)"
         sql = "INSERT INTO t1 VALUES("
         tail = ""
         for i = 0, 199, 1 do
@@ -309,10 +309,10 @@ test:do_test(
 -- do_test misc5-7.2 {
 --   sqlite3 db2 :memory:
 --   catchsql {
---     CREATE TABLE t1(x UNIQUE);
+--     CREATE TABLE t1(x  INT UNIQUE);
 --     UPDATE sqlite_master SET sql='CREATE table t(o CHECK(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((;VALUES(o)';
 --     BEGIN;
---     CREATE TABLE t2(y);
+--     CREATE TABLE t2(y INT );
 --     ROLLBACK;
 --     DROP TABLE IF EXISTS D;
 --   } db2
@@ -367,7 +367,7 @@ test:do_test(
     "misc5-11.1",
     function()
         return test:execsql [[
-            CREATE TABLE t3(x primary key);
+            CREATE TABLE t3(x  INT primary key);
             INSERT INTO t3 VALUES(-18);
             INSERT INTO t3 VALUES(-17);
             INSERT INTO t3 VALUES(-16);

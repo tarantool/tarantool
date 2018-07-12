@@ -27,10 +27,10 @@ test:do_test(
     "tkt3773-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(a primary key,b);
+            CREATE TABLE t1(a INT primary key,b INT);
             INSERT INTO t1 VALUES(2,1);
             INSERT INTO t1 VALUES(33,3);
-            CREATE TABLE t2(x,y primary key);
+            CREATE TABLE t2(x INT,y INT primary key);
             INSERT INTO t2 VALUES(123,2);
             INSERT INTO t2 VALUES(4,4);
             SELECT a FROM (

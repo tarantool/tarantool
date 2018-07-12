@@ -23,10 +23,10 @@ test:plan(15)
 test:do_execsql_test(
     "tkt1537-1.1",
     [[
-        CREATE TABLE t1(id primary key, a1, a2);
+        CREATE TABLE t1(id INT primary key, a1 INT, a2 INT);
         INSERT INTO t1 VALUES(1, NULL, NULL);
         INSERT INTO t1 VALUES(2, 1, 3);
-        CREATE TABLE t2(id primary key, b);
+        CREATE TABLE t2(id INT primary key, b INT);
         INSERT INTO t2 VALUES(3, 1);
         INSERT INTO t2 VALUES(4, NULL);
         SELECT * FROM t1 LEFT JOIN t2 ON a1=b OR a2=+b;

@@ -25,7 +25,7 @@ test:plan(50)
 test:do_test("where5-1.0", function()
     test:execsql [[
         CREATE TABLE t1(x TEXT primary key);
-        CREATE TABLE t2(x integet primary key);
+        CREATE TABLE t2(x integer primary key);
         CREATE TABLE t3(x integer PRIMARY KEY);
         INSERT INTO t1 VALUES(-1);
         INSERT INTO t1 VALUES(0);

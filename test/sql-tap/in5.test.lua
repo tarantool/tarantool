@@ -269,7 +269,7 @@ test:do_test(
 test:do_execsql_test(
     "6.1.1",
     [[
-        CREATE TABLE t1(id primary key, a COLLATE "unicode_ci");
+        CREATE TABLE t1(id  INT primary key, a  TEXT COLLATE "unicode_ci");
         INSERT INTO t1 VALUES(1, 'one');
         INSERT INTO t1 VALUES(2, 'ONE');
     ]])
@@ -287,7 +287,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "6.2.1",
     [[
-        CREATE TABLE t3(a, b PRIMARY KEY);
+        CREATE TABLE t3(a INT , b  INT PRIMARY KEY);
         INSERT INTO t3 VALUES(1, 1);
         INSERT INTO t3 VALUES(1, 2);
         INSERT INTO t3 VALUES(1, 3);
@@ -322,8 +322,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "6.3.1",
     [[
-        CREATE TABLE x1(pk primary key, a);
-        CREATE TABLE x2(pk primary key, b);
+        CREATE TABLE x1(pk  INT primary key, a INT );
+        CREATE TABLE x2(pk  INT primary key, b INT );
         INSERT INTO x1 VALUES(1, 1), (2, 1), (3, 2);
         INSERT INTO x2 VALUES(1, 1), (2, 2);
         SELECT count(*) FROM x2 WHERE b IN (SELECT DISTINCT a FROM x1 LIMIT 2);

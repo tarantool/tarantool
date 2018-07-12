@@ -68,8 +68,8 @@ box.space._fk_constraint:insert(t)
 -- Temporary, in SQL all fields except for INTEGER PRIMARY KEY
 -- are scalar.
 --
-t = {'fk_1', child_id, parent_id, false, 'simple', 'restrict', 'restrict', {1}, {0}}
-box.space._fk_constraint:insert(t)
+--t = {'fk_1', child_id, parent_id, false, 'simple', 'restrict', 'restrict', {1}, {0}}
+--box.space._fk_constraint:insert(t)
 
 -- Each referenced column must appear once.
 --

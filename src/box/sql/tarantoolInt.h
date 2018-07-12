@@ -217,9 +217,7 @@ fkey_encode_links(struct region *region, const struct fkey_def *def, int type,
  */
 char *
 sql_encode_index_parts(struct region *region, const struct field_def *fields,
-		       const struct index_def *idx_def,
-		       const struct index_def *pk_def,
-		       uint32_t *size);
+		       const struct index_def *idx_def, uint32_t *size);
 
 /**
  * Encode "opts" dictionary for _index entry on @region.

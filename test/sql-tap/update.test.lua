@@ -39,7 +39,7 @@ test:do_catchsql_test("update-1.1", [[
 -- Create a table to work with
 --
 test:do_test("update-3.1", function()
-  test:execsql "CREATE TABLE test1(id primary key, f1 int,f2 int)"
+  test:execsql "CREATE TABLE test1(id  INT primary key, f1 int,f2 int)"
   -- for _ in X(0, "X!for", [=[["set i 1","$i<=10","incr i"]]=]) do
   for i = 1, 10 do    
     sql = string.format("INSERT INTO test1 VALUES(%s,%s,%s)", i, i, bit.lshift(1, i)) -- X(0, "X!expr", [=[["<<",1,["i"]]]=]))
@@ -889,9 +889,9 @@ test:do_execsql_test("update-10.1", [[
   DROP TABLE test1;
   CREATE TABLE t1(
      a integer primary key,
-     b UNIQUE, 
-     c, d,
-     e, f,
+     b  INT UNIQUE,
+     c INT , d INT ,
+     e INT , f INT ,
      UNIQUE(c,d)
   );
   INSERT INTO t1 VALUES(1,2,3,4,5,6);
@@ -1012,7 +1012,7 @@ test:do_catchsql_test("update-10.10", [[
 -- do_test update-13.1 {
 --   execsql {
 --     BEGIN;
---     CREATE TABLE t2(id primary key, a);
+--     CREATE TABLE t2(id  INT primary key, a INT );
 --     INSERT INTO t2 VALUES(1, 1);
 --     INSERT INTO t2 VALUES(2, 2);
 --     INSERT INTO t2 SELECT id+2,a+2 FROM t2;
@@ -1070,7 +1070,7 @@ test:do_catchsql_test("update-10.10", [[
 -- #
 -- do_test update-14.1 {
 --   execsql {
---     CREATE TABLE t3(a,b,c);
+--     CREATE TABLE t3(a INT ,b INT ,c INT );
 --     CREATE TRIGGER t3r1 BEFORE UPDATE on t3 WHEN nosuchcol BEGIN
 --       SELECT 'illegal WHEN clause';
 --     END;
@@ -1083,7 +1083,7 @@ test:do_catchsql_test("update-10.10", [[
 -- } {1 {no such column: nosuchcol}}
 -- do_test update-14.3 {
 --   execsql {
---     CREATE TABLE t4(a,b,c);
+--     CREATE TABLE t4(a INT ,b INT ,c INT );
 --     CREATE TRIGGER t4r1 AFTER UPDATE on t4 WHEN nosuchcol BEGIN
 --       SELECT 'illegal WHEN clause';
 --     END;
@@ -1100,7 +1100,7 @@ test:do_catchsql_test("update-10.10", [[
 -- # An assertion fault on UPDATE
 -- #
 -- do_execsql_test update-15.1 {
---   CREATE TABLE t15(a INTEGER PRIMARY KEY, b);
+--   CREATE TABLE t15(a INTEGER PRIMARY KEY, b INT );
 --   INSERT INTO t15(a,b) VALUES(10,'abc'),(20,'def'),(30,'ghi');
 --   ALTER TABLE t15 ADD COLUMN c;
 --   CREATE INDEX t15c ON t15(c);
@@ -1113,7 +1113,7 @@ test:do_catchsql_test("update-10.10", [[
 test:do_execsql_test(
     "insert-15.0",
     [[
-        create table test(a primary key);
+        create table test(a int primary key);
         insert into test(a) values(1);
     ]])
 

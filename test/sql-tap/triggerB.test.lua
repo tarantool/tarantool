@@ -81,9 +81,9 @@ test:do_test(
     "triggerB-2.3",
     function()
         test:execsql [[
-            CREATE TABLE t2(a INTEGER PRIMARY KEY, b);
+            CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT );
             INSERT INTO t2 VALUES(1,2);
-            CREATE TABLE changes(x PRIMARY KEY,y);
+            CREATE TABLE changes(x  INT PRIMARY KEY,y INT );
             CREATE TRIGGER r1t2 AFTER UPDATE ON t2 BEGIN
               INSERT INTO changes VALUES(new.a, new.b);
             END;
@@ -128,15 +128,15 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE t3(
-               c0 PRIMARY KEY,  c1,  c2,  c3,  c4,  c5,  c6,  c7,  c8,  c9,
-               c10, c11, c12, c13, c14, c15, c16, c17, c18, c19,
-               c20, c21, c22, c23, c24, c25, c26, c27, c28, c29,
-               c30, c31, c32, c33, c34, c35, c36, c37, c38, c39,
-               c40, c41, c42, c43, c44, c45, c46, c47, c48, c49,
-               c50, c51, c52, c53, c54, c55, c56, c57, c58, c59,
-               c60, c61, c62, c63, c64, c65
+               c0  TEXT PRIMARY KEY,  c1 TEXT ,  c2 TEXT ,  c3 TEXT ,  c4 TEXT ,  c5 TEXT ,  c6 TEXT ,  c7 TEXT ,  c8 TEXT ,  c9 TEXT ,
+               c10 TEXT , c11 TEXT , c12 TEXT , c13 TEXT , c14 TEXT , c15 TEXT , c16 TEXT , c17 TEXT , c18 TEXT , c19 TEXT ,
+               c20 TEXT , c21 TEXT , c22 TEXT , c23 TEXT , c24 TEXT , c25 TEXT , c26 TEXT , c27 TEXT , c28 TEXT , c29 TEXT ,
+               c30 TEXT , c31 TEXT , c32 TEXT , c33 TEXT , c34 TEXT , c35 TEXT , c36 TEXT , c37 TEXT , c38 TEXT , c39 TEXT ,
+               c40 TEXT , c41 TEXT , c42 TEXT , c43 TEXT , c44 TEXT , c45 TEXT , c46 TEXT , c47 TEXT , c48 TEXT , c49 TEXT ,
+               c50 TEXT , c51 TEXT , c52 TEXT , c53 TEXT , c54 TEXT , c55 TEXT , c56 TEXT , c57 TEXT , c58 TEXT , c59 TEXT ,
+               c60 TEXT , c61 TEXT , c62 TEXT , c63 TEXT , c64 TEXT , c65 TEXT
             );
-            CREATE TABLE t3_changes(colnum PRIMARY KEY, oldval, newval);
+            CREATE TABLE t3_changes(colnum INT PRIMARY KEY, oldval TEXT , newval TEXT );
             INSERT INTO t3 VALUES(
                'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9',
                'a10','a11','a12','a13','a14','a15','a16','a17','a18','a19',

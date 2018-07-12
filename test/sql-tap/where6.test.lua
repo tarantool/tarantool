@@ -25,7 +25,7 @@ test:plan(20)
 test:do_execsql_test(
     "where6-1.1",
     [[
-        CREATE TABLE t1(a INTEGER PRIMARY KEY,b,c);
+        CREATE TABLE t1(a INTEGER PRIMARY KEY,b INT ,c INT );
         INSERT INTO t1 VALUES(1,3,1);
         INSERT INTO t1 VALUES(2,4,2);
         CREATE TABLE t2(x INTEGER PRIMARY KEY);
@@ -239,11 +239,11 @@ test:do_test(
     "where6-3.1",
     function()
         return test:execsql [[
-            CREATE TABLE t4(x PRIMARY key);
+            CREATE TABLE t4(x TEXT PRIMARY key);
             INSERT INTO t4 VALUES('abc');
             INSERT INTO t4 VALUES('def');
             INSERT INTO t4 VALUES('ghi');
-            CREATE TABLE t5(a, b, c, PRIMARY KEY(a,b));
+            CREATE TABLE t5(a TEXT, b TEXT , c INT , PRIMARY KEY(a,b));
             INSERT INTO t5 VALUES('abc','def',123);
             INSERT INTO t5 VALUES('def','ghi',456);
 

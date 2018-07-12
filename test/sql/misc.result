@@ -16,7 +16,7 @@ box.sql.execute('select 1; select 2;')
 ---
 - error: keyword "select" is reserved
 ...
-box.sql.execute('create table t1 (id primary key); select 100;')
+box.sql.execute('create table t1 (id INT primary key); select 100;')
 ---
 - error: keyword "select" is reserved
 ...

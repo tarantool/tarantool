@@ -286,13 +286,13 @@ allocateCursor(
  * point or exponential notation, the result is only MEM_Real, even
  * if there is an exact integer representation of the quantity.
  */
-static void
+static int
 applyNumericAffinity(Mem *pRec, int bTryForInt)
 {
 	double rValue;
 	i64 iValue;
 	assert((pRec->flags & (MEM_Str|MEM_Int|MEM_Real))==MEM_Str);
-	if (sqlite3AtoF(pRec->z, &rValue, pRec->n)==0) return;
+	if (sqlite3AtoF(pRec->z, &rValue, pRec->n) == 0) return -1;
 	if (0 == sql_atoi64(pRec->z, (int64_t *)&iValue, pRec->n)) {
 		pRec->u.i = iValue;
 		pRec->flags |= MEM_Int;
@@ -301,6 +301,7 @@ applyNumericAffinity(Mem *pRec, int bTryForInt)
 		pRec->flags |= MEM_Real;
 		if (bTryForInt) sqlite3VdbeIntegerAffinity(pRec);
 	}
+	return 0;
 }
 
 /*
@@ -2114,7 +2115,14 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 					flags3 = pIn3->flags;
 				}
 				if ((flags3 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
-					applyNumericAffinity(pIn3,0);
+					if (applyNumericAffinity(pIn3,0) != 0) {
+						sqlite3VdbeError(p,
+								 "Can't convert to numeric %s",
+								 sqlite3_value_text(pIn3));
+						rc = SQLITE_MISMATCH;
+						goto abort_due_to_error;
+					}
+
 				}
 			}
 			/* Handle the common case of integer comparison here, as an

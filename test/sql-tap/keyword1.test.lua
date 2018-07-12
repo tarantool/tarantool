@@ -20,7 +20,7 @@ test:plan(175)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 test:execsql [[
-    CREATE TABLE t1(a PRIMARY KEY, b);
+    CREATE TABLE t1(a INT PRIMARY KEY, b TEXT);
     INSERT INTO t1 VALUES(1, 'one');
     INSERT INTO t1 VALUES(2, 'two');
     INSERT INTO t1 VALUES(3, 'three');
@@ -200,9 +200,9 @@ for _, kw in ipairs(kwlist) do
         "keyword1-"..kw..".1",
         function()
             if (kw == "if") then
-                test:execsql( string.format([[CREATE TABLE "%s"(%s %s PRIMARY KEY)]], kw:upper(), kw, kw))
+                test:execsql( string.format([[CREATE TABLE "%s"(%s %s PRIMARY KEY)]], kw:upper(), kw, 'INT'))
             else
-                test:execsql(string.format("CREATE TABLE %s(%s %s PRIMARY KEY)", kw, kw, kw))
+                test:execsql(string.format("CREATE TABLE %s(%s %s PRIMARY KEY)", kw, kw, 'INT'))
             end
             test:execsql("INSERT INTO "..kw.." VALUES(99)")
             test:execsql("INSERT INTO "..kw.." SELECT a FROM t1")

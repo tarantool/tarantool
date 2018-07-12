@@ -31,39 +31,39 @@ testprefix = "selectA"
 test:do_execsql_test(
     "selectA-1.0",
     [[
-        CREATE TABLE t1(id primary key, a,b,c COLLATE "unicode_ci");
+        CREATE TABLE t1(id  INT primary key, a INT ,b TEXT,c TEXT COLLATE "unicode_ci");
         INSERT INTO t1 VALUES(1, 1,'a','a');
-        INSERT INTO t1 VALUES(2, 9.9, 'b', 'B');
+        INSERT INTO t1 VALUES(2, 9, 'b', 'B');
         INSERT INTO t1 VALUES(3, NULL, 'C', 'c');
-        INSERT INTO t1 VALUES(4, 'hello', 'd', 'D');
-        INSERT INTO t1 VALUES(5, x'616263', 'e', 'e');
+        INSERT INTO t1 VALUES(4, 4, 'd', 'D');
+        INSERT INTO t1 VALUES(5, -9, 'e', 'e');
         SELECT a,b,c FROM t1;
     ]], {
         -- <selectA-1.0>
-        1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e"
+        1, "a", "a", 9, "b", "B", "", "C", "c", 4, "d", "D", -9, "e", "e"
         -- </selectA-1.0>
     })
 
 test:do_execsql_test(
     "selectA-1.1",
     [[
-        CREATE TABLE t2(id primary key, x,y,z COLLATE "unicode_ci");
+        CREATE TABLE t2(id  INT primary key, x INT ,y TEXT,z  TEXT COLLATE "unicode_ci");
         INSERT INTO t2 VALUES(1, NULL,'U','u');
-        INSERT INTO t2 VALUES(2, 'mad', 'Z', 'z');
-        INSERT INTO t2 VALUES(3, x'68617265', 'm', 'M');
+        INSERT INTO t2 VALUES(2, 4, 'Z', 'z');
+        INSERT INTO t2 VALUES(3, 4444, 'm', 'M');
         INSERT INTO t2 VALUES(4, 5.2e6, 'X', 'x');
         INSERT INTO t2 VALUES(5, -23, 'Y', 'y');
         SELECT x,y,z FROM t2;
     ]], {
         -- <selectA-1.1>
-        "", "U", "u", "mad", "Z", "z", "hare", "m", "M", 5200000.0, "X", "x", -23, "Y", "y"
+        "", "U", "u", 4, "Z", "z", 4444, "m", "M", 5200000, "X", "x", -23, "Y", "y"
         -- </selectA-1.1>
     })
 
 test:do_execsql_test(
     "selectA-1.2",
     [[
-        CREATE TABLE t3(id primary key, a,b,c COLLATE "unicode_ci");
+        CREATE TABLE t3(id  INT primary key, a INT ,b TEXT ,c  TEXT COLLATE "unicode_ci");
         INSERT INTO t3 SELECT id, a, b, c FROM t1;
         INSERT INTO t3 SELECT id+10, x, y, z FROM t2;
         INSERT INTO t3 SELECT id+20, a, b, c FROM t1;
@@ -88,7 +88,7 @@ test:do_execsql_test(
         ORDER BY a,b,c
     ]], {
         -- <selectA-2.1>
-        "", "C", "c", "", "U", "u", -23, "Y", "y", 1, "a", "a", 9.9, "b", "B", 5200000.0, "X", "x", "hello", "d", "D", "mad", "Z", "z", "abc", "e", "e", "hare", "m", "M"
+        "","C","c","","U","u",-23,"Y","y",1,"a","a",4,"Z","z",9,"b","B",4444,"m","M",5200000,"X","x"
         -- </selectA-2.1>
     })
 
@@ -102,7 +102,7 @@ test:do_test(
         ]]
     end, {
         -- <selectA-2.1.1>
-        "", "C", "c", "", "U", "u", -23, "Y", "y", 1, "a", "a", 9.9, "b", "B", 5200000.0, "X", "x", "hello", "d", "D", "mad", "Z", "z", "abc", "e", "e", "hare", "m", "M"
+        "","C","c","","U","u",-23,"Y","y",1,"a","a",4,"Z","z",9,"b","B",4444,"m","M",5200000,"X","x"
         -- </selectA-2.1.1>
     })
 
@@ -116,7 +116,7 @@ test:do_test(
         ]]
     end, {
         -- <selectA-2.1.2>
-        "", "C", "c", "", "U", "u", -23, "Y", "y", 1, "a", "a", 9.9, "b", "B", 5200000.0, "X", "x", "hello", "d", "D", "mad", "Z", "z", "abc", "e", "e", "hare", "m", "M"
+        5200000,"X","x",4444,"m","M",9,"b","B",4,"Z","z",1,"a","a",-23,"Y","y","","C","c","","U","u"
         -- </selectA-2.1.2>
     })
 
@@ -127,7 +127,7 @@ test:do_execsql_test(
         ORDER BY a DESC,b,c
     ]], {
         -- <selectA-2.2>
-        "hare", "m", "M", "abc", "e", "e", "mad", "Z", "z", "hello", "d", "D", 5200000.0, "X", "x", 9.9, "b", "B", 1, "a", "a", -23, "Y", "y", "", "C", "c", "", "U", "u"
+        5200000,"X","x",4444,"m","M",9,"b","B",4,"Z","z",1,"a","a",-23,"Y","y","","C","c","","U","u"
         -- </selectA-2.2>
     })
 
@@ -138,7 +138,7 @@ test:do_execsql_test(
         ORDER BY a,c,b
     ]], {
         -- <selectA-2.3>
-        "", "C", "c", "", "U", "u", -23, "Y", "y", 1, "a", "a", 9.9, "b", "B", 5200000.0, "X", "x", "hello", "d", "D", "mad", "Z", "z", "abc", "e", "e", "hare", "m", "M"
+        "","C","c","","U","u",-23,"Y","y",1,"a","a",4,"Z","z",9,"b","B",4444,"m","M",5200000,"X","x"
         -- </selectA-2.3>
     })
 
@@ -149,7 +149,7 @@ test:do_execsql_test(
         ORDER BY b,a,c
     ]], {
         -- <selectA-2.4>
-        "", "C", "c", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z", 1, "a", "a", 9.9, "b", "B", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M"
+        "","C","c","","U","u",5200000,"X","x",-23,"Y","y",4,"Z","z",1,"a","a",9,"b","B",4444,"m","M"
         -- </selectA-2.4>
     })
 
@@ -160,7 +160,7 @@ test:do_execsql_test(
         ORDER BY b COLLATE "unicode_ci",a,c
     ]], {
         -- <selectA-2.5>
-        1, "a", "a", 9.9, "b", "B", "", "C", "c", "hello", "d", "D", "abc", "e", "e", "hare", "m", "M", "", "U", "u", 5200000.0, "X", "x", -23, "Y", "y", "mad", "Z", "z"
+        "","C","c","","U","u",5200000,"X","x",-23,"Y","y",4,"Z","z",1,"a","a",9,"b","B",4444,"m","M"
         -- </selectA-2.5>
     })
 
@@ -2370,8 +2370,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         DROP TABLE IF EXISTS t5;
-        CREATE TABLE t4(id int primary key, a int, b);
-        CREATE TABLE t5(id int primary key, c int, d);
+        CREATE TABLE t4(id int primary key, a int, b INT );
+        CREATE TABLE t5(id int primary key, c int, d INT );
 
         INSERT INTO t5 VALUES(0, 1, 'x');
         INSERT INTO t5 VALUES(1, 2, 'x');
@@ -2419,8 +2419,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t6;
         DROP TABLE IF EXISTS t7;
-        CREATE TABLE t6(id int primary key, a, b);
-        CREATE TABLE t7(id int primary key, c, d);
+        CREATE TABLE t6(id int primary key, a INT , b INT );
+        CREATE TABLE t7(id int primary key, c INT , d INT );
 
         INSERT INTO t7 VALUES(0, 2, 9);
         INSERT INTO t6 VALUES(0, 3, 0);
@@ -2472,8 +2472,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t8;
         DROP TABLE IF EXISTS t9;
-        CREATE TABLE t8(id int primary key, a, b);
-        CREATE TABLE t9(id int primary key, c, d);
+        CREATE TABLE t8(id int primary key, a INT , b INT );
+        CREATE TABLE t9(id int primary key, c INT , d INT );
     ]], {
         -- <5.0>
         

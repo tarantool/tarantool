@@ -15,7 +15,7 @@ box.sql.execute("CREATE TABLE t2(a INT PRIMARY KEY ON CONFLICT IGNORE)")
 
 -- CHECK constraint is illegal with REPLACE option.
 --
-box.sql.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a CHECK (a > 5) ON CONFLICT REPLACE);")
+box.sql.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER CHECK (a > 5) ON CONFLICT REPLACE);")
 
 --
 -- gh-3473: Primary key can't be declared with NULL.
@@ -27,7 +27,7 @@ box.sql.execute("CREATE TABLE test (a int, b int NULL, c int, PRIMARY KEY(a, b, 
 
 -- Several NOT NULL REPLACE constraints work
 --
-box.sql.execute("CREATE TABLE a (id INT PRIMARY KEY, a NOT NULL ON CONFLICT REPLACE DEFAULT 1, b NOT NULL ON CONFLICT REPLACE DEFAULT 2);")
+box.sql.execute("CREATE TABLE a (id INT PRIMARY KEY, a INT NOT NULL ON CONFLICT REPLACE DEFAULT 1, b INT NOT NULL ON CONFLICT REPLACE DEFAULT 2);")
 box.sql.execute("INSERT INTO a VALUES(1, NULL, NULL);")
 box.sql.execute("INSERT INTO a VALUES(2, NULL, NULL);")
 box.sql.execute("SELECT * FROM a;")

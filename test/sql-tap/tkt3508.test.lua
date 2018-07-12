@@ -22,7 +22,7 @@ test:do_catchsql_test(
     "tkt3508-1.1",
     [[
         CREATE TABLE modificationsTmp (
-          id primary key,
+          id  INT primary key,
           SUBSTRATE_HPRD_ID VARCHAR(80),
           SUBSTRATE_GENE_SYMBOL VARCHAR(80),
           SUBSTRATE_ISOFORM_ID VARCHAR(80),

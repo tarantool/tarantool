@@ -26,7 +26,7 @@ test:catchsql " pragma recursive_triggers = off "
 test:do_execsql_test(
     "tkt3731-1.1",
     [[
-        CREATE TABLE t1(a PRIMARY KEY, b);
+        CREATE TABLE t1(a  TEXT PRIMARY KEY, b TEXT );
         CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN
           INSERT INTO t1 VALUES(new.a || '+', new.b || '+');
         END;
@@ -52,7 +52,7 @@ test:do_execsql_test(
     "tkt3731-1.3",
     [[
         DELETE FROM t1;
-        CREATE TABLE t2(a primary key, b);
+        CREATE TABLE t2(a TEXT primary key, b TEXT);
         INSERT INTO t2 VALUES('e', 'f');
         INSERT INTO t2 VALUES('g', 'h');
         INSERT INTO t1 SELECT * FROM t2;

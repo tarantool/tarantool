@@ -222,17 +222,17 @@ string.format([[
         INSERT INTO test1 VALUES(11,22);
         INSERT INTO test1 VALUES(33,44);
         DROP TABLE IF EXISTS t3;
-        CREATE TABLE t3(id INT, a, b, PRIMARY KEY(id));
+        CREATE TABLE t3(id INT, a TEXT, b TEXT, PRIMARY KEY(id));
         INSERT INTO t3 VALUES(1, 'abc',NULL);
         INSERT INTO t3 VALUES(2, NULL,'xyz');
         INSERT INTO t3 SELECT f1, * FROM test1;
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(id INT, a, b, PRIMARY KEY(id));
+        CREATE TABLE t4(id INT, a INT , b TEXT , PRIMARY KEY(id));
         INSERT INTO t4 VALUES(1, NULL,'%s');
         SELECT * FROM t3;
     ]], long), {
         -- <select1-2.0>
-        1, "abc", "", 2, "", "xyz", 11, 11, 22, 33, 33, 44
+        1, "abc", "", 2, "", "xyz", 11, "11", "22", 33, "33", "44"
         -- </select1-2.0>
     })
 
@@ -308,13 +308,13 @@ test:do_execsql_test(
         -- </select1-2.5.2>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "select1-2.5.3",
     [[
         SELECT count(*),count(a),count(b) FROM t4 WHERE b=5
     ]], {
         -- <select1-2.5.3>
-        0, 0, 0
+        1, "Can't convert to numeric This is a string that is too big to fit inside a NBFS buffer"
         -- </select1-2.5.3>
     })
 
@@ -359,7 +359,7 @@ test:do_execsql_test(
         SELECT coalesce(min(a),'xyzzy') FROM t3
     ]], {
         -- <select1-2.8.1>
-        11
+        "11"
         -- </select1-2.8.1>
     })
 
@@ -369,7 +369,7 @@ test:do_execsql_test(
         SELECT min(coalesce(a,'xyzzy')) FROM t3
     ]], {
         -- <select1-2.8.2>
-        11
+        "11"
         -- </select1-2.8.2>
     })
 
@@ -570,7 +570,7 @@ test:do_catchsql_test(
 -- MUST_WORK_TEST
 -- do_test select1-2.23 {
 --   execsql {
---     CREATE TABLE tkt2526(a,b,c PRIMARY KEY);
+--     CREATE TABLE tkt2526(a INT ,b INT ,c  INT PRIMARY KEY);
 --     INSERT INTO tkt2526 VALUES('x','y',NULL);
 --     INSERT INTO tkt2526 VALUES('x','z',NULL);
 --   }
@@ -803,7 +803,7 @@ test:do_execsql_test(
     "select1-4.8",
     [[
         DROP TABLE IF EXISTS t5;
-        CREATE TABLE t5(a primary key,b);
+        CREATE TABLE t5(a  INT primary key,b INT );
         INSERT INTO t5 VALUES(1,10);
         INSERT INTO t5 VALUES(2,9);
         SELECT * FROM t5 ORDER BY 1;
@@ -1505,7 +1505,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select1-8.2",
     [[
-        SELECT f1 FROM test1 WHERE ('x' || f1) BETWEEN 'x10' AND 'x20'
+        SELECT f1 FROM test1 WHERE ('x' || cast(f1 as TEXT)) BETWEEN 'x10' AND 'x20'
         ORDER BY f1
     ]], {
         -- <select1-8.2>
@@ -1695,7 +1695,7 @@ test:do_execsql_test(
         SELECT * FROM t3, t4;
     ]], {
         -- <select1-11.1>
-        0, 1, 2, 0, 3, 4
+        0, "1", "2", 0, 3, "4"
         -- </select1-11.1>
     })
 
@@ -1705,7 +1705,7 @@ test:do_execsql_test(
         SELECT * FROM t3, t4;
     ]], {
         -- <select1-11.2.1>
-        0, 1, 2, 0, 3, 4
+        0, "1", "2", 0, 3, "4"
         -- </select1-11.2.1>
     })
 
@@ -1715,7 +1715,7 @@ test:do_execsql2_test(
         SELECT * FROM t3, t4;
     ]], {
         -- <select1-11.2.2>
-        "ID",0,"A",1,"B",2,"ID",0,"A",3,"B",4
+        "ID",0,"A","1","B","2","ID",0,"A",3,"B","4"
         -- </select1-11.2.2>
     })
 
@@ -1725,7 +1725,7 @@ test:do_execsql_test(
         SELECT t3.*, t4.b FROM t3, t4;
     ]], {
         -- <select1-11.4.1>
-        0, 1, 2, 4
+        0, "1", "2", "4"
         -- </select1-11.4.1>
     })
 
@@ -1735,7 +1735,7 @@ test:do_execsql_test(
         SELECT "T3".*, t4.b FROM t3, t4;
     ]], {
         -- <select1-11.4.2>
-        0, 1, 2, 4
+        0, "1", "2", "4"
         -- </select1-11.4.2>
     })
 
@@ -1745,7 +1745,7 @@ test:do_execsql2_test(
         SELECT t3.*, t4.b FROM t3, t4;
     ]], {
         -- <select1-11.5.1>
-        "ID", 0, "A", 1, "B", 2, "B", 4
+        "ID", 0, "A", "1", "B", "2", "B", "4"
         -- </select1-11.5.1>
     })
 
@@ -1755,7 +1755,7 @@ test:do_execsql2_test(
         SELECT x.*, y.b FROM t3 AS x, t4 AS y;
     ]], {
         -- <select1-11.6>
-        "ID", 0, "A", 1, "B", 2, "B", 4
+        "ID", 0, "A", "1", "B", "2", "B", "4"
         -- </select1-11.6>
     })
 
@@ -1765,7 +1765,7 @@ test:do_execsql_test(
         SELECT t3.b, t4.* FROM t3, t4;
     ]], {
         -- <select1-11.7>
-        2, 0, 3, 4
+        "2", 0, 3, "4"
         -- </select1-11.7>
     })
 
@@ -1775,7 +1775,7 @@ test:do_execsql2_test(
         SELECT t3.b, t4.* FROM t3, t4;
     ]], {
         -- <select1-11.8>
-        "B", 2, "ID", 0, "A", 3, "B", 4
+        "B", "2", "ID", 0, "A", 3, "B", "4"
         -- </select1-11.8>
     })
 
@@ -1785,7 +1785,7 @@ test:do_execsql2_test(
         SELECT x.b, y.* FROM t3 AS x, t4 AS y;
     ]], {
         -- <select1-11.9>
-        "B", 2, "ID", 0, "A", 3, "B", 4
+        "B", "2", "ID", 0, "A", 3, "B", "4"
         -- </select1-11.9>
     })
 
@@ -1815,7 +1815,7 @@ test:do_execsql2_test(
             SELECT t3.* FROM t3, (SELECT max(a), max(b) FROM t4)
         ]], {
             -- <select1-11.12>
-            "ID", 0, "A", 1, "B", 2
+            "ID", 0, "A", "1", "B", "2"
             -- </select1-11.12>
         })
 
@@ -1825,7 +1825,7 @@ test:do_execsql2_test(
             SELECT t3.* FROM (SELECT max(a), max(b) FROM t4), t3
         ]], {
             -- <select1-11.13>
-            "ID", 0, "A", 1, "B", 2
+            "ID", 0, "A", "1", "B", "2"
             -- </select1-11.13>
         })
 
@@ -1835,7 +1835,7 @@ test:do_execsql2_test(
             SELECT * FROM t3, (SELECT max(a), max(b) FROM t4) as "tx"
         ]], {
             -- <select1-11.14>
-            "ID", 0, "A", 1, "B", 2, "max(a)", 3, "max(b)", 4
+            "ID", 0, "A", "1", "B", "2", "max(a)", 3, "max(b)", "4"
             -- </select1-11.14>
         })
 
@@ -1845,7 +1845,7 @@ test:do_execsql2_test(
             SELECT y.*, t3.* FROM t3, (SELECT max(a), max(b) FROM t4) AS y
         ]], {
             -- <select1-11.15>
-            "max(a)", 3, "max(b)", 4, "ID", 0, "A", 1, "B", 2
+            "max(a)", 3, "max(b)", "4", "ID", 0, "A", "1", "B", "2"
             -- </select1-11.15>
         })
 
@@ -1857,7 +1857,7 @@ test:do_execsql2_test(
         SELECT y.* FROM t3 as y, t4 as z
     ]], {
         -- <select1-11.16>
-        "ID", 0, "A", 1, "B", 2
+        "ID", 0, "A", "1", "B", "2"
         -- </select1-11.16>
     })
 
@@ -1910,7 +1910,7 @@ test:do_execsql_test(
             SELECT a,b FROM t3 UNION SELECT 3 as "a", 4 ORDER BY a;
         ]], {
             -- <select1-12.5>
-            1, 2, 3, 4
+            3, 4, "1", "2"
             -- </select1-12.5>
         })
 
@@ -1920,7 +1920,7 @@ test:do_execsql_test(
             SELECT 5, 3, 4 UNION SELECT * FROM t3;
         ]], {
             -- <select1-12.6>
-            0, 1, 2, 5, 3, 4
+            0, "1", "2", 5, 3, 4
             -- </select1-12.6>
         })
 
@@ -1934,7 +1934,7 @@ test:do_execsql_test(
             SELECT * FROM t3 WHERE a=(SELECT 1);
         ]], {
             -- <select1-12.7>
-            0, 1, 2
+            0, "1", "2"
             -- </select1-12.7>
         })
 
@@ -1958,7 +1958,7 @@ test:do_execsql2_test(
         ) ORDER BY x;
     ]], {
         -- <select1-12.9>
-        "X", 1, "X", 3
+        "X", 3, "X", "1"
         -- </select1-12.9>
     })
 
@@ -1970,7 +1970,7 @@ test:do_execsql2_test(
         ) as z ORDER BY x;
     ]], {
         -- <select1-12.10>
-        "X", 1, "X", 3
+        "X", 3, "X", "1"
         -- </select1-12.10>
     })
 
@@ -1984,7 +1984,7 @@ test:do_test(
     function()
         test:execsql [[
             drop table if exists abc;
-            create TABLE abc(a, b, c, PRIMARY KEY(a, b));
+            create TABLE abc(a INT, b INT, c INT, PRIMARY KEY(a, b));
             START TRANSACTION;
             INSERT INTO abc VALUES(1, 1, 1);
         ]]
@@ -2040,7 +2040,7 @@ test:do_test(
         "select1-15.1",
         [[
             DROP TABLE IF EXISTS t1;
-            CREATE TABLE t1(id int primary key,a);
+            CREATE TABLE t1(id int primary key,a INT );
             CREATE INDEX i1 ON t1(a);
             INSERT INTO t1 VALUES(1, 1);
             INSERT INTO t1 VALUES(2, 2);

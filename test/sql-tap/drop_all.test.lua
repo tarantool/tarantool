@@ -9,7 +9,7 @@ test:do_test(
     prefix.."1.0",
     function()
         for i = 1, N do
-            test:execsql(string.format("create table table%s(a primary key)", i))
+            test:execsql(string.format("create table table%s(a INT primary key)", i))
         end
 
         for i = 1, N do

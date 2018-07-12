@@ -167,7 +167,7 @@ for _, data_collation in ipairs(data_collations) do
         local result = test_case[3]
         test:do_execsql_test(
             extendex_prefix.."create_table",
-            string.format("create table t1(a primary key, b %s);", data_collation[1]),
+            string.format("create table t1(a INT primary key, b TEXT %s);", data_collation[1]),
             {})
         test:do_test(
             extendex_prefix.."insert_values",

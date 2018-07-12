@@ -23,7 +23,7 @@ testprefix = "tkt-a8a0d2996a"
 test:do_execsql_test(
     1.0,
     [[
-        CREATE TABLE t(x primary key,y);
+        CREATE TABLE t(x TEXT primary key,y TEXT);
         INSERT INTO t VALUES('1','1');
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {

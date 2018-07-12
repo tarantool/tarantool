@@ -23,7 +23,7 @@ test:plan(3)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 test:execsql [[
     DROP TABLE IF EXISTS songs;
-    CREATE TABLE songs(songid primary key, artist, timesplayed);
+    CREATE TABLE songs(songid INT primary key, artist TEXT, timesplayed INT);
     INSERT INTO songs VALUES(1,'one',1);
     INSERT INTO songs VALUES(2,'one',2);
     INSERT INTO songs VALUES(3,'two',3);

@@ -5,7 +5,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 errinj = box.error.injection
 fiber = require('fiber')
 
-box.sql.execute('create table test (id primary key, a float, b text)')
+box.sql.execute('create table test (id int primary key, a float, b text)')
 box.schema.user.grant('guest','read,write,execute', 'universe')
 cn = remote.connect(box.cfg.listen)
 cn:ping()
@@ -75,7 +75,7 @@ box.sql.execute("DROP TABLE t2;")
 -- Tests which are aimed at verifying work of commit/rollback
 -- triggers on _fk_constraint space.
 --
-box.sql.execute("CREATE TABLE t3 (id PRIMARY KEY, a REFERENCES t3, b INT UNIQUE);")
+box.sql.execute("CREATE TABLE t3 (id NUMERIC PRIMARY KEY, a INT REFERENCES t3, b INT UNIQUE);")
 t = box.space._fk_constraint:select{}[1]:totable()
 errinj = box.error.injection
 errinj.set("ERRINJ_WAL_IO", true)

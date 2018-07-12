@@ -202,7 +202,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "trigger1-1.10",
     [[
-        create table t1(a int PRIMARY KEY,b);
+        create table t1(a int PRIMARY KEY,b TEXT);
         insert into t1 values(1,'a');
         insert into t1 values(2,'b');
         insert into t1 values(3,'c');
@@ -222,7 +222,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger1-1.11",
     [[
-        create table t1(a int PRIMARY KEY,b);
+        create table t1(a int PRIMARY KEY,b TEXT);
         create table tt1(a int PRIMARY KEY);
         insert into t1 values(1,'a');
         insert into t1 values(2,'b');
@@ -245,7 +245,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "trigger1-1.12",
     [[
-        create table t1(a int PRIMARY KEY,b);
+        create table t1(a int PRIMARY KEY,b TEXT);
         create trigger t1t instead of update on t1 for each row begin
           delete from t1 WHERE a=old.a+2;
         end;
@@ -459,7 +459,7 @@ test:do_catchsql_test(
 --   }
 -- }
 test:execsql [[
-    CREATE TABLE t2(x int PRIMARY KEY,y);
+    CREATE TABLE t2(x int PRIMARY KEY,y INT);
     DROP VIEW v1;
     DROP TABLE t1;
     INSERT INTO t2 VALUES(3, 4);
@@ -747,7 +747,7 @@ test:do_catchsql_test(
 --   catchsql { INSERT INTO tA VALUES('abc', 2, 3) }
 -- } {1 {datatype mismatch}}
 test:execsql [[
-    CREATE TABLE tA(a INTEGER PRIMARY KEY, b, c);
+    CREATE TABLE tA(a INTEGER PRIMARY KEY, b INT, c INT);
     CREATE TRIGGER tA_trigger BEFORE UPDATE ON tA BEGIN SELECT 1; END;
     INSERT INTO tA VALUES(1, 2, 3);
 ]]
@@ -760,7 +760,7 @@ test:do_test(
     "trigger1-16.1",
     function()
         test:execsql [[
-            CREATE TABLE t16(a int PRIMARY KEY,b,c);
+            CREATE TABLE t16(a int PRIMARY KEY, b INT, c INT);
             CREATE INDEX t16b ON t16(b);
         ]]
         return test:catchsql [[

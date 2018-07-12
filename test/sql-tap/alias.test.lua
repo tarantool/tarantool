@@ -38,7 +38,7 @@ test:do_test(
     "alias-1.1",
     function()
         return test:execsql([[
-            CREATE TABLE t1(x primary key);
+            CREATE TABLE t1(x INT primary key);
             INSERT INTO t1 VALUES(9);
             INSERT INTO t1 VALUES(8);
             INSERT INTO t1 VALUES(7);

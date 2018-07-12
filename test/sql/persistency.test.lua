@@ -4,7 +4,7 @@ engine = test_run:get_cfg('engine')
 box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- create space
-box.sql.execute("CREATE TABLE foobar (foo PRIMARY KEY, bar)")
+box.sql.execute("CREATE TABLE foobar (foo INT PRIMARY KEY, bar TEXT)")
 
 -- prepare data
 box.sql.execute("INSERT INTO foobar VALUES (1, 'foo')")
@@ -41,7 +41,7 @@ box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 -- multi-index
 
 -- create space
-box.sql.execute("CREATE TABLE barfoo (bar, foo NUM PRIMARY KEY)")
+box.sql.execute("CREATE TABLE barfoo (bar TEXT, foo NUM PRIMARY KEY)")
 box.sql.execute("CREATE UNIQUE INDEX barfoo2 ON barfoo(bar)")
 
 -- prepare data
@@ -54,7 +54,7 @@ box.sql.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO
 box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 
 -- Many entries
-box.sql.execute("CREATE TABLE t1(a,b,c,PRIMARY KEY(b,c));")
+box.sql.execute("CREATE TABLE t1(a INT,b INT,c INT,PRIMARY KEY(b,c));")
 box.sql.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000) INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;")
 box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 

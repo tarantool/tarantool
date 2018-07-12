@@ -82,7 +82,7 @@ for _, row in ipairs(data) do
     test:do_catchsql_test(
         test_prefix.."2.1."..row[1],
         string.format( [[
-                CREATE TABLE table%s ("columNN", %s, primary key("columNN", %s));
+                CREATE TABLE table%s ("columNN" INT, %s INT, primary key("columNN", %s));
                 INSERT INTO table%s(%s, "columNN") values (%s, %s);
                 ]],
                 row[1], row[2], row[2],
@@ -116,7 +116,7 @@ test:do_test(
     end,
     6)
 
-test:execsql([[create table table1(columnn, "columnn" primary key)]])
+test:execsql([[create table table1(columnn INT , "columnn" INT primary key)]])
 test:execsql([[insert into table1("columnn", "COLUMNN") values(2,1)]])
 
 
@@ -158,7 +158,7 @@ test:do_test(
 
 test:do_execsql_test(
     test_prefix.."4.0",
-    string.format([[create table table1(a, b primary key)]]),
+    string.format([[create table table1(a INT , b  INT primary key)]]),
     nil
 )
 
@@ -213,7 +213,7 @@ data = {
 test:do_catchsql_test(
     test_prefix.."6.0.",
     [[
-        CREATE TABLE T1 (a primary key, b);
+        CREATE TABLE T1 (a TEXT primary key, b TEXT);
     ]],
     {0})
 

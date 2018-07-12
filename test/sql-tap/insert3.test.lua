@@ -28,8 +28,8 @@ test:plan(18)
 test:do_execsql_test(
     "insert3-1.0",
     [[
-            CREATE TABLE t1(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a,b);
-            CREATE TABLE log(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x UNIQUE, y);
+            CREATE TABLE t1(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT );
+            CREATE TABLE log(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x  INT UNIQUE, y INT );
             CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN
               UPDATE log SET y=y+1 WHERE x=new.a;
               INSERT OR IGNORE INTO log(x, y) VALUES(new.a, 1);
@@ -57,7 +57,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "insert3-1.2",
     [[
-            CREATE TABLE log2(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x UNIQUE,y);
+            CREATE TABLE log2(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x  INT UNIQUE,y INT );
             CREATE TRIGGER r2 BEFORE INSERT ON t1 BEGIN
               UPDATE log2 SET y=y+1 WHERE x=new.b;
               INSERT OR IGNORE INTO log2(x, y) VALUES(new.b,1);
@@ -121,10 +121,10 @@ test:do_execsql_test(
     [[
             CREATE TABLE t2(
               a INTEGER PRIMARY KEY AUTOINCREMENT,
-              b DEFAULT 'b',
-              c DEFAULT 'c'
+              b  INT DEFAULT 'b',
+              c  INT DEFAULT 'c'
             );
-            CREATE TABLE t2dup(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a,b,c);
+            CREATE TABLE t2dup(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT );
             CREATE TRIGGER t2r1 BEFORE INSERT ON t2 BEGIN
               INSERT INTO t2dup(a,b,c) VALUES(new.a,new.b,new.c);
             END;
@@ -157,7 +157,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "insert3-3.1",
     [[
-            CREATE TABLE t3(id INTEGER PRIMARY KEY AUTOINCREMENT, a,b,c);
+            CREATE TABLE t3(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT );
             CREATE TRIGGER t3r1 BEFORE INSERT on t3 WHEN nosuchcol BEGIN
               SELECT 'illegal WHEN clause';
             END;
@@ -179,7 +179,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "insert3-3.3",
     [[
-            CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a,b,c);
+            CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT );
             CREATE TRIGGER t4r1 AFTER INSERT on t4 WHEN nosuchcol BEGIN
               SELECT 'illegal WHEN clause';
             END;
@@ -209,7 +209,7 @@ test:do_execsql_test(
     [[
             CREATE TABLE t5(
               a INTEGER PRIMARY KEY AUTOINCREMENT,
-              b DEFAULT 'xyz'
+              b  INT DEFAULT 'xyz'
             );
             INSERT INTO t5 DEFAULT VALUES;
             SELECT * FROM t5;
@@ -233,7 +233,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "insert3-3.7",
     [[
-            CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x,y DEFAULT 4.3, z DEFAULT x'6869');
+            CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x INT ,y  INT DEFAULT 4.3, z  INT DEFAULT x'6869');
             INSERT INTO t6 DEFAULT VALUES;
             SELECT * FROM t6;
     ]], {
@@ -273,7 +273,7 @@ test:drop_all_tables()
 --         "insert3-4.1",
 --         function()
 --             test:execsql([[
---                 CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b, c);
+--                 CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT , b INT , c INT );
 --                 CREATE INDEX i1 ON t1(a, b);
 --                 BEGIN;
 --                 INSERT INTO t1 (a,b,c)VALUES(randstr(10,400),randstr(10,400),randstr(10,400));

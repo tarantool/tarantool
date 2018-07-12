@@ -2254,7 +2254,8 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 {
 	int nCmp = sqlite3ExprVectorSize(pTerm->pExpr->pLeft);
 	int i;
-
+	struct space *space = space_by_id(idx_def->space_id);
+	assert(space != NULL);
 	nCmp = MIN(nCmp, (int)(idx_def->key_def->part_count - nEq));
 	for (i = 1; i < nCmp; i++) {
 		/* Test if comparison i of pTerm is compatible with column (i+nEq)
@@ -2281,10 +2282,8 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		    pLhs->iColumn != (int)parts[i + nEq].fieldno ||
 		    parts[i + nEq].sort_order != parts[nEq].sort_order)
 			break;
-
-		struct space *space = space_by_id(idx_def->space_id);
-		assert(space != NULL);
-		aff = sqlite3CompareAffinity(pRhs, sqlite3ExprAffinity(pLhs));
+		enum affinity_type rhs_aff = sqlite3ExprAffinity(pRhs);
+		aff = sql_affinity_result(rhs_aff, sqlite3ExprAffinity(pLhs));
 		idxaff =
 		    sqlite3TableColumnAffinity(space->def, pLhs->iColumn);
 		if (aff != idxaff)

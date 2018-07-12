@@ -9,7 +9,7 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 ...
 -- box.cfg()
 -- create space
-box.sql.execute("CREATE TABLE zoobar (c1, c2 PRIMARY KEY, c3, c4)")
+box.sql.execute("CREATE TABLE zoobar (c1 INT, c2 INT PRIMARY KEY, c3 TEXT, c4 INT)")
 ---
 ...
 box.sql.execute("CREATE UNIQUE INDEX zoobar2 ON zoobar(c1, c4)")

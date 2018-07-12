@@ -54,7 +54,7 @@ test:do_test(
         return test:execsql(string.format([[
             CREATE TABLE Items(
                 itemId integer primary key,
-                 item str unique
+                 item  TEXT unique
             );
             INSERT INTO Items VALUES(0, 'ALL');
             INSERT INTO Items VALUES(1, 'double:source');
@@ -64,13 +64,13 @@ test:do_test(
 
             CREATE TABLE Labels(
                 labelId INTEGER PRIMARY KEY,
-                label STR UNIQUE
+                label  TEXT UNIQUE
             );
             INSERT INTO Labels VALUES(0, 'ALL');
             INSERT INTO Labels VALUES(1, 'localhost@rpl:linux');
             INSERT INTO Labels VALUES(2, 'localhost@rpl:branch');
 
-            CREATE TABLE LabelMap(id primary key,
+            CREATE TABLE LabelMap(id  INT primary key,
                 itemId INTEGER,
                 labelId INTEGER,
                 branchId integer
@@ -84,9 +84,9 @@ test:do_test(
 
             CREATE TABLE Users (
                 userId INTEGER PRIMARY KEY,
-                "user" STRING UNIQUE,
-                salt BINARY,
-                password STRING
+                "user" TEXT UNIQUE,
+                salt  BLOB,
+                password  TEXT
             );
             INSERT INTO Users VALUES(1, 'test', 'æ%s',
                        '43ba0f45014306bd6df529551ffdb3df');
@@ -94,7 +94,7 @@ test:do_test(
                        'cf07c8348fdf675cc1f7696b7d45191b');
             CREATE TABLE UserGroups (
                 userGroupId INTEGER PRIMARY KEY,
-                userGroup STRING UNIQUE
+                userGroup  TEXT UNIQUE
             );
             INSERT INTO UserGroups VALUES(1, 'test');
             INSERT INTO UserGroups VALUES(2, 'limited');

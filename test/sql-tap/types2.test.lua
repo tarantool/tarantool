@@ -36,7 +36,7 @@ test:plan(398)
 -- handled similarly in the implementation.
 test:execsql [[
     CREATE TABLE t1(
-      id primary key,
+      id  INT primary key,
       i1 INTEGER,
       i2 INTEGER,
       n1 NUMERIC,
@@ -79,17 +79,17 @@ end
 -- Changed by ticket #805:  Use no affinity for literal comparisons.
 --
 test_bool("types2-1.1", "", "500 = 500.0", 1)
-test_bool("types2-1.2", "", "'500' = 500.0", 0)
+test_bool("types2-1.2", "", "'500' = 500.0", 1)
 test_bool("types2-1.3", "", "500 = '500.0'", 0)
 test_bool("types2-1.4", "", "'500' = '500.0'", 0)
 -- Compare literals against a column with TEXT affinity
 test_bool("types2-1.5", "t1=500", "500 = t1", 1)
 test_bool("types2-1.6", "t1=500", "'500' = t1", 1)
-test_bool("types2-1.7", "t1=500", "500.0 = t1", 0)
+test_bool("types2-1.7", "t1=500", "500.0 = t1", 1)
 test_bool("types2-1.8", "t1=500", "'500.0' = t1", 0)
 test_bool("types2-1.9", "t1='500'", "500 = t1", 1)
 test_bool("types2-1.10", "t1='500'", "'500' = t1", 1)
-test_bool("types2-1.11", "t1='500'", "500.0 = t1", 0)
+test_bool("types2-1.11", "t1='500'", "500.0 = t1", 1)
 test_bool("types2-1.12", "t1='500'", "'500.0' = t1", 0)
 -- Compare literals against a column with NUMERIC affinity
 test_bool("types2-1.13", "n1=500", "500 = n1", 1)
@@ -112,7 +112,7 @@ test_bool("types2-1.28", "o1='500'", "'500.0' = o1", 0)
 local vals = { 10, "10.0", "'10'", "'10.0'", 20, "20.0", "'20'", "'20.0'", 30, "30.0", "'30'", "'30.0'" }
 --             1    2      3         4      5  6       7        8      9    10       11   12
 test:execsql [[
-    CREATE TABLE t2(id primary key, i INTEGER, n NUMERIC, t TEXT, o XBLOBY);
+    CREATE TABLE t2(id  INT primary key, i INTEGER, n NUMERIC, t TEXT, o XBLOBY);
     CREATE INDEX t2i1 ON t2(i);
     CREATE INDEX t2i2 ON t2(n);
     CREATE INDEX t2i3 ON t2(t);
@@ -274,7 +274,7 @@ test_boolset("types2-6.9", "id IN (1, 6, 10)", {1, 6, 10})
 -- Tests types2-7.* concentrate on expressions of the form 
 -- "x IN (SELECT...)" with no index.
 test:execsql [[
-    CREATE TABLE t3(id primary key, i INTEGER, n NUMERIC, t TEXT, o BLOB);
+    CREATE TABLE t3(id  INT primary key, i INTEGER, n NUMERIC, t TEXT, o BLOB);
     INSERT INTO t3 VALUES(1, 1, 1, 1, 1);
     INSERT INTO t3 VALUES(2, 2, 2, 2, 2);
     INSERT INTO t3 VALUES(3, 3, 3, 3, 3);
@@ -306,7 +306,7 @@ test_bool("types2-7.15", "o1='2'", "o1 IN (SELECT o||'' FROM t3)", 1)
 -- set vals [list 10 10.0 '10' '10.0' 20 20.0 '20' '20.0' 30 30.0 '30' '30.0']
 --                1  2    3    4      5  6    7    8      9  10   11   12
 test:execsql [[
-    CREATE TABLE t4(id primary key, i INTEGER, n NUMERIC, t VARCHAR(20), o LARGE BLOB);
+    CREATE TABLE t4(id  INT primary key, i INTEGER, n NUMERIC, t VARCHAR(20), o  INT LARGE BLOB);
     INSERT INTO t4 VALUES(1, 10, 20, 20, 30);
 ]]
 test_boolset("types2-8.1", "i IN (SELECT i FROM t4)", {1, 2, 3, 4})

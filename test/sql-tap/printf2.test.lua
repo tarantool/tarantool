@@ -174,15 +174,13 @@ test:do_execsql_test(
 test:do_execsql_test(
     "printf2-2.1",
     [[
-        CREATE TABLE t1(id primary key, a,b,c);
+        CREATE TABLE t1(id INT primary key, a INT,b INT,c INT);
         INSERT INTO t1 VALUES(1, 1,2,3);
         INSERT INTO t1 VALUES(2, -1,-2,-3);
-        INSERT INTO t1 VALUES(3, 'abc','def','ghi');
-        INSERT INTO t1 VALUES(4, 1.5,2.25,3.125);
         SELECT printf('(%s)-%n-(%s)',a,b,c) FROM t1 ORDER BY id;
     ]], {
         -- <printf2-2.1>
-        "(1)--(2)", "(-1)--(-2)", "(abc)--(def)", "(1.5)--(2.25)"
+        "(1)--(2)", "(-1)--(-2)"
         -- </printf2-2.1>
     })
 
@@ -194,7 +192,7 @@ test:do_execsql_test(
         SELECT printf('%s=(%p)',a,a) FROM t1 ORDER BY a;
     ]], {
         -- <printf2-2.2>
-        "-1=(FFFFFFFFFFFFFFFF)", "1=(1)", "1.5=(1)", "abc=(0)"
+        "-1=(FFFFFFFFFFFFFFFF)", "1=(1)"
         -- </printf2-2.2>
     })
 
@@ -209,7 +207,7 @@ test:do_execsql_test(
         SELECT printf('%s=(%d/%g/%s)',a) FROM t1 ORDER BY a;
     ]], {
         -- <printf2-2.3>
-        "-1=(0/0/)", "1=(0/0/)", "1.5=(0/0/)", "abc=(0/0/)"
+        "-1=(0/0/)", "1=(0/0/)"
         -- </printf2-2.3>
     })
 

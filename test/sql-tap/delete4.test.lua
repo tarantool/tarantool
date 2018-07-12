@@ -22,7 +22,7 @@ testprefix = "delete4"
 test:do_execsql_test(
     1.1,
     [[
-        CREATE TABLE t1(x INTEGER PRIMARY KEY, y);
+        CREATE TABLE t1(x INTEGER PRIMARY KEY, y INT );
         INSERT INTO t1 VALUES(1, 0);
         INSERT INTO t1 VALUES(2, 1);
         INSERT INTO t1 VALUES(3, 0);
@@ -56,7 +56,7 @@ test:do_execsql_test(
     2.1,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(x INTEGER PRIMARY KEY, y, z);
+        CREATE TABLE t1(x INTEGER PRIMARY KEY, y INT , z BLOB);
         INSERT INTO t1 VALUES(1, 0, randomblob(200));
         INSERT INTO t1 VALUES(2, 1, randomblob(200));
         INSERT INTO t1 VALUES(3, 0, randomblob(200));
@@ -90,7 +90,7 @@ test:do_execsql_test(
     3.1,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a, b, PRIMARY KEY(a, b));
+        CREATE TABLE t1(a INT , b INT , PRIMARY KEY(a, b));
         INSERT INTO t1 VALUES(1, 2);
         INSERT INTO t1 VALUES(2, 4);
         INSERT INTO t1 VALUES(1, 5);
@@ -110,7 +110,7 @@ test:do_execsql_test(
     3.1,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(i INTEGER PRIMARY KEY, a, b);
+        CREATE TABLE t1(i INTEGER PRIMARY KEY, a TEXT, b TEXT);
         CREATE INDEX i1a ON t1(a);
         CREATE INDEX i1b ON t1(b);
         INSERT INTO t1 VALUES(1, 'one', 'i');
@@ -154,7 +154,7 @@ test:do_execsql_test(
     4.1,
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(col0 PRIMARY KEY, col1);
+        CREATE TABLE t4(col0  INT PRIMARY KEY, col1 TEXT);
         INSERT INTO t4 VALUES(14, 'abcde');
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);
         DELETE FROM t4 WHERE col0=69 OR col0>7;
@@ -168,7 +168,7 @@ test:do_execsql_test(
     4.2,
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(col0 PRIMARY KEY, col1);
+        CREATE TABLE t4(col0  INT PRIMARY KEY, col1 TEXT);
         INSERT INTO t4 VALUES(14, 'abcde');
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);
         DELETE FROM t4 WHERE col0=69 OR col0>7;
@@ -182,7 +182,7 @@ test:do_execsql_test(
     4.11,
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(col0, col1, pk PRIMARY KEY);
+        CREATE TABLE t4(col0 INT , col1 TEXT, pk TEXT PRIMARY KEY);
         INSERT INTO t4 VALUES(14, 'abcde','xyzzy');
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);
         CREATE INDEX idx_t4_3 ON t4 (col0);
@@ -197,7 +197,7 @@ test:do_execsql_test(
     4.12,
     [[
         DROP TABLE IF EXISTS t4;
-        CREATE TABLE t4(col0, col1, pk PRIMARY KEY);
+        CREATE TABLE t4(col0 INT , col1 TEXT, pk TEXT PRIMARY KEY);
         INSERT INTO t4 VALUES(14, 'abcde','xyzzy');
         CREATE INDEX idx_t4_3 ON t4 (col0);
         CREATE INDEX idx_t4_0 ON t4 (col1, col0);

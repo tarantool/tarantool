@@ -20,8 +20,8 @@ test:plan(1)
 test:do_execsql_test(
     "trigger4-1.1",
     [[
-        create table test1(id integer primary key,a);
-        create table test2(id integer primary key,b);
+        create table test1(id integer primary key,a INT);
+        create table test2(id integer primary key,b INT);
         create view test as
           select test1.id as id,a as a,b as b
           from test1 join test2 on test2.id =  test1.id;
@@ -111,7 +111,7 @@ test:do_execsql_test(
 -- } {1 22 4 5}
 -- do_test trigger4-3.5 {
 --   execsql {
---     create table test2(id,b);
+--     create table test2(id INT, b INT);
 --     insert into test values(7,8,9);
 --     select * from test1;
 --   }

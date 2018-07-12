@@ -185,7 +185,7 @@ create_table_args ::= AS select(S). {
 }
 columnlist ::= columnlist COMMA columnname carglist.
 columnlist ::= columnname carglist.
-columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
+columnname(A) ::= nm(A) typedef(Y). {sqlite3AddColumn(pParse,&A,&Y);}
 
 // An IDENTIFIER can be a generic identifier, or one of several
 // keywords.  Any non-standard keyword can also be an identifier.
@@ -228,25 +228,6 @@ nm(A) ::= id(A). {
     sqlite3ErrorMsg(pParse, "keyword \"%T\" is reserved", &A);
   }
 }
-
-// A typetoken is really zero or more tokens that form a type name such
-// as can be found after the column name in a CREATE TABLE statement.
-// Multiple tokens are concatenated to form the value of the typetoken.
-//
-%type typetoken {Token}
-typetoken(A) ::= .   {A.n = 0; A.z = 0;}
-typetoken(A) ::= typename(A).
-typetoken(A) ::= typename(A) LP signed RP(Y). {
-  A.n = (int)(&Y.z[Y.n] - A.z);
-}
-typetoken(A) ::= typename(A) LP signed COMMA signed RP(Y). {
-  A.n = (int)(&Y.z[Y.n] - A.z);
-}
-%type typename {Token}
-typename(A) ::= ids(A).
-typename(A) ::= typename(A) ids(Y). {A.n=Y.n+(int)(Y.z-A.z);}
-signed ::= plus_num.
-signed ::= minus_num.
 
 // "carglist" is a list of additional constraints that come after the
 // column name and column type in a CREATE TABLE statement.
@@ -837,6 +818,20 @@ idlist(A) ::= nm(Y).
     Expr *p = sqlite3DbMallocRawNN(pParse->db, sizeof(Expr)+t.n+1);
     if( p ){
       memset(p, 0, sizeof(Expr));
+      switch (op) {
+      case TK_STRING:
+        p->affinity = AFFINITY_TEXT;
+        break;
+      case TK_BLOB:
+        p->affinity = AFFINITY_BLOB;
+        break;
+      case TK_INTEGER:
+        p->affinity = AFFINITY_INTEGER;
+        break;
+      case TK_FLOAT:
+        p->affinity = AFFINITY_REAL;
+        break;
+      }
       p->op = (u8)op;
       p->flags = EP_Leaf;
       p->iAgg = -1;
@@ -872,6 +867,7 @@ term(A) ::= FLOAT|BLOB(X). {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= STRING(X).     {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= INTEGER(X). {
   A.pExpr = sqlite3ExprAlloc(pParse->db, TK_INTEGER, &X, 1);
+  A.pExpr->affinity = AFFINITY_INTEGER;
   A.zStart = X.z;
   A.zEnd = X.z + X.n;
   if( A.pExpr ) A.pExpr->flags |= EP_Leaf;
@@ -901,9 +897,10 @@ expr(A) ::= expr(A) COLLATE id(C). {
   A.zEnd = &C.z[C.n];
 }
 %ifndef SQLITE_OMIT_CAST
-expr(A) ::= CAST(X) LP expr(E) AS typetoken(T) RP(Y). {
+expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
-  A.pExpr = sqlite3ExprAlloc(pParse->db, TK_CAST, &T, 1);
+  A.pExpr = sqlite3ExprAlloc(pParse->db, TK_CAST, 0, 1);
+  A.pExpr->affinity = T.type;
   sqlite3ExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
 }
 %endif  SQLITE_OMIT_CAST
@@ -917,6 +914,21 @@ expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
     A.pExpr->flags |= EP_Distinct;
   }
 }
+
+type_func(A) ::= DATE(A) .
+type_func(A) ::= DATETIME(A) .
+type_func(A) ::= CHAR(A) .
+expr(A) ::= type_func(X) LP distinct(D) exprlist(Y) RP(E). {
+  if( Y && Y->nExpr>pParse->db->aLimit[SQLITE_LIMIT_FUNCTION_ARG] ){
+    sqlite3ErrorMsg(pParse, "too many arguments on function %T", &X);
+  }
+  A.pExpr = sqlite3ExprFunction(pParse, Y, &X);
+  spanSet(&A,&X,&E);
+  if( D==SF_Distinct && A.pExpr ){
+    A.pExpr->flags |= EP_Distinct;
+  }
+}
+
 expr(A) ::= id(X) LP STAR RP(E). {
   A.pExpr = sqlite3ExprFunction(pParse, 0, &X);
   spanSet(&A,&X,&E);
@@ -1410,7 +1422,7 @@ expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
 }
 expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
   spanSet(&A,&X,&Y);  /*A-overwrites-X*/
-  A.pExpr = sqlite3ExprAlloc(pParse->db, TK_RAISE, &Z, 1); 
+  A.pExpr = sqlite3ExprAlloc(pParse->db, TK_RAISE, &Z, 1);
   if( A.pExpr ) {
     A.pExpr->on_conflict_action = (enum on_conflict_action) T;
   }
@@ -1464,3 +1476,45 @@ wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
   A = sqlite3WithAdd(pParse, A, &X, Y, Z);
 }
 %endif  SQLITE_OMIT_CTE
+
+/* Primitive types. */
+%type typedef {struct type_def}
+typedef(A) ::= TEXT . { A.type = AFFINITY_TEXT; }
+typedef(A) ::= BLOB . { A.type = AFFINITY_BLOB; }
+typedef(A) ::= DATE . { A.type = AFFINITY_REAL; }
+typedef(A) ::= TIME . { A.type = AFFINITY_REAL; }
+typedef(A) ::= DATETIME . { A.type = AFFINITY_REAL; }
+
+%type char_len_typedef {struct type_def}
+typedef(A) ::= CHAR|VARCHAR char_len_typedef(B) . {
+  A.type = AFFINITY_TEXT;
+  (void) B;
+}
+
+char_len_typedef(A) ::= LP INTEGER(B) RP . {
+  (void) A;
+  (void) B;
+}
+
+%type number_typedef {struct type_def}
+typedef(A) ::= number_typedef(A) .
+number_typedef(A) ::= FLOAT|REAL|DOUBLE . { A.type = AFFINITY_REAL; }
+number_typedef(A) ::= INT|INTEGER . { A.type = AFFINITY_INTEGER; }
+
+%type number_len_typedef {struct type_def}
+number_typedef(A) ::= DECIMAL|NUMERIC|NUM number_len_typedef(B) . {
+  A.type = AFFINITY_REAL;
+  (void) B;
+}
+
+number_len_typedef(A) ::= . { (void) A; }
+number_len_typedef(A) ::= LP INTEGER(B) RP . {
+  (void) A;
+  (void) B;
+}
+
+number_len_typedef(A) ::= LP INTEGER(B) COMMA INTEGER(C) RP . {
+  (void) A;
+  (void) B;
+  (void) C;
+}

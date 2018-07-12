@@ -22,7 +22,7 @@ test:plan(6)
 test:do_execsql_test(
     "distinctagg-1.1",
     [[
-        CREATE TABLE t1(a,b,c primary key);
+        CREATE TABLE t1(a INT,b INT,c INT primary key);
         INSERT INTO t1 VALUES(1,2,3);
         INSERT INTO t1 VALUES(1,3,4);
         INSERT INTO t1 VALUES(1,3,5);

@@ -24,7 +24,7 @@ test:plan(5)
 test:do_execsql_test(
     "func5-1.1",
     [[
-        CREATE TABLE t1(x PRIMARY KEY,a,b,c);
+        CREATE TABLE t1(x INT PRIMARY KEY,a TEXT,b TEXT,c INT );
         INSERT INTO t1 VALUES(1,'ab','cd',1);
         INSERT INTO t1 VALUES(2,'gh','ef',5);
         INSERT INTO t1 VALUES(3,'pqr','fuzzy',99);
@@ -60,7 +60,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func5-2.1",
     [[
-        CREATE TABLE t2(x PRIMARY KEY,y);
+        CREATE TABLE t2(x  INT PRIMARY KEY,y INT );
         INSERT INTO t2 VALUES(1,2),(3,4),(5,6),(7,8);
         SELECT x, y FROM t2 WHERE x+5=5+x ORDER BY +x;
     ]], {

@@ -74,7 +74,7 @@ box.sql.execute("DROP TABLE t2;")
 immutable_part(box.space._trigger:select())
 
 -- Test target tables restricts.
-box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY,b);")
+box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY,b INT);")
 space_id = box.space.T1.id
 
 tuple = {"T1T", space_id, {sql = [[create trigger t1t instead of update on t1 for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
@@ -101,11 +101,11 @@ box.sql.execute("DROP TABLE T1;")
 --
 -- Case 1: Src 'vinyl' table; Dst 'memtx' table
 box.sql.execute("PRAGMA sql_default_engine ('vinyl');")
-box.sql.execute("CREATE TABLE m (s1 SCALAR PRIMARY KEY);")
+box.sql.execute("CREATE TABLE m (s1 NUMERIC PRIMARY KEY);")
 box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = DATETIME('now'); END;")
 box.sql.execute("PRAGMA sql_default_engine('memtx');")
-box.sql.execute("CREATE TABLE n (s1 CHAR PRIMARY KEY, s2 char);")
-box.sql.execute("INSERT INTO m VALUES ('');")
+box.sql.execute("CREATE TABLE n (s1 TEXT PRIMARY KEY, s2 TEXT);")
+box.sql.execute("INSERT INTO m VALUES (0);")
 box.sql.execute("INSERT INTO n VALUES ('',null);")
 box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 
@@ -117,11 +117,11 @@ box.sql.execute("DROP TABLE n;")
 
 -- Case 2: Src 'memtx' table; Dst 'vinyl' table
 box.sql.execute("PRAGMA sql_default_engine ('memtx');")
-box.sql.execute("CREATE TABLE m (s1 SCALAR PRIMARY KEY);")
+box.sql.execute("CREATE TABLE m (s1 NUMERIC PRIMARY KEY);")
 box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = DATETIME('now'); END;")
 box.sql.execute("PRAGMA sql_default_engine('vinyl');")
-box.sql.execute("CREATE TABLE n (s1 CHAR PRIMARY KEY, s2 char);")
-box.sql.execute("INSERT INTO m VALUES ('');")
+box.sql.execute("CREATE TABLE n (s1 TEXT PRIMARY KEY, s2 TEXT);")
+box.sql.execute("INSERT INTO m VALUES (0);")
 box.sql.execute("INSERT INTO n VALUES ('',null);")
 box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 

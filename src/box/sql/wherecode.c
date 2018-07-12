@@ -421,7 +421,8 @@ updateRangeAffinityStr(Expr * pRight,	/* RHS of comparison */
 	int i;
 	for (i = 0; i < n; i++) {
 		Expr *p = sqlite3VectorFieldSubexpr(pRight, i);
-		if (sqlite3CompareAffinity(p, zAff[i]) == AFFINITY_BLOB
+		enum affinity_type aff = sqlite3ExprAffinity(p);
+		if (sql_affinity_result(aff, zAff[i]) == AFFINITY_BLOB
 		    || sqlite3ExprNeedsNoAffinityChange(p, zAff[i])) {
 			zAff[i] = AFFINITY_BLOB;
 		}
@@ -774,7 +775,9 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 				VdbeCoverage(v);
 			}
 			if (zAff) {
-				if (sqlite3CompareAffinity(pRight, zAff[j]) ==
+				enum affinity_type aff =
+					sqlite3ExprAffinity(pRight);
+				if (sql_affinity_result(aff, zAff[j]) ==
 				    AFFINITY_BLOB) {
 					zAff[j] = AFFINITY_BLOB;
 				}

@@ -3,7 +3,7 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
-box.sql.execute('create table test (id primary key, a float, b text)')
+box.sql.execute('create table test (id int primary key, a float, b text)')
 space = box.space.TEST
 space:replace{1, 2, '3'}
 space:replace{4, 5, '6'}
@@ -116,7 +116,7 @@ parameters[1][':value'] = {kek = 300}
 cn:execute('select :value', parameters)
 
 -- gh-2608 SQL iproto DDL
-cn:execute('create table test2(id primary key, a, b, c)')
+cn:execute('create table test2(id int primary key, a int, b int, c int)')
 box.space.TEST2.name
 cn:execute('insert into test2 values (1, 1, 1, 1)')
 cn:execute('select * from test2')
@@ -128,11 +128,11 @@ box.space.TEST2
 -- gh-2617 DDL row_count either 0 or 1.
 
 -- Test CREATE [IF NOT EXISTS] TABLE.
-cn:execute('create table test3(id primary key, a, b)')
+cn:execute('create table test3(id int primary key, a int, b int)')
 -- Rowcount = 1, although two tuples were created:
 -- for _space and for _index.
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
-cn:execute('create table if not exists test3(id primary key)')
+cn:execute('create table if not exists test3(id int primary key)')
 
 -- Test CREATE VIEW [IF NOT EXISTS] and
 --      DROP   VIEW [IF EXISTS].

@@ -26,7 +26,7 @@ test:do_test(
     "cse-1.1",
     function()
         test:execsql [[
-            CREATE TABLE t1(a INTEGER PRIMARY KEY, b, c, d, e, f);
+            CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT , c INT , d INT , e INT , f INT );
             INSERT INTO t1 VALUES(1,11,12,13,14,15);
             INSERT INTO t1 VALUES(2,21,22,23,24,25);
         ]]
@@ -221,11 +221,11 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-2.1",
     [[
-        CREATE TABLE t2(a0 PRIMARY KEY,a1,a2,a3,a4,a5,a6,a7,a8,a9,
-                        a10,a11,a12,a13,a14,a15,a16,a17,a18,a19,
-                        a20,a21,a22,a23,a24,a25,a26,a27,a28,a29,
-                        a30,a31,a32,a33,a34,a35,a36,a37,a38,a39,
-                        a40,a41,a42,a43,a44,a45,a46,a47,a48,a49);
+        CREATE TABLE t2(a0  INT PRIMARY KEY,a1 INT ,a2 INT ,a3 INT ,a4 INT ,a5 INT ,a6 INT ,a7 INT ,a8 INT ,a9 INT ,
+                        a10 INT ,a11 INT ,a12 INT ,a13 INT ,a14 INT ,a15 INT ,a16 INT ,a17 INT ,a18 INT ,a19 INT ,
+                        a20 INT ,a21 INT ,a22 INT ,a23 INT ,a24 INT ,a25 INT ,a26 INT ,a27 INT ,a28 INT ,a29 INT ,
+                        a30 INT ,a31 INT ,a32 INT ,a33 INT ,a34 INT ,a35 INT ,a36 INT ,a37 INT ,a38 INT ,a39 INT ,
+                        a40 INT ,a41 INT ,a42 INT ,a43 INT ,a44 INT ,a45 INT ,a46 INT ,a47 INT ,a48 INT ,a49 INT );
         INSERT INTO t2 VALUES(0,1,2,3,4,5,6,7,8,9,
                         10,11,12,13,14,15,16,17,18,19,
                         20,21,22,23,24,25,26,27,28,29,

@@ -23,21 +23,21 @@ test:plan(9)
 test:do_execsql_test(
     "tkt2339.1",
     [[
-        create table t1(num int primary key);
+        create table t1(numb int primary key);
         insert into t1 values (1);
         insert into t1 values (2);
         insert into t1 values (3);
         insert into t1 values (4);
 
-        create table t2(num int primary key);
+        create table t2(numb int primary key);
         insert into t2 values (11);
         insert into t2 values (12);
         insert into t2 values (13);
         insert into t2 values (14);
 
-        SELECT * FROM (SELECT * FROM t1 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t1 ORDER BY numb DESC LIMIT 2)
         UNION
-        SELECT * FROM (SELECT * FROM t2 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t2 ORDER BY numb DESC LIMIT 2)
     ]], {
         -- <tkt2339.1>
         3, 4, 13, 14
@@ -47,9 +47,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2339.2",
     [[
-        SELECT * FROM (SELECT * FROM t1 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t1 ORDER BY numb DESC LIMIT 2)
         UNION ALL
-        SELECT * FROM (SELECT * FROM t2 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t2 ORDER BY numb DESC LIMIT 2)
     ]], {
         -- <tkt2339.2>
         4, 3, 14, 13
@@ -59,9 +59,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2339.3",
     [[
-        SELECT * FROM (SELECT * FROM t1 ORDER BY num DESC)
+        SELECT * FROM (SELECT * FROM t1 ORDER BY numb DESC)
         UNION ALL
-        SELECT * FROM (SELECT * FROM t2 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t2 ORDER BY numb DESC LIMIT 2)
     ]], {
         -- <tkt2339.3>
         4, 3, 2, 1, 14, 13
@@ -71,9 +71,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2339.4",
     [[
-        SELECT * FROM (SELECT * FROM t1 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t1 ORDER BY numb DESC LIMIT 2)
         UNION ALL
-        SELECT * FROM (SELECT * FROM t2 ORDER BY num DESC)
+        SELECT * FROM (SELECT * FROM t2 ORDER BY numb DESC)
     ]], {
         -- <tkt2339.4>
         4, 3, 14, 13, 12, 11
@@ -83,9 +83,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2339.5",
     [[
-        SELECT * FROM (SELECT * FROM t1 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t1 ORDER BY numb DESC LIMIT 2)
         UNION
-        SELECT * FROM (SELECT * FROM t2 ORDER BY num DESC)
+        SELECT * FROM (SELECT * FROM t2 ORDER BY numb DESC)
     ]], {
         -- <tkt2339.5>
         3, 4, 11, 12, 13, 14
@@ -95,9 +95,9 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2339.6",
     [[
-        SELECT * FROM (SELECT * FROM t1 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t1 ORDER BY numb DESC LIMIT 2)
         EXCEPT
-        SELECT * FROM (SELECT * FROM t2 ORDER BY num DESC)
+        SELECT * FROM (SELECT * FROM t2 ORDER BY numb DESC)
     ]], {
         -- <tkt2339.6>
         3, 4
@@ -109,7 +109,7 @@ test:do_execsql_test(
     [[
         SELECT * FROM (SELECT * FROM t1 LIMIT 2)
         UNION
-        SELECT * FROM (SELECT * FROM t2 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t2 ORDER BY numb DESC LIMIT 2)
     ]], {
         -- <tkt2339.7>
         1, 2, 13, 14
@@ -131,7 +131,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2339.9",
     [[
-        SELECT * FROM (SELECT * FROM t1 ORDER BY num DESC LIMIT 2)
+        SELECT * FROM (SELECT * FROM t1 ORDER BY numb DESC LIMIT 2)
         UNION
         SELECT * FROM (SELECT * FROM t2 LIMIT 2)
     ]], {

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(5)
+test:plan(4)
 
 --!./tcltestrunner.lua
 -- 2008 October 20
@@ -45,9 +45,9 @@ local function EQP(sql)
     return test:execsql("EXPLAIN QUERY PLAN "..sql)
 end
 
--- These tests perform an EXPLAIN QUERY PLAN on both versions of the 
--- SELECT referenced in ticket #3442 (both '5000' and "5000") 
--- and verify that the query plan is the same.
+-- These tests perform an EXPLAIN QUERY PLAN on both versions of
+-- SELECT: with string literal and numeric constant and verify
+-- that the query plans are different.
 --
 test:do_test(
     "tkt3442-1.2",
@@ -62,34 +62,18 @@ test:do_test(
 test:do_test(
     "tkt3442-1.3",
     function()
-        return EQP([[ SELECT node FROM listhash WHERE id='5000' LIMIT 1; ]])
+        return EQP([[ SELECT node FROM listhash WHERE id=5000 LIMIT 1; ]])
     end, {
         -- <tkt3442-1.3>
-        0, 0, 0, "SEARCH TABLE LISTHASH USING COVERING INDEX IDIDX (ID=?)"
+        0, 0, 0, "SCAN TABLE LISTHASH"
         -- </tkt3442-1.3>
     })
 
-
-
--- Some extra tests testing other permutations of 5000.
---
-test:do_test(
-    "tkt3442-1.4",
-    function()
-        return EQP(" SELECT node FROM listhash WHERE id=5000 LIMIT 1; ")
-    end, {
-        -- <tkt3442-1.4>
-        0, 0, 0, "SEARCH TABLE LISTHASH USING COVERING INDEX IDIDX (ID=?)"
-        -- </tkt3442-1.4>
-    })
-
-
-
 test:do_catchsql_test(
-    "tkt3442-1.5",
-    [=[
+    "tkt3442-1.4",
+    [[
         SELECT node FROM listhash WHERE id="5000" LIMIT 1;
-    ]=], {
+    ]], {
         -- <tkt3442-1.5>
         1, "no such column: 5000"
         -- </tkt3442-1.5>

@@ -61,8 +61,8 @@ test:do_test(
     "analyze5-1.0",
     function()
         -- Tarantool: waiting for #2130
-        -- test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t,u,v TEXT COLLATE nocase,w,x,y,z)")
-        test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t,u,v,w,x,y,z)")
+        -- test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t INT ,u INT ,v TEXT COLLATE nocase,w INT ,x INT ,y INT ,z INT )")
+        test:execsql("CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT, t TEXT ,u TEXT ,v TEXT ,w TEXT ,x TEXT ,y TEXT ,z FLOAT)")
         for i=0,999 do -- _ in X(0, "X!for", [=[["set i 0","$i < 1000","incr i"]]=]) do
             if  ((i >= 25) and (i <= 50)) then
                 y = 1
@@ -255,7 +255,7 @@ for i, v in pairs({
             w2 = v[1]:gsub('y', '+y'):gsub('z', '+z')
             a1 = test:execsql("SELECT id FROM t1 NOT INDEXED WHERE "..w2.." ORDER BY +id")
             a2 = test:execsql("SELECT id FROM t1 WHERE "..v[1].." ORDER BY +id")
-            if (test:is_deeply_regex(a1, a2))
+            if (test.is_deeply_regex(a1, a2))
             then
                 res = "ok"
             else

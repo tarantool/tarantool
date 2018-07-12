@@ -42,9 +42,9 @@ test:do_test(
             CREATE TABLE ElemAnd (
              CodeAnd INTEGER,
              Code INTEGER,
-             Attr1 INTEGER,
-             Attr2 INTEGER,
-             Attr3 INTEGER,
+             Attr1 TEXT,
+             Attr2 TEXT,
+             Attr3 TEXT,
              PRIMARY KEY(CodeAnd,Code)
             );
 

@@ -28,9 +28,9 @@ test:plan(14)
 test:do_execsql_test(
     "join6-1.1",
     [[
-        CREATE TABLE t1(a primary key);
-        CREATE TABLE t2(a primary key);
-        CREATE TABLE t3(a primary key,b);
+        CREATE TABLE t1(a INT primary key);
+        CREATE TABLE t2(a INT primary key);
+        CREATE TABLE t3(a INT primary key,b INT);
         INSERT INTO t1 VALUES(1);
         INSERT INTO t3 VALUES(1,2);
 
@@ -70,9 +70,9 @@ test:do_execsql_test(
         DROP TABLE t2;
         DROP TABLE t3;
 
-        CREATE TABLE t1(x primary key,y);
-        CREATE TABLE t2(y primary key,z);
-        CREATE TABLE t3(x primary key,z);
+        CREATE TABLE t1(x INT primary key,y INT);
+        CREATE TABLE t2(y INT primary key,z INT);
+        CREATE TABLE t3(x INT primary key,z INT);
 
         INSERT INTO t1 VALUES(1,2);
         INSERT INTO t1 VALUES(3,4);
@@ -107,15 +107,15 @@ test:do_execsql_test(
         DROP TABLE t2;
         DROP TABLE t3;
 
-        CREATE TABLE t1(a primary key,x,y);
+        CREATE TABLE t1(a INT primary key,x INT,y INT);
         INSERT INTO t1 VALUES(1,91,92);
         INSERT INTO t1 VALUES(2,93,94);
 
-        CREATE TABLE t2(b primary key,y,z);
+        CREATE TABLE t2(b INT primary key,y INT,z INT);
         INSERT INTO t2 VALUES(3,92,93);
         INSERT INTO t2 VALUES(4,94,95);
 
-        CREATE TABLE t3(c primary key,x,z);
+        CREATE TABLE t3(c INT primary key,x INT,z INT);
         INSERT INTO t3 VALUES(5,91,93);
         INSERT INTO t3 VALUES(6,99,95);
 
