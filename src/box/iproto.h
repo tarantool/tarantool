@@ -75,10 +75,7 @@ void
 iproto_init();
 
 void
-iproto_bind(const char *uri);
-
-void
-iproto_listen();
+iproto_listen(const char *uri);
 
 void
 iproto_set_msg_max(int iproto_msg_max);

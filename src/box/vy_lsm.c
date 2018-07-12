@@ -110,8 +110,8 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm)
 
 struct vy_lsm *
 vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
-	     struct vy_mem_env *mem_env, struct index_def *index_def,
-	     struct tuple_format *format, struct vy_lsm *pk)
+	   struct vy_mem_env *mem_env, struct index_def *index_def,
+	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -202,6 +202,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->in_compact.pos = UINT32_MAX;
 	lsm->space_id = index_def->space_id;
 	lsm->index_id = index_def->iid;
+	lsm->group_id = group_id;
 	lsm->opts = index_def->opts;
 	lsm->check_is_unique = lsm->opts.is_unique;
 	vy_lsm_read_set_new(&lsm->read_set);
@@ -331,7 +332,8 @@ vy_lsm_create(struct vy_lsm *lsm)
 
 	/* Write the new LSM tree record to vylog. */
 	vy_log_tx_begin();
-	vy_log_prepare_lsm(id, lsm->space_id, lsm->index_id, lsm->key_def);
+	vy_log_prepare_lsm(id, lsm->space_id, lsm->index_id,
+			   lsm->group_id, lsm->key_def);
 	vy_log_insert_range(id, range->id, NULL, NULL);
 	if (vy_log_tx_commit() < 0)
 		return -1;

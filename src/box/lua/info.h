@@ -49,8 +49,4 @@ luaT_info_handler_create(struct info_handler *h, struct lua_State *L);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#if defined(__cplusplus)
-} /* extern "C" */
-#endif /* defined(__cplusplus) */
-
 #endif /* INCLUDES_TARANTOOL_LUA_INFO_H */

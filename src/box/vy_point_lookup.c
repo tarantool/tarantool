@@ -95,44 +95,15 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 			 const struct vy_read_view **rv,
 			 struct tuple *key, struct vy_history *history)
 {
-	struct tree_mem_key tree_key;
-	tree_key.stmt = key;
-	tree_key.lsn = (*rv)->vlsn;
-	bool exact;
-	struct vy_mem_tree_iterator mem_itr =
-		vy_mem_tree_lower_bound(&mem->tree, &tree_key, &exact);
-	lsm->stat.memory.iterator.lookup++;
-	const struct tuple *stmt = NULL;
-	if (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
-		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_stmt_compare(stmt, key, mem->cmp_def) != 0)
-			stmt = NULL;
-	}
-
-	if (stmt == NULL)
-		return 0;
-
-	while (true) {
-		if (vy_history_append_stmt(history, (struct tuple *)stmt) != 0)
-			return -1;
-
-		vy_stmt_counter_acct_tuple(&lsm->stat.memory.iterator.get,
-					   stmt);
-
-		if (vy_history_is_terminal(history))
-			break;
-
-		if (!vy_mem_tree_iterator_next(&mem->tree, &mem_itr))
-			break;
-
-		const struct tuple *prev_stmt = stmt;
-		stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_stmt_lsn(stmt) >= vy_stmt_lsn(prev_stmt))
-			break;
-		if (vy_stmt_compare(stmt, key, mem->cmp_def) != 0)
-			break;
-	}
-	return 0;
+	struct vy_mem_iterator mem_itr;
+	vy_mem_iterator_open(&mem_itr, &lsm->stat.memory.iterator,
+			     mem, ITER_EQ, key, rv);
+	struct vy_history mem_history;
+	vy_history_create(&mem_history, &lsm->env->history_node_pool);
+	int rc = vy_mem_iterator_next(&mem_itr, &mem_history);
+	vy_history_splice(history, &mem_history);
+	vy_mem_iterator_close(&mem_itr);
+	return rc;
 
 }
 

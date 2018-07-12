@@ -595,11 +595,6 @@ vinyl_engine_check_space_def(struct space_def *def)
 			 def->name, "engine does not support temporary flag");
 		return -1;
 	}
-	if (def->opts.group_id != 0) {
-		diag_set(ClientError, ER_ALTER_SPACE, def->name,
-			 "engine does not support replication groups");
-		return -1;
-	}
 	return 0;
 }
 
@@ -724,7 +719,8 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 	}
 	struct vy_lsm *lsm = vy_lsm_new(&env->lsm_env, &env->cache_env,
 					&env->mem_env, index_def,
-					space->format, pk);
+					space->format, pk,
+					space_group_id(space));
 	if (lsm == NULL) {
 		free(index);
 		return NULL;
@@ -3161,6 +3157,10 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 
 	if (lsm_info->drop_lsn >= 0 || lsm_info->create_lsn < 0) {
 		/* Dropped or not yet built LSM tree. */
+		return 0;
+	}
+	if (lsm_info->group_id == GROUP_LOCAL) {
+		/* Replica local space. */
 		return 0;
 	}
 

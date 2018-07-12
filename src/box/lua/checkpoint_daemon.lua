@@ -79,6 +79,7 @@ local function daemon_fiber(self)
         if msg == 'shutdown' then
             break
         elseif msg == 'reload' then
+            offset = random % self.checkpoint_interval
             log.info("reloaded") -- continue
         elseif msg == nil and box.info.status == 'running' then
             local s, e = pcall(process, self)

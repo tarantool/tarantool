@@ -69,6 +69,9 @@ void
 recovery_delete(struct recovery *r);
 
 void
+recovery_end_vclock(struct recovery *r, struct vclock *end_vclock);
+
+void
 recovery_follow_local(struct recovery *r, struct xstream *stream,
 		      const char *name, ev_tstamp wal_dir_rescan_delay);
 

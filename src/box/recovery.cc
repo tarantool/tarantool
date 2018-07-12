@@ -116,6 +116,29 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 	return r;
 }
 
+void
+recovery_end_vclock(struct recovery *r, struct vclock *end_vclock)
+{
+	xdir_scan_xc(&r->wal_dir);
+
+	struct vclock *vclock = vclockset_last(&r->wal_dir.index);
+	if (vclock == NULL || vclock_compare(vclock, &r->vclock) < 0) {
+		/* No xlogs after last checkpoint. */
+		vclock_copy(end_vclock, &r->vclock);
+		return;
+	}
+
+	/* Scan the last xlog to find end vclock. */
+	vclock_copy(end_vclock, vclock);
+	struct xlog_cursor cursor;
+	if (xdir_open_cursor(&r->wal_dir, vclock_sum(vclock), &cursor) != 0)
+		return;
+	struct xrow_header row;
+	while (xlog_cursor_next(&cursor, &row, true) == 0)
+		vclock_follow(end_vclock, row.replica_id, row.lsn);
+	xlog_cursor_close(&cursor, false);
+}
+
 static inline void
 recovery_close_log(struct recovery *r)
 {
@@ -154,7 +177,7 @@ recovery_open_log(struct recovery *r, const struct vclock *vclock)
 	}
 
 	if (state != XLOG_CURSOR_NEW &&
-	    r->cursor.meta.has_prev_vclock &&
+	    vclock_is_set(&r->cursor.meta.prev_vclock) &&
 	    vclock_compare(&r->cursor.meta.prev_vclock, &meta.vclock) != 0) {
 		/*
 		 * WALs are missing between the last scanned WAL

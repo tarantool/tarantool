@@ -66,6 +66,20 @@ enum {
 	VCLOCK_STR_LEN_MAX = 1 + VCLOCK_MAX * (2 + 2 + 20 + 2) + 1
 };
 
+/** Predefined replication group identifiers. */
+enum {
+	/**
+	 * Default replication group: changes made to the space
+	 * are replicated throughout the entire cluster.
+	 */
+	GROUP_DEFAULT = 0,
+	/**
+	 * Replica local space: changes made to the space are
+	 * not replicated.
+	 */
+	GROUP_LOCAL = 1,
+};
+
 /** Cluster vector clock */
 struct vclock {
 	/** Map of used components in lsn array */
@@ -116,6 +130,27 @@ static inline void
 vclock_create(struct vclock *vclock)
 {
 	memset(vclock, 0, sizeof(*vclock));
+}
+
+/**
+ * Reset a vclock object. After this function is called,
+ * vclock_is_set() will return false.
+ */
+static inline void
+vclock_clear(struct vclock *vclock)
+{
+	memset(vclock, 0, sizeof(*vclock));
+	vclock->signature = -1;
+}
+
+/**
+ * Returns false if the vclock was cleared with vclock_clear(),
+ * true otherwise.
+ */
+static inline bool
+vclock_is_set(const struct vclock *vclock)
+{
+	return vclock->signature >= 0;
 }
 
 static inline int64_t

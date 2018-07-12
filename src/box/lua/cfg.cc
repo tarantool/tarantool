@@ -69,7 +69,6 @@ static int
 lbox_cfg_set_listen(struct lua_State *L)
 {
 	try {
-		box_bind();
 		box_listen();
 	} catch (Exception *) {
 		luaT_error(L);

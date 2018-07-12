@@ -246,9 +246,19 @@ struct xlog_meta {
 	 * directory for missing WALs.
 	 */
 	struct vclock prev_vclock;
-	/** Set if @prev_vclock is present. */
-	bool has_prev_vclock;
 };
+
+/**
+ * Initialize xlog meta struct.
+ *
+ * @vclock and @prev_vclock are optional: if the value is NULL,
+ * the key won't be written to the xlog header.
+ */
+void
+xlog_meta_create(struct xlog_meta *meta, const char *filetype,
+		 const struct tt_uuid *instance_uuid,
+		 const struct vclock *vclock,
+		 const struct vclock *prev_vclock);
 
 /* }}} */
 

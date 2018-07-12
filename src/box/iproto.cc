@@ -1975,7 +1975,6 @@ iproto_init()
 
 /** Available iproto configuration changes. */
 enum iproto_cfg_op {
-	IPROTO_CFG_BIND,
 	IPROTO_CFG_MSG_MAX,
 	IPROTO_CFG_LISTEN
 };
@@ -2013,12 +2012,6 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 	int old;
 	try {
 		switch (cfg_msg->op) {
-		case IPROTO_CFG_BIND:
-			if (evio_service_is_active(&binary))
-				evio_service_stop(&binary);
-			if (cfg_msg->uri != NULL)
-				evio_service_bind(&binary, cfg_msg->uri);
-			break;
 		case IPROTO_CFG_MSG_MAX:
 			cpipe_set_max_input(&tx_pipe,
 					    cfg_msg->iproto_msg_max / 2);
@@ -2029,7 +2022,11 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 			break;
 		case IPROTO_CFG_LISTEN:
 			if (evio_service_is_active(&binary))
+				evio_service_stop(&binary);
+			if (cfg_msg->uri != NULL) {
+				evio_service_bind(&binary, cfg_msg->uri);
 				evio_service_listen(&binary);
+			}
 			break;
 		default:
 			unreachable();
@@ -2049,19 +2046,11 @@ iproto_do_cfg(struct iproto_cfg_msg *msg)
 }
 
 void
-iproto_bind(const char *uri)
-{
-	struct iproto_cfg_msg cfg_msg;
-	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_BIND);
-	cfg_msg.uri = uri;
-	iproto_do_cfg(&cfg_msg);
-}
-
-void
-iproto_listen()
+iproto_listen(const char *uri)
 {
 	struct iproto_cfg_msg cfg_msg;
 	iproto_cfg_msg_create(&cfg_msg, IPROTO_CFG_LISTEN);
+	cfg_msg.uri = uri;
 	iproto_do_cfg(&cfg_msg);
 }
 
