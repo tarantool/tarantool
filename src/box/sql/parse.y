@@ -1405,14 +1405,14 @@ expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
   spanSet(&A,&X,&Y);  /*A-overwrites-X*/
   A.pExpr = sqlite3PExpr(pParse, TK_RAISE, 0, 0); 
   if( A.pExpr ){
-    A.pExpr->affinity = ON_CONFLICT_ACTION_IGNORE;
+    A.pExpr->on_conflict_action = ON_CONFLICT_ACTION_IGNORE;
   }
 }
 expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
   spanSet(&A,&X,&Y);  /*A-overwrites-X*/
   A.pExpr = sqlite3ExprAlloc(pParse->db, TK_RAISE, &Z, 1); 
   if( A.pExpr ) {
-    A.pExpr->affinity = (char)T;
+    A.pExpr->on_conflict_action = (enum on_conflict_action) T;
   }
 }
 

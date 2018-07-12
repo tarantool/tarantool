@@ -4267,35 +4267,25 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlite3VdbeResolveLabel(v, endLabel);
 			break;
 		}
-	case TK_RAISE:{
-			assert(pExpr->affinity == ON_CONFLICT_ACTION_ROLLBACK
-			       || pExpr->affinity == ON_CONFLICT_ACTION_ABORT
-			       || pExpr->affinity == ON_CONFLICT_ACTION_FAIL
-			       || pExpr->affinity == ON_CONFLICT_ACTION_IGNORE);
-			if (!pParse->pTriggerTab) {
-				sqlite3ErrorMsg(pParse,
-						"RAISE() may only be used within a trigger-program");
-				return 0;
-			}
-			if (pExpr->affinity == ON_CONFLICT_ACTION_ABORT) {
-				sqlite3MayAbort(pParse);
-			}
-			assert(!ExprHasProperty(pExpr, EP_IntValue));
-			if (pExpr->affinity == ON_CONFLICT_ACTION_IGNORE) {
-				sqlite3VdbeAddOp4(v, OP_Halt, SQLITE_OK,
-						  ON_CONFLICT_ACTION_IGNORE, 0,
-						  pExpr->u.zToken,
-						  0);
-				VdbeCoverage(v);
-			} else {
-				sqlite3HaltConstraint(pParse,
-						      SQLITE_CONSTRAINT_TRIGGER,
-						      pExpr->affinity,
-						      pExpr->u.zToken, 0, 0);
-			}
-
-			break;
+	case TK_RAISE:
+		if (pParse->pTriggerTab == NULL) {
+			sqlite3ErrorMsg(pParse, "RAISE() may only be used "
+					"within a trigger-program");
+			return 0;
 		}
+		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_ABORT)
+			sqlite3MayAbort(pParse);
+		assert(!ExprHasProperty(pExpr, EP_IntValue));
+		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_IGNORE) {
+			sqlite3VdbeAddOp4(v, OP_Halt, SQLITE_OK,
+					  ON_CONFLICT_ACTION_IGNORE, 0,
+					  pExpr->u.zToken, 0);
+		} else {
+			sqlite3HaltConstraint(pParse, SQLITE_CONSTRAINT_TRIGGER,
+					      pExpr->on_conflict_action,
+					      pExpr->u.zToken, 0, 0);
+		}
+		break;
 	}
 	sqlite3ReleaseTempReg(pParse, regFree1);
 	sqlite3ReleaseTempReg(pParse, regFree2);
