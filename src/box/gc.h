@@ -32,13 +32,12 @@
  */
 
 #include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct vclock;
 struct gc_consumer;
 
 /** Consumer type: WAL consumer, or SNAP */
@@ -79,7 +78,7 @@ gc_set_checkpoint_count(int checkpoint_count);
  * Register a consumer.
  *
  * This will stop garbage collection of objects newer than
- * @signature until the consumer is unregistered or advanced.
+ * @vclock until the consumer is unregistered or advanced.
  * @name is a human-readable name of the consumer, it will
  * be used for reporting the consumer to the user.
  * @type consumer type, reporting whether consumer only depends
@@ -89,7 +88,7 @@ gc_set_checkpoint_count(int checkpoint_count);
  * memory allocation failure.
  */
 struct gc_consumer *
-gc_consumer_register(const char *name, int64_t signature,
+gc_consumer_register(const char *name, const struct vclock *vclock,
 		     enum gc_consumer_type type);
 
 /**
@@ -100,19 +99,19 @@ void
 gc_consumer_unregister(struct gc_consumer *consumer);
 
 /**
- * Advance the vclock signature tracked by a consumer and
+ * Advance the vclock tracked by a consumer and
  * invoke garbage collection if needed.
  */
 void
-gc_consumer_advance(struct gc_consumer *consumer, int64_t signature);
+gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock);
 
 /** Return the name of a consumer. */
 const char *
 gc_consumer_name(const struct gc_consumer *consumer);
 
-/** Return the signature a consumer tracks. */
-int64_t
-gc_consumer_signature(const struct gc_consumer *consumer);
+/** Return the vclock a consumer tracks. */
+void
+gc_consumer_vclock(const struct gc_consumer *consumer, struct vclock *vclock);
 
 /**
  * Iterator over registered consumers. The iterator is valid

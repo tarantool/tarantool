@@ -59,8 +59,8 @@ struct gc_consumer {
 	gc_node_t node;
 	/** Human-readable name. */
 	char *name;
-	/** The vclock signature tracked by this consumer. */
-	int64_t signature;
+	/** The vclock tracked by this consumer. */
+	struct vclock vclock;
 	/** Consumer type, indicating that consumer only consumes
 	 * WAL files, or both - SNAP and WAL.
 	 */
@@ -73,10 +73,10 @@ typedef rb_tree(struct gc_consumer) gc_tree_t;
 struct gc_state {
 	/** Number of checkpoints to maintain. */
 	int checkpoint_count;
-	/** Max signature WAL garbage collection has been called for. */
-	int64_t wal_signature;
-	/** Max signature checkpoint garbage collection has been called for. */
-	int64_t checkpoint_signature;
+	/** Max vclock WAL garbage collection has been called for. */
+	struct vclock wal_vclock;
+	/** Max vclock checkpoint garbage collection has been called for. */
+	struct vclock checkpoint_vclock;
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
 	/**
@@ -94,9 +94,9 @@ static struct gc_state gc;
 static inline int
 gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 {
-	if (a->signature < b->signature)
+	if (vclock_sum(&a->vclock) < vclock_sum(&b->vclock))
 		return -1;
-	if (a->signature > b->signature)
+	if (vclock_sum(&a->vclock) > vclock_sum(&b->vclock))
 		return 1;
 	if ((intptr_t)a < (intptr_t)b)
 		return -1;
@@ -110,7 +110,7 @@ rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
 
 /** Allocate a consumer object. */
 static struct gc_consumer *
-gc_consumer_new(const char *name, int64_t signature,
+gc_consumer_new(const char *name, const struct vclock *vclock,
 		enum gc_consumer_type type)
 {
 	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
@@ -126,7 +126,7 @@ gc_consumer_new(const char *name, int64_t signature,
 		free(consumer);
 		return NULL;
 	}
-	consumer->signature = signature;
+	vclock_copy(&consumer->vclock, vclock);
 	consumer->type = type;
 	return consumer;
 }
@@ -143,8 +143,8 @@ gc_consumer_delete(struct gc_consumer *consumer)
 void
 gc_init(void)
 {
-	gc.wal_signature = -1;
-	gc.checkpoint_signature = -1;
+	vclock_create(&gc.wal_vclock);
+	vclock_create(&gc.checkpoint_vclock);
 	gc_tree_new(&gc.consumers);
 	latch_create(&gc.latch);
 }
@@ -191,7 +191,8 @@ gc_run(void)
 	 * We have to maintain @checkpoint_count oldest checkpoints,
 	 * plus we can't remove checkpoints that are still in use.
 	 */
-	int64_t gc_checkpoint_signature = -1;
+	struct vclock gc_checkpoint_vclock;
+	vclock_create(&gc_checkpoint_vclock);
 
 	struct checkpoint_iterator checkpoints;
 	checkpoint_iterator_init(&checkpoints);
@@ -201,18 +202,21 @@ gc_run(void)
 		if (--checkpoint_count > 0)
 			continue;
 		if (leftmost_checkpoint != NULL &&
-		    leftmost_checkpoint->signature < vclock_sum(vclock))
+		    vclock_sum(&leftmost_checkpoint->vclock) < vclock_sum(vclock))
 			continue;
-		gc_checkpoint_signature = vclock_sum(vclock);
+		vclock_copy(&gc_checkpoint_vclock, vclock);
 		break;
 	}
 
-	int64_t gc_wal_signature = MIN(gc_checkpoint_signature,
-				       leftmost != NULL ?
-				       leftmost->signature : INT64_MAX);
+	struct vclock gc_wal_vclock;
+	if (leftmost != NULL &&
+	    vclock_sum(&leftmost->vclock) < vclock_sum(&gc_checkpoint_vclock))
+		vclock_copy(&gc_wal_vclock, &leftmost->vclock);
+	else
+		vclock_copy(&gc_wal_vclock, &gc_checkpoint_vclock);
 
-	if (gc_wal_signature <= gc.wal_signature &&
-	    gc_checkpoint_signature <= gc.checkpoint_signature)
+	if (vclock_sum(&gc_wal_vclock) <= vclock_sum(&gc.wal_vclock) &&
+	    vclock_sum(&gc_checkpoint_vclock) <= vclock_sum(&gc.checkpoint_vclock))
 		return; /* nothing to do */
 
 	/*
@@ -231,14 +235,14 @@ gc_run(void)
 	 */
 	int rc = 0;
 
-	if (gc_checkpoint_signature > gc.checkpoint_signature) {
-		gc.checkpoint_signature = gc_checkpoint_signature;
-		rc = engine_collect_garbage(gc_checkpoint_signature);
+	if (vclock_sum(&gc_checkpoint_vclock) > vclock_sum(&gc.checkpoint_vclock)) {
+		vclock_copy(&gc.checkpoint_vclock, &gc_checkpoint_vclock);
+		rc = engine_collect_garbage(vclock_sum(&gc_checkpoint_vclock));
 	}
-	if (gc_wal_signature > gc.wal_signature) {
-		gc.wal_signature = gc_wal_signature;
+	if (vclock_sum(&gc_wal_vclock) > vclock_sum(&gc.wal_vclock)) {
+		vclock_copy(&gc.wal_vclock, &gc_wal_vclock);
 		if (rc == 0)
-			wal_collect_garbage(gc_wal_signature);
+			wal_collect_garbage(vclock_sum(&gc_wal_vclock));
 	}
 
 	latch_unlock(&gc.latch);
@@ -251,11 +255,10 @@ gc_set_checkpoint_count(int checkpoint_count)
 }
 
 struct gc_consumer *
-gc_consumer_register(const char *name, int64_t signature,
+gc_consumer_register(const char *name, const struct vclock *vclock,
 		     enum gc_consumer_type type)
 {
-	struct gc_consumer *consumer = gc_consumer_new(name, signature,
-						       type);
+	struct gc_consumer *consumer = gc_consumer_new(name, vclock, type);
 	if (consumer != NULL)
 		gc_tree_insert(&gc.consumers, consumer);
 	return consumer;
@@ -264,7 +267,7 @@ gc_consumer_register(const char *name, int64_t signature,
 void
 gc_consumer_unregister(struct gc_consumer *consumer)
 {
-	int64_t signature = consumer->signature;
+	int64_t signature = vclock_sum(&consumer->vclock);
 
 	gc_tree_remove(&gc.consumers, consumer);
 	gc_consumer_delete(consumer);
@@ -274,14 +277,15 @@ gc_consumer_unregister(struct gc_consumer *consumer)
 	 * if it referenced the oldest vclock.
 	 */
 	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
-	if (leftmost == NULL || leftmost->signature > signature)
+	if (leftmost == NULL || vclock_sum(&leftmost->vclock) > signature)
 		gc_run();
 }
 
 void
-gc_consumer_advance(struct gc_consumer *consumer, int64_t signature)
+gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 {
-	int64_t prev_signature = consumer->signature;
+	int64_t signature = vclock_sum(vclock);
+	int64_t prev_signature = vclock_sum(&consumer->vclock);
 
 	assert(signature >= prev_signature);
 	if (signature == prev_signature)
@@ -292,12 +296,13 @@ gc_consumer_advance(struct gc_consumer *consumer, int64_t signature)
 	 * is violated.
 	 */
 	struct gc_consumer *next = gc_tree_next(&gc.consumers, consumer);
-	bool update_tree = (next != NULL && signature >= next->signature);
+	bool update_tree = (next != NULL &&
+			    signature >= vclock_sum(&next->vclock));
 
 	if (update_tree)
 		gc_tree_remove(&gc.consumers, consumer);
 
-	consumer->signature = signature;
+	vclock_copy(&consumer->vclock, vclock);
 
 	if (update_tree)
 		gc_tree_insert(&gc.consumers, consumer);
@@ -307,7 +312,7 @@ gc_consumer_advance(struct gc_consumer *consumer, int64_t signature)
 	 * if it referenced the oldest vclock.
 	 */
 	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
-	if (leftmost == NULL || leftmost->signature > prev_signature)
+	if (leftmost == NULL || vclock_sum(&leftmost->vclock) > prev_signature)
 		gc_run();
 }
 
@@ -317,10 +322,10 @@ gc_consumer_name(const struct gc_consumer *consumer)
 	return consumer->name;
 }
 
-int64_t
-gc_consumer_signature(const struct gc_consumer *consumer)
+void
+gc_consumer_vclock(const struct gc_consumer *consumer, struct vclock *vclock)
 {
-	return consumer->signature;
+	vclock_copy(vclock, &consumer->vclock);
 }
 
 struct gc_consumer *
