@@ -400,6 +400,11 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 	wal_writer_create(writer, wal_mode, wal_dirname, instance_uuid,
 			  vclock, wal_max_rows, wal_max_size);
 
+	/*
+	 * Scan the WAL directory to build an index of all
+	 * existing WAL files. Required for garbage collection,
+	 * see wal_collect_garbage().
+	 */
 	if (xdir_scan(&writer->wal_dir))
 		return -1;
 
@@ -589,6 +594,10 @@ wal_opt_rotate(struct wal_writer *writer)
 		free(vclock);
 		return -1;
 	}
+	/*
+	 * Keep track of the new WAL vclock. Required for garbage
+	 * collection, see wal_collect_garbage().
+	 */
 	xdir_add_vclock(&writer->wal_dir, vclock);
 
 	wal_notify_watchers(writer, WAL_EVENT_ROTATE);

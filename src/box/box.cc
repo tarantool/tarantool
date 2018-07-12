@@ -1819,7 +1819,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 * so we must reflect this in replicaset vclock to
 	 * not attempt to apply these rows twice.
 	 */
-	recovery_end_vclock(recovery, &replicaset.vclock);
+	recovery_scan(recovery, &replicaset.vclock);
 
 	if (wal_dir_lock >= 0) {
 		box_listen();
@@ -1855,7 +1855,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
 
 	engine_begin_final_recovery_xc();
-	recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
+	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
 	/*
 	 * Leave hot standby mode, if any, only after
 	 * acquiring the lock.
