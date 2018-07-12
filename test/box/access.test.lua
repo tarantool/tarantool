@@ -538,14 +538,10 @@ box.session.su("admin")
 -- tables from ddl
 --
 box.schema.user.grant('tester', 'write', 'universe')
--- no entity user currently, so have to grant create
--- on universe in order to create a user.
-box.schema.user.grant('tester', 'create', 'universe')
--- this should work instead:
---box.schema.user.grant('tester', 'create', 'user')
---box.schema.user.grant('tester', 'create', 'space')
---box.schema.user.grant('tester', 'create', 'function')
---box.schema.user.grant('tester', 'create' , 'sequence')
+box.schema.user.grant('tester', 'create', 'user')
+box.schema.user.grant('tester', 'create', 'space')
+box.schema.user.grant('tester', 'create', 'function')
+box.schema.user.grant('tester', 'create' , 'sequence')
 box.schema.user.grant('tester', 'read', 'space', '_sequence')
 box.session.su("tester")
 -- successful create

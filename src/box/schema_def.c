@@ -49,6 +49,10 @@ schema_entity_type(enum schema_object_type type)
 		return SC_ENTITY_SPACE;
 	case SC_FUNCTION:
 		return SC_ENTITY_FUNCTION;
+	case SC_USER:
+		return SC_ENTITY_USER;
+	case SC_ROLE:
+		return SC_ENTITY_ROLE;
 	case SC_SEQUENCE:
 		return SC_ENTITY_SEQUENCE;
 	case SC_COLLATION:

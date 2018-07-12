@@ -1739,6 +1739,8 @@ local priv_object_combo = {
                            box.priv.C, box.priv.D),
     ["role"]     = bit.bor(box.priv.X, box.priv.U,
                            box.priv.C, box.priv.D),
+    ["user"]     = bit.bor(box.priv.C, box.priv.A,
+                           box.priv.D),
 }
 
 --
@@ -1845,18 +1847,23 @@ local function object_resolve(object_type, object_name)
         end
         return seq
     end
-    if object_type == 'role' then
-        local _vuser = box.space[box.schema.VUSER_ID]
-        local role
-        if type(object_name) == 'string' then
-            role = _vuser.index.name:get{object_name}
-        else
-            role = _vuser:get{object_name}
+    if object_type == 'role' or object_type == 'user' then
+        if object_name == '' then
+            return ''
         end
-        if role and role[4] == 'role' then
-            return role[1]
+        local _vuser = box.space[box.schema.VUSER_ID]
+        local role_or_user
+        if type(object_name) == 'string' then
+            role_or_user = _vuser.index.name:get{object_name}
         else
+            role_or_user = _vuser:get{object_name}
+        end
+        if role_or_user and role_or_user[4] == object_type then
+            return role_or_user[1]
+        elseif object_type == 'role' then
             box.error(box.error.NO_SUCH_ROLE, object_name)
+        else
+            box.error(box.error.NO_SUCH_USER, object_name)
         end
     end
 
@@ -2111,7 +2118,8 @@ local function grant(uid, name, privilege, object_type,
     if privilege_hex ~= old_privilege then
         _priv:replace{options.grantor, uid, object_type, oid, privilege_hex}
     elseif not options.if_not_exists then
-            if object_type == 'role' then
+            if object_type == 'role' and object_name ~= '' and
+               privilege == 'execute' then
                 box.error(box.error.ROLE_GRANTED, name, object_name)
             else
                 box.error(box.error.PRIV_GRANTED, name, privilege,
@@ -2145,7 +2153,8 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
         if options.if_exists then
             return
         end
-        if object_type == 'role' then
+        if object_type == 'role' and object_name ~= '' and
+           privilege == 'execute' then
             box.error(box.error.ROLE_NOT_GRANTED, name, object_name)
         else
             box.error(box.error.PRIV_NOT_GRANTED, name, privilege,

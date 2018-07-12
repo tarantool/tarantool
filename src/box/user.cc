@@ -217,6 +217,16 @@ access_find(struct priv_def *priv)
 		access = entity_access.function;
 		break;
 	}
+	case SC_ENTITY_USER:
+	{
+		access = entity_access.user;
+		break;
+	}
+	case SC_ENTITY_ROLE:
+	{
+		access = entity_access.role;
+		break;
+	}
 	case SC_ENTITY_SEQUENCE:
 	{
 		access = entity_access.sequence;
@@ -234,6 +244,16 @@ access_find(struct priv_def *priv)
 		struct func *func = func_by_id(priv->object_id);
 		if (func)
 			access = func->access;
+		break;
+	}
+	case SC_USER:
+	{
+		/* No grants on a single object user yet. */
+		break;
+	}
+	case SC_ROLE:
+	{
+		/* No grants on a single object role yet. */
 		break;
 	}
 	case SC_SEQUENCE:
@@ -318,7 +338,7 @@ user_reload_privs(struct user *user)
 			 * Skip role grants, we're only
 			 * interested in real objects.
 			 */
-			if (priv.object_type != SC_ROLE)
+			if (priv.object_type != SC_ROLE || !(priv.access & PRIV_X))
 				user_grant_priv(user, &priv);
 		}
 	}

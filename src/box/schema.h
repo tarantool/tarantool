@@ -240,6 +240,8 @@ struct on_access_denied_ctx {
 struct entity_access {
        struct access space[BOX_USER_MAX];
        struct access function[BOX_USER_MAX];
+       struct access user[BOX_USER_MAX];
+       struct access role[BOX_USER_MAX];
        struct access sequence[BOX_USER_MAX];
 };
 
@@ -257,6 +259,12 @@ entity_access_get(enum schema_object_type type)
 	case SC_FUNCTION:
 	case SC_ENTITY_FUNCTION:
 		return entity_access.function;
+	case SC_USER:
+	case SC_ENTITY_USER:
+		return entity_access.user;
+	case SC_ROLE:
+	case SC_ENTITY_ROLE:
+		return entity_access.role;
 	case SC_SEQUENCE:
 	case SC_ENTITY_SEQUENCE:
 		return entity_access.sequence;

@@ -361,7 +361,7 @@ testuser_uid = session.uid()
 ...
 _ = box.space._user:delete(2)
 ---
-- error: Drop access to user 'public' is denied for user 'testuser'
+- error: Drop access to role 'public' is denied for user 'testuser'
 ...
 box.space._user:select(1)
 ---
