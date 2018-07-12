@@ -272,8 +272,13 @@ ccons ::= DEFAULT id(X).              {
 // In addition to the type name, we also care about the primary key and
 // UNIQUE constraints.
 //
-ccons ::= NULL onconf.
-ccons ::= NOT NULL onconf(R).    {sqlite3AddNotNull(pParse, R);}
+ccons ::= NULL onconf(R).        {
+    sql_column_add_nullable_action(pParse, ON_CONFLICT_ACTION_NONE);
+    /* Trigger nullability mismatch error if required. */
+    if (R != ON_CONFLICT_ACTION_DEFAULT)
+        sql_column_add_nullable_action(pParse, R);
+}
+ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
 ccons ::= PRIMARY KEY sortorder(Z) onconf(R) autoinc(I).
                                  {sqlite3AddPrimaryKey(pParse,0,R,I,Z);}
 ccons ::= UNIQUE onconf(R).      {sql_create_index(pParse,0,0,0,R,0,0,

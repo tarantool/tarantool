@@ -38,3 +38,11 @@ box.sql.execute('DROP TABLE p')
 box.sql.execute('DROP TABLE e')
 box.sql.execute('DROP TABLE t1')
 box.sql.execute('DROP TABLE t2')
+
+--
+-- gh-3473: Primary key can't be declared with NULL.
+--
+box.sql.execute('CREATE TABLE te17 (s1 INT NULL PRIMARY KEY NOT NULL);')
+box.sql.execute('CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);')
+box.sql.execute("CREATE TABLE test (a int PRIMARY KEY, b int NULL ON CONFLICT IGNORE);")
+box.sql.execute("CREATE TABLE test (a int, b int NULL, c int, PRIMARY KEY(a, b, c))")

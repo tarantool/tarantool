@@ -3516,7 +3516,22 @@ Table *sqlite3ResultSetOfSelect(Parse *, Select *);
 Index *sqlite3PrimaryKeyIndex(Table *);
 void sqlite3StartTable(Parse *, Token *, int);
 void sqlite3AddColumn(Parse *, Token *, Token *);
-void sqlite3AddNotNull(Parse *, int);
+
+/**
+ * This routine is called by the parser while in the middle of
+ * parsing a CREATE TABLE statement.  A "NOT NULL" constraint has
+ * been seen on a column.  This routine sets the is_nullable flag
+ * on the column currently under construction.
+ * If nullable_action has been already set, this function raises
+ * an error.
+ *
+ * @param parser SQL Parser object.
+ * @param nullable_action on_conflict_action value.
+ */
+void
+sql_column_add_nullable_action(struct Parse *parser,
+			       enum on_conflict_action nullable_action);
+
 void sqlite3AddPrimaryKey(Parse *, ExprList *, int, int, enum sort_order);
 
 /**

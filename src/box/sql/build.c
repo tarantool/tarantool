@@ -653,7 +653,12 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	struct field_def *column_def = &p->def->fields[p->def->field_count];
 	memcpy(column_def, &field_def_default, sizeof(field_def_default));
 	column_def->name = z;
-	column_def->nullable_action = ON_CONFLICT_ACTION_NONE;
+	/*
+	 * Marker on_conflict_action_MAX is used to detect
+	 * attempts to define NULL multiple time or to detect
+	 * invalid primary key definition.
+	 */
+	column_def->nullable_action = on_conflict_action_MAX;
 	column_def->is_nullable = true;
 
 	if (pType->n == 0) {
@@ -688,22 +693,30 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	pParse->constraintName.n = 0;
 }
 
-/*
- * This routine is called by the parser while in the middle of
- * parsing a CREATE TABLE statement.  A "NOT NULL" constraint has
- * been seen on a column.  This routine sets the notNull flag on
- * the column currently under construction.
- */
 void
-sqlite3AddNotNull(Parse * pParse, int onError)
+sql_column_add_nullable_action(struct Parse *parser,
+			       enum on_conflict_action nullable_action)
 {
-	Table *p;
-	p = pParse->pNewTable;
-	if (p == 0 || NEVER(p->def->field_count < 1))
+	struct Table *p = parser->pNewTable;
+	if (p == NULL || NEVER(p->def->field_count < 1))
 		return;
-	p->def->fields[p->def->field_count - 1].nullable_action = (u8)onError;
-	p->def->fields[p->def->field_count - 1].is_nullable =
-		action_is_nullable(onError);
+	struct field_def *field = &p->def->fields[p->def->field_count - 1];
+	if (field->nullable_action != on_conflict_action_MAX &&
+	    nullable_action != ON_CONFLICT_ACTION_DEFAULT) {
+		/* Prevent defining nullable_action many times. */
+		const char *err_msg =
+			tt_sprintf("NULL declaration for column '%s' of table "
+				   "'%s' has been already set to '%s'",
+				   field->name, p->def->name,
+				   on_conflict_action_strs[field->
+							   nullable_action]);
+		diag_set(ClientError, ER_SQL, err_msg);
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
+		return;
+	}
+	field->nullable_action = nullable_action;
+	field->is_nullable = action_is_nullable(nullable_action);
 }
 
 /*
@@ -849,6 +862,23 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 	sql_expr_delete(db, pSpan->pExpr, false);
 }
 
+static int
+field_def_create_for_pk(struct Parse *parser, struct field_def *field,
+			const char *space_name)
+{
+	if (field->nullable_action != ON_CONFLICT_ACTION_ABORT &&
+	    field->nullable_action != ON_CONFLICT_ACTION_DEFAULT &&
+	    field->nullable_action != on_conflict_action_MAX) {
+		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name);
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
+		return -1;
+	} else if (field->nullable_action == on_conflict_action_MAX) {
+		field->nullable_action = ON_CONFLICT_ACTION_ABORT;
+		field->is_nullable = false;
+	}
+	return 0;
+}
 
 /*
  * Designate the PRIMARY KEY for the table.  pList is a list of names
@@ -944,12 +974,11 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 		pList = 0;
 	}
 
- 	/* Mark every PRIMARY KEY column as NOT NULL. */
+	/* Mark every PRIMARY KEY column as NOT NULL. */
 	for (uint32_t i = 0; i < pTab->def->field_count; i++) {
 		if (pTab->aCol[i].is_primkey) {
-			pTab->def->fields[i].nullable_action
-				= ON_CONFLICT_ACTION_ABORT;
-			pTab->def->fields[i].is_nullable = false;
+			field_def_create_for_pk(pParse, &pTab->def->fields[i],
+						pTab->def->name);
 		}
 	}
 primary_key_exit:
@@ -1608,6 +1637,15 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 					"PRIMARY KEY missing on table %s",
 					p->def->name);
 			return;
+		}
+	}
+
+	/* Set default on_nullable action if required. */
+	struct field_def *field = p->def->fields;
+	for (uint32_t i = 0; i < p->def->field_count; ++i, ++field) {
+		if (field->nullable_action == on_conflict_action_MAX) {
+			field->nullable_action = ON_CONFLICT_ACTION_NONE;
+			field->is_nullable = true;
 		}
 	}
 
