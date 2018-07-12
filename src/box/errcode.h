@@ -221,6 +221,8 @@ struct errcode_record {
 	/*166 */_(ER_NO_SUCH_COLLATION,		"Collation '%s' does not exist") \
 	/*167 */_(ER_CREATE_FK_CONSTRAINT,	"Failed to create foreign key constraint '%s': %s") \
 	/*168 */_(ER_DROP_FK_CONSTRAINT,	"Failed to drop foreign key constraint '%s': %s") \
+	/*169 */_(ER_NO_SUCH_CONSTRAINT,	"Constraint %s does not exist") \
+	/*170 */_(ER_CONSTRAINT_EXISTS,		"Constraint %s already exists") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

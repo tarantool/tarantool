@@ -1580,6 +1580,20 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 		sqlite3VdbeAddOp2(vdbe, OP_Integer, fk->parent_id,
 				  constr_tuple_reg + 2);
 	}
+	/*
+	 * Lets check that constraint with this name hasn't
+	 * been created before.
+	 */
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(ER_CONSTRAINT_EXISTS), name_copy);
+	if (vdbe_emit_halt_with_presence_test(parse_context,
+					      BOX_FK_CONSTRAINT_ID, 0,
+					      constr_tuple_reg, 2,
+					      ER_CONSTRAINT_EXISTS, error_msg,
+					      false, OP_NoConflict) != 0) {
+		sqlite3DbFree(parse_context->db, name_copy);
+		return;
+	}
 	sqlite3VdbeAddOp2(vdbe, OP_Bool, 0, constr_tuple_reg + 3);
 	sqlite3VdbeChangeP4(vdbe, -1, (char*)&fk->is_deferred, P4_BOOL);
 	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 4, 0,
@@ -2028,7 +2042,7 @@ sql_clear_stat_spaces(struct Parse *parse, const char *table_name,
  * @param child_id Id of table which constraint belongs to.
  */
 static void
-vdbe_emit_fkey_drop(struct Parse *parse_context, const char *constraint_name,
+vdbe_emit_fkey_drop(struct Parse *parse_context, char *constraint_name,
 		    uint32_t child_id)
 {
 	struct Vdbe *vdbe = sqlite3GetVdbe(parse_context);
@@ -2037,6 +2051,17 @@ vdbe_emit_fkey_drop(struct Parse *parse_context, const char *constraint_name,
 	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, key_reg, 0, constraint_name,
 			  P4_DYNAMIC);
 	sqlite3VdbeAddOp2(vdbe, OP_Integer, child_id,  key_reg + 1);
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT),
+			   constraint_name);
+	if (vdbe_emit_halt_with_presence_test(parse_context,
+					      BOX_FK_CONSTRAINT_ID, 0,
+					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
+					      error_msg, false,
+					      OP_Found) != 0) {
+		sqlite3DbFree(parse_context->db, constraint_name);
+		return;
+	}
 	sqlite3VdbeAddOp3(vdbe, OP_MakeRecord, key_reg, 2, key_reg + 2);
 	sqlite3VdbeAddOp2(vdbe, OP_SDelete, BOX_FK_CONSTRAINT_ID, key_reg + 2);
 	sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
@@ -2102,8 +2127,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	/* Delete all child FK constraints. */
 	struct fkey *child_fk;
 	rlist_foreach_entry (child_fk, &space->child_fkey, child_link) {
-		const char *fk_name_dup = sqlite3DbStrDup(v->db,
-							  child_fk->def->name);
+		char *fk_name_dup = sqlite3DbStrDup(v->db, child_fk->def->name);
 		if (fk_name_dup == NULL)
 			return;
 		vdbe_emit_fkey_drop(parse_context, fk_name_dup, space_id);
@@ -2503,8 +2527,8 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 		parse_context->nErr++;
 		return;
 	}
-	const char *constraint_name = sqlite3NameFromToken(parse_context->db,
-							   constraint);
+	char *constraint_name = sqlite3NameFromToken(parse_context->db,
+						     constraint);
 	if (constraint_name != NULL)
 		vdbe_emit_fkey_drop(parse_context, constraint_name, child_id);
 }
@@ -4004,7 +4028,7 @@ sqlite3WithDelete(sqlite3 * db, With * pWith)
 
 int
 vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
-				  int index_id, const char *name_src,
+				  int index_id, int key_reg, uint32_t key_len,
 				  int tarantool_error_code,
 				  const char *error_src, bool no_error,
 				  int cond_opcode)
@@ -4014,22 +4038,16 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 	assert(v != NULL);
 
 	struct sqlite3 *db = parser->db;
-	char *name = sqlite3DbStrDup(db, name_src);
-	if (name == NULL)
-		return -1;
 	char *error = sqlite3DbStrDup(db, error_src);
-	if (error == NULL) {
-		sqlite3DbFree(db, name);
+	if (error == NULL)
 		return -1;
-	}
 
 	int cursor = parser->nTab++;
 	vdbe_emit_open_cursor(parser, cursor, index_id, space_by_id(space_id));
-
-	int name_reg = ++parser->nMem;
-	int label = sqlite3VdbeAddOp4(v, OP_String8, 0, name_reg, 0, name,
-				      P4_DYNAMIC);
-	sqlite3VdbeAddOp4Int(v, cond_opcode, cursor, label + 3, name_reg, 1);
+	sqlite3VdbeChangeP5(v, OPFLAG_SYSTEMSP);
+	int label = sqlite3VdbeCurrentAddr(v);
+	sqlite3VdbeAddOp4Int(v, cond_opcode, cursor, label + 3, key_reg,
+			     key_len);
 	if (no_error) {
 		sqlite3VdbeAddOp0(v, OP_Halt);
 	} else {

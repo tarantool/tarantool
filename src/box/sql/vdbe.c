@@ -3092,7 +3092,8 @@ case OP_OpenRead:
 case OP_OpenWrite:
 
 	assert(pOp->opcode==OP_OpenWrite || pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
-	if (box_schema_version() != p->schema_ver) {
+	if (box_schema_version() != p->schema_ver &&
+	    (pOp->p5 & OPFLAG_SYSTEMSP) == 0) {
 		p->expired = 1;
 		rc = SQLITE_ERROR;
 		sqlite3VdbeError(p, "schema version has changed: " \

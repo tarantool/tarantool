@@ -493,6 +493,8 @@ t;
   166: box.error.NO_SUCH_COLLATION
   167: box.error.CREATE_FK_CONSTRAINT
   168: box.error.DROP_FK_CONSTRAINT
+  169: box.error.NO_SUCH_CONSTRAINT
+  170: box.error.CONSTRAINT_EXISTS
 ...
 test_run:cmd("setopt delimiter ''");
 ---
