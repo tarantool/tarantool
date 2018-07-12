@@ -113,8 +113,17 @@ int
 func_call(struct func *func, box_function_ctx_t *ctx, const char *args,
 	  const char *args_end);
 
+/**
+ * Reload dynamically loadable module.
+ *
+ * @param package name begin pointer.
+ * @param package_end package_end name end pointer.
+ * @param[out] module a pointer to store module object on success.
+ * @retval -1 on error.
+ * @retval 0 on success.
+ */
 int
-func_reload(struct func *func);
+module_reload(const char *package, const char *package_end, struct module **module);
 
 #if defined(__cplusplus)
 } /* extern "C" */

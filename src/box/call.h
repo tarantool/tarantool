@@ -42,8 +42,15 @@ struct box_function_ctx {
 	struct port *port;
 };
 
+/**
+ * Reload loadable module by name.
+ *
+ * @param name of the module to reload.
+ * @retval -1 on error.
+ * @retval 0 on success.
+ */
 int
-box_func_reload(const char *name);
+box_module_reload(const char *name);
 
 int
 box_process_call(struct call_request *request, struct port *port);

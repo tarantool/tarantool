@@ -1953,7 +1953,7 @@ function box.schema.func.exists(name_or_id)
     return tuple ~= nil
 end
 
-box.schema.func.reload = internal.func_reload
+box.schema.func.reload = internal.module_reload
 
 box.internal.collation = {}
 box.internal.collation.create = function(name, coll_type, locale, opts)

@@ -458,10 +458,10 @@ box_lua_eval(struct call_request *request, struct port *port)
 }
 
 static int
-lbox_func_reload(lua_State *L)
+lbox_module_reload(lua_State *L)
 {
 	const char *name = luaL_checkstring(L, 1);
-	if (box_func_reload(name) != 0)
+	if (box_module_reload(name) != 0)
 		return luaT_error(L);
 	return 0;
 }
@@ -469,7 +469,7 @@ lbox_func_reload(lua_State *L)
 static const struct luaL_Reg boxlib_internal[] = {
 	{"call_loadproc",  lbox_call_loadproc},
 	{"sql_create_function",  lbox_sql_create_function},
-	{"func_reload", lbox_func_reload},
+	{"module_reload", lbox_module_reload},
 	{NULL, NULL}
 };
 

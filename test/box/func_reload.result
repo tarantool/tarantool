@@ -51,8 +51,9 @@ fio.symlink(reload1_path, reload_path)
 - true
 ...
 --check not fail on non-load func
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 ---
+- error: Module 'reload' does not exist
 ...
 -- test of usual case reload. No hanging calls
 box.space.test:insert{0}
@@ -74,7 +75,7 @@ fio.symlink(reload2_path, reload_path)
 ---
 - true
 ...
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 ---
 ...
 c:call("reload.foo")
@@ -98,7 +99,7 @@ fio.symlink(reload1_path, reload_path)
 ---
 - true
 ...
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 ---
 ...
 fibers = 10
@@ -111,7 +112,7 @@ while box.space.test:count() < fibers do fiber.sleep(0.001) end
 ---
 ...
 -- double reload doesn't fail waiting functions
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 ---
 ...
 _ = fio.unlink(reload_path)
@@ -121,7 +122,7 @@ fio.symlink(reload2_path, reload_path)
 ---
 - true
 ...
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 ---
 ...
 c:call("reload.foo")
@@ -208,7 +209,7 @@ _ = fiber.create(function() ch:put(c:call("reload.test_reload")) end)
 while s:get({1}) == nil do fiber.yield(0.0001) end
 ---
 ...
-box.schema.func.reload("reload.test_reload")
+box.schema.func.reload("reload")
 ---
 ...
 _ = fiber.create(function() ch:put(c:call("reload.test_reload")) end)
@@ -242,14 +243,6 @@ fio.symlink(reload1_path, reload_path)
 ---
 - true
 ...
-s, e = pcall(box.schema.func.reload, "reload.test_reload")
----
-...
-s, string.find(tostring(e), 'test_reload_fail') ~= nil
----
-- false
-- true
-...
 c:call("reload.test_reload")
 ---
 - [[2]]
@@ -273,5 +266,5 @@ box.schema.func.reload()
 ...
 box.schema.func.reload("non-existing")
 ---
-- error: Function 'non-existing' does not exist
+- error: Module 'non-existing' does not exist
 ...

@@ -298,9 +298,6 @@ module_sym(struct module *module, const char *name)
 	return f;
 }
 
-/*
- * Reload a dso.
- */
 int
 module_reload(const char *package, const char *package_end, struct module **module)
 {
@@ -432,19 +429,6 @@ func_load(struct func *func)
 		return -1;
 	func->module = module;
 	rlist_add(&module->funcs, &func->item);
-	return 0;
-}
-
-int
-func_reload(struct func *func)
-{
-	struct func_name name;
-	func_split_name(func->def->name, &name);
-	struct module *module = NULL;
-	if (module_reload(name.package, name.package_end, &module) != 0) {
-		diag_log();
-		return -1;
-	}
 	return 0;
 }
 

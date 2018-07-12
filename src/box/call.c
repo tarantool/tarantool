@@ -132,20 +132,23 @@ box_c_call(struct func *func, struct call_request *request, struct port *port)
 }
 
 int
-box_func_reload(const char *name)
+box_module_reload(const char *name)
 {
-	size_t name_len = strlen(name);
-	struct func *func = NULL;
-	if ((access_check_func(name, name_len, &func)) != 0)
-		return -1;
-	if (func == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_FUNCTION, name);
+	struct credentials *credentials = effective_user();
+	if ((credentials->universal_access & (PRIV_X | PRIV_U)) !=
+	    (PRIV_X | PRIV_U)) {
+		struct user *user = user_find(credentials->uid);
+		if (user != NULL)
+			diag_set(AccessDeniedError, priv_name(PRIV_U),
+				 schema_object_name(SC_UNIVERSE), "",
+				 user->def->name);
 		return -1;
 	}
-	if (func->def->language != FUNC_LANGUAGE_C || func->func == NULL)
-		return 0; /* Nothing to do */
-	if (func_reload(func) == 0)
+	struct module *module = NULL;
+	if (module_reload(name, name + strlen(name), &module) == 0 &&
+	    module != NULL)
 		return 0;
+	diag_set(ClientError, ER_NO_SUCH_MODULE, name);
 	return -1;
 }
 

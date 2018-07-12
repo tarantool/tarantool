@@ -20,7 +20,7 @@ _ = fio.unlink(reload_path)
 fio.symlink(reload1_path, reload_path)
 
 --check not fail on non-load func
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 
 -- test of usual case reload. No hanging calls
 box.space.test:insert{0}
@@ -29,7 +29,7 @@ box.space.test:delete{0}
 _ = fio.unlink(reload_path)
 fio.symlink(reload2_path, reload_path)
 
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 c:call("reload.foo")
 box.space.test:select{}
 box.space.test:truncate()
@@ -37,18 +37,18 @@ box.space.test:truncate()
 -- test case with hanging calls
 _ = fio.unlink(reload_path)
 fio.symlink(reload1_path, reload_path)
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 
 fibers = 10
 for i = 1, fibers do fiber.create(function() c:call("reload.foo", {i}) end) end
 
 while box.space.test:count() < fibers do fiber.sleep(0.001) end
 -- double reload doesn't fail waiting functions
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 
 _ = fio.unlink(reload_path)
 fio.symlink(reload2_path, reload_path)
-box.schema.func.reload("reload.foo")
+box.schema.func.reload("reload")
 c:call("reload.foo")
 
 while box.space.test:count() < 2 * fibers + 1 do fiber.sleep(0.001) end
@@ -71,7 +71,7 @@ _ = fio.unlink(reload_path)
 fio.symlink(reload2_path, reload_path)
 _ = fiber.create(function() ch:put(c:call("reload.test_reload")) end)
 while s:get({1}) == nil do fiber.yield(0.0001) end
-box.schema.func.reload("reload.test_reload")
+box.schema.func.reload("reload")
 _ = fiber.create(function() ch:put(c:call("reload.test_reload")) end)
 ch:get()
 ch:get()
@@ -82,8 +82,6 @@ box.schema.user.grant('guest', 'execute', 'function', 'reload.test_reload_fail')
 c:call("reload.test_reload_fail")
 _ = fio.unlink(reload_path)
 fio.symlink(reload1_path, reload_path)
-s, e = pcall(box.schema.func.reload, "reload.test_reload")
-s, string.find(tostring(e), 'test_reload_fail') ~= nil
 c:call("reload.test_reload")
 c:call("reload.test_reload_fail")
 

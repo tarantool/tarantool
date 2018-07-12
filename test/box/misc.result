@@ -489,6 +489,7 @@ t;
   162: box.error.FOREIGN_KEY_CONSTRAINT
   163: box.error.TRANSACTION_YIELD
   164: box.error.NO_SUCH_GROUP
+  165: box.error.NO_SUCH_MODULE
 ...
 test_run:cmd("setopt delimiter ''");
 ---
