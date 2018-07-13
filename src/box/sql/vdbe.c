@@ -4858,7 +4858,6 @@ case OP_Param: {           /* out2 */
 	break;
 }
 
-#ifndef SQLITE_OMIT_FOREIGN_KEY
 /* Opcode: FkCounter P1 P2 * * *
  * Synopsis: fkctr[P1]+=P2
  *
@@ -4902,7 +4901,6 @@ case OP_FkIfZero: {         /* jump */
 	}
 	break;
 }
-#endif /* #ifndef SQLITE_OMIT_FOREIGN_KEY */
 
 /* Opcode: IfPos P1 P2 P3 * *
  * Synopsis: if r[P1]>0 then r[P1]-=P3, goto P2

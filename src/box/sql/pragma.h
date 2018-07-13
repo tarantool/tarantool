@@ -123,30 +123,24 @@ static const PragmaName aPragmaName[] = {
 	 /* iArg:      */ SQLITE_CountRows},
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-#if !defined(SQLITE_OMIT_FOREIGN_KEY)
 	{ /* zName:     */ "defer_foreign_keys",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ SQLITE_DeferFKs},
 #endif
-#endif
-#if !defined(SQLITE_OMIT_FOREIGN_KEY)
 	{ /* zName:     */ "foreign_key_list",
 	 /* ePragTyp:  */ PragTyp_FOREIGN_KEY_LIST,
 	 /* ePragFlg:  */
 	 PragFlg_NeedSchema | PragFlg_Result1 | PragFlg_SchemaOpt,
 	 /* ColNames:  */ 29, 8,
 	 /* iArg:      */ 0},
-#endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
-#if !defined(SQLITE_OMIT_FOREIGN_KEY)
 	{ /* zName:     */ "foreign_keys",
 	 /* ePragTyp:  */ PragTyp_FLAG,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ SQLITE_ForeignKeys},
-#endif
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS)
 	{ /* zName:     */ "full_column_names",

@@ -493,11 +493,7 @@ void sqlite3VdbeMemAboutToChange(Vdbe *, Mem *);
 int sqlite3VdbeCheckMemInvariants(Mem *);
 #endif
 
-#ifndef SQLITE_OMIT_FOREIGN_KEY
 int sqlite3VdbeCheckFk(Vdbe *, int);
-#else
-#define sqlite3VdbeCheckFk(p,i) 0
-#endif
 
 int sqlite3VdbeMemTranslate(Mem *, u8);
 #ifdef SQLITE_DEBUG

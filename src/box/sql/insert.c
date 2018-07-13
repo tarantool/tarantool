@@ -1812,7 +1812,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		/* Tables have different CHECK constraints.  Ticket #2252 */
 		return 0;
 	}
-#ifndef SQLITE_OMIT_FOREIGN_KEY
 	/* Disallow the transfer optimization if the destination table constains
 	 * any foreign key constraints.  This is more restrictive than necessary.
 	 * So the extra complication to make this rule less restrictive is probably
@@ -1823,7 +1822,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if ((user_session->sql_flags & SQLITE_ForeignKeys) != 0 &&
 	    !rlist_empty(&dest->child_fkey))
 		return 0;
-#endif
 	if ((user_session->sql_flags & SQLITE_CountRows) != 0) {
 		return 0;	/* xfer opt does not play well with PRAGMA count_changes */
 	}
