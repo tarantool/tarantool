@@ -298,6 +298,17 @@ box.space._func:select()
 
 session = nil
 
+-- an error when granting or revoking non-existent privilege
+box.schema.user.grant("guest", "everything", "universe")
+box.schema.user.revoke("guest", "everything", "universe")
+-- an error when granting or revoking a privilege on a non-existent entity
+box.schema.user.grant("guest", "read", "everywhere")
+box.schema.user.revoke("guest", "read", "everywhere")
+-- an error even when granting or revoking a non-existent privilege
+-- on a non-existent entity
+box.schema.user.grant("guest", "everything", "everywhere")
+box.schema.user.revoke("guest", "everything", "everywhere")
+
 --  produce an error if revoking a non-granted privilege
 box.schema.user.create("tester")
 box.schema.user.grant('tester', 'read', 'universe')
