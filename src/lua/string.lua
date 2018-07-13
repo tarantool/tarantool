@@ -292,27 +292,56 @@ local function string_hex(inp)
     return ffi.string(res, len)
 end
 
-local function string_strip(inp)
+local function string_strip(inp, to_strip)
     if type(inp) ~= 'string' then
         error(err_string_arg:format(1, "string.strip", 'string', type(inp)), 2)
     end
-    return (string.gsub(inp, "^%s*(.-)%s*$", "%1"))
+    if to_strip == nil then
+        return (string.gsub(inp, "^%s*(.-)%s*$", "%1"))
+    end
+    if type(to_strip) ~= 'string' then
+        error(err_string_arg:format(1, "string.rstrip", 'string', type(to_strip)), 2)
+    end
+    if string.len(to_strip) ~= 1 then
+        error(err_string_arg:format(1, "string.rstrip", 'one char', string.len(to_strip)), 2) --change error code
+    end
+    local match = (to_strip == '%' and "%%" or to_strip)
+    return (string.gsub(inp, "^" .. match .. "*(.-)" .. match .. "*$", "%1"))
 end
 
-local function string_lstrip(inp)
+local function string_lstrip(inp, to_strip)
     if type(inp) ~= 'string' then
         error(err_string_arg:format(1, "string.lstrip", 'string', type(inp)), 2)
     end
-    return (string.gsub(inp, "^%s*(.-)", "%1"))
+    if to_strip == nil then
+        return (string.gsub(inp, "^%s*(.-)", "%1"))
+    end
+    if type(to_strip) ~= 'string' then
+        error(err_string_arg:format(1, "string.rstrip", 'string', type(to_strip)), 2)
+    end
+    if string.len(to_strip) ~= 1 then
+        error(err_string_arg:format(1, "string.rstrip", 'one char', string.len(to_strip)), 2) --change error code
+    end
+    local match = (to_strip == '%' and "%%" or to_strip)
+    return (string.gsub(inp, "^" .. match .. "*(.-)", "%1"))
 end
 
-local function string_rstrip(inp)
+local function string_rstrip(inp, to_strip)
     if type(inp) ~= 'string' then
         error(err_string_arg:format(1, "string.rstrip", 'string', type(inp)), 2)
     end
-    return (string.gsub(inp, "(.-)%s*$", "%1"))
+    if to_strip == nil then
+        return (string.gsub(inp, "(.-)%s*$", "%1"))
+    end
+    if type(to_strip) ~= 'string' then
+        error(err_string_arg:format(1, "string.rstrip", 'string', type(to_strip)), 2)
+    end
+    if string.len(to_strip) ~= 1 then
+        error(err_string_arg:format(1, "string.rstrip", 'one char', string.len(to_strip)), 2) --change error code
+    end
+    local match = (to_strip == '%' and "%%" or to_strip)
+    return (string.gsub(inp, "(.-)" .. match .. "*$", "%1"))
 end
-
 
 -- It'll automatically set string methods, too.
 local string = require('string')
