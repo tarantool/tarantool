@@ -64,6 +64,26 @@ mp_encode_vclock(char *data, const struct vclock *vclock)
 	return data;
 }
 
+static int
+mp_decode_vclock(const char **data, struct vclock *vclock)
+{
+	vclock_create(vclock);
+	if (mp_typeof(**data) != MP_MAP)
+		return -1;
+	uint32_t size = mp_decode_map(data);
+	for (uint32_t i = 0; i < size; i++) {
+		if (mp_typeof(**data) != MP_UINT)
+			return -1;
+		uint32_t id = mp_decode_uint(data);
+		if (mp_typeof(**data) != MP_UINT)
+			return -1;
+		int64_t lsn = mp_decode_uint(data);
+		if (lsn > 0)
+			vclock_follow(vclock, id, lsn);
+	}
+	return 0;
+}
+
 int
 xrow_header_decode(struct xrow_header *header, const char **pos,
 		   const char *end)
@@ -885,7 +905,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 	/* For backward compatibility initialize read-only with false. */
 	if (read_only)
 		*read_only = false;
-	const char *lsnmap = NULL;
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -911,13 +930,11 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		case IPROTO_VCLOCK:
 			if (vclock == NULL)
 				goto skip;
-			if (mp_typeof(*d) != MP_MAP) {
+			if (mp_decode_vclock(&d, vclock) != 0) {
 				diag_set(ClientError, ER_INVALID_MSGPACK,
 					 "invalid VCLOCK");
 				return -1;
 			}
-			lsnmap = d;
-			mp_next(&d);
 			break;
 		case IPROTO_SERVER_VERSION:
 			if (version_id == NULL)
@@ -942,26 +959,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		default: skip:
 			mp_next(&d); /* value */
 		}
-	}
-
-	if (lsnmap == NULL)
-		return 0;
-
-	/* Check & save LSNMAP */
-	d = lsnmap;
-	uint32_t lsnmap_size = mp_decode_map(&d);
-	for (uint32_t i = 0; i < lsnmap_size; i++) {
-		if (mp_typeof(*d) != MP_UINT) {
-		map_error:
-			diag_set(ClientError, ER_INVALID_MSGPACK, "VCLOCK");
-			return -1;
-		}
-		uint32_t id = mp_decode_uint(&d);
-		if (mp_typeof(*d) != MP_UINT)
-			goto map_error;
-		int64_t lsn = (int64_t) mp_decode_uint(&d);
-		if (lsn > 0)
-			vclock_follow(vclock, id, lsn);
 	}
 	return 0;
 }
