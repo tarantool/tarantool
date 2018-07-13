@@ -163,6 +163,9 @@ box_process_join(struct ev_io *io, struct xrow_header *header);
 void
 box_process_subscribe(struct ev_io *io, struct xrow_header *header);
 
+void
+box_process_vote(struct ballot *ballot);
+
 /**
  * Check Lua configuration before initialization or
  * in case of a configuration change.

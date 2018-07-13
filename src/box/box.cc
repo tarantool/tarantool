@@ -1564,6 +1564,13 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 			replica_version_id);
 }
 
+void
+box_process_vote(struct ballot *ballot)
+{
+	ballot->is_ro = cfg_geti("read_only") != 0;
+	vclock_copy(&ballot->vclock, &replicaset.vclock);
+}
+
 /** Insert a new cluster into _schema */
 static void
 box_set_replicaset_uuid(const struct tt_uuid *replicaset_uuid)

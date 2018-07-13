@@ -1158,7 +1158,8 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(&msg->base, subscribe_route);
 		*stop_input = true;
 		break;
-	case IPROTO_REQUEST_VOTE:
+	case IPROTO_REQUEST_VOTE:               /* deprecated. */
+	case IPROTO_VOTE:
 		cmsg_init(&msg->base, misc_route);
 		break;
 	case IPROTO_AUTH:
@@ -1526,6 +1527,7 @@ tx_process_misc(struct cmsg *m)
 		goto error;
 
 	try {
+		struct ballot ballot;
 		switch (msg->header.type) {
 		case IPROTO_AUTH:
 			box_process_auth(&msg->auth, con->salt);
@@ -1541,6 +1543,11 @@ tx_process_misc(struct cmsg *m)
 						     ::schema_version,
 						     &replicaset.vclock,
 						     cfg_geti("read_only"));
+			break;
+		case IPROTO_VOTE:
+			box_process_vote(&ballot);
+			iproto_reply_vote_xc(out, &ballot, msg->header.sync,
+					     ::schema_version);
 			break;
 		default:
 			unreachable();

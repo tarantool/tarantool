@@ -78,10 +78,16 @@ enum iproto_key {
 	IPROTO_EXPR = 0x27, /* EVAL */
 	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
 	IPROTO_SERVER_IS_RO = 0x29,
+	IPROTO_BALLOT = 0x2a,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
 	IPROTO_KEY_MAX
+};
+
+enum iproto_ballot_key {
+	IPROTO_BALLOT_IS_RO = 0x01,
+	IPROTO_BALLOT_VCLOCK = 0x02,
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)
@@ -155,8 +161,13 @@ enum iproto_type {
 	IPROTO_JOIN = 65,
 	/** Replication SUBSCRIBE command */
 	IPROTO_SUBSCRIBE = 66,
-	/** Vote request command for master election */
+	/**
+	 * Vote request command for master election
+	 * DEPRECATED: use IPROTO_VOTE instead
+	 */
 	IPROTO_REQUEST_VOTE = 67,
+	/** Instance status request command */
+	IPROTO_VOTE = 68,
 
 	/** Vinyl run info stored in .index file */
 	VY_INDEX_RUN_INFO = 100,

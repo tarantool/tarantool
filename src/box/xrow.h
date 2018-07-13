@@ -30,18 +30,18 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <sys/uio.h> /* struct iovec */
 
 #include "tt_uuid.h"
 #include "diag.h"
+#include "vclock.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-struct vclock;
 
 enum {
 	XROW_HEADER_IOVMAX = 1,
@@ -223,12 +223,28 @@ xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
 		 const char *login, size_t login_len, const char *password,
 		 size_t password_len);
 
+/** Instance status. */
+struct ballot {
+	/** Set if the instance is running in read-only mode. */
+	bool is_ro;
+	/** Current instance vclock. */
+	struct vclock vclock;
+};
+
 /**
- * Encode a vote request for master election.
+ * Decode ballot response to IPROTO_VOTE from MessagePack.
+ * @param row Row to decode.
+ * @param[out] status
+ */
+int
+xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot);
+
+/**
+ * Encode an instance vote request.
  * @param row[out] Row to encode into.
  */
 void
-xrow_encode_request_vote(struct xrow_header *row);
+xrow_encode_vote(struct xrow_header *row);
 
 /**
  * Encode SUBSCRIBE command.
@@ -315,22 +331,6 @@ xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 }
 
 /**
- * Decode peer vclock and access rights (a response to VOTE command).
- * @param row Row to decode.
- * @param[out] vclock.
- * @param[out] read_only.
- *
- * @retval  0 Success.
- * @retval -1 Memory or format error.
- */
-static inline int
-xrow_decode_request_vote(struct xrow_header *row, struct vclock *vclock,
-			 bool *read_only)
-{
-	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL, read_only);
-}
-
-/**
  * Encode a heartbeat message.
  * @param row[out] Row to encode into.
  * @param replica_id Instance id.
@@ -388,7 +388,7 @@ int
 iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
 
 /**
- * Encode iproto header with IPROTO_OK response code
+ * Encode iproto header with IPROTO_OK response code. DEPRECATED.
  * and vclock in the body.
  * @param out Encode to.
  * @param sync Request sync.
@@ -403,6 +403,20 @@ int
 iproto_reply_request_vote(struct obuf *out, uint64_t sync,
 			 uint32_t schema_version, const struct vclock *vclock,
 			 bool read_only);
+
+/**
+ * Encode a reply to an instance status request.
+ * @param out Buffer to write to.
+ * @param status Instance status to encode.
+ * @param sync Request sync.
+ * @param schema_version Actual schema version.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+int
+iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
+		  uint64_t sync, uint32_t schema_version);
 
 /**
  * Write an error packet int output buffer. Doesn't throw if out
@@ -585,6 +599,14 @@ xrow_encode_auth_xc(struct xrow_header *row, const char *salt, size_t salt_len,
 		diag_raise();
 }
 
+/** @copydoc xrow_decode_ballot. */
+static inline void
+xrow_decode_ballot_xc(struct xrow_header *row, struct ballot *ballot)
+{
+	if (xrow_decode_ballot(row, ballot) != 0)
+		diag_raise();
+}
+
 /** @copydoc xrow_encode_subscribe. */
 static inline void
 xrow_encode_subscribe_xc(struct xrow_header *row,
@@ -642,15 +664,6 @@ xrow_decode_vclock_xc(struct xrow_header *row, struct vclock *vclock)
 		diag_raise();
 }
 
-/** @copydoc xrow_decode_request_vote. */
-static inline void
-xrow_decode_request_vote_xc(struct xrow_header *row, struct vclock *vclock,
-			    bool *read_only)
-{
-	if (xrow_decode_request_vote(row, vclock, read_only) != 0)
-		diag_raise();
-}
-
 /** @copydoc iproto_reply_ok. */
 static inline void
 iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
@@ -659,7 +672,7 @@ iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
 		diag_raise();
 }
 
-/** @copydoc iproto_reply_request_vote_xc. */
+/** @copydoc iproto_reply_request_vote. */
 static inline void
 iproto_reply_request_vote_xc(struct obuf *out, uint64_t sync,
 			     uint32_t schema_version,
@@ -667,6 +680,15 @@ iproto_reply_request_vote_xc(struct obuf *out, uint64_t sync,
 {
 	if (iproto_reply_request_vote(out, sync, schema_version,
 				      vclock, read_only) != 0)
+		diag_raise();
+}
+
+/** @copydoc iproto_reply_status. */
+static inline void
+iproto_reply_vote_xc(struct obuf *out, const struct ballot *status,
+		       uint64_t sync, uint32_t schema_version)
+{
+	if (iproto_reply_vote(out, status, sync, schema_version) != 0)
 		diag_raise();
 }
 

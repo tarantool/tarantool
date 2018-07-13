@@ -732,7 +732,8 @@ replicaset_round(bool skip_ro)
 {
 	struct replica *leader = NULL;
 	replicaset_foreach(replica) {
-		if (replica->applier == NULL)
+		struct applier *applier = replica->applier;
+		if (applier == NULL)
 			continue;
 		/**
 		 * While bootstrapping a new cluster, read-only
@@ -741,7 +742,7 @@ replicaset_round(bool skip_ro)
 		 * replicas since there is still a possibility
 		 * that all replicas exist in cluster table.
 		 */
-		if (skip_ro && replica->applier->remote_is_ro)
+		if (skip_ro && applier->ballot.is_ro)
 			continue;
 		if (leader == NULL) {
 			leader = replica;
@@ -753,8 +754,8 @@ replicaset_round(bool skip_ro)
 		 * with the same vclock, prefer the one with
 		 * the lowest uuid.
 		 */
-		int cmp = vclock_compare(&replica->applier->vclock,
-					 &leader->applier->vclock);
+		int cmp = vclock_compare(&applier->ballot.vclock,
+				&leader->applier->ballot.vclock);
 		if (cmp < 0)
 			continue;
 		if (cmp == 0 && tt_uuid_compare(&replica->uuid,
