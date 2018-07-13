@@ -47,6 +47,7 @@ local default_cfg
 local positional_arguments
 local keyword_arguments
 local lua_arguments = arg
+local language
 
 -- function for printing usage reference
 local usage
@@ -154,6 +155,14 @@ local function load_default_file(default_file)
     d.memtx_dir = fio.pathjoin(d.memtx_dir, instance_name)
     d.vinyl_dir = fio.pathjoin(d.vinyl_dir, instance_name)
     d.log       = fio.pathjoin(d.log,       instance_name .. '.log')
+
+    language = (d.language or "lua"):lower()
+    d.language  = nil
+
+    if language ~= "lua" and language ~= "sql" then
+        log.error('Unknown language: %s', language)
+        os.exit(1)
+    end
 
     default_cfg = d
 
@@ -629,6 +638,12 @@ local function logrotate()
 end
 
 local function enter()
+    local options = keyword_arguments
+    language = (options.language or language):lower()
+    if language ~= "lua" and language ~= "sql" then
+        log.error('Unknown language: %s', options.language)
+        return 1
+    end
     local console_sock_path = uri.parse(console_sock).service
     if fio.stat(console_sock_path) == nil then
         log.error("Can't connect to %s (%s)", console_sock_path, errno.strerror())
@@ -639,12 +654,15 @@ local function enter()
         return 1
     end
 
-    local cmd = string.format(
+    local cmd_connect = string.format(
         "require('console').connect('%s', { connect_timeout = %s })",
         console_sock, TIMEOUT_INFINITY
     )
 
-    console.on_start(function(self) self:eval(cmd) end)
+    local cmd_language = string.format("\\set language %s", language)
+
+    console.on_start(function(self) self:eval(cmd_connect)
+                     self:eval(cmd_language) end)
     console.on_client_disconnect(function(self) self.running = false end)
     console.start()
     return 0
@@ -1008,11 +1026,15 @@ local commands = setmetatable({
         }
     }, enter = {
         func = exit_wrapper(enter), process = process_local, help = {
-            header = "%s enter INSTANCE",
+            header = "%s enter INSTANCE [--language=language]",
             linkmode = "%s enter",
             description =
 [=[
-        Enter an instance's interactive Lua console.
+        Enter an instance's interactive Lua or SQL console.
+
+        Supported options:
+        * --language=language to set interactive console language.
+          May be either Lua or SQL.
 ]=],
             weight = 65,
             deprecated = false,
@@ -1284,6 +1306,7 @@ do
         { 'chdir',       'string'  },
         { 'only-server', 'string'  },
         { 'server',      'string'  },
+        { 'language',    'string'  },
     })
 
     local cmd_name

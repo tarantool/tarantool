@@ -20,6 +20,7 @@ default_cfg = {
     vinyl_dir  = "@TARANTOOL_DATADIR@", -- @TARANTOOL_DATADIR@/${INSTANCE}
     log        = "@TARANTOOL_LOGDIR@", -- @TARANTOOL_LOGDIR@/${INSTANCE}.log
     username   = "@TARANTOOL_USER@",
+    language   = "@TARANTOOL_LANGUAGE@",
 }
 
 -- instances.available - all available instances
