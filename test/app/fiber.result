@@ -1209,3 +1209,21 @@ test_run:cmd("clear filter")
 ---
 - true
 ...
+box.schema.user.grant('guest', 'execute', 'universe')
+---
+...
+con = require('net.box').connect(box.cfg.listen)
+---
+...
+pcall(con.eval, con, 'fiber.cancel(fiber.self())')
+---
+- false
+- fiber is cancelled
+...
+con:eval('fiber.sleep(0) return "Ok"')
+---
+- Ok
+...
+box.schema.user.revoke('guest', 'execute', 'universe')
+---
+...

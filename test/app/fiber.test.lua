@@ -505,3 +505,9 @@ l1 = nil
 
 -- cleanup
 test_run:cmd("clear filter")
+
+box.schema.user.grant('guest', 'execute', 'universe')
+con = require('net.box').connect(box.cfg.listen)
+pcall(con.eval, con, 'fiber.cancel(fiber.self())')
+con:eval('fiber.sleep(0) return "Ok"')
+box.schema.user.revoke('guest', 'execute', 'universe')
