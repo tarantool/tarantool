@@ -2911,8 +2911,7 @@ pk = space:create_index('primary', { type = 'tree', parts = {1, 'string'}})
 ...
 pk:select({}, {iterator = 'BITS_ALL_SET'})
 ---
-- error: Index 'primary' (TREE) of space 'invalid' (engine) does not support requested
-    iterator type
+- error: Index 'primary' (TREE) of space 'invalid' (engine) does not support requested iterator type
 ...
 space:drop()
 ---

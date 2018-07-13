@@ -156,8 +156,7 @@ name = string.rep('a', box.schema.NAME_MAX - 1)
 ...
 box.schema.user.create(name..'aa')
 ---
-- error: 'Failed to create user ''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'':
-    user name is too long'
+- error: 'Failed to create user ''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'': user name is too long'
 ...
 box.schema.user.create(name..'a')
 ---
@@ -213,8 +212,7 @@ session.effective_user()
 -- drop current user
 session.su('admin', function() return box.schema.user.drop('tester') end)
 ---
-- error: 'Failed to drop user or role ''tester'': the user is active in the current
-    session'
+- error: 'Failed to drop user or role ''tester'': the user is active in the current session'
 ...
 session.user()
 ---
@@ -397,8 +395,7 @@ box.schema.user.drop('grantee')
 -- fails, can't kill oneself
 box.schema.user.drop('grantor')
 ---
-- error: 'Failed to drop user or role ''grantor'': the user is active in the current
-    session'
+- error: 'Failed to drop user or role ''grantor'': the user is active in the current session'
 ...
 session.su('admin')
 ---
@@ -561,8 +558,7 @@ box.space._user:insert{10, 1, 'name', 'strange-object-type', utils.setmap({})}
 ...
 box.space._user:insert{10, 1, 'name', 'role', utils.setmap{'password'}}
 ---
-- error: 'Failed to create role ''name'': authentication data can not be set for a
-    role'
+- error: 'Failed to create role ''name'': authentication data can not be set for a role'
 ...
 session = nil
 ---
@@ -829,8 +825,7 @@ name = string.rep('a', box.schema.NAME_MAX - 1)
 ...
 box.schema.func.create(name..'aa')
 ---
-- error: 'Failed to create function ''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'':
-    function name is too long'
+- error: 'Failed to create function ''aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'': function name is too long'
 ...
 box.schema.func.create(name..'a')
 ---

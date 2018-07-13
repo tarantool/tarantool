@@ -45,8 +45,7 @@ crypto.hmac.sha512()
 ...
 crypto.hmac.nodigest
 ---
-- error: '[string "return crypto.hmac.nodigest "]:1: HMAC method "nodigest" is not
-    supported'
+- error: '[string "return crypto.hmac.nodigest "]:1: HMAC method "nodigest" is not supported'
 ...
 crypto.hmac.sha1('012345678', 'fred')
 ---

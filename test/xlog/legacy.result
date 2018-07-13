@@ -58,15 +58,11 @@ s.index.sk:drop()
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'thing'}
 ---
-- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1
-    type (string), ...'
+- error: 'Wrong index parts: unknown field type; expected field1 id (number), field1 type (string), ...'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 1, 2, 'array', 'wtf'}
 ---
-- error: 'Wrong record in _index space: got {number, number, string, string, number,
-    number, number, string, string}, expected {space id (number), index id (number),
-    name (string), type (string), is_unique (number), part count (number) part0 field
-    no (number), part0 field type (string), ...}'
+- error: 'Wrong record in _index space: got {number, number, string, string, number, number, number, string, string}, expected {space id (number), index id (number), name (string), type (string), is_unique (number), part count (number) part0 field no (number), part0 field type (string), ...}'
 ...
 box.space._index:insert{s.id, 2, 's', 'rtree', 0, 0}
 ---
@@ -97,8 +93,7 @@ s.temporary
 ...
 _ = _space:update(s.id, {{'=', 6, ''}})
 ---
-- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
-    space'
+- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty space'
 ...
 s.temporary
 ---
@@ -151,8 +146,7 @@ s.temporary
 ...
 _ = _space:update(s.id, {{'=', 6, 'no-temporary'}})
 ---
-- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty
-    space'
+- error: 'Can''t modify space ''t'': can not switch temporary flag on a non-empty space'
 ...
 s.temporary
 ---

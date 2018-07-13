@@ -254,10 +254,7 @@ box.space.email:upsert({email, email_hash_index, time}, {{'!', -1, email_hash_in
 ...
 box.space.email:select{email}
 ---
-- - ['test@domain.com', 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs',
-    1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234,
-    'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs',
-    1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234]
+- - ['test@domain.com', 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234, 'asdfasdfs', 1234]
 ...
 box.space.email:drop()
 ---

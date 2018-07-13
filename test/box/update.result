@@ -15,8 +15,7 @@ s:update({1000001}, {{'#', 1, 1}})
 ...
 s:update({1000001}, {{'#', 1, "only one record please"}})
 ---
-- error: 'Argument type in operation ''#'' on field 1 does not match field type: expected
-    a number of fields to delete'
+- error: 'Argument type in operation ''#'' on field 1 does not match field type: expected a number of fields to delete'
 ...
 s:truncate()
 ---
@@ -80,8 +79,7 @@ s:update({0}, {{'#', 42, 1}})
 ...
 s:update({0}, {{'#', 4, 'abirvalg'}})
 ---
-- error: 'Argument type in operation ''#'' on field 4 does not match field type: expected
-    a number of fields to delete'
+- error: 'Argument type in operation ''#'' on field 4 does not match field type: expected a number of fields to delete'
 ...
 s:update({0}, {{'#', 2, 1}, {'#', 4, 2}, {'#', 6, 1}})
 ---
@@ -490,8 +488,7 @@ s:insert{0, -1}
 -- + --
 s:update({0}, {{'+', 2, "a"}}) -- err
 ---
-- error: 'Argument type in operation ''+'' on field 2 does not match field type: expected
-    a number'
+- error: 'Argument type in operation ''+'' on field 2 does not match field type: expected a number'
 ...
 s:update({0}, {{'+', 2, 10}}) -- neg(ative) + pos(itive) = pos(itive) 9
 ---
@@ -520,8 +517,7 @@ s:update({0}, {{'+', 2, 7}}) -- neg + pos = neg -8
 -- - --
 s:update({0}, {{'-', 2, "a"}}) -- err
 ---
-- error: 'Argument type in operation ''-'' on field 2 does not match field type: expected
-    a number'
+- error: 'Argument type in operation ''-'' on field 2 does not match field type: expected a number'
 ...
 s:update({0}, {{'-', 2, 16}}) -- neg(ative) - pos(itive) = neg(ative) -24
 ---
@@ -570,18 +566,15 @@ s:update({0}, {{'^', 2, 6}}) -- 20
 ...
 s:update({0}, {{'|', 2, -1}}) -- err
 ---
-- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'&', 2, -1}}) -- err
 ---
-- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'^', 2, -1}}) -- err
 ---
-- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected a positive integer'
 ...
 s:replace{0, -1} -- -1
 ---
@@ -589,18 +582,15 @@ s:replace{0, -1} -- -1
 ...
 s:update({0}, {{'|', 2, 2}}) -- err
 ---
-- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'&', 2, 40}}) -- err
 ---
-- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'^', 2, 6}}) -- err
 ---
-- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected a positive integer'
 ...
 s:replace{0, 1.5} -- 1.5
 ---
@@ -608,18 +598,15 @@ s:replace{0, 1.5} -- 1.5
 ...
 s:update({0}, {{'|', 2, 2}}) -- err
 ---
-- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'&', 2, 40}}) -- err
 ---
-- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''&'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'^', 2, 6}}) -- err
 ---
-- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''^'' on field 2 does not match field type: expected a positive integer'
 ...
 -- double
 s:replace{0, 5} -- 5
@@ -632,8 +619,7 @@ s:update({0}, {{'+', 2, 1.5}}) -- int + double = double 6.5
 ...
 s:update({0}, {{'|', 2, 2}}) -- err (double!)
 ---
-- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'-', 2, 0.5}}) -- double - double = double 6
 ---
@@ -658,8 +644,7 @@ s:update({0}, {{'+', 2, ffi.new("float", 3.5)}}) -- float + int = float 7
 ...
 s:update({0}, {{'|', 2, 2}}) -- err (float!)
 ---
-- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected
-    a positive integer'
+- error: 'Argument type in operation ''|'' on field 2 does not match field type: expected a positive integer'
 ...
 s:update({0}, {{'-', 2, ffi.new("float", 1.5)}}) -- float - float = float 5.5
 ---
@@ -781,8 +766,7 @@ s:update({0}, {'+', 2, 2})
 ...
 s:update({0}, {{}})
 ---
-- error: Illegal parameters, update operation must be an array {op,..}, got empty
-    array
+- error: Illegal parameters, update operation must be an array {op,..}, got empty array
 ...
 s:update({0}, {{'+'}})
 ---

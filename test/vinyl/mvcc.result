@@ -2212,8 +2212,7 @@ c3:commit() -- not in transaction
 --
 c3:get{1} -- {1, 20}
 ---
-- error: '[string "return c3:get{1} -- {1, 20} "]:1: attempt to call method ''get''
-    (a nil value)'
+- error: '[string "return c3:get{1} -- {1, 20} "]:1: attempt to call method ''get'' (a nil value)'
 ...
 -- cleanup
 --

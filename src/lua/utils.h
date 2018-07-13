@@ -212,6 +212,8 @@ struct luaL_serializer {
 	int encode_use_tostring;
 	/** Use NULL for all unrecognizable types */
 	int encode_invalid_as_nil;
+	/** The preferred width of the output lines */
+	int encode_best_width;
 
 	/** Enables decoding NaN and Inf numbers */
 	int decode_invalid_numbers;

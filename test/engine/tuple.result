@@ -35,8 +35,7 @@ max_tuple_size = box.cfg[engine_max_tuple_size]
 ...
 _ = s:replace({1, string.rep('x', max_tuple_size)})
 ---
-- error: 'Failed to allocate <NUM> bytes for tuple: tuple is too large. Check ''<ENGINE>_max_tuple_size''
-    configuration option.'
+- error: 'Failed to allocate <NUM> bytes for tuple: tuple is too large. Check ''<ENGINE>_max_tuple_size'' configuration option.'
 ...
 -- check max_tuple_size dynamic configuration
 box.cfg { [engine_max_tuple_size] = 2 * max_tuple_size }
@@ -65,8 +64,7 @@ box.cfg { [engine_max_tuple_size] = 1 * 1024 * 1024 }
 ...
 _ = s:replace({1, string.rep('x', 2 * 1024 * 1024 )})
 ---
-- error: 'Failed to allocate <NUM> bytes for tuple: tuple is too large. Check ''<ENGINE>_max_tuple_size''
-    configuration option.'
+- error: 'Failed to allocate <NUM> bytes for tuple: tuple is too large. Check ''<ENGINE>_max_tuple_size'' configuration option.'
 ...
 _ = s:replace({1, string.rep('x', 1 * 1024 * 1024 - engine_tuple_size - 8)})
 ---

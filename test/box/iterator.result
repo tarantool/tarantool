@@ -96,8 +96,7 @@ iterate('tweedledum', 'i4', 0, 1, box.index.ALL)
 ...
 iterate('tweedledum', 'i4', 0, 1, box.index.EQ)
 ---
-- error: HASH index  does not support selects via a partial key (expected 1 parts,
-    got 0). Please Consider changing index type to TREE.
+- error: HASH index  does not support selects via a partial key (expected 1 parts, got 0). Please Consider changing index type to TREE.
 ...
 iterate('tweedledum', 'i4', 0, 1, box.index.EQ, 'pid_003')
 ---
@@ -125,8 +124,7 @@ iterate('tweedledum', 'i5', 1, 3, box.index.ALL)
 ...
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005')
 ---
-- error: HASH index  does not support selects via a partial key (expected 2 parts,
-    got 1). Please Consider changing index type to TREE.
+- error: HASH index  does not support selects via a partial key (expected 2 parts, got 1). Please Consider changing index type to TREE.
 ...
 iterate('tweedledum', 'i5', 1, 3, box.index.EQ, 'sid_005', 'tid_995')
 ---
@@ -301,13 +299,11 @@ space:select(2)
 ...
 space:select(5, {iterator="GE"})
 ---
-- error: Index 'primary' (HASH) of space 'test' (memtx) does not support requested
-    iterator type
+- error: Index 'primary' (HASH) of space 'test' (memtx) does not support requested iterator type
 ...
 space:select(nil, {iterator="GE"})
 ---
-- error: HASH index  does not support selects via a partial key (expected 1 parts,
-    got 0). Please Consider changing index type to TREE.
+- error: HASH index  does not support selects via a partial key (expected 1 parts, got 0). Please Consider changing index type to TREE.
 ...
 space:select(5, {iterator="GT"})
 ---

@@ -1379,13 +1379,11 @@ c:eval('return echo(...)', {42})
 -- invalid arguments
 c:call('echo', 42)
 ---
-- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:call(func_name, {arg1, arg2, ...},
-    opts) instead of remote:call(func_name, arg1, arg2, ...)'
+- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:call(func_name, {arg1, arg2, ...}, opts) instead of remote:call(func_name, arg1, arg2, ...)'
 ...
 c:eval('return echo(...)', 42)
 ---
-- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:eval(expression, {arg1, arg2, ...},
-    opts) instead of remote:eval(expression, arg1, arg2, ...)'
+- error: 'builtin/box/net_box.lua..."]:<line>: Use remote:eval(expression, {arg1, arg2, ...}, opts) instead of remote:eval(expression, arg1, arg2, ...)'
 ...
 c:close()
 ---

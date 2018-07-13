@@ -84,8 +84,7 @@ space:insert{4, 'world'}
 ...
 space[0]:insert{5, 'hello world'}
 ---
-- error: '[string "return space[0]:insert{5, ''hello world''} "]:1: attempt to index
-    a nil value'
+- error: '[string "return space[0]:insert{5, ''hello world''} "]:1: attempt to index a nil value'
 ...
 crossjoin(space, space, 10000)
 ---

@@ -16,8 +16,7 @@ i1 = space:create_index('primary', { type = 'tree', parts = {1, 'string', 2, 'st
 ...
 space:insert{'Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?'}
 ---
-- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with
-    cheese in Paris?']
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
 ...
 space:insert{'Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with cheese?'}
 ---
@@ -25,8 +24,7 @@ space:insert{'Jules', 'Vincent', 0, 'They don`t call it a Quarter Pounder with c
 ...
 space:insert{'Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.'}
 ---
-- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know
-    what the f--k a Quarter Pounder is.']
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
 ...
 space:insert{'Jules', 'Vincent', 1, 'Then what do they call it?'}
 ---
@@ -86,21 +84,15 @@ space:insert{'Vincent', 'The Wolf!', 1, 'I said a please would be nice.'}
 ...
 space:insert{'The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.'}
 ---
-- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please,
-    I`m here to tell you what to do and if self-preservation is an instinct you possess
-    you`d better fucking do it and do it quick. I`m here to help - if my help`s not
-    appreciated then lotsa luck, gentlemen.']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
 space:insert{'The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.'}
 ---
-- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people
-    barking orders at me.']
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
 space:insert{'Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.'}
 ---
-- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor.
-    I think fast, I talk fast and I need you guys to act fast if you wanna get out
-    of this. So, pretty please... with sugar on top. Clean the fucking car.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 --
 -- Select test
@@ -108,8 +100,7 @@ space:insert{'Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time 
 -- Select by one entry
 space.index['primary']:get{'Vincent', 'Jules', 0}
 ---
-- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with
-    cheese in Paris?']
+- ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
 ...
 space.index['primary']:get{'Jules', 'Vincent', 0}
 ---
@@ -117,8 +108,7 @@ space.index['primary']:get{'Jules', 'Vincent', 0}
 ...
 space.index['primary']:get{'Vincent', 'Jules', 1}
 ---
-- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know
-    what the f--k a Quarter Pounder is.']
+- ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
 ...
 space.index['primary']:get{'Jules', 'Vincent', 1}
 ---
@@ -178,29 +168,21 @@ space.index['primary']:get{'Vincent', 'The Wolf!', 1}
 ...
 space.index['primary']:get{'The Wolf!', 'Vincent', 2}
 ---
-- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please,
-    I`m here to tell you what to do and if self-preservation is an instinct you possess
-    you`d better fucking do it and do it quick. I`m here to help - if my help`s not
-    appreciated then lotsa luck, gentlemen.']
+- ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
 space.index['primary']:get{'The Wolf!', 'Vincent', 3}
 ---
-- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people
-    barking orders at me.']
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
 space.index['primary']:get{'Vincent', 'The Wolf!', 2}
 ---
-- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor.
-    I think fast, I talk fast and I need you guys to act fast if you wanna get out
-    of this. So, pretty please... with sugar on top. Clean the fucking car.']
+- ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Select all messages from Vincent to Jules
 space.index['primary']:select({'Vincent', 'Jules'})
 ---
-- - ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder
-      with cheese in Paris?']
-  - ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know
-      what the f--k a Quarter Pounder is.']
+- - ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
+  - ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
   - ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
   - ['Vincent', 'Jules', 3, 'That`s right.']
   - ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
@@ -222,29 +204,21 @@ space.index['primary']:select({'Vincent', 'The Wolf!'})
 ---
 - - ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
   - ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor.
-      I think fast, I talk fast and I need you guys to act fast if you wanna get out
-      of this. So, pretty please... with sugar on top. Clean the fucking car.']
+  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Select all messages from The Wolf to Vincent
 space.index['primary']:select({'The Wolf!', 'Vincent'})
 ---
 - - ['The Wolf!', 'Vincent', 0, 'Jimmie, lead the way. Boys, get to work.']
   - ['The Wolf!', 'Vincent', 1, 'Come again?']
-  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please,
-      I`m here to tell you what to do and if self-preservation is an instinct you
-      possess you`d better fucking do it and do it quick. I`m here to help - if my
-      help`s not appreciated then lotsa luck, gentlemen.']
-  - ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people
-      barking orders at me.']
+  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
+  - ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
 -- Select all Vincent messages
 space.index['primary']:select({'Vincent'})
 ---
-- - ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder
-      with cheese in Paris?']
-  - ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know
-      what the f--k a Quarter Pounder is.']
+- - ['Vincent', 'Jules', 0, 'Do you know what they call a - a - a Quarter Pounder with cheese in Paris?']
+  - ['Vincent', 'Jules', 1, 'No man, they got the metric system. They wouldn`t know what the f--k a Quarter Pounder is.']
   - ['Vincent', 'Jules', 2, 'They call it a `Royale` with cheese.']
   - ['Vincent', 'Jules', 3, 'That`s right.']
   - ['Vincent', 'Jules', 4, 'A Big Mac`s a Big Mac, but they call it `Le Big Mac.`']
@@ -252,9 +226,7 @@ space.index['primary']:select({'Vincent'})
   - ['Vincent', 'Jules', 6, 'I dunno, I didn`t go into Burger King.']
   - ['Vincent', 'The Wolf!', 0, 'A please would be nice.']
   - ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor.
-      I think fast, I talk fast and I need you guys to act fast if you wanna get out
-      of this. So, pretty please... with sugar on top. Clean the fucking car.']
+  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 --
 -- Delete test
@@ -266,8 +238,7 @@ space:delete{'The Wolf!', 'Vincent', 0}
 ...
 space:delete{'The Wolf!', 'Vincent', 3}
 ---
-- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people
-    barking orders at me.']
+- ['The Wolf!', 'Vincent', 3, 'I don`t mean any disrespect, I just don`t like people barking orders at me.']
 ...
 space:delete{'Vincent', 'The Wolf!', 0}
 ---
@@ -275,8 +246,7 @@ space:delete{'Vincent', 'The Wolf!', 0}
 ...
 space:update({'Vincent', 'The Wolf!', 1}, {{ '=', 1, 'Updated' }, {'=', 5, 'New'}})
 ---
-- error: Attempt to modify a tuple field which is part of index 'primary' in space
-    'tweedledum'
+- error: Attempt to modify a tuple field which is part of index 'primary' in space 'tweedledum'
 ...
 space:update({'Updated', 'The Wolf!', 1}, {{ '=', 1, 'Vincent'}, { '#', 5, 1 }})
 ---
@@ -285,18 +255,13 @@ space:update({'Updated', 'The Wolf!', 1}, {{ '=', 1, 'Vincent'}, { '#', 5, 1 }})
 space.index['primary']:select({'Vincent', 'The Wolf!'})
 ---
 - - ['Vincent', 'The Wolf!', 1, 'I said a please would be nice.']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor.
-      I think fast, I talk fast and I need you guys to act fast if you wanna get out
-      of this. So, pretty please... with sugar on top. Clean the fucking car.']
+  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Checking The Wolf's last messages
 space.index['primary']:select({'The Wolf!', 'Vincent'})
 ---
 - - ['The Wolf!', 'Vincent', 1, 'Come again?']
-  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please,
-      I`m here to tell you what to do and if self-preservation is an instinct you
-      possess you`d better fucking do it and do it quick. I`m here to help - if my
-      help`s not appreciated then lotsa luck, gentlemen.']
+  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
 -- try to delete nonexistent message
 space:delete{'Vincent', 'The Wolf!', 3}
@@ -327,18 +292,13 @@ space:update({'Vincent', 'The Wolf!', 1}, {{'=', 4, '<ooops>'}})
 space.index['primary']:select({'Vincent', 'The Wolf!'})
 ---
 - - ['Vincent', 'The Wolf!', 1, '<ooops>']
-  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor.
-      I think fast, I talk fast and I need you guys to act fast if you wanna get out
-      of this. So, pretty please... with sugar on top. Clean the fucking car.']
+  - ['Vincent', 'The Wolf!', 2, 'If I`m curt with you it`s because time is a factor. I think fast, I talk fast and I need you guys to act fast if you wanna get out of this. So, pretty please... with sugar on top. Clean the fucking car.']
 ...
 -- Checking The Wolf's last messages
 space.index['primary']:select({'The Wolf!', 'Vincent'})
 ---
 - - ['The Wolf!', 'Vincent', 1, '<ooops>']
-  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please,
-      I`m here to tell you what to do and if self-preservation is an instinct you
-      possess you`d better fucking do it and do it quick. I`m here to help - if my
-      help`s not appreciated then lotsa luck, gentlemen.']
+  - ['The Wolf!', 'Vincent', 2, 'Get it straight buster - I`m not here to say please, I`m here to tell you what to do and if self-preservation is an instinct you possess you`d better fucking do it and do it quick. I`m here to help - if my help`s not appreciated then lotsa luck, gentlemen.']
 ...
 -- try to update a nonexistent message
 space:update({'Vincent', 'The Wolf!', 4}, {{'=', 4, '<ooops>'}})
@@ -490,13 +450,11 @@ i1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 3, '
 ...
 space:insert{1, 1}
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 3)
+- error: Tuple field count 2 is less than required by space format or defined indexes (expected at least 3)
 ...
 space:replace{1, 1}
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 3)
+- error: Tuple field count 2 is less than required by space format or defined indexes (expected at least 3)
 ...
 space:drop()
 ---

@@ -446,8 +446,7 @@ f==g
 -- arguments to fiber.create
 f = fiber.create(print('hello'))
 ---
-- error: '[string "f = fiber.create(print(''hello'')) "]:1: fiber.create(function,
-    ...): bad arguments'
+- error: '[string "f = fiber.create(print(''hello'')) "]:1: fiber.create(function, ...): bad arguments'
 ...
 -- test passing arguments in and out created fiber
 res = {}
