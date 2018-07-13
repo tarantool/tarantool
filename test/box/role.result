@@ -49,6 +49,9 @@ box.schema.user.info('tester')
   - - session,usage
     - universe
     - 
+  - - alter
+    - user
+    - tester
 ...
 box.schema.user.grant('tester', 'execute', 'role', 'iddqd')
 ---
@@ -64,6 +67,9 @@ box.schema.user.info('tester')
   - - session,usage
     - universe
     - 
+  - - alter
+    - user
+    - tester
 ...
 -- test granting user to a user
 box.schema.user.grant('tester', 'execute', 'role', 'tester')
@@ -935,6 +941,9 @@ box.schema.user.info('test_user')
   - - session,usage
     - universe
     - 
+  - - alter
+    - user
+    - test_user
 ...
 box.schema.role.info('test_user')
 ---

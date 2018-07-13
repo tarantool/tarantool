@@ -198,10 +198,10 @@ user_grant_priv(struct user *user, struct priv_def *def)
  * given object type and object id.
  */
 struct access *
-access_find(struct priv_def *priv)
+access_find(enum schema_object_type object_type, uint32_t object_id)
 {
 	struct access *access = NULL;
-	switch (priv->object_type) {
+	switch (object_type) {
 	case SC_UNIVERSE:
 	{
 		access = universe.access;
@@ -234,31 +234,35 @@ access_find(struct priv_def *priv)
 	}
 	case SC_SPACE:
 	{
-		struct space *space = space_by_id(priv->object_id);
+		struct space *space = space_by_id(object_id);
 		if (space)
 			access = space->access;
 		break;
 	}
 	case SC_FUNCTION:
 	{
-		struct func *func = func_by_id(priv->object_id);
+		struct func *func = func_by_id(object_id);
 		if (func)
 			access = func->access;
 		break;
 	}
 	case SC_USER:
 	{
-		/* No grants on a single object user yet. */
+		struct user *user = user_by_id(object_id);
+		if (user)
+			access = user->access;
 		break;
 	}
 	case SC_ROLE:
 	{
-		/* No grants on a single object role yet. */
+		struct user *role = user_by_id(object_id);
+		if (role)
+			access = role->access;
 		break;
 	}
 	case SC_SEQUENCE:
 	{
-		struct sequence *seq = sequence_by_id(priv->object_id);
+		struct sequence *seq = sequence_by_id(object_id);
 		if (seq)
 			access = seq->access;
 		break;
@@ -282,7 +286,8 @@ user_set_effective_access(struct user *user)
 	privset_ifirst(&user->privs, &it);
 	struct priv_def *priv;
 	while ((priv = privset_inext(&it)) != NULL) {
-		struct access *object = access_find(priv);
+		struct access *object = access_find(priv->object_type,
+						    priv->object_id);
 		 /* Protect against a concurrent drop. */
 		if (object == NULL)
 			continue;
@@ -697,7 +702,7 @@ role_revoke(struct user *grantee, struct user *role)
 void
 priv_grant(struct user *grantee, struct priv_def *priv)
 {
-	struct access *object = access_find(priv);
+	struct access *object = access_find(priv->object_type, priv->object_id);
 	if (object == NULL)
 		return;
 	struct access *access = &object[grantee->auth_token];

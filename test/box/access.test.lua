@@ -60,6 +60,7 @@ box.schema.func.drop('dummy')
 box.space['_user']:delete{uid}
 box.schema.user.revoke('rich', 'read,write', 'universe')
 box.schema.user.revoke('rich', 'public')
+box.schema.user.revoke('rich', 'alter', 'user', 'rich')
 box.schema.user.disable("rich")
 -- test double disable is a no op
 box.schema.user.disable("rich")
@@ -727,3 +728,54 @@ _ = box.schema.sequence.create('test_sequence')
 box.session.su('admin')
 box.schema.user.drop('tester')
 
+
+--
+-- test case for 3530: do not ignore single object privileges
+--
+box.schema.user.create("test")
+_ = box.schema.space.create("space1")
+box.schema.user.grant("test", "read", "space", "space1")
+box.schema.user.grant("test", "write", "space", "_index")
+box.session.su("test")
+box.space.space1:create_index("pk")
+box.session.su("admin")
+box.space.space1.index[0] == nil
+box.schema.user.grant("test", "create", "space", "space1")
+box.session.su("test")
+_ = box.space.space1:create_index("pk")
+box.space.space1:insert{5}
+box.session.su("admin")
+box.space.space1.index[0] ~= nil
+box.space.space1:select{}
+box.schema.user.grant("test", "write", "space", "space1")
+box.session.su("test")
+box.space.space1:insert{5}
+box.session.su("admin")
+box.space.space1:select{}
+box.schema.user.drop("test")
+box.space.space1:drop()
+
+--
+-- test that it is possible to grant privileges on a single user.
+box.schema.user.create("user1")
+box.schema.user.create("user2")
+box.schema.user.create("user3")
+box.schema.user.grant("user1", "write", "space", "_user")
+box.schema.user.grant("user1", "read", "space", "_user")
+box.space._user:select{}
+box.session.su("user1")
+-- can alter itself, but can't alter others without privileges.
+box.schema.user.passwd("user1", "abcd")
+box.schema.user.passwd("user2", "abcd")
+box.session.su("admin")
+box.space._user:select{}
+box.schema.user.grant("user1", "alter", "user", "user2")
+box.session.su("user1")
+box.schema.user.passwd("user2", "abcd")
+-- still fails
+box.schema.user.passwd("user3", "qewr")
+box.session.su("admin")
+box.space._user:select{}
+box.schema.user.drop("user1")
+box.schema.user.drop("user2")
+box.schema.user.drop("user3")

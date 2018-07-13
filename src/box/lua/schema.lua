@@ -2060,6 +2060,9 @@ box.schema.user.create = function(name, opts)
     uid = _user:auto_increment{session.euid(), name, 'user', auth_mech_list}[1]
     -- grant role 'public' to the user
     box.schema.user.grant(uid, 'public')
+    -- Grant privilege 'alter' on itself, so that it can
+    -- change its password or username.
+    box.schema.user.grant(uid, 'alter', 'user', uid)
     -- we have to grant global privileges from setuid function, since
     -- only admin has the ownership over universe and we don't have
     -- grant option
