@@ -1577,13 +1577,15 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		case OP_Subtract:  if (sqlite3SubInt64(&iB,iA)) goto fp_math;  break;
 		case OP_Multiply:  if (sqlite3MulInt64(&iB,iA)) goto fp_math;  break;
 		case OP_Divide: {
-			if (iA==0) goto arithmetic_result_is_null;
+			if (iA == 0)
+				goto division_by_zero;
 			if (iA==-1 && iB==SMALLEST_INT64) goto fp_math;
 			iB /= iA;
 			break;
 		}
 		default: {
-			if (iA==0) goto arithmetic_result_is_null;
+			if (iA == 0)
+				goto division_by_zero;
 			if (iA==-1) iA = 1;
 			iB %= iA;
 			break;
@@ -1602,14 +1604,16 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		case OP_Multiply:    rB *= rA;       break;
 		case OP_Divide: {
 			/* (double)0 In case of SQLITE_OMIT_FLOATING_POINT... */
-			if (rA==(double)0) goto arithmetic_result_is_null;
+			if (rA == (double)0)
+				goto division_by_zero;
 			rB /= rA;
 			break;
 		}
 		default: {
 			iA = (i64)rA;
 			iB = (i64)rB;
-			if (iA==0) goto arithmetic_result_is_null;
+			if (iA == 0)
+				goto division_by_zero;
 			if (iA==-1) iA = 1;
 			rB = (double)(iB % iA);
 			break;
@@ -1631,9 +1635,14 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 	}
 	break;
 
-			arithmetic_result_is_null:
+arithmetic_result_is_null:
 	sqlite3VdbeMemSetNull(pOut);
 	break;
+
+division_by_zero:
+	diag_set(ClientError, ER_SQL_EXECUTE, "division by zero");
+	rc = SQL_TARANTOOL_ERROR;
+	goto abort_due_to_error;
 }
 
 /* Opcode: CollSeq P1 * * P4

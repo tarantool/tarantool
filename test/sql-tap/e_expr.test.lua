@@ -165,11 +165,20 @@ for _, op1 in ipairs(oplist) do
             local sql1 = string.format("SELECT %s %s %s %s %s", A, op1, B, op2, C)
             local sql2 = string.format("SELECT (%s %s %s) %s %s", A, op1, B, op2, C)
             local sql3 = string.format("SELECT %s %s (%s %s %s)", A, op1, B, op2, C)
-            local a2 = test:execsql(sql2)
-            local a3 = test:execsql(sql3)
-            test:do_execsql_test(
-                testname,
-                sql1, (opprec[op2] < opprec[op1]) and a3 or a2)
+            local a2 = test:catchsql(sql2)
+            local a3 = test:catchsql(sql3)
+            local res = opprec[op2] < opprec[op1] and a3 or a2
+
+            if res[1] ~= 0 then
+                --
+                -- gh-2135: Division by zero is forbiden.
+                --
+                test:do_catchsql_test(
+                    testname, sql1,
+                    {1, "Failed to execute SQL statement: division by zero"})
+            else
+                test:do_execsql_test(testname, sql1, res[2])
+            end
 
             if (a2 ~= a3) then
                 untested[op1..","..op2] = nil
@@ -460,18 +469,29 @@ literals = {
 for _, op in ipairs(oplist) do
     for n1, rhs in ipairs(literals) do
         for n2, lhs in ipairs(literals) do
-            local t = test:execsql(string.format(" SELECT typeof(%s %s %s) ", lhs, op, rhs))[1]
-            test:do_test(
-                string.format("e_expr-7.%s.%s.%s", opname[op], n1, n2),
-                function()
-                    --print("\n op "..op.." t "..t)
-                    return (((op == "||") and ((t == "text") or
-                            (t == "null"))) or
-                            ((op ~= "||") and (((t == "integer") or
-                                    (t == "real")) or
-                                    (t == "null")))) and 1 or 0
-                end, 1)
-
+            local res = test:catchsql(string.format(" SELECT typeof(%s %s %s) ", lhs, op, rhs))
+            local testname = string.format("e_expr-7.%s.%s.%s", opname[op], n1, n2)
+            if res[1] ~= 0 then
+                --
+                -- gh-2135: Division by zero is forbiden.
+                --
+                test:do_test(
+                    testname,
+                    function()
+                        return res[2] == "Failed to execute SQL statement: division by zero"
+                    end, true)
+            else
+                local t = res[2][1]
+                test:do_test(
+                    testname,
+                    function()
+                        return (((op == "||") and ((t == "text") or
+                                (t == "null"))) or
+                                ((op ~= "||") and (((t == "integer") or
+                                        (t == "real")) or
+                                        (t == "null")))) and 1 or 0
+                    end, 1)
+            end
         end
     end
 end

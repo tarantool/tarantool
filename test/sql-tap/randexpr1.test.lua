@@ -16537,7 +16537,7 @@ test:do_test(
 test:do_test(
     "randexpr-2.1650",
     function()
-        return test:execsql "SELECT f+case when 17-t1.f in (select ~count(distinct (abs((abs(c)/abs(c)))/abs((abs(11)/abs(+case  -t1.a when t1.d then  -13 else 17 end))))-t1.c) from t1 union select ~case cast(avg(t1.c) AS integer) when  -~ -count(*)*max((t1.f))+count(*) then (min(d)) else max(a) end-count(distinct t1.a)+ -count(*)-count(*) from t1) then d when b not between t1.f and t1.e then a else 11 end+t1.a FROM t1 WHERE NOT ((exists(select 1 from t1 where case when exists(select 1 from t1 where case when (t1.e+case (t1.b) when f then case t1.c when 11 |  -13-coalesce((select max(d) from t1 where c not in ( -t1.e,t1.c,17) and t1.c<17),e)*17+t1.a then t1.b else 11 end else d end)+t1.f not in (d,13,d) then f else t1.d end not between (c) and f) then t1.e else f end-t1.c in (t1.b,t1.a,f))))"
+        return test:execsql "SELECT f+case when 17-t1.f in (select ~count(distinct (abs((abs(c)/abs(c)))/abs((abs(11)*abs(+case  -t1.a when t1.d then  -13 else 17 end))))-t1.c) from t1 union select ~case cast(avg(t1.c) AS integer) when  -~ -count(*)*max((t1.f))+count(*) then (min(d)) else max(a) end-count(distinct t1.a)+ -count(*)-count(*) from t1) then d when b not between t1.f and t1.e then a else 11 end+t1.a FROM t1 WHERE NOT ((exists(select 1 from t1 where case when exists(select 1 from t1 where case when (t1.e+case (t1.b) when f then case t1.c when 11 |  -13-coalesce((select max(d) from t1 where c not in ( -t1.e,t1.c,17) and t1.c<17),e)*17+t1.a then t1.b else 11 end else d end)+t1.f not in (d,13,d) then f else t1.d end not between (c) and f) then t1.e else f end-t1.c in (t1.b,t1.a,f))))"
     end, {
         -- <randexpr-2.1650>
         800
