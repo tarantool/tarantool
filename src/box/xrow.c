@@ -311,14 +311,11 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 }
 
 int
-iproto_reply_vote_deprecated(struct obuf *out, uint64_t sync,
-			     uint32_t schema_version,
-			     const struct vclock *vclock,
-			     bool read_only)
+iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
+		    uint64_t sync, uint32_t schema_version)
 {
-	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(2) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(vclock) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(true);
+	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(vclock);
 
 	char *buf = obuf_reserve(out, max_size);
 	if (buf == NULL) {
@@ -328,9 +325,7 @@ iproto_reply_vote_deprecated(struct obuf *out, uint64_t sync,
 	}
 
 	char *data = buf + IPROTO_HEADER_LEN;
-	data = mp_encode_map(data, 2);
-	data = mp_encode_uint(data, IPROTO_SERVER_IS_RO);
-	data = mp_encode_bool(data, read_only);
+	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_vclock(data, vclock);
 	size_t size = data - buf;
@@ -982,7 +977,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *read_only)
+		      uint32_t *version_id)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -997,9 +992,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		return -1;
 	}
 
-	/* For backward compatibility initialize read-only with false. */
-	if (read_only)
-		*read_only = false;
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -1040,16 +1032,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 				return -1;
 			}
 			*version_id = mp_decode_uint(&d);
-			break;
-		case IPROTO_SERVER_IS_RO:
-			if (read_only == NULL)
-				goto skip;
-			if (mp_typeof(*d) != MP_BOOL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "invalid STATUS");
-				return -1;
-			}
-			*read_only = mp_decode_bool(&d);
 			break;
 		default: skip:
 			mp_next(&d); /* value */

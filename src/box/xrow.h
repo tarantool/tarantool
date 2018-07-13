@@ -269,7 +269,6 @@ xrow_encode_subscribe(struct xrow_header *row,
  * @param[out] instance_uuid.
  * @param[out] vclock.
  * @param[out] version_id.
- * @param[out] read_only.
  *
  * @retval  0 Success.
  * @retval -1 Memory or format error.
@@ -277,7 +276,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *read_only);
+		      uint32_t *version_id);
 
 /**
  * Encode JOIN command.
@@ -301,8 +300,7 @@ xrow_encode_join(struct xrow_header *row, const struct tt_uuid *instance_uuid);
 static inline int
 xrow_decode_join(struct xrow_header *row, struct tt_uuid *instance_uuid)
 {
-	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL,
-				     NULL);
+	return xrow_decode_subscribe(row, NULL, instance_uuid, NULL, NULL);
 }
 
 /**
@@ -327,7 +325,7 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock);
 static inline int
 xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 {
-	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL, NULL);
+	return xrow_decode_subscribe(row, NULL, NULL, vclock, NULL);
 }
 
 /**
@@ -389,20 +387,18 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
 
 /**
  * Encode iproto header with IPROTO_OK response code and vclock
- * in the body. This function is DEPRECATED.
+ * in the body.
  * @param out Encode to.
+ * @param vclock Vclock to encode.
  * @param sync Request sync.
  * @param schema_version.
- * @param vclock.
- * @param read_only.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 int
-iproto_reply_vote_deprecated(struct obuf *out, uint64_t sync,
-			     uint32_t schema_version,
-			     const struct vclock *vclock, bool read_only);
+iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
+		    uint64_t sync, uint32_t schema_version);
 
 /**
  * Encode a reply to an IPROTO_VOTE request.
@@ -627,7 +623,7 @@ xrow_decode_subscribe_xc(struct xrow_header *row,
 			 uint32_t *replica_version_id)
 {
 	if (xrow_decode_subscribe(row, replicaset_uuid, instance_uuid,
-				  vclock, replica_version_id, NULL) != 0)
+				  vclock, replica_version_id) != 0)
 		diag_raise();
 }
 
@@ -672,14 +668,12 @@ iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
 		diag_raise();
 }
 
-/** @copydoc iproto_reply_vote_deprecated. */
+/** @copydoc iproto_reply_vclock. */
 static inline void
-iproto_reply_vote_deprecated_xc(struct obuf *out, uint64_t sync,
-				uint32_t schema_version,
-				const struct vclock *vclock, bool read_only)
+iproto_reply_vclock_xc(struct obuf *out, const struct vclock *vclock,
+		       uint64_t sync, uint32_t schema_version)
 {
-	if (iproto_reply_vote_deprecated(out, sync, schema_version,
-					 vclock, read_only) != 0)
+	if (iproto_reply_vclock(out, vclock, sync, schema_version) != 0)
 		diag_raise();
 }
 

@@ -77,8 +77,7 @@ enum iproto_key {
 	IPROTO_VCLOCK = 0x26,
 	IPROTO_EXPR = 0x27, /* EVAL */
 	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
-	IPROTO_SERVER_IS_RO = 0x29,
-	IPROTO_BALLOT = 0x2a,
+	IPROTO_BALLOT = 0x29,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,

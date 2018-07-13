@@ -61,8 +61,6 @@
 #include "iproto_constants.h"
 #include "rmean.h"
 #include "errinj.h"
-#include "applier.h"
-#include "cfg.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,
@@ -1539,10 +1537,9 @@ tx_process_misc(struct cmsg *m)
 					   ::schema_version);
 			break;
 		case IPROTO_VOTE_DEPRECATED:
-			iproto_reply_vote_deprecated_xc(out, msg->header.sync,
-							::schema_version,
-							&replicaset.vclock,
-							cfg_geti("read_only"));
+			iproto_reply_vclock_xc(out, &replicaset.vclock,
+					       msg->header.sync,
+					       ::schema_version);
 			break;
 		case IPROTO_VOTE:
 			box_process_vote(&ballot);
