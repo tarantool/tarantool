@@ -275,13 +275,13 @@ ccons ::= DEFAULT id(X).              {
 ccons ::= NULL onconf(R).        {
     sql_column_add_nullable_action(pParse, ON_CONFLICT_ACTION_NONE);
     /* Trigger nullability mismatch error if required. */
-    if (R != ON_CONFLICT_ACTION_DEFAULT)
+    if (R != ON_CONFLICT_ACTION_ABORT)
         sql_column_add_nullable_action(pParse, R);
 }
 ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
 ccons ::= PRIMARY KEY sortorder(Z) onconf(R) autoinc(I).
                                  {sqlite3AddPrimaryKey(pParse,0,R,I,Z);}
-ccons ::= UNIQUE onconf(R).      {sql_create_index(pParse,0,0,0,R,0,0,
+ccons ::= UNIQUE index_onconf(R). {sql_create_index(pParse,0,0,0,R,0,0,
 						   SORT_ORDER_ASC, false,
 						   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
 ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
@@ -331,7 +331,7 @@ tconscomma ::= .
 tcons ::= CONSTRAINT nm(X).      {pParse->constraintName = X;}
 tcons ::= PRIMARY KEY LP sortlist(X) autoinc(I) RP onconf(R).
                                  {sqlite3AddPrimaryKey(pParse,X,R,I,0);}
-tcons ::= UNIQUE LP sortlist(X) RP onconf(R).
+tcons ::= UNIQUE LP sortlist(X) RP index_onconf(R).
                                  {sql_create_index(pParse,0,0,X,R,0,0,
 						   SORT_ORDER_ASC,false,
 						   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
@@ -350,9 +350,12 @@ defer_subclause_opt(A) ::= defer_subclause(A).
 // default behavior when there is a constraint conflict.
 //
 %type onconf {int}
+%type index_onconf {int}
 %type orconf {int}
 %type resolvetype {int}
-onconf(A) ::= .                              {A = ON_CONFLICT_ACTION_DEFAULT;}
+index_onconf(A) ::= .                           {A = ON_CONFLICT_ACTION_DEFAULT;}
+index_onconf(A) ::= ON CONFLICT resolvetype(X). {A = X;}
+onconf(A) ::= .                              {A = ON_CONFLICT_ACTION_ABORT;}
 onconf(A) ::= ON CONFLICT resolvetype(X).    {A = X;}
 orconf(A) ::= .                              {A = ON_CONFLICT_ACTION_DEFAULT;}
 orconf(A) ::= OR resolvetype(X).             {A = X;}

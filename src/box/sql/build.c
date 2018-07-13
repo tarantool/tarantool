@@ -654,11 +654,11 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	memcpy(column_def, &field_def_default, sizeof(field_def_default));
 	column_def->name = z;
 	/*
-	 * Marker on_conflict_action_MAX is used to detect
+	 * Marker ON_CONFLICT_ACTION_DEFAULT is used to detect
 	 * attempts to define NULL multiple time or to detect
 	 * invalid primary key definition.
 	 */
-	column_def->nullable_action = on_conflict_action_MAX;
+	column_def->nullable_action = ON_CONFLICT_ACTION_DEFAULT;
 	column_def->is_nullable = true;
 
 	if (pType->n == 0) {
@@ -701,8 +701,8 @@ sql_column_add_nullable_action(struct Parse *parser,
 	if (p == NULL || NEVER(p->def->field_count < 1))
 		return;
 	struct field_def *field = &p->def->fields[p->def->field_count - 1];
-	if (field->nullable_action != on_conflict_action_MAX &&
-	    nullable_action != ON_CONFLICT_ACTION_DEFAULT) {
+	if (field->nullable_action != ON_CONFLICT_ACTION_DEFAULT &&
+	    nullable_action != field->nullable_action) {
 		/* Prevent defining nullable_action many times. */
 		const char *err_msg =
 			tt_sprintf("NULL declaration for column '%s' of table "
@@ -867,13 +867,12 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
 			const char *space_name)
 {
 	if (field->nullable_action != ON_CONFLICT_ACTION_ABORT &&
-	    field->nullable_action != ON_CONFLICT_ACTION_DEFAULT &&
-	    field->nullable_action != on_conflict_action_MAX) {
+	    field->nullable_action != ON_CONFLICT_ACTION_DEFAULT) {
 		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name);
 		parser->rc = SQL_TARANTOOL_ERROR;
 		parser->nErr++;
 		return -1;
-	} else if (field->nullable_action == on_conflict_action_MAX) {
+	} else if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
 		field->nullable_action = ON_CONFLICT_ACTION_ABORT;
 		field->is_nullable = false;
 	}
@@ -1636,14 +1635,14 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 			sqlite3ErrorMsg(pParse,
 					"PRIMARY KEY missing on table %s",
 					p->def->name);
-			return;
+			goto cleanup;
 		}
 	}
 
 	/* Set default on_nullable action if required. */
 	struct field_def *field = p->def->fields;
 	for (uint32_t i = 0; i < p->def->field_count; ++i, ++field) {
-		if (field->nullable_action == on_conflict_action_MAX) {
+		if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
 			field->nullable_action = ON_CONFLICT_ACTION_NONE;
 			field->is_nullable = true;
 		}
@@ -1654,7 +1653,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 				"only PRIMARY KEY constraint can "
 				"have ON CONFLICT REPLACE clause "
 				"- %s", p->def->name);
-		return;
+		goto cleanup;
 	}
 	if (db->init.busy) {
 		/*
@@ -1666,7 +1665,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		 */
 		struct ExprList *old_checks = p->def->opts.checks;
 		if (sql_table_def_rebuild(db, p) != 0)
-			return;
+			goto cleanup;
 		sql_expr_list_delete(db, old_checks);
 	}
 
@@ -1684,7 +1683,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 
 		v = sqlite3GetVdbe(pParse);
 		if (NEVER(v == 0))
-			return;
+			goto cleanup;
 
 		/*
 		 * Initialize zType for the new view or table.
@@ -1769,7 +1768,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		if (pOld) {
 			assert(p == pOld);	/* Malloc must have failed inside HashInsert() */
 			sqlite3OomFault(db);
-			return;
+			goto cleanup;
 		}
 		pParse->pNewTable = 0;
 		current_session()->sql_flags |= SQLITE_InternChanges;
@@ -1794,6 +1793,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	 * don't require make a copy on space_def_dup and to improve
 	 * debuggability.
 	 */
+cleanup:
 	sql_expr_list_delete(db, p->def->opts.checks);
 	p->def->opts.checks = NULL;
 }
