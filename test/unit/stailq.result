@@ -1,4 +1,4 @@
-1..68
+1..75
 ok 1 - list is empty
 ok 2 - list is empty after reverse
 ok 3 - first item
@@ -67,3 +67,10 @@ ok 65 - head element after concat 3
 ok 66 - head element after concat 4
 ok 67 - head element after concat 5
 ok 68 - head element after concat 6
+ok 69 - element 0 (insert)
+ok 70 - element 1 (insert)
+ok 71 - element 2 (insert)
+ok 72 - element 3 (insert)
+ok 73 - element 4 (insert)
+ok 74 - first item (insert)
+ok 75 - last item (insert)

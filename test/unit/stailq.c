@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include "unit.h"
 
-#define PLAN		68
+#define PLAN		75
 
 #define ITEMS		7
 
@@ -111,5 +111,19 @@ main(void)
 		is(it, items + i, "head element after concat %d", i);
 		i++;
 	}
+
+	stailq_create(&head);
+	stailq_add_entry(&head, &items[0], next);
+	stailq_insert(&head, &items[2].next, &items[0].next);
+	stailq_insert(&head, &items[1].next, &items[0].next);
+	stailq_insert_entry(&head, &items[4], &items[2], next);
+	stailq_insert_entry(&head, &items[3], &items[2], next);
+	i = 0;
+	stailq_foreach_entry(it, &head, next) {
+		is(it, items + i, "element %d (insert)", i);
+		i++;
+	}
+	is(stailq_first(&head), &items[0].next, "first item (insert)");
+	is(stailq_last(&head), &items[4].next, "last item (insert)");
 	return check_plan();
 }
