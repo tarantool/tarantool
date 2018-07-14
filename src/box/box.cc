@@ -1569,6 +1569,7 @@ box_process_vote(struct ballot *ballot)
 {
 	ballot->is_ro = cfg_geti("read_only") != 0;
 	vclock_copy(&ballot->vclock, &replicaset.vclock);
+	gc_vclock(&ballot->gc_vclock);
 }
 
 /** Insert a new cluster into _schema */

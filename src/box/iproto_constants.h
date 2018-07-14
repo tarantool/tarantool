@@ -87,6 +87,7 @@ enum iproto_key {
 enum iproto_ballot_key {
 	IPROTO_BALLOT_IS_RO = 0x01,
 	IPROTO_BALLOT_VCLOCK = 0x02,
+	IPROTO_BALLOT_GC_VCLOCK = 0x03,
 };
 
 #define bit(c) (1ULL<<IPROTO_##c)

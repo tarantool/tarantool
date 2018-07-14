@@ -61,6 +61,12 @@ void
 gc_free(void);
 
 /**
+ * Get the oldest available vclock.
+ */
+void
+gc_vclock(struct vclock *vclock);
+
+/**
  * Invoke garbage collection in order to remove files left
  * from old checkpoints. The number of checkpoints saved by
  * this function is specified by box.cfg.checkpoint_count.

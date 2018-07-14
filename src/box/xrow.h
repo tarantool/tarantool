@@ -229,6 +229,8 @@ struct ballot {
 	bool is_ro;
 	/** Current instance vclock. */
 	struct vclock vclock;
+	/** Oldest vclock available on the instance. */
+	struct vclock gc_vclock;
 };
 
 /**

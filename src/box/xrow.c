@@ -344,9 +344,10 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 		  uint64_t sync, uint32_t schema_version)
 {
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(2) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(3) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(&ballot->vclock);
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(&ballot->vclock) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(&ballot->gc_vclock);
 
 	char *buf = obuf_reserve(out, max_size);
 	if (buf == NULL) {
@@ -358,11 +359,13 @@ iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
 	char *data = buf + IPROTO_HEADER_LEN;
 	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_BALLOT);
-	data = mp_encode_map(data, 2);
+	data = mp_encode_map(data, 3);
 	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
 	data = mp_encode_bool(data, ballot->is_ro);
 	data = mp_encode_uint(data, IPROTO_BALLOT_VCLOCK);
 	data = mp_encode_vclock(data, &ballot->vclock);
+	data = mp_encode_uint(data, IPROTO_BALLOT_GC_VCLOCK);
+	data = mp_encode_vclock(data, &ballot->gc_vclock);
 	size_t size = data - buf;
 	assert(size <= max_size);
 
@@ -931,6 +934,10 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 			break;
 		case IPROTO_BALLOT_VCLOCK:
 			if (mp_decode_vclock(&data, &ballot->vclock) != 0)
+				goto err;
+			break;
+		case IPROTO_BALLOT_GC_VCLOCK:
+			if (mp_decode_vclock(&data, &ballot->gc_vclock) != 0)
 				goto err;
 			break;
 		default:
