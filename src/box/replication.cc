@@ -41,6 +41,7 @@
 #include "error.h"
 #include "relay.h"
 #include "vclock.h" /* VCLOCK_MAX */
+#include "sio.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -623,6 +624,64 @@ error:
 	/* ignore original error */
 	tnt_raise(ClientError, ER_CFG, "replication",
 		  "failed to connect to one or more replicas");
+}
+
+bool
+replicaset_needs_rejoin(struct replica **master)
+{
+	struct replica *leader = NULL;
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier == NULL)
+			continue;
+
+		const struct ballot *ballot = &applier->ballot;
+		if (vclock_compare(&ballot->gc_vclock,
+				   &replicaset.vclock) <= 0) {
+			/*
+			 * There's at least one master that still stores
+			 * WALs needed by this instance. Proceed to local
+			 * recovery.
+			 */
+			return false;
+		}
+
+		const char *addr_str = sio_strfaddr(&applier->addr,
+						applier->addr_len);
+		char *local_vclock_str = vclock_to_string(&replicaset.vclock);
+		char *remote_vclock_str = vclock_to_string(&ballot->vclock);
+		char *gc_vclock_str = vclock_to_string(&ballot->gc_vclock);
+
+		say_info("can't follow %s: required %s available %s",
+			 addr_str, local_vclock_str, gc_vclock_str);
+
+		if (vclock_compare(&replicaset.vclock, &ballot->vclock) > 0) {
+			/*
+			 * Replica has some rows that are not present on
+			 * the master. Don't rebootstrap as we don't want
+			 * to lose any data.
+			 */
+			say_info("can't rebootstrap from %s: "
+				 "replica has local rows: local %s remote %s",
+				 addr_str, local_vclock_str, remote_vclock_str);
+			goto next;
+		}
+
+		/* Prefer a master with the max vclock. */
+		if (leader == NULL ||
+		    vclock_sum(&ballot->vclock) >
+		    vclock_sum(&leader->applier->ballot.vclock))
+			leader = replica;
+next:
+		free(local_vclock_str);
+		free(remote_vclock_str);
+		free(gc_vclock_str);
+	}
+	if (leader == NULL)
+		return false;
+
+	*master = leader;
+	return true;
 }
 
 void
