@@ -13,7 +13,7 @@ end
 test:do_test(
     "lua_sql-1.0",
     function ()
-        box.internal.sql_create_function("func1", allways_2)
+        box.internal.sql_create_function("func1", "INT", allways_2)
         return test:execsql("select func1(1)")
     end,
     {2})
@@ -22,7 +22,7 @@ test:do_test(
 test:do_test(
     "lua_sql-1.1",
     function ()
-        box.internal.sql_create_function("func1", func1)
+        box.internal.sql_create_function("func1", "INT", func1)
         return test:execsql("select func1(1)")
     end,
     {1})
@@ -32,7 +32,7 @@ test:do_test(
     "lua_sql-1.2",
     function ()
         for i = 1, 1000000, 1 do
-            box.internal.sql_create_function("func1", func1)
+            box.internal.sql_create_function("func1", "INT", func1)
         end
         return test:execsql("select func1(1)")
     end,
@@ -42,10 +42,10 @@ test:do_test(
 test:do_test(
     "lua_sql-1.3",
     function ()
-        box.internal.sql_create_function("allways_2", allways_2, 1) -- specify 1 arg
-        box.internal.sql_create_function("allways_2", func1)
-        box.internal.sql_create_function("allways_2", func1, 2)
-        box.internal.sql_create_function("allways_2", func1, 3)
+        box.internal.sql_create_function("allways_2", "INT", allways_2, 1) -- specify 1 arg
+        box.internal.sql_create_function("allways_2", "INT", func1)
+        box.internal.sql_create_function("allways_2", "INT", func1, 2)
+        box.internal.sql_create_function("allways_2", "INT", func1, 3)
         return test:execsql("select allways_2(1)")
     end,
     {2})
@@ -88,7 +88,7 @@ local function check_from_sql_to_lua(i, arg)
     end
     return 0
 end
-box.internal.sql_create_function("check_from_sql_to_lua", check_from_sql_to_lua)
+box.internal.sql_create_function("check_from_sql_to_lua", "INT", check_from_sql_to_lua)
 
 -- check for different types
 for i = 1, #from_sql_to_lua, 1 do
@@ -108,7 +108,7 @@ local from_lua_to_sql = {
 local function check_from_lua_to_sql(i)
     return from_lua_to_sql[i][2]
 end
-box.internal.sql_create_function("check_from_lua_to_sql", check_from_lua_to_sql)
+box.internal.sql_create_function("check_from_lua_to_sql", "BLOB", check_from_lua_to_sql)
 
 -- check for different types
 for i = 1, #from_lua_to_sql, 1 do
@@ -125,7 +125,7 @@ local from_lua_to_sql_bad = {
 local function check_from_lua_to_sql_bad(i)
     return from_lua_to_sql_bad[i]
 end
-box.internal.sql_create_function("check_from_lua_to_sql_bad", check_from_lua_to_sql_bad)
+box.internal.sql_create_function("check_from_lua_to_sql_bad", "BLOB", check_from_lua_to_sql_bad)
 
 for i = 1, #from_lua_to_sql_bad, 1 do
     test:do_catchsql_test(
@@ -138,7 +138,7 @@ local function allways_error()
     error("my_error123")
     return 1
 end
-box.internal.sql_create_function("allways_error", allways_error)
+box.internal.sql_create_function("allways_error", "INT", allways_error)
 
 test:do_catchsql_test(
     "lua_sql-2.6",

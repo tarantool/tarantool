@@ -76,8 +76,8 @@ counter = function(str)
     return global_counter
 end
 
-box.internal.sql_create_function("counter1", counter, -1, false)
-box.internal.sql_create_function("counter2", counter, -1, true)
+box.internal.sql_create_function("counter1", "INT", counter, -1, false)
+box.internal.sql_create_function("counter2", "INT", counter, -1, true)
 
 test:do_execsql_test(
     "func5-2.2",

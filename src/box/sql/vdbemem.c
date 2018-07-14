@@ -1420,7 +1420,7 @@ void
 sqlite3AnalyzeFunctions(void)
 {
 	static FuncDef aAnalyzeTableFuncs[] = {
-		FUNCTION(sqlite_record, 1, 0, 0, recordFunc),
+		FUNCTION(sqlite_record, 1, 0, 0, recordFunc, 0),
 	};
 	sqlite3InsertBuiltinFuncs(aAnalyzeTableFuncs,
 				  ArraySize(aAnalyzeTableFuncs));

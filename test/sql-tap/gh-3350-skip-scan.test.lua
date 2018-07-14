@@ -19,8 +19,8 @@ local function int_to_char(i)
     return res
 end
 
-box.internal.sql_create_function("lindex", lindex)
-box.internal.sql_create_function("int_to_char", int_to_char)
+box.internal.sql_create_function("lindex", "TEXT", lindex)
+box.internal.sql_create_function("int_to_char", "TEXT", int_to_char)
 
 test:do_execsql_test(
         "skip-scan-1.1",

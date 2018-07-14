@@ -46,6 +46,7 @@ test:do_test(
     function()
         box.internal.sql_create_function(
             "msgpack_decode",
+            "BLOB",
             function(txt)
                 -- MsgPack, must contain single-element array w/ string
                 return require('msgpack').decode(txt)[1]

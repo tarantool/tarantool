@@ -22,7 +22,7 @@ local function isqrt(i)
     return math.floor(math.sqrt(i))
 end
 
-box.internal.sql_create_function("isqrt", isqrt)
+box.internal.sql_create_function("isqrt", "FLOAT", isqrt)
 
 test:do_execsql_test(
     1.0,
@@ -109,9 +109,9 @@ local function det19()
 end
 
 
-box.internal.sql_create_function("det4", det4)
+box.internal.sql_create_function("det4", "NUM", det4)
 
-box.internal.sql_create_function("det19", det19)
+box.internal.sql_create_function("det19", "NUM", det19)
 
 where_clause_x = {"x = det4() AND y = det19()"}
 where_clauses_y = {"x = det19() AND y = det4()"}

@@ -61,7 +61,7 @@ msgpack_decode_sample = function(txt)
     return decoded_str
 end
 
-box.internal.sql_create_function("msgpack_decode_sample", msgpack_decode_sample)
+box.internal.sql_create_function("msgpack_decode_sample", "TEXT", msgpack_decode_sample)
 
 test:do_execsql_test(
     1.2,
@@ -135,7 +135,7 @@ lindex = function(str, pos)
     return string.sub(str, pos+1, pos+1)
 end
 
-box.internal.sql_create_function("lindex", lindex)
+box.internal.sql_create_function("lindex", "TEXT", lindex)
 
 -- Analogue of function from tcl
 lrange = function(str, first, last)
@@ -154,7 +154,7 @@ lrange = function(str, first, last)
     return res_tokens
 end
 
-box.internal.sql_create_function("lrange", lrange)
+box.internal.sql_create_function("lrange", "TEXT", lrange)
 
 generate_tens = function(n)
     tens = {}
@@ -242,7 +242,7 @@ insert_filler_rows_n = function(iStart, nCopy, nVal)
     end
 end
 
-box.internal.sql_create_function("insert_filler_rows_n", insert_filler_rows_n)
+box.internal.sql_create_function("insert_filler_rows_n", "INT", insert_filler_rows_n)
 
 test:do_test(
     4.1,
@@ -1210,7 +1210,7 @@ r = function()
     return math.random(1, 15)
 end
 
-box.internal.sql_create_function("r", r)
+box.internal.sql_create_function("r", "NUM", r)
 
 test:do_test(
     20.1,
@@ -1346,7 +1346,7 @@ int_to_char = function(i)
     return ret
 end
 
-box.internal.sql_create_function("int_to_char", int_to_char)
+box.internal.sql_create_function("int_to_char", "TEXT", int_to_char)
 
 -- These tests are commented until query planer will be stable.
 --test:do_execsql_test(

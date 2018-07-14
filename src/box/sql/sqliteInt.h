@@ -724,6 +724,7 @@ sqlite3_memory_used(void);
 int
 sqlite3_create_function_v2(sqlite3 * db,
 			   const char *zFunctionName,
+			   enum affinity_type type,
 			   int nArg,
 			   int flags,
 			   void *pApp,
@@ -1641,6 +1642,8 @@ struct FuncDef {
 		FuncDef *pHash;	/* Next with a different name but the same hash */
 		FuncDestructor *pDestructor;	/* Reference counted destructor function */
 	} u;
+	/* Return type. */
+	enum affinity_type ret_type;
 };
 
 /*
@@ -1723,30 +1726,30 @@ struct FuncDestructor {
  *     FuncDef.flags variable is set to the value passed as the flags
  *     parameter.
  */
-#define FUNCTION(zName, nArg, iArg, bNC, xFunc) \
+#define FUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
   {nArg, SQLITE_FUNC_CONSTANT|(bNC*SQLITE_FUNC_NEEDCOLL), \
-   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
-#define VFUNCTION(zName, nArg, iArg, bNC, xFunc) \
+   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type }
+#define VFUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
   {nArg, (bNC*SQLITE_FUNC_NEEDCOLL), \
-   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
-#define DFUNCTION(zName, nArg, iArg, bNC, xFunc) \
+   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type }
+#define DFUNCTION(zName, nArg, iArg, bNC, xFunc, type) \
   {nArg, SQLITE_FUNC_SLOCHNG|(bNC*SQLITE_FUNC_NEEDCOLL), \
-   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
-#define FUNCTION2(zName, nArg, iArg, bNC, xFunc, extraFlags) \
+   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type }
+#define FUNCTION2(zName, nArg, iArg, bNC, xFunc, extraFlags, type) \
   {nArg,SQLITE_FUNC_CONSTANT|(bNC*SQLITE_FUNC_NEEDCOLL)|extraFlags,\
-   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0} }
+   SQLITE_INT_TO_PTR(iArg), 0, xFunc, 0, #zName, {0}, type }
 #define STR_FUNCTION(zName, nArg, pArg, bNC, xFunc) \
   {nArg, SQLITE_FUNC_SLOCHNG|(bNC*SQLITE_FUNC_NEEDCOLL), \
-   pArg, 0, xFunc, 0, #zName, }
-#define LIKEFUNC(zName, nArg, arg, flags) \
+   pArg, 0, xFunc, 0, #zName, {SQLITE_AFF_STRING, {0}}}
+#define LIKEFUNC(zName, nArg, arg, flags, type) \
   {nArg, SQLITE_FUNC_CONSTANT|flags, \
-   (void *)arg, 0, likeFunc, 0, #zName, {0} }
-#define AGGREGATE(zName, nArg, arg, nc, xStep, xFinal) \
+   (void *)arg, 0, likeFunc, 0, #zName, {0}, type }
+#define AGGREGATE(zName, nArg, arg, nc, xStep, xFinal, type) \
   {nArg, (nc*SQLITE_FUNC_NEEDCOLL), \
-   SQLITE_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}}
-#define AGGREGATE2(zName, nArg, arg, nc, xStep, xFinal, extraFlags) \
+   SQLITE_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
+#define AGGREGATE2(zName, nArg, arg, nc, xStep, xFinal, extraFlags, type) \
   {nArg, (nc*SQLITE_FUNC_NEEDCOLL)|extraFlags, \
-   SQLITE_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}}
+   SQLITE_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
 
 /*
  * All current savepoints are stored in a linked list starting at
@@ -4520,7 +4523,8 @@ sql_key_info_to_key_def(struct sql_key_info *key_info);
 
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
-int sqlite3CreateFunc(sqlite3 *, const char *, int, int, void *,
+int sqlite3CreateFunc(sqlite3 *, const char *, enum affinity_type,
+		      int, int, void *,
 		      void (*)(sqlite3_context *, int, sqlite3_value **),
 		      void (*)(sqlite3_context *, int, sqlite3_value **),
 		      void (*)(sqlite3_context *),

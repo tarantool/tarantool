@@ -451,7 +451,7 @@ local function sleeper()
     -- after 100 ms
     os.execute("sleep 0.1")
 end
-box.internal.sql_create_function("sleeper", sleeper)
+box.internal.sql_create_function("sleeper", "INT", sleeper)
 -- db("func", "sleeper", "sleeper")
 test:do_test(
     "date-15.1",

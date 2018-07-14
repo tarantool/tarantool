@@ -708,7 +708,7 @@ test:do_execsql_test(
 local function myfunc(x)
     return x < 10
 end
-box.internal.sql_create_function("myfunc", myfunc)
+box.internal.sql_create_function("myfunc", "INT", myfunc)
 
 test:do_execsql_test(
     7.1,

@@ -46,7 +46,7 @@ local function has_rowdata(sql)
 --     X(41, "X!cmd", [=[["expr","[lsearch [execsql \"explain $sql\"] RowData]>=0"]]=])
 end
 
-box.internal.sql_create_function('randstr', test.randstr, 1)
+box.internal.sql_create_function('randstr', 'TEXT', test.randstr, 1)
 
 -- MUST_WORK_TEST
 test:do_execsql_test(

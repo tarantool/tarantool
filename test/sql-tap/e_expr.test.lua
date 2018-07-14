@@ -43,8 +43,8 @@ end
 local function regexfunc(a, b)
     return (a == b)
 end
-box.internal.sql_create_function("MATCH", matchfunc)
-box.internal.sql_create_function("REGEXP", regexfunc)
+box.internal.sql_create_function("MATCH", "INT", matchfunc)
+box.internal.sql_create_function("REGEXP", "INT", regexfunc)
 
 -- Set up three global variables:
 --
@@ -653,7 +653,7 @@ end
 local function reverse_collate(zLeft, zRight)
     return reverse_str(zLeft) > reverse_str(zRight)
 end
-box.internal.sql_create_function("REVERSE", reverse_collate)
+box.internal.sql_create_function("REVERSE", "INT", reverse_collate)
 --db("collate", "reverse", "reverse_collate")
 -- EVIDENCE-OF: R-59577-33471 The COLLATE operator is a unary postfix
 -- operator that assigns a collating sequence to an expression.
@@ -1277,9 +1277,9 @@ local function glob(args)
     return 1
 end
 
-box.internal.sql_create_function("GLOB", glob)
-box.internal.sql_create_function("MATCH", glob)
-box.internal.sql_create_function("REGEXP", glob)
+box.internal.sql_create_function("GLOB", "INT", glob)
+box.internal.sql_create_function("MATCH", "INT", glob)
+box.internal.sql_create_function("REGEXP", "INT", glob)
 local test_cases12 ={
     {1, 123},
     {2, 123.4e05},
@@ -1438,7 +1438,7 @@ local function func_x()
     xcount = xcount + 1
     return x
 end
-box.internal.sql_create_function("X", func_x)
+box.internal.sql_create_function("X", "INT", func_x)
 local test_cases13 = {
     {1, 10, "x() >= 5 AND x() <= 15", 1, 2},
     {2, 10, "x() BETWEEN 5 AND 15", 1, 1},
@@ -2126,7 +2126,7 @@ function likefunc(...)
     return 1
 end
 
-box.internal.sql_create_function("LIKE", likefunc)
+box.internal.sql_create_function("LIKE", "INT", likefunc)
 --db("func", "like", "-argcount", 2, "likefunc")
 --db("func", "like", "-argcount", 3, "likefunc")
 test:do_execsql_test(
@@ -2430,7 +2430,7 @@ local function globfunc(...)
     end
     return 1
 end
-box.internal.sql_create_function("GLOB", globfunc, 2)
+box.internal.sql_create_function("GLOB", "INT", globfunc, 2)
 --db("func", "glob", "-argcount", 2, "globfunc")
 
 test:do_execsql_test(
@@ -2498,7 +2498,7 @@ local function regexpfunc(...)
     end
     return 1
 end
-box.internal.sql_create_function("REGEXP", regexpfunc, 2)
+box.internal.sql_create_function("REGEXP", "INT", regexpfunc, 2)
 --db("func", "regexp", "-argcount", 2, "regexpfunc")
 
 test:do_execsql_test(
@@ -2581,7 +2581,7 @@ local function matchfunc(...)
     end
     return 1
 end
-box.internal.sql_create_function("MATCH", matchfunc, 2)
+box.internal.sql_create_function("MATCH", "INT", matchfunc, 2)
 
 test:do_execsql_test(
     "e_expr-19.2.1",
@@ -2659,7 +2659,7 @@ local function var(nm)
     local result = loadstring("return "..nm)()
     return result
 end
-box.internal.sql_create_function("VAR", var)
+box.internal.sql_create_function("VAR", "BLOB", var)
 --db("func", "var", "var")
 -- EVIDENCE-OF: R-30638-59954 In a CASE without a base expression, each
 -- WHEN expression is evaluated and the result treated as a boolean,
@@ -3070,7 +3070,7 @@ local function ceval(x)
     evalcount = evalcount + 1
     return x
 end
-box.internal.sql_create_function("CEVAL", ceval)
+box.internal.sql_create_function("CEVAL", "BLOB", ceval)
 evalcount = 0
 test:do_execsql_test(
     "e_expr-26.1.1",

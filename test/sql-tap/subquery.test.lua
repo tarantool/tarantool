@@ -720,7 +720,7 @@ test:do_test(
         end
 
         callcnt = 0
-        box.internal.sql_create_function("callcnt", callcntproc)
+        box.internal.sql_create_function("callcnt", "INT", callcntproc)
         return test:execsql [[
             CREATE TABLE t4(x,y PRIMARY KEY);
             INSERT INTO t4 VALUES('one',1);
