@@ -1809,25 +1809,15 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 {
 	/* Database connection */
 	sqlite3 *db = parse->db;
-	int i, j;		/* Loop counters */
 	u32 cnt;		/* Index added to make the name unique */
-	Column *aCol, *pCol;	/* For looping over result columns */
-	int nCol;		/* Number of columns in the result set */
 	Expr *p;		/* Expression for a single result column */
 	char *zName;		/* Column name */
 	int nName;		/* Size of name in zName[] */
 	Hash ht;		/* Hash table of column names */
 
 	sqlite3HashInit(&ht);
-	if (expr_list) {
-		nCol = expr_list->nExpr;
-		aCol = sqlite3DbMallocZero(db, sizeof(aCol[0]) * nCol);
-		testcase(aCol == 0);
-	} else {
-		nCol = 0;
-		aCol = NULL;
-	}
-	assert(nCol == (i16) nCol);
+	uint32_t column_count =
+		expr_list != NULL ? (uint32_t)expr_list->nExpr : 0;
 	/*
 	 * This should be a table without resolved columns.
 	 * sqlite3ViewGetColumnNames could use it to resolve
@@ -1836,21 +1826,21 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 	assert(table->def->fields == NULL);
 	struct region *region = &parse->region;
 	table->def->fields =
-		region_alloc(region, nCol * sizeof(table->def->fields[0]));
+		region_alloc(region,
+			     column_count * sizeof(table->def->fields[0]));
 	if (table->def->fields == NULL) {
 		sqlite3OomFault(db);
 		goto cleanup;
 	}
-	for (int i = 0; i < nCol; i++) {
+	for (uint32_t i = 0; i < column_count; i++) {
 		memcpy(&table->def->fields[i], &field_def_default,
 		       sizeof(field_def_default));
 		table->def->fields[i].nullable_action = ON_CONFLICT_ACTION_NONE;
 		table->def->fields[i].is_nullable = true;
 	}
-	table->def->field_count = (uint32_t)nCol;
-	table->aCol = aCol;
+	table->def->field_count = column_count;
 
-	for (i = 0, pCol = aCol; i < nCol; i++, pCol++) {
+	for (uint32_t i = 0; i < column_count; i++) {
 		/* Get an appropriate name for the column
 		 */
 		p = sqlite3ExprSkipCollate(expr_list->a[i].pExpr);
@@ -1887,9 +1877,9 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 		while (zName && sqlite3HashFind(&ht, zName) != 0) {
 			nName = sqlite3Strlen30(zName);
 			if (nName > 0) {
+				int j;
 				for (j = nName - 1;
-				     j > 0 && sqlite3Isdigit(zName[j]); j--) {
-				}
+				     j > 0 && sqlite3Isdigit(zName[j]); j--);
 				if (zName[j] == ':')
 					nName = j;
 			}
@@ -1899,7 +1889,9 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 				sqlite3_randomness(sizeof(cnt), &cnt);
 		}
 		size_t name_len = strlen(zName);
-		if (zName != NULL && sqlite3HashInsert(&ht, zName, pCol) == pCol)
+		void *field = &table->def->fields[i];
+		if (zName != NULL &&
+		    sqlite3HashInsert(&ht, zName, field) == field)
 			sqlite3OomFault(db);
 		table->def->fields[i].name =
 			region_alloc(region, name_len + 1);
@@ -1919,10 +1911,8 @@ cleanup:
 		 * pTable->def could be not temporal in
 		 * sqlite3ViewGetColumnNames so we need clean-up.
 		 */
-		sqlite3DbFree(db, aCol);
 		table->def->fields = NULL;
 		table->def->field_count = 0;
-		table->aCol = NULL;
 		rc = SQLITE_NOMEM_BKPT;
 	}
 	return rc;
@@ -1947,8 +1937,6 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 {
 	sqlite3 *db = pParse->db;
 	NameContext sNC;
-	Column *pCol;
-	int i;
 	Expr *p;
 	struct ExprList_item *a;
 
@@ -1961,8 +1949,7 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	memset(&sNC, 0, sizeof(sNC));
 	sNC.pSrcList = pSelect->pSrc;
 	a = pSelect->pEList->a;
-	for (i = 0, pCol = pTab->aCol;
-		i < (int)pTab->def->field_count; i++, pCol++) {
+	for (uint32_t i = 0; i < pTab->def->field_count; i++) {
 		enum field_type type;
 		p = a[i].pExpr;
 		type = columnType(&sNC, p, 0, 0);
@@ -1972,13 +1959,11 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 		if (affinity == 0)
 			affinity = AFFINITY_BLOB;
 		pTab->def->fields[i].affinity = affinity;
-		bool unused;
-		uint32_t id;
-		struct coll *coll = sql_expr_coll(pParse, p, &unused, &id);
-		if (coll != NULL && pCol->coll == NULL) {
-			pCol->coll = coll;
-			pTab->def->fields[i].coll_id = id;
-		}
+		bool is_found;
+		uint32_t coll_id;
+		if (pTab->def->fields[i].coll_id == COLL_NONE &&
+		    sql_expr_coll(pParse, p, &is_found, &coll_id) && is_found)
+			pTab->def->fields[i].coll_id = coll_id;
 	}
 }
 

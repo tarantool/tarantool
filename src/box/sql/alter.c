@@ -147,7 +147,6 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	Table *pNew;		/* Copy of pParse->pNewTable */
 	Table *pTab;		/* Table being altered */
 	const char *zTab;	/* Table name */
-	Column *pCol;		/* The new column */
 	Expr *pDflt;		/* Default value for the new column */
 	sqlite3 *db;		/* The database connection; */
 	Vdbe *v = pParse->pVdbe;	/* The prepared statement under construction */
@@ -162,7 +161,6 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 
 	/* Skip the "sqlite_altertab_" prefix on the name. */
 	zTab = &pNew->def->name[16];
-	pCol = &pNew->aCol[pNew->def->field_count - 1];
 	assert(pNew->def != NULL);
 	pDflt = space_column_default_expr(pNew->def->id,
 					  pNew->def->field_count - 1);
@@ -182,7 +180,10 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	 * If there is a NOT NULL constraint, then the default value for the
 	 * column must not be NULL.
 	 */
-	if (pCol->is_primkey) {
+	struct Index *pk = sqlite3PrimaryKeyIndex(pTab);
+	assert(pk != NULL);
+	struct key_def *pk_key_def = pk->def->key_def;
+	if (key_def_find(pk_key_def, pNew->def->field_count - 1) != NULL) {
 		sqlite3ErrorMsg(pParse, "Cannot add a PRIMARY KEY column");
 		return;
 	}
@@ -259,8 +260,6 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	Table *pNew;
 	Table *pTab;
 	Vdbe *v;
-	uint32_t i;
-	int nAlloc;
 	sqlite3 *db = pParse->db;
 
 	/* Look up the table being altered. */
@@ -297,24 +296,10 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	}
 	pParse->pNewTable = pNew;
 	assert(pNew->def->field_count > 0);
-	nAlloc = (((pNew->def->field_count - 1) / 8) * 8) + 8;
-	assert((uint32_t)nAlloc >= pNew->def->field_count && nAlloc % 8 == 0 &&
-	       nAlloc - pNew->def->field_count < 8);
-	pNew->aCol =
-	    (Column *) sqlite3DbMallocZero(db, sizeof(Column) * nAlloc);
 	/* FIXME: pNew->zName = sqlite3MPrintf(db, "sqlite_altertab_%s", pTab->zName); */
 	/* FIXME: if (!pNew->aCol || !pNew->zName) { */
-	if (!pNew->aCol) {
-		assert(db->mallocFailed);
-		goto exit_begin_add_column;
-	}
-	memcpy(pNew->aCol, pTab->aCol, sizeof(Column) * pNew->def->field_count);
-	for (i = 0; i < pNew->def->field_count; i++) {
-		Column *pCol = &pNew->aCol[i];
-		/* FIXME: pNew->def->name = sqlite3DbStrDup(db, pCol->zName); */
-		pCol->coll = NULL;
-		pNew->def->fields[i].coll_id = COLL_NONE;
-	}
+	for (uint32_t i = 0; i < pNew->def->field_count; i++)
+		pNew->def->fields[i] = field_def_default;
 	pNew->pSchema = db->pSchema;
 	pNew->addColOffset = pTab->addColOffset;
 	pNew->nTabRef = 1;

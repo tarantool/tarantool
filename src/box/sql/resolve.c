@@ -219,7 +219,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 	NameContext *pTopNC = pNC;	/* First namecontext in the list */
 	int isTrigger = 0;	/* True if resolved to a trigger column */
 	Table *pTab = 0;	/* Table hold the row */
-	Column *pCol;		/* A column of pTab */
 
 	assert(pNC);		/* the name context cannot be NULL. */
 	assert(zCol);		/* The Z in X.Y.Z cannot be NULL */
@@ -272,9 +271,8 @@ lookupName(Parse * pParse,	/* The parsing context */
 				if (0 == (cntTab++)) {
 					pMatch = pItem;
 				}
-				for (j = 0, pCol = pTab->aCol;
-					j < (int)pTab->def->field_count;
-					j++, pCol++) {
+				for (j = 0; j < (int)pTab->def->field_count;
+				     j++) {
 					if (strcmp(pTab->def->fields[j].name,
 						   zCol) == 0) {
 						/* If there has been exactly one prior match and this match
@@ -331,9 +329,8 @@ lookupName(Parse * pParse,	/* The parsing context */
 			if (pTab) {
 				int iCol;
 				cntTab++;
-				for (iCol = 0, pCol = pTab->aCol;
-				     iCol < (int)pTab->def->field_count;
-				     iCol++, pCol++) {
+				for (iCol = 0; iCol <
+				     (int)pTab->def->field_count; iCol++) {
 					if (strcmp(pTab->def->fields[iCol].name,
 						   zCol) == 0) {
 						break;

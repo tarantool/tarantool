@@ -359,7 +359,7 @@ test:do_catchsql_test(
         CREATE TABLE t3(a PRIMARY KEY ON CONFLICT REPLACE,
                         b UNIQUE ON CONFLICT REPLACE);
     ]], {
-        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
+        1, "SQL error: only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
 test:do_catchsql_test(
@@ -368,7 +368,7 @@ test:do_catchsql_test(
         CREATE TABLE t3(a PRIMARY KEY,
                         b UNIQUE ON CONFLICT REPLACE);
     ]], {
-        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
+        1, "SQL error: only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
 test:do_catchsql_test(
@@ -378,7 +378,7 @@ test:do_catchsql_test(
                         b UNIQUE ON CONFLICT REPLACE,
                         c UNIQUE ON CONFLICT REPLACE);
     ]], {
-        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
+        1, "SQL error: only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
 test:do_catchsql_test(
@@ -387,7 +387,7 @@ test:do_catchsql_test(
         CREATE TABLE t3(a PRIMARY KEY,
                         b NOT NULL ON CONFLICT REPLACE DEFAULT 1488);
     ]], {
-        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
+        1, "SQL error: only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
 test:do_catchsql_test(
@@ -396,7 +396,7 @@ test:do_catchsql_test(
         CREATE TABLE t3(a PRIMARY KEY ON CONFLICT REPLACE,
                         b NOT NULL ON CONFLICT REPLACE DEFAULT 1488);
     ]], {
-        1, "only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
+        1, "SQL error: only PRIMARY KEY constraint can have ON CONFLICT REPLACE clause - T3"
     })
 
 test:finish_test()

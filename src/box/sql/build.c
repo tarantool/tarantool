@@ -116,38 +116,48 @@ sql_finish_coding(struct Parse *parse_context)
 
 /**
  * This is a function which should be called during execution
- * of sqlite3EndTable. It ensures that only PRIMARY KEY
- * constraint may have ON CONFLICT REPLACE clause.
+ * of sqlite3EndTable. It set defaults for columns having no
+ * separate NULL/NOT NULL specifiers and ensures that only
+ * PRIMARY KEY constraint may have ON CONFLICT REPLACE clause.
  *
+ * @param parser SQL Parser object.
  * @param table Space which should be checked.
- * @retval False, if only primary key constraint has
- *         ON CONFLICT REPLACE clause or if there are no indexes
- *         with REPLACE as error action. True otherwise.
+ * @retval -1 on error. Parser SQL_TARANTOOL_ERROR is set.
+ * @retval 0 on success.
  */
-static bool
-check_on_conflict_replace_entries(struct Table *table)
+static int
+actualize_on_conflict_actions(struct Parse *parser, struct Table *table)
 {
-	/* Check all NOT NULL constraints. */
-	for (int i = 0; i < (int)table->def->field_count; i++) {
-		enum on_conflict_action on_error =
-			table->def->fields[i].nullable_action;
-		if (on_error == ON_CONFLICT_ACTION_REPLACE &&
-		    table->aCol[i].is_primkey == false) {
-			return true;
+	const char *err_msg = NULL;
+	struct field_def *field = table->def->fields;
+	struct Index *pk = sqlite3PrimaryKeyIndex(table);
+	for (uint32_t i = 0; i < table->def->field_count; ++i, ++field) {
+		if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
+			/* Set default nullability NONE. */
+			field->nullable_action = ON_CONFLICT_ACTION_NONE;
+			field->is_nullable = true;
 		}
+		if (field->nullable_action == ON_CONFLICT_ACTION_REPLACE &&
+		    (pk == NULL || key_def_find(pk->def->key_def, i) == NULL))
+			goto non_pk_on_conflict_error;
 	}
-	/* Check all UNIQUE constraints. */
+
 	for (struct Index *idx = table->pIndex; idx; idx = idx->pNext) {
 		if (idx->onError == ON_CONFLICT_ACTION_REPLACE &&
-		    !IsPrimaryKeyIndex(idx)) {
-			return true;
-		}
+		    !IsPrimaryKeyIndex(idx))
+			goto non_pk_on_conflict_error;
 	}
-	/*
-	 * CHECK constraints are not allowed to have REPLACE as
-	 * error action and therefore can be skipped.
-	 */
-	return false;
+
+	return 0;
+
+non_pk_on_conflict_error:
+	err_msg = tt_sprintf("only PRIMARY KEY constraint can have "
+			     "ON CONFLICT REPLACE clause - %s",
+			     table->def->name);
+	diag_set(ClientError, ER_SQL, err_msg);
+	parser->rc = SQL_TARANTOOL_ERROR;
+	parser->nErr++;
+	return -1;
 }
 
 /*
@@ -338,7 +348,6 @@ deleteTable(sqlite3 * db, Table * pTable)
 	/* Delete the Table structure itself.
 	 */
 	sqlite3HashClear(&pTable->idxHash);
-	sqlite3DbFree(db, pTable->aCol);
 	sqlite3DbFree(db, pTable->zColAff);
 	assert(pTable->def != NULL);
 	/* Do not delete pTable->def allocated on region. */
@@ -601,7 +610,6 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 	int i;
 	char *z;
 	char *zType;
-	Column *pCol;
 	sqlite3 *db = pParse->db;
 	if ((p = pParse->pNewTable) == 0)
 		return;
@@ -639,17 +647,6 @@ sqlite3AddColumn(Parse * pParse, Token * pName, Token * pType)
 			return;
 		}
 	}
-	if ((p->def->field_count & 0x7) == 0) {
-		Column *aNew =
-			sqlite3DbRealloc(db, p->aCol,
-					 (p->def->field_count + 8) *
-					 sizeof(p->aCol[0]));
-		if (aNew == NULL)
-			return;
-		p->aCol = aNew;
-	}
-	pCol = &p->aCol[p->def->field_count];
-	memset(pCol, 0, sizeof(p->aCol[0]));
 	struct field_def *column_def = &p->def->fields[p->def->field_count];
 	memcpy(column_def, &field_def_default, sizeof(field_def_default));
 	column_def->name = z;
@@ -900,7 +897,6 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
     )
 {
 	Table *pTab = pParse->pNewTable;
-	Column *pCol = 0;
 	int iCol = -1, i;
 	int nTerm;
 	if (pTab == 0)
@@ -914,8 +910,6 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	pTab->tabFlags |= TF_HasPrimaryKey;
 	if (pList == 0) {
 		iCol = pTab->def->field_count - 1;
-		pCol = &pTab->aCol[iCol];
-		pCol->is_primkey = 1;
 		nTerm = 1;
 	} else {
 		nTerm = pList->nExpr;
@@ -924,25 +918,22 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 			    sqlite3ExprSkipCollate(pList->a[i].pExpr);
 			assert(pCExpr != 0);
 			if (pCExpr->op != TK_ID) {
-				sqlite3ErrorMsg(pParse, "expressions prohibited in PRIMARY KEY");
+				sqlite3ErrorMsg(pParse, "expressions prohibited"
+							" in PRIMARY KEY");
 				goto primary_key_exit;
 			}
-			const char *zCName = pCExpr->u.zToken;
-			for (iCol = 0;
-				iCol < (int)pTab->def->field_count; iCol++) {
-				if (strcmp
-				    (zCName,
-				     pTab->def->fields[iCol].name) == 0) {
-					pCol = &pTab->aCol[iCol];
-					pCol->is_primkey = 1;
+			const char *name = pCExpr->u.zToken;
+			struct space_def *def = pTab->def;
+			for (uint32_t idx = 0; idx < def->field_count; idx++) {
+				if (strcmp(name, def->fields[idx].name) == 0) {
+					iCol = idx;
 					break;
 				}
 			}
 		}
 	}
-	assert(pCol == NULL || pCol == &pTab->aCol[iCol]);
-	if (nTerm == 1 && pCol != NULL &&
-	    (pTab->def->fields[iCol].type == FIELD_TYPE_INTEGER) &&
+	if (nTerm == 1 && iCol != -1 &&
+	    pTab->def->fields[iCol].type == FIELD_TYPE_INTEGER &&
 	    sortOrder != SORT_ORDER_DESC) {
 		assert(autoInc == 0 || autoInc == 1);
 		if (autoInc) {
@@ -966,19 +957,23 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	} else if (autoInc) {
 		sqlite3ErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
 				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
+		goto primary_key_exit;
 	} else {
 		sql_create_index(pParse, 0, 0, pList, onError, 0,
 				 0, sortOrder, false,
 				 SQL_INDEX_TYPE_CONSTRAINT_PK);
 		pList = 0;
+		if (pParse->nErr > 0)
+			goto primary_key_exit;
 	}
 
-	/* Mark every PRIMARY KEY column as NOT NULL. */
-	for (uint32_t i = 0; i < pTab->def->field_count; i++) {
-		if (pTab->aCol[i].is_primkey) {
-			field_def_create_for_pk(pParse, &pTab->def->fields[i],
-						pTab->def->name);
-		}
+	struct Index *pk = sqlite3PrimaryKeyIndex(pTab);
+	assert(pk != NULL);
+	struct key_def *pk_key_def = pk->def->key_def;
+	for (uint32_t i = 0; i < pk_key_def->part_count; i++) {
+		uint32_t idx = pk_key_def->parts[i].fieldno;
+		field_def_create_for_pk(pParse, &pTab->def->fields[idx],
+					pTab->def->name);
 	}
 primary_key_exit:
 	sql_expr_list_delete(pParse->db, pList);
@@ -1028,9 +1023,8 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 	char *zColl = sqlite3NameFromToken(db, pToken);
 	if (!zColl)
 		return;
-	uint32_t *id = &p->def->fields[i].coll_id;
-	p->aCol[i].coll = sql_get_coll_seq(pParse, zColl, id);
-	if (p->aCol[i].coll != NULL) {
+	uint32_t *coll_id = &p->def->fields[i].coll_id;
+	if (sql_get_coll_seq(pParse, zColl, coll_id) != NULL) {
 		/* If the column is declared as "<name> PRIMARY KEY COLLATE <type>",
 		 * then an index may have been created on this column before the
 		 * collation type was added. Correct this if it is the case.
@@ -1039,9 +1033,8 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 		     pIdx = pIdx->pNext) {
 			assert(pIdx->def->key_def->part_count == 1);
 			if (pIdx->def->key_def->parts[0].fieldno == i) {
-				id = &pIdx->def->key_def->parts[0].coll_id;
-				pIdx->def->key_def->parts[0].coll =
-					sql_column_collation(p->def, i, id);
+				coll_id = &pIdx->def->key_def->parts[0].coll_id;
+				(void)sql_column_collation(p->def, i, coll_id);
 			}
 		}
 	}
@@ -1190,14 +1183,11 @@ identPut(char *z, int *pIdx, char *zSignedIdent)
 static char *
 createTableStmt(sqlite3 * db, Table * p)
 {
-	int i, k, n;
 	char *zStmt;
 	char *zSep, *zSep2, *zEnd;
-	Column *pCol;
-	n = 0;
-	for (pCol = p->aCol, i = 0; i < (int)p->def->field_count; i++, pCol++) {
+	int n = 0;
+	for (uint32_t i = 0; i < p->def->field_count; i++)
 		n += identLength(p->def->fields[i].name) + 5;
-	}
 	n += identLength(p->def->name);
 	if (n < 50) {
 		zSep = "";
@@ -1215,10 +1205,10 @@ createTableStmt(sqlite3 * db, Table * p)
 		return 0;
 	}
 	sqlite3_snprintf(n, zStmt, "CREATE TABLE ");
-	k = sqlite3Strlen30(zStmt);
+	int k = sqlite3Strlen30(zStmt);
 	identPut(zStmt, &k, p->def->name);
 	zStmt[k++] = '(';
-	for (pCol = p->aCol, i = 0; i < (int)p->def->field_count; i++, pCol++) {
+	for (uint32_t i = 0; i < p->def->field_count; i++) {
 		static const char *const azType[] = {
 			/* AFFINITY_BLOB    */ "",
 			/* AFFINITY_TEXT    */ " TEXT",
@@ -1639,22 +1629,9 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		}
 	}
 
-	/* Set default on_nullable action if required. */
-	struct field_def *field = p->def->fields;
-	for (uint32_t i = 0; i < p->def->field_count; ++i, ++field) {
-		if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
-			field->nullable_action = ON_CONFLICT_ACTION_NONE;
-			field->is_nullable = true;
-		}
-	}
-
-	if (check_on_conflict_replace_entries(p)) {
-		sqlite3ErrorMsg(pParse,
-				"only PRIMARY KEY constraint can "
-				"have ON CONFLICT REPLACE clause "
-				"- %s", p->def->name);
+	if (actualize_on_conflict_actions(pParse, p))
 		goto cleanup;
-	}
+
 	if (db->init.busy) {
 		/*
 		 * As rebuild creates a new ExpList tree and
@@ -1829,12 +1806,9 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 		sqlite3SelectAddColumnTypeAndCollation(parse_context, p,
 						       select);
 	} else {
-		assert(p->aCol == NULL);
 		assert(sel_tab->def->opts.is_temporary);
 		p->def->fields = sel_tab->def->fields;
 		p->def->field_count = sel_tab->def->field_count;
-		p->aCol = sel_tab->aCol;
-		sel_tab->aCol = NULL;
 		sel_tab->def->fields = NULL;
 		sel_tab->def->field_count = 0;
 	}

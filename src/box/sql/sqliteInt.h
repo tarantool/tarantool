@@ -1872,16 +1872,6 @@ struct Savepoint {
 #define SAVEPOINT_RELEASE    1
 #define SAVEPOINT_ROLLBACK   2
 
-/*
- * information about each column of an SQL table is held in an instance
- * of this structure.
- */
-struct Column {
-	/** Collating sequence. */
-	struct coll *coll;
-	u8 is_primkey;		/* Boolean propertie for being PK */
-};
-
 #define sqlite3IsNumericAffinity(X)  ((X)>=AFFINITY_NUMERIC)
 
 /*
@@ -1910,7 +1900,6 @@ struct Column {
  * by an instance of the following structure.
  */
 struct Table {
-	Column *aCol;		/* Information about each column */
 	Index *pIndex;		/* List of SQL indexes on this table. */
 	FKey *pFKey;		/* Linked list of all foreign keys in this table */
 	char *zColAff;		/* String defining the affinity of each column */
