@@ -103,8 +103,12 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	if (sqlite3LocateTable(parse, LOCATE_NOERR, tab_name) == NULL) {
 		space_id = box_space_id_by_name(tab_name,
 						strlen(tab_name));
-		if (space_id == BOX_ID_NIL)
+		if (space_id == BOX_ID_NIL) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, tab_name);
+			parse->rc = SQL_TARANTOOL_ERROR;
+			parse->nErr++;
 			goto delete_from_cleanup;
+		}
 		/*
 		 * In this case space has been created via Lua
 		 * facilities, so there is no corresponding entry
