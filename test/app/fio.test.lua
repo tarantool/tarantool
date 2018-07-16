@@ -131,6 +131,14 @@ fio.rmdir(dir2)
 
 { fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }
 { fio.unlink(file1), fio.unlink(file2), fio.unlink(file3), fio.unlink(file4) }
+
+-- gh-3258 rmtree should remove directories with files
+fio.mktree('tmp2/tmp3/tmp4')
+fh = fio.open('tmp2/tmp3/tmp4/tmp.txt', {'O_RDWR', 'O_CREAT'})
+fh:close()
+fio.rmtree('tmp2')
+fio.stat('tmp2')
+
 fio.rmdir(tmpdir)
 fio.rmdir(tmpdir)
 
