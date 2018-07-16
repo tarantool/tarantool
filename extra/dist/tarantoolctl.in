@@ -638,15 +638,20 @@ local function enter()
         end
         return 1
     end
-
-    local cmd = string.format(
-        "require('console').connect('%s', { connect_timeout = %s })",
-        console_sock, TIMEOUT_INFINITY
-    )
-
-    console.on_start(function(self) self:eval(cmd) end)
+    local status, ret
+    console.on_start(function(self)
+        status, ret = pcall(console.connect, console_sock,
+                            {connect_timeout = TIMEOUT_INFINITY})
+        if not status then
+            log.error("Can't connect to %s (%s)", console_sock_path, ret)
+            self.running = false
+        end
+    end)
     console.on_client_disconnect(function(self) self.running = false end)
     console.start()
+    if not status then
+        return 1
+    end
     return 0
 end
 

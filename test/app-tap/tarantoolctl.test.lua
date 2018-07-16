@@ -157,7 +157,7 @@ local function check_ok(test, dir, cmd, args, e_res, e_stdout, e_stderr)
 end
 
 local test = tap.test('tarantoolctl')
-test:plan(6)
+test:plan(7)
 
 -- basic start/stop test
 -- must be stopped afterwards
@@ -250,6 +250,44 @@ do
     end)
 
     cleanup_instance(dir, 'good_script')
+    recursive_rmdir(dir)
+
+    if status == false then
+        print(("Error: %s"):format(err))
+        os.exit()
+    end
+end
+
+-- check enter
+do
+    local dir = fio.tempdir()
+
+    local code = [[ box.cfg{} ]]
+    create_script(dir, 'script.lua', code)
+
+    local status, err = pcall(function()
+        test:test("check error codes in case of enter", function(test_i)
+            test_i:plan(10)
+            check_ok(test_i, dir, 'enter', 'script', 1, nil, "Can't connect to")
+            local console_sock = 'script.control'
+            console_sock = fio.pathjoin(dir, console_sock)
+            test_i:is(fio.path.exists(console_sock), false, "directory clean")
+            check_ok(test_i, dir, 'start', 'script', 0)
+            tctl_wait_start(dir, 'script')
+            test_i:is(fio.path.exists(console_sock), true,
+                      "unix socket created")
+            check_ok(test_i, dir, 'stop', 'script', 0)
+            tctl_wait_stop(dir, 'script')
+            test_i:is(fio.path.exists(console_sock), false,
+                      "remove unix socket upon exit")
+            fio.open(console_sock, 'O_CREAT')
+            test_i:is(fio.path.exists(console_sock), true, "file created")
+            check_ok(test_i, dir, 'enter', 'script', 1, nil, "Can't connect to")
+            fio.unlink(console_sock)
+        end)
+    end)
+
+    cleanup_instance(dir, 'script')
     recursive_rmdir(dir)
 
     if status == false then
