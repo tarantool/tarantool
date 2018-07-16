@@ -413,6 +413,27 @@ fio.rmdir(dir2)
   - false
   - 'fio: No such file or directory'
 ...
+-- gh-3258 rmtree should remove directories with files
+fio.mktree('tmp2/tmp3/tmp4')
+---
+- true
+...
+fh = fio.open('tmp2/tmp3/tmp4/tmp.txt', {'O_RDWR', 'O_CREAT'})
+---
+...
+fh:close()
+---
+- true
+...
+fio.rmtree('tmp2')
+---
+- true
+...
+fio.stat('tmp2')
+---
+- null
+- 'fio: No such file or directory'
+...
 fio.rmdir(tmpdir)
 ---
 - true
