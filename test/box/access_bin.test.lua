@@ -4,14 +4,14 @@ test_run = env.new()
 -- Access control tests which require a binary protocol
 -- connection to the server
 --
-box.schema.user.grant('guest','read,write,execute','universe')
+box.schema.user.grant('guest','execute','universe')
 session = box.session
 remote = require('net.box')
 c = remote.connect(box.cfg.listen)
 c:eval("session.su('admin')")
 c:eval("return session.user()")
 c:close()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'execute', 'universe')
 
 -- gh-488 suid functions
 --

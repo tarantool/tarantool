@@ -5,11 +5,11 @@ fio = require('fio')
 xlog = require('xlog')
 netbox = require('net.box')
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
-
 --
 -- Check that xlogs doesn't contain IPROTO_SYNC
 --
+
+box.schema.user.grant('guest', 'write', 'space', '_schema')
 
 conn = netbox.connect(box.cfg.listen)
 -- insert some row using the binary protocol
@@ -31,7 +31,8 @@ box.space._schema:delete('test')
 --
 -- Clean up
 --
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 netbox = nil
 xlog = nil
 fio = nil
+
+box.schema.user.revoke('guest', 'write', 'space', '_schema')

@@ -73,6 +73,8 @@ remote.self:eval('error("exception")')
 remote.self:eval('box.error(0)')
 remote.self:eval('!invalid expression')
 
+box.schema.user.revoke('guest', 'execute', 'universe')
+
 --
 -- gh-822: net.box.call should roll back local transaction on error
 --
@@ -113,8 +115,9 @@ rollback_on_eval_error();
 test_run:cmd("setopt delimiter ''");
 box.space.gh822:drop()
 
-box.schema.user.revoke('guest','execute','universe')
-box.schema.user.grant('guest','read,write,execute','universe')
+box.schema.user.grant('guest', 'read,write', 'space', 'net_box_test_space')
+box.schema.user.grant('guest', 'execute', 'universe')
+
 cn:close()
 cn = remote.connect(box.cfg.listen)
 
@@ -189,6 +192,10 @@ cn.space.net_box_test_space:get(354)
 
 -- reconnects after errors
 
+box.schema.user.revoke('guest', 'execute', 'universe')
+box.schema.func.create('test_foo')
+box.schema.user.grant('guest', 'execute', 'function', 'test_foo')
+
 -- -- 1. no reconnect
 x_fatal(cn)
 cn.state
@@ -224,13 +231,19 @@ cn1:close()
 type(fiber.create(function() fiber.sleep(.5) x_fatal(cn) end))
 function pause() fiber.sleep(10) return true end
 
+box.schema.func.create('pause')
+box.schema.user.grant('guest', 'execute', 'function', 'pause')
 cn:call('pause')
 cn:call('test_foo', {'a', 'b', 'c'})
-
+box.schema.func.drop('pause')
 
 -- call
 remote.self:call('test_foo', {'a', 'b', 'c'})
 cn:call('test_foo', {'a', 'b', 'c'})
+box.schema.func.drop('test_foo')
+
+box.schema.func.create('long_rep')
+box.schema.user.grant('guest', 'execute', 'function', 'long_rep')
 
 -- long replies
 function long_rep() return { 1,  string.rep('a', 5000) } end
@@ -243,14 +256,21 @@ res = cn:call('long_rep')
 res[1] == 1
 res[2] == string.rep('a', 50000)
 
+box.schema.func.drop('long_rep')
+
 -- a.b.c.d
 u = '84F7BCFA-079C-46CC-98B4-F0C821BE833E'
 X = {}
 X.X = X
 function X.fn(x,y) return y or x end
+box.schema.user.grant('guest', 'execute', 'universe')
+cn:close()
+cn = remote.connect(LISTEN.host, LISTEN.service)
 cn:call('X.fn', {u})
 cn:call('X.X.X.X.X.X.X.fn', {u})
 cn:call('X.X.X.X:fn', {u})
+box.schema.user.revoke('guest', 'execute', 'universe')
+cn:close()
 
 -- auth
 
@@ -259,9 +279,10 @@ cn:is_connected()
 cn.error
 cn.state
 
-box.schema.user.create('netbox', { password  = 'test' })
-box.schema.user.grant('netbox', 'read, write, execute', 'universe');
 
+box.schema.user.create('netbox', { password  = 'test' })
+box.schema.user.grant('netbox', 'read,write', 'space', 'net_box_test_space')
+box.schema.user.grant('netbox', 'execute', 'universe')
 cn = remote.connect(LISTEN.host, LISTEN.service, { user = 'netbox', password = 'test' })
 cn.state
 cn.error
@@ -427,6 +448,9 @@ cn:close()
 -- #544 usage for remote[point]method
 cn = remote.connect(LISTEN.host, LISTEN.service)
 
+box.schema.user.grant('guest', 'execute', 'universe')
+cn:close()
+cn = remote.connect(LISTEN.host, LISTEN.service)
 cn:eval('return true')
 cn.eval('return true')
 
@@ -436,7 +460,7 @@ cn:close()
 
 remote.self:eval('return true')
 remote.self.eval('return true')
-
+box.schema.user.revoke('guest', 'execute', 'universe')
 
 -- uri as the first argument
 uri = string.format('%s:%s@%s:%s', 'netbox', 'test', LISTEN.host, LISTEN.service)
@@ -455,10 +479,11 @@ cn = remote.new(uri, { user = 'netbox', password = 'test' })
 cn:ping()
 cn:close()
 
-box.schema.user.revoke('netbox', 'read, write, execute', 'universe');
 box.schema.user.drop('netbox')
 
 -- #594: bad argument #1 to 'setmetatable' (table expected, got number)
+box.schema.func.create('dostring')
+box.schema.user.grant('guest', 'execute', 'function', 'dostring')
 test_run:cmd("setopt delimiter ';'")
 function gh594()
     local cn = remote.connect(box.cfg.listen)
@@ -468,12 +493,15 @@ function gh594()
 end;
 test_run:cmd("setopt delimiter ''");
 gh594()
+box.schema.func.drop('dostring')
+
 
 -- #636: Reload schema on demand
 sp = box.schema.space.create('test_old')
 _ = sp:create_index('primary')
 sp:insert{1, 2, 3}
 
+box.schema.user.grant('guest', 'read', 'space', 'test_old')
 con = remote.new(box.cfg.listen)
 con:ping()
 con.space.test_old:select{}
@@ -482,6 +510,8 @@ con.space.test == nil
 sp = box.schema.space.create('test')
 _ = sp:create_index('primary')
 sp:insert{2, 3, 4}
+
+box.schema.user.grant('guest', 'read', 'space', 'test')
 
 con.space.test == nil
 con:reload_schema()
@@ -495,6 +525,7 @@ name = string.match(arg[0], "([^,]+)%.lua")
 file_log = require('fio').open(name .. '.log', {'O_RDONLY', 'O_NONBLOCK'})
 file_log:seek(0, 'SEEK_END') ~= 0
 
+box.schema.user.grant('guest', 'execute', 'universe')
 test_run:cmd("setopt delimiter ';'")
 
 _ = fiber.create(
@@ -506,6 +537,7 @@ _ = fiber.create(
 );
 test_run:cmd("setopt delimiter ''");
 test_run:grep_log("default", "ER_NO_SUCH_PROC")
+box.schema.user.revoke('guest', 'execute', 'universe')
 
 -- gh-983 selecting a lot of data crashes the server or hangs the
 -- connection
@@ -518,6 +550,7 @@ data1k = "aaaabbbbccccddddeeeeffffgggghhhhaaaabbbbccccddddeeeeffffgggghhhhaaaabb
 
 for i = 0,10000 do box.space.test:insert{i, data1k} end
 
+box.schema.user.grant('guest', 'read', 'space', 'test')
 net = require('net.box')
 c = net:connect(box.cfg.listen)
 r = c.space.test:select(nil, {limit=5000})
@@ -528,6 +561,7 @@ _ = box.schema.space.create('test')
 _ = box.space.test:create_index('primary', {type = 'TREE', parts = {1,'unsigned'}})
 _ = box.space.test:create_index('covering', {type = 'TREE', parts = {1,'unsigned',3,'string',2,'unsigned'}})
 _ = box.space.test:insert{1, 2, "string"}
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
 c = net:connect(box.cfg.listen)
 c.space.test:select{}
 c.space.test:upsert({1, 2, 'nothing'}, {{'+', 2, 1}}) -- common update
@@ -545,6 +579,7 @@ box.space.test:drop()
 
 -- CALL vs CALL_16 in connect options
 function echo(...) return ... end
+box.schema.user.grant('guest', 'execute', 'universe')
 c = net.connect(box.cfg.listen)
 c:call('echo', {42})
 c:eval('return echo(...)', {42})
@@ -556,6 +591,7 @@ c = net.connect(box.cfg.listen, {call_16 = true})
 c:call('echo', 42)
 c:eval('return echo(...)', 42)
 c:close()
+box.schema.user.revoke('guest', 'execute', 'universe')
 
 --
 -- gh-2195 export pure msgpack from net.box
@@ -563,6 +599,8 @@ c:close()
 
 space = box.schema.space.create('test')
 _ = box.space.test:create_index('primary')
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
+box.schema.user.grant('guest', 'execute', 'universe')
 c = net.connect(box.cfg.listen)
 ibuf = require('buffer').ibuf()
 
@@ -649,6 +687,7 @@ ibuf.rpos == rpos, ibuf.wpos == wpos
 ibuf = nil
 c:close()
 space:drop()
+box.schema.user.revoke('guest', 'execute', 'universe')
 
 -- gh-1904 net.box hangs in :close() if a fiber was cancelled
 -- while blocked in :_wait_state() in :_request()
@@ -657,6 +696,8 @@ c = net:new(box.cfg.listen, options)
 f = fiber.create(function() c:call("") end)
 fiber.sleep(0.01)
 f:cancel(); c:close()
+
+box.schema.user.grant('guest', 'read', 'space', '_schema')
 
 -- check for on_schema_reload callback
 test_run:cmd("setopt delimiter ';'")
@@ -699,7 +740,7 @@ do
 end;
 test_run:cmd("setopt delimiter ''");
 
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'read', 'space', '_schema')
 
 -- Tarantool < 1.7.1 compatibility (gh-1533)
 c = net.new(box.cfg.listen)
@@ -745,7 +786,7 @@ test_run:cmd("clear filter")
 space = box.schema.space.create('test', {format={{name="id", type="unsigned"}}})
 space ~= nil
 _ = box.space.test:create_index('primary')
-box.schema.user.grant('guest','read,write,execute','space', 'test')
+box.schema.user.grant('guest', 'read', 'space', 'test')
 
 c = net.connect(box.cfg.listen)
 
@@ -785,10 +826,12 @@ c:close()
 -- gh-2642: box.session.type()
 --
 
-box.schema.user.grant('guest','read,write,execute','universe')
+box.schema.user.grant('guest','execute','universe')
 c = net.connect(box.cfg.listen)
 c:call("box.session.type")
 c:close()
+box.schema.user.revoke('guest', 'execute', 'universe')
+
 
 --
 -- On_connect/disconnect triggers.
@@ -818,6 +861,7 @@ test_run:cmd('stop server connecter')
 --
 space:drop()
 space = box.schema.space.create('test')
+box.schema.user.grant('guest', 'read', 'space', 'test')
 c = net.connect(box.cfg.listen)
 cspace = c.space.test
 space.index.test_index == nil
@@ -829,15 +873,18 @@ cspace.index.test_index ~= nil
 c.space.test.index.test_index ~= nil
 
 -- cleanup
-box.schema.user.revoke('guest','read,write,execute','universe')
 
 space:drop()
 
 --
 -- gh-946: long polling CALL blocks input
 --
-box.schema.user.grant('guest', 'execute', 'universe')
-
+box.schema.func.create('fast_call')
+box.schema.func.create('long_call')
+box.schema.func.create('wait_signal')
+box.schema.user.grant('guest', 'execute', 'function', 'fast_call')
+box.schema.user.grant('guest', 'execute', 'function', 'long_call')
+box.schema.user.grant('guest', 'execute', 'function', 'wait_signal')
 c = net.connect(box.cfg.listen)
 
 N = 100
@@ -902,6 +949,9 @@ disconnected -- true
 
 box.session.on_disconnect(nil, on_disconnect)
 
+box.schema.func.drop('long_call')
+box.schema.func.drop('fast_call')
+box.schema.func.drop('wait_signal')
 --
 -- gh-2666: check that netbox.call is not repeated on schema
 -- change.
@@ -911,6 +961,8 @@ box.schema.user.grant('guest', 'write', 'space', '_schema')
 box.schema.user.grant('guest', 'create', 'universe')
 count = 0
 function create_space(name) count = count + 1 box.schema.create_space(name) return true end
+box.schema.func.create('create_space')
+box.schema.user.grant('guest', 'execute', 'function', 'create_space')
 c = net.connect(box.cfg.listen)
 c:call('create_space', {'test1'})
 count
@@ -925,6 +977,7 @@ box.schema.user.revoke('guest', 'write', 'space', '_space')
 box.schema.user.revoke('guest', 'write', 'space', '_schema')
 box.schema.user.revoke('guest', 'create', 'universe')
 c:close()
+box.schema.func.drop('create_space')
 
 --
 -- gh-3164: netbox connection is not closed and garbage collected
@@ -979,7 +1032,7 @@ weak.c
 -- binary or text protocol, and netbox could not be created from
 -- existing socket.
 --
-box.schema.user.grant('guest','read,write,execute','universe')
+box.schema.user.grant('guest', 'execute', 'universe')
 urilib = require('uri')
 uri = urilib.parse(tostring(box.cfg.listen))
 s, greeting = net.establish_connection(uri.host, uri.service)
@@ -992,6 +1045,7 @@ c:eval('a = 200')
 a
 c:call('kek', {300})
 s = box.schema.create_space('test')
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
 pk = s:create_index('pk')
 c:reload_schema()
 c.space.test:replace{1}
@@ -1016,7 +1070,7 @@ c = net.connect('localhost:33333', {reconnect_after = 0.1, wait_connected = fals
 while c.state ~= 'error_reconnect' do fiber.sleep(0.01) end
 c:close()
 
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'execute', 'universe')
 c.state
 c = nil
 
@@ -1024,7 +1078,7 @@ c = nil
 -- gh-3256 net.box is_nullable and collation options output
 --
 space = box.schema.create_space('test')
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read', 'space', 'test')
 _ = space:create_index('pk')
 _ = space:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}})
 c = net:connect(box.cfg.listen)
@@ -1032,6 +1086,9 @@ c.space.test.index.sk.parts
 space:drop()
 
 space = box.schema.create_space('test')
+c:close()
+box.schema.user.grant('guest', 'read', 'space', 'test')
+c = net:connect(box.cfg.listen)
 box.internal.collation.create('test', 'ICU', 'ru-RU')
 _ = space:create_index('sk', { type = 'tree', parts = {{1, 'str', collation = 'test'}}, unique = true })
 c:reload_schema()
@@ -1046,6 +1103,8 @@ c = nil
 -- gh-3107: fiber-async netbox.
 --
 cond = nil
+box.schema.func.create('long_function')
+box.schema.user.grant('guest', 'execute', 'function', 'long_function')
 function long_function(...) cond = fiber.cond() cond:wait() return ... end
 function finalize_long() while not cond do fiber.sleep(0.01) end cond:signal() cond = nil end
 s = box.schema.create_space('test')
@@ -1083,12 +1142,18 @@ _ = fiber.create(function() ret = c:call('long_function', {1, 2, 3}, {is_async =
 finalize_long()
 while not ret do fiber.sleep(0.01) end
 ret
-
+c:close()
+box.schema.user.grant('guest', 'execute', 'universe')
+c = net:connect(box.cfg.listen)
 future = c:eval('return long_function(...)', {1, 2, 3}, {is_async = true})
 future:result()
 future:wait_result(0.01) -- Must fail on timeout.
 finalize_long()
 future:wait_result(100)
+
+c:close()
+box.schema.user.revoke('guest', 'execute', 'universe')
+c = net:connect(box.cfg.listen)
 
 --
 -- Ensure the request is garbage collected both if is not used and
@@ -1128,6 +1193,9 @@ ret
 --
 -- Test space methods.
 --
+c:close()
+box.schema.user.grant('guest', 'read,write', 'space', 'test')
+c = net:connect(box.cfg.listen)
 future = c.space.test:select({1}, {is_async = true})
 ret = future:wait_result(100)
 ret
@@ -1161,8 +1229,14 @@ future = c.space.test.index.pk:min({}, {is_async = true})
 future:wait_result(100)
 future = c.space.test.index.pk:max({}, {is_async = true})
 future:wait_result(100)
+c:close()
+box.schema.user.grant('guest', 'execute', 'universe')
+c = net:connect(box.cfg.listen)
 future = c.space.test.index.pk:count({3}, {is_async = true})
 future:wait_result(100)
+c:close()
+box.schema.user.revoke('guest', 'execute', 'universe')
+c = net:connect(box.cfg.listen)
 future = c.space.test.index.pk:delete({3}, {is_async = true})
 future:wait_result(100)
 s:get{3}
@@ -1227,10 +1301,17 @@ future:wait_result(100)
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
+box.schema.func.drop('long_function')
+
 --
 -- Test async schema version change.
 --
 function change_schema(i) local tmp = box.schema.create_space('test'..i) return 'ok' end
+box.schema.func.create('change_schema')
+box.schema.user.grant('guest', 'execute', 'function', 'change_schema')
+box.schema.user.grant('guest', 'write', 'space', '_schema')
+box.schema.user.grant('guest', 'read,write', 'space', '_space')
+box.schema.user.grant('guest', 'create', 'space')
 future1 = c:call('change_schema', {'1'}, {is_async = true})
 future2 = c:call('change_schema', {'2'}, {is_async = true})
 future3 = c:call('change_schema', {'3'}, {is_async = true})
@@ -1243,6 +1324,7 @@ s:drop()
 box.space.test1:drop()
 box.space.test2:drop()
 box.space.test3:drop()
+box.schema.func.drop('change_schema')
 
 --
 -- gh-3400: long-poll input discard must not touch event loop of
@@ -1271,6 +1353,7 @@ c._transport.perform_request(nil, nil, 'inject', nil, nil, data)
 c:close()
 test_run:grep_log('default', 'too big packet size in the header') ~= nil
 
+
 --
 -- gh-3629: netbox leaks when a connection is closed deliberately
 -- and it has non-finished requests.
@@ -1280,6 +1363,8 @@ ok = nil
 err = nil
 c = net:connect(box.cfg.listen)
 function do_long() while not ready do fiber.sleep(0.01) end end
+box.schema.func.create('do_long')
+box.schema.user.grant('guest', 'execute', 'function', 'do_long')
 f = fiber.create(function() ok, err = pcall(c.call, c, 'do_long') end)
 while f:status() ~= 'suspended' do fiber.sleep(0.01) end
 c:close()
@@ -1287,4 +1372,7 @@ ready = true
 while not err do fiber.sleep(0.01) end
 ok, err
 
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.func.drop('do_long')
+box.schema.user.revoke('guest', 'write', 'space', '_schema')
+box.schema.user.revoke('guest', 'read,write', 'space', '_space')
+box.schema.user.revoke('guest', 'create', 'space')

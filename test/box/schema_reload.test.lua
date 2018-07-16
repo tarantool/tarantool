@@ -1,4 +1,3 @@
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 net_box = require('net.box')
 fiber = require('fiber')
 LISTEN = require('uri').parse(box.cfg.listen)
@@ -6,6 +5,7 @@ LISTEN = require('uri').parse(box.cfg.listen)
 -- create first space
 s = box.schema.create_space('test')
 i = s:create_index('primary')
+box.schema.user.grant('guest', 'read', 'space', 'test')
 cn = net_box.connect(LISTEN.host, LISTEN.service)
 
 -- check that schema is correct
@@ -15,6 +15,7 @@ old_schema_version = cn.schema_version
 -- create one more space
 s2 = box.schema.create_space('test2')
 i2 = s2:create_index('primary')
+box.schema.user.grant('guest', 'read', 'space', 'test2')
 
 ----------------------------------
 -- TEST #1 simple reload
@@ -66,6 +67,7 @@ request_fiber:cancel()
 reload_fiber:cancel()
 s:drop()
 s2:drop()
+cn:close()
 
 --------------------------------------------------------------------------------
 -- gh-1808: support schema_version in CALL, EVAL and PING
@@ -95,6 +97,8 @@ cn.schema_version == schema_version + 1
 schema_version = cn.schema_version
 bump_schema_version()
 function somefunc() return true end
+box.schema.func.create('somefunc')
+box.schema.user.grant('guest', 'execute', 'function', 'somefunc')
 cn:call('somefunc')
 wait_new_schema()
 cn.schema_version == schema_version + 1
@@ -106,6 +110,12 @@ bump_schema_version()
 cn:call('somefunc')
 wait_new_schema()
 cn.schema_version == schema_version + 1
+
+box.schema.func.drop('somefunc')
+
+cn:close()
+box.schema.user.grant('guest', 'execute', 'universe')
+cn = net_box.connect(box.cfg.listen)
 
 -- eval
 schema_version = cn.schema_version
@@ -125,6 +135,7 @@ somefunc = nil
 
 cn:close()
 
+
 -- box.internal.schema_version()
 schema_version = box.internal.schema_version()
 schema_version > 0
@@ -132,5 +143,4 @@ bump_schema_version()
 box.internal.schema_version() == schema_version + 1
 
 if box.space.bump_schema_version ~= nil then box.space.bump_schema_version:drop() end
-
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'execute', 'universe')

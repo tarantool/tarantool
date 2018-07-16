@@ -23,7 +23,9 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 netbox = require('net.box')
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+
+box.schema.func.create('do_pushes')
+box.schema.user.grant('guest', 'execute', 'function', 'do_pushes')
 
 c = netbox.connect(box.cfg.listen)
 c:ping()
@@ -37,6 +39,7 @@ catchers = {}
 started = 0
 finished = 0
 s = box.schema.create_space('test', {format = {{'field1', 'integer'}}})
+box.schema.user.grant('guest', 'write', 'space', 'test')
 pk = s:create_index('pk')
 c:reload_schema()
 test_run:cmd("setopt delimiter ';'")
@@ -77,6 +80,9 @@ function dml_push_and_dml_f()
     table.insert(catchers, catcher)
     finished = finished + 1
 end;
+box.schema.func.create('dml_push_and_dml');
+box.schema.user.grant('guest', 'execute', 'function', 'dml_push_and_dml');
+
 -- At first check that a pushed message can be ignored in a binary
 -- protocol too.
 c:call('do_pushes', {300});
@@ -86,6 +92,8 @@ for i = 1, 200 do
     fiber.create(push_catcher_f)
 end;
 while finished ~= 400 do fiber.sleep(0.1) end;
+
+box.schema.func.drop('dml_push_and_dml')
 
 failed_catchers = {};
 
@@ -121,9 +129,11 @@ failed_catchers
 --
 function push_null() box.session.push(box.NULL) end
 messages = {}
+box.schema.func.create('push_null')
+box.schema.user.grant('guest', 'execute', 'function', 'push_null')
 c:call('push_null', {}, {on_push = table.insert, on_push_ctx = messages})
 messages
-
+box.schema.func.drop('push_null')
 --
 -- Test binary pushes.
 --
@@ -148,10 +158,12 @@ err = nil
 messages = {}
 t = setmetatable({100}, {__serialize = function() error('err in ser') end})
 function do_push() ok, err = box.session.push(t) end
+box.schema.func.create('do_push')
+box.schema.user.grant("guest", "execute", "function", "do_push")
 c:call('do_push', {}, {on_push = table.insert, on_push_ctx = messages})
 ok, err
 messages
-
+box.schema.func.drop('do_push')
 --
 -- Test push from a non-call request.
 --
@@ -209,7 +221,11 @@ s = box.schema.create_space('test')
 pk = s:create_index('pk')
 s:replace{1}
 
+box.schema.user.grant('guest', 'write', 'space', 'test')
+
 function do_push_and_duplicate() box.session.push(100) s:insert{1} end
+box.schema.func.create('do_push_and_duplicate')
+box.schema.user.grant('guest', 'execute', 'function', 'do_push_and_duplicate')
 future = c:call('do_push_and_duplicate', {}, {is_async = true})
 future:wait_result(1000)
 messages = {}
@@ -218,7 +234,7 @@ for i, message in future:pairs() do table.insert(messages, message) table.insert
 messages
 keys
 
+box.schema.func.drop('do_push_and_duplicate')
+box.schema.func.drop('do_pushes')
 s:drop()
 c:close()
-
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')

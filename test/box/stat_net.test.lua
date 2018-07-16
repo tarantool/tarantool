@@ -7,7 +7,7 @@ box.stat.net.SENT -- zero
 box.stat.net.RECEIVED -- zero
 
 space = box.schema.space.create('tweedledum')
-box.schema.user.grant('guest','read,write,execute','universe')
+box.schema.user.grant('guest', 'read', 'space', 'tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 remote = require 'net.box'
 
@@ -26,6 +26,5 @@ box.stat.reset()
 box.stat.net.SENT.total
 box.stat.net.RECEIVED.total
 
-space:drop()
+space:drop() -- tweedledum
 cn:close()
-box.schema.user.revoke('guest','read,write,execute','universe')

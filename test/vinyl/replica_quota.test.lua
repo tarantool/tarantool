@@ -1,6 +1,5 @@
 test_run = require('test_run').new()
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'replication')
 
 s = box.schema.space.create('test', { engine = 'vinyl' })
@@ -49,4 +48,3 @@ _ = test_run:cmd("cleanup server replica")
 s:drop()
 
 box.schema.user.revoke('guest', 'replication')
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')

@@ -5,7 +5,8 @@ net_box = require('net.box')
 s = box.schema.space.create('test')
 _ = box.schema.space.create('test1', { id = 555 })
 box.schema.user.create('test', { password = 'test' })
-box.schema.user.grant('test', 'execute,read,write', 'universe')
+box.schema.user.grant('test', 'read,write,alter', 'space', 'test1')
+box.schema.user.grant('test', 'read,write,alter', 'space', 'test')
 
 conn = net_box.connect('test:test@' .. box.cfg.listen)
 space = conn.space.test
@@ -92,8 +93,8 @@ net_box = require('net.box')
 
 -- Prepare spaces
 box.schema.user.create('test', { password = 'test' })
-box.schema.user.grant('test', 'execute,read,write', 'universe')
 s = box.schema.space.create('tweedledum')
+box.schema.user.grant('test', 'read,write,alter', 'space', 'tweedledum')
 index1 = s:create_index('primary', { type = 'tree', parts = { 1, 'string'} })
 index2 = s:create_index('secondary', { type = 'tree', unique = false, parts = {2, 'string'}})
 function compare(a,b) return a[1] < b[1] end

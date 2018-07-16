@@ -792,7 +792,7 @@ test_run:cmd('setopt delimiter ""');
 - true
 ...
 -- Port_dump can fail.
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read', 'space', '_space')
 ---
 ...
 cn = net_box.connect(box.cfg.listen)
@@ -824,7 +824,7 @@ errinj.set('ERRINJ_PORT_DUMP', false)
 cn:close()
 ---
 ...
-box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+box.schema.user.revoke('guest', 'read', 'space', '_space')
 ---
 ...
 run()
@@ -1077,13 +1077,13 @@ s:drop()
 -- gh-3255: iproto can crash and discard responses, if a network
 -- is saturated, and DML yields too long on commit.
 --
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
----
-...
 s = box.schema.space.create('test')
 ---
 ...
 _ = s:create_index('pk')
+---
+...
+box.schema.user.grant('guest', 'read,write,alter', 'space', 'test')
 ---
 ...
 c = net_box.connect(box.cfg.listen)
@@ -1116,10 +1116,22 @@ s:drop()
 -- gh-3325: do not cancel already sent requests, when a schema
 -- change is detected.
 --
+box.schema.user.grant('guest', 'execute', 'universe')
+---
+...
 s = box.schema.create_space('test')
 ---
 ...
 pk = s:create_index('pk')
+---
+...
+box.schema.user.grant('guest', 'read,write,alter', 'space', 'test')
+---
+...
+box.schema.user.grant('guest', 'create', 'space')
+---
+...
+box.schema.user.grant('guest', 'write', 'space', '_index')
 ---
 ...
 s:replace{1, 1}
@@ -1172,6 +1184,12 @@ cn:close()
 s:drop()
 ---
 ...
+box.schema.user.revoke('guest', 'execute', 'universe')
+---
+...
+box.schema.user.revoke('guest', 'create', 'space')
+---
+...
 --
 -- If message memory pool is used up, stop the connection, until
 -- the pool has free memory.
@@ -1195,6 +1213,12 @@ function long_poll_f()
     while not continue do fiber.sleep(0.01) end
     finished = finished + 1
 end;
+---
+...
+box.schema.func.create('long_poll_f');
+---
+...
+box.schema.user.grant('guest', 'execute', 'function', 'long_poll_f');
 ---
 ...
 test_run:cmd('setopt delimiter ""');
@@ -1258,7 +1282,10 @@ while finished ~= 2 do fiber.sleep(0.01) end
 cn:close()
 ---
 ...
-box.schema.user.revoke('guest', 'read,write,execute','universe')
+box.schema.user.revoke('guest', 'execute', 'function', 'long_poll_f')
+---
+...
+box.schema.func.drop('long_poll_f')
 ---
 ...
 --
