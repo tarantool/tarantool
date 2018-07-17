@@ -37,11 +37,19 @@ def headers():
                ]
     return code, body, headers
 
+def long_query():
+    sleep(0.005)
+    code = "200 OK"
+    body = [b"abc"]
+    headers = [('Content-Type', 'application/json')]
+    return code, body, headers
+
 paths = {
         "/": hello,
         "/abc": hello1,
         "/absent": absent,
         "/headers": headers,
+        "/long_query": long_query,
         }
 
 def read_handle(env, response):
