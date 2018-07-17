@@ -1397,7 +1397,7 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('count', opts, code, { key })
+        return remote:_request('count', opts, code, { key, opts })
     end
 
     function methods:delete(key, opts)
