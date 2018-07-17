@@ -96,6 +96,19 @@ stailq_add_tail(struct stailq *head, struct stailq_entry *item)
 }
 
 /**
+ * Insert @item into list @head after @prev.
+ */
+inline static void
+stailq_insert(struct stailq *head, struct stailq_entry *item,
+	      struct stailq_entry *prev)
+{
+	item->next = prev->next;
+	prev->next = item;
+	if (item->next == NULL)
+		head->last = &item->next;
+}
+
+/**
  * return first element
  */
 inline static struct stailq_entry *
@@ -232,6 +245,12 @@ stailq_cut_tail(struct stailq *head, struct stailq_entry *last,
  */
 #define stailq_add_tail_entry(head, item, member)			\
 	stailq_add_tail((head), &(item)->member)
+
+/**
+ * insert entry into list
+ */
+#define stailq_insert_entry(head, item, prev, member)			\
+	stailq_insert((head), &(item)->member, &(prev)->member)
 
 /**
  * foreach through list

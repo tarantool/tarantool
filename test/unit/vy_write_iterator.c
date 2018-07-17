@@ -4,11 +4,10 @@
 #include "vy_iterators_helper.h"
 
 /**
- * Create the mem with the specified key_def and content, iterate
- * over it with write_iterator and compare actual result
- * statements with the expected ones.
+ * Create a mem with the specified content, iterate over it with
+ * write_iterator and compare actual result statements with the
+ * expected ones.
  *
- * @param key_def Key definition for the mem.
  * @param content Mem content statements.
  * @param content_count Size of the @content.
  * @param expected Expected results of the iteration.
@@ -20,14 +19,17 @@
  * @param is_last_level True, if the new mem is the last level.
  */
 void
-compare_write_iterator_results(struct key_def *key_def,
-			       const struct vy_stmt_template *content,
+compare_write_iterator_results(const struct vy_stmt_template *content,
 			       int content_count,
 			       const struct vy_stmt_template *expected,
 			       int expected_count,
 			       const int *vlsns, int vlsns_count,
 			       bool is_primary, bool is_last_level)
 {
+	uint32_t fields[] = { 0 };
+	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
+	struct key_def *key_def = box_key_def_new(fields, types, 1);
+	fail_if(key_def == NULL);
 	struct vy_mem *mem = create_test_mem(key_def);
 	for (int i = 0; i < content_count; ++i)
 		vy_mem_insert_template(mem, &content[i]);
@@ -59,7 +61,7 @@ compare_write_iterator_results(struct key_def *key_def,
 	/* Clean up */
 	wi->iface->close(wi);
 	vy_mem_delete(mem);
-
+	box_key_def_delete(key_def);
 	free(rv_array);
 }
 
@@ -68,13 +70,7 @@ test_basic(void)
 {
 	header();
 	plan(46);
-
-	/* Create key_def */
-	uint32_t fields[] = { 0 };
-	uint32_t types[] = { FIELD_TYPE_UNSIGNED };
-	struct key_def *key_def = box_key_def_new(fields, types, 1);
-	assert(key_def != NULL);
-
+{
 /*
  * STATEMENT: REPL REPL REPL  DEL  REPL  REPL  REPL  REPL  REPL  REPL
  * LSN:        5     6   7     8    9     10    11    12    13    14
@@ -82,7 +78,6 @@ test_basic(void)
  *            \____________/\________/\_________________/\___________/
  *                 merge       merge          merge           merge
  */
-{
 	const struct vy_stmt_template content[] = {
 		STMT_TEMPLATE(5, REPLACE, 1, 1),
 		STMT_TEMPLATE(6, REPLACE, 1, 2),
@@ -102,7 +97,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, true);
 }
@@ -136,7 +131,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
@@ -164,7 +159,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, true);
 }
@@ -184,7 +179,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, true);
 }
@@ -208,7 +203,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, true);
 }
@@ -231,7 +226,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
@@ -259,7 +254,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, false, true);
 }
@@ -279,7 +274,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, false, false);
 }
@@ -306,7 +301,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
@@ -334,7 +329,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, true);
 }
@@ -359,7 +354,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, false, false);
 }
@@ -384,7 +379,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
@@ -414,7 +409,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
@@ -455,7 +450,7 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
@@ -495,11 +490,10 @@ test_basic(void)
 	int content_count = sizeof(content) / sizeof(content[0]);
 	int expected_count = sizeof(expected) / sizeof(expected[0]);
 	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(key_def, content, content_count,
+	compare_write_iterator_results(content, content_count,
 				       expected, expected_count,
 				       vlsns, vlsns_count, true, false);
 }
-	key_def_delete(key_def);
 	fiber_gc();
 	footer();
 	check_plan();

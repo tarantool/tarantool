@@ -91,7 +91,6 @@ struct vy_write_history {
  * reverses key LSN order from newest first to oldest first, i.e.
  * orders statements on the same key chronologically.
  *
- * @param region Allocator for the object.
  * @param tuple Key version.
  * @param next Next version of the key.
  *
@@ -99,11 +98,10 @@ struct vy_write_history {
  * @retval NULL     Memory error.
  */
 static inline struct vy_write_history *
-vy_write_history_new(struct region *region, struct tuple *tuple,
-		     struct vy_write_history *next)
+vy_write_history_new(struct tuple *tuple, struct vy_write_history *next)
 {
-	struct vy_write_history *h =
-		region_alloc_object(region, struct vy_write_history);
+	struct vy_write_history *h;
+	h = region_alloc_object(&fiber()->gc, struct vy_write_history);
 	if (h == NULL)
 		return NULL;
 	h->tuple = tuple;
@@ -499,15 +497,14 @@ vy_write_iterator_get_vlsn(struct vy_write_iterator *stream, int rv_i)
  * @retval -1 Memory error.
  */
 static inline int
-vy_write_iterator_push_rv(struct region *region,
-			  struct vy_write_iterator *stream,
+vy_write_iterator_push_rv(struct vy_write_iterator *stream,
 			  struct tuple *tuple, int current_rv_i)
 {
 	assert(current_rv_i < stream->rv_count);
 	struct vy_read_view_stmt *rv = &stream->read_views[current_rv_i];
 	assert(rv->vlsn >= vy_stmt_lsn(tuple));
 	struct vy_write_history *h =
-		vy_write_history_new(region, tuple, rv->history);
+		vy_write_history_new(tuple, rv->history);
 	if (h == NULL)
 		return -1;
 	rv->history = h;
@@ -560,7 +557,6 @@ vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
  * This is why there is a special "merge" step which applies
  * UPSERTs and builds a tuple for each read view.
  *
- * @param region History objects allocator.
  * @param stream Write iterator.
  * @param[out] count Count of statements saved in the history.
  * @param[out] is_first_insert Set if the oldest statement for
@@ -570,8 +566,7 @@ vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
  * @retval -1 Memory error.
  */
 static NODISCARD int
-vy_write_iterator_build_history(struct region *region,
-				struct vy_write_iterator *stream,
+vy_write_iterator_build_history(struct vy_write_iterator *stream,
 				int *count, bool *is_first_insert)
 {
 	*count = 0;
@@ -678,8 +673,7 @@ vy_write_iterator_build_history(struct region *region,
 			    key_update_can_be_skipped(key_mask, stmt_mask))
 				goto next_lsn;
 
-			rc = vy_write_iterator_push_rv(region, stream,
-						       src->tuple,
+			rc = vy_write_iterator_push_rv(stream, src->tuple,
 						       current_rv_i);
 			if (rc != 0)
 				break;
@@ -693,7 +687,7 @@ vy_write_iterator_build_history(struct region *region,
 		}
 
 		assert(vy_stmt_type(src->tuple) == IPROTO_UPSERT);
-		rc = vy_write_iterator_push_rv(region, stream, src->tuple,
+		rc = vy_write_iterator_push_rv(stream, src->tuple,
 					       current_rv_i);
 		if (rc != 0)
 			break;
@@ -798,8 +792,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		/* Not the first statement. */
 		return 0;
 	}
-	struct tuple *tuple = rv->tuple;
-	if (is_first_insert && vy_stmt_type(tuple) == IPROTO_DELETE) {
+	if (is_first_insert && vy_stmt_type(rv->tuple) == IPROTO_DELETE) {
 		/*
 		 * Optimization 6: discard the first DELETE if
 		 * the oldest statement for the current key among
@@ -807,11 +800,12 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		 * statements for this key in older runs or the
 		 * last statement is a DELETE.
 		 */
-		vy_stmt_unref_if_possible(tuple);
+		vy_stmt_unref_if_possible(rv->tuple);
 		rv->tuple = NULL;
-	}
-	if ((is_first_insert && vy_stmt_type(tuple) == IPROTO_REPLACE) ||
-	    (!is_first_insert && vy_stmt_type(tuple) == IPROTO_INSERT)) {
+	} else if ((is_first_insert &&
+		    vy_stmt_type(rv->tuple) == IPROTO_REPLACE) ||
+		   (!is_first_insert &&
+		    vy_stmt_type(rv->tuple) == IPROTO_INSERT)) {
 		/*
 		 * If the oldest statement among all sources is an
 		 * INSERT, convert the first REPLACE to an INSERT
@@ -824,14 +818,14 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		 * compaction.
 		 */
 		uint32_t size;
-		const char *data = tuple_data_range(tuple, &size);
+		const char *data = tuple_data_range(rv->tuple, &size);
 		struct tuple *copy = is_first_insert ?
 			vy_stmt_new_insert(stream->format, data, data + size) :
 			vy_stmt_new_replace(stream->format, data, data + size);
 		if (copy == NULL)
 			return -1;
-		vy_stmt_set_lsn(copy, vy_stmt_lsn(tuple));
-		vy_stmt_unref_if_possible(tuple);
+		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->tuple));
+		vy_stmt_unref_if_possible(rv->tuple);
 		rv->tuple = copy;
 	}
 	return 0;
@@ -857,7 +851,7 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 	struct region *region = &fiber()->gc;
 	size_t used = region_used(region);
 	stream->rv_used_count = 0;
-	if (vy_write_iterator_build_history(region, stream, &raw_count,
+	if (vy_write_iterator_build_history(stream, &raw_count,
 					    &is_first_insert) != 0)
 		goto error;
 	if (raw_count == 0) {
