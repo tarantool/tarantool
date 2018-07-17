@@ -4315,8 +4315,56 @@ char
 sqlite3TableColumnAffinity(struct space_def *def, int idx);
 
 char sqlite3ExprAffinity(Expr * pExpr);
-int sqlite3Atoi64(const char *, i64 *, int);
-int sqlite3DecOrHexToI64(const char *, i64 *);
+
+
+/**
+ * Convert z to a 64-bit signed integer.  z must be decimal. This
+ * routine does *not* accept hexadecimal notation.
+ *
+ * If the z value is representable as a 64-bit twos-complement
+ * integer, then write that value into *val and return 0.
+ *
+ * If z is exactly 9223372036854775808, return 2.  This special
+ * case is broken out because while 9223372036854775808 cannot be
+ * a signed 64-bit integer, its negative -9223372036854775808 can
+ * be.
+ *
+ * If z is too big for a 64-bit integer and is not
+ * 9223372036854775808  or if z contains any non-numeric text,
+ * then return 1.
+ *
+ * length is the number of bytes in the string (bytes, not
+ * characters). The string is not necessarily zero-terminated.
+ * The encoding is given by enc.
+ *
+ * @param z String being parsed.
+ * @param[out] val Output integer value.
+ * @param length String length in bytes.
+ * @retval
+ *     0    Successful transformation.  Fits in a 64-bit signed
+ *          integer.
+ *     1    Integer too large for a 64-bit signed integer or is
+ *          malformed
+ *     2    Special case of 9223372036854775808
+ */
+int
+sql_atoi64(const char *z, int64_t *val, int length);
+
+/**
+ * Transform a UTF-8 integer literal, in either decimal or
+ * hexadecimal, into a 64-bit signed integer.  This routine
+ * accepts hexadecimal literals, whereas sql_atoi64() does not.
+ *
+ * @param z Literal being parsed.
+ * @param[out] val Parsed value.
+ * @retval
+ *     0    Successful transformation.  Fits in a 64-bit signed integer.
+ *     1    Integer too large for a 64-bit signed integer or is malformed
+ *     2    Special case of 9223372036854775808
+ */
+int
+sql_dec_or_hex_to_i64(const char *z, int64_t *val);
+
 void sqlite3ErrorWithMsg(sqlite3 *, int, const char *, ...);
 void sqlite3Error(sqlite3 *, int);
 void sqlite3SystemError(sqlite3 *, int);

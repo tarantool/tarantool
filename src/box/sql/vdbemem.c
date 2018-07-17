@@ -459,9 +459,9 @@ sqlite3VdbeIntValue(Mem * pMem)
 	} else if (flags & MEM_Real) {
 		return doubleToInt64(pMem->u.r);
 	} else if (flags & (MEM_Str | MEM_Blob)) {
-		i64 value = 0;
+		int64_t value = 0;
 		assert(pMem->z || pMem->n == 0);
-		sqlite3Atoi64(pMem->z, &value, pMem->n);
+		sql_atoi64(pMem->z, &value, pMem->n);
 		return value;
 	} else {
 		return 0;
@@ -562,7 +562,7 @@ sqlite3VdbeMemNumerify(Mem * pMem)
 {
 	if ((pMem->flags & (MEM_Int | MEM_Real | MEM_Null)) == 0) {
 		assert((pMem->flags & (MEM_Blob | MEM_Str)) != 0);
-		if (0 == sqlite3Atoi64(pMem->z, &pMem->u.i, pMem->n)) {
+		if (0 == sql_atoi64(pMem->z, (int64_t *)&pMem->u.i, pMem->n)) {
 			MemSetTypeFlag(pMem, MEM_Int);
 		} else {
 			pMem->u.r = sqlite3VdbeRealValue(pMem);

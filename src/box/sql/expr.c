@@ -1087,15 +1087,14 @@ sqlite3ExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			 * "nnn" to an integer and use it as the
 			 * variable number
 			 */
-			i64 i;
-			int bOk =
-			    0 == sqlite3Atoi64(&z[1], &i, n - 1);
+			int64_t i;
+			bool is_ok = 0 == sql_atoi64(&z[1], &i, n - 1);
 			x = (ynVar) i;
 			testcase(i == 0);
 			testcase(i == 1);
 			testcase(i == SQL_BIND_PARAMETER_MAX - 1);
 			testcase(i == SQL_BIND_PARAMETER_MAX);
-			if (bOk == 0 || i < 1 || i > SQL_BIND_PARAMETER_MAX) {
+			if (!is_ok || i < 1 || i > SQL_BIND_PARAMETER_MAX) {
 				sqlite3ErrorMsg(pParse,
 						"variable number must be between $1 and $%d",
 						SQL_BIND_PARAMETER_MAX);
@@ -3264,51 +3263,48 @@ codeReal(Vdbe * v, const char *z, int negateFlag, int iMem)
 }
 #endif
 
-/*
+/**
  * Generate an instruction that will put the integer describe by
  * text z[0..n-1] into register iMem.
  *
- * Expr.u.zToken is always UTF8 and zero-terminated.
+ * @param parse Parsing context.
+ * @param expr Expression being parsed. Expr.u.zToken is always
+ *             UTF8 and zero-terminated.
+ * @param neg_flag True if value is negative.
+ * @param mem Register to store parsed integer
  */
 static void
-codeInteger(Parse * pParse, Expr * pExpr, int negFlag, int iMem)
+expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
+	      int mem)
 {
-	Vdbe *v = pParse->pVdbe;
-	if (pExpr->flags & EP_IntValue) {
-		int i = pExpr->u.iValue;
+	struct Vdbe *v = parse->pVdbe;
+	if (expr->flags & EP_IntValue) {
+		int i = expr->u.iValue;
 		assert(i >= 0);
-		if (negFlag)
+		if (is_neg)
 			i = -i;
-		sqlite3VdbeAddOp2(v, OP_Integer, i, iMem);
+		sqlite3VdbeAddOp2(v, OP_Integer, i, mem);
 	} else {
-		int c;
-		i64 value;
-		const char *z = pExpr->u.zToken;
-		assert(z != 0);
-		c = sqlite3DecOrHexToI64(z, &value);
-		if (c == 1 || (c == 2 && !negFlag)
-		    || (negFlag && value == SMALLEST_INT64)) {
-#ifdef SQLITE_OMIT_FLOATING_POINT
-			sqlite3ErrorMsg(pParse, "oversized integer: %s%s",
-					negFlag ? "-" : "", z);
-#else
-#ifndef SQLITE_OMIT_HEX_INTEGER
+		int64_t value;
+		const char *z = expr->u.zToken;
+		assert(z != NULL);
+		int c = sql_dec_or_hex_to_i64(z, &value);
+		if (c == 1 || (c == 2 && !is_neg) ||
+		    (is_neg && value == SMALLEST_INT64)) {
 			if (sqlite3_strnicmp(z, "0x", 2) == 0) {
-				sqlite3ErrorMsg(pParse,
+				sqlite3ErrorMsg(parse,
 						"hex literal too big: %s%s",
-						negFlag ? "-" : "", z);
-			} else
-#endif
-			{
-				codeReal(v, z, negFlag, iMem);
+						is_neg ? "-" : "", z);
+			} else {
+				sqlite3ErrorMsg(parse,
+						"oversized integer: %s%s",
+						is_neg ? "-" : "", z);
 			}
-#endif
 		} else {
-			if (negFlag) {
+			if (is_neg)
 				value = c == 2 ? SMALLEST_INT64 : -value;
-			}
-			sqlite3VdbeAddOp4Dup8(v, OP_Int64, 0, iMem, 0,
-					      (u8 *) & value, P4_INT64);
+			sqlite3VdbeAddOp4Dup8(v, OP_Int64, 0, mem, 0,
+					      (u8 *)&value, P4_INT64);
 		}
 	}
 }
@@ -3720,7 +3716,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 							target, pExpr->op2);
 		}
 	case TK_INTEGER:{
-			codeInteger(pParse, pExpr, 0, target);
+			expr_code_int(pParse, pExpr, false, target);
 			return target;
 		}
 #ifndef SQLITE_OMIT_FLOATING_POINT
@@ -3880,7 +3876,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			Expr *pLeft = pExpr->pLeft;
 			assert(pLeft);
 			if (pLeft->op == TK_INTEGER) {
-				codeInteger(pParse, pLeft, 1, target);
+				expr_code_int(pParse, pLeft, true, target);
 				return target;
 #ifndef SQLITE_OMIT_FLOATING_POINT
 			} else if (pLeft->op == TK_FLOAT) {

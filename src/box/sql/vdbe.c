@@ -291,7 +291,7 @@ applyNumericAffinity(Mem *pRec, int bTryForInt)
 	i64 iValue;
 	assert((pRec->flags & (MEM_Str|MEM_Int|MEM_Real))==MEM_Str);
 	if (sqlite3AtoF(pRec->z, &rValue, pRec->n)==0) return;
-	if (0==sqlite3Atoi64(pRec->z, &iValue, pRec->n)) {
+	if (0 == sql_atoi64(pRec->z, (int64_t *)&iValue, pRec->n)) {
 		pRec->u.i = iValue;
 		pRec->flags |= MEM_Int;
 	} else {
@@ -389,12 +389,10 @@ static u16 SQLITE_NOINLINE computeNumericType(Mem *pMem)
 {
 	assert((pMem->flags & (MEM_Int|MEM_Real))==0);
 	assert((pMem->flags & (MEM_Str|MEM_Blob))!=0);
-	if (sqlite3AtoF(pMem->z, &pMem->u.r, pMem->n)==0) {
+	if (sqlite3AtoF(pMem->z, &pMem->u.r, pMem->n)==0)
 		return 0;
-	}
-	if (sqlite3Atoi64(pMem->z, &pMem->u.i, pMem->n)==SQLITE_OK) {
+	if (sql_atoi64(pMem->z, (int64_t *)&pMem->u.i, pMem->n)==SQLITE_OK)
 		return MEM_Int;
-	}
 	return MEM_Real;
 }
 
