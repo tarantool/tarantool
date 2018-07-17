@@ -347,6 +347,29 @@ remote_pk:max({0}, { timeout = 1.00 })
 remote_pk:max({1}, { timeout = 1e-9 })
 remote_pk:max({2})
 
+--
+-- gh-3262: index:count() inconsistent results
+--
+test_run:cmd("setopt delimiter ';'")
+
+function do_count_test(min, it)
+    local r1 = remote_pk:count(min, {iterator = it} )
+    local r2 = box.space.net_box_test_space.index.primary:count(min, {iterator = it} )
+    local r3 = remote.self.space.net_box_test_space.index.primary:count(min, {iterator = it} )
+    return r1 == r2 and r2 == r3
+end;
+
+data = remote_pk:select();
+
+for _, v in pairs(data) do
+    local itrs = {'GE', 'GT', 'LE', 'LT' }
+    for _, it in pairs(itrs) do
+        assert(do_count_test(v[0], it) == true)
+    end
+end;
+
+test_run:cmd("setopt delimiter ''");
+
 _ = remote_space:delete({0}, { timeout = 1e-9 })
 _ = remote_pk:delete({0}, { timeout = 1.00 })
 _ = remote_space:delete({1}, { timeout = 1.00 })

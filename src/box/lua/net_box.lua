@@ -1093,7 +1093,7 @@ index_metatable = function(remote)
         end
         local code = string.format('box.space.%s.index.%s:count',
                                    self.space.name, self.name)
-        return remote:_request('call_16', opts, code, { key })[1][1]
+        return remote:_request('call_16', opts, code, { key, opts })[1][1]
     end
 
     function methods:delete(key, opts)
