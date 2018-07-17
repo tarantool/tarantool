@@ -2381,8 +2381,7 @@ sqlite3VdbeHalt(Vdbe * p)
 					 */
 					box_txn_rollback();
 					closeCursorsAndFree(p);
-					sqlite3RollbackAll(p,
-							   SQLITE_ABORT_ROLLBACK);
+					sqlite3RollbackAll(p);
 					sqlite3CloseSavepoints(p);
 					p->nChange = 0;
 				}
@@ -2433,7 +2432,7 @@ sqlite3VdbeHalt(Vdbe * p)
 					p->rc = rc;
 					box_txn_rollback();
 					closeCursorsAndFree(p);
-					sqlite3RollbackAll(p, SQLITE_OK);
+					sqlite3RollbackAll(p);
 					p->nChange = 0;
 				} else {
 					sqlite3CommitInternalChanges();
@@ -2441,7 +2440,7 @@ sqlite3VdbeHalt(Vdbe * p)
 			} else {
 				box_txn_rollback();
 				closeCursorsAndFree(p);
-				sqlite3RollbackAll(p, SQLITE_OK);
+				sqlite3RollbackAll(p);
 				p->nChange = 0;
 			}
 			p->anonymous_savepoint = NULL;
@@ -2453,7 +2452,7 @@ sqlite3VdbeHalt(Vdbe * p)
 			} else {
 				box_txn_rollback();
 				closeCursorsAndFree(p);
-				sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
+				sqlite3RollbackAll(p);
 				sqlite3CloseSavepoints(p);
 				p->nChange = 0;
 			}
@@ -2476,7 +2475,7 @@ sqlite3VdbeHalt(Vdbe * p)
 					p->zErrMsg = 0;
 				}
 				closeCursorsAndFree(p);
-				sqlite3RollbackAll(p, SQLITE_ABORT_ROLLBACK);
+				sqlite3RollbackAll(p);
 				sqlite3CloseSavepoints(p);
 				p->nChange = 0;
 			}
@@ -3869,31 +3868,4 @@ sqlite3VdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the
 		}
 		pMem++;
 	}
-}
-
-/**
- * Return action on nullable constraint violation of given column in given table.
- * FIXME: This is implemented in expensive way. For each invocation table lookup
- * is performed. In future, first param will be replaced with pointer to struct
- * space.
- *
- * @param tab  pointer to the table
- * @param column column number for which action to be returned
- * @retval return action found for given column
- */
-enum on_conflict_action
-table_column_nullable_action(struct Table *tab, uint32_t column)
-{
-	struct space *space = space_cache_find(tab->def->id);
-
-	assert(space != NULL);
-
-	struct tuple_format *format = space->format;
-
-	assert(format != NULL);
-	assert(format->field_count > column);
-
-	struct tuple_field field = format->fields[column];
-
-	return field.nullable_action;
 }

@@ -280,11 +280,11 @@ ccons ::= NULL onconf(R).        {
         sql_column_add_nullable_action(pParse, R);
 }
 ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
-ccons ::= PRIMARY KEY sortorder(Z) onconf(R) autoinc(I).
-                                 {sqlite3AddPrimaryKey(pParse,0,R,I,Z);}
-ccons ::= UNIQUE index_onconf(R). {sql_create_index(pParse,0,0,0,R,0,
-						   SORT_ORDER_ASC, false,
-						   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
+ccons ::= PRIMARY KEY sortorder(Z) autoinc(I).
+                                 {sqlite3AddPrimaryKey(pParse,0,I,Z);}
+ccons ::= UNIQUE.                {sql_create_index(pParse,0,0,0,0,
+                                                   SORT_ORDER_ASC, false,
+                                                   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
 ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
 ccons ::= REFERENCES nm(T) eidlist_opt(TA) refargs(R).
                                  {sql_create_foreign_key(pParse, NULL, NULL, NULL, &T, TA, false, R);}
@@ -334,12 +334,12 @@ conslist ::= tcons.
 tconscomma ::= COMMA.            {pParse->constraintName.n = 0;}
 tconscomma ::= .
 tcons ::= CONSTRAINT nm(X).      {pParse->constraintName = X;}
-tcons ::= PRIMARY KEY LP sortlist(X) autoinc(I) RP onconf(R).
-                                 {sqlite3AddPrimaryKey(pParse,X,R,I,0);}
-tcons ::= UNIQUE LP sortlist(X) RP index_onconf(R).
-                                 {sql_create_index(pParse,0,0,X,R,0,
-						   SORT_ORDER_ASC,false,
-						   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
+tcons ::= PRIMARY KEY LP sortlist(X) autoinc(I) RP.
+                                 {sqlite3AddPrimaryKey(pParse,X,I,0);}
+tcons ::= UNIQUE LP sortlist(X) RP.
+                                 {sql_create_index(pParse,0,0,X,0,
+                                                   SORT_ORDER_ASC,false,
+                                                   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
 tcons ::= CHECK LP expr(E) RP onconf.
                                  {sql_add_check_constraint(pParse,&E);}
 tcons ::= FOREIGN KEY LP eidlist(FA) RP
@@ -357,8 +357,6 @@ defer_subclause_opt(A) ::= defer_subclause(A).
 %type index_onconf {int}
 %type orconf {int}
 %type resolvetype {int}
-index_onconf(A) ::= .                           {A = ON_CONFLICT_ACTION_DEFAULT;}
-index_onconf(A) ::= ON CONFLICT resolvetype(X). {A = X;}
 onconf(A) ::= .                              {A = ON_CONFLICT_ACTION_ABORT;}
 onconf(A) ::= ON CONFLICT resolvetype(X).    {A = X;}
 orconf(A) ::= .                              {A = ON_CONFLICT_ACTION_DEFAULT;}
@@ -1200,10 +1198,8 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 //
 cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP. {
-  enum on_conflict_action on_error =
-          U ? ON_CONFLICT_ACTION_ABORT : ON_CONFLICT_ACTION_NONE;
-  sql_create_index(pParse, &X, sqlite3SrcListAppend(pParse->db,0,&Y), Z,
-                   on_error, &S, SORT_ORDER_ASC, NE, U);
+  sql_create_index(pParse, &X, sqlite3SrcListAppend(pParse->db,0,&Y), Z, &S,
+                   SORT_ORDER_ASC, NE, U);
 }
 
 %type uniqueflag {int}

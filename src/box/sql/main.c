@@ -726,10 +726,9 @@ sqlite3_close_v2(sqlite3 * db)
  * but are "saved" in case the table pages are moved around.
  */
 void
-sqlite3RollbackAll(Vdbe * pVdbe, int tripCode)
+sqlite3RollbackAll(Vdbe * pVdbe)
 {
 	sqlite3 *db = pVdbe->db;
-	(void)tripCode;
 
 	/* If one has been configured, invoke the rollback-hook callback */
 	if (db->xRollbackCallback && (!pVdbe->auto_commit)) {
@@ -760,9 +759,6 @@ sqlite3ErrName(int rc)
 			break;
 		case SQLITE_ABORT:
 			zName = "SQLITE_ABORT";
-			break;
-		case SQLITE_ABORT_ROLLBACK:
-			zName = "SQLITE_ABORT_ROLLBACK";
 			break;
 		case SQLITE_BUSY:
 			zName = "SQLITE_BUSY";
@@ -963,20 +959,9 @@ sqlite3ErrStr(int rc)
 		/* SQL_TARANTOOL_ERROR */ "SQL-/Tarantool error",
 	};
 	const char *zErr = "unknown error";
-	switch (rc) {
-	case SQLITE_ABORT_ROLLBACK:{
-			zErr = "abort due to ROLLBACK";
-			break;
-		}
-	default:{
-			rc &= 0xff;
-			if (ALWAYS(rc >= 0) && rc < ArraySize(aMsg)
-			    && aMsg[rc] != 0) {
-				zErr = aMsg[rc];
-			}
-			break;
-		}
-	}
+	rc &= 0xff;
+	if (ALWAYS(rc >= 0) && rc < ArraySize(aMsg) && aMsg[rc] != 0)
+		zErr = aMsg[rc];
 	return zErr;
 }
 
@@ -997,28 +982,6 @@ sqliteDefaultBusyCallback(void *ptr,	/* Database connection */
 	}
 	sqlite3OsSleep(db->pVfs, 1000000);
 	return 1;
-}
-
-/*
- * Invoke the given busy handler.
- *
- * This routine is called when an operation failed with a lock.
- * If this routine returns non-zero, the lock is retried.  If it
- * returns 0, the operation aborts with an SQLITE_BUSY error.
- */
-int
-sqlite3InvokeBusyHandler(BusyHandler * p)
-{
-	int rc;
-	if (NEVER(p == 0) || p->xFunc == 0 || p->nBusy < 0)
-		return 0;
-	rc = p->xFunc(p->pArg, p->nBusy);
-	if (rc == 0) {
-		p->nBusy = -1;
-	} else {
-		p->nBusy++;
-	}
-	return rc;
 }
 
 /*

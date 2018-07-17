@@ -2833,7 +2833,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		 */
 		Index *pFirst;	/* First of real indices on the table */
 		memset(&fake_index, 0, sizeof(Index));
-		fake_index.onError = ON_CONFLICT_ACTION_REPLACE;
 		fake_index.pTable = pTab;
 
 		struct key_def *key_def = key_def_new(1);
@@ -4640,10 +4639,6 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			struct space *space = space_cache_find(pTabItem->pTab->def->id);
 			int iIndexCur;
 			int op = OP_OpenRead;
-			/* iAuxArg is always set if to a positive value if ONEPASS is possible */
-			assert(iAuxArg != 0
-			       || (pWInfo->
-				   wctrlFlags & WHERE_ONEPASS_DESIRED) == 0);
 			/* Check if index is primary. Either of
 			 * points should be true:
 			 * 1. struct Index is non-NULL and is

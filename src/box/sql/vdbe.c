@@ -4250,7 +4250,9 @@ case OP_Next:          /* jump */
  * @param P2 Index of a register with MessagePack data to insert.
  * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
  *        accounts the change in a case of successful insertion in
- *        nChange counter.
+ *        nChange counter. If P5 contains OPFLAG_OE_IGNORE, then
+ *        we are processing INSERT OR INGORE statement. Thus, in
+ *        case of conflict we don't raise an error.
  */
 /* Opcode: IdxReplace P1 P2 * * P5
  * Synopsis: key=r[P2]
@@ -4314,10 +4316,9 @@ case OP_IdxInsert: {        /* in2 */
 		}
 	} else if (pOp->p5 & OPFLAG_OE_FAIL) {
 		p->errorAction = ON_CONFLICT_ACTION_FAIL;
+	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
+		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
-
-	assert(p->errorAction == ON_CONFLICT_ACTION_ABORT ||
-	       p->errorAction == ON_CONFLICT_ACTION_FAIL);
 	if (rc) goto abort_due_to_error;
 	break;
 }

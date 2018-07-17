@@ -12,17 +12,16 @@ test:do_catchsql_test(
     test_prefix.."1.0.2",
     "CREATE TABLE t2 (a int primary key);")
 
-local insert_err = {1, "UNIQUE constraint failed: T2.A"}
-local insert_err_PK = {1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"}
+local insert_err = {1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"}
 local data = {
 --id|TRIG TYPE|INSERT TYPE|insert error|commit error| result
- {1, "AFTER", "or abort",   insert_err_PK, {0},          {1,1,2}},
+ {1, "AFTER", "or abort",   insert_err, {0},          {1,1,2}},
  {2, "AFTER", "or rollback",insert_err, {1, "/no transaction is active/"}, {}},
- {3, "AFTER", "or fail",    insert_err_PK, {0},          {1,2,1,2}},
+ {3, "AFTER", "or fail",    insert_err, {0},          {1,2,1,2}},
  {4, "AFTER", "or ignore",  {0}       , {0},          {1,2,1,2}},
- {5, "BEFORE","or abort",   insert_err_PK, {0},          {1,1,2}},
+ {5, "BEFORE","or abort",   insert_err, {0},          {1,1,2}},
  {6, "BEFORE","or rollback",insert_err, {1, "/no transaction is active/"}, {}},
- {7, "BEFORE","or fail",    insert_err_PK, {0},          {1,1,2}},
+ {7, "BEFORE","or fail",    insert_err, {0},          {1,1,2}},
  {8, "BEFORE","or ignore",  {0}       , {0},          {1,2,1,2}}
 }
 

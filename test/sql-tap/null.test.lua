@@ -316,11 +316,10 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "null-7.1",
     [[
-        create table t2(a primary key, b unique on conflict ignore);
+        create table t2(a primary key, b unique);
         insert into t2 values(1,1);
         insert into t2 values(2,null);
         insert into t2 values(3,null);
-        insert into t2 values(4,1);
         select a from t2 order by a;
     ]], {
         -- <null-7.1>
@@ -331,11 +330,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "null-7.2",
     [[
-        create table t3(a primary key, b, c, unique(b,c) on conflict ignore);
+        create table t3(a primary key, b, c, unique(b,c));
         insert into t3 values(1,1,1);
         insert into t3 values(2,null,1);
         insert into t3 values(3,null,1);
-        insert into t3 values(4,1,1);
         select a from t3 order by a;
     ]], {
         -- <null-7.2>

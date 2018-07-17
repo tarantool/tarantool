@@ -25,8 +25,8 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE t1(
-              a INTEGER PRIMARY KEY ON CONFLICT REPLACE,
-              b UNIQUE ON CONFLICT FAIL
+              a INTEGER PRIMARY KEY,
+              b UNIQUE
             );
             INSERT INTO t1 VALUES(1, 1);
             INSERT INTO t1 VALUES(2, 2);
@@ -38,7 +38,7 @@ test:do_test(
         ]]
     end, {
         -- <tkt-4a03ed-1.1>
-        1, "UNIQUE constraint failed: T1.B"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
         -- </tkt-4a03ed-1.1>
     })
 

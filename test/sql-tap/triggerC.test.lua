@@ -242,7 +242,7 @@ test:do_catchsql_test(
         UPDATE OR ROLLBACK t1 SET a=100;
     ]], {
         -- <triggerC-1.15>
-        1, "UNIQUE constraint failed: T1.A"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
         -- </triggerC-1.15>
     })
 

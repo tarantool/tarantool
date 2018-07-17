@@ -634,7 +634,6 @@ sqlite3_exec(sqlite3 *,	/* An open database */
 #define SQLITE_IOERR_GETTEMPPATH       (SQLITE_IOERR | (25<<8))
 #define SQLITE_IOERR_CONVPATH          (SQLITE_IOERR | (26<<8))
 #define SQLITE_IOERR_VNODE             (SQLITE_IOERR | (27<<8))
-#define SQLITE_ABORT_ROLLBACK          (SQLITE_ABORT | (2<<8))
 #define SQLITE_CONSTRAINT_CHECK        (SQLITE_CONSTRAINT | (1<<8))
 #define SQLITE_CONSTRAINT_FOREIGNKEY   (SQLITE_CONSTRAINT | (3<<8))
 #define SQLITE_CONSTRAINT_FUNCTION     (SQLITE_CONSTRAINT | (4<<8))
@@ -658,30 +657,6 @@ enum sql_type {
 enum sql_subtype {
 	SQL_SUBTYPE_NO = 0,
 	SQL_SUBTYPE_MSGPACK = 77,
-};
-
-/**
- * Structure for internal usage during INSERT/UPDATE
- * statements compilation.
- */
-struct on_conflict {
-	/**
-	 * Represents an error action in queries like
-	 * INSERT/UPDATE OR <override_error>, which
-	 * overrides all space constraints error actions.
-	 * That kind of error action is strictly specified by
-	 * user and therefore have highest priority.
-	 */
-	enum on_conflict_action override_error;
-	/**
-	 * Represents an ON CONFLICT action which can be
-	 * optimized and executed without VDBE bytecode, by
-	 * Tarantool facilities. If optimization is not available,
-	 * then the value is ON_CONFLICT_ACTION_NONE, otherwise
-	 * it is ON_CONFLICT_ACTON_IGNORE or
-	 * ON_CONFLICT_ACTION_REPLACE.
-	 */
-	enum on_conflict_action optimized_action;
 };
 
 void *
@@ -1971,12 +1946,6 @@ struct Index {
 	Table *pTable;
 	/** The next index associated with the same table. */
 	Index *pNext;
-	/**
-	 * Conflict resolution algorithm to employ whenever an
-	 * attempt is made to insert a non-unique element in
-	 * unique index.
-	 */
-	u8 onError;
 	/** Index definition. */
 	struct index_def *def;
 };
@@ -2865,6 +2834,7 @@ struct Parse {
 #define OPFLAG_EPHEM         0x01	/* OP_Column: Ephemeral output is ok */
 #define OPFLAG_OE_IGNORE    0x200	/* OP_IdxInsert: Ignore flag */
 #define OPFLAG_OE_FAIL      0x400	/* OP_IdxInsert: Fail flag */
+#define OPFLAG_OE_ROLLBACK  0x800	/* OP_IdxInsert: Rollback flag. */
 #define OPFLAG_LENGTHARG     0x40	/* OP_Column only used for length() */
 #define OPFLAG_TYPEOFARG     0x80	/* OP_Column only used for typeof() */
 #define OPFLAG_SEEKEQ        0x02	/* OP_Open** cursor uses EQ seek only */
@@ -3417,7 +3387,7 @@ void
 sql_column_add_nullable_action(struct Parse *parser,
 			       enum on_conflict_action nullable_action);
 
-void sqlite3AddPrimaryKey(Parse *, ExprList *, int, int, enum sort_order);
+void sqlite3AddPrimaryKey(Parse *, ExprList *, int, enum sort_order);
 
 /**
  * Add a new CHECK constraint to the table currently under
@@ -3545,8 +3515,6 @@ void sqlite3SrcListDelete(sqlite3 *, SrcList *);
  * @param token Index name. May be NULL.
  * @param tbl_name Table to index. Use pParse->pNewTable ifNULL.
  * @param col_list A list of columns to be indexed.
- * @param on_error One of ON_CONFLICT_ACTION_ABORT, _IGNORE,
- *        _REPLACE, or _NONE.
  * @param start The CREATE token that begins this statement.
  * @param sort_order Sort order of primary key when pList==NULL.
  * @param if_not_exist Omit error if index already exists.
@@ -3555,9 +3523,8 @@ void sqlite3SrcListDelete(sqlite3 *, SrcList *);
 void
 sql_create_index(struct Parse *parse, struct Token *token,
 		 struct SrcList *tbl_name, struct ExprList *col_list,
-		 enum on_conflict_action on_error, struct Token *start,
-		 enum sort_order sort_order, bool if_not_exist,
-		 enum sql_index_type idx_type);
+		 struct Token *start, enum sort_order sort_order,
+		 bool if_not_exist, enum sql_index_type idx_type);
 
 /**
  * This routine will drop an existing named index.  This routine
@@ -3725,7 +3692,7 @@ Vdbe *sqlite3GetVdbe(Parse *);
 void sqlite3PrngSaveState(void);
 void sqlite3PrngRestoreState(void);
 #endif
-void sqlite3RollbackAll(Vdbe *, int);
+void sqlite3RollbackAll(Vdbe *);
 
 /**
  * Generate opcodes which start new Tarantool transaction.
@@ -3851,26 +3818,90 @@ int
 sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
 		       int reg_out, struct Index *prev, int reg_prev);
 
-void sqlite3GenerateConstraintChecks(Parse *, Table *, int *, int, int, int,
-				     int, u8, struct on_conflict *, int, int *,
-				     int *);
+/**
+ * Generate code to do constraint checks prior to an INSERT or
+ * an UPDATE on the given table.
+ *
+ * The @new_tuple_reg is the first register in a range that
+ * contains the data to be inserted or the data after the update.
+ * There will be field_count registers in this range.
+ * The first register in the range will contains the content of
+ * the first table column, and so forth.
+ *
+ * To test NULL, CHECK and statement (except for REPLACE)
+ * constraints we can avoid opening cursors on secondary indexes.
+ * However, to implement INSERT OR REPLACE or UPDATE OR REPLACE,
+ * we should
+ *
+ * Constraint
+ *    type       Action              What Happens
+ * ----------  ----------  --------------------------------------
+ *    any       ROLLBACK   The current transaction is rolled
+ *                         back and VDBE stops immediately
+ *                         with return code of SQLITE_CONSTRAINT.
+ *
+ *    any        ABORT     Back out changes from the current
+ *                         command only (do not do a complete
+ *                         rollback) then cause VDBE to return
+ *                         immediately with SQLITE_CONSTRAINT.
+ *
+ *    any        FAIL      VDBE returns immediately with a
+ *                         return code of SQLITE_CONSTRAINT. The
+ *                         transaction is not rolled back and any
+ *                         changes to prior rows are retained.
+ *
+ *    any       IGNORE     The attempt in insert or update the
+ *                         current row is skipped, without
+ *                         throwing an error. Processing
+ *                         continues with the next row.
+ *
+ *  NOT NULL    REPLACE    The NULL value is replace by the
+ *                         default value for that column. If the
+ *                         default value is NULL, the action is
+ *                         the same as ABORT.
+ *
+ *  UNIQUE      REPLACE    The other row that conflicts with the
+ *                         row being inserted is removed.
+ *                         Triggers are fired, foreign keys
+ *                         constraints are checked.
+ *
+ *  CHECK       REPLACE    Illegal. Results in an exception.
+ *
+ * @param parse_context Current parsing context.
+ * @param tab The table being inserted or updated.
+ * @param new_tuple_reg First register in a range holding values
+ *                      to insert.
+ * @param on_conflict On conflict error action of INSERT or
+ *        UPDATE statement (for example INSERT OR REPLACE).
+ * @param ignore_label Jump to this label on an IGNORE resolution.
+ * @param upd_cols Columns to be updated with the size of table's
+ *                 field count. NULL for INSERT operation.
+ */
+void
+vdbe_emit_constraint_checks(struct Parse *parse_context,
+			    struct Table *tab, int new_tuple_reg,
+			    enum on_conflict_action on_conflict,
+			    int ignore_label, int *upd_cols);
+
 /**
  * This routine generates code to finish the INSERT or UPDATE
  * operation that was started by a prior call to
- * sqlite3GenerateConstraintChecks.
+ * vdbe_emit_constraint_checks. It encodes raw data which is held
+ * in a range of registers starting from @raw_data_reg and length
+ * of @tuple_len and inserts this record to space using given
+ * @cursor_id.
+ *
  * @param v Virtual database engine.
  * @param cursor_id Primary index cursor.
- * @param tuple_id Register with data to insert.
- * @param on_conflict Structure, which contains override error
- * 	  action on failed insert/replaceand and optimized error
- * 	  action after generating bytecode for constraints checks.
+ * @param raw_data_reg Register with raw data to insert.
+ * @param tuple_len Number of registers to hold the tuple.
+ * @param on_conflict On conflict action.
  */
 void
-vdbe_emit_insertion_completion(Vdbe *v, int cursor_id, int tuple_id,
-			       struct on_conflict *on_conflict);
+vdbe_emit_insertion_completion(struct Vdbe *v, int cursor_id, int raw_data_reg,
+			       uint32_t tuple_len,
+			       enum on_conflict_action on_conflict);
 
-int sqlite3OpenTableAndIndices(Parse *, Table *, int, u8, int, u8 *, int *,
-			       int *, u8, u8);
 void
 sql_set_multi_write(Parse *, bool);
 void sqlite3MayAbort(Parse *);
@@ -4480,8 +4511,6 @@ void sqlite3Analyze(Parse *, Token *);
 ssize_t
 sql_index_tuple_size(struct space *space, struct index *idx);
 
-int sqlite3InvokeBusyHandler(BusyHandler *);
-
 /**
  * Load the content of the _sql_stat1 and sql_stat4 tables. The
  * contents of _sql_stat1 are used to populate the tuple_stat1[]
@@ -4798,9 +4827,6 @@ void sqlite3VectorErrorMsg(Parse *, Expr *);
 extern int sqlSubProgramsRemaining;
 
 extern int sqlite3InitDatabase(sqlite3 * db);
-
-enum on_conflict_action
-table_column_nullable_action(struct Table *tab, uint32_t column);
 
 /**
  * Generate VDBE code to halt execution with correct error if

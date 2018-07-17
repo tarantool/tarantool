@@ -28,39 +28,33 @@ test:do_execsql_test('rollback1_check',
                      {1, 1, 2, 2})
 
 for _, verb in ipairs({'ROLLBACK', 'ABORT'}) do
-        box.sql.execute('DELETE FROM t2')
-	if verb == 'ROLLBACK' then
-		answer = 'UNIQUE constraint failed: T1.S1'
-	else
-		answer = "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
-	end
-        test:do_catchsql_test('insert1_'..verb,
-                              [[START TRANSACTION;
-                                  INSERT INTO t2 VALUES (2, 2);
-                                  INSERT OR ]]..verb..[[ INTO t1 VALUES (1,1);
-                              ]],
-                              {1, answer})
+    box.sql.execute('DELETE FROM t2')
+    answer = "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
+    test:do_catchsql_test('insert1_'..verb,
+                          [[START TRANSACTION;
+                            INSERT INTO t2 VALUES (2, 2);
+                            INSERT OR ]]..verb..[[ INTO t1 VALUES (1,1);
+                          ]],
+                          {1, answer})
 
-        local expect = {}
-        if verb == 'ABORT' then
-            box.sql.execute('COMMIT')
-            expect = {2, 2}
-        end
-        test:do_execsql_test('insert1_'..verb..'_check',
-                             'SELECT * FROM t2',
-                             expect)
+    local expect = {}
+    if verb == 'ABORT' then
+         box.sql.execute('COMMIT')
+         expect = {2, 2}
+    end
+    test:do_execsql_test('insert1_'..verb..'_check',
+                         'SELECT * FROM t2', expect)
 
-        box.sql.execute('DELETE FROM t2')
-        test:do_catchsql_test('update1_'..verb,
-                       [[START TRANSACTION;
-                           INSERT INTO t2 VALUES (2, 2);
-                           UPDATE OR ]]..verb..[[ t1 SET s1 = 1 WHERE s1 = 2;
-                         ]],
-                       {1, answer})
+    box.sql.execute('DELETE FROM t2')
+    test:do_catchsql_test('update1_'..verb,
+                          [[START TRANSACTION;
+                            INSERT INTO t2 VALUES (2, 2);
+                            UPDATE OR ]]..verb..[[ t1 SET s1 = 1 WHERE s1 = 2;
+                          ]],
+                          {1, answer})
 
-        test:do_execsql_test('update1_'..verb..'check',
-                             'SELECT * FROM t2',
-                             expect)
+    test:do_execsql_test('update1_'..verb..'check',
+                         'SELECT * FROM t2', expect)
 end
 
 box.sql.execute('COMMIT')

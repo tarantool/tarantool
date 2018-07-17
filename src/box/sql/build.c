@@ -115,52 +115,6 @@ sql_finish_coding(struct Parse *parse_context)
 	}
 }
 
-/**
- * This is a function which should be called during execution
- * of sqlite3EndTable. It set defaults for columns having no
- * separate NULL/NOT NULL specifiers and ensures that only
- * PRIMARY KEY constraint may have ON CONFLICT REPLACE clause.
- *
- * @param parser SQL Parser object.
- * @param table Space which should be checked.
- * @retval -1 on error. Parser SQL_TARANTOOL_ERROR is set.
- * @retval 0 on success.
- */
-static int
-actualize_on_conflict_actions(struct Parse *parser, struct Table *table)
-{
-	const char *err_msg = NULL;
-	struct field_def *field = table->def->fields;
-	struct Index *pk = sqlite3PrimaryKeyIndex(table);
-	for (uint32_t i = 0; i < table->def->field_count; ++i, ++field) {
-		if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
-			/* Set default nullability NONE. */
-			field->nullable_action = ON_CONFLICT_ACTION_NONE;
-			field->is_nullable = true;
-		}
-		if (field->nullable_action == ON_CONFLICT_ACTION_REPLACE &&
-		    (pk == NULL || key_def_find(pk->def->key_def, i) == NULL))
-			goto non_pk_on_conflict_error;
-	}
-
-	for (struct Index *idx = table->pIndex; idx; idx = idx->pNext) {
-		if (idx->onError == ON_CONFLICT_ACTION_REPLACE &&
-		    !sql_index_is_primary(idx))
-			goto non_pk_on_conflict_error;
-	}
-
-	return 0;
-
-non_pk_on_conflict_error:
-	err_msg = tt_sprintf("only PRIMARY KEY constraint can have "
-			     "ON CONFLICT REPLACE clause - %s",
-			     table->def->name);
-	diag_set(ClientError, ER_SQL, err_msg);
-	parser->rc = SQL_TARANTOOL_ERROR;
-	parser->nErr++;
-	return -1;
-}
-
 /*
  * Locate the in-memory structure that describes a particular database
  * table given the name of that table. Return NULL if not found.
@@ -872,7 +826,6 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
 void
 sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 		     ExprList * pList,	/* List of field names to be indexed */
-		     int onError,	/* What to do with a uniqueness conflict */
 		     int autoInc,	/* True if the AUTOINCREMENT keyword is present */
 		     enum sort_order sortOrder
     )
@@ -927,7 +880,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 							     &token, 0));
 		if (list == NULL)
 			goto primary_key_exit;
-		sql_create_index(pParse, 0, 0, list, onError, 0, SORT_ORDER_ASC,
+		sql_create_index(pParse, 0, 0, list, 0, SORT_ORDER_ASC,
 				 false, SQL_INDEX_TYPE_CONSTRAINT_PK);
 		if (db->mallocFailed)
 			goto primary_key_exit;
@@ -936,8 +889,8 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
 		goto primary_key_exit;
 	} else {
-		sql_create_index(pParse, 0, 0, pList, onError, 0, sortOrder,
-				 false, SQL_INDEX_TYPE_CONSTRAINT_PK);
+		sql_create_index(pParse, 0, 0, pList, 0, sortOrder, false,
+				 SQL_INDEX_TYPE_CONSTRAINT_PK);
 		pList = 0;
 		if (pParse->nErr > 0)
 			goto primary_key_exit;
@@ -1695,8 +1648,19 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		}
 	}
 
-	if (actualize_on_conflict_actions(pParse, p))
-		goto cleanup;
+	/*
+	 * Actualize conflict action for NOT NULL constraint.
+	 * Set defaults for columns having no separate
+	 * NULL/NOT NULL specifiers.
+	 */
+	struct field_def *field = p->def->fields;
+	for (uint32_t i = 0; i < p->def->field_count; ++i, ++field) {
+		if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
+			/* Set default nullability NONE. */
+			field->nullable_action = ON_CONFLICT_ACTION_NONE;
+			field->is_nullable = true;
+		}
+	}
 
 	if (db->init.busy) {
 		/*
@@ -2755,9 +2719,8 @@ sql_index_is_primary(const struct Index *idx)
 void
 sql_create_index(struct Parse *parse, struct Token *token,
 		 struct SrcList *tbl_name, struct ExprList *col_list,
-		 enum on_conflict_action on_error, struct Token *start,
-		 enum sort_order sort_order, bool if_not_exist,
-		 enum sql_index_type idx_type) {
+		 struct Token *start, enum sort_order sort_order,
+		 bool if_not_exist, enum sql_index_type idx_type) {
 	/* The index to be created. */
 	struct Index *index = NULL;
 	/* Name of the index. */
@@ -2915,8 +2878,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		goto exit_create_index;
 
 	index->pTable = table;
-	index->onError = (u8) on_error;
-
 	/*
 	 * TODO: Issue a warning if two or more columns of the
 	 * index are identical.
@@ -3019,21 +2980,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 
 			if (k != key_def->part_count)
 				continue;
-
-			if (index->onError != existing_idx->onError) {
-				if (index->onError !=
-				    ON_CONFLICT_ACTION_DEFAULT &&
-				    existing_idx->onError !=
-				    ON_CONFLICT_ACTION_DEFAULT)
-					sqlite3ErrorMsg(parse,
-							"conflicting "\
-							"ON CONFLICT "\
-							"clauses specified");
-
-				if (existing_idx->onError ==
-				    ON_CONFLICT_ACTION_DEFAULT)
-					existing_idx->onError = index->onError;
-			}
 
 			bool is_named =
 				constraint_is_named(existing_idx->def->name);

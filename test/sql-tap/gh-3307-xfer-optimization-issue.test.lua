@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(46)
+test:plan(39)
 
 local function do_xfer_test(test, test_func, test_name, func, exp, opts)
     local opts = opts or {}
@@ -184,11 +184,7 @@ test:do_execsql_test(
 
 -- The following tests are supposed to test if xfer-optimization is actually
 -- used in the given cases (if the conflict actually occurs):
--- 	1.0) insert w/o explicit confl. action & w/o index replace action
--- 	1.1) insert w/o explicit confl. action & w/ index replace action &
---		empty dest_table
--- 	1.2) insert w/o explicit confl. action & w/ index replace action &
---		non-empty dest_table
+-- 	1) insert w/o explicit confl. action & w/o index replace action
 -- 	2) insert with abort
 -- 	3.0) insert with rollback (into empty table)
 -- 	3.1) insert with rollback (into non-empty table)
@@ -197,7 +193,7 @@ test:do_execsql_test(
 -- 	6) insert with ignore
 
 
--- 1.0) insert w/o explicit confl. action & w/o index replace action
+-- 1) insert w/o explicit confl. action & w/o index replace action
 ------------------------------------------------------------------------------
 
 test:do_catchsql_xfer_test(
@@ -230,89 +226,6 @@ test:do_execsql_test(
         -- <xfer-optimization-1.14>
         2, 2, 3, 4, 4, 4, 10, 10
         -- <xfer-optimization-1.14>
-    })
-
--- 1.1) insert w/o explicit confl. action & w/
---      index replace action & empty dest_table
-------------------------------------------------------------------------------
-
-test:do_catchsql_xfer_test(
-    "xfer-optimization-1.15",
-    [[
-        DROP TABLE t1;
-        DROP TABLE t2;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY ON CONFLICT REPLACE, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY ON CONFLICT REPLACE, b);
-        CREATE TABLE t3(id INT PRIMARY KEY);
-        INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
-        START TRANSACTION;
-            INSERT INTO t3 VALUES (1);
-            INSERT INTO t2 SELECT * FROM t1;
-    ]], {
-        -- <xfer-optimization-1.15>
-        0
-        -- <xfer-optimization-1.15>
-    }, {
-        exp_xfer_count = 1
-    })
-
-test:do_execsql_test(
-    "xfer-optimization-1.16",
-    [[
-            INSERT INTO t2 VALUES (10, 10);
-        COMMIT;
-        SELECT * FROM t2;
-    ]], {
-        -- <xfer-optimization-1.16>
-        1, 1, 3, 3, 5, 5, 10, 10
-        -- <xfer-optimization-1.16>
-    })
-
-test:do_execsql_test(
-    "xfer-optimization-1.17",
-    [[
-        SELECT * FROM t3;
-    ]], {
-        -- <xfer-optimization-1.17>
-        1
-        -- <xfer-optimization-1.17>
-    })
-
--- 1.2) insert w/o explicit confl. action & w/
--- index replace action & non-empty dest_table
-------------------------------------------------------------------------------
-
-test:do_catchsql_xfer_test(
-    "xfer-optimization-1.18",
-    [[
-        DROP TABLE t1;
-        DROP TABLE t2;
-        DROP TABLE t3;
-        CREATE TABLE t1(a INTEGER PRIMARY KEY ON CONFLICT REPLACE, b);
-        CREATE TABLE t2(a INTEGER PRIMARY KEY ON CONFLICT REPLACE, b);
-        INSERT INTO t1 VALUES (1, 1), (3, 3), (5, 5);
-        INSERT INTO t2 VALUES (2, 2), (3, 4);
-        START TRANSACTION;
-            INSERT INTO t2 VALUES (4, 4);
-            INSERT INTO t2 SELECT * FROM t1;
-    ]], {
-        -- <xfer-optimization-1.18>
-        0
-        -- <xfer-optimization-1.18>
-    }, {
-        exp_xfer_count = 0
-    })
-
-test:do_execsql_test(
-    "xfer-optimization-1.19",
-    [[
-            INSERT INTO t2 VALUES (10, 10);
-        COMMIT;
-        SELECT * FROM t2;
-    ]], {
-        -- <xfer-optimization-1.19>
-        1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 10, 10
-        -- <xfer-optimization-1.19>
     })
 
 -- 2) insert with abort
@@ -400,7 +313,7 @@ test:do_catchsql_xfer_test(
             INSERT OR ROLLBACK INTO t2 SELECT * FROM t1;
     ]], {
         -- <xfer-optimization-1.24>
-        1, "UNIQUE constraint failed: T2.A"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
         -- <xfer-optimization-1.24>
     }, {
         exp_xfer_count = 0
