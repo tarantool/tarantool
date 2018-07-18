@@ -502,6 +502,11 @@ log_syslog_init(struct log *log, const char *init_str)
 		log->syslog_ident = strdup("tarantool");
 	else
 		log->syslog_ident = strdup(opts.identity);
+	if (log->syslog_ident == NULL) {
+		diag_set(OutOfMemory, strlen(opts.identity), "malloc",
+		         "log->syslog_ident");
+		return -1;
+	}
 
 	if (opts.facility == syslog_facility_MAX)
 		log->syslog_facility = SYSLOG_LOCAL7;
