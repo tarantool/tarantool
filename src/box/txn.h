@@ -249,7 +249,6 @@ txn_commit_ro_stmt(struct txn *txn)
 {
 	assert(txn == in_txn());
 	if (txn) {
-		assert(txn->engine);
 		/* nothing to do */
 	} else {
 		fiber_gc();

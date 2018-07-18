@@ -116,16 +116,15 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 	stailq_cut_tail(&txn->stmts, svp, &rollback);
 	stailq_reverse(&rollback);
 	stailq_foreach_entry(stmt, &rollback, next) {
-		if (stmt->space != NULL) {
+		if (txn->engine != NULL && stmt->space != NULL)
 			engine_rollback_statement(txn->engine, txn, stmt);
-			stmt->space = NULL;
-		}
 		if (stmt->row != NULL) {
 			assert(txn->n_rows > 0);
 			txn->n_rows--;
-			stmt->row = NULL;
 		}
 		txn_stmt_unref_tuples(stmt);
+		stmt->space = NULL;
+		stmt->row = NULL;
 	}
 }
 
@@ -158,6 +157,8 @@ txn_begin(bool is_autocommit)
 int
 txn_begin_in_engine(struct engine *engine, struct txn *txn)
 {
+	if (engine->flags & ENGINE_BYPASS_TX)
+		return 0;
 	if (txn->engine == NULL) {
 		txn->engine = engine;
 		return engine_begin(engine, txn);

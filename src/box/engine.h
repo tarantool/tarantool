@@ -190,6 +190,16 @@ struct engine_vtab {
 	int (*check_space_def)(struct space_def *);
 };
 
+enum {
+	/**
+	 * If set, the engine will not participate in transaction
+	 * control. In particular, this means that any operations
+	 * done on this engine's spaces can mix in other engine's
+	 * transactions w/o throwing ER_CROSS_ENGINE_TRANSACTION.
+	 */
+	ENGINE_BYPASS_TX = 1 << 0,
+};
+
 struct engine {
 	/** Virtual function table. */
 	const struct engine_vtab *vtab;
@@ -197,6 +207,8 @@ struct engine {
 	const char *name;
 	/** Engine id. */
 	uint32_t id;
+	/** Engine flags. */
+	uint32_t flags;
 	/** Used for search for engine by name. */
 	struct rlist link;
 };

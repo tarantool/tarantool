@@ -471,21 +471,21 @@ t = s:on_replace(function () s:create_index('sec') end, t)
 ...
 s:replace({2, 3})
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: DDL does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.schema.user.create('newu') end, t)
 ---
 ...
 s:replace({3, 4})
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: Space _user does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.schema.role.create('newr') end, t)
 ---
 ...
 s:replace({4, 5})
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: Space _user does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.space._user:delete{box.schema.GUEST_ID} end, t)
 ---
@@ -506,21 +506,21 @@ t = s:on_replace(function () s:drop() end, t)
 ...
 s:replace({5, 6})
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: DDL does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.schema.func.create('newf') end, t)
 ---
 ...
 s:replace({6, 7})
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: Space _func does not support multi-statement transactions
 ...
 t = s:on_replace(function () box.schema.user.grant('guest', 'read,write', 'space', 'test_on_repl_ddl') end, t)
 ---
 ...
 s:replace({7, 8})
 ---
-- error: A multi-statement transaction can not use multiple storage engines
+- error: Space _priv does not support multi-statement transactions
 ...
 t = s:on_replace(function () s:rename('newname') end, t)
 ---
