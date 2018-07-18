@@ -36,7 +36,7 @@ local test6_ans = "|23|\t|456|\t|abcac|\t|'multiword field 4'|\t\n|none|" ..
                   "lag[ flag ])|\t\n||\t||\t||\t\n"
 
 test = tap.test("csv")
-test:plan(11)
+test:plan(12)
 
 readable = {}
 readable.read = myread
@@ -127,5 +127,10 @@ fio.unlink(file2)
 fio.unlink(file3)
 fio.unlink(file4)
 fio.rmdir(tmpdir)
+
+-- gh-3489: crash with ending space and empty field
+local res = csv.load('929,N1XDN ,,"Enfield, CT",')
+local exp = {{'929', 'N1XDN', '', 'Enfield, CT', ''}}
+test:is_deeply(res, exp, 'gh-3489')
 
 test:check()
