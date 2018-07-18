@@ -2779,6 +2779,72 @@ listening_socket:close()
 ---
 - true
 ...
+--gh-3344 connection should not fail is there is a spurious wakeup for io fiber
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+echo_fiber = nil
+server = socket.tcp_server('localhost', 0, { handler = function(s)
+    echo_fiber = fiber.self()
+    while true do
+        local b = s:read(1, 0.1)
+        if b ~= nil then
+            s:write(b)
+        end
+    end
+end, name = 'echoserv'});
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+addr = server:name()
+---
+...
+client = socket.tcp_connect(addr.host, addr.port)
+---
+...
+echo_fiber ~= nil
+---
+- true
+...
+client:write('hello')
+---
+- 5
+...
+client:read(5, 0.1) == 'hello'
+---
+- true
+...
+-- send spurious wakeup
+fiber.wakeup(echo_fiber)
+---
+...
+fiber.sleep(0)
+---
+...
+client:write('world')
+---
+- 5
+...
+client:read(5, 0.1) == 'world'
+---
+- true
+...
+-- cancel fiber
+fiber.cancel(echo_fiber)
+---
+...
+client:read(1, 0.1) == ''
+---
+- true
+...
+server:close()
+---
+- true
+...
 test_run:cmd("clear filter")
 ---
 - true
