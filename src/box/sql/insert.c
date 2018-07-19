@@ -334,7 +334,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	int nColumn;		/* Number of columns in the data */
 	int iDataCur = 0;	/* VDBE cursor that is the main data repository */
 	int iIdxCur = 0;	/* First index cursor */
-	int ipkColumn = -1;	/* Column that is the INTEGER PRIMARY KEY */
 	int endOfLoop;		/* Label for the end of the insertion loop */
 	int srcTab = 0;		/* Data comes from this temporary cursor if >=0 */
 	int addrInsTop = 0;	/* Jump to label "D" */
@@ -444,13 +443,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	/* If the INSERT statement included an IDLIST term, then make sure
 	 * all elements of the IDLIST really are columns of the table and
 	 * remember the column indices.
-	 *
-	 * If the table has an INTEGER PRIMARY KEY column and that column
-	 * is named in the IDLIST, then record in the ipkColumn variable
-	 * the index into IDLIST of the primary key column.  ipkColumn is
-	 * the index of the primary key as it appears in IDLIST, not as
-	 * is appears in the original table.  (The index of the INTEGER
-	 * PRIMARY KEY in the original table is pTab->iPKey.)
 	 */
 	/* Create bitmask to mark used columns of the table. */
 	void *used_columns = tt_static_buf();
@@ -470,10 +462,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 					pColumn->a[i].idx = j;
 					if (i != j)
 						bIdListInOrder = 0;
-					if (j == pTab->iPKey) {
-						ipkColumn = i;
-						assert(is_view);
-					}
 					break;
 				}
 			}
@@ -601,14 +589,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		} else {
 			nColumn = 0;
 		}
-	}
-
-	/* If there is no IDLIST term but the table has an integer primary
-	 * key, the set the ipkColumn variable to the integer primary key
-	 * column index in the original table definition.
-	 */
-	if (pColumn == 0 && nColumn > 0) {
-		ipkColumn = pTab->iPKey;
 	}
 
 	if (pColumn == 0 && nColumn && nColumn != (int)def->field_count) {
@@ -742,18 +722,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 * registers beginning at regIns.
 	 */
 	if (!is_view) {
-		if (ipkColumn >= 0) {
-			if (useTempTable) {
-				sqlite3VdbeAddOp3(v, OP_Column, srcTab,
-						  ipkColumn, regTupleid);
-			} else if (pSelect) {
-				sqlite3VdbeAddOp2(v, OP_Copy,
-						  regFromSelect + ipkColumn,
-						  regTupleid);
-			}
-		} else {
-			sqlite3VdbeAddOp2(v, OP_Null, 0, regTupleid);
-		}
+		sqlite3VdbeAddOp2(v, OP_Null, 0, regTupleid);
 
 		/* Compute data for all columns of the new entry, beginning
 		 * with the first column.
@@ -866,7 +835,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		on_conflict.optimized_action = ON_CONFLICT_ACTION_NONE;
 		sqlite3GenerateConstraintChecks(pParse, pTab, aRegIdx, iDataCur,
 						iIdxCur, regIns, 0,
-						ipkColumn >= 0, &on_conflict,
+						true, &on_conflict,
 						endOfLoop, &isReplace, 0);
 		sqlite3FkCheck(pParse, pTab, 0, regIns, 0);
 		vdbe_emit_insertion_completion(v, iIdxCur, aRegIdx[0],
@@ -1089,8 +1058,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	/* Test all NOT NULL constraints.
 	 */
 	for (uint32_t i = 0; i < def->field_count; i++) {
-		if ((int) i == pTab->iPKey)
-			continue;
 		if (aiChng && aiChng[i] < 0) {
 			/* Don't bother checking for NOT NULL on columns that do not change */
 			continue;
@@ -1259,10 +1226,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				 * needed for proper UNIQUE
 				 * constraint handling.
 				 */
-				if ((int) fieldno == pTab->iPKey)
-					reg = regNewData;
-				else
-					reg = fieldno + regNewData + 1;
+				reg = fieldno + regNewData + 1;
 				sqlite3VdbeAddOp2(v, OP_SCopy, reg, regIdx + i);
 				VdbeComment((v, "%s",
 					    def->fields[fieldno].name));
@@ -1738,8 +1702,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if (space_trigger_list(pDest->def->id) != NULL)
 		return 0;
 	if (onError == ON_CONFLICT_ACTION_DEFAULT) {
-		if (pDest->iPKey >= 0)
-			onError = pDest->keyConf;
 		if (onError == ON_CONFLICT_ACTION_DEFAULT)
 			onError = ON_CONFLICT_ACTION_ABORT;
 	}
@@ -1799,9 +1761,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		return 0;
 	/* Number of columns must be the same in src and dst. */
 	if (pDest->def->field_count != pSrc->def->field_count)
-		return 0;
-	/* Both tables must have the same INTEGER PRIMARY KEY. */
-	if (pDest->iPKey != pSrc->iPKey)
 		return 0;
 	for (i = 0; i < (int)pDest->def->field_count; i++) {
 		enum affinity_type dest_affinity =
@@ -1893,7 +1852,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	regTupleid = sqlite3GetTempReg(pParse);
 	sqlite3OpenTable(pParse, iDest, pDest, OP_OpenWrite);
 	assert(destHasUniqueIdx);
-	if ((pDest->iPKey < 0 && pDest->pIndex != 0)	/* (1) */
+	if ((pDest->pIndex != 0)	/* (1) */
 	    ||destHasUniqueIdx	/* (2) */
 	    || (onError != ON_CONFLICT_ACTION_ABORT
 		&& onError != ON_CONFLICT_ACTION_ROLLBACK)	/* (3) */

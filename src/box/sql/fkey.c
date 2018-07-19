@@ -230,23 +230,7 @@ sqlite3FkLocateIndex(Parse * pParse,	/* Parse context to store any error in */
 	 * space for the aiCol array (returned via output parameter *paiCol).
 	 * Non-composite foreign keys do not require the aiCol array.
 	 */
-	if (nCol == 1) {
-		/* The FK maps to the IPK if any of the following are true:
-		 *
-		 *   1) There is an INTEGER PRIMARY KEY column and the FK is implicitly
-		 *      mapped to the primary key of table pParent, or
-		 *   2) The FK is explicitly mapped to a column declared as INTEGER
-		 *      PRIMARY KEY.
-		 */
-		if (pParent->iPKey >= 0) {
-			if (!zKey)
-				return 0;
-			if (!strcmp(pParent->def->fields[pParent->iPKey].name,
-				    zKey))
-				return 0;
-		}
-	} else if (paiCol) {
-		assert(nCol > 1);
+	if (paiCol && nCol > 1) {
 		aiCol =
 		    (int *)sqlite3DbMallocRawNN(pParse->db, nCol * sizeof(int));
 		if (!aiCol)
@@ -470,11 +454,6 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 					int iChild = aiCol[i] + 1 + regData;
 					int iParent = 1 + regData +
 						      (int)part->fieldno;
-					assert(aiCol[i] != pTab->iPKey);
-					if ((int)part->fieldno == pTab->iPKey) {
-						/* The parent key is a composite key that includes the IPK column */
-						iParent = regData;
-					}
 					sqlite3VdbeAddOp3(v, OP_Ne, iChild,
 							  iJump, iParent);
 					VdbeCoverage(v);
@@ -538,7 +517,7 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 
 	pExpr = sqlite3Expr(db, TK_REGISTER, 0);
 	if (pExpr) {
-		if (iCol >= 0 && iCol != pTab->iPKey) {
+		if (iCol >= 0) {
 			pExpr->iTable = regBase + iCol + 1;
 			char affinity = pTab->def->fields[iCol].affinity;
 			pExpr->affinity = affinity;
@@ -982,11 +961,6 @@ sqlite3FkCheck(Parse * pParse,	/* Parse context */
 			iCol = pFKey->aCol[0].iFrom;
 			aiCol = &iCol;
 		}
-		for (i = 0; i < pFKey->nCol; i++) {
-			if (aiCol[i] == pTab->iPKey) {
-				aiCol[i] = -1;
-			}
-		}
 
 		pParse->nTab++;
 
@@ -1262,14 +1236,9 @@ fkActionTrigger(struct Parse *pParse, struct Table *pTab, struct FKey *pFKey,
 
 			iFromCol = aiCol ? aiCol[i] : pFKey->aCol[0].iFrom;
 			assert(iFromCol >= 0);
-			assert(pIdx != 0
-			       || (pTab->iPKey >= 0
-				   && pTab->iPKey <
-				      (int)pTab->def->field_count));
+			assert(pIdx != NULL);
 
-			uint32_t fieldno = pIdx != NULL ?
-					   pIdx->def->key_def->parts[i].fieldno :
-					   (uint32_t)pTab->iPKey;
+			uint32_t fieldno = pIdx->def->key_def->parts[i].fieldno;
 			sqlite3TokenInit(&tToCol,
 					 pTab->def->fields[fieldno].name);
 			sqlite3TokenInit(&tFromCol,

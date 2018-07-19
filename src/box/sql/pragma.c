@@ -726,22 +726,19 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						int iKey = pFK->aCol[0].iFrom;
 						assert(iKey >= 0 && iKey <
 						       (int)pTab->def->field_count);
-						if (iKey != pTab->iPKey) {
-							sqlite3VdbeAddOp3(v,
-									  OP_Column,
-									  0,
-									  iKey,
-									  regRow);
-							sqlite3ColumnDefault(v,
-									     pTab->def,
-									     iKey,
-									     regRow);
-							sqlite3VdbeAddOp2(v,
-									  OP_IsNull,
-									  regRow,
-									  addrOk);
-							VdbeCoverage(v);
-						}
+						sqlite3VdbeAddOp3(v,
+								  OP_Column,
+								  0,
+								  iKey,
+								  regRow);
+						sqlite3ColumnDefault(v,
+								     pTab->def,
+								     iKey,
+								     regRow);
+						sqlite3VdbeAddOp2(v,
+								  OP_IsNull,
+								  regRow,
+								  addrOk);
 						VdbeCoverage(v);
 						sqlite3VdbeGoto(v, addrOk);
 						sqlite3VdbeJumpHere(v,

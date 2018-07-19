@@ -116,7 +116,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE y=5]],
     {
         -- <analyze6-2.2>
-        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX sql_autoindex_T201_1 (Y=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX unique_unnamed_T201_2 (Y=?)"}
         -- </analyze6-2.2>
 })
 
@@ -148,7 +148,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE y=5]],
     {
         -- <analyze6-2.5>
-        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX sql_autoindex_T201_1 (Y=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX unique_unnamed_T201_2 (Y=?)"}
         -- </analyze6-2.5>
 })
 
@@ -183,7 +183,7 @@ test:do_eqp_test(
     [[SELECT * FROM t201 WHERE y=5]],
     {
         -- <analyze6-2.8>
-        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX sql_autoindex_T201_1 (Y=?)"}
+        {0, 0, 0, "SEARCH TABLE T201 USING COVERING INDEX unique_unnamed_T201_2 (Y=?)"}
         -- </analyze6-2.8>
 })
 

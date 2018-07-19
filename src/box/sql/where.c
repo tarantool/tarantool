@@ -3478,8 +3478,6 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 						pIndex->def->key_def;
 					iColumn = def->parts[j].fieldno;
 					revIdx = def->parts[j].sort_order;
-					if (iColumn == pIndex->pTable->iPKey)
-						iColumn = -1;
 				} else {
 					iColumn = -1;
 					revIdx = 0;

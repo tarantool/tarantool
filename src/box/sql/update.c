@@ -468,28 +468,24 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	newmask = sql_trigger_colmask(pParse, trigger, pChanges, 1,
 				      TRIGGER_BEFORE, pTab, on_error);
 	for (i = 0; i < (int)def->field_count; i++) {
-		if (i == pTab->iPKey) {
-			sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
+		j = aXRef[i];
+		if (j >= 0) {
+			sqlite3ExprCode(pParse, pChanges->a[j].pExpr,
+					regNew + i);
+		} else if (0 == (tmask & TRIGGER_BEFORE) || i > 31
+			   || (newmask & MASKBIT32(i))) {
+			/* This branch loads the value of a column that will not be changed
+			 * into a register. This is done if there are no BEFORE triggers, or
+			 * if there are one or more BEFORE triggers that use this value via
+			 * a new.* reference in a trigger program.
+			 */
+			testcase(i == 31);
+			testcase(i == 32);
+			sqlite3ExprCodeGetColumnToReg(pParse, def, i,
+						      iDataCur,
+						      regNew + i);
 		} else {
-			j = aXRef[i];
-			if (j >= 0) {
-				sqlite3ExprCode(pParse, pChanges->a[j].pExpr,
-						regNew + i);
-			} else if (0 == (tmask & TRIGGER_BEFORE) || i > 31
-				   || (newmask & MASKBIT32(i))) {
-				/* This branch loads the value of a column that will not be changed
-				 * into a register. This is done if there are no BEFORE triggers, or
-				 * if there are one or more BEFORE triggers that use this value via
-				 * a new.* reference in a trigger program.
-				 */
-				testcase(i == 31);
-				testcase(i == 32);
-				sqlite3ExprCodeGetColumnToReg(pParse, def, i,
-							      iDataCur,
-							      regNew + i);
-			} else {
-				sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
-			}
+			sqlite3VdbeAddOp2(v, OP_Null, 0, regNew + i);
 		}
 	}
 
@@ -524,7 +520,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		 * registers in case this has happened.
 		 */
 		for (i = 0; i < (int)def->field_count; i++) {
-			if (aXRef[i] < 0 && i != pTab->iPKey) {
+			if (aXRef[i] < 0) {
 				sqlite3ExprCodeGetColumnOfTable(v, def,
 								iDataCur, i,
 								regNew + i);

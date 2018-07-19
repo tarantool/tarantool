@@ -80,7 +80,7 @@ local testcases = {
 		{0,{1,2,10,11,1,2,4,10,11}}},
 	{"14",
 		[[insert into t1 values(4);]],
-		{1,"Duplicate key exists in unique index 'sql_autoindex_T2_1' in space 'T2'"}},
+		{1,"Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"}},
 	{"15",
 		[[select * from t1 union all select * from t2;]],
 		{0,{1,2,10,11,1,2,4,10,11}}},

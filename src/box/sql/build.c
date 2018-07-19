@@ -459,7 +459,6 @@ sql_table_new(Parse *parser, char *name)
 	strcpy(table->def->engine_name,
 	       sql_storage_engine_strs[current_session()->sql_default_engine]);
 
-	table->iPKey = -1;
 	table->iAutoIncPKey = -1;
 	table->pSchema = db->pSchema;
 	sqlite3HashInit(&table->idxHash);
@@ -862,10 +861,6 @@ sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
  * a primary key (and this is the second primary key) then create an
  * error.
  *
- * Set the Table.iPKey field of the table under construction to be the
- * index of the INTEGER PRIMARY KEY column.
- * Table.iPKey is set to -1 if there is no INTEGER PRIMARY KEY.
- *
  * If the key is not an INTEGER PRIMARY KEY, then create a unique
  * index for the key.  No index is created for INTEGER PRIMARY KEYs.
  */
@@ -923,14 +918,24 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	    (pTab->def->fields[iCol].type == FIELD_TYPE_INTEGER) &&
 	    sortOrder != SORT_ORDER_DESC) {
 		assert(autoInc == 0 || autoInc == 1);
-		pTab->iPKey = iCol;
-		pTab->keyConf = (u8) onError;
 		if (autoInc) {
 			pTab->iAutoIncPKey = iCol;
 			pTab->tabFlags |= TF_Autoincrement;
 		}
-		if (pList)
-			pParse->iPkSortOrder = pList->a[0].sort_order;
+		struct sqlite3 *db = pParse->db;
+		struct ExprList *list;
+		struct Token token;
+		sqlite3TokenInit(&token, pTab->def->fields[iCol].name);
+		list = sql_expr_list_append(db, NULL,
+					    sqlite3ExprAlloc(db, TK_ID,
+							     &token, 0));
+		if (list == NULL)
+			goto primary_key_exit;
+		sql_create_index(pParse, 0, 0, list, onError, 0, 0,
+				 SORT_ORDER_ASC, false,
+				 SQL_INDEX_TYPE_CONSTRAINT_PK);
+		if (db->mallocFailed)
+			goto primary_key_exit;
 	} else if (autoInc) {
 		sqlite3ErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
 				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
@@ -941,7 +946,15 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 		pList = 0;
 	}
 
- primary_key_exit:
+ 	/* Mark every PRIMARY KEY column as NOT NULL. */
+	for (uint32_t i = 0; i < pTab->def->field_count; i++) {
+		if (pTab->aCol[i].is_primkey) {
+			pTab->def->fields[i].nullable_action
+				= ON_CONFLICT_ACTION_ABORT;
+			pTab->def->fields[i].is_nullable = false;
+		}
+	}
+primary_key_exit:
 	sql_expr_list_delete(pParse->db, pList);
 	return;
 }
@@ -1213,63 +1226,6 @@ createTableStmt(sqlite3 * db, Table * p)
 	}
 	sqlite3_snprintf(n - k, &zStmt[k], "%s", zEnd);
 	return zStmt;
-}
-
-/*
- * This routine runs at the end of parsing a CREATE TABLE statement.
- * The job of this routine is to convert both
- * internal schema data structures and the generated VDBE code.
- * Changes include:
- *
- *     (1)  Set all columns of the PRIMARY KEY schema object to be NOT NULL.
- *     (2)  Set the Index.tnum of the PRIMARY KEY Index object in the
- *          schema to the rootpage from the main table.
- *     (3)  Add all table columns to the PRIMARY KEY Index object
- *          so that the PRIMARY KEY is a covering index.
- */
-static void
-convertToWithoutRowidTable(Parse * pParse, Table * pTab)
-{
-	Index *pPk;
-	sqlite3 *db = pParse->db;
-
-	/* Mark every PRIMARY KEY column as NOT NULL (except for imposter tables)
-	 */
-	if (!db->init.imposterTable) {
-		for (uint32_t i = 0; i < pTab->def->field_count; i++) {
-			if (pTab->aCol[i].is_primkey) {
-				pTab->def->fields[i].nullable_action
-					= ON_CONFLICT_ACTION_ABORT;
-				pTab->def->fields[i].is_nullable = false;
-			}
-		}
-	}
-
-	/* Locate the PRIMARY KEY index.  Or, if this table was originally
-	 * an INTEGER PRIMARY KEY table, create a new PRIMARY KEY index.
-	 */
-	if (pTab->iPKey >= 0) {
-		ExprList *pList;
-		Token ipkToken;
-		sqlite3TokenInit(&ipkToken, pTab->def->fields[pTab->iPKey].name);
-		pList = sql_expr_list_append(pParse->db, NULL,
-					     sqlite3ExprAlloc(db, TK_ID,
-							      &ipkToken, 0));
-		if (pList == 0)
-			return;
-		pList->a[0].sort_order = pParse->iPkSortOrder;
-		assert(pParse->pNewTable == pTab);
-		sql_create_index(pParse, 0, 0, pList, pTab->keyConf, 0, 0,
-				 SORT_ORDER_ASC, false,
-				 SQL_INDEX_TYPE_CONSTRAINT_PK);
-		if (db->mallocFailed)
-			return;
-		pPk = sqlite3PrimaryKeyIndex(pTab);
-		pTab->iPKey = -1;
-	} else {
-		pPk = sqlite3PrimaryKeyIndex(pTab);
-	}
-	assert(pPk != 0);
 }
 
 /*
@@ -1652,8 +1608,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 					"PRIMARY KEY missing on table %s",
 					p->def->name);
 			return;
-		} else {
-			convertToWithoutRowidTable(pParse, p);
 		}
 	}
 
@@ -2559,7 +2513,9 @@ tnt_error:
 static bool
 constraint_is_named(const char *name)
 {
-	return strncmp(name, "sql_autoindex_", strlen("sql_autoindex_"));
+	return strncmp(name, "sql_autoindex_", strlen("sql_autoindex_")) &&
+		strncmp(name, "pk_unnamed_", strlen("pk_unnamed_")) &&
+		strncmp(name, "unique_unnamed_", strlen("unique_unnamed_"));
 }
 
 void
@@ -2648,29 +2604,37 @@ sql_create_index(struct Parse *parse, struct Token *token,
 				sqlite3NameFromToken(db,
 						     &parse->constraintName);
 
+	       /*
+		* This naming is temporary. Now it's not
+		* possible (since we implement UNIQUE
+		* and PK constraints with indexes and
+		* indexes can not have same names), but
+		* in future we would use names exactly
+		* as they are set by user.
+		*/
+		assert(idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE ||
+		       idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK);
+		const char *prefix = NULL;
+		if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE) {
+			prefix = constraint_name == NULL ?
+				"unique_unnamed_%s_%d" : "unique_%s_%d";
+		}
+		else { /* idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK */
+			prefix = constraint_name == NULL ?
+				"pk_unnamed_%s_%d" : "pk_%s_%d";
+		}
+
+		uint32_t n = 1;
+		for (struct Index *idx = table->pIndex; idx != NULL;
+		     idx = idx->pNext, n++);
+
 		if (constraint_name == NULL ||
 		    strcmp(constraint_name, "") == 0) {
-			uint32_t n = 1;
-			for (struct Index *idx = table->pIndex; idx != NULL;
-			     idx = idx->pNext, n++);
-			name = sqlite3MPrintf(db, "sql_autoindex_%s_%d",
+			name = sqlite3MPrintf(db, prefix,
 					      table->def->name, n);
 		} else {
-			/*
-			 * This naming is temporary. Now it's not
-			 * possible (since we implement UNIQUE
-			 * and PK constraints with indexes and
-			 * indexes can not have same names), but
-			 * in future we would use names exactly
-			 * as they are set by user.
-			 */
-			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE)
-				name = sqlite3MPrintf(db,
-						      "unique_constraint_%s",
-						      constraint_name);
-			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK)
-				name = sqlite3MPrintf(db, "pk_constraint_%s",
-						      constraint_name);
+			name = sqlite3MPrintf(db, prefix,
+					      constraint_name, n);
 		}
 		sqlite3DbFree(db, constraint_name);
 	}

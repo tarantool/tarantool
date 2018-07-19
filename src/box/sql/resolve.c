@@ -336,9 +336,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 				     iCol++, pCol++) {
 					if (strcmp(pTab->def->fields[iCol].name,
 						   zCol) == 0) {
-						if (iCol == pTab->iPKey) {
-							iCol = -1;
-						}
 						break;
 					}
 				}
@@ -498,15 +495,11 @@ sqlite3CreateColumnExpr(sqlite3 * db, SrcList * pSrc, int iSrc, int iCol)
 		struct SrcList_item *pItem = &pSrc->a[iSrc];
 		p->space_def = pItem->pTab->def;
 		p->iTable = pItem->iCursor;
-		if (pItem->pTab->iPKey == iCol) {
-			p->iColumn = -1;
-		} else {
-			p->iColumn = (ynVar) iCol;
-			testcase(iCol == BMS);
-			testcase(iCol == BMS - 1);
-			pItem->colUsed |=
-			    ((Bitmask) 1) << (iCol >= BMS ? BMS - 1 : iCol);
-		}
+		p->iColumn = (ynVar) iCol;
+		testcase(iCol == BMS);
+		testcase(iCol == BMS - 1);
+		pItem->colUsed |=
+			((Bitmask) 1) << (iCol >= BMS ? BMS - 1 : iCol);
 		ExprSetProperty(p, EP_Resolved);
 	}
 	return p;

@@ -1762,8 +1762,6 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 			}
 			assert(j < pTabList->nSrc);
 			pTab = pTabList->a[j].pTab;
-			if (iCol < 0)
-				iCol = pTab->iPKey;
 			assert(iCol >= 0 && iCol < (int)pTab->def->field_count);
 			zCol = pTab->def->fields[iCol].name;
 			if (!shortNames && !fullNames) {
@@ -2016,7 +2014,6 @@ sqlite3ResultSetOfSelect(Parse * pParse, Select * pSelect)
 	assert(sqlite3LogEst(DEFAULT_TUPLE_COUNT) == DEFAULT_TUPLE_LOG_COUNT);
 	sqlite3ColumnsFromExprList(pParse, pSelect->pEList, table);
 	sqlite3SelectAddColumnTypeAndCollation(pParse, table, pSelect);
-	table->iPKey = -1;
 	if (db->mallocFailed) {
 		sqlite3DeleteTable(db, table);
 		return 0;
@@ -4618,7 +4615,6 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 		if (pTab == NULL)
 			return WRC_Abort;
 		pTab->nTabRef = 1;
-		pTab->iPKey = -1;
 		pTab->tuple_log_count = DEFAULT_TUPLE_LOG_COUNT;
 		assert(sqlite3LogEst(DEFAULT_TUPLE_COUNT) ==
 		       DEFAULT_TUPLE_LOG_COUNT);
@@ -4821,7 +4817,6 @@ selectExpander(Walker * pWalker, Select * p)
 			sqlite3ColumnsFromExprList(pParse, pSel->pEList, pTab);
 			if (sql_table_def_rebuild(db, pTab) != 0)
 				return WRC_Abort;
-			pTab->iPKey = -1;
 			pTab->tuple_log_count = DEFAULT_TUPLE_LOG_COUNT;
 			assert(sqlite3LogEst(DEFAULT_TUPLE_COUNT) ==
 			       DEFAULT_TUPLE_LOG_COUNT);

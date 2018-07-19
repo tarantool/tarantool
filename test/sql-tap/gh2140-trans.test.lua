@@ -32,7 +32,7 @@ for _, verb in ipairs({'ROLLBACK', 'ABORT'}) do
 	if verb == 'ROLLBACK' then
 		answer = 'UNIQUE constraint failed: T1.S1'
 	else
-		answer = "Duplicate key exists in unique index 'sql_autoindex_T1_1' in space 'T1'"
+		answer = "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
 	end
         test:do_catchsql_test('insert1_'..verb,
                               [[START TRANSACTION;

@@ -355,7 +355,7 @@ test:do_catchsql_test(
                 "_index"."id" = "_space"."id" AND
                 "_space"."name"='TEST5';
         ]],
-        {0, {"sql_autoindex_TEST5_1",0}})
+        {0, {"pk_unnamed_TEST5_1",0}})
 
 -- This test checks that CREATE TABLE statement with PK constraint
 -- and NAMED UNIQUE constraint (declared on THE SAME COLUMNS)
@@ -371,7 +371,7 @@ test:do_catchsql_test(
                 "_index"."id" = "_space"."id" AND
                 "_space"."name"='TEST6';
         ]],
-        {0, {"sql_autoindex_TEST6_1",0,"unique_constraint_C1",1}})
+        {0, {"pk_unnamed_TEST6_1",0,"unique_C1_2",1}})
 
 -- This test checks that CREATE TABLE statement with PK constraint
 -- and UNIQUE constraint is executed correctly
@@ -386,7 +386,7 @@ test:do_catchsql_test(
                 "_index"."id" = "_space"."id" AND
                 "_space"."name"='TEST7';
         ]],
-        {0, {"sql_autoindex_TEST7_1",0}})
+        {0, {"unique_unnamed_TEST7_1",0}})
 
 
 -- This test is the same as previous, but with named UNIQUE
@@ -401,6 +401,6 @@ test:do_catchsql_test(
                 "_index"."id" = "_space"."id" AND
                 "_space"."name"='TEST8';
         ]],
-        {0, {"sql_autoindex_TEST8_2",0,"unique_constraint_C1",1}})
+        {0, {"pk_TEST8_2",0,"unique_C1_1",1}})
 
 test:finish_test()

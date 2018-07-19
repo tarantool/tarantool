@@ -1918,7 +1918,6 @@ struct Table {
 	Hash idxHash;		/* All (named) indices indexed by name */
 	int tnum;		/* Root BTree page for this table */
 	u32 nTabRef;		/* Number of pointers to this Table */
-	i16 iPKey;		/* If not negative, use aCol[iPKey] as the rowid */
 	i16 iAutoIncPKey;	/* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
 				   column number here, -1 otherwise Tarantool specifics */
 	/**
@@ -1929,7 +1928,6 @@ struct Table {
 	 */
 	LogEst tuple_log_count;
 	u8 tabFlags;		/* Mask of TF_* values */
-	u8 keyConf;		/* What to do in case of uniqueness conflict on iPKey */
 #ifndef SQLITE_OMIT_ALTERTABLE
 	int addColOffset;	/* Offset in CREATE TABLE stmt to add a new column */
 #endif
@@ -2096,7 +2094,7 @@ enum sql_index_type {
  * of this structure may be created. In this case the Index.tnum variable is
  * used to store the address of a VDBE instruction, not a database page
  * number (it cannot - the database page is not allocated until the VDBE
- * program is executed). See convertToWithoutRowidTable() for details.
+ * program is executed).
  */
 struct Index {
 	/** The SQL table being indexed. */
@@ -2935,7 +2933,6 @@ struct Parse {
 
 	Token sLastToken;	/* The last token parsed */
 	ynVar nVar;		/* Number of '?' variables seen in the SQL so far */
-	u8 iPkSortOrder;	/* ASC or DESC for INTEGER PRIMARY KEY */
 	u8 explain;		/* True if the EXPLAIN flag is found on the query */
 	int nHeight;		/* Expression tree height of current sub-select */
 	int iSelectId;		/* ID of current select for EXPLAIN output */

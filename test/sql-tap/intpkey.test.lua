@@ -42,7 +42,7 @@ test:do_execsql_test(
         SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T1'
     ]], {
         -- <intpkey-1.1>
-        "sql_autoindex_T1_1"
+        "pk_unnamed_T1_1"
         -- </intpkey-1.1>
     })
 
@@ -96,7 +96,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(5,'second','entry');
     ]], {
         -- <intpkey-1.6>
-        1, "Duplicate key exists in unique index 'sql_autoindex_T1_1' in space 'T1'"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
         -- </intpkey-1.6>
     })
 

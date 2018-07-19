@@ -444,10 +444,10 @@ test:do_execsql_test(
 test:do_execsql_test(
     "index-7.3",
     [[
-        SELECT "name" FROM "_index" WHERE "name"='sql_autoindex_TEST1_1'
+        SELECT "name" FROM "_index" WHERE "name"='pk_unnamed_TEST1_1'
     ]], {
         -- <index-7.3>
-        "sql_autoindex_TEST1_1"
+        "pk_unnamed_TEST1_1"
         -- </index-7.3>
     })
 
@@ -1017,7 +1017,7 @@ test:do_execsql_test(
         SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-17.1>
-        "sql_autoindex_T7_3", "sql_autoindex_T7_2", "sql_autoindex_T7_1"
+        "pk_unnamed_T7_3", "unique_unnamed_T7_2", "unique_unnamed_T7_1"
         -- </index-17.1>
     })
 
@@ -1071,7 +1071,7 @@ test:do_execsql_test(
             INSERT INTO t7 VALUES(1);
         ]], {
             -- <index-19.2>
-            1, "Duplicate key exists in unique index 'sql_autoindex_T7_1' in space 'T7'"
+            1, "Duplicate key exists in unique index 'unique_unnamed_T7_1' in space 'T7'"
             -- </index-19.2>
         })
 
