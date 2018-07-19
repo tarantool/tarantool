@@ -823,6 +823,34 @@ box.space._func:select()
 session = nil
 ---
 ...
+-- an error when granting or revoking non-existent privilege
+box.schema.user.grant("guest", "everything", "universe")
+---
+- error: Unsupported universe privilege 'everything'
+...
+box.schema.user.revoke("guest", "everything", "universe")
+---
+- error: Unsupported universe privilege 'everything'
+...
+-- an error when granting or revoking a privilege on a non-existent entity
+box.schema.user.grant("guest", "read", "everywhere")
+---
+- error: Unknown object type 'everywhere'
+...
+box.schema.user.revoke("guest", "read", "everywhere")
+---
+- error: Unknown object type 'everywhere'
+...
+-- an error even when granting or revoking a non-existent privilege
+-- on a non-existent entity
+box.schema.user.grant("guest", "everything", "everywhere")
+---
+- error: Unknown object type 'everywhere'
+...
+box.schema.user.revoke("guest", "everything", "everywhere")
+---
+- error: Unknown object type 'everywhere'
+...
 --  produce an error if revoking a non-granted privilege
 box.schema.user.create("tester")
 ---

@@ -1764,7 +1764,10 @@ local priv_object_combo = {
 --
 local function privilege_check(privilege, object_type)
     local priv_hex = privilege_resolve(privilege)
-    if bit.band(priv_hex, priv_object_combo[object_type] or 0) ~= priv_hex then
+    if priv_object_combo[object_type] == nil then
+        box.error(box.error.UNKNOWN_SCHEMA_OBJECT, object_type)
+    elseif type(priv_hex) ~= 'number' or priv_hex == 0 or
+           bit.band(priv_hex, priv_object_combo[object_type] or 0) ~= priv_hex then
         box.error(box.error.UNSUPPORTED_PRIV, object_type, privilege)
     end
     return priv_hex

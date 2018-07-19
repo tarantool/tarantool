@@ -222,7 +222,19 @@ lbox_tonumber64(struct lua_State *L)
 			if (argl == 0) {
 				lua_pushnil(L);
 			} else if (negative) {
-				luaL_pushint64(L, -1 * (long long )result);
+				/*
+				 * To test overflow, consider
+				 *  result > -INT64_MIN;
+				 *  result - 1 > -INT64_MIN - 1;
+				 * Assumption:
+				 *  INT64_MAX == -(INT64_MIN + 1);
+				 * Finally,
+				 *  result - 1 > INT64_MAX;
+				 */
+				if (result != 0 && result - 1 > INT64_MAX)
+					lua_pushnil(L);
+				else
+					luaL_pushint64(L, -result);
 			} else {
 				luaL_pushuint64(L, result);
 			}

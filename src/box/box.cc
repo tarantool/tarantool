@@ -1452,7 +1452,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	/* Register the replica with the garbage collector. */
 	struct gc_consumer *gc = gc_consumer_register(
 		tt_sprintf("replica %s", tt_uuid_str(&instance_uuid)),
-		vclock_sum(&start_vclock), GC_CONSUMER_WAL);
+		&start_vclock, GC_CONSUMER_WAL);
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([=]{
@@ -1850,7 +1850,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 * so we must reflect this in replicaset vclock to
 	 * not attempt to apply these rows twice.
 	 */
-	recovery_end_vclock(recovery, &replicaset.vclock);
+	recovery_scan(recovery, &replicaset.vclock);
 
 	if (wal_dir_lock >= 0) {
 		box_listen();
@@ -1886,7 +1886,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	memtx_engine_recover_snapshot_xc(memtx, checkpoint_vclock);
 
 	engine_begin_final_recovery_xc();
-	recover_remaining_wals(recovery, &wal_stream.base, NULL, true);
+	recover_remaining_wals(recovery, &wal_stream.base, NULL, false);
 	/*
 	 * Leave hot standby mode, if any, only after
 	 * acquiring the lock.
@@ -2151,8 +2151,7 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 			return -1;
 		}
 	} while (checkpoint_idx-- > 0);
-	backup_gc = gc_consumer_register("backup", vclock_sum(vclock),
-					 GC_CONSUMER_ALL);
+	backup_gc = gc_consumer_register("backup", vclock, GC_CONSUMER_ALL);
 	if (backup_gc == NULL)
 		return -1;
 	int rc = engine_backup(vclock, cb, cb_arg);

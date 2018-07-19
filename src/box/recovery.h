@@ -68,8 +68,13 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 void
 recovery_delete(struct recovery *r);
 
+/**
+ * Scan the WAL directory, build an index of all found
+ * WAL files, then scan the most recent WAL file to find
+ * the vclock of the last record (returned in @end_vclock).
+ */
 void
-recovery_end_vclock(struct recovery *r, struct vclock *end_vclock);
+recovery_scan(struct recovery *r, struct vclock *end_vclock);
 
 void
 recovery_follow_local(struct recovery *r, struct xstream *stream,

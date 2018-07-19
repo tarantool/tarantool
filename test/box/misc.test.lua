@@ -165,6 +165,16 @@ tostring(tonumber64('12345678901234')) == '12345678901234'
 tostring(tonumber64('123456789012345')) == '123456789012345ULL'
 tostring(tonumber64('1234567890123456')) == '1234567890123456ULL'
 
+--
+-- gh-3466: Strange behaviour of tonumber64 function
+--
+tostring(tonumber64('9223372036854775807')) == '9223372036854775807ULL'
+tostring(tonumber64('18446744073709551615')) == '18446744073709551615ULL'
+tonumber64('18446744073709551616') == nil
+tostring(tonumber64('-9223372036854775808')) == '-9223372036854775808LL'
+tonumber64('-9223372036854775809') == nil
+tostring(tonumber64('0')) == '0'
+
 tonumber64('0x12') == 18
 tonumber64('0x12', 16) == 18
 tonumber64('0x12', 17) == nil

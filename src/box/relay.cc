@@ -78,8 +78,8 @@ struct relay_gc_msg {
 	struct stailq_entry in_pending;
 	/** Relay instance */
 	struct relay *relay;
-	/** Vclock signature to advance to */
-	int64_t signature;
+	/** Vclock to advance to */
+	struct vclock vclock;
 };
 
 /** State of a replication relay. */
@@ -325,7 +325,7 @@ static void
 tx_gc_advance(struct cmsg *msg)
 {
 	struct relay_gc_msg *m = (struct relay_gc_msg *)msg;
-	gc_consumer_advance(m->relay->replica->gc, m->signature);
+	gc_consumer_advance(m->relay->replica->gc, &m->vclock);
 	free(m);
 }
 
@@ -343,7 +343,7 @@ relay_on_close_log_f(struct trigger *trigger, void * /* event */)
 	}
 	cmsg_init(&m->msg, route);
 	m->relay = relay;
-	m->signature = vclock_sum(&relay->r->vclock);
+	vclock_copy(&m->vclock, &relay->r->vclock);
 	/*
 	 * Do not invoke garbage collection until the replica
 	 * confirms that it has received data stored in the
@@ -356,16 +356,16 @@ relay_on_close_log_f(struct trigger *trigger, void * /* event */)
  * Invoke pending garbage collection requests.
  *
  * This function schedules the most recent gc message whose
- * signature is less than or equal to the given one. Older
+ * vclock is less than or equal to the given one. Older
  * messages are discarded as their job will be done by the
  * scheduled message anyway.
  */
 static inline void
-relay_schedule_pending_gc(struct relay *relay, int64_t signature)
+relay_schedule_pending_gc(struct relay *relay, const struct vclock *vclock)
 {
 	struct relay_gc_msg *curr, *next, *gc_msg = NULL;
 	stailq_foreach_entry_safe(curr, next, &relay->pending_gc, in_pending) {
-		if (curr->signature > signature)
+		if (vclock_sum(&curr->vclock) > vclock_sum(vclock))
 			break;
 		stailq_shift(&relay->pending_gc);
 		free(gc_msg);
@@ -533,7 +533,7 @@ relay_subscribe_f(va_list ap)
 		relay->status_msg.relay = relay;
 		cpipe_push(&relay->tx_pipe, &relay->status_msg.msg);
 		/* Collect xlog files received by the replica. */
-		relay_schedule_pending_gc(relay, vclock_sum(send_vclock));
+		relay_schedule_pending_gc(relay, send_vclock);
 	}
 
 	say_crit("exiting the relay loop");
@@ -578,7 +578,7 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 	if (replica->gc == NULL) {
 		replica->gc = gc_consumer_register(
 			tt_sprintf("replica %s", tt_uuid_str(&replica->uuid)),
-			vclock_sum(replica_clock), GC_CONSUMER_WAL);
+			replica_clock, GC_CONSUMER_WAL);
 		if (replica->gc == NULL)
 			diag_raise();
 	}

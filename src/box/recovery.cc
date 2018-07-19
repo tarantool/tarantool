@@ -117,7 +117,7 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 }
 
 void
-recovery_end_vclock(struct recovery *r, struct vclock *end_vclock)
+recovery_scan(struct recovery *r, struct vclock *end_vclock)
 {
 	xdir_scan_xc(&r->wal_dir);
 
