@@ -242,12 +242,15 @@ heap_less(heap_t *heap, struct heap_node *node1, struct heap_node *node2)
 	if (lsn1 != lsn2)
 		return lsn1 > lsn2;
 
-	/**
-	 * LSNs are equal. This may happen only during forced recovery.
-	 * Prioritize terminal (non-UPSERT) statements
+	/*
+	 * LSNs are equal. This may only happen if one of the statements
+	 * is a deferred DELETE and the overwritten tuple which it is
+	 * supposed to purge has the same key parts as the REPLACE that
+	 * overwrote it. Discard the deferred DELETE as the overwritten
+	 * tuple will be (or has already been) purged by the REPLACE.
 	 */
-	return (vy_stmt_type(src1->tuple) == IPROTO_UPSERT ? 1 : 0) <
-	       (vy_stmt_type(src2->tuple) == IPROTO_UPSERT ? 1 : 0);
+	return (vy_stmt_type(src1->tuple) == IPROTO_DELETE ? 1 : 0) <
+	       (vy_stmt_type(src2->tuple) == IPROTO_DELETE ? 1 : 0);
 
 }
 
