@@ -396,9 +396,7 @@ lbox_info_gc_call(struct lua_State *L)
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "signature");
-		struct vclock vclock;
-		gc_consumer_vclock(consumer, &vclock);
-		luaL_pushint64(L, vclock_sum(&vclock));
+		luaL_pushint64(L, gc_consumer_signature(consumer));
 		lua_settable(L, -3);
 
 		lua_rawseti(L, -2, ++count);

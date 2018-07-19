@@ -328,6 +328,12 @@ gc_consumer_vclock(const struct gc_consumer *consumer, struct vclock *vclock)
 	vclock_copy(vclock, &consumer->vclock);
 }
 
+int64_t
+gc_consumer_signature(const struct gc_consumer *consumer)
+{
+	return vclock_sum(&consumer->vclock);
+}
+
 struct gc_consumer *
 gc_consumer_iterator_next(struct gc_consumer_iterator *it)
 {

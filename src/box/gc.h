@@ -32,6 +32,7 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -112,6 +113,11 @@ gc_consumer_name(const struct gc_consumer *consumer);
 /** Return the vclock a consumer tracks. */
 void
 gc_consumer_vclock(const struct gc_consumer *consumer, struct vclock *vclock);
+
+
+/** Return the vclock signature a consumer tracks. */
+int64_t
+gc_consumer_signature(const struct gc_consumer *consumer);
 
 /**
  * Iterator over registered consumers. The iterator is valid
