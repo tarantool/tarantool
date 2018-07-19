@@ -940,12 +940,14 @@ old_log_level = box.cfg.log_level
 box.cfg{log_level = 6}
 log.info(string.rep('a', 1000))
 test_run:cmd("setopt delimiter ';'")
-while test_run:grep_log('default', 'Connection refused', 1000) == nil and
+while test_run:grep_log('default', 'Network is unreachable', 1000) == nil and
+      test_run:grep_log('default', 'Connection refused', 1000) == nil and
       test_run:grep_log('default', 'Cannot assign requested address', 1000) == nil do
        fiber.sleep(0.1)
 end;
 log.info(string.rep('a', 1000));
-while test_run:grep_log('default', 'Connection refused', 1000) == nil and
+while test_run:grep_log('default', 'Network is unreachable', 1000) == nil and
+      test_run:grep_log('default', 'Connection refused', 1000) == nil and
       test_run:grep_log('default', 'Cannot assign requested address', 1000) == nil do
        fiber.sleep(0.1)
 end;
