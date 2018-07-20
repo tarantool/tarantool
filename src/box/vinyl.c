@@ -2324,17 +2324,6 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
 	return vy_upsert(env, tx, stmt, space, request);
 }
 
-static inline void
-txn_stmt_unref_tuples(struct txn_stmt *stmt)
-{
-	if (stmt->old_tuple)
-		tuple_unref(stmt->old_tuple);
-	if (stmt->new_tuple)
-		tuple_unref(stmt->new_tuple);
-	stmt->old_tuple = NULL;
-	stmt->new_tuple = NULL;
-}
-
 static int
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
@@ -2442,11 +2431,7 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 	/* We can't abort the transaction at this point, use force. */
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
 
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		txn_stmt_unref_tuples(stmt);
 	txn->engine_tx = NULL;
-
 	if (!txn->is_autocommit)
 		trigger_clear(&txn->fiber_on_stop);
 }
@@ -2461,11 +2446,7 @@ vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 
 	vy_tx_rollback(tx);
 
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		txn_stmt_unref_tuples(stmt);
 	txn->engine_tx = NULL;
-
 	if (!txn->is_autocommit)
 		trigger_clear(&txn->fiber_on_stop);
 }
@@ -2489,7 +2470,6 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	struct vy_tx *tx = txn->engine_tx;
 	assert(tx != NULL);
 	vy_tx_rollback_to_savepoint(tx, stmt->engine_savepoint);
-	txn_stmt_unref_tuples(stmt);
 }
 
 /* }}} Public API of transaction control */
@@ -3290,7 +3270,10 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	else
 		vy_tx_rollback(tx);
 
-	txn_stmt_unref_tuples(&stmt);
+	if (stmt.old_tuple != NULL)
+		tuple_unref(stmt.old_tuple);
+	if (stmt.new_tuple != NULL)
+		tuple_unref(stmt.new_tuple);
 
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
