@@ -51,6 +51,7 @@
 #include "engine.h"
 #include "memtx_engine.h"
 #include "sysview.h"
+#include "blackhole.h"
 #include "vinyl.h"
 #include "space.h"
 #include "index.h"
@@ -1634,6 +1635,9 @@ engine_init()
 
 	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);
+
+	struct engine *blackhole = blackhole_engine_new_xc();
+	engine_register(blackhole);
 
 	struct vinyl_engine *vinyl;
 	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),

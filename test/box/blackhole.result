@@ -1,0 +1,177 @@
+test_run = require('test_run').new()
+---
+...
+s = box.schema.space.create('test', {engine = 'blackhole'})
+---
+...
+-- Blackhole doesn't support indexes.
+s:create_index('pk')
+---
+- error: Blackhole does not support indexes
+...
+-- Blackhole does support space format.
+s:format{{'key', 'unsigned'}, {'value', 'string'}}
+---
+...
+s:format()
+---
+- [{'name': 'key', 'type': 'unsigned'}, {'name': 'value', 'type': 'string'}]
+...
+t = s:insert{1, 'a'} -- ok
+---
+...
+t, t.key, t.value
+---
+- [1, 'a']
+- 1
+- a
+...
+s:insert{1, 2, 3} -- error
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
+...
+s:replace{'a', 'b', 'c'} -- error
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+...
+s:format{}
+---
+...
+s:insert{1, 2, 3} -- ok
+---
+- [1, 2, 3]
+...
+s:replace{'a', 'b', 'c'} -- ok
+---
+- ['a', 'b', 'c']
+...
+-- Blackhole doesn't support delete/update/upsert operations.
+box.internal.delete(s.id, 0, {})
+---
+- error: Blackhole does not support delete()
+...
+box.internal.update(s.id, 0, {}, {})
+---
+- error: Blackhole does not support update()
+...
+box.internal.upsert(s.id, {}, {})
+---
+- error: Blackhole does not support upsert()
+...
+-- Blackhole supports on_replace and before_replace triggers.
+s_old = nil
+---
+...
+s_new = nil
+---
+...
+f1 = s:on_replace(function(old, new) s_old = old s_new = new end)
+---
+...
+s:replace{1, 2, 3}
+---
+- [1, 2, 3]
+...
+s_old, s_new
+---
+- null
+- [1, 2, 3]
+...
+f2 = s:before_replace(function(old, new) return box.tuple.new{4, 5, 6} end)
+---
+...
+s:replace{1, 2, 3}
+---
+- [4, 5, 6]
+...
+s_old, s_new
+---
+- null
+- [4, 5, 6]
+...
+s:on_replace(nil, f1)
+---
+...
+s:before_replace(nil, f2)
+---
+...
+-- Test recovery.
+test_run:cmd('restart server default')
+s = box.space.test
+---
+...
+-- Test snapshot.
+box.snapshot()
+---
+- ok
+...
+-- Operations done on a blackhole space are written to the WAL
+-- and therefore get replicated. Check it with the aid of an
+-- on_replace trigger.
+box.schema.user.grant('guest', 'replication')
+---
+...
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+t = {}
+---
+...
+_ = box.space.test:on_replace(function(old, new) table.insert(t, new) end)
+---
+...
+test_run:cmd('switch default')
+---
+- true
+...
+s = box.space.test
+---
+...
+for i = 1, 5 do s:replace{i} end
+---
+...
+vclock = test_run:get_vclock('default')
+---
+...
+test_run:wait_vclock('replica', vclock)
+---
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+t
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [5]
+...
+test_run:cmd('switch default')
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...
+s:drop()
+---
+...
