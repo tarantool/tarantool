@@ -505,3 +505,76 @@ space_execute_dml(struct space *space, struct txn *txn,
 	}
 	return 0;
 }
+
+/* {{{ Virtual method stubs */
+
+size_t
+generic_space_bsize(struct space *space)
+{
+	(void)space;
+	return 0;
+}
+
+int
+generic_space_apply_initial_join_row(struct space *space,
+				     struct request *request)
+{
+	(void)space;
+	(void)request;
+	return 0;
+}
+
+void
+generic_init_system_space(struct space *space)
+{
+	(void)space;
+}
+
+int
+generic_space_check_index_def(struct space *space, struct index_def *index_def)
+{
+	(void)space;
+	(void)index_def;
+	return 0;
+}
+
+int
+generic_space_add_primary_key(struct space *space)
+{
+	(void)space;
+	return 0;
+}
+
+void
+generic_space_drop_primary_key(struct space *space)
+{
+	(void)space;
+}
+
+int
+generic_space_check_format(struct space *space, struct tuple_format *format)
+{
+	(void)space;
+	(void)format;
+	return 0;
+}
+
+int
+generic_space_build_index(struct space *src_space, struct index *new_index,
+			  struct tuple_format *new_format)
+{
+	(void)src_space;
+	(void)new_index;
+	(void)new_format;
+	return 0;
+}
+
+int
+generic_space_prepare_alter(struct space *old_space, struct space *new_space)
+{
+	(void)old_space;
+	(void)new_space;
+	return 0;
+}
+
+/* }}} */

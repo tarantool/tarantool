@@ -196,3 +196,164 @@ engine_reset_stat(void)
 	engine_foreach(engine)
 		engine->vtab->reset_stat(engine);
 }
+
+/* {{{ Virtual method stubs */
+
+int
+generic_engine_join(struct engine *engine, const struct vclock *vclock,
+		    struct xstream *stream)
+{
+	(void)engine;
+	(void)vclock;
+	(void)stream;
+	return 0;
+}
+
+int
+generic_engine_begin(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	(void)txn;
+	return 0;
+}
+
+int
+generic_engine_begin_statement(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	(void)txn;
+	return 0;
+}
+
+int
+generic_engine_prepare(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	(void)txn;
+	return 0;
+}
+
+void
+generic_engine_commit(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	(void)txn;
+}
+
+void
+generic_engine_rollback_statement(struct engine *engine, struct txn *txn,
+				  struct txn_stmt *stmt)
+{
+	(void)engine;
+	(void)txn;
+	(void)stmt;
+}
+
+void
+generic_engine_rollback(struct engine *engine, struct txn *txn)
+{
+	(void)engine;
+	(void)txn;
+}
+
+int
+generic_engine_bootstrap(struct engine *engine)
+{
+	(void)engine;
+	return 0;
+}
+
+int
+generic_engine_begin_initial_recovery(struct engine *engine,
+				      const struct vclock *vclock)
+{
+	(void)engine;
+	(void)vclock;
+	return 0;
+}
+
+int
+generic_engine_begin_final_recovery(struct engine *engine)
+{
+	(void)engine;
+	return 0;
+}
+
+int
+generic_engine_end_recovery(struct engine *engine)
+{
+	(void)engine;
+	return 0;
+}
+
+int
+generic_engine_begin_checkpoint(struct engine *engine)
+{
+	(void)engine;
+	return 0;
+}
+
+int
+generic_engine_wait_checkpoint(struct engine *engine,
+			       const struct vclock *vclock)
+{
+	(void)engine;
+	(void)vclock;
+	return 0;
+}
+
+void
+generic_engine_commit_checkpoint(struct engine *engine,
+				 const struct vclock *vclock)
+{
+	(void)engine;
+	(void)vclock;
+}
+
+void
+generic_engine_abort_checkpoint(struct engine *engine)
+{
+	(void)engine;
+}
+
+int
+generic_engine_collect_garbage(struct engine *engine, int64_t lsn)
+{
+	(void)engine;
+	(void)lsn;
+	return 0;
+}
+
+int
+generic_engine_backup(struct engine *engine, const struct vclock *vclock,
+		      engine_backup_cb cb, void *cb_arg)
+{
+	(void)engine;
+	(void)vclock;
+	(void)cb;
+	(void)cb_arg;
+	return 0;
+}
+
+void
+generic_engine_memory_stat(struct engine *engine,
+			   struct engine_memory_stat *stat)
+{
+	(void)engine;
+	(void)stat;
+}
+
+void
+generic_engine_reset_stat(struct engine *engine)
+{
+	(void)engine;
+}
+
+int
+generic_engine_check_space_def(struct space_def *def)
+{
+	(void)def;
+	return 0;
+}
+
+/* }}} */

@@ -398,6 +398,20 @@ space_dump_def(const struct space *space, struct rlist *key_list);
 void
 space_fill_index_map(struct space *space);
 
+/*
+ * Virtual method stubs.
+ */
+size_t generic_space_bsize(struct space *);
+int generic_space_apply_initial_join_row(struct space *, struct request *);
+void generic_init_system_space(struct space *);
+int generic_space_check_index_def(struct space *, struct index_def *);
+int generic_space_add_primary_key(struct space *space);
+void generic_space_drop_primary_key(struct space *space);
+int generic_space_check_format(struct space *, struct tuple_format *);
+int generic_space_build_index(struct space *, struct index *,
+			      struct tuple_format *);
+int generic_space_prepare_alter(struct space *, struct space *);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

@@ -667,6 +667,9 @@ void generic_index_commit_modify(struct index *, int64_t);
 void generic_index_commit_drop(struct index *, int64_t);
 void generic_index_update_def(struct index *);
 bool generic_index_depends_on_pk(struct index *);
+bool generic_index_def_change_requires_rebuild(struct index *,
+					       const struct index_def *);
+ssize_t generic_index_bsize(struct index *);
 ssize_t generic_index_size(struct index *);
 int generic_index_min(struct index *, const char *, uint32_t, struct tuple **);
 int generic_index_max(struct index *, const char *, uint32_t, struct tuple **);

@@ -84,22 +84,6 @@ sysview_index_destroy(struct index *index)
 	free(index);
 }
 
-static ssize_t
-sysview_index_bsize(struct index *index)
-{
-	(void)index;
-	return 0;
-}
-
-static bool
-sysview_index_def_change_requires_rebuild(struct index *index,
-					  const struct index_def *new_def)
-{
-	(void)index;
-	(void)new_def;
-	return true;
-}
-
 static struct iterator *
 sysview_index_create_iterator(struct index *base, enum iterator_type type,
 			      const char *key, uint32_t part_count)
@@ -177,9 +161,9 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ generic_index_depends_on_pk,
 	/* .def_change_requires_rebuild = */
-		sysview_index_def_change_requires_rebuild,
+		generic_index_def_change_requires_rebuild,
 	/* .size = */ generic_index_size,
-	/* .bsize = */ sysview_index_bsize,
+	/* .bsize = */ generic_index_bsize,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,

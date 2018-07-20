@@ -1002,13 +1002,6 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 	return false;
 }
 
-static void
-vinyl_init_system_space(struct space *space)
-{
-	(void)space;
-	unreachable();
-}
-
 static int
 vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
@@ -1157,12 +1150,6 @@ static int
 vinyl_space_add_primary_key(struct space *space)
 {
 	return vinyl_index_open(space->index[0]);
-}
-
-static void
-vinyl_space_drop_primary_key(struct space *space)
-{
-	(void)space;
 }
 
 static size_t
@@ -4488,11 +4475,11 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .execute_delete = */ vinyl_space_execute_delete,
 	/* .execute_update = */ vinyl_space_execute_update,
 	/* .execute_upsert = */ vinyl_space_execute_upsert,
-	/* .init_system_space = */ vinyl_init_system_space,
+	/* .init_system_space = */ generic_init_system_space,
 	/* .check_index_def = */ vinyl_space_check_index_def,
 	/* .create_index = */ vinyl_space_create_index,
 	/* .add_primary_key = */ vinyl_space_add_primary_key,
-	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
+	/* .drop_primary_key = */ generic_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
 	/* .build_index = */ vinyl_space_build_index,
 	/* .swap_index = */ vinyl_space_swap_index,
