@@ -50,7 +50,7 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
-#include "sysview_engine.h"
+#include "sysview.h"
 #include "vinyl.h"
 #include "space.h"
 #include "index.h"

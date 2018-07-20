@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED
-#define TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED
+#ifndef TARANTOOL_BOX_SYSVIEW_H_INCLUDED
+#define TARANTOOL_BOX_SYSVIEW_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -30,31 +30,31 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "index.h"
+#include <stddef.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct space;
-struct tuple;
 struct sysview_engine;
 
-typedef bool (*sysview_filter_f)(struct space *source, struct tuple *);
-
-struct sysview_index {
-	struct index base;
-	uint32_t source_space_id;
-	uint32_t source_index_id;
-	sysview_filter_f filter;
-};
-
-struct sysview_index *
-sysview_index_new(struct sysview_engine *sysview,
-		  struct index_def *def, const char *space_name);
+struct sysview_engine *
+sysview_engine_new(void);
 
 #if defined(__cplusplus)
 } /* extern "C" */
-#endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_BOX_SYSVIEW_INDEX_H_INCLUDED */
+#include "diag.h"
+
+static inline struct sysview_engine *
+sysview_engine_new_xc(void)
+{
+	struct sysview_engine *sysview = sysview_engine_new();
+	if (sysview == NULL)
+		diag_raise();
+	return sysview;
+}
+
+#endif /* defined(__plusplus) */
+
+#endif /* TARANTOOL_BOX_SYSVIEW_H_INCLUDED */
