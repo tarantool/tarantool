@@ -300,6 +300,12 @@ set(Readline_FIND_REQUIRED ON)
 find_package(Readline)
 
 #
+# ICONV
+#
+set(ICONV_FIND_REQUIRED ON)
+find_package(ICONV)
+
+#
 # ICU
 #
 

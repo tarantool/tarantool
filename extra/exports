@@ -38,6 +38,9 @@ title_set_custom
 title_get_custom
 title_set_status
 title_get_status
+tnt_iconv_open
+tnt_iconv_close
+tnt_iconv
 exception_get_string
 exception_get_int
 
