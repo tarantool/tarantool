@@ -733,6 +733,12 @@ cmd ::= with(C) DELETE FROM fullname(X) indexed_opt(I) where_opt(W). {
   sql_table_delete_from(pParse,X,W);
 }
 
+/////////////////////////// The TRUNCATE statement /////////////////////////////
+//
+cmd ::= TRUNCATE TABLE fullname(X). {
+  sql_table_truncate(pParse, X);
+}
+
 %type where_opt {Expr*}
 %destructor where_opt {sql_expr_delete(pParse->db, $$, false);}
 

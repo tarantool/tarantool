@@ -3719,6 +3719,15 @@ void
 sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		      struct Expr *where);
 
+/**
+ * Generate a code for TRUNCATE TABLE statement.
+ *
+ * @param parse Parsing context.
+ * @param tab_list List of single table to truncate.
+ */
+void
+sql_table_truncate(struct Parse *parse, struct SrcList *tab_list);
+
 void sqlite3Update(Parse *, SrcList *, ExprList *, Expr *,
 		   enum on_conflict_action);
 WhereInfo *sqlite3WhereBegin(Parse *, SrcList *, Expr *, ExprList *, ExprList *,

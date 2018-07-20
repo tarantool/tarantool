@@ -37,3 +37,41 @@ box.sql.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 BEGIN DELETE FROM t1; END
 box.sql.execute("INSERT INTO t2 VALUES (0);")
 
 box.sql.execute("DROP TABLE t2;")
+
+
+--
+-- gh-2201: TRUNCATE TABLE operation.
+--
+
+-- can't truncate system table.
+box.sql.execute("TRUNCATE TABLE \"_sql_stat1\";")
+
+box.sql.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b STR);")
+box.sql.execute("INSERT INTO t1 VALUES(1, 1, 'one');")
+box.sql.execute("INSERT INTO t1 VALUES(2, 2, 'two');")
+
+-- Can't truncate in transaction.
+box.sql.execute("START TRANSACTION")
+box.sql.execute("TRUNCATE TABLE t1;")
+box.sql.execute("ROLLBACK")
+
+-- Can't truncate view.
+box.sql.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
+box.sql.execute("TRUNCATE TABLE v1;")
+
+-- Can't truncate table with FK.
+box.sql.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")
+box.sql.execute("TRUNCATE TABLE t1;")
+
+-- Table triggers should be ignored.
+box.sql.execute("DROP TABLE t2;")
+box.sql.execute("CREATE TABLE t2(x INT PRIMARY KEY);")
+box.sql.execute("CREATE TRIGGER trig2 BEFORE DELETE ON t1 BEGIN INSERT INTO t2 VALUES(old.x); END;")
+box.sql.execute("TRUNCATE TABLE t1;")
+box.sql.execute("SELECT * FROM t1;")
+box.sql.execute("SELECT * FROM t2;")
+
+-- Cleanup.
+box.sql.execute("DROP VIEW v1");
+box.sql.execute("DROP TABLE t1;")
+box.sql.execute("DROP TABLE t2;")

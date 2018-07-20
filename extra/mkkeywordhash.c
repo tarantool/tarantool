@@ -281,6 +281,7 @@ static Keyword aKeywordTable[] = {
   { "VARCHAR",                "TK_ID",          RESERVED,         true  },
   { "WHENEVER",               "TK_STANDARD",    RESERVED,         true  },
   { "WHILE",                  "TK_STANDARD",    RESERVED,         true  },
+  { "TRUNCATE",               "TK_TRUNCATE",    ALWAYS,           true  },
 };
 
 /* Number of keywords */

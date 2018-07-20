@@ -39,6 +39,7 @@
  * in this file for details.  If in doubt, do not deviate from existing
  * commenting and indentation practices when changing or adding code.
  */
+#include "box/box.h"
 #include "box/txn.h"
 #include "box/session.h"
 #include "sqliteInt.h"
@@ -4562,8 +4563,9 @@ case OP_IdxGE:  {       /* jump */
 	break;
 }
 
-/* Opcode: Clear P1 * * * *
+/* Opcode: Clear P1 P2 * * *
  * Synopsis: space id = P1
+ * If P2 is not 0, use Truncate semantics.
  *
  * Delete all contents of the space, which space id is given
  * in P1 argument. It is worth mentioning, that clearing routine
@@ -4575,7 +4577,13 @@ case OP_Clear: {
 	uint32_t space_id = pOp->p1;
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
-	rc = tarantoolSqlite3ClearTable(space);
+	rc = 0;
+	if (pOp->p2 > 0) {
+		if (box_truncate(space_id) != 0)
+			rc = SQL_TARANTOOL_ERROR;
+	} else {
+		rc = tarantoolSqlite3ClearTable(space);
+	}
 	if (rc) goto abort_due_to_error;
 	break;
 }

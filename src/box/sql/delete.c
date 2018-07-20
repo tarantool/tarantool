@@ -72,6 +72,50 @@ sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 }
 
 void
+sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
+{
+	assert(tab_list->nSrc == 1);
+
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	if (v == NULL)
+		goto cleanup;
+
+	const char *tab_name = tab_list->a->zName;
+	uint32_t space_id = box_space_id_by_name(tab_name, strlen(tab_name));
+	if (space_id == BOX_ID_NIL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE, tab_name);
+		goto tarantool_error;
+	}
+	struct space *space = space_cache_find(space_id);
+	assert(space != NULL);
+
+	struct Table *table = sqlite3LocateTable(parse, LOCATE_NOERR, tab_name);
+	if (table != NULL && sqlite3FkReferences(table) != NULL) {
+		const char *err_msg =
+			tt_sprintf("can not truncate space '%s' because other "
+				   "objects depend on it", space->def->name);
+		diag_set(ClientError, ER_SQL, err_msg);
+		goto tarantool_error;
+	}
+	if (space->def->opts.is_view) {
+		const char *err_msg =
+			tt_sprintf("can not truncate space '%s' because it is "
+				   "a view", space->def->name);
+		diag_set(ClientError, ER_SQL, err_msg);
+		goto tarantool_error;
+	}
+	sqlite3VdbeAddOp2(v, OP_Clear, space->def->id, true);
+cleanup:
+	sqlite3SrcListDelete(parse->db, tab_list);
+	return;
+
+tarantool_error:
+	parse->rc = SQL_TARANTOOL_ERROR;
+	parse->nErr++;
+	goto cleanup;
+}
+
+void
 sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		      struct Expr *where)
 {
