@@ -28,16 +28,40 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "sysview_index.h"
-#include "sysview_engine.h"
+#include "sysview.h"
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <small/mempool.h>
-#include "fiber.h"
+
+#include "diag.h"
+#include "error.h"
+#include "errcode.h"
 #include "schema.h"
 #include "sequence.h"
 #include "space.h"
+#include "index.h"
+#include "engine.h"
 #include "func.h"
 #include "tuple.h"
 #include "session.h"
+
+typedef bool (*sysview_filter_f)(struct space *, struct tuple *);
+
+struct sysview_engine {
+	struct engine base;
+	/** Memory pool for index iterator. */
+	struct mempool iterator_pool;
+};
+
+struct sysview_index {
+	struct index base;
+	uint32_t source_space_id;
+	uint32_t source_index_id;
+	sysview_filter_f filter;
+};
 
 struct sysview_iterator {
 	struct iterator base;
@@ -82,22 +106,6 @@ static void
 sysview_index_destroy(struct index *index)
 {
 	free(index);
-}
-
-static ssize_t
-sysview_index_bsize(struct index *index)
-{
-	(void)index;
-	return 0;
-}
-
-static bool
-sysview_index_def_change_requires_rebuild(struct index *index,
-					  const struct index_def *new_def)
-{
-	(void)index;
-	(void)new_def;
-	return true;
 }
 
 static struct iterator *
@@ -177,9 +185,9 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .update_def = */ generic_index_update_def,
 	/* .depends_on_pk = */ generic_index_depends_on_pk,
 	/* .def_change_requires_rebuild = */
-		sysview_index_def_change_requires_rebuild,
+		generic_index_def_change_requires_rebuild,
 	/* .size = */ generic_index_size,
-	/* .bsize = */ sysview_index_bsize,
+	/* .bsize = */ generic_index_bsize,
 	/* .min = */ generic_index_min,
 	/* .max = */ generic_index_max,
 	/* .random = */ generic_index_random,
@@ -197,6 +205,55 @@ static const struct index_vtab sysview_index_vtab = {
 	/* .build_next = */ generic_index_build_next,
 	/* .end_build = */ generic_index_end_build,
 };
+
+static void
+sysview_space_destroy(struct space *space)
+{
+	free(space);
+}
+
+static int
+sysview_space_execute_replace(struct space *space, struct txn *txn,
+			      struct request *request, struct tuple **result)
+{
+	(void)txn;
+	(void)request;
+	(void)result;
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
+}
+
+static int
+sysview_space_execute_delete(struct space *space, struct txn *txn,
+			     struct request *request, struct tuple **result)
+{
+	(void)txn;
+	(void)request;
+	(void)result;
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
+}
+
+static int
+sysview_space_execute_update(struct space *space, struct txn *txn,
+			     struct request *request, struct tuple **result)
+{
+	(void)txn;
+	(void)request;
+	(void)result;
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
+}
+
+static int
+sysview_space_execute_upsert(struct space *space, struct txn *txn,
+			     struct request *request)
+{
+	(void)txn;
+	(void)request;
+	diag_set(ClientError, ER_VIEW_IS_RO, space->def->name);
+	return -1;
+}
 
 /*
  * System view filters.
@@ -345,12 +402,12 @@ vsequence_filter(struct space *source, struct tuple *tuple)
 	       ((PRIV_WRDA | PRIV_X) & effective);
 }
 
-struct sysview_index *
-sysview_index_new(struct sysview_engine *sysview,
-		  struct index_def *def, const char *space_name)
+static struct index *
+sysview_space_create_index(struct space *space, struct index_def *def)
 {
 	assert(def->type == TREE);
 
+	struct sysview_engine *sysview = (struct sysview_engine *)space->engine;
 	if (!mempool_is_initialized(&sysview->iterator_pool)) {
 		mempool_create(&sysview->iterator_pool, cord_slab_cache(),
 			       sizeof(struct sysview_iterator));
@@ -393,7 +450,7 @@ sysview_index_new(struct sysview_engine *sysview,
 		break;
 	default:
 		diag_set(ClientError, ER_MODIFY_INDEX,
-			 def->name, space_name,
+			 def->name, space_name(space),
 			 "unknown space for system view");
 		return NULL;
 	}
@@ -414,5 +471,94 @@ sysview_index_new(struct sysview_engine *sysview,
 	index->source_space_id = source_space_id;
 	index->source_index_id = source_index_id;
 	index->filter = filter;
-	return index;
+	return &index->base;
+}
+
+static const struct space_vtab sysview_space_vtab = {
+	/* .destroy = */ sysview_space_destroy,
+	/* .bsize = */ generic_space_bsize,
+	/* .apply_initial_join_row = */ generic_space_apply_initial_join_row,
+	/* .execute_replace = */ sysview_space_execute_replace,
+	/* .execute_delete = */ sysview_space_execute_delete,
+	/* .execute_update = */ sysview_space_execute_update,
+	/* .execute_upsert = */ sysview_space_execute_upsert,
+	/* .ephemeral_replace = */ generic_space_ephemeral_replace,
+	/* .ephemeral_delete = */ generic_space_ephemeral_delete,
+	/* .init_system_space = */ generic_init_system_space,
+	/* .init_ephemeral_space = */ generic_init_ephemeral_space,
+	/* .check_index_def = */ generic_space_check_index_def,
+	/* .create_index = */ sysview_space_create_index,
+	/* .add_primary_key = */ generic_space_add_primary_key,
+	/* .drop_primary_key = */ generic_space_drop_primary_key,
+	/* .check_format = */ generic_space_check_format,
+	/* .build_index = */ generic_space_build_index,
+	/* .swap_index = */ generic_space_swap_index,
+	/* .prepare_alter = */ generic_space_prepare_alter,
+};
+
+static void
+sysview_engine_shutdown(struct engine *engine)
+{
+	struct sysview_engine *sysview = (struct sysview_engine *)engine;
+	if (mempool_is_initialized(&sysview->iterator_pool))
+		mempool_destroy(&sysview->iterator_pool);
+	free(engine);
+}
+
+static struct space *
+sysview_engine_create_space(struct engine *engine, struct space_def *def,
+			    struct rlist *key_list)
+{
+	struct space *space = (struct space *)calloc(1, sizeof(*space));
+	if (space == NULL) {
+		diag_set(OutOfMemory, sizeof(*space),
+			 "malloc", "struct space");
+		return NULL;
+	}
+	if (space_create(space, engine, &sysview_space_vtab,
+			 def, key_list, NULL) != 0) {
+		free(space);
+		return NULL;
+	}
+	return space;
+}
+
+static const struct engine_vtab sysview_engine_vtab = {
+	/* .shutdown = */ sysview_engine_shutdown,
+	/* .create_space = */ sysview_engine_create_space,
+	/* .join = */ generic_engine_join,
+	/* .begin = */ generic_engine_begin,
+	/* .begin_statement = */ generic_engine_begin_statement,
+	/* .prepare = */ generic_engine_prepare,
+	/* .commit = */ generic_engine_commit,
+	/* .rollback_statement = */ generic_engine_rollback_statement,
+	/* .rollback = */ generic_engine_rollback,
+	/* .bootstrap = */ generic_engine_bootstrap,
+	/* .begin_initial_recovery = */ generic_engine_begin_initial_recovery,
+	/* .begin_final_recovery = */ generic_engine_begin_final_recovery,
+	/* .end_recovery = */ generic_engine_end_recovery,
+	/* .begin_checkpoint = */ generic_engine_begin_checkpoint,
+	/* .wait_checkpoint = */ generic_engine_wait_checkpoint,
+	/* .commit_checkpoint = */ generic_engine_commit_checkpoint,
+	/* .abort_checkpoint = */ generic_engine_abort_checkpoint,
+	/* .collect_garbage = */ generic_engine_collect_garbage,
+	/* .backup = */ generic_engine_backup,
+	/* .memory_stat = */ generic_engine_memory_stat,
+	/* .reset_stat = */ generic_engine_reset_stat,
+	/* .check_space_def = */ generic_engine_check_space_def,
+};
+
+struct sysview_engine *
+sysview_engine_new(void)
+{
+	struct sysview_engine *sysview = calloc(1, sizeof(*sysview));
+	if (sysview == NULL) {
+		diag_set(OutOfMemory, sizeof(*sysview),
+			 "malloc", "struct sysview_engine");
+		return NULL;
+	}
+
+	sysview->base.vtab = &sysview_engine_vtab;
+	sysview->base.name = "sysview";
+	return sysview;
 }

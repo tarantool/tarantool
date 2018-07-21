@@ -99,6 +99,15 @@ txn_stmt_new(struct txn *txn)
 	return stmt;
 }
 
+static inline void
+txn_stmt_unref_tuples(struct txn_stmt *stmt)
+{
+	if (stmt->old_tuple != NULL)
+		tuple_unref(stmt->old_tuple);
+	if (stmt->new_tuple != NULL)
+		tuple_unref(stmt->new_tuple);
+}
+
 static void
 txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 {
@@ -116,6 +125,7 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 			txn->n_rows--;
 			stmt->row = NULL;
 		}
+		txn_stmt_unref_tuples(stmt);
 	}
 }
 
@@ -338,6 +348,10 @@ txn_commit(struct txn *txn)
 	if (txn->engine != NULL)
 		engine_commit(txn->engine, txn);
 
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		txn_stmt_unref_tuples(stmt);
+
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
@@ -375,6 +389,11 @@ txn_rollback()
 	}
 	if (txn->engine)
 		engine_rollback(txn->engine, txn);
+
+	struct txn_stmt *stmt;
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		txn_stmt_unref_tuples(stmt);
+
 	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();

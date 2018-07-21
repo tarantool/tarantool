@@ -213,19 +213,17 @@ applier_connect(struct applier *applier)
 	diag_clear(&fiber()->diag);
 
 	/*
-	 * Tarantool >= 1.7.7: send an IPROTO_REQUEST_VOTE message
-	 * to fetch the master's vclock before proceeding to "join".
+	 * Tarantool >= 1.10.1: send an IPROTO_VOTE request to
+	 * fetch the master's ballot before proceeding to "join".
 	 * It will be used for leader election on bootstrap.
 	 */
-	if (applier->version_id >= version_id(1, 7, 7)) {
-		xrow_encode_request_vote(&row);
+	if (applier->version_id >= version_id(1, 10, 1)) {
+		xrow_encode_vote(&row);
 		coio_write_xrow(coio, &row);
 		coio_read_xrow(coio, ibuf, &row);
 		if (row.type != IPROTO_OK)
 			xrow_decode_error_xc(&row);
-		vclock_create(&applier->vclock);
-		xrow_decode_request_vote_xc(&row, &applier->vclock,
-					    &applier->remote_is_ro);
+		xrow_decode_ballot_xc(&row, &applier->ballot);
 	}
 
 	applier_set_state(applier, APPLIER_CONNECTED);

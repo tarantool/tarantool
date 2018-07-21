@@ -436,8 +436,9 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 
 	/* Only roll back the changes if they were made. */
 	if (stmt->engine_savepoint == NULL)
-		index_count = 0;
-	else if (memtx_space->replace == memtx_space_replace_all_keys)
+		return;
+
+	if (memtx_space->replace == memtx_space_replace_all_keys)
 		index_count = space->index_count;
 	else if (memtx_space->replace == memtx_space_replace_primary_key)
 		index_count = 1;
@@ -455,16 +456,12 @@ memtx_engine_rollback_statement(struct engine *engine, struct txn *txn,
 			panic("failed to rollback change");
 		}
 	}
-	/** Reset to old bsize, if it was changed. */
-	if (stmt->engine_savepoint != NULL)
-		memtx_space_update_bsize(space, stmt->new_tuple,
-					 stmt->old_tuple);
 
-	if (stmt->new_tuple)
+	memtx_space_update_bsize(space, stmt->new_tuple, stmt->old_tuple);
+	if (stmt->old_tuple != NULL)
+		tuple_ref(stmt->old_tuple);
+	if (stmt->new_tuple != NULL)
 		tuple_unref(stmt->new_tuple);
-
-	stmt->old_tuple = NULL;
-	stmt->new_tuple = NULL;
 }
 
 static void
@@ -478,17 +475,6 @@ memtx_engine_rollback(struct engine *engine, struct txn *txn)
 	stailq_reverse(&txn->stmts);
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		memtx_engine_rollback_statement(engine, txn, stmt);
-}
-
-static void
-memtx_engine_commit(struct engine *engine, struct txn *txn)
-{
-	(void)engine;
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next) {
-		if (stmt->old_tuple)
-			tuple_unref(stmt->old_tuple);
-	}
 }
 
 static int
@@ -966,19 +952,6 @@ memtx_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	stat->index += index_stats.totals.used;
 }
 
-static void
-memtx_engine_reset_stat(struct engine *engine)
-{
-	(void)engine;
-}
-
-static int
-memtx_engine_check_space_def(struct space_def *def)
-{
-	(void)def;
-	return 0;
-}
-
 static const struct engine_vtab memtx_engine_vtab = {
 	/* .shutdown = */ memtx_engine_shutdown,
 	/* .create_space = */ memtx_engine_create_space,
@@ -986,7 +959,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .begin = */ memtx_engine_begin,
 	/* .begin_statement = */ memtx_engine_begin_statement,
 	/* .prepare = */ memtx_engine_prepare,
-	/* .commit = */ memtx_engine_commit,
+	/* .commit = */ generic_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
 	/* .rollback = */ memtx_engine_rollback,
 	/* .bootstrap = */ memtx_engine_bootstrap,
@@ -1000,8 +973,8 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .collect_garbage = */ memtx_engine_collect_garbage,
 	/* .backup = */ memtx_engine_backup,
 	/* .memory_stat = */ memtx_engine_memory_stat,
-	/* .reset_stat = */ memtx_engine_reset_stat,
-	/* .check_space_def = */ memtx_engine_check_space_def,
+	/* .reset_stat = */ generic_engine_reset_stat,
+	/* .check_space_def = */ generic_engine_check_space_def,
 };
 
 /**

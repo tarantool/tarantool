@@ -585,11 +585,24 @@ bool generic_index_depends_on_pk(struct index *)
 	return false;
 }
 
+bool
+generic_index_def_change_requires_rebuild(struct index *,
+					  const struct index_def *)
+{
+	return true;
+}
+
 ssize_t
 generic_index_size(struct index *index)
 {
 	diag_set(UnsupportedIndexFeature, index->def, "size()");
 	return -1;
+}
+
+ssize_t
+generic_index_bsize(struct index *)
+{
+	return 0;
 }
 
 int

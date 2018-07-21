@@ -43,7 +43,7 @@
 #include "tt_uuid.h"
 #include "uri.h"
 
-#include "vclock.h"
+#include "xrow.h"
 
 struct xstream;
 
@@ -94,10 +94,8 @@ struct applier {
 	struct uri uri;
 	/** Remote version encoded as a number, see version_id() macro */
 	uint32_t version_id;
-	/** Remote vclock at time of connect. */
-	struct vclock vclock;
-	/** Remote peer mode, true if read-only, default: false */
-	bool remote_is_ro;
+	/** Remote ballot at the time of connect. */
+	struct ballot ballot;
 	/** Remote address */
 	union {
 		struct sockaddr addr;

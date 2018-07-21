@@ -164,6 +164,12 @@ gc_free(void)
 	latch_destroy(&gc.latch);
 }
 
+void
+gc_vclock(struct vclock *vclock)
+{
+	vclock_copy(vclock, &gc.wal_vclock);
+}
+
 /** Find the consumer that uses the oldest checkpoint. */
 struct gc_consumer *
 gc_tree_first_checkpoint(gc_tree_t *consumers)

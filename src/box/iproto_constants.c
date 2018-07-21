@@ -86,7 +86,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x26 */	MP_MAP, /* IPROTO_VCLOCK */
 	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
 	/* 0x28 */	MP_ARRAY, /* IPROTO_OPS */
-	/* 0x29 */	MP_BOOL, /* IPROTO_SERVER_IS_RO */
+	/* 0x29 */	MP_MAP, /* IPROTO_BALLOT */
 	/* 0x2a */	MP_MAP, /* IPROTO_OPTIONS */
 	/* }}} */
 };
@@ -168,7 +168,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"vector clock",     /* 0x26 */
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
-	"server is ro",     /* 0x29 */
+	"ballot",           /* 0x29 */
 	"options",          /* 0x2a */
 	NULL,               /* 0x2b */
 	NULL,               /* 0x2c */

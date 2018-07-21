@@ -1003,20 +1003,6 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 	return false;
 }
 
-static void
-vinyl_init_system_space(struct space *space)
-{
-	(void)space;
-	unreachable();
-}
-
-static void
-vinyl_init_ephemeral_space(struct space *space)
-{
-	(void)space;
-	unreachable();
-}
-
 static int
 vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 {
@@ -1165,12 +1151,6 @@ static int
 vinyl_space_add_primary_key(struct space *space)
 {
 	return vinyl_index_open(space->index[0]);
-}
-
-static void
-vinyl_space_drop_primary_key(struct space *space)
-{
-	(void)space;
 }
 
 static size_t
@@ -2346,37 +2326,6 @@ vinyl_space_execute_upsert(struct space *space, struct txn *txn,
 }
 
 static int
-vinyl_space_ephemeral_replace(struct space *space, const char *tuple,
-			      const char *tuple_end)
-{
-	(void)space;
-	(void)tuple;
-	(void)tuple_end;
-	unreachable();
-	return -1;
-}
-
-static int
-vinyl_space_ephemeral_delete(struct space *space, const char *key)
-{
-	(void)space;
-	(void)key;
-	unreachable();
-	return -1;
-}
-
-static inline void
-txn_stmt_unref_tuples(struct txn_stmt *stmt)
-{
-	if (stmt->old_tuple)
-		tuple_unref(stmt->old_tuple);
-	if (stmt->new_tuple)
-		tuple_unref(stmt->new_tuple);
-	stmt->old_tuple = NULL;
-	stmt->new_tuple = NULL;
-}
-
-static int
 vinyl_engine_begin(struct engine *engine, struct txn *txn)
 {
 	struct vy_env *env = vy_env(engine);
@@ -2483,11 +2432,7 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 	/* We can't abort the transaction at this point, use force. */
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
 
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		txn_stmt_unref_tuples(stmt);
 	txn->engine_tx = NULL;
-
 	if (!txn->is_autocommit)
 		trigger_clear(&txn->fiber_on_stop);
 }
@@ -2502,11 +2447,7 @@ vinyl_engine_rollback(struct engine *engine, struct txn *txn)
 
 	vy_tx_rollback(tx);
 
-	struct txn_stmt *stmt;
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		txn_stmt_unref_tuples(stmt);
 	txn->engine_tx = NULL;
-
 	if (!txn->is_autocommit)
 		trigger_clear(&txn->fiber_on_stop);
 }
@@ -2530,7 +2471,6 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	struct vy_tx *tx = txn->engine_tx;
 	assert(tx != NULL);
 	vy_tx_rollback_to_savepoint(tx, stmt->engine_savepoint);
-	txn_stmt_unref_tuples(stmt);
 }
 
 /* }}} Public API of transaction control */
@@ -3331,7 +3271,10 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	else
 		vy_tx_rollback(tx);
 
-	txn_stmt_unref_tuples(&stmt);
+	if (stmt.old_tuple != NULL)
+		tuple_unref(stmt.old_tuple);
+	if (stmt.new_tuple != NULL)
+		tuple_unref(stmt.new_tuple);
 
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
@@ -4516,14 +4459,14 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .execute_delete = */ vinyl_space_execute_delete,
 	/* .execute_update = */ vinyl_space_execute_update,
 	/* .execute_upsert = */ vinyl_space_execute_upsert,
-	/* .ephemeral_replace = */ vinyl_space_ephemeral_replace,
-	/* .ephemeral_delete = */ vinyl_space_ephemeral_delete,
-	/* .init_system_space = */ vinyl_init_system_space,
-	/* .init_ephemeral_space = */ vinyl_init_ephemeral_space,
+	/* .ephemeral_replace = */ generic_space_ephemeral_replace,
+	/* .ephemeral_delete = */ generic_space_ephemeral_delete,
+	/* .init_system_space = */ generic_init_system_space,
+	/* .init_ephemeral_space = */ generic_init_ephemeral_space,
 	/* .check_index_def = */ vinyl_space_check_index_def,
 	/* .create_index = */ vinyl_space_create_index,
 	/* .add_primary_key = */ vinyl_space_add_primary_key,
-	/* .drop_primary_key = */ vinyl_space_drop_primary_key,
+	/* .drop_primary_key = */ generic_space_drop_primary_key,
 	/* .check_format = */ vinyl_space_check_format,
 	/* .build_index = */ vinyl_space_build_index,
 	/* .swap_index = */ vinyl_space_swap_index,

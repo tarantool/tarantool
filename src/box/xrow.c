@@ -318,13 +318,11 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 }
 
 int
-iproto_reply_request_vote(struct obuf *out, uint64_t sync,
-			  uint32_t schema_version, const struct vclock *vclock,
-			  bool read_only)
+iproto_reply_vclock(struct obuf *out, const struct vclock *vclock,
+		    uint64_t sync, uint32_t schema_version)
 {
-	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(2) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(vclock) +
-		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(true);
+	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(vclock);
 
 	char *buf = obuf_reserve(out, max_size);
 	if (buf == NULL) {
@@ -334,11 +332,47 @@ iproto_reply_request_vote(struct obuf *out, uint64_t sync,
 	}
 
 	char *data = buf + IPROTO_HEADER_LEN;
-	data = mp_encode_map(data, 2);
-	data = mp_encode_uint(data, IPROTO_SERVER_IS_RO);
-	data = mp_encode_bool(data, read_only);
+	data = mp_encode_map(data, 1);
 	data = mp_encode_uint(data, IPROTO_VCLOCK);
 	data = mp_encode_vclock(data, vclock);
+	size_t size = data - buf;
+	assert(size <= max_size);
+
+	iproto_header_encode(buf, IPROTO_OK, sync, schema_version,
+			     size - IPROTO_HEADER_LEN);
+
+	char *ptr = obuf_alloc(out, size);
+	assert(ptr == buf);
+	return 0;
+}
+
+int
+iproto_reply_vote(struct obuf *out, const struct ballot *ballot,
+		  uint64_t sync, uint32_t schema_version)
+{
+	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(1) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_map(3) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_bool(ballot->is_ro) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(&ballot->vclock) +
+		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(&ballot->gc_vclock);
+
+	char *buf = obuf_reserve(out, max_size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, max_size,
+			 "obuf_alloc", "buf");
+		return -1;
+	}
+
+	char *data = buf + IPROTO_HEADER_LEN;
+	data = mp_encode_map(data, 1);
+	data = mp_encode_uint(data, IPROTO_BALLOT);
+	data = mp_encode_map(data, 3);
+	data = mp_encode_uint(data, IPROTO_BALLOT_IS_RO);
+	data = mp_encode_bool(data, ballot->is_ro);
+	data = mp_encode_uint(data, IPROTO_BALLOT_VCLOCK);
+	data = mp_encode_vclock(data, &ballot->vclock);
+	data = mp_encode_uint(data, IPROTO_BALLOT_GC_VCLOCK);
+	data = mp_encode_vclock(data, &ballot->gc_vclock);
 	size_t size = data - buf;
 	assert(size <= max_size);
 
@@ -912,10 +946,73 @@ error:
 }
 
 void
-xrow_encode_request_vote(struct xrow_header *row)
+xrow_encode_vote(struct xrow_header *row)
 {
 	memset(row, 0, sizeof(*row));
-	row->type = IPROTO_REQUEST_VOTE;
+	row->type = IPROTO_VOTE;
+}
+
+int
+xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
+{
+	ballot->is_ro = false;
+	vclock_create(&ballot->vclock);
+
+	if (row->bodycnt == 0)
+		goto err;
+	assert(row->bodycnt == 1);
+
+	const char *data = (const char *) row->body[0].iov_base;
+	const char *end = data + row->body[0].iov_len;
+	const char *tmp = data;
+	if (mp_check(&tmp, end) != 0 || mp_typeof(*data) != MP_MAP)
+		goto err;
+
+	/* Find BALLOT key. */
+	uint32_t map_size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*data) != MP_UINT) {
+			mp_next(&data); /* key */
+			mp_next(&data); /* value */
+			continue;
+		}
+		if (mp_decode_uint(&data) == IPROTO_BALLOT)
+			break;
+	}
+	if (data == end)
+		return 0;
+
+	/* Decode BALLOT map. */
+	map_size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < map_size; i++) {
+		if (mp_typeof(*data) != MP_UINT) {
+			mp_next(&data); /* key */
+			mp_next(&data); /* value */
+			continue;
+		}
+		uint32_t key = mp_decode_uint(&data);
+		switch (key) {
+		case IPROTO_BALLOT_IS_RO:
+			if (mp_typeof(*data) != MP_BOOL)
+				goto err;
+			ballot->is_ro = mp_decode_bool(&data);
+			break;
+		case IPROTO_BALLOT_VCLOCK:
+			if (mp_decode_vclock(&data, &ballot->vclock) != 0)
+				goto err;
+			break;
+		case IPROTO_BALLOT_GC_VCLOCK:
+			if (mp_decode_vclock(&data, &ballot->gc_vclock) != 0)
+				goto err;
+			break;
+		default:
+			mp_next(&data);
+		}
+	}
+	return 0;
+err:
+	diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+	return -1;
 }
 
 int
@@ -952,7 +1049,7 @@ xrow_encode_subscribe(struct xrow_header *row,
 int
 xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		      struct tt_uuid *instance_uuid, struct vclock *vclock,
-		      uint32_t *version_id, bool *read_only)
+		      uint32_t *version_id)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "request body");
@@ -967,9 +1064,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 		return -1;
 	}
 
-	/* For backward compatibility initialize read-only with false. */
-	if (read_only)
-		*read_only = false;
 	d = data;
 	uint32_t map_size = mp_decode_map(&d);
 	for (uint32_t i = 0; i < map_size; i++) {
@@ -1010,16 +1104,6 @@ xrow_decode_subscribe(struct xrow_header *row, struct tt_uuid *replicaset_uuid,
 				return -1;
 			}
 			*version_id = mp_decode_uint(&d);
-			break;
-		case IPROTO_SERVER_IS_RO:
-			if (read_only == NULL)
-				goto skip;
-			if (mp_typeof(*d) != MP_BOOL) {
-				diag_set(ClientError, ER_INVALID_MSGPACK,
-					 "invalid STATUS");
-				return -1;
-			}
-			*read_only = mp_decode_bool(&d);
 			break;
 		default: skip:
 			mp_next(&d); /* value */

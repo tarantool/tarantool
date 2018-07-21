@@ -50,7 +50,7 @@
 #include "schema.h"
 #include "engine.h"
 #include "memtx_engine.h"
-#include "sysview_engine.h"
+#include "sysview.h"
 #include "vinyl.h"
 #include "space.h"
 #include "index.h"
@@ -1592,6 +1592,14 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 */
 	relay_subscribe(replica, io->fd, header->sync, &replica_clock,
 			replica_version_id);
+}
+
+void
+box_process_vote(struct ballot *ballot)
+{
+	ballot->is_ro = cfg_geti("read_only") != 0;
+	vclock_copy(&ballot->vclock, &replicaset.vclock);
+	gc_vclock(&ballot->gc_vclock);
 }
 
 /** Insert a new cluster into _schema */

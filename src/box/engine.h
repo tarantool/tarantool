@@ -336,6 +336,34 @@ engine_memory_stat(struct engine_memory_stat *stat);
 void
 engine_reset_stat(void);
 
+/*
+ * Virtual method stubs.
+ */
+int generic_engine_join(struct engine *, const struct vclock *,
+			struct xstream *);
+int generic_engine_begin(struct engine *, struct txn *);
+int generic_engine_begin_statement(struct engine *, struct txn *);
+int generic_engine_prepare(struct engine *, struct txn *);
+void generic_engine_commit(struct engine *, struct txn *);
+void generic_engine_rollback_statement(struct engine *, struct txn *,
+				       struct txn_stmt *);
+void generic_engine_rollback(struct engine *, struct txn *);
+int generic_engine_bootstrap(struct engine *);
+int generic_engine_begin_initial_recovery(struct engine *,
+					  const struct vclock *);
+int generic_engine_begin_final_recovery(struct engine *);
+int generic_engine_end_recovery(struct engine *);
+int generic_engine_begin_checkpoint(struct engine *);
+int generic_engine_wait_checkpoint(struct engine *, const struct vclock *);
+void generic_engine_commit_checkpoint(struct engine *, const struct vclock *);
+void generic_engine_abort_checkpoint(struct engine *);
+int generic_engine_collect_garbage(struct engine *, int64_t);
+int generic_engine_backup(struct engine *, const struct vclock *,
+			  engine_backup_cb, void *);
+void generic_engine_memory_stat(struct engine *, struct engine_memory_stat *);
+void generic_engine_reset_stat(struct engine *);
+int generic_engine_check_space_def(struct space_def *);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 
