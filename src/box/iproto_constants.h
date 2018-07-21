@@ -161,12 +161,9 @@ enum iproto_type {
 	IPROTO_JOIN = 65,
 	/** Replication SUBSCRIBE command */
 	IPROTO_SUBSCRIBE = 66,
-	/**
-	 * Vote request command for master election
-	 * DEPRECATED: use IPROTO_VOTE instead
-	 */
-	IPROTO_REQUEST_VOTE = 67,
-	/** Instance status request command */
+	/** DEPRECATED: use IPROTO_VOTE instead */
+	IPROTO_VOTE_DEPRECATED = 67,
+	/** Vote request command for master election */
 	IPROTO_VOTE = 68,
 
 	/** Vinyl run info stored in .index file */

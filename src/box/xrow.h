@@ -223,7 +223,7 @@ xrow_encode_auth(struct xrow_header *row, const char *salt, size_t salt_len,
 		 const char *login, size_t login_len, const char *password,
 		 size_t password_len);
 
-/** Instance status. */
+/** Reply to IPROTO_VOTE request. */
 struct ballot {
 	/** Set if the instance is running in read-only mode. */
 	bool is_ro;
@@ -234,7 +234,7 @@ struct ballot {
 /**
  * Decode ballot response to IPROTO_VOTE from MessagePack.
  * @param row Row to decode.
- * @param[out] status
+ * @param[out] ballot Where to store the decoded ballot.
  */
 int
 xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot);
@@ -388,8 +388,8 @@ int
 iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
 
 /**
- * Encode iproto header with IPROTO_OK response code. DEPRECATED.
- * and vclock in the body.
+ * Encode iproto header with IPROTO_OK response code and vclock
+ * in the body. This function is DEPRECATED.
  * @param out Encode to.
  * @param sync Request sync.
  * @param schema_version.
@@ -400,14 +400,14 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version);
  * @retval -1 Memory error.
  */
 int
-iproto_reply_request_vote(struct obuf *out, uint64_t sync,
-			 uint32_t schema_version, const struct vclock *vclock,
-			 bool read_only);
+iproto_reply_vote_deprecated(struct obuf *out, uint64_t sync,
+			     uint32_t schema_version,
+			     const struct vclock *vclock, bool read_only);
 
 /**
- * Encode a reply to an instance status request.
+ * Encode a reply to an IPROTO_VOTE request.
  * @param out Buffer to write to.
- * @param status Instance status to encode.
+ * @param ballot Ballot to encode.
  * @param sync Request sync.
  * @param schema_version Actual schema version.
  *
@@ -672,23 +672,23 @@ iproto_reply_ok_xc(struct obuf *out, uint64_t sync, uint32_t schema_version)
 		diag_raise();
 }
 
-/** @copydoc iproto_reply_request_vote. */
+/** @copydoc iproto_reply_vote_deprecated. */
 static inline void
-iproto_reply_request_vote_xc(struct obuf *out, uint64_t sync,
-			     uint32_t schema_version,
-			     const struct vclock *vclock, bool read_only)
+iproto_reply_vote_deprecated_xc(struct obuf *out, uint64_t sync,
+				uint32_t schema_version,
+				const struct vclock *vclock, bool read_only)
 {
-	if (iproto_reply_request_vote(out, sync, schema_version,
-				      vclock, read_only) != 0)
+	if (iproto_reply_vote_deprecated(out, sync, schema_version,
+					 vclock, read_only) != 0)
 		diag_raise();
 }
 
-/** @copydoc iproto_reply_status. */
+/** @copydoc iproto_reply_vote. */
 static inline void
-iproto_reply_vote_xc(struct obuf *out, const struct ballot *status,
+iproto_reply_vote_xc(struct obuf *out, const struct ballot *ballot,
 		       uint64_t sync, uint32_t schema_version)
 {
-	if (iproto_reply_vote(out, status, sync, schema_version) != 0)
+	if (iproto_reply_vote(out, ballot, sync, schema_version) != 0)
 		diag_raise();
 }
 

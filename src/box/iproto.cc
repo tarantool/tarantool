@@ -1158,7 +1158,7 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(&msg->base, subscribe_route);
 		*stop_input = true;
 		break;
-	case IPROTO_REQUEST_VOTE:               /* deprecated. */
+	case IPROTO_VOTE_DEPRECATED:
 	case IPROTO_VOTE:
 		cmsg_init(&msg->base, misc_route);
 		break;
@@ -1538,11 +1538,11 @@ tx_process_misc(struct cmsg *m)
 			iproto_reply_ok_xc(out, msg->header.sync,
 					   ::schema_version);
 			break;
-		case IPROTO_REQUEST_VOTE:
-			iproto_reply_request_vote_xc(out, msg->header.sync,
-						     ::schema_version,
-						     &replicaset.vclock,
-						     cfg_geti("read_only"));
+		case IPROTO_VOTE_DEPRECATED:
+			iproto_reply_vote_deprecated_xc(out, msg->header.sync,
+							::schema_version,
+							&replicaset.vclock,
+							cfg_geti("read_only"));
 			break;
 		case IPROTO_VOTE:
 			box_process_vote(&ballot);

@@ -311,9 +311,10 @@ iproto_reply_ok(struct obuf *out, uint64_t sync, uint32_t schema_version)
 }
 
 int
-iproto_reply_request_vote(struct obuf *out, uint64_t sync,
-			  uint32_t schema_version, const struct vclock *vclock,
-			  bool read_only)
+iproto_reply_vote_deprecated(struct obuf *out, uint64_t sync,
+			     uint32_t schema_version,
+			     const struct vclock *vclock,
+			     bool read_only)
 {
 	size_t max_size = IPROTO_HEADER_LEN + mp_sizeof_map(2) +
 		mp_sizeof_uint(UINT32_MAX) + mp_sizeof_vclock(vclock) +
@@ -904,7 +905,7 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 	if (mp_check(&tmp, end) != 0 || mp_typeof(*data) != MP_MAP)
 		goto err;
 
-	/* Find STATUS key. */
+	/* Find BALLOT key. */
 	uint32_t map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*data) != MP_UINT) {
@@ -918,7 +919,7 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 	if (data == end)
 		return 0;
 
-	/* Decode STATUS map. */
+	/* Decode BALLOT map. */
 	map_size = mp_decode_map(&data);
 	for (uint32_t i = 0; i < map_size; i++) {
 		if (mp_typeof(*data) != MP_UINT) {

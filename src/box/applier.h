@@ -94,7 +94,7 @@ struct applier {
 	struct uri uri;
 	/** Remote version encoded as a number, see version_id() macro */
 	uint32_t version_id;
-	/** Remote status at time of connect. */
+	/** Remote ballot at the time of connect. */
 	struct ballot ballot;
 	/** Remote address */
 	union {
