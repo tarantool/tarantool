@@ -157,6 +157,42 @@ replica_set.start_all(test_run)
 replica_set.wait_all(test_run)
 replica_set.drop_all(test_run)
 
+--
+-- Check that once a replica is removed from the cluster table,
+-- all xlogs kept for it are removed even if it is configured as
+-- a replication master (gh-3546).
+--
+fio = require('fio')
+fiber = require('fiber')
+
+-- Start a replica and set it up as a master for this instance.
+test_run:cmd("start server replica")
+replica_port = test_run:eval('replica', 'return box.cfg.listen')[1]
+replica_port ~= nil
+box.cfg{replication = replica_port}
+
+-- Stop the replica and write a few WALs.
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+_ = s:auto_increment{}
+box.snapshot()
+_ = s:auto_increment{}
+box.snapshot()
+_ = s:auto_increment{}
+box.snapshot()
+#fio.glob('./master/*.xlog') == 4 or fio.listdir('./master')
+
+-- Delete the replica from the cluster table and check that
+-- all xlog files are removed.
+test_run:cleanup_cluster()
+box.snapshot()
+t = fiber.time()
+while #fio.glob('./master/*xlog') > 0 and fiber.time() - t < 10 do fiber.sleep(0.01) end
+#fio.glob('./master/*.xlog') == 0 or fio.listdir('./master')
+
+-- Restore the config.
+box.cfg{replication = {}}
+
 -- Cleanup.
 s:drop()
 box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)

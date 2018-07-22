@@ -197,6 +197,18 @@ replica_clear_id(struct replica *replica)
 	 */
 	replicaset.replica_by_id[replica->id] = NULL;
 	replica->id = REPLICA_ID_NIL;
+	/*
+	 * The replica will never resubscribe so we don't need to keep
+	 * WALs for it anymore. Unregister it with the garbage collector
+	 * if the relay thread is stopped. In case the relay thread is
+	 * still running, it may need to access replica->gc so leave the
+	 * job to replica_clear_relay, which will be called as soon as
+	 * the relay thread exits.
+	 */
+	if (replica->gc != NULL && replica->relay == NULL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replica_delete(replica);
@@ -702,6 +714,16 @@ replica_clear_relay(struct replica *replica)
 {
 	assert(replica->relay != NULL);
 	replica->relay = NULL;
+	/*
+	 * If the replica was evicted from the cluster, we don't
+	 * need to keep WALs for it anymore. Unregister it with
+	 * the garbage collector then. See also replica_clear_id.
+	 */
+	assert(replica->gc != NULL);
+	if (replica->id == REPLICA_ID_NIL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replica_delete(replica);
