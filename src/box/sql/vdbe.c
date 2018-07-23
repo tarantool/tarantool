@@ -1155,15 +1155,13 @@ case OP_NextAutoincValue: {
 	assert(pOp->p1 > 0);
 	assert(pOp->p2 > 0);
 
-	int64_t value;
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
-
-	struct space *space = space_by_id(space_id);
+	struct space *space = space_by_id(pOp->p1);
 	if (space == NULL) {
 		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 
+	int64_t value;
 	struct sequence *sequence = space->sequence;
 	if (sequence == NULL || sequence_next(sequence, &value) != 0) {
 		rc = SQL_TARANTOOL_ERROR;
@@ -4615,19 +4613,16 @@ case OP_ResetSorter: {
  *  <name, pageno (which is hash(spaceId, indexId)), sql>
  */
 case OP_ParseSchema2: {
-	InitData initData;
+	struct init_data init;
 	Mem *pRec, *pRecEnd;
-	char *argv[4] = {NULL, NULL, NULL, NULL};
-
-
 	assert(db->pSchema != NULL);
 
-	initData.db = db;
-	initData.pzErrMsg = &p->zErrMsg;
+	init.db = db;
+	init.pzErrMsg = &p->zErrMsg;
 
 	assert(db->init.busy==0);
 	db->init.busy = 1;
-	initData.rc = SQLITE_OK;
+	init.rc = SQLITE_OK;
 	assert(!db->mallocFailed);
 
 	pRec = &aMem[pOp->p1];
@@ -4641,16 +4636,12 @@ case OP_ParseSchema2: {
 	 *
 	 * Uppdate the schema.
 	 */
-	for( ; pRecEnd-pRec>=4 && initData.rc==SQLITE_OK; pRec+=4) {
-		argv[0] = pRec[0].z;
-		int pageNo = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(pRec[1].u.i,
-								    pRec[2].u.i);
-		argv[1] = (char *)&pageNo;
-		argv[2] = pRec[3].z;
-		sqlite3InitCallback(&initData, 3, argv, NULL);
+	for(; pRecEnd - pRec >= 4 && init.rc == SQLITE_OK; pRec += 4) {
+		sql_init_callback(&init, pRec[0].z, pRec[1].u.i, pRec[2].u.i,
+				  pRec[3].z);
 	}
 
-	rc = initData.rc;
+	rc = init.rc;
 	db->init.busy = 0;
 
 	if (rc) {
@@ -4664,7 +4655,7 @@ case OP_ParseSchema2: {
 }
 
 /* Opcode: RenameTable P1 * * P4 *
- * Synopsis: P1 = root, P4 = name
+ * Synopsis: P1 = space_id, P4 = name
  *
  * Rename table P1 with name from P4.
  * Invoke tarantoolSqlite3RenameTable, which updates tuple with
@@ -4676,18 +4667,16 @@ case OP_ParseSchema2: {
  *
  */
 case OP_RenameTable: {
-	unsigned space_id;
+	uint32_t space_id;
 	struct space *space;
 	const char *zOldTableName;
 	const char *zNewTableName;
 	Table *pTab;
 	FKey *pFKey;
-	int iRootPage;
-	InitData initData;
-	char *argv[4] = {NULL, NULL, NULL, NULL};
+	struct init_data init;
 	char *zSqlStmt;
 
-	space_id = SQLITE_PAGENO_TO_SPACEID(pOp->p1);
+	space_id = pOp->p1;
 	space = space_by_id(space_id);
 	assert(space);
 	/* Rename space op doesn't change triggers. */
@@ -4696,19 +4685,17 @@ case OP_RenameTable: {
 	assert(zOldTableName);
 	pTab = sqlite3HashFind(&db->pSchema->tblHash, zOldTableName);
 	assert(pTab);
-	iRootPage = pTab->tnum;
 	zNewTableName = pOp->p4.z;
 	zOldTableName = sqlite3DbStrNDup(db, zOldTableName,
 					 sqlite3Strlen30(zOldTableName));
-	rc = tarantoolSqlite3RenameTable(pTab->tnum, zNewTableName,
-					 &zSqlStmt);
+	rc = sql_rename_table(space_id, zNewTableName, &zSqlStmt);
 	if (rc) goto abort_due_to_error;
 
 	/* If it is parent table, all children statements should be updated. */
 	for (pFKey = sqlite3FkReferences(pTab); pFKey; pFKey = pFKey->pNextTo) {
-		assert(pFKey->zTo);
-		assert(pFKey->pFrom);
-		rc = tarantoolSqlite3RenameParentTable(pFKey->pFrom->tnum,
+		assert(pFKey->zTo != NULL);
+		assert(pFKey->pFrom != NULL);
+		rc = tarantoolSqlite3RenameParentTable(pFKey->pFrom->def->id,
 						       pFKey->zTo,
 						       zNewTableName);
 		if (rc) goto abort_due_to_error;
@@ -4720,17 +4707,14 @@ case OP_RenameTable: {
 
 	sqlite3UnlinkAndDeleteTable(db, pTab->def->name);
 
-	initData.db = db;
-	initData.pzErrMsg = &p->zErrMsg;
+	init.db = db;
+	init.pzErrMsg = &p->zErrMsg;
 	assert(db->init.busy == 0);
 	db->init.busy = 1;
-	initData.rc = SQLITE_OK;
-	argv[0] = (char*) zNewTableName;
-	argv[1] = (char*) &iRootPage;
-	argv[2] = zSqlStmt;
-	sqlite3InitCallback(&initData, 3, argv, NULL);
+	init.rc = SQLITE_OK;
+	sql_init_callback(&init, zNewTableName, space_id, 0, zSqlStmt);
 	db->init.busy = 0;
-	rc = initData.rc;
+	rc = init.rc;
 	if (rc) {
 		sqlite3CommitInternalChanges();
 		goto abort_due_to_error;

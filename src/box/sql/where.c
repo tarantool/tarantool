@@ -373,11 +373,10 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 	if (pIdx != NULL) {
 		int j = iColumn;
 		/*
-		 * pIdx->def->opts.sql == "fake_autoindex" means that
+		 * pIdx->def->iid == UINT32_MAX means that
 		 * pIdx is a fake integer primary key index.
 		 */
-		if (pIdx->def->opts.sql != NULL &&
-		    strcmp(pIdx->def->opts.sql, "fake_autoindex") != 0) {
+		if (pIdx->def->iid != UINT32_MAX) {
 			iColumn = pIdx->def->key_def->parts[iColumn].fieldno;
 			pScan->idxaff =
 				pIdx->pTable->def->fields[iColumn].affinity;
@@ -938,10 +937,9 @@ whereKeyStats(Parse * pParse,	/* Database connection */
 	      int roundUp,	/* Round up if true.  Round down if false */
 	      tRowcnt * aStat)	/* OUT: stats written here */
 {
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pIdx->tnum);
-	struct space *space = space_by_id(space_id);
+	struct space *space = space_by_id(pIdx->pTable->def->id);
 	assert(space != NULL);
-	uint32_t iid = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
+	uint32_t iid = pIdx->def->iid;
 	struct index *idx = space_index(space, iid);
 	assert(idx != NULL && idx->def->opts.stat != NULL);
 	struct index_sample *samples = idx->def->opts.stat->samples;
@@ -1217,10 +1215,9 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 		      int *pbDone)		/* Set to true if at least one expr. value extracted */
 {
 	Index *p = pLoop->pIndex;
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(p->tnum));
+	struct space *space = space_by_id(p->pTable->def->id);
 	assert(space != NULL);
-	struct index *index = space_index(space,
-					  SQLITE_PAGENO_TO_INDEXID(p->tnum));
+	struct index *index = space_index(space, p->def->iid);
 	assert(index != NULL && index->def->opts.stat != NULL);
 	int nEq = pLoop->nEq;
 	sqlite3 *db = pParse->db;
@@ -1348,11 +1345,10 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 
 	Index *p = pLoop->pIndex;
 	int nEq = pLoop->nEq;
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(p->tnum);
+	uint32_t space_id = p->pTable->def->id;
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
-	uint32_t iid = SQLITE_PAGENO_TO_INDEXID(p->tnum);
-	struct index *idx = space_index(space, iid);
+	struct index *idx = space_index(space, p->def->iid);
 	assert(idx != NULL);
 	struct index_stat *stat = idx->def->opts.stat;
 	/*
@@ -1406,14 +1402,11 @@ whereRangeScanEst(Parse * pParse,	/* Parsing & code generating context */
 				 * are in range.
 				 */
 				iLower = 0;
-				uint32_t space_id =
-					SQLITE_PAGENO_TO_SPACEID(p->tnum);
+				uint32_t space_id = p->def->space_id;
 				struct space *space = space_by_id(space_id);
 				assert(space != NULL);
-				uint32_t iid =
-					SQLITE_PAGENO_TO_INDEXID(p->tnum);
 				struct index *idx =
-					space_index(space, iid);
+					space_index(space, p->def->iid);
 				assert(idx != NULL);
 				iUpper = index_size(idx);
 			} else {
@@ -2178,8 +2171,8 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 	}
 	rc = whereLoopXfer(db, p, pTemplate);
 	Index *pIndex = p->pIndex;
-	if (pIndex && pIndex->tnum == 0)
-		p->pIndex = 0;
+	if (pIndex != NULL && pIndex->pTable->def->id == 0)
+		p->pIndex = NULL;
 	return rc;
 }
 
@@ -2343,12 +2336,12 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
  * index pIndex. Try to match one more.
  *
  * When this function is called, pBuilder->pNew->nOut contains the
- * number of rows expected to be visited by filtering using the nEq
- * terms only. If it is modified, this value is restored before this
- * function returns.
+ * number of rows expected to be visited by filtering using the
+ * nEq terms only. If it is modified, this value is restored before
+ * this function returns.
  *
- * If pProbe->tnum==0, that means pIndex is a fake index used for the
- * INTEGER PRIMARY KEY.
+ * If pProbe->def->space_id==UIN32_MAX, that means pIndex is a
+ * fake index used for the INTEGER PRIMARY KEY.
  */
 static int
 whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
@@ -2391,12 +2384,11 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		opMask =
 		    WO_EQ | WO_IN | WO_GT | WO_GE | WO_LT | WO_LE | WO_ISNULL;
 	}
-	struct space *space =
-		space_by_id(SQLITE_PAGENO_TO_SPACEID(pProbe->tnum));
+	struct space *space = space_by_id(pProbe->def->space_id);
 	struct index *idx = NULL;
 	struct index_stat *stat = NULL;
-	if (space != NULL) {
-		idx = space_index(space, SQLITE_PAGENO_TO_INDEXID(pProbe->tnum));
+	if (space != NULL && pProbe->def->iid != UINT32_MAX) {
+		idx = space_index(space, pProbe->def->iid);
 		assert(idx != NULL);
 		stat = idx->def->opts.stat;
 	}
@@ -2514,7 +2506,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 				bool index_is_unique_not_null =
 					pProbe->def->key_def->is_nullable &&
 					pProbe->def->opts.is_unique;
-				if (pProbe->tnum != 0 &&
+				if (pProbe->def->space_id != 0 &&
 				    !index_is_unique_not_null) {
 					pNew->wsFlags |= WHERE_UNQ_WANTED;
 				} else {
@@ -2577,7 +2569,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 			assert(eOp & (WO_ISNULL | WO_EQ | WO_IN));
 
 			assert(pNew->nOut == saved_nOut);
-			if (pTerm->truthProb <= 0 && pProbe->tnum != 0 ) {
+			if (pTerm->truthProb <= 0 && pProbe->pTable->def->id != 0) {
 				assert((eOp & WO_IN) || nIn == 0);
 				testcase(eOp & WO_IN);
 				pNew->nOut += pTerm->truthProb;
@@ -2639,11 +2631,10 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 		 * visiting the rows in the main table.
 		 */
 		struct space *space =
-			space_by_id(SQLITE_PAGENO_TO_SPACEID(pProbe->tnum));
+			space_by_id(pProbe->pTable->def->id);
 		assert(space != NULL);
 		struct index *idx =
-			space_index(space,
-				    SQLITE_PAGENO_TO_INDEXID(pProbe->tnum));
+			space_index(space, pProbe->def->iid);
 		assert(idx != NULL);
 		/*
 		 * FIXME: currently, the procedure below makes no
@@ -2750,11 +2741,10 @@ static bool
 index_is_unordered(struct Index *idx)
 {
 	assert(idx != NULL);
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(idx->tnum));
+	struct space *space = space_by_id(idx->pTable->def->id);
 	if (space == NULL)
 		return false;
-	uint32_t iid = SQLITE_PAGENO_TO_INDEXID(idx->tnum);
-	struct index *tnt_idx = space_index(space, iid);
+	struct index *tnt_idx = space_index(space, idx->def->iid);
 	if (tnt_idx == NULL)
 		return false;
 	if (tnt_idx->def->opts.stat != NULL)
@@ -2920,6 +2910,8 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 					sizeof("fake_autoindex") - 1,
 					TREE, &opts, key_def, NULL);
 		key_def_delete(key_def);
+		/* Special marker for  non-existent index. */
+		fake_index.def->iid = UINT32_MAX;
 
 		if (fake_index.def == NULL) {
 			pWInfo->pParse->nErr++;
@@ -3026,7 +3018,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		/* The ONEPASS_DESIRED flags never occurs together with ORDER BY */
 		assert((pWInfo->wctrlFlags & WHERE_ONEPASS_DESIRED) == 0
 		       || b == 0);
-		if (pProbe->tnum <= 0) {
+		if (pProbe->def->iid == UINT32_MAX) {
 			/* Integer primary key index */
 			pNew->wsFlags = WHERE_IPK;
 
@@ -4778,15 +4770,12 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			if (op) {
 				if (pIx != NULL) {
 					uint32_t space_id =
-						SQLITE_PAGENO_TO_SPACEID(pIx->
-									 tnum);
+						pIx->pTable->def->id;
 					struct space *space =
 						space_by_id(space_id);
-					uint32_t idx_id =
-						SQLITE_PAGENO_TO_INDEXID(pIx->
-									 tnum);
 					vdbe_emit_open_cursor(pParse, iIndexCur,
-							      idx_id, space);
+							      pIx->def->iid,
+							      space);
 				} else {
 					vdbe_emit_open_cursor(pParse, iIndexCur,
 							      idx_def->iid,

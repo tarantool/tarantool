@@ -803,7 +803,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 	if (v == 0 || NEVER(pTab == 0)) {
 		return;
 	}
-	assert(pTab->tnum != 0);
+	assert(pTab->def->id != 0);
 	if (sqlite3_strlike("\\_%", pTab->def->name, '\\') == 0) {
 		/* Do not gather statistics on system tables */
 		return;
@@ -882,9 +882,8 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		pParse->nMem = MAX(pParse->nMem, regPrev + part_count);
 
 		/* Open a read-only cursor on the index being analyzed. */
-		struct space *space =
-			space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
-		int idx_id = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
+		struct space *space = space_by_id(pIdx->def->space_id);
+		int idx_id = pIdx->def->iid;
 		assert(space != NULL);
 		sqlite3VdbeAddOp4(v, OP_OpenRead, iIdxCur, idx_id, 0,
 				  (void *) space, P4_SPACEPTR);
@@ -1624,7 +1623,7 @@ const log_est_t default_tuple_est[] = {DEFAULT_TUPLE_LOG_COUNT,
 LogEst
 sql_space_tuple_log_count(struct Table *tab)
 {
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(tab->tnum));
+	struct space *space = space_by_id(tab->def->id);
 	if (space == NULL)
 		return tab->tuple_log_count;
 	struct index *pk = space_index(space, 0);
@@ -1638,11 +1637,10 @@ sql_space_tuple_log_count(struct Table *tab)
 log_est_t
 index_field_tuple_est(struct Index *idx, uint32_t field)
 {
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(idx->tnum));
-	if (space == NULL)
+	struct space *space = space_by_id(idx->pTable->def->id);
+	if (space == NULL || strcmp(idx->def->opts.sql, "fake_autoindex") == 0)
 		return idx->def->opts.stat->tuple_log_est[field];
-	struct index *tnt_idx =
-		space_index(space, SQLITE_PAGENO_TO_INDEXID(idx->tnum));
+	struct index *tnt_idx = space_index(space, idx->def->iid);
 	assert(tnt_idx != NULL);
 	assert(field <= tnt_idx->def->key_def->part_count);
 	if (tnt_idx->def->opts.stat == NULL) {

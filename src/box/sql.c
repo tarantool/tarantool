@@ -726,28 +726,13 @@ rename_fail:
 	return SQL_TARANTOOL_ERROR;
 }
 
-/*
- * Rename the table in _space. Update tuple with corresponding id with
- * new name and statement fields and insert back. If sql_stmt is NULL,
- * then return from function after getting length of new statement:
- * it is the way how to dynamically allocate memory for new statement in VDBE.
- * So basically this function should be called twice: firstly to get length of
- * CREATE TABLE statement, and secondly to make routine of replacing tuple and
- * filling out param sql_stmt with new CREATE TABLE statement.
- *
- * @param iTab pageno of table to be renamed
- * @param new_name new name of table
- * @param[out] sql_stmt CREATE TABLE statement for new name table, can be NULL.
- *
- * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
- */
-int tarantoolSqlite3RenameTable(int iTab, const char *new_name, char **sql_stmt)
+int
+sql_rename_table(uint32_t space_id, const char *new_name, char **sql_stmt)
 {
-	assert(iTab > 0);
-	assert(new_name);
-	assert(sql_stmt);
+	assert(space_id != 0);
+	assert(new_name != NULL);
+	assert(sql_stmt != NULL);
 
-	int space_id = SQLITE_PAGENO_TO_SPACEID(iTab);
 	box_tuple_t *tuple;
 	uint32_t key_len = mp_sizeof_uint(space_id) + mp_sizeof_array(1);
 	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
@@ -858,14 +843,13 @@ rename_fail:
  * Acts almost as tarantoolSqlite3RenameTable, but doesn't change
  * name of table, only statement.
  */
-int tarantoolSqlite3RenameParentTable(int iTab, const char *old_parent_name,
+int tarantoolSqlite3RenameParentTable(int space_id, const char *old_parent_name,
 				      const char *new_parent_name)
 {
-	assert(iTab > 0);
-	assert(old_parent_name);
-	assert(new_parent_name);
+	assert(space_id != 0);
+	assert(old_parent_name != NULL);
+	assert(new_parent_name != NULL);
 
-	int space_id = SQLITE_PAGENO_TO_SPACEID(iTab);
 	box_tuple_t *tuple;
 	uint32_t key_len = mp_sizeof_uint(space_id) + mp_sizeof_array(1);
 
@@ -1181,63 +1165,34 @@ cursor_advance(BtCursor *pCur, int *pRes)
  * Schema support.
  */
 
-/*
- * Manully add objects to SQLite in-memory schema.
- * This is loosely based on sqlite_master row format.
- * @Params
- *   name - object name
- *   id   - SQLITE_PAGENO_FROM_SPACEID_INDEXID(...)
- *          for tables and indices
- *   sql  - SQL statement that created this object
- */
-static void
-sql_schema_put(InitData *init,
-	       const char *name,
-	       uint32_t spaceid, uint32_t indexid,
-	       const char *sql)
-{
-	int pageno = SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(spaceid, indexid);
-
-	char *argv[] = {
-		(char *)name,
-		(char *)&pageno,
-		(char *)sql,
-		NULL
-	};
-
-	if (init->rc != SQLITE_OK) return;
-
-	sqlite3InitCallback(init, 3, argv, NULL);
-}
-
 static int
 space_foreach_put_cb(struct space *space, void *udata)
 {
 	if (space->def->opts.sql == NULL)
 		return 0; /* Not SQL space. */
-	sql_schema_put((InitData *) udata, space->def->name, space->def->id, 0,
-		       space->def->opts.sql);
+	sql_init_callback((struct init_data *) udata, space->def->name,
+			  space->def->id, 0, space->def->opts.sql);
 	for (uint32_t i = 0; i < space->index_count; ++i) {
 		struct index_def *def = space_index_def(space, i);
 		if (def->opts.sql != NULL) {
-			sql_schema_put((InitData *) udata, def->name,
-				       def->space_id, def->iid, def->opts.sql);
+			sql_init_callback((struct init_data *) udata, def->name,
+					  def->space_id, def->iid, def->opts.sql);
 		}
 	}
 	return 0;
 }
 
 /* Load database schema from Tarantool. */
-void tarantoolSqlite3LoadSchema(InitData *init)
+void tarantoolSqlite3LoadSchema(struct init_data *init)
 {
-	sql_schema_put(
+	sql_init_callback(
 		init, TARANTOOL_SYS_SCHEMA_NAME,
 		BOX_SCHEMA_ID, 0,
 		"CREATE TABLE \""TARANTOOL_SYS_SCHEMA_NAME
 		"\" (\"key\" TEXT PRIMARY KEY, \"value\")"
 	);
 
-	sql_schema_put(
+	sql_init_callback(
 		init, TARANTOOL_SYS_SPACE_NAME,
 		BOX_SPACE_ID, 0,
 		"CREATE TABLE \""TARANTOOL_SYS_SPACE_NAME
@@ -1245,7 +1200,7 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		"\"engine\" TEXT, \"field_count\" INT, \"opts\", \"format\")"
 	);
 
-	sql_schema_put(
+	sql_init_callback(
 		init, TARANTOOL_SYS_INDEX_NAME,
 		BOX_INDEX_ID, 0,
 		"CREATE TABLE \""TARANTOOL_SYS_INDEX_NAME"\" "
@@ -1253,38 +1208,41 @@ void tarantoolSqlite3LoadSchema(InitData *init)
 		"\"opts\", \"parts\", PRIMARY KEY (\"id\", \"iid\"))"
 	);
 
-	sql_schema_put(
+	sql_init_callback(
 		init, TARANTOOL_SYS_TRIGGER_NAME,
 		BOX_TRIGGER_ID, 0,
 		"CREATE TABLE \""TARANTOOL_SYS_TRIGGER_NAME"\" ("
 		"\"name\" TEXT PRIMARY KEY, \"space_id\" INT, \"opts\")"
 	);
 
-	sql_schema_put(
+	sql_init_callback(
 		init, TARANTOOL_SYS_TRUNCATE_NAME,
 		BOX_TRUNCATE_ID, 0,
 		"CREATE TABLE \""TARANTOOL_SYS_TRUNCATE_NAME
 		"\" (\"id\" INT PRIMARY KEY, \"count\" INT NOT NULL)"
 	);
 
-	sql_schema_put(init, TARANTOOL_SYS_SEQUENCE_NAME, BOX_SEQUENCE_ID, 0,
-		       "CREATE TABLE \""TARANTOOL_SYS_SEQUENCE_NAME
-		       "\" (\"id\" INT PRIMARY KEY, \"uid\" INT, \"name\" TEXT, \"step\" INT, "
-		       "\"max\" INT, \"min\" INT, \"start\" INT, \"cache\" INT, \"cycle\" INT)");
+	sql_init_callback(init, TARANTOOL_SYS_SEQUENCE_NAME, BOX_SEQUENCE_ID, 0,
+			  "CREATE TABLE \""TARANTOOL_SYS_SEQUENCE_NAME
+			  "\" (\"id\" INT PRIMARY KEY, \"uid\" INT, \"name\" TEXT, \"step\" INT, "
+			  "\"max\" INT, \"min\" INT, \"start\" INT, \"cache\" INT, \"cycle\" INT)");
 
-	sql_schema_put(init, TARANTOOL_SYS_SPACE_SEQUENCE_NAME, BOX_SPACE_SEQUENCE_ID, 0,
-		       "CREATE TABLE \""TARANTOOL_SYS_SPACE_SEQUENCE_NAME
-		       "\" (\"space_id\" INT PRIMARY KEY, \"sequence_id\" INT, \"flag\" INT)");
+	sql_init_callback(init, TARANTOOL_SYS_SPACE_SEQUENCE_NAME,
+			  BOX_SPACE_SEQUENCE_ID, 0,
+			  "CREATE TABLE \""TARANTOOL_SYS_SPACE_SEQUENCE_NAME
+			  "\" (\"space_id\" INT PRIMARY KEY, \"sequence_id\" INT, \"flag\" INT)");
 
-	sql_schema_put(init, TARANTOOL_SYS_SQL_STAT1_NAME, BOX_SQL_STAT1_ID, 0,
-		       "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT1_NAME
+	sql_init_callback(init, TARANTOOL_SYS_SQL_STAT1_NAME,
+			  BOX_SQL_STAT1_ID, 0,
+			  "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT1_NAME
 			       "\"(\"tbl\" text,"
 			       "\"idx\" text,"
 			       "\"stat\" not null,"
 			       "PRIMARY KEY(\"tbl\", \"idx\"))");
 
-	sql_schema_put(init, TARANTOOL_SYS_SQL_STAT4_NAME, BOX_SQL_STAT4_ID, 0,
-		       "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT4_NAME
+	sql_init_callback(init, TARANTOOL_SYS_SQL_STAT4_NAME,
+			  BOX_SQL_STAT4_ID, 0,
+			  "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT4_NAME
 			       "\"(\"tbl\" text,"
 			       "\"idx\" text,"
 			       "\"neq\" text,"

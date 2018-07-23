@@ -2474,10 +2474,8 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							  pIdx->def->name),
 							  P4_DYNAMIC);
 					struct space *space =
-						space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
-					uint32_t idx_id =
-						SQLITE_PAGENO_TO_INDEXID(pIdx->
-									 tnum);
+						space_by_id(pIdx->pTable->def->id);
+					uint32_t idx_id = pIdx->def->iid;
 					vdbe_emit_open_cursor(pParse, iTab,
 							      idx_id, space);
 					VdbeComment((v, "%s", pIdx->def->name));

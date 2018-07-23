@@ -384,7 +384,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	if (pTab == NULL)
 		goto insert_cleanup;
 
-	space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
+	space_id = pTab->def->id;
 
 	/* Figure out if we have any triggers and if the table being
 	 * inserted into is a view
@@ -742,7 +742,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				if (i == pTab->iAutoIncPKey) {
 					sqlite3VdbeAddOp2(v,
 							  OP_NextAutoincValue,
-							  pTab->tnum,
+							  pTab->def->id,
 							  iRegStore);
 					continue;
 				}
@@ -1075,9 +1075,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			on_error = ON_CONFLICT_ACTION_ABORT;
 
 		struct Expr *dflt = NULL;
-		dflt = space_column_default_expr(
-			SQLITE_PAGENO_TO_SPACEID(pTab->tnum),
-			i);
+		dflt = space_column_default_expr(pTab->def->id, i);
 		if (on_error == ON_CONFLICT_ACTION_REPLACE && dflt == 0)
 			on_error = ON_CONFLICT_ACTION_ABORT;
 
@@ -1124,8 +1122,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 	 * Get server checks.
 	 * Test all CHECK constraints.
 	 */
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
-	ExprList *checks = space_checks_expr_list(space_id);
+	ExprList *checks = space_checks_expr_list(pTab->def->id);
 	if (checks != NULL &&
 	    (user_session->sql_flags & SQLITE_IgnoreChecks) == 0) {
 		pParse->ckBase = regNewData + 1;
@@ -1389,7 +1386,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				     ++i, ++part) {
 					char *p4 = (char *) part->coll;
 					x = part->fieldno;
-					if (pPk->tnum==0)
+					if (pTab->def->id == 0)
 						x = -1;
 					if (i == (pk_part_count - 1)) {
 						addrJump = addrUniqueOk;
@@ -1531,7 +1528,7 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		*piDataCur = iDataCur;
 	if (piIdxCur)
 		*piIdxCur = iBase;
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(pTab->tnum));
+	struct space *space = space_by_id(pTab->def->id);
 	assert(space != NULL);
 	/* One iteration of this cycle adds OpenRead/OpenWrite which
 	 * opens cursor for current index.
@@ -1578,10 +1575,9 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 				p5 = 0;
 			}
 			if (aToOpen == 0 || aToOpen[i + 1]) {
-				int idx_id =
-					SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
-				sqlite3VdbeAddOp4(v, op, iIdxCur, idx_id, 0,
-						  (void *) space, P4_SPACEPTR);
+				sqlite3VdbeAddOp4(v, op, iIdxCur, pIdx->def->iid,
+						  0, (void *) space,
+						  P4_SPACEPTR);
 				sqlite3VdbeChangeP5(v, p5);
 				VdbeComment((v, "%s", pIdx->def->name));
 			}
@@ -1780,12 +1776,10 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		}
 		/* Default values for second and subsequent columns need to match. */
 		if (i > 0) {
-			uint32_t src_space_id =
-				SQLITE_PAGENO_TO_SPACEID(pSrc->tnum);
+			uint32_t src_space_id = pSrc->def->id;
 			struct space *src_space =
 				space_cache_find(src_space_id);
-			uint32_t dest_space_id =
-				SQLITE_PAGENO_TO_SPACEID(pDest->tnum);
+			uint32_t dest_space_id = pDest->def->id;
 			struct space *dest_space =
 				space_cache_find(dest_space_id);
 			assert(src_space != NULL && dest_space != NULL);
@@ -1813,10 +1807,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			return 0;
 	}
 	/* Get server checks. */
-	ExprList *pCheck_src = space_checks_expr_list(
-		SQLITE_PAGENO_TO_SPACEID(pSrc->tnum));
-	ExprList *pCheck_dest = space_checks_expr_list(
-		SQLITE_PAGENO_TO_SPACEID(pDest->tnum));
+	ExprList *pCheck_src = space_checks_expr_list(pSrc->def->id);
+	ExprList *pCheck_dest = space_checks_expr_list(pDest->def->id);
 	if (pCheck_dest != NULL &&
 	    sqlite3ExprListCompare(pCheck_src, pCheck_dest, -1) != 0) {
 		/* Tables have different CHECK constraints.  Ticket #2252 */
@@ -1884,15 +1876,14 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		}
 		assert(pSrcIdx);
 		struct space *src_space =
-			space_by_id(SQLITE_PAGENO_TO_SPACEID(pSrcIdx->tnum));
+			space_by_id(pSrc->def->id);
 		vdbe_emit_open_cursor(pParse, iSrc,
-				      SQLITE_PAGENO_TO_INDEXID(pSrcIdx->tnum),
+				      pSrcIdx->def->iid,
 				      src_space);
 		VdbeComment((v, "%s", pSrcIdx->def->name));
-		struct space *dest_space =
-			space_by_id(SQLITE_PAGENO_TO_SPACEID(pDestIdx->tnum));
+		struct space *dest_space = space_by_id(pDest->def->id);
 		vdbe_emit_open_cursor(pParse, iDest,
-				      SQLITE_PAGENO_TO_INDEXID(pDestIdx->tnum),
+				      pDestIdx->def->iid,
 				      dest_space);
 		VdbeComment((v, "%s", pDestIdx->def->name));
 		addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);

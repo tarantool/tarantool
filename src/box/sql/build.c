@@ -278,8 +278,7 @@ sqlite3CommitInternalChanges()
 bool
 table_column_is_in_pk(Table *table, uint32_t column)
 {
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
-	struct space *space = space_by_id(space_id);
+	struct space *space = space_by_id(table->def->id);
 	assert(space != NULL);
 
 	struct index *primary_idx = index_find(space, 0 /* PK */);
@@ -1597,8 +1596,10 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	 * schema.
 	 */
 	if (db->init.busy) {
-		p->tnum = db->init.newTnum;
-		p->def->id = SQLITE_PAGENO_TO_SPACEID(p->tnum);
+		p->def->id = db->init.space_id;
+		for(struct Index *idx = p->pIndex; idx != NULL;
+		    idx = idx->pNext)
+			idx->def->space_id = p->def->id;
 	}
 
 	if (!p->def->opts.is_view) {
@@ -2256,15 +2257,9 @@ sqlite3DeferForeignKey(Parse * pParse, int isDeferred)
  * Generate code that will erase and refill index *pIdx.  This is
  * used to initialize a newly created index or to recompute the
  * content of an index in response to a REINDEX command.
- *
- * if memRootPage is not negative, it means that the index is newly
- * created.  The register specified by memRootPage contains the
- * root page number of the index.  If memRootPage is negative, then
- * the index already exists and must be cleared before being refilled and
- * the root page number of the index is taken from pIndex->tnum.
  */
 static void
-sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
+sqlite3RefillIndex(Parse * pParse, Index * pIndex)
 {
 	Table *pTab = pIndex->pTable;	/* The table that is indexed */
 	int iTab = pParse->nTab++;	/* Btree cursor used for pTab */
@@ -2272,7 +2267,6 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	int iSorter;		/* Cursor opened by OpenSorter (if in use) */
 	int addr1;		/* Address of top of loop */
 	int addr2;		/* Address to jump to for next iteration */
-	int tnum;		/* Root page of index */
 	int iPartIdxLabel;	/* Jump to this label to skip a row */
 	Vdbe *v;		/* Generate code into this virtual machine */
 	int regRecord;		/* Register holding assembled index record */
@@ -2280,11 +2274,6 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	v = sqlite3GetVdbe(pParse);
 	if (v == 0)
 		return;
-	if (memRootPage >= 0) {
-		tnum = memRootPage;
-	} else {
-		tnum = pIndex->tnum;
-	}
 	struct key_def *def = key_def_dup(pIndex->def->key_def);
 	if (def == NULL) {
 		sqlite3OomFault(db);
@@ -2311,13 +2300,11 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex, int memRootPage)
 	sqlite3VdbeAddOp2(v, OP_Next, iTab, addr1 + 1);
 	VdbeCoverage(v);
 	sqlite3VdbeJumpHere(v, addr1);
-	if (memRootPage < 0)
-		sqlite3VdbeAddOp2(v, OP_Clear, SQLITE_PAGENO_TO_SPACEID(tnum),
-				  0);
-	struct space *space = space_by_id(SQLITE_PAGENO_TO_SPACEID(tnum));
-	vdbe_emit_open_cursor(pParse, iIdx, SQLITE_PAGENO_TO_INDEXID(tnum),
+	sqlite3VdbeAddOp2(v, OP_Clear, pIndex->pTable->def->id, 0);
+	struct space *space = space_by_id(pIndex->pTable->def->id);
+	vdbe_emit_open_cursor(pParse, iIdx, pIndex->def->iid,
 			      space);
-	sqlite3VdbeChangeP5(v, memRootPage >= 0 ? OPFLAG_P2ISREG : 0);
+	sqlite3VdbeChangeP5(v, 0);
 
 	addr1 = sqlite3VdbeAddOp2(v, OP_SorterSort, iSorter, 0);
 	VdbeCoverage(v);
@@ -2715,7 +2702,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	 */
 	uint32_t iid = idx_type != SQL_INDEX_TYPE_CONSTRAINT_PK;
 	if (db->init.busy)
-		iid = SQLITE_PAGENO_TO_INDEXID(db->init.newTnum);
+		iid = db->init.index_id;
 
 	if (index_fill_def(parse, index, table, iid, name, strlen(name),
 			   col_list, idx_type, sql_stmt) != 0)
@@ -2845,7 +2832,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			goto exit_create_index;
 		}
 		user_session->sql_flags |= SQLITE_InternChanges;
-		index->tnum = db->init.newTnum;
+		index->def->iid = db->init.index_id;
 	}
 
 	/*
@@ -2878,7 +2865,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		sqlite3VdbeChangeP5(vdbe, OPFLAG_SEEKEQ);
 
 		assert(start != NULL);
-		space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
+		space_id = table->def->id;
 		index_id = getNewIid(parse, space_id, cursor);
 		sqlite3VdbeAddOp1(vdbe, OP_Close, cursor);
 		createIndex(parse, index, space_id, index_id, sql_stmt);
@@ -3576,7 +3563,7 @@ reindexTable(Parse * pParse, Table * pTab, struct coll *coll)
 	for (pIndex = pTab->pIndex; pIndex; pIndex = pIndex->pNext) {
 		if (coll == 0 || collationMatch(coll, pIndex)) {
 			sql_set_multi_write(pParse, false);
-			sqlite3RefillIndex(pParse, pIndex, -1);
+			sqlite3RefillIndex(pParse, pIndex);
 		}
 	}
 }
@@ -3670,7 +3657,7 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 	pIndex = sqlite3HashFind(&pTab->idxHash, z);
 	if (pIndex != NULL) {
 		sql_set_multi_write(pParse, false);
-		sqlite3RefillIndex(pParse, pIndex, -1);
+		sqlite3RefillIndex(pParse, pIndex);
 		return;
 	}
 

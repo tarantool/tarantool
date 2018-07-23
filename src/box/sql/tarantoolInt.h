@@ -28,23 +28,8 @@
 #define TARANTOOL_INDEX_INSERT 1
 #define TARANTOOL_INDEX_REPLACE 2
 
-/*
- * SQLite uses the root page number to identify a Table or Index BTree.
- * We switched it to using Tarantool spaces and indices instead of the
- * BTrees. Hence the functions to encode index and space id in
- * a page number.
- */
-#define SQLITE_PAGENO_FROM_SPACEID_AND_INDEXID(spaceid, iid) \
-  (((unsigned)(spaceid) << 10) | (iid))
-
-#define SQLITE_PAGENO_TO_SPACEID(pgno) \
-  ((unsigned)(pgno) >> 10)
-
-#define SQLITE_PAGENO_TO_INDEXID(pgno) \
-  ((pgno) & 1023)
-
 /* Load database schema from Tarantool. */
-void tarantoolSqlite3LoadSchema(InitData * init);
+void tarantoolSqlite3LoadSchema(struct init_data *init);
 
 /* Misc */
 const char *tarantoolErrorMessage();
@@ -82,10 +67,24 @@ int
 sql_delete_by_key(struct space *space, char *key, uint32_t key_size);
 int tarantoolSqlite3ClearTable(struct space *space);
 
-/* Rename table pTab with zNewName by inserting new tuple to _space.
- * SQL statement, which creates table with new name is saved in pzSqlStmt.
+/**
+ * Rename the table in _space. Update tuple with corresponding id
+ * with new name and statement fields and insert back. If sql_stmt
+ * is NULL, then return from function after getting length of new
+ * statement: it is the way how to dynamically allocate memory for
+ * new statement in VDBE. So basically this function should be
+ * called twice: firstly to get length of CREATE TABLE statement,
+ * and secondly to make routine of replacing tuple and filling out
+ * param sql_stmt with new CREATE TABLE statement.
+ *
+ * @param space_id Table's space identifier.
+ * @param new_name new name of table
+ * @param[out] sql_stmt CREATE TABLE statement for new name table, can be NULL.
+ *
+ * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
-int tarantoolSqlite3RenameTable(int iTab, const char *zNewName, char **zSqlStmt);
+int
+sql_rename_table(uint32_t space_id, const char *new_name, char **sql_stmt);
 
 /* Alter trigger statement after rename table. */
 int tarantoolSqlite3RenameTrigger(const char *zTriggerName,

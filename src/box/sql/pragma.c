@@ -432,9 +432,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			for (i = sqliteHashFirst(&db->pSchema->tblHash); i;
 			     i = sqliteHashNext(i)) {
 				Table *pTab = sqliteHashData(i);
-				uint32_t space_id =
-					SQLITE_PAGENO_TO_SPACEID(pTab->tnum);
-				struct space *space = space_by_id(space_id);
+				struct space *space = space_by_id(pTab->def->id);
 				assert(space != NULL);
 				struct index *pk = space_index(space, 0);
 				size_t avg_tuple_size_pk =
@@ -447,10 +445,8 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
 				for (pIdx = pTab->pIndex; pIdx;
 				     pIdx = pIdx->pNext) {
-					uint32_t iid =
-						SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
 					struct index *idx =
-						space_index(space, iid);
+						space_index(space, pIdx->def->iid);
 					assert(idx != NULL);
 					size_t avg_tuple_size_idx =
 						sql_index_tuple_size(space, idx);
@@ -689,12 +685,9 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					struct space *space =
 						space_cache_find(pIdx->pTable->
 								 def->id);
-					int idx_id =
-						SQLITE_PAGENO_TO_INDEXID(pIdx->
-									 tnum);
 					assert(space != NULL);
 					sqlite3VdbeAddOp4(v, OP_OpenRead, i,
-							  idx_id, 0,
+							  pIdx->def->iid, 0,
 							  (void *) space,
 							  P4_SPACEPTR);
 

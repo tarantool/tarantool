@@ -410,12 +410,6 @@ sqlite3VdbeAddParseSchema2Op(Vdbe * p, int iRec, int n)
 	sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, 0);
 }
 
-void
-sqlite3VdbeAddRenameTableOp(Vdbe * p, int iTab, char* zNewName)
-{
-	sqlite3VdbeAddOp4(p, OP_RenameTable, iTab, 0, 0, zNewName, P4_DYNAMIC);
-}
-
 /*
  * Add an opcode that includes the p4 value as an integer.
  */
@@ -4001,8 +3995,7 @@ sqlite3VdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the
 enum on_conflict_action
 table_column_nullable_action(struct Table *tab, uint32_t column)
 {
-	uint32_t space_id = SQLITE_PAGENO_TO_SPACEID(tab->tnum);
-	struct space *space = space_cache_find(space_id);
+	struct space *space = space_cache_find(tab->def->id);
 
 	assert(space != NULL);
 

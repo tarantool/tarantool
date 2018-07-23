@@ -44,12 +44,12 @@
  * that the database is corrupt.
  */
 static void
-corruptSchema(InitData * pData,	/* Initialization context */
+corruptSchema(struct init_data *data,	/* Initialization context */
 	      const char *zObj,	/* Object being parsed at the point of error */
 	      const char *zExtra	/* Error information */
     )
 {
-	sqlite3 *db = pData->db;
+	sqlite3 *db = data->db;
 	if (!db->mallocFailed) {
 		char *z;
 		if (zObj == 0)
@@ -57,46 +57,30 @@ corruptSchema(InitData * pData,	/* Initialization context */
 		z = sqlite3MPrintf(db, "malformed database schema (%s)", zObj);
 		if (zExtra)
 			z = sqlite3MPrintf(db, "%z - %s", z, zExtra);
-		sqlite3DbFree(db, *pData->pzErrMsg);
-		*pData->pzErrMsg = z;
+		sqlite3DbFree(db, *data->pzErrMsg);
+		*data->pzErrMsg = z;
 	}
-	pData->rc = db->mallocFailed ? SQLITE_NOMEM_BKPT : SQLITE_CORRUPT_BKPT;
+	data->rc = db->mallocFailed ? SQLITE_NOMEM_BKPT : SQLITE_CORRUPT_BKPT;
 }
 
 /* Necessary for appropriate value return in InitCallback.
  * Otherwise it will return uint32_t instead of 64 bit pointer.
  */
 struct space *space_by_id(uint32_t id);
-/*
- * This is the callback routine for the code that initializes the
- * database.  See sqlite3Init() below for additional information.
- * This routine is also called from the OP_ParseSchema opcode of the VDBE.
- *
- * Each callback contains the following information:
- *
- *     argv[0] = name of thing being created
- *     argv[1] = root page number address.
- *     argv[2] = SQL text for the CREATE statement.
- *
- */
+
 int
-sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
+sql_init_callback(struct init_data *init, const char *name,
+		  uint32_t space_id, uint32_t index_id, const char *sql)
 {
-	InitData *pData = (InitData *) pInit;
-	sqlite3 *db = pData->db;
-	assert(argc == 3);
-	UNUSED_PARAMETER2(NotUsed, argc);
+	sqlite3 *db = init->db;
 	if (db->mallocFailed) {
-		corruptSchema(pData, argv[0], 0);
+		corruptSchema(init, name, 0);
 		return 1;
 	}
 
-	if (argv == 0)
-		return 0;	/* Might happen if EMPTY_RESULT_CALLBACKS are on */
-	if (argv[1] == 0) {
-		corruptSchema(pData, argv[0], 0);
-	} else if ((strlen(argv[2]) > 7) &&
-		   sqlite3_strnicmp(argv[2], "create ", 7) == 0) {
+	assert(space_id > 0);
+	if ((strlen(sql) > 7) &&
+	    sqlite3_strnicmp(sql, "create ", 7) == 0) {
 		/* Call the parser to process a CREATE TABLE, INDEX or VIEW.
 		 * But because db->init.busy is set to 1, no VDBE code is generated
 		 * or executed.  All the parser does is build the internal data
@@ -107,25 +91,24 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 		TESTONLY(int rcp);	/* Return code from sqlite3_prepare() */
 
 		assert(db->init.busy);
-		db->init.newTnum = *((int *)argv[1]);
+		db->init.space_id = space_id;
+		db->init.index_id = index_id;
 		db->init.orphanTrigger = 0;
-		TESTONLY(rcp =) sqlite3_prepare(db, argv[2],
-						strlen(argv[2]) + 1, &pStmt, 0);
+		TESTONLY(rcp =) sqlite3_prepare(db, sql,
+						strlen(sql) + 1, &pStmt, 0);
 		rc = db->errCode;
 		assert((rc & 0xFF) == (rcp & 0xFF));
 		if (SQLITE_OK != rc) {
-			pData->rc = rc;
-			if (rc == SQLITE_NOMEM) {
+			init->rc = rc;
+			if (rc == SQLITE_NOMEM)
 				sqlite3OomFault(db);
-			} else if (rc != SQLITE_INTERRUPT
-				   && (rc & 0xFF) != SQLITE_LOCKED) {
-				corruptSchema(pData, argv[0],
-					      sqlite3_errmsg(db));
-			}
+			else if (rc != SQLITE_INTERRUPT &&
+				 (rc & 0xFF) != SQLITE_LOCKED)
+				corruptSchema(init, name, sqlite3_errmsg(db));
 		}
 		sqlite3_finalize(pStmt);
-	} else if (argv[0] == 0 || (argv[2] != 0 && argv[2][0] != 0)) {
-		corruptSchema(pData, argv[0], 0);
+	} else if (name == NULL || (sql != NULL && sql[0] != 0)) {
+		corruptSchema(init, name, 0);
 	} else {
 		/* If the SQL column is blank it means this is an index that
 		 * was created to be the PRIMARY KEY or to fulfill a UNIQUE
@@ -134,12 +117,10 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 		 * to do here is record the root page number for that index.
 		 */
 		Index *pIndex;
-		long pageNo = *((long *)argv[1]);
-		int iSpace = (int)SQLITE_PAGENO_TO_SPACEID(pageNo);
-		struct space *pSpace = space_by_id(iSpace);
-		const char *zSpace = space_name(pSpace);
-		pIndex = sqlite3LocateIndex(db, argv[0], zSpace);
-		if (pIndex == 0) {
+		struct space *space = space_by_id(space_id);
+		const char *zSpace = space_name(space);
+		pIndex = sqlite3LocateIndex(db, name, zSpace);
+		if (pIndex == NULL) {
 			/* This can occur if there exists an index on a TEMP table which
 			 * has the same name as another index on a permanent index.  Since
 			 * the permanent table is hidden by the TEMP table, we can also
@@ -147,7 +128,7 @@ sqlite3InitCallback(void *pInit, int argc, char **argv, char **NotUsed)
 			 */
 			/* Do Nothing */ ;
 		}
-		pIndex->tnum = pageNo;
+		pIndex->def->iid = index_id;
 	}
 	return 0;
 }
@@ -161,18 +142,18 @@ extern int
 sqlite3InitDatabase(sqlite3 * db)
 {
 	int rc;
-	InitData initData;
+	struct init_data init;
 
 	assert(db->pSchema != NULL);
 
-	memset(&initData, 0, sizeof(InitData));
-	initData.db = db;
+	memset(&init, 0, sizeof(init));
+	init.db = db;
 
 	/* Load schema from Tarantool - into the primary db only. */
-	tarantoolSqlite3LoadSchema(&initData);
+	tarantoolSqlite3LoadSchema(&init);
 
-	if (initData.rc) {
-		rc = initData.rc;
+	if (init.rc) {
+		rc = init.rc;
 		goto error_out;
 	}
 
@@ -185,7 +166,7 @@ sqlite3InitDatabase(sqlite3 * db)
 	 */
 	assert(db->init.busy);
 	{
-		rc = initData.rc;
+		rc = init.rc;
 		if (rc == SQLITE_OK)
 			sql_analysis_load(db);
 	}

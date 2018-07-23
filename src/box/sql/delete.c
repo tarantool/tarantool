@@ -125,7 +125,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		table = sql_list_lookup_table(parse, tab_list);
 		if (table == NULL)
 			goto delete_from_cleanup;
-		space_id = SQLITE_PAGENO_TO_SPACEID(table->tnum);
+		space_id = table->def->id;
 		space = space_by_id(space_id);
 		assert(space != NULL);
 		trigger_list = sql_triggers_exist(table, TK_DELETE, NULL, NULL);

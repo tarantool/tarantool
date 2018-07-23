@@ -4364,8 +4364,7 @@ is_simple_count(struct Select *select, struct AggInfo *agg_info)
 	    select->pSrc->nSrc != 1 || select->pSrc->a[0].pSelect != NULL) {
 		return NULL;
 	}
-	uint32_t space_id =
-		SQLITE_PAGENO_TO_SPACEID(select->pSrc->a[0].pTab->tnum);
+	uint32_t space_id = select->pSrc->a[0].pTab->def->id;
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL && !space->def->opts.is_view);
 	struct Expr *expr = select->pEList->a[0].pExpr;

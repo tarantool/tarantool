@@ -426,9 +426,9 @@ fkLookupParent(Parse * pParse,	/* Parse context */
 			int regTemp = sqlite3GetTempRange(pParse, nCol);
 			int regRec = sqlite3GetTempReg(pParse);
 			struct space *space =
-				space_by_id(SQLITE_PAGENO_TO_SPACEID(pIdx->tnum));
-			uint32_t idx_id = SQLITE_PAGENO_TO_INDEXID(pIdx->tnum);
-			vdbe_emit_open_cursor(pParse, iCur, idx_id, space);
+				space_by_id(pIdx->pTable->def->id);
+			vdbe_emit_open_cursor(pParse, iCur, pIdx->def->iid,
+					      space);
 			for (i = 0; i < nCol; i++) {
 				sqlite3VdbeAddOp2(v, OP_Copy,
 						  aiCol[i] + 1 + regData,
@@ -1304,12 +1304,10 @@ fkActionTrigger(struct Parse *pParse, struct Table *pTab, struct FKey *pFKey,
 									     &tToCol,
 									     0));
 				} else if (action == OE_SetDflt) {
-					uint32_t space_id =
-						SQLITE_PAGENO_TO_SPACEID(
-							pFKey->pFrom->tnum);
 					Expr *pDflt =
 						space_column_default_expr(
-							space_id, (uint32_t)iFromCol);
+							pFKey->pFrom->def->id,
+							(uint32_t)iFromCol);
 					if (pDflt) {
 						pNew =
 						    sqlite3ExprDup(db, pDflt,

@@ -60,7 +60,8 @@ reloadTableSchema(Parse * pParse, Table * pTab, const char *zName)
 		return;
 
 	char *zNewName = sqlite3MPrintf(pParse->db, "%s", zName);
-	sqlite3VdbeAddRenameTableOp(v, pTab->tnum, zNewName);
+	sqlite3VdbeAddOp4(v, OP_RenameTable, pTab->def->id, 0, 0, zNewName,
+			  P4_DYNAMIC);
 }
 
 /*
@@ -163,7 +164,7 @@ sqlite3AlterFinishAddColumn(Parse * pParse, Token * pColDef)
 	zTab = &pNew->def->name[16];
 	pCol = &pNew->aCol[pNew->def->field_count - 1];
 	assert(pNew->def != NULL);
-	pDflt = space_column_default_expr(SQLITE_PAGENO_TO_SPACEID(pNew->tnum),
+	pDflt = space_column_default_expr(pNew->def->id,
 					  pNew->def->field_count - 1);
 	pTab = sqlite3HashFind(&db->pSchema->tblHash, zTab);;
 	assert(pTab);

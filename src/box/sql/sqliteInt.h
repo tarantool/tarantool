@@ -844,8 +844,7 @@ sqlite3_vfs_find(const char *zVfsName);
 #define SQLITE_TESTCTRL_BYTEORDER               22
 #define SQLITE_TESTCTRL_ISINIT                  23
 #define SQLITE_TESTCTRL_SORTER_MMAP             24
-#define SQLITE_TESTCTRL_IMPOSTER                25
-#define SQLITE_TESTCTRL_LAST                    25
+#define SQLITE_TESTCTRL_LAST                    24
 
 int
 sqlite3_status64(int op, sqlite3_int64 * pCurrent,
@@ -1608,7 +1607,8 @@ struct sqlite3 {
 	int aLimit[SQLITE_N_LIMIT];	/* Limits */
 	int nMaxSorterMmap;	/* Maximum size of regions mapped by sorter */
 	struct sqlite3InitInfo {	/* Information used during initialization */
-		int newTnum;	/* Rootpage of table being initialized */
+		uint32_t space_id;
+		uint32_t index_id;
 		u8 busy;	/* TRUE if currently initializing */
 		u8 orphanTrigger;	/* Last statement is orphaned TEMP trigger */
 		u8 imposterTable;	/* Building an imposter table */
@@ -1916,7 +1916,6 @@ struct Table {
 	char *zColAff;		/* String defining the affinity of each column */
 	/*   ... also used as column name list in a VIEW */
 	Hash idxHash;		/* All (named) indices indexed by name */
-	int tnum;		/* Root BTree page for this table */
 	u32 nTabRef;		/* Number of pointers to this Table */
 	i16 iAutoIncPKey;	/* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
 				   column number here, -1 otherwise Tarantool specifics */
@@ -2091,10 +2090,7 @@ enum sql_index_type {
  * While parsing a CREATE TABLE or CREATE INDEX statement in order to
  * generate VDBE code (as opposed to reading from Tarantool's _space
  * space as part of parsing an existing database schema), transient instances
- * of this structure may be created. In this case the Index.tnum variable is
- * used to store the address of a VDBE instruction, not a database page
- * number (it cannot - the database page is not allocated until the VDBE
- * program is executed).
+ * of this structure may be created.
  */
 struct Index {
 	/** The SQL table being indexed. */
@@ -2105,8 +2101,6 @@ struct Index {
 	Index *pNext;
 	/** WHERE clause for partial indices. */
 	Expr *pPartIdxWhere;
-	/** DB Page containing root of this index. */
-	int tnum;
 	/**
 	 * Conflict resolution algorithm to employ whenever an
 	 * attempt is made to insert a non-unique element in
@@ -3127,15 +3121,18 @@ struct StrAccum {
 
 #define isMalloced(X)  (((X)->printfFlags & SQLITE_PRINTF_MALLOCED)!=0)
 
-/*
+/**
  * A pointer to this structure is used to communicate information
- * from sqlite3Init and OP_ParseSchema into the sqlite3InitCallback.
+ * from sqlite3Init and OP_ParseSchema into the sql_init_callback.
  */
-typedef struct {
-	sqlite3 *db;		/* The database being initialized */
-	char **pzErrMsg;	/* Error message stored here */
-	int rc;			/* Result code stored here */
-} InitData;
+struct init_data {
+	/** The database being initialized. */
+	sqlite3 *db;
+	/** Error message stored here. */
+	char **pzErrMsg;
+	/** Result code stored here. */
+	int rc;
+};
 
 /*
  * Structure containing global configuration data for the SQLite library.
@@ -3474,7 +3471,25 @@ void sqlite3ExprListSetName(Parse *, ExprList *, Token *, int);
 void sqlite3ExprListSetSpan(Parse *, ExprList *, ExprSpan *);
 u32 sqlite3ExprListFlags(const ExprList *);
 int sqlite3Init(sqlite3 *);
-int sqlite3InitCallback(void *, int, char **, char **);
+
+/**
+ * This is the callback routine for the code that initializes the
+ * database.  See sqlite3Init() below for additional information.
+ * This routine is also called from the OP_ParseSchema2 opcode of
+ * the VDBE.
+ *
+ * @param init Initialization context.
+ * @param name Name of thing being created.
+ * @param space_id Space identifier.
+ * @param index_id Index identifier.
+ * @param sql Text of SQL query.
+ *
+ * @retval 0 on success, 1 otherwise.
+ */
+int
+sql_init_callback(struct init_data *init, const char *name,
+		  uint32_t space_id, uint32_t index_id, const char *sql);
+
 void sqlite3Pragma(Parse *, Token *, Token *, Token *, int);
 void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
 void sqlite3CommitInternalChanges();

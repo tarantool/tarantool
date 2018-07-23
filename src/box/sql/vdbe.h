@@ -234,7 +234,6 @@ void sqlite3VdbeVerifyNoResultRow(Vdbe * p);
 VdbeOp *sqlite3VdbeAddOpList(Vdbe *, int nOp, VdbeOpList const *aOp,
 			     int iLineno);
 void sqlite3VdbeAddParseSchema2Op(Vdbe * p, int, int);
-void sqlite3VdbeAddRenameTableOp(Vdbe * p, int, char *);
 void sqlite3VdbeChangeOpcode(Vdbe *, u32 addr, u8);
 void sqlite3VdbeChangeP1(Vdbe *, u32 addr, int P1);
 void sqlite3VdbeChangeP2(Vdbe *, u32 addr, int P2);
