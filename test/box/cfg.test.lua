@@ -70,6 +70,18 @@ test_run:cmd("stop server cfg_tester4")
 test_run:cmd("cleanup server cfg_tester4")
 
 --------------------------------------------------------------------------------
+-- Check fix for pid_file option overwritten by tarantoolctl
+--------------------------------------------------------------------------------
+
+test_run:cmd('create server cfg_tester5 with script = "box/lua/cfg_test1.lua"')
+test_run:cmd("start server cfg_tester5")
+test_run:cmd('switch cfg_tester5')
+box.cfg{pid_file = "current.pid"}
+test_run:cmd("switch default")
+test_run:cmd("stop server cfg_tester5")
+test_run:cmd("cleanup server cfg_tester5")
+
+--------------------------------------------------------------------------------
 -- Check that 'vinyl_dir' cfg option is not checked as long as
 -- there is no vinyl indexes (issue #2664)
 --------------------------------------------------------------------------------
