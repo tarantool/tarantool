@@ -192,6 +192,10 @@ struct vy_write_iterator {
 	 */
 	int stmt_i;
 	/**
+	 * Last statement returned to the caller, pinned in memory.
+	 */
+	struct tuple *last_stmt;
+	/**
 	 * Read views of the same key sorted by LSN in descending
 	 * order, starting from INT64_MAX.
 	 *
@@ -398,6 +402,10 @@ vy_write_iterator_stop(struct vy_stmt_stream *vstream)
 	struct vy_write_src *src, *tmp;
 	rlist_foreach_entry_safe(src, &stream->src_list, in_src_list, tmp)
 		vy_write_iterator_delete_src(stream, src);
+	if (stream->last_stmt != NULL) {
+		vy_stmt_unref_if_possible(stream->last_stmt);
+		stream->last_stmt = NULL;
+	}
 }
 
 /**
@@ -527,12 +535,6 @@ static inline struct tuple *
 vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
 {
 	struct vy_read_view_stmt *rv;
-	if (stream->stmt_i >= 0) {
-		/* Destroy the current before getting to the next. */
-		rv = &stream->read_views[stream->stmt_i];
-		assert(rv->history == NULL);
-		vy_read_view_stmt_destroy(rv);
-	}
 	if (stream->rv_used_count == 0)
 		return NULL;
 	/* Find a next non-empty history element. */
@@ -544,7 +546,11 @@ vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
 	} while (rv->tuple == NULL);
 	assert(stream->rv_used_count > 0);
 	stream->rv_used_count--;
-	return rv->tuple;
+	if (stream->last_stmt != NULL)
+		vy_stmt_unref_if_possible(stream->last_stmt);
+	stream->last_stmt = rv->tuple;
+	rv->tuple = NULL;
+	return stream->last_stmt;
 }
 
 /**
