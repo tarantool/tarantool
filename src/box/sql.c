@@ -1118,12 +1118,21 @@ cursor_seek(BtCursor *pCur, int *pRes)
 		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
 
-	struct iterator *it = index_create_iterator(pCur->index, pCur->iter_type,
-						    key, part_count);
+	struct space *space = pCur->space;
+	struct txn *txn = NULL;
+	if (space->def->id != 0 && txn_begin_ro_stmt(space, &txn) != 0)
+		return SQL_TARANTOOL_ERROR;
+	struct iterator *it =
+		index_create_iterator(pCur->index, pCur->iter_type, key,
+				      part_count);
 	if (it == NULL) {
+		if (txn != NULL)
+			txn_rollback_stmt();
 		pCur->eState = CURSOR_INVALID;
 		return SQL_TARANTOOL_ITERATOR_FAIL;
 	}
+	if (txn != NULL)
+		txn_commit_ro_stmt(txn);
 	pCur->iter = it;
 	pCur->eState = CURSOR_VALID;
 

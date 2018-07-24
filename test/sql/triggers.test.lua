@@ -95,3 +95,50 @@ box.space._trigger:insert(tuple)
 
 box.sql.execute("DROP VIEW V1;")
 box.sql.execute("DROP TABLE T1;")
+
+--
+-- gh-3531: Assertion with trigger and two storage engines
+--
+-- Case 1: Src 'vinyl' table; Dst 'memtx' table
+box.sql.execute("PRAGMA sql_default_engine ('vinyl');")
+box.sql.execute("CREATE TABLE m (s1 SCALAR PRIMARY KEY);")
+box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = DATETIME('now'); END;")
+box.sql.execute("PRAGMA sql_default_engine('memtx');")
+box.sql.execute("CREATE TABLE n (s1 CHAR PRIMARY KEY, s2 char);")
+box.sql.execute("INSERT INTO m VALUES ('');")
+box.sql.execute("INSERT INTO n VALUES ('',null);")
+box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
+
+-- ANALYZE operates with _sql_stat{1,4} tables should work
+box.sql.execute("ANALYZE m;")
+box.sql.execute("DROP TABLE m;")
+box.sql.execute("DROP TABLE n;")
+
+
+-- Case 2: Src 'memtx' table; Dst 'vinyl' table
+box.sql.execute("PRAGMA sql_default_engine ('memtx');")
+box.sql.execute("CREATE TABLE m (s1 SCALAR PRIMARY KEY);")
+box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = DATETIME('now'); END;")
+box.sql.execute("PRAGMA sql_default_engine('vinyl');")
+box.sql.execute("CREATE TABLE n (s1 CHAR PRIMARY KEY, s2 char);")
+box.sql.execute("INSERT INTO m VALUES ('');")
+box.sql.execute("INSERT INTO n VALUES ('',null);")
+box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
+
+-- ANALYZE operates with _sql_stat{1,4} tables should work
+box.sql.execute("ANALYZE n;")
+box.sql.execute("DROP TABLE m;")
+box.sql.execute("DROP TABLE n;")
+
+-- Test SQL Transaction with LUA
+box.sql.execute("PRAGMA sql_default_engine ('memtx');")
+box.sql.execute("CREATE TABLE test (id INT PRIMARY KEY)")
+box.sql.execute("PRAGMA sql_default_engine='vinyl'")
+box.sql.execute("CREATE TABLE test2 (id INT PRIMARY KEY)")
+box.sql.execute("INSERT INTO test2 VALUES (2)")
+box.sql.execute("START TRANSACTION")
+box.sql.execute("INSERT INTO test VALUES (1)")
+box.sql.execute("SELECT * FROM test2")
+box.sql.execute("ROLLBACK;")
+box.sql.execute("DROP TABLE test;")
+box.sql.execute("DROP TABLE test2;")
