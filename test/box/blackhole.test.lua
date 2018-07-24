@@ -33,6 +33,25 @@ s_old, s_new
 s:on_replace(nil, f1)
 s:before_replace(nil, f2)
 
+-- Blackhole statements can be mixed in other engines' transactions.
+memtx = box.schema.space.create('memtx', {engine = 'memtx'})
+_ = memtx:create_index('pk')
+test_run:cmd("setopt delimiter ';'")
+box.begin()
+s:replace{1}
+memtx:replace{1}
+s:replace{2}
+memtx:replace{2}
+box.commit();
+test_run:cmd("setopt delimiter ''");
+memtx:select()
+f = s:on_replace(function(old, new) memtx:replace(new) end)
+s:replace{3}
+s:replace{4}
+memtx:select()
+s:on_replace(nil, f)
+memtx:drop()
+
 -- Test recovery.
 test_run:cmd('restart server default')
 s = box.space.test

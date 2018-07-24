@@ -206,5 +206,6 @@ blackhole_engine_new(void)
 
 	engine->vtab = &blackhole_engine_vtab;
 	engine->name = "blackhole";
+	engine->flags = ENGINE_BYPASS_TX;
 	return engine;
 }
