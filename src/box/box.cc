@@ -362,11 +362,6 @@ box_check_say()
 			  diag_last_error(diag_get())->errmsg);
 	}
 
-	if (say_check_init_str(log) == -1) {
-
-		diag_raise();
-	}
-
 	if (type == SAY_LOGGER_SYSLOG) {
 		struct say_syslog_opts opts;
 		if (say_parse_syslog_opts(log, &opts) < 0) {

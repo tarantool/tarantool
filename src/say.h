@@ -372,14 +372,6 @@ CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 #define log_say_syserror(log, format, ...) \
 	log_say_level(log, S_SYSERROR, strerror(errno), format, ##__VA_ARGS__)
 
-/**
- * validates logger init string;
- * @returns 0 if validation passed or -1
- *           with an error message written to diag
- */
-int
-say_check_init_str(const char *str);
-
 /* internals, for unit testing */
 
 /**

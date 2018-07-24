@@ -960,24 +960,6 @@ write_to_syslog(struct log *log, int total)
  * Init string parser(s)
  */
 
-int
-say_check_init_str(const char *str)
-{
-	enum say_logger_type type;
-	if (say_parse_logger_type(&str, &type)) {
-		diag_set(IllegalParams, logger_syntax_reminder);
-		return -1;
-	}
-	if (type == SAY_LOGGER_SYSLOG) {
-		struct say_syslog_opts opts;
-
-		if (say_parse_syslog_opts(str, &opts) < 0)
-			return -1;
-		say_free_syslog_opts(&opts);
-	}
-	return 0;
-}
-
 /**
  * @retval string after prefix if a prefix is found,
  *         *str also is advanced to the prefix
