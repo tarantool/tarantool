@@ -369,6 +369,89 @@ replica_set.wait_all(test_run)
 replica_set.drop_all(test_run)
 ---
 ...
+--
+-- Check that once a replica is removed from the cluster table,
+-- all xlogs kept for it are removed even if it is configured as
+-- a replication master (gh-3546).
+--
+fio = require('fio')
+---
+...
+fiber = require('fiber')
+---
+...
+-- Start a replica and set it up as a master for this instance.
+test_run:cmd("start server replica")
+---
+- true
+...
+replica_port = test_run:eval('replica', 'return box.cfg.listen')[1]
+---
+...
+replica_port ~= nil
+---
+- true
+...
+box.cfg{replication = replica_port}
+---
+...
+-- Stop the replica and write a few WALs.
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+_ = s:auto_increment{}
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s:auto_increment{}
+---
+...
+box.snapshot()
+---
+- ok
+...
+_ = s:auto_increment{}
+---
+...
+box.snapshot()
+---
+- ok
+...
+#fio.glob('./master/*.xlog') == 3 or fio.listdir('./master')
+---
+- true
+...
+-- Delete the replica from the cluster table and check that
+-- all xlog files are removed.
+test_run:cleanup_cluster()
+---
+...
+box.snapshot()
+---
+- ok
+...
+t = fiber.time()
+---
+...
+while #fio.glob('./master/*xlog') > 0 and fiber.time() - t < 10 do fiber.sleep(0.01) end
+---
+...
+#fio.glob('./master/*.xlog') == 0 or fio.listdir('./master')
+---
+- true
+...
+-- Restore the config.
+box.cfg{replication = {}}
+---
+...
 -- Cleanup.
 s:drop()
 ---
