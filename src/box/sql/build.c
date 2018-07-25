@@ -197,8 +197,11 @@ sqlite3LocateIndex(sqlite3 * db, const char *zName, const char *zTable)
 
 	if (pTab == NULL)
 		return NULL;
-
-	return sqlite3HashFind(&pTab->idxHash, zName);
+	for (struct Index *idx = pTab->pIndex; idx != NULL; idx = idx->pNext) {
+		if (strcmp(zName, idx->def->name) == 0)
+			return idx;
+	}
+	return NULL;
 }
 
 /*
@@ -224,12 +227,8 @@ void
 sqlite3UnlinkAndDeleteIndex(sqlite3 * db, Index * pIndex)
 {
 	assert(pIndex != 0);
-	assert(&pIndex->pTable->idxHash);
 
 	struct session *user_session = current_session();
-
-	pIndex = sqlite3HashInsert(&pIndex->pTable->idxHash,
-				   pIndex->def->name, 0);
 	if (ALWAYS(pIndex)) {
 		if (pIndex->pTable->pIndex == pIndex) {
 			pIndex->pTable->pIndex = pIndex->pNext;
@@ -332,19 +331,8 @@ deleteTable(sqlite3 * db, Table * pTable)
 	/* Delete all indices associated with this table. */
 	for (pIndex = pTable->pIndex; pIndex; pIndex = pNext) {
 		pNext = pIndex->pNext;
-		if ((db == 0 || db->pnBytesFreed == 0)) {
-			char *zName = pIndex->def->name;
-			TESTONLY(Index *
-				 pOld =) sqlite3HashInsert(&pTable->idxHash,
-							   zName, 0);
-			assert(pOld == pIndex || pOld == 0);
-		}
 		freeIndex(db, pIndex);
 	}
-
-	/* Delete the Table structure itself.
-	 */
-	sqlite3HashClear(&pTable->idxHash);
 	assert(pTable->def != NULL);
 	/* Do not delete pTable->def allocated on region. */
 	if (!pTable->def->opts.is_temporary)
@@ -464,7 +452,6 @@ sql_table_new(Parse *parser, char *name)
 
 	table->iAutoIncPKey = -1;
 	table->pSchema = db->pSchema;
-	sqlite3HashInit(&table->idxHash);
 	table->nTabRef = 1;
 	return table;
 }
@@ -2866,7 +2853,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		if (name == NULL)
 			goto exit_create_index;
 		assert(token->z != NULL);
-		if (sqlite3HashFind(&table->idxHash, name) != NULL) {
+		if (sqlite3LocateIndex(db, name, table->def->name) != NULL) {
 			if (!if_not_exist) {
 				sqlite3ErrorMsg(parse,
 						"index %s.%s already exists",
@@ -3114,14 +3101,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	 */
 	assert(parse->nErr == 0);
 	if (db->init.busy) {
-		struct Index *p = sqlite3HashInsert(&table->idxHash,
-						    index->def->name, index);
-		if (p != NULL) {
-			/* Malloc must have failed. */
-			assert(p == index);
-			sqlite3OomFault(db);
-			goto exit_create_index;
-		}
 		user_session->sql_flags |= SQLITE_InternChanges;
 		index->def->iid = db->init.index_id;
 	}
@@ -3901,7 +3880,6 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 	char *z = 0;		/* Name of index */
 	char *zTable = 0;	/* Name of indexed table */
 	Table *pTab;		/* A table in the database */
-	Index *pIndex;		/* An index associated with pTab */
 	sqlite3 *db = pParse->db;	/* The database connection */
 
 	assert(db->pSchema != NULL);
@@ -3942,13 +3920,6 @@ sqlite3Reindex(Parse * pParse, Token * pName1, Token * pName2)
 	if (pTab == 0) {
 		sqlite3ErrorMsg(pParse, "no such table: %s", zTable);
 		goto exit_reindex;
-	}
-
-	pIndex = sqlite3HashFind(&pTab->idxHash, z);
-	if (pIndex != NULL) {
-		sql_set_multi_write(pParse, false);
-		sqlite3RefillIndex(pParse, pIndex);
-		return;
 	}
 
 	sqlite3ErrorMsg(pParse,
