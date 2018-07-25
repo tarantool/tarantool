@@ -53,11 +53,7 @@ struct Keyword {
 /*
 ** Define masks used to determine which keywords are allowed
 */
-#ifdef SQLITE_OMIT_ALTERTABLE
-#  define ALTER      0
-#else
-#  define ALTER      0x00000001
-#endif
+#define ALTER        0x00000001
 #define ALWAYS       0x00000002
 #ifdef SQLITE_OMIT_AUTOINCREMENT
 #  define AUTOINCR   0

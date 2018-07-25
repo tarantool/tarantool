@@ -1709,7 +1709,6 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
  */
 void
 sqlite3EndTable(Parse * pParse,	/* Parse context */
-		Token * pCons,	/* The ',' token after the last column defn. */
 		Token * pEnd,	/* The ')' before options in the CREATE TABLE */
 		Select * pSelect	/* Select from a "CREATE ... AS SELECT" */
     )
@@ -1775,19 +1774,6 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		}
 		pParse->pNewTable = NULL;
 		current_session()->sql_flags |= SQLITE_InternChanges;
-
-#ifndef SQLITE_OMIT_ALTERTABLE
-		if (!p->def->opts.is_view) {
-			const char *zName = (const char *)pParse->sNameToken.z;
-			int nName;
-			assert(!pSelect && pCons && pEnd);
-			if (pCons->z == 0) {
-				pCons = pEnd;
-			}
-			nName = (int)((const char *)pCons->z - zName);
-			p->addColOffset = 13 + sqlite3Utf8CharLen(zName, nName);
-		}
-#endif
 		goto finish;
 	}
 	/*
@@ -1957,7 +1943,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	}
 
 	/* Use sqlite3EndTable() to add the view to the Tarantool.  */
-	sqlite3EndTable(parse_context, 0, &end, 0);
+	sqlite3EndTable(parse_context, &end, 0);
 
  create_view_fail:
 	sqlite3DbFree(db, sel_tab);
