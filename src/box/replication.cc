@@ -358,6 +358,10 @@ replica_on_applier_disconnect(struct replica *replica)
 		assert(replicaset.applier.connected > 0);
 		replicaset.applier.connected--;
 		break;
+	case APPLIER_LOADING:
+		assert(replicaset.applier.loading > 0);
+		replicaset.applier.loading--;
+		break;
 	case APPLIER_DISCONNECTED:
 		break;
 	default:
