@@ -396,11 +396,10 @@ vy_stmt_new_surrogate_delete_from_key(const char *key,
 }
 
 struct tuple *
-vy_stmt_new_surrogate_delete(struct tuple_format *format,
-			     const struct tuple *src)
+vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
+				 const char *src_data, const char *src_data_end)
 {
-	uint32_t src_size;
-	const char *src_data = tuple_data_range(src, &src_size);
+	uint32_t src_size = src_data_end - src_data;
 	uint32_t total_size = src_size + format->field_map_size;
 	/* Surrogate tuple uses less memory than the original tuple */
 	char *data = region_alloc(&fiber()->gc, total_size);

@@ -467,8 +467,18 @@ vy_stmt_new_surrogate_delete_from_key(const char *key,
  * @retval     NULL Memory or fields format error.
  */
 struct tuple *
+vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
+				 const char *data, const char *data_end);
+
+/** @copydoc vy_stmt_new_surrogate_delete_raw. */
+static inline struct tuple *
 vy_stmt_new_surrogate_delete(struct tuple_format *format,
-			     const struct tuple *tuple);
+			     const struct tuple *tuple)
+{
+	uint32_t size;
+	const char *data = tuple_data_range(tuple, &size);
+	return vy_stmt_new_surrogate_delete_raw(format, data, data + size);
+}
 
 /**
  * Create the REPLACE statement from raw MessagePack data.
