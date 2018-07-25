@@ -1840,8 +1840,6 @@ struct Savepoint {
  */
 struct Table {
 	Index *pIndex;		/* List of SQL indexes on this table. */
-	char *zColAff;		/* String defining the affinity of each column */
-	/*   ... also used as column name list in a VIEW */
 	Hash idxHash;		/* All (named) indices indexed by name */
 	u32 nTabRef;		/* Number of pointers to this Table */
 	i16 iAutoIncPKey;	/* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
@@ -4288,7 +4286,17 @@ const char *sqlite3IndexAffinityStr(sqlite3 *, Index *);
 char *
 sql_index_affinity_str(struct sqlite3 *db, struct index_def *def);
 
-void sqlite3TableAffinity(Vdbe *, Table *, int);
+/**
+ * Code an OP_Affinity opcode that will set affinities
+ * for given range of register starting from @reg.
+ *
+ * @param v VDBE.
+ * @param def Definition of table to be used.
+ * @param reg Register where affinities will be placed.
+ */
+void
+sql_emit_table_affinity(struct Vdbe *v, struct space_def *def, int reg);
+
 char sqlite3CompareAffinity(Expr * pExpr, char aff2);
 int sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity);
 

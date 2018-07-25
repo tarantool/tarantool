@@ -124,59 +124,19 @@ sql_index_affinity_str(struct sqlite3 *db, struct index_def *def)
 	return aff;
 }
 
-/*
- * Compute the affinity string for table pTab, if it has not already been
- * computed.  As an optimization, omit trailing AFFINITY_BLOB affinities.
- *
- * If the affinity exists (if it is no entirely AFFINITY_BLOB values) and
- * if iReg>0 then code an OP_Affinity opcode that will set the affinities
- * for register iReg and following.  Or if affinities exists and iReg==0,
- * then just set the P4 operand of the previous opcode (which should  be
- * an OP_MakeRecord) to the affinity string.
- *
- * A column affinity string has one character per column:
- *
- *  Character      Column affinity
- *  ------------------------------
- *  'A'            BLOB
- *  'B'            TEXT
- *  'C'            NUMERIC
- *  'D'            INTEGER
- *  'E'            REAL
- */
 void
-sqlite3TableAffinity(Vdbe * v, Table * pTab, int iReg)
+sql_emit_table_affinity(struct Vdbe *v, struct space_def *def, int reg)
 {
-	int i;
-	char *zColAff = pTab->zColAff;
-	if (zColAff == 0) {
-		sqlite3 *db = sqlite3VdbeDb(v);
-		zColAff =
-			(char *)sqlite3DbMallocRaw(0,
-						   pTab->def->field_count + 1);
-		if (!zColAff) {
-			sqlite3OomFault(db);
-			return;
-		}
-
-		for (i = 0; i < (int)pTab->def->field_count; i++) {
-			char affinity = pTab->def->fields[i].affinity;
-			zColAff[i] = affinity;
-		}
-		do {
-			zColAff[i--] = 0;
-		} while (i >= 0 && zColAff[i] == AFFINITY_BLOB);
-		pTab->zColAff = zColAff;
-	}
-	i = sqlite3Strlen30(zColAff);
-	if (i) {
-		if (iReg) {
-			sqlite3VdbeAddOp4(v, OP_Affinity, iReg, i, 0, zColAff,
-					  i);
-		} else {
-			sqlite3VdbeChangeP4(v, -1, zColAff, i);
-		}
-	}
+	assert(reg > 0);
+	struct sqlite3 *db = sqlite3VdbeDb(v);
+	uint32_t field_count = def->field_count;
+	char *colls_aff = (char *) sqlite3DbMallocZero(db, field_count + 1);
+	if (colls_aff == NULL)
+		return;
+	for (uint32_t i = 0; i < field_count; ++i)
+		colls_aff[i] = def->fields[i].affinity;
+	sqlite3VdbeAddOp4(v, OP_Affinity, reg, field_count, 0, colls_aff,
+			  P4_DYNAMIC);
 }
 
 /**
@@ -704,9 +664,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		 * If this is a real table, attempt conversions as required by the
 		 * table column affinities.
 		 */
-		if (!is_view) {
-			sqlite3TableAffinity(v, pTab, regCols + 1);
-		}
+		if (!is_view)
+			sql_emit_table_affinity(v, pTab->def, regCols + 1);
 
 		/* Fire BEFORE or INSTEAD OF triggers */
 		vdbe_code_row_trigger(pParse, trigger, TK_INSERT, 0,
@@ -1188,7 +1147,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		if (aRegIdx[ix] == 0)
 			continue;	/* Skip indices that do not change */
 		if (bAffinityDone == 0) {
-			sqlite3TableAffinity(v, pTab, regNewData+1);
+			sql_emit_table_affinity(v, pTab->def, regNewData + 1);
 			bAffinityDone = 1;
 		}
 		iThisCur = iIdxCur + ix;
@@ -1239,7 +1198,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 					pIdx->def->key_def->parts[0].fieldno;
 				reg_pk = regNewData + 1 + fieldno;
 
-				if (pTab->zColAff[fieldno] ==
+				if (pTab->def->fields[fieldno].affinity ==
 				    AFFINITY_INTEGER) {
 					int skip_if_null = sqlite3VdbeMakeLabel(v);
 					if ((pTab->tabFlags & TF_Autoincrement) != 0) {

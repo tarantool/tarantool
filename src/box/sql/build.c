@@ -345,7 +345,6 @@ deleteTable(sqlite3 * db, Table * pTable)
 	/* Delete the Table structure itself.
 	 */
 	sqlite3HashClear(&pTable->idxHash);
-	sqlite3DbFree(db, pTable->zColAff);
 	assert(pTable->def != NULL);
 	/* Do not delete pTable->def allocated on region. */
 	if (!pTable->def->opts.is_temporary)

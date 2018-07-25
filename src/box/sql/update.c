@@ -494,7 +494,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 * verified. One could argue that this is wrong.
 	 */
 	if (tmask & TRIGGER_BEFORE) {
-		sqlite3TableAffinity(v, pTab, regNew);
+		sql_emit_table_affinity(v, pTab->def, regNew);
 		vdbe_code_row_trigger(pParse, trigger, TK_UPDATE, pChanges,
 				      TRIGGER_BEFORE, pTab, regOldPk,
 				      on_error, labelContinue);
