@@ -884,13 +884,12 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	int nTerm;
 	if (pTab == 0)
 		goto primary_key_exit;
-	if (pTab->tabFlags & TF_HasPrimaryKey) {
+	if (sqlite3PrimaryKeyIndex(pTab) != NULL) {
 		sqlite3ErrorMsg(pParse,
 				"table \"%s\" has more than one primary key",
 				pTab->def->name);
 		goto primary_key_exit;
 	}
-	pTab->tabFlags |= TF_HasPrimaryKey;
 	if (pList == 0) {
 		iCol = pTab->def->field_count - 1;
 		nTerm = 1;
@@ -919,10 +918,8 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	    pTab->def->fields[iCol].type == FIELD_TYPE_INTEGER &&
 	    sortOrder != SORT_ORDER_DESC) {
 		assert(autoInc == 0 || autoInc == 1);
-		if (autoInc) {
+		if (autoInc)
 			pTab->iAutoIncPKey = iCol;
-			pTab->tabFlags |= TF_Autoincrement;
-		}
 		struct sqlite3 *db = pParse->db;
 		struct ExprList *list;
 		struct Token token;
@@ -1724,7 +1721,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	}
 
 	if (!p->def->opts.is_view) {
-		if ((p->tabFlags & TF_HasPrimaryKey) == 0) {
+		if (sqlite3PrimaryKeyIndex(p) == NULL) {
 			sqlite3ErrorMsg(pParse,
 					"PRIMARY KEY missing on table %s",
 					p->def->name);
@@ -1793,7 +1790,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	 * Check to see if we need to create an _sequence table
 	 * for keeping track of autoincrement keys.
 	 */
-	if ((p->tabFlags & TF_Autoincrement) != 0) {
+	if (p->iAutoIncPKey >= 0) {
 		assert(reg_space_id != 0);
 		/* Do an insertion into _sequence. */
 		int reg_seq_id = ++pParse->nMem;

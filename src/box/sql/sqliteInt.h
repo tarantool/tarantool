@@ -1850,7 +1850,6 @@ struct Table {
 	 * can be fetched from space struct.
 	 */
 	LogEst tuple_log_count;
-	u8 tabFlags;		/* Mask of TF_* values */
 	Schema *pSchema;	/* Schema that contains this table */
 	Table *pNextZombie;	/* Next on the Parse.pZombieTab list */
 	/** Space definition with Tarantool metadata. */
@@ -1866,13 +1865,6 @@ struct Table {
  */
 LogEst
 sql_space_tuple_log_count(struct Table *tab);
-
-/*
- * Allowed values for Table.tabFlags.
- */
-#define TF_Ephemeral       0x02	/* An ephemeral table */
-#define TF_HasPrimaryKey   0x04	/* Table has a primary key */
-#define TF_Autoincrement   0x08	/* Integer primary key is autoincrement */
 
 /*
  * Each foreign key constraint is an instance of the following structure.

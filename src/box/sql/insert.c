@@ -712,8 +712,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 							  dflt,
 							  iRegStore);
 			} else if (useTempTable) {
-				if ((pTab->tabFlags & TF_Autoincrement)
-				    && (i == pTab->iAutoIncPKey)) {
+				if (i == pTab->iAutoIncPKey) {
 					int regTmp = ++pParse->nMem;
 					/* Emit code which doesn't override
 					 * autoinc-ed value with select result
@@ -732,8 +731,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				}
 			} else if (pSelect) {
 				if (regFromSelect != regData) {
-					if ((pTab->tabFlags & TF_Autoincrement)
-					    && (i == pTab->iAutoIncPKey)) {
+					if (i == pTab->iAutoIncPKey) {
 						/* Emit code which doesn't override
 						 * autoinc-ed value with select result
 						 * in case that result is NULL
@@ -1020,9 +1018,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			/* Don't bother checking for NOT NULL on columns that do not change */
 			continue;
 		}
-		if (def->fields[i].is_nullable ||
-		    (pTab->tabFlags & TF_Autoincrement &&
-		     pTab->iAutoIncPKey == (int) i))
+		if (def->fields[i].is_nullable || pTab->iAutoIncPKey == (int) i)
 			continue;	/* This column is allowed to be NULL */
 
 		on_error = table_column_nullable_action(pTab, i);
@@ -1201,7 +1197,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				if (pTab->def->fields[fieldno].affinity ==
 				    AFFINITY_INTEGER) {
 					int skip_if_null = sqlite3VdbeMakeLabel(v);
-					if ((pTab->tabFlags & TF_Autoincrement) != 0) {
+					if (pTab->iAutoIncPKey >= 0) {
 						sqlite3VdbeAddOp2(v, OP_IsNull,
 								  reg_pk,
 								  skip_if_null);

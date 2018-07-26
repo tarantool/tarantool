@@ -4601,7 +4601,6 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 		pTab->tuple_log_count = DEFAULT_TUPLE_LOG_COUNT;
 		assert(sqlite3LogEst(DEFAULT_TUPLE_COUNT) ==
 		       DEFAULT_TUPLE_LOG_COUNT);
-		pTab->tabFlags |= TF_Ephemeral;
 		pFrom->pSelect = sqlite3SelectDup(db, pCte->pSelect, 0);
 		if (db->mallocFailed)
 			return SQLITE_NOMEM_BKPT;
@@ -4803,7 +4802,6 @@ selectExpander(Walker * pWalker, Select * p)
 			pTab->tuple_log_count = DEFAULT_TUPLE_LOG_COUNT;
 			assert(sqlite3LogEst(DEFAULT_TUPLE_COUNT) ==
 			       DEFAULT_TUPLE_LOG_COUNT);
-			pTab->tabFlags |= TF_Ephemeral;
 		} else {
 			/*
 			 * An ordinary table or view name in the
@@ -5157,7 +5155,7 @@ selectAddSubqueryTypeInfo(Walker * pWalker, Select * p)
 	for (i = 0, pFrom = pTabList->a; i < pTabList->nSrc; i++, pFrom++) {
 		Table *pTab = pFrom->pTab;
 		assert(pTab != 0);
-		if ((pTab->tabFlags & TF_Ephemeral) != 0) {
+		if (pTab->def->id == 0) {
 			/* A sub-query in the FROM clause of a SELECT */
 			Select *pSel = pFrom->pSelect;
 			if (pSel) {
