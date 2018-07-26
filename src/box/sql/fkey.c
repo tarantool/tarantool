@@ -256,7 +256,8 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 	struct index *idx = space_index(parent, referenced_idx);
 	assert(idx != NULL);
 	sqlite3VdbeAddOp4(v, OP_MakeRecord, temp_regs, field_count, rec_reg,
-			  sql_index_affinity_str(parse_context->db, idx->def),
+			  sql_space_index_affinity_str(parse_context->db,
+						       parent->def, idx->def),
 			  P4_DYNAMIC);
 	sqlite3VdbeAddOp4Int(v, OP_Found, cursor, ok_label, rec_reg, 0);
 	sqlite3ReleaseTempReg(parse_context, rec_reg);

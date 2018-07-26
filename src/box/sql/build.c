@@ -213,7 +213,6 @@ freeIndex(sqlite3 * db, Index * p)
 	sql_expr_delete(db, p->pPartIdxWhere, false);
 	if (p->def != NULL)
 		index_def_delete(p->def);
-	sqlite3DbFree(db, p->zColAff);
 	sqlite3DbFree(db, p);
 }
 

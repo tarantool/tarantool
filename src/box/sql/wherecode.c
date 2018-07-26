@@ -724,10 +724,17 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 
 	char *zAff;
 	if (pIdx != NULL) {
+		struct space *space = space_by_id(pIdx->def->space_id);
+		assert(space != NULL);
 		zAff = sqlite3DbStrDup(pParse->db,
-				       sqlite3IndexAffinityStr(pParse->db, pIdx));
+				       sql_space_index_affinity_str(pParse->db,
+								    space->def,
+								    pIdx->def));
 	} else {
-		zAff = sql_index_affinity_str(pParse->db, idx_def);
+		struct space *space = space_by_id(idx_def->space_id);
+		assert(space != NULL);
+		zAff = sql_space_index_affinity_str(pParse->db, space->def,
+						    idx_def);
 	}
 	assert(zAff != 0 || pParse->db->mallocFailed);
 

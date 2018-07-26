@@ -347,7 +347,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		regKey = iPk;
 	} else {
 		const char *zAff = is_view ? 0 :
-				   sqlite3IndexAffinityStr(pParse->db, pPk);
+				   sql_space_index_affinity_str(pParse->db, def,
+								pPk->def);
 		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, pk_part_count,
 				  regKey, zAff, pk_part_count);
 		sqlite3VdbeAddOp2(v, OP_IdxInsert, iEph, regKey);

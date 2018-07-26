@@ -1158,18 +1158,13 @@ whereRangeAdjust(WhereTerm * pTerm, LogEst nNew)
 	return nRet;
 }
 
-/*
- * Return the affinity for a single column of an index.
- */
-char
-sqlite3IndexColumnAffinity(sqlite3 * db, Index * pIdx, int iCol)
+enum affinity_type
+sql_space_index_part_affinity(struct space_def *def, struct index_def *idx,
+			      uint32_t partno)
 {
-	assert(iCol >= 0 && iCol < (int) pIdx->def->key_def->part_count);
-	if (!pIdx->zColAff) {
-		if (sqlite3IndexAffinityStr(db, pIdx) == 0)
-			return AFFINITY_BLOB;
-	}
-	return pIdx->zColAff[iCol];
+	assert(partno < idx->key_def->part_count);
+	uint32_t fieldno = idx->key_def->parts[partno].fieldno;
+	return def->fields[fieldno].affinity;
 }
 
 /*
@@ -1224,7 +1219,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	int nLower = -1;
 	int nUpper = index->def->opts.stat->sample_count + 1;
 	int rc = SQLITE_OK;
-	u8 aff = sqlite3IndexColumnAffinity(db, p, nEq);
+	u8 aff = sql_space_index_part_affinity(space->def, p->def, nEq);
 
 	sqlite3_value *p1 = 0;	/* Value extracted from pLower */
 	sqlite3_value *p2 = 0;	/* Value extracted from pUpper */
@@ -1774,7 +1769,6 @@ whereLoopClearUnion(sqlite3 * db, WhereLoop * p)
 {
 	if ((p->wsFlags & WHERE_AUTO_INDEX) != 0 &&
 	    (p->wsFlags & WHERE_AUTO_INDEX) != 0 && p->pIndex != 0) {
-		sqlite3DbFree(db, p->pIndex->zColAff);
 		sqlite3DbFree(db, p->pIndex);
 		p->pIndex = 0;
 	}

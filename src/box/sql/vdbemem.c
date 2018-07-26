@@ -39,6 +39,7 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
+#include "box/schema.h"
 
 #ifdef SQLITE_DEBUG
 /*
@@ -1548,13 +1549,14 @@ sqlite3Stat4ProbeSetValue(Parse * pParse,	/* Parse context */
 		alloc.pIdx = pIdx;
 		alloc.ppRec = ppRec;
 
+		struct space *space = space_by_id(pIdx->def->space_id);
+		assert(space != NULL);
 		for (i = 0; i < nElem; i++) {
 			sqlite3_value *pVal = 0;
 			Expr *pElem =
 			    (pExpr ? sqlite3VectorFieldSubexpr(pExpr, i) : 0);
-			u8 aff =
-			    sqlite3IndexColumnAffinity(pParse->db, pIdx,
-						       iVal + i);
+			u8 aff = sql_space_index_part_affinity(space->def, pIdx->def,
+							       iVal + i);
 			alloc.iVal = iVal + i;
 			rc = stat4ValueFromExpr(pParse, pElem, aff, &alloc,
 						&pVal);

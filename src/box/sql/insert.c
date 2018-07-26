@@ -58,69 +58,30 @@ sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 	VdbeComment((v, "%s", pTab->def->name));
 }
 
-/*
- * Return a pointer to the column affinity string associated with index
- * pIdx. A column affinity string has one character for each column in
- * the table, according to the affinity of the column:
- *
- *  Character      Column affinity
- *  ------------------------------
- *  'A'            BLOB
- *  'B'            TEXT
- *  'C'            NUMERIC
- *  'D'            INTEGER
- *  'F'            REAL
- *
- * Memory for the buffer containing the column index affinity string
- * is managed along with the rest of the Index structure. It will be
- * released when sqlite3DeleteIndex() is called.
- */
-const char *
-sqlite3IndexAffinityStr(sqlite3 *db, Index *index)
-{
-	if (index->zColAff != NULL)
-		return index->zColAff;
-	/*
-	 * The first time a column affinity string for a
-	 * particular index is required, it is allocated and
-	 * populated here. It is then stored as a member of the
-	 * Index structure for subsequent use. The column affinity
-	 * string will eventually be deleted by
-	 * sqliteDeleteIndex() when the Index structure itself is
-	 * cleaned up.
-	 */
-	int column_count = index->def->key_def->part_count;
-	index->zColAff = (char *) sqlite3DbMallocRaw(0, column_count + 1);
-	if (index->zColAff == NULL) {
-		sqlite3OomFault(db);
-		return NULL;
-	}
-	for (int n = 0; n < column_count; n++) {
-		uint16_t x = index->def->key_def->parts[n].fieldno;
-		index->zColAff[n] = index->pTable->def->fields[x].affinity;
-	}
-	index->zColAff[column_count] = 0;
-	return index->zColAff;
-}
-
 char *
-sql_index_affinity_str(struct sqlite3 *db, struct index_def *def)
+sql_space_index_affinity_str(struct sqlite3 *db, struct space_def *space_def,
+			     struct index_def *idx_def)
 {
-	uint32_t column_count = def->key_def->part_count;
+	uint32_t column_count = idx_def->key_def->part_count;
 	char *aff = (char *)sqlite3DbMallocRaw(db, column_count + 1);
 	if (aff == NULL)
 		return NULL;
-	struct space *space = space_by_id(def->space_id);
-	assert(space != NULL);
-
-	for (uint32_t i = 0; i < column_count; i++) {
-		uint32_t x = def->key_def->parts[i].fieldno;
-		aff[i] = space->def->fields[x].affinity;
-		if (aff[i] == AFFINITY_UNDEFINED)
-			aff[i] = 'A';
+	/*
+	 * Table may occasionally come from non-SQL API, so lets
+	 * gentle process this case by setting default affinity
+	 * for it.
+	 */
+	if (space_def->fields == NULL) {
+		memset(aff, AFFINITY_BLOB, column_count);
+	} else {
+		for (uint32_t i = 0; i < column_count; i++) {
+			aff[i] = sql_space_index_part_affinity(space_def,
+							       idx_def, i);
+			if (aff[i] == AFFINITY_UNDEFINED)
+				aff[i] = AFFINITY_BLOB;
+		}
 	}
 	aff[column_count] = '\0';
-
 	return aff;
 }
 
