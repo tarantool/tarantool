@@ -733,7 +733,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	Bitmask idxCols;	/* Bitmap of columns used for indexing */
 	Bitmask extraCols;	/* Bitmap of additional columns */
 	u8 sentWarning = 0;	/* True if a warnning has been issued */
-	Expr *pPartial = 0;	/* Partial Index Expression */
 	int iContinue = 0;	/* Jump here to skip excluded rows */
 	struct SrcList_item *pTabItem;	/* FROM clause term being indexed */
 	int addrCounter = 0;	/* Address where integer counter is initialized */
@@ -756,18 +755,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 	pLoop = pLevel->pWLoop;
 	idxCols = 0;
 	for (pTerm = pWC->a; pTerm < pWCEnd; pTerm++) {
-		Expr *pExpr = pTerm->pExpr;
-		assert(!ExprHasProperty(pExpr, EP_FromJoin)	/* prereq always non-zero */
-		       ||pExpr->iRightJoinTable != pSrc->iCursor	/*   for the right-hand   */
-		       || pLoop->prereq != 0);	/*   table of a LEFT JOIN */
-		if (pLoop->prereq == 0
-		    && (pTerm->wtFlags & TERM_VIRTUAL) == 0
-		    && !ExprHasProperty(pExpr, EP_FromJoin)
-		    && sqlite3ExprIsTableConstant(pExpr, pSrc->iCursor)) {
-			pPartial = sqlite3ExprAnd(pParse->db, pPartial,
-						  sqlite3ExprDup(pParse->db,
-								 pExpr, 0));
-		}
 		if (termCanDriveIndex(pTerm, pSrc, notReady)) {
 			int iCol = pTerm->u.leftColumn;
 			Bitmask cMask =
@@ -882,18 +869,10 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 		addrTop = sqlite3VdbeAddOp1(v, OP_Rewind, pLevel->iTabCur);
 		VdbeCoverage(v);
 	}
-	if (pPartial) {
-		iContinue = sqlite3VdbeMakeLabel(v);
-		sqlite3ExprIfFalse(pParse, pPartial, iContinue,
-				   SQLITE_JUMPIFNULL);
-		pLoop->wsFlags |= WHERE_PARTIALIDX;
-	}
 	regRecord = sqlite3GetTempReg(pParse);
 	regBase = sql_generate_index_key(pParse, pIdx, pLevel->iTabCur,
-					 regRecord, NULL, NULL, 0);
+					 regRecord, NULL, 0);
 	sqlite3VdbeAddOp2(v, OP_IdxInsert, pLevel->iIdxCur, regRecord);
-	if (pPartial)
-		sql_resolve_part_idx_label(v, iContinue);
 	if (pTabItem->fg.viaCoroutine) {
 		sqlite3VdbeChangeP2(v, addrCounter, regBase + n);
 		translateColumnToCopy(v, addrTop, pLevel->iTabCur,
@@ -911,9 +890,6 @@ constructAutomaticIndex(Parse * pParse,			/* The parsing context */
 
 	/* Jump here when skipping the initialization */
 	sqlite3VdbeJumpHere(v, addrInit);
-
- end_auto_index_create:
-	sqlite3ExprDelete(pParse->db, pPartial);
 }
 #endif				/* SQLITE_OMIT_AUTOMATIC_INDEX */
 
@@ -2780,31 +2756,6 @@ indexMightHelpWithOrderBy(WhereLoopBuilder * pBuilder,
 	return 0;
 }
 
-/* Check to see if a partial index with pPartIndexWhere can be used
- * in the current query.  Return true if it can be and false if not.
- */
-static int
-whereUsablePartialIndex(int iTab, WhereClause * pWC, Expr * pWhere)
-{
-	int i;
-	WhereTerm *pTerm;
-	while (pWhere->op == TK_AND) {
-		if (!whereUsablePartialIndex(iTab, pWC, pWhere->pLeft))
-			return 0;
-		pWhere = pWhere->pRight;
-	}
-	for (i = 0, pTerm = pWC->a; i < pWC->nTerm; i++, pTerm++) {
-		Expr *pExpr = pTerm->pExpr;
-		if (sqlite3ExprImpliesExpr(pExpr, pWhere, iTab)
-		    && (!ExprHasProperty(pExpr, EP_FromJoin)
-			|| pExpr->iRightJoinTable == iTab)
-		    ) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
 /*
  * Add all WhereLoop objects for a single table of the join where the table
  * is identified by pBuilder->pNew->iTab.
@@ -2990,12 +2941,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 	/* Loop over all indices
 	 */
 	for (; rc == SQLITE_OK && pProbe; pProbe = pProbe->pNext, iSortIdx++) {
-		if (pProbe->pPartIdxWhere != 0
-		    && !whereUsablePartialIndex(pSrc->iCursor, pWC,
-						pProbe->pPartIdxWhere)) {
-			testcase(pNew->iTab != pSrc->iCursor);	/* See ticket [98d973b8f5] */
-			continue;	/* Partial index inappropriate for this query */
-		}
 		rSize = index_field_tuple_est(pProbe, 0);
 		pNew->nEq = 0;
 		pNew->nBtm = 0;

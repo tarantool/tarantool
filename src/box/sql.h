@@ -303,7 +303,7 @@ sql_expr_list_append(struct sqlite3 *db, struct ExprList *expr_list,
  * in parser.
  * @param parser Parsing context.
  * @param table The table being referenced.
- * @param type NC_IsCheck or NC_PartIdx or NC_IdxExpr.
+ * @param type NC_IsCheck or NC_IdxExpr.
  * @param expr Expression to resolve.  May be NULL.
  * @param expr_list Expression list to resolve.  May be NUL.
  */

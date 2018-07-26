@@ -231,8 +231,6 @@ sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
 				if (isSearch) {
 					zFmt = "PRIMARY KEY";
 				}
-			} else if (flags & WHERE_PARTIALIDX) {
-				zFmt = "AUTOMATIC PARTIAL COVERING INDEX";
 			} else if (flags & WHERE_AUTO_INDEX) {
 				zFmt = "AUTOMATIC COVERING INDEX";
 			} else if (flags & WHERE_IDX_ONLY) {

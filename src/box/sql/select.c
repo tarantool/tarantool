@@ -6247,7 +6247,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 				 * optimized specially. The OP_Count instruction
 				 * is executed on the primary key index,
 				 * since there is no difference which index
-				 * to choose (except for partial indexes).
+				 * to choose.
 				 */
 				const int cursor = pParse->nTab++;
 				/*

@@ -506,10 +506,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 								     pIdx->def->opts.is_unique,
 								     azOrigin
 								     [pIdx->
-								      index_type],
-								     pIdx->
-								     pPartIdxWhere
-								     != 0);
+								      index_type]);
 						sqlite3VdbeAddOp2(v,
 								  OP_ResultRow,
 								  1, 5);

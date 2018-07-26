@@ -51,9 +51,9 @@
  * which the index belongs.  In each such row, the stat column will be
  * a string consisting of a list of integers.  The first integer in this
  * list is the number of rows in the index.  (This is the same as the
- * number of rows in the table, except for partial indices.)  The second
- * integer is the average number of rows in the index that have the same
- * value in the first column of the index.  The third integer is the average
+ * number of rows in the table.)  The second integer is the
+ * average number of rows in the index that have the same value in
+ * the first column of the index.  The third integer is the average
  * number of rows in the index that have the same value for the first two
  * columns.  The N-th integer (for N>1) is the average number of rows in
  * the index which have the same value for the first N-1 columns.  For

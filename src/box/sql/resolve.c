@@ -512,13 +512,15 @@ notValid(Parse * pParse,	/* Leave error message here */
 	 int validMask		/* Set of contexts for which prohibited */
     )
 {
-	assert((validMask & ~(NC_IsCheck | NC_PartIdx | NC_IdxExpr)) == 0);
+	assert((validMask & ~(NC_IsCheck | NC_IdxExpr)) == 0);
 	if ((pNC->ncFlags & validMask) != 0) {
-		const char *zIn = "partial index WHERE clauses";
+		const char *zIn;
 		if (pNC->ncFlags & NC_IdxExpr)
 			zIn = "index expressions";
 		else if (pNC->ncFlags & NC_IsCheck)
 			zIn = "CHECK constraints";
+		else
+			unreachable();
 		sqlite3ErrorMsg(pParse, "%s prohibited in %s", zMsg, zIn);
 	}
 }
@@ -699,7 +701,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 					 */
 					notValid(pParse, pNC,
 						 "non-deterministic functions",
-						 NC_IdxExpr | NC_PartIdx);
+						 NC_IdxExpr);
 				}
 			}
 			if (is_agg && (pNC->ncFlags & NC_AllowAgg) == 0) {
@@ -766,7 +768,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				int nRef = pNC->nRef;
 				notValid(pParse, pNC, "subqueries",
-					 NC_IsCheck | NC_PartIdx | NC_IdxExpr);
+					 NC_IsCheck | NC_IdxExpr);
 				sqlite3WalkSelect(pWalker, pExpr->x.pSelect);
 				assert(pNC->nRef >= nRef);
 				if (nRef != pNC->nRef) {
@@ -778,7 +780,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 		}
 	case TK_VARIABLE:{
 			notValid(pParse, pNC, "parameters",
-				 NC_IsCheck | NC_PartIdx | NC_IdxExpr);
+				 NC_IsCheck | NC_IdxExpr);
 			break;
 		}
 	case TK_BETWEEN:
@@ -1568,7 +1570,7 @@ sql_resolve_self_reference(struct Parse *parser, struct Table *table, int type,
 	/* Name context for parser->pNewTable */
 	NameContext sNC;
 
-	assert(type == NC_IsCheck || type == NC_PartIdx || type == NC_IdxExpr);
+	assert(type == NC_IsCheck || type == NC_IdxExpr);
 	memset(&sNC, 0, sizeof(sNC));
 	memset(&sSrc, 0, sizeof(sSrc));
 	sSrc.nSrc = 1;

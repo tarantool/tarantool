@@ -1975,8 +1975,6 @@ struct Index {
 	Table *pTable;
 	/** The next index associated with the same table. */
 	Index *pNext;
-	/** WHERE clause for partial indices. */
-	Expr *pPartIdxWhere;
 	/**
 	 * Conflict resolution algorithm to employ whenever an
 	 * attempt is made to insert a non-unique element in
@@ -2505,7 +2503,6 @@ struct NameContext {
  *
  */
 #define NC_AllowAgg  0x0001	/* Aggregate functions are allowed here */
-#define NC_PartIdx   0x0002	/* True if resolving a partial index WHERE */
 #define NC_IsCheck   0x0004	/* True if resolving names in a CHECK constraint */
 #define NC_InAggFunc 0x0008	/* True if analyzing arguments to an agg func */
 #define NC_HasAgg    0x0010	/* One or more aggregate functions seen */
@@ -3561,7 +3558,6 @@ void sqlite3SrcListDelete(sqlite3 *, SrcList *);
  * @param on_error One of ON_CONFLICT_ACTION_ABORT, _IGNORE,
  *        _REPLACE, or _NONE.
  * @param start The CREATE token that begins this statement.
- * @param where WHERE clause for partial indices.
  * @param sort_order Sort order of primary key when pList==NULL.
  * @param if_not_exist Omit error if index already exists.
  * @param idx_type The index type.
@@ -3570,8 +3566,8 @@ void
 sql_create_index(struct Parse *parse, struct Token *token,
 		 struct SrcList *tbl_name, struct ExprList *col_list,
 		 enum on_conflict_action on_error, struct Token *start,
-		 struct Expr *where, enum sort_order sort_order,
-		 bool if_not_exist, enum sql_index_type idx_type);
+		 enum sort_order sort_order, bool if_not_exist,
+		 enum sql_index_type idx_type);
 
 /**
  * This routine will drop an existing named index.  This routine
@@ -3837,15 +3833,6 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
  * table table and pointing to the entry that needs indexing.
  * cursor must be the cursor of the PRIMARY KEY index.
  *
- * If part_idx_label is not NULL, fill it in with a label and
- * jump to that label if index is a partial index that should be
- * skipped. The label should be resolved using
- * sql_resolve_part_idx_label(). A partial index should be skipped
- * if its WHERE clause evaluates to false or null.  If index is
- * not a partial index, *part_idx_label will be set to zero which
- * is an empty label that is ignored by
- * sql_resolve_part_idx_label().
- *
  * The prev and reg_prev parameters are used to implement a
  * cache to avoid unnecessary register loads.  If prev is not
  * NULL, then it is a pointer to a different index for which an
@@ -3862,8 +3849,6 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
  * @param index The index for which to generate a key.
  * @param cursor Cursor number from which to take column data.
  * @param reg_out Put the new key into this register if not NULL.
- * @param[out] part_idx_label Jump to this label to skip partial
- *        index.
  * @param prev Previously generated index key
  * @param reg_prev Register holding previous generated key.
  *
@@ -3874,19 +3859,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
  */
 int
 sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
-		       int reg_out, int *part_idx_label, struct Index *prev,
-		       int reg_prev);
-
-/**
- * If a prior call to sql_generate_index_key() generated a
- * jump-over label because it was a partial index, then this
- * routine should be called to resolve that label.
- *
- * @param parse Parsing context.
- * @param label Label to resolve.
- */
-void
-sql_resolve_part_idx_label(struct Parse *parse, int label);
+		       int reg_out, struct Index *prev, int reg_prev);
 
 void sqlite3GenerateConstraintChecks(Parse *, Table *, int *, int, int, int,
 				     int, u8, struct on_conflict *, int, int *,

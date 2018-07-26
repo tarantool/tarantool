@@ -583,27 +583,12 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 
 int
 sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
-		       int reg_out, int *part_idx_label, struct Index *prev,
-		       int reg_prev)
+		       int reg_out, struct Index *prev, int reg_prev)
 {
 	struct Vdbe *v = parse->pVdbe;
-
-	if (part_idx_label != NULL) {
-		if (index->pPartIdxWhere != NULL) {
-			*part_idx_label = sqlite3VdbeMakeLabel(v);
-			parse->iSelfTab = cursor;
-			sqlite3ExprCachePush(parse);
-			sqlite3ExprIfFalseDup(parse, index->pPartIdxWhere,
-					      *part_idx_label,
-					      SQLITE_JUMPIFNULL);
-		} else {
-			*part_idx_label = 0;
-		}
-	}
 	int col_cnt = index->def->key_def->part_count;
 	int reg_base = sqlite3GetTempRange(parse, col_cnt);
-	if (prev != NULL && (reg_base != reg_prev ||
-			     prev->pPartIdxWhere != NULL))
+	if (prev != NULL && reg_base != reg_prev)
 		prev = NULL;
 	for (int j = 0; j < col_cnt; j++) {
 		if (prev != NULL && prev->def->key_def->parts[j].fieldno ==
@@ -634,13 +619,4 @@ sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
 
 	sqlite3ReleaseTempRange(parse, reg_base, col_cnt);
 	return reg_base;
-}
-
-void
-sql_resolve_part_idx_label(struct Parse *parse, int label)
-{
-	if (label != 0) {
-		sqlite3VdbeResolveLabel(parse->pVdbe, label);
-		sqlite3ExprCachePop(parse);
-	}
 }

@@ -3700,7 +3700,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			int iTab = pExpr->iTable;
 			if (iTab < 0) {
 				if (pParse->ckBase > 0) {
-					/* Generating CHECK constraints or inserting into partial index */
+					/* Generating CHECK constraints. */
 					return pExpr->iColumn + pParse->ckBase;
 				} else {
 					/* Coding an expression that is part of an index where column names

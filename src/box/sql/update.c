@@ -239,7 +239,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	for (j = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, j++) {
 		int reg;
 		uint32_t part_count = pIdx->def->key_def->part_count;
-		if (chngPk || hasFK || pIdx->pPartIdxWhere || pIdx == pPk) {
+		if (chngPk || hasFK || pIdx == pPk) {
 			reg = ++pParse->nMem;
 			pParse->nMem += part_count;
 		} else {

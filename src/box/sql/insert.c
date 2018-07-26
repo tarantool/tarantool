@@ -1110,15 +1110,6 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 		iThisCur = iIdxCur + ix;
 		addrUniqueOk = sqlite3VdbeMakeLabel(v);
 
-		/* Skip partial indices for which the WHERE clause is not true */
-		if (pIdx->pPartIdxWhere) {
-			sqlite3VdbeAddOp2(v, OP_Null, 0, aRegIdx[ix]);
-			pParse->ckBase = regNewData + 1;
-			sqlite3ExprIfFalseDup(pParse, pIdx->pPartIdxWhere,
-					      addrUniqueOk, SQLITE_JUMPIFNULL);
-			pParse->ckBase = 0;
-		}
-
 		/* Create a record for this index entry as it should appear after
 		 * the insert or update.  Store that record in the aRegIdx[ix] register
 		 */
@@ -1538,9 +1529,6 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 			return 0;	/* Different sort orders */
 		if (src_part->coll != dest_part->coll)
 			return 0;	/* Different collating sequences */
-	}
-	if (sqlite3ExprCompare(pSrc->pPartIdxWhere, pDest->pPartIdxWhere, -1)) {
-		return 0;	/* Different WHERE clauses */
 	}
 
 	/* If no test above fails then the indices must be compatible */
