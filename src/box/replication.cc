@@ -94,6 +94,14 @@ replication_init(void)
 void
 replication_free(void)
 {
+	/*
+	 * Relay threads keep sending messages to tx via
+	 * cbus upon shutdown, which could lead to segfaults.
+	 * So cancel them.
+	 */
+	replicaset_foreach(replica)
+		relay_cancel(replica->relay);
+
 	free(replicaset.replica_by_id);
 	fiber_cond_destroy(&replicaset.applier.cond);
 }

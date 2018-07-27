@@ -1604,13 +1604,13 @@ box_free(void)
 	if (is_box_configured) {
 #if 0
 		session_free();
-		replication_free();
 		user_cache_free();
 		schema_free();
 		module_free();
 		tuple_free();
 		port_free();
 #endif
+		replication_free();
 		sequence_free();
 		gc_free();
 		engine_shutdown();
