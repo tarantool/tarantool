@@ -37,12 +37,13 @@
 #include "sqliteInt.h"
 #include "vdbeInt.h"
 #include "version.h"
+#include "coll.h"
 #include <unicode/ustring.h>
 #include <unicode/ucasemap.h>
 #include <unicode/ucnv.h>
 #include <unicode/uchar.h>
+#include <unicode/ucol.h>
 
-static UCaseMap *pUCaseMap;
 static UConverter* pUtf8conv;
 
 /*
@@ -503,7 +504,15 @@ case_type##ICUFunc(sqlite3_context *context, int argc, sqlite3_value **argv)   \
 		return;                                                        \
 	}                                                                      \
 	UErrorCode status = U_ZERO_ERROR;                                      \
-	int len = ucasemap_utf8To##case_type(pUCaseMap, z1, n, z2, n, &status);\
+	struct coll *coll = sqlite3GetFuncCollSeq(context);                    \
+	const char *locale = NULL;                                             \
+	if (coll != NULL) {                                                    \
+		locale = ucol_getLocaleByType(coll->collator,                  \
+					      ULOC_VALID_LOCALE, &status);     \
+	}                                                                      \
+	UCaseMap *case_map = ucasemap_open(locale, 0, &status);                \
+	assert(case_map != NULL);                                              \
+	int len = ucasemap_utf8To##case_type(case_map, z1, n, z2, n, &status); \
 	if (len > n) {                                                         \
 		status = U_ZERO_ERROR;                                         \
 		sqlite3_free(z1);                                              \
@@ -512,8 +521,9 @@ case_type##ICUFunc(sqlite3_context *context, int argc, sqlite3_value **argv)   \
 			sqlite3_result_error_nomem(context);                   \
 			return;                                                \
 		}                                                              \
-		ucasemap_utf8To##case_type(pUCaseMap, z1, len, z2, n, &status);\
+		ucasemap_utf8To##case_type(case_map, z1, len, z2, n, &status); \
 	}                                                                      \
+	ucasemap_close(case_map);                                              \
 	sqlite3_result_text(context, z1, len, sqlite3_free);                   \
 }                                                                              \
 
@@ -1789,8 +1799,6 @@ sqlite3RegisterBuiltinFunctions(void)
 	 */
 	UErrorCode status = U_ZERO_ERROR;
 
-	pUCaseMap = ucasemap_open(NULL, 0, &status);
-	assert(pUCaseMap);
 	pUtf8conv = ucnv_open("utf8", &status);
 	assert(pUtf8conv);
 	/*
@@ -1835,8 +1843,8 @@ sqlite3RegisterBuiltinFunctions(void)
 		FUNCTION(round, 1, 0, 0, roundFunc),
 		FUNCTION(round, 2, 0, 0, roundFunc),
 #endif
-		FUNCTION(upper, 1, 0, 0, UpperICUFunc),
-		FUNCTION(lower, 1, 0, 0, LowerICUFunc),
+		FUNCTION(upper, 1, 0, 1, UpperICUFunc),
+		FUNCTION(lower, 1, 0, 1, LowerICUFunc),
 		FUNCTION(hex, 1, 0, 0, hexFunc),
 		FUNCTION2(ifnull, 2, 0, 0, noopFunc, SQLITE_FUNC_COALESCE),
 		VFUNCTION(random, 0, 0, 0, randomFunc),
