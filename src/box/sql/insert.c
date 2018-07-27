@@ -1138,7 +1138,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 
 		bool table_ipk_autoinc = false;
 		int reg_pk = -1;
-		if (IsPrimaryKeyIndex(pIdx)) {
+		if (sql_index_is_primary(pIdx)) {
 			/* If PK is marked as INTEGER, use it as strict type,
 			 * not as affinity. Emit code for type checking */
 			if (part_count == 1) {
@@ -1176,7 +1176,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 			sqlite3VdbeResolveLabel(v, addrUniqueOk);
 			continue;
 		}
-		if (!IsUniqueIndex(pIdx)) {
+		if (!pIdx->def->opts.is_unique) {
 			sqlite3VdbeResolveLabel(v, addrUniqueOk);
 			continue;
 		}
@@ -1283,7 +1283,7 @@ sqlite3GenerateConstraintChecks(Parse * pParse,		/* The parser context */
 				int addrJump = sqlite3VdbeCurrentAddr(v) +
 					       pk_part_count;
 				int op = OP_Ne;
-				int regCmp = IsPrimaryKeyIndex(pIdx) ?
+				int regCmp = sql_index_is_primary(pIdx) ?
 					     regIdx : regR;
 				struct key_part *part =
 					pPk->def->key_def->parts;
@@ -1462,9 +1462,8 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		 * iteration and don't open new index cursor
 		 */
 
-		if (isUpdate || 			/* Condition 1 */
-		    IsPrimaryKeyIndex(pIdx) ||		/* Condition 2 */
-		    ! rlist_empty(&space->parent_fkey) ||
+		if (isUpdate || !rlist_empty(&space->parent_fkey) ||
+		    sql_index_is_primary(pIdx) ||
 		    /* Condition 4 */
 		    (pIdx->def->opts.is_unique &&
 		     pIdx->onError != ON_CONFLICT_ACTION_DEFAULT &&
@@ -1474,7 +1473,7 @@ sqlite3OpenTableAndIndices(Parse * pParse,	/* Parsing context */
 		     overrideError == ON_CONFLICT_ACTION_ROLLBACK) {
 
 			int iIdxCur = iBase++;
-			if (IsPrimaryKeyIndex(pIdx)) {
+			if (sql_index_is_primary(pIdx)) {
 				if (piDataCur)
 					*piDataCur = iIdxCur;
 				p5 = 0;
@@ -1513,8 +1512,6 @@ xferCompatibleIndex(Index * pDest, Index * pSrc)
 	uint32_t dest_idx_part_count = pDest->def->key_def->part_count;
 	uint32_t src_idx_part_count = pSrc->def->key_def->part_count;
 	if (dest_idx_part_count != src_idx_part_count)
-		return 0;
-	if ((pDest->index_type != pSrc->index_type))
 		return 0;
 	if (pDest->onError != pSrc->onError) {
 		return 0;	/* Different conflict resolution strategies */

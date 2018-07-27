@@ -831,7 +831,7 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		 * names. Thus, for the sake of clarity, use
 		 * instead more familiar table name.
 		 */
-		if (IsPrimaryKeyIndex(pIdx))
+		if (sql_index_is_primary(pIdx))
 			idx_name = pTab->def->name;
 		else
 			idx_name = pIdx->def->name;

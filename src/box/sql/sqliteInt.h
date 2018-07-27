@@ -1953,13 +1953,9 @@ enum sql_index_type {
     SQL_INDEX_TYPE_CONSTRAINT_PK,
 };
 
-/* Return true if index X is a PRIMARY KEY index */
-#define IsPrimaryKeyIndex(X)  ((X)->index_type==SQL_INDEX_TYPE_CONSTRAINT_PK)
-
-/* Return true if index X is a UNIQUE index */
-#define IsUniqueIndex(X)  (((X)->index_type == SQL_INDEX_TYPE_CONSTRAINT_UNIQUE) || \
-			   ((X)->index_type == SQL_INDEX_TYPE_CONSTRAINT_PK) || \
-			   ((X)->index_type == SQL_INDEX_TYPE_UNIQUE))
+/** Simple wrapper to test index id on zero. */
+bool
+sql_index_is_primary(const struct Index *idx);
 
 /*
  * Each SQL index is represented in memory by an
@@ -1981,12 +1977,6 @@ struct Index {
 	 * unique index.
 	 */
 	u8 onError;
-	/**
-	 * Index type: non-unique index, unique index, index
-	 * implementing UNIQUE constraint or index implementing
-	 * PK constraint.
-	 */
-	enum sql_index_type index_type;
 	/** Index definition. */
 	struct index_def *def;
 };

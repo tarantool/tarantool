@@ -145,7 +145,7 @@ actualize_on_conflict_actions(struct Parse *parser, struct Table *table)
 
 	for (struct Index *idx = table->pIndex; idx; idx = idx->pNext) {
 		if (idx->onError == ON_CONFLICT_ACTION_REPLACE &&
-		    !IsPrimaryKeyIndex(idx))
+		    !sql_index_is_primary(idx))
 			goto non_pk_on_conflict_error;
 	}
 
@@ -422,8 +422,8 @@ Index *
 sqlite3PrimaryKeyIndex(Table * pTab)
 {
 	Index *p;
-	for (p = pTab->pIndex; p && !IsPrimaryKeyIndex(p); p = p->pNext) {
-	}
+	for (p = pTab->pIndex; p != NULL && !sql_index_is_primary(p);
+	     p = p->pNext);
 	return p;
 }
 
@@ -1285,8 +1285,11 @@ createIndex(Parse * pParse, Index * pIndex, int iSpaceId, int iIndexId,
 			  SQL_SUBTYPE_MSGPACK, index_parts, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 6, iRecord);
 	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_INDEX_ID, iRecord);
-	if (pIndex->index_type == SQL_INDEX_TYPE_NON_UNIQUE ||
-	    pIndex->index_type == SQL_INDEX_TYPE_UNIQUE)
+	/*
+	 * Non-NULL value means that index has been created via
+	 * separate CREATE INDEX statement.
+	 */
+	if (zSql != NULL)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 	return;
 error:
@@ -1397,38 +1400,6 @@ error:
 }
 
 /*
- * Generate code to create implicit indexes in the new table.
- * iSpaceId is a register storing the id of the space.
- * iCursor is a cursor to access _index.
- */
-static void
-createImplicitIndices(Parse * pParse, int iSpaceId)
-{
-	Table *p = pParse->pNewTable;
-	Index *pIdx, *pPrimaryIdx = sqlite3PrimaryKeyIndex(p);
-	int i;
-
-	if (pPrimaryIdx) {
-		/* Tarantool quirk: primary index is created first */
-		createIndex(pParse, pPrimaryIdx, iSpaceId, 0, NULL);
-	} else {
-		/*
-		 * This branch should not be taken.
-		 * If it is, then the current CREATE TABLE statement fails to
-		 * specify the PRIMARY KEY. The error is reported elsewhere.
-		 */
-		unreachable();
-	}
-
-	/* (pIdx->i) mapping must be consistent with parseTableSchemaRecord */
-	for (pIdx = p->pIndex, i = 0; pIdx; pIdx = pIdx->pNext) {
-		if (pIdx == pPrimaryIdx)
-			continue;
-		createIndex(pParse, pIdx, iSpaceId, ++i, NULL);
-	}
-}
-
-/*
  * Generate code to emit and parse table schema record.
  * iSpaceId is a register storing the id of the space.
  * Consumes zStmt.
@@ -1449,7 +1420,6 @@ parseTableSchemaRecord(Parse * pParse, int iSpaceId, char *zStmt)
 	sqlite3VdbeAddOp4(v, OP_String8, 0, iTop + 3, 0, zStmt, P4_DYNAMIC);
 
 	pPrimaryIdx = sqlite3PrimaryKeyIndex(p);
-	/* (pIdx->i) mapping must be consistent with createImplicitIndices */
 	for (pIdx = p->pIndex, i = 0; pIdx; pIdx = pIdx->pNext) {
 		if (pIdx == pPrimaryIdx)
 			continue;
@@ -1779,8 +1749,12 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	int reg_space_id = getNewSpaceId(pParse);
 	createSpace(pParse, reg_space_id, stmt);
 	/* Indexes aren't required for VIEW's.. */
-	if (!p->def->opts.is_view)
-		createImplicitIndices(pParse, reg_space_id);
+	if (!p->def->opts.is_view) {
+		struct Index *idx = sqlite3PrimaryKeyIndex(p);
+		assert(idx != NULL);
+		for (uint32_t i = 0; idx != NULL; idx = idx->pNext, i++)
+			createIndex(pParse, idx, reg_space_id, i, NULL);
+	}
 
 	/*
 	 * Check to see if we need to create an _sequence table
@@ -2576,7 +2550,7 @@ sqlite3RefillIndex(Parse * pParse, Index * pIndex)
 
 	addr1 = sqlite3VdbeAddOp2(v, OP_SorterSort, iSorter, 0);
 	VdbeCoverage(v);
-	if (IsUniqueIndex(pIndex)) {
+	if (pIndex->def->opts.is_unique) {
 		int j2 = sqlite3VdbeCurrentAddr(v) + 3;
 		sqlite3VdbeGoto(v, j2);
 		addr2 = sqlite3VdbeCurrentAddr(v);
@@ -2772,6 +2746,12 @@ constraint_is_named(const char *name)
 		strncmp(name, "unique_unnamed_", strlen("unique_unnamed_"));
 }
 
+bool
+sql_index_is_primary(const struct Index *idx)
+{
+	return idx->def->iid == 0;
+}
+
 void
 sql_create_index(struct Parse *parse, struct Token *token,
 		 struct SrcList *tbl_name, struct ExprList *col_list,
@@ -2936,7 +2916,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 
 	index->pTable = table;
 	index->onError = (u8) on_error;
-	index->index_type = idx_type;
 
 	/*
 	 * TODO: Issue a warning if two or more columns of the
@@ -2962,9 +2941,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	 * still must have iid == 0.
 	 */
 	uint32_t iid = idx_type != SQL_INDEX_TYPE_CONSTRAINT_PK;
-	if (db->init.busy)
-		iid = db->init.index_id;
-
 	if (index_fill_def(parse, index, table, iid, name, strlen(name),
 			   col_list, idx_type, sql_stmt) != 0)
 		goto exit_create_index;
@@ -3062,14 +3038,10 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			bool is_named =
 				constraint_is_named(existing_idx->def->name);
 			/* CREATE TABLE t(a, UNIQUE(a), PRIMARY KEY(a)). */
-			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK) {
-				if (existing_idx->index_type ==
-				    SQL_INDEX_TYPE_CONSTRAINT_UNIQUE &&
-				    !is_named) {
-					existing_idx->index_type =
-						SQL_INDEX_TYPE_CONSTRAINT_PK;
-					goto exit_create_index;
-				}
+			if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK &&
+			    !sql_index_is_primary(existing_idx) && !is_named) {
+				existing_idx->def->iid = 0;
+				goto exit_create_index;
 			}
 
 			/* CREATE TABLE t(a, PRIMARY KEY(a), UNIQUE(a)). */
@@ -3080,10 +3052,12 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	}
 	/*
 	 * Link the new Index structure to its table and to the
-	 * other in-memory database structures.
+	 * other in-memory database structures. If index created
+	 * within CREATE TABLE statement, its iid is assigned
+	 * in sql_init_callback().
 	 */
 	assert(parse->nErr == 0);
-	if (db->init.busy) {
+	if (db->init.busy && tbl_name != NULL) {
 		user_session->sql_flags |= SQLITE_InternChanges;
 		index->def->iid = db->init.index_id;
 	}
@@ -3775,7 +3749,7 @@ parser_emit_unique_constraint(struct Parse *parser,
 		sqlite3XPrintf(&err_accum, "%s.%s", def->name, col_name);
 	}
 	char *err_msg = sqlite3StrAccumFinish(&err_accum);
-	sqlite3HaltConstraint(parser, IsPrimaryKeyIndex(index) ?
+	sqlite3HaltConstraint(parser, sql_index_is_primary(index) ?
 			      SQLITE_CONSTRAINT_PRIMARYKEY :
 			      SQLITE_CONSTRAINT_UNIQUE, on_error, err_msg,
 			      P4_DYNAMIC, P5_ConstraintUnique);

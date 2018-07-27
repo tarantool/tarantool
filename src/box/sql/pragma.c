@@ -498,15 +498,10 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					pParse->nMem = 5;
 					for (pIdx = pTab->pIndex, i = 0; pIdx;
 					     pIdx = pIdx->pNext, i++) {
-						const char *azOrigin[] =
-						    { "c", "u", "u", "pk" };
 						sqlite3VdbeMultiLoad(v, 1,
 								     "isisi", i,
 								     pIdx->def->name,
-								     pIdx->def->opts.is_unique,
-								     azOrigin
-								     [pIdx->
-								      index_type]);
+								     pIdx->def->opts.is_unique);
 						sqlite3VdbeAddOp2(v,
 								  OP_ResultRow,
 								  1, 5);

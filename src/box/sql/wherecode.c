@@ -226,7 +226,7 @@ sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
 			assert(pIdx != NULL || idx_def != NULL);
 			assert(!(flags & WHERE_AUTO_INDEX)
 			       || (flags & WHERE_IDX_ONLY));
-			if ((pIdx != NULL && IsPrimaryKeyIndex(pIdx)) ||
+			if ((pIdx != NULL && sql_index_is_primary(pIdx)) ||
 			    (idx_def != NULL && idx_def->iid == 0)) {
 				if (isSearch) {
 					zFmt = "PRIMARY KEY";
@@ -1630,8 +1630,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 					assert((pSubLoop->wsFlags & WHERE_AUTO_INDEX) == 0);
 					if ((pSubLoop->wsFlags & WHERE_INDEXED) != 0
 					    && (ii == 0 || pSubLoop->pIndex == pCov)
-					    && (!IsPrimaryKeyIndex(pSubLoop->pIndex))
-					    ) {
+					    && !sql_index_is_primary(pSubLoop->pIndex)) {
 						assert(pSubWInfo->a[0].
 						       iIdxCur == iCovCur);
 						pCov = pSubLoop->pIndex;

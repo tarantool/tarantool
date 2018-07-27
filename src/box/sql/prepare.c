@@ -120,14 +120,7 @@ sql_init_callback(struct init_data *init, const char *name,
 		struct space *space = space_by_id(space_id);
 		const char *zSpace = space_name(space);
 		pIndex = sqlite3LocateIndex(db, name, zSpace);
-		if (pIndex == NULL) {
-			/* This can occur if there exists an index on a TEMP table which
-			 * has the same name as another index on a permanent index.  Since
-			 * the permanent table is hidden by the TEMP table, we can also
-			 * safely ignore the index on the permanent table.
-			 */
-			/* Do Nothing */ ;
-		}
+		assert(pIndex != NULL);
 		pIndex->def->iid = index_id;
 	}
 	return 0;

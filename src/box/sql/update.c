@@ -162,7 +162,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	iIdxCur = iDataCur + 1;
 	pPk = is_view ? 0 : sqlite3PrimaryKeyIndex(pTab);
 	for (nIdx = 0, pIdx = pTab->pIndex; pIdx; pIdx = pIdx->pNext, nIdx++) {
-		if (IsPrimaryKeyIndex(pIdx) && pPk != 0) {
+		if (sql_index_is_primary(pIdx) && pPk != NULL) {
 			iDataCur = pParse->nTab;
 			pTabList->a[0].iCursor = iDataCur;
 		}
