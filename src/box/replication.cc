@@ -659,14 +659,15 @@ replicaset_needs_rejoin(struct replica **master)
 			return false;
 		}
 
+		const char *uuid_str = tt_uuid_str(&replica->uuid);
 		const char *addr_str = sio_strfaddr(&applier->addr,
 						applier->addr_len);
 		char *local_vclock_str = vclock_to_string(&replicaset.vclock);
 		char *remote_vclock_str = vclock_to_string(&ballot->vclock);
 		char *gc_vclock_str = vclock_to_string(&ballot->gc_vclock);
 
-		say_info("can't follow %s: required %s available %s",
-			 addr_str, local_vclock_str, gc_vclock_str);
+		say_info("can't follow %s at %s: required %s available %s",
+			 uuid_str, addr_str, local_vclock_str, gc_vclock_str);
 
 		if (vclock_compare(&replicaset.vclock, &ballot->vclock) > 0) {
 			/*
@@ -674,9 +675,10 @@ replicaset_needs_rejoin(struct replica **master)
 			 * the master. Don't rebootstrap as we don't want
 			 * to lose any data.
 			 */
-			say_info("can't rebootstrap from %s: "
+			say_info("can't rebootstrap from %s at %s: "
 				 "replica has local rows: local %s remote %s",
-				 addr_str, local_vclock_str, remote_vclock_str);
+				 uuid_str, addr_str, local_vclock_str,
+				 remote_vclock_str);
 			goto next;
 		}
 

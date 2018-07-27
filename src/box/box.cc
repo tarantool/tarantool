@@ -1703,7 +1703,8 @@ bootstrap_from_master(struct replica *master)
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
 	assert(applier->state == APPLIER_READY);
 
-	say_info("bootstrapping replica from %s",
+	say_info("bootstrapping replica from %s at %s",
+		 tt_uuid_str(&master->uuid),
 		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/*
