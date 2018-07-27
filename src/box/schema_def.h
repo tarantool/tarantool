@@ -228,8 +228,22 @@ enum schema_object_type {
 	SC_ROLE = 5,
 	SC_SEQUENCE = 6,
 	SC_COLLATION = 7,
-	schema_object_type_MAX = 8
+	/*
+	 * All object types are supposed to be above this point,
+	 * all entity types - below.
+	 */
+	schema_object_type_MAX = 8,
+	SC_ENTITY_SPACE,
+	SC_ENTITY_FUNCTION,
+	SC_ENTITY_SEQUENCE,
+	SC_ENTITY_COLLATION
 };
+
+/**
+ * Given a object type, return an entity type it belongs to.
+ */
+enum schema_object_type
+schema_entity_type(enum schema_object_type type);
 
 enum schema_object_type
 schema_object_type(const char *name);

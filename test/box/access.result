@@ -504,7 +504,7 @@ box.space._priv:select{id}
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
-- error: User 'user' already has read access on universe 'nil'
+- error: User 'user' already has read access on universe ''
 ...
 box.space._priv:select{id}
 ---
@@ -690,7 +690,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
-- error: User 'guest' already has read,write,execute access on universe 'nil'
+- error: User 'guest' already has read,write,execute access on universe ''
 ...
 box.schema.user.grant('guest', 'read,write,execute', 'universe', '', { if_not_exists = true })
 ---
@@ -703,7 +703,7 @@ box.schema.user.revoke('guest', 'usage,session', 'universe')
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
-- error: User 'guest' does not have read,write,execute access on universe 'nil'
+- error: User 'guest' does not have read,write,execute access on universe ''
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe', '', { if_exists = true })
 ---

@@ -964,6 +964,28 @@ local function upgrade_to_1_10_0()
     create_vsequence_space()
 end
 
+--------------------------------------------------------------------------------
+--- Tarantool 1.10.2
+--------------------------------------------------------------------------------
+local function upgrade_priv_to_1_10_2()
+    local _priv = box.space._priv
+    local _vpriv = box.space._vpriv
+    local format = _priv:format()
+
+    format[4].type = 'scalar'
+    _priv:format(format)
+    format = _vpriv:format()
+    format[4].type = 'scalar'
+    _vpriv:format(format)
+    _priv.index.primary:alter{parts={2, 'unsigned', 3, 'string', 4, 'scalar'}}
+    _vpriv.index.primary:alter{parts={2, 'unsigned', 3, 'string', 4, 'scalar'}}
+    _priv.index.object:alter{parts={3, 'string', 4, 'scalar'}}
+    _vpriv.index.object:alter{parts={3, 'string', 4, 'scalar'}}
+end
+
+local function upgrade_to_1_10_2()
+    upgrade_priv_to_1_10_2()
+end
 
 local function get_version()
     local version = box.space._schema:get{'version'}
@@ -991,6 +1013,7 @@ local function upgrade(options)
         {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = false},
         {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
         {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
+        {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2, auto = true},
     }
 
     for _, handler in ipairs(handlers) do

@@ -214,13 +214,13 @@ _index:select{}
   - [305, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [305, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [312, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
-      [3, 'unsigned']]]
+      [3, 'scalar']]]
   - [312, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
-  - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
+  - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'scalar']]]
   - [313, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
-      [3, 'unsigned']]]
+      [3, 'scalar']]]
   - [313, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
-  - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
+  - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'scalar']]]
   - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [320, 1, 'uuid', 'tree', {'unique': true}, [[1, 'string']]]
   - [330, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]

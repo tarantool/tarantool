@@ -36,7 +36,7 @@ box.space._schema:select()
 ---
 - - ['cluster', '<server_uuid>']
   - ['max_id', 513]
-  - ['version', 1, 10, 0]
+  - ['version', 1, 10, 2]
 ...
 box.space._space:select()
 ---
@@ -85,10 +85,10 @@ box.space._space:select()
         'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
   - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'unsigned'}, {
         'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+      {'name': 'object_id', 'type': 'scalar'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'unsigned'},
       {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+      {'name': 'object_id', 'type': 'scalar'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid',
         'type': 'string'}]]
   - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'count',
@@ -134,13 +134,13 @@ box.space._index:select()
   - [305, 1, 'owner', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [305, 2, 'name', 'tree', {'unique': true}, [[2, 'string']]]
   - [312, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
-      [3, 'unsigned']]]
+      [3, 'scalar']]]
   - [312, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
-  - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
+  - [312, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'scalar']]]
   - [313, 0, 'primary', 'tree', {'unique': true}, [[1, 'unsigned'], [2, 'string'],
-      [3, 'unsigned']]]
+      [3, 'scalar']]]
   - [313, 1, 'owner', 'tree', {'unique': false}, [[0, 'unsigned']]]
-  - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'unsigned']]]
+  - [313, 2, 'object', 'tree', {'unique': false}, [[2, 'string'], [3, 'scalar']]]
   - [320, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
   - [320, 1, 'uuid', 'tree', {'unique': true}, [[1, 'string']]]
   - [330, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]

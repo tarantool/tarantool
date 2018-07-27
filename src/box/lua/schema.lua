@@ -1801,16 +1801,16 @@ local function privilege_name(privilege)
 end
 
 local function object_resolve(object_type, object_name)
+    if object_name ~= nil and type(object_name) ~= 'string'
+            and type(object_name) ~= 'number' then
+        box.error(box.error.ILLEGAL_PARAMS, "wrong object name type")
+    end
     if object_type == 'universe' then
-        if object_name ~= nil and type(object_name) ~= 'string'
-                and type(object_name) ~= 'number' then
-            box.error(box.error.ILLEGAL_PARAMS, "wrong object name type")
-        end
         return 0
     end
     if object_type == 'space' then
-        if object_name == nil or object_name == 0 then
-            return 0
+        if object_name == '' then
+            return ''
         end
         local space = box.space[object_name]
         if  space == nil then
@@ -1819,8 +1819,8 @@ local function object_resolve(object_type, object_name)
         return space.id
     end
     if object_type == 'function' then
-        if object_name == nil or object_name == 0 then
-            return 0
+        if object_name == '' then
+            return ''
         end
         local _vfunc = box.space[box.schema.VFUNC_ID]
         local func
@@ -1836,8 +1836,8 @@ local function object_resolve(object_type, object_name)
         end
     end
     if object_type == 'sequence' then
-        if object_name == nil or object_name == 0 then
-            return 0
+        if object_name == '' then
+            return ''
         end
         local seq = sequence_resolve(object_name)
         if seq == nil then
@@ -1864,7 +1864,7 @@ local function object_resolve(object_type, object_name)
 end
 
 local function object_name(object_type, object_id)
-    if object_type == 'universe' then
+    if object_type == 'universe' or object_id == '' then
         return ""
     end
     local space
@@ -2072,12 +2072,18 @@ local function grant(uid, name, privilege, object_type,
                      object_name, options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax grant(user, role).
-    if object_name == nil and object_type == nil then
-        -- sic: avoid recursion, to not bother with roles
-        -- named 'execute'
-        object_type = 'role'
-        object_name = privilege
-        privilege = 'execute'
+    if object_name == nil then
+        if object_type == nil then
+            -- sic: avoid recursion, to not bother with roles
+            -- named 'execute'
+            object_type = 'role'
+            object_name = privilege
+            privilege = 'execute'
+        else
+            -- Allow syntax grant(user, priv, entity)
+            -- for entity grants.
+            object_name = ''
+        end
     end
     local privilege_hex = privilege_check(privilege, object_type)
 
@@ -2117,10 +2123,16 @@ end
 local function revoke(uid, name, privilege, object_type, object_name, options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax revoke(user, role).
-    if object_name == nil and object_type == nil then
-        object_type = 'role'
-        object_name = privilege
-        privilege = 'execute'
+    if object_name == nil then
+        if object_type == nil then
+            object_type = 'role'
+            object_name = privilege
+            privilege = 'execute'
+        else
+            -- Allow syntax revoke(user, privilege, entity)
+            -- to revoke entity privileges.
+            object_name = ''
+        end
     end
     local privilege_hex = privilege_check(privilege, object_type)
     options = options or {}
@@ -2192,8 +2204,8 @@ local function drop(uid, opts)
     local privs = _vpriv.index.primary:select{uid}
 
     for k, tuple in pairs(privs) do
-	-- we need an additional box.session.su() here, because of
-	-- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+        -- we need an additional box.session.su() here, because of
+        -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
         box.session.su("admin", revoke, uid, uid, tuple[5], tuple[3], tuple[4])
     end
     box.space[box.schema.USER_ID]:delete{uid}

@@ -436,7 +436,7 @@ box.schema.user.revoke('testuser', 'usage,session', 'universe')
 ...
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 ---
-- error: User 'testuser' does not have read, write, execute access on universe 'nil'
+- error: User 'testuser' does not have read, write, execute access on universe ''
 ...
 box.schema.user.revoke('testuser', 'create', 'universe')
 ---
@@ -797,10 +797,10 @@ box.space._space:select()
         'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
   - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'unsigned'}, {
         'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+      {'name': 'object_id', 'type': 'scalar'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'unsigned'},
       {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+      {'name': 'object_id', 'type': 'scalar'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid',
         'type': 'string'}]]
   - [330, 1, '_truncate', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'count',
@@ -853,7 +853,7 @@ box.schema.user.grant('tester', 'read', 'universe')
 -- error: the privilege is not granted
 box.schema.user.revoke('tester', 'create', 'universe')
 ---
-- error: User 'tester' does not have create access on universe 'nil'
+- error: User 'tester' does not have create access on universe ''
 ...
 -- no error: if_exists clause
 box.schema.user.revoke('tester', 'create', 'universe', nil, { if_exists = true })

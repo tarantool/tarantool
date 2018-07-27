@@ -250,16 +250,19 @@ static inline
 struct access *
 entity_access_get(enum schema_object_type type)
 {
-       switch (type) {
-       case SC_SPACE:
-               return entity_access.space;
-       case SC_FUNCTION:
-               return entity_access.function;
-       case SC_SEQUENCE:
-               return entity_access.sequence;
-       default:
-               return NULL;
-       }
+	switch (type) {
+	case SC_SPACE:
+	case SC_ENTITY_SPACE:
+		return entity_access.space;
+	case SC_FUNCTION:
+	case SC_ENTITY_FUNCTION:
+		return entity_access.function;
+	case SC_SEQUENCE:
+	case SC_ENTITY_SEQUENCE:
+		return entity_access.sequence;
+	default:
+		return NULL;
+	}
 }
 
 #endif /* INCLUDES_TARANTOOL_BOX_SCHEMA_H */

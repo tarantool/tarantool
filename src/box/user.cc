@@ -207,12 +207,23 @@ access_find(struct priv_def *priv)
 		access = universe.access;
 		break;
 	}
+	case SC_ENTITY_SPACE:
+	{
+		access = entity_access.space;
+		break;
+	}
+	case SC_ENTITY_FUNCTION:
+	{
+		access = entity_access.function;
+		break;
+	}
+	case SC_ENTITY_SEQUENCE:
+	{
+		access = entity_access.sequence;
+		break;
+	}
 	case SC_SPACE:
 	{
-		if (priv->object_id == 0) {
-			access = entity_access.space;
-			break;
-		}
 		struct space *space = space_by_id(priv->object_id);
 		if (space)
 			access = space->access;
@@ -220,10 +231,6 @@ access_find(struct priv_def *priv)
 	}
 	case SC_FUNCTION:
 	{
-		if (priv->object_id == 0) {
-			access = entity_access.function;
-			break;
-		}
 		struct func *func = func_by_id(priv->object_id);
 		if (func)
 			access = func->access;
@@ -231,10 +238,6 @@ access_find(struct priv_def *priv)
 	}
 	case SC_SEQUENCE:
 	{
-		if (priv->object_id == 0) {
-			access = entity_access.sequence;
-			break;
-		}
 		struct sequence *seq = sequence_by_id(priv->object_id);
 		if (seq)
 			access = seq->access;

@@ -2537,10 +2537,35 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 {
 	priv->grantor_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_ID);
 	priv->grantee_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_UID);
+
 	const char *object_type =
 		tuple_field_cstr_xc(tuple, BOX_PRIV_FIELD_OBJECT_TYPE);
-	priv->object_id = tuple_field_u32_xc(tuple, BOX_PRIV_FIELD_OBJECT_ID);
 	priv->object_type = schema_object_type(object_type);
+
+	const char *data = tuple_field(tuple, BOX_PRIV_FIELD_OBJECT_ID);
+	if (data == NULL) {
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD,
+			  BOX_PRIV_FIELD_OBJECT_ID + TUPLE_INDEX_BASE);
+	}
+	/*
+	 * When granting or revoking privileges on a whole entity
+	 * we pass empty string ('') to object_id to indicate
+	 * grant on every object of that entity.
+	 * So check for that first.
+	 */
+	switch (mp_typeof(*data)) {
+	case MP_STR:
+		if (mp_decode_strl(&data) == 0) {
+			/* Entity-wide privilege. */
+			priv->object_id = 0;
+			priv->object_type = schema_entity_type(priv->object_type);
+			break;
+		}
+		FALLTHROUGH;
+	default:
+		priv->object_id = tuple_field_u32_xc(tuple,
+						     BOX_PRIV_FIELD_OBJECT_ID);
+	}
 	if (priv->object_type == SC_UNKNOWN) {
 		tnt_raise(ClientError, ER_UNKNOWN_SCHEMA_OBJECT,
 			  object_type);
@@ -2583,10 +2608,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		break;
 	case SC_SPACE:
 	{
-		struct space *space = NULL;
-		if (priv->object_id != 0)
-			space = space_cache_find_xc(priv->object_id);
-		if ((space == NULL || space->def->uid != grantor->def->uid) &&
+		struct space *space = space_cache_find_xc(priv->object_id);
+		if (space->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
@@ -2597,10 +2620,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_FUNCTION:
 	{
-		struct func *func = NULL;
-		if (priv->object_id != 0)
-			func = func_cache_find(priv->object_id);
-		if ((func == NULL || func->def->uid != grantor->def->uid) &&
+		struct func *func = func_cache_find(priv->object_id);
+		if (func->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
@@ -2611,10 +2632,8 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 	}
 	case SC_SEQUENCE:
 	{
-		struct sequence *seq = NULL;
-		if (priv->object_id != 0)
-			seq = sequence_cache_find(priv->object_id);
-		if ((seq == NULL || seq->def->uid != grantor->def->uid) &&
+		struct sequence *seq = sequence_cache_find(priv->object_id);
+		if (seq->def->uid != grantor->def->uid &&
 		    grantor->def->uid != ADMIN) {
 			tnt_raise(AccessDeniedError,
 				  priv_name(priv_type),
@@ -2645,6 +2664,18 @@ priv_def_check(struct priv_def *priv, enum priv_type priv_type)
 		}
 		/* Not necessary to do during revoke, but who cares. */
 		role_check(grantee, role);
+		break;
+	}
+	case SC_ENTITY_SPACE:
+	case SC_ENTITY_FUNCTION:
+	case SC_ENTITY_SEQUENCE:
+	{
+		/* Only admin may grant privileges on an entire entity. */
+		if (grantor->def->uid != ADMIN) {
+			tnt_raise(AccessDeniedError, priv_name(priv_type),
+				  schema_object_name(priv->object_type), name,
+				  grantor->def->name);
+		}
 	}
 	default:
 		break;
