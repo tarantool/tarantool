@@ -120,16 +120,6 @@ updateMaxBlobsize(Mem *p)
 #endif
 
 /*
- * This macro evaluates to true if either the update hook or the preupdate
- * hook are enabled for database connect DB.
- */
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-# define HAS_UPDATE_HOOK(DB) ((DB)->xPreUpdateCallback||(DB)->xUpdateCallback)
-#else
-# define HAS_UPDATE_HOOK(DB) ((DB)->xUpdateCallback)
-#endif
-
-/*
  * The next global variable is incremented each time the OP_Found opcode
  * is executed. This is used to test whether or not the foreign key
  * operation implemented using OP_FkIsZero is working. This variable

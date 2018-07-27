@@ -559,26 +559,12 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 
 		/* If changing the PK value, or if there are foreign key constraints
-		 * to process, delete the old record. Otherwise, add a noop OP_Delete
-		 * to invoke the pre-update hook.
-		 *
-		 * That (regNew==regnewPk+1) is true is also important for the
-		 * pre-update hook. If the caller invokes preupdate_new(), the returned
-		 * value is copied from memory cell (regNewPk+1+iCol), where iCol
-		 * is the column index supplied by the user.
+		 * to process, delete the old record.
 		 */
 		assert(regNew == regNewPk + 1);
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-		sqlite3VdbeAddOp3(v, OP_Delete, iDataCur,
-				  OPFLAG_ISUPDATE |
-				  ((hasFK || chngKey
-				    || pPk != 0) ? 0 : OPFLAG_ISNOOP),
-				  regNewRowid);
-#else
 		if (hasFK || chngPk || pPk != 0) {
 			sqlite3VdbeAddOp2(v, OP_Delete, iDataCur, 0);
 		}
-#endif
 		if (bReplace || chngPk) {
 			sqlite3VdbeJumpHere(v, addr1);
 		}

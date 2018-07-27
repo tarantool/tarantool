@@ -1483,7 +1483,6 @@ typedef struct Lookaside Lookaside;
 typedef struct LookasideSlot LookasideSlot;
 typedef struct NameContext NameContext;
 typedef struct Parse Parse;
-typedef struct PreUpdate PreUpdate;
 typedef struct PrintfArguments PrintfArguments;
 typedef struct RowSet RowSet;
 typedef struct Savepoint Savepoint;
@@ -1626,14 +1625,6 @@ struct sqlite3 {
 	void *pUpdateArg;
 	void (*xUpdateCallback) (void *, int, const char *, const char *,
 				 sqlite_int64);
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-	void *pPreUpdateArg;	/* First argument to xPreUpdateCallback */
-	void (*xPreUpdateCallback) (	/* Registered using sqlite3_preupdate_hook() */
-					   void *, sqlite3 *, int, char const *,
-					   char const *, sqlite3_int64,
-					   sqlite3_int64);
-	PreUpdate *pPreUpdate;	/* Context for active pre-update callback */
-#endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
 	sqlite3_value *pErr;	/* Most recent error message */
 	union {
 		volatile int isInterrupted;	/* True if sqlite3_interrupt has been called */
@@ -2956,12 +2947,8 @@ struct Parse {
 #define OPFLAG_NCHANGE       0x01	/* OP_Insert: Set to update db->nChange */
 				     /* Also used in P2 (not P5) of OP_Delete */
 #define OPFLAG_EPHEM         0x01	/* OP_Column: Ephemeral output is ok */
-#define OPFLAG_ISUPDATE      0x04	/* This OP_Insert is an sql UPDATE */
 #define OPFLAG_OE_IGNORE    0x200	/* OP_IdxInsert: Ignore flag */
 #define OPFLAG_OE_FAIL      0x400	/* OP_IdxInsert: Fail flag */
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-#define OPFLAG_ISNOOP        0x40	/* OP_Delete does pre-update-hook only */
-#endif
 #define OPFLAG_LENGTHARG     0x40	/* OP_Column only used for length() */
 #define OPFLAG_TYPEOFARG     0x80	/* OP_Column only used for typeof() */
 #define OPFLAG_SEEKEQ        0x02	/* OP_Open** cursor uses EQ seek only */

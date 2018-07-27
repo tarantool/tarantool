@@ -3625,31 +3625,6 @@ sqlite3VdbeSetVarmask(Vdbe * v, int iVar)
 	}
 }
 
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-
-/*
- * If the second argument is not NULL, release any allocations associated
- * with the memory cells in the p->aMem[] array. Also free the UnpackedRecord
- * structure itself, using sqlite3DbFree().
- *
- * This function is used to free UnpackedRecord structures allocated by
- * the vdbeUnpackRecord() function found in vdbeapi.c.
- */
-static void
-vdbeFreeUnpacked(sqlite3 * db, UnpackedRecord * p)
-{
-	if (p) {
-		int i;
-		for (i = 0; i < p->nField; i++) {
-			Mem *pMem = &p->aMem[i];
-			if (pMem->zMalloc)
-				sqlite3VdbeMemRelease(pMem);
-		}
-		sqlite3DbFree(db, p);
-	}
-}
-#endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
-
 i64
 sqlite3VdbeMsgpackRecordLen(Mem * pRec, u32 n)
 {

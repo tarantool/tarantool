@@ -1325,26 +1325,6 @@ sqlite3_rollback_hook(sqlite3 * db,	/* Attach the hook to this database */
 	return pRet;
 }
 
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-/*
- * Register a callback to be invoked each time a row is updated,
- * inserted or deleted using this database connection.
- */
-void *
-sqlite3_preupdate_hook(sqlite3 * db,		/* Attach the hook to this database */
-		       void (*xCallback) (	/* Callback function */
-			       void *, sqlite3 *, int,
-			       char const *, sqlite3_int64, sqlite3_int64),
-		       void *pArg)		/* First callback argument */
-{
-	void *pRet;
-	pRet = db->pPreUpdateArg;
-	db->xPreUpdateCallback = xCallback;
-	db->pPreUpdateArg = pArg;
-	return pRet;
-}
-#endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
-
 /*
  * Configure an sqlite3_wal_hook() callback to automatically checkpoint
  * a database after committing a transaction if there are nFrame or

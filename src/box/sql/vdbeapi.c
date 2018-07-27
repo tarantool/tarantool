@@ -1574,26 +1574,6 @@ sqlite3_expanded_sql(sqlite3_stmt * pStmt)
 #endif
 }
 
-#ifdef SQLITE_ENABLE_PREUPDATE_HOOK
-/*
- * This function is designed to be called from within a pre-update callback
- * only. It returns zero if the change that caused the callback was made
- * immediately by a user SQL statement. Or, if the change was made by a
- * trigger program, it returns the number of trigger programs currently
- * on the stack (1 for a top-level trigger, 2 for a trigger fired by a
- * top-level trigger etc.).
- *
- * For the purposes of the previous paragraph, a foreign key CASCADE, SET NULL
- * or SET DEFAULT action is considered a trigger.
- */
-int
-sqlite3_preupdate_depth(sqlite3 * db)
-{
-	PreUpdate *p = db->pPreUpdate;
-	return (p ? p->v->nFrame : 0);
-}
-#endif				/* SQLITE_ENABLE_PREUPDATE_HOOK */
-
 #ifdef SQLITE_ENABLE_STMT_SCANSTATUS
 /*
  * Return status data for a single loop within query pStmt.
