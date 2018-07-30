@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(97)
+test:plan(100)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -39,6 +39,7 @@ invalid('listen', '//!')
 invalid('log', ':')
 invalid('log', 'syslog:xxx=')
 invalid('log_level', 'unknown')
+invalid('log', ':test:')
 invalid('vinyl_memory', -1)
 invalid('vinyl_read_threads', 0)
 invalid('vinyl_write_threads', 1)
@@ -51,11 +52,12 @@ invalid('vinyl_bloom_fpr', 1.1)
 
 local function invalid_combinations(name, val)
     local status, result = pcall(box.cfg, val)
-    test:ok(not status and result:match('Illegal'), 'invalid '..name)
+    test:ok(not status and result:match('Incorrect'), 'invalid '..name)
 end
 
 invalid_combinations("log, log_nonblock", {log = "1.log", log_nonblock = true})
 invalid_combinations("log, log_format", {log = "syslog:identity=tarantool", log_format = 'json'})
+invalid_combinations("log, log_nonblock", {log_nonblock = true})
 
 test:is(type(box.cfg), 'function', 'box is not started')
 
@@ -105,6 +107,7 @@ test:ok(status and result == 'table', 'configured box')
 --------------------------------------------------------------------------------
 
 invalid('log_level', 'unknown')
+invalid('log_format', 'xxx')
 
 --------------------------------------------------------------------------------
 -- gh-534: Segmentation fault after two bad wal_mode settings

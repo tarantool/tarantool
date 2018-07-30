@@ -128,14 +128,6 @@ static const char *level_strs[] = {
 	[S_DEBUG] = "DEBUG",
 };
 
-static const char *say_logger_type_strs[] = {
-	[SAY_LOGGER_BOOT] = "stdout",
-	[SAY_LOGGER_STDERR] = "stderr",
-	[SAY_LOGGER_FILE] = "file",
-	[SAY_LOGGER_PIPE] = "pipe",
-	[SAY_LOGGER_SYSLOG] = "syslog",
-};
-
 static const char*
 level_to_string(int level)
 {
@@ -194,32 +186,21 @@ say_set_log_level(int new_level)
 void
 say_set_log_format(enum say_format format)
 {
-	/*
-	 * For syslog, default or boot log type the log format can
-	 * not be changed.
-	 */
-	bool allowed_to_change = log_default->type == SAY_LOGGER_STDERR ||
-				 log_default->type == SAY_LOGGER_PIPE ||
-				 log_default->type == SAY_LOGGER_FILE;
+	log_format_func_t format_func;
+
 	switch (format) {
 	case SF_JSON:
-
-		if (!allowed_to_change) {
-			say_error("json log format is not supported when output is '%s'",
-				  say_logger_type_strs[log_default->type]);
-			return;
-		}
-		log_set_format(log_default, say_format_json);
+		assert(log_default->type != SAY_LOGGER_SYSLOG);
+		format_func = say_format_json;
 		break;
 	case SF_PLAIN:
-		if (!allowed_to_change) {
-			return;
-		}
-		log_set_format(log_default, say_format_plain);
+		format_func = say_format_plain;
 		break;
 	default:
 		unreachable();
 	}
+
+	log_set_format(log_default, format_func);
 	log_format = format;
 }
 
@@ -621,10 +602,9 @@ log_create(struct log *log, const char *init_str, int nonblock)
 
 	if (init_str != NULL) {
 		enum say_logger_type type;
-		if (say_parse_logger_type(&init_str, &type)) {
-			diag_set(IllegalParams, logger_syntax_reminder);
+		if (say_parse_logger_type(&init_str, &type))
 			return -1;
-		}
+
 		int rc;
 		switch (type) {
 		case SAY_LOGGER_PIPE:
@@ -1070,8 +1050,10 @@ say_parse_logger_type(const char **str, enum say_logger_type *type)
 		*type = SAY_LOGGER_SYSLOG;
 	else if (strchr(*str, ':') == NULL)
 		*type = SAY_LOGGER_FILE;
-	else
+	else {
+		diag_set(IllegalParams, logger_syntax_reminder);
 		return -1;
+	}
 	return 0;
 }
 
