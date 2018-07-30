@@ -170,10 +170,6 @@ tx_manager_read_view(struct tx_manager *xm)
 		rv->vlsn = xm->lsn;
 		rv->refs = 1;
 	}
-	/*
-	 * Add to the tail of the list, so that tx_manager_vlsn()
-	 * works correctly.
-	 */
 	rlist_add_tail_entry(&xm->read_views, rv, in_read_views);
 	return rv;
 }
@@ -191,17 +187,6 @@ tx_manager_destroy_read_view(struct tx_manager *xm,
 		rlist_del_entry(rv, in_read_views);
 		mempool_free(&xm->read_view_mempool, rv);
 	}
-}
-
-int64_t
-tx_manager_vlsn(struct tx_manager *xm)
-{
-	if (rlist_empty(&xm->read_views))
-		return xm->lsn;
-	struct vy_read_view *oldest = rlist_first_entry(&xm->read_views,
-							struct vy_read_view,
-							in_read_views);
-	return oldest->vlsn;
 }
 
 static struct txv *
