@@ -260,7 +260,6 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		sqlite3VdbeAddOp1(v, OP_Close, cursor);
 
 		sql_set_multi_write(parse, false);
-		sqlite3ChangeCookie(parse);
 	} else {
 		parse->parsed_ast.trigger = trigger;
 		parse->parsed_ast_type = AST_TYPE_TRIGGER;
@@ -450,7 +449,6 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 			  record_to_delete);
 	if (account_changes)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
-	sqlite3ChangeCookie(parser);
 }
 
 void

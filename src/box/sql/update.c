@@ -217,7 +217,6 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		if (j >= (int)def->field_count) {
 			sqlite3ErrorMsg(pParse, "no such column: %s",
 					pChanges->a[i].zName);
-			pParse->checkSchema = 1;
 			goto update_cleanup;
 		}
 	}

@@ -5,7 +5,6 @@
  */
 
 /* The various pragma types */
-#define PragTyp_HEADER_VALUE                   0
 #define PragTyp_BUSY_TIMEOUT                   1
 #define PragTyp_CASE_SENSITIVE_LIKE            2
 #define PragTyp_COLLATION_LIST                 3
@@ -23,7 +22,6 @@
 #define PragFlg_NeedSchema 0x01	/* Force schema load before running */
 #define PragFlg_NoColumns  0x02	/* OP_ResultRow called with zero columns */
 #define PragFlg_NoColumns1 0x04	/* zero columns if RHS argument is present */
-#define PragFlg_ReadOnly   0x08	/* Read-only HEADER_VALUE */
 #define PragFlg_Result0    0x10	/* Acts as query when no argument */
 #define PragFlg_Result1    0x20	/* Acts as query when has one argument */
 #define PragFlg_SchemaOpt  0x40	/* Schema restricts name search if present */
@@ -223,16 +221,6 @@ static const PragmaName aPragmaName[] = {
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ SQLITE_ReverseOrder},
-#endif
-#if !defined(SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS)
-	{ /* zName:     */ "schema_version",
-	 /* ePragTyp:  */ PragTyp_HEADER_VALUE,
-	 /* ePragFlg:  */ PragFlg_NoColumns1 | PragFlg_Result0,
-	 /* ColNames:  */ 0, 0,
-	  /* Tarantool: need to take schema version from
-	   * backend.
-	   */
-	 /* iArg:      */ 0},
 #endif
 #if !defined(SQLITE_OMIT_FLAG_PRAGMAS) && defined(SQLITE_ENABLE_SELECTTRACE)
 	{ /* zName:     */ "select_trace",

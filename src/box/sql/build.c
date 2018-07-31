@@ -179,10 +179,8 @@ sqlite3LocateTable(Parse * pParse,	/* context in which to report errors */
 	if (p == NULL) {
 		const char *zMsg =
 		    flags & LOCATE_VIEW ? "no such view" : "no such table";
-		if ((flags & LOCATE_NOERR) == 0) {
+		if ((flags & LOCATE_NOERR) == 0)
 			sqlite3ErrorMsg(pParse, "%s: %s", zMsg, zName);
-			pParse->checkSchema = 1;
-		}
 	}
 
 	return p;
@@ -1086,33 +1084,6 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 	return sqlite3VdbeAddOp4(parse_context->pVdbe, OP_OpenWrite, cursor,
 				 index_id, 0, (void *) space, P4_SPACEPTR);
 }
-/*
- * Generate code that will increment the schema cookie.
- *
- * The schema cookie is used to determine when the schema for the
- * database changes.  After each schema change, the cookie value
- * changes.  When a process first reads the schema it records the
- * cookie.  Thereafter, whenever it goes to access the database,
- * it checks the cookie to make sure the schema has not changed
- * since it was last read.
- *
- * This plan is not completely bullet-proof.  It is possible for
- * the schema to change multiple times and for the cookie to be
- * set back to prior value.  But schema changes are infrequent
- * and the probability of hitting the same cookie value is only
- * 1 chance in 2^32.  So we're safe enough.
- *
- * IMPLEMENTATION-OF: R-34230-56049 SQLite automatically increments
- * the schema-version whenever the schema changes.
- */
-void
-sqlite3ChangeCookie(Parse * pParse)
-{
-	sqlite3 *db = pParse->db;
-	Vdbe *v = pParse->pVdbe;
-	sqlite3VdbeAddOp3(v, OP_SetCookie, 0, 0,
-			  db->pSchema->schema_cookie + 1);
-}
 
 /*
  * Measure the number of characters needed to output the given
@@ -1495,7 +1466,6 @@ parseTableSchemaRecord(Parse * pParse, int iSpaceId, char *zStmt)
 		makeIndexSchemaRecord(pParse, pIdx, iSpaceId, ++i, NULL);
 	}
 
-	sqlite3ChangeCookie(pParse);
 	sqlite3VdbeAddParseSchema2Op(v, iTop, pParse->nMem - iTop + 1);
 }
 
@@ -2891,7 +2861,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		 * Reparse the schema. Code an OP_Expire
 		 * to invalidate all pre-compiled statements.
 		 */
-		sqlite3ChangeCookie(parse);
 		sqlite3VdbeAddParseSchema2Op(vdbe, first_schema_col, 4);
 		sqlite3VdbeAddOp0(vdbe, OP_Expire);
 	}

@@ -3076,49 +3076,6 @@ case OP_TTransaction: {
 	break;
 }
 
-/* Opcode: ReadCookie P1 P2 P3 * *
- *
- * Read cookie number P3 from database P1 and write it into register P2.
- * P3==1 is the schema version.  P3==2 is the database format.
- * P3==3 is the recommended pager cache size, and so forth.  P1==0 is
- * the main database file and P1==1 is the database file used to store
- * temporary tables.
- *
- * There must be a read-lock on the database (either a transaction
- * must be started or there must be an open cursor) before
- * executing this instruction.
- */
-case OP_ReadCookie: {               /* out2 */
-	pOut = out2Prerelease(p, pOp);
-	pOut->u.i = 0;
-	break;
-}
-
-/* Opcode: SetCookie P1 P2 P3 * *
- *
- * Write the integer value P3 into the schema version.
- * P2==3 is the recommended pager cache
- * size, and so forth.  P1==0 is the main database file and P1==1 is the
- * database file used to store temporary tables.
- *
- * A transaction must be started before executing this opcode.
- */
-case OP_SetCookie: {
-	assert(pOp->p1==0);
-	/* See note about index shifting on OP_ReadCookie */
-	/* When the schema cookie changes, record the new cookie internally */
-	user_session->sql_flags |= SQLITE_InternChanges;
-	if (pOp->p1==1) {
-		/* Invalidate all prepared statements whenever the TEMP database
-		 * schema is changed.  Ticket #1644
-		 */
-		sqlite3ExpirePreparedStatements(db);
-		p->expired = 0;
-	}
-	if (rc) goto abort_due_to_error;
-	break;
-}
-
 /* Opcode: OpenRead P1 P2 P3 P4 P5
  * Synopsis: index id = P2, space ptr = P4
  *

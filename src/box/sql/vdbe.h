@@ -112,18 +112,6 @@ struct SubProgram {
 };
 
 /*
- * A smaller version of VdbeOp used for the VdbeAddOpList() function because
- * it takes up less space.
- */
-struct VdbeOpList {
-	u8 opcode;		/* What operation to perform */
-	signed char p1;		/* First operand */
-	signed char p2;		/* Second parameter (often the jump destination) */
-	signed char p3;		/* Third parameter */
-};
-typedef struct VdbeOpList VdbeOpList;
-
-/*
  * Allowed values of VdbeOp.p4type
  */
 #define P4_NOTUSED    0		/* The P4 parameter is not used */
@@ -173,9 +161,7 @@ typedef struct VdbeOpList VdbeOpList;
 
 /*
  * The following macro converts a relative address in the p2 field
- * of a VdbeOp structure into a negative number so that
- * sqlite3VdbeAddOpList() knows that the address is relative.  Calling
- * the macro again restores the address.
+ * of a VdbeOp structure into a negative number.
  */
 #define ADDR(X)  (-1-(X))
 
@@ -225,14 +211,10 @@ int sqlite3VdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
 int sqlite3VdbeAddOp4Int(Vdbe *, int, int, int, int, int);
 void sqlite3VdbeEndCoroutine(Vdbe *, int);
 #if defined(SQLITE_DEBUG) && !defined(SQLITE_TEST_REALLOC_STRESS)
-void sqlite3VdbeVerifyNoMallocRequired(Vdbe * p, int N);
 void sqlite3VdbeVerifyNoResultRow(Vdbe * p);
 #else
-#define sqlite3VdbeVerifyNoMallocRequired(A,B)
 #define sqlite3VdbeVerifyNoResultRow(A)
 #endif
-VdbeOp *sqlite3VdbeAddOpList(Vdbe *, int nOp, VdbeOpList const *aOp,
-			     int iLineno);
 void sqlite3VdbeAddParseSchema2Op(Vdbe * p, int, int);
 void sqlite3VdbeChangeOpcode(Vdbe *, u32 addr, u8);
 void sqlite3VdbeChangeP1(Vdbe *, u32 addr, int P1);
@@ -257,7 +239,6 @@ sql_vdbe_set_p4_key_def(struct Parse *parse, struct Index *index);
 VdbeOp *sqlite3VdbeGetOp(Vdbe *, int);
 int sqlite3VdbeMakeLabel(Vdbe *);
 void sqlite3VdbeRunOnlyOnce(Vdbe *);
-void sqlite3VdbeReusable(Vdbe *);
 void sqlite3VdbeDelete(Vdbe *);
 void sqlite3VdbeClearObject(sqlite3 *, Vdbe *);
 void sqlite3VdbeMakeReady(Vdbe *, Parse *);

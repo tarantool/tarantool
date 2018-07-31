@@ -1267,7 +1267,6 @@ cmd ::= DROP INDEX ifexists(E) fullname(X) ON nm(Y).   {
 
 ///////////////////////////// The PRAGMA command /////////////////////////////
 //
-%ifndef SQLITE_OMIT_PRAGMA
 cmd ::= PRAGMA nm(X).                        {
     sqlite3Pragma(pParse,&X,0,0,0);
 }
@@ -1296,7 +1295,6 @@ nmnum(A) ::= nm(A).
 nmnum(A) ::= ON(A).
 nmnum(A) ::= DELETE(A).
 nmnum(A) ::= DEFAULT(A).
-%endif SQLITE_OMIT_PRAGMA
 
 %token_class number INTEGER|FLOAT.
 plus_num(A) ::= PLUS number(X).       {A = X;}

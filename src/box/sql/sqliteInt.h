@@ -285,21 +285,6 @@ void sqlite3Coverage(int);
 #endif
 
 /*
- * Some malloc failures are only possible if SQLITE_TEST_REALLOC_STRESS is
- * defined.  We need to defend against those failures when testing with
- * SQLITE_TEST_REALLOC_STRESS, but we don't want the unreachable branches
- * during a normal build.  The following macro can be used to disable tests
- * that are always false except when SQLITE_TEST_REALLOC_STRESS is set.
- */
-#if defined(SQLITE_TEST_REALLOC_STRESS)
-#define ONLY_IF_REALLOC_STRESS(X)  (X)
-#elif !defined(NDEBUG)
-#define ONLY_IF_REALLOC_STRESS(X)  ((X)?(assert(0),1):0)
-#else
-#define ONLY_IF_REALLOC_STRESS(X)  (0)
-#endif
-
-/*
  * Is the sqlite3ErrName() function needed in the build?  Currently,
  * it is needed by several "test*.c" files (which are
  * compiled using SQLITE_TEST).
@@ -1522,7 +1507,6 @@ typedef int VList;
  * An instance of the following structure stores a database schema.
  */
 struct Schema {
-	int schema_cookie;      /* Database schema version number for this file */
 	Hash tblHash;		/* All tables indexed by name */
 	Hash fkeyHash;		/* All foreign keys by referenced table name */
 };
@@ -2840,7 +2824,6 @@ struct Parse {
 	Vdbe *pVdbe;		/* An engine for executing database bytecode */
 	int rc;			/* Return code from execution */
 	u8 colNamesSet;		/* TRUE after OP_ColumnName has been issued to pVdbe */
-	u8 checkSchema;		/* Causes schema cookie check after an error */
 	u8 nTempReg;		/* Number of temporary registers in aTempReg[] */
 	u8 isMultiWrite;	/* True if statement may modify/insert multiple rows */
 	u8 mayAbort;		/* True if statement may throw an ABORT exception */
@@ -4017,7 +4000,6 @@ void sqlite3RegisterDateTimeFunctions(void);
 void sqlite3RegisterPerConnectionBuiltinFunctions(sqlite3 *);
 int sqlite3SafetyCheckOk(sqlite3 *);
 int sqlite3SafetyCheckSickOrOk(sqlite3 *);
-void sqlite3ChangeCookie(Parse *);
 
 /**
  * Evaluate a view and store its result in an ephemeral table.

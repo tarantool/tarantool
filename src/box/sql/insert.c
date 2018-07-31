@@ -469,7 +469,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				sqlite3ErrorMsg(pParse,
 						"table %S has no column named %s",
 						pTabList, 0, pColumn->a[i].zName);
-				pParse->checkSchema = 1;
 				goto insert_cleanup;
 			}
 			if (bit_test(used_columns, j)) {

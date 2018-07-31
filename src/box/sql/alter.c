@@ -111,10 +111,7 @@ sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
 				pTab->def->name);
 		goto exit_rename_table;
 	}
-	/* Begin a transaction for database.
-	 * Then modify the schema cookie (since the ALTER TABLE modifies the
-	 * schema).
-	 */
+	/* Begin a transaction for database. */
 	v = sqlite3GetVdbe(pParse);
 	if (v == 0) {
 		goto exit_rename_table;
@@ -304,13 +301,11 @@ sqlite3AlterBeginAddColumn(Parse * pParse, SrcList * pSrc)
 	pNew->addColOffset = pTab->addColOffset;
 	pNew->nTabRef = 1;
 
-	/* Begin a transaction and increment the schema cookie.  */
+	/* Begin a transaction. */
 	sql_set_multi_write(pParse, false);
 	v = sqlite3GetVdbe(pParse);
 	if (!v)
 		goto exit_begin_add_column;
-	sqlite3ChangeCookie(pParse);
-
  exit_begin_add_column:
 	sqlite3SrcListDelete(db, pSrc);
 	return;

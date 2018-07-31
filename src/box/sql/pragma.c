@@ -119,8 +119,6 @@ sqlite3GetBoolean(const char *z, u8 dflt)
  * the rest of the file if PRAGMAs are omitted from the build.
  */
 
-#if !defined(SQLITE_OMIT_PRAGMA)
-
 /*
  * Set result column names for a pragma.
  */
@@ -813,112 +811,25 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			break;
 		}
 
-#ifndef SQLITE_INTEGRITY_CHECK_ERROR_MAX
-#define SQLITE_INTEGRITY_CHECK_ERROR_MAX 100
-#endif
-
-#ifndef SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS
-		/* *   PRAGMA [schema.]schema_version *   PRAGMA
-		 * [schema.]schema_version = <integer> *
-		 *
-		 * PRAGMA [schema.]user_version *   PRAGMA
-		 * [schema.]user_version = <integer> *
-		 *
-		 * PRAGMA [schema.]freelist_count *
-		 *
-		 * PRAGMA [schema.]data_version *
-		 *
-		 * PRAGMA [schema.]application_id *   PRAGMA
-		 * [schema.]application_id = <integer> *
-		 *
-		 * The pragma's schema_version and user_version are used
-		 * to set or get * the value of the schema-version and
-		 * user-version, respectively. Both * the
-		 * schema-version and the user-version are 32-bit
-		 * signed integers * stored in the database header. *
-		 *
-		 * The schema-cookie is usually only manipulated
-		 * internally by SQLite. It * is incremented by SQLite
-		 * whenever the database schema is modified (by *
-		 * creating or dropping a table or index). The schema
-		 * version is used by * SQLite each time a query is
-		 * executed to ensure that the internal cache * of the
-		 * schema used when compiling the SQL query matches the
-		 * schema of * the database against which the compiled
-		 * query is actually executed. * Subverting this
-		 * mechanism by using "PRAGMA schema_version" to modify *
-		 * the schema-version is potentially dangerous and may
-		 * lead to program * crashes or database corruption.
-		 * Use with caution! *
-		 *
-		 * The user-version is not used internally by SQLite. It
-		 * may be used by * applications for any purpose.
-		 */
-	case PragTyp_HEADER_VALUE:{
-			int iCookie = pPragma->iArg;	/* Which cookie to read
-							 * or write
-							 */
-			if (zRight
-			    && (pPragma->mPragFlg & PragFlg_ReadOnly) == 0) {
-				/* Write the specified cookie value */
-				static const VdbeOpList setCookie[] = {
-					{OP_SetCookie, 0, 0, 0},	/* 1 */
-				};
-				VdbeOp *aOp;
-				sqlite3VdbeVerifyNoMallocRequired(v,
-								  ArraySize
-								  (setCookie));
-				aOp =
-				    sqlite3VdbeAddOpList(v,
-							 ArraySize(setCookie),
-							 setCookie, 0);
-				if (ONLY_IF_REALLOC_STRESS(aOp == 0))
-					break;
-				aOp[0].p1 = 0;
-				aOp[0].p2 = iCookie;
-				aOp[0].p3 = sqlite3Atoi(zRight);
-			} else {
-				/* Read the specified cookie value */
-				static const VdbeOpList readCookie[] = {
-					{OP_ReadCookie, 0, 1, 0},	/* 1 */
-					{OP_ResultRow, 1, 1, 0}
-				};
-				VdbeOp *aOp;
-				sqlite3VdbeVerifyNoMallocRequired(v,
-								  ArraySize
-								  (readCookie));
-				aOp =
-				    sqlite3VdbeAddOpList(v,
-							 ArraySize(readCookie),
-							 readCookie, 0);
-				if (ONLY_IF_REALLOC_STRESS(aOp == 0))
-					break;
-				aOp[0].p1 = 0;
-				aOp[1].p1 = 0;
-				aOp[1].p3 = iCookie;
-				sqlite3VdbeReusable(v);
-			}
-			break;
+	case PragTyp_DEFAULT_ENGINE: {
+		if (sql_default_engine_set(zRight) != 0) {
+			pParse->rc = SQL_TARANTOOL_ERROR;
+			pParse->nErr++;
+			goto pragma_out;
 		}
-		case PragTyp_DEFAULT_ENGINE: {
-			if (sql_default_engine_set(zRight) != 0) {
-				pParse->rc = SQL_TARANTOOL_ERROR;
-				pParse->nErr++;
-				goto pragma_out;
-			}
-			sqlite3VdbeAddOp0(v, OP_Expire);
-			break;
-		}
+		sqlite3VdbeAddOp0(v, OP_Expire);
+		break;
+	}
 
-		/* *   PRAGMA busy_timeout *   PRAGMA busy_timeout = N *
-		 *
-		 * Call sqlite3_busy_timeout(db, N).  Return the current
-		 * timeout value * if one is set.  If no busy handler
-		 * or a different busy handler is set * then 0 is
-		 * returned.  Setting the busy_timeout to 0 or negative *
-		 * disables the timeout.
-		 */
-		/* case PragTyp_BUSY_TIMEOUT */
+	/* *   PRAGMA busy_timeout *   PRAGMA busy_timeout = N *
+	 *
+	 * Call sqlite3_busy_timeout(db, N).  Return the current
+	 * timeout value * if one is set.  If no busy handler
+	 * or a different busy handler is set * then 0 is
+	 * returned.  Setting the busy_timeout to 0 or negative *
+	 * disables the timeout.
+	 */
+	/* case PragTyp_BUSY_TIMEOUT */
 	default:{
 			assert(pPragma->ePragTyp == PragTyp_BUSY_TIMEOUT);
 			if (zRight) {
@@ -944,6 +855,3 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	sqlite3DbFree(db, zRight);
 	sqlite3DbFree(db, zTable);
 }
-
-#endif				/* SQLITE_OMIT_PRAGMA */
-#endif

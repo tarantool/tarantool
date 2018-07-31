@@ -505,15 +505,6 @@ sqlite3VdbeRunOnlyOnce(Vdbe * p)
 	p->runOnlyOnce = 1;
 }
 
-/*
- * Mark the VDBE as one that can only be run multiple times.
- */
-void
-sqlite3VdbeReusable(Vdbe * p)
-{
-	p->runOnlyOnce = 0;
-}
-
 #ifdef SQLITE_DEBUG		/* sqlite3AssertMayAbort() logic */
 
 /*
@@ -723,22 +714,6 @@ sqlite3VdbeCurrentAddr(Vdbe * p)
 }
 
 /*
- * Verify that at least N opcode slots are available in p without
- * having to malloc for more space (except when compiled using
- * SQLITE_TEST_REALLOC_STRESS).  This interface is used during testing
- * to verify that certain calls to sqlite3VdbeAddOpList() can never
- * fail due to a OOM fault and hence that the return value from
- * sqlite3VdbeAddOpList() will always be non-NULL.
- */
-#if defined(SQLITE_DEBUG) && !defined(SQLITE_TEST_REALLOC_STRESS)
-void
-sqlite3VdbeVerifyNoMallocRequired(Vdbe * p, int N)
-{
-	assert(p->nOp + N <= p->pParse->nOpAlloc);
-}
-#endif
-
-/*
  * Verify that the VM passed as the only argument does not contain
  * an OP_ResultRow opcode. Fail an assert() if it does. This is used
  * by code in pragma.c to ensure that the implementation of certain
@@ -777,60 +752,6 @@ sqlite3VdbeTakeOpArray(Vdbe * p, int *pnOp, int *pnMaxArg)
 	*pnOp = p->nOp;
 	p->aOp = 0;
 	return aOp;
-}
-
-/*
- * Add a whole list of operations to the operation stack.  Return a
- * pointer to the first operation inserted.
- *
- * Non-zero P2 arguments to jump instructions are automatically adjusted
- * so that the jump target is relative to the first operation inserted.
- */
-VdbeOp *
-sqlite3VdbeAddOpList(Vdbe * p,	/* Add opcodes to the prepared statement */
-		     int nOp,	/* Number of opcodes to add */
-		     VdbeOpList const *aOp,	/* The opcodes to be added */
-		     int iLineno)	/* Source-file line number of first opcode */
-{
-	int i;
-	struct session MAYBE_UNUSED *user_session;
-	user_session = current_session();
-	VdbeOp *pOut, *pFirst;
-	assert(nOp > 0);
-	assert(p->magic == VDBE_MAGIC_INIT);
-	if (p->nOp + nOp > p->pParse->nOpAlloc && growOpArray(p, nOp)) {
-		return 0;
-	}
-	pFirst = pOut = &p->aOp[p->nOp];
-	for (i = 0; i < nOp; i++, aOp++, pOut++) {
-		pOut->opcode = aOp->opcode;
-		pOut->p1 = aOp->p1;
-		pOut->p2 = aOp->p2;
-		assert(aOp->p2 >= 0);
-		if ((sqlite3OpcodeProperty[aOp->opcode] & OPFLG_JUMP) != 0
-		    && aOp->p2 > 0) {
-			pOut->p2 += p->nOp;
-		}
-		pOut->p3 = aOp->p3;
-		pOut->p4type = P4_NOTUSED;
-		pOut->p4.p = 0;
-		pOut->p5 = 0;
-#ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
-		pOut->zComment = 0;
-#endif
-#ifdef SQLITE_VDBE_COVERAGE
-		pOut->iSrcLine = iLineno + i;
-#else
-		(void)iLineno;
-#endif
-#ifdef SQLITE_DEBUG
-		if (user_session->sql_flags & SQLITE_VdbeAddopTrace) {
-			sqlite3VdbePrintOp(0, i + p->nOp, &p->aOp[i + p->nOp]);
-		}
-#endif
-	}
-	p->nOp += nOp;
-	return pFirst;
 }
 
 #if defined(SQLITE_ENABLE_STMT_SCANSTATUS)
@@ -1039,9 +960,6 @@ sqlite3VdbeDeletePriorOpcode(Vdbe * p, u8 op)
 
 /*
  * Change the value of the P4 operand for a specific instruction.
- * This routine is useful when a large program is loaded from a
- * static array using sqlite3VdbeAddOpList but we want to make a
- * few minor changes to the program.
  *
  * If n>=0 then the P4 operand is dynamic, meaning that a copy of
  * the string is made into memory obtained from sqlite3_malloc().

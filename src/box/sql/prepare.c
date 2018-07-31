@@ -156,12 +156,6 @@ sqlite3InitDatabase(sqlite3 * db)
 		rc = init.rc;
 		goto error_out;
 	}
-
-	/* Tarantool: schema_cookie is not used so far, but
-	 * might be used in future. Set it to dummy value.
-	 */
-	db->pSchema->schema_cookie = 0;
-
 	/* Read the schema information out of the schema tables
 	 */
 	assert(db->init.busy);
