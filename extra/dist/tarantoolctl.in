@@ -910,6 +910,8 @@ local function rocks()
        remove = "luarocks.remove",
        show = "luarocks.show",
        make = "luarocks.make",
+       pack = "luarocks.pack",
+       unpack = "luarocks.unpack",
     }
     rawset(_G, 'commands', commands)
 
