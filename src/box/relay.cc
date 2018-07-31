@@ -287,6 +287,9 @@ relay_final_join(struct replica *replica, int fd, uint64_t sync,
 	if (rc != 0)
 		diag_raise();
 
+	ERROR_INJECT(ERRINJ_RELAY_FINAL_JOIN,
+		     tnt_raise(ClientError, ER_INJECTION, "relay final join"));
+
 	ERROR_INJECT(ERRINJ_RELAY_FINAL_SLEEP, {
 		while (vclock_compare(stop_vclock, &replicaset.vclock) == 0)
 			fiber_sleep(0.001);

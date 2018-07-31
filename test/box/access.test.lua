@@ -340,7 +340,10 @@ c:close()
 
 session = box.session
 box.schema.user.create('test')
-box.schema.user.grant('test', 'read,write,create', 'universe')
+box.schema.user.grant('test', 'read', 'space', '_collation')
+--box.schema.user.grant('test', 'write', 'space', '_collation')
+-- FIXME: granting create on 'collation' only doesn't work
+box.schema.user.grant('test', 'create', 'universe')
 session.su('test')
 box.internal.collation.create('test', 'ICU', 'ru_RU')
 session.su('admin')
@@ -520,7 +523,8 @@ box.schema.space.create("test_space")
 box.schema.user.create('test_user')
 box.schema.func.create('test_func')
 box.session.su("admin")
-box.schema.user.grant("tester", "read", "universe")
+box.schema.user.grant("tester", "read", "space", "_user")
+box.schema.user.grant("tester", "read", "space", "_func")
 -- failed create
 box.session.su("tester")
 box.schema.space.create("test_space")
@@ -533,7 +537,16 @@ box.session.su("admin")
 -- explicitly since we still use process_rw to write to system
 -- tables from ddl
 --
-box.schema.user.grant("tester", "create,write", "universe")
+box.schema.user.grant('tester', 'write', 'universe')
+-- no entity user currently, so have to grant create
+-- on universe in order to create a user.
+box.schema.user.grant('tester', 'create', 'universe')
+-- this should work instead:
+--box.schema.user.grant('tester', 'create', 'user')
+--box.schema.user.grant('tester', 'create', 'space')
+--box.schema.user.grant('tester', 'create', 'function')
+--box.schema.user.grant('tester', 'create' , 'sequence')
+box.schema.user.grant('tester', 'read', 'space', '_sequence')
 box.session.su("tester")
 -- successful create
 s1 = box.schema.space.create("test_space")
@@ -712,7 +725,7 @@ box.schema.user.grant('tester', 'read,write', 'space', '_sequence')
 box.session.su('tester')
 _  = box.schema.sequence.create('test_sequence')
 box.session.su('admin')
-box.schema.user.grant('tester', 'create', 'universe')
+box.schema.user.grant('tester', 'create', 'sequence')
 box.session.su('tester')
 _ = box.schema.sequence.create('test_sequence')
 box.session.su('admin')

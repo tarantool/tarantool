@@ -51,6 +51,7 @@
 #include "engine.h"
 #include "memtx_engine.h"
 #include "sysview.h"
+#include "blackhole.h"
 #include "vinyl.h"
 #include "space.h"
 #include "index.h"
@@ -1661,6 +1662,9 @@ engine_init()
 	struct sysview_engine *sysview = sysview_engine_new_xc();
 	engine_register((struct engine *)sysview);
 
+	struct engine *blackhole = blackhole_engine_new_xc();
+	engine_register(blackhole);
+
 	struct vinyl_engine *vinyl;
 	vinyl = vinyl_engine_new_xc(cfg_gets("vinyl_dir"),
 				    cfg_geti64("vinyl_memory"),
@@ -1725,7 +1729,8 @@ bootstrap_from_master(struct replica *master)
 	applier_resume_to_state(applier, APPLIER_READY, TIMEOUT_INFINITY);
 	assert(applier->state == APPLIER_READY);
 
-	say_info("bootstrapping replica from %s",
+	say_info("bootstrapping replica from %s at %s",
+		 tt_uuid_str(&master->uuid),
 		 sio_strfaddr(&applier->addr, applier->addr_len));
 
 	/*
@@ -1823,6 +1828,9 @@ bootstrap(const struct tt_uuid *instance_uuid,
 /**
  * Recover the instance from the local directory.
  * Enter hot standby if the directory is locked.
+ * Invoke rebootstrap if the instance fell too much
+ * behind its peers in the replica set and needs
+ * to be rebootstrapped.
  */
 static void
 local_recovery(const struct tt_uuid *instance_uuid,
@@ -1858,6 +1866,12 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	if (wal_dir_lock >= 0) {
 		box_listen();
 		box_sync_replication(replication_connect_timeout, false);
+
+		struct replica *master;
+		if (replicaset_needs_rejoin(&master)) {
+			say_crit("replica is too old, initiating rebootstrap");
+			return bootstrap_from_master(master);
+		}
 	}
 
 	/*

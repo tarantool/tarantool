@@ -560,5 +560,6 @@ sysview_engine_new(void)
 
 	sysview->base.vtab = &sysview_engine_vtab;
 	sysview->base.name = "sysview";
+	sysview->base.flags = ENGINE_BYPASS_TX;
 	return sysview;
 }

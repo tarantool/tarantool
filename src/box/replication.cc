@@ -41,6 +41,7 @@
 #include "error.h"
 #include "relay.h"
 #include "vclock.h" /* VCLOCK_MAX */
+#include "sio.h"
 
 uint32_t instance_id = REPLICA_ID_NIL;
 struct tt_uuid INSTANCE_UUID;
@@ -205,6 +206,19 @@ replica_clear_id(struct replica *replica)
 	 */
 	replicaset.replica_by_id[replica->id] = NULL;
 	replica->id = REPLICA_ID_NIL;
+	/*
+	 * The replica will never resubscribe so we don't need to keep
+	 * WALs for it anymore. Unregister it with the garbage collector
+	 * if the relay thread is stopped. In case the relay thread is
+	 * still running, it may need to access replica->gc so leave the
+	 * job to replica_on_relay_stop, which will be called as soon as
+	 * the relay thread exits.
+	 */
+	if (replica->gc != NULL &&
+	    relay_get_state(replica->relay) != RELAY_FOLLOW) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replica_delete(replica);
@@ -625,6 +639,66 @@ error:
 		  "failed to connect to one or more replicas");
 }
 
+bool
+replicaset_needs_rejoin(struct replica **master)
+{
+	struct replica *leader = NULL;
+	replicaset_foreach(replica) {
+		struct applier *applier = replica->applier;
+		if (applier == NULL)
+			continue;
+
+		const struct ballot *ballot = &applier->ballot;
+		if (vclock_compare(&ballot->gc_vclock,
+				   &replicaset.vclock) <= 0) {
+			/*
+			 * There's at least one master that still stores
+			 * WALs needed by this instance. Proceed to local
+			 * recovery.
+			 */
+			return false;
+		}
+
+		const char *uuid_str = tt_uuid_str(&replica->uuid);
+		const char *addr_str = sio_strfaddr(&applier->addr,
+						applier->addr_len);
+		char *local_vclock_str = vclock_to_string(&replicaset.vclock);
+		char *remote_vclock_str = vclock_to_string(&ballot->vclock);
+		char *gc_vclock_str = vclock_to_string(&ballot->gc_vclock);
+
+		say_info("can't follow %s at %s: required %s available %s",
+			 uuid_str, addr_str, local_vclock_str, gc_vclock_str);
+
+		if (vclock_compare(&replicaset.vclock, &ballot->vclock) > 0) {
+			/*
+			 * Replica has some rows that are not present on
+			 * the master. Don't rebootstrap as we don't want
+			 * to lose any data.
+			 */
+			say_info("can't rebootstrap from %s at %s: "
+				 "replica has local rows: local %s remote %s",
+				 uuid_str, addr_str, local_vclock_str,
+				 remote_vclock_str);
+			goto next;
+		}
+
+		/* Prefer a master with the max vclock. */
+		if (leader == NULL ||
+		    vclock_sum(&ballot->vclock) >
+		    vclock_sum(&leader->applier->ballot.vclock))
+			leader = replica;
+next:
+		free(local_vclock_str);
+		free(remote_vclock_str);
+		free(gc_vclock_str);
+	}
+	if (leader == NULL)
+		return false;
+
+	*master = leader;
+	return true;
+}
+
 void
 replicaset_follow(void)
 {
@@ -700,6 +774,16 @@ replicaset_check_quorum(void)
 void
 replica_on_relay_stop(struct replica *replica)
 {
+	/*
+	 * If the replica was evicted from the cluster, we don't
+	 * need to keep WALs for it anymore. Unregister it with
+	 * the garbage collector then. See also replica_clear_id.
+	 */
+	assert(replica->gc != NULL);
+	if (replica->id == REPLICA_ID_NIL) {
+		gc_consumer_unregister(replica->gc);
+		replica->gc = NULL;
+	}
 	if (replica_is_orphan(replica)) {
 		replica_hash_remove(&replicaset.hash, replica);
 		replica_delete(replica);

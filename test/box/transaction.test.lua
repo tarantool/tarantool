@@ -232,3 +232,19 @@ test_run:cmd("setopt delimiter ''");
 space:select{}
 
 space:drop()
+
+--
+-- gh-3528: sysview engine shouldn't participate in transaction control
+--
+space = box.schema.space.create('test', {id = 9000})
+index = space:create_index('primary')
+
+test_run:cmd("setopt delimiter ';'")
+box.begin()
+space:auto_increment{box.space._vspace:get{space.id}}
+space:auto_increment{box.space._vindex:get{space.id, index.id}}
+box.commit();
+test_run:cmd("setopt delimiter ''");
+
+space:select()
+space:drop()

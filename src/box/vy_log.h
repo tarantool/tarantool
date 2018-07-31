@@ -196,6 +196,27 @@ enum vy_log_record_type {
 	 * a VY_LOG_CREATE_LSM record to commit it.
 	 */
 	VY_LOG_PREPARE_LSM		= 15,
+	/**
+	 * This record denotes the beginning of a rebootstrap section.
+	 * A rebootstrap section ends either by another record of this
+	 * type or by VY_LOG_ABORT_REBOOTSTRAP or at the end of the file.
+	 * All objects created between a VY_LOG_REBOOTSTRAP record and
+	 * VY_LOG_ABORT_REBOOTSTRAP or another VY_LOG_REBOOTSTRAP are
+	 * considered to be garbage and marked as dropped on recovery.
+	 *
+	 * We write a record of this type if a vylog file already exists
+	 * at bootstrap time, which means we are going to rebootstrap.
+	 * If rebootstrap succeeds, we rotate the vylog on checkpoint and
+	 * mark all objects written before the last VY_LOG_REBOOTSTRAP
+	 * record as dropped in the rotated vylog. If rebootstrap fails,
+	 * we write VY_LOG_ABORT_REBOOTSTRAP on recovery.
+	 */
+	VY_LOG_REBOOTSTRAP		= 16,
+	/**
+	 * This record is written on recovery if rebootstrap failed.
+	 * See also VY_LOG_REBOOTSTRAP.
+	 */
+	VY_LOG_ABORT_REBOOTSTRAP	= 17,
 
 	vy_log_record_type_MAX
 };
@@ -276,6 +297,12 @@ struct vy_recovery {
 	 * or -1 in case no vinyl objects were recovered.
 	 */
 	int64_t max_id;
+	/**
+	 * Set if we are currently processing a rebootstrap section,
+	 * i.e. we encountered a VY_LOG_REBOOTSTRAP record and haven't
+	 * seen matching VY_LOG_ABORT_REBOOTSTRAP.
+	 */
+	bool in_rebootstrap;
 };
 
 /** LSM tree info stored in a recovery context. */
@@ -326,6 +353,8 @@ struct vy_lsm_recovery_info {
 	 * this one after successful ALTER.
 	 */
 	struct vy_lsm_recovery_info *prepared;
+	/** Set if this LSM tree was created during rebootstrap. */
+	bool in_rebootstrap;
 };
 
 /** Vinyl range info stored in a recovery context. */
@@ -533,6 +562,11 @@ enum vy_recovery_flag {
 	 * of the last checkpoint.
 	 */
 	VY_RECOVERY_LOAD_CHECKPOINT	= 1 << 0,
+	/**
+	 * Consider the last attempt to rebootstrap aborted even if
+	 * there's no VY_LOG_ABORT_REBOOTSTRAP record.
+	 */
+	VY_RECOVERY_ABORT_REBOOTSTRAP	= 1 << 1,
 };
 
 /**

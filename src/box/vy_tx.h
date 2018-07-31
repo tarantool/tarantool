@@ -262,18 +262,6 @@ tx_manager_new(void);
 void
 tx_manager_delete(struct tx_manager *xm);
 
-/*
- * Determine the lowest possible vlsn, i.e. the level below
- * which the history could be compacted.
- *
- * If there are active read views, it is the first's vlsn.
- * If there is no active read view, a read view could be
- * created at any moment with vlsn = m->lsn, so m->lsn must
- * be chosen.
- */
-int64_t
-tx_manager_vlsn(struct tx_manager *xm);
-
 /** Initialize a tx object. */
 void
 vy_tx_create(struct tx_manager *xm, struct vy_tx *tx);

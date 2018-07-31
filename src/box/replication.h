@@ -360,6 +360,15 @@ replicaset_connect(struct applier **appliers, int count,
 		   double timeout, bool connect_all);
 
 /**
+ * Check if the current instance fell too much behind its
+ * peers in the replica set and needs to be rebootstrapped.
+ * If it does, return true and set @master to the instance
+ * to use for rebootstrap, otherwise return false.
+ */
+bool
+replicaset_needs_rejoin(struct replica **master);
+
+/**
  * Resume all appliers registered with the replica set.
  */
 void

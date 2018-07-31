@@ -86,6 +86,13 @@ access_check_ddl(const char *name, uint32_t owner_uid,
 	user_access_t access = ((PRIV_U | (user_access_t) priv_type) &
 				~has_access);
 	bool is_owner = owner_uid == cr->uid || cr->uid == ADMIN;
+	if (access == 0)
+		return; /* Access granted. */
+	/* Check for specific entity access. */
+	struct access *object = entity_access_get(type);
+	if (object) {
+		access &= ~object[cr->auth_token].effective;
+	}
 	/*
 	 * Only the owner of the object or someone who has
 	 * specific DDL privilege on the object can execute
@@ -95,7 +102,7 @@ access_check_ddl(const char *name, uint32_t owner_uid,
 	 * the owner of the object, but this should be ignored --
 	 * CREATE privilege is required.
 	 */
-	if (access == 0 || (is_owner && !(access & (PRIV_U|PRIV_C))))
+	if (access == 0 || (is_owner && !(access & (PRIV_U | PRIV_C))))
 		return; /* Access granted. */
 
 	/* Create a meaningful error message. */
@@ -3126,7 +3133,7 @@ on_replace_dd_sequence(struct trigger * /* trigger */, void *event)
 						      ER_CREATE_SEQUENCE);
 		assert(sequence_by_id(new_def->id) == NULL);
 		access_check_ddl(new_def->name, new_def->uid, SC_SEQUENCE,
-			PRIV_C, false);
+				 PRIV_C, false);
 		sequence_cache_replace(new_def);
 		alter->new_def = new_def;
 	} else if (old_tuple != NULL && new_tuple == NULL) {	/* DELETE */
@@ -3231,8 +3238,19 @@ on_replace_dd_space_sequence(struct trigger * /* trigger */, void *event)
 		priv_type = PRIV_A;
 
 	/* Check we have the correct access type on the sequence.  * */
-	access_check_ddl(seq->def->name, seq->def->uid, SC_SEQUENCE, priv_type,
-			 false);
+	if (is_generated || !stmt->new_tuple) {
+		access_check_ddl(seq->def->name, seq->def->uid, SC_SEQUENCE,
+				 priv_type, false);
+	} else {
+		/*
+		 * In case user wants to attach an existing sequence,
+		 * check that it has read and write access.
+		 */
+		access_check_ddl(seq->def->name, seq->def->uid, SC_SEQUENCE,
+				 PRIV_R, false);
+		access_check_ddl(seq->def->name, seq->def->uid, SC_SEQUENCE,
+				 PRIV_W, false);
+	}
 	/** Check we have alter access on space. */
 	access_check_ddl(space->def->name, space->def->uid, SC_SPACE, PRIV_A,
 			 false);

@@ -285,23 +285,20 @@ static int
 space_before_replace(struct space *space, struct txn *txn,
 		     struct request *request)
 {
-	if (space->index_count == 0) {
-		/* Empty space, nothing to do. */
-		return 0;
-	}
-
 	struct region *gc = &fiber()->gc;
 	enum iproto_type type = request->type;
-	struct index *pk = space->index[0];
+	struct index *pk = space_index(space, 0);
 
-	const char *key;
-	uint32_t part_count;
-	struct index *index;
+	const char *key = NULL;
+	uint32_t part_count = 0;
+	struct index *index = NULL;
 
 	/*
 	 * Lookup the old tuple.
 	 */
-	if (type == IPROTO_UPDATE || type == IPROTO_DELETE) {
+	switch (type) {
+	case IPROTO_UPDATE:
+	case IPROTO_DELETE:
 		index = index_find_unique(space, request->index_id);
 		if (index == NULL)
 			return -1;
@@ -310,21 +307,27 @@ space_before_replace(struct space *space, struct txn *txn,
 		if (exact_key_validate(index->def->key_def,
 				       key, part_count) != 0)
 			return -1;
-	} else if (type == IPROTO_INSERT || type == IPROTO_REPLACE ||
-		   type == IPROTO_UPSERT) {
+		break;
+	case IPROTO_INSERT:
+	case IPROTO_REPLACE:
+	case IPROTO_UPSERT:
+		if (pk == NULL)
+			break;
 		index = pk;
 		key = tuple_extract_key_raw(request->tuple, request->tuple_end,
 					    index->def->key_def, NULL);
 		if (key == NULL)
 			return -1;
 		part_count = mp_decode_array(&key);
-	} else {
+		break;
+	default:
 		/* Unknown request type, nothing to do. */
 		return 0;
 	}
 
-	struct tuple *old_tuple;
-	if (index_get(index, key, part_count, &old_tuple) != 0)
+	struct tuple *old_tuple = NULL;
+	if (index != NULL &&
+	    index_get(index, key, part_count, &old_tuple) != 0)
 		return -1;
 
 	/*
@@ -435,7 +438,8 @@ space_before_replace(struct space *space, struct txn *txn,
 	 * We don't allow to change the value of the primary key
 	 * in the same statement.
 	 */
-	if (request_changed && old_tuple != NULL && new_tuple != NULL &&
+	if (pk != NULL && request_changed &&
+	    old_tuple != NULL && new_tuple != NULL &&
 	    tuple_compare(old_tuple, new_tuple, pk->def->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 pk->def->name, space->def->name);
