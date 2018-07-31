@@ -27,6 +27,10 @@ testprefix = "selectG"
 -- for an O(N*N) inefficiency that was once in the code and that would make
 -- the insert run for over a minute.
 --
+local engine = test:engine()
+local time_quota =
+    engine == 'memtx' and 25 or (
+    engine == 'vinyl' and 50 or 0) -- seconds
 test:do_test(
     100,
     function()
@@ -42,7 +46,8 @@ test:do_test(
         test:execsql(sql)
         local end_time = os.time()
         -- max run time was increased because of parallel test run
-        return test:execsql( "SELECT count(x), sum(x), avg(x), "..(end_time - start_time).."<25 FROM t1;")
+        return test:execsql(("SELECT count(x), sum(x), avg(x), %d<%d FROM t1;")
+            :format(end_time - start_time, time_quota))
     end, {
         -- <100>
         100000, 5000050000, 50000.5, 1

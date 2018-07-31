@@ -3,6 +3,12 @@ local json = require('json')
 local test = tap.test("errno")
 local sql_tokenizer = require('sql_tokenizer')
 
+-- pcall here, because we allow to run a test w/o test-run; use:
+-- LUA_PATH='test/sql-tap/lua/?.lua;test/sql/lua/?.lua;;' \
+--     ./test/sql-tap/xxx.test.lua
+local ok, test_run = pcall(require, 'test_run')
+test_run = ok and test_run.new() or nil
+
 local function flatten(arr)
     local result = { }
 
@@ -411,8 +417,12 @@ test.do_eqp_test = function (self, label, sql, result)
 end
 
 setmetatable(_G, nil)
-os.execute("rm -rf $(ls -d */)")
-os.execute("rm -f *.snap *.xlog* *.vylog* *.run*")
+
+-- perform clean up only under test-run
+if test_run then
+    os.execute("rm -rf $(ls -d */)")
+    os.execute("rm -f *.snap *.xlog* *.vylog* *.run*")
+end
 
 -- start the database
 box.cfg{
@@ -421,8 +431,11 @@ box.cfg{
     log="tarantool.log";
 }
 
-test_run = require('test_run').new()
-engine = test_run:get_cfg('engine')
+local engine = test_run and test_run:get_cfg('engine') or 'memtx'
 box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+
+function test.engine(self)
+    return engine
+end
 
 return test
