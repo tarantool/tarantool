@@ -70,8 +70,6 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	struct sql_trigger *trigger = NULL;
 	/* The database connection. */
 	struct sqlite3 *db = parse->db;
-	/* State vector for the DB fixer. */
-	struct DbFixer fixdb;
 	/* The name of the Trigger. */
 	char *trigger_name = NULL;
 
@@ -94,9 +92,6 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	if (db->mallocFailed)
 		goto trigger_cleanup;
 	assert(table->nSrc == 1);
-	sqlite3FixInit(&fixdb, parse, "trigger", name);
-	if (sqlite3FixSrcList(&fixdb, table) != 0)
-		goto trigger_cleanup;
 
 	trigger_name = sqlite3NameFromToken(db, name);
 	if (trigger_name == NULL)
@@ -191,13 +186,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 
 	/* Trigger name for error reporting. */
 	struct Token trigger_name_token;
-	/* Fixer object. */
-	struct DbFixer fixdb;
 	sqlite3TokenInit(&trigger_name_token, trigger->zName);
-	sqlite3FixInit(&fixdb, parse, "trigger", &trigger_name_token);
-	if (sqlite3FixTriggerStep(&fixdb, trigger->step_list) ||
-	    sqlite3FixExpr(&fixdb, trigger->pWhen))
-		goto triggerfinish_cleanup;
 
 	/*
 	 * Generate byte code to insert a new trigger into

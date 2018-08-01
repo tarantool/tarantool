@@ -32,7 +32,6 @@ add_library(sql STATIC
     parse.c
     alter.c
     analyze.c
-    attach.c
     cursor.c
     build.c
     callback.c

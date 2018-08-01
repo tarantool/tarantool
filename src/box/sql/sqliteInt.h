@@ -3045,20 +3045,6 @@ struct TriggerStep {
 };
 
 /*
- * The following structure contains information used by the sqliteFix...
- * routines as they walk the parse tree to make database references
- * explicit.
- */
-typedef struct DbFixer DbFixer;
-struct DbFixer {
-	Parse *pParse;		/* The parsing context.  Error messages written here */
-	Schema *pSchema;	/* Fix items to this schema */
-	int bVarOnly;		/* Check for variable references only */
-	const char *zType;	/* Type of the container - used for error messages */
-	const Token *pName;	/* Name of the container - used for error messages */
-};
-
-/*
  * An objected used to accumulate the text of a string where we
  * do not necessarily know how big the string will be in the end.
  */
@@ -4226,12 +4212,6 @@ int sqlite3JoinType(Parse *, Token *, Token *, Token *);
 void sqlite3CreateForeignKey(Parse *, ExprList *, Token *, ExprList *, int);
 void sqlite3DeferForeignKey(Parse *, int);
 void sqlite3Detach(Parse *, Expr *);
-void sqlite3FixInit(DbFixer *, Parse *, const char *, const Token *);
-int sqlite3FixSrcList(DbFixer *, SrcList *);
-int sqlite3FixSelect(DbFixer *, Select *);
-int sqlite3FixExpr(DbFixer *, Expr *);
-int sqlite3FixExprList(DbFixer *, ExprList *);
-int sqlite3FixTriggerStep(DbFixer *, TriggerStep *);
 int sqlite3AtoF(const char *z, double *, int);
 int sqlite3GetInt32(const char *, int *);
 int sqlite3Atoi(const char *);
