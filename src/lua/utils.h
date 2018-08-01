@@ -430,6 +430,12 @@ luaT_cpcall(lua_State *L, lua_CFunction func, void *ud);
 LUA_API lua_State *
 luaT_state(void);
 
+/**
+ * Like lua_tolstring, but supports metatables, booleans and nil properly.
+ */
+LUA_API const char *
+luaT_tolstring(lua_State *L, int idx, size_t *ssize);
+
 /** \endcond public */
 
 void
