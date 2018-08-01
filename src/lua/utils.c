@@ -920,7 +920,7 @@ luaT_toerror(lua_State *L)
 		diag_add_error(&fiber()->diag, e);
 	} else {
 		/* Convert Lua error to a Tarantool exception. */
-		diag_set(LuajitError, lua_tostring(L, -1));
+		diag_set(LuajitError, luaT_tolstring(L, -1, NULL));
 	}
 	return 1;
 }
