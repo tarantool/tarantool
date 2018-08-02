@@ -2286,7 +2286,8 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-while test_run:grep_log('default', 'Connection refused', 1000) == nil and
+while test_run:grep_log('default', 'Network is unreachable', 1000) == nil and
+      test_run:grep_log('default', 'Connection refused', 1000) == nil and
       test_run:grep_log('default', 'Cannot assign requested address', 1000) == nil do
        fiber.sleep(0.1)
 end;
@@ -2295,7 +2296,8 @@ end;
 log.info(string.rep('a', 1000));
 ---
 ...
-while test_run:grep_log('default', 'Connection refused', 1000) == nil and
+while test_run:grep_log('default', 'Network is unreachable', 1000) == nil and
+      test_run:grep_log('default', 'Connection refused', 1000) == nil and
       test_run:grep_log('default', 'Cannot assign requested address', 1000) == nil do
        fiber.sleep(0.1)
 end;
