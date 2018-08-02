@@ -1254,7 +1254,52 @@ vy_is_committed(struct vy_env *env, struct space *space)
 }
 
 /**
- * Get a vinyl tuple from the LSM tree by the key.
+ * Get a full tuple by a tuple read from a secondary index.
+ * @param lsm         LSM tree from which the tuple was read.
+ * @param tx          Current transaction.
+ * @param rv          Read view.
+ * @param tuple       Tuple read from a secondary index.
+ * @param[out] result The found tuple is stored here. Must be
+ *                    unreferenced after usage.
+ *
+ * @param  0 Success.
+ * @param -1 Memory error or read error.
+ */
+static int
+vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
+			  const struct vy_read_view **rv,
+			  struct tuple *tuple, struct tuple **result)
+{
+	assert(lsm->index_id > 0);
+	/*
+	 * No need in vy_tx_track() as the tuple must already be
+	 * tracked in the secondary index LSM tree.
+	 */
+	if (vy_point_lookup(lsm->pk, tx, rv, tuple, result) != 0)
+		return -1;
+
+	if (*result == NULL) {
+		/*
+		 * All indexes of a space must be consistent, i.e.
+		 * if a tuple is present in one index, it must be
+		 * present in all other indexes as well, so we can
+		 * get here only if there's a bug somewhere in vinyl.
+		 * Don't abort as core dump won't really help us in
+		 * this case. Just warn the user and proceed to the
+		 * next tuple.
+		 */
+		say_warn("%s: key %s missing in primary index",
+			 vy_lsm_name(lsm), vy_stmt_str(tuple));
+	}
+
+	if ((*rv)->vlsn == INT64_MAX)
+		vy_cache_add(&lsm->pk->cache, *result, NULL, tuple, ITER_EQ);
+
+	return 0;
+}
+
+/**
+ * Get a tuple from a vinyl space by key.
  * @param lsm         LSM tree in which search.
  * @param tx          Current transaction.
  * @param rv          Read view.
@@ -1265,10 +1310,10 @@ vy_is_committed(struct vy_env *env, struct space *space)
  * @param  0 Success.
  * @param -1 Memory error or read error.
  */
-static inline int
-vy_lsm_get(struct vy_lsm *lsm, struct vy_tx *tx,
-	     const struct vy_read_view **rv,
-	     struct tuple *key, struct tuple **result)
+static int
+vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
+       const struct vy_read_view **rv,
+       struct tuple *key, struct tuple **result)
 {
 	/*
 	 * tx can be NULL, for example, if an user calls
@@ -1276,52 +1321,112 @@ vy_lsm_get(struct vy_lsm *lsm, struct vy_tx *tx,
 	 */
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
+	int rc;
+	struct tuple *tuple;
+
 	if (tuple_field_count(key) >= lsm->cmp_def->part_count) {
+		/*
+		 * Use point lookup for a full key.
+		 */
 		if (tx != NULL && vy_tx_track_point(tx, lsm, key) != 0)
 			return -1;
-		return vy_point_lookup(lsm, tx, rv, key, result);
+		if (vy_point_lookup(lsm, tx, rv, key, &tuple) != 0)
+			return -1;
+		if (lsm->index_id > 0 && tuple != NULL) {
+			rc = vy_get_by_secondary_tuple(lsm, tx, rv,
+						       tuple, result);
+			tuple_unref(tuple);
+			if (rc != 0)
+				return -1;
+		} else {
+			*result = tuple;
+		}
+		if ((*rv)->vlsn == INT64_MAX)
+			vy_cache_add(&lsm->cache, *result, NULL, key, ITER_EQ);
+		return 0;
 	}
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, lsm, tx, ITER_EQ, key, rv);
-	int rc = vy_read_iterator_next(&itr, result);
-	if (*result != NULL)
-		tuple_ref(*result);
+	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
+		if (lsm->index_id == 0 || tuple == NULL) {
+			*result = tuple;
+			if (tuple != NULL)
+				tuple_ref(tuple);
+			break;
+		}
+		rc = vy_get_by_secondary_tuple(lsm, tx, rv, tuple, result);
+		if (rc != 0 || *result != NULL)
+			break;
+	}
+	if (rc == 0)
+		vy_read_iterator_cache_add(&itr, *result);
 	vy_read_iterator_close(&itr);
 	return rc;
 }
 
 /**
- * Check if the LSM tree contains the key. If true, then set
- * a duplicate key error in the diagnostics area.
+ * Get a tuple from a vinyl space by raw key.
+ * @param lsm         LSM tree in which search.
+ * @param tx          Current transaction.
+ * @param rv          Read view.
+ * @param key_raw     MsgPack array of key fields.
+ * @param part_count  Count of parts in the key.
+ * @param[out] result The found tuple is stored here. Must be
+ *                    unreferenced after usage.
+ *
+ * @param  0 Success.
+ * @param -1 Memory error or read error.
+ */
+static int
+vy_get_by_raw_key(struct vy_lsm *lsm, struct vy_tx *tx,
+		  const struct vy_read_view **rv,
+		  const char *key_raw, uint32_t part_count,
+		  struct tuple **result)
+{
+	struct tuple *key = vy_stmt_new_select(lsm->env->key_format,
+					       key_raw, part_count);
+	if (key == NULL)
+		return -1;
+	int rc = vy_get(lsm, tx, rv, key, result);
+	tuple_unref(key);
+	return rc;
+}
+
+/**
+ * Check if insertion of a new tuple violates unique constraint
+ * of the primary index.
  * @param env        Vinyl environment.
  * @param tx         Current transaction.
  * @param rv         Read view.
  * @param space_name Space name.
  * @param index_name Index name.
- * @param lsm        LSM tree in which to search.
- * @param key        Key statement.
+ * @param lsm        LSM tree corresponding to the index.
+ * @param stmt       New tuple.
  *
- * @retval  0 Success, the key isn't found.
- * @retval -1 Memory error or the key is found.
+ * @retval  0 Success, unique constraint is satisfied.
+ * @retval -1 Duplicate is found or read error occurred.
  */
 static inline int
-vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
-		   const struct vy_read_view **rv,
-		   const char *space_name, const char *index_name,
-		   struct vy_lsm *lsm, struct tuple *key)
+vy_check_is_unique_primary(struct vy_env *env, struct vy_tx *tx,
+			   const struct vy_read_view **rv,
+			   const char *space_name, const char *index_name,
+			   struct vy_lsm *lsm, struct tuple *stmt)
 {
-	struct tuple *found;
+	assert(lsm->index_id == 0);
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
 	/*
 	 * During recovery we apply rows that were successfully
 	 * applied before restart so no conflict is possible.
 	 */
 	if (env->status != VINYL_ONLINE)
 		return 0;
-	if (vy_lsm_get(lsm, tx, rv, key, &found))
+	if (!lsm->check_is_unique)
+		return 0;
+	struct tuple *found;
+	if (vy_get(lsm, tx, rv, stmt, &found))
 		return -1;
-
-	if (found) {
+	if (found != NULL) {
 		tuple_unref(found);
 		diag_set(ClientError, ER_TUPLE_FOUND,
 			 index_name, space_name);
@@ -1351,19 +1456,36 @@ vy_check_is_unique_secondary(struct vy_env *env, struct vy_tx *tx,
 			     struct vy_lsm *lsm, const struct tuple *stmt)
 {
 	assert(lsm->index_id > 0);
-	struct key_def *def = lsm->key_def;
-	if (lsm->check_is_unique &&
-	    !key_update_can_be_skipped(def->column_mask,
-				       vy_stmt_column_mask(stmt)) &&
-	    (!def->is_nullable || !vy_tuple_key_contains_null(stmt, def))) {
-		struct tuple *key = vy_stmt_extract_key(stmt, def,
-							lsm->env->key_format);
-		if (key == NULL)
-			return -1;
-		int rc = vy_check_is_unique(env, tx, rv, space_name,
-					    index_name, lsm, key);
-		tuple_unref(key);
-		return rc;
+	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(stmt) == IPROTO_REPLACE);
+	/*
+	 * During recovery we apply rows that were successfully
+	 * applied before restart so no conflict is possible.
+	 */
+	if (env->status != VINYL_ONLINE)
+		return 0;
+	if (!lsm->check_is_unique)
+		return 0;
+	if (key_update_can_be_skipped(lsm->key_def->column_mask,
+				      vy_stmt_column_mask(stmt)))
+		return 0;
+	if (lsm->key_def->is_nullable &&
+	    vy_tuple_key_contains_null(stmt, lsm->key_def))
+		return 0;
+	struct tuple *key = vy_stmt_extract_key(stmt, lsm->key_def,
+						lsm->env->key_format);
+	if (key == NULL)
+		return -1;
+	struct tuple *found;
+	int rc = vy_get(lsm, tx, rv, key, &found);
+	tuple_unref(key);
+	if (rc != 0)
+		return -1;
+	if (found != NULL) {
+		tuple_unref(found);
+		diag_set(ClientError, ER_TUPLE_FOUND,
+			 index_name, space_name);
+		return -1;
 	}
 	return 0;
 }
@@ -1390,10 +1512,10 @@ vy_insert_primary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 	 * A primary index is always unique and the new tuple must not
 	 * conflict with existing tuples.
 	 */
-	if (pk->check_is_unique &&
-	    vy_check_is_unique(env, tx, vy_tx_read_view(tx), space_name(space),
-			       index_name_by_id(space, pk->index_id),
-			       pk, stmt) != 0)
+	if (vy_check_is_unique_primary(env, tx, vy_tx_read_view(tx),
+				       space_name(space),
+				       index_name_by_id(space, pk->index_id),
+				       pk, stmt) != 0)
 		return -1;
 	return vy_tx_set(tx, pk, stmt);
 }
@@ -1434,161 +1556,6 @@ vy_insert_secondary(struct vy_env *env, struct vy_tx *tx, struct space *space,
 }
 
 /**
- * Execute REPLACE in a space with a single index, possibly with
- * lookup for an old tuple if the space has at least one
- * on_replace trigger.
- * @param env     Vinyl environment.
- * @param tx      Current transaction.
- * @param space   Space in which replace.
- * @param request Request with the tuple data.
- * @param stmt    Statement for triggers is filled with old
- *                statement.
- *
- * @retval  0 Success.
- * @retval -1 Memory error OR duplicate key error OR the primary
- *            index is not found OR a tuple reference increment
- *            error.
- */
-static inline int
-vy_replace_one(struct vy_env *env, struct vy_tx *tx, struct space *space,
-	       struct request *request, struct txn_stmt *stmt)
-{
-	(void)env;
-	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	struct vy_lsm *pk = vy_lsm(space->index[0]);
-	assert(pk->index_id == 0);
-	if (tuple_validate_raw(pk->mem_format, request->tuple))
-		return -1;
-	struct tuple *new_tuple =
-		vy_stmt_new_replace(pk->mem_format, request->tuple,
-				    request->tuple_end);
-	if (new_tuple == NULL)
-		return -1;
-	/**
-	 * If the space has triggers, then we need to fetch the
-	 * old tuple to pass it to the trigger.
-	 */
-	if (stmt != NULL && !rlist_empty(&space->on_replace)) {
-		if (vy_lsm_get(pk, tx, vy_tx_read_view(tx),
-			       new_tuple, &stmt->old_tuple) != 0)
-			goto error_unref;
-	}
-	if (vy_tx_set(tx, pk, new_tuple))
-		goto error_unref;
-
-	if (stmt != NULL)
-		stmt->new_tuple = new_tuple;
-	else
-		tuple_unref(new_tuple);
-	return 0;
-
-error_unref:
-	tuple_unref(new_tuple);
-	return -1;
-}
-
-/**
- * Execute REPLACE in a space with multiple indexes and lookup for
- * an old tuple, that should has been set in \p stmt->old_tuple if
- * the space has at least one on_replace trigger.
- * @param env     Vinyl environment.
- * @param tx      Current transaction.
- * @param space   Vinyl space.
- * @param request Request with the tuple data.
- * @param stmt    Statement for triggers filled with old
- *                statement.
- *
- * @retval  0 Success
- * @retval -1 Memory error OR duplicate key error OR the primary
- *            index is not found OR a tuple reference increment
- *            error.
- */
-static inline int
-vy_replace_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
-		struct request *request, struct txn_stmt *stmt)
-{
-	assert(tx != NULL && tx->state == VINYL_TX_READY);
-	struct tuple *old_stmt = NULL;
-	struct tuple *new_stmt = NULL;
-	struct tuple *delete = NULL;
-	struct vy_lsm *pk = vy_lsm_find(space, 0);
-	if (pk == NULL) /* space has no primary key */
-		return -1;
-	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, pk));
-	assert(pk->index_id == 0);
-	if (tuple_validate_raw(pk->mem_format, request->tuple))
-		return -1;
-	new_stmt = vy_stmt_new_replace(pk->mem_format, request->tuple,
-				       request->tuple_end);
-	if (new_stmt == NULL)
-		return -1;
-
-	/* Get full tuple from the primary index. */
-	if (vy_lsm_get(pk, tx, vy_tx_read_view(tx),
-			 new_stmt, &old_stmt) != 0)
-		goto error;
-
-	if (old_stmt == NULL) {
-		/*
-		 * We can turn REPLACE into INSERT if the new key
-		 * does not have history.
-		 */
-		vy_stmt_set_type(new_stmt, IPROTO_INSERT);
-	}
-
-	/*
-	 * Replace in the primary index without explicit deletion
-	 * of the old tuple.
-	 */
-	if (vy_tx_set(tx, pk, new_stmt) != 0)
-		goto error;
-
-	if (space->index_count > 1 && old_stmt != NULL) {
-		delete = vy_stmt_new_surrogate_delete(pk->mem_format, old_stmt);
-		if (delete == NULL)
-			goto error;
-	}
-
-	/* Update secondary keys, avoid duplicates. */
-	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
-		struct vy_lsm *lsm = vy_lsm(space->index[iid]);
-		if (vy_is_committed_one(env, lsm))
-			continue;
-		/*
-		 * Delete goes first, so if old and new keys
-		 * fully match, there is no look up beyond the
-		 * transaction index.
-		 */
-		if (old_stmt != NULL) {
-			if (vy_tx_set(tx, lsm, delete) != 0)
-				goto error;
-		}
-		if (vy_insert_secondary(env, tx, space, lsm, new_stmt) != 0)
-			goto error;
-	}
-	if (delete != NULL)
-		tuple_unref(delete);
-	/*
-	 * The old tuple is used if there is an on_replace
-	 * trigger.
-	 */
-	if (stmt != NULL) {
-		stmt->new_tuple = new_stmt;
-		stmt->old_tuple = old_stmt;
-	}
-	return 0;
-error:
-	if (delete != NULL)
-		tuple_unref(delete);
-	if (old_stmt != NULL)
-		tuple_unref(old_stmt);
-	if (new_stmt != NULL)
-		tuple_unref(new_stmt);
-	return -1;
-}
-
-/**
  * Check that the key can be used for search in a unique index
  * LSM tree.
  * @param  lsm        LSM tree for checking.
@@ -1622,92 +1589,6 @@ vy_unique_key_validate(struct vy_lsm *lsm, const char *key,
 		return -1;
 	}
 	return key_validate_parts(lsm->cmp_def, key, part_count, false);
-}
-
-/**
- * Find a tuple in the primary index LSM tree by the key of the
- * specified LSM tree.
- * @param lsm         LSM tree for which the key is specified.
- *                    Can be both primary and secondary.
- * @param tx          Current transaction.
- * @param rv          Read view.
- * @param key_raw     MessagePack'ed data, the array without a
- *                    header.
- * @param part_count  Count of parts in the key.
- * @param[out] result The found statement is stored here. Must be
- *                    unreferenced after usage.
- *
- * @retval  0 Success.
- * @retval -1 Memory error.
- */
-static inline int
-vy_lsm_full_by_key(struct vy_lsm *lsm, struct vy_tx *tx,
-		   const struct vy_read_view **rv,
-		   const char *key_raw, uint32_t part_count,
-		   struct tuple **result)
-{
-	int rc;
-	struct tuple *key = vy_stmt_new_select(lsm->env->key_format,
-					       key_raw, part_count);
-	if (key == NULL)
-		return -1;
-	struct tuple *found;
-	rc = vy_lsm_get(lsm, tx, rv, key, &found);
-	tuple_unref(key);
-	if (rc != 0)
-		return -1;
-	if (lsm->index_id == 0 || found == NULL) {
-		*result = found;
-		return 0;
-	}
-	/*
-	 * No need in vy_tx_track() as the tuple is already
-	 * tracked in the secondary index LSM tree.
-	 */
-	rc = vy_point_lookup(lsm->pk, tx, rv, found, result);
-	tuple_unref(found);
-	return rc;
-}
-
-/**
- * Delete the tuple from all LSM trees of the vinyl space.
- * @param env        Vinyl environment.
- * @param tx         Current transaction.
- * @param space      Vinyl space.
- * @param tuple      Tuple to delete.
- *
- * @retval  0 Success
- * @retval -1 Memory error or the index is not found.
- */
-static inline int
-vy_delete_impl(struct vy_env *env, struct vy_tx *tx, struct space *space,
-	       const struct tuple *tuple)
-{
-	struct vy_lsm *pk = vy_lsm_find(space, 0);
-	if (pk == NULL)
-		return -1;
-	/* Primary key is dumped last. */
-	assert(!vy_is_committed_one(env, pk));
-	struct tuple *delete =
-		vy_stmt_new_surrogate_delete(pk->mem_format, tuple);
-	if (delete == NULL)
-		return -1;
-	if (vy_tx_set(tx, pk, delete) != 0)
-		goto error;
-
-	/* At second, delete from seconary indexes. */
-	for (uint32_t i = 1; i < space->index_count; ++i) {
-		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (vy_is_committed_one(env, lsm))
-			continue;
-		if (vy_tx_set(tx, lsm, delete) != 0)
-			goto error;
-	}
-	tuple_unref(delete);
-	return 0;
-error:
-	tuple_unref(delete);
-	return -1;
 }
 
 /**
@@ -1751,27 +1632,38 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 *   and pass them to indexes for deletion.
 	 */
 	if (has_secondary || !rlist_empty(&space->on_replace)) {
-		if (vy_lsm_full_by_key(lsm, tx, vy_tx_read_view(tx),
-				key, part_count, &stmt->old_tuple) != 0)
+		if (vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
+				      key, part_count, &stmt->old_tuple) != 0)
 			return -1;
 		if (stmt->old_tuple == NULL)
 			return 0;
 	}
+	int rc = 0;
+	struct tuple *delete;
 	if (has_secondary) {
 		assert(stmt->old_tuple != NULL);
-		return vy_delete_impl(env, tx, space, stmt->old_tuple);
-	} else { /* Primary is the single index in the space. */
-		assert(lsm->index_id == 0);
-		struct tuple *delete =
-			vy_stmt_new_surrogate_delete_from_key(request->key,
-							      pk->key_def,
-							      pk->mem_format);
+		delete = vy_stmt_new_surrogate_delete(pk->mem_format,
+						      stmt->old_tuple);
 		if (delete == NULL)
 			return -1;
-		int rc = vy_tx_set(tx, pk, delete);
-		tuple_unref(delete);
-		return rc;
+		for (uint32_t i = 0; i < space->index_count; i++) {
+			struct vy_lsm *lsm = vy_lsm(space->index[i]);
+			if (vy_is_committed_one(env, lsm))
+				continue;
+			rc = vy_tx_set(tx, lsm, delete);
+			if (rc != 0)
+				break;
+		}
+	} else { /* Primary is the single index in the space. */
+		assert(lsm->index_id == 0);
+		delete = vy_stmt_new_surrogate_delete_from_key(request->key,
+						pk->key_def, pk->mem_format);
+		if (delete == NULL)
+			return -1;
+		rc = vy_tx_set(tx, pk, delete);
 	}
+	tuple_unref(delete);
+	return rc;
 }
 
 /**
@@ -1833,8 +1725,8 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (vy_unique_key_validate(lsm, key, part_count))
 		return -1;
 
-	if (vy_lsm_full_by_key(lsm, tx, vy_tx_read_view(tx),
-			       key, part_count, &stmt->old_tuple) != 0)
+	if (vy_get_by_raw_key(lsm, tx, vy_tx_read_view(tx),
+			      key, part_count, &stmt->old_tuple) != 0)
 		return -1;
 	/* Nothing to update. */
 	if (stmt->old_tuple == NULL)
@@ -2107,8 +1999,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 					pk->key_def, pk->env->key_format);
 	if (key == NULL)
 		return -1;
-	int rc = vy_lsm_get(pk, tx, vy_tx_read_view(tx),
-			      key, &stmt->old_tuple);
+	int rc = vy_get(pk, tx, vy_tx_read_view(tx), key, &stmt->old_tuple);
 	tuple_unref(key);
 	if (rc != 0)
 		return -1;
@@ -2257,18 +2148,86 @@ static int
 vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	   struct space *space, struct request *request)
 {
+	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	if (vy_is_committed(env, space))
 		return 0;
 	if (request->type == IPROTO_INSERT)
 		return vy_insert(env, tx, stmt, space, request);
 
-	if (space->index_count == 1) {
-		/* Replace in a space with a single index. */
-		return vy_replace_one(env, tx, space, request, stmt);
-	} else {
-		/* Replace in a space with secondary indexes. */
-		return vy_replace_impl(env, tx, space, request, stmt);
+	struct vy_lsm *pk = vy_lsm_find(space, 0);
+	if (pk == NULL)
+		return -1;
+	/* Primary key is dumped last. */
+	assert(!vy_is_committed_one(env, pk));
+
+	/* Validate and create a statement for the new tuple. */
+	if (tuple_validate_raw(pk->mem_format, request->tuple))
+		return -1;
+	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, request->tuple,
+					      request->tuple_end);
+	if (stmt->new_tuple == NULL)
+		return -1;
+	/*
+	 * Get the overwritten tuple from the primary index if
+	 * the space has on_replace triggers, in which case we
+	 * need to pass the old tuple to trigger callbacks, or
+	 * if the space has secondary indexes and so we need
+	 * the old tuple to delete it from them.
+	 */
+	if (space->index_count > 1 || !rlist_empty(&space->on_replace)) {
+		if (vy_get(pk, tx, vy_tx_read_view(tx),
+			   stmt->new_tuple, &stmt->old_tuple) != 0)
+			return -1;
+		if (stmt->old_tuple == NULL) {
+			/*
+			 * We can turn REPLACE into INSERT if the
+			 * new key does not have history.
+			 */
+			vy_stmt_set_type(stmt->new_tuple, IPROTO_INSERT);
+		}
 	}
+	/*
+	 * Replace in the primary index without explicit deletion
+	 * of the old tuple.
+	 */
+	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
+		return -1;
+	if (space->index_count == 1)
+		return 0;
+	/*
+	 * Replace in secondary indexes with explicit deletion
+	 * of the old tuple, if any.
+	 */
+	int rc = 0;
+	struct tuple *delete = NULL;
+	if (stmt->old_tuple != NULL) {
+		delete = vy_stmt_new_surrogate_delete(pk->mem_format,
+						      stmt->old_tuple);
+		if (delete == NULL)
+			return -1;
+	}
+	for (uint32_t i = 1; i < space->index_count; i++) {
+		struct vy_lsm *lsm = vy_lsm(space->index[i]);
+		if (vy_is_committed_one(env, lsm))
+			continue;
+		/*
+		 * DELETE goes first, so if old and new keys
+		 * fully match, there is no look up beyond the
+		 * transaction write set.
+		 */
+		if (delete != NULL) {
+			rc = vy_tx_set(tx, lsm, delete);
+			if (rc != 0)
+				break;
+		}
+		rc = vy_insert_secondary(env, tx, space, lsm,
+					 stmt->new_tuple);
+		if (rc != 0)
+			break;
+	}
+	if (delete != NULL)
+		tuple_unref(delete);
+	return rc;
 }
 
 static int
@@ -3533,11 +3492,6 @@ vy_squash_process(struct vy_squash *squash)
 
 	struct vy_lsm *lsm = squash->lsm;
 	struct vy_env *env = squash->env;
-	/*
-	 * vy_apply_upsert() is used for primary key only,
-	 * so this is the same as lsm->key_def
-	 */
-	struct key_def *def = lsm->cmp_def;
 
 	/* Upserts enabled only in the primary index LSM tree. */
 	assert(lsm->index_id == 0);
@@ -3555,8 +3509,10 @@ vy_squash_process(struct vy_squash *squash)
 
 	/*
 	 * While we were reading on-disk runs, new statements could
-	 * have been inserted into the in-memory tree. Apply them to
-	 * the result.
+	 * have been prepared for the squashed key. We mustn't apply
+	 * them, because they may be rolled back, but we must adjust
+	 * their n_upserts counter so that they will get squashed by
+	 * vy_lsm_commit_upsert().
 	 */
 	struct vy_mem *mem = lsm->mem;
 	struct tree_mem_key tree_key = {
@@ -3573,107 +3529,19 @@ vy_squash_process(struct vy_squash *squash)
 		tuple_unref(result);
 		return 0;
 	}
-	/**
-	 * Algorithm of the squashing.
-	 * Assume, during building the non-UPSERT statement
-	 * 'result' in the mem some new UPSERTs were inserted, and
-	 * some of them were commited, while the other were just
-	 * prepared. And lets UPSERT_THRESHOLD to be equal to 3,
-	 * for example.
-	 *                    Mem
-	 *    -------------------------------------+
-	 *    UPSERT, lsn = 1, n_ups = 0           |
-	 *    UPSERT, lsn = 2, n_ups = 1           | Commited
-	 *    UPSERT, lsn = 3, n_ups = 2           |
-	 *    -------------------------------------+
-	 *    UPSERT, lsn = MAX,     n_ups = 3     |
-	 *    UPSERT, lsn = MAX + 1, n_ups = 4     | Prepared
-	 *    UPSERT, lsn = MAX + 2, n_ups = 5     |
-	 *    -------------------------------------+
-	 * In such a case the UPSERT statements with
-	 * lsns = {1, 2, 3} are squashed. But now the n_upsert
-	 * values in the prepared statements are not correct.
-	 * If we will not update values, then the
-	 * vy_lsm_commit_upsert will not be able to squash them.
-	 *
-	 * So after squashing it is necessary to update n_upsert
-	 * value in the prepared statements:
-	 *                    Mem
-	 *    -------------------------------------+
-	 *    UPSERT, lsn = 1, n_ups = 0           |
-	 *    UPSERT, lsn = 2, n_ups = 1           | Commited
-	 *    REPLACE, lsn = 3                     |
-	 *    -------------------------------------+
-	 *    UPSERT, lsn = MAX,     n_ups = 0 !!! |
-	 *    UPSERT, lsn = MAX + 1, n_ups = 1 !!! | Prepared
-	 *    UPSERT, lsn = MAX + 2, n_ups = 2 !!! |
-	 *    -------------------------------------+
-	 */
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
-	const struct tuple *mem_stmt;
-	int64_t stmt_lsn;
-	/*
-	 * According to the described algorithm, squash the
-	 * commited UPSERTs at first.
-	 */
+	uint8_t n_upserts = 0;
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
+		const struct tuple *mem_stmt;
 		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		stmt_lsn = vy_stmt_lsn(mem_stmt);
-		if (vy_tuple_compare(result, mem_stmt, def) != 0)
+		if (vy_tuple_compare(result, mem_stmt, lsm->cmp_def) != 0 ||
+		    vy_stmt_type(mem_stmt) != IPROTO_UPSERT)
 			break;
-		/**
-		 * Leave alone prepared statements; they will be handled
-		 * in vy_range_commit_stmt.
-		 */
-		if (stmt_lsn >= MAX_LSN)
-			break;
-		if (vy_stmt_type(mem_stmt) != IPROTO_UPSERT) {
-			/**
-			 * Somebody inserted non-upsert statement,
-			 * squashing is useless.
-			 */
-			tuple_unref(result);
-			return 0;
-		}
-		assert(lsm->index_id == 0);
-		struct tuple *applied = vy_apply_upsert(mem_stmt, result, def,
-							mem->format, true);
-		lsm->stat.upsert.applied++;
-		tuple_unref(result);
-		if (applied == NULL)
-			return -1;
-		result = applied;
-		/**
-		 * In normal cases we get a result with the same lsn as
-		 * in mem_stmt.
-		 * But if there are buggy upserts that do wrong things,
-		 * they are ignored and the result has lower lsn.
-		 * We should fix the lsn in any case to replace
-		 * exactly mem_stmt in general and the buggy upsert
-		 * in particular.
-		 */
-		vy_stmt_set_lsn(result, stmt_lsn);
+		assert(vy_stmt_lsn(mem_stmt) >= MAX_LSN);
+		vy_stmt_set_n_upserts((struct tuple *)mem_stmt, n_upserts);
+		if (n_upserts <= VY_UPSERT_THRESHOLD)
+			++n_upserts;
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
-	}
-	/*
-	 * The second step of the algorithm above is updating of
-	 * n_upsert values of the prepared UPSERTs.
-	 */
-	if (stmt_lsn >= MAX_LSN) {
-		uint8_t n_upserts = 0;
-		while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
-			mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree,
-								  &mem_itr);
-			if (vy_tuple_compare(result, mem_stmt, def) != 0 ||
-			    vy_stmt_type(mem_stmt) != IPROTO_UPSERT)
-				break;
-			assert(vy_stmt_lsn(mem_stmt) >= MAX_LSN);
-			vy_stmt_set_n_upserts((struct tuple *)mem_stmt,
-					      n_upserts);
-			if (n_upserts <= VY_UPSERT_THRESHOLD)
-				++n_upserts;
-			vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
-		}
 	}
 
 	lsm->stat.upsert.squashed++;
@@ -3860,6 +3728,7 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 		goto fail;
 	if (vy_read_iterator_next(&it->iterator, ret) != 0)
 		goto fail;
+	vy_read_iterator_cache_add(&it->iterator, *ret);
 	if (*ret == NULL) {
 		/* EOF. Close the iterator immediately. */
 		vinyl_iterator_close(it);
@@ -3889,6 +3758,7 @@ next:
 
 	if (tuple == NULL) {
 		/* EOF. Close the iterator immediately. */
+		vy_read_iterator_cache_add(&it->iterator, NULL);
 		vinyl_iterator_close(it);
 		*ret = NULL;
 		return 0;
@@ -3901,28 +3771,14 @@ next:
 			fiber_sleep(0.01);
 	}
 #endif
-	/*
-	 * Get the full tuple from the primary index.
-	 * Note, there's no need in vy_tx_track() as the
-	 * tuple is already tracked in the secondary index.
-	 */
-	if (vy_point_lookup(it->lsm->pk, it->tx, vy_tx_read_view(it->tx),
-			    tuple, ret) != 0)
+	/* Get the full tuple from the primary index. */
+	if (vy_get_by_secondary_tuple(it->lsm, it->tx,
+				      vy_tx_read_view(it->tx),
+				      tuple, ret) != 0)
 		goto fail;
-	if (*ret == NULL) {
-		/*
-		 * All indexes of a space must be consistent, i.e.
-		 * if a tuple is present in one index, it must be
-		 * present in all other indexes as well, so we can
-		 * get here only if there's a bug somewhere in vinyl.
-		 * Don't abort as core dump won't really help us in
-		 * this case. Just warn the user and proceed to the
-		 * next tuple.
-		 */
-		say_warn("%s: key %s missing in primary index",
-			 vy_lsm_name(it->lsm), vy_stmt_str(tuple));
+	if (*ret == NULL)
 		goto next;
-	}
+	vy_read_iterator_cache_add(&it->iterator, *ret);
 	tuple_bless(*ret);
 	tuple_unref(*ret);
 	return 0;
@@ -4011,7 +3867,7 @@ vinyl_index_get(struct index *index, const char *key,
 	const struct vy_read_view **rv = (tx != NULL ? vy_tx_read_view(tx) :
 					  &env->xm->p_global_read_view);
 
-	if (vy_lsm_full_by_key(lsm, tx, rv, key, part_count, ret) != 0)
+	if (vy_get_by_raw_key(lsm, tx, rv, key, part_count, ret) != 0)
 		return -1;
 	if (*ret != NULL) {
 		tuple_bless(*ret);

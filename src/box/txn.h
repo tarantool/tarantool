@@ -302,6 +302,17 @@ txn_rollback_stmt();
 int
 txn_check_singlestatement(struct txn *txn, const char *where);
 
+/**
+ * Returns true if the transaction has a single statement.
+ * Supposed to be used from a space on_replace trigger to
+ * detect transaction boundaries.
+ */
+static inline bool
+txn_is_first_statement(struct txn *txn)
+{
+	return stailq_last(&txn->stmts) == stailq_first(&txn->stmts);
+}
+
 /** The current statement of the transaction. */
 static inline struct txn_stmt *
 txn_current_stmt(struct txn *txn)

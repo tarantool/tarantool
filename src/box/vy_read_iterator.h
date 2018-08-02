@@ -65,6 +65,11 @@ struct vy_read_iterator {
 	/** Last statement returned by vy_read_iterator_next(). */
 	struct tuple *last_stmt;
 	/**
+	 * Last statement added to the tuple cache by
+	 * vy_read_iterator_cache_add().
+	 */
+	struct tuple *last_cached_stmt;
+	/**
 	 * Copy of lsm->range_tree_version.
 	 * Used for detecting range tree changes.
 	 */
@@ -140,6 +145,25 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
  */
 NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result);
+
+/**
+ * Add the last tuple returned by the read iterator to the cache.
+ * @param itr  Read iterator
+ * @param stmt Last tuple returned by the iterator.
+ *
+ * We use a separate function for populating the cache rather than
+ * doing that right in vy_read_iterator_next() so that we can store
+ * full tuples in a secondary index cache, thus saving some memory.
+ *
+ * Usage pattern:
+ * - Call vy_read_iterator_next() to get a partial tuple.
+ * - Call vy_point_lookup() to get the full tuple corresponding
+ *   to the partial tuple returned by the iterator.
+ * - Call vy_read_iterator_cache_add() on the full tuple to add
+ *   the result to the cache.
+ */
+void
+vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct tuple *stmt);
 
 /**
  * Close the iterator and free resources.

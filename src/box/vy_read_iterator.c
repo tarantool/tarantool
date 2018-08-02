@@ -845,24 +845,17 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 	ev_tstamp start_time = ev_monotonic_now(loop());
 
 	struct vy_lsm *lsm = itr->lsm;
-	struct tuple *stmt, *prev_stmt;
+	struct tuple *stmt;
 
-	/*
-	 * Remember the statement returned by the last iteration.
-	 * We will need it to update the cache.
-	 */
-	prev_stmt = itr->last_stmt;
-	if (prev_stmt != NULL)
-		tuple_ref(prev_stmt);
-	else /* first iteration */
-		lsm->stat.lookup++;
+	if (itr->last_stmt == NULL)
+		lsm->stat.lookup++; /* first iteration */
 next_key:
 	if (vy_read_iterator_advance(itr) != 0)
-		goto err;
+		return -1;
 	if (vy_read_iterator_apply_history(itr, &stmt) != 0)
-		goto err;
+		return -1;
 	if (vy_read_iterator_track_read(itr, stmt) != 0)
-		goto err;
+		return -1;
 
 	if (itr->last_stmt != NULL)
 		tuple_unref(itr->last_stmt);
@@ -877,9 +870,9 @@ next_key:
 		 * previous + current tuple as an unbroken chain.
 		 */
 		if (vy_stmt_lsn(stmt) == INT64_MAX) {
-			if (prev_stmt != NULL)
-				tuple_unref(prev_stmt);
-			prev_stmt = NULL;
+			if (itr->last_cached_stmt != NULL)
+				tuple_unref(itr->last_cached_stmt);
+			itr->last_cached_stmt = NULL;
 		}
 		goto next_key;
 	}
@@ -887,18 +880,6 @@ next_key:
 	       vy_stmt_type(stmt) == IPROTO_INSERT ||
 	       vy_stmt_type(stmt) == IPROTO_REPLACE);
 
-	/*
-	 * Store the result in the cache provided we are reading
-	 * the latest data.
-	 */
-	if ((**itr->read_view).vlsn == INT64_MAX) {
-		vy_cache_add(&lsm->cache, stmt, prev_stmt,
-			     itr->key, itr->iterator_type);
-	}
-	if (prev_stmt != NULL)
-		tuple_unref(prev_stmt);
-
-	/* Update LSM tree stats. */
 	if (stmt != NULL)
 		vy_stmt_counter_acct_tuple(&lsm->stat.get, stmt);
 
@@ -914,10 +895,24 @@ next_key:
 
 	*result = stmt;
 	return 0;
-err:
-	if (prev_stmt != NULL)
-		tuple_unref(prev_stmt);
-	return -1;
+}
+
+void
+vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct tuple *stmt)
+{
+	if ((**itr->read_view).vlsn != INT64_MAX) {
+		if (itr->last_cached_stmt != NULL)
+			tuple_unref(itr->last_cached_stmt);
+		itr->last_cached_stmt = NULL;
+		return;
+	}
+	vy_cache_add(&itr->lsm->cache, stmt, itr->last_cached_stmt,
+		     itr->key, itr->iterator_type);
+	if (stmt != NULL)
+		tuple_ref(stmt);
+	if (itr->last_cached_stmt != NULL)
+		tuple_unref(itr->last_cached_stmt);
+	itr->last_cached_stmt = stmt;
 }
 
 /**
@@ -928,6 +923,8 @@ vy_read_iterator_close(struct vy_read_iterator *itr)
 {
 	if (itr->last_stmt != NULL)
 		tuple_unref(itr->last_stmt);
+	if (itr->last_cached_stmt != NULL)
+		tuple_unref(itr->last_cached_stmt);
 	vy_read_iterator_cleanup(itr);
 	free(itr->src);
 	TRASH(itr);

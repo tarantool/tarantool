@@ -62,12 +62,9 @@ struct tuple;
  * tuple in the LSM tree. The tuple is returned in @ret with its
  * reference counter elevated.
  *
- * The caller must guarantee that if the tuple looked up by this
- * function is modified, the transaction will be sent to read view.
- * This is needed to avoid inserting a stale value into the cache.
- * In other words, vy_tx_track() must be called for the search key
- * before calling this function unless this is a primary index and
- * the tuple is already tracked in a secondary index.
+ * Note, this function doesn't track the result in the transaction
+ * read set, i.e. it is up to the caller to call vy_tx_track() if
+ * necessary.
  */
 int
 vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
