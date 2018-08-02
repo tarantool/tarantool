@@ -1440,6 +1440,9 @@ box.schema.user.grant('tester', 'create', 'universe')
 box.schema.user.grant('tester', 'read', 'space', '_sequence')
 ---
 ...
+box.schema.user.grant('tester', 'read', 'space', '_trigger')
+---
+...
 box.session.su("tester")
 ---
 ...
