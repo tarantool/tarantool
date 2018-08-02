@@ -101,6 +101,22 @@ sql_emit_table_affinity(struct Vdbe *v, struct space_def *def, int reg)
 }
 
 /**
+ * In SQL table can be created with AUTOINCREMENT.
+ * In Tarantool it can be detected as primary key which consists
+ * from one field with not NULL space's sequence.
+ */
+static uint32_t
+sql_space_autoinc_fieldno(struct space *space)
+{
+	assert(space != NULL);
+	struct index *pk = space_index(space, 0);
+	if (pk == NULL || pk->def->key_def->part_count != 1 ||
+	    space->sequence == NULL)
+		return UINT32_MAX;
+	return pk->def->key_def->parts[0].fieldno;
+}
+
+/**
  * This routine is used to see if a statement of the form
  * "INSERT INTO <table> SELECT ..." can run for the results of the
  * SELECT.
@@ -556,7 +572,9 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		    sqlite3VdbeAddOp1(v, OP_Yield, dest.iSDParm);
 		VdbeCoverage(v);
 	}
-
+	struct space *space = space_by_id(pTab->def->id);
+	assert(space != NULL);
+	uint32_t autoinc_fieldno = sql_space_autoinc_fieldno(space);
 	/* Run the BEFORE and INSTEAD OF triggers, if there are any
 	 */
 	endOfLoop = sqlite3VdbeMakeLabel(v);
@@ -574,7 +592,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			}
 			if ((!useTempTable && !pList)
 			    || (pColumn && j >= pColumn->nId)) {
-				if (i == pTab->iAutoIncPKey) {
+				if (i == (int) autoinc_fieldno) {
 					sqlite3VdbeAddOp2(v, OP_Integer, -1,
 							  regCols + i + 1);
 				} else {
@@ -637,7 +655,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			}
 			if (j < 0 || nColumn == 0
 			    || (pColumn && j >= pColumn->nId)) {
-				if (i == pTab->iAutoIncPKey) {
+				if (i == (int) autoinc_fieldno) {
 					sqlite3VdbeAddOp2(v,
 							  OP_NextAutoincValue,
 							  pTab->def->id,
@@ -652,7 +670,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 							  dflt,
 							  iRegStore);
 			} else if (useTempTable) {
-				if (i == pTab->iAutoIncPKey) {
+				if (i == (int) autoinc_fieldno) {
 					int regTmp = ++pParse->nMem;
 					/* Emit code which doesn't override
 					 * autoinc-ed value with select result
@@ -671,7 +689,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				}
 			} else if (pSelect) {
 				if (regFromSelect != regData) {
-					if (i == pTab->iAutoIncPKey) {
+					if (i == (int) autoinc_fieldno) {
 						/* Emit code which doesn't override
 						 * autoinc-ed value with select result
 						 * in case that result is NULL
@@ -693,7 +711,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 				}
 			} else {
 
-				if (i == pTab->iAutoIncPKey) {
+				if (i == (int) autoinc_fieldno) {
 					if (pList->a[j].pExpr->op == TK_NULL) {
 						sqlite3VdbeAddOp2(v, OP_Null, 0, iRegStore);
 						continue;
@@ -730,8 +748,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 					    on_error, endOfLoop, 0);
 		fkey_emit_check(pParse, pTab, 0, regIns, 0);
 		int pk_cursor = pParse->nTab++;
-		struct space *space = space_by_id(pTab->def->id);
-		assert(space != NULL);
 		vdbe_emit_open_cursor(pParse, pk_cursor, 0, space);
 		vdbe_emit_insertion_completion(v, pk_cursor, regIns + 1,
 					       pTab->def->field_count,
@@ -842,10 +858,13 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 	struct sqlite3 *db = parse_context->db;
 	struct Vdbe *v = sqlite3GetVdbe(parse_context);
 	assert(v != NULL);
-	struct space_def *def = tab->def;
+	bool is_update = upd_cols != NULL;
+	struct space *space = space_by_id(tab->def->id);
+	assert(space != NULL);
+	struct space_def *def = space->def;
 	/* Insertion into VIEW is prohibited. */
 	assert(!def->opts.is_view);
-	bool is_update = upd_cols != NULL;
+	uint32_t autoinc_fieldno = sql_space_autoinc_fieldno(space);
 	/* Test all NOT NULL constraints. */
 	for (uint32_t i = 0; i < def->field_count; i++) {
 		/*
@@ -855,15 +874,15 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 		if (is_update && upd_cols[i] < 0)
 			continue;
 		/* This column is allowed to be NULL. */
-		if (def->fields[i].is_nullable || tab->iAutoIncPKey == (int) i)
+		if (def->fields[i].is_nullable || autoinc_fieldno == i)
 			continue;
 		enum on_conflict_action on_conflict_nullable =
 			on_conflict != ON_CONFLICT_ACTION_DEFAULT ?
-			on_conflict : tab->def->fields[i].nullable_action;
+			on_conflict : def->fields[i].nullable_action;
 		/* ABORT is a default error action. */
 		if (on_conflict_nullable == ON_CONFLICT_ACTION_DEFAULT)
 			on_conflict_nullable = ON_CONFLICT_ACTION_ABORT;
-		struct Expr *dflt = space_column_default_expr(tab->def->id, i);
+		struct Expr *dflt = space_column_default_expr(def->id, i);
 		if (on_conflict_nullable == ON_CONFLICT_ACTION_REPLACE &&
 		    dflt == NULL)
 			on_conflict_nullable = ON_CONFLICT_ACTION_ABORT;
@@ -904,7 +923,7 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 	if (on_conflict == ON_CONFLICT_ACTION_DEFAULT)
 		on_conflict = ON_CONFLICT_ACTION_ABORT;
 	/* Test all CHECK constraints. */
-	struct ExprList *checks = space_checks_expr_list(tab->def->id);
+	struct ExprList *checks = space_checks_expr_list(def->id);
 	enum on_conflict_action on_conflict_check = on_conflict;
 	if (on_conflict == ON_CONFLICT_ACTION_REPLACE)
 		on_conflict_check = ON_CONFLICT_ACTION_ABORT;
@@ -946,9 +965,9 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 	if (part_count == 1) {
 		uint32_t fieldno = pk->def->key_def->parts[0].fieldno;
 		int reg_pk = new_tuple_reg + fieldno;
-		if (tab->def->fields[fieldno].affinity == AFFINITY_INTEGER) {
+		if (def->fields[fieldno].affinity == AFFINITY_INTEGER) {
 			int skip_if_null = sqlite3VdbeMakeLabel(v);
-			if (tab->iAutoIncPKey >= 0) {
+			if (autoinc_fieldno != UINT32_MAX) {
 				sqlite3VdbeAddOp2(v, OP_IsNull, reg_pk,
 						  skip_if_null);
 			}
@@ -1000,7 +1019,7 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 process_index:  ;
 		int cursor = parse_context->nTab++;
 		vdbe_emit_open_cursor(parse_context, cursor, idx->def->iid,
-				      space_by_id(tab->def->id));
+				      space);
 		/*
 		 * If there is no conflict in current index, just
 		 * jump to the start of next iteration. Label is

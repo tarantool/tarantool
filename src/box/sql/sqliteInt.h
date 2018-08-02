@@ -1816,8 +1816,6 @@ struct Savepoint {
 struct Table {
 	Index *pIndex;		/* List of SQL indexes on this table. */
 	u32 nTabRef;		/* Number of pointers to this Table */
-	i16 iAutoIncPKey;	/* If PK is marked INTEGER PRIMARY KEY AUTOINCREMENT, store
-				   column number here, -1 otherwise Tarantool specifics */
 	/**
 	 * Estimated number of entries in table.
 	 * Used only when table represents temporary objects,
@@ -2804,6 +2802,8 @@ struct Parse {
 	 */
 	struct rlist new_fkey;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
+	/** True, if table to be created has AUTOINCREMENT PK. */
+	bool is_new_table_autoinc;
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
 	/** Type of parsed_ast member. */
