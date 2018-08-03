@@ -192,6 +192,7 @@ csv_parse_impl(struct csv *csv, const char *s, const char *end, bool firstonly)
 				/* end of field */
 				csv->state = CSV_LEADING_SPACES;
 				csv->bufp -= csv->ending_spaces;
+				csv->ending_spaces = 0;
 				if (firstonly) {
 					csv->state = CSV_NEWFIELD;
 					return p;
