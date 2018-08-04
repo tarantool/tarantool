@@ -150,7 +150,7 @@ echo "self.skip = True" > ./test/app/socket.skipcond
 # https://github.com/tarantool/tarantool/issues/1322
 echo "self.skip = True" > ./test/app/digest.skipcond
 # run a safe subset of the test suite
-cd test && ./test-run.py -j -1 unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
+cd test && ./test-run.py -j 1 unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
 %endif
 
 %pre
