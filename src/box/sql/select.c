@@ -4817,14 +4817,13 @@ selectExpander(Walker * pWalker, Select * p)
 				int space_id =
 					box_space_id_by_name(t_name,
 							     strlen(t_name));
-				if (space_id == BOX_ID_NIL) {
+				struct space *space = space_by_id(space_id);
+				if (space == NULL) {
 					sqlite3ErrorMsg(pParse,
 							"no such table: %s",
 							t_name);
 					return WRC_Abort;
 				}
-				struct space *space = space_by_id(space_id);
-
 				if (space->def->field_count <= 0) {
 					sqlite3ErrorMsg(pParse, "no format for"\
 							" space: %s", t_name);

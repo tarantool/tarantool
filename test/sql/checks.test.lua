@@ -43,4 +43,11 @@ format = {{name = 'X', type = 'unsigned'}}
 t = {513, 1, 'test', 'memtx', 0, opts, format}
 s = box.space._space:insert(t)
 
+
+--
+-- gh-3611: Segfault on table creation with check referencing this table
+--
+box.sql.execute("CREATE TABLE w2 (s1 INT PRIMARY KEY, CHECK ((SELECT COUNT(*) FROM w2) = 0));")
+box.sql.execute("DROP TABLE w2;")
+
 test_run:cmd("clear filter")
