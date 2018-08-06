@@ -9,6 +9,16 @@ replication_timeout = box.cfg.replication_timeout
 replication_connect_timeout = box.cfg.replication_connect_timeout
 box.cfg{replication_timeout=0.05, replication_connect_timeout=0.05, replication={}}
 box.cfg{replication = {'127.0.0.1:12345', box.cfg.listen}}
+
+-- gh-3606 - Tarantool crashes if box.cfg.replication is updated concurrently
+fiber = require('fiber')
+c = fiber.channel(2)
+f = function() fiber.create(function() pcall(box.cfg, {replication = {12345}}) c:put(true) end) end
+f()
+f()
+c:get()
+c:get()
+
 box.cfg{replication_timeout = replication_timeout, replication_connect_timeout = replication_connect_timeout}
 
 -- gh-3111 - Allow to rebootstrap a replica from a read-only master

@@ -5,6 +5,21 @@ local json = require('json')
 local private = require('box.internal')
 local urilib = require('uri')
 local math = require('math')
+local fiber = require('fiber')
+
+-- Function decorator that is used to prevent box.cfg() from
+-- being called concurrently by different fibers.
+local lock = fiber.channel(1)
+local function locked(f)
+    return function(...)
+        lock:put(true)
+        local status, err = pcall(f, ...)
+        lock:get()
+        if not status then
+            error(err)
+        end
+    end
+end
 
 -- all available options
 local default_cfg = {
@@ -387,7 +402,7 @@ local function load_cfg(cfg)
     -- Save new box.cfg
     box.cfg = cfg
     if not pcall(private.cfg_check)  then
-        box.cfg = load_cfg -- restore original box.cfg
+        box.cfg = locked(load_cfg) -- restore original box.cfg
         return box.error() -- re-throw exception from check_cfg()
     end
     -- Restore box members after initial configuration
@@ -401,7 +416,7 @@ local function load_cfg(cfg)
             __newindex = function(table, index)
                 error('Attempt to modify a read-only table')
             end,
-            __call = reload_cfg,
+            __call = locked(reload_cfg),
         })
     private.cfg_load()
     for key, fun in pairs(dynamic_cfg) do
@@ -417,7 +432,7 @@ local function load_cfg(cfg)
         box.schema.upgrade{auto = true}
     end
 end
-box.cfg = load_cfg
+box.cfg = locked(load_cfg)
 
 -- gh-810:
 -- hack luajit default cpath
