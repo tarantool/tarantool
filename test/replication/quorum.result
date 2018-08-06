@@ -5,7 +5,7 @@ SERVERS = {'quorum1', 'quorum2', 'quorum3'}
 ---
 ...
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
 test_run:wait_fullmesh(SERVERS)
@@ -27,7 +27,7 @@ test_run:cmd('switch quorum2')
 ---
 - true
 ...
-test_run:cmd('restart server quorum2')
+test_run:cmd('restart server quorum2 with args="0.1 0.5"')
 box.info.status -- orphan
 ---
 - orphan
@@ -51,7 +51,7 @@ box.info.status -- running
 ---
 - running
 ...
-test_run:cmd('restart server quorum2')
+test_run:cmd('restart server quorum2 with args="0.1 0.5"')
 box.info.status -- orphan
 ---
 - orphan
@@ -82,7 +82,7 @@ box.info.status -- running
 ---
 - running
 ...
-test_run:cmd('restart server quorum2')
+test_run:cmd('restart server quorum2 with args="0.1 0.5"')
 box.info.status -- orphan
 ---
 - orphan
@@ -99,7 +99,7 @@ box.space.test:replace{100} -- error
 ---
 - error: Can't modify data because this instance is in read-only mode.
 ...
-test_run:cmd('start server quorum1')
+test_run:cmd('start server quorum1 with args="0.1 0.5"')
 ---
 - true
 ...
@@ -158,7 +158,7 @@ fiber = require('fiber')
 fiber.sleep(0.1)
 ---
 ...
-test_run:cmd('start server quorum1')
+test_run:cmd('start server quorum1 with args="0.1  0.5"')
 ---
 - true
 ...
@@ -196,7 +196,7 @@ test_run:cmd('switch quorum1')
 ---
 - true
 ...
-test_run:cmd('restart server quorum1 with cleanup=1')
+test_run:cmd('restart server quorum1 with cleanup=1, args="0.1 0.5"')
 box.space.test:count() -- 100
 ---
 - 100
@@ -356,7 +356,7 @@ SERVERS = {'master_quorum1', 'master_quorum2'}
 ---
 ...
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
 test_run:wait_fullmesh(SERVERS)

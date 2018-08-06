@@ -98,7 +98,7 @@ box.schema.user.revoke('guest', 'replication')
 SERVERS = { 'on_replace1', 'on_replace2' }
 ---
 ...
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.2"})
 ---
 ...
 test_run:wait_fullmesh(SERVERS)

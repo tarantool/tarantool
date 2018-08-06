@@ -3,7 +3,7 @@ test_run = require('test_run').new()
 SERVERS = {'quorum1', 'quorum2', 'quorum3'}
 
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 test_run:wait_fullmesh(SERVERS)
 
 -- Stop one replica and try to restart another one.
@@ -18,7 +18,7 @@ test_run:cmd('stop server quorum1')
 
 test_run:cmd('switch quorum2')
 
-test_run:cmd('restart server quorum2')
+test_run:cmd('restart server quorum2 with args="0.1 0.5"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
@@ -26,7 +26,7 @@ box.space.test:replace{100} -- error
 box.cfg{replication={}}
 box.info.status -- running
 
-test_run:cmd('restart server quorum2')
+test_run:cmd('restart server quorum2 with args="0.1 0.5"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
@@ -36,12 +36,12 @@ box.ctl.wait_rw()
 box.info.ro -- false
 box.info.status -- running
 
-test_run:cmd('restart server quorum2')
+test_run:cmd('restart server quorum2 with args="0.1 0.5"')
 box.info.status -- orphan
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
 box.space.test:replace{100} -- error
-test_run:cmd('start server quorum1')
+test_run:cmd('start server quorum1 with args="0.1 0.5"')
 box.ctl.wait_rw()
 box.info.ro -- false
 box.info.status -- running
@@ -63,7 +63,7 @@ for i = 1, 100 do box.space.test:insert{i} end
 fiber = require('fiber')
 fiber.sleep(0.1)
 
-test_run:cmd('start server quorum1')
+test_run:cmd('start server quorum1 with args="0.1  0.5"')
 test_run:cmd('switch quorum1')
 box.space.test:count() -- 100
 
@@ -79,7 +79,7 @@ test_run:cmd('switch quorum2')
 box.snapshot()
 
 test_run:cmd('switch quorum1')
-test_run:cmd('restart server quorum1 with cleanup=1')
+test_run:cmd('restart server quorum1 with cleanup=1, args="0.1 0.5"')
 
 box.space.test:count() -- 100
 
@@ -136,7 +136,7 @@ box.schema.user.revoke('guest', 'replication')
 -- Second case, check that master-master works.
 SERVERS = {'master_quorum1', 'master_quorum2'}
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 test_run:wait_fullmesh(SERVERS)
 test_run:cmd("switch master_quorum1")
 repl = box.cfg.replication

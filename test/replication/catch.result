@@ -23,7 +23,7 @@ test_run:cmd("create server replica with rpl_master=default, script='replication
 ---
 - true
 ...
-test_run:cmd("start server replica with args='1'")
+test_run:cmd("start server replica with args='0.1'")
 ---
 - true
 ...

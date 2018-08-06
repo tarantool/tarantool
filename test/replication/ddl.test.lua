@@ -3,7 +3,7 @@ test_run = require('test_run').new()
 SERVERS = { 'ddl1', 'ddl2', 'ddl3', 'ddl4' }
 
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 test_run:wait_fullmesh(SERVERS)
 test_run:cmd("switch ddl1")
 test_run = require('test_run').new()

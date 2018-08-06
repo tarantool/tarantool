@@ -8,7 +8,7 @@ SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 ---
 ...
 -- Start servers
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
 -- Wait for full mesh
@@ -66,7 +66,7 @@ fio.unlink(fio.pathjoin(fio.abspath("."), string.format('autobootstrap1/%020d.xl
 ---
 - true
 ...
-test_run:cmd("start server autobootstrap1")
+test_run:cmd('start server autobootstrap1 with args="0.1 0.5"')
 ---
 - true
 ...
