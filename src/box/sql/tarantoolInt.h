@@ -66,8 +66,22 @@ int tarantoolSqlite3Insert(struct space *space, const char *tuple,
 int tarantoolSqlite3Replace(struct space *space, const char *tuple,
 			    const char *tuple_end);
 int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
+
+/**
+ * Delete entry from space by its key.
+ *
+ * @param space Space which contains record to be deleted.
+ * @param iid Index id.
+ * @param key Key of record to be deleted.
+ * @param key_size Size of key.
+ *
+ * @retval SQLITE_OK on success, SQL_TARANTOOL_DELETE_FAIL
+ *         otherwise.
+ */
 int
-sql_delete_by_key(struct space *space, char *key, uint32_t key_size);
+sql_delete_by_key(struct space *space, uint32_t iid, char *key,
+		  uint32_t key_size);
+
 int tarantoolSqlite3ClearTable(struct space *space);
 
 /**

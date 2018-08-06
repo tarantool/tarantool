@@ -4367,7 +4367,7 @@ case OP_SDelete: {
 	struct space *space = space_by_id(pOp->p1);
 	assert(space != NULL);
 	assert(space_is_system(space));
-	rc = sql_delete_by_key(space, pIn2->z, pIn2->n);
+	rc = sql_delete_by_key(space, 0, pIn2->z, pIn2->n);
 	if (rc)
 		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)

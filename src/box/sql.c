@@ -543,23 +543,15 @@ int tarantoolSqlite3Delete(BtCursor *pCur, u8 flags)
 				&key_size);
 	if (key == NULL)
 		return SQL_TARANTOOL_DELETE_FAIL;
-
-	rc = sql_delete_by_key(pCur->space, key, key_size);
+	rc = sql_delete_by_key(pCur->space, pCur->index->def->iid, key,
+			       key_size);
 
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_DELETE_FAIL;
 }
 
-/**
- * Delete entry from space by its key.
- *
- * @param space Space which contains record to be deleted.
- * @param key Key of record to be deleted.
- * @param key_size Size of key.
- *
- * @retval SQLITE_OK on success, SQL_TARANTOOL_DELETE_FAIL otherwise.
- */
 int
-sql_delete_by_key(struct space *space, char *key, uint32_t key_size)
+sql_delete_by_key(struct space *space, uint32_t iid, char *key,
+		  uint32_t key_size)
 {
 	struct request request;
 	struct tuple *unused;
@@ -568,6 +560,8 @@ sql_delete_by_key(struct space *space, char *key, uint32_t key_size)
 	request.key = key;
 	request.key_end = key + key_size;
 	request.space_id = space->def->id;
+	request.index_id = iid;
+	assert(space_index(space, iid)->def->opts.is_unique);
 	int rc = box_process_rw(&request, space, &unused);
 
 	return rc == 0 ? SQLITE_OK : SQL_TARANTOOL_DELETE_FAIL;
