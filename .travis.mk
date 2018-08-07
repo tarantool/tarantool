@@ -42,7 +42,7 @@ deps_ubuntu:
 test_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo
 	make -j8
-	cd test && /usr/bin/python test-run.py -j -1
+	cd test && /usr/bin/python test-run.py -j 1
 
 deps_osx:
 	brew update
@@ -62,14 +62,14 @@ test_osx: deps_osx
 	curl --silent --show-error --retry 5 https://bootstrap.pypa.io/get-pip.py | python && \
 	pip --version && \
 	pip install -r test-run/requirements.txt && \
-	cd test && python test-run.py -j -1 unit/ app/ app-tap/ box/ box-tap/ && \
+	cd test && python test-run.py -j 1 unit/ app/ app-tap/ box/ box-tap/ && \
 	deactivate
 
 coverage_ubuntu: deps_ubuntu
 	cmake . -DCMAKE_BUILD_TYPE=Debug -DENABLE_GCOV=ON
 	make -j8
 	# Enable --long tests for coverage
-	cd test && /usr/bin/python test-run.py -j -1 --long
+	cd test && /usr/bin/python test-run.py -j 1 --long
 	lcov --compat-libtool --directory src/ --capture --output-file coverage.info.tmp
 	lcov --compat-libtool --remove coverage.info.tmp 'tests/*' 'third_party/*' '/usr/*' \
 		--output-file coverage.info
