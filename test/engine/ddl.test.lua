@@ -534,7 +534,9 @@ format[1] = { name = 'field1', type = 'unsigned', is_nullable = true }
 format[2] = { name = 'field2', type = 'unsigned', is_nullable = true }
 s = box.schema.space.create('test', {engine = engine, format = format})
 s:create_index('primary', { parts = { 'field1' } })
-s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
+-- This is allowed, but the actual part is_nullable stays false.
+pk = s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
+pk:drop()
 format[1].is_nullable = false
 s:format(format)
 s:create_index('primary', { parts = {{'field1', is_nullable = true}} })
@@ -545,6 +547,8 @@ i.parts
 -- Check that is_nullable can't be set to false on non-empty space
 s:insert({1, NULL})
 format[1].is_nullable = true
+-- The format is allowed since in primary index parts
+-- is_nullable is still set to false.
 s:format(format)
 format[1].is_nullable = false
 format[2].is_nullable = false

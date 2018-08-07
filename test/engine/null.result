@@ -70,47 +70,7 @@ ok
 ---
 - false
 ...
--- Conflict of is_nullable in format and in parts.
-parts[1].is_nullable = false
----
-...
-sk = s:create_index('sk', { parts = parts }) -- Fail.
----
-- error: Field 2 is nullable in space format, but not nullable in index parts
-...
--- Try skip nullable in format and specify in part.
-parts[1].is_nullable = true
----
-...
-sk = s:create_index('sk', { parts = parts }) -- Ok.
----
-...
-format[2].is_nullable = nil
----
-...
-s:format(format) -- Fail.
----
-- error: Field 2 is not nullable in space format, but nullable in index parts
-...
-sk:drop()
----
-...
--- Try to set nullable in part with no format.
-s:format({})
----
-...
 sk = s:create_index('sk', { parts = parts })
----
-...
--- And then set format with no nullable.
-s:format(format) -- Fail.
----
-- error: Field 2 is not nullable in space format, but nullable in index parts
-...
-format[2].is_nullable = true
----
-...
-s:format(format) -- Ok.
 ---
 ...
 -- Test insert.
@@ -1556,6 +1516,179 @@ i2:select{}
   - [100, 100]
   - [25, 25, 25]
   - [75, 75, 75]
+...
+s:drop()
+---
+...
+-- gh-3430 allow different nullability in space format and indices.
+-- Resulting field nullability is the strictest of the two.
+s = box.schema.space.create('test', {engine=engine})
+---
+...
+pk = s:create_index('primary', {parts={1, 'unsigned'}})
+---
+...
+sk = s:create_index('secondary', {parts={2, 'unsigned', is_nullable=false}})
+---
+...
+format = {}
+---
+...
+format[1] = {name = 'first', type = 'unsigned', is_nullable = false}
+---
+...
+format[2] = {name = 'second', type = 'unsigned', is_nullable = false}
+---
+...
+s:format(format)
+---
+...
+-- Field 2 is not nullable.
+s:insert{5}
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+s:insert{5, box.NULL}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}} -- This is allowed.
+---
+...
+-- Without space format setting this fails.
+s:insert{5, box.NULL}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:insert{5}
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
+---
+...
+format[2].is_nullable = true
+---
+...
+s:format(format) -- This is also allowed.
+---
+...
+-- inserts still fail due to not nullable index parts.
+s:insert{5, box.NULL}
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:insert{5}
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}}
+---
+...
+-- Now the field really is nullable.
+-- Success.
+s:insert{5, box.NULL}
+---
+- [5, null]
+...
+s:insert{6}
+---
+- [6]
+...
+s:insert{7, 8}
+---
+- [7, 8]
+...
+s:select{}
+---
+- - [5, null]
+  - [6]
+  - [7, 8]
+...
+-- Check that we cannot set field nullability to false when the
+-- space has tuples with NULL in this field.
+format[2].is_nullable = false
+---
+...
+s:format(format) -- Fail.
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Fail.
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+_ = s:delete{5}
+---
+...
+s:format(format) -- Still fail.
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Still fail.
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+-- Now check we can set nullability to false step by step.
+_ = s:delete{6}
+---
+...
+format[2].is_nullable = false
+---
+...
+s:format(format)
+---
+...
+s:insert{5, box.NULL} -- Fail.
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:insert{5} -- Fail.
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+format[2].is_nullable = true
+---
+...
+s:format(format)
+---
+...
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
+---
+...
+s:insert{5, box.NULL} -- Fail.
+---
+- error: 'Tuple field 2 type does not match one required by operation: expected unsigned'
+...
+s:insert{5} -- Fail.
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+format[2].is_nullable = false
+---
+...
+s:format(format)
+---
+...
+s:select{}
+---
+- - [7, 8]
+...
+s:insert{5} -- Fail.
+---
+- error: Tuple field count 1 is less than required by space format or defined indexes
+    (expected at least 2)
+...
+s:insert{9, 10} -- Success.
+---
+- [9, 10]
 ...
 s:drop()
 ---

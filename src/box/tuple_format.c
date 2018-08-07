@@ -84,12 +84,11 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			if (part->fieldno >= field_count) {
 				field->is_nullable = part->is_nullable;
 			} else if (field->is_nullable != part->is_nullable) {
-				diag_set(ClientError, ER_NULLABLE_MISMATCH,
-					 part->fieldno + TUPLE_INDEX_BASE,
-					 field->is_nullable ? "nullable" :
-					 "not nullable", part->is_nullable ?
-					 "nullable" : "not nullable");
-				return -1;
+				/*
+				 * In case of mismatch set the most
+				 * strict option for is_nullable.
+				 */
+				field->is_nullable = false;
 			}
 
 			/*
