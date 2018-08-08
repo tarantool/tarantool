@@ -1284,8 +1284,9 @@ errinj.set('ERRINJ_VY_LOG_FILE_RENAME', false)
 ---
 - ok
 ...
-for i = 1, 10 do box.space.test:insert{i} end
+errinj.set('ERRINJ_VY_GC', true)
 ---
+- ok
 ...
 errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.001)
 ---
@@ -1295,20 +1296,29 @@ errinj.set('ERRINJ_VY_RUN_FILE_RENAME', true)
 ---
 - ok
 ...
+box.space.test:insert{1}
+---
+- [1]
+...
 box.snapshot() -- error
 ---
 - error: Error injection 'vinyl run file rename'
-...
-errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', true)
----
-- ok
 ...
 errinj.set('ERRINJ_VY_RUN_FILE_RENAME', false)
 ---
 - ok
 ...
-fiber.sleep(0.01)
+-- Wait for the scheduler to unthrottle.
+repeat fiber.sleep(0.001) until pcall(box.snapshot)
 ---
+...
+errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', true)
+---
+- ok
+...
+box.space.test:insert{2}
+---
+- [2]
 ...
 box.snapshot() -- error
 ---
@@ -1319,6 +1329,10 @@ errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', false)
 - ok
 ...
 errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
+---
+- ok
+...
+errinj.set('ERRINJ_VY_GC', false)
 ---
 - ok
 ...

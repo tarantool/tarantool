@@ -448,17 +448,24 @@ errinj.set('ERRINJ_VY_LOG_FILE_RENAME', true)
 box.snapshot()
 errinj.set('ERRINJ_VY_LOG_FILE_RENAME', false)
 
-for i = 1, 10 do box.space.test:insert{i} end
-
+errinj.set('ERRINJ_VY_GC', true)
 errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.001)
+
 errinj.set('ERRINJ_VY_RUN_FILE_RENAME', true)
+box.space.test:insert{1}
 box.snapshot() -- error
-errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', true)
 errinj.set('ERRINJ_VY_RUN_FILE_RENAME', false)
-fiber.sleep(0.01)
+
+-- Wait for the scheduler to unthrottle.
+repeat fiber.sleep(0.001) until pcall(box.snapshot)
+
+errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', true)
+box.space.test:insert{2}
 box.snapshot() -- error
 errinj.set('ERRINJ_VY_INDEX_FILE_RENAME', false)
+
 errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
+errinj.set('ERRINJ_VY_GC', false)
 
 #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, '*.vylog.inprogress')) > 0
 #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, box.space.test.id, 0, '*.run.inprogress')) > 0
