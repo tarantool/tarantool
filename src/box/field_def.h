@@ -78,6 +78,11 @@ enum affinity_type {
     AFFINITY_INTEGER = 'D',
     AFFINITY_REAL = 'E',
 };
+
+/** String name of @a type. */
+const char *
+affinity_type_str(enum affinity_type type);
+
 /** \endcond public */
 
 extern const char *field_type_strs[];

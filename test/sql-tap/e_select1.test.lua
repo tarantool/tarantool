@@ -1574,7 +1574,7 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-7.10.0",
     [[
-        CREATE TABLE y1(a  TEXT COLLATE "unicode_ci" PRIMARY KEY, b  TEXT COLLATE binary, c INT );
+        CREATE TABLE y1(a  TEXT COLLATE "unicode_ci" PRIMARY KEY, b  TEXT COLLATE binary, c TEXT );
         INSERT INTO y1 VALUES('Abc', 'abc', 'aBC');
     ]], {
         -- <e_select-7.10.0>

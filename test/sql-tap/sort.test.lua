@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(62)
+test:plan(60)
 
 --!./tcltestrunner.lua
 -- 2001 September 15.
@@ -258,16 +258,6 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    "sort-2.1.3",
-    [[
-        SELECT v FROM t1 ORDER BY substr(v,2,999)+0.0;
-    ]], {
-        -- <sort-2.1.3>
-        "x-4221.0", "x-123.0", "x-3.141592653", "x-2.15", "x-2b", "x0.0013442", "x1.6", "x11.0"
-        -- </sort-2.1.3>
-    })
-
-test:do_execsql_test(
     "sort-2.1.4",
     [[
         SELECT v FROM t1 ORDER BY substr(v,2,999) DESC;
@@ -275,16 +265,6 @@ test:do_execsql_test(
         -- <sort-2.1.4>
         "x11.0", "x1.6", "x0.0013442", "x-4221.0", "x-3.141592653", "x-2b", "x-2.15", "x-123.0"
         -- </sort-2.1.4>
-    })
-
-test:do_execsql_test(
-    "sort-2.1.5",
-    [[
-        SELECT v FROM t1 ORDER BY substr(v,2,999)+0.0 DESC;
-    ]], {
-        -- <sort-2.1.5>
-        "x11.0", "x1.6", "x0.0013442", "x-2b", "x-2.15", "x-3.141592653", "x-123.0", "x-4221.0"
-        -- </sort-2.1.5>
     })
 
 -- This is a bug fix for 2.2.4.

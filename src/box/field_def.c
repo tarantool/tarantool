@@ -33,6 +33,24 @@
 #include "trivia/util.h"
 #include "key_def.h"
 
+static const char *affinity_type_strs[] = {
+	/* [UNDEFINED] */ "undefined",
+	/* [BLOB - 'A'] */ "blob",
+	/* [TEXT - 'A'] */ "text",
+	/* [NUMERIC - 'A'] */ "numeric",
+	/* [INTEGER - 'A'] */ "integer",
+	/* [REAL - 'A'] */ "real",
+};
+
+const char *
+affinity_type_str(enum affinity_type type)
+{
+	if (type < 'A')
+		return affinity_type_strs[type];
+	else
+		return affinity_type_strs[type - 'A' + 1];
+}
+
 const char *field_type_strs[] = {
 	/* [FIELD_TYPE_ANY]      = */ "any",
 	/* [FIELD_TYPE_UNSIGNED] = */ "unsigned",

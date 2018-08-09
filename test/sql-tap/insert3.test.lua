@@ -28,18 +28,18 @@ test:plan(18)
 test:do_execsql_test(
     "insert3-1.0",
     [[
-            CREATE TABLE t1(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT );
-            CREATE TABLE log(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x  INT UNIQUE, y INT );
+            CREATE TABLE t1(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a TEXT ,b INT);
+            CREATE TABLE log(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT UNIQUE, y INT );
             CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN
               UPDATE log SET y=y+1 WHERE x=new.a;
               INSERT OR IGNORE INTO log(x, y) VALUES(new.a, 1);
             END;
-            INSERT INTO t1(a, b) VALUES('hello','world');
-            INSERT INTO t1(a, b) VALUES(5,10);
+            INSERT INTO t1(a, b) VALUES('hello',5);
+            INSERT INTO t1(a, b) VALUES('5',1);
             SELECT x,y FROM log ORDER BY x;
     ]], {
         -- <insert3-1.0>
-        5, 1, "hello", 1
+        "5", 1, "hello", 1
         -- </insert3-1.0>
 })
 
@@ -50,23 +50,23 @@ test:do_execsql_test(
             SELECT x, y FROM log ORDER BY x;
     ]], {
         -- <insert3-1.1>
-        5, 2, "hello", 2
+        "5", 2, "hello", 2
         -- </insert3-1.1>
 })
 
 test:do_execsql_test(
     "insert3-1.2",
     [[
-            CREATE TABLE log2(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x  INT UNIQUE,y INT );
+            CREATE TABLE log2(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT UNIQUE,y INT );
             CREATE TRIGGER r2 BEFORE INSERT ON t1 BEGIN
               UPDATE log2 SET y=y+1 WHERE x=new.b;
               INSERT OR IGNORE INTO log2(x, y) VALUES(new.b,1);
             END;
-            INSERT INTO t1(a, b) VALUES(453,'hi');
+            INSERT INTO t1(a, b) VALUES('hi', 453);
             SELECT x,y FROM log ORDER BY x;
     ]], {
         -- <insert3-1.2>
-        5, 2, 453, 1, "hello", 2
+        "5",2,"hello",2,"hi",1
         -- </insert3-1.2>
 })
 
@@ -76,7 +76,7 @@ test:do_execsql_test(
             SELECT x,y FROM log2 ORDER BY x;
     ]], {
         -- <insert3-1.3>
-        "hi", 1
+        "453", 1
         -- </insert3-1.3>
 })
 
@@ -88,7 +88,7 @@ test:do_execsql_test(
                 SELECT 'b:', x, y FROM log2 ORDER BY x;
     ]], {
         -- <insert3-1.4.1>
-        "a:", 5, 4, "b:", 10, 2, "b:", 20, 1, "a:", 453, 2, "a:", "hello", 4, "b:", "hi", 2, "b:", "world", 1
+        "b:","1",1,"b:","11",1,"b:","15",1,"b:","453",2,"a:","5",4,"b:","5",1,"a:","hello",4,"a:","hi",2
         -- </insert3-1.4.1>
 })
 
@@ -99,7 +99,7 @@ test:do_execsql_test(
                 SELECT 'b:', x, y FROM log2 ORDER BY x, y;
     ]], {
         -- <insert3-1.4.2>
-        "a:", 5, 4, "b:", 10, 2, "b:", 20, 1, "a:", 453, 2, "a:", "hello", 4, "b:", "hi", 2, "b:", "world", 1
+        "b:","1",1,"b:","11",1,"b:","15",1,"b:","453",2,"b:","5",1,"a:","5",4,"a:","hello",4,"a:","hi",2
         -- </insert3-1.4.2>
 })
 
@@ -110,7 +110,7 @@ test:do_execsql_test(
             SELECT x,y FROM log ORDER BY x;
     ]], {
         -- <insert3-1.5>
-        5, 4, 453, 2, "hello", 4, "xyz", 1
+        "5",4,"hello",4,"hi",2,"xyz",1
         -- </insert3-1.5>
 })
 
@@ -121,10 +121,10 @@ test:do_execsql_test(
     [[
             CREATE TABLE t2(
               a INTEGER PRIMARY KEY AUTOINCREMENT,
-              b  INT DEFAULT 'b',
-              c  INT DEFAULT 'c'
+              b TEXT DEFAULT 'b',
+              c TEXT DEFAULT 'c'
             );
-            CREATE TABLE t2dup(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT );
+            CREATE TABLE t2dup(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b TEXT, c TEXT);
             CREATE TRIGGER t2r1 BEFORE INSERT ON t2 BEGIN
               INSERT INTO t2dup(a,b,c) VALUES(new.a,new.b,new.c);
             END;
@@ -134,7 +134,7 @@ test:do_execsql_test(
             SELECT * FROM t2dup;
     ]], {
         -- <insert3-2.1>
-        1, 123, "b", "c", 2, -1, 234, "c", 3, -1, "b", 345
+        1, 123, "b", "c", 2, -1, "234", "c", 3, -1, "b", "345"
         -- </insert3-2.1>
 })
 
@@ -148,7 +148,7 @@ test:do_execsql_test(
             SELECT * FROM t2dup;
     ]], {
         -- <insert3-2.2>
-        4, 1, "b", "c", 5, -1, 987, "c", 6, -1, "b", 876
+        4, 1, "b", "c", 5, -1, "987", "c", 6, -1, "b", "876"
         -- </insert3-2.2>
 })
 
@@ -209,7 +209,7 @@ test:do_execsql_test(
     [[
             CREATE TABLE t5(
               a INTEGER PRIMARY KEY AUTOINCREMENT,
-              b  INT DEFAULT 'xyz'
+              b TEXT DEFAULT 'xyz'
             );
             INSERT INTO t5 DEFAULT VALUES;
             SELECT * FROM t5;
@@ -233,7 +233,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "insert3-3.7",
     [[
-            CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x INT ,y  INT DEFAULT 4.3, z  INT DEFAULT x'6869');
+            CREATE TABLE t6(id INTEGER PRIMARY KEY AUTOINCREMENT, x INT ,y FLOAT DEFAULT 4.3, z TEXT DEFAULT 'hi');
             INSERT INTO t6 DEFAULT VALUES;
             SELECT * FROM t6;
     ]], {

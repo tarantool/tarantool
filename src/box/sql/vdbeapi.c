@@ -206,19 +206,25 @@ sqlite3_value_bytes(sqlite3_value * pVal)
 double
 sqlite3_value_double(sqlite3_value * pVal)
 {
-	return sqlite3VdbeRealValue((Mem *) pVal);
+	double v;
+	sqlite3VdbeRealValue((Mem *) pVal, &v);
+	return v;
 }
 
 int
 sqlite3_value_int(sqlite3_value * pVal)
 {
-	return (int)sqlite3VdbeIntValue((Mem *) pVal);
+	int64_t i;
+	sqlite3VdbeIntValue((Mem *) pVal, &i);
+	return (int)i;
 }
 
 sqlite_int64
 sqlite3_value_int64(sqlite3_value * pVal)
 {
-	return sqlite3VdbeIntValue((Mem *) pVal);
+	int64_t i;
+	sqlite3VdbeIntValue((Mem *) pVal, &i);
+	return i;
 }
 
 enum sql_subtype

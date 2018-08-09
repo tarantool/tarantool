@@ -269,7 +269,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.26",
     [[
-        INSERT INTO t8 VALUES(666, 'b');
+        INSERT INTO t8 VALUES(666, 54644);
     ]], {
         -- <fkey2-1.26>
         1, "FOREIGN KEY constraint failed"

@@ -104,7 +104,7 @@ test:do_execsql_test(
         SELECT msgpack_decode_sample("sample") FROM "_sql_stat4";
     ]], {
         -- <2.1>
-        "some text 14", "text 12", "some text", 22
+        "text 12","some text 14","text","some text"
         -- </2.1>
     })
 

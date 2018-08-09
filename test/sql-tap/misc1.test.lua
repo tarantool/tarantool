@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(59)
+test:plan(58)
 
 --!./tcltestrunner.lua
 -- 2001 September 15.
@@ -1045,17 +1045,6 @@ test:do_catchsql_test(
         -- <misc1-21.2>
         1, [[near ";": syntax error]]
         -- </misc1-21.2>
-    })
-
--- 2015-04-15
-test:do_execsql_test(
-    "misc1-22.1",
-    [[
-        SELECT ''+3 FROM (SELECT ''+5);
-    ]], {
-        -- <misc1-22.1>
-        3
-        -- </misc1-22.1>
     })
 
 -- # 2015-04-19: NULL pointer dereference on a corrupt schema

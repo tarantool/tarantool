@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(25)
+test:plan(23)
 
 --!./tcltestrunner.lua
 -- 2007 May 15
@@ -206,27 +206,6 @@ test:do_test(
         -- </badutf-1.20>
     })
 end
-
-
-test:do_test(
-    "badutf-2.1",
-    function()
-        return test:execsql2("SELECT '\x80'=CAST(x'80' AS text) AS x")
-    end, {
-        -- <badutf-2.1>
-        "X", 1
-        -- </badutf-2.1>
-    })
-
-test:do_test(
-    "badutf-2.2",
-    function()
-        return test:execsql2("SELECT CAST('\x80' AS blob)=x'80' AS x")
-    end, {
-        -- <badutf-2.2>
-        "X", 1
-        -- </badutf-2.2>
-    })
 
 
 

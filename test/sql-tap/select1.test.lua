@@ -314,7 +314,7 @@ test:do_catchsql_test(
         SELECT count(*),count(a),count(b) FROM t4 WHERE b=5
     ]], {
         -- <select1-2.5.3>
-        1, "Can't convert to numeric This is a string that is too big to fit inside a NBFS buffer"
+        1, "Type mismatch: can not convert This is a string that is too big to fit inside a NBFS buffer to numeric"
         -- </select1-2.5.3>
     })
 

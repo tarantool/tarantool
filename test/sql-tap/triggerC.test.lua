@@ -974,7 +974,7 @@ test:do_execsql_test(
         PRAGMA recursive_triggers = 1;
         CREATE TABLE node(
             id int not null primary key,
-            pid int not null default 0 references node,
+            pid int not null default 0,
             key TEXT not null,
             path TEXT default '',
             unique(pid, key)

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(9)
+test:plan(8)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -68,16 +68,6 @@ test:do_catchsql_test(
 
 test:do_catchsql_test(
     "quote-1.3.1",
-    [[
-        SELECT '!pqr', '#xyz'+5 FROM "abc5_"
-    ]], {
-        -- <quote-1.3.1>
-        0, {"!pqr", 5}
-        -- </quote-1.3.1>
-    })
-
-test:do_catchsql_test(
-    "quote-1.3.2",
     [[
         SELECT "!pqr", "#xyz"+5 FROM "abc5_"
     ]], {

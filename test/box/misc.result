@@ -497,6 +497,7 @@ t;
   168: box.error.DROP_FK_CONSTRAINT
   169: box.error.NO_SUCH_CONSTRAINT
   170: box.error.CONSTRAINT_EXISTS
+  171: box.error.SQL_TYPE_MISMATCH
 ...
 test_run:cmd("setopt delimiter ''");
 ---

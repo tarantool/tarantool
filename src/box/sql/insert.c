@@ -77,8 +77,20 @@ sql_emit_table_affinity(struct Vdbe *v, struct space_def *def, int reg)
 	char *colls_aff = (char *) sqlite3DbMallocZero(db, field_count + 1);
 	if (colls_aff == NULL)
 		return;
-	for (uint32_t i = 0; i < field_count; ++i)
+	for (uint32_t i = 0; i < field_count; ++i) {
 		colls_aff[i] = def->fields[i].affinity;
+		/*
+		 * Force INTEGER type to handle queries like:
+		 * CREATE TABLE t1 (id INT PRIMARY KEY);
+		 * INSERT INTO t1 VALUES (1.123);
+		 *
+		 * In this case 1.123 should be truncated to 1.
+		 */
+		if (colls_aff[i] == AFFINITY_INTEGER) {
+			sqlite3VdbeAddOp2(v, OP_Cast, reg + i,
+					  AFFINITY_INTEGER);
+		}
+	}
 	sqlite3VdbeAddOp4(v, OP_Affinity, reg, field_count, 0, colls_aff,
 			  P4_DYNAMIC);
 }

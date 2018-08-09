@@ -169,7 +169,7 @@ test:do_execsql_test(
         SELECT count(*), +a=123 FROM t1 
     ]], {
         -- <tkt3493-2.2.5>
-        1, 0
+        1, 1
         -- </tkt3493-2.2.5>
     })
 

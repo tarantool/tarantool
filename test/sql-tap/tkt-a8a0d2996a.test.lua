@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(22)
+test:plan(12)
 
 --!./tcltestrunner.lua
 -- 2014-03-24
@@ -73,57 +73,6 @@ test:do_execsql_test(
     })
 
 test:do_execsql_test(
-    2.0,
-    [[
-        UPDATE t SET x='1xyzzy';
-        SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
-    ]], {
-        -- <2.0>
-        "text", "text"
-        -- </2.0>
-    })
-
-test:do_execsql_test(
-    2.1,
-    [[
-        SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
-    ]], {
-        -- <2.1>
-        "text", "text"
-        -- </2.1>
-    })
-
-test:do_execsql_test(
-    2.2,
-    [[
-        SELECT typeof(x), typeof(y) FROM t WHERE 1=x*1 AND y=='1';
-    ]], {
-        -- <2.2>
-        "text", "text"
-        -- </2.2>
-    })
-
-test:do_execsql_test(
-    2.3,
-    [[
-        SELECT typeof(x), typeof(y) FROM t WHERE 1=x/1 AND y=='1';
-    ]], {
-        -- <2.3>
-        "text", "text"
-        -- </2.3>
-    })
-
-test:do_execsql_test(
-    2.4,
-    [[
-        SELECT typeof(x), typeof(y) FROM t WHERE 1=x%4 AND y=='1';
-    ]], {
-        -- <2.4>
-        "text", "text"
-        -- </2.4>
-    })
-
-test:do_execsql_test(
     3.0,
     [[
         UPDATE t SET x='1.0';
@@ -192,56 +141,6 @@ test:do_execsql_test(
         -- <4.1>
         123.0
         -- </4.1>
-    })
-
-test:do_execsql_test(
-    4.2,
-    [[
-        SELECT '100x'+'-2y';
-    ]], {
-        -- <4.2>
-        98
-        -- </4.2>
-    })
-
-test:do_execsql_test(
-    4.3,
-    [[
-        SELECT '100x'+'4.5y';
-    ]], {
-        -- <4.3>
-        104.5
-        -- </4.3>
-    })
-
-test:do_execsql_test(
-    4.4,
-    [[
-        SELECT '-9223372036854775807x'-'1x';
-    ]], {
-        -- <4.4>
-        -9223372036854775808
-        -- </4.4>
-    })
-
-test:do_execsql_test(
-    4.5,
-    [[
-        SELECT '9223372036854775806x'+'1x';
-    ]], {
-        -- <4.5>
-        9223372036854775808
-        -- </4.5>
-    })
-
-test:do_execsql_test(
-    4.6,
-    [[
-        SELECT '1234x'/'10y';
-    ]], {
-        -- <4.6>
-        123.4
-        -- </4.6>
     })
 
 test:finish_test()

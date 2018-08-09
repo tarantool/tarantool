@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(17)
+test:plan(11)
 
 --!./tcltestrunner.lua
 -- 2013 March 20
@@ -40,9 +40,6 @@ for _, enc in ipairs({"utf8"}) do
         {"3", "-12345.0e0", -12345.0, -12345},
         {"4", "-12345.25", -12345.25, -12345},
         {"5", "-12345.0", -12345.0, -12345},
-        {"6", "'876xyz'", 876.0, 876},
-        {"7", "'456ķ89'", 456.0, 456},
-        {"8", "'Ġ 321.5'", 0.0, 0},
     }
     for _, val in ipairs(data) do
         local idx = val[1]

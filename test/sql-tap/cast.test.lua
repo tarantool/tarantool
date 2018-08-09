@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(89)
+test:plan(82)
 
 --!./tcltestrunner.lua
 -- 2005 June 25
@@ -64,24 +64,14 @@ test:do_execsql_test(
         -- </cast-1.4>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "cast-1.5",
     [[
         SELECT CAST(x'616263' AS numeric)
     ]], {
         -- <cast-1.5>
-        0
+        1, 'Type mismatch: can not convert abc to real'
         -- </cast-1.5>
-    })
-
-test:do_execsql_test(
-    "cast-1.6",
-    [[
-        SELECT typeof(CAST(x'616263' AS numeric))
-    ]], {
-        -- <cast-1.6>
-        "real"
-        -- </cast-1.6>
     })
 
 test:do_execsql_test(
@@ -104,27 +94,15 @@ test:do_execsql_test(
         -- </cast-1.8>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "cast-1.9",
     [[
         SELECT CAST(x'616263' AS integer)
     ]], {
         -- <cast-1.9>
-        0
+        1, 'Type mismatch: can not convert abc to integer'
         -- </cast-1.9>
     })
-
-test:do_execsql_test(
-    "cast-1.10",
-    [[
-        SELECT typeof(CAST(x'616263' AS integer))
-    ]], {
-        -- <cast-1.10>
-        "integer"
-        -- </cast-1.10>
-    })
-
-
 
 test:do_execsql_test(
     "cast-1.11",
@@ -466,34 +444,14 @@ test:do_execsql_test(
         -- </cast-1.44>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "cast-1.45",
     [[
         SELECT CAST('123abc' AS numeric)
     ]], {
         -- <cast-1.45>
-        123
+        1, 'Type mismatch: can not convert 123abc to real'
         -- </cast-1.45>
-    })
-
-test:do_execsql_test(
-    "cast-1.46",
-    [[
-        SELECT typeof(CAST('123abc' AS numeric))
-    ]], {
-        -- <cast-1.46>
-        "real"
-        -- </cast-1.46>
-    })
-
-test:do_execsql_test(
-    "cast-1.47",
-    [[
-        SELECT CAST('123abc' AS blob)
-    ]], {
-        -- <cast-1.47>
-        "123abc"
-        -- </cast-1.47>
     })
 
 test:do_execsql_test(
@@ -506,45 +464,36 @@ test:do_execsql_test(
         -- </cast-1.48>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "cast-1.49",
     [[
         SELECT CAST('123abc' AS integer)
     ]], {
         -- <cast-1.49>
-        123
+        1, 'Type mismatch: can not convert 123abc to integer'
         -- </cast-1.49>
     })
 
-test:do_execsql_test(
-    "cast-1.50",
-    [[
-        SELECT typeof(CAST('123abc' AS integer))
-    ]], {
-        -- <cast-1.50>
-        "integer"
-        -- </cast-1.50>
-    })
-
-test:do_execsql_test(
+test:do_catchsql_test(
     "cast-1.51",
     [[
         SELECT CAST('123.5abc' AS numeric)
     ]], {
         -- <cast-1.51>
-        123.5
+        1, 'Type mismatch: can not convert 123.5abc to real'
         -- </cast-1.51>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "cast-1.53",
     [[
         SELECT CAST('123.5abc' AS integer)
     ]], {
         -- <cast-1.53>
-        123
+        1, 'Type mismatch: can not convert 123.5abc to integer'
         -- </cast-1.53>
     })
+
 
 test:do_execsql_test(
     "case-1.60",
@@ -606,24 +555,14 @@ test:do_execsql_test(
         -- </case-1.65>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "case-1.66",
     [[
         SELECT CAST('abc' AS REAL)
     ]], {
         -- <case-1.66>
-        0.0
+        1, 'Type mismatch: can not convert abc to real'
         -- </case-1.66>
-    })
-
-test:do_execsql_test(
-    "case-1.67",
-    [[
-        SELECT typeof(CAST('abc' AS REAL))
-    ]], {
-        -- <case-1.67>
-        "real"
-        -- </case-1.67>
     })
 
 test:do_execsql_test(
@@ -905,50 +844,38 @@ end
 test:do_test(
     "cast-4.1",
     function()
-        return test:execsql [[
+        return test:catchsql [[
             CREATE TABLE t1(a TEXT primary key);
             INSERT INTO t1 VALUES('abc');
             SELECT a, CAST(a AS integer) FROM t1;
         ]]
     end, {
         -- <cast-4.1>
-        "abc", 0
+        1, 'Type mismatch: can not convert abc to integer'
         -- </cast-4.1>
     })
 
 test:do_test(
     "cast-4.2",
     function()
-        return test:execsql [[
+        return test:catchsql [[
             SELECT CAST(a AS integer), a FROM t1;
         ]]
     end, {
         -- <cast-4.2>
-        0, "abc"
+        1, 'Type mismatch: can not convert abc to integer'
         -- </cast-4.2>
-    })
-
-test:do_test(
-    "cast-4.3",
-    function()
-        return test:execsql [[
-            SELECT a, CAST(a AS integer), a FROM t1;
-        ]]
-    end, {
-        -- <cast-4.3>
-        "abc", 0, "abc"
-        -- </cast-4.3>
     })
 
 test:do_test(
     "cast-4.4",
     function()
-        return test:execsql [[
-            SELECT CAST(a AS integer), a, CAST(a AS real), a FROM t1;
+        return test:catchsql [[
+            SELECT a, CAST(a AS real), a FROM t1;
         ]]
     end, {
         -- <cast-4.4>
-        0, "abc", 0.0, "abc"
+        1, 'Type mismatch: can not convert abc to real'
         -- </cast-4.4>
     })
 

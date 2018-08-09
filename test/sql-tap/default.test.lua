@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(16)
+test:plan(15)
 
 --!./tcltestrunner.lua
 -- 2005 August 18
@@ -241,7 +241,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "default-5.4",
     [[
-        CREATE TABLE t6(id INTEGER PRIMARY KEY, b INT DEFAULT('id'));
+        CREATE TABLE t6(id INTEGER PRIMARY KEY, b TEXT DEFAULT('id'));
         INSERT INTO t6(id) VALUES(1);
         SELECT * FROM t6;
     ]], {

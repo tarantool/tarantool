@@ -673,7 +673,7 @@ test:do_execsql_test(
         SELECT c FROM t4b WHERE +b IN (a);
     ]], {
         -- <in4-4.19>
-        
+        4
         -- </in4-4.19>
     })
 

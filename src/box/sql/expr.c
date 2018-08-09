@@ -3072,15 +3072,21 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 		if (destIfNull != destIfFalse) {
 			regCkNull = sqlite3GetTempReg(pParse);
-			sqlite3VdbeAddOp3(v, OP_BitAnd, rLhs, rLhs, regCkNull);
+			sqlite3VdbeAddOp2(v, OP_Integer, 0, regCkNull);
+			int lCheckNull = sqlite3VdbeMakeLabel(v);
+			sqlite3VdbeAddOp2(v, OP_NotNull, rLhs, lCheckNull);
+			sqlite3VdbeAddOp2(v, OP_Null, 0, regCkNull);
+			sqlite3VdbeResolveLabel(v, lCheckNull);
 		}
 		for (ii = 0; ii < pList->nExpr; ii++) {
 			r2 = sqlite3ExprCodeTemp(pParse, pList->a[ii].pExpr,
 						 &regToFree);
 			if (regCkNull
 			    && sqlite3ExprCanBeNull(pList->a[ii].pExpr)) {
-				sqlite3VdbeAddOp3(v, OP_BitAnd, regCkNull, r2,
-						  regCkNull);
+				int lCheckNull = sqlite3VdbeMakeLabel(v);
+				sqlite3VdbeAddOp2(v, OP_NotNull, r2, lCheckNull);
+				sqlite3VdbeAddOp2(v, OP_Null, 0, regCkNull);
+				sqlite3VdbeResolveLabel(v, lCheckNull);
 			}
 			if (ii < pList->nExpr - 1 || destIfNull != destIfFalse) {
 				sqlite3VdbeAddOp4(v, OP_Eq, rLhs, labelOk, r2,
@@ -3649,6 +3655,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_AGG_COLUMN:{
 			AggInfo *pAggInfo = pExpr->pAggInfo;
 			struct AggInfo_col *pCol = &pAggInfo->aCol[pExpr->iAgg];
+			pExpr->affinity = pCol->pExpr->affinity;
 			if (!pAggInfo->directMode) {
 				assert(pCol->iMem > 0);
 				return pCol->iMem;
@@ -3663,10 +3670,11 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_COLUMN:{
 			int iTab = pExpr->iTable;
+			int col = pExpr->iColumn;
 			if (iTab < 0) {
 				if (pParse->ckBase > 0) {
 					/* Generating CHECK constraints. */
-					return pExpr->iColumn + pParse->ckBase;
+					return col + pParse->ckBase;
 				} else {
 					/* Coding an expression that is part of an index where column names
 					 * in the index refer to the table to which the index belongs
@@ -3674,22 +3682,28 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					iTab = pParse->iSelfTab;
 				}
 			}
-			return sqlite3ExprCodeGetColumn(pParse, pExpr->space_def,
-							pExpr->iColumn, iTab,
-							target, pExpr->op2);
+			pExpr->affinity =
+				pExpr->space_def->fields[col].affinity;
+			return sqlite3ExprCodeGetColumn(pParse,
+							pExpr->space_def, col,
+							iTab, target,
+							pExpr->op2);
 		}
 	case TK_INTEGER:{
+			pExpr->affinity = AFFINITY_INTEGER;
 			expr_code_int(pParse, pExpr, false, target);
 			return target;
 		}
 #ifndef SQLITE_OMIT_FLOATING_POINT
 	case TK_FLOAT:{
+			pExpr->affinity = AFFINITY_REAL;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			codeReal(v, pExpr->u.zToken, 0, target);
 			return target;
 		}
 #endif
 	case TK_STRING:{
+			pExpr->affinity = AFFINITY_TEXT;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			sqlite3VdbeLoadString(v, target, pExpr->u.zToken);
 			return target;
@@ -3707,6 +3721,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			assert(pExpr->u.zToken[0] == 'x'
 			       || pExpr->u.zToken[0] == 'X');
 			assert(pExpr->u.zToken[1] == '\'');
+			pExpr->affinity = AFFINITY_BLOB;
 			z = &pExpr->u.zToken[2];
 			n = sqlite3Strlen30(z) - 1;
 			assert(z[n] == '\'');
@@ -3788,6 +3803,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				testcase(regFree1 == 0);
 				testcase(regFree2 == 0);
 			}
+			pExpr->affinity = AFFINITY_INTEGER;
 			break;
 		}
 	case TK_AND:
@@ -3831,10 +3847,15 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlite3VdbeAddOp3(v, op, r2, r1, target);
 			testcase(regFree1 == 0);
 			testcase(regFree2 == 0);
+			if (op != TK_CONCAT)
+				pExpr->affinity = AFFINITY_NUMERIC;
+			else
+				pExpr->affinity = AFFINITY_TEXT;
 			break;
 		}
 	case TK_UMINUS:{
 			Expr *pLeft = pExpr->pLeft;
+			pExpr->affinity = AFFINITY_NUMERIC;
 			assert(pLeft);
 			if (pLeft->op == TK_INTEGER) {
 				expr_code_int(pParse, pLeft, true, target);
@@ -3861,6 +3882,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_BITNOT:
 	case TK_NOT:{
+			pExpr->affinity = AFFINITY_INTEGER;
 			assert(TK_BITNOT == OP_BitNot);
 			testcase(op == TK_BITNOT);
 			assert(TK_NOT == OP_Not);
@@ -3874,6 +3896,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_ISNULL:
 	case TK_NOTNULL:{
 			int addr;
+			pExpr->affinity = AFFINITY_INTEGER;
 			assert(TK_ISNULL == OP_IsNull);
 			testcase(op == TK_ISNULL);
 			assert(TK_NOTNULL == OP_NotNull);
@@ -3897,6 +3920,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						"misuse of aggregate: %s()",
 						pExpr->u.zToken);
 			} else {
+				pExpr->affinity = pInfo->aFunc->pFunc->ret_type;
 				return pInfo->aFunc[pExpr->iAgg].iMem;
 			}
 			break;
@@ -3933,6 +3957,18 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				break;
 			}
 
+			if (pDef->ret_type != AFFINITY_UNDEFINED) {
+				pExpr->affinity = pDef->ret_type;
+			} else {
+				/*
+				 * Otherwise, use first arg as
+				 * expression affinity.
+				 */
+				if (pFarg && pFarg->nExpr > 0) {
+					pExpr->affinity =
+						pFarg->a[0].pExpr->affinity;
+				}
+			}
 			/* Attempt a direct implementation of the built-in COALESCE() and
 			 * IFNULL() functions.  This avoids unnecessary evaluation of
 			 * arguments past the first non-NULL argument.
@@ -4076,12 +4112,14 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_IN:{
 			int destIfFalse = sqlite3VdbeMakeLabel(v);
 			int destIfNull = sqlite3VdbeMakeLabel(v);
+			pExpr->affinity = AFFINITY_INTEGER;
 			sqlite3VdbeAddOp2(v, OP_Null, 0, target);
 			sqlite3ExprCodeIN(pParse, pExpr, destIfFalse,
 					  destIfNull);
 			sqlite3VdbeAddOp2(v, OP_Integer, 1, target);
+			sqlite3VdbeGoto(v, destIfNull);
 			sqlite3VdbeResolveLabel(v, destIfFalse);
-			sqlite3VdbeAddOp2(v, OP_AddImm, target, 0);
+			sqlite3VdbeAddOp2(v, OP_Integer, 0, target);
 			sqlite3VdbeResolveLabel(v, destIfNull);
 			return target;
 		}
@@ -4098,12 +4136,18 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		 * Z is stored in pExpr->pList->a[1].pExpr.
 		 */
 	case TK_BETWEEN:{
+			pExpr->affinity = AFFINITY_INTEGER;
 			exprCodeBetween(pParse, pExpr, target, 0, 0);
 			return target;
 		}
 	case TK_SPAN:
-	case TK_COLLATE:
+	case TK_COLLATE:{
+			pExpr->affinity = AFFINITY_TEXT;
+			return sqlite3ExprCodeTarget(pParse, pExpr->pLeft,
+						     target);
+		}
 	case TK_UPLUS:{
+			pExpr->affinity = AFFINITY_NUMERIC;
 			return sqlite3ExprCodeTarget(pParse, pExpr->pLeft,
 						     target);
 		}

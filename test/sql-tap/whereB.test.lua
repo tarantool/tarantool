@@ -74,6 +74,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.4>
+    1, 2, 1
     -- </whereB-1.4>
     })
 
@@ -107,7 +108,7 @@ test:do_execsql_test(
     ]],
     {
     -- <whereB-1.102>
-    
+    1, 2, 1
     -- </whereB-1.102>
     })
 
