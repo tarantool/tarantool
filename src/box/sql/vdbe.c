@@ -4648,12 +4648,35 @@ case OP_RenameTable: {
 	db->init.busy = 1;
 	init.rc = SQLITE_OK;
 	sql_init_callback(&init, zNewTableName, space_id, 0, zSqlStmt);
-	db->init.busy = 0;
 	rc = init.rc;
-	if (rc) {
+	if (rc != SQLITE_OK) {
 		sqlite3CommitInternalChanges();
+		db->init.busy = 0;
 		goto abort_due_to_error;
 	}
+
+	/* Space was altered, refetch the pointer. */
+	space = space_by_id(space_id);
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		struct index_def *def = space->index[i]->def;
+		if (def->opts.sql == NULL)
+			continue;
+		char *sql_stmt;
+		rc = sql_index_update_table_name(def, zNewTableName, &sql_stmt);
+		if (rc != 0)
+			goto abort_due_to_error;
+		space = space_by_id(space_id);
+		sql_init_callback(&init, zNewTableName, space_id,
+				  space->index[i]->def->iid, sql_stmt);
+		sqlite3DbFree(db, sql_stmt);
+		if (init.rc != 0) {
+			sqlite3CommitInternalChanges();
+			rc = init.rc;
+			db->init.busy = 0;
+			goto abort_due_to_error;
+		}
+	}
+	db->init.busy = 0;
 
 	/*
 	 * Rebuild 'CREATE TRIGGER' expressions of all triggers

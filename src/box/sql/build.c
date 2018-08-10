@@ -1245,14 +1245,15 @@ createIndex(Parse * pParse, Index * pIndex, int iSpaceId, int iIndexId,
 	int zOptsSz, zPartsSz;
 
 	/* Format "opts" and "parts" for _index entry. */
+	struct index_opts opts = pIndex->def->opts;
+	opts.sql = (char *)zSql;
 	zOpts = sqlite3DbMallocRaw(pParse->db,
-				   tarantoolSqlite3MakeIdxOpts(pIndex, zSql,
-							       NULL) +
+				   sql_encode_index_opts(&opts, NULL) +
 				   tarantoolSqlite3MakeIdxParts(pIndex,
 								NULL) + 2);
 	if (!zOpts)
 		return;
-	zOptsSz = tarantoolSqlite3MakeIdxOpts(pIndex, zSql, zOpts);
+	zOptsSz = sql_encode_index_opts(&opts, zOpts);
 	zParts = zOpts + zOptsSz + 1;
 	zPartsSz = tarantoolSqlite3MakeIdxParts(pIndex, zParts);
 #if SQLITE_DEBUG

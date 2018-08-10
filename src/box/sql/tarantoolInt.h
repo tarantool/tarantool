@@ -89,6 +89,20 @@ int tarantoolSqlite3ClearTable(struct space *space);
 int
 sql_rename_table(uint32_t space_id, const char *new_name, char **sql_stmt);
 
+/**
+ * Update CREATE INDEX field (def->opt.sql) replacing table name
+ * w/ new one in _index space.
+ *
+ * @param idef Index definition.
+ * @param new_tbl_name new name of table
+ * @param[out] sql_stmt New CREATE INDEX statement.
+ *
+ * @retval 0 on success, -1 otherwise.
+ */
+int
+sql_index_update_table_name(struct index_def *idef, const char *new_tbl_name,
+			    char **sql_stmt);
+
 /* Alter trigger statement after rename table. */
 int tarantoolSqlite3RenameTrigger(const char *zTriggerName,
 				  const char *zOldName, const char *zNewName);
@@ -171,12 +185,15 @@ fkey_encode_links(const struct fkey_def *def, int type, char *buf);
  */
 int tarantoolSqlite3MakeIdxParts(Index * index, void *buf);
 
-/*
+/**
  * Format "opts" dictionary for _index entry.
- * Returns result size.
- * If buf==NULL estimate result size.
+ *
+ * @param opts Options to encode.
+ * @param[out] buf destination buffer.
+ * @retval Result size or size estimation if buf == NULL.
  */
-int tarantoolSqlite3MakeIdxOpts(Index * index, const char *zSql, void *buf);
+int
+sql_encode_index_opts(struct index_opts *opts, void *buf);
 
 /**
  * Extract next id from _sequence space.
