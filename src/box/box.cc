@@ -595,7 +595,7 @@ cfg_get_replication(int *p_count)
  * don't start appliers.
  */
 static void
-box_sync_replication(double timeout, bool connect_all)
+box_sync_replication(bool connect_quorum)
 {
 	int count = 0;
 	struct applier **appliers = cfg_get_replication(&count);
@@ -607,7 +607,7 @@ box_sync_replication(double timeout, bool connect_all)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
 
-	replicaset_connect(appliers, count, timeout, connect_all);
+	replicaset_connect(appliers, count, connect_quorum);
 
 	guard.is_active = false;
 }
@@ -625,8 +625,13 @@ box_set_replication(void)
 	}
 
 	box_check_replication();
-	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(replication_connect_timeout, true);
+	/*
+	 * Try to connect to all replicas within the timeout period.
+	 * The configuration will succeed as long as we've managed
+	 * to connect to at least replication_connect_quorum
+	 * masters.
+	 */
+	box_sync_replication(true);
 	/* Follow replica */
 	replicaset_follow();
 }
@@ -1865,8 +1870,13 @@ box_cfg_xc(void)
 
 		title("orphan");
 
-		/* Wait for the cluster to start up */
-		box_sync_replication(replication_connect_timeout, false);
+		/*
+		 * In case of recovering from a checkpoint we
+		 * don't need to wait for 'quorum' masters, since
+		 * the recovered _cluster space will have all the
+		 * information about cluster.
+		 */
+		box_sync_replication(false);
 	} else {
 		if (!tt_uuid_is_nil(&instance_uuid))
 			INSTANCE_UUID = instance_uuid;
@@ -1883,12 +1893,15 @@ box_cfg_xc(void)
 		/*
 		 * Wait for the cluster to start up.
 		 *
-		 * Note, when bootstrapping a new instance, we have to
-		 * connect to all masters to make sure all replicas
-		 * receive the same replica set UUID when a new cluster
-		 * is deployed.
+		 * Note, when bootstrapping a new instance, we try to
+		 * connect to all masters during timeout to make sure
+		 * all replicas recieve the same replica set UUID when
+		 * a new cluster is deployed.
+		 * If we fail to do so, settle with connecting to
+		 * 'replication_connect_quorum' masters.
+		 * If this also fails, throw an error.
 		 */
-		box_sync_replication(TIMEOUT_INFINITY, true);
+		box_sync_replication(true);
 		/* Bootstrap a new master */
 		bootstrap(&replicaset_uuid, &is_bootstrap_leader);
 	}

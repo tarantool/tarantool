@@ -150,3 +150,23 @@ box.space.test:select()
 test_run:cmd("switch default")
 -- Cleanup.
 test_run:drop_cluster(SERVERS)
+
+-- Test that quorum is not ignored neither during bootstrap, nor
+-- during reconfiguration.
+box.schema.user.grant('guest', 'replication')
+test_run:cmd('create server replica_quorum with script="replication/replica_quorum.lua"')
+-- Arguments are: replication_connect_quorum, replication_timeout
+-- replication_connect_timeout.
+-- If replication_connect_quorum was ignored here, the instance
+-- would exit with an error.
+test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05 0.1"')
+test_run:cmd('switch replica_quorum')
+-- If replication_connect_quorum was ignored here, the instance
+-- would exit with an error.
+box.cfg{replication={INSTANCE_URI, nonexistent_uri(1)}}
+box.info.id
+test_run:cmd('switch default')
+test_run:cmd('stop server replica_quorum')
+test_run:cmd('cleanup server replica_quorum')
+test_run:cmd('delete server replica_quorum')
+box.schema.user.revoke('guest', 'replication')
