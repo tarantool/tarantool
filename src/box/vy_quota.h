@@ -31,13 +31,8 @@
  * SUCH DAMAGE.
  */
 
-#include <stdbool.h>
 #include <stddef.h>
-#include <tarantool_ev.h>
-
-#include "fiber.h"
 #include "fiber_cond.h"
-#include "say.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -83,71 +78,38 @@ struct vy_quota {
 	vy_quota_exceeded_f quota_exceeded_cb;
 };
 
-static inline void
-vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
-{
-	q->limit = SIZE_MAX;
-	q->watermark = SIZE_MAX;
-	q->used = 0;
-	q->too_long_threshold = TIMEOUT_INFINITY;
-	q->quota_exceeded_cb = quota_exceeded_cb;
-	fiber_cond_create(&q->cond);
-}
+void
+vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb);
 
-static inline void
-vy_quota_destroy(struct vy_quota *q)
-{
-	fiber_cond_broadcast(&q->cond);
-	fiber_cond_destroy(&q->cond);
-}
+void
+vy_quota_destroy(struct vy_quota *q);
 
 /**
  * Set memory limit. If current memory usage exceeds
  * the new limit, invoke the callback.
  */
-static inline void
-vy_quota_set_limit(struct vy_quota *q, size_t limit)
-{
-	q->limit = q->watermark = limit;
-	if (q->used >= limit)
-		q->quota_exceeded_cb(q);
-	fiber_cond_broadcast(&q->cond);
-}
+void
+vy_quota_set_limit(struct vy_quota *q, size_t limit);
 
 /**
  * Set memory watermark. If current memory usage exceeds
  * the new watermark, invoke the callback.
  */
-static inline void
-vy_quota_set_watermark(struct vy_quota *q, size_t watermark)
-{
-	q->watermark = watermark;
-	if (q->used >= watermark)
-		q->quota_exceeded_cb(q);
-}
+void
+vy_quota_set_watermark(struct vy_quota *q, size_t watermark);
 
 /**
  * Consume @size bytes of memory. In contrast to vy_quota_use()
  * this function does not throttle the caller.
  */
-static inline void
-vy_quota_force_use(struct vy_quota *q, size_t size)
-{
-	q->used += size;
-	if (q->used >= q->watermark)
-		q->quota_exceeded_cb(q);
-}
+void
+vy_quota_force_use(struct vy_quota *q, size_t size);
 
 /**
  * Release @size bytes of memory.
  */
-static inline void
-vy_quota_release(struct vy_quota *q, size_t size)
-{
-	assert(q->used >= size);
-	q->used -= size;
-	fiber_cond_broadcast(&q->cond);
-}
+void
+vy_quota_release(struct vy_quota *q, size_t size);
 
 /**
  * Try to consume @size bytes of memory, throttle the caller
@@ -183,28 +145,8 @@ vy_quota_release(struct vy_quota *q, size_t size)
  * are stored in the common memory level, which isn't taken into
  * account while estimating the size of a memory allocation.
  */
-static inline int
-vy_quota_use(struct vy_quota *q, size_t size, double timeout)
-{
-	double start_time = ev_monotonic_now(loop());
-	double deadline = start_time + timeout;
-	while (q->used + size > q->limit && timeout > 0) {
-		q->quota_exceeded_cb(q);
-		if (fiber_cond_wait_deadline(&q->cond, deadline) != 0)
-			break; /* timed out */
-	}
-	double wait_time = ev_monotonic_now(loop()) - start_time;
-	if (wait_time > q->too_long_threshold) {
-		say_warn("waited for %zu bytes of vinyl memory quota "
-			 "for too long: %.3f sec", size, wait_time);
-	}
-	if (q->used + size > q->limit)
-		return -1;
-	q->used += size;
-	if (q->used >= q->watermark)
-		q->quota_exceeded_cb(q);
-	return 0;
-}
+int
+vy_quota_use(struct vy_quota *q, size_t size, double timeout);
 
 /**
  * Adjust quota after allocating memory.
@@ -214,28 +156,14 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
  *
  * See also vy_quota_use().
  */
-static inline void
-vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used)
-{
-	if (reserved > used) {
-		size_t excess = reserved - used;
-		assert(q->used >= excess);
-		q->used -= excess;
-		fiber_cond_broadcast(&q->cond);
-	}
-	if (reserved < used)
-		vy_quota_force_use(q, used - reserved);
-}
+void
+vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used);
 
 /**
  * Block the caller until the quota is not exceeded.
  */
-static inline void
-vy_quota_wait(struct vy_quota *q)
-{
-	while (q->used > q->limit)
-		fiber_cond_wait(&q->cond);
-}
+void
+vy_quota_wait(struct vy_quota *q);
 
 #if defined(__cplusplus)
 } /* extern "C" */
