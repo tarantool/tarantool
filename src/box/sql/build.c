@@ -393,8 +393,6 @@ sqlite3PrimaryKeyIndex(Table * pTab)
 static Table *
 sql_table_new(Parse *parser, char *name)
 {
-	sqlite3 *db = parser->db;
-
 	struct Table *table = sql_ephemeral_table_new(parser, name);
 	if (table == NULL)
 		return NULL;
@@ -402,7 +400,6 @@ sql_table_new(Parse *parser, char *name)
 	strcpy(table->def->engine_name,
 	       sql_storage_engine_strs[current_session()->sql_default_engine]);
 
-	table->pSchema = db->pSchema;
 	table->nTabRef = 1;
 	return table;
 }
@@ -1676,8 +1673,8 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		 * Add the table to the in-memory representation
 		 * of the database.
 		 */
-		struct Table *pOld = sqlite3HashInsert(&p->pSchema->tblHash,
-							p->def->name, p);
+		struct Table *pOld = sqlite3HashInsert(&db->pSchema->tblHash,
+						       p->def->name, p);
 		if (pOld != NULL) {
 			assert(p == pOld);
 			sqlite3OomFault(db);

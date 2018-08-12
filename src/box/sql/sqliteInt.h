@@ -1823,7 +1823,6 @@ struct Table {
 	 * can be fetched from space struct.
 	 */
 	LogEst tuple_log_count;
-	Schema *pSchema;	/* Schema that contains this table */
 	Table *pNextZombie;	/* Next on the Parse.pZombieTab list */
 	/** Space definition with Tarantool metadata. */
 	struct space_def *def;
@@ -2344,7 +2343,6 @@ struct SrcList {
 	int nSrc;		/* Number of tables or subqueries in the FROM clause */
 	u32 nAlloc;		/* Number of entries allocated in a[] below */
 	struct SrcList_item {
-		Schema *pSchema;	/* Schema to which this item is fixed */
 		char *zName;	/* Name of the table */
 		char *zAlias;	/* The "B" part of a "A AS B" phrase.  zName is the "A" */
 		Table *pTab;	/* An SQL table corresponding to zName */

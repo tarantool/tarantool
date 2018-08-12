@@ -1672,7 +1672,7 @@ columnTypeImpl(NameContext * pNC, Expr * pExpr
 					    columnType(&sNC, p, &zOrigTab,
 						       &zOrigCol);
 				}
-			} else if (pTab->pSchema) {
+			} else {
 				/* A real table */
 				assert(!pS);
 				assert(iCol >= 0 &&
