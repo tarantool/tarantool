@@ -102,7 +102,7 @@ struct vy_quota {
 	 * bandwidth to be equal to the 10th percentile, i.e. the
 	 * best result among 10% worst measurements.
 	 */
-	struct histogram *dump_bw;
+	struct histogram *dump_bw_hist;
 };
 
 int

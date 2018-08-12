@@ -116,9 +116,9 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 		700 * MB, 800 * MB, 900 * MB,
 	};
 
-	q->dump_bw = histogram_new(dump_bandwidth_buckets,
-				   lengthof(dump_bandwidth_buckets));
-	if (q->dump_bw == NULL) {
+	q->dump_bw_hist = histogram_new(dump_bandwidth_buckets,
+					lengthof(dump_bandwidth_buckets));
+	if (q->dump_bw_hist == NULL) {
 		diag_set(OutOfMemory, 0, "histogram_new",
 			 "dump bandwidth histogram");
 		return -1;
@@ -127,7 +127,7 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 	 * Until we dump anything, assume bandwidth to be 10 MB/s,
 	 * which should be fine for initial guess.
 	 */
-	histogram_collect(q->dump_bw, 10 * MB);
+	histogram_collect(q->dump_bw_hist, 10 * MB);
 
 	q->limit = SIZE_MAX;
 	q->watermark = SIZE_MAX;
@@ -148,7 +148,7 @@ void
 vy_quota_destroy(struct vy_quota *q)
 {
 	ev_timer_stop(loop(), &q->timer);
-	histogram_delete(q->dump_bw);
+	histogram_delete(q->dump_bw_hist);
 	fiber_cond_broadcast(&q->cond);
 	fiber_cond_destroy(&q->cond);
 }
@@ -165,8 +165,8 @@ vy_quota_set_limit(struct vy_quota *q, size_t limit)
 size_t
 vy_quota_dump_bandwidth(struct vy_quota *q)
 {
-	/* See comment to vy_quota::dump_bw. */
-	return histogram_percentile(q->dump_bw, 10);
+	/* See comment to vy_quota::dump_bw_hist. */
+	return histogram_percentile(q->dump_bw_hist, 10);
 }
 
 void
@@ -174,7 +174,7 @@ vy_quota_update_dump_bandwidth(struct vy_quota *q, size_t size,
 			       double duration)
 {
 	if (duration > 0)
-		histogram_collect(q->dump_bw, size / duration);
+		histogram_collect(q->dump_bw_hist, size / duration);
 }
 
 void
