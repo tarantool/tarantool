@@ -104,19 +104,16 @@ vy_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 int
 vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 {
-	enum { KB = 1000, MB = 1000 * 1000 };
+	enum { KB = 1024, MB = KB * KB };
 	static int64_t dump_bandwidth_buckets[] = {
-		100 * KB, 200 * KB, 300 * KB, 400 * KB, 500 * KB,
-		  1 * MB,   2 * MB,   3 * MB,   4 * MB,   5 * MB,
-		 10 * MB,  20 * MB,  30 * MB,  40 * MB,  50 * MB,
-		 60 * MB,  70 * MB,  80 * MB,  90 * MB, 100 * MB,
-		110 * MB, 120 * MB, 130 * MB, 140 * MB, 150 * MB,
-		160 * MB, 170 * MB, 180 * MB, 190 * MB, 200 * MB,
-		220 * MB, 240 * MB, 260 * MB, 280 * MB, 300 * MB,
-		320 * MB, 340 * MB, 360 * MB, 380 * MB, 400 * MB,
-		450 * MB, 500 * MB, 550 * MB, 600 * MB, 650 * MB,
-		700 * MB, 750 * MB, 800 * MB, 850 * MB, 900 * MB,
-		950 * MB, 1000 * MB,
+		100 * KB, 200 * KB, 300 * KB, 400 * KB, 500 * KB, 600 * KB,
+		700 * KB, 800 * KB, 900 * KB,   1 * MB,   2 * MB,   3 * MB,
+		  4 * MB,   5 * MB,   6 * MB,   7 * MB,   8 * MB,   9 * MB,
+		 10 * MB,  15 * MB,  20 * MB,  25 * MB,  30 * MB,  35 * MB,
+		 40 * MB,  45 * MB,  50 * MB,  55 * MB,  60 * MB,  65 * MB,
+		 70 * MB,  75 * MB,  80 * MB,  85 * MB,  90 * MB,  95 * MB,
+		100 * MB, 200 * MB, 300 * MB, 400 * MB, 500 * MB, 600 * MB,
+		700 * MB, 800 * MB, 900 * MB,
 	};
 
 	q->dump_bw = histogram_new(dump_bandwidth_buckets,
