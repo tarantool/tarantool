@@ -45,7 +45,6 @@
 #include "vy_scheduler.h"
 #include "vy_stat.h"
 
-#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -106,31 +105,6 @@ struct vy_env {
 	struct mempool iterator_pool;
 	/** Memory quota */
 	struct vy_quota     quota;
-	/** Timer for updating quota watermark. */
-	ev_timer            quota_timer;
-	/**
-	 * Amount of quota used since the last
-	 * invocation of the quota timer callback.
-	 */
-	size_t quota_use_curr;
-	/**
-	 * Quota use rate, in bytes per second.
-	 * Calculated as exponentially weighted
-	 * moving average of quota_use_curr.
-	 */
-	size_t quota_use_rate;
-	/**
-	 * Dump bandwidth is needed for calculating the quota watermark.
-	 * The higher the bandwidth, the later we can start dumping w/o
-	 * suffering from transaction throttling. So we want to be very
-	 * conservative about estimating the bandwidth.
-	 *
-	 * To make sure we don't overestimate it, we maintain a
-	 * histogram of all observed measurements and assume the
-	 * bandwidth to be equal to the 10th percentile, i.e. the
-	 * best result among 10% worst measurements.
-	 */
-	struct histogram *dump_bw;
 	/** Common LSM tree environment. */
 	struct vy_lsm_env lsm_env;
 	/** Environment for cache subsystem */
@@ -169,26 +143,6 @@ struct vy_env {
 	/** Try to recover corrupted data if set. */
 	bool force_recovery;
 };
-
-enum {
-	/**
-	 * Time interval between successive updates of
-	 * quota watermark and use rate, in seconds.
-	 */
-	VY_QUOTA_UPDATE_INTERVAL = 1,
-	/**
-	 * Period of time over which the quota use rate
-	 * is averaged, in seconds.
-	 */
-	VY_QUOTA_RATE_AVG_PERIOD = 5,
-};
-
-static inline int64_t
-vy_dump_bandwidth(struct vy_env *env)
-{
-	/* See comment to vy_env::dump_bw. */
-	return histogram_percentile(env->dump_bw, 10);
-}
 
 struct vinyl_engine {
 	struct engine base;
@@ -303,8 +257,8 @@ vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "used", q->used);
 	info_append_int(h, "limit", q->limit);
 	info_append_int(h, "watermark", q->watermark);
-	info_append_int(h, "use_rate", env->quota_use_rate);
-	info_append_int(h, "dump_bandwidth", vy_dump_bandwidth(env));
+	info_append_int(h, "use_rate", q->use_rate);
+	info_append_int(h, "dump_bandwidth", vy_quota_dump_bandwidth(q));
 	info_table_end(h);
 }
 
@@ -2383,14 +2337,9 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	size_t write_size = mem_used_after - mem_used_before;
-	vy_quota_adjust(&env->quota, tx->write_size, write_size);
-
-	if (rc != 0)
-		return -1;
-
-	env->quota_use_curr += write_size;
-	return 0;
+	vy_quota_adjust(&env->quota, tx->write_size,
+			mem_used_after - mem_used_before);
+	return rc;
 }
 
 static void
@@ -2461,41 +2410,6 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 /** {{{ Environment */
 
 static void
-vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
-{
-	(void)loop;
-	(void)events;
-
-	struct vy_env *e = timer->data;
-
-	/*
-	 * Update the quota use rate with the new measurement.
-	 */
-	const double weight = 1 - exp(-VY_QUOTA_UPDATE_INTERVAL /
-				      (double)VY_QUOTA_RATE_AVG_PERIOD);
-	e->quota_use_rate = (1 - weight) * e->quota_use_rate +
-		weight * e->quota_use_curr / VY_QUOTA_UPDATE_INTERVAL;
-	e->quota_use_curr = 0;
-
-	/*
-	 * Due to log structured nature of the lsregion allocator,
-	 * which is used for allocating statements, we cannot free
-	 * memory in chunks, only all at once. Therefore we should
-	 * configure the watermark so that by the time we hit the
-	 * limit, all memory have been dumped, i.e.
-	 *
-	 *   limit - watermark      watermark
-	 *   ----------------- = --------------
-	 *     quota_use_rate    dump_bandwidth
-	 */
-	int64_t dump_bandwidth = vy_dump_bandwidth(e);
-	size_t watermark = ((double)e->quota.limit * dump_bandwidth /
-			    (dump_bandwidth + e->quota_use_rate + 1));
-
-	vy_quota_set_watermark(&e->quota, watermark);
-}
-
-static void
 vy_env_quota_exceeded_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
@@ -2542,13 +2456,8 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	assert(mem_used_after <= mem_used_before);
 	size_t mem_dumped = mem_used_before - mem_used_after;
 	vy_quota_release(quota, mem_dumped);
-
+	vy_quota_update_dump_bandwidth(quota, mem_dumped, dump_duration);
 	say_info("dumped %zu bytes in %.1f sec", mem_dumped, dump_duration);
-
-	/* Account dump bandwidth. */
-	if (dump_duration > 0)
-		histogram_collect(env->dump_bw,
-				  mem_dumped / dump_duration);
 }
 
 static struct vy_squash_queue *
@@ -2563,21 +2472,6 @@ static struct vy_env *
 vy_env_new(const char *path, size_t memory,
 	   int read_threads, int write_threads, bool force_recovery)
 {
-	enum { KB = 1000, MB = 1000 * 1000 };
-	static int64_t dump_bandwidth_buckets[] = {
-		100 * KB, 200 * KB, 300 * KB, 400 * KB, 500 * KB,
-		  1 * MB,   2 * MB,   3 * MB,   4 * MB,   5 * MB,
-		 10 * MB,  20 * MB,  30 * MB,  40 * MB,  50 * MB,
-		 60 * MB,  70 * MB,  80 * MB,  90 * MB, 100 * MB,
-		110 * MB, 120 * MB, 130 * MB, 140 * MB, 150 * MB,
-		160 * MB, 170 * MB, 180 * MB, 190 * MB, 200 * MB,
-		220 * MB, 240 * MB, 260 * MB, 280 * MB, 300 * MB,
-		320 * MB, 340 * MB, 360 * MB, 380 * MB, 400 * MB,
-		450 * MB, 500 * MB, 550 * MB, 600 * MB, 650 * MB,
-		700 * MB, 750 * MB, 800 * MB, 850 * MB, 900 * MB,
-		950 * MB, 1000 * MB,
-	};
-
 	struct vy_env *e = malloc(sizeof(*e));
 	if (unlikely(e == NULL)) {
 		diag_set(OutOfMemory, sizeof(*e), "malloc", "struct vy_env");
@@ -2597,19 +2491,6 @@ vy_env_new(const char *path, size_t memory,
 		goto error_path;
 	}
 
-	e->dump_bw = histogram_new(dump_bandwidth_buckets,
-				   lengthof(dump_bandwidth_buckets));
-	if (e->dump_bw == NULL) {
-		diag_set(OutOfMemory, 0, "histogram_new",
-			 "dump bandwidth histogram");
-		goto error_dump_bw;
-	}
-	/*
-	 * Until we dump anything, assume bandwidth to be 10 MB/s,
-	 * which should be fine for initial guess.
-	 */
-	histogram_collect(e->dump_bw, 10 * MB);
-
 	e->xm = tx_manager_new();
 	if (e->xm == NULL)
 		goto error_xm;
@@ -2627,18 +2508,18 @@ vy_env_new(const char *path, size_t memory,
 			      vy_squash_schedule, e) != 0)
 		goto error_lsm_env;
 
+	if (vy_quota_create(&e->quota, vy_env_quota_exceeded_cb) != 0)
+		goto error_quota;
+
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->iterator_pool, slab_cache,
 	               sizeof(struct vinyl_iterator));
-	vy_quota_create(&e->quota, vy_env_quota_exceeded_cb);
-	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0,
-		      VY_QUOTA_UPDATE_INTERVAL);
-	e->quota_timer.data = e;
-	ev_timer_start(loop(), &e->quota_timer);
 	vy_cache_env_create(&e->cache_env, slab_cache);
 	vy_run_env_create(&e->run_env);
 	vy_log_init(e->path);
 	return e;
+error_quota:
+	vy_lsm_env_destroy(&e->lsm_env);
 error_lsm_env:
 	vy_mem_env_destroy(&e->mem_env);
 	vy_scheduler_destroy(&e->scheduler);
@@ -2646,8 +2527,6 @@ error_lsm_env:
 error_squash_queue:
 	tx_manager_delete(e->xm);
 error_xm:
-	histogram_delete(e->dump_bw);
-error_dump_bw:
 	free(e->path);
 error_path:
 	free(e);
@@ -2657,12 +2536,10 @@ error_path:
 static void
 vy_env_delete(struct vy_env *e)
 {
-	ev_timer_stop(loop(), &e->quota_timer);
 	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
 	tx_manager_delete(e->xm);
 	free(e->path);
-	histogram_delete(e->dump_bw);
 	mempool_destroy(&e->iterator_pool);
 	vy_run_env_destroy(&e->run_env);
 	vy_lsm_env_destroy(&e->lsm_env);
