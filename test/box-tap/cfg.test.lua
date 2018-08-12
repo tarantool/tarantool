@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(95)
+test:plan(96)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -529,6 +529,29 @@ sc:close()
 os.exit(res)
 ]]
 test:is(run_script(code), 0, "remote syslog log configuration")
+
+--
+-- gh-3615: check that log_nonblock is not lost
+--
+code=[[
+local socket = require('socket')
+local log = require('log')
+local fio = require('fio')
+
+path = fio.pathjoin(fio.cwd(), 'log_unix_socket_test.sock')
+unix_socket = socket('AF_UNIX', 'SOCK_DGRAM', 0)
+unix_socket:bind('unix/', path)
+
+opt = string.format("syslog:server=unix:%s,identity=tarantool", path)
+box.cfg{log = opt, log_nonblock=true}
+-- Try to fill buffer
+for i = 1, 1000 do log.info(string.rep('x', 1000)) end
+
+unix_socket:close()
+os.remove(path)
+os.exit(0)
+]]
+test:is(run_script(code), 0, "log_nonblock")
 
 test:check()
 os.exit(0)
