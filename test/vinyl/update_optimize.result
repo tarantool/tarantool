@@ -711,3 +711,50 @@ lookups()
 space:drop()
 ---
 ...
+--
+-- gh-3607: phantom tuples in secondary index if UPDATE does not
+-- change key fields.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:create_index('sk', {parts = {2, 'unsigned'}, run_count_per_level = 10})
+---
+...
+s:insert{1, 10}
+---
+- [1, 10]
+...
+box.snapshot()
+---
+- ok
+...
+s:update(1, {{'=', 2, 10}})
+---
+- [1, 10]
+...
+s:delete(1)
+---
+...
+box.snapshot()
+---
+- ok
+...
+s.index.sk:stat().rows -- INSERT in the first run + DELETE the second run
+---
+- 2
+...
+s:insert{1, 20}
+---
+- [1, 20]
+...
+s.index.sk:select()
+---
+- - [1, 20]
+...
+s:drop()
+---
+...
