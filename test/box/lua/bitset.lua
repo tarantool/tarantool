@@ -36,7 +36,7 @@ function drop_space()
 end
 
 function dump(...)
-	return iterate('tweedledum', 'bitset', 1, 2, ...)
+	return utils.iterate('tweedledum', 'bitset', 1, 2, ...)
 end
 
 function test_insert_delete(n)

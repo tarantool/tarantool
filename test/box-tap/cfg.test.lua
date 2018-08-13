@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(95)
+test:plan(97)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -463,6 +463,81 @@ test:is(run_script(code), PANIC, "instance_uuid mismatch")
 code = string.format(code_fmt, dir, instance_uuid, uuid.new())
 test:is(run_script(code), PANIC, "replicaset_uuid mismatch")
 fio.rmdir(dir)
+
+--
+-- Check syslog unix socket configuration
+--
+code = [[
+local socket = require('socket')
+local log = require('log')
+local fio = require('fio')
+
+path = fio.pathjoin(fio.cwd(), 'log_unix_socket_test.sock')
+unix_socket = socket('AF_UNIX', 'SOCK_DGRAM', 0)
+unix_socket:bind('unix/', path)
+
+opt = string.format("syslog:server=unix:%s,identity=tarantool", path)
+local res = 1
+local buf = 'Started\n'
+box.cfg{log = opt}
+
+-- make sure that socket would not block
+while unix_socket:readable(0.001) do
+    buf = buf .. unix_socket:recv(1000)
+end
+log.info("Test socket syslog destination")
+while unix_socket:readable(0.001) do
+    buf = buf .. unix_socket:recv(1000)
+    if buf:match('Test socket syslog destination') then res = 0 end
+end
+
+unix_socket:close()
+os.remove(path)
+os.exit(res)
+]]
+test:is(run_script(code), 0, "unix socket syslog log configuration")
+
+--
+-- Check syslog remote configuration
+--
+code = [[
+local socket = require('socket')
+local log = require('log')
+
+addr = '127.0.0.1'
+port = 1000 + math.random(32768)
+
+sc = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+local attempt = 0
+while attempt < 10 do
+    if not sc:bind (addr, port) then
+        port = 1000 + math.random(32768)
+        attempt = attempt + 1
+    else
+        break
+    end
+end
+sc:bind(addr, port)
+
+local opt = string.format("syslog:server=%s:%u,identity=tarantool", addr, port)
+local res = 1
+local buf = 'Started\n'
+box.cfg{log = opt}
+
+-- make sure that socket would not block
+while sc:readable(0.001) do
+    buf = buf .. sc:recv(1000)
+end
+log.info('Test syslog destination')
+while sc:readable(0.001) do
+    buf = buf .. sc:recv(1000)
+    if buf:match('Test syslog destination') then res = 0 end
+end
+
+sc:close()
+os.exit(res)
+]]
+test:is(run_script(code), 0, "remote syslog log configuration")
 
 test:check()
 os.exit(0)

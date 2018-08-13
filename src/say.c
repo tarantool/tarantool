@@ -36,6 +36,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <netdb.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -48,6 +49,7 @@
 pid_t log_pid = 0;
 int log_level = S_INFO;
 enum say_format log_format = SF_PLAIN;
+enum { SAY_SYSLOG_DEFAULT_PORT = 512 };
 
 /** List of logs to rotate */
 static RLIST_HEAD(log_rotate_list);
@@ -473,16 +475,86 @@ syslog_connect_unix(const char *path)
 	return fd;
 }
 
+/**
+ * Connect to remote syslogd using server:port.
+ * @param server_address address of remote host.
+ * @retval not 0 Socket descriptor.
+ * @retval    -1 Socket error.
+ */
+static int
+syslog_connect_remote(const char *server_address)
+{
+	struct addrinfo *inf, hints, *ptr;
+	char *remote;
+	char buf[10];
+	char *portnum, *copy;
+	int fd = -1;
+	int ret;
+
+	copy = strdup(server_address);
+	if (copy == NULL) {
+		diag_set(OutOfMemory, strlen(server_address), "malloc",
+			 "stslog server address");
+		return fd;
+	}
+	portnum = copy;
+	remote = strsep(&portnum, ":");
+	if (portnum == NULL) {
+		snprintf(buf, sizeof(buf), "%d", SAY_SYSLOG_DEFAULT_PORT);
+		portnum = buf;
+	}
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+
+	ret = getaddrinfo(remote, portnum, &hints, &inf);
+	if (ret < 0) {
+		errno = EIO;
+		diag_set(SystemError, "getaddrinfo: %s",
+			 gai_strerror(ret));
+		goto out;
+	}
+	for (ptr = inf; ptr; ptr = ptr->ai_next) {
+		fd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+		if (fd < 0) {
+			diag_set(SystemError, "socket");
+			continue;
+		}
+		if (connect(fd, inf->ai_addr, inf->ai_addrlen) != 0) {
+			close(fd);
+			fd = -1;
+			diag_set(SystemError, "connect");
+			continue;
+		}
+		break;
+	}
+	freeaddrinfo(inf);
+out:
+	free(copy);
+	return fd;
+}
+
 static inline int
 log_syslog_connect(struct log *log)
 {
 	/*
-	 * Try two locations: '/dev/log' for Linux and
+	 * If server option is not set use '/dev/log' for Linux and
 	 * '/var/run/syslog' for Mac.
 	 */
-	log->fd = syslog_connect_unix("/dev/log");
-	if (log->fd < 0)
-		log->fd = syslog_connect_unix("/var/run/syslog");
+	switch (log->syslog_server_type) {
+	case SAY_SYSLOG_UNIX:
+		log->fd = syslog_connect_unix(log->path);
+		break;
+	case SAY_SYSLOG_REMOTE:
+		log->fd = syslog_connect_remote(log->path);
+		break;
+	default:
+		log->fd = syslog_connect_unix("/dev/log");
+		if (log->fd < 0)
+			log->fd = syslog_connect_unix("/var/run/syslog");
+
+	}
 	return log->fd;
 }
 
@@ -498,6 +570,15 @@ log_syslog_init(struct log *log, const char *init_str)
 	if (say_parse_syslog_opts(init_str, &opts) < 0)
 		return -1;
 
+	log->syslog_server_type = opts.server_type;
+	if (log->syslog_server_type != SAY_SYSLOG_DEFAULT) {
+		log->path = strdup(opts.server_path);
+		if (log->path == NULL) {
+			diag_set(OutOfMemory, strlen(opts.server_path),
+				 "malloc", "server address");
+			return -1;
+		}
+	}
 	if (opts.identity == NULL)
 		log->syslog_ident = strdup("tarantool");
 	else
@@ -1031,6 +1112,8 @@ say_syslog_facility_by_name(const char *facility)
 int
 say_parse_syslog_opts(const char *init_str, struct say_syslog_opts *opts)
 {
+	opts->server_path = NULL;
+	opts->server_type = SAY_SYSLOG_DEFAULT;
 	opts->identity = NULL;
 	opts->facility = syslog_facility_MAX;
 	opts->copy = strdup(init_str);
@@ -1047,7 +1130,18 @@ say_parse_syslog_opts(const char *init_str, struct say_syslog_opts *opts)
 			break;
 
 		value = option;
-		if (say_parse_prefix(&value, "identity=")) {
+		if (say_parse_prefix(&value, "server=")) {
+			if (opts->server_path != NULL ||
+			    opts->server_type != SAY_SYSLOG_DEFAULT)
+				goto duplicate;
+			if (say_parse_prefix(&value, "unix:")) {
+				opts->server_type = SAY_SYSLOG_UNIX;
+				opts->server_path = value;
+			} else {
+				opts->server_type = SAY_SYSLOG_REMOTE;
+				opts->server_path = value;
+			}
+		} else if (say_parse_prefix(&value, "identity=")) {
 			if (opts->identity != NULL)
 				goto duplicate;
 			opts->identity = value;
