@@ -5394,7 +5394,7 @@ vdbe_return:
 	testcase( nVmStep>0);
 	p->aCounter[SQLITE_STMTSTATUS_VM_STEP] += (int)nVmStep;
 	assert(rc!=SQLITE_OK || nExtraDelete==0
-		|| sqlite3_strlike("DELETE%",p->zSql,0)!=0
+		|| sql_strlike_ci("DELETE%", p->zSql, 0) != 0
 		);
 	return rc;
 

@@ -1276,11 +1276,10 @@ analysis_loader(void *data, int argc, char **argv, char **unused)
 	/* Position ptr at the end of stat string. */
 	for (; *z == ' ' || (*z >= '0' && *z <= '9'); ++z);
 	while (z[0]) {
-		if (sqlite3_strglob("unordered*", z) == 0) {
+		if (sql_strlike_cs("unordered%", z, '[') == 0)
 			index->def->opts.stat->is_unordered = true;
-		} else if (sqlite3_strglob("noskipscan*", z) == 0) {
+		else if (sql_strlike_cs("noskipscan%", z, '[') == 0)
 			index->def->opts.stat->skip_scan_enabled = false;
-		}
 		while (z[0] != 0 && z[0] != ' ')
 			z++;
 		while (z[0] == ' ')

@@ -404,7 +404,7 @@ if 0
             CREATE TABLE t401(p INTEGER PRIMARY KEY, q INT , r INT );
             CREATE TABLE t402(x INTEGER PRIMARY KEY, y INT , z INT );
             EXPLAIN QUERY PLAN
-            SELECT * FROM t400, t401, t402 WHERE t402.z GLOB 'abc*';
+            SELECT * FROM t400, t401, t402 WHERE t402.z LIKE 'abc%';
         ]], {
             -- <where3-4.0>
             0, 0, 2, "SCAN TABLE T402", 0, 1, 0, "SCAN TABLE T400", 0, 2, 1, "SCAN TABLE T401"
@@ -415,7 +415,7 @@ if 0
         "where3-4.1",
         [[
             EXPLAIN QUERY PLAN
-            SELECT * FROM t400, t401, t402 WHERE t401.r GLOB 'abc*';
+            SELECT * FROM t400, t401, t402 WHERE t401.r LIKE 'abc%';
         ]], {
             -- <where3-4.1>
             0, 0, 1, "SCAN TABLE T401", 0, 1, 0, "SCAN TABLE T400", 0, 2, 2, "SCAN TABLE T402"
@@ -426,7 +426,7 @@ if 0
         "where3-4.2",
         [[
             EXPLAIN QUERY PLAN
-            SELECT * FROM t400, t401, t402 WHERE t400.c GLOB 'abc*';
+            SELECT * FROM t400, t401, t402 WHERE t400.c LIKE 'abc%';
         ]], {
             -- <where3-4.2>
             0, 0, 0, "SCAN TABLE T400", 0, 1, 1, "SCAN TABLE T401", 0, 2, 2, "SCAN TABLE T402"

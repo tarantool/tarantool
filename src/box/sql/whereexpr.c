@@ -219,37 +219,50 @@ operatorMask(int op)
 }
 
 #ifndef SQLITE_OMIT_LIKE_OPTIMIZATION
-/*
- * Check to see if the given expression is a LIKE or GLOB operator that
- * can be optimized using inequality constraints.  Return TRUE if it is
- * so and false if not.
+/**
+ * Check to see if the given expression is a LIKE operator that
+ * can be optimized using inequality constraints.
  *
- * In order for the operator to be optimizible, the RHS must be a string
- * literal that does not begin with a wildcard.  The LHS must be a column
- * that may only be NULL, a string, or a BLOB, never a number. The
- * collating sequence for the column on the LHS must be appropriate for
- * the operator.
+ * In order for the operator to be optimizible, the RHS must be a
+ * string literal that does not begin with a wildcard. The LHS
+ * must be a column that may only be NULL, a string, or a BLOB,
+ * never a number. The collating sequence for the column on the
+ * LHS must be appropriate for the operator.
+ *
+ * @param pParse      Parsing and code generating context.
+ * @param pExpr       Test this expression.
+ * @param ppPrefix    Pointer to TK_STRING expression with
+ *                    pattern prefix.
+ * @param pisComplete True if the only wildcard is '%' in the
+ *                    last character.
+ * @param pnoCase     True if case insensitive.
+ *
+ * @retval True if the given expr is a LIKE operator & is
+ *         optimizable using inequality constraints.
  */
 static int
-isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
-	     Expr * pExpr,	/* Test this expression */
-	     Expr ** ppPrefix,	/* Pointer to TK_STRING expression with pattern prefix */
-	     int *pisComplete,	/* True if the only wildcard is % in the last character */
-	     int *pnoCase	/* True if uppercase is equivalent to lowercase */
-    )
+like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
+			   int *pisComplete, int *pnoCase)
 {
-	const char *z = 0;	/* String on RHS of LIKE operator */
-	Expr *pRight, *pLeft;	/* Right and left size of LIKE operator */
-	ExprList *pList;	/* List of operands to the LIKE operator */
-	int c;			/* One character in z[] */
-	int cnt;		/* Number of non-wildcard prefix characters */
-	char wc[3];		/* Wildcard characters */
-	sqlite3 *db = pParse->db;	/* Database connection */
+	/* String on RHS of LIKE operator. */
+	const char *z = 0;
+	/* Right and left size of LIKE operator. */
+	Expr *pRight, *pLeft;
+	/* List of operands to the LIKE operator. */
+	ExprList *pList;
+	/* One character in z[]. */
+	int c;
+	/* Number of non-wildcard prefix characters. */
+	int cnt;
+	/* Database connection. */
+	sqlite3 *db = pParse->db;
 	sqlite3_value *pVal = 0;
-	int op;			/* Opcode of pRight */
-	int rc;			/* Result code to return */
+	/* Opcode of pRight. */
+	int op;
+	/* Result code to return. */
+	int rc;
 
-	if (!sqlite3IsLikeFunction(db, pExpr, pnoCase, wc)) {
+	if (!sql_is_like_func(db, pExpr, pnoCase)) {
 		return 0;
 	}
 	pList = pExpr->x.pList;
@@ -257,8 +270,9 @@ isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
 	/* Value might be numeric */
 	if (pLeft->op != TK_COLUMN ||
 	    sqlite3ExprAffinity(pLeft) != AFFINITY_TEXT) {
-		/* IMP: R-02065-49465 The left-hand side of the LIKE or GLOB operator must
-		 * be the name of an indexed column with TEXT affinity.
+		/* IMP: R-02065-49465 The left-hand side of the
+		 * LIKE operator must be the name of an indexed
+		 * column with TEXT affinity.
 		 */
 		return 0;
 	}
@@ -281,13 +295,13 @@ isLikeOrGlob(Parse * pParse,	/* Parsing and code generating context */
 	}
 	if (z) {
 		cnt = 0;
-		while ((c = z[cnt]) != 0 && c != wc[0] && c != wc[1]
-		       && c != wc[2]) {
+		while ((c = z[cnt]) != 0 && c != MATCH_ONE_WILDCARD &&
+		       c != MATCH_ALL_WILDCARD)
 			cnt++;
-		}
 		if (cnt != 0 && 255 != (u8) z[cnt - 1]) {
 			Expr *pPrefix;
-			*pisComplete = c == wc[0] && z[cnt + 1] == 0;
+			*pisComplete = c == MATCH_ALL_WILDCARD &&
+				       z[cnt + 1] == 0;
 			pPrefix = sqlite3Expr(db, TK_STRING, z);
 			if (pPrefix)
 				pPrefix->u.zToken[cnt] = 0;
@@ -943,19 +957,32 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	    int idxTerm		/* Index of the term to be analyzed */
     )
 {
-	WhereInfo *pWInfo = pWC->pWInfo;	/* WHERE clause processing context */
-	WhereTerm *pTerm;	/* The term to be analyzed */
-	WhereMaskSet *pMaskSet;	/* Set of table index masks */
-	Expr *pExpr;		/* The expression to be analyzed */
-	Bitmask prereqLeft;	/* Prerequesites of the pExpr->pLeft */
-	Bitmask prereqAll;	/* Prerequesites of pExpr */
-	Bitmask extraRight = 0;	/* Extra dependencies on LEFT JOIN */
-	Expr *pStr1 = 0;	/* RHS of LIKE/GLOB operator */
-	int isComplete = 0;	/* RHS of LIKE/GLOB ends with wildcard */
-	int noCase = 0;		/* uppercase equivalent to lowercase */
-	int op;			/* Top-level operator.  pExpr->op */
-	Parse *pParse = pWInfo->pParse;	/* Parsing context */
-	sqlite3 *db = pParse->db;	/* Database connection */
+	/* WHERE clause processing context. */
+	WhereInfo *pWInfo = pWC->pWInfo;
+	/* The term to be analyzed. */
+	WhereTerm *pTerm;
+	/* Set of table index masks. */
+	WhereMaskSet *pMaskSet;
+	/* The expression to be analyzed. */
+	Expr *pExpr;
+	/* Prerequesites of the pExpr->pLeft. */
+	Bitmask prereqLeft;
+	/* Prerequesites of pExpr. */
+	Bitmask prereqAll;
+	/* Extra dependencies on LEFT JOIN. */
+	Bitmask extraRight = 0;
+	/* RHS of LIKE operator. */
+	Expr *pStr1 = 0;
+	/* RHS of LIKE ends with wildcard. */
+	int isComplete = 0;
+	/* uppercase equivalent to lowercase. */
+	int noCase = 0;
+	/* Top-level operator. pExpr->op. */
+	int op;
+	/* Parsing context. */
+	Parse *pParse = pWInfo->pParse;
+	/* Database connection. */
+	sqlite3 *db = pParse->db;
 
 	if (db->mallocFailed) {
 		return;
@@ -1111,37 +1138,43 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 #endif				/* SQLITE_OMIT_OR_OPTIMIZATION */
 
 #ifndef SQLITE_OMIT_LIKE_OPTIMIZATION
-	/* Add constraints to reduce the search space on a LIKE or GLOB
+	/*
+	 * Add constraints to reduce the search space on a LIKE
 	 * operator.
 	 *
-	 * A like pattern of the form "x LIKE 'aBc%'" is changed into constraints
+	 * A like pattern of the form "x LIKE 'aBc%'" is changed
+	 * into constraints:
 	 *
 	 *          x>='ABC' AND x<'abd' AND x LIKE 'aBc%'
 	 *
-	 * The last character of the prefix "abc" is incremented to form the
-	 * termination condition "abd".  If case is not significant (the default
-	 * for LIKE) then the lower-bound is made all uppercase and the upper-
-	 * bound is made all lowercase so that the bounds also work when comparing
-	 * BLOBs.
+	 * The last character of the prefix "abc" is incremented
+	 * to form the termination condition "abd". If case is
+	 * not significant (the default for LIKE) then the
+	 * lower-bound is made all uppercase and the upper-bound
+	 * is made all lowercase so that the bounds also work
+	 * when comparing BLOBs.
 	 */
-	if (pWC->op == TK_AND
-	    && isLikeOrGlob(pParse, pExpr, &pStr1, &isComplete, &noCase)
-	    ) {
-		Expr *pLeft;	/* LHS of LIKE/GLOB operator */
-		Expr *pStr2;	/* Copy of pStr1 - RHS of LIKE/GLOB operator */
+	if (pWC->op == TK_AND &&
+	    like_optimization_is_valid(pParse, pExpr, &pStr1,
+				       &isComplete, &noCase)) {
+		Expr *pLeft;
+		/* Copy of pStr1 - RHS of LIKE operator. */
+		Expr *pStr2;
 		Expr *pNewExpr1;
 		Expr *pNewExpr2;
 		int idxNew1;
 		int idxNew2;
-		const char *zCollSeqName;	/* Name of collating sequence */
+		const char *zCollSeqName;
 		const u16 wtFlags = TERM_LIKEOPT | TERM_VIRTUAL | TERM_DYNAMIC;
 
 		pLeft = pExpr->x.pList->a[1].pExpr;
 		pStr2 = sqlite3ExprDup(db, pStr1, 0);
 
-		/* Convert the lower bound to upper-case and the upper bound to
-		 * lower-case (upper-case is less than lower-case in ASCII) so that
-		 * the range constraints also work for BLOBs
+		/*
+		 * Convert the lower bound to upper-case and the
+		 * upper bound to lower-case (upper-case is less
+		 * than lower-case in ASCII) so that the range
+		 * constraints also work for BLOBs.
 		 */
 		if (noCase && !pParse->db->mallocFailed) {
 			int i;

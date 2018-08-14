@@ -12,13 +12,13 @@ test:plan(7)
 --    May you find forgiveness for yourself and forgive others.
 --    May you share freely, never taking more than you give.
 --
--------------------------------------------------------------------------
+-----------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library.  The
--- focus of this file is testing the LIKE and GLOB operators and
--- in particular the optimizations that occur to help those operators
--- run faster and that those optimizations work correctly when there
--- are both strings and blobs being tested.
+-- This file implements regression tests for SQLite library. The
+-- focus of this file is testing the LIKE operator and
+-- in particular the optimizations that occur to help this
+-- operator run faster and that those optimizations work
+-- correctly when there are both strings and blobs being tested.
 --
 -- Ticket 05f43be8fdda9fbd948d374319b99b054140bc36 shows that the following
 -- SQL was not working correctly:
@@ -73,57 +73,52 @@ test:do_execsql_test(
         CREATE TABLE t2(a INT PRIMARY KEY, b TEXT);
         INSERT INTO t2 SELECT a, b FROM t1;
         CREATE INDEX t2ba ON t2(b,a);
-        SELECT a, b FROM t2 WHERE b GLOB 'ab*' ORDER BY +a;
+        SELECT a, b FROM t2 WHERE b LIKE 'ab%' ORDER BY +a;
     ]], {
         -- <like3-2.0>
-        1, "abc", 4, "abc"
+        1, "abc", 2, "ABX", 4, "abc", 5, "ABX"
         -- </like3-2.0>
     })
-
 test:do_execsql_test(
     "like3-2.1",
     [[
-        SELECT a, b FROM t2 WHERE +b GLOB 'ab*' ORDER BY +a;
+        SELECT a, b FROM t2 WHERE +b LIKE 'ab%' ORDER BY +a;
     ]], {
         -- <like3-2.1>
-        1, "abc", 4, "abc"
+        1, "abc", 2, "ABX", 4, "abc", 5, "ABX"
         -- </like3-2.1>
     })
-
 test:do_execsql_test(
     "like3-2.2",
     [[
-        SELECT a, b FROM t2 WHERE b>='ab' AND b GLOB 'ab*'
+        SELECT a, b FROM t2 WHERE b>='ab' AND b LIKE 'ab%'
     ]], {
         -- <like3-2.2>
         1, "abc", 4, "abc"
         -- </like3-2.2>
     })
-
 test:do_execsql_test(
     "like3-2.3",
     [[
-        SELECT a, b FROM t2 WHERE +b>='ab' AND +b GLOB 'ab*'
+        SELECT a, b FROM t2 WHERE +b>='ab' AND +b LIKE 'ab%'
     ]], {
         -- <like3-2.3>
         1, "abc", 4, "abc"
         -- </like3-2.3>
     })
-
 test:do_execsql_test(
     "like3-2.4",
     [[
-        SELECT a, b FROM t2 WHERE b GLOB 'ab*' AND b>='ab'
+        SELECT a, b FROM t2 WHERE b LIKE 'ab%' AND b>='ab'
     ]], {
         -- <like3-2.4>
         1, "abc", 4, "abc"
         -- </like3-2.4>
     })
-
 test:do_execsql_test(
     "like3-2.5",
     [[
-        SELECT a, b FROM t2 WHERE +b GLOB 'ab*' AND +b>='ab'
+        SELECT a, b FROM t2 WHERE +b LIKE 'ab%' AND +b>='ab'
     ]], {
         -- <like3-2.5>
         1, "abc", 4, "abc"

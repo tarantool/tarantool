@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(10661)
+test:plan(10641)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -77,10 +77,6 @@ local operations = {
     {"<>", "ne1"},
     {"!=", "ne2"},
     {"IS", "is"},
--- NOTE: This test needs refactoring after deletion of GLOB &
---	 type restrictions for LIKE. (See #3572)
---    {"LIKE", "like"},
---    {"GLOB", "glob"},
     {"AND", "and"},
     {"OR", "or"},
     {"MATCH", "match"},
@@ -98,12 +94,9 @@ operations = {
     {"+", "-"},
     {"<<", ">>", "&", "|"},
     {"<", "<=", ">", ">="},
--- NOTE: This test needs refactoring after deletion of GLOB &
--- type restrictions for LIKE. (See #3572)
--- Also, MATCH & REGEXP aren't supported in Tarantool &
--- are waiting for their hour, don't confuse them
--- being commented with ticket above.
-    {"=", "==", "!=", "<>"}, --"LIKE", "GLOB"}, --"MATCH", "REGEXP"},
+-- NOTE: MATCH & REGEXP aren't supported in Tarantool &
+-- are waiting for their hour.
+    {"=", "==", "!=", "<>"}, --"MATCH", "REGEXP"},
     {"AND"},
     {"OR"},
 }
@@ -128,7 +121,7 @@ end
 -- EVIDENCE-OF: R-15514-65163 SQLite understands the following binary
 -- operators, in order from highest to lowest precedence: || * / % + -
 -- << >> & | < <= > >= = == != <> IS IS
--- NOT IN LIKE GLOB MATCH REGEXP AND OR
+-- NOT IN LIKE MATCH REGEXP AND OR
 --
 -- EVIDENCE-OF: R-38759-38789 Operators IS and IS NOT have the same
 -- precedence as =.
@@ -1275,7 +1268,6 @@ local function glob(args)
     return 1
 end
 
-box.internal.sql_create_function("GLOB", "INT", glob)
 box.internal.sql_create_function("MATCH", "INT", glob)
 box.internal.sql_create_function("REGEXP", "INT", glob)
 local test_cases12 ={
@@ -1336,47 +1328,43 @@ local test_cases12 ={
 
     {47, "EXPR1 LIKE EXPR2"},
     {48, "EXPR1 LIKE EXPR2 ESCAPE EXPR"},
-    {49, "EXPR1 GLOB EXPR2"},
-    {50, "EXPR1 GLOB EXPR2 ESCAPE EXPR"},
-    {51, "EXPR1 REGEXP EXPR2"},
-    {52, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
-    {53, "EXPR1 MATCH EXPR2"},
-    {54, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
-    {55, "EXPR1 NOT LIKE EXPR2"},
-    {56, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
-    {57, "EXPR1 NOT GLOB EXPR2"},
-    {58, "EXPR1 NOT GLOB EXPR2 ESCAPE EXPR"},
-    {59, "EXPR1 NOT REGEXP EXPR2"},
-    {60, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
-    {61, "EXPR1 NOT MATCH EXPR2"},
-    {62, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
+    {49, "EXPR1 REGEXP EXPR2"},
+    {50, "EXPR1 REGEXP EXPR2 ESCAPE EXPR"},
+    {51, "EXPR1 MATCH EXPR2"},
+    {52, "EXPR1 MATCH EXPR2 ESCAPE EXPR"},
+    {53, "EXPR1 NOT LIKE EXPR2"},
+    {54, "EXPR1 NOT LIKE EXPR2 ESCAPE EXPR"},
+    {55, "EXPR1 NOT REGEXP EXPR2"},
+    {56, "EXPR1 NOT REGEXP EXPR2 ESCAPE EXPR"},
+    {57, "EXPR1 NOT MATCH EXPR2"},
+    {58, "EXPR1 NOT MATCH EXPR2 ESCAPE EXPR"},
 
-    {63, "EXPR IS NULL"},
-    {64, "EXPR IS NOT NULL"},
+    {59, "EXPR IS NULL"},
+    {60, "EXPR IS NOT NULL"},
 
-    {65, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
-    {66, "EXPR BETWEEN EXPR1 AND EXPR2"},
+    {61, "EXPR NOT BETWEEN EXPR1 AND EXPR2"},
+    {62, "EXPR BETWEEN EXPR1 AND EXPR2"},
 
-    {67, "EXPR NOT IN (SELECT cname FROM tblname)"},
-    {68, "EXPR NOT IN (1)"},
-    {69, "EXPR NOT IN (1, 2, 3)"},
-    {70, "EXPR NOT IN tblname"},
-    {71, "EXPR IN (SELECT cname FROM tblname)"},
-    {72, "EXPR IN (1)"},
-    {73, "EXPR IN (1, 2, 3)"},
-    {74, "EXPR IN tblname"},
+    {63, "EXPR NOT IN (SELECT cname FROM tblname)"},
+    {64, "EXPR NOT IN (1)"},
+    {65, "EXPR NOT IN (1, 2, 3)"},
+    {66, "EXPR NOT IN tblname"},
+    {67, "EXPR IN (SELECT cname FROM tblname)"},
+    {68, "EXPR IN (1)"},
+    {69, "EXPR IN (1, 2, 3)"},
+    {70, "EXPR IN tblname"},
 
-    {75, "EXISTS (SELECT cname FROM tblname)"},
-    {76, "NOT EXISTS (SELECT cname FROM tblname)"},
+    {71, "EXISTS (SELECT cname FROM tblname)"},
+    {72, "NOT EXISTS (SELECT cname FROM tblname)"},
 
-    {77, "CASE EXPR WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
-    {78, "CASE EXPR WHEN EXPR1 THEN EXPR2 END"},
-    {79, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
-    {80, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
-    {81, "CASE WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
-    {82, "CASE WHEN EXPR1 THEN EXPR2 END"},
-    {83, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
-    {84, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
+    {73, "CASE EXPR WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
+    {74, "CASE EXPR WHEN EXPR1 THEN EXPR2 END"},
+    {75, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
+    {76, "CASE EXPR WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
+    {77, "CASE WHEN EXPR1 THEN EXPR2 ELSE EXPR END"},
+    {78, "CASE WHEN EXPR1 THEN EXPR2 END"},
+    {79, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 ELSE EXPR2 END"},
+    {80, "CASE WHEN EXPR1 THEN EXPR2 WHEN EXPR THEN EXPR1 END"},
 }
 
 for _, val in ipairs(test_cases12) do
@@ -1769,7 +1757,7 @@ test:do_execsql_test(
     })
 
 ---------------------------------------------------------------------------
--- Test the statements related to the LIKE and GLOB operators.
+-- Test the statements related to the LIKE operator.
 --
 -- EVIDENCE-OF: R-16584-60189 The LIKE operator does a pattern matching
 -- comparison.
@@ -2257,98 +2245,36 @@ test:do_execsql_test(
         -- </e_expr-16.1.7>
     })
 
--- EVIDENCE-OF: R-52087-12043 The GLOB operator is similar to LIKE but
--- uses the Unix file globbing syntax for its wildcards.
---
--- EVIDENCE-OF: R-09813-17279 Also, GLOB is case sensitive, unlike LIKE.
---
-test:do_execsql_test(
-    "e_expr-17.1.1",
-    [[
-        SELECT 'abcxyz' GLOB 'abc%'
-    ]], {
-        -- <e_expr-17.1.1>
-        0
-        -- </e_expr-17.1.1>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.1.2",
-    [[
-        SELECT 'abcxyz' GLOB 'abc*'
-    ]], {
-        -- <e_expr-17.1.2>
-        1
-        -- </e_expr-17.1.2>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.1.3",
-    [[
-        SELECT 'abcxyz' GLOB 'abc___'
-    ]], {
-        -- <e_expr-17.1.3>
-        0
-        -- </e_expr-17.1.3>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.1.4",
-    [[
-        SELECT 'abcxyz' GLOB 'abc???'
-    ]], {
-        -- <e_expr-17.1.4>
-        1
-        -- </e_expr-17.1.4>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.1.5",
-    [[
-        SELECT 'abcxyz' GLOB 'abc*'
-    ]], {
-        -- <e_expr-17.1.5>
-        1
-        -- </e_expr-17.1.5>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.1.6",
-    [[
-        SELECT 'ABCxyz' GLOB 'abc*'
-    ]], {
-        -- <e_expr-17.1.6>
-        0
-        -- </e_expr-17.1.6>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.1.7",
-    [[
-        SELECT 'abcxyz' GLOB 'ABC*'
-    ]], {
-        -- <e_expr-17.1.7>
-        0
-        -- </e_expr-17.1.7>
-    })
-
--- EVIDENCE-OF: R-39616-20555 Both GLOB and LIKE may be preceded by the
+-- EVIDENCE-OF: R-39616-20555 LIKE may be preceded by the
 -- NOT keyword to invert the sense of the test.
 --
 test:do_execsql_test(
+    "e_expr-17.2.0",
+    [[
+        PRAGMA case_sensitive_like = 1;
+        SELECT 'abcxyz' NOT LIKE 'ABC%';
+    ]], {
+        -- <e_expr-17.2.0>
+        1
+        -- </e_expr-17.2.0>
+    })
+
+test:execsql("PRAGMA case_sensitive_like = 0;")
+
+test:do_execsql_test(
     "e_expr-17.2.1",
     [[
-        SELECT 'abcxyz' NOT GLOB 'ABC*'
+        SELECT 'abcxyz' NOT LIKE 'ABC%'
     ]], {
         -- <e_expr-17.2.1>
-        1
+        0
         -- </e_expr-17.2.1>
     })
 
 test:do_execsql_test(
     "e_expr-17.2.2",
     [[
-        SELECT 'abcxyz' NOT GLOB 'abc*'
+        SELECT 'abcxyz' NOT LIKE 'abc%'
     ]], {
         -- <e_expr-17.2.2>
         0
@@ -2358,40 +2284,40 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_expr-17.2.3",
     [[
-        SELECT 'abcxyz' NOT LIKE 'ABC%'
-    ]], {
-        -- <e_expr-17.2.3>
-        0
-        -- </e_expr-17.2.3>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.2.4",
-    [[
-        SELECT 'abcxyz' NOT LIKE 'abc%'
-    ]], {
-        -- <e_expr-17.2.4>
-        0
-        -- </e_expr-17.2.4>
-    })
-
-test:do_execsql_test(
-    "e_expr-17.2.5",
-    [[
         SELECT 'abdxyz' NOT LIKE 'abc%'
     ]], {
-        -- <e_expr-17.2.5>
+        -- <e_expr-17.2.3>
         1
-        -- </e_expr-17.2.5>
+        -- </e_expr-17.2.3>
     })
 
 -- MUST_WORK_TEST uses access to nullvalue... (sql parameters) and built in functions
 if 0>0 then
     db("nullvalue", "null")
     test:do_execsql_test(
-        "e_expr-17.2.6",
+        "e_expr-17.2.4",
         [[
             SELECT 'abcxyz' NOT GLOB NULL
+        ]], {
+            -- <e_expr-17.2.4>
+            "null"
+            -- </e_expr-17.2.4>
+        })
+
+    test:do_execsql_test(
+        "e_expr-17.2.5",
+        [[
+            SELECT 'abcxyz' NOT LIKE NULL
+        ]], {
+            -- <e_expr-17.2.5>
+            "null"
+            -- </e_expr-17.2.5>
+        })
+
+    test:do_execsql_test(
+        "e_expr-17.2.6",
+        [[
+            SELECT NULL NOT GLOB 'abc*'
         ]], {
             -- <e_expr-17.2.6>
             "null"
@@ -2401,91 +2327,15 @@ if 0>0 then
     test:do_execsql_test(
         "e_expr-17.2.7",
         [[
-            SELECT 'abcxyz' NOT LIKE NULL
+            SELECT NULL NOT LIKE 'ABC%'
         ]], {
             -- <e_expr-17.2.7>
             "null"
             -- </e_expr-17.2.7>
         })
 
-    test:do_execsql_test(
-        "e_expr-17.2.8",
-        [[
-            SELECT NULL NOT GLOB 'abc*'
-        ]], {
-            -- <e_expr-17.2.8>
-            "null"
-            -- </e_expr-17.2.8>
-        })
-
-    test:do_execsql_test(
-        "e_expr-17.2.9",
-        [[
-            SELECT NULL NOT LIKE 'ABC%'
-        ]], {
-            -- <e_expr-17.2.9>
-            "null"
-            -- </e_expr-17.2.9>
-        })
-
     db("nullvalue", "")
 end
-
--- EVIDENCE-OF: R-39414-35489 The infix GLOB operator is implemented by
--- calling the function glob(Y,X) and can be modified by overriding that
--- function.
-
-local globargs = {}
-local function globfunc(...)
-    local args = {...}
-    for i, v in ipairs(args) do
-        table.insert(globargs, v)
-    end
-    return 1
-end
-box.internal.sql_create_function("GLOB", "INT", globfunc, 2)
---db("func", "glob", "-argcount", 2, "globfunc")
-
-test:do_execsql_test(
-    "e_expr-17.3.1",
-    [[
-        SELECT 'abc' GLOB 'def'
-    ]], {
-        -- <e_expr-17.3.1>
-        1
-        -- </e_expr-17.3.1>
-    })
-
-test:do_test(
-    "e_expr-17.3.2",
-    function()
-        return globargs
-    end, {
-        -- <e_expr-17.3.2>
-        "def", "abc"
-        -- </e_expr-17.3.2>
-    })
-
-globargs = {  }
-test:do_execsql_test(
-    "e_expr-17.3.3",
-    [[
-        SELECT 'X' NOT GLOB 'Y'
-    ]], {
-        -- <e_expr-17.3.3>
-        0
-        -- </e_expr-17.3.3>
-    })
-
-test:do_test(
-    "e_expr-17.3.4",
-    function()
-        return globargs
-    end, {
-        -- <e_expr-17.3.4>
-        "Y", "X"
-        -- </e_expr-17.3.4>
-    })
 
 --sqlite3("db", "test.db")
 -- EVIDENCE-OF: R-41650-20872 No regexp() user function is defined by

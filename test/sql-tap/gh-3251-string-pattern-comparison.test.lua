@@ -142,17 +142,17 @@ for i, tested_string in ipairs(invalid_testcases) do
     local test_name = prefix .. "2." .. tostring(i)
     local test_itself = "SELECT 'abc' LIKE 'ab" .. tested_string .. "';"
     test:do_catchsql_test(test_name, test_itself,
-                          {1, "LIKE or GLOB pattern can only contain UTF-8 characters"})
+                          {1, "LIKE pattern can only contain UTF-8 characters"})
 
     test_name = prefix .. "3." .. tostring(i)
     test_itself = "SELECT 'abc' LIKE 'abc" .. tested_string .. "';"
     test:do_catchsql_test(test_name, test_itself,
-                          {1, "LIKE or GLOB pattern can only contain UTF-8 characters"})
+                          {1, "LIKE pattern can only contain UTF-8 characters"})
 
     test_name = prefix .. "4." .. tostring(i)
     test_itself = "SELECT 'abc' LIKE 'ab" .. tested_string .. "c';"
     test:do_catchsql_test(test_name, test_itself,
-                          {1, "LIKE or GLOB pattern can only contain UTF-8 characters"})
+                          {1, "LIKE pattern can only contain UTF-8 characters"})
 
     -- Just skipping if row value predicand contains invalid character.
 

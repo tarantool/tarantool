@@ -324,7 +324,7 @@ sqlite3WhereAddScanStatus(Vdbe * v,		/* Vdbe to add scanstatus entry to */
  * automatically disabled.  In this way, terms get disabled if derived
  * virtual terms are tested first.  For example:
  *
- *      x GLOB 'abc*' AND x>='abc' AND x<'acd'
+ *      x LIKE 'abc%' AND x>='abc' AND x<'acd'
  *      \___________/     \______/     \_____/
  *         parent          child1       child2
  *

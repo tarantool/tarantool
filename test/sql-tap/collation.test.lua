@@ -219,7 +219,7 @@ local like_testcases =
         {0, {"Aab", "aaa"}} },
     {"2.1.2",
         "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
-        {0, {0, 0, 0, "/USING COVERING INDEX I1/"}} },
+        {0, {0, 0, 0, "SEARCH TABLE TX1 USING COVERING INDEX I1 (S1>? AND S1<?)"}}},
     {"2.2.0",
         "PRAGMA case_sensitive_like = true;",
         {0}},

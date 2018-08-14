@@ -448,12 +448,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=1070
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
   ]])
     end, {
         -- <where7-2.2.1>
@@ -467,12 +467,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=1070
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
   ]])
     end, {
         -- <where7-2.2.2>
@@ -487,11 +487,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR ((a BETWEEN 33 AND 35) AND a!=34)
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR b=220
          OR (d>=70.0 AND d<71.0 AND d IS NOT NULL)
          OR ((a BETWEEN 67 AND 69) AND a!=68)
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.3.1>
@@ -506,11 +506,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR ((a BETWEEN 33 AND 35) AND a!=34)
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR b=220
          OR (d>=70.0 AND d<71.0 AND d IS NOT NULL)
          OR ((a BETWEEN 67 AND 69) AND a!=68)
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.3.2>
@@ -525,7 +525,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=190
          OR ((a BETWEEN 49 AND 51) AND a!=50)
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR b=407
   ]])
     end, {
@@ -541,7 +541,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=190
          OR ((a BETWEEN 49 AND 51) AND a!=50)
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR b=407
   ]])
     end, {
@@ -555,7 +555,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?opqr*' AND f GLOB 'nopq*')
+      WHERE (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=795
          OR b=1103
          OR b=583
@@ -571,7 +571,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?opqr*' AND f GLOB 'nopq*')
+      WHERE (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=795
          OR b=1103
          OR b=583
@@ -589,7 +589,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=74
          OR a=50
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR ((a BETWEEN 16 AND 18) AND a!=17)
          OR c=21021
          OR ((a BETWEEN 82 AND 84) AND a!=83)
@@ -607,7 +607,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=74
          OR a=50
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR ((a BETWEEN 16 AND 18) AND a!=17)
          OR c=21021
          OR ((a BETWEEN 82 AND 84) AND a!=83)
@@ -746,7 +746,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=72.0 AND d<73.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR c=11011
          OR c=20020
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
@@ -763,7 +763,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=72.0 AND d<73.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR c=11011
          OR c=20020
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
@@ -781,7 +781,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR (d>=83.0 AND d<84.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR b=792
          OR a=97
          OR (d>=87.0 AND d<88.0 AND d IS NOT NULL)
@@ -804,7 +804,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR (d>=83.0 AND d<84.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR b=792
          OR a=97
          OR (d>=87.0 AND d<88.0 AND d IS NOT NULL)
@@ -827,11 +827,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 50 AND 52) AND a!=51)
          OR c=9009
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=539
          OR b=297
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR b=957
          OR f='xyzabcdef'
          OR b=619
@@ -849,11 +849,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 50 AND 52) AND a!=51)
          OR c=9009
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=539
          OR b=297
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR b=957
          OR f='xyzabcdef'
          OR b=619
@@ -931,7 +931,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=938
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.16.1>
@@ -946,7 +946,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=938
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.16.2>
@@ -963,12 +963,12 @@ test:do_test(
          OR f='zabcdefgh'
          OR b=308
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR ((a BETWEEN 15 AND 17) AND a!=16)
          OR b=443
          OR ((a BETWEEN 12 AND 14) AND a!=13)
          OR f='uvwxyzabc'
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
   ]])
     end, {
         -- <where7-2.17.1>
@@ -985,12 +985,12 @@ test:do_test(
          OR f='zabcdefgh'
          OR b=308
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR ((a BETWEEN 15 AND 17) AND a!=16)
          OR b=443
          OR ((a BETWEEN 12 AND 14) AND a!=13)
          OR f='uvwxyzabc'
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
   ]])
     end, {
         -- <where7-2.17.2>
@@ -1037,13 +1037,13 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR a=46
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR a=73
          OR c=20020
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR b=267
          OR ((a BETWEEN 68 AND 70) AND a!=69)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.19.1>
@@ -1058,13 +1058,13 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR a=46
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR a=73
          OR c=20020
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR b=267
          OR ((a BETWEEN 68 AND 70) AND a!=69)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.19.2>
@@ -1078,7 +1078,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 27 AND 29) AND a!=28)
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.20.1>
@@ -1092,7 +1092,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 27 AND 29) AND a!=28)
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.20.2>
@@ -1111,9 +1111,9 @@ test:do_test(
          OR ((a BETWEEN 87 AND 89) AND a!=88)
          OR f='bcdefghij'
          OR b=586
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR (d>=6.0 AND d<7.0 AND d IS NOT NULL)
          OR a=9
   ]])
@@ -1134,9 +1134,9 @@ test:do_test(
          OR ((a BETWEEN 87 AND 89) AND a!=88)
          OR f='bcdefghij'
          OR b=586
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR (d>=6.0 AND d<7.0 AND d IS NOT NULL)
          OR a=9
   ]])
@@ -1154,7 +1154,7 @@ test:do_test(
       WHERE b=399
          OR c=28028
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -1171,7 +1171,7 @@ test:do_test(
       WHERE b=399
          OR c=28028
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -1185,15 +1185,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR ((a BETWEEN 96 AND 98) AND a!=97)
          OR c=14014
          OR c=33033
          OR a=89
          OR b=770
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR a=35
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR b=253
          OR c=14014
   ]])
@@ -1208,15 +1208,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR ((a BETWEEN 96 AND 98) AND a!=97)
          OR c=14014
          OR c=33033
          OR a=89
          OR b=770
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR a=35
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR b=253
          OR c=14014
   ]])
@@ -1231,10 +1231,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'vwxyz*')
+      WHERE (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=330
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR a=16
   ]])
     end, {
@@ -1248,10 +1248,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'vwxyz*')
+      WHERE (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=330
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR a=16
   ]])
     end, {
@@ -1268,7 +1268,7 @@ test:do_test(
       WHERE c=5005
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
          OR ((a BETWEEN 36 AND 38) AND a!=37)
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.25.1>
@@ -1284,7 +1284,7 @@ test:do_test(
       WHERE c=5005
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
          OR ((a BETWEEN 36 AND 38) AND a!=37)
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.25.2>
@@ -1298,9 +1298,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=30.0 AND d<31.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=33
   ]])
     end, {
@@ -1315,9 +1315,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=30.0 AND d<31.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=33
   ]])
     end, {
@@ -1361,8 +1361,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE c=18018
          OR a=94
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=1012
          OR a=3
          OR d>1e10
@@ -1382,8 +1382,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE c=18018
          OR a=94
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=1012
          OR a=3
          OR d>1e10
@@ -1405,11 +1405,11 @@ test:do_test(
          OR c=11011
          OR b=297
          OR a=63
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR a=76
          OR b=1026
          OR a=26
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR c=30030
   ]])
     end, {
@@ -1427,11 +1427,11 @@ test:do_test(
          OR c=11011
          OR b=297
          OR a=63
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR a=76
          OR b=1026
          OR a=26
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR c=30030
   ]])
     end, {
@@ -1449,7 +1449,7 @@ test:do_test(
          OR b=1070
          OR a=59
          OR b=715
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
   ]])
     end, {
         -- <where7-2.30.1>
@@ -1466,7 +1466,7 @@ test:do_test(
          OR b=1070
          OR a=59
          OR b=715
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
   ]])
     end, {
         -- <where7-2.30.2>
@@ -1479,13 +1479,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=1056
          OR b=1012
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR ((a BETWEEN 67 AND 69) AND a!=68)
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
   ]])
     end, {
         -- <where7-2.31.1>
@@ -1498,13 +1498,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=1056
          OR b=1012
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR ((a BETWEEN 67 AND 69) AND a!=68)
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
   ]])
     end, {
         -- <where7-2.31.2>
@@ -1518,7 +1518,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='rstuvwxyz'
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 90 AND 92) AND a!=91)
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
   ]])
@@ -1534,7 +1534,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='rstuvwxyz'
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 90 AND 92) AND a!=91)
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
   ]])
@@ -1549,13 +1549,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?stuv*' AND f GLOB 'rstu*')
+      WHERE (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR c=12012
          OR a=18
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
   ]])
     end, {
         -- <where7-2.33.1>
@@ -1568,13 +1568,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?stuv*' AND f GLOB 'rstu*')
+      WHERE (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR c=12012
          OR a=18
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
   ]])
     end, {
         -- <where7-2.33.2>
@@ -1622,7 +1622,7 @@ test:do_test(
          OR ((a BETWEEN 67 AND 69) AND a!=68)
          OR c=33033
          OR b=11
-         OR (g='wvutsrq' AND f GLOB 'lmnop*')
+         OR (g='wvutsrq' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 7 AND 9) AND a!=8)
   ]])
     end, {
@@ -1643,7 +1643,7 @@ test:do_test(
          OR ((a BETWEEN 67 AND 69) AND a!=68)
          OR c=33033
          OR b=11
-         OR (g='wvutsrq' AND f GLOB 'lmnop*')
+         OR (g='wvutsrq' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 7 AND 9) AND a!=8)
   ]])
     end, {
@@ -1719,7 +1719,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=165
          OR b=201
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR a=32
   ]])
     end, {
@@ -1735,7 +1735,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=165
          OR b=201
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR a=32
   ]])
     end, {
@@ -1749,8 +1749,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
   ]])
     end, {
         -- <where7-2.39.1>
@@ -1763,8 +1763,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
   ]])
     end, {
         -- <where7-2.39.2>
@@ -1785,8 +1785,8 @@ test:do_test(
          OR a=18
          OR a=34
          OR b=132
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR c=18018
   ]])
     end, {
@@ -1808,8 +1808,8 @@ test:do_test(
          OR a=18
          OR a=34
          OR b=132
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR c=18018
   ]])
     end, {
@@ -1851,13 +1851,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR b=297
          OR b=113
          OR b=176
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR (d>=75.0 AND d<76.0 AND d IS NOT NULL)
          OR a=67
          OR c=26026
@@ -1873,13 +1873,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR b=297
          OR b=113
          OR b=176
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR (d>=75.0 AND d<76.0 AND d IS NOT NULL)
          OR a=67
          OR c=26026
@@ -1940,8 +1940,8 @@ test:do_test(
          OR ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=487
          OR b=619
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.44.1>
@@ -1959,8 +1959,8 @@ test:do_test(
          OR ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=487
          OR b=619
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.44.2>
@@ -1980,7 +1980,7 @@ test:do_test(
          OR c=17017
          OR a=82
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR (d>=39.0 AND d<40.0 AND d IS NOT NULL)
   ]])
@@ -2002,7 +2002,7 @@ test:do_test(
          OR c=17017
          OR a=82
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR (d>=39.0 AND d<40.0 AND d IS NOT NULL)
   ]])
@@ -2017,7 +2017,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ihgfedc' AND f GLOB 'bcdef*')
+      WHERE (g='ihgfedc' AND f LIKE 'bcdef%')
          OR c=22022
   ]])
     end, {
@@ -2031,7 +2031,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ihgfedc' AND f GLOB 'bcdef*')
+      WHERE (g='ihgfedc' AND f LIKE 'bcdef%')
          OR c=22022
   ]])
     end, {
@@ -2048,7 +2048,7 @@ test:do_test(
       WHERE c=7007
          OR b=91
          OR b=212
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR c=28028
          OR (d>=83.0 AND d<84.0 AND d IS NOT NULL)
   ]])
@@ -2066,7 +2066,7 @@ test:do_test(
       WHERE c=7007
          OR b=91
          OR b=212
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR c=28028
          OR (d>=83.0 AND d<84.0 AND d IS NOT NULL)
   ]])
@@ -2111,9 +2111,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'mnopq*')
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+      WHERE (g='wvutsrq' AND f LIKE 'mnopq%')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR ((a BETWEEN 0 AND 2) AND a!=1)
          OR c=4004
          OR b=322
@@ -2131,9 +2131,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'mnopq*')
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+      WHERE (g='wvutsrq' AND f LIKE 'mnopq%')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR ((a BETWEEN 0 AND 2) AND a!=1)
          OR c=4004
          OR b=322
@@ -2156,8 +2156,8 @@ test:do_test(
          OR a=46
          OR b=660
          OR (d>=41.0 AND d<42.0 AND d IS NOT NULL)
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR b=355
          OR a=93
          OR b=297
@@ -2178,8 +2178,8 @@ test:do_test(
          OR a=46
          OR b=660
          OR (d>=41.0 AND d<42.0 AND d IS NOT NULL)
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR b=355
          OR a=93
          OR b=297
@@ -2197,7 +2197,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=190
          OR a=62
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.51.1>
@@ -2212,7 +2212,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=190
          OR a=62
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.51.2>
@@ -2306,7 +2306,7 @@ test:do_test(
          OR b=256
          OR a=72
          OR c>=34035
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=674
          OR a=22
   ]])
@@ -2328,7 +2328,7 @@ test:do_test(
          OR b=256
          OR a=72
          OR c>=34035
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=674
          OR a=22
   ]])
@@ -2381,9 +2381,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 96 AND 98) AND a!=97)
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.56.1>
@@ -2396,9 +2396,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 96 AND 98) AND a!=97)
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.56.2>
@@ -2413,7 +2413,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=748
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
          OR b=630
   ]])
@@ -2430,7 +2430,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=748
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
          OR b=630
   ]])
@@ -2521,7 +2521,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=979
          OR ((a BETWEEN 3 AND 5) AND a!=4)
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.60.1>
@@ -2536,7 +2536,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=979
          OR ((a BETWEEN 3 AND 5) AND a!=4)
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.60.2>
@@ -2555,7 +2555,7 @@ test:do_test(
          OR b=726
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR ((a BETWEEN 50 AND 52) AND a!=51)
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
   ]])
     end, {
@@ -2575,7 +2575,7 @@ test:do_test(
          OR b=726
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR ((a BETWEEN 50 AND 52) AND a!=51)
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
   ]])
     end, {
@@ -2593,10 +2593,10 @@ test:do_test(
          OR ((a BETWEEN 18 AND 20) AND a!=19)
          OR b=924
          OR c=11011
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR b=231
          OR b=872
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.62.1>
@@ -2613,10 +2613,10 @@ test:do_test(
          OR ((a BETWEEN 18 AND 20) AND a!=19)
          OR b=924
          OR c=11011
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR b=231
          OR b=872
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.62.2>
@@ -2631,8 +2631,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=24
          OR b=473
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR b=509
          OR b=924
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
@@ -2650,8 +2650,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=24
          OR b=473
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR b=509
          OR b=924
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
@@ -2668,11 +2668,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=93.0 AND d<94.0 AND d IS NOT NULL)
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=363
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR ((a BETWEEN 56 AND 58) AND a!=57)
   ]])
@@ -2688,11 +2688,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=93.0 AND d<94.0 AND d IS NOT NULL)
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=363
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR ((a BETWEEN 56 AND 58) AND a!=57)
   ]])
@@ -2711,9 +2711,9 @@ test:do_test(
          OR e IS NULL
          OR b=495
          OR 1000000<b
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR a=45
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR a=85
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
   ]])
@@ -2732,9 +2732,9 @@ test:do_test(
          OR e IS NULL
          OR b=495
          OR 1000000<b
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR a=45
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR a=85
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
   ]])
@@ -2781,9 +2781,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE c>=34035
          OR ((a BETWEEN 96 AND 98) AND a!=97)
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR (d>=27.0 AND d<28.0 AND d IS NOT NULL)
          OR a=91
   ]])
@@ -2800,9 +2800,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE c>=34035
          OR ((a BETWEEN 96 AND 98) AND a!=97)
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR (d>=27.0 AND d<28.0 AND d IS NOT NULL)
          OR a=91
   ]])
@@ -2817,9 +2817,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='gfedcba' AND f GLOB 'nopqr*')
+      WHERE (g='gfedcba' AND f LIKE 'nopqr%')
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR b=649
          OR b=231
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
@@ -2837,9 +2837,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='gfedcba' AND f GLOB 'nopqr*')
+      WHERE (g='gfedcba' AND f LIKE 'nopqr%')
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR b=649
          OR b=231
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
@@ -2918,11 +2918,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=65
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR c=22022
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR b=671
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR a=91
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
          OR ((a BETWEEN 47 AND 49) AND a!=48)
@@ -2941,11 +2941,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=65
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR c=22022
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR b=671
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR a=91
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
          OR ((a BETWEEN 47 AND 49) AND a!=48)
@@ -2995,7 +2995,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=11.0 AND d<12.0 AND d IS NOT NULL)
          OR a=14
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
          OR b=212
@@ -3014,7 +3014,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=11.0 AND d<12.0 AND d IS NOT NULL)
          OR a=14
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
          OR b=212
@@ -3031,11 +3031,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ihgfedc' AND f GLOB 'bcdef*')
+      WHERE (g='ihgfedc' AND f LIKE 'bcdef%')
          OR b=168
          OR b=25
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.74.1>
@@ -3048,11 +3048,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ihgfedc' AND f GLOB 'bcdef*')
+      WHERE (g='ihgfedc' AND f LIKE 'bcdef%')
          OR b=168
          OR b=25
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.74.2>
@@ -3098,10 +3098,10 @@ test:do_test(
       WHERE c=31031
          OR (d>=100.0 AND d<101.0 AND d IS NOT NULL)
          OR ((a BETWEEN 87 AND 89) AND a!=88)
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR a=49
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.76.1>
@@ -3117,10 +3117,10 @@ test:do_test(
       WHERE c=31031
          OR (d>=100.0 AND d<101.0 AND d IS NOT NULL)
          OR ((a BETWEEN 87 AND 89) AND a!=88)
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR a=49
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.76.2>
@@ -3170,7 +3170,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=85.0 AND d<86.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 30 AND 32) AND a!=31)
          OR b=1089
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
@@ -3187,7 +3187,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=85.0 AND d<86.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 30 AND 32) AND a!=31)
          OR b=1089
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
@@ -3205,8 +3205,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=399
          OR ((a BETWEEN 9 AND 11) AND a!=10)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR a=10
          OR b=1026
   ]])
@@ -3223,8 +3223,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=399
          OR ((a BETWEEN 9 AND 11) AND a!=10)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR a=10
          OR b=1026
   ]])
@@ -3239,11 +3239,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'yzabc*')
+      WHERE (g='jihgfed' AND f LIKE 'yzabc%')
          OR b=465
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.80.1>
@@ -3256,11 +3256,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'yzabc*')
+      WHERE (g='jihgfed' AND f LIKE 'yzabc%')
          OR b=465
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.80.2>
@@ -3275,7 +3275,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=25
          OR b=792
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
   ]])
     end, {
         -- <where7-2.81.1>
@@ -3290,7 +3290,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=25
          OR b=792
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
   ]])
     end, {
         -- <where7-2.81.2>
@@ -3308,10 +3308,10 @@ test:do_test(
          OR a=13
          OR a=15
          OR ((a BETWEEN 6 AND 8) AND a!=7)
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR a=27
          OR ((a BETWEEN 98 AND 100) AND a!=99)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR a=32
          OR a=39
   ]])
@@ -3331,10 +3331,10 @@ test:do_test(
          OR a=13
          OR a=15
          OR ((a BETWEEN 6 AND 8) AND a!=7)
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR a=27
          OR ((a BETWEEN 98 AND 100) AND a!=99)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR a=32
          OR a=39
   ]])
@@ -3350,14 +3350,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='hijklmnop'
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR ((a BETWEEN 77 AND 79) AND a!=78)
          OR b=528
          OR c=30030
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.83.1>
@@ -3371,14 +3371,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='hijklmnop'
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR ((a BETWEEN 77 AND 79) AND a!=78)
          OR b=528
          OR c=30030
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.83.2>
@@ -3425,11 +3425,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='lkjihgf' AND f GLOB 'pqrst*')
+      WHERE (g='lkjihgf' AND f LIKE 'pqrst%')
          OR b=748
          OR b=696
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
   ]])
     end, {
         -- <where7-2.85.1>
@@ -3442,11 +3442,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='lkjihgf' AND f GLOB 'pqrst*')
+      WHERE (g='lkjihgf' AND f LIKE 'pqrst%')
          OR b=748
          OR b=696
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
   ]])
     end, {
         -- <where7-2.85.2>
@@ -3460,10 +3460,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 71 AND 73) AND a!=72)
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR a=87
          OR a=80
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=784
          OR a=49
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -3480,10 +3480,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 71 AND 73) AND a!=72)
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR a=87
          OR a=80
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=784
          OR a=49
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -3500,13 +3500,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 14 AND 16) AND a!=15)
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR c=1001
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR c=33033
   ]])
     end, {
@@ -3521,13 +3521,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 14 AND 16) AND a!=15)
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR c=1001
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR c=33033
   ]])
     end, {
@@ -3611,13 +3611,13 @@ test:do_test(
          OR b=553
          OR a=64
          OR (d>=93.0 AND d<94.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR a=62
          OR b=1081
          OR b=770
          OR b=762
          OR b=803
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.90.1>
@@ -3634,13 +3634,13 @@ test:do_test(
          OR b=553
          OR a=64
          OR (d>=93.0 AND d<94.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR a=62
          OR b=1081
          OR b=770
          OR b=762
          OR b=803
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.90.2>
@@ -3653,8 +3653,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'klmno*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (g='wvutsrq' AND f LIKE 'klmno%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR c=17017
          OR b=168
          OR ((a BETWEEN 77 AND 79) AND a!=78)
@@ -3670,8 +3670,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'klmno*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (g='wvutsrq' AND f LIKE 'klmno%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR c=17017
          OR b=168
          OR ((a BETWEEN 77 AND 79) AND a!=78)
@@ -3690,12 +3690,12 @@ test:do_test(
       WHERE c=34034
          OR (d>=68.0 AND d<69.0 AND d IS NOT NULL)
          OR a=44
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR c=31031
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR b=619
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR ((a BETWEEN 29 AND 31) AND a!=30)
   ]])
     end, {
@@ -3712,12 +3712,12 @@ test:do_test(
       WHERE c=34034
          OR (d>=68.0 AND d<69.0 AND d IS NOT NULL)
          OR a=44
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR c=31031
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR b=619
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR ((a BETWEEN 29 AND 31) AND a!=30)
   ]])
     end, {
@@ -3738,10 +3738,10 @@ test:do_test(
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR b=110
          OR f='klmnopqrs'
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR b=674
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.93.1>
@@ -3761,10 +3761,10 @@ test:do_test(
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR b=110
          OR f='klmnopqrs'
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR b=674
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.93.2>
@@ -3882,7 +3882,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=231
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.97.1>
@@ -3896,7 +3896,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=231
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.97.2>
@@ -4057,7 +4057,7 @@ test:do_test(
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR b=630
          OR c=19019
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR a=24
          OR (d>=95.0 AND d<96.0 AND d IS NOT NULL)
          OR ((a BETWEEN 51 AND 53) AND a!=52)
@@ -4077,7 +4077,7 @@ test:do_test(
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR b=630
          OR c=19019
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR a=24
          OR (d>=95.0 AND d<96.0 AND d IS NOT NULL)
          OR ((a BETWEEN 51 AND 53) AND a!=52)
@@ -4128,11 +4128,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='stuvwxyza'
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR ((a BETWEEN 1 AND 3) AND a!=2)
          OR b=1037
          OR f='zabcdefgh'
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.104.1>
@@ -4146,11 +4146,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='stuvwxyza'
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR ((a BETWEEN 1 AND 3) AND a!=2)
          OR b=1037
          OR f='zabcdefgh'
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.104.2>
@@ -4163,7 +4163,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR ((a BETWEEN 30 AND 32) AND a!=31)
   ]])
@@ -4178,7 +4178,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR ((a BETWEEN 30 AND 32) AND a!=31)
   ]])
@@ -4197,8 +4197,8 @@ test:do_test(
          OR b=190
          OR ((a BETWEEN 38 AND 40) AND a!=39)
          OR ((a BETWEEN 70 AND 72) AND a!=71)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR b=704
   ]])
     end, {
@@ -4216,8 +4216,8 @@ test:do_test(
          OR b=190
          OR ((a BETWEEN 38 AND 40) AND a!=39)
          OR ((a BETWEEN 70 AND 72) AND a!=71)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR b=704
   ]])
     end, {
@@ -4234,7 +4234,7 @@ test:do_test(
       WHERE b=88
          OR f='vwxyzabcd'
          OR f='fghijklmn'
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.107.1>
@@ -4250,7 +4250,7 @@ test:do_test(
       WHERE b=88
          OR f='vwxyzabcd'
          OR f='fghijklmn'
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.107.2>
@@ -4296,7 +4296,7 @@ test:do_test(
       WHERE ((a BETWEEN 47 AND 49) AND a!=48)
          OR a=5
          OR b=179
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR a=69
   ]])
     end, {
@@ -4313,7 +4313,7 @@ test:do_test(
       WHERE ((a BETWEEN 47 AND 49) AND a!=48)
          OR a=5
          OR b=179
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR a=69
   ]])
     end, {
@@ -4328,8 +4328,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=971
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR b=828
          OR a=81
          OR ((a BETWEEN 23 AND 25) AND a!=24)
@@ -4350,8 +4350,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=971
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR b=828
          OR a=81
          OR ((a BETWEEN 23 AND 25) AND a!=24)
@@ -4399,8 +4399,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='lkjihgf' AND f GLOB 'opqrs*')
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+      WHERE (g='lkjihgf' AND f LIKE 'opqrs%')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
   ]])
     end, {
         -- <where7-2.112.1>
@@ -4413,8 +4413,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='lkjihgf' AND f GLOB 'opqrs*')
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+      WHERE (g='lkjihgf' AND f LIKE 'opqrs%')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
   ]])
     end, {
         -- <where7-2.112.2>
@@ -4463,8 +4463,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='vutsrqp' AND f GLOB 'rstuv*')
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='vutsrqp' AND f LIKE 'rstuv%')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=396
   ]])
     end, {
@@ -4478,8 +4478,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='vutsrqp' AND f GLOB 'rstuv*')
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='vutsrqp' AND f LIKE 'rstuv%')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=396
   ]])
     end, {
@@ -4531,7 +4531,7 @@ test:do_test(
          OR ((a BETWEEN 20 AND 22) AND a!=21)
          OR b=396
          OR b=630
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR c=3003
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
   ]])
@@ -4552,7 +4552,7 @@ test:do_test(
          OR ((a BETWEEN 20 AND 22) AND a!=21)
          OR b=396
          OR b=630
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR c=3003
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
   ]])
@@ -4573,8 +4573,8 @@ test:do_test(
          OR b=957
          OR b=311
          OR b=143
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -4594,8 +4594,8 @@ test:do_test(
          OR b=957
          OR b=311
          OR b=143
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -4612,7 +4612,7 @@ test:do_test(
       WHERE ((a BETWEEN 74 AND 76) AND a!=75)
          OR ((a BETWEEN 94 AND 96) AND a!=95)
          OR b=451
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.118.1>
@@ -4628,7 +4628,7 @@ test:do_test(
       WHERE ((a BETWEEN 74 AND 76) AND a!=75)
          OR ((a BETWEEN 94 AND 96) AND a!=95)
          OR b=451
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.118.2>
@@ -4645,11 +4645,11 @@ test:do_test(
          OR b=451
          OR b=363
          OR b=330
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR ((a BETWEEN 52 AND 54) AND a!=53)
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR ((a BETWEEN 81 AND 83) AND a!=82)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.119.1>
@@ -4666,11 +4666,11 @@ test:do_test(
          OR b=451
          OR b=363
          OR b=330
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR ((a BETWEEN 52 AND 54) AND a!=53)
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR ((a BETWEEN 81 AND 83) AND a!=82)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.119.2>
@@ -4683,9 +4683,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR (d>=68.0 AND d<69.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR e IS NULL
          OR b=759
   ]])
@@ -4700,9 +4700,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR (d>=68.0 AND d<69.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR e IS NULL
          OR b=759
   ]])
@@ -4717,9 +4717,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR ((a BETWEEN 19 AND 21) AND a!=20)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.121.1>
@@ -4732,9 +4732,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR ((a BETWEEN 19 AND 21) AND a!=20)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.121.2>
@@ -4815,14 +4815,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='fedcbaz' AND f GLOB 'tuvwx*')
+      WHERE (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR b=421
          OR b=429
          OR b=498
          OR b=33
          OR b=198
          OR c=14014
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
   ]])
     end, {
         -- <where7-2.124.1>
@@ -4835,14 +4835,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='fedcbaz' AND f GLOB 'tuvwx*')
+      WHERE (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR b=421
          OR b=429
          OR b=498
          OR b=33
          OR b=198
          OR c=14014
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
   ]])
     end, {
         -- <where7-2.124.2>
@@ -4858,13 +4858,13 @@ test:do_test(
       WHERE b=47
          OR c=31031
          OR a=38
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR b=242
          OR (d>=70.0 AND d<71.0 AND d IS NOT NULL)
          OR b=352
          OR a=49
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.125.1>
@@ -4880,13 +4880,13 @@ test:do_test(
       WHERE b=47
          OR c=31031
          OR a=38
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR b=242
          OR (d>=70.0 AND d<71.0 AND d IS NOT NULL)
          OR b=352
          OR a=49
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.125.2>
@@ -4969,9 +4969,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=528
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.128.1>
@@ -4984,9 +4984,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=528
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.128.2>
@@ -5031,7 +5031,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=71.0 AND d<72.0 AND d IS NOT NULL)
          OR 1000000<b
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR a=24
   ]])
@@ -5048,7 +5048,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=71.0 AND d<72.0 AND d IS NOT NULL)
          OR 1000000<b
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR a=24
   ]])
@@ -5071,8 +5071,8 @@ test:do_test(
          OR a=14
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR b=440
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
   ]])
     end, {
         -- <where7-2.131.1>
@@ -5093,8 +5093,8 @@ test:do_test(
          OR a=14
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR b=440
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
   ]])
     end, {
         -- <where7-2.131.2>
@@ -5226,9 +5226,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=27
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=1045
          OR a=84
          OR f='qrstuvwxy'
@@ -5245,9 +5245,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=27
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=1045
          OR a=84
          OR f='qrstuvwxy'
@@ -5266,7 +5266,7 @@ test:do_test(
       WHERE b=704
          OR b=949
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR c=24024
          OR b=553
          OR a=18
@@ -5286,7 +5286,7 @@ test:do_test(
       WHERE b=704
          OR b=949
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR c=24024
          OR b=553
          OR a=18
@@ -5303,8 +5303,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?cdef*' AND f GLOB 'bcde*')
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (f LIKE '_cdef%' AND f LIKE 'bcde%')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=902
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR b=25
@@ -5323,8 +5323,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?cdef*' AND f GLOB 'bcde*')
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (f LIKE '_cdef%' AND f LIKE 'bcde%')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=902
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR b=25
@@ -5405,8 +5405,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?qrst*' AND f GLOB 'pqrs*')
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+      WHERE (f LIKE '_qrst%' AND f LIKE 'pqrs%')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=641
          OR ((a BETWEEN 36 AND 38) AND a!=37)
   ]])
@@ -5421,8 +5421,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?qrst*' AND f GLOB 'pqrs*')
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+      WHERE (f LIKE '_qrst%' AND f LIKE 'pqrs%')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=641
          OR ((a BETWEEN 36 AND 38) AND a!=37)
   ]])
@@ -5442,9 +5442,9 @@ test:do_test(
          OR ((a BETWEEN 44 AND 46) AND a!=45)
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR b=11
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR a=52
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR a=13
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
   ]])
@@ -5464,9 +5464,9 @@ test:do_test(
          OR ((a BETWEEN 44 AND 46) AND a!=45)
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR b=11
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR a=52
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR a=13
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
   ]])
@@ -5487,7 +5487,7 @@ test:do_test(
          OR b=1045
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR f='uvwxyzabc'
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
   ]])
     end, {
         -- <where7-2.143.1>
@@ -5506,7 +5506,7 @@ test:do_test(
          OR b=1045
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR f='uvwxyzabc'
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
   ]])
     end, {
         -- <where7-2.143.2>
@@ -5562,9 +5562,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=91
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
          OR b=102
@@ -5584,9 +5584,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=91
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
          OR b=102
@@ -5605,8 +5605,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='vutsrqp' AND f GLOB 'opqrs*')
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+      WHERE (g='vutsrqp' AND f LIKE 'opqrs%')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR b=990
          OR a=52
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
@@ -5622,8 +5622,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='vutsrqp' AND f GLOB 'opqrs*')
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+      WHERE (g='vutsrqp' AND f LIKE 'opqrs%')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR b=990
          OR a=52
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
@@ -5683,13 +5683,13 @@ test:do_test(
          OR b=421
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR c=22022
          OR b=825
          OR ((a BETWEEN 17 AND 19) AND a!=18)
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
   ]])
     end, {
         -- <where7-2.148.1>
@@ -5706,13 +5706,13 @@ test:do_test(
          OR b=421
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR c=22022
          OR b=825
          OR ((a BETWEEN 17 AND 19) AND a!=18)
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
   ]])
     end, {
         -- <where7-2.148.2>
@@ -5729,7 +5729,7 @@ test:do_test(
          OR b=484
          OR b=1026
          OR a=90
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=608
          OR a=32
   ]])
@@ -5748,7 +5748,7 @@ test:do_test(
          OR b=484
          OR b=1026
          OR a=90
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=608
          OR a=32
   ]])
@@ -5771,7 +5771,7 @@ test:do_test(
          OR a=55
          OR b=773
          OR b=319
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.150.1>
@@ -5792,7 +5792,7 @@ test:do_test(
          OR a=55
          OR b=773
          OR b=319
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.150.2>
@@ -5805,7 +5805,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'ijklm*')
+      WHERE (g='wvutsrq' AND f LIKE 'ijklm%')
          OR f='mnopqrstu'
          OR a=62
   ]])
@@ -5820,7 +5820,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'ijklm*')
+      WHERE (g='wvutsrq' AND f LIKE 'ijklm%')
          OR f='mnopqrstu'
          OR a=62
   ]])
@@ -5839,9 +5839,9 @@ test:do_test(
          OR b=1045
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR c=13013
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR b=124
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.152.1>
@@ -5858,9 +5858,9 @@ test:do_test(
          OR b=1045
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR c=13013
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR b=124
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.152.2>
@@ -5880,7 +5880,7 @@ test:do_test(
          OR b=421
          OR b=803
          OR c=4004
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
   ]])
     end, {
         -- <where7-2.153.1>
@@ -5900,7 +5900,7 @@ test:do_test(
          OR b=421
          OR b=803
          OR c=4004
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
   ]])
     end, {
         -- <where7-2.153.2>
@@ -5913,9 +5913,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?rstu*' AND f GLOB 'qrst*')
+      WHERE (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR b=99
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.154.1>
@@ -5928,9 +5928,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?rstu*' AND f GLOB 'qrst*')
+      WHERE (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR b=99
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.154.2>
@@ -5972,9 +5972,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=795
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR f='jklmnopqr'
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR b=1056
   ]])
@@ -5990,9 +5990,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=795
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR f='jklmnopqr'
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR b=1056
   ]])
@@ -6146,7 +6146,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=23
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=641
          OR b=352
          OR b=179
@@ -6166,7 +6166,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=23
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=641
          OR b=352
          OR b=179
@@ -6189,7 +6189,7 @@ test:do_test(
          OR b=1078
          OR ((a BETWEEN 11 AND 13) AND a!=12)
          OR c=12012
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR b=319
          OR c=5005
          OR 1000000<b
@@ -6211,7 +6211,7 @@ test:do_test(
          OR b=1078
          OR ((a BETWEEN 11 AND 13) AND a!=12)
          OR c=12012
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR b=319
          OR c=5005
          OR 1000000<b
@@ -6230,8 +6230,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='cdefghijk'
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR (d>=59.0 AND d<60.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -6246,8 +6246,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='cdefghijk'
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR (d>=59.0 AND d<60.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -6297,13 +6297,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+      WHERE (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=891
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR b=484
          OR a=62
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.165.1>
@@ -6316,13 +6316,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+      WHERE (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=891
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR b=484
          OR a=62
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.165.2>
@@ -6336,11 +6336,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=363
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR a=39
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
   ]])
@@ -6356,11 +6356,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=363
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR a=39
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
   ]])
@@ -6378,7 +6378,7 @@ test:do_test(
       WHERE c=30030
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR b=850
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
   ]])
     end, {
         -- <where7-2.167.1>
@@ -6394,7 +6394,7 @@ test:do_test(
       WHERE c=30030
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR b=850
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
   ]])
     end, {
         -- <where7-2.167.2>
@@ -6540,7 +6540,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=333
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
          OR b=407
          OR a=5
@@ -6559,7 +6559,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=333
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
          OR b=407
          OR a=5
@@ -6580,7 +6580,7 @@ test:do_test(
       WHERE b<0
          OR b=352
          OR b=517
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 12 AND 14) AND a!=13)
          OR b=1012
          OR ((a BETWEEN 11 AND 13) AND a!=12)
@@ -6599,7 +6599,7 @@ test:do_test(
       WHERE b<0
          OR b=352
          OR b=517
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 12 AND 14) AND a!=13)
          OR b=1012
          OR ((a BETWEEN 11 AND 13) AND a!=12)
@@ -6615,11 +6615,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
          OR c<=10
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR a=32
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR d<0.0
   ]])
     end, {
@@ -6633,11 +6633,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
          OR c<=10
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR a=32
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR d<0.0
   ]])
     end, {
@@ -6653,9 +6653,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 20 AND 22) AND a!=21)
          OR b=1045
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR a=26
-         OR (g='gfedcba' AND f GLOB 'opqrs*')
+         OR (g='gfedcba' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.175.1>
@@ -6670,9 +6670,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 20 AND 22) AND a!=21)
          OR b=1045
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR a=26
-         OR (g='gfedcba' AND f GLOB 'opqrs*')
+         OR (g='gfedcba' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.175.2>
@@ -6714,7 +6714,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=3.0 AND d<4.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR c=32032
          OR b=289
          OR ((a BETWEEN 17 AND 19) AND a!=18)
@@ -6732,7 +6732,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=3.0 AND d<4.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR c=32032
          OR b=289
          OR ((a BETWEEN 17 AND 19) AND a!=18)
@@ -6752,7 +6752,7 @@ test:do_test(
       WHERE ((a BETWEEN 15 AND 17) AND a!=16)
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR b=33
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
   ]])
     end, {
         -- <where7-2.178.1>
@@ -6768,7 +6768,7 @@ test:do_test(
       WHERE ((a BETWEEN 15 AND 17) AND a!=16)
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR b=33
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
   ]])
     end, {
         -- <where7-2.178.2>
@@ -6783,15 +6783,15 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=828
          OR b=341
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR b=902
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=242
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.179.1>
@@ -6806,15 +6806,15 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=828
          OR b=341
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR b=902
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=242
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.179.2>
@@ -6827,7 +6827,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='nmlkjih' AND f GLOB 'efghi*')
+      WHERE (g='nmlkjih' AND f LIKE 'efghi%')
          OR b=982
          OR b=781
          OR ((a BETWEEN 66 AND 68) AND a!=67)
@@ -6845,7 +6845,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='nmlkjih' AND f GLOB 'efghi*')
+      WHERE (g='nmlkjih' AND f LIKE 'efghi%')
          OR b=982
          OR b=781
          OR ((a BETWEEN 66 AND 68) AND a!=67)
@@ -6863,13 +6863,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
          OR a=31
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR a=76
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=176
   ]])
     end, {
@@ -6883,13 +6883,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
          OR a=31
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR a=76
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=176
   ]])
     end, {
@@ -6903,11 +6903,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ponmlkj' AND f GLOB 'vwxyz*')
+      WHERE (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=14
          OR ((a BETWEEN 88 AND 90) AND a!=89)
          OR f='zabcdefgh'
@@ -6923,11 +6923,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ponmlkj' AND f GLOB 'vwxyz*')
+      WHERE (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=14
          OR ((a BETWEEN 88 AND 90) AND a!=89)
          OR f='zabcdefgh'
@@ -6943,7 +6943,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR b=286
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
          OR b=91
@@ -6960,7 +6960,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR b=286
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
          OR b=91
@@ -6977,9 +6977,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='lkjihgf' AND f GLOB 'nopqr*')
+      WHERE (g='lkjihgf' AND f LIKE 'nopqr%')
          OR c=19019
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR b=374
   ]])
     end, {
@@ -6993,9 +6993,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='lkjihgf' AND f GLOB 'nopqr*')
+      WHERE (g='lkjihgf' AND f LIKE 'nopqr%')
          OR c=19019
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR b=374
   ]])
     end, {
@@ -7010,7 +7010,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE g IS NULL
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.185.1>
@@ -7024,7 +7024,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE g IS NULL
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.185.2>
@@ -7067,10 +7067,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=564
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=234
          OR b=641
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR (d>=5.0 AND d<6.0 AND d IS NOT NULL)
          OR a=98
@@ -7088,10 +7088,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=564
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=234
          OR b=641
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR (d>=5.0 AND d<6.0 AND d IS NOT NULL)
          OR a=98
@@ -7111,12 +7111,12 @@ test:do_test(
          OR b=44
          OR b=539
          OR c=11011
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=69
          OR b=1001
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR ((a BETWEEN 32 AND 34) AND a!=33)
   ]])
     end, {
@@ -7134,12 +7134,12 @@ test:do_test(
          OR b=44
          OR b=539
          OR c=11011
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=69
          OR b=1001
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR ((a BETWEEN 32 AND 34) AND a!=33)
   ]])
     end, {
@@ -7224,7 +7224,7 @@ test:do_test(
       WHERE c=23023
          OR (d>=83.0 AND d<84.0 AND d IS NOT NULL)
          OR a=66
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR a=51
          OR a=23
          OR c=4004
@@ -7243,7 +7243,7 @@ test:do_test(
       WHERE c=23023
          OR (d>=83.0 AND d<84.0 AND d IS NOT NULL)
          OR a=66
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR a=51
          OR a=23
          OR c=4004
@@ -7260,7 +7260,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=36
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR a=80
   ]])
     end, {
@@ -7275,7 +7275,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=36
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR a=80
   ]])
     end, {
@@ -7289,7 +7289,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+      WHERE (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR ((a BETWEEN 37 AND 39) AND a!=38)
          OR a=55
          OR f='efghijklm'
@@ -7310,7 +7310,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+      WHERE (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR ((a BETWEEN 37 AND 39) AND a!=38)
          OR a=55
          OR f='efghijklm'
@@ -7333,11 +7333,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=87.0 AND d<88.0 AND d IS NOT NULL)
          OR b=836
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=91
          OR b=594
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.194.1>
@@ -7352,11 +7352,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=87.0 AND d<88.0 AND d IS NOT NULL)
          OR b=836
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=91
          OR b=594
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.194.2>
@@ -7369,8 +7369,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='tsrqpon' AND f GLOB 'yzabc*')
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+      WHERE (g='tsrqpon' AND f LIKE 'yzabc%')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 62 AND 64) AND a!=63)
          OR c=6006
          OR ((a BETWEEN 50 AND 52) AND a!=51)
@@ -7389,8 +7389,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='tsrqpon' AND f GLOB 'yzabc*')
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+      WHERE (g='tsrqpon' AND f LIKE 'yzabc%')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 62 AND 64) AND a!=63)
          OR c=6006
          OR ((a BETWEEN 50 AND 52) AND a!=51)
@@ -7415,10 +7415,10 @@ test:do_test(
          OR b=121
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR ((a BETWEEN 12 AND 14) AND a!=13)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR b=660
          OR b=792
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.196.1>
@@ -7437,10 +7437,10 @@ test:do_test(
          OR b=121
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR ((a BETWEEN 12 AND 14) AND a!=13)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR b=660
          OR b=792
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.196.2>
@@ -7456,10 +7456,10 @@ test:do_test(
       WHERE b=1089
          OR b=495
          OR b=157
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR (d>=59.0 AND d<60.0 AND d IS NOT NULL)
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR f='wxyzabcde'
   ]])
@@ -7477,10 +7477,10 @@ test:do_test(
       WHERE b=1089
          OR b=495
          OR b=157
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR (d>=59.0 AND d<60.0 AND d IS NOT NULL)
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR f='wxyzabcde'
   ]])
@@ -7497,7 +7497,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE f='bcdefghij'
          OR ((a BETWEEN 40 AND 42) AND a!=41)
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR b=157
          OR b=267
          OR c=34034
@@ -7515,7 +7515,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE f='bcdefghij'
          OR ((a BETWEEN 40 AND 42) AND a!=41)
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR b=157
          OR b=267
          OR c=34034
@@ -7534,7 +7534,7 @@ test:do_test(
       WHERE a=19
          OR a=23
          OR c<=10
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.199.1>
@@ -7550,7 +7550,7 @@ test:do_test(
       WHERE a=19
          OR a=23
          OR c<=10
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.199.2>
@@ -7567,7 +7567,7 @@ test:do_test(
          OR b=792
          OR b=803
          OR b=36
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
   ]])
     end, {
         -- <where7-2.200.1>
@@ -7584,7 +7584,7 @@ test:do_test(
          OR b=792
          OR b=803
          OR b=36
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
   ]])
     end, {
         -- <where7-2.200.2>
@@ -7597,11 +7597,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'uvwxy*')
+      WHERE (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR ((a BETWEEN 76 AND 78) AND a!=77)
          OR f='jklmnopqr'
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
          OR b=891
          OR a=40
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
@@ -7617,11 +7617,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'uvwxy*')
+      WHERE (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR ((a BETWEEN 76 AND 78) AND a!=77)
          OR f='jklmnopqr'
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
          OR b=891
          OR a=40
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
@@ -7644,7 +7644,7 @@ test:do_test(
          OR d>1e10
          OR b=429
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
          OR c=10010
          OR ((a BETWEEN 83 AND 85) AND a!=84)
   ]])
@@ -7666,7 +7666,7 @@ test:do_test(
          OR d>1e10
          OR b=429
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
          OR c=10010
          OR ((a BETWEEN 83 AND 85) AND a!=84)
   ]])
@@ -7681,14 +7681,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'defgh*')
+      WHERE (g='xwvutsr' AND f LIKE 'defgh%')
          OR a=22
          OR a=26
          OR a=81
          OR a=53
          OR ((a BETWEEN 92 AND 94) AND a!=93)
          OR c=30030
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=82
          OR b=594
   ]])
@@ -7703,14 +7703,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'defgh*')
+      WHERE (g='xwvutsr' AND f LIKE 'defgh%')
          OR a=22
          OR a=26
          OR a=81
          OR a=53
          OR ((a BETWEEN 92 AND 94) AND a!=93)
          OR c=30030
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=82
          OR b=594
   ]])
@@ -7727,14 +7727,14 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 34 AND 36) AND a!=35)
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR a=83
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR ((a BETWEEN 99 AND 101) AND a!=100)
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=1092
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR b=25
   ]])
     end, {
@@ -7750,14 +7750,14 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 34 AND 36) AND a!=35)
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR a=83
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR ((a BETWEEN 99 AND 101) AND a!=100)
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=1092
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR b=25
   ]])
     end, {
@@ -7773,9 +7773,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=20
          OR b=421
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR a=50
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -7791,9 +7791,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=20
          OR b=421
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR a=50
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -7808,7 +7808,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=960
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
   ]])
     end, {
         -- <where7-2.206.1>
@@ -7822,7 +7822,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=960
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
   ]])
     end, {
         -- <where7-2.206.2>
@@ -7899,7 +7899,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='edcbazy' AND f GLOB 'wxyza*')
+      WHERE (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=957
          OR ((a BETWEEN 48 AND 50) AND a!=49)
   ]])
@@ -7914,7 +7914,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='edcbazy' AND f GLOB 'wxyza*')
+      WHERE (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=957
          OR ((a BETWEEN 48 AND 50) AND a!=49)
   ]])
@@ -7961,7 +7961,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=66.0 AND d<67.0 AND d IS NOT NULL)
          OR b=11
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 14 AND 16) AND a!=15)
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR a=99
@@ -7979,7 +7979,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=66.0 AND d<67.0 AND d IS NOT NULL)
          OR b=11
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 14 AND 16) AND a!=15)
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR a=99
@@ -7997,12 +7997,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE f='fghijklmn'
          OR a=16
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR ((a BETWEEN 60 AND 62) AND a!=61)
          OR ((a BETWEEN 90 AND 92) AND a!=91)
          OR ((a BETWEEN 9 AND 11) AND a!=10)
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=80
   ]])
     end, {
@@ -8018,12 +8018,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE f='fghijklmn'
          OR a=16
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR ((a BETWEEN 60 AND 62) AND a!=61)
          OR ((a BETWEEN 90 AND 92) AND a!=91)
          OR ((a BETWEEN 9 AND 11) AND a!=10)
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=80
   ]])
     end, {
@@ -8037,10 +8037,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'mnopq*')
+      WHERE (g='wvutsrq' AND f LIKE 'mnopq%')
          OR a=44
          OR a=43
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
          OR b=25
   ]])
     end, {
@@ -8054,10 +8054,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'mnopq*')
+      WHERE (g='wvutsrq' AND f LIKE 'mnopq%')
          OR a=44
          OR a=43
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
          OR b=25
   ]])
     end, {
@@ -8134,10 +8134,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=3.0 AND d<4.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'opqrs*')
+         OR (g='gfedcba' AND f LIKE 'opqrs%')
          OR b=1015
          OR c=16016
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR f='abcdefghi'
          OR b=605
          OR a=63
@@ -8154,10 +8154,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=3.0 AND d<4.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'opqrs*')
+         OR (g='gfedcba' AND f LIKE 'opqrs%')
          OR b=1015
          OR c=16016
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR f='abcdefghi'
          OR b=605
          OR a=63
@@ -8173,7 +8173,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='yxwvuts' AND f GLOB 'bcdef*')
+      WHERE (g='yxwvuts' AND f LIKE 'bcdef%')
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR b=641
          OR b=795
@@ -8189,7 +8189,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='yxwvuts' AND f GLOB 'bcdef*')
+      WHERE (g='yxwvuts' AND f LIKE 'bcdef%')
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR b=641
          OR b=795
@@ -8281,7 +8281,7 @@ test:do_test(
          OR b=1089
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR f IS NULL
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
   ]])
     end, {
         -- <where7-2.220.1>
@@ -8302,7 +8302,7 @@ test:do_test(
          OR b=1089
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR f IS NULL
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
   ]])
     end, {
         -- <where7-2.220.2>
@@ -8317,15 +8317,15 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1026
          OR b=407
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR b=564
          OR c=23023
          OR b=891
          OR c=22022
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR ((a BETWEEN 9 AND 11) AND a!=10)
-         OR (g='rqponml' AND f GLOB 'ijklm*')
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.221.1>
@@ -8340,15 +8340,15 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1026
          OR b=407
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR b=564
          OR c=23023
          OR b=891
          OR c=22022
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR ((a BETWEEN 9 AND 11) AND a!=10)
-         OR (g='rqponml' AND f GLOB 'ijklm*')
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.221.2>
@@ -8395,7 +8395,7 @@ test:do_test(
          OR ((a BETWEEN 79 AND 81) AND a!=80)
          OR c=18018
          OR b=792
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR (d>=8.0 AND d<9.0 AND d IS NOT NULL)
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
@@ -8417,7 +8417,7 @@ test:do_test(
          OR ((a BETWEEN 79 AND 81) AND a!=80)
          OR c=18018
          OR b=792
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR (d>=8.0 AND d<9.0 AND d IS NOT NULL)
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
@@ -8437,10 +8437,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=429
          OR (d>=33.0 AND d<34.0 AND d IS NOT NULL)
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR b=1070
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.224.1>
@@ -8455,10 +8455,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=429
          OR (d>=33.0 AND d<34.0 AND d IS NOT NULL)
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR b=1070
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.224.2>
@@ -8471,7 +8471,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='mlkjihg' AND f GLOB 'jklmn*')
+      WHERE (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=572
   ]])
     end, {
@@ -8485,7 +8485,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='mlkjihg' AND f GLOB 'jklmn*')
+      WHERE (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=572
   ]])
     end, {
@@ -8501,7 +8501,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 62 AND 64) AND a!=63)
          OR f='abcdefghi'
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.226.1>
@@ -8516,7 +8516,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 62 AND 64) AND a!=63)
          OR f='abcdefghi'
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.226.2>
@@ -8562,7 +8562,7 @@ test:do_test(
          OR a=1
          OR ((a BETWEEN 75 AND 77) AND a!=76)
          OR a=75
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
   ]])
     end, {
@@ -8581,7 +8581,7 @@ test:do_test(
          OR a=1
          OR ((a BETWEEN 75 AND 77) AND a!=76)
          OR a=75
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
   ]])
     end, {
@@ -8595,9 +8595,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='gfedcba' AND f GLOB 'nopqr*')
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+      WHERE (g='gfedcba' AND f LIKE 'nopqr%')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR b=231
          OR a=87
   ]])
@@ -8612,9 +8612,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='gfedcba' AND f GLOB 'nopqr*')
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+      WHERE (g='gfedcba' AND f LIKE 'nopqr%')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR b=231
          OR a=87
   ]])
@@ -8630,8 +8630,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=77
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR c=24024
          OR c=5005
   ]])
@@ -8647,8 +8647,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=77
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR c=24024
          OR c=5005
   ]])
@@ -8663,13 +8663,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='mlkjihg' AND f GLOB 'ijklm*')
+      WHERE (g='mlkjihg' AND f LIKE 'ijklm%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR b=682
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -8683,13 +8683,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='mlkjihg' AND f GLOB 'ijklm*')
+      WHERE (g='mlkjihg' AND f LIKE 'ijklm%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR b=682
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -8707,7 +8707,7 @@ test:do_test(
          OR b=121
          OR c=2002
          OR ((a BETWEEN 84 AND 86) AND a!=85)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.232.1>
@@ -8724,7 +8724,7 @@ test:do_test(
          OR b=121
          OR c=2002
          OR ((a BETWEEN 84 AND 86) AND a!=85)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.232.2>
@@ -8740,8 +8740,8 @@ test:do_test(
       WHERE (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR f='abcdefghi'
          OR b=267
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR a=82
          OR a=54
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
@@ -8761,8 +8761,8 @@ test:do_test(
       WHERE (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR f='abcdefghi'
          OR b=267
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR a=82
          OR a=54
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
@@ -8815,9 +8815,9 @@ test:do_test(
          OR ((a BETWEEN 31 AND 33) AND a!=32)
          OR (d>=94.0 AND d<95.0 AND d IS NOT NULL)
          OR 1000000<b
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
   ]])
     end, {
         -- <where7-2.235.1>
@@ -8836,9 +8836,9 @@ test:do_test(
          OR ((a BETWEEN 31 AND 33) AND a!=32)
          OR (d>=94.0 AND d<95.0 AND d IS NOT NULL)
          OR 1000000<b
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
   ]])
     end, {
         -- <where7-2.235.2>
@@ -8853,7 +8853,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1001
          OR b=168
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -8869,7 +8869,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1001
          OR b=168
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -8884,8 +8884,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=51
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR b=330
   ]])
     end, {
@@ -8900,8 +8900,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=51
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR b=330
   ]])
     end, {
@@ -8915,13 +8915,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'tuvwx*')
+      WHERE (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=704
          OR a=62
          OR f='pqrstuvwx'
          OR b=495
          OR c=26026
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b<0
          OR b=597
   ]])
@@ -8936,13 +8936,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'tuvwx*')
+      WHERE (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=704
          OR a=62
          OR f='pqrstuvwx'
          OR b=495
          OR c=26026
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b<0
          OR b=597
   ]])
@@ -8992,7 +8992,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=14014
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=572
          OR c=15015
   ]])
@@ -9008,7 +9008,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=14014
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=572
          OR c=15015
   ]])
@@ -9023,9 +9023,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR b=850
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 15 AND 17) AND a!=16)
          OR b=88
          OR f='hijklmnop'
@@ -9044,9 +9044,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR b=850
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 15 AND 17) AND a!=16)
          OR b=88
          OR f='hijklmnop'
@@ -9073,8 +9073,8 @@ test:do_test(
          OR b=374
          OR b=938
          OR b=773
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.242.1>
@@ -9095,8 +9095,8 @@ test:do_test(
          OR b=374
          OR b=938
          OR b=773
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.242.2>
@@ -9109,7 +9109,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=146
   ]])
     end, {
@@ -9123,7 +9123,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=146
   ]])
     end, {
@@ -9171,7 +9171,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR b=399
          OR b=1004
          OR c=16016
@@ -9193,7 +9193,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR b=399
          OR b=1004
          OR c=16016
@@ -9222,8 +9222,8 @@ test:do_test(
          OR b=861
          OR (d>=90.0 AND d<91.0 AND d IS NOT NULL)
          OR b=949
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.246.1>
@@ -9243,8 +9243,8 @@ test:do_test(
          OR b=861
          OR (d>=90.0 AND d<91.0 AND d IS NOT NULL)
          OR b=949
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.246.2>
@@ -9257,7 +9257,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'hijkl*')
+      WHERE (g='xwvutsr' AND f LIKE 'hijkl%')
          OR a=83
          OR c=26026
          OR a=49
@@ -9276,7 +9276,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'hijkl*')
+      WHERE (g='xwvutsr' AND f LIKE 'hijkl%')
          OR a=83
          OR c=26026
          OR a=49
@@ -9328,7 +9328,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=451
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
   ]])
     end, {
         -- <where7-2.249.1>
@@ -9342,7 +9342,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=451
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
   ]])
     end, {
         -- <where7-2.249.2>
@@ -9356,7 +9356,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=47
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
   ]])
     end, {
         -- <where7-2.250.1>
@@ -9370,7 +9370,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=47
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
   ]])
     end, {
         -- <where7-2.250.2>
@@ -9384,7 +9384,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=1037
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=344
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
@@ -9401,7 +9401,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=1037
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=344
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
@@ -9419,7 +9419,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=506
          OR ((a BETWEEN 20 AND 22) AND a!=21)
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR b=429
          OR b=275
   ]])
@@ -9436,7 +9436,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=506
          OR ((a BETWEEN 20 AND 22) AND a!=21)
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR b=429
          OR b=275
   ]])
@@ -9458,7 +9458,7 @@ test:do_test(
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR a=60
          OR b=80
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR b=616
   ]])
     end, {
@@ -9479,7 +9479,7 @@ test:do_test(
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR a=60
          OR b=80
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR b=616
   ]])
     end, {
@@ -9521,13 +9521,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'hijkl*')
+      WHERE (g='xwvutsr' AND f LIKE 'hijkl%')
          OR a=43
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR b=586
          OR c=17017
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR a=87
          OR b=968
   ]])
@@ -9542,13 +9542,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'hijkl*')
+      WHERE (g='xwvutsr' AND f LIKE 'hijkl%')
          OR a=43
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR b=586
          OR c=17017
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR a=87
          OR b=968
   ]])
@@ -9597,8 +9597,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='rqponml' AND f GLOB 'jklmn*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+      WHERE (g='rqponml' AND f LIKE 'jklmn%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR c>=34035
          OR b=850
          OR ((a BETWEEN 32 AND 34) AND a!=33)
@@ -9620,8 +9620,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='rqponml' AND f GLOB 'jklmn*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+      WHERE (g='rqponml' AND f LIKE 'jklmn%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR c>=34035
          OR b=850
          OR ((a BETWEEN 32 AND 34) AND a!=33)
@@ -9705,7 +9705,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'nopqr*')
+      WHERE (g='qponmlk' AND f LIKE 'nopqr%')
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=993
   ]])
@@ -9720,7 +9720,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'nopqr*')
+      WHERE (g='qponmlk' AND f LIKE 'nopqr%')
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=993
   ]])
@@ -9739,7 +9739,7 @@ test:do_test(
          OR a=22
          OR b=289
          OR b=795
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR b=242
          OR a=59
          OR b=1045
@@ -9760,7 +9760,7 @@ test:do_test(
          OR a=22
          OR b=289
          OR b=795
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR b=242
          OR a=59
          OR b=1045
@@ -9778,9 +9778,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=245
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR c=3003
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR (d>=33.0 AND d<34.0 AND d IS NOT NULL)
@@ -9798,9 +9798,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=245
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR c=3003
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR (d>=33.0 AND d<34.0 AND d IS NOT NULL)
@@ -9817,15 +9817,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'jklmn*')
+      WHERE (g='hgfedcb' AND f LIKE 'jklmn%')
          OR b=220
          OR b=443
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR a=62
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR b=1023
          OR a=100
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -9839,15 +9839,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'jklmn*')
+      WHERE (g='hgfedcb' AND f LIKE 'jklmn%')
          OR b=220
          OR b=443
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR a=62
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR b=1023
          OR a=100
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -9863,8 +9863,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE c=11011
          OR f='tuvwxyzab'
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.264.1>
@@ -9879,8 +9879,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE c=11011
          OR f='tuvwxyzab'
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.264.2>
@@ -10005,15 +10005,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=443
          OR b=33
          OR b=762
          OR b=575
          OR c=16016
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 41 AND 43) AND a!=42)
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR b=1092
   ]])
     end, {
@@ -10027,15 +10027,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=443
          OR b=33
          OR b=762
          OR b=575
          OR c=16016
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 41 AND 43) AND a!=42)
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR b=1092
   ]])
     end, {
@@ -10051,14 +10051,14 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=806
          OR b=872
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR f='uvwxyzabc'
          OR b=748
          OR b=586
          OR ((a BETWEEN 15 AND 17) AND a!=16)
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR ((a BETWEEN 32 AND 34) AND a!=33)
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR b=891
   ]])
     end, {
@@ -10074,14 +10074,14 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=806
          OR b=872
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR f='uvwxyzabc'
          OR b=748
          OR b=586
          OR ((a BETWEEN 15 AND 17) AND a!=16)
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR ((a BETWEEN 32 AND 34) AND a!=33)
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR b=891
   ]])
     end, {
@@ -10097,8 +10097,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=693
          OR f='fghijklmn'
-         OR (g='rqponml' AND f GLOB 'hijkl*')
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR a=96
   ]])
@@ -10115,8 +10115,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=693
          OR f='fghijklmn'
-         OR (g='rqponml' AND f GLOB 'hijkl*')
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR a=96
   ]])
@@ -10131,7 +10131,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'ijklm*')
+      WHERE (g='hgfedcb' AND f LIKE 'ijklm%')
          OR b=451
          OR ((a BETWEEN 96 AND 98) AND a!=97)
          OR ((a BETWEEN 97 AND 99) AND a!=98)
@@ -10148,7 +10148,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'ijklm*')
+      WHERE (g='hgfedcb' AND f LIKE 'ijklm%')
          OR b=451
          OR ((a BETWEEN 96 AND 98) AND a!=97)
          OR ((a BETWEEN 97 AND 99) AND a!=98)
@@ -10165,16 +10165,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='nmlkjih' AND f GLOB 'bcdef*')
+      WHERE (g='nmlkjih' AND f LIKE 'bcdef%')
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR a=75
          OR b=960
-         OR (g='tsrqpon' AND f GLOB 'yzabc*')
+         OR (g='tsrqpon' AND f LIKE 'yzabc%')
          OR b=616
          OR b=330
          OR ((a BETWEEN 16 AND 18) AND a!=17)
          OR a=26
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.272.1>
@@ -10187,16 +10187,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='nmlkjih' AND f GLOB 'bcdef*')
+      WHERE (g='nmlkjih' AND f LIKE 'bcdef%')
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR a=75
          OR b=960
-         OR (g='tsrqpon' AND f GLOB 'yzabc*')
+         OR (g='tsrqpon' AND f LIKE 'yzabc%')
          OR b=616
          OR b=330
          OR ((a BETWEEN 16 AND 18) AND a!=17)
          OR a=26
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.272.2>
@@ -10210,7 +10210,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=762
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.273.1>
@@ -10224,7 +10224,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=762
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.273.2>
@@ -10310,7 +10310,7 @@ test:do_test(
          OR b=176
          OR ((a BETWEEN 34 AND 36) AND a!=35)
          OR b=220
-         OR (g='tsrqpon' AND f GLOB 'yzabc*')
+         OR (g='tsrqpon' AND f LIKE 'yzabc%')
          OR a=4
   ]])
     end, {
@@ -10329,7 +10329,7 @@ test:do_test(
          OR b=176
          OR ((a BETWEEN 34 AND 36) AND a!=35)
          OR b=220
-         OR (g='tsrqpon' AND f GLOB 'yzabc*')
+         OR (g='tsrqpon' AND f LIKE 'yzabc%')
          OR a=4
   ]])
     end, {
@@ -10344,7 +10344,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=29
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=979
          OR b=275
          OR ((a BETWEEN 56 AND 58) AND a!=57)
@@ -10364,7 +10364,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=29
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=979
          OR b=275
          OR ((a BETWEEN 56 AND 58) AND a!=57)
@@ -10384,11 +10384,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 43 AND 45) AND a!=44)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR f='fghijklmn'
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR a=74
          OR ((a BETWEEN 7 AND 9) AND a!=8)
@@ -10405,11 +10405,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 43 AND 45) AND a!=44)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR f='fghijklmn'
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR a=74
          OR ((a BETWEEN 7 AND 9) AND a!=8)
@@ -10426,10 +10426,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 80 AND 82) AND a!=81)
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
          OR ((a BETWEEN 49 AND 51) AND a!=50)
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.279.1>
@@ -10443,10 +10443,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 80 AND 82) AND a!=81)
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
          OR ((a BETWEEN 49 AND 51) AND a!=50)
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.279.2>
@@ -10495,11 +10495,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR c=23023
          OR b=377
          OR b=858
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.281.1>
@@ -10512,11 +10512,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR c=23023
          OR b=377
          OR b=858
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.281.2>
@@ -10532,13 +10532,13 @@ test:do_test(
       WHERE (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR b=322
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'pqrst*')
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='fedcbaz' AND f LIKE 'pqrst%')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR b=432
          OR b=55
          OR a=53
          OR (d>=74.0 AND d<75.0 AND d IS NOT NULL)
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR b=25
   ]])
     end, {
@@ -10555,13 +10555,13 @@ test:do_test(
       WHERE (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR b=322
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'pqrst*')
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='fedcbaz' AND f LIKE 'pqrst%')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR b=432
          OR b=55
          OR a=53
          OR (d>=74.0 AND d<75.0 AND d IS NOT NULL)
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR b=25
   ]])
     end, {
@@ -10576,7 +10576,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=484
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=616
          OR c=5005
          OR ((a BETWEEN 27 AND 29) AND a!=28)
@@ -10593,7 +10593,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=484
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=616
          OR c=5005
          OR ((a BETWEEN 27 AND 29) AND a!=28)
@@ -10610,11 +10610,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=916
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=1048
          OR c=6006
          OR b=762
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
          OR b=751
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
@@ -10631,11 +10631,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=916
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=1048
          OR c=6006
          OR b=762
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
          OR b=751
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
@@ -10656,7 +10656,7 @@ test:do_test(
          OR b=275
          OR b=396
          OR c=4004
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR b=319
          OR ((a BETWEEN 83 AND 85) AND a!=84)
          OR a=3
@@ -10678,7 +10678,7 @@ test:do_test(
          OR b=275
          OR b=396
          OR c=4004
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR b=319
          OR ((a BETWEEN 83 AND 85) AND a!=84)
          OR a=3
@@ -10695,16 +10695,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'lmnop*')
+      WHERE (g='wvutsrq' AND f LIKE 'lmnop%')
          OR b=718
          OR f='vwxyzabcd'
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR ((a BETWEEN 66 AND 68) AND a!=67)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -10718,16 +10718,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'lmnop*')
+      WHERE (g='wvutsrq' AND f LIKE 'lmnop%')
          OR b=718
          OR f='vwxyzabcd'
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR ((a BETWEEN 66 AND 68) AND a!=67)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -10920,9 +10920,9 @@ test:do_test(
          OR b=231
          OR b=212
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR c=30030
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
   ]])
     end, {
         -- <where7-2.292.1>
@@ -10940,9 +10940,9 @@ test:do_test(
          OR b=231
          OR b=212
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR c=30030
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
   ]])
     end, {
         -- <where7-2.292.2>
@@ -10996,8 +10996,8 @@ test:do_test(
          OR f='vwxyzabcd'
          OR b=762
          OR a=60
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.294.1>
@@ -11015,8 +11015,8 @@ test:do_test(
          OR f='vwxyzabcd'
          OR b=762
          OR a=60
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.294.2>
@@ -11029,14 +11029,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='mlkjihg' AND f GLOB 'ghijk*')
+      WHERE (g='mlkjihg' AND f LIKE 'ghijk%')
          OR a=3
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=498
          OR a=100
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR a=69
   ]])
     end, {
@@ -11050,14 +11050,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='mlkjihg' AND f GLOB 'ghijk*')
+      WHERE (g='mlkjihg' AND f LIKE 'ghijk%')
          OR a=3
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=498
          OR a=100
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR a=69
   ]])
     end, {
@@ -11071,12 +11071,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=300
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
          OR b=58
          OR ((a BETWEEN 55 AND 57) AND a!=56)
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR b=286
          OR b=234
          OR ((a BETWEEN 43 AND 45) AND a!=44)
@@ -11094,12 +11094,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=300
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
          OR b=58
          OR ((a BETWEEN 55 AND 57) AND a!=56)
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR b=286
          OR b=234
          OR ((a BETWEEN 43 AND 45) AND a!=44)
@@ -11121,12 +11121,12 @@ test:do_test(
          OR ((a BETWEEN 72 AND 74) AND a!=73)
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR b=594
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR ((a BETWEEN 37 AND 39) AND a!=38)
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
   ]])
     end, {
@@ -11144,12 +11144,12 @@ test:do_test(
          OR ((a BETWEEN 72 AND 74) AND a!=73)
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR b=594
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR ((a BETWEEN 37 AND 39) AND a!=38)
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
   ]])
     end, {
@@ -11164,8 +11164,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=949
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.298.1>
@@ -11179,8 +11179,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=949
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.298.2>
@@ -11195,13 +11195,13 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=960
          OR a=44
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR a=39
          OR b=828
          OR ((a BETWEEN 3 AND 5) AND a!=4)
          OR d<0.0
          OR b=770
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR b=594
          OR ((a BETWEEN 89 AND 91) AND a!=90)
   ]])
@@ -11218,13 +11218,13 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=960
          OR a=44
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR a=39
          OR b=828
          OR ((a BETWEEN 3 AND 5) AND a!=4)
          OR d<0.0
          OR b=770
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR b=594
          OR ((a BETWEEN 89 AND 91) AND a!=90)
   ]])
@@ -11278,7 +11278,7 @@ test:do_test(
       WHERE b=1081
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=1004
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 29 AND 31) AND a!=30)
          OR b=660
          OR b=957
@@ -11298,7 +11298,7 @@ test:do_test(
       WHERE b=1081
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=1004
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 29 AND 31) AND a!=30)
          OR b=660
          OR b=957
@@ -11320,9 +11320,9 @@ test:do_test(
          OR f='yzabcdefg'
          OR b=880
          OR a=63
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.302.1>
@@ -11340,9 +11340,9 @@ test:do_test(
          OR f='yzabcdefg'
          OR b=880
          OR a=63
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.302.2>
@@ -11357,12 +11357,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=69
          OR b=1103
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR f='wxyzabcde'
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR f='pqrstuvwx'
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR a=59
          OR b=946
   ]])
@@ -11379,12 +11379,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=69
          OR b=1103
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR f='wxyzabcde'
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR f='pqrstuvwx'
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR a=59
          OR b=946
   ]])
@@ -11400,7 +11400,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=47.0 AND d<48.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR a=68
          OR ((a BETWEEN 14 AND 16) AND a!=15)
   ]])
@@ -11416,7 +11416,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=47.0 AND d<48.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR a=68
          OR ((a BETWEEN 14 AND 16) AND a!=15)
   ]])
@@ -11432,7 +11432,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=10.0 AND d<11.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.305.1>
@@ -11446,7 +11446,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=10.0 AND d<11.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.305.2>
@@ -11526,12 +11526,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR c=14014
          OR b=990
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
          OR c=14014
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR b=740
          OR c=3003
   ]])
@@ -11547,12 +11547,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR c=14014
          OR b=990
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
          OR c=14014
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR b=740
          OR c=3003
   ]])
@@ -11640,7 +11640,7 @@ test:do_test(
          OR a=4
          OR b=311
          OR ((a BETWEEN 97 AND 99) AND a!=98)
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR b=396
   ]])
     end, {
@@ -11663,7 +11663,7 @@ test:do_test(
          OR a=4
          OR b=311
          OR ((a BETWEEN 97 AND 99) AND a!=98)
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR b=396
   ]])
     end, {
@@ -11679,7 +11679,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=82
          OR b=333
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR b=99
          OR a=63
          OR a=35
@@ -11698,7 +11698,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=82
          OR b=333
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR b=99
          OR a=63
          OR a=35
@@ -11803,9 +11803,9 @@ test:do_test(
          OR f='hijklmnop'
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR b=817
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
   ]])
@@ -11824,9 +11824,9 @@ test:do_test(
          OR f='hijklmnop'
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR b=817
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
   ]])
@@ -11841,12 +11841,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR b=311
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR a=48
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR c=32032
          OR f='opqrstuvw'
          OR b=300
@@ -11864,12 +11864,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR b=311
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR a=48
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR c=32032
          OR f='opqrstuvw'
          OR b=300
@@ -11889,7 +11889,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=95.0 AND d<96.0 AND d IS NOT NULL)
          OR b=1070
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR a=22
@@ -11912,7 +11912,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=95.0 AND d<96.0 AND d IS NOT NULL)
          OR b=1070
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR a=22
@@ -11934,7 +11934,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=8.0 AND d<9.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR a=21
          OR b=1026
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -11952,7 +11952,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=8.0 AND d<9.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR a=21
          OR b=1026
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -11975,7 +11975,7 @@ test:do_test(
          OR a=29
          OR c=15015
          OR a=87
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.319.1>
@@ -11994,7 +11994,7 @@ test:do_test(
          OR a=29
          OR c=15015
          OR a=87
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.319.2>
@@ -12042,7 +12042,7 @@ test:do_test(
          OR a=91
          OR b=1015
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR ((a BETWEEN 91 AND 93) AND a!=92)
   ]])
     end, {
@@ -12061,7 +12061,7 @@ test:do_test(
          OR a=91
          OR b=1015
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR ((a BETWEEN 91 AND 93) AND a!=92)
   ]])
     end, {
@@ -12076,12 +12076,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=7
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR b=1015
          OR b=839
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR b=410
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR a=71
   ]])
     end, {
@@ -12096,12 +12096,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=7
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR b=1015
          OR b=839
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR b=410
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR a=71
   ]])
     end, {
@@ -12118,12 +12118,12 @@ test:do_test(
       WHERE b=880
          OR b=982
          OR a=52
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR a=24
          OR ((a BETWEEN 47 AND 49) AND a!=48)
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
   ]])
     end, {
         -- <where7-2.323.1>
@@ -12139,12 +12139,12 @@ test:do_test(
       WHERE b=880
          OR b=982
          OR a=52
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR a=24
          OR ((a BETWEEN 47 AND 49) AND a!=48)
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
   ]])
     end, {
         -- <where7-2.323.2>
@@ -12158,9 +12158,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 67 AND 69) AND a!=68)
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
   ]])
     end, {
         -- <where7-2.324.1>
@@ -12174,9 +12174,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 67 AND 69) AND a!=68)
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
   ]])
     end, {
         -- <where7-2.324.2>
@@ -12192,7 +12192,7 @@ test:do_test(
       WHERE f='abcdefghi'
          OR a=5
          OR b=124
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=432
          OR 1000000<b
          OR a=58
@@ -12214,7 +12214,7 @@ test:do_test(
       WHERE f='abcdefghi'
          OR a=5
          OR b=124
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=432
          OR 1000000<b
          OR a=58
@@ -12271,7 +12271,7 @@ test:do_test(
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR ((a BETWEEN 63 AND 65) AND a!=64)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR f='uvwxyzabc'
   ]])
     end, {
@@ -12293,7 +12293,7 @@ test:do_test(
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR ((a BETWEEN 63 AND 65) AND a!=64)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR f='uvwxyzabc'
   ]])
     end, {
@@ -12308,16 +12308,16 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 57 AND 59) AND a!=58)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=564
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR b=77
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
          OR b=968
          OR b=847
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.328.1>
@@ -12331,16 +12331,16 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 57 AND 59) AND a!=58)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=564
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR b=77
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
          OR b=968
          OR b=847
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.328.2>
@@ -12421,7 +12421,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=72.0 AND d<73.0 AND d IS NOT NULL)
          OR b=693
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR b=968
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR b=132
@@ -12441,7 +12441,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=72.0 AND d<73.0 AND d IS NOT NULL)
          OR b=693
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR b=968
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR b=132
@@ -12496,11 +12496,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=190
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR b=924
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR b=759
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.333.1>
@@ -12514,11 +12514,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=190
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR b=924
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR b=759
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.333.2>
@@ -12576,12 +12576,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=26026
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR c=17017
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='srqponm' AND f GLOB 'ghijk*')
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
   ]])
@@ -12597,12 +12597,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=26026
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR c=17017
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='srqponm' AND f GLOB 'ghijk*')
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
   ]])
@@ -12662,9 +12662,9 @@ test:do_test(
          OR (d>=100.0 AND d<101.0 AND d IS NOT NULL)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR b=300
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR a=41
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR b=135
          OR b=605
   ]])
@@ -12684,9 +12684,9 @@ test:do_test(
          OR (d>=100.0 AND d<101.0 AND d IS NOT NULL)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR b=300
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR a=41
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR b=135
          OR b=605
   ]])
@@ -12701,16 +12701,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?stuv*' AND f GLOB 'rstu*')
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (f LIKE '_stuv%' AND f LIKE 'rstu%')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR b=762
          OR b=484
          OR b=190
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR (d>=74.0 AND d<75.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=1023
   ]])
     end, {
@@ -12724,16 +12724,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?stuv*' AND f GLOB 'rstu*')
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (f LIKE '_stuv%' AND f LIKE 'rstu%')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR b=762
          OR b=484
          OR b=190
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR (d>=74.0 AND d<75.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=1023
   ]])
     end, {
@@ -12747,7 +12747,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (g='ihgfedc' AND f LIKE 'efghi%')
          OR a=34
          OR f='rstuvwxyz'
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
@@ -12764,7 +12764,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (g='ihgfedc' AND f LIKE 'efghi%')
          OR a=34
          OR f='rstuvwxyz'
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
@@ -12783,7 +12783,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=37.0 AND d<38.0 AND d IS NOT NULL)
          OR b=1004
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR g IS NULL
   ]])
     end, {
@@ -12799,7 +12799,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=37.0 AND d<38.0 AND d IS NOT NULL)
          OR b=1004
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR g IS NULL
   ]])
     end, {
@@ -12822,8 +12822,8 @@ test:do_test(
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR a=44
          OR a=23
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.341.1>
@@ -12845,8 +12845,8 @@ test:do_test(
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR a=44
          OR a=23
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.341.2>
@@ -12864,8 +12864,8 @@ test:do_test(
          OR a=11
          OR ((a BETWEEN 12 AND 14) AND a!=13)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR a=13
          OR a=15
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
@@ -12887,8 +12887,8 @@ test:do_test(
          OR a=11
          OR ((a BETWEEN 12 AND 14) AND a!=13)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR a=13
          OR a=15
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
@@ -13019,16 +13019,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='gfedcba' AND f GLOB 'klmno*')
+      WHERE (g='gfedcba' AND f LIKE 'klmno%')
          OR ((a BETWEEN 9 AND 11) AND a!=10)
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR a=48
          OR b=113
          OR ((a BETWEEN 20 AND 22) AND a!=21)
          OR b=880
          OR ((a BETWEEN 85 AND 87) AND a!=86)
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.346.1>
@@ -13041,16 +13041,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='gfedcba' AND f GLOB 'klmno*')
+      WHERE (g='gfedcba' AND f LIKE 'klmno%')
          OR ((a BETWEEN 9 AND 11) AND a!=10)
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR a=48
          OR b=113
          OR ((a BETWEEN 20 AND 22) AND a!=21)
          OR b=880
          OR ((a BETWEEN 85 AND 87) AND a!=86)
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.346.2>
@@ -13065,10 +13065,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=517
          OR b=187
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR b=1092
          OR ((a BETWEEN 84 AND 86) AND a!=85)
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.347.1>
@@ -13083,10 +13083,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=517
          OR b=187
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR b=1092
          OR ((a BETWEEN 84 AND 86) AND a!=85)
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.347.2>
@@ -13259,7 +13259,7 @@ test:do_test(
          OR a=30
          OR c=3003
          OR (d>=88.0 AND d<89.0 AND d IS NOT NULL)
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
          OR b=564
          OR b=55
          OR a=38
@@ -13281,7 +13281,7 @@ test:do_test(
          OR a=30
          OR c=3003
          OR (d>=88.0 AND d<89.0 AND d IS NOT NULL)
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
          OR b=564
          OR b=55
          OR a=38
@@ -13328,7 +13328,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=792
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
   ]])
     end, {
         -- <where7-2.354.1>
@@ -13342,7 +13342,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=792
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
   ]])
     end, {
         -- <where7-2.354.2>
@@ -13357,9 +13357,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=73.0 AND d<74.0 AND d IS NOT NULL)
          OR c=21021
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR f='zabcdefgh'
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR b=781
          OR a=64
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
@@ -13377,9 +13377,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=73.0 AND d<74.0 AND d IS NOT NULL)
          OR c=21021
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR f='zabcdefgh'
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR b=781
          OR a=64
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
@@ -13395,12 +13395,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='lkjihgf' AND f GLOB 'pqrst*')
+      WHERE (g='lkjihgf' AND f LIKE 'pqrst%')
          OR (d>=90.0 AND d<91.0 AND d IS NOT NULL)
          OR a=34
-         OR (g='rqponml' AND f GLOB 'ijklm*')
-         OR (g='rqponml' AND f GLOB 'klmno*')
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
+         OR (g='rqponml' AND f LIKE 'klmno%')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR b=319
          OR b=330
          OR ((a BETWEEN 28 AND 30) AND a!=29)
@@ -13416,12 +13416,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='lkjihgf' AND f GLOB 'pqrst*')
+      WHERE (g='lkjihgf' AND f LIKE 'pqrst%')
          OR (d>=90.0 AND d<91.0 AND d IS NOT NULL)
          OR a=34
-         OR (g='rqponml' AND f GLOB 'ijklm*')
-         OR (g='rqponml' AND f GLOB 'klmno*')
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
+         OR (g='rqponml' AND f LIKE 'klmno%')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR b=319
          OR b=330
          OR ((a BETWEEN 28 AND 30) AND a!=29)
@@ -13437,8 +13437,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR a=45
          OR (d>=81.0 AND d<82.0 AND d IS NOT NULL)
   ]])
@@ -13453,8 +13453,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR a=45
          OR (d>=81.0 AND d<82.0 AND d IS NOT NULL)
   ]])
@@ -13470,7 +13470,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=53.0 AND d<54.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=165
          OR b=836
   ]])
@@ -13486,7 +13486,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=53.0 AND d<54.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=165
          OR b=836
   ]])
@@ -13503,7 +13503,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1034
          OR f='vwxyzabcd'
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
   ]])
     end, {
@@ -13519,7 +13519,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1034
          OR f='vwxyzabcd'
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
   ]])
     end, {
@@ -13575,12 +13575,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=37
          OR b=88
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR c=23023
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
          OR a=56
          OR ((a BETWEEN 13 AND 15) AND a!=14)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR f='ijklmnopq'
          OR ((a BETWEEN 85 AND 87) AND a!=86)
   ]])
@@ -13597,12 +13597,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=37
          OR b=88
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR c=23023
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
          OR a=56
          OR ((a BETWEEN 13 AND 15) AND a!=14)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR f='ijklmnopq'
          OR ((a BETWEEN 85 AND 87) AND a!=86)
   ]])
@@ -13620,7 +13620,7 @@ test:do_test(
       WHERE (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR a=74
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 42 AND 44) AND a!=43)
   ]])
     end, {
@@ -13637,7 +13637,7 @@ test:do_test(
       WHERE (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR a=74
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 42 AND 44) AND a!=43)
   ]])
     end, {
@@ -13747,13 +13747,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'vwxyz*')
+      WHERE (g='jihgfed' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR b=212
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR a=20
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=627
   ]])
     end, {
@@ -13767,13 +13767,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'vwxyz*')
+      WHERE (g='jihgfed' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR b=212
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR a=20
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=627
   ]])
     end, {
@@ -13787,7 +13787,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+      WHERE (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR b=157
          OR b=1026
@@ -13803,7 +13803,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+      WHERE (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR b=157
          OR b=1026
@@ -13823,10 +13823,10 @@ test:do_test(
          OR a=16
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='wvutsrq' AND f GLOB 'lmnop*')
+         OR (g='wvutsrq' AND f LIKE 'lmnop%')
          OR f='zabcdefgh'
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.368.1>
@@ -13843,10 +13843,10 @@ test:do_test(
          OR a=16
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='wvutsrq' AND f GLOB 'lmnop*')
+         OR (g='wvutsrq' AND f LIKE 'lmnop%')
          OR f='zabcdefgh'
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.368.2>
@@ -13895,11 +13895,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE f IS NULL
          OR a=37
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 55 AND 57) AND a!=56)
          OR b=168
          OR b=22
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=506
   ]])
     end, {
@@ -13915,11 +13915,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE f IS NULL
          OR a=37
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 55 AND 57) AND a!=56)
          OR b=168
          OR b=22
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=506
   ]])
     end, {
@@ -13935,11 +13935,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=29
          OR ((a BETWEEN 26 AND 28) AND a!=27)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR b=209
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
          OR b=146
   ]])
     end, {
@@ -13955,11 +13955,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=29
          OR ((a BETWEEN 26 AND 28) AND a!=27)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR b=209
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
          OR b=146
   ]])
     end, {
@@ -14017,7 +14017,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='edcbazy' AND f GLOB 'wxyza*')
+      WHERE (g='edcbazy' AND f LIKE 'wxyza%')
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR b=113
          OR ((a BETWEEN 40 AND 42) AND a!=41)
@@ -14035,7 +14035,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='edcbazy' AND f GLOB 'wxyza*')
+      WHERE (g='edcbazy' AND f LIKE 'wxyza%')
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR b=113
          OR ((a BETWEEN 40 AND 42) AND a!=41)
@@ -14081,7 +14081,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='rqponml' AND f GLOB 'ijklm*')
+      WHERE (g='rqponml' AND f LIKE 'ijklm%')
          OR a=99
          OR a=100
          OR b=429
@@ -14104,7 +14104,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='rqponml' AND f GLOB 'ijklm*')
+      WHERE (g='rqponml' AND f LIKE 'ijklm%')
          OR a=99
          OR a=100
          OR b=429
@@ -14164,9 +14164,9 @@ test:do_test(
          OR c=6006
          OR a=18
          OR c=24024
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR c=19019
          OR (d>=87.0 AND d<88.0 AND d IS NOT NULL)
          OR ((a BETWEEN 44 AND 46) AND a!=45)
@@ -14187,9 +14187,9 @@ test:do_test(
          OR c=6006
          OR a=18
          OR c=24024
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR c=19019
          OR (d>=87.0 AND d<88.0 AND d IS NOT NULL)
          OR ((a BETWEEN 44 AND 46) AND a!=45)
@@ -14243,7 +14243,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=99
          OR ((a BETWEEN 85 AND 87) AND a!=86)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
   ]])
     end, {
         -- <where7-2.379.1>
@@ -14258,7 +14258,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=99
          OR ((a BETWEEN 85 AND 87) AND a!=86)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
   ]])
     end, {
         -- <where7-2.379.2>
@@ -14271,7 +14271,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?hijk*' AND f GLOB 'ghij*')
+      WHERE (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR ((a BETWEEN 79 AND 81) AND a!=80)
          OR b=715
          OR ((a BETWEEN 23 AND 25) AND a!=24)
@@ -14287,7 +14287,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?hijk*' AND f GLOB 'ghij*')
+      WHERE (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR ((a BETWEEN 79 AND 81) AND a!=80)
          OR b=715
          OR ((a BETWEEN 23 AND 25) AND a!=24)
@@ -14304,7 +14304,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=97.0 AND d<98.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR a=46
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
   ]])
@@ -14320,7 +14320,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=97.0 AND d<98.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR a=46
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
   ]])
@@ -14335,7 +14335,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ihgfedc' AND f GLOB 'defgh*')
+      WHERE (g='ihgfedc' AND f LIKE 'defgh%')
          OR ((a BETWEEN 97 AND 99) AND a!=98)
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
          OR b=1056
@@ -14352,7 +14352,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ihgfedc' AND f GLOB 'defgh*')
+      WHERE (g='ihgfedc' AND f LIKE 'defgh%')
          OR ((a BETWEEN 97 AND 99) AND a!=98)
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
          OR b=1056
@@ -14453,7 +14453,7 @@ test:do_test(
          OR ((a BETWEEN 39 AND 41) AND a!=40)
          OR b=242
          OR ((a BETWEEN 32 AND 34) AND a!=33)
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=300
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
@@ -14476,7 +14476,7 @@ test:do_test(
          OR ((a BETWEEN 39 AND 41) AND a!=40)
          OR b=242
          OR ((a BETWEEN 32 AND 34) AND a!=33)
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=300
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
@@ -14502,7 +14502,7 @@ test:do_test(
          OR b=1048
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR c=19019
   ]])
     end, {
@@ -14525,7 +14525,7 @@ test:do_test(
          OR b=1048
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR c=19019
   ]])
     end, {
@@ -14608,10 +14608,10 @@ test:do_test(
          OR a=58
          OR b=333
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR b=572
          OR ((a BETWEEN 50 AND 52) AND a!=51)
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
   ]])
     end, {
         -- <where7-2.389.1>
@@ -14631,10 +14631,10 @@ test:do_test(
          OR a=58
          OR b=333
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR b=572
          OR ((a BETWEEN 50 AND 52) AND a!=51)
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
   ]])
     end, {
         -- <where7-2.389.2>
@@ -14649,7 +14649,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1034
          OR f='lmnopqrst'
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.390.1>
@@ -14664,7 +14664,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1034
          OR f='lmnopqrst'
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.390.2>
@@ -14679,7 +14679,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE c=15015
          OR (d>=87.0 AND d<88.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR b=58
          OR b=674
          OR b=979
@@ -14697,7 +14697,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE c=15015
          OR (d>=87.0 AND d<88.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR b=58
          OR b=674
          OR b=979
@@ -14747,9 +14747,9 @@ test:do_test(
          OR (d>=64.0 AND d<65.0 AND d IS NOT NULL)
          OR b=630
          OR a=19
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR f='wxyzabcde'
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR b=377
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
          OR a=77
@@ -14770,9 +14770,9 @@ test:do_test(
          OR (d>=64.0 AND d<65.0 AND d IS NOT NULL)
          OR b=630
          OR a=19
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR f='wxyzabcde'
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR b=377
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
          OR a=77
@@ -14818,14 +14818,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=64
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'cdefg*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
          OR c=14014
          OR b=586
          OR c=27027
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.395.1>
@@ -14839,14 +14839,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=64
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'cdefg*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
          OR c=14014
          OR b=586
          OR c=27027
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.395.2>
@@ -14903,11 +14903,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR a=23
          OR b=737
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
@@ -14926,11 +14926,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR a=23
          OR b=737
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
@@ -14983,10 +14983,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=18
          OR b=1059
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=795
   ]])
     end, {
@@ -15002,10 +15002,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=18
          OR b=1059
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=795
   ]])
     end, {
@@ -15019,7 +15019,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?mnop*' AND f GLOB 'lmno*')
+      WHERE (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR a=93
          OR a=11
          OR f='nopqrstuv'
@@ -15039,7 +15039,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?mnop*' AND f GLOB 'lmno*')
+      WHERE (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR a=93
          OR a=11
          OR f='nopqrstuv'
@@ -15062,8 +15062,8 @@ test:do_test(
       WHERE b=685
          OR a=33
          OR ((a BETWEEN 40 AND 42) AND a!=41)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 39 AND 41) AND a!=40)
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR b=715
@@ -15085,8 +15085,8 @@ test:do_test(
       WHERE b=685
          OR a=33
          OR ((a BETWEEN 40 AND 42) AND a!=41)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 39 AND 41) AND a!=40)
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR b=715
@@ -15107,7 +15107,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=89
          OR b=1037
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.402.1>
@@ -15122,7 +15122,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=89
          OR b=1037
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.402.2>
@@ -15179,9 +15179,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (g='rqponml' AND f GLOB 'jklmn*')
-         OR (g='lkjihgf' AND f GLOB 'mnopq*')
+      WHERE (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
+         OR (g='lkjihgf' AND f LIKE 'mnopq%')
          OR b=726
          OR ((a BETWEEN 73 AND 75) AND a!=74)
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
@@ -15201,9 +15201,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (g='rqponml' AND f GLOB 'jklmn*')
-         OR (g='lkjihgf' AND f GLOB 'mnopq*')
+      WHERE (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
+         OR (g='lkjihgf' AND f LIKE 'mnopq%')
          OR b=726
          OR ((a BETWEEN 73 AND 75) AND a!=74)
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
@@ -15223,7 +15223,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=924
          OR f='lmnopqrst'
          OR b=1048
@@ -15239,7 +15239,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=924
          OR f='lmnopqrst'
          OR b=1048
@@ -15256,7 +15256,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=198
          OR (d>=58.0 AND d<59.0 AND d IS NOT NULL)
          OR ((a BETWEEN 12 AND 14) AND a!=13)
@@ -15276,7 +15276,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=198
          OR (d>=58.0 AND d<59.0 AND d IS NOT NULL)
          OR ((a BETWEEN 12 AND 14) AND a!=13)
@@ -15341,7 +15341,7 @@ test:do_test(
          OR b=630
          OR a=55
          OR c=26026
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -15359,7 +15359,7 @@ test:do_test(
          OR b=630
          OR a=55
          OR c=26026
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -15375,12 +15375,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE f='uvwxyzabc'
          OR f='xyzabcdef'
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR (d>=70.0 AND d<71.0 AND d IS NOT NULL)
          OR ((a BETWEEN 51 AND 53) AND a!=52)
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
          OR b=69
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
   ]])
     end, {
         -- <where7-2.409.1>
@@ -15395,12 +15395,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE f='uvwxyzabc'
          OR f='xyzabcdef'
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR (d>=70.0 AND d<71.0 AND d IS NOT NULL)
          OR ((a BETWEEN 51 AND 53) AND a!=52)
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
          OR b=69
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
   ]])
     end, {
         -- <where7-2.409.2>
@@ -15417,7 +15417,7 @@ test:do_test(
          OR b=454
          OR ((a BETWEEN 92 AND 94) AND a!=93)
          OR b=179
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR f='qrstuvwxy'
   ]])
     end, {
@@ -15435,7 +15435,7 @@ test:do_test(
          OR b=454
          OR ((a BETWEEN 92 AND 94) AND a!=93)
          OR b=179
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR f='qrstuvwxy'
   ]])
     end, {
@@ -15452,7 +15452,7 @@ test:do_test(
       WHERE ((a BETWEEN 6 AND 8) AND a!=7)
          OR b=619
          OR a=20
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR b=946
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR a=64
@@ -15474,7 +15474,7 @@ test:do_test(
       WHERE ((a BETWEEN 6 AND 8) AND a!=7)
          OR b=619
          OR a=20
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR b=946
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
          OR a=64
@@ -15527,8 +15527,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR a=32
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR c=32032
   ]])
     end, {
@@ -15544,8 +15544,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR a=32
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR c=32032
   ]])
     end, {
@@ -15654,7 +15654,7 @@ test:do_test(
       WHERE (d>=32.0 AND d<33.0 AND d IS NOT NULL)
          OR a=27
          OR ((a BETWEEN 55 AND 57) AND a!=56)
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.417.1>
@@ -15670,7 +15670,7 @@ test:do_test(
       WHERE (d>=32.0 AND d<33.0 AND d IS NOT NULL)
          OR a=27
          OR ((a BETWEEN 55 AND 57) AND a!=56)
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.417.2>
@@ -15720,7 +15720,7 @@ test:do_test(
          OR b=561
          OR b=352
          OR (d>=37.0 AND d<38.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR a=95
   ]])
     end, {
@@ -15743,7 +15743,7 @@ test:do_test(
          OR b=561
          OR b=352
          OR (d>=37.0 AND d<38.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR a=95
   ]])
     end, {
@@ -15761,7 +15761,7 @@ test:do_test(
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR f='ghijklmno'
          OR b=619
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR b=476
          OR a=83
@@ -15782,7 +15782,7 @@ test:do_test(
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR f='ghijklmno'
          OR b=619
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR b=476
          OR a=83
@@ -15868,8 +15868,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=1059
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=47
          OR b=660
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -15887,8 +15887,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=1059
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=47
          OR b=660
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -15936,13 +15936,13 @@ test:do_test(
       WHERE b=597
          OR f='lmnopqrst'
          OR a=24
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 31 AND 33) AND a!=32)
          OR b=1023
          OR a=53
          OR a=78
          OR f='efghijklm'
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -15959,13 +15959,13 @@ test:do_test(
       WHERE b=597
          OR f='lmnopqrst'
          OR a=24
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 31 AND 33) AND a!=32)
          OR b=1023
          OR a=53
          OR a=78
          OR f='efghijklm'
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -16012,11 +16012,11 @@ test:do_test(
       WHERE f='tuvwxyzab'
          OR b=388
          OR ((a BETWEEN 84 AND 86) AND a!=85)
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR b=957
          OR b=663
          OR b=847
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.427.1>
@@ -16032,11 +16032,11 @@ test:do_test(
       WHERE f='tuvwxyzab'
          OR b=388
          OR ((a BETWEEN 84 AND 86) AND a!=85)
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR b=957
          OR b=663
          OR b=847
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.427.2>
@@ -16051,7 +16051,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=81.0 AND d<82.0 AND d IS NOT NULL)
          OR a=56
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.428.1>
@@ -16066,7 +16066,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=81.0 AND d<82.0 AND d IS NOT NULL)
          OR a=56
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
   ]])
     end, {
         -- <where7-2.428.2>
@@ -16082,7 +16082,7 @@ test:do_test(
       WHERE c>=34035
          OR b=168
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
   ]])
     end, {
         -- <where7-2.429.1>
@@ -16098,7 +16098,7 @@ test:do_test(
       WHERE c>=34035
          OR b=168
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
   ]])
     end, {
         -- <where7-2.429.2>
@@ -16144,9 +16144,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=29.0 AND d<30.0 AND d IS NOT NULL)
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR f='rstuvwxyz'
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.431.1>
@@ -16160,9 +16160,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=29.0 AND d<30.0 AND d IS NOT NULL)
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR f='rstuvwxyz'
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.431.2>
@@ -16246,7 +16246,7 @@ test:do_test(
       WHERE b=113
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR b=113
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR ((a BETWEEN 62 AND 64) AND a!=63)
          OR c=6006
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
@@ -16267,7 +16267,7 @@ test:do_test(
       WHERE b=113
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR b=113
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR ((a BETWEEN 62 AND 64) AND a!=63)
          OR c=6006
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
@@ -16285,7 +16285,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR c=22022
          OR ((a BETWEEN 79 AND 81) AND a!=80)
@@ -16303,7 +16303,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR c=22022
          OR ((a BETWEEN 79 AND 81) AND a!=80)
@@ -16322,7 +16322,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 74 AND 76) AND a!=75)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=47
          OR ((a BETWEEN 44 AND 46) AND a!=45)
          OR a=92
@@ -16331,7 +16331,7 @@ test:do_test(
          OR c=7007
          OR a=93
          OR ((a BETWEEN 93 AND 95) AND a!=94)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.436.1>
@@ -16345,7 +16345,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 74 AND 76) AND a!=75)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=47
          OR ((a BETWEEN 44 AND 46) AND a!=45)
          OR a=92
@@ -16354,7 +16354,7 @@ test:do_test(
          OR c=7007
          OR a=93
          OR ((a BETWEEN 93 AND 95) AND a!=94)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.436.2>
@@ -16367,11 +16367,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR a=13
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR c=29029
          OR b=311
          OR b=366
@@ -16389,11 +16389,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR a=13
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR c=29029
          OR b=311
          OR b=366
@@ -16453,12 +16453,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=82.0 AND d<83.0 AND d IS NOT NULL)
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR a=41
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR b=913
   ]])
     end, {
@@ -16474,12 +16474,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=82.0 AND d<83.0 AND d IS NOT NULL)
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR a=41
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR b=913
   ]])
     end, {
@@ -16593,12 +16593,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=102
          OR b=212
          OR (d>=37.0 AND d<38.0 AND d IS NOT NULL)
          OR b=487
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.443.1>
@@ -16611,12 +16611,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=102
          OR b=212
          OR (d>=37.0 AND d<38.0 AND d IS NOT NULL)
          OR b=487
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.443.2>
@@ -16661,7 +16661,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=872
          OR ((a BETWEEN 58 AND 60) AND a!=59)
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR b=957
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
          OR a=67
@@ -16680,7 +16680,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=872
          OR ((a BETWEEN 58 AND 60) AND a!=59)
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR b=957
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
          OR a=67
@@ -16700,12 +16700,12 @@ test:do_test(
       WHERE b=66
          OR b=102
          OR b=396
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 7 AND 9) AND a!=8)
          OR b=759
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR f='ghijklmno'
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 90 AND 92) AND a!=91)
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
   ]])
@@ -16723,12 +16723,12 @@ test:do_test(
       WHERE b=66
          OR b=102
          OR b=396
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 7 AND 9) AND a!=8)
          OR b=759
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR f='ghijklmno'
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 90 AND 92) AND a!=91)
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
   ]])
@@ -16744,8 +16744,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR a=72
          OR b=1100
          OR b=102
@@ -16763,8 +16763,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR a=72
          OR b=1100
          OR b=102
@@ -16878,7 +16878,7 @@ test:do_test(
       WHERE b=47
          OR a=91
          OR d>1e10
-         OR (g='srqponm' AND f GLOB 'cdefg*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.451.1>
@@ -16894,7 +16894,7 @@ test:do_test(
       WHERE b=47
          OR a=91
          OR d>1e10
-         OR (g='srqponm' AND f GLOB 'cdefg*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.451.2>
@@ -16975,13 +16975,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR b=619
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR c=11011
          OR b=550
          OR b=1059
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR (d>=78.0 AND d<79.0 AND d IS NOT NULL)
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
@@ -16998,13 +16998,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR b=619
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR c=11011
          OR b=550
          OR b=1059
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR (d>=78.0 AND d<79.0 AND d IS NOT NULL)
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
@@ -17021,16 +17021,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='edcbazy' AND f GLOB 'vwxyz*')
+      WHERE (g='edcbazy' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR a=78
          OR a=27
          OR b=792
          OR b=946
          OR c=22022
          OR a=23
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=388
   ]])
     end, {
@@ -17044,16 +17044,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='edcbazy' AND f GLOB 'vwxyz*')
+      WHERE (g='edcbazy' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 59 AND 61) AND a!=60)
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR a=78
          OR a=27
          OR b=792
          OR b=946
          OR c=22022
          OR a=23
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=388
   ]])
     end, {
@@ -17070,8 +17070,8 @@ test:do_test(
       WHERE c=32032
          OR f IS NULL
          OR ((a BETWEEN 37 AND 39) AND a!=38)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR b=825
   ]])
     end, {
@@ -17088,8 +17088,8 @@ test:do_test(
       WHERE c=32032
          OR f IS NULL
          OR ((a BETWEEN 37 AND 39) AND a!=38)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR b=825
   ]])
     end, {
@@ -17104,7 +17104,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=84.0 AND d<85.0 AND d IS NOT NULL)
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR b=1078
@@ -17126,7 +17126,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=84.0 AND d<85.0 AND d IS NOT NULL)
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR b=1078
@@ -17147,11 +17147,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'ijklm*')
+      WHERE (g='wvutsrq' AND f LIKE 'ijklm%')
          OR c=25025
          OR b=550
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.458.1>
@@ -17164,11 +17164,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'ijklm*')
+      WHERE (g='wvutsrq' AND f LIKE 'ijklm%')
          OR c=25025
          OR b=550
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.458.2>
@@ -17183,7 +17183,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=432
          OR f='opqrstuvw'
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.459.1>
@@ -17198,7 +17198,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=432
          OR f='opqrstuvw'
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.459.2>
@@ -17213,7 +17213,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 14 AND 16) AND a!=15)
          OR b=847
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR b=583
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
@@ -17234,7 +17234,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 14 AND 16) AND a!=15)
          OR b=847
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR b=583
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
@@ -17299,7 +17299,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=586
          OR d<0.0
          OR c=9009
@@ -17315,7 +17315,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=586
          OR d<0.0
          OR c=9009
@@ -17378,7 +17378,7 @@ test:do_test(
       WHERE ((a BETWEEN 44 AND 46) AND a!=45)
          OR a=53
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=594
          OR b=80
          OR ((a BETWEEN 18 AND 20) AND a!=19)
@@ -17399,7 +17399,7 @@ test:do_test(
       WHERE ((a BETWEEN 44 AND 46) AND a!=45)
          OR a=53
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=594
          OR b=80
          OR ((a BETWEEN 18 AND 20) AND a!=19)
@@ -17482,9 +17482,9 @@ test:do_test(
       WHERE a=59
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR f='wxyzabcde'
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
          OR a=70
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR ((a BETWEEN 14 AND 16) AND a!=15)
@@ -17503,9 +17503,9 @@ test:do_test(
       WHERE a=59
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR f='wxyzabcde'
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
          OR a=70
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR ((a BETWEEN 14 AND 16) AND a!=15)
@@ -17522,7 +17522,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=69
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.468.1>
@@ -17536,7 +17536,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=69
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.468.2>
@@ -17552,8 +17552,8 @@ test:do_test(
       WHERE a=41
          OR a=43
          OR a=92
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.469.1>
@@ -17569,8 +17569,8 @@ test:do_test(
       WHERE a=41
          OR a=43
          OR a=92
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.469.2>
@@ -17617,7 +17617,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE f='fghijklmn'
          OR f='fghijklmn'
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR b=465
          OR b=586
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
@@ -17639,7 +17639,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE f='fghijklmn'
          OR f='fghijklmn'
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR b=465
          OR b=586
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
@@ -17660,10 +17660,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=34.0 AND d<35.0 AND d IS NOT NULL)
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=814
          OR a=20
          OR 1000000<b
@@ -17681,10 +17681,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=34.0 AND d<35.0 AND d IS NOT NULL)
-         OR (f GLOB '?abcd*' AND f GLOB 'zabc*')
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (f LIKE '_abcd%' AND f LIKE 'zabc%')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=814
          OR a=20
          OR 1000000<b
@@ -17701,14 +17701,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
          OR c=1001
          OR b=484
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
          OR c<=10
          OR a=92
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 0 AND 2) AND a!=1)
          OR b=1026
   ]])
@@ -17723,14 +17723,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'uvwxy*')
+      WHERE (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
          OR c=1001
          OR b=484
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
          OR c<=10
          OR a=92
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 0 AND 2) AND a!=1)
          OR b=1026
   ]])
@@ -17746,13 +17746,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=54
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR b=993
          OR c=22022
          OR a=68
          OR ((a BETWEEN 99 AND 101) AND a!=100)
          OR a=62
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR b=1015
   ]])
     end, {
@@ -17767,13 +17767,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=54
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR b=993
          OR c=22022
          OR a=68
          OR ((a BETWEEN 99 AND 101) AND a!=100)
          OR a=62
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
          OR b=1015
   ]])
     end, {
@@ -17789,7 +17789,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=319
          OR a=50
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
@@ -17808,7 +17808,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=319
          OR a=50
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
@@ -17889,14 +17889,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
          OR b=407
          OR b=454
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
          OR b=627
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
   ]])
     end, {
         -- <where7-2.478.1>
@@ -17909,14 +17909,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
          OR b=407
          OR b=454
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
          OR b=627
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
   ]])
     end, {
         -- <where7-2.478.2>
@@ -17933,7 +17933,7 @@ test:do_test(
          OR c=34034
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR a=67
   ]])
     end, {
@@ -17951,7 +17951,7 @@ test:do_test(
          OR c=34034
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR a=67
   ]])
     end, {
@@ -17970,7 +17970,7 @@ test:do_test(
          OR (d>=81.0 AND d<82.0 AND d IS NOT NULL)
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
   ]])
     end, {
         -- <where7-2.480.1>
@@ -17988,7 +17988,7 @@ test:do_test(
          OR (d>=81.0 AND d<82.0 AND d IS NOT NULL)
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
   ]])
     end, {
         -- <where7-2.480.2>
@@ -18006,12 +18006,12 @@ test:do_test(
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
          OR b=201
          OR a=99
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 36 AND 38) AND a!=37)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
          OR b=946
          OR b=993
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.481.1>
@@ -18029,12 +18029,12 @@ test:do_test(
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
          OR b=201
          OR a=99
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 36 AND 38) AND a!=37)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
          OR b=946
          OR b=993
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.481.2>
@@ -18048,7 +18048,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=806
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR b=916
          OR b<0
@@ -18070,7 +18070,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=806
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR b=916
          OR b<0
@@ -18093,11 +18093,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=836
          OR d>1e10
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR f='pqrstuvwx'
          OR ((a BETWEEN 3 AND 5) AND a!=4)
          OR f='abcdefghi'
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR a=33
          OR ((a BETWEEN 19 AND 21) AND a!=20)
          OR ((a BETWEEN 88 AND 90) AND a!=89)
@@ -18116,11 +18116,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=836
          OR d>1e10
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR f='pqrstuvwx'
          OR ((a BETWEEN 3 AND 5) AND a!=4)
          OR f='abcdefghi'
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR a=33
          OR ((a BETWEEN 19 AND 21) AND a!=20)
          OR ((a BETWEEN 88 AND 90) AND a!=89)
@@ -18140,10 +18140,10 @@ test:do_test(
       WHERE a=48
          OR a=92
          OR a=1
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR b=905
          OR ((a BETWEEN 51 AND 53) AND a!=52)
   ]])
@@ -18161,10 +18161,10 @@ test:do_test(
       WHERE a=48
          OR a=92
          OR a=1
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR b=905
          OR ((a BETWEEN 51 AND 53) AND a!=52)
   ]])
@@ -18215,12 +18215,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=740
          OR b=564
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR a=11
          OR ((a BETWEEN 44 AND 46) AND a!=45)
          OR b=322
          OR (d>=6.0 AND d<7.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR b=902
          OR c>=34035
   ]])
@@ -18237,12 +18237,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=740
          OR b=564
-         OR (g='onmlkji' AND f GLOB 'zabcd*')
+         OR (g='onmlkji' AND f LIKE 'zabcd%')
          OR a=11
          OR ((a BETWEEN 44 AND 46) AND a!=45)
          OR b=322
          OR (d>=6.0 AND d<7.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR b=902
          OR c>=34035
   ]])
@@ -18264,7 +18264,7 @@ test:do_test(
          OR a=48
          OR b=927
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR f='abcdefghi'
          OR b=91
          OR b=55
@@ -18287,7 +18287,7 @@ test:do_test(
          OR a=48
          OR b=927
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
          OR f='abcdefghi'
          OR b=91
          OR b=55
@@ -18303,7 +18303,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='srqponm' AND f GLOB 'efghi*')
+      WHERE (g='srqponm' AND f LIKE 'efghi%')
          OR ((a BETWEEN 88 AND 90) AND a!=89)
          OR a=20
          OR b=11
@@ -18319,7 +18319,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='srqponm' AND f GLOB 'efghi*')
+      WHERE (g='srqponm' AND f LIKE 'efghi%')
          OR ((a BETWEEN 88 AND 90) AND a!=89)
          OR a=20
          OR b=11
@@ -18338,7 +18338,7 @@ test:do_test(
       WHERE (d>=27.0 AND d<28.0 AND d IS NOT NULL)
          OR b=55
          OR (d>=13.0 AND d<14.0 AND d IS NOT NULL)
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR a=50
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
@@ -18358,7 +18358,7 @@ test:do_test(
       WHERE (d>=27.0 AND d<28.0 AND d IS NOT NULL)
          OR b=55
          OR (d>=13.0 AND d<14.0 AND d IS NOT NULL)
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR a=50
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
@@ -18375,8 +18375,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='rqponml' AND f GLOB 'ijklm*')
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+      WHERE (g='rqponml' AND f LIKE 'ijklm%')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
   ]])
     end, {
         -- <where7-2.490.1>
@@ -18389,8 +18389,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='rqponml' AND f GLOB 'ijklm*')
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+      WHERE (g='rqponml' AND f LIKE 'ijklm%')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
   ]])
     end, {
         -- <where7-2.490.2>
@@ -18405,7 +18405,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=704
          OR b=924
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR b=113
   ]])
     end, {
@@ -18421,7 +18421,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=704
          OR b=924
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR b=113
   ]])
     end, {
@@ -18503,11 +18503,11 @@ test:do_test(
          OR b=726
          OR f='abcdefghi'
          OR b=179
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=539
          OR b=66
          OR ((a BETWEEN 86 AND 88) AND a!=87)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.494.1>
@@ -18524,11 +18524,11 @@ test:do_test(
          OR b=726
          OR f='abcdefghi'
          OR b=179
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=539
          OR b=66
          OR ((a BETWEEN 86 AND 88) AND a!=87)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.494.2>
@@ -18573,11 +18573,11 @@ test:do_test(
          OR b=682
          OR b=443
          OR b=836
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
          OR ((a BETWEEN 51 AND 53) AND a!=52)
          OR b=110
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
   ]])
     end, {
         -- <where7-2.496.1>
@@ -18594,11 +18594,11 @@ test:do_test(
          OR b=682
          OR b=443
          OR b=836
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
          OR ((a BETWEEN 51 AND 53) AND a!=52)
          OR b=110
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
   ]])
     end, {
         -- <where7-2.496.2>
@@ -18611,15 +18611,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?zabc*' AND f GLOB 'yzab*')
+      WHERE (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR b=462
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR a=22
          OR b=594
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
   ]])
     end, {
         -- <where7-2.497.1>
@@ -18632,15 +18632,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?zabc*' AND f GLOB 'yzab*')
+      WHERE (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR b=462
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR a=22
          OR b=594
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
   ]])
     end, {
         -- <where7-2.497.2>
@@ -18653,11 +18653,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'wxyza*')
+      WHERE (g='utsrqpo' AND f LIKE 'wxyza%')
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR f='vwxyzabcd'
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR a=37
          OR a=50
   ]])
@@ -18672,11 +18672,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'wxyza*')
+      WHERE (g='utsrqpo' AND f LIKE 'wxyza%')
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR f='vwxyzabcd'
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR a=37
          OR a=50
   ]])
@@ -18693,10 +18693,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 83 AND 85) AND a!=84)
          OR b=784
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR b=825
          OR a=80
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR b=531
          OR a=100
@@ -18714,10 +18714,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 83 AND 85) AND a!=84)
          OR b=784
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR b=825
          OR a=80
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR b=531
          OR a=100
@@ -18733,7 +18733,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=220
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
   ]])
@@ -18748,7 +18748,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'tuvwx*')
+      WHERE (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR b=220
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
   ]])
@@ -18797,9 +18797,9 @@ test:do_test(
          OR b=894
          OR c=28028
          OR b=905
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR b=1037
   ]])
     end, {
@@ -18817,9 +18817,9 @@ test:do_test(
          OR b=894
          OR c=28028
          OR b=905
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR b=1037
   ]])
     end, {
@@ -18863,9 +18863,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'mnopq*')
+      WHERE (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=861
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.504.1>
@@ -18878,9 +18878,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'mnopq*')
+      WHERE (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=861
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.504.2>
@@ -18894,13 +18894,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=704
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR b=25
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=487
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR ((a BETWEEN 77 AND 79) AND a!=78)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
          OR (d>=84.0 AND d<85.0 AND d IS NOT NULL)
@@ -18917,13 +18917,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=704
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR b=25
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=487
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR ((a BETWEEN 77 AND 79) AND a!=78)
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
          OR (d>=84.0 AND d<85.0 AND d IS NOT NULL)
@@ -18940,16 +18940,16 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=19
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR b=674
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR b=355
          OR ((a BETWEEN 72 AND 74) AND a!=73)
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR c=28028
          OR b=649
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
+         OR (g='srqponm' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.506.1>
@@ -18963,16 +18963,16 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=19
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR b=674
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR b=355
          OR ((a BETWEEN 72 AND 74) AND a!=73)
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR c=28028
          OR b=649
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
+         OR (g='srqponm' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.506.2>
@@ -19020,7 +19020,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=135
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 39 AND 41) AND a!=40)
   ]])
     end, {
@@ -19035,7 +19035,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=135
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 39 AND 41) AND a!=40)
   ]])
     end, {
@@ -19049,8 +19049,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+      WHERE (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.509.1>
@@ -19063,8 +19063,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'ijklm*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+      WHERE (g='hgfedcb' AND f LIKE 'ijklm%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.509.2>
@@ -19077,7 +19077,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'wxyza*')
+      WHERE (g='jihgfed' AND f LIKE 'wxyza%')
          OR f='ghijklmno'
   ]])
     end, {
@@ -19091,7 +19091,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'wxyza*')
+      WHERE (g='jihgfed' AND f LIKE 'wxyza%')
          OR f='ghijklmno'
   ]])
     end, {
@@ -19187,7 +19187,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?lmno*' AND f GLOB 'klmn*')
+      WHERE (f LIKE '_lmno%' AND f LIKE 'klmn%')
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR b=99
          OR a=54
@@ -19203,7 +19203,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?lmno*' AND f GLOB 'klmn*')
+      WHERE (f LIKE '_lmno%' AND f LIKE 'klmn%')
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR b=99
          OR a=54
@@ -19220,7 +19220,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=300
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
          OR b=319
          OR f='fghijklmn'
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
@@ -19238,7 +19238,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=300
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
          OR b=319
          OR f='fghijklmn'
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
@@ -19263,7 +19263,7 @@ test:do_test(
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
          OR b=748
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.515.1>
@@ -19284,7 +19284,7 @@ test:do_test(
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
          OR b=748
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.515.2>
@@ -19333,10 +19333,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'wxyza*')
+      WHERE (g='jihgfed' AND f LIKE 'wxyza%')
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
          OR b=110
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR c=26026
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
          OR b=850
@@ -19353,10 +19353,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'wxyza*')
+      WHERE (g='jihgfed' AND f LIKE 'wxyza%')
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
          OR b=110
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR c=26026
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
          OR b=850
@@ -19375,9 +19375,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 74 AND 76) AND a!=75)
          OR ((a BETWEEN 1 AND 3) AND a!=2)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
          OR b=135
          OR a=28
          OR ((a BETWEEN 1 AND 3) AND a!=2)
@@ -19396,9 +19396,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 74 AND 76) AND a!=75)
          OR ((a BETWEEN 1 AND 3) AND a!=2)
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
-         OR (g='mlkjihg' AND f GLOB 'klmno*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
+         OR (g='mlkjihg' AND f LIKE 'klmno%')
          OR b=135
          OR a=28
          OR ((a BETWEEN 1 AND 3) AND a!=2)
@@ -19485,9 +19485,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR a=52
   ]])
     end, {
@@ -19501,9 +19501,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR a=52
   ]])
     end, {
@@ -19517,7 +19517,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ihgfedc' AND f GLOB 'abcde*')
+      WHERE (g='ihgfedc' AND f LIKE 'abcde%')
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR a=86
          OR c=33033
@@ -19535,7 +19535,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ihgfedc' AND f GLOB 'abcde*')
+      WHERE (g='ihgfedc' AND f LIKE 'abcde%')
          OR ((a BETWEEN 2 AND 4) AND a!=3)
          OR a=86
          OR c=33033
@@ -19557,7 +19557,7 @@ test:do_test(
          OR b=517
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR ((a BETWEEN 67 AND 69) AND a!=68)
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR f='defghijkl'
          OR b=707
          OR c>=34035
@@ -19580,7 +19580,7 @@ test:do_test(
          OR b=517
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR ((a BETWEEN 67 AND 69) AND a!=68)
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR f='defghijkl'
          OR b=707
          OR c>=34035
@@ -19602,7 +19602,7 @@ test:do_test(
       WHERE (d>=96.0 AND d<97.0 AND d IS NOT NULL)
          OR b=209
          OR b=399
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.524.1>
@@ -19618,7 +19618,7 @@ test:do_test(
       WHERE (d>=96.0 AND d<97.0 AND d IS NOT NULL)
          OR b=209
          OR b=399
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.524.2>
@@ -19632,11 +19632,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=597
          OR a=95
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR b=432
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
   ]])
@@ -19652,11 +19652,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=597
          OR a=95
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR b=432
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
   ]])
@@ -19680,7 +19680,7 @@ test:do_test(
          OR c=21021
          OR b=330
          OR b=231
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.526.1>
@@ -19702,7 +19702,7 @@ test:do_test(
          OR c=21021
          OR b=330
          OR b=231
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
   ]])
     end, {
         -- <where7-2.526.2>
@@ -19715,7 +19715,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'fghij*')
+      WHERE (g='hgfedcb' AND f LIKE 'fghij%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR f IS NULL
   ]])
@@ -19730,7 +19730,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'fghij*')
+      WHERE (g='hgfedcb' AND f LIKE 'fghij%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR f IS NULL
   ]])
@@ -19746,9 +19746,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 99 AND 101) AND a!=100)
-         OR (g='fedcbaz' AND f GLOB 'pqrst*')
+         OR (g='fedcbaz' AND f LIKE 'pqrst%')
          OR 1000000<b
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR b=990
   ]])
     end, {
@@ -19763,9 +19763,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 99 AND 101) AND a!=100)
-         OR (g='fedcbaz' AND f GLOB 'pqrst*')
+         OR (g='fedcbaz' AND f LIKE 'pqrst%')
          OR 1000000<b
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR b=990
   ]])
     end, {
@@ -19781,7 +19781,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=165
          OR a=69
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.529.1>
@@ -19796,7 +19796,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=165
          OR a=69
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.529.2>
@@ -19809,13 +19809,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='nmlkjih' AND f GLOB 'defgh*')
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='nmlkjih' AND f LIKE 'defgh%')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=784
          OR b=583
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR b=814
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR b=619
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
   ]])
@@ -19830,13 +19830,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='nmlkjih' AND f GLOB 'defgh*')
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='nmlkjih' AND f LIKE 'defgh%')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=784
          OR b=583
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR b=814
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR b=619
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
   ]])
@@ -19853,7 +19853,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=86
          OR b=484
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR b=418
          OR b=509
          OR a=42
@@ -19876,7 +19876,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=86
          OR b=484
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR b=418
          OR b=509
          OR a=42
@@ -20007,7 +20007,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?klmn*' AND f GLOB 'jklm*')
+      WHERE (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR c=5005
          OR ((a BETWEEN 50 AND 52) AND a!=51)
          OR a=93
@@ -20015,7 +20015,7 @@ test:do_test(
          OR b=619
          OR b=234
          OR b=55
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -20029,7 +20029,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?klmn*' AND f GLOB 'jklm*')
+      WHERE (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR c=5005
          OR ((a BETWEEN 50 AND 52) AND a!=51)
          OR a=93
@@ -20037,7 +20037,7 @@ test:do_test(
          OR b=619
          OR b=234
          OR b=55
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -20053,11 +20053,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=355
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=806
          OR b=462
          OR b=531
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
          OR f='mnopqrstu'
   ]])
     end, {
@@ -20073,11 +20073,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=355
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=806
          OR b=462
          OR b=531
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
          OR f='mnopqrstu'
   ]])
     end, {
@@ -20093,9 +20093,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 60 AND 62) AND a!=61)
          OR f='pqrstuvwx'
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
          OR b=495
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
          OR a=75
   ]])
     end, {
@@ -20111,9 +20111,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 60 AND 62) AND a!=61)
          OR f='pqrstuvwx'
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
          OR b=495
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
          OR a=75
   ]])
     end, {
@@ -20127,8 +20127,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'efghi*')
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+      WHERE (g='xwvutsr' AND f LIKE 'efghi%')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=748
          OR b=913
          OR (d>=5.0 AND d<6.0 AND d IS NOT NULL)
@@ -20145,8 +20145,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'efghi*')
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+      WHERE (g='xwvutsr' AND f LIKE 'efghi%')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=748
          OR b=913
          OR (d>=5.0 AND d<6.0 AND d IS NOT NULL)
@@ -20167,7 +20167,7 @@ test:do_test(
          OR b=902
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR b=168
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR a=50
          OR f='uvwxyzabc'
          OR b=836
@@ -20189,7 +20189,7 @@ test:do_test(
          OR b=902
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR b=168
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR a=50
          OR f='uvwxyzabc'
          OR b=836
@@ -20243,13 +20243,13 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=814
          OR c=30030
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
          OR a=16
          OR b=1048
          OR b=113
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR b=729
          OR a=54
   ]])
@@ -20266,13 +20266,13 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=814
          OR c=30030
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
          OR a=16
          OR b=1048
          OR b=113
          OR (d>=61.0 AND d<62.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR b=729
          OR a=54
   ]])
@@ -20288,15 +20288,15 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=399
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=814
          OR c=22022
          OR (d>=8.0 AND d<9.0 AND d IS NOT NULL)
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR a=1
          OR b=311
          OR b=121
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=198
   ]])
     end, {
@@ -20311,15 +20311,15 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=399
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=814
          OR c=22022
          OR (d>=8.0 AND d<9.0 AND d IS NOT NULL)
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR a=1
          OR b=311
          OR b=121
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=198
   ]])
     end, {
@@ -20403,7 +20403,7 @@ test:do_test(
          OR a=22
          OR b=594
          OR (d>=15.0 AND d<16.0 AND d IS NOT NULL)
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
   ]])
     end, {
         -- <where7-2.545.1>
@@ -20424,7 +20424,7 @@ test:do_test(
          OR a=22
          OR b=594
          OR (d>=15.0 AND d<16.0 AND d IS NOT NULL)
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
   ]])
     end, {
         -- <where7-2.545.2>
@@ -20443,7 +20443,7 @@ test:do_test(
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
          OR ((a BETWEEN 3 AND 5) AND a!=4)
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR f='mnopqrstu'
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
          OR b=902
@@ -20465,7 +20465,7 @@ test:do_test(
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
          OR ((a BETWEEN 3 AND 5) AND a!=4)
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR f='mnopqrstu'
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
          OR b=902
@@ -20481,8 +20481,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='onmlkji' AND f GLOB 'zabcd*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+      WHERE (g='onmlkji' AND f LIKE 'zabcd%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR a=13
   ]])
     end, {
@@ -20496,8 +20496,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='onmlkji' AND f GLOB 'zabcd*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+      WHERE (g='onmlkji' AND f LIKE 'zabcd%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR a=13
   ]])
     end, {
@@ -20511,11 +20511,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='edcbazy' AND f GLOB 'wxyza*')
+      WHERE (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=410
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=418
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -20529,11 +20529,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='edcbazy' AND f GLOB 'wxyza*')
+      WHERE (g='edcbazy' AND f LIKE 'wxyza%')
          OR b=410
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=418
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -20552,8 +20552,8 @@ test:do_test(
          OR a=56
          OR a=46
          OR (d>=100.0 AND d<101.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR (d>=41.0 AND d<42.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -20572,8 +20572,8 @@ test:do_test(
          OR a=56
          OR a=46
          OR (d>=100.0 AND d<101.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR (d>=41.0 AND d<42.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -20633,7 +20633,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=539
          OR b=418
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR b=759
   ]])
     end, {
@@ -20649,7 +20649,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=539
          OR b=418
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR b=759
   ]])
     end, {
@@ -20664,8 +20664,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=1001
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR c=34034
          OR a=84
   ]])
@@ -20681,8 +20681,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=1001
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR c=34034
          OR a=84
   ]])
@@ -20702,7 +20702,7 @@ test:do_test(
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR b=322
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR c=34034
@@ -20724,7 +20724,7 @@ test:do_test(
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR b=322
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR c=34034
@@ -20742,12 +20742,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=13013
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=47
          OR (d>=79.0 AND d<80.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=828
   ]])
     end, {
@@ -20762,12 +20762,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=13013
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=47
          OR (d>=79.0 AND d<80.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=828
   ]])
     end, {
@@ -20783,7 +20783,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=451
          OR b=836
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.555.1>
@@ -20798,7 +20798,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=451
          OR b=836
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.555.2>
@@ -20848,7 +20848,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='tuvwxyzab'
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.557.1>
@@ -20862,7 +20862,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='tuvwxyzab'
-         OR (g='nmlkjih' AND f GLOB 'efghi*')
+         OR (g='nmlkjih' AND f LIKE 'efghi%')
   ]])
     end, {
         -- <where7-2.557.2>
@@ -20881,7 +20881,7 @@ test:do_test(
          OR d<0.0
          OR b=982
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR ((a BETWEEN 97 AND 99) AND a!=98)
          OR e IS NULL
          OR c=32032
@@ -20904,7 +20904,7 @@ test:do_test(
          OR d<0.0
          OR b=982
          OR (d>=2.0 AND d<3.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR ((a BETWEEN 97 AND 99) AND a!=98)
          OR e IS NULL
          OR c=32032
@@ -20922,9 +20922,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=62
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.559.1>
@@ -20938,9 +20938,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=62
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.559.2>
@@ -20994,8 +20994,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=44
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.561.1>
@@ -21009,8 +21009,8 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=44
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.561.2>
@@ -21026,7 +21026,7 @@ test:do_test(
       WHERE b=883
          OR b=311
          OR b=880
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR a=88
          OR b=154
@@ -21048,7 +21048,7 @@ test:do_test(
       WHERE b=883
          OR b=311
          OR b=880
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR a=88
          OR b=154
@@ -21067,12 +21067,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='onmlkji' AND f GLOB 'xyzab*')
+      WHERE (g='onmlkji' AND f LIKE 'xyzab%')
          OR a=10
          OR b=190
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 67 AND 69) AND a!=68)
          OR b=385
          OR a=82
@@ -21090,12 +21090,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='onmlkji' AND f GLOB 'xyzab*')
+      WHERE (g='onmlkji' AND f LIKE 'xyzab%')
          OR a=10
          OR b=190
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 67 AND 69) AND a!=68)
          OR b=385
          OR a=82
@@ -21151,7 +21151,7 @@ test:do_test(
          OR a=49
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR c=33033
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR (d>=81.0 AND d<82.0 AND d IS NOT NULL)
          OR g IS NULL
          OR b=220
@@ -21174,7 +21174,7 @@ test:do_test(
          OR a=49
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR c=33033
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR (d>=81.0 AND d<82.0 AND d IS NOT NULL)
          OR g IS NULL
          OR b=220
@@ -21191,7 +21191,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'tuvwx*')
+      WHERE (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=212
          OR b=418
          OR ((a BETWEEN 31 AND 33) AND a!=32)
@@ -21207,7 +21207,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'tuvwx*')
+      WHERE (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=212
          OR b=418
          OR ((a BETWEEN 31 AND 33) AND a!=32)
@@ -21283,8 +21283,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'jklmn*')
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+      WHERE (g='hgfedcb' AND f LIKE 'jklmn%')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
   ]])
     end, {
         -- <where7-2.569.1>
@@ -21297,8 +21297,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'jklmn*')
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+      WHERE (g='hgfedcb' AND f LIKE 'jklmn%')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
   ]])
     end, {
         -- <where7-2.569.2>
@@ -21356,7 +21356,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=18018
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR b=410
          OR b=858
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
@@ -21373,7 +21373,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=18018
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR b=410
          OR b=858
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
@@ -21389,7 +21389,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ponmlkj' AND f GLOB 'vwxyz*')
+      WHERE (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR b=781
   ]])
     end, {
@@ -21403,7 +21403,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ponmlkj' AND f GLOB 'vwxyz*')
+      WHERE (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR b=781
   ]])
     end, {
@@ -21420,10 +21420,10 @@ test:do_test(
       WHERE b=1070
          OR ((a BETWEEN 50 AND 52) AND a!=51)
          OR a=54
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR a=9
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -21440,10 +21440,10 @@ test:do_test(
       WHERE b=1070
          OR ((a BETWEEN 50 AND 52) AND a!=51)
          OR a=54
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR a=9
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -21460,8 +21460,8 @@ test:do_test(
       WHERE a=55
          OR a=62
          OR a=63
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
          OR ((a BETWEEN 99 AND 101) AND a!=100)
   ]])
     end, {
@@ -21478,8 +21478,8 @@ test:do_test(
       WHERE a=55
          OR a=62
          OR a=63
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
          OR ((a BETWEEN 99 AND 101) AND a!=100)
   ]])
     end, {
@@ -21527,9 +21527,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=553
          OR ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR (d>=59.0 AND d<60.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=583
          OR a=56
   ]])
@@ -21546,9 +21546,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=553
          OR ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR (d>=59.0 AND d<60.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=583
          OR a=56
   ]])
@@ -21565,7 +21565,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=83
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR a=1
          OR ((a BETWEEN 17 AND 19) AND a!=18)
          OR ((a BETWEEN 49 AND 51) AND a!=50)
@@ -21584,7 +21584,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=83
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR a=1
          OR ((a BETWEEN 17 AND 19) AND a!=18)
          OR ((a BETWEEN 49 AND 51) AND a!=50)
@@ -21635,7 +21635,7 @@ test:do_test(
          OR a=92
          OR a=63
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.579.1>
@@ -21652,7 +21652,7 @@ test:do_test(
          OR a=92
          OR a=63
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.579.2>
@@ -21668,7 +21668,7 @@ test:do_test(
       WHERE b=440
          OR f='vwxyzabcd'
          OR b=190
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
          OR b=88
          OR b=58
@@ -21687,7 +21687,7 @@ test:do_test(
       WHERE b=440
          OR f='vwxyzabcd'
          OR b=190
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR (d>=42.0 AND d<43.0 AND d IS NOT NULL)
          OR b=88
          OR b=58
@@ -21707,7 +21707,7 @@ test:do_test(
          OR c=24024
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
          OR b=1001
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR d>1e10
          OR b=531
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
@@ -21728,7 +21728,7 @@ test:do_test(
          OR c=24024
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
          OR b=1001
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR d>1e10
          OR b=531
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
@@ -21774,7 +21774,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 71 AND 73) AND a!=72)
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR ((a BETWEEN 91 AND 93) AND a!=92)
@@ -21795,7 +21795,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 71 AND 73) AND a!=72)
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR ((a BETWEEN 91 AND 93) AND a!=92)
@@ -21820,8 +21820,8 @@ test:do_test(
          OR b=806
          OR b=605
          OR ((a BETWEEN 23 AND 25) AND a!=24)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
   ]])
     end, {
         -- <where7-2.584.1>
@@ -21839,8 +21839,8 @@ test:do_test(
          OR b=806
          OR b=605
          OR ((a BETWEEN 23 AND 25) AND a!=24)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
   ]])
     end, {
         -- <where7-2.584.2>
@@ -21856,9 +21856,9 @@ test:do_test(
       WHERE ((a BETWEEN 84 AND 86) AND a!=85)
          OR b=572
          OR c=10010
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=29
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
   ]])
     end, {
         -- <where7-2.585.1>
@@ -21874,9 +21874,9 @@ test:do_test(
       WHERE ((a BETWEEN 84 AND 86) AND a!=85)
          OR b=572
          OR c=10010
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=29
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
   ]])
     end, {
         -- <where7-2.585.2>
@@ -21962,9 +21962,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=5005
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR b=143
          OR a=68
          OR a=77
@@ -21982,9 +21982,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=5005
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR b=143
          OR a=68
          OR a=77
@@ -22002,10 +22002,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=5.0 AND d<6.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
          OR ((a BETWEEN 76 AND 78) AND a!=77)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=99
          OR ((a BETWEEN 12 AND 14) AND a!=13)
   ]])
@@ -22021,10 +22021,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=5.0 AND d<6.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'ghijk*')
+         OR (g='xwvutsr' AND f LIKE 'ghijk%')
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
          OR ((a BETWEEN 76 AND 78) AND a!=77)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=99
          OR ((a BETWEEN 12 AND 14) AND a!=13)
   ]])
@@ -22039,12 +22039,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'opqrs*')
+      WHERE (g='qponmlk' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 88 AND 90) AND a!=89)
          OR (d>=13.0 AND d<14.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR b=971
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.590.1>
@@ -22057,12 +22057,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'opqrs*')
+      WHERE (g='qponmlk' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 88 AND 90) AND a!=89)
          OR (d>=13.0 AND d<14.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR b=971
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.590.2>
@@ -22075,12 +22075,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?lmno*' AND f GLOB 'klmn*')
+      WHERE (f LIKE '_lmno%' AND f LIKE 'klmn%')
          OR b=806
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR b=1015
          OR ((a BETWEEN 68 AND 70) AND a!=69)
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
   ]])
     end, {
         -- <where7-2.591.1>
@@ -22093,12 +22093,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?lmno*' AND f GLOB 'klmn*')
+      WHERE (f LIKE '_lmno%' AND f LIKE 'klmn%')
          OR b=806
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR b=1015
          OR ((a BETWEEN 68 AND 70) AND a!=69)
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
   ]])
     end, {
         -- <where7-2.591.2>
@@ -22119,7 +22119,7 @@ test:do_test(
          OR a=26
          OR b=1048
          OR b=561
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR ((a BETWEEN 55 AND 57) AND a!=56)
          OR a=56
   ]])
@@ -22142,7 +22142,7 @@ test:do_test(
          OR a=26
          OR b=1048
          OR b=561
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR ((a BETWEEN 55 AND 57) AND a!=56)
          OR a=56
   ]])
@@ -22165,7 +22165,7 @@ test:do_test(
          OR b=113
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
          OR b=385
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.593.1>
@@ -22186,7 +22186,7 @@ test:do_test(
          OR b=113
          OR (d>=16.0 AND d<17.0 AND d IS NOT NULL)
          OR b=385
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.593.2>
@@ -22204,7 +22204,7 @@ test:do_test(
          OR b=674
          OR b=825
          OR b=704
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR a=76
@@ -22227,7 +22227,7 @@ test:do_test(
          OR b=674
          OR b=825
          OR b=704
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR a=76
@@ -22246,7 +22246,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=869
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.595.1>
@@ -22260,7 +22260,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=869
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.595.2>
@@ -22303,12 +22303,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='rqponml' AND f GLOB 'hijkl*')
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+      WHERE (g='rqponml' AND f LIKE 'hijkl%')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR a=8
          OR a=72
          OR ((a BETWEEN 95 AND 97) AND a!=96)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.597.1>
@@ -22321,12 +22321,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='rqponml' AND f GLOB 'hijkl*')
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+      WHERE (g='rqponml' AND f LIKE 'hijkl%')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR a=8
          OR a=72
          OR ((a BETWEEN 95 AND 97) AND a!=96)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.597.2>
@@ -22342,7 +22342,7 @@ test:do_test(
       WHERE a=20
          OR ((a BETWEEN 74 AND 76) AND a!=75)
          OR b=341
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=814
          OR b=1026
          OR a=14
@@ -22364,7 +22364,7 @@ test:do_test(
       WHERE a=20
          OR ((a BETWEEN 74 AND 76) AND a!=75)
          OR b=341
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=814
          OR b=1026
          OR a=14
@@ -22387,8 +22387,8 @@ test:do_test(
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR b=839
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR c=7007
   ]])
     end, {
@@ -22406,8 +22406,8 @@ test:do_test(
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR b=839
          OR (d>=51.0 AND d<52.0 AND d IS NOT NULL)
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR c=7007
   ]])
     end, {
@@ -22421,7 +22421,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?rstu*' AND f GLOB 'qrst*')
+      WHERE (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR a=21
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
          OR (d>=3.0 AND d<4.0 AND d IS NOT NULL)
@@ -22443,7 +22443,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?rstu*' AND f GLOB 'qrst*')
+      WHERE (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR a=21
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
          OR (d>=3.0 AND d<4.0 AND d IS NOT NULL)
@@ -22469,11 +22469,11 @@ test:do_test(
          OR f='bcdefghij'
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=762
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.601.1>
@@ -22490,11 +22490,11 @@ test:do_test(
          OR f='bcdefghij'
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=762
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.601.2>
@@ -22574,7 +22574,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=55.0 AND d<56.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR b=1067
          OR b=231
@@ -22595,7 +22595,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=55.0 AND d<56.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR b=1067
          OR b=231
@@ -22620,7 +22620,7 @@ test:do_test(
          OR b=396
          OR b=1059
          OR a=69
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR b=440
          OR b=825
   ]])
@@ -22640,7 +22640,7 @@ test:do_test(
          OR b=396
          OR b=1059
          OR a=69
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR b=440
          OR b=825
   ]])
@@ -22658,7 +22658,7 @@ test:do_test(
       WHERE (d>=26.0 AND d<27.0 AND d IS NOT NULL)
          OR b=308
          OR c<=10
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
          OR f='ghijklmno'
          OR b=289
          OR a=5
@@ -22680,7 +22680,7 @@ test:do_test(
       WHERE (d>=26.0 AND d<27.0 AND d IS NOT NULL)
          OR b=308
          OR c<=10
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
          OR f='ghijklmno'
          OR b=289
          OR a=5
@@ -22703,9 +22703,9 @@ test:do_test(
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
          OR b=993
          OR ((a BETWEEN 43 AND 45) AND a!=44)
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR b=663
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR b=869
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
          OR b=121
@@ -22725,9 +22725,9 @@ test:do_test(
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
          OR b=993
          OR ((a BETWEEN 43 AND 45) AND a!=44)
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR b=663
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR b=869
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
          OR b=121
@@ -22743,9 +22743,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'efghi*')
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+      WHERE (g='xwvutsr' AND f LIKE 'efghi%')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR b=770
   ]])
     end, {
@@ -22759,9 +22759,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'efghi*')
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+      WHERE (g='xwvutsr' AND f LIKE 'efghi%')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR b=770
   ]])
     end, {
@@ -22776,10 +22776,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 80 AND 82) AND a!=81)
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.609.1>
@@ -22793,10 +22793,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 80 AND 82) AND a!=81)
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.609.2>
@@ -22855,16 +22855,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='onmlkji' AND f GLOB 'zabcd*')
+      WHERE (g='onmlkji' AND f LIKE 'zabcd%')
          OR b=1092
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR a=77
          OR a=63
          OR b=762
          OR b=894
          OR b=685
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.611.1>
@@ -22877,16 +22877,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='onmlkji' AND f GLOB 'zabcd*')
+      WHERE (g='onmlkji' AND f LIKE 'zabcd%')
          OR b=1092
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR a=77
          OR a=63
          OR b=762
          OR b=894
          OR b=685
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.611.2>
@@ -22899,7 +22899,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'klmno*')
+      WHERE (g='wvutsrq' AND f LIKE 'klmno%')
          OR ((a BETWEEN 93 AND 95) AND a!=94)
          OR b=231
   ]])
@@ -22914,7 +22914,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'klmno*')
+      WHERE (g='wvutsrq' AND f LIKE 'klmno%')
          OR ((a BETWEEN 93 AND 95) AND a!=94)
          OR b=231
   ]])
@@ -22930,7 +22930,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=828
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
   ]])
     end, {
@@ -22945,7 +22945,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=828
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
   ]])
     end, {
@@ -22959,13 +22959,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?opqr*' AND f GLOB 'nopq*')
+      WHERE (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR b=520
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR a=21
   ]])
     end, {
@@ -22979,13 +22979,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?opqr*' AND f GLOB 'nopq*')
+      WHERE (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR b=520
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR a=21
   ]])
     end, {
@@ -23000,7 +23000,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=553
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
          OR b=1034
          OR b=418
          OR a=57
@@ -23019,7 +23019,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=553
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
          OR b=1034
          OR b=418
          OR a=57
@@ -23038,9 +23038,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=43
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR b=418
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
          OR b=594
          OR a=21
@@ -23060,9 +23060,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=43
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
          OR b=418
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
          OR b=594
          OR a=21
@@ -23082,7 +23082,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=671
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 95 AND 97) AND a!=96)
   ]])
     end, {
@@ -23097,7 +23097,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=671
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR ((a BETWEEN 95 AND 97) AND a!=96)
   ]])
     end, {
@@ -23148,7 +23148,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=806
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR b=275
@@ -23166,7 +23166,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=806
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR b=275
@@ -23184,12 +23184,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=24024
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR b=429
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR b=110
          OR a=39
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.620.1>
@@ -23203,12 +23203,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=24024
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR b=429
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR b=110
          OR a=39
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.620.2>
@@ -23287,7 +23287,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=509
          OR ((a BETWEEN 22 AND 24) AND a!=23)
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR b=718
          OR a=4
          OR ((a BETWEEN 56 AND 58) AND a!=57)
@@ -23307,7 +23307,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=509
          OR ((a BETWEEN 22 AND 24) AND a!=23)
-         OR (g='vutsrqp' AND f GLOB 'nopqr*')
+         OR (g='vutsrqp' AND f LIKE 'nopqr%')
          OR b=718
          OR a=4
          OR ((a BETWEEN 56 AND 58) AND a!=57)
@@ -23325,7 +23325,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=1026
          OR a=93
          OR c=18018
@@ -23341,7 +23341,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=1026
          OR a=93
          OR c=18018
@@ -23422,11 +23422,11 @@ test:do_test(
       WHERE b=990
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR ((a BETWEEN 41 AND 43) AND a!=42)
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
          OR b=531
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR f='qrstuvwxy'
   ]])
     end, {
@@ -23443,11 +23443,11 @@ test:do_test(
       WHERE b=990
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR ((a BETWEEN 41 AND 43) AND a!=42)
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
          OR b=531
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR f='qrstuvwxy'
   ]])
     end, {
@@ -23462,9 +23462,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=60
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR b=627
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR (d>=78.0 AND d<79.0 AND d IS NOT NULL)
          OR b=883
@@ -23484,9 +23484,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=60
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR b=627
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR (d>=78.0 AND d<79.0 AND d IS NOT NULL)
          OR b=883
@@ -23572,13 +23572,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=28
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR b=69
          OR ((a BETWEEN 85 AND 87) AND a!=86)
          OR b=781
          OR a=64
          OR b=91
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR a=16
          OR b=278
          OR a=26
@@ -23595,13 +23595,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=28
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR b=69
          OR ((a BETWEEN 85 AND 87) AND a!=86)
          OR b=781
          OR a=64
          OR b=91
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR a=16
          OR b=278
          OR a=26
@@ -23710,7 +23710,7 @@ test:do_test(
       WHERE f='yzabcdefg'
          OR ((a BETWEEN 48 AND 50) AND a!=49)
          OR a=100
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
          OR a=62
          OR a=67
          OR b=605
@@ -23733,7 +23733,7 @@ test:do_test(
       WHERE f='yzabcdefg'
          OR ((a BETWEEN 48 AND 50) AND a!=49)
          OR a=100
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
          OR a=62
          OR a=67
          OR b=605
@@ -23787,9 +23787,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?stuv*' AND f GLOB 'rstu*')
+      WHERE (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR b=751
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR a=67
          OR b=102
@@ -23805,9 +23805,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?stuv*' AND f GLOB 'rstu*')
+      WHERE (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR b=751
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR a=67
          OR b=102
@@ -23862,14 +23862,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=2002
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR ((a BETWEEN 41 AND 43) AND a!=42)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR b=33
          OR b=817
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -23884,14 +23884,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=2002
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR ((a BETWEEN 41 AND 43) AND a!=42)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR b=33
          OR b=817
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -23905,8 +23905,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='srqponm' AND f GLOB 'cdefg*')
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+      WHERE (g='srqponm' AND f LIKE 'cdefg%')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR a=80
          OR a=53
          OR a=62
@@ -23926,8 +23926,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='srqponm' AND f GLOB 'cdefg*')
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+      WHERE (g='srqponm' AND f LIKE 'cdefg%')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR a=80
          OR a=53
          OR a=62
@@ -23951,7 +23951,7 @@ test:do_test(
          OR b=652
          OR a=72
          OR b=209
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR a=38
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR d>1e10
@@ -23971,7 +23971,7 @@ test:do_test(
          OR b=652
          OR a=72
          OR b=209
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR a=38
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR d>1e10
@@ -24016,11 +24016,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=179
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR b=509
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR f='bcdefghij'
   ]])
     end, {
@@ -24035,11 +24035,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=179
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR b=509
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR (d>=49.0 AND d<50.0 AND d IS NOT NULL)
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR f='bcdefghij'
   ]])
     end, {
@@ -24149,13 +24149,13 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR b=421
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=704
          OR a=90
          OR a=78
          OR 1000000<b
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
   ]])
     end, {
@@ -24171,13 +24171,13 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR b=421
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=704
          OR a=90
          OR a=78
          OR 1000000<b
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
   ]])
     end, {
@@ -24191,7 +24191,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='fedcbaz' AND f GLOB 'pqrst*')
+      WHERE (g='fedcbaz' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 93 AND 95) AND a!=94)
   ]])
     end, {
@@ -24205,7 +24205,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='fedcbaz' AND f GLOB 'pqrst*')
+      WHERE (g='fedcbaz' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 93 AND 95) AND a!=94)
   ]])
     end, {
@@ -24226,7 +24226,7 @@ test:do_test(
          OR ((a BETWEEN 25 AND 27) AND a!=26)
          OR e IS NULL
          OR a=48
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.649.1>
@@ -24246,7 +24246,7 @@ test:do_test(
          OR ((a BETWEEN 25 AND 27) AND a!=26)
          OR e IS NULL
          OR a=48
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.649.2>
@@ -24292,7 +24292,7 @@ test:do_test(
       WHERE b=275
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
          OR f='ijklmnopq'
   ]])
@@ -24310,7 +24310,7 @@ test:do_test(
       WHERE b=275
          OR ((a BETWEEN 57 AND 59) AND a!=58)
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
          OR f='ijklmnopq'
   ]])
@@ -24360,7 +24360,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='zabcdefgh'
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR a=54
          OR b=770
          OR ((a BETWEEN 96 AND 98) AND a!=97)
@@ -24380,7 +24380,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='zabcdefgh'
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR a=54
          OR b=770
          OR ((a BETWEEN 96 AND 98) AND a!=97)
@@ -24446,7 +24446,7 @@ test:do_test(
       WHERE b=223
          OR a=14
          OR ((a BETWEEN 74 AND 76) AND a!=75)
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR b=539
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
@@ -24467,7 +24467,7 @@ test:do_test(
       WHERE b=223
          OR a=14
          OR ((a BETWEEN 74 AND 76) AND a!=75)
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR b=539
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
@@ -24486,7 +24486,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=99
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR a=73
          OR a=56
          OR b=253
@@ -24504,7 +24504,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=99
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR a=73
          OR a=56
          OR b=253
@@ -24524,8 +24524,8 @@ test:do_test(
       WHERE b=927
          OR b=300
          OR b=223
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=154
          OR b=759
   ]])
@@ -24543,8 +24543,8 @@ test:do_test(
       WHERE b=927
          OR b=300
          OR b=223
-         OR (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=154
          OR b=759
   ]])
@@ -24562,7 +24562,7 @@ test:do_test(
       WHERE b=242
          OR b=905
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR (d>=96.0 AND d<97.0 AND d IS NOT NULL)
          OR a=24
          OR ((a BETWEEN 67 AND 69) AND a!=68)
@@ -24584,7 +24584,7 @@ test:do_test(
       WHERE b=242
          OR b=905
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'ijklm*')
+         OR (g='hgfedcb' AND f LIKE 'ijklm%')
          OR (d>=96.0 AND d<97.0 AND d IS NOT NULL)
          OR a=24
          OR ((a BETWEEN 67 AND 69) AND a!=68)
@@ -24606,10 +24606,10 @@ test:do_test(
       WHERE b=190
          OR a=72
          OR b=377
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR (d>=93.0 AND d<94.0 AND d IS NOT NULL)
          OR b=476
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.659.1>
@@ -24625,10 +24625,10 @@ test:do_test(
       WHERE b=190
          OR a=72
          OR b=377
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR (d>=93.0 AND d<94.0 AND d IS NOT NULL)
          OR b=476
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.659.2>
@@ -24644,12 +24644,12 @@ test:do_test(
       WHERE b=245
          OR b=638
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR f='opqrstuvw'
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
          OR b=817
          OR a=85
-         OR (g='lkjihgf' AND f GLOB 'mnopq*')
+         OR (g='lkjihgf' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.660.1>
@@ -24665,12 +24665,12 @@ test:do_test(
       WHERE b=245
          OR b=638
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR f='opqrstuvw'
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
          OR b=817
          OR a=85
-         OR (g='lkjihgf' AND f GLOB 'mnopq*')
+         OR (g='lkjihgf' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.660.2>
@@ -24749,9 +24749,9 @@ test:do_test(
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
          OR c<=10
          OR ((a BETWEEN 75 AND 77) AND a!=76)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=553
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR b=1045
   ]])
     end, {
@@ -24769,9 +24769,9 @@ test:do_test(
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
          OR c<=10
          OR ((a BETWEEN 75 AND 77) AND a!=76)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=553
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR b=1045
   ]])
     end, {
@@ -24788,12 +24788,12 @@ test:do_test(
       WHERE b=440
          OR ((a BETWEEN 3 AND 5) AND a!=4)
          OR ((a BETWEEN 44 AND 46) AND a!=45)
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR a=89
          OR c=18018
          OR b=154
          OR b=506
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR a=78
          OR b=751
   ]])
@@ -24811,12 +24811,12 @@ test:do_test(
       WHERE b=440
          OR ((a BETWEEN 3 AND 5) AND a!=4)
          OR ((a BETWEEN 44 AND 46) AND a!=45)
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR a=89
          OR c=18018
          OR b=154
          OR b=506
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR a=78
          OR b=751
   ]])
@@ -24832,13 +24832,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=407
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR b=209
          OR b=814
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR a=44
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR (d>=99.0 AND d<100.0 AND d IS NOT NULL)
          OR b=1092
   ]])
@@ -24854,13 +24854,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=407
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR b=209
          OR b=814
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR a=44
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR (d>=99.0 AND d<100.0 AND d IS NOT NULL)
          OR b=1092
   ]])
@@ -25002,10 +25002,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=27
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR b=121
          OR ((a BETWEEN 7 AND 9) AND a!=8)
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=67
          OR ((a BETWEEN 30 AND 32) AND a!=31)
          OR c=1001
@@ -25024,10 +25024,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=27
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR b=121
          OR ((a BETWEEN 7 AND 9) AND a!=8)
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=67
          OR ((a BETWEEN 30 AND 32) AND a!=31)
          OR c=1001
@@ -25046,7 +25046,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=99
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
@@ -25063,7 +25063,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=99
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=98.0 AND d<99.0 AND d IS NOT NULL)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
@@ -25083,9 +25083,9 @@ test:do_test(
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
          OR b=355
          OR b=814
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR a=81
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=542
          OR b=795
   ]])
@@ -25104,9 +25104,9 @@ test:do_test(
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
          OR b=355
          OR b=814
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR a=81
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=542
          OR b=795
   ]])
@@ -25124,10 +25124,10 @@ test:do_test(
       WHERE (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR b=363
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR b=619
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR a=73
   ]])
     end, {
@@ -25144,10 +25144,10 @@ test:do_test(
       WHERE (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR b=363
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR ((a BETWEEN 64 AND 66) AND a!=65)
          OR b=619
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
          OR a=73
   ]])
     end, {
@@ -25163,9 +25163,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=935
          OR a=42
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR b=330
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.673.1>
@@ -25180,9 +25180,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=935
          OR a=42
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR b=330
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.673.2>
@@ -25201,7 +25201,7 @@ test:do_test(
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
          OR a=64
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR a=89
   ]])
     end, {
@@ -25221,7 +25221,7 @@ test:do_test(
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
          OR a=64
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR a=89
   ]])
     end, {
@@ -25240,9 +25240,9 @@ test:do_test(
          OR b=663
          OR c=17017
          OR b=561
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=495
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR b=352
          OR ((a BETWEEN 39 AND 41) AND a!=40)
   ]])
@@ -25262,9 +25262,9 @@ test:do_test(
          OR b=663
          OR c=17017
          OR b=561
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR b=495
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR b=352
          OR ((a BETWEEN 39 AND 41) AND a!=40)
   ]])
@@ -25280,7 +25280,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=100.0 AND d<101.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR f='klmnopqrs'
          OR f='lmnopqrst'
   ]])
@@ -25296,7 +25296,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=100.0 AND d<101.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
          OR f='klmnopqrs'
          OR f='lmnopqrst'
   ]])
@@ -25342,16 +25342,16 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=36
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 18 AND 20) AND a!=19)
          OR b=682
          OR ((a BETWEEN 53 AND 55) AND a!=54)
          OR b=91
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR c=12012
          OR b=267
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.678.1>
@@ -25365,16 +25365,16 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=36
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 18 AND 20) AND a!=19)
          OR b=682
          OR ((a BETWEEN 53 AND 55) AND a!=54)
          OR b=91
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR c=12012
          OR b=267
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.678.2>
@@ -25390,12 +25390,12 @@ test:do_test(
       WHERE b=594
          OR f='hijklmnop'
          OR ((a BETWEEN 65 AND 67) AND a!=66)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR b=707
          OR b=363
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=157
-         OR (g='tsrqpon' AND f GLOB 'yzabc*')
+         OR (g='tsrqpon' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.679.1>
@@ -25411,12 +25411,12 @@ test:do_test(
       WHERE b=594
          OR f='hijklmnop'
          OR ((a BETWEEN 65 AND 67) AND a!=66)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR b=707
          OR b=363
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=157
-         OR (g='tsrqpon' AND f GLOB 'yzabc*')
+         OR (g='tsrqpon' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.679.2>
@@ -25473,7 +25473,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='nmlkjih' AND f GLOB 'defgh*')
+      WHERE (g='nmlkjih' AND f LIKE 'defgh%')
          OR b=674
          OR ((a BETWEEN 38 AND 40) AND a!=39)
          OR c=3003
@@ -25492,7 +25492,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='nmlkjih' AND f GLOB 'defgh*')
+      WHERE (g='nmlkjih' AND f LIKE 'defgh%')
          OR b=674
          OR ((a BETWEEN 38 AND 40) AND a!=39)
          OR c=3003
@@ -25554,7 +25554,7 @@ test:do_test(
          OR b=707
          OR f='vwxyzabcd'
          OR b=286
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=693
          OR ((a BETWEEN 6 AND 8) AND a!=7)
   ]])
@@ -25576,7 +25576,7 @@ test:do_test(
          OR b=707
          OR f='vwxyzabcd'
          OR b=286
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=693
          OR ((a BETWEEN 6 AND 8) AND a!=7)
   ]])
@@ -25596,8 +25596,8 @@ test:do_test(
          OR a=52
          OR (d>=64.0 AND d<65.0 AND d IS NOT NULL)
          OR d<0.0
-         OR (g='rqponml' AND f GLOB 'jklmn*')
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR b=168
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR f='uvwxyzabc'
@@ -25619,8 +25619,8 @@ test:do_test(
          OR a=52
          OR (d>=64.0 AND d<65.0 AND d IS NOT NULL)
          OR d<0.0
-         OR (g='rqponml' AND f GLOB 'jklmn*')
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR b=168
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR f='uvwxyzabc'
@@ -25638,12 +25638,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 4 AND 6) AND a!=5)
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR f='rstuvwxyz'
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=14
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
   ]])
@@ -25659,12 +25659,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 4 AND 6) AND a!=5)
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR f='rstuvwxyz'
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR a=14
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
   ]])
@@ -25681,9 +25681,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 13 AND 15) AND a!=14)
          OR ((a BETWEEN 93 AND 95) AND a!=94)
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR f='mnopqrstu'
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR a=38
          OR c=26026
@@ -25701,9 +25701,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 13 AND 15) AND a!=14)
          OR ((a BETWEEN 93 AND 95) AND a!=94)
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR f='mnopqrstu'
-         OR (g='fedcbaz' AND f GLOB 'tuvwx*')
+         OR (g='fedcbaz' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR a=38
          OR c=26026
@@ -25719,11 +25719,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ponmlkj' AND f GLOB 'stuvw*')
+      WHERE (g='ponmlkj' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR a=7
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
   ]])
     end, {
@@ -25737,11 +25737,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ponmlkj' AND f GLOB 'stuvw*')
+      WHERE (g='ponmlkj' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 71 AND 73) AND a!=72)
          OR a=7
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
   ]])
     end, {
@@ -25759,8 +25759,8 @@ test:do_test(
          OR b=938
          OR b=484
          OR b=652
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR f='opqrstuvw'
   ]])
     end, {
@@ -25778,8 +25778,8 @@ test:do_test(
          OR b=938
          OR b=484
          OR b=652
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR f='opqrstuvw'
   ]])
     end, {
@@ -25835,12 +25835,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=25
          OR ((a BETWEEN 43 AND 45) AND a!=44)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR b=443
          OR b=564
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=531
          OR b=1081
          OR a=96
@@ -25858,12 +25858,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=25
          OR ((a BETWEEN 43 AND 45) AND a!=44)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
          OR b=443
          OR b=564
-         OR (g='kjihgfe' AND f GLOB 'rstuv*')
+         OR (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=531
          OR b=1081
          OR a=96
@@ -25880,7 +25880,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=36
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.691.1>
@@ -25894,7 +25894,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=36
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.691.2>
@@ -25907,7 +25907,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'stuvw*')
+      WHERE (g='kjihgfe' AND f LIKE 'stuvw%')
          OR b=531
          OR ((a BETWEEN 93 AND 95) AND a!=94)
          OR (d>=3.0 AND d<4.0 AND d IS NOT NULL)
@@ -25923,7 +25923,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'stuvw*')
+      WHERE (g='kjihgfe' AND f LIKE 'stuvw%')
          OR b=531
          OR ((a BETWEEN 93 AND 95) AND a!=94)
          OR (d>=3.0 AND d<4.0 AND d IS NOT NULL)
@@ -25975,8 +25975,8 @@ test:do_test(
          OR b=718
          OR a=18
          OR a=3
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR c=28028
   ]])
     end, {
@@ -25998,8 +25998,8 @@ test:do_test(
          OR b=718
          OR a=18
          OR a=3
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR c=28028
   ]])
     end, {
@@ -26062,7 +26062,7 @@ test:do_test(
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
          OR ((a BETWEEN 30 AND 32) AND a!=31)
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -26081,7 +26081,7 @@ test:do_test(
          OR (d>=19.0 AND d<20.0 AND d IS NOT NULL)
          OR ((a BETWEEN 30 AND 32) AND a!=31)
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -26095,7 +26095,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='mlkjihg' AND f GLOB 'ijklm*')
+      WHERE (g='mlkjihg' AND f LIKE 'ijklm%')
          OR b=883
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR b=938
@@ -26115,7 +26115,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='mlkjihg' AND f GLOB 'ijklm*')
+      WHERE (g='mlkjihg' AND f LIKE 'ijklm%')
          OR b=883
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR b=938
@@ -26167,7 +26167,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='tsrqpon' AND f GLOB 'abcde*')
+      WHERE (g='tsrqpon' AND f LIKE 'abcde%')
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR ((a BETWEEN 74 AND 76) AND a!=75)
@@ -26185,7 +26185,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='tsrqpon' AND f GLOB 'abcde*')
+      WHERE (g='tsrqpon' AND f LIKE 'abcde%')
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR ((a BETWEEN 74 AND 76) AND a!=75)
@@ -26271,12 +26271,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?abcd*' AND f GLOB 'zabc*')
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
-         OR (g='srqponm' AND f GLOB 'cdefg*')
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+      WHERE (f LIKE '_abcd%' AND f LIKE 'zabc%')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR f='lmnopqrst'
          OR ((a BETWEEN 11 AND 13) AND a!=12)
          OR b=872
@@ -26294,12 +26294,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?abcd*' AND f GLOB 'zabc*')
-         OR (g='srqponm' AND f GLOB 'efghi*')
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
-         OR (g='srqponm' AND f GLOB 'cdefg*')
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+      WHERE (f LIKE '_abcd%' AND f LIKE 'zabc%')
+         OR (g='srqponm' AND f LIKE 'efghi%')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR f='lmnopqrst'
          OR ((a BETWEEN 11 AND 13) AND a!=12)
          OR b=872
@@ -26319,14 +26319,14 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 71 AND 73) AND a!=72)
          OR a=20
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR b=1004
          OR b=77
          OR b=927
          OR a=99
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
   ]])
     end, {
         -- <where7-2.703.1>
@@ -26341,14 +26341,14 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 71 AND 73) AND a!=72)
          OR a=20
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR b=1004
          OR b=77
          OR b=927
          OR a=99
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
   ]])
     end, {
         -- <where7-2.703.2>
@@ -26394,7 +26394,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=572
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.705.1>
@@ -26408,7 +26408,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=572
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.705.2>
@@ -26424,8 +26424,8 @@ test:do_test(
       WHERE (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR ((a BETWEEN 54 AND 56) AND a!=55)
          OR f='lmnopqrst'
-         OR (f GLOB '?lmno*' AND f GLOB 'klmn*')
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (f LIKE '_lmno%' AND f LIKE 'klmn%')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR a=23
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
   ]])
@@ -26443,8 +26443,8 @@ test:do_test(
       WHERE (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR ((a BETWEEN 54 AND 56) AND a!=55)
          OR f='lmnopqrst'
-         OR (f GLOB '?lmno*' AND f GLOB 'klmn*')
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (f LIKE '_lmno%' AND f LIKE 'klmn%')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR a=23
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
   ]])
@@ -26463,13 +26463,13 @@ test:do_test(
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR b=605
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
          OR b=759
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR ((a BETWEEN 38 AND 40) AND a!=39)
          OR a=40
          OR f='ghijklmno'
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.707.1>
@@ -26486,13 +26486,13 @@ test:do_test(
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR b=605
          OR (d>=46.0 AND d<47.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
          OR b=759
-         OR (f GLOB '?zabc*' AND f GLOB 'yzab*')
+         OR (f LIKE '_zabc%' AND f LIKE 'yzab%')
          OR ((a BETWEEN 38 AND 40) AND a!=39)
          OR a=40
          OR f='ghijklmno'
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.707.2>
@@ -26601,7 +26601,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='nmlkjih' AND f GLOB 'efghi*')
+      WHERE (g='nmlkjih' AND f LIKE 'efghi%')
          OR a=34
          OR ((a BETWEEN 6 AND 8) AND a!=7)
          OR (d>=75.0 AND d<76.0 AND d IS NOT NULL)
@@ -26619,7 +26619,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='nmlkjih' AND f GLOB 'efghi*')
+      WHERE (g='nmlkjih' AND f LIKE 'efghi%')
          OR a=34
          OR ((a BETWEEN 6 AND 8) AND a!=7)
          OR (d>=75.0 AND d<76.0 AND d IS NOT NULL)
@@ -26637,16 +26637,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
          OR a=52
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR f='ghijklmno'
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=319
          OR a=34
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR f='hijklmnop'
   ]])
     end, {
@@ -26660,16 +26660,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
          OR a=52
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=24.0 AND d<25.0 AND d IS NOT NULL)
          OR f='ghijklmno'
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=319
          OR a=34
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR f='hijklmnop'
   ]])
     end, {
@@ -26683,7 +26683,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
          OR a=47
@@ -26699,7 +26699,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'pqrst*')
+      WHERE (g='qponmlk' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
          OR a=47
@@ -26781,11 +26781,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE c=31031
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=256
          OR ((a BETWEEN 77 AND 79) AND a!=78)
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=715
          OR b=212
          OR b=99
@@ -26804,11 +26804,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE c=31031
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 66 AND 68) AND a!=67)
          OR b=256
          OR ((a BETWEEN 77 AND 79) AND a!=78)
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=715
          OR b=212
          OR b=99
@@ -26899,7 +26899,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 62 AND 64) AND a!=63)
   ]])
     end, {
@@ -26913,7 +26913,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR ((a BETWEEN 62 AND 64) AND a!=63)
   ]])
     end, {
@@ -26929,11 +26929,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 43 AND 45) AND a!=44)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR a=43
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
          OR b=729
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.720.1>
@@ -26948,11 +26948,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 43 AND 45) AND a!=44)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR a=43
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
          OR b=729
-         OR (g='vutsrqp' AND f GLOB 'opqrs*')
+         OR (g='vutsrqp' AND f LIKE 'opqrs%')
   ]])
     end, {
         -- <where7-2.720.2>
@@ -26972,7 +26972,7 @@ test:do_test(
          OR c=8008
          OR f='opqrstuvw'
          OR ((a BETWEEN 23 AND 25) AND a!=24)
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.721.1>
@@ -26992,7 +26992,7 @@ test:do_test(
          OR c=8008
          OR f='opqrstuvw'
          OR ((a BETWEEN 23 AND 25) AND a!=24)
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.721.2>
@@ -27008,9 +27008,9 @@ test:do_test(
       WHERE ((a BETWEEN 40 AND 42) AND a!=41)
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
          OR c<=10
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR a=35
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=1089
          OR a=73
          OR b=737
@@ -27031,9 +27031,9 @@ test:do_test(
       WHERE ((a BETWEEN 40 AND 42) AND a!=41)
          OR (d>=62.0 AND d<63.0 AND d IS NOT NULL)
          OR c<=10
-         OR (g='srqponm' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR a=35
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=1089
          OR a=73
          OR b=737
@@ -27053,7 +27053,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 0 AND 2) AND a!=1)
          OR (d>=79.0 AND d<80.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=762
          OR ((a BETWEEN 39 AND 41) AND a!=40)
          OR a=80
@@ -27071,7 +27071,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 0 AND 2) AND a!=1)
          OR (d>=79.0 AND d<80.0 AND d IS NOT NULL)
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=762
          OR ((a BETWEEN 39 AND 41) AND a!=40)
          OR a=80
@@ -27092,10 +27092,10 @@ test:do_test(
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR b=979
          OR a=36
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR a=55
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.724.1>
@@ -27113,10 +27113,10 @@ test:do_test(
          OR ((a BETWEEN 80 AND 82) AND a!=81)
          OR b=979
          OR a=36
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
          OR a=55
-         OR (g='fedcbaz' AND f GLOB 'rstuv*')
+         OR (g='fedcbaz' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.724.2>
@@ -27131,8 +27131,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=75
          OR a=61
-         OR (g='onmlkji' AND f GLOB 'abcde*')
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.725.1>
@@ -27147,8 +27147,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=75
          OR a=61
-         OR (g='onmlkji' AND f GLOB 'abcde*')
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.725.2>
@@ -27162,7 +27162,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=1004
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
          OR a=56
   ]])
@@ -27178,7 +27178,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=1004
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
          OR a=56
   ]])
@@ -27194,13 +27194,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=93
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR a=83
          OR b=828
          OR b=454
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR b=924
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
          OR a=50
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
   ]])
@@ -27216,13 +27216,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=93
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR a=83
          OR b=828
          OR b=454
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR b=924
-         OR (g='lkjihgf' AND f GLOB 'opqrs*')
+         OR (g='lkjihgf' AND f LIKE 'opqrs%')
          OR a=50
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
   ]])
@@ -27269,7 +27269,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=55
          OR a=65
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
   ]])
     end, {
         -- <where7-2.729.1>
@@ -27284,7 +27284,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=55
          OR a=65
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
   ]])
     end, {
         -- <where7-2.729.2>
@@ -27300,7 +27300,7 @@ test:do_test(
       WHERE ((a BETWEEN 72 AND 74) AND a!=73)
          OR b=605
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 72 AND 74) AND a!=73)
          OR f='ijklmnopq'
          OR ((a BETWEEN 86 AND 88) AND a!=87)
@@ -27322,7 +27322,7 @@ test:do_test(
       WHERE ((a BETWEEN 72 AND 74) AND a!=73)
          OR b=605
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 72 AND 74) AND a!=73)
          OR f='ijklmnopq'
          OR ((a BETWEEN 86 AND 88) AND a!=87)
@@ -27342,7 +27342,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=476
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR b=982
          OR a=43
          OR b=355
@@ -27359,7 +27359,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=476
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR b=982
          OR a=43
          OR b=355
@@ -27377,8 +27377,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=85
          OR b=718
-         OR (g='fedcbaz' AND f GLOB 'pqrst*')
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (g='fedcbaz' AND f LIKE 'pqrst%')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -27394,8 +27394,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=85
          OR b=718
-         OR (g='fedcbaz' AND f GLOB 'pqrst*')
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (g='fedcbaz' AND f LIKE 'pqrst%')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -27515,12 +27515,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?rstu*' AND f GLOB 'qrst*')
+      WHERE (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR b=465
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR a=37
          OR b=1056
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR (d>=4.0 AND d<5.0 AND d IS NOT NULL)
          OR b=1023
   ]])
@@ -27535,12 +27535,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?rstu*' AND f GLOB 'qrst*')
+      WHERE (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR b=465
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR a=37
          OR b=1056
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR (d>=4.0 AND d<5.0 AND d IS NOT NULL)
          OR b=1023
   ]])
@@ -27557,7 +27557,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=76
          OR a=8
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR b=495
          OR b=663
          OR a=98
@@ -27576,7 +27576,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=76
          OR a=8
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
          OR b=495
          OR b=663
          OR a=98
@@ -27595,7 +27595,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1081
          OR b=542
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR b=828
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
@@ -27615,7 +27615,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1081
          OR b=542
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR b=828
          OR (d>=67.0 AND d<68.0 AND d IS NOT NULL)
@@ -27745,9 +27745,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=880
          OR b=696
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR b=308
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 96 AND 98) AND a!=97)
   ]])
     end, {
@@ -27763,9 +27763,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=880
          OR b=696
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR b=308
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 96 AND 98) AND a!=97)
   ]])
     end, {
@@ -27779,7 +27779,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR a=24
          OR f IS NULL
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
@@ -27798,7 +27798,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR a=24
          OR f IS NULL
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
@@ -27819,7 +27819,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=94
          OR (d>=74.0 AND d<75.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR b=792
          OR a=77
          OR a=26
@@ -27839,7 +27839,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=94
          OR (d>=74.0 AND d<75.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR b=792
          OR a=77
          OR a=26
@@ -27935,11 +27935,11 @@ test:do_test(
          OR c=19019
          OR a=42
          OR b=938
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR ((a BETWEEN 22 AND 24) AND a!=23)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.747.1>
@@ -27958,11 +27958,11 @@ test:do_test(
          OR c=19019
          OR a=42
          OR b=938
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
          OR ((a BETWEEN 22 AND 24) AND a!=23)
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
   ]])
     end, {
         -- <where7-2.747.2>
@@ -27977,7 +27977,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=179
          OR a=50
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.748.1>
@@ -27992,7 +27992,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=179
          OR a=50
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
   ]])
     end, {
         -- <where7-2.748.2>
@@ -28005,12 +28005,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='vutsrqp' AND f GLOB 'rstuv*')
+      WHERE (g='vutsrqp' AND f LIKE 'rstuv%')
          OR f='xyzabcdef'
          OR ((a BETWEEN 49 AND 51) AND a!=50)
          OR b=575
          OR b=385
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR a=46
          OR b=220
@@ -28027,12 +28027,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='vutsrqp' AND f GLOB 'rstuv*')
+      WHERE (g='vutsrqp' AND f LIKE 'rstuv%')
          OR f='xyzabcdef'
          OR ((a BETWEEN 49 AND 51) AND a!=50)
          OR b=575
          OR b=385
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 63 AND 65) AND a!=64)
          OR a=46
          OR b=220
@@ -28055,7 +28055,7 @@ test:do_test(
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
          OR c=31031
          OR b=869
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=245
          OR a=92
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
@@ -28078,7 +28078,7 @@ test:do_test(
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
          OR c=31031
          OR b=869
-         OR (g='jihgfed' AND f GLOB 'zabcd*')
+         OR (g='jihgfed' AND f LIKE 'zabcd%')
          OR b=245
          OR a=92
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
@@ -28099,8 +28099,8 @@ test:do_test(
          OR c=28028
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR ((a BETWEEN 17 AND 19) AND a!=18)
          OR c=9009
          OR a=17
@@ -28121,8 +28121,8 @@ test:do_test(
          OR c=28028
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
-         OR (g='mlkjihg' AND f GLOB 'jklmn*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
+         OR (g='mlkjihg' AND f LIKE 'jklmn%')
          OR ((a BETWEEN 17 AND 19) AND a!=18)
          OR c=9009
          OR a=17
@@ -28141,7 +28141,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=57.0 AND d<58.0 AND d IS NOT NULL)
          OR b=762
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR f='tuvwxyzab'
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
@@ -28161,7 +28161,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=57.0 AND d<58.0 AND d IS NOT NULL)
          OR b=762
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR f='tuvwxyzab'
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
@@ -28219,7 +28219,7 @@ test:do_test(
          OR a=14
          OR c=16016
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR f='jklmnopqr'
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
          OR (d>=96.0 AND d<97.0 AND d IS NOT NULL)
@@ -28240,7 +28240,7 @@ test:do_test(
          OR a=14
          OR c=16016
          OR (d>=21.0 AND d<22.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR f='jklmnopqr'
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
          OR (d>=96.0 AND d<97.0 AND d IS NOT NULL)
@@ -28258,12 +28258,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=949
-         OR (g='srqponm' AND f GLOB 'cdefg*')
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR c<=10
          OR a=14
          OR b=608
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
          OR b=121
          OR b=333
@@ -28281,12 +28281,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=949
-         OR (g='srqponm' AND f GLOB 'cdefg*')
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
          OR c<=10
          OR a=14
          OR b=608
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
          OR b=121
          OR b=333
@@ -28303,7 +28303,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=355
          OR b=627
          OR b=1001
@@ -28321,7 +28321,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'rstuv*')
+      WHERE (g='kjihgfe' AND f LIKE 'rstuv%')
          OR b=355
          OR b=627
          OR b=1001
@@ -28339,7 +28339,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'efghi*')
+      WHERE (g='xwvutsr' AND f LIKE 'efghi%')
          OR (d>=79.0 AND d<80.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -28353,7 +28353,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'efghi*')
+      WHERE (g='xwvutsr' AND f LIKE 'efghi%')
          OR (d>=79.0 AND d<80.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -28370,11 +28370,11 @@ test:do_test(
       WHERE b=685
          OR a=14
          OR b=990
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR f='efghijklm'
          OR c=1001
          OR b=784
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -28391,11 +28391,11 @@ test:do_test(
       WHERE b=685
          OR a=14
          OR b=990
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR f='efghijklm'
          OR c=1001
          OR b=784
-         OR (g='srqponm' AND f GLOB 'ghijk*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -28410,7 +28410,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=54
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR c=26026
          OR ((a BETWEEN 97 AND 99) AND a!=98)
   ]])
@@ -28426,7 +28426,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=54
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR c=26026
          OR ((a BETWEEN 97 AND 99) AND a!=98)
   ]])
@@ -28441,13 +28441,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'ghijk*')
+      WHERE (g='hgfedcb' AND f LIKE 'ghijk%')
          OR c=24024
          OR a=98
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR a=5
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR f='pqrstuvwx'
          OR f='bcdefghij'
          OR b=1001
@@ -28464,13 +28464,13 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'ghijk*')
+      WHERE (g='hgfedcb' AND f LIKE 'ghijk%')
          OR c=24024
          OR a=98
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR a=5
          OR ((a BETWEEN 31 AND 33) AND a!=32)
-         OR (g='rqponml' AND f GLOB 'klmno*')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR f='pqrstuvwx'
          OR f='bcdefghij'
          OR b=1001
@@ -28488,11 +28488,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=781
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR (d>=99.0 AND d<100.0 AND d IS NOT NULL)
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR f='lmnopqrst'
          OR a=39
          OR a=100
@@ -28510,11 +28510,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=781
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR (d>=99.0 AND d<100.0 AND d IS NOT NULL)
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR f='lmnopqrst'
          OR a=39
          OR a=100
@@ -28533,11 +28533,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE c=4004
          OR b=718
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR a=50
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
          OR b=363
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
          OR b=1023
   ]])
     end, {
@@ -28553,11 +28553,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE c=4004
          OR b=718
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR a=50
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
          OR b=363
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
          OR b=1023
   ]])
     end, {
@@ -28576,8 +28576,8 @@ test:do_test(
          OR b=473
          OR ((a BETWEEN 43 AND 45) AND a!=44)
          OR b=586
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
   ]])
     end, {
         -- <where7-2.763.1>
@@ -28595,8 +28595,8 @@ test:do_test(
          OR b=473
          OR ((a BETWEEN 43 AND 45) AND a!=44)
          OR b=586
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
-         OR (f GLOB '?vwxy*' AND f GLOB 'uvwx*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
+         OR (f LIKE '_vwxy%' AND f LIKE 'uvwx%')
   ]])
     end, {
         -- <where7-2.763.2>
@@ -28609,7 +28609,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+      WHERE (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR (d>=58.0 AND d<59.0 AND d IS NOT NULL)
          OR (d>=13.0 AND d<14.0 AND d IS NOT NULL)
   ]])
@@ -28624,7 +28624,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+      WHERE (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR (d>=58.0 AND d<59.0 AND d IS NOT NULL)
          OR (d>=13.0 AND d<14.0 AND d IS NOT NULL)
   ]])
@@ -28639,11 +28639,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR ((a BETWEEN 76 AND 78) AND a!=77)
          OR a=47
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
          OR (d>=84.0 AND d<85.0 AND d IS NOT NULL)
          OR f='lmnopqrst'
   ]])
@@ -28658,11 +28658,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR ((a BETWEEN 76 AND 78) AND a!=77)
          OR a=47
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
-         OR (g='lkjihgf' AND f GLOB 'lmnop*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
+         OR (g='lkjihgf' AND f LIKE 'lmnop%')
          OR (d>=84.0 AND d<85.0 AND d IS NOT NULL)
          OR f='lmnopqrst'
   ]])
@@ -28680,7 +28680,7 @@ test:do_test(
       WHERE c>=34035
          OR a=29
          OR ((a BETWEEN 19 AND 21) AND a!=20)
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR f='abcdefghi'
          OR b=993
          OR ((a BETWEEN 52 AND 54) AND a!=53)
@@ -28700,7 +28700,7 @@ test:do_test(
       WHERE c>=34035
          OR a=29
          OR ((a BETWEEN 19 AND 21) AND a!=20)
-         OR (f GLOB '?wxyz*' AND f GLOB 'vwxy*')
+         OR (f LIKE '_wxyz%' AND f LIKE 'vwxy%')
          OR f='abcdefghi'
          OR b=993
          OR ((a BETWEEN 52 AND 54) AND a!=53)
@@ -28878,7 +28878,7 @@ test:do_test(
       WHERE ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=1045
          OR c=27027
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
   ]])
     end, {
         -- <where7-2.771.1>
@@ -28894,7 +28894,7 @@ test:do_test(
       WHERE ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=1045
          OR c=27027
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
   ]])
     end, {
         -- <where7-2.771.2>
@@ -28910,7 +28910,7 @@ test:do_test(
       WHERE a=87
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR b=487
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.772.1>
@@ -28926,7 +28926,7 @@ test:do_test(
       WHERE a=87
          OR (d>=47.0 AND d<48.0 AND d IS NOT NULL)
          OR b=487
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
   ]])
     end, {
         -- <where7-2.772.2>
@@ -29018,10 +29018,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=220
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=363
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR ((a BETWEEN 10 AND 12) AND a!=11)
   ]])
@@ -29037,10 +29037,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=220
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=363
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'defgh*')
+         OR (g='nmlkjih' AND f LIKE 'defgh%')
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR ((a BETWEEN 10 AND 12) AND a!=11)
   ]])
@@ -29096,8 +29096,8 @@ test:do_test(
       WHERE b=1059
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR b=960
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=894
          OR c=2002
   ]])
@@ -29115,8 +29115,8 @@ test:do_test(
       WHERE b=1059
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR b=960
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR b=894
          OR c=2002
   ]])
@@ -29132,7 +29132,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=14
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.778.1>
@@ -29146,7 +29146,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=14
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.778.2>
@@ -29160,7 +29160,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=806
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR b=795
          OR ((a BETWEEN 99 AND 101) AND a!=100)
          OR ((a BETWEEN 21 AND 23) AND a!=22)
@@ -29180,7 +29180,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=806
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
          OR b=795
          OR ((a BETWEEN 99 AND 101) AND a!=100)
          OR ((a BETWEEN 21 AND 23) AND a!=22)
@@ -29200,7 +29200,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=726
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR f='abcdefghi'
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
@@ -29218,7 +29218,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=726
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR f='abcdefghi'
          OR (d>=92.0 AND d<93.0 AND d IS NOT NULL)
@@ -29238,7 +29238,7 @@ test:do_test(
       WHERE a=59
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR b=1081
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.781.1>
@@ -29254,7 +29254,7 @@ test:do_test(
       WHERE a=59
          OR ((a BETWEEN 5 AND 7) AND a!=6)
          OR b=1081
-         OR (g='fedcbaz' AND f GLOB 'stuvw*')
+         OR (g='fedcbaz' AND f LIKE 'stuvw%')
   ]])
     end, {
         -- <where7-2.781.2>
@@ -29267,15 +29267,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'nopqr*')
+      WHERE (g='qponmlk' AND f LIKE 'nopqr%')
          OR b=1037
          OR b=132
          OR c=1001
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR (d>=58.0 AND d<59.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=32
   ]])
     end, {
@@ -29289,15 +29289,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'nopqr*')
+      WHERE (g='qponmlk' AND f LIKE 'nopqr%')
          OR b=1037
          OR b=132
          OR c=1001
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR (d>=58.0 AND d<59.0 AND d IS NOT NULL)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=32
   ]])
     end, {
@@ -29355,7 +29355,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='mlkjihg' AND f GLOB 'jklmn*')
+      WHERE (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=1001
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR a=83
@@ -29371,7 +29371,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='mlkjihg' AND f GLOB 'jklmn*')
+      WHERE (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=1001
          OR ((a BETWEEN 23 AND 25) AND a!=24)
          OR a=83
@@ -29389,13 +29389,13 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR b=36
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR ((a BETWEEN 46 AND 48) AND a!=47)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR ((a BETWEEN 26 AND 28) AND a!=27)
   ]])
@@ -29412,13 +29412,13 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR b=36
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR ((a BETWEEN 46 AND 48) AND a!=47)
          OR ((a BETWEEN 31 AND 33) AND a!=32)
          OR (d>=91.0 AND d<92.0 AND d IS NOT NULL)
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR ((a BETWEEN 26 AND 28) AND a!=27)
   ]])
@@ -29434,7 +29434,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=69
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR a=98
          OR b=300
@@ -29456,7 +29456,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=69
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR ((a BETWEEN 58 AND 60) AND a!=59)
          OR a=98
          OR b=300
@@ -29480,8 +29480,8 @@ test:do_test(
       WHERE ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
          OR ((a BETWEEN 94 AND 96) AND a!=95)
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR b=619
          OR c=6006
@@ -29503,8 +29503,8 @@ test:do_test(
       WHERE ((a BETWEEN 68 AND 70) AND a!=69)
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
          OR ((a BETWEEN 94 AND 96) AND a!=95)
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 22 AND 24) AND a!=23)
          OR b=619
          OR c=6006
@@ -29525,7 +29525,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 9 AND 11) AND a!=10)
          OR a=55
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.788.1>
@@ -29540,7 +29540,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 9 AND 11) AND a!=10)
          OR a=55
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.788.2>
@@ -29558,7 +29558,7 @@ test:do_test(
          OR b=201
          OR a=7
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR b=957
   ]])
     end, {
@@ -29577,7 +29577,7 @@ test:do_test(
          OR b=201
          OR a=7
          OR (d>=26.0 AND d<27.0 AND d IS NOT NULL)
-         OR (g='yxwvuts' AND f GLOB 'cdefg*')
+         OR (g='yxwvuts' AND f LIKE 'cdefg%')
          OR b=957
   ]])
     end, {
@@ -29593,10 +29593,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 90 AND 92) AND a!=91)
          OR a=74
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 95 AND 97) AND a!=96)
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR a=89
   ]])
     end, {
@@ -29612,10 +29612,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 90 AND 92) AND a!=91)
          OR a=74
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
          OR ((a BETWEEN 95 AND 97) AND a!=96)
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
-         OR (f GLOB '?tuvw*' AND f GLOB 'stuv*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
+         OR (f LIKE '_tuvw%' AND f LIKE 'stuv%')
          OR a=89
   ]])
     end, {
@@ -29636,7 +29636,7 @@ test:do_test(
          OR b=495
          OR b=564
          OR b=289
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.791.1>
@@ -29656,7 +29656,7 @@ test:do_test(
          OR b=495
          OR b=564
          OR b=289
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
   ]])
     end, {
         -- <where7-2.791.2>
@@ -29669,7 +29669,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'wxyza*')
+      WHERE (g='utsrqpo' AND f LIKE 'wxyza%')
          OR a=69
          OR a=12
          OR b=718
@@ -29686,7 +29686,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'wxyza*')
+      WHERE (g='utsrqpo' AND f LIKE 'wxyza%')
          OR a=69
          OR a=12
          OR b=718
@@ -29703,7 +29703,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR f='klmnopqrs'
          OR b=674
          OR a=96
@@ -29712,7 +29712,7 @@ test:do_test(
          OR b=707
          OR f='cdefghijk'
          OR a=91
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.793.1>
@@ -29725,7 +29725,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='tsrqpon' AND f GLOB 'zabcd*')
+      WHERE (g='tsrqpon' AND f LIKE 'zabcd%')
          OR f='klmnopqrs'
          OR b=674
          OR a=96
@@ -29734,7 +29734,7 @@ test:do_test(
          OR b=707
          OR f='cdefghijk'
          OR a=91
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.793.2>
@@ -29747,12 +29747,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?klmn*' AND f GLOB 'jklm*')
+      WHERE (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR b=564
          OR b=784
          OR b=418
          OR b=275
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR a=58
          OR c=11011
          OR b=660
@@ -29768,12 +29768,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?klmn*' AND f GLOB 'jklm*')
+      WHERE (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR b=564
          OR b=784
          OR b=418
          OR b=275
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
          OR a=58
          OR c=11011
          OR b=660
@@ -29794,7 +29794,7 @@ test:do_test(
          OR b=1004
          OR ((a BETWEEN 28 AND 30) AND a!=29)
          OR ((a BETWEEN 57 AND 59) AND a!=58)
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR f='pqrstuvwx'
   ]])
     end, {
@@ -29813,7 +29813,7 @@ test:do_test(
          OR b=1004
          OR ((a BETWEEN 28 AND 30) AND a!=29)
          OR ((a BETWEEN 57 AND 59) AND a!=58)
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR f='pqrstuvwx'
   ]])
     end, {
@@ -29886,7 +29886,7 @@ test:do_test(
       WHERE a=19
          OR a=29
          OR b=476
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR b=91
   ]])
     end, {
@@ -29903,7 +29903,7 @@ test:do_test(
       WHERE a=19
          OR a=29
          OR b=476
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR b=91
   ]])
     end, {
@@ -29954,8 +29954,8 @@ test:do_test(
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=44
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR b=707
          OR b=322
   ]])
@@ -29975,8 +29975,8 @@ test:do_test(
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR ((a BETWEEN 32 AND 34) AND a!=33)
          OR b=44
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR b=707
          OR b=322
   ]])
@@ -29991,8 +29991,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR f='jklmnopqr'
   ]])
@@ -30007,8 +30007,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?efgh*' AND f GLOB 'defg*')
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (f LIKE '_efgh%' AND f LIKE 'defg%')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR (d>=89.0 AND d<90.0 AND d IS NOT NULL)
          OR f='jklmnopqr'
   ]])
@@ -30024,14 +30024,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=946
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR a=47
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR (d>=93.0 AND d<94.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR b=80
          OR ((a BETWEEN 60 AND 62) AND a!=61)
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.802.1>
@@ -30045,14 +30045,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=946
-         OR (g='ihgfedc' AND f GLOB 'abcde*')
+         OR (g='ihgfedc' AND f LIKE 'abcde%')
          OR a=47
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR (d>=93.0 AND d<94.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
          OR b=80
          OR ((a BETWEEN 60 AND 62) AND a!=61)
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
   ]])
     end, {
         -- <where7-2.802.2>
@@ -30069,10 +30069,10 @@ test:do_test(
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR b=1015
          OR a=57
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR ((a BETWEEN 47 AND 49) AND a!=48)
          OR ((a BETWEEN 98 AND 100) AND a!=99)
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
          OR (d>=4.0 AND d<5.0 AND d IS NOT NULL)
          OR b=165
   ]])
@@ -30091,10 +30091,10 @@ test:do_test(
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
          OR b=1015
          OR a=57
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR ((a BETWEEN 47 AND 49) AND a!=48)
          OR ((a BETWEEN 98 AND 100) AND a!=99)
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
          OR (d>=4.0 AND d<5.0 AND d IS NOT NULL)
          OR b=165
   ]])
@@ -30113,7 +30113,7 @@ test:do_test(
          OR a=73
          OR b=1048
          OR c>=34035
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR a=72
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR b=638
@@ -30133,7 +30133,7 @@ test:do_test(
          OR a=73
          OR b=1048
          OR c>=34035
-         OR (g='ihgfedc' AND f GLOB 'cdefg*')
+         OR (g='ihgfedc' AND f LIKE 'cdefg%')
          OR a=72
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR b=638
@@ -30181,10 +30181,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=50
          OR ((a BETWEEN 61 AND 63) AND a!=62)
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR a=32
          OR ((a BETWEEN 93 AND 95) AND a!=94)
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR a=14
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR b=946
@@ -30204,10 +30204,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=50
          OR ((a BETWEEN 61 AND 63) AND a!=62)
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR a=32
          OR ((a BETWEEN 93 AND 95) AND a!=94)
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR a=14
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR b=946
@@ -30228,7 +30228,7 @@ test:do_test(
       WHERE ((a BETWEEN 88 AND 90) AND a!=89)
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.807.1>
@@ -30244,7 +30244,7 @@ test:do_test(
       WHERE ((a BETWEEN 88 AND 90) AND a!=89)
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.807.2>
@@ -30259,7 +30259,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=6
          OR f='tuvwxyzab'
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR b=286
          OR b=781
   ]])
@@ -30276,7 +30276,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=6
          OR f='tuvwxyzab'
-         OR (g='mlkjihg' AND f GLOB 'hijkl*')
+         OR (g='mlkjihg' AND f LIKE 'hijkl%')
          OR b=286
          OR b=781
   ]])
@@ -30291,12 +30291,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
          OR ((a BETWEEN 79 AND 81) AND a!=80)
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR f='vwxyzabcd'
          OR b=275
   ]])
@@ -30311,12 +30311,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
          OR ((a BETWEEN 79 AND 81) AND a!=80)
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR f='vwxyzabcd'
          OR b=275
   ]])
@@ -30332,10 +30332,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=30.0 AND d<31.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR (d>=64.0 AND d<65.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR a=59
   ]])
     end, {
@@ -30350,10 +30350,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=30.0 AND d<31.0 AND d IS NOT NULL)
-         OR (g='xwvutsr' AND f GLOB 'efghi*')
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='xwvutsr' AND f LIKE 'efghi%')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR (d>=64.0 AND d<65.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'nopqr*')
+         OR (g='gfedcba' AND f LIKE 'nopqr%')
          OR a=59
   ]])
     end, {
@@ -30367,10 +30367,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+      WHERE (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR b=663
          OR f='ghijklmno'
          OR ((a BETWEEN 14 AND 16) AND a!=15)
@@ -30390,10 +30390,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+      WHERE (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR ((a BETWEEN 8 AND 10) AND a!=9)
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR b=663
          OR f='ghijklmno'
          OR ((a BETWEEN 14 AND 16) AND a!=15)
@@ -30420,9 +30420,9 @@ test:do_test(
          OR b=597
          OR ((a BETWEEN 92 AND 94) AND a!=93)
          OR (d>=88.0 AND d<89.0 AND d IS NOT NULL)
-         OR (f GLOB '?lmno*' AND f GLOB 'klmn*')
+         OR (f LIKE '_lmno%' AND f LIKE 'klmn%')
          OR b=168
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.812.1>
@@ -30442,9 +30442,9 @@ test:do_test(
          OR b=597
          OR ((a BETWEEN 92 AND 94) AND a!=93)
          OR (d>=88.0 AND d<89.0 AND d IS NOT NULL)
-         OR (f GLOB '?lmno*' AND f GLOB 'klmn*')
+         OR (f LIKE '_lmno%' AND f LIKE 'klmn%')
          OR b=168
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.812.2>
@@ -30498,7 +30498,7 @@ test:do_test(
          OR a=75
          OR b=179
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
          OR b=850
          OR a=62
@@ -30519,7 +30519,7 @@ test:do_test(
          OR a=75
          OR b=179
          OR (d>=43.0 AND d<44.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'stuvw*')
+         OR (g='utsrqpo' AND f LIKE 'stuvw%')
          OR (d>=65.0 AND d<66.0 AND d IS NOT NULL)
          OR b=850
          OR a=62
@@ -30583,7 +30583,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=176
          OR b=297
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR f='ijklmnopq'
   ]])
     end, {
@@ -30599,7 +30599,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=176
          OR b=297
-         OR (g='tsrqpon' AND f GLOB 'zabcd*')
+         OR (g='tsrqpon' AND f LIKE 'zabcd%')
          OR f='ijklmnopq'
   ]])
     end, {
@@ -30653,9 +30653,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR b=396
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=1012
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR b=784
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR b=979
@@ -30676,9 +30676,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR b=396
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR b=1012
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR b=784
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
          OR b=979
@@ -30726,9 +30726,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 79 AND 81) AND a!=80)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR ((a BETWEEN 23 AND 25) AND a!=24)
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
   ]])
     end, {
         -- <where7-2.820.1>
@@ -30742,9 +30742,9 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 79 AND 81) AND a!=80)
-         OR (f GLOB '?rstu*' AND f GLOB 'qrst*')
+         OR (f LIKE '_rstu%' AND f LIKE 'qrst%')
          OR ((a BETWEEN 23 AND 25) AND a!=24)
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
   ]])
     end, {
         -- <where7-2.820.2>
@@ -30830,7 +30830,7 @@ test:do_test(
          OR c=19019
          OR b=245
          OR ((a BETWEEN 97 AND 99) AND a!=98)
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR b=572
          OR ((a BETWEEN 22 AND 24) AND a!=23)
@@ -30853,7 +30853,7 @@ test:do_test(
          OR c=19019
          OR b=245
          OR ((a BETWEEN 97 AND 99) AND a!=98)
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR b=572
          OR ((a BETWEEN 22 AND 24) AND a!=23)
@@ -30915,7 +30915,7 @@ test:do_test(
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR b=828
          OR b=363
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.825.1>
@@ -30934,7 +30934,7 @@ test:do_test(
          OR (d>=40.0 AND d<41.0 AND d IS NOT NULL)
          OR b=828
          OR b=363
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
   ]])
     end, {
         -- <where7-2.825.2>
@@ -30947,7 +30947,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='gfedcba' AND f GLOB 'lmnop*')
+      WHERE (g='gfedcba' AND f LIKE 'lmnop%')
          OR a=41
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
          OR b=825
@@ -30963,7 +30963,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='gfedcba' AND f GLOB 'lmnop*')
+      WHERE (g='gfedcba' AND f LIKE 'lmnop%')
          OR a=41
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
          OR b=825
@@ -30986,7 +30986,7 @@ test:do_test(
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR b=561
          OR c=8008
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR b=935
          OR c=1001
   ]])
@@ -31008,7 +31008,7 @@ test:do_test(
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR b=561
          OR c=8008
-         OR (g='hgfedcb' AND f GLOB 'ghijk*')
+         OR (g='hgfedcb' AND f LIKE 'ghijk%')
          OR b=935
          OR c=1001
   ]])
@@ -31024,7 +31024,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 75 AND 77) AND a!=76)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.828.1>
@@ -31038,7 +31038,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 75 AND 77) AND a!=76)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.828.2>
@@ -31114,9 +31114,9 @@ test:do_test(
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR f='zabcdefgh'
          OR b=861
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR a=28
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=311
   ]])
     end, {
@@ -31137,9 +31137,9 @@ test:do_test(
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR f='zabcdefgh'
          OR b=861
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
          OR a=28
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=311
   ]])
     end, {
@@ -31154,10 +31154,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=575
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
          OR b=418
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR b=792
          OR b=861
          OR b=220
@@ -31175,10 +31175,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=575
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
          OR b=418
-         OR (f GLOB '?qrst*' AND f GLOB 'pqrs*')
+         OR (f LIKE '_qrst%' AND f LIKE 'pqrs%')
          OR b=792
          OR b=861
          OR b=220
@@ -31233,7 +31233,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'qrstu*')
+      WHERE (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=693
          OR a=73
          OR b=627
@@ -31243,7 +31243,7 @@ test:do_test(
          OR b=267
          OR b=872
          OR a=27
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.834.1>
@@ -31256,7 +31256,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'qrstu*')
+      WHERE (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=693
          OR a=73
          OR b=627
@@ -31266,7 +31266,7 @@ test:do_test(
          OR b=267
          OR b=872
          OR a=27
-         OR (g='gfedcba' AND f GLOB 'klmno*')
+         OR (g='gfedcba' AND f LIKE 'klmno%')
   ]])
     end, {
         -- <where7-2.834.2>
@@ -31351,15 +31351,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=66
          OR b=322
          OR b=465
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
          OR ((a BETWEEN 77 AND 79) AND a!=78)
-         OR (g='lkjihgf' AND f GLOB 'mnopq*')
+         OR (g='lkjihgf' AND f LIKE 'mnopq%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR b=454
   ]])
@@ -31374,15 +31374,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ponmlkj' AND f GLOB 'uvwxy*')
+      WHERE (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR b=66
          OR b=322
          OR b=465
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR (d>=7.0 AND d<8.0 AND d IS NOT NULL)
          OR ((a BETWEEN 77 AND 79) AND a!=78)
-         OR (g='lkjihgf' AND f GLOB 'mnopq*')
+         OR (g='lkjihgf' AND f LIKE 'mnopq%')
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR b=454
   ]])
@@ -31402,7 +31402,7 @@ test:do_test(
          OR c=15015
          OR (d>=84.0 AND d<85.0 AND d IS NOT NULL)
          OR ((a BETWEEN 3 AND 5) AND a!=4)
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR b=803
   ]])
     end, {
@@ -31421,7 +31421,7 @@ test:do_test(
          OR c=15015
          OR (d>=84.0 AND d<85.0 AND d IS NOT NULL)
          OR ((a BETWEEN 3 AND 5) AND a!=4)
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR b=803
   ]])
     end, {
@@ -31436,12 +31436,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=1100
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 72 AND 74) AND a!=73)
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR a=75
          OR a=45
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR a=27
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR b=850
@@ -31459,12 +31459,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=1100
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 72 AND 74) AND a!=73)
          OR ((a BETWEEN 68 AND 70) AND a!=69)
          OR a=75
          OR a=45
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR a=27
          OR (d>=77.0 AND d<78.0 AND d IS NOT NULL)
          OR b=850
@@ -31484,7 +31484,7 @@ test:do_test(
       WHERE b=751
          OR ((a BETWEEN 96 AND 98) AND a!=97)
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR a=89
          OR ((a BETWEEN 36 AND 38) AND a!=37)
@@ -31503,7 +31503,7 @@ test:do_test(
       WHERE b=751
          OR ((a BETWEEN 96 AND 98) AND a!=97)
          OR (d>=71.0 AND d<72.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR a=89
          OR ((a BETWEEN 36 AND 38) AND a!=37)
@@ -31519,10 +31519,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+      WHERE (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR a=1
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.841.1>
@@ -31535,10 +31535,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='wvutsrq' AND f GLOB 'jklmn*')
-         OR (g='yxwvuts' AND f GLOB 'bcdef*')
+      WHERE (g='wvutsrq' AND f LIKE 'jklmn%')
+         OR (g='yxwvuts' AND f LIKE 'bcdef%')
          OR a=1
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
   ]])
     end, {
         -- <where7-2.841.2>
@@ -31557,9 +31557,9 @@ test:do_test(
          OR c=8008
          OR ((a BETWEEN 41 AND 43) AND a!=42)
          OR b=960
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
          OR b=443
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.842.1>
@@ -31578,9 +31578,9 @@ test:do_test(
          OR c=8008
          OR ((a BETWEEN 41 AND 43) AND a!=42)
          OR b=960
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
          OR b=443
-         OR (g='rqponml' AND f GLOB 'ijklm*')
+         OR (g='rqponml' AND f LIKE 'ijklm%')
   ]])
     end, {
         -- <where7-2.842.2>
@@ -31624,14 +31624,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=685
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR b=520
          OR (d>=76.0 AND d<77.0 AND d IS NOT NULL)
          OR a=53
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR b=938
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR c=25025
   ]])
     end, {
@@ -31646,14 +31646,14 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=685
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR (d>=63.0 AND d<64.0 AND d IS NOT NULL)
          OR b=520
          OR (d>=76.0 AND d<77.0 AND d IS NOT NULL)
          OR a=53
          OR ((a BETWEEN 91 AND 93) AND a!=92)
          OR b=938
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR c=25025
   ]])
     end, {
@@ -31700,7 +31700,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='abcdefghi'
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.846.1>
@@ -31714,7 +31714,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='abcdefghi'
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.846.2>
@@ -31802,7 +31802,7 @@ test:do_test(
       WHERE b=209
          OR b=806
          OR (d>=8.0 AND d<9.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.849.1>
@@ -31818,7 +31818,7 @@ test:do_test(
       WHERE b=209
          OR b=806
          OR (d>=8.0 AND d<9.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'rstuv*')
+         OR (g='vutsrqp' AND f LIKE 'rstuv%')
   ]])
     end, {
         -- <where7-2.849.2>
@@ -31863,10 +31863,10 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=4.0 AND d<5.0 AND d IS NOT NULL)
          OR a=45
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR a=69
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.851.1>
@@ -31881,10 +31881,10 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=4.0 AND d<5.0 AND d IS NOT NULL)
          OR a=45
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR a=69
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.851.2>
@@ -31899,9 +31899,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE c=9009
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.852.1>
@@ -31916,9 +31916,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE c=9009
          OR (d>=85.0 AND d<86.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR (d>=9.0 AND d<10.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'pqrst*')
+         OR (g='lkjihgf' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.852.2>
@@ -31937,7 +31937,7 @@ test:do_test(
          OR a=47
          OR c=24024
          OR a=27
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -31957,7 +31957,7 @@ test:do_test(
          OR a=47
          OR c=24024
          OR a=27
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -31971,9 +31971,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+      WHERE (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR a=19
   ]])
     end, {
@@ -31987,9 +31987,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+      WHERE (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR a=19
   ]])
     end, {
@@ -32006,7 +32006,7 @@ test:do_test(
       WHERE c=12012
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
          OR ((a BETWEEN 16 AND 18) AND a!=17)
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.855.1>
@@ -32022,7 +32022,7 @@ test:do_test(
       WHERE c=12012
          OR (d>=80.0 AND d<81.0 AND d IS NOT NULL)
          OR ((a BETWEEN 16 AND 18) AND a!=17)
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.855.2>
@@ -32036,7 +32036,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 38 AND 40) AND a!=39)
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR b=429
          OR f='jklmnopqr'
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
@@ -32054,7 +32054,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 38 AND 40) AND a!=39)
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR b=429
          OR f='jklmnopqr'
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
@@ -32071,7 +32071,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='lkjihgf' AND f GLOB 'mnopq*')
+      WHERE (g='lkjihgf' AND f LIKE 'mnopq%')
          OR b=190
   ]])
     end, {
@@ -32085,7 +32085,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='lkjihgf' AND f GLOB 'mnopq*')
+      WHERE (g='lkjihgf' AND f LIKE 'mnopq%')
          OR b=190
   ]])
     end, {
@@ -32099,7 +32099,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'yzabc*')
+      WHERE (g='jihgfed' AND f LIKE 'yzabc%')
          OR b=674
          OR b=289
   ]])
@@ -32114,7 +32114,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'yzabc*')
+      WHERE (g='jihgfed' AND f LIKE 'yzabc%')
          OR b=674
          OR b=289
   ]])
@@ -32131,8 +32131,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=17
          OR b=539
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.859.1>
@@ -32147,8 +32147,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=17
          OR b=539
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
-         OR (g='utsrqpo' AND f GLOB 'vwxyz*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
+         OR (g='utsrqpo' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.859.2>
@@ -32259,12 +32259,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE f='ghijklmno'
          OR a=26
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=81
          OR (d>=3.0 AND d<4.0 AND d IS NOT NULL)
          OR ((a BETWEEN 28 AND 30) AND a!=29)
          OR b=275
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR b=311
          OR b=894
          OR b=872
@@ -32282,12 +32282,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE f='ghijklmno'
          OR a=26
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR a=81
          OR (d>=3.0 AND d<4.0 AND d IS NOT NULL)
          OR ((a BETWEEN 28 AND 30) AND a!=29)
          OR b=275
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR b=311
          OR b=894
          OR b=872
@@ -32376,12 +32376,12 @@ test:do_test(
       WHERE a=44
          OR b=55
          OR a=30
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR 1000000<b
          OR a=24
          OR b=1089
          OR (d>=75.0 AND d<76.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.866.1>
@@ -32397,12 +32397,12 @@ test:do_test(
       WHERE a=44
          OR b=55
          OR a=30
-         OR (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+         OR (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR 1000000<b
          OR a=24
          OR b=1089
          OR (d>=75.0 AND d<76.0 AND d IS NOT NULL)
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.866.2>
@@ -32487,14 +32487,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='edcbazy' AND f GLOB 'uvwxy*')
+      WHERE (g='edcbazy' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 25 AND 27) AND a!=26)
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR f='xyzabcdef'
          OR b=517
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.869.1>
@@ -32507,14 +32507,14 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='edcbazy' AND f GLOB 'uvwxy*')
+      WHERE (g='edcbazy' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 25 AND 27) AND a!=26)
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR ((a BETWEEN 89 AND 91) AND a!=90)
          OR f='xyzabcdef'
          OR b=517
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.869.2>
@@ -32555,9 +32555,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='tsrqpon' AND f GLOB 'yzabc*')
+      WHERE (g='tsrqpon' AND f LIKE 'yzabc%')
          OR b=762
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR a=25
          OR ((a BETWEEN 65 AND 67) AND a!=66)
   ]])
@@ -32572,9 +32572,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='tsrqpon' AND f GLOB 'yzabc*')
+      WHERE (g='tsrqpon' AND f LIKE 'yzabc%')
          OR b=762
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR a=25
          OR ((a BETWEEN 65 AND 67) AND a!=66)
   ]])
@@ -32594,9 +32594,9 @@ test:do_test(
          OR b=839
          OR f='defghijkl'
          OR (d>=95.0 AND d<96.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR b=498
   ]])
     end, {
@@ -32615,9 +32615,9 @@ test:do_test(
          OR b=839
          OR f='defghijkl'
          OR (d>=95.0 AND d<96.0 AND d IS NOT NULL)
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR (d>=52.0 AND d<53.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR b=498
   ]])
     end, {
@@ -32667,7 +32667,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='mlkjihg' AND f GLOB 'jklmn*')
+      WHERE (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=256
          OR b=586
          OR a=74
@@ -32686,7 +32686,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='mlkjihg' AND f GLOB 'jklmn*')
+      WHERE (g='mlkjihg' AND f LIKE 'jklmn%')
          OR b=256
          OR b=586
          OR a=74
@@ -32739,14 +32739,14 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=308
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR a=83
          OR c=23023
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR a=58
          OR ((a BETWEEN 17 AND 19) AND a!=18)
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR c=4004
   ]])
     end, {
@@ -32762,14 +32762,14 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=308
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
          OR a=83
          OR c=23023
          OR (d>=57.0 AND d<58.0 AND d IS NOT NULL)
-         OR (g='lkjihgf' AND f GLOB 'nopqr*')
+         OR (g='lkjihgf' AND f LIKE 'nopqr%')
          OR a=58
          OR ((a BETWEEN 17 AND 19) AND a!=18)
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR c=4004
   ]])
     end, {
@@ -32789,7 +32789,7 @@ test:do_test(
          OR b=762
          OR b=157
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.877.1>
@@ -32808,7 +32808,7 @@ test:do_test(
          OR b=762
          OR b=157
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
   ]])
     end, {
         -- <where7-2.877.2>
@@ -32825,12 +32825,12 @@ test:do_test(
          OR a=1
          OR ((a BETWEEN 93 AND 95) AND a!=94)
          OR b=278
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR f='qrstuvwxy'
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR ((a BETWEEN 82 AND 84) AND a!=83)
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -32848,12 +32848,12 @@ test:do_test(
          OR a=1
          OR ((a BETWEEN 93 AND 95) AND a!=94)
          OR b=278
-         OR (g='xwvutsr' AND f GLOB 'defgh*')
+         OR (g='xwvutsr' AND f LIKE 'defgh%')
          OR f='qrstuvwxy'
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR ((a BETWEEN 82 AND 84) AND a!=83)
-         OR (g='edcbazy' AND f GLOB 'uvwxy*')
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'uvwxy%')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -32872,9 +32872,9 @@ test:do_test(
          OR ((a BETWEEN 41 AND 43) AND a!=42)
          OR (d>=96.0 AND d<97.0 AND d IS NOT NULL)
          OR b=759
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR ((a BETWEEN 45 AND 47) AND a!=46)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.879.1>
@@ -32892,9 +32892,9 @@ test:do_test(
          OR ((a BETWEEN 41 AND 43) AND a!=42)
          OR (d>=96.0 AND d<97.0 AND d IS NOT NULL)
          OR b=759
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR ((a BETWEEN 45 AND 47) AND a!=46)
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
   ]])
     end, {
         -- <where7-2.879.2>
@@ -32916,7 +32916,7 @@ test:do_test(
          OR b=44
          OR f='zabcdefgh'
          OR b=979
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.880.1>
@@ -32938,7 +32938,7 @@ test:do_test(
          OR b=44
          OR f='zabcdefgh'
          OR b=979
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.880.2>
@@ -32988,7 +32988,7 @@ test:do_test(
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR a=90
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR f='nopqrstuv'
   ]])
     end, {
@@ -33011,7 +33011,7 @@ test:do_test(
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR a=90
          OR (d>=66.0 AND d<67.0 AND d IS NOT NULL)
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
          OR f='nopqrstuv'
   ]])
     end, {
@@ -33061,7 +33061,7 @@ test:do_test(
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR d<0.0
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR c=9009
   ]])
     end, {
@@ -33083,7 +33083,7 @@ test:do_test(
          OR ((a BETWEEN 4 AND 6) AND a!=5)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
          OR d<0.0
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR c=9009
   ]])
     end, {
@@ -33097,7 +33097,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR b=814
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
   ]])
@@ -33112,7 +33112,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?uvwx*' AND f GLOB 'tuvw*')
+      WHERE (f LIKE '_uvwx%' AND f LIKE 'tuvw%')
          OR b=814
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
   ]])
@@ -33127,7 +33127,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='lkjihgf' AND f GLOB 'mnopq*')
+      WHERE (g='lkjihgf' AND f LIKE 'mnopq%')
          OR b=333
          OR b=275
   ]])
@@ -33142,7 +33142,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='lkjihgf' AND f GLOB 'mnopq*')
+      WHERE (g='lkjihgf' AND f LIKE 'mnopq%')
          OR b=333
          OR b=275
   ]])
@@ -33157,7 +33157,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (g='ihgfedc' AND f LIKE 'efghi%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
   ]])
     end, {
@@ -33171,7 +33171,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='ihgfedc' AND f GLOB 'efghi*')
+      WHERE (g='ihgfedc' AND f LIKE 'efghi%')
          OR ((a BETWEEN 33 AND 35) AND a!=34)
   ]])
     end, {
@@ -33187,7 +33187,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 11 AND 13) AND a!=12)
          OR b=253
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=286
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
   ]])
@@ -33204,7 +33204,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 11 AND 13) AND a!=12)
          OR b=253
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=286
          OR (d>=10.0 AND d<11.0 AND d IS NOT NULL)
   ]])
@@ -33220,10 +33220,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=15.0 AND d<16.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 26 AND 28) AND a!=27)
          OR b=421
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR f='ijklmnopq'
          OR b=891
          OR b=1056
@@ -33240,10 +33240,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=15.0 AND d<16.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 26 AND 28) AND a!=27)
          OR b=421
-         OR (g='xwvutsr' AND f GLOB 'fghij*')
+         OR (g='xwvutsr' AND f LIKE 'fghij%')
          OR f='ijklmnopq'
          OR b=891
          OR b=1056
@@ -33260,10 +33260,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='fghijklmn'
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR b=671
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.890.1>
@@ -33277,10 +33277,10 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='fghijklmn'
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
-         OR (g='edcbazy' AND f GLOB 'vwxyz*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
+         OR (g='edcbazy' AND f LIKE 'vwxyz%')
          OR b=671
-         OR (g='xwvutsr' AND f GLOB 'hijkl*')
+         OR (g='xwvutsr' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.890.2>
@@ -33293,10 +33293,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='lkjihgf' AND f GLOB 'lmnop*')
-         OR (g='srqponm' AND f GLOB 'fghij*')
+      WHERE (g='lkjihgf' AND f LIKE 'lmnop%')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR ((a BETWEEN 4 AND 6) AND a!=5)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -33310,10 +33310,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='lkjihgf' AND f GLOB 'lmnop*')
-         OR (g='srqponm' AND f GLOB 'fghij*')
+      WHERE (g='lkjihgf' AND f LIKE 'lmnop%')
+         OR (g='srqponm' AND f LIKE 'fghij%')
          OR ((a BETWEEN 4 AND 6) AND a!=5)
-         OR (g='kjihgfe' AND f GLOB 'qrstu*')
+         OR (g='kjihgfe' AND f LIKE 'qrstu%')
          OR (d>=11.0 AND d<12.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -33439,11 +33439,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 67 AND 69) AND a!=68)
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR a=46
          OR b=187
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.895.1>
@@ -33458,11 +33458,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 67 AND 69) AND a!=68)
          OR (d>=69.0 AND d<70.0 AND d IS NOT NULL)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR a=46
          OR b=187
          OR ((a BETWEEN 69 AND 71) AND a!=70)
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
   ]])
     end, {
         -- <where7-2.895.2>
@@ -33522,7 +33522,7 @@ test:do_test(
          OR b=729
          OR ((a BETWEEN 81 AND 83) AND a!=82)
          OR a=58
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=608
   ]])
     end, {
@@ -33543,7 +33543,7 @@ test:do_test(
          OR b=729
          OR ((a BETWEEN 81 AND 83) AND a!=82)
          OR a=58
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR b=608
   ]])
     end, {
@@ -33561,7 +33561,7 @@ test:do_test(
          OR f='efghijklm'
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
          OR a=26
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
   ]])
     end, {
         -- <where7-2.898.1>
@@ -33578,7 +33578,7 @@ test:do_test(
          OR f='efghijklm'
          OR (d>=48.0 AND d<49.0 AND d IS NOT NULL)
          OR a=26
-         OR (f GLOB '?efgh*' AND f GLOB 'defg*')
+         OR (f LIKE '_efgh%' AND f LIKE 'defg%')
   ]])
     end, {
         -- <where7-2.898.2>
@@ -33592,11 +33592,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE a=59
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR a=7
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=762
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
   ]])
     end, {
         -- <where7-2.899.1>
@@ -33610,11 +33610,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE a=59
-         OR (g='wvutsrq' AND f GLOB 'mnopq*')
+         OR (g='wvutsrq' AND f LIKE 'mnopq%')
          OR a=7
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=762
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
   ]])
     end, {
         -- <where7-2.899.2>
@@ -33627,7 +33627,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='gfedcba' AND f GLOB 'nopqr*')
+      WHERE (g='gfedcba' AND f LIKE 'nopqr%')
          OR b=539
          OR b=399
   ]])
@@ -33642,7 +33642,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='gfedcba' AND f GLOB 'nopqr*')
+      WHERE (g='gfedcba' AND f LIKE 'nopqr%')
          OR b=539
          OR b=399
   ]])
@@ -33687,10 +33687,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (g='rqponml' AND f GLOB 'klmno*')
+      WHERE (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR f='lmnopqrst'
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.902.1>
@@ -33703,10 +33703,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?klmn*' AND f GLOB 'jklm*')
-         OR (g='rqponml' AND f GLOB 'klmno*')
+      WHERE (f LIKE '_klmn%' AND f LIKE 'jklm%')
+         OR (g='rqponml' AND f LIKE 'klmno%')
          OR f='lmnopqrst'
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.902.2>
@@ -33751,14 +33751,14 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1067
          OR ((a BETWEEN 53 AND 55) AND a!=54)
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR b=520
          OR b=399
          OR b=209
          OR a=68
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.904.1>
@@ -33773,14 +33773,14 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1067
          OR ((a BETWEEN 53 AND 55) AND a!=54)
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR b=520
          OR b=399
          OR b=209
          OR a=68
-         OR (g='fedcbaz' AND f GLOB 'qrstu*')
+         OR (g='fedcbaz' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.904.2>
@@ -33798,7 +33798,7 @@ test:do_test(
          OR b=55
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
          OR ((a BETWEEN 20 AND 22) AND a!=21)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 0 AND 2) AND a!=1)
          OR ((a BETWEEN 21 AND 23) AND a!=22)
   ]])
@@ -33818,7 +33818,7 @@ test:do_test(
          OR b=55
          OR (d>=34.0 AND d<35.0 AND d IS NOT NULL)
          OR ((a BETWEEN 20 AND 22) AND a!=21)
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR ((a BETWEEN 0 AND 2) AND a!=1)
          OR ((a BETWEEN 21 AND 23) AND a!=22)
   ]])
@@ -33837,7 +33837,7 @@ test:do_test(
          OR a=2
          OR b=784
          OR ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR b=850
   ]])
     end, {
@@ -33855,7 +33855,7 @@ test:do_test(
          OR a=2
          OR b=784
          OR ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='ihgfedc' AND f GLOB 'defgh*')
+         OR (g='ihgfedc' AND f LIKE 'defgh%')
          OR b=850
   ]])
     end, {
@@ -33903,17 +33903,17 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
          OR a=18
          OR a=30
          OR ((a BETWEEN 9 AND 11) AND a!=10)
          OR ((a BETWEEN 84 AND 86) AND a!=85)
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR b=792
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR ((a BETWEEN 19 AND 21) AND a!=20)
          OR c=26026
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.908.1>
@@ -33926,17 +33926,17 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'zabcd*')
+      WHERE (g='jihgfed' AND f LIKE 'zabcd%')
          OR a=18
          OR a=30
          OR ((a BETWEEN 9 AND 11) AND a!=10)
          OR ((a BETWEEN 84 AND 86) AND a!=85)
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR b=792
-         OR (f GLOB '?mnop*' AND f GLOB 'lmno*')
+         OR (f LIKE '_mnop%' AND f LIKE 'lmno%')
          OR ((a BETWEEN 19 AND 21) AND a!=20)
          OR c=26026
-         OR (g='rqponml' AND f GLOB 'hijkl*')
+         OR (g='rqponml' AND f LIKE 'hijkl%')
   ]])
     end, {
         -- <where7-2.908.2>
@@ -33949,11 +33949,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='vutsrqp' AND f GLOB 'qrstu*')
+      WHERE (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=968
          OR ((a BETWEEN 63 AND 65) AND a!=64)
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
          OR a=78
          OR ((a BETWEEN 90 AND 92) AND a!=91)
@@ -33969,11 +33969,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='vutsrqp' AND f GLOB 'qrstu*')
+      WHERE (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=968
          OR ((a BETWEEN 63 AND 65) AND a!=64)
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR (d>=72.0 AND d<73.0 AND d IS NOT NULL)
          OR a=78
          OR ((a BETWEEN 90 AND 92) AND a!=91)
@@ -34096,7 +34096,7 @@ test:do_test(
          OR (d>=78.0 AND d<79.0 AND d IS NOT NULL)
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR a=81
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR f='mnopqrstu'
   ]])
     end, {
@@ -34117,7 +34117,7 @@ test:do_test(
          OR (d>=78.0 AND d<79.0 AND d IS NOT NULL)
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR a=81
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR f='mnopqrstu'
   ]])
     end, {
@@ -34177,7 +34177,7 @@ test:do_test(
          OR ((a BETWEEN 20 AND 22) AND a!=21)
          OR ((a BETWEEN 27 AND 29) AND a!=28)
          OR b=319
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 14 AND 16) AND a!=15)
   ]])
     end, {
@@ -34197,7 +34197,7 @@ test:do_test(
          OR ((a BETWEEN 20 AND 22) AND a!=21)
          OR ((a BETWEEN 27 AND 29) AND a!=28)
          OR b=319
-         OR (g='qponmlk' AND f GLOB 'opqrs*')
+         OR (g='qponmlk' AND f LIKE 'opqrs%')
          OR ((a BETWEEN 14 AND 16) AND a!=15)
   ]])
     end, {
@@ -34214,7 +34214,7 @@ test:do_test(
       WHERE b=179
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR a=46
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
          OR a=25
          OR (d>=5.0 AND d<6.0 AND d IS NOT NULL)
@@ -34237,7 +34237,7 @@ test:do_test(
       WHERE b=179
          OR ((a BETWEEN 95 AND 97) AND a!=96)
          OR a=46
-         OR (g='kjihgfe' AND f GLOB 'uvwxy*')
+         OR (g='kjihgfe' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 53 AND 55) AND a!=54)
          OR a=25
          OR (d>=5.0 AND d<6.0 AND d IS NOT NULL)
@@ -34257,7 +34257,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='nmlkjih' AND f GLOB 'fghij*')
+      WHERE (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=15.0 AND d<16.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -34271,7 +34271,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='nmlkjih' AND f GLOB 'fghij*')
+      WHERE (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=15.0 AND d<16.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -34286,7 +34286,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=748
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR a=32
          OR b=110
          OR b=297
@@ -34308,7 +34308,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=748
-         OR (g='utsrqpo' AND f GLOB 'wxyza*')
+         OR (g='utsrqpo' AND f LIKE 'wxyza%')
          OR a=32
          OR b=110
          OR b=297
@@ -34332,13 +34332,13 @@ test:do_test(
       WHERE (d>=33.0 AND d<34.0 AND d IS NOT NULL)
          OR b=905
          OR a=97
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR c=27027
          OR f='bcdefghij'
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
          OR ((a BETWEEN 38 AND 40) AND a!=39)
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
   ]])
     end, {
         -- <where7-2.919.1>
@@ -34354,13 +34354,13 @@ test:do_test(
       WHERE (d>=33.0 AND d<34.0 AND d IS NOT NULL)
          OR b=905
          OR a=97
-         OR (g='hgfedcb' AND f GLOB 'hijkl*')
+         OR (g='hgfedcb' AND f LIKE 'hijkl%')
          OR c=27027
          OR f='bcdefghij'
          OR (d>=54.0 AND d<55.0 AND d IS NOT NULL)
          OR (d>=25.0 AND d<26.0 AND d IS NOT NULL)
          OR ((a BETWEEN 38 AND 40) AND a!=39)
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
   ]])
     end, {
         -- <where7-2.919.2>
@@ -34403,13 +34403,13 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=594
          OR b=80
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=421
          OR b=418
          OR b=828
          OR a=88
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -34425,13 +34425,13 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=594
          OR b=80
-         OR (g='tsrqpon' AND f GLOB 'bcdef*')
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='tsrqpon' AND f LIKE 'bcdef%')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=421
          OR b=418
          OR b=828
          OR a=88
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR (d>=60.0 AND d<61.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -34446,11 +34446,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=17.0 AND d<18.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR b=366
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR c=16016
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR c=9009
   ]])
     end, {
@@ -34465,11 +34465,11 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=17.0 AND d<18.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'xyzab*')
+         OR (g='jihgfed' AND f LIKE 'xyzab%')
          OR b=366
          OR (d>=28.0 AND d<29.0 AND d IS NOT NULL)
          OR c=16016
-         OR (g='edcbazy' AND f GLOB 'wxyza*')
+         OR (g='edcbazy' AND f LIKE 'wxyza%')
          OR c=9009
   ]])
     end, {
@@ -34485,7 +34485,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=33
          OR f='qrstuvwxy'
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR b=858
   ]])
     end, {
@@ -34501,7 +34501,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=33
          OR f='qrstuvwxy'
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR b=858
   ]])
     end, {
@@ -34516,7 +34516,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=861
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
          OR b=682
          OR ((a BETWEEN 93 AND 95) AND a!=94)
@@ -34534,7 +34534,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=861
-         OR (f GLOB '?xyza*' AND f GLOB 'wxyz*')
+         OR (f LIKE '_xyza%' AND f LIKE 'wxyz%')
          OR (d>=29.0 AND d<30.0 AND d IS NOT NULL)
          OR b=682
          OR ((a BETWEEN 93 AND 95) AND a!=94)
@@ -34584,7 +34584,7 @@ test:do_test(
       WHERE f='abcdefghi'
          OR c=9009
          OR b=663
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR b=91
   ]])
     end, {
@@ -34601,7 +34601,7 @@ test:do_test(
       WHERE f='abcdefghi'
          OR c=9009
          OR b=663
-         OR (g='wvutsrq' AND f GLOB 'klmno*')
+         OR (g='wvutsrq' AND f LIKE 'klmno%')
          OR b=91
   ]])
     end, {
@@ -34615,15 +34615,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='kjihgfe' AND f GLOB 'qrstu*')
+      WHERE (g='kjihgfe' AND f LIKE 'qrstu%')
          OR ((a BETWEEN 29 AND 31) AND a!=30)
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=1015
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=916
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
          OR b=69
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.927.1>
@@ -34636,15 +34636,15 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='kjihgfe' AND f GLOB 'qrstu*')
+      WHERE (g='kjihgfe' AND f LIKE 'qrstu%')
          OR ((a BETWEEN 29 AND 31) AND a!=30)
-         OR (f GLOB '?opqr*' AND f GLOB 'nopq*')
+         OR (f LIKE '_opqr%' AND f LIKE 'nopq%')
          OR b=1015
-         OR (g='qponmlk' AND f GLOB 'qrstu*')
+         OR (g='qponmlk' AND f LIKE 'qrstu%')
          OR b=916
          OR (d>=31.0 AND d<32.0 AND d IS NOT NULL)
          OR b=69
-         OR (g='hgfedcb' AND f GLOB 'fghij*')
+         OR (g='hgfedcb' AND f LIKE 'fghij%')
   ]])
     end, {
         -- <where7-2.927.2>
@@ -34664,7 +34664,7 @@ test:do_test(
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR a=63
          OR f='mnopqrstu'
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR b=495
          OR a=35
          OR a=22
@@ -34687,7 +34687,7 @@ test:do_test(
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR a=63
          OR f='mnopqrstu'
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR b=495
          OR a=35
          OR a=22
@@ -34704,7 +34704,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=869
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=289
          OR a=62
          OR ((a BETWEEN 9 AND 11) AND a!=10)
@@ -34721,7 +34721,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=869
-         OR (g='rqponml' AND f GLOB 'jklmn*')
+         OR (g='rqponml' AND f LIKE 'jklmn%')
          OR b=289
          OR a=62
          OR ((a BETWEEN 9 AND 11) AND a!=10)
@@ -34774,7 +34774,7 @@ test:do_test(
       WHERE ((a BETWEEN 57 AND 59) AND a!=58)
          OR b=1078
          OR ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR b=429
   ]])
@@ -34792,7 +34792,7 @@ test:do_test(
       WHERE ((a BETWEEN 57 AND 59) AND a!=58)
          OR b=1078
          OR ((a BETWEEN 21 AND 23) AND a!=22)
-         OR (g='mlkjihg' AND f GLOB 'ijklm*')
+         OR (g='mlkjihg' AND f LIKE 'ijklm%')
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
          OR b=429
   ]])
@@ -34876,7 +34876,7 @@ test:do_test(
       WHERE (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR b=858
          OR a=58
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR c=21021
          OR ((a BETWEEN 45 AND 47) AND a!=46)
          OR b=616
@@ -34897,7 +34897,7 @@ test:do_test(
       WHERE (d>=56.0 AND d<57.0 AND d IS NOT NULL)
          OR b=858
          OR a=58
-         OR (g='onmlkji' AND f GLOB 'xyzab*')
+         OR (g='onmlkji' AND f LIKE 'xyzab%')
          OR c=21021
          OR ((a BETWEEN 45 AND 47) AND a!=46)
          OR b=616
@@ -34917,7 +34917,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=682
          OR b=99
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR b=531
   ]])
     end, {
@@ -34933,7 +34933,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=682
          OR b=99
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR b=531
   ]])
     end, {
@@ -34948,13 +34948,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 56 AND 58) AND a!=57)
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR b=726
          OR a=79
          OR a=47
          OR b=212
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR c=8008
   ]])
     end, {
@@ -34969,13 +34969,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 56 AND 58) AND a!=57)
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (f GLOB '?jklm*' AND f GLOB 'ijkl*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (f LIKE '_jklm%' AND f LIKE 'ijkl%')
          OR b=726
          OR a=79
          OR a=47
          OR b=212
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
          OR c=8008
   ]])
     end, {
@@ -34993,7 +34993,7 @@ test:do_test(
          OR ((a BETWEEN 60 AND 62) AND a!=61)
          OR a=5
          OR b=33
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
          OR a=59
          OR b=44
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
@@ -35014,7 +35014,7 @@ test:do_test(
          OR ((a BETWEEN 60 AND 62) AND a!=61)
          OR a=5
          OR b=33
-         OR (f GLOB '?yzab*' AND f GLOB 'xyza*')
+         OR (f LIKE '_yzab%' AND f LIKE 'xyza%')
          OR a=59
          OR b=44
          OR (d>=14.0 AND d<15.0 AND d IS NOT NULL)
@@ -35213,8 +35213,8 @@ test:do_test(
      SELECT a FROM t2
       WHERE a=96
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR ((a BETWEEN 37 AND 39) AND a!=38)
          OR a=85
          OR ((a BETWEEN 10 AND 12) AND a!=11)
@@ -35236,8 +35236,8 @@ test:do_test(
      SELECT a FROM t3
       WHERE a=96
          OR (d>=23.0 AND d<24.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'vwxyz*')
-         OR (f GLOB '?fghi*' AND f GLOB 'efgh*')
+         OR (g='ponmlkj' AND f LIKE 'vwxyz%')
+         OR (f LIKE '_fghi%' AND f LIKE 'efgh%')
          OR ((a BETWEEN 37 AND 39) AND a!=38)
          OR a=85
          OR ((a BETWEEN 10 AND 12) AND a!=11)
@@ -35299,17 +35299,17 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'hijkl*')
+      WHERE (g='xwvutsr' AND f LIKE 'hijkl%')
          OR a=60
          OR a=4
          OR b=520
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR a=44
          OR a=36
          OR (d>=76.0 AND d<77.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=715
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.945.1>
@@ -35322,17 +35322,17 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'hijkl*')
+      WHERE (g='xwvutsr' AND f LIKE 'hijkl%')
          OR a=60
          OR a=4
          OR b=520
-         OR (g='ihgfedc' AND f GLOB 'bcdef*')
+         OR (g='ihgfedc' AND f LIKE 'bcdef%')
          OR a=44
          OR a=36
          OR (d>=76.0 AND d<77.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=715
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
   ]])
     end, {
         -- <where7-2.945.2>
@@ -35349,10 +35349,10 @@ test:do_test(
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR (d>=15.0 AND d<16.0 AND d IS NOT NULL)
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
          OR a=24
          OR (d>=99.0 AND d<100.0 AND d IS NOT NULL)
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
   ]])
     end, {
         -- <where7-2.946.1>
@@ -35369,10 +35369,10 @@ test:do_test(
          OR ((a BETWEEN 56 AND 58) AND a!=57)
          OR (d>=15.0 AND d<16.0 AND d IS NOT NULL)
          OR (d>=55.0 AND d<56.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'yzabc*')
+         OR (g='jihgfed' AND f LIKE 'yzabc%')
          OR a=24
          OR (d>=99.0 AND d<100.0 AND d IS NOT NULL)
-         OR (f GLOB '?bcde*' AND f GLOB 'abcd*')
+         OR (f LIKE '_bcde%' AND f LIKE 'abcd%')
   ]])
     end, {
         -- <where7-2.946.2>
@@ -35385,12 +35385,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='utsrqpo' AND f GLOB 'vwxyz*')
+      WHERE (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=132
          OR f='ghijklmno'
          OR b=740
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=1059
   ]])
     end, {
@@ -35404,12 +35404,12 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='utsrqpo' AND f GLOB 'vwxyz*')
+      WHERE (g='utsrqpo' AND f LIKE 'vwxyz%')
          OR b=132
          OR f='ghijklmno'
          OR b=740
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=1059
   ]])
     end, {
@@ -35459,10 +35459,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='nmlkjih' AND f GLOB 'cdefg*')
+      WHERE (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=1026
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'lmnop*')
+         OR (g='wvutsrq' AND f LIKE 'lmnop%')
          OR b=355
          OR b=641
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
@@ -35478,10 +35478,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='nmlkjih' AND f GLOB 'cdefg*')
+      WHERE (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=1026
          OR (d>=1.0 AND d<2.0 AND d IS NOT NULL)
-         OR (g='wvutsrq' AND f GLOB 'lmnop*')
+         OR (g='wvutsrq' AND f LIKE 'lmnop%')
          OR b=355
          OR b=641
          OR (d>=53.0 AND d<54.0 AND d IS NOT NULL)
@@ -35506,7 +35506,7 @@ test:do_test(
          OR f='opqrstuvw'
          OR a=41
          OR a=83
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=751
   ]])
     end, {
@@ -35529,7 +35529,7 @@ test:do_test(
          OR f='opqrstuvw'
          OR a=41
          OR a=83
-         OR (g='nmlkjih' AND f GLOB 'cdefg*')
+         OR (g='nmlkjih' AND f LIKE 'cdefg%')
          OR b=751
   ]])
     end, {
@@ -35579,7 +35579,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'qrstu*')
+      WHERE (g='qponmlk' AND f LIKE 'qrstu%')
          OR f='bcdefghij'
          OR f='hijklmnop'
          OR a=65
@@ -35602,7 +35602,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'qrstu*')
+      WHERE (g='qponmlk' AND f LIKE 'qrstu%')
          OR f='bcdefghij'
          OR f='hijklmnop'
          OR a=65
@@ -35625,11 +35625,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='jihgfed' AND f GLOB 'vwxyz*')
+      WHERE (g='jihgfed' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR ((a BETWEEN 79 AND 81) AND a!=80)
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR b=1100
          OR c=6006
          OR c=4004
@@ -35647,11 +35647,11 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='jihgfed' AND f GLOB 'vwxyz*')
+      WHERE (g='jihgfed' AND f LIKE 'vwxyz%')
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR ((a BETWEEN 79 AND 81) AND a!=80)
-         OR (g='kjihgfe' AND f GLOB 'stuvw*')
-         OR (g='qponmlk' AND f GLOB 'pqrst*')
+         OR (g='kjihgfe' AND f LIKE 'stuvw%')
+         OR (g='qponmlk' AND f LIKE 'pqrst%')
          OR b=1100
          OR c=6006
          OR c=4004
@@ -35728,7 +35728,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE (d>=42.0 AND d<43.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 21 AND 23) AND a!=22)
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=737
@@ -35745,7 +35745,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE (d>=42.0 AND d<43.0 AND d IS NOT NULL)
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR ((a BETWEEN 21 AND 23) AND a!=22)
          OR (d>=12.0 AND d<13.0 AND d IS NOT NULL)
          OR b=737
@@ -35761,7 +35761,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='rqponml' AND f GLOB 'klmno*')
+      WHERE (g='rqponml' AND f LIKE 'klmno%')
          OR ((a BETWEEN 5 AND 7) AND a!=6)
   ]])
     end, {
@@ -35775,7 +35775,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='rqponml' AND f GLOB 'klmno*')
+      WHERE (g='rqponml' AND f LIKE 'klmno%')
          OR ((a BETWEEN 5 AND 7) AND a!=6)
   ]])
     end, {
@@ -35789,7 +35789,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR c=32032
          OR f='opqrstuvw'
          OR ((a BETWEEN 66 AND 68) AND a!=67)
@@ -35807,7 +35807,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='hgfedcb' AND f GLOB 'hijkl*')
+      WHERE (g='hgfedcb' AND f LIKE 'hijkl%')
          OR c=32032
          OR f='opqrstuvw'
          OR ((a BETWEEN 66 AND 68) AND a!=67)
@@ -35875,11 +35875,11 @@ test:do_test(
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR ((a BETWEEN 86 AND 88) AND a!=87)
          OR b=146
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR ((a BETWEEN 73 AND 75) AND a!=74)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 60 AND 62) AND a!=61)
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=704
   ]])
     end, {
@@ -35897,11 +35897,11 @@ test:do_test(
          OR ((a BETWEEN 8 AND 10) AND a!=9)
          OR ((a BETWEEN 86 AND 88) AND a!=87)
          OR b=146
-         OR (g='ponmlkj' AND f GLOB 'rstuv*')
+         OR (g='ponmlkj' AND f LIKE 'rstuv%')
          OR ((a BETWEEN 73 AND 75) AND a!=74)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
          OR ((a BETWEEN 60 AND 62) AND a!=61)
-         OR (g='ihgfedc' AND f GLOB 'efghi*')
+         OR (g='ihgfedc' AND f LIKE 'efghi%')
          OR b=704
   ]])
     end, {
@@ -35950,7 +35950,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE c=17017
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=971
          OR a=37
          OR a=7
@@ -35970,7 +35970,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE c=17017
-         OR (g='qponmlk' AND f GLOB 'mnopq*')
+         OR (g='qponmlk' AND f LIKE 'mnopq%')
          OR b=971
          OR a=37
          OR a=7
@@ -35990,7 +35990,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE f='tuvwxyzab'
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
   ]])
     end, {
         -- <where7-2.963.1>
@@ -36004,7 +36004,7 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE f='tuvwxyzab'
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
   ]])
     end, {
         -- <where7-2.963.2>
@@ -36019,7 +36019,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=638
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR b=165
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR f='stuvwxyza'
@@ -36041,7 +36041,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=638
          OR (d>=44.0 AND d<45.0 AND d IS NOT NULL)
-         OR (g='gfedcba' AND f GLOB 'lmnop*')
+         OR (g='gfedcba' AND f LIKE 'lmnop%')
          OR b=165
          OR ((a BETWEEN 10 AND 12) AND a!=11)
          OR f='stuvwxyza'
@@ -36067,7 +36067,7 @@ test:do_test(
          OR a=93
          OR b=858
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.965.1>
@@ -36086,7 +36086,7 @@ test:do_test(
          OR a=93
          OR b=858
          OR (d>=18.0 AND d<19.0 AND d IS NOT NULL)
-         OR (g='jihgfed' AND f GLOB 'vwxyz*')
+         OR (g='jihgfed' AND f LIKE 'vwxyz%')
   ]])
     end, {
         -- <where7-2.965.2>
@@ -36157,7 +36157,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='qponmlk' AND f GLOB 'mnopq*')
+      WHERE (g='qponmlk' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR a=5
          OR b=396
@@ -36174,7 +36174,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='qponmlk' AND f GLOB 'mnopq*')
+      WHERE (g='qponmlk' AND f LIKE 'mnopq%')
          OR ((a BETWEEN 24 AND 26) AND a!=25)
          OR a=5
          OR b=396
@@ -36191,7 +36191,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=748
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
@@ -36210,7 +36210,7 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
          OR b=748
          OR (d>=97.0 AND d<98.0 AND d IS NOT NULL)
          OR ((a BETWEEN 69 AND 71) AND a!=70)
@@ -36231,7 +36231,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=30.0 AND d<31.0 AND d IS NOT NULL)
          OR ((a BETWEEN 8 AND 10) AND a!=9)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR a=50
          OR a=46
          OR ((a BETWEEN 38 AND 40) AND a!=39)
@@ -36249,7 +36249,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=30.0 AND d<31.0 AND d IS NOT NULL)
          OR ((a BETWEEN 8 AND 10) AND a!=9)
-         OR (f GLOB '?pqrs*' AND f GLOB 'opqr*')
+         OR (f LIKE '_pqrs%' AND f LIKE 'opqr%')
          OR a=50
          OR a=46
          OR ((a BETWEEN 38 AND 40) AND a!=39)
@@ -36312,7 +36312,7 @@ test:do_test(
          OR c=16016
          OR b=1078
          OR b=960
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
   ]])
     end, {
         -- <where7-2.972.1>
@@ -36330,7 +36330,7 @@ test:do_test(
          OR c=16016
          OR b=1078
          OR b=960
-         OR (g='hgfedcb' AND f GLOB 'jklmn*')
+         OR (g='hgfedcb' AND f LIKE 'jklmn%')
   ]])
     end, {
         -- <where7-2.972.2>
@@ -36345,7 +36345,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1081
          OR ((a BETWEEN 19 AND 21) AND a!=20)
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 73 AND 75) AND a!=74)
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR a=6
@@ -36363,7 +36363,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1081
          OR ((a BETWEEN 19 AND 21) AND a!=20)
-         OR (g='ponmlkj' AND f GLOB 'tuvwx*')
+         OR (g='ponmlkj' AND f LIKE 'tuvwx%')
          OR ((a BETWEEN 73 AND 75) AND a!=74)
          OR (d>=38.0 AND d<39.0 AND d IS NOT NULL)
          OR a=6
@@ -36379,10 +36379,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR a=92
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR f='fghijklmn'
          OR a=100
          OR b=209
@@ -36402,10 +36402,10 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='fedcbaz' AND f GLOB 'rstuv*')
-         OR (g='rqponml' AND f GLOB 'lmnop*')
+      WHERE (g='fedcbaz' AND f LIKE 'rstuv%')
+         OR (g='rqponml' AND f LIKE 'lmnop%')
          OR a=92
-         OR (f GLOB '?klmn*' AND f GLOB 'jklm*')
+         OR (f LIKE '_klmn%' AND f LIKE 'jklm%')
          OR f='fghijklmn'
          OR a=100
          OR b=209
@@ -36458,13 +36458,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE ((a BETWEEN 51 AND 53) AND a!=52)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=91
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR b=77
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.976.1>
@@ -36478,13 +36478,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE ((a BETWEEN 51 AND 53) AND a!=52)
-         OR (g='utsrqpo' AND f GLOB 'uvwxy*')
-         OR (f GLOB '?cdef*' AND f GLOB 'bcde*')
+         OR (g='utsrqpo' AND f LIKE 'uvwxy%')
+         OR (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR b=91
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR b=77
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
-         OR (g='vutsrqp' AND f GLOB 'pqrst*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
+         OR (g='vutsrqp' AND f LIKE 'pqrst%')
   ]])
     end, {
         -- <where7-2.976.2>
@@ -36582,13 +36582,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=737
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR a=40
          OR f='uvwxyzabc'
          OR b=311
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=927
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
   ]])
@@ -36604,13 +36604,13 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=737
-         OR (g='wvutsrq' AND f GLOB 'ijklm*')
-         OR (f GLOB '?ghij*' AND f GLOB 'fghi*')
+         OR (g='wvutsrq' AND f LIKE 'ijklm%')
+         OR (f LIKE '_ghij%' AND f LIKE 'fghi%')
          OR a=40
          OR f='uvwxyzabc'
          OR b=311
-         OR (g='nmlkjih' AND f GLOB 'bcdef*')
-         OR (f GLOB '?hijk*' AND f GLOB 'ghij*')
+         OR (g='nmlkjih' AND f LIKE 'bcdef%')
+         OR (f LIKE '_hijk%' AND f LIKE 'ghij%')
          OR b=927
          OR (d>=50.0 AND d<51.0 AND d IS NOT NULL)
   ]])
@@ -36657,16 +36657,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR b=487
          OR f='tuvwxyzab'
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR b=971
          OR c=19019
          OR a=39
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR b=550
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=660
   ]])
     end, {
@@ -36680,16 +36680,16 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='xwvutsr' AND f GLOB 'ghijk*')
+      WHERE (g='xwvutsr' AND f LIKE 'ghijk%')
          OR b=487
          OR f='tuvwxyzab'
-         OR (g='onmlkji' AND f GLOB 'wxyza*')
+         OR (g='onmlkji' AND f LIKE 'wxyza%')
          OR b=971
          OR c=19019
          OR a=39
-         OR (f GLOB '?nopq*' AND f GLOB 'mnop*')
+         OR (f LIKE '_nopq%' AND f LIKE 'mnop%')
          OR b=550
-         OR (g='kjihgfe' AND f GLOB 'tuvwx*')
+         OR (g='kjihgfe' AND f LIKE 'tuvwx%')
          OR b=660
   ]])
     end, {
@@ -36735,7 +36735,7 @@ test:do_test(
          OR b=630
          OR b=935
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR f='yzabcdefg'
          OR ((a BETWEEN 37 AND 39) AND a!=38)
   ]])
@@ -36754,7 +36754,7 @@ test:do_test(
          OR b=630
          OR b=935
          OR (d>=20.0 AND d<21.0 AND d IS NOT NULL)
-         OR (g='srqponm' AND f GLOB 'defgh*')
+         OR (g='srqponm' AND f LIKE 'defgh%')
          OR f='yzabcdefg'
          OR ((a BETWEEN 37 AND 39) AND a!=38)
   ]])
@@ -36774,7 +36774,7 @@ test:do_test(
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
          OR f='abcdefghi'
          OR b=696
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=682
          OR a=32
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -36797,7 +36797,7 @@ test:do_test(
          OR (d>=86.0 AND d<87.0 AND d IS NOT NULL)
          OR f='abcdefghi'
          OR b=696
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=682
          OR a=32
          OR ((a BETWEEN 34 AND 36) AND a!=35)
@@ -36815,8 +36815,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (g='gfedcba' AND f GLOB 'lmnop*')
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+      WHERE (g='gfedcba' AND f LIKE 'lmnop%')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR b=311
   ]])
     end, {
@@ -36830,8 +36830,8 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (g='gfedcba' AND f GLOB 'lmnop*')
-         OR (f GLOB '?ijkl*' AND f GLOB 'hijk*')
+      WHERE (g='gfedcba' AND f LIKE 'lmnop%')
+         OR (f LIKE '_ijkl%' AND f LIKE 'hijk%')
          OR b=311
   ]])
     end, {
@@ -36884,7 +36884,7 @@ test:do_test(
       WHERE ((a BETWEEN 98 AND 100) AND a!=99)
          OR b=110
          OR ((a BETWEEN 38 AND 40) AND a!=39)
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR b=484
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
   ]])
@@ -36902,7 +36902,7 @@ test:do_test(
       WHERE ((a BETWEEN 98 AND 100) AND a!=99)
          OR b=110
          OR ((a BETWEEN 38 AND 40) AND a!=39)
-         OR (g='tsrqpon' AND f GLOB 'xyzab*')
+         OR (g='tsrqpon' AND f LIKE 'xyzab%')
          OR b=484
          OR (d>=82.0 AND d<83.0 AND d IS NOT NULL)
   ]])
@@ -36925,7 +36925,7 @@ test:do_test(
          OR c=27027
          OR b=1026
          OR c=6006
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -36947,7 +36947,7 @@ test:do_test(
          OR c=27027
          OR b=1026
          OR c=6006
-         OR (g='ponmlkj' AND f GLOB 'uvwxy*')
+         OR (g='ponmlkj' AND f LIKE 'uvwxy%')
          OR (d>=73.0 AND d<74.0 AND d IS NOT NULL)
   ]])
     end, {
@@ -36963,11 +36963,11 @@ test:do_test(
      SELECT a FROM t2
       WHERE (d>=79.0 AND d<80.0 AND d IS NOT NULL)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR a=97
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR ((a BETWEEN 22 AND 24) AND a!=23)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR b=674
          OR c=14014
          OR b=69
@@ -36985,11 +36985,11 @@ test:do_test(
      SELECT a FROM t3
       WHERE (d>=79.0 AND d<80.0 AND d IS NOT NULL)
          OR ((a BETWEEN 18 AND 20) AND a!=19)
-         OR (g='qponmlk' AND f GLOB 'nopqr*')
+         OR (g='qponmlk' AND f LIKE 'nopqr%')
          OR a=97
          OR (d>=45.0 AND d<46.0 AND d IS NOT NULL)
          OR ((a BETWEEN 22 AND 24) AND a!=23)
-         OR (g='mlkjihg' AND f GLOB 'ghijk*')
+         OR (g='mlkjihg' AND f LIKE 'ghijk%')
          OR b=674
          OR c=14014
          OR b=69
@@ -37039,12 +37039,12 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=451
          OR ((a BETWEEN 11 AND 13) AND a!=12)
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=539
          OR a=26
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR b=465
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.991.1>
@@ -37059,12 +37059,12 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=451
          OR ((a BETWEEN 11 AND 13) AND a!=12)
-         OR (g='tsrqpon' AND f GLOB 'abcde*')
+         OR (g='tsrqpon' AND f LIKE 'abcde%')
          OR b=539
          OR a=26
-         OR (g='srqponm' AND f GLOB 'efghi*')
+         OR (g='srqponm' AND f LIKE 'efghi%')
          OR b=465
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
   ]])
     end, {
         -- <where7-2.991.2>
@@ -37135,9 +37135,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t2
-      WHERE (f GLOB '?cdef*' AND f GLOB 'bcde*')
+      WHERE (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR a=13
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR b=322
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR b=377
@@ -37156,9 +37156,9 @@ test:do_test(
     function()
         return count_steps_sort([[
      SELECT a FROM t3
-      WHERE (f GLOB '?cdef*' AND f GLOB 'bcde*')
+      WHERE (f LIKE '_cdef%' AND f LIKE 'bcde%')
          OR a=13
-         OR (f GLOB '?stuv*' AND f GLOB 'rstu*')
+         OR (f LIKE '_stuv%' AND f LIKE 'rstu%')
          OR b=322
          OR ((a BETWEEN 33 AND 35) AND a!=34)
          OR b=377
@@ -37181,9 +37181,9 @@ test:do_test(
          OR b=990
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
          OR b=605
-         OR (g='srqponm' AND f GLOB 'cdefg*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=968
          OR a=66
   ]])
@@ -37202,9 +37202,9 @@ test:do_test(
          OR b=990
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
          OR b=605
-         OR (g='srqponm' AND f GLOB 'cdefg*')
+         OR (g='srqponm' AND f LIKE 'cdefg%')
          OR (d>=36.0 AND d<37.0 AND d IS NOT NULL)
-         OR (g='vutsrqp' AND f GLOB 'qrstu*')
+         OR (g='vutsrqp' AND f LIKE 'qrstu%')
          OR b=968
          OR a=66
   ]])
@@ -37220,12 +37220,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t2
       WHERE b=1059
-         OR (g='srqponm' AND f GLOB 'ghijk*')
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
          OR (d>=37.0 AND d<38.0 AND d IS NOT NULL)
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR ((a BETWEEN 39 AND 41) AND a!=40)
   ]])
     end, {
@@ -37240,12 +37240,12 @@ test:do_test(
         return count_steps_sort([[
      SELECT a FROM t3
       WHERE b=1059
-         OR (g='srqponm' AND f GLOB 'ghijk*')
-         OR (g='utsrqpo' AND f GLOB 'tuvwx*')
-         OR (g='nmlkjih' AND f GLOB 'fghij*')
+         OR (g='srqponm' AND f LIKE 'ghijk%')
+         OR (g='utsrqpo' AND f LIKE 'tuvwx%')
+         OR (g='nmlkjih' AND f LIKE 'fghij%')
          OR (d>=17.0 AND d<18.0 AND d IS NOT NULL)
          OR (d>=37.0 AND d<38.0 AND d IS NOT NULL)
-         OR (g='onmlkji' AND f GLOB 'abcde*')
+         OR (g='onmlkji' AND f LIKE 'abcde%')
          OR ((a BETWEEN 39 AND 41) AND a!=40)
   ]])
     end, {
@@ -37261,7 +37261,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE ((a BETWEEN 41 AND 43) AND a!=42)
          OR f='nopqrstuv'
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR a=42
          OR b=729
          OR b=297
@@ -37282,7 +37282,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE ((a BETWEEN 41 AND 43) AND a!=42)
          OR f='nopqrstuv'
-         OR (g='ponmlkj' AND f GLOB 'stuvw*')
+         OR (g='ponmlkj' AND f LIKE 'stuvw%')
          OR a=42
          OR b=729
          OR b=297
@@ -37337,9 +37337,9 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=451
          OR b=660
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
          OR b=781
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=198
          OR b=1023
          OR a=98
@@ -37359,9 +37359,9 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=451
          OR b=660
-         OR (g='onmlkji' AND f GLOB 'yzabc*')
+         OR (g='onmlkji' AND f LIKE 'yzabc%')
          OR b=781
-         OR (g='jihgfed' AND f GLOB 'wxyza*')
+         OR (g='jihgfed' AND f LIKE 'wxyza%')
          OR b=198
          OR b=1023
          OR a=98
@@ -37383,7 +37383,7 @@ test:do_test(
          OR a=86
          OR c=17017
          OR ((a BETWEEN 85 AND 87) AND a!=86)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR a=80
          OR b=773
   ]])
@@ -37402,7 +37402,7 @@ test:do_test(
          OR a=86
          OR c=17017
          OR ((a BETWEEN 85 AND 87) AND a!=86)
-         OR (g='gfedcba' AND f GLOB 'mnopq*')
+         OR (g='gfedcba' AND f LIKE 'mnopq%')
          OR a=80
          OR b=773
   ]])
@@ -37419,7 +37419,7 @@ test:do_test(
      SELECT a FROM t2
       WHERE b=1092
          OR a=23
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR d<0.0
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR a=91
@@ -37437,7 +37437,7 @@ test:do_test(
      SELECT a FROM t3
       WHERE b=1092
          OR a=23
-         OR (f GLOB '?defg*' AND f GLOB 'cdef*')
+         OR (f LIKE '_defg%' AND f LIKE 'cdef%')
          OR d<0.0
          OR (d>=22.0 AND d<23.0 AND d IS NOT NULL)
          OR a=91

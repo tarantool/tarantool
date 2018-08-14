@@ -232,7 +232,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE xyz(x  INT PRIMARY KEY);
         ALTER TABLE xyz RENAME TO "xyz1234abc";
-        SELECT "name" FROM "_space" WHERE "name" GLOB 'xyz*';
+        SELECT "name" FROM "_space" WHERE "name" = 'xyz1234abc';
     ]], {
         -- <alter-5.1>
         "xyz1234abc"
@@ -243,7 +243,7 @@ test:do_execsql_test(
     "alter-5.2",
     [[
         ALTER TABLE "xyz1234abc" RENAME TO xyzabc;
-        SELECT "name" FROM "_space" WHERE "name" GLOB 'XYZ*';
+        SELECT "name" FROM "_space" WHERE "name" = 'XYZABC';
     ]], {
         -- <alter-5.2>
         "XYZABC"

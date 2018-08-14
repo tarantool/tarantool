@@ -12,11 +12,11 @@ test:plan(282)
 --    May you find forgiveness for yourself and forgive others.
 --    May you share freely, never taking more than you give.
 --
--------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
--- focus of this file is testing the LIKE and GLOB operators and
--- in particular the optimizations that occur to help those operators
--- run faster.
+-----------------------------------------------------------------
+-- This file implements regression tests for SQLite library. The
+-- focus of this file is testing the LIKE operator and
+-- in particular the optimizations that occur to help this
+-- operator run faster.
 --
 -- $Id: like2.test,v 1.1 2008/05/26 18:33:41 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

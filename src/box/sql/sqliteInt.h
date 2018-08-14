@@ -527,16 +527,21 @@ sqlite3_snprintf(int, char *, const char *, ...);
 char *
 sqlite3_vsnprintf(int, char *, const char *, va_list);
 
+/**
+ * Wildcard characters used in REGEXP-like operators.
+ */
+#define MATCH_ONE_WILDCARD '_'
+#define MATCH_ALL_WILDCARD '%'
+
 int
-sqlite3_strlike(const char *zGlob, const char *zStr,
-		unsigned int cEsc);
+sql_strlike_cs(const char *zLike, const char *zStr, unsigned int cEsc);
+
+int
+sql_strlike_ci(const char *zLike, const char *zStr, unsigned int cEsc);
 
 typedef void (*sqlite3_destructor_type) (void *);
 #define SQLITE_STATIC      ((sqlite3_destructor_type)0)
 #define SQLITE_TRANSIENT   ((sqlite3_destructor_type)-1)
-
-int
-sqlite3_strglob(const char *zGlob, const char *zStr);
 
 int
 sqlite3_prepare(sqlite3 * db,	/* Database handle */
@@ -647,9 +652,6 @@ enum sql_subtype {
 	SQL_SUBTYPE_NO = 0,
 	SQL_SUBTYPE_MSGPACK = 77,
 };
-
-void *
-sqlite3_user_data(sqlite3_context *);
 
 void
 sqlite3_randomness(int N, void *P);
@@ -1757,7 +1759,7 @@ struct FuncDestructor {
    pArg, 0, xFunc, 0, #zName, {SQLITE_AFF_STRING, {0}}}
 #define LIKEFUNC(zName, nArg, arg, flags, type) \
   {nArg, SQLITE_FUNC_CONSTANT|flags, \
-   (void *)arg, 0, likeFunc, 0, #zName, {0}, type }
+   (void *)(SQLITE_INT_TO_PTR(arg)), 0, likeFunc, 0, #zName, {0}, type }
 #define AGGREGATE(zName, nArg, arg, nc, xStep, xFinal, type) \
   {nArg, (nc*SQLITE_FUNC_NEEDCOLL), \
    SQLITE_INT_TO_PTR(arg), 0, xStep,xFinal,#zName, {0}, type}
@@ -2153,7 +2155,7 @@ struct Expr {
 #define EP_Distinct  0x000010	/* Aggregate function with DISTINCT keyword */
 #define EP_VarSelect 0x000020	/* pSelect is correlated, not constant */
 #define EP_DblQuoted 0x000040	/* token.z was originally in "..." */
-#define EP_InfixFunc 0x000080	/* True for an infix function: LIKE, GLOB, etc */
+#define EP_InfixFunc 0x000080	/* True for an infix function: LIKE, etc */
 #define EP_Collate   0x000100	/* Tree contains a TK_COLLATE operator */
 #define EP_Generic   0x000200	/* Ignore COLLATE or affinity on this tree */
 #define EP_IntValue  0x000400	/* Integer value contained in u.iValue */
@@ -4550,7 +4552,20 @@ struct key_def *
 sql_key_info_to_key_def(struct sql_key_info *key_info);
 
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
-int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
+
+/**
+ * Check if the function implements LIKE-style comparison & if it
+ * is appropriate to apply a LIKE query optimization.
+ *
+ * @param db database structure.
+ * @param pExpr pointer to a function-implementing expression.
+ * @param[out] is_like_ci true if LIKE is case insensitive.
+ *
+ * @retval 1 if LIKE optimization can be used, 0 otherwise.
+ */
+int
+sql_is_like_func(struct sqlite3 *db, struct Expr *expr, int *is_like_ci);
+
 int sqlite3CreateFunc(sqlite3 *, const char *, enum affinity_type,
 		      int, int, void *,
 		      void (*)(sqlite3_context *, int, sqlite3_value **),

@@ -76,7 +76,7 @@ test:do_test(
     "triggerA-1.3",
     function()
         return test:execsql [[
-            CREATE VIEW v2 AS SELECT x, y FROM t1 WHERE y GLOB '*e*';
+            CREATE VIEW v2 AS SELECT x, y FROM t1 WHERE y LIKE '%e%';
             SELECT * FROM v2 ORDER BY 1;
         ]]
     end, {

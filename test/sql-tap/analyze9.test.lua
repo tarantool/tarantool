@@ -207,10 +207,10 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(81, 1, 'one-i');
         INSERT INTO t1 VALUES(91, 1, 'one-j');
         INSERT INTO t1 SELECT a+1,2,'two' || substr(c,4) FROM t1;
-        INSERT INTO t1 SELECT a+2,3,'three'||substr(c,4) FROM t1 WHERE c GLOB 'one-*';
-        INSERT INTO t1 SELECT a+3,4,'four'||substr(c,4) FROM t1 WHERE c GLOB 'one-*';
-        INSERT INTO t1 SELECT a+4,5,'five'||substr(c,4) FROM t1 WHERE c GLOB 'one-*';
-        INSERT INTO t1 SELECT a+5,6,'six'||substr(c,4) FROM t1 WHERE c GLOB 'one-*';	
+        INSERT INTO t1 SELECT a+2,3,'three'||substr(c,4) FROM t1 WHERE c LIKE 'one-%';
+        INSERT INTO t1 SELECT a+3,4,'four'||substr(c,4) FROM t1 WHERE c LIKE 'one-%';
+        INSERT INTO t1 SELECT a+4,5,'five'||substr(c,4) FROM t1 WHERE c LIKE 'one-%';
+        INSERT INTO t1 SELECT a+5,6,'six'||substr(c,4) FROM t1 WHERE c LIKE 'one-%';
         CREATE INDEX t1b ON t1(b);
         ANALYZE;
         SELECT c FROM t1 WHERE b=3 AND a BETWEEN 30 AND 60;
