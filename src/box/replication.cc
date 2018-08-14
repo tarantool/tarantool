@@ -48,7 +48,7 @@ struct tt_uuid INSTANCE_UUID;
 struct tt_uuid REPLICASET_UUID;
 
 double replication_timeout = 1.0; /* seconds */
-double replication_connect_timeout = 4.0; /* seconds */
+double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
 bool replication_skip_conflict = false;
@@ -550,7 +550,7 @@ applier_on_connect_f(struct trigger *trigger, void *event)
 
 void
 replicaset_connect(struct applier **appliers, int count,
-		   double timeout, bool connect_all)
+		   bool connect_quorum)
 {
 	if (count == 0) {
 		/* Cleanup the replica set. */
@@ -581,6 +581,9 @@ replicaset_connect(struct applier **appliers, int count,
 	state.connected = state.failed = 0;
 	fiber_cond_create(&state.wakeup);
 
+	double timeout = replication_connect_timeout;
+	int quorum = MIN(count, replication_connect_quorum);
+
 	/* Add triggers and start simulations connection to remote peers */
 	for (int i = 0; i < count; i++) {
 		struct applier *applier = appliers[i];
@@ -597,7 +600,7 @@ replicaset_connect(struct applier **appliers, int count,
 		double wait_start = ev_monotonic_now(loop());
 		if (fiber_cond_wait_timeout(&state.wakeup, timeout) != 0)
 			break;
-		if (state.failed > 0 && connect_all)
+		if (count - state.failed < quorum)
 			break;
 		timeout -= ev_monotonic_now(loop()) - wait_start;
 	}
@@ -605,7 +608,7 @@ replicaset_connect(struct applier **appliers, int count,
 		say_crit("failed to connect to %d out of %d replicas",
 			 count - state.connected, count);
 		/* Timeout or connection failure. */
-		if (connect_all)
+		if (connect_quorum && state.connected < quorum)
 			goto error;
 	} else {
 		say_verbose("connected to %d replicas", state.connected);

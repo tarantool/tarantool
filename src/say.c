@@ -222,6 +222,21 @@ static void
 write_to_syslog(struct log *log, int total);
 
 /**
+ * Sets O_NONBLOCK flag in case if lognonblock is set.
+ */
+static void
+log_set_nonblock(struct log *log)
+{
+	if (!log->nonblock)
+		return;
+	int flags;
+	if ((flags = fcntl(log->fd, F_GETFL, 0)) < 0 ||
+	    fcntl(log->fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+		say_syserror("fcntl, fd=%i", log->fd);
+	}
+}
+
+/**
  * Rotate logs on SIGHUP
  */
 static int
@@ -245,13 +260,8 @@ log_rotate(struct log *log)
 	dup2(fd, log->fd);
 	close(fd);
 
-	if (log->nonblock) {
-		int flags;
-		if ( (flags = fcntl(log->fd, F_GETFL, 0)) < 0 ||
-		     fcntl(log->fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-			say_syserror("fcntl, fd=%i", log->fd);
-		}
-	}
+	log_set_nonblock(log);
+
 	/* We are in ev signal handler
 	 * so we don't have to be worry about async signal safety
 	 */
@@ -630,12 +640,7 @@ log_create(struct log *log, const char *init_str, int nonblock)
 		 * non-blocking: this will garble interactive
 		 * console output.
 		 */
-		if (log->nonblock) {
-			int flags;
-			if ( (flags = fcntl(log->fd, F_GETFL, 0)) < 0 ||
-			     fcntl(log->fd, F_SETFL, flags | O_NONBLOCK) < 0)
-				say_syserror("fcntl, fd=%i", log->fd);
-		}
+		log_set_nonblock(log);
 	} else {
 		log->type = SAY_LOGGER_STDERR;
 		log->fd = STDERR_FILENO;
@@ -1003,6 +1008,7 @@ write_to_syslog(struct log *log, int total)
 			close(log->fd);
 		log->fd = log_syslog_connect(log);
 		if (log->fd >= 0) {
+			log_set_nonblock(log);
 			/*
 			 * In a case or error the log message is
 			 * lost. We can not wait for connection -

@@ -3,7 +3,7 @@ test_run = env.new()
 
 SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 -- Start servers
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 -- Wait for full mesh
 test_run:wait_fullmesh(SERVERS)
 
@@ -29,7 +29,7 @@ fio = require('fio')
 -- in 'read-only' mode unless it receives all data.
 list = fio.glob(fio.pathjoin(fio.abspath("."), 'autobootstrap1/*.xlog'))
 fio.unlink(list[#list])
-test_run:cmd("start server autobootstrap1")
+test_run:cmd('start server autobootstrap1 with args="0.1 0.5"')
 
 test_run:cmd("switch autobootstrap1")
 for i = 10, 19 do box.space.test:insert{i, 'test' .. i} end

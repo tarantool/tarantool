@@ -5,6 +5,10 @@ local INSTANCE_ID = string.match(arg[0], "%d")
 local USER = 'cluster'
 local PASSWORD = 'somepassword'
 local SOCKET_DIR = require('fio').cwd()
+
+local TIMEOUT = tonumber(arg[1])
+local CON_TIMEOUT  = arg[2] and tonumber(arg[2]) or 30.0
+
 local function instance_uri(instance_id)
     --return 'localhost:'..(3310 + instance_id)
     return SOCKET_DIR..'/autobootstrap'..instance_id..'.sock';
@@ -22,7 +26,8 @@ box.cfg({
         USER..':'..PASSWORD..'@'..instance_uri(3);
         USER..':'..PASSWORD..'@'..instance_uri(4);
     };
-    replication_connect_timeout = 0.5,
+    replication_timeout = TIMEOUT,
+    replication_connect_timeout = CON_TIMEOUT,
 })
 
 box.once("bootstrap", function()

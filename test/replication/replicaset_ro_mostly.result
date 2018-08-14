@@ -27,7 +27,7 @@ UUID = sort({uuid1, uuid2}, sort_cmp)
 create_cluster_cmd1 = 'create server %s with script="replication/%s.lua"'
 ---
 ...
-create_cluster_cmd2 = 'start server %s with args="%s", wait_load=False, wait=False'
+create_cluster_cmd2 = 'start server %s with args="%s %s", wait_load=False, wait=False'
 ---
 ...
 test_run:cmd("setopt delimiter ';'")
@@ -37,7 +37,9 @@ test_run:cmd("setopt delimiter ';'")
 function create_cluster_uuid(servers, uuids)
     for i, name in ipairs(servers) do
         test_run:cmd(create_cluster_cmd1:format(name, name))
-        test_run:cmd(create_cluster_cmd2:format(name, uuids[i]))
+    end
+    for i, name in ipairs(servers) do
+        test_run:cmd(create_cluster_cmd2:format(name, uuids[i], "0.1"))
     end
 end;
 ---
@@ -61,7 +63,7 @@ test_run:cmd(create_cluster_cmd1:format(name, name))
 ---
 - true
 ...
-test_run:cmd(create_cluster_cmd2:format(name, uuid.new()))
+test_run:cmd(create_cluster_cmd2:format(name, uuid.new(), "0.1"))
 ---
 - true
 ...

@@ -418,7 +418,7 @@ test_run:cmd("create server replica_timeout with rpl_master=default, script='rep
 ---
 - true
 ...
-test_run:cmd("start server replica_timeout with args='0.01'")
+test_run:cmd("start server replica_timeout with args='0.01 0.5'")
 ---
 - true
 ...
@@ -474,7 +474,7 @@ errinj.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
 ...
 -- Check replica's ACKs don't prevent the master from sending
 -- heartbeat messages (gh-3160).
-test_run:cmd("start server replica_timeout with args='0.009'")
+test_run:cmd("start server replica_timeout with args='0.009 0.5'")
 ---
 - true
 ...
@@ -522,7 +522,7 @@ for i = 0, 9999 do box.space.test:replace({i, 4, 5, 'test'}) end
 -- during the join stage, i.e. a replica with a minuscule
 -- timeout successfully bootstraps and breaks connection only
 -- after subscribe.
-test_run:cmd("start server replica_timeout with args='0.00001'")
+test_run:cmd("start server replica_timeout with args='0.00001 0.5'")
 ---
 - true
 ...

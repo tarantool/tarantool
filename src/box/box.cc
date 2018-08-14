@@ -656,7 +656,7 @@ cfg_get_replication(int *p_count)
  * don't start appliers.
  */
 static void
-box_sync_replication(double timeout, bool connect_all)
+box_sync_replication(bool connect_quorum)
 {
 	int count = 0;
 	struct applier **appliers = cfg_get_replication(&count);
@@ -668,7 +668,7 @@ box_sync_replication(double timeout, bool connect_all)
 			applier_delete(appliers[i]); /* doesn't affect diag */
 	});
 
-	replicaset_connect(appliers, count, timeout, connect_all);
+	replicaset_connect(appliers, count, connect_quorum);
 
 	guard.is_active = false;
 }
@@ -686,8 +686,13 @@ box_set_replication(void)
 	}
 
 	box_check_replication();
-	/* Try to connect to all replicas within the timeout period */
-	box_sync_replication(replication_connect_timeout, true);
+	/*
+	 * Try to connect to all replicas within the timeout period.
+	 * The configuration will succeed as long as we've managed
+	 * to connect to at least replication_connect_quorum
+	 * masters.
+	 */
+	box_sync_replication(true);
 	/* Follow replica */
 	replicaset_follow();
 }
@@ -1790,12 +1795,14 @@ bootstrap(const struct tt_uuid *instance_uuid,
 	/*
 	 * Wait for the cluster to start up.
 	 *
-	 * Note, when bootstrapping a new instance, we have to
-	 * connect to all masters to make sure all replicas
-	 * receive the same replica set UUID when a new cluster
-	 * is deployed.
+	 * Note, when bootstrapping a new instance, we try to
+	 * connect to all masters during timeout to make sure
+	 * all replicas recieve the same replica set UUID when
+	 * a new cluster is deployed. If we fail to do so, settle
+	 * with connecting to 'replication_connect_quorum' masters.
+	 * If this also fails, throw an error.
 	 */
-	box_sync_replication(TIMEOUT_INFINITY, true);
+	box_sync_replication(true);
 
 	/* Use the first replica by URI as a bootstrap leader */
 	struct replica *master = replicaset_leader();
@@ -1856,7 +1863,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 
 	if (wal_dir_lock >= 0) {
 		box_listen();
-		box_sync_replication(replication_connect_timeout, false);
+		box_sync_replication(false);
 
 		struct replica *master;
 		if (replicaset_needs_rejoin(&master)) {
@@ -1919,7 +1926,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 		 */
 		vclock_copy(&replicaset.vclock, &recovery->vclock);
 		box_listen();
-		box_sync_replication(replication_connect_timeout, false);
+		box_sync_replication(false);
 	}
 	recovery_finalize(recovery);
 	engine_end_recovery_xc();
