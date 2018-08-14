@@ -53,6 +53,7 @@
 #include "lua/utils.h"
 #include "third_party/lua-cjson/lua_cjson.h"
 #include "third_party/lua-yaml/lyaml.h"
+#include "extra/lua-zlib/lua_zlib.h"
 #include "lua/msgpack.h"
 #include "lua/pickle.h"
 #include "lua/fio.h"
@@ -115,7 +116,61 @@ extern char strict_lua[],
 	trigger_lua[],
 	string_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
-	zone_lua[] /* LuaJIT 2.1 profiler */;
+	zone_lua[], /* LuaJIT 2.1 profiler */
+	luarocks_cfg_lua[],
+	luarocks_command_line_lua[],
+	luarocks_deps_lua[],
+	luarocks_dir_lua[],
+	luarocks_fs_lua[],
+	luarocks_fs_lua_lua[],
+	luarocks_fs_tools_lua[],
+	luarocks_fs_unix_lua[],
+	luarocks_fs_unix_tools_lua[],
+	luarocks_loader_lua[],
+	luarocks_manif_core_lua[],
+	luarocks_path_lua[],
+	luarocks_persist_lua[],
+	luarocks_site_config_lua[],
+	luarocks_patch_lua[],
+	luarocks_zip_lua[],
+	luarocks_type_check_lua[],
+	luarocks_util_lua[],
+	luarocks_search_lua[],
+	luarocks_manif_lua[],
+	luarocks_repos_lua[],
+	luarocks_fetch_lua[],
+	luarocks_remove_lua[],
+	luarocks_install_lua[],
+	luarocks_pack_lua[],
+	luarocks_unpack_lua[],
+	luarocks_build_lua[],
+	luarocks_build_builtin_lua[],
+	luarocks_build_make_lua[],
+	luarocks_build_cmake_lua[],
+	luarocks_build_command_lua[],
+	luarocks_purge_lua[],
+	luarocks_make_manifest_lua[],
+	luarocks_upload_multipart_lua[],
+	luarocks_upload_api_lua[],
+	luarocks_upload_lua[],
+	luarocks_unpack_lua[],
+	luarocks_add_lua[],
+	luarocks_make_lua[],
+	luarocks_download_lua[],
+	luarocks_admin_remove_lua[],
+	luarocks_index_lua[],
+	luarocks_new_version_lua[],
+	luarocks_doc_lua[],
+	luarocks_cache_lua[],
+	luarocks_search_lua[],
+	luarocks_write_rockspec_lua[],
+	luarocks_fetch_lua[],
+	luarocks_fetch_svn_lua[],
+	luarocks_fetch_git_lua[],
+	luarocks_fetch_cvs_lua[],
+	luarocks_fetch_sscm_lua[],
+	luarocks_fetch_hg_lua[],
+	luarocks_validate_lua[];
 
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
@@ -158,6 +213,60 @@ static const char *lua_modules[] = {
 	/* Profiler */
 	"jit.p", p_lua,
 	"jit.zone", zone_lua,
+	/* luarocks */
+	"luarocks.util", luarocks_util_lua,
+	"luarocks.persist", luarocks_persist_lua,
+	"luarocks.site_config", luarocks_site_config_lua,
+	"luarocks.cfg", luarocks_cfg_lua,
+	"luarocks.dir", luarocks_dir_lua,
+	"luarocks.path", luarocks_path_lua,
+	"luarocks.manif_core", luarocks_manif_core_lua,
+	"luarocks.deps", luarocks_deps_lua,
+	"luarocks.type_check", luarocks_type_check_lua,
+	"luarocks.fs", luarocks_fs_lua,
+	"luarocks.tools.patch", luarocks_patch_lua,
+	"luarocks.tools.zip", luarocks_zip_lua,
+	"luarocks.fs.unix", luarocks_fs_unix_lua,
+	"luarocks.fs.lua", luarocks_fs_lua_lua,
+	"luarocks.fs.unix.tools", luarocks_fs_unix_tools_lua,
+	"luarocks.fs.tools", luarocks_fs_tools_lua,
+	"luarocks.command_line", luarocks_command_line_lua,
+	"luarocks.loader", luarocks_loader_lua,
+	"luarocks.fetch", luarocks_fetch_lua,
+	"luarocks.search", luarocks_search_lua,
+	"luarocks.manif", luarocks_manif_lua,
+	"luarocks.repos", luarocks_repos_lua,
+	"luarocks.remove", luarocks_remove_lua,
+	"luarocks.install", luarocks_install_lua,
+	"luarocks.pack", luarocks_pack_lua,
+	"luarocks.build", luarocks_build_lua,
+	"luarocks.build.builtin", luarocks_build_builtin_lua,
+	"luarocks.build.make", luarocks_build_make_lua,
+	"luarocks.build.cmake", luarocks_build_cmake_lua,
+	"luarocks.build.command", luarocks_build_command_lua,
+	"luarocks.purge", luarocks_purge_lua,
+	"luarocks.index", luarocks_index_lua,
+	"luarocks.make_manifest", luarocks_make_manifest_lua,
+	"luarocks.upload.multipart", luarocks_upload_multipart_lua,
+	"luarocks.upload.api", luarocks_upload_api_lua,
+	"luarocks.upload", luarocks_upload_lua,
+	"luarocks.unpack", luarocks_unpack_lua,
+	"luarocks.cache", luarocks_cache_lua,
+	"luarocks.add", luarocks_add_lua,
+	"luarocks.make", luarocks_make_lua,
+	"luarocks.download", luarocks_download_lua,
+	"luarocks.admin_remove", luarocks_admin_remove_lua,
+	"luarocks.new_version", luarocks_new_version_lua,
+	"luarocks.doc", luarocks_doc_lua,
+	"luarocks.search", luarocks_search_lua,
+	"luarocks.write_rockspec", luarocks_write_rockspec_lua,
+	"luarocks.fetch", luarocks_fetch_lua,
+	"luarocks.fetch.svn", luarocks_fetch_svn_lua,
+	"luarocks.fetch.git", luarocks_fetch_git_lua,
+	"luarocks.fetch.cvs", luarocks_fetch_cvs_lua,
+	"luarocks.fetch.sscm", luarocks_fetch_sscm_lua,
+	"luarocks.fetch.hg", luarocks_fetch_hg_lua,
+	"luarocks.validate", luarocks_validate_lua,
 	NULL
 };
 
@@ -430,6 +539,8 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	lua_pop(L, 1);
 	luaopen_json(L);
 	lua_pop(L, 1);
+	luaopen_zlib(L);
+	lua_pop(L, 1);
 #if defined(HAVE_GNU_READLINE)
 	/*
 	 * Disable libreadline signals handlers. All signals are handled in
@@ -438,6 +549,9 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	rl_catch_signals = 0;
 	rl_catch_sigwinch = 0;
 #endif
+
+	luaopen_tarantool(L);
+	lua_pop(L, 1);
 
 	lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
 	for (const char **s = lua_modules; *s; s += 2) {
@@ -459,8 +573,6 @@ tarantool_lua_init(const char *tarantool_bin, int argc, char **argv)
 	}
 	lua_pop(L, 1); /* _LOADED */
 
-	luaopen_tarantool(L);
-	lua_pop(L, 1);
 
 	lua_newtable(L);
 	lua_pushinteger(L, -1);

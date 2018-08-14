@@ -31,3 +31,7 @@
 	path = third_party/luarocks
 	url = https://github.com/tarantool/luarocks.git
 	branch = tarantool-1.7
+[submodule "third_party/lua-zlib"]
+	path = third_party/lua-zlib
+	url = https://github.com/tarantool/lua-zlib.git
+	branch = v1.2

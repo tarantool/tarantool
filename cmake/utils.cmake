@@ -38,7 +38,7 @@ macro(set_source_files_compile_flags)
 endmacro(set_source_files_compile_flags)
 
 # A helper function to compile *.lua source into *.lua.c sources
-function(lua_source varname filename)
+function(lua_source varname filename symbolname)
     if (IS_ABSOLUTE "${filename}")
         set (srcfile "${filename}")
         set (tmpfile "${filename}.new.c")
@@ -57,7 +57,7 @@ function(lua_source varname filename)
     endif()
 
     ADD_CUSTOM_COMMAND(OUTPUT ${dstfile}
-        COMMAND ${ECHO} 'const char ${module}_lua[] =' > ${tmpfile}
+        COMMAND ${ECHO} 'const char ${symbolname}[] =' > ${tmpfile}
         COMMAND ${CMAKE_BINARY_DIR}/extra/txt2c ${srcfile} >> ${tmpfile}
         COMMAND ${ECHO} '\;' >> ${tmpfile}
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${tmpfile} ${dstfile}
@@ -85,4 +85,3 @@ function(bin_source varname srcfile dstfile)
         DEPENDS ${srcfile} bin2c)
 
 endfunction()
-
