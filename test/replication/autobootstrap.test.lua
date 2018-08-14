@@ -8,7 +8,7 @@ SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 --
 -- Start servers
 --
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 
 --
 -- Wait for full mesh
@@ -76,7 +76,7 @@ box.space.test_u:select()
 -- Rebootstrap one node and check that others follow.
 --
 _ = test_run:cmd("switch autobootstrap1")
-_ = test_run:cmd("restart server autobootstrap1 with cleanup=1")
+_ = test_run:cmd("restart server autobootstrap1 with cleanup=1, args ='0.1 0.5'")
 
 _ = box.space.test_u:replace({5, 6, 7, 8})
 box.space.test_u:select()

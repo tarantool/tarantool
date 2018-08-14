@@ -37,7 +37,7 @@ box.cfg{read_only = false}
 SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 test_run:wait_fullmesh(SERVERS)
 test_run:cmd("switch autobootstrap1")
 test_run = require('test_run').new()

@@ -7,7 +7,7 @@ SERVERS = { 'autobootstrap_guest1', 'autobootstrap_guest2', 'autobootstrap_guest
 --
 -- Start servers
 --
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 
 --
 -- Wait for full mesh

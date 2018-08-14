@@ -9,7 +9,7 @@ errinj = box.error.injection
 
 box.schema.user.grant('guest', 'replication')
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica_timeout.lua'")
-test_run:cmd("start server replica with args='1'")
+test_run:cmd("start server replica with args='0.1'")
 test_run:cmd("switch replica")
 
 test_run:cmd("switch default")

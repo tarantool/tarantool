@@ -5,7 +5,8 @@ box.cfg({
     replication         = os.getenv("MASTER"),
     memtx_memory        = 107374182,
     replication_connect_quorum = 0,
-    replication_connect_timeout = 0.1,
+    replication_timeout = 0.1,
+    replication_connect_timeout = 0.5,
 })
 
 require('console').listen(os.getenv('ADMIN'))

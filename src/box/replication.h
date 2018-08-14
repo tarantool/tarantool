@@ -352,12 +352,13 @@ replicaset_add(uint32_t replica_id, const struct tt_uuid *instance_uuid);
  * \param appliers the array of appliers
  * \param count size of appliers array
  * \param timeout connection timeout
- * \param connect_all if this flag is set, fail unless all
- *                    appliers have successfully connected
+ * \param connect_quorum if this flag is set, fail unless at
+ *                       least replication_connect_quorum
+ *                       appliers have successfully connected.
  */
 void
 replicaset_connect(struct applier **appliers, int count,
-		   double timeout, bool connect_all);
+		   bool connect_quorum);
 
 /**
  * Check if the current instance fell too much behind its

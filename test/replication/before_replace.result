@@ -11,7 +11,7 @@ SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 ---
 ...
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
+test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
 test_run:wait_fullmesh(SERVERS)
@@ -135,7 +135,7 @@ box.space.test:select()
   - [9, 90]
   - [10, 100]
 ...
-test_run:cmd('restart server autobootstrap1')
+test_run:cmd('restart server autobootstrap1 with args="0.1 0.5"')
 box.space.test:select()
 ---
 - - [1, 10]
@@ -166,7 +166,7 @@ box.space.test:select()
   - [9, 90]
   - [10, 100]
 ...
-test_run:cmd('restart server autobootstrap2')
+test_run:cmd('restart server autobootstrap2 with args="0.1 0.5"')
 box.space.test:select()
 ---
 - - [1, 10]
@@ -201,7 +201,7 @@ push_err
 ---
 - Session 'applier' does not support push()
 ...
-test_run:cmd('restart server autobootstrap3')
+test_run:cmd('restart server autobootstrap3 with args="0.1 0.5"')
 box.space.test:select()
 ---
 - - [1, 10]
