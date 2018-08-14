@@ -258,7 +258,7 @@ vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "limit", q->limit);
 	info_append_int(h, "watermark", q->watermark);
 	info_append_int(h, "use_rate", q->use_rate);
-	info_append_int(h, "dump_bandwidth", vy_quota_dump_bandwidth(q));
+	info_append_int(h, "dump_bandwidth", q->dump_bw);
 	info_table_end(h);
 }
 

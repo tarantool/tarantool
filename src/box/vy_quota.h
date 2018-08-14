@@ -91,6 +91,8 @@ struct vy_quota {
 	 * moving average of use_curr.
 	 */
 	size_t use_rate;
+	/** Current dump bandwidth estimate. */
+	size_t dump_bw;
 	/**
 	 * Dump bandwidth is needed for calculating the quota watermark.
 	 * The higher the bandwidth, the later we can start dumping w/o

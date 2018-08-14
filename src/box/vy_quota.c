@@ -57,6 +57,12 @@ enum {
 };
 
 /**
+ * Histogram percentile used for estimating dump bandwidth.
+ * For details see the comment to vy_quota::dump_bw_hist.
+ */
+enum { VY_DUMP_BANDWIDTH_PCT = 10 };
+
+/**
  * Returns true if the quota limit is exceeded and so consumers
  * have to wait.
  */
@@ -94,9 +100,8 @@ vy_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 	 *   ----------------- = --------------
 	 *        use_rate       dump_bandwidth
 	 */
-	size_t dump_bandwidth = vy_quota_dump_bandwidth(q);
-	q->watermark = ((double)q->limit * dump_bandwidth /
-			(dump_bandwidth + q->use_rate + 1));
+	q->watermark = ((double)q->limit * q->dump_bw /
+			(q->dump_bw + q->use_rate + 1));
 	if (q->used >= q->watermark)
 		q->quota_exceeded_cb(q);
 }
@@ -127,7 +132,8 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 	 * Until we dump anything, assume bandwidth to be 10 MB/s,
 	 * which should be fine for initial guess.
 	 */
-	histogram_collect(q->dump_bw_hist, 10 * MB);
+	q->dump_bw = 10 * MB;
+	histogram_collect(q->dump_bw_hist, q->dump_bw);
 
 	q->limit = SIZE_MAX;
 	q->watermark = SIZE_MAX;
@@ -162,19 +168,15 @@ vy_quota_set_limit(struct vy_quota *q, size_t limit)
 	fiber_cond_signal(&q->cond);
 }
 
-size_t
-vy_quota_dump_bandwidth(struct vy_quota *q)
-{
-	/* See comment to vy_quota::dump_bw_hist. */
-	return histogram_percentile(q->dump_bw_hist, 10);
-}
-
 void
 vy_quota_update_dump_bandwidth(struct vy_quota *q, size_t size,
 			       double duration)
 {
-	if (duration > 0)
+	if (duration > 0) {
 		histogram_collect(q->dump_bw_hist, size / duration);
+		q->dump_bw = histogram_percentile(q->dump_bw_hist,
+						  VY_DUMP_BANDWIDTH_PCT);
+	}
 }
 
 void
