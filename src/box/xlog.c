@@ -183,6 +183,13 @@ parse_vclock(const char *val, const char *val_end, struct vclock *vclock)
 	return 0;
 }
 
+static inline bool
+xlog_meta_key_equal(const char *key, const char *key_end, const char *str)
+{
+	size_t key_len = key_end - key;
+	return key_len == strlen(str) && memcmp(key, str, key_len) == 0;
+}
+
 /**
  * Parse xlog meta from buffer, update buffer read
  * position in case of success
@@ -261,8 +268,8 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 		assert(val <= val_end);
 		pos = eol + 1;
 
-		if (memcmp(key, INSTANCE_UUID_KEY, key_end - key) == 0 ||
-		    memcmp(key, INSTANCE_UUID_KEY_V12, key_end - key) == 0) {
+		if (xlog_meta_key_equal(key, key_end, INSTANCE_UUID_KEY) ||
+		    xlog_meta_key_equal(key, key_end, INSTANCE_UUID_KEY_V12)) {
 			/*
 			 * Instance: <uuid>
 			 */
@@ -277,19 +284,19 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 				diag_set(XlogError, "can't parse instance UUID");
 				return -1;
 			}
-		} else if (memcmp(key, VCLOCK_KEY, key_end - key) == 0){
+		} else if (xlog_meta_key_equal(key, key_end, VCLOCK_KEY)) {
 			/*
 			 * VClock: <vclock>
 			 */
 			if (parse_vclock(val, val_end, &meta->vclock) != 0)
 				return -1;
-		} else if (memcmp(key, PREV_VCLOCK_KEY, key_end - key) == 0) {
+		} else if (xlog_meta_key_equal(key, key_end, PREV_VCLOCK_KEY)) {
 			/*
 			 * PrevVClock: <vclock>
 			 */
 			if (parse_vclock(val, val_end, &meta->prev_vclock) != 0)
 				return -1;
-		} else if (memcmp(key, VERSION_KEY, key_end - key) == 0) {
+		} else if (xlog_meta_key_equal(key, key_end, VERSION_KEY)) {
 			/* Ignore Version: for now */
 		} else {
 			/*
