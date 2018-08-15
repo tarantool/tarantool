@@ -90,6 +90,13 @@ int64_t
 histogram_percentile(struct histogram *hist, int pct);
 
 /**
+ * Same as histogram_percentile(), but return a lower bound
+ * estimate of the percentile.
+ */
+int64_t
+histogram_percentile_lower(struct histogram *hist, int pct);
+
+/**
  * Print string representation of a histogram.
  */
 int

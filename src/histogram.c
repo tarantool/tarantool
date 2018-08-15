@@ -145,6 +145,19 @@ histogram_percentile(struct histogram *hist, int pct)
 	return hist->max;
 }
 
+int64_t
+histogram_percentile_lower(struct histogram *hist, int pct)
+{
+	size_t count = 0;
+
+	for (size_t i = 0; i < hist->n_buckets; i++) {
+		count += hist->buckets[i].count;
+		if (count * 100 > hist->total * pct)
+			return hist->buckets[i > 0 ? i - 1 : 0].max;
+	}
+	return hist->max;
+}
+
 int
 histogram_snprint(char *buf, int size, struct histogram *hist)
 {

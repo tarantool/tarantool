@@ -154,14 +154,18 @@ test_percentile(void)
 	for (int pct = 5; pct < 100; pct += 5) {
 		int64_t val = data[data_len * pct / 100];
 		int64_t expected = max;
+		int64_t expected_lo = max;
 		for (size_t b = 0; b < n_buckets; b++) {
 			if (buckets[b] >= val) {
 				expected = buckets[b];
+				expected_lo = buckets[b > 0 ? b - 1 : 0];
 				break;
 			}
 		}
 		int64_t result = histogram_percentile(hist, pct);
 		fail_if(result != expected);
+		int64_t result_lo = histogram_percentile_lower(hist, pct);
+		fail_if(result_lo != expected_lo);
 	}
 
 	histogram_delete(hist);
