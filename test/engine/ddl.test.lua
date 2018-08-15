@@ -686,6 +686,25 @@ sk4:select{}
 s:drop()
 
 --
+-- gh-3578: false-positive unique constraint violation check failure.
+--
+fiber = require('fiber')
+
+s = box.schema.space.create('test', {engine = engine})
+_ = s:create_index('pk')
+s:replace{1, 1, 1}
+
+c = fiber.channel(1)
+_ = fiber.create(function() for i = 1, 10 do s:update(1, {{'+', 3, 1}}) end c:put(true) end)
+
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+s.index.pk:select()
+s.index.sk:select()
+
+c:get()
+s:drop()
+
+--
 -- Creating/altering a secondary index of a non-empty space.
 --
 s = box.schema.space.create('test', {engine = engine})
