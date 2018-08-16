@@ -56,6 +56,12 @@ enum {
 	VY_QUOTA_RATE_AVG_PERIOD = 5,
 };
 
+/*
+ * Until we dump anything, assume bandwidth to be 10 MB/s,
+ * which should be fine for initial guess.
+ */
+static const size_t VY_DEFAULT_DUMP_BANDWIDTH = 10 * 1024 * 1024;
+
 /**
  * Histogram percentile used for estimating dump bandwidth.
  * For details see the comment to vy_quota::dump_bw_hist.
@@ -128,12 +134,6 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 			 "dump bandwidth histogram");
 		return -1;
 	}
-	/*
-	 * Until we dump anything, assume bandwidth to be 10 MB/s,
-	 * which should be fine for initial guess.
-	 */
-	q->dump_bw = 10 * MB;
-	histogram_collect(q->dump_bw_hist, q->dump_bw);
 
 	q->limit = SIZE_MAX;
 	q->watermark = SIZE_MAX;
@@ -141,6 +141,7 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 	q->use_curr = 0;
 	q->use_rate = 0;
 	q->too_long_threshold = TIMEOUT_INFINITY;
+	q->dump_bw = VY_DEFAULT_DUMP_BANDWIDTH;
 	q->quota_exceeded_cb = quota_exceeded_cb;
 	fiber_cond_create(&q->cond);
 	ev_timer_init(&q->timer, vy_quota_timer_cb, 0,
