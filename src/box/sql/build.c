@@ -290,7 +290,8 @@ table_column_is_in_pk(Table *table, uint32_t column)
 	struct space *space = space_by_id(table->def->id);
 	assert(space != NULL);
 
-	struct index *primary_idx = index_find(space, 0 /* PK */);
+	/* Primary key always has index 0. */
+	struct index *primary_idx = space_index(space, 0);
 	/* Views don't have any indexes. */
 	if (primary_idx == NULL)
 		return false;

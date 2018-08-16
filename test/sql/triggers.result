@@ -356,3 +356,34 @@ box.sql.execute("DROP TABLE test;")
 box.sql.execute("DROP TABLE test2;")
 ---
 ...
+--
+-- gh-3536: Some triggers cause error messages and/or half-finished updates
+--
+box.sql.execute("CREATE TABLE t (s1 INT, s2 INT, s3 INT, s4 INT PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE VIEW v AS SELECT s1, s2 FROM t;")
+---
+...
+box.sql.execute("CREATE TRIGGER tv INSTEAD OF UPDATE ON v BEGIN UPDATE t SET s3 = new.s1 WHERE s1 = old.s1; END;")
+---
+...
+box.sql.execute("INSERT INTO t VALUES (1,1,1,1);")
+---
+...
+box.sql.execute("UPDATE v SET s2 = s1 + 1;")
+---
+...
+box.sql.execute("UPDATE v SET s1 = s1 + 5;")
+---
+...
+box.sql.execute("SELECT * FROM t;")
+---
+- - [1, 1, 6, 1]
+...
+box.sql.execute("DROP VIEW v;")
+---
+...
+box.sql.execute("DROP TABLE t;")
+---
+...
