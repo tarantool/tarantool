@@ -136,7 +136,7 @@ box.cfg {
 
     -- If true, tarantool does not block on the log file descriptor
     -- when it’s not ready for write, and drops the message instead
-    log_nonblock = true;
+    log_nonblock = false;
 
     -- If processing a request takes longer than
     -- the given value (in seconds), warn about it in the log
