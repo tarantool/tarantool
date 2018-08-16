@@ -67,6 +67,8 @@ t
   - index
   - info
   - internal
+  - on_commit
+  - on_rollback
   - once
   - priv
   - rollback
