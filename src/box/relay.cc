@@ -203,7 +203,8 @@ relay_cancel(struct relay *relay)
 {
 	/* Check that the thread is running first. */
 	if (relay->cord.id != 0) {
-		tt_pthread_cancel(relay->cord.id);
+		if (tt_pthread_cancel(relay->cord.id) == ESRCH)
+			return;
 		tt_pthread_join(relay->cord.id, NULL);
 	}
 }
