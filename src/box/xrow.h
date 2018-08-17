@@ -127,6 +127,9 @@ struct request {
 	/** Upsert operations. */
 	const char *ops;
 	const char *ops_end;
+	/** Tuple metadata. */
+	const char *tuple_meta;
+	const char *tuple_meta_end;
 	/** Base field offset for UPDATE/UPSERT, e.g. 0 for C and 1 for Lua. */
 	int index_base;
 };

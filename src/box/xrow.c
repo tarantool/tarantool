@@ -532,6 +532,10 @@ error:
 			request->ops = value;
 			request->ops_end = data;
 			break;
+		case IPROTO_TUPLE_META:
+			request->tuple_meta = value;
+			request->tuple_meta_end = data;
+			break;
 		default:
 			break;
 		}
@@ -585,7 +589,8 @@ xrow_encode_dml(const struct request *request, struct iovec *iov)
 	const int MAP_LEN_MAX = 40;
 	uint32_t key_len = request->key_end - request->key;
 	uint32_t ops_len = request->ops_end - request->ops;
-	uint32_t len = MAP_LEN_MAX + key_len + ops_len;
+	uint32_t tuple_meta_len = request->tuple_meta_end - request->tuple_meta;
+	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len;
 	char *begin = (char *) region_alloc(&fiber()->gc, len);
 	if (begin == NULL) {
 		diag_set(OutOfMemory, len, "region_alloc", "begin");
@@ -618,6 +623,12 @@ xrow_encode_dml(const struct request *request, struct iovec *iov)
 		pos = mp_encode_uint(pos, IPROTO_OPS);
 		memcpy(pos, request->ops, ops_len);
 		pos += ops_len;
+		map_size++;
+	}
+	if (request->tuple_meta) {
+		pos = mp_encode_uint(pos, IPROTO_TUPLE_META);
+		memcpy(pos, request->tuple_meta, tuple_meta_len);
+		pos += tuple_meta_len;
 		map_size++;
 	}
 	if (request->tuple) {

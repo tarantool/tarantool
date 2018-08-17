@@ -78,6 +78,7 @@ enum iproto_key {
 	IPROTO_EXPR = 0x27, /* EVAL */
 	IPROTO_OPS = 0x28, /* UPSERT but not UPDATE ops, because of legacy */
 	IPROTO_BALLOT = 0x29,
+	IPROTO_TUPLE_META = 0x2a,
 	/* Leave a gap between request keys and response keys */
 	IPROTO_DATA = 0x30,
 	IPROTO_ERROR = 0x31,
@@ -96,7 +97,7 @@ enum iproto_ballot_key {
 			  bit(LSN) | bit(SCHEMA_VERSION))
 #define IPROTO_DML_BODY_BMAP (bit(SPACE_ID) | bit(INDEX_ID) | bit(LIMIT) |\
 			      bit(OFFSET) | bit(ITERATOR) | bit(INDEX_BASE) |\
-			      bit(KEY) | bit(TUPLE) | bit(OPS))
+			      bit(KEY) | bit(TUPLE) | bit(OPS) | bit(TUPLE_META))
 
 static inline bool
 xrow_header_has_key(const char *pos, const char *end)

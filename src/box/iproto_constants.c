@@ -87,6 +87,7 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 	/* 0x27 */	MP_STR, /* IPROTO_EXPR */
 	/* 0x28 */	MP_ARRAY, /* IPROTO_OPS */
 	/* 0x29 */	MP_MAP, /* IPROTO_BALLOT */
+	/* 0x2a */	MP_MAP, /* IPROTO_TUPLE_META */
 	/* }}} */
 };
 
@@ -168,7 +169,7 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"expression",       /* 0x27 */
 	"operations",       /* 0x28 */
 	"ballot",           /* 0x29 */
-	NULL,               /* 0x2a */
+	"tuple meta",       /* 0x2a */
 	NULL,               /* 0x2b */
 	NULL,               /* 0x2c */
 	NULL,               /* 0x2d */
