@@ -42,6 +42,7 @@
 #include "small/obuf.h"
 #include "lua_sql.h"
 #include "trivia/util.h"
+#include "mpstream.h"
 
 /**
  * A helper to find a Lua function by name and put it
@@ -175,7 +176,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 *         ..., { scalar }, ...`
 				 */
 				lua_pushvalue(L, i);
-				luamp_encode_array(cfg, stream, 1);
+				mpstream_encode_array(stream, 1);
 				luamp_encode_r(L, cfg, stream, &field, 0);
 				lua_pop(L, 1);
 			} else {
@@ -202,7 +203,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 		 * `return scalar`
 		 * `return map`
 		 */
-		luamp_encode_array(cfg, stream, 1);
+		mpstream_encode_array(stream, 1);
 		assert(lua_gettop(L) == 1);
 		luamp_encode_r(L, cfg, stream, &root, 0);
 		return 1;
@@ -211,7 +212,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 	assert(root.type == MP_ARRAY);
 	if (root.size == 0) {
 		/* `return {}` => `{ box.tuple() }` */
-		luamp_encode_array(cfg, stream, 0);
+		mpstream_encode_array(stream, 0);
 		return 1;
 	}
 
@@ -230,7 +231,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 				 * `return { scalar, ... } =>
 				 *        box.tuple.new(scalar, ...)`
 				 */
-				luamp_encode_array(cfg, stream, root.size);
+				mpstream_encode_array(stream, root.size);
 				/*
 				 * Encode the first field of tuple using
 				 * existing information from luaL_tofield
@@ -250,7 +251,7 @@ luamp_encode_call_16(lua_State *L, struct luaL_serializer *cfg,
 			 * `return { tuple/array, ..., scalar, ... } =>
 			 *         { tuple/array, ..., { scalar }, ... }`
 			 */
-			luamp_encode_array(cfg, stream, 1);
+			mpstream_encode_array(stream, 1);
 			luamp_encode_r(L, cfg, stream, &field, 0);
 		} else {
 			/* `return { tuple/array, ..., tuple/array, ... }` */

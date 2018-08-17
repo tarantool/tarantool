@@ -38,6 +38,7 @@
 #include "box/box.h"
 #include "box/port.h"
 #include "box/lua/tuple.h"
+#include "mpstream.h"
 
 /** {{{ Miscellaneous utils **/
 

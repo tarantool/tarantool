@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "lua/msgpack.h"
-
+#include "mpstream.h"
 #include "lua/utils.h"
 
 #if defined(LUAJIT)
@@ -50,46 +50,6 @@ luamp_error(void *error_ctx)
 	luaL_error(L, diag_last_error(diag_get())->errmsg);
 }
 
-void
-mpstream_init(struct mpstream *stream, void *ctx,
-	      luamp_reserve_f reserve, luamp_alloc_f alloc,
-	      luamp_error_f error, void *error_ctx)
-{
-	stream->ctx = ctx;
-	stream->reserve = reserve;
-	stream->alloc = alloc;
-	stream->error = error;
-	stream->error_ctx = error_ctx;
-	mpstream_reset(stream);
-}
-
-void
-mpstream_reserve_slow(struct mpstream *stream, size_t size)
-{
-	stream->alloc(stream->ctx, stream->pos - stream->buf);
-	stream->buf = (char *) stream->reserve(stream->ctx, &size);
-	if (stream->buf == NULL) {
-		diag_set(OutOfMemory, size, "mpstream", "reserve");
-		stream->error(stream->error_ctx);
-	}
-	stream->pos = stream->buf;
-	stream->end = stream->pos + size;
-}
-
-void
-mpstream_reset(struct mpstream *stream)
-{
-	size_t size = 0;
-	stream->buf = (char *) stream->reserve(stream->ctx, &size);
-	if (stream->buf == NULL) {
-		diag_set(OutOfMemory, size, "mpstream", "reset");
-		stream->error(stream->error_ctx);
-	}
-	stream->pos = stream->buf;
-	stream->end = stream->pos + size;
-}
-
-
 static uint32_t CTID_CHAR_PTR;
 static uint32_t CTID_STRUCT_IBUF;
 
@@ -106,104 +66,6 @@ static luamp_encode_extension_f luamp_encode_extension =
 		luamp_encode_extension_default;
 static luamp_decode_extension_f luamp_decode_extension =
 		luamp_decode_extension_default;
-
-void
-luamp_encode_array(struct luaL_serializer *cfg, struct mpstream *stream,
-		   uint32_t size)
-{
-	(void) cfg;
-	assert(mp_sizeof_array(size) <= 5);
-	char *data = mpstream_reserve(stream, 5);
-	char *pos = mp_encode_array(data, size);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_map(struct luaL_serializer *cfg, struct mpstream *stream,
-		 uint32_t size)
-{
-	(void) cfg;
-	assert(mp_sizeof_map(size) <= 5);
-	char *data = mpstream_reserve(stream, 5);
-	char *pos = mp_encode_map(data, size);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_uint(struct luaL_serializer *cfg, struct mpstream *stream,
-		  uint64_t num)
-{
-	(void) cfg;
-	assert(mp_sizeof_uint(num) <= 9);
-	char *data = mpstream_reserve(stream, 9);
-	char *pos = mp_encode_uint(data, num);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_int(struct luaL_serializer *cfg, struct mpstream *stream,
-		 int64_t num)
-{
-	(void) cfg;
-	assert(mp_sizeof_int(num) <= 9);
-	char *data = mpstream_reserve(stream, 9);
-	char *pos = mp_encode_int(data, num);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_float(struct luaL_serializer *cfg, struct mpstream *stream,
-		   float num)
-{
-	(void) cfg;
-	assert(mp_sizeof_float(num) <= 5);
-	char *data = mpstream_reserve(stream, 5);
-	char *pos = mp_encode_float(data, num);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_double(struct luaL_serializer *cfg, struct mpstream *stream,
-		    double num)
-{
-	(void) cfg;
-	assert(mp_sizeof_double(num) <= 9);
-	char *data = mpstream_reserve(stream, 9);
-	char *pos = mp_encode_double(data, num);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_str(struct luaL_serializer *cfg, struct mpstream *stream,
-		 const char *str, uint32_t len)
-{
-	(void) cfg;
-	assert(mp_sizeof_str(len) <= 5 + len);
-	char *data = mpstream_reserve(stream, 5 + len);
-	char *pos = mp_encode_str(data, str, len);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_nil(struct luaL_serializer *cfg, struct mpstream *stream)
-{
-	(void) cfg;
-	assert(mp_sizeof_nil() <= 1);
-	char *data = mpstream_reserve(stream, 1);
-	char *pos = mp_encode_nil(data);
-	mpstream_advance(stream, pos - data);
-}
-
-void
-luamp_encode_bool(struct luaL_serializer *cfg, struct mpstream *stream,
-		  bool val)
-{
-	(void) cfg;
-	assert(mp_sizeof_bool(val) <= 1);
-	char *data = mpstream_reserve(stream, 1);
-	char *pos = mp_encode_bool(data, val);
-	mpstream_advance(stream, pos - data);
-}
 
 static enum mp_type
 luamp_encode_extension_default(struct lua_State *L, int idx,
@@ -254,38 +116,36 @@ luamp_encode_r(struct lua_State *L, struct luaL_serializer *cfg,
 restart: /* used by MP_EXT */
 	switch (field->type) {
 	case MP_UINT:
-		luamp_encode_uint(cfg, stream, field->ival);
+		mpstream_encode_uint(stream, field->ival);
 		return MP_UINT;
 	case MP_STR:
-		luamp_encode_str(cfg, stream, field->sval.data,
-				field->sval.len);
+		mpstream_encode_strn(stream, field->sval.data, field->sval.len);
 		return MP_STR;
 	case MP_BIN:
-		luamp_encode_str(cfg, stream, field->sval.data,
-				field->sval.len);
+		mpstream_encode_strn(stream, field->sval.data, field->sval.len);
 		return MP_BIN;
 	case MP_INT:
-		luamp_encode_int(cfg, stream, field->ival);
+		mpstream_encode_int(stream, field->ival);
 		return MP_INT;
 	case MP_FLOAT:
-		luamp_encode_float(cfg, stream, field->fval);
+		mpstream_encode_float(stream, field->fval);
 		return MP_FLOAT;
 	case MP_DOUBLE:
-		luamp_encode_double(cfg, stream, field->dval);
+		mpstream_encode_double(stream, field->dval);
 		return MP_DOUBLE;
 	case MP_BOOL:
-		luamp_encode_bool(cfg, stream, field->bval);
+		mpstream_encode_bool(stream, field->bval);
 		return MP_BOOL;
 	case MP_NIL:
-		luamp_encode_nil(cfg, stream);
+		mpstream_encode_nil(stream);
 		return MP_NIL;
 	case MP_MAP:
 		/* Map */
 		if (level >= cfg->encode_max_depth) {
-			luamp_encode_nil(cfg, stream); /* Limit nested maps */
+			mpstream_encode_nil(stream); /* Limit nested maps */
 			return MP_NIL;
 		}
-		luamp_encode_map(cfg, stream, field->size);
+		mpstream_encode_map(stream, field->size);
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, top) != 0) {
 			lua_pushvalue(L, -2); /* push a copy of key to top */
@@ -301,11 +161,11 @@ restart: /* used by MP_EXT */
 	case MP_ARRAY:
 		/* Array */
 		if (level >= cfg->encode_max_depth) {
-			luamp_encode_nil(cfg, stream); /* Limit nested arrays */
+			mpstream_encode_nil(stream); /* Limit nested arrays */
 			return MP_NIL;
 		}
 		uint32_t size = field->size;
-		luamp_encode_array(cfg, stream, size);
+		mpstream_encode_array(stream, size);
 		for (uint32_t i = 0; i < size; i++) {
 			lua_rawgeti(L, top, i + 1);
 			luaL_tofield(L, cfg, top + 1, field);

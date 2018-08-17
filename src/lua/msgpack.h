@@ -1,7 +1,7 @@
 #ifndef TARANTOOL_LUA_MSGPACK_H_INCLUDED
 #define TARANTOOL_LUA_MSGPACK_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -42,6 +42,8 @@ extern "C" {
 #include <lua.h>
 
 struct luaL_serializer;
+struct mpstream;
+
 /**
  * Default instance of msgpack serializer (msgpack = require('msgpack')).
  * This instance is used by all box's Lua/C API bindings (e.g. space:replace()).
@@ -51,110 +53,12 @@ struct luaL_serializer;
 extern struct luaL_serializer *luaL_msgpack_default;
 
 /**
- * A streaming API so that it's possible to encode to any output
- * stream.
- */
-
-/**
- * Ask the allocator to reserve at least size bytes. It can reserve
- * more, and update *size with the new size.
- */
-typedef	void *(*luamp_reserve_f)(void *ctx, size_t *size);
-
-/** Actually use the bytes. */
-typedef	void *(*luamp_alloc_f)(void *ctx, size_t size);
-
-/** Actually use the bytes. */
-typedef	void (*luamp_error_f)(void *error_ctx);
-
-struct mpstream {
-	/**
-	 * When pos >= end, or required size doesn't fit in
-	 * pos..end range alloc() is called to advance the stream
-	 * and reserve() to get a new chunk.
-	 */
-	char *buf, *pos, *end;
-	void *ctx;
-	luamp_reserve_f reserve;
-	luamp_alloc_f alloc;
-	luamp_error_f error;
-	void *error_ctx;
-};
-
-/**
  * luaL_error()
  */
 void
 luamp_error(void *);
 
-void
-mpstream_init(struct mpstream *stream, void *ctx,
-	      luamp_reserve_f reserve, luamp_alloc_f alloc,
-	      luamp_error_f error, void *error_ctx);
-
-void
-mpstream_reset(struct mpstream *stream);
-
-void
-mpstream_reserve_slow(struct mpstream *stream, size_t size);
-
-static inline void
-mpstream_flush(struct mpstream *stream)
-{
-	stream->alloc(stream->ctx, stream->pos - stream->buf);
-	stream->buf = stream->pos;
-}
-
-static inline char *
-mpstream_reserve(struct mpstream *stream, size_t size)
-{
-	if (stream->pos + size > stream->end)
-		mpstream_reserve_slow(stream, size);
-	return stream->pos;
-}
-
-static inline void
-mpstream_advance(struct mpstream *stream, size_t size)
-{
-	assert(stream->pos + size <= stream->end);
-	stream->pos += size;
-}
-
 enum { LUAMP_ALLOC_FACTOR = 256 };
-
-void
-luamp_encode_array(struct luaL_serializer *cfg, struct mpstream *stream,
-		   uint32_t size);
-
-void
-luamp_encode_map(struct luaL_serializer *cfg, struct mpstream *stream, uint32_t size);
-
-void
-luamp_encode_uint(struct luaL_serializer *cfg, struct mpstream *stream,
-		  uint64_t num);
-
-void
-luamp_encode_int(struct luaL_serializer *cfg, struct mpstream *stream,
-		 int64_t num);
-
-void
-luamp_encode_float(struct luaL_serializer *cfg, struct mpstream *stream,
-		   float num);
-
-void
-luamp_encode_double(struct luaL_serializer *cfg, struct mpstream *stream,
-		    double num);
-
-void
-luamp_encode_str(struct luaL_serializer *cfg, struct mpstream *stream,
-		 const char *str, uint32_t len);
-
-void
-luamp_encode_nil(struct luaL_serializer *cfg, struct mpstream *stream);
-
-void
-luamp_encode_bool(struct luaL_serializer *cfg, struct mpstream *stream,
-		  bool val);
 
 /* low-level function needed for execute_lua_call() */
 enum mp_type

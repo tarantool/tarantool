@@ -42,6 +42,7 @@
 #include "box/tuple_convert.h"
 #include "box/errcode.h"
 #include "json/path.h"
+#include "mpstream.h"
 
 /** {{{ box.tuple Lua library
  *
@@ -111,7 +112,7 @@ lbox_tuple_new(lua_State *L)
 		luamp_encode_tuple(L, luaL_msgpack_default, &stream, 1);
 	} else {
 		/* Backward-compatible format: box.tuple.new(1, 2, 3). */
-		luamp_encode_array(luaL_msgpack_default, &stream, argc);
+		mpstream_encode_array(&stream, argc);
 		for (int k = 1; k <= argc; ++k) {
 			luamp_encode(L, luaL_msgpack_default, &stream, k);
 		}
@@ -228,9 +229,9 @@ luamp_convert_key(struct lua_State *L, struct luaL_serializer *cfg,
 		luamp_encode_r(L, cfg, stream, &field, 0);
 		lua_pop(L, 1);
 	} else if (field.type == MP_NIL) {
-		luamp_encode_array(cfg, stream, 0);
+		mpstream_encode_array(stream, 0);
 	} else {
-		luamp_encode_array(cfg, stream, 1);
+		mpstream_encode_array(stream, 1);
 		lua_pushvalue(L, index);
 		luamp_encode_r(L, cfg, stream, &field, 0);
 		lua_pop(L, 1);
@@ -393,18 +394,18 @@ lbox_tuple_transform(struct lua_State *L)
 	/*
 	 * Prepare UPDATE expression
 	 */
-	luamp_encode_array(luaL_msgpack_default, &stream, op_cnt);
+	mpstream_encode_array(&stream, op_cnt);
 	if (len > 0) {
-		luamp_encode_array(luaL_msgpack_default, &stream, 3);
-		luamp_encode_str(luaL_msgpack_default, &stream, "#", 1);
-		luamp_encode_uint(luaL_msgpack_default, &stream, offset);
-		luamp_encode_uint(luaL_msgpack_default, &stream, len);
+		mpstream_encode_array(&stream, 3);
+		mpstream_encode_str(&stream, "#");
+		mpstream_encode_uint(&stream, offset);
+		mpstream_encode_uint(&stream, len);
 	}
 
 	for (int i = argc ; i > 3; i--) {
-		luamp_encode_array(luaL_msgpack_default, &stream, 3);
-		luamp_encode_str(luaL_msgpack_default, &stream, "!", 1);
-		luamp_encode_uint(luaL_msgpack_default, &stream, offset);
+		mpstream_encode_array(&stream, 3);
+		mpstream_encode_str(&stream, "!");
+		mpstream_encode_uint(&stream, offset);
 		luamp_encode(L, luaL_msgpack_default, &stream, i);
 	}
 	mpstream_flush(&stream);
