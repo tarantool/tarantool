@@ -292,6 +292,53 @@ local function string_hex(inp)
     return ffi.string(res, len)
 end
 
+local hexadecimal_chars = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A',
+    'a', 'B', 'b', 'C', 'c', 'D', 'd', 'E', 'e', 'F', 'f'}
+
+local hexadecimal_values = {
+    0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
+    10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15}
+
+local hexadecimals_mapping = {}
+
+for i, char in ipairs(hexadecimal_chars) do
+    hexadecimals_mapping[string.byte(char)] = hexadecimal_values[i]
+end
+
+
+--
+-- Match a hexadecimal representation of a string to its
+-- string representation.
+-- @param inp the string of hexadecimals
+--
+-- @retval formatted string
+--
+local function string_fromhex(inp)
+    if type(inp) ~= 'string' then
+        error(err_string_arg:format(1, 'string.fromhex', 'string',
+                                    type(inp)), 2)
+    end
+    if inp:len() % 2 ~= 0 then
+        error(err_string_arg:format(1, 'string.fromhex',
+                                    'even amount of chars',
+                                    'odd amount'), 2)
+    end
+    local len = inp:len() / 2
+    local casted_inp = ffi.cast('const char *', inp)
+    local res = ffi.new('char[?]', len)
+    for i = 0, len - 1 do
+        local first = hexadecimals_mapping[casted_inp[i * 2]]
+        local second = hexadecimals_mapping[casted_inp[i * 2 + 1]]
+        if first == nil or second == nil then
+            error(err_string_arg:format(1, 'string.fromhex', 'hex string',
+                                        'non hex chars'), 2)
+        end
+        res[i] = first * 16 + second
+    end
+    return ffi.string(res, len)
+end
+
 local function string_strip(inp)
     if type(inp) ~= 'string' then
         error(err_string_arg:format(1, "string.strip", 'string', type(inp)), 2)
@@ -323,6 +370,7 @@ string.center     = string_center
 string.startswith = string_startswith
 string.endswith   = string_endswith
 string.hex        = string_hex
+string.fromhex    = string_fromhex
 string.strip      = string_strip
 string.lstrip      = string_lstrip
 string.rstrip      = string_rstrip

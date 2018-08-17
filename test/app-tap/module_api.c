@@ -402,6 +402,44 @@ test_state(lua_State *L)
 	return 1;
 }
 
+static int table_tostring(lua_State *L) {
+	lua_pushstring(L, "123");
+	return 1;
+}
+
+static int
+test_tostring(lua_State *L)
+{
+	/* original table */
+	lua_createtable(L, 0, 0);
+	/* meta-table */
+	lua_createtable(L, 0, 0);
+	/* pushing __tostring function */
+	lua_pushcfunction(L, table_tostring);
+	lua_setfield(L, -2, "__tostring");
+	/* setting metatable */
+	lua_setmetatable(L, -2);
+	assert(strcmp(luaT_tolstring(L, -1, NULL), "123") == 0);
+
+	lua_pushnumber(L, 1);
+	assert(strcmp(luaT_tolstring(L, -1, NULL), "1") == 0);
+
+	lua_createtable(L, 0, 0);
+	assert(strncmp(luaT_tolstring(L, -1, NULL), "table: ", 7) == 0);
+
+	lua_pushboolean(L, true);
+	assert(strcmp(luaT_tolstring(L, -1, NULL), "true") == 0);
+
+	lua_pushboolean(L, false);
+	assert(strcmp(luaT_tolstring(L, -1, NULL), "false") == 0);
+
+	lua_pushnil(L);
+	assert(strcmp(luaT_tolstring(L, -1, NULL), "nil") == 0);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -428,6 +466,7 @@ luaopen_module_api(lua_State *L)
 		{"test_call", test_call},
 		{"test_cpcall", test_cpcall},
 		{"test_state", test_state},
+		{"test_tostring", test_tostring},
 		{NULL, NULL}
 	};
 	luaL_register(L, "module_api", lib);

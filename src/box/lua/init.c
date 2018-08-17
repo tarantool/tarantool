@@ -35,6 +35,7 @@
 #include <lualib.h>
 
 #include "lua/utils.h" /* luaT_error() */
+#include "lua/trigger.h"
 
 #include "box/box.h"
 #include "box/txn.h"
@@ -56,6 +57,7 @@
 #include "box/lua/cfg.h"
 #include "box/lua/xlog.h"
 #include "box/lua/console.h"
+#include "box/lua/tuple.h"
 #include "box/lua/sql.h"
 
 extern char session_lua[],
@@ -99,6 +101,117 @@ lbox_rollback(lua_State *L)
 		return luaT_error(L);
 	return 0;
 }
+
+/**
+ * Get a next txn statement from the current transaction. This is
+ * a C closure and 2 upvalues should be available: first is a
+ * transaction id, second is a previous statement. This function
+ * works only inside on commit trigger of the concrete
+ * transaction.
+ * It takes two parameters according to Lua 'for' semantics: the
+ * first is iterator (that here is nil and unused), the second is
+ * key of iteration - here it is integer growing from 1 to
+ * txn->n_rows.
+ * It returns values with respect to Lua 'for' as well: the first
+ * is the next key (previous + 1), the 2th - 4th are a statement
+ * attributes: old tuple or nil, new tuple or nil, space id.
+ */
+static int
+lbox_txn_iterator_next(struct lua_State *L)
+{
+	struct txn *txn = in_txn();
+	int64_t txn_id = luaL_toint64(L, lua_upvalueindex(1));
+	if (txn == NULL || txn->id != txn_id) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		return luaT_error(L);
+	}
+	struct txn_stmt *stmt =
+		(struct txn_stmt *) lua_topointer(L, lua_upvalueindex(2));
+	if (stmt == NULL)
+		return 0;
+	while (stmt->row == NULL) {
+		stmt = stailq_next_entry(stmt, next);
+		if (stmt == NULL) {
+			lua_pushnil(L);
+			lua_replace(L, lua_upvalueindex(2));
+			return 0;
+		}
+	}
+	lua_pushinteger(L, lua_tointeger(L, 2) + 1);
+	if (stmt->old_tuple != NULL)
+		luaT_pushtuple(L, stmt->old_tuple);
+	else
+		lua_pushnil(L);
+	if (stmt->new_tuple != NULL)
+		luaT_pushtuple(L, stmt->new_tuple);
+	else
+		lua_pushnil(L);
+	lua_pushinteger(L, space_id(stmt->space));
+	/* Prepare a statement to the next call. */
+	stmt = stailq_next_entry(stmt, next);
+	lua_pushlightuserdata(L, stmt);
+	lua_replace(L, lua_upvalueindex(2));
+	return 4;
+}
+
+/**
+ * Open an iterator over the transaction statements. This is a C
+ * closure and 1 upvalue should be available - id of the
+ * transaction to iterate over.
+ * It returns 3 values which can be used in Lua 'for': iterator
+ * generator function, unused nil and the zero key.
+ */
+static int
+lbox_txn_pairs(struct lua_State *L)
+{
+	int64_t txn_id = luaL_toint64(L, lua_upvalueindex(1));
+	struct txn *txn = in_txn();
+	if (txn == NULL || txn->id != txn_id) {
+		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
+		return luaT_error(L);
+	}
+	luaL_pushint64(L, txn_id);
+	lua_pushlightuserdata(L, stailq_first_entry(&txn->stmts,
+						    struct txn_stmt, next));
+	lua_pushcclosure(L, lbox_txn_iterator_next, 2);
+	lua_pushnil(L);
+	lua_pushinteger(L, 0);
+	return 3;
+}
+
+/**
+ * Push an argument for on_commit Lua trigger. The argument is
+ * a function to open an iterator over the transaction statements.
+ */
+static int
+lbox_push_txn(struct lua_State *L, void *event)
+{
+	struct txn *txn = (struct txn *) event;
+	luaL_pushint64(L, txn->id);
+	lua_pushcclosure(L, lbox_txn_pairs, 1);
+	return 1;
+}
+
+/**
+ * Update the transaction on_commit/rollback triggers.
+ * @sa lbox_trigger_reset.
+ */
+#define LBOX_TXN_TRIGGER(name)                                                 \
+static int                                                                     \
+lbox_on_##name(struct lua_State *L) {                                          \
+	struct txn *txn = in_txn();                                            \
+	int top = lua_gettop(L);                                               \
+	if (top > 2 || txn == NULL) {                                          \
+		return luaL_error(L, "Usage inside a transaction: "            \
+				  "box.on_" #name "([function | nil, "         \
+				  "[function | nil]])");                       \
+	}                                                                      \
+	txn_init_triggers(txn);                                                \
+	return lbox_trigger_reset(L, 2, &txn->on_##name, lbox_push_txn, NULL); \
+}
+
+LBOX_TXN_TRIGGER(commit)
+LBOX_TXN_TRIGGER(rollback)
 
 static int
 lbox_snapshot(struct lua_State *L)
@@ -158,6 +271,8 @@ lbox_backup_stop(struct lua_State *L)
 static const struct luaL_Reg boxlib[] = {
 	{"commit", lbox_commit},
 	{"rollback", lbox_rollback},
+	{"on_commit", lbox_on_commit},
+	{"on_rollback", lbox_on_rollback},
 	{"snapshot", lbox_snapshot},
 	{NULL, NULL}
 };

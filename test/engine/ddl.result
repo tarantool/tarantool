@@ -1431,9 +1431,12 @@ s:create_index('primary', { parts = { 'field1' } })
 ---
 - error: Primary index of the space 'test' can not contain nullable parts
 ...
-s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
+-- This is allowed, but the actual part is_nullable stays false.
+pk = s:create_index('primary', { parts = {{'field1', is_nullable = false}} })
 ---
-- error: Field 1 is nullable in space format, but not nullable in index parts
+...
+pk:drop()
+---
 ...
 format[1].is_nullable = false
 ---
@@ -1462,9 +1465,10 @@ s:insert({1, NULL})
 format[1].is_nullable = true
 ---
 ...
+-- The format is allowed since in primary index parts
+-- is_nullable is still set to false.
 s:format(format)
 ---
-- error: Field 1 is nullable in space format, but not nullable in index parts
 ...
 format[1].is_nullable = false
 ---
@@ -1897,6 +1901,46 @@ sk4:select{}
   - [5, 5, 5]
   - [1, true, 100]
   - [4, 0, 120]
+...
+s:drop()
+---
+...
+--
+-- gh-3578: false-positive unique constraint violation check failure.
+--
+fiber = require('fiber')
+---
+...
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+s:replace{1, 1, 1}
+---
+- [1, 1, 1]
+...
+c = fiber.channel(1)
+---
+...
+_ = fiber.create(function() for i = 1, 10 do s:update(1, {{'+', 3, 1}}) end c:put(true) end)
+---
+...
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s.index.pk:select()
+---
+- - [1, 1, 11]
+...
+s.index.sk:select()
+---
+- - [1, 1, 11]
+...
+c:get()
+---
+- true
 ...
 s:drop()
 ---

@@ -35,24 +35,7 @@ pk = s:create_index('pk')
 ok = pcall(s.create_index, s, 'sk', { parts = parts, type = 'hash' }) -- Fail.
 ok
 
--- Conflict of is_nullable in format and in parts.
-parts[1].is_nullable = false
-sk = s:create_index('sk', { parts = parts }) -- Fail.
-
--- Try skip nullable in format and specify in part.
-parts[1].is_nullable = true
-sk = s:create_index('sk', { parts = parts }) -- Ok.
-format[2].is_nullable = nil
-s:format(format) -- Fail.
-sk:drop()
-
--- Try to set nullable in part with no format.
-s:format({})
 sk = s:create_index('sk', { parts = parts })
--- And then set format with no nullable.
-s:format(format) -- Fail.
-format[2].is_nullable = true
-s:format(format) -- Ok.
 
 -- Test insert.
 
@@ -313,7 +296,8 @@ parts[1].nullable_action = 'default'
 sk = s:create_index('sk', { parts = parts }) -- Fail.
 
 parts[1].nullable_action = 'none'
-sk = s:create_index('sk', { parts = parts }) -- Fail.
+sk = s:create_index('sk', { parts = parts }) -- Ok, assume is_nullable = false.
+sk:drop()
 
 parts[1].is_nullable = false
 parts[1].nullable_action = 'none'
@@ -557,4 +541,65 @@ i1:select{}
 i2:select{}
 i2:select{box.NULL, 50}
 i2:select{}
+s:drop()
+
+-- gh-3430 allow different nullability in space format and indices.
+-- Resulting field nullability is the strictest of the two.
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'unsigned'}})
+sk = s:create_index('secondary', {parts={2, 'unsigned', is_nullable=false}})
+format = {}
+format[1] = {name = 'first', type = 'unsigned', is_nullable = false}
+format[2] = {name = 'second', type = 'unsigned', is_nullable = false}
+s:format(format)
+-- Field 2 is not nullable.
+s:insert{5}
+s:insert{5, box.NULL}
+
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}} -- This is allowed.
+-- Without space format setting this fails.
+s:insert{5, box.NULL}
+s:insert{5}
+
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
+format[2].is_nullable = true
+s:format(format) -- This is also allowed.
+-- inserts still fail due to not nullable index parts.
+s:insert{5, box.NULL}
+s:insert{5}
+
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}}
+-- Now the field really is nullable.
+-- Success.
+s:insert{5, box.NULL}
+s:insert{6}
+s:insert{7, 8}
+s:select{}
+
+-- Check that we cannot set field nullability to false when the
+-- space has tuples with NULL in this field.
+format[2].is_nullable = false
+s:format(format) -- Fail.
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Fail.
+_ = s:delete{5}
+s:format(format) -- Still fail.
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Still fail.
+-- Now check we can set nullability to false step by step.
+_ = s:delete{6}
+
+format[2].is_nullable = false
+s:format(format)
+s:insert{5, box.NULL} -- Fail.
+s:insert{5} -- Fail.
+format[2].is_nullable = true
+s:format(format)
+s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
+s:insert{5, box.NULL} -- Fail.
+s:insert{5} -- Fail.
+format[2].is_nullable = false
+s:format(format)
+s:select{}
+s:insert{5} -- Fail.
+s:insert{9, 10} -- Success.
+
 s:drop()

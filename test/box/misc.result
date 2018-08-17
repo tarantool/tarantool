@@ -67,6 +67,8 @@ t
   - index
   - info
   - internal
+  - on_commit
+  - on_rollback
   - once
   - priv
   - rollback
@@ -477,18 +479,17 @@ t;
   150: box.error.CANT_CREATE_COLLATION
   151: box.error.WRONG_COLLATION_OPTIONS
   152: box.error.NULLABLE_PRIMARY
-  153: box.error.NULLABLE_MISMATCH
-  154: box.error.SQL_BIND_VALUE
-  155: box.error.SQL_BIND_TYPE
-  156: box.error.SQL_BIND_PARAMETER_MAX
-  157: box.error.SQL_EXECUTE
-  158: box.error.SQL
-  159: box.error.SQL_BIND_NOT_FOUND
-  160: box.error.ACTION_MISMATCH
-  161: box.error.VIEW_MISSING_SQL
-  162: box.error.FOREIGN_KEY_CONSTRAINT
-  163: box.error.TRANSACTION_YIELD
-  164: box.error.NO_SUCH_GROUP
+  154: box.error.TRANSACTION_YIELD
+  155: box.error.NO_SUCH_GROUP
+  156: box.error.SQL_BIND_VALUE
+  157: box.error.SQL_BIND_TYPE
+  158: box.error.SQL_BIND_PARAMETER_MAX
+  159: box.error.SQL_EXECUTE
+  160: box.error.SQL
+  161: box.error.SQL_BIND_NOT_FOUND
+  162: box.error.ACTION_MISMATCH
+  163: box.error.VIEW_MISSING_SQL
+  164: box.error.FOREIGN_KEY_CONSTRAINT
   165: box.error.NO_SUCH_MODULE
   166: box.error.NO_SUCH_COLLATION
   167: box.error.CREATE_FK_CONSTRAINT

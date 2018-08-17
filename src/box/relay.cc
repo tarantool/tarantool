@@ -198,6 +198,17 @@ relay_start(struct relay *relay, int fd, uint64_t sync,
 	relay->state = RELAY_FOLLOW;
 }
 
+void
+relay_cancel(struct relay *relay)
+{
+	/* Check that the thread is running first. */
+	if (relay->cord.id != 0) {
+		if (tt_pthread_cancel(relay->cord.id) == ESRCH)
+			return;
+		tt_pthread_join(relay->cord.id, NULL);
+	}
+}
+
 static void
 relay_stop(struct relay *relay)
 {
@@ -211,6 +222,12 @@ relay_stop(struct relay *relay)
 		recovery_delete(relay->r);
 	relay->r = NULL;
 	relay->state = RELAY_STOPPED;
+	/*
+	 * Needed to track whether relay thread is running or not
+	 * for relay_cancel(). Id is reset to a positive value
+	 * upon cord_create().
+	 */
+	relay->cord.id = 0;
 }
 
 void

@@ -205,18 +205,18 @@ struct errcode_record {
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
 	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of the space '%s' can not contain nullable parts") \
-	/*153 */_(ER_NULLABLE_MISMATCH,		"Field %d is %s in space format, but %s in index parts") \
-	/*154 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
-	/*155 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
-	/*156 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
-	/*157 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
-	/*158 */_(ER_SQL,			"SQL error: %s") \
-	/*159 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
-	/*160 */_(ER_ACTION_MISMATCH,		"Field %d contains %s on conflict action, but %s in index parts") \
-	/*161 */_(ER_VIEW_MISSING_SQL,		"Space declared as a view must have SQL statement") \
-	/*162 */_(ER_FOREIGN_KEY_CONSTRAINT,	"Can not commit transaction: deferred foreign keys violations are not resolved") \
-	/*163 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
-	/*164 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
+	/*153 */_(ER_UNUSED,			"") \
+	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
+	/*155 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
+	/*156 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
+	/*157 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
+	/*158 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
+	/*159 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
+	/*160 */_(ER_SQL,			"SQL error: %s") \
+	/*161 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
+	/*162 */_(ER_ACTION_MISMATCH,		"Field %d contains %s on conflict action, but %s in index parts") \
+	/*163 */_(ER_VIEW_MISSING_SQL,		"Space declared as a view must have SQL statement") \
+	/*164 */_(ER_FOREIGN_KEY_CONSTRAINT,	"Can not commit transaction: deferred foreign keys violations are not resolved") \
 	/*165 */_(ER_NO_SUCH_MODULE,		"Module '%s' does not exist") \
 	/*166 */_(ER_NO_SUCH_COLLATION,		"Collation '%s' does not exist") \
 	/*167 */_(ER_CREATE_FK_CONSTRAINT,	"Failed to create foreign key constraint '%s': %s") \

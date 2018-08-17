@@ -86,7 +86,7 @@ local function run_command(dir, command)
     return res/256, fstdout_e, fstderr_e
 end
 
-local function tctl_wait(dir, name)
+local function tctl_wait_start(dir, name)
     if name then
         local path = fio.pathjoin(dir, name .. '.control')
         while not fio.stat(path) do
@@ -110,6 +110,13 @@ local function tctl_wait(dir, name)
                 break
             end
         end
+    end
+end
+
+local function tctl_wait_stop(dir, name)
+    local path = fio.pathjoin(dir, name .. '.pid')
+    while fio.path.exists(path) do
+        fiber.sleep(0.01)
     end
 end
 
@@ -163,11 +170,12 @@ do
         test:test("basic test", function(test_i)
             test_i:plan(16)
             check_ok(test_i, dir, 'start',  'script', 0, nil, "Starting instance")
-            tctl_wait(dir, 'script')
+            tctl_wait_start(dir, 'script')
             check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
             check_ok(test_i, dir, 'start',  'script', 1, nil, "is already running")
             check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
             check_ok(test_i, dir, 'stop',   'script', 0, nil, "Stopping")
+            tctl_wait_stop(dir, 'script')
             check_ok(test_i, dir, 'status', 'script', 1, nil, "is stopped")
             check_ok(test_i, dir, 'stop',   'script', 0, nil, "is not running")
             check_ok(test_i, dir, 'status', 'script', 1, nil, "is stopped" )
@@ -200,7 +208,7 @@ do
             check_ok(test_i, dir, 'start', 'bad_script', 1, nil,
                      'unexpected symbol near')
             check_ok(test_i, dir, 'start', 'good_script', 0)
-            tctl_wait(dir, 'good_script')
+            tctl_wait_start(dir, 'good_script')
             -- wait here
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
                      nil, 'Error while reloading config:')
@@ -232,7 +240,7 @@ do
         test:test("check answers in case of call", function(test_i)
             test_i:plan(6)
             check_ok(test_i, dir, 'start', 'good_script', 0)
-            tctl_wait(dir, 'good_script')
+            tctl_wait_start(dir, 'good_script')
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3, nil,
                      'Error while reloading config')
             check_ok(test_i, dir, 'eval',  'good_script ok_script.lua', 0,

@@ -60,14 +60,6 @@ void
 tarantool_lua_free();
 
 /**
- * This function exists because lua_tostring does not use
- * __tostring metamethod, and this metamethod has to be used
- * if we want to print Lua userdata correctly.
- */
-const char *
-tarantool_lua_tostring(struct lua_State *L, int index);
-
-/**
  * Load and execute start-up file
  *
  * @param interactive force interactive mode

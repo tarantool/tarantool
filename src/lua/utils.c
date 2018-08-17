@@ -920,7 +920,7 @@ luaT_toerror(lua_State *L)
 		diag_add_error(&fiber()->diag, e);
 	} else {
 		/* Convert Lua error to a Tarantool exception. */
-		diag_set(LuajitError, lua_tostring(L, -1));
+		diag_set(LuajitError, luaT_tolstring(L, -1, NULL));
 	}
 	return 1;
 }
@@ -939,6 +939,37 @@ luaT_cpcall(lua_State *L, lua_CFunction func, void *ud)
 	if (lua_cpcall(L, func, ud))
 		return luaT_toerror(L);
 	return 0;
+}
+
+/**
+ * This function exists because lua_tostring does not use
+ * __tostring metamethod, and this metamethod has to be used
+ * if we want to print Lua userdata correctly.
+ */
+const char *
+luaT_tolstring(lua_State *L, int idx, size_t *len)
+{
+	if (!luaL_callmeta(L, idx, "__tostring")) {
+		switch (lua_type(L, idx)) {
+		case LUA_TNUMBER:
+		case LUA_TSTRING:
+			lua_pushvalue(L, idx);
+			break;
+		case LUA_TBOOLEAN: {
+			int val = lua_toboolean(L, idx);
+			lua_pushstring(L, val ? "true" : "false");
+			break;
+		}
+		case LUA_TNIL:
+			lua_pushliteral(L, "nil");
+			break;
+		default:
+			lua_pushfstring(L, "%s: %p", luaL_typename(L, idx),
+						     lua_topointer(L, idx));
+		}
+	}
+
+	return lua_tolstring(L, -1, len);
 }
 
 lua_State *

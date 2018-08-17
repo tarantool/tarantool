@@ -1,8 +1,12 @@
 #!/usr/bin/env tarantool
 
+local fio = require('fio')
+
 box.cfg{log = "tarantool.log"}
 build_path = os.getenv("BUILDDIR")
-package.cpath = build_path .. '/test/app-tap/?.so;' .. build_path .. '/test/app-tap/?.dylib;'
+package.cpath = fio.pathjoin(build_path, 'test/app-tap/?.so'   ) .. ';' ..
+                fio.pathjoin(build_path, 'test/app-tap/?.dylib') .. ';' ..
+                package.cpath
 
 local function test_pushcdata(test, module)
     test:plan(6)
@@ -33,11 +37,15 @@ local function test_pushcdata(test, module)
 end
 
 local test = require('tap').test("module_api", function(test)
-    test:plan(22)
+    test:plan(23)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
     if not status then
+        test:diag("Failed to load library:")
+        for _, line in ipairs(module:split("\n")) do
+            test:diag("%s", line)
+        end
         return
     end
 
@@ -57,4 +65,5 @@ local test = require('tap').test("module_api", function(test)
 
     space:drop()
 end)
+
 os.exit(0)

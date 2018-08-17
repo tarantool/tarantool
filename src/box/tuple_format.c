@@ -94,42 +94,31 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 
 		for (; part < parts_end; part++) {
 			assert(part->fieldno < format->field_count);
-			struct tuple_field *field =
-				&format->fields[part->fieldno];
+			struct tuple_field *field = &format->fields[part->fieldno];
+			/*
+			 * Field and part nullable actions may differ only
+			 * if one of them is DEFAULT, in which case we use
+			 * the non-default action *except* the case when
+			 * the other one is NONE, in which case we assume
+			 * DEFAULT. The latter is needed so that in case
+			 * index definition and space format have different
+			 * is_nullable flag, we will use the strictest option,
+			 * i.e. DEFAULT.
+			 */
 			if (part->fieldno >= field_count) {
 				field->nullable_action = part->nullable_action;
-			} else {
-				if (tuple_field_is_nullable(field) !=
-				    key_part_is_nullable(part)) {
-					diag_set(ClientError,
-						 ER_NULLABLE_MISMATCH,
-						 part->fieldno +
-						 TUPLE_INDEX_BASE,
-						 tuple_field_is_nullable(field) ?
-						 "nullable" : "not nullable",
-						 key_part_is_nullable(part) ?
-						 "nullable" : "not nullable");
-					return -1;
-				}
-
-				if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT &&
-				    !(part->nullable_action == ON_CONFLICT_ACTION_NONE ||
-				      part->nullable_action == ON_CONFLICT_ACTION_DEFAULT))
+			} else if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
+				if (part->nullable_action != ON_CONFLICT_ACTION_NONE)
 					field->nullable_action = part->nullable_action;
-				else {
-					if (field->nullable_action != part->nullable_action &&
-					    part->nullable_action != ON_CONFLICT_ACTION_DEFAULT) {
-						int action_f = field->nullable_action;
-						int action_p = part->nullable_action;
-						diag_set(ClientError,
-							 ER_ACTION_MISMATCH,
-							 part->fieldno +
-							 TUPLE_INDEX_BASE,
-							 on_conflict_action_strs[action_f],
-							 on_conflict_action_strs[action_p]);
-						return -1;
-					}
-				}
+			} else if (part->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
+				if (field->nullable_action == ON_CONFLICT_ACTION_NONE)
+					field->nullable_action = part->nullable_action;
+			} else if (field->nullable_action != part->nullable_action) {
+				diag_set(ClientError, ER_ACTION_MISMATCH,
+					 part->fieldno + TUPLE_INDEX_BASE,
+					 on_conflict_action_strs[field->nullable_action],
+					 on_conflict_action_strs[part->nullable_action]);
+				return -1;
 			}
 
 			/*

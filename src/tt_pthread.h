@@ -277,6 +277,12 @@
 	tt_pthread_error(e__);				\
 })
 
+#define tt_pthread_cancel(thread)			\
+({	int e__ = pthread_cancel(thread);		\
+	assert(e__ == 0 || e__ == ESRCH);		\
+	e__;						\
+})
+
 #define tt_pthread_key_create(key, dtor)		\
 ({	int e__ = pthread_key_create(key, dtor);	\
 	tt_pthread_error(e__);				\
