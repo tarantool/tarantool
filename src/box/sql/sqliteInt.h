@@ -1402,7 +1402,6 @@ typedef struct FuncDestructor FuncDestructor;
 typedef struct FuncDef FuncDef;
 typedef struct FuncDefHash FuncDefHash;
 typedef struct IdList IdList;
-typedef struct Index Index;
 typedef struct KeyClass KeyClass;
 typedef struct Lookaside Lookaside;
 typedef struct LookasideSlot LookasideSlot;
@@ -1814,7 +1813,6 @@ struct Savepoint {
  * by an instance of the following structure.
  */
 struct Table {
-	Index *pIndex;		/* List of SQL indexes on this table. */
 	u32 nTabRef;		/* Number of pointers to this Table */
 	/**
 	 * Estimated number of entries in table.
@@ -1826,6 +1824,8 @@ struct Table {
 	Table *pNextZombie;	/* Next on the Parse.pZombieTab list */
 	/** Space definition with Tarantool metadata. */
 	struct space_def *def;
+	/** Surrogate space containing array of indexes. */
+	struct space *space;
 };
 
 /**
@@ -1925,28 +1925,6 @@ enum sql_index_type {
     SQL_INDEX_TYPE_CONSTRAINT_PK,
 };
 
-/** Simple wrapper to test index id on zero. */
-bool
-sql_index_is_primary(const struct Index *idx);
-
-/*
- * Each SQL index is represented in memory by an
- * instance of the following structure.
- *
- * While parsing a CREATE TABLE or CREATE INDEX statement in order to
- * generate VDBE code (as opposed to reading from Tarantool's _space
- * space as part of parsing an existing database schema), transient instances
- * of this structure may be created.
- */
-struct Index {
-	/** The SQL table being indexed. */
-	Table *pTable;
-	/** The next index associated with the same table. */
-	Index *pNext;
-	/** Index definition. */
-	struct index_def *def;
-};
-
 /**
  * Fetch statistics concerning tuples to be selected:
  * logarithm of number of tuples which has the same key as for
@@ -1962,12 +1940,12 @@ struct Index {
  * If there is no appropriate Tarantool's index,
  * return one of default values.
  *
- * @param idx Index.
+ * @param idx Index definition.
  * @param field Number of field to be examined.
  * @retval Estimate logarithm of tuples selected by given field.
  */
 log_est_t
-index_field_tuple_est(struct Index *idx, uint32_t field);
+index_field_tuple_est(const struct index_def *idx, uint32_t field);
 
 #ifdef DEFAULT_TUPLE_COUNT
 #undef DEFAULT_TUPLE_COUNT
@@ -2368,7 +2346,7 @@ struct SrcList {
 			char *zIndexedBy;	/* Identifier from "INDEXED BY <zIndex>" clause */
 			ExprList *pFuncArg;	/* Arguments to table-valued-function */
 		} u1;
-		Index *pIBIndex;	/* Index structure corresponding to u1.zIndexedBy */
+		struct index_def *pIBIndex;
 	} a[1];			/* One entry for each identifier on the list */
 };
 
@@ -2737,7 +2715,6 @@ struct Parse {
 	int *aLabel;		/* Space to hold the labels */
 	ExprList *pConstExpr;	/* Constant expressions */
 	Token constraintName;	/* Name of the constraint currently being parsed */
-	int regRoot;		/* Register holding root page number for new objects */
 	int nMaxArg;		/* Max args passed to user function by sub-program */
 	int nSelect;		/* Number of SELECT statements seen */
 	int nSelectIndent;	/* How far to indent SELECTTRACE() output */
@@ -3076,7 +3053,6 @@ struct Walker {
 		SrcList *pSrcList;	/* FROM clause */
 		struct SrcCount *pSrcCount;	/* Counting column references */
 		int *aiCol;	/* array of column indexes */
-		struct IdxCover *pIdxCover;	/* Check for index coverage */
 		/** Space definition. */
 		struct space_def *space_def;
 	} u;
@@ -3366,7 +3342,13 @@ int sqlite3ColumnsFromExprList(Parse *parse, ExprList *expr_list, Table *table);
 
 void sqlite3SelectAddColumnTypeAndCollation(Parse *, Table *, Select *);
 Table *sqlite3ResultSetOfSelect(Parse *, Select *);
-Index *sqlite3PrimaryKeyIndex(Table *);
+
+/**
+ * Return the PRIMARY KEY index of a table.
+ */
+struct index *
+sql_table_primary_key(const struct Table *tab);
+
 void sqlite3StartTable(Parse *, Token *, int);
 void sqlite3AddColumn(Parse *, Token *, Token *);
 
@@ -3604,7 +3586,6 @@ int sqlite3WhereOkOnePass(WhereInfo *, int *);
 #define ONEPASS_OFF      0	/* Use of ONEPASS not allowed */
 #define ONEPASS_SINGLE   1	/* ONEPASS valid for a single row update */
 #define ONEPASS_MULTI    2	/* ONEPASS is valid for multiple rows */
-void sqlite3ExprCodeLoadIndexColumn(Parse *, Index *, int, int, int);
 
 /**
  * Generate code that will extract the iColumn-th column from
@@ -3670,20 +3651,32 @@ int sqlite3ExprCodeExprList(Parse *, ExprList *, int, int, u8);
 #define SQLITE_ECEL_OMITREF  0x08	/* Omit if ExprList.u.x.iOrderByCol */
 void sqlite3ExprIfTrue(Parse *, Expr *, int, int);
 void sqlite3ExprIfFalse(Parse *, Expr *, int, int);
-void sqlite3ExprIfFalseDup(Parse *, Expr *, int, int);
 #define LOCATE_VIEW    0x01
 #define LOCATE_NOERR   0x02
 Table *sqlite3LocateTable(Parse *, u32 flags, const char *);
-Index *sqlite3LocateIndex(sqlite3 *, const char *, const char *);
+
+struct index *
+sqlite3LocateIndex(sqlite3 *, const char *, const char *);
 void sqlite3UnlinkAndDeleteTable(sqlite3 *, const char *);
-void sqlite3UnlinkAndDeleteIndex(sqlite3 *, Index *);
+
+/**
+ * Release memory for index with given iid and
+ * reallocate memory for an array of indexes.
+ * FIXME: should be removed after finishing merging SQLite DD
+ * with server one.
+ *
+ * @param space Space which index belongs to.
+ * @param iid Id of index to be deleted.
+ */
+void
+sql_space_index_delete(struct space *space, uint32_t iid);
+
 char *sqlite3NameFromToken(sqlite3 *, Token *);
 int sqlite3ExprCompare(Expr *, Expr *, int);
 int sqlite3ExprListCompare(ExprList *, ExprList *, int);
 int sqlite3ExprImpliesExpr(Expr *, Expr *, int);
 void sqlite3ExprAnalyzeAggregates(NameContext *, Expr *);
 void sqlite3ExprAnalyzeAggList(NameContext *, ExprList *);
-int sqlite3ExprCoveredByIndex(Expr *, int iCur, Index * pIdx);
 int sqlite3FunctionUsesThisSrc(Expr *, SrcList *);
 Vdbe *sqlite3GetVdbe(Parse *);
 #ifndef SQLITE_UNTESTABLE
@@ -3813,8 +3806,8 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
  * this routine returns.
  */
 int
-sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
-		       int reg_out, struct Index *prev, int reg_prev);
+sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
+		       int reg_out, struct index *prev, int reg_prev);
 
 /**
  * Generate code to do constraint checks prior to an INSERT or
@@ -3904,17 +3897,7 @@ void
 sql_set_multi_write(Parse *, bool);
 void sqlite3MayAbort(Parse *);
 void sqlite3HaltConstraint(Parse *, int, int, char *, i8, u8);
-/**
- * Code an OP_Halt due to UNIQUE or PRIMARY KEY constraint
- * violation.
- * @param parser SQL parser.
- * @param on_error Constraint type.
- * @param index Index triggered the constraint.
- */
-void
-parser_emit_unique_constraint(struct Parse *parser,
-			      enum on_conflict_action on_error,
-			      const struct Index *index);
+
 Expr *sqlite3ExprDup(sqlite3 *, Expr *, int);
 SrcList *sqlite3SrcListDup(sqlite3 *, SrcList *, int);
 IdList *sqlite3IdListDup(sqlite3 *, IdList *);
@@ -4410,7 +4393,6 @@ extern FuncDefHash sqlite3BuiltinFunctions;
 extern int sqlite3PendingByte;
 #endif
 #endif
-void sqlite3Reindex(Parse *, Token *, Token *);
 void sqlite3AlterRenameTable(Parse *, SrcList *, Token *);
 
 /**
@@ -4546,7 +4528,7 @@ Expr *sqlite3CreateColumnExpr(sqlite3 *, SrcList *, int, int);
 int sqlite3ExprCheckIN(Parse *, Expr *);
 
 void sqlite3AnalyzeFunctions(void);
-int sqlite3Stat4ProbeSetValue(Parse *, Index *, UnpackedRecord **, Expr *, int,
+int sqlite3Stat4ProbeSetValue(Parse *, struct index_def *, UnpackedRecord **, Expr *, int,
 			      int, int *);
 int sqlite3Stat4ValueFromExpr(Parse *, Expr *, u8, sqlite3_value **);
 void sqlite3Stat4ProbeFree(UnpackedRecord *);

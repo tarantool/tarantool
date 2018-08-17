@@ -551,7 +551,7 @@ test:do_execsql_test(
 test:do_eqp_test("5.3.1", "SELECT a, b FROM t1 WHERE a=1", {
     -- It is equal for tarantol wheather to use i1 or i2
     -- because both of them are covering
-    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
+    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
     --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
 })
 -- EVIDENCE-OF: R-09991-48941 sqlite> EXPLAIN QUERY PLAN
@@ -592,8 +592,8 @@ test:do_execsql_test(
 test:do_eqp_test("5.6.1", "SELECT a, b FROM t1 WHERE a=1 OR b=2", {
     -- It is equal for tarantol wheather to use i1 or i2
     -- because both of them are covering
-    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
-    --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
+    --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
+    {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
     {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I3 (B=?)"},
 })
 -- EVIDENCE-OF: R-24577-38891 sqlite> EXPLAIN QUERY PLAN
@@ -633,8 +633,8 @@ test:do_eqp_test(5.9, [[
     {0, 0, 0, "EXECUTE SCALAR SUBQUERY 1"},
     -- It is equally for tarantol wheather to use i1 or i2
     -- because both of them are covering
-    {1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
-    --{1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
+    --{1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=?)"},
+    {1, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
     {0, 0, 0, "EXECUTE CORRELATED SCALAR SUBQUERY 2"},
     {2, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I3 (B=?)"},
 })
@@ -647,7 +647,7 @@ test:do_eqp_test(5.9, [[
 test:do_eqp_test(5.10, [[
   SELECT count(*) FROM (SELECT max(b) AS x FROM t1 GROUP BY a) GROUP BY x
 ]], {
-    {1, 0, 0, "SCAN TABLE T1 USING COVERING INDEX I2"},
+    {1, 0, 0, "SCAN TABLE T1 USING COVERING INDEX I1"},
     {0, 0, 0, "SCAN SUBQUERY 1"},
     {0, 0, 0, "USE TEMP B-TREE FOR GROUP BY"},
 })
@@ -678,7 +678,7 @@ test:do_eqp_test(5.12, "SELECT a,b FROM t1 UNION SELECT c, 99 FROM t2", {
 -- 0|0|0|COMPOUND SUBQUERIES 1 AND 2 (EXCEPT)
 --
 test:do_eqp_test(5.13, "SELECT a FROM t1 EXCEPT SELECT d FROM t2 ORDER BY 1", {
-    {1, 0, 0, "SCAN TABLE T1 USING COVERING INDEX I2"},
+    {1, 0, 0, "SCAN TABLE T1 USING COVERING INDEX I1"},
     {2, 0, 0, "SCAN TABLE T2"},
     {2, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
     {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 (EXCEPT)"},

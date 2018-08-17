@@ -961,7 +961,7 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 	 * FIXME: should be removed after introducing
 	 * strict typing.
 	 */
-	struct Index *pk = sqlite3PrimaryKeyIndex(tab);
+	struct index *pk = sql_table_primary_key(tab);
 	uint32_t part_count = pk->def->key_def->part_count;
 	if (part_count == 1) {
 		uint32_t fieldno = pk->def->key_def->parts[0].fieldno;
@@ -985,7 +985,8 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 		return;
 	/* Calculate MAX range of register we may occupy. */
 	uint32_t reg_count = 0;
-	for (struct Index *idx = tab->pIndex; idx != NULL; idx = idx->pNext) {
+	for (uint32_t i = 0; i < tab->space->index_count; ++i) {
+		struct index *idx = tab->space->index[i];
 		if (idx->def->key_def->part_count > reg_count)
 			reg_count = idx->def->key_def->part_count;
 	}
@@ -1001,7 +1002,8 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 	 * Otherwise, we should skip removal of old entry and
 	 * insertion of new one.
 	 */
-	for (struct Index *idx = tab->pIndex; idx != NULL; idx = idx->pNext) {
+	for (uint32_t i = 0; i < tab->space->index_count; ++i) {
+		struct index *idx = tab->space->index[i];
 		/* Conflicts may occur only in UNIQUE indexes. */
 		if (!idx->def->opts.is_unique)
 			continue;
@@ -1081,40 +1083,30 @@ vdbe_emit_insertion_completion(struct Vdbe *v, int cursor_id, int raw_data_reg,
 }
 
 #ifndef SQLITE_OMIT_XFER_OPT
-/*
- * Check to see if index pSrc is compatible as a source of data
- * for index pDest in an insert transfer optimization.  The rules
+/**
+ * Check to see if index @src is compatible as a source of data
+ * for index @dest in an insert transfer optimization. The rules
  * for a compatible index:
  *
- *    *   The index is over the same set of columns
- *    *   The same DESC and ASC markings occurs on all columns
- *    *   The same onError processing (ON_CONFLICT_ACTION_ABORT, _IGNORE, etc)
- *    *   The same collating sequence on each column
- *    *   The index has the exact same WHERE clause
+ * - The index is over the same set of columns;
+ * - The same DESC and ASC markings occurs on all columns;
+ * - The same collating sequence on each column.
+ *
+ * @param dest Index of destination space.
+ * @param src Index of source space.
+ *
+ * @retval True, if two indexes are compatible in terms of
+ *         xfer optimization.
  */
-static int
-xferCompatibleIndex(Index * pDest, Index * pSrc)
+static bool
+sql_index_is_xfer_compatible(const struct index_def *dest,
+			     const struct index_def *src)
 {
-	assert(pDest && pSrc);
-	assert(pDest->pTable != pSrc->pTable);
-	uint32_t dest_idx_part_count = pDest->def->key_def->part_count;
-	uint32_t src_idx_part_count = pSrc->def->key_def->part_count;
-	if (dest_idx_part_count != src_idx_part_count)
-		return 0;
-	struct key_part *src_part = pSrc->def->key_def->parts;
-	struct key_part *dest_part = pDest->def->key_def->parts;
-	for (uint32_t i = 0; i < src_idx_part_count;
-	     ++i, ++src_part, ++dest_part) {
-		if (src_part->fieldno != dest_part->fieldno)
-			return 0;	/* Different columns indexed */
-		if (src_part->sort_order != dest_part->sort_order)
-			return 0;	/* Different sort orders */
-		if (src_part->coll != dest_part->coll)
-			return 0;	/* Different collating sequences */
-	}
-
-	/* If no test above fails then the indices must be compatible */
-	return 1;
+	assert(dest != NULL && src != NULL);
+	assert(dest->space_id != src->space_id);
+	return key_part_cmp(src->key_def->parts, src->key_def->part_count,
+			    dest->key_def->parts,
+			    dest->key_def->part_count) == 0;
 }
 
 /*
@@ -1148,7 +1140,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 {
 	ExprList *pEList;	/* The result set of the SELECT */
 	Table *pSrc;		/* The table in the FROM clause of SELECT */
-	Index *pSrcIdx, *pDestIdx;	/* Source and destination indices */
+	struct index *pSrcIdx, *pDestIdx;
 	struct SrcList_item *pItem;	/* An element of pSelect->pSrc */
 	int i;			/* Loop counter */
 	int iSrc, iDest;	/* Cursors from source and destination */
@@ -1256,9 +1248,9 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		/* Default values for second and subsequent columns need to match. */
 		if (i > 0) {
 			char *src_expr_str =
-				src_space->def->fields[i].default_value;
+				pSrc->def->fields[i].default_value;
 			char *dest_expr_str =
-				dest_space->def->fields[i].default_value;
+				pDest->def->fields[i].default_value;
 			if ((dest_expr_str == NULL) != (src_expr_str == NULL) ||
 			    (dest_expr_str &&
 			     strcmp(src_expr_str, dest_expr_str) != 0)
@@ -1267,9 +1259,12 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			}
 		}
 	}
-	for (pDestIdx = pDest->pIndex; pDestIdx; pDestIdx = pDestIdx->pNext) {
-		for (pSrcIdx = pSrc->pIndex; pSrcIdx; pSrcIdx = pSrcIdx->pNext) {
-			if (xferCompatibleIndex(pDestIdx, pSrcIdx))
+	for (uint32_t i = 0; i < pDest->space->index_count; ++i) {
+		pDestIdx = pDest->space->index[i];
+		for (uint32_t j = 0; j < pSrc->space->index_count; ++j) {
+			pSrcIdx = pSrc->space->index[j];
+			if (sql_index_is_xfer_compatible(pDestIdx->def,
+							 pSrcIdx->def))
 				break;
 		}
 		/* pDestIdx has no corresponding index in pSrc. */

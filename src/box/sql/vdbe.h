@@ -79,7 +79,6 @@ struct VdbeOp {
 		bool b;         /* Used when p4type is P4_BOOL */
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */
-		Index *pIndex;	/* Used when p4type is P4_INDEX */
 		int (*xAdvance) (BtCursor *, int *);
 		/** Used when p4type is P4_KEYDEF. */
 		struct key_def *key_def;
@@ -127,7 +126,6 @@ struct SubProgram {
 #define P4_INTARRAY (-12)	/* P4 is a vector of 32-bit integers */
 #define P4_SUBPROGRAM  (-13)	/* P4 is a pointer to a SubProgram structure */
 #define P4_ADVANCE  (-14)	/* P4 is a pointer to BtreeNext() or BtreePrev() */
-#define P4_INDEX    (-15)	/* P4 is a pointer to a Index structure */
 #define P4_FUNCCTX  (-16)	/* P4 is a pointer to an sqlite3_context object */
 #define P4_BOOL     (-17)	/* P4 is a bool value */
 #define P4_PTR      (-18)	/* P4 is a generic pointer */
@@ -231,10 +229,10 @@ void sqlite3VdbeAppendP4(Vdbe *, void *pP4, int p4type);
  * Set the P4 on the most recently added opcode to the key_def for the
  * index given.
  * @param Parse context, for error reporting.
- * @param Index to get key_def from.
+ * @param key_def Definition of a key to set.
  */
 void
-sql_vdbe_set_p4_key_def(struct Parse *parse, struct Index *index);
+sql_vdbe_set_p4_key_def(struct Parse *parse, struct key_def *key_def);
 
 VdbeOp *sqlite3VdbeGetOp(Vdbe *, int);
 int sqlite3VdbeMakeLabel(Vdbe *);

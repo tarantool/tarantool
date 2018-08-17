@@ -31,15 +31,9 @@
 #include <assert.h>
 #include "field_def.h"
 #include "sql.h"
-/*
- * Both Tarantool and SQLite codebases declare Index, hence the
- * workaround below.
- */
-#define Index SqliteIndex
 #include "sql/sqliteInt.h"
 #include "sql/tarantoolInt.h"
 #include "sql/vdbeInt.h"
-#undef Index
 
 #include "index.h"
 #include "info.h"
@@ -848,7 +842,8 @@ set_encode_error(void *error_ctx)
  * @param opts Index options to encode.
  */
 static void
-mpstream_encode_index_opts(struct mpstream *stream, struct index_opts *opts)
+mpstream_encode_index_opts(struct mpstream *stream,
+			   const struct index_opts *opts)
 {
 	mpstream_encode_map(stream, 2);
 	mpstream_encode_str(stream, "unique");
@@ -1302,7 +1297,7 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 	 * If table's PK is single column which is INTEGER, then
 	 * treat it as strict type, not affinity.
 	 */
-	struct SqliteIndex *pk_idx = sqlite3PrimaryKeyIndex(table);
+	struct index *pk_idx = sql_table_primary_key(table);
 	uint32_t pk_forced_int = UINT32_MAX;
 	if (pk_idx != NULL && pk_idx->def->key_def->part_count == 1) {
 		int pk = pk_idx->def->key_def->parts[0].fieldno;
@@ -1453,8 +1448,9 @@ fkey_encode_links(struct region *region, const struct fkey_def *def, int type,
 }
 
 char *
-sql_encode_index_parts(struct region *region, struct SqliteIndex *index,
-		       uint32_t *size)
+sql_encode_index_parts(struct region *region, const struct field_def *fields,
+		       const struct index_def *idx_def,
+		       const struct index_def *pk_def, uint32_t *size)
 {
 	size_t used = region_used(region);
 	struct mpstream stream;
@@ -1466,12 +1462,10 @@ sql_encode_index_parts(struct region *region, struct SqliteIndex *index,
 	 * treat it as strict type, not affinity.
 	 */
 	uint32_t pk_forced_int = UINT32_MAX;
-	struct SqliteIndex *pk = sqlite3PrimaryKeyIndex(index->pTable);
-	struct field_def *fields = index->pTable->def->fields;
-	if (pk->def->key_def->part_count == 1) {
-		int fieldno = pk->def->key_def->parts[0].fieldno;
-		if (fields[fieldno].type == FIELD_TYPE_INTEGER)
-			pk_forced_int = fieldno;
+	if (pk_def->key_def->part_count == 1) {
+		int pk = pk_def->key_def->parts[0].fieldno;
+		if (fields[pk].type == FIELD_TYPE_INTEGER)
+			pk_forced_int = pk;
 	}
 
 	/* gh-2187
@@ -1480,7 +1474,7 @@ sql_encode_index_parts(struct region *region, struct SqliteIndex *index,
 	 * primary key columns. Query planner depends on this particular
 	 * data layout.
 	 */
-	struct key_def *key_def = index->def->key_def;
+	struct key_def *key_def = idx_def->key_def;
 	struct key_part *part = key_def->parts;
 	mpstream_encode_array(&stream, key_def->part_count);
 	for (uint32_t i = 0; i < key_def->part_count; ++i, ++part) {
@@ -1532,7 +1526,7 @@ sql_encode_index_parts(struct region *region, struct SqliteIndex *index,
 }
 
 char *
-sql_encode_index_opts(struct region *region, struct index_opts *opts,
+sql_encode_index_opts(struct region *region, const struct index_opts *opts,
 		      uint32_t *size)
 {
 	size_t used = region_used(region);
@@ -1666,6 +1660,14 @@ sql_ephemeral_table_new(Parse *parser, const char *name)
 	if (table != NULL)
 		def = sql_ephemeral_space_def_new(parser, name);
 	if (def == NULL) {
+		sqlite3DbFree(db, table);
+		return NULL;
+	}
+	table->space = (struct space *) calloc(1, sizeof(struct space));
+	if (table->space == NULL) {
+		diag_set(OutOfMemory, sizeof(struct space), "calloc", "space");
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
 		sqlite3DbFree(db, table);
 		return NULL;
 	}

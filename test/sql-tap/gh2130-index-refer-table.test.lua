@@ -69,16 +69,4 @@ test:do_execsql_test(
 	-- <index-1.5>
 	})
 
--- This part of test is banned in scope of #2174
--- test:do_execsql_test(
---	"index-1.6",
---	[[
---		REINDEX t1ix1 ON t1;
---	]],
---	{
---	-- <index-1.6>
---
---	-- <index-1.6>
---	})
-
 test:finish_test()

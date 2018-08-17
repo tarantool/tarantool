@@ -250,6 +250,8 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 		if (part1->coll != part2->coll)
 			return (uintptr_t) part1->coll <
 			       (uintptr_t) part2->coll ? -1 : 1;
+		if (part1->sort_order != part2->sort_order)
+			return part1->sort_order < part2->sort_order ? -1 : 1;
 		if (key_part_is_nullable(part1) != key_part_is_nullable(part2))
 			return key_part_is_nullable(part1) <
 			       key_part_is_nullable(part2) ? -1 : 1;

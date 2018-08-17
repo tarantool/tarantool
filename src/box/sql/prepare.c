@@ -116,12 +116,11 @@ sql_init_callback(struct init_data *init, const char *name,
 		 * been created when we processed the CREATE TABLE.  All we have
 		 * to do here is record the root page number for that index.
 		 */
-		Index *pIndex;
 		struct space *space = space_by_id(space_id);
 		const char *zSpace = space_name(space);
-		pIndex = sqlite3LocateIndex(db, name, zSpace);
-		assert(pIndex != NULL);
-		pIndex->def->iid = index_id;
+		struct index *idx = sqlite3LocateIndex(db, name, zSpace);
+		assert(idx != NULL);
+		idx->def->iid = index_id;
 	}
 	return 0;
 }

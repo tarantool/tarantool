@@ -4378,16 +4378,20 @@ sqlite3IndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
 	if (pFrom->pTab && pFrom->fg.isIndexedBy) {
 		Table *pTab = pFrom->pTab;
 		char *zIndexedBy = pFrom->u1.zIndexedBy;
-		Index *pIdx;
-		for (pIdx = pTab->pIndex;
-		     pIdx && strcmp(pIdx->def->name, zIndexedBy);
-		     pIdx = pIdx->pNext) ;
-		if (!pIdx) {
+		struct index *idx = NULL;
+		for (uint32_t i = 0; i < pTab->space->index_count; ++i) {
+			if (strcmp(pTab->space->index[i]->def->name,
+				   zIndexedBy) == 0) {
+				idx = pTab->space->index[i];
+				break;
+			}
+		}
+		if (idx == NULL) {
 			sqlite3ErrorMsg(pParse, "no such index: %s", zIndexedBy,
 					0);
 			return SQLITE_ERROR;
 		}
-		pFrom->pIBIndex = pIdx;
+		pFrom->pIBIndex = idx->def;
 	}
 	return SQLITE_OK;
 }
@@ -4833,6 +4837,7 @@ selectExpander(Walker * pWalker, Select * p)
 					return WRC_Abort;
 				tab->nTabRef = 1;
 				tab->def = space_def_dup(space->def);
+				tab->space = space;
 				pFrom->pTab = pTab = tab;
 			} else {
 				if (pTab->nTabRef >= 0xffff) {

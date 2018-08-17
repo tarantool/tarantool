@@ -102,7 +102,7 @@ struct WhereLevel {
 				u8 eEndLoopOp;	/* IN Loop terminator. OP_Next or OP_Prev */
 			} *aInLoop;	/* Information about each nested IN operator */
 		} in;		/* Used when pWLoop->wsFlags&WHERE_IN_ABLE */
-		Index *pCovidx;	/* Possible covering index for WHERE_MULTI_OR */
+		struct index_def *pCovidx;	/* Possible covering index for WHERE_MULTI_OR */
 	} u;
 	struct WhereLoop *pWLoop;	/* The selected WhereLoop object */
 	Bitmask notReady;	/* FROM entries not usable at this level */
@@ -140,8 +140,7 @@ struct WhereLoop {
 	u16 nEq;	/* Number of equality constraints */
 	u16 nBtm;	/* Size of BTM vector */
 	u16 nTop;	/* Size of TOP vector */
-	Index *pIndex;	/* Index used, or NULL */
-	/** Index definition, if there's no pIndex. */
+	/** Index definition. */
 	struct index_def *index_def;
 	u32 wsFlags;		/* WHERE_* flags describing the plan */
 	u16 nLTerm;		/* Number of entries in aLTerm[] */
@@ -452,8 +451,7 @@ WhereTerm *sqlite3WhereFindTerm(WhereClause * pWC,	/* The WHERE clause to be sea
 				int iColumn,	/* Column number of LHS */
 				Bitmask notReady,	/* RHS must not overlap with this mask */
 				u32 op,	/* Mask of WO_xx values describing operator */
-				Index * pIdx	/* Must be compatible with this index, if not NULL */
-    );
+				struct index_def *idx_def);
 
 /* wherecode.c: */
 int sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */

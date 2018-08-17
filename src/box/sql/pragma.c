@@ -237,6 +237,89 @@ sql_default_engine_set(const char *engine_name)
 	return 0;
 }
 
+/**
+ * This function handles PRAGMA INDEX_INFO and PRAGMA INDEX_XINFO
+ * statements.
+ *
+ * @param parse Current parsing content.
+ * @param pragma Definition of index_info pragma.
+ * @param table_name Name of table index belongs to.
+ * @param idx_name Name of index to display info about.
+ */
+static void
+sql_pragma_index_info(struct Parse *parse, const PragmaName *pragma,
+		      const char *tbl_name, const char *idx_name)
+{
+	if (idx_name == NULL || tbl_name == NULL)
+		return;
+	uint32_t space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
+	if (space_id == BOX_ID_NIL)
+		return;
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	if (space->def->opts.sql == NULL)
+		return;
+	uint32_t iid = box_index_id_by_name(space_id, idx_name,
+					     strlen(idx_name));
+	if (iid == BOX_ID_NIL)
+		return;
+	struct index *idx = space_index(space, iid);
+	assert(idx != NULL);
+	/* PRAGMA index_xinfo (more informative version). */
+	if (pragma->iArg > 0) {
+		parse->nMem = 6;
+	} else {
+		/* PRAGMA index_info ... */
+		parse->nMem = 3;
+	}
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	assert(v != NULL);
+	uint32_t part_count = idx->def->key_def->part_count;
+	assert(parse->nMem <= pragma->nPragCName);
+	struct key_part *part = idx->def->key_def->parts;
+	for (uint32_t i = 0; i < part_count; i++, part++) {
+		sqlite3VdbeMultiLoad(v, 1, "iis", i, part->fieldno,
+				     space->def->fields[part->fieldno].name);
+		if (pragma->iArg > 0) {
+			const char *c_n;
+			uint32_t id = part->coll_id;
+			struct coll *coll = part->coll;
+			if (coll != NULL)
+				c_n = coll_by_id(id)->name;
+			else
+				c_n = "BINARY";
+			sqlite3VdbeMultiLoad(v, 4, "isi", part->sort_order,
+					     c_n, i < part_count);
+		}
+		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, parse->nMem);
+	}
+}
+
+/**
+ * This function handles PRAGMA INDEX_LIST statement.
+ *
+ * @param parse Current parsing content.
+ * @param table_name Name of table to display list of indexes.
+ */
+void
+sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
+{
+	if (tbl_name == NULL)
+		return;
+	uint32_t space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
+	if (space_id == BOX_ID_NIL)
+		return;
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	parse->nMem = 5;
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		struct index *idx = space->index[i];
+		sqlite3VdbeMultiLoad(v, 1, "isisi", i, idx->def->name,
+				     idx->def->opts.is_unique);
+		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 5);
+	}
+}
 
 /*
  * Process a pragma statement.
@@ -360,7 +443,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			break;
 		struct space *space = space_cache_find(table->def->id);
 		struct space_def *def = space->def;
-		struct Index *pk = sqlite3PrimaryKeyIndex(table);
+		struct index *pk = sql_table_primary_key(table);
 		pParse->nMem = 6;
 		if (def->opts.is_view) {
 			const char *sql = table->def->opts.sql;
@@ -387,7 +470,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		break;
 
 	case PragTyp_STATS:{
-			Index *pIdx;
 			HashElem *i;
 			pParse->nMem = 4;
 			for (i = sqliteHashFirst(&db->pSchema->tblHash); i;
@@ -404,17 +486,15 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 						     avg_tuple_size_pk,
 						     sql_space_tuple_log_count(pTab));
 				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
-				for (pIdx = pTab->pIndex; pIdx;
-				     pIdx = pIdx->pNext) {
-					struct index *idx =
-						space_index(space, pIdx->def->iid);
+				for (uint32_t i = 0; i < pTab->space->index_count; ++i) {
+					struct index *idx = pTab->space->index[i];
 					assert(idx != NULL);
 					size_t avg_tuple_size_idx =
 						sql_index_tuple_size(space, idx);
 					sqlite3VdbeMultiLoad(v, 2, "sii",
-							     pIdx->def->name,
+							     idx->def->name,
 							     avg_tuple_size_idx,
-							     index_field_tuple_est(pIdx, 0));
+							     index_field_tuple_est(idx->def, 0));
 					sqlite3VdbeAddOp2(v, OP_ResultRow, 1,
 							  4);
 				}
@@ -423,93 +503,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		}
 
 	case PragTyp_INDEX_INFO:{
-			if (zRight && zTable) {
-				Index *pIdx;
-				pIdx = sqlite3LocateIndex(db, zRight, zTable);
-				if (pIdx) {
-					int i;
-					int mx;
-					if (pPragma->iArg) {
-						/* PRAGMA index_xinfo (newer
-						 * version with more rows and
-						 * columns)
-						 */
-						pParse->nMem = 6;
-					} else {
-						/* PRAGMA index_info (legacy
-						 * version)
-						 */
-						pParse->nMem = 3;
-					}
-					mx = pIdx->def->key_def->part_count;
-					assert(pParse->nMem <=
-					       pPragma->nPragCName);
-					struct key_part *part =
-						pIdx->def->key_def->parts;
-					for (i = 0; i < mx; i++, part++) {
-						i16 cnum = (int) part->fieldno;
-						assert(pIdx->pTable);
-						sqlite3VdbeMultiLoad(v, 1,
-								     "iis", i,
-								     cnum,
-								     cnum <
-								     0 ? 0 :
-								     pIdx->
-								     pTable->
-								     def->
-								     fields[cnum].
-								     name);
-						if (pPragma->iArg) {
-							const char *c_n;
-							uint32_t id =
-								part->coll_id;
-							struct coll *coll =
-								part->coll;
-							if (coll != NULL)
-								c_n = coll_by_id(id)->name;
-							else
-								c_n = "BINARY";
-							sqlite3VdbeMultiLoad(v,
-									     4,
-									     "isi",
-									     part->
-									     sort_order,
-									     c_n,
-									     i <
-									     mx);
-						}
-						sqlite3VdbeAddOp2(v,
-								  OP_ResultRow,
-								  1,
-								  pParse->nMem);
-					}
-				}
-			}
-			break;
-		}
+		sql_pragma_index_info(pParse, pPragma, zTable, zRight);
+		break;
+	}
 	case PragTyp_INDEX_LIST:{
-			if (zRight) {
-				Index *pIdx;
-				Table *pTab;
-				int i;
-				pTab = sqlite3HashFind(&db->pSchema->tblHash,
-						       zRight);
-				if (pTab != NULL) {
-					pParse->nMem = 5;
-					for (pIdx = pTab->pIndex, i = 0; pIdx;
-					     pIdx = pIdx->pNext, i++) {
-						sqlite3VdbeMultiLoad(v, 1,
-								     "isisi", i,
-								     pIdx->def->name,
-								     pIdx->def->opts.is_unique);
-						sqlite3VdbeAddOp2(v,
-								  OP_ResultRow,
-								  1, 5);
-					}
-				}
-			}
-			break;
-		}
+		sql_pragma_index_list(pParse, zRight);
+		break;
+	}
 
 	case PragTyp_COLLATION_LIST:{
 		int i = 0;

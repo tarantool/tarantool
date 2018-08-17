@@ -162,6 +162,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		memset(&tmp_tab, 0, sizeof(tmp_tab));
 		tmp_tab.def = space->def;
 		/* Prevent from freeing memory in DeleteTable. */
+		tmp_tab.space = space;
 		tmp_tab.nTabRef = 2;
 		tab_list->a[0].pTab = &tmp_tab;
 	} else {
@@ -350,7 +351,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			 * key.
 			 */
 			key_len = 0;
-			struct Index *pk = sqlite3PrimaryKeyIndex(table);
+			struct index *pk = sql_table_primary_key(table);
 			const char *zAff = is_view ? NULL :
 					   sql_space_index_affinity_str(parse->db,
 									space->def,
@@ -582,14 +583,16 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 }
 
 int
-sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
-		       int reg_out, struct Index *prev, int reg_prev)
+sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
+		       int reg_out, struct index *prev, int reg_prev)
 {
 	struct Vdbe *v = parse->pVdbe;
 	int col_cnt = index->def->key_def->part_count;
 	int reg_base = sqlite3GetTempRange(parse, col_cnt);
 	if (prev != NULL && reg_base != reg_prev)
 		prev = NULL;
+	struct space *space = space_by_id(index->def->space_id);
+	assert(space != NULL);
 	for (int j = 0; j < col_cnt; j++) {
 		if (prev != NULL && prev->def->key_def->parts[j].fieldno ==
 				    index->def->key_def->parts[j].fieldno) {
@@ -599,8 +602,9 @@ sql_generate_index_key(struct Parse *parse, struct Index *index, int cursor,
 			 */
 			continue;
 		}
-		sqlite3ExprCodeLoadIndexColumn(parse, index, cursor, j,
-					       reg_base + j);
+		uint32_t tabl_col = index->def->key_def->parts[j].fieldno;
+		sqlite3ExprCodeGetColumnOfTable(v, space->def, cursor, tabl_col,
+						reg_base + j);
 		/*
 		 * If the column affinity is REAL but the number
 		 * is an integer, then it might be stored in the

@@ -678,8 +678,8 @@ test:do_execsql_test(
     "11.0",
     [[
         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a COLLATE "unicode_ci", b);
-        CREATE INDEX t4a ON t4(a);
         CREATE INDEX t4b ON t4(b);
+        CREATE INDEX t4a ON t4(a);
     ]], {
         -- <11.0>
         -- </11.0>
@@ -729,8 +729,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a, b);
-        CREATE INDEX t4a ON t4(a COLLATE "unicode_ci");
         CREATE INDEX t4b ON t4(b);
+        CREATE INDEX t4a ON t4(a COLLATE "unicode_ci");
     ]], {
         -- <11.4>
         -- </11.4>
@@ -790,8 +790,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a COLLATE "unicode_ci", b);
-        CREATE INDEX t4a ON t4(x, a);
         CREATE INDEX t4b ON t4(x, b);
+        CREATE INDEX t4a ON t4(x, a);
     ]], {
         -- <12.0>
         -- </12.0>
@@ -841,8 +841,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t4;
         CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, x, a, b);
-        CREATE INDEX t4a ON t4(x, a COLLATE "unicode_ci");
         CREATE INDEX t4b ON t4(x, b);
+        CREATE INDEX t4a ON t4(x, a COLLATE "unicode_ci");
     ]], {
         -- <12.4>
         -- </12.4>
@@ -1169,7 +1169,7 @@ test:do_execsql_test(
         EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE d IS NOT NULL AND a=0 AND b=10 AND c=10;
     ]], {
         -- <17.5>
-        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (C=? AND D>?)"
+	0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=? AND B=?)"
         -- </17.5>
     })
 

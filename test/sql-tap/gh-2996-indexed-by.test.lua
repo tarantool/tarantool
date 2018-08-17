@@ -8,8 +8,8 @@ test:plan(13)
 
 test:execsql [[
     CREATE TABLE t1(a INT PRIMARY KEY, b);
-    CREATE INDEX t1ix1 ON t1(b);
     CREATE INDEX t1ix2 on t1(b);
+    CREATE INDEX t1ix1 on t1(b);
 ]]
 
 sample_size = 1000
@@ -74,8 +74,8 @@ test:do_catchsql_test(
 
 -- Make sure that DELETE statement works correctly with INDEXED BY.
 test:execsql [[
-    CREATE INDEX t1ix1 ON t1(b);
-    CREATE INDEX t1ix2 on t1(b);
+    CREATE INDEX t1ix2 ON t1(b);
+    CREATE INDEX t1ix1 on t1(b);
 ]]
 
 test:do_eqp_test(
@@ -116,8 +116,8 @@ test:do_catchsql_test(
     })
 
 test:execsql [[
-    CREATE INDEX t1ix1 ON t1(b);
-    CREATE INDEX t1ix2 ON t1(b);
+   CREATE INDEX t1ix2 ON t1(b);
+   CREATE INDEX t1ix1 ON t1(b);
 ]]
 
 test:do_eqp_test(

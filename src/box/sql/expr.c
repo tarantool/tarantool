@@ -2363,7 +2363,6 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		pTab = p->pSrc->a[0].pTab;
 		assert(v);	/* sqlite3GetVdbe() has always been previously called */
 
-		Index *pIdx;	/* Iterator variable */
 		int affinity_ok = 1;
 		int i;
 
@@ -2398,15 +2397,21 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		}
 
 		if (affinity_ok) {
+			/*
+			 * Here we need real space since further
+			 * it is used in cursor opening routine.
+			 */
+			struct space *space = space_by_id(pTab->def->id);
 			/* Search for an existing index that will work for this IN operator */
-			for (pIdx = pTab->pIndex; pIdx && eType == 0;
-			     pIdx = pIdx->pNext) {
+			for (uint32_t k = 0; k < space->index_count &&
+			     eType == 0; ++k) {
+				struct index *idx = space->index[k];
 				Bitmask colUsed; /* Columns of the index used */
 				Bitmask mCol;	/* Mask for the current column */
 				uint32_t part_count =
-					pIdx->def->key_def->part_count;
+					idx->def->key_def->part_count;
 				struct key_part *parts =
-					pIdx->def->key_def->parts;
+					idx->def->key_def->parts;
 				if ((int)part_count < nExpr)
 					continue;
 				/* Maximum nColumn is BMS-2, not BMS-1, so that we can compute
@@ -2418,7 +2423,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 					continue;
 				if (mustBeUnique &&
 				    ((int)part_count > nExpr ||
-				     !pIdx->def->opts.is_unique)) {
+				     !idx->def->opts.is_unique)) {
 					/*
 					 * This index is not
 					 * unique over the IN RHS
@@ -2470,14 +2475,12 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 							  0, 0, 0,
 							  sqlite3MPrintf(db,
 							  "USING INDEX %s FOR IN-OPERATOR",
-							  pIdx->def->name),
+							  idx->def->name),
 							  P4_DYNAMIC);
-					struct space *space =
-						space_by_id(pIdx->pTable->def->id);
-					uint32_t idx_id = pIdx->def->iid;
 					vdbe_emit_open_cursor(pParse, iTab,
-							      idx_id, space);
-					VdbeComment((v, "%s", pIdx->def->name));
+							      idx->def->iid,
+							      space);
+					VdbeComment((v, "%s", idx->def->name));
 					assert(IN_INDEX_INDEX_DESC ==
 					       IN_INDEX_INDEX_ASC + 1);
 					eType = IN_INDEX_INDEX_ASC +
@@ -3137,9 +3140,8 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 
 		struct Table *tab = src_list->a[0].pTab;
 		assert(tab != NULL);
-
-		struct Index *pk = sqlite3PrimaryKeyIndex(tab);
-		assert(pk);
+		struct index *pk = sql_table_primary_key(tab);
+		assert(pk != NULL);
 
 		uint32_t fieldno = pk->def->key_def->parts[0].fieldno;
 		enum affinity_type affinity =
@@ -3462,22 +3464,6 @@ sqlite3ExprCachePinRegister(Parse * pParse, int iReg)
 			p->tempReg = 0;
 		}
 	}
-}
-
-/* Generate code that will load into register regOut a value that is
- * appropriate for the iIdxCol-th column of index pIdx.
- */
-void
-sqlite3ExprCodeLoadIndexColumn(Parse * pParse,	/* The parsing context */
-			       Index * pIdx,	/* The index whose column is to be loaded */
-			       int iTabCur,	/* Cursor pointing to a table row */
-			       int iIdxCol,	/* The column of the index to be loaded */
-			       int regOut	/* Store the index column value in this register */
-    )
-{
-	i16 iTabCol = pIdx->def->key_def->parts[iIdxCol].fieldno;
-	sqlite3ExprCodeGetColumnOfTable(pParse->pVdbe, pIdx->pTable->def,
-					iTabCur, iTabCol, regOut);
 }
 
 void
@@ -4985,22 +4971,6 @@ sqlite3ExprIfFalse(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
 }
 
 /*
- * Like sqlite3ExprIfFalse() except that a copy is made of pExpr before
- * code generation, and that copy is deleted after code generation. This
- * ensures that the original pExpr is unchanged.
- */
-void
-sqlite3ExprIfFalseDup(Parse * pParse, Expr * pExpr, int dest, int jumpIfNull)
-{
-	sqlite3 *db = pParse->db;
-	Expr *pCopy = sqlite3ExprDup(db, pExpr, 0);
-	if (db->mallocFailed == 0) {
-		sqlite3ExprIfFalse(pParse, pCopy, dest, jumpIfNull);
-	}
-	sql_expr_delete(db, pCopy, false);
-}
-
-/*
  * Do a deep comparison of two expression trees.  Return 0 if the two
  * expressions are completely identical.  Return 1 if they differ only
  * by a COLLATE operator at the top level.  Return 2 if there are differences
@@ -5154,62 +5124,6 @@ sqlite3ExprImpliesExpr(Expr * pE1, Expr * pE2, int iTab)
 			return 1;
 	}
 	return 0;
-}
-
-/*
- * An instance of the following structure is used by the tree walker
- * to determine if an expression can be evaluated by reference to the
- * index only, without having to do a search for the corresponding
- * table entry.  The IdxCover.pIdx field is the index.  IdxCover.iCur
- * is the cursor for the table.
- */
-struct IdxCover {
-	Index *pIdx;		/* The index to be tested for coverage */
-	int iCur;		/* Cursor number for the table corresponding to the index */
-};
-
-/*
- * Check to see if there are references to columns in table
- * pWalker->u.pIdxCover->iCur can be satisfied using the index
- * pWalker->u.pIdxCover->pIdx.
- */
-static int
-exprIdxCover(Walker * pWalker, Expr * pExpr)
-{
-	if (pExpr->op == TK_COLUMN
-	    && pExpr->iTable == pWalker->u.pIdxCover->iCur
-	    && pExpr->iColumn < 0) {
-		pWalker->eCode = 1;
-		return WRC_Abort;
-	}
-	return WRC_Continue;
-}
-
-/*
- * Determine if an index pIdx on table with cursor iCur contains will
- * the expression pExpr.  Return true if the index does cover the
- * expression and false if the pExpr expression references table columns
- * that are not found in the index pIdx.
- *
- * An index covering an expression means that the expression can be
- * evaluated using only the index and without having to lookup the
- * corresponding table entry.
- */
-int
-sqlite3ExprCoveredByIndex(Expr * pExpr,	/* The index to be tested */
-			  int iCur,	/* The cursor number for the corresponding table */
-			  Index * pIdx	/* The index that might be used for coverage */
-    )
-{
-	Walker w;
-	struct IdxCover xcov;
-	memset(&w, 0, sizeof(w));
-	xcov.iCur = iCur;
-	xcov.pIdx = pIdx;
-	w.xExprCallback = exprIdxCover;
-	w.u.pIdxCover = &xcov;
-	sqlite3WalkExpr(&w, pExpr);
-	return !w.eCode;
 }
 
 /*

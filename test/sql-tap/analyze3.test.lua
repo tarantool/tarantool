@@ -603,8 +603,8 @@ test:do_test(
         test:execsql([[
             DROP INDEX IF EXISTS i1 ON t1;
             DROP INDEX IF EXISTS i2 ON t1;
-            CREATE INDEX i1 ON t1(a, b);
             CREATE INDEX i2 ON t1(c);
+            CREATE INDEX i1 ON t1(a, b);
         ]])
         return test:execsql("ANALYZE")
     end, {

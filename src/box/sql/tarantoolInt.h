@@ -217,7 +217,9 @@ fkey_encode_links(struct region *region, const struct fkey_def *def, int type,
  * @retval not NULL Pointer to msgpack on success
  */
 char *
-sql_encode_index_parts(struct region *region, struct Index *index,
+sql_encode_index_parts(struct region *region, const struct field_def *fields,
+		       const struct index_def *idx_def,
+		       const struct index_def *pk_def,
 		       uint32_t *size);
 
 /**
@@ -230,7 +232,7 @@ sql_encode_index_parts(struct region *region, struct Index *index,
  * @retval not NULL pointer to msgpack on success
  */
 char *
-sql_encode_index_opts(struct region *region, struct index_opts *opts,
+sql_encode_index_opts(struct region *region, const struct index_opts *opts,
 		      uint32_t *size);
 
 /**

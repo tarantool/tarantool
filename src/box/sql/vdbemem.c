@@ -1062,7 +1062,7 @@ sqlite3ValueNew(sqlite3 * db)
  */
 struct ValueNewStat4Ctx {
 	Parse *pParse;
-	Index *pIdx;
+	struct index_def *pIdx;
 	UnpackedRecord **ppRec;
 	int iVal;
 };
@@ -1084,19 +1084,17 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 	if (p) {
 		UnpackedRecord *pRec = p->ppRec[0];
 
-		if (pRec == 0) {
-			Index *pIdx = p->pIdx;	/* Index being probed */
-			int nByte;	/* Bytes of space to allocate */
-			int i;	/* Counter variable */
-			int part_count = pIdx->def->key_def->part_count;
+		if (pRec == NULL) {
+			struct index_def *idx = p->pIdx;
+			uint32_t part_count = idx->key_def->part_count;
 
-			nByte = sizeof(Mem) * part_count +
-				ROUND8(sizeof(UnpackedRecord));
-			pRec =
-			    (UnpackedRecord *) sqlite3DbMallocZero(db, nByte);
+			int nByte = sizeof(Mem) * part_count +
+				    ROUND8(sizeof(UnpackedRecord));
+			pRec = (UnpackedRecord *) sqlite3DbMallocZero(db,
+								      nByte);
 			if (pRec == NULL)
 				return NULL;
-			pRec->key_def = key_def_dup(pIdx->def->key_def);
+			pRec->key_def = key_def_dup(idx->key_def);
 			if (pRec->key_def == NULL) {
 				sqlite3DbFree(db, pRec);
 				sqlite3OomFault(db);
@@ -1104,7 +1102,7 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 			}
 			pRec->aMem = (Mem *)((char *) pRec +
 					     ROUND8(sizeof(UnpackedRecord)));
-			for (i = 0; i < (int) part_count; i++) {
+			for (uint32_t i = 0; i < part_count; i++) {
 				pRec->aMem[i].flags = MEM_Null;
 				pRec->aMem[i].db = db;
 			}
@@ -1530,7 +1528,7 @@ stat4ValueFromExpr(Parse * pParse,	/* Parse context */
  */
 int
 sqlite3Stat4ProbeSetValue(Parse * pParse,	/* Parse context */
-			  Index * pIdx,	/* Index being probed */
+			  struct index_def *idx,
 			  UnpackedRecord ** ppRec,	/* IN/OUT: Probe record */
 			  Expr * pExpr,	/* The expression to extract a value from */
 			  int nElem,	/* Maximum number of values to append */
@@ -1546,16 +1544,16 @@ sqlite3Stat4ProbeSetValue(Parse * pParse,	/* Parse context */
 		struct ValueNewStat4Ctx alloc;
 
 		alloc.pParse = pParse;
-		alloc.pIdx = pIdx;
+		alloc.pIdx = idx;
 		alloc.ppRec = ppRec;
 
-		struct space *space = space_by_id(pIdx->def->space_id);
+		struct space *space = space_by_id(idx->space_id);
 		assert(space != NULL);
 		for (i = 0; i < nElem; i++) {
 			sqlite3_value *pVal = 0;
 			Expr *pElem =
 			    (pExpr ? sqlite3VectorFieldSubexpr(pExpr, i) : 0);
-			u8 aff = sql_space_index_part_affinity(space->def, pIdx->def,
+			u8 aff = sql_space_index_part_affinity(space->def, idx,
 							       iVal + i);
 			alloc.iVal = iVal + i;
 			rc = stat4ValueFromExpr(pParse, pElem, aff, &alloc,

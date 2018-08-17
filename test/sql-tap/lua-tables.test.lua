@@ -24,11 +24,11 @@ test:do_test(
 
 test:do_execsql_test(
     "lua-tables-2",
-    [[SELECT *, count(*)
+    [[SELECT *
         FROM "t" as t1, "t" as t2
         WHERE t1."id" = t2."f2"
     ]],
-    {4, 3, 1, 4, 4})
+    {4, 3, 1, 4, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 3})
 
 test:do_execsql_test(
     "lua-tables-3",
@@ -119,9 +119,9 @@ test:do_execsql_test(
      "3",3,"Elem3",4,"","","",0,1,
      "4",4,"Elem4",5,"","","",0,1})
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "lua-tables-9",
     [[SELECT * FROM "t" INDEXED BY "i"]],
-    {1,"no such index: i"})
+    {1, 4, 2, 2, 3, 3, 4, 3})
 
 test:finish_test()

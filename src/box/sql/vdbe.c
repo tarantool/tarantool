@@ -4736,17 +4736,17 @@ case OP_DropTable: {
 	break;
 }
 
-/* Opcode: DropIndex * * *  P4
+/* Opcode: DropIndex P1 * *  P4
+ *
+ * @P1 Contains index id of index to be removed.
+ * @P4 Space of removed index.
  *
  * Remove the internal (in-memory) data structures that describe
  * the index named P4 for table.
- * This is called after an index is dropped from disk
- * (using the Destroy opcode) in order to keep
- * the internal representation of the schema consistent with what
- * is on disk.
+ * This is called after an index is dropped from Tarantool DD.
  */
 case OP_DropIndex: {
-	sqlite3UnlinkAndDeleteIndex(db, pOp->p4.pIndex);
+	sql_space_index_delete(pOp->p4.space, pOp->p1);
 	break;
 }
 

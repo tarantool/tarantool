@@ -162,8 +162,8 @@ test:do_execsql_test(
 		-- After running second ANALYZE query, there are equal statistics for
 		-- indexes t1a and t1b, so it doesn't really matter which index planner uses.
         -- <analyze7-3.3>
-        -- 0, 0, 0, "SEARCH TABLE t1 USING COVERING INDEX t1a (a=?)"
-        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1A (A=?)"
+        --0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
         -- </analyze7-3.3>
     })
 
@@ -173,7 +173,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=123 AND b=123;
 	]], {
         -- <analyze7-3.4>
-        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
+        0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CD (C=?)"
         -- </analyze7-3.4>
     })
 
@@ -183,7 +183,7 @@ test:do_execsql_test(
 		EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE c=123 AND d=123 AND b=123;
 	]], {
        -- <analyze7-3.6>
-       0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1B (B=?)"
+       0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX T1CD (C=? AND D=?)"
        -- </analyze7-3.6>
     })
 

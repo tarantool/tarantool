@@ -211,7 +211,7 @@ columnname(A) ::= nm(A) typetoken(Y). {sqlite3AddColumn(pParse,&A,&Y);}
 %ifdef SQLITE_OMIT_COMPOUND_SELECT
   INTERSECT 
 %endif SQLITE_OMIT_COMPOUND_SELECT
-  REINDEX RENAME CTIME_KW IF
+  RENAME CTIME_KW IF
   .
 %wildcard ANY.
 
@@ -1429,14 +1429,6 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
   sql_drop_trigger(pParse,X,NOERR);
 }
-
-////////////////////////// REINDEX collation //////////////////////////////////
-/* gh-2174: Commended until REINDEX is implemented in scope of gh-3195 */
-/* %ifndef SQLITE_OMIT_REINDEX */
-/* cmd ::= REINDEX.                {sqlite3Reindex(pParse, 0, 0);} */
-/* cmd ::= REINDEX nm(X).          {sqlite3Reindex(pParse, &X, 0);} */
-/* cmd ::= REINDEX nm(X) ON nm(Y). {sqlite3Reindex(pParse, &X, &Y);} */
-/* %endif  SQLITE_OMIT_REINDEX */
 
 /////////////////////////////////// ANALYZE ///////////////////////////////////
 cmd ::= ANALYZE.                {sqlite3Analyze(pParse, 0);}

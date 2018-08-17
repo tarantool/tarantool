@@ -119,67 +119,6 @@ test:do_test(
         -- </index-2.2>
     })
 
--- MUST_WORK_TEST REINDEX and integrity_check
-if (0 > 0)
- then
-    -- Try creating a bunch of indices on the same table
-    --
-    local r = {}
-    for i = 1, 99, 1 do
-        table.insert(r,string.format("index%02d", i))
-    end
-    test:do_test(
-        "index-3.1",
-        function()
-            test:execsql("CREATE TABLE test1(f1 int primary key, f2 int, f3 int, f4 int, f5 int)")
-            for i = 1, 99, 1 do
-                local sql = string.format("CREATE INDEX %s ON test1(f%s)", string.format("index%02d", i), (i%5)+1)
-                test:execsql(sql)
-            end
-            return test:execsql [[SELECT name FROM sqlite_master 
-              WHERE type='index' AND tbl_name='test1'
-              ORDER BY name]]
-        end, {
-            -- <index-3.1>
-            r
-            -- </index-3.1>
-        })
-
-    X(104, "X!cmd", [=[["integrity_check","index-3.2.1"]]=])
-    test:do_execsql_test(
-        "index-3.2.2",
-        [[
-            REINDEX
-        ]], {
-            -- <index-3.2.2>
-            
-            -- </index-3.2.2>
-        })
-
-
-
-    --X(110, "X!cmd", [=[["integrity_check","index-3.2.3"]]=])
-    -- Verify that all the indices go away when we drop the table.
-    --
-    test:do_test(
-        "index-3.3",
-        function()
-            test:execsql "DROP TABLE test1"
-            return test:execsql [[SELECT name FROM sqlite_master 
-              WHERE type='index' AND tbl_name='test1'
-              ORDER BY name]]
-        end, {
-            -- <index-3.3>
-            
-            -- </index-3.3>
-        })
-
-    -- Create a table and insert values into that table. Then create
-    -- an index on that table. Verify that we can select values
-    -- from the table correctly using the index
-    -- Note that the index names index9 and indext are chosen because
-    -- they both have the same hash.
-end
 test:do_test(
     "index-4.1",
     function()
@@ -1017,7 +956,7 @@ test:do_execsql_test(
         SELECT "_index"."name" FROM "_index" JOIN "_space" WHERE "_index"."id" = "_space"."id" AND "_space"."name"='T7';
     ]], {
         -- <index-17.1>
-        "pk_unnamed_T7_3", "unique_unnamed_T7_2", "unique_unnamed_T7_1"
+        "pk_unnamed_T7_3","unique_unnamed_T7_1","unique_unnamed_T7_2"
         -- </index-17.1>
     })
 
