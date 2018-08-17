@@ -1241,26 +1241,29 @@ createIndex(Parse * pParse, Index * pIndex, int iSpaceId, int iIndexId,
 	Vdbe *v = sqlite3GetVdbe(pParse);
 	int iFirstCol = ++pParse->nMem;
 	int iRecord = (pParse->nMem += 6);	/* 6 total columns */
-	char *zOpts, *zParts;
-	int zOptsSz, zPartsSz;
-
-	/* Format "opts" and "parts" for _index entry. */
 	struct index_opts opts = pIndex->def->opts;
 	opts.sql = (char *)zSql;
-	zOpts = sqlite3DbMallocRaw(pParse->db,
-				   sql_encode_index_opts(&opts, NULL) +
-				   tarantoolSqlite3MakeIdxParts(pIndex,
-								NULL) + 2);
-	if (!zOpts)
+	struct region *region = &pParse->region;
+	uint32_t index_opts_sz = 0;
+	char *index_opts =
+		sql_encode_index_opts(region, &opts, &index_opts_sz);
+	if (index_opts == NULL)
+		goto error;
+	uint32_t index_parts_sz = 0;
+	char *index_parts =
+		sql_encode_index_parts(region, pIndex, &index_parts_sz);
+	if (index_parts == NULL)
+		goto error;
+	char *raw = sqlite3DbMallocRaw(pParse->db,
+				       index_opts_sz + index_parts_sz);
+	if (raw == NULL)
 		return;
-	zOptsSz = sql_encode_index_opts(&opts, zOpts);
-	zParts = zOpts + zOptsSz + 1;
-	zPartsSz = tarantoolSqlite3MakeIdxParts(pIndex, zParts);
-#if SQLITE_DEBUG
-	/* NUL-termination is necessary for VDBE trace facility only */
-	zOpts[zOptsSz] = 0;
-	zParts[zPartsSz] = 0;
-#endif
+
+	memcpy(raw, index_opts, index_opts_sz);
+	index_opts = raw;
+	raw += index_opts_sz;
+	memcpy(raw, index_parts, index_parts_sz);
+	index_parts = raw;
 
 	if (pParse->pNewTable) {
 		int reg;
@@ -1296,16 +1299,20 @@ createIndex(Parse * pParse, Index * pIndex, int iSpaceId, int iIndexId,
 			  P4_DYNAMIC);
 	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 3, 0, "tree",
 			  P4_STATIC);
-	sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 4,
-			  SQL_SUBTYPE_MSGPACK, zOpts, P4_DYNAMIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, index_opts_sz, iFirstCol + 4,
+			  SQL_SUBTYPE_MSGPACK, index_opts, P4_DYNAMIC);
 	/* zOpts and zParts are co-located, hence STATIC */
-	sqlite3VdbeAddOp4(v, OP_Blob, zPartsSz, iFirstCol + 5,
-			  SQL_SUBTYPE_MSGPACK,zParts, P4_STATIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, index_parts_sz, iFirstCol + 5,
+			  SQL_SUBTYPE_MSGPACK, index_parts, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 6, iRecord);
 	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_INDEX_ID, iRecord);
 	if (pIndex->index_type == SQL_INDEX_TYPE_NON_UNIQUE ||
 	    pIndex->index_type == SQL_INDEX_TYPE_UNIQUE)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	return;
+error:
+	pParse->rc = SQL_TARANTOOL_ERROR;
+	pParse->nErr++;
 }
 
 /*
@@ -1360,50 +1367,54 @@ makeIndexSchemaRecord(Parse * pParse,
 static void
 createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 {
-	Table *p = pParse->pNewTable;
+	struct Table *table = pParse->pNewTable;
 	Vdbe *v = sqlite3GetVdbe(pParse);
 	int iFirstCol = ++pParse->nMem;
 	int iRecord = (pParse->nMem += 7);
-	char *zOpts, *zFormat;
-	int zOptsSz, zFormatSz;
+	struct region *region = &pParse->region;
+	uint32_t table_opts_stmt_sz = 0;
+	char *table_opts_stmt = sql_encode_table_opts(region, table, zStmt,
+						      &table_opts_stmt_sz);
+	if (table_opts_stmt == NULL)
+		goto error;
+	uint32_t table_stmt_sz = 0;
+	char *table_stmt = sql_encode_table(region, table, &table_stmt_sz);
+	if (table_stmt == NULL)
+		goto error;
+	char *raw = sqlite3DbMallocRaw(pParse->db,
+				       table_stmt_sz + table_opts_stmt_sz);
+	if (raw == NULL)
+		return;
 
-	zOpts = sqlite3DbMallocRaw(pParse->db,
-				   tarantoolSqlite3MakeTableFormat(p, NULL) +
-				   tarantoolSqlite3MakeTableOpts(p, zStmt,
-								 NULL) + 2);
-	if (!zOpts) {
-		zOptsSz = 0;
-		zFormat = NULL;
-		zFormatSz = 0;
-	} else {
-		zOptsSz = tarantoolSqlite3MakeTableOpts(p, zStmt, zOpts);
-		zFormat = zOpts + zOptsSz + 1;
-		zFormatSz = tarantoolSqlite3MakeTableFormat(p, zFormat);
-#if SQLITE_DEBUG
-		/* NUL-termination is necessary for VDBE-tracing facility only */
-		zOpts[zOptsSz] = 0;
-		zFormat[zFormatSz] = 0;
-#endif
-	}
+	memcpy(raw, table_opts_stmt, table_opts_stmt_sz);
+	table_opts_stmt = raw;
+	raw += table_opts_stmt_sz;
+	memcpy(raw, table_stmt, table_stmt_sz);
+	table_stmt = raw;
 
 	sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */ );
 	sqlite3VdbeAddOp2(v, OP_Integer, effective_user()->uid,
 			  iFirstCol + 1 /* owner */ );
 	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 2 /* name */ , 0,
-			  sqlite3DbStrDup(pParse->db, p->def->name), P4_DYNAMIC);
-	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 3 /* engine */ , 0,
-			  sqlite3DbStrDup(pParse->db, p->def->engine_name),
+			  sqlite3DbStrDup(pParse->db, table->def->name),
 			  P4_DYNAMIC);
-	sqlite3VdbeAddOp2(v, OP_Integer, p->def->field_count,
+	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 3 /* engine */ , 0,
+			  sqlite3DbStrDup(pParse->db, table->def->engine_name),
+			  P4_DYNAMIC);
+	sqlite3VdbeAddOp2(v, OP_Integer, table->def->field_count,
 			  iFirstCol + 4 /* field_count */ );
-	sqlite3VdbeAddOp4(v, OP_Blob, zOptsSz, iFirstCol + 5,
-			  SQL_SUBTYPE_MSGPACK, zOpts, P4_DYNAMIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, table_opts_stmt_sz, iFirstCol + 5,
+			  SQL_SUBTYPE_MSGPACK, table_opts_stmt, P4_DYNAMIC);
 	/* zOpts and zFormat are co-located, hence STATIC */
-	sqlite3VdbeAddOp4(v, OP_Blob, zFormatSz, iFirstCol + 6,
-			  SQL_SUBTYPE_MSGPACK, zFormat, P4_STATIC);
+	sqlite3VdbeAddOp4(v, OP_Blob, table_stmt_sz, iFirstCol + 6,
+			  SQL_SUBTYPE_MSGPACK, table_stmt, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
 	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SPACE_ID, iRecord);
 	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	return;
+error:
+	pParse->nErr++;
+	pParse->rc = SQL_TARANTOOL_ERROR;
 }
 
 /*
@@ -1592,10 +1603,8 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 					      BOX_FK_CONSTRAINT_ID, 0,
 					      constr_tuple_reg, 2,
 					      ER_CONSTRAINT_EXISTS, error_msg,
-					      false, OP_NoConflict) != 0) {
-		sqlite3DbFree(parse_context->db, name_copy);
+					      false, OP_NoConflict) != 0)
 		return;
-	}
 	sqlite3VdbeAddOp2(vdbe, OP_Bool, 0, constr_tuple_reg + 3);
 	sqlite3VdbeChangeP4(vdbe, -1, (char*)&fk->is_deferred, P4_BOOL);
 	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 4, 0,
@@ -1604,33 +1613,48 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 			  fkey_action_strs[fk->on_delete], P4_STATIC);
 	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 6, 0,
 			  fkey_action_strs[fk->on_update], P4_STATIC);
-	size_t parent_size = fkey_encode_links(fk, FIELD_LINK_PARENT, NULL);
-	size_t child_size = fkey_encode_links(fk, FIELD_LINK_CHILD, NULL);
+	struct region *region = &parse_context->region;
+	uint32_t parent_links_size = 0;
+	char *parent_links = fkey_encode_links(region, fk, FIELD_LINK_PARENT,
+					       &parent_links_size);
+	if (parent_links == NULL)
+		goto error;
+	uint32_t child_links_size = 0;
+	char *child_links = fkey_encode_links(region, fk, FIELD_LINK_CHILD,
+					      &child_links_size);
+	if (child_links == NULL)
+		goto error;
 	/*
 	 * We are allocating memory for both parent and child
 	 * arrays in the same chunk. Thus, first OP_Blob opcode
 	 * interprets it as static memory, and the second one -
 	 * as dynamic and releases memory.
 	 */
-	char *parent_links = sqlite3DbMallocRaw(parse_context->db,
-						parent_size + child_size);
-	if (parent_links == NULL) {
-		sqlite3DbFree(parse_context->db, (void *) name_copy);
+	char *raw = sqlite3DbMallocRaw(parse_context->db,
+				       parent_links_size + child_links_size);
+	if (raw == NULL)
 		return;
-	}
-	parent_size = fkey_encode_links(fk, FIELD_LINK_PARENT, parent_links);
-	char *child_links = parent_links + parent_size;
-	child_size = fkey_encode_links(fk, FIELD_LINK_CHILD, child_links);
-	sqlite3VdbeAddOp4(vdbe, OP_Blob, child_size, constr_tuple_reg + 7,
+	memcpy(raw, parent_links, parent_links_size);
+	parent_links = raw;
+	raw += parent_links_size;
+	memcpy(raw, child_links, child_links_size);
+	child_links = raw;
+
+	sqlite3VdbeAddOp4(vdbe, OP_Blob, child_links_size, constr_tuple_reg + 7,
 			  SQL_SUBTYPE_MSGPACK, child_links, P4_STATIC);
-	sqlite3VdbeAddOp4(vdbe, OP_Blob, parent_size, constr_tuple_reg + 8,
-			  SQL_SUBTYPE_MSGPACK, parent_links, P4_DYNAMIC);
+	sqlite3VdbeAddOp4(vdbe, OP_Blob, parent_links_size,
+			  constr_tuple_reg + 8, SQL_SUBTYPE_MSGPACK,
+			  parent_links, P4_DYNAMIC);
 	sqlite3VdbeAddOp3(vdbe, OP_MakeRecord, constr_tuple_reg, 9,
 			  constr_tuple_reg + 9);
 	sqlite3VdbeAddOp2(vdbe, OP_SInsert, BOX_FK_CONSTRAINT_ID,
 			  constr_tuple_reg + 9);
 	sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
 	sqlite3ReleaseTempRange(parse_context, constr_tuple_reg, 10);
+	return;
+error:
+	parse_context->nErr++;
+	parse_context->rc = SQL_TARANTOOL_ERROR;
 }
 
 /**

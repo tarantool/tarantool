@@ -173,16 +173,12 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 {
 	/* Trigger being finished. */
 	struct sql_trigger *trigger = parse->parsed_ast.trigger;
-	/* SQL text. */
-	char *sql_str = NULL;
-	/* MsgPack containing SQL options. */
-	char *opts_buff = NULL;
 	/* The database. */
 	struct sqlite3 *db = parse->db;
 
 	parse->parsed_ast.trigger = NULL;
 	if (NEVER(parse->nErr) || trigger == NULL)
-		goto triggerfinish_cleanup;
+		goto cleanup;
 	char *trigger_name = trigger->zName;
 	trigger->step_list = step_list;
 	while (step_list != NULL) {
@@ -202,17 +198,18 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		/* Make an entry in the _trigger space. */
 		struct Vdbe *v = sqlite3GetVdbe(parse);
 		if (v == 0)
-			goto triggerfinish_cleanup;
+			goto cleanup;
 
 		struct Table *sys_trigger =
-			sqlite3HashFind(&parse->db->pSchema->tblHash,
+			sqlite3HashFind(&db->pSchema->tblHash,
 					TARANTOOL_SYS_TRIGGER_NAME);
 		if (NEVER(sys_trigger == NULL))
-			goto triggerfinish_cleanup;
+			goto cleanup;
 
-		sql_str = sqlite3MPrintf(db, "CREATE TRIGGER %s", token->z);
-		if (db->mallocFailed)
-			goto triggerfinish_cleanup;
+		char *sql_str =
+			sqlite3MPrintf(db, "CREATE TRIGGER %s", token->z);
+		if (sql_str == NULL)
+			goto cleanup;
 
 		int cursor = parse->nTab++;
 		sqlite3OpenTable(parse, cursor, sys_trigger, OP_OpenWrite);
@@ -225,24 +222,27 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		parse->nMem += 3;
 		int record = ++parse->nMem;
 
-		opts_buff =
-			sqlite3DbMallocRaw(parse->db,
-					   tarantoolSqlite3MakeTableOpts(0,
-									 sql_str,
-									 NULL) +
-					   1);
-		if (db->mallocFailed)
-			goto triggerfinish_cleanup;
+		uint32_t opts_buff_sz = 0;
+		char *data = sql_encode_table_opts(&fiber()->gc, NULL, sql_str,
+						   &opts_buff_sz);
+		sqlite3DbFree(db, sql_str);
+		if (data == NULL) {
+			parse->nErr++;
+			parse->rc = SQL_TARANTOOL_ERROR;
+			goto cleanup;
+		}
+		char *opts_buff = sqlite3DbMallocRaw(db, opts_buff_sz);
+		if (opts_buff == NULL)
+			goto cleanup;
+		memcpy(opts_buff, data, opts_buff_sz);
 
-		int opts_buff_sz =
-			tarantoolSqlite3MakeTableOpts(0, sql_str, opts_buff);
+		trigger_name = sqlite3DbStrDup(db, trigger_name);
+		if (trigger_name == NULL) {
+			sqlite3DbFree(db, opts_buff);
+			goto cleanup;
+		}
 
-		trigger_name = sqlite3DbStrDup(parse->db, trigger_name);
-		if (db->mallocFailed)
-			goto triggerfinish_cleanup;
-
-		sqlite3VdbeAddOp4(v,
-				  OP_String8, 0, first_col, 0,
+		sqlite3VdbeAddOp4(v, OP_String8, 0, first_col, 0,
 				  trigger_name, P4_DYNAMIC);
 		sqlite3VdbeAddOp2(v, OP_Integer, trigger->space_id,
 				  first_col + 1);
@@ -261,11 +261,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		trigger = NULL;
 	}
 
- triggerfinish_cleanup:
-	if (db->mallocFailed) {
-		sqlite3DbFree(db, sql_str);
-		sqlite3DbFree(db, opts_buff);
-	}
+cleanup:
 	sql_trigger_delete(db, trigger);
 	assert(parse->parsed_ast.trigger == NULL || parse->parse_only);
 	sqlite3DeleteTriggerStep(db, step_list);
