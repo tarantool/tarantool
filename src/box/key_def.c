@@ -43,7 +43,7 @@ static const struct key_part_def key_part_def_default = {
 	field_type_MAX,
 	COLL_NONE,
 	false,
-	ON_CONFLICT_ACTION_ABORT,
+	ON_CONFLICT_ACTION_DEFAULT,
 	SORT_ORDER_ASC
 };
 
@@ -493,7 +493,7 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		if (is_action_missing) {
 			part->nullable_action = part->is_nullable ?
 				ON_CONFLICT_ACTION_NONE
-				: ON_CONFLICT_ACTION_ABORT;
+				: ON_CONFLICT_ACTION_DEFAULT;
 		}
 		if (part->type == field_type_MAX) {
 			diag_set(ClientError, ER_WRONG_INDEX_OPTIONS,
