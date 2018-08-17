@@ -103,6 +103,7 @@ struct vy_stmt {
 	struct tuple base;
 	int64_t lsn;
 	uint8_t  type; /* IPROTO_SELECT/REPLACE/UPSERT/DELETE */
+	uint8_t flags;
 	/**
 	 * Offsets array concatenated with MessagePack fields
 	 * array.
@@ -136,6 +137,20 @@ static inline void
 vy_stmt_set_type(struct tuple *stmt, enum iproto_type type)
 {
 	((struct vy_stmt *) stmt)->type = type;
+}
+
+/** Get flags of the vinyl statement. */
+static inline uint8_t
+vy_stmt_flags(const struct tuple *stmt)
+{
+	return ((const struct vy_stmt *)stmt)->flags;
+}
+
+/** Set flags of the vinyl statement. */
+static inline void
+vy_stmt_set_flags(struct tuple *stmt, uint8_t flags)
+{
+	((struct vy_stmt *)stmt)->flags = flags;
 }
 
 /**

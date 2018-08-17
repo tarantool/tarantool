@@ -45,6 +45,14 @@
 #include "xrow.h"
 #include "fiber.h"
 
+/**
+ * Statement metadata keys.
+ */
+enum vy_stmt_meta_key {
+	/** Statement flags. */
+	VY_STMT_FLAGS = 0x01,
+};
+
 static struct tuple *
 vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
@@ -112,6 +120,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 	tuple->data_offset = sizeof(struct vy_stmt) + meta_size;;
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
+	vy_stmt_set_flags(tuple, 0);
 	return tuple;
 }
 
@@ -485,6 +494,56 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
 	return key;
 }
 
+/**
+ * Encode the given statement meta data in a request.
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+static int
+vy_stmt_meta_encode(const struct tuple *stmt, struct request *request)
+{
+	if (vy_stmt_flags(stmt) == 0)
+		return 0; /* nothing to encode */
+
+	size_t len = mp_sizeof_map(1) * 2 * mp_sizeof_uint(UINT64_MAX);
+	char *buf = region_alloc(&fiber()->gc, len);
+	if (buf == NULL)
+		return -1;
+	char *pos = buf;
+	pos = mp_encode_map(pos, 1);
+	pos = mp_encode_uint(pos, VY_STMT_FLAGS);
+	pos = mp_encode_uint(pos, vy_stmt_flags(stmt));
+	assert(pos <= buf + len);
+
+	request->tuple_meta = buf;
+	request->tuple_meta_end = pos;
+	return 0;
+}
+
+/**
+ * Decode statement meta data from a request.
+ */
+static void
+vy_stmt_meta_decode(struct request *request, struct tuple *stmt)
+{
+	const char *data = request->tuple_meta;
+	if (data == NULL)
+		return; /* nothing to decode */
+
+	uint32_t size = mp_decode_map(&data);
+	for (uint32_t i = 0; i < size; i++) {
+		uint64_t key = mp_decode_uint(&data);
+		switch (key) {
+		case VY_STMT_FLAGS: {
+			uint64_t flags = mp_decode_uint(&data);
+			vy_stmt_set_flags(stmt, flags);
+			break;
+		}
+		default:
+			mp_next(&data); /* unknown key, ignore */
+		}
+	}
+}
+
 int
 vy_stmt_encode_primary(const struct tuple *value,
 		       const struct key_def *key_def, uint32_t space_id,
@@ -525,6 +584,8 @@ vy_stmt_encode_primary(const struct tuple *value,
 	default:
 		unreachable();
 	}
+	if (vy_stmt_meta_encode(value, &request) != 0)
+		return -1;
 	xrow->bodycnt = xrow_encode_dml(&request, xrow->body);
 	if (xrow->bodycnt < 0)
 		return -1;
@@ -556,6 +617,8 @@ vy_stmt_encode_secondary(const struct tuple *value,
 		request.key = extracted;
 		request.key_end = extracted + size;
 	}
+	if (vy_stmt_meta_encode(value, &request) != 0)
+		return -1;
 	xrow->bodycnt = xrow_encode_dml(&request, xrow->body);
 	if (xrow->bodycnt < 0)
 		return -1;
@@ -613,6 +676,7 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 	if (stmt == NULL)
 		return NULL; /* OOM */
 
+	vy_stmt_meta_decode(&request, stmt);
 	vy_stmt_set_lsn(stmt, xrow->lsn);
 	return stmt;
 }
