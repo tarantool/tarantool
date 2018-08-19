@@ -707,6 +707,16 @@ xdir_collect_inprogress(struct xdir *xdir)
 	}
 }
 
+void
+xdir_add_vclock(struct xdir *xdir, const struct vclock *vclock)
+{
+	struct vclock *copy = malloc(sizeof(*vclock));
+	if (copy == NULL)
+		panic("failed to allocate vclock");
+	vclock_copy(copy, vclock);
+	vclockset_insert(&xdir->index, copy);
+}
+
 /* }}} */
 
 

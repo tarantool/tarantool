@@ -208,13 +208,9 @@ xdir_last_vclock(struct xdir *xdir, struct vclock *vclock)
 
 /**
  * Insert a vclock into the file index of a directory.
- * The vclock must be allocated with malloc().
  */
-static inline void
-xdir_add_vclock(struct xdir *xdir, struct vclock *vclock)
-{
-	vclockset_insert(&xdir->index, vclock);
-}
+void
+xdir_add_vclock(struct xdir *xdir, const struct vclock *vclock);
 
 /* }}} */
 
