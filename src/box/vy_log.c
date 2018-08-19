@@ -912,8 +912,17 @@ vy_log_begin_recovery(const struct vclock *vclock)
 	if (xdir_scan(&vy_log.dir) < 0 && errno != ENOENT)
 		return NULL;
 
-	if (xdir_last_vclock(&vy_log.dir, &vy_log.last_checkpoint) < 0)
+	if (xdir_last_vclock(&vy_log.dir, &vy_log.last_checkpoint) < 0) {
+		/*
+		 * Even if there's no vylog (i.e. vinyl isn't in use),
+		 * we still have to add the vclock to the xdir index,
+		 * because we may need it for garbage collection or
+		 * backup in case the user starts using vinyl after
+		 * recovery.
+		 */
+		xdir_add_vclock(&vy_log.dir, vclock);
 		vclock_copy(&vy_log.last_checkpoint, vclock);
+	}
 
 	int cmp = vclock_compare(&vy_log.last_checkpoint, vclock);
 	if (cmp > 0) {
