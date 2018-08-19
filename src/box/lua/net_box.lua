@@ -393,7 +393,8 @@ local function create_transport(host, port, user, password, callback,
         last_error = new_error
         callback('state_changed', new_state, new_errno, new_error)
         state_cond:broadcast()
-        if state == 'error' or state == 'error_reconnect' then
+        if state == 'error' or state == 'error_reconnect' or
+           state == 'closed' then
             for _, request in pairs(requests) do
                 request.id = nil
                 request.errno = new_errno
