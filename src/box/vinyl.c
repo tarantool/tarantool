@@ -3007,7 +3007,7 @@ vy_send_range(struct vy_join_ctx *ctx,
 	struct rlist fake_read_views;
 	rlist_create(&fake_read_views);
 	ctx->wi = vy_write_iterator_new(ctx->key_def, ctx->format,
-					true, true, &fake_read_views);
+					true, true, &fake_read_views, NULL);
 	if (ctx->wi == NULL) {
 		rc = -1;
 		goto out;

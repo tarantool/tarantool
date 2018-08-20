@@ -70,6 +70,25 @@ extern struct tuple_format_vtab vy_tuple_format_vtab;
  */
 extern size_t vy_max_tuple_size;
 
+/** Statement flags. */
+enum {
+	/**
+	 * A REPLACE/DELETE request is supposed to delete the old
+	 * tuple from all indexes. In order to generate a DELETE
+	 * statement for a secondary index, we need to look up the
+	 * old tuple in the primary index, which is expensive as
+	 * it implies a random disk access. We can optimize out the
+	 * lookup by deferring generation of the DELETE statement
+	 * until primary index compaction.
+	 *
+	 * The following flag is set for those REPLACE and DELETE
+	 * statements that skipped deletion of the old tuple from
+	 * secondary indexes. It makes the write iterator generate
+	 * DELETE statements for them during compaction.
+	 */
+	VY_STMT_DEFERRED_DELETE		= 1 << 0,
+};
+
 /**
  * There are two groups of statements:
  *

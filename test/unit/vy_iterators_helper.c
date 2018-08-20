@@ -136,6 +136,7 @@ vy_new_simple_stmt(struct tuple_format *format,
 	}
 	free(buf);
 	vy_stmt_set_lsn(ret, templ->lsn);
+	vy_stmt_set_flags(ret, templ->flags);
 	if (templ->optimize_update)
 		vy_stmt_set_column_mask(ret, 0);
 	return ret;
@@ -274,6 +275,10 @@ vy_stmt_are_same(const struct tuple *actual,
 		return false;
 	}
 	if (vy_stmt_lsn(actual) != expected->lsn) {
+		tuple_unref(tmp);
+		return false;
+	}
+	if (vy_stmt_flags(actual) != expected->flags) {
 		tuple_unref(tmp);
 		return false;
 	}
