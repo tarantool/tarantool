@@ -741,6 +741,11 @@ space:drop()
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
+-- Install on_replace trigger to disable DELETE optimization
+-- in the secondary index (gh-2129).
+_ = s:on_replace(function() end)
+---
+...
 pk = s:create_index('primary', {run_count_per_level = 1})
 ---
 ...

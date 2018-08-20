@@ -317,6 +317,9 @@ space:drop()
 -- gh-2875 INSERT+DELETE pairs are annihilated on compaction
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
+-- Install on_replace trigger to disable DELETE optimization
+-- in the secondary index (gh-2129).
+_ = s:on_replace(function() end)
 pk = s:create_index('primary', {run_count_per_level = 1})
 sk = s:create_index('secondary', {run_count_per_level = 1, parts = {2, 'unsigned'}})
 PAD1 = 100

@@ -71,6 +71,24 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 		const struct vy_read_view **rv,
 		struct tuple *key, struct tuple **ret);
 
+/**
+ * Look up a tuple by key in memory.
+ *
+ * This function works just like vy_point_lookup() except:
+ *
+ * - It only scans in-memory level and cache and hence doesn't yield.
+ * - It doesn't turn DELETE into NULL so it returns NULL if and only
+ *   if no terminal statement matching the key is present in memory
+ *   (there still may be statements stored on disk though).
+ * - It doesn't account the lookup to LSM tree stats (as it never
+ *   descends to lower levels).
+ *
+ * The function returns 0 on success, -1 on memory allocation error.
+ */
+int
+vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
+		    struct tuple *key, struct tuple **ret);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

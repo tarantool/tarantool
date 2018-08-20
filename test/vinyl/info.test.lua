@@ -322,8 +322,8 @@ s:drop()
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
 s:bsize()
-i1 = s:create_index('i1', {parts = {1, 'unsigned'}, run_count_per_level = 1})
-i2 = s:create_index('i2', {parts = {2, 'unsigned'}, run_count_per_level = 1})
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}, run_count_per_level = 10})
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}, run_count_per_level = 10})
 s:bsize()
 i1:len(), i2:len()
 i1:bsize(), i2:bsize()
@@ -365,8 +365,13 @@ i2:len() == st2.memory.rows + st2.disk.rows
 i1:bsize() == st1.memory.index_size + st1.disk.index_size + st1.disk.bloom_size
 i2:bsize() == st2.memory.index_size + st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
 
+-- Compact the primary index first to generate deferred DELETEs.
+-- Then dump them and compact the secondary index.
 box.snapshot()
+i1:compact()
 wait(function() return i1:stat() end, st1, 'disk.compact.count', 1)
+box.snapshot()
+i2:compact()
 wait(function() return i2:stat() end, st2, 'disk.compact.count', 1)
 st1 = i1:stat()
 st2 = i2:stat()

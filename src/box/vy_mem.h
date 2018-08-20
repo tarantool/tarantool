@@ -171,6 +171,12 @@ struct vy_mem {
 	 *
 	 * Once the tree is dumped to disk it will be used to update
 	 * vy_lsm::dump_lsn, see vy_task_dump_new().
+	 *
+	 * Note, we account not only original LSN (vy_stmt_lsn())
+	 * in this variable, but also WAL LSN of deferred DELETE
+	 * statements. This is needed to skip WAL recovery of both
+	 * deferred and normal statements that have been dumped to
+	 * disk. See vy_deferred_delete_on_replace() for more details.
 	 */
 	int64_t dump_lsn;
 	/**

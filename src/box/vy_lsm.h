@@ -50,6 +50,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct histogram;
+struct index;
 struct tuple;
 struct tuple_format;
 struct vy_lsm;
@@ -291,6 +292,10 @@ struct vy_lsm {
 	 */
 	vy_lsm_read_set_t read_set;
 };
+
+/** Extract vy_lsm from an index object. */
+struct vy_lsm *
+vy_lsm(struct index *index);
 
 /** Return LSM tree name. Used for logging. */
 const char *

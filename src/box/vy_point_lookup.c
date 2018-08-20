@@ -293,3 +293,35 @@ done:
 	}
 	return 0;
 }
+
+int
+vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
+		    struct tuple *key, struct tuple **ret)
+{
+	assert(tuple_field_count(key) >= lsm->cmp_def->part_count);
+
+	int rc;
+	struct vy_history history;
+	vy_history_create(&history, &lsm->env->history_node_pool);
+
+	rc = vy_point_lookup_scan_cache(lsm, rv, key, &history);
+	if (rc != 0 || vy_history_is_terminal(&history))
+		goto done;
+
+	rc = vy_point_lookup_scan_mems(lsm, rv, key, &history);
+	if (rc != 0 || vy_history_is_terminal(&history))
+		goto done;
+
+	*ret = NULL;
+	goto out;
+done:
+	if (rc == 0) {
+		int upserts_applied;
+		rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
+				      true, &upserts_applied, ret);
+		lsm->stat.upsert.applied += upserts_applied;
+	}
+out:
+	vy_history_cleanup(&history);
+	return rc;
+}

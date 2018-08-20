@@ -1036,10 +1036,10 @@ s:bsize()
 ---
 - 0
 ...
-i1 = s:create_index('i1', {parts = {1, 'unsigned'}, run_count_per_level = 1})
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}, run_count_per_level = 10})
 ---
 ...
-i2 = s:create_index('i2', {parts = {2, 'unsigned'}, run_count_per_level = 1})
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}, run_count_per_level = 10})
 ---
 ...
 s:bsize()
@@ -1162,7 +1162,7 @@ s:bsize()
 i1:len(), i2:len()
 ---
 - 150
-- 150
+- 100
 ...
 i1:bsize(), i2:bsize()
 ---
@@ -1189,11 +1189,23 @@ i2:bsize() == st2.memory.index_size + st2.disk.index_size + st2.disk.bloom_size 
 ---
 - true
 ...
+-- Compact the primary index first to generate deferred DELETEs.
+-- Then dump them and compact the secondary index.
 box.snapshot()
 ---
 - ok
 ...
+i1:compact()
+---
+...
 wait(function() return i1:stat() end, st1, 'disk.compact.count', 1)
+---
+...
+box.snapshot()
+---
+- ok
+...
+i2:compact()
 ---
 ...
 wait(function() return i2:stat() end, st2, 'disk.compact.count', 1)

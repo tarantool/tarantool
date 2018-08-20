@@ -380,8 +380,8 @@ c4:commit()
 
 s:drop()
 ----------------------------------------------------------------
--- gh-2534: Iterator over a secondary index doesn't double track
--- results in the primary index.
+-- Iterator over a secondary index tracks all results in the
+-- primary index. Needed for gh-2129.
 ----------------------------------------------------------------
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {parts = {1, 'unsigned'}})
@@ -390,11 +390,11 @@ for i = 1, 100 do s:insert{i, i} end
 box.begin()
 gap_lock_count() -- 0
 _ = s.index.sk:select({}, {limit = 50})
-gap_lock_count() -- 1
-for i = 1, 100 do s.index.sk:get(i) end
 gap_lock_count() -- 51
+for i = 1, 100 do s.index.sk:get(i) end
+gap_lock_count() -- 151
 _ = s.index.sk:select()
-gap_lock_count() -- 1
+gap_lock_count() -- 101
 box.commit()
 gap_lock_count() -- 0
 s:drop()
