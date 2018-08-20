@@ -124,7 +124,7 @@
  * @param parse Parsing context.
  * @param stat_cursor Open the _sql_stat1 table on this cursor.
  *        you should allocate |stat_names| cursors before call.
- * @param table_name Delete records of this index if specified.
+ * @param table_name Delete records of this table if specified.
  */
 static void
 vdbe_emit_stat_space_open(struct Parse *parse, int stat_cursor,
@@ -137,12 +137,6 @@ vdbe_emit_stat_space_open(struct Parse *parse, int stat_cursor,
 	assert(sqlite3VdbeDb(v) == parse->db);
 	for (uint i = 0; i < lengthof(stat_names); ++i) {
 		const char *space_name = stat_names[i];
-		/*
-		 * The table already exists, because it is a
-		 * system space.
-		 */
-		assert(sqlite3HashFind(&parse->db->pSchema->tblHash,
-				       space_name) != NULL);
 		if (table_name != NULL) {
 			vdbe_emit_stat_space_clear(parse, space_name, NULL,
 						   table_name);
@@ -770,67 +764,58 @@ callStatGet(Vdbe * v, int regStat4, int iParam, int regOut)
 	sqlite3VdbeChangeP5(v, 2);
 }
 
-/*
+/**
  * Generate code to do an analysis of all indices associated with
  * a single table.
+ *
+ * @param parse Current parsing context.
+ * @param space Space to be analyzed.
+ * @param stat_cursor Cursor pointing to spaces containing
+ *        statistics: _sql_stat1 (stat_cursor) and
+ *        _sql_stat4 (stat_cursor + 1).
  */
 static void
-analyzeOneTable(Parse * pParse,	/* Parser context */
-		Table * pTab,	/* Table whose indices are to be analyzed */
-		int iStatCur,	/* Index of VdbeCursor that writes the _sql_stat1 table */
-		int iMem,	/* Available memory locations begin here */
-		int iTab	/* Next available cursor */
-    )
+vdbe_emit_analyze_space(struct Parse *parse, struct space *space,
+			int stat_cursor)
 {
-	sqlite3 *db = pParse->db;	/* Database handle */
-	int iIdxCur;		/* Cursor open on index being analyzed */
-	int iTabCur;		/* Table cursor */
-	Vdbe *v;		/* The virtual machine being built up */
-	int i;			/* Loop counter */
-	int regStat4 = iMem++;	/* Register to hold Stat4Accum object */
-	int regChng = iMem++;	/* Index of changed index field */
-	int regKey = iMem++;	/* Key argument passed to stat_push() */
-	int regTemp = iMem++;	/* Temporary use register */
-	int regTabname = iMem++;	/* Register containing table name */
-	int regIdxname = iMem++;	/* Register containing index name */
-	int regStat1 = iMem++;	/* Value for the stat column of _sql_stat1 */
-	int regPrev = iMem;	/* MUST BE LAST (see below) */
-
-	pParse->nMem = MAX(pParse->nMem, iMem);
-	v = sqlite3GetVdbe(pParse);
-	if (v == 0 || NEVER(pTab == 0)) {
-		return;
-	}
-	assert(pTab->def->id != 0);
-	/*
-	 * Here we need real space from Tarantool DD since
-	 * further it is passed to cursor opening routine.
-	 */
-	struct space *space = space_by_id(pTab->def->id);
 	assert(space != NULL);
-	const char *tab_name = space_name(space);
-	if (sqlite3_strlike("\\_%", tab_name, '\\') == 0) {
-		/* Do not gather statistics on system tables */
+	/* Register to hold Stat4Accum object. */
+	int stat4_reg = ++parse->nMem;
+	/* Index of changed index field. */
+	int chng_reg = ++parse->nMem;
+	/* Key argument passed to stat_push(). */
+	int key_reg = ++parse->nMem;
+	/* Temporary use register. */
+	int tmp_reg = ++parse->nMem;
+	/* Register containing table name. */
+	int tab_name_reg = ++parse->nMem;
+	/* Register containing index name. */
+	int idx_name_reg = ++parse->nMem;
+	/* Value for the stat column of _sql_stat1. */
+	int stat1_reg = ++parse->nMem;
+	/* MUST BE LAST (see below). */
+	int prev_reg = ++parse->nMem;
+	/* Do not gather statistics on system tables. */
+	if (space_is_system(space))
 		return;
-	}
-
-	/* Establish a read-lock on the table at the shared-cache level.
-	 * Open a read-only cursor on the table. Also allocate a cursor number
-	 * to use for scanning indexes (iIdxCur). No index cursor is opened at
-	 * this time though.
+	/*
+	 * Open a read-only cursor on the table. Also allocate
+	 * a cursor number to use for scanning indexes.
 	 */
-	iTabCur = iTab++;
-	iIdxCur = iTab++;
-	pParse->nTab = MAX(pParse->nTab, iTab);
-	sqlite3OpenTable(pParse, iTabCur, pTab, OP_OpenRead);
-	sqlite3VdbeLoadString(v, regTabname, tab_name);
+	int tab_cursor = parse->nTab;
+	parse->nTab += 2;
+	assert(space->index_count != 0);
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	assert(v != NULL);
+	const char *tab_name = space_name(space);
+	sqlite3VdbeAddOp4(v, OP_OpenRead, tab_cursor, 0, 0, (void *) space,
+			  P4_SPACEPTR);
+	sqlite3VdbeLoadString(v, tab_name_reg, space->def->name);
 	for (uint32_t j = 0; j < space->index_count; ++j) {
 		struct index *idx = space->index[j];
-		int addrRewind;	/* Address of "OP_Rewind iIdxCur" */
-		int addrNextRow;	/* Address of "next_row:" */
-		const char *idx_name;	/* Name of the index */
-
-		/* Primary indexes feature automatically generated
+		const char *idx_name;
+		/*
+		 * Primary indexes feature automatically generated
 		 * names. Thus, for the sake of clarity, use
 		 * instead more familiar table name.
 		 */
@@ -839,101 +824,113 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 		else
 			idx_name = idx->def->name;
 		int part_count = idx->def->key_def->part_count;
-
 		/* Populate the register containing the index name. */
-		sqlite3VdbeLoadString(v, regIdxname, idx_name);
+		sqlite3VdbeLoadString(v, idx_name_reg, idx_name);
 		VdbeComment((v, "Analysis for %s.%s", tab_name, idx_name));
-
 		/*
 		 * Pseudo-code for loop that calls stat_push():
 		 *
 		 *   Rewind csr
 		 *   if eof(csr) goto end_of_scan;
-		 *   regChng = 0
+		 *   chng_reg = 0
 		 *   goto chng_addr_0;
 		 *
 		 *  next_row:
-		 *   regChng = 0
-		 *   if( idx(0) != regPrev(0) ) goto chng_addr_0
-		 *   regChng = 1
-		 *   if( idx(1) != regPrev(1) ) goto chng_addr_1
+		 *   chng_reg = 0
+		 *   if( idx(0) != prev_reg(0) ) goto chng_addr_0
+		 *   chng_reg = 1
+		 *   if( idx(1) != prev_reg(1) ) goto chng_addr_1
 		 *   ...
-		 *   regChng = N
+		 *   chng_reg = N
 		 *   goto chng_addr_N
 		 *
 		 *  chng_addr_0:
-		 *   regPrev(0) = idx(0)
+		 *   prev_reg(0) = idx(0)
 		 *  chng_addr_1:
-		 *   regPrev(1) = idx(1)
+		 *   prev_reg(1) = idx(1)
 		 *  ...
 		 *
-		 *  endDistinctTest:
-		 *   regKey = idx(key)
-		 *   stat_push(P, regChng, regKey)
+		 *  distinct_addr:
+		 *   key_reg = idx(key)
+		 *   stat_push(P, chng_reg, key_reg)
 		 *   Next csr
 		 *   if !eof(csr) goto next_row;
 		 *
 		 *  end_of_scan:
 		 */
 
-		/* Make sure there are enough memory cells allocated to accommodate
-		 * the regPrev array and a trailing key (the key slot is required
-		 * when building a record to insert into the sample column of
-		 * the _sql_stat4 table).
+		/*
+		 * Make sure there are enough memory cells
+		 * allocated to accommodate the prev_reg array
+		 * and a trailing key (the key slot is required
+		 * when building a record to insert into
+		 * the sample column of the _sql_stat4 table).
 		 */
-		pParse->nMem = MAX(pParse->nMem, regPrev + part_count);
-
-		/* Open a read-only cursor on the index being analyzed. */
-		sqlite3VdbeAddOp4(v, OP_OpenRead, iIdxCur, idx->def->iid, 0,
-				  (void *) space, P4_SPACEPTR);
-		VdbeComment((v, "%s", idx->def->name));
-
-		/* Invoke the stat_init() function. The arguments are:
-		 *
-		 *    (1) the number of columns in the index
-		 *        (including the number of PK columns)
-		 *    (2) the number of columns in the key without the pk
-		 *    (3) the number of rows in the index
-		 *
+		parse->nMem = MAX(parse->nMem, prev_reg + part_count);
+		/* Open a cursor on the index being analyzed. */
+		int idx_cursor;
+		if (j != 0) {
+			idx_cursor = parse->nTab - 1;
+			sqlite3VdbeAddOp4(v, OP_OpenRead, idx_cursor,
+					  idx->def->iid, 0,
+					  (void *) space, P4_SPACEPTR);
+			VdbeComment((v, "%s", idx->def->name));
+		} else {
+			/* We have already opened cursor on PK. */
+			idx_cursor = tab_cursor;
+		}
+		/*
+		 * Invoke the stat_init() function.
+		 * The arguments are:
+		 *  (1) The number of columns in the index
+		 *      (including the number of PK columns);
+		 *  (2) The number of columns in the key
+		 *       without the pk;
+		 *  (3) the number of rows in the index;
+		 * FIXME: for Tarantool first and second args
+		 * are the same.
 		 *
 		 * The third argument is only used for STAT4
 		 */
-		sqlite3VdbeAddOp2(v, OP_Count, iIdxCur, regStat4 + 3);
-		sqlite3VdbeAddOp2(v, OP_Integer, part_count, regStat4 + 1);
-		sqlite3VdbeAddOp2(v, OP_Integer, part_count, regStat4 + 2);
-		sqlite3VdbeAddOp4(v, OP_Function0, 0, regStat4 + 1, regStat4,
+		sqlite3VdbeAddOp2(v, OP_Count, idx_cursor, stat4_reg + 3);
+		sqlite3VdbeAddOp2(v, OP_Integer, part_count, stat4_reg + 1);
+		sqlite3VdbeAddOp2(v, OP_Integer, part_count, stat4_reg + 2);
+		sqlite3VdbeAddOp4(v, OP_Function0, 0, stat4_reg + 1, stat4_reg,
 				  (char *)&statInitFuncdef, P4_FUNCDEF);
 		sqlite3VdbeChangeP5(v, 3);
-
-		/* Implementation of the following:
+		/*
+		 * Implementation of the following:
 		 *
 		 *   Rewind csr
 		 *   if eof(csr) goto end_of_scan;
-		 *   regChng = 0
+		 *   chng_reg = 0
 		 *   goto next_push_0;
-		 *
 		 */
-		addrRewind = sqlite3VdbeAddOp1(v, OP_Rewind, iIdxCur);
-		VdbeCoverage(v);
-		sqlite3VdbeAddOp2(v, OP_Integer, 0, regChng);
-		int endDistinctTest = sqlite3VdbeMakeLabel(v);
+		int rewind_addr = sqlite3VdbeAddOp1(v, OP_Rewind, idx_cursor);
+		sqlite3VdbeAddOp2(v, OP_Integer, 0, chng_reg);
+		int distinct_addr = sqlite3VdbeMakeLabel(v);
 		/* Array of jump instruction addresses. */
-		int *aGotoChng =
-			sqlite3DbMallocRawNN(db, sizeof(int) * part_count);
-		if (aGotoChng == NULL)
-			continue;
+		int *jump_addrs = region_alloc(&parse->region,
+					       sizeof(int) * part_count);
+		if (jump_addrs == NULL) {
+			diag_set(OutOfMemory, sizeof(int) * part_count,
+				 "region", "jump_addrs");
+			parse->rc = SQL_TARANTOOL_ERROR;
+			parse->nErr++;
+			return;
+		}
 		/*
 		 *  next_row:
-		 *   regChng = 0
-		 *   if( idx(0) != regPrev(0) ) goto chng_addr_0
-		 *   regChng = 1
-		 *   if( idx(1) != regPrev(1) ) goto chng_addr_1
+		 *   chng_reg = 0
+		 *   if( idx(0) != prev_reg(0) ) goto chng_addr_0
+		 *   chng_reg = 1
+		 *   if( idx(1) != prev_reg(1) ) goto chng_addr_1
 		 *   ...
-		 *   regChng = N
-		 *   goto endDistinctTest
+		 *   chng_reg = N
+		 *   goto distinct_addr
 		 */
 		sqlite3VdbeAddOp0(v, OP_Goto);
-		addrNextRow = sqlite3VdbeCurrentAddr(v);
+		int next_row_addr = sqlite3VdbeCurrentAddr(v);
 		if (part_count == 1 && idx->def->opts.is_unique) {
 			/*
 			 * For a single-column UNIQUE index, once
@@ -941,122 +938,110 @@ analyzeOneTable(Parse * pParse,	/* Parser context */
 			 * that all the rest will be distinct, so
 			 * skip subsequent distinctness tests.
 			 */
-			sqlite3VdbeAddOp2(v, OP_NotNull, regPrev,
-					  endDistinctTest);
-			VdbeCoverage(v);
+			sqlite3VdbeAddOp2(v, OP_NotNull, prev_reg,
+					  distinct_addr);
 		}
 		struct key_part *part = idx->def->key_def->parts;
-		for (i = 0; i < part_count; ++i, ++part) {
+		for (int i = 0; i < part_count; ++i, ++part) {
 			struct coll *coll = part->coll;
-			sqlite3VdbeAddOp2(v, OP_Integer, i, regChng);
-			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, part->fieldno,
-					  regTemp);
-			aGotoChng[i] = sqlite3VdbeAddOp4(v, OP_Ne, regTemp, 0,
-							 regPrev + i,
+			sqlite3VdbeAddOp2(v, OP_Integer, i, chng_reg);
+			sqlite3VdbeAddOp3(v, OP_Column, idx_cursor,
+					  part->fieldno, tmp_reg);
+			jump_addrs[i] = sqlite3VdbeAddOp4(v, OP_Ne, tmp_reg, 0,
+							 prev_reg + i,
 							 (char *)coll,
 							 P4_COLLSEQ);
 			sqlite3VdbeChangeP5(v, SQLITE_NULLEQ);
-			VdbeCoverage(v);
 		}
-		sqlite3VdbeAddOp2(v, OP_Integer, part_count, regChng);
-		sqlite3VdbeGoto(v, endDistinctTest);
-
+		sqlite3VdbeAddOp2(v, OP_Integer, part_count, chng_reg);
+		sqlite3VdbeGoto(v, distinct_addr);
 		/*
 		 *  chng_addr_0:
-		 *   regPrev(0) = idx(0)
+		 *   prev_reg(0) = idx(0)
 		 *  chng_addr_1:
-		 *   regPrev(1) = idx(1)
+		 *   prev_reg(1) = idx(1)
 		 *  ...
 		 */
-		sqlite3VdbeJumpHere(v, addrNextRow - 1);
+		sqlite3VdbeJumpHere(v, next_row_addr - 1);
 		part = idx->def->key_def->parts;
-		for (i = 0; i < part_count; ++i, ++part) {
-			sqlite3VdbeJumpHere(v, aGotoChng[i]);
-			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, part->fieldno,
-					  regPrev + i);
+		for (int i = 0; i < part_count; ++i, ++part) {
+			sqlite3VdbeJumpHere(v, jump_addrs[i]);
+			sqlite3VdbeAddOp3(v, OP_Column, idx_cursor,
+					  part->fieldno, prev_reg + i);
 		}
-		sqlite3VdbeResolveLabel(v, endDistinctTest);
-		sqlite3DbFree(db, aGotoChng);
-
+		sqlite3VdbeResolveLabel(v, distinct_addr);
 		/*
 		 *  chng_addr_N:
-		 *   regKey = idx(key)              // STAT4 only
-		 *   stat_push(P, regChng, regKey)  // 3rd parameter STAT4 only
+		 *   key_reg = idx(key)
+		 *   stat_push(P, chng_reg, key_reg)
 		 *   Next csr
 		 *   if !eof(csr) goto next_row;
 		 */
-		assert(regKey == (regStat4 + 2));
+		assert(key_reg == (stat4_reg + 2));
 		struct index *pk = space_index(space, 0);
 		int pk_part_count = pk->def->key_def->part_count;
 		/* Allocate memory for array. */
-		pParse->nMem = MAX(pParse->nMem,
-				   regPrev + part_count + pk_part_count);
-		int regKeyStat = regPrev + part_count;
-		for (i = 0; i < pk_part_count; i++) {
+		parse->nMem = MAX(parse->nMem,
+				  prev_reg + part_count + pk_part_count);
+		int stat_key_reg = prev_reg + part_count;
+		for (int i = 0; i < pk_part_count; i++) {
 			uint32_t k = pk->def->key_def->parts[i].fieldno;
 			assert(k < space->def->field_count);
-			sqlite3VdbeAddOp3(v, OP_Column, iIdxCur, k,
-					  regKeyStat + i);
+			sqlite3VdbeAddOp3(v, OP_Column, idx_cursor, k,
+					  stat_key_reg + i);
 			VdbeComment((v, "%s", space->def->fields[k].name));
 		}
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, regKeyStat,
-				  pk_part_count, regKey);
-
-		assert(regChng == (regStat4 + 1));
-		sqlite3VdbeAddOp4(v, OP_Function0, 1, regStat4, regTemp,
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, stat_key_reg,
+				  pk_part_count, key_reg);
+		assert(chng_reg == (stat4_reg + 1));
+		sqlite3VdbeAddOp4(v, OP_Function0, 1, stat4_reg, tmp_reg,
 				  (char *)&statPushFuncdef, P4_FUNCDEF);
 		sqlite3VdbeChangeP5(v, 3);
-		sqlite3VdbeAddOp2(v, OP_Next, iIdxCur, addrNextRow);
-		VdbeCoverage(v);
-
+		sqlite3VdbeAddOp2(v, OP_Next, idx_cursor, next_row_addr);
 		/* Add the entry to the stat1 table. */
-		callStatGet(v, regStat4, STAT_GET_STAT1, regStat1);
+		callStatGet(v, stat4_reg, STAT_GET_STAT1, stat1_reg);
 		assert("BBB"[0] == AFFINITY_TEXT);
-		sqlite3VdbeAddOp4(v, OP_MakeRecord, regTabname, 3, regTemp,
+		sqlite3VdbeAddOp4(v, OP_MakeRecord, tab_name_reg, 3, tmp_reg,
 				  "BBB", 0);
-		sqlite3VdbeAddOp2(v, OP_IdxInsert, iStatCur, regTemp);
-
+		sqlite3VdbeAddOp2(v, OP_IdxInsert, stat_cursor, tmp_reg);
 		/* Add the entries to the stat4 table. */
-
-		int regEq = regStat1;
-		int regLt = regStat1 + 1;
-		int regDLt = regStat1 + 2;
-		int regSample = regStat1 + 3;
-		int regCol = regStat1 + 4;
-		int regSampleKey = regCol + part_count;
-		int addrNext;
-		int addrIsNull;
-
-		pParse->nMem = MAX(pParse->nMem, regCol + part_count);
-
-		addrNext = sqlite3VdbeCurrentAddr(v);
-		callStatGet(v, regStat4, STAT_GET_KEY, regSampleKey);
-		addrIsNull = sqlite3VdbeAddOp1(v, OP_IsNull, regSampleKey);
-		VdbeCoverage(v);
-		callStatGet(v, regStat4, STAT_GET_NEQ, regEq);
-		callStatGet(v, regStat4, STAT_GET_NLT, regLt);
-		callStatGet(v, regStat4, STAT_GET_NDLT, regDLt);
-		sqlite3VdbeAddOp4Int(v, OP_NotFound, iTabCur, addrNext,
-				     regSampleKey, 0);
-		/* We know that the regSampleKey row exists because it was read by
-		 * the previous loop.  Thus the not-found jump of seekOp will never
-		 * be taken
+		int eq_reg = stat1_reg;
+		int lt_reg = stat1_reg + 1;
+		int dlt_reg = stat1_reg + 2;
+		int sample_reg = stat1_reg + 3;
+		int col_reg = stat1_reg + 4;
+		int sample_key_reg = col_reg + part_count;
+		parse->nMem = MAX(parse->nMem, col_reg + part_count);
+		int next_addr = sqlite3VdbeCurrentAddr(v);
+		callStatGet(v, stat4_reg, STAT_GET_KEY, sample_key_reg);
+		int is_null_addr = sqlite3VdbeAddOp1(v, OP_IsNull,
+						     sample_key_reg);
+		callStatGet(v, stat4_reg, STAT_GET_NEQ, eq_reg);
+		callStatGet(v, stat4_reg, STAT_GET_NLT, lt_reg);
+		callStatGet(v, stat4_reg, STAT_GET_NDLT, dlt_reg);
+		sqlite3VdbeAddOp4Int(v, OP_NotFound, tab_cursor, next_addr,
+				     sample_key_reg, 0);
+		/*
+		 * We know that the sample_key_reg row exists
+		 * because it was read by the previous loop.
+		 * Thus the not-found jump of seekOp will never
+		 * be taken.
 		 */
-		VdbeCoverageNeverTaken(v);
-		for (i = 0; i < part_count; i++) {
+		for (int i = 0; i < part_count; i++) {
 			uint32_t tabl_col = idx->def->key_def->parts[i].fieldno;
-			sqlite3ExprCodeGetColumnOfTable(v, space->def, iTabCur,
-							tabl_col, regCol + i);
+			sqlite3ExprCodeGetColumnOfTable(v, space->def,
+							tab_cursor, tabl_col,
+							col_reg + i);
 		}
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, regCol, part_count,
-				  regSample);
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, regTabname, 6, regTemp);
-		sqlite3VdbeAddOp2(v, OP_IdxReplace, iStatCur + 1, regTemp);
-		sqlite3VdbeAddOp2(v, OP_Goto, 1, addrNext);	/* P1==1 for end-of-loop */
-		sqlite3VdbeJumpHere(v, addrIsNull);
-
-		/* End of analysis */
-		sqlite3VdbeJumpHere(v, addrRewind);
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, col_reg, part_count,
+				  sample_reg);
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, tab_name_reg, 6, tmp_reg);
+		sqlite3VdbeAddOp2(v, OP_IdxReplace, stat_cursor + 1, tmp_reg);
+		/* P1==1 for end-of-loop. */
+		sqlite3VdbeAddOp2(v, OP_Goto, 1, next_addr);
+		sqlite3VdbeJumpHere(v, is_null_addr);
+		/* End of analysis. */
+		sqlite3VdbeJumpHere(v, rewind_addr);
 	}
 }
 
@@ -1073,27 +1058,43 @@ loadAnalysis(Parse * pParse)
 	}
 }
 
-/*
- * Generate code that will do an analysis of an entire database
+/**
+ * Wrapper to pass args to space_foreach callback.
+ */
+struct analyze_data {
+	struct Parse *parse_context;
+	/**
+	 * Cursor numbers pointing to stat spaces:
+	 * stat_cursor is opened on _sql_stat1 and
+	 * stat_cursor + 1 - on _sql_stat4.
+	 */
+	int stat_cursor;
+};
+
+static int
+sql_space_foreach_analyze(struct space *space, void *data)
+{
+	if (space->def->opts.sql == NULL || space->def->opts.is_view)
+		return 0;
+	struct analyze_data *anal_data = (struct analyze_data *) data;
+	vdbe_emit_analyze_space(anal_data->parse_context, space,
+				anal_data->stat_cursor);
+	return 0;
+}
+
+/**
+ * Generate code that will do an analysis of all spaces created
+ * via SQL facilities.
  */
 static void
-sql_analyze_database(Parse *parser)
+sql_analyze_database(struct Parse *parser)
 {
-	struct Schema *schema = parser->db->pSchema;
 	sql_set_multi_write(parser, false);
 	int stat_cursor = parser->nTab;
-	parser->nTab += 3;
+	parser->nTab += 2;
 	vdbe_emit_stat_space_open(parser, stat_cursor, NULL);
-	int reg = parser->nMem + 1;
-	int tab_cursor = parser->nTab;
-	for (struct HashElem *k = sqliteHashFirst(&schema->tblHash); k != NULL;
-	     k = sqliteHashNext(k)) {
-		struct Table *table = (struct Table *) sqliteHashData(k);
-		if (! table->def->opts.is_view) {
-			analyzeOneTable(parser, table, stat_cursor, reg,
-					tab_cursor);
-		}
-	}
+	struct analyze_data anal_data = { parser, stat_cursor };
+	space_foreach(sql_space_foreach_analyze, (void *) &anal_data);
 	loadAnalysis(parser);
 }
 
@@ -1105,15 +1106,18 @@ sql_analyze_database(Parse *parser)
  * @param table Target table to analyze.
  */
 static void
-vdbe_emit_analyze_table(struct Parse *parse, struct Table *table)
+vdbe_emit_analyze_table(struct Parse *parse, struct space *space)
 {
-	assert(table != NULL);
+	assert(space != NULL);
 	sql_set_multi_write(parse, false);
+	/*
+	 * There are two system spaces for statistics: _sql_stat1
+	 * and _sql_stat4.
+	 */
 	int stat_cursor = parse->nTab;
-	parse->nTab += 3;
-	vdbe_emit_stat_space_open(parse, stat_cursor, table->def->name);
-	analyzeOneTable(parse, table, stat_cursor, parse->nMem + 1,
-			parse->nTab);
+	parse->nTab += 2;
+	vdbe_emit_stat_space_open(parse, stat_cursor, space->def->name);
+	vdbe_emit_analyze_space(parse, space, stat_cursor);
 	loadAnalysis(parse);
 }
 
@@ -1139,15 +1143,21 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 		/* Form 2:  Analyze table named */
 		char *z = sqlite3NameFromToken(db, pName);
 		if (z != NULL) {
-			Table *pTab = sqlite3LocateTable(pParse, 0, z);
-			if (pTab != NULL) {
-				if (pTab->def->opts.is_view) {
+			uint32_t space_id = box_space_id_by_name(z, strlen(z));
+			if (space_id != BOX_ID_NIL) {
+				struct space *sp = space_by_id(space_id);
+				assert(sp != NULL);
+				if (sp->def->opts.is_view) {
 					sqlite3ErrorMsg(pParse, "VIEW isn't "\
 							"allowed to be "\
 							"analyzed");
 				} else {
-					vdbe_emit_analyze_table(pParse, pTab);
+					vdbe_emit_analyze_table(pParse, sp);
 				}
+			} else {
+				diag_set(ClientError, ER_NO_SUCH_SPACE, z);
+				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->nErr++;
 			}
 			sqlite3DbFree(db, z);
 		}

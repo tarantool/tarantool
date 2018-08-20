@@ -26,7 +26,7 @@ test:do_catchsql_test(
         ANALYZE no_such_table
     ]], {
         -- <analyze-1.1>
-        1, "no such table: NO_SUCH_TABLE"
+        1, "Space 'NO_SUCH_TABLE' does not exist"
         -- </analyze-1.1>
     })
 
