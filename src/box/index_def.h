@@ -212,6 +212,10 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 		return o1->run_size_ratio < o2->run_size_ratio ? -1 : 1;
 	if (o1->bloom_fpr != o2->bloom_fpr)
 		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
+	if ((o1->sql == NULL) != (o2->sql == NULL))
+		return 1;
+	if (o1->sql != NULL)
+		return strcmp(o1->sql, o2->sql);
 	return 0;
 }
 
