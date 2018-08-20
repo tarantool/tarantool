@@ -93,9 +93,14 @@ lbox_pushapplier(lua_State *L, struct applier *applier)
 			       applier->last_row_time);
 		lua_settable(L, -3);
 
-		char name[FIBER_NAME_MAX];
+		char name[APPLIER_SOURCE_MAXLEN];
 		int total = uri_format(name, sizeof(name), &applier->uri, false);
-
+		/*
+		 * total can be greater than sizeof(name) if
+		 * name has insufficient length. Terminating
+		 * zero is ignored by lua_pushlstring.
+		 */
+		total = MIN(total, (int)sizeof(name) - 1);
 		lua_pushstring(L, "peer");
 		lua_pushlstring(L, name, total);
 		lua_settable(L, -3);
