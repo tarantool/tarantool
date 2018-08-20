@@ -785,7 +785,6 @@ local function eval()
     end
     local error_response = yaml.decode(full_response)[1]
     if type(error_response) == 'table' and error_response.error then
-        log.error("Error while reloading config:")
         log.error(error_response.error)
         return 3
     end

@@ -202,7 +202,7 @@ do
 
     local status, err = pcall(function()
         test:test("basic test for bad script", function(test_i)
-            test_i:plan(8)
+            test_i:plan(7)
             check_ok(test_i, dir, 'start', 'script', 1, nil,
                      'Instance script is not found')
             check_ok(test_i, dir, 'start', 'bad_script', 1, nil,
@@ -211,7 +211,7 @@ do
             tctl_wait_start(dir, 'good_script')
             -- wait here
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
-                     nil, 'Error while reloading config:')
+                     nil, nil)
             check_ok(test_i, dir, 'stop', 'good_script', 0)
         end)
     end)
@@ -238,11 +238,11 @@ do
 
     local status, err = pcall(function()
         test:test("check answers in case of call", function(test_i)
-            test_i:plan(6)
+            test_i:plan(5)
             check_ok(test_i, dir, 'start', 'good_script', 0)
             tctl_wait_start(dir, 'good_script')
-            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3, nil,
-                     'Error while reloading config')
+            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
+                     nil, nil)
             check_ok(test_i, dir, 'eval',  'good_script ok_script.lua', 0,
                      '---\n- 1\n...', nil)
             check_ok(test_i, dir, 'stop', 'good_script', 0)
