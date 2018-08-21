@@ -752,7 +752,10 @@ box.space._user:select()
 ...
 box.space._space:select()
 ---
-- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}]]
+- - [257, 1, '_vinyl_deferred_delete', 'blackhole', 0, {'group_id': 1}, [{'name': 'space_id',
+        'type': 'unsigned'}, {'name': 'lsn', 'type': 'unsigned'}, {'name': 'tuple',
+        'type': 'array'}]]
+  - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}]]
   - [276, 1, '_collation', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {
         'name': 'name', 'type': 'string'}, {'name': 'owner', 'type': 'unsigned'},
       {'name': 'type', 'type': 'string'}, {'name': 'locale', 'type': 'string'}, {

@@ -66,6 +66,8 @@ static_assert(BOX_INVALID_NAME_MAX <= BOX_NAME_MAX,
 enum {
 	/** Start of the reserved range of system spaces. */
 	BOX_SYSTEM_ID_MIN = 256,
+	/** Space if of _vinyl_deferred_delete. */
+	BOX_VINYL_DEFERRED_DELETE_ID = 257,
 	/** Space id of _schema. */
 	BOX_SCHEMA_ID = 272,
 	/** Space id of _collation. */

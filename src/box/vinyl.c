@@ -65,6 +65,7 @@
 #include "engine.h"
 #include "space.h"
 #include "index.h"
+#include "schema.h"
 #include "xstream.h"
 #include "info.h"
 #include "column_mask.h"
@@ -255,6 +256,8 @@ struct vinyl_iterator {
 static const struct engine_vtab vinyl_engine_vtab;
 static const struct space_vtab vinyl_space_vtab;
 static const struct index_vtab vinyl_index_vtab;
+
+static struct trigger on_replace_vinyl_deferred_delete;
 
 /**
  * A quick intro into Vinyl cosmology and file format
@@ -2771,6 +2774,20 @@ vinyl_engine_abort_checkpoint(struct engine *engine)
 
 /** {{{ Recovery */
 
+/**
+ * Install trigger on the _vinyl_deferred_delete system space.
+ * Called on bootstrap and recovery. Note, this function can't
+ * be called from engine constructor, because the latter is
+ * invoked before the schema is initialized.
+ */
+static void
+vy_set_deferred_delete_trigger(void)
+{
+	struct space *space = space_by_id(BOX_VINYL_DEFERRED_DELETE_ID);
+	assert(space != NULL);
+	trigger_add(&space->on_replace, &on_replace_vinyl_deferred_delete);
+}
+
 static int
 vinyl_engine_bootstrap(struct engine *engine)
 {
@@ -2780,6 +2797,7 @@ vinyl_engine_bootstrap(struct engine *engine)
 		return -1;
 	vy_quota_set_limit(&e->quota, e->memory);
 	e->status = VINYL_ONLINE;
+	vy_set_deferred_delete_trigger();
 	return 0;
 }
 
@@ -2802,6 +2820,7 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 		vy_quota_set_limit(&e->quota, e->memory);
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
+	vy_set_deferred_delete_trigger();
 	return 0;
 }
 
@@ -4264,6 +4283,21 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 }
 
 /* }}} Index build */
+
+/* {{{ Deferred DELETE handling */
+
+static void
+vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
+{
+	(void)trigger;
+	(void)event;
+}
+
+static struct trigger on_replace_vinyl_deferred_delete = {
+	RLIST_LINK_INITIALIZER, vy_deferred_delete_on_replace, NULL, NULL
+};
+
+/* }}} Deferred DELETE handling */
 
 static const struct engine_vtab vinyl_engine_vtab = {
 	/* .shutdown = */ vinyl_engine_shutdown,

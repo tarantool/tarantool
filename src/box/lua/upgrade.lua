@@ -983,8 +983,23 @@ local function upgrade_priv_to_1_10_2()
     _vpriv.index.object:alter{parts={3, 'string', 4, 'scalar'}}
 end
 
+local function create_vinyl_deferred_delete_space()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _vinyl_deferred_delete = box.space[box.schema.VINYL_DEFERRED_DELETE_ID]
+
+    local format = {}
+    format[1] = {name = 'space_id', type = 'unsigned'}
+    format[2] = {name = 'lsn', type = 'unsigned'}
+    format[3] = {name = 'tuple', type = 'array'}
+
+    log.info("create space _vinyl_deferred_delete")
+    _space:insert{_vinyl_deferred_delete.id, ADMIN, '_vinyl_deferred_delete',
+                  'blackhole', 0, {group_id = 1}, format}
+end
+
 local function upgrade_to_1_10_2()
     upgrade_priv_to_1_10_2()
+    create_vinyl_deferred_delete_space()
 end
 
 local function get_version()
