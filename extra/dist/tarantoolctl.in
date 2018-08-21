@@ -532,6 +532,13 @@ local function start()
         end
         os.exit(1)
     end
+    local old_call = getmetatable(box.cfg).__call
+    getmetatable(box.cfg).__call = function(old_cfg, cfg)
+        if old_cfg.pid_file ~= nil and cfg ~= nil and cfg.pid_file ~= nil then
+            cfg.pid_file = old_cfg.pid_file
+        end
+        old_call(old_cfg, cfg)
+    end
     return 0
 end
 
