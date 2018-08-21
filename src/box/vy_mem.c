@@ -108,8 +108,7 @@ vy_mem_new(struct vy_mem_env *env, int64_t generation,
 		return NULL;
 	}
 	index->env = env;
-	index->min_lsn = INT64_MAX;
-	index->max_lsn = -1;
+	index->dump_lsn = -1;
 	index->cmp_def = cmp_def;
 	index->generation = generation;
 	index->space_cache_version = space_cache_version;
@@ -249,11 +248,10 @@ vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt)
 	/*
 	 * Normally statement LSN grows monotonically,
 	 * but not in case of building an index on an
-	 * existing non-empty space. Hence use of MIN/MAX
+	 * existing non-empty space. Hence use of MAX
 	 * here.
          */
-	mem->min_lsn = MIN(mem->min_lsn, lsn);
-	mem->max_lsn = MAX(mem->max_lsn, lsn);
+	mem->dump_lsn = MAX(mem->dump_lsn, lsn);
 	/*
 	 * If we don't bump mem version after assigning LSN to
 	 * a mem statement, a read iterator which uses

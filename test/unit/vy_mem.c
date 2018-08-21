@@ -18,21 +18,18 @@ test_basic(void)
 	assert(key_def != NULL);
 	struct vy_mem *mem = create_test_mem(key_def);
 
-	is(mem->min_lsn, INT64_MAX, "mem->min_lsn on empty mem");
-	is(mem->max_lsn, -1, "mem->max_lsn on empty mem");
+	is(mem->dump_lsn, -1, "mem->dump_lsn on empty mem");
 	const struct vy_stmt_template stmts[] = {
 		STMT_TEMPLATE(100, REPLACE, 1), STMT_TEMPLATE(101, REPLACE, 1),
 		STMT_TEMPLATE(102, REPLACE, 1), STMT_TEMPLATE(103, REPLACE, 1),
 		STMT_TEMPLATE(104, REPLACE, 1)
 	};
 
-	/* Check min/max lsn */
+	/* Check dump lsn */
 	const struct tuple *stmt = vy_mem_insert_template(mem, &stmts[0]);
-	is(mem->min_lsn, INT64_MAX, "mem->min_lsn after prepare");
-	is(mem->max_lsn, -1, "mem->max_lsn after prepare");
+	is(mem->dump_lsn, -1, "mem->dump_lsn after prepare");
 	vy_mem_commit_stmt(mem, stmt);
-	is(mem->min_lsn, 100, "mem->min_lsn after commit");
-	is(mem->max_lsn, 100, "mem->max_lsn after commit");
+	is(mem->dump_lsn, 100, "mem->dump_lsn after commit");
 
 	/* Check vy_mem_older_lsn */
 	const struct tuple *older = stmt;

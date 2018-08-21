@@ -982,7 +982,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 			vy_lsm_delete_mem(lsm, mem);
 			continue;
 		}
-		dump_lsn = MAX(dump_lsn, mem->max_lsn);
+		dump_lsn = MAX(dump_lsn, mem->dump_lsn);
 	}
 
 	if (dump_lsn < 0) {

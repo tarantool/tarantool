@@ -166,9 +166,13 @@ struct vy_mem {
 	size_t tree_extent_size;
 	/** Number of statements. */
 	struct vy_stmt_counter count;
-	/** The min and max values of stmt->lsn in this tree. */
-	int64_t min_lsn;
-	int64_t max_lsn;
+	/**
+	 * Max LSN covered by this in-memory tree.
+	 *
+	 * Once the tree is dumped to disk it will be used to update
+	 * vy_lsm::dump_lsn, see vy_task_dump_new().
+	 */
+	int64_t dump_lsn;
 	/**
 	 * Key definition for this index, extended with primary
 	 * key parts.
