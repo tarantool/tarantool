@@ -268,6 +268,9 @@ static const struct lbox_sockopt_reg so_opts[] = {
 #ifdef SO_PROTOCOL
 	{"SO_PROTOCOL",		SO_PROTOCOL,		1,	0, },
 #endif
+#ifdef SO_NREAD /* available on Darwin */
+	{"SO_NREAD",		SO_NREAD,		1,	0, },
+#endif
 
 	{"SO_TYPE",		SO_TYPE,		1,	0, },
 
