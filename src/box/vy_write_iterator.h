@@ -213,11 +213,47 @@
  */
 
 struct vy_write_iterator;
+struct vy_deferred_delete_handler;
 struct key_def;
 struct tuple_format;
 struct tuple;
 struct vy_mem;
 struct vy_slice;
+
+/**
+ * Callback invoked by the write iterator for tuples that were
+ * overwritten or deleted in the primary index without generating
+ * a DELETE statement for secondary indexes. It is supposed to
+ * produce a DELETE statement and insert it into secondary indexes.
+ *
+ * @param handler  Deferred DELETE handler.
+ * @param old_stmt Overwritten tuple.
+ * @param new_stmt Statement that overwrote @old_stmt.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ *
+ * @sa VY_STMT_DEFERRED_DELETE.
+ */
+typedef int
+(*vy_deferred_delete_process_f)(struct vy_deferred_delete_handler *handler,
+				struct tuple *old_stmt, struct tuple *new_stmt);
+
+/**
+ * Callack invoked by the write iterator to destroy a deferred
+ * DELETE handler when the iteration is stopped.
+ */
+typedef void
+(*vy_deferred_delete_destroy_f)(struct vy_deferred_delete_handler *handler);
+
+struct vy_deferred_delete_handler_iface {
+	vy_deferred_delete_process_f process;
+	vy_deferred_delete_destroy_f destroy;
+};
+
+struct vy_deferred_delete_handler {
+	const struct vy_deferred_delete_handler_iface *iface;
+};
 
 /**
  * Open an empty write iterator. To add sources to the iterator
@@ -227,13 +263,16 @@ struct vy_slice;
  * @param LSM tree is_primary - set if this iterator is for a primary index.
  * @param is_last_level - there is no older level than the one we're writing to.
  * @param read_views - Opened read views.
+ * @param handler - Deferred DELETE handler or NULL if no deferred DELETEs is
+ * expected. Only relevant to primary index compaction. For secondary indexes
+ * this argument must be set to NULL.
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
 vy_write_iterator_new(const struct key_def *cmp_def,
-		      struct tuple_format *format,
-		      bool is_primary, bool is_last_level,
-		      struct rlist *read_views);
+		      struct tuple_format *format, bool is_primary,
+		      bool is_last_level, struct rlist *read_views,
+		      struct vy_deferred_delete_handler *handler);
 
 /**
  * Add a mem as a source to the iterator.

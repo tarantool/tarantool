@@ -460,6 +460,44 @@ local function upgrade_to_1_10_0()
 end
 
 --------------------------------------------------------------------------------
+--- Tarantool 1.10.2
+--------------------------------------------------------------------------------
+local function upgrade_priv_to_1_10_2()
+    local _priv = box.space._priv
+    local _vpriv = box.space._vpriv
+    local format = _priv:format()
+
+    format[4].type = 'scalar'
+    _priv:format(format)
+    format = _vpriv:format()
+    format[4].type = 'scalar'
+    _vpriv:format(format)
+    _priv.index.primary:alter{parts={2, 'unsigned', 3, 'string', 4, 'scalar'}}
+    _vpriv.index.primary:alter{parts={2, 'unsigned', 3, 'string', 4, 'scalar'}}
+    _priv.index.object:alter{parts={3, 'string', 4, 'scalar'}}
+    _vpriv.index.object:alter{parts={3, 'string', 4, 'scalar'}}
+end
+
+local function create_vinyl_deferred_delete_space()
+    local _space = box.space[box.schema.SPACE_ID]
+    local _vinyl_deferred_delete = box.space[box.schema.VINYL_DEFERRED_DELETE_ID]
+
+    local format = {}
+    format[1] = {name = 'space_id', type = 'unsigned'}
+    format[2] = {name = 'lsn', type = 'unsigned'}
+    format[3] = {name = 'tuple', type = 'array'}
+
+    log.info("create space _vinyl_deferred_delete")
+    _space:insert{_vinyl_deferred_delete.id, ADMIN, '_vinyl_deferred_delete',
+                  'blackhole', 0, {group_id = 1}, format}
+end
+
+local function upgrade_to_1_10_2()
+    upgrade_priv_to_1_10_2()
+    create_vinyl_deferred_delete_space()
+end
+
+--------------------------------------------------------------------------------
 -- Tarantool 2.1.0
 --------------------------------------------------------------------------------
 
@@ -566,6 +604,7 @@ local function upgrade(options)
         {version = mkversion(1, 7, 6), func = upgrade_to_1_7_6, auto = true},
         {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
         {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
+        {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2, auto = true},
         {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true}
     }
 

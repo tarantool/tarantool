@@ -157,7 +157,7 @@ local function check_ok(test, dir, cmd, args, e_res, e_stdout, e_stderr)
 end
 
 local test = tap.test('tarantoolctl')
-test:plan(6)
+test:plan(7)
 
 -- basic start/stop test
 -- must be stopped afterwards
@@ -202,7 +202,7 @@ do
 
     local status, err = pcall(function()
         test:test("basic test for bad script", function(test_i)
-            test_i:plan(8)
+            test_i:plan(7)
             check_ok(test_i, dir, 'start', 'script', 1, nil,
                      'Instance script is not found')
             check_ok(test_i, dir, 'start', 'bad_script', 1, nil,
@@ -211,7 +211,7 @@ do
             tctl_wait_start(dir, 'good_script')
             -- wait here
             check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
-                     nil, 'Error while reloading config:')
+                     nil, nil)
             check_ok(test_i, dir, 'stop', 'good_script', 0)
         end)
     end)
@@ -238,11 +238,11 @@ do
 
     local status, err = pcall(function()
         test:test("check answers in case of call", function(test_i)
-            test_i:plan(6)
+            test_i:plan(5)
             check_ok(test_i, dir, 'start', 'good_script', 0)
             tctl_wait_start(dir, 'good_script')
-            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3, nil,
-                     'Error while reloading config')
+            check_ok(test_i, dir, 'eval',  'good_script bad_script.lua', 3,
+                     nil, nil)
             check_ok(test_i, dir, 'eval',  'good_script ok_script.lua', 0,
                      '---\n- 1\n...', nil)
             check_ok(test_i, dir, 'stop', 'good_script', 0)
@@ -250,6 +250,44 @@ do
     end)
 
     cleanup_instance(dir, 'good_script')
+    recursive_rmdir(dir)
+
+    if status == false then
+        print(("Error: %s"):format(err))
+        os.exit()
+    end
+end
+
+-- check enter
+do
+    local dir = fio.tempdir()
+
+    local code = [[ box.cfg{} ]]
+    create_script(dir, 'script.lua', code)
+
+    local status, err = pcall(function()
+        test:test("check error codes in case of enter", function(test_i)
+            test_i:plan(10)
+            check_ok(test_i, dir, 'enter', 'script', 1, nil, "Can't connect to")
+            local console_sock = 'script.control'
+            console_sock = fio.pathjoin(dir, console_sock)
+            test_i:is(fio.path.exists(console_sock), false, "directory clean")
+            check_ok(test_i, dir, 'start', 'script', 0)
+            tctl_wait_start(dir, 'script')
+            test_i:is(fio.path.exists(console_sock), true,
+                      "unix socket created")
+            check_ok(test_i, dir, 'stop', 'script', 0)
+            tctl_wait_stop(dir, 'script')
+            test_i:is(fio.path.exists(console_sock), false,
+                      "remove unix socket upon exit")
+            fio.open(console_sock, 'O_CREAT')
+            test_i:is(fio.path.exists(console_sock), true, "file created")
+            check_ok(test_i, dir, 'enter', 'script', 1, nil, "Can't connect to")
+            fio.unlink(console_sock)
+        end)
+    end)
+
+    cleanup_instance(dir, 'script')
     recursive_rmdir(dir)
 
     if status == false then
@@ -346,7 +384,7 @@ do
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1", "\n", 3)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 1 --replica 2", "\n", 3)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system --replica 2", "\n", 0)
-            check_ctlcat_snap(test_i, dir, "--space=280", "---\n", 22)
+            check_ctlcat_snap(test_i, dir, "--space=280", "---\n", 23)
             check_ctlcat_snap(test_i, dir, "--space=288", "---\n", 49)
         end)
     end)

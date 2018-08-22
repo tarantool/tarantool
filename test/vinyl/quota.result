@@ -89,7 +89,7 @@ _ = space:replace{1, 1, string.rep('a', 1024 * 1024 * 5)}
 ...
 box.stat.vinyl().quota.used
 ---
-- 5341228
+- 5341267
 ...
 space:drop()
 ---

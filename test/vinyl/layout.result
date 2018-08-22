@@ -253,17 +253,17 @@ result
   - - 00000000000000000008.run
     - - HEADER:
           lsn: 10
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: ['ёёё', null]
       - HEADER:
           lsn: 9
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: ['эээ', null]
       - HEADER:
           lsn: 8
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: ['ЭЭЭ', null]
       - HEADER:
@@ -285,8 +285,8 @@ result
         BODY:
           row_index_offset: <offset>
           offset: <offset>
-          size: 90
-          unpacked_size: 71
+          size: 102
+          unpacked_size: 83
           row_count: 3
           min_key: ['ёёё']
   - - 00000000000000000012.run
@@ -295,20 +295,23 @@ result
           type: REPLACE
         BODY:
           tuple: ['ёёё', 123]
+          tuple_meta: {1: 1}
       - HEADER:
           lsn: 13
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: ['ююю', 789]
+          tuple_meta: {1: 1}
       - HEADER:
           lsn: 12
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: ['ЮЮЮ', 456]
+          tuple_meta: {1: 1}
       - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: "\0\0\0\0\0\0\0\x10\0\0\0\""
+          row_index: "\0\0\0\0\0\0\0\x14\0\0\0*"
   - - 00000000000000000006.index
     - - HEADER:
           type: RUNINFO
@@ -331,17 +334,17 @@ result
   - - 00000000000000000006.run
     - - HEADER:
           lsn: 10
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: [null, 'ёёё']
       - HEADER:
           lsn: 9
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: [null, 'эээ']
       - HEADER:
           lsn: 8
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: [null, 'ЭЭЭ']
       - HEADER:
@@ -357,41 +360,36 @@ result
           page_count: 1
           bloom_filter: <bloom_filter>
           max_lsn: 13
-          min_key: [null, 'ёёё']
+          min_key: [123, 'ёёё']
       - HEADER:
           type: PAGEINFO
         BODY:
           row_index_offset: <offset>
           offset: <offset>
-          size: 110
-          unpacked_size: 91
-          row_count: 4
-          min_key: [null, 'ёёё']
+          size: 90
+          unpacked_size: 71
+          row_count: 3
+          min_key: [123, 'ёёё']
   - - 00000000000000000010.run
     - - HEADER:
-          lsn: 11
-          type: DELETE
-        BODY:
-          key: [null, 'ёёё']
-      - HEADER:
           lsn: 11
           type: REPLACE
         BODY:
           tuple: [123, 'ёёё']
       - HEADER:
           lsn: 12
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: [456, 'ЮЮЮ']
       - HEADER:
           lsn: 13
-          type: INSERT
+          type: REPLACE
         BODY:
           tuple: [789, 'ююю']
       - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: "\0\0\0\0\0\0\0\x10\0\0\0 \0\0\02"
+          row_index: "\0\0\0\0\0\0\0\x10\0\0\0\""
 ...
 test_run:cmd("clear filter")
 ---

@@ -47,6 +47,27 @@ static const char *object_type_strs[] = {
 };
 
 enum schema_object_type
+schema_entity_type(enum schema_object_type type)
+{
+	switch (type) {
+	case SC_SPACE:
+		return SC_ENTITY_SPACE;
+	case SC_FUNCTION:
+		return SC_ENTITY_FUNCTION;
+	case SC_USER:
+		return SC_ENTITY_USER;
+	case SC_ROLE:
+		return SC_ENTITY_ROLE;
+	case SC_SEQUENCE:
+		return SC_ENTITY_SEQUENCE;
+	case SC_COLLATION:
+		return SC_ENTITY_COLLATION;
+	default:
+		return SC_UNKNOWN;
+	}
+}
+
+enum schema_object_type
 schema_object_type(const char *name)
 {
 	/**

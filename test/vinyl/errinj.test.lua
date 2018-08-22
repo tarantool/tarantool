@@ -736,3 +736,32 @@ s.index.sk:select()
 s.index.sk:stat().memory.rows
 
 s:drop()
+
+--
+-- Check that tarantool doesn't hang or crash if error
+-- occurs while writing a deferred DELETE to WAL.
+--
+fiber = require('fiber')
+errinj = box.error.injection
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {run_count_per_level = 10})
+_ = s:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
+s:replace{1, 10}
+box.snapshot()
+s:replace{1, 20}
+box.snapshot()
+
+errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0.001)
+errinj.set("ERRINJ_WAL_IO", true)
+errors = box.stat.ERROR.total
+s.index.pk:compact()
+while box.stat.ERROR.total - errors == 0 do fiber.sleep(0.001) end
+s.index.pk:stat().disk.compact.count -- 0
+errinj.set("ERRINJ_WAL_IO", false)
+while s.index.pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+s.index.pk:stat().disk.compact.count -- 1
+errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0)
+
+box.snapshot() -- ok
+s:drop()

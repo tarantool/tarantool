@@ -615,8 +615,11 @@ vy_stmt_encode_secondary(const struct tuple *value,
 		request.key = extracted;
 		request.key_end = extracted + size;
 	}
-	if (vy_stmt_meta_encode(value, &request) != 0)
-		return -1;
+	/*
+	 * Note, all flags used with vinyl statements make sense
+	 * only for primary indexes so we do not encode meta for
+	 * secondary index statements.
+	 */
 	xrow->bodycnt = xrow_encode_dml(&request, xrow->body);
 	if (xrow->bodycnt < 0)
 		return -1;

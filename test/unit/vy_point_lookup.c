@@ -13,6 +13,8 @@
 
 uint32_t schema_version;
 uint32_t space_cache_version;
+struct space *space_by_id(uint32_t id) { return NULL; }
+struct vy_lsm *vy_lsm(struct index *index) { return NULL; }
 
 static int
 write_run(struct vy_run *run, const char *dir_name,
@@ -192,7 +194,7 @@ test_basic()
 	}
 	struct vy_stmt_stream *write_stream
 		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					true, true, &read_views);
+					true, true, &read_views, NULL);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	struct vy_run *run = vy_run_new(&run_env, 1);
 	isnt(run, NULL, "vy_run_new");
@@ -225,7 +227,7 @@ test_basic()
 	}
 	write_stream
 		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					true, true, &read_views);
+					true, true, &read_views, NULL);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	run = vy_run_new(&run_env, 2);
 	isnt(run, NULL, "vy_run_new");

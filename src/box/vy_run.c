@@ -1157,7 +1157,8 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 	assert(itr->curr_stmt != NULL);
 	assert(itr->curr_pos.page_no < slice->run->info.page_count);
 
-	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
+	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn ||
+	       vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ) {
 		if (vy_run_iterator_next_pos(itr, iterator_type,
 					     &itr->curr_pos) != 0) {
 			vy_run_iterator_stop(itr);
@@ -1183,6 +1184,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 						 &test_stmt) != 0)
 				return -1;
 			if (vy_stmt_lsn(test_stmt) > (**itr->read_view).vlsn ||
+			    vy_stmt_flags(test_stmt) & VY_STMT_SKIP_READ ||
 			    vy_tuple_compare(itr->curr_stmt, test_stmt,
 					     cmp_def) != 0) {
 				tuple_unref(test_stmt);
@@ -1478,6 +1480,7 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 	assert(itr->curr_pos.page_no < itr->slice->run->info.page_count);
 
 	struct vy_run_iterator_pos next_pos;
+next:
 	if (vy_run_iterator_next_pos(itr, ITER_GE, &next_pos) != 0) {
 		vy_run_iterator_stop(itr);
 		return 0;
@@ -1495,6 +1498,8 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 	tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = next_key;
 	itr->curr_pos = next_pos;
+	if (vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ)
+		goto next;
 
 	vy_stmt_counter_acct_tuple(&itr->stat->get, itr->curr_stmt);
 	*ret = itr->curr_stmt;

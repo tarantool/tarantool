@@ -361,7 +361,7 @@ testuser_uid = session.uid()
 ...
 _ = box.space._user:delete(2)
 ---
-- error: Drop access to user 'public' is denied for user 'testuser'
+- error: Drop access to role 'public' is denied for user 'testuser'
 ...
 box.space._user:select(1)
 ---
@@ -436,7 +436,7 @@ box.schema.user.revoke('testuser', 'usage,session', 'universe')
 ...
 box.schema.user.revoke('testuser', 'read, write, execute', 'universe')
 ---
-- error: User 'testuser' does not have read, write, execute access on universe 'nil'
+- error: User 'testuser' does not have read, write, execute access on universe ''
 ...
 box.schema.user.revoke('testuser', 'create', 'universe')
 ---
@@ -752,7 +752,10 @@ box.space._user:select()
 ...
 box.space._space:select()
 ---
-- - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}, {'type': 'any',
+- - [257, 1, '_vinyl_deferred_delete', 'blackhole', 0, {'group_id': 1}, [{'name': 'space_id',
+        'type': 'unsigned'}, {'name': 'lsn', 'type': 'unsigned'}, {'name': 'tuple',
+        'type': 'array'}]]
+  - [272, 1, '_schema', 'memtx', 0, {}, [{'type': 'string', 'name': 'key'}, {'type': 'any',
         'name': 'value', 'is_nullable': true}]]
   - [276, 1, '_collation', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {
         'name': 'name', 'type': 'string'}, {'name': 'owner', 'type': 'unsigned'},
@@ -798,10 +801,10 @@ box.space._space:select()
         'type': 'string'}, {'name': 'auth', 'type': 'map'}]]
   - [312, 1, '_priv', 'memtx', 0, {}, [{'name': 'grantor', 'type': 'unsigned'}, {
         'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+      {'name': 'object_id', 'type': 'scalar'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [313, 1, '_vpriv', 'sysview', 0, {}, [{'name': 'grantor', 'type': 'unsigned'},
       {'name': 'grantee', 'type': 'unsigned'}, {'name': 'object_type', 'type': 'string'},
-      {'name': 'object_id', 'type': 'unsigned'}, {'name': 'privilege', 'type': 'unsigned'}]]
+      {'name': 'object_id', 'type': 'scalar'}, {'name': 'privilege', 'type': 'unsigned'}]]
   - [320, 1, '_cluster', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'}, {'name': 'uuid',
         'type': 'string'}]]
   - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'space_id',
@@ -866,7 +869,7 @@ box.schema.user.grant('tester', 'read', 'universe')
 -- error: the privilege is not granted
 box.schema.user.revoke('tester', 'create', 'universe')
 ---
-- error: User 'tester' does not have create access on universe 'nil'
+- error: User 'tester' does not have create access on universe ''
 ...
 -- no error: if_exists clause
 box.schema.user.revoke('tester', 'create', 'universe', nil, { if_exists = true })

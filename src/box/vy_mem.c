@@ -108,8 +108,7 @@ vy_mem_new(struct vy_mem_env *env, int64_t generation,
 		return NULL;
 	}
 	index->env = env;
-	index->min_lsn = INT64_MAX;
-	index->max_lsn = -1;
+	index->dump_lsn = -1;
 	index->cmp_def = cmp_def;
 	index->generation = generation;
 	index->space_cache_version = space_cache_version;
@@ -249,11 +248,10 @@ vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt)
 	/*
 	 * Normally statement LSN grows monotonically,
 	 * but not in case of building an index on an
-	 * existing non-empty space. Hence use of MIN/MAX
+	 * existing non-empty space. Hence use of MAX
 	 * here.
          */
-	mem->min_lsn = MIN(mem->min_lsn, lsn);
-	mem->max_lsn = MAX(mem->max_lsn, lsn);
+	mem->dump_lsn = MAX(mem->dump_lsn, lsn);
 	/*
 	 * If we don't bump mem version after assigning LSN to
 	 * a mem statement, a read iterator which uses
@@ -324,7 +322,8 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr,
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	const struct key_def *cmp_def = itr->mem->cmp_def;
-	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn) {
+	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn ||
+	       vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ) {
 		if (vy_mem_iterator_step(itr, iterator_type) != 0 ||
 		    (iterator_type == ITER_EQ &&
 		     vy_stmt_compare(key, itr->curr_stmt, cmp_def))) {
@@ -341,6 +340,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr,
 				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
 							       &prev_pos);
 			if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
+			    vy_stmt_flags(prev_stmt) & VY_STMT_SKIP_READ ||
 			    vy_tuple_compare(itr->curr_stmt, prev_stmt,
 					     cmp_def) != 0)
 				break;
@@ -496,18 +496,21 @@ vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr)
 	const struct key_def *cmp_def = itr->mem->cmp_def;
 
 	struct vy_mem_tree_iterator next_pos = itr->curr_pos;
+next:
 	vy_mem_tree_iterator_next(&itr->mem->tree, &next_pos);
 	if (vy_mem_tree_iterator_is_invalid(&next_pos))
 		return 1; /* EOF */
 
 	const struct tuple *next_stmt;
 	next_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
-	if (vy_tuple_compare(itr->curr_stmt, next_stmt, cmp_def) == 0) {
-		itr->curr_pos = next_pos;
-		itr->curr_stmt = next_stmt;
-		return 0;
-	}
-	return 1;
+	if (vy_tuple_compare(itr->curr_stmt, next_stmt, cmp_def) != 0)
+		return 1;
+
+	itr->curr_pos = next_pos;
+	itr->curr_stmt = next_stmt;
+	if (vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ)
+		goto next;
+	return 0;
 }
 
 /**

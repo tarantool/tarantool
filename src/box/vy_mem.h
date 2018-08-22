@@ -166,9 +166,19 @@ struct vy_mem {
 	size_t tree_extent_size;
 	/** Number of statements. */
 	struct vy_stmt_counter count;
-	/** The min and max values of stmt->lsn in this tree. */
-	int64_t min_lsn;
-	int64_t max_lsn;
+	/**
+	 * Max LSN covered by this in-memory tree.
+	 *
+	 * Once the tree is dumped to disk it will be used to update
+	 * vy_lsm::dump_lsn, see vy_task_dump_new().
+	 *
+	 * Note, we account not only original LSN (vy_stmt_lsn())
+	 * in this variable, but also WAL LSN of deferred DELETE
+	 * statements. This is needed to skip WAL recovery of both
+	 * deferred and normal statements that have been dumped to
+	 * disk. See vy_deferred_delete_on_replace() for more details.
+	 */
+	int64_t dump_lsn;
 	/**
 	 * Key definition for this index, extended with primary
 	 * key parts.

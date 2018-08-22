@@ -580,7 +580,7 @@ struct checkpoint {
 	struct cord cord;
 	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
-	struct vclock *vclock;
+	struct vclock vclock;
 	struct xdir dir;
 	/**
 	 * Do nothing, just touch the snapshot file - the
@@ -597,14 +597,7 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 	ckpt->waiting_for_snap_thread = false;
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
-	/* May be used in abortCheckpoint() */
-	ckpt->vclock = malloc(sizeof(*ckpt->vclock));
-	if (ckpt->vclock == NULL) {
-		diag_set(OutOfMemory, sizeof(*ckpt->vclock),
-			 "malloc", "vclock");
-		return -1;
-	}
-	vclock_create(ckpt->vclock);
+	vclock_create(&ckpt->vclock);
 	ckpt->touch = false;
 	return 0;
 }
@@ -618,7 +611,6 @@ checkpoint_destroy(struct checkpoint *ckpt)
 	}
 	rlist_create(&ckpt->entries);
 	xdir_destroy(&ckpt->dir);
-	free(ckpt->vclock);
 }
 
 
@@ -656,7 +648,7 @@ checkpoint_f(va_list ap)
 	struct checkpoint *ckpt = va_arg(ap, struct checkpoint *);
 
 	if (ckpt->touch) {
-		if (xdir_touch_xlog(&ckpt->dir, ckpt->vclock) == 0)
+		if (xdir_touch_xlog(&ckpt->dir, &ckpt->vclock) == 0)
 			return 0;
 		/*
 		 * Failed to touch an existing snapshot, create
@@ -666,7 +658,7 @@ checkpoint_f(va_list ap)
 	}
 
 	struct xlog snap;
-	if (xdir_create_xlog(&ckpt->dir, &snap, ckpt->vclock) != 0)
+	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
 		return -1;
 
 	snap.rate_limit = ckpt->snap_io_rate_limit;
@@ -739,7 +731,7 @@ memtx_engine_wait_checkpoint(struct engine *engine,
 	    vclock_compare(&last, vclock) == 0) {
 		memtx->checkpoint->touch = true;
 	}
-	vclock_copy(memtx->checkpoint->vclock, vclock);
+	vclock_copy(&memtx->checkpoint->vclock, vclock);
 
 	if (cord_costart(&memtx->checkpoint->cord, "snapshot",
 			 checkpoint_f, memtx->checkpoint)) {
@@ -771,7 +763,7 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, false);
 
 	if (!memtx->checkpoint->touch) {
-		int64_t lsn = vclock_sum(memtx->checkpoint->vclock);
+		int64_t lsn = vclock_sum(&memtx->checkpoint->vclock);
 		struct xdir *dir = &memtx->checkpoint->dir;
 		/* rename snapshot on completion */
 		char to[PATH_MAX];
@@ -795,9 +787,7 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 	if (xdir_last_vclock(&memtx->snap_dir, &last) < 0 ||
 	    vclock_compare(&last, vclock) != 0) {
 		/* Add the new checkpoint to the set. */
-		xdir_add_vclock(&memtx->snap_dir, memtx->checkpoint->vclock);
-		/* Prevent checkpoint_destroy() from freeing vclock. */
-		memtx->checkpoint->vclock = NULL;
+		xdir_add_vclock(&memtx->snap_dir, &memtx->checkpoint->vclock);
 	}
 
 	checkpoint_destroy(memtx->checkpoint);
@@ -824,7 +814,7 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 	/** Remove garbage .inprogress file. */
 	char *filename =
 		xdir_format_filename(&memtx->checkpoint->dir,
-				     vclock_sum(memtx->checkpoint->vclock),
+				     vclock_sum(&memtx->checkpoint->vclock),
 				     INPROGRESS);
 	(void) coio_unlink(filename);
 

@@ -1760,6 +1760,8 @@ local priv_object_combo = {
                            box.priv.C, box.priv.D),
     ["role"]     = bit.bor(box.priv.X, box.priv.U,
                            box.priv.C, box.priv.D),
+    ["user"]     = bit.bor(box.priv.C, box.priv.A,
+                           box.priv.D),
 }
 
 --
@@ -1822,16 +1824,16 @@ local function privilege_name(privilege)
 end
 
 local function object_resolve(object_type, object_name)
+    if object_name ~= nil and type(object_name) ~= 'string'
+            and type(object_name) ~= 'number' then
+        box.error(box.error.ILLEGAL_PARAMS, "wrong object name type")
+    end
     if object_type == 'universe' then
-        if object_name ~= nil and type(object_name) ~= 'string'
-                and type(object_name) ~= 'number' then
-            box.error(box.error.ILLEGAL_PARAMS, "wrong object name type")
-        end
         return 0
     end
     if object_type == 'space' then
-        if object_name == nil or object_name == 0 then
-            return 0
+        if object_name == '' then
+            return ''
         end
         local space = box.space[object_name]
         if  space == nil then
@@ -1840,8 +1842,8 @@ local function object_resolve(object_type, object_name)
         return space.id
     end
     if object_type == 'function' then
-        if object_name == nil or object_name == 0 then
-            return 0
+        if object_name == '' then
+            return ''
         end
         local _vfunc = box.space[box.schema.VFUNC_ID]
         local func
@@ -1857,8 +1859,8 @@ local function object_resolve(object_type, object_name)
         end
     end
     if object_type == 'sequence' then
-        if object_name == nil or object_name == 0 then
-            return 0
+        if object_name == '' then
+            return ''
         end
         local seq = sequence_resolve(object_name)
         if seq == nil then
@@ -1866,18 +1868,23 @@ local function object_resolve(object_type, object_name)
         end
         return seq
     end
-    if object_type == 'role' then
-        local _vuser = box.space[box.schema.VUSER_ID]
-        local role
-        if type(object_name) == 'string' then
-            role = _vuser.index.name:get{object_name}
-        else
-            role = _vuser:get{object_name}
+    if object_type == 'role' or object_type == 'user' then
+        if object_name == '' then
+            return ''
         end
-        if role and role[4] == 'role' then
-            return role[1]
+        local _vuser = box.space[box.schema.VUSER_ID]
+        local role_or_user
+        if type(object_name) == 'string' then
+            role_or_user = _vuser.index.name:get{object_name}
         else
+            role_or_user = _vuser:get{object_name}
+        end
+        if role_or_user and role_or_user[4] == object_type then
+            return role_or_user[1]
+        elseif object_type == 'role' then
             box.error(box.error.NO_SUCH_ROLE, object_name)
+        else
+            box.error(box.error.NO_SUCH_USER, object_name)
         end
     end
 
@@ -1885,7 +1892,7 @@ local function object_resolve(object_type, object_name)
 end
 
 local function object_name(object_type, object_id)
-    if object_type == 'universe' then
+    if object_type == 'universe' or object_id == '' then
         return ""
     end
     local space
@@ -2093,12 +2100,18 @@ local function grant(uid, name, privilege, object_type,
                      object_name, options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax grant(user, role).
-    if object_name == nil and object_type == nil then
-        -- sic: avoid recursion, to not bother with roles
-        -- named 'execute'
-        object_type = 'role'
-        object_name = privilege
-        privilege = 'execute'
+    if object_name == nil then
+        if object_type == nil then
+            -- sic: avoid recursion, to not bother with roles
+            -- named 'execute'
+            object_type = 'role'
+            object_name = privilege
+            privilege = 'execute'
+        else
+            -- Allow syntax grant(user, priv, entity)
+            -- for entity grants.
+            object_name = ''
+        end
     end
     local privilege_hex = privilege_check(privilege, object_type)
 
@@ -2126,7 +2139,8 @@ local function grant(uid, name, privilege, object_type,
     if privilege_hex ~= old_privilege then
         _priv:replace{options.grantor, uid, object_type, oid, privilege_hex}
     elseif not options.if_not_exists then
-            if object_type == 'role' then
+            if object_type == 'role' and object_name ~= '' and
+               privilege == 'execute' then
                 box.error(box.error.ROLE_GRANTED, name, object_name)
             else
                 box.error(box.error.PRIV_GRANTED, name, privilege,
@@ -2138,10 +2152,16 @@ end
 local function revoke(uid, name, privilege, object_type, object_name, options)
     -- From user point of view, role is the same thing
     -- as a privilege. Allow syntax revoke(user, role).
-    if object_name == nil and object_type == nil then
-        object_type = 'role'
-        object_name = privilege
-        privilege = 'execute'
+    if object_name == nil then
+        if object_type == nil then
+            object_type = 'role'
+            object_name = privilege
+            privilege = 'execute'
+        else
+            -- Allow syntax revoke(user, privilege, entity)
+            -- to revoke entity privileges.
+            object_name = ''
+        end
     end
     local privilege_hex = privilege_check(privilege, object_type)
     options = options or {}
@@ -2154,7 +2174,8 @@ local function revoke(uid, name, privilege, object_type, object_name, options)
         if options.if_exists then
             return
         end
-        if object_type == 'role' then
+        if object_type == 'role' and object_name ~= '' and
+           privilege == 'execute' then
             box.error(box.error.ROLE_NOT_GRANTED, name, object_name)
         else
             box.error(box.error.PRIV_NOT_GRANTED, name, privilege,
@@ -2213,8 +2234,8 @@ local function drop(uid, opts)
     local privs = _vpriv.index.primary:select{uid}
 
     for k, tuple in pairs(privs) do
-	-- we need an additional box.session.su() here, because of
-	-- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
+        -- we need an additional box.session.su() here, because of
+        -- unnecessary check for privilege PRIV_REVOKE in priv_def_check()
         box.session.su("admin", revoke, uid, uid, tuple[5], tuple[3], tuple[4])
     end
     box.space[box.schema.USER_ID]:delete{uid}

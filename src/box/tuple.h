@@ -632,6 +632,55 @@ tuple_seek(struct tuple_iterator *it, uint32_t fieldno);
 const char *
 tuple_next(struct tuple_iterator *it);
 
+/** Return a tuple field and check its type. */
+static inline const char *
+tuple_next_with_type(struct tuple_iterator *it, enum mp_type type)
+{
+	uint32_t fieldno = it->fieldno;
+	const char *field = tuple_next(it);
+	if (field == NULL) {
+		diag_set(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
+		return NULL;
+	}
+	if (mp_typeof(*field) != type) {
+		diag_set(ClientError, ER_FIELD_TYPE,
+			  fieldno + TUPLE_INDEX_BASE,
+			  mp_type_strs[type]);
+		return NULL;
+	}
+	return field;
+}
+
+/** Get next field from iterator as uint32_t. */
+static inline int
+tuple_next_u32(struct tuple_iterator *it, uint32_t *out)
+{
+	uint32_t fieldno = it->fieldno;
+	const char *field = tuple_next_with_type(it, MP_UINT);
+	if (field == NULL)
+		return -1;
+	uint32_t val = mp_decode_uint(&field);
+	if (val > UINT32_MAX) {
+		diag_set(ClientError, ER_FIELD_TYPE,
+			 fieldno + TUPLE_INDEX_BASE,
+			 field_type_strs[FIELD_TYPE_UNSIGNED]);
+		return -1;
+	}
+	*out = val;
+	return 0;
+}
+
+/** Get next field from iterator as uint64_t. */
+static inline int
+tuple_next_u64(struct tuple_iterator *it, uint64_t *out)
+{
+	const char *field = tuple_next_with_type(it, MP_UINT);
+	if (field == NULL)
+		return -1;
+	*out = mp_decode_uint(&field);
+	return 0;
+}
+
 /**
  * Assert that buffer is valid MessagePack array
  * @param tuple buffer
@@ -945,56 +994,6 @@ tuple_field_uuid_xc(const struct tuple *tuple, int fieldno,
 {
 	if (tuple_field_uuid(tuple, fieldno, out) != 0)
 		diag_raise();
-}
-
-/** Return a tuple field and check its type. */
-static inline const char *
-tuple_next_xc(struct tuple_iterator *it, enum mp_type type)
-{
-	uint32_t fieldno = it->fieldno;
-	const char *field = tuple_next(it);
-	if (field == NULL)
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
-	if (mp_typeof(*field) != MP_UINT) {
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE,
-			  mp_type_strs[type]);
-	}
-
-	return field;
-}
-
-/**
- * A convenience shortcut for the data dictionary - get next field
- * from iterator as uint32_t or raise an error if there is
- * no next field.
- */
-static inline uint32_t
-tuple_next_u32_xc(struct tuple_iterator *it)
-{
-	uint32_t fieldno = it->fieldno;
-	const char *field = tuple_next_xc(it, MP_UINT);
-	uint32_t val = mp_decode_uint(&field);
-	if (val > UINT32_MAX) {
-		tnt_raise(ClientError, ER_FIELD_TYPE,
-			  fieldno + TUPLE_INDEX_BASE,
-			  field_type_strs[FIELD_TYPE_UNSIGNED]);
-	}
-	return val;
-}
-
-/**
- * A convenience shortcut for the data dictionary - get next field
- * from iterator as a C string or raise an error if there is no
- * next field.
- */
-static inline const char *
-tuple_next_cstr_xc(struct tuple_iterator *it)
-{
-	const char *field = tuple_next_xc(it, MP_STR);
-	uint32_t len = 0;
-	const char *str = mp_decode_str(&field, &len);
-	return tt_cstr(str, len);
 }
 
 #endif /* defined(__cplusplus) */

@@ -579,26 +579,16 @@ wal_opt_rotate(struct wal_writer *writer)
 	if (xlog_is_open(&writer->current_wal))
 		return 0;
 
-	struct vclock *vclock = (struct vclock *)malloc(sizeof(*vclock));
-	if (vclock == NULL) {
-		diag_set(OutOfMemory, sizeof(*vclock),
-			 "malloc", "struct vclock");
-		diag_log();
-		return -1;
-	}
-	vclock_copy(vclock, &writer->vclock);
-
 	if (xdir_create_xlog(&writer->wal_dir, &writer->current_wal,
 			     &writer->vclock) != 0) {
 		diag_log();
-		free(vclock);
 		return -1;
 	}
 	/*
 	 * Keep track of the new WAL vclock. Required for garbage
 	 * collection, see wal_collect_garbage().
 	 */
-	xdir_add_vclock(&writer->wal_dir, vclock);
+	xdir_add_vclock(&writer->wal_dir, &writer->vclock);
 
 	wal_notify_watchers(writer, WAL_EVENT_ROTATE);
 	return 0;

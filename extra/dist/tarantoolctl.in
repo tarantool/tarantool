@@ -541,6 +541,13 @@ local function start()
         end
         os.exit(1)
     end
+    local old_call = getmetatable(box.cfg).__call
+    getmetatable(box.cfg).__call = function(old_cfg, cfg)
+        if old_cfg.pid_file ~= nil and cfg ~= nil and cfg.pid_file ~= nil then
+            cfg.pid_file = old_cfg.pid_file
+        end
+        old_call(old_cfg, cfg)
+    end
     return 0
 end
 
@@ -653,18 +660,22 @@ local function enter()
         end
         return 1
     end
-
-    local cmd_connect = string.format(
-        "require('console').connect('%s', { connect_timeout = %s })",
-        console_sock, TIMEOUT_INFINITY
-    )
-
-    local cmd_language = string.format("\\set language %s", language)
-
-    console.on_start(function(self) self:eval(cmd_connect)
-                     self:eval(cmd_language) end)
+    local status, ret
+    console.on_start(function(self)
+        status, ret = pcall(console.connect, console_sock,
+                            {connect_timeout = TIMEOUT_INFINITY})
+        if not status then
+            log.error("Can't connect to %s (%s)", console_sock_path, ret)
+            self.running = false
+            return
+        end
+        self:eval(string.format("\\set language %s", language))
+    end)
     console.on_client_disconnect(function(self) self.running = false end)
     console.start()
+    if not status then
+        return 1
+    end
     return 0
 end
 
@@ -803,7 +814,6 @@ local function eval()
     end
     local error_response = yaml.decode(full_response)[1]
     if type(error_response) == 'table' and error_response.error then
-        log.error("Error while reloading config:")
         log.error(error_response.error)
         return 3
     end

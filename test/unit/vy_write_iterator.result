@@ -1,5 +1,5 @@
 	*** test_basic ***
-1..46
+1..66
 ok 1 - stmt 0 is correct
 ok 2 - stmt 1 is correct
 ok 3 - stmt 2 is correct
@@ -46,4 +46,24 @@ ok 43 - stmt 0 is correct
 ok 44 - stmt 1 is correct
 ok 45 - stmt 2 is correct
 ok 46 - correct results count
+ok 47 - stmt 0 is correct
+ok 48 - stmt 1 is correct
+ok 49 - stmt 2 is correct
+ok 50 - correct results count
+ok 51 - deferred stmt 0 is correct
+ok 52 - deferred stmt 1 is correct
+ok 53 - deferred stmt 2 is correct
+ok 54 - deferred stmt 3 is correct
+ok 55 - correct deferred stmt count
+ok 56 - stmt 0 is correct
+ok 57 - stmt 1 is correct
+ok 58 - correct results count
+ok 59 - correct deferred stmt count
+ok 60 - stmt 0 is correct
+ok 61 - stmt 1 is correct
+ok 62 - correct results count
+ok 63 - correct deferred stmt count
+ok 64 - stmt 0 is correct
+ok 65 - correct results count
+ok 66 - correct deferred stmt count
 	*** test_basic: done ***

@@ -519,6 +519,8 @@ box_lua_space_init(struct lua_State *L)
 	lua_newtable(L);
 	lua_setfield(L, -2, "schema");
 	lua_getfield(L, -1, "schema");
+	lua_pushnumber(L, BOX_VINYL_DEFERRED_DELETE_ID);
+	lua_setfield(L, -2, "VINYL_DEFERRED_DELETE_ID");
 	lua_pushnumber(L, BOX_SCHEMA_ID);
 	lua_setfield(L, -2, "SCHEMA_ID");
 	lua_pushnumber(L, BOX_SPACE_ID);

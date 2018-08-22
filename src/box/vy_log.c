@@ -893,14 +893,9 @@ vy_log_bootstrap(void)
 		return vy_log_rebootstrap();
 
 	/* Add initial vclock to the xdir. */
-	struct vclock *vclock = malloc(sizeof(*vclock));
-	if (vclock == NULL) {
-		diag_set(OutOfMemory, sizeof(*vclock),
-			 "malloc", "struct vclock");
-		return -1;
-	}
-	vclock_create(vclock);
-	xdir_add_vclock(&vy_log.dir, vclock);
+	struct vclock vclock;
+	vclock_create(&vclock);
+	xdir_add_vclock(&vy_log.dir, &vclock);
 	return 0;
 }
 
@@ -917,8 +912,17 @@ vy_log_begin_recovery(const struct vclock *vclock)
 	if (xdir_scan(&vy_log.dir) < 0 && errno != ENOENT)
 		return NULL;
 
-	if (xdir_last_vclock(&vy_log.dir, &vy_log.last_checkpoint) < 0)
+	if (xdir_last_vclock(&vy_log.dir, &vy_log.last_checkpoint) < 0) {
+		/*
+		 * Even if there's no vylog (i.e. vinyl isn't in use),
+		 * we still have to add the vclock to the xdir index,
+		 * because we may need it for garbage collection or
+		 * backup in case the user starts using vinyl after
+		 * recovery.
+		 */
+		xdir_add_vclock(&vy_log.dir, vclock);
 		vclock_copy(&vy_log.last_checkpoint, vclock);
+	}
 
 	int cmp = vclock_compare(&vy_log.last_checkpoint, vclock);
 	if (cmp > 0) {
@@ -1020,15 +1024,6 @@ vy_log_rotate(const struct vclock *vclock)
 		return 0;
 
 	assert(signature > prev_signature);
-
-	struct vclock *new_vclock = malloc(sizeof(*new_vclock));
-	if (new_vclock == NULL) {
-		diag_set(OutOfMemory, sizeof(*new_vclock),
-			 "malloc", "struct vclock");
-		return -1;
-	}
-	vclock_copy(new_vclock, vclock);
-
 	say_verbose("rotating vylog %lld => %lld",
 		    (long long)prev_signature, (long long)signature);
 
@@ -1065,14 +1060,13 @@ vy_log_rotate(const struct vclock *vclock)
 	vclock_copy(&vy_log.last_checkpoint, vclock);
 
 	/* Add the new vclock to the xdir so that we can track it. */
-	xdir_add_vclock(&vy_log.dir, new_vclock);
+	xdir_add_vclock(&vy_log.dir, vclock);
 
 	latch_unlock(&vy_log.latch);
 	say_verbose("done rotating vylog");
 	return 0;
 fail:
 	latch_unlock(&vy_log.latch);
-	free(new_vclock);
 	return -1;
 }
 

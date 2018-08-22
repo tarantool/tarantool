@@ -12,6 +12,7 @@ include_directories(${LIBYAML_INCLUDE_DIRS})
 include_directories(${MSGPUCK_INCLUDE_DIRS})
 include_directories(${CURL_INCLUDE_DIRS})
 include_directories(${ICU_INCLUDE_DIRS})
+include_directories(${ICONV_INCLUDE_DIRS})
 
 set(LIBUTIL_FREEBSD_SRC ${CMAKE_SOURCE_DIR}/third_party/libutil_freebsd)
 include_directories(${LIBUTIL_FREEBSD_SRC})
@@ -161,6 +162,7 @@ set (server_sources
      lua/msgpack.c
      lua/utils.c
      lua/errno.c
+     lua/tnt_iconv.c
      lua/socket.c
      lua/pickle.c
      lua/fio.c
@@ -224,6 +226,7 @@ set (common_libraries
     ${READLINE_LIBRARIES}
     ${OPENSSL_LIBRARIES}
     ${CURL_LIBRARIES}
+    ${ICONV_LIBRARIES}
 )
 
 if (TARGET_OS_LINUX OR TARGET_OS_DEBIAN_FREEBSD)
@@ -236,12 +239,6 @@ if (TARGET_OS_FREEBSD AND NOT TARGET_OS_DEBIAN_FREEBSD)
         message(FATAL_ERROR "intl library not found")
     else()
         set (common_libraries ${common_libraries} ${INTL})
-    endif()
-    find_library (ICONV iconv)
-    if (NOT ICONV)
-        message(FATAL_ERROR "iconv library not found")
-    else()
-        set (common_libraries ${common_libraries} ${ICONV})
     endif()
 endif()
 
