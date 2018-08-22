@@ -72,7 +72,7 @@ test:do_catchsql_test(
         ALTER TABLE none RENAME TO hi;
     ]], {
         -- <alter-2.1>
-        1, "no such table: NONE"
+        1, "Space 'NONE' does not exist"
         -- </alter-2.1>
     })
 
@@ -83,7 +83,7 @@ test:do_catchsql_test(
         ALTER TABLE t2 RENAME TO t3;
     ]], {
         -- <alter-2.2>
-        1, "there is already another table or index with this name: T3"
+        1, "Space 'T3' already exists"
         -- </alter-2.2>
     })
 

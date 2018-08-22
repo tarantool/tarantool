@@ -1436,7 +1436,7 @@ cmd ::= ANALYZE nm(X).          {sqlite3Analyze(pParse, &X);}
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
 cmd ::= ALTER TABLE fullname(X) RENAME TO nm(Z). {
-  sqlite3AlterRenameTable(pParse,X,&Z);
+  sql_alter_table_rename(pParse,X,&Z);
 }
 
 cmd ::= ALTER TABLE fullname(X) ADD CONSTRAINT nm(Z) FOREIGN KEY

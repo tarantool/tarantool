@@ -4393,7 +4393,18 @@ extern FuncDefHash sqlite3BuiltinFunctions;
 extern int sqlite3PendingByte;
 #endif
 #endif
-void sqlite3AlterRenameTable(Parse *, SrcList *, Token *);
+
+/**
+ * Generate code to implement the "ALTER TABLE xxx RENAME TO yyy"
+ * command.
+ *
+ * @param parse Current parsing context.
+ * @param src_tab The table to rename.
+ * @param new_name_tk Token containing new name of the table.
+ */
+void
+sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
+		       struct Token *new_name_tk);
 
 /**
  * Return the length (in bytes) of the token that begins at z[0].

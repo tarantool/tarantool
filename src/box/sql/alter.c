@@ -34,91 +34,50 @@
  * that implements the ALTER TABLE command.
  */
 #include "sqliteInt.h"
-#include "src/box/session.h"
-#include "tarantoolInt.h"
+#include "box/box.h"
+#include "box/schema.h"
 
-/*
- * Generate code to drop and reload the internal representation of table
- * pTab from the database, including triggers.
- * Argument zName is the name of the table in the database schema at
- * the time the generated code is executed. This can be different from
- * pTab->zName if this function is being called to code part of an
- * "ALTER TABLE RENAME TO" statement.
- */
-static void
-reloadTableSchema(Parse * pParse, Table * pTab, const char *zName)
-{
-	Vdbe *v;
-	v = sqlite3GetVdbe(pParse);
-	if (NEVER(v == 0))
-		return;
-
-	char *zNewName = sqlite3MPrintf(pParse->db, "%s", zName);
-	sqlite3VdbeAddOp4(v, OP_RenameTable, pTab->def->id, 0, 0, zNewName,
-			  P4_DYNAMIC);
-}
-
-/*
- * Generate code to implement the "ALTER TABLE xxx RENAME TO yyy"
- * command.
- */
 void
-sqlite3AlterRenameTable(Parse * pParse,	/* Parser context. */
-			SrcList * pSrc,	/* The table to rename. */
-			Token * pName)	/* The new table name. */
+sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
+		       struct Token *new_name_tk)
 {
-	Table *pTab;		/* Table being renamed */
-	char *zName = 0;	/* NULL-terminated version of pName */
-	sqlite3 *db = pParse->db;	/* Database connection */
-	Vdbe *v;
-	uint32_t savedDbFlags;	/* Saved value of db->flags */
-	struct session *user_session = current_session();
-
-	savedDbFlags = user_session->sql_flags;
-
-	if (NEVER(db->mallocFailed))
+	assert(src_tab->nSrc == 1);
+	struct sqlite3 *db = parse->db;
+	char *new_name = sqlite3NameFromToken(db, new_name_tk);
+	if (new_name == NULL)
 		goto exit_rename_table;
-	assert(pSrc->nSrc == 1);
-
-	pTab = sqlite3LocateTable(pParse, 0, pSrc->a[0].zName);
-	if (pTab == NULL)
-		goto exit_rename_table;
-
-	user_session->sql_flags |= SQLITE_PreferBuiltin;
-
-	/* Get a NULL terminated version of the new table name. */
-	zName = sqlite3NameFromToken(db, pName);
-	if (!zName)
-		goto exit_rename_table;
-
-	/* Check that a table named 'zName' does not already exist
-	 * in database. If so, this is an error.
-	 */
-	if (sqlite3HashFind(&db->pSchema->tblHash, zName) != NULL) {
-		sqlite3ErrorMsg(pParse,
-				"there is already another table or index with this name: %s",
-				zName);
-		goto exit_rename_table;
+	/* Check that new name isn't occupied by another table. */
+	uint32_t space_id = box_space_id_by_name(new_name, strlen(new_name));
+	if (space_id != BOX_ID_NIL) {
+		diag_set(ClientError, ER_SPACE_EXISTS, new_name);
+		goto tnt_error;
 	}
-	if (pTab->def->opts.is_view) {
-		sqlite3ErrorMsg(pParse, "view %s may not be altered",
-				pTab->def->name);
-		goto exit_rename_table;
+	const char *tbl_name = src_tab->a[0].zName;
+	space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
+	if (space_id == BOX_ID_NIL) {
+		diag_set(ClientError, ER_NO_SUCH_SPACE, tbl_name);
+		goto tnt_error;
 	}
-	/* Begin a transaction for database. */
-	v = sqlite3GetVdbe(pParse);
-	if (v == 0) {
-		goto exit_rename_table;
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	if (space->def->opts.is_view) {
+		diag_set(ClientError, ER_ALTER_SPACE, tbl_name,
+			 "view may not be altered");
+		goto tnt_error;
 	}
-	sql_set_multi_write(pParse, false);
-
+	sql_set_multi_write(parse, false);
 	/* Drop and reload the internal table schema. */
-	reloadTableSchema(pParse, pTab, zName);
-
- exit_rename_table:
-	sqlite3SrcListDelete(db, pSrc);
-	sqlite3DbFree(db, zName);
-	user_session->sql_flags = savedDbFlags;
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	sqlite3VdbeAddOp4(v, OP_RenameTable, space_id, 0, 0, new_name,
+			  P4_DYNAMIC);
+exit_rename_table:
+	sqlite3SrcListDelete(db, src_tab);
+	return;
+tnt_error:
+	sqlite3DbFree(db, new_name);
+	parse->rc = SQL_TARANTOOL_ERROR;
+	parse->nErr++;
+	goto exit_rename_table;
 }
 
 /*

@@ -4622,7 +4622,6 @@ case OP_RenameTable: {
 	struct space *space;
 	const char *zOldTableName;
 	const char *zNewTableName;
-	Table *pTab;
 	struct init_data init;
 	char *zSqlStmt;
 
@@ -4633,15 +4632,13 @@ case OP_RenameTable: {
 	struct sql_trigger *triggers = space->sql_triggers;
 	zOldTableName = space_name(space);
 	assert(zOldTableName);
-	pTab = sqlite3HashFind(&db->pSchema->tblHash, zOldTableName);
-	assert(pTab);
 	zNewTableName = pOp->p4.z;
 	zOldTableName = sqlite3DbStrNDup(db, zOldTableName,
 					 sqlite3Strlen30(zOldTableName));
 	rc = sql_rename_table(space_id, zNewTableName, &zSqlStmt);
 	if (rc) goto abort_due_to_error;
 
-	sqlite3UnlinkAndDeleteTable(db, pTab->def->name);
+	sqlite3UnlinkAndDeleteTable(db, space->def->name);
 
 	init.db = db;
 	init.pzErrMsg = &p->zErrMsg;
