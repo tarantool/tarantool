@@ -1424,7 +1424,7 @@ tx_process_join_subscribe(struct cmsg *m)
 			unreachable();
 		}
 	} catch (SocketError *e) {
-		throw; /* don't write error response to prevent SIGPIPE */
+		return; /* don't write error response to prevent SIGPIPE */
 	} catch (Exception *e) {
 		iproto_write_error(con->input.fd, e, ::schema_version,
 				   msg->header.sync);
