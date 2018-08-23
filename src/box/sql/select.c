@@ -4811,45 +4811,9 @@ selectExpander(Walker * pWalker, Select * p)
 			 * An ordinary table or view name in the
 			 * FROM clause.
 			 */
-			assert(pFrom->pTab == NULL);
-			const char *t_name = pFrom->zName;
-			pFrom->pTab = pTab =
-			    sqlite3LocateTable(pParse, LOCATE_NOERR, t_name);
-			if (pTab == NULL) {
-				int space_id =
-					box_space_id_by_name(t_name,
-							     strlen(t_name));
-				struct space *space = space_by_id(space_id);
-				if (space == NULL) {
-					sqlite3ErrorMsg(pParse,
-							"no such table: %s",
-							t_name);
-					return WRC_Abort;
-				}
-				if (space->def->field_count <= 0) {
-					sqlite3ErrorMsg(pParse, "no format for"\
-							" space: %s", t_name);
-					return WRC_Abort;
-				}
-				struct Table *tab =
-					sqlite3DbMallocZero(db, sizeof(*tab));
-				if (tab == NULL)
-					return WRC_Abort;
-				tab->nTabRef = 1;
-				tab->def = space_def_dup(space->def);
-				tab->space = space;
-				pFrom->pTab = pTab = tab;
-			} else {
-				if (pTab->nTabRef >= 0xffff) {
-					sqlite3ErrorMsg(pParse, "too many "\
-							"references to "\
-							"\"%s\": max 65535",
-							t_name);
-					pFrom->pTab = NULL;
-					return WRC_Abort;
-				}
-				pTab->nTabRef++;
-			}
+			pTab = sql_lookup_table(pParse, pFrom);
+			if (pTab == NULL)
+				return WRC_Abort;
 			if (cannotBeFunction(pParse, pFrom))
 				return WRC_Abort;
 			if (pTab->def->opts.is_view) {

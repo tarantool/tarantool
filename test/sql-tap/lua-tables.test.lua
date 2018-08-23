@@ -46,7 +46,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "lua-tables-5",
     [[SELECT * from "t1"]],
-    {1, "no format for space: t1"}
+    {1, "SQL does not support space without format"}
 )
 -- Extract from tkt3527.test.lua
 test:do_test(

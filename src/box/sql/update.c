@@ -121,7 +121,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 
 	/* Locate the table which we want to update.
 	 */
-	pTab = sql_list_lookup_table(pParse, pTabList);
+	pTab = sql_lookup_table(pParse, pTabList->a);
 	if (pTab == NULL)
 		goto update_cleanup;
 
@@ -172,9 +172,9 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		for (j = 0; j < (int)def->field_count; j++) {
 			if (strcmp(def->fields[j].name,
 				   pChanges->a[i].zName) == 0) {
-				if (pPk && table_column_is_in_pk(pTab, j)) {
+				if (pPk &&
+				    sql_space_column_is_in_pk(pTab->space, j))
 					is_pk_modified = true;
-				}
 				if (aXRef[j] != -1) {
 					sqlite3ErrorMsg(pParse,
 							"set id list: duplicate"
@@ -330,8 +330,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 					       pTab, on_error);
 		for (i = 0; i < (int)def->field_count; i++) {
 			if (oldmask == 0xffffffff
-			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0)
-			    || table_column_is_in_pk(pTab, i)) {
+			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0) ||
+				sql_space_column_is_in_pk(pTab->space, i)) {
 				testcase(oldmask != 0xffffffff && i == 31);
 				sqlite3ExprCodeGetColumnOfTable(v, def,
 								pk_cursor, i,

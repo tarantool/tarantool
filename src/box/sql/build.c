@@ -223,37 +223,19 @@ sqlite3CommitInternalChanges()
 	current_session()->sql_flags &= ~SQLITE_InternChanges;
 }
 
-/*
- * Return true if given column is part of primary key.
- * If field number is less than 63, corresponding bit
- * in column mask is tested. Otherwise, check whether 64-th bit
- * in mask is set or not. If it is set, then iterate through
- * key parts of primary index and check field number.
- * In case it isn't set, there are no key columns among
- * the rest of fields.
- */
 bool
-table_column_is_in_pk(Table *table, uint32_t column)
+sql_space_column_is_in_pk(struct space *space, uint32_t column)
 {
-	struct space *space = space_by_id(table->def->id);
-	assert(space != NULL);
-
-	/* Primary key always has index 0. */
-	struct index *primary_idx = space_index(space, 0);
-	/* Views don't have any indexes. */
-	if (primary_idx == NULL)
+	if (space->def->opts.is_view)
 		return false;
-	struct index_def *idx_def = primary_idx->def;
-	uint64_t pk_mask = idx_def->key_def->column_mask;
-	if (column < 63) {
-		return pk_mask & (((uint64_t) 1) << column);
-	} else if ((pk_mask & (((uint64_t) 1) << 63)) != 0) {
-		for (uint32_t i = 0; i < idx_def->key_def->part_count; ++i) {
-			struct key_part *part = &idx_def->key_def->parts[i];
-			if (part->fieldno == column)
-				return true;
-		}
-	}
+	struct index *primary_idx = space_index(space, 0);
+	assert(primary_idx != NULL);
+	struct key_def *key_def = primary_idx->def->key_def;
+	uint64_t pk_mask = key_def->column_mask;
+	if (column < 63)
+		return (pk_mask & (((uint64_t) 1) << column)) != 0;
+	else if ((pk_mask & (((uint64_t) 1) << 63)) != 0)
+		return key_def_find(key_def, column) != NULL;
 	return false;
 }
 

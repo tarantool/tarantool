@@ -2690,30 +2690,6 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 	return rc;
 }
 
-/**
- * Check if is_unordered flag is set for given index.
- * Since now there may not be corresponding Tarantool's index
- * (e.g. for temporary objects such as ephemeral tables),
- * a few preliminary checks are made.
- *
- * @param idx Index to be tested.
- * @retval True, if statistics exist and unordered flag is set.
- */
-static bool
-index_is_unordered(const struct index_def *idx)
-{
-	assert(idx != NULL);
-	struct space *space = space_by_id(idx->space_id);
-	if (space == NULL)
-		return false;
-	struct index *tnt_idx = space_index(space, idx->iid);
-	if (tnt_idx == NULL)
-		return false;
-	if (tnt_idx->def->opts.stat != NULL)
-		return tnt_idx->def->opts.stat->is_unordered;
-	return false;
-}
-
 /*
  * Return True if it is possible that pIndex might be useful in
  * implementing the ORDER BY clause in pBuilder.
@@ -2729,7 +2705,7 @@ indexMightHelpWithOrderBy(WhereLoopBuilder * pBuilder,
 	ExprList *pOB;
 	int ii, jj;
 	int part_count = idx_def->key_def->part_count;
-	if (index_is_unordered(idx_def))
+	if (idx_def->opts.stat != NULL && idx_def->opts.stat->is_unordered)
 		return 0;
 	if ((pOB = pBuilder->pWInfo->pOrderBy) == 0)
 		return 0;
@@ -3310,7 +3286,8 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 				idx_def = NULL;
 				nColumn = 1;
 			} else if ((idx_def = pLoop->index_def) == NULL ||
-				   index_is_unordered(idx_def)) {
+				   (idx_def->opts.stat != NULL &&
+				    idx_def->opts.stat->is_unordered)) {
 				return 0;
 			} else {
 				nColumn = idx_def->key_def->part_count;
@@ -4582,6 +4559,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 		struct SrcList_item *pTabItem = &pTabList->a[pLevel->iFrom];
 		Table *pTab = pTabItem->pTab;
 		pLoop = pLevel->pWLoop;
+		struct space *space = space_cache_find(pTabItem->pTab->def->id);
 		if (pTab->def->id == 0 || pTab->def->opts.is_view) {
 			/* Do nothing */
 		} else if ((pLoop->wsFlags & WHERE_IDX_ONLY) == 0 &&
@@ -4591,7 +4569,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 				op = OP_OpenWrite;
 				pWInfo->aiCurOnePass[0] = pTabItem->iCursor;
 			};
-			sqlite3OpenTable(pParse, pTabItem->iCursor, pTab, op);
+			sqlite3OpenTable(pParse, pTabItem->iCursor, space, op);
 			assert(pTabItem->iCursor == pLevel->iTabCur);
 			testcase(pWInfo->eOnePass == ONEPASS_OFF
 				 && pTab->nCol == BMS - 1);
@@ -4607,7 +4585,6 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 		}
 		if (pLoop->wsFlags & WHERE_INDEXED) {
 			struct index_def *idx_def = pLoop->index_def;
-			struct space *space = space_cache_find(pTabItem->pTab->def->id);
 			int iIndexCur;
 			int op = OP_OpenRead;
 			/* Check if index is primary. Either of

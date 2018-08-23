@@ -36,16 +36,33 @@
 #include "tarantoolInt.h"
 
 struct Table *
-sql_list_lookup_table(struct Parse *parse, SrcList *src_list)
+sql_lookup_table(struct Parse *parse, struct SrcList_item *tbl_name)
 {
-	struct SrcList_item *item = src_list->a;
-	assert(item != NULL && src_list->nSrc == 1);
-	struct Table *table = sqlite3LocateTable(parse, 0, item->zName);
-	sqlite3DeleteTable(parse->db, item->pTab);
-	item->pTab = table;
-	if (table != NULL)
-		item->pTab->nTabRef++;
-	if (sqlite3IndexedByLookup(parse, item) != 0)
+	assert(tbl_name != NULL);
+	assert(tbl_name->pTab == NULL);
+	uint32_t space_id = box_space_id_by_name(tbl_name->zName,
+						 strlen(tbl_name->zName));
+	struct space *space = space_by_id(space_id);
+	if (space_id == BOX_ID_NIL || space == NULL) {
+		sqlite3ErrorMsg(parse, "no such table: %s", tbl_name->zName);
+		return NULL;
+	}
+	assert(space != NULL);
+	if (space->def->field_count == 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
+			 "space without format");
+		parse->rc = SQL_TARANTOOL_ERROR;
+		parse->nErr++;
+		return NULL;
+	}
+	struct Table *table = sqlite3DbMallocZero(parse->db, sizeof(*table));
+	if (table == NULL)
+		return NULL;
+	table->def = space_def_dup(space->def);
+	table->space = space;
+	table->nTabRef = 1;
+	tbl_name->pTab = table;
+	if (sqlite3IndexedByLookup(parse, tbl_name) != 0)
 		table = NULL;
 	return table;
 }
@@ -130,9 +147,6 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	 * with multiple tables and expect an SrcList* parameter
 	 * instead of just a Table* parameter.
 	 */
-	struct Table *table = NULL;
-	struct space *space = NULL;
-	uint32_t space_id;
 	/* Figure out if we have any triggers and if the table
 	 * being deleted from is a view.
 	 */
@@ -140,44 +154,14 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	/* True if there are triggers or FKs or subqueries in the
 	 * WHERE clause.
 	 */
-	bool is_complex = false;
-	const char *tab_name = tab_list->a->zName;
-	struct Table tmp_tab;
-	if (sqlite3LocateTable(parse, LOCATE_NOERR, tab_name) == NULL) {
-		space_id = box_space_id_by_name(tab_name,
-						strlen(tab_name));
-		if (space_id == BOX_ID_NIL) {
-			diag_set(ClientError, ER_NO_SUCH_SPACE, tab_name);
-			parse->rc = SQL_TARANTOOL_ERROR;
-			parse->nErr++;
-			goto delete_from_cleanup;
-		}
-		/*
-		 * In this case space has been created via Lua
-		 * facilities, so there is no corresponding entry
-		 * in table hash. Thus, lets create simple
-		 * wrapper around space_def to support interface.
-		 */
-		space = space_by_id(space_id);
-		memset(&tmp_tab, 0, sizeof(tmp_tab));
-		tmp_tab.def = space->def;
-		/* Prevent from freeing memory in DeleteTable. */
-		tmp_tab.space = space;
-		tmp_tab.nTabRef = 2;
-		tab_list->a[0].pTab = &tmp_tab;
-	} else {
-		table = sql_list_lookup_table(parse, tab_list);
-		if (table == NULL)
-			goto delete_from_cleanup;
-		space_id = table->def->id;
-		space = space_by_id(space_id);
-		assert(space != NULL);
-		trigger_list = sql_triggers_exist(table, TK_DELETE, NULL, NULL);
-		is_complex = trigger_list != NULL ||
-			     fkey_is_required(table->def->id, NULL);
-	}
-	assert(space != NULL);
-
+	struct Table *table = sql_lookup_table(parse, tab_list->a);
+	if (table == NULL)
+		goto delete_from_cleanup;
+	assert(table->space != NULL);
+	trigger_list = sql_triggers_exist(table, TK_DELETE, NULL, NULL);
+	bool is_complex = trigger_list != NULL ||
+			  fkey_is_required(table->def->id, NULL);
+	struct space *space = table->space;
 	bool is_view = space->def->opts.is_view;
 
 	/* If table is really a view, make sure it has been
@@ -230,7 +214,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	if (where == NULL && !is_complex) {
 		assert(!is_view);
 
-		sqlite3VdbeAddOp1(v, OP_Clear, space_id);
+		sqlite3VdbeAddOp1(v, OP_Clear, space->def->id);
 
 		/* Do not start Tarantool's transaction in case of
 		 * truncate optimization. This is workaround until

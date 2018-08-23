@@ -612,11 +612,18 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 		struct SrcList_item *item = src->a;
 		struct space *child = space_by_id(fk->def->child_id);
 		assert(child != NULL);
-		struct Table *child_tab = sqlite3HashFind(&db->pSchema->tblHash,
-							  child->def->name);
-		item->pTab = child_tab;
+		/*
+		 * Create surrogate struct Table wrapper around
+		 * space_def to support legacy interface.
+		 */
+		struct Table fake_tab;
+		memset(&fake_tab, 0, sizeof(fake_tab));
+		fake_tab.def = child->def;
+		fake_tab.space = child;
+		/* Prevent from deallocationg fake_tab. */
+		fake_tab.nTabRef = 2;
+		item->pTab = &fake_tab;
 		item->zName = sqlite3DbStrDup(db, child->def->name);
-		item->pTab->nTabRef++;
 		item->iCursor = parser->nTab++;
 
 		if (reg_new != 0) {

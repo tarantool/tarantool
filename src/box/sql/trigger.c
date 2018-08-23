@@ -200,19 +200,15 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		if (v == 0)
 			goto cleanup;
 
-		struct Table *sys_trigger =
-			sqlite3HashFind(&db->pSchema->tblHash,
-					TARANTOOL_SYS_TRIGGER_NAME);
-		if (NEVER(sys_trigger == NULL))
-			goto cleanup;
-
 		char *sql_str =
 			sqlite3MPrintf(db, "CREATE TRIGGER %s", token->z);
-		if (sql_str == NULL)
+		if (db->mallocFailed)
 			goto cleanup;
 
 		int cursor = parse->nTab++;
-		sqlite3OpenTable(parse, cursor, sys_trigger, OP_OpenWrite);
+		struct space *_trigger = space_by_id(BOX_TRIGGER_ID);
+		assert(_trigger != NULL);
+		vdbe_emit_open_cursor(parse, cursor, 0, _trigger);
 
 		/*
 		 * makerecord(cursor(iRecord),

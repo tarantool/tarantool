@@ -1021,7 +1021,7 @@ test:do_execsql_test(
         INSERT INTO x1 VALUES(3, 4);
         INSERT INTO x1 VALUES(5, 6);
         ANALYZE;
-        INSERT INTO "_sql_stat4" VALUES('x1', 'abc', 0, 0, 0, '');
+        INSERT INTO "_sql_stat4" VALUES('x1', 'abc', '', '', '', '');
     ]])
 
 test:do_execsql_test(

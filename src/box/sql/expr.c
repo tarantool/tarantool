@@ -278,7 +278,7 @@ comparisonAffinity(Expr * pExpr)
 		aff =
 		    sqlite3CompareAffinity(pExpr->x.pSelect->pEList->a[0].pExpr,
 					   aff);
-	} else if (NEVER(aff == 0)) {
+	} else {
 		aff = AFFINITY_BLOB;
 	}
 	return aff;

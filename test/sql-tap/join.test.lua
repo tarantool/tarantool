@@ -1080,9 +1080,9 @@ jointest("join-12.9", 1000, {1, 'at most 64 tables in a join'})
 --    if X(703, "X!cmd", [=[["expr","[lsearch [db eval {PRAGMA compile_options}] MEMDEBUG]<0"]]=])
 -- then
 jointest("join-12.10", 65534, {1, 'at most 64 tables in a join'})
-jointest("join-12.11", 65535, {1, 'too many references to "T14": max 65535'})
-jointest("join-12.12", 65536, {1, 'too many references to "T14": max 65535'})
-jointest("join-12.13", 65537, {1, 'too many references to "T14": max 65535'})
+jointest("join-12.11", 65535, {1, 'at most 64 tables in a join'})
+jointest("join-12.12", 65536, {1, 'at most 64 tables in a join'})
+jointest("join-12.13", 65537, {1, 'at most 64 tables in a join'})
 --    end
 --end
 

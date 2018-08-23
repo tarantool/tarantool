@@ -3323,7 +3323,18 @@ void sqlite3Pragma(Parse *, Token *, Token *, Token *, int);
 void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
 void sqlite3CommitInternalChanges();
 void sqlite3DeleteColumnNames(sqlite3 *, Table *);
-bool table_column_is_in_pk(Table *, uint32_t);
+
+/**
+ * Return true if given column is part of primary key.
+ * If field number is less than 63, corresponding bit
+ * in column mask is tested. Otherwise, check whether 64-th bit
+ * in mask is set or not. If it is set, then iterate through
+ * key parts of primary index and check field number.
+ * In case it isn't set, there are no key columns among
+ * the rest of fields.
+ */
+bool
+sql_space_column_is_in_pk(struct space *space, uint32_t);
 
 /**
  * Given an expression list (which is really the list of expressions
@@ -3526,10 +3537,10 @@ Select *sqlite3SelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
  * While a SrcList can in general represent multiple tables and
  * subqueries (as in the FROM clause of a SELECT statement) in
  * this case it contains the name of a single table, as one might
- * find in an INSERT, DELETE, or UPDATE statement.  Look up that
- * table in the symbol table and return a pointer.  Set an error
- * message and return NULL if the table name is not found or if
- * any other error occurs.
+ * find in an INSERT, DELETE, or UPDATE statement. Look up that
+ * space in the cache and create Table wrapper around it.
+ * Set an error message and return NULL if the table name is not
+ * found or if space doesn't have format.
  *
  * The following fields are initialized appropriate in src_list:
  *
@@ -3538,13 +3549,13 @@ Select *sqlite3SelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
  *                              if there is one.
  *
  * @param parse Parsing context.
- * @param src_list List containing single table element.
- * @retval Table object if found, NULL oterwise.
+ * @param tbl_name Table element.
+ * @retval Table object if found, NULL otherwise.
  */
 struct Table *
-sql_list_lookup_table(struct Parse *parse, struct SrcList *src_list);
+sql_lookup_table(struct Parse *parse, struct SrcList_item *tbl_name);
 
-void sqlite3OpenTable(Parse *, int iCur, Table *, int);
+void sqlite3OpenTable(Parse *, int iCur, struct space *, int);
 /**
  * Generate code for a DELETE FROM statement.
  *

@@ -44,7 +44,7 @@ box.sql.execute("DROP TABLE t1;");
 --
 box.sql.execute("DELETE FROM t1;")
 ---
-- error: Space 'T1' does not exist
+- error: 'no such table: T1'
 ...
 box.sql.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
 ---
@@ -54,7 +54,7 @@ box.sql.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 BEGIN DELETE FROM t1; END
 ...
 box.sql.execute("INSERT INTO t2 VALUES (0);")
 ---
-- error: Space 'T1' does not exist
+- error: 'no such table: T1'
 ...
 box.sql.execute("DROP TABLE t2;")
 ---

@@ -38,6 +38,7 @@
 #include "box/session.h"
 #include "box/schema.h"
 #include "bit/bit.h"
+#include "box/box.h"
 
 /*
  * Generate code that will open pTab as cursor iCur.
@@ -45,17 +46,15 @@
 void
 sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
 		 int iCur,	/* The cursor number of the table */
-		 Table * pTab,	/* The table to be opened */
+		 struct space *space,	/* The table to be opened */
 		 int opcode)	/* OP_OpenRead or OP_OpenWrite */
 {
 	Vdbe *v;
 	v = sqlite3GetVdbe(pParse);
 	assert(opcode == OP_OpenWrite || opcode == OP_OpenRead);
-
-	struct space *space = space_by_id(pTab->def->id);
 	assert(space->index_count > 0);
 	vdbe_emit_open_cursor(pParse, iCur, 0, space);
-	VdbeComment((v, "%s", pTab->def->name));
+	VdbeComment((v, "%s", space->def->name));
 }
 
 char *
@@ -150,11 +149,10 @@ vdbe_has_table_read(struct Parse *parser, const struct Table *table)
 	return false;
 }
 
-
 /* Forward declaration */
 static int
 xferOptimization(Parse * pParse,	/* Parser context */
-		 Table * pDest,	/* The table we are inserting into */
+		 struct space *dest,
 		 Select * pSelect,	/* A SELECT statement to use as the data source */
 		 int onError);	/* How to handle constraint errors */
 
@@ -314,7 +312,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	zTab = pTabList->a[0].zName;
 	if (NEVER(zTab == 0))
 		goto insert_cleanup;
-	pTab = sql_list_lookup_table(pParse, pTabList);
+	pTab = sql_lookup_table(pParse, pTabList->a);
 	if (pTab == NULL)
 		goto insert_cleanup;
 
@@ -360,7 +358,8 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 	 *
 	 * This is the 2nd template.
 	 */
-	if (pColumn == 0 && xferOptimization(pParse, pTab, pSelect, on_error)) {
+	if (pColumn == 0 &&
+	    xferOptimization(pParse, pTab->space, pSelect, on_error)) {
 		assert(trigger == NULL);
 		assert(pList == 0);
 		goto insert_end;
@@ -1134,12 +1133,11 @@ sql_index_is_xfer_compatible(const struct index_def *dest,
  */
 static int
 xferOptimization(Parse * pParse,	/* Parser context */
-		 Table * pDest,		/* The table we are inserting into */
+		 struct space *dest,
 		 Select * pSelect,	/* A SELECT statement to use as the data source */
 		 int onError)		/* How to handle constraint errors */
 {
 	ExprList *pEList;	/* The result set of the SELECT */
-	Table *pSrc;		/* The table in the FROM clause of SELECT */
 	struct index *pSrcIdx, *pDestIdx;
 	struct SrcList_item *pItem;	/* An element of pSelect->pSrc */
 	int i;			/* Loop counter */
@@ -1160,7 +1158,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		return 0;
 	}
 	/* The pDest must not have triggers. */
-	if (space_trigger_list(pDest->def->id) != NULL)
+	if (dest->sql_triggers != NULL)
 		return 0;
 	if (onError == ON_CONFLICT_ACTION_DEFAULT) {
 		onError = ON_CONFLICT_ACTION_ABORT;
@@ -1210,47 +1208,42 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 * we have to check the semantics.
 	 */
 	pItem = pSelect->pSrc->a;
-	pSrc = sqlite3LocateTable(pParse, 0, pItem->zName);
+	uint32_t src_id = box_space_id_by_name(pItem->zName,
+					       strlen(pItem->zName));
 	/* FROM clause does not contain a real table. */
-	if (pSrc == NULL)
+	if (src_id == BOX_ID_NIL)
 		return 0;
+	struct space *src = space_by_id(src_id);
+	assert(src != NULL);
 	/* Src and dest may not be the same table. */
-	if (pSrc == pDest)
+	if (src->def->id == dest->def->id)
 		return 0;
 	/* Src may not be a view. */
-	if (pSrc->def->opts.is_view)
+	if (src->def->opts.is_view)
 		return 0;
 	/* Number of columns must be the same in src and dst. */
-	if (pDest->def->field_count != pSrc->def->field_count)
+	if (dest->def->field_count != src->def->field_count)
 		return 0;
-	uint32_t src_space_id = pSrc->def->id;
-	struct space *src_space = space_cache_find(src_space_id);
-	uint32_t dest_space_id = pDest->def->id;
-	struct space *dest_space = space_cache_find(dest_space_id);
-	assert(src_space != NULL && dest_space != NULL);
-	for (i = 0; i < (int)pDest->def->field_count; i++) {
+	for (i = 0; i < (int)dest->def->field_count; i++) {
 		enum affinity_type dest_affinity =
-			pDest->def->fields[i].affinity;
+			dest->def->fields[i].affinity;
 		enum affinity_type src_affinity =
-			pSrc->def->fields[i].affinity;
+			src->def->fields[i].affinity;
 		/* Affinity must be the same on all columns. */
 		if (dest_affinity != src_affinity)
 			return 0;
 		uint32_t id;
-		if (sql_column_collation(pDest->def, i, &id) !=
-		    sql_column_collation(pSrc->def, i, &id)) {
-			return 0;	/* Collating sequence must be the same on all columns */
-		}
-		if (!pDest->def->fields[i].is_nullable
-		    && pSrc->def->fields[i].is_nullable) {
-			return 0;	/* tab2 must be NOT NULL if tab1 is */
-		}
+		if (sql_column_collation(dest->def, i, &id) !=
+		    sql_column_collation(src->def, i, &id))
+			return 0;
+		if (!dest->def->fields[i].is_nullable &&
+		    src->def->fields[i].is_nullable)
+			return 0;
 		/* Default values for second and subsequent columns need to match. */
 		if (i > 0) {
-			char *src_expr_str =
-				pSrc->def->fields[i].default_value;
+			char *src_expr_str = src->def->fields[i].default_value;
 			char *dest_expr_str =
-				pDest->def->fields[i].default_value;
+				dest->def->fields[i].default_value;
 			if ((dest_expr_str == NULL) != (src_expr_str == NULL) ||
 			    (dest_expr_str &&
 			     strcmp(src_expr_str, dest_expr_str) != 0)
@@ -1259,10 +1252,11 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			}
 		}
 	}
-	for (uint32_t i = 0; i < pDest->space->index_count; ++i) {
-		pDestIdx = pDest->space->index[i];
-		for (uint32_t j = 0; j < pSrc->space->index_count; ++j) {
-			pSrcIdx = pSrc->space->index[j];
+
+	for (uint32_t i = 0; i < dest->index_count; ++i) {
+		pDestIdx = dest->index[i];
+		for (uint32_t j = 0; j < src->index_count; ++j) {
+			pSrcIdx = src->index[j];
 			if (sql_index_is_xfer_compatible(pDestIdx->def,
 							 pSrcIdx->def))
 				break;
@@ -1272,8 +1266,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 			return 0;
 	}
 	/* Get server checks. */
-	ExprList *pCheck_src = space_checks_expr_list(src_space_id);
-	ExprList *pCheck_dest = space_checks_expr_list(dest_space_id);
+	ExprList *pCheck_src = space_checks_expr_list(src->def->id);
+	ExprList *pCheck_dest = space_checks_expr_list(dest->def->id);
 	if (pCheck_dest != NULL &&
 	    sqlite3ExprListCompare(pCheck_src, pCheck_dest, -1) != 0) {
 		/* Tables have different CHECK constraints.  Ticket #2252 */
@@ -1284,8 +1278,6 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 * So the extra complication to make this rule less restrictive is probably
 	 * not worth the effort.  Ticket [6284df89debdfa61db8073e062908af0c9b6118e]
 	 */
-	struct space *dest = space_by_id(pDest->def->id);
-	assert(dest != NULL);
 	if ((user_session->sql_flags & SQLITE_ForeignKeys) != 0 &&
 	    !rlist_empty(&dest->child_fkey))
 		return 0;
@@ -1305,8 +1297,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	regData = sqlite3GetTempReg(pParse);
 	regTupleid = sqlite3GetTempReg(pParse);
 
-	vdbe_emit_open_cursor(pParse, iDest, 0, dest_space);
-	VdbeComment((v, "%s", pDest->def->name));
+	vdbe_emit_open_cursor(pParse, iDest, 0, dest);
+	VdbeComment((v, "%s", dest->def->name));
 
 	/*
 	 * Xfer optimization is unable to correctly insert data
@@ -1325,8 +1317,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 		sqlite3VdbeJumpHere(v, addr1);
 	}
 
-	vdbe_emit_open_cursor(pParse, iSrc, 0, src_space);
-	VdbeComment((v, "%s", pSrc->def->name));
+	vdbe_emit_open_cursor(pParse, iSrc, 0, src);
+	VdbeComment((v, "%s", src->def->name));
 	addr1 = sqlite3VdbeAddOp2(v, OP_Rewind, iSrc, 0);
 	VdbeCoverage(v);
 	sqlite3VdbeAddOp2(v, OP_RowData, iSrc, regData);

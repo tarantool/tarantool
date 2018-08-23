@@ -238,6 +238,90 @@ sql_default_engine_set(const char *engine_name)
 }
 
 /**
+ * This function handles PRAGMA TABLE_INFO(<table>).
+ *
+ * Return a single row for each column of the named table.
+ * The columns of the returned data set are:
+ *
+ * - cid: Column id (numbered from left to right, starting at 0);
+ * - name: Column name;
+ * - type: Column declaration type;
+ * - notnull: True if 'NOT NULL' is part of column declaration;
+ * - dflt_value: The default value for the column, if any.
+ *
+ * @param parse Current parsing context.
+ * @param tbl_name Name of table to be examined.
+ */
+static void
+sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
+{
+	if (tbl_name == NULL)
+		return;
+	uint32_t space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
+	if (space_id == BOX_ID_NIL)
+		return;
+	struct space *space = space_by_id(space_id);
+	assert(space != NULL);
+	struct index *pk = space_index(space, 0);
+	parse->nMem = 6;
+	if (space->def->opts.is_view)
+		sql_view_assign_cursors(parse, space->def->opts.sql);
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	struct field_def *field = space->def->fields;
+	for (uint32_t i = 0, k; i < space->def->field_count; ++i, ++field) {
+		if (!sql_space_column_is_in_pk(space, i)) {
+			k = 0;
+		} else if (pk == NULL) {
+			k = 1;
+		} else {
+			struct key_def *kdef = pk->def->key_def;
+			k = key_def_find(kdef, i) - kdef->parts + 1;
+		}
+		sqlite3VdbeMultiLoad(v, 1, "issisi", i, field->name,
+				     field_type_strs[field->type],
+				     !field->is_nullable, field->default_value,
+				     k);
+		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 6);
+	}
+}
+
+/**
+ * This function handles PRAGMA stats.
+ * It displays estimate (log) number of tuples in space and
+ * average size of tuple in each index.
+ *
+ * @param space Space to be examined.
+ * @param data Parsing context passed as callback argument.
+ */
+static int
+sql_pragma_table_stats(struct space *space, void *data)
+{
+	if (space->def->opts.sql == NULL || space->def->opts.is_view)
+		return 0;
+	struct Parse *parse = (struct Parse *) data;
+	struct index *pk = space_index(space, 0);
+	if (pk == NULL)
+		return 0;
+	struct Vdbe *v = sqlite3GetVdbe(parse);
+	LogEst tuple_count_est = sqlite3LogEst(index_size(pk));
+	size_t avg_tuple_size_pk = sql_index_tuple_size(space, pk);
+	parse->nMem = 4;
+	sqlite3VdbeMultiLoad(v, 1, "ssii", space->def->name, 0,
+			     avg_tuple_size_pk, tuple_count_est);
+	sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
+	for (uint32_t i = 0; i < space->index_count; ++i) {
+		struct index *idx = space->index[i];
+		assert(idx != NULL);
+		size_t avg_tuple_size_idx = sql_index_tuple_size(space, idx);
+		sqlite3VdbeMultiLoad(v, 2, "sii", idx->def->name,
+				     avg_tuple_size_idx,
+				     index_field_tuple_est(idx->def, 0));
+		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
+	}
+	return 0;
+}
+
+/**
  * This function handles PRAGMA INDEX_INFO and PRAGMA INDEX_XINFO
  * statements.
  *
@@ -423,93 +507,18 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 #endif				/* SQLITE_OMIT_FLAG_PRAGMAS */
 
 #ifndef SQLITE_OMIT_SCHEMA_PRAGMAS
-		/* *   PRAGMA table_info(<table>) *
-		 *
-		 * Return a single row for each column of the named table. The
-		 * columns of * the returned data set are: *
-		 *
-		 * cid:        Column id (numbered from left to right, starting at
-		 * 0) * name:       Column name * type:       Column
-		 * declaration type. * notnull:    True if 'NOT NULL' is part
-		 * of column declaration * dflt_value: The default value for
-		 * the column, if any.
-		 */
 	case PragTyp_TABLE_INFO:
-		if (zRight == NULL)
-			break;
-		struct Table *table =
-			sqlite3LocateTable(pParse, LOCATE_NOERR, zRight);
-		if (table == NULL)
-			break;
-		struct space *space = space_cache_find(table->def->id);
-		struct space_def *def = space->def;
-		struct index *pk = sql_table_primary_key(table);
-		pParse->nMem = 6;
-		if (def->opts.is_view) {
-			const char *sql = table->def->opts.sql;
-			sql_view_assign_cursors(pParse, sql);
-		}
-		for (uint32_t i = 0, k; i < def->field_count; ++i) {
-			if (!table_column_is_in_pk(table, i)) {
-				k = 0;
-			} else if (pk == NULL) {
-				k = 1;
-			} else {
-				struct key_def *kdef = pk->def->key_def;
-				k = key_def_find(kdef, i) - kdef->parts + 1;
-			}
-			bool is_nullable = def->fields[i].is_nullable;
-			char *expr_str = def->fields[i].default_value;
-			const char *name = def->fields[i].name;
-			enum field_type type = def->fields[i].type;
-			sqlite3VdbeMultiLoad(v, 1, "issisi", i, name,
-					     field_type_strs[type],
-					     !is_nullable, expr_str, k);
-			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 6);
-		}
+		sql_pragma_table_info(pParse, zRight);
 		break;
-
-	case PragTyp_STATS:{
-			HashElem *i;
-			pParse->nMem = 4;
-			for (i = sqliteHashFirst(&db->pSchema->tblHash); i;
-			     i = sqliteHashNext(i)) {
-				Table *pTab = sqliteHashData(i);
-				struct space *space = space_by_id(pTab->def->id);
-				assert(space != NULL);
-				struct index *pk = space_index(space, 0);
-				size_t avg_tuple_size_pk =
-					sql_index_tuple_size(space, pk);
-				sqlite3VdbeMultiLoad(v, 1, "ssii",
-						     pTab->def->name,
-						     0,
-						     avg_tuple_size_pk,
-						     sql_space_tuple_log_count(pTab));
-				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
-				for (uint32_t i = 0; i < pTab->space->index_count; ++i) {
-					struct index *idx = pTab->space->index[i];
-					assert(idx != NULL);
-					size_t avg_tuple_size_idx =
-						sql_index_tuple_size(space, idx);
-					sqlite3VdbeMultiLoad(v, 2, "sii",
-							     idx->def->name,
-							     avg_tuple_size_idx,
-							     index_field_tuple_est(idx->def, 0));
-					sqlite3VdbeAddOp2(v, OP_ResultRow, 1,
-							  4);
-				}
-			}
-			break;
-		}
-
-	case PragTyp_INDEX_INFO:{
+	case PragTyp_STATS:
+		space_foreach(sql_pragma_table_stats, (void *) pParse);
+		break;
+	case PragTyp_INDEX_INFO:
 		sql_pragma_index_info(pParse, pPragma, zTable, zRight);
 		break;
-	}
-	case PragTyp_INDEX_LIST:{
+	case PragTyp_INDEX_LIST:
 		sql_pragma_index_list(pParse, zRight);
 		break;
-	}
 
 	case PragTyp_COLLATION_LIST:{
 		int i = 0;
