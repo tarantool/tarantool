@@ -850,9 +850,6 @@ sqlite3ErrName(int rc)
 		case SQLITE_IOERR_CONVPATH:
 			zName = "SQLITE_IOERR_CONVPATH";
 			break;
-		case SQLITE_CORRUPT:
-			zName = "SQLITE_CORRUPT";
-			break;
 		case SQLITE_NOTFOUND:
 			zName = "SQLITE_NOTFOUND";
 			break;
@@ -942,7 +939,6 @@ sqlite3ErrStr(int rc)
 		/* SQLITE_NOMEM       */ "out of memory",
 		/* SQLITE_INTERRUPT   */ "interrupted",
 		/* SQLITE_IOERR       */ "disk I/O error",
-		/* SQLITE_CORRUPT     */ "database disk image is malformed",
 		/* SQLITE_NOTFOUND    */ "unknown operation",
 		/* SQLITE_FULL        */ "database or disk is full",
 		/* SQLITE_CANTOPEN    */ "unable to open database file",
@@ -1859,7 +1855,6 @@ sql_init_db(sqlite3 **out_db)
 	db->szMmap = sqlite3GlobalConfig.szMmap;
 	db->nMaxSorterMmap = 0x7FFFFFFF;
 
-	db->pSchema = NULL;
 	db->magic = SQLITE_MAGIC_OPEN;
 	if (db->mallocFailed) {
 		goto opendb_out;
@@ -1950,7 +1945,7 @@ opendb_out:
 }
 
 /*
- * The following routines are substitutes for constants SQLITE_CORRUPT,
+ * The following routines are substitutes for constants
  * SQLITE_MISUSE, SQLITE_CANTOPEN, SQLITE_NOMEM and possibly other error
  * constants.  They serve two purposes:
  *
@@ -1966,13 +1961,6 @@ reportError(int iErr, int lineno, const char *zType)
 	sqlite3_log(iErr, "%s at line %d of [%.10s]",
 		    zType, lineno, 20 + tarantool_version());
 	return iErr;
-}
-
-int
-sqlite3CorruptError(int lineno)
-{
-	testcase(sqlite3GlobalConfig.xLog != 0);
-	return reportError(SQLITE_CORRUPT, lineno, "database corruption");
 }
 
 int

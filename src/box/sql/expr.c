@@ -3140,7 +3140,7 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 
 		struct Table *tab = src_list->a[0].pTab;
 		assert(tab != NULL);
-		struct index *pk = sql_table_primary_key(tab);
+		struct index *pk = space_index(tab->space, 0);
 		assert(pk != NULL);
 
 		uint32_t fieldno = pk->def->key_def->parts[0].fieldno;

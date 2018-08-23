@@ -213,7 +213,6 @@ void sqlite3VdbeVerifyNoResultRow(Vdbe * p);
 #else
 #define sqlite3VdbeVerifyNoResultRow(A)
 #endif
-void sqlite3VdbeAddParseSchema2Op(Vdbe * p, int, int);
 void sqlite3VdbeChangeOpcode(Vdbe *, u32 addr, u8);
 void sqlite3VdbeChangeP1(Vdbe *, u32 addr, int P1);
 void sqlite3VdbeChangeP2(Vdbe *, u32 addr, int P2);

@@ -10,30 +10,6 @@
 
 struct fkey_def;
 
-/*
- * Tarantool system spaces.
- */
-#define TARANTOOL_SYS_SEQUENCE_NAME "_sequence"
-#define TARANTOOL_SYS_SPACE_SEQUENCE_NAME "_space_sequence"
-#define TARANTOOL_SYS_SCHEMA_NAME  "_schema"
-#define TARANTOOL_SYS_SPACE_NAME   "_space"
-#define TARANTOOL_SYS_INDEX_NAME   "_index"
-#define TARANTOOL_SYS_TRIGGER_NAME "_trigger"
-#define TARANTOOL_SYS_TRUNCATE_NAME "_truncate"
-#define TARANTOOL_SYS_SQL_STAT1_NAME "_sql_stat1"
-#define TARANTOOL_SYS_SQL_STAT4_NAME "_sql_stat4"
-#define TARANTOOL_SYS_FK_CONSTRAINT_NAME "_fk_constraint"
-
-/* Max space id seen so far. */
-#define TARANTOOL_SYS_SCHEMA_MAXID_KEY "max_id"
-
-/* Insert or replace operation types - necessary for vdbe */
-#define TARANTOOL_INDEX_INSERT 1
-#define TARANTOOL_INDEX_REPLACE 2
-
-/* Load database schema from Tarantool. */
-void tarantoolSqlite3LoadSchema(struct init_data *init);
-
 /* Misc */
 const char *tarantoolErrorMessage();
 

@@ -108,8 +108,7 @@ sqlite3CursorPayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf)
 	const void *pPayload;
 	u32 sz;
 	pPayload = tarantoolSqlite3PayloadFetch(pCur, &sz);
-	if ((uptr) (offset + amt) > sz)
-		return SQLITE_CORRUPT_BKPT;
+	assert((uptr) (offset + amt) <= sz);
 	memcpy(pBuf, pPayload + offset, amt);
 	return SQLITE_OK;
 }

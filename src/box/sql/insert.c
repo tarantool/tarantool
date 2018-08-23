@@ -960,7 +960,7 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 	 * FIXME: should be removed after introducing
 	 * strict typing.
 	 */
-	struct index *pk = sql_table_primary_key(tab);
+	struct index *pk = space_index(tab->space, 0);
 	uint32_t part_count = pk->def->key_def->part_count;
 	if (part_count == 1) {
 		uint32_t fieldno = pk->def->key_def->parts[0].fieldno;

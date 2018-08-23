@@ -594,7 +594,6 @@ int sqlite3VdbeExec(Vdbe *p)
 #endif
 	int rc = SQLITE_OK;        /* Value to return */
 	sqlite3 *db = p->db;       /* The database */
-	u8 resetSchemaOnFault = 0; /* Reset schema after an error if positive */
 	int iCompare = 0;          /* Result of last comparison */
 	unsigned nVmStep = 0;      /* Number of virtual machine steps */
 #ifndef SQLITE_OMIT_PROGRESS_CALLBACK
@@ -2914,12 +2913,8 @@ case OP_Savepoint: {
 				}
 				rc = p->rc;
 			} else {
-				if (p1==SAVEPOINT_ROLLBACK) {
+				if (p1==SAVEPOINT_ROLLBACK)
 					box_txn_rollback_to_savepoint(pSavepoint->tnt_savepoint);
-					if ((user_session->sql_flags &
-					     SQLITE_InternChanges) != 0)
-						sqlite3ExpirePreparedStatements(db);
-				}
 			}
 
 			/* Regardless of whether this is a RELEASE or ROLLBACK, destroy all
@@ -4556,55 +4551,6 @@ case OP_ResetSorter: {
 	break;
 }
 
-/* Opcode: ParseSchema2 P1 P2 * * *
- * Synopsis: rows=r[P1@P2]
- *
- * For each 4-tuple from r[P1@P2] range convert to following
- * format and update the schema with the resulting entry:
- *  <name, pageno (which is hash(spaceId, indexId)), sql>
- */
-case OP_ParseSchema2: {
-	struct init_data init;
-	Mem *pRec, *pRecEnd;
-	assert(db->pSchema != NULL);
-
-	init.db = db;
-	init.pzErrMsg = &p->zErrMsg;
-
-	assert(db->init.busy==0);
-	db->init.busy = 1;
-	init.rc = SQLITE_OK;
-	assert(!db->mallocFailed);
-
-	pRec = &aMem[pOp->p1];
-	pRecEnd = pRec + pOp->p2;
-
-	/*
-	 * A register range contains
-	 *   name1, spaceId1, indexId1, sql1,
-	 *   ...
-	 *   nameN, spaceIdN, indexIdN, sqlN.
-	 *
-	 * Uppdate the schema.
-	 */
-	for(; pRecEnd - pRec >= 4 && init.rc == SQLITE_OK; pRec += 4) {
-		sql_init_callback(&init, pRec[0].z, pRec[1].u.i, pRec[2].u.i,
-				  pRec[3].z);
-	}
-
-	rc = init.rc;
-	db->init.busy = 0;
-
-	if (rc) {
-		sqlite3ResetAllSchemasOfConnection(db);
-		if (rc==SQLITE_NOMEM) {
-			goto no_mem;
-		}
-		goto abort_due_to_error;
-	}
-	break;
-}
-
 /* Opcode: RenameTable P1 * * P4 *
  * Synopsis: P1 = space_id, P4 = name
  *
@@ -4622,7 +4568,6 @@ case OP_RenameTable: {
 	struct space *space;
 	const char *zOldTableName;
 	const char *zNewTableName;
-	struct init_data init;
 	char *zSqlStmt;
 
 	space_id = pOp->p1;
@@ -4637,45 +4582,6 @@ case OP_RenameTable: {
 					 sqlite3Strlen30(zOldTableName));
 	rc = sql_rename_table(space_id, zNewTableName, &zSqlStmt);
 	if (rc) goto abort_due_to_error;
-
-	sqlite3UnlinkAndDeleteTable(db, space->def->name);
-
-	init.db = db;
-	init.pzErrMsg = &p->zErrMsg;
-	assert(db->init.busy == 0);
-	db->init.busy = 1;
-	init.rc = SQLITE_OK;
-	sql_init_callback(&init, zNewTableName, space_id, 0, zSqlStmt);
-	rc = init.rc;
-	if (rc != SQLITE_OK) {
-		sqlite3CommitInternalChanges();
-		db->init.busy = 0;
-		goto abort_due_to_error;
-	}
-
-	/* Space was altered, refetch the pointer. */
-	space = space_by_id(space_id);
-	for (uint32_t i = 0; i < space->index_count; ++i) {
-		struct index_def *def = space->index[i]->def;
-		if (def->opts.sql == NULL)
-			continue;
-		char *sql_stmt;
-		rc = sql_index_update_table_name(def, zNewTableName, &sql_stmt);
-		if (rc != 0)
-			goto abort_due_to_error;
-		space = space_by_id(space_id);
-		sql_init_callback(&init, zNewTableName, space_id,
-				  space->index[i]->def->iid, sql_stmt);
-		sqlite3DbFree(db, sql_stmt);
-		if (init.rc != 0) {
-			sqlite3CommitInternalChanges();
-			rc = init.rc;
-			db->init.busy = 0;
-			goto abort_due_to_error;
-		}
-	}
-	db->init.busy = 0;
-
 	/*
 	 * Rebuild 'CREATE TRIGGER' expressions of all triggers
 	 * created on this table. Sure, this action is not atomic
@@ -4697,7 +4603,6 @@ case OP_RenameTable: {
 			 * In this case, rename table back and
 			 * try again.
 			 */
-			sqlite3CommitInternalChanges();
 			goto abort_due_to_error;
 		}
 		trigger = next_trigger;
@@ -4717,33 +4622,6 @@ case OP_LoadAnalysis: {
 	assert(pOp->p1==0 );
 	rc = sql_analysis_load(db);
 	if (rc) goto abort_due_to_error;
-	break;
-}
-
-/* Opcode: DropTable P1 * * P4 *
- *
- * Remove the internal (in-memory) data structures that describe
- * the table named P4 in database P1.  This is called after a table
- * is dropped from disk (using the Destroy opcode) in order to keep
- * the internal representation of the
- * schema consistent with what is on disk.
- */
-case OP_DropTable: {
-	sqlite3UnlinkAndDeleteTable(db, pOp->p4.z);
-	break;
-}
-
-/* Opcode: DropIndex P1 * *  P4
- *
- * @P1 Contains index id of index to be removed.
- * @P4 Space of removed index.
- *
- * Remove the internal (in-memory) data structures that describe
- * the index named P4 for table.
- * This is called after an index is dropped from Tarantool DD.
- */
-case OP_DropIndex: {
-	sql_space_index_delete(pOp->p4.space, pOp->p1);
 	break;
 }
 
@@ -5365,9 +5243,6 @@ abort_due_to_error:
 	sqlite3VdbeHalt(p);
 	if (rc==SQLITE_IOERR_NOMEM) sqlite3OomFault(db);
 	rc = SQLITE_ERROR;
-	if (resetSchemaOnFault>0) {
-		sqlite3SchemaClear(db);
-	}
 
 	/* This is the only way out of this procedure. */
 vdbe_return:

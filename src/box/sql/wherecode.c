@@ -1351,7 +1351,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		Expr *pAndExpr = 0;	/* An ".. AND (...)" expression */
 		Table *pTab = pTabItem->pTab;
 		struct key_def *pk_key_def =
-			sql_table_primary_key(pTab)->def->key_def;
+			space_index(pTab->space, 0)->def->key_def;
 		uint32_t pk_part_count = pk_key_def->part_count;
 
 		pTerm = pLoop->aLTerm[0];

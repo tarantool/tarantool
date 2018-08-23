@@ -461,11 +461,6 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		sqlite3ErrorMsg(pParse, "no such pragma: %s", zLeft);
 		goto pragma_out;
 	}
-
-	/* Make sure the database schema is loaded if the pragma requires that */
-	if ((pPragma->mPragFlg & PragFlg_NeedSchema) != 0) {
-		assert(db->pSchema != NULL);
-	}
 	/* Register the result column names for pragmas that return results */
 	if ((pPragma->mPragFlg & PragFlg_NoColumns) == 0
 	    && ((pPragma->mPragFlg & PragFlg_NoColumns1) == 0 || zRight == 0)

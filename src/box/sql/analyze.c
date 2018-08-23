@@ -1135,7 +1135,6 @@ void
 sqlite3Analyze(Parse * pParse, Token * pName)
 {
 	sqlite3 *db = pParse->db;
-	assert(db->pSchema != NULL);
 	if (pName == NULL) {
 		/* Form 1:  Analyze everything */
 		sql_analyze_database(pParse);

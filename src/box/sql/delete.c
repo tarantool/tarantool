@@ -58,7 +58,7 @@ sql_lookup_table(struct Parse *parse, struct SrcList_item *tbl_name)
 	struct Table *table = sqlite3DbMallocZero(parse->db, sizeof(*table));
 	if (table == NULL)
 		return NULL;
-	table->def = space_def_dup(space->def);
+	table->def = space->def;
 	table->space = space;
 	table->nTabRef = 1;
 	tbl_name->pTab = table;
@@ -335,7 +335,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			 * key.
 			 */
 			key_len = 0;
-			struct index *pk = sql_table_primary_key(table);
+			struct index *pk = space_index(space, 0);
 			const char *zAff = is_view ? NULL :
 					   sql_space_index_affinity_str(parse->db,
 									space->def,

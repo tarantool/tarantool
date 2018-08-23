@@ -404,12 +404,6 @@ sqlite3VdbeAddOp4Dup8(Vdbe * p,	/* Add the opcode to this VM */
 	return sqlite3VdbeAddOp4(p, op, p1, p2, p3, p4copy, p4type);
 }
 
-void
-sqlite3VdbeAddParseSchema2Op(Vdbe * p, int iRec, int n)
-{
-	sqlite3VdbeAddOp3(p, OP_ParseSchema2, iRec, n, 0);
-}
-
 /*
  * Add an opcode that includes the p4 value as an integer.
  */
@@ -2434,8 +2428,6 @@ sqlite3VdbeHalt(Vdbe * p)
 					closeCursorsAndFree(p);
 					sqlite3RollbackAll(p);
 					p->nChange = 0;
-				} else {
-					sqlite3CommitInternalChanges();
 				}
 			} else {
 				box_txn_rollback();

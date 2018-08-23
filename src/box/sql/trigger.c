@@ -418,7 +418,6 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 		       bool account_changes)
 {
 	sqlite3 *db = parser->db;
-	assert(db->pSchema != NULL);
 	struct Vdbe *v = sqlite3GetVdbe(parser);
 	if (v == NULL)
 		return;
@@ -445,7 +444,6 @@ sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
 	sqlite3 *db = parser->db;
 	if (db->mallocFailed)
 		goto drop_trigger_cleanup;
-	assert(db->pSchema != NULL);
 
 	struct Vdbe *v = sqlite3GetVdbe(parser);
 	if (v != NULL)
@@ -473,11 +471,10 @@ sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
 }
 
 int
-sql_trigger_replace(struct sqlite3 *db, const char *name, uint32_t space_id,
+sql_trigger_replace(const char *name, uint32_t space_id,
 		    struct sql_trigger *trigger,
 		    struct sql_trigger **old_trigger)
 {
-	assert(db->pSchema != NULL);
 	assert(trigger == NULL || strcmp(name, trigger->zName) == 0);
 
 	struct space *space = space_cache_find(space_id);

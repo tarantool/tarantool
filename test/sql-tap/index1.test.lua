@@ -83,7 +83,7 @@ test:do_catchsql_test(
         CREATE INDEX index1 ON test1(f1)
     ]], {
         -- <index-2.1>
-        1, "no such table: TEST1"
+        1, "Space 'TEST1' does not exist"
         -- </index-2.1>
     })
 

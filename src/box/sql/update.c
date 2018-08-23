@@ -146,7 +146,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	/* Allocate cursor on primary index. */
 	int pk_cursor = pParse->nTab++;
 	pTabList->a[0].iCursor = pk_cursor;
-	struct index *pPk = sql_table_primary_key(pTab);
+	struct index *pPk = space_index(pTab->space, 0);
 	i = sizeof(int) * def->field_count;
 	aXRef = (int *) region_alloc(&pParse->region, i);
 	if (aXRef == NULL) {

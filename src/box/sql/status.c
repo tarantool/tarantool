@@ -240,22 +240,6 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 	case SQLITE_DBSTATUS_SCHEMA_USED:{
 			int nByte = 0;	/* Used to accumulate return value */
 
-			db->pnBytesFreed = &nByte;
-			Schema *pSchema = db->pSchema;
-			if (ALWAYS(pSchema != 0)) {
-				HashElem *p;
-				nByte += ROUND8(sizeof(HashElem)) *
-					 pSchema->tblHash.count;
-
-				for (p = sqliteHashFirst(&pSchema->tblHash); p;
-				     p = sqliteHashNext(p)) {
-					sqlite3DeleteTable(db,
-							   (Table *)
-							   sqliteHashData(p));
-				}
-			}
-			db->pnBytesFreed = 0;
-
 			*pHighwater = 0;
 			*pCurrent = nByte;
 			break;

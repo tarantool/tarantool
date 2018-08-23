@@ -73,37 +73,27 @@ sql_init()
 		panic("failed to initialize SQL subsystem");
 
 	assert(db != NULL);
-	/*
-	 * Initialize pSchema to use SQL parser on initialization:
-	 * e.g. Trigger objects (compiled from SQL on tuple
-	 * insertion in _trigger) need to refer it.
-	 */
-	db->pSchema = sqlite3SchemaCreate(db);
-	if (db->pSchema == NULL) {
-		sqlite3_close(db);
-		panic("failed to initialize SQL Schema subsystem");
-	}
 }
 
 void
 sql_load_schema()
 {
-	assert(db->pSchema != NULL);
-	int rc;
-	struct session *user_session = current_session();
-	int commit_internal = !(user_session->sql_flags
-				& SQLITE_InternChanges);
-
 	assert(db->init.busy == 0);
+	/*
+	 * This function is called before version upgrade.
+	 * Old versions (< 2.0) lack system spaces containing
+	 * statistics (_sql_stat1 and _sql_stat4). Thus, we can
+	 * skip statistics loading.
+	 */
+	struct space *stat = space_by_id(BOX_SQL_STAT1_ID);
+	assert(stat != NULL);
+	if (stat->def->field_count == 0)
+		return;
 	db->init.busy = 1;
-	rc = sqlite3InitDatabase(db);
-	if (rc != SQLITE_OK) {
-		sqlite3SchemaClear(db);
+	sql_analysis_load(db);
+	if (db->errCode != SQLITE_OK)
 		panic("failed to initialize SQL subsystem");
-	}
 	db->init.busy = 0;
-	if (rc == SQLITE_OK && commit_internal)
-		sqlite3CommitInternalChanges();
 }
 
 void
@@ -1139,111 +1129,6 @@ cursor_advance(BtCursor *pCur, int *pRes)
 }
 
 /*********************************************************************
- * Schema support.
- */
-
-static int
-space_foreach_put_cb(struct space *space, void *udata)
-{
-	if (space->def->opts.sql == NULL)
-		return 0; /* Not SQL space. */
-	sql_init_callback((struct init_data *) udata, space->def->name,
-			  space->def->id, 0, space->def->opts.sql);
-	for (uint32_t i = 0; i < space->index_count; ++i) {
-		struct index_def *def = space_index_def(space, i);
-		if (def->opts.sql != NULL) {
-			sql_init_callback((struct init_data *) udata, def->name,
-					  def->space_id, def->iid, def->opts.sql);
-		}
-	}
-	return 0;
-}
-
-/* Load database schema from Tarantool. */
-void tarantoolSqlite3LoadSchema(struct init_data *init)
-{
-	sql_init_callback(
-		init, TARANTOOL_SYS_SCHEMA_NAME,
-		BOX_SCHEMA_ID, 0,
-		"CREATE TABLE \""TARANTOOL_SYS_SCHEMA_NAME
-		"\" (\"key\" TEXT PRIMARY KEY, \"value\")"
-	);
-
-	sql_init_callback(
-		init, TARANTOOL_SYS_SPACE_NAME,
-		BOX_SPACE_ID, 0,
-		"CREATE TABLE \""TARANTOOL_SYS_SPACE_NAME
-		"\" (\"id\" INT PRIMARY KEY, \"owner\" INT, \"name\" TEXT, "
-		"\"engine\" TEXT, \"field_count\" INT, \"opts\", \"format\")"
-	);
-
-	sql_init_callback(
-		init, TARANTOOL_SYS_INDEX_NAME,
-		BOX_INDEX_ID, 0,
-		"CREATE TABLE \""TARANTOOL_SYS_INDEX_NAME"\" "
-		"(\"id\" INT, \"iid\" INT, \"name\" TEXT, \"type\" TEXT,"
-		"\"opts\", \"parts\", PRIMARY KEY (\"id\", \"iid\"))"
-	);
-
-	sql_init_callback(
-		init, TARANTOOL_SYS_TRIGGER_NAME,
-		BOX_TRIGGER_ID, 0,
-		"CREATE TABLE \""TARANTOOL_SYS_TRIGGER_NAME"\" ("
-		"\"name\" TEXT PRIMARY KEY, \"space_id\" INT, \"opts\")"
-	);
-
-	sql_init_callback(
-		init, TARANTOOL_SYS_TRUNCATE_NAME,
-		BOX_TRUNCATE_ID, 0,
-		"CREATE TABLE \""TARANTOOL_SYS_TRUNCATE_NAME
-		"\" (\"id\" INT PRIMARY KEY, \"count\" INT NOT NULL)"
-	);
-
-	sql_init_callback(init, TARANTOOL_SYS_SEQUENCE_NAME, BOX_SEQUENCE_ID, 0,
-			  "CREATE TABLE \""TARANTOOL_SYS_SEQUENCE_NAME
-			  "\" (\"id\" INT PRIMARY KEY, \"uid\" INT, \"name\" TEXT, \"step\" INT, "
-			  "\"max\" INT, \"min\" INT, \"start\" INT, \"cache\" INT, \"cycle\" INT)");
-
-	sql_init_callback(init, TARANTOOL_SYS_SPACE_SEQUENCE_NAME,
-			  BOX_SPACE_SEQUENCE_ID, 0,
-			  "CREATE TABLE \""TARANTOOL_SYS_SPACE_SEQUENCE_NAME
-			  "\" (\"space_id\" INT PRIMARY KEY, \"sequence_id\" INT, \"flag\" INT)");
-
-	sql_init_callback(init, TARANTOOL_SYS_SQL_STAT1_NAME,
-			  BOX_SQL_STAT1_ID, 0,
-			  "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT1_NAME
-			       "\"(\"tbl\" text,"
-			       "\"idx\" text,"
-			       "\"stat\" not null,"
-			       "PRIMARY KEY(\"tbl\", \"idx\"))");
-
-	sql_init_callback(init, TARANTOOL_SYS_SQL_STAT4_NAME,
-			  BOX_SQL_STAT4_ID, 0,
-			  "CREATE TABLE \""TARANTOOL_SYS_SQL_STAT4_NAME
-			       "\"(\"tbl\" text,"
-			       "\"idx\" text,"
-			       "\"neq\" text,"
-			       "\"nlt\" text,"
-			       "\"ndlt\" text,"
-			       "\"sample\","
-			       "PRIMARY KEY(\"tbl\", \"idx\", \"sample\"))");
-
-	sql_init_callback(init, TARANTOOL_SYS_FK_CONSTRAINT_NAME,
-			  BOX_FK_CONSTRAINT_ID, 0,
-			  "CREATE TABLE \""TARANTOOL_SYS_FK_CONSTRAINT_NAME
-			  "\"(\"name\" TEXT, \"parent_id\" INT, \"child_id\" INT,"
-			  "\"deferred\" INT, \"match\" TEXT, \"on_delete\" TEXT,"
-			  "\"on_update\" TEXT, \"child_cols\", \"parent_cols\","
-			  "PRIMARY KEY(\"name\", \"child_id\"))");
-
-	/* Read _space */
-	if (space_foreach(space_foreach_put_cb, init) != 0) {
-		init->rc = SQL_TARANTOOL_ERROR;
-		return;
-	}
-}
-
-/*********************************************************************
  * Metainformation about available spaces and indices is stored in
  * _space and _index system spaces respectively.
  *
@@ -1663,15 +1548,16 @@ sql_ephemeral_table_new(Parse *parser, const char *name)
 		sqlite3DbFree(db, table);
 		return NULL;
 	}
-	table->space = (struct space *) calloc(1, sizeof(struct space));
+	table->space = (struct space *) region_alloc(&parser->region,
+						     sizeof(struct space));
 	if (table->space == NULL) {
-		diag_set(OutOfMemory, sizeof(struct space), "calloc", "space");
+		diag_set(OutOfMemory, sizeof(struct space), "region", "space");
 		parser->rc = SQL_TARANTOOL_ERROR;
 		parser->nErr++;
 		sqlite3DbFree(db, table);
 		return NULL;
 	}
-
+	memset(table->space, 0, sizeof(struct space));
 	table->def = def;
 	return table;
 }

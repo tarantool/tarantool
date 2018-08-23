@@ -384,8 +384,6 @@ enum sql_ret_code {
 	SQLITE_INTERRUPT,
 	/** Some kind of disk I/O error occurred. */
 	SQLITE_IOERR,
-	/** The database disk image is malformed. */
-	SQLITE_CORRUPT,
 	/** Unknown opcode in sqlite3_file_control(). */
 	SQLITE_NOTFOUND,
 	/** Insertion failed because database is full. */
@@ -1394,7 +1392,6 @@ void *sqlite3_wsd_find(void *K, int L);
 typedef struct AggInfo AggInfo;
 typedef struct Bitvec Bitvec;
 typedef struct Column Column;
-typedef struct Schema Schema;
 typedef struct Expr Expr;
 typedef struct ExprList ExprList;
 typedef struct ExprSpan ExprSpan;
@@ -1441,13 +1438,6 @@ typedef int VList;
 #include "cursor.h"
 #include "vdbe.h"
 #include "os.h"
-
-/*
- * An instance of the following structure stores a database schema.
- */
-struct Schema {
-	Hash tblHash;		/* All tables indexed by name */
-};
 
 /*
  * The number of different kinds of things that can be limited
@@ -1509,7 +1499,6 @@ struct sqlite3 {
 	sqlite3_vfs *pVfs;	/* OS Interface */
 	struct Vdbe *pVdbe;	/* List of active virtual machines */
 	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
-	struct Schema *pSchema; /* Schema of the database */
 	i64 szMmap;		/* Default mmap_size setting */
 	int errCode;		/* Most recent error code (SQLITE_*) */
 	int errMask;		/* & result codes with this before returning */
@@ -1568,7 +1557,6 @@ struct sqlite3 {
  * Possible values for the sqlite3.flags.
  */
 #define SQLITE_VdbeTrace      0x00000001	/* True to trace VDBE execution */
-#define SQLITE_InternChanges  0x00000002	/* Uncommitted Hash table changes */
 #define SQLITE_FullColNames   0x00000004	/* Show full column names on SELECT */
 #define SQLITE_ShortColNames  0x00000040	/* Show short columns names */
 #define SQLITE_CountRows      0x00000080	/* Count rows changed by INSERT, */
@@ -2951,19 +2939,6 @@ struct StrAccum {
 
 #define isMalloced(X)  (((X)->printfFlags & SQLITE_PRINTF_MALLOCED)!=0)
 
-/**
- * A pointer to this structure is used to communicate information
- * from sqlite3Init and OP_ParseSchema into the sql_init_callback.
- */
-struct init_data {
-	/** The database being initialized. */
-	sqlite3 *db;
-	/** Error message stored here. */
-	char **pzErrMsg;
-	/** Result code stored here. */
-	int rc;
-};
-
 /*
  * Structure containing global configuration data for the SQLite library.
  *
@@ -3117,10 +3092,8 @@ struct TreeView {
  * using sqlite3_log().  The routines also provide a convenient place
  * to set a debugger breakpoint.
  */
-int sqlite3CorruptError(int);
 int sqlite3MisuseError(int);
 int sqlite3CantopenError(int);
-#define SQLITE_CORRUPT_BKPT sqlite3CorruptError(__LINE__)
 #define SQLITE_MISUSE_BKPT sqlite3MisuseError(__LINE__)
 #define SQLITE_CANTOPEN_BKPT sqlite3CantopenError(__LINE__)
 #ifdef SQLITE_DEBUG
@@ -3301,27 +3274,7 @@ void sqlite3ExprListSetSpan(Parse *, ExprList *, ExprSpan *);
 u32 sqlite3ExprListFlags(const ExprList *);
 int sqlite3Init(sqlite3 *);
 
-/**
- * This is the callback routine for the code that initializes the
- * database.  See sqlite3Init() below for additional information.
- * This routine is also called from the OP_ParseSchema2 opcode of
- * the VDBE.
- *
- * @param init Initialization context.
- * @param name Name of thing being created.
- * @param space_id Space identifier.
- * @param index_id Index identifier.
- * @param sql Text of SQL query.
- *
- * @retval 0 on success, 1 otherwise.
- */
-int
-sql_init_callback(struct init_data *init, const char *name,
-		  uint32_t space_id, uint32_t index_id, const char *sql);
-
 void sqlite3Pragma(Parse *, Token *, Token *, Token *, int);
-void sqlite3ResetAllSchemasOfConnection(sqlite3 *);
-void sqlite3CommitInternalChanges();
 void sqlite3DeleteColumnNames(sqlite3 *, Table *);
 
 /**
@@ -3662,25 +3615,6 @@ int sqlite3ExprCodeExprList(Parse *, ExprList *, int, int, u8);
 #define SQLITE_ECEL_OMITREF  0x08	/* Omit if ExprList.u.x.iOrderByCol */
 void sqlite3ExprIfTrue(Parse *, Expr *, int, int);
 void sqlite3ExprIfFalse(Parse *, Expr *, int, int);
-#define LOCATE_VIEW    0x01
-#define LOCATE_NOERR   0x02
-Table *sqlite3LocateTable(Parse *, u32 flags, const char *);
-
-struct index *
-sqlite3LocateIndex(sqlite3 *, const char *, const char *);
-void sqlite3UnlinkAndDeleteTable(sqlite3 *, const char *);
-
-/**
- * Release memory for index with given iid and
- * reallocate memory for an array of indexes.
- * FIXME: should be removed after finishing merging SQLite DD
- * with server one.
- *
- * @param space Space which index belongs to.
- * @param iid Id of index to be deleted.
- */
-void
-sql_space_index_delete(struct space *space, uint32_t iid);
 
 char *sqlite3NameFromToken(sqlite3 *, Token *);
 int sqlite3ExprCompare(Expr *, Expr *, int);
@@ -4527,8 +4461,6 @@ sql_analysis_load(struct sqlite3 *db);
 
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);
-void sqlite3SchemaClear(sqlite3 *);
-Schema *sqlite3SchemaCreate(sqlite3 *);
 int sqlite3CreateFunc(sqlite3 *, const char *, int, int, void *,
 		      void (*)(sqlite3_context *, int, sqlite3_value **),
 		      void (*)(sqlite3_context *, int, sqlite3_value **),
@@ -4827,8 +4759,6 @@ void sqlite3VectorErrorMsg(Parse *, Expr *);
  * compilation to avoid stack overflow.
  */
 extern int sqlSubProgramsRemaining;
-
-extern int sqlite3InitDatabase(sqlite3 * db);
 
 /**
  * Generate VDBE code to halt execution with correct error if
