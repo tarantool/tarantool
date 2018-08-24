@@ -62,6 +62,10 @@ i5 = s:create_index('i5', {unique = true, parts = {4, 'unsigned', 5, 'unsigned',
 i6 = s:create_index('i6', {unique = true, parts = {4, 'unsigned', 6, 'unsigned', 5, 'unsigned'}})
 i7 = s:create_index('i7', {unique = true, parts = {6, 'unsigned'}})
 
+-- space.create_index() does a lookup in the primary index
+-- so reset the stats before calling space.insert().
+box.stat.reset()
+
 s:insert{1, 1, 1, 1, 1, 1}
 
 i1:stat().lookup -- 1

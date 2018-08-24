@@ -13,6 +13,9 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 pk = s:create_index('pk', {run_count_per_level = 10})
 i1 = s:create_index('i1', {run_count_per_level = 10, parts = {2, 'unsigned'}, unique = false})
 i2 = s:create_index('i2', {run_count_per_level = 10, parts = {3, 'unsigned'}, unique = true})
+-- space.create_index() does a lookup in the primary index
+-- so reset the stats before filling up the space.
+box.stat.reset()
 for i = 1, 10 do s:replace{i, i, i} end
 box.snapshot()
 for i = 1, 10, 2 do s:delete{i} end

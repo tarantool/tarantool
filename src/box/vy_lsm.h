@@ -316,6 +316,17 @@ void
 vy_lsm_delete(struct vy_lsm *lsm);
 
 /**
+ * Return true if the LSM tree has no statements, neither on disk
+ * nor in memory.
+ */
+static inline bool
+vy_lsm_is_empty(struct vy_lsm *lsm)
+{
+	return (lsm->stat.disk.count.rows == 0 &&
+		lsm->stat.memory.count.rows == 0);
+}
+
+/**
  * Increment the reference counter of an LSM tree.
  * An LSM tree cannot be deleted if its reference
  * counter is elevated.

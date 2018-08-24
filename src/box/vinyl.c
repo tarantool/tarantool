@@ -1017,6 +1017,29 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+/**
+ * This function is called after installing on_replace trigger
+ * used for propagating changes done during DDL. It aborts all
+ * rw transactions affecting the given LSM tree that began
+ * before the trigger was installed so that DDL doesn't miss
+ * their working set.
+ */
+static int
+vy_abort_writers_for_ddl(struct vy_env *env, struct vy_lsm *lsm)
+{
+	if (tx_manager_abort_writers(env->xm, lsm) != 0)
+		return -1;
+	/*
+	 * Wait for prepared transactions to complete
+	 * (we can't abort them as they reached WAL).
+	 */
+	struct vclock unused;
+	if (wal_checkpoint(&unused, false) != 0)
+		return -1;
+
+	return 0;
+}
+
 /** Argument passed to vy_check_format_on_replace(). */
 struct vy_check_format_ctx {
 	/** Format to check new tuples against. */
@@ -1087,10 +1110,13 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	trigger_create(&on_replace, vy_check_format_on_replace, &ctx, NULL);
 	trigger_add(&space->on_replace, &on_replace);
 
+	int rc = vy_abort_writers_for_ddl(env, pk);
+	if (rc != 0)
+		goto out;
+
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
-			      &env->xm->p_global_read_view);
-	int rc;
+			      &env->xm->p_committed_read_view);
 	int loops = 0;
 	struct tuple *tuple;
 	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
@@ -1114,6 +1140,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 			break;
 	}
 	vy_read_iterator_close(&itr);
+out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
 	tuple_unref(key);
@@ -4190,10 +4217,8 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 {
 	struct vy_env *env = vy_env(src_space->engine);
 	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
-	bool is_empty = (pk->stat.disk.count.rows == 0 &&
-			 pk->stat.memory.count.rows == 0);
 
-	if (new_index->def->iid == 0 && !is_empty) {
+	if (new_index->def->iid == 0 && !vy_lsm_is_empty(pk)) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "rebuilding the primary index of a non-empty space");
 		return -1;
@@ -4209,9 +4234,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL)
 		return vy_build_recover(env, new_lsm, pk);
-
-	if (is_empty)
-		return 0;
 
 	/*
 	 * Iterate over all tuples stored in the space and insert
@@ -4234,10 +4256,13 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
 	trigger_add(&src_space->on_replace, &on_replace);
 
+	int rc = vy_abort_writers_for_ddl(env, pk);
+	if (rc != 0)
+		goto out;
+
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
 			      &env->xm->p_committed_read_view);
-	int rc;
 	int loops = 0;
 	struct tuple *tuple;
 	int64_t build_lsn = env->xm->lsn;
@@ -4280,22 +4305,23 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		}
 	}
 	vy_read_iterator_close(&itr);
-	tuple_unref(key);
 
 	/*
 	 * Dump the new index upon build completion so that we don't
-	 * have to rebuild it on recovery.
+	 * have to rebuild it on recovery. No need to trigger dump if
+	 * the space happens to be empty.
 	 */
-	if (rc == 0)
+	if (rc == 0 && !vy_lsm_is_empty(new_lsm))
 		rc = vy_scheduler_dump(&env->scheduler);
 
 	if (rc == 0 && ctx.is_failed) {
 		diag_move(&ctx.diag, diag_get());
 		rc = -1;
 	}
-
+out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
+	tuple_unref(key);
 	return rc;
 }
 

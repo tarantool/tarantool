@@ -253,7 +253,6 @@ box.commit();
 last_val = 1000;
 
 function gen_load()
-    fiber.sleep(0.001)
     local s = box.space.test
     for i = 1, 200 do
         local op = math.random(4)
