@@ -50,7 +50,7 @@ tx2.rollback - tx1.rollback -- 1
 s:drop()
 
 --
--- gh-3158: check of duplicates is skipped if the index
+-- gh-3154: check of duplicates is skipped if the index
 -- is contained by another unique index which is checked.
 --
 s = box.schema.create_space('test', {engine = 'vinyl'})
@@ -76,4 +76,15 @@ i5:stat().lookup -- 0
 i6:stat().lookup -- 0
 i7:stat().lookup -- 1
 
+s:drop()
+
+--
+-- gh-3643: unique optimization results in skipping uniqueness
+-- check in the primary index on insertion.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk', {unique = true, parts = {1, 'unsigned', 2, 'unsigned'}})
+_ = s:create_index('sk', {unique = true, parts = {2, 'unsigned'}})
+s:insert{1, 1, 1}
+s:insert{1, 1, 2} -- error
 s:drop()

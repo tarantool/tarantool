@@ -1516,14 +1516,18 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 	tuple_unref(key);
 	if (rc != 0)
 		return -1;
-	if (found != NULL && vy_tuple_compare(stmt, found,
-					      lsm->pk->key_def) == 0) {
-		/*
-		 * If the old and new tuples are the same in
-		 * terms of the primary key definition, the
-		 * statement doesn't modify the secondary key
-		 * and so there's actually no conflict.
-		 */
+	/*
+	 * The old and new tuples may happen to be the same in
+	 * terms of the primary key definition. For REPLACE this
+	 * means that the operation overwrites the old tuple
+	 * without modifying the secondary key and so there's
+	 * actually no conflict. For INSERT this can only happen
+	 * if we optimized out the primary index uniqueness check
+	 * (see vy_lsm::check_is_unique), in which case we must
+	 * fail here.
+	 */
+	if (found != NULL && vy_stmt_type(stmt) == IPROTO_REPLACE &&
+	    vy_tuple_compare(stmt, found, lsm->pk->key_def) == 0) {
 		tuple_unref(found);
 		return 0;
 	}
@@ -4043,6 +4047,14 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	if (tuple_validate(new_format, tuple) != 0)
 		return -1;
 
+	/* Reallocate the new tuple using the new space format. */
+	uint32_t data_len;
+	const char *data = tuple_data_range(tuple, &data_len);
+	struct tuple *stmt = vy_stmt_new_replace(new_format, data,
+						 data + data_len);
+	if (stmt == NULL)
+		return -1;
+
 	/*
 	 * Check unique constraint if necessary.
 	 *
@@ -4056,21 +4068,20 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	 * store statements with greater LSNs. So we pin the
 	 * in-memory index that is active now and insert the tuple
 	 * into it after the yield.
+	 *
+	 * Also note that this operation is semantically a REPLACE
+	 * while the original tuple may have INSERT type. Since the
+	 * uniqueness check helper is sensitive to the statement
+	 * type, we must not use the original tuple for the check.
 	 */
 	vy_mem_pin(mem);
 	rc = vy_check_is_unique_secondary(NULL, &env->xm->p_committed_read_view,
-					  space_name, index_name, lsm, tuple);
+					  space_name, index_name, lsm, stmt);
 	vy_mem_unpin(mem);
-	if (rc != 0)
+	if (rc != 0) {
+		tuple_unref(stmt);
 		return -1;
-
-	/* Reallocate the new tuple using the new space format. */
-	uint32_t data_len;
-	const char *data = tuple_data_range(tuple, &data_len);
-	struct tuple *stmt = vy_stmt_new_replace(new_format, data,
-						 data + data_len);
-	if (stmt == NULL)
-		return -1;
+	}
 
 	/* Insert the new tuple into the in-memory index. */
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
