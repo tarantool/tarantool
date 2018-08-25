@@ -277,6 +277,9 @@ box.snapshot()
 ---
 - ok
 ...
+pk:compact()
+---
+...
 -- Wait for compaction
 while pk:stat().run_count ~= 1 do fiber.sleep(0.01) end
 ---

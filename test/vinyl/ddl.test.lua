@@ -100,6 +100,7 @@ pad = string.rep('I', pad_size)
 for i = 1, 20 do space:replace{i + 20, pad} end
 est_bsize = est_bsize + pad_size * 20
 box.snapshot()
+pk:compact()
 -- Wait for compaction
 while pk:stat().run_count ~= 1 do fiber.sleep(0.01) end
 pk:stat().disk.pages
