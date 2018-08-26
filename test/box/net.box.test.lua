@@ -872,10 +872,18 @@ x = 0
 for i = 1, N do x = x + long_call_channel:get() end
 x
 
+--
 -- Check that a connection does not leak if there is
 -- a long CALL in progress when it is closed.
+--
 disconnected = false
 function on_disconnect() disconnected = true end
+
+-- Make sure all dangling connections are collected so
+-- that on_disconnect trigger isn't called spuriously.
+collectgarbage('collect')
+fiber.sleep(0)
+
 box.session.on_disconnect(on_disconnect) == on_disconnect
 
 ch1 = fiber.channel(1)
