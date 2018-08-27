@@ -196,8 +196,11 @@ vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used);
 /**
  * Block the caller until the quota is not exceeded.
  */
-void
-vy_quota_wait(struct vy_quota *q);
+static inline void
+vy_quota_wait(struct vy_quota *q)
+{
+	vy_quota_use(q, 0, TIMEOUT_INFINITY);
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

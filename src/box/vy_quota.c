@@ -227,10 +227,3 @@ vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used)
 	if (reserved < used)
 		vy_quota_force_use(q, used - reserved);
 }
-
-void
-vy_quota_wait(struct vy_quota *q)
-{
-	while (q->used > q->limit)
-		fiber_cond_wait(&q->cond);
-}
