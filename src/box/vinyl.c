@@ -2384,21 +2384,7 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t write_size = mem_used_after - mem_used_before;
-	/*
-	 * Insertion of a statement into an in-memory tree can trigger
-	 * an allocation of a new tree block. This should not normally
-	 * result in a noticeable excess of the memory limit, because
-	 * most memory is occupied by statements anyway, but we need to
-	 * adjust the quota accordingly in this case.
-	 *
-	 * The actual allocation size can also be less than reservation
-	 * if a statement is allocated from an lsregion slab allocated
-	 * by a previous transaction. Take this into account, too.
-	 */
-	if (write_size >= tx->write_size)
-		vy_quota_force_use(&env->quota, write_size - tx->write_size);
-	else
-		vy_quota_release(&env->quota, tx->write_size - write_size);
+	vy_quota_adjust(&env->quota, tx->write_size, write_size);
 
 	if (rc != 0)
 		return -1;
@@ -3292,11 +3278,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t used = mem_used_after - mem_used_before;
-	if (used >= reserved)
-		vy_quota_force_use(&env->quota, used - reserved);
-	else
-		vy_quota_release(&env->quota, reserved - used);
-
+	vy_quota_adjust(&env->quota, reserved, used);
 	return rc;
 }
 

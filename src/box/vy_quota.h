@@ -153,6 +153,35 @@ vy_quota_release(struct vy_quota *q, size_t size)
  * Try to consume @size bytes of memory, throttle the caller
  * if the limit is exceeded. @timeout specifies the maximal
  * time to wait. Return 0 on success, -1 on timeout.
+ *
+ * Usage pattern:
+ *
+ *   size_t reserved = <estimate>;
+ *   if (vy_quota_use(q, reserved, timeout) != 0)
+ *           return -1;
+ *   <allocate memory>
+ *   size_t used = <actually allocated>;
+ *   vy_quota_adjust(q, reserved, used);
+ *
+ * We use two-step quota allocation strategy (reserve-consume),
+ * because we may not yield after we start inserting statements
+ * into a space so we estimate the allocation size and wait for
+ * quota before committing statements. At the same time, we
+ * cannot precisely estimate the size of memory we are going to
+ * consume so we adjust the quota after the allocation.
+ *
+ * The size of memory allocated while committing a transaction
+ * may be greater than an estimate, because insertion of a
+ * statement into an in-memory index can trigger allocation
+ * of a new index extent. This should not normally result in a
+ * noticeable breach in the memory limit, because most memory
+ * is occupied by statements, but we need to adjust the quota
+ * accordingly after the allocation in this case.
+ *
+ * The actual memory allocation size may also be less than an
+ * estimate if the space has multiple indexes, because statements
+ * are stored in the common memory level, which isn't taken into
+ * account while estimating the size of a memory allocation.
  */
 static inline int
 vy_quota_use(struct vy_quota *q, size_t size, double timeout)
@@ -175,6 +204,27 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 	if (q->used >= q->watermark)
 		q->quota_exceeded_cb(q);
 	return 0;
+}
+
+/**
+ * Adjust quota after allocating memory.
+ *
+ * @reserved: size of quota reserved by vy_quota_use().
+ * @used: size of memory actually allocated.
+ *
+ * See also vy_quota_use().
+ */
+static inline void
+vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used)
+{
+	if (reserved > used) {
+		size_t excess = reserved - used;
+		assert(q->used >= excess);
+		q->used -= excess;
+		fiber_cond_broadcast(&q->cond);
+	}
+	if (reserved < used)
+		vy_quota_force_use(q, used - reserved);
 }
 
 /**
