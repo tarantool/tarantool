@@ -103,3 +103,28 @@ test_run:cmd('stop server er_load1')
 -- er_load2 exits automatically.
 test_run:cmd('cleanup server er_load1')
 test_run:cmd('cleanup server er_load2')
+
+--
+-- Test case for gh-3637. Before the fix replica would exit with
+-- an error. Now check that we don't hang and successfully connect.
+--
+fiber = require('fiber')
+
+test_run:cleanup_cluster()
+
+test_run:cmd("create server replica_auth with rpl_master=default, script='replication/replica_auth.lua'")
+test_run:cmd("start server replica_auth with wait=False, wait_load=False, args='cluster:pass 0.05'")
+-- Wait a bit to make sure replica waits till user is created.
+fiber.sleep(0.1)
+box.schema.user.create('cluster', {password='pass'})
+box.schema.user.grant('cluster', 'replication')
+
+while box.info.replication[2] == nil do fiber.sleep(0.01) end
+vclock = test_run:get_vclock('default')
+_ = test_run:wait_vclock('replica_auth', vclock)
+
+test_run:cmd("stop server replica_auth")
+test_run:cmd("cleanup server replica_auth")
+test_run:cmd("delete server replica_auth")
+
+box.schema.user.drop('cluster')

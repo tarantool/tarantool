@@ -677,6 +677,11 @@ static int
 lbox_socket_push_addr(struct lua_State *L,
 			 const struct sockaddr *addr, socklen_t alen)
 {
+	if (alen == 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+
 	lua_newtable(L);
 
 	lua_pushliteral(L, "family");

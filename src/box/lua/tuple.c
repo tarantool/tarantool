@@ -296,12 +296,12 @@ lbox_tuple_to_map(struct lua_State *L)
 
 	const struct tuple *tuple = lua_checktuple(L, 1);
 	const struct tuple_format *format = tuple_format(tuple);
-	const struct tuple_field *field = &format->fields[0];
 	const char *pos = tuple_data(tuple);
 	int field_count = (int)mp_decode_array(&pos);
 	int n_named = format->dict->name_count;
 	lua_createtable(L, field_count, n_named);
-	for (int i = 0; i < n_named; ++i, ++field) {
+	int named_and_presented = MIN(field_count, n_named);
+	for (int i = 0; i < named_and_presented; ++i) {
 		/* Access by name. */
 		const char *name = format->dict->names[i];
 		lua_pushstring(L, name);
