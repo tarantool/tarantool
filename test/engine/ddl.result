@@ -1930,6 +1930,10 @@ _ = fiber.create(function() for i = 1, 10 do s:update(1, {{'+', 3, 1}}) end c:pu
 _ = s:create_index('sk', {parts = {2, 'unsigned'}})
 ---
 ...
+c:get()
+---
+- true
+...
 s.index.pk:select()
 ---
 - - [1, 1, 11]
@@ -1937,10 +1941,6 @@ s.index.pk:select()
 s.index.sk:select()
 ---
 - - [1, 1, 11]
-...
-c:get()
----
-- true
 ...
 s:drop()
 ---
