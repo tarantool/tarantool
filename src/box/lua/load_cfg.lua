@@ -199,6 +199,7 @@ local dynamic_cfg = {
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
+    replication_sync_lag    = private.cfg_set_replication_sync_lag,
     instance_uuid           = function()
         if box.cfg.instance_uuid ~= box.info.uuid then
             box.error(box.error.CFG, 'instance_uuid',
@@ -220,6 +221,7 @@ local dynamic_cfg_skip_at_load = {
     replication_timeout     = true,
     replication_connect_timeout = true,
     replication_connect_quorum = true,
+    replication_sync_lag    = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,

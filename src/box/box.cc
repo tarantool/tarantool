@@ -657,6 +657,12 @@ box_set_replication_connect_quorum(void)
 }
 
 void
+box_set_replication_sync_lag(void)
+{
+	replication_sync_lag = box_check_replication_sync_lag();
+}
+
+void
 box_bind(void)
 {
 	const char *uri = cfg_gets("listen");
@@ -1747,7 +1753,7 @@ box_cfg_xc(void)
 	box_set_replication_timeout();
 	box_set_replication_connect_timeout();
 	box_set_replication_connect_quorum();
-	replication_sync_lag = box_check_replication_sync_lag();
+	box_set_replication_sync_lag();
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 

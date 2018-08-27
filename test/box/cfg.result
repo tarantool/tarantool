@@ -226,6 +226,22 @@ box.cfg{vinyl_write_threads = "threads"}
 ---
 - error: 'Incorrect value for option ''vinyl_write_threads'': should be of type number'
 ...
+--------------------------------------------------------------------------------
+-- Dynamic configuration check
+--------------------------------------------------------------------------------
+replication_sync_lag = box.cfg.replication_sync_lag
+---
+...
+box.cfg{replication_sync_lag = 0.123}
+---
+...
+box.cfg.replication_sync_lag
+---
+- 0.123
+...
+box.cfg{replication_sync_lag = replication_sync_lag}
+---
+...
 box.cfg{instance_uuid = box.info.uuid}
 ---
 ...

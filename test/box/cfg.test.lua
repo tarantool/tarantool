@@ -18,6 +18,7 @@ box.cfg{coredump = 'true'}
 -- check comment to issue #2191 - bad argument #2 to ''uri_parse''
 box.cfg{replication = {}}
 box.cfg{replication = {}}
+
 --------------------------------------------------------------------------------
 -- Test of hierarchical cfg type check
 --------------------------------------------------------------------------------
@@ -26,6 +27,14 @@ box.cfg{memtx_memory = "100500"}
 box.cfg{vinyl = "vinyl"}
 box.cfg{vinyl_write_threads = "threads"}
 
+--------------------------------------------------------------------------------
+-- Dynamic configuration check
+--------------------------------------------------------------------------------
+
+replication_sync_lag = box.cfg.replication_sync_lag
+box.cfg{replication_sync_lag = 0.123}
+box.cfg.replication_sync_lag
+box.cfg{replication_sync_lag = replication_sync_lag}
 
 box.cfg{instance_uuid = box.info.uuid}
 box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}

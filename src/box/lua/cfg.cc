@@ -262,6 +262,17 @@ lbox_cfg_set_replication_connect_quorum(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_cfg_set_replication_sync_lag(struct lua_State *L)
+{
+	try {
+		box_set_replication_sync_lag();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
 void
 box_lua_cfg_init(struct lua_State *L)
 {
@@ -286,6 +297,7 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
 		{"cfg_set_replication_connect_timeout", lbox_cfg_set_replication_connect_timeout},
 		{"cfg_set_replication_connect_quorum", lbox_cfg_set_replication_connect_quorum},
+		{"cfg_set_replication_sync_lag", lbox_cfg_set_replication_sync_lag},
 		{NULL, NULL}
 	};
 
