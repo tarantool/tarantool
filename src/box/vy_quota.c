@@ -56,6 +56,16 @@ enum {
 	VY_QUOTA_RATE_AVG_PERIOD = 5,
 };
 
+/**
+ * Returns true if the quota limit is exceeded and so consumers
+ * have to wait.
+ */
+static inline bool
+vy_quota_is_exceeded(struct vy_quota *q)
+{
+	return q->used > q->limit;
+}
+
 static void
 vy_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 {
@@ -152,7 +162,7 @@ vy_quota_set_limit(struct vy_quota *q, size_t limit)
 	q->limit = q->watermark = limit;
 	if (q->used >= limit)
 		q->quota_exceeded_cb(q);
-	fiber_cond_broadcast(&q->cond);
+	fiber_cond_signal(&q->cond);
 }
 
 size_t
@@ -184,28 +194,40 @@ vy_quota_release(struct vy_quota *q, size_t size)
 {
 	assert(q->used >= size);
 	q->used -= size;
-	fiber_cond_broadcast(&q->cond);
+	fiber_cond_signal(&q->cond);
 }
 
 int
 vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 {
-	double start_time = ev_monotonic_now(loop());
-	double deadline = start_time + timeout;
-	while (q->used + size > q->limit && timeout > 0) {
-		q->quota_exceeded_cb(q);
-		if (fiber_cond_wait_deadline(&q->cond, deadline) != 0)
-			break; /* timed out */
-	}
-	double wait_time = ev_monotonic_now(loop()) - start_time;
-	if (wait_time > q->too_long_threshold) {
-		say_warn("waited for %zu bytes of vinyl memory quota "
-			 "for too long: %.3f sec", size, wait_time);
-	}
-	if (q->used + size > q->limit)
-		return -1;
 	q->used += size;
 	q->use_curr += size;
+	if (vy_quota_is_exceeded(q)) {
+		/* Wait for quota. */
+		double start_time = ev_monotonic_now(loop());
+		double deadline = start_time + timeout;
+
+		do {
+			q->quota_exceeded_cb(q);
+			q->used -= size;
+			q->use_curr -= size;
+			if (fiber_cond_wait_deadline(&q->cond, deadline) != 0)
+				return -1; /* timed out */
+			q->used += size;
+			q->use_curr += size;
+		} while (vy_quota_is_exceeded(q));
+
+		double wait_time = ev_monotonic_now(loop()) - start_time;
+		if (wait_time > q->too_long_threshold) {
+			say_warn("waited for %zu bytes of vinyl memory quota "
+				 "for too long: %.3f sec", size, wait_time);
+		}
+		/*
+		 * Wake up the next fiber in the line waiting
+		 * for quota.
+		 */
+		fiber_cond_signal(&q->cond);
+	}
 	if (q->used >= q->watermark)
 		q->quota_exceeded_cb(q);
 	return 0;
@@ -222,7 +244,7 @@ vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used)
 			q->use_curr -= excess;
 		else /* was reset by timeout */
 			q->use_curr = 0;
-		fiber_cond_broadcast(&q->cond);
+		fiber_cond_signal(&q->cond);
 	}
 	if (reserved < used)
 		vy_quota_force_use(q, used - reserved);
