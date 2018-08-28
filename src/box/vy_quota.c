@@ -175,8 +175,13 @@ vy_quota_update_dump_bandwidth(struct vy_quota *q, size_t size,
 {
 	if (duration > 0) {
 		histogram_collect(q->dump_bw_hist, size / duration);
-		q->dump_bw = histogram_percentile(q->dump_bw_hist,
-						  VY_DUMP_BANDWIDTH_PCT);
+		/*
+		 * To avoid unpredictably long stalls, we need to
+		 * know the worst (smallest) dump bandwidth so use
+		 * a lower-bound percentile estimate.
+		 */
+		q->dump_bw = histogram_percentile_lower(q->dump_bw_hist,
+							VY_DUMP_BANDWIDTH_PCT);
 	}
 }
 
