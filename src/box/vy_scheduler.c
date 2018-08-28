@@ -1685,7 +1685,6 @@ vy_task_execute_f(struct cmsg *cmsg)
 		cpipe_push(&worker->tx_pipe, &task->cmsg);
 	} else {
 		worker->task = task;
-		fiber_set_joinable(task->fiber, true);
 		fiber_start(task->fiber, task);
 	}
 }
@@ -2002,6 +2001,8 @@ vy_worker_f(va_list ap)
 	if (worker->task != NULL) {
 		struct fiber *fiber = worker->task->fiber;
 		assert(fiber != NULL);
+		assert(!fiber_is_dead(fiber));
+		fiber_set_joinable(fiber, true);
 		fiber_cancel(fiber);
 		fiber_join(fiber);
 	}
