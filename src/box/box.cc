@@ -1616,8 +1616,6 @@ box_free(void)
 		engine_shutdown();
 		wal_thread_stop();
 	}
-
-	fiber_cond_destroy(&ro_cond);
 }
 
 static void
