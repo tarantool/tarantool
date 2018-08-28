@@ -2626,7 +2626,9 @@ vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 void
 vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit)
 {
-	vinyl->env->run_env.snap_io_rate_limit = limit * 1024 * 1024;
+	int64_t limit_in_bytes = limit * 1024 * 1024;
+	vinyl->env->run_env.snap_io_rate_limit = limit_in_bytes;
+	vy_quota_reset_dump_bandwidth(&vinyl->env->quota, limit_in_bytes);
 }
 
 /** }}} Environment */
