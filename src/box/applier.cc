@@ -213,17 +213,24 @@ applier_connect(struct applier *applier)
 	diag_clear(&fiber()->diag);
 
 	/*
-	 * Tarantool >= 1.10.1: send an IPROTO_VOTE request to
-	 * fetch the master's ballot before proceeding to "join".
-	 * It will be used for leader election on bootstrap.
+	 * Send an IPROTO_VOTE request to fetch the master's ballot
+	 * before proceeding to "join". It will be used for leader
+	 * election on bootstrap.
 	 */
-	if (applier->version_id >= version_id(1, 10, 1)) {
-		xrow_encode_vote(&row);
-		coio_write_xrow(coio, &row);
-		coio_read_xrow(coio, ibuf, &row);
-		if (row.type != IPROTO_OK)
-			xrow_decode_error_xc(&row);
+	xrow_encode_vote(&row);
+	coio_write_xrow(coio, &row);
+	coio_read_xrow(coio, ibuf, &row);
+	if (row.type == IPROTO_OK) {
 		xrow_decode_ballot_xc(&row, &applier->ballot);
+	} else try {
+		xrow_decode_error_xc(&row);
+	} catch (ClientError *e) {
+		if (e->errcode() != ER_UNKNOWN_REQUEST_TYPE)
+			e->raise();
+		/*
+		 * Master isn't aware of IPROTO_VOTE request.
+		 * It's OK - we can proceed without it.
+		 */
 	}
 
 	applier_set_state(applier, APPLIER_CONNECTED);
