@@ -177,6 +177,7 @@ void box_set_replication_timeout(void);
 void box_set_replication_connect_timeout(void);
 void box_set_replication_connect_quorum(void);
 void box_set_replication_sync_lag(void);
+void box_set_replication_sync_timeout(void);
 
 extern "C" {
 #endif /* defined(__cplusplus) */

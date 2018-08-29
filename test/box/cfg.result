@@ -54,6 +54,8 @@ cfg_filter(box.cfg)
     - 30
   - - replication_sync_lag
     - 10
+  - - replication_sync_timeout
+    - 300
   - - replication_timeout
     - 1
   - - rows_per_wal
@@ -143,6 +145,8 @@ cfg_filter(box.cfg)
     - 30
   - - replication_sync_lag
     - 10
+  - - replication_sync_timeout
+    - 300
   - - replication_timeout
     - 1
   - - rows_per_wal
@@ -240,6 +244,19 @@ box.cfg.replication_sync_lag
 - 0.123
 ...
 box.cfg{replication_sync_lag = replication_sync_lag}
+---
+...
+replication_sync_timeout = box.cfg.replication_sync_timeout
+---
+...
+box.cfg{replication_sync_timeout = 123}
+---
+...
+box.cfg.replication_sync_timeout
+---
+- 123
+...
+box.cfg{replication_sync_timeout = replication_sync_timeout}
 ---
 ...
 box.cfg{instance_uuid = box.info.uuid}

@@ -72,6 +72,7 @@ local default_cfg = {
     worker_pool_threads = 4,
     replication_timeout = 1,
     replication_sync_lag = 10,
+    replication_sync_timeout = 300,
     replication_connect_timeout = 30,
     replication_connect_quorum = nil, -- connect all
 }
@@ -128,6 +129,7 @@ local template_cfg = {
     worker_pool_threads = 'number',
     replication_timeout = 'number',
     replication_sync_lag = 'number',
+    replication_sync_timeout = 'number',
     replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
 }
@@ -200,6 +202,7 @@ local dynamic_cfg = {
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
     replication_sync_lag    = private.cfg_set_replication_sync_lag,
+    replication_sync_timeout = private.cfg_set_replication_sync_timeout,
     instance_uuid           = function()
         if box.cfg.instance_uuid ~= box.info.uuid then
             box.error(box.error.CFG, 'instance_uuid',
@@ -222,6 +225,7 @@ local dynamic_cfg_skip_at_load = {
     replication_connect_timeout = true,
     replication_connect_quorum = true,
     replication_sync_lag    = true,
+    replication_sync_timeout = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,

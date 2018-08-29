@@ -36,6 +36,11 @@ box.cfg{replication_sync_lag = 0.123}
 box.cfg.replication_sync_lag
 box.cfg{replication_sync_lag = replication_sync_lag}
 
+replication_sync_timeout = box.cfg.replication_sync_timeout
+box.cfg{replication_sync_timeout = 123}
+box.cfg.replication_sync_timeout
+box.cfg{replication_sync_timeout = replication_sync_timeout}
+
 box.cfg{instance_uuid = box.info.uuid}
 box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}
 

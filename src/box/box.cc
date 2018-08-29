@@ -420,6 +420,17 @@ box_check_replication_sync_lag(void)
 	return lag;
 }
 
+static double
+box_check_replication_sync_timeout(void)
+{
+	double timeout = cfg_getd("replication_sync_timeout");
+	if (timeout <= 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_sync_timeout",
+			  "the value must be greater than 0");
+	}
+	return timeout;
+}
+
 static void
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -546,6 +557,7 @@ box_check_config()
 	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
 	box_check_replication_sync_lag();
+	box_check_replication_sync_timeout();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
@@ -660,6 +672,12 @@ void
 box_set_replication_sync_lag(void)
 {
 	replication_sync_lag = box_check_replication_sync_lag();
+}
+
+void
+box_set_replication_sync_timeout(void)
+{
+	replication_sync_timeout = box_check_replication_sync_timeout();
 }
 
 void
@@ -1754,6 +1772,7 @@ box_cfg_xc(void)
 	box_set_replication_connect_timeout();
 	box_set_replication_connect_quorum();
 	box_set_replication_sync_lag();
+	box_set_replication_sync_timeout();
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 

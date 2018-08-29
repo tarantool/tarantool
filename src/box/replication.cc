@@ -49,6 +49,7 @@ double replication_timeout = 1.0; /* seconds */
 double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
+double replication_sync_timeout = 300.0; /* seconds */
 
 struct replicaset replicaset;
 
@@ -673,12 +674,16 @@ replicaset_sync(void)
 
 	/*
 	 * Wait until all connected replicas synchronize up to
-	 * replication_sync_lag
+	 * replication_sync_lag or return on replication_sync_timeout
 	 */
+	double deadline = ev_monotonic_now(loop()) + replication_sync_timeout;
 	while (replicaset.applier.synced < quorum &&
 	       replicaset.applier.connected +
-	       replicaset.applier.loading >= quorum)
-		fiber_cond_wait(&replicaset.applier.cond);
+	       replicaset.applier.loading >= quorum) {
+		if (fiber_cond_wait_deadline(&replicaset.applier.cond,
+					     deadline) != 0)
+			break;
+	}
 
 	if (replicaset.applier.synced < quorum) {
 		/*

@@ -127,6 +127,12 @@ extern int replication_connect_quorum;
 extern double replication_sync_lag;
 
 /**
+ * Max time to wait for appliers to synchronize before entering
+ * the orphan mode.
+ */
+extern double replication_sync_timeout;
+
+/**
  * Wait for the given period of time before trying to reconnect
  * to a master.
  */
