@@ -199,6 +199,14 @@ vclock_sum(const struct vclock *vclock)
 	return vclock->signature;
 }
 
+/**
+ * Update vclock with the next LSN value for given replica id.
+ *
+ * @param vclock Vector clock.
+ * @param replica_id Replica identifier.
+ * @param lsn Next lsn.
+ * @return previous lsn value.
+ */
 int64_t
 vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn);
 

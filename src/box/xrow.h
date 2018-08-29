@@ -522,6 +522,37 @@ xrow_to_iovec(const struct xrow_header *row, struct iovec *out);
 void
 xrow_decode_error(struct xrow_header *row);
 
+/**
+ * Update vclock with the next LSN value for given replica id.
+ * The function will cause panic if the next LSN happens to be
+ * out of order. The details of provided row are included into
+ * diagnostic message.
+ *
+ * @param vclock Vector clock.
+ * @param row Data row.
+ * @return Previous LSN value.
+ */
+static inline int64_t
+vclock_follow_xrow(struct vclock* vclock, const struct xrow_header *row)
+{
+	assert(row);
+	assert(row->replica_id < VCLOCK_MAX);
+	if (row->lsn <= vclock->lsn[row->replica_id]) {
+		struct request req;
+		const char *req_str = "n/a";
+		if (xrow_decode_dml((struct xrow_header *)row, &req, 0) == 0)
+			req_str = request_str(&req);
+		/* Never confirm LSN out of order. */
+		panic("LSN for %u is used twice or COMMIT order is broken: "
+		      "confirmed: %lld, new: %lld, req: %s",
+		      (unsigned) row->replica_id,
+		      (long long) vclock->lsn[row->replica_id],
+		      (long long) row->lsn,
+		      req_str);
+	}
+	return vclock_follow(vclock, row->replica_id, row->lsn);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 

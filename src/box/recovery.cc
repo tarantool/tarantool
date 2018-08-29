@@ -135,7 +135,7 @@ recovery_scan(struct recovery *r, struct vclock *end_vclock)
 		return;
 	struct xrow_header row;
 	while (xlog_cursor_next(&cursor, &row, true) == 0)
-		vclock_follow(end_vclock, row.replica_id, row.lsn);
+		vclock_follow_xrow(end_vclock, &row);
 	xlog_cursor_close(&cursor, false);
 }
 
@@ -266,7 +266,7 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		 * in case of forced recovery, when we skip the
 		 * failed row anyway.
 		 */
-		vclock_follow(&r->vclock,  row.replica_id, row.lsn);
+		vclock_follow_xrow(&r->vclock, &row);
 		if (xstream_write(stream, &row) == 0) {
 			++row_count;
 			if (row_count % 100000 == 0)

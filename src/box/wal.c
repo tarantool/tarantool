@@ -186,6 +186,12 @@ xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 	struct xrow_header **row = entry->rows;
 	for (; row < entry->rows + entry->n_rows; row++) {
 		(*row)->tm = ev_now(loop());
+		struct errinj *inj = errinj(ERRINJ_WAL_BREAK_LSN, ERRINJ_INT);
+		if (inj != NULL && inj->iparam == (*row)->lsn) {
+			(*row)->lsn = inj->iparam - 1;
+			say_warn("injected broken lsn: %lld",
+				 (long long) (*row)->lsn);
+		}
 		if (xlog_write_row(l, *row) < 0) {
 			/*
 			 * Rollback all un-written rows
@@ -652,8 +658,7 @@ wal_assign_lsn(struct wal_writer *writer, struct xrow_header **row,
 			(*row)->lsn = vclock_inc(&writer->vclock, instance_id);
 			(*row)->replica_id = instance_id;
 		} else {
-			vclock_follow(&writer->vclock, (*row)->replica_id,
-				      (*row)->lsn);
+			vclock_follow_xrow(&writer->vclock, *row);
 		}
 	}
 }
@@ -878,9 +883,8 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 				 */
 				if (vclock_get(&replicaset.vclock,
 					       instance_id) < (*last)->lsn) {
-					vclock_follow(&replicaset.vclock,
-						      instance_id,
-						      (*last)->lsn);
+					vclock_follow_xrow(&replicaset.vclock,
+							   *last);
 				}
 				break;
 			}

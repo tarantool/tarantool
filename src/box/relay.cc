@@ -676,6 +676,13 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 	if (packet->replica_id != relay->replica->id ||
 	    packet->lsn <= vclock_get(&relay->local_vclock_at_subscribe,
 				      packet->replica_id)) {
+		struct errinj *inj = errinj(ERRINJ_RELAY_BREAK_LSN,
+					    ERRINJ_INT);
+		if (inj != NULL && packet->lsn == inj->iparam) {
+			packet->lsn = inj->iparam - 1;
+			say_warn("injected broken lsn: %lld",
+				 (long long) packet->lsn);
+		}
 		relay_send(relay, packet);
 	}
 }
