@@ -110,7 +110,7 @@ static fiber_cond ro_cond;
  * synchronize to a sufficient number of replicas to form
  * a quorum and so was forced to switch to read-only mode.
  */
-static bool is_orphan = true;
+static bool is_orphan;
 
 /* Use the shared instance of xstream for all appliers */
 static struct xstream join_stream;
@@ -219,16 +219,22 @@ box_wait_ro(bool ro, double timeout)
 }
 
 void
-box_clear_orphan(void)
+box_set_orphan(bool orphan)
 {
-	if (!is_orphan)
+	if (is_orphan == orphan)
 		return; /* nothing to do */
 
-	is_orphan = false;
+	is_orphan = orphan;
 	fiber_cond_broadcast(&ro_cond);
 
 	/* Update the title to reflect the new status. */
-	title("running");
+	if (is_orphan) {
+		say_crit("entering orphan mode");
+		title("orphan");
+	} else {
+		say_crit("leaving orphan mode");
+		title("running");
+	}
 }
 
 struct wal_stream {
@@ -646,6 +652,8 @@ box_set_replication(void)
 	box_sync_replication(true);
 	/* Follow replica */
 	replicaset_follow();
+	/* Wait until appliers are in sync */
+	replicaset_sync();
 }
 
 void
@@ -1893,8 +1901,6 @@ box_cfg_xc(void)
 		/** Begin listening only when the local recovery is complete. */
 		box_listen();
 
-		title("orphan");
-
 		/*
 		 * In case of recovering from a checkpoint we
 		 * don't need to wait for 'quorum' masters, since
@@ -1912,8 +1918,6 @@ box_cfg_xc(void)
 		 * master-master replication leader election.
 		 */
 		box_listen();
-
-		title("orphan");
 
 		/*
 		 * Wait for the cluster to start up.
@@ -1951,25 +1955,17 @@ box_cfg_xc(void)
 
 	rmean_cleanup(rmean_box);
 
-	/*
-	 * If this instance is a leader of a newly bootstrapped
-	 * cluster, it is uptodate by definition so leave the
-	 * 'orphan' mode right away to let it initialize cluster
-	 * schema.
-	 */
-	if (is_bootstrap_leader)
-		box_clear_orphan();
-
 	/* Follow replica */
 	replicaset_follow();
 
 	fiber_gc();
 	is_box_configured = true;
 
+	title("running");
+	say_info("ready to accept requests");
+
 	if (!is_bootstrap_leader)
 		replicaset_sync();
-
-	say_info("ready to accept requests");
 }
 
 void
