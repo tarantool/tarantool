@@ -523,7 +523,6 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 	if (pParse->zErrMsg) {
 		*pzErrMsg = pParse->zErrMsg;
 		sqlite3_log(pParse->rc, "%s", *pzErrMsg);
-		pParse->zErrMsg = 0;
 		nErr++;
 	}
 	if (pParse->pVdbe != NULL && pParse->nErr > 0) {

@@ -279,7 +279,6 @@ sqlite3Prepare(sqlite3 * db,	/* Database handle. */
 
 	if (zErrMsg) {
 		sqlite3ErrorWithMsg(db, rc, "%s", zErrMsg);
-		sqlite3DbFree(db, zErrMsg);
 	} else {
 		sqlite3Error(db, rc);
 	}
