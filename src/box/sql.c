@@ -1711,10 +1711,9 @@ sql_check_list_item_init(struct ExprList *expr_list, int column,
 	}
 	if (expr_str != NULL) {
 		item->pExpr = sql_expr_compile(db, expr_str, expr_str_len);
-		if (item->pExpr == NULL) {
-			sqlite3DbFree(db, item->zName);
+		/* The item->zName would be released later. */
+		if (item->pExpr == NULL)
 			return -1;
-		}
 	}
 	return 0;
 }
