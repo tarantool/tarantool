@@ -1010,8 +1010,12 @@ case OP_Halt: {
 	p->pc = pcx;
 	if (p->rc) {
 		if (p->rc == SQL_TARANTOOL_ERROR) {
-			assert(pOp->p4.z != NULL);
-			box_error_set(__FILE__, __LINE__, pOp->p5, pOp->p4.z);
+			if (pOp->p4.z == NULL) {
+				assert(! diag_is_empty(diag_get()));
+			} else {
+				box_error_set(__FILE__, __LINE__, pOp->p5,
+					      pOp->p4.z);
+			}
 		} else if (pOp->p5 != 0) {
 			static const char * const azType[] = { "NOT NULL", "UNIQUE", "CHECK",
 							       "FOREIGN KEY" };
@@ -4313,8 +4317,8 @@ case OP_IdxInsert: {
 	break;
 }
 
-/* Opcode: SInsert P1 P2 * * P5
- * Synopsis: space id = P1, key = r[P2]
+/* Opcode: SInsert P1 P2 P3 * P5
+ * Synopsis: space id = P1, key = r[P3], on error goto P2
  *
  * This opcode is used only during DDL routine.
  * In contrast to ordinary insertion, insertion to system spaces
@@ -4327,15 +4331,15 @@ case OP_IdxInsert: {
  */
 case OP_SInsert: {
 	assert(pOp->p1 > 0);
-	assert(pOp->p2 >= 0);
+	assert(pOp->p2 > 0);
+	assert(pOp->p3 >= 0);
 
-	pIn2 = &aMem[pOp->p2];
+	pIn3 = &aMem[pOp->p3];
 	struct space *space = space_by_id(pOp->p1);
 	assert(space != NULL);
 	assert(space_is_system(space));
-	rc = tarantoolSqlite3Insert(space, pIn2->z, pIn2->z + pIn2->n);
-	if (rc)
-		goto abort_due_to_error;
+	if (tarantoolSqlite3Insert(space, pIn3->z, pIn3->z + pIn3->n) != 0)
+		goto jump_to_p2;
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
 	break;

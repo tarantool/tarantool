@@ -55,6 +55,53 @@
 #include "box/tuple_format.h"
 #include "box/coll_id_cache.h"
 
+/**
+ * Structure that contains information about record that was
+ * inserted into system space.
+ */
+struct saved_record
+{
+	/** A link in a record list. */
+	struct rlist link;
+	/** Id of space in which the record was inserted. */
+	uint32_t space_id;
+	/** First register of the key of the record. */
+	int reg_key;
+	/** Number of registers the key consists of. */
+	int reg_key_count;
+	/** The number of the OP_SInsert operation. */
+	int insertion_opcode;
+};
+
+/**
+ * Save inserted in system space record in list.
+ *
+ * @param parser SQL Parser object.
+ * @param space_id Id of table in which record is inserted.
+ * @param reg_key Register that contains first field of the key.
+ * @param reg_key_count Exact number of fields of the key.
+ * @param insertion_opcode Number of OP_SInsert opcode.
+ */
+static inline void
+save_record(struct Parse *parser, uint32_t space_id, int reg_key,
+	    int reg_key_count, int insertion_opcode)
+{
+	struct saved_record *record =
+		region_alloc(&parser->region, sizeof(*record));
+	if (record == NULL) {
+		diag_set(OutOfMemory, sizeof(*record), "region_alloc",
+			 "record");
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
+		return;
+	}
+	record->space_id = space_id;
+	record->reg_key = reg_key;
+	record->reg_key_count = reg_key_count;
+	record->insertion_opcode = insertion_opcode;
+	rlist_add_entry(&parser->record_list, record, link);
+}
+
 void
 sql_finish_coding(struct Parse *parse_context)
 {
@@ -62,6 +109,42 @@ sql_finish_coding(struct Parse *parse_context)
 	struct sqlite3 *db = parse_context->db;
 	struct Vdbe *v = sqlite3GetVdbe(parse_context);
 	sqlite3VdbeAddOp0(v, OP_Halt);
+	/*
+	 * In case statement "CREATE TABLE ..." fails it can
+	 * left some records in system spaces that shouldn't be
+	 * there. To clean-up properly this code is added. Last
+	 * record isn't deleted because if statement fails than
+	 * it won't be created. This code works the same way for
+	 * other "CREATE ..." statements but it won't delete
+	 * anything as these statements create no more than one
+	 * record.
+	 */
+	if (!rlist_empty(&parse_context->record_list)) {
+		struct saved_record *record =
+			rlist_shift_entry(&parse_context->record_list,
+					  struct saved_record, link);
+		/* Set P2 of SInsert. */
+		sqlite3VdbeChangeP2(v, record->insertion_opcode, v->nOp);
+		MAYBE_UNUSED const char *comment =
+			"Delete entry from %s if CREATE TABLE fails";
+		rlist_foreach_entry(record, &parse_context->record_list, link) {
+			int record_reg = ++parse_context->nMem;
+			sqlite3VdbeAddOp3(v, OP_MakeRecord, record->reg_key,
+					  record->reg_key_count, record_reg);
+			sqlite3VdbeAddOp2(v, OP_SDelete, record->space_id,
+					  record_reg);
+			MAYBE_UNUSED struct space *space =
+				space_by_id(record->space_id);
+			VdbeComment((v, comment, space_name(space)));
+			/* Set P2 of SInsert. */
+			sqlite3VdbeChangeP2(v, record->insertion_opcode,
+					    v->nOp);
+		}
+		sqlite3VdbeAddOp1(v, OP_Halt, SQL_TARANTOOL_ERROR);
+		VdbeComment((v,
+			     "Exit with an error if CREATE statement fails"));
+	}
+
 	if (db->mallocFailed || parse_context->nErr != 0) {
 		if (parse_context->rc == SQLITE_OK)
 			parse_context->rc = SQLITE_ERROR;
@@ -1101,13 +1184,14 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 	sqlite3VdbeAddOp4(v, OP_Blob, index_parts_sz, entry_reg + 5,
 			  SQL_SUBTYPE_MSGPACK, index_parts, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, entry_reg, 6, tuple_reg);
-	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_INDEX_ID, tuple_reg);
+	sqlite3VdbeAddOp3(v, OP_SInsert, BOX_INDEX_ID, 0, tuple_reg);
 	/*
 	 * Non-NULL value means that index has been created via
 	 * separate CREATE INDEX statement.
 	 */
 	if (idx_def->opts.sql != NULL)
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	save_record(parse, BOX_INDEX_ID, entry_reg, 2, v->nOp - 1);
 	return;
 error:
 	parse->rc = SQL_TARANTOOL_ERROR;
@@ -1165,8 +1249,9 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 	sqlite3VdbeAddOp4(v, OP_Blob, table_stmt_sz, iFirstCol + 6,
 			  SQL_SUBTYPE_MSGPACK, table_stmt, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
-	sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SPACE_ID, iRecord);
+	sqlite3VdbeAddOp3(v, OP_SInsert, BOX_SPACE_ID, 0, iRecord);
 	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	save_record(pParse, BOX_SPACE_ID, iFirstCol, 1, v->nOp - 1);
 	return;
 error:
 	pParse->nErr++;
@@ -1340,9 +1425,11 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 			  parent_links, P4_DYNAMIC);
 	sqlite3VdbeAddOp3(vdbe, OP_MakeRecord, constr_tuple_reg, 9,
 			  constr_tuple_reg + 9);
-	sqlite3VdbeAddOp2(vdbe, OP_SInsert, BOX_FK_CONSTRAINT_ID,
+	sqlite3VdbeAddOp3(vdbe, OP_SInsert, BOX_FK_CONSTRAINT_ID, 0,
 			  constr_tuple_reg + 9);
 	sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
+	save_record(parse_context, BOX_FK_CONSTRAINT_ID, constr_tuple_reg, 2,
+		    vdbe->nOp - 1);
 	sqlite3ReleaseTempRange(parse_context, constr_tuple_reg, 10);
 	return;
 error:
@@ -1487,14 +1574,18 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		int reg_seq_record =
 			emitNewSysSequenceRecord(pParse, reg_seq_id,
 						 p->def->name);
-		sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SEQUENCE_ID,
+		sqlite3VdbeAddOp3(v, OP_SInsert, BOX_SEQUENCE_ID, 0,
 				  reg_seq_record);
+		save_record(pParse, BOX_SEQUENCE_ID, reg_seq_record + 1, 1,
+			    v->nOp - 1);
 		/* Do an insertion into _space_sequence. */
 		int reg_space_seq_record =
 			emitNewSysSpaceSequenceRecord(pParse, reg_space_id,
 						      reg_seq_id);
-		sqlite3VdbeAddOp2(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID,
+		sqlite3VdbeAddOp3(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID, 0,
 				  reg_space_seq_record);
+		save_record(pParse, BOX_SPACE_SEQUENCE_ID,
+			    reg_space_seq_record + 1, 1, v->nOp - 1);
 	}
 	/* Code creation of FK constraints, if any. */
 	struct fkey_parse *fk_parse;

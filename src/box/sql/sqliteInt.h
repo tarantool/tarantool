@@ -2765,6 +2765,11 @@ struct Parse {
 	 * Foreign key constraint appeared in CREATE TABLE stmt.
 	 */
 	struct rlist new_fkey;
+	/**
+	 * List of all records that were inserted in system spaces
+	 * in current statement.
+	 */
+	struct rlist record_list;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
 	/** True, if table to be created has AUTOINCREMENT PK. */
 	bool is_new_table_autoinc;

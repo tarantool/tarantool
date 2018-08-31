@@ -274,6 +274,7 @@ sql_parser_create(struct Parse *parser, sqlite3 *db)
 	memset(parser, 0, sizeof(struct Parse));
 	parser->db = db;
 	rlist_create(&parser->new_fkey);
+	rlist_create(&parser->record_list);
 	region_create(&parser->region, &cord()->slabc);
 }
 
