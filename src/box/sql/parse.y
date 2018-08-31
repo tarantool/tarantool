@@ -881,7 +881,11 @@ term(A) ::= INTEGER(X). {
 }
 expr(A) ::= VARIABLE(X).     {
   Token t = X;
-  if( !(X.z[0]=='#' && sqlite3Isdigit(X.z[1])) ){
+  if (pParse->parse_only) {
+    spanSet(&A, &t, &t);
+    sqlite3ErrorMsg(pParse, "bindings are not allowed in DDL");
+    A.pExpr = NULL;
+  } else if (!(X.z[0]=='#' && sqlite3Isdigit(X.z[1]))) {
     u32 n = X.n;
     spanExpr(&A, pParse, TK_VARIABLE, X);
     if (A.pExpr->u.zToken[0] == '?' && n > 1)

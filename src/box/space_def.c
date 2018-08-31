@@ -338,7 +338,8 @@ checks_array_decode(const char **str, uint32_t len, char *opt, uint32_t errcode,
 			box_error_t *err = box_error_last();
 			if (box_error_code(err) != ENOMEM) {
 				snprintf(errmsg, TT_STATIC_BUF_LEN,
-					 "invalid expression specified");
+					 "invalid expression specified (%s)",
+					 box_error_message(err));
 				diag_set(ClientError, errcode, field_no,
 					 errmsg);
 			}

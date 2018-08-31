@@ -561,10 +561,10 @@ sql_expr_compile(sqlite3 *db, const char *expr, int expr_len)
 	}
 	sprintf(stmt, "%s%.*s", outer, expr_len, expr);
 
-	char *unused;
-	if (sqlite3RunParser(&parser, stmt, &unused) != SQLITE_OK ||
+	char *sql_error = NULL;
+	if (sqlite3RunParser(&parser, stmt, &sql_error) != SQLITE_OK ||
 	    parser.parsed_ast_type != AST_TYPE_EXPR) {
-		diag_set(ClientError, ER_SQL_EXECUTE, stmt);
+		diag_set(ClientError, ER_SQL, sql_error);
 	} else {
 		expression = parser.parsed_ast.expr;
 		parser.parsed_ast.expr = NULL;
@@ -602,7 +602,7 @@ sql_trigger_compile(struct sqlite3 *db, const char *sql)
 	struct Parse parser;
 	sql_parser_create(&parser, db);
 	parser.parse_only = true;
-	char *sql_error;
+	char *sql_error = NULL;
 	struct sql_trigger *trigger = NULL;
 	if (sqlite3RunParser(&parser, sql, &sql_error) != SQLITE_OK ||
 	    parser.parsed_ast_type != AST_TYPE_TRIGGER) {

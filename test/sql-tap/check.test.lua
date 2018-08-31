@@ -555,7 +555,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.1>
-        1, "Failed to create space 'T5': SQL error: parameters prohibited in CHECK constraints"
+        1, "Wrong space options (field 5): invalid expression specified (SQL error: bindings are not allowed in DDL)"
         -- </check-5.1>
     })
 
@@ -567,7 +567,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.2>
-        1, "Failed to create space 'T5': SQL error: parameters prohibited in CHECK constraints"
+        1, "Wrong space options (field 5): invalid expression specified (SQL error: bindings are not allowed in DDL)"
         -- </check-5.2>
     })
 

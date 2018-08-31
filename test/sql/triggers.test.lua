@@ -155,3 +155,13 @@ box.sql.execute("UPDATE v SET s1 = s1 + 5;")
 box.sql.execute("SELECT * FROM t;")
 box.sql.execute("DROP VIEW v;")
 box.sql.execute("DROP TABLE t;")
+
+--
+-- gh-3653: Dissallow bindings for DDL
+--
+box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
+space_id = box.space.T1.id
+box.sql.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 WHEN new.a = ? BEGIN SELECT 1; END;")
+tuple = {"TR1", space_id, {sql = [[CREATE TRIGGER tr1 AFTER INSERT ON t1 WHEN new.a = ? BEGIN SELECT 1; END;]]}}
+box.space._trigger:insert(tuple)
+box.sql.execute("DROP TABLE t1;")

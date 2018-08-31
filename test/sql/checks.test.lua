@@ -50,4 +50,15 @@ s = box.space._space:insert(t)
 box.sql.execute("CREATE TABLE w2 (s1 INT PRIMARY KEY, CHECK ((SELECT COUNT(*) FROM w2) = 0));")
 box.sql.execute("DROP TABLE w2;")
 
+--
+-- gh-3653: Dissallow bindings for DDL
+--
+box.sql.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
+
+opts = {checks = {{expr = '?>5', name = 'ONE'}}}
+format = {{name = 'X', type = 'unsigned'}}
+t = {513, 1, 'test', 'memtx', 0, opts, format}
+s = box.space._space:insert(t)
+
+
 test_run:cmd("clear filter")
