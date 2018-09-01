@@ -71,7 +71,15 @@ vy_cache_env_destroy(struct vy_cache_env *e)
 static inline size_t
 vy_cache_entry_size(const struct vy_cache_entry *entry)
 {
-	return sizeof(*entry) + tuple_size(entry->stmt);
+	size_t size = sizeof(*entry);
+	/*
+	 * Tuples are shared between primary and secondary index
+	 * cache so to avoid double accounting, we account only
+	 * primary index tuples.
+	 */
+	if (entry->cache->is_primary)
+		size += tuple_size(entry->stmt);
+	return size;
 }
 
 static struct vy_cache_entry *
@@ -128,10 +136,11 @@ vy_cache_tree_page_free(void *ctx, void *p)
 
 void
 vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
-		struct key_def *cmp_def)
+		struct key_def *cmp_def, bool is_primary)
 {
 	cache->env = env;
 	cache->cmp_def = cmp_def;
+	cache->is_primary = is_primary;
 	cache->version = 1;
 	vy_cache_tree_create(&cache->cache_tree, cmp_def,
 			     vy_cache_tree_page_alloc,

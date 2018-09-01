@@ -232,7 +232,7 @@ create_test_cache(uint32_t *fields, uint32_t *types,
 {
 	*def = box_key_def_new(fields, types, key_cnt);
 	assert(*def != NULL);
-	vy_cache_create(cache, &cache_env, *def);
+	vy_cache_create(cache, &cache_env, *def, true);
 	*format = tuple_format_new(&vy_tuple_format_vtab, def, 1, 0, NULL, 0,
 				   NULL);
 	tuple_format_ref(*format);

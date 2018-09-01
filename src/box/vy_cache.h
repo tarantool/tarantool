@@ -160,6 +160,8 @@ struct vy_cache {
 	 * key parts
 	 */
 	struct key_def *cmp_def;
+	/** Set if this cache is for a primary index. */
+	bool is_primary;
 	/* Tree of cache entries */
 	struct vy_cache_tree cache_tree;
 	/* The vesrion of state of cache_tree. Increments on every change */
@@ -174,10 +176,11 @@ struct vy_cache {
  * Allocate and initialize tuple cache.
  * @param env - pointer to common cache environment.
  * @param cmp_def - key definition for tuple comparison.
+ * @param is_primary - set if cache is for primary index
  */
 void
 vy_cache_create(struct vy_cache *cache, struct vy_cache_env *env,
-		struct key_def *cmp_def);
+		struct key_def *cmp_def, bool is_primary);
 
 /**
  * Destroy and deallocate tuple cache.

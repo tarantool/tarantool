@@ -82,7 +82,7 @@ test_basic()
 	struct key_def *key_def = box_key_def_new(fields, types, 1);
 	isnt(key_def, NULL, "key_def is not NULL");
 
-	vy_cache_create(&cache, &cache_env, key_def);
+	vy_cache_create(&cache, &cache_env, key_def, true);
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
 						       &key_def, 1, 0, NULL, 0,
 						       NULL);

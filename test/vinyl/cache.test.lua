@@ -380,3 +380,21 @@ st2.put.rows - st1.put.rows
 box.stat.vinyl().cache.used
 s:drop()
 box.cfg{vinyl_cache = vinyl_cache}
+
+--
+-- gh-3655: statements are shared between primary and secondary
+-- index cache.
+--
+vinyl_cache = box.cfg.vinyl_cache
+box.cfg{vinyl_cache = 1024 * 1024}
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+_ = s:create_index('i1', {unique = false, parts = {2, 'string'}})
+_ = s:create_index('i2', {unique = false, parts = {3, 'string'}})
+for i = 1, 100 do pad = string.rep(i % 10, 1000) s:replace{i, pad, pad} end
+s.index.pk:count()
+s.index.i1:count()
+s.index.i2:count()
+box.stat.vinyl().cache.used -- should be about 200 KB
+s:drop()
+box.cfg{vinyl_cache = vinyl_cache}
