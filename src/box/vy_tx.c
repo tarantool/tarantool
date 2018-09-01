@@ -137,6 +137,25 @@ tx_manager_delete(struct tx_manager *xm)
 	free(xm);
 }
 
+size_t
+tx_manager_mem_used(struct tx_manager *xm)
+{
+	struct mempool_stats mstats;
+	size_t ret = 0;
+
+	ret += xm->write_set_size + xm->read_set_size;
+	mempool_stats(&xm->tx_mempool, &mstats);
+	ret += mstats.totals.used;
+	mempool_stats(&xm->txv_mempool, &mstats);
+	ret += mstats.totals.used;
+	mempool_stats(&xm->read_interval_mempool, &mstats);
+	ret += mstats.totals.used;
+	mempool_stats(&xm->read_view_mempool, &mstats);
+	ret += mstats.totals.used;
+
+	return ret;
+}
+
 /** Create or reuse an instance of a read view. */
 static struct vy_read_view *
 tx_manager_read_view(struct tx_manager *xm)

@@ -268,6 +268,10 @@ tx_manager_new(void);
 void
 tx_manager_delete(struct tx_manager *xm);
 
+/** Return total amount of memory used by active transactions. */
+size_t
+tx_manager_mem_used(struct tx_manager *xm);
+
 /**
  * Abort all rw transactions that affect the given LSM tree
  * and haven't reached WAL yet.

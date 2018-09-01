@@ -1031,21 +1031,21 @@ for i = 1, 100 do s:replace{i, string.rep('x', 1000)} end
 for i = 1, 100 do s:get{i} end
 ---
 ...
-box.stat.vinyl().cache.used
+box.stat.vinyl().memory.tuple_cache
 ---
 - 107700
 ...
 box.cfg{vinyl_cache = 50 * 1000}
 ---
 ...
-box.stat.vinyl().cache.used
+box.stat.vinyl().memory.tuple_cache
 ---
 - 49542
 ...
 box.cfg{vinyl_cache = 0}
 ---
 ...
-box.stat.vinyl().cache.used
+box.stat.vinyl().memory.tuple_cache
 ---
 - 0
 ...
@@ -1067,7 +1067,7 @@ st2.put.rows - st1.put.rows
 ---
 - 0
 ...
-box.stat.vinyl().cache.used
+box.stat.vinyl().memory.tuple_cache
 ---
 - 0
 ...
@@ -1114,7 +1114,7 @@ s.index.i2:count()
 ---
 - 100
 ...
-box.stat.vinyl().cache.used -- should be about 200 KB
+box.stat.vinyl().memory.tuple_cache -- should be about 200 KB
 ---
 - 216800
 ...

@@ -263,23 +263,6 @@ vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 }
 
 static void
-vy_info_append_cache(struct vy_env *env, struct info_handler *h)
-{
-	struct vy_cache_env *c = &env->cache_env;
-
-	info_table_begin(h, "cache");
-
-	info_append_int(h, "used", c->mem_used);
-	info_append_int(h, "limit", c->mem_quota);
-
-	struct mempool_stats mstats;
-	mempool_stats(&c->cache_entry_mempool, &mstats);
-	info_append_int(h, "tuples", mstats.objcount);
-
-	info_table_end(h);
-}
-
-static void
 vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 {
 	struct tx_manager *xm = env->xm;
@@ -303,6 +286,18 @@ vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 	info_table_end(h);
 }
 
+static void
+vy_info_append_memory(struct vy_env *env, struct info_handler *h)
+{
+	info_table_begin(h, "memory");
+	info_append_int(h, "tx", tx_manager_mem_used(env->xm));
+	info_append_int(h, "level0", lsregion_used(&env->mem_env.allocator));
+	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
+	info_append_int(h, "page_index", env->lsm_env.page_index_size);
+	info_append_int(h, "bloom_filter", env->lsm_env.bloom_size);
+	info_table_end(h);
+}
+
 void
 vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 {
@@ -310,8 +305,8 @@ vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 
 	info_begin(h);
 	vy_info_append_quota(env, h);
-	vy_info_append_cache(env, h);
 	vy_info_append_tx(env, h);
+	vy_info_append_memory(env, h);
 	info_end(h);
 }
 
@@ -466,7 +461,6 @@ static void
 vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
 	struct vy_env *env = vy_env(engine);
-	struct mempool_stats mstats;
 
 	stat->data += lsregion_used(&env->mem_env.allocator) -
 				env->mem_env.tree_extent_size;
@@ -474,15 +468,7 @@ vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	stat->index += env->lsm_env.bloom_size;
 	stat->index += env->lsm_env.page_index_size;
 	stat->cache += env->cache_env.mem_used;
-	stat->tx += env->xm->write_set_size + env->xm->read_set_size;
-	mempool_stats(&env->xm->tx_mempool, &mstats);
-	stat->tx += mstats.totals.used;
-	mempool_stats(&env->xm->txv_mempool, &mstats);
-	stat->tx += mstats.totals.used;
-	mempool_stats(&env->xm->read_interval_mempool, &mstats);
-	stat->tx += mstats.totals.used;
-	mempool_stats(&env->xm->read_view_mempool, &mstats);
-	stat->tx += mstats.totals.used;
+	stat->tx += tx_manager_mem_used(env->xm);
 }
 
 static void
