@@ -24,6 +24,11 @@ i1 = s:create_index('i1', {run_count_per_level = 10, parts = {2, 'unsigned'}, un
 i2 = s:create_index('i2', {run_count_per_level = 10, parts = {3, 'unsigned'}, unique = true})
 ---
 ...
+-- space.create_index() does a lookup in the primary index
+-- so reset the stats before filling up the space.
+box.stat.reset()
+---
+...
 for i = 1, 10 do s:replace{i, i, i} end
 ---
 ...

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(20)
+test:plan(21)
 
 -- This suite is aimed to test ALTER TABLE ADD CONSTRAINT statement.
 --
@@ -61,10 +61,22 @@ test:do_execsql_test(
         -- </alter2-1.5>
     })
 
+test:do_test(
+    "alter2-1.5.1",
+    function()
+        test:execsql([[DELETE FROM t1;]])
+        if box.space.T1.engine == 'vinyl' then
+            -- trigger dump to empty the space
+            box.snapshot()
+        end
+    end, {
+        -- <alter2-1.5.1>
+        -- </alter2-1.5.1>
+    })
+
 test:do_catchsql_test(
     "alter2-1.6",
     [[
-        DELETE FROM t1;
         CREATE UNIQUE INDEX i1 ON t1(b, a);
         ALTER TABLE t1 ADD CONSTRAINT fk1 FOREIGN KEY (a, b) REFERENCES t1(b, a);
         INSERT INTO t1 VALUES(3, 1, 1);
@@ -91,11 +103,10 @@ test:do_test(
     "alter2-1.7.1",
     function()
         test:execsql([[DELETE FROM t1;]])
-        t1 = box.space.T1
-        if t1.engine ~= 'vinyl' then
-            return
+        if box.space.T1.engine == 'vinyl' then
+            -- trigger dump to empty the space
+            box.snapshot()
         end
-        box.snapshot()
     end, {
         -- <alter2-1.7.1>
         -- </alter2-1.7.1>

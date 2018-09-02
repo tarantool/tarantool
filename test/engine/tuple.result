@@ -891,6 +891,69 @@ t["{"]
 s:drop()
 ---
 ...
+--
+-- gh-3631: Wrong 'tomap' work with nullable fields
+--
+format = {}
+---
+...
+format[1] = {'first', 'unsigned'}
+---
+...
+format[2] = {'second', 'unsigned'}
+---
+...
+format[3] = {'third', 'unsigned'}
+---
+...
+format[4] = {'fourth', 'string', is_nullable = true}
+---
+...
+s = box.schema.space.create('test', {format = format, engine = engine})
+---
+...
+pk = s:create_index('primary', {parts = {1, 'unsigned'}})
+---
+...
+s:insert({1, 2, 3})
+---
+- [1, 2, 3]
+...
+tuple = s:get(1)
+---
+...
+tuple
+---
+- [1, 2, 3]
+...
+-- Should be NULL
+tuple.fourth
+---
+- null
+...
+-- Should have only three named fields
+tuple:tomap()
+---
+- 1: 1
+  2: 2
+  3: 3
+  third: 3
+  second: 2
+  first: 1
+...
+-- Should be NULL
+tuple:tomap().fourth
+---
+- null
+...
+-- Should be nil
+type(tuple:tomap().fourth)
+---
+- nil
+...
+s:drop()
+---
+...
 engine = nil
 ---
 ...

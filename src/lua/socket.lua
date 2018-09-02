@@ -86,8 +86,12 @@ local function check_socket(socket)
     end
 end
 
-local function make_socket(fd)
-    local socket = { _gc_socket = ffi.new(gc_socket_t, { fd = fd }) }
+local function make_socket(fd, itype)
+    assert(itype ~= nil)
+    local socket = {
+        _gc_socket = ffi.new(gc_socket_t, { fd = fd }),
+        itype = itype,
+    }
     return setmetatable(socket, socket_mt)
 end
 
@@ -590,7 +594,7 @@ local function socket_accept(self)
         self._errno = boxerrno()
         return nil
     end
-    local client = make_socket(client_fd)
+    local client = make_socket(client_fd, self.itype)
     if not client:nonblock(true) then
         client:close()
         return
@@ -770,6 +774,56 @@ local function socket_send(self, octets, flags)
     return tonumber(res)
 end
 
+-- Returns nil and sets EAGAIN when tries to determine the next
+-- datagram length and there are no datagrams in the receive
+-- queue.
+local function get_recv_size(self, size)
+    if size ~= nil then
+        return size
+    end
+
+    if self.itype ~= get_ivalue(internal.SO_TYPE, 'SOCK_DGRAM') then
+        return 512
+    end
+
+    -- Determine the next datagram length.
+    local fd = check_socket(self)
+    self._errno = nil
+    if jit.os == 'OSX' then
+        size = self:getsockopt('SOL_SOCKET', 'SO_NREAD')
+        -- recv() with zero length buffer is always successful on
+        -- Mac OS (at least for valid UDP sockets), so we need
+        -- extra calls below to distinguish a zero length datagram
+        -- from no datagram situation to set EAGAIN correctly.
+        if size == 0 then
+            -- No datagram or zero length datagram: distinguish
+            -- them using message peek.
+            local iflags = get_iflags(internal.SEND_FLAGS, {'MSG_PEEK'})
+            assert(iflags ~= nil)
+            local buf = ffi.new('char[?]', 1)
+            size = tonumber(ffi.C.recv(fd, buf, 1, iflags))
+            -- Prevent race condition: proceed with the case when
+            -- a datagram of length > 0 has been arrived after the
+            -- getsockopt call above.
+            if size > 0 then
+                size = self:getsockopt('SOL_SOCKET', 'SO_NREAD')
+                assert(size > 0)
+            end
+        end
+    else
+        local iflags = get_iflags(internal.SEND_FLAGS, {'MSG_TRUNC', 'MSG_PEEK'})
+        assert(iflags ~= nil)
+        size = tonumber(ffi.C.recv(fd, nil, 0, iflags))
+    end
+
+    if size == -1 then
+        self._errno = boxerrno()
+        return nil
+    end
+
+    return size
+end
+
 local function socket_recv(self, size, flags)
     local fd = check_socket(self)
     local iflags = get_iflags(internal.SEND_FLAGS, flags)
@@ -778,7 +832,11 @@ local function socket_recv(self, size, flags)
         return nil
     end
 
-    size = size or 512
+    size = get_recv_size(self, size)
+    if size == nil then
+        return nil
+    end
+
     self._errno = nil
     local buf = ffi.new("char[?]", size)
 
@@ -799,7 +857,11 @@ local function socket_recvfrom(self, size, flags)
         return nil
     end
 
-    size = size or 512
+    size = get_recv_size(self, size)
+    if size == nil then
+        return nil
+    end
+
     self._errno = nil
     local res, from = internal.recvfrom(fd, size, iflags)
     if res == nil then
@@ -860,7 +922,7 @@ local function socket_new(domain, stype, proto)
 
     local fd = ffi.C.socket(idomain, itype, iproto)
     if fd >= 0 then
-        local socket = make_socket(fd)
+        local socket = make_socket(fd, itype)
         if not socket:nonblock(true) then
             socket:close()
         else

@@ -103,7 +103,6 @@ replication_free(void)
 		relay_cancel(replica->relay);
 
 	free(replicaset.replica_by_id);
-	fiber_cond_destroy(&replicaset.applier.cond);
 }
 
 void

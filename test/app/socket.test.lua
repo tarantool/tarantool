@@ -736,4 +736,207 @@ sc:connect(host, port)
 sc:close()
 s:close()
 
+--------------------------------------------------------------------------------
+-- gh-3619: socket.recvfrom crops UDP packets
+--------------------------------------------------------------------------------
+
+test_run:cmd("setopt delimiter ';'")
+function sendto_zero(self, host, port)
+    local fd = self:fd()
+
+    host = tostring(host)
+    port = tostring(port)
+
+    local addrbuf = ffi.new('char[128]') --[[ enough to fit any address ]]
+    local addr = ffi.cast('struct sockaddr *', addrbuf)
+    local addr_len = ffi.new('socklen_t[1]')
+    addr_len[0] = ffi.sizeof(addrbuf)
+
+    self._errno = nil
+    local res = ffi.C.lbox_socket_local_resolve(host, port, addr, addr_len)
+    if res == 0 then
+        res = ffi.C.sendto(fd, nil, 0, 0, addr, addr_len[0])
+    end
+
+    if res < 0 then
+        self._errno = boxerrno()
+        return nil
+    end
+
+    return tonumber(res)
+end;
+test_run:cmd("setopt delimiter ''");
+
+receiving_socket = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+receiving_socket:bind('127.0.0.1', 0)
+receiving_socket_port = receiving_socket:name().port
+sending_socket = socket('AF_INET', 'SOCK_DGRAM', 'udp')
+
+-- case: recv, no datagram
+received_message = receiving_socket:recv()
+e = receiving_socket:errno()
+received_message == nil -- expected true
+received_message
+e == errno.EAGAIN -- expected true
+
+-- case: recvfrom, no datagram
+received_message, from = receiving_socket:recvfrom()
+e = receiving_socket:errno()
+received_message == nil -- expected true
+received_message
+from == nil -- expected true
+from
+e == errno.EAGAIN -- expected true
+
+-- case: recv, zero datagram
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+received_message = receiving_socket:recv()
+e = receiving_socket:errno()
+received_message == '' -- expected true
+received_message
+e == 0 -- expected true
+
+-- case: recvfrom, zero datagram
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+received_message, from = receiving_socket:recvfrom()
+e = receiving_socket:errno()
+received_message == '' -- expected true
+received_message
+from ~= nil -- expected true
+from.host == '127.0.0.1' -- expected true
+e == 0 -- expected true
+
+-- case: recv, no datagram, explicit size
+received_message = receiving_socket:recv(512)
+e = receiving_socket:errno()
+received_message == nil -- expected true
+received_message
+e == errno.EAGAIN -- expected true
+
+-- case: recvfrom, no datagram, explicit size
+received_message, from = receiving_socket:recvfrom(512)
+e = receiving_socket:errno()
+received_message == nil -- expected true
+received_message
+from == nil -- expected true
+from
+e == errno.EAGAIN -- expected true
+
+-- case: recv, zero datagram, explicit size
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+received_message = receiving_socket:recv(512)
+e = receiving_socket:errno()
+received_message == '' -- expected true
+received_message
+e == 0 -- expected true
+
+-- case: recvfrom, zero datagram, explicit size
+sendto_zero(sending_socket, '127.0.0.1', receiving_socket_port)
+received_message, from = receiving_socket:recvfrom(512)
+e = receiving_socket:errno()
+received_message == '' -- expected true
+received_message
+from ~= nil -- expected true
+from.host == '127.0.0.1' -- expected true
+e == 0 -- expected true
+
+message_len = 1025
+message = string.rep('x', message_len)
+
+-- case: recv, non-zero length datagram, the buffer size should be evaluated
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+received_message = receiving_socket:recv()
+e = receiving_socket:errno()
+received_message == message -- expected true
+received_message:len()
+received_message
+e == 0 -- expected true
+e
+
+-- case: recvfrom, non-zero length datagram, the buffer size should be
+-- evaluated
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+received_message, from = receiving_socket:recvfrom()
+e = receiving_socket:errno()
+received_message == message -- expected true
+received_message:len()
+received_message
+from ~= nil -- expected true
+from.host == '127.0.0.1' -- expected true
+e == 0 -- expected true
+e
+
+-- case: recv truncates a datagram larger then the buffer of an explicit size
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+received_message = receiving_socket:recv(512)
+e = receiving_socket:errno()
+received_message == message:sub(1, 512) -- expected true
+received_message:len() == 512 -- expected true
+received_message
+received_message:len()
+e == 0 -- expected true
+e
+
+-- we set the different message to ensure the tail of the previous datagram was
+-- discarded
+message_len = 1025
+message = string.rep('y', message_len)
+
+-- case: recvfrom truncates a datagram larger then the buffer of an explicit size
+sending_socket:sendto('127.0.0.1', receiving_socket_port, message)
+received_message, from = receiving_socket:recvfrom(512)
+e = receiving_socket:errno()
+received_message == message:sub(1, 512) -- expected true
+received_message:len() == 512 -- expected true
+received_message
+received_message:len()
+from ~= nil -- expected true
+from.host == '127.0.0.1' -- expected true
+e == 0 -- expected true
+e
+
+receiving_socket:close()
+sending_socket:close()
+
+message_len = 513
+message = string.rep('x', message_len)
+
+listening_socket = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+listening_socket:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
+listening_socket:bind('127.0.0.1', 0)
+listening_socket:listen()
+listening_socket_port = listening_socket:name().port
+sending_socket = socket('AF_INET', 'SOCK_STREAM', 'tcp')
+sending_socket:sysconnect('127.0.0.1', listening_socket_port) or errno() == errno.EINPROGRESS
+receiving_socket = listening_socket:accept()
+sending_socket:write(message)
+
+-- case: recvfrom reads first 512 bytes from the message with tcp
+received_message, from = receiving_socket:recvfrom()
+e = receiving_socket:errno()
+received_message == message:sub(1, 512) -- expected true
+received_message:len() == 512 -- expected true
+received_message
+received_message:len()
+from == nil -- expected true
+from
+e == 0 -- expected true
+e
+
+-- case: recvfrom does not discard the message tail with tcp
+received_message, from = receiving_socket:recvfrom()
+e = receiving_socket:errno()
+received_message == message:sub(513, 513) -- expected true
+received_message:len() == 1 -- expected true
+received_message
+received_message:len()
+from == nil -- expected true
+from
+e == 0 -- expected true
+e
+
+receiving_socket:close()
+sending_socket:close()
+listening_socket:close()
+
 test_run:cmd("clear filter")

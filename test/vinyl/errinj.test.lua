@@ -765,3 +765,88 @@ errinj.set("ERRINJ_VY_SCHED_TIMEOUT", 0)
 
 box.snapshot() -- ok
 s:drop()
+
+--
+-- gh-3458: check that rw transactions that started before DDL are
+-- aborted.
+--
+vinyl_cache = box.cfg.vinyl_cache
+box.cfg{vinyl_cache = 0}
+
+s1 = box.schema.space.create('test1', {engine = 'vinyl'})
+_ = s1:create_index('pk', {page_size = 16})
+s2 = box.schema.space.create('test2', {engine = 'vinyl'})
+_ = s2:create_index('pk')
+
+pad = string.rep('x', 16)
+for i = 101, 200 do s1:replace{i, i, pad} end
+box.snapshot()
+
+test_run:cmd("setopt delimiter ';'")
+function async_replace(space, tuple, timeout)
+    local c = fiber.channel(1)
+    fiber.create(function()
+        box.begin()
+        space:replace(tuple)
+        fiber.sleep(timeout)
+        local status = pcall(box.commit)
+        c:put(status)
+    end)
+    return c
+end;
+test_run:cmd("setopt delimiter ''");
+
+c1 = async_replace(s1, {1}, 0.01)
+c2 = async_replace(s2, {1}, 0.01)
+
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
+s1:format{{'key', 'unsigned'}, {'value', 'unsigned'}}
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0)
+
+c1:get() -- false (transaction was aborted)
+c2:get() -- true
+
+s1:get(1) == nil
+s2:get(1) ~= nil
+s1:format()
+s1:format{}
+
+c1 = async_replace(s1, {2}, 0.01)
+c2 = async_replace(s2, {2}, 0.01)
+
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
+_ = s1:create_index('sk', {parts = {2, 'unsigned'}})
+errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0)
+
+c1:get() -- false (transaction was aborted)
+c2:get() -- true
+
+s1:get(2) == nil
+s2:get(2) ~= nil
+s1.index.pk:count() == s1.index.sk:count()
+
+s1:drop()
+s2:drop()
+box.cfg{vinyl_cache = vinyl_cache}
+
+-- Transactions that reached WAL must not be aborted.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+
+errinj.set('ERRINJ_WAL_DELAY', true)
+_ = fiber.create(function() s:replace{1} end)
+_ = fiber.create(function() fiber.sleep(0.01) errinj.set('ERRINJ_WAL_DELAY', false) end)
+
+fiber.sleep(0)
+s:format{{'key', 'unsigned'}, {'value', 'unsigned'}} -- must fail
+s:select()
+s:truncate()
+
+errinj.set('ERRINJ_WAL_DELAY', true)
+_ = fiber.create(function() s:replace{1} end)
+_ = fiber.create(function() fiber.sleep(0.01) errinj.set('ERRINJ_WAL_DELAY', false) end)
+
+fiber.sleep(0)
+s:create_index('sk', {parts = {2, 'unsigned'}})
+s:select()
+s:drop()

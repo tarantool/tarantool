@@ -136,6 +136,9 @@ box.schema.user.revoke('rich', 'read,write', 'universe')
 box.schema.user.revoke('rich', 'public')
 ---
 ...
+box.schema.user.revoke('rich', 'alter', 'user', 'rich')
+---
+...
 box.schema.user.disable("rich")
 ---
 ...
@@ -501,6 +504,7 @@ box.space._priv:select{id}
 ---
 - - [1, 32, 'role', 2, 4]
   - [1, 32, 'universe', 0, 27]
+  - [1, 32, 'user', 32, 128]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
@@ -510,6 +514,7 @@ box.space._priv:select{id}
 ---
 - - [1, 32, 'role', 2, 4]
   - [1, 32, 'universe', 0, 27]
+  - [1, 32, 'user', 32, 128]
 ...
 box.schema.user.revoke('user', 'write', 'universe')
 ---
@@ -518,6 +523,7 @@ box.space._priv:select{id}
 ---
 - - [1, 32, 'role', 2, 4]
   - [1, 32, 'universe', 0, 25]
+  - [1, 32, 'user', 32, 128]
 ...
 box.schema.user.revoke('user', 'read', 'universe')
 ---
@@ -526,6 +532,7 @@ box.space._priv:select{id}
 ---
 - - [1, 32, 'role', 2, 4]
   - [1, 32, 'universe', 0, 24]
+  - [1, 32, 'user', 32, 128]
 ...
 box.schema.user.grant('user', 'write', 'universe')
 ---
@@ -534,6 +541,7 @@ box.space._priv:select{id}
 ---
 - - [1, 32, 'role', 2, 4]
   - [1, 32, 'universe', 0, 26]
+  - [1, 32, 'user', 32, 128]
 ...
 box.schema.user.grant('user', 'read', 'universe')
 ---
@@ -542,6 +550,7 @@ box.space._priv:select{id}
 ---
 - - [1, 32, 'role', 2, 4]
   - [1, 32, 'universe', 0, 27]
+  - [1, 32, 'user', 32, 128]
 ...
 box.schema.user.drop('user')
 ---
@@ -967,6 +976,9 @@ box.schema.user.info('test_user')
   - - session,usage
     - universe
     - 
+  - - alter
+    - user
+    - test_user
 ...
 box.schema.role.info('test_role')
 ---
@@ -997,6 +1009,9 @@ box.schema.user.info('test_user')
   - - session,usage
     - universe
     - 
+  - - alter
+    - user
+    - test_user
 ...
 box.schema.role.info('test_role')
 ---
@@ -1866,5 +1881,171 @@ box.session.su('admin')
 ---
 ...
 box.schema.user.drop('tester')
+---
+...
+--
+-- test case for 3530: do not ignore single object privileges
+--
+box.schema.user.create("test")
+---
+...
+_ = box.schema.space.create("space1")
+---
+...
+box.schema.user.grant("test", "read", "space", "space1")
+---
+...
+box.schema.user.grant("test", "write", "space", "_index")
+---
+...
+box.session.su("test")
+---
+...
+box.space.space1:create_index("pk")
+---
+- error: Create access to space 'space1' is denied for user 'test'
+...
+box.session.su("admin")
+---
+...
+box.space.space1.index[0] == nil
+---
+- true
+...
+box.schema.user.grant("test", "create", "space", "space1")
+---
+...
+box.session.su("test")
+---
+...
+_ = box.space.space1:create_index("pk")
+---
+...
+box.space.space1:insert{5}
+---
+- error: Write access to space 'space1' is denied for user 'test'
+...
+box.session.su("admin")
+---
+...
+box.space.space1.index[0] ~= nil
+---
+- true
+...
+box.space.space1:select{}
+---
+- []
+...
+box.schema.user.grant("test", "write", "space", "space1")
+---
+...
+box.session.su("test")
+---
+...
+box.space.space1:insert{5}
+---
+- [5]
+...
+box.session.su("admin")
+---
+...
+box.space.space1:select{}
+---
+- - [5]
+...
+box.schema.user.drop("test")
+---
+...
+box.space.space1:drop()
+---
+...
+--
+-- test that it is possible to grant privileges on a single user.
+box.schema.user.create("user1")
+---
+...
+box.schema.user.create("user2")
+---
+...
+box.schema.user.create("user3")
+---
+...
+box.schema.user.grant("user1", "write", "space", "_user")
+---
+...
+box.schema.user.grant("user1", "read", "space", "_user")
+---
+...
+box.space._user:select{}
+---
+- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
+  - [1, 1, 'admin', 'user', {}]
+  - [2, 1, 'public', 'role', {}]
+  - [3, 1, 'replication', 'role', {}]
+  - [31, 1, 'super', 'role', {}]
+  - [32, 1, 'user1', 'user', {}]
+  - [33, 1, 'user2', 'user', {}]
+  - [34, 1, 'user3', 'user', {}]
+...
+box.session.su("user1")
+---
+...
+-- can alter itself, but can't alter others without privileges.
+box.schema.user.passwd("user1", "abcd")
+---
+...
+box.schema.user.passwd("user2", "abcd")
+---
+- error: Alter access to user 'user2' is denied for user 'user1'
+...
+box.session.su("admin")
+---
+...
+box.space._user:select{}
+---
+- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
+  - [1, 1, 'admin', 'user', {}]
+  - [2, 1, 'public', 'role', {}]
+  - [3, 1, 'replication', 'role', {}]
+  - [31, 1, 'super', 'role', {}]
+  - [32, 1, 'user1', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}]
+  - [33, 1, 'user2', 'user', {}]
+  - [34, 1, 'user3', 'user', {}]
+...
+box.schema.user.grant("user1", "alter", "user", "user2")
+---
+...
+box.session.su("user1")
+---
+...
+box.schema.user.passwd("user2", "abcd")
+---
+...
+-- still fails
+box.schema.user.passwd("user3", "qewr")
+---
+- error: Alter access to user 'user3' is denied for user 'user1'
+...
+box.session.su("admin")
+---
+...
+box.space._user:select{}
+---
+- - [0, 1, 'guest', 'user', {'chap-sha1': 'vhvewKp0tNyweZQ+cFKAlsyphfg='}]
+  - [1, 1, 'admin', 'user', {}]
+  - [2, 1, 'public', 'role', {}]
+  - [3, 1, 'replication', 'role', {}]
+  - [31, 1, 'super', 'role', {}]
+  - [32, 1, 'user1', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}]
+  - [33, 1, 'user2', 'user', {'chap-sha1': 'oVTFJWXp5/lL/Aih/nAmJO2O/9o='}]
+  - [34, 1, 'user3', 'user', {}]
+...
+box.schema.user.drop("user1")
+---
+...
+box.schema.user.drop("user2")
+---
+...
+box.schema.user.drop("user3")
 ---
 ...

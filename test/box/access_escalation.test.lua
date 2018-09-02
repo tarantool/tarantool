@@ -20,7 +20,8 @@ os = require('os')
 
 -- define functions
 
-function setuid() fiber.sleep(1000000) end
+channel = fiber.channel(1)
+function setuid() channel:get() end
 
 function escalation() return box.space._space:get{box.schema.SPACE_ID} ~= nil end
 
@@ -37,7 +38,7 @@ connection = net:connect(os.getenv("LISTEN"))
 
 background = fiber.create(function() connection:call("setuid") end)
 connection:call("escalation")
-fiber.cancel(background)
+channel:put(true)
 
 --
 -- tear down the functions; the grants are dropped recursively
@@ -75,7 +76,7 @@ connection = net:connect(os.getenv("LISTEN"))
 
 background = fiber.create(function() connection:call("setuid") end)
 connection:call("escalation")
-fiber.cancel(background)
+channel:put(true)
 
 -- tear down
 

@@ -45,7 +45,6 @@
 #include "vy_scheduler.h"
 #include "vy_stat.h"
 
-#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -106,31 +105,6 @@ struct vy_env {
 	struct mempool iterator_pool;
 	/** Memory quota */
 	struct vy_quota     quota;
-	/** Timer for updating quota watermark. */
-	ev_timer            quota_timer;
-	/**
-	 * Amount of quota used since the last
-	 * invocation of the quota timer callback.
-	 */
-	size_t quota_use_curr;
-	/**
-	 * Quota use rate, in bytes per second.
-	 * Calculated as exponentially weighted
-	 * moving average of quota_use_curr.
-	 */
-	size_t quota_use_rate;
-	/**
-	 * Dump bandwidth is needed for calculating the quota watermark.
-	 * The higher the bandwidth, the later we can start dumping w/o
-	 * suffering from transaction throttling. So we want to be very
-	 * conservative about estimating the bandwidth.
-	 *
-	 * To make sure we don't overestimate it, we maintain a
-	 * histogram of all observed measurements and assume the
-	 * bandwidth to be equal to the 10th percentile, i.e. the
-	 * best result among 10% worst measurements.
-	 */
-	struct histogram *dump_bw;
 	/** Common LSM tree environment. */
 	struct vy_lsm_env lsm_env;
 	/** Environment for cache subsystem */
@@ -169,26 +143,6 @@ struct vy_env {
 	/** Try to recover corrupted data if set. */
 	bool force_recovery;
 };
-
-enum {
-	/**
-	 * Time interval between successive updates of
-	 * quota watermark and use rate, in seconds.
-	 */
-	VY_QUOTA_UPDATE_INTERVAL = 1,
-	/**
-	 * Period of time over which the quota use rate
-	 * is averaged, in seconds.
-	 */
-	VY_QUOTA_RATE_AVG_PERIOD = 5,
-};
-
-static inline int64_t
-vy_dump_bandwidth(struct vy_env *env)
-{
-	/* See comment to vy_env::dump_bw. */
-	return histogram_percentile(env->dump_bw, 10);
-}
 
 struct vinyl_engine {
 	struct engine base;
@@ -303,8 +257,8 @@ vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "used", q->used);
 	info_append_int(h, "limit", q->limit);
 	info_append_int(h, "watermark", q->watermark);
-	info_append_int(h, "use_rate", env->quota_use_rate);
-	info_append_int(h, "dump_bandwidth", vy_dump_bandwidth(env));
+	info_append_int(h, "use_rate", q->use_rate);
+	info_append_int(h, "dump_bandwidth", q->dump_bw);
 	info_table_end(h);
 }
 
@@ -1018,6 +972,29 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+/**
+ * This function is called after installing on_replace trigger
+ * used for propagating changes done during DDL. It aborts all
+ * rw transactions affecting the given LSM tree that began
+ * before the trigger was installed so that DDL doesn't miss
+ * their working set.
+ */
+static int
+vy_abort_writers_for_ddl(struct vy_env *env, struct vy_lsm *lsm)
+{
+	if (tx_manager_abort_writers(env->xm, lsm) != 0)
+		return -1;
+	/*
+	 * Wait for prepared transactions to complete
+	 * (we can't abort them as they reached WAL).
+	 */
+	struct vclock unused;
+	if (wal_checkpoint(&unused, false) != 0)
+		return -1;
+
+	return 0;
+}
+
 /** Argument passed to vy_check_format_on_replace(). */
 struct vy_check_format_ctx {
 	/** Format to check new tuples against. */
@@ -1088,10 +1065,13 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	trigger_create(&on_replace, vy_check_format_on_replace, &ctx, NULL);
 	trigger_add(&space->on_replace, &on_replace);
 
+	int rc = vy_abort_writers_for_ddl(env, pk);
+	if (rc != 0)
+		goto out;
+
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
-			      &env->xm->p_global_read_view);
-	int rc;
+			      &env->xm->p_committed_read_view);
 	int loops = 0;
 	struct tuple *tuple;
 	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
@@ -1115,6 +1095,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 			break;
 	}
 	vy_read_iterator_close(&itr);
+out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
 	tuple_unref(key);
@@ -1490,14 +1471,18 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 	tuple_unref(key);
 	if (rc != 0)
 		return -1;
-	if (found != NULL && vy_tuple_compare(stmt, found,
-					      lsm->pk->key_def) == 0) {
-		/*
-		 * If the old and new tuples are the same in
-		 * terms of the primary key definition, the
-		 * statement doesn't modify the secondary key
-		 * and so there's actually no conflict.
-		 */
+	/*
+	 * The old and new tuples may happen to be the same in
+	 * terms of the primary key definition. For REPLACE this
+	 * means that the operation overwrites the old tuple
+	 * without modifying the secondary key and so there's
+	 * actually no conflict. For INSERT this can only happen
+	 * if we optimized out the primary index uniqueness check
+	 * (see vy_lsm::check_is_unique), in which case we must
+	 * fail here.
+	 */
+	if (found != NULL && vy_stmt_type(stmt) == IPROTO_REPLACE &&
+	    vy_tuple_compare(stmt, found, lsm->pk->key_def) == 0) {
 		tuple_unref(found);
 		return 0;
 	}
@@ -2353,28 +2338,9 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	size_t write_size = mem_used_after - mem_used_before;
-	/*
-	 * Insertion of a statement into an in-memory tree can trigger
-	 * an allocation of a new tree block. This should not normally
-	 * result in a noticeable excess of the memory limit, because
-	 * most memory is occupied by statements anyway, but we need to
-	 * adjust the quota accordingly in this case.
-	 *
-	 * The actual allocation size can also be less than reservation
-	 * if a statement is allocated from an lsregion slab allocated
-	 * by a previous transaction. Take this into account, too.
-	 */
-	if (write_size >= tx->write_size)
-		vy_quota_force_use(&env->quota, write_size - tx->write_size);
-	else
-		vy_quota_release(&env->quota, tx->write_size - write_size);
-
-	if (rc != 0)
-		return -1;
-
-	env->quota_use_curr += write_size;
-	return 0;
+	vy_quota_adjust(&env->quota, tx->write_size,
+			mem_used_after - mem_used_before);
+	return rc;
 }
 
 static void
@@ -2445,41 +2411,6 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 /** {{{ Environment */
 
 static void
-vy_env_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
-{
-	(void)loop;
-	(void)events;
-
-	struct vy_env *e = timer->data;
-
-	/*
-	 * Update the quota use rate with the new measurement.
-	 */
-	const double weight = 1 - exp(-VY_QUOTA_UPDATE_INTERVAL /
-				      (double)VY_QUOTA_RATE_AVG_PERIOD);
-	e->quota_use_rate = (1 - weight) * e->quota_use_rate +
-		weight * e->quota_use_curr / VY_QUOTA_UPDATE_INTERVAL;
-	e->quota_use_curr = 0;
-
-	/*
-	 * Due to log structured nature of the lsregion allocator,
-	 * which is used for allocating statements, we cannot free
-	 * memory in chunks, only all at once. Therefore we should
-	 * configure the watermark so that by the time we hit the
-	 * limit, all memory have been dumped, i.e.
-	 *
-	 *   limit - watermark      watermark
-	 *   ----------------- = --------------
-	 *     quota_use_rate    dump_bandwidth
-	 */
-	int64_t dump_bandwidth = vy_dump_bandwidth(e);
-	size_t watermark = ((double)e->quota.limit * dump_bandwidth /
-			    (dump_bandwidth + e->quota_use_rate + 1));
-
-	vy_quota_set_watermark(&e->quota, watermark);
-}
-
-static void
 vy_env_quota_exceeded_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
@@ -2526,13 +2457,8 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	assert(mem_used_after <= mem_used_before);
 	size_t mem_dumped = mem_used_before - mem_used_after;
 	vy_quota_release(quota, mem_dumped);
-
+	vy_quota_update_dump_bandwidth(quota, mem_dumped, dump_duration);
 	say_info("dumped %zu bytes in %.1f sec", mem_dumped, dump_duration);
-
-	/* Account dump bandwidth. */
-	if (dump_duration > 0)
-		histogram_collect(env->dump_bw,
-				  mem_dumped / dump_duration);
 }
 
 static struct vy_squash_queue *
@@ -2547,21 +2473,6 @@ static struct vy_env *
 vy_env_new(const char *path, size_t memory,
 	   int read_threads, int write_threads, bool force_recovery)
 {
-	enum { KB = 1000, MB = 1000 * 1000 };
-	static int64_t dump_bandwidth_buckets[] = {
-		100 * KB, 200 * KB, 300 * KB, 400 * KB, 500 * KB,
-		  1 * MB,   2 * MB,   3 * MB,   4 * MB,   5 * MB,
-		 10 * MB,  20 * MB,  30 * MB,  40 * MB,  50 * MB,
-		 60 * MB,  70 * MB,  80 * MB,  90 * MB, 100 * MB,
-		110 * MB, 120 * MB, 130 * MB, 140 * MB, 150 * MB,
-		160 * MB, 170 * MB, 180 * MB, 190 * MB, 200 * MB,
-		220 * MB, 240 * MB, 260 * MB, 280 * MB, 300 * MB,
-		320 * MB, 340 * MB, 360 * MB, 380 * MB, 400 * MB,
-		450 * MB, 500 * MB, 550 * MB, 600 * MB, 650 * MB,
-		700 * MB, 750 * MB, 800 * MB, 850 * MB, 900 * MB,
-		950 * MB, 1000 * MB,
-	};
-
 	struct vy_env *e = malloc(sizeof(*e));
 	if (unlikely(e == NULL)) {
 		diag_set(OutOfMemory, sizeof(*e), "malloc", "struct vy_env");
@@ -2581,19 +2492,6 @@ vy_env_new(const char *path, size_t memory,
 		goto error_path;
 	}
 
-	e->dump_bw = histogram_new(dump_bandwidth_buckets,
-				   lengthof(dump_bandwidth_buckets));
-	if (e->dump_bw == NULL) {
-		diag_set(OutOfMemory, 0, "histogram_new",
-			 "dump bandwidth histogram");
-		goto error_dump_bw;
-	}
-	/*
-	 * Until we dump anything, assume bandwidth to be 10 MB/s,
-	 * which should be fine for initial guess.
-	 */
-	histogram_collect(e->dump_bw, 10 * MB);
-
 	e->xm = tx_manager_new();
 	if (e->xm == NULL)
 		goto error_xm;
@@ -2611,18 +2509,18 @@ vy_env_new(const char *path, size_t memory,
 			      vy_squash_schedule, e) != 0)
 		goto error_lsm_env;
 
+	if (vy_quota_create(&e->quota, vy_env_quota_exceeded_cb) != 0)
+		goto error_quota;
+
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->iterator_pool, slab_cache,
 	               sizeof(struct vinyl_iterator));
-	vy_quota_create(&e->quota, vy_env_quota_exceeded_cb);
-	ev_timer_init(&e->quota_timer, vy_env_quota_timer_cb, 0,
-		      VY_QUOTA_UPDATE_INTERVAL);
-	e->quota_timer.data = e;
-	ev_timer_start(loop(), &e->quota_timer);
 	vy_cache_env_create(&e->cache_env, slab_cache);
 	vy_run_env_create(&e->run_env);
 	vy_log_init(e->path);
 	return e;
+error_quota:
+	vy_lsm_env_destroy(&e->lsm_env);
 error_lsm_env:
 	vy_mem_env_destroy(&e->mem_env);
 	vy_scheduler_destroy(&e->scheduler);
@@ -2630,8 +2528,6 @@ error_lsm_env:
 error_squash_queue:
 	tx_manager_delete(e->xm);
 error_xm:
-	histogram_delete(e->dump_bw);
-error_dump_bw:
 	free(e->path);
 error_path:
 	free(e);
@@ -2641,12 +2537,10 @@ error_path:
 static void
 vy_env_delete(struct vy_env *e)
 {
-	ev_timer_stop(loop(), &e->quota_timer);
 	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
 	tx_manager_delete(e->xm);
 	free(e->path);
-	histogram_delete(e->dump_bw);
 	mempool_destroy(&e->iterator_pool);
 	vy_run_env_destroy(&e->run_env);
 	vy_lsm_env_destroy(&e->lsm_env);
@@ -2733,7 +2627,9 @@ vinyl_engine_set_too_long_threshold(struct vinyl_engine *vinyl,
 void
 vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit)
 {
-	vinyl->env->run_env.snap_io_rate_limit = limit * 1024 * 1024;
+	int64_t limit_in_bytes = limit * 1024 * 1024;
+	vinyl->env->run_env.snap_io_rate_limit = limit_in_bytes;
+	vy_quota_reset_dump_bandwidth(&vinyl->env->quota, limit_in_bytes);
 }
 
 /** }}} Environment */
@@ -3262,11 +3158,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t used = mem_used_after - mem_used_before;
-	if (used >= reserved)
-		vy_quota_force_use(&env->quota, used - reserved);
-	else
-		vy_quota_release(&env->quota, reserved - used);
-
+	vy_quota_adjust(&env->quota, reserved, used);
 	return rc;
 }
 
@@ -4017,6 +3909,14 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	if (tuple_validate(new_format, tuple) != 0)
 		return -1;
 
+	/* Reallocate the new tuple using the new space format. */
+	uint32_t data_len;
+	const char *data = tuple_data_range(tuple, &data_len);
+	struct tuple *stmt = vy_stmt_new_replace(new_format, data,
+						 data + data_len);
+	if (stmt == NULL)
+		return -1;
+
 	/*
 	 * Check unique constraint if necessary.
 	 *
@@ -4030,21 +3930,20 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	 * store statements with greater LSNs. So we pin the
 	 * in-memory index that is active now and insert the tuple
 	 * into it after the yield.
+	 *
+	 * Also note that this operation is semantically a REPLACE
+	 * while the original tuple may have INSERT type. Since the
+	 * uniqueness check helper is sensitive to the statement
+	 * type, we must not use the original tuple for the check.
 	 */
 	vy_mem_pin(mem);
 	rc = vy_check_is_unique_secondary(NULL, &env->xm->p_committed_read_view,
-					  space_name, index_name, lsm, tuple);
+					  space_name, index_name, lsm, stmt);
 	vy_mem_unpin(mem);
-	if (rc != 0)
+	if (rc != 0) {
+		tuple_unref(stmt);
 		return -1;
-
-	/* Reallocate the new tuple using the new space format. */
-	uint32_t data_len;
-	const char *data = tuple_data_range(tuple, &data_len);
-	struct tuple *stmt = vy_stmt_new_replace(new_format, data,
-						 data + data_len);
-	if (stmt == NULL)
-		return -1;
+	}
 
 	/* Insert the new tuple into the in-memory index. */
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
@@ -4191,10 +4090,8 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 {
 	struct vy_env *env = vy_env(src_space->engine);
 	struct vy_lsm *pk = vy_lsm(src_space->index[0]);
-	bool is_empty = (pk->stat.disk.count.rows == 0 &&
-			 pk->stat.memory.count.rows == 0);
 
-	if (new_index->def->iid == 0 && !is_empty) {
+	if (new_index->def->iid == 0 && !vy_lsm_is_empty(pk)) {
 		diag_set(ClientError, ER_UNSUPPORTED, "Vinyl",
 			 "rebuilding the primary index of a non-empty space");
 		return -1;
@@ -4210,9 +4107,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	if (env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
 	    env->status == VINYL_FINAL_RECOVERY_LOCAL)
 		return vy_build_recover(env, new_lsm, pk);
-
-	if (is_empty)
-		return 0;
 
 	/*
 	 * Iterate over all tuples stored in the space and insert
@@ -4235,10 +4129,13 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
 	trigger_add(&src_space->on_replace, &on_replace);
 
+	int rc = vy_abort_writers_for_ddl(env, pk);
+	if (rc != 0)
+		goto out;
+
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
 			      &env->xm->p_committed_read_view);
-	int rc;
 	int loops = 0;
 	struct tuple *tuple;
 	int64_t build_lsn = env->xm->lsn;
@@ -4281,22 +4178,23 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		}
 	}
 	vy_read_iterator_close(&itr);
-	tuple_unref(key);
 
 	/*
 	 * Dump the new index upon build completion so that we don't
-	 * have to rebuild it on recovery.
+	 * have to rebuild it on recovery. No need to trigger dump if
+	 * the space happens to be empty.
 	 */
-	if (rc == 0)
+	if (rc == 0 && !vy_lsm_is_empty(new_lsm))
 		rc = vy_scheduler_dump(&env->scheduler);
 
 	if (rc == 0 && ctx.is_failed) {
 		diag_move(&ctx.diag, diag_get());
 		rc = -1;
 	}
-
+out:
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
+	tuple_unref(key);
 	return rc;
 }
 

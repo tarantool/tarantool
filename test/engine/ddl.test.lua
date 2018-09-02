@@ -702,10 +702,11 @@ c = fiber.channel(1)
 _ = fiber.create(function() for i = 1, 10 do s:update(1, {{'+', 3, 1}}) end c:put(true) end)
 
 _ = s:create_index('sk', {parts = {2, 'unsigned'}})
+
+c:get()
 s.index.pk:select()
 s.index.sk:select()
 
-c:get()
 s:drop()
 
 --

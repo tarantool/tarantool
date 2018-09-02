@@ -213,17 +213,24 @@ applier_connect(struct applier *applier)
 	diag_clear(&fiber()->diag);
 
 	/*
-	 * Tarantool >= 1.10.1: send an IPROTO_VOTE request to
-	 * fetch the master's ballot before proceeding to "join".
-	 * It will be used for leader election on bootstrap.
+	 * Send an IPROTO_VOTE request to fetch the master's ballot
+	 * before proceeding to "join". It will be used for leader
+	 * election on bootstrap.
 	 */
-	if (applier->version_id >= version_id(1, 10, 1)) {
-		xrow_encode_vote(&row);
-		coio_write_xrow(coio, &row);
-		coio_read_xrow(coio, ibuf, &row);
-		if (row.type != IPROTO_OK)
-			xrow_decode_error_xc(&row);
+	xrow_encode_vote(&row);
+	coio_write_xrow(coio, &row);
+	coio_read_xrow(coio, ibuf, &row);
+	if (row.type == IPROTO_OK) {
 		xrow_decode_ballot_xc(&row, &applier->ballot);
+	} else try {
+		xrow_decode_error_xc(&row);
+	} catch (ClientError *e) {
+		if (e->errcode() != ER_UNKNOWN_REQUEST_TYPE)
+			e->raise();
+		/*
+		 * Master isn't aware of IPROTO_VOTE request.
+		 * It's OK - we can proceed without it.
+		 */
 	}
 
 	applier_set_state(applier, APPLIER_CONNECTED);
@@ -336,8 +343,7 @@ applier_join(struct applier *applier)
 		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
-			vclock_follow(&replicaset.vclock, row.replica_id,
-				      row.lsn);
+			vclock_follow_xrow(&replicaset.vclock, &row);
 			xstream_write_xc(applier->subscribe_stream, &row);
 		} else if (row.type == IPROTO_OK) {
 			/*
@@ -503,8 +509,7 @@ applier_subscribe(struct applier *applier)
 			 * the row is skipped when the replication
 			 * is resumed.
 			 */
-			vclock_follow(&replicaset.vclock, row.replica_id,
-				      row.lsn);
+			vclock_follow_xrow(&replicaset.vclock, &row);
 			struct replica *replica = replica_by_id(row.replica_id);
 			struct latch *latch = (replica ? &replica->order_latch :
 					       &replicaset.applier.order_latch);
@@ -602,7 +607,8 @@ applier_f(va_list ap)
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
-			} else if (e->errcode() == ER_ACCESS_DENIED) {
+			} else if (e->errcode() == ER_ACCESS_DENIED ||
+				   e->errcode() == ER_NO_SUCH_USER) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_DISCONNECTED);

@@ -80,6 +80,8 @@ static const struct cmsg_hop vy_task_complete_route[] = {
 	{ vy_task_complete_f, NULL },
 };
 
+struct vy_task;
+
 /** Vinyl worker thread. */
 struct vy_worker {
 	struct cord cord;
@@ -87,13 +89,16 @@ struct vy_worker {
 	struct cpipe worker_pipe;
 	/** Pipe from the worker thread to tx. */
 	struct cpipe tx_pipe;
+	/**
+	 * Task that is currently being executed by the worker
+	 * or NULL if the worker is idle.
+	 */
+	struct vy_task *task;
 	/** Link in vy_scheduler::idle_workers. */
 	struct stailq_entry in_idle;
 	/** Route for sending deferred DELETEs back to tx. */
 	struct cmsg_hop deferred_delete_route[2];
 };
-
-struct vy_task;
 
 /** Max number of statements in a batch of deferred DELETEs. */
 enum { VY_DEFERRED_DELETE_BATCH_MAX = 100 };
@@ -1638,6 +1643,12 @@ static int
 vy_task_f(va_list va)
 {
 	struct vy_task *task = va_arg(va, struct vy_task *);
+	struct vy_worker *worker = task->worker;
+
+	assert(task->fiber == fiber());
+	assert(worker->task == task);
+	assert(&worker->cord == cord());
+
 	if (task->ops->execute(task) != 0 && !task->is_failed) {
 		struct diag *diag = diag_get();
 		assert(!diag_is_empty(diag));
@@ -1645,8 +1656,9 @@ vy_task_f(va_list va)
 		diag_move(diag, &task->diag);
 	}
 	cmsg_init(&task->cmsg, vy_task_complete_route);
-	cpipe_push(&task->worker->tx_pipe, &task->cmsg);
+	cpipe_push(&worker->tx_pipe, &task->cmsg);
 	task->fiber = NULL;
+	worker->task = NULL;
 	return 0;
 }
 
@@ -1659,14 +1671,20 @@ static void
 vy_task_execute_f(struct cmsg *cmsg)
 {
 	struct vy_task *task = container_of(cmsg, struct vy_task, cmsg);
+	struct vy_worker *worker = task->worker;
+
 	assert(task->fiber == NULL);
+	assert(worker->task == NULL);
+	assert(&worker->cord == cord());
+
 	task->fiber = fiber_new("task", vy_task_f);
 	if (task->fiber == NULL) {
 		task->is_failed = true;
 		diag_move(diag_get(), &task->diag);
 		cmsg_init(&task->cmsg, vy_task_complete_route);
-		cpipe_push(&task->worker->tx_pipe, &task->cmsg);
+		cpipe_push(&worker->tx_pipe, &task->cmsg);
 	} else {
+		worker->task = task;
 		fiber_start(task->fiber, task);
 	}
 }
@@ -1975,6 +1993,19 @@ vy_worker_f(va_list ap)
 	cbus_endpoint_create(&endpoint, cord_name(&worker->cord),
 			     fiber_schedule_cb, fiber());
 	cbus_loop(&endpoint);
+	/*
+	 * Cancel the task that is currently being executed by
+	 * this worker and join the fiber before destroying
+	 * the pipe to make sure it doesn't access freed memory.
+	 */
+	if (worker->task != NULL) {
+		struct fiber *fiber = worker->task->fiber;
+		assert(fiber != NULL);
+		assert(!fiber_is_dead(fiber));
+		fiber_set_joinable(fiber, true);
+		fiber_cancel(fiber);
+		fiber_join(fiber);
+	}
 	cbus_endpoint_destroy(&endpoint, cbus_process);
 	cpipe_destroy(&worker->tx_pipe);
 	return 0;

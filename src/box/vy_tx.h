@@ -133,6 +133,8 @@ write_set_search_key(write_set_t *tree, struct vy_lsm *lsm,
 
 /** Transaction object. */
 struct vy_tx {
+	/** Link in tx_manager::writers. */
+	struct rlist in_writers;
 	/** Transaction manager. */
 	struct tx_manager *xm;
 	/**
@@ -209,6 +211,10 @@ struct tx_manager {
 	 */
 	struct vy_tx *last_prepared_tx;
 	/**
+	 * List of rw transactions, linked by vy_tx::in_writers.
+	 */
+	struct rlist writers;
+	/**
 	 * The list of TXs with a read view in order of vlsn.
 	 */
 	struct rlist read_views;
@@ -261,6 +267,15 @@ tx_manager_new(void);
 /** Delete a tx manager object. */
 void
 tx_manager_delete(struct tx_manager *xm);
+
+/**
+ * Abort all rw transactions that affect the given LSM tree
+ * and haven't reached WAL yet.
+ *
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+int
+tx_manager_abort_writers(struct tx_manager *xm, struct vy_lsm *lsm);
 
 /** Initialize a tx object. */
 void

@@ -161,7 +161,6 @@ gc_free(void)
 		gc_consumer_delete(consumer);
 		consumer = next;
 	}
-	latch_destroy(&gc.latch);
 }
 
 void

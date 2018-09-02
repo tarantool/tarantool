@@ -1362,6 +1362,9 @@ box.schema.user.info()
   - - session,usage
     - universe
     - 
+  - - alter
+    - user
+    - user
 ...
 sq:set(100) -- ok
 ---

@@ -46,6 +46,8 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+enum { SERVICE_NAME_MAXLEN = 32 };
+
 const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
 
@@ -89,8 +91,6 @@ sio_add_to_iov(struct iovec *iov, size_t size)
 
 #if defined(__cplusplus)
 } /* extern "C" */
-
-enum { SERVICE_NAME_MAXLEN = 32 };
 
 const char *sio_socketname(int fd);
 int sio_socket(int domain, int type, int protocol);

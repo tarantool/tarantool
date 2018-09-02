@@ -90,6 +90,41 @@ box.space.space1:drop()
 test_run:cmd("switch default")
 test_run:drop_cluster(SERVERS)
 
+-- gh-3642 - Check that socket file descriptor doesn't leak
+-- when a replica is disconnected.
+rlimit = require('rlimit')
+lim = rlimit.limit()
+rlimit.getrlimit(rlimit.RLIMIT_NOFILE, lim)
+old_fno = lim.rlim_cur
+lim.rlim_cur = 64
+rlimit.setrlimit(rlimit.RLIMIT_NOFILE, lim)
+
+test_run:cmd('create server sock with rpl_master=default, script="replication/replica.lua"')
+test_run:cmd(string.format('start server sock'))
+test_run:cmd('switch sock')
+test_run = require('test_run').new()
+fiber = require('fiber')
+test_run:cmd("setopt delimiter ';'")
+for i = 1, 64 do
+    local replication = box.cfg.replication
+    box.cfg{replication = {}}
+    box.cfg{replication = replication}
+    while box.info.replication[1].upstream.status ~= 'follow' do
+        fiber.sleep(0.001)
+    end
+end;
+test_run:cmd("setopt delimiter ''");
+
+box.info.replication[1].upstream.status
+
+test_run:cmd('switch default')
+
+lim.rlim_cur = old_fno
+rlimit.setrlimit(rlimit.RLIMIT_NOFILE, lim)
+
+test_run:cmd('stop server sock')
+test_run:cmd('cleanup server sock')
+
 box.schema.user.revoke('guest', 'replication')
 
 -- gh-3510 assertion failure in replica_on_applier_disconnect()
@@ -103,3 +138,28 @@ test_run:cmd('stop server er_load1')
 -- er_load2 exits automatically.
 test_run:cmd('cleanup server er_load1')
 test_run:cmd('cleanup server er_load2')
+
+--
+-- Test case for gh-3637. Before the fix replica would exit with
+-- an error. Now check that we don't hang and successfully connect.
+--
+fiber = require('fiber')
+
+test_run:cleanup_cluster()
+
+test_run:cmd("create server replica_auth with rpl_master=default, script='replication/replica_auth.lua'")
+test_run:cmd("start server replica_auth with wait=False, wait_load=False, args='cluster:pass 0.05'")
+-- Wait a bit to make sure replica waits till user is created.
+fiber.sleep(0.1)
+box.schema.user.create('cluster', {password='pass'})
+box.schema.user.grant('cluster', 'replication')
+
+while box.info.replication[2] == nil do fiber.sleep(0.01) end
+vclock = test_run:get_vclock('default')
+_ = test_run:wait_vclock('replica_auth', vclock)
+
+test_run:cmd("stop server replica_auth")
+test_run:cmd("cleanup server replica_auth")
+test_run:cmd("delete server replica_auth")
+
+box.schema.user.drop('cluster')

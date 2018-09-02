@@ -89,6 +89,7 @@ add_library(box STATIC
     vy_history.c
     vy_read_set.c
     vy_scheduler.c
+    vy_quota.c
     request.c
     space.c
     space_def.c

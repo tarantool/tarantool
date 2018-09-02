@@ -61,8 +61,11 @@ struct wal_thread {
 	struct cord cord;
 	/** A pipe from 'tx' thread to 'wal' */
 	struct cpipe wal_pipe;
-	/** Return pipe from 'wal' to tx' */
-	struct cpipe tx_pipe;
+	/**
+	 * Return pipe from 'wal' to tx'. This is a
+	 * priority pipe and DOES NOT support yield.
+	 */
+	struct cpipe tx_prio_pipe;
 };
 
 /*
@@ -157,7 +160,7 @@ static void
 tx_schedule_commit(struct cmsg *msg);
 
 static struct cmsg_hop wal_request_route[] = {
-	{wal_write_to_disk, &wal_thread.tx_pipe},
+	{wal_write_to_disk, &wal_thread.tx_prio_pipe},
 	{tx_schedule_commit, NULL},
 };
 
@@ -186,6 +189,12 @@ xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 	struct xrow_header **row = entry->rows;
 	for (; row < entry->rows + entry->n_rows; row++) {
 		(*row)->tm = ev_now(loop());
+		struct errinj *inj = errinj(ERRINJ_WAL_BREAK_LSN, ERRINJ_INT);
+		if (inj != NULL && inj->iparam == (*row)->lsn) {
+			(*row)->lsn = inj->iparam - 1;
+			say_warn("injected broken lsn: %lld",
+				 (long long) (*row)->lsn);
+		}
 		if (xlog_write_row(l, *row) < 0) {
 			/*
 			 * Rollback all un-written rows
@@ -349,7 +358,7 @@ wal_open(struct wal_writer *writer)
 	 * thread.
 	 */
 	struct cbus_call_msg msg;
-	if (cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+	if (cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, &msg,
 		      wal_open_f, NULL, TIMEOUT_INFINITY) == 0) {
 		/*
 		 * Success: we can now append to
@@ -496,7 +505,7 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 		return 0;
 	}
 	static struct cmsg_hop wal_checkpoint_route[] = {
-		{wal_checkpoint_f, &wal_thread.tx_pipe},
+		{wal_checkpoint_f, &wal_thread.tx_prio_pipe},
 		{wal_checkpoint_done_f, NULL},
 	};
 	vclock_create(vclock);
@@ -536,7 +545,7 @@ wal_collect_garbage(int64_t lsn)
 	struct wal_gc_msg msg;
 	msg.lsn = lsn;
 	bool cancellable = fiber_set_cancellable(false);
-	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg.base,
+	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, &msg.base,
 		  wal_collect_garbage_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 }
@@ -621,7 +630,7 @@ wal_writer_begin_rollback(struct wal_writer *writer)
 		 * list.
 		 */
 		{ wal_writer_clear_bus, &wal_thread.wal_pipe },
-		{ wal_writer_clear_bus, &wal_thread.tx_pipe },
+		{ wal_writer_clear_bus, &wal_thread.tx_prio_pipe },
 		/*
 		 * Step 2: writer->rollback queue contains all
 		 * messages which need to be rolled back,
@@ -639,7 +648,7 @@ wal_writer_begin_rollback(struct wal_writer *writer)
 	 * all input until rollback mode is off.
 	 */
 	cmsg_init(&writer->in_rollback, rollback_route);
-	cpipe_push(&wal_thread.tx_pipe, &writer->in_rollback);
+	cpipe_push(&wal_thread.tx_prio_pipe, &writer->in_rollback);
 }
 
 static void
@@ -652,8 +661,7 @@ wal_assign_lsn(struct wal_writer *writer, struct xrow_header **row,
 			(*row)->lsn = vclock_inc(&writer->vclock, instance_id);
 			(*row)->replica_id = instance_id;
 		} else {
-			vclock_follow(&writer->vclock, (*row)->replica_id,
-				      (*row)->lsn);
+			vclock_follow_xrow(&writer->vclock, *row);
 		}
 	}
 }
@@ -769,7 +777,7 @@ wal_thread_f(va_list ap)
 	 * endpoint, to ensure that WAL messages are delivered
 	 * even when tx fiber pool is used up by net messages.
 	 */
-	cpipe_create(&wal_thread.tx_pipe, "tx_prio");
+	cpipe_create(&wal_thread.tx_prio_pipe, "tx_prio");
 
 	cbus_loop(&endpoint);
 
@@ -798,7 +806,7 @@ wal_thread_f(va_list ap)
 	if (xlog_is_open(&vy_log_writer.xlog))
 		xlog_close(&vy_log_writer.xlog, false);
 
-	cpipe_destroy(&wal_thread.tx_pipe);
+	cpipe_destroy(&wal_thread.tx_prio_pipe);
 	return 0;
 }
 
@@ -878,9 +886,8 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 				 */
 				if (vclock_get(&replicaset.vclock,
 					       instance_id) < (*last)->lsn) {
-					vclock_follow(&replicaset.vclock,
-						      instance_id,
-						      (*last)->lsn);
+					vclock_follow_xrow(&replicaset.vclock,
+							   *last);
 				}
 				break;
 			}
@@ -943,8 +950,9 @@ wal_write_vy_log(struct journal_entry *entry)
 	struct wal_write_vy_log_msg msg;
 	msg.entry= entry;
 	bool cancellable = fiber_set_cancellable(false);
-	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg.base,
-			   wal_write_vy_log_f, NULL, TIMEOUT_INFINITY);
+	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
+			   &msg.base, wal_write_vy_log_f, NULL,
+			   TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 	return rc;
 }
@@ -963,7 +971,7 @@ wal_rotate_vy_log()
 {
 	struct cbus_call_msg msg;
 	bool cancellable = fiber_set_cancellable(false);
-	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_pipe, &msg,
+	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, &msg,
 		  wal_rotate_vy_log_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 }
