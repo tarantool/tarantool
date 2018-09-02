@@ -262,18 +262,6 @@ vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
 	vy_disk_stmt_counter_sub(&range->count, &slice->count);
 }
 
-void
-vy_range_force_compaction(struct vy_range *range)
-{
-	if (range->slice_count == 1) {
-		/* Already compacted. */
-		assert(!range->needs_compaction);
-		return;
-	}
-	range->needs_compaction = true;
-	range->compact_priority = range->slice_count;
-}
-
 /**
  * To reduce write amplification caused by compaction, we follow
  * the LSM tree design. Runs in each range are divided into groups
@@ -304,9 +292,9 @@ vy_range_update_compact_priority(struct vy_range *range,
 	assert(opts->run_count_per_level > 0);
 	assert(opts->run_size_ratio > 1);
 
-	if (range->slice_count == 1) {
+	if (range->slice_count <= 1) {
 		/* Nothing to compact. */
-		range->compact_priority = 1;
+		range->compact_priority = 0;
 		range->needs_compaction = false;
 		return;
 	}

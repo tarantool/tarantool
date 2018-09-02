@@ -1016,6 +1016,7 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 			if (new_slice != NULL)
 				vy_range_add_slice(part, new_slice);
 		}
+		part->needs_compaction = range->needs_compaction;
 		part->compact_priority = range->compact_priority;
 	}
 
@@ -1123,6 +1124,8 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 		rlist_splice(&result->slices, &it->slices);
 		result->slice_count += it->slice_count;
 		vy_disk_stmt_counter_add(&result->count, &it->count);
+		if (it->needs_compaction)
+			result->needs_compaction = true;
 		vy_range_delete(it);
 		it = next;
 	}
@@ -1157,8 +1160,10 @@ vy_lsm_force_compaction(struct vy_lsm *lsm)
 	struct vy_range_tree_iterator it;
 
 	vy_range_tree_ifirst(lsm->tree, &it);
-	while ((range = vy_range_tree_inext(&it)) != NULL)
-		vy_range_force_compaction(range);
+	while ((range = vy_range_tree_inext(&it)) != NULL) {
+		range->needs_compaction = true;
+		vy_range_update_compact_priority(range, &lsm->opts);
+	}
 
 	vy_range_heap_update_all(&lsm->range_heap);
 }
