@@ -1017,7 +1017,7 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 				vy_range_add_slice(part, new_slice);
 		}
 		part->needs_compaction = range->needs_compaction;
-		part->compact_priority = range->compact_priority;
+		vy_range_update_compact_priority(part, &lsm->opts);
 	}
 
 	/*
@@ -1130,12 +1130,11 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 		it = next;
 	}
 	/*
-	 * Coalescing increases read amplification and breaks the log
-	 * structured layout of the run list, so, although we could
-	 * leave the resulting range as it is, we'd better compact it
-	 * as soon as we can.
+	 * Even though coalescing increases read amplification,
+	 * we don't need to compact the resulting range as long
+	 * as it fits the configured LSM tree shape.
 	 */
-	result->compact_priority = result->slice_count;
+	vy_range_update_compact_priority(result, &lsm->opts);
 	vy_lsm_acct_range(lsm, result);
 	vy_lsm_add_range(lsm, result);
 	lsm->range_tree_version++;
