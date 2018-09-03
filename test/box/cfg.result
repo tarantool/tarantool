@@ -211,7 +211,7 @@ box.cfg{sherlock = 'holmes'}
 ---
 - error: 'Incorrect value for option ''sherlock'': unexpected option'
 ...
--- check that cfg with unexpected type of parameter failes
+-- check that cfg with unexpected type of parameter fails
 box.cfg{listen = {}}
 ---
 - error: 'Incorrect value for option ''listen'': should be one of types string, number'

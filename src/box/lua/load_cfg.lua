@@ -396,11 +396,12 @@ local box_cfg_guard_whitelist = {
     session = true;
     tuple = true;
     runtime = true;
+    ctl = true,
     NULL = true;
 };
 
 local box = require('box')
--- Move all box members except 'error' to box_configured
+-- Move all box members except the whitelisted to box_configured
 local box_configured = {}
 for k, v in pairs(box) do
     box_configured[k] = v
