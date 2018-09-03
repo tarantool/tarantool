@@ -56,22 +56,27 @@ typedef void
 (*vy_scheduler_dump_complete_f)(struct vy_scheduler *scheduler,
 				int64_t dump_generation, double dump_duration);
 
+struct vy_worker_pool {
+	/** Number of worker threads in the pool. */
+	int size;
+	/** Array of all worker threads in the pool. */
+	struct vy_worker *workers;
+	/** List of workers that are currently idle. */
+	struct stailq idle_workers;
+	/** Length of @idle_workers list. */
+	int idle_worker_count;
+};
+
 struct vy_scheduler {
 	/** Scheduler fiber. */
 	struct fiber *scheduler_fiber;
 	/** Used to wake up the scheduler fiber from TX. */
 	struct fiber_cond scheduler_cond;
 	/**
-	 * Array of worker threads used for performing
-	 * dump/compaction tasks.
+	 * Pool of threads used for performing dump/compaction
+	 * tasks in the background.
 	 */
-	struct vy_worker *worker_pool;
-	/** Total number of worker threads. */
-	int worker_pool_size;
-	/** Number worker threads that are currently idle. */
-	int idle_worker_count;
-	/** List of idle workers, linked by vy_worker::in_idle. */
-	struct stailq idle_workers;
+	struct vy_worker_pool worker_pool;
 	/** Queue of processed tasks, linked by vy_task::in_processed. */
 	struct stailq processed_tasks;
 	/**
