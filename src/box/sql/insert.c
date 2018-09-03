@@ -891,6 +891,7 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 		switch (on_conflict_nullable) {
 		case ON_CONFLICT_ACTION_ABORT:
 			sqlite3MayAbort(parse_context);
+			FALLTHROUGH;
 		case ON_CONFLICT_ACTION_ROLLBACK:
 		case ON_CONFLICT_ACTION_FAIL:
 			err_msg = sqlite3MPrintf(db, "%s.%s", def->name,
