@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <small/mempool.h>
@@ -149,6 +150,18 @@ struct vy_scheduler {
 	/** Context needed for writing runs. */
 	struct vy_run_env *run_env;
 };
+
+/**
+ * Return true if memory dump is in progress, i.e. there are
+ * in-memory trees that are being dumped right now or should
+ * be scheduled for dump as soon as possible.
+ */
+static inline bool
+vy_scheduler_dump_in_progress(struct vy_scheduler *scheduler)
+{
+	assert(scheduler->dump_generation <= scheduler->generation);
+	return scheduler->dump_generation < scheduler->generation;
+}
 
 /**
  * Create a scheduler instance.

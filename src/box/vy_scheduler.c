@@ -488,8 +488,7 @@ vy_scheduler_unpin_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 void
 vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
 {
-	assert(scheduler->dump_generation <= scheduler->generation);
-	if (scheduler->dump_generation < scheduler->generation) {
+	if (vy_scheduler_dump_in_progress(scheduler)) {
 		/* Dump is already in progress, nothing to do. */
 		return;
 	}
@@ -520,13 +519,13 @@ vy_scheduler_dump(struct vy_scheduler *scheduler)
 		fiber_cond_wait(&scheduler->dump_cond);
 
 	/* Trigger dump. */
-	if (scheduler->generation == scheduler->dump_generation)
+	if (!vy_scheduler_dump_in_progress(scheduler))
 		scheduler->dump_start = ev_monotonic_now(loop());
-	int64_t generation = ++scheduler->generation;
+	scheduler->generation++;
 	fiber_cond_signal(&scheduler->scheduler_cond);
 
 	/* Wait for dump to complete. */
-	while (scheduler->dump_generation < generation) {
+	while (vy_scheduler_dump_in_progress(scheduler)) {
 		if (scheduler->is_throttled) {
 			/* Dump error occurred. */
 			struct error *e = diag_last_error(&scheduler->diag);
@@ -611,8 +610,7 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 		return -1;
 	}
 
-	assert(scheduler->dump_generation <= scheduler->generation);
-	if (scheduler->generation == scheduler->dump_generation) {
+	if (!vy_scheduler_dump_in_progress(scheduler)) {
 		/*
 		 * We are about to start a new dump round.
 		 * Remember the current time so that we can update
@@ -638,7 +636,7 @@ vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 	 * Wait until all in-memory trees created before
 	 * checkpoint started have been dumped.
 	 */
-	while (scheduler->dump_generation < scheduler->generation) {
+	while (vy_scheduler_dump_in_progress(scheduler)) {
 		if (scheduler->is_throttled) {
 			/* A dump error occurred, abort checkpoint. */
 			struct error *e = diag_last_error(&scheduler->diag);
@@ -1721,8 +1719,7 @@ vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
 retry:
 	*ptask = NULL;
-	assert(scheduler->dump_generation <= scheduler->generation);
-	if (scheduler->dump_generation == scheduler->generation) {
+	if (!vy_scheduler_dump_in_progress(scheduler)) {
 		/*
 		 * All memory trees of past generations have
 		 * been dumped, nothing to do.
