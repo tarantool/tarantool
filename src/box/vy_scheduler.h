@@ -57,6 +57,8 @@ typedef void
 				int64_t dump_generation, double dump_duration);
 
 struct vy_worker_pool {
+	/** Name of the pool. Used for naming threads. */
+	const char *name;
 	/** Number of worker threads in the pool. */
 	int size;
 	/** Array of all worker threads in the pool. */
@@ -72,11 +74,10 @@ struct vy_scheduler {
 	struct fiber *scheduler_fiber;
 	/** Used to wake up the scheduler fiber from TX. */
 	struct fiber_cond scheduler_cond;
-	/**
-	 * Pool of threads used for performing dump/compaction
-	 * tasks in the background.
-	 */
-	struct vy_worker_pool worker_pool;
+	/** Pool of threads for performing background dumps. */
+	struct vy_worker_pool dump_pool;
+	/** Pool of threads for performing background compactions. */
+	struct vy_worker_pool compact_pool;
 	/** Queue of processed tasks, linked by vy_task::in_processed. */
 	struct stailq processed_tasks;
 	/**
