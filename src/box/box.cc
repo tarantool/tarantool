@@ -111,7 +111,7 @@ static fiber_cond ro_cond;
  * synchronize to a sufficient number of replicas to form
  * a quorum and so was forced to switch to read-only mode.
  */
-static bool is_orphan = true;
+static bool is_orphan;
 
 /* Use the shared instance of xstream for all appliers */
 static struct xstream join_stream;
@@ -238,16 +238,22 @@ box_wait_ro(bool ro, double timeout)
 }
 
 void
-box_clear_orphan(void)
+box_set_orphan(bool orphan)
 {
-	if (!is_orphan)
+	if (is_orphan == orphan)
 		return; /* nothing to do */
 
-	is_orphan = false;
+	is_orphan = orphan;
 	fiber_cond_broadcast(&ro_cond);
 
 	/* Update the title to reflect the new status. */
-	title("running");
+	if (is_orphan) {
+		say_crit("entering orphan mode");
+		title("orphan");
+	} else {
+		say_crit("leaving orphan mode");
+		title("running");
+	}
 }
 
 struct wal_stream {
@@ -443,6 +449,17 @@ box_check_replication_sync_lag(void)
 	return lag;
 }
 
+static double
+box_check_replication_sync_timeout(void)
+{
+	double timeout = cfg_getd("replication_sync_timeout");
+	if (timeout <= 0) {
+		tnt_raise(ClientError, ER_CFG, "replication_sync_timeout",
+			  "the value must be greater than 0");
+	}
+	return timeout;
+}
+
 static void
 box_check_instance_uuid(struct tt_uuid *uuid)
 {
@@ -591,6 +608,7 @@ box_check_config()
 	box_check_replication_connect_timeout();
 	box_check_replication_connect_quorum();
 	box_check_replication_sync_lag();
+	box_check_replication_sync_timeout();
 	box_check_readahead(cfg_geti("readahead"));
 	box_check_checkpoint_count(cfg_geti("checkpoint_count"));
 	box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
@@ -680,6 +698,8 @@ box_set_replication(void)
 	box_sync_replication(true);
 	/* Follow replica */
 	replicaset_follow();
+	/* Wait until appliers are in sync */
+	replicaset_sync();
 }
 
 void
@@ -700,6 +720,18 @@ box_set_replication_connect_quorum(void)
 	replication_connect_quorum = box_check_replication_connect_quorum();
 	if (is_box_configured)
 		replicaset_check_quorum();
+}
+
+void
+box_set_replication_sync_lag(void)
+{
+	replication_sync_lag = box_check_replication_sync_lag();
+}
+
+void
+box_set_replication_sync_timeout(void)
+{
+	replication_sync_timeout = box_check_replication_sync_timeout();
 }
 
 void
@@ -1993,8 +2025,9 @@ box_cfg_xc(void)
 	box_set_replication_timeout();
 	box_set_replication_connect_timeout();
 	box_set_replication_connect_quorum();
+	box_set_replication_sync_lag();
+	box_set_replication_sync_timeout();
 	box_set_replication_skip_conflict();
-	replication_sync_lag = box_check_replication_sync_lag();
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 
@@ -2049,30 +2082,20 @@ box_cfg_xc(void)
 
 	rmean_cleanup(rmean_box);
 
-	title("orphan");
-
-	/*
-	 * If this instance is a leader of a newly bootstrapped
-	 * cluster, it is uptodate by definition so leave the
-	 * 'orphan' mode right away to let it initialize cluster
-	 * schema.
-	 */
-	if (is_bootstrap_leader)
-		box_clear_orphan();
-
 	/* Follow replica */
 	replicaset_follow();
 
 	fiber_gc();
 	is_box_configured = true;
 
+	title("running");
+	say_info("ready to accept requests");
+
 	if (!is_bootstrap_leader)
 		replicaset_sync();
 
 	/* If anyone is waiting for ro mode to go away */
 	fiber_cond_broadcast(&ro_cond);
-
-	say_info("ready to accept requests");
 }
 
 void

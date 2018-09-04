@@ -295,6 +295,28 @@ lbox_cfg_set_replication_connect_quorum(struct lua_State *L)
 }
 
 static int
+lbox_cfg_set_replication_sync_lag(struct lua_State *L)
+{
+	try {
+		box_set_replication_sync_lag();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
+static int
+lbox_cfg_set_replication_sync_timeout(struct lua_State *L)
+{
+	try {
+		box_set_replication_sync_timeout();
+	} catch (Exception *) {
+		luaT_error(L);
+	}
+	return 0;
+}
+
+static int
 lbox_cfg_set_replication_skip_conflict(struct lua_State *L)
 {
 	(void) L;
@@ -327,8 +349,10 @@ box_lua_cfg_init(struct lua_State *L)
 		{"cfg_set_vinyl_timeout", lbox_cfg_set_vinyl_timeout},
 		{"cfg_set_replication_timeout", lbox_cfg_set_replication_timeout},
 		{"cfg_set_replication_connect_quorum", lbox_cfg_set_replication_connect_quorum},
-		{"cfg_set_replication_skip_conflict", lbox_cfg_set_replication_skip_conflict},
 		{"cfg_set_replication_connect_timeout", lbox_cfg_set_replication_connect_timeout},
+		{"cfg_set_replication_sync_lag", lbox_cfg_set_replication_sync_lag},
+		{"cfg_set_replication_sync_timeout", lbox_cfg_set_replication_sync_timeout},
+		{"cfg_set_replication_skip_conflict", lbox_cfg_set_replication_skip_conflict},
 		{"cfg_set_net_msg_max", lbox_cfg_set_net_msg_max},
 		{NULL, NULL}
 	};
