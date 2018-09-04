@@ -340,7 +340,6 @@ vy_worker_pool_start(struct vy_worker_pool *pool)
 {
 	assert(pool->workers == NULL);
 
-	pool->idle_worker_count = pool->size;
 	pool->workers = calloc(pool->size, sizeof(*pool->workers));
 	if (pool->workers == NULL)
 		panic("failed to allocate vinyl worker pool");
@@ -385,7 +384,6 @@ vy_worker_pool_create(struct vy_worker_pool *pool, const char *name, int size)
 	pool->size = size;
 	pool->workers = NULL;
 	stailq_create(&pool->idle_workers);
-	pool->idle_worker_count = 0;
 }
 
 static void
@@ -403,8 +401,6 @@ vy_worker_pool_get(struct vy_worker_pool *pool)
 {
 	struct vy_worker *worker = NULL;
 	if (!stailq_empty(&pool->idle_workers)) {
-		assert(pool->idle_worker_count > 0);
-		pool->idle_worker_count--;
 		worker = stailq_shift_entry(&pool->idle_workers,
 					    struct vy_worker, in_idle);
 		assert(worker->pool == pool);
@@ -420,8 +416,6 @@ static void
 vy_worker_pool_put(struct vy_worker *worker)
 {
 	struct vy_worker_pool *pool = worker->pool;
-	assert(pool->idle_worker_count < pool->size);
-	pool->idle_worker_count++;
 	stailq_add_entry(&pool->idle_workers, worker, in_idle);
 }
 

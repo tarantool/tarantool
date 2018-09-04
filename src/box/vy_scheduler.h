@@ -65,8 +65,6 @@ struct vy_worker_pool {
 	struct vy_worker *workers;
 	/** List of workers that are currently idle. */
 	struct stailq idle_workers;
-	/** Length of @idle_workers list. */
-	int idle_worker_count;
 };
 
 struct vy_scheduler {
