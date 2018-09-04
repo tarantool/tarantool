@@ -34,9 +34,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <small/mempool.h>
 #include <small/rlist.h>
-#include <tarantool_ev.h>
 
 #include "diag.h"
 #include "fiber_cond.h"
@@ -74,8 +72,6 @@ struct vy_scheduler {
 	int idle_worker_count;
 	/** List of idle workers, linked by vy_worker::in_idle. */
 	struct stailq idle_workers;
-	/** Memory pool used for allocating vy_task objects. */
-	struct mempool task_pool;
 	/** Queue of processed tasks, linked by vy_task::in_processed. */
 	struct stailq processed_tasks;
 	/**

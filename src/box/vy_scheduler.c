@@ -36,7 +36,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <small/mempool.h>
 #include <small/rlist.h>
 #include <tarantool_ev.h>
 
@@ -233,10 +232,10 @@ static struct vy_task *
 vy_task_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 	    const struct vy_task_ops *ops)
 {
-	struct vy_task *task = mempool_alloc(&scheduler->task_pool);
+	struct vy_task *task = calloc(1, sizeof(*task));
 	if (task == NULL) {
 		diag_set(OutOfMemory, sizeof(*task),
-			 "mempool", "struct vy_task");
+			 "malloc", "struct vy_task");
 		return NULL;
 	}
 	memset(task, 0, sizeof(*task));
@@ -245,13 +244,13 @@ vy_task_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 	task->lsm = lsm;
 	task->cmp_def = key_def_dup(lsm->cmp_def);
 	if (task->cmp_def == NULL) {
-		mempool_free(&scheduler->task_pool, task);
+		free(task);
 		return NULL;
 	}
 	task->key_def = key_def_dup(lsm->key_def);
 	if (task->key_def == NULL) {
 		key_def_delete(task->cmp_def);
-		mempool_free(&scheduler->task_pool, task);
+		free(task);
 		return NULL;
 	}
 	vy_lsm_ref(lsm);
@@ -270,7 +269,7 @@ vy_task_delete(struct vy_task *task)
 	key_def_delete(task->key_def);
 	vy_lsm_unref(task->lsm);
 	diag_destroy(&task->diag);
-	mempool_free(&task->scheduler->task_pool, task);
+	free(task);
 }
 
 static bool
@@ -397,8 +396,6 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 	fiber_cond_create(&scheduler->scheduler_cond);
 
 	scheduler->worker_pool_size = write_threads;
-	mempool_create(&scheduler->task_pool, cord_slab_cache(),
-		       sizeof(struct vy_task));
 	stailq_create(&scheduler->idle_workers);
 	stailq_create(&scheduler->processed_tasks);
 
@@ -424,7 +421,6 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 		vy_scheduler_stop_workers(scheduler);
 
 	diag_destroy(&scheduler->diag);
-	mempool_destroy(&scheduler->task_pool);
 	fiber_cond_destroy(&scheduler->dump_cond);
 	fiber_cond_destroy(&scheduler->scheduler_cond);
 	vy_dump_heap_destroy(&scheduler->dump_heap);
