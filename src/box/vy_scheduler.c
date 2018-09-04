@@ -399,6 +399,14 @@ vy_worker_pool_destroy(struct vy_worker_pool *pool)
 static struct vy_worker *
 vy_worker_pool_get(struct vy_worker_pool *pool)
 {
+	/*
+	 * Start worker threads only when a task is scheduled
+	 * so that they are not dangling around if vinyl is
+	 * not used.
+	 */
+	if (pool->workers == NULL)
+		vy_worker_pool_start(pool);
+
 	struct vy_worker *worker = NULL;
 	if (!stailq_empty(&pool->idle_workers)) {
 		worker = stailq_shift_entry(&pool->idle_workers,
@@ -465,7 +473,11 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 
 	diag_create(&scheduler->diag);
 	fiber_cond_create(&scheduler->dump_cond);
+}
 
+void
+vy_scheduler_start(struct vy_scheduler *scheduler)
+{
 	fiber_start(scheduler->scheduler_fiber, scheduler);
 }
 
@@ -1937,21 +1949,6 @@ static int
 vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
-
-	/*
-	 * Yield immediately, until the quota watermark is reached
-	 * for the first time or a checkpoint is made.
-	 * Then start the worker threads: we know they will be
-	 * needed. If quota watermark is never reached, workers
-	 * are not started and the scheduler is idle until
-	 * shutdown or checkpoint.
-	 */
-	fiber_cond_wait(&scheduler->scheduler_cond);
-	if (scheduler->scheduler_fiber == NULL)
-		return 0; /* destroyed */
-
-	vy_worker_pool_start(&scheduler->dump_pool);
-	vy_worker_pool_start(&scheduler->compact_pool);
 
 	while (scheduler->scheduler_fiber != NULL) {
 		struct stailq processed_tasks;

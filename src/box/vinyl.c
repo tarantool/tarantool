@@ -2414,21 +2414,6 @@ vy_env_quota_exceeded_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
 
-	/*
-	 * The scheduler must be disabled during local recovery so as
-	 * not to distort data stored on disk. Not that we really need
-	 * it anyway, because the memory footprint is limited by the
-	 * memory limit from the previous run.
-	 *
-	 * On the contrary, remote recovery does require the scheduler
-	 * to be up and running, because the amount of data received
-	 * when bootstrapping from a remote master is only limited by
-	 * its disk size, which can exceed the size of available
-	 * memory by orders of magnitude.
-	 */
-	assert(env->status != VINYL_INITIAL_RECOVERY_LOCAL &&
-	       env->status != VINYL_FINAL_RECOVERY_LOCAL);
-
 	if (lsregion_used(&env->mem_env.allocator) == 0) {
 		/*
 		 * The memory limit has been exceeded, but there's
@@ -2704,13 +2689,15 @@ vy_set_deferred_delete_trigger(void)
 static int
 vinyl_engine_bootstrap(struct engine *engine)
 {
+	vy_set_deferred_delete_trigger();
+
 	struct vy_env *e = vy_env(engine);
 	assert(e->status == VINYL_OFFLINE);
 	if (vy_log_bootstrap() != 0)
 		return -1;
+	vy_scheduler_start(&e->scheduler);
 	vy_quota_set_limit(&e->quota, e->memory);
 	e->status = VINYL_ONLINE;
-	vy_set_deferred_delete_trigger();
 	return 0;
 }
 
@@ -2718,6 +2705,8 @@ static int
 vinyl_engine_begin_initial_recovery(struct engine *engine,
 				    const struct vclock *recovery_vclock)
 {
+	vy_set_deferred_delete_trigger();
+
 	struct vy_env *e = vy_env(engine);
 	assert(e->status == VINYL_OFFLINE);
 	if (recovery_vclock != NULL) {
@@ -2726,14 +2715,25 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 		e->recovery = vy_log_begin_recovery(recovery_vclock);
 		if (e->recovery == NULL)
 			return -1;
+		/*
+		 * We can't schedule any background tasks until
+		 * local recovery is complete, because they would
+		 * disrupt yet to be recovered data stored on disk.
+		 * So we don't start the scheduler fiber or enable
+		 * memory limit until then.
+		 *
+		 * This is OK, because during recovery an instance
+		 * can't consume more memory than it used before
+		 * restart and hence memory dumps are not necessary.
+		 */
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
 	} else {
 		if (vy_log_bootstrap() != 0)
 			return -1;
+		vy_scheduler_start(&e->scheduler);
 		vy_quota_set_limit(&e->quota, e->memory);
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
-	vy_set_deferred_delete_trigger();
 	return 0;
 }
 
@@ -2774,11 +2774,10 @@ vinyl_engine_end_recovery(struct engine *engine)
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
 		e->recovery_vclock = NULL;
-		e->status = VINYL_ONLINE;
+		vy_scheduler_start(&e->scheduler);
 		vy_quota_set_limit(&e->quota, e->memory);
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
-		e->status = VINYL_ONLINE;
 		break;
 	default:
 		unreachable();
@@ -2790,6 +2789,8 @@ vinyl_engine_end_recovery(struct engine *engine)
 	 */
 	if (e->lsm_env.lsm_count > 0)
 		vy_run_env_enable_coio(&e->run_env, e->read_threads);
+
+	e->status = VINYL_ONLINE;
 	return 0;
 }
 

@@ -172,6 +172,12 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 		    struct vy_run_env *run_env, struct rlist *read_views);
 
 /**
+ * Start a scheduler fiber.
+ */
+void
+vy_scheduler_start(struct vy_scheduler *scheduler);
+
+/**
  * Destroy a scheduler instance.
  */
 void
