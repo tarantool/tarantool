@@ -281,9 +281,13 @@ struct vy_page {
 
 /**
  * Initialize vinyl run environment
+ *
+ * @param read_threads - max number of background threads to
+ * use for disk reads; note background threads are not used
+ * until vy_run_env_enable_coio() is called.
  */
 void
-vy_run_env_create(struct vy_run_env *env);
+vy_run_env_create(struct vy_run_env *env, int read_threads);
 
 /**
  * Destroy vinyl run environment
@@ -294,14 +298,17 @@ vy_run_env_destroy(struct vy_run_env *env);
 /**
  * Enable coio reads for a vinyl run environment.
  *
- * This function starts @threads reader threads and makes
- * the run iterator hand disk reads over to them rather than
- * read run files directly blocking the current fiber.
+ * This function starts background reader threads and makes
+ * the run iterator hand disk reads over to them rather
+ * than read run files directly blocking the current fiber.
+ *
+ * The number of background reader threads is configured when
+ * the environment is created, see vy_run_env_create().
  *
  * Subsequent calls to this function will silently return.
  */
 void
-vy_run_env_enable_coio(struct vy_run_env *env, int threads);
+vy_run_env_enable_coio(struct vy_run_env *env);
 
 /**
  * Return the size of a run bloom filter.

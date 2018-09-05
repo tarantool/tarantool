@@ -70,7 +70,7 @@ test_basic()
 	is(rc, 0, "vy_lsm_env_create");
 
 	struct vy_run_env run_env;
-	vy_run_env_create(&run_env);
+	vy_run_env_create(&run_env, 0);
 
 	struct vy_cache_env cache_env;
 	vy_cache_env_create(&cache_env, slab_cache);

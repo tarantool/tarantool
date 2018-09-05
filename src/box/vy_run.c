@@ -123,12 +123,11 @@ vy_run_reader_f(va_list ap)
 
 /** Start run reader threads. */
 static void
-vy_run_env_start_readers(struct vy_run_env *env, int threads)
+vy_run_env_start_readers(struct vy_run_env *env)
 {
-	assert(threads > 0);
 	assert(env->reader_pool == NULL);
+	assert(env->reader_pool_size > 0);
 
-	env->reader_pool_size = threads;
 	env->reader_pool = calloc(env->reader_pool_size,
 				  sizeof(*env->reader_pool));
 	if (env->reader_pool == NULL)
@@ -166,9 +165,10 @@ vy_run_env_stop_readers(struct vy_run_env *env)
  * Initialize vinyl run environment
  */
 void
-vy_run_env_create(struct vy_run_env *env)
+vy_run_env_create(struct vy_run_env *env, int read_threads)
 {
 	memset(env, 0, sizeof(*env));
+	env->reader_pool_size = read_threads;
 	tt_pthread_key_create(&env->zdctx_key, vy_free_zdctx);
 	mempool_create(&env->read_task_pool, cord_slab_cache(),
 		       sizeof(struct vy_page_read_task));
@@ -190,11 +190,11 @@ vy_run_env_destroy(struct vy_run_env *env)
  * Enable coio reads for a vinyl run environment.
  */
 void
-vy_run_env_enable_coio(struct vy_run_env *env, int threads)
+vy_run_env_enable_coio(struct vy_run_env *env)
 {
 	if (env->reader_pool != NULL)
 		return; /* already enabled */
-	vy_run_env_start_readers(env, threads);
+	vy_run_env_start_readers(env);
 }
 
 /**

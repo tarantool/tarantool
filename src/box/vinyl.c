@@ -135,14 +135,8 @@ struct vy_env {
 	int64_t join_lsn;
 	/** Path to the data directory. */
 	char *path;
-	/** Max size of the memory level. */
-	size_t memory;
 	/** Max time a transaction may wait for memory. */
 	double timeout;
-	/** Max number of threads used for reading. */
-	int read_threads;
-	/** Max number of threads used for writing. */
-	int write_threads;
 	/** Try to recover corrupted data if set. */
 	bool force_recovery;
 };
@@ -760,8 +754,7 @@ vinyl_index_open(struct index *index)
 		rc = vy_lsm_create(lsm);
 		if (rc == 0) {
 			/* Make sure reader threads are up and running. */
-			vy_run_env_enable_coio(&env->run_env,
-					       env->read_threads);
+			vy_run_env_enable_coio(&env->run_env);
 		}
 		break;
 	case VINYL_INITIAL_RECOVERY_REMOTE:
@@ -2489,10 +2482,7 @@ vy_env_new(const char *path, size_t memory,
 	}
 	memset(e, 0, sizeof(*e));
 	e->status = VINYL_OFFLINE;
-	e->memory = memory;
 	e->timeout = TIMEOUT_INFINITY;
-	e->read_threads = read_threads;
-	e->write_threads = write_threads;
 	e->force_recovery = force_recovery;
 	e->path = strdup(path);
 	if (e->path == NULL) {
@@ -2508,8 +2498,8 @@ vy_env_new(const char *path, size_t memory,
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
 
-	vy_mem_env_create(&e->mem_env, e->memory);
-	vy_scheduler_create(&e->scheduler, e->write_threads,
+	vy_mem_env_create(&e->mem_env, memory);
+	vy_scheduler_create(&e->scheduler, write_threads,
 			    vy_env_dump_complete_cb,
 			    &e->run_env, &e->xm->read_views);
 
@@ -2526,7 +2516,7 @@ vy_env_new(const char *path, size_t memory,
 	mempool_create(&e->iterator_pool, slab_cache,
 	               sizeof(struct vinyl_iterator));
 	vy_cache_env_create(&e->cache_env, slab_cache);
-	vy_run_env_create(&e->run_env);
+	vy_run_env_create(&e->run_env, read_threads);
 	vy_log_init(e->path);
 	return e;
 
@@ -2824,7 +2814,7 @@ vinyl_engine_end_recovery(struct engine *engine)
 	 * creation, see vinyl_index_open().
 	 */
 	if (e->lsm_env.lsm_count > 0)
-		vy_run_env_enable_coio(&e->run_env, e->read_threads);
+		vy_run_env_enable_coio(&e->run_env);
 
 	e->status = VINYL_ONLINE;
 	return 0;
