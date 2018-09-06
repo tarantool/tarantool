@@ -67,6 +67,7 @@ t
   - index
   - info
   - internal
+  - is_in_txn
   - on_commit
   - on_rollback
   - once

@@ -19,6 +19,19 @@ box.begin() box.rollback() box.rollback();
 box.begin() box.rollback();
 -- no current transaction - implicit begin
 box.commit();
+
+--
+-- gh-3518: Add is_in_txn().
+--
+-- no active transaction - false
+box.is_in_txn();
+-- active transaction - true
+box.begin();
+box.is_in_txn();
+-- no active transaction - false
+box.commit();
+box.is_in_txn();
+
 fiber = require('fiber');
 function sloppy()
     box.begin()
