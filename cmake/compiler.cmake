@@ -280,6 +280,11 @@ macro(enable_tnt_compile_flags)
     endif()
 endmacro(enable_tnt_compile_flags)
 
+if (HAVE_OPENMP)
+    add_compile_flags("C;CXX" "-fopenmp")
+endif()
+
+
 if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCC)
     set(HAVE_BUILTIN_CTZ 1)
     set(HAVE_BUILTIN_CTZLL 1)
