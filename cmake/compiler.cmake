@@ -25,14 +25,18 @@ endif()
 if (CMAKE_COMPILER_IS_GNUCC)
 # cmake 2.8.9 and earlier doesn't support CMAKE_CXX_COMPILER_VERSION
        if (NOT CMAKE_CXX_COMPILER_VERSION)
-               execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
-                               OUTPUT_VARIABLE CMAKE_CXX_COMPILER_VERSION)
+           execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
+                           OUTPUT_VARIABLE CMAKE_CXX_COMPILER_VERSION)
        endif()
        if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.5)
-               message(FATAL_ERROR "
-               Your GCC version is ${CMAKE_CXX_COMPILER_VERSION}, please update
-                       ")
+           message(FATAL_ERROR "
+           Your GCC version is ${CMAKE_CXX_COMPILER_VERSION}, please update
+                   ")
        endif()
+else()
+     if (BUILD_STATIC)
+           message(FATAL_ERROR "Static build is supported for GCC only")
+     endif()
 endif()
 
 #
@@ -283,7 +287,6 @@ endmacro(enable_tnt_compile_flags)
 if (HAVE_OPENMP)
     add_compile_flags("C;CXX" "-fopenmp")
 endif()
-
 
 if (CMAKE_COMPILER_IS_CLANG OR CMAKE_COMPILER_IS_GNUCC)
     set(HAVE_BUILTIN_CTZ 1)
