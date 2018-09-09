@@ -97,7 +97,7 @@ cfg_filter(box.cfg)
   - - vinyl_timeout
     - 60
   - - vinyl_write_threads
-    - 2
+    - 4
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay
@@ -198,7 +198,7 @@ cfg_filter(box.cfg)
   - - vinyl_timeout
     - 60
   - - vinyl_write_threads
-    - 2
+    - 4
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay
@@ -326,7 +326,7 @@ box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 ---
 - 268435456
 - 1.05
-- 2
+- 4
 ...
 test_run:cmd("switch default")
 ---
@@ -356,7 +356,7 @@ box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 ---
 - 214748364
 - 1.05
-- 2
+- 4
 ...
 test_run:cmd("switch default")
 ---
@@ -416,7 +416,7 @@ box.cfg.memtx_memory, box.cfg.slab_alloc_factor, box.cfg.vinyl_write_threads
 ---
 - 268435456
 - 3.14
-- 2
+- 4
 ...
 test_run:cmd("switch default")
 ---

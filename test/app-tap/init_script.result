@@ -44,7 +44,7 @@ box.cfg
 39	vinyl_run_count_per_level:2
 40	vinyl_run_size_ratio:3.5
 41	vinyl_timeout:60
-42	vinyl_write_threads:2
+42	vinyl_write_threads:4
 43	wal_dir:.
 44	wal_dir_rescan_delay:2
 45	wal_max_size:268435456
