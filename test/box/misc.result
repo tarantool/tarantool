@@ -1148,6 +1148,15 @@ s = box.schema.space.create('test', {user="no_such_user"})
 ---
 - error: User 'no_such_user' is not found
 ...
+--
+-- gh-3659 assertion failure after an error in code called from
+-- box.session.su()
+--
+box.session.su("admin", function(x) return #x end, 3)
+---
+- error: '[string "return box.session.su("admin", function(x) re..."]:1: attempt to
+    get length of local ''x'' (a number value)'
+...
 -- Too long WAL write warning (gh-2743).
 s = box.schema.space.create('test')
 ---
