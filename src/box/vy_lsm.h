@@ -457,6 +457,22 @@ void
 vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range);
 
 /**
+ * Account dump in LSM tree statistics.
+ */
+void
+vy_lsm_acct_dump(struct vy_lsm *lsm,
+		 const struct vy_stmt_counter *in,
+		 const struct vy_disk_stmt_counter *out);
+
+/**
+ * Account compaction in LSM tree statistics.
+ */
+void
+vy_lsm_acct_compaction(struct vy_lsm *lsm,
+		       const struct vy_disk_stmt_counter *in,
+		       const struct vy_disk_stmt_counter *out);
+
+/**
  * Allocate a new active in-memory index for an LSM tree while
  * moving the old one to the sealed list. Used by the dump task
  * in order not to bother about synchronization with concurrent
