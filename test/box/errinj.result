@@ -58,6 +58,8 @@ errinj.info()
     state: 0
   ERRINJ_XLOG_META:
     state: false
+  ERRINJ_SNAP_COMMIT_DELAY:
+    state: false
   ERRINJ_WAL_BREAK_LSN:
     state: -1
   ERRINJ_WAL_WRITE_DISK:
@@ -74,7 +76,7 @@ errinj.info()
     state: false
   ERRINJ_RELAY_FINAL_JOIN:
     state: false
-  ERRINJ_SNAP_COMMIT_DELAY:
+  ERRINJ_VY_COMPACTION_DELAY:
     state: false
   ERRINJ_RELAY_FINAL_SLEEP:
     state: false

@@ -107,6 +107,8 @@ struct vy_range {
 	 * how we  decide how many runs to compact next time.
 	 */
 	int compact_priority;
+	/** Number of statements that need to be compacted. */
+	struct vy_disk_stmt_counter compact_queue;
 	/**
 	 * If this flag is set, the range must be scheduled for
 	 * major compaction, i.e. its compact_priority must be

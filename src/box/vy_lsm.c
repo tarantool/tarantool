@@ -735,12 +735,16 @@ void
 vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_collect(lsm->run_hist, range->slice_count);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.queue,
+				 &range->compact_queue);
 }
 
 void
 vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_discard(lsm->run_hist, range->slice_count);
+	vy_disk_stmt_counter_sub(&lsm->stat.disk.compact.queue,
+				 &range->compact_queue);
 }
 
 int
@@ -1160,8 +1164,10 @@ vy_lsm_force_compaction(struct vy_lsm *lsm)
 
 	vy_range_tree_ifirst(lsm->tree, &it);
 	while ((range = vy_range_tree_inext(&it)) != NULL) {
+		vy_lsm_unacct_range(lsm, range);
 		range->needs_compaction = true;
 		vy_range_update_compact_priority(range, &lsm->opts);
+		vy_lsm_acct_range(lsm, range);
 	}
 
 	vy_range_heap_update_all(&lsm->range_heap);

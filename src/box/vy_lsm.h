@@ -436,11 +436,23 @@ vy_lsm_add_range(struct vy_lsm *lsm, struct vy_range *range);
 void
 vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range);
 
-/** Account a range to the run histogram of an LSM tree. */
+/**
+ * Account a range in an LSM tree.
+ *
+ * This function updates the following LSM tree statistics:
+ *  - vy_lsm::run_hist after a slice is added to or removed from
+ *    a range of the LSM tree.
+ *  - vy_lsm::stat::disk::compact::queue after compaction priority
+ *    of a range is updated.
+ */
 void
 vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range);
 
-/** Unaccount a range from the run histogram of an LSM tree. */
+/**
+ * Unaccount a range in an LSM tree.
+ *
+ * This function undoes the effect of vy_lsm_acct_range().
+ */
 void
 vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range);
 

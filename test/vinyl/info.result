@@ -171,6 +171,11 @@ istat()
         rows: 0
         bytes: 0
       count: 0
+      queue:
+        bytes_compressed: 0
+        pages: 0
+        rows: 0
+        bytes: 0
       out:
         bytes_compressed: 0
         pages: 0
@@ -983,6 +988,11 @@ istat()
         rows: 0
         bytes: 0
       count: 0
+      queue:
+        bytes_compressed: <bytes_compressed>
+        pages: 0
+        rows: 0
+        bytes: 0
       out:
         bytes_compressed: <bytes_compressed>
         pages: 0

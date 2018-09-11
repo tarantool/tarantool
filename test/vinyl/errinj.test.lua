@@ -850,3 +850,30 @@ fiber.sleep(0)
 s:create_index('sk', {parts = {2, 'unsigned'}})
 s:select()
 s:drop()
+
+--
+-- Check disk.compact.queue stat.
+--
+test_run:cmd("push filter 'bytes_compressed: .*' to 'bytes_compressed: <bytes_compressed>'")
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('pk', {run_count_per_level = 2})
+function dump() for i = 1, 10 do s:replace{i} end box.snapshot() end
+dump()
+dump()
+i:stat().disk.compact.queue -- none
+errinj.set('ERRINJ_VY_COMPACTION_DELAY', true)
+dump()
+i:stat().disk.compact.queue -- 30 statements
+dump()
+i:stat().disk.compact.queue -- 40 statements
+dump()
+i:stat().disk.compact.queue -- 50 statements
+box.stat.reset() -- doesn't affect queue size
+i:stat().disk.compact.queue -- 50 statements
+errinj.set('ERRINJ_VY_COMPACTION_DELAY', false)
+while i:stat().disk.compact.count < 2 do fiber.sleep(0.01) end
+i:stat().disk.compact.queue -- none
+s:drop()
+
+test_run:cmd("clear filter")

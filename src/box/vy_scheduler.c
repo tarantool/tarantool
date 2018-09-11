@@ -1201,8 +1201,8 @@ vy_task_dump_complete(struct vy_task *task)
 		slice = new_slices[i];
 		vy_lsm_unacct_range(lsm, range);
 		vy_range_add_slice(range, slice);
-		vy_lsm_acct_range(lsm, range);
 		vy_range_update_compact_priority(range, &lsm->opts);
+		vy_lsm_acct_range(lsm, range);
 		if (!vy_range_is_scheduled(range))
 			vy_range_heap_update(&lsm->range_heap,
 					     &range->heap_node);
@@ -1428,6 +1428,11 @@ err:
 static int
 vy_task_compact_execute(struct vy_task *task)
 {
+	struct errinj *errinj = errinj(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL);
+	if (errinj != NULL && errinj->bparam) {
+		while (errinj->bparam)
+			fiber_sleep(0.01);
+	}
 	return vy_task_write_run(task);
 }
 
@@ -1551,8 +1556,8 @@ vy_task_compact_complete(struct vy_task *task)
 	}
 	range->n_compactions++;
 	range->version++;
-	vy_lsm_acct_range(lsm, range);
 	vy_range_update_compact_priority(range, &lsm->opts);
+	vy_lsm_acct_range(lsm, range);
 	lsm->stat.disk.compact.count++;
 
 	/*

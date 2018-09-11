@@ -149,6 +149,8 @@ struct vy_lsm_stat {
 			struct vy_disk_stmt_counter in;
 			/** Number of output statements. */
 			struct vy_disk_stmt_counter out;
+			/** Number of statements awaiting compaction. */
+			struct vy_disk_stmt_counter queue;
 		} compact;
 	} disk;
 	/** TX write set statistics. */

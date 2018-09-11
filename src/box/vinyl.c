@@ -396,6 +396,7 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_append_int(h, "count", stat->disk.compact.count);
 	vy_info_append_disk_stmt_counter(h, "in", &stat->disk.compact.in);
 	vy_info_append_disk_stmt_counter(h, "out", &stat->disk.compact.out);
+	vy_info_append_disk_stmt_counter(h, "queue", &stat->disk.compact.queue);
 	info_table_end(h); /* compact */
 	info_append_int(h, "index_size", lsm->page_index_size);
 	info_append_int(h, "bloom_size", lsm->bloom_size);
