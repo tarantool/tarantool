@@ -345,6 +345,10 @@ do
         space:update({[1] = 2}, {[1] = {[1] = '\x3d', [2] = 3, [3] = 4}})
         space:upsert({[1] = 3, [2] = 4, [3] = 5, [4] = 6}, {[1] = {[1] = '\x3d', [2] = 3, [3] = 4}})
         space:upsert({[1] = 3, [2] = 4, [3] = 5, [4] = 6}, {[1] = {[1] = '\x3d', [2] = 3, [3] = 4}})
+        f = function(old, new) return old end
+        space:before_replace(f)
+        space:replace{1,5}
+        space:before_replace(nil, f)
         os.exit(0)
     ]]
 
@@ -372,11 +376,11 @@ do
         test:test("fill and test cat output", function(test_i)
             test_i:plan(29)
             check_ok(test_i, dir, 'start', 'filler', 0)
-            check_ctlcat_xlog(test_i, dir, nil, "---\n", 6)
+            check_ctlcat_xlog(test_i, dir, nil, "---\n", 7)
             check_ctlcat_xlog(test_i, dir, "--space=512", "---\n", 6)
             check_ctlcat_xlog(test_i, dir, "--space=666", "---\n", 0)
-            check_ctlcat_xlog(test_i, dir, "--show-system", "---\n", 9)
-            check_ctlcat_xlog(test_i, dir, "--format=json", "\n", 6)
+            check_ctlcat_xlog(test_i, dir, "--show-system", "---\n", 10)
+            check_ctlcat_xlog(test_i, dir, "--format=json", "\n", 7)
             check_ctlcat_xlog(test_i, dir, "--format=lua",  "\n", 6)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json", "\n", 2)
             check_ctlcat_xlog(test_i, dir, "--from=3 --to=6 --format=json --show-system", "\n", 3)
@@ -411,6 +415,10 @@ do
         space:update({[1] = 2}, {[1] = {[1] = '\x3d', [2] = 3, [3] = 4}})
         space:upsert({[1] = 3, [2] = 4, [3] = 5, [4] = 6}, {[1] = {[1] = '\x3d', [2] = 3, [3] = 4}})
         space:upsert({[1] = 3, [2] = 4, [3] = 5, [4] = 6}, {[1] = {[1] = '\x3d', [2] = 3, [3] = 4}})
+        f = function(old, new) return old end
+        space:before_replace(f)
+        space:replace{1,5}
+        space:before_replace(nil, f)
         os.exit(0)
     ]]
     create_script(dir, 'filler.lua', filler_code)
