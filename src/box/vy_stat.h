@@ -32,6 +32,7 @@
  */
 
 #include <stdint.h>
+#include <string.h>
 
 #include "latency.h"
 #include "tuple.h"
@@ -201,6 +202,18 @@ static inline void
 vy_lsm_stat_destroy(struct vy_lsm_stat *stat)
 {
 	latency_destroy(&stat->latency);
+}
+
+static inline void
+vy_stmt_counter_reset(struct vy_stmt_counter *c)
+{
+	memset(c, 0, sizeof(*c));
+}
+
+static inline void
+vy_disk_stmt_counter_reset(struct vy_disk_stmt_counter *c)
+{
+	memset(c, 0, sizeof(*c));
 }
 
 static inline void

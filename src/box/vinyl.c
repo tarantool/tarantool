@@ -436,22 +436,34 @@ vinyl_index_reset_stat(struct index *index)
 	struct vy_lsm_stat *stat = &lsm->stat;
 	struct vy_cache_stat *cache_stat = &lsm->cache.stat;
 
+	/* Get/put */
 	stat->lookup = 0;
 	latency_reset(&stat->latency);
-	memset(&stat->get, 0, sizeof(stat->get));
-	memset(&stat->put, 0, sizeof(stat->put));
+	vy_stmt_counter_reset(&stat->get);
+	vy_stmt_counter_reset(&stat->put);
 	memset(&stat->upsert, 0, sizeof(stat->upsert));
+
+	/* Iterator */
 	memset(&stat->txw.iterator, 0, sizeof(stat->txw.iterator));
 	memset(&stat->memory.iterator, 0, sizeof(stat->memory.iterator));
 	memset(&stat->disk.iterator, 0, sizeof(stat->disk.iterator));
-	memset(&stat->disk.dump, 0, sizeof(stat->disk.dump));
-	memset(&stat->disk.compact, 0, sizeof(stat->disk.compact));
 
+	/* Dump */
+	stat->disk.dump.count = 0;
+	vy_stmt_counter_reset(&stat->disk.dump.in);
+	vy_disk_stmt_counter_reset(&stat->disk.dump.out);
+
+	/* Compaction */
+	stat->disk.compact.count = 0;
+	vy_disk_stmt_counter_reset(&stat->disk.compact.in);
+	vy_disk_stmt_counter_reset(&stat->disk.compact.out);
+
+	/* Cache */
 	cache_stat->lookup = 0;
-	memset(&cache_stat->get, 0, sizeof(cache_stat->get));
-	memset(&cache_stat->put, 0, sizeof(cache_stat->put));
-	memset(&cache_stat->invalidate, 0, sizeof(cache_stat->invalidate));
-	memset(&cache_stat->evict, 0, sizeof(cache_stat->evict));
+	vy_stmt_counter_reset(&cache_stat->get);
+	vy_stmt_counter_reset(&cache_stat->put);
+	vy_stmt_counter_reset(&cache_stat->invalidate);
+	vy_stmt_counter_reset(&cache_stat->evict);
 }
 
 static void
