@@ -91,6 +91,8 @@ struct vy_lsm_env {
 	size_t bloom_size;
 	/** Size of memory used for page index. */
 	size_t page_index_size;
+	/** Global disk statistics. */
+	struct vy_disk_stat disk_stat;
 	/** Memory pool for vy_history_node allocations. */
 	struct mempool history_node_pool;
 };

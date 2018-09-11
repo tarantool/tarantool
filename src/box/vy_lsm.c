@@ -252,6 +252,8 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	assert(lsm->env->lsm_count > 0);
 
 	lsm->env->lsm_count--;
+	lsm->env->disk_stat.compact.queue -=
+			lsm->stat.disk.compact.queue.bytes;
 
 	if (lsm->pk != NULL)
 		vy_lsm_unref(lsm->pk);
@@ -685,32 +687,56 @@ vy_lsm_compact_priority(struct vy_lsm *lsm)
 void
 vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run)
 {
+	struct vy_lsm_env *env = lsm->env;
+	size_t bloom_size = vy_run_bloom_size(run);
+	size_t page_index_size = run->page_index_size;
+
 	assert(rlist_empty(&run->in_lsm));
 	rlist_add_entry(&lsm->runs, run, in_lsm);
 	lsm->run_count++;
 	vy_disk_stmt_counter_add(&lsm->stat.disk.count, &run->count);
 
-	lsm->bloom_size += vy_run_bloom_size(run);
-	lsm->page_index_size += run->page_index_size;
+	lsm->bloom_size += bloom_size;
+	lsm->page_index_size += page_index_size;
 
-	lsm->env->bloom_size += vy_run_bloom_size(run);
-	lsm->env->page_index_size += run->page_index_size;
+	env->bloom_size += bloom_size;
+	env->page_index_size += page_index_size;
+
+	/* Data size is consistent with space.bsize. */
+	if (lsm->index_id == 0)
+		env->disk_stat.data += run->count.bytes;
+	/* Index size is consistent with index.bsize. */
+	env->disk_stat.index += bloom_size + page_index_size;
+	if (lsm->index_id > 0)
+		env->disk_stat.index += run->count.bytes;
 }
 
 void
 vy_lsm_remove_run(struct vy_lsm *lsm, struct vy_run *run)
 {
+	struct vy_lsm_env *env = lsm->env;
+	size_t bloom_size = vy_run_bloom_size(run);
+	size_t page_index_size = run->page_index_size;
+
 	assert(lsm->run_count > 0);
 	assert(!rlist_empty(&run->in_lsm));
 	rlist_del_entry(run, in_lsm);
 	lsm->run_count--;
 	vy_disk_stmt_counter_sub(&lsm->stat.disk.count, &run->count);
 
-	lsm->bloom_size -= vy_run_bloom_size(run);
-	lsm->page_index_size -= run->page_index_size;
+	lsm->bloom_size -= bloom_size;
+	lsm->page_index_size -= page_index_size;
 
-	lsm->env->bloom_size -= vy_run_bloom_size(run);
-	lsm->env->page_index_size -= run->page_index_size;
+	env->bloom_size -= bloom_size;
+	env->page_index_size -= page_index_size;
+
+	/* Data size is consistent with space.bsize. */
+	if (lsm->index_id == 0)
+		env->disk_stat.data -= run->count.bytes;
+	/* Index size is consistent with index.bsize. */
+	env->disk_stat.index -= bloom_size + page_index_size;
+	if (lsm->index_id > 0)
+		env->disk_stat.index -= run->count.bytes;
 }
 
 void
@@ -737,6 +763,7 @@ vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range)
 	histogram_collect(lsm->run_hist, range->slice_count);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.queue,
 				 &range->compact_queue);
+	lsm->env->disk_stat.compact.queue += range->compact_queue.bytes;
 }
 
 void
@@ -745,6 +772,7 @@ vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 	histogram_discard(lsm->run_hist, range->slice_count);
 	vy_disk_stmt_counter_sub(&lsm->stat.disk.compact.queue,
 				 &range->compact_queue);
+	lsm->env->disk_stat.compact.queue -= range->compact_queue.bytes;
 }
 
 void
@@ -755,6 +783,9 @@ vy_lsm_acct_dump(struct vy_lsm *lsm,
 	lsm->stat.disk.dump.count++;
 	vy_stmt_counter_add(&lsm->stat.disk.dump.in, in);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.dump.out, out);
+
+	lsm->env->disk_stat.dump.in += in->bytes;
+	lsm->env->disk_stat.dump.out += out->bytes;
 }
 
 void
@@ -765,6 +796,9 @@ vy_lsm_acct_compaction(struct vy_lsm *lsm,
 	lsm->stat.disk.compact.count++;
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.in, in);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.out, out);
+
+	lsm->env->disk_stat.compact.in += in->bytes;
+	lsm->env->disk_stat.compact.out += out->bytes;
 }
 
 int

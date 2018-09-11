@@ -194,6 +194,26 @@ struct vy_tx_stat {
 	int64_t conflict;
 };
 
+/**
+ * Global disk statistics.
+ *
+ * Fields correspond to those of per LSM tree statistics.
+ * All counters are given in bytes, uncompressed.
+ */
+struct vy_disk_stat {
+	int64_t data;
+	int64_t index;
+	struct {
+		int64_t in;
+		int64_t out;
+	} dump;
+	struct {
+		int64_t in;
+		int64_t out;
+		int64_t queue;
+	} compact;
+};
+
 static inline int
 vy_lsm_stat_create(struct vy_lsm_stat *stat)
 {

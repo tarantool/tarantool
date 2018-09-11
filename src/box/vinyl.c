@@ -298,6 +298,30 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	info_table_end(h); /* memory */
 }
 
+static void
+vy_info_append_disk(struct vy_env *env, struct info_handler *h)
+{
+	struct vy_disk_stat *stat = &env->lsm_env.disk_stat;
+
+	info_table_begin(h, "disk");
+
+	info_append_int(h, "data", stat->data);
+	info_append_int(h, "index", stat->index);
+
+	info_table_begin(h, "dump");
+	info_append_int(h, "in", stat->dump.in);
+	info_append_int(h, "out", stat->dump.out);
+	info_table_end(h); /* dump */
+
+	info_table_begin(h, "compact");
+	info_append_int(h, "in", stat->compact.in);
+	info_append_int(h, "out", stat->compact.out);
+	info_append_int(h, "queue", stat->compact.queue);
+	info_table_end(h); /* compact */
+
+	info_table_end(h); /* disk */
+}
+
 void
 vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 {
@@ -307,6 +331,7 @@ vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 	vy_info_append_quota(env, h);
 	vy_info_append_tx(env, h);
 	vy_info_append_memory(env, h);
+	vy_info_append_disk(env, h);
 	info_end(h);
 }
 
@@ -485,9 +510,15 @@ static void
 vinyl_engine_reset_stat(struct engine *engine)
 {
 	struct vy_env *env = vy_env(engine);
-	struct tx_manager *xm = env->xm;
 
+	struct tx_manager *xm = env->xm;
 	memset(&xm->stat, 0, sizeof(xm->stat));
+
+	struct vy_disk_stat *disk_stat = &env->lsm_env.disk_stat;
+	disk_stat->dump.in = 0;
+	disk_stat->dump.out = 0;
+	disk_stat->compact.in = 0;
+	disk_stat->compact.out = 0;
 }
 
 /** }}} Introspection */

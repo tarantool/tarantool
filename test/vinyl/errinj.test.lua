@@ -862,15 +862,20 @@ function dump() for i = 1, 10 do s:replace{i} end box.snapshot() end
 dump()
 dump()
 i:stat().disk.compact.queue -- none
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', true)
 dump()
 i:stat().disk.compact.queue -- 30 statements
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
 dump()
 i:stat().disk.compact.queue -- 40 statements
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
 dump()
 i:stat().disk.compact.queue -- 50 statements
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
 box.stat.reset() -- doesn't affect queue size
 i:stat().disk.compact.queue -- 50 statements
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', false)
 while i:stat().disk.compact.count < 2 do fiber.sleep(0.01) end
 i:stat().disk.compact.queue -- none

@@ -2147,6 +2147,10 @@ i:stat().disk.compact.queue -- none
   rows: 0
   bytes: 0
 ...
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+---
+- true
+...
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', true)
 ---
 - ok
@@ -2161,6 +2165,10 @@ i:stat().disk.compact.queue -- 30 statements
   rows: 30
   bytes: 471
 ...
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+---
+- true
+...
 dump()
 ---
 ...
@@ -2171,6 +2179,10 @@ i:stat().disk.compact.queue -- 40 statements
   rows: 40
   bytes: 628
 ...
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+---
+- true
+...
 dump()
 ---
 ...
@@ -2181,6 +2193,10 @@ i:stat().disk.compact.queue -- 50 statements
   rows: 50
   bytes: 785
 ...
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+---
+- true
+...
 box.stat.reset() -- doesn't affect queue size
 ---
 ...
@@ -2190,6 +2206,10 @@ i:stat().disk.compact.queue -- 50 statements
   pages: 5
   rows: 50
   bytes: 785
+...
+i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+---
+- true
 ...
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', false)
 ---
