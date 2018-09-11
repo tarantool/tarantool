@@ -2506,21 +2506,25 @@ static int multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 			      SelectDest * pDest	/* What to do with query results */
     );
 
-/*
- * Handle the special case of a compound-select that originates from a
- * VALUES clause.  By handling this as a special case, we avoid deep
- * recursion, and thus do not need to enforce the SQLITE_LIMIT_COMPOUND_SELECT
- * on a VALUES clause.
+/**
+ * Handle the special case of a compound-select that originates
+ * from a VALUES clause.  By handling this as a special case, we
+ * avoid deep recursion, and thus do not need to enforce the
+ * SQL_LIMIT_COMPOUND_SELECT on a VALUES clause.
  *
  * Because the Select object originates from a VALUES clause:
  *   (1) It has no LIMIT or OFFSET
  *   (2) All terms are UNION ALL
  *   (3) There is no ORDER BY clause
+ *
+ * @param pParse Parsing context.
+ * @param p The right-most of SELECTs to be coded.
+ * @param pDest What to do with query results.
+ * @retval 0 On success, not 0 elsewhere.
  */
 static int
-multiSelectValues(Parse * pParse,	/* Parsing context */
-		  Select * p,		/* The right-most of SELECTs to be coded */
-		  SelectDest * pDest)	/* What to do with query results */
+multiSelectValues(struct Parse *pParse, struct Select *p,
+		  struct SelectDest *pDest)
 {
 	Select *pPrior;
 	int nRow = 1;

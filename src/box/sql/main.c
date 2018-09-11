@@ -1422,7 +1422,7 @@ static const int aHardLimit[] = {
 	SQLITE_MAX_SQL_LENGTH,
 	SQLITE_MAX_COLUMN,
 	SQLITE_MAX_EXPR_DEPTH,
-	SQLITE_MAX_COMPOUND_SELECT,
+	SQL_MAX_COMPOUND_SELECT,
 	SQLITE_MAX_VDBE_OP,
 	SQLITE_MAX_FUNCTION_ARG,
 	SQLITE_MAX_ATTACHED,
@@ -1443,8 +1443,8 @@ static const int aHardLimit[] = {
 #if SQLITE_MAX_SQL_LENGTH>SQLITE_MAX_LENGTH
 #error SQLITE_MAX_SQL_LENGTH must not be greater than SQLITE_MAX_LENGTH
 #endif
-#if SQLITE_MAX_COMPOUND_SELECT<2
-#error SQLITE_MAX_COMPOUND_SELECT must be at least 2
+#if SQL_MAX_COMPOUND_SELECT<2
+#error SQL_MAX_COMPOUND_SELECT must be at least 2
 #endif
 #if SQLITE_MAX_VDBE_OP<40
 #error SQLITE_MAX_VDBE_OP must be at least 40
@@ -1499,8 +1499,8 @@ sqlite3_limit(sqlite3 * db, int limitId, int newLimit)
 	assert(aHardLimit[SQLITE_LIMIT_SQL_LENGTH] == SQLITE_MAX_SQL_LENGTH);
 	assert(aHardLimit[SQLITE_LIMIT_COLUMN] == SQLITE_MAX_COLUMN);
 	assert(aHardLimit[SQLITE_LIMIT_EXPR_DEPTH] == SQLITE_MAX_EXPR_DEPTH);
-	assert(aHardLimit[SQLITE_LIMIT_COMPOUND_SELECT] ==
-	       SQLITE_MAX_COMPOUND_SELECT);
+	assert(aHardLimit[SQL_LIMIT_COMPOUND_SELECT] ==
+	       SQL_MAX_COMPOUND_SELECT);
 	assert(aHardLimit[SQLITE_LIMIT_VDBE_OP] == SQLITE_MAX_VDBE_OP);
 	assert(aHardLimit[SQLITE_LIMIT_FUNCTION_ARG] ==
 	       SQLITE_MAX_FUNCTION_ARG);
@@ -1852,6 +1852,7 @@ sql_init_db(sqlite3 **out_db)
 	assert(sizeof(db->aLimit) == sizeof(aHardLimit));
 	memcpy(db->aLimit, aHardLimit, sizeof(db->aLimit));
 	db->aLimit[SQLITE_LIMIT_WORKER_THREADS] = SQLITE_DEFAULT_WORKER_THREADS;
+	db->aLimit[SQL_LIMIT_COMPOUND_SELECT] = SQL_DEFAULT_COMPOUND_SELECT;
 	db->szMmap = sqlite3GlobalConfig.szMmap;
 	db->nMaxSorterMmap = 0x7FFFFFFF;
 

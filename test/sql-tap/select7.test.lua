@@ -169,17 +169,17 @@ test:do_catchsql_test(
 -- compound select statement.
 
 -- hardcoded define from src
--- 500 is default value
-local SQLITE_MAX_COMPOUND_SELECT = 500
+-- 30 is default value
+local SQL_MAX_COMPOUND_SELECT = 30
 sql = "SELECT 0"
-for i = 0, SQLITE_MAX_COMPOUND_SELECT + 1, 1 do
+for i = 0, SQL_MAX_COMPOUND_SELECT + 1, 1 do
     sql = sql .. " UNION ALL SELECT "..i..""
 end
 test:do_catchsql_test(
     "select7-6.2",
     sql, {
         -- <select7-6.2>
-        1, "Too many UNION or EXCEPT or INTERSECT operations"
+        1, "Too many UNION or EXCEPT or INTERSECT operations (limit 30 is set)"
         -- </select7-6.2>
     })
 

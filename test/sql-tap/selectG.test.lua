@@ -15,7 +15,7 @@ test:plan(1)
 -------------------------------------------------------------------------
 --
 -- This file verifies that INSERT operations with a very large number of
--- VALUE terms works and does not hit the SQLITE_LIMIT_COMPOUND_SELECT limit.
+-- VALUE terms works and does not hit the SQL_LIMIT_COMPOUND_SELECT limit.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]

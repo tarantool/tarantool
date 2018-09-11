@@ -406,11 +406,11 @@ cmd ::= select(X).  {
 %destructor oneselect {sql_select_delete(pParse->db, $$);}
 
 %include {
-  /*
-  ** For a compound SELECT statement, make sure p->pPrior->pNext==p for
-  ** all elements in the list.  And make sure list length does not exceed
-  ** SQLITE_LIMIT_COMPOUND_SELECT.
-  */
+  /**
+   * For a compound SELECT statement, make sure
+   * p->pPrior->pNext==p for all elements in the list. And make
+   * sure list length does not exceed SQL_LIMIT_COMPOUND_SELECT.
+   */
   static void parserDoubleLinkSelect(Parse *pParse, Select *p){
     if( p->pPrior ){
       Select *pNext = 0, *pLoop;
@@ -420,10 +420,12 @@ cmd ::= select(X).  {
         pLoop->selFlags |= SF_Compound;
       }
       if( (p->selFlags & SF_MultiValue)==0 && 
-        (mxSelect = pParse->db->aLimit[SQLITE_LIMIT_COMPOUND_SELECT])>0 &&
+        (mxSelect = pParse->db->aLimit[SQL_LIMIT_COMPOUND_SELECT])>0 &&
         cnt>mxSelect
       ){
-        sqlite3ErrorMsg(pParse, "Too many UNION or EXCEPT or INTERSECT operations");
+        sqlite3ErrorMsg(pParse, "Too many UNION or EXCEPT or INTERSECT "
+                        "operations (limit %d is set)",
+                        pParse->db->aLimit[SQL_LIMIT_COMPOUND_SELECT]);
       }
     }
   }

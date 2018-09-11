@@ -16,6 +16,7 @@
 #define PragTyp_TABLE_INFO                    17
 #define PragTyp_PARSER_TRACE                  24
 #define PragTyp_DEFAULT_ENGINE                25
+#define PragTyp_COMPOUND_SELECT_LIMIT         26
 
 /* Property flags associated with various pragma. */
 #define PragFlg_NeedSchema 0x01	/* Force schema load before running */
@@ -221,6 +222,11 @@ static const PragmaName aPragmaName[] = {
 	 /* ColNames:  */ 0, 0,
 	 /* iArg:      */ SQLITE_ShortColNames},
 #endif
+	{ /* zName:     */ "sql_compound_select_limit",
+	/* ePragTyp:  */ PragTyp_COMPOUND_SELECT_LIMIT,
+	/* ePragFlg:  */ PragFlg_Result0,
+	/* ColNames:  */ 0, 0,
+	/* iArg:      */ 0},
 	{ /* zName:     */ "sql_default_engine",
 	 /* ePragTyp:  */ PragTyp_DEFAULT_ENGINE,
 	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,

@@ -611,6 +611,17 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		break;
 	}
 
+	case PragTyp_COMPOUND_SELECT_LIMIT: {
+		if (zRight != NULL) {
+			sqlite3_limit(db, SQL_LIMIT_COMPOUND_SELECT,
+				      sqlite3Atoi(zRight));
+		}
+		int retval =
+			sqlite3_limit(db, SQL_LIMIT_COMPOUND_SELECT, -1);
+		returnSingleInt(v, retval);
+		break;
+	}
+
 	/* *   PRAGMA busy_timeout *   PRAGMA busy_timeout = N *
 	 *
 	 * Call sqlite3_busy_timeout(db, N).  Return the current

@@ -357,7 +357,7 @@ struct sqlite3_vfs {
 #define SQLITE_LIMIT_SQL_LENGTH                1
 #define SQLITE_LIMIT_COLUMN                    2
 #define SQLITE_LIMIT_EXPR_DEPTH                3
-#define SQLITE_LIMIT_COMPOUND_SELECT           4
+#define SQL_LIMIT_COMPOUND_SELECT              4
 #define SQLITE_LIMIT_VDBE_OP                   5
 #define SQLITE_LIMIT_FUNCTION_ARG              6
 #define SQLITE_LIMIT_ATTACHED                  7
@@ -1027,6 +1027,17 @@ sqlite3_bind_parameter_lindex(sqlite3_stmt * pStmt, const char *zName,
 #if SQLITE_DEFAULT_WORKER_THREADS>SQLITE_MAX_WORKER_THREADS
 #undef SQLITE_MAX_WORKER_THREADS
 #define SQLITE_MAX_WORKER_THREADS SQLITE_DEFAULT_WORKER_THREADS
+#endif
+
+/**
+ * Default count of allowed compound selects.
+ *
+ * Tarantool: gh-2548, gh-3382: Fiber stack is 64KB by default,
+ * so maximum number of entities should be less than 30 or stack
+ * guard will be triggered (triggered with clang).
+*/
+#ifndef SQL_DEFAULT_COMPOUND_SELECT
+#define SQL_DEFAULT_COMPOUND_SELECT 30
 #endif
 
 /*

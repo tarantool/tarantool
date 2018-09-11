@@ -1,12 +1,14 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(8)
+test:plan(14)
 
 -- box.cfg{wal_mode='none'}
 
-table_count = 51
+table_count = 31
 
-for _, term in ipairs({'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT'}) do 
+select_string_last = ''
+
+for _, term in ipairs({'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT'}) do
     select_string = ''
     test:do_test("Positive COMPOUND "..term,
                  function()
@@ -39,6 +41,8 @@ for _, term in ipairs({'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT'}) do
                  end,
                  false)
 
+    select_string_last = select_string
+
 --    if not pcall(function() box.sql.execute(select_string) end) then
 --        print('not ok')
 --    end
@@ -48,5 +52,57 @@ for _, term in ipairs({'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT'}) do
 --        print('not ok')
 --    end
 end
+
+
+test:do_catchsql_test(
+    "gh2548-select-compound-limit-2",
+    select_string_last, {
+        -- <gh2548-select-compound-limit-2>
+        1, "Too many UNION or EXCEPT or INTERSECT operations (limit 30 is set)"
+        -- </gh2548-select-compound-limit-2>
+    })
+
+test:do_execsql_test(
+    "gh2548-select-compound-limit-3.1", [[
+        pragma sql_compound_select_limit
+    ]], {
+        -- <gh2548-select-compound-limit-3.1>
+        30
+        -- </gh2548-select-compound-limit-3.1>
+    })
+
+test:do_execsql_test(
+    "gh2548-select-compound-limit-3.2", [[
+        pragma sql_compound_select_limit=31
+    ]], {
+        -- <gh2548-select-compound-limit-3.2>
+        31
+        -- </gh2548-select-compound-limit-3.2>
+})
+
+test:do_execsql_test(
+    "gh2548-select-compound-limit-3.3",
+    select_string_last, {
+        -- <gh2548-select-compound-limit-3.3>
+        0, 1
+        -- </gh2548-select-compound-limit-3.3>
+    })
+
+test:do_execsql_test(
+    "gh2548-select-compound-limit-3.4", [[
+        pragma sql_compound_select_limit=0
+    ]], {
+        -- <gh2548-select-compound-limit-3.4>
+        0
+        -- </gh2548-select-compound-limit-3.4>
+    })
+
+test:do_execsql_test(
+    "gh2548-select-compound-limit-3.3",
+    select_string_last, {
+        -- <gh2548-select-compound-limit-3.3>
+        0, 1
+        -- </gh2548-select-compound-limit-3.3>
+    })
 
 test:finish_test()
