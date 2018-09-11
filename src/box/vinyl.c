@@ -259,7 +259,7 @@ vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "watermark", q->watermark);
 	info_append_int(h, "use_rate", q->use_rate);
 	info_append_int(h, "dump_bandwidth", q->dump_bw);
-	info_table_end(h);
+	info_table_end(h); /* quota */
 }
 
 static void
@@ -283,7 +283,7 @@ vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 	mempool_stats(&xm->read_view_mempool, &mstats);
 	info_append_int(h, "read_views", mstats.objcount);
 
-	info_table_end(h);
+	info_table_end(h); /* tx */
 }
 
 static void
@@ -295,7 +295,7 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
 	info_append_int(h, "page_index", env->lsm_env.page_index_size);
 	info_append_int(h, "bloom_filter", env->lsm_env.bloom_size);
-	info_table_end(h);
+	info_table_end(h); /* memory */
 }
 
 void
@@ -371,21 +371,21 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_append_double(h, "p90", latency_get(&stat->latency, 90));
 	info_append_double(h, "p95", latency_get(&stat->latency, 95));
 	info_append_double(h, "p99", latency_get(&stat->latency, 99));
-	info_table_end(h);
+	info_table_end(h); /* latency */
 
 	info_table_begin(h, "upsert");
 	info_append_int(h, "squashed", stat->upsert.squashed);
 	info_append_int(h, "applied", stat->upsert.applied);
-	info_table_end(h);
+	info_table_end(h); /* upsert */
 
 	info_table_begin(h, "memory");
 	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
 	info_table_begin(h, "iterator");
 	info_append_int(h, "lookup", stat->memory.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->memory.iterator.get);
-	info_table_end(h);
+	info_table_end(h); /* iterator */
 	info_append_int(h, "index_size", vy_lsm_mem_tree_size(lsm));
-	info_table_end(h);
+	info_table_end(h); /* memory */
 
 	info_table_begin(h, "disk");
 	vy_info_append_disk_stmt_counter(h, NULL, &stat->disk.count);
@@ -396,13 +396,13 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_table_begin(h, "bloom");
 	info_append_int(h, "hit", stat->disk.iterator.bloom_hit);
 	info_append_int(h, "miss", stat->disk.iterator.bloom_miss);
-	info_table_end(h);
-	info_table_end(h);
+	info_table_end(h); /* bloom */
+	info_table_end(h); /* iterator */
 	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
 	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
 	info_append_int(h, "index_size", lsm->page_index_size);
 	info_append_int(h, "bloom_size", lsm->bloom_size);
-	info_table_end(h);
+	info_table_end(h); /* disk */
 
 	info_table_begin(h, "cache");
 	vy_info_append_stmt_counter(h, NULL, &cache_stat->count);
@@ -413,15 +413,15 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
 	info_append_int(h, "index_size",
 			vy_cache_tree_mem_used(&lsm->cache.cache_tree));
-	info_table_end(h);
+	info_table_end(h); /* cache */
 
 	info_table_begin(h, "txw");
 	vy_info_append_stmt_counter(h, NULL, &stat->txw.count);
 	info_table_begin(h, "iterator");
 	info_append_int(h, "lookup", stat->txw.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->txw.iterator.get);
-	info_table_end(h);
-	info_table_end(h);
+	info_table_end(h); /* iterator */
+	info_table_end(h); /* txw */
 
 	info_append_int(h, "range_count", lsm->range_count);
 	info_append_int(h, "run_count", lsm->run_count);
