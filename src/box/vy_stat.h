@@ -101,15 +101,6 @@ struct vy_txw_iterator_stat {
 	struct vy_stmt_counter get;
 };
 
-/** Dump/compaction statistics. */
-struct vy_compact_stat {
-	int32_t count;
-	/** Number of input statements. */
-	struct vy_stmt_counter in;
-	/** Number of output statements. */
-	struct vy_stmt_counter out;
-};
-
 /** LSM tree statistics. */
 struct vy_lsm_stat {
 	/** Number of lookups in the LSM tree. */
@@ -141,9 +132,23 @@ struct vy_lsm_stat {
 		/** Run iterator statistics. */
 		struct vy_run_iterator_stat iterator;
 		/** Dump statistics. */
-		struct vy_compact_stat dump;
+		struct {
+			/* Number of completed tasks. */
+			int32_t count;
+			/** Number of input statements. */
+			struct vy_stmt_counter in;
+			/** Number of output statements. */
+			struct vy_disk_stmt_counter out;
+		} dump;
 		/** Compaction statistics. */
-		struct vy_compact_stat compact;
+		struct {
+			/* Number of completed tasks. */
+			int32_t count;
+			/** Number of input statements. */
+			struct vy_disk_stmt_counter in;
+			/** Number of output statements. */
+			struct vy_disk_stmt_counter out;
+		} compact;
 	} disk;
 	/** TX write set statistics. */
 	struct {

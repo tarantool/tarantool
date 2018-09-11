@@ -337,17 +337,6 @@ vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
 }
 
 static void
-vy_info_append_compact_stat(struct info_handler *h, const char *name,
-			    const struct vy_compact_stat *stat)
-{
-	info_table_begin(h, name);
-	info_append_int(h, "count", stat->count);
-	vy_info_append_stmt_counter(h, "in", &stat->in);
-	vy_info_append_stmt_counter(h, "out", &stat->out);
-	info_table_end(h);
-}
-
-static void
 vinyl_index_stat(struct index *index, struct info_handler *h)
 {
 	char buf[1024];
@@ -398,8 +387,16 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_append_int(h, "miss", stat->disk.iterator.bloom_miss);
 	info_table_end(h); /* bloom */
 	info_table_end(h); /* iterator */
-	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
-	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
+	info_table_begin(h, "dump");
+	info_append_int(h, "count", stat->disk.dump.count);
+	vy_info_append_stmt_counter(h, "in", &stat->disk.dump.in);
+	vy_info_append_disk_stmt_counter(h, "out", &stat->disk.dump.out);
+	info_table_end(h); /* dump */
+	info_table_begin(h, "compact");
+	info_append_int(h, "count", stat->disk.compact.count);
+	vy_info_append_disk_stmt_counter(h, "in", &stat->disk.compact.in);
+	vy_info_append_disk_stmt_counter(h, "out", &stat->disk.compact.out);
+	info_table_end(h); /* compact */
 	info_append_int(h, "index_size", lsm->page_index_size);
 	info_append_int(h, "bloom_size", lsm->bloom_size);
 	info_table_end(h); /* disk */

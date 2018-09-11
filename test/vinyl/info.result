@@ -160,14 +160,20 @@ istat()
         bytes: 0
       count: 0
       out:
+        bytes_compressed: 0
+        pages: 0
         rows: 0
         bytes: 0
     compact:
       in:
+        bytes_compressed: 0
+        pages: 0
         rows: 0
         bytes: 0
       count: 0
       out:
+        bytes_compressed: 0
+        pages: 0
         rows: 0
         bytes: 0
     iterator:
@@ -264,8 +270,10 @@ stat_diff(istat(), st)
         bytes: 26525
       count: 1
       out:
-        rows: 25
         bytes: 26049
+        pages: 7
+        bytes_compressed: <bytes_compressed>
+        rows: 25
     index_size: 294
     rows: 25
     bloom_size: 70
@@ -300,8 +308,10 @@ stat_diff(istat(), st)
         bytes: 53050
       count: 1
       out:
-        rows: 50
         bytes: 52091
+        pages: 13
+        bytes_compressed: <bytes_compressed>
+        rows: 50
     index_size: 252
     rows: 25
     bytes_compressed: <bytes_compressed>
@@ -309,12 +319,16 @@ stat_diff(istat(), st)
     bytes: 26042
     compact:
       in:
-        rows: 75
         bytes: 78140
+        pages: 20
+        bytes_compressed: <bytes_compressed>
+        rows: 75
       count: 1
       out:
-        rows: 50
         bytes: 52091
+        pages: 13
+        bytes_compressed: <bytes_compressed>
+        rows: 50
   put:
     rows: 50
     bytes: 53050
@@ -958,14 +972,20 @@ istat()
         bytes: 0
       count: 0
       out:
+        bytes_compressed: <bytes_compressed>
+        pages: 0
         rows: 0
         bytes: 0
     compact:
       in:
+        bytes_compressed: <bytes_compressed>
+        pages: 0
         rows: 0
         bytes: 0
       count: 0
       out:
+        bytes_compressed: <bytes_compressed>
+        pages: 0
         rows: 0
         bytes: 0
     iterator:

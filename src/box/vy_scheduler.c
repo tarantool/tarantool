@@ -1182,7 +1182,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Account the new run.
 	 */
 	vy_lsm_add_run(lsm, new_run);
-	vy_stmt_counter_add_disk(&lsm->stat.disk.dump.out, &new_run->count);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.dump.out, &new_run->count);
 
 	/* Drop the reference held by the task. */
 	vy_run_unref(new_run);
@@ -1521,7 +1521,7 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	if (new_slice != NULL) {
 		vy_lsm_add_run(lsm, new_run);
-		vy_stmt_counter_add_disk(&lsm->stat.disk.compact.out,
+		vy_disk_stmt_counter_add(&lsm->stat.disk.compact.out,
 					 &new_run->count);
 		/* Drop the reference held by the task. */
 		vy_run_unref(new_run);
@@ -1544,7 +1544,7 @@ vy_task_compact_complete(struct vy_task *task)
 		next_slice = rlist_next_entry(slice, in_range);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
-		vy_stmt_counter_add_disk(&lsm->stat.disk.compact.in,
+		vy_disk_stmt_counter_add(&lsm->stat.disk.compact.in,
 					 &slice->count);
 		if (slice == last_slice)
 			break;
