@@ -215,13 +215,6 @@ box_leave_local_standby_mode(void *data __attribute__((unused)))
 int
 box_check_config(struct tarantool_cfg *conf)
 {
-	/* replication & hot standby modes can not work together */
-	if (conf->replication_source != NULL && conf->local_hot_standby > 0) {
-		out_warning(CNF_OK, "replication and local hot standby modes "
-			       "can't be enabled simultaneously");
-		return -1;
-	}
-
 	/* check replication mode */
 	if (conf->replication_source != NULL) {
 		/* check replication port */
