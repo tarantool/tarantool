@@ -774,6 +774,9 @@ iproto_on_accept(struct evio_service *service, int fd,
 			       iproto_process_connect);
 }
 
+static struct evio_service primary;
+static struct evio_service secondary;
+
 /**
  * Initialize read-write and read-only ports
  * with binary protocol handlers.
@@ -784,7 +787,6 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 {
 	/* Run a primary server. */
 	if (primary_port != 0) {
-		static struct evio_service primary;
 		evio_service_init(&primary, "primary",
 				  bind_ipaddr, primary_port,
 				  iproto_on_accept, &box_process);
@@ -795,7 +797,6 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 
 	/* Run a secondary server. */
 	if (secondary_port != 0) {
-		static struct evio_service secondary;
 		evio_service_init(&secondary, "secondary",
 				  bind_ipaddr, secondary_port,
 				  iproto_on_accept, &box_process_ro);
@@ -805,3 +806,14 @@ iproto_init(const char *bind_ipaddr, int primary_port,
 			  iproto_queue_handler);
 }
 
+void
+iproto_exit()
+{
+	/* On modern Linux it takes a lot of time to unmap
+	 * memory segments of a large instance. Do not hold file
+	 * descriptors for the primary/secondary port while the OS
+	 * is un-mapping the memory at shutdown.
+	 */
+	evio_close(&primary.ev);
+	evio_close(&secondary.ev);
+}

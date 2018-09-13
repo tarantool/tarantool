@@ -653,6 +653,8 @@ tarantool_free(void)
 	memcached_free();
 	tarantool_lua_free();
 	box_free();
+	/* Close the file descriptors. */
+	iproto_exit();
 	recovery_free();
 	stat_free();
 

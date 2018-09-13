@@ -31,4 +31,8 @@
 void
 iproto_init(const char *bind_ipaddr, int primary_port,
 	    int secondary_port);
+
+void
+iproto_exit();
+
 #endif
