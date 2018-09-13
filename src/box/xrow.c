@@ -135,7 +135,8 @@ error:
 		}
 	}
 	assert(*pos <= end);
-	if (*pos < end) {
+	/* Nop requests aren't supposed to have a body. */
+	if (*pos < end && header->type != IPROTO_NOP) {
 		const char *body = *pos;
 		if (mp_check(pos, end)) {
 			diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
