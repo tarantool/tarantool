@@ -263,23 +263,6 @@ vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 }
 
 static void
-vy_info_append_cache(struct vy_env *env, struct info_handler *h)
-{
-	struct vy_cache_env *c = &env->cache_env;
-
-	info_table_begin(h, "cache");
-
-	info_append_int(h, "used", c->mem_used);
-	info_append_int(h, "limit", c->mem_quota);
-
-	struct mempool_stats mstats;
-	mempool_stats(&c->cache_entry_mempool, &mstats);
-	info_append_int(h, "tuples", mstats.objcount);
-
-	info_table_end(h);
-}
-
-static void
 vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 {
 	struct tx_manager *xm = env->xm;
@@ -303,6 +286,18 @@ vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 	info_table_end(h);
 }
 
+static void
+vy_info_append_memory(struct vy_env *env, struct info_handler *h)
+{
+	info_table_begin(h, "memory");
+	info_append_int(h, "tx", tx_manager_mem_used(env->xm));
+	info_append_int(h, "level0", lsregion_used(&env->mem_env.allocator));
+	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
+	info_append_int(h, "page_index", env->lsm_env.page_index_size);
+	info_append_int(h, "bloom_filter", env->lsm_env.bloom_size);
+	info_table_end(h);
+}
+
 void
 vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 {
@@ -310,8 +305,8 @@ vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 
 	info_begin(h);
 	vy_info_append_quota(env, h);
-	vy_info_append_cache(env, h);
 	vy_info_append_tx(env, h);
+	vy_info_append_memory(env, h);
 	info_end(h);
 }
 
@@ -466,7 +461,6 @@ static void
 vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 {
 	struct vy_env *env = vy_env(engine);
-	struct mempool_stats mstats;
 
 	stat->data += lsregion_used(&env->mem_env.allocator) -
 				env->mem_env.tree_extent_size;
@@ -474,15 +468,7 @@ vinyl_engine_memory_stat(struct engine *engine, struct engine_memory_stat *stat)
 	stat->index += env->lsm_env.bloom_size;
 	stat->index += env->lsm_env.page_index_size;
 	stat->cache += env->cache_env.mem_used;
-	stat->tx += env->xm->write_set_size + env->xm->read_set_size;
-	mempool_stats(&env->xm->tx_mempool, &mstats);
-	stat->tx += mstats.totals.used;
-	mempool_stats(&env->xm->txv_mempool, &mstats);
-	stat->tx += mstats.totals.used;
-	mempool_stats(&env->xm->read_interval_mempool, &mstats);
-	stat->tx += mstats.totals.used;
-	mempool_stats(&env->xm->read_view_mempool, &mstats);
-	stat->tx += mstats.totals.used;
+	stat->tx += tx_manager_mem_used(env->xm);
 }
 
 static void
@@ -2415,21 +2401,6 @@ vy_env_quota_exceeded_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
 
-	/*
-	 * The scheduler must be disabled during local recovery so as
-	 * not to distort data stored on disk. Not that we really need
-	 * it anyway, because the memory footprint is limited by the
-	 * memory limit from the previous run.
-	 *
-	 * On the contrary, remote recovery does require the scheduler
-	 * to be up and running, because the amount of data received
-	 * when bootstrapping from a remote master is only limited by
-	 * its disk size, which can exceed the size of available
-	 * memory by orders of magnitude.
-	 */
-	assert(env->status != VINYL_INITIAL_RECOVERY_LOCAL &&
-	       env->status != VINYL_FINAL_RECOVERY_LOCAL);
-
 	if (lsregion_used(&env->mem_env.allocator) == 0) {
 		/*
 		 * The memory limit has been exceeded, but there's
@@ -2705,13 +2676,15 @@ vy_set_deferred_delete_trigger(void)
 static int
 vinyl_engine_bootstrap(struct engine *engine)
 {
+	vy_set_deferred_delete_trigger();
+
 	struct vy_env *e = vy_env(engine);
 	assert(e->status == VINYL_OFFLINE);
 	if (vy_log_bootstrap() != 0)
 		return -1;
+	vy_scheduler_start(&e->scheduler);
 	vy_quota_set_limit(&e->quota, e->memory);
 	e->status = VINYL_ONLINE;
-	vy_set_deferred_delete_trigger();
 	return 0;
 }
 
@@ -2719,6 +2692,8 @@ static int
 vinyl_engine_begin_initial_recovery(struct engine *engine,
 				    const struct vclock *recovery_vclock)
 {
+	vy_set_deferred_delete_trigger();
+
 	struct vy_env *e = vy_env(engine);
 	assert(e->status == VINYL_OFFLINE);
 	if (recovery_vclock != NULL) {
@@ -2727,14 +2702,25 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 		e->recovery = vy_log_begin_recovery(recovery_vclock);
 		if (e->recovery == NULL)
 			return -1;
+		/*
+		 * We can't schedule any background tasks until
+		 * local recovery is complete, because they would
+		 * disrupt yet to be recovered data stored on disk.
+		 * So we don't start the scheduler fiber or enable
+		 * memory limit until then.
+		 *
+		 * This is OK, because during recovery an instance
+		 * can't consume more memory than it used before
+		 * restart and hence memory dumps are not necessary.
+		 */
 		e->status = VINYL_INITIAL_RECOVERY_LOCAL;
 	} else {
 		if (vy_log_bootstrap() != 0)
 			return -1;
+		vy_scheduler_start(&e->scheduler);
 		vy_quota_set_limit(&e->quota, e->memory);
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
-	vy_set_deferred_delete_trigger();
 	return 0;
 }
 
@@ -2775,11 +2761,10 @@ vinyl_engine_end_recovery(struct engine *engine)
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
 		e->recovery_vclock = NULL;
-		e->status = VINYL_ONLINE;
+		vy_scheduler_start(&e->scheduler);
 		vy_quota_set_limit(&e->quota, e->memory);
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
-		e->status = VINYL_ONLINE;
 		break;
 	default:
 		unreachable();
@@ -2791,6 +2776,8 @@ vinyl_engine_end_recovery(struct engine *engine)
 	 */
 	if (e->lsm_env.lsm_count > 0)
 		vy_run_env_enable_coio(&e->run_env, e->read_threads);
+
+	e->status = VINYL_ONLINE;
 	return 0;
 }
 

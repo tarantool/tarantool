@@ -10,7 +10,7 @@ cfg_filter(box.cfg)
 -- check that cfg with unexpected parameter fails.
 box.cfg{sherlock = 'holmes'}
 
--- check that cfg with unexpected type of parameter failes
+-- check that cfg with unexpected type of parameter fails
 box.cfg{listen = {}}
 box.cfg{wal_dir = 0}
 box.cfg{coredump = 'true'}
@@ -18,6 +18,7 @@ box.cfg{coredump = 'true'}
 -- check comment to issue #2191 - bad argument #2 to ''uri_parse''
 box.cfg{replication = {}}
 box.cfg{replication = {}}
+
 --------------------------------------------------------------------------------
 -- Test of hierarchical cfg type check
 --------------------------------------------------------------------------------
@@ -28,6 +29,19 @@ box.cfg{vinyl_memory = -1}
 box.cfg{vinyl = "vinyl"}
 box.cfg{vinyl_write_threads = "threads"}
 
+--------------------------------------------------------------------------------
+-- Dynamic configuration check
+--------------------------------------------------------------------------------
+
+replication_sync_lag = box.cfg.replication_sync_lag
+box.cfg{replication_sync_lag = 0.123}
+box.cfg.replication_sync_lag
+box.cfg{replication_sync_lag = replication_sync_lag}
+
+replication_sync_timeout = box.cfg.replication_sync_timeout
+box.cfg{replication_sync_timeout = 123}
+box.cfg.replication_sync_timeout
+box.cfg{replication_sync_timeout = replication_sync_timeout}
 
 box.cfg{instance_uuid = box.info.uuid}
 box.cfg{instance_uuid = '12345678-0123-5678-1234-abcdefabcdef'}

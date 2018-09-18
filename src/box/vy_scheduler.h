@@ -31,11 +31,10 @@
  * SUCH DAMAGE.
  */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <small/mempool.h>
 #include <small/rlist.h>
-#include <tarantool_ev.h>
 
 #include "diag.h"
 #include "fiber_cond.h"
@@ -57,24 +56,26 @@ typedef void
 (*vy_scheduler_dump_complete_f)(struct vy_scheduler *scheduler,
 				int64_t dump_generation, double dump_duration);
 
+struct vy_worker_pool {
+	/** Name of the pool. Used for naming threads. */
+	const char *name;
+	/** Number of worker threads in the pool. */
+	int size;
+	/** Array of all worker threads in the pool. */
+	struct vy_worker *workers;
+	/** List of workers that are currently idle. */
+	struct stailq idle_workers;
+};
+
 struct vy_scheduler {
 	/** Scheduler fiber. */
 	struct fiber *scheduler_fiber;
 	/** Used to wake up the scheduler fiber from TX. */
 	struct fiber_cond scheduler_cond;
-	/**
-	 * Array of worker threads used for performing
-	 * dump/compaction tasks.
-	 */
-	struct vy_worker *worker_pool;
-	/** Total number of worker threads. */
-	int worker_pool_size;
-	/** Number worker threads that are currently idle. */
-	int idle_worker_count;
-	/** List of idle workers, linked by vy_worker::in_idle. */
-	struct stailq idle_workers;
-	/** Memory pool used for allocating vy_task objects. */
-	struct mempool task_pool;
+	/** Pool of threads for performing background dumps. */
+	struct vy_worker_pool dump_pool;
+	/** Pool of threads for performing background compactions. */
+	struct vy_worker_pool compact_pool;
 	/** Queue of processed tasks, linked by vy_task::in_processed. */
 	struct stailq processed_tasks;
 	/**
@@ -151,12 +152,30 @@ struct vy_scheduler {
 };
 
 /**
+ * Return true if memory dump is in progress, i.e. there are
+ * in-memory trees that are being dumped right now or should
+ * be scheduled for dump as soon as possible.
+ */
+static inline bool
+vy_scheduler_dump_in_progress(struct vy_scheduler *scheduler)
+{
+	assert(scheduler->dump_generation <= scheduler->generation);
+	return scheduler->dump_generation < scheduler->generation;
+}
+
+/**
  * Create a scheduler instance.
  */
 void
 vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 		    vy_scheduler_dump_complete_f dump_complete_cb,
 		    struct vy_run_env *run_env, struct rlist *read_views);
+
+/**
+ * Start a scheduler fiber.
+ */
+void
+vy_scheduler_start(struct vy_scheduler *scheduler);
 
 /**
  * Destroy a scheduler instance.

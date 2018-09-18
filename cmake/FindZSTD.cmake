@@ -2,8 +2,13 @@ find_path(ZSTD_INCLUDE_DIR
   NAMES zstd.h
 )
 
+if(BUILD_STATIC)
+    set(ZSTD_LIB_NAME libzstd.a)
+else()
+    set(ZSTD_LIB_NAME zstd)
+endif()
 find_library(ZSTD_LIBRARY
-  NAMES zstd
+    NAMES ${ZSTD_LIB_NAME}
 )
 
 set(ZSTD_INCLUDE_DIRS "${ZSTD_INCLUDE_DIR}")

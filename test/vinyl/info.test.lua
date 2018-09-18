@@ -206,15 +206,15 @@ box.rollback()
 -- Global statistics.
 --
 
--- use quota
+-- use memory
 st = gstat()
 put(1)
-stat_diff(gstat(), st, 'quota')
+stat_diff(gstat(), st, 'memory.level0')
 
 -- use cache
 st = gstat()
 _ = s:get(1)
-stat_diff(gstat(), st, 'cache')
+stat_diff(gstat(), st, 'memory.tuple_cache')
 
 s:delete(1)
 
@@ -329,6 +329,7 @@ i1:len(), i2:len()
 i1:bsize(), i2:bsize()
 
 for i = 1, 100, 2 do s:replace{i, i, pad()} end
+gst = gstat()
 st1 = i1:stat()
 st2 = i2:stat()
 s:bsize()
@@ -339,8 +340,11 @@ i1:len() == st1.memory.rows
 i2:len() == st2.memory.rows
 i1:bsize() == st1.memory.index_size
 i2:bsize() == st2.memory.index_size
+gst.memory.page_index == 0
+gst.memory.bloom_filter == 0
 
 box.snapshot()
+gst = gstat()
 st1 = i1:stat()
 st2 = i2:stat()
 s:bsize()
@@ -351,6 +355,8 @@ i1:len() == st1.disk.rows
 i2:len() == st2.disk.rows
 i1:bsize() == st1.disk.index_size + st1.disk.bloom_size
 i2:bsize() == st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+gst.memory.page_index == st1.disk.index_size + st2.disk.index_size
+gst.memory.bloom_filter == st1.disk.bloom_size + st2.disk.bloom_size
 
 for i = 1, 100, 2 do s:delete(i) end
 for i = 2, 100, 2 do s:replace{i, i, pad()} end
@@ -373,6 +379,7 @@ wait(function() return i1:stat() end, st1, 'disk.compact.count', 1)
 box.snapshot()
 i2:compact()
 wait(function() return i2:stat() end, st2, 'disk.compact.count', 1)
+gst = gstat()
 st1 = i1:stat()
 st2 = i2:stat()
 s:bsize()
@@ -383,8 +390,14 @@ i1:len() == st1.disk.rows
 i2:len() == st2.disk.rows
 i1:bsize() == st1.disk.index_size + st1.disk.bloom_size
 i2:bsize() == st2.disk.index_size + st2.disk.bloom_size + st2.disk.bytes
+gst.memory.page_index == st1.disk.index_size + st2.disk.index_size
+gst.memory.bloom_filter == st1.disk.bloom_size + st2.disk.bloom_size
 
 s:drop()
+
+gst = gstat()
+gst.memory.page_index == 0
+gst.memory.bloom_filter == 0
 
 test_run:cmd('switch default')
 test_run:cmd('stop server test')

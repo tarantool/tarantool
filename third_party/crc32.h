@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-uint32_t crc32(const void *buf, size_t size);
-uint32_t crc32c(uint32_t crc32c, const char *buffer, unsigned int length);
+#define crc32 tnt_crc32
+uint32_t tnt_crc32(const void *buf, size_t size);
+#define crc32c tnt_crc32c
+uint32_t tnt_crc32c(uint32_t crc32c, const char *buffer, unsigned int length);
 
 #endif

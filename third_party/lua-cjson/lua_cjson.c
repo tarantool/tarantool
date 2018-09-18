@@ -417,22 +417,25 @@ static void json_append_data(lua_State *l, struct luaL_serializer *cfg,
     }
 }
 
-static int json_encode(lua_State *l)
-{
-    struct luaL_serializer *cfg = luaL_checkserializer(l);
-    char *json;
-    int len;
+static int json_encode(lua_State *l) {
+    luaL_argcheck(l, lua_gettop(l) == 2 || lua_gettop(l) == 1, 1,
+                  "expected 1 or 2 arguments");
 
-    luaL_argcheck(l, lua_gettop(l) == 1, 1, "expected 1 argument");
-
-    /* Reuse existing buffer */
+    /* Reuse existing buffer. */
     strbuf_reset(&encode_buf);
+    struct luaL_serializer *cfg = luaL_checkserializer(l);
 
-    json_append_data(l, cfg, 0, &encode_buf);
-    json = strbuf_string(&encode_buf, &len);
+    if (lua_gettop(l) == 2) {
+        struct luaL_serializer user_cfg = *cfg;
+        luaL_serializer_parse_options(l, &user_cfg);
+        lua_pop(l, 1);
+        json_append_data(l, &user_cfg, 0, &encode_buf);
+    } else {
+        json_append_data(l, cfg, 0, &encode_buf);
+    }
 
-    lua_pushlstring(l, json, len);
-
+    char *json = strbuf_string(&encode_buf, NULL);
+    lua_pushlstring(l, json, strbuf_length(&encode_buf));
     return 1;
 }
 
@@ -977,9 +980,18 @@ static int json_decode(lua_State *l)
     json_token_t token;
     size_t json_len;
 
-    luaL_argcheck(l, lua_gettop(l) == 1, 1, "expected 1 argument");
+    luaL_argcheck(l, lua_gettop(l) == 2 || lua_gettop(l) == 1, 1,
+                  "expected 1 or 2 arguments");
 
-    json.cfg = luaL_checkserializer(l);
+    if (lua_gettop(l) == 2) {
+        struct luaL_serializer user_cfg = *luaL_checkserializer(l);
+        luaL_serializer_parse_options(l, &user_cfg);
+        lua_pop(l, 1);
+        json.cfg = &user_cfg;
+    } else {
+        json.cfg = luaL_checkserializer(l);
+    }
+
     json.data = luaL_checklstring(l, 1, &json_len);
     json.current_depth = 0;
     json.ptr = json.data;

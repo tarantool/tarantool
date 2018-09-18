@@ -188,7 +188,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->refs = 1;
 	lsm->dump_lsn = -1;
 	lsm->commit_lsn = -1;
-	vy_cache_create(&lsm->cache, cache_env, cmp_def);
+	vy_cache_create(&lsm->cache, cache_env, cmp_def, index_def->iid == 0);
 	rlist_create(&lsm->sealed);
 	vy_range_tree_new(lsm->tree);
 	vy_range_heap_create(&lsm->range_heap);

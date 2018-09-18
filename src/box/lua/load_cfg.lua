@@ -37,7 +37,7 @@ local default_cfg = {
     vinyl_cache         = 128 * 1024 * 1024,
     vinyl_max_tuple_size = 1024 * 1024,
     vinyl_read_threads  = 1,
-    vinyl_write_threads = 2,
+    vinyl_write_threads = 4,
     vinyl_timeout       = 60,
     vinyl_run_count_per_level = 2,
     vinyl_run_size_ratio      = 3.5,
@@ -72,6 +72,7 @@ local default_cfg = {
     worker_pool_threads = 4,
     replication_timeout = 1,
     replication_sync_lag = 10,
+    replication_sync_timeout = 300,
     replication_connect_timeout = 30,
     replication_connect_quorum = nil, -- connect all
     replication_skip_conflict = false,
@@ -133,6 +134,7 @@ local template_cfg = {
     worker_pool_threads = 'number',
     replication_timeout = 'number',
     replication_sync_lag = 'number',
+    replication_sync_timeout = 'number',
     replication_connect_timeout = 'number',
     replication_connect_quorum = 'number',
     replication_skip_conflict = 'boolean',
@@ -227,9 +229,11 @@ local dynamic_cfg = {
     replication_timeout     = private.cfg_set_replication_timeout,
     replication_connect_timeout = private.cfg_set_replication_connect_timeout,
     replication_connect_quorum = private.cfg_set_replication_connect_quorum,
+    replication_sync_lag    = private.cfg_set_replication_sync_lag,
+    replication_sync_timeout = private.cfg_set_replication_sync_timeout,
+    replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     instance_uuid           = check_instance_uuid,
     replicaset_uuid         = check_replicaset_uuid,
-    replication_skip_conflict = private.cfg_set_replication_skip_conflict,
     net_msg_max             = private.cfg_set_net_msg_max,
 }
 
@@ -242,6 +246,8 @@ local dynamic_cfg_skip_at_load = {
     replication_timeout     = true,
     replication_connect_timeout = true,
     replication_connect_quorum = true,
+    replication_sync_lag    = true,
+    replication_sync_timeout = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,
@@ -396,11 +402,12 @@ local box_cfg_guard_whitelist = {
     session = true;
     tuple = true;
     runtime = true;
+    ctl = true,
     NULL = true;
 };
 
 local box = require('box')
--- Move all box members except 'error' to box_configured
+-- Move all box members except the whitelisted to box_configured
 local box_configured = {}
 for k, v in pairs(box) do
     box_configured[k] = v

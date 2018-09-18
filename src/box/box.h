@@ -101,12 +101,16 @@ int
 box_wait_ro(bool ro, double timeout);
 
 /**
- * Switch this instance from 'orphan' to 'running' state.
- * Called on initial configuration as soon as this instance
- * synchronizes with enough replicas to form a quorum.
+ * Switch this instance from 'orphan' to 'running' state or
+ * vice versa depending on the value of the function argument.
+ *
+ * An instance enters 'orphan' state on returning from box.cfg()
+ * if it failed to synchornize with 'quorum' replicas within a
+ * specified timeout. It will keep trying to synchronize in the
+ * background and leave 'orphan' state once it's done.
  */
 void
-box_clear_orphan(void);
+box_set_orphan(bool orphan);
 
 /** True if snapshot is in progress. */
 extern bool box_checkpoint_is_in_progress;
@@ -192,6 +196,8 @@ void box_set_vinyl_timeout(void);
 void box_set_replication_timeout(void);
 void box_set_replication_connect_timeout(void);
 void box_set_replication_connect_quorum(void);
+void box_set_replication_sync_lag(void);
+void box_set_replication_sync_timeout(void);
 void box_set_replication_skip_conflict(void);
 void box_set_net_msg_max(void);
 

@@ -126,6 +126,12 @@ extern int replication_connect_quorum;
 extern double replication_sync_lag;
 
 /**
+ * Max time to wait for appliers to synchronize before entering
+ * the orphan mode.
+ */
+extern double replication_sync_timeout;
+
+/*
  * Allows automatic skip of conflicting rows in replication (e.g. applying
  * the row throws ER_TUPLE_FOUND) based on box.cfg configuration option.
  */

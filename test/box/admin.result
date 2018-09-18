@@ -74,6 +74,8 @@ cfg_filter(box.cfg)
     - false
   - - replication_sync_lag
     - 10
+  - - replication_sync_timeout
+    - 300
   - - replication_timeout
     - 1
   - - rows_per_wal
@@ -105,7 +107,7 @@ cfg_filter(box.cfg)
   - - vinyl_timeout
     - 60
   - - vinyl_write_threads
-    - 2
+    - 4
   - - wal_dir
     - <hidden>
   - - wal_dir_rescan_delay

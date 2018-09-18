@@ -36,7 +36,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <small/mempool.h>
 #include <small/rlist.h>
 #include <tarantool_ev.h>
 
@@ -89,12 +88,14 @@ struct vy_worker {
 	struct cpipe worker_pipe;
 	/** Pipe from the worker thread to tx. */
 	struct cpipe tx_pipe;
+	/** Pool this worker was allocated from. */
+	struct vy_worker_pool *pool;
 	/**
 	 * Task that is currently being executed by the worker
 	 * or NULL if the worker is idle.
 	 */
 	struct vy_task *task;
-	/** Link in vy_scheduler::idle_workers. */
+	/** Link in vy_worker_pool::idle_workers. */
 	struct stailq_entry in_idle;
 	/** Route for sending deferred DELETEs back to tx. */
 	struct cmsg_hop deferred_delete_route[2];
@@ -230,28 +231,29 @@ vy_task_deferred_delete_iface;
  * does not free it from under us.
  */
 static struct vy_task *
-vy_task_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
-	    const struct vy_task_ops *ops)
+vy_task_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
+	    struct vy_lsm *lsm, const struct vy_task_ops *ops)
 {
-	struct vy_task *task = mempool_alloc(&scheduler->task_pool);
+	struct vy_task *task = calloc(1, sizeof(*task));
 	if (task == NULL) {
 		diag_set(OutOfMemory, sizeof(*task),
-			 "mempool", "struct vy_task");
+			 "malloc", "struct vy_task");
 		return NULL;
 	}
 	memset(task, 0, sizeof(*task));
 	task->ops = ops;
 	task->scheduler = scheduler;
+	task->worker = worker;
 	task->lsm = lsm;
 	task->cmp_def = key_def_dup(lsm->cmp_def);
 	if (task->cmp_def == NULL) {
-		mempool_free(&scheduler->task_pool, task);
+		free(task);
 		return NULL;
 	}
 	task->key_def = key_def_dup(lsm->key_def);
 	if (task->key_def == NULL) {
 		key_def_delete(task->cmp_def);
-		mempool_free(&scheduler->task_pool, task);
+		free(task);
 		return NULL;
 	}
 	vy_lsm_ref(lsm);
@@ -270,7 +272,7 @@ vy_task_delete(struct vy_task *task)
 	key_def_delete(task->key_def);
 	vy_lsm_unref(task->lsm);
 	diag_destroy(&task->diag);
-	mempool_free(&task->scheduler->task_pool, task);
+	free(task);
 }
 
 static bool
@@ -334,27 +336,24 @@ vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
 #undef HEAP_NAME
 
 static void
-vy_scheduler_start_workers(struct vy_scheduler *scheduler)
+vy_worker_pool_start(struct vy_worker_pool *pool)
 {
-	assert(scheduler->worker_pool == NULL);
-	/* One thread is reserved for dumps, see vy_schedule(). */
-	assert(scheduler->worker_pool_size >= 2);
+	assert(pool->workers == NULL);
 
-	scheduler->idle_worker_count = scheduler->worker_pool_size;
-	scheduler->worker_pool = calloc(scheduler->worker_pool_size,
-					sizeof(*scheduler->worker_pool));
-	if (scheduler->worker_pool == NULL)
+	pool->workers = calloc(pool->size, sizeof(*pool->workers));
+	if (pool->workers == NULL)
 		panic("failed to allocate vinyl worker pool");
 
-	for (int i = 0; i < scheduler->worker_pool_size; i++) {
+	for (int i = 0; i < pool->size; i++) {
 		char name[FIBER_NAME_MAX];
-		snprintf(name, sizeof(name), "vinyl.writer.%d", i);
-		struct vy_worker *worker = &scheduler->worker_pool[i];
+		snprintf(name, sizeof(name), "vinyl.%s.%d", pool->name, i);
+		struct vy_worker *worker = &pool->workers[i];
 		if (cord_costart(&worker->cord, name, vy_worker_f, worker) != 0)
 			panic("failed to start vinyl worker thread");
+
+		worker->pool = pool;
 		cpipe_create(&worker->worker_pipe, name);
-		stailq_add_tail_entry(&scheduler->idle_workers,
-				      worker, in_idle);
+		stailq_add_tail_entry(&pool->idle_workers, worker, in_idle);
 
 		struct cmsg_hop *route = worker->deferred_delete_route;
 		route[0].f = vy_deferred_delete_batch_process_f;
@@ -365,17 +364,67 @@ vy_scheduler_start_workers(struct vy_scheduler *scheduler)
 }
 
 static void
-vy_scheduler_stop_workers(struct vy_scheduler *scheduler)
+vy_worker_pool_stop(struct vy_worker_pool *pool)
 {
-	assert(scheduler->worker_pool != NULL);
-	for (int i = 0; i < scheduler->worker_pool_size; i++) {
-		struct vy_worker *worker = &scheduler->worker_pool[i];
+	assert(pool->workers != NULL);
+	for (int i = 0; i < pool->size; i++) {
+		struct vy_worker *worker = &pool->workers[i];
 		cbus_stop_loop(&worker->worker_pipe);
 		cpipe_destroy(&worker->worker_pipe);
 		cord_join(&worker->cord);
 	}
-	free(scheduler->worker_pool);
-	scheduler->worker_pool = NULL;
+	free(pool->workers);
+	pool->workers = NULL;
+}
+
+static void
+vy_worker_pool_create(struct vy_worker_pool *pool, const char *name, int size)
+{
+	pool->name = name;
+	pool->size = size;
+	pool->workers = NULL;
+	stailq_create(&pool->idle_workers);
+}
+
+static void
+vy_worker_pool_destroy(struct vy_worker_pool *pool)
+{
+	if (pool->workers != NULL)
+		vy_worker_pool_stop(pool);
+}
+
+/**
+ * Get an idle worker from a pool.
+ */
+static struct vy_worker *
+vy_worker_pool_get(struct vy_worker_pool *pool)
+{
+	/*
+	 * Start worker threads only when a task is scheduled
+	 * so that they are not dangling around if vinyl is
+	 * not used.
+	 */
+	if (pool->workers == NULL)
+		vy_worker_pool_start(pool);
+
+	struct vy_worker *worker = NULL;
+	if (!stailq_empty(&pool->idle_workers)) {
+		worker = stailq_shift_entry(&pool->idle_workers,
+					    struct vy_worker, in_idle);
+		assert(worker->pool == pool);
+	}
+	return worker;
+}
+
+/**
+ * Put a worker back to the pool it was allocated from once
+ * it's done its job.
+ */
+static void
+vy_worker_pool_put(struct vy_worker *worker)
+{
+	struct vy_worker_pool *pool = worker->pool;
+	stailq_add_entry(&pool->idle_workers, worker, in_idle);
 }
 
 void
@@ -396,10 +445,27 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 
 	fiber_cond_create(&scheduler->scheduler_cond);
 
-	scheduler->worker_pool_size = write_threads;
-	mempool_create(&scheduler->task_pool, cord_slab_cache(),
-		       sizeof(struct vy_task));
-	stailq_create(&scheduler->idle_workers);
+	/*
+	 * Dump tasks must be scheduled as soon as possible,
+	 * otherwise we may run out of memory quota and have
+	 * to stall transactions. To avoid unpredictably long
+	 * stalls caused by ongoing compaction tasks blocking
+	 * scheduling of dump tasks, we use separate thread
+	 * pools for dump and compaction tasks.
+	 *
+	 * Since a design based on LSM trees typically implies
+	 * high write amplification, we allocate only 1/4th of
+	 * all available threads to dump tasks while the rest
+	 * is used exclusively for compaction.
+	 */
+	assert(write_threads > 1);
+	int dump_threads = MAX(1, write_threads / 4);
+	int compact_threads = write_threads - dump_threads;
+	vy_worker_pool_create(&scheduler->dump_pool,
+			      "dump", dump_threads);
+	vy_worker_pool_create(&scheduler->compact_pool,
+			      "compact", compact_threads);
+
 	stailq_create(&scheduler->processed_tasks);
 
 	vy_dump_heap_create(&scheduler->dump_heap);
@@ -407,7 +473,11 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 
 	diag_create(&scheduler->diag);
 	fiber_cond_create(&scheduler->dump_cond);
+}
 
+void
+vy_scheduler_start(struct vy_scheduler *scheduler)
+{
 	fiber_start(scheduler->scheduler_fiber, scheduler);
 }
 
@@ -420,11 +490,9 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 	fiber_cond_signal(&scheduler->dump_cond);
 	fiber_cond_signal(&scheduler->scheduler_cond);
 
-	if (scheduler->worker_pool != NULL)
-		vy_scheduler_stop_workers(scheduler);
-
+	vy_worker_pool_destroy(&scheduler->dump_pool);
+	vy_worker_pool_destroy(&scheduler->compact_pool);
 	diag_destroy(&scheduler->diag);
-	mempool_destroy(&scheduler->task_pool);
 	fiber_cond_destroy(&scheduler->dump_cond);
 	fiber_cond_destroy(&scheduler->scheduler_cond);
 	vy_dump_heap_destroy(&scheduler->dump_heap);
@@ -488,8 +556,7 @@ vy_scheduler_unpin_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 void
 vy_scheduler_trigger_dump(struct vy_scheduler *scheduler)
 {
-	assert(scheduler->dump_generation <= scheduler->generation);
-	if (scheduler->dump_generation < scheduler->generation) {
+	if (vy_scheduler_dump_in_progress(scheduler)) {
 		/* Dump is already in progress, nothing to do. */
 		return;
 	}
@@ -520,13 +587,13 @@ vy_scheduler_dump(struct vy_scheduler *scheduler)
 		fiber_cond_wait(&scheduler->dump_cond);
 
 	/* Trigger dump. */
-	if (scheduler->generation == scheduler->dump_generation)
+	if (!vy_scheduler_dump_in_progress(scheduler))
 		scheduler->dump_start = ev_monotonic_now(loop());
-	int64_t generation = ++scheduler->generation;
+	scheduler->generation++;
 	fiber_cond_signal(&scheduler->scheduler_cond);
 
 	/* Wait for dump to complete. */
-	while (scheduler->dump_generation < generation) {
+	while (vy_scheduler_dump_in_progress(scheduler)) {
 		if (scheduler->is_throttled) {
 			/* Dump error occurred. */
 			struct error *e = diag_last_error(&scheduler->diag);
@@ -611,8 +678,7 @@ vy_scheduler_begin_checkpoint(struct vy_scheduler *scheduler)
 		return -1;
 	}
 
-	assert(scheduler->dump_generation <= scheduler->generation);
-	if (scheduler->generation == scheduler->dump_generation) {
+	if (!vy_scheduler_dump_in_progress(scheduler)) {
 		/*
 		 * We are about to start a new dump round.
 		 * Remember the current time so that we can update
@@ -638,7 +704,7 @@ vy_scheduler_wait_checkpoint(struct vy_scheduler *scheduler)
 	 * Wait until all in-memory trees created before
 	 * checkpoint started have been dumped.
 	 */
-	while (scheduler->dump_generation < scheduler->generation) {
+	while (vy_scheduler_dump_in_progress(scheduler)) {
 		if (scheduler->is_throttled) {
 			/* A dump error occurred, abort checkpoint. */
 			struct error *e = diag_last_error(&scheduler->diag);
@@ -1237,8 +1303,8 @@ vy_task_dump_abort(struct vy_task *task)
  * trees created at @scheduler->dump_generation.
  */
 static int
-vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
-		 struct vy_task **p_task)
+vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
+		 struct vy_lsm *lsm, struct vy_task **p_task)
 {
 	static struct vy_task_ops dump_ops = {
 		.execute = vy_task_dump_execute,
@@ -1291,7 +1357,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 		return 0;
 	}
 
-	struct vy_task *task = vy_task_new(scheduler, lsm, &dump_ops);
+	struct vy_task *task = vy_task_new(scheduler, worker, lsm, &dump_ops);
 	if (task == NULL)
 		goto err;
 
@@ -1541,8 +1607,8 @@ vy_task_compact_abort(struct vy_task *task)
 }
 
 static int
-vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
-		    struct vy_task **p_task)
+vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
+		    struct vy_lsm *lsm, struct vy_task **p_task)
 {
 	static struct vy_task_ops compact_ops = {
 		.execute = vy_task_compact_execute,
@@ -1566,7 +1632,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_lsm *lsm,
 		return 0;
 	}
 
-	struct vy_task *task = vy_task_new(scheduler, lsm, &compact_ops);
+	struct vy_task *task = vy_task_new(scheduler, worker, lsm, &compact_ops);
 	if (task == NULL)
 		goto err_task;
 
@@ -1706,8 +1772,8 @@ vy_task_complete_f(struct cmsg *cmsg)
 
 /**
  * Create a task for dumping an LSM tree. The new task is returned
- * in @ptask. If there's no LSM tree that needs to be dumped @ptask
- * is set to NULL.
+ * in @ptask. If there's no LSM tree that needs to be dumped or all
+ * workers are currently busy, @ptask is set to NULL.
  *
  * We only dump an LSM tree if it needs to be snapshotted or the quota
  * on memory usage is exceeded. In either case, the oldest LSM tree
@@ -1719,15 +1785,15 @@ vy_task_complete_f(struct cmsg *cmsg)
 static int
 vy_scheduler_peek_dump(struct vy_scheduler *scheduler, struct vy_task **ptask)
 {
+	struct vy_worker *worker = NULL;
 retry:
 	*ptask = NULL;
-	assert(scheduler->dump_generation <= scheduler->generation);
-	if (scheduler->dump_generation == scheduler->generation) {
+	if (!vy_scheduler_dump_in_progress(scheduler)) {
 		/*
 		 * All memory trees of past generations have
 		 * been dumped, nothing to do.
 		 */
-		return 0;
+		goto no_task;
 	}
 	/*
 	 * Look up the oldest LSM tree eligible for dump.
@@ -1739,7 +1805,7 @@ retry:
 		 * Complete the current dump round.
 		 */
 		vy_scheduler_complete_dump(scheduler);
-		return 0;
+		goto no_task;
 	}
 	struct vy_lsm *lsm = container_of(pn, struct vy_lsm, in_dump);
 	if (!lsm->is_dumping && lsm->pin_count == 0 &&
@@ -1749,8 +1815,15 @@ retry:
 		 * contains data that must be dumped at the current
 		 * round. Try to create a task for it.
 		 */
-		if (vy_task_dump_new(scheduler, lsm, ptask) != 0)
+		if (worker == NULL) {
+			worker = vy_worker_pool_get(&scheduler->dump_pool);
+			if (worker == NULL)
+				return 0; /* all workers are busy */
+		}
+		if (vy_task_dump_new(scheduler, worker, lsm, ptask) != 0) {
+			vy_worker_pool_put(worker);
 			return -1;
+		}
 		if (*ptask != NULL)
 			return 0; /* new task */
 		/*
@@ -1766,13 +1839,16 @@ retry:
 	 * is complete.
 	 */
 	assert(scheduler->dump_task_count > 0);
+no_task:
+	if (worker != NULL)
+		vy_worker_pool_put(worker);
 	return 0;
 }
 
 /**
  * Create a task for compacting a range. The new task is returned
- * in @ptask. If there's no range that needs to be compacted @ptask
- * is set to NULL.
+ * in @ptask. If there's no range that needs to be compacted or all
+ * workers are currently busy, @ptask is set to NULL.
  *
  * We compact ranges that have more runs in a level than specified
  * by run_count_per_level configuration option. Among those runs we
@@ -1785,19 +1861,31 @@ static int
 vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
 			  struct vy_task **ptask)
 {
+	struct vy_worker *worker = NULL;
 retry:
 	*ptask = NULL;
 	struct heap_node *pn = vy_compact_heap_top(&scheduler->compact_heap);
 	if (pn == NULL)
-		return 0; /* nothing to do */
+		goto no_task; /* nothing to do */
 	struct vy_lsm *lsm = container_of(pn, struct vy_lsm, in_compact);
 	if (vy_lsm_compact_priority(lsm) <= 1)
-		return 0; /* nothing to do */
-	if (vy_task_compact_new(scheduler, lsm, ptask) != 0)
+		goto no_task; /* nothing to do */
+	if (worker == NULL) {
+		worker = vy_worker_pool_get(&scheduler->compact_pool);
+		if (worker == NULL)
+			return 0; /* all workers are busy */
+	}
+	if (vy_task_compact_new(scheduler, worker, lsm, ptask) != 0) {
+		vy_worker_pool_put(worker);
 		return -1;
+	}
 	if (*ptask == NULL)
 		goto retry; /* LSM tree dropped or range split/coalesced */
 	return 0; /* new task */
+no_task:
+	if (worker != NULL)
+		vy_worker_pool_put(worker);
+	return 0;
 }
 
 static int
@@ -1809,18 +1897,6 @@ vy_schedule(struct vy_scheduler *scheduler, struct vy_task **ptask)
 		goto fail;
 	if (*ptask != NULL)
 		return 0;
-
-	if (scheduler->idle_worker_count <= 1) {
-		/*
-		 * If all worker threads are busy doing compaction
-		 * when we run out of quota, ongoing transactions will
-		 * hang until one of the threads has finished, which
-		 * may take quite a while. To avoid unpredictably long
-		 * stalls, always keep one worker thread reserved for
-		 * dumps.
-		 */
-		return 0;
-	}
 
 	if (vy_scheduler_peek_compact(scheduler, ptask) != 0)
 		goto fail;
@@ -1874,20 +1950,6 @@ vy_scheduler_f(va_list va)
 {
 	struct vy_scheduler *scheduler = va_arg(va, struct vy_scheduler *);
 
-	/*
-	 * Yield immediately, until the quota watermark is reached
-	 * for the first time or a checkpoint is made.
-	 * Then start the worker threads: we know they will be
-	 * needed. If quota watermark is never reached, workers
-	 * are not started and the scheduler is idle until
-	 * shutdown or checkpoint.
-	 */
-	fiber_cond_wait(&scheduler->scheduler_cond);
-	if (scheduler->scheduler_fiber == NULL)
-		return 0; /* destroyed */
-
-	vy_scheduler_start_workers(scheduler);
-
 	while (scheduler->scheduler_fiber != NULL) {
 		struct stailq processed_tasks;
 		struct vy_task *task, *next;
@@ -1904,12 +1966,8 @@ vy_scheduler_f(va_list va)
 				tasks_failed++;
 			else
 				tasks_done++;
-			stailq_add_entry(&scheduler->idle_workers,
-					 task->worker, in_idle);
+			vy_worker_pool_put(task->worker);
 			vy_task_delete(task);
-			scheduler->idle_worker_count++;
-			assert(scheduler->idle_worker_count <=
-			       scheduler->worker_pool_size);
 		}
 		/*
 		 * Reset the timeout if we managed to successfully
@@ -1930,21 +1988,17 @@ vy_scheduler_f(va_list va)
 		/* Throttle for a while if a task failed. */
 		if (tasks_failed > 0)
 			goto error;
-		/* All worker threads are busy. */
-		if (scheduler->idle_worker_count == 0)
-			goto wait;
 		/* Get a task to schedule. */
 		if (vy_schedule(scheduler, &task) != 0)
 			goto error;
-		/* Nothing to do. */
-		if (task == NULL)
-			goto wait;
+		/* Nothing to do or all workers are busy. */
+		if (task == NULL) {
+			/* Wait for changes. */
+			fiber_cond_wait(&scheduler->scheduler_cond);
+			continue;
+		}
 
-		/* Queue the task and notify workers if necessary. */
-		assert(!stailq_empty(&scheduler->idle_workers));
-		task->worker = stailq_shift_entry(&scheduler->idle_workers,
-						  struct vy_worker, in_idle);
-		scheduler->idle_worker_count--;
+		/* Queue the task for execution. */
 		cmsg_init(&task->cmsg, vy_task_execute_route);
 		cpipe_push(&task->worker->worker_pipe, &task->cmsg);
 
@@ -1974,10 +2028,6 @@ error:
 		scheduler->is_throttled = true;
 		fiber_sleep(scheduler->timeout);
 		scheduler->is_throttled = false;
-		continue;
-wait:
-		/* Wait for changes */
-		fiber_cond_wait(&scheduler->scheduler_cond);
 	}
 
 	return 0;

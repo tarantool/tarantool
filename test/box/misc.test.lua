@@ -322,6 +322,12 @@ s:drop()
 --
 s = box.schema.space.create('test', {user="no_such_user"})
 
+--
+-- gh-3659 assertion failure after an error in code called from
+-- box.session.su()
+--
+box.session.su("admin", function(x) return #x end, 3)
+
 -- Too long WAL write warning (gh-2743).
 s = box.schema.space.create('test')
 _ = s:create_index('pk')

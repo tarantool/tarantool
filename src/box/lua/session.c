@@ -202,7 +202,8 @@ lbox_session_su(struct lua_State *L)
 	fiber_set_user(fiber(), old_credentials);
 
 	if (error)
-		luaT_error(L);
+		lua_error(L);
+
 	return lua_gettop(L) - 1;
 }
 

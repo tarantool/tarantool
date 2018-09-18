@@ -51,6 +51,7 @@ double replication_timeout = 1.0; /* seconds */
 double replication_connect_timeout = 30.0; /* seconds */
 int replication_connect_quorum = REPLICATION_CONNECT_QUORUM_ALL;
 double replication_sync_lag = 10.0; /* seconds */
+double replication_sync_timeout = 300.0; /* seconds */
 bool replication_skip_conflict = false;
 
 struct replicaset replicaset;
@@ -568,7 +569,8 @@ replicaset_connect(struct applier **appliers, int count,
 		replicaset_update(appliers, count);
 		return;
 	}
-	say_verbose("connecting to %d replicas", count);
+
+	say_info("connecting to %d replicas", count);
 
 	/*
 	 * Simultaneously connect to remote peers to receive their UUIDs
@@ -622,7 +624,7 @@ replicaset_connect(struct applier **appliers, int count,
 		if (connect_quorum && state.connected < quorum)
 			goto error;
 	} else {
-		say_verbose("connected to %d replicas", state.connected);
+		say_info("connected to %d replicas", state.connected);
 	}
 
 	for (int i = 0; i < count; i++) {
@@ -716,13 +718,6 @@ next:
 void
 replicaset_follow(void)
 {
-	if (replicaset.applier.total == 0) {
-		/*
-		 * Replication is not configured.
-		 */
-		box_clear_orphan();
-		return;
-	}
 	struct replica *replica;
 	replicaset_foreach(replica) {
 		/* Resume connected appliers. */
@@ -733,13 +728,6 @@ replicaset_follow(void)
 		/* Restart appliers that failed to connect. */
 		applier_start(replica->applier);
 	}
-	if (replicaset_quorum() == 0) {
-		/*
-		 * Leaving orphan mode immediately since
-		 * replication_connect_quorum is set to 0.
-		 */
-		box_clear_orphan();
-	}
 }
 
 void
@@ -747,19 +735,29 @@ replicaset_sync(void)
 {
 	int quorum = replicaset_quorum();
 
-	if (quorum == 0)
+	if (quorum == 0) {
+		/*
+		 * Quorum is 0 or replication is not configured.
+		 * Leaving 'orphan' state immediately.
+		 */
+		box_set_orphan(false);
 		return;
+	}
 
-	say_verbose("synchronizing with %d replicas", quorum);
+	say_info("synchronizing with %d replicas", quorum);
 
 	/*
 	 * Wait until all connected replicas synchronize up to
-	 * replication_sync_lag
+	 * replication_sync_lag or return on replication_sync_timeout
 	 */
+	double deadline = ev_monotonic_now(loop()) + replication_sync_timeout;
 	while (replicaset.applier.synced < quorum &&
 	       replicaset.applier.connected +
-	       replicaset.applier.loading >= quorum)
-		fiber_cond_wait(&replicaset.applier.cond);
+	       replicaset.applier.loading >= quorum) {
+		if (fiber_cond_wait_deadline(&replicaset.applier.cond,
+					     deadline) != 0)
+			break;
+	}
 
 	if (replicaset.applier.synced < quorum) {
 		/*
@@ -767,22 +765,21 @@ replicaset_sync(void)
 		 * Do not stall configuration, leave the instance
 		 * in 'orphan' state.
 		 */
-		say_crit("entering orphan mode");
-		return;
+		say_crit("failed to synchronize with %d out of %d replicas",
+			 replicaset.applier.total - replicaset.applier.synced,
+			 replicaset.applier.total);
+		box_set_orphan(true);
+	} else {
+		say_info("replica set sync complete");
+		box_set_orphan(false);
 	}
-
-	say_crit("replica set sync complete, quorum of %d "
-		 "replicas formed", quorum);
 }
 
 void
 replicaset_check_quorum(void)
 {
-	if (replicaset.applier.synced >= replicaset_quorum()) {
-		if (replicaset_quorum() > 0)
-			say_crit("leaving orphan mode");
-		box_clear_orphan();
-	}
+	if (replicaset.applier.synced >= replicaset_quorum())
+		box_set_orphan(false);
 }
 
 void
