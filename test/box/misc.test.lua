@@ -352,3 +352,35 @@ rows == expected_rows
 lsn == expected_lsn
 box.cfg{too_long_threshold = too_long_threshold}
 s:drop()
+
+--
+-- gh-1607: on_shutdown triggers.
+--
+f = function() print('on_shutdown 1') end
+g = function() print('on_shutdown 2') end
+h = function() print('on_shutdown 3') end
+-- Check that on_shutdown triggers may yield
+-- and perform some complicated actions.
+fiber = require('fiber')
+test_run:cmd("setopt delimiter ';'")
+trig = function()
+    fiber.sleep(0.01)
+    fiber.yield()
+    box.schema.space.create("shutdown")
+    box.space.shutdown:create_index("pk")
+    box.space.shutdown:insert{1,2,3}
+    print('on_shutdown 4')
+end;
+test_run:cmd("setopt delimiter ''");
+_ = box.ctl.on_shutdown(f)
+_ = box.ctl.on_shutdown(g)
+-- Check that replacing triggers works
+_ = box.ctl.on_shutdown(h, g)
+_ = box.ctl.on_shutdown(trig)
+test_run:cmd('restart server default')
+test_run:grep_log('default', 'on_shutdown 1', nil, {noreset=true})
+test_run:grep_log('default', 'on_shutdown 2', nil, {noreset=true})
+test_run:grep_log('default', 'on_shutdown 3', nil, {noreset=true})
+test_run:grep_log('default', 'on_shutdown 4', nil, {noreset=true})
+box.space.shutdown:select{}
+box.space.shutdown:drop()

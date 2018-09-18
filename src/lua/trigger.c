@@ -91,7 +91,10 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	}
 	int top = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
-	int nargs = trigger->push_event(L, event);
+	int nargs = 0;
+	if (trigger->push_event != NULL) {
+		nargs = trigger->push_event(L, event);
+	}
 	if (luaT_call(L, nargs, LUA_MULTRET)) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();

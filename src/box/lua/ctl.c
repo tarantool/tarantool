@@ -37,6 +37,7 @@
 #include <lualib.h>
 
 #include "lua/utils.h"
+#include "lua/trigger.h"
 
 #include "box/box.h"
 
@@ -64,9 +65,16 @@ lbox_ctl_wait_rw(struct lua_State *L)
 	return 0;
 }
 
+static int
+lbox_ctl_on_shutdown(struct lua_State *L)
+{
+	return lbox_trigger_reset(L, 2, &box_on_shutdown, NULL, NULL);
+}
+
 static const struct luaL_Reg lbox_ctl_lib[] = {
 	{"wait_ro", lbox_ctl_wait_ro},
 	{"wait_rw", lbox_ctl_wait_rw},
+	{"on_shutdown", lbox_ctl_on_shutdown},
 	{NULL, NULL}
 };
 

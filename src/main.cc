@@ -89,6 +89,13 @@ static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
 
 static double start_time;
 
+/** A preallocated fiber to run on_shutdown triggers. */
+static struct fiber *on_shutdown_fiber = NULL;
+/** A flag restricting repeated execution of tarantool_exit(). */
+static bool is_shutting_down = false;
+/** A trigger which will break the event loop on shutdown. */
+static struct trigger break_loop_trigger;
+
 double
 tarantool_uptime(void)
 {
@@ -119,9 +126,33 @@ sig_checkpoint(ev_loop * /* loop */, struct ev_signal * /* w */,
 	fiber_wakeup(f);
 }
 
+static int
+on_shutdown_f(va_list ap)
+{
+	(void) ap;
+	trigger_run(&box_on_shutdown, NULL);
+	return 0;
+}
+
+static void
+tarantool_exit(void)
+{
+	if (is_shutting_down) {
+		/*
+		 * We are already running on_shutdown triggers,
+		 * and will exit as soon as they'll finish.
+		 * Do not execute them twice.
+		 */
+		return;
+	}
+	is_shutting_down = true;
+	fiber_call(on_shutdown_fiber);
+}
+
 static void
 signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 {
+	(void) loop;
 	(void) w;
 	(void) revents;
 
@@ -135,8 +166,7 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	if (pid_file)
 		say_crit("got signal %d - %s", w->signum, strsignal(w->signum));
 	start_loop = false;
-	/* Terminate the main event loop */
-	ev_break(loop, EVBREAK_ALL);
+	tarantool_exit();
 }
 
 static void
@@ -628,6 +658,12 @@ print_help(const char *program)
 	puts("to see online documentation, submit bugs or contribute a patch.");
 }
 
+static void
+break_loop(struct trigger *, void *)
+{
+	ev_break(loop(), EVBREAK_ALL);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -751,6 +787,26 @@ main(int argc, char **argv)
 	try {
 		box_init();
 		box_lua_init(tarantool_L);
+		/*
+		 * Reserve a fiber to run on_shutdown triggers.
+		 * Make sure the fiber is non-cancellable so that
+		 * it doesn't get woken up from Lua unintentionally.
+		 */
+		struct fiber_attr attr;
+		fiber_attr_create(&attr);
+		attr.flags &= ~FIBER_IS_CANCELLABLE;
+		on_shutdown_fiber = fiber_new_ex("on_shutdown",
+						 &attr,
+						 on_shutdown_f);
+		if (on_shutdown_fiber == NULL)
+			diag_raise();
+		/*
+		 * Register a on_shutdown trigger which will break the
+		 * main event loop. The trigger will be the last to run
+		 * since it's the first one we register.
+		 */
+		trigger_create(&break_loop_trigger, break_loop, NULL, NULL);
+		trigger_add(&box_on_shutdown, &break_loop_trigger);
 
 		/* main core cleanup routine */
 		atexit(tarantool_free);

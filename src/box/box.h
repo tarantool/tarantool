@@ -64,6 +64,9 @@ struct vclock;
  */
 extern const struct vclock *box_vclock;
 
+/** Invoked on box shutdown. */
+extern struct rlist box_on_shutdown;
+
 /*
  * Initialize box library
  * @throws C++ exception
