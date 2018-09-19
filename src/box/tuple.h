@@ -43,6 +43,7 @@ extern "C" {
 
 struct slab_arena;
 struct quota;
+struct key_part;
 
 /**
  * A format for standalone tuples allocated on runtime arena.
@@ -519,6 +520,19 @@ tuple_field(const struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
 			       tuple_field_map(tuple), fieldno);
+}
+
+/**
+ * Get a field refereed by index @part in tuple.
+ * @param tuple Tuple to get the field from.
+ * @param part Index part to use.
+ * @retval Field data if the field exists or NULL.
+ */
+static inline const char *
+tuple_field_by_part(const struct tuple *tuple, struct key_part *part)
+{
+	return tuple_field_by_part_raw(tuple_format(tuple), tuple_data(tuple),
+				       tuple_field_map(tuple), part);
 }
 
 /**

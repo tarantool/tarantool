@@ -716,8 +716,13 @@ vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
 static inline bool
 vy_tuple_key_contains_null(const struct tuple *tuple, struct key_def *def)
 {
-	for (uint32_t i = 0; i < def->part_count; ++i) {
-		const char *field = tuple_field(tuple, def->parts[i].fieldno);
+	struct tuple_format *format = tuple_format(tuple);
+	const char *data = tuple_data(tuple);
+	const uint32_t *field_map = tuple_field_map(tuple);
+	for (struct key_part *part = def->parts, *end = part + def->part_count;
+	     part < end; ++part) {
+		const char *field =
+			tuple_field_by_part_raw(format, data, field_map, part);
 		if (field == NULL || mp_typeof(*field) == MP_NIL)
 			return true;
 	}

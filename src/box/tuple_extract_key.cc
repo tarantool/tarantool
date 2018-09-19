@@ -109,8 +109,8 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 	/* Calculate the key size. */
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const char *field =
-			tuple_field_raw(format, data, field_map,
-					key_def->parts[i].fieldno);
+			tuple_field_by_part_raw(format, data, field_map,
+						&key_def->parts[i]);
 		if (has_optional_parts && field == NULL) {
 			bsize += mp_sizeof_nil();
 			continue;
@@ -151,8 +151,8 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 	char *key_buf = mp_encode_array(key, part_count);
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const char *field =
-			tuple_field_raw(format, data, field_map,
-					key_def->parts[i].fieldno);
+			tuple_field_by_part_raw(format, data, field_map,
+						&key_def->parts[i]);
 		if (has_optional_parts && field == NULL) {
 			key_buf = mp_encode_nil(key_buf);
 			continue;

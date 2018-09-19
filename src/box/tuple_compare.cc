@@ -430,10 +430,20 @@ tuple_common_key_parts(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		       struct key_def *key_def)
 {
 	uint32_t i;
+	struct tuple_format *tuple_a_format = tuple_format(tuple_a);
+	struct tuple_format *tuple_b_format = tuple_format(tuple_b);
+	const char *tuple_a_raw = tuple_data(tuple_a);
+	const char *tuple_b_raw = tuple_data(tuple_b);
+	const uint32_t *tuple_a_field_map = tuple_field_map(tuple_a);
+	const uint32_t *tuple_b_field_map = tuple_field_map(tuple_b);
 	for (i = 0; i < key_def->part_count; i++) {
-		const struct key_part *part = &key_def->parts[i];
-		const char *field_a = tuple_field(tuple_a, part->fieldno);
-		const char *field_b = tuple_field(tuple_b, part->fieldno);
+		struct key_part *part = (struct key_part *)&key_def->parts[i];
+		const char *field_a =
+			tuple_field_by_part_raw(tuple_a_format, tuple_a_raw,
+						tuple_a_field_map, part);
+		const char *field_b =
+			tuple_field_by_part_raw(tuple_b_format, tuple_b_raw,
+						tuple_b_field_map, part);
 		enum mp_type a_type = field_a != NULL ?
 				      mp_typeof(*field_a) : MP_NIL;
 		enum mp_type b_type = field_b != NULL ?
@@ -497,10 +507,10 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		end = part + key_def->part_count;
 
 	for (; part < end; part++) {
-		field_a = tuple_field_raw(format_a, tuple_a_raw, field_map_a,
-					  part->fieldno);
-		field_b = tuple_field_raw(format_b, tuple_b_raw, field_map_b,
-					  part->fieldno);
+		field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
+						  field_map_a, part);
+		field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
+						  field_map_b, part);
 		assert(has_optional_parts ||
 		       (field_a != NULL && field_b != NULL));
 		if (! is_nullable) {
@@ -547,10 +557,10 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	 */
 	end = key_def->parts + key_def->part_count;
 	for (; part < end; ++part) {
-		field_a = tuple_field_raw(format_a, tuple_a_raw, field_map_a,
-					  part->fieldno);
-		field_b = tuple_field_raw(format_b, tuple_b_raw, field_map_b,
-					  part->fieldno);
+		field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
+						  field_map_a, part);
+		field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
+						  field_map_b, part);
 		/*
 		 * Extended parts are primary, and they can not
 		 * be absent or be NULLs.
@@ -580,9 +590,9 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 	const uint32_t *field_map = tuple_field_map(tuple);
 	enum mp_type a_type, b_type;
 	if (likely(part_count == 1)) {
-		const char *field;
-		field = tuple_field_raw(format, tuple_raw, field_map,
-					part->fieldno);
+		const char *field =
+			tuple_field_by_part_raw(format, tuple_raw, field_map,
+						part);
 		if (! is_nullable) {
 			return tuple_compare_field(field, key, part->type,
 						   part->coll);
@@ -606,9 +616,9 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 	struct key_part *end = part + part_count;
 	int rc;
 	for (; part < end; ++part, mp_next(&key)) {
-		const char *field;
-		field = tuple_field_raw(format, tuple_raw, field_map,
-					part->fieldno);
+		const char *field =
+			tuple_field_by_part_raw(format, tuple_raw,
+						field_map, part);
 		if (! is_nullable) {
 			rc = tuple_compare_field(field, key, part->type,
 						 part->coll);

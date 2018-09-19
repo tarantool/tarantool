@@ -157,7 +157,8 @@ struct TupleHash
 		uint32_t h = HASH_SEED;
 		uint32_t carry = 0;
 		uint32_t total_size = 0;
-		const char *field = tuple_field(tuple, key_def->parts->fieldno);
+		const char *field =
+			tuple_field_by_part(tuple, key_def->parts);
 		TupleFieldHash<TYPE, MORE_TYPES...>::
 			hash(&field, &h, &carry, &total_size);
 		return PMurHash32_Result(h, carry, total_size);
@@ -169,7 +170,8 @@ struct TupleHash<FIELD_TYPE_UNSIGNED> {
 	static uint32_t	hash(const struct tuple *tuple,
 			     struct key_def *key_def)
 	{
-		const char *field = tuple_field(tuple, key_def->parts->fieldno);
+		const char *field =
+			tuple_field_by_part(tuple, key_def->parts);
 		uint64_t val = mp_decode_uint(&field);
 		if (likely(val <= UINT32_MAX))
 			return val;
@@ -311,7 +313,7 @@ uint32_t
 tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
 		    struct key_part *part)
 {
-	const char *field = tuple_field(tuple, part->fieldno);
+	const char *field = tuple_field_by_part(tuple, part);
 	if (field == NULL)
 		return tuple_hash_null(ph1, pcarry);
 	return tuple_hash_field(ph1, pcarry, &field, part->coll);
@@ -326,7 +328,12 @@ tuple_hash_slowpath(const struct tuple *tuple, struct key_def *key_def)
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
 	uint32_t prev_fieldno = key_def->parts[0].fieldno;
-	const char *field = tuple_field(tuple, key_def->parts[0].fieldno);
+	struct tuple_format *format = tuple_format(tuple);
+	const char *tuple_raw = tuple_data(tuple);
+	const uint32_t *field_map = tuple_field_map(tuple);
+	const char *field =
+		tuple_field_by_part_raw(format, tuple_raw, field_map,
+					key_def->parts);
 	const char *end = (char *)tuple + tuple_size(tuple);
 	if (has_optional_parts && field == NULL) {
 		total_size += tuple_hash_null(&h, &carry);
@@ -340,7 +347,9 @@ tuple_hash_slowpath(const struct tuple *tuple, struct key_def *key_def)
 		 * need of tuple_field
 		 */
 		if (prev_fieldno + 1 != key_def->parts[part_id].fieldno) {
-			field = tuple_field(tuple, key_def->parts[part_id].fieldno);
+			struct key_part *part = &key_def->parts[part_id];
+			field = tuple_field_by_part_raw(format, tuple_raw,
+							field_map, part);
 		}
 		if (has_optional_parts && (field == NULL || field >= end)) {
 			total_size += tuple_hash_null(&h, &carry);
