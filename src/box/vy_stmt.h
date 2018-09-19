@@ -331,7 +331,7 @@ vy_stmt_unref_if_possible(struct tuple *stmt)
  */
 static inline int
 vy_key_compare(const struct tuple *a, const struct tuple *b,
-	       const struct key_def *cmp_def)
+	       struct key_def *cmp_def)
 {
 	assert(vy_stmt_type(a) == IPROTO_SELECT);
 	assert(vy_stmt_type(b) == IPROTO_SELECT);
@@ -352,7 +352,7 @@ vy_key_compare(const struct tuple *a, const struct tuple *b,
  */
 static inline int
 vy_tuple_compare(const struct tuple *a, const struct tuple *b,
-		 const struct key_def *cmp_def)
+		 struct key_def *cmp_def)
 {
 	enum iproto_type type;
 	type = vy_stmt_type(a);
@@ -381,7 +381,7 @@ vy_tuple_compare(const struct tuple *a, const struct tuple *b,
  */
 static inline int
 vy_tuple_compare_with_raw_key(const struct tuple *tuple, const char *key,
-			      const struct key_def *key_def)
+			      struct key_def *key_def)
 {
 	uint32_t part_count = mp_decode_array(&key);
 	return tuple_compare_with_key(tuple, key, part_count, key_def);
@@ -390,7 +390,7 @@ vy_tuple_compare_with_raw_key(const struct tuple *tuple, const char *key,
 /** @sa vy_tuple_compare_with_raw_key(). */
 static inline int
 vy_tuple_compare_with_key(const struct tuple *tuple, const struct tuple *key,
-			  const struct key_def *key_def)
+			  struct key_def *key_def)
 {
 	const char *key_mp = tuple_data(key);
 	uint32_t part_count = mp_decode_array(&key_mp);
@@ -400,7 +400,7 @@ vy_tuple_compare_with_key(const struct tuple *tuple, const struct tuple *key,
 /** @sa tuple_compare. */
 static inline int
 vy_stmt_compare(const struct tuple *a, const struct tuple *b,
-		const struct key_def *key_def)
+		struct key_def *key_def)
 {
 	bool a_is_tuple = vy_stmt_type(a) != IPROTO_SELECT;
 	bool b_is_tuple = vy_stmt_type(b) != IPROTO_SELECT;
@@ -419,7 +419,7 @@ vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 /** @sa tuple_compare_with_raw_key. */
 static inline int
 vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
-			     const struct key_def *key_def)
+			     struct key_def *key_def)
 {
 	if (vy_stmt_type(stmt) != IPROTO_SELECT)
 		return vy_tuple_compare_with_raw_key(stmt, key, key_def);
@@ -429,7 +429,7 @@ vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 /** @sa tuple_compare_with_key. */
 static inline int
 vy_stmt_compare_with_key(const struct tuple *stmt, const struct tuple *key,
-			 const struct key_def *key_def)
+			 struct key_def *key_def)
 {
 	assert(vy_stmt_type(key) == IPROTO_SELECT);
 	return vy_stmt_compare_with_raw_key(stmt, tuple_data(key), key_def);
@@ -476,7 +476,7 @@ vy_key_dup(const char *key);
  */
 struct tuple *
 vy_stmt_new_surrogate_delete_from_key(const char *key,
-				      const struct key_def *cmp_def,
+				      struct key_def *cmp_def,
 				      struct tuple_format *format);
 
 /**
@@ -628,7 +628,7 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
  * malloc().
  */
 struct tuple *
-vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+vy_stmt_extract_key(const struct tuple *stmt, struct key_def *key_def,
 		    struct tuple_format *format);
 
 /**
@@ -638,7 +638,7 @@ vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
  */
 struct tuple *
 vy_stmt_extract_key_raw(const char *data, const char *data_end,
-			const struct key_def *key_def,
+			struct key_def *key_def,
 			struct tuple_format *format);
 
 /**
@@ -654,9 +654,8 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
  * @retval -1 if error
  */
 int
-vy_stmt_encode_primary(const struct tuple *value,
-		       const struct key_def *key_def, uint32_t space_id,
-		       struct xrow_header *xrow);
+vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
+		       uint32_t space_id, struct xrow_header *xrow);
 
 /**
  * Encode vy_stmt for a secondary key as xrow_header
@@ -669,8 +668,7 @@ vy_stmt_encode_primary(const struct tuple *value,
  * @retval -1 if error
  */
 int
-vy_stmt_encode_secondary(const struct tuple *value,
-			 const struct key_def *cmp_def,
+vy_stmt_encode_secondary(const struct tuple *value, struct key_def *cmp_def,
 			 struct xrow_header *xrow);
 
 /**
@@ -716,7 +714,7 @@ vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
  * @retval Does the key contain NULL or not?
  */
 static inline bool
-vy_tuple_key_contains_null(const struct tuple *tuple, const struct key_def *def)
+vy_tuple_key_contains_null(const struct tuple *tuple, struct key_def *def)
 {
 	for (uint32_t i = 0; i < def->part_count; ++i) {
 		const char *field = tuple_field(tuple, def->parts[i].fieldno);

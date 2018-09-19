@@ -49,9 +49,8 @@ extern "C" {
  * @return number of key parts the two tuples have in common
  */
 uint32_t
-tuple_common_key_parts(const struct tuple *tuple_a,
-		       const struct tuple *tuple_b,
-		       const struct key_def *key_def);
+tuple_common_key_parts(const struct tuple *tuple_a, const struct tuple *tuple_b,
+		       struct key_def *key_def);
 
 /**
  * Create a comparison function for the key_def

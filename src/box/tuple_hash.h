@@ -70,9 +70,8 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
  * This function updates @ph1 and @pcarry.
  */
 uint32_t
-tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry,
-		    const struct tuple *tuple,
-		    const struct key_part *part);
+tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
+		    struct key_part *part);
 
 /**
  * Calculates a common hash value for a tuple
@@ -81,7 +80,7 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry,
  * @return - hash value
  */
 static inline uint32_t
-tuple_hash(const struct tuple *tuple, const struct key_def *key_def)
+tuple_hash(const struct tuple *tuple, struct key_def *key_def)
 {
 	return key_def->tuple_hash(tuple, key_def);
 }
@@ -93,7 +92,7 @@ tuple_hash(const struct tuple *tuple, const struct key_def *key_def)
  * @return - hash value
  */
 static inline uint32_t
-key_hash(const char *key, const struct key_def *key_def)
+key_hash(const char *key, struct key_def *key_def)
 {
 	return key_def->key_hash(key, key_def);
 }

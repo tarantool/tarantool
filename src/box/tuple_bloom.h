@@ -117,8 +117,7 @@ tuple_bloom_builder_delete(struct tuple_bloom_builder *builder);
  */
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			const struct tuple *tuple,
-			const struct key_def *key_def,
+			const struct tuple *tuple, struct key_def *key_def,
 			uint32_t hashed_parts);
 
 /**
@@ -147,8 +146,7 @@ tuple_bloom_delete(struct tuple_bloom *bloom);
  */
 bool
 tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
-		      const struct tuple *tuple,
-		      const struct key_def *key_def);
+		      const struct tuple *tuple, struct key_def *key_def);
 
 /**
  * Check if a tuple matching a key was stored in a tuple bloom filter.
@@ -162,7 +160,7 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
 bool
 tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 			  const char *key, uint32_t part_count,
-			  const struct key_def *key_def);
+			  struct key_def *key_def);
 
 /**
  * Return the size of a tuple bloom filter when encoded.

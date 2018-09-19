@@ -22,8 +22,7 @@ key_def_contains_sequential_parts(const struct key_def *def)
 template <bool has_optional_parts>
 static char *
 tuple_extract_key_sequential_raw(const char *data, const char *data_end,
-				 const struct key_def *key_def,
-				 uint32_t *key_size)
+				 struct key_def *key_def, uint32_t *key_size)
 {
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(key_def_is_sequential(key_def));
@@ -72,8 +71,7 @@ tuple_extract_key_sequential_raw(const char *data, const char *data_end,
  */
 template <bool has_optional_parts>
 static inline char *
-tuple_extract_key_sequential(const struct tuple *tuple,
-			     const struct key_def *key_def,
+tuple_extract_key_sequential(const struct tuple *tuple, struct key_def *key_def,
 			     uint32_t *key_size)
 {
 	assert(key_def_is_sequential(key_def));
@@ -94,7 +92,7 @@ tuple_extract_key_sequential(const struct tuple *tuple,
 template <bool contains_sequential_parts, bool has_optional_parts>
 static char *
 tuple_extract_key_slowpath(const struct tuple *tuple,
-			   const struct key_def *key_def, uint32_t *key_size)
+			   struct key_def *key_def, uint32_t *key_size)
 {
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
@@ -204,8 +202,7 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 template <bool has_optional_parts>
 static char *
 tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
-			       const struct key_def *key_def,
-			       uint32_t *key_size)
+			       struct key_def *key_def, uint32_t *key_size)
 {
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);

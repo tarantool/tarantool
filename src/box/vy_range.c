@@ -178,7 +178,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 
 struct vy_range *
 vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
-	     const struct key_def *cmp_def)
+	     struct key_def *cmp_def)
 {
 	struct vy_range *range = calloc(1, sizeof(*range));
 	if (range == NULL) {

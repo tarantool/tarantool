@@ -208,14 +208,14 @@ box_key_def_delete(box_key_def_t *key_def)
 
 int
 box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
-		  const box_key_def_t *key_def)
+		  box_key_def_t *key_def)
 {
 	return tuple_compare(tuple_a, tuple_b, key_def);
 }
 
 int
 box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
-			   const box_key_def_t *key_def)
+			   box_key_def_t *key_def)
 {
 	uint32_t part_count = mp_decode_array(&key_b);
 	return tuple_compare_with_key(tuple_a, key_b, part_count, key_def);

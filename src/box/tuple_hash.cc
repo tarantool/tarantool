@@ -103,7 +103,7 @@ struct KeyFieldHash<TYPE> {
 
 template <int TYPE, int ...MORE_TYPES>
 struct KeyHash {
-	static uint32_t hash(const char *key, const struct key_def *)
+	static uint32_t hash(const char *key, struct key_def *)
 	{
 		uint32_t h = HASH_SEED;
 		uint32_t carry = 0;
@@ -116,7 +116,7 @@ struct KeyHash {
 
 template <>
 struct KeyHash<FIELD_TYPE_UNSIGNED> {
-	static uint32_t hash(const char *key, const struct key_def *key_def)
+	static uint32_t hash(const char *key, struct key_def *key_def)
 	{
 		uint64_t val = mp_decode_uint(&key);
 		(void) key_def;
@@ -152,7 +152,7 @@ template <int TYPE, int ...MORE_TYPES>
 struct TupleHash
 {
 	static uint32_t hash(const struct tuple *tuple,
-			     const struct key_def *key_def)
+			     struct key_def *key_def)
 	{
 		uint32_t h = HASH_SEED;
 		uint32_t carry = 0;
@@ -167,7 +167,7 @@ struct TupleHash
 template <>
 struct TupleHash<FIELD_TYPE_UNSIGNED> {
 	static uint32_t	hash(const struct tuple *tuple,
-			     const struct key_def *key_def)
+			     struct key_def *key_def)
 	{
 		const char *field = tuple_field(tuple, key_def->parts->fieldno);
 		uint64_t val = mp_decode_uint(&field);
@@ -213,10 +213,10 @@ static const hasher_signature hash_arr[] = {
 
 template <bool has_optional_parts>
 uint32_t
-tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def);
+tuple_hash_slowpath(const struct tuple *tuple, struct key_def *key_def);
 
 uint32_t
-key_hash_slowpath(const char *key, const struct key_def *key_def);
+key_hash_slowpath(const char *key, struct key_def *key_def);
 
 void
 tuple_hash_func_set(struct key_def *key_def) {
@@ -308,9 +308,8 @@ tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
 }
 
 uint32_t
-tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry,
-		    const struct tuple *tuple,
-		    const struct key_part *part)
+tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
+		    struct key_part *part)
 {
 	const char *field = tuple_field(tuple, part->fieldno);
 	if (field == NULL)
@@ -320,7 +319,7 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry,
 
 template <bool has_optional_parts>
 uint32_t
-tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def)
+tuple_hash_slowpath(const struct tuple *tuple, struct key_def *key_def)
 {
 	assert(has_optional_parts == key_def->has_optional_parts);
 	uint32_t h = HASH_SEED;
@@ -357,13 +356,13 @@ tuple_hash_slowpath(const struct tuple *tuple, const struct key_def *key_def)
 }
 
 uint32_t
-key_hash_slowpath(const char *key, const struct key_def *key_def)
+key_hash_slowpath(const char *key, struct key_def *key_def)
 {
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
 
-	for (const struct key_part *part = key_def->parts;
+	for (struct key_part *part = key_def->parts;
 	     part < key_def->parts + key_def->part_count; part++) {
 		total_size += tuple_hash_field(&h, &carry, &key, part->coll);
 	}
