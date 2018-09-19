@@ -264,11 +264,6 @@ ccons ::= DEFAULT MINUS(A) term(X).      {
   v.zEnd = X.zEnd;
   sqlite3AddDefaultValue(pParse,&v);
 }
-ccons ::= DEFAULT id(X).              {
-  ExprSpan v;
-  spanExpr(&v, pParse, TK_STRING, X);
-  sqlite3AddDefaultValue(pParse,&v);
-}
 
 // In addition to the type name, we also care about the primary key and
 // UNIQUE constraints.

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(11)
+test:plan(15)
 
 --!./tcltestrunner.lua
 -- 2005 August 18
@@ -205,6 +205,49 @@ test:do_catchsql_test(
 	-- </default-4.4>
 })
 
+-- gh-3695: IDs (i.e. columns' names) are not allowed as
+-- default values.
+--
+test:do_catchsql_test(
+    "default-5.1",
+    [[
+        CREATE TABLE t6(id INTEGER PRIMARY KEY, b TEXT DEFAULT(id));
+    ]], {
+    -- <default-5.1>
+    1, "default value of column [B] is not constant"
+    -- </default-5.1>
+})
 
+test:do_catchsql_test(
+    "default-5.2",
+    [[
+        CREATE TABLE t6(id INTEGER PRIMARY KEY, b TEXT DEFAULT id);
+    ]], {
+    -- <default-5.2>
+    1, "near \"id\": syntax error"
+    -- </default-5.2>
+})
+
+test:do_catchsql_test(
+    "default-5.3",
+    [[
+        CREATE TABLE t6(id INTEGER PRIMARY KEY, b TEXT DEFAULT "id");
+    ]], {
+    -- <default-5.3>
+    1, "near \"\"id\"\": syntax error"
+    -- </default-5.3>
+})
+
+test:do_execsql_test(
+    "default-5.4",
+    [[
+        CREATE TABLE t6(id INTEGER PRIMARY KEY, b INT DEFAULT('id'));
+        INSERT INTO t6(id) VALUES(1);
+        SELECT * FROM t6;
+    ]], {
+    -- <default-5.4>
+    1, 'id'
+    -- </default-5.4>
+})
 
 test:finish_test()
