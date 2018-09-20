@@ -3,14 +3,6 @@
 #
 enable_tnt_compile_flags()
 
-# Suppress noise GCC 8 warnings.
-#
-# reflection.h casts a pointer to a member function to an another pointer to a
-# member function to store it in a structure, but cast it back before a call.
-# It is legal and does not lead to an undefined behaviour.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-cast-function-type")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-cast-function-type")
-
 include_directories(${LIBEV_INCLUDE_DIR})
 include_directories(${LIBEIO_INCLUDE_DIR})
 include_directories(${LIBCORO_INCLUDE_DIR})
