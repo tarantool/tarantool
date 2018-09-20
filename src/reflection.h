@@ -106,10 +106,10 @@ struct method_info {
 	};
 };
 
-#define type_foreach_method(m, method)					\
+#define type_foreach_method(m, method)						\
 	for(const struct type_info *_m = (m); _m != NULL; _m = _m->parent)	\
-		for (const struct method_info *(method) = _m->methods;	\
-		     (method)->name != NULL; (method)++)
+		for (const struct method_info *method = _m->methods;		\
+		     method->name != NULL; method++)
 
 inline const struct method_info *
 type_method_by_name(const struct type_info *type, const char *name)
