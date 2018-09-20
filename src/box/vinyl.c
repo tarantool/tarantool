@@ -259,7 +259,7 @@ vy_info_append_quota(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "watermark", q->watermark);
 	info_append_int(h, "use_rate", q->use_rate);
 	info_append_int(h, "dump_bandwidth", q->dump_bw);
-	info_table_end(h);
+	info_table_end(h); /* quota */
 }
 
 static void
@@ -283,7 +283,7 @@ vy_info_append_tx(struct vy_env *env, struct info_handler *h)
 	mempool_stats(&xm->read_view_mempool, &mstats);
 	info_append_int(h, "read_views", mstats.objcount);
 
-	info_table_end(h);
+	info_table_end(h); /* tx */
 }
 
 static void
@@ -295,7 +295,31 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "tuple_cache", env->cache_env.mem_used);
 	info_append_int(h, "page_index", env->lsm_env.page_index_size);
 	info_append_int(h, "bloom_filter", env->lsm_env.bloom_size);
-	info_table_end(h);
+	info_table_end(h); /* memory */
+}
+
+static void
+vy_info_append_disk(struct vy_env *env, struct info_handler *h)
+{
+	struct vy_disk_stat *stat = &env->lsm_env.disk_stat;
+
+	info_table_begin(h, "disk");
+
+	info_append_int(h, "data", stat->data);
+	info_append_int(h, "index", stat->index);
+
+	info_table_begin(h, "dump");
+	info_append_int(h, "in", stat->dump.in);
+	info_append_int(h, "out", stat->dump.out);
+	info_table_end(h); /* dump */
+
+	info_table_begin(h, "compact");
+	info_append_int(h, "in", stat->compact.in);
+	info_append_int(h, "out", stat->compact.out);
+	info_append_int(h, "queue", stat->compact.queue);
+	info_table_end(h); /* compact */
+
+	info_table_end(h); /* disk */
 }
 
 void
@@ -307,6 +331,7 @@ vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 	vy_info_append_quota(env, h);
 	vy_info_append_tx(env, h);
 	vy_info_append_memory(env, h);
+	vy_info_append_disk(env, h);
 	info_end(h);
 }
 
@@ -337,17 +362,6 @@ vy_info_append_disk_stmt_counter(struct info_handler *h, const char *name,
 }
 
 static void
-vy_info_append_compact_stat(struct info_handler *h, const char *name,
-			    const struct vy_compact_stat *stat)
-{
-	info_table_begin(h, name);
-	info_append_int(h, "count", stat->count);
-	vy_info_append_stmt_counter(h, "in", &stat->in);
-	vy_info_append_stmt_counter(h, "out", &stat->out);
-	info_table_end(h);
-}
-
-static void
 vinyl_index_stat(struct index *index, struct info_handler *h)
 {
 	char buf[1024];
@@ -371,21 +385,21 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_append_double(h, "p90", latency_get(&stat->latency, 90));
 	info_append_double(h, "p95", latency_get(&stat->latency, 95));
 	info_append_double(h, "p99", latency_get(&stat->latency, 99));
-	info_table_end(h);
+	info_table_end(h); /* latency */
 
 	info_table_begin(h, "upsert");
 	info_append_int(h, "squashed", stat->upsert.squashed);
 	info_append_int(h, "applied", stat->upsert.applied);
-	info_table_end(h);
+	info_table_end(h); /* upsert */
 
 	info_table_begin(h, "memory");
 	vy_info_append_stmt_counter(h, NULL, &stat->memory.count);
 	info_table_begin(h, "iterator");
 	info_append_int(h, "lookup", stat->memory.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->memory.iterator.get);
-	info_table_end(h);
+	info_table_end(h); /* iterator */
 	info_append_int(h, "index_size", vy_lsm_mem_tree_size(lsm));
-	info_table_end(h);
+	info_table_end(h); /* memory */
 
 	info_table_begin(h, "disk");
 	vy_info_append_disk_stmt_counter(h, NULL, &stat->disk.count);
@@ -396,13 +410,22 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_table_begin(h, "bloom");
 	info_append_int(h, "hit", stat->disk.iterator.bloom_hit);
 	info_append_int(h, "miss", stat->disk.iterator.bloom_miss);
-	info_table_end(h);
-	info_table_end(h);
-	vy_info_append_compact_stat(h, "dump", &stat->disk.dump);
-	vy_info_append_compact_stat(h, "compact", &stat->disk.compact);
+	info_table_end(h); /* bloom */
+	info_table_end(h); /* iterator */
+	info_table_begin(h, "dump");
+	info_append_int(h, "count", stat->disk.dump.count);
+	vy_info_append_stmt_counter(h, "in", &stat->disk.dump.in);
+	vy_info_append_disk_stmt_counter(h, "out", &stat->disk.dump.out);
+	info_table_end(h); /* dump */
+	info_table_begin(h, "compact");
+	info_append_int(h, "count", stat->disk.compact.count);
+	vy_info_append_disk_stmt_counter(h, "in", &stat->disk.compact.in);
+	vy_info_append_disk_stmt_counter(h, "out", &stat->disk.compact.out);
+	vy_info_append_disk_stmt_counter(h, "queue", &stat->disk.compact.queue);
+	info_table_end(h); /* compact */
 	info_append_int(h, "index_size", lsm->page_index_size);
 	info_append_int(h, "bloom_size", lsm->bloom_size);
-	info_table_end(h);
+	info_table_end(h); /* disk */
 
 	info_table_begin(h, "cache");
 	vy_info_append_stmt_counter(h, NULL, &cache_stat->count);
@@ -413,15 +436,15 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	vy_info_append_stmt_counter(h, "evict", &cache_stat->evict);
 	info_append_int(h, "index_size",
 			vy_cache_tree_mem_used(&lsm->cache.cache_tree));
-	info_table_end(h);
+	info_table_end(h); /* cache */
 
 	info_table_begin(h, "txw");
 	vy_info_append_stmt_counter(h, NULL, &stat->txw.count);
 	info_table_begin(h, "iterator");
 	info_append_int(h, "lookup", stat->txw.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->txw.iterator.get);
-	info_table_end(h);
-	info_table_end(h);
+	info_table_end(h); /* iterator */
+	info_table_end(h); /* txw */
 
 	info_append_int(h, "range_count", lsm->range_count);
 	info_append_int(h, "run_count", lsm->run_count);
@@ -439,22 +462,34 @@ vinyl_index_reset_stat(struct index *index)
 	struct vy_lsm_stat *stat = &lsm->stat;
 	struct vy_cache_stat *cache_stat = &lsm->cache.stat;
 
+	/* Get/put */
 	stat->lookup = 0;
 	latency_reset(&stat->latency);
-	memset(&stat->get, 0, sizeof(stat->get));
-	memset(&stat->put, 0, sizeof(stat->put));
+	vy_stmt_counter_reset(&stat->get);
+	vy_stmt_counter_reset(&stat->put);
 	memset(&stat->upsert, 0, sizeof(stat->upsert));
+
+	/* Iterator */
 	memset(&stat->txw.iterator, 0, sizeof(stat->txw.iterator));
 	memset(&stat->memory.iterator, 0, sizeof(stat->memory.iterator));
 	memset(&stat->disk.iterator, 0, sizeof(stat->disk.iterator));
-	memset(&stat->disk.dump, 0, sizeof(stat->disk.dump));
-	memset(&stat->disk.compact, 0, sizeof(stat->disk.compact));
 
+	/* Dump */
+	stat->disk.dump.count = 0;
+	vy_stmt_counter_reset(&stat->disk.dump.in);
+	vy_disk_stmt_counter_reset(&stat->disk.dump.out);
+
+	/* Compaction */
+	stat->disk.compact.count = 0;
+	vy_disk_stmt_counter_reset(&stat->disk.compact.in);
+	vy_disk_stmt_counter_reset(&stat->disk.compact.out);
+
+	/* Cache */
 	cache_stat->lookup = 0;
-	memset(&cache_stat->get, 0, sizeof(cache_stat->get));
-	memset(&cache_stat->put, 0, sizeof(cache_stat->put));
-	memset(&cache_stat->invalidate, 0, sizeof(cache_stat->invalidate));
-	memset(&cache_stat->evict, 0, sizeof(cache_stat->evict));
+	vy_stmt_counter_reset(&cache_stat->get);
+	vy_stmt_counter_reset(&cache_stat->put);
+	vy_stmt_counter_reset(&cache_stat->invalidate);
+	vy_stmt_counter_reset(&cache_stat->evict);
 }
 
 static void
@@ -475,9 +510,15 @@ static void
 vinyl_engine_reset_stat(struct engine *engine)
 {
 	struct vy_env *env = vy_env(engine);
-	struct tx_manager *xm = env->xm;
 
+	struct tx_manager *xm = env->xm;
 	memset(&xm->stat, 0, sizeof(xm->stat));
+
+	struct vy_disk_stat *disk_stat = &env->lsm_env.disk_stat;
+	disk_stat->dump.in = 0;
+	disk_stat->dump.out = 0;
+	disk_stat->compact.in = 0;
+	disk_stat->compact.out = 0;
 }
 
 /** }}} Introspection */

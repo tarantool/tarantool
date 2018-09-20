@@ -262,18 +262,6 @@ vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
 	vy_disk_stmt_counter_sub(&range->count, &slice->count);
 }
 
-void
-vy_range_force_compaction(struct vy_range *range)
-{
-	if (range->slice_count == 1) {
-		/* Already compacted. */
-		assert(!range->needs_compaction);
-		return;
-	}
-	range->needs_compaction = true;
-	range->compact_priority = range->slice_count;
-}
-
 /**
  * To reduce write amplification caused by compaction, we follow
  * the LSM tree design. Runs in each range are divided into groups
@@ -304,19 +292,24 @@ vy_range_update_compact_priority(struct vy_range *range,
 	assert(opts->run_count_per_level > 0);
 	assert(opts->run_size_ratio > 1);
 
-	if (range->slice_count == 1) {
+	range->compact_priority = 0;
+	vy_disk_stmt_counter_reset(&range->compact_queue);
+
+	if (range->slice_count <= 1) {
 		/* Nothing to compact. */
-		range->compact_priority = 1;
 		range->needs_compaction = false;
 		return;
 	}
+
 	if (range->needs_compaction) {
 		range->compact_priority = range->slice_count;
+		range->compact_queue = range->count;
 		return;
 	}
 
-	range->compact_priority = 0;
-
+	/* Total number of statements in checked runs. */
+	struct vy_disk_stmt_counter total_stmt_count;
+	vy_disk_stmt_counter_reset(&total_stmt_count);
 	/* Total number of checked runs. */
 	uint32_t total_run_count = 0;
 	/* The total size of runs checked so far. */
@@ -345,6 +338,7 @@ vy_range_update_compact_priority(struct vy_range *range,
 		total_size += size;
 		level_run_count++;
 		total_run_count++;
+		vy_disk_stmt_counter_add(&total_stmt_count, &slice->count);
 		while (size > target_run_size) {
 			/*
 			 * The run size exceeds the threshold
@@ -382,6 +376,7 @@ vy_range_update_compact_priority(struct vy_range *range,
 			 * this level and upper levels.
 			 */
 			range->compact_priority = total_run_count;
+			range->compact_queue = total_stmt_count;
 			est_new_run_size = total_size;
 		}
 	}

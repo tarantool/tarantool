@@ -252,6 +252,8 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	assert(lsm->env->lsm_count > 0);
 
 	lsm->env->lsm_count--;
+	lsm->env->disk_stat.compact.queue -=
+			lsm->stat.disk.compact.queue.bytes;
 
 	if (lsm->pk != NULL)
 		vy_lsm_unref(lsm->pk);
@@ -685,32 +687,56 @@ vy_lsm_compact_priority(struct vy_lsm *lsm)
 void
 vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run)
 {
+	struct vy_lsm_env *env = lsm->env;
+	size_t bloom_size = vy_run_bloom_size(run);
+	size_t page_index_size = run->page_index_size;
+
 	assert(rlist_empty(&run->in_lsm));
 	rlist_add_entry(&lsm->runs, run, in_lsm);
 	lsm->run_count++;
 	vy_disk_stmt_counter_add(&lsm->stat.disk.count, &run->count);
 
-	lsm->bloom_size += vy_run_bloom_size(run);
-	lsm->page_index_size += run->page_index_size;
+	lsm->bloom_size += bloom_size;
+	lsm->page_index_size += page_index_size;
 
-	lsm->env->bloom_size += vy_run_bloom_size(run);
-	lsm->env->page_index_size += run->page_index_size;
+	env->bloom_size += bloom_size;
+	env->page_index_size += page_index_size;
+
+	/* Data size is consistent with space.bsize. */
+	if (lsm->index_id == 0)
+		env->disk_stat.data += run->count.bytes;
+	/* Index size is consistent with index.bsize. */
+	env->disk_stat.index += bloom_size + page_index_size;
+	if (lsm->index_id > 0)
+		env->disk_stat.index += run->count.bytes;
 }
 
 void
 vy_lsm_remove_run(struct vy_lsm *lsm, struct vy_run *run)
 {
+	struct vy_lsm_env *env = lsm->env;
+	size_t bloom_size = vy_run_bloom_size(run);
+	size_t page_index_size = run->page_index_size;
+
 	assert(lsm->run_count > 0);
 	assert(!rlist_empty(&run->in_lsm));
 	rlist_del_entry(run, in_lsm);
 	lsm->run_count--;
 	vy_disk_stmt_counter_sub(&lsm->stat.disk.count, &run->count);
 
-	lsm->bloom_size -= vy_run_bloom_size(run);
-	lsm->page_index_size -= run->page_index_size;
+	lsm->bloom_size -= bloom_size;
+	lsm->page_index_size -= page_index_size;
 
-	lsm->env->bloom_size -= vy_run_bloom_size(run);
-	lsm->env->page_index_size -= run->page_index_size;
+	env->bloom_size -= bloom_size;
+	env->page_index_size -= page_index_size;
+
+	/* Data size is consistent with space.bsize. */
+	if (lsm->index_id == 0)
+		env->disk_stat.data -= run->count.bytes;
+	/* Index size is consistent with index.bsize. */
+	env->disk_stat.index -= bloom_size + page_index_size;
+	if (lsm->index_id > 0)
+		env->disk_stat.index -= run->count.bytes;
 }
 
 void
@@ -735,12 +761,44 @@ void
 vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_collect(lsm->run_hist, range->slice_count);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.queue,
+				 &range->compact_queue);
+	lsm->env->disk_stat.compact.queue += range->compact_queue.bytes;
 }
 
 void
 vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_discard(lsm->run_hist, range->slice_count);
+	vy_disk_stmt_counter_sub(&lsm->stat.disk.compact.queue,
+				 &range->compact_queue);
+	lsm->env->disk_stat.compact.queue -= range->compact_queue.bytes;
+}
+
+void
+vy_lsm_acct_dump(struct vy_lsm *lsm,
+		 const struct vy_stmt_counter *in,
+		 const struct vy_disk_stmt_counter *out)
+{
+	lsm->stat.disk.dump.count++;
+	vy_stmt_counter_add(&lsm->stat.disk.dump.in, in);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.dump.out, out);
+
+	lsm->env->disk_stat.dump.in += in->bytes;
+	lsm->env->disk_stat.dump.out += out->bytes;
+}
+
+void
+vy_lsm_acct_compaction(struct vy_lsm *lsm,
+		       const struct vy_disk_stmt_counter *in,
+		       const struct vy_disk_stmt_counter *out)
+{
+	lsm->stat.disk.compact.count++;
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.in, in);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.out, out);
+
+	lsm->env->disk_stat.compact.in += in->bytes;
+	lsm->env->disk_stat.compact.out += out->bytes;
 }
 
 int
@@ -1016,7 +1074,8 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 			if (new_slice != NULL)
 				vy_range_add_slice(part, new_slice);
 		}
-		part->compact_priority = range->compact_priority;
+		part->needs_compaction = range->needs_compaction;
+		vy_range_update_compact_priority(part, &lsm->opts);
 	}
 
 	/*
@@ -1123,16 +1182,17 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 		rlist_splice(&result->slices, &it->slices);
 		result->slice_count += it->slice_count;
 		vy_disk_stmt_counter_add(&result->count, &it->count);
+		if (it->needs_compaction)
+			result->needs_compaction = true;
 		vy_range_delete(it);
 		it = next;
 	}
 	/*
-	 * Coalescing increases read amplification and breaks the log
-	 * structured layout of the run list, so, although we could
-	 * leave the resulting range as it is, we'd better compact it
-	 * as soon as we can.
+	 * Even though coalescing increases read amplification,
+	 * we don't need to compact the resulting range as long
+	 * as it fits the configured LSM tree shape.
 	 */
-	result->compact_priority = result->slice_count;
+	vy_range_update_compact_priority(result, &lsm->opts);
 	vy_lsm_acct_range(lsm, result);
 	vy_lsm_add_range(lsm, result);
 	lsm->range_tree_version++;
@@ -1157,8 +1217,12 @@ vy_lsm_force_compaction(struct vy_lsm *lsm)
 	struct vy_range_tree_iterator it;
 
 	vy_range_tree_ifirst(lsm->tree, &it);
-	while ((range = vy_range_tree_inext(&it)) != NULL)
-		vy_range_force_compaction(range);
+	while ((range = vy_range_tree_inext(&it)) != NULL) {
+		vy_lsm_unacct_range(lsm, range);
+		range->needs_compaction = true;
+		vy_range_update_compact_priority(range, &lsm->opts);
+		vy_lsm_acct_range(lsm, range);
+	}
 
 	vy_range_heap_update_all(&lsm->range_heap);
 }

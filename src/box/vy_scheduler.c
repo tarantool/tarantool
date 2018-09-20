@@ -1090,6 +1090,8 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_run *new_run = task->new_run;
 	int64_t dump_lsn = new_run->dump_lsn;
+	struct vy_disk_stmt_counter dump_out = new_run->count;
+	struct vy_stmt_counter dump_in;
 	struct tuple_format *key_format = lsm->env->key_format;
 	struct vy_mem *mem, *next_mem;
 	struct vy_slice **new_slices, *slice;
@@ -1178,12 +1180,8 @@ vy_task_dump_complete(struct vy_task *task)
 	if (vy_log_tx_commit() < 0)
 		goto fail_free_slices;
 
-	/*
-	 * Account the new run.
-	 */
+	/* Account the new run. */
 	vy_lsm_add_run(lsm, new_run);
-	vy_stmt_counter_add_disk(&lsm->stat.disk.dump.out, &new_run->count);
-
 	/* Drop the reference held by the task. */
 	vy_run_unref(new_run);
 
@@ -1201,8 +1199,8 @@ vy_task_dump_complete(struct vy_task *task)
 		slice = new_slices[i];
 		vy_lsm_unacct_range(lsm, range);
 		vy_range_add_slice(range, slice);
-		vy_lsm_acct_range(lsm, range);
 		vy_range_update_compact_priority(range, &lsm->opts);
+		vy_lsm_acct_range(lsm, range);
 		if (!vy_range_is_scheduled(range))
 			vy_range_heap_update(&lsm->range_heap,
 					     &range->heap_node);
@@ -1212,16 +1210,18 @@ vy_task_dump_complete(struct vy_task *task)
 
 delete_mems:
 	/*
-	 * Delete dumped in-memory trees.
+	 * Delete dumped in-memory trees and account dump in
+	 * LSM tree statistics.
 	 */
+	vy_stmt_counter_reset(&dump_in);
 	rlist_foreach_entry_safe(mem, &lsm->sealed, in_sealed, next_mem) {
 		if (mem->generation > scheduler->dump_generation)
 			continue;
-		vy_stmt_counter_add(&lsm->stat.disk.dump.in, &mem->count);
+		vy_stmt_counter_add(&dump_in, &mem->count);
 		vy_lsm_delete_mem(lsm, mem);
 	}
 	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
-	lsm->stat.disk.dump.count++;
+	vy_lsm_acct_dump(lsm, &dump_in, &dump_out);
 
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
@@ -1428,6 +1428,11 @@ err:
 static int
 vy_task_compact_execute(struct vy_task *task)
 {
+	struct errinj *errinj = errinj(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL);
+	if (errinj != NULL && errinj->bparam) {
+		while (errinj->bparam)
+			fiber_sleep(0.01);
+	}
 	return vy_task_write_run(task);
 }
 
@@ -1438,6 +1443,8 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_range *range = task->range;
 	struct vy_run *new_run = task->new_run;
+	struct vy_disk_stmt_counter compact_out = new_run->count;
+	struct vy_disk_stmt_counter compact_in;
 	struct vy_slice *first_slice = task->first_slice;
 	struct vy_slice *last_slice = task->last_slice;
 	struct vy_slice *slice, *next_slice, *new_slice = NULL;
@@ -1521,15 +1528,14 @@ vy_task_compact_complete(struct vy_task *task)
 	 */
 	if (new_slice != NULL) {
 		vy_lsm_add_run(lsm, new_run);
-		vy_stmt_counter_add_disk(&lsm->stat.disk.compact.out,
-					 &new_run->count);
 		/* Drop the reference held by the task. */
 		vy_run_unref(new_run);
 	} else
 		vy_run_discard(new_run);
 
 	/*
-	 * Replace compacted slices with the resulting slice.
+	 * Replace compacted slices with the resulting slice and
+	 * account compaction in LSM tree statistics.
 	 *
 	 * Note, since a slice might have been added to the range
 	 * by a concurrent dump while compaction was in progress,
@@ -1540,20 +1546,20 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_lsm_unacct_range(lsm, range);
 	if (new_slice != NULL)
 		vy_range_add_slice_before(range, new_slice, first_slice);
+	vy_disk_stmt_counter_reset(&compact_in);
 	for (slice = first_slice; ; slice = next_slice) {
 		next_slice = rlist_next_entry(slice, in_range);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
-		vy_stmt_counter_add_disk(&lsm->stat.disk.compact.in,
-					 &slice->count);
+		vy_disk_stmt_counter_add(&compact_in, &slice->count);
 		if (slice == last_slice)
 			break;
 	}
 	range->n_compactions++;
 	range->version++;
-	vy_lsm_acct_range(lsm, range);
 	vy_range_update_compact_priority(range, &lsm->opts);
-	lsm->stat.disk.compact.count++;
+	vy_lsm_acct_range(lsm, range);
+	vy_lsm_acct_compaction(lsm, &compact_in, &compact_out);
 
 	/*
 	 * Unaccount unused runs and delete compacted slices.
@@ -1667,6 +1673,8 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	}
 	assert(n == 0);
 	assert(new_run->dump_lsn >= 0);
+
+	range->needs_compaction = false;
 
 	task->range = range;
 	task->new_run = new_run;

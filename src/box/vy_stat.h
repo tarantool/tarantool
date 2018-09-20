@@ -32,6 +32,7 @@
  */
 
 #include <stdint.h>
+#include <string.h>
 
 #include "latency.h"
 #include "tuple.h"
@@ -101,15 +102,6 @@ struct vy_txw_iterator_stat {
 	struct vy_stmt_counter get;
 };
 
-/** Dump/compaction statistics. */
-struct vy_compact_stat {
-	int32_t count;
-	/** Number of input statements. */
-	struct vy_stmt_counter in;
-	/** Number of output statements. */
-	struct vy_stmt_counter out;
-};
-
 /** LSM tree statistics. */
 struct vy_lsm_stat {
 	/** Number of lookups in the LSM tree. */
@@ -141,9 +133,25 @@ struct vy_lsm_stat {
 		/** Run iterator statistics. */
 		struct vy_run_iterator_stat iterator;
 		/** Dump statistics. */
-		struct vy_compact_stat dump;
+		struct {
+			/* Number of completed tasks. */
+			int32_t count;
+			/** Number of input statements. */
+			struct vy_stmt_counter in;
+			/** Number of output statements. */
+			struct vy_disk_stmt_counter out;
+		} dump;
 		/** Compaction statistics. */
-		struct vy_compact_stat compact;
+		struct {
+			/* Number of completed tasks. */
+			int32_t count;
+			/** Number of input statements. */
+			struct vy_disk_stmt_counter in;
+			/** Number of output statements. */
+			struct vy_disk_stmt_counter out;
+			/** Number of statements awaiting compaction. */
+			struct vy_disk_stmt_counter queue;
+		} compact;
 	} disk;
 	/** TX write set statistics. */
 	struct {
@@ -186,6 +194,26 @@ struct vy_tx_stat {
 	int64_t conflict;
 };
 
+/**
+ * Global disk statistics.
+ *
+ * Fields correspond to those of per LSM tree statistics.
+ * All counters are given in bytes, uncompressed.
+ */
+struct vy_disk_stat {
+	int64_t data;
+	int64_t index;
+	struct {
+		int64_t in;
+		int64_t out;
+	} dump;
+	struct {
+		int64_t in;
+		int64_t out;
+		int64_t queue;
+	} compact;
+};
+
 static inline int
 vy_lsm_stat_create(struct vy_lsm_stat *stat)
 {
@@ -196,6 +224,18 @@ static inline void
 vy_lsm_stat_destroy(struct vy_lsm_stat *stat)
 {
 	latency_destroy(&stat->latency);
+}
+
+static inline void
+vy_stmt_counter_reset(struct vy_stmt_counter *c)
+{
+	memset(c, 0, sizeof(*c));
+}
+
+static inline void
+vy_disk_stmt_counter_reset(struct vy_disk_stmt_counter *c)
+{
+	memset(c, 0, sizeof(*c));
 }
 
 static inline void

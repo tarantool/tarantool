@@ -91,6 +91,8 @@ struct vy_lsm_env {
 	size_t bloom_size;
 	/** Size of memory used for page index. */
 	size_t page_index_size;
+	/** Global disk statistics. */
+	struct vy_disk_stat disk_stat;
 	/** Memory pool for vy_history_node allocations. */
 	struct mempool history_node_pool;
 };
@@ -436,13 +438,41 @@ vy_lsm_add_range(struct vy_lsm *lsm, struct vy_range *range);
 void
 vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range);
 
-/** Account a range to the run histogram of an LSM tree. */
+/**
+ * Account a range in an LSM tree.
+ *
+ * This function updates the following LSM tree statistics:
+ *  - vy_lsm::run_hist after a slice is added to or removed from
+ *    a range of the LSM tree.
+ *  - vy_lsm::stat::disk::compact::queue after compaction priority
+ *    of a range is updated.
+ */
 void
 vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range);
 
-/** Unaccount a range from the run histogram of an LSM tree. */
+/**
+ * Unaccount a range in an LSM tree.
+ *
+ * This function undoes the effect of vy_lsm_acct_range().
+ */
 void
 vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range);
+
+/**
+ * Account dump in LSM tree statistics.
+ */
+void
+vy_lsm_acct_dump(struct vy_lsm *lsm,
+		 const struct vy_stmt_counter *in,
+		 const struct vy_disk_stmt_counter *out);
+
+/**
+ * Account compaction in LSM tree statistics.
+ */
+void
+vy_lsm_acct_compaction(struct vy_lsm *lsm,
+		       const struct vy_disk_stmt_counter *in,
+		       const struct vy_disk_stmt_counter *out);
 
 /**
  * Allocate a new active in-memory index for an LSM tree while

@@ -292,6 +292,7 @@ http_parse_header_line(struct http_parser *prsr, char **bufp,
 			default:
 				return HTTP_PARSE_INVALID;
 			}
+			break;
 		/* http_header name */
 		case sw_name:
 			c = lowcase[ch];
