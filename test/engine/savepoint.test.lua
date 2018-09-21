@@ -1,5 +1,6 @@
 env = require('test_run')
 test_run = env.new()
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
 
 -- gh-2025 box.savepoint
 

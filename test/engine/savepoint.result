@@ -4,6 +4,10 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+---
+- true
+...
 -- gh-2025 box.savepoint
 s1 = nil
 ---
@@ -14,7 +18,7 @@ s1 = box.savepoint()
 ...
 box.rollback_to_savepoint(s1)
 ---
-- error: 'builtin/box/schema.lua:340: Usage: box.rollback_to_savepoint(savepoint)'
+- error: 'builtin/box/schema.lua: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 box.begin() s1 = box.savepoint()
 ---
@@ -323,27 +327,27 @@ test_run:cmd("setopt delimiter ''");
 ok1, errmsg1
 ---
 - false
-- 'builtin/box/schema.lua:340: Usage: box.rollback_to_savepoint(savepoint)'
+- 'builtin/box/schema.lua: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok2, errmsg2
 ---
 - false
-- 'builtin/box/schema.lua:340: Usage: box.rollback_to_savepoint(savepoint)'
+- 'builtin/box/schema.lua: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok3, errmsg3
 ---
 - false
-- 'builtin/box/schema.lua:340: Usage: box.rollback_to_savepoint(savepoint)'
+- 'builtin/box/schema.lua: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok4, errmsg4
 ---
 - false
-- 'builtin/box/schema.lua:340: Usage: box.rollback_to_savepoint(savepoint)'
+- 'builtin/box/schema.lua: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 ok5, errmsg5
 ---
 - false
-- 'builtin/box/schema.lua:340: Usage: box.rollback_to_savepoint(savepoint)'
+- 'builtin/box/schema.lua: Usage: box.rollback_to_savepoint(savepoint)'
 ...
 s:select{}
 ---
