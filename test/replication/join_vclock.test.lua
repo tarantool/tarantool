@@ -3,7 +3,6 @@ env = require('test_run')
 replica_set = require('fast_replica')
 test_run = env.new()
 engine = test_run:get_cfg('engine')
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 errinj = box.error.injection
 errinj.set("ERRINJ_RELAY_FINAL_SLEEP", true)
@@ -33,5 +32,4 @@ test_run:cmd("switch default")
 
 replica_set.drop_all(test_run)
 box.space.test:drop()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'replication')

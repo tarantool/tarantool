@@ -101,7 +101,8 @@ function audit_disconnect() box.space['tweedledum']:delete{session.id()} end
 test:is(type(session.on_connect(audit_connect)), "function", "type of trigger audit_connect on_connect")
 test:is(type(session.on_disconnect(audit_disconnect)), "function", "type of trigger audit_connect on_disconnect")
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read,write', 'space', 'tweedledum')
+box.schema.user.grant('guest', 'execute', 'universe')
 a = net.box.connect(HOST, PORT)
 test:ok(a:eval('return space:get{box.session.id()}[1] == session.id()'), "eval get_id")
 test:ok(a:eval('return session.sync() ~= 0'), "eval sync")
@@ -112,12 +113,12 @@ session.on_connect(nil, audit_connect)
 session.on_disconnect(nil, audit_disconnect)
 test:is(active_connections, 0, "active connections after other triggers")
 
-space:drop()
+space:drop() -- tweedledum
 
 test:is(session.uid(), 1, "uid == 1")
 test:is(session.user(), "admin", "user is admin")
 test:is(session.sync(), 0, "sync constant")
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'execute', 'universe')
 
 -- audit permission in on_connect/on_disconnect triggers
 box.schema.user.create('tester', { password = 'tester' })
@@ -199,7 +200,10 @@ function f2()
 	sync2 = box.session.sync()
 	cond:signal()
 end
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.func.create('f1')
+box.schema.func.create('f2')
+box.schema.user.grant('guest', 'execute', 'function', 'f1')
+box.schema.user.grant('guest', 'execute', 'function', 'f2')
 conn = net.box.connect(box.cfg.listen)
 test:ok(conn:ping(), 'connect to self')
 _ = fiber.create(function() conn:call('f1') end)
@@ -208,7 +212,8 @@ _ = fiber.create(function() conn:call('f2') end)
 while started ~= 2 do fiber.sleep(0.01) end
 test:isnt(sync1, sync2, 'session.sync() is request local')
 conn:close()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'execute', 'function', 'f1')
+box.schema.user.revoke('guest', 'execute', 'function', 'f2')
 
 inspector:cmd('stop server session with cleanup=1')
 session = nil

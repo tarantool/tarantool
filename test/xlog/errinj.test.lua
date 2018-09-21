@@ -25,9 +25,10 @@ test_run:cmd('restart server default with cleanup=1')
 -- gh-881 iproto request with wal IO error
 errinj = box.error.injection
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 test = box.schema.create_space('test')
 _ = test:create_index('primary')
+
+box.schema.user.grant('guest', 'write', 'space', 'test')
 
 for i=1, box.cfg.rows_per_wal do test:insert{i, 'test'} end
 c = require('net.box').connect(box.cfg.listen)
@@ -40,4 +41,3 @@ errinj.set('ERRINJ_WAL_WRITE', false)
 -- Cleanup
 test:drop()
 errinj = nil
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')

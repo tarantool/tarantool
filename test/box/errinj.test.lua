@@ -245,7 +245,7 @@ test_run:cmd('setopt delimiter ""');
 
 -- Port_dump can fail.
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read', 'space', '_space')
 
 cn = net_box.connect(box.cfg.listen)
 cn:ping()
@@ -255,7 +255,7 @@ assert(not ok)
 assert(string.match(tostring(ret), 'Failed to allocate'))
 errinj.set('ERRINJ_PORT_DUMP', false)
 cn:close()
-box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+box.schema.user.revoke('guest', 'read', 'space', '_space')
 
 run()
 ch:get()
@@ -350,10 +350,9 @@ s:drop()
 -- is saturated, and DML yields too long on commit.
 --
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 s = box.schema.space.create('test')
 _ = s:create_index('pk')
-
+box.schema.user.grant('guest', 'read,write,alter', 'space', 'test')
 c = net_box.connect(box.cfg.listen)
 
 ch = fiber.channel(200)
@@ -369,8 +368,15 @@ s:drop()
 -- gh-3325: do not cancel already sent requests, when a schema
 -- change is detected.
 --
+
+box.schema.user.grant('guest', 'execute', 'universe')
+
 s = box.schema.create_space('test')
 pk = s:create_index('pk')
+
+box.schema.user.grant('guest', 'read,write,alter', 'space', 'test')
+box.schema.user.grant('guest', 'create', 'space')
+box.schema.user.grant('guest', 'write', 'space', '_index')
 s:replace{1, 1}
 cn = net_box.connect(box.cfg.listen)
 errinj.set("ERRINJ_WAL_DELAY", true)
@@ -388,7 +394,8 @@ while ok == nil do fiber.sleep(0.01) end
 ok, err
 cn:close()
 s:drop()
-
+box.schema.user.revoke('guest', 'execute', 'universe')
+box.schema.user.revoke('guest', 'create', 'space')
 --
 -- If message memory pool is used up, stop the connection, until
 -- the pool has free memory.
@@ -403,6 +410,10 @@ function long_poll_f()
     while not continue do fiber.sleep(0.01) end
     finished = finished + 1
 end;
+
+box.schema.func.create('long_poll_f');
+box.schema.user.grant('guest', 'execute', 'function', 'long_poll_f');
+
 test_run:cmd('setopt delimiter ""');
 cn = net_box.connect(box.cfg.listen)
 function long_poll() cn:call('long_poll_f') end
@@ -428,8 +439,8 @@ errinj.set("ERRINJ_TESTING", false)
 while finished ~= 2 do fiber.sleep(0.01) end
 cn:close()
 
-box.schema.user.revoke('guest', 'read,write,execute','universe')
-
+box.schema.user.revoke('guest', 'execute', 'function', 'long_poll_f')
+box.schema.func.drop('long_poll_f')
 --
 -- gh-3289: drop/truncate leaves the space in inconsistent
 -- state if WAL write fails.

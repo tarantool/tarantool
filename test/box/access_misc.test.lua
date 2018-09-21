@@ -86,7 +86,7 @@ s:select()
 -- and create this user session
 --
 box.schema.user.create('uniuser')
-box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+box.schema.user.grant('uniuser', 'read, write, execute, create', 'universe')
 session.su('uniuser')
 uid = session.uid()
 --
@@ -123,7 +123,7 @@ box.schema.func.create('uniuser_func')
 
 session.su('admin')
 box.schema.user.create('someuser')
-box.schema.user.grant('someuser', 'read, write, execute', 'universe')
+box.schema.user.grant('someuser', 'read, write, execute, create', 'universe')
 session.su('someuser')
 --
 -- Check drop objects of another user

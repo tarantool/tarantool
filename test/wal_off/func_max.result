@@ -36,36 +36,41 @@ function drop_limit_func()
 end;
 ---
 ...
-func_limit();
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+func_limit()
 ---
 - error: 'A limit on the total number of functions has been reached: 32000'
 ...
-drop_limit_func();
+drop_limit_func()
 ---
 - error: Function 'func32000' does not exist
 ...
-box.schema.user.create('testuser');
+box.schema.user.create('testuser')
 ---
 ...
-box.schema.user.grant('testuser', 'read, write, execute,create', 'universe');
+box.schema.user.grant('testuser', 'read,write', 'space', '_func')
 ---
 ...
-session.su('testuser');
+box.schema.user.grant('testuser', 'create', 'function')
 ---
 ...
-func_limit();
+session.su('testuser')
+---
+...
+func_limit()
 ---
 - error: 'A limit on the total number of functions has been reached: 32000'
 ...
-drop_limit_func();
+drop_limit_func()
 ---
 - error: Function 'func32000' does not exist
 ...
 session.su('admin')
-box.schema.user.drop('testuser');
 ---
 ...
-test_run:cmd("setopt delimiter ''");
+box.schema.user.drop('testuser')
 ---
-- true
 ...

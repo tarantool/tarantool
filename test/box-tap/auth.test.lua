@@ -20,10 +20,7 @@ test:plan(42)
 local space = box.schema.space.create('tweedledum')
 local index = space:create_index('primary', { type = 'hash' })
 box.schema.user.create('test', {password='pass'})
-box.schema.user.grant('test', 'read,write,execute', 'universe')
 box.schema.user.create('test2', {password=''})
-box.schema.user.grant('test2', 'read,write,execute', 'universe')
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 -- check how authentication trigger work
 local msg, counter, succeeded
@@ -163,8 +160,6 @@ test:is(session.sync(), 0, "box.session.sync()")
 
 -- cleanup
 space:drop()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
-box.schema.user.revoke('test', 'read,write,execute', 'universe')
 box.schema.user.drop('test', { if_exists = true})
 box.schema.user.drop("test2", { if_exists = true})
 

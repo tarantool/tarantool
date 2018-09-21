@@ -62,7 +62,7 @@ connection:close()
 
 box.schema.user.create('underprivileged')
 box.schema.user.grant('underprivileged', 'read,write', 'space', '_func')
-box.schema.user.grant('underprivileged', 'create', 'universe')
+box.schema.user.grant('underprivileged', 'create', 'function')
 box.session.su('underprivileged')
 box.schema.func.create('setuid', {setuid=true})
 box.session.su('admin')
@@ -70,7 +70,10 @@ box.session.su('admin')
 -- create a deprived function
 --
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.func.create('escalation')
+box.schema.user.grant('guest', 'execute', 'function', 'setuid')
+box.schema.user.grant('guest', 'execute', 'function', 'escalation')
+box.schema.user.grant('guest', 'read', 'space', '_space')
 
 connection = net:connect(os.getenv("LISTEN"))
 
@@ -81,6 +84,6 @@ channel:put(true)
 -- tear down
 
 box.schema.user.drop('underprivileged')
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
-
+box.schema.func.drop('escalation')
+box.schema.user.revoke('guest', 'read', 'space', '_space')
 connection:close()

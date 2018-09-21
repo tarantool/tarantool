@@ -21,13 +21,14 @@ function drop_limit_func()
         i = i + 1
     end
 end;
-func_limit();
-drop_limit_func();
-box.schema.user.create('testuser');
-box.schema.user.grant('testuser', 'read, write, execute,create', 'universe');
-session.su('testuser');
-func_limit();
-drop_limit_func();
-session.su('admin')
-box.schema.user.drop('testuser');
 test_run:cmd("setopt delimiter ''");
+func_limit()
+drop_limit_func()
+box.schema.user.create('testuser')
+box.schema.user.grant('testuser', 'read,write', 'space', '_func')
+box.schema.user.grant('testuser', 'create', 'function')
+session.su('testuser')
+func_limit()
+drop_limit_func()
+session.su('admin')
+box.schema.user.drop('testuser')

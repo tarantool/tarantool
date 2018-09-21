@@ -2,7 +2,6 @@ env = require('test_run')
 test_run = env.new()
 engine = test_run:get_cfg('engine')
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 box.schema.user.grant('guest', 'replication')
 
 space = box.schema.space.create('test', {engine = engine});
@@ -34,4 +33,3 @@ test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')

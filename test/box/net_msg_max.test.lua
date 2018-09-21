@@ -3,7 +3,10 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 net_box = require('net.box')
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'read', 'space', '_space')
+box.schema.func.create('do_long_f')
+box.schema.user.grant('guest', 'execute', 'function', 'do_long_f')
+
 conn = net_box.connect(box.cfg.listen)
 conn2 = net_box.connect(box.cfg.listen)
 active = 0
@@ -79,6 +82,7 @@ wait_finished(run_max)
 --
 -- Test minimal iproto msg count.
 --
+
 box.cfg{net_msg_max = 2}
 conn:ping()
 #conn.space._space:select{} > 0
@@ -136,5 +140,6 @@ wait_finished(110)
 conn2:close()
 conn:close()
 
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.func.drop('do_long_f')
+box.schema.user.revoke('guest', 'read', 'space', '_space')
 box.cfg{readahead = old_readahead, net_msg_max = limit}

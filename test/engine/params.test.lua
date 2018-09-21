@@ -3,7 +3,6 @@ test_run = require('test_run')
 inspector = test_run.new()
 engine = inspector:get_cfg('engine')
 
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 s = box.schema.create_space('engine', {engine=engine})
 i = s:create_index('primary')
 
@@ -14,4 +13,3 @@ box.space.engine:select{}
 
 -- cleanup
 box.space.engine:drop()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')

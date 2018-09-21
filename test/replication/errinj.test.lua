@@ -1,7 +1,6 @@
 env = require('test_run')
 test_run = env.new()
 engine = test_run:get_cfg('engine')
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 errinj = box.error.injection
 

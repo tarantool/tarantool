@@ -208,7 +208,7 @@ s:select()
 box.schema.user.create('uniuser')
 ---
 ...
-box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+box.schema.user.grant('uniuser', 'read, write, execute, create', 'universe')
 ---
 ...
 session.su('uniuser')
@@ -291,7 +291,7 @@ session.su('admin')
 box.schema.user.create('someuser')
 ---
 ...
-box.schema.user.grant('someuser', 'read, write, execute', 'universe')
+box.schema.user.grant('someuser', 'read, write, execute, create', 'universe')
 ---
 ...
 session.su('someuser')

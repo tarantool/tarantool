@@ -5,14 +5,6 @@ endif()
 file(GLOB all_sources *.c *.cc)
 set_source_files_compile_flags(${all_sources})
 
-# Suppress noise GCC 8 warnings.
-#
-# reflection.h casts a pointer to a member function to an another pointer to a
-# member function to store it in a structure, but cast it back before a call.
-# It is legal and does not lead to an undefined behaviour.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-cast-function-type")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-cast-function-type")
-
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PROJECT_BINARY_DIR}/src)
 include_directories(${PROJECT_SOURCE_DIR}/src/box)

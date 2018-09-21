@@ -55,12 +55,20 @@ _ = test_run:cmd("switch default")
 
 _ = test_run:cmd("switch autobootstrap1")
 u1 = box.schema.user.create('test_u')
-box.schema.user.grant('test_u', 'read,write,create', 'universe')
+box.schema.user.grant('test_u', 'create', 'space')
+box.schema.user.grant('test_u', 'read,write', 'space', '_space')
+box.schema.user.grant('test_u', 'write', 'space', '_schema')
+box.schema.user.grant('test_u', 'write', 'space', '_index')
 box.session.su('test_u')
 _ = box.schema.space.create('test_u'):create_index('pk')
 box.session.su('admin')
 _ = box.space.test_u:replace({1, 2, 3, 4})
 box.space.test_u:select()
+
+box.schema.user.revoke('test_u', 'write', 'space', '_index')
+box.schema.user.revoke('test_u', 'write', 'space', '_schema')
+box.schema.user.revoke('test_u', 'read,write', 'space', '_space')
+box.schema.user.revoke('test_u', 'create', 'space')
 
 -- Synchronize
 vclock = test_run:get_vclock('autobootstrap1')

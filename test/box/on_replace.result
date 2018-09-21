@@ -540,7 +540,7 @@ s:select()
 ---
 - []
 ...
-s:drop()
+s:drop() -- test_on_repl_ddl
 ---
 ...
 --

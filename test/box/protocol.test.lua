@@ -1,4 +1,3 @@
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 --------------------------------------------------------------------------------
 -- Test case for #273: IPROTO_ITERATOR ignored in network protocol
@@ -6,6 +5,9 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'tree'})
+
+box.schema.user.grant('guest', 'read', 'space', 'tweedledum')
+
 for i=1,5 do space:insert{i} end
 
 LISTEN = require('uri').parse(box.cfg.listen)
@@ -18,4 +20,3 @@ conn.space[space.id]:select(3, { iterator = 'LT' })
 conn:close()
 
 space:drop()
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')

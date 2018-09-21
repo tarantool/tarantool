@@ -19,7 +19,7 @@ box.stat.net.RECEIVED -- zero
 space = box.schema.space.create('tweedledum')
 ---
 ...
-box.schema.user.grant('guest','read,write,execute','universe')
+box.schema.user.grant('guest', 'read', 'space', 'tweedledum')
 ---
 ...
 index = space:create_index('primary', { type = 'hash' })
@@ -60,12 +60,9 @@ box.stat.net.RECEIVED.total
 ---
 - 0
 ...
-space:drop()
+space:drop() -- tweedledum
 ---
 ...
 cn:close()
----
-...
-box.schema.user.revoke('guest','read,write,execute','universe')
 ---
 ...

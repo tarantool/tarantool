@@ -99,6 +99,7 @@ check_c_compiler_flag("-Wno-varargs" CC_HAS_WNO_VARARGS)
 check_c_compiler_flag("-Wno-char-subscripts" CC_HAS_WNO_CHAR_SUBSCRIPTS)
 check_c_compiler_flag("-Wno-format-truncation" CC_HAS_WNO_FORMAT_TRUNCATION)
 check_c_compiler_flag("-Wno-implicit-fallthrough" CC_HAS_WNO_IMPLICIT_FALLTHROUGH)
+check_c_compiler_flag("-Wno-cast-function-type" CC_HAS_WNO_CAST_FUNCTION_TYPE)
 
 #
 # Perform build type specific configuration.
@@ -270,6 +271,15 @@ macro(enable_tnt_compile_flags)
     if (CMAKE_COMPILER_IS_GNUCC)
         # A workaround for Redhat Developer Toolset 2.x on RHEL/CentOS 5.x
         add_compile_flags("C" "-fno-gnu89-inline")
+    endif()
+
+    # Suppress noise GCC 8 warnings.
+    #
+    # reflection.h casts a pointer to a member function to an another pointer
+    # to a member function to store it in a structure, but cast it back before
+    # a call. It is legal and does not lead to an undefined behaviour.
+    if (CC_HAS_WNO_CAST_FUNCTION_TYPE)
+        add_compile_flags("C;CXX" "-Wno-cast-function-type")
     endif()
 
     add_definitions("-D__STDC_FORMAT_MACROS=1")

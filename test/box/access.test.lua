@@ -167,10 +167,10 @@ box.schema.user.drop('uniuser')
 -- only by its creator at the moment
 -- ------------------------------------------------------------
 box.schema.user.create('grantor')
-box.schema.user.grant('grantor', 'read, write, execute', 'universe')
+box.schema.user.grant('grantor', 'read, write, execute, create, alter, drop', 'universe')
 session.su('grantor')
 box.schema.user.create('grantee')
-box.schema.user.grant('grantee', 'read, write, execute', 'universe')
+box.schema.user.grant('grantee', 'read, write, execute, create, alter, drop', 'universe')
 session.su('grantee')
 -- fails - can't suicide - ask the creator to kill you
 box.schema.user.drop('grantee')

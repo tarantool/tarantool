@@ -370,7 +370,7 @@ box.schema.user.drop('uniuser')
 box.schema.user.create('grantor')
 ---
 ...
-box.schema.user.grant('grantor', 'read, write, execute', 'universe')
+box.schema.user.grant('grantor', 'read, write, execute, create, alter, drop', 'universe')
 ---
 ...
 session.su('grantor')
@@ -379,7 +379,7 @@ session.su('grantor')
 box.schema.user.create('grantee')
 ---
 ...
-box.schema.user.grant('grantee', 'read, write, execute', 'universe')
+box.schema.user.grant('grantee', 'read, write, execute, create, alter, drop', 'universe')
 ---
 - error: Grant access to universe '' is denied for user 'grantor'
 ...

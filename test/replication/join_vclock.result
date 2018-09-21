@@ -13,9 +13,6 @@ test_run = env.new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
----
-...
 errinj = box.error.injection
 ---
 ...
@@ -85,9 +82,6 @@ replica_set.drop_all(test_run)
 ---
 ...
 box.space.test:drop()
----
-...
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...
 box.schema.user.revoke('guest', 'replication')

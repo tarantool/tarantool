@@ -1,4 +1,4 @@
-box.schema.user.grant('guest', 'read,write,execute', 'universe')
+box.schema.user.grant('guest', 'execute', 'universe')
 
 conn = require('net.box').connect(box.cfg.listen)
 conn:ping()
@@ -240,4 +240,4 @@ conn:call_16("return_sparse4")
 conn:close()
 require('msgpack').cfg { encode_sparse_safe = sparse_safe }
 
-box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'execute', 'universe')

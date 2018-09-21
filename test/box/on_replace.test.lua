@@ -202,7 +202,7 @@ s:replace({8, 9})
 t = s:on_replace(function () s.index.pk:rename('newname') end, t)
 s:replace({9, 10})
 s:select()
-s:drop()
+s:drop() -- test_on_repl_ddl
 
 --
 -- gh-3020: sub-statement rollback
