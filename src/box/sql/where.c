@@ -4614,10 +4614,10 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 				iIndexCur = pLevel->iTabCur;
 				op = 0;
 			} else if (pWInfo->eOnePass != ONEPASS_OFF) {
+				iIndexCur = iAuxArg;
 				if (pTabItem->pTab->space->index_count != 0) {
 					uint32_t iid = 0;
 					struct index *pJ = pTabItem->pTab->space->index[iid];
-					iIndexCur = iAuxArg;
 					assert(wctrlFlags &
 					       WHERE_ONEPASS_DESIRED);
 					while (pJ->def->iid != idx_def->iid) {

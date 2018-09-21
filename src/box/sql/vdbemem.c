@@ -1597,6 +1597,7 @@ sql_stat4_column(struct sqlite3 *db, const char *record, uint32_t col_num,
 	const char *a = record;
 	assert(mp_typeof(a[0]) == MP_ARRAY);
 	uint32_t col_cnt = mp_decode_array(&a);
+	(void) col_cnt;
 	assert(col_cnt > col_num);
 	for (uint32_t i = 0; i < col_num; i++)
 		mp_next(&a);

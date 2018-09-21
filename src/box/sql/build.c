@@ -2387,7 +2387,7 @@ constraint_is_named(const char *name)
 void
 sql_create_index(struct Parse *parse, struct Token *token,
 		 struct SrcList *tbl_name, struct ExprList *col_list,
-		 struct Token *start, enum sort_order sort_order,
+		 MAYBE_UNUSED struct Token *start, enum sort_order sort_order,
 		 bool if_not_exist, enum sql_index_type idx_type) {
 	/* The index to be created. */
 	struct index *index = NULL;

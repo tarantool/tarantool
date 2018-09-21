@@ -2271,7 +2271,7 @@ sql_txn_begin(Vdbe *p)
 }
 
 Savepoint *
-sql_savepoint(Vdbe *p, const char *zName)
+sql_savepoint(MAYBE_UNUSED Vdbe *p, const char *zName)
 {
 	assert(p);
 	size_t nName = zName ? strlen(zName) + 1 : 0;
