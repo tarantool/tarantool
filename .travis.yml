@@ -4,9 +4,9 @@ services:
 
 language: cpp
 
-os:
-  - linux
-  - osx
+# default values
+os: linux
+compiler: gcc
 
 osx_image: xcode9
 
@@ -17,64 +17,44 @@ cache:
 git:
     depth: 100500
 
-env:
-    matrix:
-      - TARGET=source
-      - TARGET=test
-      - TARGET=coverage
-      - OS=el DIST=6
-      - OS=el DIST=7
-      - OS=fedora DIST=26
-      - OS=fedora DIST=27
-      - OS=ubuntu DIST=artful
-      - OS=ubuntu DIST=trusty
-      - OS=ubuntu DIST=xenial
-      - OS=ubuntu DIST=bionic
-      - OS=debian DIST=wheezy
-      - OS=debian DIST=jessie
-      - OS=debian DIST=stretch
-
 matrix:
     allow_failures:
       - TARGET=coverage
-#      - env: OS=el DIST=6
-#      - env: OS=el DIST=7
-#      - env: OS=fedora DIST=26
-#      - env: OS=fedora DIST=27
-#      - env: OS=ubuntu DIST=artful
-#      - env: OS=ubuntu DIST=trusty
-#      - env: OS=ubuntu DIST=xenial
-#      - env: OS=ubuntu DIST=bionic
-#      - env: OS=debian DIST=wheezy
-#      - env: OS=debian DIST=jessie
-#      - env: OS=debian DIST=stretch
-    exclude:
-      - env: OS=el DIST=6
+    include:
+      - name: Create and deploy tarball
+        env: TARGET=source
+      - name: RelWithDebInfoWError build + test (Linux, gcc)
+        env: TARGET=test
+      - name: RelWithDebInfoWError build + test (Linux, clang)
+        env: TARGET=test
+        compiler: clang
+      - name: RelWithDebInfoWError build + test (OS X)
+        env: TARGET=test
         os: osx
-      - env: OS=el DIST=7
-        os: osx
-      - env: OS=fedora DIST=26
-        os: osx
-      - env: OS=fedora DIST=27
-        os: osx
-      - env: OS=ubuntu DIST=artful
-        os: osx
-      - env: OS=ubuntu DIST=trusty
-        os: osx
-      - env: OS=ubuntu DIST=xenial
-        os: osx
-      - env: OS=ubuntu DIST=bionic
-        os: osx
-      - env: OS=debian DIST=wheezy
-        os: osx
-      - env: OS=debian DIST=jessie
-        os: osx
-      - env: OS=debian DIST=stretch
-        os: osx
-      - env: TARGET=source
-        os: osx
-      - env: TARGET=coverage
-        os: osx
+      - name: Debug build + test + coverage (Linux, gcc)
+        env: TARGET=coverage
+      - name: CentOS 6 build + test + deploy RPM
+        env: OS=el DIST=6
+      - name: CentOS 7 build + test + deploy RPM
+        env: OS=el DIST=7
+      - name: Fedora 26 build + test + deploy RPM
+        env: OS=fedora DIST=26
+      - name: Fedora 27 build + test + deploy RPM
+        env: OS=fedora DIST=27
+      - name: Ubuntu Trusty (14.04) build + deploy DEB
+        env: OS=ubuntu DIST=trusty
+      - name: Ubuntu Xenial (16.04) build + deploy DEB
+        env: OS=ubuntu DIST=xenial
+      - name: Ubuntu Artful (17.10) build + deploy DEB
+        env: OS=ubuntu DIST=artful
+      - name: Ubuntu Bionic (18.04) build + deploy DEB
+        env: OS=ubuntu DIST=bionic
+      - name: Debian Wheezy (7) build + deploy DEB
+        env: OS=debian DIST=wheezy
+      - name: Debian Jessie (8) build + deploy DEB
+        env: OS=debian DIST=jessie
+      - name: Debian Stretch (9) build + deploy DEB
+        env: OS=debian DIST=stretch
 
 script:
   - make -f .travis.mk ${TARGET}
