@@ -58,7 +58,7 @@ extern "C" {
 struct xlog;
 struct vclock;
 struct key_def;
-struct key_part;
+struct key_part_def;
 struct mh_i64ptr_t;
 
 /** Type of a metadata log record. */
@@ -252,7 +252,7 @@ struct vy_log_record {
 	/** Index key definition, as defined by the user. */
 	const struct key_def *key_def;
 	/** Array of key part definitions. */
-	struct key_part *key_parts;
+	struct key_part_def *key_parts;
 	/** Number of key parts. */
 	uint32_t key_part_count;
 	/** LSN of the WAL row that created the LSM tree. */
@@ -318,7 +318,7 @@ struct vy_lsm_recovery_info {
 	/** Replication group ID. */
 	uint32_t group_id;
 	/** Array of key part definitions. */
-	struct key_part *key_parts;
+	struct key_part_def *key_parts;
 	/** Number of key parts. */
 	uint32_t key_part_count;
 	/**
