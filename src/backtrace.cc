@@ -366,12 +366,32 @@ __asm__ volatile(
 #endif
 }
 
+/**
+ * Call `cb' callback for each `coro_ctx' contained frame or the current
+ * executed coroutine if `coro_ctx' is NULL. A coro_context is a structure
+ * created on each coroutine yield to store execution context so for an
+ * on-CPU coroutine there is no valid coro_context could be defined and
+ * NULL is passed.
+ */
 void
 backtrace_foreach(backtrace_cb cb, coro_context *coro_ctx, void *cb_ctx)
 {
 	unw_cursor_t unw_cur;
 	unw_context_t unw_ctx;
-	coro_unwcontext(&unw_ctx, coro_ctx);
+	if (coro_ctx == NULL) {
+		/*
+		 * Current executing coroutine and simple unw_getcontext
+		 * should function.
+		 */
+		unw_getcontext(&unw_ctx);
+	} else {
+		/*
+		 * Execution context is stored in the coro_ctx
+		 * so use special context-switching handler to
+		 * capture an unwind context.
+		 */
+		coro_unwcontext(&unw_ctx, coro_ctx);
+	}
 	unw_init_local(&unw_cur, &unw_ctx);
 	int frame_no = 0;
 	unw_word_t sp = 0, old_sp = 0, ip, offset;
