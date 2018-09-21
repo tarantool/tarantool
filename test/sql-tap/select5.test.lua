@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(32)
+test:plan(44)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -411,6 +411,132 @@ test:do_execsql_test(
         "two", 3, "one", 9
         -- </select5-8.8>
     })
+
+--
+-- gh-2364: Support HAVING without GROUP BY clause.
+--
+test:do_catchsql_test(
+    "select5-9.1",
+    [[
+        CREATE TABLE te40 (s1 INT, s2 INT, PRIMARY KEY (s1,s2));
+        INSERT INTO te40 VALUES (1,1);
+        INSERT INTO te40 VALUES (2,2);
+        SELECT s1 FROM te40 HAVING s1 = 1;
+    ]], {
+    -- <select5-9.1>
+    1, "SQL error: HAVING argument must appear in the GROUP BY clause or be used in an aggregate function"
+    -- </select5-9.1>
+})
+
+test:do_catchsql_test(
+    "select5-9.2",
+    [[
+        SELECT SUM(s1) FROM te40 HAVING s1 = 2;
+    ]], {
+    -- <select5-9.2>
+    1, "SQL error: HAVING argument must appear in the GROUP BY clause or be used in an aggregate function"
+    -- </select5-9.2>
+})
+
+test:do_catchsql_test(
+    "select5-9.3",
+    [[
+        SELECT s1 FROM te40 HAVING SUM(s1) = 2;
+    ]], {
+    -- <select5-9.3>
+    1, "SQL error: HAVING argument must appear in the GROUP BY clause or be used in an aggregate function"
+    -- </select5-9.3>
+})
+
+test:do_execsql_test(
+    "select5-9.4",
+    [[
+        SELECT SUM(s1) FROM te40 HAVING SUM(s1) > 0;
+    ]], {
+    -- <select5-9.4>
+    3
+    -- </select5-9.4>
+})
+
+test:do_execsql_test(
+    "select5-9.5",
+    [[
+        SELECT MIN(s1) FROM te40 HAVING SUM(s1) > 0;
+    ]], {
+    -- <select5-9.5>
+    1
+    -- </select5-9.5>
+})
+
+test:do_execsql_test(
+    "select5-9.6",
+    [[
+        SELECT SUM(s1) FROM te40 HAVING SUM(s1) < 0;
+    ]],
+    -- <select5-9.6>
+    {}
+    -- </select5-9.6>
+)
+
+test:do_catchsql_test(
+    "select5-9.7",
+    [[
+        SELECT SUM(s1),s2 FROM te40 HAVING SUM(s1) > 0;
+    ]], {
+    -- <select5-9.7>
+    1, "SQL error: HAVING argument must appear in the GROUP BY clause or be used in an aggregate function"
+    -- </select5-9.7>
+})
+
+test:do_catchsql_test(
+    "select5-9.8",
+    [[
+        SELECT SUM(s1) FROM te40 HAVING SUM(s1) > 0 and s2 > 0;
+    ]], {
+    -- <select5-9.8>
+    1, "SQL error: HAVING argument must appear in the GROUP BY clause or be used in an aggregate function"
+    -- </select5-9.8>
+})
+
+test:do_execsql_test(
+    "select5-9.9",
+    [[
+        SELECT SUM(s1) FROM te40 HAVING SUM(s1) > 0 and SUM(s2) > 0;
+    ]], {
+    -- <select5-9.9>
+    3
+    -- </select5-9.9>
+})
+
+test:do_execsql_test(
+    "select5-9.10",
+    [[
+        SELECT 1 FROM te40 HAVING SUM(s1) > 0;
+    ]], {
+    -- <select5-9.10>
+    1
+    -- </select5-9.10>
+})
+
+test:do_execsql_test(
+    "select5-9.11",
+    [[
+        SELECT -1 FROM te40 HAVING SUM(s1) > 0;
+    ]], {
+    -- <select5-9.11>
+    -1
+    -- </select5-9.11>
+})
+
+test:do_execsql_test(
+    "select5-9.12",
+    [[
+        SELECT NULL FROM te40 HAVING SUM(s1) > 0;
+    ]], {
+    -- <select5-9.12>
+    ""
+    -- </select5-9.12>
+})
 
 test:finish_test()
 

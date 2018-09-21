@@ -602,6 +602,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 		/* A lone identifier is the name of a column.
 		 */
 	case TK_ID:{
+			if ((pNC->ncFlags & NC_AllowAgg) != 0)
+				pNC->ncFlags |= NC_HasUnaggregatedId;
 			return lookupName(pParse, 0, pExpr->u.zToken, pNC,
 					  pExpr);
 		}
@@ -1285,13 +1287,34 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		/* Set up the local name-context to pass to sqlite3ResolveExprNames() to
 		 * resolve the result-set expression list.
 		 */
+		bool is_all_select_agg = true;
 		sNC.ncFlags = NC_AllowAgg;
 		sNC.pSrcList = p->pSrc;
 		sNC.pNext = pOuterNC;
-
+		struct ExprList_item *item = p->pEList->a;
 		/* Resolve names in the result set. */
-		if (sqlite3ResolveExprListNames(&sNC, p->pEList))
-			return WRC_Abort;
+		for (i = 0; i < p->pEList->nExpr; ++i, ++item) {
+			u16 has_agg_flag = sNC.ncFlags & NC_HasAgg;
+			sNC.ncFlags &= ~NC_HasAgg;
+			if (sqlite3ResolveExprNames(&sNC, item->pExpr) != 0)
+				return WRC_Abort;
+			if ((sNC.ncFlags & NC_HasAgg) == 0 &&
+			    !sqlite3ExprIsConstantOrFunction(item->pExpr, 0)) {
+				is_all_select_agg = false;
+				sNC.ncFlags |= has_agg_flag;
+				break;
+			}
+			sNC.ncFlags |= has_agg_flag;
+		}
+		/*
+		 * Finish iteration for is_all_select_agg == false
+		 * and do not care about flags anymore.
+		 */
+		for (; i < p->pEList->nExpr; ++i, ++item) {
+			assert(! is_all_select_agg);
+			if (sqlite3ResolveExprNames(&sNC, item->pExpr) != 0)
+				return WRC_Abort;
+		}
 
 		/* If there are no aggregate functions in the result-set, and no GROUP BY
 		 * expression, do not allow aggregates in any of the other expressions.
@@ -1306,25 +1329,53 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			sNC.ncFlags &= ~NC_AllowAgg;
 		}
 
-		/* If a HAVING clause is present, then there must be a GROUP BY clause.
-		 */
-		if (p->pHaving && !pGroupBy) {
-			sqlite3ErrorMsg(pParse,
-					"a GROUP BY clause is required before HAVING");
-			return WRC_Abort;
-		}
-
-		/* Add the output column list to the name-context before parsing the
-		 * other expressions in the SELECT statement. This is so that
-		 * expressions in the WHERE clause (etc.) can refer to expressions by
-		 * aliases in the result set.
+		/*
+		 * Add the output column list to the name-context
+		 * before parsing the other expressions in the
+		 * SELECT statement. This is so that expressions
+		 * in the WHERE clause (etc.) can refer to
+		 * expressions by aliases in the result set.
 		 *
-		 * Minor point: If this is the case, then the expression will be
-		 * re-evaluated for each reference to it.
+		 * Minor point: If this is the case, then the
+		 * expression will be re-evaluated for each
+		 * reference to it.
 		 */
 		sNC.pEList = p->pEList;
-		if (sqlite3ResolveExprNames(&sNC, p->pHaving))
-			return WRC_Abort;
+		/*
+		 * If a HAVING clause is present, then there must
+		 * be a GROUP BY clause or aggregate function
+		 * should be specified.
+		 */
+		if (p->pHaving != NULL && pGroupBy == NULL) {
+			sNC.ncFlags |= NC_AllowAgg;
+			if (is_all_select_agg &&
+			    sqlite3ResolveExprNames(&sNC, p->pHaving) != 0)
+				return WRC_Abort;
+			if ((sNC.ncFlags & NC_HasAgg) == 0 ||
+			    (sNC.ncFlags & NC_HasUnaggregatedId) != 0) {
+				diag_set(ClientError, ER_SQL, "HAVING "
+					 "argument must appear in the GROUP BY "
+					 "clause or be used in an aggregate "
+					 "function");
+				pParse->nErr++;
+				pParse->rc = SQL_TARANTOOL_ERROR;
+				return WRC_Abort;
+			}
+			/*
+			 * Aggregate functions may return only
+			 * one tuple, so user-defined LIMITs have
+			 * no sense (most DBs don't support such
+			 * LIMIT but there is no reason to
+			 * restrict it directly).
+			 */
+			sql_expr_delete(db, p->pLimit, false);
+			p->pLimit =
+			    sqlite3ExprAlloc(db, TK_INTEGER,
+					     &sqlite3IntTokens[1], 0);
+		} else {
+			if (sqlite3ResolveExprNames(&sNC, p->pHaving))
+				return WRC_Abort;
+		}
 		if (sqlite3ResolveExprNames(&sNC, p->pWhere))
 			return WRC_Abort;
 

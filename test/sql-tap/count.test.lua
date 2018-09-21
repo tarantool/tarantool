@@ -172,15 +172,15 @@ test:do_test(
         return uses_op_count("SELECT count(*) FROM t2 WHERE a IS NOT NULL")
     end, 0)
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "count-2.9",
     [[
         SELECT count(*) FROM t2 HAVING count(*)>1
-    ]], {
+    ]],
         -- <count-2.9>
-        1, "a GROUP BY clause is required before HAVING"
+        {}
         -- </count-2.9>
-    })
+    )
 
 test:do_test(
     "count-2.10",

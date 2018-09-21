@@ -2454,7 +2454,8 @@ struct NameContext {
 #define NC_IdxExpr   0x0020	/* True if resolving columns of CREATE INDEX */
 #define NC_VarSelect 0x0040	/* A correlated subquery has been seen */
 #define NC_MinMaxAgg 0x1000	/* min/max aggregates seen.  See note above */
-
+/** One or more identifiers are out of aggregate function. */
+#define NC_HasUnaggregatedId     0x2000
 /*
  * An instance of the following structure contains all information
  * needed to generate code for a single SELECT statement.
