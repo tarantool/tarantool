@@ -339,31 +339,31 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	}
 	identifier_check_xc(name, name_len);
 	struct key_def *key_def = NULL;
-	struct key_part_def *part_def = (struct key_part_def *)
-			malloc(sizeof(*part_def) * part_count);
-	if (part_def == NULL) {
-		tnt_raise(OutOfMemory, sizeof(*part_def) * part_count,
-			  "malloc", "key_part_def");
+	struct key_part *part = (struct key_part *)
+			malloc(sizeof(*part) * part_count);
+	if (part == NULL) {
+		tnt_raise(OutOfMemory, sizeof(*part) * part_count,
+			  "malloc", "key_part");
 	}
 	auto key_def_guard = make_scoped_guard([&] {
-		free(part_def);
+		free(part);
 		if (key_def != NULL)
 			key_def_delete(key_def);
 	});
 	if (is_166plus) {
 		/* 1.6.6+ */
-		if (key_def_decode_parts(part_def, part_count, &parts,
+		if (key_def_decode_parts(part, part_count, &parts,
 					 space->def->fields,
 					 space->def->field_count) != 0)
 			diag_raise();
 	} else {
 		/* 1.6.5- TODO: remove it in newer versions, find all 1.6.5- */
-		if (key_def_decode_parts_160(part_def, part_count, &parts,
+		if (key_def_decode_parts_160(part, part_count, &parts,
 					     space->def->fields,
 					     space->def->field_count) != 0)
 			diag_raise();
 	}
-	key_def = key_def_new_with_parts(part_def, part_count);
+	key_def = key_def_new_with_parts(part, part_count);
 	if (key_def == NULL)
 		diag_raise();
 	struct index_def *index_def =

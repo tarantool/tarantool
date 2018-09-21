@@ -45,19 +45,8 @@ extern "C" {
 /* MsgPack type names */
 extern const char *mp_type_strs[];
 
-struct key_part_def {
-	/** Tuple field index for this part. */
-	uint32_t fieldno;
-	/** Type of the tuple field. */
-	enum field_type type;
-	/** Collation ID for string comparison. */
-	uint32_t coll_id;
-	/** True if a key part can store NULLs. */
-	bool is_nullable;
-};
-
 /**
- * Set key_part_def.coll_id to COLL_NONE if
+ * Set key_part.coll_id to COLL_NONE if
  * the field does not have a collation.
  */
 #define COLL_NONE UINT32_MAX
@@ -70,7 +59,16 @@ struct key_part {
 	enum field_type type;
 	/** Collation ID for string comparison. */
 	uint32_t coll_id;
-	/** Collation definition for string comparison */
+	/**
+	 * Pointer to the collation corresponding to @coll_id.
+	 *
+	 * The only purpose of this pointer is to avoid collation
+	 * lookup on tuple comparison. So it is only set if the
+	 * part is used for tuple comparisons, i.e. attached to a
+	 * key_def. If the part is needed just to store a decoded
+	 * key part definition, it will be set to NULL, because
+	 * the collation with the given id may not exist.
+	 */
 	struct coll *coll;
 	/** True if a part can store NULLs. */
 	bool is_nullable;
@@ -237,13 +235,13 @@ key_def_new(uint32_t part_count);
  * and initialize its parts.
  */
 struct key_def *
-key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count);
+key_def_new_with_parts(const struct key_part *parts, uint32_t part_count);
 
 /**
  * Dump part definitions of the given key def.
  */
 void
-key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
+key_def_dump_parts(const struct key_def *def, struct key_part *parts);
 
 /**
  * Set a single key part in a key def.
@@ -268,7 +266,7 @@ key_def_update_optionality(struct key_def *def, uint32_t min_field_count);
  * An snprint-style function to print a key definition.
  */
 int
-key_def_snprint_parts(char *buf, int size, const struct key_part_def *parts,
+key_def_snprint_parts(char *buf, int size, const struct key_part *parts,
 		      uint32_t part_count);
 
 /**
@@ -276,14 +274,14 @@ key_def_snprint_parts(char *buf, int size, const struct key_part_def *parts,
  * See also key_def_encode_parts().
  */
 size_t
-key_def_sizeof_parts(const struct key_part_def *parts, uint32_t part_count);
+key_def_sizeof_parts(const struct key_part *parts, uint32_t part_count);
 
 /**
  * Encode key parts array in MsgPack and return a pointer following
  * the end of encoded data.
  */
 char *
-key_def_encode_parts(char *data, const struct key_part_def *parts,
+key_def_encode_parts(char *data, const struct key_part *parts,
 		     uint32_t part_count);
 
 /**
@@ -297,7 +295,7 @@ key_def_encode_parts(char *data, const struct key_part_def *parts,
  *  {field=NUM, type=STR, ..}{field=NUM, type=STR, ..}..,
  */
 int
-key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
+key_def_decode_parts(struct key_part *parts, uint32_t part_count,
 		     const char **data, const struct field_def *fields,
 		     uint32_t field_count);
 
@@ -310,7 +308,7 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
  *  NUM, STR, NUM, STR, ..,
  */
 int
-key_def_decode_parts_160(struct key_part_def *parts, uint32_t part_count,
+key_def_decode_parts_160(struct key_part *parts, uint32_t part_count,
 			 const char **data, const struct field_def *fields,
 			 uint32_t field_count);
 

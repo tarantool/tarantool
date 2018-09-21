@@ -588,12 +588,12 @@ vy_log_record_decode(struct vy_log_record *record,
 			break;
 		case VY_LOG_KEY_DEF: {
 			uint32_t part_count = mp_decode_array(&pos);
-			struct key_part_def *parts = region_alloc(&fiber()->gc,
+			struct key_part *parts = region_alloc(&fiber()->gc,
 						sizeof(*parts) * part_count);
 			if (parts == NULL) {
 				diag_set(OutOfMemory,
 					 sizeof(*parts) * part_count,
-					 "region", "struct key_part_def");
+					 "region", "struct key_part");
 				return -1;
 			}
 			if (key_def_decode_parts(parts, part_count, &pos,
@@ -704,11 +704,11 @@ vy_log_record_dup(struct region *pool, const struct vy_log_record *src)
 	}
 	if (src->key_def != NULL) {
 		size_t size = src->key_def->part_count *
-				sizeof(struct key_part_def);
+				sizeof(struct key_part);
 		dst->key_parts = region_alloc(pool, size);
 		if (dst->key_parts == NULL) {
 			diag_set(OutOfMemory, size, "region",
-				 "struct key_part_def");
+				 "struct key_part");
 			goto err;
 		}
 		key_def_dump_parts(src->key_def, dst->key_parts);
@@ -1281,7 +1281,7 @@ static struct vy_lsm_recovery_info *
 vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 			  uint32_t space_id, uint32_t index_id,
 			  uint32_t group_id,
-			  const struct key_part_def *key_parts,
+			  const struct key_part *key_parts,
 			  uint32_t key_part_count)
 {
 	if (key_parts == NULL) {
@@ -1299,7 +1299,7 @@ vy_recovery_do_create_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->key_parts = malloc(sizeof(*key_parts) * key_part_count);
 	if (lsm->key_parts == NULL) {
 		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
-			 "malloc", "struct key_part_def");
+			 "malloc", "struct key_part");
 		free(lsm);
 		return NULL;
 	}
@@ -1359,7 +1359,7 @@ static int
 vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
 			uint32_t space_id, uint32_t index_id,
 			uint32_t group_id,
-			const struct key_part_def *key_parts,
+			const struct key_part *key_parts,
 			uint32_t key_part_count)
 {
 	if (vy_recovery_lookup_lsm(recovery, id) != NULL) {
@@ -1387,7 +1387,7 @@ vy_recovery_prepare_lsm(struct vy_recovery *recovery, int64_t id,
 static int
 vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
 		       uint32_t space_id, uint32_t index_id, uint32_t group_id,
-		       const struct key_part_def *key_parts,
+		       const struct key_part *key_parts,
 		       uint32_t key_part_count, int64_t create_lsn,
 		       int64_t modify_lsn, int64_t dump_lsn)
 {
@@ -1426,7 +1426,7 @@ vy_recovery_create_lsm(struct vy_recovery *recovery, int64_t id,
  */
 static int
 vy_recovery_modify_lsm(struct vy_recovery *recovery, int64_t id,
-		       const struct key_part_def *key_parts,
+		       const struct key_part *key_parts,
 		       uint32_t key_part_count, int64_t modify_lsn)
 {
 	struct vy_lsm_recovery_info *lsm;
@@ -1447,7 +1447,7 @@ vy_recovery_modify_lsm(struct vy_recovery *recovery, int64_t id,
 	lsm->key_parts = malloc(sizeof(*key_parts) * key_part_count);
 	if (lsm->key_parts == NULL) {
 		diag_set(OutOfMemory, sizeof(*key_parts) * key_part_count,
-			 "malloc", "struct key_part_def");
+			 "malloc", "struct key_part");
 		return -1;
 	}
 	memcpy(lsm->key_parts, key_parts, sizeof(*key_parts) * key_part_count);
