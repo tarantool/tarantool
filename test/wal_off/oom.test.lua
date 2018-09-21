@@ -1,6 +1,6 @@
 env = require('test_run')
 test_run = env.new()
-test_run:cmd('restart server default')
+test_run:cmd('restart server default with cleanup=1')
 test_run:cmd("push filter 'error: Failed to allocate [0-9]+ ' to 'error: Failed to allocate <NUM> '")
 
 space = box.schema.space.create('tweedledum')

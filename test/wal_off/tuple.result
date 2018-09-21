@@ -4,7 +4,7 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
-test_run:cmd("restart server default")
+test_run:cmd('restart server default with cleanup=1')
 -- 
 -- Test various tuple bugs which do not require a write ahead log.
 -- 
