@@ -49,7 +49,7 @@ extern "C" {
 #ifndef NDEBUG
 #define TRASH(ptr) memset(ptr, '#', sizeof(*ptr))
 #else
-#define TRASH(ptr)
+#define TRASH(ptr) (void) (ptr)
 #endif
 
 #ifndef MAX
