@@ -396,6 +396,7 @@ cn:close()
 s:drop()
 box.schema.user.revoke('guest', 'execute', 'universe')
 box.schema.user.revoke('guest', 'create', 'space')
+box.schema.user.revoke('guest', 'write', 'space', '_index')
 --
 -- If message memory pool is used up, stop the connection, until
 -- the pool has free memory.
