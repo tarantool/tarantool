@@ -271,6 +271,8 @@ replica_on_applier_connect(struct replica *replica)
 	assert(replica->applier_sync_state == APPLIER_DISCONNECTED);
 
 	replica->uuid = applier->uuid;
+	replica->applier_sync_state = APPLIER_CONNECTED;
+	replicaset.applier.connected++;
 
 	struct replica *orig = replica_hash_search(&replicaset.hash, replica);
 	if (orig != NULL && orig->applier != NULL) {
@@ -290,6 +292,8 @@ replica_on_applier_connect(struct replica *replica)
 
 	if (orig != NULL) {
 		/* Use existing struct replica */
+		assert(orig->applier_sync_state == APPLIER_DISCONNECTED);
+		orig->applier_sync_state = replica->applier_sync_state;
 		replica_set_applier(orig, applier);
 		replica_clear_applier(replica);
 		replica_delete(replica);
@@ -298,9 +302,6 @@ replica_on_applier_connect(struct replica *replica)
 		/* Add a new struct replica */
 		replica_hash_insert(&replicaset.hash, replica);
 	}
-
-	replica->applier_sync_state = APPLIER_CONNECTED;
-	replicaset.applier.connected++;
 }
 
 static void
@@ -427,6 +428,7 @@ replicaset_update(struct applier **appliers, int count)
 	auto uniq_guard = make_scoped_guard([&]{
 		replica_hash_foreach_safe(&uniq, replica, next) {
 			replica_hash_remove(&uniq, replica);
+			replica_clear_applier(replica);
 			replica_delete(replica);
 		}
 	});
@@ -454,6 +456,8 @@ replicaset_update(struct applier **appliers, int count)
 		replica->uuid = applier->uuid;
 
 		if (replica_hash_search(&uniq, replica) != NULL) {
+			replica_clear_applier(replica);
+			replica_delete(replica);
 			tnt_raise(ClientError, ER_CFG, "replication",
 				  "duplicate connection to the same replica");
 		}
@@ -621,8 +625,11 @@ replicaset_connect(struct applier **appliers, int count,
 		say_crit("failed to connect to %d out of %d replicas",
 			 count - state.connected, count);
 		/* Timeout or connection failure. */
-		if (connect_quorum && state.connected < quorum)
+		if (connect_quorum && state.connected < quorum) {
+			diag_set(ClientError, ER_CFG, "replication",
+				 "failed to connect to one or more replicas");
 			goto error;
+		}
 	} else {
 		say_info("connected to %d replicas", state.connected);
 	}
@@ -641,7 +648,11 @@ replicaset_connect(struct applier **appliers, int count,
 	}
 
 	/* Now all the appliers are connected, update the replica set. */
-	replicaset_update(appliers, count);
+	try {
+		replicaset_update(appliers, count);
+	} catch (Exception *e) {
+		goto error;
+	}
 	return;
 error:
 	/* Destroy appliers */
@@ -649,10 +660,7 @@ error:
 		trigger_clear(&triggers[i].base);
 		applier_stop(appliers[i]);
 	}
-
-	/* ignore original error */
-	tnt_raise(ClientError, ER_CFG, "replication",
-		  "failed to connect to one or more replicas");
+	diag_raise();
 }
 
 bool
