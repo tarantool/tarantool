@@ -56,6 +56,8 @@ struct key_part_def {
 	bool is_nullable;
 };
 
+extern const struct key_part_def key_part_def_default;
+
 /**
  * Set key_part_def.coll_id to COLL_NONE if
  * the field does not have a collation.
@@ -227,32 +229,17 @@ key_def_sizeof(uint32_t part_count)
 }
 
 /**
- * Allocate a new key_def with the given part count.
- */
-struct key_def *
-key_def_new(uint32_t part_count);
-
-/**
  * Allocate a new key_def with the given part count
  * and initialize its parts.
  */
 struct key_def *
-key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count);
+key_def_new(const struct key_part_def *parts, uint32_t part_count);
 
 /**
  * Dump part definitions of the given key def.
  */
 void
 key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
-
-/**
- * Set a single key part in a key def.
- * @pre part_no < part_count
- */
-void
-key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
-		 enum field_type type, bool is_nullable, struct coll *coll,
-		 uint32_t coll_id);
 
 /**
  * Update 'has_optional_parts' of @a key_def with correspondence

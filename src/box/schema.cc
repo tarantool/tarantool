@@ -192,10 +192,17 @@ space_cache_replace(struct space *space)
 
 /** A wrapper around space_new() for data dictionary spaces. */
 static void
-sc_space_new(uint32_t id, const char *name, struct key_def *key_def,
+sc_space_new(uint32_t id, const char *name,
+	     struct key_part_def *key_parts,
+	     uint32_t key_part_count,
 	     struct trigger *replace_trigger,
 	     struct trigger *stmt_begin_trigger)
 {
+	struct key_def *key_def = key_def_new(key_parts, key_part_count);
+	if (key_def == NULL)
+		diag_raise();
+	auto key_def_guard =
+		make_scoped_guard([=] { key_def_delete(key_def); });
 	struct index_def *index_def = index_def_new(id, /* space id */
 						    0 /* index id */,
 						    "primary", /* name */
@@ -270,6 +277,10 @@ schema_find_id(uint32_t system_space_id, uint32_t index_id,
 void
 schema_init()
 {
+	struct key_part_def key_parts[2];
+	for (uint32_t i = 0; i < lengthof(key_parts); i++)
+		key_parts[i] = key_part_def_default;
+
 	/* Initialize the space cache. */
 	spaces = mh_i32ptr_new();
 	funcs = mh_i32ptr_new();
@@ -286,71 +297,60 @@ schema_init()
 	 * (and re-created) first.
 	 */
 	/* _schema - key/value space with schema description */
-	struct key_def *key_def = key_def_new(1); /* part count */
-	if (key_def == NULL)
-		diag_raise();
-	auto key_def_guard = make_scoped_guard([&] { key_def_delete(key_def); });
-
-	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_STRING, false, NULL, COLL_NONE);
-	sc_space_new(BOX_SCHEMA_ID, "_schema", key_def, &on_replace_schema,
-		     NULL);
-
-	/* _space - home for all spaces. */
-	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_UNSIGNED, false, NULL, COLL_NONE);
+	key_parts[0].fieldno = 0;
+	key_parts[0].type = FIELD_TYPE_STRING;
+	sc_space_new(BOX_SCHEMA_ID, "_schema", key_parts, 1,
+		     &on_replace_schema, NULL);
 
 	/* _collation - collation description. */
-	sc_space_new(BOX_COLLATION_ID, "_collation", key_def,
+	key_parts[0].fieldno = 0;
+	key_parts[0].type = FIELD_TYPE_UNSIGNED;
+	sc_space_new(BOX_COLLATION_ID, "_collation", key_parts, 1,
 		     &on_replace_collation, NULL);
 
-	sc_space_new(BOX_SPACE_ID, "_space", key_def,
+	/* _space - home for all spaces. */
+	sc_space_new(BOX_SPACE_ID, "_space", key_parts, 1,
 		     &alter_space_on_replace_space, &on_stmt_begin_space);
 
 	/* _truncate - auxiliary space for triggering space truncation. */
-	sc_space_new(BOX_TRUNCATE_ID, "_truncate", key_def,
+	sc_space_new(BOX_TRUNCATE_ID, "_truncate", key_parts, 1,
 		     &on_replace_truncate, &on_stmt_begin_truncate);
 
 	/* _sequence - definition of all sequence objects. */
-	sc_space_new(BOX_SEQUENCE_ID, "_sequence", key_def,
+	sc_space_new(BOX_SEQUENCE_ID, "_sequence", key_parts, 1,
 		     &on_replace_sequence, NULL);
 
 	/* _sequence_data - current sequence value. */
-	sc_space_new(BOX_SEQUENCE_DATA_ID, "_sequence_data", key_def,
+	sc_space_new(BOX_SEQUENCE_DATA_ID, "_sequence_data", key_parts, 1,
 		     &on_replace_sequence_data, NULL);
 
 	/* _space_seq - association space <-> sequence. */
-	sc_space_new(BOX_SPACE_SEQUENCE_ID, "_space_sequence", key_def,
+	sc_space_new(BOX_SPACE_SEQUENCE_ID, "_space_sequence", key_parts, 1,
 		     &on_replace_space_sequence, NULL);
 
 	/* _user - all existing users */
-	sc_space_new(BOX_USER_ID, "_user", key_def, &on_replace_user, NULL);
+	sc_space_new(BOX_USER_ID, "_user", key_parts, 1, &on_replace_user, NULL);
 
 	/* _func - all executable objects on which one can have grants */
-	sc_space_new(BOX_FUNC_ID, "_func", key_def, &on_replace_func, NULL);
+	sc_space_new(BOX_FUNC_ID, "_func", key_parts, 1, &on_replace_func, NULL);
 	/*
 	 * _priv - association user <-> object
 	 * The real index is defined in the snapshot.
 	 */
-	sc_space_new(BOX_PRIV_ID, "_priv", key_def, &on_replace_priv, NULL);
+	sc_space_new(BOX_PRIV_ID, "_priv", key_parts, 1, &on_replace_priv, NULL);
 	/*
 	 * _cluster - association instance uuid <-> instance id
 	 * The real index is defined in the snapshot.
 	 */
-	sc_space_new(BOX_CLUSTER_ID, "_cluster", key_def, &on_replace_cluster,
-		     NULL);
+	sc_space_new(BOX_CLUSTER_ID, "_cluster", key_parts, 1,
+		     &on_replace_cluster, NULL);
 
-	key_def_delete(key_def);
-	key_def = key_def_new(2); /* part count */
-	if (key_def == NULL)
-		diag_raise();
-	/* space no */
-	key_def_set_part(key_def, 0 /* part no */, 0 /* field no */,
-			 FIELD_TYPE_UNSIGNED, false, NULL, COLL_NONE);
-	/* index no */
-	key_def_set_part(key_def, 1 /* part no */, 1 /* field no */,
-			 FIELD_TYPE_UNSIGNED, false, NULL, COLL_NONE);
-	sc_space_new(BOX_INDEX_ID, "_index", key_def,
+	/* _index - definition of all space indexes. */
+	key_parts[0].fieldno = 0; /* space id */
+	key_parts[0].type = FIELD_TYPE_UNSIGNED;
+	key_parts[1].fieldno = 1; /* index id */
+	key_parts[1].type = FIELD_TYPE_UNSIGNED;
+	sc_space_new(BOX_INDEX_ID, "_index", key_parts, 2,
 		     &alter_space_on_replace_index, &on_stmt_begin_index);
 
 	/*

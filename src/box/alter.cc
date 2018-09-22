@@ -363,7 +363,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 					     space->def->field_count) != 0)
 			diag_raise();
 	}
-	key_def = key_def_new_with_parts(part_def, part_count);
+	key_def = key_def_new(part_def, part_count);
 	if (key_def == NULL)
 		diag_raise();
 	struct index_def *index_def =
