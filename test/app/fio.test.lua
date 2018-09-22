@@ -224,7 +224,7 @@ err:match("mktree") ~= nil
 fio.mktree(tree)
 fio.stat(tree) ~= nil
 fio.stat(tmp2) ~= nil
-fio.mktree(tree2, 1)
+fio.mktree(tree2, 0777)
 
 -- copy and copytree
 file1 = fio.pathjoin(tmp1, 'file.1')
@@ -251,6 +251,7 @@ fio.stat(fio.pathjoin(newdir, "file.1")) ~= nil
 fio.stat(fio.pathjoin(newdir, "2", "file.2")) ~= nil
 fio.stat(fio.pathjoin(newdir, "2", "3", "file.3")) ~= nil
 fio.readlink(fio.pathjoin(newdir, "2", "3", "file.3")) == file1
+fio.rmtree(tmpdir)
 fio.copytree("/no/such/dir", "/some/where")
 
 -- ibuf read/write

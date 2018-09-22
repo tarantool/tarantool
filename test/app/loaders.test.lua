@@ -78,3 +78,4 @@ f = rocks_loader_dyn("loaderslib")
 type(f) -- error
 
 fio.chdir(orig_cwd)
+fio.rmtree(tmp_dir)

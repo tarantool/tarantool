@@ -163,7 +163,7 @@ function run_script(code)
     script:close()
     local cmd = [[/bin/sh -c 'cd "%s" && "%s" ./script.lua 2> /dev/null']]
     local res = os.execute(string.format(cmd, dir, tarantool_bin))
-    fio.rmdir(dir)
+    fio.rmtree(dir)
     return res
 end
 
@@ -386,7 +386,7 @@ box.cfg{vinyl_dir = '%s'}
 os.exit(0)
 ]], vinyl_dir)
 test:is(run_script(code), PANIC, "bootstrap from non-empty vinyl_dir")
-fio.rmdir(vinyl_dir)
+fio.rmtree(vinyl_dir)
 
 --
 -- gh-2278 vinyl does not support DDL/DML if wal_mode = 'none'
@@ -413,7 +413,7 @@ ok = ok and pcall(s.select, s)
 os.exit(ok and 0 or 1)
 ]], cfg)
 test:is(run_script(code), 0, "wal_mode none -> vinyl DDL/DML is not supported")
-fio.rmdir(dir)
+fio.rmtree(dir)
 
 --
 -- Invalid values of instance_uuid or replicaset_uuid.
@@ -455,7 +455,7 @@ code = string.format(code_fmt, dir, uuid.new(), replicaset_uuid)
 test:is(run_script(code), PANIC, "instance_uuid mismatch")
 code = string.format(code_fmt, dir, instance_uuid, uuid.new())
 test:is(run_script(code), PANIC, "replicaset_uuid mismatch")
-fio.rmdir(dir)
+fio.rmtree(dir)
 
 --
 -- Check syslog unix socket configuration
