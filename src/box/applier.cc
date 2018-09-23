@@ -619,7 +619,7 @@ applier_f(va_list ap)
 				   e->errcode() == ER_NO_SUCH_USER) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_DISCONNECTED);
+				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
 			} else if (e->errcode() == ER_SYSTEM) {
 				/* System error from master instance. */

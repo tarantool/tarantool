@@ -213,6 +213,84 @@ box.info.ro -- false
 ---
 - false
 ...
+-- gh-3636: Check that replica set sync doesn't stop on cfg errors.
+-- To do that we inject an error on the master to temporarily block
+-- the relay thread from exiting, then reconfigure replication on
+-- the slave using the same configuration. Since the relay is still
+-- running when replication is reconfigured, the replica will get
+-- ER_CFG "duplicate connection with the same replica UUID" error.
+-- It should print it to the log, but keep trying to synchronize.
+-- Eventually, it should leave box.cfg() following the master.
+box.cfg{replication_timeout = 0.1}
+---
+...
+box.cfg{replication_sync_lag = 1}
+---
+...
+box.cfg{replication_sync_timeout = 10}
+---
+...
+test_run:cmd("switch default")
+---
+- true
+...
+box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
+---
+- ok
+...
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+---
+- ok
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+_ = fiber.create(function()
+    box.space.test:replace{123456789}
+end);
+---
+...
+_ = fiber.create(function()
+    fiber.sleep(0.1)
+    box.error.injection.set('ERRINJ_WAL_DELAY', false)
+end);
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+replication = box.cfg.replication
+---
+...
+box.cfg{replication = {}}
+---
+...
+box.cfg{replication = replication}
+---
+...
+box.info.status -- running
+---
+- running
+...
+box.info.ro -- false
+---
+- false
+...
+box.info.replication[1].upstream.status -- follow
+---
+- follow
+...
+test_run:grep_log('replica', 'ER_CFG.*')
+---
+- 'ER_CFG: Incorrect value for option ''replication'': duplicate connection with the
+  same replica UUID'
+...
 test_run:cmd("switch default")
 ---
 - true
@@ -224,10 +302,6 @@ test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 ---
 - true
-...
-box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
----
-- ok
 ...
 box.space.test:drop()
 ---

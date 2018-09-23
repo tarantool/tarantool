@@ -27,7 +27,10 @@ test_run:cmd('switch wal_off')
 box.schema.user.revoke('guest', 'replication')
 test_run:cmd('switch default')
 
+replication_sync_timeout = box.cfg.replication_sync_timeout
+box.cfg { replication_sync_timeout = 0.01 }
 box.cfg { replication = wal_off_uri }
+box.cfg { replication_sync_timeout = replication_sync_timeout }
 check = "Read access to universe"
 while string.find(box.info.replication[wal_off_id].upstream.message, check) == nil do fiber.sleep(0.01) end
 box.cfg { replication = "" }
