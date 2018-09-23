@@ -585,11 +585,7 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 {
 	assert(replica->id != REPLICA_ID_NIL);
 	struct relay *relay = replica->relay;
-	/* Don't allow multiple relays for the same replica */
-	if (relay->state == RELAY_FOLLOW) {
-		tnt_raise(ClientError, ER_CFG, "replication",
-			  "duplicate connection with the same replica UUID");
-	}
+	assert(relay->state != RELAY_FOLLOW);
 	/*
 	 * Register the replica with the garbage collector
 	 * unless it has already been registered by initial

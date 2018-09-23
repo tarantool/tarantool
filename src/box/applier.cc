@@ -91,9 +91,18 @@ applier_log_error(struct applier *applier, struct error *e)
 		break;
 	}
 	error_log(e);
-	if (type_cast(SocketError, e) || type_cast(SystemError, e))
+	switch (errcode) {
+	case ER_LOADING:
+	case ER_CFG:
+	case ER_ACCESS_DENIED:
+	case ER_NO_SUCH_USER:
+	case ER_SYSTEM:
 		say_info("will retry every %.2lf second",
 			 replication_reconnect_interval());
+		break;
+	default:
+		break;
+	}
 	applier->last_logged_errcode = errcode;
 }
 
@@ -382,6 +391,30 @@ applier_subscribe(struct applier *applier)
 				 &replicaset.vclock);
 	coio_write_xrow(coio, &row);
 
+	/* Read SUBSCRIBE response */
+	if (applier->version_id >= version_id(1, 6, 7)) {
+		coio_read_xrow(coio, ibuf, &row);
+		if (iproto_type_is_error(row.type)) {
+			xrow_decode_error_xc(&row);  /* error */
+		} else if (row.type != IPROTO_OK) {
+			tnt_raise(ClientError, ER_PROTOCOL,
+				  "Invalid response to SUBSCRIBE");
+		}
+		/*
+		 * In case of successful subscribe, the server
+		 * responds with its current vclock.
+		 */
+		vclock_create(&remote_vclock_at_subscribe);
+		xrow_decode_vclock_xc(&row, &remote_vclock_at_subscribe);
+	}
+	/*
+	 * Tarantool < 1.6.7:
+	 * If there is an error in subscribe, it's sent directly
+	 * in response to subscribe.  If subscribe is successful,
+	 * there is no "OK" response, but a stream of rows from
+	 * the binary log.
+	 */
+
 	if (applier->state == APPLIER_READY) {
 		/*
 		 * Tarantool < 1.7.7 does not send periodic heartbeat
@@ -402,32 +435,6 @@ applier_subscribe(struct applier *applier)
 		assert(applier->state == APPLIER_FINAL_JOIN);
 		assert(applier->version_id < version_id(1, 7, 0));
 	}
-
-	/*
-	 * Read SUBSCRIBE response
-	 */
-	if (applier->version_id >= version_id(1, 6, 7)) {
-		coio_read_xrow(coio, ibuf, &row);
-		if (iproto_type_is_error(row.type)) {
-			xrow_decode_error_xc(&row);  /* error */
-		} else if (row.type != IPROTO_OK) {
-			tnt_raise(ClientError, ER_PROTOCOL,
-				  "Invalid response to SUBSCRIBE");
-		}
-		/*
-		 * In case of successful subscribe, the server
-		 * responds with its current vclock.
-		 */
-		vclock_create(&remote_vclock_at_subscribe);
-		xrow_decode_vclock_xc(&row, &remote_vclock_at_subscribe);
-	}
-	/**
-	 * Tarantool < 1.6.7:
-	 * If there is an error in subscribe, it's sent directly
-	 * in response to subscribe.  If subscribe is successful,
-	 * there is no "OK" response, but a stream of rows from
-	 * the binary log.
-	 */
 
 	/* Re-enable warnings after successful execution of SUBSCRIBE */
 	applier->last_logged_errcode = 0;
@@ -607,7 +614,8 @@ applier_f(va_list ap)
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_LOADING);
 				goto reconnect;
-			} else if (e->errcode() == ER_ACCESS_DENIED ||
+			} else if (e->errcode() == ER_CFG ||
+				   e->errcode() == ER_ACCESS_DENIED ||
 				   e->errcode() == ER_NO_SUCH_USER) {
 				/* Invalid configuration */
 				applier_log_error(applier, e);
@@ -615,11 +623,6 @@ applier_f(va_list ap)
 				goto reconnect;
 			} else if (e->errcode() == ER_SYSTEM) {
 				/* System error from master instance. */
-				applier_log_error(applier, e);
-				applier_disconnect(applier, APPLIER_DISCONNECTED);
-				goto reconnect;
-			} else if (e->errcode() == ER_CFG) {
-				/* Invalid configuration */
 				applier_log_error(applier, e);
 				applier_disconnect(applier, APPLIER_DISCONNECTED);
 				goto reconnect;

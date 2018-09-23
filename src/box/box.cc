@@ -1560,6 +1560,12 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 			  tt_uuid_str(&REPLICASET_UUID));
 	}
 
+	/* Don't allow multiple relays for the same replica */
+	if (relay_get_state(replica->relay) == RELAY_FOLLOW) {
+		tnt_raise(ClientError, ER_CFG, "replication",
+			  "duplicate connection with the same replica UUID");
+	}
+
 	/* Forbid replication with disabled WAL */
 	if (wal_mode() == WAL_NONE) {
 		tnt_raise(ClientError, ER_UNSUPPORTED, "Replication",
