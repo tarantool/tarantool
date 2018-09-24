@@ -4,12 +4,21 @@
 
 enum { MSGPACK_NULL = 0xc0 };
 
+/** True if key part i and i+1 are sequential. */
+static inline bool
+key_def_parts_are_sequential(const struct key_def *def, int i)
+{
+	uint32_t fieldno1 = def->parts[i].fieldno + 1;
+	uint32_t fieldno2 = def->parts[i + 1].fieldno;
+	return fieldno1 == fieldno2;
+}
+
 /** True, if a key con contain two or more parts in sequence. */
 static bool
 key_def_contains_sequential_parts(const struct key_def *def)
 {
 	for (uint32_t i = 0; i < def->part_count - 1; ++i) {
-		if (def->parts[i].fieldno + 1 == def->parts[i + 1].fieldno)
+		if (key_def_parts_are_sequential(def, i))
 			return true;
 	}
 	return false;
@@ -123,8 +132,7 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 			 * minimize tuple_field_raw() calls.
 			 */
 			for (; i < part_count - 1; i++) {
-				if (key_def->parts[i].fieldno + 1 !=
-				    key_def->parts[i + 1].fieldno) {
+				if (!key_def_parts_are_sequential(key_def, i)) {
 					/*
 					 * End of sequential part.
 					 */
@@ -165,8 +173,7 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 			 * minimize tuple_field_raw() calls.
 			 */
 			for (; i < part_count - 1; i++) {
-				if (key_def->parts[i].fieldno + 1 !=
-				    key_def->parts[i + 1].fieldno) {
+				if (!key_def_parts_are_sequential(key_def, i)) {
 					/*
 					 * End of sequential part.
 					 */
@@ -231,8 +238,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 		uint32_t fieldno = key_def->parts[i].fieldno;
 		uint32_t null_count = 0;
 		for (; i < key_def->part_count - 1; i++) {
-			if (key_def->parts[i].fieldno + 1 !=
-			    key_def->parts[i + 1].fieldno)
+			if (!key_def_parts_are_sequential(key_def, i))
 				break;
 		}
 		uint32_t end_fieldno = key_def->parts[i].fieldno;
