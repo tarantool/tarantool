@@ -240,7 +240,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 * is held in ephemeral table, there is no PK for
 		 * it, so columns should be loaded manually.
 		 */
-		struct key_def *pk_def = NULL;
+		struct sql_key_info *pk_info = NULL;
 		int reg_pk = parse->nMem + 1;
 		int pk_len;
 		int eph_cursor = parse->nTab++;
@@ -252,16 +252,15 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 					  eph_cursor, pk_len);
 		} else {
                         assert(space->index_count > 0);
-                        pk_def = key_def_dup(space->index[0]->def->key_def);
-                        if(pk_def == NULL) {
-                                sqlite3OomFault(parse->db);
+                        pk_info = sql_key_info_new_from_key_def(db,
+					space->index[0]->def->key_def);
+                        if (pk_info == NULL)
                                 goto delete_from_cleanup;
-                        }
-                        pk_len = pk_def->part_count;
+                        pk_len = pk_info->part_count;
                         parse->nMem += pk_len;
                         sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, eph_cursor,
                                           pk_len, 0,
-                                          (char *)pk_def, P4_KEYDEF);
+                                          (char *)pk_info, P4_KEYINFO);
 		}
 
 		/* Construct a query to find the primary key for
@@ -299,7 +298,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 		/* Extract the primary key for the current row */
 		if (!is_view) {
-			struct key_part *part = pk_def->parts;
+			struct key_part_def *part = pk_info->parts;
 			for (int i = 0; i < pk_len; i++, part++) {
 				struct space_def *def = space->def;
 				sqlite3ExprCodeGetColumnOfTable(v, def,
@@ -385,7 +384,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (one_pass != ONEPASS_OFF) {
 			/* OP_Found will use an unpacked key. */
 			assert(key_len == pk_len);
-			assert(pk_def != NULL || table->def->opts.is_view);
+			assert(pk_info != NULL || table->def->opts.is_view);
 			sqlite3VdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
 

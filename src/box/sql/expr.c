@@ -2716,11 +2716,9 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			pExpr->is_ephemeral = 1;
 			addr = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
 						 pExpr->iTable, nVal);
-			struct key_def *key_def = key_def_new(nVal);
-			if (key_def == NULL) {
-				sqlite3OomFault(pParse->db);
+			struct sql_key_info *key_info = sql_key_info_new(pParse->db, nVal);
+			if (key_info == NULL)
 				return 0;
-			}
 
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				/* Case 1:     expr IN (SELECT ...)
@@ -2750,7 +2748,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					    (pParse, pSelect, &dest)) {
 						sqlite3DbFree(pParse->db,
 							      dest.zAffSdst);
-						key_def_delete(key_def);
+						sql_key_info_unref(key_info);
 						return 0;
 					}
 					sqlite3DbFree(pParse->db,
@@ -2761,19 +2759,9 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 						Expr *p =
 						    sqlite3VectorFieldSubexpr
 						    (pLeft, i);
-
-						uint32_t id;
-						struct coll *coll =
-							sql_binary_compare_coll_seq(
-								pParse, p,
-								pEList->a[i].pExpr,
-								&id);
-
-						key_def_set_part(key_def, i, i,
-								 FIELD_TYPE_SCALAR,
-								 ON_CONFLICT_ACTION_ABORT,
-								 coll, id,
-								 SORT_ORDER_ASC);
+						sql_binary_compare_coll_seq(pParse, p,
+							pEList->a[i].pExpr,
+							&key_info->parts[i].coll_id);
 					}
 				}
 			} else if (ALWAYS(pExpr->x.pList != 0)) {
@@ -2795,15 +2783,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					affinity = AFFINITY_BLOB;
 				}
 				bool unused;
-				uint32_t id;
-				struct coll *coll =
-					sql_expr_coll(pParse, pExpr->pLeft,
-						      &unused, &id);
-
-				key_def_set_part(key_def, 0, 0,
-						 FIELD_TYPE_SCALAR,
-						 ON_CONFLICT_ACTION_ABORT, coll,
-						 id, SORT_ORDER_ASC);
+				sql_expr_coll(pParse, pExpr->pLeft,
+					      &unused, &key_info->parts[0].coll_id);
 
 				/* Loop through each expression in <exprlist>. */
 				r1 = sqlite3GetTempReg(pParse);
@@ -2833,8 +2814,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				sqlite3ReleaseTempReg(pParse, r1);
 				sqlite3ReleaseTempReg(pParse, r2);
 			}
-			sqlite3VdbeChangeP4(v, addr, (void *)key_def,
-					    P4_KEYDEF);
+			sqlite3VdbeChangeP4(v, addr, (void *)key_info,
+					    P4_KEYINFO);
 			break;
 		}
 

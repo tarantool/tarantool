@@ -80,8 +80,8 @@ struct VdbeOp {
 		int *ai;	/* Used when p4type is P4_INTARRAY */
 		SubProgram *pProgram;	/* Used when p4type is P4_SUBPROGRAM */
 		int (*xAdvance) (BtCursor *, int *);
-		/** Used when p4type is P4_KEYDEF. */
-		struct key_def *key_def;
+		/** Used when p4type is P4_KEYINFO. */
+		struct sql_key_info *key_info;
 		/** Used when p4type is P4_SPACEPTR. */
 		struct space *space;
 	} p4;
@@ -129,7 +129,7 @@ struct SubProgram {
 #define P4_FUNCCTX  (-16)	/* P4 is a pointer to an sqlite3_context object */
 #define P4_BOOL     (-17)	/* P4 is a bool value */
 #define P4_PTR      (-18)	/* P4 is a generic pointer */
-#define P4_KEYDEF   (-19)       /* P4 is a pointer to key_def structure. */
+#define P4_KEYINFO  (-19)       /* P4 is a pointer to sql_key_info structure. */
 #define P4_SPACEPTR (-20)       /* P4 is a space pointer */
 
 /* Error message codes for OP_Halt */

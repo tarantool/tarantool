@@ -867,8 +867,8 @@ freeP4(sqlite3 * db, int p4type, void *p4)
 			sqlite3DbFree(db, p4);
 			break;
 		}
-	case P4_KEYDEF:
-		key_def_delete(p4);
+	case P4_KEYINFO:
+		sql_key_info_unref(p4);
 		break;
 	case P4_FUNCDEF:{
 			freeEphemeralFunction(db, (FuncDef *) p4);
@@ -1054,11 +1054,10 @@ sql_vdbe_set_p4_key_def(struct Parse *parse, struct key_def *key_def)
 	struct Vdbe *v = parse->pVdbe;
 	assert(v != NULL);
 	assert(key_def != NULL);
-	key_def = key_def_dup(key_def);
-	if (key_def == NULL)
-		sqlite3OomFault(parse->db);
-	else
-		sqlite3VdbeAppendP4(v, key_def, P4_KEYDEF);
+	struct sql_key_info *key_info =
+		sql_key_info_new_from_key_def(parse->db, key_def);
+	if (key_info != NULL)
+		sqlite3VdbeAppendP4(v, key_info, P4_KEYINFO);
 }
 
 #ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
@@ -1290,12 +1289,13 @@ displayP4(Op * pOp, char *zTemp, int nTemp)
 	assert(nTemp >= 20);
 	sqlite3StrAccumInit(&x, 0, zTemp, nTemp, 0);
 	switch (pOp->p4type) {
-	case P4_KEYDEF:{
-
-			if (pOp->p4.key_def == NULL) {
+	case P4_KEYINFO:{
+			struct key_def *def = NULL;
+			if (pOp->p4.key_info != NULL)
+				def = sql_key_info_to_key_def(pOp->p4.key_info);
+			if (def == NULL) {
 				sqlite3XPrintf(&x, "k[NULL]");
 			} else {
-				struct key_def *def = pOp->p4.key_def;
 				sqlite3XPrintf(&x, "k(%d", def->part_count);
 				for (int j = 0; j < (int)def->part_count; j++) {
 					struct coll *coll = def->parts[j].coll;

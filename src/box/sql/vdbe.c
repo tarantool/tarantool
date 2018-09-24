@@ -2259,12 +2259,14 @@ case OP_Compare: {
 
 	int n = pOp->p3;
 
-	assert(pOp->p4type == P4_KEYDEF);
+	assert(pOp->p4type == P4_KEYINFO);
 	assert(n>0);
 	p1 = pOp->p1;
 	p2 = pOp->p2;
 
-	struct key_def *def = pOp->p4.key_def;
+	struct key_def *def = sql_key_info_to_key_def(pOp->p4.key_info);
+	if (def == NULL)
+		goto no_mem;
 #if SQLITE_DEBUG
 	if (aPermute) {
 		int mx = 0;
@@ -3150,7 +3152,7 @@ case OP_OpenTEphemeral: {
 	BtCursor *pBtCur;
 	assert(pOp->p1 >= 0);
 	assert(pOp->p2 > 0);
-	assert(pOp->p4type != P4_KEYDEF || pOp->p4.key_def != NULL);
+	assert(pOp->p4type != P4_KEYINFO || pOp->p4.key_info != NULL);
 
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_TARANTOOL);
 	if (pCx == 0) goto no_mem;
@@ -3162,7 +3164,7 @@ case OP_OpenTEphemeral: {
 	pBtCur->curFlags = BTCF_TEphemCursor;
 
 	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2,
-					     pOp->p4.key_def);
+					     pOp->p4.key_info);
 	pCx->key_def = pCx->uc.pCursor->index->def->key_def;
 	if (rc) goto abort_due_to_error;
 	break;
@@ -3183,9 +3185,11 @@ case OP_SorterOpen: {
 
 	assert(pOp->p1>=0);
 	assert(pOp->p2>=0);
+	struct key_def *def = sql_key_info_to_key_def(pOp->p4.key_info);
+	if (def == NULL) goto no_mem;
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_SORTER);
 	if (pCx==0) goto no_mem;
-	pCx->key_def = pOp->p4.key_def;
+	pCx->key_def = def;
 	rc = sqlite3VdbeSorterInit(db, pCx);
 	if (rc) goto abort_due_to_error;
 	break;

@@ -642,12 +642,12 @@ sqliteProcessJoin(Parse * pParse, Select * p)
 }
 
 /**
- * Given an expression list, generate a key_def structure that
+ * Given an expression list, generate a key_info structure that
  * records the collating sequence for each expression in that
  * expression list.
  *
  * If the ExprList is an ORDER BY or GROUP BY clause then the
- * resulting key_def structure is appropriate for initializing
+ * resulting key_info structure is appropriate for initializing
  * a virtual index to implement that clause.  If the ExprList is
  * the result set of a SELECT then the key_info structure is
  * appropriate for initializing a virtual index to implement a
@@ -661,10 +661,10 @@ sqliteProcessJoin(Parse * pParse, Select * p)
  * @param list Expression list.
  * @param start No of leading parts to skip.
  *
- * @retval Allocated key_def, NULL in case of OOM.
+ * @retval Allocated key_info, NULL in case of OOM.
  */
-static struct key_def *
-sql_expr_list_to_key_def(struct Parse *parse, struct ExprList *list, int start);
+static struct sql_key_info *
+sql_expr_list_to_key_info(struct Parse *parse, struct ExprList *list, int start);
 
 
 /*
@@ -740,17 +740,13 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 		if (pParse->db->mallocFailed)
 			return;
 		pOp->p2 = nKey + nData;
-		struct key_def *def = key_def_dup(pOp->p4.key_def);
-		if (def == NULL) {
-			sqlite3OomFault(pParse->db);
-			return;
-		}
-		for (uint32_t i = 0; i < def->part_count; ++i)
-			pOp->p4.key_def->parts[i].sort_order = SORT_ORDER_ASC;
-		sqlite3VdbeChangeP4(v, -1, (char *)def, P4_KEYDEF);
-		pOp->p4.key_def = sql_expr_list_to_key_def(pParse,
-							   pSort->pOrderBy,
-							   nOBSat);
+		struct sql_key_info *key_info = pOp->p4.key_info;
+		for (uint32_t i = 0; i < key_info->part_count; i++)
+			key_info->parts[i].sort_order = SORT_ORDER_ASC;
+		sqlite3VdbeChangeP4(v, -1, (char *)key_info, P4_KEYINFO);
+		pOp->p4.key_info = sql_expr_list_to_key_info(pParse,
+							     pSort->pOrderBy,
+							     nOBSat);
 		addrJmp = sqlite3VdbeCurrentAddr(v);
 		sqlite3VdbeAddOp3(v, OP_Jump, addrJmp + 1, 0, addrJmp + 1);
 		VdbeCoverage(v);
@@ -1292,26 +1288,103 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 	}
 }
 
-static struct key_def *
-sql_expr_list_to_key_def(struct Parse *parse, struct ExprList *list, int start)
+static inline size_t
+sql_key_info_sizeof(uint32_t part_count)
 {
-	int expr_count = list->nExpr;
-	struct key_def *def = key_def_new(expr_count);
-	if (def == NULL) {
-		sqlite3OomFault(parse->db);
+	return sizeof(struct sql_key_info) +
+		part_count * sizeof(struct key_part_def);
+}
+
+struct sql_key_info *
+sql_key_info_new(sqlite3 *db, uint32_t part_count)
+{
+	struct sql_key_info *key_info = sqlite3DbMallocRawNN(db,
+				sql_key_info_sizeof(part_count));
+	if (key_info == NULL) {
+		sqlite3OomFault(db);
 		return NULL;
 	}
+	key_info->db = db;
+	key_info->key_def = NULL;
+	key_info->refs = 1;
+	key_info->part_count = part_count;
+	for (uint32_t i = 0; i < part_count; i++) {
+		struct key_part_def *part = &key_info->parts[i];
+		part->fieldno = i;
+		part->type = FIELD_TYPE_SCALAR;
+		part->coll_id = COLL_NONE;
+		part->is_nullable = false;
+		part->nullable_action = ON_CONFLICT_ACTION_ABORT;
+		part->sort_order = SORT_ORDER_ASC;
+	}
+	return key_info;
+}
+
+struct sql_key_info *
+sql_key_info_new_from_key_def(sqlite3 *db, const struct key_def *key_def)
+{
+	struct sql_key_info *key_info = sqlite3DbMallocRawNN(db,
+				sql_key_info_sizeof(key_def->part_count));
+	if (key_info == NULL) {
+		sqlite3OomFault(db);
+		return NULL;
+	}
+	key_info->db = db;
+	key_info->key_def = NULL;
+	key_info->refs = 1;
+	key_info->part_count = key_def->part_count;
+	key_def_dump_parts(key_def, key_info->parts);
+	return key_info;
+}
+
+struct sql_key_info *
+sql_key_info_ref(struct sql_key_info *key_info)
+{
+	assert(key_info->refs > 0);
+	key_info->refs++;
+	return key_info;
+}
+
+void
+sql_key_info_unref(struct sql_key_info *key_info)
+{
+	if (key_info == NULL)
+		return;
+	assert(key_info->refs > 0);
+	if (--key_info->refs == 0) {
+		if (key_info->key_def != NULL)
+			key_def_delete(key_info->key_def);
+		sqlite3DbFree(key_info->db, key_info);
+	}
+}
+
+struct key_def *
+sql_key_info_to_key_def(struct sql_key_info *key_info)
+{
+	if (key_info->key_def == NULL) {
+		key_info->key_def = key_def_new_with_parts(key_info->parts,
+							   key_info->part_count);
+	}
+	return key_info->key_def;
+}
+
+static struct sql_key_info *
+sql_expr_list_to_key_info(struct Parse *parse, struct ExprList *list, int start)
+{
+	int expr_count = list->nExpr;
+	struct sql_key_info *key_info = sql_key_info_new(parse->db, expr_count);
+	if (key_info == NULL)
+		return NULL;
 	struct ExprList_item *item = list->a + start;
 	for (int i = start; i < expr_count; ++i, ++item) {
+		struct key_part_def *part = &key_info->parts[i - start];
 		bool unused;
 		uint32_t id;
-		struct coll *coll =
-			sql_expr_coll(parse, item->pExpr, &unused, &id);
-		key_def_set_part(def, i-start, i-start, FIELD_TYPE_SCALAR,
-				 ON_CONFLICT_ACTION_ABORT, coll, id,
-				 item->sort_order);
+		sql_expr_coll(parse, item->pExpr, &unused, &id);
+		part->coll_id = id;
+		part->sort_order = item->sort_order;
 	}
-	return def;
+	return key_info;
 }
 
 /*
@@ -2196,10 +2269,10 @@ multi_select_coll_seq(Parse *parser, Select *p, int n, uint32_t *coll_id)
 /**
  * The select statement passed as the second parameter is a
  * compound SELECT with an ORDER BY clause. This function
- * allocates and returns a key_def structure suitable for
+ * allocates and returns a sql_key_info structure suitable for
  * implementing the ORDER BY.
  *
- * Space to hold the key_def structure is obtained from malloc.
+ * Space to hold the sql_key_info structure is obtained from malloc.
  * The calling function is responsible for ensuring that this
  * structure is eventually freed.
  *
@@ -2207,33 +2280,33 @@ multi_select_coll_seq(Parse *parser, Select *p, int n, uint32_t *coll_id)
  * @param s Select struct to analyze.
  * @param extra No of extra slots to allocate.
  *
- * @retval Allocated key_def, NULL in case of OOM.
+ * @retval Allocated key_info, NULL in case of OOM.
  */
-static struct key_def *
-sql_multiselect_orderby_to_key_def(struct Parse *parse, struct Select *s,
+static struct sql_key_info *
+sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 				   int extra)
 {
 	int ob_count = s->pOrderBy->nExpr;
-	struct key_def *key_def = key_def_new(ob_count + extra);
-	if (key_def == NULL) {
+	struct sql_key_info *key_info = sql_key_info_new(parse->db,
+							 ob_count + extra);
+	if (key_info == NULL) {
 		sqlite3OomFault(parse->db);
 		return NULL;
 	}
 
 	ExprList *order_by = s->pOrderBy;
 	for (int i = 0; i < ob_count; i++) {
+		struct key_part_def *part = &key_info->parts[i];
 		struct ExprList_item *item = &order_by->a[i];
 		struct Expr *term = item->pExpr;
-		struct coll *coll;
 		uint32_t id;
 		if ((term->flags & EP_Collate) != 0) {
 			bool is_found = false;
-			coll = sql_expr_coll(parse, term, &is_found, &id);
+			sql_expr_coll(parse, term, &is_found, &id);
 		} else {
-			coll = multi_select_coll_seq(parse, s,
-						     item->u.x.iOrderByCol - 1,
-						     &id);
-			if (coll != NULL) {
+			multi_select_coll_seq(parse, s,
+					      item->u.x.iOrderByCol - 1, &id);
+			if (id != COLL_NONE) {
 				const char *name = coll_by_id(id)->name;
 				order_by->a[i].pExpr =
 					sqlite3ExprAddCollateString(parse, term,
@@ -2244,12 +2317,11 @@ sql_multiselect_orderby_to_key_def(struct Parse *parse, struct Select *s,
 								    "BINARY");
 			}
 		}
-		key_def_set_part(key_def, i, i, FIELD_TYPE_SCALAR,
-				 ON_CONFLICT_ACTION_ABORT, coll, id,
-				 order_by->a[i].sort_order);
+		part->coll_id = id;
+		part->sort_order = order_by->a[i].sort_order;
 	}
 
-	return key_def;
+	return key_info;
 }
 
 #ifndef SQLITE_OMIT_CTE
@@ -2349,11 +2421,11 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	regCurrent = ++pParse->nMem;
 	sqlite3VdbeAddOp3(v, OP_OpenPseudo, iCurrent, regCurrent, nCol);
 	if (pOrderBy) {
-		struct key_def *def = sql_multiselect_orderby_to_key_def(pParse,
-									 p, 1);
+		struct sql_key_info *key_info =
+			sql_multiselect_orderby_to_key_info(pParse, p, 1);
 		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iQueue,
-				  pOrderBy->nExpr + 2, 0, (char *)def,
-				  P4_KEYDEF);
+				  pOrderBy->nExpr + 2, 0, (char *)key_info,
+				  P4_KEYINFO);
 		VdbeComment((v, "Orderby table"));
 		destQueue.pOrderBy = pOrderBy;
 	} else {
@@ -2866,7 +2938,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 
 	/* Compute collating sequences used by
 	 * temporary tables needed to implement the compound select.
-	 * Attach the key_def structure to all temporary tables.
+	 * Attach the key_info structure to all temporary tables.
 	 *
 	 * This section is run by the right-most SELECT statement only.
 	 * SELECT statements to the left always skip this part.  The right-most
@@ -2876,19 +2948,12 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	if (p->selFlags & SF_UsesEphemeral) {
 		assert(p->pNext == NULL);
 		int nCol = p->pEList->nExpr;
-		struct key_def *key_def = key_def_new(nCol);
-		if (key_def == NULL) {
-			sqlite3OomFault(db);
+		struct sql_key_info *key_info = sql_key_info_new(db, nCol);
+		if (key_info == NULL)
 			goto multi_select_end;
-		}
 		for (int i = 0; i < nCol; i++) {
-			uint32_t id;
-			struct coll *coll = multi_select_coll_seq(pParse, p, i,
-								  &id);
-			key_def_set_part(key_def, i, i,
-					 FIELD_TYPE_SCALAR,
-					 ON_CONFLICT_ACTION_ABORT, coll, id,
-					 SORT_ORDER_ASC);
+			multi_select_coll_seq(pParse, p, i,
+					      &key_info->parts[i].coll_id);
 		}
 
 		for (struct Select *pLoop = p; pLoop; pLoop = pLoop->pPrior) {
@@ -2902,19 +2967,13 @@ multiSelect(Parse * pParse,	/* Parsing context */
 					break;
 				}
 				sqlite3VdbeChangeP2(v, addr, nCol);
-				struct key_def *dup_def = key_def_dup(key_def);
-				if (dup_def == NULL) {
-					free(key_def);
-					sqlite3OomFault(db);
-					goto multi_select_end;
-				}
-
-				sqlite3VdbeChangeP4(v, addr, (char *)dup_def,
-						    P4_KEYDEF);
+				sqlite3VdbeChangeP4(v, addr,
+						    (char *)sql_key_info_ref(key_info),
+						    P4_KEYINFO);
 				pLoop->addrOpenEphm[i] = -1;
 			}
 		}
-		free(key_def);
+		sql_key_info_unref(key_info);
 	}
 
  multi_select_end:
@@ -2952,7 +3011,7 @@ sqlite3SelectWrongNumTermsError(struct Parse *parse, struct Select * p)
  * If regPrev>0 then it is the first register in a vector that
  * records the previous output.  mem[regPrev] is a flag that is
  * false if there has been no previous output.  If regPrev>0 then
- * code is generated to suppress duplicates.  def is used for
+ * code is generated to suppress duplicates. key_info is used for
  * comparing keys.
  *
  * If the LIMIT found in p->iLimit is reached, jump immediately to
@@ -2964,7 +3023,7 @@ sqlite3SelectWrongNumTermsError(struct Parse *parse, struct Select * p)
  * @param dest Where to send the data.
  * @param reg_ret The return address register.
  * @param reg_prev Previous result register.  No uniqueness if 0.
- * @param def For comparing with previous entry.
+ * @param key_info For comparing with previous entry.
  * @param break_addr Jump here if we hit the LIMIT.
  *
  * @retval Address of generated routine.
@@ -2972,7 +3031,8 @@ sqlite3SelectWrongNumTermsError(struct Parse *parse, struct Select * p)
 static int
 generateOutputSubroutine(struct Parse *parse, struct Select *p,
 			 struct SelectDest *in, struct SelectDest *dest,
-			 int reg_ret, int reg_prev, const struct key_def *def,
+			 int reg_ret, int reg_prev,
+			 struct sql_key_info *key_info,
 			 int break_addr)
 {
 	Vdbe *v = parse->pVdbe;
@@ -2988,16 +3048,11 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 		int addr1, addr2;
 		addr1 = sqlite3VdbeAddOp1(v, OP_IfNot, reg_prev);
 		VdbeCoverage(v);
-		struct key_def *dup_def = key_def_dup(def);
-		if (dup_def == NULL) {
-			sqlite3OomFault(parse->db);
-			return 0;
-		}
 		addr2 =
 		    sqlite3VdbeAddOp4(v, OP_Compare, in->iSdst, reg_prev + 1,
 				      in->nSdst,
-				      (char *)dup_def,
-				      P4_KEYDEF);
+				      (char *)sql_key_info_ref(key_info),
+				      P4_KEYINFO);
 		sqlite3VdbeAddOp3(v, OP_Jump, addr2 + 2, iContinue, addr2 + 2);
 		VdbeCoverage(v);
 		sqlite3VdbeJumpHere(v, addr1);
@@ -3229,9 +3284,9 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	int addr1;		/* Jump instructions that get retargetted */
 	int op;			/* One of TK_ALL, TK_UNION, TK_EXCEPT, TK_INTERSECT */
 	/* Comparison information for duplicate removal */
-	struct key_def *def_dup = NULL;
+	struct sql_key_info *key_info_dup = NULL;
 	/* Comparison information for merging rows */
-	struct key_def *def_merge;
+	struct sql_key_info *key_info_merge;
 	sqlite3 *db;		/* Database connection */
 	ExprList *pOrderBy;	/* The ORDER BY clause */
 	int nOrderBy;		/* Number of terms in the ORDER BY clause */
@@ -3283,7 +3338,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		}
 	}
 
-	/* Compute the comparison permutation and key_def that is used with
+	/* Compute the comparison permutation and key_info that is used with
 	 * the permutation used to determine if the next
 	 * row of results comes from selectA or selectB.  Also add explicit
 	 * collations to the ORDER BY clause terms so that when the subqueries
@@ -3299,9 +3354,10 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 			assert(pItem->u.x.iOrderByCol <= p->pEList->nExpr);
 			aPermute[i] = pItem->u.x.iOrderByCol - 1;
 		}
-		def_merge = sql_multiselect_orderby_to_key_def(pParse, p, 1);
+		key_info_merge = sql_multiselect_orderby_to_key_info(pParse,
+								     p, 1);
 	} else {
-		def_merge = NULL;
+		key_info_merge = NULL;
 	}
 
 	/* Reattach the ORDER BY clause to the query.
@@ -3309,7 +3365,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	p->pOrderBy = pOrderBy;
 	pPrior->pOrderBy = sql_expr_list_dup(pParse->db, pOrderBy, 0);
 
-	/* Allocate a range of temporary registers and the key_def needed
+	/* Allocate a range of temporary registers and the key_info needed
 	 * for the logic that removes duplicate result rows when the
 	 * operator is UNION, EXCEPT, or INTERSECT (but not UNION ALL).
 	 */
@@ -3321,20 +3377,12 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		regPrev = pParse->nMem + 1;
 		pParse->nMem += expr_count + 1;
 		sqlite3VdbeAddOp2(v, OP_Integer, 0, regPrev);
-		def_dup = key_def_new(expr_count);
-		if (def_dup != NULL) {
+		key_info_dup = sql_key_info_new(db, expr_count);
+		if (key_info_dup != NULL) {
 			for (int i = 0; i < expr_count; i++) {
-				uint32_t id;
-				struct coll *coll =
-					multi_select_coll_seq(pParse, p, i,
-							      &id);
-				key_def_set_part(def_dup, i, i,
-						 FIELD_TYPE_SCALAR,
-						 ON_CONFLICT_ACTION_ABORT, coll,
-						 id, SORT_ORDER_ASC);
+				multi_select_coll_seq(pParse, p, i,
+					&key_info_dup->parts[i].coll_id);
 			}
-		} else {
-			sqlite3OomFault(db);
 		}
 	}
 
@@ -3408,7 +3456,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	VdbeNoopComment((v, "Output routine for A"));
 	addrOutA = generateOutputSubroutine(pParse,
 					    p, &destA, pDest, regOutA,
-					    regPrev, def_dup, labelEnd);
+					    regPrev, key_info_dup, labelEnd);
 
 	/* Generate a subroutine that outputs the current row of the B
 	 * select as the next output row of the compound select.
@@ -3417,10 +3465,11 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		VdbeNoopComment((v, "Output routine for B"));
 		addrOutB = generateOutputSubroutine(pParse,
 						    p, &destB, pDest, regOutB,
-						    regPrev, def_dup, labelEnd);
+						    regPrev, key_info_dup,
+						    labelEnd);
 	}
 
-	key_def_delete(def_dup);
+	sql_key_info_unref(key_info_dup);
 
 	/* Generate a subroutine to run when the results from select A
 	 * are exhausted and only data in select B remains.
@@ -3500,7 +3549,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	sqlite3VdbeAddOp4(v, OP_Permutation, 0, 0, 0, (char *)aPermute,
 			  P4_INTARRAY);
 	sqlite3VdbeAddOp4(v, OP_Compare, destA.iSdst, destB.iSdst, nOrderBy,
-			  (char *)def_merge, P4_KEYDEF);
+			  (char *)key_info_merge, P4_KEYINFO);
 	sqlite3VdbeChangeP5(v, OPFLAG_PERMUTE);
 	sqlite3VdbeAddOp3(v, OP_Jump, addrAltB, addrAeqB, addrAgtB);
 	VdbeCoverage(v);
@@ -5233,13 +5282,13 @@ resetAccumulator(Parse * pParse, AggInfo * pAggInfo)
 						"argument");
 				pFunc->iDistinct = -1;
 			} else {
-				struct key_def *def =
-					sql_expr_list_to_key_def(pParse,
-								 pE->x.pList,
-								 0);
+				struct sql_key_info *key_info =
+					sql_expr_list_to_key_info(pParse,
+								  pE->x.pList,
+								  0);
 				sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
 						  pFunc->iDistinct, 1, 0,
-						  (char *)def, P4_KEYDEF);
+						  (char *)key_info, P4_KEYINFO);
 			}
 		}
 	}
@@ -5745,22 +5794,22 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	 * that change.
 	 */
 	if (sSort.pOrderBy) {
-		struct key_def *def =
-			sql_expr_list_to_key_def(pParse, sSort.pOrderBy, 0);
+		struct sql_key_info *key_info =
+			sql_expr_list_to_key_info(pParse, sSort.pOrderBy, 0);
 		sSort.iECursor = pParse->nTab++;
 		/* Number of columns in transient table equals to number of columns in
 		 * SELECT statement plus number of columns in ORDER BY statement
 		 * and plus one column for ID.
 		 */
 		int nCols = pEList->nExpr + sSort.pOrderBy->nExpr + 1;
-		if (def->parts[0].sort_order == SORT_ORDER_DESC) {
+		if (key_info->parts[0].sort_order == SORT_ORDER_DESC) {
 			sSort.sortFlags |= SORTFLAG_DESC;
 		}
 		sSort.addrSortIndex =
 		    sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
 				      sSort.iECursor,
 				      nCols,
-				      0, (char *)def, P4_KEYDEF);
+				      0, (char *)key_info, P4_KEYINFO);
 		VdbeComment((v, "Sort table"));
 	} else {
 		sSort.addrSortIndex = -1;
@@ -5791,12 +5840,13 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	 */
 	if (p->selFlags & SF_Distinct) {
 		sDistinct.tabTnct = pParse->nTab++;
-		struct key_def *def = sql_expr_list_to_key_def(pParse, p->pEList, 0);
+		struct sql_key_info *key_info =
+			sql_expr_list_to_key_info(pParse, p->pEList, 0);
 		sDistinct.addrTnct = sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
 						       sDistinct.tabTnct,
-						       def->part_count,
-						       0, (char *)def,
-						       P4_KEYDEF);
+						       key_info->part_count,
+						       0, (char *)key_info,
+						       P4_KEYINFO);
 		VdbeComment((v, "Distinct table"));
 		sDistinct.eTnctType = WHERE_DISTINCT_UNORDERED;
 	} else {
@@ -5952,13 +6002,13 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			 * will be converted into a Noop.
 			 */
 			sAggInfo.sortingIdx = pParse->nTab++;
-			struct key_def *def =
-				sql_expr_list_to_key_def(pParse, pGroupBy, 0);
+			struct sql_key_info *key_info =
+				sql_expr_list_to_key_info(pParse, pGroupBy, 0);
 			addrSortingIdx =
 			    sqlite3VdbeAddOp4(v, OP_SorterOpen,
 					      sAggInfo.sortingIdx,
 					      sAggInfo.nSortingColumn, 0,
-					      (char *)def, P4_KEYDEF);
+					      (char *)key_info, P4_KEYINFO);
 
 			/* Initialize memory locations used by GROUP BY aggregate processing
 			 */
@@ -5996,7 +6046,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			if (sqlite3WhereIsOrdered(pWInfo) == pGroupBy->nExpr) {
 				/* The optimizer is able to deliver rows in group by order so
 				 * we do not have to sort.  The OP_OpenEphemeral table will be
-				 * cancelled later because we still need to use the key_def
+				 * cancelled later because we still need to use the key_info
 				 */
 				groupBySort = 0;
 			} else {
@@ -6106,14 +6156,10 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 							iBMem + j);
 				}
 			}
-			struct key_def *dup_def = key_def_dup(def);
-			if (dup_def == NULL) {
-				sqlite3OomFault(db);
-				goto select_end;
-			}
 			sqlite3VdbeAddOp4(v, OP_Compare, iAMem, iBMem,
-					  pGroupBy->nExpr, (char*)dup_def,
-					  P4_KEYDEF);
+					  pGroupBy->nExpr,
+					  (char*)sql_key_info_ref(key_info),
+					  P4_KEYINFO);
 			addr1 = sqlite3VdbeCurrentAddr(v);
 			sqlite3VdbeAddOp3(v, OP_Jump, addr1 + 1, 0, addr1 + 1);
 			VdbeCoverage(v);

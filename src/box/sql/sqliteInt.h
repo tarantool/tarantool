@@ -2443,12 +2443,12 @@ struct NameContext {
  *
  * addrOpenEphm[] entries contain the address of OP_OpenEphemeral opcodes.
  * These addresses must be stored so that we can go back and fill in
- * the P4_KEYDEF and P2 parameters later.  Neither the key_def nor
+ * the P4_KEYINFO and P2 parameters later.  Neither the key_info nor
  * the number of columns in P2 can be computed at the same time
  * as the OP_OpenEphm instruction is coded because not
  * enough information about the compound query is known at that point.
- * The key_def for addrOpenTran[0] and [1] contains collating sequences
- * for the result set.  The key_def for addrOpenEphm[2] contains collating
+ * The key_info for addrOpenTran[0] and [1] contains collating sequences
+ * for the result set. The key_info for addrOpenEphm[2] contains collating
  * sequences for the ORDER BY clause.
  */
 struct Select {
@@ -4458,6 +4458,59 @@ sql_index_tuple_size(struct space *space, struct index *idx);
  */
 int
 sql_analysis_load(struct sqlite3 *db);
+
+/**
+ * An instance of the following structure controls how keys
+ * are compared by VDBE, see P4_KEYINFO.
+ */
+struct sql_key_info {
+	sqlite3 *db;
+	/**
+	 * Key definition created from this object,
+	 * see sql_key_info_to_key_def().
+	 */
+	struct key_def *key_def;
+	/** Reference counter. */
+	uint32_t refs;
+	/** Number of parts in the key. */
+	uint32_t part_count;
+	/** Definition of the key parts. */
+	struct key_part_def parts[];
+};
+
+/**
+ * Allocate a key_info object sufficient for an index with
+ * the given number of key columns.
+ */
+struct sql_key_info *
+sql_key_info_new(sqlite3 *db, uint32_t part_count);
+
+/**
+ * Allocate a key_info object from the given key definition.
+ */
+struct sql_key_info *
+sql_key_info_new_from_key_def(sqlite3 *db, const struct key_def *key_def);
+
+/**
+ * Increment the reference counter of a key_info object.
+ */
+struct sql_key_info *
+sql_key_info_ref(struct sql_key_info *key_info);
+
+/**
+ * Decrement the reference counter of a key_info object and
+ * free memory if the object isn't referenced anymore.
+ */
+void
+sql_key_info_unref(struct sql_key_info *key_info);
+
+/**
+ * Create a key definition from a key_info object.
+ * The new key definition is cached in key_info struct
+ * so that subsequent calls to this function are free.
+ */
+struct key_def *
+sql_key_info_to_key_def(struct sql_key_info *key_info);
 
 void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int sqlite3IsLikeFunction(sqlite3 *, Expr *, int *, char *);

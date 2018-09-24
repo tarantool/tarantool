@@ -364,16 +364,23 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
  *
  * @param pCur Cursor which will point to the new ephemeral space.
  * @param field_count Number of fields in ephemeral space.
- * @param def Keys description for new ephemeral space.
+ * @param key_info Keys description for new ephemeral space.
  *
  * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
  */
 int
 tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
-				struct key_def *def)
+				struct sql_key_info *key_info)
 {
 	assert(pCur);
 	assert(pCur->curFlags & BTCF_TEphemCursor);
+
+	struct key_def *def = NULL;
+	if (key_info != NULL) {
+		def = sql_key_info_to_key_def(key_info);
+		if (def == NULL)
+			return SQL_TARANTOOL_ERROR;
+	}
 
 	struct key_def *ephemer_key_def = key_def_new(field_count);
 	if (ephemer_key_def == NULL)
