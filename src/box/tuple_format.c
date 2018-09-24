@@ -557,6 +557,41 @@ tuple_field_go_to_key(const char **field, const char *key, int len)
 	return -1;
 }
 
+/**
+ * Retrieve msgpack data by JSON path.
+ * @param data Pointer to msgpack with data.
+ * @param path The path to process.
+ * @param path_len The length of the @path.
+ * @retval 0 On success.
+ * @retval >0 On path parsing error, invalid character position.
+ */
+static int
+tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len)
+{
+	int rc;
+	struct json_path_parser parser;
+	struct json_path_node node;
+	json_path_parser_create(&parser, path, path_len);
+	while ((rc = json_path_next(&parser, &node)) == 0) {
+		switch (node.type) {
+		case JSON_PATH_NUM:
+			rc = tuple_field_go_to_index(data, node.num);
+			break;
+		case JSON_PATH_STR:
+			rc = tuple_field_go_to_key(data, node.str, node.len);
+			break;
+		default:
+			assert(node.type == JSON_PATH_END);
+			return 0;
+		}
+		if (rc != 0) {
+			*data = NULL;
+			return 0;
+		}
+	}
+	return rc;
+}
+
 int
 tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
                         const uint32_t *field_map, const char *path,
@@ -620,23 +655,13 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 		*field = NULL;
 		return 0;
 	}
-	while ((rc = json_path_next(&parser, &node)) == 0) {
-		switch(node.type) {
-		case JSON_PATH_NUM:
-			rc = tuple_field_go_to_index(field, node.num);
-			break;
-		case JSON_PATH_STR:
-			rc = tuple_field_go_to_key(field, node.str, node.len);
-			break;
-		default:
-			assert(node.type == JSON_PATH_END);
-			return 0;
-		}
-		if (rc != 0) {
-			*field = NULL;
-			return 0;
-		}
-	}
+	rc = tuple_field_go_to_path(field, path + parser.offset,
+				    path_len - parser.offset);
+	if (rc == 0)
+		return 0;
+	/* Setup absolute error position. */
+	rc += parser.offset;
+
 error:
 	assert(rc > 0);
 	diag_set(ClientError, ER_ILLEGAL_PARAMS,
