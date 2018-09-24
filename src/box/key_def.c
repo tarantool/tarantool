@@ -519,12 +519,21 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 }
 
 const struct key_part *
-key_def_find(const struct key_def *key_def, uint32_t fieldno)
+key_def_find_by_fieldno(const struct key_def *key_def, uint32_t fieldno)
+{
+	struct key_part part;
+	memset(&part, 0, sizeof(struct key_part));
+	part.fieldno = fieldno;
+	return key_def_find(key_def, &part);
+}
+
+const struct key_part *
+key_def_find(const struct key_def *key_def, const struct key_part *to_find)
 {
 	const struct key_part *part = key_def->parts;
 	const struct key_part *end = part + key_def->part_count;
 	for (; part != end; part++) {
-		if (part->fieldno == fieldno)
+		if (part->fieldno == to_find->fieldno)
 			return part;
 	}
 	return NULL;
@@ -536,7 +545,7 @@ key_def_contains(const struct key_def *first, const struct key_def *second)
 	const struct key_part *part = second->parts;
 	const struct key_part *end = part + second->part_count;
 	for (; part != end; part++) {
-		if (key_def_find(first, part->fieldno) == NULL)
+		if (key_def_find(first, part) == NULL)
 			return false;
 	}
 	return true;
@@ -553,7 +562,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	const struct key_part *part = second->parts;
 	const struct key_part *end = part + second->part_count;
 	for (; part != end; part++) {
-		if (key_def_find(first, part->fieldno))
+		if (key_def_find(first, part) != NULL)
 			--new_part_count;
 	}
 
@@ -584,7 +593,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	part = second->parts;
 	end = part + second->part_count;
 	for (; part != end; part++) {
-		if (key_def_find(first, part->fieldno))
+		if (key_def_find(first, part) != NULL)
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
 				 part->nullable_action, part->coll,

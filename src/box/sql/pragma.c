@@ -273,7 +273,7 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 			k = 1;
 		} else {
 			struct key_def *kdef = pk->def->key_def;
-			k = key_def_find(kdef, i) - kdef->parts + 1;
+			k = key_def_find_by_fieldno(kdef, i) - kdef->parts + 1;
 		}
 		sqlite3VdbeMultiLoad(v, 1, "issisi", i, field->name,
 				     field_type_strs[field->type],

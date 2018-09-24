@@ -228,7 +228,7 @@ sql_space_column_is_in_pk(struct space *space, uint32_t column)
 	if (column < 63)
 		return (pk_mask & (((uint64_t) 1) << column)) != 0;
 	else if ((pk_mask & (((uint64_t) 1) << 63)) != 0)
-		return key_def_find(key_def, column) != NULL;
+		return key_def_find_by_fieldno(key_def, column) != NULL;
 	return false;
 }
 

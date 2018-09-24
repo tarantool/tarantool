@@ -3948,9 +3948,10 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 				continue;
 			uint32_t j;
 			for (j = 0; j < fk_def->field_count; ++j) {
-				if (key_def_find(idx->def->key_def,
-						 fk_def->links[j].parent_field)
-				    == NULL)
+				if (key_def_find_by_fieldno(idx->def->key_def,
+							    fk_def->links[j].
+							    parent_field) ==
+							    NULL)
 					break;
 			}
 			if (j != fk_def->field_count)

@@ -314,7 +314,14 @@ key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
  * If fieldno is not in index_def->parts returns NULL.
  */
 const struct key_part *
-key_def_find(const struct key_def *key_def, uint32_t fieldno);
+key_def_find_by_fieldno(const struct key_def *key_def, uint32_t fieldno);
+
+/**
+ * Returns the part in index_def->parts for the specified key part.
+ * If to_find is not in index_def->parts returns NULL.
+ */
+const struct key_part *
+key_def_find(const struct key_def *key_def, const struct key_part *to_find);
 
 /**
  * Check if key definition @a first contains all parts of
