@@ -83,7 +83,7 @@ sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 	struct Select *select = sqlite3SelectNew(parse, NULL, from, where, NULL,
 						 NULL, NULL, 0, NULL, NULL);
 	struct SelectDest dest;
-	sqlite3SelectDestInit(&dest, SRT_EphemTab, cursor);
+	sqlite3SelectDestInit(&dest, SRT_EphemTab, cursor, ++parse->nMem);
 	sqlite3Select(parse, select, &dest);
 	sql_select_delete(db, select);
 }
@@ -241,6 +241,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 * it, so columns should be loaded manually.
 		 */
 		struct sql_key_info *pk_info = NULL;
+		int reg_eph = ++parse->nMem;
 		int reg_pk = parse->nMem + 1;
 		int pk_len;
 		int eph_cursor = parse->nTab++;
@@ -248,8 +249,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (is_view) {
 			pk_len = table->def->field_count;
 			parse->nMem += pk_len;
-			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
-					  eph_cursor, pk_len);
+			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
+					  pk_len);
 		} else {
                         assert(space->index_count > 0);
                         pk_info = sql_key_info_new_from_key_def(db,
@@ -258,9 +259,9 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
                                 goto delete_from_cleanup;
                         pk_len = pk_info->part_count;
                         parse->nMem += pk_len;
-                        sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, eph_cursor,
-                                          pk_len, 0,
-                                          (char *)pk_info, P4_KEYINFO);
+			sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, reg_eph,
+					  pk_len, 0,
+					  (char *)pk_info, P4_KEYINFO);
 		}
 
 		/* Construct a query to find the primary key for
@@ -345,7 +346,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			 * by malloc.
 			 */
 			sqlite3VdbeChangeP5(v, 1);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, eph_cursor, reg_key);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, reg_key, reg_eph);
 		}
 
 		/* If this DELETE cannot use the ONEPASS strategy,
@@ -369,7 +370,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 				iAddrOnce = sqlite3VdbeAddOp0(v, OP_Once);
 				VdbeCoverage(v);
 			}
-			sqlite3VdbeAddOp4(v, OP_OpenWrite, tab_cursor, 0, 0,
+			sqlite3VdbeAddOp4(v, OP_IteratorOpen, tab_cursor, 0, 0,
 					  (void *) space, P4_SPACEPTR);
 			VdbeComment((v, "%s", space->index[0]->def->name));
 
@@ -390,6 +391,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 			VdbeCoverage(v);
 		} else {
+			sqlite3VdbeAddOp3(v, OP_IteratorOpen,
+					  eph_cursor, 0, reg_eph);
 			addr_loop = sqlite3VdbeAddOp1(v, OP_Rewind, eph_cursor);
 			VdbeCoverage(v);
 			sqlite3VdbeAddOp2(v, OP_RowData, eph_cursor, reg_key);

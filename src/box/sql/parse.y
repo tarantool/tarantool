@@ -385,11 +385,11 @@ cmd ::= DROP VIEW ifexists(E) fullname(X). {
 //////////////////////// The SELECT statement /////////////////////////////////
 //
 cmd ::= select(X).  {
-  SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0};
+  SelectDest dest = {SRT_Output, 0, 0, 0, 0, 0, 0};
   if(!pParse->parse_only)
-	  sqlite3Select(pParse, X, &dest);
+          sqlite3Select(pParse, X, &dest);
   else
-	  sql_expr_extract_select(pParse, X);
+          sql_expr_extract_select(pParse, X);
   sql_select_delete(pParse->db, X);
 }
 

@@ -3054,51 +3054,37 @@ case OP_TTransaction: {
 	break;
 }
 
-/* Opcode: OpenRead P1 P2 P3 P4 P5
+/* Opcode: IteratorReopen P1 P2 P3 P4 P5
  * Synopsis: index id = P2, space ptr = P4
+ *
+ * The IteratorReopen opcode works exactly like IteratorOpen except
+ * that it first checks to see if the cursor on P1 is already open
+ * with the same index and if it is this opcode becomes a no-op.
+ * In other words, if the cursor is already open, do not reopen
+ * it.
+ *
+ * The IteratorReopen opcode may only be used with P5 == 0.
+ */
+/* Opcode: IteratorOpen P1 P2 P3 P4 P5
+ * Synopsis: index id = P2, space ptr = P4 or reg[P3]
  *
  * Open a cursor for a space specified by pointer in P4 and index
  * id in P2. Give the new cursor an identifier of P1. The P1
  * values need not be contiguous but all P1 values should be
  * small integers. It is an error for P1 to be negative.
+ * If P4 was not set, then P3 supposed to be the register
+ * containing space pointer.
  */
-/* Opcode: ReopenIdx P1 P2 P3 P4 P5
- * Synopsis: index id = P2, space ptr = P4
- *
- * The ReopenIdx opcode works exactly like OpenRead except that
- * it first checks to see if the cursor on P1 is already open
- * with the same index and if it is this opcode becomes a no-op.
- * In other words, if the cursor is already open, do not reopen it.
- *
- * The ReopenIdx opcode may only be used with P5 == 0.
- */
-/* Opcode: OpenWrite P1 P2 P3 P4 P5
- * Synopsis: index id = P2, space ptr = P4
- *
- * For now, OpenWrite is an alias for OpenRead.
- * It exists just due legacy reasons and should be removed:
- * it isn't neccessary to open cursor to make insertion or
- * deletion.
- */
-case OP_ReopenIdx: {
-	int nField;
-	int p2;
-	VdbeCursor *pCur;
-	BtCursor *pBtCur;
-
-	assert(pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
-	pCur = p->apCsr[pOp->p1];
-	p2 = pOp->p2;
-	if (pCur && pCur->uc.pCursor->space == pOp->p4.space &&
-	    pCur->uc.pCursor->index->def->iid == (uint32_t)p2)
+case OP_IteratorReopen: {
+	assert(pOp->p5 == 0);
+	struct VdbeCursor *cur = p->apCsr[pOp->p1];
+	if (cur != NULL && cur->uc.pCursor->space == pOp->p4.space &&
+	    cur->uc.pCursor->index->def->iid == (uint32_t)pOp->p2)
 		goto open_cursor_set_hints;
 	/* If the cursor is not currently open or is open on a different
-	 * index, then fall through into OP_OpenRead to force a reopen
+	 * index, then fall through into OP_OpenCursor to force a reopen
 	 */
-case OP_OpenRead:
-case OP_OpenWrite:
-
-	assert(pOp->opcode==OP_OpenWrite || pOp->p5==0 || pOp->p5==OPFLAG_SEEKEQ);
+case OP_IteratorOpen:
 	if (box_schema_version() != p->schema_ver &&
 	    (pOp->p5 & OPFLAG_SYSTEMSP) == 0) {
 		p->expired = 1;
@@ -3107,66 +3093,60 @@ case OP_OpenWrite:
 				    "need to re-compile SQL statement");
 		goto abort_due_to_error;
 	}
-	p2 = pOp->p2;
-	struct space *space = pOp->p4.space;
+	struct space *space;
+	if (pOp->p4type == P4_SPACEPTR)
+		space = pOp->p4.space;
+	else
+		space = aMem[pOp->p3].u.p;
 	assert(space != NULL);
-	struct index *index = space_index(space, p2);
+	struct index *index = space_index(space, pOp->p2);
 	assert(index != NULL);
-	/*
-	 * Since Tarantool iterator provides the full tuple,
-	 * we need a number of fields as wide as the table itself.
-	 * Otherwise, not enough slots for row parser cache are
-	 * allocated in VdbeCursor object.
-	 */
-	nField = space->def->field_count;
-	assert(pOp->p1>=0);
-	assert(nField>=0);
-	pCur = allocateCursor(p, pOp->p1, nField, CURTYPE_TARANTOOL);
-	if (pCur==0) goto no_mem;
-	pCur->nullRow = 1;
-	pBtCur = pCur->uc.pCursor;
-	pBtCur->curFlags |= BTCF_TaCursor;
-	pBtCur->space = space;
-	pBtCur->index = index;
-	pBtCur->eState = CURSOR_INVALID;
+	assert(pOp->p1 >= 0);
+	cur = allocateCursor(p, pOp->p1,
+			     space->def->exact_field_count == 0 ?
+			     space->def->field_count :
+			     space->def->exact_field_count,
+			     CURTYPE_TARANTOOL);
+	if (cur == NULL)
+		goto no_mem;
+	struct BtCursor *bt_cur = cur->uc.pCursor;
+	bt_cur->curFlags |= space->def->id == 0 ? BTCF_TEphemCursor :
+				BTCF_TaCursor;
+	bt_cur->space = space;
+	bt_cur->index = index;
+	bt_cur->eState = CURSOR_INVALID;
 	/* Key info still contains sorter order and collation. */
-	pCur->key_def = index->def->key_def;
-
+	cur->key_def = index->def->key_def;
+	cur->nullRow = 1;
 open_cursor_set_hints:
-	pCur->uc.pCursor->hints = pOp->p5 & OPFLAG_SEEKEQ;
-	if (rc) goto abort_due_to_error;
+	cur->uc.pCursor->hints = pOp->p5 & OPFLAG_SEEKEQ;
+	if (rc != 0)
+		goto abort_due_to_error;
 	break;
 }
 
 /**
  * Opcode: OpenTEphemeral P1 P2 * P4 *
  * Synopsis:
- * @param P1 index of new cursor to be created.
+ * @param P1 register, where pointer to new space is stored.
  * @param P2 number of columns in a new table.
  * @param P4 key def for new table, NULL is allowed.
  *
- * This opcode creates Tarantool's ephemeral table and sets cursor P1 to it.
+ * This opcode creates Tarantool's ephemeral table and stores pointer
+ * to it into P1 register.
  */
 case OP_OpenTEphemeral: {
-	VdbeCursor *pCx;
-	BtCursor *pBtCur;
 	assert(pOp->p1 >= 0);
 	assert(pOp->p2 > 0);
 	assert(pOp->p4type != P4_KEYINFO || pOp->p4.key_info != NULL);
 
-	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_TARANTOOL);
-	if (pCx == 0) goto no_mem;
-	pCx->nullRow = 1;
+	struct space *space = sql_ephemeral_space_create(pOp->p2,
+							 pOp->p4.key_info);
 
-	pBtCur = pCx->uc.pCursor;
-	/* Ephemeral spaces don't have space_id */
-	pBtCur->eState = CURSOR_INVALID;
-	pBtCur->curFlags = BTCF_TEphemCursor;
-
-	rc = tarantoolSqlite3EphemeralCreate(pCx->uc.pCursor, pOp->p2,
-					     pOp->p4.key_info);
-	pCx->key_def = pCx->uc.pCursor->index->def->key_def;
-	if (rc) goto abort_due_to_error;
+	if (space == NULL)
+		goto abort_due_to_error;
+	aMem[pOp->p1].u.p = space;
+	aMem[pOp->p1].flags = MEM_Ptr;
 	break;
 }
 
@@ -3708,23 +3688,21 @@ case OP_NextSequenceId: {
 /* Opcode: NextIdEphemeral P1 P2 P3 * *
  * Synopsis: r[P3]=get_max(space_index[P1]{Column[P2]})
  *
- * This opcode works in the same way as OP_NextId does, except it is
- * only applied for ephemeral tables. The difference is in the fact that
- * all ephemeral tables don't have space_id (to be more precise it equals to zero).
+ * This opcode works in the same way as OP_NextId does, except it
+ * is only applied for ephemeral tables. The difference is in the
+ * fact that all ephemeral tables don't have space_id (to be more
+ * precise it equals to zero). This opcode uses register P1 to
+ * fetch pointer to epehemeral space.
  */
 case OP_NextIdEphemeral: {
-	VdbeCursor *pC;
-	int p2;
-	pC = p->apCsr[pOp->p1];
-	p2 = pOp->p2;
+	struct space *space = (struct space*)p->aMem[pOp->p1].u.p;
+	int p2 = pOp->p2;
+	assert(space != NULL);
 	pOut = &aMem[pOp->p3];
-
-	assert(pC->uc.pCursor->curFlags & BTCF_TEphemCursor);
-
-	rc = tarantoolSqlite3EphemeralGetMaxId(pC->uc.pCursor, p2,
+	rc = tarantoolSqlite3EphemeralGetMaxId(space, p2,
 					       (uint64_t *) &pOut->u.i);
-	if (rc) goto abort_due_to_error;
-
+	if (rc != 0)
+		goto abort_due_to_error;
 	pOut->u.i += 1;
 	pOut->flags = MEM_Int;
 	break;
@@ -4242,23 +4220,6 @@ case OP_Next:          /* jump */
 	goto check_for_interrupt;
 }
 
-/* Opcode: IdxInsert P1 P2 * * P5
- * Synopsis: key=r[P2]
- *
- * @param P1 Index of a space cursor.
- * @param P2 Index of a register with MessagePack data to insert.
- * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
- *        accounts the change in a case of successful insertion in
- *        nChange counter. If P5 contains OPFLAG_OE_IGNORE, then
- *        we are processing INSERT OR INGORE statement. Thus, in
- *        case of conflict we don't raise an error.
- */
-/* Opcode: IdxReplace P1 P2 * * P5
- * Synopsis: key=r[P2]
- *
- * This opcode works exactly as IdxInsert does, but in Tarantool
- * internals it invokes box_replace() instead of box_insert().
- */
 /* Opcode: SorterInsert P1 P2 * * *
  * Synopsis: key=r[P2]
  *
@@ -4266,59 +4227,84 @@ case OP_Next:          /* jump */
  * MakeRecord instructions.  This opcode writes that key
  * into the sorter P1.  Data for the entry is nil.
  */
-case OP_SorterInsert:       /* in2 */
-case OP_IdxReplace:
-case OP_IdxInsert: {        /* in2 */
-	VdbeCursor *pC;
-
-	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
-	pC = p->apCsr[pOp->p1];
-	assert(pC!=0);
-	assert(isSorter(pC)==(pOp->opcode==OP_SorterInsert));
+case OP_SorterInsert: {      /* in2 */
+	assert(pOp->p1 >= 0 && pOp->p1 < p->nCursor);
+	struct VdbeCursor *cursor = p->apCsr[pOp->p1];
+	assert(cursor != NULL);
+	assert(isSorter(cursor));
 	pIn2 = &aMem[pOp->p2];
-	assert(pIn2->flags & MEM_Blob);
-	if (pOp->p5 & OPFLAG_NCHANGE) p->nChange++;
-	assert(pC->eCurType==CURTYPE_TARANTOOL || pOp->opcode==OP_SorterInsert);
+	assert((pIn2->flags & MEM_Blob) != 0);
 	rc = ExpandBlob(pIn2);
-	if (rc) goto abort_due_to_error;
-	if (pOp->opcode==OP_SorterInsert) {
-		rc = sqlite3VdbeSorterWrite(pC, pIn2);
-	} else {
-		BtCursor *pBtCur = pC->uc.pCursor;
-		if (pBtCur->curFlags & BTCF_TaCursor) {
-			/* Make sure that memory has been allocated on region. */
-			assert(aMem[pOp->p2].flags & MEM_Ephem);
-			if (pOp->opcode == OP_IdxInsert)
-				rc = tarantoolSqlite3Insert(pBtCur->space,
-							    pIn2->z,
-							    pIn2->z + pIn2->n);
-			else
-				rc = tarantoolSqlite3Replace(pBtCur->space,
-							     pIn2->z,
-							     pIn2->z + pIn2->n);
-		} else if (pBtCur->curFlags & BTCF_TEphemCursor) {
-			rc = tarantoolSqlite3EphemeralInsert(pBtCur->space,
-							     pIn2->z,
-							     pIn2->z + pIn2->n);
+	if (rc != 0)
+		goto abort_due_to_error;
+	rc = sqlite3VdbeSorterWrite(cursor, pIn2);
+	if (rc != 0)
+		goto abort_due_to_error;
+	break;
+}
+
+/* Opcode: IdxInsert P1 P2 * P4 P5
+ * Synopsis: key=r[P1]
+ *
+ * @param P1 Index of a register with MessagePack data to insert.
+ * @param P2 If P4 is not set, then P2 is register containing pointer
+ *           to space to insert into.
+ * @param P4 Pointer to the struct space to insert to.
+ * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
+ *        accounts the change in a case of successful insertion in
+ *        nChange counter. If P5 contains OPFLAG_OE_IGNORE, then
+ *        we are processing INSERT OR INGORE statement. Thus, in
+ *        case of conflict we don't raise an error.
+ */
+/* Opcode: IdxReplace2 P1 * * P4 P5
+ * Synopsis: key=r[P1]
+ *
+ * This opcode works exactly as IdxInsert does, but in Tarantool
+ * internals it invokes box_replace() instead of box_insert().
+ */
+case OP_IdxReplace:
+case OP_IdxInsert: {
+	pIn2 = &aMem[pOp->p1];
+	assert((pIn2->flags & MEM_Blob) != 0);
+	if (pOp->p5 & OPFLAG_NCHANGE)
+		p->nChange++;
+	rc = ExpandBlob(pIn2);
+	if (rc != 0)
+		goto abort_due_to_error;
+	struct space *space;
+	if (pOp->p4type == P4_SPACEPTR)
+		space = pOp->p4.space;
+	else
+		space = aMem[pOp->p2].u.p;
+	assert(space != NULL);
+	if (space->def->id != 0) {
+		/* Make sure that memory has been allocated on region. */
+		assert(aMem[pOp->p1].flags & MEM_Ephem);
+		if (pOp->opcode == OP_IdxInsert) {
+			rc = tarantoolSqlite3Insert(space, pIn2->z,
+						    pIn2->z + pIn2->n);
 		} else {
-			unreachable();
+			rc = tarantoolSqlite3Replace(space, pIn2->z,
+						     pIn2->z + pIn2->n);
 		}
-		pC->cacheStatus = CACHE_STALE;
+	} else {
+		rc = tarantoolSqlite3EphemeralInsert(space, pIn2->z,
+						     pIn2->z + pIn2->n);
 	}
 
 	if (pOp->p5 & OPFLAG_OE_IGNORE) {
 		/* Ignore any kind of failes and do not raise error message */
 		rc = SQLITE_OK;
 		/* If we are in trigger, increment ignore raised counter */
-		if (p->pFrame) {
+		if (p->pFrame)
 			p->ignoreRaised++;
-		}
 	} else if (pOp->p5 & OPFLAG_OE_FAIL) {
 		p->errorAction = ON_CONFLICT_ACTION_FAIL;
 	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
 		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
-	if (rc) goto abort_due_to_error;
+	if (rc != 0)
+		goto abort_due_to_error;
 	break;
 }
 

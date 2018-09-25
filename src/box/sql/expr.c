@@ -2714,8 +2714,11 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			 */
 			pExpr->iTable = pParse->nTab++;
 			pExpr->is_ephemeral = 1;
+			int reg_eph = ++pParse->nMem;
 			addr = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
-						 pExpr->iTable, nVal);
+						 reg_eph, nVal);
+			sqlite3VdbeAddOp3(v, OP_IteratorOpen, pExpr->iTable, 0,
+					  reg_eph);
 			struct sql_key_info *key_info = sql_key_info_new(pParse->db, nVal);
 			if (key_info == NULL)
 				return 0;
@@ -2736,7 +2739,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					SelectDest dest;
 					int i;
 					sqlite3SelectDestInit(&dest, SRT_Set,
-							      pExpr->iTable);
+							      pExpr->iTable, reg_eph);
 					dest.zAffSdst =
 					    exprINAffinity(pParse, pExpr);
 					assert((pExpr->iTable & 0x0000FFFF) ==
@@ -2808,8 +2811,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 							  1, r2, &affinity, 1);
 					sqlite3ExprCacheAffinityChange(pParse,
 								       r3, 1);
-					sqlite3VdbeAddOp2(v, OP_IdxInsert,
-							  pExpr->iTable, r2);
+					sqlite3VdbeAddOp2(v, OP_IdxInsert, r2,
+							  reg_eph);
 				}
 				sqlite3ReleaseTempReg(pParse, r1);
 				sqlite3ReleaseTempReg(pParse, r2);
@@ -2847,7 +2850,7 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 
 			pSel = pExpr->x.pSelect;
 			nReg = pExpr->op == TK_SELECT ? pSel->pEList->nExpr : 1;
-			sqlite3SelectDestInit(&dest, 0, pParse->nMem + 1);
+			sqlite3SelectDestInit(&dest, 0, pParse->nMem + 1, -1);
 			pParse->nMem += nReg;
 			if (pExpr->op == TK_SELECT) {
 				dest.eDest = SRT_Mem;
@@ -5361,24 +5364,17 @@ analyzeAggregate(Walker * pWalker, Expr * pExpr)
 						pItem->iMem = ++pParse->nMem;
 						assert(!ExprHasProperty
 						       (pExpr, EP_IntValue));
-						pItem->pFunc =
-						    sqlite3FindFunction(pParse->
-									db,
-									pExpr->
-									u.
-									zToken,
-									pExpr->
-									x.
-									pList ?
-									pExpr->
-									x.
-									pList->
-									nExpr :
-									0,
-									0);
+						pItem->pFunc = sqlite3FindFunction(
+							pParse->db,
+							pExpr->u.zToken,
+							pExpr->x.pList ?
+							pExpr->x.pList->nExpr : 0,
+							0);
 						if (pExpr->flags & EP_Distinct) {
 							pItem->iDistinct =
-							    pParse->nTab++;
+								pParse->nTab++;
+							pItem->reg_eph =
+								++pParse->nMem;
 						} else {
 							pItem->iDistinct = -1;
 						}

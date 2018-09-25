@@ -416,7 +416,7 @@ struct WhereInfo {
 	ExprList *pOrderBy;	/* The ORDER BY clause or NULL */
 	ExprList *pDistinctSet;	/* DISTINCT over all these values */
 	LogEst iLimit;		/* LIMIT if wctrlFlags has WHERE_USE_LIMIT */
-	int aiCurOnePass[2];	/* OP_OpenWrite cursors for the ONEPASS opt */
+	int aiCurOnePass[2];	/* OP_IteratorOpen cursors for the ONEPASS opt */
 	int iContinue;		/* Jump here to continue with next record */
 	int iBreak;		/* Jump here to break out of the loop */
 	int savedNQueryLoop;	/* pParse->nQueryLoop outside the WHERE loop */

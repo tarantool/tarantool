@@ -40,23 +40,6 @@
 #include "bit/bit.h"
 #include "box/box.h"
 
-/*
- * Generate code that will open pTab as cursor iCur.
- */
-void
-sqlite3OpenTable(Parse * pParse,	/* Generate code into this VDBE */
-		 int iCur,	/* The cursor number of the table */
-		 struct space *space,	/* The table to be opened */
-		 int opcode)	/* OP_OpenRead or OP_OpenWrite */
-{
-	Vdbe *v;
-	v = sqlite3GetVdbe(pParse);
-	assert(opcode == OP_OpenWrite || opcode == OP_OpenRead);
-	assert(space->index_count > 0);
-	vdbe_emit_open_cursor(pParse, iCur, 0, space);
-	VdbeComment((v, "%s", space->def->name));
-}
-
 char *
 sql_space_index_affinity_str(struct sqlite3 *db, struct space_def *space_def,
 			     struct index_def *idx_def)
@@ -139,9 +122,12 @@ vdbe_has_table_read(struct Parse *parser, const struct Table *table)
 		 * Currently, there is no difference between Read
 		 * and Write cursors.
 		 */
-		if (op->opcode == OP_OpenRead || op->opcode == OP_OpenWrite) {
-			assert(op->p4type == P4_SPACEPTR);
-			struct space *space = op->p4.space;
+		if (op->opcode == OP_IteratorOpen) {
+			struct space *space = NULL;
+			if (op->p4type == P4_SPACEPTR)
+				space = op->p4.space;
+			else
+				continue;
 			if (space->def->id == table->def->id)
 				return true;
 		}
@@ -418,6 +404,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		}
 	}
 
+	int reg_eph;
 	/* Figure out how many columns of data are supplied.  If the data
 	 * is coming from a SELECT statement, then generate a co-routine that
 	 * produces a single row of the SELECT on each invocation.  The
@@ -434,7 +421,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		regYield = ++pParse->nMem;
 		addrTop = sqlite3VdbeCurrentAddr(v) + 1;
 		sqlite3VdbeAddOp3(v, OP_InitCoroutine, regYield, 0, addrTop);
-		sqlite3SelectDestInit(&dest, SRT_Coroutine, regYield);
+		sqlite3SelectDestInit(&dest, SRT_Coroutine, regYield, -1);
 		dest.iSdst = bIdListInOrder ? regData : 0;
 		dest.nSdst = def->field_count;
 		rc = sqlite3Select(pParse, pSelect, &dest);
@@ -480,10 +467,13 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			int64_t initial_pk = 0;
 
 			srcTab = pParse->nTab++;
+			reg_eph = ++pParse->nMem;
 			regRec = sqlite3GetTempReg(pParse);
 			regCopy = sqlite3GetTempRange(pParse, nColumn);
 			regTempId = sqlite3GetTempReg(pParse);
-			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, srcTab, nColumn+1);
+			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
+					  nColumn + 1);
+
 			/* Create counter for rowid */
 			sqlite3VdbeAddOp4Dup8(v, OP_Int64,
 					      0 /* unused */,
@@ -499,7 +489,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 					  nColumn + 1, regRec);
 			/* Set flag to save memory allocating one by malloc. */
 			sqlite3VdbeChangeP5(v, 1);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, srcTab, regRec);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, regRec, reg_eph);
 
 			sqlite3VdbeGoto(v, addrL);
 			sqlite3VdbeJumpHere(v, addrL);
@@ -515,6 +505,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		memset(&sNC, 0, sizeof(sNC));
 		sNC.pParse = pParse;
 		srcTab = -1;
+		reg_eph = -1;
 		assert(useTempTable == 0);
 		if (pList) {
 			nColumn = pList->nExpr;
@@ -555,6 +546,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		 *         end loop
 		 *      D: ...
 		 */
+		sqlite3VdbeAddOp3(v, OP_IteratorOpen, srcTab, 0, reg_eph);
 		addrInsTop = sqlite3VdbeAddOp1(v, OP_Rewind, srcTab);
 		VdbeCoverage(v);
 		addrCont = sqlite3VdbeCurrentAddr(v);
@@ -746,9 +738,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		vdbe_emit_constraint_checks(pParse, pTab, regIns + 1,
 					    on_error, endOfLoop, 0);
 		fkey_emit_check(pParse, pTab, 0, regIns, 0);
-		int pk_cursor = pParse->nTab++;
-		vdbe_emit_open_cursor(pParse, pk_cursor, 0, space);
-		vdbe_emit_insertion_completion(v, pk_cursor, regIns + 1,
+		vdbe_emit_insertion_completion(v, space, regIns + 1,
 					       pTab->def->field_count,
 					       on_error);
 	}
@@ -1063,8 +1053,8 @@ process_index:  ;
 }
 
 void
-vdbe_emit_insertion_completion(struct Vdbe *v, int cursor_id, int raw_data_reg,
-			       uint32_t tuple_len,
+vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
+			       int raw_data_reg, uint32_t tuple_len,
 			       enum on_conflict_action on_conflict)
 {
 	assert(v != NULL);
@@ -1077,7 +1067,8 @@ vdbe_emit_insertion_completion(struct Vdbe *v, int cursor_id, int raw_data_reg,
 		pik_flags |= OPFLAG_OE_ROLLBACK;
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, raw_data_reg, tuple_len,
 			  raw_data_reg + tuple_len);
-	sqlite3VdbeAddOp2(v, OP_IdxInsert, cursor_id, raw_data_reg + tuple_len);
+	sqlite3VdbeAddOp1(v, OP_IdxInsert, raw_data_reg + tuple_len);
+	sqlite3VdbeChangeP4(v, -1, (char *)space, P4_SPACEPTR);
 	sqlite3VdbeChangeP5(v, pik_flags);
 }
 
@@ -1327,7 +1318,8 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	sqlite3VdbeChangeP5(v, OPFLAG_XFER_OPT);
 #endif
 
-	sqlite3VdbeAddOp2(v, OP_IdxInsert, iDest, regData);
+	sqlite3VdbeAddOp4(v, OP_IdxInsert, regData, 0, 0,
+			  (char *)dest, P4_SPACEPTR);
 	switch (onError) {
 	case ON_CONFLICT_ACTION_IGNORE:
 		sqlite3VdbeChangeP5(v, OPFLAG_OE_IGNORE | OPFLAG_NCHANGE);

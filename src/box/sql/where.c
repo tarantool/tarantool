@@ -4569,12 +4569,12 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 			/* Do nothing */
 		} else if ((pLoop->wsFlags & WHERE_IDX_ONLY) == 0 &&
 			   (wctrlFlags & WHERE_OR_SUBCLAUSE) == 0) {
-			int op = OP_OpenRead;
-			if (pWInfo->eOnePass != ONEPASS_OFF) {
-				op = OP_OpenWrite;
+			if (pWInfo->eOnePass != ONEPASS_OFF)
 				pWInfo->aiCurOnePass[0] = pTabItem->iCursor;
-			};
-			sqlite3OpenTable(pParse, pTabItem->iCursor, space, op);
+			assert(space->index_count > 0);
+			vdbe_emit_open_cursor(pParse, pTabItem->iCursor, 0,
+					      space);
+			VdbeComment((v, "%s", space->def->name));
 			assert(pTabItem->iCursor == pLevel->iTabCur);
 			testcase(pWInfo->eOnePass == ONEPASS_OFF
 				 && pTab->nCol == BMS - 1);
@@ -4591,7 +4591,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 		if (pLoop->wsFlags & WHERE_INDEXED) {
 			struct index_def *idx_def = pLoop->index_def;
 			int iIndexCur;
-			int op = OP_OpenRead;
+			int op;
 			/* Check if index is primary. Either of
 			 * points should be true:
 			 * 1. struct Index is non-NULL and is
@@ -4636,12 +4636,12 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 					}
 				}
 				assert(wctrlFlags & WHERE_ONEPASS_DESIRED);
-				op = OP_OpenWrite;
+				op = OP_IteratorOpen;
 				pWInfo->aiCurOnePass[1] = iIndexCur;
 			} else if (iAuxArg
 				   && (wctrlFlags & WHERE_OR_SUBCLAUSE) != 0) {
 				iIndexCur = iAuxArg;
-				op = OP_ReopenIdx;
+				op = OP_IteratorReopen;
 			} else {
 				iIndexCur = pParse->nTab++;
 			}

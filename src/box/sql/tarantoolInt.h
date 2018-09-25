@@ -97,9 +97,21 @@ sql_index_update_table_name(struct index_def *idef, const char *new_tbl_name,
 int tarantoolSqlite3RenameTrigger(const char *zTriggerName,
 				  const char *zOldName, const char *zNewName);
 
-/* Interface for ephemeral tables. */
-int tarantoolSqlite3EphemeralCreate(BtCursor * pCur, uint32_t filed_count,
-				    struct sql_key_info *key_info);
+/**
+ * Create ephemeral space. Features of ephemeral spaces: id == 0,
+ * name == "ephemeral", memtx engine (in future it can be changed,
+ * but now only memtx engine is supported), primary index which
+ * covers all fields and no secondary indexes, given field number
+ * and collation sequence. All fields are scalar and nullable.
+ *
+ * @param field_count Number of fields in ephemeral space.
+ * @param key_info Keys description for new ephemeral space.
+ *
+ * @retval Pointer to created space, NULL if error.
+ */
+struct space *
+sql_ephemeral_space_create(uint32_t filed_count, struct sql_key_info *key_info);
+
 /**
  * Insert tuple into ephemeral space.
  * In contrast to ordinary spaces, there is no need to create and
@@ -117,7 +129,18 @@ int tarantoolSqlite3EphemeralDelete(BtCursor * pCur);
 int tarantoolSqlite3EphemeralCount(BtCursor * pCur, i64 * pnEntry);
 int tarantoolSqlite3EphemeralDrop(BtCursor * pCur);
 int tarantoolSqlite3EphemeralClearTable(BtCursor * pCur);
-int tarantoolSqlite3EphemeralGetMaxId(BtCursor * pCur, uint32_t fieldno,
+
+/**
+ * Extract maximum integer value from ephemeral space.
+ * If index is empty - return 0 in max_id and success status.
+ *
+ * @param space Pointer to ephemeral space.
+ * @param fieldno Number of field from fetching tuple.
+ * @param[out] max_id Fetched max value.
+ *
+ * @retval 0 on success, -1 otherwise.
+ */
+int tarantoolSqlite3EphemeralGetMaxId(struct space *space, uint32_t fieldno,
 				       uint64_t * max_id);
 
 /**

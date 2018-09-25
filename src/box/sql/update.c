@@ -222,13 +222,15 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	 * an ephemeral table.
 	 */
 	uint32_t pk_part_count;
+	struct space *space;
 	if (is_view) {
 		sql_materialize_view(pParse, def->name, pWhere, pk_cursor);
 		/* Number of columns from SELECT plus ID.*/
 		pk_part_count = nKey = def->field_count + 1;
 	} else {
-		vdbe_emit_open_cursor(pParse, pk_cursor, 0,
-				      space_by_id(pTab->def->id));
+		space = pTab->space;
+		assert(space != NULL);
+		vdbe_emit_open_cursor(pParse, pk_cursor, 0, space);
 		pk_part_count = pPk->def->key_def->part_count;
 	}
 
@@ -242,11 +244,12 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	int iPk = pParse->nMem + 1;
 	pParse->nMem += pk_part_count;
 	regKey = ++pParse->nMem;
+	int reg_eph = ++pParse->nMem;
 	iEph = pParse->nTab++;
 	sqlite3VdbeAddOp2(v, OP_Null, 0, iPk);
 
 	/* Address of the OpenEphemeral instruction. */
-	int addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iEph,
+	int addrOpen = sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
 					 pk_part_count);
 	pWInfo = sqlite3WhereBegin(pParse, pTabList, pWhere, 0, 0,
 				   WHERE_ONEPASS_DESIRED, pk_cursor);
@@ -276,9 +279,12 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 								pPk->def);
 		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, pk_part_count,
 				  regKey, zAff, pk_part_count);
-		sqlite3VdbeAddOp2(v, OP_IdxInsert, iEph, regKey);
-		/* Set flag to save memory allocating one by malloc. */
+		/*
+		 * Set flag to save memory allocating one by
+		 * malloc.
+		 */
 		sqlite3VdbeChangeP5(v, 1);
+		sqlite3VdbeAddOp2(v, OP_IdxInsert, regKey, reg_eph);
 	}
 	/* End the database scan loop.
 	 */
@@ -304,6 +310,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		}
 	} else {
 		labelContinue = sqlite3VdbeMakeLabel(v);
+		sqlite3VdbeAddOp3(v, OP_IteratorOpen, iEph, 0, reg_eph);
 		sqlite3VdbeAddOp2(v, OP_Rewind, iEph, labelBreak);
 		addrTop = sqlite3VdbeAddOp2(v, OP_RowData, iEph, regKey);
 		sqlite3VdbeAddOp4Int(v, OP_NotFound, pk_cursor, labelContinue,
@@ -437,7 +444,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		sqlite3VdbeJumpHere(v, addr1);
 		if (hasFK)
 			fkey_emit_check(pParse, pTab, 0, regNewPk, aXRef);
-		vdbe_emit_insertion_completion(v, pk_cursor, regNew,
+		vdbe_emit_insertion_completion(v, space, regNew,
 					       pTab->def->field_count,
 					       on_error);
 		/*

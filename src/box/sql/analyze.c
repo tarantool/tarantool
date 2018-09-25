@@ -122,13 +122,10 @@
  * created.
  *
  * @param parse Parsing context.
- * @param stat_cursor Open the _sql_stat1 table on this cursor.
- *        you should allocate |stat_names| cursors before call.
  * @param table_name Delete records of this table if specified.
  */
 static void
-vdbe_emit_stat_space_open(struct Parse *parse, int stat_cursor,
-			  const char *table_name)
+vdbe_emit_stat_space_open(struct Parse *parse, const char *table_name)
 {
 	const char *stat_names[] = {"_sql_stat1", "_sql_stat4"};
 	const uint32_t stat_ids[] = {BOX_SQL_STAT1_ID, BOX_SQL_STAT4_ID};
@@ -143,14 +140,6 @@ vdbe_emit_stat_space_open(struct Parse *parse, int stat_cursor,
 		} else {
 			sqlite3VdbeAddOp1(v, OP_Clear, stat_ids[i]);
 		}
-	}
-
-	/* Open the sql_stat tables for writing. */
-	for (uint i = 0; i < lengthof(stat_names); ++i) {
-		uint32_t id = stat_ids[i];
-		vdbe_emit_open_cursor(parse, stat_cursor + i, 0,
-				      space_by_id(id));
-		VdbeComment((v, stat_names[i]));
 	}
 }
 
@@ -770,15 +759,16 @@ callStatGet(Vdbe * v, int regStat4, int iParam, int regOut)
  *
  * @param parse Current parsing context.
  * @param space Space to be analyzed.
- * @param stat_cursor Cursor pointing to spaces containing
- *        statistics: _sql_stat1 (stat_cursor) and
- *        _sql_stat4 (stat_cursor + 1).
  */
 static void
-vdbe_emit_analyze_space(struct Parse *parse, struct space *space,
-			int stat_cursor)
+vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 {
 	assert(space != NULL);
+	struct space *stat1 = space_by_id(BOX_SQL_STAT1_ID);
+	assert(stat1 != NULL);
+	struct space *stat4 = space_by_id(BOX_SQL_STAT4_ID);
+	assert(stat4 != NULL);
+
 	/* Register to hold Stat4Accum object. */
 	int stat4_reg = ++parse->nMem;
 	/* Index of changed index field. */
@@ -808,7 +798,7 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space,
 	struct Vdbe *v = sqlite3GetVdbe(parse);
 	assert(v != NULL);
 	const char *tab_name = space_name(space);
-	sqlite3VdbeAddOp4(v, OP_OpenRead, tab_cursor, 0, 0, (void *) space,
+	sqlite3VdbeAddOp4(v, OP_IteratorOpen, tab_cursor, 0, 0, (void *) space,
 			  P4_SPACEPTR);
 	sqlite3VdbeLoadString(v, tab_name_reg, space->def->name);
 	for (uint32_t j = 0; j < space->index_count; ++j) {
@@ -871,7 +861,7 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space,
 		int idx_cursor;
 		if (j != 0) {
 			idx_cursor = parse->nTab - 1;
-			sqlite3VdbeAddOp4(v, OP_OpenRead, idx_cursor,
+			sqlite3VdbeAddOp4(v, OP_IteratorOpen, idx_cursor,
 					  idx->def->iid, 0,
 					  (void *) space, P4_SPACEPTR);
 			VdbeComment((v, "%s", idx->def->name));
@@ -1003,7 +993,8 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space,
 		assert("BBB"[0] == AFFINITY_TEXT);
 		sqlite3VdbeAddOp4(v, OP_MakeRecord, tab_name_reg, 3, tmp_reg,
 				  "BBB", 0);
-		sqlite3VdbeAddOp2(v, OP_IdxInsert, stat_cursor, tmp_reg);
+		sqlite3VdbeAddOp4(v, OP_IdxInsert, tmp_reg, 0, 0,
+				  (char *)stat1, P4_SPACEPTR);
 		/* Add the entries to the stat4 table. */
 		int eq_reg = stat1_reg;
 		int lt_reg = stat1_reg + 1;
@@ -1036,7 +1027,8 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space,
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, col_reg, part_count,
 				  sample_reg);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, tab_name_reg, 6, tmp_reg);
-		sqlite3VdbeAddOp2(v, OP_IdxReplace, stat_cursor + 1, tmp_reg);
+		sqlite3VdbeAddOp4(v, OP_IdxReplace, tmp_reg, 0, 0,
+				  (char *)stat4, P4_SPACEPTR);
 		/* P1==1 for end-of-loop. */
 		sqlite3VdbeAddOp2(v, OP_Goto, 1, next_addr);
 		sqlite3VdbeJumpHere(v, is_null_addr);
@@ -1058,27 +1050,12 @@ loadAnalysis(Parse * pParse)
 	}
 }
 
-/**
- * Wrapper to pass args to space_foreach callback.
- */
-struct analyze_data {
-	struct Parse *parse_context;
-	/**
-	 * Cursor numbers pointing to stat spaces:
-	 * stat_cursor is opened on _sql_stat1 and
-	 * stat_cursor + 1 - on _sql_stat4.
-	 */
-	int stat_cursor;
-};
-
 static int
 sql_space_foreach_analyze(struct space *space, void *data)
 {
 	if (space->def->opts.sql == NULL || space->def->opts.is_view)
 		return 0;
-	struct analyze_data *anal_data = (struct analyze_data *) data;
-	vdbe_emit_analyze_space(anal_data->parse_context, space,
-				anal_data->stat_cursor);
+	vdbe_emit_analyze_space((struct Parse*)data, space);
 	return 0;
 }
 
@@ -1090,11 +1067,8 @@ static void
 sql_analyze_database(struct Parse *parser)
 {
 	sql_set_multi_write(parser, false);
-	int stat_cursor = parser->nTab;
-	parser->nTab += 2;
-	vdbe_emit_stat_space_open(parser, stat_cursor, NULL);
-	struct analyze_data anal_data = { parser, stat_cursor };
-	space_foreach(sql_space_foreach_analyze, (void *) &anal_data);
+	vdbe_emit_stat_space_open(parser, NULL);
+	space_foreach(sql_space_foreach_analyze, (void *)parser);
 	loadAnalysis(parser);
 }
 
@@ -1114,10 +1088,8 @@ vdbe_emit_analyze_table(struct Parse *parse, struct space *space)
 	 * There are two system spaces for statistics: _sql_stat1
 	 * and _sql_stat4.
 	 */
-	int stat_cursor = parse->nTab;
-	parse->nTab += 2;
-	vdbe_emit_stat_space_open(parse, stat_cursor, space->def->name);
-	vdbe_emit_analyze_space(parse, space, stat_cursor);
+	vdbe_emit_stat_space_open(parse, space->def->name);
+	vdbe_emit_analyze_space(parse, space);
 	loadAnalysis(parse);
 }
 

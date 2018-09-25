@@ -205,15 +205,9 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		if (db->mallocFailed)
 			goto cleanup;
 
-		int cursor = parse->nTab++;
 		struct space *_trigger = space_by_id(BOX_TRIGGER_ID);
 		assert(_trigger != NULL);
-		vdbe_emit_open_cursor(parse, cursor, 0, _trigger);
 
-		/*
-		 * makerecord(cursor(iRecord),
-		 * [reg(first_col), reg(first_col+1)]).
-		 */
 		int first_col = parse->nMem + 1;
 		parse->nMem += 3;
 		int record = ++parse->nMem;
@@ -245,10 +239,10 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		sqlite3VdbeAddOp4(v, OP_Blob, opts_buff_sz, first_col + 2,
 				  SQL_SUBTYPE_MSGPACK, opts_buff, P4_DYNAMIC);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
-		sqlite3VdbeAddOp2(v, OP_IdxInsert, cursor, record);
+		sqlite3VdbeAddOp4(v, OP_IdxInsert, record, 0, 0,
+				  (char *)_trigger, P4_SPACEPTR);
 
 		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
-		sqlite3VdbeAddOp1(v, OP_Close, cursor);
 
 		sql_set_multi_write(parse, false);
 	} else {
@@ -694,7 +688,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 				SelectDest sDest;
 				Select *pSelect =
 				    sqlite3SelectDup(db, pStep->pSelect, 0);
-				sqlite3SelectDestInit(&sDest, SRT_Discard, 0);
+				sqlite3SelectDestInit(&sDest, SRT_Discard, 0, -1);
 				sqlite3Select(pParse, pSelect, &sDest);
 				sql_select_delete(db, pSelect);
 				break;

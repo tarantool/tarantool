@@ -64,8 +64,17 @@ typedef struct DistinctCtx DistinctCtx;
 struct DistinctCtx {
 	u8 isTnct;		/* True if the DISTINCT keyword is present */
 	u8 eTnctType;		/* One of the WHERE_DISTINCT_* operators */
-	int tabTnct;		/* Ephemeral table used for DISTINCT processing */
-	int addrTnct;		/* Address of OP_OpenEphemeral opcode for tabTnct */
+	/**
+	 * Ephemeral table's cursor used for DISTINCT processing.
+	 * It is used for reading from ephemeral space.
+	 */
+	int cur_eph;
+	/**
+	 * Register, containing a pointer to ephemeral space.
+	 * It is used for insertions while procesing DISTINCT.
+	 */
+	int reg_eph;
+	int addrTnct;		/* Address of OP_OpenEphemeral opcode for cur_eph */
 };
 
 /*
@@ -77,6 +86,8 @@ struct SortCtx {
 	ExprList *pOrderBy;	/* The ORDER BY (or GROUP BY clause) */
 	int nOBSat;		/* Number of ORDER BY terms satisfied by indices */
 	int iECursor;		/* Cursor number for the sorter */
+	/** Register, containing pointer to ephemeral space. */
+	int reg_eph;
 	int regReturn;		/* Register holding block-output return address */
 	int labelBkOut;		/* Start label for the block-output subroutine */
 	int addrSortIndex;	/* Address of the OP_SorterOpen or OP_OpenEphemeral */
@@ -117,10 +128,11 @@ clearSelect(sqlite3 * db, Select * p, int bFree)
  * Initialize a SelectDest structure.
  */
 void
-sqlite3SelectDestInit(SelectDest * pDest, int eDest, int iParm)
+sqlite3SelectDestInit(SelectDest * pDest, int eDest, int iParm, int reg_eph)
 {
 	pDest->eDest = (u8) eDest;
 	pDest->iSDParm = iParm;
+	pDest->reg_eph = reg_eph;
 	pDest->zAffSdst = 0;
 	pDest->iSdst = 0;
 	pDest->nSdst = 0;
@@ -687,7 +699,6 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 	int regBase;		/* Regs for sorter record */
 	int regRecord = ++pParse->nMem;	/* Assembled sorter record */
 	int nOBSat = pSort->nOBSat;	/* ORDER BY terms to skip */
-	int op;			/* Opcode to add sorter record to sorter */
 	int iLimit;		/* LIMIT counter */
 
 	assert(bSeq == 0 || bSeq == 1);
@@ -764,11 +775,13 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 		sqlite3ExprCodeMove(pParse, regBase, regPrevKey, pSort->nOBSat);
 		sqlite3VdbeJumpHere(v, addrJmp);
 	}
-	if (pSort->sortFlags & SORTFLAG_UseSorter)
-		op = OP_SorterInsert;
-	else
-		op = OP_IdxInsert;
-	sqlite3VdbeAddOp2(v, op, pSort->iECursor, regRecord);
+	if (pSort->sortFlags & SORTFLAG_UseSorter) {
+		sqlite3VdbeAddOp2(v, OP_SorterInsert, pSort->iECursor,
+				  regRecord);
+	} else {
+		sqlite3VdbeAddOp2(v, OP_IdxInsert, regRecord, pSort->reg_eph);
+	}
+
 	if (iLimit) {
 		int addr;
 		int r1 = 0;
@@ -823,32 +836,33 @@ codeOffset(Vdbe * v,		/* Generate code into this VM */
 	}
 }
 
-/*
- * Add code that will check to make sure the N registers starting at iMem
- * form a distinct entry.  iTab is a sorting index that holds previously
- * seen combinations of the N values.  A new entry is made in iTab
- * if the current N values are new.
+/**
+ * Add code that will check to make sure the @n registers starting
+ * at @reg_data form a distinct entry. @cursor is a sorting index
+ * that holds previously seen combinations of the @n values.
+ * A new entry is made in @cursor if the current n values are new.
  *
- * A jump to addrRepeat is made and the N+1 values are popped from the
- * stack if the top N elements are not distinct.
+ * A jump to @addr_repeat is made and the @n+1 values are popped
+ * from the stack if the top n elements are not distinct.
+ *
+ * @param parse Parsing and code generating context.
+ * @param cursor A sorting index cursor used to test for
+ *               distinctness.
+ * @param reg_eph Register holding ephemeral space's pointer.
+ * @param addr_repeat Jump here if not distinct.
+ * @param n Number of elements in record.
+ * @param reg_data First register holding the data.
  */
 static void
-codeDistinct(Parse * pParse,	/* Parsing and code generating context */
-	     int iTab,		/* A sorting index used to test for distinctness */
-	     int addrRepeat,	/* Jump to here if not distinct */
-	     int N,		/* Number of elements */
-	     int iMem)		/* First element */
+vdbe_insert_distinct(struct Parse *parse, int cursor, int reg_eph,
+		     int addr_repeat, int n, int reg_data)
 {
-	Vdbe *v;
-	int r1;
-
-	v = pParse->pVdbe;
-	r1 = sqlite3GetTempReg(pParse);
-	sqlite3VdbeAddOp4Int(v, OP_Found, iTab, addrRepeat, iMem, N);
-	VdbeCoverage(v);
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, iMem, N, r1);
-	sqlite3VdbeAddOp2(v, OP_IdxInsert, iTab, r1);
-	sqlite3ReleaseTempReg(pParse, r1);
+	struct Vdbe *v = parse->pVdbe;
+	int r1 = sqlite3GetTempReg(parse);
+	sqlite3VdbeAddOp4Int(v, OP_Found, cursor, addr_repeat, reg_data, n);
+	sqlite3VdbeAddOp3(v, OP_MakeRecord, reg_data, n, r1);
+	sqlite3VdbeAddOp2(v, OP_IdxInsert, r1, reg_eph);
+	sqlite3ReleaseTempReg(parse, r1);
 }
 
 /*
@@ -991,14 +1005,23 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				regPrev = pParse->nMem + 1;
 				pParse->nMem += nResultCol;
 
-				/* Change the OP_OpenEphemeral coded earlier to an OP_Null
-				 * sets the MEM_Cleared bit on the first register of the
-				 * previous value.  This will cause the OP_Ne below to always
-				 * fail on the first iteration of the loop even if the first
-				 * row is all NULLs.
+				/*
+				 * Actually, for DISTINCT handling
+				 * two op-codes were emitted here:
+				 * OpenTEphemeral & IteratorOpen.
+				 * So, we need to Noop one and
+				 * re-use second for Null op-code.
+				 *
+				 * Change to an OP_Null sets the
+				 * MEM_Cleared bit on the first
+				 * register of the previous value. 
+				 * This will cause the OP_Ne below
+				 * to always fail on the first
+				 * iteration of the loop even if
+				 * the first row is all NULLs.
 				 */
 				sqlite3VdbeChangeToNoop(v, pDistinct->addrTnct);
-				pOp = sqlite3VdbeGetOp(v, pDistinct->addrTnct);
+				pOp = sqlite3VdbeGetOp(v, pDistinct->addrTnct + 1);
 				pOp->opcode = OP_Null;
 				pOp->p1 = 1;
 				pOp->p2 = regPrev;
@@ -1039,17 +1062,26 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			}
 
 		case WHERE_DISTINCT_UNIQUE:{
-				sqlite3VdbeChangeToNoop(v, pDistinct->addrTnct);
-				break;
+			/**
+			 * To handle DISTINCT two op-codes are
+			 * emitted: OpenTEphemeral & IteratorOpen.
+			 * addrTnct is address of first insn in
+			 * a couple. To evict ephemral space,
+			 * need to noop both op-codes.
+			 */
+			sqlite3VdbeChangeToNoop(v, pDistinct->addrTnct);
+			sqlite3VdbeChangeToNoop(v, pDistinct->addrTnct + 1);
+			break;
 			}
 
 		default:{
-				assert(pDistinct->eTnctType ==
-				       WHERE_DISTINCT_UNORDERED);
-				codeDistinct(pParse, pDistinct->tabTnct,
-					     iContinue, nResultCol, regResult);
-				break;
-			}
+			assert(pDistinct->eTnctType ==
+			       WHERE_DISTINCT_UNORDERED);
+			vdbe_insert_distinct(pParse, pDistinct->cur_eph,
+					     pDistinct->reg_eph, iContinue,
+					     nResultCol, regResult);
+			break;
+		}
 		}
 		if (pSort == 0) {
 			codeOffset(v, p->iOffset, iContinue);
@@ -1066,7 +1098,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			r1 = sqlite3GetTempReg(pParse);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regResult,
 					  nResultCol, r1);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, r1);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert,  r1, pDest->reg_eph);
 			sqlite3ReleaseTempReg(pParse, r1);
 			break;
 		}
@@ -1109,8 +1141,8 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				sqlite3VdbeAddOp4Int(v, OP_Found, iParm + 1,
 						     addr, r1, 0);
 				VdbeCoverage(v);
-				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm + 1,
-						  r1);
+				sqlite3VdbeAddOp2(v, OP_IdxInsert, r1,
+						  pDest->reg_eph + 1);
 				assert(pSort == 0);
 			}
 #endif
@@ -1122,7 +1154,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				int regRec = sqlite3GetTempReg(pParse);
 				/* Last column is required for ID. */
 				int regCopy = sqlite3GetTempRange(pParse, nResultCol + 1);
-				sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, iParm,
+				sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, pDest->reg_eph,
 						  nResultCol, regCopy + nResultCol);
 				/* Positioning ID column to be last in inserted tuple.
 				 * NextId -> regCopy + n + 1
@@ -1134,7 +1166,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy, nResultCol + 1, regRec);
 				/* Set flag to save memory allocating one by malloc. */
 				sqlite3VdbeChangeP5(v, 1);
-				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, regRec);
+				sqlite3VdbeAddOp2(v, OP_IdxInsert, regRec, pDest->reg_eph);
 				sqlite3ReleaseTempReg(pParse, regRec);
 				sqlite3ReleaseTempRange(pParse, regCopy, nResultCol + 1);
 			}
@@ -1164,7 +1196,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				sqlite3ExprCacheAffinityChange(pParse,
 							       regResult,
 							       nResultCol);
-				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, r1);
+				sqlite3VdbeAddOp2(v, OP_IdxInsert, r1, pDest->reg_eph);
 				sqlite3ReleaseTempReg(pParse, r1);
 			}
 			break;
@@ -1247,8 +1279,8 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regResult,
 					  nResultCol, r3);
 			if (eDest == SRT_DistQueue) {
-				sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm + 1,
-						  r3);
+				sqlite3VdbeAddOp2(v, OP_IdxInsert, r3,
+						  pDest->reg_eph + 1);
 			}
 			for (i = 0; i < nKey; i++) {
 				sqlite3VdbeAddOp2(v, OP_SCopy,
@@ -1258,7 +1290,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			}
 			sqlite3VdbeAddOp2(v, OP_Sequence, iParm, r2 + nKey);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, r2, nKey + 2, r1);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, r1);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, r1, pDest->reg_eph);
 			if (addrTest)
 				sqlite3VdbeJumpHere(v, addrTest);
 			sqlite3ReleaseTempReg(pParse, r1);
@@ -1498,7 +1530,6 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	int iTab;
 	ExprList *pOrderBy = pSort->pOrderBy;
 	int eDest = pDest->eDest;
-	int iParm = pDest->iSDParm;
 	int regRow;
 	int regTupleid;
 	int iCol;
@@ -1570,10 +1601,11 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 	case SRT_Table:
 	case SRT_EphemTab: {
 			int regCopy = sqlite3GetTempRange(pParse,  nColumn);
-			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, iParm, nColumn, regTupleid);
+			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, pDest->reg_eph,
+					  nColumn, regTupleid);
 			sqlite3VdbeAddOp3(v, OP_Copy, regRow, regCopy, nSortData - 1);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy, nColumn + 1, regRow);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, regRow);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, regRow, pDest->reg_eph);
 			sqlite3ReleaseTempReg(pParse, regCopy);
 			break;
 		}
@@ -1583,7 +1615,7 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, regRow, nColumn,
 					  regTupleid, pDest->zAffSdst, nColumn);
 			sqlite3ExprCacheAffinityChange(pParse, regRow, nColumn);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, regTupleid);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, regTupleid, pDest->reg_eph);
 			break;
 		}
 	case SRT_Mem:{
@@ -2409,13 +2441,16 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	 * for the SRT_DistFifo and SRT_DistQueue destinations to work.
 	 */
 	iQueue = pParse->nTab++;
+	int reg_queue = ++pParse->nMem;
+	int reg_dist = 0;
 	if (p->op == TK_UNION) {
 		eDest = pOrderBy ? SRT_DistQueue : SRT_DistFifo;
 		iDistinct = pParse->nTab++;
+		reg_dist = ++pParse->nMem;
 	} else {
 		eDest = pOrderBy ? SRT_Queue : SRT_Fifo;
 	}
-	sqlite3SelectDestInit(&destQueue, eDest, iQueue);
+	sqlite3SelectDestInit(&destQueue, eDest, iQueue, reg_queue);
 
 	/* Allocate cursors for Current, Queue, and Distinct. */
 	regCurrent = ++pParse->nMem;
@@ -2423,18 +2458,20 @@ generateWithRecursiveQuery(Parse * pParse,	/* Parsing context */
 	if (pOrderBy) {
 		struct sql_key_info *key_info =
 			sql_multiselect_orderby_to_key_info(pParse, p, 1);
-		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, iQueue,
+		sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, reg_queue,
 				  pOrderBy->nExpr + 2, 0, (char *)key_info,
 				  P4_KEYINFO);
 		VdbeComment((v, "Orderby table"));
 		destQueue.pOrderBy = pOrderBy;
 	} else {
-		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iQueue, nCol + 1);
+		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_queue, nCol + 1);
 		VdbeComment((v, "Queue table"));
 	}
+	sqlite3VdbeAddOp3(v, OP_IteratorOpen, iQueue, 0, reg_queue);
 	if (iDistinct) {
 		p->addrOpenEphm[0] =
-		    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, iDistinct, 1);
+		    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_dist, 1);
+		sqlite3VdbeAddOp3(v, OP_IteratorOpen, iDistinct, 0, reg_dist);
 		p->selFlags |= SF_UsesEphemeral;
 		VdbeComment((v, "Distinct table"));
 	}
@@ -2634,7 +2671,8 @@ multiSelect(Parse * pParse,	/* Parsing context */
 	if (dest.eDest == SRT_EphemTab) {
 		assert(p->pEList);
 		int nCols = p->pEList->nExpr;
-		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, dest.iSDParm, nCols + 1);
+		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, dest.reg_eph, nCols + 1);
+		sqlite3VdbeAddOp3(v, OP_IteratorOpen, dest.iSDParm, 0, dest.reg_eph);
 		VdbeComment((v, "Destination temp"));
 		dest.eDest = SRT_Table;
 	}
@@ -2725,6 +2763,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 		case TK_EXCEPT:
 		case TK_UNION:{
 				int unionTab;	/* Cursor number of the temporary table holding result */
+				int reg_union;
 				u8 op = 0;	/* One of the SRT_ operations to apply to self */
 				int priorOp;	/* The SRT_ operation to apply to prior selects */
 				Expr *pLimit, *pOffset;	/* Saved values of p->nLimit and p->nOffset */
@@ -2741,16 +2780,19 @@ multiSelect(Parse * pParse,	/* Parsing context */
 					assert(p->pLimit == 0);	/* Not allowed on leftward elements */
 					assert(p->pOffset == 0);	/* Not allowed on leftward elements */
 					unionTab = dest.iSDParm;
+					reg_union = dest.reg_eph;
 				} else {
 					/* We will need to create our own temporary table to hold the
 					 * intermediate results.
 					 */
 					unionTab = pParse->nTab++;
+					reg_union = ++pParse->nMem;
 					assert(p->pOrderBy == 0);
 					addr =
 					    sqlite3VdbeAddOp2(v,
 							      OP_OpenTEphemeral,
-							      unionTab, 0);
+							      reg_union, 0);
+					sqlite3VdbeAddOp3(v, OP_IteratorOpen, unionTab, 0, reg_union);
 					assert(p->addrOpenEphm[0] == -1);
 					p->addrOpenEphm[0] = addr;
 					findRightmost(p)->selFlags |=
@@ -2762,7 +2804,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				 */
 				assert(!pPrior->pOrderBy);
 				sqlite3SelectDestInit(&uniondest, priorOp,
-						      unionTab);
+						      unionTab, reg_union);
 				iSub1 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, pPrior, &uniondest);
 				if (rc) {
@@ -2845,6 +2887,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 		default:
 			assert(p->op == TK_INTERSECT); {
 				int tab1, tab2;
+				int reg_eph1, reg_eph2;
 				int iCont, iBreak, iStart;
 				Expr *pLimit, *pOffset;
 				int addr;
@@ -2856,12 +2899,15 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				 * by allocating the tables we will need.
 				 */
 				tab1 = pParse->nTab++;
+				reg_eph1 = ++pParse->nMem;
 				tab2 = pParse->nTab++;
+				reg_eph2 = ++pParse->nMem;
 				assert(p->pOrderBy == 0);
 
 				addr =
-				    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, tab1,
+				    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_eph1,
 						      0);
+				sqlite3VdbeAddOp3(v, OP_IteratorOpen, tab1, 0, reg_eph1);
 				assert(p->addrOpenEphm[0] == -1);
 				p->addrOpenEphm[0] = addr;
 				findRightmost(p)->selFlags |= SF_UsesEphemeral;
@@ -2870,7 +2916,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				/* Code the SELECTs to our left into temporary table "tab1".
 				 */
 				sqlite3SelectDestInit(&intersectdest, SRT_Union,
-						      tab1);
+						      tab1, reg_eph1);
 				iSub1 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, pPrior,
 						   &intersectdest);
@@ -2881,8 +2927,9 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				/* Code the current SELECT into temporary table "tab2"
 				 */
 				addr =
-				    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, tab2,
+				    sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_eph2,
 						      0);
+				sqlite3VdbeAddOp3(v, OP_IteratorOpen, tab2, 0, reg_eph2);
 				assert(p->addrOpenEphm[1] == -1);
 				p->addrOpenEphm[1] = addr;
 				p->pPrior = 0;
@@ -2891,6 +2938,7 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				pOffset = p->pOffset;
 				p->pOffset = 0;
 				intersectdest.iSDParm = tab2;
+				intersectdest.reg_eph = reg_eph2;
 				iSub2 = pParse->iNextSelectId;
 				rc = sqlite3Select(pParse, p, &intersectdest);
 				testcase(rc != SQLITE_OK);
@@ -3079,7 +3127,7 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 	case SRT_EphemTab:{
 			int regRec = sqlite3GetTempReg(parse);
 			int regCopy = sqlite3GetTempRange(parse, in->nSdst + 1);
-			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, dest->iSDParm,
+			sqlite3VdbeAddOp3(v, OP_NextIdEphemeral, dest->reg_eph,
 					  in->nSdst, regCopy + in->nSdst);
 			sqlite3VdbeAddOp3(v, OP_Copy, in->iSdst, regCopy,
 					  in->nSdst - 1);
@@ -3087,7 +3135,7 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 					  in->nSdst + 1, regRec);
 			/* Set flag to save memory allocating one by malloc. */
 			sqlite3VdbeChangeP5(v, 1);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, dest->iSDParm, regRec);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, regRec, dest->reg_eph);
 			sqlite3ReleaseTempRange(parse, regCopy, in->nSdst + 1);
 			sqlite3ReleaseTempReg(parse, regRec);
 			break;
@@ -3103,7 +3151,7 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 					  in->nSdst);
 			sqlite3ExprCacheAffinityChange(parse, in->iSdst,
 						       in->nSdst);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, dest->iSDParm, r1);
+			sqlite3VdbeAddOp2(v, OP_IdxInsert, r1, dest->reg_eph);
 			sqlite3ReleaseTempReg(parse, r1);
 			break;
 		}
@@ -3421,8 +3469,8 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 	regAddrB = ++pParse->nMem;
 	regOutA = ++pParse->nMem;
 	regOutB = ++pParse->nMem;
-	sqlite3SelectDestInit(&destA, SRT_Coroutine, regAddrA);
-	sqlite3SelectDestInit(&destB, SRT_Coroutine, regAddrB);
+	sqlite3SelectDestInit(&destA, SRT_Coroutine, regAddrA, -1);
+	sqlite3SelectDestInit(&destB, SRT_Coroutine, regAddrB, -1);
 
 	/* Generate a coroutine to evaluate the SELECT statement to the
 	 * left of the compound operator - the "A" select.
@@ -5265,7 +5313,7 @@ resetAccumulator(Parse * pParse, AggInfo * pAggInfo)
 	/* Verify that all AggInfo registers are within the range specified by
 	 * AggInfo.mnReg..AggInfo.mxReg
 	 */
-	assert(nReg == pAggInfo->mxReg - pAggInfo->mnReg + 1);
+	assert(nReg <= pAggInfo->mxReg - pAggInfo->mnReg + 1);
 	for (i = 0; i < pAggInfo->nColumn; i++) {
 		assert(pAggInfo->aCol[i].iMem >= pAggInfo->mnReg
 		       && pAggInfo->aCol[i].iMem <= pAggInfo->mxReg);
@@ -5291,8 +5339,10 @@ resetAccumulator(Parse * pParse, AggInfo * pAggInfo)
 								  pE->x.pList,
 								  0);
 				sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
-						  pFunc->iDistinct, 1, 0,
+						  pFunc->reg_eph, 1, 0,
 						  (char *)key_info, P4_KEYINFO);
+				sqlite3VdbeAddOp3(v, OP_IteratorOpen,
+						  pFunc->iDistinct, 0, pFunc->reg_eph);
 			}
 		}
 	}
@@ -5351,8 +5401,8 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			addrNext = sqlite3VdbeMakeLabel(v);
 			testcase(nArg == 0);	/* Error condition */
 			testcase(nArg > 1);	/* Also an error */
-			codeDistinct(pParse, pF->iDistinct, addrNext, 1,
-				     regAgg);
+			vdbe_insert_distinct(pParse, pF->iDistinct, pF->reg_eph,
+					     addrNext, 1, regAgg);
 		}
 		if (pF->pFunc->funcFlags & SQLITE_FUNC_NEEDCOLL) {
 			struct coll *coll = NULL;
@@ -5683,7 +5733,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			VdbeComment((v, "%s", pItem->pTab->def->name));
 			pItem->addrFillSub = addrTop;
 			sqlite3SelectDestInit(&dest, SRT_Coroutine,
-					      pItem->regReturn);
+					      pItem->regReturn, -1);
 			pItem->iSelectId = pParse->iNextSelectId;
 			sqlite3Select(pParse, pSub, &dest);
 			pItem->pTab->tuple_log_count = pSub->nSelectRow;
@@ -5721,7 +5771,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 						 pItem->pTab->def->name));
 			}
 			sqlite3SelectDestInit(&dest, SRT_EphemTab,
-					      pItem->iCursor);
+					      pItem->iCursor, ++pParse->nMem);
 			pItem->iSelectId = pParse->iNextSelectId;
 			sqlite3Select(pParse, pSub, &dest);
 			pItem->pTab->tuple_log_count = pSub->nSelectRow;
@@ -5800,6 +5850,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	if (sSort.pOrderBy) {
 		struct sql_key_info *key_info =
 			sql_expr_list_to_key_info(pParse, sSort.pOrderBy, 0);
+		sSort.reg_eph = ++pParse->nMem;
 		sSort.iECursor = pParse->nTab++;
 		/* Number of columns in transient table equals to number of columns in
 		 * SELECT statement plus number of columns in ORDER BY statement
@@ -5811,9 +5862,10 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		}
 		sSort.addrSortIndex =
 		    sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
-				      sSort.iECursor,
+				      sSort.reg_eph,
 				      nCols,
 				      0, (char *)key_info, P4_KEYINFO);
+		sqlite3VdbeAddOp3(v, OP_IteratorOpen, sSort.iECursor, 0, sSort.reg_eph);
 		VdbeComment((v, "Sort table"));
 	} else {
 		sSort.addrSortIndex = -1;
@@ -5822,8 +5874,10 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	/* If the output is destined for a temporary table, open that table.
 	 */
 	if (pDest->eDest == SRT_EphemTab) {
-		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, pDest->iSDParm,
+		sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, pDest->reg_eph,
 				  pEList->nExpr + 1);
+		sqlite3VdbeAddOp3(v, OP_IteratorOpen, pDest->iSDParm, 0,
+				  pDest->reg_eph);
 
 		VdbeComment((v, "Output table"));
 	}
@@ -5837,20 +5891,25 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 	computeLimitRegisters(pParse, p, iEnd);
 	if (p->iLimit == 0 && sSort.addrSortIndex >= 0) {
 		sqlite3VdbeChangeOpcode(v, sSort.addrSortIndex, OP_SorterOpen);
+		sqlite3VdbeChangeP1(v, sSort.addrSortIndex, sSort.iECursor);
+		sqlite3VdbeChangeToNoop(v, sSort.addrSortIndex + 1);
 		sSort.sortFlags |= SORTFLAG_UseSorter;
 	}
 
 	/* Open an ephemeral index to use for the distinct set.
 	 */
 	if (p->selFlags & SF_Distinct) {
-		sDistinct.tabTnct = pParse->nTab++;
+		sDistinct.cur_eph = pParse->nTab++;
+		sDistinct.reg_eph = ++pParse->nMem;
 		struct sql_key_info *key_info =
 			sql_expr_list_to_key_info(pParse, p->pEList, 0);
 		sDistinct.addrTnct = sqlite3VdbeAddOp4(v, OP_OpenTEphemeral,
-						       sDistinct.tabTnct,
+						       sDistinct.reg_eph,
 						       key_info->part_count,
 						       0, (char *)key_info,
 						       P4_KEYINFO);
+		sqlite3VdbeAddOp3(v, OP_IteratorOpen, sDistinct.cur_eph, 0,
+				  sDistinct.reg_eph);
 		VdbeComment((v, "Distinct table"));
 		sDistinct.eTnctType = WHERE_DISTINCT_UNORDERED;
 	} else {
@@ -5889,7 +5948,16 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 		 * into an OP_Noop.
 		 */
 		if (sSort.addrSortIndex >= 0 && sSort.pOrderBy == 0) {
+			/*
+			 * To handle ordering two op-codes are
+			 * emitted: OpenTEphemeral & IteratorOpen.
+			 * sSort.addrSortIndex is address of
+			 * first insn in a couple. To evict
+			 * ephemral space, need to noop both
+			 * op-codes.
+			 */
 			sqlite3VdbeChangeToNoop(v, sSort.addrSortIndex);
+			sqlite3VdbeChangeToNoop(v, sSort.addrSortIndex + 1);
 		}
 
 		/* Use the standard inner loop. */
@@ -6134,6 +6202,7 @@ sqlite3Select(Parse * pParse,		/* The parser context */
 			    ) {
 				sSort.pOrderBy = 0;
 				sqlite3VdbeChangeToNoop(v, sSort.addrSortIndex);
+				sqlite3VdbeChangeToNoop(v, sSort.addrSortIndex + 1);
 			}
 
 			/* Evaluate the current GROUP BY terms and store in b0, b1, b2...

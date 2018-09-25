@@ -1341,7 +1341,8 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		int iCovCur = pParse->nTab++;	/* Cursor used for index scans (if any) */
 
 		int regReturn = ++pParse->nMem;	/* Register used with OP_Gosub */
-		int regRowset = 0;	/* Register for RowSet object */
+		int cur_row_set = 0;
+		int reg_row_set = 0;
 		int regPk = 0;	/* Register holding PK */
 		int iLoopBody = sqlite3VdbeMakeLabel(v);	/* Start of loop body */
 		int iRetInit;	/* Address of regReturn init */
@@ -1399,9 +1400,12 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		 * called on an uninitialized cursor.
 		 */
 		if ((pWInfo->wctrlFlags & WHERE_DUPLICATES_OK) == 0) {
-			regRowset = pParse->nTab++;
+			cur_row_set = pParse->nTab++;
+			reg_row_set = ++pParse->nMem;
 			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral,
-					  regRowset, pk_part_count);
+					  reg_row_set, pk_part_count);
+			sqlite3VdbeAddOp3(v, OP_IteratorOpen, cur_row_set, 0,
+					  reg_row_set);
 			sql_vdbe_set_p4_key_def(pParse, pk_key_def);
 			regPk = ++pParse->nMem;
 		}
@@ -1534,7 +1538,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 						if (iSet) {
 							jmp1 = sqlite3VdbeAddOp4Int
 								(v, OP_Found,
-								 regRowset, 0,
+								 cur_row_set, 0,
 								 r,
 								 pk_part_count);
 							VdbeCoverage(v);
@@ -1545,7 +1549,7 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 								 r, pk_part_count, regPk);
 							sqlite3VdbeAddOp2
 								(v, OP_IdxInsert,
-								 regRowset, regPk);
+								 regPk, reg_row_set);
 						}
 
 						/* Release the array of temp registers */

@@ -883,7 +883,7 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 		      struct space *space)
 {
 	assert(space != NULL);
-	return sqlite3VdbeAddOp4(parse_context->pVdbe, OP_OpenWrite, cursor,
+	return sqlite3VdbeAddOp4(parse_context->pVdbe, OP_IteratorOpen, cursor,
 				 index_id, 0, (void *) space, P4_SPACEPTR);
 }
 
@@ -2693,7 +2693,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			goto exit_create_index;
 
 		sql_set_multi_write(parse, true);
-		sqlite3VdbeAddOp4(vdbe, OP_OpenWrite, cursor, 0, 0,
+		sqlite3VdbeAddOp4(vdbe, OP_IteratorOpen, cursor, 0, 0,
 				  (void *)space_by_id(BOX_INDEX_ID),
 				  P4_SPACEPTR);
 		sqlite3VdbeChangeP5(vdbe, OPFLAG_SEEKEQ);

@@ -355,31 +355,14 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
 	return SQLITE_OK;
 }
 
-/**
- * Create ephemeral space and set cursor to the first entry. Features of
- * ephemeral spaces: id == 0, name == "ephemeral", memtx engine (in future it
- * can be changed, but now only memtx engine is supported), primary index
- * which covers all fields and no secondary indexes, given field number and
- * collation sequence. All fields are scalar and nullable.
- *
- * @param pCur Cursor which will point to the new ephemeral space.
- * @param field_count Number of fields in ephemeral space.
- * @param key_info Keys description for new ephemeral space.
- *
- * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
- */
-int
-tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
-				struct sql_key_info *key_info)
+struct space *
+sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 {
-	assert(pCur);
-	assert(pCur->curFlags & BTCF_TEphemCursor);
-
 	struct key_def *def = NULL;
 	if (key_info != NULL) {
 		def = sql_key_info_to_key_def(key_info);
 		if (def == NULL)
-			return SQL_TARANTOOL_ERROR;
+			return NULL;
 	}
 
 	struct key_part_def *ephemer_key_parts = region_alloc(&fiber()->gc,
@@ -387,7 +370,7 @@ tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 	if (ephemer_key_parts == NULL) {
 		diag_set(OutOfMemory, sizeof(*ephemer_key_parts) * field_count,
 			 "region", "key parts");
-		return SQL_TARANTOOL_ERROR;
+		return NULL;
 	}
 	for (uint32_t i = 0; i < field_count; ++i) {
 		struct key_part_def *part = &ephemer_key_parts[i];
@@ -404,14 +387,14 @@ tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 	struct key_def *ephemer_key_def = key_def_new(ephemer_key_parts,
 						      field_count);
 	if (ephemer_key_def == NULL)
-		return SQL_TARANTOOL_ERROR;
+		return NULL;
 
 	struct index_def *ephemer_index_def =
 		index_def_new(0, 0, "ephemer_idx", strlen("ephemer_idx"), TREE,
 			      &index_opts_default, ephemer_key_def, NULL);
 	key_def_delete(ephemer_key_def);
 	if (ephemer_index_def == NULL)
-		return SQL_TARANTOOL_ERROR;
+		return NULL;
 
 	struct rlist key_list;
 	rlist_create(&key_list);
@@ -425,24 +408,15 @@ tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 			      0 /* length of field_def */);
 	if (ephemer_space_def == NULL) {
 		index_def_delete(ephemer_index_def);
-		return SQL_TARANTOOL_ERROR;
+		return NULL;
 	}
 
 	struct space *ephemer_new_space = space_new_ephemeral(ephemer_space_def,
 							      &key_list);
 	index_def_delete(ephemer_index_def);
 	space_def_delete(ephemer_space_def);
-	if (ephemer_new_space == NULL)
-		return SQL_TARANTOOL_ERROR;
-	if (key_alloc(pCur, field_count) != 0) {
-		space_delete(ephemer_new_space);
-		return SQL_TARANTOOL_ERROR;
-	}
-	pCur->space = ephemer_new_space;
-	pCur->index = *ephemer_new_space->index;
 
-	int unused;
-	return tarantoolSqlite3First(pCur, &unused);
+	return ephemer_new_space;
 }
 
 int tarantoolSqlite3EphemeralInsert(struct space *space, const char *tuple,
@@ -1461,35 +1435,31 @@ sql_debug_info(struct info_handler *h)
 	info_end(h);
 }
 
-/*
+/**
  * Extract maximum integer value from ephemeral space.
  * If index is empty - return 0 in max_id and success status.
  *
- * @param pCur Cursor pointing to ephemeral space.
+ * @param space Pointer to ephemeral space.
  * @param fieldno Number of field from fetching tuple.
  * @param[out] max_id Fetched max value.
  *
  * @retval 0 on success, -1 otherwise.
  */
-int tarantoolSqlite3EphemeralGetMaxId(BtCursor *pCur, uint32_t fieldno,
-				       uint64_t *max_id)
+int tarantoolSqlite3EphemeralGetMaxId(struct space *space, uint32_t fieldno,
+				      uint64_t *max_id)
 {
-	struct space *ephem_space = pCur->space;
-	assert(ephem_space);
-	struct index *primary_index = *ephem_space->index;
-
+	struct index *primary_index = *space->index;
 	struct tuple *tuple;
-	if (index_max(primary_index, NULL, 0, &tuple) != 0) {
-		return SQL_TARANTOOL_ERROR;
-	}
+	if (index_max(primary_index, NULL, 0, &tuple) != 0)
+		return -1;
 	if (tuple == NULL) {
 		*max_id = 0;
-		return SQLITE_OK;
+		return 0;
 	}
 	if (tuple_field_u64(tuple, fieldno, max_id) == -1)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 
-	return SQLITE_OK;
+	return 0;
 }
 
 int
