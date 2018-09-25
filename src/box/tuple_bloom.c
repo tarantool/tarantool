@@ -74,8 +74,7 @@ tuple_bloom_builder_delete(struct tuple_bloom_builder *builder)
 
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			const struct tuple *tuple,
-			const struct key_def *key_def,
+			const struct tuple *tuple, struct key_def *key_def,
 			uint32_t hashed_parts)
 {
 	assert(builder->part_count == key_def->part_count);
@@ -168,8 +167,7 @@ tuple_bloom_delete(struct tuple_bloom *bloom)
 
 bool
 tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
-		      const struct tuple *tuple,
-		      const struct key_def *key_def)
+		      const struct tuple *tuple, struct key_def *key_def)
 {
 	if (bloom->is_legacy) {
 		return bloom_maybe_has(&bloom->parts[0],
@@ -195,7 +193,7 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
 bool
 tuple_bloom_maybe_has_key(const struct tuple_bloom *bloom,
 			  const char *key, uint32_t part_count,
-			  const struct key_def *key_def)
+			  struct key_def *key_def)
 {
 	if (bloom->is_legacy) {
 		if (part_count < key_def->part_count)

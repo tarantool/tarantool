@@ -3021,8 +3021,8 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 	ctx->space_id = lsm_info->space_id;
 
 	/* Create key definition and tuple format. */
-	ctx->key_def = key_def_new_with_parts(lsm_info->key_parts,
-					      lsm_info->key_part_count);
+	ctx->key_def = key_def_new(lsm_info->key_parts,
+				   lsm_info->key_part_count);
 	if (ctx->key_def == NULL)
 		goto out;
 	ctx->format = tuple_format_new(&vy_tuple_format_vtab, &ctx->key_def,

@@ -302,8 +302,8 @@ vy_run_bloom_size(struct vy_run *run)
  */
 static uint32_t
 vy_page_index_find_page(struct vy_run *run, const struct tuple *key,
-			const struct key_def *cmp_def,
-			enum iterator_type itype, bool *equal_key)
+			struct key_def *cmp_def, enum iterator_type itype,
+			bool *equal_key)
 {
 	if (itype == ITER_EQ)
 		itype = ITER_GE; /* One day it'll become obsolete */
@@ -365,9 +365,8 @@ vy_page_index_find_page(struct vy_run *run, const struct tuple *key,
 }
 
 struct vy_slice *
-vy_slice_new(int64_t id, struct vy_run *run,
-	     struct tuple *begin, struct tuple *end,
-	     const struct key_def *cmp_def)
+vy_slice_new(int64_t id, struct vy_run *run, struct tuple *begin,
+	     struct tuple *end, struct key_def *cmp_def)
 {
 	struct vy_slice *slice = malloc(sizeof(*slice));
 	if (slice == NULL) {
@@ -446,9 +445,8 @@ vy_slice_delete(struct vy_slice *slice)
 }
 
 int
-vy_slice_cut(struct vy_slice *slice, int64_t id,
-	     struct tuple *begin, struct tuple *end,
-	     const struct key_def *cmp_def,
+vy_slice_cut(struct vy_slice *slice, int64_t id, struct tuple *begin,
+	     struct tuple *end, struct key_def *cmp_def,
 	     struct vy_slice **result)
 {
 	*result = NULL;
@@ -1148,7 +1146,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 			 const struct tuple *key, struct tuple **ret)
 {
 	struct vy_slice *slice = itr->slice;
-	const struct key_def *cmp_def = itr->cmp_def;
+	struct key_def *cmp_def = itr->cmp_def;
 
 	*ret = NULL;
 
@@ -1228,7 +1226,7 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 	*ret = NULL;
 
 	struct tuple_bloom *bloom = run->info.bloom;
-	const struct key_def *key_def = itr->key_def;
+	struct key_def *key_def = itr->key_def;
 	if (iterator_type == ITER_EQ && bloom != NULL) {
 		bool need_lookup;
 		if (vy_stmt_type(key) == IPROTO_SELECT) {
@@ -1318,7 +1316,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 		     enum iterator_type iterator_type,
 		     const struct tuple *key, struct tuple **ret)
 {
-	const struct key_def *cmp_def = itr->cmp_def;
+	struct key_def *cmp_def = itr->cmp_def;
 	struct vy_slice *slice = itr->slice;
 	const struct tuple *check_eq_key = NULL;
 	int cmp;
@@ -1392,8 +1390,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
-		     const struct key_def *cmp_def,
-		     const struct key_def *key_def,
+		     struct key_def *cmp_def, struct key_def *key_def,
 		     struct tuple_format *format,
 		     bool is_primary)
 {
@@ -1729,7 +1726,7 @@ fail:
 /* dump statement to the run page buffers (stmt header and data) */
 static int
 vy_run_dump_stmt(const struct tuple *value, struct xlog *data_xlog,
-		 struct vy_page_info *info, const struct key_def *key_def,
+		 struct vy_page_info *info, struct key_def *key_def,
 		 bool is_primary)
 {
 	struct xrow_header xrow;
@@ -2019,9 +2016,9 @@ fail:
 
 int
 vy_run_writer_create(struct vy_run_writer *writer, struct vy_run *run,
-		const char *dirpath, uint32_t space_id, uint32_t iid,
-		const struct key_def *cmp_def, const struct key_def *key_def,
-		uint64_t page_size, double bloom_fpr)
+		     const char *dirpath, uint32_t space_id, uint32_t iid,
+		     struct key_def *cmp_def, struct key_def *key_def,
+		     uint64_t page_size, double bloom_fpr)
 {
 	memset(writer, 0, sizeof(*writer));
 	writer->run = run;
@@ -2285,10 +2282,8 @@ vy_run_writer_abort(struct vy_run_writer *writer)
 int
 vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		     uint32_t space_id, uint32_t iid,
-		     const struct key_def *cmp_def,
-		     const struct key_def *key_def,
-		     struct tuple_format *format,
-		     const struct index_opts *opts)
+		     struct key_def *cmp_def, struct key_def *key_def,
+		     struct tuple_format *format, const struct index_opts *opts)
 {
 	assert(run->info.bloom == NULL);
 	assert(run->page_info == NULL);
@@ -2628,7 +2623,7 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
 
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
-		     const struct key_def *cmp_def, struct tuple_format *format,
+		     struct key_def *cmp_def, struct tuple_format *format,
 		     bool is_primary)
 {
 	stream->base.iface = &vy_slice_stream_iface;

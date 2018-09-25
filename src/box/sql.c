@@ -382,23 +382,29 @@ tarantoolSqlite3EphemeralCreate(BtCursor *pCur, uint32_t field_count,
 			return SQL_TARANTOOL_ERROR;
 	}
 
-	struct key_def *ephemer_key_def = key_def_new(field_count);
+	struct key_part_def *ephemer_key_parts = region_alloc(&fiber()->gc,
+				sizeof(*ephemer_key_parts) * field_count);
+	if (ephemer_key_parts == NULL) {
+		diag_set(OutOfMemory, sizeof(*ephemer_key_parts) * field_count,
+			 "region", "key parts");
+		return SQL_TARANTOOL_ERROR;
+	}
+	for (uint32_t i = 0; i < field_count; ++i) {
+		struct key_part_def *part = &ephemer_key_parts[i];
+		part->fieldno = i;
+		part->type = FIELD_TYPE_SCALAR;
+		part->nullable_action = ON_CONFLICT_ACTION_NONE;
+		part->is_nullable = true;
+		part->sort_order = SORT_ORDER_ASC;
+		if (def != NULL && i < def->part_count)
+			part->coll_id = def->parts[i].coll_id;
+		else
+			part->coll_id = COLL_NONE;
+	}
+	struct key_def *ephemer_key_def = key_def_new(ephemer_key_parts,
+						      field_count);
 	if (ephemer_key_def == NULL)
 		return SQL_TARANTOOL_ERROR;
-	for (uint32_t part = 0; part < field_count; ++part) {
-		struct coll *coll;
-		uint32_t id;
-		if (def != NULL && part < def->part_count) {
-			coll = def->parts[part].coll;
-			id = def->parts[part].coll_id;
-		} else {
-			coll = NULL;
-			id = COLL_NONE;
-		}
-		key_def_set_part(ephemer_key_def, part, part, FIELD_TYPE_SCALAR,
-				 ON_CONFLICT_ACTION_NONE, coll, id,
-				 SORT_ORDER_ASC);
-	}
 
 	struct index_def *ephemer_index_def =
 		index_def_new(0, 0, "ephemer_idx", strlen("ephemer_idx"), TREE,
@@ -909,7 +915,7 @@ tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
 	assert(cursor->iter != NULL);
 	assert(cursor->last_tuple != NULL);
 
-	const box_key_def_t *key_def;
+	struct key_def *key_def;
 	const struct tuple *tuple;
 	const char *base;
 	const struct tuple_format *format;

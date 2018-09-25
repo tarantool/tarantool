@@ -97,7 +97,7 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 
 struct vy_mem *
 vy_mem_new(struct vy_mem_env *env, int64_t generation,
-	   const struct key_def *cmp_def, struct tuple_format *format,
+	   struct key_def *cmp_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   uint32_t space_cache_version)
 {
@@ -321,7 +321,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr,
 {
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
-	const struct key_def *cmp_def = itr->mem->cmp_def;
+	struct key_def *cmp_def = itr->mem->cmp_def;
 	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn ||
 	       vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ) {
 		if (vy_mem_iterator_step(itr, iterator_type) != 0 ||
@@ -461,7 +461,7 @@ vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
 	assert(itr->mem->version == itr->version);
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
-	const struct key_def *cmp_def = itr->mem->cmp_def;
+	struct key_def *cmp_def = itr->mem->cmp_def;
 
 	const struct tuple *prev_stmt = itr->curr_stmt;
 	do {
@@ -493,7 +493,7 @@ vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr)
 	assert(itr->mem->version == itr->version);
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
-	const struct key_def *cmp_def = itr->mem->cmp_def;
+	struct key_def *cmp_def = itr->mem->cmp_def;
 
 	struct vy_mem_tree_iterator next_pos = itr->curr_pos;
 next:

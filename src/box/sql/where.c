@@ -2800,17 +2800,22 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		 * indices to follow
 		 */
 		memset(&fake_index, 0, sizeof(fake_index));
-		struct key_def *key_def = key_def_new(1);
+
+		struct key_part_def part;
+		part.fieldno = 0;
+		part.type = pTab->def->fields[0].type;
+		part.nullable_action = ON_CONFLICT_ACTION_ABORT;
+		part.is_nullable = false;
+		part.sort_order = SORT_ORDER_ASC;
+		part.coll_id = COLL_NONE;
+
+		struct key_def *key_def = key_def_new(&part, 1);
 		if (key_def == NULL) {
 tnt_error:
 			pWInfo->pParse->nErr++;
 			pWInfo->pParse->rc = SQL_TARANTOOL_ERROR;
 			return SQL_TARANTOOL_ERROR;
 		}
-
-		key_def_set_part(key_def, 0, 0, pTab->def->fields[0].type,
-				 ON_CONFLICT_ACTION_ABORT,
-				 NULL, COLL_NONE, SORT_ORDER_ASC);
 
 		struct index_opts opts;
 		index_opts_create(&opts);

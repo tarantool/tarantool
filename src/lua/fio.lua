@@ -381,7 +381,7 @@ fio.rmtree = function(path)
     end
     for i, f in ipairs(ls) do
         local tmppath = fio.pathjoin(path, f)
-        local st = fio.stat(tmppath)
+        local st = fio.lstat(tmppath)
         if st then
             if st:is_dir() then
                 st, err = fio.rmtree(tmppath)

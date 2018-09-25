@@ -8,6 +8,8 @@
 #include <coio_task.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 int
 parse_logger_type(const char *input)
@@ -130,9 +132,13 @@ test_log_rotate()
 
 	for (int i = 0; i < created_logs; i++) {
 		log_destroy(&loggers[i].logger);
+		char tmp_filename[30];
+		sprintf(tmp_filename, "%s/%i.log", tmp_dir, i);
+		unlink(tmp_filename);
 	}
 	memset(loggers, '#', NUMBER_LOGGERS * sizeof(struct create_log));
 	free(loggers);
+	rmdir(tmp_dir);
 
 	is_raised = true;
 	tt_pthread_cond_broadcast(&cond);
@@ -265,5 +271,7 @@ int main()
 	log_destroy(&test_log);
 	fiber_free();
 	memory_free();
+	unlink(tmp_filename);
+	rmdir(tmp_dir);
 	return check_plan();
 }

@@ -423,6 +423,21 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
                         uint32_t path_len, uint32_t path_hash,
                         const char **field);
 
+/**
+ * Get a tuple field pointed to by an index part.
+ * @param format Tuple format.
+ * @param tuple A pointer to MessagePack array.
+ * @param field_map A pointer to the LAST element of field map.
+ * @param part Index part to use.
+ * @retval Field data if the field exists or NULL.
+ */
+static inline const char *
+tuple_field_by_part_raw(const struct tuple_format *format, const char *data,
+			const uint32_t *field_map, struct key_part *part)
+{
+	return tuple_field_raw(format, data, field_map, part->fieldno);
+}
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

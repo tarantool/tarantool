@@ -269,9 +269,9 @@ struct vy_deferred_delete_handler {
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(const struct key_def *cmp_def,
-		      struct tuple_format *format, bool is_primary,
-		      bool is_last_level, struct rlist *read_views,
+vy_write_iterator_new(struct key_def *cmp_def, struct tuple_format *format,
+		      bool is_primary, bool is_last_level,
+		      struct rlist *read_views,
 		      struct vy_deferred_delete_handler *handler);
 
 /**

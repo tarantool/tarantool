@@ -22,8 +22,7 @@ key_def_contains_sequential_parts(const struct key_def *def)
 template <bool has_optional_parts>
 static char *
 tuple_extract_key_sequential_raw(const char *data, const char *data_end,
-				 const struct key_def *key_def,
-				 uint32_t *key_size)
+				 struct key_def *key_def, uint32_t *key_size)
 {
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(key_def_is_sequential(key_def));
@@ -72,8 +71,7 @@ tuple_extract_key_sequential_raw(const char *data, const char *data_end,
  */
 template <bool has_optional_parts>
 static inline char *
-tuple_extract_key_sequential(const struct tuple *tuple,
-			     const struct key_def *key_def,
+tuple_extract_key_sequential(const struct tuple *tuple, struct key_def *key_def,
 			     uint32_t *key_size)
 {
 	assert(key_def_is_sequential(key_def));
@@ -94,7 +92,7 @@ tuple_extract_key_sequential(const struct tuple *tuple,
 template <bool contains_sequential_parts, bool has_optional_parts>
 static char *
 tuple_extract_key_slowpath(const struct tuple *tuple,
-			   const struct key_def *key_def, uint32_t *key_size)
+			   struct key_def *key_def, uint32_t *key_size)
 {
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
@@ -111,8 +109,8 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 	/* Calculate the key size. */
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const char *field =
-			tuple_field_raw(format, data, field_map,
-					key_def->parts[i].fieldno);
+			tuple_field_by_part_raw(format, data, field_map,
+						&key_def->parts[i]);
 		if (has_optional_parts && field == NULL) {
 			bsize += mp_sizeof_nil();
 			continue;
@@ -153,8 +151,8 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 	char *key_buf = mp_encode_array(key, part_count);
 	for (uint32_t i = 0; i < part_count; ++i) {
 		const char *field =
-			tuple_field_raw(format, data, field_map,
-					key_def->parts[i].fieldno);
+			tuple_field_by_part_raw(format, data, field_map,
+						&key_def->parts[i]);
 		if (has_optional_parts && field == NULL) {
 			key_buf = mp_encode_nil(key_buf);
 			continue;
@@ -204,8 +202,7 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 template <bool has_optional_parts>
 static char *
 tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
-			       const struct key_def *key_def,
-			       uint32_t *key_size)
+			       struct key_def *key_def, uint32_t *key_size)
 {
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);

@@ -166,7 +166,7 @@ struct vy_write_iterator {
 	/* A heap to order the sources, newest LSN at heap top. */
 	heap_t src_heap;
 	/** Index key definition used to store statements on disk. */
-	const struct key_def *cmp_def;
+	struct key_def *cmp_def;
 	/** Format to allocate new REPLACE and DELETE tuples from vy_run */
 	struct tuple_format *format;
 	/* There is no LSM tree level older than the one we're writing to. */
@@ -340,9 +340,9 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface;
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(const struct key_def *cmp_def,
-		      struct tuple_format *format, bool is_primary,
-		      bool is_last_level, struct rlist *read_views,
+vy_write_iterator_new(struct key_def *cmp_def, struct tuple_format *format,
+		      bool is_primary, bool is_last_level,
+		      struct rlist *read_views,
 		      struct vy_deferred_delete_handler *handler)
 {
 	/*

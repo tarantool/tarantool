@@ -704,7 +704,7 @@ fio.stat(tmp2) ~= nil
 ---
 - true
 ...
-fio.mktree(tree2, 1)
+fio.mktree(tree2, 0777)
 ---
 - true
 ...
@@ -783,6 +783,10 @@ fio.stat(fio.pathjoin(newdir, "2", "3", "file.3")) ~= nil
 - true
 ...
 fio.readlink(fio.pathjoin(newdir, "2", "3", "file.3")) == file1
+---
+- true
+...
+fio.rmtree(tmpdir)
 ---
 - true
 ...

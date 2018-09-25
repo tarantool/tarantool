@@ -70,6 +70,8 @@ struct key_part_def {
 	enum sort_order sort_order;
 };
 
+extern const struct key_part_def key_part_def_default;
+
 /**
  * Set key_part_def.coll_id to COLL_NONE if
  * the field does not have a collation.
@@ -111,26 +113,26 @@ key_part_is_nullable(const struct key_part *part)
 typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
 					const char *key,
 					uint32_t part_count,
-					const struct key_def *key_def);
+					struct key_def *key_def);
 /** @copydoc tuple_compare() */
 typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
 			       const struct tuple *tuple_b,
-			       const struct key_def *key_def);
+			       struct key_def *key_def);
 /** @copydoc tuple_extract_key() */
 typedef char *(*tuple_extract_key_t)(const struct tuple *tuple,
-				     const struct key_def *key_def,
+				     struct key_def *key_def,
 				     uint32_t *key_size);
 /** @copydoc tuple_extract_key_raw() */
 typedef char *(*tuple_extract_key_raw_t)(const char *data,
 					 const char *data_end,
-					 const struct key_def *key_def,
+					 struct key_def *key_def,
 					 uint32_t *key_size);
 /** @copydoc tuple_hash() */
 typedef uint32_t (*tuple_hash_t)(const struct tuple *tuple,
-				 const struct key_def *key_def);
+				 struct key_def *key_def);
 /** @copydoc key_hash() */
 typedef uint32_t (*key_hash_t)(const char *key,
-				const struct key_def *key_def);
+				struct key_def *key_def);
 
 /* Definition of a multipart key. */
 struct key_def {
@@ -229,7 +231,7 @@ box_key_def_delete(box_key_def_t *key_def);
  */
 int
 box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
-		  const box_key_def_t *key_def);
+		  box_key_def_t *key_def);
 
 /**
  * @brief Compare tuple with key using the key definition.
@@ -244,7 +246,7 @@ box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
 
 int
 box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
-			   const box_key_def_t *key_def);
+			   box_key_def_t *key_def);
 
 /** \endcond public */
 
@@ -255,33 +257,17 @@ key_def_sizeof(uint32_t part_count)
 }
 
 /**
- * Allocate a new key_def with the given part count.
- */
-struct key_def *
-key_def_new(uint32_t part_count);
-
-/**
  * Allocate a new key_def with the given part count
  * and initialize its parts.
  */
 struct key_def *
-key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count);
+key_def_new(const struct key_part_def *parts, uint32_t part_count);
 
 /**
  * Dump part definitions of the given key def.
  */
 void
 key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
-
-/**
- * Set a single key part in a key def.
- * @pre part_no < part_count
- */
-void
-key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
-		 enum field_type type, enum on_conflict_action nullable_action,
-		 struct coll *coll, uint32_t coll_id,
-		 enum sort_order sort_order);
 
 /**
  * Update 'has_optional_parts' of @a key_def with correspondence
@@ -458,7 +444,7 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
  * @retval NULL     Memory allocation error
  */
 static inline char *
-tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
+tuple_extract_key(const struct tuple *tuple, struct key_def *key_def,
 		  uint32_t *key_size)
 {
 	return key_def->tuple_extract_key(tuple, key_def, key_size);
@@ -479,7 +465,7 @@ tuple_extract_key(const struct tuple *tuple, const struct key_def *key_def,
  */
 static inline char *
 tuple_extract_key_raw(const char *data, const char *data_end,
-		      const struct key_def *key_def, uint32_t *key_size)
+		      struct key_def *key_def, uint32_t *key_size)
 {
 	return key_def->tuple_extract_key_raw(data, data_end, key_def,
 					      key_size);
@@ -498,8 +484,7 @@ tuple_extract_key_raw(const char *data, const char *data_end,
  * @retval >0 if key_a > key_b
  */
 int
-key_compare(const char *key_a, const char *key_b,
-	    const struct key_def *key_def);
+key_compare(const char *key_a, const char *key_b, struct key_def *key_def);
 
 /**
  * Compare tuples using the key definition.
@@ -512,7 +497,7 @@ key_compare(const char *key_a, const char *key_b,
  */
 static inline int
 tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
-	      const struct key_def *key_def)
+	      struct key_def *key_def)
 {
 	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
 }
@@ -530,7 +515,7 @@ tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
  */
 static inline int
 tuple_compare_with_key(const struct tuple *tuple, const char *key,
-		       uint32_t part_count, const struct key_def *key_def)
+		       uint32_t part_count, struct key_def *key_def)
 {
 	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
 }

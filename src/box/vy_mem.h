@@ -88,7 +88,7 @@ struct tree_mem_key {
  */
 static int
 vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
-		const struct key_def *cmp_def)
+		struct key_def *cmp_def)
 {
 	int res = vy_tuple_compare(a, b, cmp_def);
 	if (res)
@@ -102,7 +102,7 @@ vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
  */
 static int
 vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
-		    const struct key_def *cmp_def)
+		    struct key_def *cmp_def)
 {
 	int res = vy_stmt_compare(a, key->stmt, cmp_def);
 	if (res == 0) {
@@ -123,7 +123,7 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_mem_tree_cmp_key(a, b, cmp_def)
 #define bps_tree_elem_t const struct tuple *
 #define bps_tree_key_t struct tree_mem_key *
-#define bps_tree_arg_t const struct key_def *
+#define bps_tree_arg_t struct key_def *
 #define BPS_TREE_NO_DEBUG
 
 #include <salad/bps_tree.h>
@@ -183,7 +183,7 @@ struct vy_mem {
 	 * Key definition for this index, extended with primary
 	 * key parts.
 	 */
-	const struct key_def *cmp_def;
+	struct key_def *cmp_def;
 	/** version is initially 0 and is incremented on every write */
 	uint32_t version;
 	/** Data dictionary cache version at the time of creation. */
@@ -265,7 +265,7 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  */
 struct vy_mem *
 vy_mem_new(struct vy_mem_env *env, int64_t generation,
-	   const struct key_def *cmp_def, struct tuple_format *format,
+	   struct key_def *cmp_def, struct tuple_format *format,
 	   struct tuple_format *format_with_colmask,
 	   uint32_t space_cache_version);
 

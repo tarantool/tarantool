@@ -72,7 +72,7 @@ struct vy_range {
 	 * keys, to ensure an always distinct result for
 	 * non-unique keys.
 	 */
-	const struct key_def *cmp_def;
+	struct key_def *cmp_def;
 	/** An estimate of the number of statements in this range. */
 	struct vy_disk_stmt_counter count;
 	/**
@@ -197,7 +197,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
  */
 struct vy_range *
 vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
-	     const struct key_def *cmp_def);
+	     struct key_def *cmp_def);
 
 /**
  * Free a range and all its slices.

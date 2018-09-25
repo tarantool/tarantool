@@ -38,7 +38,7 @@
 
 const char *sort_order_strs[] = { "asc", "desc", "undef" };
 
-static const struct key_part_def key_part_def_default = {
+const struct key_part_def key_part_def_default = {
 	0,
 	field_type_MAX,
 	COLL_NONE,
@@ -140,30 +140,39 @@ key_def_set_cmp(struct key_def *def)
 	tuple_extract_key_set(def);
 }
 
-struct key_def *
-key_def_new(uint32_t part_count)
+static void
+key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
+		 enum field_type type, enum on_conflict_action nullable_action,
+		 struct coll *coll, uint32_t coll_id,
+		 enum sort_order sort_order)
 {
-	size_t sz = key_def_sizeof(part_count);
-	/** Use calloc() to zero comparator function pointers. */
-	struct key_def *key_def = (struct key_def *) calloc(1, sz);
-	if (key_def == NULL) {
-		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
-		return NULL;
-	}
-	key_def->part_count = part_count;
-	key_def->unique_part_count = part_count;
-	return key_def;
+	assert(part_no < def->part_count);
+	assert(type < field_type_MAX);
+	def->is_nullable |= (nullable_action == ON_CONFLICT_ACTION_NONE);
+	def->parts[part_no].nullable_action = nullable_action;
+	def->parts[part_no].fieldno = fieldno;
+	def->parts[part_no].type = type;
+	def->parts[part_no].coll = coll;
+	def->parts[part_no].coll_id = coll_id;
+	def->parts[part_no].sort_order = sort_order;
+	column_mask_set_fieldno(&def->column_mask, fieldno);
 }
 
 struct key_def *
-key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
+key_def_new(const struct key_part_def *parts, uint32_t part_count)
 {
-	struct key_def *def = key_def_new(part_count);
-	if (def == NULL)
+	size_t sz = key_def_sizeof(part_count);
+	struct key_def *def = calloc(1, sz);
+	if (def == NULL) {
+		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
 		return NULL;
+	}
+
+	def->part_count = part_count;
+	def->unique_part_count = part_count;
 
 	for (uint32_t i = 0; i < part_count; i++) {
-		struct key_part_def *part = &parts[i];
+		const struct key_part_def *part = &parts[i];
 		struct coll *coll = NULL;
 		if (part->coll_id != COLL_NONE) {
 			struct coll_id *coll_id = coll_by_id(part->coll_id);
@@ -179,6 +188,7 @@ key_def_new_with_parts(struct key_part_def *parts, uint32_t part_count)
 				 part->nullable_action, coll, part->coll_id,
 				 part->sort_order);
 	}
+	key_def_set_cmp(def);
 	return def;
 }
 
@@ -199,16 +209,23 @@ key_def_dump_parts(const struct key_def *def, struct key_part_def *parts)
 box_key_def_t *
 box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 {
-	struct key_def *key_def = key_def_new(part_count);
-	if (key_def == NULL)
-		return key_def;
+	size_t sz = key_def_sizeof(part_count);
+	struct key_def *key_def = calloc(1, sz);
+	if (key_def == NULL) {
+		diag_set(OutOfMemory, sz, "malloc", "struct key_def");
+		return NULL;
+	}
+
+	key_def->part_count = part_count;
+	key_def->unique_part_count = part_count;
 
 	for (uint32_t item = 0; item < part_count; ++item) {
 		key_def_set_part(key_def, item, fields[item],
 				 (enum field_type)types[item],
-				 key_part_def_default.nullable_action,
+				 ON_CONFLICT_ACTION_DEFAULT,
 				 NULL, COLL_NONE, SORT_ORDER_ASC);
 	}
+	key_def_set_cmp(key_def);
 	return key_def;
 }
 
@@ -220,14 +237,14 @@ box_key_def_delete(box_key_def_t *key_def)
 
 int
 box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
-		  const box_key_def_t *key_def)
+		  box_key_def_t *key_def)
 {
 	return tuple_compare(tuple_a, tuple_b, key_def);
 }
 
 int
 box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
-			   const box_key_def_t *key_def)
+			   box_key_def_t *key_def)
 {
 	uint32_t part_count = mp_decode_array(&key_b);
 	return tuple_compare_with_key(tuple_a, key_b, part_count, key_def);
@@ -257,38 +274,6 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 			       key_part_is_nullable(part2) ? -1 : 1;
 	}
 	return part_count1 < part_count2 ? -1 : part_count1 > part_count2;
-}
-
-void
-key_def_set_part(struct key_def *def, uint32_t part_no, uint32_t fieldno,
-		 enum field_type type, enum on_conflict_action nullable_action,
-		 struct coll *coll, uint32_t coll_id,
-		 enum sort_order sort_order)
-{
-	assert(part_no < def->part_count);
-	assert(type < field_type_MAX);
-	def->is_nullable |= (nullable_action == ON_CONFLICT_ACTION_NONE);
-	def->parts[part_no].nullable_action = nullable_action;
-	def->parts[part_no].fieldno = fieldno;
-	def->parts[part_no].type = type;
-	def->parts[part_no].coll = coll;
-	def->parts[part_no].coll_id = coll_id;
-	def->parts[part_no].sort_order = sort_order;
-	column_mask_set_fieldno(&def->column_mask, fieldno);
-	/**
-	 * When all parts are set, initialize the tuple
-	 * comparator function.
-	 */
-	/* Last part is set, initialize the comparators. */
-	bool all_parts_set = true;
-	for (uint32_t i = 0; i < def->part_count; i++) {
-		if (def->parts[i].type == FIELD_TYPE_ANY) {
-			all_parts_set = false;
-			break;
-		}
-	}
-	if (all_parts_set)
-		key_def_set_cmp(def);
 }
 
 void
@@ -605,6 +590,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 				 part->nullable_action, part->coll,
 				 part->coll_id, part->sort_order);
 	}
+	key_def_set_cmp(new_def);
 	return new_def;
 }
 

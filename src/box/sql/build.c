@@ -2298,9 +2298,14 @@ index_fill_def(struct Parse *parse, struct index *index,
 	index->def = NULL;
 	int rc = -1;
 
-	struct key_def *key_def = key_def_new(expr_list->nExpr);
-	if (key_def == NULL)
+	struct key_def *key_def = NULL;
+	struct key_part_def *key_parts = region_alloc(&fiber()->gc,
+				sizeof(*key_parts) * expr_list->nExpr);
+	if (key_parts == NULL) {
+		diag_set(OutOfMemory, sizeof(*key_parts) * expr_list->nExpr,
+			 "region", "key parts");
 		goto tnt_error;
+	}
 	struct Table tmp_tab;
 	tmp_tab.def = space_def;
 	tmp_tab.nTabRef = 2;
@@ -2320,29 +2325,32 @@ index_fill_def(struct Parse *parse, struct index *index,
 
 		uint32_t fieldno = column_expr->iColumn;
 		uint32_t coll_id;
-		struct coll *coll;
 		if (expr->op == TK_COLLATE) {
-			coll = sql_get_coll_seq(parse, expr->u.zToken,
-						&coll_id);
-			if (coll == NULL &&
+			sql_get_coll_seq(parse, expr->u.zToken, &coll_id);
+			if (coll_id == COLL_NONE &&
 			    strcasecmp(expr->u.zToken, "binary") != 0) {
 				diag_set(ClientError, ER_NO_SUCH_COLLATION,
 					 expr->u.zToken);
 				goto tnt_error;
 			}
 		} else {
-			coll = sql_column_collation(space_def, fieldno,
-						    &coll_id);
+			sql_column_collation(space_def, fieldno, &coll_id);
 		}
 		/*
 		 * Tarantool: DESC indexes are not supported so
 		 * far.
 		 */
-		key_def_set_part(key_def, i, fieldno,
-				 space_def->fields[fieldno].type,
-				 space_def->fields[fieldno].nullable_action,
-				 coll, coll_id, SORT_ORDER_ASC);
+		struct key_part_def *part = &key_parts[i];
+		part->fieldno = fieldno;
+		part->type = space_def->fields[fieldno].type;
+		part->nullable_action = space_def->fields[fieldno].nullable_action;
+		part->is_nullable = part->nullable_action == ON_CONFLICT_ACTION_NONE;
+		part->sort_order = SORT_ORDER_ASC;
+		part->coll_id = coll_id;
 	}
+	key_def = key_def_new(key_parts, expr_list->nExpr);
+	if (key_def == NULL)
+		goto tnt_error;
 	/*
 	 * Index def of PK is set to be NULL since it matters
 	 * only for comparison routine. Meanwhile on front-end

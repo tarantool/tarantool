@@ -65,7 +65,7 @@ struct tuple_format;
  */
 struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
-		const struct key_def *cmp_def, struct tuple_format *format,
+		struct key_def *cmp_def, struct tuple_format *format,
 		bool suppress_error);
 
 #if defined(__cplusplus)

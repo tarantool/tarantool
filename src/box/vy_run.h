@@ -218,9 +218,9 @@ struct vy_run_iterator {
 
 	/* Members needed for memory allocation and disk access */
 	/** Key definition used for comparing statements on disk. */
-	const struct key_def *cmp_def;
+	struct key_def *cmp_def;
 	/** Key definition provided by the user. */
-	const struct key_def *key_def;
+	struct key_def *key_def;
 	/**
 	 * Format ot allocate REPLACE and DELETE tuples read from
 	 * pages.
@@ -370,8 +370,7 @@ vy_run_recover(struct vy_run *run, const char *dir,
 int
 vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		     uint32_t space_id, uint32_t iid,
-		     const struct key_def *cmp_def,
-		     const struct key_def *key_def,
+		     struct key_def *cmp_def, struct key_def *key_def,
 		     struct tuple_format *format,
 		     const struct index_opts *opts);
 
@@ -428,9 +427,8 @@ vy_run_remove_files(const char *dir, uint32_t space_id,
  * This function increments @run->refs.
  */
 struct vy_slice *
-vy_slice_new(int64_t id, struct vy_run *run,
-	     struct tuple *begin, struct tuple *end,
-	     const struct key_def *cmp_def);
+vy_slice_new(int64_t id, struct vy_run *run, struct tuple *begin,
+	     struct tuple *end, struct key_def *cmp_def);
 
 /**
  * Free a run slice.
@@ -480,9 +478,8 @@ vy_slice_wait_pinned(struct vy_slice *slice)
  * with [@begin, @end), @result is set to NULL.
  */
 int
-vy_slice_cut(struct vy_slice *slice, int64_t id,
-	     struct tuple *begin, struct tuple *end,
-	     const struct key_def *cmp_def,
+vy_slice_cut(struct vy_slice *slice, int64_t id, struct tuple *begin,
+	     struct tuple *end, struct key_def *cmp_def,
 	     struct vy_slice **result);
 
 /**
@@ -496,8 +493,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
-		     const struct key_def *cmp_def,
-		     const struct key_def *key_def,
+		     struct key_def *cmp_def, struct key_def *key_def,
 		     struct tuple_format *format, bool is_primary);
 
 /**
@@ -547,7 +543,7 @@ struct vy_slice_stream {
 	 * Key def for comparing with slice boundaries,
 	 * includes secondary key parts.
 	 */
-	const struct key_def *cmp_def;
+	struct key_def *cmp_def;
 	/** Format for allocating REPLACE and DELETE tuples read from pages. */
 	struct tuple_format *format;
 	/** Set if this iterator is for a primary index. */
@@ -559,7 +555,7 @@ struct vy_slice_stream {
  */
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
-		     const struct key_def *cmp_def, struct tuple_format *format,
+		     struct key_def *cmp_def, struct tuple_format *format,
 		     bool is_primary);
 
 /**
@@ -580,9 +576,9 @@ struct vy_run_writer {
 	 * min key, run min/max keys, and secondary index
 	 * statements.
 	 */
-	const struct key_def *cmp_def;
+	struct key_def *cmp_def;
 	/** Key definition to calculate bloom. */
-	const struct key_def *key_def;
+	struct key_def *key_def;
 	/**
 	 * Minimal page size. When a page becames bigger, it is
 	 * dumped.
@@ -610,9 +606,9 @@ struct vy_run_writer {
 /** Create a run writer to fill a run with statements. */
 int
 vy_run_writer_create(struct vy_run_writer *writer, struct vy_run *run,
-		const char *dirpath, uint32_t space_id, uint32_t iid,
-		const struct key_def *cmp_def, const struct key_def *key_def,
-		uint64_t page_size, double bloom_fpr);
+		     const char *dirpath, uint32_t space_id, uint32_t iid,
+		     struct key_def *cmp_def, struct key_def *key_def,
+		     uint64_t page_size, double bloom_fpr);
 
 /**
  * Write a specified statement into a run.

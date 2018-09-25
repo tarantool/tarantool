@@ -387,8 +387,7 @@ vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
 }
 
 struct tuple *
-vy_stmt_new_surrogate_delete_from_key(const char *key,
-				      const struct key_def *cmp_def,
+vy_stmt_new_surrogate_delete_from_key(const char *key, struct key_def *cmp_def,
 				      struct tuple_format *format)
 {
 	return vy_stmt_new_surrogate_from_key(key, IPROTO_DELETE,
@@ -457,7 +456,7 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 }
 
 struct tuple *
-vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
+vy_stmt_extract_key(const struct tuple *stmt, struct key_def *key_def,
 		    struct tuple_format *format)
 {
 	struct region *region = &fiber()->gc;
@@ -475,7 +474,7 @@ vy_stmt_extract_key(const struct tuple *stmt, const struct key_def *key_def,
 
 struct tuple *
 vy_stmt_extract_key_raw(const char *data, const char *data_end,
-			const struct key_def *key_def,
+			struct key_def *key_def,
 			struct tuple_format *format)
 {
 	struct region *region = &fiber()->gc;
@@ -543,9 +542,8 @@ vy_stmt_meta_decode(struct request *request, struct tuple *stmt)
 }
 
 int
-vy_stmt_encode_primary(const struct tuple *value,
-		       const struct key_def *key_def, uint32_t space_id,
-		       struct xrow_header *xrow)
+vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
+		       uint32_t space_id, struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
 	enum iproto_type type = vy_stmt_type(value);
@@ -591,8 +589,7 @@ vy_stmt_encode_primary(const struct tuple *value,
 }
 
 int
-vy_stmt_encode_secondary(const struct tuple *value,
-			 const struct key_def *cmp_def,
+vy_stmt_encode_secondary(const struct tuple *value, struct key_def *cmp_def,
 			 struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));

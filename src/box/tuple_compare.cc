@@ -426,15 +426,24 @@ tuple_compare_field_with_hint(const char *field_a, enum mp_type a_type,
 }
 
 uint32_t
-tuple_common_key_parts(const struct tuple *tuple_a,
-		       const struct tuple *tuple_b,
-		       const struct key_def *key_def)
+tuple_common_key_parts(const struct tuple *tuple_a, const struct tuple *tuple_b,
+		       struct key_def *key_def)
 {
 	uint32_t i;
+	struct tuple_format *tuple_a_format = tuple_format(tuple_a);
+	struct tuple_format *tuple_b_format = tuple_format(tuple_b);
+	const char *tuple_a_raw = tuple_data(tuple_a);
+	const char *tuple_b_raw = tuple_data(tuple_b);
+	const uint32_t *tuple_a_field_map = tuple_field_map(tuple_a);
+	const uint32_t *tuple_b_field_map = tuple_field_map(tuple_b);
 	for (i = 0; i < key_def->part_count; i++) {
-		const struct key_part *part = &key_def->parts[i];
-		const char *field_a = tuple_field(tuple_a, part->fieldno);
-		const char *field_b = tuple_field(tuple_b, part->fieldno);
+		struct key_part *part = (struct key_part *)&key_def->parts[i];
+		const char *field_a =
+			tuple_field_by_part_raw(tuple_a_format, tuple_a_raw,
+						tuple_a_field_map, part);
+		const char *field_b =
+			tuple_field_by_part_raw(tuple_b_format, tuple_b_raw,
+						tuple_b_field_map, part);
 		enum mp_type a_type = field_a != NULL ?
 				      mp_typeof(*field_a) : MP_NIL;
 		enum mp_type b_type = field_b != NULL ?
@@ -452,12 +461,12 @@ tuple_common_key_parts(const struct tuple *tuple_a,
 template<bool is_nullable, bool has_optional_parts>
 static inline int
 tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
-		       const struct key_def *key_def)
+		       struct key_def *key_def)
 {
 	assert(!has_optional_parts || is_nullable);
 	assert(is_nullable == key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
-	const struct key_part *part = key_def->parts;
+	struct key_part *part = key_def->parts;
 	const char *tuple_a_raw = tuple_data(tuple_a);
 	const char *tuple_b_raw = tuple_data(tuple_b);
 	if (key_def->part_count == 1 && part->fieldno == 0) {
@@ -488,7 +497,7 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	const struct tuple_format *format_b = tuple_format(tuple_b);
 	const uint32_t *field_map_a = tuple_field_map(tuple_a);
 	const uint32_t *field_map_b = tuple_field_map(tuple_b);
-	const struct key_part *end;
+	struct key_part *end;
 	const char *field_a, *field_b;
 	enum mp_type a_type, b_type;
 	int rc;
@@ -498,10 +507,10 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		end = part + key_def->part_count;
 
 	for (; part < end; part++) {
-		field_a = tuple_field_raw(format_a, tuple_a_raw, field_map_a,
-					  part->fieldno);
-		field_b = tuple_field_raw(format_b, tuple_b_raw, field_map_b,
-					  part->fieldno);
+		field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
+						  field_map_a, part);
+		field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
+						  field_map_b, part);
 		assert(has_optional_parts ||
 		       (field_a != NULL && field_b != NULL));
 		if (! is_nullable) {
@@ -548,10 +557,10 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	 */
 	end = key_def->parts + key_def->part_count;
 	for (; part < end; ++part) {
-		field_a = tuple_field_raw(format_a, tuple_a_raw, field_map_a,
-					  part->fieldno);
-		field_b = tuple_field_raw(format_b, tuple_b_raw, field_map_b,
-					  part->fieldno);
+		field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
+						  field_map_a, part);
+		field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
+						  field_map_b, part);
 		/*
 		 * Extended parts are primary, and they can not
 		 * be absent or be NULLs.
@@ -568,23 +577,22 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 template<bool is_nullable, bool has_optional_parts>
 static inline int
 tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
-				uint32_t part_count,
-				const struct key_def *key_def)
+				uint32_t part_count, struct key_def *key_def)
 {
 	assert(!has_optional_parts || is_nullable);
 	assert(is_nullable == key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
 	assert(key != NULL || part_count == 0);
 	assert(part_count <= key_def->part_count);
-	const struct key_part *part = key_def->parts;
+	struct key_part *part = key_def->parts;
 	const struct tuple_format *format = tuple_format(tuple);
 	const char *tuple_raw = tuple_data(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
 	enum mp_type a_type, b_type;
 	if (likely(part_count == 1)) {
-		const char *field;
-		field = tuple_field_raw(format, tuple_raw, field_map,
-					part->fieldno);
+		const char *field =
+			tuple_field_by_part_raw(format, tuple_raw, field_map,
+						part);
 		if (! is_nullable) {
 			return tuple_compare_field(field, key, part->type,
 						   part->coll);
@@ -605,12 +613,12 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 		}
 	}
 
-	const struct key_part *end = part + part_count;
+	struct key_part *end = part + part_count;
 	int rc;
 	for (; part < end; ++part, mp_next(&key)) {
-		const char *field;
-		field = tuple_field_raw(format, tuple_raw, field_map,
-					part->fieldno);
+		const char *field =
+			tuple_field_by_part_raw(format, tuple_raw,
+						field_map, part);
 		if (! is_nullable) {
 			rc = tuple_compare_field(field, key, part->type,
 						 part->coll);
@@ -643,11 +651,11 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 template<bool is_nullable>
 static inline int
 key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
-		  const struct key_def *key_def)
+		  struct key_def *key_def)
 {
 	assert(is_nullable == key_def->is_nullable);
 	assert((key_a != NULL && key_b != NULL) || part_count == 0);
-	const struct key_part *part = key_def->parts;
+	struct key_part *part = key_def->parts;
 	if (likely(part_count == 1)) {
 		if (! is_nullable) {
 			return tuple_compare_field(key_a, key_b, part->type,
@@ -667,7 +675,7 @@ key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
 		}
 	}
 
-	const struct key_part *end = part + part_count;
+	struct key_part *end = part + part_count;
 	int rc;
 	for (; part < end; ++part, mp_next(&key_a), mp_next(&key_b)) {
 		if (! is_nullable) {
@@ -699,8 +707,7 @@ key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
 template<bool is_nullable, bool has_optional_parts>
 static inline int
 tuple_compare_with_key_sequential(const struct tuple *tuple, const char *key,
-				  uint32_t part_count,
-				  const struct key_def *key_def)
+				  uint32_t part_count, struct key_def *key_def)
 {
 	assert(!has_optional_parts || is_nullable);
 	assert(key_def_is_sequential(key_def));
@@ -739,8 +746,7 @@ tuple_compare_with_key_sequential(const struct tuple *tuple, const char *key,
 }
 
 int
-key_compare(const char *key_a, const char *key_b,
-	    const struct key_def *key_def)
+key_compare(const char *key_a, const char *key_b, struct key_def *key_def)
 {
 	uint32_t part_count_a = mp_decode_array(&key_a);
 	uint32_t part_count_b = mp_decode_array(&key_b);
@@ -760,8 +766,7 @@ key_compare(const char *key_a, const char *key_b,
 template <bool is_nullable, bool has_optional_parts>
 static int
 tuple_compare_sequential(const struct tuple *tuple_a,
-			 const struct tuple *tuple_b,
-			 const struct key_def *key_def)
+			 const struct tuple *tuple_b, key_def *key_def)
 {
 	assert(!has_optional_parts || is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
@@ -778,8 +783,8 @@ tuple_compare_sequential(const struct tuple *tuple_a,
 						key_def->part_count, key_def);
 	}
 	bool was_null_met = false;
-	const struct key_part *part = key_def->parts;
-	const struct key_part *end = part + key_def->unique_part_count;
+	struct key_part *part = key_def->parts;
+	struct key_part *end = part + key_def->unique_part_count;
 	int rc;
 	uint32_t i = 0;
 	for (; part < end; ++part, ++i) {
@@ -944,7 +949,7 @@ struct TupleCompare
 {
 	static int compare(const struct tuple *tuple_a,
 			   const struct tuple *tuple_b,
-			   const struct key_def *)
+			   struct key_def *)
 	{
 		struct tuple_format *format_a = tuple_format(tuple_a);
 		struct tuple_format *format_b = tuple_format(tuple_b);
@@ -963,7 +968,7 @@ template <int TYPE, int ...MORE_TYPES>
 struct TupleCompare<0, TYPE, MORE_TYPES...> {
 	static int compare(const struct tuple *tuple_a,
 			   const struct tuple *tuple_b,
-			   const struct key_def *)
+			   struct key_def *)
 	{
 		struct tuple_format *format_a = tuple_format(tuple_a);
 		struct tuple_format *format_b = tuple_format(tuple_b);
@@ -1115,7 +1120,7 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 {
 	inline static int
 	compare(const struct tuple *tuple, const char *key,
-		uint32_t part_count, const struct key_def *key_def,
+		uint32_t part_count, struct key_def *key_def,
 		const struct tuple_format *format, const char *field)
 	{
 		int r;
@@ -1141,11 +1146,11 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 template <int FLD_ID, int IDX, int TYPE>
 struct FieldCompareWithKey<FLD_ID, IDX, TYPE> {
 	inline static int compare(const struct tuple *,
-					 const char *key,
-					 uint32_t,
-					 const struct key_def *,
-					 const struct tuple_format *,
-					 const char *field)
+				  const char *key,
+				  uint32_t,
+				  struct key_def *,
+				  const struct tuple_format *,
+				  const char *field)
 	{
 		return field_compare_with_key<TYPE>(&field, &key);
 	}
@@ -1159,7 +1164,7 @@ struct TupleCompareWithKey
 {
 	static int
 	compare(const struct tuple *tuple, const char *key,
-		uint32_t part_count, const struct key_def *key_def)
+		uint32_t part_count, struct key_def *key_def)
 	{
 		/* Part count can be 0 in wildcard searches. */
 		if (part_count == 0)
@@ -1180,7 +1185,7 @@ struct TupleCompareWithKey<0, 0, TYPE, MORE_TYPES...>
 	static int compare(const struct tuple *tuple,
 				  const char *key,
 				  uint32_t part_count,
-				  const struct key_def *key_def)
+				  struct key_def *key_def)
 	{
 		/* Part count can be 0 in wildcard searches. */
 		if (part_count == 0)
