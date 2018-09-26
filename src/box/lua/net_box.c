@@ -672,16 +672,35 @@ static void
 netbox_decode_sql_info(struct lua_State *L, const char **data)
 {
 	uint32_t map_size = mp_decode_map(data);
-	/* Only SQL_INFO_ROW_COUNT is available. */
-	assert(map_size == 1);
-	(void) map_size;
+	assert(map_size == 1 || map_size == 2);
+	lua_newtable(L);
+	/*
+	 * First element in data is SQL_INFO_ROW_COUNT.
+	 */
 	uint32_t key = mp_decode_uint(data);
 	assert(key == SQL_INFO_ROW_COUNT);
-	(void) key;
 	uint32_t row_count = mp_decode_uint(data);
-	lua_createtable(L, 0, 1);
 	lua_pushinteger(L, row_count);
 	lua_setfield(L, -2, "rowcount");
+	/*
+	 * If data have two elements then second is
+	 * SQL_INFO_AUTOINCREMENT_IDS.
+	 */
+	if (map_size == 2) {
+		key = mp_decode_uint(data);
+		assert(key == SQL_INFO_AUTOINCREMENT_IDS);
+		(void)key;
+		uint64_t count = mp_decode_array(data);
+		assert(count > 0);
+		lua_createtable(L, 0, count);
+		for (uint32_t j = 0; j < count; ++j) {
+			int64_t id;
+			mp_read_int64(data, &id);
+			luaL_pushint64(L, id);
+			lua_rawseti(L, -2, j + 1);
+		}
+		lua_setfield(L, -2, "autoincrement_ids");
+	}
 }
 
 static int

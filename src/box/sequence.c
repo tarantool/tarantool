@@ -38,6 +38,7 @@
 #include <small/mempool.h>
 #include <msgpuck/msgpuck.h>
 
+#include "txn.h"
 #include "diag.h"
 #include "error.h"
 #include "errcode.h"
@@ -194,6 +195,9 @@ sequence_next(struct sequence *seq, int64_t *result)
 					  new_data) == light_sequence_end)
 			return -1;
 		*result = def->start;
+		if (txn_vdbe() != NULL &&
+		    vdbe_add_new_autoinc_id(txn_vdbe(), *result) != 0)
+			return -1;
 		return 0;
 	}
 	old_data = light_sequence_get(&sequence_data_index, pos);
@@ -228,6 +232,9 @@ done:
 				   new_data, &old_data) == light_sequence_end)
 		unreachable();
 	*result = value;
+	if (txn_vdbe() != NULL &&
+	    vdbe_add_new_autoinc_id(txn_vdbe(), value) != 0)
+		return -1;
 	return 0;
 overflow:
 	if (!def->cycle) {

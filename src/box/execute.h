@@ -42,6 +42,7 @@ extern "C" {
 /** Keys of IPROTO_SQL_INFO map. */
 enum sql_info_key {
 	SQL_INFO_ROW_COUNT = 0,
+	SQL_INFO_AUTOINCREMENT_IDS = 1,
 	sql_info_key_MAX,
 };
 

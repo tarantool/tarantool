@@ -175,10 +175,11 @@ Vdbe *sqlite3VdbeCreate(Parse *);
  * Allocate and initialize SQL-specific struct which completes
  * original Tarantool's txn struct using region allocator.
  *
+ * @param v Vdbe with which associate this transaction.
  * @retval NULL on OOM, new psql_txn struct on success.
  **/
 struct sql_txn *
-sql_alloc_txn();
+sql_alloc_txn(struct Vdbe *v);
 
 /**
  * Prepare given VDBE to execution: initialize structs connected
@@ -192,6 +193,15 @@ sql_alloc_txn();
  */
 int
 sql_vdbe_prepare(struct Vdbe *vdbe);
+
+/**
+ * Return pointer to list of generated ids.
+ *
+ * @param vdbe VDBE to get list of generated ids from.
+ * @retval List of generated ids.
+ */
+struct stailq *
+vdbe_autoinc_id_list(struct Vdbe *vdbe);
 
 int sqlite3VdbeAddOp0(Vdbe *, int);
 int sqlite3VdbeAddOp1(Vdbe *, int, int);

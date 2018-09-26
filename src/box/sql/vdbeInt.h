@@ -367,6 +367,11 @@ struct Vdbe {
 	struct sql_txn *psql_txn;
 	/** The auto-commit flag. */
 	bool auto_commit;
+	/**
+	 * List of ids generated in current VDBE. It is returned
+	 * as metadata of SQL response.
+	 */
+	struct stailq autoinc_id_list;
 
 	/* When allocating a new Vdbe object, all of the fields below should be
 	 * initialized to zero or NULL

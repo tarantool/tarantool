@@ -57,6 +57,7 @@ sqlite3VdbeCreate(Parse * pParse)
 		return 0;
 	memset(p, 0, sizeof(Vdbe));
 	p->db = db;
+	stailq_create(&p->autoinc_id_list);
 	if (db->pVdbe) {
 		db->pVdbe->pPrev = p;
 	}
@@ -75,7 +76,7 @@ sqlite3VdbeCreate(Parse * pParse)
 }
 
 struct sql_txn *
-sql_alloc_txn()
+sql_alloc_txn(struct Vdbe *v)
 {
 	struct sql_txn *txn = region_alloc_object(&fiber()->gc,
 						  struct sql_txn);
@@ -84,6 +85,8 @@ sql_alloc_txn()
 			 "struct sql_txn");
 		return NULL;
 	}
+	txn->vdbe = v;
+	v->psql_txn = txn;
 	txn->pSavepoint = NULL;
 	txn->fk_deferred_count = 0;
 	return txn;
@@ -103,11 +106,12 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
 		 * check FK violations, at least now.
 		 */
 		if (txn->psql_txn == NULL) {
-			txn->psql_txn = sql_alloc_txn();
+			txn->psql_txn = sql_alloc_txn(vdbe);
 			if (txn->psql_txn == NULL)
 				return -1;
+		} else {
+			vdbe->psql_txn = txn->psql_txn;
 		}
-		vdbe->psql_txn = txn->psql_txn;
 	} else {
 		vdbe->psql_txn = NULL;
 	}
@@ -2261,12 +2265,11 @@ sql_txn_begin(Vdbe *p)
 	struct txn *ptxn = txn_begin(false);
 	if (ptxn == NULL)
 		return -1;
-	ptxn->psql_txn = sql_alloc_txn();
+	ptxn->psql_txn = sql_alloc_txn(p);
 	if (ptxn->psql_txn == NULL) {
 		box_txn_rollback();
 		return -1;
 	}
-	p->psql_txn = ptxn->psql_txn;
 	return 0;
 }
 
@@ -2414,9 +2417,9 @@ sqlite3VdbeHalt(Vdbe * p)
 					 * key constraints to hold up the transaction. This means a commit
 					 * is required.
 					 */
-					rc = box_txn_commit() ==
-						    0 ? SQLITE_OK :
-						    SQL_TARANTOOL_ERROR;
+					rc = (in_txn() == NULL ||
+					      txn_commit(in_txn()) == 0) ?
+					     SQLITE_OK : SQL_TARANTOOL_ERROR;
 					closeCursorsAndFree(p);
 				}
 				if (rc == SQLITE_BUSY && !p->pDelFrame) {
@@ -2781,6 +2784,12 @@ sqlite3VdbeDelete(Vdbe * p)
 	p->magic = VDBE_MAGIC_DEAD;
 	p->db = 0;
 	free(p->var_pos);
+	/*
+	 * VDBE is responsible for releasing region after txn
+	 * was commited.
+	 */
+	if (in_txn() == NULL)
+		fiber_gc();
 	sqlite3DbFree(db, p);
 }
 

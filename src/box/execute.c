@@ -42,6 +42,7 @@
 #include "schema.h"
 #include "port.h"
 #include "tuple.h"
+#include "sql/vdbe.h"
 
 const char *sql_type_strs[] = {
 	NULL,
@@ -642,11 +643,26 @@ err:
 	} else {
 		keys = 1;
 		assert(port_tuple->size == 0);
-		if (iproto_reply_map_key(out, 1, IPROTO_SQL_INFO) != 0)
+		struct stailq *autoinc_id_list =
+			vdbe_autoinc_id_list((struct Vdbe *)stmt);
+		uint32_t map_size = stailq_empty(autoinc_id_list) ? 1 : 2;
+		if (iproto_reply_map_key(out, map_size, IPROTO_SQL_INFO) != 0)
 			goto err;
+		uint64_t id_count = 0;
 		int changes = sqlite3_changes(db);
 		int size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
 			   mp_sizeof_uint(changes);
+		if (!stailq_empty(autoinc_id_list)) {
+			struct autoinc_id_entry *id_entry;
+			stailq_foreach_entry(id_entry, autoinc_id_list, link) {
+				size += id_entry->id >= 0 ?
+					mp_sizeof_uint(id_entry->id) :
+					mp_sizeof_int(id_entry->id);
+				id_count++;
+			}
+			size += mp_sizeof_uint(SQL_INFO_AUTOINCREMENT_IDS) +
+				mp_sizeof_array(id_count);
+		}
 		char *buf = obuf_alloc(out, size);
 		if (buf == NULL) {
 			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
@@ -654,6 +670,16 @@ err:
 		}
 		buf = mp_encode_uint(buf, SQL_INFO_ROW_COUNT);
 		buf = mp_encode_uint(buf, changes);
+		if (!stailq_empty(autoinc_id_list)) {
+			buf = mp_encode_uint(buf, SQL_INFO_AUTOINCREMENT_IDS);
+			buf = mp_encode_array(buf, id_count);
+			struct autoinc_id_entry *id_entry;
+			stailq_foreach_entry(id_entry, autoinc_id_list, link) {
+				buf = id_entry->id >= 0 ?
+				      mp_encode_uint(buf, id_entry->id) :
+				      mp_encode_int(buf, id_entry->id);
+			}
+		}
 	}
 	iproto_reply_sql(out, &header_svp, response->sync, schema_version,
 			 keys);

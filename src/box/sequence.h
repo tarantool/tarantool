@@ -43,6 +43,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct iterator;
+struct Vdbe;
 
 /** Sequence metadata. */
 struct sequence_def {
@@ -138,6 +139,9 @@ sequence_next(struct sequence *seq, int64_t *result);
  */
 int
 access_check_sequence(struct sequence *seq);
+
+int
+vdbe_add_new_autoinc_id(struct Vdbe *vdbe, int64_t id);
 
 /**
  * Create an iterator over sequence data.

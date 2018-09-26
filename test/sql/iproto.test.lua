@@ -202,6 +202,35 @@ future4:wait_result()
 cn:close()
 box.sql.execute('drop table test')
 
+-- gh-2618 Return generated columns after INSERT in IPROTO.
+-- Return all ids generated in current INSERT statement.
+box.sql.execute('create table test (id integer primary key autoincrement, a integer)')
+
+cn = remote.connect(box.cfg.listen)
+cn:execute('insert into test values (1, 1)')
+cn:execute('insert into test values (null, 2)')
+cn:execute('update test set a = 11 where id == 1')
+cn:execute('insert into test values (100, 1), (null, 1), (120, 1), (null, 1)')
+cn:execute('insert into test values (null, 1), (null, 1), (null, 1), (null, 1), (null, 1)')
+cn:execute('select * from test')
+
+s = box.schema.create_space('test2', {engine = engine})
+sq = box.schema.sequence.create('test2')
+pk = s:create_index('pk', {sequence = 'test2'})
+function push_id() s:replace{box.NULL} s:replace{box.NULL} end
+_ = box.space.TEST:on_replace(push_id)
+cn:execute('insert into test values (null, 1)')
+
+box.sql.execute('create table test3 (id int primary key autoincrement)')
+box.schema.sequence.alter('TEST3', {min=-10000, step=-10})
+cn:execute('insert into TEST3 values (null), (null), (null), (null)')
+
+cn:close()
+box.sql.execute('drop table test')
+s:drop()
+sq:drop()
+box.sql.execute('drop table test3')
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'create', 'space')
 space = nil
