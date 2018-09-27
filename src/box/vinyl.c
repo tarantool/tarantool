@@ -2565,6 +2565,17 @@ vy_env_delete(struct vy_env *e)
 	free(e);
 }
 
+/**
+ * Called upon local recovery completion to enable memory quota
+ * and start the scheduler.
+ */
+static void
+vy_env_complete_recovery(struct vy_env *env)
+{
+	vy_scheduler_start(&env->scheduler);
+	vy_quota_set_limit(&env->quota, env->memory);
+}
+
 struct vinyl_engine *
 vinyl_engine_new(const char *dir, size_t memory,
 		 int read_threads, int write_threads, bool force_recovery)
@@ -2722,8 +2733,7 @@ vinyl_engine_bootstrap(struct engine *engine)
 	assert(e->status == VINYL_OFFLINE);
 	if (vy_log_bootstrap() != 0)
 		return -1;
-	vy_scheduler_start(&e->scheduler);
-	vy_quota_set_limit(&e->quota, e->memory);
+	vy_env_complete_recovery(e);
 	e->status = VINYL_ONLINE;
 	return 0;
 }
@@ -2757,8 +2767,7 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 	} else {
 		if (vy_log_bootstrap() != 0)
 			return -1;
-		vy_scheduler_start(&e->scheduler);
-		vy_quota_set_limit(&e->quota, e->memory);
+		vy_env_complete_recovery(e);
 		e->status = VINYL_INITIAL_RECOVERY_REMOTE;
 	}
 	return 0;
@@ -2801,8 +2810,7 @@ vinyl_engine_end_recovery(struct engine *engine)
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
 		e->recovery_vclock = NULL;
-		vy_scheduler_start(&e->scheduler);
-		vy_quota_set_limit(&e->quota, e->memory);
+		vy_env_complete_recovery(e);
 		break;
 	case VINYL_FINAL_RECOVERY_REMOTE:
 		break;
