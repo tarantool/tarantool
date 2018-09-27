@@ -43,6 +43,7 @@
 #include "vy_point_lookup.h"
 #include "vy_quota.h"
 #include "vy_scheduler.h"
+#include "vy_regulator.h"
 #include "vy_stat.h"
 
 #include <stdbool.h>
@@ -115,6 +116,8 @@ struct vy_env {
 	struct vy_mem_env mem_env;
 	/** Scheduler */
 	struct vy_scheduler scheduler;
+	/** Load regulator. */
+	struct vy_regulator regulator;
 	/** Local recovery context. */
 	struct vy_recovery *recovery;
 	/** Local recovery vclock. */
@@ -249,17 +252,15 @@ static struct trigger on_replace_vinyl_deferred_delete;
 /** {{{ Introspection */
 
 static void
-vy_info_append_quota(struct vy_env *env, struct info_handler *h)
+vy_info_append_regulator(struct vy_env *env, struct info_handler *h)
 {
-	struct vy_quota *q = &env->quota;
+	struct vy_regulator *r = &env->regulator;
 
-	info_table_begin(h, "quota");
-	info_append_int(h, "used", q->used);
-	info_append_int(h, "limit", q->limit);
-	info_append_int(h, "watermark", q->watermark);
-	info_append_int(h, "use_rate", q->use_rate);
-	info_append_int(h, "dump_bandwidth", q->dump_bw);
-	info_table_end(h); /* quota */
+	info_table_begin(h, "regulator");
+	info_append_int(h, "write_rate", r->write_rate);
+	info_append_int(h, "dump_bandwidth", r->dump_bandwidth);
+	info_append_int(h, "dump_watermark", r->dump_watermark);
+	info_table_end(h); /* regulator */
 }
 
 static void
@@ -328,10 +329,10 @@ vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 	struct vy_env *env = vinyl->env;
 
 	info_begin(h);
-	vy_info_append_quota(env, h);
 	vy_info_append_tx(env, h);
 	vy_info_append_memory(env, h);
 	vy_info_append_disk(env, h);
+	vy_info_append_regulator(env, h);
 	info_end(h);
 }
 
@@ -2366,6 +2367,7 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 	assert(mem_used_after >= mem_used_before);
 	vy_quota_adjust(&env->quota, tx->write_size,
 			mem_used_after - mem_used_before);
+	vy_regulator_check_dump_watermark(&env->regulator);
 	return rc;
 }
 
@@ -2390,6 +2392,7 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 	assert(mem_used_after >= mem_used_before);
 	/* We can't abort the transaction at this point, use force. */
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_regulator_check_dump_watermark(&env->regulator);
 
 	txn->engine_tx = NULL;
 	if (!txn->is_autocommit)
@@ -2440,6 +2443,13 @@ static void
 vy_env_quota_exceeded_cb(struct vy_quota *quota)
 {
 	struct vy_env *env = container_of(quota, struct vy_env, quota);
+	vy_regulator_quota_exceeded(&env->regulator);
+}
+
+static void
+vy_env_trigger_dump_cb(struct vy_regulator *regulator)
+{
+	struct vy_env *env = container_of(regulator, struct vy_env, regulator);
 
 	if (lsregion_used(&env->mem_env.allocator) == 0) {
 		/*
@@ -2468,7 +2478,7 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	assert(mem_used_after <= mem_used_before);
 	size_t mem_dumped = mem_used_before - mem_used_after;
 	vy_quota_release(quota, mem_dumped);
-	vy_quota_update_dump_bandwidth(quota, mem_dumped, dump_duration);
+	vy_regulator_dump_complete(&env->regulator, mem_dumped, dump_duration);
 	say_info("dumped %zu bytes in %.1f sec", mem_dumped, dump_duration);
 }
 
@@ -2520,8 +2530,9 @@ vy_env_new(const char *path, size_t memory,
 			      vy_squash_schedule, e) != 0)
 		goto error_lsm_env;
 
-	if (vy_quota_create(&e->quota, vy_env_quota_exceeded_cb) != 0)
-		goto error_quota;
+	vy_quota_create(&e->quota, vy_env_quota_exceeded_cb);
+	vy_regulator_create(&e->regulator, &e->quota,
+			    vy_env_trigger_dump_cb);
 
 	struct slab_cache *slab_cache = cord_slab_cache();
 	mempool_create(&e->iterator_pool, slab_cache,
@@ -2530,8 +2541,7 @@ vy_env_new(const char *path, size_t memory,
 	vy_run_env_create(&e->run_env);
 	vy_log_init(e->path);
 	return e;
-error_quota:
-	vy_lsm_env_destroy(&e->lsm_env);
+
 error_lsm_env:
 	vy_mem_env_destroy(&e->mem_env);
 	vy_scheduler_destroy(&e->scheduler);
@@ -2548,6 +2558,7 @@ error_path:
 static void
 vy_env_delete(struct vy_env *e)
 {
+	vy_regulator_destroy(&e->regulator);
 	vy_scheduler_destroy(&e->scheduler);
 	vy_squash_queue_delete(e->squash_queue);
 	tx_manager_delete(e->xm);
@@ -2574,6 +2585,7 @@ vy_env_complete_recovery(struct vy_env *env)
 {
 	vy_scheduler_start(&env->scheduler);
 	vy_quota_set_limit(&env->quota, env->memory);
+	vy_regulator_start(&env->regulator);
 }
 
 struct vinyl_engine *
@@ -2651,7 +2663,8 @@ vinyl_engine_set_snap_io_rate_limit(struct vinyl_engine *vinyl, double limit)
 {
 	int64_t limit_in_bytes = limit * 1024 * 1024;
 	vinyl->env->run_env.snap_io_rate_limit = limit_in_bytes;
-	vy_quota_reset_dump_bandwidth(&vinyl->env->quota, limit_in_bytes);
+	vy_regulator_reset_dump_bandwidth(&vinyl->env->regulator,
+					  limit_in_bytes);
 }
 
 /** }}} Environment */
@@ -3194,6 +3207,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	assert(mem_used_after >= mem_used_before);
 	size_t used = mem_used_after - mem_used_before;
 	vy_quota_adjust(&env->quota, reserved, used);
+	vy_regulator_check_dump_watermark(&env->regulator);
 	return rc;
 }
 
@@ -3515,6 +3529,7 @@ vy_squash_process(struct vy_squash *squash)
 		vy_mem_commit_stmt(mem, region_stmt);
 		vy_quota_force_use(&env->quota,
 				   mem_used_after - mem_used_before);
+		vy_regulator_check_dump_watermark(&env->regulator);
 	}
 	return rc;
 }
@@ -3989,6 +4004,7 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_regulator_check_dump_watermark(&env->regulator);
 	vy_quota_wait(&env->quota);
 	return rc;
 }
@@ -4419,6 +4435,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_regulator_check_dump_watermark(&env->regulator);
 
 	tuple_unref(delete);
 	if (rc != 0)

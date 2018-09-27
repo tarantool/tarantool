@@ -40,7 +40,6 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct vy_quota;
-struct histogram;
 
 typedef void
 (*vy_quota_exceeded_f)(struct vy_quota *quota);
@@ -55,12 +54,6 @@ struct vy_quota {
 	 * throttled until memory is reclaimed.
 	 */
 	size_t limit;
-	/**
-	 * Memory watermark. Exceeding it does not result in
-	 * throttling new transactions, but it does trigger
-	 * background memory reclaim.
-	 */
-	size_t watermark;
 	/** Current memory consumption. */
 	size_t used;
 	/**
@@ -74,40 +67,13 @@ struct vy_quota {
 	 */
 	struct fiber_cond cond;
 	/**
-	 * Called when quota is consumed if used >= watermark.
+	 * Called if the limit is hit when quota is consumed.
 	 * It is supposed to trigger memory reclaim.
 	 */
 	vy_quota_exceeded_f quota_exceeded_cb;
-	/** Timer for updating quota watermark. */
-	ev_timer timer;
-	/**
-	 * Amount of quota used since the last
-	 * invocation of the quota timer callback.
-	 */
-	size_t use_curr;
-	/**
-	 * Quota use rate, in bytes per second.
-	 * Calculated as exponentially weighted
-	 * moving average of use_curr.
-	 */
-	size_t use_rate;
-	/** Current dump bandwidth estimate. */
-	size_t dump_bw;
-	/**
-	 * Dump bandwidth is needed for calculating the quota watermark.
-	 * The higher the bandwidth, the later we can start dumping w/o
-	 * suffering from transaction throttling. So we want to be very
-	 * conservative about estimating the bandwidth.
-	 *
-	 * To make sure we don't overestimate it, we maintain a
-	 * histogram of all observed measurements and assume the
-	 * bandwidth to be equal to the 10th percentile, i.e. the
-	 * best result among 10% worst measurements.
-	 */
-	struct histogram *dump_bw_hist;
 };
 
-int
+void
 vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb);
 
 void
@@ -119,27 +85,6 @@ vy_quota_destroy(struct vy_quota *q);
  */
 void
 vy_quota_set_limit(struct vy_quota *q, size_t limit);
-
-/** Return dump bandwidth. */
-size_t
-vy_quota_dump_bandwidth(struct vy_quota *q);
-
-/**
- * Update dump bandwidth.
- *
- * @size: size of dumped memory.
- * @duration: how long memory dump took.
- */
-void
-vy_quota_update_dump_bandwidth(struct vy_quota *q, size_t size,
-			       double duration);
-
-/**
- * Reset dump bandwidth histogram and update initial estimate.
- * Called when box.cfg.snap_io_rate_limit is updated.
- */
-void
-vy_quota_reset_dump_bandwidth(struct vy_quota *q, size_t max);
 
 /**
  * Consume @size bytes of memory. In contrast to vy_quota_use()
