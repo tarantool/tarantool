@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <small/rlist.h>
 #include <tarantool_ev.h>
@@ -59,6 +60,8 @@ struct vy_quota_wait_node {
  * in the vinyl engine. It is NOT multi-threading safe.
  */
 struct vy_quota {
+	/** Set if the quota was enabled. */
+	bool is_enabled;
 	/**
 	 * Memory limit. Once hit, new transactions are
 	 * throttled until memory is reclaimed.
@@ -84,9 +87,25 @@ struct vy_quota {
 	struct rlist wait_queue;
 };
 
+/**
+ * Initialize a quota object.
+ *
+ * Note, the limit won't be imposed until vy_quota_enable()
+ * is called.
+ */
 void
-vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb);
+vy_quota_create(struct vy_quota *q, size_t limit,
+		vy_quota_exceeded_f quota_exceeded_cb);
 
+/**
+ * Enable the configured limit for a quota object.
+ */
+void
+vy_quota_enable(struct vy_quota *q);
+
+/**
+ * Destroy a quota object.
+ */
 void
 vy_quota_destroy(struct vy_quota *q);
 

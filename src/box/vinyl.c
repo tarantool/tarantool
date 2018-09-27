@@ -2518,7 +2518,7 @@ vy_env_new(const char *path, size_t memory,
 			      vy_squash_schedule, e) != 0)
 		goto error_lsm_env;
 
-	vy_quota_create(&e->quota, vy_env_quota_exceeded_cb);
+	vy_quota_create(&e->quota, memory, vy_env_quota_exceeded_cb);
 	vy_regulator_create(&e->regulator, &e->quota,
 			    vy_env_trigger_dump_cb);
 
@@ -2572,7 +2572,7 @@ static void
 vy_env_complete_recovery(struct vy_env *env)
 {
 	vy_scheduler_start(&env->scheduler);
-	vy_quota_set_limit(&env->quota, env->memory);
+	vy_quota_enable(&env->quota);
 	vy_regulator_start(&env->regulator);
 }
 

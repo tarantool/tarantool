@@ -49,6 +49,8 @@
 static inline bool
 vy_quota_may_use(struct vy_quota *q, size_t size)
 {
+	if (!q->is_enabled)
+		return true;
 	if (q->used + size > q->limit)
 		return false;
 	return true;
@@ -81,7 +83,7 @@ vy_quota_do_unuse(struct vy_quota *q, size_t size)
 static inline void
 vy_quota_check_limit(struct vy_quota *q)
 {
-	if (q->used > q->limit)
+	if (q->is_enabled && q->used > q->limit)
 		q->quota_exceeded_cb(q);
 }
 
@@ -105,13 +107,23 @@ vy_quota_signal(struct vy_quota *q)
 }
 
 void
-vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
+vy_quota_create(struct vy_quota *q, size_t limit,
+		vy_quota_exceeded_f quota_exceeded_cb)
 {
-	q->limit = SIZE_MAX;
+	q->is_enabled = false;
+	q->limit = limit;
 	q->used = 0;
 	q->too_long_threshold = TIMEOUT_INFINITY;
 	q->quota_exceeded_cb = quota_exceeded_cb;
 	rlist_create(&q->wait_queue);
+}
+
+void
+vy_quota_enable(struct vy_quota *q)
+{
+	assert(!q->is_enabled);
+	q->is_enabled = true;
+	vy_quota_check_limit(q);
 }
 
 void
