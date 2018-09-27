@@ -35,6 +35,7 @@
  */
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
+#include "vdbeInt.h"
 #include "box/session.h"
 #include "box/schema.h"
 #include "bit/bit.h"
@@ -669,6 +670,11 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 					 */
 					sqlite3VdbeAddOp3(v, OP_Column, srcTab,
 							  j, regTmp);
+					sqlite3VdbeAddOp2(v, OP_IsNull,
+							  regTmp,
+							  v->nOp + 2);
+					sqlite3VdbeAddOp1(v, OP_MustBeInt,
+							  regTmp);
 					sqlite3VdbeAddOp2(v, OP_FCopy, regTmp,
 							  iRegStore);
 					sqlite3VdbeChangeP3(v, -1,
@@ -685,6 +691,14 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						 * autoinc-ed value with select result
 						 * in case that result is NULL
 						 */
+						sqlite3VdbeAddOp2(v, OP_IsNull,
+								  regFromSelect
+								  + j,
+								  v->nOp + 2);
+						sqlite3VdbeAddOp1(v,
+								  OP_MustBeInt,
+								  regFromSelect
+								  + j);
 						sqlite3VdbeAddOp2(v, OP_FCopy,
 								  regFromSelect
 								  + j,
@@ -714,6 +728,14 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 						 * autoinc-ed value with select result
 						 * in case that result is NULL
 						 */
+						sqlite3VdbeAddOp2(v, OP_IsNull,
+								  pList->a[j].
+								  pExpr->iTable,
+								  v->nOp + 2);
+						sqlite3VdbeAddOp1(v,
+								  OP_MustBeInt,
+								  pList->a[j].
+								  pExpr->iTable);
 						sqlite3VdbeAddOp2(v, OP_FCopy,
 								  pList->a[j].
 								  pExpr->iTable,
