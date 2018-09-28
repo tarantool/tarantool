@@ -32,17 +32,27 @@
  */
 
 #include <stddef.h>
+#include <small/rlist.h>
 #include <tarantool_ev.h>
-#include "fiber_cond.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct fiber;
 struct vy_quota;
 
 typedef void
 (*vy_quota_exceeded_f)(struct vy_quota *quota);
+
+struct vy_quota_wait_node {
+	/** Link in vy_quota::wait_queue. */
+	struct rlist in_wait_queue;
+	/** Fiber waiting for quota. */
+	struct fiber *fiber;
+	/** Amount of requested memory. */
+	size_t size;
+};
 
 /**
  * Quota used for accounting and limiting memory consumption
@@ -62,15 +72,16 @@ struct vy_quota {
 	 */
 	double too_long_threshold;
 	/**
-	 * Condition variable used for throttling consumers when
-	 * there is no quota left.
-	 */
-	struct fiber_cond cond;
-	/**
 	 * Called if the limit is hit when quota is consumed.
 	 * It is supposed to trigger memory reclaim.
 	 */
 	vy_quota_exceeded_f quota_exceeded_cb;
+	/**
+	 * Queue of consumers waiting for quota, linked by
+	 * vy_quota_wait_node::state. Newcomers are added
+	 * to the tail.
+	 */
+	struct rlist wait_queue;
 };
 
 void

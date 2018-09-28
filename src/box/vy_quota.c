@@ -39,7 +39,6 @@
 #include "error.h"
 #include "errcode.h"
 #include "fiber.h"
-#include "fiber_cond.h"
 #include "say.h"
 #include "trivia/util.h"
 
@@ -92,7 +91,17 @@ vy_quota_check_limit(struct vy_quota *q)
 static void
 vy_quota_signal(struct vy_quota *q)
 {
-	fiber_cond_signal(&q->cond);
+	if (!rlist_empty(&q->wait_queue)) {
+		struct vy_quota_wait_node *n;
+		n = rlist_first_entry(&q->wait_queue,
+				      struct vy_quota_wait_node, in_wait_queue);
+		/*
+		 * No need in waking up a consumer if it will have
+		 * to go back to sleep immediately.
+		 */
+		if (vy_quota_may_use(q, n->size))
+			fiber_wakeup(n->fiber);
+	}
 }
 
 void
@@ -102,14 +111,13 @@ vy_quota_create(struct vy_quota *q, vy_quota_exceeded_f quota_exceeded_cb)
 	q->used = 0;
 	q->too_long_threshold = TIMEOUT_INFINITY;
 	q->quota_exceeded_cb = quota_exceeded_cb;
-	fiber_cond_create(&q->cond);
+	rlist_create(&q->wait_queue);
 }
 
 void
 vy_quota_destroy(struct vy_quota *q)
 {
-	fiber_cond_broadcast(&q->cond);
-	fiber_cond_destroy(&q->cond);
+	(void)q;
 }
 
 void
@@ -155,6 +163,12 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 	double wait_start = ev_monotonic_now(loop());
 	double deadline = wait_start + timeout;
 
+	struct vy_quota_wait_node wait_node = {
+		.fiber = fiber(),
+		.size = size,
+	};
+	rlist_add_tail_entry(&q->wait_queue, &wait_node, in_wait_queue);
+
 	do {
 		/*
 		 * If the requested amount of memory cannot be
@@ -164,11 +178,18 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 		 */
 		if (q->used + size > q->limit)
 			q->quota_exceeded_cb(q);
-		if (fiber_cond_wait_deadline(&q->cond, deadline) != 0) {
+
+		double now = ev_monotonic_now(loop());
+		fiber_yield_timeout(deadline - now);
+
+		if (now >= deadline) {
+			rlist_del_entry(&wait_node, in_wait_queue);
 			diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
 			return -1;
 		}
 	} while (!vy_quota_may_use(q, size));
+
+	rlist_del_entry(&wait_node, in_wait_queue);
 
 	double wait_time = ev_monotonic_now(loop()) - wait_start;
 	if (wait_time > q->too_long_threshold) {
