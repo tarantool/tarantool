@@ -31,6 +31,7 @@
 #include "vy_regulator.h"
 
 #include <math.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <tarantool_ev.h>
@@ -64,6 +65,18 @@ static const int VY_DUMP_BANDWIDTH_PCT = 10;
  * which should be fine for initial guess.
  */
 static const size_t VY_DUMP_BANDWIDTH_DEFAULT = 10 * 1024 * 1024;
+
+static void
+vy_regulator_trigger_dump(struct vy_regulator *regulator)
+{
+	if (regulator->dump_in_progress)
+		return;
+
+	if (regulator->trigger_dump_cb(regulator) != 0)
+		return;
+
+	regulator->dump_in_progress = true;
+}
 
 static void
 vy_regulator_update_write_rate(struct vy_regulator *regulator)
@@ -156,6 +169,7 @@ vy_regulator_create(struct vy_regulator *regulator, struct vy_quota *quota,
 	regulator->quota_used_last = 0;
 	regulator->dump_bandwidth = VY_DUMP_BANDWIDTH_DEFAULT;
 	regulator->dump_watermark = SIZE_MAX;
+	regulator->dump_in_progress = false;
 }
 
 void
@@ -175,20 +189,22 @@ vy_regulator_destroy(struct vy_regulator *regulator)
 void
 vy_regulator_quota_exceeded(struct vy_regulator *regulator)
 {
-	regulator->trigger_dump_cb(regulator);
+	vy_regulator_trigger_dump(regulator);
 }
 
 void
 vy_regulator_check_dump_watermark(struct vy_regulator *regulator)
 {
 	if (regulator->quota->used >= regulator->dump_watermark)
-		regulator->trigger_dump_cb(regulator);
+		vy_regulator_trigger_dump(regulator);
 }
 
 void
 vy_regulator_dump_complete(struct vy_regulator *regulator,
 			   size_t mem_dumped, double dump_duration)
 {
+	regulator->dump_in_progress = false;
+
 	if (dump_duration > 0) {
 		histogram_collect(regulator->dump_bandwidth_hist,
 				  mem_dumped / dump_duration);
