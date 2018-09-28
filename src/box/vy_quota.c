@@ -35,6 +35,9 @@
 #include <stddef.h>
 #include <tarantool_ev.h>
 
+#include "diag.h"
+#include "error.h"
+#include "errcode.h"
 #include "fiber.h"
 #include "fiber_cond.h"
 #include "say.h"
@@ -139,6 +142,15 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 		return 0;
 	}
 
+	/*
+	 * Fail early if the configured memory limit never allows
+	 * us to commit the transaction.
+	 */
+	if (size > q->limit) {
+		diag_set(OutOfMemory, size, "lsregion", "vinyl transaction");
+		return -1;
+	}
+
 	/* Wait for quota. */
 	double wait_start = ev_monotonic_now(loop());
 	double deadline = wait_start + timeout;
@@ -152,8 +164,10 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 		 */
 		if (q->used + size > q->limit)
 			q->quota_exceeded_cb(q);
-		if (fiber_cond_wait_deadline(&q->cond, deadline) != 0)
-			return -1; /* timed out */
+		if (fiber_cond_wait_deadline(&q->cond, deadline) != 0) {
+			diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
+			return -1;
+		}
 	} while (!vy_quota_may_use(q, size));
 
 	double wait_time = ev_monotonic_now(loop()) - wait_start;
