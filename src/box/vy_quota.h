@@ -31,10 +31,13 @@
  * SUCH DAMAGE.
  */
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <small/rlist.h>
 #include <tarantool_ev.h>
+
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -42,6 +45,67 @@ extern "C" {
 
 struct fiber;
 struct vy_quota;
+
+/** Rate limit state. */
+struct vy_rate_limit {
+	/** Max allowed rate, per second. */
+	size_t rate;
+	/** Current quota. */
+	ssize_t value;
+};
+
+/** Initialize a rate limit state. */
+static inline void
+vy_rate_limit_create(struct vy_rate_limit *rl)
+{
+	rl->rate = SIZE_MAX;
+	rl->value = SSIZE_MAX;
+}
+
+/** Set rate limit. */
+static inline void
+vy_rate_limit_set(struct vy_rate_limit *rl, size_t rate)
+{
+	rl->rate = rate;
+}
+
+/**
+ * Return true if quota may be consumed without exceeding
+ * the configured rate limit.
+ */
+static inline bool
+vy_rate_limit_may_use(struct vy_rate_limit *rl)
+{
+	return rl->value > 0;
+}
+
+/** Consume the given amount of quota. */
+static inline void
+vy_rate_limit_use(struct vy_rate_limit *rl, size_t size)
+{
+	rl->value -= size;
+}
+
+/** Release the given amount of quota. */
+static inline void
+vy_rate_limit_unuse(struct vy_rate_limit *rl, size_t size)
+{
+	rl->value += size;
+}
+
+/**
+ * Replenish quota by the amount accumulated for the given
+ * time interval.
+ */
+static inline void
+vy_rate_limit_refill(struct vy_rate_limit *rl, double time)
+{
+	double size = rl->rate * time;
+	double value = rl->value + size;
+	/* Allow bursts up to 2x rate. */
+	value = MIN(value, size * 2);
+	rl->value = MIN(value, SSIZE_MAX);
+}
 
 typedef void
 (*vy_quota_exceeded_f)(struct vy_quota *quota);
@@ -85,6 +149,13 @@ struct vy_quota {
 	 * to the tail.
 	 */
 	struct rlist wait_queue;
+	/** Rate limit state. */
+	struct vy_rate_limit rate_limit;
+	/**
+	 * Periodic timer that is used for refilling the rate
+	 * limit value.
+	 */
+	ev_timer timer;
 };
 
 /**
@@ -115,6 +186,13 @@ vy_quota_destroy(struct vy_quota *q);
  */
 void
 vy_quota_set_limit(struct vy_quota *q, size_t limit);
+
+/**
+ * Set the max rate at which quota may be consumed,
+ * in bytes per second.
+ */
+void
+vy_quota_set_rate_limit(struct vy_quota *q, size_t rate);
 
 /**
  * Consume @size bytes of memory. In contrast to vy_quota_use()
