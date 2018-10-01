@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(12)
+test:plan(11)
 
 --!./tcltestrunner.lua
 -- 2011 August 22
@@ -23,12 +23,6 @@ test:plan(12)
 
 
 testprefix = "tkt-b1d3a2e531"
-
-test:do_execsql_test(
-    1.0,
-    [[
-        PRAGMA foreign_keys = 'ON'
-    ]])
 
 test:do_execsql_test(
     1.1,

@@ -1570,7 +1570,6 @@ struct sqlite3 {
 #define SQLITE_ReadUncommitted 0x0004000	/* For shared-cache mode */
 #define SQLITE_ReverseOrder   0x00020000	/* Reverse unordered SELECTs */
 #define SQLITE_RecTriggers    0x00040000	/* Enable recursive triggers */
-#define SQLITE_ForeignKeys    0x00080000	/* Enforce foreign key constraints  */
 #define SQLITE_AutoIndex      0x00100000	/* Enable automatic indexes */
 #define SQLITE_PreferBuiltin  0x00200000	/* Preference to built-in funcs */
 #define SQLITE_EnableTrigger  0x01000000	/* True to enable triggers */

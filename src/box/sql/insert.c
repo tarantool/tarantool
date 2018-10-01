@@ -1269,8 +1269,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 * So the extra complication to make this rule less restrictive is probably
 	 * not worth the effort.  Ticket [6284df89debdfa61db8073e062908af0c9b6118e]
 	 */
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) != 0 &&
-	    !rlist_empty(&dest->child_fkey))
+	if (!rlist_empty(&dest->child_fkey))
 		return 0;
 	if ((user_session->sql_flags & SQLITE_CountRows) != 0) {
 		return 0;	/* xfer opt does not play well with PRAGMA count_changes */

@@ -59,8 +59,7 @@ static const char nil_key[] = { 0x90 }; /* Empty MsgPack array. */
 static const uint32_t default_sql_flags = SQLITE_ShortColNames
 					  | SQLITE_EnableTrigger
 					  | SQLITE_AutoIndex
-					  | SQLITE_RecTriggers
-					  | SQLITE_ForeignKeys;
+					  | SQLITE_RecTriggers;
 
 void
 sql_init()

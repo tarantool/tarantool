@@ -27,9 +27,6 @@ box.sql.execute('START TRANSACTION;') box.commit();
 box.sql.execute('START TRANSACTION;') box.rollback();
 ---
 ...
-box.sql.execute('pragma foreign_keys = 1;');
----
-...
 box.sql.execute('CREATE TABLE parent(id INT PRIMARY KEY, y INT UNIQUE);');
 ---
 ...

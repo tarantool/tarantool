@@ -528,12 +528,6 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 	assert((reg_old == 0) != (reg_new == 0));
 
 	/*
-	 * If foreign-keys are disabled, this function is a no-op.
-	 */
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) == 0)
-		return;
-
-	/*
 	 * Loop through all the foreign key constraints for which
 	 * tab is the child table.
 	 */
@@ -674,9 +668,6 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 bool
 fkey_is_required(uint32_t space_id, const int *changes)
 {
-	struct session *user_session = current_session();
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) == 0)
-		return false;
 	struct space *space = space_by_id(space_id);
 	if (changes == NULL) {
 		/*
@@ -919,16 +910,12 @@ void
 fkey_emit_actions(struct Parse *parser, struct Table *tab, int reg_old,
 		  const int *changes)
 {
-	struct session *user_session = current_session();
 	/*
-	 * If foreign-key support is enabled, iterate through all
-	 * FKs that refer to table tab. If there is an action
-	 * associated with the FK for this operation (either
-	 * update or delete), invoke the associated trigger
-	 * sub-program.
+	 * Iterate through all FKs that refer to table tab.
+	 * If there is an action associated with the FK for
+	 * this operation (either update or delete),
+	 * invoke the associated trigger sub-program.
 	 */
-	if ((user_session->sql_flags & SQLITE_ForeignKeys) == 0)
-		return;
 	struct space *space = space_by_id(tab->def->id);
 	assert(space != NULL);
 	struct fkey *fk;

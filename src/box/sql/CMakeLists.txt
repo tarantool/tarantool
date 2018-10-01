@@ -16,7 +16,6 @@ include_directories(${SQL_SRC_DIR})
 include_directories(${SQL_BIN_DIR})
 
 add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
-add_definitions(-DSQLITE_DEFAULT_FOREIGN_KEYS=1)
 add_definitions(-DSQLITE_OMIT_AUTOMATIC_INDEX)
 
 set(TEST_DEFINITIONS

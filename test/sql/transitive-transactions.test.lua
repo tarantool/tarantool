@@ -13,7 +13,6 @@ box.begin() box.sql.execute('ROLLBACK');
 box.sql.execute('START TRANSACTION;') box.commit();
 box.sql.execute('START TRANSACTION;') box.rollback();
 
-box.sql.execute('pragma foreign_keys = 1;');
 box.sql.execute('CREATE TABLE parent(id INT PRIMARY KEY, y INT UNIQUE);');
 box.sql.execute('CREATE TABLE child(id INT PRIMARY KEY, x INT REFERENCES parent(y) DEFERRABLE INITIALLY DEFERRED);');
 
