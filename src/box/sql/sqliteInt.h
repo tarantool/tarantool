@@ -285,17 +285,6 @@ void sqlite3Coverage(int);
 #endif
 
 /*
- * Is the sqlite3ErrName() function needed in the build?  Currently,
- * it is needed by several "test*.c" files (which are
- * compiled using SQLITE_TEST).
- */
-#if defined(SQLITE_TEST)
-#define SQLITE_NEED_ERR_NAME
-#else
-#undef  SQLITE_NEED_ERR_NAME
-#endif
-
-/*
  * Return true (non-zero) if the input is an integer that is too large
  * to fit in 32-bits.  This macro is used inside of various testcase()
  * macros to verify that we have tested SQLite for large-file support.
@@ -836,9 +825,6 @@ struct sqlite3_io_methods {
 
 int
 sqlite3_os_init(void);
-
-int
-sqlite3_db_release_memory(sqlite3 *);
 
 int
 sqlite3_busy_timeout(sqlite3 *, int ms);
@@ -4291,10 +4277,6 @@ void sqlite3Error(sqlite3 *, int);
 void sqlite3SystemError(sqlite3 *, int);
 void *sqlite3HexToBlob(sqlite3 *, const char *z, int n);
 u8 sqlite3HexToInt(int h);
-
-#if defined(SQLITE_NEED_ERR_NAME)
-const char *sqlite3ErrName(int);
-#endif
 
 const char *sqlite3ErrStr(int);
 

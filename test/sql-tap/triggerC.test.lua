@@ -42,7 +42,6 @@ testprefix = "triggerC"
 -- Enable recursive triggers for this file.
 --
 test:execsql " PRAGMA recursive_triggers = on "
---sqlite3_db_config_lookaside db 0 0 0
 ---------------------------------------------------------------------------
 -- This block of tests, triggerC-1.*, are not aimed at any specific
 -- property of the triggers sub-system. They were created to debug

@@ -484,105 +484,6 @@ setupLookaside(sqlite3 * db, void *pBuf, int sz, int cnt)
 }
 
 /*
- * Free up as much memory as we can from the given database
- * connection.
- */
-int
-sqlite3_db_release_memory(sqlite3 * db)
-{
-	(void)db;
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db))
-		return SQLITE_MISUSE_BKPT;
-#endif
-	return SQLITE_OK;
-}
-
-/*
- * Flush any dirty pages in the pager-cache for any attached database
- * to disk.
- */
-int
-sqlite3_db_cacheflush(sqlite3 * db)
-{
-	int rc = SQLITE_OK;
-	int bSeenBusy = 0;
-	(void)db;
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db))
-		return SQLITE_MISUSE_BKPT;
-#endif
-	return ((rc == SQLITE_OK && bSeenBusy) ? SQLITE_BUSY : rc);
-}
-
-/*
- * Configuration settings for an individual database connection
- */
-int
-sqlite3_db_config(sqlite3 * db, int op, ...)
-{
-	va_list ap;
-	int rc;
-	struct session *user_session = current_session();
-
-	va_start(ap, op);
-	switch (op) {
-	case SQLITE_DBCONFIG_LOOKASIDE:{
-			void *pBuf = va_arg(ap, void *);	/* IMP: R-26835-10964 */
-			int sz = va_arg(ap, int);	/* IMP: R-47871-25994 */
-			int cnt = va_arg(ap, int);	/* IMP: R-04460-53386 */
-			rc = setupLookaside(db, pBuf, sz, cnt);
-			break;
-		}
-	default:{
-			static const struct {
-				int op;	/* The opcode */
-				u32 mask;	/* Mask of the bit in sqlite3.flags to set/clear */
-			} aFlagOp[] = {
-				{
-				SQLITE_DBCONFIG_ENABLE_FKEY,
-					    SQLITE_ForeignKeys}, {
-				SQLITE_DBCONFIG_ENABLE_TRIGGER,
-					    SQLITE_EnableTrigger}, {
-			SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE,
-					    SQLITE_NoCkptOnClose},};
-			unsigned int i;
-			rc = SQLITE_ERROR;	/* IMP: R-42790-23372 */
-			for (i = 0; i < ArraySize(aFlagOp); i++) {
-				if (aFlagOp[i].op == op) {
-					int onoff = va_arg(ap, int);
-					int *pRes = va_arg(ap, int *);
-					uint32_t oldFlags =
-					    user_session->sql_flags;
-					if (onoff > 0) {
-						user_session->sql_flags |=
-						    aFlagOp[i].mask;
-					} else if (onoff == 0) {
-						user_session->sql_flags &=
-						    ~aFlagOp[i].mask;
-					}
-					if (oldFlags != user_session->sql_flags) {
-						sqlite3ExpirePreparedStatements
-						    (db);
-					}
-					if (pRes) {
-						*pRes =
-						    (user_session->
-						     sql_flags & aFlagOp[i].
-						     mask) != 0;
-					}
-					rc = SQLITE_OK;
-					break;
-				}
-			}
-			break;
-		}
-	}
-	va_end(ap);
-	return rc;
-}
-
-/*
  * Return the number of changes in the most recent call to sqlite3_exec().
  */
 int
@@ -660,12 +561,7 @@ connectionIsBusy(sqlite3 * db)
 static int
 sqlite3Close(sqlite3 * db, int forceZombie)
 {
-	if (!db) {
-		/* EVIDENCE-OF: R-63257-11740 Calling sqlite3_close() or
-		 * sqlite3_close_v2() with a NULL pointer argument is a harmless no-op.
-		 */
-		return SQLITE_OK;
-	}
+	assert(db);
 	if (!sqlite3SafetyCheckSickOrOk(db)) {
 		return SQLITE_MISUSE_BKPT;
 	}
@@ -701,21 +597,12 @@ sqlite3Close(sqlite3 * db, int forceZombie)
  * Two variations on the public interface for closing a database
  * connection. The sqlite3_close() version returns SQLITE_BUSY and
  * leaves the connection option if there are unfinalized prepared
- * statements.  The sqlite3_close_v2()
- * version forces the connection to become a zombie if there are
- * unclosed resources, and arranges for deallocation when the last
- * prepare statement.
+ * statements.
  */
 int
 sqlite3_close(sqlite3 * db)
 {
 	return sqlite3Close(db, 0);
-}
-
-int
-sqlite3_close_v2(sqlite3 * db)
-{
-	return sqlite3Close(db, 1);
 }
 
 /*
@@ -735,192 +622,6 @@ sqlite3RollbackAll(Vdbe * pVdbe)
 		db->xRollbackCallback(db->pRollbackArg);
 	}
 }
-
-/*
- * Return a static string containing the name corresponding to the error code
- * specified in the argument.
- */
-#if defined(SQLITE_NEED_ERR_NAME)
-const char *
-sqlite3ErrName(int rc)
-{
-	const char *zName = 0;
-	int i, origRc = rc;
-	for (i = 0; i < 2 && zName == 0; i++, rc &= 0xff) {
-		switch (rc) {
-		case SQLITE_OK:
-			zName = "SQLITE_OK";
-			break;
-		case SQLITE_ERROR:
-			zName = "SQLITE_ERROR";
-			break;
-		case SQLITE_PERM:
-			zName = "SQLITE_PERM";
-			break;
-		case SQLITE_ABORT:
-			zName = "SQLITE_ABORT";
-			break;
-		case SQLITE_BUSY:
-			zName = "SQLITE_BUSY";
-			break;
-		case SQLITE_LOCKED:
-			zName = "SQLITE_LOCKED";
-			break;
-		case SQLITE_NOMEM:
-			zName = "SQLITE_NOMEM";
-			break;
-		case SQLITE_INTERRUPT:
-			zName = "SQLITE_INTERRUPT";
-			break;
-		case SQLITE_IOERR:
-			zName = "SQLITE_IOERR";
-			break;
-		case SQLITE_IOERR_READ:
-			zName = "SQLITE_IOERR_READ";
-			break;
-		case SQLITE_IOERR_SHORT_READ:
-			zName = "SQLITE_IOERR_SHORT_READ";
-			break;
-		case SQLITE_IOERR_WRITE:
-			zName = "SQLITE_IOERR_WRITE";
-			break;
-		case SQLITE_IOERR_FSYNC:
-			zName = "SQLITE_IOERR_FSYNC";
-			break;
-		case SQLITE_IOERR_DIR_FSYNC:
-			zName = "SQLITE_IOERR_DIR_FSYNC";
-			break;
-		case SQLITE_IOERR_TRUNCATE:
-			zName = "SQLITE_IOERR_TRUNCATE";
-			break;
-		case SQLITE_IOERR_FSTAT:
-			zName = "SQLITE_IOERR_FSTAT";
-			break;
-		case SQLITE_IOERR_UNLOCK:
-			zName = "SQLITE_IOERR_UNLOCK";
-			break;
-		case SQLITE_IOERR_RDLOCK:
-			zName = "SQLITE_IOERR_RDLOCK";
-			break;
-		case SQLITE_IOERR_DELETE:
-			zName = "SQLITE_IOERR_DELETE";
-			break;
-		case SQLITE_IOERR_NOMEM:
-			zName = "SQLITE_IOERR_NOMEM";
-			break;
-		case SQLITE_IOERR_ACCESS:
-			zName = "SQLITE_IOERR_ACCESS";
-			break;
-		case SQLITE_IOERR_CHECKRESERVEDLOCK:
-			zName = "SQLITE_IOERR_CHECKRESERVEDLOCK";
-			break;
-		case SQLITE_IOERR_LOCK:
-			zName = "SQLITE_IOERR_LOCK";
-			break;
-		case SQLITE_IOERR_CLOSE:
-			zName = "SQLITE_IOERR_CLOSE";
-			break;
-		case SQLITE_IOERR_DIR_CLOSE:
-			zName = "SQLITE_IOERR_DIR_CLOSE";
-			break;
-		case SQLITE_IOERR_SHMOPEN:
-			zName = "SQLITE_IOERR_SHMOPEN";
-			break;
-		case SQLITE_IOERR_SHMSIZE:
-			zName = "SQLITE_IOERR_SHMSIZE";
-			break;
-		case SQLITE_IOERR_SHMLOCK:
-			zName = "SQLITE_IOERR_SHMLOCK";
-			break;
-		case SQLITE_IOERR_SHMMAP:
-			zName = "SQLITE_IOERR_SHMMAP";
-			break;
-		case SQLITE_IOERR_SEEK:
-			zName = "SQLITE_IOERR_SEEK";
-			break;
-		case SQLITE_IOERR_DELETE_NOENT:
-			zName = "SQLITE_IOERR_DELETE_NOENT";
-			break;
-		case SQLITE_IOERR_MMAP:
-			zName = "SQLITE_IOERR_MMAP";
-			break;
-		case SQLITE_IOERR_GETTEMPPATH:
-			zName = "SQLITE_IOERR_GETTEMPPATH";
-			break;
-		case SQLITE_IOERR_CONVPATH:
-			zName = "SQLITE_IOERR_CONVPATH";
-			break;
-		case SQLITE_NOTFOUND:
-			zName = "SQLITE_NOTFOUND";
-			break;
-		case SQLITE_FULL:
-			zName = "SQLITE_FULL";
-			break;
-		case SQLITE_CANTOPEN:
-			zName = "SQLITE_CANTOPEN";
-			break;
-		case SQLITE_SCHEMA:
-			zName = "SQLITE_SCHEMA";
-			break;
-		case SQLITE_TOOBIG:
-			zName = "SQLITE_TOOBIG";
-			break;
-		case SQLITE_CONSTRAINT:
-			zName = "SQLITE_CONSTRAINT";
-			break;
-		case SQLITE_CONSTRAINT_UNIQUE:
-			zName = "SQLITE_CONSTRAINT_UNIQUE";
-			break;
-		case SQLITE_CONSTRAINT_TRIGGER:
-			zName = "SQLITE_CONSTRAINT_TRIGGER";
-			break;
-		case SQLITE_CONSTRAINT_FOREIGNKEY:
-			zName = "SQLITE_CONSTRAINT_FOREIGNKEY";
-			break;
-		case SQLITE_CONSTRAINT_CHECK:
-			zName = "SQLITE_CONSTRAINT_CHECK";
-			break;
-		case SQLITE_CONSTRAINT_PRIMARYKEY:
-			zName = "SQLITE_CONSTRAINT_PRIMARYKEY";
-			break;
-		case SQLITE_CONSTRAINT_NOTNULL:
-			zName = "SQLITE_CONSTRAINT_NOTNULL";
-			break;
-		case SQLITE_CONSTRAINT_FUNCTION:
-			zName = "SQLITE_CONSTRAINT_FUNCTION";
-			break;
-		case SQLITE_MISMATCH:
-			zName = "SQLITE_MISMATCH";
-			break;
-		case SQLITE_MISUSE:
-			zName = "SQLITE_MISUSE";
-			break;
-		case SQLITE_RANGE:
-			zName = "SQLITE_RANGE";
-			break;
-		case SQL_TARANTOOL_ERROR:
-			zName = "SQLITE_TARANTOOL_ERROR";
-			break;
-		case SQLITE_ROW:
-			zName = "SQLITE_ROW";
-			break;
-		case SQLITE_WARNING:
-			zName = "SQLITE_WARNING";
-			break;
-		case SQLITE_DONE:
-			zName = "SQLITE_DONE";
-			break;
-		}
-	}
-	if (zName == 0) {
-		static char zBuf[50];
-		sqlite3_snprintf(sizeof(zBuf), zBuf, "SQLITE_UNKNOWN(%d)",
-				 origRc);
-		zName = zBuf;
-	}
-	return zName;
-}
-#endif
 
 /*
  * Return a static string that describes the kind of error specified in the
