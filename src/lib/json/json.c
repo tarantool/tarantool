@@ -30,11 +30,19 @@
  */
 
 #include "json.h"
+
+#include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unicode/uchar.h>
 #include <unicode/utf8.h>
+
 #include "trivia/util.h"
+#include "third_party/PMurHash.h"
 
 /**
  * Read a single symbol from a string starting from an offset.
@@ -242,4 +250,272 @@ json_lexer_next_token(struct json_lexer *lexer, struct json_token *token)
 		json_revert_symbol(lexer, last_offset);
 		return json_parse_identifier(lexer, token);
 	}
+}
+
+/**
+ * Compare JSON token keys.
+ */
+static int
+json_token_cmp(const struct json_token *a, const struct json_token *b)
+{
+	if (a->parent != b->parent)
+		return a->parent - b->parent;
+	if (a->type != b->type)
+		return a->type - b->type;
+	int ret = 0;
+	if (a->type == JSON_TOKEN_STR) {
+		if (a->len != b->len)
+			return a->len - b->len;
+		ret = memcmp(a->str, b->str, a->len);
+	} else if (a->type == JSON_TOKEN_NUM) {
+		ret = a->num - b->num;
+	} else {
+		unreachable();
+	}
+	return ret;
+}
+
+#define MH_SOURCE 1
+#define mh_name _json
+#define mh_key_t struct json_token *
+#define mh_node_t struct json_token *
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((*(a))->hash)
+#define mh_hash_key(a, arg) ((a)->hash)
+#define mh_cmp(a, b, arg) (json_token_cmp(*(a), *(b)))
+#define mh_cmp_key(a, b, arg) (json_token_cmp((a), *(b)))
+#include "salad/mhash.h"
+
+static const uint32_t hash_seed = 13U;
+
+/**
+ * Compute the hash value of a JSON token.
+ *
+ * See the comment to json_tree::hash for implementation details.
+ */
+static uint32_t
+json_token_hash(struct json_token *token)
+{
+	uint32_t h = token->parent->hash;
+	uint32_t carry = 0;
+	const void *data;
+	int data_size;
+	if (token->type == JSON_TOKEN_STR) {
+		data = token->str;
+		data_size = token->len;
+	} else if (token->type == JSON_TOKEN_NUM) {
+		data = &token->num;
+		data_size = sizeof(token->num);
+	} else {
+		unreachable();
+	}
+	PMurHash32_Process(&h, &carry, data, data_size);
+	return PMurHash32_Result(h, carry, data_size);
+}
+
+int
+json_tree_create(struct json_tree *tree)
+{
+	memset(tree, 0, sizeof(struct json_tree));
+	tree->root.hash = hash_seed;
+	tree->root.type = JSON_TOKEN_END;
+	tree->root.max_child_idx = -1;
+	tree->root.sibling_idx = -1;
+	tree->hash = mh_json_new();
+	return tree->hash == NULL ? -1 : 0;
+}
+
+static void
+json_token_destroy(struct json_token *token)
+{
+ 	assert(token->max_child_idx == -1);
+	assert(token->sibling_idx == -1);
+	free(token->children);
+	token->children = NULL;
+}
+
+void
+json_tree_destroy(struct json_tree *tree)
+{
+	json_token_destroy(&tree->root);
+	mh_json_delete(tree->hash);
+}
+
+struct json_token *
+json_tree_lookup_slowpath(struct json_tree *tree, struct json_token *parent,
+			  const struct json_token *token)
+{
+	assert(token->type == JSON_TOKEN_STR);
+	struct json_token key;
+	key.type = token->type;
+	key.str = token->str;
+	key.len = token->len;
+	key.parent = parent;
+	key.hash = json_token_hash(&key);
+	mh_int_t id = mh_json_find(tree->hash, &key, NULL);
+	if (id == mh_end(tree->hash))
+		return NULL;
+	struct json_token **entry = mh_json_node(tree->hash, id);
+	assert(entry != NULL && *entry != NULL);
+	return *entry;
+}
+
+int
+json_tree_add(struct json_tree *tree, struct json_token *parent,
+	      struct json_token *token)
+{
+	assert(json_tree_lookup(tree, parent, token) == NULL);
+	token->parent = parent;
+	token->children = NULL;
+	token->children_capacity = 0;
+	token->max_child_idx = -1;
+	token->hash = json_token_hash(token);
+	int insert_idx = token->type == JSON_TOKEN_NUM ?
+			 (int)token->num : parent->max_child_idx + 1;
+	/*
+	 * Dynamically grow the children array if necessary.
+	 */
+	if (insert_idx >= parent->children_capacity) {
+		int new_size = parent->children_capacity == 0 ?
+			       8 : 2 * parent->children_capacity;
+		while (insert_idx >= new_size)
+			new_size *= 2;
+		struct json_token **children = realloc(parent->children,
+						new_size * sizeof(void *));
+		if (children == NULL)
+			return -1; /* out of memory */
+		memset(children + parent->children_capacity, 0,
+		       (new_size - parent->children_capacity) * sizeof(void *));
+		parent->children = children;
+		parent->children_capacity = new_size;
+	}
+	/*
+	 * Insert the token into the hash (only for tokens representing
+	 * JSON map entries, see the comment to json_tree::hash).
+	 */
+	if (token->type == JSON_TOKEN_STR) {
+		mh_int_t id = mh_json_put(tree->hash,
+			(const struct json_token **)&token, NULL, NULL);
+		if (id == mh_end(tree->hash))
+			return -1; /* out of memory */
+	}
+	/*
+	 * Success, now we can insert the new token into its parent's
+	 * children array.
+	 */
+	assert(parent->children[insert_idx] == NULL);
+	parent->children[insert_idx] = token;
+	parent->max_child_idx = MAX(parent->max_child_idx, insert_idx);
+	token->sibling_idx = insert_idx;
+	assert(json_tree_lookup(tree, parent, token) == token);
+	return 0;
+}
+
+void
+json_tree_del(struct json_tree *tree, struct json_token *token)
+{
+	struct json_token *parent = token->parent;
+	assert(token->sibling_idx >= 0);
+	assert(parent->children[token->sibling_idx] == token);
+	assert(json_tree_lookup(tree, parent, token) == token);
+	/*
+	 * Clear the entry corresponding to this token in parent's
+	 * children array and update max_child_idx if necessary.
+	 */
+	parent->children[token->sibling_idx] = NULL;
+	token->sibling_idx = -1;
+	while (parent->max_child_idx >= 0 &&
+	       parent->children[parent->max_child_idx] == NULL)
+		parent->max_child_idx--;
+	/*
+	 * Remove the token from the hash (only for tokens representing
+	 * JSON map entries, see the comment to json_tree::hash).
+	 */
+	if (token->type == JSON_TOKEN_STR) {
+		mh_int_t id = mh_json_find(tree->hash, token, NULL);
+		assert(id != mh_end(tree->hash));
+		mh_json_del(tree->hash, id, NULL);
+	}
+	json_token_destroy(token);
+	assert(json_tree_lookup(tree, parent, token) == NULL);
+}
+
+struct json_token *
+json_tree_lookup_path(struct json_tree *tree, struct json_token *root,
+		      const char *path, int path_len, int index_base)
+{
+	int rc;
+	struct json_lexer lexer;
+	struct json_token token;
+	struct json_token *ret = root;
+	json_lexer_create(&lexer, path, path_len, index_base);
+	while ((rc = json_lexer_next_token(&lexer, &token)) == 0 &&
+	       token.type != JSON_TOKEN_END && ret != NULL) {
+		ret = json_tree_lookup(tree, ret, &token);
+	}
+	if (rc != 0 || token.type != JSON_TOKEN_END)
+		return NULL;
+	return ret;
+}
+
+/**
+ * Return the child of @parent following @pos or NULL if @pos
+ * points to the last child in the children array. If @pos is
+ * NULL, this function returns the first child.
+ */
+static struct json_token *
+json_tree_child_next(struct json_token *parent, struct json_token *pos)
+{
+	assert(pos == NULL || pos->parent == parent);
+	struct json_token **arr = parent->children;
+	if (arr == NULL)
+		return NULL;
+	int idx = pos != NULL ? pos->sibling_idx + 1 : 0;
+	while (idx <= parent->max_child_idx && arr[idx] == NULL)
+		idx++;
+	return idx <= parent->max_child_idx ? arr[idx] : NULL;
+}
+
+/**
+ * Return the leftmost descendant of the tree rooted at @pos
+ * or NULL if the tree is empty.
+ */
+static struct json_token *
+json_tree_leftmost(struct json_token *pos)
+{
+	struct json_token *last;
+	do {
+		last = pos;
+		pos = json_tree_child_next(pos, NULL);
+	} while (pos != NULL);
+	return last;
+}
+
+struct json_token *
+json_tree_preorder_next(struct json_token *root, struct json_token *pos)
+{
+	struct json_token *next = json_tree_child_next(pos, NULL);
+	if (next != NULL)
+		return next;
+	while (pos != root) {
+		next = json_tree_child_next(pos->parent, pos);
+		if (next != NULL)
+			return next;
+		pos = pos->parent;
+	}
+	return NULL;
+}
+
+struct json_token *
+json_tree_postorder_next(struct json_token *root, struct json_token *pos)
+{
+	struct json_token *next;
+	if (pos == NULL)
+		return json_tree_leftmost(root);
+	if (pos == root)
+		return NULL;
+	next = json_tree_child_next(pos->parent, pos);
+	if (next != NULL)
+		return json_tree_leftmost(next);
+	return pos->parent;
 }

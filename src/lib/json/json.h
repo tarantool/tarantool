@@ -30,9 +30,16 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stddef.h>
+#include <stdint.h>
+#include "trivia/util.h"
 
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifndef typeof
+#define typeof __typeof__
 #endif
 
 /**
@@ -66,6 +73,10 @@ enum json_token_type {
  * Element of a JSON path. It can be either string or number.
  * String idenfiers are in ["..."] and between dots. Numbers are
  * indexes in [...].
+ *
+ * May be organized in a tree-like structure reflecting a JSON
+ * document structure, for more details see the comment to struct
+ * json_tree.
  */
 struct json_token {
 	enum json_token_type type;
@@ -79,6 +90,118 @@ struct json_token {
 		/** Index value. */
 		int num;
 	};
+	/** Pointer to the parent token in a JSON tree. */
+	struct json_token *parent;
+	/**
+	 * Array of child tokens in a JSON tree. Indexes in this
+	 * array match [token.num] index for JSON_TOKEN_NUM type
+	 * and are allocated sequentially for JSON_TOKEN_STR child
+	 * tokens.
+	 */
+	struct json_token **children;
+	/** Allocation size of children array. */
+	int children_capacity;
+	/**
+	 * Max occupied index in the children array or -1 if
+	 * the children array is empty.
+	 */
+	int max_child_idx;
+	/**
+	 * Index of this token in parent's children array or -1
+	 * if the token was removed from a JSON tree or represents
+	 * a JSON tree root.
+	 */
+	int sibling_idx;
+	/**
+	 * Hash value of the token. Used for lookups in a JSON tree.
+	 * For more details, see the comment to json_tree::hash.
+	 */
+	uint32_t hash;
+};
+
+struct mh_json_t;
+
+/**
+ * This structure is used for organizing JSON tokens produced
+ * by a lexer in a tree-like structure reflecting a JSON document
+ * structure.
+ *
+ * Each intermediate node of the tree corresponds to either
+ * a JSON map or an array, depending on the key type used by
+ * its children (JSON_TOKEN_STR or JSON_TOKEN_NUM, respectively).
+ * Leaf nodes may represent both complex JSON structures and
+ * final values - it is not mandated by the JSON tree design.
+ * The root of the tree doesn't have a key and is preallocated
+ * when the tree is created.
+ *
+ * The json_token structure is intrusive by design, i.e. to store
+ * arbitrary information in a JSON tree, one has to incorporate it
+ * into a user defined structure.
+ *
+ * Example:
+ *
+ *   struct data {
+ *           ...
+ *           struct json_token token;
+ *   };
+ *
+ *   struct json_tree tree;
+ *   json_tree_create(&tree);
+ *   struct json_token *parent = &tree->root;
+ *
+ *   // Add a path to the tree.
+ *   struct data *data = data_new();
+ *   struct json_lexer lexer;
+ *   json_lexer_create(&lexer, path, path_len);
+ *   json_lexer_next_token(&lexer, &data->token);
+ *   while (data->token.type != JSON_TOKEN_END) {
+ *           json_tree_add(&tree, parent, &data->token);
+ *           parent = &data->token;
+ *           data = data_new();
+ *           json_lexer_next_token(&lexer, &data->token);
+ *   }
+ *   data_delete(data);
+ *
+ *   // Look up a path in the tree.
+ *   data = json_tree_lookup_path(&tree, &tree.root,
+ *                                path, path_len);
+ */
+struct json_tree {
+	/**
+	 * Preallocated token corresponding to the JSON tree root.
+	 * It doesn't have a key (set to JSON_TOKEN_END).
+	 */
+	struct json_token root;
+	/**
+	 * Hash table that is used to quickly look up a token
+	 * corresponding to a JSON map item given a key and
+	 * a parent token. We store all tokens that have type
+	 * JSON_TOKEN_STR in this hash table. Apparently, we
+	 * don't need to store JSON_TOKEN_NUM tokens as we can
+	 * quickly look them up in the children array anyway.
+	 *
+	 * The hash table uses pair <parent, key> as key, so
+	 * even tokens that happen to have the same key will
+	 * have different keys in the hash. To look up a tree
+	 * node corresponding to a particular path, we split
+	 * the path into tokens and look up the first token
+	 * in the root node and each following token in the
+	 * node returned at the previous step.
+	 *
+	 * We compute a hash value for a token by hashing its
+	 * key using the hash value of its parent as seed. This
+	 * is equivalent to computing hash for the path leading
+	 * to the token. However, we don't need to recompute
+	 * hash starting from the root at each step as we
+	 * descend the tree looking for a specific path, and we
+	 * can start descent from any node, not only from the root.
+	 *
+	 * As a consequence of this hashing technique, even
+	 * though we don't need to store JSON_TOKEN_NUM tokens
+	 * in the hash table, we still have to compute hash
+	 * values for them.
+	 */
+	struct mh_json_t *hash;
 };
 
 /**
@@ -111,6 +234,217 @@ json_lexer_create(struct json_lexer *lexer, const char *src, int src_len,
  */
 int
 json_lexer_next_token(struct json_lexer *lexer, struct json_token *token);
+
+/**
+ * Initialize a new empty JSON tree.
+ *
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+int
+json_tree_create(struct json_tree *tree);
+
+/**
+ * Destroy a JSON tree.
+ *
+ * Note, this routine expects the tree to be empty - the caller
+ * is supposed to use json_tree_foreach_safe() and json_tree_del()
+ * to dismantle the tree before calling this function.
+ */
+void
+json_tree_destroy(struct json_tree *tree);
+
+/**
+ * Internal function, use json_tree_lookup() instead.
+ */
+struct json_token *
+json_tree_lookup_slowpath(struct json_tree *tree, struct json_token *parent,
+			  const struct json_token *token);
+
+/**
+ * Look up a token in a JSON tree given a parent token and a key.
+ *
+ * Returns NULL if not found.
+ */
+static inline struct json_token *
+json_tree_lookup(struct json_tree *tree, struct json_token *parent,
+		 const struct json_token *token)
+{
+	struct json_token *ret = NULL;
+	if (likely(token->type == JSON_TOKEN_NUM)) {
+		ret = (int)token->num < parent->children_capacity ?
+		      parent->children[token->num] : NULL;
+	} else {
+		ret = json_tree_lookup_slowpath(tree, parent, token);
+	}
+	return ret;
+}
+
+/**
+ * Insert a token into a JSON tree at a given position.
+ *
+ * The token key (json_token::type and num/str,len) must be set,
+ * e.g. by json_lexer_next_token(). The caller must ensure that
+ * no token with the same key is linked to the same parent, e.g.
+ * with json_tree_lookup().
+ *
+ * Returns 0 on success, -1 on memory allocation error.
+ */
+int
+json_tree_add(struct json_tree *tree, struct json_token *parent,
+	      struct json_token *token);
+
+/**
+ * Delete a token from a JSON tree.
+ *
+ * The token must be linked to the tree (see json_tree_add())
+ * and must not have any children.
+ */
+void
+json_tree_del(struct json_tree *tree, struct json_token *token);
+
+/**
+ * Look up a token in a JSON tree by path.
+ *
+ * The path is relative to the given root token. In order to
+ * look up a token by absolute path, pass json_tree::root.
+ * The index_base is passed to json_lexer used for tokenizing
+ * the path, see json_lexer_create() for more details.
+ *
+ * Returns NULL if no token is found or the path is invalid.
+ */
+struct json_token *
+json_tree_lookup_path(struct json_tree *tree, struct json_token *root,
+		      const char *path, int path_len, int index_base);
+
+/**
+ * Perform pre-order traversal in a JSON subtree rooted
+ * at a given node.
+ *
+ * To start a new traversal, pass NULL for @pos.
+ * Returns @root at the first iteration.
+ * Returns NULL when traversal is over.
+ */
+struct json_token *
+json_tree_preorder_next(struct json_token *root, struct json_token *pos);
+
+/**
+ * Perform post-order traversal in a JSON subtree rooted
+ * at a given node.
+ *
+ * To start a new traversal, pass NULL for @pos.
+ * Returns @root at the last iteration.
+ * Returns NULL when traversal is over.
+ */
+struct json_token *
+json_tree_postorder_next(struct json_token *root, struct json_token *pos);
+
+/**
+ * Perform pre-order JSON tree traversal.
+ * Note, this function does not visit the root node.
+ * See also json_tree_preorder_next().
+ */
+#define json_tree_foreach_preorder(pos, root)				     \
+	for ((pos) = json_tree_preorder_next((root), (root));		     \
+	     (pos) != NULL;						     \
+	     (pos) = json_tree_preorder_next((root), (pos)))
+
+/**
+ * Perform post-order JSON tree traversal.
+ * Note, this function does not visit the root node.
+ * See also json_tree_postorder_next().
+ */
+#define json_tree_foreach_postorder(pos, root)				     \
+	for ((pos) = json_tree_postorder_next((root), NULL);		     \
+	     (pos) != (root);						     \
+	     (pos) = json_tree_postorder_next((root), (pos)))
+
+/**
+ * Perform post-order JSON tree traversal safe against node removal.
+ * Note, this function does not visit the root node.
+ * See also json_tree_postorder_next().
+ */
+#define json_tree_foreach_safe(pos, root, tmp)				     \
+	for ((pos) = json_tree_postorder_next((root), NULL);		     \
+	     (pos) != (root) &&						     \
+	     ((tmp) = json_tree_postorder_next((root), (pos))) != NULL;	     \
+	     (pos) = (tmp))
+
+/**
+ * Return a container of a json_tree_token.
+ */
+#define json_tree_entry(token, type, member)				     \
+	container_of((token), type, member)
+
+/**
+ * Return a container of a json_tree_token or NULL if @token is NULL.
+ */
+#define json_tree_entry_safe(token, type, member)			     \
+	((token) != NULL ? json_tree_entry((token), type, member) : NULL)    \
+
+/**
+ * Container-aware wrapper around json_tree_lookup().
+ */
+#define json_tree_lookup_entry(tree, parent, token, type, member) ({	     \
+	struct json_token *ret = json_tree_lookup((tree), (parent), (token));\
+	json_tree_entry_safe(ret, type, member);			     \
+})
+
+/**
+ * Container-aware wrapper around json_tree_lookup_path().
+ */
+#define json_tree_lookup_path_entry(tree, root, path, path_len, index_base,  \
+				    type, member) ({			     \
+	struct json_token *ret = json_tree_lookup_path((tree), (root),	     \
+					(path), (path_len), (index_base));   \
+	json_tree_entry_safe(ret, type, member);			     \
+})
+
+/**
+ * Container-aware wrapper around json_tree_preorder_next().
+ */
+#define json_tree_preorder_next_entry(root, pos, type, member) ({	     \
+	struct json_token *next = json_tree_preorder_next((root), (pos));    \
+	json_tree_entry_safe(next, type, member);			     \
+})
+
+/**
+ * Container-aware wrapper around json_tree_postorder_next().
+ */
+#define json_tree_postorder_next_entry(root, pos, type, member) ({	     \
+	struct json_token *next = json_tree_postorder_next((root), (pos));   \
+	json_tree_entry_safe(next, type, member);			     \
+})
+
+/**
+ * Container-aware version of json_tree_foreach_preorder().
+ */
+#define json_tree_foreach_entry_preorder(pos, root, type, member)	     \
+	for ((pos) = json_tree_preorder_next_entry((root), (root),	     \
+						   type, member);	     \
+	     (pos) != NULL;						     \
+	     (pos) = json_tree_preorder_next_entry((root), &(pos)->member,   \
+						   type, member))
+
+/**
+ * Container-aware version of json_tree_foreach_postorder().
+ */
+#define json_tree_foreach_entry_postorder(pos, root, type, member)	     \
+	for ((pos) = json_tree_postorder_next_entry((root), NULL,	     \
+						    type, member);	     \
+	     &(pos)->member != (root);					     \
+	     (pos) = json_tree_postorder_next_entry((root), &(pos)->member,  \
+						     type, member))
+
+/**
+ * Container-aware version of json_tree_foreach_safe().
+ */
+#define json_tree_foreach_entry_safe(pos, root, type, member, tmp)	     \
+	for ((pos) = json_tree_postorder_next_entry((root), NULL,	     \
+						    type, member);	     \
+	     &(pos)->member != (root) &&				     \
+	     ((tmp) = json_tree_postorder_next_entry((root), &(pos)->member, \
+						     type, member)) != NULL; \
+	     (pos) = (tmp))
 
 #ifdef __cplusplus
 }
