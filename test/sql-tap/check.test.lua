@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(61)
+test:plan(60)
 
 --!./tcltestrunner.lua
 -- 2005 November 2
@@ -524,22 +524,9 @@ test:do_execsql_test(
         -- </check-4.7>
     })
 
-test:do_execsql_test(
-    "check-4.8",
-    [[
-        PRAGMA ignore_check_constraints='ON';
-        UPDATE t4 SET x=0, y=1;
-        SELECT * FROM t4;
-    ]], {
-        -- <check-4.8>
-        0, 1
-        -- </check-4.8>
-    })
-
 test:do_catchsql_test(
     "check-4.9",
     [[
-        PRAGMA ignore_check_constraints='OFF';
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>

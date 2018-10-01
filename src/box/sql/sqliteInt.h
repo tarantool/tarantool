@@ -1566,7 +1566,6 @@ struct sqlite3 {
 #define SQLITE_WhereTrace     0x00008000       /* Debug info about optimizer's work */
 #define SQLITE_VdbeListing    0x00000400	/* Debug listings of VDBE programs */
 #define SQLITE_VdbeAddopTrace 0x00001000	/* Trace sqlite3VdbeAddOp() calls */
-#define SQLITE_IgnoreChecks   0x00002000	/* Do not enforce check constraints */
 #define SQLITE_ReadUncommitted 0x0004000	/* For shared-cache mode */
 #define SQLITE_ReverseOrder   0x00020000	/* Reverse unordered SELECTs */
 #define SQLITE_RecTriggers    0x00040000	/* Enable recursive triggers */

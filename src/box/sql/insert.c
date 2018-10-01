@@ -843,7 +843,6 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 			    enum on_conflict_action on_conflict,
 			    int ignore_label, int *upd_cols)
 {
-	struct session *user_session = current_session();
 	struct sqlite3 *db = parse_context->db;
 	struct Vdbe *v = sqlite3GetVdbe(parse_context);
 	assert(v != NULL);
@@ -917,8 +916,7 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct Table *tab,
 	enum on_conflict_action on_conflict_check = on_conflict;
 	if (on_conflict == ON_CONFLICT_ACTION_REPLACE)
 		on_conflict_check = ON_CONFLICT_ACTION_ABORT;
-	if (checks != NULL &&
-	    (user_session->sql_flags & SQLITE_IgnoreChecks) == 0) {
+	if (checks != NULL) {
 		parse_context->ckBase = new_tuple_reg;
 		for (int i = 0; i < checks->nExpr; i++) {
 			struct Expr *expr = checks->a[i].pExpr;
