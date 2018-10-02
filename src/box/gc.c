@@ -48,44 +48,7 @@
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
 
-typedef rb_node(struct gc_consumer) gc_node_t;
-
-/**
- * The object of this type is used to prevent garbage
- * collection from removing files that are still in use.
- */
-struct gc_consumer {
-	/** Link in gc_state::consumers. */
-	gc_node_t node;
-	/** Human-readable name. */
-	char *name;
-	/** The vclock tracked by this consumer. */
-	struct vclock vclock;
-	/** Consumer type, indicating that consumer only consumes
-	 * WAL files, or both - SNAP and WAL.
-	 */
-	enum gc_consumer_type type;
-};
-
-typedef rb_tree(struct gc_consumer) gc_tree_t;
-
-/** Garbage collection state. */
-struct gc_state {
-	/** Number of checkpoints to maintain. */
-	int checkpoint_count;
-	/** Max vclock WAL garbage collection has been called for. */
-	struct vclock wal_vclock;
-	/** Max vclock checkpoint garbage collection has been called for. */
-	struct vclock checkpoint_vclock;
-	/** Registered consumers, linked by gc_consumer::node. */
-	gc_tree_t consumers;
-	/**
-	 * Latch serializing concurrent invocations of engine
-	 * garbage collection callbacks.
-	 */
-	struct latch latch;
-};
-static struct gc_state gc;
+struct gc_state gc;
 
 /**
  * Comparator used for ordering gc_consumer objects by signature
@@ -161,12 +124,6 @@ gc_free(void)
 		gc_consumer_delete(consumer);
 		consumer = next;
 	}
-}
-
-void
-gc_vclock(struct vclock *vclock)
-{
-	vclock_copy(vclock, &gc.wal_vclock);
 }
 
 /** Find the consumer that uses the oldest checkpoint. */
@@ -319,24 +276,6 @@ gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
 	if (leftmost == NULL || vclock_sum(&leftmost->vclock) > prev_signature)
 		gc_run();
-}
-
-const char *
-gc_consumer_name(const struct gc_consumer *consumer)
-{
-	return consumer->name;
-}
-
-void
-gc_consumer_vclock(const struct gc_consumer *consumer, struct vclock *vclock)
-{
-	vclock_copy(vclock, &consumer->vclock);
-}
-
-int64_t
-gc_consumer_signature(const struct gc_consumer *consumer)
-{
-	return vclock_sum(&consumer->vclock);
 }
 
 struct gc_consumer *

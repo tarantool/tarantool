@@ -397,11 +397,11 @@ lbox_info_gc_call(struct lua_State *L)
 		lua_createtable(L, 0, 2);
 
 		lua_pushstring(L, "name");
-		lua_pushstring(L, gc_consumer_name(consumer));
+		lua_pushstring(L, consumer->name);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "signature");
-		luaL_pushint64(L, gc_consumer_signature(consumer));
+		luaL_pushint64(L, vclock_sum(&consumer->vclock));
 		lua_settable(L, -3);
 
 		lua_rawseti(L, -2, ++count);
