@@ -32,7 +32,10 @@
 
 #include <trivia/util.h>
 
+#include <assert.h>
+#include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -45,7 +48,6 @@
 #include "say.h"
 #include "latch.h"
 #include "vclock.h"
-#include "checkpoint.h"
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
 
@@ -80,9 +82,21 @@ gc_consumer_delete(struct gc_consumer *consumer)
 	free(consumer);
 }
 
+/** Free a checkpoint object. */
+static void
+gc_checkpoint_delete(struct gc_checkpoint *checkpoint)
+{
+	TRASH(checkpoint);
+	free(checkpoint);
+}
+
 void
 gc_init(void)
 {
+	/* Don't delete any files until recovery is complete. */
+	gc.min_checkpoint_count = INT_MAX;
+
+	rlist_create(&gc.checkpoints);
 	vclock_create(&gc.wal_vclock);
 	vclock_create(&gc.checkpoint_vclock);
 	gc_tree_new(&gc.consumers);
@@ -92,6 +106,12 @@ gc_init(void)
 void
 gc_free(void)
 {
+	/* Free checkpoints. */
+	struct gc_checkpoint *checkpoint, *next_checkpoint;
+	rlist_foreach_entry_safe(checkpoint, &gc.checkpoints, in_checkpoints,
+				 next_checkpoint) {
+		gc_checkpoint_delete(checkpoint);
+	}
 	/* Free all registered consumers. */
 	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
 	while (consumer != NULL) {
@@ -113,12 +133,14 @@ gc_tree_first_checkpoint(gc_tree_t *consumers)
 	return consumer;
 }
 
-void
+/**
+ * Invoke garbage collection in order to remove files left
+ * from old checkpoints. The number of checkpoints saved by
+ * this function is specified by box.cfg.checkpoint_count.
+ */
+static void
 gc_run(void)
 {
-	int min_checkpoint_count = gc.min_checkpoint_count;
-	assert(min_checkpoint_count > 0);
-
 	/* Look up the consumer that uses the oldest WAL. */
 	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
 	/* Look up the consumer that uses the oldest checkpoint. */
@@ -134,19 +156,24 @@ gc_run(void)
 	struct vclock gc_checkpoint_vclock;
 	vclock_create(&gc_checkpoint_vclock);
 
-	struct checkpoint_iterator checkpoints;
-	checkpoint_iterator_init(&checkpoints);
-
-	const struct vclock *vclock;
-	while ((vclock = checkpoint_iterator_prev(&checkpoints)) != NULL) {
-		if (--min_checkpoint_count > 0)
-			continue;
+	struct gc_checkpoint *checkpoint = NULL;
+	while (true) {
+		checkpoint = rlist_first_entry(&gc.checkpoints,
+				struct gc_checkpoint, in_checkpoints);
+		vclock_copy(&gc_checkpoint_vclock, &checkpoint->vclock);
+		if (gc.checkpoint_count <= gc.min_checkpoint_count)
+			break;
 		if (leftmost_checkpoint != NULL &&
-		    vclock_sum(&leftmost_checkpoint->vclock) < vclock_sum(vclock))
-			continue;
-		vclock_copy(&gc_checkpoint_vclock, vclock);
-		break;
+		    vclock_sum(&checkpoint->vclock) >=
+		    vclock_sum(&leftmost_checkpoint->vclock))
+			break; /* checkpoint is in use */
+		rlist_del_entry(checkpoint, in_checkpoints);
+		gc_checkpoint_delete(checkpoint);
+		gc.checkpoint_count--;
 	}
+
+	/* At least one checkpoint must always be available. */
+	assert(checkpoint != NULL);
 
 	struct vclock gc_wal_vclock;
 	if (leftmost != NULL &&
@@ -192,6 +219,39 @@ void
 gc_set_min_checkpoint_count(int min_checkpoint_count)
 {
 	gc.min_checkpoint_count = min_checkpoint_count;
+}
+
+void
+gc_add_checkpoint(const struct vclock *vclock)
+{
+	struct gc_checkpoint *last_checkpoint = gc_last_checkpoint();
+	if (last_checkpoint != NULL &&
+	    vclock_sum(&last_checkpoint->vclock) == vclock_sum(vclock)) {
+		/*
+		 * box.snapshot() doesn't create a new checkpoint
+		 * if no rows has been written since the last one.
+		 * Rerun the garbage collector in this case, just
+		 * in case box.cfg.checkpoint_count has changed.
+		 */
+		gc_run();
+		return;
+	}
+	assert(last_checkpoint == NULL ||
+	       vclock_sum(&last_checkpoint->vclock) < vclock_sum(vclock));
+
+	struct gc_checkpoint *checkpoint = calloc(1, sizeof(*checkpoint));
+	/*
+	 * This function is called after a checkpoint is written
+	 * to disk so it can't fail.
+	 */
+	if (checkpoint == NULL)
+		panic("out of memory");
+
+	vclock_copy(&checkpoint->vclock, vclock);
+	rlist_add_tail_entry(&gc.checkpoints, checkpoint, in_checkpoints);
+	gc.checkpoint_count++;
+
+	gc_run();
 }
 
 struct gc_consumer *

@@ -32,6 +32,7 @@
  */
 
 #include <stddef.h>
+#include <small/rlist.h>
 
 #include "vclock.h"
 #include "latch.h"
@@ -53,6 +54,17 @@ enum gc_consumer_type {
 };
 
 typedef rb_node(struct gc_consumer) gc_node_t;
+
+/**
+ * Garbage collector keeps track of all preserved checkpoints.
+ * The following structure represents a checkpoint.
+ */
+struct gc_checkpoint {
+	/** Link in gc_state::checkpoints. */
+	struct rlist in_checkpoints;
+	/** VClock of the checkpoint. */
+	struct vclock vclock;
+};
 
 /**
  * The object of this type is used to prevent garbage
@@ -80,6 +92,17 @@ struct gc_state {
 	 * Configured by box.cfg.checkpoint_count.
 	 */
 	int min_checkpoint_count;
+	/**
+	 * Number of preserved checkpoints. May be greater than
+	 * @min_checkpoint_count, because some checkpoints may
+	 * be in use by replication or backup.
+	 */
+	int checkpoint_count;
+	/**
+	 * List of preserved checkpoints. New checkpoints are added
+	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
+	 */
+	struct rlist checkpoints;
 	/** Max vclock WAL garbage collection has been called for. */
 	struct vclock wal_vclock;
 	/** Max vclock checkpoint garbage collection has been called for. */
@@ -95,6 +118,35 @@ struct gc_state {
 extern struct gc_state gc;
 
 /**
+ * Iterate over all checkpoints tracked by the garbage collector,
+ * starting from the oldest and ending with the newest.
+ */
+#define gc_foreach_checkpoint(checkpoint) \
+	rlist_foreach_entry(checkpoint, &gc.checkpoints, in_checkpoints)
+
+/**
+ * Iterate over all checkpoints tracked by the garbage collector
+ * in the reverse order, that is starting from the newest and
+ * ending with the oldest.
+ */
+#define gc_foreach_checkpoint_reverse(checkpoint) \
+	rlist_foreach_entry_reverse(checkpoint, &gc.checkpoints, in_checkpoints)
+
+/**
+ * Return the last (newest) checkpoint known to the garbage
+ * collector. If there's no checkpoint, return NULL.
+ */
+static inline struct gc_checkpoint *
+gc_last_checkpoint(void)
+{
+	if (rlist_empty(&gc.checkpoints))
+		return NULL;
+
+	return rlist_last_entry(&gc.checkpoints, struct gc_checkpoint,
+				in_checkpoints);
+}
+
+/**
  * Initialize the garbage collection state.
  */
 void
@@ -107,14 +159,6 @@ void
 gc_free(void);
 
 /**
- * Invoke garbage collection in order to remove files left
- * from old checkpoints. The number of checkpoints saved by
- * this function is specified by box.cfg.checkpoint_count.
- */
-void
-gc_run(void);
-
-/**
  * Update the minimal number of checkpoints to preserve.
  * Called when box.cfg.checkpoint_count is updated.
  *
@@ -124,6 +168,14 @@ gc_run(void);
  */
 void
 gc_set_min_checkpoint_count(int min_checkpoint_count);
+
+/**
+ * Track a new checkpoint in the garbage collector state.
+ * Note, this function may run garbage collector to remove
+ * old checkpoints.
+ */
+void
+gc_add_checkpoint(const struct vclock *vclock);
 
 /**
  * Register a consumer.

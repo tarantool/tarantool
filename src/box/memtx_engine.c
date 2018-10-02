@@ -1046,6 +1046,13 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		xlog_cursor_close(&cursor, false);
 	}
 
+	/* Apprise the garbage collector of available checkpoints. */
+	for (struct vclock *vclock = vclockset_first(&memtx->snap_dir.index);
+	     vclock != NULL;
+	     vclock = vclockset_next(&memtx->snap_dir.index, vclock)) {
+		gc_add_checkpoint(vclock);
+	}
+
 	stailq_create(&memtx->gc_queue);
 	memtx->gc_fiber = fiber_new("memtx.gc", memtx_engine_gc_f);
 	if (memtx->gc_fiber == NULL)

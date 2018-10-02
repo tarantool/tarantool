@@ -47,7 +47,6 @@
 #include "box/replication.h"
 #include "box/info.h"
 #include "box/gc.h"
-#include "box/checkpoint.h"
 #include "box/engine.h"
 #include "box/vinyl.h"
 #include "main.h"
@@ -363,22 +362,19 @@ static int
 lbox_info_gc_call(struct lua_State *L)
 {
 	int count;
-	const struct vclock *vclock;
 
 	lua_newtable(L);
 
 	lua_pushstring(L, "checkpoints");
 	lua_newtable(L);
 
-	struct checkpoint_iterator checkpoints;
-	checkpoint_iterator_init(&checkpoints);
-
 	count = 0;
-	while ((vclock = checkpoint_iterator_next(&checkpoints)) != NULL) {
+	struct gc_checkpoint *checkpoint;
+	gc_foreach_checkpoint(checkpoint) {
 		lua_createtable(L, 0, 1);
 
 		lua_pushstring(L, "signature");
-		luaL_pushint64(L, vclock_sum(vclock));
+		luaL_pushint64(L, vclock_sum(&checkpoint->vclock));
 		lua_settable(L, -3);
 
 		lua_rawseti(L, -2, ++count);

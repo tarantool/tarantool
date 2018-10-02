@@ -68,7 +68,6 @@
 #include "authentication.h"
 #include "path_lock.h"
 #include "gc.h"
-#include "checkpoint.h"
 #include "systemd.h"
 #include "call.h"
 #include "func.h"
@@ -1446,16 +1445,19 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
-	/* Remember start vclock. */
-	struct vclock start_vclock;
 	/*
 	 * The only case when the directory index is empty is
 	 * when someone has deleted a snapshot and tries to join
 	 * as a replica. Our best effort is to not crash in such
 	 * case: raise ER_MISSING_SNAPSHOT.
 	 */
-	if (checkpoint_last(&start_vclock) < 0)
+	struct gc_checkpoint *checkpoint = gc_last_checkpoint();
+	if (checkpoint == NULL)
 		tnt_raise(ClientError, ER_MISSING_SNAPSHOT);
+
+	/* Remember start vclock. */
+	struct vclock start_vclock;
+	vclock_copy(&start_vclock, &checkpoint->vclock);
 
 	/* Register the replica with the garbage collector. */
 	struct gc_consumer *gc = gc_consumer_register(&start_vclock,
@@ -1725,6 +1727,8 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 	if (engine_begin_checkpoint() ||
 	    engine_commit_checkpoint(&replicaset.vclock))
 		panic("failed to create a checkpoint");
+
+	gc_add_checkpoint(&replicaset.vclock);
 }
 
 /**
@@ -1785,6 +1789,8 @@ bootstrap_from_master(struct replica *master)
 	if (engine_begin_checkpoint() ||
 	    engine_commit_checkpoint(&replicaset.vclock))
 		panic("failed to create a checkpoint");
+
+	gc_add_checkpoint(&replicaset.vclock);
 }
 
 /**
@@ -2036,8 +2042,7 @@ box_cfg_xc(void)
 	xstream_create(&join_stream, apply_initial_join_row);
 	xstream_create(&subscribe_stream, apply_row);
 
-	struct vclock last_checkpoint_vclock;
-	int64_t last_checkpoint_lsn = checkpoint_last(&last_checkpoint_vclock);
+	struct gc_checkpoint *checkpoint = gc_last_checkpoint();
 
 	/*
 	 * Lock the write ahead log directory to avoid multiple
@@ -2051,14 +2056,14 @@ box_cfg_xc(void)
 		 * refuse to start. In hot standby mode, a busy
 		 * WAL dir must contain at least one xlog.
 		 */
-		if (!cfg_geti("hot_standby") || last_checkpoint_lsn < 0)
+		if (!cfg_geti("hot_standby") || checkpoint == NULL)
 			tnt_raise(ClientError, ER_ALREADY_RUNNING, cfg_gets("wal_dir"));
 	}
 	bool is_bootstrap_leader = false;
-	if (last_checkpoint_lsn >= 0) {
+	if (checkpoint != NULL) {
 		/* Recover the instance from the local directory */
 		local_recovery(&instance_uuid, &replicaset_uuid,
-			       &last_checkpoint_vclock);
+			       &checkpoint->vclock);
 	} else {
 		/* Bootstrap a new master */
 		bootstrap(&instance_uuid, &replicaset_uuid,
@@ -2151,7 +2156,8 @@ end:
 	if (rc)
 		engine_abort_checkpoint();
 	else
-		gc_run();
+		gc_add_checkpoint(&vclock);
+
 	latch_unlock(&schema_lock);
 	box_checkpoint_is_in_progress = false;
 	return rc;
@@ -2165,20 +2171,20 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
-	const struct vclock *vclock;
-	struct checkpoint_iterator it;
-	checkpoint_iterator_init(&it);
-	do {
-		vclock = checkpoint_iterator_prev(&it);
-		if (vclock == NULL) {
-			diag_set(ClientError, ER_MISSING_SNAPSHOT);
-			return -1;
-		}
-	} while (checkpoint_idx-- > 0);
-	backup_gc = gc_consumer_register(vclock, GC_CONSUMER_ALL, "backup");
+	struct gc_checkpoint *checkpoint;
+	gc_foreach_checkpoint_reverse(checkpoint) {
+		if (checkpoint_idx-- == 0)
+			break;
+	}
+	if (checkpoint_idx >= 0) {
+		diag_set(ClientError, ER_MISSING_SNAPSHOT);
+		return -1;
+	}
+	backup_gc = gc_consumer_register(&checkpoint->vclock,
+					 GC_CONSUMER_ALL, "backup");
 	if (backup_gc == NULL)
 		return -1;
-	int rc = engine_backup(vclock, cb, cb_arg);
+	int rc = engine_backup(&checkpoint->vclock, cb, cb_arg);
 	if (rc != 0) {
 		gc_consumer_unregister(backup_gc);
 		backup_gc = NULL;

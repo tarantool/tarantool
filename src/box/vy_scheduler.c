@@ -39,7 +39,6 @@
 #include <small/rlist.h>
 #include <tarantool_ev.h>
 
-#include "checkpoint.h"
 #include "diag.h"
 #include "errcode.h"
 #include "errinj.h"

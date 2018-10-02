@@ -70,7 +70,6 @@
 #include "info.h"
 #include "column_mask.h"
 #include "trigger.h"
-#include "checkpoint.h"
 #include "session.h"
 #include "wal.h" /* wal_mode() */
 
@@ -3304,7 +3303,7 @@ vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 	vy_log_collect_garbage(lsn);
 
 	/* Cleanup run files. */
-	int64_t signature = checkpoint_last(NULL);
+	int64_t signature = vy_log_signature();
 	struct vy_recovery *recovery = vy_recovery_new(signature, 0);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog for garbage collection");
