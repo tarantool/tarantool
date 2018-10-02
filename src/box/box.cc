@@ -826,7 +826,7 @@ box_set_checkpoint_count(void)
 {
 	int checkpoint_count = cfg_geti("checkpoint_count");
 	box_check_checkpoint_count(checkpoint_count);
-	gc_set_checkpoint_count(checkpoint_count);
+	gc_set_min_checkpoint_count(checkpoint_count);
 }
 
 void

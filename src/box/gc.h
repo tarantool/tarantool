@@ -75,8 +75,11 @@ typedef rb_tree(struct gc_consumer) gc_tree_t;
 
 /** Garbage collection state. */
 struct gc_state {
-	/** Number of checkpoints to maintain. */
-	int checkpoint_count;
+	/**
+	 * Minimal number of checkpoints to preserve.
+	 * Configured by box.cfg.checkpoint_count.
+	 */
+	int min_checkpoint_count;
 	/** Max vclock WAL garbage collection has been called for. */
 	struct vclock wal_vclock;
 	/** Max vclock checkpoint garbage collection has been called for. */
@@ -112,11 +115,15 @@ void
 gc_run(void);
 
 /**
- * Update the checkpoint_count configuration option and
- * rerun garbage collection.
+ * Update the minimal number of checkpoints to preserve.
+ * Called when box.cfg.checkpoint_count is updated.
+ *
+ * Note, this function doesn't run garbage collector so
+ * changes will take effect only after a new checkpoint
+ * is created or a consumer is unregistered.
  */
 void
-gc_set_checkpoint_count(int checkpoint_count);
+gc_set_min_checkpoint_count(int min_checkpoint_count);
 
 /**
  * Register a consumer.

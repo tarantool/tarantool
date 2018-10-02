@@ -116,8 +116,8 @@ gc_tree_first_checkpoint(gc_tree_t *consumers)
 void
 gc_run(void)
 {
-	int checkpoint_count = gc.checkpoint_count;
-	assert(checkpoint_count > 0);
+	int min_checkpoint_count = gc.min_checkpoint_count;
+	assert(min_checkpoint_count > 0);
 
 	/* Look up the consumer that uses the oldest WAL. */
 	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
@@ -127,8 +127,9 @@ gc_run(void)
 
 	/*
 	 * Find the oldest checkpoint that must be preserved.
-	 * We have to maintain @checkpoint_count oldest checkpoints,
-	 * plus we can't remove checkpoints that are still in use.
+	 * We have to preserve @min_checkpoint_count oldest
+	 * checkpoints, plus we can't remove checkpoints that
+	 * are still in use.
 	 */
 	struct vclock gc_checkpoint_vclock;
 	vclock_create(&gc_checkpoint_vclock);
@@ -138,7 +139,7 @@ gc_run(void)
 
 	const struct vclock *vclock;
 	while ((vclock = checkpoint_iterator_prev(&checkpoints)) != NULL) {
-		if (--checkpoint_count > 0)
+		if (--min_checkpoint_count > 0)
 			continue;
 		if (leftmost_checkpoint != NULL &&
 		    vclock_sum(&leftmost_checkpoint->vclock) < vclock_sum(vclock))
@@ -188,9 +189,9 @@ gc_run(void)
 }
 
 void
-gc_set_checkpoint_count(int checkpoint_count)
+gc_set_min_checkpoint_count(int min_checkpoint_count)
 {
-	gc.checkpoint_count = checkpoint_count;
+	gc.min_checkpoint_count = min_checkpoint_count;
 }
 
 struct gc_consumer *
