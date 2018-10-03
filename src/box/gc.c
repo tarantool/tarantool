@@ -34,7 +34,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
 
 #define RB_COMPACT 1
 #include <small/rb.h>
@@ -82,13 +82,7 @@ gc_consumer_new(const char *name, const struct vclock *vclock,
 			 "malloc", "struct gc_consumer");
 		return NULL;
 	}
-	consumer->name = strdup(name);
-	if (consumer->name == NULL) {
-		diag_set(OutOfMemory, strlen(name) + 1,
-			 "malloc", "struct gc_consumer");
-		free(consumer);
-		return NULL;
-	}
+	snprintf(consumer->name, GC_NAME_MAX, "%s", name);
 	vclock_copy(&consumer->vclock, vclock);
 	consumer->type = type;
 	return consumer;
@@ -98,7 +92,6 @@ gc_consumer_new(const char *name, const struct vclock *vclock,
 static void
 gc_consumer_delete(struct gc_consumer *consumer)
 {
-	free(consumer->name);
 	TRASH(consumer);
 	free(consumer);
 }

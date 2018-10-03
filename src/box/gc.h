@@ -42,6 +42,8 @@ extern "C" {
 
 struct gc_consumer;
 
+enum { GC_NAME_MAX = 64 };
+
 /** Consumer type: WAL consumer, or SNAP */
 enum gc_consumer_type {
 	GC_CONSUMER_WAL = 1,
@@ -59,7 +61,7 @@ struct gc_consumer {
 	/** Link in gc_state::consumers. */
 	gc_node_t node;
 	/** Human-readable name. */
-	char *name;
+	char name[GC_NAME_MAX];
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
 	/** Consumer type, indicating that consumer only consumes
