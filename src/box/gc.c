@@ -32,6 +32,7 @@
 
 #include <trivia/util.h>
 
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -193,8 +194,8 @@ gc_set_checkpoint_count(int checkpoint_count)
 }
 
 struct gc_consumer *
-gc_consumer_register(const char *name, const struct vclock *vclock,
-		     enum gc_consumer_type type)
+gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
+		     const char *format, ...)
 {
 	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
 	if (consumer == NULL) {
@@ -203,7 +204,11 @@ gc_consumer_register(const char *name, const struct vclock *vclock,
 		return NULL;
 	}
 
-	snprintf(consumer->name, GC_NAME_MAX, "%s", name);
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(consumer->name, GC_NAME_MAX, format, ap);
+	va_end(ap);
+
 	vclock_copy(&consumer->vclock, vclock);
 	consumer->type = type;
 

@@ -35,6 +35,7 @@
 
 #include "vclock.h"
 #include "latch.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -122,17 +123,18 @@ gc_set_checkpoint_count(int checkpoint_count);
  *
  * This will stop garbage collection of objects newer than
  * @vclock until the consumer is unregistered or advanced.
- * @name is a human-readable name of the consumer, it will
- * be used for reporting the consumer to the user.
+ * @format... specifies a human-readable name of the consumer,
+ * it will be used for listing the consumer in box.info.gc().
  * @type consumer type, reporting whether consumer only depends
  * on WAL files.
  *
  * Returns a pointer to the new consumer object or NULL on
  * memory allocation failure.
  */
+CFORMAT(printf, 3, 4)
 struct gc_consumer *
-gc_consumer_register(const char *name, const struct vclock *vclock,
-		     enum gc_consumer_type type);
+gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
+		     const char *format, ...);
 
 /**
  * Unregister a consumer and invoke garbage collection
