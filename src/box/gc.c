@@ -122,16 +122,6 @@ gc_free(void)
 	}
 }
 
-/** Find the consumer that uses the oldest checkpoint. */
-struct gc_consumer *
-gc_tree_first_checkpoint(gc_tree_t *consumers)
-{
-	struct gc_consumer *consumer = gc_tree_first(consumers);
-	while (consumer != NULL && consumer->type == GC_CONSUMER_WAL)
-		consumer = gc_tree_next(consumers, consumer);
-	return consumer;
-}
-
 /**
  * Invoke garbage collection in order to remove files left
  * from old checkpoints. The number of checkpoints saved by
@@ -140,10 +130,6 @@ gc_tree_first_checkpoint(gc_tree_t *consumers)
 static void
 gc_run(void)
 {
-	/* Look up the consumer that uses the oldest checkpoint. */
-	struct gc_consumer *leftmost_checkpoint =
-		gc_tree_first_checkpoint(&gc.consumers);
-
 	bool run_wal_gc = false;
 	bool run_engine_gc = false;
 
@@ -159,9 +145,7 @@ gc_run(void)
 				struct gc_checkpoint, in_checkpoints);
 		if (gc.checkpoint_count <= gc.min_checkpoint_count)
 			break;
-		if (leftmost_checkpoint != NULL &&
-		    vclock_sum(&checkpoint->vclock) >=
-		    vclock_sum(&leftmost_checkpoint->vclock))
+		if (!rlist_empty(&checkpoint->refs))
 			break; /* checkpoint is in use */
 		rlist_del_entry(checkpoint, in_checkpoints);
 		gc_checkpoint_delete(checkpoint);
@@ -245,6 +229,7 @@ gc_add_checkpoint(const struct vclock *vclock)
 	if (checkpoint == NULL)
 		panic("out of memory");
 
+	rlist_create(&checkpoint->refs);
 	vclock_copy(&checkpoint->vclock, vclock);
 	rlist_add_tail_entry(&gc.checkpoints, checkpoint, in_checkpoints);
 	gc.checkpoint_count++;
@@ -252,9 +237,27 @@ gc_add_checkpoint(const struct vclock *vclock)
 	gc_run();
 }
 
+void
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
+		  struct gc_checkpoint_ref *ref, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(ref->name, GC_NAME_MAX, format, ap);
+	va_end(ap);
+
+	rlist_add_tail_entry(&checkpoint->refs, ref, in_refs);
+}
+
+void
+gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
+{
+	rlist_del_entry(ref, in_refs);
+	gc_run();
+}
+
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
-		     const char *format, ...)
+gc_consumer_register(const struct vclock *vclock, const char *format, ...)
 {
 	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
 	if (consumer == NULL) {
@@ -269,8 +272,6 @@ gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
 	va_end(ap);
 
 	vclock_copy(&consumer->vclock, vclock);
-	consumer->type = type;
-
 	gc_tree_insert(&gc.consumers, consumer);
 	return consumer;
 }

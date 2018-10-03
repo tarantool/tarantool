@@ -389,6 +389,16 @@ lbox_info_gc_call(struct lua_State *L)
 		luaL_pushint64(L, vclock_sum(&checkpoint->vclock));
 		lua_settable(L, -3);
 
+		lua_pushstring(L, "references");
+		lua_newtable(L);
+		int ref_idx = 0;
+		struct gc_checkpoint_ref *ref;
+		gc_foreach_checkpoint_ref(ref, checkpoint) {
+			lua_pushstring(L, ref->name);
+			lua_rawseti(L, -2, ++ref_idx);
+		}
+		lua_settable(L, -3);
+
 		lua_rawseti(L, -2, ++count);
 	}
 	lua_settable(L, -3);

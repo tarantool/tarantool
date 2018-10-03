@@ -46,13 +46,6 @@ struct gc_consumer;
 
 enum { GC_NAME_MAX = 64 };
 
-/** Consumer type: WAL consumer, or SNAP */
-enum gc_consumer_type {
-	GC_CONSUMER_WAL = 1,
-	GC_CONSUMER_SNAP = 2,
-	GC_CONSUMER_ALL = 3,
-};
-
 typedef rb_node(struct gc_consumer) gc_node_t;
 
 /**
@@ -64,11 +57,30 @@ struct gc_checkpoint {
 	struct rlist in_checkpoints;
 	/** VClock of the checkpoint. */
 	struct vclock vclock;
+	/**
+	 * List of checkpoint references, linked by
+	 * gc_checkpoint_ref::in_refs.
+	 *
+	 * We use a list rather than a reference counter so
+	 * that we can list reference names in box.info.gc().
+	 */
+	struct rlist refs;
+};
+
+/**
+ * The following structure represents a checkpoint reference.
+ * See also gc_checkpoint::refs.
+ */
+struct gc_checkpoint_ref {
+	/** Link in gc_checkpoint::refs. */
+	struct rlist in_refs;
+	/** Human-readable name of this checkpoint reference. */
+	char name[GC_NAME_MAX];
 };
 
 /**
  * The object of this type is used to prevent garbage
- * collection from removing files that are still in use.
+ * collection from removing WALs that are still in use.
  */
 struct gc_consumer {
 	/** Link in gc_state::consumers. */
@@ -77,10 +89,6 @@ struct gc_consumer {
 	char name[GC_NAME_MAX];
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
-	/** Consumer type, indicating that consumer only consumes
-	 * WAL files, or both - SNAP and WAL.
-	 */
-	enum gc_consumer_type type;
 };
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
@@ -131,6 +139,12 @@ extern struct gc_state gc;
 	rlist_foreach_entry_reverse(checkpoint, &gc.checkpoints, in_checkpoints)
 
 /**
+ * Iterate over all references to the given checkpoint.
+ */
+#define gc_foreach_checkpoint_ref(ref, checkpoint) \
+	rlist_foreach_entry(ref, &(checkpoint)->refs, in_refs)
+
+/**
  * Return the last (newest) checkpoint known to the garbage
  * collector. If there's no checkpoint, return NULL.
  */
@@ -176,22 +190,41 @@ void
 gc_add_checkpoint(const struct vclock *vclock);
 
 /**
+ * Get a reference to @checkpoint and store it in @ref.
+ * This will block the garbage collector from deleting
+ * the checkpoint files until the reference is released
+ * with gc_put_checkpoint_ref().
+ *
+ * @format... specifies a human-readable name that will be
+ * used for listing the reference in box.info.gc().
+ */
+CFORMAT(printf, 3, 4)
+void
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
+		  struct gc_checkpoint_ref *ref, const char *format, ...);
+
+/**
+ * Release a reference to a checkpoint previously taken
+ * with gc_ref_checkpoint(). This function may trigger
+ * garbage collection.
+ */
+void
+gc_unref_checkpoint(struct gc_checkpoint_ref *ref);
+
+/**
  * Register a consumer.
  *
- * This will stop garbage collection of objects newer than
+ * This will stop garbage collection of WAL files newer than
  * @vclock until the consumer is unregistered or advanced.
  * @format... specifies a human-readable name of the consumer,
  * it will be used for listing the consumer in box.info.gc().
- * @type consumer type, reporting whether consumer only depends
- * on WAL files.
  *
  * Returns a pointer to the new consumer object or NULL on
  * memory allocation failure.
  */
-CFORMAT(printf, 3, 4)
+CFORMAT(printf, 2, 3)
 struct gc_consumer *
-gc_consumer_register(const struct vclock *vclock, enum gc_consumer_type type,
-		     const char *format, ...);
+gc_consumer_register(const struct vclock *vclock, const char *format, ...);
 
 /**
  * Unregister a consumer and invoke garbage collection

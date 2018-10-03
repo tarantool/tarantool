@@ -89,11 +89,17 @@ static void title(const char *new_status)
 bool box_checkpoint_is_in_progress = false;
 
 /**
- * If backup is in progress, this points to the gc consumer
+ * Set if backup is in progress, i.e. box_backup_start() was
+ * called but box_backup_stop() hasn't been yet.
+ */
+static bool backup_is_in_progress;
+
+/**
+ * If backup is in progress, this points to the gc reference
  * object that prevents the garbage collector from deleting
  * the checkpoint files that are currently being backed up.
  */
-static struct gc_consumer *backup_gc;
+static struct gc_checkpoint_ref backup_gc;
 
 /**
  * The instance is in read-write mode: the local checkpoint
@@ -1461,7 +1467,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Register the replica with the garbage collector. */
 	struct gc_consumer *gc = gc_consumer_register(&start_vclock,
-		GC_CONSUMER_WAL, "replica %s", tt_uuid_str(&instance_uuid));
+			"replica %s", tt_uuid_str(&instance_uuid));
 	if (gc == NULL)
 		diag_raise();
 	auto gc_guard = make_scoped_guard([=]{
@@ -2167,7 +2173,7 @@ int
 box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 {
 	assert(checkpoint_idx >= 0);
-	if (backup_gc != NULL) {
+	if (backup_is_in_progress) {
 		diag_set(ClientError, ER_BACKUP_IN_PROGRESS);
 		return -1;
 	}
@@ -2180,14 +2186,12 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 		diag_set(ClientError, ER_MISSING_SNAPSHOT);
 		return -1;
 	}
-	backup_gc = gc_consumer_register(&checkpoint->vclock,
-					 GC_CONSUMER_ALL, "backup");
-	if (backup_gc == NULL)
-		return -1;
+	backup_is_in_progress = true;
+	gc_ref_checkpoint(checkpoint, &backup_gc, "backup");
 	int rc = engine_backup(&checkpoint->vclock, cb, cb_arg);
 	if (rc != 0) {
-		gc_consumer_unregister(backup_gc);
-		backup_gc = NULL;
+		gc_unref_checkpoint(&backup_gc);
+		backup_is_in_progress = false;
 	}
 	return rc;
 }
@@ -2195,9 +2199,9 @@ box_backup_start(int checkpoint_idx, box_backup_cb cb, void *cb_arg)
 void
 box_backup_stop(void)
 {
-	if (backup_gc != NULL) {
-		gc_consumer_unregister(backup_gc);
-		backup_gc = NULL;
+	if (backup_is_in_progress) {
+		gc_unref_checkpoint(&backup_gc);
+		backup_is_in_progress = false;
 	}
 }
 
