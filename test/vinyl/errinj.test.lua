@@ -882,3 +882,21 @@ i:stat().disk.compact.queue -- none
 s:drop()
 
 test_run:cmd("clear filter")
+
+--
+-- Check that an instance doesn't crash if a run file needed for
+-- joining a replica is corrupted (see gh-3708).
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+s:replace{1, 2, 3}
+box.snapshot()
+box.schema.user.grant('guest', 'replication')
+errinj.set('ERRINJ_VYRUN_INDEX_GARBAGE', true)
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server replica with crash_expected=True")
+test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+errinj.set('ERRINJ_VYRUN_INDEX_GARBAGE', false)
+box.schema.user.revoke('guest', 'replication')
+s:drop()

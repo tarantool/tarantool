@@ -2983,13 +2983,13 @@ vy_send_range(struct vy_join_ctx *ctx,
 		       vy_send_range_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 
+out_delete_wi:
+	ctx->wi->iface->close(ctx->wi);
+	ctx->wi = NULL;
 out_delete_slices:
 	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
 		vy_slice_delete(slice);
 	rlist_create(&ctx->slices);
-out_delete_wi:
-	ctx->wi->iface->close(ctx->wi);
-	ctx->wi = NULL;
 out:
 	return rc;
 }
