@@ -77,13 +77,11 @@ end;
 
 -- Return global statistics.
 --
--- Note, quota watermark checking is beyond the scope of this
--- test so we just filter out related statistics.
+-- Note, checking correctness of the load regulator logic is beyond
+-- the scope of this test so we just filter out related statistics.
 function gstat()
     local st = box.stat.vinyl()
-    st.quota.use_rate = nil
-    st.quota.dump_bandwidth = nil
-    st.quota.watermark = nil
+    st.regulator = nil
     return st
 end;
 

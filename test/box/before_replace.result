@@ -623,15 +623,25 @@ s:before_replace(nil, cb)
 s:on_replace(nil, cb)
 ---
 ...
--- Make sure the server can recover from xlogs after
--- using space:before_replace.
+-- gh-3678: Check that IPROTO_NOP in a multi-statement transaction
+-- is recovered correctly.
+f = function(old, new) return old end
+---
+...
+type(s:before_replace(f))
+---
+- function
+...
+box.begin() s:replace{10, 10} s:before_replace(nil, f) s:replace{10, 100} box.commit()
+---
+...
 test_run:cmd('restart server default')
 s = box.space.test
 ---
 ...
-s:select()
+s:select() -- [10, 100]
 ---
-- []
+- - [10, 100]
 ...
 -- Check that IPROTO_NOP is actually written to xlog.
 fio = require('fio')

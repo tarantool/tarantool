@@ -95,13 +95,11 @@ end;
 ...
 -- Return global statistics.
 --
--- Note, quota watermark checking is beyond the scope of this
--- test so we just filter out related statistics.
+-- Note, checking correctness of the load regulator logic is beyond
+-- the scope of this test so we just filter out related statistics.
 function gstat()
     local st = box.stat.vinyl()
-    st.quota.use_rate = nil
-    st.quota.dump_bandwidth = nil
-    st.quota.watermark = nil
+    st.regulator = nil
     return st
 end;
 ---
@@ -231,9 +229,6 @@ gstat()
       out: 0
     data: 0
     index: 0
-  quota:
-    limit: 134217728
-    used: 0
   memory:
     tuple_cache: 0
     tx: 0
@@ -1075,9 +1070,6 @@ gstat()
       out: 0
     data: 104300
     index: 1190
-  quota:
-    limit: 134217728
-    used: 262583
   memory:
     tuple_cache: 14313
     tx: 0

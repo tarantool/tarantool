@@ -382,6 +382,12 @@ write_lua_table = function(tuple)
 end
 
 local function cat_lua_cb(record)
+    -- Ignore both versions of IPROTO_NOP: the one without a
+    -- body (new), and the one with empty body (old).
+    if record.HEADER.type == 'NOP' or record.BODY == nil or
+       record.BODY.space_id == nil then
+        return
+    end
     io.stdout:write(('box.space[%d]'):format(record.BODY.space_id))
     local op = record.HEADER.type:lower()
     io.stdout:write((':%s('):format(op))
@@ -833,17 +839,17 @@ local function cat()
     for id, file in ipairs(positional_arguments) do
         log.error("Processing file '%s'", file)
         for lsn, record in xlog.pairs(file) do
-            local sid = record.BODY.space_id
+            local sid = record.BODY and record.BODY.space_id
             local rid = record.HEADER.replica_id
-            if (lsn < from) or
+            if lsn >= to then
+                -- stop, as we've finished reading tuple with lsn == to
+                -- and the next lsn's will be bigger
+                break
+            elseif (lsn < from) or
                (not spaces and sid and sid < 512 and not show_system) or
                (spaces and (sid == nil or not find_in_list(sid, spaces))) or
                (replicas and not find_in_list(rid, replicas)) then
                 -- pass this tuple
-            elseif lsn >= to then
-                -- stop, as we've finished reading tuple with lsn == to
-                -- and the next lsn's will be bigger
-                break
             else
                 is_printed = true
                 format_cb(record)
@@ -874,17 +880,17 @@ local function play()
     for id, file in ipairs(positional_arguments) do
         log.info(("Processing file '%s'"):format(file))
         for lsn, record in xlog.pairs(file) do
-            local sid = record.BODY.space_id
+            local sid = record.BODY and record.BODY.space_id
             local rid = record.HEADER.replica_id
-            if (lsn < from) or
-               (not spaces and sid and sid < 512 and not show_system) or
-               (spaces and (sid == nil or not find_in_list(sid, spaces))) or
-               (replicas and not find_in_list(rid, replicas)) then
-                -- pass this tuple
-            elseif lsn >= to then
+            if lsn >= to then
                 -- stop, as we've finished reading tuple with lsn == to
                 -- and the next lsn's will be bigger
                 break
+            elseif (lsn < from) or sid == nil or
+               (not spaces and sid < 512 and not show_system) or
+               (spaces and not find_in_list(sid, spaces)) or
+               (replicas and not find_in_list(rid, replicas)) then
+                -- pass this tuple
             else
                 local args, so = {}, remote.space[sid]
                 if so == nil then

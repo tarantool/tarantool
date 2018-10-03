@@ -47,7 +47,7 @@ s:count()
 ---
 - 1
 ...
-box.stat.vinyl().quota.used
+box.stat.vinyl().memory.level0
 ---
 - 748241
 ...
@@ -61,7 +61,7 @@ s:count()
 ---
 - 1
 ...
-box.stat.vinyl().quota.used
+box.stat.vinyl().memory.level0
 ---
 - 748241
 ...
@@ -148,7 +148,7 @@ box.snapshot()
 -- The following operation should fail instantly irrespective
 -- of the value of 'vinyl_timeout' (gh-3291).
 --
-box.stat.vinyl().quota.used == 0
+box.stat.vinyl().memory.level0 == 0
 ---
 - true
 ...

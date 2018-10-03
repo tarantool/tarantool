@@ -78,7 +78,16 @@ test_run:cmd('switch default')
 ---
 - true
 ...
+replication_sync_timeout = box.cfg.replication_sync_timeout
+---
+...
+box.cfg { replication_sync_timeout = 0.01 }
+---
+...
 box.cfg { replication = wal_off_uri }
+---
+...
+box.cfg { replication_sync_timeout = replication_sync_timeout }
 ---
 ...
 check = "Read access to universe"
