@@ -148,7 +148,7 @@ test:test("strip", function(test)
 end )
 
 test:test("unicode", function(test)
-    test:plan(102)
+    test:plan(104)
     local str = 'хеЛлоу вОрЛд ё Ё я Я э Э ъ Ъ hElLo WorLd 1234 i I İ 勺#☢༺'
     local upper_res = 'ХЕЛЛОУ ВОРЛД Ё Ё Я Я Э Э Ъ Ъ HELLO WORLD 1234 I I İ 勺#☢༺'
     local lower_res = 'хеллоу ворлд ё ё я я э э ъ ъ hello world 1234 i i i̇ 勺#☢༺'
@@ -306,6 +306,10 @@ test:test("unicode", function(test)
     test:is(utf8.casecmp('', '') == 0, true, 'test empty icompare')
     test:is(utf8.casecmp('', 'a') < 0, true, 'test left empty icompare')
     test:is(utf8.casecmp('a', '') > 0, true, 'test right empty icompare')
+
+    -- gh-3709: utf8 can not handle an empty string.
+    test:is(utf8.lower(''), '', 'lower empty')
+    test:is(utf8.upper(''), '', 'upper empty')
 end)
 
 os.exit(test:check() == true and 0 or -1)
