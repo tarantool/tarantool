@@ -71,23 +71,6 @@ gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
        struct gc_consumer, node, gc_consumer_cmp);
 
-/** Allocate a consumer object. */
-static struct gc_consumer *
-gc_consumer_new(const char *name, const struct vclock *vclock,
-		enum gc_consumer_type type)
-{
-	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
-	if (consumer == NULL) {
-		diag_set(OutOfMemory, sizeof(*consumer),
-			 "malloc", "struct gc_consumer");
-		return NULL;
-	}
-	snprintf(consumer->name, GC_NAME_MAX, "%s", name);
-	vclock_copy(&consumer->vclock, vclock);
-	consumer->type = type;
-	return consumer;
-}
-
 /** Free a consumer object. */
 static void
 gc_consumer_delete(struct gc_consumer *consumer)
@@ -213,9 +196,18 @@ struct gc_consumer *
 gc_consumer_register(const char *name, const struct vclock *vclock,
 		     enum gc_consumer_type type)
 {
-	struct gc_consumer *consumer = gc_consumer_new(name, vclock, type);
-	if (consumer != NULL)
-		gc_tree_insert(&gc.consumers, consumer);
+	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
+	if (consumer == NULL) {
+		diag_set(OutOfMemory, sizeof(*consumer),
+			 "malloc", "struct gc_consumer");
+		return NULL;
+	}
+
+	snprintf(consumer->name, GC_NAME_MAX, "%s", name);
+	vclock_copy(&consumer->vclock, vclock);
+	consumer->type = type;
+
+	gc_tree_insert(&gc.consumers, consumer);
 	return consumer;
 }
 
