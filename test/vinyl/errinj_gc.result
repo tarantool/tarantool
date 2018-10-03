@@ -254,10 +254,6 @@ ch:get()
 - true
 ...
 test_run:cmd('restart server default')
-box.snapshot()
----
-- ok
-...
 fio = require('fio')
 ---
 ...

@@ -3246,6 +3246,8 @@ vy_gc_lsm(struct vy_lsm_recovery_info *lsm_info)
 	}
 	struct vy_run_recovery_info *run_info;
 	rlist_foreach_entry(run_info, &lsm_info->runs, in_lsm) {
+		if (lsm_info->create_lsn < 0)
+			run_info->is_incomplete = true;
 		if (!run_info->is_dropped) {
 			run_info->is_dropped = true;
 			run_info->gc_lsn = lsm_info->drop_lsn;

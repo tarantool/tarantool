@@ -59,8 +59,6 @@ test_run:cmd("start server replica with crash_expected=True") -- fail
 test_run:cmd("start server replica with crash_expected=True") -- fail again
 test_run:cmd("start server replica with args='disable_replication'")
 test_run:cmd("switch replica")
-box.cfg{checkpoint_count = 1}
-box.snapshot()
 fio = require('fio')
 fio.chdir(box.cfg.vinyl_dir)
 fio.glob(fio.pathjoin(box.space.test.id, 0, '*'))
