@@ -87,6 +87,8 @@ typedef rb_tree(struct gc_consumer) gc_tree_t;
 
 /** Garbage collection state. */
 struct gc_state {
+	/** VClock of the oldest WAL row available on the instance. */
+	struct vclock vclock;
 	/**
 	 * Minimal number of checkpoints to preserve.
 	 * Configured by box.cfg.checkpoint_count.
@@ -103,10 +105,6 @@ struct gc_state {
 	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
 	 */
 	struct rlist checkpoints;
-	/** Max vclock WAL garbage collection has been called for. */
-	struct vclock wal_vclock;
-	/** Max vclock checkpoint garbage collection has been called for. */
-	struct vclock checkpoint_vclock;
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
 	/**

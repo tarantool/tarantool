@@ -96,9 +96,8 @@ gc_init(void)
 	/* Don't delete any files until recovery is complete. */
 	gc.min_checkpoint_count = INT_MAX;
 
+	vclock_create(&gc.vclock);
 	rlist_create(&gc.checkpoints);
-	vclock_create(&gc.wal_vclock);
-	vclock_create(&gc.checkpoint_vclock);
 	gc_tree_new(&gc.consumers);
 	latch_create(&gc.latch);
 }
@@ -141,11 +140,12 @@ gc_tree_first_checkpoint(gc_tree_t *consumers)
 static void
 gc_run(void)
 {
-	/* Look up the consumer that uses the oldest WAL. */
-	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
 	/* Look up the consumer that uses the oldest checkpoint. */
 	struct gc_consumer *leftmost_checkpoint =
 		gc_tree_first_checkpoint(&gc.consumers);
+
+	bool run_wal_gc = false;
+	bool run_engine_gc = false;
 
 	/*
 	 * Find the oldest checkpoint that must be preserved.
@@ -153,14 +153,10 @@ gc_run(void)
 	 * checkpoints, plus we can't remove checkpoints that
 	 * are still in use.
 	 */
-	struct vclock gc_checkpoint_vclock;
-	vclock_create(&gc_checkpoint_vclock);
-
 	struct gc_checkpoint *checkpoint = NULL;
 	while (true) {
 		checkpoint = rlist_first_entry(&gc.checkpoints,
 				struct gc_checkpoint, in_checkpoints);
-		vclock_copy(&gc_checkpoint_vclock, &checkpoint->vclock);
 		if (gc.checkpoint_count <= gc.min_checkpoint_count)
 			break;
 		if (leftmost_checkpoint != NULL &&
@@ -170,20 +166,29 @@ gc_run(void)
 		rlist_del_entry(checkpoint, in_checkpoints);
 		gc_checkpoint_delete(checkpoint);
 		gc.checkpoint_count--;
+		run_engine_gc = true;
 	}
 
 	/* At least one checkpoint must always be available. */
 	assert(checkpoint != NULL);
 
-	struct vclock gc_wal_vclock;
-	if (leftmost != NULL &&
-	    vclock_sum(&leftmost->vclock) < vclock_sum(&gc_checkpoint_vclock))
-		vclock_copy(&gc_wal_vclock, &leftmost->vclock);
-	else
-		vclock_copy(&gc_wal_vclock, &gc_checkpoint_vclock);
+	/*
+	 * Find the vclock of the oldest WAL row to keep.
+	 * Note, we must keep all WALs created after the
+	 * oldest checkpoint, even if no consumer needs them.
+	 */
+	const struct vclock *vclock = (gc_tree_empty(&gc.consumers) ? NULL :
+				       &gc_tree_first(&gc.consumers)->vclock);
+	if (vclock == NULL ||
+	    vclock_sum(vclock) > vclock_sum(&checkpoint->vclock))
+		vclock = &checkpoint->vclock;
 
-	if (vclock_sum(&gc_wal_vclock) <= vclock_sum(&gc.wal_vclock) &&
-	    vclock_sum(&gc_checkpoint_vclock) <= vclock_sum(&gc.checkpoint_vclock))
+	if (vclock_sum(vclock) > vclock_sum(&gc.vclock)) {
+		vclock_copy(&gc.vclock, vclock);
+		run_wal_gc = true;
+	}
+
+	if (!run_engine_gc && !run_wal_gc)
 		return; /* nothing to do */
 
 	/*
@@ -201,17 +206,10 @@ gc_run(void)
 	 * fails - see comment to memtx_engine_collect_garbage().
 	 */
 	int rc = 0;
-
-	if (vclock_sum(&gc_checkpoint_vclock) > vclock_sum(&gc.checkpoint_vclock)) {
-		vclock_copy(&gc.checkpoint_vclock, &gc_checkpoint_vclock);
-		rc = engine_collect_garbage(vclock_sum(&gc_checkpoint_vclock));
-	}
-	if (vclock_sum(&gc_wal_vclock) > vclock_sum(&gc.wal_vclock)) {
-		vclock_copy(&gc.wal_vclock, &gc_wal_vclock);
-		if (rc == 0)
-			wal_collect_garbage(vclock_sum(&gc_wal_vclock));
-	}
-
+	if (run_engine_gc)
+		rc = engine_collect_garbage(vclock_sum(&checkpoint->vclock));
+	if (run_wal_gc && rc == 0)
+		wal_collect_garbage(vclock_sum(vclock));
 	latch_unlock(&gc.latch);
 }
 
