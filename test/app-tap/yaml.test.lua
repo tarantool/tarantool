@@ -130,9 +130,86 @@ local function test_tagged(test, s)
             "tag prefix on multiple documents")
 end
 
+local function test_api(test, s)
+    local encode_usage = 'Usage: encode(object, {tag_prefix = <string>, ' ..
+        'tag_handle = <string>})'
+    local decode_usage = 'Usage: yaml.decode(document, [{tag_only = boolean}])'
+
+    local cases = {
+        {
+            'encode: no args',
+            func = s.encode,
+            args = {},
+            exp_err = encode_usage,
+        },
+        {
+            'encode: wrong opts',
+            func = s.encode,
+            args = {{}, 1},
+            exp_err = encode_usage,
+        },
+        {
+            'encode: wrong tag_prefix',
+            func = s.encode,
+            args = {{}, {tag_prefix = 1}},
+            exp_err = encode_usage,
+        },
+        {
+            'encode: wrong tag_handle',
+            func = s.encode,
+            args = {{}, {tag_handle = 1}},
+            exp_err = encode_usage,
+        },
+        {
+            'encode: nil opts',
+            func = s.encode,
+            args = {{}, nil},
+            args_len = 2,
+            exp_err = nil,
+        },
+        {
+            'decode: no args',
+            func = s.decode,
+            args = {},
+            exp_err = decode_usage,
+        },
+        {
+            'decode: wrong input',
+            func = s.decode,
+            args = {true},
+            exp_err = decode_usage,
+        },
+        {
+            'decode: wrong opts',
+            func = s.decode,
+            args = {'', 1},
+            exp_err = decode_usage,
+        },
+        {
+            'decode: nil opts',
+            func = s.decode,
+            args = {'', nil},
+            args_len = 2,
+            exp_err = nil,
+        },
+    }
+
+    test:plan(#cases)
+
+    for _, case in ipairs(cases) do
+        local args_len = case.args_len or table.maxn(case.args)
+        local ok, err = pcall(case.func, unpack(case.args, 1, args_len))
+        if case.exp_err == nil then
+            test:ok(ok, case[1])
+        else
+            test:is_deeply({ok, err}, {false, case.exp_err}, case[1])
+        end
+    end
+end
+
 tap.test("yaml", function(test)
     local serializer = require('yaml')
-    test:plan(11)
+    test:plan(12)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -144,4 +221,5 @@ tap.test("yaml", function(test)
     test:test("compact", test_compact, serializer)
     test:test("output", test_output, serializer)
     test:test("tagged", test_tagged, serializer)
+    test:test("api", test_api, serializer)
 end)
