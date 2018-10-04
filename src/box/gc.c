@@ -279,18 +279,9 @@ gc_consumer_register(const struct vclock *vclock, const char *format, ...)
 void
 gc_consumer_unregister(struct gc_consumer *consumer)
 {
-	int64_t signature = vclock_sum(&consumer->vclock);
-
 	gc_tree_remove(&gc.consumers, consumer);
 	gc_consumer_delete(consumer);
-
-	/*
-	 * Rerun garbage collection after removing the consumer
-	 * if it referenced the oldest vclock.
-	 */
-	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
-	if (leftmost == NULL || vclock_sum(&leftmost->vclock) > signature)
-		gc_run();
+	gc_run();
 }
 
 void
@@ -319,13 +310,7 @@ gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 	if (update_tree)
 		gc_tree_insert(&gc.consumers, consumer);
 
-	/*
-	 * Rerun garbage collection after advancing the consumer
-	 * if it referenced the oldest vclock.
-	 */
-	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
-	if (leftmost == NULL || vclock_sum(&leftmost->vclock) > prev_signature)
-		gc_run();
+	gc_run();
 }
 
 struct gc_consumer *
