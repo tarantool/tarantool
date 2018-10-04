@@ -5,6 +5,7 @@ replica_set = require('fast_replica')
 fiber = require('fiber')
 
 test_run:cleanup_cluster()
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
 
 -- Make each snapshot trigger garbage collection.
 default_checkpoint_count = box.cfg.checkpoint_count
@@ -21,8 +22,10 @@ box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0.05)
 
 -- Create and populate the space we will replicate.
 s = box.schema.space.create('test', {engine = engine});
-_ = s:create_index('pk')
-for i = 1, 100 do s:auto_increment{} end
+_ = s:create_index('pk', {run_count_per_level = 1})
+for i = 1, 50 do s:auto_increment{} end
+box.snapshot()
+for i = 1, 50 do s:auto_increment{} end
 box.snapshot()
 for i = 1, 100 do s:auto_increment{} end
 
@@ -43,7 +46,6 @@ end)
 test_run:cmd("setopt delimiter ''");
 
 -- Start the replica.
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
 test_run:cmd("start server replica")
 
 -- Despite the fact that we invoked garbage collection that

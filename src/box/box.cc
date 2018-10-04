@@ -1465,14 +1465,14 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	struct vclock start_vclock;
 	vclock_copy(&start_vclock, &checkpoint->vclock);
 
-	/* Register the replica with the garbage collector. */
-	struct gc_consumer *gc = gc_consumer_register(&start_vclock,
-			"replica %s", tt_uuid_str(&instance_uuid));
-	if (gc == NULL)
-		diag_raise();
-	auto gc_guard = make_scoped_guard([=]{
-		gc_consumer_unregister(gc);
-	});
+	/*
+	 * Make sure the checkpoint files won't be deleted while
+	 * initial join is in progress.
+	 */
+	struct gc_checkpoint_ref gc;
+	gc_ref_checkpoint(checkpoint, &gc, "replica %s",
+			  tt_uuid_str(&instance_uuid));
+	auto gc_guard = make_scoped_guard([&]{ gc_unref_checkpoint(&gc); });
 
 	/* Respond to JOIN request with start_vclock. */
 	struct xrow_header row;
@@ -1496,8 +1496,14 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	replica = replica_by_uuid(&instance_uuid);
 	assert(replica != NULL);
-	replica->gc = gc;
-	gc_guard.is_active = false;
+
+	/* Register the replica as a WAL consumer. */
+	if (replica->gc != NULL)
+		gc_consumer_unregister(replica->gc);
+	replica->gc = gc_consumer_register(&start_vclock, "replica %s",
+					   tt_uuid_str(&instance_uuid));
+	if (replica->gc == NULL)
+		diag_raise();
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
