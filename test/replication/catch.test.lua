@@ -13,7 +13,7 @@ test_run:cmd("switch replica")
 
 test_run:cmd("switch default")
 s = box.schema.space.create('test', {engine = engine});
--- vinyl does not support hash index
+-- Vinyl does not support hash index.
 index = s:create_index('primary', {type = (engine == 'vinyl' and 'tree' or 'hash') })
 
 test_run:cmd("switch replica")
@@ -22,41 +22,40 @@ while box.space.test == nil do fiber.sleep(0.01) end
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 
--- insert values on the master while replica is stopped and can't fetch them
-for i=1,100 do s:insert{i, 'this is test message12345'} end
-
--- sleep after every tuple
-errinj.set("ERRINJ_RELAY_TIMEOUT", 1000.0)
+-- Insert values on the master while replica is stopped and can't
+-- fetch them.
+errinj.set('ERRINJ_RELAY_SEND_DELAY', true)
+for i = 1, 100 do s:insert{i, 'this is test message12345'} end
 
 test_run:cmd("start server replica with args='0.01'")
 test_run:cmd("switch replica")
 
 -- Check that replica doesn't enter read-write mode before
--- catching up with the master: to check that we inject sleep into
--- the master relay_send function and attempt a data modifying
--- statement in replica while it's still fetching data from the
--- master.
--- In the next two cases we try to delete a tuple while replica is
--- catching up with the master (local delete, remote delete) case
+-- catching up with the master: to check that we stop sending
+-- rows on the master in relay_send function and attempt a data
+-- modifying statement in replica while it's still fetching data
+-- from the master.
 --
--- #1: delete tuple on replica
+-- In the next two cases we try to replace a tuple while replica
+-- is catching up with the master (local replace, remote replace)
+-- case.
+--
+-- Case #1: replace tuple on replica locally.
 --
 box.space.test ~= nil
-d = box.space.test:delete{1}
-box.space.test:get(1) ~= nil
+box.space.test:replace{1}
 
--- case #2: delete tuple by net.box
+-- Case #2: replace tuple on replica by net.box.
 
 test_run:cmd("switch default")
 test_run:cmd("set variable r_uri to 'replica.listen'")
 c = net_box.connect(r_uri)
-d = c.space.test:delete{1}
-c.space.test:get(1) ~= nil
+d = c.space.test:replace{1}
 
--- check sync
-errinj.set("ERRINJ_RELAY_TIMEOUT", 0)
+-- Resume replication.
+errinj.set('ERRINJ_RELAY_SEND_DELAY', false)
 
--- cleanup
+-- Cleanup.
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 test_run:cmd("delete server replica")
