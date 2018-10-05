@@ -4591,7 +4591,7 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 		if (pLoop->wsFlags & WHERE_INDEXED) {
 			struct index_def *idx_def = pLoop->index_def;
 			int iIndexCur;
-			int op;
+			int op = OP_IteratorOpen;
 			/* Check if index is primary. Either of
 			 * points should be true:
 			 * 1. struct Index is non-NULL and is
@@ -4636,7 +4636,6 @@ sqlite3WhereBegin(Parse * pParse,	/* The parser context */
 					}
 				}
 				assert(wctrlFlags & WHERE_ONEPASS_DESIRED);
-				op = OP_IteratorOpen;
 				pWInfo->aiCurOnePass[1] = iIndexCur;
 			} else if (iAuxArg
 				   && (wctrlFlags & WHERE_OR_SUBCLAUSE) != 0) {
