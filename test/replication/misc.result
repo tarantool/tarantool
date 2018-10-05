@@ -88,6 +88,13 @@ test_run:cmd('cleanup server test')
 box.cfg{read_only = false}
 ---
 ...
+test_run:cmd('delete server test')
+---
+- true
+...
+test_run:cleanup_cluster()
+---
+...
 -- gh-3160 - Send heartbeats if there are changes from a remote master only
 SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 ---
@@ -229,6 +236,9 @@ test_run:cmd("switch default")
 test_run:drop_cluster(SERVERS)
 ---
 ...
+test_run:cleanup_cluster()
+---
+...
 -- gh-3642 - Check that socket file descriptor doesn't leak
 -- when a replica is disconnected.
 rlimit = require('rlimit')
@@ -253,7 +263,7 @@ test_run:cmd('create server sock with rpl_master=default, script="replication/re
 ---
 - true
 ...
-test_run:cmd(string.format('start server sock'))
+test_run:cmd('start server sock')
 ---
 - true
 ...
@@ -299,13 +309,20 @@ lim.rlim_cur = old_fno
 rlimit.setrlimit(rlimit.RLIMIT_NOFILE, lim)
 ---
 ...
-test_run:cmd('stop server sock')
+test_run:cmd("stop server sock")
 ---
 - true
 ...
-test_run:cmd('cleanup server sock')
+test_run:cmd("cleanup server sock")
 ---
 - true
+...
+test_run:cmd("delete server sock")
+---
+- true
+...
+test_run:cleanup_cluster()
+---
 ...
 box.schema.user.revoke('guest', 'replication')
 ---
@@ -342,14 +359,22 @@ test_run:cmd('cleanup server er_load2')
 ---
 - true
 ...
+test_run:cmd('delete server er_load1')
+---
+- true
+...
+test_run:cmd('delete server er_load2')
+---
+- true
+...
+test_run:cleanup_cluster()
+---
+...
 --
 -- Test case for gh-3637. Before the fix replica would exit with
 -- an error. Now check that we don't hang and successfully connect.
 --
 fiber = require('fiber')
----
-...
-test_run:cleanup_cluster()
 ---
 ...
 test_run:cmd("create server replica_auth with rpl_master=default, script='replication/replica_auth.lua'")
@@ -390,6 +415,9 @@ test_run:cmd("cleanup server replica_auth")
 test_run:cmd("delete server replica_auth")
 ---
 - true
+...
+test_run:cleanup_cluster()
+---
 ...
 box.schema.user.drop('cluster')
 ---
@@ -463,6 +491,9 @@ test_run:cmd("cleanup server replica")
 test_run:cmd("delete server replica")
 ---
 - true
+...
+test_run:cleanup_cluster()
+---
 ...
 box.schema.user.revoke('guest', 'replication')
 ---
@@ -560,4 +591,7 @@ test_run:cmd("cleanup server replica")
 test_run:cmd("delete server replica")
 ---
 - true
+...
+test_run:cleanup_cluster()
+---
 ...

@@ -76,6 +76,8 @@ box.space.test3:select()
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+test_run:cleanup_cluster()
 box.schema.user.revoke('guest', 'replication')
 
 s1:select()
