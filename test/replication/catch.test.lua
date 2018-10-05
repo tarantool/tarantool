@@ -2,7 +2,6 @@ env = require('test_run')
 test_run = env.new()
 engine = test_run:get_cfg('engine')
 
-
 net_box = require('net.box')
 errinj = box.error.injection
 

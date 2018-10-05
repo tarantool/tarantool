@@ -63,6 +63,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
+fiber = require('fiber')
+---
+...
 while box.space.test:count() < 2 do fiber.sleep(0.01) end
 ---
 ...
