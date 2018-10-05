@@ -27,6 +27,28 @@ default_checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 ---
 ...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function wait_gc(n)
+    return test_run:wait_cond(function()
+        return #box.info.gc().checkpoints == n
+    end, 10)
+end;
+---
+...
+function wait_xlog(n, timeout)
+    return test_run:wait_cond(function()
+        return #fio.glob('./master/*.xlog') == n
+    end, 10)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
 -- Grant permissions needed for replication.
 box.schema.user.grant('guest', 'replication')
 ---
@@ -63,14 +85,13 @@ for i = 1, 100 do s:auto_increment{} end
 ...
 -- Make sure replica join will take long enough for us to
 -- invoke garbage collection.
-box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.05)
+box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", true)
 ---
 - ok
 ...
 -- While the replica is receiving the initial data set,
 -- make a snapshot and invoke garbage collection, then
--- remove the timeout injection so that we don't have to
--- wait too long for the replica to start.
+-- remove delay to allow replica to start.
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
@@ -78,7 +99,7 @@ test_run:cmd("setopt delimiter ';'")
 fiber.create(function()
     fiber.sleep(0.1)
     box.snapshot()
-    box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
+    box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", false)
 end)
 test_run:cmd("setopt delimiter ''");
 ---
@@ -110,21 +131,16 @@ test_run:cmd("switch default")
 ...
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
-test_run:wait_cond(function() return #box.info.gc().checkpoints == 1 end, 10)
+wait_gc(1) or box.info.gc()
 ---
 - true
 ...
-#box.info.gc().checkpoints == 1 or box.info.gc()
+wait_xlog(1) or fio.listdir('./master') -- Make sure the replica will not receive data until
 ---
 - true
 ...
-#fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
----
-- true
-...
--- Make sure the replica will receive data it is subscribed
--- to long enough for us to invoke garbage collection.
-box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.05)
+-- we test garbage collection.
+box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", true)
 ---
 - ok
 ...
@@ -152,17 +168,17 @@ box.snapshot()
 ---
 - ok
 ...
-#box.info.gc().checkpoints == 1 or box.info.gc()
+wait_gc(1) or box.info.gc()
 ---
 - true
 ...
-#fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
+wait_xlog(2) or fio.listdir('./master')
 ---
 - true
 ...
--- Remove the timeout injection so that the replica catches
+-- Resume replication so that the replica catches
 -- up quickly.
-box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
+box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", false)
 ---
 - ok
 ...
@@ -185,11 +201,11 @@ test_run:cmd("switch default")
 ...
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
-test_run:wait_cond(function() return #fio.glob('./master/*.xlog') == 0 end, 10)
+wait_gc(1) or box.info.gc()
 ---
 - true
 ...
-#fio.glob('./master/*.xlog') == 0 or fio.listdir('./master')
+wait_xlog(0) or fio.listdir('./master')
 ---
 - true
 ...
@@ -228,11 +244,11 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- Garbage collection must not delete the old xlog file
 -- because it is still needed by the replica, but remove
 -- the old snapshot.
-#box.info.gc().checkpoints == 1 or box.info.gc()
+wait_gc(1) or box.info.gc()
 ---
 - true
 ...
-#fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
+wait_xlog(2) or fio.listdir('./master')
 ---
 - true
 ...
@@ -266,11 +282,11 @@ test_run:cmd("switch default")
 - true
 ...
 -- Now it's safe to drop the old xlog.
-test_run:wait_cond(function() return #fio.glob('./master/*.xlog') == 1 end, 10)
+wait_gc(1) or box.info.gc()
 ---
 - true
 ...
-#fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
+wait_xlog(1) or fio.listdir('./master')
 ---
 - true
 ...
@@ -302,17 +318,11 @@ box.snapshot()
 ---
 - ok
 ...
-#box.info.gc().checkpoints == 1 or box.info.gc()
+wait_gc(1) or box.info.gc()
 ---
 - true
 ...
-xlog_count = #fio.glob('./master/*.xlog')
----
-...
--- the replica may have managed to download all data
--- from xlog #1 before it was stopped, in which case
--- it's OK to collect xlog #1
-xlog_count == 3 or xlog_count == 2 or fio.listdir('./master')
+wait_xlog(2) or fio.listdir('./master')
 ---
 - true
 ...
@@ -321,7 +331,11 @@ xlog_count == 3 or xlog_count == 2 or fio.listdir('./master')
 test_run:cleanup_cluster()
 ---
 ...
-#fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
+wait_gc(1) or box.info.gc()
+---
+- true
+...
+wait_xlog(1) or fio.listdir('./master')
 ---
 - true
 ...
@@ -409,7 +423,7 @@ box.snapshot()
 ---
 - ok
 ...
-#fio.glob('./master/*.xlog') == 3 or fio.listdir('./master')
+wait_xlog(3) or fio.listdir('./master')
 ---
 - true
 ...
@@ -422,11 +436,7 @@ box.snapshot()
 ---
 - ok
 ...
-test_run:wait_cond(function() return #fio.glob('./master/*.xlog') == 0 end, 10)
----
-- true
-...
-#fio.glob('./master/*.xlog') == 0 or fio.listdir('./master')
+wait_xlog(0, 10) or fio.listdir('./master')
 ---
 - true
 ...
