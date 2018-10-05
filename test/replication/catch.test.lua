@@ -59,6 +59,7 @@ errinj.set("ERRINJ_RELAY_TIMEOUT", 0)
 -- cleanup
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+test_run:cleanup_cluster()
 box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')
-

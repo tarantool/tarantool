@@ -37,5 +37,7 @@ box.cfg { replication = "" }
 
 test_run:cmd("stop server wal_off")
 test_run:cmd("cleanup server wal_off")
+test_run:cmd("delete server wal_off")
+test_run:cleanup_cluster()
 
 box.schema.user.revoke('guest', 'replication')

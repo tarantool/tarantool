@@ -190,6 +190,7 @@ box.cfg{replication = replica_port}
 -- Stop the replica and write a few WALs.
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
 _ = s:auto_increment{}
 box.snapshot()
 _ = s:auto_increment{}

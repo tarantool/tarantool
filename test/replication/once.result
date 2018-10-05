@@ -85,3 +85,15 @@ once -- 1
 box.cfg{read_only = false}
 ---
 ...
+box.space._schema:delete{"oncero"}
+---
+- ['oncero']
+...
+box.space._schema:delete{"oncekey"}
+---
+- ['oncekey']
+...
+box.space._schema:delete{"oncetest"}
+---
+- ['oncetest']
+...

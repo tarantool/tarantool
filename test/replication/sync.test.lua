@@ -145,6 +145,8 @@ test_run:grep_log('replica', 'ER_CFG.*')
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+test_run:cleanup_cluster()
 
 box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')

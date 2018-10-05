@@ -408,6 +408,10 @@ test_run:cmd("cleanup server replica")
 ---
 - true
 ...
+test_run:cmd("delete server replica")
+---
+- true
+...
 _ = s:auto_increment{}
 ---
 ...

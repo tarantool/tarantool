@@ -80,6 +80,7 @@ box.space.test:select()
 -- Cleanup.
 test_run:cmd("switch default")
 test_run:drop_cluster(SERVERS)
+test_run:cleanup_cluster()
 
 --
 -- gh-3722: Check that when space:before_replace trigger modifies
@@ -117,6 +118,7 @@ test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 test_run:cmd("delete server replica")
+test_run:cleanup_cluster()
 
 box.schema.user.revoke('guest', 'replication')
 box.space.test:drop()

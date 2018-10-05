@@ -391,3 +391,10 @@ test_run:cmd("cleanup server replica")
 ---
 - true
 ...
+test_run:cmd("delete server replica")
+---
+- true
+...
+test_run:cleanup_cluster()
+---
+...

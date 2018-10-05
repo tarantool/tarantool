@@ -28,3 +28,6 @@ box.cfg{read_only = true}
 box.once("ro", f, 1) -- ok, already done
 once -- 1
 box.cfg{read_only = false}
+box.space._schema:delete{"oncero"}
+box.space._schema:delete{"oncekey"}
+box.space._schema:delete{"oncetest"}

@@ -32,6 +32,8 @@ test_run:cmd(string.format('start server test with args="%s"', replica_uuid))
 test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')
 box.cfg{read_only = false}
+test_run:cmd('delete server test')
+test_run:cleanup_cluster()
 
 -- gh-3160 - Send heartbeats if there are changes from a remote master only
 SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
@@ -89,6 +91,7 @@ box.space.space1:drop()
 
 test_run:cmd("switch default")
 test_run:drop_cluster(SERVERS)
+test_run:cleanup_cluster()
 
 -- gh-3642 - Check that socket file descriptor doesn't leak
 -- when a replica is disconnected.
@@ -100,7 +103,7 @@ lim.rlim_cur = 64
 rlimit.setrlimit(rlimit.RLIMIT_NOFILE, lim)
 
 test_run:cmd('create server sock with rpl_master=default, script="replication/replica.lua"')
-test_run:cmd(string.format('start server sock'))
+test_run:cmd('start server sock')
 test_run:cmd('switch sock')
 test_run = require('test_run').new()
 fiber = require('fiber')
@@ -122,8 +125,10 @@ test_run:cmd('switch default')
 lim.rlim_cur = old_fno
 rlimit.setrlimit(rlimit.RLIMIT_NOFILE, lim)
 
-test_run:cmd('stop server sock')
-test_run:cmd('cleanup server sock')
+test_run:cmd("stop server sock")
+test_run:cmd("cleanup server sock")
+test_run:cmd("delete server sock")
+test_run:cleanup_cluster()
 
 box.schema.user.revoke('guest', 'replication')
 
@@ -138,15 +143,15 @@ test_run:cmd('stop server er_load1')
 -- er_load2 exits automatically.
 test_run:cmd('cleanup server er_load1')
 test_run:cmd('cleanup server er_load2')
+test_run:cmd('delete server er_load1')
+test_run:cmd('delete server er_load2')
+test_run:cleanup_cluster()
 
 --
 -- Test case for gh-3637. Before the fix replica would exit with
 -- an error. Now check that we don't hang and successfully connect.
 --
 fiber = require('fiber')
-
-test_run:cleanup_cluster()
-
 test_run:cmd("create server replica_auth with rpl_master=default, script='replication/replica_auth.lua'")
 test_run:cmd("start server replica_auth with wait=False, wait_load=False, args='cluster:pass 0.05'")
 -- Wait a bit to make sure replica waits till user is created.
@@ -161,6 +166,8 @@ _ = test_run:wait_vclock('replica_auth', vclock)
 test_run:cmd("stop server replica_auth")
 test_run:cmd("cleanup server replica_auth")
 test_run:cmd("delete server replica_auth")
+test_run:cleanup_cluster()
+
 box.schema.user.drop('cluster')
 
 --
@@ -190,6 +197,7 @@ while test_run:grep_log('replica', 'duplicate connection') == nil do fiber.sleep
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 test_run:cmd("delete server replica")
+test_run:cleanup_cluster()
 box.schema.user.revoke('guest', 'replication')
 
 --
@@ -227,3 +235,4 @@ test_run:cmd("switch default")
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 test_run:cmd("delete server replica")
+test_run:cleanup_cluster()
