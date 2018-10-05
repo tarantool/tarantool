@@ -286,10 +286,11 @@ macro(enable_tnt_compile_flags)
     add_definitions("-D__STDC_LIMIT_MACROS=1")
     add_definitions("-D__STDC_CONSTANT_MACROS=1")
 
-    # Only add -Werror if it's a debug build, done by developers.
-    # Release builds should not cause extra trouble.
-    if ((${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-        AND HAVE_STD_C11 AND HAVE_STD_CXX11)
+    # Only add -Werror if it's a Debug or RelWithDebInfoWError build, done by
+    # developers. Release builds should not cause extra trouble.
+    if (((${CMAKE_BUILD_TYPE} STREQUAL "Debug") OR
+        (${CMAKE_BUILD_TYPE} STREQUAL "RelWithDebInfoWError")) AND
+        HAVE_STD_C11 AND HAVE_STD_CXX11)
         add_compile_flags("C;CXX" "-Werror")
     endif()
 endmacro(enable_tnt_compile_flags)

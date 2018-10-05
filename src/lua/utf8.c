@@ -49,6 +49,8 @@ static int
 utf8_str_to_case(struct lua_State *L, const char *src, int src_bsize,
 		 bool is_to_upper)
 {
+	if (src_bsize == 0)
+		return 1;
 	int i = 0;
 	int dst_bsize = src_bsize;
 	(void) i;
