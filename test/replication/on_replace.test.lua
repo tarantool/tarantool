@@ -26,6 +26,7 @@ session_type
 test_run:cmd("switch default")
 box.space.test:insert{2}
 test_run:cmd("switch replica")
+fiber = require('fiber')
 while box.space.test:count() < 2 do fiber.sleep(0.01) end
 --
 -- applier

@@ -1,6 +1,3 @@
-fio = require 'fio'
----
-...
 test_run = require('test_run').new()
 ---
 ...
@@ -11,6 +8,9 @@ replica_set = require('fast_replica')
 ---
 ...
 fiber = require('fiber')
+---
+...
+fio = require('fio')
 ---
 ...
 test_run:cleanup_cluster()
