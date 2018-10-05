@@ -46,10 +46,12 @@ errinj.info()
     state: false
   ERRINJ_WAL_FALLOCATE:
     state: 0
-  ERRINJ_SNAP_COMMIT_DELAY:
+  ERRINJ_LOG_ROTATE:
     state: false
   ERRINJ_VY_DUMP_DELAY:
     state: false
+  ERRINJ_WAL_BREAK_LSN:
+    state: -1
   ERRINJ_TUPLE_ALLOC:
     state: false
   ERRINJ_VY_RUN_WRITE_DELAY:
@@ -58,25 +60,25 @@ errinj.info()
     state: false
   ERRINJ_RELAY_REPORT_INTERVAL:
     state: 0
-  ERRINJ_WAL_BREAK_LSN:
+  ERRINJ_RELAY_BREAK_LSN:
     state: -1
   ERRINJ_VY_READ_PAGE_TIMEOUT:
     state: 0
   ERRINJ_XLOG_META:
     state: false
-  ERRINJ_RELAY_BREAK_LSN:
-    state: -1
   ERRINJ_VY_INDEX_FILE_RENAME:
-    state: false
-  ERRINJ_WAL_WRITE_DISK:
     state: false
   ERRINJ_VY_RUN_FILE_RENAME:
     state: false
+  ERRINJ_WAL_WRITE_DISK:
+    state: false
   ERRINJ_VY_LOG_FILE_RENAME:
+    state: false
+  ERRINJ_HTTP_RESPONSE_ADD_WAIT:
     state: false
   ERRINJ_VY_RUN_WRITE:
     state: false
-  ERRINJ_HTTP_RESPONSE_ADD_WAIT:
+  ERRINJ_SNAP_COMMIT_DELAY:
     state: false
   ERRINJ_VY_LOG_FLUSH_DELAY:
     state: false
@@ -90,34 +92,34 @@ errinj.info()
     state: false
   ERRINJ_WAL_ROTATE:
     state: false
-  ERRINJ_LOG_ROTATE:
-    state: false
-  ERRINJ_VY_POINT_ITER_WAIT:
-    state: false
-  ERRINJ_RELAY_EXIT_DELAY:
-    state: 0
-  ERRINJ_IPROTO_TX_DELAY:
-    state: false
   ERRINJ_BUILD_INDEX:
     state: -1
+  ERRINJ_RELAY_EXIT_DELAY:
+    state: 0
+  ERRINJ_VY_POINT_ITER_WAIT:
+    state: false
+  ERRINJ_IPROTO_TX_DELAY:
+    state: false
   ERRINJ_XLOG_READ:
     state: -1
+  ERRINJ_TUPLE_FIELD:
+    state: false
   ERRINJ_XLOG_GARBAGE:
     state: false
-  ERRINJ_TUPLE_FIELD:
+  ERRINJ_INDEX_ALLOC:
     state: false
   ERRINJ_VY_READ_PAGE_DELAY:
     state: false
   ERRINJ_TESTING:
     state: false
-  ERRINJ_INDEX_ALLOC:
-    state: false
+  ERRINJ_RELAY_TIMEOUT:
+    state: 0
   ERRINJ_VY_SQUASH_TIMEOUT:
     state: 0
   ERRINJ_VY_LOG_FLUSH:
     state: false
-  ERRINJ_RELAY_TIMEOUT:
-    state: 0
+  ERRINJ_RELAY_SEND_DELAY:
+    state: false
 ...
 errinj.set("some-injection", true)
 ---

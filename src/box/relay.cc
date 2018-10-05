@@ -693,12 +693,16 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 static void
 relay_send(struct relay *relay, struct xrow_header *packet)
 {
+	struct errinj *inj = errinj(ERRINJ_RELAY_SEND_DELAY, ERRINJ_BOOL);
+	while (inj != NULL && inj->bparam)
+		fiber_sleep(0.01);
+
 	packet->sync = relay->sync;
 	relay->last_row_time = ev_monotonic_now(loop());
 	coio_write_xrow(&relay->io, packet);
 	fiber_gc();
 
-	struct errinj *inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
+	inj = errinj(ERRINJ_RELAY_TIMEOUT, ERRINJ_DOUBLE);
 	if (inj != NULL && inj->dparam > 0)
 		fiber_sleep(inj->dparam);
 }
