@@ -6,7 +6,17 @@ MB = 1024 * 1024
 TUPLE_SIZE = 1024
 TUPLE_COUNT = 100
 
-snap_io_rate_limit = box.cfg.snap_io_rate_limit
+snap_io_rate_limit = box.cfg.snap_io_rate_limit or 0
+
+-- When snap_io_rate_limit is reconfigured, the dump bandwidth
+-- is set to the new value, max 10 MB/s.
+box.cfg{snap_io_rate_limit = 100}
+box.stat.vinyl().regulator.dump_bandwidth -- 10 MB/s
+box.cfg{snap_io_rate_limit = 0.5}
+box.stat.vinyl().regulator.dump_bandwidth -- 0.5 MB/s
+box.cfg{snap_io_rate_limit = 0}
+box.stat.vinyl().regulator.dump_bandwidth -- 10 MB/s
+
 box.cfg{snap_io_rate_limit = 0.1}
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
