@@ -16,6 +16,10 @@ fiber = require('fiber')
 test_run:cleanup_cluster()
 ---
 ...
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
 -- Make each snapshot trigger garbage collection.
 default_checkpoint_count = box.cfg.checkpoint_count
 ---
@@ -40,10 +44,17 @@ box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0.05)
 s = box.schema.space.create('test', {engine = engine});
 ---
 ...
-_ = s:create_index('pk')
+_ = s:create_index('pk', {run_count_per_level = 1})
 ---
 ...
-for i = 1, 100 do s:auto_increment{} end
+for i = 1, 50 do s:auto_increment{} end
+---
+...
+box.snapshot()
+---
+- ok
+...
+for i = 1, 50 do s:auto_increment{} end
 ---
 ...
 box.snapshot()
@@ -76,10 +87,6 @@ test_run:cmd("setopt delimiter ''");
 ---
 ...
 -- Start the replica.
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
----
-- true
-...
 test_run:cmd("start server replica")
 ---
 - true

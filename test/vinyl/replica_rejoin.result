@@ -164,13 +164,6 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.cfg{checkpoint_count = 1}
----
-...
-box.snapshot()
----
-- ok
-...
 fio = require('fio')
 ---
 ...

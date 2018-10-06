@@ -32,9 +32,13 @@
 
 #include <trivia/util.h>
 
+#include <assert.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
 
 #define RB_COMPACT 1
 #include <small/rb.h>
@@ -44,48 +48,10 @@
 #include "say.h"
 #include "latch.h"
 #include "vclock.h"
-#include "checkpoint.h"
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
 
-typedef rb_node(struct gc_consumer) gc_node_t;
-
-/**
- * The object of this type is used to prevent garbage
- * collection from removing files that are still in use.
- */
-struct gc_consumer {
-	/** Link in gc_state::consumers. */
-	gc_node_t node;
-	/** Human-readable name. */
-	char *name;
-	/** The vclock tracked by this consumer. */
-	struct vclock vclock;
-	/** Consumer type, indicating that consumer only consumes
-	 * WAL files, or both - SNAP and WAL.
-	 */
-	enum gc_consumer_type type;
-};
-
-typedef rb_tree(struct gc_consumer) gc_tree_t;
-
-/** Garbage collection state. */
-struct gc_state {
-	/** Number of checkpoints to maintain. */
-	int checkpoint_count;
-	/** Max vclock WAL garbage collection has been called for. */
-	struct vclock wal_vclock;
-	/** Max vclock checkpoint garbage collection has been called for. */
-	struct vclock checkpoint_vclock;
-	/** Registered consumers, linked by gc_consumer::node. */
-	gc_tree_t consumers;
-	/**
-	 * Latch serializing concurrent invocations of engine
-	 * garbage collection callbacks.
-	 */
-	struct latch latch;
-};
-static struct gc_state gc;
+struct gc_state gc;
 
 /**
  * Comparator used for ordering gc_consumer objects by signature
@@ -108,43 +74,30 @@ gc_consumer_cmp(const struct gc_consumer *a, const struct gc_consumer *b)
 rb_gen(MAYBE_UNUSED static inline, gc_tree_, gc_tree_t,
        struct gc_consumer, node, gc_consumer_cmp);
 
-/** Allocate a consumer object. */
-static struct gc_consumer *
-gc_consumer_new(const char *name, const struct vclock *vclock,
-		enum gc_consumer_type type)
-{
-	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
-	if (consumer == NULL) {
-		diag_set(OutOfMemory, sizeof(*consumer),
-			 "malloc", "struct gc_consumer");
-		return NULL;
-	}
-	consumer->name = strdup(name);
-	if (consumer->name == NULL) {
-		diag_set(OutOfMemory, strlen(name) + 1,
-			 "malloc", "struct gc_consumer");
-		free(consumer);
-		return NULL;
-	}
-	vclock_copy(&consumer->vclock, vclock);
-	consumer->type = type;
-	return consumer;
-}
-
 /** Free a consumer object. */
 static void
 gc_consumer_delete(struct gc_consumer *consumer)
 {
-	free(consumer->name);
 	TRASH(consumer);
 	free(consumer);
+}
+
+/** Free a checkpoint object. */
+static void
+gc_checkpoint_delete(struct gc_checkpoint *checkpoint)
+{
+	TRASH(checkpoint);
+	free(checkpoint);
 }
 
 void
 gc_init(void)
 {
-	vclock_create(&gc.wal_vclock);
-	vclock_create(&gc.checkpoint_vclock);
+	/* Don't delete any files until recovery is complete. */
+	gc.min_checkpoint_count = INT_MAX;
+
+	vclock_create(&gc.vclock);
+	rlist_create(&gc.checkpoints);
 	gc_tree_new(&gc.consumers);
 	latch_create(&gc.latch);
 }
@@ -152,6 +105,12 @@ gc_init(void)
 void
 gc_free(void)
 {
+	/* Free checkpoints. */
+	struct gc_checkpoint *checkpoint, *next_checkpoint;
+	rlist_foreach_entry_safe(checkpoint, &gc.checkpoints, in_checkpoints,
+				 next_checkpoint) {
+		gc_checkpoint_delete(checkpoint);
+	}
 	/* Free all registered consumers. */
 	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
 	while (consumer != NULL) {
@@ -163,65 +122,57 @@ gc_free(void)
 	}
 }
 
-void
-gc_vclock(struct vclock *vclock)
-{
-	vclock_copy(vclock, &gc.wal_vclock);
-}
-
-/** Find the consumer that uses the oldest checkpoint. */
-struct gc_consumer *
-gc_tree_first_checkpoint(gc_tree_t *consumers)
-{
-	struct gc_consumer *consumer = gc_tree_first(consumers);
-	while (consumer != NULL && consumer->type == GC_CONSUMER_WAL)
-		consumer = gc_tree_next(consumers, consumer);
-	return consumer;
-}
-
-void
+/**
+ * Invoke garbage collection in order to remove files left
+ * from old checkpoints. The number of checkpoints saved by
+ * this function is specified by box.cfg.checkpoint_count.
+ */
+static void
 gc_run(void)
 {
-	int checkpoint_count = gc.checkpoint_count;
-	assert(checkpoint_count > 0);
-
-	/* Look up the consumer that uses the oldest WAL. */
-	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
-	/* Look up the consumer that uses the oldest checkpoint. */
-	struct gc_consumer *leftmost_checkpoint =
-		gc_tree_first_checkpoint(&gc.consumers);
+	bool run_wal_gc = false;
+	bool run_engine_gc = false;
 
 	/*
 	 * Find the oldest checkpoint that must be preserved.
-	 * We have to maintain @checkpoint_count oldest checkpoints,
-	 * plus we can't remove checkpoints that are still in use.
+	 * We have to preserve @min_checkpoint_count oldest
+	 * checkpoints, plus we can't remove checkpoints that
+	 * are still in use.
 	 */
-	struct vclock gc_checkpoint_vclock;
-	vclock_create(&gc_checkpoint_vclock);
-
-	struct checkpoint_iterator checkpoints;
-	checkpoint_iterator_init(&checkpoints);
-
-	const struct vclock *vclock;
-	while ((vclock = checkpoint_iterator_prev(&checkpoints)) != NULL) {
-		if (--checkpoint_count > 0)
-			continue;
-		if (leftmost_checkpoint != NULL &&
-		    vclock_sum(&leftmost_checkpoint->vclock) < vclock_sum(vclock))
-			continue;
-		vclock_copy(&gc_checkpoint_vclock, vclock);
-		break;
+	struct gc_checkpoint *checkpoint = NULL;
+	while (true) {
+		checkpoint = rlist_first_entry(&gc.checkpoints,
+				struct gc_checkpoint, in_checkpoints);
+		if (gc.checkpoint_count <= gc.min_checkpoint_count)
+			break;
+		if (!rlist_empty(&checkpoint->refs))
+			break; /* checkpoint is in use */
+		rlist_del_entry(checkpoint, in_checkpoints);
+		gc_checkpoint_delete(checkpoint);
+		gc.checkpoint_count--;
+		run_engine_gc = true;
 	}
 
-	struct vclock gc_wal_vclock;
-	if (leftmost != NULL &&
-	    vclock_sum(&leftmost->vclock) < vclock_sum(&gc_checkpoint_vclock))
-		vclock_copy(&gc_wal_vclock, &leftmost->vclock);
-	else
-		vclock_copy(&gc_wal_vclock, &gc_checkpoint_vclock);
+	/* At least one checkpoint must always be available. */
+	assert(checkpoint != NULL);
 
-	if (vclock_sum(&gc_wal_vclock) <= vclock_sum(&gc.wal_vclock) &&
-	    vclock_sum(&gc_checkpoint_vclock) <= vclock_sum(&gc.checkpoint_vclock))
+	/*
+	 * Find the vclock of the oldest WAL row to keep.
+	 * Note, we must keep all WALs created after the
+	 * oldest checkpoint, even if no consumer needs them.
+	 */
+	const struct vclock *vclock = (gc_tree_empty(&gc.consumers) ? NULL :
+				       &gc_tree_first(&gc.consumers)->vclock);
+	if (vclock == NULL ||
+	    vclock_sum(vclock) > vclock_sum(&checkpoint->vclock))
+		vclock = &checkpoint->vclock;
+
+	if (vclock_sum(vclock) > vclock_sum(&gc.vclock)) {
+		vclock_copy(&gc.vclock, vclock);
+		run_wal_gc = true;
+	}
+
+	if (!run_engine_gc && !run_wal_gc)
 		return; /* nothing to do */
 
 	/*
@@ -239,51 +190,98 @@ gc_run(void)
 	 * fails - see comment to memtx_engine_collect_garbage().
 	 */
 	int rc = 0;
-
-	if (vclock_sum(&gc_checkpoint_vclock) > vclock_sum(&gc.checkpoint_vclock)) {
-		vclock_copy(&gc.checkpoint_vclock, &gc_checkpoint_vclock);
-		rc = engine_collect_garbage(vclock_sum(&gc_checkpoint_vclock));
-	}
-	if (vclock_sum(&gc_wal_vclock) > vclock_sum(&gc.wal_vclock)) {
-		vclock_copy(&gc.wal_vclock, &gc_wal_vclock);
-		if (rc == 0)
-			wal_collect_garbage(vclock_sum(&gc_wal_vclock));
-	}
-
+	if (run_engine_gc)
+		rc = engine_collect_garbage(vclock_sum(&checkpoint->vclock));
+	if (run_wal_gc && rc == 0)
+		wal_collect_garbage(vclock_sum(vclock));
 	latch_unlock(&gc.latch);
 }
 
 void
-gc_set_checkpoint_count(int checkpoint_count)
+gc_set_min_checkpoint_count(int min_checkpoint_count)
 {
-	gc.checkpoint_count = checkpoint_count;
+	gc.min_checkpoint_count = min_checkpoint_count;
+}
+
+void
+gc_add_checkpoint(const struct vclock *vclock)
+{
+	struct gc_checkpoint *last_checkpoint = gc_last_checkpoint();
+	if (last_checkpoint != NULL &&
+	    vclock_sum(&last_checkpoint->vclock) == vclock_sum(vclock)) {
+		/*
+		 * box.snapshot() doesn't create a new checkpoint
+		 * if no rows has been written since the last one.
+		 * Rerun the garbage collector in this case, just
+		 * in case box.cfg.checkpoint_count has changed.
+		 */
+		gc_run();
+		return;
+	}
+	assert(last_checkpoint == NULL ||
+	       vclock_sum(&last_checkpoint->vclock) < vclock_sum(vclock));
+
+	struct gc_checkpoint *checkpoint = calloc(1, sizeof(*checkpoint));
+	/*
+	 * This function is called after a checkpoint is written
+	 * to disk so it can't fail.
+	 */
+	if (checkpoint == NULL)
+		panic("out of memory");
+
+	rlist_create(&checkpoint->refs);
+	vclock_copy(&checkpoint->vclock, vclock);
+	rlist_add_tail_entry(&gc.checkpoints, checkpoint, in_checkpoints);
+	gc.checkpoint_count++;
+
+	gc_run();
+}
+
+void
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
+		  struct gc_checkpoint_ref *ref, const char *format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(ref->name, GC_NAME_MAX, format, ap);
+	va_end(ap);
+
+	rlist_add_tail_entry(&checkpoint->refs, ref, in_refs);
+}
+
+void
+gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
+{
+	rlist_del_entry(ref, in_refs);
+	gc_run();
 }
 
 struct gc_consumer *
-gc_consumer_register(const char *name, const struct vclock *vclock,
-		     enum gc_consumer_type type)
+gc_consumer_register(const struct vclock *vclock, const char *format, ...)
 {
-	struct gc_consumer *consumer = gc_consumer_new(name, vclock, type);
-	if (consumer != NULL)
-		gc_tree_insert(&gc.consumers, consumer);
+	struct gc_consumer *consumer = calloc(1, sizeof(*consumer));
+	if (consumer == NULL) {
+		diag_set(OutOfMemory, sizeof(*consumer),
+			 "malloc", "struct gc_consumer");
+		return NULL;
+	}
+
+	va_list ap;
+	va_start(ap, format);
+	vsnprintf(consumer->name, GC_NAME_MAX, format, ap);
+	va_end(ap);
+
+	vclock_copy(&consumer->vclock, vclock);
+	gc_tree_insert(&gc.consumers, consumer);
 	return consumer;
 }
 
 void
 gc_consumer_unregister(struct gc_consumer *consumer)
 {
-	int64_t signature = vclock_sum(&consumer->vclock);
-
 	gc_tree_remove(&gc.consumers, consumer);
 	gc_consumer_delete(consumer);
-
-	/*
-	 * Rerun garbage collection after removing the consumer
-	 * if it referenced the oldest vclock.
-	 */
-	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
-	if (leftmost == NULL || vclock_sum(&leftmost->vclock) > signature)
-		gc_run();
+	gc_run();
 }
 
 void
@@ -312,31 +310,7 @@ gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 	if (update_tree)
 		gc_tree_insert(&gc.consumers, consumer);
 
-	/*
-	 * Rerun garbage collection after advancing the consumer
-	 * if it referenced the oldest vclock.
-	 */
-	struct gc_consumer *leftmost = gc_tree_first(&gc.consumers);
-	if (leftmost == NULL || vclock_sum(&leftmost->vclock) > prev_signature)
-		gc_run();
-}
-
-const char *
-gc_consumer_name(const struct gc_consumer *consumer)
-{
-	return consumer->name;
-}
-
-void
-gc_consumer_vclock(const struct gc_consumer *consumer, struct vclock *vclock)
-{
-	vclock_copy(vclock, &consumer->vclock);
-}
-
-int64_t
-gc_consumer_signature(const struct gc_consumer *consumer)
-{
-	return vclock_sum(&consumer->vclock);
+	gc_run();
 }
 
 struct gc_consumer *

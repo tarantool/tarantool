@@ -120,7 +120,6 @@ ch:get()
 #fio.listdir(fio.pathjoin(box.cfg.vinyl_dir, s.id, 1)) > 0
 
 test_run:cmd('restart server default')
-box.snapshot()
 
 fio = require('fio')
 s = box.space.test

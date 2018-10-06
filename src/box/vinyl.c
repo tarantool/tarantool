@@ -70,7 +70,6 @@
 #include "info.h"
 #include "column_mask.h"
 #include "trigger.h"
-#include "checkpoint.h"
 #include "session.h"
 #include "wal.h" /* wal_mode() */
 
@@ -2984,13 +2983,13 @@ vy_send_range(struct vy_join_ctx *ctx,
 		       vy_send_range_f, NULL, TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 
+out_delete_wi:
+	ctx->wi->iface->close(ctx->wi);
+	ctx->wi = NULL;
 out_delete_slices:
 	rlist_foreach_entry_safe(slice, &ctx->slices, in_join, tmp)
 		vy_slice_delete(slice);
 	rlist_create(&ctx->slices);
-out_delete_wi:
-	ctx->wi->iface->close(ctx->wi);
-	ctx->wi = NULL;
 out:
 	return rc;
 }
@@ -3247,6 +3246,8 @@ vy_gc_lsm(struct vy_lsm_recovery_info *lsm_info)
 	}
 	struct vy_run_recovery_info *run_info;
 	rlist_foreach_entry(run_info, &lsm_info->runs, in_lsm) {
+		if (lsm_info->create_lsn < 0)
+			run_info->is_incomplete = true;
 		if (!run_info->is_dropped) {
 			run_info->is_dropped = true;
 			run_info->gc_lsn = lsm_info->drop_lsn;
@@ -3303,7 +3304,7 @@ vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
 	vy_log_collect_garbage(lsn);
 
 	/* Cleanup run files. */
-	int64_t signature = checkpoint_last(NULL);
+	int64_t signature = vy_log_signature();
 	struct vy_recovery *recovery = vy_recovery_new(signature, 0);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog for garbage collection");

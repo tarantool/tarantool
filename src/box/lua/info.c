@@ -47,7 +47,6 @@
 #include "box/replication.h"
 #include "box/info.h"
 #include "box/gc.h"
-#include "box/checkpoint.h"
 #include "box/engine.h"
 #include "box/vinyl.h"
 #include "main.h"
@@ -363,22 +362,41 @@ static int
 lbox_info_gc_call(struct lua_State *L)
 {
 	int count;
-	const struct vclock *vclock;
 
 	lua_newtable(L);
+
+	lua_pushstring(L, "vclock");
+	lbox_pushvclock(L, &gc.vclock);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, "signature");
+	luaL_pushint64(L, vclock_sum(&gc.vclock));
+	lua_settable(L, -3);
 
 	lua_pushstring(L, "checkpoints");
 	lua_newtable(L);
 
-	struct checkpoint_iterator checkpoints;
-	checkpoint_iterator_init(&checkpoints);
-
 	count = 0;
-	while ((vclock = checkpoint_iterator_next(&checkpoints)) != NULL) {
-		lua_createtable(L, 0, 1);
+	struct gc_checkpoint *checkpoint;
+	gc_foreach_checkpoint(checkpoint) {
+		lua_createtable(L, 0, 2);
+
+		lua_pushstring(L, "vclock");
+		lbox_pushvclock(L, &checkpoint->vclock);
+		lua_settable(L, -3);
 
 		lua_pushstring(L, "signature");
-		luaL_pushint64(L, vclock_sum(vclock));
+		luaL_pushint64(L, vclock_sum(&checkpoint->vclock));
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "references");
+		lua_newtable(L);
+		int ref_idx = 0;
+		struct gc_checkpoint_ref *ref;
+		gc_foreach_checkpoint_ref(ref, checkpoint) {
+			lua_pushstring(L, ref->name);
+			lua_rawseti(L, -2, ++ref_idx);
+		}
 		lua_settable(L, -3);
 
 		lua_rawseti(L, -2, ++count);
@@ -394,14 +412,18 @@ lbox_info_gc_call(struct lua_State *L)
 	count = 0;
 	struct gc_consumer *consumer;
 	while ((consumer = gc_consumer_iterator_next(&consumers)) != NULL) {
-		lua_createtable(L, 0, 2);
+		lua_createtable(L, 0, 3);
 
 		lua_pushstring(L, "name");
-		lua_pushstring(L, gc_consumer_name(consumer));
+		lua_pushstring(L, consumer->name);
+		lua_settable(L, -3);
+
+		lua_pushstring(L, "vclock");
+		lbox_pushvclock(L, &consumer->vclock);
 		lua_settable(L, -3);
 
 		lua_pushstring(L, "signature");
-		luaL_pushint64(L, gc_consumer_signature(consumer));
+		luaL_pushint64(L, vclock_sum(&consumer->vclock));
 		lua_settable(L, -3);
 
 		lua_rawseti(L, -2, ++count);

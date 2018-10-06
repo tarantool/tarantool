@@ -32,21 +32,131 @@
  */
 
 #include <stddef.h>
-#include <stdint.h>
+#include <small/rlist.h>
+
+#include "vclock.h"
+#include "latch.h"
+#include "trivia/util.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct vclock;
 struct gc_consumer;
 
-/** Consumer type: WAL consumer, or SNAP */
-enum gc_consumer_type {
-	GC_CONSUMER_WAL = 1,
-	GC_CONSUMER_SNAP = 2,
-	GC_CONSUMER_ALL = 3,
+enum { GC_NAME_MAX = 64 };
+
+typedef rb_node(struct gc_consumer) gc_node_t;
+
+/**
+ * Garbage collector keeps track of all preserved checkpoints.
+ * The following structure represents a checkpoint.
+ */
+struct gc_checkpoint {
+	/** Link in gc_state::checkpoints. */
+	struct rlist in_checkpoints;
+	/** VClock of the checkpoint. */
+	struct vclock vclock;
+	/**
+	 * List of checkpoint references, linked by
+	 * gc_checkpoint_ref::in_refs.
+	 *
+	 * We use a list rather than a reference counter so
+	 * that we can list reference names in box.info.gc().
+	 */
+	struct rlist refs;
 };
+
+/**
+ * The following structure represents a checkpoint reference.
+ * See also gc_checkpoint::refs.
+ */
+struct gc_checkpoint_ref {
+	/** Link in gc_checkpoint::refs. */
+	struct rlist in_refs;
+	/** Human-readable name of this checkpoint reference. */
+	char name[GC_NAME_MAX];
+};
+
+/**
+ * The object of this type is used to prevent garbage
+ * collection from removing WALs that are still in use.
+ */
+struct gc_consumer {
+	/** Link in gc_state::consumers. */
+	gc_node_t node;
+	/** Human-readable name. */
+	char name[GC_NAME_MAX];
+	/** The vclock tracked by this consumer. */
+	struct vclock vclock;
+};
+
+typedef rb_tree(struct gc_consumer) gc_tree_t;
+
+/** Garbage collection state. */
+struct gc_state {
+	/** VClock of the oldest WAL row available on the instance. */
+	struct vclock vclock;
+	/**
+	 * Minimal number of checkpoints to preserve.
+	 * Configured by box.cfg.checkpoint_count.
+	 */
+	int min_checkpoint_count;
+	/**
+	 * Number of preserved checkpoints. May be greater than
+	 * @min_checkpoint_count, because some checkpoints may
+	 * be in use by replication or backup.
+	 */
+	int checkpoint_count;
+	/**
+	 * List of preserved checkpoints. New checkpoints are added
+	 * to the tail. Linked by gc_checkpoint::in_checkpoints.
+	 */
+	struct rlist checkpoints;
+	/** Registered consumers, linked by gc_consumer::node. */
+	gc_tree_t consumers;
+	/**
+	 * Latch serializing concurrent invocations of engine
+	 * garbage collection callbacks.
+	 */
+	struct latch latch;
+};
+extern struct gc_state gc;
+
+/**
+ * Iterate over all checkpoints tracked by the garbage collector,
+ * starting from the oldest and ending with the newest.
+ */
+#define gc_foreach_checkpoint(checkpoint) \
+	rlist_foreach_entry(checkpoint, &gc.checkpoints, in_checkpoints)
+
+/**
+ * Iterate over all checkpoints tracked by the garbage collector
+ * in the reverse order, that is starting from the newest and
+ * ending with the oldest.
+ */
+#define gc_foreach_checkpoint_reverse(checkpoint) \
+	rlist_foreach_entry_reverse(checkpoint, &gc.checkpoints, in_checkpoints)
+
+/**
+ * Iterate over all references to the given checkpoint.
+ */
+#define gc_foreach_checkpoint_ref(ref, checkpoint) \
+	rlist_foreach_entry(ref, &(checkpoint)->refs, in_refs)
+
+/**
+ * Return the last (newest) checkpoint known to the garbage
+ * collector. If there's no checkpoint, return NULL.
+ */
+static inline struct gc_checkpoint *
+gc_last_checkpoint(void)
+{
+	if (rlist_empty(&gc.checkpoints))
+		return NULL;
+
+	return rlist_last_entry(&gc.checkpoints, struct gc_checkpoint,
+				in_checkpoints);
+}
 
 /**
  * Initialize the garbage collection state.
@@ -61,42 +171,60 @@ void
 gc_free(void);
 
 /**
- * Get the oldest available vclock.
+ * Update the minimal number of checkpoints to preserve.
+ * Called when box.cfg.checkpoint_count is updated.
+ *
+ * Note, this function doesn't run garbage collector so
+ * changes will take effect only after a new checkpoint
+ * is created or a consumer is unregistered.
  */
 void
-gc_vclock(struct vclock *vclock);
+gc_set_min_checkpoint_count(int min_checkpoint_count);
 
 /**
- * Invoke garbage collection in order to remove files left
- * from old checkpoints. The number of checkpoints saved by
- * this function is specified by box.cfg.checkpoint_count.
+ * Track a new checkpoint in the garbage collector state.
+ * Note, this function may run garbage collector to remove
+ * old checkpoints.
  */
 void
-gc_run(void);
+gc_add_checkpoint(const struct vclock *vclock);
 
 /**
- * Update the checkpoint_count configuration option and
- * rerun garbage collection.
+ * Get a reference to @checkpoint and store it in @ref.
+ * This will block the garbage collector from deleting
+ * the checkpoint files until the reference is released
+ * with gc_put_checkpoint_ref().
+ *
+ * @format... specifies a human-readable name that will be
+ * used for listing the reference in box.info.gc().
+ */
+CFORMAT(printf, 3, 4)
+void
+gc_ref_checkpoint(struct gc_checkpoint *checkpoint,
+		  struct gc_checkpoint_ref *ref, const char *format, ...);
+
+/**
+ * Release a reference to a checkpoint previously taken
+ * with gc_ref_checkpoint(). This function may trigger
+ * garbage collection.
  */
 void
-gc_set_checkpoint_count(int checkpoint_count);
+gc_unref_checkpoint(struct gc_checkpoint_ref *ref);
 
 /**
  * Register a consumer.
  *
- * This will stop garbage collection of objects newer than
+ * This will stop garbage collection of WAL files newer than
  * @vclock until the consumer is unregistered or advanced.
- * @name is a human-readable name of the consumer, it will
- * be used for reporting the consumer to the user.
- * @type consumer type, reporting whether consumer only depends
- * on WAL files.
+ * @format... specifies a human-readable name of the consumer,
+ * it will be used for listing the consumer in box.info.gc().
  *
  * Returns a pointer to the new consumer object or NULL on
  * memory allocation failure.
  */
+CFORMAT(printf, 2, 3)
 struct gc_consumer *
-gc_consumer_register(const char *name, const struct vclock *vclock,
-		     enum gc_consumer_type type);
+gc_consumer_register(const struct vclock *vclock, const char *format, ...);
 
 /**
  * Unregister a consumer and invoke garbage collection
@@ -111,19 +239,6 @@ gc_consumer_unregister(struct gc_consumer *consumer);
  */
 void
 gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock);
-
-/** Return the name of a consumer. */
-const char *
-gc_consumer_name(const struct gc_consumer *consumer);
-
-/** Return the vclock a consumer tracks. */
-void
-gc_consumer_vclock(const struct gc_consumer *consumer, struct vclock *vclock);
-
-
-/** Return the vclock signature a consumer tracks. */
-int64_t
-gc_consumer_signature(const struct gc_consumer *consumer);
 
 /**
  * Iterator over registered consumers. The iterator is valid

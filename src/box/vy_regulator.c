@@ -207,5 +207,7 @@ void
 vy_regulator_reset_dump_bandwidth(struct vy_regulator *regulator, size_t max)
 {
 	histogram_reset(regulator->dump_bandwidth_hist);
-	regulator->dump_bandwidth = MIN(VY_DUMP_BANDWIDTH_DEFAULT, max);
+	regulator->dump_bandwidth = VY_DUMP_BANDWIDTH_DEFAULT;
+	if (max > 0 && regulator->dump_bandwidth > max)
+		regulator->dump_bandwidth = max;
 }

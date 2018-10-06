@@ -2232,3 +2232,54 @@ test_run:cmd("clear filter")
 ---
 - true
 ...
+--
+-- Check that an instance doesn't crash if a run file needed for
+-- joining a replica is corrupted (see gh-3708).
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+s:replace{1, 2, 3}
+---
+- [1, 2, 3]
+...
+box.snapshot()
+---
+- ok
+...
+box.schema.user.grant('guest', 'replication')
+---
+...
+errinj.set('ERRINJ_VYRUN_INDEX_GARBAGE', true)
+---
+- ok
+...
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica with crash_expected=True")
+---
+- false
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+test_run:cmd("delete server replica")
+---
+- true
+...
+errinj.set('ERRINJ_VYRUN_INDEX_GARBAGE', false)
+---
+- ok
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...
+s:drop()
+---
+...

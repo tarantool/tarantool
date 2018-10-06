@@ -628,6 +628,7 @@ tarantool_lua_run_script(char *path, bool interactive,
 	script_fiber = fiber_new(title, run_script_f);
 	if (script_fiber == NULL)
 		panic("%s", diag_last_error(diag_get())->errmsg);
+	script_fiber->storage.lua.stack = tarantool_L;
 	fiber_start(script_fiber, tarantool_L, path, interactive,
 		    optc, optv, argc, argv);
 
