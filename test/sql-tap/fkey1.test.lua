@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(18)
+test:plan(25)
 
 -- This file implements regression tests for foreign keys.
 
@@ -231,6 +231,29 @@ test:do_execsql_test(
     ]], {
         -- <fkey1-6.3>
         -- </fkey1-6.3>
+    })
+
+-- gh-3645: update col=Null do not activates ON UPDATE trigger.
+
+test:do_select_tests(
+    "fkey1-7",
+    {
+        {"0",
+            [[
+                CREATE TABLE T12 (A INTEGER PRIMARY KEY,
+                    B CHAR(5) UNIQUE);
+                CREATE TABLE T13 (A INTEGER PRIMARY KEY,
+                    B CHAR(5) UNIQUE,
+                    FOREIGN KEY (B) REFERENCES T12 (B) ON UPDATE SET NULL);
+                INSERT INTO T12 VALUES (1,'a');
+                INSERT INTO T13 VALUES (1,'a');
+            ]], {}},
+        {"1", "UPDATE T12 SET B = NULL", {}},
+        {"2", "SELECT * FROM T12", {1, ""}},
+        {"3", "SELECT * FROM T13", {1, ""}},
+        {"4", "UPDATE T12 SET B = 'a'", {}},
+        {"5", "SELECT * FROM T12", {1, "a"}},
+        {"6", "SELECT * FROM T13", {1, ""}},
     })
 
 test:finish_test()

@@ -787,24 +787,39 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 
 		/*
 		 * For ON UPDATE, construct the next term of the
-		 * WHEN clause. The final WHEN clause will be like
+		 * WHEN clause, which should return false in case
+		 * there is a reason to for a broken constrant in
+		 * a parent table:
+		 *     no_action_needed := `oldval` IS NULL OR
+		 *         (`newval` IS NOT NULL AND
+		 *             `newval` = `oldval`)
+		 *
+		 * The final WHEN clause will be like
 		 * this:
 		 *
-		 *    WHEN NOT(old.col1 = new.col1 AND ... AND
-		 *             old.colN = new.colN)
+		 *    WHEN NOT( no_action_needed(col1) AND ...
+		 *        no_action_needed(colN))
 		 */
 		if (is_update) {
-			struct Expr *l, *r;
-			l = sqlite3PExpr(pParse, TK_DOT,
-					 sqlite3ExprAlloc(db, TK_ID, &t_old, 0),
-					 sqlite3ExprAlloc(db, TK_ID, &t_to_col,
-							  0));
-			r = sqlite3PExpr(pParse, TK_DOT,
-					 sqlite3ExprAlloc(db, TK_ID, &t_new, 0),
-					 sqlite3ExprAlloc(db, TK_ID, &t_to_col,
-							  0));
-			eq = sqlite3PExpr(pParse, TK_EQ, l, r);
-			when = sqlite3ExprAnd(db, when, eq);
+			struct Expr *old_val = sqlite3PExpr(pParse, TK_DOT,
+				sqlite3ExprAlloc(db, TK_ID, &t_old, 0),
+				sqlite3ExprAlloc(db, TK_ID, &t_to_col, 0));
+			struct Expr *new_val = sqlite3PExpr(pParse, TK_DOT,
+				sqlite3ExprAlloc(db, TK_ID, &t_new, 0),
+				sqlite3ExprAlloc(db, TK_ID, &t_to_col, 0));
+			struct Expr *old_is_null = sqlite3PExpr(
+				pParse, TK_ISNULL,
+				sqlite3ExprDup(db, old_val, 0), NULL);
+			eq = sqlite3PExpr(pParse, TK_EQ, old_val,
+				sqlite3ExprDup(db, new_val, 0));
+			struct Expr *new_non_null =
+				sqlite3PExpr(pParse, TK_NOTNULL, new_val, NULL);
+			struct Expr *non_null_eq =
+				sqlite3PExpr(pParse, TK_AND, new_non_null, eq);
+			struct Expr *no_action_needed =
+				sqlite3PExpr(pParse, TK_OR, old_is_null,
+					     non_null_eq);
+			when = sqlite3ExprAnd(db, when, no_action_needed);
 		}
 
 		if (action != FKEY_ACTION_RESTRICT &&
