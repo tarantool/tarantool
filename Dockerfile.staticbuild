@@ -87,4 +87,10 @@ RUN set -x \
 
 RUN cd /tarantool && make install
 
+RUN mkdir /build \
+    && mkdir /build/include \
+    && cp /usr/local/bin/tarantool /build \
+    && cp /usr/local/bin/tarantoolctl /build/tarantoolctl \
+    && cp -r /usr/local/include/tarantool /build/include
+
 ENTRYPOINT /bin/bash
