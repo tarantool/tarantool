@@ -919,7 +919,6 @@ end
 local function rocks()
     local cfg = require("luarocks.cfg")
     local util = require("luarocks.util")
-    local loader = require("luarocks.loader")
     local command_line = require("luarocks.command_line")
     local options = keyword_arguments
     local key = nil
@@ -929,6 +928,21 @@ local function rocks()
         key = find_arg("server")
     end
     table.insert(positional_arguments, key)
+
+    -- Patch luarocks.cfg to use statically linked tarantool build
+    -- Applies changes to luarocks.cfg when tarantoolctl launched within the directory where
+    -- release artifact (archive) unpacked
+    local script_dir = fio.dirname(fio.abspath(arg[0]))
+    local tarantool_bin_file = fio.pathjoin(script_dir, "tarantool")
+    local tarantool_include_dir = fio.pathjoin(script_dir, "include")
+
+    if fio.path.is_dir(tarantool_include_dir) then
+        table.insert(cfg.external_deps_dirs, script_dir)
+
+        cfg.variables.LUA_INCDIR = fio.pathjoin(script_dir, "include", "tarantool")
+        cfg.variables.LUA = tarantool_bin_file
+        cfg.variables.LUAROCKS_PREFIX = script_dir
+    end
 
     -- Tweak help messages
     util.see_help = function(command, program)
