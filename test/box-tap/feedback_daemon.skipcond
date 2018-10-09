@@ -1,0 +1,8 @@
+import os
+import platform
+
+# Disabled on Mac OS in CI due to flaky fail #3558.
+if os.environ.get('TRAVIS_JOB_ID', '') and platform.system() == 'Darwin':
+    self.skip = 1
+
+# vim: set ft=python:
