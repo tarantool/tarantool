@@ -97,6 +97,10 @@ enum {
 	 * particular key.
 	 */
 	VY_STMT_SKIP_READ		= 1 << 1,
+	/**
+	 * Bit mask of all statement flags.
+	 */
+	VY_STMT_FLAGS_ALL = VY_STMT_DEFERRED_DELETE | VY_STMT_SKIP_READ,
 };
 
 /**
