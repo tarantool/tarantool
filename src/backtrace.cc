@@ -209,8 +209,11 @@ unw_getcontext_f(unw_context_t *unw_context, void *stack)
  *
  * @param @unw_context unwind context to store execution state.
  * @param @coro_ctx fiber context to unwind.
+ *
+ * Note, this function needs a separate stack frame and therefore
+ * MUST NOT be inlined.
  */
-static void
+static void NOINLINE
 coro_unwcontext(unw_context_t *unw_context, struct coro_context *coro_ctx)
 {
 #if __amd64
