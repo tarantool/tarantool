@@ -309,6 +309,7 @@ box_tuple_format_unref(box_tuple_format_t *format);
  * @param field_map A pointer behind the last element of the field
  *                  map.
  * @param tuple     MessagePack array.
+ * @param validate  If set, validate the tuple against the format.
  *
  * @retval  0 Success.
  * @retval -1 Format error.
@@ -321,7 +322,7 @@ box_tuple_format_unref(box_tuple_format_t *format);
  */
 int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
-		     const char *tuple);
+		     const char *tuple, bool validate);
 
 /**
  * Get a field at the specific position in this MessagePack array.

@@ -349,7 +349,7 @@ tuple_format_dup(struct tuple_format *src)
 /** @sa declaration for details. */
 int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
-		     const char *tuple)
+		     const char *tuple, bool validate)
 {
 	if (format->field_count == 0)
 		return 0; /* Nothing to initialize */
@@ -358,14 +358,14 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 
 	/* Check to see if the tuple has a sufficient number of fields. */
 	uint32_t field_count = mp_decode_array(&pos);
-	if (format->exact_field_count > 0 &&
+	if (validate && format->exact_field_count > 0 &&
 	    format->exact_field_count != field_count) {
 		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
 			 (unsigned) field_count,
 			 (unsigned) format->exact_field_count);
 		return -1;
 	}
-	if (unlikely(field_count < format->min_field_count)) {
+	if (validate && field_count < format->min_field_count) {
 		diag_set(ClientError, ER_MIN_FIELD_COUNT,
 			 (unsigned) field_count,
 			 (unsigned) format->min_field_count);
@@ -375,14 +375,17 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 	/* first field is simply accessible, so we do not store offset to it */
 	enum mp_type mp_type = mp_typeof(*pos);
 	const struct tuple_field *field = &format->fields[0];
-	if (key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
+	if (validate &&
+	    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
 				 TUPLE_INDEX_BASE, field->is_nullable))
 		return -1;
 	mp_next(&pos);
 	/* other fields...*/
 	++field;
 	uint32_t i = 1;
-	uint32_t defined_field_count = MIN(field_count, format->field_count);
+	uint32_t defined_field_count = MIN(field_count, validate ?
+					   format->field_count :
+					   format->index_field_count);
 	if (field_count < format->index_field_count) {
 		/*
 		 * Nullify field map to be able to detect by 0,
@@ -393,7 +396,8 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 	}
 	for (; i < defined_field_count; ++i, ++field) {
 		mp_type = mp_typeof(*pos);
-		if (key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
+		if (validate &&
+		    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
 					 i + TUPLE_INDEX_BASE,
 					 field->is_nullable))
 			return -1;

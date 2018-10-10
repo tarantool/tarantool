@@ -1170,7 +1170,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	char *raw = (char *) tuple + tuple->data_offset;
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, tuple_len);
-	if (tuple_init_field_map(format, field_map, raw)) {
+	if (tuple_init_field_map(format, field_map, raw, true)) {
 		memtx_tuple_delete(format, tuple);
 		return NULL;
 	}

@@ -228,6 +228,21 @@ s:replace{-1}
 s:drop()
 
 --
+-- gh-3540 assertion after ALTER when reading an overwritten
+-- statement that doesn't match the new space format.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('primary', {run_count_per_level = 10})
+s:replace{1}
+s:replace{2, 'a'}
+box.snapshot()
+s:replace{1, 1}
+s:delete{2}
+_ = s:create_index('secondary', {parts = {2, 'unsigned'}})
+s:select()
+s:drop()
+
+--
 -- Check that all modifications done to the space during index build
 -- are reflected in the new index.
 --

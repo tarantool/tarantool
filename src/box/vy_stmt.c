@@ -75,6 +75,9 @@ vy_stmt_persistent_flags(const struct tuple *stmt, bool is_primary)
 static struct tuple *
 vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
+	if (tuple_validate_raw(format, data) != 0)
+		return NULL;
+
 	return vy_stmt_new_insert(format, data, end);
 }
 
@@ -264,9 +267,7 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	mp_tuple_assert(tuple_begin, tuple_end);
 
 	const char *tmp = tuple_begin;
-	uint32_t field_count = mp_decode_array(&tmp);
-	assert(field_count >= format->min_field_count);
-	(void) field_count;
+	mp_decode_array(&tmp);
 
 	size_t ops_size = 0;
 	for (int i = 0; i < op_count; ++i)
@@ -293,8 +294,20 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	}
 	vy_stmt_set_type(stmt, type);
 
-	/* Calculate offsets for key parts */
-	if (tuple_init_field_map(format, (uint32_t *) raw, raw)) {
+	/*
+	 * Calculate offsets for key parts.
+	 *
+	 * Note, an overwritten statement loaded from a primary
+	 * index run file may not conform to the current format
+	 * in case the space was altered (e.g. a new field was
+	 * added which is missing in a deleted tuple). Although
+	 * we should never return such statements to the user,
+	 * we may still need to decode them while iterating over
+	 * a run so we skip tuple validation here. This is OK as
+	 * tuples inserted into a space are validated explicitly
+	 * with tuple_validate() anyway.
+	 */
+	if (tuple_init_field_map(format, (uint32_t *) raw, raw, false)) {
 		tuple_unref(stmt);
 		return NULL;
 	}
