@@ -40,7 +40,7 @@ deps_ubuntu:
 		lcov ruby
 
 test_ubuntu: deps_ubuntu
-	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfoWError
+	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfoWError ${CMAKE_EXTRA_PARAMS}
 	make -j8
 	cd test && /usr/bin/python test-run.py -j 1
 
@@ -49,7 +49,7 @@ deps_osx:
 	brew install openssl readline curl icu4c --force
 
 test_osx: deps_osx
-	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfoWError
+	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfoWError ${CMAKE_EXTRA_PARAMS}
 	# Increase the maximum number of open file descriptors on macOS
 	sudo sysctl -w kern.maxfiles=20480 || :
 	sudo sysctl -w kern.maxfilesperproc=20480 || :

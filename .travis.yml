@@ -33,6 +33,14 @@ matrix:
         os: osx
       - name: Debug build + test + coverage (Linux, gcc)
         env: TARGET=coverage
+      - name: LTO build + test (Linux, gcc)
+        env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+      - name: LTO build + test (Linux, clang)
+        env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+        compiler: clang
+      - name: LTO build + test (OS X)
+        os: osx
+        env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
       - name: CentOS 6 build + test + deploy RPM
         env: OS=el DIST=6
       - name: CentOS 7 build + test + deploy RPM
