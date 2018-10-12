@@ -45,14 +45,20 @@
 /**
  * Return true if the requested amount of memory may be consumed
  * right now, false if consumers have to wait.
+ *
+ * If the requested amount of memory cannot be consumed due to
+ * the configured limit, invoke the registered callback so that
+ * it can start memory reclaim immediately.
  */
 static inline bool
 vy_quota_may_use(struct vy_quota *q, size_t size)
 {
 	if (!q->is_enabled)
 		return true;
-	if (q->used + size > q->limit)
+	if (q->used + size > q->limit) {
+		q->quota_exceeded_cb(q);
 		return false;
+	}
 	return true;
 }
 
@@ -157,11 +163,6 @@ vy_quota_release(struct vy_quota *q, size_t size)
 int
 vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 {
-	if (vy_quota_may_use(q, size)) {
-		vy_quota_do_use(q, size);
-		return 0;
-	}
-
 	/*
 	 * Fail early if the configured memory limit never allows
 	 * us to commit the transaction.
@@ -169,6 +170,11 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 	if (size > q->limit) {
 		diag_set(OutOfMemory, size, "lsregion", "vinyl transaction");
 		return -1;
+	}
+
+	if (vy_quota_may_use(q, size)) {
+		vy_quota_do_use(q, size);
+		return 0;
 	}
 
 	/* Wait for quota. */
@@ -182,18 +188,8 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 	rlist_add_tail_entry(&q->wait_queue, &wait_node, in_wait_queue);
 
 	do {
-		/*
-		 * If the requested amount of memory cannot be
-		 * consumed due to the configured limit, notify
-		 * the caller before going to sleep so that it
-		 * can start memory reclaim immediately.
-		 */
-		if (q->used + size > q->limit)
-			q->quota_exceeded_cb(q);
-
 		double now = ev_monotonic_now(loop());
 		fiber_yield_timeout(deadline - now);
-
 		if (now >= deadline) {
 			rlist_del_entry(&wait_node, in_wait_queue);
 			diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
