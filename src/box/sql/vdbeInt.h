@@ -380,6 +380,19 @@ struct Vdbe {
 	char *zErrMsg;		/* Error message written here */
 	VdbeCursor **apCsr;	/* One element of this array for each open cursor */
 	Mem *aVar;		/* Values for the OP_Variable opcode. */
+	/**
+	 * Array which contains positions of variables to be
+	 * bound in resulting set of SELECT.
+	 **/
+	uint32_t *var_pos;
+	/**
+	 * Number of variables to be bound in result set.
+	 * In other words - size of @var_pos array.
+	 * For example:
+	 * SELECT ?, ? WHERE id = ?;
+	 * Result set consists of two binding variables.
+	 */
+	uint32_t res_var_count;
 	VList *pVList;		/* Name of variables */
 #ifndef SQLITE_OMIT_TRACE
 	i64 startTime;		/* Time when query started - used for profiling */

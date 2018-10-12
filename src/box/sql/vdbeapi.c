@@ -1111,6 +1111,13 @@ sqlite3_column_name(sqlite3_stmt * pStmt, int N)
 			  COLNAME_NAME);
 }
 
+const char *
+sqlite3_column_datatype(sqlite3_stmt *pStmt, int N)
+{
+	return columnName(pStmt, N, (const void *(*)(Mem *))sqlite3_value_text,
+			  COLNAME_DECLTYPE);
+}
+
 /*
  * Constraint:  If you have ENABLE_COLUMN_METADATA then you must
  * not define OMIT_DECLTYPE.
@@ -1224,6 +1231,50 @@ vdbeUnbind(Vdbe * p, int i)
 	return SQLITE_OK;
 }
 
+/**
+ * This function sets type for bound variable.
+ * We should bind types only for variables which occur in
+ * result set of SELECT query. For example:
+ *
+ * SELECT id, ?, ?, a WHERE id = ?;
+ *
+ * In this case we should set types only for two variables.
+ * That one which is situated under WHERE condition - is out
+ * of our interest.
+ *
+ * For named binding parameters we should propagate type
+ * for all occurrences of this parameter - since binding
+ * routine takes place only once for each DISTINCT parameter
+ * from list.
+ *
+ * @param v Current VDBE.
+ * @param position Ordinal position of binding parameter.
+ * @param type String literal representing type of binding param.
+ * @retval 0 on success.
+ */
+static int
+sql_bind_type(struct Vdbe *v, uint32_t position, const char *type)
+{
+	if (v->res_var_count < position)
+		return 0;
+	int rc = sqlite3VdbeSetColName(v, v->var_pos[position - 1],
+				       COLNAME_DECLTYPE, type,
+				       SQLITE_TRANSIENT);
+	const char *bind_name = v->aColName[position - 1].z;
+	if (strcmp(bind_name, "?") == 0)
+		return rc;
+	for (uint32_t i = position; i < v->res_var_count; ++i) {
+		if (strcmp(bind_name,  v->aColName[i].z) == 0) {
+			rc = sqlite3VdbeSetColName(v, v->var_pos[i],
+						   COLNAME_DECLTYPE, type,
+						   SQLITE_TRANSIENT);
+			if (rc != 0)
+				return rc;
+		}
+	}
+	return 0;
+}
+
 /*
  * Bind a text or BLOB value.
  */
@@ -1244,6 +1295,8 @@ bindText(sqlite3_stmt * pStmt,	/* The statement to bind against */
 		if (zData != 0) {
 			pVar = &p->aVar[i - 1];
 			rc = sqlite3VdbeMemSetStr(pVar, zData, nData, 1, xDel);
+			if (rc == SQLITE_OK)
+				rc = sql_bind_type(p, i, "TEXT");
 			sqlite3Error(p->db, rc);
 			rc = sqlite3ApiExit(p->db, rc);
 		}
@@ -1290,6 +1343,7 @@ sqlite3_bind_double(sqlite3_stmt * pStmt, int i, double rValue)
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
 	if (rc == SQLITE_OK) {
+		rc = sql_bind_type(p, i, "NUMERIC");
 		sqlite3VdbeMemSetDouble(&p->aVar[i - 1], rValue);
 	}
 	return rc;
@@ -1308,6 +1362,7 @@ sqlite3_bind_int64(sqlite3_stmt * pStmt, int i, sqlite_int64 iValue)
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
 	if (rc == SQLITE_OK) {
+		rc = sql_bind_type(p, i, "INTEGER");
 		sqlite3VdbeMemSetInt64(&p->aVar[i - 1], iValue);
 	}
 	return rc;
@@ -1319,6 +1374,8 @@ sqlite3_bind_null(sqlite3_stmt * pStmt, int i)
 	int rc;
 	Vdbe *p = (Vdbe *) pStmt;
 	rc = vdbeUnbind(p, i);
+	if (rc == SQLITE_OK)
+		rc = sql_bind_type(p, i, "BOOLEAN");
 	return rc;
 }
 

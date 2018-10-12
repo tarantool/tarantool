@@ -150,11 +150,7 @@ struct SubProgram {
 #ifdef SQLITE_ENABLE_COLUMN_METADATA
 #define COLNAME_N        5	/* Number of COLNAME_xxx symbols */
 #else
-#ifdef SQLITE_OMIT_DECLTYPE
-#define COLNAME_N      1	/* Store only the name */
-#else
 #define COLNAME_N      2	/* Store the name and decltype */
-#endif
 #endif
 
 /*

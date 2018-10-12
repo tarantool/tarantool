@@ -79,6 +79,7 @@ select_res
 ---
 - metadata:
   - name: '1'
+    type: INTEGER
   rows:
   - [1]
 ...

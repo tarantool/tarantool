@@ -36,6 +36,7 @@
 #include "coll.h"
 #include "sqliteInt.h"
 #include "tarantoolInt.h"
+#include "vdbeInt.h"
 #include "box/box.h"
 #include "box/coll_id_cache.h"
 #include "box/schema.h"
@@ -1687,16 +1688,59 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 	if (pParse->colNamesSet || db->mallocFailed)
 		return;
 	assert(v != 0);
+	size_t var_pos_sz =  pParse->nVar * sizeof(uint32_t);
+	uint32_t *var_pos = (uint32_t *) region_alloc(&pParse->region,
+						      var_pos_sz);
+	if (var_pos == NULL) {
+		diag_set(OutOfMemory, var_pos_sz, "region", "var_pos");
+		return;
+	}
 	assert(pTabList != 0);
 	pParse->colNamesSet = 1;
 	fullNames = (user_session->sql_flags & SQLITE_FullColNames) != 0;
 	shortNames = (user_session->sql_flags & SQLITE_ShortColNames) != 0;
 	sqlite3VdbeSetNumCols(v, pEList->nExpr);
+	uint32_t var_count = 0;
 	for (i = 0; i < pEList->nExpr; i++) {
 		Expr *p;
 		p = pEList->a[i].pExpr;
 		if (NEVER(p == 0))
 			continue;
+		switch (p->affinity) {
+		case AFFINITY_INTEGER:
+			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "INTEGER",
+					      SQLITE_TRANSIENT);
+			break;
+		case AFFINITY_REAL:
+		case AFFINITY_NUMERIC:
+			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "NUMERIC",
+					      SQLITE_TRANSIENT);
+			break;
+		case AFFINITY_TEXT:
+			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "TEXT",
+					      SQLITE_TRANSIENT);
+			break;
+		case AFFINITY_BLOB:
+			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "BLOB",
+					      SQLITE_TRANSIENT);
+			break;
+		default: ;
+			char *type;
+			/*
+			 * For variables we set BOOLEAN type since
+			 * unassigned bindings will be replaced
+			 * with NULL automatically, i.e. without
+			 * explicit call of sql_bind_value().
+			 */
+			if (p->op == TK_VARIABLE) {
+				var_pos[var_count++] = i;
+				type = "BOOLEAN";
+			} else {
+				type = "UNKNOWN";
+			}
+			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, type,
+					      SQLITE_TRANSIENT);
+		}
 		if (pEList->a[i].zName) {
 			char *zName = pEList->a[i].zName;
 			sqlite3VdbeSetColName(v, i, COLNAME_NAME, zName,
@@ -1738,6 +1782,16 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 					      SQLITE_DYNAMIC);
 		}
 	}
+	if (var_count == 0)
+		return;
+	v->var_pos = (uint32_t *) malloc(var_count * sizeof(uint32_t));
+	if (v->var_pos ==  NULL) {
+		diag_set(OutOfMemory, var_count * sizeof(uint32_t),
+			 "malloc", "v->var_pos");
+		return;
+	}
+	memcpy(v->var_pos, var_pos, var_count * sizeof(uint32_t));
+	v->res_var_count = var_count;
 }
 
 /*

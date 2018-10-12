@@ -2168,7 +2168,7 @@ sqlite3VdbeSetColName(Vdbe * p,			/* Vdbe being configured */
 		return SQLITE_NOMEM_BKPT;
 	}
 	assert(p->aColName != 0);
-	assert(var == COLNAME_NAME);
+	assert(var == COLNAME_NAME || var == COLNAME_DECLTYPE);
 	pColName = &(p->aColName[idx + var * p->nResColumn]);
 	rc = sqlite3VdbeMemSetStr(pColName, zName, -1, 1, xDel);
 	assert(rc != 0 || !zName || (pColName->flags & MEM_Term) != 0);
@@ -2780,6 +2780,7 @@ sqlite3VdbeDelete(Vdbe * p)
 	}
 	p->magic = VDBE_MAGIC_DEAD;
 	p->db = 0;
+	free(p->var_pos);
 	sqlite3DbFree(db, p);
 }
 

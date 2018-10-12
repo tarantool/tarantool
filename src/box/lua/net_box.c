@@ -644,8 +644,7 @@ netbox_decode_metadata(struct lua_State *L, const char **data)
 	lua_createtable(L, count, 0);
 	for (uint32_t i = 0; i < count; ++i) {
 		uint32_t map_size = mp_decode_map(data);
-		/* Only IPROTO_FIELD_NAME is available. */
-		assert(map_size == 1);
+		assert(map_size == 2);
 		(void) map_size;
 		uint32_t key = mp_decode_uint(data);
 		assert(key == IPROTO_FIELD_NAME);
@@ -655,6 +654,11 @@ netbox_decode_metadata(struct lua_State *L, const char **data)
 		const char *str = mp_decode_str(data, &len);
 		lua_pushlstring(L, str, len);
 		lua_setfield(L, -2, "name");
+		key = mp_decode_uint(data);
+		assert(key == IPROTO_FIELD_TYPE);
+		const char *type = mp_decode_str(data, &len);
+		lua_pushlstring(L, type, len);
+		lua_setfield(L, -2, "type");
 		lua_rawseti(L, -2, i + 1);
 	}
 }

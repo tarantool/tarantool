@@ -528,9 +528,11 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 		return -1;
 
 	for (int i = 0; i < column_count; ++i) {
-		size_t size = mp_sizeof_map(1) +
-			      mp_sizeof_uint(IPROTO_FIELD_NAME);
+		size_t size = mp_sizeof_map(2) +
+			      mp_sizeof_uint(IPROTO_FIELD_NAME) +
+			      mp_sizeof_uint(IPROTO_FIELD_TYPE);
 		const char *name = sqlite3_column_name(stmt, i);
+		const char *type = sqlite3_column_datatype(stmt, i);
 		/*
 		 * Can not fail, since all column names are
 		 * preallocated during prepare phase and the
@@ -538,14 +540,17 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 		 */
 		assert(name != NULL);
 		size += mp_sizeof_str(strlen(name));
+		size += mp_sizeof_str(strlen(type));
 		char *pos = (char *) obuf_alloc(out, size);
 		if (pos == NULL) {
 			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 			return -1;
 		}
-		pos = mp_encode_map(pos, 1);
+		pos = mp_encode_map(pos, 2);
 		pos = mp_encode_uint(pos, IPROTO_FIELD_NAME);
 		pos = mp_encode_str(pos, name, strlen(name));
+		pos = mp_encode_uint(pos, IPROTO_FIELD_TYPE);
+		pos = mp_encode_str(pos, type, strlen(type));
 	}
 	return 0;
 }

@@ -678,6 +678,9 @@ const char *
 sqlite3_column_name(sqlite3_stmt *, int N);
 
 const char *
+sqlite3_column_datatype(sqlite3_stmt *, int N);
+
+const char *
 sqlite3_errmsg(sqlite3 *);
 
 int
