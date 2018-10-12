@@ -136,3 +136,4 @@ ftpscript.txt
 sftpscript.txt
 *.md5sum
 extra/deploy_key
+compile_commands.json
