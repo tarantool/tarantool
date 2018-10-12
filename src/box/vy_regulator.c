@@ -66,6 +66,13 @@ static const int VY_DUMP_BANDWIDTH_PCT = 10;
  */
 static const size_t VY_DUMP_BANDWIDTH_DEFAULT = 10 * 1024 * 1024;
 
+/**
+ * Do not take into account small dumps when estimating dump
+ * bandwidth, because they have too high overhead associated
+ * with file creation.
+ */
+static const size_t VY_DUMP_SIZE_ACCT_MIN = 1024 * 1024;
+
 static void
 vy_regulator_trigger_dump(struct vy_regulator *regulator)
 {
@@ -205,7 +212,7 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
 {
 	regulator->dump_in_progress = false;
 
-	if (dump_duration > 0) {
+	if (mem_dumped >= VY_DUMP_SIZE_ACCT_MIN && dump_duration > 0) {
 		histogram_collect(regulator->dump_bandwidth_hist,
 				  mem_dumped / dump_duration);
 		/*
