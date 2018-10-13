@@ -212,6 +212,34 @@ sk:stat().rows -- ditto
 s:drop()
 
 --
+-- Check that deferred DELETEs don't overwrite newer statements.
+--
+vinyl_cache = box.cfg.vinyl_cache
+box.cfg{vinyl_cache = 0}
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+pk = s:create_index('primary', {run_count_per_level = 10})
+sk = s:create_index('secondary', {unique = false, parts = {2, 'unsigned'}, run_count_per_level = 10})
+
+s:replace{1, 10, 'a'}
+box.snapshot()
+s:replace{1, 20, 'b'} -- will generate deferred DELETE for [1, 10, 'a']
+box.snapshot()
+s:replace{1, 10, 'c'} -- must not be overwritten by the deferred DELETE
+box.snapshot()
+
+-- Generate deferred DELETEs.
+pk:compact()
+while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+
+sk:select() -- [1, 10, 'c']
+box.snapshot()
+sk:select() -- ditto
+s:drop()
+
+box.cfg{vinyl_cache = vinyl_cache}
+
+--
 -- Check that on recovery we do not apply deferred DELETEs that
 -- have been dumped to disk.
 --

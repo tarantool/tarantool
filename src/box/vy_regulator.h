@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <tarantool_ev.h>
 
@@ -42,7 +43,7 @@ struct histogram;
 struct vy_quota;
 struct vy_regulator;
 
-typedef void
+typedef int
 (*vy_trigger_dump_f)(struct vy_regulator *regulator);
 
 /**
@@ -59,7 +60,7 @@ struct vy_regulator {
 	/**
 	 * Called when the regulator detects that memory usage
 	 * exceeds the computed watermark. Supposed to trigger
-	 * memory dump.
+	 * memory dump and return 0 on success, -1 on failure.
 	 */
 	vy_trigger_dump_f trigger_dump_cb;
 	/**
@@ -100,6 +101,12 @@ struct vy_regulator {
 	 * background memory reclaim.
 	 */
 	size_t dump_watermark;
+	/**
+	 * Set if the last triggered memory dump hasn't completed
+	 * yet, i.e. trigger_dump_cb() was successfully invoked,
+	 * but vy_regulator_dump_complete() hasn't been called yet.
+	 */
+	bool dump_in_progress;
 };
 
 void

@@ -115,7 +115,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	char *raw = (char *) tuple + tuple->data_offset;
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, data_len);
-	if (tuple_init_field_map(format, field_map, raw)) {
+	if (tuple_init_field_map(format, field_map, raw, true)) {
 		runtime_tuple_delete(format, tuple);
 		return NULL;
 	}

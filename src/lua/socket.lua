@@ -332,12 +332,17 @@ local function do_wait(self, what, timeout)
     self._errno = nil
     timeout = timeout or TIMEOUT_INFINITY
 
-    local res = internal.iowait(fd, what, timeout)
-    if res == 0 then
-        self._errno = boxerrno.ETIMEDOUT
-        return 0
-    end
-    return res
+    repeat
+        local started = fiber.clock()
+        local events = internal.iowait(fd, what, timeout)
+        fiber.testcancel()
+        if events ~= 0 and events ~= '' then
+            return events
+        end
+        timeout = timeout - (fiber.clock() - started)
+    until timeout < 0
+    self._errno = boxerrno.ETIMEDOUT
+    return 0
 end
 
 local function socket_readable(self, timeout)
@@ -666,9 +671,8 @@ local function read(self, limit, timeout, check, ...)
         return data
     end
 
-    while timeout > 0 do
-        local started = fiber.clock()
-
+    local deadline = fiber.clock() + timeout
+    repeat
         assert(rbuf:size() < limit)
         local to_read = math.min(limit - rbuf:size(), buffer.READAHEAD)
         local data = rbuf:reserve(to_read)
@@ -692,16 +696,7 @@ local function read(self, limit, timeout, check, ...)
         elseif not errno_is_transient[self._errno] then
             return nil
         end
-
-        if not socket_readable(self, timeout) then
-            return nil
-        end
-        if timeout <= 0 then
-            break
-        end
-        timeout = timeout - ( fiber.clock() - started )
-    end
-    self._errno = boxerrno.ETIMEDOUT
+    until not socket_readable(self, deadline - fiber.clock())
     return nil
 end
 
@@ -739,8 +734,8 @@ local function socket_write(self, octets, timeout)
         return 0
     end
 
-    local started = fiber.clock()
-    while true do
+    local deadline = fiber.clock() + timeout
+    repeat
         local written = syswrite(self, p, e - p)
         if written == 0 then
             return p - s -- eof
@@ -754,11 +749,8 @@ local function socket_write(self, octets, timeout)
             return nil
         end
 
-        timeout = timeout - (fiber.clock() - started)
-        if timeout <= 0 or not socket_writable(self, timeout) then
-            break
-        end
-    end
+    until not socket_writable(self, deadline - fiber.clock())
+    return nil
 end
 
 local function socket_send(self, octets, flags)
@@ -999,8 +991,6 @@ local function socket_tcp_connect(s, address, port, timeout)
     -- conditions appart SO_ERROR must be consulted (man connect).
     if socket_writable(s, timeout) then
         s._errno = socket_getsockopt(s, 'SOL_SOCKET', 'SO_ERROR')
-    else
-        s._errno = boxerrno.ETIMEDOUT
     end
     if s._errno ~= 0 then
         return nil

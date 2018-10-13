@@ -2427,7 +2427,7 @@ vy_env_quota_exceeded_cb(struct vy_quota *quota)
 	vy_regulator_quota_exceeded(&env->regulator);
 }
 
-static void
+static int
 vy_env_trigger_dump_cb(struct vy_regulator *regulator)
 {
 	struct vy_env *env = container_of(regulator, struct vy_env, regulator);
@@ -2439,9 +2439,10 @@ vy_env_trigger_dump_cb(struct vy_regulator *regulator)
 		 * quota has been consumed by pending transactions.
 		 * There's nothing we can do about that.
 		 */
-		return;
+		return -1;
 	}
 	vy_scheduler_trigger_dump(&env->scheduler);
+	return 0;
 }
 
 static void
@@ -2458,9 +2459,15 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
 	size_t mem_dumped = mem_used_before - mem_used_after;
-	vy_quota_release(quota, mem_dumped);
-	vy_regulator_dump_complete(&env->regulator, mem_dumped, dump_duration);
 	say_info("dumped %zu bytes in %.1f sec", mem_dumped, dump_duration);
+	/*
+	 * In certain corner cases, vy_quota_release() may need
+	 * to trigger a new dump. Notify the regulator about dump
+	 * completion before releasing quota so that it can start
+	 * a new dump immediately.
+	 */
+	vy_regulator_dump_complete(&env->regulator, mem_dumped, dump_duration);
+	vy_quota_release(quota, mem_dumped);
 }
 
 static struct vy_squash_queue *

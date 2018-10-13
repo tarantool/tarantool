@@ -744,6 +744,7 @@ xlog_rename(struct xlog *l)
 		return -1;
 	}
 	l->is_inprogress = false;
+	filename[suffix - filename] = '\0';
 	return 0;
 }
 
@@ -820,8 +821,9 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 	 */
 	xlog->fd = open(xlog->filename, flags, 0644);
 	if (xlog->fd < 0) {
-		say_syserror("open, [%s]", name);
-		diag_set(SystemError, "failed to create file '%s'", name);
+		say_syserror("open, [%s]", xlog->filename);
+		diag_set(SystemError, "failed to create file '%s'",
+			 xlog->filename);
 		goto err_open;
 	}
 
@@ -834,7 +836,8 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 
 	/* Write metadata */
 	if (fio_writen(xlog->fd, meta_buf, meta_len) < 0) {
-		diag_set(SystemError, "%s: failed to write xlog meta", name);
+		diag_set(SystemError, "%s: failed to write xlog meta",
+			 xlog->filename);
 		goto err_write;
 	}
 

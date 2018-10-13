@@ -69,6 +69,8 @@ include(cmake/profile.cmake)
 include(cmake/module.cmake)
 include(cmake/thread.cmake)
 
+set(CMAKE_REQUIRED_DEFINITIONS "-D_GNU_SOURCE")
+
 check_symbol_exists(MAP_ANON sys/mman.h HAVE_MAP_ANON)
 check_symbol_exists(MAP_ANONYMOUS sys/mman.h HAVE_MAP_ANONYMOUS)
 check_include_file(sys/time.h HAVE_SYS_TIME_H)

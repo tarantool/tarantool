@@ -31,6 +31,7 @@
 #include "vy_regulator.h"
 
 #include <math.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <tarantool_ev.h>
@@ -64,6 +65,44 @@ static const int VY_DUMP_BANDWIDTH_PCT = 10;
  * which should be fine for initial guess.
  */
 static const size_t VY_DUMP_BANDWIDTH_DEFAULT = 10 * 1024 * 1024;
+
+/**
+ * Do not take into account small dumps when estimating dump
+ * bandwidth, because they have too high overhead associated
+ * with file creation.
+ */
+static const size_t VY_DUMP_SIZE_ACCT_MIN = 1024 * 1024;
+
+static void
+vy_regulator_trigger_dump(struct vy_regulator *regulator)
+{
+	if (regulator->dump_in_progress)
+		return;
+
+	if (regulator->trigger_dump_cb(regulator) != 0)
+		return;
+
+	regulator->dump_in_progress = true;
+
+	/*
+	 * To avoid unpredictably long stalls, we must limit
+	 * the write rate when a dump is in progress so that
+	 * we don't hit the hard limit before the dump has
+	 * completed, i.e.
+	 *
+	 *    mem_left        mem_used
+	 *   ---------- >= --------------
+	 *   write_rate    dump_bandwidth
+	 */
+	struct vy_quota *quota = regulator->quota;
+	size_t mem_left = (quota->used < quota->limit ?
+			   quota->limit - quota->used : 0);
+	size_t mem_used = quota->used;
+	size_t max_write_rate = (double)mem_left / (mem_used + 1) *
+					regulator->dump_bandwidth;
+	max_write_rate = MIN(max_write_rate, regulator->dump_bandwidth);
+	vy_quota_set_rate_limit(quota, max_write_rate);
+}
 
 static void
 vy_regulator_update_write_rate(struct vy_regulator *regulator)
@@ -156,12 +195,14 @@ vy_regulator_create(struct vy_regulator *regulator, struct vy_quota *quota,
 	regulator->quota_used_last = 0;
 	regulator->dump_bandwidth = VY_DUMP_BANDWIDTH_DEFAULT;
 	regulator->dump_watermark = SIZE_MAX;
+	regulator->dump_in_progress = false;
 }
 
 void
 vy_regulator_start(struct vy_regulator *regulator)
 {
 	regulator->quota_used_last = regulator->quota->used;
+	vy_quota_set_rate_limit(regulator->quota, regulator->dump_bandwidth);
 	ev_timer_start(loop(), &regulator->timer);
 }
 
@@ -175,21 +216,23 @@ vy_regulator_destroy(struct vy_regulator *regulator)
 void
 vy_regulator_quota_exceeded(struct vy_regulator *regulator)
 {
-	regulator->trigger_dump_cb(regulator);
+	vy_regulator_trigger_dump(regulator);
 }
 
 void
 vy_regulator_check_dump_watermark(struct vy_regulator *regulator)
 {
 	if (regulator->quota->used >= regulator->dump_watermark)
-		regulator->trigger_dump_cb(regulator);
+		vy_regulator_trigger_dump(regulator);
 }
 
 void
 vy_regulator_dump_complete(struct vy_regulator *regulator,
 			   size_t mem_dumped, double dump_duration)
 {
-	if (dump_duration > 0) {
+	regulator->dump_in_progress = false;
+
+	if (mem_dumped >= VY_DUMP_SIZE_ACCT_MIN && dump_duration > 0) {
 		histogram_collect(regulator->dump_bandwidth_hist,
 				  mem_dumped / dump_duration);
 		/*
@@ -201,6 +244,16 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
 		regulator->dump_bandwidth = histogram_percentile_lower(
 			regulator->dump_bandwidth_hist, VY_DUMP_BANDWIDTH_PCT);
 	}
+
+	/*
+	 * Reset the rate limit.
+	 *
+	 * It doesn't make sense to allow to consume memory at
+	 * a higher rate than it can be dumped so we set the rate
+	 * limit to the dump bandwidth rather than disabling it
+	 * completely.
+	 */
+	vy_quota_set_rate_limit(regulator->quota, regulator->dump_bandwidth);
 }
 
 void
@@ -210,4 +263,5 @@ vy_regulator_reset_dump_bandwidth(struct vy_regulator *regulator, size_t max)
 	regulator->dump_bandwidth = VY_DUMP_BANDWIDTH_DEFAULT;
 	if (max > 0 && regulator->dump_bandwidth > max)
 		regulator->dump_bandwidth = max;
+	vy_quota_set_rate_limit(regulator->quota, regulator->dump_bandwidth);
 }

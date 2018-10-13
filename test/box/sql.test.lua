@@ -3,7 +3,7 @@ test_run = env.new()
 net_box = require('net.box')
 
 s = box.schema.space.create('test')
-_ = box.schema.space.create('test1', { id = 555 })
+_ = box.schema.space.create('test1')
 box.schema.user.create('test', { password = 'test' })
 box.schema.user.grant('test', 'read,write,alter', 'space', 'test1')
 box.schema.user.grant('test', 'read,write,alter', 'space', 'test')
