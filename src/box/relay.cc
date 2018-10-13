@@ -32,6 +32,7 @@
 
 #include "trivia/config.h"
 #include "trivia/util.h"
+#include "scoped_guard.h"
 #include "cbus.h"
 #include "cfg.h"
 #include "errinj.h"
@@ -262,10 +263,14 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock)
 	struct relay *relay = relay_new(NULL);
 	if (relay == NULL)
 		diag_raise();
+
 	relay_start(relay, fd, sync, relay_send_initial_join_row);
+	auto relay_guard = make_scoped_guard([=] {
+		relay_stop(relay);
+		relay_delete(relay);
+	});
+
 	engine_join_xc(vclock, &relay->stream);
-	relay_stop(relay);
-	relay_delete(relay);
 }
 
 int
@@ -284,11 +289,19 @@ relay_final_join_f(va_list ap)
 }
 
 void
-relay_final_join(struct replica *replica, int fd, uint64_t sync,
-		 struct vclock *start_vclock, struct vclock *stop_vclock)
+relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
+		 struct vclock *stop_vclock)
 {
-	struct relay *relay = replica->relay;
+	struct relay *relay = relay_new(NULL);
+	if (relay == NULL)
+		diag_raise();
+
 	relay_start(relay, fd, sync, relay_send_row);
+	auto relay_guard = make_scoped_guard([=] {
+		relay_stop(relay);
+		relay_delete(relay);
+	});
+
 	relay->r = recovery_new(cfg_gets("wal_dir"),
 			       cfg_geti("force_recovery"),
 			       start_vclock);
@@ -298,9 +311,6 @@ relay_final_join(struct replica *replica, int fd, uint64_t sync,
 			      relay_final_join_f, relay);
 	if (rc == 0)
 		rc = cord_cojoin(&relay->cord);
-
-	relay_stop(relay);
-
 	if (rc != 0)
 		diag_raise();
 
@@ -660,15 +670,19 @@ relay_send_row(struct xstream *stream, struct xrow_header *packet)
 		packet->bodycnt = 0;
 	}
 	/*
-	 * We're feeding a WAL, thus responding to SUBSCRIBE request.
-	 * In that case, only send a row if it is not from the same replica
+	 * We're feeding a WAL, thus responding to FINAL JOIN or SUBSCRIBE
+	 * request. If this is FINAL JOIN (i.e. relay->replica is NULL),
+	 * we must relay all rows, even those originating from the replica
+	 * itself (there may be such rows if this is rebootstrap). If this
+	 * SUBSCRIBE, only send a row if it is not from the same replica
 	 * (i.e. don't send replica's own rows back) or if this row is
 	 * missing on the other side (i.e. in case of sudden power-loss,
 	 * data was not written to WAL, so remote master can't recover
 	 * it). In the latter case packet's LSN is less than or equal to
 	 * local master's LSN at the moment it received 'SUBSCRIBE' request.
 	 */
-	if (packet->replica_id != relay->replica->id ||
+	if (relay->replica == NULL ||
+	    packet->replica_id != relay->replica->id ||
 	    packet->lsn <= vclock_get(&relay->local_vclock_at_subscribe,
 				      packet->replica_id)) {
 		struct errinj *inj = errinj(ERRINJ_RELAY_BREAK_LSN,

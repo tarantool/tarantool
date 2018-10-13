@@ -106,8 +106,8 @@ relay_initial_join(int fd, uint64_t sync, struct vclock *vclock);
  * @param sync      sync from incoming JOIN request
  */
 void
-relay_final_join(struct replica *replica, int fd, uint64_t sync,
-		 struct vclock *start_vclock, struct vclock *stop_vclock);
+relay_final_join(int fd, uint64_t sync, struct vclock *start_vclock,
+		 struct vclock *stop_vclock);
 
 /**
  * Subscribe a replica to updates.

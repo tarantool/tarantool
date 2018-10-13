@@ -59,8 +59,7 @@ box.space.test:auto_increment{'v1'}
 test_run:cmd('create server replica with rpl_master=default, script="xlog/replica.lua"')
 test_run:cmd('start server replica with crash_expected=True')
 fiber = require('fiber')
-while box.info.replication == nil do fiber.sleep(0.001) end
-while box.info.replication[2].downstream.status ~= "stopped" do fiber.sleep(0.001) end
+while box.info.replication[2] == nil do fiber.sleep(0.001) end
 box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", -1)
 
 logpath = fio.pathjoin(fio.cwd(), 'replica.log')

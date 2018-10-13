@@ -229,10 +229,147 @@ box.space.test:select()
   - [20, 20]
   - [30, 30]
 ...
+--
+-- gh-3740: rebootstrap crashes if the master has rows originating
+-- from the replica.
+--
+-- Bootstrap a new replica.
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+test_run:cleanup_cluster()
+---
+...
+box.space.test:truncate()
+---
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+-- Subscribe the master to the replica.
+replica_listen = test_run:cmd("eval replica 'return box.cfg.listen'")
+---
+...
+replica_listen ~= nil
+---
+- true
+...
+box.cfg{replication = replica_listen}
+---
+...
+-- Unsubscribe the replica from the master.
+test_run:cmd("switch replica")
+---
+- true
+...
+box.cfg{replication = ''}
+---
+...
+-- Bump vclock on the master.
+test_run:cmd("switch default")
+---
+- true
+...
+box.space.test:replace{1}
+---
+- [1]
+...
+-- Bump vclock on the replica.
+test_run:cmd("switch replica")
+---
+- true
+...
+for i = 1, 10 do box.space.test:replace{2} end
+---
+...
+vclock = test_run:get_vclock('replica')
+---
+...
+_ = test_run:wait_vclock('default', vclock)
+---
+...
+-- Restart the master and force garbage collection.
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("restart server default")
+replica_listen = test_run:cmd("eval replica 'return box.cfg.listen'")
+---
+...
+replica_listen ~= nil
+---
+- true
+...
+box.cfg{replication = replica_listen}
+---
+...
+default_checkpoint_count = box.cfg.checkpoint_count
+---
+...
+box.cfg{checkpoint_count = 1}
+---
+...
+box.snapshot()
+---
+- ok
+...
+box.cfg{checkpoint_count = default_checkpoint_count}
+---
+...
+fio = require('fio')
+---
+...
+#fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog')) == 1
+---
+- true
+...
+-- Bump vclock on the replica again.
+test_run:cmd("switch replica")
+---
+- true
+...
+for i = 1, 10 do box.space.test:replace{2} end
+---
+...
+vclock = test_run:get_vclock('replica')
+---
+...
+_ = test_run:wait_vclock('default', vclock)
+---
+...
+-- Restart the replica. It should successfully rebootstrap.
+test_run:cmd("restart server replica")
+box.space.test:select()
+---
+- - [1]
+  - [2]
+...
+box.snapshot()
+---
+- ok
+...
+box.space.test:replace{2}
+---
+- [2]
+...
 -- Cleanup.
 test_run:cmd("switch default")
 ---
 - true
+...
+box.cfg{replication = ''}
+---
 ...
 test_run:cmd("stop server replica")
 ---
