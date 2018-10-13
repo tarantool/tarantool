@@ -83,8 +83,59 @@ test_run:cmd("switch replica")
 box.info.status -- orphan
 box.space.test:select()
 
+--
+-- gh-3740: rebootstrap crashes if the master has rows originating
+-- from the replica.
+--
+
+-- Bootstrap a new replica.
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+test_run:cleanup_cluster()
+box.space.test:truncate()
+test_run:cmd("start server replica")
+-- Subscribe the master to the replica.
+replica_listen = test_run:cmd("eval replica 'return box.cfg.listen'")
+replica_listen ~= nil
+box.cfg{replication = replica_listen}
+-- Unsubscribe the replica from the master.
+test_run:cmd("switch replica")
+box.cfg{replication = ''}
+-- Bump vclock on the master.
+test_run:cmd("switch default")
+box.space.test:replace{1}
+-- Bump vclock on the replica.
+test_run:cmd("switch replica")
+for i = 1, 10 do box.space.test:replace{2} end
+vclock = test_run:get_vclock('replica')
+_ = test_run:wait_vclock('default', vclock)
+-- Restart the master and force garbage collection.
+test_run:cmd("switch default")
+test_run:cmd("restart server default")
+replica_listen = test_run:cmd("eval replica 'return box.cfg.listen'")
+replica_listen ~= nil
+box.cfg{replication = replica_listen}
+default_checkpoint_count = box.cfg.checkpoint_count
+box.cfg{checkpoint_count = 1}
+box.snapshot()
+box.cfg{checkpoint_count = default_checkpoint_count}
+fio = require('fio')
+#fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog')) == 1
+-- Bump vclock on the replica again.
+test_run:cmd("switch replica")
+for i = 1, 10 do box.space.test:replace{2} end
+vclock = test_run:get_vclock('replica')
+_ = test_run:wait_vclock('default', vclock)
+-- Restart the replica. It should successfully rebootstrap.
+test_run:cmd("restart server replica")
+box.space.test:select()
+box.snapshot()
+box.space.test:replace{2}
+
 -- Cleanup.
 test_run:cmd("switch default")
+box.cfg{replication = ''}
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 box.space.test:drop()
