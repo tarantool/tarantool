@@ -274,7 +274,7 @@ test_basic()
 			struct vy_stmt_template tmpl_key =
 				STMT_TEMPLATE(0, SELECT, i);
 			struct tuple *key = vy_new_simple_stmt(format,
-					pk->mem_format_with_colmask, &tmpl_key);
+							       &tmpl_key);
 			struct tuple *res;
 			rc = vy_point_lookup(pk, NULL, &prv, key, &res);
 			tuple_unref(key);

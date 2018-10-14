@@ -43,13 +43,10 @@
 #define vyend 99999999
 #define MAX_FIELDS_COUNT 100
 #define STMT_TEMPLATE(lsn, type, ...) \
-{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, false, 0, 0, 0 }
-
-#define STMT_TEMPLATE_OPTIMIZED(lsn, type, ...) \
-{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, true, 0, 0, 0 }
+{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, 0, 0, 0 }
 
 #define STMT_TEMPLATE_FLAGS(lsn, type, flags, ...) \
-{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, false, flags, 0, 0 }
+{ { __VA_ARGS__, vyend }, IPROTO_##type, lsn, flags, 0, 0 }
 
 #define STMT_TEMPLATE_DEFERRED_DELETE(lsn, type, ...) \
 STMT_TEMPLATE_FLAGS(lsn, type, VY_STMT_DEFERRED_DELETE, __VA_ARGS__)
@@ -83,11 +80,6 @@ struct vy_stmt_template {
 	enum iproto_type type;
 	/** Statement lsn. */
 	int64_t lsn;
-	/*
-	 * True, if statement must have column mask, that allows
-	 * to skip it in the write_iterator.
-	 */
-	bool optimize_update;
 	/** Statement flags. */
 	uint8_t flags;
 	/*
@@ -103,15 +95,12 @@ struct vy_stmt_template {
  * Create a new vinyl statement using the specified template.
  *
  * @param format
- * @param format_with_colmask Format for statements with a
- *        colmask.
  * @param templ Statement template.
  *
  * @return Created statement.
  */
 struct tuple *
 vy_new_simple_stmt(struct tuple_format *format,
-		   struct tuple_format *format_with_colmask,
 		   const struct vy_stmt_template *templ);
 
 /**
@@ -210,15 +199,13 @@ destroy_test_cache(struct vy_cache *cache, struct key_def *def,
  * @param stmt Actual value.
  * @param templ Expected value.
  * @param format Template statement format.
- * @param format_with_colmask Template statement format with colmask.
  *
  * @retval stmt === template.
  */
 bool
 vy_stmt_are_same(const struct tuple *actual,
 		 const struct vy_stmt_template *expected,
-		 struct tuple_format *format,
-		 struct tuple_format *format_with_colmask);
+		 struct tuple_format *format);
 
 #if defined(__cplusplus)
 }
