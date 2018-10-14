@@ -1723,6 +1723,9 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	if (vy_check_is_unique(env, tx, space, stmt->new_tuple) != 0)
 		return -1;
+
+	vy_stmt_set_flags(stmt->new_tuple, VY_STMT_UPDATE);
+
 	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
 		return -1;
 	if (space->index_count == 1)

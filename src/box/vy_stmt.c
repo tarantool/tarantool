@@ -61,6 +61,14 @@ static inline uint8_t
 vy_stmt_persistent_flags(const struct tuple *stmt, bool is_primary)
 {
 	uint8_t mask = VY_STMT_FLAGS_ALL;
+
+	/*
+	 * This flag is only used by the write iterator to turn
+	 * in-memory REPLACEs into INSERTs on dump so no need to
+	 * persist it.
+	 */
+	mask &= ~VY_STMT_UPDATE;
+
 	if (!is_primary) {
 		/*
 		 * Do not store VY_STMT_DEFERRED_DELETE flag in
