@@ -213,7 +213,8 @@ tx_manager_destroy_read_view(struct tx_manager *xm,
 }
 
 static struct txv *
-txv_new(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
+txv_new(struct vy_tx *tx, struct vy_lsm *lsm,
+	struct tuple *stmt, uint64_t column_mask)
 {
 	struct tx_manager *xm = tx->xm;
 	struct txv *v = mempool_alloc(&xm->txv_mempool);
@@ -227,6 +228,7 @@ txv_new(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 	v->stmt = stmt;
 	tuple_ref(stmt);
 	v->region_stmt = NULL;
+	v->column_mask = column_mask;
 	v->tx = tx;
 	v->is_first_insert = false;
 	v->is_overwritten = false;
@@ -587,7 +589,8 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 	int rc = 0;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		struct txv *delete_txv = txv_new(tx, lsm, delete_stmt);
+		struct txv *delete_txv = txv_new(tx, lsm, delete_stmt,
+						 UINT64_MAX);
 		if (delete_txv == NULL) {
 			rc = -1;
 			break;
@@ -655,7 +658,7 @@ vy_tx_prepare(struct vy_tx *tx)
 		/* Skip statements which don't change this secondary key. */
 		if (lsm->index_id > 0 &&
 		    key_update_can_be_skipped(lsm->key_def->column_mask,
-					      vy_stmt_column_mask(v->stmt)))
+					      v->column_mask))
 			continue;
 
 		if (lsm->index_id > 0 && repsert == NULL && delete == NULL) {
@@ -955,7 +958,8 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 }
 
 int
-vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
+vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
+		       struct tuple *stmt, uint64_t column_mask)
 {
 	assert(vy_stmt_type(stmt) != 0);
 	/**
@@ -987,7 +991,7 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 	}
 
 	/* Allocate a MVCC container. */
-	struct txv *v = txv_new(tx, lsm, stmt);
+	struct txv *v = txv_new(tx, lsm, stmt, column_mask);
 	if (applied != NULL)
 		tuple_unref(applied);
 	if (v == NULL)
@@ -1005,15 +1009,12 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 	if (old == NULL && vy_stmt_type(stmt) == IPROTO_INSERT)
 		v->is_first_insert = true;
 
-	if (old != NULL && vy_stmt_type(stmt) != IPROTO_UPSERT) {
+	if (old != NULL) {
 		/*
 		 * Inherit the column mask of the overwritten statement
 		 * so as not to skip both statements on commit.
 		 */
-		uint64_t column_mask = vy_stmt_column_mask(stmt);
-		if (column_mask != UINT64_MAX)
-			vy_stmt_set_column_mask(stmt, column_mask |
-						vy_stmt_column_mask(old->stmt));
+		v->column_mask |= old->column_mask;
 	}
 
 	if (lsm->index_id > 0 && vy_stmt_type(stmt) == IPROTO_REPLACE &&
@@ -1038,10 +1039,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 		 * key bits in the column mask to ensure that no REPLACE
 		 * statement will be written for this secondary key.
 		 */
-		uint64_t column_mask = vy_stmt_column_mask(stmt);
-		if (column_mask != UINT64_MAX)
-			vy_stmt_set_column_mask(stmt, column_mask &
-						~lsm->cmp_def->column_mask);
+		if (v->column_mask != UINT64_MAX)
+			v->column_mask &= ~lsm->cmp_def->column_mask;
 	}
 
 	v->overwritten = old;
