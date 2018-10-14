@@ -1475,9 +1475,6 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 
 	if (!lsm->check_is_unique)
 		return 0;
-	if (key_update_can_be_skipped(lsm->key_def->column_mask,
-				      vy_stmt_column_mask(stmt)))
-		return 0;
 	if (lsm->key_def->is_nullable &&
 	    vy_tuple_key_contains_null(stmt, lsm->key_def))
 		return 0;
@@ -1517,17 +1514,22 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 /**
  * Check if insertion of a new tuple violates unique constraint
  * of any index of the space.
- * @param env        Vinyl environment.
- * @param tx         Current transaction.
- * @param space      Space to check.
- * @param stmt       New tuple.
+ * @param env          Vinyl environment.
+ * @param tx           Current transaction.
+ * @param space        Space to check.
+ * @param stmt         New tuple.
+ * @param column_mask  Mask of columns changed by the operation.
+ *                     Used to optimize out uniqueness check in
+ *                     secondary indexes when an inserted tuple
+ *                     is a result of an UPDATE operation.
  *
  * @retval  0 Success, unique constraint is satisfied.
  * @retval -1 Duplicate is found or read error occurred.
  */
 static int
 vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
-		   struct space *space, struct tuple *stmt)
+		   struct space *space, struct tuple *stmt,
+		   uint64_t column_mask)
 {
 	assert(space->index_count > 0);
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
@@ -1560,6 +1562,9 @@ vy_check_is_unique(struct vy_env *env, struct vy_tx *tx,
 	 */
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
+		if (key_update_can_be_skipped(lsm->key_def->column_mask,
+					      column_mask))
+			continue;
 		if (vy_check_is_unique_secondary(tx, rv, space_name(space),
 						 index_name_by_id(space, i),
 						 lsm, stmt) != 0)
@@ -1721,7 +1726,8 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	assert(stmt->old_tuple != NULL);
 	assert(stmt->new_tuple != NULL);
 
-	if (vy_check_is_unique(env, tx, space, stmt->new_tuple) != 0)
+	if (vy_check_is_unique(env, tx, space, stmt->new_tuple,
+			       column_mask) != 0)
 		return -1;
 
 	vy_stmt_set_flags(stmt->new_tuple, VY_STMT_UPDATE);
@@ -1853,7 +1859,7 @@ vy_insert_first_upsert(struct vy_env *env, struct vy_tx *tx,
 	assert(tx != NULL && tx->state == VINYL_TX_READY);
 	assert(space->index_count > 0);
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT);
-	if (vy_check_is_unique(env, tx, space, stmt) != 0)
+	if (vy_check_is_unique(env, tx, space, stmt, COLUMN_MASK_FULL) != 0)
 		return -1;
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
 	assert(pk->index_id == 0);
@@ -2121,7 +2127,8 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 					     request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
-	if (vy_check_is_unique(env, tx, space, stmt->new_tuple) != 0)
+	if (vy_check_is_unique(env, tx, space, stmt->new_tuple,
+			       COLUMN_MASK_FULL) != 0)
 		return -1;
 	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
 		return -1;
@@ -2173,7 +2180,8 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 					      request->tuple_end);
 	if (stmt->new_tuple == NULL)
 		return -1;
-	if (vy_check_is_unique(env, tx, space, stmt->new_tuple) != 0)
+	if (vy_check_is_unique(env, tx, space, stmt->new_tuple,
+			       COLUMN_MASK_FULL) != 0)
 		return -1;
 	/*
 	 * Get the overwritten tuple from the primary index if
