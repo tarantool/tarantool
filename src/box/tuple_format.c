@@ -140,7 +140,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 
 	assert(format->fields[0].offset_slot == TUPLE_OFFSET_SLOT_NIL);
 	size_t field_map_size = -current_slot * sizeof(uint32_t);
-	if (field_map_size + format->extra_size > UINT16_MAX) {
+	if (field_map_size > UINT16_MAX) {
 		/** tuple->data_offset is 16 bits */
 		diag_set(ClientError, ER_INDEX_FIELD_COUNT_LIMIT,
 			 -current_slot);
@@ -258,8 +258,7 @@ tuple_format_delete(struct tuple_format *format)
 
 struct tuple_format *
 tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
-		 uint16_t key_count, uint16_t extra_size,
-		 const struct field_def *space_fields,
+		 uint16_t key_count, const struct field_def *space_fields,
 		 uint32_t space_field_count, struct tuple_dictionary *dict)
 {
 	struct tuple_format *format =
@@ -268,7 +267,6 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 		return NULL;
 	format->vtab = *vtab;
 	format->engine = NULL;
-	format->extra_size = extra_size;
 	format->is_temporary = false;
 	if (tuple_format_register(format) < 0) {
 		tuple_format_destroy(format);

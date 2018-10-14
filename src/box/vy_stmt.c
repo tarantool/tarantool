@@ -127,8 +127,8 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 static struct tuple *
 vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 {
-	uint32_t meta_size = tuple_format_meta_size(format);
-	uint32_t total_size = sizeof(struct vy_stmt) + meta_size + bsize;
+	uint32_t total_size = sizeof(struct vy_stmt) + format->field_map_size +
+		bsize;
 	if (unlikely(total_size > vy_max_tuple_size)) {
 		diag_set(ClientError, ER_VINYL_MAX_TUPLE_SIZE,
 			 (unsigned) total_size);
@@ -141,13 +141,13 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 		return NULL;
 	}
 	say_debug("vy_stmt_alloc(format = %d %u, bsize = %zu) = %p",
-		format->id, tuple_format_meta_size(format), bsize, tuple);
+		format->id, format->field_map_size, bsize, tuple);
 	tuple->refs = 1;
 	tuple->format_id = tuple_format_id(format);
 	if (cord_is_main())
 		tuple_format_ref(format);
 	tuple->bsize = bsize;
-	tuple->data_offset = sizeof(struct vy_stmt) + meta_size;;
+	tuple->data_offset = sizeof(struct vy_stmt) + format->field_map_size;
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
 	vy_stmt_set_flags(tuple, 0);

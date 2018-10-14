@@ -603,7 +603,7 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 		keys[key_count++] = index_def->key_def;
 
 	struct tuple_format *format =
-		tuple_format_new(&vy_tuple_format_vtab, keys, key_count, 0,
+		tuple_format_new(&vy_tuple_format_vtab, keys, key_count,
 				 def->fields, def->field_count, def->dict);
 	if (format == NULL) {
 		free(space);
@@ -3007,7 +3007,7 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 	if (ctx->key_def == NULL)
 		goto out;
 	ctx->format = tuple_format_new(&vy_tuple_format_vtab, &ctx->key_def,
-				       1, 0, NULL, 0, NULL);
+				       1, NULL, 0, NULL);
 	if (ctx->format == NULL)
 		goto out_free_key_def;
 	tuple_format_ref(ctx->format);

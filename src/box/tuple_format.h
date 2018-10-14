@@ -130,12 +130,6 @@ struct tuple_format {
 	 */
 	bool is_temporary;
 	/**
-	 * The number of extra bytes to reserve in tuples before
-	 * field map.
-	 * \sa struct tuple
-	 */
-	uint16_t extra_size;
-	/**
 	 * Size of field map of tuple in bytes.
 	 * \sa struct tuple
 	 */
@@ -204,7 +198,6 @@ tuple_format_unref(struct tuple_format *format)
  * @param vtab Virtual function table for specific engines.
  * @param keys Array of key_defs of a space.
  * @param key_count The number of keys in @a keys array.
- * @param extra_size Extra bytes to reserve in tuples metadata.
  * @param space_fields Array of fields, defined in a space format.
  * @param space_field_count Length of @a space_fields.
  *
@@ -213,8 +206,7 @@ tuple_format_unref(struct tuple_format *format)
  */
 struct tuple_format *
 tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
-		 uint16_t key_count, uint16_t extra_size,
-		 const struct field_def *space_fields,
+		 uint16_t key_count, const struct field_def *space_fields,
 		 uint32_t space_field_count, struct tuple_dictionary *dict);
 
 /**
@@ -231,19 +223,6 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 bool
 tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 				       const struct tuple_format *format2);
-
-/**
- * Returns the total size of tuple metadata of this format.
- * See @link struct tuple @endlink for explanation of tuple layout.
- *
- * @param format Tuple Format.
- * @returns the total size of tuple metadata
- */
-static inline uint16_t
-tuple_format_meta_size(const struct tuple_format *format)
-{
-	return format->extra_size + format->field_map_size;
-}
 
 /**
  * Calculate minimal field count of tuples with specified keys and

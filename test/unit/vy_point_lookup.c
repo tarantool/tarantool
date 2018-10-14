@@ -84,7 +84,7 @@ test_basic()
 
 	vy_cache_create(&cache, &cache_env, key_def, true);
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-						       &key_def, 1, 0, NULL, 0,
+						       &key_def, 1, NULL, 0,
 						       NULL);
 	isnt(format, NULL, "tuple_format_new is not NULL");
 	tuple_format_ref(format);
