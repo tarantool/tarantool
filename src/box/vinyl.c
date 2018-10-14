@@ -1708,6 +1708,50 @@ vy_check_update(struct space *space, const struct vy_lsm *pk,
 }
 
 /**
+ * An UPDATE operation turns into a REPLACE statement in the
+ * primary index and into DELETE + INSERT in secondary indexes.
+ * This function performs an UPDATE operation in the given
+ * transaction write set after stmt->old_tuple and new_tuple
+ * have been initialized and checked.
+ */
+static int
+vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
+		  struct space *space, struct vy_lsm *pk, int64_t column_mask)
+{
+	assert(stmt->old_tuple != NULL);
+	assert(stmt->new_tuple != NULL);
+
+	if (vy_check_is_unique(env, tx, space, stmt->new_tuple) != 0)
+		return -1;
+	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
+		return -1;
+	if (space->index_count == 1)
+		return 0;
+
+	struct tuple *delete;
+	delete = vy_stmt_new_surrogate_delete(pk->mem_format_with_colmask,
+					      stmt->old_tuple);
+	if (delete == NULL)
+		return -1;
+	vy_stmt_set_column_mask(delete, column_mask);
+
+	for (uint32_t i = 1; i < space->index_count; ++i) {
+		struct vy_lsm *lsm = vy_lsm(space->index[i]);
+		if (vy_is_committed_one(env, lsm))
+			continue;
+		if (vy_tx_set(tx, lsm, delete) != 0)
+			goto error;
+		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
+			goto error;
+	}
+	tuple_unref(delete);
+	return 0;
+error:
+	tuple_unref(delete);
+	return -1;
+}
+
+/**
  * Execute UPDATE in a vinyl space.
  * @param env     Vinyl environment.
  * @param tx      Current transaction.
@@ -1767,15 +1811,14 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, new_tuple))
 		return -1;
 
-	struct tuple_format *mask_format = pk->mem_format_with_colmask;
 	if (space->index_count == 1) {
 		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
 						      new_tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 	} else {
-		stmt->new_tuple = vy_stmt_new_replace(mask_format, new_tuple,
-						      new_tuple_end);
+		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format_with_colmask,
+						      new_tuple, new_tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
@@ -1783,38 +1826,8 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
 			    column_mask) != 0)
 		return -1;
-	if (vy_check_is_unique(env, tx, space, stmt->new_tuple) != 0)
-		return -1;
 
-	/*
-	 * In the primary index the tuple can be replaced without
-	 * the old tuple deletion.
-	 */
-	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
-		return -1;
-	if (space->index_count == 1)
-		return 0;
-
-	struct tuple *delete = vy_stmt_new_surrogate_delete(mask_format,
-							    stmt->old_tuple);
-	if (delete == NULL)
-		return -1;
-	vy_stmt_set_column_mask(delete, column_mask);
-
-	for (uint32_t i = 1; i < space->index_count; ++i) {
-		lsm = vy_lsm(space->index[i]);
-		if (vy_is_committed_one(env, lsm))
-			continue;
-		if (vy_tx_set(tx, lsm, delete) != 0)
-			goto error;
-		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
-			goto error;
-	}
-	tuple_unref(delete);
-	return 0;
-error:
-	tuple_unref(delete);
-	return -1;
+	return vy_perform_update(env, tx, stmt, space, pk, column_mask);
 }
 
 /**
@@ -2046,15 +2059,14 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, new_tuple))
 		return -1;
 	new_tuple_end = new_tuple + new_size;
-	struct tuple_format *mask_format = pk->mem_format_with_colmask;
 	if (space->index_count == 1) {
 		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
 						      new_tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 	} else {
-		stmt->new_tuple = vy_stmt_new_replace(mask_format, new_tuple,
-						      new_tuple_end);
+		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format_with_colmask,
+						      new_tuple, new_tuple_end);
 		if (stmt->new_tuple == NULL)
 			return -1;
 		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
@@ -2068,34 +2080,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		 */
 		return 0;
 	}
-	if (vy_check_is_unique(env, tx, space, stmt->new_tuple) != 0)
-		return -1;
-	if (vy_tx_set(tx, pk, stmt->new_tuple))
-		return -1;
-	if (space->index_count == 1)
-		return 0;
-
-	/* Replace in secondary indexes works as delete insert. */
-	struct tuple *delete = vy_stmt_new_surrogate_delete(mask_format,
-							    stmt->old_tuple);
-	if (delete == NULL)
-		return -1;
-	vy_stmt_set_column_mask(delete, column_mask);
-
-	for (uint32_t i = 1; i < space->index_count; ++i) {
-		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (vy_is_committed_one(env, lsm))
-			continue;
-		if (vy_tx_set(tx, lsm, delete) != 0)
-			goto error;
-		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
-			goto error;
-	}
-	tuple_unref(delete);
-	return 0;
-error:
-	tuple_unref(delete);
-	return -1;
+	return vy_perform_update(env, tx, stmt, space, pk, column_mask);
 }
 
 /**
