@@ -219,39 +219,6 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 	*((uint8_t *)stmt - 1) = n;
 }
 
-/** Get the column mask of the specified tuple. */
-static inline uint64_t
-vy_stmt_column_mask(const struct tuple *tuple)
-{
-	enum iproto_type type = vy_stmt_type(tuple);
-	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
-	       type == IPROTO_DELETE);
-	(void) type;
-	if (tuple_format(tuple)->extra_size == sizeof(uint64_t)) {
-		/* Tuple has column mask */
-		const char *extra = tuple_extra(tuple);
-		return load_u64(extra);
-	}
-	return UINT64_MAX; /* return default value */
-}
-
-/**
- * Set the column mask in the tuple.
- * @param tuple       Tuple to set column mask.
- * @param column_mask Bitmask of the updated columns.
- */
-static inline void
-vy_stmt_set_column_mask(struct tuple *tuple, uint64_t column_mask)
-{
-	enum iproto_type type = vy_stmt_type(tuple);
-	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
-	       type == IPROTO_DELETE);
-	assert(tuple_format(tuple)->extra_size == sizeof(uint64_t));
-	(void) type;
-	char *extra = (char *) tuple_extra(tuple);
-	store_u64(extra, column_mask);
-}
-
 /**
  * Free the tuple of a vinyl space.
  * @pre tuple->refs  == 0
@@ -708,17 +675,6 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt);
  */
 const char *
 vy_stmt_str(const struct tuple *stmt);
-
-/**
- * Create a tuple format with column mask of an update operation.
- * @sa vy_index.column_mask, vy_can_skip_update().
- * @param mem_format A base tuple format.
- *
- * @retval not NULL Success.
- * @retval     NULL Memory or format register error.
- */
-struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *mem_format);
 
 /**
  * Check if a key of @a tuple contains NULL.

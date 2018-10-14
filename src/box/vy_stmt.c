@@ -748,15 +748,3 @@ vy_stmt_str(const struct tuple *stmt)
 		return "<failed to format statement>";
 	return buf;
 }
-
-struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *mem_format)
-{
-	struct tuple_format *format = tuple_format_dup(mem_format);
-	if (format == NULL)
-		return NULL;
-	/* + size of column mask. */
-	assert(format->extra_size == 0);
-	format->extra_size = sizeof(uint64_t);
-	return format;
-}

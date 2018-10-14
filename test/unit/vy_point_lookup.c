@@ -179,9 +179,8 @@ test_basic()
 
 	/* create second run */
 	struct vy_mem *run_mem =
-		vy_mem_new(pk->mem->env, *pk->env->p_generation,
-			   pk->cmp_def, pk->mem_format,
-			   pk->mem_format_with_colmask, 0);
+		vy_mem_new(pk->mem->env, pk->cmp_def, pk->mem_format,
+			   *pk->env->p_generation, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {
 		if (!in_run2[i])
@@ -211,10 +210,8 @@ test_basic()
 	vy_run_unref(run);
 
 	/* create first run */
-	run_mem =
-		vy_mem_new(pk->mem->env, *pk->env->p_generation,
-			   pk->cmp_def, pk->mem_format,
-			   pk->mem_format_with_colmask, 0);
+	run_mem = vy_mem_new(pk->mem->env, pk->cmp_def, pk->mem_format,
+			     *pk->env->p_generation, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {
 		if (!in_run1[i])

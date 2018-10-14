@@ -1138,8 +1138,6 @@ vinyl_space_swap_index(struct space *old_space, struct space *new_space,
 	SWAP(old_lsm, new_lsm);
 	SWAP(old_lsm->check_is_unique, new_lsm->check_is_unique);
 	SWAP(old_lsm->mem_format, new_lsm->mem_format);
-	SWAP(old_lsm->mem_format_with_colmask,
-	     new_lsm->mem_format_with_colmask);
 	SWAP(old_lsm->disk_format, new_lsm->disk_format);
 	SWAP(old_lsm->opts, new_lsm->opts);
 	key_def_swap(old_lsm->key_def, new_lsm->key_def);
@@ -1737,12 +1735,10 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (space->index_count == 1)
 		return 0;
 
-	struct tuple *delete;
-	delete = vy_stmt_new_surrogate_delete(pk->mem_format_with_colmask,
-					      stmt->old_tuple);
+	struct tuple *delete = vy_stmt_new_surrogate_delete(pk->mem_format,
+							    stmt->old_tuple);
 	if (delete == NULL)
 		return -1;
-	vy_stmt_set_column_mask(delete, column_mask);
 
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
@@ -1821,19 +1817,10 @@ vy_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 */
 	if (tuple_validate_raw(pk->mem_format, new_tuple))
 		return -1;
-
-	if (space->index_count == 1) {
-		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
-						      new_tuple_end);
-		if (stmt->new_tuple == NULL)
-			return -1;
-	} else {
-		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format_with_colmask,
-						      new_tuple, new_tuple_end);
-		if (stmt->new_tuple == NULL)
-			return -1;
-		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
-	}
+	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
+					      new_tuple_end);
+	if (stmt->new_tuple == NULL)
+		return -1;
 	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
 			    column_mask) != 0)
 		return -1;
@@ -2070,18 +2057,10 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (tuple_validate_raw(pk->mem_format, new_tuple))
 		return -1;
 	new_tuple_end = new_tuple + new_size;
-	if (space->index_count == 1) {
-		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
-						      new_tuple_end);
-		if (stmt->new_tuple == NULL)
-			return -1;
-	} else {
-		stmt->new_tuple = vy_stmt_new_replace(pk->mem_format_with_colmask,
-						      new_tuple, new_tuple_end);
-		if (stmt->new_tuple == NULL)
-			return -1;
-		vy_stmt_set_column_mask(stmt->new_tuple, column_mask);
-	}
+	stmt->new_tuple = vy_stmt_new_replace(pk->mem_format, new_tuple,
+					      new_tuple_end);
+	if (stmt->new_tuple == NULL)
+		return -1;
 	if (vy_check_update(space, pk, stmt->old_tuple, stmt->new_tuple,
 			    column_mask) != 0) {
 		diag_log();

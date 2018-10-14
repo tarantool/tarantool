@@ -205,14 +205,8 @@ create_test_mem(struct key_def *def)
 				 0, NULL, 0, NULL);
 	fail_if(format == NULL);
 
-	/* Create format with column mask */
-	struct tuple_format *format_with_colmask =
-		vy_tuple_format_new_with_colmask(format);
-	assert(format_with_colmask != NULL);
-
 	/* Create mem */
-	struct vy_mem *mem = vy_mem_new(&mem_env, 1, def, format,
-					format_with_colmask, 0);
+	struct vy_mem *mem = vy_mem_new(&mem_env, def, format, 1, 0);
 	fail_if(mem == NULL);
 	return mem;
 }

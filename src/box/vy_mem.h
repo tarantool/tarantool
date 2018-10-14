@@ -194,12 +194,12 @@ struct vy_mem {
 	 */
 	int64_t generation;
 	/**
-	 * Format of vy_mem REPLACE and DELETE tuples without
-	 * column mask.
+	 * Format of statements stored in this in-memory index.
+	 * Note, the statements don't reference the format by
+	 * themselves, instead it is referenced once by vy_mem.
+	 * This allows us to drop vy_mem in O(1).
 	 */
 	struct tuple_format *format;
-	/** Format of vy_mem tuples with column mask. */
-	struct tuple_format *format_with_colmask;
 	/**
 	 * Number of active writers to this index.
 	 *
@@ -254,19 +254,16 @@ vy_mem_wait_pinned(struct vy_mem *mem)
  * Instantiate a new in-memory level.
  *
  * @param env Vinyl memory environment.
- * @param generation Generation of statements stored in the tree.
  * @param key_def key definition.
  * @param format Format for REPLACE and DELETE tuples.
- * @param format_with_colmask Format for tuples, which have
- *        column mask.
+ * @param generation Generation of statements stored in the tree.
  * @param space_cache_version Data dictionary cache version
  * @retval new vy_mem instance on success.
  * @retval NULL on error, check diag.
  */
 struct vy_mem *
-vy_mem_new(struct vy_mem_env *env, int64_t generation,
-	   struct key_def *cmp_def, struct tuple_format *format,
-	   struct tuple_format *format_with_colmask,
+vy_mem_new(struct vy_mem_env *env, struct key_def *cmp_def,
+	   struct tuple_format *format, int64_t generation,
 	   uint32_t space_cache_version);
 
 /**
