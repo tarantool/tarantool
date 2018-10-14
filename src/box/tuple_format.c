@@ -324,28 +324,6 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 	return true;
 }
 
-struct tuple_format *
-tuple_format_dup(struct tuple_format *src)
-{
-	uint32_t total = sizeof(struct tuple_format) +
-			 src->field_count * sizeof(struct tuple_field);
-	struct tuple_format *format = (struct tuple_format *) malloc(total);
-	if (format == NULL) {
-		diag_set(OutOfMemory, total, "malloc", "tuple format");
-		return NULL;
-	}
-	memcpy(format, src, total);
-	tuple_dictionary_ref(format->dict);
-	format->id = FORMAT_ID_NIL;
-	format->refs = 0;
-	if (tuple_format_register(format) != 0) {
-		tuple_format_destroy(format);
-		free(format);
-		return NULL;
-	}
-	return format;
-}
-
 /** @sa declaration for details. */
 int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,

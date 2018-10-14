@@ -233,16 +233,6 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 				       const struct tuple_format *format2);
 
 /**
- * Register the duplicate of the specified format.
- * @param src Original format.
- *
- * @retval not NULL Success.
- * @retval     NULL Memory or format register error.
- */
-struct tuple_format *
-tuple_format_dup(struct tuple_format *src);
-
-/**
  * Returns the total size of tuple metadata of this format.
  * See @link struct tuple @endlink for explanation of tuple layout.
  *
