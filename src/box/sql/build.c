@@ -1858,9 +1858,10 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 		trigger = trigger->next;
 	}
 	/*
-	 * Remove any entries of the _sequence and _space_sequence
-	 * space associated with the table being dropped. This is
-	 * done before the table is dropped from internal schema.
+	 * Remove any entries from the _sequence_data, _sequence
+	 * and _space_sequence spaces associated with the table
+	 * being dropped. This is done before the table is dropped
+	 * from internal schema.
 	 */
 	int idx_rec_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
@@ -1868,6 +1869,15 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
 	sqlite3VdbeAddOp1(v, OP_CheckViewReferences, space_id_reg);
 	if (space->sequence != NULL) {
+		/* Delete entry from _sequence_data. */
+		int sequence_id_reg = ++parse_context->nMem;
+		sqlite3VdbeAddOp2(v, OP_Integer, space->sequence->def->id,
+				  sequence_id_reg);
+		sqlite3VdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
+				  idx_rec_reg);
+		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_DATA_ID,
+				  idx_rec_reg);
+		VdbeComment((v, "Delete entry from _sequence_data"));
 		/* Delete entry from _space_sequence. */
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1,
 				  idx_rec_reg);
@@ -1875,9 +1885,6 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 				  idx_rec_reg);
 		VdbeComment((v, "Delete entry from _space_sequence"));
 		/* Delete entry by id from _sequence. */
-		int sequence_id_reg = ++parse_context->nMem;
-		sqlite3VdbeAddOp2(v, OP_Integer, space->sequence->def->id,
-				  sequence_id_reg);
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
 				  idx_rec_reg);
 		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_ID, idx_rec_reg);
