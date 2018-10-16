@@ -309,11 +309,14 @@ applier_join(struct applier *applier)
 	 * Receive initial data.
 	 */
 	assert(applier->join_stream != NULL);
+	uint64_t row_count = 0;
 	while (true) {
 		coio_read_xrow(coio, ibuf, &row);
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			xstream_write_xc(applier->join_stream, &row);
+			if (++row_count % 100000 == 0)
+				say_info("%.1fM rows received", row_count / 1e6);
 		} else if (row.type == IPROTO_OK) {
 			if (applier->version_id < version_id(1, 7, 0)) {
 				/*
@@ -354,6 +357,8 @@ applier_join(struct applier *applier)
 		if (iproto_type_is_dml(row.type)) {
 			vclock_follow_xrow(&replicaset.vclock, &row);
 			xstream_write_xc(applier->subscribe_stream, &row);
+			if (++row_count % 100000 == 0)
+				say_info("%.1fM rows received", row_count / 1e6);
 		} else if (row.type == IPROTO_OK) {
 			/*
 			 * Current vclock. This is not used now,
