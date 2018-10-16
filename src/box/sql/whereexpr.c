@@ -1164,7 +1164,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		Expr *pNewExpr2;
 		int idxNew1;
 		int idxNew2;
-		const char *zCollSeqName;
 		const u16 wtFlags = TERM_LIKEOPT | TERM_VIRTUAL | TERM_DYNAMIC;
 
 		pLeft = pExpr->x.pList->a[1].pExpr;
@@ -1204,24 +1203,24 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			}
 			*pC = c + 1;
 		}
-		/* Support only for unicode_ci indexes by now */
-		zCollSeqName = noCase ? "unicode_ci" : "BINARY";
 		pNewExpr1 = sqlite3ExprDup(db, pLeft, 0);
-		pNewExpr1 = sqlite3PExpr(pParse, TK_GE,
-					 sqlite3ExprAddCollateString(pParse,
-								     pNewExpr1,
-								     zCollSeqName),
-					 pStr1);
+		if (noCase) {
+			pNewExpr1 =
+				sqlite3ExprAddCollateString(pParse, pNewExpr1,
+							    "unicode_ci");
+		}
+		pNewExpr1 = sqlite3PExpr(pParse, TK_GE, pNewExpr1, pStr1);
 		transferJoinMarkings(pNewExpr1, pExpr);
 		idxNew1 = whereClauseInsert(pWC, pNewExpr1, wtFlags);
 		testcase(idxNew1 == 0);
 		exprAnalyze(pSrc, pWC, idxNew1);
 		pNewExpr2 = sqlite3ExprDup(db, pLeft, 0);
-		pNewExpr2 = sqlite3PExpr(pParse, TK_LT,
-					 sqlite3ExprAddCollateString(pParse,
-								     pNewExpr2,
-								     zCollSeqName),
-					 pStr2);
+		if (noCase) {
+			pNewExpr2 =
+				sqlite3ExprAddCollateString(pParse, pNewExpr2,
+							    "unicode_ci");
+		}
+		pNewExpr2 = sqlite3PExpr(pParse, TK_LT, pNewExpr2, pStr2);
 		transferJoinMarkings(pNewExpr2, pExpr);
 		idxNew2 = whereClauseInsert(pWC, pNewExpr2, wtFlags);
 		testcase(idxNew2 == 0);

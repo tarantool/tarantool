@@ -2238,10 +2238,6 @@ sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 				order_by->a[i].pExpr =
 					sqlite3ExprAddCollateString(parse, term,
 								    name);
-			} else {
-				order_by->a[i].pExpr =
-					sqlite3ExprAddCollateString(parse, term,
-								    "BINARY");
 			}
 		}
 		part->coll_id = id;

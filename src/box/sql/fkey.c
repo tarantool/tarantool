@@ -313,8 +313,6 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 			pExpr->iTable = regBase + iCol + 1;
 			char affinity = pTab->def->fields[iCol].affinity;
 			pExpr->affinity = affinity;
-			pExpr = sqlite3ExprAddCollateString(pParse, pExpr,
-							    "binary");
 		} else {
 			pExpr->iTable = regBase;
 			pExpr->affinity = AFFINITY_INTEGER;
