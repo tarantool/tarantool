@@ -43,6 +43,89 @@ static const struct tuple_field tuple_field_default = {
 	ON_CONFLICT_ACTION_NONE, NULL, COLL_NONE,
 };
 
+static int
+tuple_format_use_key_part(struct tuple_format *format,
+			  const struct field_def *fields, uint32_t field_count,
+			  const struct key_part *part, bool is_sequential,
+			  int *current_slot)
+{
+	assert(part->fieldno < format->field_count);
+	struct tuple_field *field = &format->fields[part->fieldno];
+	/*
+		* If a field is not present in the space format,
+		* inherit nullable action of the first key part
+		* referencing it.
+		*/
+	if (part->fieldno >= field_count && !field->is_key_part)
+		field->nullable_action = part->nullable_action;
+	/*
+	 * Field and part nullable actions may differ only
+	 * if one of them is DEFAULT, in which case we use
+	 * the non-default action *except* the case when
+	 * the other one is NONE, in which case we assume
+	 * DEFAULT. The latter is needed so that in case
+	 * index definition and space format have different
+	 * is_nullable flag, we will use the strictest option,
+	 * i.e. DEFAULT.
+	 */
+	if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
+		if (part->nullable_action != ON_CONFLICT_ACTION_NONE)
+			field->nullable_action = part->nullable_action;
+	} else if (part->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
+		if (field->nullable_action == ON_CONFLICT_ACTION_NONE)
+			field->nullable_action = part->nullable_action;
+	} else if (field->nullable_action != part->nullable_action) {
+		diag_set(ClientError, ER_ACTION_MISMATCH,
+				part->fieldno + TUPLE_INDEX_BASE,
+				on_conflict_action_strs[field->nullable_action],
+				on_conflict_action_strs[part->nullable_action]);
+		return -1;
+	}
+
+	/**
+	 * Check that there are no conflicts between index part
+	 * types and space fields. If a part type is compatible
+	 * with field's one, then the part type is more strict
+	 * and the part type must be used in tuple_format.
+	 */
+	if (field_type1_contains_type2(field->type,
+					part->type)) {
+		field->type = part->type;
+	} else if (!field_type1_contains_type2(part->type,
+					       field->type)) {
+		const char *name;
+		int fieldno = part->fieldno + TUPLE_INDEX_BASE;
+		if (part->fieldno >= field_count) {
+			name = tt_sprintf("%d", fieldno);
+		} else {
+			const struct field_def *def =
+				&fields[part->fieldno];
+			name = tt_sprintf("'%s'", def->name);
+		}
+		int errcode;
+		if (!field->is_key_part)
+			errcode = ER_FORMAT_MISMATCH_INDEX_PART;
+		else
+			errcode = ER_INDEX_PART_TYPE_MISMATCH;
+		diag_set(ClientError, errcode, name,
+			 field_type_strs[field->type],
+			 field_type_strs[part->type]);
+		return -1;
+	}
+	field->is_key_part = true;
+	/*
+	 * In the tuple, store only offsets necessary to access
+	 * fields of non-sequential keys. First field is always
+	 * simply accessible, so we don't store an offset for it.
+	 */
+	if (field->offset_slot == TUPLE_OFFSET_SLOT_NIL &&
+	    is_sequential == false && part->fieldno > 0) {
+		*current_slot = *current_slot - 1;
+		field->offset_slot = *current_slot;
+	}
+	return 0;
+}
+
 /**
  * Extract all available type info from keys and field
  * definitions.
@@ -93,83 +176,11 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		const struct key_part *parts_end = part + key_def->part_count;
 
 		for (; part < parts_end; part++) {
-			assert(part->fieldno < format->field_count);
-			struct tuple_field *field = &format->fields[part->fieldno];
-			/*
-			 * If a field is not present in the space format,
-			 * inherit nullable action of the first key part
-			 * referencing it.
-			 */
-			if (part->fieldno >= field_count && !field->is_key_part)
-				field->nullable_action = part->nullable_action;
-			/*
-			 * Field and part nullable actions may differ only
-			 * if one of them is DEFAULT, in which case we use
-			 * the non-default action *except* the case when
-			 * the other one is NONE, in which case we assume
-			 * DEFAULT. The latter is needed so that in case
-			 * index definition and space format have different
-			 * is_nullable flag, we will use the strictest option,
-			 * i.e. DEFAULT.
-			 */
-			if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
-				if (part->nullable_action != ON_CONFLICT_ACTION_NONE)
-					field->nullable_action = part->nullable_action;
-			} else if (part->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
-				if (field->nullable_action == ON_CONFLICT_ACTION_NONE)
-					field->nullable_action = part->nullable_action;
-			} else if (field->nullable_action != part->nullable_action) {
-				diag_set(ClientError, ER_ACTION_MISMATCH,
-					 part->fieldno + TUPLE_INDEX_BASE,
-					 on_conflict_action_strs[field->nullable_action],
-					 on_conflict_action_strs[part->nullable_action]);
+			if (tuple_format_use_key_part(format, fields,
+						      field_count, part,
+						      is_sequential,
+						      &current_slot) != 0)
 				return -1;
-			}
-
-			/*
-			 * Check that there are no conflicts
-			 * between index part types and space
-			 * fields. If a part type is compatible
-			 * with field's one, then the part type is
-			 * more strict and the part type must be
-			 * used in tuple_format.
-			 */
-			if (field_type1_contains_type2(field->type,
-						       part->type)) {
-				field->type = part->type;
-			} else if (! field_type1_contains_type2(part->type,
-								field->type)) {
-				const char *name;
-				int fieldno = part->fieldno + TUPLE_INDEX_BASE;
-				if (part->fieldno >= field_count) {
-					name = tt_sprintf("%d", fieldno);
-				} else {
-					const struct field_def *def =
-						&fields[part->fieldno];
-					name = tt_sprintf("'%s'", def->name);
-				}
-				int errcode;
-				if (! field->is_key_part)
-					errcode = ER_FORMAT_MISMATCH_INDEX_PART;
-				else
-					errcode = ER_INDEX_PART_TYPE_MISMATCH;
-				diag_set(ClientError, errcode, name,
-					 field_type_strs[field->type],
-					 field_type_strs[part->type]);
-				return -1;
-			}
-			field->is_key_part = true;
-			/*
-			 * In the tuple, store only offsets necessary
-			 * to access fields of non-sequential keys.
-			 * First field is always simply accessible,
-			 * so we don't store an offset for it.
-			 */
-			if (field->offset_slot == TUPLE_OFFSET_SLOT_NIL &&
-			    is_sequential == false && part->fieldno > 0) {
-
-				field->offset_slot = --current_slot;
-			}
 		}
 	}
 
