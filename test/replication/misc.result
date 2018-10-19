@@ -146,15 +146,24 @@ test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
+function wait_follow(replicaA, replicaB)
+    return test_run:wait_cond(function()
+        return replicaA.status ~= 'follow' or replicaB.status ~= 'follow'
+    end, 0.01)
+end ;
+---
+...
 function test_timeout()
+    local replicaA = box.info.replication[1].upstream or box.info.replication[2].upstream
+    local replicaB = box.info.replication[3].upstream or box.info.replication[2].upstream
+    local follows = test_run:wait_cond(function()
+        return replicaA.status == 'follow' or replicaB.status == 'follow'
+    end, 0.1)
+    if not follows then error('replicas not in follow status') end
     for i = 0, 99 do 
         box.space.test_timeout:replace({1})
-        fiber.sleep(0.005)
-        local rinfo = box.info.replication
-        if rinfo[1].upstream and rinfo[1].upstream.status ~= 'follow' or
-           rinfo[2].upstream and rinfo[2].upstream.status ~= 'follow' or
-           rinfo[3].upstream and rinfo[3].upstream.status ~= 'follow' then
-            return error('Replication broken')
+        if wait_follow(replicaA, replicaB) then
+            return error(box.info.replication)
         end
     end
     return true
