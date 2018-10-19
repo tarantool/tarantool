@@ -66,14 +66,14 @@ deploy:
   # Deploy packages to PackageCloud
   - provider: packagecloud
     username: "tarantool"
-    repository: "master"
+    repository: "2.1"
     token: "${PACKAGECLOUD_TOKEN}"
     dist: "${OS}/${DIST}"
     package_glob: build/*.{rpm,deb,dsc}
     skip_cleanup: true
     on:
       repo: tarantool/tarantool
-      branch: "master"
+      branch: "2.1"
       condition: -n "${OS}" && -n "${DIST}" && -n "${PACKAGECLOUD_TOKEN}"
   # Deploy source tarballs to S3
   - provider: script
@@ -81,7 +81,7 @@ deploy:
     skip_cleanup: true
     on:
       repo: tarantool/tarantool
-      branch: "master"
+      branch: "2.1"
       condition: "x${TARGET} = xsource"
 
 notifications:
