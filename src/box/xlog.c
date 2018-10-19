@@ -971,8 +971,10 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	if (xlog_create(xlog, filename, dir->open_wflags, &meta) != 0)
 		return -1;
 
-	/* set sync interval from xdir settings */
+	/* Inherit xdir settings. */
+	xlog->sync_is_async = dir->sync_is_async;
 	xlog->sync_interval = dir->sync_interval;
+
 	/* free file cache if dir should be synced */
 	xlog->free_cache = dir->sync_interval != 0 ? true: false;
 	xlog->rate_limit = 0;
