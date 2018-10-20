@@ -198,6 +198,7 @@ const char *vy_run_info_key_strs[VY_RUN_INFO_KEY_MAX] = {
 	"page count",
 	"bloom filter legacy",
 	"bloom filter",
+	"stmt stat",
 };
 
 const char *vy_row_index_key_strs[VY_ROW_INDEX_KEY_MAX] = {

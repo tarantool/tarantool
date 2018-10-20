@@ -397,6 +397,12 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 
 	info_table_begin(h, "disk");
 	vy_info_append_disk_stmt_counter(h, NULL, &stat->disk.count);
+	info_table_begin(h, "statement");
+	info_append_int(h, "inserts", stat->disk.stmt.inserts);
+	info_append_int(h, "replaces", stat->disk.stmt.replaces);
+	info_append_int(h, "deletes", stat->disk.stmt.deletes);
+	info_append_int(h, "upserts", stat->disk.stmt.upserts);
+	info_table_end(h); /* statement */
 	info_table_begin(h, "iterator");
 	info_append_int(h, "lookup", stat->disk.iterator.lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->disk.iterator.get);

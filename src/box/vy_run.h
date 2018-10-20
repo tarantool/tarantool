@@ -87,6 +87,8 @@ struct vy_run_info {
 	uint32_t page_count;
 	/** Bloom filter of all tuples in run */
 	struct tuple_bloom *bloom;
+	/** Statement statistics. */
+	struct vy_stmt_stat stmt_stat;
 };
 
 /**
