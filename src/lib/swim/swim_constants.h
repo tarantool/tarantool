@@ -37,6 +37,11 @@
 enum swim_member_status {
 	/** The instance is ok, responds to requests. */
 	MEMBER_ALIVE = 0,
+	/**
+	 * The member is considered dead. It will disappear from
+	 * the membership after some unacknowledged pings.
+	 */
+	MEMBER_DEAD,
 	swim_member_status_MAX,
 };
 

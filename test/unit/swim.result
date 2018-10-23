@@ -1,5 +1,5 @@
 	*** main_f ***
-1..5
+1..11
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -60,4 +60,49 @@ ok 4 - subtests
     ok 13 - back in fullmesh after a member removal in the middle of a step
 ok 5 - subtests
 	*** swim_test_add_remove: done ***
+	*** swim_test_basic_failure_detection ***
+    1..7
+    ok 1 - node is added as alive
+    ok 2 - member still is not dead after 2 noacks
+    ok 3 - but it is dead after one more
+    ok 4 - after 1 more unack the member still is not deleted
+    ok 5 - but it is dropped after 1 more
+    ok 6 - fullmesh is restored
+    ok 7 - a member is added back on an ACK
+ok 6 - subtests
+	*** swim_test_basic_failure_detection: done ***
+	*** swim_test_probe ***
+    1..2
+    ok 1 - send probe
+    ok 2 - receive ACK on probe and get fullmesh
+ok 7 - subtests
+	*** swim_test_probe: done ***
+	*** swim_test_refute ***
+    1..4
+    ok 1 - S2 increments its own incarnation to refute its death
+    ok 2 - new incarnation has reached S1 with a next round message
+    ok 3 - after restart S2's incarnation is 0 again
+    ok 4 - S2 learned its old bigger incarnation 1 from S0
+ok 8 - subtests
+	*** swim_test_refute: done ***
+	*** swim_test_basic_gossip ***
+    1..4
+    ok 1 - S1 still thinks that S2 is alive
+    ok 2 - but one more second, and a third ack timed out - S1 sees S2 as dead
+    ok 3 - S3 still thinks that S2 is alive
+    ok 4 - S3 learns about dead S2 from S1
+ok 9 - subtests
+	*** swim_test_basic_gossip: done ***
+	*** swim_test_too_big_packet ***
+    1..2
+    ok 1 - despite S1 can not send all the 50 members in a one packet, fullmesh is eventually reached
+    ok 2 - S26 drops all the packets - it should become dead
+ok 10 - subtests
+	*** swim_test_too_big_packet: done ***
+	*** swim_test_undead ***
+    1..2
+    ok 1 - member S2 is dead
+    ok 2 - but it is never deleted due to the cfg option
+ok 11 - subtests
+	*** swim_test_undead: done ***
 	*** main_f: done ***

@@ -208,6 +208,13 @@ struct swim_task {
 	const char *desc;
 };
 
+/** Check if @a task is already scheduled. */
+static inline bool
+swim_task_is_scheduled(struct swim_task *task)
+{
+	return ! rlist_empty(&task->in_queue_output);
+}
+
 /**
  * Put the task into a queue of tasks. Eventually it will be sent.
  */
@@ -219,6 +226,15 @@ swim_task_send(struct swim_task *task, const struct sockaddr_in *dst,
 void
 swim_task_create(struct swim_task *task, swim_task_f complete,
 		 swim_task_f cancel, const char *desc);
+
+/** Allocate and create a new task. */
+struct swim_task *
+swim_task_new(swim_task_f complete, swim_task_f cancel, const char *desc);
+
+/** Callback to delete a task after its completion. */
+void
+swim_task_delete_cb(struct swim_task *task, struct swim_scheduler *scheduler,
+		    int rc);
 
 /** Destroy the task, pop from the queue. */
 static inline void

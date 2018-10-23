@@ -62,11 +62,31 @@ swim_cluster_new(int size)
 		assert(res->node[i] != NULL);
 		sprintf(uri, "127.0.0.1:%d", i + 1);
 		uuid.time_low = i + 1;
-		int rc = swim_cfg(res->node[i], uri, -1, &uuid);
+		int rc = swim_cfg(res->node[i], uri, -1, -1, -1, &uuid);
 		assert(rc == 0);
 		(void) rc;
 	}
 	return res;
+}
+
+#define swim_cluster_set_cfg(cluster, ...) ({				\
+	for (int i = 0; i < cluster->size; ++i) {			\
+		int rc = swim_cfg(cluster->node[i], __VA_ARGS__);	\
+		assert(rc == 0);					\
+		(void) rc;						\
+	}								\
+})
+
+void
+swim_cluster_set_ack_timeout(struct swim_cluster *cluster, double ack_timeout)
+{
+	swim_cluster_set_cfg(cluster, NULL, -1, ack_timeout, -1, NULL);
+}
+
+void
+swim_cluster_set_gc(struct swim_cluster *cluster, enum swim_gc_mode gc_mode)
+{
+	swim_cluster_set_cfg(cluster, NULL, -1, -1, gc_mode, NULL);
 }
 
 void
@@ -107,11 +127,41 @@ swim_cluster_member_status(struct swim_cluster *cluster, int node_id,
 	return swim_member_status(m);
 }
 
+uint64_t
+swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
+				int member_id)
+{
+	const struct swim_member *m =
+		swim_cluster_member_view(cluster, node_id, member_id);
+	if (m == NULL)
+		return UINT64_MAX;
+	return swim_member_incarnation(m);
+}
+
 struct swim *
 swim_cluster_node(struct swim_cluster *cluster, int i)
 {
 	assert(i >= 0 && i < cluster->size);
 	return cluster->node[i];
+}
+
+void
+swim_cluster_restart_node(struct swim_cluster *cluster, int i)
+{
+	assert(i >= 0 && i < cluster->size);
+	struct swim *s = cluster->node[i];
+	const struct swim_member *self = swim_self(s);
+	struct tt_uuid uuid = *swim_member_uuid(self);
+	char uri[128];
+	strcpy(uri, swim_member_uri(self));
+	double ack_timeout = swim_ack_timeout(s);
+	swim_delete(s);
+	s = swim_new();
+	assert(s != NULL);
+	int rc = swim_cfg(s, uri, -1, ack_timeout, -1, &uuid);
+	assert(rc == 0);
+	(void) rc;
+	cluster->node[i] = s;
 }
 
 void
@@ -124,6 +174,12 @@ void
 swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
 {
 	swim_test_transport_unblock_fd(swim_fd(cluster->node[i]));
+}
+
+void
+swim_cluster_set_drop(struct swim_cluster *cluster, int i, bool value)
+{
+	swim_test_transport_set_drop(swim_fd(cluster->node[i]), value);
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */
@@ -217,6 +273,114 @@ void
 swim_run_for(double duration)
 {
 	swim_wait_timeout(duration, NULL, swim_loop_check_false, NULL);
+}
+
+/**
+ * A helper structure to carry some parameters into a callback
+ * which checks a condition after each SWIM loop iteration. It
+ * describes one member and what to check for that member.
+ */
+struct swim_member_template {
+	/**
+	 * In SWIM a member is a relative concept. The same member
+	 * can look differently on various SWIM instances. This
+	 * attribute specifies from which view the member should
+	 * be looked at.
+	 */
+	int node_id;
+	/** Ordinal number of the SWIM member in the cluster. */
+	int member_id;
+	/**
+	 * True, if the status should be checked to be equal to @a
+	 * status.
+	 */
+	bool need_check_status;
+	enum swim_member_status status;
+	/**
+	 * True, if the incarnation should be checked to be equal
+	 * to @a incarnation.
+	 */
+	bool need_check_incarnation;
+	uint64_t incarnation;
+};
+
+/** Build member template. No checks are set. */
+static inline void
+swim_member_template_create(struct swim_member_template *t, int node_id,
+			    int member_id)
+{
+	memset(t, 0, sizeof(*t));
+	t->node_id = node_id;
+	t->member_id = member_id;
+}
+
+/**
+ * Set that the member template should be used to check member
+ * status.
+ */
+static inline void
+swim_member_template_set_status(struct swim_member_template *t,
+				enum swim_member_status status)
+{
+	t->need_check_status = true;
+	t->status = status;
+}
+
+/**
+ * Set that the member template should be used to check member
+ * incarnation.
+ */
+static inline void
+swim_member_template_set_incarnation(struct swim_member_template *t,
+				     uint64_t incarnation)
+{
+	t->need_check_incarnation = true;
+	t->incarnation = incarnation;
+}
+
+/** Callback to check that a member matches a template. */
+static bool
+swim_loop_check_member(struct swim_cluster *cluster, void *data)
+{
+	struct swim_member_template *t = (struct swim_member_template *) data;
+	const struct swim_member *m =
+		swim_cluster_member_view(cluster, t->node_id, t->member_id);
+	enum swim_member_status status;
+	uint64_t incarnation;
+	if (m != NULL) {
+		status = swim_member_status(m);
+		incarnation = swim_member_incarnation(m);
+	} else {
+		status = swim_member_status_MAX;
+		incarnation = 0;
+	}
+	if (t->need_check_status && status != t->status)
+		return false;
+	if (t->need_check_incarnation && incarnation != t->incarnation)
+		return false;
+	return true;
+}
+
+int
+swim_cluster_wait_status(struct swim_cluster *cluster, int node_id,
+			 int member_id, enum swim_member_status status,
+			 double timeout)
+{
+	struct swim_member_template t;
+	swim_member_template_create(&t, node_id, member_id);
+	swim_member_template_set_status(&t, status);
+	return swim_wait_timeout(timeout, cluster, swim_loop_check_member, &t);
+}
+
+int
+swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
+			      int member_id, uint64_t incarnation,
+			      double timeout)
+{
+	struct swim_member_template t;
+	swim_member_template_create(&t, node_id, member_id);
+	swim_member_template_set_incarnation(&t, incarnation);
+	return swim_wait_timeout(timeout, cluster, swim_loop_check_member, &t);
 }
 
 bool

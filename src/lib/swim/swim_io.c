@@ -67,11 +67,32 @@ swim_task_create(struct swim_task *task, swim_task_f complete,
 	rlist_create(&task->in_queue_output);
 }
 
+struct swim_task *
+swim_task_new(swim_task_f complete, swim_task_f cancel, const char *desc)
+{
+	struct swim_task *task = (struct swim_task *) malloc(sizeof(*task));
+	if (task == NULL) {
+		diag_set(OutOfMemory, sizeof(*task), "malloc", "task");
+		return NULL;
+	}
+	swim_task_create(task, complete, cancel, desc);
+	return task;
+}
+
+void
+swim_task_delete_cb(struct swim_task *task, struct swim_scheduler *scheduler,
+		    int rc)
+{
+	(void) rc;
+	(void) scheduler;
+	free(task);
+}
+
 /** Put the task into the queue of output tasks. */
 static inline void
 swim_task_schedule(struct swim_task *task, struct swim_scheduler *scheduler)
 {
-	assert(rlist_empty(&task->in_queue_output));
+	assert(! swim_task_is_scheduled(task));
 	rlist_add_tail_entry(&scheduler->queue_output, task, in_queue_output);
 	swim_ev_io_start(loop(), &scheduler->output);
 }

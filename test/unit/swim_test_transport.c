@@ -96,7 +96,11 @@ struct swim_fd {
 	 * blocked, new messages are queued, but not delivered.
 	 */
 	bool is_opened;
-
+	/**
+	 * True if any message sent to that fd should be just
+	 * dropped, not queued.
+	 */
+	bool is_dropping;
 	/**
 	 * Link in the list of opened and non-blocked descriptors.
 	 * Used to feed them all EV_WRITE.
@@ -126,6 +130,7 @@ swim_fd_open(struct swim_fd *fd)
 		return -1;
 	}
 	fd->is_opened = true;
+	fd->is_dropping = false;
 	rlist_add_tail_entry(&swim_fd_active, fd, in_active);
 	return 0;
 }
@@ -151,6 +156,7 @@ swim_test_transport_init(void)
 	for (int i = 0, evfd = FAKE_FD_BASE; i < FAKE_FD_NUMBER; ++i, ++evfd) {
 		swim_fd[i].evfd = evfd;
 		swim_fd[i].is_opened = false;
+		swim_fd[i].is_dropping = false;
 		rlist_create(&swim_fd[i].in_active);
 		rlist_create(&swim_fd[i].recv_queue);
 		rlist_create(&swim_fd[i].send_queue);
@@ -261,6 +267,14 @@ swim_test_transport_unblock_fd(int fd)
 		rlist_add_tail_entry(&swim_fd_active, sfd, in_active);
 }
 
+void
+swim_test_transport_set_drop(int fd, bool value)
+{
+	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
+	if (sfd->is_opened)
+		sfd->is_dropping = value;
+}
+
 /** Send one packet to destination's recv queue. */
 static inline void
 swim_fd_send_packet(struct swim_fd *fd)
@@ -271,7 +285,7 @@ swim_fd_send_packet(struct swim_fd *fd)
 		rlist_shift_entry(&fd->send_queue, struct swim_test_packet,
 				  in_queue);
 	struct swim_fd *dst = &swim_fd[ntohs(p->dst.sin_port)];
-	if (dst->is_opened)
+	if (dst->is_opened && ! dst->is_dropping && ! fd->is_dropping)
 		rlist_add_tail_entry(&dst->recv_queue, p, in_queue);
 	else
 		swim_test_packet_delete(p);

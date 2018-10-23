@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include <stdint.h>
 #include "swim_constants.h"
 
 #if defined(__cplusplus)
@@ -42,6 +43,23 @@ struct swim;
 struct tt_uuid;
 struct swim_iterator;
 struct swim_member;
+
+/** Types of SWIM dead member deletion policy. */
+enum swim_gc_mode {
+	/** Just keep the current mode as is. */
+	SWIM_GC_DEFAULT = -1,
+	/**
+	 * Turn GC off. With that mode dead members are never
+	 * deleted automatically.
+	 */
+	SWIM_GC_OFF = 0,
+	/**
+	 * Turn GC on. Normal classical SWIM GC mode. Dead members
+	 * are deleted automatically after a number of
+	 * unacknowledged pings.
+	 */
+	SWIM_GC_ON = 1,
+};
 
 /**
  * Create a new SWIM instance. Do not bind to a port or set any
@@ -64,6 +82,13 @@ swim_is_configured(const struct swim *swim);
  *        @heartbeat_rate seconds. It is rather the protocol
  *        speed. Protocol period depends on member count and
  *        @heartbeat_rate.
+ * @param ack_timeout Time in seconds after which a ping is
+ *        considered to be unacknowledged.
+ * @param gc_mode Says if members should never be deleted due to
+ *        too many unacknowledged pings. It could be useful, if
+ *        SWIM is used mainly for monitoring of existing nodes
+ *        with manual removal of dead ones, and probably with only
+ *        a single initial discovery.
  * @param uuid UUID of this instance. Must be unique over the
  *        cluster.
  *
@@ -72,7 +97,12 @@ swim_is_configured(const struct swim *swim);
  */
 int
 swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
+	 double ack_timeout, enum swim_gc_mode gc_mode,
 	 const struct tt_uuid *uuid);
+
+/** SWIM's ACK timeout, previously set via @sa swim_cfg. */
+double
+swim_ack_timeout(const struct swim *swim);
 
 /**
  * Stop listening and broadcasting messages, cleanup all internal
@@ -96,6 +126,15 @@ swim_add_member(struct swim *swim, const char *uri, const struct tt_uuid *uuid);
 /** Silently remove a member from member table. */
 int
 swim_remove_member(struct swim *swim, const struct tt_uuid *uuid);
+
+/**
+ * Send a ping to this address. If an ACK is received, the member
+ * will be added. The main purpose of the method is to add a new
+ * member manually but without knowledge of its UUID. The member
+ * will send it with an ACK.
+ */
+int
+swim_probe_member(struct swim *swim, const char *uri);
 
 /** Dump member statuses into @a info. */
 void
@@ -146,6 +185,10 @@ swim_member_uri(const struct swim_member *member);
 /** Member's UUID. */
 const struct tt_uuid *
 swim_member_uuid(const struct swim_member *member);
+
+/** Member's incarnation. */
+uint64_t
+swim_member_incarnation(const struct swim_member *member);
 
 #if defined(__cplusplus)
 }

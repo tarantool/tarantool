@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
 struct ev_loop;
 
 /**
@@ -57,6 +58,14 @@ swim_test_transport_block_fd(int fd);
 /** Unblock a file descriptor. */
 void
 swim_test_transport_unblock_fd(int fd);
+
+/**
+ * Set to true, if all incomming and outgoing packets should be
+ * dropped. Note, that the node, owning @a fd, thinks, that its
+ * packets are sent.
+ */
+void
+swim_test_transport_set_drop(int fd, bool value);
 
 /** Initialize test transport system. */
 void
