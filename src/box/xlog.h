@@ -179,11 +179,22 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 		     enum log_suffix suffix);
 
 /**
+ * Flags passed to xdir_collect_garbage().
+ */
+enum {
+	/**
+	 * Delete files in coio threads so as not to block
+	 * the caller thread.
+	 */
+	XDIR_GC_USE_COIO = 1 << 0,
+};
+
+/**
  * Remove files whose signature is less than specified.
- * If @use_coio is set, files are deleted by coio threads.
+ * For possible values of @flags see XDIR_GC_*.
  */
 int
-xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio);
+xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
 
 /**
  * Remove inprogress files in the specified directory.

@@ -532,7 +532,7 @@ static int
 wal_collect_garbage_f(struct cbus_call_msg *data)
 {
 	int64_t lsn = ((struct wal_gc_msg *)data)->lsn;
-	xdir_collect_garbage(&wal_writer_singleton.wal_dir, lsn, false);
+	xdir_collect_garbage(&wal_writer_singleton.wal_dir, lsn, 0);
 	return 0;
 }
 

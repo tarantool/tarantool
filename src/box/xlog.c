@@ -653,7 +653,7 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 }
 
 int
-xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio)
+xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 {
 	struct vclock *vclock;
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
@@ -661,7 +661,7 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio)
 		char *filename = xdir_format_filename(dir, vclock_sum(vclock),
 						      NONE);
 		int rc;
-		if (use_coio)
+		if (flags & XDIR_GC_USE_COIO)
 			rc = coio_unlink(filename);
 		else
 			rc = unlink(filename);
