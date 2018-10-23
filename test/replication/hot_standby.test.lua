@@ -80,8 +80,18 @@ a = (require 'net.box').connect(REPLICA.host, REPLICA.service)
 a:call('_set_pri_lsn', {box.info.id, box.info.lsn})
 a:close()
 
+test_run:cmd("switch hot_standby")
+test_run:wait_lsn("hot_standby", "default")
+_set_pri_lsn(box.info.id, box.info.lsn)
+_print_lsn()
+
+test_run:cmd("switch default")
 _insert(1, 10)
 _select(1, 10)
+
+-- Check box.info.vclock is updated during hot standby.
+test_run:cmd("switch hot_standby")
+_wait_lsn(10)
 
 test_run:cmd("switch replica")
 _wait_lsn(10)
