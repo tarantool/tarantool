@@ -182,6 +182,7 @@ set (server_sources
      lua/crypto.c
      lua/httpc.c
      lua/utf8.c
+     lua/info.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c

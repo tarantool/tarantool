@@ -3,9 +3,9 @@
 #include "lua/msgpack.h"
 
 #include "box/sql/sqliteInt.h"
-#include "box/info.h"
+#include <info.h>
+#include "lua/info.h"
 #include "lua/utils.h"
-#include "info.h"
 
 static void
 lua_push_column_names(struct lua_State *L, struct sqlite3_stmt *stmt)

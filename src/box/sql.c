@@ -36,7 +36,7 @@
 #include "sql/vdbeInt.h"
 
 #include "index.h"
-#include "info.h"
+#include <info.h>
 #include "schema.h"
 #include "box.h"
 #include "txn.h"

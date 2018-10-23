@@ -30,10 +30,10 @@
  */
 #include "box/lua/index.h"
 #include "lua/utils.h"
+#include "lua/info.h"
+#include <info.h>
 #include "box/box.h"
 #include "box/index.h"
-#include "box/info.h"
-#include "box/lua/info.h"
 #include "box/lua/tuple.h"
 #include "box/lua/misc.h" /* lbox_encode_tuple_on_gc() */
 

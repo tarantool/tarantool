@@ -28,11 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
-#include "box/lua/info.h"
+#include "lua/info.h"
 
 #include <ctype.h> /* tolower() */
 
@@ -45,7 +41,7 @@
 #include "box/iproto.h"
 #include "box/wal.h"
 #include "box/replication.h"
-#include "box/info.h"
+#include <info.h>
 #include "box/gc.h"
 #include "box/engine.h"
 #include "box/vinyl.h"
@@ -446,80 +442,6 @@ lbox_info_gc(struct lua_State *L)
 
 	lua_setmetatable(L, -2);
 	return 1;
-}
-
-static void
-luaT_info_begin(struct info_handler *info)
-{
-	lua_State *L = (lua_State *) info->ctx;
-	lua_newtable(L);
-}
-
-static void
-luaT_info_end(struct info_handler *info)
-{
-	(void) info;
-}
-
-static void
-luaT_info_begin_table(struct info_handler *info, const char *key)
-{
-	lua_State *L = (lua_State *) info->ctx;
-	lua_pushstring(L, key);
-	lua_newtable(L);
-}
-
-static void
-luaT_info_end_table(struct info_handler *info)
-{
-	lua_State *L = (lua_State *) info->ctx;
-	lua_settable(L, -3);
-}
-
-static void
-luaT_info_append_double(struct info_handler *info,
-			const char *key, double value)
-{
-	lua_State *L = (lua_State *) info->ctx;
-	lua_pushstring(L, key);
-	lua_pushnumber(L, value);
-	lua_settable(L, -3);
-}
-
-static void
-luaT_info_append_int(struct info_handler *info, const char *key,
-		     int64_t value)
-{
-	lua_State *L = (lua_State *) info->ctx;
-	lua_pushstring(L, key);
-	luaL_pushint64(L, value);
-	lua_settable(L, -3);
-}
-
-static void
-luaT_info_append_str(struct info_handler *info, const char *key,
-		     const char *value)
-{
-	lua_State *L = (lua_State *) info->ctx;
-	lua_pushstring(L, key);
-	lua_pushstring(L, value);
-	lua_settable(L, -3);
-}
-
-void
-luaT_info_handler_create(struct info_handler *h, struct lua_State *L)
-{
-	static struct info_handler_vtab lua_vtab = {
-		.begin = luaT_info_begin,
-		.end = luaT_info_end,
-		.begin_table = luaT_info_begin_table,
-		.end_table = luaT_info_end_table,
-		.append_int = luaT_info_append_int,
-		.append_str = luaT_info_append_str,
-		.append_double = luaT_info_append_double
-	};
-	h->vtab = &lua_vtab;
-	h->ctx = L;
 }
 
 static int

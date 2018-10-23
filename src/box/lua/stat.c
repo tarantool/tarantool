@@ -42,8 +42,8 @@
 #include "box/iproto.h"
 #include "box/engine.h"
 #include "box/vinyl.h"
-#include "box/info.h"
-#include "box/lua/info.h"
+#include <info.h>
+#include "lua/info.h"
 #include "lua/utils.h"
 
 extern struct rmean *rmean_box;
