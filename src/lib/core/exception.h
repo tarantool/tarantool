@@ -50,6 +50,7 @@ extern const struct type_info type_LuajitError;
 extern const struct type_info type_IllegalParams;
 extern const struct type_info type_SystemError;
 extern const struct type_info type_CollationError;
+extern const struct type_info type_SwimError;
 
 const char *
 exception_get_string(struct error *e, const struct method_info *method);
@@ -156,6 +157,12 @@ class CollationError: public Exception {
 public:
 	CollationError(const char *file, unsigned line, const char *format,
 		       ...);
+	virtual void raise() { throw this; }
+};
+
+class SwimError: public Exception {
+public:
+	SwimError(const char *file, unsigned line, const char *format, ...);
 	virtual void raise() { throw this; }
 };
 

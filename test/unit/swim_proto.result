@@ -1,0 +1,31 @@
+	*** main ***
+1..2
+	*** swim_test_member_def ***
+    1..12
+    ok 1 - not map header
+    ok 2 - not uint member key
+    ok 3 - too big member key
+    ok 4 - STATUS is not uint
+    ok 5 - invalid STATUS
+    ok 6 - invalid address
+    ok 7 - bad port
+    ok 8 - unexpected buffer end
+    ok 9 - unexpected buffer end
+    ok 10 - uuid is nil/undefined
+    ok 11 - port is 0/undefined
+    ok 12 - normal member def
+ok 1 - subtests
+	*** swim_test_member_def: done ***
+	*** swim_test_meta ***
+    1..8
+    ok 1 - not map header
+    ok 2 - not uint meta key
+    ok 3 - unknown meta key
+    ok 4 - unexpected end
+    ok 5 - invalid version
+    ok 6 - port is 0/undefined
+    ok 7 - version is 0/undefined
+    ok 8 - normal meta
+ok 2 - subtests
+	*** swim_test_meta: done ***
+	*** main: done ***

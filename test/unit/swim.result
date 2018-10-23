@@ -1,0 +1,57 @@
+	*** main_f ***
+1..5
+	*** swim_test_one_link ***
+    1..1
+    ok 1 - one link
+ok 1 - subtests
+	*** swim_test_one_link: done ***
+	*** swim_test_sequence ***
+    1..1
+    ok 1 - sequence
+ok 2 - subtests
+	*** swim_test_sequence: done ***
+	*** swim_test_uuid_update ***
+    1..4
+    ok 1 - UUID update
+    ok 2 - old UUID is returned back as a 'ghost' member
+    ok 3 - can not update to an existing UUID - swim_cfg fails
+    ok 4 - diag says 'exists'
+ok 3 - subtests
+	*** swim_test_uuid_update: done ***
+	*** swim_test_cfg ***
+    1..15
+    ok 1 - first cfg failed - no URI
+    ok 2 - diag says 'mandatory'
+    ok 3 - first cfg failed - no UUID
+    ok 4 - diag says 'mandatory'
+    ok 5 - configured first time
+    ok 6 - second time can omit URI, UUID
+    ok 7 - hearbeat is dynamic
+    ok 8 - can not use invalid URI
+    ok 9 - diag says 'invalid uri'
+    ok 10 - can not use domain names
+    ok 11 - diag says 'invalid uri'
+    ok 12 - UNIX sockets are not supported
+    ok 13 - diag says 'only IP'
+    ok 14 - can not bind to an occupied port
+    ok 15 - diag says 'bind'
+ok 4 - subtests
+	*** swim_test_cfg: done ***
+	*** swim_test_add_remove ***
+    1..13
+    ok 1 - can not add an existing member
+    ok 2 - diag says 'already exists'
+    ok 3 - can not add a invalid uri
+    ok 4 - diag says 'invalid uri'
+    ok 5 - can not remove self
+    ok 6 - diag says the same
+    ok 7 - find by UUID works
+    ok 8 - now remove one element
+    ok 9 - and it can not be found anymore
+    ok 10 - remove of a not existing member
+    ok 11 - after removal the cluster is not in fullmesh
+    ok 12 - but it is back in 1 step
+    ok 13 - back in fullmesh after a member removal in the middle of a step
+ok 5 - subtests
+	*** swim_test_add_remove: done ***
+	*** main_f: done ***

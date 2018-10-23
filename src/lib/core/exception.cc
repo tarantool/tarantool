@@ -269,6 +269,17 @@ CollationError::CollationError(const char *file, unsigned line,
 	va_end(ap);
 }
 
+const struct type_info type_SwimError = make_type("SwimError", &type_Exception);
+
+SwimError::SwimError(const char *file, unsigned line, const char *format, ...)
+	: Exception(&type_SwimError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\
@@ -341,6 +352,18 @@ BuildCollationError(const char *file, unsigned line, const char *format, ...)
 {
 	BuildAlloc(CollationError);
 	CollationError *e =  new (p) CollationError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildSwimError(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(SwimError);
+	SwimError *e =  new (p) SwimError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);

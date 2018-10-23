@@ -162,7 +162,8 @@ endif()
 
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
-target_link_libraries(server core coll http_parser bit uri uuid)
+target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
+                      swim_ev)
 
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
