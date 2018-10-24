@@ -24,7 +24,7 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
-- 2
+- 1
 ...
 box.stat.ERROR.total
 ---
@@ -59,7 +59,7 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
-- 5
+- 4
 ...
 -- check exceptions
 space:get('Impossible value')
@@ -118,7 +118,7 @@ box.stat.REPLACE.total
 ...
 box.stat.SELECT.total
 ---
-- 2
+- 1
 ...
 box.stat.ERROR.total
 ---

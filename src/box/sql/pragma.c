@@ -257,11 +257,9 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 {
 	if (tbl_name == NULL)
 		return;
-	uint32_t space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
-	if (space_id == BOX_ID_NIL)
+	struct space *space = space_by_name(tbl_name);
+	if (space == NULL)
 		return;
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
 	struct index *pk = space_index(space, 0);
 	parse->nMem = 6;
 	if (space->def->opts.is_view)
@@ -336,14 +334,12 @@ sql_pragma_index_info(struct Parse *parse, const PragmaName *pragma,
 {
 	if (idx_name == NULL || tbl_name == NULL)
 		return;
-	uint32_t space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
-	if (space_id == BOX_ID_NIL)
+	struct space *space = space_by_name(tbl_name);
+	if (space == NULL)
 		return;
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
 	if (space->def->opts.sql == NULL)
 		return;
-	uint32_t iid = box_index_id_by_name(space_id, idx_name,
+	uint32_t iid = box_index_id_by_name(space->def->id, idx_name,
 					     strlen(idx_name));
 	if (iid == BOX_ID_NIL)
 		return;
@@ -390,11 +386,9 @@ sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
 {
 	if (tbl_name == NULL)
 		return;
-	uint32_t space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
-	if (space_id == BOX_ID_NIL)
+	struct space *space = space_by_name(tbl_name);
+	if (space == NULL)
 		return;
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
 	parse->nMem = 5;
 	struct Vdbe *v = sqlite3GetVdbe(parse);
 	for (uint32_t i = 0; i < space->index_count; ++i) {
@@ -516,15 +510,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 
 	case PragTyp_COLLATION_LIST:{
 		int i = 0;
-		uint32_t space_id;
-		space_id = box_space_id_by_name("_collation",
-						(uint32_t) strlen("_collation"));
+		struct space *space = space_by_name("_collation");
 		char key_buf[16]; /* 16 is enough to encode 0 len array */
 		char *key_end = key_buf;
 		key_end = mp_encode_array(key_end, 0);
 		box_tuple_t *tuple;
 		box_iterator_t* iter;
-		iter = box_index_iterator(space_id, 0,ITER_ALL, key_buf, key_end);
+		iter = box_index_iterator(space->def->id, 0,ITER_ALL, key_buf, key_end);
 		int rc = box_iterator_next(iter, &tuple);
 		(void) rc;
 		assert(rc == 0);
@@ -544,11 +536,9 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	case PragTyp_FOREIGN_KEY_LIST:{
 		if (zRight == NULL)
 			break;
-		uint32_t space_id = box_space_id_by_name(zRight,
-							 strlen(zRight));
-		if (space_id == BOX_ID_NIL)
+		struct space *space = space_by_name(zRight);
+		if (space == NULL)
 			break;
-		struct space *space = space_by_id(space_id);
 		int i = 0;
 		pParse->nMem = 8;
 		struct fkey *fkey;

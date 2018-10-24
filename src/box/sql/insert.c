@@ -1197,13 +1197,10 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 * we have to check the semantics.
 	 */
 	pItem = pSelect->pSrc->a;
-	uint32_t src_id = box_space_id_by_name(pItem->zName,
-					       strlen(pItem->zName));
+	struct space *src = space_by_name(pItem->zName);
 	/* FROM clause does not contain a real table. */
-	if (src_id == BOX_ID_NIL)
+	if (src == NULL)
 		return 0;
-	struct space *src = space_by_id(src_id);
-	assert(src != NULL);
 	/* Src and dest may not be the same table. */
 	if (src->def->id == dest->def->id)
 		return 0;

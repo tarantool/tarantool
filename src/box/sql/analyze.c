@@ -1114,10 +1114,8 @@ sqlite3Analyze(Parse * pParse, Token * pName)
 		/* Form 2:  Analyze table named */
 		char *z = sqlite3NameFromToken(db, pName);
 		if (z != NULL) {
-			uint32_t space_id = box_space_id_by_name(z, strlen(z));
-			if (space_id != BOX_ID_NIL) {
-				struct space *sp = space_by_id(space_id);
-				assert(sp != NULL);
+			struct space *sp = space_by_name(z);
+			if (sp != NULL) {
 				if (sp->def->opts.is_view) {
 					sqlite3ErrorMsg(pParse, "VIEW isn't "\
 							"allowed to be "\
@@ -1224,13 +1222,12 @@ analysis_loader(void *data, int argc, char **argv, char **unused)
 	struct analysis_index_info *info = (struct analysis_index_info *) data;
 	assert(info->stats != NULL);
 	struct index_stat *stat = &info->stats[info->index_count++];
-	uint32_t space_id = box_space_id_by_name(argv[0], strlen(argv[0]));
-	if (space_id == BOX_ID_NIL)
+	struct space *space = space_by_name(argv[0]);
+	if (space == NULL)
 		return -1;
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
 	struct index *index;
-	uint32_t iid = box_index_id_by_name(space_id, argv[1], strlen(argv[1]));
+	uint32_t iid = box_index_id_by_name(space->def->id, argv[1],
+					    strlen(argv[1]));
 	/*
 	 * Convention is if index's name matches with space's
 	 * one, then it is primary index.
@@ -1395,13 +1392,10 @@ load_stat_from_space(struct sqlite3 *db, const char *sql_select_prepare,
 		if (index_name == NULL)
 			continue;
 		uint32_t sample_count = sqlite3_column_int(stmt, 2);
-		uint32_t space_id = box_space_id_by_name(space_name,
-							 strlen(space_name));
-		assert(space_id != BOX_ID_NIL);
-		struct space *space = space_by_id(space_id);
+		struct space *space = space_by_name(space_name);
 		assert(space != NULL);
 		struct index *index;
-		uint32_t iid = box_index_id_by_name(space_id, index_name,
+		uint32_t iid = box_index_id_by_name(space->def->id, index_name,
 						    strlen(index_name));
 		if (sqlite3_stricmp(space_name, index_name) == 0 &&
 		    iid == BOX_ID_NIL)
@@ -1466,13 +1460,10 @@ load_stat_from_space(struct sqlite3 *db, const char *sql_select_prepare,
 		const char *index_name = (char *)sqlite3_column_text(stmt, 1);
 		if (index_name == NULL)
 			continue;
-		uint32_t space_id = box_space_id_by_name(space_name,
-							 strlen(space_name));
-		assert(space_id != BOX_ID_NIL);
-		struct space *space = space_by_id(space_id);
+		struct space *space = space_by_name(space_name);
 		assert(space != NULL);
 		struct index *index;
-		uint32_t iid = box_index_id_by_name(space_id, index_name,
+		uint32_t iid = box_index_id_by_name(space->def->id, index_name,
 						    strlen(index_name));
 		if (iid != BOX_ID_NIL) {
 			index = space_index(space, iid);
@@ -1550,14 +1541,10 @@ load_stat_to_index(struct sqlite3 *db, const char *sql_select_load,
 		const char *index_name = (char *)sqlite3_column_text(stmt, 1);
 		if (index_name == NULL)
 			continue;
-		uint32_t space_id = box_space_id_by_name(space_name,
-							 strlen(space_name));
-		if (space_id == BOX_ID_NIL)
-			return -1;
-		struct space *space = space_by_id(space_id);
+		struct space *space = space_by_name(space_name);
 		assert(space != NULL);
 		struct index *index;
-		uint32_t iid = box_index_id_by_name(space_id, index_name,
+		uint32_t iid = box_index_id_by_name(space->def->id, index_name,
 						    strlen(index_name));
 		if (iid != BOX_ID_NIL) {
 			index = space_index(space, iid);

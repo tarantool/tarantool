@@ -329,8 +329,8 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	if (sqlite3CheckIdentifierName(pParse, zName) != SQLITE_OK)
 		goto cleanup;
 
-	uint32_t space_id = box_space_id_by_name(zName, strlen(zName));
-	if (space_id != BOX_ID_NIL) {
+	struct space *space = space_by_name(zName);
+	if (space != NULL) {
 		if (!noErr) {
 			sqlite3ErrorMsg(pParse, "table %s already exists",
 					zName);
@@ -1863,9 +1863,8 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	assert(parse_context->nErr == 0);
 	assert(table_name_list->nSrc == 1);
 	const char *space_name = table_name_list->a[0].zName;
-	uint32_t space_id = box_space_id_by_name(space_name,
-						 strlen(space_name));
-	if (space_id == BOX_ID_NIL) {
+	struct space *space = space_by_name(space_name);
+	if (space == NULL) {
 		if (!is_view && !if_exists)
 			sqlite3ErrorMsg(parse_context, "no such table: %s",
 					space_name);
@@ -1874,8 +1873,6 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 					space_name);
 		goto exit_drop_table;
 	}
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
 	/*
 	 * Ensure DROP TABLE is not used on a view,
 	 * and DROP VIEW is not used on a table.
@@ -1990,17 +1987,13 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	}
 	assert(!is_alter || (child != NULL && child->nSrc == 1));
 	struct space *child_space = NULL;
-	uint32_t child_id = 0;
 	if (is_alter) {
 		const char *child_name = child->a[0].zName;
-		child_id = box_space_id_by_name(child_name,
-						strlen(child_name));
-		if (child_id == BOX_ID_NIL) {
+		child_space = space_by_name(child_name);
+		if (child_space == NULL) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, child_name);
 			goto tnt_error;
 		}
-		child_space = space_by_id(child_id);
-		assert(child_space != NULL);
 	} else {
 		struct fkey_parse *fk = region_alloc(&parse_context->region,
 						     sizeof(*fk));
@@ -2016,8 +2009,6 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	parent_name = sqlite3NameFromToken(db, parent);
 	if (parent_name == NULL)
 		goto exit_create_fk;
-	uint32_t parent_id = box_space_id_by_name(parent_name,
-						  strlen(parent_name));
 	/*
 	 * Within ALTER TABLE ADD CONSTRAINT FK also can be
 	 * self-referenced, but in this case parent (which is
@@ -2025,9 +2016,8 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	 */
 	is_self_referenced = !is_alter &&
 			     strcmp(parent_name, new_tab->def->name) == 0;
-	struct space *parent_space;
-	if (parent_id == BOX_ID_NIL) {
-		parent_space = NULL;
+	struct space *parent_space = space_by_name(parent_name);
+	if (parent_space == NULL) {
 		if (is_self_referenced) {
 			struct fkey_parse *fk =
 				rlist_first_entry(&parse_context->new_fkey,
@@ -2039,8 +2029,6 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 			goto tnt_error;
 		}
 	} else {
-		parent_space = space_by_id(parent_id);
-		assert(parent_space != NULL);
 		if (parent_space->def->opts.is_view) {
 			sqlite3ErrorMsg(parse_context,
 					"referenced table can't be view");
@@ -2092,8 +2080,8 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		goto tnt_error;
 	}
 	fk->field_count = child_cols_count;
-	fk->child_id = child_id;
-	fk->parent_id = parent_id;
+	fk->child_id = child_space != NULL ? child_space->def->id : 0;
+	fk->parent_id = parent_space != NULL ? parent_space->def->id : 0;
 	fk->is_deferred = is_deferred;
 	fk->match = (enum fkey_match) ((actions >> 16) & 0xff);
 	fk->on_update = (enum fkey_action) ((actions >> 8) & 0xff);
@@ -2184,9 +2172,8 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 {
 	assert(table != NULL && table->nSrc == 1);
 	const char *table_name = table->a[0].zName;
-	uint32_t child_id = box_space_id_by_name(table_name,
-						 strlen(table_name));
-	if (child_id == BOX_ID_NIL) {
+	struct space *child = space_by_name(table_name);
+	if (child == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
 		parse_context->rc = SQL_TARANTOOL_ERROR;
 		parse_context->nErr++;
@@ -2195,7 +2182,8 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 	char *constraint_name = sqlite3NameFromToken(parse_context->db,
 						     constraint);
 	if (constraint_name != NULL)
-		vdbe_emit_fkey_drop(parse_context, constraint_name, child_id);
+		vdbe_emit_fkey_drop(parse_context, constraint_name,
+				    child->def->id);
 }
 
 /*
@@ -2415,8 +2403,8 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	if (tbl_name != NULL) {
 		assert(token != NULL && token->z != NULL);
 		const char *name = tbl_name->a[0].zName;
-		uint32_t space_id = box_space_id_by_name(name, strlen(name));
-		if (space_id == BOX_ID_NIL) {
+		space = space_by_name(name);
+		if (space == NULL) {
 			if (! if_not_exist) {
 				diag_set(ClientError, ER_NO_SUCH_SPACE, name);
 				parse->rc = SQL_TARANTOOL_ERROR;
@@ -2424,8 +2412,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			}
 			goto exit_create_index;
 		}
-		space = space_by_id(space_id);
-		assert(space != NULL);
 		def = space->def;
 	} else {
 		if (parse->pNewTable == NULL)
@@ -2738,16 +2724,15 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	sqlite3VdbeCountChanges(v);
 	assert(index_name_list->nSrc == 1);
 	assert(table_token->n > 0);
-	uint32_t space_id = box_space_id_by_name(table_name,
-						 strlen(table_name));
-	if (space_id == BOX_ID_NIL) {
+	struct space *space = space_by_name(table_name);
+	if (space == NULL) {
 		if (!if_exists)
 			sqlite3ErrorMsg(parse_context, "no such space: %s",
 					table_name);
 		goto exit_drop_index;
 	}
 	const char *index_name = index_name_list->a[0].zName;
-	uint32_t index_id = box_index_id_by_name(space_id, index_name,
+	uint32_t index_id = box_index_id_by_name(space->def->id, index_name,
 						 strlen(index_name));
 	if (index_id == BOX_ID_NIL) {
 		if (!if_exists)
@@ -2755,8 +2740,6 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 					table_name, index_name);
 		goto exit_drop_index;
 	}
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
 	struct index *index = space_index(space, index_id);
 	assert(index != NULL);
 	/*
@@ -2779,7 +2762,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	sql_clear_stat_spaces(parse_context, table_name, index->def->name);
 	int record_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
-	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
+	sqlite3VdbeAddOp2(v, OP_Integer, space->def->id, space_id_reg);
 	sqlite3VdbeAddOp2(v, OP_Integer, index_id, space_id_reg + 1);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2, record_reg);
 	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, record_reg);

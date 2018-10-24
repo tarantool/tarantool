@@ -47,19 +47,16 @@ sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
 	if (new_name == NULL)
 		goto exit_rename_table;
 	/* Check that new name isn't occupied by another table. */
-	uint32_t space_id = box_space_id_by_name(new_name, strlen(new_name));
-	if (space_id != BOX_ID_NIL) {
+	if (space_by_name(new_name) != NULL) {
 		diag_set(ClientError, ER_SPACE_EXISTS, new_name);
 		goto tnt_error;
 	}
 	const char *tbl_name = src_tab->a[0].zName;
-	space_id = box_space_id_by_name(tbl_name, strlen(tbl_name));
-	if (space_id == BOX_ID_NIL) {
+	struct space *space = space_by_name(tbl_name);
+	if (space == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, tbl_name);
 		goto tnt_error;
 	}
-	struct space *space = space_by_id(space_id);
-	assert(space != NULL);
 	if (space->def->opts.is_view) {
 		diag_set(ClientError, ER_ALTER_SPACE, tbl_name,
 			 "view may not be altered");
@@ -68,7 +65,7 @@ sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
 	sql_set_multi_write(parse, false);
 	/* Drop and reload the internal table schema. */
 	struct Vdbe *v = sqlite3GetVdbe(parse);
-	sqlite3VdbeAddOp4(v, OP_RenameTable, space_id, 0, 0, new_name,
+	sqlite3VdbeAddOp4(v, OP_RenameTable, space->def->id, 0, 0, new_name,
 			  P4_DYNAMIC);
 exit_rename_table:
 	sqlite3SrcListDelete(db, src_tab);
