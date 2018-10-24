@@ -42,7 +42,7 @@ print len(rows) == 1 and rows[0].return_message.find('Write access') >= 0 and \
 def check_join(msg):
     ok = True
     for resp in server.iproto.py_con.join(replica_uuid):
-        if resp.completion_status != 0:
+        if resp._return_code != 0:
             print 'not ok', '-', msg, resp.return_message
             ok = False
 

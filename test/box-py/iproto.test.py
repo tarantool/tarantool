@@ -158,20 +158,22 @@ admin("index = space:create_index('primary', { type = 'hash', parts = {1, 'strin
 
 class RawInsert(Request):
     request_type = REQUEST_TYPE_INSERT
+
     def __init__(self, conn, space_no, blob):
         super(RawInsert, self).__init__(conn)
         request_body = "\x82" + msgpack.dumps(IPROTO_SPACE_ID) + \
             msgpack.dumps(space_id) + msgpack.dumps(IPROTO_TUPLE) + blob
-        self._bytes = self.header(len(request_body)) + request_body
+        self._body = request_body
 
 class RawSelect(Request):
     request_type = REQUEST_TYPE_SELECT
+
     def __init__(self, conn, space_no, blob):
         super(RawSelect, self).__init__(conn)
         request_body = "\x83" + msgpack.dumps(IPROTO_SPACE_ID) + \
             msgpack.dumps(space_id) + msgpack.dumps(IPROTO_KEY) + blob + \
             msgpack.dumps(IPROTO_LIMIT) + msgpack.dumps(100);
-        self._bytes = self.header(len(request_body)) + request_body
+        self._body = request_body
 
 c = iproto.py_con
 space = c.space('test')
