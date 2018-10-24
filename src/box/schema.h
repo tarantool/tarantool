@@ -58,6 +58,14 @@ extern struct latch schema_lock;
 struct space *
 space_by_id(uint32_t id);
 
+/**
+ * Try to look up a space by space name in the space name cache.
+ *
+ * @return NULL if space not found, otherwise space object.
+ */
+struct space *
+space_by_name(const char *name);
+
 uint32_t
 box_schema_version();
 
