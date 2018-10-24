@@ -66,6 +66,7 @@ journal_entry_new(size_t n_rows)
 		diag_set(OutOfMemory, size, "region", "struct journal_entry");
 		return NULL;
 	}
+	entry->approx_len = 0;
 	entry->n_rows = n_rows;
 	entry->res = -1;
 	entry->fiber = fiber();

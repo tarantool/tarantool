@@ -44,6 +44,17 @@
 #include "coio_task.h"
 #include "replication.h"
 
+enum {
+	/**
+	 * Size of disk space to preallocate with xlog_fallocate().
+	 * Obviously, we want to call this function as infrequent as
+	 * possible to avoid the overhead associated with a system
+	 * call, however at the same time we do not want to call it
+	 * to allocate too big chunks, because this may increase tx
+	 * latency. 1 MB seems to be a well balanced choice.
+	 */
+	WAL_FALLOCATE_LEN = 1024 * 1024,
+};
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
@@ -126,6 +137,8 @@ struct wal_writer
 
 struct wal_msg {
 	struct cmsg base;
+	/** Approximate size of this request when encoded. */
+	size_t approx_len;
 	/** Input queue, on output contains all committed requests. */
 	struct stailq commit;
 	/**
@@ -168,6 +181,7 @@ static void
 wal_msg_create(struct wal_msg *batch)
 {
 	cmsg_init(&batch->base, wal_request_route);
+	batch->approx_len = 0;
 	stailq_create(&batch->commit);
 	stailq_create(&batch->rollback);
 }
@@ -603,6 +617,31 @@ wal_opt_rotate(struct wal_writer *writer)
 	return 0;
 }
 
+/**
+ * Make sure there's enough disk space to append @len bytes
+ * of data to the current WAL.
+ */
+static int
+wal_fallocate(struct wal_writer *writer, size_t len)
+{
+	struct xlog *l = &writer->current_wal;
+
+	/*
+	 * The actual write size can be greater than the sum size
+	 * of encoded rows (compression, fixheaders). Double the
+	 * given length to get a rough upper bound estimate.
+	 */
+	len *= 2;
+
+	if (l->allocated >= len)
+		return 0;
+	if (xlog_fallocate(l, MAX(len, WAL_FALLOCATE_LEN)) == 0)
+		return 0;
+
+	diag_log();
+	return -1;
+}
+
 static void
 wal_writer_clear_bus(struct cmsg *msg)
 {
@@ -685,6 +724,12 @@ wal_write_to_disk(struct cmsg *msg)
 
 	/* Xlog is only rotated between queue processing  */
 	if (wal_opt_rotate(writer) != 0) {
+		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
+		return wal_writer_begin_rollback(writer);
+	}
+
+	/* Ensure there's enough disk space before writing anything. */
+	if (wal_fallocate(writer, wal_msg->approx_len) != 0) {
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
 		return wal_writer_begin_rollback(writer);
 	}
@@ -858,6 +903,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 		stailq_add_tail_entry(&batch->commit, entry, fifo);
 		cpipe_push(&wal_thread.wal_pipe, &batch->base);
 	}
+	batch->approx_len += entry->approx_len;
 	wal_thread.wal_pipe.n_input += entry->n_rows * XROW_IOVMAX;
 	cpipe_flush_input(&wal_thread.wal_pipe);
 	/**

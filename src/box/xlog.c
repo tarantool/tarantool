@@ -990,6 +990,26 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	return 0;
 }
 
+ssize_t
+xlog_fallocate(struct xlog *log, size_t len)
+{
+#ifdef HAVE_POSIX_FALLOCATE
+	int rc = posix_fallocate(log->fd, log->offset + log->allocated, len);
+	if (rc != 0) {
+		errno = rc;
+		diag_set(SystemError, "%s: can't allocate disk space",
+			 log->filename);
+		return -1;
+	}
+	log->allocated += len;
+	return 0;
+#else
+	(void)log;
+	(void)len;
+	return 0;
+#endif /* HAVE_POSIX_FALLOCATE */
+}
+
 /**
  * Write a sequence of uncompressed xrow objects.
  *
@@ -1179,8 +1199,13 @@ xlog_tx_write(struct xlog *log)
 		if (lseek(log->fd, log->offset, SEEK_SET) < 0 ||
 		    ftruncate(log->fd, log->offset) != 0)
 			panic_syserror("failed to truncate xlog after write error");
+		log->allocated = 0;
 		return -1;
 	}
+	if (log->allocated > (size_t)written)
+		log->allocated -= written;
+	else
+		log->allocated = 0;
 	log->offset += written;
 	log->rows += log->tx_rows;
 	log->tx_rows = 0;
@@ -1378,6 +1403,17 @@ xlog_write_eof(struct xlog *l)
 		diag_set(ClientError, ER_INJECTION, "xlog write injection");
 		return -1;
 	});
+
+	/*
+	 * Free disk space preallocated with xlog_fallocate().
+	 * Don't write the eof marker if this fails, otherwise
+	 * we'll get "data after eof marker" error on recovery.
+	 */
+	if (l->allocated > 0 && ftruncate(l->fd, l->offset) < 0) {
+		diag_set(SystemError, "ftruncate() failed");
+		return -1;
+	}
+
 	if (fio_writen(l->fd, &eof_marker, sizeof(eof_marker)) < 0) {
 		diag_set(SystemError, "write() failed");
 		return -1;
@@ -1793,6 +1829,15 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 		return -1;
 	if (rc > 0)
 		return 1;
+	if (load_u32(i->rbuf.rpos) == 0) {
+		/*
+		 * Space preallocated with xlog_fallocate().
+		 * Treat as eof and clear the buffer.
+		 */
+		i->read_offset -= ibuf_used(&i->rbuf);
+		ibuf_reset(&i->rbuf);
+		return 1;
+	}
 	if (load_u32(i->rbuf.rpos) == eof_marker) {
 		/* eof marker found */
 		goto eof_found;

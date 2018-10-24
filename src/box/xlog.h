@@ -314,6 +314,11 @@ struct xlog {
 	/** The current offset in the log file, for writing. */
 	off_t offset;
 	/**
+	 * Size of disk space preallocated at @offset with
+	 * xlog_fallocate().
+	 */
+	size_t allocated;
+	/**
 	 * Output buffer, works as row accumulator for
 	 * compression.
 	 */
@@ -432,6 +437,17 @@ xlog_is_open(struct xlog *l)
  */
 int
 xlog_rename(struct xlog *l);
+
+/**
+ * Allocate @size bytes of disk space at the end of the given
+ * xlog file.
+ *
+ * Returns -1 on fallocate error and sets both diag and errno
+ * accordingly. On success returns 0. If the underlying OS
+ * does not support fallocate, this function also returns 0.
+ */
+ssize_t
+xlog_fallocate(struct xlog *log, size_t size);
 
 /**
  * Write a row to xlog, 

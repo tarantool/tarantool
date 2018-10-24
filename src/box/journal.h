@@ -59,6 +59,10 @@ struct journal_entry {
 	 */
 	struct fiber *fiber;
 	/**
+	 * Approximate size of this request when encoded.
+	 */
+	size_t approx_len;
+	/**
 	 * The number of rows in the request.
 	 */
 	int n_rows;

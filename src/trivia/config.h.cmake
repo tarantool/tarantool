@@ -166,6 +166,7 @@
 #cmakedefine HAVE_PTHREAD_YIELD 1
 #cmakedefine HAVE_SCHED_YIELD 1
 #cmakedefine HAVE_POSIX_FADVISE 1
+#cmakedefine HAVE_POSIX_FALLOCATE 1
 #cmakedefine HAVE_MREMAP 1
 #cmakedefine HAVE_SYNC_FILE_RANGE 1
 
