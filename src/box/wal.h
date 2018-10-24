@@ -96,6 +96,11 @@ struct wal_watcher {
 	/** Message sent to notify the watcher. */
 	struct wal_watcher_msg msg;
 	/**
+	 * Bit mask of WAL events that this watcher is
+	 * interested in.
+	 */
+	unsigned event_mask;
+	/**
 	 * Bit mask of WAL events that happened while
 	 * the notification message was en route.
 	 * It indicates that the message must be resend
@@ -126,11 +131,13 @@ struct wal_watcher {
  * @param process_cb  Function called to process cbus messages
  *                    while the watcher is being attached or NULL
  *                    if the cbus loop is running elsewhere.
+ * @param event_mask  Bit mask of events the watcher is interested in.
  */
 void
 wal_set_watcher(struct wal_watcher *watcher, const char *name,
 		void (*watcher_cb)(struct wal_watcher_msg *),
-		void (*process_cb)(struct cbus_endpoint *));
+		void (*process_cb)(struct cbus_endpoint *),
+		unsigned event_mask);
 
 /**
  * Unsubscribe from WAL events.
