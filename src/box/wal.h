@@ -101,7 +101,7 @@ struct wal_watcher {
 	 * It indicates that the message must be resend
 	 * right upon returning to WAL.
 	 */
-	unsigned events;
+	unsigned pending_events;
 };
 
 /**

@@ -1033,7 +1033,7 @@ wal_watcher_notify(struct wal_watcher *watcher, unsigned events)
 		 * mark the watcher to resend it as soon as it
 		 * returns to WAL so as not to lose any events.
 		 */
-		watcher->events |= events;
+		watcher->pending_events |= events;
 		return;
 	}
 
@@ -1062,13 +1062,13 @@ wal_watcher_notify_complete(struct cmsg *cmsg)
 		return;
 	}
 
-	if (watcher->events != 0) {
+	if (watcher->pending_events != 0) {
 		/*
 		 * Resend the message if we got notified while
 		 * it was en route, see wal_watcher_notify().
 		 */
-		wal_watcher_notify(watcher, watcher->events);
-		watcher->events = 0;
+		wal_watcher_notify(watcher, watcher->pending_events);
+		watcher->pending_events = 0;
 	}
 }
 
@@ -1109,7 +1109,7 @@ wal_set_watcher(struct wal_watcher *watcher, const char *name,
 	watcher->msg.watcher = watcher;
 	watcher->msg.events = 0;
 	watcher->msg.cmsg.route = NULL;
-	watcher->events = 0;
+	watcher->pending_events = 0;
 
 	assert(lengthof(watcher->route) == 2);
 	watcher->route[0] = (struct cmsg_hop)
