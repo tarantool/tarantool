@@ -63,9 +63,15 @@ wal_init(enum wal_mode wal_mode, const char *wal_dirname,
 void
 wal_thread_stop();
 
+/**
+ * A notification message sent from the WAL to a watcher
+ * when a WAL event occurs.
+ */
 struct wal_watcher_msg {
 	struct cmsg cmsg;
+	/** Pointer to the watcher this message is for. */
 	struct wal_watcher *watcher;
+	/** Bit mask of events, see wal_event. */
 	unsigned events;
 };
 
@@ -80,7 +86,7 @@ struct wal_watcher {
 	/** Link in wal_writer::watchers. */
 	struct rlist next;
 	/** The watcher callback function. */
-	void (*cb)(struct wal_watcher *, unsigned events);
+	void (*cb)(struct wal_watcher_msg *);
 	/** Pipe from the watcher to WAL. */
 	struct cpipe wal_pipe;
 	/** Pipe from WAL to the watcher. */
@@ -114,16 +120,16 @@ struct wal_watcher {
  * @param watcher     WAL watcher to register.
  * @param name        Name of the cbus endpoint at the caller's cord.
  * @param watcher_cb  Callback to invoke from the caller's cord
- *                    upon receiving a WAL event. Apart from the
- *                    watcher itself, it takes a bit mask of events.
- *                    Events are described in wal_event enum.
+ *                    upon receiving a WAL event. It takes an object
+ *                    of type wal_watcher_msg that stores a pointer
+ *                    to the watcher and information about the event.
  * @param process_cb  Function called to process cbus messages
  *                    while the watcher is being attached or NULL
  *                    if the cbus loop is running elsewhere.
  */
 void
 wal_set_watcher(struct wal_watcher *watcher, const char *name,
-		void (*watcher_cb)(struct wal_watcher *, unsigned events),
+		void (*watcher_cb)(struct wal_watcher_msg *),
 		void (*process_cb)(struct cbus_endpoint *));
 
 /**

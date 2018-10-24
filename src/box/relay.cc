@@ -406,9 +406,10 @@ relay_schedule_pending_gc(struct relay *relay, const struct vclock *vclock)
 }
 
 static void
-relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
+relay_process_wal_event(struct wal_watcher_msg *msg)
 {
-	struct relay *relay = container_of(watcher, struct relay, wal_watcher);
+	struct relay *relay = container_of(msg->watcher, struct relay,
+					   wal_watcher);
 	if (relay->state != RELAY_FOLLOW) {
 		/*
 		 * Do not try to send anything to the replica
@@ -418,7 +419,7 @@ relay_process_wal_event(struct wal_watcher *watcher, unsigned events)
 	}
 	try {
 		recover_remaining_wals(relay->r, &relay->stream, NULL,
-				       (events & WAL_EVENT_ROTATE) != 0);
+				       (msg->events & WAL_EVENT_ROTATE) != 0);
 	} catch (Exception *e) {
 		e->log();
 		diag_move(diag_get(), &relay->diag);
