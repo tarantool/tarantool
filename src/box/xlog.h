@@ -179,6 +179,20 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 		     enum log_suffix suffix);
 
 /**
+ * Return true if the given directory index has files whose
+ * signature is less than specified.
+ *
+ * Supposed to be used to check if xdir_collect_garbage() can
+ * actually delete some files.
+ */
+static inline bool
+xdir_has_garbage(struct xdir *dir, int64_t signature)
+{
+	struct vclock *vclock = vclockset_first(&dir->index);
+	return vclock != NULL && vclock_sum(vclock) < signature;
+}
+
+/**
  * Flags passed to xdir_collect_garbage().
  */
 enum {
@@ -187,6 +201,10 @@ enum {
 	 * the caller thread.
 	 */
 	XDIR_GC_USE_COIO = 1 << 0,
+	/**
+	 * Return after removing a file.
+	 */
+	XDIR_GC_REMOVE_ONE = 1 << 1,
 };
 
 /**
@@ -201,6 +219,21 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
  */
 void
 xdir_collect_inprogress(struct xdir *xdir);
+
+/**
+ * Return LSN and vclock (unless @vclock is NULL) of the oldest
+ * file in a directory or -1 if the directory is empty.
+ */
+static inline int64_t
+xdir_first_vclock(struct xdir *xdir, struct vclock *vclock)
+{
+	struct vclock *first = vclockset_first(&xdir->index);
+	if (first == NULL)
+		return -1;
+	if (vclock != NULL)
+		vclock_copy(vclock, first);
+	return vclock_sum(first);
+}
 
 /**
  * Return LSN and vclock (unless @vclock is NULL) of the newest

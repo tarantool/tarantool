@@ -678,6 +678,9 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 			say_info("removed %s", filename);
 		vclockset_remove(&dir->index, vclock);
 		free(vclock);
+
+		if (flags & XDIR_GC_REMOVE_ONE)
+			break;
 	}
 	return 0;
 }

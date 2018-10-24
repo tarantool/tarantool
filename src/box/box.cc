@@ -2092,14 +2092,19 @@ box_cfg_xc(void)
 		}
 	}
 
+	struct gc_checkpoint *first_checkpoint = gc_first_checkpoint();
+	assert(first_checkpoint != NULL);
+
 	/* Start WAL writer */
 	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
-	if (wal_init(wal_mode, cfg_gets("wal_dir"), &INSTANCE_UUID,
-		      &replicaset.vclock, wal_max_rows, wal_max_size)) {
+	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_rows,
+		     wal_max_size, &INSTANCE_UUID, &replicaset.vclock,
+		     vclock_sum(&first_checkpoint->vclock))) {
 		diag_raise();
 	}
+	gc_set_wal_watcher();
 
 	rmean_cleanup(rmean_box);
 
