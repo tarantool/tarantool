@@ -2567,8 +2567,10 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
 	if (stream->slice->end != NULL &&
 	    stream->page_no >= stream->slice->last_page_no &&
 	    vy_tuple_compare_with_key(tuple, stream->slice->end,
-				      stream->cmp_def) >= 0)
+				      stream->cmp_def) >= 0) {
+		tuple_unref(tuple);
 		return 0;
+	}
 
 	/* We definitely has the next non-null tuple. Save it in stream */
 	if (stream->tuple != NULL)
