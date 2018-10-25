@@ -443,6 +443,7 @@ vy_write_iterator_close(struct vy_stmt_stream *vstream)
 	assert(vstream->iface->close == vy_write_iterator_close);
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	vy_write_iterator_stop(vstream);
+	vy_source_heap_destroy(&stream->src_heap);
 	tuple_format_unref(stream->format);
 	free(stream);
 }
