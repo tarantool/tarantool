@@ -74,7 +74,7 @@ deploy:
   # Deploy packages to PackageCloud
   - provider: packagecloud
     username: "tarantool"
-    repository: "2.1"
+    repository: "2x"
     token: "${PACKAGECLOUD_TOKEN}"
     dist: "${OS}/${DIST}"
     package_glob: build/*.{rpm,deb,dsc}
