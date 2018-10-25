@@ -32,6 +32,16 @@ test_scramble()
 
 	printf("%d\n", scramble_check(scramble, salt, hash2));
 
+	int remote_salt[SCRAMBLE_SIZE/sizeof(int)];
+	for(size_t i = 0; i < sizeof(salt)/sizeof(int); ++i)
+		remote_salt[i] = rand();
+
+	char new_scramble[SCRAMBLE_SIZE];
+
+	scramble_reencode(new_scramble, scramble, salt, remote_salt, hash2);
+
+	printf("%d\n", scramble_check(new_scramble, remote_salt, hash2));
+
 	password = "wrongpass";
 	scramble_prepare(scramble, salt, password, strlen(password));
 

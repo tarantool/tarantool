@@ -67,6 +67,29 @@ scramble_prepare(void *out, const void *salt, const void *password,
 	xor(out, hash1, out, SCRAMBLE_SIZE);
 }
 
+void
+scramble_reencode(void *out, const void *in, const void *salt,
+		  const void *msalt, const void *hash2)
+{
+	unsigned char hash1[SCRAMBLE_SIZE];
+	unsigned char sh[SCRAMBLE_SIZE];
+	SHA1_CTX ctx;
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, salt, SCRAMBLE_SIZE);
+	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
+	SHA1Final(sh, &ctx);
+
+	xor(hash1, in, sh, SCRAMBLE_SIZE);
+
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, msalt, SCRAMBLE_SIZE);
+	SHA1Update(&ctx, hash2, SCRAMBLE_SIZE);
+	SHA1Final(out, &ctx);
+
+	xor(out, hash1, out, SCRAMBLE_SIZE);
+}
+
 int
 scramble_check(const void *scramble, const void *salt, const void *hash2)
 {
