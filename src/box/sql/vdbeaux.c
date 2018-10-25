@@ -86,7 +86,6 @@ sql_alloc_txn(struct Vdbe *v)
 		return NULL;
 	}
 	txn->vdbe = v;
-	v->psql_txn = txn;
 	txn->pSavepoint = NULL;
 	txn->fk_deferred_count = 0;
 	return txn;
@@ -109,11 +108,7 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
 			txn->psql_txn = sql_alloc_txn(vdbe);
 			if (txn->psql_txn == NULL)
 				return -1;
-		} else {
-			vdbe->psql_txn = txn->psql_txn;
 		}
-	} else {
-		vdbe->psql_txn = NULL;
 	}
 	return 0;
 }
@@ -2244,8 +2239,9 @@ sqlite3VdbeCloseStatement(Vdbe * p, int eOp)
 int
 sqlite3VdbeCheckFk(Vdbe * p, int deferred)
 {
-	if ((deferred && p->psql_txn != NULL &&
-	     p->psql_txn->fk_deferred_count > 0) ||
+	struct txn *txn = in_txn();
+	if ((deferred && txn != NULL && txn->psql_txn != NULL &&
+	     txn->psql_txn->fk_deferred_count > 0) ||
 	    (!deferred && p->nFkConstraint > 0)) {
 		p->rc = SQLITE_CONSTRAINT_FOREIGNKEY;
 		p->errorAction = ON_CONFLICT_ACTION_ABORT;

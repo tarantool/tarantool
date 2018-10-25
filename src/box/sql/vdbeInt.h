@@ -363,8 +363,6 @@ struct Vdbe {
 	 * ignoreRaised variable helps to track such situations
 	 */
 	u8 ignoreRaised;	/* Flag for ON CONFLICT IGNORE for triggers */
-	/** Data related to current transaction. */
-	struct sql_txn *psql_txn;
 	/** The auto-commit flag. */
 	bool auto_commit;
 	/**

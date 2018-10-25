@@ -2978,7 +2978,8 @@ case OP_Savepoint: {
 	Savepoint *pNew;
 	Savepoint *pSavepoint;
 	Savepoint *pTmp;
-	struct sql_txn *psql_txn = p->psql_txn;
+	struct txn *txn = in_txn();
+	struct sql_txn *psql_txn = txn != NULL ? txn->psql_txn : NULL;
 
 	if (psql_txn == NULL) {
 		assert(!box_txn());
@@ -3056,7 +3057,7 @@ case OP_Savepoint: {
 				assert(pSavepoint == psql_txn->pSavepoint);
 				psql_txn->pSavepoint = pSavepoint->pNext;
 			} else {
-				p->psql_txn->fk_deferred_count =
+				psql_txn->fk_deferred_count =
 					pSavepoint->tnt_savepoint->fk_deferred_count;
 			}
 		}
@@ -4922,8 +4923,9 @@ case OP_Param: {           /* out2 */
 case OP_FkCounter: {
 	if ((user_session->sql_flags & SQLITE_DeferFKs || pOp->p1 != 0) &&
 	    !p->auto_commit) {
-		assert(p->psql_txn != NULL);
-		p->psql_txn->fk_deferred_count += pOp->p2;
+		struct txn *txn = in_txn();
+		assert(txn != NULL && txn->psql_txn != NULL);
+		txn->psql_txn->fk_deferred_count += pOp->p2;
 	} else {
 		p->nFkConstraint += pOp->p2;
 	}
@@ -4945,8 +4947,9 @@ case OP_FkCounter: {
 case OP_FkIfZero: {         /* jump */
 	if ((user_session->sql_flags & SQLITE_DeferFKs || pOp->p1) &&
 	    !p->auto_commit) {
-		assert(p->psql_txn != NULL);
-		if (p->psql_txn->fk_deferred_count == 0)
+		struct txn *txn = in_txn();
+		assert(txn != NULL && txn->psql_txn != NULL);
+		if (txn->psql_txn->fk_deferred_count == 0)
 			goto jump_to_p2;
 	} else {
 		if (p->nFkConstraint == 0)
