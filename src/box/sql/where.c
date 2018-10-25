@@ -304,11 +304,11 @@ whereScanNext(WhereScan * pScan)
 								Parse *pParse =
 									pWC->pWInfo->pParse;
 								assert(pX->pLeft);
-								uint32_t id;
+								uint32_t unused;
 								struct coll *coll =
 									sql_binary_compare_coll_seq(
 										pParse, pX->pLeft,
-										pX->pRight, &id);
+										pX->pRight, &unused);
 								if (coll != pScan->coll)
 									continue;
 							}
@@ -559,7 +559,7 @@ findIndexCol(Parse * pParse,	/* Parse context */
 			struct coll *coll = sql_expr_coll(pParse,
 							  pList->a[i].pExpr,
 							  &is_found, &id);
-			if (is_found && coll == part_to_match->coll)
+			if (coll == part_to_match->coll)
 				return i;
 		}
 	}
@@ -2288,8 +2288,8 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		    sqlite3TableColumnAffinity(space->def, pLhs->iColumn);
 		if (aff != idxaff)
 			break;
-		uint32_t id;
-		pColl = sql_binary_compare_coll_seq(pParse, pLhs, pRhs, &id);
+		uint32_t unused;
+		pColl = sql_binary_compare_coll_seq(pParse, pLhs, pRhs, &unused);
 		if (pColl == 0)
 			break;
 		if (idx_def->key_def->parts[i + nEq].coll != pColl)
@@ -3408,8 +3408,7 @@ wherePathSatisfiesOrderBy(WhereInfo * pWInfo,	/* The WHERE clause */
 								      &is_found, &id);
 						struct coll *idx_coll =
 							idx_def->key_def->parts[j].coll;
-						if (is_found &&
-						    coll != idx_coll)
+						if (coll != idx_coll)
 							continue;
 					}
 					isMatch = 1;

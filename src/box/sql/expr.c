@@ -190,10 +190,10 @@ sqlite3ExprSkipCollate(Expr * pExpr)
 }
 
 struct coll *
-sql_expr_coll(Parse *parse, Expr *p, bool *is_found, uint32_t *coll_id)
+sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id)
 {
 	struct coll *coll = NULL;
-	*is_found = false;
+	*is_explicit_coll = false;
 	*coll_id = COLL_NONE;
 	while (p != NULL) {
 		int op = p->op;
@@ -206,7 +206,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found, uint32_t *coll_id)
 		if (op == TK_COLLATE ||
 		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
 			coll = sql_get_coll_seq(parse, p->u.zToken, coll_id);
-			*is_found = true;
+			*is_explicit_coll = true;
 			break;
 		}
 		if ((op == TK_AGG_COLUMN || op == TK_COLUMN ||
@@ -219,7 +219,6 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_found, uint32_t *coll_id)
 			if (j >= 0) {
 				coll = sql_column_collation(p->space_def, j,
 							    coll_id);
-				*is_found = true;
 			}
 			break;
 		}
@@ -342,25 +341,63 @@ binaryCompareP5(Expr * pExpr1, Expr * pExpr2, int jumpIfNull)
 	return aff;
 }
 
+int
+collations_check_compatibility(uint32_t lhs_id, bool is_lhs_forced,
+			       uint32_t rhs_id, bool is_rhs_forced,
+			       uint32_t *res_id)
+{
+	assert(res_id != NULL);
+	if (is_lhs_forced && is_rhs_forced) {
+		if (lhs_id != rhs_id)
+			goto illegal_collation_mix;
+	}
+	if (is_lhs_forced) {
+		*res_id = lhs_id;
+		return 0;
+	}
+	if (is_rhs_forced) {
+		*res_id = rhs_id;
+		return 0;
+	}
+	if (lhs_id != rhs_id) {
+		if (lhs_id == COLL_NONE) {
+			*res_id = rhs_id;
+			return 0;
+		}
+		if (rhs_id == COLL_NONE) {
+			*res_id = lhs_id;
+			return 0;
+		}
+		goto illegal_collation_mix;
+	}
+	*res_id = lhs_id;
+	return 0;
+illegal_collation_mix:
+	diag_set(ClientError, ER_ILLEGAL_COLLATION_MIX);
+	return -1;
+}
+
 struct coll *
 sql_binary_compare_coll_seq(Parse *parser, Expr *left, Expr *right,
 			    uint32_t *coll_id)
 {
-	struct coll *coll;
-	bool is_found;
 	assert(left != NULL);
-	if ((left->flags & EP_Collate) != 0) {
-		coll = sql_expr_coll(parser, left, &is_found, coll_id);
-	} else if (right != NULL && (right->flags & EP_Collate) != 0) {
-		coll = sql_expr_coll(parser, right, &is_found, coll_id);
-	} else {
-		coll = sql_expr_coll(parser, left, &is_found, coll_id);
-		if (! is_found) {
-			coll = sql_expr_coll(parser, right, &is_found,
-					     coll_id);
-		}
+	bool is_lhs_forced;
+	bool is_rhs_forced;
+	uint32_t lhs_coll_id;
+	uint32_t rhs_coll_id;
+	struct coll *lhs_coll = sql_expr_coll(parser, left, &is_lhs_forced,
+					      &lhs_coll_id);
+	struct coll *rhs_coll = sql_expr_coll(parser, right, &is_rhs_forced,
+					      &rhs_coll_id);
+	if (collations_check_compatibility(lhs_coll_id, is_lhs_forced,
+					   rhs_coll_id, is_rhs_forced,
+					   coll_id) != 0) {
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
+		return NULL;
 	}
-	return coll;
+	return *coll_id == rhs_coll_id ? rhs_coll : lhs_coll;;
 }
 
 /*

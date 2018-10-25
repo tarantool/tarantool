@@ -246,7 +246,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3493-3.1",
     [[
-        CREATE TABLE t2(a  TEXT COLLATE "unicode_ci" PRIMARY KEY, b  TEXT COLLATE "binary");
+        CREATE TABLE t2(a  TEXT COLLATE "unicode_ci" PRIMARY KEY, b  TEXT);
         INSERT INTO t2 VALUES('aBc', 'DeF');
     ]], {
         -- <tkt3493-3.1>
@@ -304,7 +304,7 @@ test:do_execsql_test(
         SELECT b>a FROM t2 GROUP BY a, b
     ]], {
         -- <tkt3493-3.3.3>
-        0
+        1
         -- </tkt3493-3.3.3>
     })
 

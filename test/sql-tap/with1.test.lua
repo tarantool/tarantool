@@ -880,7 +880,7 @@ test:do_execsql_test("10.8.4.2", [[
   SELECT a FROM tst UNION ALL SELECT b COLLATE "unicode_ci" FROM tst ORDER BY 1;
 ]], {
   -- <10.8.4.2>
-  "A", "B", "C", "a", "b", "c"
+  "a", "A", "b", "B", "c", "C"
   -- </10.8.4.2>
 })
 

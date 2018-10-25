@@ -531,7 +531,7 @@ test:do_execsql_test(
         SELECT c FROM t4a WHERE a=b ORDER BY c;
     ]], {
         -- <in4-4.1>
-        3
+        1, 3
         -- </in4-4.1>
     })
 

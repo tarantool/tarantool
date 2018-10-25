@@ -500,6 +500,7 @@ t;
   171: box.error.SQL_TYPE_MISMATCH
   172: box.error.ROWID_OVERFLOW
   173: box.error.DROP_COLLATION
+  174: box.error.ILLEGAL_COLLATION_MIX
 ...
 test_run:cmd("setopt delimiter ''");
 ---

@@ -226,6 +226,7 @@ struct errcode_record {
 	/*171 */_(ER_SQL_TYPE_MISMATCH,		"Type mismatch: can not convert %s to %s") \
 	/*172 */_(ER_ROWID_OVERFLOW,            "Rowid is overflowed: too many entries in ephemeral space") \
 	/*173 */_(ER_DROP_COLLATION,		"Can't drop collation %s : %s") \
+	/*174 */_(ER_ILLEGAL_COLLATION_MIX,	"Illegal mix of collations") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

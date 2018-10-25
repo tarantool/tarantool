@@ -1048,7 +1048,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 								  regPrev + i);
 						VdbeCoverage(v);
 					}
-					if (is_found) {
+					if (coll != NULL) {
 						sqlite3VdbeChangeP4(v, -1,
 								    (const char *)coll,
 								    P4_COLLSEQ);
@@ -1961,8 +1961,10 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 		pTab->def->fields[i].type = sql_affinity_to_field_type(affinity);
 		bool is_found;
 		uint32_t coll_id;
+
 		if (pTab->def->fields[i].coll_id == COLL_NONE &&
-		    sql_expr_coll(pParse, p, &is_found, &coll_id) && is_found)
+		    sql_expr_coll(pParse, p, &is_found, &coll_id) &&
+		    coll_id != COLL_NONE)
 			pTab->def->fields[i].coll_id = coll_id;
 	}
 }
@@ -2150,47 +2152,58 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 }
 
 #ifndef SQLITE_OMIT_COMPOUND_SELECT
-static struct coll *
-multi_select_coll_seq_r(Parse *parser, Select *p, int n, bool *is_found,
-			uint32_t *coll_id)
+/**
+ * This function determines resulting collation sequence for
+ * @n-th column of the result set for the compound SELECT
+ * statement. Since compound SELECT performs implicit comparisons
+ * between values, all parts of compound queries must use
+ * the same collation. Otherwise, an error is raised.
+ *
+ * @param parser Parse context.
+ * @param p Select meta-information.
+ * @param n Column number of the result set.
+ * @param is_forced_coll Used if we fall into recursion.
+ *        For most-outer call it is unused. Used to indicate that
+ *        explicit COLLATE clause is used.
+ * @retval Id of collation to be used during string comparison.
+ */
+static uint32_t
+multi_select_coll_seq_r(struct Parse *parser, struct Select *p, int n,
+			bool *is_forced_coll)
 {
-	struct coll *coll;
+	bool is_prior_forced = false;
+	bool is_current_forced;
+	uint32_t prior_coll_id = COLL_NONE;
+	uint32_t current_coll_id;
 	if (p->pPrior != NULL) {
-		coll = multi_select_coll_seq_r(parser, p->pPrior, n, is_found,
-					       coll_id);
-	} else {
-		coll = NULL;
-		*coll_id = COLL_NONE;
+		prior_coll_id = multi_select_coll_seq_r(parser, p->pPrior, n,
+							&is_prior_forced);
 	}
-	assert(n >= 0);
-	/* iCol must be less than p->pEList->nExpr.  Otherwise an error would
-	 * have been thrown during name resolution and we would not have gotten
-	 * this far
+	/*
+	 * Column number must be less than p->pEList->nExpr.
+	 * Otherwise an error would have been thrown during name
+	 * resolution and we would not have got this far.
 	 */
-	if (!*is_found && ALWAYS(n < p->pEList->nExpr)) {
-		coll = sql_expr_coll(parser, p->pEList->a[n].pExpr, is_found,
-				     coll_id);
+	assert(n >= 0 && n < p->pEList->nExpr);
+	sql_expr_coll(parser, p->pEList->a[n].pExpr, &is_current_forced,
+		      &current_coll_id);
+	uint32_t res_coll_id;
+	if (collations_check_compatibility(prior_coll_id, is_prior_forced,
+					   current_coll_id, is_current_forced,
+					   &res_coll_id) != 0) {
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
+		return 0;
 	}
-	return coll;
+	*is_forced_coll = (is_prior_forced || is_current_forced);
+	return res_coll_id;
 }
 
-/**
- * The collating sequence for the compound select is taken from the
- * left-most term of the select that has a collating sequence.
- * @param parser Parser.
- * @param p Select.
- * @param n Column number.
- * @param[out] coll_id Collation identifer.
- * @retval The appropriate collating sequence for the n-th column
- *         of the result set for the compound-select statement
- *         "p".
- * @retval NULL The column has no default collating sequence.
- */
-static inline struct coll *
-multi_select_coll_seq(Parse *parser, Select *p, int n, uint32_t *coll_id)
+static inline uint32_t
+multi_select_coll_seq(struct Parse *parser, struct Select *p, int n)
 {
-	bool is_found = false;
-	return multi_select_coll_seq_r(parser, p, n, &is_found, coll_id);
+	bool unused;
+	return multi_select_coll_seq_r(parser, p, n, &unused);
 }
 
 /**
@@ -2227,12 +2240,12 @@ sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 		struct ExprList_item *item = &order_by->a[i];
 		struct Expr *term = item->pExpr;
 		uint32_t id;
+		bool unused;
 		if ((term->flags & EP_Collate) != 0) {
-			bool is_found = false;
-			sql_expr_coll(parse, term, &is_found, &id);
+			sql_expr_coll(parse, term, &unused, &id);
 		} else {
-			multi_select_coll_seq(parse, s,
-					      item->u.x.iOrderByCol - 1, &id);
+			id = multi_select_coll_seq(parse, s,
+						   item->u.x.iOrderByCol - 1);
 			if (id != COLL_NONE) {
 				const char *name = coll_by_id(id)->name;
 				order_by->a[i].pExpr =
@@ -2895,8 +2908,8 @@ multiSelect(Parse * pParse,	/* Parsing context */
 		if (key_info == NULL)
 			goto multi_select_end;
 		for (int i = 0; i < nCol; i++) {
-			multi_select_coll_seq(pParse, p, i,
-					      &key_info->parts[i].coll_id);
+			key_info->parts[i].coll_id =
+				multi_select_coll_seq(pParse, p, i);
 		}
 
 		for (struct Select *pLoop = p; pLoop; pLoop = pLoop->pPrior) {
@@ -3323,8 +3336,8 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		key_info_dup = sql_key_info_new(db, expr_count);
 		if (key_info_dup != NULL) {
 			for (int i = 0; i < expr_count; i++) {
-				multi_select_coll_seq(pParse, p, i,
-					&key_info_dup->parts[i].coll_id);
+				key_info_dup->parts[i].coll_id =
+					multi_select_coll_seq(pParse, p, i);
 			}
 		}
 	}
@@ -5300,12 +5313,12 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			struct ExprList_item *pItem;
 			int j;
 			assert(pList != 0);	/* pList!=0 if pF->pFunc has NEEDCOLL */
-			bool is_found = false;
+			bool unused;
 			uint32_t id;
-			for (j = 0, pItem = pList->a; !is_found && j < nArg;
+			for (j = 0, pItem = pList->a; coll == NULL && j < nArg;
 			     j++, pItem++) {
 				coll = sql_expr_coll(pParse, pItem->pExpr,
-						     &is_found, &id);
+						     &unused, &id);
 			}
 			if (regHit == 0 && pAggInfo->nAccumulator)
 				regHit = ++pParse->nMem;

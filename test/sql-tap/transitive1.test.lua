@@ -503,7 +503,7 @@ test:do_execsql_test(
         SELECT * FROM c1 WHERE x=y AND z=y AND z='abc';
     ]], {
         -- <transitive1-570>
-
+        1, "ABC", "ABC", "abc"
         -- </transitive1-570>
     })
 
@@ -516,7 +516,7 @@ test:do_execsql_test(
         SELECT * FROM c1 WHERE x=y AND z=y AND z='abc';
     ]], {
         -- <transitive1-570eqp>
-        "/SEARCH TABLE C1 USING COVERING INDEX C1X/"
+        "/SCAN TABLE C1/"
         -- </transitive1-570eqp>
     })
 

@@ -4333,13 +4333,15 @@ const char *sqlite3ErrStr(int);
  *
  * @param parse Parsing context.
  * @param expr Expression to scan.
- * @param[out] is_found Flag set if collation was found.
+ * @param[out] is_explicit_coll Flag set if explicit COLLATE
+ *             clause is used.
  * @param[out] coll_id Collation identifier.
  *
  * @retval Pointer to collation.
  */
 struct coll *
-sql_expr_coll(Parse * pParse, Expr * pExpr, bool *is_found, uint32_t *coll_id);
+sql_expr_coll(Parse * pParse, Expr * pExpr, bool *is_explicit_coll,
+	      uint32_t *coll_id);
 
 Expr *sqlite3ExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
 Expr *sqlite3ExprAddCollateString(Parse *, Expr *, const char *);
@@ -4647,6 +4649,29 @@ int sqlite3VdbeParameterIndex(Vdbe *, const char *, int);
 int sqlite3TransferBindings(sqlite3_stmt *, sqlite3_stmt *);
 int sqlite3Reprepare(Vdbe *);
 void sqlite3ExprListCheckLength(Parse *, ExprList *, const char *);
+
+/**
+ * This function verifies that two collations (to be more precise
+ * their ids) are compatible. In terms of SQL ANSI they are
+ * compatible if:
+ *  - one of collations is mentioned alongside with explicit
+ *    COLLATE clause, which forces this collation over another
+ *    one. It is allowed to have the same forced collations;
+ * - both collations are derived from table columns and they
+ *   are the same;
+ * - one collation is derived from table column and another
+ *   one is not specified (i.e. COLL_NONE);
+ * In all other cases they are not accounted to be compatible
+ * and error should be raised.
+ * Collation to be used in comparison operator is returned
+ * via @res_id: in case one of collations is absent, then
+ * the second one is utilized.
+ */
+int
+collations_check_compatibility(uint32_t lhs_id, bool is_lhs_forced,
+			       uint32_t rhs_id, bool is_rhs_forced,
+			       uint32_t *res_id);
+
 /**
  * Return a pointer to the collation sequence that should be used
  * by a binary comparison operator comparing left and right.

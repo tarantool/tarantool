@@ -168,7 +168,7 @@ exprCommute(Parse * pParse, Expr * pExpr)
 			bool is_found;
 			uint32_t id;
 			sql_expr_coll(pParse, pExpr->pLeft, &is_found, &id);
-			if (is_found) {
+			if (id != COLL_NONE) {
 				/*
 				 * Neither X nor Y have COLLATE
 				 * operators, but X has a
@@ -851,15 +851,16 @@ termIsEquivalence(Parse * pParse, Expr * pExpr)
 	    ) {
 		return 0;
 	}
-	uint32_t id;
+	uint32_t unused;
 	struct coll *coll1 =
 	    sql_binary_compare_coll_seq(pParse, pExpr->pLeft, pExpr->pRight,
-					&id);
+					&unused);
 	if (coll1 == NULL)
 		return 1;
-	bool unused;
-	coll1 = sql_expr_coll(pParse, pExpr->pLeft, &unused, &id);
-	struct coll *coll2 = sql_expr_coll(pParse, pExpr->pRight, &unused, &id);
+	bool unused1;
+	coll1 = sql_expr_coll(pParse, pExpr->pLeft, &unused1, &unused);
+	struct coll *coll2 = sql_expr_coll(pParse, pExpr->pRight, &unused1,
+					   &unused);
 	return coll1 != NULL && coll1 == coll2;
 }
 

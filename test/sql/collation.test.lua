@@ -71,4 +71,26 @@ t:drop()
 box.space._collation:select{0}
 box.space._collation:delete{0}
 
+-- gh-3185: collations of LHS and RHS must be compatible.
+--
+box.sql.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT, b TEXT COLLATE \"binary\", c TEXT COLLATE \"unicode_ci\");")
+box.sql.execute("SELECT * FROM t WHERE a = b;")
+box.sql.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = b;")
+box.sql.execute("SELECT * FROM t WHERE b = c;")
+box.sql.execute("SELECT * FROM t WHERE b COLLATE \"binary\" = c;")
+box.sql.execute("SELECT * FROM t WHERE a = c;")
+box.sql.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = c COLLATE \"unicode\";")
+
+-- Compound queries perform implicit comparisons between values.
+-- Hence, rules for collations compatibilities are the same.
+--
+box.sql.execute("SELECT 'abc' COLLATE \"binary\" UNION SELECT 'ABC' COLLATE \"unicode_ci\"")
+box.sql.execute("SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC' COLLATE binary")
+box.sql.execute("SELECT c FROM t UNION SELECT b FROM t;")
+box.sql.execute("SELECT b FROM t UNION SELECT a FROM t;")
+box.sql.execute("SELECT a FROM t UNION SELECT c FROM t;")
+box.sql.execute("SELECT c COLLATE \"binary\" FROM t UNION SELECT a FROM t;")
+box.sql.execute("SELECT b COLLATE \"unicode\" FROM t UNION SELECT a FROM t;")
+
+box.sql.execute("DROP TABLE t;")
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
