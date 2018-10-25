@@ -64,8 +64,20 @@ source:
 	git clone https://github.com/packpack/packpack.git packpack
 	TARBALL_COMPRESSOR=gz packpack/packpack tarball
 
+# Push alpha and beta versions to <major>x bucket (say, 2x),
+# stable to <major>.<minor> bucket (say, 2.2).
+MAJOR_VERSION=$(word 1,$(subst ., ,$(TRAVIS_BRANCH)))
+MINOR_VERSION=$(word 2,$(subst ., ,$(TRAVIS_BRANCH)))
+BUCKET=tarantool.$(MAJOR_VERSION).$(MINOR_VERSION).src
+ifeq ($(MINOR_VERSION),0)
+BUCKET=tarantool.$(MAJOR_VERSION)x.src
+endif
+ifeq ($(MINOR_VERSION),1)
+BUCKET=tarantool.$(MAJOR_VERSION)x.src
+endif
+
 source_deploy:
 	pip install awscli --user
 	aws --endpoint-url "${AWS_S3_ENDPOINT_URL}" s3 \
-		cp build/*.tar.gz "s3://tarantool-${TRAVIS_BRANCH}-src/" \
+		cp build/*.tar.gz "s3://${BUCKET}/" \
 		--acl public-read
