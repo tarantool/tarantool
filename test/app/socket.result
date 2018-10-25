@@ -42,6 +42,9 @@ test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 ---
 - true
 ...
+WAIT_COND_TIME = 10
+---
+...
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 ---
 - null
@@ -104,11 +107,11 @@ s:nonblock(true)
 ---
 - true
 ...
-s:readable(.01)
+s:readable(.1)
 ---
 - true
 ...
-s:wait(.01)
+s:wait(.1)
 ---
 - RW
 ...
@@ -609,13 +612,16 @@ s:nonblock()
 ---
 - true
 ...
-os.remove('/tmp/tarantool-test-socket')
+path = 'tarantool-test-socket'
+---
+...
+os.remove(path)
 ---
 - null
-- '/tmp/tarantool-test-socket: No such file or directory'
+- 'tarantool-test-socket: No such file or directory'
 - 2
 ...
-s:bind('unix/', '/tmp/tarantool-test-socket')
+s:bind('unix/', path)
 ---
 - true
 ...
@@ -634,7 +640,7 @@ sc:nonblock(true)
 ---
 - true
 ...
-sc:sysconnect('unix/', '/tmp/tarantool-test-socket')
+sc:sysconnect('unix/', path)
 ---
 - true
 ...
@@ -673,7 +679,7 @@ s:close()
 ---
 - true
 ...
-_ = os.remove('/tmp/tarantool-test-socket')
+_ = os.remove(path)
 ---
 ...
 test_run:cmd("setopt delimiter ';'")
@@ -963,7 +969,7 @@ socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
 - true
 ...
 -- AF_UNIX
-path = '/tmp/tarantool-test-socket'
+path = 'tarantool-test-socket'
 ---
 ...
 _ = os.remove(path)
@@ -1109,27 +1115,25 @@ master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 ---
 - true
 ...
-port = 32768 + math.random(32768)
+port = 32768 + math.random(0, 32767)
 ---
 ...
-attempt = 0
----
-...
+-- SO_REUSEADDR allows to bind to the same source addr:port twice,
+-- so listen() can return EADDRINUSE and so we check it within
+-- wait_cond().
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
-while attempt < 10 do
-    if not master:bind('127.0.0.1', port)  then
+test_run:wait_cond(function()
+    local ok = master:bind('127.0.0.1', port)
+    local ok = ok and master:listen()
+    if not ok then
         port = 32768 + math.random(32768)
-        attempt = attempt + 1
-    else
-        break
+        return false, master:error()
     end
-end;
----
-...
-master:listen();
+    return true
+end, WAIT_COND_TIME);
 ---
 - true
 ...
@@ -1161,7 +1165,7 @@ master:close()
 f = nil
 ---
 ...
-path = '/tmp/tarantool-test-socket'
+path = 'tarantool-test-socket'
 ---
 ...
 s = socket('PF_UNIX', 'SOCK_STREAM', 0)
@@ -1599,7 +1603,7 @@ s = nil
 ---
 ...
 -- start AF_UNIX server with dead socket exists
-path = '/tmp/tarantool-test-socket'
+path = 'tarantool-test-socket'
 ---
 ...
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
@@ -1691,9 +1695,7 @@ test_run:cmd("setopt delimiter ';'")
 err = nil;
 ---
 ...
-path = '/tmp/tarantool-test-socket';
----
-...
+path = 'tarantool-test-socket'
 for i = 1, 10 do
     local server = socket.tcp_server('unix/', path, function() end)
     if not server then
