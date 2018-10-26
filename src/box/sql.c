@@ -41,6 +41,7 @@
 #include "box.h"
 #include "txn.h"
 #include "space.h"
+#include "memtx_space.h"
 #include "space_def.h"
 #include "index_def.h"
 #include "tuple.h"
@@ -1357,33 +1358,6 @@ sql_debug_info(struct info_handler *h)
 	info_append_int(h, "sql_found_count", sql_found_count);
 	info_append_int(h, "sql_xfer_count", sql_xfer_count);
 	info_end(h);
-}
-
-/**
- * Extract maximum integer value from ephemeral space.
- * If index is empty - return 0 in max_id and success status.
- *
- * @param space Pointer to ephemeral space.
- * @param fieldno Number of field from fetching tuple.
- * @param[out] max_id Fetched max value.
- *
- * @retval 0 on success, -1 otherwise.
- */
-int tarantoolSqlite3EphemeralGetMaxId(struct space *space, uint32_t fieldno,
-				      uint64_t *max_id)
-{
-	struct index *primary_index = *space->index;
-	struct tuple *tuple;
-	if (index_max(primary_index, NULL, 0, &tuple) != 0)
-		return -1;
-	if (tuple == NULL) {
-		*max_id = 0;
-		return 0;
-	}
-	if (tuple_field_u64(tuple, fieldno, max_id) == -1)
-		return -1;
-
-	return 0;
 }
 
 int

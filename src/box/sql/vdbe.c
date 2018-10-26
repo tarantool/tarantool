@@ -3827,25 +3827,36 @@ case OP_NextSequenceId: {
 	break;
 }
 
-/* Opcode: NextIdEphemeral P1 P2 P3 * *
- * Synopsis: r[P3]=get_max(space_index[P1]{Column[P2]})
+/* Opcode: NextIdEphemeral P1 P2 * * *
+ * Synopsis: r[P2]=get_next_rowid(space[P1])
  *
- * This opcode works in the same way as OP_NextId does, except it
- * is only applied for ephemeral tables. The difference is in the
- * fact that all ephemeral tables don't have space_id (to be more
- * precise it equals to zero). This opcode uses register P1 to
- * fetch pointer to epehemeral space.
+ * This opcode stores next `rowid` for the ephemeral space to
+ * P2 register. `rowid` is required, because inserted to
+ * ephemeral space tuples may be not unique. Meanwhile,
+ * Tarantool`s ephemeral spaces can contain only unique tuples
+ * due to only one index (which is PK over all columns in space).
  */
 case OP_NextIdEphemeral: {
 	struct space *space = (struct space*)p->aMem[pOp->p1].u.p;
-	int p2 = pOp->p2;
-	assert(space != NULL);
-	pOut = &aMem[pOp->p3];
-	rc = tarantoolSqlite3EphemeralGetMaxId(space, p2,
-					       (uint64_t *) &pOut->u.i);
-	if (rc != 0)
+	assert(space->def->id == 0);
+	uint64_t rowid;
+	if (space->vtab->ephemeral_rowid_next(space, &rowid) != 0) {
+		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
-	pOut->u.i += 1;
+	}
+	/*
+	 * FIXME: since memory cell can comprise only 32-bit
+	 * integer, make sure it can fit in. This check should
+	 * be removed when memory cell is extended with unsigned
+	 * 64-bit integer.
+	 */
+	if (rowid > INT32_MAX) {
+		diag_set(ClientError, ER_ROWID_OVERFLOW);
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+	pOut = &aMem[pOp->p2];
+	pOut->u.i = rowid;
 	pOut->flags = MEM_Int;
 	break;
 }

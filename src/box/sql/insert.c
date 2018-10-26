@@ -474,29 +474,19 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			 *      M: ...
 			 */
 			int regRec;	/* Register to hold packed record */
-			int regTempId;	/* Register to hold temp table ID */
 			int regCopy;    /* Register to keep copy of registers from select */
 			int addrL;	/* Label "L" */
-			int64_t initial_pk = 0;
 
 			srcTab = pParse->nTab++;
 			reg_eph = ++pParse->nMem;
 			regRec = sqlite3GetTempReg(pParse);
-			regCopy = sqlite3GetTempRange(pParse, nColumn);
-			regTempId = sqlite3GetTempReg(pParse);
+			regCopy = sqlite3GetTempRange(pParse, nColumn + 1);
 			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
 					  nColumn + 1);
-
-			/* Create counter for rowid */
-			sqlite3VdbeAddOp4Dup8(v, OP_Int64,
-					      0 /* unused */,
-					      regTempId,
-					      0 /* unused */,
-					      (const unsigned char*) &initial_pk,
-					      P4_INT64);
 			addrL = sqlite3VdbeAddOp1(v, OP_Yield, dest.iSDParm);
 			VdbeCoverage(v);
-			sqlite3VdbeAddOp2(v, OP_AddImm, regTempId, 1);
+			sqlite3VdbeAddOp2(v, OP_NextIdEphemeral, reg_eph,
+					  regCopy + nColumn);
 			sqlite3VdbeAddOp3(v, OP_Copy, regFromSelect, regCopy, nColumn-1);
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regCopy,
 					  nColumn + 1, regRec);
@@ -507,7 +497,6 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 			sqlite3VdbeGoto(v, addrL);
 			sqlite3VdbeJumpHere(v, addrL);
 			sqlite3ReleaseTempReg(pParse, regRec);
-			sqlite3ReleaseTempReg(pParse, regTempId);
 			sqlite3ReleaseTempRange(pParse, regCopy, nColumn);
 		}
 	} else {

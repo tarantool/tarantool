@@ -131,19 +131,6 @@ int tarantoolSqlite3EphemeralDrop(BtCursor * pCur);
 int tarantoolSqlite3EphemeralClearTable(BtCursor * pCur);
 
 /**
- * Extract maximum integer value from ephemeral space.
- * If index is empty - return 0 in max_id and success status.
- *
- * @param space Pointer to ephemeral space.
- * @param fieldno Number of field from fetching tuple.
- * @param[out] max_id Fetched max value.
- *
- * @retval 0 on success, -1 otherwise.
- */
-int tarantoolSqlite3EphemeralGetMaxId(struct space *space, uint32_t fieldno,
-				       uint64_t * max_id);
-
-/**
  * Performs exactly as extract_key + sqlite3VdbeCompareMsgpack,
  * only faster.
  *
