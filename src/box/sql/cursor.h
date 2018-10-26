@@ -41,7 +41,6 @@ typedef struct BtCursor BtCursor;
  * for ordinary space, or to TEphemCursor for ephemeral space.
  */
 struct BtCursor {
-	i64 nKey;		/* Size of pKey, or last integer key */
 	u8 curFlags;		/* zero or more BTCF_* flags defined below */
 	u8 eState;		/* One of the CURSOR_XXX constants (see below) */
 	u8 hints;		/* As configured by CursorSetHints() */

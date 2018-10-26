@@ -340,8 +340,7 @@ int tarantoolSqlite3EphemeralCount(struct BtCursor *pCur, i64 *pnEntry)
 	assert(pCur->curFlags & BTCF_TEphemCursor);
 
 	struct index *primary_index = space_index(pCur->space, 0 /* PK */);
-	*pnEntry = index_count(primary_index, pCur->iter_type, pCur->key,
-			       pCur->nKey);
+	*pnEntry = index_count(primary_index, pCur->iter_type, NULL, 0);
 	return SQLITE_OK;
 }
 
@@ -349,8 +348,7 @@ int tarantoolSqlite3Count(BtCursor *pCur, i64 *pnEntry)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
 
-	*pnEntry = index_count(pCur->index, pCur->iter_type, pCur->key,
-			       pCur->nKey);
+	*pnEntry = index_count(pCur->index, pCur->iter_type, NULL, 0);
 	return SQLITE_OK;
 }
 
@@ -1031,7 +1029,6 @@ key_alloc(BtCursor *cur, size_t key_size)
 		}
 		cur->key = new_key;
 	}
-	cur->nKey = key_size;
 	return 0;
 }
 
