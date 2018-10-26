@@ -14,8 +14,6 @@ void
 simple_test()
 {
 	cout << "*** " << __func__ << " ***" << endl;
-	struct quota q;
-	quota_init(&q, 100500);
 	srand(time(0));
 	uint32_t error_count = 0;
 	uint32_t fp_rate_too_big = 0;
@@ -24,7 +22,7 @@ simple_test()
 		uint64_t false_positive = 0;
 		for (uint32_t count = 1000; count <= 10000; count *= 2) {
 			struct bloom bloom;
-			bloom_create(&bloom, count, p, &q);
+			bloom_create(&bloom, count, p);
 			unordered_set<uint32_t> check;
 			for (uint32_t i = 0; i < count; i++) {
 				uint32_t val = rand() % (count * 10);
@@ -41,7 +39,7 @@ simple_test()
 				if (!has && bloom_possible)
 					false_positive++;
 			}
-			bloom_destroy(&bloom, &q);
+			bloom_destroy(&bloom);
 		}
 		double fp_rate = (double)false_positive / tests;
 		if (fp_rate > p + 0.001)
@@ -49,15 +47,12 @@ simple_test()
 	}
 	cout << "error_count = " << error_count << endl;
 	cout << "fp_rate_too_big = " << fp_rate_too_big << endl;
-	cout << "memory after destruction = " << quota_used(&q) << endl << endl;
 }
 
 void
 store_load_test()
 {
 	cout << "*** " << __func__ << " ***" << endl;
-	struct quota q;
-	quota_init(&q, 100500);
 	srand(time(0));
 	uint32_t error_count = 0;
 	uint32_t fp_rate_too_big = 0;
@@ -66,7 +61,7 @@ store_load_test()
 		uint64_t false_positive = 0;
 		for (uint32_t count = 300; count <= 3000; count *= 10) {
 			struct bloom bloom;
-			bloom_create(&bloom, count, p, &q);
+			bloom_create(&bloom, count, p);
 			unordered_set<uint32_t> check;
 			for (uint32_t i = 0; i < count; i++) {
 				uint32_t val = rand() % (count * 10);
@@ -76,9 +71,9 @@ store_load_test()
 			struct bloom test = bloom;
 			char *buf = (char *)malloc(bloom_store_size(&bloom));
 			bloom_store(&bloom, buf);
-			bloom_destroy(&bloom, &q);
+			bloom_destroy(&bloom);
 			memset(&bloom, '#', sizeof(bloom));
-			bloom_load_table(&test, buf, &q);
+			bloom_load_table(&test, buf);
 			free(buf);
 			for (uint32_t i = 0; i < count * 10; i++) {
 				bool has = check.find(i) != check.end();
@@ -90,7 +85,7 @@ store_load_test()
 				if (!has && bloom_possible)
 					false_positive++;
 			}
-			bloom_destroy(&test, &q);
+			bloom_destroy(&test);
 		}
 		double fp_rate = (double)false_positive / tests;
 		double excess = fp_rate / p;
@@ -99,7 +94,6 @@ store_load_test()
 	}
 	cout << "error_count = " << error_count << endl;
 	cout << "fp_rate_too_big = " << fp_rate_too_big << endl;
-	cout << "memory after destruction = " << quota_used(&q) << endl << endl;
 }
 
 int
