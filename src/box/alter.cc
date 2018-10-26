@@ -1702,6 +1702,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * so it's safe to simply drop the space on
 		 * rollback.
 		 */
+		struct trigger *on_commit =
+			txn_alter_trigger_new(on_create_space_commit, space);
+		txn_on_commit(txn, on_commit);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_create_space_rollback, space);
+		txn_on_rollback(txn, on_rollback);
 		if (def->opts.is_view) {
 			struct Select *select = sql_view_compile(sql_get(),
 								 def->opts.sql);
@@ -1732,12 +1738,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			txn_on_rollback(txn, on_rollback_view);
 			select_guard.is_active = false;
 		}
-		struct trigger *on_commit =
-			txn_alter_trigger_new(on_create_space_commit, space);
-		txn_on_commit(txn, on_commit);
-		struct trigger *on_rollback =
-			txn_alter_trigger_new(on_create_space_rollback, space);
-		txn_on_rollback(txn, on_rollback);
 	} else if (new_tuple == NULL) { /* DELETE */
 		access_check_ddl(old_space->def->name, old_space->def->id,
 				 old_space->def->uid, SC_SPACE, PRIV_D, true);
@@ -1788,6 +1788,9 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		struct trigger *on_commit =
 			txn_alter_trigger_new(on_drop_space_commit, old_space);
 		txn_on_commit(txn, on_commit);
+		struct trigger *on_rollback =
+			txn_alter_trigger_new(on_drop_space_rollback, old_space);
+		txn_on_rollback(txn, on_rollback);
 		if (old_space->def->opts.is_view) {
 			struct Select *select =
 				sql_view_compile(sql_get(),
@@ -1807,10 +1810,6 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			txn_on_rollback(txn, on_rollback_view);
 			select_guard.is_active = false;
 		}
-		struct trigger *on_rollback =
-			txn_alter_trigger_new(on_drop_space_rollback,
-					      old_space);
-		txn_on_rollback(txn, on_rollback);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);
 		struct space_def *def =
