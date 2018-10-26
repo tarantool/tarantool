@@ -39,9 +39,9 @@ True
 
 
 IPROTO_CALL
-query {'IPROTO_CODE': 6} {}
+query {'IPROTO_CODE': 10} {}
 True
-query {'IPROTO_CODE': 6} {'IPROTO_KEY': ('procname',)}
+query {'IPROTO_CODE': 10} {'IPROTO_KEY': ('procname',)}
 True
 
 
@@ -58,22 +58,14 @@ index = space:create_index('primary', { type = 'hash' })
 box.schema.user.grant('guest', 'read,write,execute', 'space', 'test')
 ---
 ...
-- [1, baobab]
-
-- [2, obbaba]
-
-- [1, baobab]
-
-- [3, occama]
-
-- [2, obbaba]
-
-- [4, ockham]
-
-- [1, baobab]
-
-- [2, obbaba]
-
+- [1, 'baobab']
+- [2, 'obbaba']
+- [1, 'baobab']
+- [3, 'occama']
+- [2, 'obbaba']
+- [4, 'ockham']
+- [1, 'baobab']
+- [2, 'obbaba']
 space:drop()
 ---
 ...
@@ -186,11 +178,8 @@ box.schema.user.grant('guest', 'read,write,execute', 'space', 'test_index_base')
 ---
 ...
 - [1, 0, 0, 0]
-
 - [1, 0, 1, -1]
-
 - [1, 0, 2, -2]
-
 function kek() return 'kek' end
 ---
 ...
@@ -198,7 +187,7 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
 ...
 Sync:  100
-Retcode:  [['kek']]
+Retcode:  ['kek']
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...

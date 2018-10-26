@@ -48,7 +48,6 @@
 #include <stddef.h>
 #include <limits.h>
 #include "bit/bit.h"
-#include "small/quota.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -88,21 +87,19 @@ struct bloom {
  * @param bloom - structure to initialize
  * @param number_of_values - estimated number of values to be added
  * @param false_positive_rate - desired false positive rate
- * @param quota - quota for memory allocation
  * @return 0 - OK, -1 - memory error
  */
 int
 bloom_create(struct bloom *bloom, uint32_t number_of_values,
-	     double false_positive_rate, struct quota *quota);
+	     double false_positive_rate);
 
 /**
  * Free resources of the bloom filter
  *
  * @param bloom - the bloom filter
- * @param quota - quota for memory deallocation
  */
 void
-bloom_destroy(struct bloom *bloom, struct quota *quota);
+bloom_destroy(struct bloom *bloom);
 
 /**
  * Add a value into the data set
@@ -156,11 +153,10 @@ bloom_store(const struct bloom *bloom, char *table);
  *
  * @param bloom - structure to load to
  * @param table - data to load
- * @param quota - quota for memory allocation
  * @return 0 - OK, -1 - memory error
  */
 int
-bloom_load_table(struct bloom *bloom, const char *table, struct quota *quota);
+bloom_load_table(struct bloom *bloom, const char *table);
 
 /* }}} API declaration */
 

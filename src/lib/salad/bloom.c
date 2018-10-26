@@ -41,7 +41,7 @@
 
 int
 bloom_create(struct bloom *bloom, uint32_t number_of_values,
-	     double false_positive_rate, struct quota *quota)
+	     double false_positive_rate)
 {
 	/* Optimal hash_count and bit count calculation */
 	uint16_t hash_count = ceil(log(false_positive_rate) / log(0.5));
@@ -49,14 +49,9 @@ bloom_create(struct bloom *bloom, uint32_t number_of_values,
 	uint32_t block_bits = CHAR_BIT * sizeof(struct bloom_block);
 	uint32_t block_count = (bit_count + block_bits - 1) / block_bits;
 
-	if (quota_use(quota, block_count * sizeof(*bloom->table)) < 0)
-		return -1;
-
 	bloom->table = calloc(block_count, sizeof(*bloom->table));
-	if (bloom->table == NULL) {
-		quota_release(quota, block_count * sizeof(*bloom->table));
+	if (bloom->table == NULL)
 		return -1;
-	}
 
 	bloom->table_size = block_count;
 	bloom->hash_count = hash_count;
@@ -64,9 +59,8 @@ bloom_create(struct bloom *bloom, uint32_t number_of_values,
 }
 
 void
-bloom_destroy(struct bloom *bloom, struct quota *quota)
+bloom_destroy(struct bloom *bloom)
 {
-	quota_release(quota, bloom->table_size * sizeof(*bloom->table));
 	free(bloom->table);
 }
 
@@ -98,18 +92,12 @@ bloom_store(const struct bloom *bloom, char *table)
 }
 
 int
-bloom_load_table(struct bloom *bloom, const char *table, struct quota *quota)
+bloom_load_table(struct bloom *bloom, const char *table)
 {
 	size_t size = bloom->table_size * sizeof(struct bloom_block);
-	if (quota_use(quota, size) < 0) {
-		bloom->table = NULL;
-		return -1;
-	}
 	bloom->table = malloc(size);
-	if (bloom->table == NULL) {
-		quota_release(quota, size);
+	if (bloom->table == NULL)
 		return -1;
-	}
 	memcpy(bloom->table, table, size);
 	return 0;
 }

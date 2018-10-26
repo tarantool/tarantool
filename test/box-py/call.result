@@ -21,29 +21,40 @@ f1()
 - null
 ...
 call  f1 ()
-- [testing]
-- [1]
-- [false]
-- [-1]
-- [1.123]
-- [true]
-- [null]
-
+- 'testing'
+- 1
+- False
+- -1
+- 1.123
+- True
+- None
 f1=nil
 ---
 ...
 call  f1 ()
-error: {code: ER_NO_SUCH_PROC, reason: Procedure 'f1' is not defined}
-
+{
+    "error": {
+        "code": "ER_NO_SUCH_PROC", 
+        "reason": "Procedure 'f1' is not defined"
+    }
+}
 function f1() return f1 end
 ---
 ...
 call  f1 ()
-error: {code: ER_PROC_LUA, reason: unsupported Lua type 'function'}
-
+{
+    "error": {
+        "code": "ER_PROC_LUA", 
+        "reason": "unsupported Lua type 'function'"
+    }
+}
 call  box.error (33333, 'Hey!')
-error: {code: U, reason: Unknown error}
-
+{
+    "error": {
+        "code": "U", 
+        "reason": "Unknown error"
+    }
+}
 
 # A test case for Bug#103491
 # server CALL processing bug with name path longer than two
@@ -65,14 +76,11 @@ test.test.f = f
 ---
 ...
 call  f ()
-- [OK]
-
+- 'OK'
 call  test.f ()
-- [OK]
-
+- 'OK'
 call  test.test.f ()
-- [OK]
-
+- 'OK'
 
 # Test for Bug #955226
 # Lua Numbers are passed back wrongly as strings
@@ -82,11 +90,10 @@ function foo() return 1, 2, '1', '2' end
 ---
 ...
 call  foo ()
-- [1]
-- [2]
-- ['1']
-- ['2']
-
+- 1
+- 2
+- '1'
+- '2'
 function f1(...) return {...} end
 ---
 ...
@@ -94,81 +101,60 @@ function f2(...) return f1({...}) end
 ---
 ...
 call  f1 ('test_', 'test_')
-- [test_, test_]
-
+- ['test_', 'test_']
 call  f2 ('test_', 'test_')
-- [test_, test_]
-
+- [['test_', 'test_']]
 call  f1 ()
 - []
-
 call  f2 ()
-- []
-
+- [[]]
 function f3() return {{'hello'}, {'world'}} end
 ---
 ...
 call  f3 ()
-- [hello]
-- [world]
-
+- [['hello'], ['world']]
 function f3() return {'hello', {'world'}} end
 ---
 ...
 call  f3 ()
-- - hello
-  - [world]
-
+- ['hello', ['world']]
 function f3() return 'hello', {{'world'}, {'canada'}} end
 ---
 ...
 call  f3 ()
-- [hello]
-- - [world]
-  - [canada]
-
+- 'hello'
+- [['world'], ['canada']]
 function f3() return {}, '123', {{}, {}} end
 ---
 ...
 call  f3 ()
 - []
-- ['123']
-- - []
-  - []
-
+- '123'
+- [[], []]
 function f3() return { {{'hello'}} } end
 ---
 ...
 call  f3 ()
-- - [hello]
-
+- [[['hello']]]
 function f3() return { box.tuple.new('hello'), {'world'} } end
 ---
 ...
 call  f3 ()
-- [hello]
-- [world]
-
+- [['hello'], ['world']]
 function f3() return { {'world'}, box.tuple.new('hello') } end
 ---
 ...
 call  f3 ()
-- [world]
-- [hello]
-
+- [['world'], ['hello']]
 function f3() return { { test={1,2,3} }, { test2={1,2,3} } } end
 ---
 ...
 call  f3 ()
-- - test: [1, 2, 3]
-  - test2: [1, 2, 3]
-
+- [{'test': [1, 2, 3]}, {'test2': [1, 2, 3]}]
 call  f1 ('jason',)
-- [jason]
-
+- ['jason']
 call  f1 ('jason', 1, 'test', 2, 'stewart')
-- [jason, 1, test, 2, stewart]
-
+- ['jason', 1, 'test', 2, 'stewart']
 space = box.schema.space.create('tweedledum')
 ---
 ...
@@ -182,57 +168,42 @@ function myinsert(...) return space:insert{...} end
 ---
 ...
 call  myinsert (1, 'test box delete')
-- [1, test box delete]
-
+- [1, 'test box delete']
 call  space:delete (1,)
-- [1, test box delete]
-
+- [1, 'test box delete']
 call  myinsert (1, 'test box delete')
-- [1, test box delete]
-
+- [1, 'test box delete']
 call  space:delete (1,)
-- [1, test box delete]
-
+- [1, 'test box delete']
 call  space:delete (1,)
-[]
 
 call  myinsert (2, 'test box delete')
-- [2, test box delete]
-
+- [2, 'test box delete']
 call  space:delete (1,)
-[]
 
 call  space:delete (2,)
-- [2, test box delete]
-
+- [2, 'test box delete']
 call  space:delete (2,)
-[]
 
 space:delete{2}
 ---
 ...
 call  myinsert (2, 'test box delete')
-- [2, test box delete]
-
+- [2, 'test box delete']
 call  space:get (2,)
-- [2, test box delete]
-
+- [2, 'test box delete']
 space:delete{2}
 ---
 - [2, 'test box delete']
 ...
 call  space:get (2,)
-[]
 
 call  myinsert (2, 'test box.select()')
-- [2, test box.select()]
-
+- [2, 'test box.select()']
 call  space:get (2,)
-- [2, test box.select()]
-
+- [2, 'test box.select()']
 call  space:select (2,)
-- [2, test box.select()]
-
+- [[2, 'test box.select()']]
 space:get{2}
 ---
 - [2, 'test box.select()']
@@ -249,17 +220,13 @@ space:select{1}
 - []
 ...
 call  myreplace (2, 'hello', 'world')
-- [2, hello, world]
-
+- [2, 'hello', 'world']
 call  myreplace (2, 'goodbye', 'universe')
-- [2, goodbye, universe]
-
+- [2, 'goodbye', 'universe']
 call  space:get (2,)
-- [2, goodbye, universe]
-
+- [2, 'goodbye', 'universe']
 call  space:select (2,)
-- [2, goodbye, universe]
-
+- [[2, 'goodbye', 'universe']]
 space:get{2}
 ---
 - [2, 'goodbye', 'universe']
@@ -270,26 +237,23 @@ space:select{2}
 ...
 call  myreplace (2,)
 - [2]
-
 call  space:get (2,)
 - [2]
-
 call  space:select (2,)
-- [2]
-
+- [[2]]
 call  space:delete (2,)
 - [2]
-
 call  space:delete (2,)
-[]
 
 call  myinsert (3, 'old', 2)
-- [3, old, 2]
-
+- [3, 'old', 2]
 call  myinsert (3, 'old', 2)
-error: {code: ER_TUPLE_FOUND, reason: Duplicate key exists in unique index 'primary'
-    in space 'tweedledum'}
-
+{
+    "error": {
+        "code": "ER_TUPLE_FOUND", 
+        "reason": "Duplicate key exists in unique index 'primary' in space 'tweedledum'"
+    }
+}
 space:update({3}, {{'=', 1, 4}, {'=', 2, 'new'}})
 ---
 - error: Attempt to modify a tuple field which is part of index 'primary' in space
@@ -299,11 +263,9 @@ space:insert(space:get{3}:update{{'=', 1, 4}, {'=', 2, 'new'}}) space:delete{3}
 ---
 ...
 call  space:get (4,)
-- [4, new, 2]
-
+- [4, 'new', 2]
 call  space:select (4,)
-- [4, new, 2]
-
+- [[4, 'new', 2]]
 space:update({4}, {{'+', 3, 1}})
 ---
 - [4, 'new', 3]
@@ -313,23 +275,18 @@ space:update({4}, {{'-', 3, 1}})
 - [4, 'new', 2]
 ...
 call  space:get (4,)
-- [4, new, 2]
-
+- [4, 'new', 2]
 call  space:select (4,)
-- [4, new, 2]
-
+- [[4, 'new', 2]]
 function field_x(key, field_index) return space:get(key)[field_index] end
 ---
 ...
 call  field_x (4, 1)
-- [4]
-
+- 4
 call  field_x (4, 2)
-- [new]
-
+- 'new'
 call  space:delete (4,)
-- [4, new, 2]
-
+- [4, 'new', 2]
 space:drop()
 ---
 ...
@@ -341,423 +298,299 @@ index = space:create_index('primary', { type = 'tree' })
 ...
 eval (return 1)()
 ---
-[1]
-
+- 1
 function f(...) return 1 end
 ---
 ...
 call f()
 ---
-- [1]
-
+- 1
 eval (return 1, 2, 3)()
 ---
-[1, 2, 3]
-
+- 1
+- 2
+- 3
 function f(...) return 1, 2, 3 end
 ---
 ...
 call f()
 ---
-- [1]
-- [2]
-- [3]
-
+- 1
+- 2
+- 3
 eval (return true)()
 ---
-[true]
-
+- True
 function f(...) return true end
 ---
 ...
 call f()
 ---
-- [true]
-
+- True
 eval (return nil)()
 ---
-[null]
-
+- None
 function f(...) return nil end
 ---
 ...
 call f()
 ---
-- [null]
-
+- None
 eval (return )()
 ---
-[]
 
 function f(...) return  end
 ---
 ...
 call f()
 ---
-[]
 
 eval (return {})()
 ---
 - []
-
 function f(...) return {} end
 ---
 ...
 call f()
 ---
 - []
-
 eval (return {1})()
 ---
 - [1]
-
 function f(...) return {1} end
 ---
 ...
 call f()
 ---
 - [1]
-
 eval (return {1, 2, 3})()
 ---
 - [1, 2, 3]
-
 function f(...) return {1, 2, 3} end
 ---
 ...
 call f()
 ---
 - [1, 2, 3]
-
 eval (return {k1 = 'v1', k2 = 'v2'})()
 ---
-- {k1: v1, k2: v2}
-
+- {'k2': 'v2', 'k1': 'v1'}
 function f(...) return {k1 = 'v1', k2 = 'v2'} end
 ---
 ...
 call f()
 ---
-- - {k1: v1, k2: v2}
-
+- {'k2': 'v2', 'k1': 'v1'}
 eval (return {k1 = 'v1', k2 = 'v2'})()
 ---
-- {k1: v1, k2: v2}
-
+- {'k2': 'v2', 'k1': 'v1'}
 function f(...) return {k1 = 'v1', k2 = 'v2'} end
 ---
 ...
 call f()
 ---
-- - {k1: v1, k2: v2}
-
+- {'k2': 'v2', 'k1': 'v1'}
 eval (return {s = {1, 1428578535}, u = 1428578535, v = {}, c = {['2'] = {1, 1428578535}, ['106'] = { 1, 1428578535} }, pc = {['2'] = {1, 1428578535, 9243}, ['106'] = {1, 1428578535, 9243}}})()
 ---
-- c:
-    '106': [1, 1428578535]
-    '2': [1, 1428578535]
-  pc:
-    '106': [1, 1428578535, 9243]
-    '2': [1, 1428578535, 9243]
-  s: [1, 1428578535]
-  u: 1428578535
-  v: []
-
+- {'pc': {'2': [1, 1428578535, 9243], '106': [1, 1428578535, 9243]}, 's': [1, 1428578535], 'u': 1428578535, 'c': {'2': [1, 1428578535], '106': [1, 1428578535]}, 'v': []}
 function f(...) return {s = {1, 1428578535}, u = 1428578535, v = {}, c = {['2'] = {1, 1428578535}, ['106'] = { 1, 1428578535} }, pc = {['2'] = {1, 1428578535, 9243}, ['106'] = {1, 1428578535, 9243}}} end
 ---
 ...
 call f()
 ---
-- - c:
-      '106': [1, 1428578535]
-      '2': [1, 1428578535]
-    pc:
-      '106': [1, 1428578535, 9243]
-      '2': [1, 1428578535, 9243]
-    s: [1, 1428578535]
-    u: 1428578535
-    v: []
-
+- {'pc': {'2': [1, 1428578535, 9243], '106': [1, 1428578535, 9243]}, 's': [1, 1428578535], 'u': 1428578535, 'c': {'2': [1, 1428578535], '106': [1, 1428578535]}, 'v': []}
 eval (return true, {s = {1, 1428578535}, u = 1428578535, v = {}, c = {['2'] = {1, 1428578535}, ['106'] = { 1, 1428578535} }, pc = {['2'] = {1, 1428578535, 9243}, ['106'] = {1, 1428578535, 9243}}})()
 ---
-- true
-- c:
-    '106': [1, 1428578535]
-    '2': [1, 1428578535]
-  pc:
-    '106': [1, 1428578535, 9243]
-    '2': [1, 1428578535, 9243]
-  s: [1, 1428578535]
-  u: 1428578535
-  v: []
-
+- True
+- {'pc': {'2': [1, 1428578535, 9243], '106': [1, 1428578535, 9243]}, 's': [1, 1428578535], 'u': 1428578535, 'c': {'2': [1, 1428578535], '106': [1, 1428578535]}, 'v': []}
 function f(...) return true, {s = {1, 1428578535}, u = 1428578535, v = {}, c = {['2'] = {1, 1428578535}, ['106'] = { 1, 1428578535} }, pc = {['2'] = {1, 1428578535, 9243}, ['106'] = {1, 1428578535, 9243}}} end
 ---
 ...
 call f()
 ---
-- [true]
-- - c:
-      '106': [1, 1428578535]
-      '2': [1, 1428578535]
-    pc:
-      '106': [1, 1428578535, 9243]
-      '2': [1, 1428578535, 9243]
-    s: [1, 1428578535]
-    u: 1428578535
-    v: []
-
+- True
+- {'pc': {'2': [1, 1428578535, 9243], '106': [1, 1428578535, 9243]}, 's': [1, 1428578535], 'u': 1428578535, 'c': {'2': [1, 1428578535], '106': [1, 1428578535]}, 'v': []}
 eval (return {s = {1, 1428578535}, u = 1428578535, v = {}, c = {['2'] = {1, 1428578535}, ['106'] = { 1, 1428578535} }, pc = {['2'] = {1, 1428578535, 9243}, ['106'] = {1, 1428578535, 9243}}}, true)()
 ---
-- c:
-    '106': [1, 1428578535]
-    '2': [1, 1428578535]
-  pc:
-    '106': [1, 1428578535, 9243]
-    '2': [1, 1428578535, 9243]
-  s: [1, 1428578535]
-  u: 1428578535
-  v: []
-- true
-
+- {'pc': {'2': [1, 1428578535, 9243], '106': [1, 1428578535, 9243]}, 's': [1, 1428578535], 'u': 1428578535, 'c': {'2': [1, 1428578535], '106': [1, 1428578535]}, 'v': []}
+- True
 function f(...) return {s = {1, 1428578535}, u = 1428578535, v = {}, c = {['2'] = {1, 1428578535}, ['106'] = { 1, 1428578535} }, pc = {['2'] = {1, 1428578535, 9243}, ['106'] = {1, 1428578535, 9243}}}, true end
 ---
 ...
 call f()
 ---
-- - c:
-      '106': [1, 1428578535]
-      '2': [1, 1428578535]
-    pc:
-      '106': [1, 1428578535, 9243]
-      '2': [1, 1428578535, 9243]
-    s: [1, 1428578535]
-    u: 1428578535
-    v: []
-- [true]
-
+- {'pc': {'2': [1, 1428578535, 9243], '106': [1, 1428578535, 9243]}, 's': [1, 1428578535], 'u': 1428578535, 'c': {'2': [1, 1428578535], '106': [1, 1428578535]}, 'v': []}
+- True
 t = box.tuple.new('tuple', {1, 2, 3}, { k1 = 'v', k2 = 'v2'})
 ---
 ...
 eval (return t)()
 ---
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
 function f(...) return t end
 ---
 ...
 call f()
 ---
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
 eval (return t, t, t)()
 ---
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
 function f(...) return t, t, t end
 ---
 ...
 call f()
 ---
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
+- ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]
 eval (return {t})()
 ---
-- - - tuple
-    - [1, 2, 3]
-    - {k1: v, k2: v2}
-
+- [['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]]
 function f(...) return {t} end
 ---
 ...
 call f()
 ---
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-
+- [['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]]
 eval (return {t, t, t})()
 ---
-- - - tuple
-    - [1, 2, 3]
-    - {k1: v, k2: v2}
-  - - tuple
-    - [1, 2, 3]
-    - {k1: v, k2: v2}
-  - - tuple
-    - [1, 2, 3]
-    - {k1: v, k2: v2}
-
+- [['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}], ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}], ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]]
 function f(...) return {t, t, t} end
 ---
 ...
 call f()
 ---
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-- - tuple
-  - [1, 2, 3]
-  - {k1: v, k2: v2}
-
+- [['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}], ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}], ['tuple', [1, 2, 3], {'k2': 'v2', 'k1': 'v'}]]
 eval (return error('exception'))()
 ---
-error: {code: ER_PROC_LUA, reason: exception}
-
+{
+    "error": {
+        "code": "ER_PROC_LUA", 
+        "reason": "exception"
+    }
+}
 function f(...) return error('exception') end
 ---
 ...
 call f()
 ---
-error: {code: ER_PROC_LUA, reason: exception}
-
+{
+    "error": {
+        "code": "ER_PROC_LUA", 
+        "reason": "exception"
+    }
+}
 eval (return box.error(0))()
 ---
-error: {code: ER_OK, reason: Unknown error}
 
 function f(...) return box.error(0) end
 ---
 ...
 call f()
 ---
-error: {code: ER_OK, reason: Unknown error}
 
 eval (return ...)()
 ---
-[]
 
 function f(...) return ... end
 ---
 ...
 call f()
 ---
-[]
 
 eval (return ...)(1,2,3)
 ---
-[1, 2, 3]
-
+- 1
+- 2
+- 3
 function f(...) return ... end
 ---
 ...
 call f(1,2,3)
 ---
-- [1]
-- [2]
-- [3]
-
+- 1
+- 2
+- 3
 eval (return ...)(None,None,None)
 ---
-[null, null, null]
-
+- None
+- None
+- None
 function f(...) return ... end
 ---
 ...
 call f(None,None,None)
 ---
-- [null]
-- [null]
-- [null]
-
+- None
+- None
+- None
 eval (return ...)({'k2': 'v2', 'k1': 'v1'})
 ---
-- {k1: v1, k2: v2}
-
+- {'k2': 'v2', 'k1': 'v1'}
 function f(...) return ... end
 ---
 ...
 call f({'k2': 'v2', 'k1': 'v1'})
 ---
-- - {k1: v1, k2: v2}
-
+- {'k2': 'v2', 'k1': 'v1'}
 eval (return space:auto_increment({"transaction"}))()
 ---
-- [1, transaction]
-
+- [1, 'transaction']
 function f(...) return space:auto_increment({"transaction"}) end
 ---
 ...
 call f()
 ---
-- [2, transaction]
-
+- [2, 'transaction']
 eval (return space:select{})()
 ---
-- - [1, transaction]
-  - [2, transaction]
-
+- [[1, 'transaction'], [2, 'transaction']]
 function f(...) return space:select{} end
 ---
 ...
 call f()
 ---
-- [1, transaction]
-- [2, transaction]
-
+- [[1, 'transaction'], [2, 'transaction']]
 eval (return box.begin(), space:auto_increment({"failed"}), box.rollback())()
 ---
-- null
-- [3, failed]
-
+- None
+- [3, 'failed']
 function f(...) return box.begin(), space:auto_increment({"failed"}), box.rollback() end
 ---
 ...
 call f()
 ---
-- [null]
-- [3, failed]
-
+- None
+- [3, 'failed']
 eval (return space:select{})()
 ---
-- - [1, transaction]
-  - [2, transaction]
-
+- [[1, 'transaction'], [2, 'transaction']]
 function f(...) return space:select{} end
 ---
 ...
 call f()
 ---
-- [1, transaction]
-- [2, transaction]
-
+- [[1, 'transaction'], [2, 'transaction']]
 eval (return require("fiber").sleep(0))()
 ---
-[]
 
 function f(...) return require("fiber").sleep(0) end
 ---
 ...
 call f()
 ---
-[]
 
 eval (!invalid expression)()
 ---
-error: {code: ER_PROC_LUA, reason: 'eval:1: unexpected symbol near ''!'''}
-
+{
+    "error": {
+        "code": "ER_PROC_LUA", 
+        "reason": "eval:1: unexpected symbol near '!'"
+    }
+}
 space:drop()
 ---
 ...
