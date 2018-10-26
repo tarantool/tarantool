@@ -170,7 +170,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 
 	assert(format->fields[0].offset_slot == TUPLE_OFFSET_SLOT_NIL);
 	size_t field_map_size = -current_slot * sizeof(uint32_t);
-	if (field_map_size + format->extra_size > UINT16_MAX) {
+	if (field_map_size > UINT16_MAX) {
 		/** tuple->data_offset is 16 bits */
 		diag_set(ClientError, ER_INDEX_FIELD_COUNT_LIMIT,
 			 -current_slot);
@@ -288,8 +288,7 @@ tuple_format_delete(struct tuple_format *format)
 
 struct tuple_format *
 tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
-		 uint16_t key_count, uint16_t extra_size,
-		 const struct field_def *space_fields,
+		 uint16_t key_count, const struct field_def *space_fields,
 		 uint32_t space_field_count, struct tuple_dictionary *dict)
 {
 	struct tuple_format *format =
@@ -298,7 +297,6 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 		return NULL;
 	format->vtab = *vtab;
 	format->engine = NULL;
-	format->extra_size = extra_size;
 	format->is_temporary = false;
 	if (tuple_format_register(format) < 0) {
 		tuple_format_destroy(format);
@@ -353,28 +351,6 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 			return false;
 	}
 	return true;
-}
-
-struct tuple_format *
-tuple_format_dup(struct tuple_format *src)
-{
-	uint32_t total = sizeof(struct tuple_format) +
-			 src->field_count * sizeof(struct tuple_field);
-	struct tuple_format *format = (struct tuple_format *) malloc(total);
-	if (format == NULL) {
-		diag_set(OutOfMemory, total, "malloc", "tuple format");
-		return NULL;
-	}
-	memcpy(format, src, total);
-	tuple_dictionary_ref(format->dict);
-	format->id = FORMAT_ID_NIL;
-	format->refs = 0;
-	if (tuple_format_register(format) != 0) {
-		tuple_format_destroy(format);
-		free(format);
-		return NULL;
-	}
-	return format;
 }
 
 /** @sa declaration for details. */

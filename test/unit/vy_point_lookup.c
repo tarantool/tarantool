@@ -84,7 +84,7 @@ test_basic()
 
 	vy_cache_create(&cache, &cache_env, key_def, true);
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-						       &key_def, 1, 0, NULL, 0,
+						       &key_def, 1, NULL, 0,
 						       NULL);
 	isnt(format, NULL, "tuple_format_new is not NULL");
 	tuple_format_ref(format);
@@ -179,9 +179,8 @@ test_basic()
 
 	/* create second run */
 	struct vy_mem *run_mem =
-		vy_mem_new(pk->mem->env, *pk->env->p_generation,
-			   pk->cmp_def, pk->mem_format,
-			   pk->mem_format_with_colmask, 0);
+		vy_mem_new(pk->mem->env, pk->cmp_def, pk->mem_format,
+			   *pk->env->p_generation, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {
 		if (!in_run2[i])
@@ -211,10 +210,8 @@ test_basic()
 	vy_run_unref(run);
 
 	/* create first run */
-	run_mem =
-		vy_mem_new(pk->mem->env, *pk->env->p_generation,
-			   pk->cmp_def, pk->mem_format,
-			   pk->mem_format_with_colmask, 0);
+	run_mem = vy_mem_new(pk->mem->env, pk->cmp_def, pk->mem_format,
+			     *pk->env->p_generation, 0);
 
 	for (size_t i = 0; i < num_of_keys; i++) {
 		if (!in_run1[i])
@@ -274,7 +271,7 @@ test_basic()
 			struct vy_stmt_template tmpl_key =
 				STMT_TEMPLATE(0, SELECT, i);
 			struct tuple *key = vy_new_simple_stmt(format,
-					pk->mem_format_with_colmask, &tmpl_key);
+							       &tmpl_key);
 			struct tuple *res;
 			rc = vy_point_lookup(pk, NULL, &prv, key, &res);
 			tuple_unref(key);

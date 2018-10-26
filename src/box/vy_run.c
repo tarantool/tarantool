@@ -542,6 +542,33 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 	return 0;
 }
 
+/** Decode statement statistics from @data and advance @data. */
+static void
+vy_stmt_stat_decode(struct vy_stmt_stat *stat, const char **data)
+{
+	uint32_t size = mp_decode_map(data);
+	for (uint32_t i = 0; i < size; i++) {
+		uint64_t key = mp_decode_uint(data);
+		uint64_t value = mp_decode_uint(data);
+		switch (key) {
+		case IPROTO_INSERT:
+			stat->inserts = value;
+			break;
+		case IPROTO_REPLACE:
+			stat->replaces = value;
+			break;
+		case IPROTO_DELETE:
+			stat->deletes = value;
+			break;
+		case IPROTO_UPSERT:
+			stat->upserts = value;
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 /**
  * Decode the run metadata from xrow.
  *
@@ -602,6 +629,9 @@ vy_run_info_decode(struct vy_run_info *run_info,
 			run_info->bloom = tuple_bloom_decode(&pos);
 			if (run_info->bloom == NULL)
 				return -1;
+			break;
+		case VY_RUN_INFO_STMT_STAT:
+			vy_stmt_stat_decode(&run_info->stmt_stat, &pos);
 			break;
 		default:
 			diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
@@ -1876,6 +1906,37 @@ vy_page_info_encode(const struct vy_page_info *page_info,
 
 /** {{{ vy_run_info */
 
+/** Return the size of encoded statement statistics. */
+static size_t
+vy_stmt_stat_sizeof(const struct vy_stmt_stat *stat)
+{
+	return mp_sizeof_map(4) +
+		mp_sizeof_uint(IPROTO_INSERT) +
+		mp_sizeof_uint(IPROTO_REPLACE) +
+		mp_sizeof_uint(IPROTO_DELETE) +
+		mp_sizeof_uint(IPROTO_UPSERT) +
+		mp_sizeof_uint(stat->inserts) +
+		mp_sizeof_uint(stat->replaces) +
+		mp_sizeof_uint(stat->deletes) +
+		mp_sizeof_uint(stat->upserts);
+}
+
+/** Encode statement statistics to @buf and return advanced @buf. */
+static char *
+vy_stmt_stat_encode(const struct vy_stmt_stat *stat, char *buf)
+{
+	buf = mp_encode_map(buf, 4);
+	buf = mp_encode_uint(buf, IPROTO_INSERT);
+	buf = mp_encode_uint(buf, stat->inserts);
+	buf = mp_encode_uint(buf, IPROTO_REPLACE);
+	buf = mp_encode_uint(buf, stat->replaces);
+	buf = mp_encode_uint(buf, IPROTO_DELETE);
+	buf = mp_encode_uint(buf, stat->deletes);
+	buf = mp_encode_uint(buf, IPROTO_UPSERT);
+	buf = mp_encode_uint(buf, stat->upserts);
+	return buf;
+}
+
 /**
  * Encode vy_run_info as xrow
  * Allocates using region alloc
@@ -1898,7 +1959,7 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	mp_next(&tmp);
 	size_t max_key_size = tmp - run_info->max_key;
 
-	uint32_t key_count = 5;
+	uint32_t key_count = 6;
 	if (run_info->bloom != NULL)
 		key_count++;
 
@@ -1914,6 +1975,8 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 	if (run_info->bloom != NULL)
 		size += mp_sizeof_uint(VY_RUN_INFO_BLOOM) +
 			tuple_bloom_size(run_info->bloom);
+	size += mp_sizeof_uint(VY_RUN_INFO_STMT_STAT) +
+		vy_stmt_stat_sizeof(&run_info->stmt_stat);
 
 	char *pos = region_alloc(&fiber()->gc, size);
 	if (pos == NULL) {
@@ -1940,6 +2003,8 @@ vy_run_info_encode(const struct vy_run_info *run_info,
 		pos = mp_encode_uint(pos, VY_RUN_INFO_BLOOM);
 		pos = tuple_bloom_encode(run_info->bloom, pos);
 	}
+	pos = mp_encode_uint(pos, VY_RUN_INFO_STMT_STAT);
+	pos = vy_stmt_stat_encode(&run_info->stmt_stat, pos);
 	xrow->body->iov_len = (void *)pos - xrow->body->iov_base;
 	xrow->bodycnt = 1;
 	xrow->type = VY_INDEX_RUN_INFO;
@@ -2136,6 +2201,7 @@ vy_run_writer_write_to_page(struct vy_run_writer *writer, struct tuple *stmt)
 	int64_t lsn = vy_stmt_lsn(stmt);
 	run->info.min_lsn = MIN(run->info.min_lsn, lsn);
 	run->info.max_lsn = MAX(run->info.max_lsn, lsn);
+	vy_stmt_stat_acct(&run->info.stmt_stat, vy_stmt_type(stmt));
 	return 0;
 }
 
@@ -2567,8 +2633,10 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
 	if (stream->slice->end != NULL &&
 	    stream->page_no >= stream->slice->last_page_no &&
 	    vy_tuple_compare_with_key(tuple, stream->slice->end,
-				      stream->cmp_def) >= 0)
+				      stream->cmp_def) >= 0) {
+		tuple_unref(tuple);
 		return 0;
+	}
 
 	/* We definitely has the next non-null tuple. Save it in stream */
 	if (stream->tuple != NULL)

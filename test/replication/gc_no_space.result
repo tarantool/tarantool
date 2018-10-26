@@ -1,0 +1,234 @@
+--
+-- This test checks that when the WAL thread runs out of disk
+-- space it automatically deletes old WAL files and notifies
+-- the TX thread so that the latter can shoot off WAL consumers
+-- that need them. See gh-3397.
+--
+test_run = require('test_run').new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+fio = require('fio')
+---
+...
+errinj = box.error.injection
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+function check_file_count(dir, glob, count)
+    local files = fio.glob(fio.pathjoin(dir, glob))
+    if #files == count then
+        return true
+    end
+    return false, files
+end;
+---
+...
+function check_wal_count(count)
+    return check_file_count(box.cfg.wal_dir, '*.xlog', count)
+end;
+---
+...
+function check_snap_count(count)
+    return check_file_count(box.cfg.memtx_dir, '*.snap', count)
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+default_checkpoint_count = box.cfg.checkpoint_count
+---
+...
+box.cfg{checkpoint_count = 2}
+---
+...
+test_run:cleanup_cluster()
+---
+...
+box.schema.user.grant('guest', 'replication')
+---
+...
+s = box.schema.space.create('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+box.snapshot()
+---
+- ok
+...
+--
+-- Create a few dead replicas to pin WAL files.
+--
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+---
+- true
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+s:auto_increment{}
+---
+- [1]
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+s:auto_increment{}
+---
+- [2]
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+test_run:cmd("cleanup server replica")
+---
+- true
+...
+test_run:cmd("delete server replica")
+---
+- true
+...
+--
+-- Make a few checkpoints and check that old WAL files are not
+-- deleted.
+--
+s:auto_increment{}
+---
+- [3]
+...
+box.snapshot()
+---
+- ok
+...
+s:auto_increment{}
+---
+- [4]
+...
+box.snapshot()
+---
+- ok
+...
+s:auto_increment{}
+---
+- [5]
+...
+check_wal_count(7)
+---
+- true
+...
+check_snap_count(2)
+---
+- true
+...
+#box.info.gc().consumers -- 3
+---
+- 3
+...
+--
+-- Inject a ENOSPC error and check that the WAL thread deletes
+-- old WAL files to prevent the user from seeing the error.
+--
+errinj.set('ERRINJ_WAL_FALLOCATE', 3)
+---
+- ok
+...
+s:auto_increment{} -- success
+---
+- [6]
+...
+errinj.info()['ERRINJ_WAL_FALLOCATE'].state -- 0
+---
+- 0
+...
+check_wal_count(3)
+---
+- true
+...
+check_snap_count(2)
+---
+- true
+...
+#box.info.gc().consumers -- 1
+---
+- 1
+...
+--
+-- Check that the WAL thread never deletes WAL files that are
+-- needed for recovery from a checkpoint.
+--
+errinj.set('ERRINJ_WAL_FALLOCATE', 2)
+---
+- ok
+...
+s:auto_increment{} -- failure
+---
+- error: Failed to write to disk
+...
+errinj.info()['ERRINJ_WAL_FALLOCATE'].state -- 0
+---
+- 0
+...
+check_wal_count(2)
+---
+- true
+...
+check_snap_count(2)
+---
+- true
+...
+#box.info.gc().consumers -- 0
+---
+- 0
+...
+s:drop()
+---
+...
+box.schema.user.revoke('guest', 'replication')
+---
+...
+test_run:cleanup_cluster()
+---
+...
+box.cfg{checkpoint_count = default_checkpoint_count}
+---
+...

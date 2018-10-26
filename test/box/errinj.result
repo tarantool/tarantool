@@ -44,8 +44,8 @@ errinj.info()
     state: false
   ERRINJ_WAL_IO:
     state: false
-  ERRINJ_VY_INDEX_FILE_RENAME:
-    state: false
+  ERRINJ_WAL_FALLOCATE:
+    state: 0
   ERRINJ_TUPLE_ALLOC:
     state: false
   ERRINJ_VY_RUN_FILE_RENAME:
@@ -54,18 +54,20 @@ errinj.info()
     state: false
   ERRINJ_RELAY_REPORT_INTERVAL:
     state: 0
+  ERRINJ_SNAP_COMMIT_DELAY:
+    state: false
   ERRINJ_VY_READ_PAGE_TIMEOUT:
     state: 0
   ERRINJ_XLOG_META:
     state: false
-  ERRINJ_SNAP_COMMIT_DELAY:
-    state: false
   ERRINJ_WAL_BREAK_LSN:
+    state: -1
+  ERRINJ_RELAY_BREAK_LSN:
     state: -1
   ERRINJ_WAL_WRITE_DISK:
     state: false
-  ERRINJ_RELAY_BREAK_LSN:
-    state: -1
+  ERRINJ_VY_INDEX_FILE_RENAME:
+    state: false
   ERRINJ_VY_LOG_FILE_RENAME:
     state: false
   ERRINJ_VY_RUN_WRITE:
@@ -100,11 +102,11 @@ errinj.info()
     state: false
   ERRINJ_INDEX_ALLOC:
     state: false
-  ERRINJ_RELAY_TIMEOUT:
+  ERRINJ_VY_RUN_WRITE_TIMEOUT:
     state: 0
   ERRINJ_TESTING:
     state: false
-  ERRINJ_VY_RUN_WRITE_TIMEOUT:
+  ERRINJ_RELAY_TIMEOUT:
     state: 0
   ERRINJ_VY_SQUASH_TIMEOUT:
     state: 0

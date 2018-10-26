@@ -39,7 +39,6 @@
 #include <msgpuck.h>
 #include "diag.h"
 #include "errcode.h"
-#include "memory.h"
 #include "key_def.h"
 #include "tuple.h"
 #include "tuple_hash.h"
@@ -143,8 +142,7 @@ tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 		for (uint32_t j = 0; j < i; j++)
 			part_fpr /= bloom_fpr(&bloom->parts[j], count);
 		part_fpr = MIN(part_fpr, 0.5);
-		if (bloom_create(&bloom->parts[i], count,
-				 part_fpr, runtime.quota) != 0) {
+		if (bloom_create(&bloom->parts[i], count, part_fpr) != 0) {
 			diag_set(OutOfMemory, 0, "bloom_create",
 				 "tuple bloom part");
 			tuple_bloom_delete(bloom);
@@ -161,7 +159,7 @@ void
 tuple_bloom_delete(struct tuple_bloom *bloom)
 {
 	for (uint32_t i = 0; i < bloom->part_count; i++)
-		bloom_destroy(&bloom->parts[i], runtime.quota);
+		bloom_destroy(&bloom->parts[i]);
 	free(bloom);
 }
 
@@ -251,7 +249,7 @@ tuple_bloom_decode_part(struct bloom *part, const char **data)
 	part->hash_count = mp_decode_uint(data);
 	size_t store_size = mp_decode_binl(data);
 	assert(store_size == bloom_store_size(part));
-	if (bloom_load_table(part, *data, runtime.quota) != 0) {
+	if (bloom_load_table(part, *data) != 0) {
 		diag_set(OutOfMemory, store_size, "bloom_load_table",
 			 "tuple bloom part");
 		return -1;
@@ -329,7 +327,7 @@ tuple_bloom_decode_legacy(const char **data)
 
 	size_t store_size = mp_decode_binl(data);
 	assert(store_size == bloom_store_size(&bloom->parts[0]));
-	if (bloom_load_table(&bloom->parts[0], *data, runtime.quota) != 0) {
+	if (bloom_load_table(&bloom->parts[0], *data) != 0) {
 		diag_set(OutOfMemory, store_size, "bloom_load_table",
 			 "tuple bloom part");
 		free(bloom);

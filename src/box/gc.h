@@ -36,6 +36,7 @@
 
 #include "vclock.h"
 #include "latch.h"
+#include "wal.h"
 #include "trivia/util.h"
 
 #if defined(__cplusplus)
@@ -89,6 +90,11 @@ struct gc_consumer {
 	char name[GC_NAME_MAX];
 	/** The vclock tracked by this consumer. */
 	struct vclock vclock;
+	/**
+	 * This flag is set if a WAL needed by this consumer was
+	 * deleted by the WAL thread on ENOSPC.
+	 */
+	bool is_inactive;
 };
 
 typedef rb_tree(struct gc_consumer) gc_tree_t;
@@ -120,6 +126,11 @@ struct gc_state {
 	 * garbage collection callbacks.
 	 */
 	struct latch latch;
+	/**
+	 * WAL event watcher. Needed to shoot off stale consumers
+	 * when a WAL file is deleted due to ENOSPC.
+	 */
+	struct wal_watcher wal_watcher;
 };
 extern struct gc_state gc;
 
@@ -145,6 +156,20 @@ extern struct gc_state gc;
 	rlist_foreach_entry(ref, &(checkpoint)->refs, in_refs)
 
 /**
+ * Return the first (oldest) checkpoint known to the garbage
+ * collector. If there's no checkpoint, return NULL.
+ */
+static inline struct gc_checkpoint *
+gc_first_checkpoint(void)
+{
+	if (rlist_empty(&gc.checkpoints))
+		return NULL;
+
+	return rlist_first_entry(&gc.checkpoints, struct gc_checkpoint,
+				 in_checkpoints);
+}
+
+/**
  * Return the last (newest) checkpoint known to the garbage
  * collector. If there's no checkpoint, return NULL.
  */
@@ -163,6 +188,12 @@ gc_last_checkpoint(void)
  */
 void
 gc_init(void);
+
+/**
+ * Set WAL watcher. Called after WAL is initialized.
+ */
+void
+gc_set_wal_watcher(void);
 
 /**
  * Destroy the garbage collection state.

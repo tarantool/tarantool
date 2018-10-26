@@ -85,6 +85,8 @@ struct txv {
 	struct tuple *stmt;
 	/** Statement allocated on vy_mem->allocator. */
 	const struct tuple *region_stmt;
+	/** Mask of columns modified by this operation. */
+	uint64_t column_mask;
 	/** Next in the transaction log. */
 	struct stailq_entry next_in_log;
 	/** Member the transaction write set. */
@@ -371,7 +373,14 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
 
 /** Add a statement to a transaction. */
 int
-vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
+vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
+		       struct tuple *stmt, uint64_t column_mask);
+
+static inline int
+vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
+{
+	return vy_tx_set_with_colmask(tx, lsm, stmt, UINT64_MAX);
+}
 
 /**
  * Iterator over the write set of a transaction.

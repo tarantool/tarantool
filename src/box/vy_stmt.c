@@ -61,6 +61,14 @@ static inline uint8_t
 vy_stmt_persistent_flags(const struct tuple *stmt, bool is_primary)
 {
 	uint8_t mask = VY_STMT_FLAGS_ALL;
+
+	/*
+	 * This flag is only used by the write iterator to turn
+	 * in-memory REPLACEs into INSERTs on dump so no need to
+	 * persist it.
+	 */
+	mask &= ~VY_STMT_UPDATE;
+
 	if (!is_primary) {
 		/*
 		 * Do not store VY_STMT_DEFERRED_DELETE flag in
@@ -119,8 +127,8 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 static struct tuple *
 vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 {
-	uint32_t meta_size = tuple_format_meta_size(format);
-	uint32_t total_size = sizeof(struct vy_stmt) + meta_size + bsize;
+	uint32_t total_size = sizeof(struct vy_stmt) + format->field_map_size +
+		bsize;
 	if (unlikely(total_size > vy_max_tuple_size)) {
 		diag_set(ClientError, ER_VINYL_MAX_TUPLE_SIZE,
 			 (unsigned) total_size);
@@ -133,13 +141,13 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 		return NULL;
 	}
 	say_debug("vy_stmt_alloc(format = %d %u, bsize = %zu) = %p",
-		format->id, tuple_format_meta_size(format), bsize, tuple);
+		format->id, format->field_map_size, bsize, tuple);
 	tuple->refs = 1;
 	tuple->format_id = tuple_format_id(format);
 	if (cord_is_main())
 		tuple_format_ref(format);
 	tuple->bsize = bsize;
-	tuple->data_offset = sizeof(struct vy_stmt) + meta_size;;
+	tuple->data_offset = sizeof(struct vy_stmt) + format->field_map_size;
 	vy_stmt_set_lsn(tuple, 0);
 	vy_stmt_set_type(tuple, 0);
 	vy_stmt_set_flags(tuple, 0);
@@ -739,16 +747,4 @@ vy_stmt_str(const struct tuple *stmt)
 	if (vy_stmt_snprint(buf, TT_STATIC_BUF_LEN, stmt) < 0)
 		return "<failed to format statement>";
 	return buf;
-}
-
-struct tuple_format *
-vy_tuple_format_new_with_colmask(struct tuple_format *mem_format)
-{
-	struct tuple_format *format = tuple_format_dup(mem_format);
-	if (format == NULL)
-		return NULL;
-	/* + size of column mask. */
-	assert(format->extra_size == 0);
-	format->extra_size = sizeof(uint64_t);
-	return format;
 }

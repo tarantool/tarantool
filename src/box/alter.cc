@@ -810,9 +810,7 @@ alter_space_rollback(struct trigger *trigger, void * /* event */)
 	 */
 	space_swap_triggers(alter->new_space, alter->old_space);
 	space_swap_fkeys(alter->new_space, alter->old_space);
-	struct space *new_space = space_cache_replace(alter->old_space);
-	assert(new_space == alter->new_space);
-	(void) new_space;
+	space_cache_replace(alter->new_space, alter->old_space);
 	alter_space_delete(alter);
 }
 
@@ -913,9 +911,7 @@ alter_space_do(struct txn *txn, struct alter_space *alter)
 	 * The new space is ready. Time to update the space
 	 * cache with it.
 	 */
-	struct space *old_space = space_cache_replace(alter->new_space);
-	(void) old_space;
-	assert(old_space == alter->old_space);
+	space_cache_replace(alter->old_space, alter->new_space);
 
 	/*
 	 * Install transaction commit/rollback triggers to either
@@ -1421,7 +1417,7 @@ on_drop_space_rollback(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
-	space_cache_replace(space);
+	space_cache_replace(NULL, space);
 }
 
 /**
@@ -1447,9 +1443,7 @@ on_create_space_rollback(struct trigger *trigger, void *event)
 {
 	(void) event;
 	struct space *space = (struct space *)trigger->data;
-	struct space *cached = space_cache_delete(space_id(space));
-	(void) cached;
-	assert(cached == space);
+	space_cache_replace(space, NULL);
 	space_delete(space);
 }
 
@@ -1608,10 +1602,7 @@ on_drop_view_rollback(struct trigger *trigger, void *event)
  * Generally, whenever a data dictionary change occurs
  * 2 things should be done:
  *
- * - space cache should be updated, and changes in the space
- *   cache should be reflected in Lua bindings
- *   (this is done in space_cache_replace() and
- *   space_cache_delete())
+ * - space cache should be updated
  *
  * - the space which is changed should be rebuilt according
  *   to the nature of the modification, i.e. indexes added/dropped,
@@ -1695,7 +1686,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * cache right away to achieve linearisable
 		 * execution on a replica.
 		 */
-		(void) space_cache_replace(space);
+		space_cache_replace(NULL, space);
 		/*
 		 * Do not forget to update schema_version right after
 		 * inserting the space to the space_cache, since no
@@ -1787,7 +1778,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 * cache right away to achieve linearisable
 		 * execution on a replica.
 		 */
-		struct space *space = space_cache_delete(space_id(old_space));
+		space_cache_replace(old_space, NULL);
 		/*
 		 * Do not forget to update schema_version right after
 		 * deleting the space from the space_cache, since no
@@ -1795,7 +1786,7 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 		 */
 		++schema_version;
 		struct trigger *on_commit =
-			txn_alter_trigger_new(on_drop_space_commit, space);
+			txn_alter_trigger_new(on_drop_space_commit, old_space);
 		txn_on_commit(txn, on_commit);
 		if (old_space->def->opts.is_view) {
 			struct Select *select =
@@ -1817,7 +1808,8 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 			select_guard.is_active = false;
 		}
 		struct trigger *on_rollback =
-			txn_alter_trigger_new(on_drop_space_rollback, space);
+			txn_alter_trigger_new(on_drop_space_rollback,
+					      old_space);
 		txn_on_rollback(txn, on_rollback);
 	} else { /* UPDATE, REPLACE */
 		assert(old_space != NULL && new_tuple != NULL);

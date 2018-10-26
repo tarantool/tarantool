@@ -980,7 +980,7 @@ memtx_space_new(struct memtx_engine *memtx,
 		keys[key_count++] = index_def->key_def;
 
 	struct tuple_format *format =
-		tuple_format_new(&memtx_tuple_format_vtab, keys, key_count, 0,
+		tuple_format_new(&memtx_tuple_format_vtab, keys, key_count,
 				 def->fields, def->field_count, def->dict);
 	if (format == NULL) {
 		free(memtx_space);

@@ -119,8 +119,7 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 		if (ret == NULL)
 			break;
 		fail_if(i >= expected_count);
-		ok(vy_stmt_are_same(ret, &expected[i], mem->format,
-				    mem->format_with_colmask),
+		ok(vy_stmt_are_same(ret, &expected[i], mem->format),
 		   "stmt %d is correct", i);
 		++i;
 	} while (ret != NULL);
@@ -129,7 +128,7 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 	for (i = 0; i < handler.count; i++) {
 		fail_if(i >= deferred_count);
 		ok(vy_stmt_are_same(handler.stmt[i], &deferred[i],
-				    handler.format, NULL),
+				    handler.format),
 		   "deferred stmt %d is correct", i);
 	}
 	if (deferred != NULL) {
@@ -149,7 +148,7 @@ void
 test_basic(void)
 {
 	header();
-	plan(66);
+	plan(58);
 {
 /*
  * STATEMENT: REPL REPL REPL  DEL  REPL  REPL  REPL  REPL  REPL  REPL
@@ -312,54 +311,6 @@ test_basic(void)
 }
 {
 /*
- * STATEMENT: REPL     DEL REPL     REPL
- * LSN:        5       6    6        7
- * READ VIEW:               *
- *            \_______________/\_______/
- *             \_____/\______/
- *              merge  skip as
- *                     optimized
- *                      update
- *  DEL and REPL with lsn 6 can be skipped for read view 6 for
- *  secondary index, because they do not change secondary key.
- */
-	const struct vy_stmt_template content[] = {
-		STMT_TEMPLATE(5, REPLACE, 1, 1),
-		STMT_TEMPLATE_OPTIMIZED(6, DELETE, 1),
-		STMT_TEMPLATE_OPTIMIZED(6, REPLACE, 1, 2),
-		STMT_TEMPLATE(7, REPLACE, 1, 3)
-	};
-	const struct vy_stmt_template expected[] = { content[3], content[0] };
-	const int vlsns[] = {6};
-	int content_count = sizeof(content) / sizeof(content[0]);
-	int expected_count = sizeof(expected) / sizeof(expected[0]);
-	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(content, content_count,
-				       expected, expected_count, NULL, 0,
-				       vlsns, vlsns_count, false, true);
-}
-{
-/*
- * STATEMENT: DEL REPL
- * LSN:        6    6
- *            \______/
- *     skip both as optimized update
- */
-	const struct vy_stmt_template content[] = {
-		STMT_TEMPLATE_OPTIMIZED(6, DELETE, 1),
-		STMT_TEMPLATE_OPTIMIZED(6, REPLACE, 1, 2),
-	};
-	const struct vy_stmt_template expected[] = {};
-	const int vlsns[] = {};
-	int content_count = sizeof(content) / sizeof(content[0]);
-	int expected_count = sizeof(expected) / sizeof(expected[0]);
-	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(content, content_count,
-				       expected, expected_count, NULL, 0,
-				       vlsns, vlsns_count, false, false);
-}
-{
-/*
  * STATEMENT: UPS  UPS  UPS  REPL
  * LSN:        6    7    8    9
  * READ VIEW:       *
@@ -412,56 +363,6 @@ test_basic(void)
 	compare_write_iterator_results(content, content_count,
 				       expected, expected_count, NULL, 0,
 				       vlsns, vlsns_count, true, true);
-}
-{
-/*
- * STATEMENT: REPL  DEL  REPL
- * LSN:        6     7     7
- *           \___/\__________/
- *          merge  skip as optimized update
- *
- * last_level = false.
- * Check if the key is not fully skipped in a case of optimized
- * update as the newest version.
- */
-	const struct vy_stmt_template content[] = {
-		STMT_TEMPLATE(6, REPLACE, 1, 1),
-		STMT_TEMPLATE_OPTIMIZED(7, DELETE, 1),
-		STMT_TEMPLATE_OPTIMIZED(7, REPLACE, 1, 2),
-	};
-	const struct vy_stmt_template expected[] = { content[0] };
-	const int vlsns[] = {};
-	int content_count = sizeof(content) / sizeof(content[0]);
-	int expected_count = sizeof(expected) / sizeof(expected[0]);
-	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(content, content_count,
-				       expected, expected_count, NULL, 0,
-				       vlsns, vlsns_count, false, false);
-}
-{
-/*
- * STATEMENT: REPL  DEL  REPL
- * LSN:        6     7     7
- *           \_________/|\___/
- *      skip last level | skip as optimized
- *              delete. | update.
- *
- * last_level = true. First apply 'last level DELETE' optimization
- * and only then the 'optimized UPDATE'.
- */
-	const struct vy_stmt_template content[] = {
-		STMT_TEMPLATE(6, REPLACE, 1, 1),
-		STMT_TEMPLATE_OPTIMIZED(7, DELETE, 1),
-		STMT_TEMPLATE_OPTIMIZED(7, REPLACE, 1, 2),
-	};
-	const struct vy_stmt_template expected[] = { content[2] };
-	const int vlsns[] = {};
-	int content_count = sizeof(content) / sizeof(content[0]);
-	int expected_count = sizeof(expected) / sizeof(expected[0]);
-	int vlsns_count = sizeof(vlsns) / sizeof(vlsns[0]);
-	compare_write_iterator_results(content, content_count,
-				       expected, expected_count, NULL, 0,
-				       vlsns, vlsns_count, true, false);
 }
 {
 /*

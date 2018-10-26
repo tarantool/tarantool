@@ -132,16 +132,16 @@ space_cache_find_xc(uint32_t id)
 }
 
 /**
- * Update contents of the space cache.  Typically the new space is
- * an altered version of the original space.
- * Returns the old space, if any.
+ * Update contents of the space cache.
+ *
+ * If @old_space is NULL, insert @new_space into the cache.
+ * If @new_space is NULL, delete @old_space from the cache.
+ * If neither @old_space nor @new_space is NULL, replace
+ * @old_space with @new_space in the cache (both spaces must
+ * have the same id).
  */
-struct space *
-space_cache_replace(struct space *space);
-
-/** Delete a space from the space cache. */
-struct space *
-space_cache_delete(uint32_t id);
+void
+space_cache_replace(struct space *old_space, struct space *new_space);
 
 void
 schema_init();

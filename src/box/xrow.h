@@ -81,6 +81,19 @@ struct xrow_header {
 };
 
 /**
+ * Return the max size which the given row is going to take when
+ * encoded into a binary packet.
+ */
+static inline size_t
+xrow_approx_len(struct xrow_header *row)
+{
+	size_t len = XROW_HEADER_LEN_MAX;
+	for (int i = 0; i < row->bodycnt; i++)
+		len += row->body[i].iov_len;
+	return len;
+}
+
+/**
  * Encode xrow into a binary packet
  *
  * @param header xrow

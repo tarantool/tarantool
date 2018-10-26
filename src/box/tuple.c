@@ -97,8 +97,8 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 
 	mp_tuple_assert(data, end);
 	size_t data_len = end - data;
-	size_t meta_size = tuple_format_meta_size(format);
-	size_t total = sizeof(struct tuple) + meta_size + data_len;
+	size_t total = sizeof(struct tuple) + format->field_map_size +
+		data_len;
 
 	struct tuple *tuple = (struct tuple *) smalloc(&runtime_alloc, total);
 	if (tuple == NULL) {
@@ -111,7 +111,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	tuple->bsize = data_len;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
-	tuple->data_offset = sizeof(struct tuple) + meta_size;
+	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
 	char *raw = (char *) tuple + tuple->data_offset;
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, data_len);
@@ -129,7 +129,7 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	size_t total = sizeof(struct tuple) + tuple_format_meta_size(format) +
+	size_t total = sizeof(struct tuple) + format->field_map_size +
 		tuple->bsize;
 	tuple_format_unref(format);
 	smfree(&runtime_alloc, tuple, total);
@@ -223,7 +223,7 @@ tuple_init(field_name_hash_f hash)
 	 * Create a format for runtime tuples
 	 */
 	tuple_format_runtime = tuple_format_new(&tuple_format_runtime_vtab,
-						NULL, 0, 0, NULL, 0, NULL);
+						NULL, 0, NULL, 0, NULL);
 	if (tuple_format_runtime == NULL)
 		return -1;
 
@@ -395,7 +395,7 @@ box_tuple_format_new(struct key_def **keys, uint16_t key_count)
 {
 	box_tuple_format_t *format =
 		tuple_format_new(&tuple_format_runtime_vtab,
-				 keys, key_count, 0, NULL, 0, NULL);
+				 keys, key_count, NULL, 0, NULL);
 	if (format != NULL)
 		tuple_format_ref(format);
 	return format;

@@ -96,9 +96,8 @@ vy_mem_tree_extent_free(void *ctx, void *p)
 }
 
 struct vy_mem *
-vy_mem_new(struct vy_mem_env *env, int64_t generation,
-	   struct key_def *cmp_def, struct tuple_format *format,
-	   struct tuple_format *format_with_colmask,
+vy_mem_new(struct vy_mem_env *env, struct key_def *cmp_def,
+	   struct tuple_format *format, int64_t generation,
 	   uint32_t space_cache_version)
 {
 	struct vy_mem *index = calloc(1, sizeof(*index));
@@ -114,8 +113,6 @@ vy_mem_new(struct vy_mem_env *env, int64_t generation,
 	index->space_cache_version = space_cache_version;
 	index->format = format;
 	tuple_format_ref(format);
-	index->format_with_colmask = format_with_colmask;
-	tuple_format_ref(format_with_colmask);
 	vy_mem_tree_create(&index->tree, cmp_def,
 			   vy_mem_tree_extent_alloc,
 			   vy_mem_tree_extent_free, index);
@@ -129,7 +126,6 @@ vy_mem_delete(struct vy_mem *index)
 {
 	index->env->tree_extent_size -= index->tree_extent_size;
 	tuple_format_unref(index->format);
-	tuple_format_unref(index->format_with_colmask);
 	fiber_cond_destroy(&index->pin_cond);
 	TRASH(index);
 	free(index);
@@ -160,8 +156,7 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
-	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
-	       stmt->format_id == tuple_format_id(mem->format));
+	assert(stmt->format_id == tuple_format_id(mem->format));
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);
@@ -220,8 +215,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) != IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
-	assert(stmt->format_id == tuple_format_id(mem->format_with_colmask) ||
-	       stmt->format_id == tuple_format_id(mem->format));
+	assert(stmt->format_id == tuple_format_id(mem->format));
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);

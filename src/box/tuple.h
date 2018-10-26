@@ -289,18 +289,12 @@ box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
 /**
  * An atom of Tarantool storage. Represents MsgPack Array.
  * Tuple has the following structure:
- *                           format->tuple_meta_size      bsize
- *                          +------------------------+-------------+
- * tuple_begin, ..., raw =  |       tuple_meta       | MessagePack |
- * |                        +------------------------+-------------+
- * |                                                 ^
- * +---------------------------------------------data_offset
- *
- * tuple_meta structure:
- *   +----------------------+-----------------------+
- *   |      extra_size      | offset N ... offset 1 |
- *   +----------------------+-----------------------+
- *    @sa tuple_format_new()   uint32  ...  uint32
+ *                           uint32       uint32     bsize
+ *                          +-------------------+-------------+
+ * tuple_begin, ..., raw =  | offN | ... | off1 | MessagePack |
+ * |                        +-------------------+-------------+
+ * |                                            ^
+ * +---------------------------------------data_offset
  *
  * Each 'off_i' is the offset to the i-th indexed field.
  */
@@ -422,18 +416,6 @@ tuple_format(const struct tuple *tuple)
 	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
 	assert(tuple_format_id(format) == tuple->format_id);
 	return format;
-}
-
-/**
- * Return extra data saved in tuple metadata.
- * @param tuple tuple
- * @return a pointer to extra data saved in tuple metadata.
- */
-static inline const char *
-tuple_extra(const struct tuple *tuple)
-{
-	struct tuple_format *format = tuple_format(tuple);
-	return tuple_data(tuple) - tuple_format_meta_size(format);
 }
 
 /**

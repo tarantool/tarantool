@@ -117,27 +117,7 @@
  *         skip        keep       skip         merge
  *
  * ---------------------------------------------------------------
- * Optimization #3: when compacting runs of a secondary key, skip
- * statements, which do not update this key.
- *
- *                         --------
- *                         SAME KEY
- *                         --------
- *            VLSN(i)                                    VLSN(i+1)
- * Masks        |                                            |
- * intersection:| not 0     0       0     not 0        not 0 |
- *              |  ANY   DELETE  REPLACE   ANY  ...  REPLACE |
- *              \______/\_______________/\___________________/
- *               merge       skip              merge
- *
- * Details: when UPDATE is executed by Tarantool, it is
- * transformed into DELETE + REPLACE or a single REPLACE. But it
- * is only necessary to write anything into the secondary key if
- * such UPDATE changes any field, which is part of the key.
- * All other UPDATEs can be simply skipped.
- *
- * ---------------------------------------------------------------
- * Optimization #4: use older REPLACE/DELETE to apply UPSERTs and
+ * Optimization #3: use older REPLACE/DELETE to apply UPSERTs and
  * convert them into a single REPLACE. When compaction includes
  * the last level, absence of REPLACE or DELETE is equivalent
  * to a DELETE, and UPSERT can be converted to REPLACE as well.
@@ -166,7 +146,7 @@
  * vy_write_iterator_build_read_views.
  *
  * ---------------------------------------------------------------
- * Optimization #5: discard a tautological DELETE statement, i.e.
+ * Optimization #4: discard a tautological DELETE statement, i.e.
  * a statement that was not removed from the history because it
  * is referenced by read view, but that is preceeded by another
  * DELETE and hence not needed.
@@ -182,7 +162,7 @@
  *          skip         keep           skip         discard
  *
  * ---------------------------------------------------------------
- * Optimization #6: discard the first DELETE if the oldest
+ * Optimization #5: discard the first DELETE if the oldest
  * statement for the current key among all sources is an INSERT.
  * Rationale: if a key's history starts from an INSERT, there is
  * either no statements for this key in older runs or the latest
