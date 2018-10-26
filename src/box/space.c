@@ -568,6 +568,15 @@ generic_space_ephemeral_delete(struct space *space, const char *key)
 	return -1;
 }
 
+int
+generic_space_ephemeral_rowid_next(struct space *space, uint64_t *rowid)
+{
+	(void)space;
+	(void)rowid;
+	unreachable();
+	return 0;
+}
+
 void
 generic_init_system_space(struct space *space)
 {

@@ -4453,6 +4453,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .execute_upsert = */ vinyl_space_execute_upsert,
 	/* .ephemeral_replace = */ generic_space_ephemeral_replace,
 	/* .ephemeral_delete = */ generic_space_ephemeral_delete,
+	/* .ephemeral_rowid_next = */ generic_space_ephemeral_rowid_next,
 	/* .init_system_space = */ generic_init_system_space,
 	/* .init_ephemeral_space = */ generic_init_ephemeral_space,
 	/* .check_index_def = */ vinyl_space_check_index_def,

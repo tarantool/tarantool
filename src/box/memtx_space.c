@@ -601,6 +601,15 @@ memtx_space_ephemeral_delete(struct space *space, const char *key)
 	return 0;
 }
 
+static int
+memtx_space_ephemeral_rowid_next(struct space *space, uint64_t *rowid)
+{
+	assert(rowid != NULL);
+	struct memtx_space *memtx_space = (struct memtx_space *)space;
+	*rowid = memtx_space->rowid++;
+	return 0;
+}
+
 /* }}} DML */
 
 /* {{{ DDL */
@@ -941,6 +950,7 @@ static const struct space_vtab memtx_space_vtab = {
 	/* .execute_upsert = */ memtx_space_execute_upsert,
 	/* .ephemeral_replace = */ memtx_space_ephemeral_replace,
 	/* .ephemeral_delete = */ memtx_space_ephemeral_delete,
+	/* .ephemeral_rowid_next = */ memtx_space_ephemeral_rowid_next,
 	/* .init_system_space = */ memtx_init_system_space,
 	/* .init_ephemeral_space = */ memtx_init_ephemeral_space,
 	/* .check_index_def = */ memtx_space_check_index_def,
@@ -1002,6 +1012,7 @@ memtx_space_new(struct memtx_engine *memtx,
 	tuple_format_unref(format);
 
 	memtx_space->bsize = 0;
+	memtx_space->rowid = 0;
 	memtx_space->replace = memtx_space_replace_no_keys;
 	return (struct space *)memtx_space;
 }

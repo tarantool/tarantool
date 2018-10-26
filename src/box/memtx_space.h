@@ -43,6 +43,13 @@ struct memtx_space {
 	/* Number of bytes used in memory by tuples in the space. */
 	size_t bsize;
 	/**
+	 * This counter is used to generate unique ids for
+	 * ephemeral spaces. Mostly used by SQL: values of this
+	 * var are stored as separate field to hold non-unique
+	 * tuples within one unique primary key.
+	 */
+	uint64_t rowid;
+	/**
 	 * A pointer to replace function, set to different values
 	 * at different stages of recovery.
 	 */

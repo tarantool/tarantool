@@ -71,6 +71,8 @@ struct space_vtab {
 
 	int (*ephemeral_delete)(struct space *, const char *);
 
+	int (*ephemeral_rowid_next)(struct space *, uint64_t *);
+
 	void (*init_system_space)(struct space *);
 	/**
 	 * Initialize an ephemeral space instance.
@@ -457,6 +459,7 @@ size_t generic_space_bsize(struct space *);
 int generic_space_apply_initial_join_row(struct space *, struct request *);
 int generic_space_ephemeral_replace(struct space *, const char *, const char *);
 int generic_space_ephemeral_delete(struct space *, const char *);
+int generic_space_ephemeral_rowid_next(struct space *, uint64_t *);
 void generic_init_system_space(struct space *);
 void generic_init_ephemeral_space(struct space *);
 int generic_space_check_index_def(struct space *, struct index_def *);
