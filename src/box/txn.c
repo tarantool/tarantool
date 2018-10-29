@@ -250,8 +250,11 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 			goto fail;
 	}
 	--txn->in_sub_stmt;
-	if (txn->is_autocommit && txn->in_sub_stmt == 0)
-		return txn_commit(txn);
+	if (txn->is_autocommit && txn->in_sub_stmt == 0) {
+		int rc = txn_commit(txn);
+		fiber_gc();
+		return rc;
+	}
 	return 0;
 fail:
 	txn_rollback_stmt();
@@ -355,8 +358,6 @@ txn_commit(struct txn *txn)
 		txn_stmt_unref_tuples(stmt);
 
 	TRASH(txn);
-	/** Free volatile txn memory. */
-	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
 	return 0;
 fail:
@@ -464,7 +465,9 @@ box_txn_commit()
 		diag_set(ClientError, ER_COMMIT_IN_SUB_STMT);
 		return -1;
 	}
-	return txn_commit(txn);
+	int rc = txn_commit(txn);
+	fiber_gc();
+	return rc;
 }
 
 int

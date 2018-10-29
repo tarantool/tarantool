@@ -886,7 +886,7 @@ vy_deferred_delete_batch_process_f(struct cmsg *cmsg)
 
 	if (txn_commit(txn) != 0)
 		goto fail;
-
+	fiber_gc();
 	return;
 fail:
 	batch->is_failed = true;
