@@ -31,9 +31,7 @@
 #include "lua/init.h"
 #include "lua/utils.h"
 #include "main.h"
-#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__APPLE__)
 #include <libgen.h>
-#endif
 
 #include <lua.h>
 #include <lauxlib.h>
@@ -328,6 +326,76 @@ tarantool_lua_setpaths(struct lua_State *L)
 	lua_pop(L, 1); /* package */
 }
 
+/**
+ * Add application and its .rocks directory to package search
+ * path. Application path is determined as a directory containing
+ * `script_file`. If `script_file` is NULL, current working
+ * directory is used as application path.
+ */
+static void
+tarantool_app_setpaths(struct lua_State *L, const char* script_file)
+{
+	char cwd[PATH_MAX] = {'\0'};
+	char script_dir_dirname[PATH_MAX] = {'\0'};
+	char script_dir_realpath[PATH_MAX] = {'\0'};
+
+	getcwd(cwd, sizeof(cwd));
+	const char *script_dir = cwd;
+
+	if (script_file != NULL) {
+		strcpy(script_dir_dirname, script_file);
+		script_dir = dirname(script_dir_dirname);
+
+		if (script_dir == NULL)
+			return;
+
+		script_dir = realpath(script_dir, script_dir_realpath);
+
+		if (script_dir == NULL)
+			return;
+	}
+
+	lua_getglobal(L, "package");
+	int top = lua_gettop(L);
+
+	lua_getfield(L, top, "path");
+	const char *package_path = lua_tostring(L, -1);
+	lua_getfield(L, top, "cpath");
+	const char *package_cpath = lua_tostring(L, -1);
+
+	lua_pushstring(L, script_dir);
+	lua_pushliteral(L, "/?.lua;");
+	lua_pushstring(L, script_dir);
+	lua_pushliteral(L, "/?/init.lua;");
+	lua_pushstring(L, script_dir);
+	lua_pushliteral(L, "/.rocks/share/tarantool/?.lua;");
+	lua_pushstring(L, script_dir);
+	lua_pushliteral(L, "/.rocks/share/tarantool/?/init.lua;");
+	lua_pushstring(L, script_dir);
+	lua_pushliteral(L, "/.rocks/share/tarantool/?/init.lua;");
+	lua_pushstring(L, package_path);
+
+	lua_concat(L, lua_gettop(L) - top - 2);
+	tarantool_lua_pushpath_env(L, "LUA_PATH");
+	lua_setfield(L, top, "path");
+
+	lua_pushstring(L, script_dir);
+	lua_pushstring(L, "/?" MODULE_LIBSUFFIX ";");
+	lua_pushstring(L, "/.rocks/lib/tarantool/?" MODULE_LIBSUFFIX ";");
+	lua_pushstring(L, package_cpath);
+
+	lua_concat(L, lua_gettop(L) - top - 2);
+	tarantool_lua_pushpath_env(L, "LUA_CPATH");
+	lua_setfield(L, top, "cpath");
+
+	lua_pop(L, 2);
+
+	assert(lua_gettop(L) == top);
+
+	lua_pop(L, 1);
+}
+
+
 static int
 tarantool_panic_handler(lua_State *L) {
 	const char *problem = lua_tostring(L, -1);
@@ -525,6 +593,18 @@ run_script_f(va_list ap)
 	int argc = va_arg(ap, int);
 	char **argv = va_arg(ap, char **);
 	struct diag *diag = &fiber()->diag;
+
+	/*
+	 * If we are passed a lua file to run, add its containing
+	 * directory and a nearby .rocks to package search path.
+	 * If a lua file is not passed, treat the current working
+	 * directory as application root.
+	 * This is required in order to fix the package paths
+	 * "in place" so that setting box.cfg {work_dir=...} or
+	 * launching the app from another directory won't break
+	 * the subsequent require()-s.
+	 */
+	tarantool_app_setpaths(L, path);
 
 	/*
 	 * Load libraries and execute chunks passed by -l and -e
