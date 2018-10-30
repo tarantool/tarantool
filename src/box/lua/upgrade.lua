@@ -501,6 +501,35 @@ end
 -- Tarantool 2.1.0
 --------------------------------------------------------------------------------
 
+local function upgrade_priv_to_2_1_0()
+    local _priv = box.space[box.schema.PRIV_ID]
+    local _user = box.space[box.schema.USER_ID]
+    -- Since we remove 1.7 compatibility in 2.1.0, we have to
+    -- grant ALTER and DROP to all users with READ + WRITE on
+    -- respective objects. We also grant CREATE on entities
+    -- or on universe if a user has READ and WRITE on an entity
+    -- or on universe respectively. We do not grant CREATE on
+    -- objects, since it has no effect. We also skip grants for
+    -- sequences since they were added after the new privileges
+    -- and compatibility mode was always off for them.
+    for _, user in _user:pairs() do
+        if user[0] ~= ADMIN and user[0] ~= SUPER then
+            for _, priv in _priv:pairs(user[0]) do
+                if priv[3] ~= 'sequence' and
+                   bit.band(priv[5], box.priv.W) ~= 0 and
+                   bit.band(priv[5], box.priv.R) ~= 0 then
+                    local new_privs = bit.bor(box.priv.A, box.priv.D)
+                    if priv[3] == 'universe' or priv[4] == '' then
+                        new_privs = bit.bor(new_privs, box.priv.C)
+                    end
+                    _priv:update({priv[2], priv[3], priv[4]},
+                                 {{"|", 5, new_privs}})
+                end
+            end
+        end
+    end
+end
+
 local function upgrade_to_2_1_0()
     local _space = box.space[box.schema.SPACE_ID]
     local _index = box.space[box.schema.INDEX_ID]
@@ -576,6 +605,8 @@ local function upgrade_to_2_1_0()
     format[1] = {type='string', name='key'}
     format[2] = {type='any', name='value', is_nullable=true}
     box.space._schema:format(format)
+
+    upgrade_priv_to_2_1_0()
 end
 
 local function get_version()
