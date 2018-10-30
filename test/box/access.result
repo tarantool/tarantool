@@ -104,7 +104,10 @@ test_run:cmd("setopt delimiter ''");
 box.schema.user.create('rich')
 ---
 ...
-box.schema.user.grant('rich', 'read,write', 'universe')
+box.schema.user.grant('rich', 'read,write', 'space', '_func')
+---
+...
+box.schema.user.grant('rich', 'create', 'function')
 ---
 ...
 session.su('rich')
@@ -130,13 +133,16 @@ box.space['_user']:delete{uid}
 ---
 - error: 'Failed to drop user or role ''rich'': the user has objects'
 ...
-box.schema.user.revoke('rich', 'read,write', 'universe')
----
-...
 box.schema.user.revoke('rich', 'public')
 ---
 ...
+box.schema.user.revoke('rich', 'read,write', 'space', '_func')
+---
+...
 box.schema.user.revoke('rich', 'alter', 'user', 'rich')
+---
+...
+box.schema.user.revoke('rich', 'create', 'function')
 ---
 ...
 box.schema.user.disable("rich")
@@ -345,7 +351,13 @@ session = box.session
 box.schema.user.create('uniuser')
 ---
 ...
-box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+box.schema.user.grant('uniuser', 'create', 'space')
+---
+...
+box.schema.user.grant('uniuser', 'write', 'space', '_schema')
+---
+...
+box.schema.user.grant('uniuser', 'write', 'space', '_space')
 ---
 ...
 session.su('uniuser')
@@ -583,7 +595,22 @@ session = nil
 box.schema.user.create('twostep')
 ---
 ...
-box.schema.user.grant('twostep', 'read,write,execute', 'universe')
+box.schema.user.grant('twostep', 'create', 'space')
+---
+...
+box.schema.user.grant('twostep', 'create', 'function')
+---
+...
+box.schema.user.grant('twostep', 'write', 'space', '_schema')
+---
+...
+box.schema.user.grant('twostep', 'write', 'space', '_space')
+---
+...
+box.schema.user.grant('twostep', 'write', 'space', '_index')
+---
+...
+box.schema.user.grant('twostep', 'read,write', 'space', '_func')
 ---
 ...
 box.session.su('twostep')
@@ -599,9 +626,6 @@ box.schema.func.create('test')
 ---
 ...
 box.session.su('admin')
----
-...
-box.schema.user.revoke('twostep', 'execute,read,write', 'universe')
 ---
 ...
 box.schema.user.create('twostep_client')

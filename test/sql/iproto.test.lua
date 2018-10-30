@@ -10,6 +10,7 @@ space:replace{4, 5, '6'}
 space:replace{7, 8.5, '9'}
 box.sql.execute('select * from test')
 box.schema.user.grant('guest','read,write,execute', 'universe')
+box.schema.user.grant('guest', 'create', 'space')
 cn = remote.connect(box.cfg.listen)
 cn:ping()
 
@@ -202,6 +203,7 @@ cn:close()
 box.sql.execute('drop table test')
 
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+box.schema.user.revoke('guest', 'create', 'space')
 space = nil
 
 -- Cleanup xlog

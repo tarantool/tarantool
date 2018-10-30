@@ -50,7 +50,8 @@ end;
 usermax();
 test_run:cmd("setopt delimiter ''");
 box.schema.user.create('rich')
-box.schema.user.grant('rich', 'read,write', 'universe')
+box.schema.user.grant('rich', 'read,write', 'space', '_func')
+box.schema.user.grant('rich', 'create', 'function')
 session.su('rich')
 uid = session.uid()
 box.schema.func.create('dummy')
@@ -58,9 +59,10 @@ session.su('admin')
 box.space['_user']:delete{uid}
 box.schema.func.drop('dummy')
 box.space['_user']:delete{uid}
-box.schema.user.revoke('rich', 'read,write', 'universe')
 box.schema.user.revoke('rich', 'public')
+box.schema.user.revoke('rich', 'read,write', 'space', '_func')
 box.schema.user.revoke('rich', 'alter', 'user', 'rich')
+box.schema.user.revoke('rich', 'create', 'function')
 box.schema.user.disable("rich")
 -- test double disable is a no op
 box.schema.user.disable("rich")
@@ -154,7 +156,9 @@ box.schema.user.drop('testus')
 -- ------------------------------------------------------------
 session = box.session
 box.schema.user.create('uniuser')
-box.schema.user.grant('uniuser', 'read, write, execute', 'universe')
+box.schema.user.grant('uniuser', 'create', 'space')
+box.schema.user.grant('uniuser', 'write', 'space', '_schema')
+box.schema.user.grant('uniuser', 'write', 'space', '_space')
 session.su('uniuser')
 us = box.schema.space.create('uniuser_space')
 session.su('admin')
@@ -241,13 +245,17 @@ session = nil
 -- admin can't manage grants on not owned objects
 -- -----------------------------------------------------------
 box.schema.user.create('twostep')
-box.schema.user.grant('twostep', 'read,write,execute', 'universe')
+box.schema.user.grant('twostep', 'create', 'space')
+box.schema.user.grant('twostep', 'create', 'function')
+box.schema.user.grant('twostep', 'write', 'space', '_schema')
+box.schema.user.grant('twostep', 'write', 'space', '_space')
+box.schema.user.grant('twostep', 'write', 'space', '_index')
+box.schema.user.grant('twostep', 'read,write', 'space', '_func')
 box.session.su('twostep')
 twostep = box.schema.space.create('twostep')
 index2 = twostep:create_index('primary')
 box.schema.func.create('test')
 box.session.su('admin')
-box.schema.user.revoke('twostep', 'execute,read,write', 'universe')
 box.schema.user.create('twostep_client')
 box.schema.user.grant('twostep_client', 'execute', 'function', 'test')
 box.schema.user.drop('twostep')
