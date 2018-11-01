@@ -699,14 +699,15 @@ _ = s:create_index('pk')
 s:replace{1, 1, 1}
 
 c = fiber.channel(1)
-_ = fiber.create(function() for i = 1, 10 do s:update(1, {{'+', 3, 1}}) end c:put(true) end)
+-- Note, in Vinyl DDL aborts writers before proceeding so we
+-- use pcall() here. This is OK as we just want to check that
+-- space.create_index doesn't fail when there are concurrent
+-- updates.
+_ = fiber.create(function() for i = 1, 10 do pcall(s.update, s, 1, {{'+', 3, 1}}) end c:put(true) end)
 
 _ = s:create_index('sk', {parts = {2, 'unsigned'}})
 
 c:get()
-s.index.pk:select()
-s.index.sk:select()
-
 s:drop()
 
 --

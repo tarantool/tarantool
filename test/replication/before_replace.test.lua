@@ -3,6 +3,7 @@
 --
 env = require('test_run')
 test_run = env.new()
+engine = test_run:get_cfg('engine')
 
 SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 
@@ -76,7 +77,46 @@ push_err
 test_run:cmd('restart server autobootstrap3 with args="0.1 0.5"')
 box.space.test:select()
 
-
 -- Cleanup.
 test_run:cmd("switch default")
 test_run:drop_cluster(SERVERS)
+
+--
+-- gh-3722: Check that when space:before_replace trigger modifies
+-- the result of a replicated operation, it writes it to the WAL
+-- with the original replica id and lsn.
+--
+_ = box.schema.space.create('test', {engine = engine})
+_ = box.space.test:create_index('primary')
+
+box.schema.user.grant('guest', 'replication')
+
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server replica")
+
+test_run:cmd("switch replica")
+_ = box.space.test:before_replace(function(old, new) return new:update{{'+', 2, 1}} end)
+
+test_run:cmd("switch default")
+box.space.test:replace{1, 1}
+
+_ = test_run:wait_vclock('replica', test_run:get_vclock('default'))
+
+-- Check that replace{1, 2} coming from the master was suppressed
+-- by the before_replace trigger on the replica.
+test_run:cmd("switch replica")
+box.space.test:select() -- [1, 2]
+
+-- Check that master's component of replica's vclock was bumped
+-- so that the replica doesn't apply replace{1, 2} after restart
+-- while syncing with the master.
+test_run:cmd("restart server replica")
+box.space.test:select() -- [1, 2]
+
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+
+box.schema.user.revoke('guest', 'replication')
+box.space.test:drop()

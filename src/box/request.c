@@ -45,10 +45,34 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 
+/**
+ * Whenever we update a request, we must update its header as well.
+ * This function does the trick.
+ *
+ * We keep the original header instead of rebuilding it on commit
+ * in order to preserve the original replica id and lsn so that
+ * in case the request comes from a remote master, we will bump
+ * the master's component of the replica's vclock and hence won't
+ * try to apply the same row again on reconnect.
+ */
+static int
+request_update_header(struct request *request, struct xrow_header *row)
+{
+	if (row == NULL)
+		return 0;
+	row->type = request->type;
+	row->bodycnt = xrow_encode_dml(request, row->body);
+	if (row->bodycnt < 0)
+		return -1;
+	request->header = row;
+	return 0;
+}
+
 int
 request_create_from_tuple(struct request *request, struct space *space,
 			  struct tuple *old_tuple, struct tuple *new_tuple)
 {
+	struct xrow_header *row = request->header;
 	memset(request, 0, sizeof(*request));
 
 	if (old_tuple == new_tuple) {
@@ -57,7 +81,7 @@ request_create_from_tuple(struct request *request, struct space *space,
 		 * turn this request into no-op.
 		 */
 		request->type = IPROTO_NOP;
-		return 0;
+		return request_update_header(request, row);
 	}
 	/*
 	 * Space pointer may be zero in case of NOP, in which case
@@ -91,7 +115,7 @@ request_create_from_tuple(struct request *request, struct space *space,
 		request->tuple_end = buf + size;
 		request->type = IPROTO_REPLACE;
 	}
-	return 0;
+	return request_update_header(request, row);
 }
 
 void
@@ -198,14 +222,5 @@ request_handle_sequence(struct request *request, struct space *space)
 		if (likely(mp_read_int64(&key, &value) == 0))
 			return sequence_update(seq, value);
 	}
-	/*
-	 * As the request body was changed, we have to update body in header.
-	 */
-	struct xrow_header *row = request->header;
-	if (row != NULL) {
-		row->bodycnt = xrow_encode_dml(request, row->body);
-		if (row->bodycnt < 0)
-			return -1;
-	}
-	return 0;
+	return request_update_header(request, request->header);
 }
