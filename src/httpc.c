@@ -210,7 +210,8 @@ httpc_set_body(struct httpc_request *req, const char *body, size_t size)
 int
 httpc_set_keepalive(struct httpc_request *req, long idle, long interval)
 {
-#if (LIBCURL_VERSION_MAJOR >= 7 && LIBCURL_VERSION_MINOR >= 25)
+#if LIBCURL_VERSION_NUM >= 0x071900
+	/* keep-alive is available starting from libcurl 7.25.0 */
 	if (idle > 0 && interval > 0) {
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_TCP_KEEPALIVE, 1L);
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_TCP_KEEPIDLE, idle);
@@ -225,8 +226,7 @@ httpc_set_keepalive(struct httpc_request *req, long idle, long interval)
 			return -1;
 		}
 	}
-#else /** < 7.25.0 */
-/** Libcurl version < 7.25.0 doesn't support keep-alive feature */
+#else
 	(void) req;
 	(void) idle;
 	(void) interval;
