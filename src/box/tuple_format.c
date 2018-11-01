@@ -38,7 +38,7 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 static uint32_t formats_size = 0, formats_capacity = 0;
 
 static const struct tuple_field tuple_field_default = {
-	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false, false,
+	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false, true,
 };
 
 /**
@@ -81,15 +81,8 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			assert(part->fieldno < format->field_count);
 			struct tuple_field *field =
 				&format->fields[part->fieldno];
-			if (part->fieldno >= field_count) {
-				field->is_nullable = part->is_nullable;
-			} else if (field->is_nullable != part->is_nullable) {
-				/*
-				 * In case of mismatch set the most
-				 * strict option for is_nullable.
-				 */
-				field->is_nullable = false;
-			}
+			field->is_nullable = field->is_nullable &&
+					     part->is_nullable;
 
 			/*
 			 * Check that there are no conflicts
