@@ -332,7 +332,9 @@ httpc_execute(struct httpc_request *req, double timeout)
 			++env->stat.http_other_responses;
 		}
 		break;
-	case CURLE_SSL_CACERT:
+#if LIBCURL_VERSION_NUM < 0x073e00
+	case CURLE_SSL_CACERT: /* deprecated in libcurl 7.62.0 */
+#endif
 	case CURLE_PEER_FAILED_VERIFICATION:
 		/* 495 SSL Certificate Error (nginx non-standard) */
 		req->status = 495;
