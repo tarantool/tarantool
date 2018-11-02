@@ -188,9 +188,11 @@ lbox_sql_create_function(struct lua_State *L)
 	if (func_info == NULL)
 		return luaL_error(L, "out of memory");
 	func_info->func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	sqlite3_create_function_v2(db, normalized_name, type, func_arg_num,
-				   is_deterministic ? SQLITE_DETERMINISTIC : 0,
-				   func_info, lua_sql_call, NULL, NULL,
-				   lua_sql_destroy);
+	int rc = sqlite3_create_function_v2(db, normalized_name, type, func_arg_num,
+					   is_deterministic ? SQLITE_DETERMINISTIC : 0,
+					   func_info, lua_sql_call, NULL, NULL,
+					   lua_sql_destroy);
+	if (rc != 0)
+		return luaL_error(L, sqlite3ErrStr(rc));
 	return 0;
 }
