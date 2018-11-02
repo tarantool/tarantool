@@ -67,7 +67,14 @@ add_custom_target(ragel
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     COMMAND ragel -G2 src/uri.rl -o src/uri.c)
 
-set (generic_libraries pthread dl)
+# There is no libdl.so on FreeBSD prior to 11.2.
+#
+# Always links pthread and dl dynamically.
+set(generic_libraries pthread)
+find_library(DL_LIBRARY NAMES dl)
+if(NOT "${DL_LIBRARY}" STREQUAL "DL_LIBRARY-NOTFOUND")
+    set(generic_libraries ${generic_libraries} dl)
+endif()
 
 set (core_sources
      diag.c
