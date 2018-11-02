@@ -1,8 +1,8 @@
-Target OS: FreeBSD 10.1 (RELEASE)
+Target OS: FreeBSD 10.4 (RELEASE) and FreeBSD 11.2 (RELEASE)
 
 1. Install necessary packages:
 -------------
-pkg install sudo git cmake gmake readline
+pkg install git cmake gmake readline icu
 
 
 2. Download & build tarantool source code:
@@ -19,11 +19,14 @@ gmake
 3. Set up python 2.7
 -------------
 
-From packages:
+Install testing dependences either from packages or from pip.
+
+3.1. From packages:
+-------------
 pkg install python27 py27-yaml py27-daemon py27-msgpack
 
-From pip:
-
+3.2. From pip:
+-------------
 pkg install py27-virtualenv
 virtualenv .venv
 source .venv/bin/activate
