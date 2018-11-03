@@ -589,28 +589,34 @@ struct checkpoint {
 	bool touch;
 };
 
-static int
-checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
-		uint64_t snap_io_rate_limit)
+static struct checkpoint *
+checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 {
+	struct checkpoint *ckpt = malloc(sizeof(*ckpt));
+	if (ckpt == NULL) {
+		diag_set(OutOfMemory, sizeof(*ckpt), "malloc",
+			 "struct checkpoint");
+		return NULL;
+	}
 	rlist_create(&ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
 	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID);
 	ckpt->snap_io_rate_limit = snap_io_rate_limit;
 	vclock_create(&ckpt->vclock);
 	ckpt->touch = false;
-	return 0;
+	return ckpt;
 }
 
 static void
-checkpoint_destroy(struct checkpoint *ckpt)
+checkpoint_delete(struct checkpoint *ckpt)
 {
 	struct checkpoint_entry *entry;
 	rlist_foreach_entry(entry, &ckpt->entries, link) {
 		entry->iterator->free(entry->iterator);
+		free(entry);
 	}
-	rlist_create(&ckpt->entries);
 	xdir_destroy(&ckpt->dir);
+	free(ckpt);
 }
 
 
@@ -625,11 +631,10 @@ checkpoint_add_space(struct space *sp, void *data)
 	if (!pk)
 		return 0;
 	struct checkpoint *ckpt = (struct checkpoint *)data;
-	struct checkpoint_entry *entry;
-	entry = region_alloc_object(&fiber()->gc, struct checkpoint_entry);
+	struct checkpoint_entry *entry = malloc(sizeof(*entry));
 	if (entry == NULL) {
 		diag_set(OutOfMemory, sizeof(*entry),
-			 "region", "struct checkpoint_entry");
+			 "malloc", "struct checkpoint_entry");
 		return -1;
 	}
 	rlist_add_tail_entry(&ckpt->entries, entry, link);
@@ -693,19 +698,13 @@ memtx_engine_begin_checkpoint(struct engine *engine)
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 
 	assert(memtx->checkpoint == NULL);
-	memtx->checkpoint = region_alloc_object(&fiber()->gc, struct checkpoint);
-	if (memtx->checkpoint == NULL) {
-		diag_set(OutOfMemory, sizeof(*memtx->checkpoint),
-			 "region", "struct checkpoint");
-		return -1;
-	}
-
-	if (checkpoint_init(memtx->checkpoint, memtx->snap_dir.dirname,
-			    memtx->snap_io_rate_limit) != 0)
+	memtx->checkpoint = checkpoint_new(memtx->snap_dir.dirname,
+					   memtx->snap_io_rate_limit);
+	if (memtx->checkpoint == NULL)
 		return -1;
 
 	if (space_foreach(checkpoint_add_space, memtx->checkpoint) != 0) {
-		checkpoint_destroy(memtx->checkpoint);
+		checkpoint_delete(memtx->checkpoint);
 		memtx->checkpoint = NULL;
 		return -1;
 	}
@@ -790,7 +789,7 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 		xdir_add_vclock(&memtx->snap_dir, &memtx->checkpoint->vclock);
 	}
 
-	checkpoint_destroy(memtx->checkpoint);
+	checkpoint_delete(memtx->checkpoint);
 	memtx->checkpoint = NULL;
 }
 
@@ -818,7 +817,7 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 				     INPROGRESS);
 	(void) coio_unlink(filename);
 
-	checkpoint_destroy(memtx->checkpoint);
+	checkpoint_delete(memtx->checkpoint);
 	memtx->checkpoint = NULL;
 }
 

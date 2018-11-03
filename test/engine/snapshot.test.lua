@@ -41,3 +41,16 @@ box.space.test:select{}
 box.space.test.index.primary:select{}
 box.space.test.index.secondary:select{}
 box.space.test:drop()
+
+-- Check that box.snapshot() doesn't leave garbage one the region.
+-- https://github.com/tarantool/tarantool/issues/3732
+fiber = require('fiber')
+-- Should be 0.
+fiber.info()[fiber.self().id()].memory.used
+box.snapshot()
+-- Should be 0.
+fiber.info()[fiber.self().id()].memory.used
+box.snapshot()
+box.snapshot()
+-- Should be 0.
+fiber.info()[fiber.self().id()].memory.used

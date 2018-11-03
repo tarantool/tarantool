@@ -761,16 +761,17 @@ vy_log_flush(void)
 	stailq_foreach_entry(record, &vy_log.tx, in_tx)
 		tx_size++;
 
+	size_t used = region_used(&fiber()->gc);
 	struct journal_entry *entry = journal_entry_new(tx_size);
 	if (entry == NULL)
-		return -1;
+		goto err;
 
 	struct xrow_header *rows;
 	rows = region_aligned_alloc(&fiber()->gc,
 				    tx_size * sizeof(struct xrow_header),
 				    alignof(struct xrow_header));
 	if (rows == NULL)
-		return -1;
+		goto err;
 
 	/*
 	 * Encode buffered records.
@@ -780,7 +781,7 @@ vy_log_flush(void)
 		assert(i < tx_size);
 		struct xrow_header *row = &rows[i];
 		if (vy_log_record_encode(record, row) < 0)
-			return -1;
+			goto err;
 		entry->rows[i] = row;
 		i++;
 	}
@@ -791,12 +792,16 @@ vy_log_flush(void)
 	 * so as not to block the tx thread.
 	 */
 	if (wal_write_vy_log(entry) != 0)
-		return -1;
+		goto err;
 
 	/* Success. Free flushed records. */
 	region_reset(&vy_log.pool);
 	stailq_create(&vy_log.tx);
+	region_truncate(&fiber()->gc, used);
 	return 0;
+err:
+	region_truncate(&fiber()->gc, used);
+	return -1;
 }
 
 void
