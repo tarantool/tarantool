@@ -4,11 +4,10 @@ import re
 import os.path
 import socket
 import os
+import tempfile
 
-test_path = '/tmp/tarantool-test-socket'
-
-if os.path.exists(test_path):
-    os.remove(test_path)
+test_dir = tempfile.mkdtemp(prefix='tarantool-test-socket')
+test_path = os.path.join(test_dir, 'socket')
 
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 try:
@@ -20,3 +19,4 @@ s.close()
 
 if os.path.exists(test_path):
     os.remove(test_path)
+    os.rmdir(test_dir)

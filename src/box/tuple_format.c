@@ -40,7 +40,7 @@ static uint32_t formats_size = 0, formats_capacity = 0;
 
 static const struct tuple_field tuple_field_default = {
 	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false,
-	ON_CONFLICT_ACTION_DEFAULT, NULL, COLL_NONE,
+	ON_CONFLICT_ACTION_NONE, NULL, COLL_NONE,
 };
 
 /**
@@ -96,6 +96,13 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			assert(part->fieldno < format->field_count);
 			struct tuple_field *field = &format->fields[part->fieldno];
 			/*
+			 * If a field is not present in the space format,
+			 * inherit nullable action of the first key part
+			 * referencing it.
+			 */
+			if (part->fieldno >= field_count && !field->is_key_part)
+				field->nullable_action = part->nullable_action;
+			/*
 			 * Field and part nullable actions may differ only
 			 * if one of them is DEFAULT, in which case we use
 			 * the non-default action *except* the case when
@@ -105,9 +112,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			 * is_nullable flag, we will use the strictest option,
 			 * i.e. DEFAULT.
 			 */
-			if (part->fieldno >= field_count) {
-				field->nullable_action = part->nullable_action;
-			} else if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
+			if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
 				if (part->nullable_action != ON_CONFLICT_ACTION_NONE)
 					field->nullable_action = part->nullable_action;
 			} else if (part->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {

@@ -51,6 +51,18 @@ struct obuf;
 struct ev_io;
 struct auth_request;
 struct space;
+struct vclock;
+
+/**
+ * Pointer to TX thread local vclock.
+ *
+ * During recovery it points to the current recovery position.
+ * Once recovery is complete, it is set to &replicaset.vclock.
+ *
+ * We need it for reporting the actual vclock in box.info while
+ * the instance is in hot standby mode.
+ */
+extern const struct vclock *box_vclock;
 
 /*
  * Initialize box library

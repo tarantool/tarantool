@@ -80,16 +80,25 @@ lbox_trigger_run(struct trigger *ptr, void *event)
 	 * invocation, and in future we plan to hack into Lua
 	 * C API to fix this.
 	 */
-	struct lua_State *L = lua_newthread(tarantool_L);
-	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	struct lua_State *L;
+	int coro_ref;
+	if (fiber()->storage.lua.stack == NULL) {
+		L = lua_newthread(tarantool_L);
+		coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
+	} else {
+		L = fiber()->storage.lua.stack;
+		coro_ref = LUA_REFNIL;
+	}
+	int top = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, trigger->ref);
-	int top = trigger->push_event(L, event);
-	if (luaT_call(L, top, LUA_MULTRET)) {
+	int nargs = trigger->push_event(L, event);
+	if (luaT_call(L, nargs, LUA_MULTRET)) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}
+	int nret = lua_gettop(L) - top;
 	if (trigger->pop_event != NULL &&
-	    trigger->pop_event(L, event) != 0) {
+	    trigger->pop_event(L, nret, event) != 0) {
 		luaL_unref(tarantool_L, LUA_REGISTRYINDEX, coro_ref);
 		diag_raise();
 	}

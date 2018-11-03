@@ -24,9 +24,15 @@ else()
     set(NGHTTP2_LIB_NAME nghttp2)
 endif()
 
-# Curl may require nghttp library, search for it and add to dependicies if
-# found
+# Always links pthread and dl dynamically.
+set(PTHREAD_LIB_NAME pthread)
+set(DL_LIB_NAME dl)
+
+# Curl may be linked with optional or target-dependent libraries,
+# search for them and add to dependicies if found.
 find_library(NGHTTP2_LIBRARY NAMES ${NGHTTP2_LIB_NAME})
+find_library(PTHREAD_LIBRARY NAMES ${PTHREAD_LIB_NAME})
+find_library(DL_LIBRARY NAMES ${DL_LIB_NAME})
 
 if(DEFINED CURL_ROOT)
     set(CURL_FIND_OPTS NO_CMAKE NO_CMAKE_SYSTEM_PATH)
@@ -79,14 +85,21 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(CURL
 
 if(CURL_FOUND)
   set(CURL_LIBRARIES ${CURL_LIBRARY})
+  set(CURL_LIBRARIES ${CURL_LIBRARIES} ${OPENSSL_LIBRARIES})
   if(BUILD_STATIC)
-    # in case of a static build we have to add curl dependencies
+    # In case of a static build we have to add curl dependencies.
     if(NOT "${NGHTTP2_LIBRARY}" STREQUAL "NGHTTP2_LIBRARY-NOTFOUND")
       set(CURL_LIBRARIES ${CURL_LIBRARIES} ${NGHTTP2_LIBRARY})
     endif()
+    if(NOT "${PTHREAD_LIBRARY}" STREQUAL "PTHREAD_LIBRARY-NOTFOUND")
+      set(CURL_LIBRARIES ${CURL_LIBRARIES} ${PTHREAD_LIBRARY})
+    endif()
+    if(NOT "${DL_LIBRARY}" STREQUAL "DL_LIBRARY-NOTFOUND")
+      set(CURL_LIBRARIES ${CURL_LIBRARIES} ${DL_LIBRARY})
+    endif()
   endif()
   set(CURL_INCLUDE_DIRS ${CURL_INCLUDE_DIR})
-  set(CMAKE_REQUIRED_LIBRARIES ${CURL_LIBRARIES} ${OPENSSL_LIBRARIES} pthread dl)
+  set(CMAKE_REQUIRED_LIBRARIES ${CURL_LIBRARIES})
   set(CMAKE_REQUIRED_INCLUDES ${CURL_INCLUDE_DIRS})
   check_c_source_runs("
     #include <curl/curl.h>

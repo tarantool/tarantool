@@ -13,6 +13,8 @@ env = require('test_run')
 test_run = env.new()
 test_run:cmd("push filter '(error: .builtin/.*[.]lua):[0-9]+' to '\\1'")
 
+WAIT_COND_TIME = 10
+
 socket('PF_INET', 'SOCK_STREAM', 'tcp121222');
 
 s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
@@ -37,8 +39,8 @@ s:nonblock(false)
 s:nonblock()
 s:nonblock(true)
 
-s:readable(.01)
-s:wait(.01)
+s:readable(.1)
+s:wait(.1)
 socket.iowait(s:fd(), 'RW')
 socket.iowait(s:fd(), 3)
 socket.iowait(s:fd(), 'R')
@@ -185,14 +187,15 @@ s ~= nil
 s:nonblock()
 s:nonblock(true)
 s:nonblock()
-os.remove('/tmp/tarantool-test-socket')
-s:bind('unix/', '/tmp/tarantool-test-socket')
+path = 'tarantool-test-socket'
+os.remove(path)
+s:bind('unix/', path)
 sc ~= nil
 s:listen(1234)
 
 sc = socket('PF_UNIX', 'SOCK_STREAM', 0)
 sc:nonblock(true)
-sc:sysconnect('unix/', '/tmp/tarantool-test-socket')
+sc:sysconnect('unix/', path)
 sc:error()
 
 s:readable()
@@ -205,7 +208,7 @@ sc:close()
 sa:close()
 s:close()
 
-_ = os.remove('/tmp/tarantool-test-socket')
+_ = os.remove(path)
 
 test_run:cmd("setopt delimiter ';'")
 function aexitst(ai, hostnames, port)
@@ -306,7 +309,7 @@ s:close()
 socket.tcp_connect('127.0.0.1', port), errno() == errno.ECONNREFUSED
 
 -- AF_UNIX
-path = '/tmp/tarantool-test-socket'
+path = 'tarantool-test-socket'
 _ = os.remove(path)
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 s:bind('unix/', path)
@@ -357,18 +360,20 @@ s:error()
 -- random port
 master = socket('PF_INET', 'SOCK_STREAM', 'tcp')
 master:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
-port = 32768 + math.random(32768)
-attempt = 0
+port = 32768 + math.random(0, 32767)
+-- SO_REUSEADDR allows to bind to the same source addr:port twice,
+-- so listen() can return EADDRINUSE and so we check it within
+-- wait_cond().
 test_run:cmd("setopt delimiter ';'")
-while attempt < 10 do
-    if not master:bind('127.0.0.1', port)  then
+test_run:wait_cond(function()
+    local ok = master:bind('127.0.0.1', port)
+    local ok = ok and master:listen()
+    if not ok then
         port = 32768 + math.random(32768)
-        attempt = attempt + 1
-    else
-        break
+        return false, master:error()
     end
-end;
-master:listen();
+    return true
+end, WAIT_COND_TIME);
 function gh361()
     local s = socket('PF_INET', 'SOCK_STREAM', 'tcp')
     s:sysconnect('127.0.0.1', port)
@@ -383,7 +388,7 @@ master:close()
 f = nil
 
 
-path = '/tmp/tarantool-test-socket'
+path = 'tarantool-test-socket'
 s = socket('PF_UNIX', 'SOCK_STREAM', 0)
 s:setsockopt('SOL_SOCKET', 'SO_REUSEADDR', true)
 s:error()
@@ -531,7 +536,7 @@ yaml.decode(yaml.encode(s)).fd == s:fd()
 s = nil
 
 -- start AF_UNIX server with dead socket exists
-path = '/tmp/tarantool-test-socket'
+path = 'tarantool-test-socket'
 s = socket('AF_UNIX', 'SOCK_STREAM', 0)
 s:bind('unix/', path)
 s:close()
@@ -569,7 +574,7 @@ f:cancel()
 -- and used by a newly started one.
 test_run:cmd("setopt delimiter ';'")
 err = nil;
-path = '/tmp/tarantool-test-socket';
+path = 'tarantool-test-socket'
 for i = 1, 10 do
     local server = socket.tcp_server('unix/', path, function() end)
     if not server then

@@ -74,20 +74,20 @@ lbox_push_txn_stmt(struct lua_State *L, void *event)
 }
 
 static int
-lbox_pop_txn_stmt(struct lua_State *L, void *event)
+lbox_pop_txn_stmt(struct lua_State *L, int nret, void *event)
 {
 	struct txn_stmt *stmt = txn_current_stmt((struct txn *) event);
 
-	if (lua_gettop(L) < 1) {
+	if (nret < 1) {
 		/* No return value - nothing to do. */
 		return 0;
 	}
-
-	struct tuple *result = luaT_istuple(L, 1);
-	if (result == NULL && !lua_isnil(L, 1) && !luaL_isnull(L, 1)) {
+	int top = lua_gettop(L) - nret + 1;
+	struct tuple *result = luaT_istuple(L, top);
+	if (result == NULL && !lua_isnil(L, top) && !luaL_isnull(L, top)) {
 		/* Invalid return value - raise error. */
 		diag_set(ClientError, ER_BEFORE_REPLACE_RET,
-			 lua_typename(L, lua_type(L, 1)));
+			 lua_typename(L, lua_type(L, top)));
 		return -1;
 	}
 

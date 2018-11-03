@@ -88,6 +88,7 @@ static void title(const char *new_status)
 }
 
 bool box_checkpoint_is_in_progress = false;
+const struct vclock *box_vclock = &replicaset.vclock;
 
 /**
  * Set if backup is in progress, i.e. box_backup_start() was
@@ -1903,7 +1904,16 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	recovery = recovery_new(cfg_gets("wal_dir"),
 				cfg_geti("force_recovery"),
 				checkpoint_vclock);
-	auto guard = make_scoped_guard([=]{ recovery_delete(recovery); });
+
+	/*
+	 * Make sure we report the actual recovery position
+	 * in box.info while local recovery is in progress.
+	 */
+	box_vclock = &recovery->vclock;
+	auto guard = make_scoped_guard([&]{
+		box_vclock = &replicaset.vclock;
+		recovery_delete(recovery);
+	});
 
 	/*
 	 * Initialize the replica set vclock from recovery.
