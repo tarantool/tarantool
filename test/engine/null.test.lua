@@ -505,3 +505,12 @@ s:insert{5} -- Fail.
 s:insert{9, 10} -- Success.
 
 s:drop()
+
+-- gh-3744: Assertion after improper index creation
+s = box.schema.space.create('test', {engine=engine})
+pk = s:create_index('primary', {parts={1, 'unsigned'}})
+sk1 = s:create_index('sk1', {parts={{2, 'number', is_nullable=false}}})
+s:insert{1, -1, 1}
+sk2 = s:create_index('sk2', {parts={{2, 'number', is_nullable=true}}})
+s:insert{2, nil, 2} --error
+s:drop()
