@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(57)
+test:plan(59)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -36,6 +36,14 @@ test:ok(client ~= nil, "connect to console")
 --
 client:write('box.session.push(200)\n')
 test:is(client:read(EOL), '%TAG !push! tag:tarantool.io/push,2018\n--- 200\n...\n',
+        "pushed message")
+test:is(client:read(EOL), '---\n- true\n...\n', "pushed message")
+
+--
+-- gh-3790: box.session.push support uint64_t sync.
+--
+client:write('box.session.push(1, 9223372036854775808ULL)\n')
+test:is(client:read(EOL), '%TAG !push! tag:tarantool.io/push,2018\n--- 1\n...\n',
         "pushed message")
 test:is(client:read(EOL), '---\n- true\n...\n', "pushed message")
 
