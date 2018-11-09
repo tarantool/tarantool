@@ -673,7 +673,9 @@ cn:execute('select * from test')
 ---
 - metadata:
   - name: ID
+    type: INTEGER
   - name: A
+    type: INTEGER
   rows:
   - [1, 11]
   - [2, 2]
