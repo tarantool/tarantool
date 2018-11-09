@@ -53,11 +53,6 @@ enum {
 	/** 7 = sizeof(iproto_body_bin). */
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
 	/**
-	 * mp_sizeof(IPROTO_DATA/METADATA/SQL_INFO) +
-	 * mp_sizeof_array(UINT32_MAX).
-	 */
-	IPROTO_KEY_HEADER_LEN = 1 + 5,
-	/**
 	 * Header of message + header of body with one or two
 	 * keys: IPROTO_DATA and IPROTO_METADATA or
 	 * IPROTO_SQL_INFO. 1 == mp_sizeof_map(<=15).
@@ -421,20 +416,6 @@ iproto_prepare_select(struct obuf *buf, struct obuf_svp *svp)
 void
 iproto_reply_select(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
 		    uint32_t schema_version, uint32_t count);
-
-/**
- * Write header of the key to a preallocated buffer by svp.
- * @param buf Buffer to write to.
- * @param size Size of the key (length of the array or of the
- *        string).
- * @param key Body key.
- */
-int
-iproto_reply_array_key(struct obuf *buf, uint32_t size, uint8_t key);
-
-/** @copydoc iproto_reply_array_key. */
-int
-iproto_reply_map_key(struct obuf *buf, uint32_t size, uint8_t key);
 
 /**
  * Encode iproto header with IPROTO_OK response code.

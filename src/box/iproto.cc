@@ -1593,8 +1593,16 @@ tx_process_sql(struct cmsg *m)
 	 * become out of date during yield.
 	 */
 	out = msg->connection->tx.p_obuf;
-	if (sql_response_dump(&response, out) != 0)
+	int keys;
+	struct obuf_svp header_svp;
+	/* Prepare memory for the iproto header. */
+	if (iproto_prepare_header(out, &header_svp, IPROTO_SQL_HEADER_LEN) != 0)
 		goto error;
+	if (sql_response_dump(&response, &keys, out) != 0) {
+		obuf_rollback_to_svp(out, &header_svp);
+		goto error;
+	}
+	iproto_reply_sql(out, &header_svp, response.sync, schema_version, keys);
 	iproto_wpos_create(&msg->wpos, out);
 	return;
 error:

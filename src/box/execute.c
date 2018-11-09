@@ -534,9 +534,15 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 		    int column_count)
 {
 	assert(column_count > 0);
-	if (iproto_reply_array_key(out, column_count, IPROTO_METADATA) != 0)
+	int size = mp_sizeof_uint(IPROTO_METADATA) +
+		   mp_sizeof_array(column_count);
+	char *pos = (char *) obuf_alloc(out, size);
+	if (pos == NULL) {
+		diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 		return -1;
-
+	}
+	pos = mp_encode_uint(pos, IPROTO_METADATA);
+	pos = mp_encode_array(pos, column_count);
 	for (int i = 0; i < column_count; ++i) {
 		size_t size = mp_sizeof_map(2) +
 			      mp_sizeof_uint(IPROTO_FIELD_NAME) +
@@ -619,27 +625,28 @@ sql_prepare_and_execute(const struct sql_request *request,
 }
 
 int
-sql_response_dump(struct sql_response *response, struct obuf *out)
+sql_response_dump(struct sql_response *response, int *keys, struct obuf *out)
 {
-	struct obuf_svp header_svp;
-	/* Prepare memory for the iproto header. */
-	if (iproto_prepare_header(out, &header_svp, IPROTO_SQL_HEADER_LEN) != 0)
-		return -1;
 	sqlite3 *db = sql_get();
 	struct sqlite3_stmt *stmt = (struct sqlite3_stmt *) response->prep_stmt;
 	struct port_tuple *port_tuple = (struct port_tuple *) &response->port;
-	int keys, rc = 0, column_count = sqlite3_column_count(stmt);
+	int rc = 0, column_count = sqlite3_column_count(stmt);
 	if (column_count > 0) {
 		if (sql_get_description(stmt, out, column_count) != 0) {
 err:
-			obuf_rollback_to_svp(out, &header_svp);
 			rc = -1;
 			goto finish;
 		}
-		keys = 2;
-		if (iproto_reply_array_key(out, port_tuple->size,
-					   IPROTO_DATA) != 0)
+		*keys = 2;
+		int size = mp_sizeof_uint(IPROTO_DATA) +
+			   mp_sizeof_array(port_tuple->size);
+		char *pos = (char *) obuf_alloc(out, size);
+		if (pos == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 			goto err;
+		}
+		pos = mp_encode_uint(pos, IPROTO_DATA);
+		pos = mp_encode_array(pos, port_tuple->size);
 		/*
 		 * Just like SELECT, SQL uses output format compatible
 		 * with Tarantool 1.6
@@ -649,17 +656,24 @@ err:
 			goto err;
 		}
 	} else {
-		keys = 1;
+		*keys = 1;
 		assert(port_tuple->size == 0);
 		struct stailq *autoinc_id_list =
 			vdbe_autoinc_id_list((struct Vdbe *)stmt);
 		uint32_t map_size = stailq_empty(autoinc_id_list) ? 1 : 2;
-		if (iproto_reply_map_key(out, map_size, IPROTO_SQL_INFO) != 0)
+		int size = mp_sizeof_uint(IPROTO_SQL_INFO) +
+			   mp_sizeof_map(map_size);
+		char *pos = (char *) obuf_alloc(out, size);
+		if (pos == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 			goto err;
+		}
+		pos = mp_encode_uint(pos, IPROTO_SQL_INFO);
+		pos = mp_encode_map(pos, map_size);
 		uint64_t id_count = 0;
 		int changes = db->nChange;
-		int size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
-			   mp_sizeof_uint(changes);
+		size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
+		       mp_sizeof_uint(changes);
 		if (!stailq_empty(autoinc_id_list)) {
 			struct autoinc_id_entry *id_entry;
 			stailq_foreach_entry(id_entry, autoinc_id_list, link) {
@@ -689,8 +703,6 @@ err:
 			}
 		}
 	}
-	iproto_reply_sql(out, &header_svp, response->sync, schema_version,
-			 keys);
 finish:
 	port_destroy(&response->port);
 	sqlite3_finalize(stmt);

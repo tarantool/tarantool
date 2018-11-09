@@ -104,13 +104,14 @@ struct sql_response {
  * | }                                            |
  * +----------------------------------------------+
  * @param response EXECUTE response.
+ * @param[out] keys number of keys in dumped map.
  * @param out Output buffer.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 int
-sql_response_dump(struct sql_response *response, struct obuf *out);
+sql_response_dump(struct sql_response *response, int *keys, struct obuf *out);
 
 /**
  * Parse the EXECUTE request.
@@ -141,16 +142,6 @@ sql_prepare_and_execute(const struct sql_request *request,
 
 #if defined(__cplusplus)
 } /* extern "C" { */
-#include "diag.h"
-
-/** @copydoc sql_request_decode. Throws on error. */
-static inline void
-xrow_decode_sql_xc(const struct xrow_header *row, struct sql_request *request,
-		   struct region *region)
-{
-	if (xrow_decode_sql(row, request, region) != 0)
-		diag_raise();
-}
 #endif
 
 #endif /* TARANTOOL_SQL_EXECUTE_H_INCLUDED */
