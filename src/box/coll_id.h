@@ -37,6 +37,10 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+enum {
+	COLL_NONE = 0,
+};
+
 struct coll_id_def;
 struct coll;
 

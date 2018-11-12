@@ -606,6 +606,9 @@ local function upgrade_to_2_1_0()
     format[2] = {type='any', name='value', is_nullable=true}
     box.space._schema:format(format)
 
+    box.space._collation:replace{0, "none", ADMIN, "BINARY", "", setmap{}}
+    box.space._collation:replace{3, "binary", ADMIN, "BINARY", "", setmap{}}
+
     upgrade_priv_to_2_1_0()
 end
 

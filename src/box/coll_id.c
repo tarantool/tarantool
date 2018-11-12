@@ -37,7 +37,6 @@
 struct coll_id *
 coll_id_new(const struct coll_id_def *def)
 {
-	assert(def->base.type == COLL_TYPE_ICU);
 	size_t total_len = sizeof(struct coll_id) + def->name_len + 1;
 	struct coll_id *coll_id = (struct coll_id *) malloc(total_len);
 	if (coll_id == NULL) {

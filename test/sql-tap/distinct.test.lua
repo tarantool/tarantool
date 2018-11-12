@@ -126,7 +126,7 @@ local data = {
     {"14.2", 1, "SELECT DISTINCT a, d COLLATE \"unicode_ci\" FROM t4"},
     {"15 ", 0, "SELECT DISTINCT a, d COLLATE \"binary\" FROM t1"},
     {"16.1", 0, "SELECT DISTINCT a, b, c COLLATE \"binary\" FROM t1"},
-    {"16.2", 1, "SELECT DISTINCT a, b, c COLLATE \"binary\" FROM t4"},
+    {"16.2", 0, "SELECT DISTINCT a, b, c COLLATE \"binary\" FROM t4"},
     {"17",  0,   --{ \/* Technically, it would be possible to detect that DISTINCT\n            ** is a no-op in cases like the following. But SQLite does not\n            ** do so. *\/\n
     "SELECT DISTINCT t1.id FROM t1, t2 WHERE t1.id=t2.x" },
     {"18 ", 1, "SELECT DISTINCT c1, c2 FROM t3"},

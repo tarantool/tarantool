@@ -17,11 +17,13 @@ test:do_execsql_test(
     prefix.."0.2",
     "pragma collation_list",
     {
-        0,"unicode",
-        1,"unicode_ci",
-        2,"unicode_numeric",
-        3,"unicode_numeric_s2",
-        4,"unicode_tur_s2"
+        0,"none",
+        1,"unicode",
+        2,"unicode_ci",
+        3,"binary",
+        4,"unicode_numeric",
+        5,"unicode_numeric_s2",
+        6,"unicode_tur_s2"
     }
 )
 

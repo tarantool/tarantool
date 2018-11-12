@@ -506,7 +506,7 @@ case_type##ICUFunc(sqlite3_context *context, int argc, sqlite3_value **argv)   \
 	UErrorCode status = U_ZERO_ERROR;                                      \
 	struct coll *coll = sqlite3GetFuncCollSeq(context);                    \
 	const char *locale = NULL;                                             \
-	if (coll != NULL) {                                                    \
+	if (coll != NULL && coll->type == COLL_TYPE_ICU) {                     \
 		locale = ucol_getLocaleByType(coll->collator,                  \
 					      ULOC_VALID_LOCALE, &status);     \
 	}                                                                      \

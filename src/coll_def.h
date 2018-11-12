@@ -36,6 +36,7 @@
 /** The supported collation types */
 enum coll_type {
 	COLL_TYPE_ICU = 0,
+	COLL_TYPE_BINARY = 1,
 	coll_type_MAX,
 };
 

@@ -42,4 +42,33 @@ cn = remote.connect(box.cfg.listen)
 cn:execute('select 1 limit ? collate not_exist', {1})
 
 cn:close()
+
+-- Explicitly set BINARY collation is predifined and has ID.
+--
+box.sql.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT, b TEXT COLLATE \"binary\");")
+box.space.T:format()[2]['collation']
+box.space.T:format()[3]['collation']
+box.sql.execute("DROP TABLE t;")
+
+-- BINARY collation works in the same way as there is no collation
+-- at all.
+--
+t = box.schema.create_space('test', {format = {{'id', 'unsigned'}, {'a', 'string', collation = 'binary'}}})
+t:format()[2]['collation']
+pk = t:create_index('primary', {parts = {1}})
+i = t:create_index('secondary', {parts = {2, 'str', collation='binary'}})
+t:insert({1, 'AsD'})
+t:insert({2, 'ASD'})
+t:insert({3, 'asd'})
+i:select('asd')
+i:select('ASD')
+i:select('AsD')
+t:drop()
+
+-- Collation with id == 0 is "none". It used to unify interaction
+-- with collation interface. It also can't be dropped.
+--
+box.space._collation:select{0}
+box.space._collation:delete{0}
+
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')

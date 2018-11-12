@@ -31,7 +31,7 @@
 #include "coll_def.h"
 
 const char *coll_type_strs[] = {
-	"ICU"
+	"ICU", "BINARY"
 };
 
 const char *coll_icu_on_off_strs[] = {

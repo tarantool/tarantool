@@ -92,6 +92,17 @@ coll_icu_cmp(const char *s, size_t slen, const char *t, size_t tlen,
 	return (int)result;
 }
 
+static int
+coll_bin_cmp(const char *s, size_t slen, const char *t, size_t tlen,
+	     const struct coll *coll)
+{
+	(void) coll;
+	int res = memcmp(s, t, slen < tlen ? slen : tlen);
+	if (res == 0)
+		res = slen - tlen;
+	return res;
+}
+
 /** Get a hash of a string using ICU collation. */
 static uint32_t
 coll_icu_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
@@ -111,6 +122,15 @@ coll_icu_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
 		total_size += got;
 	} while (got == TT_STATIC_BUF_LEN);
 	return total_size;
+}
+
+static uint32_t
+coll_bin_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
+	      struct coll *coll)
+{
+	(void) coll;
+	PMurHash32_Process(ph, pcarry, s, s_len);
+	return s_len;
 }
 
 /**
@@ -262,17 +282,22 @@ static int
 coll_def_snfingerprint(char *buffer, int size, const struct coll_def *def)
 {
 	int total = 0;
-	SNPRINT(total, snprintf, buffer, size, "{locale: %s, type = %d, "\
-	        "icu: ", def->locale, (int) def->type);
-	SNPRINT(total, coll_icu_def_snfingerprint, buffer, size, &def->icu);
-	SNPRINT(total, snprintf, buffer, size, "}");
+	if (def->type == COLL_TYPE_ICU) {
+		SNPRINT(total, snprintf, buffer, size, "{locale: %s,"\
+			"type = %d, icu: ", def->locale, (int) def->type);
+		SNPRINT(total, coll_icu_def_snfingerprint, buffer,
+			size, &def->icu);
+		SNPRINT(total, snprintf, buffer, size, "}");
+	} else {
+		assert(def->type == COLL_TYPE_BINARY);
+		SNPRINT(total, snprintf, buffer, size, "{type = binary}");
+	}
 	return total;
 }
 
 struct coll *
 coll_new(const struct coll_def *def)
 {
-	assert(def->type == COLL_TYPE_ICU);
 	int fingerprint_len = coll_def_snfingerprint(NULL, 0, def);
 	assert(fingerprint_len <= TT_STATIC_BUF_LEN);
 	char *fingerprint = tt_static_buf();
@@ -296,9 +321,20 @@ coll_new(const struct coll_def *def)
 	memcpy((char *) coll->fingerprint, fingerprint, fingerprint_len + 1);
 	coll->refs = 1;
 	coll->type = def->type;
-	if (coll_icu_init_cmp(coll, def) != 0) {
-		free(coll);
-		return NULL;
+	switch (coll->type) {
+	case COLL_TYPE_ICU:
+		if (coll_icu_init_cmp(coll, def) != 0) {
+			free(coll);
+			return NULL;
+		}
+		break;
+	case COLL_TYPE_BINARY:
+		coll->collator = NULL;
+		coll->cmp = coll_bin_cmp;
+		coll->hash = coll_bin_hash;
+		break;
+	default:
+		unreachable();
 	}
 
 	struct mh_coll_node_t node = { fingerprint_len, hash, coll };

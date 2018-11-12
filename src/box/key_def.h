@@ -72,12 +72,6 @@ struct key_part_def {
 
 extern const struct key_part_def key_part_def_default;
 
-/**
- * Set key_part_def.coll_id to COLL_NONE if
- * the field does not have a collation.
- */
-#define COLL_NONE UINT32_MAX
-
 /** Descriptor of a single part in a multipart key. */
 struct key_part {
 	/** Tuple field index for this part */

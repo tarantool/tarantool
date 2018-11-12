@@ -2560,7 +2560,6 @@ coll_id_def_new_from_tuple(const struct tuple *tuple, struct coll_id_def *def)
 		tuple_field_with_type_xc(tuple, BOX_COLLATION_FIELD_OPTIONS,
 					 MP_MAP);
 
-	assert(base->type == COLL_TYPE_ICU);
 	if (opts_decode(&base->icu, coll_icu_opts_reg, &options,
 			ER_WRONG_COLLATION_OPTIONS,
 			BOX_COLLATION_FIELD_OPTIONS, NULL) != 0)
@@ -2671,6 +2670,16 @@ on_replace_dd_collation(struct trigger * /* trigger */, void *event)
 		 */
 		int32_t old_id = tuple_field_u32_xc(old_tuple,
 						    BOX_COLLATION_FIELD_ID);
+		/*
+		 * Don't allow user to drop "none" collation
+		 * since it is very special and vastly used
+		 * under the hood. Hence, we can rely on the
+		 * fact that "none" collation features id == 0.
+		 */
+		if (old_id == COLL_NONE) {
+			tnt_raise(ClientError, ER_DROP_COLLATION, "none",
+				  "system collation");
+		}
 		struct coll_id *old_coll_id = coll_by_id(old_id);
 		assert(old_coll_id != NULL);
 		access_check_ddl(old_coll_id->name, old_coll_id->id,

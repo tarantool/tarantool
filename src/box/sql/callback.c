@@ -42,13 +42,12 @@
 struct coll *
 sql_get_coll_seq(Parse *parser, const char *name, uint32_t *coll_id)
 {
-	if (name == NULL || strcmp(name, "binary") == 0) {
+	if (name == NULL) {
 		*coll_id = COLL_NONE;
-		return NULL;
+		return coll_by_id(COLL_NONE)->coll;
 	}
 	struct coll_id *p = coll_by_name(name, strlen(name));
 	if (p == NULL) {
-		*coll_id = COLL_NONE;
 		diag_set(ClientError, ER_NO_SUCH_COLLATION, name);
 		parser->rc = SQL_TARANTOOL_ERROR;
 		parser->nErr++;

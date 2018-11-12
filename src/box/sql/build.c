@@ -2405,9 +2405,8 @@ index_fill_def(struct Parse *parse, struct index *index,
 		uint32_t fieldno = column_expr->iColumn;
 		uint32_t coll_id;
 		if (expr->op == TK_COLLATE) {
-			sql_get_coll_seq(parse, expr->u.zToken, &coll_id);
-			if (coll_id == COLL_NONE &&
-			    strcmp(expr->u.zToken, "binary") != 0)
+			if (sql_get_coll_seq(parse, expr->u.zToken,
+					     &coll_id) == NULL)
 				goto tnt_error;
 		} else {
 			sql_column_collation(space_def, fieldno, &coll_id);

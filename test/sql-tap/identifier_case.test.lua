@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(67)
+test:plan(71)
 
 local test_prefix = "identifier_case-"
 
@@ -207,7 +207,9 @@ data = {
     { 4,  [["bInaRy"]], {1, "Collation 'bInaRy' does not exist"}},
     { 5,  [["unicode"]], {0}},
     { 6,  [[ unicode ]], {1,"Collation 'UNICODE' does not exist"}},
-    { 7,  [["UNICODE"]], {1,"Collation 'UNICODE' does not exist"}}
+    { 7,  [["UNICODE"]], {1,"Collation 'UNICODE' does not exist"}},
+    { 8,  [[NONE]], {1,"Collation 'NONE' does not exist"}},
+    { 9,  [["none"]], {0}},
 }
 
 test:do_catchsql_test(
@@ -241,6 +243,8 @@ data = {
     { 5,  [[ 5 < 'b' collate "unicode" ]], {0, {1}}},
     { 6,  [[ 5 < 'b' collate unicode ]], {1,"Collation 'UNICODE' does not exist"}},
     { 7,  [[ 5 < 'b' collate "unicode_ci" ]], {0, {1}}},
+    { 8,  [[ 5 < 'b' collate NONE ]], {1, "Collation 'NONE' does not exist"}},
+    { 9,  [[ 5 < 'b' collate "none" ]], {0, {1}}},
 }
 
 for _, row in ipairs(data) do
