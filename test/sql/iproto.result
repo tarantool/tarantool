@@ -742,17 +742,29 @@ box.sql.execute('drop table test3')
 --
 -- Ensure that FK inside CREATE TABLE does not affect rowcount.
 --
-cn:execute('create table test (id integer primary key)')
+cn:execute('create table test (id integer primary key, a integer)')
 ---
 - rowcount: 1
 ...
-cn:execute('create table test2 (id integer primary key, ref integer references test)')
+cn:execute('create table test2 (id integer primary key, ref integer references test(id))')
 ---
 - rowcount: 1
 ...
 cn:execute('drop table test2')
 ---
 - rowcount: 1
+...
+--
+-- Ensure that REPLACE is accounted twice in rowcount. As delete +
+-- insert.
+--
+cn:execute('insert into test values(1, 1)')
+---
+- rowcount: 1
+...
+cn:execute('insert or replace into test values(1, 2)')
+---
+- rowcount: 2
 ...
 cn:execute('drop table test')
 ---

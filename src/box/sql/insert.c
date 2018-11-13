@@ -1065,7 +1065,7 @@ process_index:  ;
 				sql_triggers_exist(tab, TK_DELETE, NULL, NULL);
 			sql_generate_row_delete(parse_context, tab, trigger,
 						cursor, idx_key_reg, part_count,
-						false,
+						true,
 						ON_CONFLICT_ACTION_REPLACE,
 						ONEPASS_SINGLE, -1);
 			sqlite3VdbeResolveLabel(v, skip_index);
