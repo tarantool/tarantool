@@ -656,8 +656,12 @@ enum sql_subtype {
 void
 sqlite3_randomness(int N, void *P);
 
-int
-sqlite3_changes(sqlite3 *);
+/**
+ * Return the number of affected rows in the last SQL statement.
+ */
+void
+sql_row_count(struct sqlite3_context *context, MAYBE_UNUSED int unused1,
+	      MAYBE_UNUSED sqlite3_value **unused2);
 
 void *
 sqlite3_user_data(sqlite3_context *);
@@ -1514,7 +1518,8 @@ struct sqlite3 {
 	u8 suppressErr;		/* Do not issue error messages if true */
 	u8 mTrace;		/* zero or more SQLITE_TRACE flags */
 	u32 magic;		/* Magic number for detect library misuse */
-	int nChange;		/* Value returned by sqlite3_changes() */
+	/** Value returned by sql_row_count(). */
+	int nChange;
 	int aLimit[SQLITE_N_LIMIT];	/* Limits */
 	int nMaxSorterMmap;	/* Maximum size of regions mapped by sorter */
 	struct sqlite3InitInfo {	/* Information used during initialization */

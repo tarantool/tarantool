@@ -649,7 +649,7 @@ err:
 		if (iproto_reply_map_key(out, map_size, IPROTO_SQL_INFO) != 0)
 			goto err;
 		uint64_t id_count = 0;
-		int changes = sqlite3_changes(db);
+		int changes = db->nChange;
 		int size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
 			   mp_sizeof_uint(changes);
 		if (!stailq_empty(autoinc_id_list)) {

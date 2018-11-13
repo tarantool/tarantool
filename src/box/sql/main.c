@@ -483,19 +483,12 @@ setupLookaside(sqlite3 * db, void *pBuf, int sz, int cnt)
 	return SQLITE_OK;
 }
 
-/*
- * Return the number of changes in the most recent call to sqlite3_exec().
- */
-int
-sqlite3_changes(sqlite3 * db)
+void
+sql_row_count(struct sqlite3_context *context, MAYBE_UNUSED int unused1,
+	      MAYBE_UNUSED sqlite3_value **unused2)
 {
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return 0;
-	}
-#endif
-	return db->nChange;
+	sqlite3 *db = sqlite3_context_db_handle(context);
+	sqlite3_result_int(context, db->nChange);
 }
 
 /*

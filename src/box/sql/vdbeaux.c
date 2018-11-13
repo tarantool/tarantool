@@ -2472,16 +2472,17 @@ sqlite3VdbeHalt(Vdbe * p)
 			}
 		}
 
-		/* If this was an INSERT, UPDATE or DELETE and no statement transaction
-		 * has been rolled back, update the database connection change-counter.
+		/*
+		 * If this was an INSERT, UPDATE or DELETE and
+		 * statement transaction has been rolled back,
+		 * update the database connection change-counter.
+		 * Other statements should return 0 (zero).
 		 */
 		if (p->changeCntOn) {
-			if (eStatementOp != SAVEPOINT_ROLLBACK) {
-				sqlite3VdbeSetChanges(db, p->nChange);
-			} else {
-				sqlite3VdbeSetChanges(db, 0);
-			}
+			sqlite3VdbeSetChanges(db, p->nChange);
 			p->nChange = 0;
+		} else {
+			db->nChange = 0;
 		}
 	}
 
