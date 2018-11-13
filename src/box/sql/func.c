@@ -600,28 +600,6 @@ changes(sqlite3_context * context, int NotUsed, sqlite3_value ** NotUsed2)
 	sqlite3_result_int(context, sqlite3_changes(db));
 }
 
-/*
- * Implementation of the total_changes() SQL function.  The return value is
- * the same as the sqlite3_total_changes() API function.
- */
-static void
-total_changes(sqlite3_context * context, int NotUsed, sqlite3_value ** NotUsed2)
-{
-	sqlite3 *db = sqlite3_context_db_handle(context);
-	UNUSED_PARAMETER2(NotUsed, NotUsed2);
-	/* IMP: R-52756-41993 This function is a wrapper around the
-	 * sqlite3_total_changes() C/C++ interface.
-	 */
-	sqlite3_result_int(context, sqlite3_total_changes(db));
-}
-
-/**
- * Providing there are symbols in string s this macro returns
- * UTF-8 code of character and promotes pointer to the next
- * symbol in the string. If s points to an invalid UTF-8 symbol
- * return code is SQL_INVALID_UTF8_SYMBOL. If there're no symbols
- * left in string s return code is SQL_END_OF_STRING.
- */
 #define Utf8Read(s, e) ucnv_getNextUChar(pUtf8conv, &(s), (e), &status)
 
 #define SQL_END_OF_STRING        0xffff
@@ -1784,8 +1762,6 @@ sqlite3RegisterBuiltinFunctions(void)
 		FUNCTION(version, 0, 0, 0, sql_func_version, AFFINITY_TEXT),
 		FUNCTION(quote, 1, 0, 0, quoteFunc, AFFINITY_TEXT),
 		VFUNCTION(changes, 0, 0, 0, changes, AFFINITY_INTEGER),
-		VFUNCTION(total_changes, 0, 0, 0, total_changes,
-			  AFFINITY_INTEGER),
 		FUNCTION(replace, 3, 0, 0, replaceFunc, AFFINITY_TEXT),
 		FUNCTION(zeroblob, 1, 0, 0, zeroblobFunc, AFFINITY_BLOB),
 		FUNCTION(substr, 2, 0, 0, substrFunc, AFFINITY_TEXT),

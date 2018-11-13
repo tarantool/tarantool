@@ -659,9 +659,6 @@ sqlite3_randomness(int N, void *P);
 int
 sqlite3_changes(sqlite3 *);
 
-int
-sqlite3_total_changes(sqlite3 *);
-
 void *
 sqlite3_user_data(sqlite3_context *);
 
@@ -1518,7 +1515,6 @@ struct sqlite3 {
 	u8 mTrace;		/* zero or more SQLITE_TRACE flags */
 	u32 magic;		/* Magic number for detect library misuse */
 	int nChange;		/* Value returned by sqlite3_changes() */
-	int nTotalChange;	/* Value returned by sqlite3_total_changes() */
 	int aLimit[SQLITE_N_LIMIT];	/* Limits */
 	int nMaxSorterMmap;	/* Maximum size of regions mapped by sorter */
 	struct sqlite3InitInfo {	/* Information used during initialization */

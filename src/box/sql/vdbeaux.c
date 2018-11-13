@@ -3453,7 +3453,6 @@ void
 sqlite3VdbeSetChanges(sqlite3 * db, int nChange)
 {
 	db->nChange = nChange;
-	db->nTotalChange += nChange;
 }
 
 /*

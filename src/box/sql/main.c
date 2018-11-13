@@ -499,21 +499,6 @@ sqlite3_changes(sqlite3 * db)
 }
 
 /*
- * Return the number of changes since the database handle was opened.
- */
-int
-sqlite3_total_changes(sqlite3 * db)
-{
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db)) {
-		(void)SQLITE_MISUSE_BKPT;
-		return 0;
-	}
-#endif
-	return db->nTotalChange;
-}
-
-/*
  * Close all open savepoints.
  * This procedure is trivial as savepoints are allocated on the "region" and
  * would be destroyed automatically.
