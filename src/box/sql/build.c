@@ -1415,7 +1415,8 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 			  constr_tuple_reg + 9);
 	sqlite3VdbeAddOp3(vdbe, OP_SInsert, BOX_FK_CONSTRAINT_ID, 0,
 			  constr_tuple_reg + 9);
-	sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
+	if (parse_context->pNewTable == NULL)
+		sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
 	save_record(parse_context, BOX_FK_CONSTRAINT_ID, constr_tuple_reg, 2,
 		    vdbe->nOp - 1);
 	sqlite3ReleaseTempRange(parse_context, constr_tuple_reg, 10);
@@ -1809,7 +1810,6 @@ vdbe_emit_fkey_drop(struct Parse *parse_context, char *constraint_name,
 	}
 	sqlite3VdbeAddOp3(vdbe, OP_MakeRecord, key_reg, 2, key_reg + 2);
 	sqlite3VdbeAddOp2(vdbe, OP_SDelete, BOX_FK_CONSTRAINT_ID, key_reg + 2);
-	sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
 	VdbeComment((vdbe, "Delete FK constraint %s", constraint_name));
 	sqlite3ReleaseTempRange(parse_context, key_reg, 3);
 }
@@ -2268,6 +2268,13 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 	if (constraint_name != NULL)
 		vdbe_emit_fkey_drop(parse_context, constraint_name,
 				    child->def->id);
+	/*
+	 * We account changes to row count only if drop of
+	 * foreign keys take place in a separate
+	 * ALTER TABLE DROP CONSTRAINT statement, since whole
+	 * DROP TABLE always returns 1 (one) as a row count.
+	 */
+	sqlite3VdbeChangeP5(sqlite3GetVdbe(parse_context), OPFLAG_NCHANGE);
 }
 
 /*

@@ -225,11 +225,20 @@ box.sql.execute('create table test3 (id int primary key autoincrement)')
 box.schema.sequence.alter('TEST3', {min=-10000, step=-10})
 cn:execute('insert into TEST3 values (null), (null), (null), (null)')
 
-cn:close()
 box.sql.execute('drop table test')
 s:drop()
 sq:drop()
 box.sql.execute('drop table test3')
+
+--
+-- Ensure that FK inside CREATE TABLE does not affect rowcount.
+--
+cn:execute('create table test (id integer primary key)')
+cn:execute('create table test2 (id integer primary key, ref integer references test)')
+cn:execute('drop table test2')
+cn:execute('drop table test')
+
+cn:close()
 
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.schema.user.revoke('guest', 'create', 'space')

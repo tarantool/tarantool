@@ -727,9 +727,6 @@ cn:execute('insert into TEST3 values (null), (null), (null), (null)')
   - -29
   rowcount: 4
 ...
-cn:close()
----
-...
 box.sql.execute('drop table test')
 ---
 ...
@@ -740,6 +737,28 @@ sq:drop()
 ---
 ...
 box.sql.execute('drop table test3')
+---
+...
+--
+-- Ensure that FK inside CREATE TABLE does not affect rowcount.
+--
+cn:execute('create table test (id integer primary key)')
+---
+- rowcount: 1
+...
+cn:execute('create table test2 (id integer primary key, ref integer references test)')
+---
+- rowcount: 1
+...
+cn:execute('drop table test2')
+---
+- rowcount: 1
+...
+cn:execute('drop table test')
+---
+- rowcount: 1
+...
+cn:close()
 ---
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
