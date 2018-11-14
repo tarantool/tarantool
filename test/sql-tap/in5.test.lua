@@ -277,7 +277,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "6.1.2",
     [[
-        SELECT count(*) FROM t1 WHERE a COLLATE BINARY IN (SELECT DISTINCT a FROM t1)
+        SELECT count(*) FROM t1 WHERE a COLLATE "binary" IN (SELECT DISTINCT a FROM t1)
     ]], {
         -- <6.1.2>
         1

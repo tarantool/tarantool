@@ -84,7 +84,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a FROM t2 EXCEPT SELECT a FROM t3
-             ORDER BY a COLLATE binary;
+             ORDER BY a COLLATE "binary";
         ]]
     end, {
         -- <selectE-1.2>
@@ -127,7 +127,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT a COLLATE "unicode_ci" FROM t2 EXCEPT SELECT a FROM t3
-             ORDER BY 1 COLLATE binary
+             ORDER BY 1 COLLATE "binary"
         ]]
     end, {
         -- <selectE-2.2>

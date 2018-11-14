@@ -42,15 +42,16 @@
 struct coll *
 sql_get_coll_seq(Parse *parser, const char *name, uint32_t *coll_id)
 {
-	if (name == NULL || strcasecmp(name, "binary") == 0) {
+	if (name == NULL || strcmp(name, "binary") == 0) {
 		*coll_id = COLL_NONE;
 		return NULL;
 	}
 	struct coll_id *p = coll_by_name(name, strlen(name));
 	if (p == NULL) {
 		*coll_id = COLL_NONE;
-		sqlite3ErrorMsg(parser, "no such collation sequence: %s",
-				name);
+		diag_set(ClientError, ER_NO_SUCH_COLLATION, name);
+		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->nErr++;
 		return NULL;
 	} else {
 		*coll_id = p->id;

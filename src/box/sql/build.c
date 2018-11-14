@@ -2407,11 +2407,8 @@ index_fill_def(struct Parse *parse, struct index *index,
 		if (expr->op == TK_COLLATE) {
 			sql_get_coll_seq(parse, expr->u.zToken, &coll_id);
 			if (coll_id == COLL_NONE &&
-			    strcasecmp(expr->u.zToken, "binary") != 0) {
-				diag_set(ClientError, ER_NO_SUCH_COLLATION,
-					 expr->u.zToken);
+			    strcmp(expr->u.zToken, "binary") != 0)
 				goto tnt_error;
-			}
 		} else {
 			sql_column_collation(space_def, fieldno, &coll_id);
 		}

@@ -502,7 +502,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.4",
     [[
-        SELECT max(x COLLATE binary), max(x COLLATE "unicode_ci") FROM t4;
+        SELECT max(x COLLATE "binary"), max(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.4>
         "abc", "BCD"
@@ -564,7 +564,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "minmax3-4.13",
     [[
-        SELECT min(x COLLATE binary), min(x COLLATE "unicode_ci") FROM t4;
+        SELECT min(x COLLATE "binary"), min(x COLLATE "unicode_ci") FROM t4;
     ]], {
         -- <minmax3-4.13>
         "BCD", "abc"

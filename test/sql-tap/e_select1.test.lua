@@ -508,11 +508,11 @@ if (0 > 0)
     test:do_execsql_test(
         "e_select-1.6.0",
         [[
-            CREATE TABLE t5(a  TEXT COLLATE "unicode_ci", b  TEXT COLLATE binary);
+            CREATE TABLE t5(a  TEXT COLLATE "unicode_ci", b  TEXT COLLATE "binary");
             INSERT INTO t5 VALUES('AA', 'cc');
             INSERT INTO t5 VALUES('BB', 'dd');
             INSERT INTO t5 VALUES(NULL, NULL);
-            CREATE TABLE t6(a  TEXT COLLATE binary, b  TEXT COLLATE "unicode_ci");
+            CREATE TABLE t6(a  TEXT COLLATE "binary", b  TEXT COLLATE "unicode_ci");
             INSERT INTO t6 VALUES('aa', 'cc');
             INSERT INTO t6 VALUES('bb', 'DD');
             INSERT INTO t6 VALUES(NULL, NULL);
@@ -997,7 +997,7 @@ test:do_execsql_test(
         INSERT INTO b2 VALUES('abc', 3);
         INSERT INTO b2 VALUES('xyz', 4);
 
-        CREATE TABLE b3(id  INT PRIMARY KEY, a  TEXT COLLATE "unicode_ci", b  TEXT COLLATE binary);
+        CREATE TABLE b3(id  INT PRIMARY KEY, a  TEXT COLLATE "unicode_ci", b  TEXT COLLATE "binary");
         INSERT INTO b3 VALUES(1, 'abc', 'abc');
         INSERT INTO b3 VALUES(2, 'aBC', 'aBC');
         INSERT INTO b3 VALUES(3, 'Def', 'Def');
@@ -1289,7 +1289,7 @@ test:do_select_tests(
         {"1", "SELECT DISTINCT b FROM h1", {"one", "I", "i", "four", "IV", "iv"}},
         {"2", "SELECT DISTINCT b COLLATE \"unicode_ci\" FROM h1", {"one", "I", "four", "IV"}},
         {"3", "SELECT DISTINCT x FROM h2", {"One", "Two", "Three", "Four"}},
-        {"4", "SELECT DISTINCT x COLLATE binary FROM h2", {
+        {"4", "SELECT DISTINCT x COLLATE \"binary\" FROM h2", {
             "One", "Two", "Three", "Four", "one", "two", "three", "four"
         }},
     })
@@ -1574,7 +1574,7 @@ test:drop_all_tables()
 test:do_execsql_test(
     "e_select-7.10.0",
     [[
-        CREATE TABLE y1(a  TEXT COLLATE "unicode_ci" PRIMARY KEY, b  TEXT COLLATE binary, c TEXT );
+        CREATE TABLE y1(a  TEXT COLLATE "unicode_ci" PRIMARY KEY, b  TEXT COLLATE "binary", c TEXT );
         INSERT INTO y1 VALUES('Abc', 'abc', 'aBC');
     ]], {
         -- <e_select-7.10.0>
@@ -1588,12 +1588,12 @@ test:do_select_tests(
         {"1", "SELECT 'abc'                UNION SELECT 'ABC'", {"ABC",  "abc"}},
         {"2", "SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC'", {"ABC" }},
         {"3", "SELECT 'abc'                UNION SELECT 'ABC' COLLATE \"unicode_ci\"", {"ABC" }},
-        {"4", "SELECT 'abc' COLLATE binary UNION SELECT 'ABC' COLLATE \"unicode_ci\"", {"ABC",  "abc"}},
-        {"5", "SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC' COLLATE binary", {"ABC" }},
+        {"4", "SELECT 'abc' COLLATE \"binary\" UNION SELECT 'ABC' COLLATE \"unicode_ci\"", {"ABC",  "abc"}},
+        {"5", "SELECT 'abc' COLLATE \"unicode_ci\" UNION SELECT 'ABC' COLLATE \"binary\"", {"ABC" }},
         {"6", "SELECT a FROM y1 UNION SELECT b FROM y1", {"abc" }},
         {"7", "SELECT b FROM y1 UNION SELECT a FROM y1", {"Abc",  "abc"}},
         {"8", "SELECT a FROM y1 UNION SELECT c FROM y1", {"aBC" }},
-        {"9", "SELECT a FROM y1 UNION SELECT c COLLATE binary FROM y1", {"aBC" }},
+        {"9", "SELECT a FROM y1 UNION SELECT c COLLATE \"binary\" FROM y1", {"aBC" }},
     })
 
 -- EVIDENCE-OF: R-32706-07403 No affinity transformations are applied to
@@ -1932,7 +1932,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-8.9.1",
     [[
-        SELECT x FROM d4 ORDER BY 1 COLLATE binary
+        SELECT x FROM d4 ORDER BY 1 COLLATE "binary"
     ]], {
         -- <e_select-8.9.1>
         "DEF", "JKL", "abc", "ghi"
@@ -1942,7 +1942,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-8.9.2",
     [[
-        SELECT x COLLATE binary FROM d4 ORDER BY 1 COLLATE "unicode_ci"
+        SELECT x COLLATE "binary" FROM d4 ORDER BY 1 COLLATE "unicode_ci"
     ]], {
         -- <e_select-8.9.2>
         "abc", "DEF", "ghi", "JKL"
@@ -1963,7 +1963,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-8.10.1",
     [[
-        SELECT x COLLATE binary FROM d4 ORDER BY 1
+        SELECT x COLLATE "binary" FROM d4 ORDER BY 1
     ]], {
         -- <e_select-8.10.1>
         "DEF", "JKL", "abc", "ghi"
@@ -1973,7 +1973,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-8.10.2",
     [[
-        SELECT x COLLATE binary FROM d4 ORDER BY x
+        SELECT x COLLATE "binary" FROM d4 ORDER BY x
     ]], {
         -- <e_select-8.10.2>
         "abc", "DEF", "ghi", "JKL"
@@ -1983,7 +1983,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-8.10.3",
     [[
-        SELECT x COLLATE binary AS x FROM d4 ORDER BY x
+        SELECT x COLLATE "binary" AS x FROM d4 ORDER BY x
     ]], {
         -- <e_select-8.10.3>
         "DEF", "JKL", "abc", "ghi"

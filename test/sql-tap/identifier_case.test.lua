@@ -201,10 +201,10 @@ end
 
 -- Check that collaiton names work as identifiers
 data = {
-    { 1,  [[ binary ]], {0}},
-    { 2,  [[ BINARY ]], {0}},
+    { 1,  [[ binary ]], {1, "Collation 'BINARY' does not exist"}},
+    { 2,  [[ BINARY ]], {1, "Collation 'BINARY' does not exist"}},
     { 3,  [["binary"]], {0}},
-    { 4,  [["bInaRy"]], {0}},
+    { 4,  [["bInaRy"]], {1, "Collation 'bInaRy' does not exist"}},
     { 5,  [["unicode"]], {0}},
     { 6,  [[ unicode ]], {1,"Collation 'UNICODE' does not exist"}},
     { 7,  [["UNICODE"]], {1,"Collation 'UNICODE' does not exist"}}
@@ -234,12 +234,12 @@ test:do_catchsql_test(
     {0})
 
 data = {
-    { 1,  [[ 'a' < 'b' collate binary ]], {0, {1}}},
+    { 1,  [[ 'a' < 'b' collate binary ]], {1, "Collation 'BINARY' does not exist"}},
     { 2,  [[ 'a' < 'b' collate "binary" ]], {0, {1}}},
     { 3,  [[ 'a' < 'b' collate 'binary' ]], {1, [[near "'binary'": syntax error]]}},
     { 4,  [[ 'a' < 'b' collate "unicode" ]], {0, {1}}},
     { 5,  [[ 5 < 'b' collate "unicode" ]], {0, {1}}},
-    { 6,  [[ 5 < 'b' collate unicode ]], {1,"no such collation sequence: UNICODE"}},
+    { 6,  [[ 5 < 'b' collate unicode ]], {1,"Collation 'UNICODE' does not exist"}},
     { 7,  [[ 5 < 'b' collate "unicode_ci" ]], {0, {1}}},
 }
 

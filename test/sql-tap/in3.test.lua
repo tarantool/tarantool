@@ -206,7 +206,7 @@ test:do_test(
 test:do_test(
     "in3-1.15",
     function()
-        return exec_neph(" SELECT a FROM t1 WHERE a COLLATE binary IN (SELECT a FROM t1) ")
+        return exec_neph(" SELECT a FROM t1 WHERE a COLLATE \"binary\" IN (SELECT a FROM t1) ")
     end, {
         -- <in3-1.15>
         0, 1, 3, 5

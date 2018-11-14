@@ -155,7 +155,7 @@ local data_test_unicode_ci = {
 local data_collations = {
     -- default collation = binary
     {"/*COLLATE DEFAULT*/", data_test_binary_1},
-    {"COLLATE BINARY", data_test_binary_1},
+    {"COLLATE \"binary\"", data_test_binary_1},
     {"COLLATE \"unicode\"", data_test_unicode},
     {"COLLATE \"unicode_ci\"", data_test_unicode_ci},
 }

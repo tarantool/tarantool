@@ -236,7 +236,7 @@ test:do_test(
         ]])
         local r = {}
         table.insert(r, test:execsql("SELECT '1', substr(m,2) AS m FROM t4 ORDER BY m;"))
-        table.insert(r, test:execsql("SELECT '2', substr(m,2) AS m FROM t4 ORDER BY m COLLATE binary;"))
+        table.insert(r, test:execsql("SELECT '2', substr(m,2) AS m FROM t4 ORDER BY m COLLATE \"binary\";"))
         table.insert(r, test:execsql("SELECT '3', substr(m,2) AS m FROM t4 ORDER BY lower(m);"))
         return r
     end, {
