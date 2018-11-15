@@ -70,6 +70,7 @@ local function set_system_triggers(val)
     box.space._func:run_triggers(val)
     box.space._priv:run_triggers(val)
     box.space._trigger:run_triggers(val)
+    box.space._collation:run_triggers(val)
 end
 
 --------------------------------------------------------------------------------
