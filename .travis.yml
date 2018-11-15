@@ -49,6 +49,8 @@ matrix:
         env: OS=ubuntu DIST=artful
       - name: Ubuntu Bionic (18.04) build + deploy DEB
         env: OS=ubuntu DIST=bionic
+      - name: Ubuntu Cosmic (18.10) build + deploy DEB
+        env: OS=ubuntu DIST=cosmic
       - name: Debian Wheezy (7) build + deploy DEB
         env: OS=debian DIST=wheezy
       - name: Debian Jessie (8) build + deploy DEB
