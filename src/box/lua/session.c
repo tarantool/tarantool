@@ -369,15 +369,15 @@ static int
 lbox_session_push(struct lua_State *L)
 {
 	struct session *session = current_session();
-	int ok;
 	uint64_t sync;
 	switch(lua_gettop(L)) {
 	case 1:
 		sync = session_sync(session);
 		break;
 	case 2:
-		sync = lua_tointegerx(L, 2, &ok);
-		if (ok != 0) {
+		sync = luaL_touint64(L, 2);
+		if (sync != 0 || (lua_isnumber(L, 2) &&
+				  lua_tonumber(L, 2) == 0)) {
 			lua_pop(L, 1);
 			break;
 		}

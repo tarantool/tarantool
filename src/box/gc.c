@@ -109,8 +109,18 @@ gc_process_wal_event(struct wal_watcher_msg *);
 void
 gc_set_wal_watcher(void)
 {
+	/*
+	 * Since the function is called from box_cfg() it is
+	 * important that we do not pass a message processing
+	 * callback to wal_set_watcher(). Doing so would cause
+	 * credentials corruption in the fiber executing
+	 * box_cfg() in case it processes some iproto messages.
+	 * Besides, by the time the function is called
+	 * tx_fiber_pool is already set up and it will process
+	 * all the messages directed to "tx" endpoint safely.
+	 */
 	wal_set_watcher(&gc.wal_watcher, "tx", gc_process_wal_event,
-			cbus_process, WAL_EVENT_GC);
+			NULL, WAL_EVENT_GC);
 }
 
 void
