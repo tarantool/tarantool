@@ -351,13 +351,21 @@ sql_column_to_messagepack(struct sqlite3_stmt *stmt, int i,
 	}
 	case SQLITE_BLOB: {
 		uint32_t len = sqlite3_column_bytes(stmt, i);
-		size = mp_sizeof_bin(len);
-		char *pos = (char *) region_alloc(region, size);
-		if (pos == NULL)
-			goto oom;
-		const char *s;
-		s = (const char *)sqlite3_column_blob(stmt, i);
-		mp_encode_bin(pos, s, len);
+		const char *s =
+			(const char *)sqlite3_column_blob(stmt, i);
+		if (sql_column_subtype(stmt, i) == SQL_SUBTYPE_MSGPACK) {
+			size = len;
+			char *pos = (char *)region_alloc(region, size);
+			if (pos == NULL)
+				goto oom;
+			memcpy(pos, s, len);
+		} else {
+			size = mp_sizeof_bin(len);
+			char *pos = (char *)region_alloc(region, size);
+			if (pos == NULL)
+				goto oom;
+			mp_encode_bin(pos, s, len);
+		}
 		break;
 	}
 	case SQLITE_NULL: {

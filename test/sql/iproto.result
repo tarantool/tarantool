@@ -770,6 +770,38 @@ cn:execute('drop table test')
 ---
 - rowcount: 1
 ...
+-- SELECT returns unpacked msgpack.
+format = {{name = 'id', type = 'integer'}, {name = 'x', type = 'any'}}
+---
+...
+s = box.schema.space.create('test', {format=format})
+---
+...
+i1 = s:create_index('i1', {parts = {1, 'int'}})
+---
+...
+s:insert({1, {1,2,3}})
+---
+- [1, [1, 2, 3]]
+...
+s:insert({2, {a = 3}})
+---
+- [2, {'a': 3}]
+...
+cn:execute('select * from "test"')
+---
+- metadata:
+  - name: id
+    type: UNKNOWN
+  - name: x
+    type: UNKNOWN
+  rows:
+  - [1, [1, 2, 3]]
+  - [2, {'a': 3}]
+...
+s:drop()
+---
+...
 cn:close()
 ---
 ...
