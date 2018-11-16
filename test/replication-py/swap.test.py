@@ -119,6 +119,6 @@ for i in range(REPEAT):
 
 # Cleanup.
 replica.stop()
-replica.cleanup(True)
+replica.cleanup()
 server.stop()
 server.deploy()

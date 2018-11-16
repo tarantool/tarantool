@@ -43,12 +43,12 @@ def parallel_run(cmd1, cmd2, compare):
 def prepare_cluster():
     print 'reset master-master replication'
     master.stop()
-    master.cleanup(True)
+    master.cleanup()
     master.start()
     master.admin("box.schema.user.grant('guest', 'replication')", silent=True)
 
     replica.stop()
-    replica.cleanup(True)
+    replica.cleanup()
     replica.start()
 
     master.admin("box.cfg{replication='%s'}" % replica.iproto.uri, silent=True)
@@ -114,7 +114,7 @@ check_replication([master, replica])
 
 # cleanup
 replica.stop()
-replica.cleanup(True)
+replica.cleanup()
 server.stop()
-server.cleanup(True)
+server.cleanup()
 server.deploy()
