@@ -244,13 +244,16 @@ _ = s:create_index('pk')
 _ = s:create_index('sk', {parts = {2, 'unsigned'}, run_count_per_level = 10})
 
 s:insert{1, 10}
+s:insert{10, 100} -- to prevent last-level compaction (gh-3657)
 box.snapshot()
 
 s:update(1, {{'=', 2, 10}})
 s:delete(1)
 box.snapshot()
 
-s.index.sk:stat().rows -- INSERT in the first run + DELETE the second run
+-- Should be 3: INSERT{10, 1} and INSERT{100, 10} in the first run
+-- plus DELETE{10, 1} in the second run.
+s.index.sk:stat().rows
 
 s:insert{1, 20}
 s.index.sk:select()

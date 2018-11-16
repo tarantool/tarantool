@@ -168,11 +168,14 @@ function count_runs() return #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, s.id, s.i
 _ = s:replace{1}
 ---
 ...
+_ = s:replace{2} -- to prevent last-level compaction (gh-3657)
+---
+...
 box.snapshot()
 ---
 - ok
 ...
-_ = s:replace{2}
+_ = s:replace{3}
 ---
 ...
 box.snapshot()
@@ -186,12 +189,11 @@ count_runs() -- 2
 for i = 1, 20 do s:replace{i, string.rep('x', 100 * 1024)} end
 ---
 ...
-while s.index.pk:stat().disk.compact.count < 1 do fiber.sleep(0.001) end
+s.index.pk:compact()
 ---
 ...
-s.index.pk:stat().disk.compact.count -- 1
+while s.index.pk:stat().run_count > 1 do fiber.sleep(0.01) end
 ---
-- 1
 ...
 count_runs() -- 3 (compacted runs created after checkpoint are deleted)
 ---

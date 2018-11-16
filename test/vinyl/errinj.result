@@ -1867,6 +1867,10 @@ s:replace{1, 10}
 ---
 - [1, 10]
 ...
+s:replace{10, 100} -- to prevent last-level compaction (gh-3657)
+---
+- [10, 100]
+...
 box.snapshot()
 ---
 - ok
@@ -2137,9 +2141,6 @@ function dump() for i = 1, 10 do s:replace{i} end box.snapshot() end
 dump()
 ---
 ...
-dump()
----
-...
 i:stat().disk.compact.queue -- none
 ---
 - bytes_compressed: <bytes_compressed>
@@ -2154,6 +2155,9 @@ i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', true)
 ---
 - ok
+...
+dump()
+---
 ...
 dump()
 ---

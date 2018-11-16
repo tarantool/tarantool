@@ -383,10 +383,10 @@ i2:bsize() == st2.memory.index_size + st2.disk.index_size + st2.disk.bloom_size 
 -- Then dump them and compact the secondary index.
 box.snapshot()
 i1:compact()
-wait(function() return i1:stat() end, st1, 'disk.compact.count', 1)
+while i1:stat().run_count > 1 do fiber.sleep(0.01) end
 box.snapshot()
 i2:compact()
-wait(function() return i2:stat() end, st2, 'disk.compact.count', 1)
+while i2:stat().run_count > 1 do fiber.sleep(0.01) end
 gst = gstat()
 st1 = i1:stat()
 st2 = i2:stat()
