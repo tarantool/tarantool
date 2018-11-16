@@ -209,7 +209,7 @@ master.admin('box.info.vclock[%d] == 2' % replica_id)
 
 master.admin("box.cfg{ replication = '' }")
 replica.stop()
-replica.cleanup(True)
+replica.cleanup()
 
 print '-------------------------------------------------------------'
 print 'Start a new replica and check that server_id, LSN is re-used'
@@ -238,7 +238,7 @@ master.admin('box.info.vclock[%d] == 2' % replica_id)
 replica.admin('box.info.vclock[%d] == 2' % replica_id)
 
 replica.stop()
-replica.cleanup(True)
+replica.cleanup()
 
 print '-------------------------------------------------------------'
 print 'JOIN replica to read-only master'

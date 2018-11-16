@@ -26,7 +26,7 @@ replica.admin('box.space.test:select()')
 replica.restart()
 replica.admin('box.space.test:select()')
 replica.stop()
-replica.cleanup(True)
+replica.cleanup()
 
 print '-------------------------------------------------------------'
 print 'replica test 2 (must be ok)'
@@ -49,7 +49,7 @@ for i in range(1, 20):
     replica.admin('space:get{%d}' % i)
 
 replica.stop()
-replica.cleanup(True)
+replica.cleanup()
 
 print '-------------------------------------------------------------'
 print 'reconnect on JOIN/SUBSCRIBE'
@@ -77,7 +77,7 @@ replica.wait_until_started()
 print 'ok'
 
 replica.stop()
-replica.cleanup(True)
+replica.cleanup()
 
 server.stop()
 server.deploy()
