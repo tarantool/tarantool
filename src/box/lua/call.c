@@ -424,6 +424,7 @@ port_lua_dump_plain(struct port *port, uint32_t *size);
 static const struct port_vtab port_lua_vtab = {
 	.dump_msgpack = port_lua_dump,
 	.dump_msgpack_16 = port_lua_dump_16,
+	.dump_lua = NULL,
 	.dump_plain = port_lua_dump_plain,
 	.destroy = port_lua_destroy,
 };

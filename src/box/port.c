@@ -121,6 +121,9 @@ port_tuple_dump_msgpack(struct port *base, struct obuf *out)
 	return 1;
 }
 
+extern void
+port_tuple_dump_lua(struct port *base, struct lua_State *L);
+
 void
 port_destroy(struct port *port)
 {
@@ -137,6 +140,12 @@ int
 port_dump_msgpack_16(struct port *port, struct obuf *out)
 {
 	return port->vtab->dump_msgpack_16(port, out);
+}
+
+void
+port_dump_lua(struct port *port, struct lua_State *L)
+{
+	port->vtab->dump_lua(port, L);
 }
 
 const char *
@@ -161,6 +170,7 @@ port_free(void)
 const struct port_vtab port_tuple_vtab = {
 	.dump_msgpack = port_tuple_dump_msgpack,
 	.dump_msgpack_16 = port_tuple_dump_msgpack_16,
+	.dump_lua = port_tuple_dump_lua,
 	.dump_plain = NULL,
 	.destroy = port_tuple_destroy,
 };

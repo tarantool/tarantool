@@ -56,22 +56,25 @@ lbox_encode_tuple_on_gc(lua_State *L, int idx, size_t *p_len)
 	return (char *) region_join_xc(gc, *p_len);
 }
 
+/**
+ * Dump port_tuple content to Lua as a table. Used in box/port.c,
+ * but implemented here to eliminate port.c dependency on Lua.
+ */
+extern "C" void
+port_tuple_dump_lua(struct port *base, struct lua_State *L)
+{
+	struct port_tuple *port = port_tuple(base);
+	lua_createtable(L, port->size, 0);
+	struct port_tuple_entry *pe = port->first;
+	for (int i = 0; pe != NULL; pe = pe->next) {
+		luaT_pushtuple(L, pe->tuple);
+		lua_rawseti(L, -2, ++i);
+	}
+}
+
 /* }}} */
 
 /** {{{ Lua/C implementation of index:select(): used only by Vinyl **/
-
-static inline void
-lbox_port_to_table(lua_State *L, struct port *port_base)
-{
-	struct port_tuple *port = port_tuple(port_base);
-	lua_createtable(L, port->size, 0);
-	struct port_tuple_entry *entry = port->first;
-	for (int i = 0 ; i < port->size; i++) {
-		luaT_pushtuple(L, entry->tuple);
-		lua_rawseti(L, -2, i + 1);
-		entry = entry->next;
-	}
-}
 
 static int
 lbox_select(lua_State *L)
@@ -106,7 +109,7 @@ lbox_select(lua_State *L)
 	 * table always crashed the first (can't be fixed with pcall).
 	 * https://github.com/tarantool/tarantool/issues/1182
 	 */
-	lbox_port_to_table(L, &port);
+	port_dump_lua(&port, L);
 	port_destroy(&port);
 	return 1; /* lua table with tuples */
 }
