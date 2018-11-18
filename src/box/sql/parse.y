@@ -176,15 +176,17 @@ createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 ifnotexists(A) ::= .              {A = 0;}
 ifnotexists(A) ::= IF NOT EXISTS. {A = 1;}
 
-create_table_args ::= LP columnlist conslist_opt RP(E). {
+create_table_args ::= LP columnlist RP(E). {
   sqlite3EndTable(pParse,&E,0);
 }
 create_table_args ::= AS select(S). {
   sqlite3EndTable(pParse,0,S);
   sql_select_delete(pParse->db, S);
 }
+columnlist ::= columnlist COMMA tconsdef.
 columnlist ::= columnlist COMMA columnname carglist.
 columnlist ::= columnname carglist.
+columnlist ::= tconsdef.
 columnname(A) ::= nm(A) typedef(Y). {sqlite3AddColumn(pParse,&A,&Y);}
 
 // An IDENTIFIER can be a generic identifier, or one of several
@@ -232,9 +234,11 @@ nm(A) ::= id(A). {
 // "carglist" is a list of additional constraints that come after the
 // column name and column type in a CREATE TABLE statement.
 //
-carglist ::= carglist ccons.
+carglist ::= carglist cconsdef.
 carglist ::= .
-ccons ::= CONSTRAINT nm(X).           {pParse->constraintName = X;}
+cconsdef ::= cconsname ccons.
+cconsname ::= CONSTRAINT nm(X).           {pParse->constraintName = X;}
+cconsname ::= .                           {pParse->constraintName.n = 0;}
 ccons ::= DEFAULT term(X).            {sqlite3AddDefaultValue(pParse,&X);}
 ccons ::= DEFAULT LP expr(X) RP.      {sqlite3AddDefaultValue(pParse,&X);}
 ccons ::= DEFAULT PLUS term(X).       {sqlite3AddDefaultValue(pParse,&X);}
@@ -303,13 +307,9 @@ init_deferred_pred_opt(A) ::= .                       {A = 0;}
 init_deferred_pred_opt(A) ::= INITIALLY DEFERRED.     {A = 1;}
 init_deferred_pred_opt(A) ::= INITIALLY IMMEDIATE.    {A = 0;}
 
-conslist_opt ::= .
-conslist_opt ::= COMMA conslist.
-conslist ::= conslist tconscomma tcons.
-conslist ::= tcons.
-tconscomma ::= COMMA.            {pParse->constraintName.n = 0;}
-tconscomma ::= .
-tcons ::= CONSTRAINT nm(X).      {pParse->constraintName = X;}
+tconsdef ::= tconsname tcons.
+tconsname ::= CONSTRAINT nm(X).      {pParse->constraintName = X;}
+tconsname ::= .                      {pParse->constraintName.n = 0;}
 tcons ::= PRIMARY KEY LP sortlist(X) autoinc(I) RP.
                                  {sqlite3AddPrimaryKey(pParse,X,I,0);}
 tcons ::= UNIQUE LP sortlist(X) RP.

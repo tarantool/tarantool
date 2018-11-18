@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(57)
+test:plan(74)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1180,4 +1180,217 @@ test:do_test(
 
     -- </table-15.1>
 })
+
+-- gh-3504 Constraints definition can appear among columns ones.
+
+test:do_execsql_test(
+    "table-21.1",
+    [[
+        CREATE TABLE t21(
+           A INTEGER,
+           PRIMARY KEY (A),
+           B INTEGER,
+           CHECK (B > 0),
+           C INTEGER
+           CHECK (C > 0)
+        );
+    ]], {
+        -- <table-21.1>
+
+        -- </table-21.1>
+    })
+
+test:do_catchsql_test(
+    "table-21.2",
+    [[
+        INSERT INTO T21 VALUES(1, 1, 1);
+        INSERT INTO T21 VALUES(1, 2, 2);
+    ]], {
+        -- <table-21.2>
+        1, "Duplicate key exists in unique index 'pk_unnamed_T21_1' in space 'T21'"
+        -- </table-21.2>
+    })
+
+test:do_catchsql_test(
+    "table-21.3",
+    [[
+        INSERT INTO T21 VALUES(1, -1, 1);
+    ]], {
+        -- <table-21.3>
+        1, "CHECK constraint failed: T21"
+        -- </table-21.3>
+    })
+
+test:do_catchsql_test(
+    "table-21.4",
+    [[
+        INSERT INTO T21 VALUES(1, 1, -1);
+    ]], {
+        -- <table-21.4>
+        1, "CHECK constraint failed: T21"
+        -- </table-21.4>
+    })
+
+test:do_execsql_test(
+    "check-21.cleanup",
+    [[
+        DROP TABLE IF EXISTS T21;
+    ]], {
+        -- <check-21.cleanup>
+
+        -- </check-21.cleanup>
+    })
+
+-- gh-3504: Check the CONSTRAINT name clause can't follow a constraint.
+-- The name may be typed once before the constraint or not.
+
+test:do_catchsql_test(
+    "table-22.1",
+    [[
+        CREATE TABLE T22(
+           A INTEGER,
+           PRIMARY KEY (A) CONSTRAINT ONE
+        );
+    ]], {
+        -- <table-22.1>
+        1,"keyword \"CONSTRAINT\" is reserved"
+        -- </table-22.1>
+    })
+
+test:do_execsql_test(
+    "table-22.2",
+    [[
+        CREATE TABLE T22(
+           A INTEGER PRIMARY KEY,
+           B INTEGER,
+           CONSTRAINT ONE UNIQUE (B),
+           C INTEGER
+        );
+    ]], {
+        -- <table-22.2>
+
+        -- </table-22.2>
+    })
+
+test:do_catchsql_test(
+    "table-22.3",
+    [[
+        INSERT INTO T22 VALUES(1, 1, 1);
+        INSERT INTO T22 VALUES(2, 1, 1);
+    ]], {
+        -- <table-22.3>
+        1,"Duplicate key exists in unique index 'unique_ONE_2' in space 'T22'"
+        -- </table-22.3>
+    })
+
+test:do_execsql_test(
+    "table-22.4",
+    [[
+        CREATE TABLE T24(
+           A INTEGER PRIMARY KEY,
+           B INTEGER CONSTRAINT TWO UNIQUE,
+           C INTEGER
+        );
+    ]], {
+        -- <table-22.4>
+
+        -- </table-22.4>
+    })
+
+test:do_catchsql_test(
+    "table-22.5",
+    [[
+        INSERT INTO T24 VALUES(1, 1, 1);
+        INSERT INTO T24 VALUES(2, 1, 1);
+    ]], {
+        -- <table-22.5>
+        1, "Duplicate key exists in unique index 'unique_TWO_2' in space 'T24'"
+        -- </table-22.5>
+    })
+
+test:do_catchsql_test(
+    "table-22.6",
+    [[
+        CREATE TABLE T26(
+           A INTEGER PRIMARY KEY,
+           B INTEGER CONSTRAINT ONE CONSTRAINT ONE UNIQUE,
+           C INTEGER
+        );
+    ]], {
+        -- <table-22.6>
+        1,"keyword \"CONSTRAINT\" is reserved"
+        -- </table-22.6>
+    })
+
+test:do_catchsql_test(
+    "table-22.7",
+    [[
+        CREATE TABLE T27(
+           A INTEGER PRIMARY KEY,
+           B INTEGER CONSTRAINT ONE CONSTRAINT TWO UNIQUE,
+           C INTEGER
+        );
+    ]], {
+        -- <table-22.7>
+        1,"keyword \"CONSTRAINT\" is reserved"
+        -- </table-22.7>
+    })
+
+test:do_execsql_test(
+    "table-22.8",
+    [[
+        CREATE TABLE T28(
+           id INT,
+           PRIMARY KEY (id),
+           CONSTRAINT check1 CHECK(id != 0),
+           CONSTRAINT check2 CHECK(id > 10)
+        );
+    ]], {
+        -- <table-22.8>
+
+        -- </table-22.8>
+    })
+
+test:do_catchsql_test(
+    "table-22.9",
+    [[
+        INSERT INTO T28 VALUES(11);
+        INSERT INTO T28 VALUES(11);
+    ]], {
+        -- <table-22.9>
+        1,"Duplicate key exists in unique index 'pk_unnamed_T28_1' in space 'T28'"
+        -- </table-22.9>
+    })
+
+test:do_catchsql_test(
+    "table-22.10",
+    [[
+        INSERT INTO T28 VALUES(0);
+    ]], {
+        -- <table-22.10>
+        1, "CHECK constraint failed: CHECK1"
+        -- </table-22.10>
+    })
+
+test:do_catchsql_test(
+    "table-22.11",
+    [[
+        INSERT INTO T28 VALUES(9);
+    ]], {
+        -- <table-22.11>
+        1, "CHECK constraint failed: CHECK2"
+        -- </table-22.11>
+    })
+
+test:do_execsql_test(
+    "check-22.cleanup",
+    [[
+        DROP TABLE IF EXISTS t22;
+        DROP TABLE IF EXISTS t24;
+        DROP TABLE IF EXISTS t28;
+    ]], {
+        -- <check-22.cleanup>
+
+        -- </check-22.cleanup>
+    })
 test:finish_test()

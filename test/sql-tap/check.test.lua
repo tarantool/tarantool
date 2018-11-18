@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(60)
+test:plan(58)
 
 --!./tcltestrunner.lua
 -- 2005 November 2
@@ -270,59 +270,33 @@ test:do_catchsql_test(
         -- </check-2.6>
     })
 
--- Undocumented behavior:  The CONSTRAINT name clause can follow a constraint.
--- Such a clause is ignored.  But the parser must accept it for backwards
--- compatibility.
---
-test:do_execsql_test(
+-- gh-3504: Check the CONSTRAINT name clause can't follow a constraint.
+
+test:do_catchsql_test(
     "check-2.10",
     [[
         CREATE TABLE t2b(
           x INTEGER CHECK( typeof(coalesce(x,0))=='integer' ) CONSTRAINT one,
-          y TEXT PRIMARY KEY constraint two,
-          z INTEGER,
-          UNIQUE(x,z) constraint three
+          PRIMARY KEY (x)
         );
     ]], {
         -- <check-2.10>
-
+        1,"near \",\": syntax error"
         -- </check-2.10>
     })
 
 test:do_catchsql_test(
     "check-2.11",
     [[
-        INSERT INTO t2b VALUES('xyzzy','hi',5);
-    ]], {
-        -- <check-2.11>
-        1, "CHECK constraint failed: T2B"
-        -- </check-2.11>
-    })
-
-test:do_execsql_test(
-    "check-2.12",
-    [[
         CREATE TABLE t2c(
-          x INTEGER CONSTRAINT x_one CONSTRAINT x_two primary key
-              CHECK( typeof(coalesce(x,0))=='integer' )
-              CONSTRAINT x_two CONSTRAINT x_three,
-          y INTEGER, z INTEGER,
-          CONSTRAINT u_one UNIQUE(x,y,z) CONSTRAINT u_two
+          x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer' )
+        CONSTRAINT two,
+          PRIMARY KEY (x)
         );
     ]], {
-        -- <check-2.12>
-
-        -- </check-2.12>
-    })
-
-test:do_catchsql_test(
-    "check-2.13",
-    [[
-        INSERT INTO t2c VALUES('xyzzy',7,8);
-    ]], {
-        -- <check-2.13>
-        1, "CHECK constraint failed: X_TWO"
-        -- </check-2.13>
+        -- <check-2.10>
+        1,"near \",\": syntax error"
+        -- </check-2.10>
     })
 
 test:do_execsql_test(
