@@ -100,6 +100,60 @@ box.sql.execute("SELECT ROW_COUNT();")
 ---
 - - [3]
 ...
+-- gh-3816: DELETE optimization returns valid number of
+-- deleted tuples.
+--
+box.sql.execute("DELETE FROM t3 WHERE 0 = 0;")
+---
+...
+box.sql.execute("SELECT ROW_COUNT();")
+---
+- - [3]
+...
+box.sql.execute("INSERT INTO t3 VALUES (1, 1), (2, 2), (3, 3);")
+---
+...
+box.sql.execute("DELETE FROM t3")
+---
+...
+box.sql.execute("SELECT ROW_COUNT();")
+---
+- - [3]
+...
+-- But triggers still should't be accounted.
+--
+box.sql.execute("CREATE TABLE tt1 (id INT PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE TABLE tt2 (id INT PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE TRIGGER tr1 AFTER DELETE ON tt1 BEGIN DELETE FROM tt2; END;")
+---
+...
+box.sql.execute("INSERT INTO tt1 VALUES (1), (2), (3);")
+---
+...
+box.sql.execute("INSERT INTO tt2 VALUES (1), (2), (3);")
+---
+...
+box.sql.execute("DELETE FROM tt1 WHERE id = 2;")
+---
+...
+box.sql.execute("SELECT ROW_COUNT();")
+---
+- - [1]
+...
+box.sql.execute("SELECT * FROM tt2;")
+---
+- []
+...
+box.sql.execute("DROP TABLE tt1;")
+---
+...
+box.sql.execute("DROP TABLE tt2;")
+---
+...
 -- All statements which are not accounted as DML should
 -- return 0 (zero) as a row count.
 --

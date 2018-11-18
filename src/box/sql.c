@@ -579,8 +579,10 @@ int tarantoolSqlite3EphemeralClearTable(BtCursor *pCur)
  * Removes all instances from table.
  * Iterate through the space and delete one by one all tuples.
  */
-int tarantoolSqlite3ClearTable(struct space *space)
+int tarantoolSqlite3ClearTable(struct space *space, uint32_t *tuple_count)
 {
+	assert(tuple_count != NULL);
+	*tuple_count = 0;
 	uint32_t key_size;
 	box_tuple_t *tuple;
 	int rc;
@@ -602,6 +604,7 @@ int tarantoolSqlite3ClearTable(struct space *space)
 			iterator_delete(iter);
 			return SQL_TARANTOOL_DELETE_FAIL;
 		}
+		(*tuple_count)++;
 	}
 	iterator_delete(iter);
 

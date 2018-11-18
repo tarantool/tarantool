@@ -4644,7 +4644,7 @@ case OP_IdxGE:  {       /* jump */
 	break;
 }
 
-/* Opcode: Clear P1 P2 * * *
+/* Opcode: Clear P1 P2 * * P5
  * Synopsis: space id = P1
  * If P2 is not 0, use Truncate semantics.
  *
@@ -4652,6 +4652,9 @@ case OP_IdxGE:  {       /* jump */
  * in P1 argument. It is worth mentioning, that clearing routine
  * doesn't involve truncating, since it features completely
  * different mechanism under hood.
+ *
+ * If the OPFLAG_NCHANGE flag is set, then the row change count
+ * is incremented by the number of deleted tuples.
  */
 case OP_Clear: {
 	assert(pOp->p1 > 0);
@@ -4663,7 +4666,10 @@ case OP_Clear: {
 		if (box_truncate(space_id) != 0)
 			rc = SQL_TARANTOOL_ERROR;
 	} else {
-		rc = tarantoolSqlite3ClearTable(space);
+		uint32_t tuple_count;
+		rc = tarantoolSqlite3ClearTable(space, &tuple_count);
+		if (rc == 0 && (pOp->p5 & OPFLAG_NCHANGE) != 0)
+			p->nChange += tuple_count;
 	}
 	if (rc) goto abort_due_to_error;
 	break;

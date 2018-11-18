@@ -210,6 +210,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		assert(!is_view);
 
 		sqlite3VdbeAddOp1(v, OP_Clear, space->def->id);
+		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 
 		/* Do not start Tarantool's transaction in case of
 		 * truncate optimization. This is workaround until

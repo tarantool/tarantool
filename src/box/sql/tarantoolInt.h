@@ -58,7 +58,7 @@ int
 sql_delete_by_key(struct space *space, uint32_t iid, char *key,
 		  uint32_t key_size);
 
-int tarantoolSqlite3ClearTable(struct space *space);
+int tarantoolSqlite3ClearTable(struct space *space, uint32_t *tuple_count);
 
 /**
  * Rename the table in _space. Update tuple with corresponding id
