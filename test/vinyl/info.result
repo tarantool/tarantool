@@ -1312,7 +1312,7 @@ box.snapshot()
 i1:compact()
 ---
 ...
-wait(function() return i1:stat() end, st1, 'disk.compact.count', 1)
+while i1:stat().run_count > 1 do fiber.sleep(0.01) end
 ---
 ...
 box.snapshot()
@@ -1322,7 +1322,7 @@ box.snapshot()
 i2:compact()
 ---
 ...
-wait(function() return i2:stat() end, st2, 'disk.compact.count', 1)
+while i2:stat().run_count > 1 do fiber.sleep(0.01) end
 ---
 ...
 gst = gstat()

@@ -377,6 +377,15 @@ vy_range_update_compact_priority(struct vy_range *range,
 			est_new_run_size = total_stmt_count.bytes_compressed;
 		}
 	}
+
+	if (level_run_count > 1) {
+		/*
+		 * Do not store more than one run at the last level
+		 * to keep space amplification low.
+		 */
+		range->compact_priority = total_run_count;
+		range->compact_queue = total_stmt_count;
+	}
 }
 
 /**

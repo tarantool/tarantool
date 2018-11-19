@@ -248,10 +248,17 @@ test_run:cmd("start server test with args='1048576'")
 test_run:cmd("switch test")
 
 fiber = require('fiber')
+digest = require('digest')
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
 pk = s:create_index('pk', {run_count_per_level = 10})
 sk = s:create_index('sk', {run_count_per_level = 10, parts = {2, 'unsigned', 3, 'string'}, unique = false})
+
+-- Write a run big enough to prevent major compaction from kicking in
+-- (run_count_per_level is ignored on the last level - see gh-3657).
+dummy_rows = 100
+for i = 1, dummy_rows do s:replace{i + 1000, i + 1000, digest.urandom(100)} end
+box.snapshot()
 
 pad = string.rep('x', 10 * 1024)
 for i = 1, 120 do s:replace{i, i, pad} end
@@ -261,7 +268,7 @@ pad = string.rep('y', 10 * 1024)
 for i = 1, 120 do s:replace{i, i, pad} end
 box.snapshot()
 
-sk:stat().rows -- 120 old REPLACEs + 120 new REPLACEs
+sk:stat().rows - dummy_rows -- 120 old REPLACEs + 120 new REPLACEs
 
 box.stat.reset()
 
@@ -273,17 +280,18 @@ while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
 
 sk:stat().disk.dump.count -- 1
 
-sk:stat().rows -- 120 old REPLACEs + 120 new REPLACEs + 120 deferred DELETEs
+sk:stat().rows - dummy_rows -- 120 old REPLACEs + 120 new REPLACEs + 120 deferred DELETEs
 
 test_run:cmd("restart server test with args='1048576'")
 s = box.space.test
 pk = s.index.pk
 sk = s.index.sk
+dummy_rows = 100
 
 -- Should be 360, the same amount of statements as before restart.
 -- If we applied all deferred DELETEs, including the dumped ones,
 -- then there would be more.
-sk:stat().rows
+sk:stat().rows - dummy_rows
 
 s:drop()
 
