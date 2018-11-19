@@ -728,6 +728,10 @@ s:insert{1, 10}
 ---
 - [1, 10]
 ...
+s:insert{10, 100} -- to prevent last-level compaction (gh-3657)
+---
+- [10, 100]
+...
 box.snapshot()
 ---
 - ok
@@ -743,9 +747,11 @@ box.snapshot()
 ---
 - ok
 ...
-s.index.sk:stat().rows -- INSERT in the first run + DELETE the second run
+-- Should be 3: INSERT{10, 1} and INSERT{100, 10} in the first run
+-- plus DELETE{10, 1} in the second run.
+s.index.sk:stat().rows
 ---
-- 2
+- 3
 ...
 s:insert{1, 20}
 ---
@@ -754,6 +760,7 @@ s:insert{1, 20}
 s.index.sk:select()
 ---
 - - [1, 20]
+  - [10, 100]
 ...
 s:drop()
 ---

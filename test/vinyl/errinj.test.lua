@@ -748,6 +748,7 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {run_count_per_level = 10})
 _ = s:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
 s:replace{1, 10}
+s:replace{10, 100} -- to prevent last-level compaction (gh-3657)
 box.snapshot()
 s:replace{1, 20}
 box.snapshot()
@@ -860,10 +861,10 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 i = s:create_index('pk', {run_count_per_level = 2})
 function dump() for i = 1, 10 do s:replace{i} end box.snapshot() end
 dump()
-dump()
 i:stat().disk.compact.queue -- none
 i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', true)
+dump()
 dump()
 i:stat().disk.compact.queue -- 30 statements
 i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue

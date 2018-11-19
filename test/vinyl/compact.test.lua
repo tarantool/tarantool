@@ -26,10 +26,6 @@ vyinfo().run_count == 1
 space:replace({2,2})
 space:upsert({2},{{'=',4,5}}) -- bad upsert
 box.snapshot() -- create the second run
-vyinfo().run_count == 2
--- create a few more runs to trigger compaction
-space:insert({3, 3})
-box.snapshot()
 
 -- wait for compaction
 while vyinfo().run_count >= 2 do fiber.sleep(0.1) end
@@ -47,8 +43,9 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {run_count_per_level = 100, page_size = 128, range_size = 1024})
 
 test_run:cmd("setopt delimiter ';'")
-function dump()
-    for i = 1, 10 do
+function dump(big)
+    local step = big and 1 or 5
+    for i = 1, 20, step do
         s:replace{i, digest.urandom(1000)}
     end
     box.snapshot()
@@ -66,7 +63,11 @@ function compact()
 end;
 test_run:cmd("setopt delimiter ''");
 
-dump()
+-- The first run should be big enough to prevent major compaction
+-- from kicking in on the next dump, because run_count_per_level
+-- is ignored on the last level (see gh-3657).
+dump(true)
+
 dump()
 dump()
 info() -- 1 range, 3 runs

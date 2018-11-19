@@ -274,11 +274,14 @@ space:drop()
 s = box.schema.space.create('test', {engine = 'vinyl'})
 i = s:create_index('test', { run_count_per_level = 20 })
 
+-- Write a big run to prevent last-level compaction (gh-3657).
+for i = 101, 110 do s:replace{i, require('digest').urandom(50)} end
+
 s:replace({1, 1})
 box.snapshot()
 s:upsert({1, 1}, {{'+', 1, 1}}) -- ignored due to primary key changed
 s:upsert({1, 1}, {{'+', 2, 1}}) -- applied to the previous statement
-s:select()
+s:get(1)
 
 --
 -- gh-2520 use cache as a hint when applying upserts.

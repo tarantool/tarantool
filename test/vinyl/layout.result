@@ -38,6 +38,8 @@ box.snapshot()
 space.index.sk:alter{parts = {{2, 'unsigned', is_nullable = true}}}
 ---
 ...
+-- Note, the first run is bigger than the second one to prevent
+-- last-level compaction (gh-3657).
 space:replace{'ЭЭЭ', box.NULL}
 ---
 - ['ЭЭЭ', null]
@@ -49,6 +51,10 @@ space:replace{'эээ', box.NULL}
 space:replace{'ёёё', box.NULL}
 ---
 - ['ёёё', null]
+...
+space:replace{'ЭЮЯ', 666}
+---
+- ['ЭЮЯ', 666]
 ...
 box.snapshot()
 ---
@@ -126,16 +132,16 @@ test_run:cmd("push filter 'offset: .*' to 'offset: <offset>'")
 ...
 result
 ---
-- - - 00000000000000000010.vylog
+- - - 00000000000000000011.vylog
     - - HEADER:
           type: INSERT
         BODY:
           tuple: [0, {6: 512, 7: [{'field': 0, 'collation': 1, 'type': 'string'}],
-              9: 10, 12: 3, 13: 7}]
+              9: 11, 12: 3, 13: 7}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {2: 8, 9: 10}]
+          tuple: [5, {2: 8, 9: 11}]
       - HEADER:
           type: INSERT
         BODY:
@@ -156,11 +162,11 @@ result
           type: INSERT
         BODY:
           tuple: [0, {0: 2, 5: 1, 6: 512, 7: [{'field': 1, 'is_nullable': true, 'type': 'unsigned'}],
-              9: 10, 12: 4, 13: 7}]
+              9: 11, 12: 4, 13: 7}]
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 6, 9: 10}]
+          tuple: [5, {0: 2, 2: 6, 9: 11}]
       - HEADER:
           type: INSERT
         BODY:
@@ -200,7 +206,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 10, 9: 13}]
+          tuple: [5, {0: 2, 2: 10, 9: 14}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -210,7 +216,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [10, {0: 2, 9: 13}]
+          tuple: [10, {0: 2, 9: 14}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -220,7 +226,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {2: 12, 9: 13}]
+          tuple: [5, {2: 12, 9: 14}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -230,26 +236,26 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [10, {9: 13}]
+          tuple: [10, {9: 14}]
   - - 00000000000000000008.index
     - - HEADER:
           type: RUNINFO
         BODY:
           min_lsn: 8
           bloom_filter: <bloom_filter>
-          max_key: ['ЭЭЭ']
+          max_key: ['ЭЮЯ']
           page_count: 1
-          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
-          max_lsn: 10
+          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 4}
+          max_lsn: 11
           min_key: ['ёёё']
       - HEADER:
           type: PAGEINFO
         BODY:
           row_index_offset: <offset>
           offset: <offset>
-          size: 86
-          unpacked_size: 67
-          row_count: 3
+          size: 108
+          unpacked_size: 89
+          row_count: 4
           min_key: ['ёёё']
   - - 00000000000000000008.run
     - - HEADER:
@@ -268,19 +274,24 @@ result
         BODY:
           tuple: ['ЭЭЭ', null]
       - HEADER:
+          lsn: 11
+          type: REPLACE
+        BODY:
+          tuple: ['ЭЮЯ', 666]
+      - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: "\0\0\0\0\0\0\0\x10\0\0\0 "
+          row_index: "\0\0\0\0\0\0\0\x10\0\0\0 \0\0\00"
   - - 00000000000000000012.index
     - - HEADER:
           type: RUNINFO
         BODY:
-          min_lsn: 11
+          min_lsn: 12
           bloom_filter: <bloom_filter>
           max_key: ['ЮЮЮ']
           page_count: 1
           stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
-          max_lsn: 13
+          max_lsn: 14
           min_key: ['ёёё']
       - HEADER:
           type: PAGEINFO
@@ -293,19 +304,19 @@ result
           min_key: ['ёёё']
   - - 00000000000000000012.run
     - - HEADER:
-          lsn: 11
+          lsn: 12
           type: REPLACE
         BODY:
           tuple: ['ёёё', 123]
           tuple_meta: {1: 1}
       - HEADER:
-          lsn: 13
+          lsn: 14
           type: REPLACE
         BODY:
           tuple: ['ююю', 789]
           tuple_meta: {1: 1}
       - HEADER:
-          lsn: 12
+          lsn: 13
           type: REPLACE
         BODY:
           tuple: ['ЮЮЮ', 456]
@@ -320,19 +331,19 @@ result
         BODY:
           min_lsn: 8
           bloom_filter: <bloom_filter>
-          max_key: [null, 'ЭЭЭ']
+          max_key: [666, 'ЭЮЯ']
           page_count: 1
-          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
-          max_lsn: 10
+          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 4}
+          max_lsn: 11
           min_key: [null, 'ёёё']
       - HEADER:
           type: PAGEINFO
         BODY:
           row_index_offset: <offset>
           offset: <offset>
-          size: 86
-          unpacked_size: 67
-          row_count: 3
+          size: 108
+          unpacked_size: 89
+          row_count: 4
           min_key: [null, 'ёёё']
   - - 00000000000000000006.run
     - - HEADER:
@@ -351,19 +362,24 @@ result
         BODY:
           tuple: [null, 'ЭЭЭ']
       - HEADER:
+          lsn: 11
+          type: REPLACE
+        BODY:
+          tuple: [666, 'ЭЮЯ']
+      - HEADER:
           type: ROWINDEX
         BODY:
-          row_index: "\0\0\0\0\0\0\0\x10\0\0\0 "
+          row_index: "\0\0\0\0\0\0\0\x10\0\0\0 \0\0\00"
   - - 00000000000000000010.index
     - - HEADER:
           type: RUNINFO
         BODY:
-          min_lsn: 11
+          min_lsn: 12
           bloom_filter: <bloom_filter>
           max_key: [789, 'ююю']
           page_count: 1
           stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
-          max_lsn: 13
+          max_lsn: 14
           min_key: [123, 'ёёё']
       - HEADER:
           type: PAGEINFO
@@ -376,17 +392,17 @@ result
           min_key: [123, 'ёёё']
   - - 00000000000000000010.run
     - - HEADER:
-          lsn: 11
+          lsn: 12
           type: REPLACE
         BODY:
           tuple: [123, 'ёёё']
       - HEADER:
-          lsn: 12
+          lsn: 13
           type: REPLACE
         BODY:
           tuple: [456, 'ЮЮЮ']
       - HEADER:
-          lsn: 13
+          lsn: 14
           type: REPLACE
         BODY:
           tuple: [789, 'ююю']
