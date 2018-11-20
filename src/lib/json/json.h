@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_JSON_PATH_H_INCLUDED
-#define TARANTOOL_JSON_PATH_H_INCLUDED
+#ifndef TARANTOOL_JSON_JSON_H_INCLUDED
+#define TARANTOOL_JSON_JSON_H_INCLUDED
 /*
  * Copyright 2010-2018 Tarantool AUTHORS: please see AUTHORS file.
  *
@@ -37,25 +37,25 @@ extern "C" {
 #endif
 
 /**
- * Parser for JSON paths:
+ * Lexer for JSON paths:
  * <field>, <.field>, <[123]>, <['field']> and their combinations.
  */
-struct json_path_parser {
+struct json_lexer {
 	/** Source string. */
 	const char *src;
 	/** Length of string. */
 	int src_len;
-	/** Current parser's offset in bytes. */
+	/** Current lexer's offset in bytes. */
 	int offset;
-	/** Current parser's offset in symbols. */
+	/** Current lexer's offset in symbols. */
 	int symbol_count;
 };
 
-enum json_path_type {
-	JSON_PATH_NUM,
-	JSON_PATH_STR,
-	/** Parser reached end of path. */
-	JSON_PATH_END,
+enum json_token_type {
+	JSON_TOKEN_NUM,
+	JSON_TOKEN_STR,
+	/** Lexer reached end of path. */
+	JSON_TOKEN_END,
 };
 
 /**
@@ -63,8 +63,8 @@ enum json_path_type {
  * String idenfiers are in ["..."] and between dots. Numbers are
  * indexes in [...].
  */
-struct json_path_node {
-	enum json_path_type type;
+struct json_token {
+	enum json_token_type type;
 	union {
 		struct {
 			/** String identifier. */
@@ -78,35 +78,34 @@ struct json_path_node {
 };
 
 /**
- * Create @a parser.
- * @param[out] parser Parser to create.
+ * Create @a lexer.
+ * @param[out] lexer Lexer to create.
  * @param src Source string.
  * @param src_len Length of @a src.
  */
 static inline void
-json_path_parser_create(struct json_path_parser *parser, const char *src,
-                        int src_len)
+json_lexer_create(struct json_lexer *lexer, const char *src, int src_len)
 {
-	parser->src = src;
-	parser->src_len = src_len;
-	parser->offset = 0;
-	parser->symbol_count = 0;
+	lexer->src = src;
+	lexer->src_len = src_len;
+	lexer->offset = 0;
+	lexer->symbol_count = 0;
 }
 
 /**
- * Get a next path node.
- * @param parser Parser.
- * @param[out] node Node to store parsed result.
- * @retval   0 Success. For result see @a node.str, node.len,
- *             node.num.
+ * Get a next path token.
+ * @param lexer Lexer.
+ * @param[out] token Token to store parsed result.
+ * @retval   0 Success. For result see @a token.str, token.len,
+ *             token.num.
  * @retval > 0 Position of a syntax error. A position is 1-based
  *             and starts from a beginning of a source string.
  */
 int
-json_path_next(struct json_path_parser *parser, struct json_path_node *node);
+json_lexer_next_token(struct json_lexer *lexer, struct json_token *token);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* TARANTOOL_JSON_PATH_H_INCLUDED */
+#endif /* TARANTOOL_JSON_JSON_H_INCLUDED */

@@ -41,7 +41,7 @@
 #include "box/tuple.h"
 #include "box/tuple_convert.h"
 #include "box/errcode.h"
-#include "json/path.h"
+#include "json/json.h"
 #include "mpstream.h"
 
 /** {{{ box.tuple Lua library

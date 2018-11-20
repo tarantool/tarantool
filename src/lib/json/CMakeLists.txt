@@ -1,5 +1,5 @@
 set(lib_sources
-    path.c
+    json.c
 )
 
 set_source_files_compile_flags(${lib_sources})

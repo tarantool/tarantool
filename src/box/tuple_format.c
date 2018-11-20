@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "json/path.h"
+#include "json/json.h"
 #include "tuple_format.h"
 #include "coll_id_cache.h"
 
@@ -580,19 +580,19 @@ static int
 tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len)
 {
 	int rc;
-	struct json_path_parser parser;
-	struct json_path_node node;
-	json_path_parser_create(&parser, path, path_len);
-	while ((rc = json_path_next(&parser, &node)) == 0) {
-		switch (node.type) {
-		case JSON_PATH_NUM:
-			rc = tuple_field_go_to_index(data, node.num);
+	struct json_lexer lexer;
+	struct json_token token;
+	json_lexer_create(&lexer, path, path_len);
+	while ((rc = json_lexer_next_token(&lexer, &token)) == 0) {
+		switch (token.type) {
+		case JSON_TOKEN_NUM:
+			rc = tuple_field_go_to_index(data, token.num);
 			break;
-		case JSON_PATH_STR:
-			rc = tuple_field_go_to_key(data, node.str, node.len);
+		case JSON_TOKEN_STR:
+			rc = tuple_field_go_to_key(data, token.str, token.len);
 			break;
 		default:
-			assert(node.type == JSON_PATH_END);
+			assert(token.type == JSON_TOKEN_END);
 			return 0;
 		}
 		if (rc != 0) {
@@ -622,15 +622,15 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 		*field = tuple_field_raw(format, tuple, field_map, fieldno);
 		return 0;
 	}
-	struct json_path_parser parser;
-	struct json_path_node node;
-	json_path_parser_create(&parser, path, path_len);
-	int rc = json_path_next(&parser, &node);
+	struct json_lexer lexer;
+	struct json_token token;
+	json_lexer_create(&lexer, path, path_len);
+	int rc = json_lexer_next_token(&lexer, &token);
 	if (rc != 0)
 		goto error;
-	switch(node.type) {
-	case JSON_PATH_NUM: {
-		int index = node.num;
+	switch(token.type) {
+	case JSON_TOKEN_NUM: {
+		int index = token.num;
 		if (index == 0) {
 			*field = NULL;
 			return 0;
@@ -641,10 +641,10 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			return 0;
 		break;
 	}
-	case JSON_PATH_STR: {
+	case JSON_TOKEN_STR: {
 		/* First part of a path is a field name. */
 		uint32_t name_hash;
-		if (path_len == (uint32_t) node.len) {
+		if (path_len == (uint32_t) token.len) {
 			name_hash = path_hash;
 		} else {
 			/*
@@ -653,25 +653,26 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			 * used. A tuple dictionary hashes only
 			 * name, not path.
 			 */
-			name_hash = field_name_hash(node.str, node.len);
+			name_hash = field_name_hash(token.str, token.len);
 		}
 		*field = tuple_field_raw_by_name(format, tuple, field_map,
-						 node.str, node.len, name_hash);
+						 token.str, token.len,
+						 name_hash);
 		if (*field == NULL)
 			return 0;
 		break;
 	}
 	default:
-		assert(node.type == JSON_PATH_END);
+		assert(token.type == JSON_TOKEN_END);
 		*field = NULL;
 		return 0;
 	}
-	rc = tuple_field_go_to_path(field, path + parser.offset,
-				    path_len - parser.offset);
+	rc = tuple_field_go_to_path(field, path + lexer.offset,
+				    path_len - lexer.offset);
 	if (rc == 0)
 		return 0;
 	/* Setup absolute error position. */
-	rc += parser.offset;
+	rc += lexer.offset;
 
 error:
 	assert(rc > 0);
