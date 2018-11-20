@@ -195,6 +195,14 @@ tostring(tonumber64('-9223372036854775808')) == '-9223372036854775808LL'
 tonumber64('-9223372036854775809') == nil
 tostring(tonumber64('0')) == '0'
 
+--
+-- gh-3431: tonumber of strings with ULL.
+--
+tonumber64('-1ULL') == -1ULL
+tonumber64('-1LL') == -1LL
+tonumber64('12345678910ULL') == 12345678910ULL
+tonumber64(tostring(tonumber64('1234567890123456'))) == 1234567890123456ULL
+
 tonumber64('0x12') == 18
 tonumber64('0x12', 16) == 18
 tonumber64('0x12', 17) == nil

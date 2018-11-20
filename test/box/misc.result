@@ -734,6 +734,25 @@ tostring(tonumber64('0')) == '0'
 ---
 - true
 ...
+--
+-- gh-3431: tonumber of strings with ULL.
+--
+tonumber64('-1ULL') == -1ULL
+---
+- true
+...
+tonumber64('-1LL') == -1LL
+---
+- true
+...
+tonumber64('12345678910ULL') == 12345678910ULL
+---
+- true
+...
+tonumber64(tostring(tonumber64('1234567890123456'))) == 1234567890123456ULL
+---
+- true
+...
 tonumber64('0x12') == 18
 ---
 - true
