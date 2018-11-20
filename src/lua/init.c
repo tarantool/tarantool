@@ -199,6 +199,10 @@ lbox_tonumber64(struct lua_State *L)
 		 * 1) '0x' or '0X' trim in case of base == 16 or base == -1
 		 * 2) '0b' or '0B' trim in case of base == 2  or base == -1
 		 * 3) '-' for negative numbers
+		 * 4) LL, ULL, LLU - trim, but only for base == 2 or
+		 *    base == 16 or base == -1. For consistency do not bother
+		 *    with any non-common bases, since user may have specified
+		 *    base >= 22, in which case 'L' will be a digit.
 		 */
 		char negative = 0;
 		if (arg[0] == '-') {
@@ -214,7 +218,26 @@ lbox_tonumber64(struct lua_State *L)
 				base = 2;  arg += 2; argl -= 2;
 			}
 		}
-		base = (base == -1 ? 10 : base);
+		bool ull = false;
+		if (argl > 2 && (base == 2 || base == 16 || base == -1)) {
+			if (arg[argl - 1] == 'u' || arg[argl - 1] == 'U') {
+				ull = true;
+				--argl;
+			}
+			if ((arg[argl - 1] == 'l' || arg[argl - 1] == 'L') &&
+			    (arg[argl - 2] == 'l' || arg[argl - 2] == 'L'))
+				argl -= 2;
+			else {
+				ull = false;
+				goto skip;
+			}
+			if (!ull && (arg[argl - 1] == 'u' ||
+				     arg[argl - 1] == 'U')) {
+				ull = true;
+				--argl;
+			}
+		}
+skip:		base = (base == -1 ? 10 : base);
 		errno = 0;
 		char *arge;
 		unsigned long long result = strtoull(arg, &arge, base);
@@ -231,7 +254,9 @@ lbox_tonumber64(struct lua_State *L)
 				 * Finally,
 				 *  result - 1 > INT64_MAX;
 				 */
-				if (result != 0 && result - 1 > INT64_MAX)
+				if (ull)
+					luaL_pushuint64(L, (UINT64_MAX - result) + 1);
+				else if (result != 0 && result - 1 > INT64_MAX)
 					lua_pushnil(L);
 				else
 					luaL_pushint64(L, -result);
