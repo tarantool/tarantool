@@ -419,8 +419,10 @@ i = s:create_index('primary', {run_count_per_level = 10})
 
 i:stat().disk.statement
 
-s:insert{1, 1}
-s:replace{2, 2}
+-- First run ought to be big to avoid last-level compaction (see gh-3657).
+digest = require('digest')
+_ = s:insert{1, 1, digest.urandom(100)}
+_ = s:replace{2, 2, digest.urandom(100)}
 box.snapshot()
 
 i:stat().disk.statement
@@ -441,7 +443,7 @@ i = s.index.primary
 i:stat().disk.statement
 
 i:compact()
-while i:stat().disk.compact.count == 0 do fiber.sleep(0.01) end
+while i:stat().run_count > 1 do fiber.sleep(0.01) end
 
 i:stat().disk.statement
 
