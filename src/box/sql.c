@@ -90,9 +90,12 @@ sql_load_schema()
 	if (stat->def->field_count == 0)
 		return;
 	db->init.busy = 1;
-	sql_analysis_load(db);
-	if (db->errCode != SQLITE_OK)
+	if (sql_analysis_load(db) != SQLITE_OK) {
+		if(!diag_is_empty(&fiber()->diag)) {
+			diag_log();
+		}
 		panic("failed to initialize SQL subsystem");
+	}
 	db->init.busy = 0;
 }
 

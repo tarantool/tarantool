@@ -1682,7 +1682,9 @@ stat_copy(struct index_stat *dest, const struct index_stat *src)
 int
 sql_analysis_load(struct sqlite3 *db)
 {
-	uint32_t index_count = box_index_len(BOX_SQL_STAT1_ID, 0);
+	ssize_t index_count = box_index_len(BOX_SQL_STAT1_ID, 0);
+	if (index_count < 0)
+		return SQL_TARANTOOL_ERROR;
 	if (box_txn_begin() != 0)
 		goto fail;
 	size_t stats_size = index_count * sizeof(struct index_stat);
