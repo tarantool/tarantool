@@ -11,8 +11,6 @@ test_run:cmd("create server replica with rpl_master=default, script='replication
 default_checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
 
-function wait_gc(n) while #box.info.gc().checkpoints > n do fiber.sleep(0.01) end end
-
 -- Grant permissions needed for replication.
 box.schema.user.grant('guest', 'replication')
 
@@ -53,14 +51,13 @@ test_run:cmd("start server replica")
 -- bootstrapped from, the replica should still receive all
 -- data from the master. Check it.
 test_run:cmd("switch replica")
-fiber = require('fiber')
-while box.space.test:count() < 200 do fiber.sleep(0.01) end
+test_run:wait_cond(function() return box.space.test:count() == 200 end, 10)
 box.space.test:count()
 test_run:cmd("switch default")
 
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
-wait_gc(1)
+test_run:wait_cond(function() return #box.info.gc().checkpoints == 1 end, 10)
 #box.info.gc().checkpoints == 1 or box.info.gc()
 #fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
 -- Make sure the replica will receive data it is subscribed
@@ -88,14 +85,13 @@ box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
 
 -- Check that the replica received all data from the master.
 test_run:cmd("switch replica")
-while box.space.test:count() < 300 do fiber.sleep(0.01) end
+test_run:wait_cond(function() return box.space.test:count() == 300 end, 10)
 box.space.test:count()
 test_run:cmd("switch default")
 
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
-wait_gc(1)
-#box.info.gc().checkpoints == 1 or box.info.gc()
+test_run:wait_cond(function() return #fio.glob('./master/*.xlog') == 0 end, 10)
 #fio.glob('./master/*.xlog') == 0 or fio.listdir('./master')
 --
 -- Check that the master doesn't delete xlog files sent to the
@@ -124,13 +120,11 @@ box.cfg{replication = {}}
 test_run:cmd("restart server replica")
 -- Wait for the replica to catch up.
 test_run:cmd("switch replica")
-fiber = require('fiber')
-while box.space.test:count() < 310 do fiber.sleep(0.01) end
+test_run:wait_cond(function() return box.space.test:count() == 310 end, 10)
 box.space.test:count()
 test_run:cmd("switch default")
 -- Now it's safe to drop the old xlog.
-wait_gc(1)
-#box.info.gc().checkpoints == 1 or box.info.gc()
+test_run:wait_cond(function() return #fio.glob('./master/*.xlog') == 1 end, 10)
 #fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
 -- Stop the replica.
 test_run:cmd("stop server replica")
@@ -155,7 +149,6 @@ xlog_count == 3 or xlog_count == 2 or fio.listdir('./master')
 -- The xlog should only be deleted after the replica
 -- is unregistered.
 test_run:cleanup_cluster()
-#box.info.gc().checkpoints == 1 or box.info.gc()
 #fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
 --
 -- Test that concurrent invocation of the garbage collector works fine.
@@ -179,7 +172,6 @@ replica_set.drop_all(test_run)
 -- a replication master (gh-3546).
 --
 fio = require('fio')
-fiber = require('fiber')
 
 -- Start a replica and set it up as a master for this instance.
 test_run:cmd("start server replica")
@@ -202,8 +194,7 @@ box.snapshot()
 -- all xlog files are removed.
 test_run:cleanup_cluster()
 box.snapshot()
-t = fiber.time()
-while #fio.glob('./master/*xlog') > 0 and fiber.time() - t < 10 do fiber.sleep(0.01) end
+test_run:wait_cond(function() return #fio.glob('./master/*.xlog') == 0 end, 10)
 #fio.glob('./master/*.xlog') == 0 or fio.listdir('./master')
 
 -- Restore the config.
