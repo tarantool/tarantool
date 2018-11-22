@@ -120,11 +120,11 @@ struct wal_writer
 	 */
 	struct vclock vclock;
 	/**
-	 * Signature of the oldest checkpoint available on the instance.
+	 * VClock of the oldest checkpoint available on the instance.
 	 * The WAL writer must not delete WAL files that are needed to
 	 * recover from it even if it is running out of disk space.
 	 */
-	int64_t checkpoint_lsn;
+	struct vclock checkpoint_vclock;
 	/** The current WAL file. */
 	struct xlog current_wal;
 	/**
@@ -295,7 +295,8 @@ static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		  const char *wal_dirname, int64_t wal_max_rows,
 		  int64_t wal_max_size, const struct tt_uuid *instance_uuid,
-		  const struct vclock *vclock, int64_t checkpoint_lsn)
+		  const struct vclock *vclock,
+		  const struct vclock *checkpoint_vclock)
 {
 	writer->wal_mode = wal_mode;
 	writer->wal_max_rows = wal_max_rows;
@@ -311,11 +312,8 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	stailq_create(&writer->rollback);
 	cmsg_init(&writer->in_rollback, NULL);
 
-	/* Create and fill writer->vclock. */
-	vclock_create(&writer->vclock);
 	vclock_copy(&writer->vclock, vclock);
-
-	writer->checkpoint_lsn = checkpoint_lsn;
+	vclock_copy(&writer->checkpoint_vclock, checkpoint_vclock);
 	rlist_create(&writer->watchers);
 }
 
@@ -421,14 +419,14 @@ wal_open(struct wal_writer *writer)
 int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
 	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
-	 const struct vclock *vclock, int64_t first_checkpoint_lsn)
+	 const struct vclock *vclock, const struct vclock *first_checkpoint_vclock)
 {
 	assert(wal_max_rows > 1);
 
 	struct wal_writer *writer = &wal_writer_singleton;
 	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_rows,
 			  wal_max_size, instance_uuid, vclock,
-			  first_checkpoint_lsn);
+			  first_checkpoint_vclock);
 
 	/*
 	 * Scan the WAL directory to build an index of all
@@ -546,8 +544,8 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 struct wal_gc_msg
 {
 	struct cbus_call_msg base;
-	int64_t wal_lsn;
-	int64_t checkpoint_lsn;
+	const struct vclock *wal_vclock;
+	const struct vclock *checkpoint_vclock;
 };
 
 static int
@@ -555,20 +553,21 @@ wal_collect_garbage_f(struct cbus_call_msg *data)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_gc_msg *msg = (struct wal_gc_msg *)data;
-	writer->checkpoint_lsn = msg->checkpoint_lsn;
-	xdir_collect_garbage(&writer->wal_dir, msg->wal_lsn, 0);
+	vclock_copy(&writer->checkpoint_vclock, msg->checkpoint_vclock);
+	xdir_collect_garbage(&writer->wal_dir, vclock_sum(msg->wal_vclock), 0);
 	return 0;
 }
 
 void
-wal_collect_garbage(int64_t wal_lsn, int64_t checkpoint_lsn)
+wal_collect_garbage(const struct vclock *wal_vclock,
+		    const struct vclock *checkpoint_vclock)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE)
 		return;
 	struct wal_gc_msg msg;
-	msg.wal_lsn = wal_lsn;
-	msg.checkpoint_lsn = checkpoint_lsn;
+	msg.wal_vclock = wal_vclock;
+	msg.checkpoint_vclock = checkpoint_vclock;
 	bool cancellable = fiber_set_cancellable(false);
 	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, &msg.base,
 		  wal_collect_garbage_f, NULL, TIMEOUT_INFINITY);
@@ -643,6 +642,12 @@ wal_fallocate(struct wal_writer *writer, size_t len)
 	struct errinj *errinj = errinj(ERRINJ_WAL_FALLOCATE, ERRINJ_INT);
 
 	/*
+	 * Max LSN that can be collected in case of ENOSPC -
+	 * we must not delete WALs necessary for recovery.
+	 */
+	int64_t gc_lsn = vclock_sum(&writer->checkpoint_vclock);
+
+	/*
 	 * The actual write size can be greater than the sum size
 	 * of encoded rows (compression, fixheaders). Double the
 	 * given length to get a rough upper bound estimate.
@@ -662,7 +667,7 @@ retry:
 	}
 	if (errno != ENOSPC)
 		goto error;
-	if (!xdir_has_garbage(&writer->wal_dir, writer->checkpoint_lsn))
+	if (!xdir_has_garbage(&writer->wal_dir, gc_lsn))
 		goto error;
 
 	if (warn_no_space) {
@@ -674,7 +679,7 @@ retry:
 	struct diag diag;
 	diag_create(&diag);
 	diag_move(diag_get(), &diag);
-	if (xdir_collect_garbage(&writer->wal_dir, writer->checkpoint_lsn,
+	if (xdir_collect_garbage(&writer->wal_dir, gc_lsn,
 				 XDIR_GC_REMOVE_ONE) != 0) {
 		diag_move(&diag, diag_get());
 		goto error;

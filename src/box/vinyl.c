@@ -3318,21 +3318,20 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 }
 
 static int
-vinyl_engine_collect_garbage(struct engine *engine, int64_t lsn)
+vinyl_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 {
 	struct vy_env *env = vy_env(engine);
 
 	/* Cleanup old metadata log files. */
-	vy_log_collect_garbage(lsn);
+	vy_log_collect_garbage(vclock);
 
 	/* Cleanup run files. */
-	int64_t signature = vy_log_signature();
-	struct vy_recovery *recovery = vy_recovery_new(signature, 0);
+	struct vy_recovery *recovery = vy_recovery_new(vy_log_signature(), 0);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog for garbage collection");
 		return 0;
 	}
-	vy_gc(env, recovery, VY_GC_DROPPED, lsn);
+	vy_gc(env, recovery, VY_GC_DROPPED, vclock_sum(vclock));
 	vy_recovery_delete(recovery);
 	return 0;
 }

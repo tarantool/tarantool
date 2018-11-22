@@ -202,22 +202,16 @@ vy_log_filename(int64_t signature)
 }
 
 /**
- * Return the lsn of the checkpoint that was taken
- * before the given lsn.
+ * Return the vclock of the checkpoint that was taken
+ * before the given vclock.
  */
-static int64_t
-vy_log_prev_checkpoint(int64_t lsn)
+static const struct vclock *
+vy_log_prev_checkpoint(const struct vclock *vclock)
 {
-	int64_t ret = -1;
-	for (struct vclock *vclock = vclockset_last(&vy_log.dir.index);
-	     vclock != NULL;
-	     vclock = vclockset_prev(&vy_log.dir.index, vclock)) {
-		if (vclock_sum(vclock) < lsn) {
-			ret = vclock_sum(vclock);
-			break;
-		}
-	}
-	return ret;
+	struct vclock *prev = vclockset_psearch(&vy_log.dir.index, vclock);
+	if (prev != NULL && vclock_sum(prev) == vclock_sum(vclock))
+		prev = vclockset_prev(&vy_log.dir.index, prev);
+	return prev;
 }
 
 /** An snprint-style function to print a log record. */
@@ -1066,14 +1060,16 @@ fail:
 }
 
 void
-vy_log_collect_garbage(int64_t signature)
+vy_log_collect_garbage(const struct vclock *vclock)
 {
 	/*
 	 * Always keep the previous file, because
 	 * it is still needed for backups.
 	 */
-	signature = vy_log_prev_checkpoint(signature);
-	xdir_collect_garbage(&vy_log.dir, signature, XDIR_GC_USE_COIO);
+	vclock = vy_log_prev_checkpoint(vclock);
+	if (vclock == NULL)
+		return;
+	xdir_collect_garbage(&vy_log.dir, vclock_sum(vclock), XDIR_GC_USE_COIO);
 }
 
 int64_t
@@ -1089,10 +1085,10 @@ vy_log_backup_path(const struct vclock *vclock)
 	 * Use the previous log file, because the current one
 	 * contains records written after the last checkpoint.
 	 */
-	int64_t lsn = vy_log_prev_checkpoint(vclock_sum(vclock));
-	if (lsn < 0)
+	vclock = vy_log_prev_checkpoint(vclock);
+	if (vclock == NULL)
 		return NULL;
-	const char *path = vy_log_filename(lsn);
+	const char *path = vy_log_filename(vclock_sum(vclock));
 	if (access(path, F_OK) == -1 && errno == ENOENT)
 		return NULL; /* vinyl not used */
 	return path;

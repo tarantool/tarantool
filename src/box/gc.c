@@ -201,9 +201,6 @@ gc_run(void)
 	if (!run_engine_gc && !run_wal_gc)
 		return; /* nothing to do */
 
-	int64_t wal_lsn = vclock_sum(vclock);
-	int64_t checkpoint_lsn = vclock_sum(&checkpoint->vclock);
-
 	/*
 	 * Engine callbacks may sleep, because they use coio for
 	 * removing files. Make sure we won't try to remove the
@@ -220,14 +217,14 @@ gc_run(void)
 	 */
 	int rc = 0;
 	if (run_engine_gc)
-		rc = engine_collect_garbage(checkpoint_lsn);
+		rc = engine_collect_garbage(&checkpoint->vclock);
 	/*
 	 * Run wal_collect_garbage() even if we don't need to
 	 * delete any WAL files, because we have to apprise
 	 * the WAL thread of the oldest checkpoint signature.
 	 */
 	if (rc == 0)
-		wal_collect_garbage(wal_lsn, checkpoint_lsn);
+		wal_collect_garbage(vclock, &checkpoint->vclock);
 	latch_unlock(&gc.latch);
 }
 
