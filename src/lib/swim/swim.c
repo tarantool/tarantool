@@ -368,7 +368,10 @@ struct swim {
 	 * Single round step task. It is impossible to have
 	 * multiple round steps in the same SWIM instance at the
 	 * same time, so it is single and preallocated per SWIM
-	 * instance.
+	 * instance. Note, that the task's packet once built at
+	 * the beginning of a round is reused during the round
+	 * without rebuilding on each step. But packet rebuild can
+	 * be triggered by any update of any member.
 	 */
 	struct swim_task round_step_task;
 	/**
@@ -421,6 +424,13 @@ struct swim {
 	struct rlist dissemination_queue;
 };
 
+/** Reset cached round message on any change of any member. */
+static inline void
+swim_cached_round_msg_invalidate(struct swim *swim)
+{
+	swim_packet_create(&swim->round_step_task.packet);
+}
+
 /** Put the member into a list of ACK waiters. */
 static void
 swim_wait_ack(struct swim *swim, struct swim_member *member)
@@ -450,6 +460,7 @@ swim_register_event(struct swim *swim, struct swim_member *member)
 				     in_dissemination_queue);
 	}
 	member->status_ttl = mh_size(swim->members);
+	swim_cached_round_msg_invalidate(swim);
 }
 
 /**
@@ -592,6 +603,7 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 	mh_int_t rc = mh_swim_table_find(swim->members, key, NULL);
 	assert(rc != mh_end(swim->members));
 	mh_swim_table_del(swim->members, rc, NULL);
+	swim_cached_round_msg_invalidate(swim);
 	rlist_del_entry(member, in_round_queue);
 
 	/* Failure detection component. */
@@ -708,6 +720,7 @@ swim_new_round(struct swim *swim)
 	/* -1 for self. */
 	say_verbose("SWIM %d: start a new round with %d members", swim_fd(swim),
 		    size - 1);
+	swim_cached_round_msg_invalidate(swim);
 	swim_shuffle_members(swim);
 	rlist_create(&swim->round_queue);
 	for (int i = 0; i < size; ++i) {
@@ -840,8 +853,11 @@ swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
 
 /** Encode SWIM components into a UDP packet. */
 static void
-swim_encode_round_msg(struct swim *swim, struct swim_packet *packet)
+swim_encode_round_msg(struct swim *swim)
 {
+	if (swim_packet_body_size(&swim->round_step_task.packet) > 0)
+		return;
+	struct swim_packet *packet = &swim->round_step_task.packet;
 	swim_packet_create(packet);
 	char *header = swim_packet_alloc(packet, 1);
 	int map_size = 0;
@@ -876,6 +892,7 @@ swim_decrease_event_ttl(struct swim *swim)
 				 tmp) {
 		if (--member->status_ttl == 0) {
 			rlist_del_entry(member, in_dissemination_queue);
+			swim_cached_round_msg_invalidate(swim);
 			if (member->status == MEMBER_LEFT)
 				swim_delete_member(swim, member);
 		}
@@ -905,8 +922,7 @@ swim_begin_step(struct ev_loop *loop, struct ev_timer *t, int events)
 	 */
 	if (rlist_empty(&swim->round_queue))
 		return;
-
-	swim_encode_round_msg(swim, &swim->round_step_task.packet);
+	swim_encode_round_msg(swim);
 	struct swim_member *m =
 		rlist_first_entry(&swim->round_queue, struct swim_member,
 				  in_round_queue);
@@ -1577,7 +1593,6 @@ swim_delete(struct swim *swim)
 	swim_scheduler_destroy(&swim->scheduler);
 	swim_ev_timer_stop(loop(), &swim->round_tick);
 	swim_ev_timer_stop(loop(), &swim->wait_ack_tick);
-	swim_task_destroy(&swim->round_step_task);
 	mh_int_t node;
 	mh_foreach(swim->members, node) {
 		struct swim_member *m =
@@ -1588,6 +1603,11 @@ swim_delete(struct swim *swim)
 		rlist_del_entry(m, in_dissemination_queue);
 		swim_member_delete(m);
 	}
+	/*
+	 * Destroy the task after members - otherwise they would
+	 * try to invalidate the already destroyed task.
+	 */
+	swim_task_destroy(&swim->round_step_task);
 	wait_ack_heap_destroy(&swim->wait_ack_heap);
 	mh_swim_table_delete(swim->members);
 	free(swim->shuffled);

@@ -126,6 +126,13 @@ swim_packet_alloc(struct swim_packet *packet, int size)
 	return res;
 }
 
+/** Size of the packet body. Meta is not counted. */
+static inline int
+swim_packet_body_size(const struct swim_packet *packet)
+{
+	return packet->pos - packet->body;
+}
+
 /** Initialize @a packet, reserve some space for meta. */
 void
 swim_packet_create(struct swim_packet *packet);
