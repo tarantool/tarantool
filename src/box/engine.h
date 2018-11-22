@@ -156,7 +156,7 @@ struct engine_vtab {
 	void (*abort_checkpoint)(struct engine *);
 	/**
 	 * Remove files that are not needed to recover
-	 * from checkpoint with @lsn or newer.
+	 * from checkpoint @vclock or newer.
 	 *
 	 * If this function returns a non-zero value, garbage
 	 * collection is aborted, i.e. this method isn't called
@@ -166,7 +166,8 @@ struct engine_vtab {
 	 * fails to delete a snapshot file, because we recover
 	 * checkpoint list by scanning the snapshot directory.
 	 */
-	int (*collect_garbage)(struct engine *engine, int64_t lsn);
+	int (*collect_garbage)(struct engine *engine,
+			       const struct vclock *vclock);
 	/**
 	 * Backup callback. It is supposed to call @cb for each file
 	 * that needs to be backed up in order to restore from the
@@ -337,7 +338,7 @@ void
 engine_abort_checkpoint(void);
 
 int
-engine_collect_garbage(int64_t lsn);
+engine_collect_garbage(const struct vclock *vclock);
 
 int
 engine_backup(const struct vclock *vclock, engine_backup_cb cb, void *cb_arg);
@@ -369,7 +370,7 @@ int generic_engine_begin_checkpoint(struct engine *);
 int generic_engine_wait_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_commit_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_abort_checkpoint(struct engine *);
-int generic_engine_collect_garbage(struct engine *, int64_t);
+int generic_engine_collect_garbage(struct engine *, const struct vclock *);
 int generic_engine_backup(struct engine *, const struct vclock *,
 			  engine_backup_cb, void *);
 void generic_engine_memory_stat(struct engine *, struct engine_memory_stat *);

@@ -2129,7 +2129,7 @@ box_cfg_xc(void)
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_rows,
 		     wal_max_size, &INSTANCE_UUID, &replicaset.vclock,
-		     vclock_sum(&first_checkpoint->vclock))) {
+		     &first_checkpoint->vclock) != 0) {
 		diag_raise();
 	}
 	gc_set_wal_watcher();

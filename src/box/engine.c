@@ -148,11 +148,11 @@ engine_abort_checkpoint(void)
 }
 
 int
-engine_collect_garbage(int64_t lsn)
+engine_collect_garbage(const struct vclock *vclock)
 {
 	struct engine *engine;
 	engine_foreach(engine) {
-		if (engine->vtab->collect_garbage(engine, lsn) < 0)
+		if (engine->vtab->collect_garbage(engine, vclock) < 0)
 			return -1;
 	}
 	return 0;
@@ -317,10 +317,11 @@ generic_engine_abort_checkpoint(struct engine *engine)
 }
 
 int
-generic_engine_collect_garbage(struct engine *engine, int64_t lsn)
+generic_engine_collect_garbage(struct engine *engine,
+			       const struct vclock *vclock)
 {
 	(void)engine;
-	(void)lsn;
+	(void)vclock;
 	return 0;
 }
 

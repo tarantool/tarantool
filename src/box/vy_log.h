@@ -455,10 +455,10 @@ vy_log_rotate(const struct vclock *vclock);
 
 /**
  * Remove metadata log files that are not needed to recover
- * from the snapshot with the given signature or newer.
+ * from checkpoint @vclock.
  */
 void
-vy_log_collect_garbage(int64_t signature);
+vy_log_collect_garbage(const struct vclock *vclock);
 
 /**
  * Return the signature of the newest vylog to the time.
