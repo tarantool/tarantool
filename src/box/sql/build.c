@@ -936,8 +936,9 @@ sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id)
 		struct coll_id *collation = coll_by_id(*coll_id);
 		return collation != NULL ? collation->coll : NULL;
 	}
-	*coll_id = space->format->fields[column].coll_id;
-	return space->format->fields[column].coll;
+	struct tuple_field *field = tuple_format_field(space->format, column);
+	*coll_id = field->coll_id;
+	return field->coll;
 }
 
 struct ExprList *

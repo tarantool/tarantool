@@ -38,10 +38,28 @@ static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size = 0, formats_capacity = 0;
 
-static const struct tuple_field tuple_field_default = {
-	FIELD_TYPE_ANY, TUPLE_OFFSET_SLOT_NIL, false,
-	ON_CONFLICT_ACTION_NONE, NULL, COLL_NONE,
-};
+static struct tuple_field *
+tuple_field_new(void)
+{
+	struct tuple_field *field = calloc(1, sizeof(struct tuple_field));
+	if (field == NULL) {
+		diag_set(OutOfMemory, sizeof(struct tuple_field), "malloc",
+			 "tuple field");
+		return NULL;
+	}
+	field->token.type = JSON_TOKEN_END;
+	field->type = FIELD_TYPE_ANY;
+	field->offset_slot = TUPLE_OFFSET_SLOT_NIL;
+	field->coll_id = COLL_NONE;
+	field->nullable_action = ON_CONFLICT_ACTION_NONE;
+	return field;
+}
+
+static void
+tuple_field_delete(struct tuple_field *field)
+{
+	free(field);
+}
 
 static int
 tuple_format_use_key_part(struct tuple_format *format,
@@ -49,8 +67,8 @@ tuple_format_use_key_part(struct tuple_format *format,
 			  const struct key_part *part, bool is_sequential,
 			  int *current_slot)
 {
-	assert(part->fieldno < format->field_count);
-	struct tuple_field *field = &format->fields[part->fieldno];
+	assert(part->fieldno < tuple_format_field_count(format));
+	struct tuple_field *field = tuple_format_field(format, part->fieldno);
 	/*
 		* If a field is not present in the space format,
 		* inherit nullable action of the first key part
@@ -138,16 +156,15 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 	format->min_field_count =
 		tuple_format_min_field_count(keys, key_count, fields,
 					     field_count);
-	if (format->field_count == 0) {
+	if (tuple_format_field_count(format) == 0) {
 		format->field_map_size = 0;
 		return 0;
 	}
 	/* Initialize defined fields */
 	for (uint32_t i = 0; i < field_count; ++i) {
-		format->fields[i].is_key_part = false;
-		format->fields[i].type = fields[i].type;
-		format->fields[i].offset_slot = TUPLE_OFFSET_SLOT_NIL;
-		format->fields[i].nullable_action = fields[i].nullable_action;
+		struct tuple_field *field = tuple_format_field(format, i);
+		field->type = fields[i].type;
+		field->nullable_action = fields[i].nullable_action;
 		struct coll *coll = NULL;
 		uint32_t cid = fields[i].coll_id;
 		if (cid != COLL_NONE) {
@@ -159,12 +176,9 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			}
 			coll = coll_id->coll;
 		}
-		format->fields[i].coll = coll;
-		format->fields[i].coll_id = cid;
+		field->coll = coll;
+		field->coll_id = cid;
 	}
-	/* Initialize remaining fields */
-	for (uint32_t i = field_count; i < format->field_count; i++)
-		format->fields[i] = tuple_field_default;
 
 	int current_slot = 0;
 
@@ -184,7 +198,8 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		}
 	}
 
-	assert(format->fields[0].offset_slot == TUPLE_OFFSET_SLOT_NIL);
+	assert(tuple_format_field(format, 0)->offset_slot ==
+	       TUPLE_OFFSET_SLOT_NIL);
 	size_t field_map_size = -current_slot * sizeof(uint32_t);
 	if (field_map_size > UINT16_MAX) {
 		/** tuple->data_offset is 16 bits */
@@ -242,6 +257,22 @@ tuple_format_deregister(struct tuple_format *format)
 	format->id = FORMAT_ID_NIL;
 }
 
+/*
+ * Dismantle the tuple field tree attached to the format and free
+ * memory occupied by tuple fields.
+ */
+static void
+tuple_format_destroy_fields(struct tuple_format *format)
+{
+	struct tuple_field *field, *tmp;
+	json_tree_foreach_entry_safe(field, &format->fields.root,
+				     struct tuple_field, token, tmp) {
+		json_tree_del(&format->fields, &field->token);
+		tuple_field_delete(field);
+	}
+	json_tree_destroy(&format->fields);
+}
+
 static struct tuple_format *
 tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 		   uint32_t space_field_count, struct tuple_dictionary *dict)
@@ -258,39 +289,59 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 		}
 	}
 	uint32_t field_count = MAX(space_field_count, index_field_count);
-	uint32_t total = sizeof(struct tuple_format) +
-			 field_count * sizeof(struct tuple_field);
 
-	struct tuple_format *format = (struct tuple_format *) malloc(total);
+	struct tuple_format *format = malloc(sizeof(struct tuple_format));
 	if (format == NULL) {
 		diag_set(OutOfMemory, sizeof(struct tuple_format), "malloc",
 			 "tuple format");
 		return NULL;
 	}
+	if (json_tree_create(&format->fields) != 0) {
+		diag_set(OutOfMemory, 0, "json_lexer_create",
+			 "tuple field tree");
+		free(format);
+		return NULL;
+	}
+	for (uint32_t fieldno = 0; fieldno < field_count; fieldno++) {
+		struct tuple_field *field = tuple_field_new();
+		if (field == NULL)
+			goto error;
+		field->token.num = fieldno;
+		field->token.type = JSON_TOKEN_NUM;
+		if (json_tree_add(&format->fields, &format->fields.root,
+				  &field->token) != 0) {
+			diag_set(OutOfMemory, 0, "json_tree_add",
+				 "tuple field tree entry");
+			tuple_field_delete(field);
+			goto error;
+		}
+	}
 	if (dict == NULL) {
 		assert(space_field_count == 0);
 		format->dict = tuple_dictionary_new(NULL, 0);
-		if (format->dict == NULL) {
-			free(format);
-			return NULL;
-		}
+		if (format->dict == NULL)
+			goto error;
 	} else {
 		format->dict = dict;
 		tuple_dictionary_ref(dict);
 	}
 	format->refs = 0;
 	format->id = FORMAT_ID_NIL;
-	format->field_count = field_count;
 	format->index_field_count = index_field_count;
 	format->exact_field_count = 0;
 	format->min_field_count = 0;
 	return format;
+error:
+	tuple_format_destroy_fields(format);
+	free(format);
+	return NULL;
 }
 
 /** Free tuple format resources, doesn't unregister. */
 static inline void
 tuple_format_destroy(struct tuple_format *format)
 {
+	tuple_format_destroy_fields(format);
 	tuple_dictionary_unref(format->dict);
 }
 
@@ -328,18 +379,21 @@ tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
 }
 
 bool
-tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
-				       const struct tuple_format *format2)
+tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
+				       struct tuple_format *format2)
 {
 	if (format1->exact_field_count != format2->exact_field_count)
 		return false;
-	for (uint32_t i = 0; i < format1->field_count; ++i) {
-		const struct tuple_field *field1 = &format1->fields[i];
+	uint32_t format1_field_count = tuple_format_field_count(format1);
+	uint32_t format2_field_count = tuple_format_field_count(format2);
+	for (uint32_t i = 0; i < format1_field_count; ++i) {
+		const struct tuple_field *field1 =
+			tuple_format_field(format1, i);
 		/*
 		 * The field has a data type in format1, but has
 		 * no data type in format2.
 		 */
-		if (i >= format2->field_count) {
+		if (i >= format2_field_count) {
 			/*
 			 * The field can get a name added
 			 * for it, and this doesn't require a data
@@ -355,7 +409,8 @@ tuple_format1_can_store_format2_tuples(const struct tuple_format *format1,
 			else
 				return false;
 		}
-		const struct tuple_field *field2 = &format2->fields[i];
+		const struct tuple_field *field2 =
+			tuple_format_field(format2, i);
 		if (! field_type1_contains_type2(field1->type, field2->type))
 			return false;
 		/*
@@ -374,7 +429,7 @@ int
 tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple, bool validate)
 {
-	if (format->field_count == 0)
+	if (tuple_format_field_count(format) == 0)
 		return 0; /* Nothing to initialize */
 
 	const char *pos = tuple;
@@ -397,17 +452,17 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 
 	/* first field is simply accessible, so we do not store offset to it */
 	enum mp_type mp_type = mp_typeof(*pos);
-	const struct tuple_field *field = &format->fields[0];
+	const struct tuple_field *field =
+		tuple_format_field((struct tuple_format *)format, 0);
 	if (validate &&
 	    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
 				 TUPLE_INDEX_BASE, tuple_field_is_nullable(field)))
 		return -1;
 	mp_next(&pos);
 	/* other fields...*/
-	++field;
 	uint32_t i = 1;
 	uint32_t defined_field_count = MIN(field_count, validate ?
-					   format->field_count :
+					   tuple_format_field_count(format) :
 					   format->index_field_count);
 	if (field_count < format->index_field_count) {
 		/*
@@ -417,7 +472,8 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		memset((char *)field_map - format->field_map_size, 0,
 		       format->field_map_size);
 	}
-	for (; i < defined_field_count; ++i, ++field) {
+	for (; i < defined_field_count; ++i) {
+		field = tuple_format_field((struct tuple_format *)format, i);
 		mp_type = mp_typeof(*pos);
 		if (validate &&
 		    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,

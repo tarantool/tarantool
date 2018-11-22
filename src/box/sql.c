@@ -199,8 +199,9 @@ tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
 	assert(pCur->last_tuple != NULL);
 
 	struct tuple_format *format = tuple_format(pCur->last_tuple);
-	if (fieldno >= format->field_count ||
-	    format->fields[fieldno].offset_slot == TUPLE_OFFSET_SLOT_NIL)
+	if (fieldno >= tuple_format_field_count(format) ||
+	    tuple_format_field(format, fieldno)->offset_slot ==
+	    TUPLE_OFFSET_SLOT_NIL)
 		return NULL;
 	const char *field = tuple_field(pCur->last_tuple, fieldno);
 	const char *end = field;
@@ -895,7 +896,7 @@ tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
 	struct key_def *key_def;
 	const struct tuple *tuple;
 	const char *base;
-	const struct tuple_format *format;
+	struct tuple_format *format;
 	const uint32_t *field_map;
 	uint32_t field_count, next_fieldno = 0;
 	const char *p, *field0;
@@ -913,7 +914,7 @@ tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
 	base = tuple_data(tuple);
 	format = tuple_format(tuple);
 	field_map = tuple_field_map(tuple);
-	field_count = format->field_count;
+	field_count = tuple_format_field_count(format);
 	field0 = base; mp_decode_array(&field0); p = field0;
 	for (i = 0; i < n; i++) {
 		/*
@@ -931,9 +932,10 @@ tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
 		uint32_t fieldno = key_def->parts[i].fieldno;
 
 		if (fieldno != next_fieldno) {
+			struct tuple_field *field =
+				tuple_format_field(format, fieldno);
 			if (fieldno >= field_count ||
-			    format->fields[fieldno].offset_slot ==
-			    TUPLE_OFFSET_SLOT_NIL) {
+			    field->offset_slot == TUPLE_OFFSET_SLOT_NIL) {
 				/* Outdated field_map. */
 				uint32_t j = 0;
 
@@ -941,9 +943,7 @@ tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
 				while (j++ != fieldno)
 					mp_next(&p);
 			} else {
-				p = base + field_map[
-					format->fields[fieldno].offset_slot
-					];
+				p = base + field_map[field->offset_slot];
 			}
 		}
 		next_fieldno = fieldno + 1;

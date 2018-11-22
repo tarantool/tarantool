@@ -138,7 +138,7 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 int
 tuple_validate_raw(struct tuple_format *format, const char *tuple)
 {
-	if (format->field_count == 0)
+	if (tuple_format_field_count(format) == 0)
 		return 0; /* Nothing to check */
 
 	/* Check to see if the tuple has a sufficient number of fields. */
@@ -158,10 +158,12 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 	}
 
 	/* Check field types */
-	struct tuple_field *field = &format->fields[0];
+	struct tuple_field *field = tuple_format_field(format, 0);
 	uint32_t i = 0;
-	uint32_t defined_field_count = MIN(field_count, format->field_count);
-	for (; i < defined_field_count; ++i, ++field) {
+	uint32_t defined_field_count =
+		MIN(field_count, tuple_format_field_count(format));
+	for (; i < defined_field_count; ++i) {
+		field = tuple_format_field(format, i);
 		if (key_mp_type_validate(field->type, mp_typeof(*tuple),
 					 ER_FIELD_TYPE, i + TUPLE_INDEX_BASE,
 					 tuple_field_is_nullable(field)))
