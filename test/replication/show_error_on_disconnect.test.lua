@@ -5,6 +5,7 @@
 --
 test_run = require('test_run').new()
 SERVERS = {'master_quorum1', 'master_quorum2'}
+
 -- Deploy a cluster.
 test_run:create_cluster(SERVERS)
 test_run:wait_fullmesh(SERVERS)
@@ -16,9 +17,14 @@ box.space.test:insert{1}
 box.snapshot()
 box.space.test:insert{2}
 box.snapshot()
-test_run:cmd("switch default")
+
+-- Manually remove all xlogs on master_quorum2 to break replication to master_quorum1.
 fio = require('fio')
-fio.unlink(fio.pathjoin(fio.abspath("."), string.format('master_quorum2/%020d.xlog', 5)))
+for _, path in ipairs(fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))) do fio.unlink(path) end
+
+box.space.test:insert{3}
+
+-- Check error reporting.
 test_run:cmd("switch master_quorum1")
 box.cfg{replication = repl}
 require('fiber').sleep(0.1)

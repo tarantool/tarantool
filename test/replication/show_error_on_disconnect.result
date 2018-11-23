@@ -46,17 +46,18 @@ box.snapshot()
 ---
 - ok
 ...
-test_run:cmd("switch default")
----
-- true
-...
+-- Manually remove all xlogs on master_quorum2 to break replication to master_quorum1.
 fio = require('fio')
 ---
 ...
-fio.unlink(fio.pathjoin(fio.abspath("."), string.format('master_quorum2/%020d.xlog', 5)))
+for _, path in ipairs(fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog'))) do fio.unlink(path) end
 ---
-- true
 ...
+box.space.test:insert{3}
+---
+- [3]
+...
+-- Check error reporting.
 test_run:cmd("switch master_quorum1")
 ---
 - true
@@ -90,6 +91,7 @@ box.space.test:select()
 ---
 - - [1]
   - [2]
+  - [3]
 ...
 other_id = box.info.id % 2 + 1
 ---

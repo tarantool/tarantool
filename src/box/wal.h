@@ -175,7 +175,9 @@ int
 wal_checkpoint(struct vclock *vclock, bool rotate);
 
 /**
- * Remove all WAL files whose signature is less than @wal_vclock.
+ * Remove WAL files that are not needed by consumers reading
+ * rows at @wal_vclock or newer.
+ *
  * Update the oldest checkpoint signature with @checkpoint_vclock.
  * WAL thread will delete WAL files that are not needed to
  * recover from the oldest checkpoint if it runs out of disk

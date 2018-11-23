@@ -68,7 +68,7 @@ s:auto_increment{}
 box.snapshot()
 s:auto_increment{}
 
-check_wal_count(7)
+check_wal_count(5)
 check_snap_count(2)
 #box.info.gc().consumers -- 3
 
@@ -76,7 +76,7 @@ check_snap_count(2)
 -- Inject a ENOSPC error and check that the WAL thread deletes
 -- old WAL files to prevent the user from seeing the error.
 --
-errinj.set('ERRINJ_WAL_FALLOCATE', 3)
+errinj.set('ERRINJ_WAL_FALLOCATE', 2)
 s:auto_increment{} -- success
 errinj.info()['ERRINJ_WAL_FALLOCATE'].state -- 0
 

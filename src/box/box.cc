@@ -1511,20 +1511,21 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	 */
 	box_on_join(&instance_uuid);
 
-	replica = replica_by_uuid(&instance_uuid);
-	assert(replica != NULL);
-
-	/* Register the replica as a WAL consumer. */
-	if (replica->gc != NULL)
-		gc_consumer_unregister(replica->gc);
-	replica->gc = gc_consumer_register(&start_vclock, "replica %s",
-					   tt_uuid_str(&instance_uuid));
-	if (replica->gc == NULL)
-		diag_raise();
-
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
 	wal_checkpoint(&stop_vclock, false);
+
+	/*
+	 * Register the replica as a WAL consumer so that
+	 * it can resume SUBSCRIBE where FINAL JOIN ends.
+	 */
+	replica = replica_by_uuid(&instance_uuid);
+	if (replica->gc != NULL)
+		gc_consumer_unregister(replica->gc);
+	replica->gc = gc_consumer_register(&stop_vclock, "replica %s",
+					   tt_uuid_str(&instance_uuid));
+	if (replica->gc == NULL)
+		diag_raise();
 
 	/* Send end of initial stage data marker */
 	xrow_encode_vclock_xc(&row, &stop_vclock);
@@ -1608,7 +1609,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 */
 	struct xrow_header row;
 	struct vclock current_vclock;
-	wal_checkpoint(&current_vclock, true);
+	wal_checkpoint(&current_vclock, false);
 	xrow_encode_vclock_xc(&row, &current_vclock);
 	/*
 	 * Identify the message with the replica id of this

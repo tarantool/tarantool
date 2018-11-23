@@ -553,8 +553,27 @@ wal_collect_garbage_f(struct cbus_call_msg *data)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_gc_msg *msg = (struct wal_gc_msg *)data;
+	const struct vclock *vclock = msg->wal_vclock;
+
+	if (!xlog_is_open(&writer->current_wal) &&
+	    vclock_sum(vclock) >= vclock_sum(&writer->vclock)) {
+		/*
+		 * The last available WAL file has been sealed and
+		 * all registered consumers have done reading it.
+		 * We can delete it now.
+		 */
+	} else {
+		/*
+		 * Find the most recent WAL file that contains rows
+		 * required by registered consumers and delete all
+		 * older WAL files.
+		 */
+		vclock = vclockset_psearch(&writer->wal_dir.index, vclock);
+	}
+	if (vclock != NULL)
+		xdir_collect_garbage(&writer->wal_dir, vclock_sum(vclock), 0);
+
 	vclock_copy(&writer->checkpoint_vclock, msg->checkpoint_vclock);
-	xdir_collect_garbage(&writer->wal_dir, vclock_sum(msg->wal_vclock), 0);
 	return 0;
 }
 
