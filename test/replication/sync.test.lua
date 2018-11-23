@@ -2,15 +2,27 @@ fiber = require('fiber')
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 
+test_run:cleanup_cluster()
+
 box.schema.user.grant('guest', 'replication')
 _ = box.schema.space.create('test', {engine = engine})
 _ = box.space.test:create_index('pk')
 
--- Slow down replication a little to test replication_sync_lag.
-box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.001)
-
--- Helper that adds some records to the space and then starts
--- a fiber to add more records in the background.
+-- A helper function to check that replication sync actually works.
+-- It inserts some records into the test space, then starts a fiber
+-- that performs the following steps in the background:
+--
+-- 1. Stall replication with the aid of error injection.
+-- 2. Wait for the test replica to subscribe.
+-- 3. Insert some more records into the test space.
+-- 4. Turn off replication delay.
+--
+-- We need the asynchronous part, because a replica doesn't stop
+-- syncing until it receives all data that existed on the master
+-- when it subscribed. So to check that it doesn't stop syncing
+-- until the time lag is less than configured, we have to insert
+-- some records after the replica subscribes, but before it leaves
+-- box.cfg() hence the need of replication delay.
 test_run:cmd("setopt delimiter ';'")
 count = 0;
 function fill()
@@ -18,12 +30,17 @@ function fill()
         box.space.test:replace{i}
     end
     fiber.create(function()
+        box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0.1)
+        test_run:wait_cond(function()
+            local r = box.info.replication[2]
+            return r ~= nil and r.downstream ~= nil and
+                   r.downstream.status ~= 'stopped'
+        end, 10)
         for i = count + 101, count + 200 do
             box.space.test:replace{i}
-            fiber.sleep(0.0001)
         end
+        box.error.injection.set('ERRINJ_RELAY_TIMEOUT', 0)
     end)
-    fiber.sleep(0.001)
     count = count + 200
 end;
 test_run:cmd("setopt delimiter ''");
@@ -32,8 +49,6 @@ test_run:cmd("setopt delimiter ''");
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
-
-fiber = require('fiber')
 
 -- Stop replication.
 replication = box.cfg.replication
@@ -46,7 +61,7 @@ test_run:cmd("switch replica")
 
 -- Resume replication.
 --
--- Since max allowed lag is small, all recoreds should arrive
+-- Since max allowed lag is small, all records should arrive
 -- by the time box.cfg() returns.
 --
 box.cfg{replication_sync_lag = 0.001}
@@ -77,7 +92,7 @@ box.info.status -- running
 box.info.ro -- false
 
 -- Wait for remaining rows to arrive.
-repeat fiber.sleep(0.01) until box.space.test:count() == 400
+test_run:wait_cond(function() return box.space.test:count() == 400 end, 10)
 
 -- Stop replication.
 replication = box.cfg.replication
@@ -90,9 +105,9 @@ test_run:cmd("switch replica")
 
 -- Resume replication
 --
--- Since max allowed lag is big, not all records will arrive
--- upon returning from box.cfg() but the instance won't enter
--- orphan state.
+-- Although max allowed lag is small, box.cfg() will fail to
+-- synchronize and leave the instance in orphan state, because
+-- the timeout is too small to receive all records in time.
 --
 box.cfg{replication_sync_lag = 0.001, replication_sync_timeout = 0.001}
 box.cfg{replication = replication}
@@ -101,10 +116,10 @@ box.info.status -- orphan
 box.info.ro -- true
 
 -- Wait for remaining rows to arrive.
-repeat fiber.sleep(0.01) until box.space.test:count() == 600
+test_run:wait_cond(function() return box.space.test:count() == 600 end, 10)
 
 -- Make sure replica leaves oprhan state.
-repeat fiber.sleep(0.01) until box.info.status ~= 'orphan'
+test_run:wait_cond(function() return box.info.status ~= 'orphan' end, 10)
 box.info.status -- running
 box.info.ro -- false
 
@@ -121,7 +136,6 @@ box.cfg{replication_sync_lag = 1}
 box.cfg{replication_sync_timeout = 10}
 
 test_run:cmd("switch default")
-box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0)
 box.error.injection.set('ERRINJ_WAL_DELAY', true)
 test_run:cmd("setopt delimiter ';'")
 _ = fiber.create(function()
