@@ -1014,10 +1014,7 @@ vy_abort_writers_for_ddl(struct vy_env *env, struct vy_lsm *lsm)
 	 * Wait for prepared transactions to complete
 	 * (we can't abort them as they reached WAL).
 	 */
-	struct vclock unused;
-	if (wal_checkpoint(&unused, false) != 0)
-		return -1;
-
+	wal_sync();
 	return 0;
 }
 

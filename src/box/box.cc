@@ -2190,10 +2190,9 @@ box_checkpoint()
 		goto end;
 
 	struct vclock vclock;
-	if ((rc = wal_checkpoint(&vclock, true))) {
-		tnt_error(ClientError, ER_CHECKPOINT_ROLLBACK);
+	if ((rc = wal_checkpoint(&vclock)))
 		goto end;
-	}
+
 	rc = engine_commit_checkpoint(&vclock);
 end:
 	if (rc)

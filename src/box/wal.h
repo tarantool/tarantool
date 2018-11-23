@@ -166,13 +166,20 @@ wal_mode();
 
 /**
  * Wait till all pending changes to the WAL are flushed.
- * Rotates the WAL.
+ */
+void
+wal_sync(void);
+
+/**
+ * Prepare WAL for checkpointing.
  *
- * @param[out] vclock WAL vclock
- *
+ * This function flushes all pending changes and rotates the
+ * current WAL. The vclock of the last record written to the
+ * rotated WAL is returned in @vclock. This is the vclock that
+ * is supposed to be used to identify the new checkpoint.
  */
 int
-wal_checkpoint(struct vclock *vclock, bool rotate);
+wal_checkpoint(struct vclock *vclock);
 
 /**
  * Remove WAL files that are not needed by consumers reading

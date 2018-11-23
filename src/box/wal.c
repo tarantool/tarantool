@@ -461,29 +461,39 @@ wal_thread_stop()
 		wal_writer_destroy(&wal_writer_singleton);
 }
 
+void
+wal_sync(void)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->wal_mode == WAL_NONE)
+		return;
+	cbus_flush(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, NULL);
+}
+
 struct wal_checkpoint
 {
-	struct cmsg base;
-	struct vclock *vclock;
-	struct fiber *fiber;
-	bool rotate;
-	int res;
+	struct cbus_call_msg base;
+	struct vclock vclock;
 };
 
-void
-wal_checkpoint_f(struct cmsg *data)
+static int
+wal_checkpoint_f(struct cbus_call_msg *data)
 {
 	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->in_rollback.route != NULL) {
-		/* We're rolling back a failed write. */
-		msg->res = -1;
-		return;
+		/*
+		 * We're rolling back a failed write and so
+		 * can't make a checkpoint - see the comment
+		 * in wal_checkpoint() for the explanation.
+		 */
+		diag_set(ClientError, ER_CHECKPOINT_ROLLBACK);
+		return -1;
 	}
 	/*
 	 * Avoid closing the current WAL if it has no rows (empty).
 	 */
-	if (msg->rotate && xlog_is_open(&writer->current_wal) &&
+	if (xlog_is_open(&writer->current_wal) &&
 	    vclock_sum(&writer->current_wal.meta.vclock) !=
 	    vclock_sum(&writer->vclock)) {
 
@@ -492,53 +502,38 @@ wal_checkpoint_f(struct cmsg *data)
 		 * The next WAL will be created on the first write.
 		 */
 	}
-	vclock_copy(msg->vclock, &writer->vclock);
-}
-
-void
-wal_checkpoint_done_f(struct cmsg *data)
-{
-	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
-	fiber_wakeup(msg->fiber);
+	vclock_copy(&msg->vclock, &writer->vclock);
+	return 0;
 }
 
 int
-wal_checkpoint(struct vclock *vclock, bool rotate)
+wal_checkpoint(struct vclock *vclock)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
-	if (! stailq_empty(&writer->rollback)) {
-		/*
-		 * The writer rollback queue is not empty,
-		 * roll back this transaction immediately.
-		 * This is to ensure we do not accidentally
-		 * commit a transaction which has seen changes
-		 * that will be rolled back.
-		 */
-		say_error("Aborting transaction %llu during "
-			  "cascading rollback",
-			  vclock_sum(&writer->vclock));
-		return -1;
-	}
 	if (writer->wal_mode == WAL_NONE) {
 		vclock_copy(vclock, &writer->vclock);
 		return 0;
 	}
-	static struct cmsg_hop wal_checkpoint_route[] = {
-		{wal_checkpoint_f, &wal_thread.tx_prio_pipe},
-		{wal_checkpoint_done_f, NULL},
-	};
-	vclock_create(vclock);
+	if (!stailq_empty(&writer->rollback)) {
+		/*
+		 * If cascading rollback is in progress, in-memory
+		 * indexes can contain changes scheduled for rollback.
+		 * If we made a checkpoint, we could write them to
+		 * the snapshot. So we abort checkpointing in this
+		 * case.
+		 */
+		diag_set(ClientError, ER_CHECKPOINT_ROLLBACK);
+		return -1;
+	}
 	struct wal_checkpoint msg;
-	cmsg_init(&msg.base, wal_checkpoint_route);
-	msg.vclock = vclock;
-	msg.fiber = fiber();
-	msg.rotate = rotate;
-	msg.res = 0;
-	cpipe_push(&wal_thread.wal_pipe, &msg.base);
-	fiber_set_cancellable(false);
-	fiber_yield();
-	fiber_set_cancellable(true);
-	return msg.res;
+	bool cancellable = fiber_set_cancellable(false);
+	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
+			   &msg.base, wal_checkpoint_f, NULL, TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+	if (rc != 0)
+		return -1;
+	vclock_copy(vclock, &msg.vclock);
+	return 0;
 }
 
 struct wal_gc_msg
