@@ -1513,7 +1513,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 
 	/* Remember master's vclock after the last request */
 	struct vclock stop_vclock;
-	wal_checkpoint(&stop_vclock, false);
+	vclock_copy(&stop_vclock, &replicaset.vclock);
 
 	/*
 	 * Register the replica as a WAL consumer so that
@@ -1540,9 +1540,7 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	say_info("final data sent.");
 
 	/* Send end of WAL stream marker */
-	struct vclock current_vclock;
-	wal_checkpoint(&current_vclock, false);
-	xrow_encode_vclock_xc(&row, &current_vclock);
+	xrow_encode_vclock_xc(&row, &replicaset.vclock);
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 }
@@ -1608,9 +1606,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * and identify ourselves with our own replica id.
 	 */
 	struct xrow_header row;
-	struct vclock current_vclock;
-	wal_checkpoint(&current_vclock, false);
-	xrow_encode_vclock_xc(&row, &current_vclock);
+	xrow_encode_vclock_xc(&row, &replicaset.vclock);
 	/*
 	 * Identify the message with the replica id of this
 	 * instance, this is the only way for a replica to find

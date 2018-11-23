@@ -311,6 +311,43 @@ test_run:cmd("stop server replica")
 ---
 - true
 ...
+-- gh-3830: Sync fails if there's a gap at the end of the master's WAL.
+box.error.injection.set('ERRINJ_WAL_WRITE_DISK', true)
+---
+- ok
+...
+box.space.test:replace{123456789}
+---
+- error: Failed to write to disk
+...
+box.error.injection.set('ERRINJ_WAL_WRITE_DISK', false)
+---
+- ok
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.info.status -- running
+---
+- running
+...
+box.info.ro -- false
+---
+- false
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
 test_run:cmd("cleanup server replica")
 ---
 - true
