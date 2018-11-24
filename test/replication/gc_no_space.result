@@ -160,9 +160,20 @@ check_snap_count(2)
 ---
 - true
 ...
-#box.info.gc().consumers -- 3
+gc = box.info.gc()
+---
+...
+#gc.consumers -- 3
 ---
 - 3
+...
+#gc.checkpoints -- 2
+---
+- 2
+...
+gc.signature == gc.consumers[1].signature
+---
+- true
 ...
 --
 -- Inject a ENOSPC error and check that the WAL thread deletes
@@ -188,15 +199,28 @@ check_snap_count(2)
 ---
 - true
 ...
-#box.info.gc().consumers -- 1
+gc = box.info.gc()
+---
+...
+#gc.consumers -- 1
 ---
 - 1
 ...
+#gc.checkpoints -- 2
+---
+- 2
+...
+gc.signature == gc.consumers[1].signature
+---
+- true
+...
 --
 -- Check that the WAL thread never deletes WAL files that are
--- needed for recovery from a checkpoint.
+-- needed for recovery from the last checkpoint, but may delete
+-- older WAL files that would be kept otherwise for recovery
+-- from backup checkpoints.
 --
-errinj.set('ERRINJ_WAL_FALLOCATE', 2)
+errinj.set('ERRINJ_WAL_FALLOCATE', 3)
 ---
 - ok
 ...
@@ -208,7 +232,7 @@ errinj.info()['ERRINJ_WAL_FALLOCATE'].state -- 0
 ---
 - 0
 ...
-check_wal_count(2)
+check_wal_count(1)
 ---
 - true
 ...
@@ -216,9 +240,20 @@ check_snap_count(2)
 ---
 - true
 ...
-#box.info.gc().consumers -- 0
+gc = box.info.gc()
+---
+...
+#gc.consumers -- 0
 ---
 - 0
+...
+#gc.checkpoints -- 2
+---
+- 2
+...
+gc.signature == gc.checkpoints[2].signature
+---
+- true
 ...
 s:drop()
 ---

@@ -58,7 +58,7 @@ wal_thread_start();
 int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
 	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
-	 const struct vclock *vclock, const struct vclock *first_checkpoint_vclock);
+	 const struct vclock *vclock, const struct vclock *checkpoint_vclock);
 
 void
 wal_thread_stop();
@@ -179,20 +179,22 @@ wal_sync(void);
  * is supposed to be used to identify the new checkpoint.
  */
 int
-wal_checkpoint(struct vclock *vclock);
+wal_begin_checkpoint(struct vclock *vclock);
+
+/**
+ * This function is called upon successful checkpoint creation.
+ * It updates the WAL thread's version of the last checkpoint
+ * vclock.
+ */
+void
+wal_commit_checkpoint(const struct vclock *vclock);
 
 /**
  * Remove WAL files that are not needed by consumers reading
- * rows at @wal_vclock or newer.
- *
- * Update the oldest checkpoint signature with @checkpoint_vclock.
- * WAL thread will delete WAL files that are not needed to
- * recover from the oldest checkpoint if it runs out of disk
- * space.
+ * rows at @vclock or newer.
  */
 void
-wal_collect_garbage(const struct vclock *wal_vclock,
-		    const struct vclock *checkpoint_vclock);
+wal_collect_garbage(const struct vclock *vclock);
 
 void
 wal_init_vy_log();

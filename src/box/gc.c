@@ -218,13 +218,8 @@ gc_run(void)
 	int rc = 0;
 	if (run_engine_gc)
 		rc = engine_collect_garbage(&checkpoint->vclock);
-	/*
-	 * Run wal_collect_garbage() even if we don't need to
-	 * delete any WAL files, because we have to apprise
-	 * the WAL thread of the oldest checkpoint signature.
-	 */
-	if (rc == 0)
-		wal_collect_garbage(vclock, &checkpoint->vclock);
+	if (run_wal_gc && rc == 0)
+		wal_collect_garbage(vclock);
 	latch_unlock(&gc.latch);
 }
 
@@ -235,6 +230,14 @@ static void
 gc_process_wal_event(struct wal_watcher_msg *msg)
 {
 	assert((msg->events & WAL_EVENT_GC) != 0);
+
+	/*
+	 * In case of emergency ENOSPC, the WAL thread may delete
+	 * WAL files needed to restore from backup checkpoints,
+	 * which would be kept by the garbage collector otherwise.
+	 * Bring the garbage collector vclock up to date.
+	 */
+	vclock_copy(&gc.vclock, &msg->gc_vclock);
 
 	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
 	while (consumer != NULL &&

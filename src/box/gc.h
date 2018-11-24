@@ -156,20 +156,6 @@ extern struct gc_state gc;
 	rlist_foreach_entry(ref, &(checkpoint)->refs, in_refs)
 
 /**
- * Return the first (oldest) checkpoint known to the garbage
- * collector. If there's no checkpoint, return NULL.
- */
-static inline struct gc_checkpoint *
-gc_first_checkpoint(void)
-{
-	if (rlist_empty(&gc.checkpoints))
-		return NULL;
-
-	return rlist_first_entry(&gc.checkpoints, struct gc_checkpoint,
-				 in_checkpoints);
-}
-
-/**
  * Return the last (newest) checkpoint known to the garbage
  * collector. If there's no checkpoint, return NULL.
  */

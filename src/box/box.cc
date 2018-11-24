@@ -2104,6 +2104,8 @@ box_cfg_xc(void)
 		/* Bootstrap a new master */
 		bootstrap(&instance_uuid, &replicaset_uuid,
 			  &is_bootstrap_leader);
+		checkpoint = gc_last_checkpoint();
+		assert(checkpoint != NULL);
 	}
 	fiber_gc();
 
@@ -2117,16 +2119,13 @@ box_cfg_xc(void)
 		}
 	}
 
-	struct gc_checkpoint *first_checkpoint = gc_first_checkpoint();
-	assert(first_checkpoint != NULL);
-
 	/* Start WAL writer */
 	int64_t wal_max_rows = box_check_wal_max_rows(cfg_geti64("rows_per_wal"));
 	int64_t wal_max_size = box_check_wal_max_size(cfg_geti64("wal_max_size"));
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_rows,
 		     wal_max_size, &INSTANCE_UUID, &replicaset.vclock,
-		     &first_checkpoint->vclock) != 0) {
+		     &checkpoint->vclock) != 0) {
 		diag_raise();
 	}
 	gc_set_wal_watcher();
@@ -2190,15 +2189,17 @@ box_checkpoint()
 		goto end;
 
 	struct vclock vclock;
-	if ((rc = wal_checkpoint(&vclock)))
+	if ((rc = wal_begin_checkpoint(&vclock)))
 		goto end;
 
-	rc = engine_commit_checkpoint(&vclock);
+	if ((rc = engine_commit_checkpoint(&vclock)))
+		goto end;
+
+	wal_commit_checkpoint(&vclock);
+	gc_add_checkpoint(&vclock);
 end:
 	if (rc)
 		engine_abort_checkpoint();
-	else
-		gc_add_checkpoint(&vclock);
 
 	latch_unlock(&schema_lock);
 	box_checkpoint_is_in_progress = false;

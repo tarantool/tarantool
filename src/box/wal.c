@@ -120,7 +120,7 @@ struct wal_writer
 	 */
 	struct vclock vclock;
 	/**
-	 * VClock of the oldest checkpoint available on the instance.
+	 * VClock of the most recent successfully created checkpoint.
 	 * The WAL writer must not delete WAL files that are needed to
 	 * recover from it even if it is running out of disk space.
 	 */
@@ -419,14 +419,14 @@ wal_open(struct wal_writer *writer)
 int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
 	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
-	 const struct vclock *vclock, const struct vclock *first_checkpoint_vclock)
+	 const struct vclock *vclock, const struct vclock *checkpoint_vclock)
 {
 	assert(wal_max_rows > 1);
 
 	struct wal_writer *writer = &wal_writer_singleton;
 	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_rows,
 			  wal_max_size, instance_uuid, vclock,
-			  first_checkpoint_vclock);
+			  checkpoint_vclock);
 
 	/*
 	 * Scan the WAL directory to build an index of all
@@ -477,7 +477,7 @@ struct wal_checkpoint
 };
 
 static int
-wal_checkpoint_f(struct cbus_call_msg *data)
+wal_begin_checkpoint_f(struct cbus_call_msg *data)
 {
 	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
@@ -485,7 +485,7 @@ wal_checkpoint_f(struct cbus_call_msg *data)
 		/*
 		 * We're rolling back a failed write and so
 		 * can't make a checkpoint - see the comment
-		 * in wal_checkpoint() for the explanation.
+		 * in wal_begin_checkpoint() for the explanation.
 		 */
 		diag_set(ClientError, ER_CHECKPOINT_ROLLBACK);
 		return -1;
@@ -507,7 +507,7 @@ wal_checkpoint_f(struct cbus_call_msg *data)
 }
 
 int
-wal_checkpoint(struct vclock *vclock)
+wal_begin_checkpoint(struct vclock *vclock)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE) {
@@ -528,7 +528,8 @@ wal_checkpoint(struct vclock *vclock)
 	struct wal_checkpoint msg;
 	bool cancellable = fiber_set_cancellable(false);
 	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
-			   &msg.base, wal_checkpoint_f, NULL, TIMEOUT_INFINITY);
+			   &msg.base, wal_begin_checkpoint_f, NULL,
+			   TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 	if (rc != 0)
 		return -1;
@@ -536,19 +537,43 @@ wal_checkpoint(struct vclock *vclock)
 	return 0;
 }
 
+static int
+wal_commit_checkpoint_f(struct cbus_call_msg *data)
+{
+	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
+	struct wal_writer *writer = &wal_writer_singleton;
+	vclock_copy(&writer->checkpoint_vclock, &msg->vclock);
+	return 0;
+}
+
+void
+wal_commit_checkpoint(const struct vclock *vclock)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->wal_mode == WAL_NONE) {
+		vclock_copy(&writer->checkpoint_vclock, vclock);
+		return;
+	}
+	struct wal_checkpoint msg;
+	vclock_copy(&msg.vclock, vclock);
+	bool cancellable = fiber_set_cancellable(false);
+	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
+		  &msg.base, wal_commit_checkpoint_f, NULL,
+		  TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+}
+
 struct wal_gc_msg
 {
 	struct cbus_call_msg base;
-	const struct vclock *wal_vclock;
-	const struct vclock *checkpoint_vclock;
+	const struct vclock *vclock;
 };
 
 static int
 wal_collect_garbage_f(struct cbus_call_msg *data)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
-	struct wal_gc_msg *msg = (struct wal_gc_msg *)data;
-	const struct vclock *vclock = msg->wal_vclock;
+	const struct vclock *vclock = ((struct wal_gc_msg *)data)->vclock;
 
 	if (!xlog_is_open(&writer->current_wal) &&
 	    vclock_sum(vclock) >= vclock_sum(&writer->vclock)) {
@@ -568,20 +593,17 @@ wal_collect_garbage_f(struct cbus_call_msg *data)
 	if (vclock != NULL)
 		xdir_collect_garbage(&writer->wal_dir, vclock_sum(vclock), 0);
 
-	vclock_copy(&writer->checkpoint_vclock, msg->checkpoint_vclock);
 	return 0;
 }
 
 void
-wal_collect_garbage(const struct vclock *wal_vclock,
-		    const struct vclock *checkpoint_vclock)
+wal_collect_garbage(const struct vclock *vclock)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE)
 		return;
 	struct wal_gc_msg msg;
-	msg.wal_vclock = wal_vclock;
-	msg.checkpoint_vclock = checkpoint_vclock;
+	msg.vclock = vclock;
 	bool cancellable = fiber_set_cancellable(false);
 	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, &msg.base,
 		  wal_collect_garbage_f, NULL, TIMEOUT_INFINITY);
