@@ -275,6 +275,48 @@ json_token_cmp(const struct json_token *a, const struct json_token *b)
 	return ret;
 }
 
+int
+json_path_cmp(const char *a, int a_len, const char *b, int b_len,
+	      int index_base)
+{
+	struct json_lexer lexer_a, lexer_b;
+	json_lexer_create(&lexer_a, a, a_len, index_base);
+	json_lexer_create(&lexer_b, b, b_len, index_base);
+	struct json_token token_a, token_b;
+	/* For the sake of json_token_cmp(). */
+	token_a.parent = NULL;
+	token_b.parent = NULL;
+	int rc_a, rc_b;
+	while ((rc_a = json_lexer_next_token(&lexer_a, &token_a)) == 0 &&
+	       (rc_b = json_lexer_next_token(&lexer_b, &token_b)) == 0 &&
+		token_a.type != JSON_TOKEN_END &&
+		token_b.type != JSON_TOKEN_END) {
+		int rc = json_token_cmp(&token_a, &token_b);
+		if (rc != 0)
+			return rc;
+	}
+	/* Paths a and b must be valid. */
+	assert(rc_b == 0 && rc_b == 0);
+	/*
+	 * The parser stopped because the end of one of the paths
+	 * was reached. As JSON_TOKEN_END > JSON_TOKEN_{NUM, STR},
+	 * the path having more tokens has lower key.type value.
+	 */
+	return token_b.type - token_a.type;
+}
+
+int
+json_path_validate(const char *path, int path_len, int index_base)
+{
+	struct json_lexer lexer;
+	json_lexer_create(&lexer, path, path_len, index_base);
+	struct json_token token;
+	int rc;
+	while ((rc = json_lexer_next_token(&lexer, &token)) == 0 &&
+	       token.type != JSON_TOKEN_END) {}
+	return rc;
+}
+
 #define MH_SOURCE 1
 #define mh_name _json
 #define mh_key_t struct json_token *

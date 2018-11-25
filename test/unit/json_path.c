@@ -404,15 +404,50 @@ test_tree()
 	footer();
 }
 
+void
+test_path_cmp()
+{
+	const char *a = "Data[1][\"FIO\"].fname";
+	uint32_t a_len = strlen(a);
+	const struct path_and_errpos rc[] = {
+		{a, 0},
+		{"[\"Data\"][1].FIO[\"fname\"]", 0},
+		{"Data[1]", 1},
+		{"Data[1][\"FIO\"].fname[1]", -1},
+		{"Data[1][\"Info\"].fname[1]", -1},
+	};
+	header();
+	plan(lengthof(rc) + 2);
+	for (size_t i = 0; i < lengthof(rc); ++i) {
+		const char *path = rc[i].path;
+		int errpos = rc[i].errpos;
+		int rc = json_path_cmp(a, a_len, path, strlen(path),
+				       INDEX_BASE);
+		if (rc > 0) rc = 1;
+		if (rc < 0) rc = -1;
+		is(rc, errpos, "path cmp result \"%s\" with \"%s\": "
+		   "have %d, expected %d", a, path, rc, errpos);
+	}
+	const char *invalid = "Data[[1][\"FIO\"].fname";
+	int ret = json_path_validate(a, strlen(a), INDEX_BASE);
+	is(ret, 0, "path %s is valid", a);
+	ret = json_path_validate(invalid, strlen(invalid), INDEX_BASE);
+	is(ret, 6, "path %s error pos %d expected %d", invalid, ret, 6);
+
+	check_plan();
+	footer();
+}
+
 int
 main()
 {
 	header();
-	plan(3);
+	plan(4);
 
 	test_basic();
 	test_errors();
 	test_tree();
+	test_path_cmp();
 
 	int rc = check_plan();
 	footer();

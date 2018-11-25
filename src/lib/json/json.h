@@ -236,6 +236,24 @@ int
 json_lexer_next_token(struct json_lexer *lexer, struct json_token *token);
 
 /**
+ * Compare two JSON paths using Lexer class.
+ * - in case of paths that have same token-sequence prefix,
+ *   the path having more tokens is assumed to be greater
+ * - both paths must be valid
+ *   (may be tested with json_path_validate).
+ */
+int
+json_path_cmp(const char *a, int a_len, const char *b, int b_len,
+	      int index_base);
+
+/**
+ * Check if the passed JSON path is valid.
+ * Return 0 for valid path and error position for invalid.
+ */
+int
+json_path_validate(const char *path, int path_len, int index_base);
+
+/**
  * Initialize a new empty JSON tree.
  *
  * Returns 0 on success, -1 on memory allocation error.
