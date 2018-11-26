@@ -26,7 +26,6 @@ function check_snap_count(count)
 end;
 test_run:cmd("setopt delimiter ''");
 
-default_checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 2}
 
 test_run:cleanup_cluster()
@@ -111,4 +110,8 @@ s:drop()
 box.schema.user.revoke('guest', 'replication')
 test_run:cleanup_cluster()
 
-box.cfg{checkpoint_count = default_checkpoint_count}
+-- Check that the garbage collector vclock is recovered correctly.
+test_run:cmd("restart server default")
+gc = box.info.gc()
+#gc.checkpoints -- 2
+gc.signature == gc.checkpoints[2].signature

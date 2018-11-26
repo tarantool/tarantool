@@ -31,6 +31,7 @@ box.space.test:select{}
 --
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
+test_run:cmd("restart server default")
 box.space.test:auto_increment{'after snapshot'}
 box.space.test:auto_increment{'after snapshot - one more row'}
 --
@@ -41,7 +42,6 @@ fio = require('fio')
 glob = fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 files = fio.glob(glob)
 for _, file in pairs(files) do fio.unlink(file) end
-test_run:cmd("restart server default")
 --
 -- make sure the server has some xlogs, otherwise the
 -- replica doesn't discover the gap in the logs

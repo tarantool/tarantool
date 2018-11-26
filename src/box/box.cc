@@ -1918,7 +1918,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 * so we must reflect this in replicaset vclock to
 	 * not attempt to apply these rows twice.
 	 */
-	recovery_scan(recovery, &replicaset.vclock);
+	recovery_scan(recovery, &replicaset.vclock, &gc.vclock);
 
 	if (wal_dir_lock >= 0) {
 		box_listen();

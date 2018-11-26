@@ -67,6 +67,7 @@ test_run:cmd("stop server replica")
 ---
 - true
 ...
+test_run:cmd("restart server default")
 box.space.test:auto_increment{'after snapshot'}
 ---
 - [2, 'after snapshot']
@@ -94,7 +95,6 @@ files = fio.glob(glob)
 for _, file in pairs(files) do fio.unlink(file) end
 ---
 ...
-test_run:cmd("restart server default")
 --
 -- make sure the server has some xlogs, otherwise the
 -- replica doesn't discover the gap in the logs

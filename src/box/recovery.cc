@@ -117,21 +117,25 @@ recovery_new(const char *wal_dirname, bool force_recovery,
 }
 
 void
-recovery_scan(struct recovery *r, struct vclock *end_vclock)
+recovery_scan(struct recovery *r, struct vclock *end_vclock,
+	      struct vclock *gc_vclock)
 {
 	xdir_scan_xc(&r->wal_dir);
 
-	struct vclock *vclock = vclockset_last(&r->wal_dir.index);
-	if (vclock == NULL || vclock_compare(vclock, &r->vclock) < 0) {
+	if (xdir_last_vclock(&r->wal_dir, end_vclock) < 0 ||
+	    vclock_compare(end_vclock, &r->vclock) < 0) {
 		/* No xlogs after last checkpoint. */
+		vclock_copy(gc_vclock, &r->vclock);
 		vclock_copy(end_vclock, &r->vclock);
 		return;
 	}
 
+	if (xdir_first_vclock(&r->wal_dir, gc_vclock) < 0)
+		unreachable();
+
 	/* Scan the last xlog to find end vclock. */
-	vclock_copy(end_vclock, vclock);
 	struct xlog_cursor cursor;
-	if (xdir_open_cursor(&r->wal_dir, vclock_sum(vclock), &cursor) != 0)
+	if (xdir_open_cursor(&r->wal_dir, vclock_sum(end_vclock), &cursor) != 0)
 		return;
 	struct xrow_header row;
 	while (xlog_cursor_next(&cursor, &row, true) == 0)
