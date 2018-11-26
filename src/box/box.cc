@@ -2203,6 +2203,18 @@ end:
 
 	latch_unlock(&schema_lock);
 	box_checkpoint_is_in_progress = false;
+
+	/*
+	 * Wait for background garbage collection that might
+	 * have been triggered by this checkpoint to complete.
+	 * Strictly speaking, it isn't necessary, but it
+	 * simplifies testing as it guarantees that by the
+	 * time box.snapshot() returns, all outdated checkpoint
+	 * files have been removed.
+	 */
+	if (!rc)
+		gc_wait();
+
 	return rc;
 }
 

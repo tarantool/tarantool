@@ -145,6 +145,7 @@ box.snapshot()
 -- The xlog should only be deleted after the replica
 -- is unregistered.
 test_run:cleanup_cluster()
+test_run:wait_cond(function() return #fio.glob('./master/*.xlog') == 1 end, 10)
 #fio.glob('./master/*.xlog') == 1 or fio.listdir('./master')
 --
 -- Test that concurrent invocation of the garbage collector works fine.

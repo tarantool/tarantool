@@ -34,8 +34,8 @@
 #include <stddef.h>
 #include <small/rlist.h>
 
+#include "fiber_cond.h"
 #include "vclock.h"
-#include "latch.h"
 #include "wal.h"
 #include "trivia/util.h"
 
@@ -43,6 +43,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct fiber;
 struct gc_consumer;
 
 enum { GC_NAME_MAX = 64 };
@@ -122,15 +123,30 @@ struct gc_state {
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
 	/**
-	 * Latch serializing concurrent invocations of engine
-	 * garbage collection callbacks.
-	 */
-	struct latch latch;
-	/**
 	 * WAL event watcher. Needed to shoot off stale consumers
 	 * when a WAL file is deleted due to ENOSPC.
 	 */
 	struct wal_watcher wal_watcher;
+	/** Fiber that removes old files in the background. */
+	struct fiber *fiber;
+	/**
+	 * Condition variable signaled by the background fiber
+	 * whenever it completes a round of garbage collection.
+	 * Used to wait for garbage collection to complete.
+	 */
+	struct fiber_cond cond;
+	/**
+	 * The following two members are used for scheduling
+	 * background garbage collection and waiting for it to
+	 * complete. To trigger background garbage collection,
+	 * @scheduled is incremented. Whenever a round of garbage
+	 * collection completes, @completed is incremented. Thus
+	 * to wait for background garbage collection scheduled
+	 * at a particular moment of time to complete, one should
+	 * sleep until @completed reaches the value of @scheduled
+	 * taken at that moment of time.
+	 */
+	unsigned completed, scheduled;
 };
 extern struct gc_state gc;
 
@@ -186,6 +202,13 @@ gc_set_wal_watcher(void);
  */
 void
 gc_free(void);
+
+/**
+ * Wait for background garbage collection scheduled prior
+ * to this point to complete.
+ */
+void
+gc_wait(void);
 
 /**
  * Update the minimal number of checkpoints to preserve.
