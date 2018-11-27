@@ -76,7 +76,7 @@ struct rtree_reinsert_list {
 };
 
 static int
-neighbor_cmp(struct rtree_neighbor *a, struct rtree_neighbor *b)
+neighbor_cmp(const struct rtree_neighbor *a, const struct rtree_neighbor *b)
 {
 	return a->distance < b->distance ? -1 :
 	       a->distance > b->distance ? 1 :
