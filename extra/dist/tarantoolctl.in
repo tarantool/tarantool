@@ -946,6 +946,7 @@ local function rocks()
        make = "luarocks.make",
        pack = "luarocks.pack",
        unpack = "luarocks.unpack",
+       doc = "luarocks.doc",
     }
     rawset(_G, 'commands', commands)
 
