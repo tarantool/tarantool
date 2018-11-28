@@ -1,0 +1,89 @@
+1..86
+	*** main ***
+ok 1 - pairs, zero idx: stack size
+ok 2 - pairs, zero idx: iter 0: gen() retval count
+ok 3 - pairs, zero idx: iter 0: gen() 1st retval
+ok 4 - pairs, zero idx: iter 0: gen() 2nd retval
+ok 5 - pairs, zero idx: iter: 0: stack size
+ok 6 - pairs, zero idx: iterator ends
+ok 7 - pairs, zero idx: stack size
+ok 8 - pairs, zero idx: stack size
+ok 9 - ipairs, zero idx: stack size
+ok 10 - ipairs, zero idx: iter 0: gen() retval count
+ok 11 - ipairs, zero idx: iter 0: gen() 1st retval
+ok 12 - ipairs, zero idx: iter 0: gen() 2nd retval
+ok 13 - ipairs, zero idx: iter: 0: stack size
+ok 14 - ipairs, zero idx: iter 1: gen() retval count
+ok 15 - ipairs, zero idx: iter 1: gen() 1st retval
+ok 16 - ipairs, zero idx: iter 1: gen() 2nd retval
+ok 17 - ipairs, zero idx: iter: 1: stack size
+ok 18 - ipairs, zero idx: iter 2: gen() retval count
+ok 19 - ipairs, zero idx: iter 2: gen() 1st retval
+ok 20 - ipairs, zero idx: iter 2: gen() 2nd retval
+ok 21 - ipairs, zero idx: iter: 2: stack size
+ok 22 - ipairs, zero idx: iterator ends
+ok 23 - ipairs, zero idx: stack size
+ok 24 - ipairs, zero idx: stack size
+ok 25 - luafun iterator, zero idx: stack size
+ok 26 - luafun iterator, zero idx: iter 0: gen() retval count
+ok 27 - luafun iterator, zero idx: iter 0: gen() 1st retval
+ok 28 - luafun iterator, zero idx: iter 0: gen() 2nd retval
+ok 29 - luafun iterator, zero idx: iter: 0: stack size
+ok 30 - luafun iterator, zero idx: iter 1: gen() retval count
+ok 31 - luafun iterator, zero idx: iter 1: gen() 1st retval
+ok 32 - luafun iterator, zero idx: iter 1: gen() 2nd retval
+ok 33 - luafun iterator, zero idx: iter: 1: stack size
+ok 34 - luafun iterator, zero idx: iter 2: gen() retval count
+ok 35 - luafun iterator, zero idx: iter 2: gen() 1st retval
+ok 36 - luafun iterator, zero idx: iter 2: gen() 2nd retval
+ok 37 - luafun iterator, zero idx: iter: 2: stack size
+ok 38 - luafun iterator, zero idx: iterator ends
+ok 39 - luafun iterator, zero idx: stack size
+ok 40 - luafun iterator, zero idx: stack size
+ok 41 - pairs, from table: stack size
+ok 42 - pairs, from table: iter 0: gen() retval count
+ok 43 - pairs, from table: iter 0: gen() 1st retval
+ok 44 - pairs, from table: iter 0: gen() 2nd retval
+ok 45 - pairs, from table: iter: 0: stack size
+ok 46 - pairs, from table: iterator ends
+ok 47 - pairs, from table: stack size
+ok 48 - pairs, from table: stack size
+ok 49 - ipairs, from table: stack size
+ok 50 - ipairs, from table: iter 0: gen() retval count
+ok 51 - ipairs, from table: iter 0: gen() 1st retval
+ok 52 - ipairs, from table: iter 0: gen() 2nd retval
+ok 53 - ipairs, from table: iter: 0: stack size
+ok 54 - ipairs, from table: iter 1: gen() retval count
+ok 55 - ipairs, from table: iter 1: gen() 1st retval
+ok 56 - ipairs, from table: iter 1: gen() 2nd retval
+ok 57 - ipairs, from table: iter: 1: stack size
+ok 58 - ipairs, from table: iter 2: gen() retval count
+ok 59 - ipairs, from table: iter 2: gen() 1st retval
+ok 60 - ipairs, from table: iter 2: gen() 2nd retval
+ok 61 - ipairs, from table: iter: 2: stack size
+ok 62 - ipairs, from table: iterator ends
+ok 63 - ipairs, from table: stack size
+ok 64 - ipairs, from table: stack size
+ok 65 - luafun iterator, from table: stack size
+ok 66 - luafun iterator, from table: iter 0: gen() retval count
+ok 67 - luafun iterator, from table: iter 0: gen() 1st retval
+ok 68 - luafun iterator, from table: iter 0: gen() 2nd retval
+ok 69 - luafun iterator, from table: iter: 0: stack size
+ok 70 - luafun iterator, from table: iter 1: gen() retval count
+ok 71 - luafun iterator, from table: iter 1: gen() 1st retval
+ok 72 - luafun iterator, from table: iter 1: gen() 2nd retval
+ok 73 - luafun iterator, from table: iter: 1: stack size
+ok 74 - luafun iterator, from table: iter 2: gen() retval count
+ok 75 - luafun iterator, from table: iter 2: gen() 1st retval
+ok 76 - luafun iterator, from table: iter 2: gen() 2nd retval
+ok 77 - luafun iterator, from table: iter: 2: stack size
+ok 78 - luafun iterator, from table: iterator ends
+ok 79 - luafun iterator, from table: stack size
+ok 80 - luafun iterator, from table: stack size
+ok 81 - lua error: stack size
+ok 82 - lua error: iterator error
+ok 83 - lua error: check error type
+ok 84 - lua error: check error message
+ok 85 - lua error: stack size
+ok 86 - lua error: stack size
+	*** main: done ***

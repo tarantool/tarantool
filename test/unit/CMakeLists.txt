@@ -144,6 +144,10 @@ add_executable(luaT_tuple_new.test luaT_tuple_new.c)
 target_link_libraries(luaT_tuple_new.test unit box server core misc
     ${CURL_LIBRARIES} ${LIBYAML_LIBRARIES} ${READLINE_LIBRARIES}
     ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES})
+add_executable(luaL_iterator.test luaL_iterator.c)
+target_link_libraries(luaL_iterator.test unit server coll core misc
+    ${CURL_LIBRARIES} ${LIBYAML_LIBRARIES} ${READLINE_LIBRARIES}
+    ${ICU_LIBRARIES} ${LUAJIT_LIBRARIES} dl)
 
 add_executable(say.test say.c)
 target_link_libraries(say.test core unit)

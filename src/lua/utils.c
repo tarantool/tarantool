@@ -1065,6 +1065,98 @@ luaT_state(void)
 	return tarantool_L;
 }
 
+/* {{{ Helper functions to interact with a Lua iterator from C */
+
+struct luaL_iterator {
+	int gen;
+	int param;
+	int state;
+};
+
+struct luaL_iterator *
+luaL_iterator_new(lua_State *L, int idx)
+{
+	struct luaL_iterator *it = malloc(sizeof(struct luaL_iterator));
+	if (it == NULL) {
+		diag_set(OutOfMemory, sizeof(struct luaL_iterator),
+			 "malloc", "luaL_iterator");
+		return NULL;
+	}
+
+	if (idx == 0) {
+		/* gen, param, state are on top of a Lua stack. */
+		lua_pushvalue(L, -3); /* Popped by luaL_ref(). */
+		it->gen = luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_pushvalue(L, -2); /* Popped by luaL_ref(). */
+		it->param = luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_pushvalue(L, -1); /* Popped by luaL_ref(). */
+		it->state = luaL_ref(L, LUA_REGISTRYINDEX);
+	} else {
+		/*
+		 * {gen, param, state} table is at idx in a Lua
+		 * stack.
+		 */
+		lua_rawgeti(L, idx, 1); /* Popped by luaL_ref(). */
+		it->gen = luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_rawgeti(L, idx, 2); /* Popped by luaL_ref(). */
+		it->param = luaL_ref(L, LUA_REGISTRYINDEX);
+		lua_rawgeti(L, idx, 3); /* Popped by luaL_ref(). */
+		it->state = luaL_ref(L, LUA_REGISTRYINDEX);
+	}
+
+	return it;
+}
+
+int
+luaL_iterator_next(lua_State *L, struct luaL_iterator *it)
+{
+	int frame_start = lua_gettop(L);
+
+	/* Call gen(param, state). */
+	lua_rawgeti(L, LUA_REGISTRYINDEX, it->gen);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, it->param);
+	lua_rawgeti(L, LUA_REGISTRYINDEX, it->state);
+	if (luaT_call(L, 2, LUA_MULTRET) != 0) {
+		/*
+		 * Pop garbage from the call (a gen function
+		 * likely will not leave the stack even when raise
+		 * an error), pop a returned error.
+		 */
+		lua_settop(L, frame_start);
+		return -1;
+	}
+	int nresults = lua_gettop(L) - frame_start;
+
+	/*
+	 * gen() function can either return nil when the iterator
+	 * ends or return zero count of values.
+	 *
+	 * In LuaJIT pairs() returns nil, but ipairs() returns
+	 * nothing when ends.
+	 */
+	if (nresults == 0 || lua_isnil(L, frame_start + 1)) {
+		lua_settop(L, frame_start);
+		return 0;
+	}
+
+	/* Save the first result to it->state. */
+	luaL_unref(L, LUA_REGISTRYINDEX, it->state);
+	lua_pushvalue(L, frame_start + 1); /* Popped by luaL_ref(). */
+	it->state = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	return nresults;
+}
+
+void luaL_iterator_delete(struct luaL_iterator *it)
+{
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, it->gen);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, it->param);
+	luaL_unref(tarantool_L, LUA_REGISTRYINDEX, it->state);
+	free(it);
+}
+
+/* }}} */
+
 int
 tarantool_lua_utils_init(struct lua_State *L)
 {
