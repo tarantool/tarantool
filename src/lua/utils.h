@@ -505,6 +505,16 @@ luaT_state(void);
 LUA_API const char *
 luaT_tolstring(lua_State *L, int idx, size_t *ssize);
 
+/**
+ * Check whether a Lua object is a function or has
+ * metatable/metatype with a __call field.
+ *
+ * Note: It does not check type of __call metatable/metatype
+ * field.
+ */
+LUA_API int
+luaL_iscallable(lua_State *L, int idx);
+
 /** \endcond public */
 
 void

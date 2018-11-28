@@ -1058,6 +1058,49 @@ luaL_checkconstchar(struct lua_State *L, int idx, const char **res,
 	return 0;
 }
 
+/* Based on ffi_meta___call() from luajit/src/lib_ffi.c. */
+static int
+luaL_cdata_iscallable(lua_State *L, int idx)
+{
+	/* Calculate absolute value in the stack. */
+	if (idx < 0)
+		idx = lua_gettop(L) + idx + 1;
+
+	/* Get cdata from the stack. */
+	assert(lua_type(L, idx) == LUA_TCDATA);
+	GCcdata *cd = cdataV(L->base + idx - 1);
+
+	CTState *cts = ctype_cts(L);
+	CTypeID id = cd->ctypeid;
+	CType *ct = ctype_raw(cts, id);
+	if (ctype_isptr(ct->info))
+		id = ctype_cid(ct->info);
+
+	/* Get ctype metamethod. */
+	cTValue *tv = lj_ctype_meta(cts, id, MM_call);
+
+	return tv != NULL;
+}
+
+int
+luaL_iscallable(lua_State *L, int idx)
+{
+	/* Whether it is function. */
+	int res = lua_isfunction(L, idx);
+	if (res == 1)
+		return 1;
+
+	/* Whether it is cdata with metatype with __call field. */
+	if (lua_type(L, idx) == LUA_TCDATA)
+		return luaL_cdata_iscallable(L, idx);
+
+	/* Whether it has metatable with __call field. */
+	res = luaL_getmetafield(L, idx, "__call");
+	if (res == 1)
+		lua_pop(L, 1); /* Pop __call value. */
+	return res;
+}
+
 lua_State *
 luaT_state(void)
 {

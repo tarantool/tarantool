@@ -1851,6 +1851,15 @@ test_tuple_new(struct lua_State *L)
 
 /* }}} test_tuple_new */
 
+static int
+test_iscallable(lua_State *L)
+{
+	int exp = lua_toboolean(L, 2);
+	int res = luaL_iscallable(L, 1);
+	lua_pushboolean(L, res == exp);
+	return 1;
+}
+
 LUA_API int
 luaopen_module_api(lua_State *L)
 {
@@ -1878,6 +1887,7 @@ luaopen_module_api(lua_State *L)
 		{"test_cpcall", test_cpcall},
 		{"test_state", test_state},
 		{"test_tostring", test_tostring},
+		{"iscallable", test_iscallable},
 		{"iscdata", test_iscdata},
 		{"test_box_region", test_box_region},
 		{"test_tuple_encode", test_tuple_encode},
