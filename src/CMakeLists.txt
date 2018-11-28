@@ -108,6 +108,7 @@ set (core_sources
      coll.c
      coll_def.c
      mpstream.c
+     port.c
  )
 
 if (TARGET_OS_NETBSD)

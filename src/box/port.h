@@ -31,78 +31,13 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include <port.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct tuple;
-struct obuf;
-struct lua_State;
-
-/**
- * A single port represents a destination of box_process output.
- * One such destination can be a Lua stack, or the binary
- * protocol.
- * An instance of a port is usually short lived, as it is created
- * for every server request. State of the instance is represented
- * by the tuples added to it. E.g.:
- *
- * struct port port;
- * port_tuple_create(&port);
- * for (tuple in tuples)
- *	port_tuple_add(tuple);
- *
- * port_dump(&port, obuf);
- * port_destroy(&port);
- *
- * Beginning with Tarantool 1.5, tuple can have different internal
- * structure and port_tuple_add() requires a double
- * dispatch: first, by the type of the port the tuple is being
- * added to, second, by the type of the tuple format, since the
- * format defines the internal structure of the tuple.
- */
-
-struct port;
-
-struct port_vtab {
-	/**
-	 * Dump the content of a port to an output buffer.
-	 * On success returns number of entries dumped.
-	 * On failure sets diag and returns -1.
-	 */
-	int (*dump_msgpack)(struct port *port, struct obuf *out);
-	/**
-	 * Same as dump_msgpack(), but use the legacy Tarantool
-	 * 1.6 format.
-	 */
-	int (*dump_msgpack_16)(struct port *port, struct obuf *out);
-	/** Dump the content of a port to Lua stack. */
-	void (*dump_lua)(struct port *port, struct lua_State *L);
-	/**
-	 * Dump a port content as a plain text into a buffer,
-	 * allocated inside.
-	 */
-	const char *(*dump_plain)(struct port *port, uint32_t *size);
-	/**
-	 * Destroy a port and release associated resources.
-	 */
-	void (*destroy)(struct port *port);
-};
-
-/**
- * Abstract port instance. It is supposed to be converted to
- * a concrete port realization, e.g. port_tuple.
- */
-struct port {
-	/** Virtual method table. */
-	const struct port_vtab *vtab;
-	/**
-	 * Implementation dependent content. Needed to declare
-	 * an abstract port instance on stack.
-	 */
-	char pad[48];
-};
 
 struct port_tuple_entry {
 	struct port_tuple_entry *next;
@@ -165,42 +100,6 @@ static_assert(sizeof(struct port_lua) <= sizeof(struct port),
 /** Initialize a port to dump from Lua. */
 void
 port_lua_create(struct port *port, struct lua_State *L);
-
-/**
- * Destroy an abstract port instance.
- */
-void
-port_destroy(struct port *port);
-
-/**
- * Dump an abstract port instance to an output buffer.
- * Return number of entries dumped on success, -1 on error.
- */
-int
-port_dump_msgpack(struct port *port, struct obuf *out);
-
-/**
- * Same as port_dump(), but use the legacy Tarantool 1.6
- * format.
- */
-int
-port_dump_msgpack_16(struct port *port, struct obuf *out);
-
-/** Dump port content to Lua stack. */
-void
-port_dump_lua(struct port *port, struct lua_State *L);
-
-/**
- * Dump a port content as a plain text into a buffer,
- * allocated inside.
- * @param port Port with data to dump.
- * @param[out] size Length of a result plain text.
- *
- * @retval nil Error.
- * @retval not nil Plain text.
- */
-const char *
-port_dump_plain(struct port *port, uint32_t *size);
 
 void
 port_init(void);
