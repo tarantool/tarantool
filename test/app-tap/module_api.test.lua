@@ -3,7 +3,9 @@
 local fio = require('fio')
 
 box.cfg{log = "tarantool.log"}
-build_path = os.getenv("BUILDDIR")
+-- Use BUILDDIR passed from test-run or cwd when run w/o
+-- test-run to find test/app-tap/module_api.{so,dylib}.
+build_path = os.getenv("BUILDDIR") or '.'
 package.cpath = fio.pathjoin(build_path, 'test/app-tap/?.so'   ) .. ';' ..
                 fio.pathjoin(build_path, 'test/app-tap/?.dylib') .. ';' ..
                 package.cpath
@@ -36,8 +38,86 @@ local function test_pushcdata(test, module)
     test:is(gc_counter, 1, 'pushcdata gc')
 end
 
+local function test_iscallable(test, module)
+    local ffi = require('ffi')
+
+    ffi.cdef([[
+        struct cdata_1 { int foo; };
+        struct cdata_2 { int foo; };
+    ]])
+
+    local cdata_1 = ffi.new('struct cdata_1')
+    local cdata_1_ref = ffi.new('struct cdata_1 &')
+    local cdata_2 = ffi.new('struct cdata_2')
+    local cdata_2_ref = ffi.new('struct cdata_2 &')
+
+    local nop = function() end
+
+    ffi.metatype('struct cdata_2', {
+        __call = nop,
+    })
+
+    local cases = {
+        {
+            obj = nop,
+            exp = true,
+            description = 'function',
+        },
+        {
+            obj = nil,
+            exp = false,
+            description = 'nil',
+        },
+        {
+            obj = 1,
+            exp = false,
+            description = 'number',
+        },
+        {
+            obj = {},
+            exp = false,
+            description = 'table without metatable',
+        },
+        {
+            obj = setmetatable({}, {}),
+            exp = false,
+            description = 'table without __call metatable field',
+        },
+        {
+            obj = setmetatable({}, {__call = nop}),
+            exp = true,
+            description = 'table with __call metatable field'
+        },
+        {
+            obj = cdata_1,
+            exp = false,
+            description = 'cdata without __call metatable field',
+        },
+        {
+            obj = cdata_1_ref,
+            exp = false,
+            description = 'cdata reference without __call metatable field',
+        },
+        {
+            obj = cdata_2,
+            exp = true,
+            description = 'cdata with __call metatable field',
+        },
+        {
+            obj = cdata_2_ref,
+            exp = true,
+            description = 'cdata reference with __call metatable field',
+        },
+    }
+
+    test:plan(#cases)
+    for _, case in ipairs(cases) do
+        test:ok(module.iscallable(case.obj, case.exp), case.description)
+    end
+end
+
 local test = require('tap').test("module_api", function(test)
-    test:plan(23)
+    test:plan(24)
     local status, module = pcall(require, 'module_api')
     test:is(status, true, "module")
     test:ok(status, "module is loaded")
@@ -62,6 +142,7 @@ local test = require('tap').test("module_api", function(test)
     test:like(msg, 'luaT_error', 'luaT_error')
 
     test:test("pushcdata", test_pushcdata, module)
+    test:test("iscallable", test_iscallable, module)
 
     space:drop()
 end)
