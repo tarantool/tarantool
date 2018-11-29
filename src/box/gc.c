@@ -48,6 +48,7 @@
 #include "say.h"
 #include "latch.h"
 #include "vclock.h"
+#include "cbus.h"
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
 
@@ -102,9 +103,34 @@ gc_init(void)
 	latch_create(&gc.latch);
 }
 
+static void
+gc_process_wal_event(struct wal_watcher_msg *);
+
+void
+gc_set_wal_watcher(void)
+{
+	/*
+	 * Since the function is called from box_cfg() it is
+	 * important that we do not pass a message processing
+	 * callback to wal_set_watcher(). Doing so would cause
+	 * credentials corruption in the fiber executing
+	 * box_cfg() in case it processes some iproto messages.
+	 * Besides, by the time the function is called
+	 * tx_fiber_pool is already set up and it will process
+	 * all the messages directed to "tx" endpoint safely.
+	 */
+	wal_set_watcher(&gc.wal_watcher, "tx", gc_process_wal_event,
+			NULL, WAL_EVENT_GC);
+}
+
 void
 gc_free(void)
 {
+	/*
+	 * Can't clear the WAL watcher as the event loop isn't
+	 * running when this function is called.
+	 */
+
 	/* Free checkpoints. */
 	struct gc_checkpoint *checkpoint, *next_checkpoint;
 	rlist_foreach_entry_safe(checkpoint, &gc.checkpoints, in_checkpoints,
@@ -175,6 +201,9 @@ gc_run(void)
 	if (!run_engine_gc && !run_wal_gc)
 		return; /* nothing to do */
 
+	int64_t wal_lsn = vclock_sum(vclock);
+	int64_t checkpoint_lsn = vclock_sum(&checkpoint->vclock);
+
 	/*
 	 * Engine callbacks may sleep, because they use coio for
 	 * removing files. Make sure we won't try to remove the
@@ -191,10 +220,42 @@ gc_run(void)
 	 */
 	int rc = 0;
 	if (run_engine_gc)
-		rc = engine_collect_garbage(vclock_sum(&checkpoint->vclock));
-	if (run_wal_gc && rc == 0)
-		wal_collect_garbage(vclock_sum(vclock));
+		rc = engine_collect_garbage(checkpoint_lsn);
+	/*
+	 * Run wal_collect_garbage() even if we don't need to
+	 * delete any WAL files, because we have to apprise
+	 * the WAL thread of the oldest checkpoint signature.
+	 */
+	if (rc == 0)
+		wal_collect_garbage(wal_lsn, checkpoint_lsn);
 	latch_unlock(&gc.latch);
+}
+
+/**
+ * Deactivate consumers that need files deleted by the WAL thread.
+ */
+static void
+gc_process_wal_event(struct wal_watcher_msg *msg)
+{
+	assert((msg->events & WAL_EVENT_GC) != 0);
+
+	struct gc_consumer *consumer = gc_tree_first(&gc.consumers);
+	while (consumer != NULL &&
+	       vclock_sum(&consumer->vclock) < vclock_sum(&msg->gc_vclock)) {
+		struct gc_consumer *next = gc_tree_next(&gc.consumers,
+							consumer);
+		assert(!consumer->is_inactive);
+		consumer->is_inactive = true;
+		gc_tree_remove(&gc.consumers, consumer);
+
+		char *vclock_str = vclock_to_string(&consumer->vclock);
+		say_crit("deactivated WAL consumer %s at %s",
+			 consumer->name, vclock_str);
+		free(vclock_str);
+
+		consumer = next;
+	}
+	gc_run();
 }
 
 void
@@ -279,14 +340,19 @@ gc_consumer_register(const struct vclock *vclock, const char *format, ...)
 void
 gc_consumer_unregister(struct gc_consumer *consumer)
 {
-	gc_tree_remove(&gc.consumers, consumer);
+	if (!consumer->is_inactive) {
+		gc_tree_remove(&gc.consumers, consumer);
+		gc_run();
+	}
 	gc_consumer_delete(consumer);
-	gc_run();
 }
 
 void
 gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 {
+	if (consumer->is_inactive)
+		return;
+
 	int64_t signature = vclock_sum(vclock);
 	int64_t prev_signature = vclock_sum(&consumer->vclock);
 

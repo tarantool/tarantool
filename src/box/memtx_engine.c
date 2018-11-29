@@ -834,7 +834,7 @@ memtx_engine_collect_garbage(struct engine *engine, int64_t lsn)
 	 * That said, we have to abort garbage collection if we
 	 * fail to delete a snap file.
 	 */
-	if (xdir_collect_garbage(&memtx->snap_dir, lsn, true) != 0)
+	if (xdir_collect_garbage(&memtx->snap_dir, lsn, XDIR_GC_USE_COIO) != 0)
 		return -1;
 
 	return 0;
@@ -1130,8 +1130,8 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(mp_typeof(*data) == MP_ARRAY);
 	size_t tuple_len = end - data;
-	size_t meta_size = tuple_format_meta_size(format);
-	size_t total = sizeof(struct memtx_tuple) + meta_size + tuple_len;
+	size_t total = sizeof(struct memtx_tuple) + format->field_map_size +
+		tuple_len;
 
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
@@ -1166,7 +1166,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * tuple base, not from memtx_tuple, because the struct
 	 * tuple is not the first field of the memtx_tuple.
 	 */
-	tuple->data_offset = sizeof(struct tuple) + meta_size;
+	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
 	char *raw = (char *) tuple + tuple->data_offset;
 	uint32_t *field_map = (uint32_t *) raw;
 	memcpy(raw, data, tuple_len);
@@ -1184,8 +1184,8 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	size_t total = sizeof(struct memtx_tuple) +
-		       tuple_format_meta_size(format) + tuple->bsize;
+	size_t total = sizeof(struct memtx_tuple) + format->field_map_size +
+		tuple->bsize;
 	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);

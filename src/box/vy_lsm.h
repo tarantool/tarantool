@@ -193,14 +193,6 @@ struct vy_lsm {
 	/** Tuple format of the space this LSM tree belongs to. */
 	struct tuple_format *mem_format;
 	/**
-	 * Format for tuples of type REPLACE or DELETE which
-	 * are a result of an UPDATE operation. Such tuples
-	 * contain a column mask which preserves the list
-	 * of actually changed columns. Used when creating
-	 * tuples for vy_mem, and used only by primary key.
-	 */
-	struct tuple_format *mem_format_with_colmask;
-	/**
 	 * If this LSM tree is for a secondary index, the following
 	 * variable points to the LSM tree of the primary index of
 	 * the same space, otherwise it is set to NULL. Referenced

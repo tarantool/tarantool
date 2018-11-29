@@ -272,6 +272,7 @@ txn_write_to_wal(struct txn *txn)
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
 		*row++ = stmt->row;
+		req->approx_len += xrow_approx_len(stmt->row);
 	}
 	assert(row == req->rows + req->n_rows);
 

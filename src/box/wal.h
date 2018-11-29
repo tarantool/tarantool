@@ -35,9 +35,9 @@
 #include "small/rlist.h"
 #include "cbus.h"
 #include "journal.h"
+#include "vclock.h"
 
 struct fiber;
-struct vclock;
 struct wal_writer;
 struct tt_uuid;
 
@@ -56,17 +56,25 @@ void
 wal_thread_start();
 
 int
-wal_init(enum wal_mode wal_mode, const char *wal_dirname,
-	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
-	 int64_t wal_max_rows, int64_t wal_max_size);
+wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
+	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+	 const struct vclock *vclock, int64_t first_checkpoint_lsn);
 
 void
 wal_thread_stop();
 
+/**
+ * A notification message sent from the WAL to a watcher
+ * when a WAL event occurs.
+ */
 struct wal_watcher_msg {
 	struct cmsg cmsg;
+	/** Pointer to the watcher this message is for. */
 	struct wal_watcher *watcher;
+	/** Bit mask of events, see wal_event. */
 	unsigned events;
+	/** VClock of the oldest stored WAL row. */
+	struct vclock gc_vclock;
 };
 
 enum wal_event {
@@ -74,13 +82,18 @@ enum wal_event {
 	WAL_EVENT_WRITE		= (1 << 0),
 	/** A new WAL is created. */
 	WAL_EVENT_ROTATE	= (1 << 1),
+	/**
+	 * The WAL thread ran out of disk space and had to delete
+	 * one or more old WAL files.
+	 **/
+	WAL_EVENT_GC		= (1 << 2),
 };
 
 struct wal_watcher {
 	/** Link in wal_writer::watchers. */
 	struct rlist next;
 	/** The watcher callback function. */
-	void (*cb)(struct wal_watcher *, unsigned events);
+	void (*cb)(struct wal_watcher_msg *);
 	/** Pipe from the watcher to WAL. */
 	struct cpipe wal_pipe;
 	/** Pipe from WAL to the watcher. */
@@ -90,12 +103,17 @@ struct wal_watcher {
 	/** Message sent to notify the watcher. */
 	struct wal_watcher_msg msg;
 	/**
+	 * Bit mask of WAL events that this watcher is
+	 * interested in.
+	 */
+	unsigned event_mask;
+	/**
 	 * Bit mask of WAL events that happened while
 	 * the notification message was en route.
 	 * It indicates that the message must be resend
 	 * right upon returning to WAL.
 	 */
-	unsigned events;
+	unsigned pending_events;
 };
 
 /**
@@ -114,17 +132,19 @@ struct wal_watcher {
  * @param watcher     WAL watcher to register.
  * @param name        Name of the cbus endpoint at the caller's cord.
  * @param watcher_cb  Callback to invoke from the caller's cord
- *                    upon receiving a WAL event. Apart from the
- *                    watcher itself, it takes a bit mask of events.
- *                    Events are described in wal_event enum.
+ *                    upon receiving a WAL event. It takes an object
+ *                    of type wal_watcher_msg that stores a pointer
+ *                    to the watcher and information about the event.
  * @param process_cb  Function called to process cbus messages
  *                    while the watcher is being attached or NULL
  *                    if the cbus loop is running elsewhere.
+ * @param event_mask  Bit mask of events the watcher is interested in.
  */
 void
 wal_set_watcher(struct wal_watcher *watcher, const char *name,
-		void (*watcher_cb)(struct wal_watcher *, unsigned events),
-		void (*process_cb)(struct cbus_endpoint *));
+		void (*watcher_cb)(struct wal_watcher_msg *),
+		void (*process_cb)(struct cbus_endpoint *),
+		unsigned event_mask);
 
 /**
  * Unsubscribe from WAL events.
@@ -155,11 +175,14 @@ int
 wal_checkpoint(struct vclock *vclock, bool rotate);
 
 /**
- * Remove WAL files that are not needed to recover
- * from snapshot with @lsn or newer.
+ * Remove all WAL files whose signature is less than @wal_lsn.
+ * Update the oldest checkpoint signature with @checkpoint_lsn.
+ * WAL thread will delete WAL files that are not needed to
+ * recover from the oldest checkpoint if it runs out of disk
+ * space.
  */
 void
-wal_collect_garbage(int64_t lsn);
+wal_collect_garbage(int64_t wal_lsn, int64_t checkpoint_lsn);
 
 void
 wal_init_vy_log();

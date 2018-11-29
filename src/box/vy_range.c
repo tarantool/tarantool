@@ -312,8 +312,6 @@ vy_range_update_compact_priority(struct vy_range *range,
 	vy_disk_stmt_counter_reset(&total_stmt_count);
 	/* Total number of checked runs. */
 	uint32_t total_run_count = 0;
-	/* The total size of runs checked so far. */
-	uint64_t total_size = 0;
 	/* Estimated size of a compacted run, if compaction is scheduled. */
 	uint64_t est_new_run_size = 0;
 	/* The number of runs at the current level. */
@@ -335,7 +333,6 @@ vy_range_update_compact_priority(struct vy_range *range,
 		 */
 		if (target_run_size == 0)
 			target_run_size = size;
-		total_size += size;
 		level_run_count++;
 		total_run_count++;
 		vy_disk_stmt_counter_add(&total_stmt_count, &slice->count);
@@ -377,7 +374,7 @@ vy_range_update_compact_priority(struct vy_range *range,
 			 */
 			range->compact_priority = total_run_count;
 			range->compact_queue = total_stmt_count;
-			est_new_run_size = total_size;
+			est_new_run_size = total_stmt_count.bytes_compressed;
 		}
 	}
 

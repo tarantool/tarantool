@@ -242,9 +242,10 @@ result
           type: RUNINFO
         BODY:
           min_lsn: 8
+          bloom_filter: <bloom_filter>
           max_key: ['ЭЮЯ']
           page_count: 1
-          bloom_filter: <bloom_filter>
+          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 4}
           max_lsn: 11
           min_key: ['ёёё']
       - HEADER:
@@ -286,9 +287,10 @@ result
           type: RUNINFO
         BODY:
           min_lsn: 12
+          bloom_filter: <bloom_filter>
           max_key: ['ЮЮЮ']
           page_count: 1
-          bloom_filter: <bloom_filter>
+          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
           max_lsn: 14
           min_key: ['ёёё']
       - HEADER:
@@ -328,9 +330,10 @@ result
           type: RUNINFO
         BODY:
           min_lsn: 8
+          bloom_filter: <bloom_filter>
           max_key: [666, 'ЭЮЯ']
           page_count: 1
-          bloom_filter: <bloom_filter>
+          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 4}
           max_lsn: 11
           min_key: [null, 'ёёё']
       - HEADER:
@@ -372,9 +375,10 @@ result
           type: RUNINFO
         BODY:
           min_lsn: 12
+          bloom_filter: <bloom_filter>
           max_key: [789, 'ююю']
           page_count: 1
-          bloom_filter: <bloom_filter>
+          stmt_stat: {9: 0, 2: 0, 5: 0, 3: 3}
           max_lsn: 14
           min_key: [123, 'ёёё']
       - HEADER:

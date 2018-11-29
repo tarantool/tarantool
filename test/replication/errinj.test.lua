@@ -160,7 +160,7 @@ old_repl = box.cfg.replication
 box.cfg{replication = {}, replication_timeout = 0.1}
 while box.info.replication[1].upstream ~= nil do fiber.sleep(0.0001) end
 -- reconnect
-box.cfg{replication = {old_repl}}
+box.cfg{replication = old_repl}
 while box.info.replication[1].upstream.status ~= 'disconnected' do fiber.sleep(0.0001) end
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 

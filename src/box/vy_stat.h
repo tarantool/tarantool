@@ -36,10 +36,19 @@
 
 #include "latency.h"
 #include "tuple.h"
+#include "iproto_constants.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+/** Number of statements of each type. */
+struct vy_stmt_stat {
+	int64_t inserts;
+	int64_t replaces;
+	int64_t deletes;
+	int64_t upserts;
+};
 
 /** Used for accounting statements stored in memory. */
 struct vy_stmt_counter {
@@ -130,6 +139,8 @@ struct vy_lsm_stat {
 	struct {
 		/** Number of statements stored on disk. */
 		struct vy_disk_stmt_counter count;
+		/** Statement statistics. */
+		struct vy_stmt_stat stmt;
 		/** Run iterator statistics. */
 		struct vy_run_iterator_stat iterator;
 		/** Dump statistics. */
@@ -296,6 +307,54 @@ vy_disk_stmt_counter_sub(struct vy_disk_stmt_counter *c1,
 	c1->bytes -= c2->bytes;
 	c1->bytes_compressed -= c2->bytes_compressed;
 	c1->pages -= c2->pages;
+}
+
+/**
+ * Account a single statement of the given type in @stat.
+ */
+static inline void
+vy_stmt_stat_acct(struct vy_stmt_stat *stat, enum iproto_type type)
+{
+	switch (type) {
+	case IPROTO_INSERT:
+		stat->inserts++;
+		break;
+	case IPROTO_REPLACE:
+		stat->replaces++;
+		break;
+	case IPROTO_DELETE:
+		stat->deletes++;
+		break;
+	case IPROTO_UPSERT:
+		stat->upserts++;
+		break;
+	default:
+		break;
+	}
+}
+
+/**
+ * Add statistics accumulated in @s2 to @s1.
+ */
+static inline void
+vy_stmt_stat_add(struct vy_stmt_stat *s1, const struct vy_stmt_stat *s2)
+{
+	s1->inserts += s2->inserts;
+	s1->replaces += s2->replaces;
+	s1->deletes += s2->deletes;
+	s1->upserts += s2->upserts;
+}
+
+/**
+ * Subtract statistics accumulated in @s2 from @s1.
+ */
+static inline void
+vy_stmt_stat_sub(struct vy_stmt_stat *s1, const struct vy_stmt_stat *s2)
+{
+	s1->inserts -= s2->inserts;
+	s1->replaces -= s2->replaces;
+	s1->deletes -= s2->deletes;
+	s1->upserts -= s2->upserts;
 }
 
 #if defined(__cplusplus)

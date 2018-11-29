@@ -151,7 +151,11 @@ istat()
   disk:
     index_size: 0
     rows: 0
-    bytes: 0
+    statement:
+      inserts: 0
+      replaces: 0
+      upserts: 0
+      deletes: 0
     dump:
       in:
         rows: 0
@@ -192,9 +196,10 @@ istat()
       get:
         rows: 0
         bytes: 0
+    bloom_size: 0
     pages: 0
     bytes_compressed: 0
-    bloom_size: 0
+    bytes: 0
   txw:
     bytes: 0
     rows: 0
@@ -286,10 +291,12 @@ stat_diff(istat(), st)
         rows: 25
     index_size: 294
     rows: 25
-    bloom_size: 70
-    pages: 7
     bytes: 26049
     bytes_compressed: <bytes_compressed>
+    bloom_size: 70
+    statement:
+      replaces: 25
+    pages: 7
   bytes: 26049
   put:
     rows: 25
@@ -324,9 +331,11 @@ stat_diff(istat(), st)
         rows: 50
     index_size: 252
     rows: 25
+    bytes: 26042
     bytes_compressed: <bytes_compressed>
     pages: 6
-    bytes: 26042
+    statement:
+      replaces: 25
     compact:
       in:
         bytes: 78140
@@ -992,7 +1001,11 @@ istat()
   disk:
     index_size: 1050
     rows: 100
-    bytes: 104300
+    statement:
+      inserts: 0
+      replaces: 100
+      upserts: 0
+      deletes: 0
     dump:
       in:
         rows: 0
@@ -1033,9 +1046,10 @@ istat()
       get:
         rows: 0
         bytes: 0
+    bloom_size: 140
     pages: 25
     bytes_compressed: <bytes_compressed>
-    bloom_size: 140
+    bytes: 104300
   txw:
     bytes: 0
     rows: 0
@@ -1391,6 +1405,93 @@ gst.disk.data == 0
 gst.disk.index == 0
 ---
 - true
+...
+--
+-- Statement statistics.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+i = s:create_index('primary', {run_count_per_level = 10})
+---
+...
+i:stat().disk.statement
+---
+- inserts: 0
+  replaces: 0
+  upserts: 0
+  deletes: 0
+...
+-- First run ought to be big to avoid last-level compaction (see gh-3657).
+digest = require('digest')
+---
+...
+_ = s:insert{1, 1, digest.urandom(100)}
+---
+...
+_ = s:replace{2, 2, digest.urandom(100)}
+---
+...
+box.snapshot()
+---
+- ok
+...
+i:stat().disk.statement
+---
+- inserts: 1
+  replaces: 1
+  upserts: 0
+  deletes: 0
+...
+s:upsert({1, 1}, {{'+', 2, 1}})
+---
+...
+s:delete{2}
+---
+...
+box.snapshot()
+---
+- ok
+...
+i:stat().disk.statement
+---
+- inserts: 1
+  replaces: 1
+  upserts: 1
+  deletes: 1
+...
+test_run:cmd('restart server test')
+fiber = require('fiber')
+---
+...
+s = box.space.test
+---
+...
+i = s.index.primary
+---
+...
+i:stat().disk.statement
+---
+- inserts: 1
+  replaces: 1
+  upserts: 1
+  deletes: 1
+...
+i:compact()
+---
+...
+while i:stat().run_count > 1 do fiber.sleep(0.01) end
+---
+...
+i:stat().disk.statement
+---
+- inserts: 1
+  replaces: 0
+  upserts: 0
+  deletes: 0
+...
+s:drop()
+---
 ...
 test_run:cmd('switch default')
 ---

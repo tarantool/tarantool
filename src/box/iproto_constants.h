@@ -313,6 +313,8 @@ enum vy_run_info_key {
 	VY_RUN_INFO_BLOOM_LEGACY = 6,
 	/** Bloom filter for keys. */
 	VY_RUN_INFO_BLOOM = 7,
+	/** Number of statements of each type (map). */
+	VY_RUN_INFO_STMT_STAT = 8,
 	/** The last key in this enum + 1 */
 	VY_RUN_INFO_KEY_MAX
 };

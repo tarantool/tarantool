@@ -179,17 +179,61 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 		     enum log_suffix suffix);
 
 /**
+ * Return true if the given directory index has files whose
+ * signature is less than specified.
+ *
+ * Supposed to be used to check if xdir_collect_garbage() can
+ * actually delete some files.
+ */
+static inline bool
+xdir_has_garbage(struct xdir *dir, int64_t signature)
+{
+	struct vclock *vclock = vclockset_first(&dir->index);
+	return vclock != NULL && vclock_sum(vclock) < signature;
+}
+
+/**
+ * Flags passed to xdir_collect_garbage().
+ */
+enum {
+	/**
+	 * Delete files in coio threads so as not to block
+	 * the caller thread.
+	 */
+	XDIR_GC_USE_COIO = 1 << 0,
+	/**
+	 * Return after removing a file.
+	 */
+	XDIR_GC_REMOVE_ONE = 1 << 1,
+};
+
+/**
  * Remove files whose signature is less than specified.
- * If @use_coio is set, files are deleted by coio threads.
+ * For possible values of @flags see XDIR_GC_*.
  */
 int
-xdir_collect_garbage(struct xdir *dir, int64_t signature, bool use_coio);
+xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
 
 /**
  * Remove inprogress files in the specified directory.
  */
 void
 xdir_collect_inprogress(struct xdir *xdir);
+
+/**
+ * Return LSN and vclock (unless @vclock is NULL) of the oldest
+ * file in a directory or -1 if the directory is empty.
+ */
+static inline int64_t
+xdir_first_vclock(struct xdir *xdir, struct vclock *vclock)
+{
+	struct vclock *first = vclockset_first(&xdir->index);
+	if (first == NULL)
+		return -1;
+	if (vclock != NULL)
+		vclock_copy(vclock, first);
+	return vclock_sum(first);
+}
 
 /**
  * Return LSN and vclock (unless @vclock is NULL) of the newest
@@ -302,6 +346,11 @@ struct xlog {
 	bool is_autocommit;
 	/** The current offset in the log file, for writing. */
 	off_t offset;
+	/**
+	 * Size of disk space preallocated at @offset with
+	 * xlog_fallocate().
+	 */
+	size_t allocated;
 	/**
 	 * Output buffer, works as row accumulator for
 	 * compression.
@@ -421,6 +470,17 @@ xlog_is_open(struct xlog *l)
  */
 int
 xlog_rename(struct xlog *l);
+
+/**
+ * Allocate @size bytes of disk space at the end of the given
+ * xlog file.
+ *
+ * Returns -1 on fallocate error and sets both diag and errno
+ * accordingly. On success returns 0. If the underlying OS
+ * does not support fallocate, this function also returns 0.
+ */
+ssize_t
+xlog_fallocate(struct xlog *log, size_t size);
 
 /**
  * Write a row to xlog, 

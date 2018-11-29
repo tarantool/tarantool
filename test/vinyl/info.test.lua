@@ -411,6 +411,44 @@ gst.memory.bloom_filter == 0
 gst.disk.data == 0
 gst.disk.index == 0
 
+--
+-- Statement statistics.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('primary', {run_count_per_level = 10})
+
+i:stat().disk.statement
+
+-- First run ought to be big to avoid last-level compaction (see gh-3657).
+digest = require('digest')
+_ = s:insert{1, 1, digest.urandom(100)}
+_ = s:replace{2, 2, digest.urandom(100)}
+box.snapshot()
+
+i:stat().disk.statement
+
+s:upsert({1, 1}, {{'+', 2, 1}})
+s:delete{2}
+box.snapshot()
+
+i:stat().disk.statement
+
+test_run:cmd('restart server test')
+
+fiber = require('fiber')
+
+s = box.space.test
+i = s.index.primary
+
+i:stat().disk.statement
+
+i:compact()
+while i:stat().run_count > 1 do fiber.sleep(0.01) end
+
+i:stat().disk.statement
+
+s:drop()
+
 test_run:cmd('switch default')
 test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')

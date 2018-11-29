@@ -1078,7 +1078,7 @@ vy_log_collect_garbage(int64_t signature)
 	 * it is still needed for backups.
 	 */
 	signature = vy_log_prev_checkpoint(signature);
-	xdir_collect_garbage(&vy_log.dir, signature, true);
+	xdir_collect_garbage(&vy_log.dir, signature, XDIR_GC_USE_COIO);
 }
 
 int64_t

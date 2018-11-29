@@ -61,7 +61,7 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 		  void *upsert_thresh_arg)
 {
 	env->key_format = tuple_format_new(&vy_tuple_format_vtab,
-					   NULL, 0, 0, NULL, 0, NULL);
+					   NULL, 0, NULL, 0, NULL);
 	if (env->key_format == NULL)
 		return -1;
 	tuple_format_ref(env->key_format);
@@ -154,22 +154,11 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 		lsm->disk_format = format;
 	} else {
 		lsm->disk_format = tuple_format_new(&vy_tuple_format_vtab,
-						    &cmp_def, 1, 0, NULL, 0,
-						    NULL);
+						    &cmp_def, 1, NULL, 0, NULL);
 		if (lsm->disk_format == NULL)
 			goto fail_format;
 	}
 	tuple_format_ref(lsm->disk_format);
-
-	if (index_def->iid == 0) {
-		lsm->mem_format_with_colmask =
-			vy_tuple_format_new_with_colmask(format);
-		if (lsm->mem_format_with_colmask == NULL)
-			goto fail_mem_format_with_colmask;
-	} else {
-		lsm->mem_format_with_colmask = pk->mem_format_with_colmask;
-	}
-	tuple_format_ref(lsm->mem_format_with_colmask);
 
 	if (vy_lsm_stat_create(&lsm->stat) != 0)
 		goto fail_stat;
@@ -178,8 +167,8 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	if (lsm->run_hist == NULL)
 		goto fail_run_hist;
 
-	lsm->mem = vy_mem_new(mem_env, *lsm->env->p_generation,
-			      cmp_def, format, lsm->mem_format_with_colmask,
+	lsm->mem = vy_mem_new(mem_env, cmp_def, format,
+			      *lsm->env->p_generation,
 			      space_cache_version);
 	if (lsm->mem == NULL)
 		goto fail_mem;
@@ -215,8 +204,6 @@ fail_mem:
 fail_run_hist:
 	vy_lsm_stat_destroy(&lsm->stat);
 fail_stat:
-	tuple_format_unref(lsm->mem_format_with_colmask);
-fail_mem_format_with_colmask:
 	tuple_format_unref(lsm->disk_format);
 fail_format:
 	key_def_delete(cmp_def);
@@ -270,7 +257,6 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	vy_range_tree_iter(lsm->tree, NULL, vy_range_tree_free_cb, NULL);
 	vy_range_heap_destroy(&lsm->range_heap);
 	tuple_format_unref(lsm->disk_format);
-	tuple_format_unref(lsm->mem_format_with_colmask);
 	key_def_delete(lsm->cmp_def);
 	key_def_delete(lsm->key_def);
 	histogram_delete(lsm->run_hist);
@@ -695,6 +681,7 @@ vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run)
 	rlist_add_entry(&lsm->runs, run, in_lsm);
 	lsm->run_count++;
 	vy_disk_stmt_counter_add(&lsm->stat.disk.count, &run->count);
+	vy_stmt_stat_add(&lsm->stat.disk.stmt, &run->info.stmt_stat);
 
 	lsm->bloom_size += bloom_size;
 	lsm->page_index_size += page_index_size;
@@ -723,6 +710,7 @@ vy_lsm_remove_run(struct vy_lsm *lsm, struct vy_run *run)
 	rlist_del_entry(run, in_lsm);
 	lsm->run_count--;
 	vy_disk_stmt_counter_sub(&lsm->stat.disk.count, &run->count);
+	vy_stmt_stat_sub(&lsm->stat.disk.stmt, &run->info.stmt_stat);
 
 	lsm->bloom_size -= bloom_size;
 	lsm->page_index_size -= page_index_size;
@@ -807,9 +795,8 @@ vy_lsm_rotate_mem(struct vy_lsm *lsm)
 	struct vy_mem *mem;
 
 	assert(lsm->mem != NULL);
-	mem = vy_mem_new(lsm->mem->env, *lsm->env->p_generation,
-			 lsm->cmp_def, lsm->mem_format,
-			 lsm->mem_format_with_colmask, space_cache_version);
+	mem = vy_mem_new(lsm->mem->env, lsm->cmp_def, lsm->mem_format,
+			 *lsm->env->p_generation, space_cache_version);
 	if (mem == NULL)
 		return -1;
 
@@ -857,8 +844,7 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	lsm->stat.memory.count.bytes += tuple_size(stmt);
 
 	/* Abort transaction if format was changed by DDL */
-	if (format_id != tuple_format_id(mem->format_with_colmask) &&
-	    format_id != tuple_format_id(mem->format)) {
+	if (format_id != tuple_format_id(mem->format)) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}

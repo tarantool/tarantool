@@ -334,6 +334,19 @@ f1:cancel()
 f2:cancel()
 f3:cancel()
 
+function sf1() loop() end
+function sf2() sf1() end
+function sf3() sf2() end
+f1 = fiber.create(sf3)
+
+info = fiber.info()
+backtrace = info[f1:id()].backtrace
+bt_str = ''
+for _, b in pairs(backtrace) do bt_str = bt_str .. (b['L'] or '') end
+bt_str:find('sf1') ~= nil
+bt_str:find('loop') ~= nil
+bt_str:find('sf3') ~= nil
+
 -- # gh-666: nulls in output
 --
 getmetatable(fiber.info())

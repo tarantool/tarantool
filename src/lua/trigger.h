@@ -52,7 +52,7 @@ typedef int
  * error will be raised for the caller.
  */
 typedef int
-(*lbox_pop_event_f)(struct lua_State *L, void *event);
+(*lbox_pop_event_f)(struct lua_State *L, int nret, void *event);
 
 /**
  * Create a Lua trigger, replace an existing one,

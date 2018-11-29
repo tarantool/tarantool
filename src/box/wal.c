@@ -44,6 +44,17 @@
 #include "coio_task.h"
 #include "replication.h"
 
+enum {
+	/**
+	 * Size of disk space to preallocate with xlog_fallocate().
+	 * Obviously, we want to call this function as infrequent as
+	 * possible to avoid the overhead associated with a system
+	 * call, however at the same time we do not want to call it
+	 * to allocate too big chunks, because this may increase tx
+	 * latency. 1 MB seems to be a well balanced choice.
+	 */
+	WAL_FALLOCATE_LEN = 1024 * 1024,
+};
 
 const char *wal_mode_STRS[] = { "none", "write", "fsync", NULL };
 
@@ -108,6 +119,12 @@ struct wal_writer
 	 * with this LSN and LSN becomes "real".
 	 */
 	struct vclock vclock;
+	/**
+	 * Signature of the oldest checkpoint available on the instance.
+	 * The WAL writer must not delete WAL files that are needed to
+	 * recover from it even if it is running out of disk space.
+	 */
+	int64_t checkpoint_lsn;
 	/** The current WAL file. */
 	struct xlog current_wal;
 	/**
@@ -126,6 +143,8 @@ struct wal_writer
 
 struct wal_msg {
 	struct cmsg base;
+	/** Approximate size of this request when encoded. */
+	size_t approx_len;
 	/** Input queue, on output contains all committed requests. */
 	struct stailq commit;
 	/**
@@ -168,6 +187,7 @@ static void
 wal_msg_create(struct wal_msg *batch)
 {
 	cmsg_init(&batch->base, wal_request_route);
+	batch->approx_len = 0;
 	stailq_create(&batch->commit);
 	stailq_create(&batch->rollback);
 }
@@ -273,9 +293,9 @@ tx_schedule_rollback(struct cmsg *msg)
  */
 static void
 wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
-		  const char *wal_dirname, const struct tt_uuid *instance_uuid,
-		  struct vclock *vclock, int64_t wal_max_rows,
-		  int64_t wal_max_size)
+		  const char *wal_dirname, int64_t wal_max_rows,
+		  int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+		  const struct vclock *vclock, int64_t checkpoint_lsn)
 {
 	writer->wal_mode = wal_mode;
 	writer->wal_max_rows = wal_max_rows;
@@ -295,6 +315,7 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	vclock_create(&writer->vclock);
 	vclock_copy(&writer->vclock, vclock);
 
+	writer->checkpoint_lsn = checkpoint_lsn;
 	rlist_create(&writer->watchers);
 }
 
@@ -398,16 +419,16 @@ wal_open(struct wal_writer *writer)
  *        mode are closed. WAL thread has been started.
  */
 int
-wal_init(enum wal_mode wal_mode, const char *wal_dirname,
-	 const struct tt_uuid *instance_uuid, struct vclock *vclock,
-	 int64_t wal_max_rows, int64_t wal_max_size)
+wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
+	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
+	 const struct vclock *vclock, int64_t first_checkpoint_lsn)
 {
 	assert(wal_max_rows > 1);
 
 	struct wal_writer *writer = &wal_writer_singleton;
-
-	wal_writer_create(writer, wal_mode, wal_dirname, instance_uuid,
-			  vclock, wal_max_rows, wal_max_size);
+	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_rows,
+			  wal_max_size, instance_uuid, vclock,
+			  first_checkpoint_lsn);
 
 	/*
 	 * Scan the WAL directory to build an index of all
@@ -525,25 +546,29 @@ wal_checkpoint(struct vclock *vclock, bool rotate)
 struct wal_gc_msg
 {
 	struct cbus_call_msg base;
-	int64_t lsn;
+	int64_t wal_lsn;
+	int64_t checkpoint_lsn;
 };
 
 static int
 wal_collect_garbage_f(struct cbus_call_msg *data)
 {
-	int64_t lsn = ((struct wal_gc_msg *)data)->lsn;
-	xdir_collect_garbage(&wal_writer_singleton.wal_dir, lsn, false);
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct wal_gc_msg *msg = (struct wal_gc_msg *)data;
+	writer->checkpoint_lsn = msg->checkpoint_lsn;
+	xdir_collect_garbage(&writer->wal_dir, msg->wal_lsn, 0);
 	return 0;
 }
 
 void
-wal_collect_garbage(int64_t lsn)
+wal_collect_garbage(int64_t wal_lsn, int64_t checkpoint_lsn)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE)
 		return;
 	struct wal_gc_msg msg;
-	msg.lsn = lsn;
+	msg.wal_lsn = wal_lsn;
+	msg.checkpoint_lsn = checkpoint_lsn;
 	bool cancellable = fiber_set_cancellable(false);
 	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, &msg.base,
 		  wal_collect_garbage_f, NULL, TIMEOUT_INFINITY);
@@ -601,6 +626,66 @@ wal_opt_rotate(struct wal_writer *writer)
 
 	wal_notify_watchers(writer, WAL_EVENT_ROTATE);
 	return 0;
+}
+
+/**
+ * Make sure there's enough disk space to append @len bytes
+ * of data to the current WAL.
+ *
+ * If fallocate() fails with ENOSPC, delete old WAL files
+ * that are not needed for recovery and retry.
+ */
+static int
+wal_fallocate(struct wal_writer *writer, size_t len)
+{
+	bool warn_no_space = true;
+	struct xlog *l = &writer->current_wal;
+	struct errinj *errinj = errinj(ERRINJ_WAL_FALLOCATE, ERRINJ_INT);
+
+	/*
+	 * The actual write size can be greater than the sum size
+	 * of encoded rows (compression, fixheaders). Double the
+	 * given length to get a rough upper bound estimate.
+	 */
+	len *= 2;
+
+retry:
+	if (errinj == NULL || errinj->iparam == 0) {
+		if (l->allocated >= len)
+			return 0;
+		if (xlog_fallocate(l, MAX(len, WAL_FALLOCATE_LEN)) == 0)
+			return 0;
+	} else {
+		errinj->iparam--;
+		diag_set(ClientError, ER_INJECTION, "xlog fallocate");
+		errno = ENOSPC;
+	}
+	if (errno != ENOSPC)
+		goto error;
+	if (!xdir_has_garbage(&writer->wal_dir, writer->checkpoint_lsn))
+		goto error;
+
+	if (warn_no_space) {
+		say_crit("ran out of disk space, try to delete old WAL files");
+		warn_no_space = false;
+	}
+
+	/* Keep the original error. */
+	struct diag diag;
+	diag_create(&diag);
+	diag_move(diag_get(), &diag);
+	if (xdir_collect_garbage(&writer->wal_dir, writer->checkpoint_lsn,
+				 XDIR_GC_REMOVE_ONE) != 0) {
+		diag_move(&diag, diag_get());
+		goto error;
+	}
+	diag_destroy(&diag);
+
+	wal_notify_watchers(writer, WAL_EVENT_GC);
+	goto retry;
+error:
+	diag_log();
+	return -1;
 }
 
 static void
@@ -685,6 +770,12 @@ wal_write_to_disk(struct cmsg *msg)
 
 	/* Xlog is only rotated between queue processing  */
 	if (wal_opt_rotate(writer) != 0) {
+		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
+		return wal_writer_begin_rollback(writer);
+	}
+
+	/* Ensure there's enough disk space before writing anything. */
+	if (wal_fallocate(writer, wal_msg->approx_len) != 0) {
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
 		return wal_writer_begin_rollback(writer);
 	}
@@ -858,6 +949,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 		stailq_add_tail_entry(&batch->commit, entry, fifo);
 		cpipe_push(&wal_thread.wal_pipe, &batch->base);
 	}
+	batch->approx_len += entry->approx_len;
 	wal_thread.wal_pipe.n_input += entry->n_rows * XROW_IOVMAX;
 	cpipe_flush_input(&wal_thread.wal_pipe);
 	/**
@@ -981,29 +1073,38 @@ wal_watcher_notify(struct wal_watcher *watcher, unsigned events)
 {
 	assert(!rlist_empty(&watcher->next));
 
-	if (watcher->msg.cmsg.route != NULL) {
+	struct wal_watcher_msg *msg = &watcher->msg;
+	struct wal_writer *writer = &wal_writer_singleton;
+
+	events &= watcher->event_mask;
+	if (events == 0) {
+		/* The watcher isn't interested in this event. */
+		return;
+	}
+
+	if (msg->cmsg.route != NULL) {
 		/*
 		 * If the notification message is still en route,
 		 * mark the watcher to resend it as soon as it
 		 * returns to WAL so as not to lose any events.
 		 */
-		watcher->events |= events;
+		watcher->pending_events |= events;
 		return;
 	}
 
-	watcher->msg.events = events;
-	cmsg_init(&watcher->msg.cmsg, watcher->route);
-	cpipe_push(&watcher->watcher_pipe, &watcher->msg.cmsg);
+	msg->events = events;
+	if (xdir_first_vclock(&writer->wal_dir, &msg->gc_vclock) < 0)
+		vclock_copy(&msg->gc_vclock, &writer->vclock);
+
+	cmsg_init(&msg->cmsg, watcher->route);
+	cpipe_push(&watcher->watcher_pipe, &msg->cmsg);
 }
 
 static void
 wal_watcher_notify_perform(struct cmsg *cmsg)
 {
 	struct wal_watcher_msg *msg = (struct wal_watcher_msg *) cmsg;
-	struct wal_watcher *watcher = msg->watcher;
-	unsigned events = msg->events;
-
-	watcher->cb(watcher, events);
+	msg->watcher->cb(msg);
 }
 
 static void
@@ -1019,13 +1120,13 @@ wal_watcher_notify_complete(struct cmsg *cmsg)
 		return;
 	}
 
-	if (watcher->events != 0) {
+	if (watcher->pending_events != 0) {
 		/*
 		 * Resend the message if we got notified while
 		 * it was en route, see wal_watcher_notify().
 		 */
-		wal_watcher_notify(watcher, watcher->events);
-		watcher->events = 0;
+		wal_watcher_notify(watcher, watcher->pending_events);
+		watcher->pending_events = 0;
 	}
 }
 
@@ -1056,8 +1157,9 @@ wal_watcher_detach(void *arg)
 
 void
 wal_set_watcher(struct wal_watcher *watcher, const char *name,
-		void (*watcher_cb)(struct wal_watcher *, unsigned events),
-		void (*process_cb)(struct cbus_endpoint *))
+		void (*watcher_cb)(struct wal_watcher_msg *),
+		void (*process_cb)(struct cbus_endpoint *),
+		unsigned event_mask)
 {
 	assert(journal_is_initialized(&wal_writer_singleton.base));
 
@@ -1066,7 +1168,8 @@ wal_set_watcher(struct wal_watcher *watcher, const char *name,
 	watcher->msg.watcher = watcher;
 	watcher->msg.events = 0;
 	watcher->msg.cmsg.route = NULL;
-	watcher->events = 0;
+	watcher->pending_events = 0;
+	watcher->event_mask = event_mask;
 
 	assert(lengthof(watcher->route) == 2);
 	watcher->route[0] = (struct cmsg_hop)
@@ -1087,6 +1190,15 @@ wal_clear_watcher(struct wal_watcher *watcher,
 		    wal_watcher_detach, watcher, process_cb);
 }
 
+/**
+ * Notify all interested watchers about a WAL event.
+ *
+ * XXX: Note, this function iterates over all registered watchers,
+ * including those that are not interested in the given event.
+ * This is OK only as long as the number of events/watchers is
+ * small. If this ever changes, we should consider maintaining
+ * a separate watcher list per each event type.
+ */
 static void
 wal_notify_watchers(struct wal_writer *writer, unsigned events)
 {
