@@ -590,7 +590,7 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 	}
 }
 
-void
+static int
 coio_service_on_accept(struct evio_service *evio_service,
 		       int fd, struct sockaddr *addr, socklen_t addrlen)
 {
@@ -606,14 +606,12 @@ coio_service_on_accept(struct evio_service *evio_service,
 		 "%s/%s", evio_service->name, sio_strfaddr(addr, addrlen));
 
 	/* Create the worker fiber. */
-	struct fiber *f;
-	try {
-		f = fiber_new_xc(fiber_name, service->handler);
-	} catch (struct error *e) {
-		error_log(e);
+	struct fiber *f = fiber_new(fiber_name, service->handler);
+	if (f == NULL) {
+		diag_log();
 		say_error("can't create a handler fiber, dropping client connection");
 		evio_close(loop(), &coio);
-		throw;
+		return -1;
 	}
 	/*
 	 * The coio is passed into the created fiber, reset the
@@ -625,6 +623,7 @@ coio_service_on_accept(struct evio_service *evio_service,
 	 * and will have to close it and free before termination.
 	 */
 	fiber_start(f, coio, addr, addrlen, service->handler_param);
+	return 0;
 }
 
 void

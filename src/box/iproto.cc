@@ -1800,7 +1800,7 @@ static const struct cmsg_hop connect_route[] = {
 /**
  * Create a connection and start input.
  */
-static void
+static int
 iproto_on_accept(struct evio_service * /* service */, int fd,
 		 struct sockaddr *addr, socklen_t addrlen)
 {
@@ -1809,26 +1809,23 @@ iproto_on_accept(struct evio_service * /* service */, int fd,
 	struct iproto_msg *msg;
 	struct iproto_connection *con = iproto_connection_new(fd);
 	if (con == NULL)
-		goto error_conn;
+		return -1;
 	/*
 	 * Ignore msg allocation failure - the queue size is
 	 * fixed so there is a limited number of msgs in
 	 * use, all stored in just a few blocks of the memory pool.
 	 */
 	msg = iproto_msg_new(con);
-	if (msg == NULL)
-		goto error_msg;
+	if (msg == NULL) {
+		mempool_free(&iproto_connection_pool, con);
+		return -1;
+	}
 	cmsg_init(&msg->base, connect_route);
 	msg->p_ibuf = con->p_ibuf;
 	msg->wpos = con->wpos;
 	msg->close_connection = false;
 	cpipe_push(&tx_pipe, &msg->base);
-	return;
-error_msg:
-	mempool_free(&iproto_connection_pool, con);
-error_conn:
-	close(fd);
-	return;
+	return 0;
 }
 
 static struct evio_service binary; /* iproto binary listener */

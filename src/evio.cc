@@ -195,8 +195,10 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 			 * Invoke the callback and pass it the accepted
 			 * socket.
 			 */
-			service->on_accept(service, fd, (struct sockaddr *)&addr, addrlen);
-
+			if (service->on_accept(service, fd,
+					       (struct sockaddr *)&addr,
+					       addrlen) != 0)
+				diag_raise();
 		} catch (Exception *e) {
 			if (fd >= 0)
 				close(fd);
@@ -308,11 +310,8 @@ evio_service_listen(struct evio_service *service)
 }
 
 void
-evio_service_init(ev_loop *loop,
-		  struct evio_service *service, const char *name,
-		  void (*on_accept)(struct evio_service *, int,
-				    struct sockaddr *, socklen_t),
-		  void *on_accept_param)
+evio_service_init(ev_loop *loop, struct evio_service *service, const char *name,
+		  evio_accept_f on_accept, void *on_accept_param)
 {
 	memset(service, 0, sizeof(struct evio_service));
 	snprintf(service->name, sizeof(service->name), "%s", name);
