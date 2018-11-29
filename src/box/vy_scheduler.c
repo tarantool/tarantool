@@ -1028,9 +1028,11 @@ vy_task_write_run(struct vy_task *task)
 		     {diag_set(ClientError, ER_INJECTION,
 			       "vinyl dump"); return -1;});
 
-	struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_TIMEOUT, ERRINJ_DOUBLE);
-	if (inj != NULL && inj->dparam > 0)
-		usleep(inj->dparam * 1000000);
+	struct errinj *inj = errinj(ERRINJ_VY_RUN_WRITE_DELAY, ERRINJ_BOOL);
+	if (inj != NULL && inj->bparam) {
+		while (inj->bparam)
+			usleep(10000);
+	}
 
 	struct vy_run_writer writer;
 	if (vy_run_writer_create(&writer, task->new_run, lsm->env->path,

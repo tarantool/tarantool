@@ -902,7 +902,7 @@ _ = s:insert{1, 1}
 ...
 -- Delay dump so that we can manage to drop the space
 -- while it is still being dumped.
-box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0.1)
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
 ---
 - ok
 ...
@@ -920,11 +920,11 @@ s:drop()
 ---
 ...
 -- Wait for the dump task to complete.
-box.snapshot()
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 ---
 - ok
 ...
-box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0)
+box.snapshot()
 ---
 - ok
 ...
@@ -1728,7 +1728,7 @@ _ = s:create_index('pk')
 for i = 1, 5 do s:replace{i, i} end
 ---
 ...
-errinj.set("ERRINJ_VY_RUN_WRITE_TIMEOUT", 0.1)
+errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", true)
 ---
 - ok
 ...
@@ -1737,10 +1737,6 @@ ch = fiber.channel(1)
 ...
 _ = fiber.create(function() s:create_index('sk', {parts = {2, 'integer'}}) ch:put(true) end)
 ---
-...
-errinj.set("ERRINJ_VY_RUN_WRITE_TIMEOUT", 0)
----
-- ok
 ...
 fiber.sleep(0.01)
 ---
@@ -1795,6 +1791,10 @@ _ = s:replace{6, -6}
 ...
 _ = s:upsert({7, -7}, {{'=', 2, -7}})
 ---
+...
+errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", false)
+---
+- ok
 ...
 ch:get()
 ---
