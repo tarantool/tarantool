@@ -596,9 +596,6 @@ coio_service_on_accept(struct evio_service *evio_service,
 {
 	struct coio_service *service = (struct coio_service *)
 			evio_service->on_accept_param;
-	struct ev_io coio;
-
-	coio_create(&coio, fd);
 
 	/* Set connection name. */
 	char fiber_name[SERVICE_NAME_MAXLEN];
@@ -610,9 +607,10 @@ coio_service_on_accept(struct evio_service *evio_service,
 	if (f == NULL) {
 		diag_log();
 		say_error("can't create a handler fiber, dropping client connection");
-		evio_close(loop(), &coio);
 		return -1;
 	}
+	struct ev_io coio;
+	coio_create(&coio, fd);
 	/*
 	 * The coio is passed into the created fiber, reset the
 	 * libev callback param to point at it.
