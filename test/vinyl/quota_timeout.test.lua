@@ -47,20 +47,22 @@ fiber.sleep(0.01) -- wait for scheduler to unthrottle
 -- Check that there's a warning in the log if a transaction
 -- waits for quota for more than too_long_threshold seconds.
 --
-box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0.01)
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
 
 box.cfg{vinyl_timeout=60}
 box.cfg{too_long_threshold=0.01}
 
 pad = string.rep('x', 2 * box.cfg.vinyl_memory / 3)
-_ = s:auto_increment{pad}
-_ = s:auto_increment{pad}
+ch = fiber.channel(1)
+f = fiber.create(function() s:auto_increment{pad} s:auto_increment{pad} ch:put(true) end)
+fiber.sleep(0.02)
+
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+ch:get()
 
 test_run:cmd("push filter '[0-9.]+ sec' to '<sec> sec'")
 test_run:grep_log('test', 'waited for .* quota for too long.*')
 test_run:cmd("clear filter")
-
-box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0)
 
 s:truncate()
 box.snapshot()

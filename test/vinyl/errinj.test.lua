@@ -359,7 +359,7 @@ _ = s:create_index('i2', {parts = {2, 'unsigned'}})
 _ = s:insert{1, 1}
 -- Delay dump so that we can manage to drop the space
 -- while it is still being dumped.
-box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0.1)
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
 -- Before failing on quota timeout, the following fiber
 -- will trigger dump due to memory shortage.
 _ = fiber.create(function() s:insert{2, 2, string.rep('x', box.cfg.vinyl_memory)} end)
@@ -368,8 +368,8 @@ fiber.sleep(0)
 -- Drop the space while the dump task is still running.
 s:drop()
 -- Wait for the dump task to complete.
+box.error.injection.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 box.snapshot()
-box.error.injection.set('ERRINJ_VY_RUN_WRITE_TIMEOUT', 0)
 
 --
 -- Check that all dump/compact tasks that are in progress at
@@ -693,10 +693,9 @@ _ = s:create_index('pk')
 
 for i = 1, 5 do s:replace{i, i} end
 
-errinj.set("ERRINJ_VY_RUN_WRITE_TIMEOUT", 0.1)
+errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", true)
 ch = fiber.channel(1)
 _ = fiber.create(function() s:create_index('sk', {parts = {2, 'integer'}}) ch:put(true) end)
-errinj.set("ERRINJ_VY_RUN_WRITE_TIMEOUT", 0)
 
 fiber.sleep(0.01)
 
@@ -718,6 +717,7 @@ _ = s:upsert({5, 2}, {{'=', 2, -5}})
 _ = s:replace{6, -6}
 _ = s:upsert({7, -7}, {{'=', 2, -7}})
 
+errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", false)
 ch:get()
 
 s.index.sk:select()
