@@ -7,7 +7,7 @@
 [![Gitter][gitter-badge]][gitter-url]
 [![Google Groups][groups-badge]][groups-url]
 
-https://tarantool.io/
+https://tarantool.io/en/
 
 Tarantool is an in-memory database and application server.
 
@@ -39,7 +39,7 @@ scalable Web architecture: queue servers, caches,
 stateful Web applications.
 
 To download and install Tarantool as a binary package for your OS, please visit
-https://tarantool.io/download/download.html.
+https://tarantool.io/en/download/.
 
 To build Tarantool from source, see detailed instructions in the Tarantool
 documentation at https://tarantool.io/en/doc/2.1/dev_guide/building_from_source/.
