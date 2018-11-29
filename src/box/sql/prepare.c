@@ -282,6 +282,7 @@ void
 sql_parser_destroy(Parse *parser)
 {
 	assert(parser != NULL);
+	assert(!parser->parse_only || parser->pVdbe == NULL);
 	sqlite3 *db = parser->db;
 	sqlite3DbFree(db, parser->aLabel);
 	sql_expr_list_delete(db, parser->pConstExpr);

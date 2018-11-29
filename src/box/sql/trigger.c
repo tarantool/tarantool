@@ -73,23 +73,12 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	/* The name of the Trigger. */
 	char *trigger_name = NULL;
 
-	struct Vdbe *v = sqlite3GetVdbe(parse);
-	if (v != NULL)
-		sqlite3VdbeCountChanges(v);
-
 	/* pName->z might be NULL, but not pName itself. */
 	assert(name != NULL);
 	assert(op == TK_INSERT || op == TK_UPDATE || op == TK_DELETE);
 	assert(op > 0 && op < 0xff);
 
 	if (table == NULL || db->mallocFailed)
-		goto trigger_cleanup;
-
-	/*
-	 * Ensure the table name matches database name and that
-	 * the table exists.
-	 */
-	if (db->mallocFailed)
 		goto trigger_cleanup;
 	assert(table->nSrc == 1);
 
@@ -111,6 +100,9 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	}
 
 	if (!parse->parse_only) {
+		struct Vdbe *v = sqlite3GetVdbe(parse);
+		if (v != NULL)
+			sqlite3VdbeCountChanges(v);
 		const char *error_msg =
 			tt_sprintf(tnt_errcode_desc(ER_TRIGGER_EXISTS),
 				   trigger_name);
