@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(83)
+test:plan(88)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1050,6 +1050,85 @@ test:do_execsql_test(
         -- <11.100>
         ""
         -- </11.100>
+    })
+
+-- gh-3616 Check result for indexed char in sub subquery.
+
+test:do_execsql_test(
+    12.1,
+    [[
+        DROP TABLE t1;
+        DROP TABLE t2;
+        CREATE TABLE t1 (s1 INT PRIMARY KEY, u CHAR UNIQUE);
+        CREATE TABLE t2 (s1 INT PRIMARY KEY, u CHAR);
+        INSERT INTO t1 VALUES (1,'');
+        INSERT INTO t2 VALUES (1,'');
+        SELECT COUNT(*) FROM t1 WHERE u IN
+                (SELECT u FROM t2 WHERE u IN (SELECT u FROM t1));
+    ]], {
+        -- <12.1>
+        1
+        -- </12.1>
+    })
+
+test:do_execsql_test(
+    12.2,
+    [[
+        DROP TABLE t1;
+        CREATE TABLE t1 (s1 INT PRIMARY KEY, u CHAR);
+        INSERT INTO t1 VALUES (1,'');
+        SELECT COUNT(*) FROM t1 WHERE u IN
+                (SELECT u FROM t2 WHERE u IN (SELECT u FROM t1));
+    ]], {
+        -- <12.2>
+        1
+        -- </12.2>
+    })
+
+test:do_execsql_test(
+    12.3,
+    [[
+        DROP TABLE t1;
+        DROP TABLE t2;
+        CREATE TABLE t1 (s1 INT PRIMARY KEY, u INT UNIQUE);
+        CREATE TABLE t2 (s1 INT PRIMARY KEY, u INT);
+        INSERT INTO t1 VALUES (1, 0);
+        INSERT INTO t2 VALUES (1, 0);
+        SELECT COUNT(*) FROM t1 WHERE u IN
+                (SELECT u FROM t2 WHERE u IN (SELECT u FROM t1));
+    ]], {
+        -- <12.3>
+        1
+        -- </12.3>
+    })
+
+test:do_execsql_test(
+    12.4,
+    [[
+        DROP TABLE t1;
+        CREATE TABLE t1 (s1 INT PRIMARY KEY, u INT);
+        INSERT INTO t1 VALUES (1, 0);
+        SELECT COUNT(*) FROM t1 WHERE u IN
+                (SELECT u FROM t2 WHERE u IN (SELECT u FROM t1));
+    ]], {
+        -- <12.4>
+        1
+        -- </12.4>
+    })
+
+test:do_execsql_test(
+    12.5,
+    [[
+        UPDATE t2
+          SET u = 1;
+        SELECT COUNT(*) FROM t1 WHERE u IN
+                (SELECT u FROM t2 WHERE u IN (SELECT u FROM t1));
+        DROP TABLE t1;
+        DROP TABLE t2;
+    ]], {
+        -- <12.5>
+        0
+        -- </12.5>
     })
 
 test:finish_test()
