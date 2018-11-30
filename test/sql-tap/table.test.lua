@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(74)
+test:plan(78)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1392,5 +1392,50 @@ test:do_execsql_test(
         -- <check-22.cleanup>
 
         -- </check-22.cleanup>
+    })
+
+-- gh-3616 Add char type without length in definitions.
+
+test:do_execsql_test(
+    "table-23.1",
+    [[
+        CREATE TABLE T23(
+           id INT PRIMARY KEY,
+           u CHAR
+        );
+    ]], {
+        -- <table-23.2>
+
+        -- </table-23.2>
+    })
+
+test:do_execsql_test(
+    "table-23.2",
+    [[
+        INSERT INTO T23 VALUES (1, 'a'), (2, 'b');
+    ]], {
+        -- <table-23.2>
+
+        -- </table-23.2>
+    })
+
+test:do_execsql_test(
+    "table-23.3",
+    [[
+        SELECT u FROM T23;
+    ]], {
+        -- <table-23.3>
+        "a","b"
+        -- </table-23.3>
+    })
+
+test:do_execsql_test(
+    "check-23.cleanup",
+    [[
+        DROP TABLE IF EXISTS t23;
+    ]], {
+        -- <check-23.cleanup>
+
+        -- </check-23.cleanup>
     })
 test:finish_test()
