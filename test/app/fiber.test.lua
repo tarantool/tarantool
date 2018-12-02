@@ -465,7 +465,6 @@ function test5()
     f:set_joinable(true)
     return f, f:status()
 end;
-local status;
 f, status = test5();
 status;
 f:status();
@@ -480,7 +479,10 @@ function test6()
 end;
 f, status = test6();
 status;
-f:status();
+test_run:wait_cond(function()
+    status = f:status()
+    return status == 'dead', status
+end, 10);
 
 -- test side fiber in transaction
 s = box.schema.space.create("test");
