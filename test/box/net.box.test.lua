@@ -754,22 +754,23 @@ greeting =
 "Tarantool 1.7.3 (Lua console)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" ..
 "type 'help' for interactive help~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 socket = require('socket');
-srv = socket.tcp_server('localhost', 3392, {
+srv = socket.tcp_server('localhost', 0, {
     handler = function(fd)
         local fiber = require('fiber')
         fiber.sleep(0.1)
         fd:write(greeting)
     end
 });
+port = srv:name().port
 -- we must get timeout
-nb = net.new('localhost:3392', {
+nb = net.new('localhost:' .. port, {
     wait_connected = true, console = true,
     connect_timeout = 0.01
 });
 nb.error:find('timed out') ~= nil;
 nb:close();
 -- we must get peer closed
-nb = net.new('localhost:3392', {
+nb = net.new('localhost:' .. port, {
     wait_connected = true, console = true,
     connect_timeout = 0.2
 });
