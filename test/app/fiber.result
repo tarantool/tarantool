@@ -1105,9 +1105,6 @@ function test5()
 end;
 ---
 ...
-local status;
----
-...
 f, status = test5();
 ---
 ...
@@ -1142,8 +1139,12 @@ status;
 ---
 - suspended
 ...
-f:status();
+test_run:wait_cond(function()
+    status = f:status()
+    return status == 'dead', status
+end, 10);
 ---
+- true
 - dead
 ...
 -- test side fiber in transaction
