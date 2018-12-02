@@ -73,7 +73,7 @@ local function test_http_client(test, url, opts)
     test:ok(r.body:match("hello") ~= nil, "body")
     test:ok(tonumber(r.headers["content-length"]) > 0,
         "content-length > 0")
-    test:is(client.get("http://localhost:0/").status, 595, 'bad url')
+    test:is(client.get("http://localhost:1/").status, 595, 'cannot connect')
 
     local r = client.request('GET', url, nil, opts)
     test:is(r.status, 200, 'request')
