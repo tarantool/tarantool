@@ -159,44 +159,37 @@ local function getpw(uid)
 end
 
 local function getpwall()
-    errno(0)
     ffi.C.setpwent()
-    if errno() ~= 0 then
-        return nil
-    end
     local pws = {}
     while true do
+        errno(0)
         local pw = ffi.C.getpwent()
         if pw == nil then
+            if errno() ~= 0 then
+                return nil
+            end
             break
         end
         table.insert(pws, getpw(pw.pw_uid))
     end
     ffi.C.endpwent()
-    if errno() ~= 0 then
-        return nil
-    end
     return pws
 end
 
 local function getgrall()
-    errno(0)
     ffi.C.setgrent()
-    if errno() ~= 0 then
-        return nil
-    end
     local grs = {}
     while true do
         local gr = ffi.C.getgrent()
         if gr == nil then
+            if errno() ~= 0 then
+                return nil
+            end
             break
         end
         table.insert(grs, getpw(gr.gr_gid))
     end
     ffi.C.endgrent()
-    if errno() ~= 0 then
-        return nil
-    end
     return grs
 end
 
