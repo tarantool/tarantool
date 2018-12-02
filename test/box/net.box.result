@@ -1879,7 +1879,7 @@ greeting =
 socket = require('socket');
 ---
 ...
-srv = socket.tcp_server('localhost', 3392, {
+srv = socket.tcp_server('localhost', 0, {
     handler = function(fd)
         local fiber = require('fiber')
         fiber.sleep(0.1)
@@ -1889,7 +1889,8 @@ srv = socket.tcp_server('localhost', 3392, {
 ---
 ...
 -- we must get timeout
-nb = net.new('localhost:3392', {
+port = srv:name().port
+nb = net.new('localhost:' .. port, {
     wait_connected = true, console = true,
     connect_timeout = 0.01
 });
@@ -1903,7 +1904,7 @@ nb:close();
 ---
 ...
 -- we must get peer closed
-nb = net.new('localhost:3392', {
+nb = net.new('localhost:' .. port, {
     wait_connected = true, console = true,
     connect_timeout = 0.2
 });
