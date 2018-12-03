@@ -88,7 +88,7 @@ local function _getpw(uid)
     elseif type(uid) == 'string' then
         pw = ffi.C.getpwnam(uid)
     else
-        error("Bad type of uid (expected 'string'/'number')", 2)
+        error("Bad type of uid (expected 'string'/'number')")
     end
     return pw
 end
@@ -101,12 +101,12 @@ local function _getgr(gid)
     elseif type(gid) == 'string' then
         gr = ffi.C.getgrnam(gid)
     else
-        error("Bad type of gid (expected 'string'/'number')", 2)
+        error("Bad type of gid (expected 'string'/'number')")
     end
     return gr
 end
 
-local pwgr_errstr = "get%s* failed [errno %d]: %s"
+local pwgr_errstr = "get%s failed [errno %d]: %s"
 
 local function getgr(gid)
     if gid == nil then
@@ -115,7 +115,7 @@ local function getgr(gid)
     local gr = _getgr(gid)
     if gr == nil then
         if errno() ~= 0 then
-            error(pwgr_errstr:format('pw', errno(), errno.strerror()), 2)
+            error(pwgr_errstr:format('gr', errno(), errno.strerror()))
         end
         return nil
     end
@@ -144,7 +144,7 @@ local function getpw(uid)
     local pw = _getpw(uid)
     if pw == nil then
         if errno() ~= 0 then
-            error(pwgr_errstr:format('pw', errno(), errno.strerror()), 2)
+            error(pwgr_errstr:format('pw', errno(), errno.strerror()))
         end
         return nil
     end
@@ -166,7 +166,7 @@ local function getpwall()
         local pw = ffi.C.getpwent()
         if pw == nil then
             if errno() ~= 0 then
-                return nil
+                error(pwgr_errstr:format('pwall', errno(), errno.strerror()))
             end
             break
         end
@@ -180,10 +180,11 @@ local function getgrall()
     ffi.C.setgrent()
     local grs = {}
     while true do
+        errno(0)
         local gr = ffi.C.getgrent()
         if gr == nil then
             if errno() ~= 0 then
-                return nil
+                error(pwgr_errstr:format('grall', errno(), errno.strerror()))
             end
             break
         end
