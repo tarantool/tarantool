@@ -1485,13 +1485,13 @@ typedef(A) ::= DATE . { A.type = AFFINITY_REAL; }
 typedef(A) ::= TIME . { A.type = AFFINITY_REAL; }
 typedef(A) ::= DATETIME . { A.type = AFFINITY_REAL; }
 
-%type char_len_typedef {struct type_def}
-typedef(A) ::= CHAR|VARCHAR char_len_typedef(B) . {
+%type char_len {int}
+typedef(A) ::= CHAR|VARCHAR char_len(B) . {
   A.type = AFFINITY_TEXT;
   (void) B;
 }
 
-char_len_typedef(A) ::= LP INTEGER(B) RP . {
+char_len(A) ::= LP INTEGER(B) RP . {
   (void) A;
   (void) B;
 }
