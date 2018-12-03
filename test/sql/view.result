@@ -174,6 +174,64 @@ box.sql.execute("DROP VIEW cv2;")
 box.sql.execute("DROP VIEW cv3;")
 ---
 ...
+-- gh-3815: AS VALUES syntax didn't incerement VIEW reference
+-- counter. Moreover, tables within sub-select were not accounted
+-- as well.
+--
+box.sql.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE VIEW bv (wombat) AS VALUES ((SELECT 'k' FROM b));")
+---
+...
+box.sql.execute("DROP TABLE b;")
+---
+- error: 'Can''t drop space ''B'': other views depend on this space'
+...
+box.sql.execute("DROP VIEW bv;")
+---
+...
+box.sql.execute("DROP TABLE b;")
+---
+...
+box.sql.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE VIEW bcv AS SELECT * FROM b WHERE s1 IN (SELECT * FROM c);")
+---
+...
+box.sql.execute("DROP TABLE c;")
+---
+- error: 'Can''t drop space ''C'': other views depend on this space'
+...
+box.sql.execute("DROP VIEW bcv;")
+---
+...
+box.sql.execute("DROP TABLE c;")
+---
+...
+box.sql.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
+---
+...
+box.sql.execute("CREATE VIEW bcv(x, y) AS VALUES((SELECT 'k' FROM b), (VALUES((SELECT 1 FROM b WHERE s1 IN (VALUES((SELECT 1 + c.s1 FROM c)))))))")
+---
+...
+box.sql.execute("DROP TABLE c;")
+---
+- error: 'Can''t drop space ''C'': other views depend on this space'
+...
+box.space.BCV:drop()
+---
+...
+box.sql.execute("DROP TABLE c;")
+---
+...
+box.sql.execute("DROP TABLE b;")
+---
+...
 -- Cleanup
 box.sql.execute("DROP VIEW v1;");
 ---

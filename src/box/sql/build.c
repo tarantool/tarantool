@@ -3129,9 +3129,6 @@ sqlite3SrcListAssignCursors(Parse * pParse, SrcList * pList)
 	}
 }
 
-/*
- * Delete an entire SrcList including all its substructure.
- */
 void
 sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
 {

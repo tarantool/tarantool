@@ -1504,20 +1504,25 @@ update_view_references(struct Select *select, int update_value,
 		       bool suppress_error, const char **not_found_space)
 {
 	assert(update_value == 1 || update_value == -1);
-	sql_select_expand_from_tables(select);
-	int from_tables_count = sql_select_from_table_count(select);
+	struct SrcList *list = sql_select_expand_from_tables(select);
+	if (list == NULL)
+		return -1;
+	int from_tables_count = sql_src_list_entry_count(list);
 	for (int i = 0; i < from_tables_count; ++i) {
-		const char *space_name = sql_select_from_table_name(select, i);
+		const char *space_name = sql_src_list_entry_name(list, i);
 		if (space_name == NULL)
 			continue;
 		uint32_t space_id;
 		if (schema_find_id(BOX_SPACE_ID, 2, space_name,
-				   strlen(space_name), &space_id) != 0)
+				   strlen(space_name), &space_id) != 0) {
+			sqlite3SrcListDelete(sql_get(), list);
 			return -1;
+		}
 		if (space_id == BOX_ID_NIL) {
 			if (! suppress_error) {
 				assert(not_found_space != NULL);
-				*not_found_space = space_name;
+				*not_found_space = tt_sprintf("%s", space_name);
+				sqlite3SrcListDelete(sql_get(), list);
 				return -1;
 			}
 			continue;
@@ -1526,6 +1531,7 @@ update_view_references(struct Select *select, int update_value,
 		assert(space->def->view_ref_count > 0 || update_value > 0);
 		space->def->view_ref_count += update_value;
 	}
+	sqlite3SrcListDelete(sql_get(), list);
 	return 0;
 }
 

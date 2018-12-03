@@ -3478,7 +3478,6 @@ int sqlite3IndexedByLookup(Parse *, struct SrcList_item *);
 void sqlite3SrcListShiftJoinType(SrcList *);
 void sqlite3SrcListAssignCursors(Parse *, SrcList *);
 void sqlite3IdListDelete(sqlite3 *, IdList *);
-void sqlite3SrcListDelete(sqlite3 *, SrcList *);
 
 /**
  * Create a new index for an SQL table.  name is the name of the

@@ -374,35 +374,42 @@ void
 sql_select_delete(struct sqlite3 *db, struct Select *select);
 
 /**
- * Expand all spaces names from 'FROM' clause, including
- * ones from subqueries, and add those names to the original
- * select.
+ * Collect all table names within given select, including
+ * ones from sub-queries, expressions, FROM clause etc.
+ * Return those names as a list.
  *
- * @param select Select to be expanded.
+ * @param select Select to be investigated.
+ * @retval List containing all involved table names.
+ *         NULL in case of OOM.
  */
-void
+struct SrcList *
 sql_select_expand_from_tables(struct Select *select);
 
 /**
  * Temporary getter in order to avoid including sqliteInt.h
  * in alter.cc.
  *
- * @param select Select to be examined.
+ * @param list List to be examined.
  * @retval Count of 'FROM' tables in given select.
  */
 int
-sql_select_from_table_count(const struct Select *select);
+sql_src_list_entry_count(const struct SrcList *list);
 
 /**
  * Temporary getter in order to avoid including sqliteInt.h
  * in alter.cc.
  *
- * @param select Select to be examined.
- * @param i Ordinal number of 'FROM' table.
- * @retval Name of i-th 'FROM' table.
+ * @param list List to be examined.
+ * @param i Ordinal number of entry.
+ * @retval Name of i-th entry.
  */
 const char *
-sql_select_from_table_name(const struct Select *select, int i);
+sql_src_list_entry_name(const struct SrcList *list, int i);
+
+/** Delete an entire SrcList including all its substructure. */
+void
+sqlite3SrcListDelete(struct sqlite3 *db, struct SrcList *list);
+
 
 #if defined(__cplusplus)
 } /* extern "C" { */
