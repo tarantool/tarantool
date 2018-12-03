@@ -148,6 +148,32 @@ box.sql.execute("DROP VIEW v2;");
 box.sql.execute("DROP TABLE t2;");
 ---
 ...
+-- gh-3849: failed to create VIEW in form of AS VALUES (const);
+--
+box.sql.execute("CREATE VIEW cv AS VALUES(1);")
+---
+...
+box.sql.execute("CREATE VIEW cv1 AS VALUES('k', 1);")
+---
+...
+box.sql.execute("CREATE VIEW cv2 AS VALUES((VALUES((SELECT 1))));")
+---
+...
+box.sql.execute("CREATE VIEW cv3 AS VALUES(1+2, 1+2);")
+---
+...
+box.sql.execute("DROP VIEW cv;")
+---
+...
+box.sql.execute("DROP VIEW cv1;")
+---
+...
+box.sql.execute("DROP VIEW cv2;")
+---
+...
+box.sql.execute("DROP VIEW cv3;")
+---
+...
 -- Cleanup
 box.sql.execute("DROP VIEW v1;");
 ---

@@ -1871,6 +1871,8 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 				zName = expr_list->a[i].zSpan;
 			}
 		}
+		if (zName == NULL)
+			zName = "_auto_field_";
 		zName = sqlite3MPrintf(db, "%s", zName);
 
 		/* Make sure the column name is unique.  If the name is not unique,
@@ -1883,13 +1885,11 @@ sqlite3ColumnsFromExprList(Parse * parse, ExprList * expr_list, Table *table)
 				int j;
 				for (j = nName - 1;
 				     j > 0 && sqlite3Isdigit(zName[j]); j--);
-				if (zName[j] == ':')
+				if (zName[j] == '_')
 					nName = j;
 			}
 			zName =
-			    sqlite3MPrintf(db, "%.*z:%u", nName, zName, ++cnt);
-			if (cnt > 3)
-				sqlite3_randomness(sizeof(cnt), &cnt);
+			    sqlite3MPrintf(db, "%.*z_%u", nName, zName, ++cnt);
 		}
 		size_t name_len = strlen(zName);
 		void *field = &table->def->fields[i];
