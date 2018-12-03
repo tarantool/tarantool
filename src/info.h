@@ -103,7 +103,6 @@ struct info_handler {
 /**
  * Starts a new document and creates root-level associative array.
  * @param info box.info() adapter.
- * @throws C++ exception on OOM, see info.h comments.
  * @pre must be called once before any other functions.
  */
 static inline void
@@ -115,7 +114,6 @@ info_begin(struct info_handler *info)
 /**
  * Finishes the document and closes root-level associative array.
  * @param info box.info() adapter.
- * @throws C++ exception on OOM, see info.h comments.
  * @pre must be called at the end.
  */
 static inline void
@@ -129,7 +127,6 @@ info_end(struct info_handler *info)
  * @param info box.info() adapter.
  * @param key key.
  * @param value value.
- * @throws C++ exception on OOM, see info.h comments.
  * @pre associative array is started.
  */
 static inline void
@@ -144,7 +141,6 @@ info_append_int(struct info_handler *info, const char *key, int64_t value)
  * @param info box.info() adapter.
  * @param key key.
  * @param value value.
- * @throws C++ exception on OOM, see info.h comments.
  */
 static inline void
 info_append_str(struct info_handler *info, const char *key,
@@ -159,7 +155,6 @@ info_append_str(struct info_handler *info, const char *key,
  * @param info box.info() adapter.
  * @param key key.
  * @param value value.
- * @throws C++ exception on OOM, see info.h comments.
  */
 static inline void
 info_append_double(struct info_handler *info, const char *key,
@@ -172,7 +167,6 @@ info_append_double(struct info_handler *info, const char *key,
  * Associates a new associative array with @a key.
  * @param info box.info() adapter.
  * @param key key.
- * @throws C++ exception on OOM, see info.h comments.
  */
 static inline void
 info_table_begin(struct info_handler *info, const char *key)
@@ -183,7 +177,6 @@ info_table_begin(struct info_handler *info, const char *key)
 /*
  * Finishes the current active associative array.
  * @param info box.info() adapter
- * @throws C++ exception on OOM, see info.h comments.
  */
 static inline void
 info_table_end(struct info_handler *info)
