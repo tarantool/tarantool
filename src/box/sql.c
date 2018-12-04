@@ -199,9 +199,8 @@ tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size)
 	assert(pCur->last_tuple != NULL);
 
 	struct tuple_format *format = tuple_format(pCur->last_tuple);
-	assert(format->exact_field_count == 0
-	       || fieldno < format->exact_field_count);
-	if (format->fields[fieldno].offset_slot == TUPLE_OFFSET_SLOT_NIL)
+	if (fieldno >= format->field_count ||
+	    format->fields[fieldno].offset_slot == TUPLE_OFFSET_SLOT_NIL)
 		return NULL;
 	const char *field = tuple_field(pCur->last_tuple, fieldno);
 	const char *end = field;
