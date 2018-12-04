@@ -38,6 +38,11 @@
 #include "tarantool_ev.h"
 #include "sio.h"
 #include "uri.h"
+
+#if defined(__cplusplus)
+extern "C" {
+#endif /* defined(__cplusplus) */
+
 /**
  * A way to add a listening socket to the event loop. Callbacks
  * are invoked on bind and accept events.
@@ -151,5 +156,9 @@ evio_timeout_update(ev_loop *loop, ev_tstamp start, ev_tstamp *delay)
 
 int
 evio_setsockopt_client(int fd, int family, int type);
+
+#if defined(__cplusplus)
+} /* extern "C" */
+#endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

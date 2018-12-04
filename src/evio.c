@@ -167,9 +167,10 @@ evio_service_name(struct evio_service *service)
  * callback.
  */
 static void
-evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
-		       int /* revents */)
+evio_service_accept_cb(ev_loop *loop, ev_io *watcher, int events)
 {
+	(void) loop;
+	(void) events;
 	struct evio_service *service = (struct evio_service *) watcher->data;
 	int fd;
 	while (1) {
