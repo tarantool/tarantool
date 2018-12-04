@@ -121,9 +121,6 @@ sio_add_to_iov(struct iovec *iov, size_t size)
 	iov->iov_base = (char *) iov->iov_base - size;
 }
 
-#if defined(__cplusplus)
-} /* extern "C" */
-
 /**
  * Pretty print socket name and peer (for exceptions).
  * Preserves the errno. Returns a thread-local buffer.
@@ -206,6 +203,8 @@ ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
 		     struct sockaddr *src_addr, socklen_t *addrlen);
 
+#if defined(__cplusplus)
+} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_SIO_H_INCLUDED */

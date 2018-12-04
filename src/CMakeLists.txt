@@ -89,7 +89,7 @@ set (core_sources
      fiber_cond.c
      fiber_channel.c
      latch.c
-     sio.cc
+     sio.c
      evio.cc
      coio.cc
      coio_task.c

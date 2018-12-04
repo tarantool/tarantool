@@ -297,7 +297,7 @@ sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
 	static __thread char name[NI_MAXHOST + _POSIX_PATH_MAX + 2];
 	switch (addr->sa_family) {
 		case AF_UNIX:
-			if (addrlen >= sizeof(sockaddr_un)) {
+			if (addrlen >= sizeof(struct sockaddr_un)) {
 				snprintf(name, sizeof(name), "unix/:%s",
 					((struct sockaddr_un *)addr)->sun_path);
 			} else {
