@@ -39,8 +39,8 @@
 #include "sio.h"
 #include "uri.h"
 /**
- * Exception-aware way to add a listening socket to the event
- * loop. Callbacks are invoked on bind and accept events.
+ * A way to add a listening socket to the event loop. Callbacks
+ * are invoked on bind and accept events.
  *
  * Coroutines/fibers are not used for port listeners
  * since listener's job is usually simple and only involves
@@ -101,7 +101,7 @@ evio_service_init(ev_loop *loop, struct evio_service *service, const char *name,
 		  evio_accept_f on_accept, void *on_accept_param);
 
 /** Bind service to specified uri */
-void
+int
 evio_service_bind(struct evio_service *service, const char *uri);
 
 /**
@@ -109,14 +109,14 @@ evio_service_bind(struct evio_service *service, const char *uri);
  *
  * @retval 0 for success
  */
-void
+int
 evio_service_listen(struct evio_service *service);
 
 /** If started, stop event flow and close the acceptor socket. */
 void
 evio_service_stop(struct evio_service *service);
 
-void
+int
 evio_socket(struct ev_io *coio, int domain, int type, int protocol);
 
 void
@@ -149,7 +149,7 @@ evio_timeout_update(ev_loop *loop, ev_tstamp start, ev_tstamp *delay)
 	*delay = (elapsed >= *delay) ? 0 : *delay - elapsed;
 }
 
-void
+int
 evio_setsockopt_client(int fd, int family, int type);
 
 #endif /* TARANTOOL_EVIO_H_INCLUDED */

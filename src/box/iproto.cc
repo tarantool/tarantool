@@ -2036,10 +2036,10 @@ iproto_do_cfg_f(struct cbus_call_msg *m)
 		case IPROTO_CFG_LISTEN:
 			if (evio_service_is_active(&binary))
 				evio_service_stop(&binary);
-			if (cfg_msg->uri != NULL) {
-				evio_service_bind(&binary, cfg_msg->uri);
-				evio_service_listen(&binary);
-			}
+			if (cfg_msg->uri != NULL &&
+			    (evio_service_bind(&binary, cfg_msg->uri) != 0 ||
+			     evio_service_listen(&binary) != 0))
+				diag_raise();
 			break;
 		default:
 			unreachable();
