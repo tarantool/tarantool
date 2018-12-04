@@ -95,8 +95,6 @@ sio_add_to_iov(struct iovec *iov, size_t size)
 const char *sio_socketname(int fd);
 int sio_socket(int domain, int type, int protocol);
 
-int sio_shutdown(int fd, int how);
-
 int sio_getfl(int fd);
 int sio_setfl(int fd, int flag, int on);
 
@@ -110,64 +108,12 @@ sio_getsockopt(int fd, int level, int optname,
 int sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen);
 int sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen);
 int sio_listen(int fd);
-int sio_listen_backlog();
 int sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen);
 
 ssize_t sio_read(int fd, void *buf, size_t count);
 
 ssize_t sio_write(int fd, const void *buf, size_t count);
 ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
-
-ssize_t sio_write_total(int fd, const void *buf, size_t count, size_t total);
-
-/**
- * Read at least count and up to buf_size bytes from fd.
- * Throw exception on error or disconnect.
- *
- * @return the number of of bytes actually read.
- */
-ssize_t
-sio_readn_ahead(int fd, void *buf, size_t count, size_t buf_size);
-
-/**
- * Read count bytes from fd.
- * Throw an exception on error or disconnect.
- *
- * @return count of bytes actually read.
- */
-static inline ssize_t
-sio_readn(int fd, void *buf, size_t count)
-{
-	return sio_readn_ahead(fd, buf, count, count);
-}
-
-/**
- * Write count bytes to fd.
- * Throw an exception on error or disconnect.
- *
- * @return count of bytes actually written.
- */
-ssize_t
-sio_writen(int fd, const void *buf, size_t count);
-
-/* Only for blocked I/O */
-ssize_t
-sio_writev_all(int fd, struct iovec *iov, int iovcnt);
-
-/**
- * A wrapper over sendfile.
- * Throw if send file failed.
- */
-ssize_t
-sio_sendfile(int sock_fd, int file_fd, off_t *offset, size_t size);
-
-/**
- * Receive a file sent by sendfile
- * Throw if receiving failed
- */
-ssize_t
-sio_recvfile(int sock_fd, int file_fd, off_t *offset, size_t size);
-
 
 ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 		   const struct sockaddr *dest_addr, socklen_t addrlen);
