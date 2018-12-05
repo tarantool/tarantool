@@ -23,6 +23,7 @@ box.space._space:replace(v1);
 
 t1 = box.space._space.index[2]:select('T1')[1]:totable();
 t1[6]['view'] = true;
+t1[6]['sql'] = 'SELECT * FROM t1;'
 box.space._space:replace(t1);
 
 -- View can't exist without SQL statement.

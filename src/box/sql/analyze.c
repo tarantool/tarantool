@@ -1056,7 +1056,7 @@ loadAnalysis(Parse * pParse)
 static int
 sql_space_foreach_analyze(struct space *space, void *data)
 {
-	if (space->def->opts.sql == NULL || space->def->opts.is_view)
+	if (space->def->opts.is_view)
 		return 0;
 	vdbe_emit_analyze_space((struct Parse*)data, space);
 	return 0;

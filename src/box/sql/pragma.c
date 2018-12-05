@@ -294,7 +294,7 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 static int
 sql_pragma_table_stats(struct space *space, void *data)
 {
-	if (space->def->opts.sql == NULL || space->def->opts.is_view)
+	if (space->def->opts.is_view)
 		return 0;
 	struct Parse *parse = (struct Parse *) data;
 	struct index *pk = space_index(space, 0);
@@ -346,8 +346,6 @@ sql_pragma_index_info(struct Parse *parse,
 		return;
 	struct space *space = space_by_name(tbl_name);
 	if (space == NULL)
-		return;
-	if (space->def->opts.sql == NULL)
 		return;
 	uint32_t iid = box_index_id_by_name(space->def->id, idx_name,
 					    strlen(idx_name));

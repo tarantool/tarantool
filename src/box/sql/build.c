@@ -596,102 +596,6 @@ sql_column_add_nullable_action(struct Parse *parser,
 }
 
 /*
- * Scan the column type name zType (length nType) and return the
- * associated affinity type.
- *
- * This routine does a case-independent search of zType for the
- * substrings in the following table. If one of the substrings is
- * found, the corresponding affinity is returned. If zType contains
- * more than one of the substrings, entries toward the top of
- * the table take priority. For example, if zType is 'BLOBINT',
- * AFFINITY_INTEGER is returned.
- *
- * Substring     | Affinity
- * --------------------------------
- * 'INT'         | AFFINITY_INTEGER
- * 'CHAR'        | AFFINITY_TEXT
- * 'CLOB'        | AFFINITY_TEXT
- * 'TEXT'        | AFFINITY_TEXT
- * 'BLOB'        | AFFINITY_BLOB
- * 'REAL'        | AFFINITY_REAL
- * 'FLOA'        | AFFINITY_REAL
- * 'DOUB'        | AFFINITY_REAL
- *
- * If none of the substrings in the above table are found,
- * AFFINITY_NUMERIC is returned.
- */
-char
-sqlite3AffinityType(const char *zIn, u8 * pszEst)
-{
-	u32 h = 0;
-	char aff = AFFINITY_NUMERIC;
-	const char *zChar = 0;
-
-	assert(zIn != 0);
-	while (zIn[0]) {
-		h = (h << 8) + sqlite3UpperToLower[(*zIn) & 0xff];
-		zIn++;
-		if (h == (('c' << 24) + ('h' << 16) + ('a' << 8) + 'r')) {	/* CHAR */
-			aff = AFFINITY_TEXT;
-			zChar = zIn;
-		} else if (h == (('c' << 24) + ('l' << 16) + ('o' << 8) + 'b')) {	/* CLOB */
-			aff = AFFINITY_TEXT;
-		} else if (h == (('t' << 24) + ('e' << 16) + ('x' << 8) + 't')) {	/* TEXT */
-			aff = AFFINITY_TEXT;
-		} else if (h == (('b' << 24) + ('l' << 16) + ('o' << 8) + 'b')	/* BLOB */
-			   &&(aff == AFFINITY_NUMERIC
-			      || aff == AFFINITY_REAL)) {
-			aff = AFFINITY_BLOB;
-			if (zIn[0] == '(')
-				zChar = zIn;
-#ifndef SQLITE_OMIT_FLOATING_POINT
-		} else if (h == (('r' << 24) + ('e' << 16) + ('a' << 8) + 'l')	/* REAL */
-			   &&aff == AFFINITY_NUMERIC) {
-			aff = AFFINITY_REAL;
-		} else if (h == (('f' << 24) + ('l' << 16) + ('o' << 8) + 'a')	/* FLOA */
-			   &&aff == AFFINITY_NUMERIC) {
-			aff = AFFINITY_REAL;
-		} else if (h == (('d' << 24) + ('o' << 16) + ('u' << 8) + 'b')	/* DOUB */
-			   &&aff == AFFINITY_NUMERIC) {
-			aff = AFFINITY_REAL;
-#endif
-		} else if ((h & 0x00FFFFFF) == (('i' << 16) + ('n' << 8) + 't')) {	/* INT */
-			aff = AFFINITY_INTEGER;
-			break;
-		}
-	}
-
-	/* If pszEst is not NULL, store an estimate of the field size.  The
-	 * estimate is scaled so that the size of an integer is 1.
-	 */
-	if (pszEst) {
-		*pszEst = 1;	/* default size is approx 4 bytes
-		*/
-		if (aff < AFFINITY_NUMERIC) {
-			if (zChar) {
-				while (zChar[0]) {
-					if (sqlite3Isdigit(zChar[0])) {
-						int v = 0;
-						sqlite3GetInt32(zChar, &v);
-						v = v / 4 + 1;
-						if (v > 255)
-							v = 255;
-						*pszEst = v;	/* BLOB(k), VARCHAR(k), CHAR(k) -> r=(k/4+1)
-						*/
-						break;
-					}
-					zChar++;
-				}
-			} else {
-				*pszEst = 5;	/* BLOB, TEXT, CLOB -> r=5  (approx 20 bytes)
-				*/
-			}
-		}
-	}
-	return aff;
-}
-
-/*
  * The expression is the default value for the most recently added column
  * of the table currently under construction.
  *
@@ -958,136 +862,6 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 	assert(space != NULL);
 	return sqlite3VdbeAddOp4(parse_context->pVdbe, OP_IteratorOpen, cursor,
 				 index_id, 0, (void *) space, P4_SPACEPTR);
-}
-
-/*
- * Measure the number of characters needed to output the given
- * identifier.  The number returned includes any quotes used
- * but does not include the null terminator.
- *
- * The estimate is conservative.  It might be larger that what is
- * really needed.
- */
-static int
-identLength(const char *z)
-{
-	int n;
-	for (n = 0; *z; n++, z++) {
-		if (*z == '"') {
-			n++;
-		}
-	}
-	return n + 2;
-}
-
-/*
- * The first parameter is a pointer to an output buffer. The second
- * parameter is a pointer to an integer that contains the offset at
- * which to write into the output buffer. This function copies the
- * nul-terminated string pointed to by the third parameter, zSignedIdent,
- * to the specified offset in the buffer and updates *pIdx to refer
- * to the first byte after the last byte written before returning.
- *
- * If the string zSignedIdent consists entirely of alpha-numeric
- * characters, does not begin with a digit and is not an SQL keyword,
- * then it is copied to the output buffer exactly as it is. Otherwise,
- * it is quoted using double-quotes.
- */
-static void
-identPut(char *z, int *pIdx, char *zSignedIdent)
-{
-	unsigned char *zIdent = (unsigned char *)zSignedIdent;
-	int i, j, needQuote;
-	i = *pIdx;
-
-	for (j = 0; zIdent[j]; j++) {
-		if (!sqlite3Isalnum(zIdent[j]) && zIdent[j] != '_')
-			break;
-	}
-	needQuote = sqlite3Isdigit(zIdent[0])
-	    || sqlite3KeywordCode(zIdent, j) != TK_ID
-	    || zIdent[j] != 0 || j == 0;
-
-	if (needQuote)
-		z[i++] = '"';
-	for (j = 0; zIdent[j]; j++) {
-		z[i++] = zIdent[j];
-		if (zIdent[j] == '"')
-			z[i++] = '"';
-	}
-	if (needQuote)
-		z[i++] = '"';
-	z[i] = 0;
-	*pIdx = i;
-}
-
-/*
- * Generate a CREATE TABLE statement appropriate for the given
- * table.  Memory to hold the text of the statement is obtained
- * from sqliteMalloc() and must be freed by the calling function.
- */
-static char *
-createTableStmt(sqlite3 * db, Table * p)
-{
-	char *zStmt;
-	char *zSep, *zSep2, *zEnd;
-	int n = 0;
-	for (uint32_t i = 0; i < p->def->field_count; i++)
-		n += identLength(p->def->fields[i].name) + 5;
-	n += identLength(p->def->name);
-	if (n < 50) {
-		zSep = "";
-		zSep2 = ",";
-		zEnd = ")";
-	} else {
-		zSep = "\n  ";
-		zSep2 = ",\n  ";
-		zEnd = "\n)";
-	}
-	n += 35 + 6 * p->def->field_count;
-	zStmt = sqlite3DbMallocRaw(0, n);
-	if (zStmt == 0) {
-		sqlite3OomFault(db);
-		return 0;
-	}
-	sqlite3_snprintf(n, zStmt, "CREATE TABLE ");
-	int k = sqlite3Strlen30(zStmt);
-	identPut(zStmt, &k, p->def->name);
-	zStmt[k++] = '(';
-	for (uint32_t i = 0; i < p->def->field_count; i++) {
-		static const char *const azType[] = {
-			/* AFFINITY_BLOB    */ "",
-			/* AFFINITY_TEXT    */ " TEXT",
-			/* AFFINITY_NUMERIC */ " NUM",
-			/* AFFINITY_INTEGER */ " INT",
-			/* AFFINITY_REAL    */ " REAL"
-		};
-		int len;
-		const char *zType;
-
-		sqlite3_snprintf(n - k, &zStmt[k], zSep);
-		k += sqlite3Strlen30(&zStmt[k]);
-		zSep = zSep2;
-		identPut(zStmt, &k, p->def->fields[i].name);
-		char affinity = p->def->fields[i].affinity;
-		assert(affinity - AFFINITY_BLOB >= 0);
-		assert(affinity - AFFINITY_BLOB < ArraySize(azType));
-		testcase(affinity == AFFINITY_BLOB);
-		testcase(affinity == AFFINITY_TEXT);
-		testcase(affinity == AFFINITY_NUMERIC);
-		testcase(affinity == AFFINITY_INTEGER);
-		testcase(affinity == AFFINITY_REAL);
-
-		zType = azType[affinity - AFFINITY_BLOB];
-		len = sqlite3Strlen30(zType);
-		assert(affinity == AFFINITY_BLOB ||
-		       affinity == sqlite3AffinityType(zType, 0));
-		memcpy(&zStmt[k], zType, len);
-		k += len;
-		assert(k <= n);
-	}
-	sqlite3_snprintf(n - k, &zStmt[k], "%s", zEnd);
-	return zStmt;
 }
 
 /*
@@ -1525,19 +1299,15 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	if (NEVER(v == 0))
 		return;
 
-	/* Text of the CREATE TABLE or CREATE VIEW statement. */
-	char *stmt;
-	if (pSelect) {
-		stmt = createTableStmt(db, p);
-	} else {
-		struct Token *pEnd2 = p->def->opts.is_view ?
-				      &pParse->sLastToken : pEnd;
+	/* Text of the CREATE VIEW statement. */
+	char *stmt = NULL;
+	if (p->def->opts.is_view) {
+		struct Token *pEnd2 = &pParse->sLastToken;
 		int n = pEnd2->z - pParse->sNameToken.z;
 		if (pEnd2->z[0] != ';')
 			n += pEnd2->n;
-		stmt = sqlite3MPrintf(db, "CREATE %s %.*s",
-				      p->def->opts.is_view ? "VIEW" : "TABLE",
-				      n, pParse->sNameToken.z);
+		stmt = sqlite3MPrintf(db, "CREATE VIEW %.*s", n,
+				      pParse->sNameToken.z);
 	}
 	int reg_space_id = getNewSpaceId(pParse);
 	createSpace(pParse, reg_space_id, stmt);

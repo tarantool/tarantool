@@ -4472,7 +4472,6 @@ char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
  */
 struct coll *
 sql_get_coll_seq(Parse *parser, const char *name, uint32_t *coll_id);
-char sqlite3AffinityType(const char *, u8 *);
 void sqlite3Analyze(Parse *, Token *);
 
 /**
