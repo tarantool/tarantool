@@ -69,6 +69,12 @@ box.schema.create_space('view', {view = true})
 ---
 - error: Illegal parameters, unexpected option 'view'
 ...
+-- Space referenced by a view can't be renamed.
+box.sql.execute("ALTER TABLE t1 RENAME TO new_name;")
+---
+- error: 'Can''t modify space ''T1'': can not rename space which is referenced by
+    view'
+...
 -- View can be created via straight insertion into _space.
 sp = box.schema.create_space('test');
 ---

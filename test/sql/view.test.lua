@@ -33,6 +33,9 @@ box.space._space:replace(v1);
 -- Views can't be created via space_create().
 box.schema.create_space('view', {view = true})
 
+-- Space referenced by a view can't be renamed.
+box.sql.execute("ALTER TABLE t1 RENAME TO new_name;")
+
 -- View can be created via straight insertion into _space.
 sp = box.schema.create_space('test');
 raw_sp = box.space._space:get(sp.id):totable();

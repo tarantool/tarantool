@@ -1829,6 +1829,12 @@ on_replace_dd_space(struct trigger * /* trigger */, void *event)
 				  space_name(old_space),
 				  "can not convert a space to "
 				  "a view and vice versa");
+		if (strcmp(def->name, old_space->def->name) != 0 &&
+		    old_space->def->view_ref_count > 0)
+			tnt_raise(ClientError, ER_ALTER_SPACE,
+				  space_name(old_space),
+				  "can not rename space which is referenced by "
+				  "view");
 		/*
 		 * Allow change of space properties, but do it
 		 * in WAL-error-safe mode.
