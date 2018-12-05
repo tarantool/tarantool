@@ -61,37 +61,14 @@ sql_delete_by_key(struct space *space, uint32_t iid, char *key,
 int tarantoolSqlite3ClearTable(struct space *space, uint32_t *tuple_count);
 
 /**
- * Rename the table in _space. Update tuple with corresponding id
- * with new name and statement fields and insert back. If sql_stmt
- * is NULL, then return from function after getting length of new
- * statement: it is the way how to dynamically allocate memory for
- * new statement in VDBE. So basically this function should be
- * called twice: firstly to get length of CREATE TABLE statement,
- * and secondly to make routine of replacing tuple and filling out
- * param sql_stmt with new CREATE TABLE statement.
- *
+ * Rename the table in _space.
  * @param space_id Table's space identifier.
  * @param new_name new name of table
- * @param[out] sql_stmt CREATE TABLE statement for new name table, can be NULL.
  *
- * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
+ * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
  */
 int
-sql_rename_table(uint32_t space_id, const char *new_name, char **sql_stmt);
-
-/**
- * Update CREATE INDEX field (def->opt.sql) replacing table name
- * w/ new one in _index space.
- *
- * @param idef Index definition.
- * @param new_tbl_name new name of table
- * @param[out] sql_stmt New CREATE INDEX statement.
- *
- * @retval 0 on success, -1 otherwise.
- */
-int
-sql_index_update_table_name(struct index_def *idef, const char *new_tbl_name,
-			    char **sql_stmt);
+sql_rename_table(uint32_t space_id, const char *new_name);
 
 /* Alter trigger statement after rename table. */
 int tarantoolSqlite3RenameTrigger(const char *zTriggerName,

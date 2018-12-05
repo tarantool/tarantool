@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(41)
+test:plan(43)
 
 test:do_execsql_test(
     "alter-1.1",
@@ -87,15 +87,41 @@ test:do_catchsql_test(
         -- </alter-2.2>
     })
 
+test:do_test(
+    "alter-2.3.prepare",
+    function()
+        format = {}
+        format[1] = { name = 'id', type = 'integer'}
+        format[2] = { name = 'f2', type = 'number'}
+        s = box.schema.create_space('t', {format = format})
+        i = s:create_index('i', {parts= {1, 'integer'}})
+
+        s:replace{1, 4}
+        s:replace{2, 2}
+        s:replace{3, 3}
+        s:replace{4, 3}
+    end,
+    {})
+
 test:do_catchsql_test(
     "alter-2.3",
     [[
-        ALTER TABLE "_space" RENAME TO space;
+        ALTER TABLE "t" RENAME TO "new_lua_space";
     ]], {
         -- <alter-2.3>
-        1, "Failed to execute SQL statement: can't modify name of space created not via SQL facilities"
+        0
         -- </alter-2.3>
     })
+
+test:do_execsql_test(
+    "alter-2.4",
+    [[
+        SELECT "f2" from "new_lua_space" WHERE "f2" >= 3 ORDER BY "id";
+    ]], {
+    -- <alter-2.4>
+        4, 3, 3
+    -- </alter-2.4>
+})
 
 test:do_execsql_test(
     "alter-3.1",

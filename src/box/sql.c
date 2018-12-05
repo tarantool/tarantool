@@ -697,124 +697,41 @@ rename_fail:
 	return SQL_TARANTOOL_ERROR;
 }
 
-int
-sql_rename_table(uint32_t space_id, const char *new_name, char **sql_stmt)
-{
-	assert(space_id != 0);
-	assert(new_name != NULL);
-	assert(sql_stmt != NULL);
-
-	box_tuple_t *tuple;
-	uint32_t key_len = mp_sizeof_uint(space_id) + mp_sizeof_array(1);
-	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
-	if (key_begin == NULL) {
-		diag_set(OutOfMemory, key_len, "region_alloc", "key_begin");
-		return SQL_TARANTOOL_ERROR;
-	}
-	char *key = mp_encode_array(key_begin, 1);
-	key = mp_encode_uint(key, space_id);
-	if (box_index_get(BOX_SPACE_ID, 0, key_begin, key, &tuple) != 0)
-		return SQL_TARANTOOL_ERROR;
-	assert(tuple != NULL);
-
-	/* Code below relies on format of _space. If number of fields or their
-	 * order will ever change, this code should be changed too.
-	 */
-	assert(tuple_field_count(tuple) == 7);
-	const char *sql_stmt_map = box_tuple_field(tuple, 5);
-
-	if (sql_stmt_map == NULL || mp_typeof(*sql_stmt_map) != MP_MAP)
-		goto rename_fail;
-	uint32_t map_size = mp_decode_map(&sql_stmt_map);
-	if (map_size != 1)
-		goto rename_fail;
-	const char *sql_str = mp_decode_str(&sql_stmt_map, &key_len);
-
-	/* If this table hasn't been created via SQL facilities,
-	 * we can't do anything yet.
-	 */
-	if (sqlite3StrNICmp(sql_str, "sql", 3) != 0)
-		goto rename_fail;
-	uint32_t sql_stmt_decoded_len;
-	const char *sql_stmt_old = mp_decode_str(&sql_stmt_map,
-						 &sql_stmt_decoded_len);
-	uint32_t old_name_len;
-	const char *old_name = box_tuple_field(tuple, 2);
-	old_name = mp_decode_str(&old_name, &old_name_len);
-	uint32_t new_name_len = strlen(new_name);
-
-	*sql_stmt = (char*)region_alloc(&fiber()->gc, sql_stmt_decoded_len + 1);
-	if (*sql_stmt == NULL) {
-		diag_set(OutOfMemory, sql_stmt_decoded_len + 1, "region_alloc",
-			 "sql_stmt");
-		return SQL_TARANTOOL_ERROR;
-	}
-	memcpy(*sql_stmt, sql_stmt_old, sql_stmt_decoded_len);
-	*(*sql_stmt + sql_stmt_decoded_len) = '\0';
-	bool is_quoted = false;
-	*sql_stmt = rename_table(db, *sql_stmt, new_name, &is_quoted);
-	if (*sql_stmt == NULL)
-		goto rename_fail;
-
-	/* If old table name isn't quoted, then need to reserve space for quotes. */
-	uint32_t  sql_stmt_len = sql_stmt_decoded_len +
-				 new_name_len - old_name_len +
-				 2 * (!is_quoted);
-
-	assert(sql_stmt_len > 0);
-	/* Construct new msgpack to insert to _space.
-	 * Since we have changed only name of table and create statement,
-	 * there is no need to decode/encode other fields of tuple,
-	 * just memcpy constant parts.
-	 */
-	char *new_tuple = (char*)region_alloc(&fiber()->gc, tuple->bsize +
-					      mp_sizeof_str(sql_stmt_len));
-	if (new_tuple == NULL) {
-		free(*sql_stmt);
-		*sql_stmt = NULL;
-		diag_set(OutOfMemory,
-			 tuple->bsize + mp_sizeof_str(sql_stmt_len),
-			 "region_alloc", "new_tuple");
-		return SQL_TARANTOOL_ERROR;
-	}
-
-	char *new_tuple_end = new_tuple;
-	const char *data_begin = tuple_data(tuple);
-	const char *data_end = tuple_field(tuple, 2);
-	uint32_t data_size = data_end - data_begin;
-	memcpy(new_tuple, data_begin, data_size);
-	new_tuple_end += data_size;
-	new_tuple_end = mp_encode_str(new_tuple_end, new_name, new_name_len);
-	data_begin = tuple_field(tuple, 3);
-	data_end = tuple_field(tuple, 5);
-	data_size = data_end - data_begin;
-	memcpy(new_tuple_end, data_begin, data_size);
-	new_tuple_end += data_size;
-	new_tuple_end = mp_encode_map(new_tuple_end, 1);
-	new_tuple_end = mp_encode_str(new_tuple_end, "sql", 3);
-	new_tuple_end = mp_encode_str(new_tuple_end, *sql_stmt, sql_stmt_len);
-	data_begin = tuple_field(tuple, 6);
-	data_end = (char*) tuple + tuple_size(tuple);
-	data_size = data_end - data_begin;
-	memcpy(new_tuple_end, data_begin, data_size);
-	new_tuple_end += data_size;
-
-	if (box_replace(BOX_SPACE_ID, new_tuple, new_tuple_end, NULL) != 0)
-		return SQL_TARANTOOL_ERROR;
-	else
-		return SQLITE_OK;
-
-rename_fail:
-	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
-		"created not via SQL facilities");
-	return SQL_TARANTOOL_ERROR;
-}
-
 /** Callback to forward and error from mpstream methods. */
 static void
 set_encode_error(void *error_ctx)
 {
 	*(bool *)error_ctx = true;
+}
+
+int
+sql_rename_table(uint32_t space_id, const char *new_name)
+{
+	assert(space_id != 0);
+	assert(new_name != NULL);
+	int name_len = strlen(new_name);
+	struct region *region = &fiber()->gc;
+	/* 32 + name_len is enough to encode one update op. */
+	size_t size = 32 + name_len;
+	char *raw = (char *) region_alloc(region, size);
+	if (raw == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "raw");
+		return SQL_TARANTOOL_ERROR;
+	}
+	/* Encode key. */
+	char *pos = mp_encode_array(raw, 1);
+	pos = mp_encode_uint(pos, space_id);
+
+	/* Encode op and new name. */
+	char *ops = pos;
+	pos = mp_encode_array(pos, 1);
+	pos = mp_encode_array(pos, 3);
+	pos = mp_encode_str(pos, "=", 1);
+	pos = mp_encode_uint(pos, BOX_SPACE_FIELD_NAME);
+	pos = mp_encode_str(pos, new_name, name_len);
+	if (box_update(BOX_SPACE_ID, 0, raw, ops, ops, pos, 0, NULL) != 0)
+		return SQL_TARANTOOL_ERROR;
+	return 0;
 }
 
 /**
@@ -834,56 +751,6 @@ mpstream_encode_index_opts(struct mpstream *stream,
 			     opts->sql != NULL ? strlen(opts->sql) : 0);
 }
 
-int
-sql_index_update_table_name(struct index_def *def, const char *new_tbl_name,
-			    char **sql_stmt)
-{
-	assert(new_tbl_name != NULL);
-
-	bool is_quoted = false;
-	*sql_stmt = rename_table(db, def->opts.sql, new_tbl_name, &is_quoted);
-	if (*sql_stmt == NULL)
-		return -1;
-
-	struct region *region = &fiber()->gc;
-	size_t used = region_used(region);
-	struct mpstream stream;
-	bool is_error = false;
-	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
-		      set_encode_error, &is_error);
-
-	/* Encode key. */
-	mpstream_encode_array(&stream, 2);
-	mpstream_encode_uint(&stream, def->space_id);
-	mpstream_encode_uint(&stream, def->iid);
-
-	/* Encode op. */
-	uint32_t op_offset = stream.pos - stream.buf;
-	mpstream_encode_array(&stream, 1);
-	mpstream_encode_array(&stream, 3);
-	mpstream_encode_str(&stream, "=");
-	mpstream_encode_uint(&stream, BOX_INDEX_FIELD_OPTS);
-
-	/* Encode index opts. */
-	struct index_opts opts = def->opts;
-	opts.sql = *sql_stmt;
-	mpstream_encode_index_opts(&stream, &opts);
-
-	mpstream_flush(&stream);
-	if (is_error) {
-		diag_set(OutOfMemory, stream.pos - stream.buf,
-			 "mpstream_flush", "stream");
-		return -1;
-	}
-	size_t sz = region_used(region) - used;
-	char *raw = region_join(region, sz);
-	if (raw == NULL) {
-		diag_set(OutOfMemory, sz, "region_join", "raw");
-		return -1;
-	}
-	return box_update(BOX_INDEX_ID, 0, raw, raw + op_offset,
-			  raw + op_offset, raw + sz, 0, NULL);
-}
 
 int
 tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,

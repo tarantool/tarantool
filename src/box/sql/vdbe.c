@@ -4713,7 +4713,6 @@ case OP_RenameTable: {
 	struct space *space;
 	const char *zOldTableName;
 	const char *zNewTableName;
-	char *zSqlStmt;
 
 	space_id = pOp->p1;
 	space = space_by_id(space_id);
@@ -4725,7 +4724,7 @@ case OP_RenameTable: {
 	zNewTableName = pOp->p4.z;
 	zOldTableName = sqlite3DbStrNDup(db, zOldTableName,
 					 sqlite3Strlen30(zOldTableName));
-	rc = sql_rename_table(space_id, zNewTableName, &zSqlStmt);
+	rc = sql_rename_table(space_id, zNewTableName);
 	if (rc) goto abort_due_to_error;
 	/*
 	 * Rebuild 'CREATE TRIGGER' expressions of all triggers
@@ -4753,7 +4752,6 @@ case OP_RenameTable: {
 		trigger = next_trigger;
 	}
 	sqlite3DbFree(db, (void*)zOldTableName);
-	sqlite3DbFree(db, (void*)zSqlStmt);
 	break;
 }
 

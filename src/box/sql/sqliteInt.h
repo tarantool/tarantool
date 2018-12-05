@@ -4461,7 +4461,6 @@ int sqlite3ResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
 void
 sqlite3ColumnDefault(Vdbe *v, struct space_def *def, int i, int ireg);
 
-char* rename_table(sqlite3 *, const char *, const char *, bool *);
 char* rename_trigger(sqlite3 *, char const *, char const *, bool *);
 /**
  * Find a collation by name. Set error in @a parser if not found.
