@@ -22,7 +22,7 @@ test:do_test(
 test:do_test(
     prefix.."-1.1",
     function()
-        return #test:drop_all_views()
+        return test:drop_all_views()
     end,
     N
 )
@@ -30,7 +30,7 @@ test:do_test(
 test:do_test(
     prefix.."-1.1",
     function()
-        return #test:drop_all_tables()
+        return test:drop_all_tables()
     end,
     N
 )

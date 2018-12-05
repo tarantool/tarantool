@@ -64,7 +64,7 @@ test:do_test(
 test:do_test(
     test_prefix.."1.3.3",
     function ()
-        return #test:drop_all_tables()
+        return test:drop_all_tables()
     end,
     3)
 
@@ -112,7 +112,7 @@ end
 test:do_test(
     test_prefix.."2.3.1",
     function ()
-        return #test:drop_all_tables()
+        return test:drop_all_tables()
     end,
     6)
 
@@ -152,7 +152,7 @@ end
 test:do_test(
     test_prefix.."3.2.1",
     function ()
-        return #test:drop_all_tables()
+        return test:drop_all_tables()
     end,
     1)
 
