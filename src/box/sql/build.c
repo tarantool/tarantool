@@ -948,12 +948,6 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 			  SQL_SUBTYPE_MSGPACK, index_parts, P4_STATIC);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, entry_reg, 6, tuple_reg);
 	sqlite3VdbeAddOp3(v, OP_SInsert, BOX_INDEX_ID, 0, tuple_reg);
-	/*
-	 * Non-NULL value means that index has been created via
-	 * separate CREATE INDEX statement.
-	 */
-	if (idx_def->opts.sql != NULL)
-		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
 	save_record(parse, BOX_INDEX_ID, entry_reg, 2, v->nOp - 1);
 	return;
 error:
@@ -2132,19 +2126,17 @@ table_add_index(struct space *space, struct index *index)
  * @param idx_type Index type: non-unique index, unique index,
  *                 index implementing UNIQUE constraint or
  *                 index implementing PK constraint.
- * @param sql_stmt SQL statement, which creates the index.
  * @retval 0 on success, -1 on error.
  */
 static int
 index_fill_def(struct Parse *parse, struct index *index,
 	       struct space_def *space_def, uint32_t iid, const char *name,
 	       uint32_t name_len, struct ExprList *expr_list,
-	       enum sql_index_type idx_type, char *sql_stmt)
+	       enum sql_index_type idx_type)
 {
 	struct index_opts opts;
 	index_opts_create(&opts);
 	opts.is_unique = idx_type != SQL_INDEX_TYPE_NON_UNIQUE;
-	opts.sql = sql_stmt;
 	index->def = NULL;
 	int rc = -1;
 
@@ -2401,25 +2393,13 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	 * TODO: Issue a warning if the table primary key is used
 	 * as part of the index key.
 	 */
-	char *sql_stmt = NULL;
-	if (tbl_name != NULL) {
-		int n = (int) (parse->sLastToken.z - token->z) +
-			parse->sLastToken.n;
-		if (token->z[n - 1] == ';')
-			n--;
-		sql_stmt = sqlite3MPrintf(db, "CREATE%s INDEX %.*s",
-			   		  idx_type == SQL_INDEX_TYPE_NON_UNIQUE ?
-					  "" : " UNIQUE", n, token->z);
-		if (sql_stmt == NULL)
-			goto exit_create_index;
-	}
 	uint32_t iid;
 	if (idx_type != SQL_INDEX_TYPE_CONSTRAINT_PK)
 		iid = space->index_id_max + 1;
 	else
 		iid = 0;
 	if (index_fill_def(parse, index, def, iid, name, strlen(name),
-			   col_list, idx_type, sql_stmt) != 0)
+			   col_list, idx_type) != 0)
 		goto exit_create_index;
 	/*
 	 * Remove all redundant columns from the PRIMARY KEY.
@@ -2547,6 +2527,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		sqlite3VdbeAddOp1(vdbe, OP_Close, cursor);
 		vdbe_emit_create_index(parse, def, index->def,
 				       def->id, index_id);
+		sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
 		sqlite3VdbeAddOp0(vdbe, OP_Expire);
 	}
 
@@ -2599,17 +2580,6 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	}
 	struct index *index = space_index(space, index_id);
 	assert(index != NULL);
-	/*
-	 * If index has been created by user, it has its SQL
-	 * statement. Otherwise (i.e. PK and UNIQUE indexes,
-	 * which are created alongside with table) it is NULL.
-	 */
-	if (index->def->opts.sql == NULL) {
-		sqlite3ErrorMsg(parse_context, "index associated with UNIQUE "
-				"or PRIMARY KEY constraint cannot be dropped",
-				0);
-		goto exit_drop_index;
-	}
 
 	/*
 	 * Generate code to remove entry from _index space
