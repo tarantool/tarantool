@@ -3,10 +3,12 @@
 #include "trivia/util.h"
 #include <string.h>
 
+#define INDEX_BASE 1
+
 #define reset_to_new_path(value) \
 	path = value; \
 	len = strlen(value); \
-	json_lexer_create(&lexer, path, len);
+	json_lexer_create(&lexer, path, len, INDEX_BASE);
 
 #define is_next_index(value_len, value) \
 	path = lexer.src + lexer.offset; \
@@ -32,17 +34,17 @@ test_basic()
 	struct json_lexer lexer;
 	struct json_token token;
 
-	reset_to_new_path("[0].field1.field2['field3'][5]");
+	reset_to_new_path("[1].field1.field2['field3'][5]");
 	is_next_index(3, 0);
 	is_next_key("field1");
 	is_next_key("field2");
 	is_next_key("field3");
-	is_next_index(3, 5);
+	is_next_index(3, 4);
 
 	reset_to_new_path("[3].field[2].field")
-	is_next_index(3, 3);
-	is_next_key("field");
 	is_next_index(3, 2);
+	is_next_key("field");
+	is_next_index(3, 1);
 	is_next_key("field");
 
 	reset_to_new_path("[\"f1\"][\"f2'3'\"]");
@@ -57,7 +59,7 @@ test_basic()
 
 	/* Long number. */
 	reset_to_new_path("[1234]");
-	is_next_index(6, 1234);
+	is_next_index(6, 1233);
 
 	/* Empty path. */
 	reset_to_new_path("");
@@ -70,8 +72,8 @@ test_basic()
 
 	/* Unicode. */
 	reset_to_new_path("[2][6]['привет中国world']['中国a']");
-	is_next_index(3, 2);
-	is_next_index(3, 6);
+	is_next_index(3, 1);
+	is_next_index(3, 5);
 	is_next_key("привет中国world");
 	is_next_key("中国a");
 
@@ -94,7 +96,7 @@ void
 test_errors()
 {
 	header();
-	plan(20);
+	plan(21);
 	const char *path;
 	int len;
 	struct json_lexer lexer;
@@ -154,6 +156,10 @@ test_errors()
 	reset_to_new_path("field\t1")
 	json_lexer_next_token(&lexer, &token);
 	is(json_lexer_next_token(&lexer, &token), 6, "tab inside identifier");
+
+	reset_to_new_path("[0]");
+	is(json_lexer_next_token(&lexer, &token), 2,
+	   "invalid token for index_base %d", INDEX_BASE);
 
 	check_plan();
 	footer();

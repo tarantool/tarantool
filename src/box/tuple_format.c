@@ -491,7 +491,7 @@ box_tuple_format_unref(box_tuple_format_t *format)
 /**
  * Propagate @a field to MessagePack(field)[index].
  * @param[in][out] field Field to propagate.
- * @param index 1-based index to propagate to.
+ * @param index 0-based index to propagate to.
  *
  * @retval  0 Success, the index was found.
  * @retval -1 Not found.
@@ -501,10 +501,6 @@ tuple_field_go_to_index(const char **field, uint64_t index)
 {
 	enum mp_type type = mp_typeof(**field);
 	if (type == MP_ARRAY) {
-		if (index == 0)
-			return -1;
-		/* Make index 0-based. */
-		index -= TUPLE_INDEX_BASE;
 		uint32_t count = mp_decode_array(field);
 		if (index >= count)
 			return -1;
@@ -512,6 +508,7 @@ tuple_field_go_to_index(const char **field, uint64_t index)
 			mp_next(field);
 		return 0;
 	} else if (type == MP_MAP) {
+		index += TUPLE_INDEX_BASE;
 		uint64_t count = mp_decode_map(field);
 		for (; count > 0; --count) {
 			type = mp_typeof(**field);
@@ -582,7 +579,7 @@ tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len)
 	int rc;
 	struct json_lexer lexer;
 	struct json_token token;
-	json_lexer_create(&lexer, path, path_len);
+	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
 	while ((rc = json_lexer_next_token(&lexer, &token)) == 0) {
 		switch (token.type) {
 		case JSON_TOKEN_NUM:
@@ -624,18 +621,13 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 	}
 	struct json_lexer lexer;
 	struct json_token token;
-	json_lexer_create(&lexer, path, path_len);
+	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
 	int rc = json_lexer_next_token(&lexer, &token);
 	if (rc != 0)
 		goto error;
 	switch(token.type) {
 	case JSON_TOKEN_NUM: {
 		int index = token.num;
-		if (index == 0) {
-			*field = NULL;
-			return 0;
-		}
-		index -= TUPLE_INDEX_BASE;
 		*field = tuple_field_raw(format, tuple, field_map, index);
 		if (*field == NULL)
 			return 0;

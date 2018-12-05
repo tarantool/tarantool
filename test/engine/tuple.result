@@ -823,7 +823,7 @@ t[0]
 ...
 t["[0]"]
 ---
-- null
+- error: Illegal parameters, error in path on position 2
 ...
 t["[1000]"]
 ---
@@ -847,7 +847,7 @@ t["[2][6].key100"]
 ...
 t["[2][0]"] -- 0-based index in array.
 ---
-- null
+- error: Illegal parameters, error in path on position 5
 ...
 t["[4][3]"] -- Can not index string.
 ---

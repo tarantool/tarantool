@@ -48,6 +48,11 @@ struct json_lexer {
 	int offset;
 	/** Current lexer's offset in symbols. */
 	int symbol_count;
+	/**
+	 * Base field offset for emitted JSON_TOKEN_NUM tokens,
+	 * e.g. 0 for C and 1 for Lua.
+	 */
+	int index_base;
 };
 
 enum json_token_type {
@@ -81,14 +86,18 @@ struct json_token {
  * @param[out] lexer Lexer to create.
  * @param src Source string.
  * @param src_len Length of @a src.
+ * @param index_base Base field offset for emitted JSON_TOKEN_NUM
+ *                   tokens e.g. 0 for C and 1 for Lua.
  */
 static inline void
-json_lexer_create(struct json_lexer *lexer, const char *src, int src_len)
+json_lexer_create(struct json_lexer *lexer, const char *src, int src_len,
+		  int index_base)
 {
 	lexer->src = src;
 	lexer->src_len = src_len;
 	lexer->offset = 0;
 	lexer->symbol_count = 0;
+	lexer->index_base = index_base;
 }
 
 /**

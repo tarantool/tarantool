@@ -144,10 +144,12 @@ json_parse_integer(struct json_lexer *lexer, struct json_token *token)
 		value = value * 10 + c - (int)'0';
 		++len;
 	} while (++pos < end && isdigit((c = *pos)));
+	if (value < lexer->index_base)
+		return lexer->symbol_count + 1;
 	lexer->offset += len;
 	lexer->symbol_count += len;
 	token->type = JSON_TOKEN_NUM;
-	token->num = value;
+	token->num = value - lexer->index_base;
 	return 0;
 }
 

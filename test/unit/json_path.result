@@ -2,9 +2,9 @@
 1..2
 	*** test_basic ***
     1..71
-    ok 1 - parse <[0]>
-    ok 2 - <[0]> is num
-    ok 3 - <[0]> is 0
+    ok 1 - parse <[1]>
+    ok 2 - <[1]> is num
+    ok 3 - <[1]> is 0
     ok 4 - parse <field1>
     ok 5 - <field1> is str
     ok 6 - len is 6
@@ -19,17 +19,17 @@
     ok 15 - str is field3
     ok 16 - parse <[5]>
     ok 17 - <[5]> is num
-    ok 18 - <[5]> is 5
+    ok 18 - <[5]> is 4
     ok 19 - parse <[3]>
     ok 20 - <[3]> is num
-    ok 21 - <[3]> is 3
+    ok 21 - <[3]> is 2
     ok 22 - parse <field>
     ok 23 - <field> is str
     ok 24 - len is 5
     ok 25 - str is field
     ok 26 - parse <[2]>
     ok 27 - <[2]> is num
-    ok 28 - <[2]> is 2
+    ok 28 - <[2]> is 1
     ok 29 - parse <field>
     ok 30 - <field> is str
     ok 31 - len is 5
@@ -52,7 +52,7 @@
     ok 48 - str is field1
     ok 49 - parse <[1234]>
     ok 50 - <[1234]> is num
-    ok 51 - <[1234]> is 1234
+    ok 51 - <[1234]> is 1233
     ok 52 - parse empty path
     ok 53 - is str
     ok 54 - parse <field1>
@@ -61,10 +61,10 @@
     ok 57 - str is field1
     ok 58 - parse <[2]>
     ok 59 - <[2]> is num
-    ok 60 - <[2]> is 2
+    ok 60 - <[2]> is 1
     ok 61 - parse <[6]>
     ok 62 - <[6]> is num
-    ok 63 - <[6]> is 6
+    ok 63 - <[6]> is 5
     ok 64 - parse <привет中国world>
     ok 65 - <привет中国world> is str
     ok 66 - len is 23
@@ -76,7 +76,7 @@
 ok 1 - subtests
 	*** test_basic: done ***
 	*** test_errors ***
-    1..20
+    1..21
     ok 1 - error on position 2 for <[[>
     ok 2 - error on position 2 for <[field]>
     ok 3 - error on position 1 for <'field1'.field2>
@@ -97,6 +97,7 @@ ok 1 - subtests
     ok 18 - error in leading <.>
     ok 19 - space inside identifier
     ok 20 - tab inside identifier
+    ok 21 - invalid token for index_base 1
 ok 2 - subtests
 	*** test_errors: done ***
 	*** main: done ***
