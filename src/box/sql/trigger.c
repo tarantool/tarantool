@@ -203,20 +203,20 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		int first_col = parse->nMem + 1;
 		parse->nMem += 3;
 		int record = ++parse->nMem;
+		int sql_str_len = strlen(sql_str);
+		int sql_len = strlen("sql");
 
-		uint32_t opts_buff_sz = 0;
-		char *data = sql_encode_table_opts(&fiber()->gc, NULL, sql_str,
-						   &opts_buff_sz);
-		sqlite3DbFree(db, sql_str);
-		if (data == NULL) {
-			parse->nErr++;
-			parse->rc = SQL_TARANTOOL_ERROR;
-			goto cleanup;
-		}
-		char *opts_buff = sqlite3DbMallocRaw(db, opts_buff_sz);
+		uint32_t opts_buff_sz = mp_sizeof_map(1) +
+					mp_sizeof_str(sql_len) +
+					mp_sizeof_str(sql_str_len);
+		char *opts_buff = (char *) sqlite3DbMallocRaw(db, opts_buff_sz);
 		if (opts_buff == NULL)
 			goto cleanup;
-		memcpy(opts_buff, data, opts_buff_sz);
+
+		char *data = mp_encode_map(opts_buff, 1);
+		data = mp_encode_str(data, "sql", sql_len);
+		data = mp_encode_str(data, sql_str, sql_str_len);
+		sqlite3DbFree(db, sql_str);
 
 		trigger_name = sqlite3DbStrDup(db, trigger_name);
 		if (trigger_name == NULL) {

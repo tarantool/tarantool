@@ -1198,16 +1198,13 @@ sql_encode_table_opts(struct region *region, struct Table *table,
 	bool is_error = false;
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
 		      set_encode_error, &is_error);
-	bool is_view = false;
 	int checks_cnt = 0;
 	struct ExprList_item *a;
-	if (table != NULL) {
-		is_view = table->def->opts.is_view;
-		struct ExprList *checks = table->def->opts.checks;
-		if (checks != NULL) {
-			checks_cnt = checks->nExpr;
-			a = checks->a;
-		}
+	bool is_view = table->def->opts.is_view;
+	struct ExprList *checks = table->def->opts.checks;
+	if (checks != NULL) {
+		checks_cnt = checks->nExpr;
+		a = checks->a;
 	}
 	mpstream_encode_map(&stream, 1 + is_view + (checks_cnt > 0));
 
