@@ -3405,6 +3405,23 @@ ok, err
 - false
 - Connection closed
 ...
+--
+-- gh-3856: wait_connected = false is ignored.
+--
+c = net.connect('8.8.8.8:123456', {wait_connected = false})
+---
+...
+c
+---
+- opts:
+    wait_connected: false
+  host: 8.8.8.8
+  state: initial
+  port: '123456'
+...
+c:close()
+---
+...
 box.schema.func.drop('do_long')
 ---
 ...
