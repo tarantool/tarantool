@@ -419,21 +419,12 @@ local function create_transport(host, port, user, password, callback,
 
     local function start()
         if state ~= 'initial' then return not is_final_state[state] end
-        if not connection and not callback('reconnect_timeout') then
-            set_state('error', E_NO_CONNECTION)
-            return
-        end
         fiber.create(function()
-            local ok, err
+            local ok, err, timeout
             worker_fiber = fiber_self()
             fiber.name(string.format('%s:%s (net.box)', host, port), {truncate=true})
-            -- It is possible, if the first connection attempt had
-            -- been failed, but reconnect timeout is set. In such
-            -- a case the worker must be run, and immediately
-            -- start reconnecting.
             if not connection then
-                set_state('error_reconnect', E_NO_CONNECTION, greeting)
-                goto do_reconnect
+                goto do_connect
             end
     ::handle_connection::
             ok, err = pcall(protocol_sm)
@@ -444,23 +435,30 @@ local function create_transport(host, port, user, password, callback,
                 connection:close()
                 connection = nil
             end
+            timeout = callback('reconnect_timeout')
     ::do_reconnect::
-            local timeout = callback('reconnect_timeout')
-            while timeout and state == 'error_reconnect' do
-                fiber.sleep(timeout)
-                timeout = callback('reconnect_timeout')
-                if not timeout or state ~= 'error_reconnect' then
-                    break
-                end
-                connection, greeting =
-                    establish_connection(host, port,
-                                         callback('fetch_connect_timeout'))
-                if connection then
-                    goto handle_connection
-                end
-                set_state('error_reconnect', E_NO_CONNECTION, greeting)
-                timeout = callback('reconnect_timeout')
+            if not timeout or state ~= 'error_reconnect' then
+                goto stop
             end
+            fiber.sleep(timeout)
+            timeout = callback('reconnect_timeout')
+            if not timeout or state ~= 'error_reconnect' then
+                goto stop
+            end
+    ::do_connect::
+            connection, greeting =
+                establish_connection(host, port, callback('fetch_connect_timeout'))
+            if connection then
+                goto handle_connection
+            end
+            timeout = callback('reconnect_timeout')
+            if not timeout then
+                set_state('error', E_NO_CONNECTION, greeting)
+                goto stop
+            end
+            set_state('error_reconnect', E_NO_CONNECTION, greeting)
+            goto do_reconnect
+    ::stop::
             send_buf:recycle()
             recv_buf:recycle()
             worker_fiber = nil
@@ -990,15 +988,7 @@ end
 -- @retval Net.box object.
 --
 local function connect(...)
-    local host, port, opts = parse_connect_params(...)
-    local connection, greeting =
-        establish_connection(host, port, opts.connect_timeout)
-    if not connection then
-        local dummy_conn = new_sm(host, port, opts)
-        dummy_conn.error = greeting
-        return dummy_conn
-    end
-    return new_sm(host, port, opts, connection, greeting)
+    return new_sm(parse_connect_params(...))
 end
 
 local function check_remote_arg(remote, method)

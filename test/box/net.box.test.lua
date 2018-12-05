@@ -1373,6 +1373,13 @@ ready = true
 while not err do fiber.sleep(0.01) end
 ok, err
 
+--
+-- gh-3856: wait_connected = false is ignored.
+--
+c = net.connect('8.8.8.8:123456', {wait_connected = false})
+c
+c:close()
+
 box.schema.func.drop('do_long')
 box.schema.user.revoke('guest', 'write', 'space', '_schema')
 box.schema.user.revoke('guest', 'read,write', 'space', '_space')
