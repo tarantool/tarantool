@@ -879,6 +879,75 @@ box.sql.execute('DROP TABLE t1')
 cn:close()
 ---
 ...
+-- gh-3832: Some statements do not return column type
+box.sql.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY)')
+---
+...
+cn = remote.connect(box.cfg.listen)
+---
+...
+-- PRAGMA:
+res = cn:execute("PRAGMA table_info(t1)")
+---
+...
+res.metadata
+---
+- - name: cid
+    type: INTEGER
+  - name: name
+    type: TEXT
+  - name: type
+    type: TEXT
+  - name: notnull
+    type: INTEGER
+  - name: dflt_value
+    type: TEXT
+  - name: pk
+    type: INTEGER
+...
+-- EXPLAIN
+res = cn:execute("EXPLAIN SELECT 1")
+---
+...
+res.metadata
+---
+- - name: addr
+    type: INTEGER
+  - name: opcode
+    type: TEXT
+  - name: p1
+    type: INTEGER
+  - name: p2
+    type: INTEGER
+  - name: p3
+    type: INTEGER
+  - name: p4
+    type: TEXT
+  - name: p5
+    type: TEXT
+  - name: comment
+    type: TEXT
+...
+res = cn:execute("EXPLAIN QUERY PLAN SELECT COUNT(*) FROM t1")
+---
+...
+res.metadata
+---
+- - name: selectid
+    type: INTEGER
+  - name: order
+    type: INTEGER
+  - name: from
+    type: INTEGER
+  - name: detail
+    type: TEXT
+...
+cn:close()
+---
+...
+box.sql.execute('DROP TABLE t1')
+---
+...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
 ...

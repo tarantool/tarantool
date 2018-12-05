@@ -482,11 +482,12 @@ sql_get_description(struct sql_stmt *stmt, struct obuf *out,
 		const char *name = sql_column_name(stmt, i);
 		const char *type = sql_column_datatype(stmt, i);
 		/*
-		 * Can not fail, since all column names are
-		 * preallocated during prepare phase and the
+		 * Can not fail, since all column names and types
+		 * are preallocated during prepare phase and the
 		 * column_name simply returns them.
 		 */
 		assert(name != NULL);
+		assert(type != NULL);
 		size += mp_sizeof_str(strlen(name));
 		size += mp_sizeof_str(strlen(type));
 		char *pos = (char *) obuf_alloc(out, size);

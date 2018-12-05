@@ -112,25 +112,18 @@ sqlGetBoolean(const char *z, u8 dflt)
  * the rest of the file if PRAGMAs are omitted from the build.
  */
 
-/*
- * Set result column names for a pragma.
- */
+/** Set result column names and types for a pragma. */
 static void
-setPragmaResultColumnNames(Vdbe * v,	/* The query under construction */
-			   const PragmaName * pPragma	/* The pragma */
-    )
+vdbe_set_pragma_result_columns(struct Vdbe *v, const struct PragmaName *pragma)
 {
-	u8 n = pPragma->nPragCName;
-	sqlVdbeSetNumCols(v, n == 0 ? 1 : n);
-	if (n == 0) {
-		sqlVdbeSetColName(v, 0, COLNAME_NAME, pPragma->zName,
-				      SQL_STATIC);
-	} else {
-		int i, j;
-		for (i = 0, j = pPragma->iPragCName; i < n; i++, j++) {
-			sqlVdbeSetColName(v, i, COLNAME_NAME, pragCName[j],
-					      SQL_STATIC);
-		}
+	int n = pragma->nPragCName;
+	assert(n > 0);
+	sqlVdbeSetNumCols(v, n);
+	for (int i = 0, j = pragma->iPragCName; i < n; ++i) {
+		sqlVdbeSetColName(v, i, COLNAME_NAME, pragCName[j++],
+				  SQL_STATIC);
+		sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, pragCName[j++],
+				  SQL_STATIC);
 	}
 }
 
@@ -451,17 +444,15 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		goto pragma_out;
 	}
 	/* Register the result column names for pragmas that return results */
-	if ((pPragma->mPragFlg & PragFlg_NoColumns) == 0
-	    && ((pPragma->mPragFlg & PragFlg_NoColumns1) == 0 || zRight == 0)
-	    ) {
-		setPragmaResultColumnNames(v, pPragma);
-	}
+	if ((pPragma->mPragFlg & PragFlg_NoColumns) == 0 &&
+	    ((pPragma->mPragFlg & PragFlg_NoColumns1) == 0 || zRight == NULL))
+		vdbe_set_pragma_result_columns(v, pPragma);
 	/* Jump to the appropriate pragma handler */
 	switch (pPragma->ePragTyp) {
 
 	case PragTyp_FLAG:{
 		if (zRight == NULL) {
-			setPragmaResultColumnNames(v, pPragma);
+			vdbe_set_pragma_result_columns(v, pPragma);
 			returnSingleInt(v, (user_session->sql_flags &
 					    pPragma->iArg) != 0);
 		} else {

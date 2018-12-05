@@ -54,7 +54,6 @@ sqlPrepare(sql * db,	/* Database handle. */
 {
 	char *zErrMsg = 0;	/* Error message */
 	int rc = SQL_OK;	/* Result code */
-	int i;			/* Loop counter */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, db);
 	sParse.pReprepare = pReprepare;
@@ -113,24 +112,48 @@ sqlPrepare(sql * db,	/* Database handle. */
 
 	if (rc == SQL_OK && sParse.pVdbe && sParse.explain) {
 		static const char *const azColName[] = {
-			"addr", "opcode", "p1", "p2", "p3", "p4", "p5",
-			    "comment",
-			"selectid", "order", "from", "detail"
+			/*  0 */ "addr",
+			/*  1 */ "INTEGER",
+			/*  2 */ "opcode",
+			/*  3 */ "TEXT",
+			/*  4 */ "p1",
+			/*  5 */ "INTEGER",
+			/*  6 */ "p2",
+			/*  7 */ "INTEGER",
+			/*  8 */ "p3",
+			/*  9 */ "INTEGER",
+			/* 10 */ "p4",
+			/* 11 */ "TEXT",
+			/* 12 */ "p5",
+			/* 13 */ "TEXT",
+			/* 14 */ "comment",
+			/* 15 */ "TEXT",
+			/* 16 */ "selectid",
+			/* 17 */ "INTEGER",
+			/* 18 */ "order",
+			/* 19 */ "INTEGER",
+			/* 20 */ "from",
+			/* 21 */ "INTEGER",
+			/* 22 */ "detail",
+			/* 23 */ "TEXT",
 		};
-		int iFirst, mx;
+
+		int name_first, name_count;
 		if (sParse.explain == 2) {
-			sqlVdbeSetNumCols(sParse.pVdbe, 4);
-			iFirst = 8;
-			mx = 12;
+			name_first = 16;
+			name_count = 4;
 		} else {
-			sqlVdbeSetNumCols(sParse.pVdbe, 8);
-			iFirst = 0;
-			mx = 8;
+			name_first = 0;
+			name_count = 8;
 		}
-		for (i = iFirst; i < mx; i++) {
-			sqlVdbeSetColName(sParse.pVdbe, i - iFirst,
-					      COLNAME_NAME, azColName[i],
-					      SQL_STATIC);
+		sqlVdbeSetNumCols(sParse.pVdbe, name_count);
+		for (int i = 0; i < name_count; i++) {
+			int name_index = 2 * i + name_first;
+			sqlVdbeSetColName(sParse.pVdbe, i, COLNAME_NAME,
+					  azColName[name_index], SQL_STATIC);
+			sqlVdbeSetColName(sParse.pVdbe, i, COLNAME_DECLTYPE,
+					  azColName[name_index + 1],
+					  SQL_STATIC);
 		}
 	}
 
