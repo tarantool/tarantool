@@ -96,18 +96,27 @@ tarantool_uptime(void)
 }
 
 /**
-* Create a checkpoint from signal handler (SIGUSR1)
-*/
+ * Create a checkpoint from signal handler (SIGUSR1)
+ */
+static int
+sig_checkpoint_f(va_list ap)
+{
+	(void)ap;
+	if (box_checkpoint() != 0)
+		diag_log();
+	return 0;
+}
+
 static void
 sig_checkpoint(ev_loop * /* loop */, struct ev_signal * /* w */,
 	     int /* revents */)
 {
-	if (box_checkpoint_is_in_progress) {
-		say_warn("Checkpoint is already in progress,"
-			" the signal is ignored");
+	struct fiber *f = fiber_new("checkpoint", sig_checkpoint_f);
+	if (f == NULL) {
+		say_warn("failed to allocate checkpoint fiber");
 		return;
 	}
-	fiber_start(fiber_new_xc("checkpoint", (fiber_func)box_checkpoint));
+	fiber_wakeup(f);
 }
 
 static void

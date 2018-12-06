@@ -87,8 +87,12 @@ static void title(const char *new_status)
 	systemd_snotify("STATUS=%s", status);
 }
 
-bool box_checkpoint_is_in_progress = false;
 const struct vclock *box_vclock = &replicaset.vclock;
+
+/**
+ * Set if there's a fiber performing box_checkpoint() right now.
+ */
+static bool checkpoint_is_in_progress;
 
 /**
  * Set if backup is in progress, i.e. box_backup_start() was
@@ -2182,11 +2186,11 @@ box_checkpoint()
 	if (! is_box_configured)
 		return 0;
 	int rc = 0;
-	if (box_checkpoint_is_in_progress) {
+	if (checkpoint_is_in_progress) {
 		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
 		return -1;
 	}
-	box_checkpoint_is_in_progress = true;
+	checkpoint_is_in_progress = true;
 	/* create checkpoint files */
 	latch_lock(&schema_lock);
 	if ((rc = engine_begin_checkpoint()))
@@ -2206,7 +2210,7 @@ end:
 		engine_abort_checkpoint();
 
 	latch_unlock(&schema_lock);
-	box_checkpoint_is_in_progress = false;
+	checkpoint_is_in_progress = false;
 
 	/*
 	 * Wait for background garbage collection that might
