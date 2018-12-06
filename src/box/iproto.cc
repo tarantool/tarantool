@@ -271,14 +271,14 @@ enum rmean_net_name {
 const char *rmean_net_strings[IPROTO_LAST] = { "SENT", "RECEIVED" };
 
 static void
-tx_process_disconnect(struct cmsg *m);
+tx_process_destroy(struct cmsg *m);
 
 static void
-net_finish_disconnect(struct cmsg *m);
+net_finish_destroy(struct cmsg *m);
 
-static const struct cmsg_hop disconnect_route[] = {
-	{ tx_process_disconnect, &net_pipe },
-	{ net_finish_disconnect, NULL },
+static const struct cmsg_hop destroy_route[] = {
+	{ tx_process_destroy, &net_pipe },
+	{ net_finish_destroy, NULL },
 };
 
 /**
@@ -397,10 +397,10 @@ struct iproto_connection
 	/** Logical session. */
 	struct session *session;
 	ev_loop *loop;
-	/* Pre-allocated disconnect msg. */
-	struct cmsg disconnect;
-	/** True if disconnect message is sent. Debug-only. */
-	bool is_disconnected;
+	/** Pre-allocated destroy msg. */
+	struct cmsg destroy_msg;
+	/** True if destroy message is sent. Debug-only. */
+	bool is_destroy_sent;
 	struct rlist in_stop_list;
 	/**
 	 * Kharon is used to implement box.session.push().
@@ -576,9 +576,9 @@ iproto_connection_close(struct iproto_connection *con)
 	 * twice.
 	 */
 	if (iproto_connection_is_idle(con)) {
-		assert(con->is_disconnected == false);
-		con->is_disconnected = true;
-		cpipe_push(&tx_pipe, &con->disconnect);
+		assert(! con->is_destroy_sent);
+		con->is_destroy_sent = true;
+		cpipe_push(&tx_pipe, &con->destroy_msg);
 	}
 	rlist_del(&con->in_stop_list);
 }
@@ -992,8 +992,8 @@ iproto_connection_new(int fd)
 	con->session = NULL;
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
-	cmsg_init(&con->disconnect, disconnect_route);
-	con->is_disconnected = false;
+	cmsg_init(&con->destroy_msg, destroy_route);
+	con->is_destroy_sent = false;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
 	return con;
@@ -1204,10 +1204,10 @@ tx_fiber_init(struct session *session, uint64_t sync)
  * as well as output buffers of the connection.
  */
 static void
-tx_process_disconnect(struct cmsg *m)
+tx_process_destroy(struct cmsg *m)
 {
 	struct iproto_connection *con =
-		container_of(m, struct iproto_connection, disconnect);
+		container_of(m, struct iproto_connection, destroy_msg);
 	if (con->session) {
 		tx_fiber_init(con->session, 0);
 		if (! rlist_empty(&session_on_disconnect))
@@ -1228,10 +1228,10 @@ tx_process_disconnect(struct cmsg *m)
  * and close the connection.
  */
 static void
-net_finish_disconnect(struct cmsg *m)
+net_finish_destroy(struct cmsg *m)
 {
 	struct iproto_connection *con =
-		container_of(m, struct iproto_connection, disconnect);
+		container_of(m, struct iproto_connection, destroy_msg);
 	/* Runs the trigger, which may yield. */
 	iproto_connection_delete(con);
 }
