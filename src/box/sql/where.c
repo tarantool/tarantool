@@ -2818,7 +2818,6 @@ tnt_error:
 
 		struct index_opts opts;
 		index_opts_create(&opts);
-		opts.sql = "fake_autoindex";
 		fake_index = index_def_new(pTab->def->id, 0,"fake_autoindex",
 					   sizeof("fake_autoindex") - 1,
 					   TREE, &opts, key_def, NULL);

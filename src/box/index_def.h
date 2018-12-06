@@ -158,10 +158,6 @@ struct index_opts {
 	 */
 	int64_t lsn;
 	/**
-	 * SQL statement that produced this index.
-	 */
-	char *sql;
-	/**
 	 * SQL specific statistics concerning tuples
 	 * distribution for query planer. It is automatically
 	 * filled after running ANALYZE command.
@@ -187,7 +183,6 @@ index_opts_create(struct index_opts *opts)
 static inline void
 index_opts_destroy(struct index_opts *opts)
 {
-	free(opts->sql);
 	free(opts->stat);
 	TRASH(opts);
 }
@@ -212,10 +207,6 @@ index_opts_cmp(const struct index_opts *o1, const struct index_opts *o2)
 		return o1->run_size_ratio < o2->run_size_ratio ? -1 : 1;
 	if (o1->bloom_fpr != o2->bloom_fpr)
 		return o1->bloom_fpr < o2->bloom_fpr ? -1 : 1;
-	if ((o1->sql == NULL) != (o2->sql == NULL))
-		return 1;
-	if (o1->sql != NULL)
-		return strcmp(o1->sql, o2->sql);
 	return 0;
 }
 

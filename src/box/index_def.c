@@ -46,7 +46,6 @@ const struct index_opts index_opts_default = {
 	/* .run_size_ratio      = */ 3.5,
 	/* .bloom_fpr           = */ 0.05,
 	/* .lsn                 = */ 0,
-	/* .sql                 = */ NULL,
 	/* .stat                = */ NULL,
 };
 
@@ -61,7 +60,6 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
 	OPT_DEF("bloom_fpr", OPT_FLOAT, struct index_opts, bloom_fpr),
 	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
-	OPT_DEF("sql", OPT_STRPTR, struct index_opts, sql),
 	OPT_END,
 };
 
@@ -109,15 +107,6 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	def->space_id = space_id;
 	def->iid = iid;
 	def->opts = *opts;
-	if (opts->sql != NULL) {
-		def->opts.sql = strdup(opts->sql);
-		if (def->opts.sql == NULL) {
-			diag_set(OutOfMemory, strlen(opts->sql) + 1, "strdup",
-				 "def->opts.sql");
-			index_def_delete(def);
-			return NULL;
-		}
-	}
 	/* Statistics are initialized separately. */
 	assert(opts->stat == NULL);
 	return def;
@@ -148,15 +137,6 @@ index_def_dup(const struct index_def *def)
 	}
 	rlist_create(&dup->link);
 	dup->opts = def->opts;
-	if (def->opts.sql != NULL) {
-		dup->opts.sql = strdup(def->opts.sql);
-		if (dup->opts.sql == NULL) {
-			diag_set(OutOfMemory, strlen(def->opts.sql) + 1,
-				 "strdup", "dup->opts.sql");
-			index_def_delete(dup);
-			return NULL;
-		}
-	}
 	if (def->opts.stat != NULL) {
 		dup->opts.stat = index_stat_dup(def->opts.stat);
 		if (dup->opts.stat == NULL) {

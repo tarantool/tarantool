@@ -187,15 +187,6 @@ index_opts_decode(struct index_opts *opts, const char *map,
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
 			  "'euclid' or 'manhattan'");
 	}
-	if (opts->sql != NULL) {
-		char *sql = strdup(opts->sql);
-		if (sql == NULL) {
-			opts->sql = NULL;
-			tnt_raise(OutOfMemory, strlen(opts->sql) + 1, "strdup",
-				  "sql");
-		}
-		opts->sql = sql;
-	}
 	if (opts->range_size <= 0) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS,
