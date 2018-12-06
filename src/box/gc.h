@@ -123,13 +123,13 @@ struct gc_state {
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
 	/** Fiber that removes old files in the background. */
-	struct fiber *fiber;
+	struct fiber *cleanup_fiber;
 	/**
-	 * Condition variable signaled by the background fiber
+	 * Condition variable signaled by the cleanup fiber
 	 * whenever it completes a round of garbage collection.
 	 * Used to wait for garbage collection to complete.
 	 */
-	struct fiber_cond cond;
+	struct fiber_cond cleanup_cond;
 	/**
 	 * The following two members are used for scheduling
 	 * background garbage collection and waiting for it to
@@ -141,7 +141,7 @@ struct gc_state {
 	 * sleep until @completed reaches the value of @scheduled
 	 * taken at that moment of time.
 	 */
-	unsigned completed, scheduled;
+	unsigned cleanup_completed, cleanup_scheduled;
 	/**
 	 * Set if there's a fiber making a checkpoint right now.
 	 */

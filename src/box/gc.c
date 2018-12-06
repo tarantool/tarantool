@@ -59,7 +59,7 @@
 struct gc_state gc;
 
 static int
-gc_fiber_f(va_list);
+gc_cleanup_fiber_f(va_list);
 
 /**
  * Comparator used for ordering gc_consumer objects by signature
@@ -107,13 +107,13 @@ gc_init(void)
 	vclock_create(&gc.vclock);
 	rlist_create(&gc.checkpoints);
 	gc_tree_new(&gc.consumers);
-	fiber_cond_create(&gc.cond);
+	fiber_cond_create(&gc.cleanup_cond);
 
-	gc.fiber = fiber_new("gc", gc_fiber_f);
-	if (gc.fiber == NULL)
+	gc.cleanup_fiber = fiber_new("gc", gc_cleanup_fiber_f);
+	if (gc.cleanup_fiber == NULL)
 		panic("failed to start garbage collection fiber");
 
-	fiber_start(gc.fiber);
+	fiber_start(gc.cleanup_fiber);
 }
 
 void
@@ -147,7 +147,7 @@ gc_free(void)
  * this function is specified by box.cfg.checkpoint_count.
  */
 static void
-gc_run(void)
+gc_run_cleanup(void)
 {
 	bool run_wal_gc = false;
 	bool run_engine_gc = false;
@@ -209,20 +209,20 @@ gc_run(void)
 }
 
 static int
-gc_fiber_f(va_list ap)
+gc_cleanup_fiber_f(va_list ap)
 {
 	(void)ap;
 	while (!fiber_is_cancelled()) {
-		int delta = gc.scheduled - gc.completed;
+		int delta = gc.cleanup_scheduled - gc.cleanup_completed;
 		if (delta == 0) {
 			/* No pending garbage collection. */
 			fiber_sleep(TIMEOUT_INFINITY);
 			continue;
 		}
 		assert(delta > 0);
-		gc_run();
-		gc.completed += delta;
-		fiber_cond_signal(&gc.cond);
+		gc_run_cleanup();
+		gc.cleanup_completed += delta;
+		fiber_cond_signal(&gc.cleanup_cond);
 	}
 	return 0;
 }
@@ -231,7 +231,7 @@ gc_fiber_f(va_list ap)
  * Trigger asynchronous garbage collection.
  */
 static void
-gc_schedule(void)
+gc_schedule_cleanup(void)
 {
 	/*
 	 * Do not wake up the background fiber if it's executing
@@ -241,8 +241,8 @@ gc_schedule(void)
 	 * then - it will rerun garbage collection as soon as
 	 * the current round completes.
 	 */
-	if (gc.scheduled++ == gc.completed)
-		fiber_wakeup(gc.fiber);
+	if (gc.cleanup_scheduled++ == gc.cleanup_completed)
+		fiber_wakeup(gc.cleanup_fiber);
 }
 
 /**
@@ -250,11 +250,11 @@ gc_schedule(void)
  * to this point to complete.
  */
 static void
-gc_wait(void)
+gc_wait_cleanup(void)
 {
-	unsigned scheduled = gc.scheduled;
-	while (gc.completed < scheduled)
-		fiber_cond_wait(&gc.cond);
+	unsigned scheduled = gc.cleanup_scheduled;
+	while (gc.cleanup_completed < scheduled)
+		fiber_cond_wait(&gc.cleanup_cond);
 }
 
 void
@@ -284,7 +284,7 @@ gc_advance(const struct vclock *vclock)
 
 		consumer = next;
 	}
-	gc_schedule();
+	gc_schedule_cleanup();
 }
 
 void
@@ -305,7 +305,7 @@ gc_add_checkpoint(const struct vclock *vclock)
 		 * Rerun the garbage collector in this case, just
 		 * in case box.cfg.checkpoint_count has changed.
 		 */
-		gc_schedule();
+		gc_schedule_cleanup();
 		return;
 	}
 	assert(last_checkpoint == NULL ||
@@ -324,7 +324,7 @@ gc_add_checkpoint(const struct vclock *vclock)
 	rlist_add_tail_entry(&gc.checkpoints, checkpoint, in_checkpoints);
 	gc.checkpoint_count++;
 
-	gc_schedule();
+	gc_schedule_cleanup();
 }
 
 int
@@ -381,7 +381,7 @@ out:
 	 * files have been removed.
 	 */
 	if (rc == 0)
-		gc_wait();
+		gc_wait_cleanup();
 
 	return rc;
 }
@@ -402,7 +402,7 @@ void
 gc_unref_checkpoint(struct gc_checkpoint_ref *ref)
 {
 	rlist_del_entry(ref, in_refs);
-	gc_schedule();
+	gc_schedule_cleanup();
 }
 
 struct gc_consumer *
@@ -430,7 +430,7 @@ gc_consumer_unregister(struct gc_consumer *consumer)
 {
 	if (!consumer->is_inactive) {
 		gc_tree_remove(&gc.consumers, consumer);
-		gc_schedule();
+		gc_schedule_cleanup();
 	}
 	gc_consumer_delete(consumer);
 }
@@ -464,7 +464,7 @@ gc_consumer_advance(struct gc_consumer *consumer, const struct vclock *vclock)
 	if (update_tree)
 		gc_tree_insert(&gc.consumers, consumer);
 
-	gc_schedule();
+	gc_schedule_cleanup();
 }
 
 struct gc_consumer *
