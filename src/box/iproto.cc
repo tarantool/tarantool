@@ -283,6 +283,14 @@ static const struct cmsg_hop destroy_route[] = {
 	{ net_finish_destroy, NULL },
 };
 
+/** Fire on_disconnect triggers in the tx thread. */
+static void
+tx_process_disconnect(struct cmsg *m);
+
+static const struct cmsg_hop disconnect_route[] = {
+	{ tx_process_disconnect, NULL }
+};
+
 /**
  * Kharon is in the dead world (iproto). Schedule an event to
  * flush new obuf as reflected in the fresh wpos.
@@ -399,7 +407,19 @@ struct iproto_connection
 	/** Logical session. */
 	struct session *session;
 	ev_loop *loop;
-	/** Pre-allocated destroy msg. */
+	/**
+	 * Pre-allocated disconnect msg. Is sent right after
+	 * actual disconnect has happened. Does not destroy the
+	 * connection. Used to notify existing requests about the
+	 * occasion.
+	 */
+	struct cmsg disconnect_msg;
+	/**
+	 * Pre-allocated destroy msg. Is sent after disconnect has
+	 * happened and a last request has finished. Firstly
+	 * destroys tx-related resources and then deletes the
+	 * connection.
+	 */
 	struct cmsg destroy_msg;
 	/** True if destroy message is sent. Debug-only. */
 	bool is_destroy_sent;
@@ -564,6 +584,7 @@ iproto_connection_close(struct iproto_connection *con)
 		 * is done only once.
 		 */
 		con->p_ibuf->wpos -= con->parse_size;
+		cpipe_push(&tx_pipe, &con->disconnect_msg);
 	}
 	/*
 	 * If the connection has no outstanding requests in the
@@ -999,6 +1020,7 @@ iproto_connection_new(int fd)
 	rlist_create(&con->in_stop_list);
 	/* It may be very awkward to allocate at close. */
 	cmsg_init(&con->destroy_msg, destroy_route);
+	cmsg_init(&con->disconnect_msg, disconnect_route);
 	con->is_destroy_sent = false;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
@@ -1217,10 +1239,20 @@ tx_fiber_init(struct session *session, uint64_t sync)
 	fiber_set_user(f, &session->credentials);
 }
 
+static void
+tx_process_disconnect(struct cmsg *m)
+{
+	struct iproto_connection *con =
+		container_of(m, struct iproto_connection, disconnect_msg);
+	if (con->session != NULL && !rlist_empty(&session_on_disconnect)) {
+		tx_fiber_init(con->session, 0);
+		session_run_on_disconnect_triggers(con->session);
+	}
+}
+
 /**
- * Fire on_disconnect triggers in the tx
- * thread and destroy the session object,
- * as well as output buffers of the connection.
+ * Destroy the session object, as well as output buffers of the
+ * connection.
  */
 static void
 tx_process_destroy(struct cmsg *m)
@@ -1228,9 +1260,6 @@ tx_process_destroy(struct cmsg *m)
 	struct iproto_connection *con =
 		container_of(m, struct iproto_connection, destroy_msg);
 	if (con->session) {
-		tx_fiber_init(con->session, 0);
-		if (! rlist_empty(&session_on_disconnect))
-			session_run_on_disconnect_triggers(con->session);
 		session_destroy(con->session);
 		con->session = NULL; /* safety */
 	}

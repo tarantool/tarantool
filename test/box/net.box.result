@@ -2262,6 +2262,11 @@ box.session.on_disconnect(on_disconnect) == on_disconnect
 ---
 - true
 ...
+--
+-- gh-3859: on_disconnect is called only after all requests are
+-- processed, but should be called right after disconnect and
+-- only once.
+--
 ch1 = fiber.channel(1)
 ---
 ...
@@ -2284,20 +2289,26 @@ c:close()
 fiber.sleep(0)
 ---
 ...
-disconnected -- false
----
-- false
-...
-ch2:put(true)
----
-- true
-...
 while disconnected == false do fiber.sleep(0.01) end
 ---
 ...
 disconnected -- true
 ---
 - true
+...
+disconnected = nil
+---
+...
+ch2:put(true)
+---
+- true
+...
+fiber.sleep(0)
+---
+...
+disconnected -- nil, on_disconnect is not called second time.
+---
+- null
 ...
 box.session.on_disconnect(nil, on_disconnect)
 ---
