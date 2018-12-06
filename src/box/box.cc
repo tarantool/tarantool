@@ -2011,6 +2011,12 @@ tx_prio_cb(struct ev_loop *loop, ev_watcher *watcher, int events)
 	cbus_process(endpoint);
 }
 
+static void
+on_wal_garbage_collection(const struct vclock *vclock)
+{
+	gc_advance(vclock);
+}
+
 void
 box_init(void)
 {
@@ -2125,10 +2131,9 @@ box_cfg_xc(void)
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_rows,
 		     wal_max_size, &INSTANCE_UUID, &replicaset.vclock,
-		     &checkpoint->vclock) != 0) {
+		     &checkpoint->vclock, on_wal_garbage_collection) != 0) {
 		diag_raise();
 	}
-	gc_set_wal_watcher();
 
 	rmean_cleanup(rmean_box);
 

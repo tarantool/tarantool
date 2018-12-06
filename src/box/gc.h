@@ -36,7 +36,6 @@
 
 #include "fiber_cond.h"
 #include "vclock.h"
-#include "wal.h"
 #include "trivia/util.h"
 
 #if defined(__cplusplus)
@@ -122,11 +121,6 @@ struct gc_state {
 	struct rlist checkpoints;
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
-	/**
-	 * WAL event watcher. Needed to shoot off stale consumers
-	 * when a WAL file is deleted due to ENOSPC.
-	 */
-	struct wal_watcher wal_watcher;
 	/** Fiber that removes old files in the background. */
 	struct fiber *fiber;
 	/**
@@ -192,12 +186,6 @@ void
 gc_init(void);
 
 /**
- * Set WAL watcher. Called after WAL is initialized.
- */
-void
-gc_set_wal_watcher(void);
-
-/**
  * Destroy the garbage collection state.
  */
 void
@@ -209,6 +197,13 @@ gc_free(void);
  */
 void
 gc_wait(void);
+
+/**
+ * Advance the garbage collector vclock to the given position.
+ * Deactivate WAL consumers that need older data.
+ */
+void
+gc_advance(const struct vclock *vclock);
 
 /**
  * Update the minimal number of checkpoints to preserve.
