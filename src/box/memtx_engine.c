@@ -610,8 +610,8 @@ checkpoint_new(const char *snap_dirname, uint64_t snap_io_rate_limit)
 static void
 checkpoint_delete(struct checkpoint *ckpt)
 {
-	struct checkpoint_entry *entry;
-	rlist_foreach_entry(entry, &ckpt->entries, link) {
+	struct checkpoint_entry *entry, *tmp;
+	rlist_foreach_entry_safe(entry, &ckpt->entries, link, tmp) {
 		entry->iterator->free(entry->iterator);
 		free(entry);
 	}
