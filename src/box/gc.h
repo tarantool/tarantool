@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <small/rlist.h>
 
@@ -141,6 +142,10 @@ struct gc_state {
 	 * taken at that moment of time.
 	 */
 	unsigned completed, scheduled;
+	/**
+	 * Set if there's a fiber making a checkpoint right now.
+	 */
+	bool checkpoint_is_in_progress;
 };
 extern struct gc_state gc;
 
@@ -192,13 +197,6 @@ void
 gc_free(void);
 
 /**
- * Wait for background garbage collection scheduled prior
- * to this point to complete.
- */
-void
-gc_wait(void);
-
-/**
  * Advance the garbage collector vclock to the given position.
  * Deactivate WAL consumers that need older data.
  */
@@ -217,12 +215,24 @@ void
 gc_set_min_checkpoint_count(int min_checkpoint_count);
 
 /**
- * Track a new checkpoint in the garbage collector state.
- * Note, this function may run garbage collector to remove
+ * Track an existing checkpoint in the garbage collector state.
+ * Note, this function may trigger garbage collection to remove
  * old checkpoints.
  */
 void
 gc_add_checkpoint(const struct vclock *vclock);
+
+/**
+ * Make a checkpoint.
+ *
+ * This function runs engine/WAL callbacks to create a checkpoint
+ * on disk, then tracks the new checkpoint in the garbage collector
+ * state (see gc_add_checkpoint()).
+ *
+ * Returns 0 on success. On failure returns -1 and sets diag.
+ */
+int
+gc_checkpoint(void);
 
 /**
  * Get a reference to @checkpoint and store it in @ref.

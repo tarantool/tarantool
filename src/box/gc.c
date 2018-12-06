@@ -45,11 +45,14 @@
 #include <small/rlist.h>
 
 #include "diag.h"
+#include "errcode.h"
 #include "fiber.h"
 #include "fiber_cond.h"
+#include "latch.h"
 #include "say.h"
 #include "vclock.h"
 #include "cbus.h"
+#include "schema.h"
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
 
@@ -242,7 +245,11 @@ gc_schedule(void)
 		fiber_wakeup(gc.fiber);
 }
 
-void
+/**
+ * Wait for background garbage collection scheduled prior
+ * to this point to complete.
+ */
+static void
 gc_wait(void)
 {
 	unsigned scheduled = gc.scheduled;
@@ -318,6 +325,65 @@ gc_add_checkpoint(const struct vclock *vclock)
 	gc.checkpoint_count++;
 
 	gc_schedule();
+}
+
+int
+gc_checkpoint(void)
+{
+	int rc;
+	struct vclock vclock;
+
+	if (gc.checkpoint_is_in_progress) {
+		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
+		return -1;
+	}
+	gc.checkpoint_is_in_progress = true;
+
+	/*
+	 * We don't support DDL operations while making a checkpoint.
+	 * Lock them out.
+	 */
+	latch_lock(&schema_lock);
+
+	/*
+	 * Rotate WAL and call engine callbacks to create a checkpoint
+	 * on disk for each registered engine.
+	 */
+	rc = engine_begin_checkpoint();
+	if (rc != 0)
+		goto out;
+	rc = wal_begin_checkpoint(&vclock);
+	if (rc != 0)
+		goto out;
+	rc = engine_commit_checkpoint(&vclock);
+	if (rc != 0)
+		goto out;
+	wal_commit_checkpoint(&vclock);
+
+	/*
+	 * Finally, track the newly created checkpoint in the garbage
+	 * collector state.
+	 */
+	gc_add_checkpoint(&vclock);
+out:
+	if (rc != 0)
+		engine_abort_checkpoint();
+
+	latch_unlock(&schema_lock);
+	gc.checkpoint_is_in_progress = false;
+
+	/*
+	 * Wait for background garbage collection that might
+	 * have been triggered by this checkpoint to complete.
+	 * Strictly speaking, it isn't necessary, but it
+	 * simplifies testing as it guarantees that by the
+	 * time box.snapshot() returns, all outdated checkpoint
+	 * files have been removed.
+	 */
+	if (rc == 0)
+		gc_wait();
+
+	return rc;
 }
 
 void

@@ -90,11 +90,6 @@ static void title(const char *new_status)
 const struct vclock *box_vclock = &replicaset.vclock;
 
 /**
- * Set if there's a fiber performing box_checkpoint() right now.
- */
-static bool checkpoint_is_in_progress;
-
-/**
  * Set if backup is in progress, i.e. box_backup_start() was
  * called but box_backup_stop() hasn't been yet.
  */
@@ -2185,45 +2180,8 @@ box_checkpoint()
 	/* Signal arrived before box.cfg{} */
 	if (! is_box_configured)
 		return 0;
-	int rc = 0;
-	if (checkpoint_is_in_progress) {
-		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
-		return -1;
-	}
-	checkpoint_is_in_progress = true;
-	/* create checkpoint files */
-	latch_lock(&schema_lock);
-	if ((rc = engine_begin_checkpoint()))
-		goto end;
 
-	struct vclock vclock;
-	if ((rc = wal_begin_checkpoint(&vclock)))
-		goto end;
-
-	if ((rc = engine_commit_checkpoint(&vclock)))
-		goto end;
-
-	wal_commit_checkpoint(&vclock);
-	gc_add_checkpoint(&vclock);
-end:
-	if (rc)
-		engine_abort_checkpoint();
-
-	latch_unlock(&schema_lock);
-	checkpoint_is_in_progress = false;
-
-	/*
-	 * Wait for background garbage collection that might
-	 * have been triggered by this checkpoint to complete.
-	 * Strictly speaking, it isn't necessary, but it
-	 * simplifies testing as it guarantees that by the
-	 * time box.snapshot() returns, all outdated checkpoint
-	 * files have been removed.
-	 */
-	if (!rc)
-		gc_wait();
-
-	return rc;
+	return gc_checkpoint();
 }
 
 int
