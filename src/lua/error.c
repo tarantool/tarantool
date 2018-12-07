@@ -75,12 +75,20 @@ luaL_error_gc(struct lua_State *L)
 void
 luaT_pusherror(struct lua_State *L, struct error *e)
 {
+	/*
+	 * gh-1955 luaT_pusherror allocates Lua objects, thus it
+	 * may trigger GC. GC may invoke finalizers which are
+	 * arbitrary Lua code, potentially invalidating last error
+	 * object, hence error_ref below.
+	 *
+	 * It also important to reference the error first and only
+	 * then set the finalizer.
+	 */
+	error_ref(e);
 	assert(CTID_CONST_STRUCT_ERROR_REF != 0);
 	struct error **ptr = (struct error **)
 		luaL_pushcdata(L, CTID_CONST_STRUCT_ERROR_REF);
 	*ptr = e;
-	/* The order is important - first reference the error, then set gc */
-	error_ref(e);
 	lua_pushcfunction(L, luaL_error_gc);
 	luaL_setcdatagc(L, -2);
 }
@@ -90,15 +98,7 @@ luaT_error(lua_State *L)
 {
 	struct error *e = diag_last_error(&fiber()->diag);
 	assert(e != NULL);
-	/*
-	 * gh-1955 luaT_pusherror allocates Lua objects, thus it may trigger
-	 * GC. GC may invoke finalizers which are arbitrary Lua code,
-	 * potentially invalidating last error object, hence error_ref
-	 * below.
-	 */
-	error_ref(e);
 	luaT_pusherror(L, e);
-	error_unref(e);
 	lua_error(L);
 	unreachable();
 	return 0;
