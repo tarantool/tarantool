@@ -250,21 +250,27 @@ local dynamic_cfg = {
 }
 
 local dynamic_cfg_skip_at_load = {
-    wal_mode                = true,
     listen                  = true,
     memtx_memory            = true,
+    memtx_max_tuple_size    = true,
     vinyl_memory            = true,
+    vinyl_max_tuple_size    = true,
+    vinyl_cache             = true,
+    vinyl_timeout           = true,
+    too_long_threshold      = true,
     replication             = true,
     replication_timeout     = true,
     replication_connect_timeout = true,
     replication_connect_quorum = true,
     replication_sync_lag    = true,
     replication_sync_timeout = true,
+    replication_skip_conflict = true,
     wal_dir_rescan_delay    = true,
     custom_proc_title       = true,
     force_recovery          = true,
     instance_uuid           = true,
     replicaset_uuid         = true,
+    net_msg_max             = true,
 }
 
 local function convert_gb(size)
