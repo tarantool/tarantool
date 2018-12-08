@@ -426,6 +426,18 @@ gc_checkpoint(void)
 	return 0;
 }
 
+void
+gc_trigger_checkpoint(void)
+{
+	if (gc.checkpoint_is_in_progress || gc.checkpoint_is_pending)
+		return;
+
+	gc.checkpoint_is_pending = true;
+	checkpoint_schedule_reset(&gc.checkpoint_schedule,
+				  ev_monotonic_now(loop()));
+	fiber_wakeup(gc.checkpoint_fiber);
+}
+
 static int
 gc_checkpoint_fiber_f(va_list ap)
 {
@@ -452,7 +464,8 @@ gc_checkpoint_fiber_f(va_list ap)
 			/* Periodic checkpointing is disabled. */
 			timeout = TIMEOUT_INFINITY;
 		}
-		if (!fiber_yield_timeout(timeout)) {
+		if (!fiber_yield_timeout(timeout) &&
+		    !gc.checkpoint_is_pending) {
 			/*
 			 * The checkpoint schedule has changed.
 			 * Reschedule the next checkpoint.
@@ -460,6 +473,7 @@ gc_checkpoint_fiber_f(va_list ap)
 			continue;
 		}
 		/* Time to make the next scheduled checkpoint. */
+		gc.checkpoint_is_pending = false;
 		if (gc.checkpoint_is_in_progress) {
 			/*
 			 * Another fiber is making a checkpoint.

@@ -858,6 +858,13 @@ box_set_checkpoint_interval(void)
 }
 
 void
+box_set_checkpoint_wal_threshold(void)
+{
+	int64_t threshold = cfg_geti64("checkpoint_wal_threshold");
+	wal_set_checkpoint_threshold(threshold);
+}
+
+void
 box_set_vinyl_memory(void)
 {
 	struct vinyl_engine *vinyl;
@@ -2023,6 +2030,13 @@ on_wal_garbage_collection(const struct vclock *vclock)
 	gc_advance(vclock);
 }
 
+static void
+on_wal_checkpoint_threshold(void)
+{
+	say_info("WAL threshold exceeded, triggering checkpoint");
+	gc_trigger_checkpoint();
+}
+
 void
 box_init(void)
 {
@@ -2136,7 +2150,8 @@ box_cfg_xc(void)
 	enum wal_mode wal_mode = box_check_wal_mode(cfg_gets("wal_mode"));
 	if (wal_init(wal_mode, cfg_gets("wal_dir"), wal_max_rows,
 		     wal_max_size, &INSTANCE_UUID, &replicaset.vclock,
-		     &checkpoint->vclock, on_wal_garbage_collection) != 0) {
+		     &checkpoint->vclock, on_wal_garbage_collection,
+		     on_wal_checkpoint_threshold) != 0) {
 		diag_raise();
 	}
 

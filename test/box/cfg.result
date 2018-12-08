@@ -20,6 +20,8 @@ cfg_filter(box.cfg)
     - 2
   - - checkpoint_interval
     - 3600
+  - - checkpoint_wal_threshold
+    - 1000000000000000000
   - - coredump
     - false
   - - feedback_enabled
@@ -119,6 +121,8 @@ cfg_filter(box.cfg)
     - 2
   - - checkpoint_interval
     - 3600
+  - - checkpoint_wal_threshold
+    - 1000000000000000000
   - - coredump
     - false
   - - feedback_enabled

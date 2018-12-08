@@ -151,6 +151,11 @@ struct gc_state {
 	 * Set if there's a fiber making a checkpoint right now.
 	 */
 	bool checkpoint_is_in_progress;
+	/**
+	 * If this flag is set, the checkpoint daemon should create
+	 * a checkpoint as soon as possible despite the schedule.
+	 */
+	bool checkpoint_is_pending;
 };
 extern struct gc_state gc;
 
@@ -245,6 +250,14 @@ gc_add_checkpoint(const struct vclock *vclock);
  */
 int
 gc_checkpoint(void);
+
+/**
+ * Trigger background checkpointing.
+ *
+ * The checkpoint will be created by the checkpoint daemon.
+ */
+void
+gc_trigger_checkpoint(void);
 
 /**
  * Get a reference to @checkpoint and store it in @ref.

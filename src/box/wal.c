@@ -92,6 +92,7 @@ struct wal_writer
 	struct journal base;
 	/* ----------------- tx ------------------- */
 	wal_on_garbage_collection_f on_garbage_collection;
+	wal_on_checkpoint_threshold_f on_checkpoint_threshold;
 	/**
 	 * The rollback queue. An accumulator for all requests
 	 * that need to be rolled back. Also acts as a valve
@@ -126,6 +127,23 @@ struct wal_writer
 	 * recover from it even if it is running out of disk space.
 	 */
 	struct vclock checkpoint_vclock;
+	/** Total size of WAL files written since the last checkpoint. */
+	int64_t checkpoint_wal_size;
+	/**
+	 * Checkpoint threshold: when the total size of WAL files
+	 * written since the last checkpoint exceeds the value of
+	 * this variable, the WAL thread will notify TX that it's
+	 * time to trigger checkpointing.
+	 */
+	int64_t checkpoint_threshold;
+	/**
+	 * This flag is set if the WAL thread has notified TX that
+	 * the checkpoint threshold has been exceeded. It is cleared
+	 * on checkpoint completion. Needed in order not to invoke
+	 * the TX callback over and over again while checkpointing
+	 * is in progress.
+	 */
+	bool checkpoint_triggered;
 	/** The current WAL file. */
 	struct xlog current_wal;
 	/**
@@ -309,6 +327,14 @@ tx_notify_gc(struct cmsg *msg)
 	free(msg);
 }
 
+static void
+tx_notify_checkpoint(struct cmsg *msg)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	writer->on_checkpoint_threshold();
+	free(msg);
+}
+
 /**
  * Initialize WAL writer context. Even though it's a singleton,
  * encapsulate the details just in case we may use
@@ -320,7 +346,8 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 		  int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 		  const struct vclock *vclock,
 		  const struct vclock *checkpoint_vclock,
-		  wal_on_garbage_collection_f on_garbage_collection)
+		  wal_on_garbage_collection_f on_garbage_collection,
+		  wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
 	writer->wal_mode = wal_mode;
 	writer->wal_max_rows = wal_max_rows;
@@ -336,11 +363,16 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	stailq_create(&writer->rollback);
 	cmsg_init(&writer->in_rollback, NULL);
 
+	writer->checkpoint_wal_size = 0;
+	writer->checkpoint_threshold = INT64_MAX;
+	writer->checkpoint_triggered = false;
+
 	vclock_copy(&writer->vclock, vclock);
 	vclock_copy(&writer->checkpoint_vclock, checkpoint_vclock);
 	rlist_create(&writer->watchers);
 
 	writer->on_garbage_collection = on_garbage_collection;
+	writer->on_checkpoint_threshold = on_checkpoint_threshold;
 }
 
 /** Destroy a WAL writer structure. */
@@ -446,14 +478,16 @@ int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
 	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
 	 const struct vclock *vclock, const struct vclock *checkpoint_vclock,
-	 wal_on_garbage_collection_f on_garbage_collection)
+	 wal_on_garbage_collection_f on_garbage_collection,
+	 wal_on_checkpoint_threshold_f on_checkpoint_threshold)
 {
 	assert(wal_max_rows > 1);
 
 	struct wal_writer *writer = &wal_writer_singleton;
 	wal_writer_create(writer, wal_mode, wal_dirname, wal_max_rows,
 			  wal_max_size, instance_uuid, vclock,
-			  checkpoint_vclock, on_garbage_collection);
+			  checkpoint_vclock, on_garbage_collection,
+			  on_checkpoint_threshold);
 
 	/*
 	 * Scan the WAL directory to build an index of all
@@ -524,6 +558,7 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 		 */
 	}
 	vclock_copy(&msg->vclock, &writer->vclock);
+	msg->wal_size = writer->checkpoint_wal_size;
 	return 0;
 }
 
@@ -533,6 +568,7 @@ wal_begin_checkpoint(struct wal_checkpoint *checkpoint)
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE) {
 		vclock_copy(&checkpoint->vclock, &writer->vclock);
+		checkpoint->wal_size = 0;
 		return 0;
 	}
 	if (!stailq_empty(&writer->rollback)) {
@@ -561,7 +597,20 @@ wal_commit_checkpoint_f(struct cbus_call_msg *data)
 {
 	struct wal_checkpoint *msg = (struct wal_checkpoint *) data;
 	struct wal_writer *writer = &wal_writer_singleton;
+	/*
+	 * Now, once checkpoint has been created, we can update
+	 * the WAL's version of the last checkpoint vclock and
+	 * reset the size of WAL files written since the last
+	 * checkpoint. Note, since new WAL records may have been
+	 * written while the checkpoint was created, we subtract
+	 * the value of checkpoint_wal_size observed at the time
+	 * when checkpointing started from the current value
+	 * rather than just setting it to 0.
+	 */
 	vclock_copy(&writer->checkpoint_vclock, &msg->vclock);
+	assert(writer->checkpoint_wal_size >= msg->wal_size);
+	writer->checkpoint_wal_size -= msg->wal_size;
+	writer->checkpoint_triggered = false;
 	return 0;
 }
 
@@ -576,6 +625,36 @@ wal_commit_checkpoint(struct wal_checkpoint *checkpoint)
 	bool cancellable = fiber_set_cancellable(false);
 	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
 		  &checkpoint->base, wal_commit_checkpoint_f, NULL,
+		  TIMEOUT_INFINITY);
+	fiber_set_cancellable(cancellable);
+}
+
+struct wal_set_checkpoint_threshold_msg {
+	struct cbus_call_msg base;
+	int64_t checkpoint_threshold;
+};
+
+static int
+wal_set_checkpoint_threshold_f(struct cbus_call_msg *data)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	struct wal_set_checkpoint_threshold_msg *msg;
+	msg = (struct wal_set_checkpoint_threshold_msg *)data;
+	writer->checkpoint_threshold = msg->checkpoint_threshold;
+	return 0;
+}
+
+void
+wal_set_checkpoint_threshold(int64_t threshold)
+{
+	struct wal_writer *writer = &wal_writer_singleton;
+	if (writer->wal_mode == WAL_NONE)
+		return;
+	struct wal_set_checkpoint_threshold_msg msg;
+	msg.checkpoint_threshold = threshold;
+	bool cancellable = fiber_set_cancellable(false);
+	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
+		  &msg.base, wal_set_checkpoint_threshold_f, NULL,
 		  TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 }
@@ -891,22 +970,49 @@ wal_write_to_disk(struct cmsg *msg)
 	/*
 	 * Iterate over requests (transactions)
 	 */
+	int rc;
 	struct journal_entry *entry;
 	struct stailq_entry *last_committed = NULL;
 	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
 		wal_assign_lsn(writer, entry->rows, entry->rows + entry->n_rows);
 		entry->res = vclock_sum(&writer->vclock);
-		int rc = xlog_write_entry(l, entry);
+		rc = xlog_write_entry(l, entry);
 		if (rc < 0)
 			goto done;
-		if (rc > 0)
+		if (rc > 0) {
+			writer->checkpoint_wal_size += rc;
 			last_committed = &entry->fifo;
+		}
 		/* rc == 0: the write is buffered in xlog_tx */
 	}
-	if (xlog_flush(l) < 0)
+	rc = xlog_flush(l);
+	if (rc < 0)
 		goto done;
 
+	writer->checkpoint_wal_size += rc;
 	last_committed = stailq_last(&wal_msg->commit);
+
+	/*
+	 * Notify TX if the checkpoint threshold has been exceeded.
+	 * Use malloc() for allocating the notification message and
+	 * don't panic on error, because if we fail to send the
+	 * message now, we will retry next time we process a request.
+	 */
+	if (!writer->checkpoint_triggered &&
+	    writer->checkpoint_wal_size > writer->checkpoint_threshold) {
+		static struct cmsg_hop route[] = {
+			{ tx_notify_checkpoint, NULL },
+		};
+		struct cmsg *msg = malloc(sizeof(*msg));
+		if (msg != NULL) {
+			cmsg_init(msg, route);
+			cpipe_push(&wal_thread.tx_prio_pipe, msg);
+			writer->checkpoint_triggered = true;
+		} else {
+			say_warn("failed to allocate checkpoint "
+				 "notification message");
+		}
+	}
 
 done:
 	error = diag_last_error(diag_get());
