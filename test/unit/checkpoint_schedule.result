@@ -1,0 +1,41 @@
+	*** main ***
+1..38
+ok 1 - checkpointing disabled - timeout after configuration
+ok 2 - checkpointing disabled - timeout after sleep
+ok 3 - checkpointing disabled - timeout after reset
+ok 4 - checkpoint interval 100 - timeout after configuration
+ok 5 - checkpoint interval 100 - initial timeout randomization
+ok 6 - checkpoint interval 100 - timeout after sleep 1
+ok 7 - checkpoint interval 100 - timeout after sleep 2
+ok 8 - checkpoint interval 100 - timeout after sleep 3
+ok 9 - checkpoint interval 100 - timeout after sleep 4
+ok 10 - checkpoint interval 100 - timeout after reset
+ok 11 - checkpoint interval 600 - timeout after configuration
+ok 12 - checkpoint interval 600 - initial timeout randomization
+ok 13 - checkpoint interval 600 - timeout after sleep 1
+ok 14 - checkpoint interval 600 - timeout after sleep 2
+ok 15 - checkpoint interval 600 - timeout after sleep 3
+ok 16 - checkpoint interval 600 - timeout after sleep 4
+ok 17 - checkpoint interval 600 - timeout after reset
+ok 18 - checkpoint interval 1200 - timeout after configuration
+ok 19 - checkpoint interval 1200 - initial timeout randomization
+ok 20 - checkpoint interval 1200 - timeout after sleep 1
+ok 21 - checkpoint interval 1200 - timeout after sleep 2
+ok 22 - checkpoint interval 1200 - timeout after sleep 3
+ok 23 - checkpoint interval 1200 - timeout after sleep 4
+ok 24 - checkpoint interval 1200 - timeout after reset
+ok 25 - checkpoint interval 1800 - timeout after configuration
+ok 26 - checkpoint interval 1800 - initial timeout randomization
+ok 27 - checkpoint interval 1800 - timeout after sleep 1
+ok 28 - checkpoint interval 1800 - timeout after sleep 2
+ok 29 - checkpoint interval 1800 - timeout after sleep 3
+ok 30 - checkpoint interval 1800 - timeout after sleep 4
+ok 31 - checkpoint interval 1800 - timeout after reset
+ok 32 - checkpoint interval 3600 - timeout after configuration
+ok 33 - checkpoint interval 3600 - initial timeout randomization
+ok 34 - checkpoint interval 3600 - timeout after sleep 1
+ok 35 - checkpoint interval 3600 - timeout after sleep 2
+ok 36 - checkpoint interval 3600 - timeout after sleep 3
+ok 37 - checkpoint interval 3600 - timeout after sleep 4
+ok 38 - checkpoint interval 3600 - timeout after reset
+	*** main: done ***

@@ -195,3 +195,9 @@ target_link_libraries(coll.test core unit ${ICU_LIBRARIES} misc)
 
 add_executable(tuple_bigref.test tuple_bigref.c)
 target_link_libraries(tuple_bigref.test tuple unit)
+
+add_executable(checkpoint_schedule.test
+    checkpoint_schedule.c
+    ${PROJECT_SOURCE_DIR}/src/box/checkpoint_schedule.c
+)
+target_link_libraries(checkpoint_schedule.test m unit)
