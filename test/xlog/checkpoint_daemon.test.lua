@@ -6,6 +6,8 @@ test_run = env.new()
 
 test_run:cleanup_cluster()
 
+default_checkpoint_count = box.cfg.checkpoint_count
+default_checkpoint_interval = box.cfg.checkpoint_interval
 box.cfg{checkpoint_interval = 0}
 
 PERIOD = jit.os == 'Linux' and 0.03 or 1.5
@@ -85,62 +87,13 @@ test_run:wait_cond(function()
 end, WAIT_COND_TIMEOUT);
 test_run:cmd("setopt delimiter ''");
 
--- restore default options
-box.cfg{checkpoint_interval = 3600 * 4, checkpoint_count = 4 }
-space:drop()
-
-daemon = box.internal.checkpoint_daemon
--- stop daemon
-box.cfg{ checkpoint_interval = 0 }
--- wait daemon to stop
-while daemon.fiber ~= nil do fiber.sleep(0) end
-daemon.fiber == nil
--- start daemon
-box.cfg{ checkpoint_interval = 10 }
-daemon.fiber ~= nil
--- reload configuration
-box.cfg{ checkpoint_interval = 15, checkpoint_count = 20 }
-daemon.checkpoint_interval == 15
-daemon.checkpoint_count = 20
-
 -- Check that checkpoint_count can't be < 1.
 box.cfg{ checkpoint_count = 1 }
 box.cfg{ checkpoint_count = 0 }
 box.cfg.checkpoint_count
 
--- Start
-PERIOD = 3600
-box.cfg{ checkpoint_count = 2, checkpoint_interval = PERIOD}
-snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
-snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
-snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
+-- Restore default options.
+box.cfg{checkpoint_count = default_checkpoint_count}
+box.cfg{checkpoint_interval = default_checkpoint_interval}
 
-daemon_fiber = daemon.fiber
-daemon_control = daemon.control
-
--- Reload #1
-PERIOD = 100
-box.cfg{ checkpoint_count = 2, checkpoint_interval = PERIOD}
-snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
-snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
-snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
-daemon.fiber == daemon_fiber
-daemon.control == daemon_control
-
--- Reload #2
-PERIOD = 1000
-box.cfg{ checkpoint_count = 2, checkpoint_interval = PERIOD}
-snapshot_time, time  = daemon.next_snapshot_time, fiber.time()
-snapshot_time + 1 >= time + PERIOD or {snapshot_time, time, PERIOD}
-snapshot_time - 1 <= time + 2 * PERIOD or {snapshot_time, time, PERIOD}
-daemon.fiber == daemon_fiber
-daemon.control == daemon_control
-
-daemon_control = nil
-daemin_fiber = nil
-
--- Shutdown
-box.cfg{ checkpoint_count = 2, checkpoint_interval = 0}
-daemon.next_snapshot_time
-daemon.fiber == nil
-daemon.control == nil
+space:drop()

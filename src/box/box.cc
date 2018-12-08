@@ -851,6 +851,13 @@ box_set_checkpoint_count(void)
 }
 
 void
+box_set_checkpoint_interval(void)
+{
+	double interval = cfg_getd("checkpoint_interval");
+	gc_set_checkpoint_interval(interval);
+}
+
+void
 box_set_vinyl_memory(void)
 {
 	struct vinyl_engine *vinyl;

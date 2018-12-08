@@ -38,6 +38,7 @@
 #include "fiber_cond.h"
 #include "vclock.h"
 #include "trivia/util.h"
+#include "checkpoint_schedule.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -122,6 +123,10 @@ struct gc_state {
 	struct rlist checkpoints;
 	/** Registered consumers, linked by gc_consumer::node. */
 	gc_tree_t consumers;
+	/** Fiber responsible for periodic checkpointing. */
+	struct fiber *checkpoint_fiber;
+	/** Schedule of periodic checkpoints. */
+	struct checkpoint_schedule checkpoint_schedule;
 	/** Fiber that removes old files in the background. */
 	struct fiber *cleanup_fiber;
 	/**
@@ -213,6 +218,13 @@ gc_advance(const struct vclock *vclock);
  */
 void
 gc_set_min_checkpoint_count(int min_checkpoint_count);
+
+/**
+ * Set the time interval between checkpoints, in seconds.
+ * Setting the interval to 0 disables periodic checkpointing.
+ */
+void
+gc_set_checkpoint_interval(double interval);
 
 /**
  * Track an existing checkpoint in the garbage collector state.

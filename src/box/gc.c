@@ -39,10 +39,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #define RB_COMPACT 1
 #include <small/rb.h>
 #include <small/rlist.h>
+#include <tarantool_ev.h>
 
 #include "diag.h"
 #include "errcode.h"
@@ -55,11 +57,14 @@
 #include "schema.h"
 #include "engine.h"		/* engine_collect_garbage() */
 #include "wal.h"		/* wal_collect_garbage() */
+#include "checkpoint_schedule.h"
 
 struct gc_state gc;
 
 static int
 gc_cleanup_fiber_f(va_list);
+static int
+gc_checkpoint_fiber_f(va_list);
 
 /**
  * Comparator used for ordering gc_consumer objects by signature
@@ -108,12 +113,19 @@ gc_init(void)
 	rlist_create(&gc.checkpoints);
 	gc_tree_new(&gc.consumers);
 	fiber_cond_create(&gc.cleanup_cond);
+	checkpoint_schedule_cfg(&gc.checkpoint_schedule, 0, 0);
 
 	gc.cleanup_fiber = fiber_new("gc", gc_cleanup_fiber_f);
 	if (gc.cleanup_fiber == NULL)
 		panic("failed to start garbage collection fiber");
 
+	gc.checkpoint_fiber = fiber_new("checkpoint_daemon",
+					gc_checkpoint_fiber_f);
+	if (gc.checkpoint_fiber == NULL)
+		panic("failed to start checkpoint daemon fiber");
+
 	fiber_start(gc.cleanup_fiber);
+	fiber_start(gc.checkpoint_fiber);
 }
 
 void
@@ -294,6 +306,18 @@ gc_set_min_checkpoint_count(int min_checkpoint_count)
 }
 
 void
+gc_set_checkpoint_interval(double interval)
+{
+	/*
+	 * Reconfigure the schedule and wake up the checkpoint
+	 * daemon so that it can readjust.
+	 */
+	checkpoint_schedule_cfg(&gc.checkpoint_schedule,
+				ev_monotonic_now(loop()), interval);
+	fiber_wakeup(gc.checkpoint_fiber);
+}
+
+void
 gc_add_checkpoint(const struct vclock *vclock)
 {
 	struct gc_checkpoint *last_checkpoint = gc_last_checkpoint();
@@ -327,16 +351,13 @@ gc_add_checkpoint(const struct vclock *vclock)
 	gc_schedule_cleanup();
 }
 
-int
-gc_checkpoint(void)
+static int
+gc_do_checkpoint(void)
 {
 	int rc;
 	struct vclock vclock;
 
-	if (gc.checkpoint_is_in_progress) {
-		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
-		return -1;
-	}
+	assert(!gc.checkpoint_is_in_progress);
 	gc.checkpoint_is_in_progress = true;
 
 	/*
@@ -371,6 +392,27 @@ out:
 
 	latch_unlock(&schema_lock);
 	gc.checkpoint_is_in_progress = false;
+	return rc;
+}
+
+int
+gc_checkpoint(void)
+{
+	if (gc.checkpoint_is_in_progress) {
+		diag_set(ClientError, ER_CHECKPOINT_IN_PROGRESS);
+		return -1;
+	}
+
+	/*
+	 * Reset the schedule and wake up the checkpoint daemon
+	 * so that it can readjust.
+	 */
+	checkpoint_schedule_reset(&gc.checkpoint_schedule,
+				  ev_monotonic_now(loop()));
+	fiber_wakeup(gc.checkpoint_fiber);
+
+	if (gc_do_checkpoint() != 0)
+		return -1;
 
 	/*
 	 * Wait for background garbage collection that might
@@ -380,10 +422,55 @@ out:
 	 * time box.snapshot() returns, all outdated checkpoint
 	 * files have been removed.
 	 */
-	if (rc == 0)
-		gc_wait_cleanup();
+	gc_wait_cleanup();
+	return 0;
+}
 
-	return rc;
+static int
+gc_checkpoint_fiber_f(va_list ap)
+{
+	(void)ap;
+
+	/*
+	 * Make the fiber non-cancellable so as not to bother
+	 * about spurious wakeups.
+	 */
+	fiber_set_cancellable(false);
+
+	struct checkpoint_schedule *sched = &gc.checkpoint_schedule;
+	while (!fiber_is_cancelled()) {
+		double timeout = checkpoint_schedule_timeout(sched,
+					ev_monotonic_now(loop()));
+		if (timeout > 0) {
+			char buf[128];
+			struct tm tm;
+			time_t time = (time_t)(ev_now(loop()) + timeout);
+			localtime_r(&time, &tm);
+			strftime(buf, sizeof(buf), "%c", &tm);
+			say_info("scheduled next checkpoint for %s", buf);
+		} else {
+			/* Periodic checkpointing is disabled. */
+			timeout = TIMEOUT_INFINITY;
+		}
+		if (!fiber_yield_timeout(timeout)) {
+			/*
+			 * The checkpoint schedule has changed.
+			 * Reschedule the next checkpoint.
+			 */
+			continue;
+		}
+		/* Time to make the next scheduled checkpoint. */
+		if (gc.checkpoint_is_in_progress) {
+			/*
+			 * Another fiber is making a checkpoint.
+			 * Skip this one.
+			 */
+			continue;
+		}
+		if (gc_do_checkpoint() != 0)
+			diag_log();
+	}
+	return 0;
 }
 
 void
