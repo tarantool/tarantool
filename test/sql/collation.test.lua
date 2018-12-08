@@ -94,3 +94,11 @@ box.sql.execute("SELECT b COLLATE \"unicode\" FROM t UNION SELECT a FROM t;")
 
 box.sql.execute("DROP TABLE t;")
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
+-- gh-3857 "PRAGMA collation_list" invokes segmentation fault.
+box.schema.user.create('tmp')
+box.session.su('tmp')
+-- Error: read access to space is denied.
+box.sql.execute("pragma collation_list")
+box.session.su('admin')
+box.schema.user.drop('tmp')

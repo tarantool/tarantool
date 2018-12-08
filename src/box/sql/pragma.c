@@ -521,6 +521,11 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		box_tuple_t *tuple;
 		box_iterator_t* iter;
 		iter = box_index_iterator(space->def->id, 0,ITER_ALL, key_buf, key_end);
+		if (iter == NULL) {
+			pParse->rc = SQL_TARANTOOL_ERROR;
+			pParse->nErr++;
+			goto pragma_out;
+		}
 		int rc = box_iterator_next(iter, &tuple);
 		(void) rc;
 		assert(rc == 0);
