@@ -355,7 +355,7 @@ static int
 gc_do_checkpoint(void)
 {
 	int rc;
-	struct vclock vclock;
+	struct wal_checkpoint checkpoint;
 
 	assert(!gc.checkpoint_is_in_progress);
 	gc.checkpoint_is_in_progress = true;
@@ -373,19 +373,19 @@ gc_do_checkpoint(void)
 	rc = engine_begin_checkpoint();
 	if (rc != 0)
 		goto out;
-	rc = wal_begin_checkpoint(&vclock);
+	rc = wal_begin_checkpoint(&checkpoint);
 	if (rc != 0)
 		goto out;
-	rc = engine_commit_checkpoint(&vclock);
+	rc = engine_commit_checkpoint(&checkpoint.vclock);
 	if (rc != 0)
 		goto out;
-	wal_commit_checkpoint(&vclock);
+	wal_commit_checkpoint(&checkpoint);
 
 	/*
 	 * Finally, track the newly created checkpoint in the garbage
 	 * collector state.
 	 */
-	gc_add_checkpoint(&vclock);
+	gc_add_checkpoint(&checkpoint.vclock);
 out:
 	if (rc != 0)
 		engine_abort_checkpoint();

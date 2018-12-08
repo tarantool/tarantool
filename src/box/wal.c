@@ -497,12 +497,6 @@ wal_sync(void)
 	cbus_flush(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe, NULL);
 }
 
-struct wal_checkpoint
-{
-	struct cbus_call_msg base;
-	struct vclock vclock;
-};
-
 static int
 wal_begin_checkpoint_f(struct cbus_call_msg *data)
 {
@@ -534,11 +528,11 @@ wal_begin_checkpoint_f(struct cbus_call_msg *data)
 }
 
 int
-wal_begin_checkpoint(struct vclock *vclock)
+wal_begin_checkpoint(struct wal_checkpoint *checkpoint)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE) {
-		vclock_copy(vclock, &writer->vclock);
+		vclock_copy(&checkpoint->vclock, &writer->vclock);
 		return 0;
 	}
 	if (!stailq_empty(&writer->rollback)) {
@@ -552,15 +546,13 @@ wal_begin_checkpoint(struct vclock *vclock)
 		diag_set(ClientError, ER_CHECKPOINT_ROLLBACK);
 		return -1;
 	}
-	struct wal_checkpoint msg;
 	bool cancellable = fiber_set_cancellable(false);
 	int rc = cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
-			   &msg.base, wal_begin_checkpoint_f, NULL,
+			   &checkpoint->base, wal_begin_checkpoint_f, NULL,
 			   TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 	if (rc != 0)
 		return -1;
-	vclock_copy(vclock, &msg.vclock);
 	return 0;
 }
 
@@ -574,18 +566,16 @@ wal_commit_checkpoint_f(struct cbus_call_msg *data)
 }
 
 void
-wal_commit_checkpoint(const struct vclock *vclock)
+wal_commit_checkpoint(struct wal_checkpoint *checkpoint)
 {
 	struct wal_writer *writer = &wal_writer_singleton;
 	if (writer->wal_mode == WAL_NONE) {
-		vclock_copy(&writer->checkpoint_vclock, vclock);
+		vclock_copy(&writer->checkpoint_vclock, &checkpoint->vclock);
 		return;
 	}
-	struct wal_checkpoint msg;
-	vclock_copy(&msg.vclock, vclock);
 	bool cancellable = fiber_set_cancellable(false);
 	cbus_call(&wal_thread.wal_pipe, &wal_thread.tx_prio_pipe,
-		  &msg.base, wal_commit_checkpoint_f, NULL,
+		  &checkpoint->base, wal_commit_checkpoint_f, NULL,
 		  TIMEOUT_INFINITY);
 	fiber_set_cancellable(cancellable);
 }
