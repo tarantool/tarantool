@@ -31,8 +31,13 @@
  * SUCH DAMAGE.
  */
 /**
- * Exception-aware wrappers around BSD sockets.
- * Provide better error logging and I/O statistics.
+ * A thin wrapper around BSD sockets. Sets the diagnostics
+ * area with a nicely formatted message for most errors (some
+ * intermittent errors such as EWOULDBLOCK, EINTR, EINPROGRESS,
+ * EAGAIN are an exception to this). The API is following
+ * suite of BSD socket API: most functinos -1 on error, 0 or a
+ * valid file descriptor on success. Exceptions to this rule, once
+ * again, are marked explicitly.
  */
 #include <stdbool.h>
 #include <sys/types.h>
@@ -41,6 +46,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <tarantool_ev.h>
+#include <errno.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -48,9 +54,35 @@ extern "C" {
 
 enum { SERVICE_NAME_MAXLEN = 32 };
 
+/**
+ * Check if an errno, returned from a sio function, means a
+ * non-critical error: EAGAIN, EWOULDBLOCK, EINTR.
+ */
+static inline bool
+sio_wouldblock(int err)
+{
+	return err == EAGAIN || err == EWOULDBLOCK || err == EINTR;
+}
+
+
+/**
+ * Format the address provided in struct sockaddr *addr.
+ * Returns result in a static thread-local buffer.
+ * May garble errno. Used for error reporting.
+ */
 const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
 
+/**
+ * Return a filled in struct sockaddr provided the file
+ * descriptor. May garble the errno.
+ *
+ * @param[in] fd   a file descriptor; safe to hold any value,
+ *                 but don't expect meaningful results for -1
+ *
+ * @param[out] addr    output buffer
+ * @param[out] addrlen buffer length
+ */
 int
 sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen);
 
@@ -92,32 +124,85 @@ sio_add_to_iov(struct iovec *iov, size_t size)
 #if defined(__cplusplus)
 } /* extern "C" */
 
+/**
+ * Pretty print socket name and peer (for exceptions).
+ * Preserves the errno. Returns a thread-local buffer.
+ */
 const char *sio_socketname(int fd);
+
+/** Create a TCP or AF_UNIX socket. */
 int sio_socket(int domain, int type, int protocol);
 
+/** Get socket flags. */
 int sio_getfl(int fd);
+
+/** Set socket flags. */
 int sio_setfl(int fd, int flag, int on);
 
+/** Set an option on a socket. */
 int
 sio_setsockopt(int fd, int level, int optname,
 	       const void *optval, socklen_t optlen);
+
+/** Get a socket option value. */
 int
 sio_getsockopt(int fd, int level, int optname,
 	       void *optval, socklen_t *optlen);
 
+/**
+ * Connect a client socket to a server.
+ * The diagnostics is not set in case of EINPROGRESS.
+ */
 int sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen);
+
+/**
+ * Bind a socket to the given address. The diagnostics is not set
+ * in case of EADDRINUSE.
+ */
 int sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen);
+
+/**
+ * Mark a socket as accepting connections. The diagnostics is not
+ * set in case of EADDRINUSE.
+ */
 int sio_listen(int fd);
+
+/**
+ * Accept a client connection on a server socket. The
+ * diagnostics is not set for inprogress errors (@sa
+ * sio_wouldblock())
+ */
 int sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen);
 
+/**
+ * Read *up to* 'count' bytes from a socket.
+ * The diagnostics is not set for sio_wouldblock() errors.
+ */
 ssize_t sio_read(int fd, void *buf, size_t count);
 
+/**
+ * Write up to 'count' bytes to a socket.
+ * The diagnostics is not set in case of sio_wouldblock() errors.
+ */
 ssize_t sio_write(int fd, const void *buf, size_t count);
+
+/**
+ * Write to a socket with iovec.
+ * The diagnostics is not set in case of sio_wouldblock() errors.
+ */
 ssize_t sio_writev(int fd, const struct iovec *iov, int iovcnt);
 
+/**
+ * Send a message on a socket.
+ * The diagnostics is not set for sio_wouldblock() errors.
+ */
 ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 		   const struct sockaddr *dest_addr, socklen_t addrlen);
 
+/**
+ * Receive a message on a socket.
+ * The diagnostics is not set for sio_wouldblock() errors.
+ */
 ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
 		     struct sockaddr *src_addr, socklen_t *addrlen);
 

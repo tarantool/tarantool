@@ -32,7 +32,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/uio.h>
-#include <errno.h>
 #include <stdio.h>
 #include <limits.h>
 #include <netinet/in.h> /* TCP_NODELAY */
@@ -41,7 +40,6 @@
 #include "trivia/util.h"
 #include "exception.h"
 
-/** Pretty print socket name and peer (for exceptions) */
 const char *
 sio_socketname(int fd)
 {
@@ -120,7 +118,6 @@ sio_listen_backlog()
 	return SOMAXCONN;
 }
 
-/** Create a TCP socket. */
 int
 sio_socket(int domain, int type, int protocol)
 {
@@ -133,7 +130,6 @@ sio_socket(int domain, int type, int protocol)
 	return fd;
 }
 
-/** Get socket flags, raise an exception if error. */
 int
 sio_getfl(int fd)
 {
@@ -144,7 +140,6 @@ sio_getfl(int fd)
 	return flags;
 }
 
-/** Set socket flags, raise an exception if error. */
 int
 sio_setfl(int fd, int flag, int on)
 {
@@ -158,9 +153,6 @@ sio_setfl(int fd, int flag, int on)
 	return flags;
 }
 
-/** Set an option on a socket.
- * @retval -1 on error
- * */
 int
 sio_setsockopt(int fd, int level, int optname,
 	       const void *optval, socklen_t optlen)
@@ -173,7 +165,6 @@ sio_setsockopt(int fd, int level, int optname,
 	return rc;
 }
 
-/** Get a socket option value. */
 int
 sio_getsockopt(int fd, int level, int optname,
 	       void *optval, socklen_t *optlen)
@@ -186,7 +177,6 @@ sio_getsockopt(int fd, int level, int optname,
 	return rc;
 }
 
-/** Connect a client socket to a server. */
 int
 sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen)
 {
@@ -199,7 +189,6 @@ sio_connect(int fd, struct sockaddr *addr, socklen_t addrlen)
 	return rc;
 }
 
-/** Bind a socket to the given address. */
 int
 sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen)
 {
@@ -209,7 +198,6 @@ sio_bind(int fd, struct sockaddr *addr, socklen_t addrlen)
 	return rc;
 }
 
-/** Mark a socket as accepting connections.  */
 int
 sio_listen(int fd)
 {
@@ -219,41 +207,31 @@ sio_listen(int fd)
 	return rc;
 }
 
-/** Accept a client connection on a server socket. */
 int
 sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen)
 {
 	/* Accept a connection. */
 	int newfd = accept(fd, addr, addrlen);
-	if (newfd < 0 &&
-	    (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR))
+	if (newfd < 0 && !sio_wouldblock(errno))
 		tnt_raise(SocketError, sio_socketname(fd), "accept");
 	return newfd;
 }
 
-/** Read up to 'count' bytes from a socket. */
 ssize_t
 sio_read(int fd, void *buf, size_t count)
 {
 	ssize_t n = read(fd, buf, count);
-	if (n < 0) {
-		if (errno == EWOULDBLOCK)
-			errno = EINTR;
-		switch (errno) {
-		case EAGAIN:
-		case EINTR:
-			break;
+	if (n < 0 && !sio_wouldblock(errno)) {
 		/*
 		 * Happens typically when the client closes
 		 * socket on timeout without reading the previous
 		 * query's response completely. Treat the same as
 		 * EOF.
 		 */
-		case ECONNRESET:
+		if (errno == ECONNRESET) {
 			errno = 0;
 			n = 0;
-			break;
-		default:
+		} else {
 			tnt_raise(SocketError, sio_socketname(fd),
 				  "read(%zd)", count);
 		}
@@ -261,61 +239,47 @@ sio_read(int fd, void *buf, size_t count)
 	return n;
 }
 
-/** Write up to 'count' bytes to a socket. */
 ssize_t
 sio_write(int fd, const void *buf, size_t count)
 {
 	ssize_t n = write(fd, buf, count);
-	if (n < 0 && errno != EAGAIN &&
-	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketError, sio_socketname(fd),
-				  "write(%zd)", count);
+	if (n < 0 && !sio_wouldblock(errno))
+		tnt_raise(SocketError, sio_socketname(fd), "write(%zd)", count);
 	return n;
 }
 
-/** Write to a socket with iovec. */
 ssize_t
 sio_writev(int fd, const struct iovec *iov, int iovcnt)
 {
 	int cnt = iovcnt < IOV_MAX ? iovcnt : IOV_MAX;
 	ssize_t n = writev(fd, iov, cnt);
-	if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK &&
-	    errno != EINTR) {
-		tnt_raise(SocketError, sio_socketname(fd),
-			  "writev(%d)", iovcnt);
-	}
+	if (n < 0 && !sio_wouldblock(errno))
+		tnt_raise(SocketError, sio_socketname(fd), "writev(%d)", iovcnt);
 	return n;
 }
 
-/** Send a message on a socket. */
 ssize_t
 sio_sendto(int fd, const void *buf, size_t len, int flags,
 	   const struct sockaddr *dest_addr, socklen_t addrlen)
 {
 	ssize_t n = sendto(fd, buf, len, flags, (struct sockaddr*)dest_addr,
 	                   addrlen);
-	if (n < 0 && errno != EAGAIN &&
-	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketError, sio_socketname(fd),
-				  "sendto(%zd)", len);
+	if (n < 0 && !sio_wouldblock(errno))
+		tnt_raise(SocketError, sio_socketname(fd), "sendto(%zd)", len);
 	return n;
 }
 
-/** Receive a message on a socket. */
 ssize_t
 sio_recvfrom(int fd, void *buf, size_t len, int flags,
 	     struct sockaddr *src_addr, socklen_t *addrlen)
 {
 	ssize_t n = recvfrom(fd, buf, len, flags, (struct sockaddr*)src_addr,
 	                     addrlen);
-	if (n < 0 && errno != EAGAIN &&
-	    errno != EWOULDBLOCK && errno != EINTR)
-			tnt_raise(SocketError, sio_socketname(fd),
-				  "recvfrom(%zd)", len);
+	if (n < 0 && !sio_wouldblock(errno))
+		tnt_raise(SocketError, sio_socketname(fd), "recvfrom(%zd)", len);
 	return n;
 }
 
-/** Get socket peer name. */
 int
 sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen)
 {
@@ -323,22 +287,14 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen)
 		say_syserror("getpeername");
 		return -1;
 	}
-	/* XXX: I've no idea where this is copy-pasted from. */
-	/*
-	if (addr->sin_addr.s_addr == 0) {
-		say_syserror("getpeername: empty peer");
-		return -1;
-	}
-	*/
 	return 0;
 }
 
-/** Pretty print a peer address. */
 const char *
 sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
 {
 	static __thread char name[NI_MAXHOST + _POSIX_PATH_MAX + 2];
-	switch(addr->sa_family) {
+	switch (addr->sa_family) {
 		case AF_UNIX:
 			if (addrlen >= sizeof(sockaddr_un)) {
 				snprintf(name, sizeof(name), "unix/:%s",
