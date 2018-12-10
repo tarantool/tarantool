@@ -525,6 +525,8 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
 					 flags, dest_addr, addrlen);
 		if (nwr > 0)
 			return nwr;
+		if (nwr < 0 && ! sio_wouldblock(errno))
+			diag_raise();
 		if (! ev_is_active(coio)) {
 			ev_io_set(coio, coio->fd, EV_WRITE);
 			ev_io_start(loop(), coio);
@@ -568,7 +570,8 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 					   src_addr, &addrlen);
 		if (nrd >= 0)
 			return nrd;
-
+		if (! sio_wouldblock(errno))
+			diag_raise();
 		if (! ev_is_active(coio)) {
 			ev_io_set(coio, coio->fd, EV_READ);
 			ev_io_start(loop(), coio);

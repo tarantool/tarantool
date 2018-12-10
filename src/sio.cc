@@ -265,7 +265,7 @@ sio_sendto(int fd, const void *buf, size_t len, int flags,
 	ssize_t n = sendto(fd, buf, len, flags, (struct sockaddr*)dest_addr,
 	                   addrlen);
 	if (n < 0 && !sio_wouldblock(errno))
-		tnt_raise(SocketError, sio_socketname(fd), "sendto(%zd)", len);
+		diag_set(SocketError, sio_socketname(fd), "sendto(%zd)", len);
 	return n;
 }
 
@@ -276,7 +276,7 @@ sio_recvfrom(int fd, void *buf, size_t len, int flags,
 	ssize_t n = recvfrom(fd, buf, len, flags, (struct sockaddr*)src_addr,
 	                     addrlen);
 	if (n < 0 && !sio_wouldblock(errno))
-		tnt_raise(SocketError, sio_socketname(fd), "recvfrom(%zd)", len);
+		diag_set(SocketError, sio_socketname(fd), "recvfrom(%zd)", len);
 	return n;
 }
 
