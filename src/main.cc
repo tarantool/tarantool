@@ -810,9 +810,6 @@ main(int argc, char **argv)
 		trigger_create(&break_loop_trigger, break_loop, NULL, NULL);
 		trigger_add(&box_on_shutdown, &break_loop_trigger);
 
-		/* main core cleanup routine */
-		atexit(tarantool_free);
-
 		if (!loop())
 			panic("%s", "can't init event loop");
 
@@ -851,5 +848,6 @@ main(int argc, char **argv)
 	if (start_loop)
 		say_crit("exiting the event loop");
 	/* freeing resources */
+	tarantool_free();
 	return exit_code;
 }
