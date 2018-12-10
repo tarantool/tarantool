@@ -316,6 +316,8 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 		} else if (nrd == 0) {
 			errno = 0;
 			return sz - to_read;
+		} else if (! sio_wouldblock(errno)) {
+			diag_raise();
 		}
 
 		/* The socket is not ready, yield */
@@ -407,6 +409,8 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 				return sz;
 			towrite -= nwr;
 			buf = (char *) buf + nwr;
+		} else if (nwr < 0 && !sio_wouldblock(errno)) {
+			diag_raise();
 		}
 		if (! ev_is_active(coio)) {
 			ev_io_set(coio, coio->fd, EV_WRITE);

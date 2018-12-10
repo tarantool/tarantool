@@ -859,6 +859,8 @@ iproto_connection_on_input(ev_loop *loop, struct ev_io *watcher,
 		/* Read input. */
 		int nrd = sio_read(fd, in->wpos, ibuf_unused(in));
 		if (nrd < 0) {                  /* Socket is not ready. */
+			if (! sio_wouldblock(errno))
+				diag_raise();
 			ev_io_start(loop, &con->input);
 			return;
 		}

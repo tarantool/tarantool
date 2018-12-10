@@ -232,7 +232,7 @@ sio_read(int fd, void *buf, size_t count)
 			errno = 0;
 			n = 0;
 		} else {
-			tnt_raise(SocketError, sio_socketname(fd),
+			diag_set(SocketError, sio_socketname(fd),
 				  "read(%zd)", count);
 		}
 	}
@@ -244,7 +244,7 @@ sio_write(int fd, const void *buf, size_t count)
 {
 	ssize_t n = write(fd, buf, count);
 	if (n < 0 && !sio_wouldblock(errno))
-		tnt_raise(SocketError, sio_socketname(fd), "write(%zd)", count);
+		diag_set(SocketError, sio_socketname(fd), "write(%zd)", count);
 	return n;
 }
 
