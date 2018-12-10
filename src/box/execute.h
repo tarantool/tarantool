@@ -55,7 +55,6 @@ struct xrow_header;
 
 /** EXECUTE request. */
 struct sql_request {
-	uint64_t sync;
 	/** SQL statement text. */
 	const char *sql_text;
 	/** Length of the SQL statement text. */
@@ -68,8 +67,6 @@ struct sql_request {
 
 /** Response on EXECUTE request. */
 struct sql_response {
-	/** Request sync. */
-	uint64_t sync;
 	/** Port with response data if any. */
 	struct port port;
 	/** Prepared SQL statement with metadata. */

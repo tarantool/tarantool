@@ -1637,7 +1637,8 @@ tx_process_sql(struct cmsg *m)
 		obuf_rollback_to_svp(out, &header_svp);
 		goto error;
 	}
-	iproto_reply_sql(out, &header_svp, response.sync, schema_version, keys);
+	iproto_reply_sql(out, &header_svp, msg->header.sync, schema_version,
+			 keys);
 	iproto_wpos_create(&msg->wpos, out);
 	return;
 error:

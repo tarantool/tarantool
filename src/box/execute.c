@@ -269,7 +269,6 @@ error:
 	request->sql_text = NULL;
 	request->bind = NULL;
 	request->bind_count = 0;
-	request->sync = row->sync;
 	for (uint32_t i = 0; i < map_size; ++i) {
 		uint8_t key = *data;
 		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT) {
@@ -615,7 +614,6 @@ sql_prepare_and_execute(const struct sql_request *request,
 	assert(stmt != NULL);
 	port_tuple_create(&response->port);
 	response->prep_stmt = stmt;
-	response->sync = request->sync;
 	if (sql_bind(request, stmt) == 0 &&
 	    sql_execute(db, stmt, &response->port, region) == 0)
 		return 0;
