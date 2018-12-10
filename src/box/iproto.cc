@@ -926,9 +926,9 @@ iproto_flush(struct iproto_connection *con)
 
 	ssize_t nwr = sio_writev(fd, iov, iovcnt);
 
-	/* Count statistics */
-	rmean_collect(rmean_net, IPROTO_SENT, nwr);
 	if (nwr > 0) {
+		/* Count statistics */
+		rmean_collect(rmean_net, IPROTO_SENT, nwr);
 		if (begin->used + nwr == end->used) {
 			*begin = *end;
 			return 0;
@@ -940,6 +940,8 @@ iproto_flush(struct iproto_connection *con)
 		begin->iov_len = advance == 0 ? begin->iov_len + offset: offset;
 		begin->pos += advance;
 		assert(begin->pos <= end->pos);
+	} else if (nwr < 0 && ! sio_wouldblock(errno)) {
+		diag_raise();
 	}
 	return -1;
 }
@@ -1762,14 +1764,14 @@ net_send_greeting(struct cmsg *m)
 	struct iproto_connection *con = msg->connection;
 	if (msg->close_connection) {
 		struct obuf *out = msg->wpos.obuf;
-		try {
-			int64_t nwr = sio_writev(con->output.fd, out->iov,
-						 obuf_iovcnt(out));
+		int64_t nwr = sio_writev(con->output.fd, out->iov,
+					 obuf_iovcnt(out));
 
-			/* Count statistics */
+		if (nwr > 0) {
+			/* Count statistics. */
 			rmean_collect(rmean_net, IPROTO_SENT, nwr);
-		} catch (Exception *e) {
-			e->log();
+		} else if (! diag_is_empty(&fiber()->diag)) {
+			diag_log();
 		}
 		assert(iproto_connection_is_idle(con));
 		iproto_connection_close(con);

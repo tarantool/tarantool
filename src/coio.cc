@@ -440,15 +440,11 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 static inline ssize_t
 coio_flush(int fd, struct iovec *iov, ssize_t offset, int iovcnt)
 {
-	ssize_t nwr;
-	try {
-		sio_add_to_iov(iov, -offset);
-		nwr = sio_writev(fd, iov, iovcnt);
-		sio_add_to_iov(iov, offset);
-	} catch (SocketError *e) {
-		sio_add_to_iov(iov, offset);
-		throw;
-	}
+	sio_add_to_iov(iov, -offset);
+	ssize_t nwr = sio_writev(fd, iov, iovcnt);
+	sio_add_to_iov(iov, offset);
+	if (nwr < 0 && ! sio_wouldblock(errno))
+		diag_raise();
 	return nwr;
 }
 

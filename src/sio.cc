@@ -242,6 +242,7 @@ sio_read(int fd, void *buf, size_t count)
 ssize_t
 sio_write(int fd, const void *buf, size_t count)
 {
+	assert(count); /* count == 0 is most likely a software bug. */
 	ssize_t n = write(fd, buf, count);
 	if (n < 0 && !sio_wouldblock(errno))
 		diag_set(SocketError, sio_socketname(fd), "write(%zd)", count);
@@ -254,7 +255,7 @@ sio_writev(int fd, const struct iovec *iov, int iovcnt)
 	int cnt = iovcnt < IOV_MAX ? iovcnt : IOV_MAX;
 	ssize_t n = writev(fd, iov, cnt);
 	if (n < 0 && !sio_wouldblock(errno))
-		tnt_raise(SocketError, sio_socketname(fd), "writev(%d)", iovcnt);
+		diag_set(SocketError, sio_socketname(fd), "writev(%d)", iovcnt);
 	return n;
 }
 
