@@ -184,8 +184,11 @@ evio_service_accept_cb(ev_loop * /* loop */, ev_io *watcher,
 			fd = sio_accept(service->ev.fd,
 				(struct sockaddr *)&addr, &addrlen);
 
-			if (fd < 0) /* EAGAIN, EWOULDLOCK, EINTR */
+			if (fd < 0) {
+				if (! sio_wouldblock(errno))
+					diag_raise();
 				return;
+			}
 			/* set common client socket options */
 			evio_setsockopt_client(fd, service->addr.sa_family, SOCK_STREAM);
 			/*
@@ -295,8 +298,11 @@ evio_service_listen(struct evio_service *service)
 
 	int fd = service->ev.fd;
 	if (sio_listen(fd)) {
-		/* raise for addr in use to */
-		tnt_raise(SocketError, sio_socketname(fd), "listen");
+		if (diag_is_empty(diag_get())) {
+			/* Raise for addr in use to */
+			diag_set(SocketError, sio_socketname(fd), "listen");
+		}
+		diag_raise();
 	}
 	ev_io_start(service->loop, &service->ev);
 }

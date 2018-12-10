@@ -35,6 +35,7 @@
 #include <netinet/tcp.h>
 #include <stdio.h>
 #include <arpa/inet.h>
+#include <errno.h>
 
 #include "sio.h"
 #include "scoped_guard.h"
@@ -258,6 +259,8 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr,
 					       SOCK_STREAM);
 			return fd;
 		}
+		if (! sio_wouldblock(errno))
+			diag_raise();
 		/* The socket is not ready, yield */
 		if (! ev_is_active(coio)) {
 			ev_io_set(coio, coio->fd, EV_READ);

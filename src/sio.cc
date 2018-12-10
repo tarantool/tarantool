@@ -203,7 +203,7 @@ sio_listen(int fd)
 {
 	int rc = listen(fd, sio_listen_backlog());
 	if (rc < 0 && errno != EADDRINUSE)
-		tnt_raise(SocketError, sio_socketname(fd), "listen");
+		diag_set(SocketError, sio_socketname(fd), "listen");
 	return rc;
 }
 
@@ -213,7 +213,7 @@ sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen)
 	/* Accept a connection. */
 	int newfd = accept(fd, addr, addrlen);
 	if (newfd < 0 && !sio_wouldblock(errno))
-		tnt_raise(SocketError, sio_socketname(fd), "accept");
+		diag_set(SocketError, sio_socketname(fd), "accept");
 	return newfd;
 }
 
