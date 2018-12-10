@@ -1184,7 +1184,7 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 		cmsg_init(&msg->base, call_route);
 		break;
 	case IPROTO_EXECUTE:
-		if (xrow_decode_sql(&msg->header, &msg->sql, &fiber()->gc))
+		if (xrow_decode_sql(&msg->header, &msg->sql) != 0)
 			goto error;
 		cmsg_init(&msg->base, sql_route);
 		break;
@@ -1614,6 +1614,10 @@ tx_process_sql(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
 	struct sql_response response;
+	struct sql_bind *bind;
+	int bind_count;
+	const char *sql;
+	uint32_t len;
 
 	tx_fiber_init(msg->connection->session, msg->header.sync);
 
@@ -1621,7 +1625,13 @@ tx_process_sql(struct cmsg *m)
 		goto error;
 	assert(msg->header.type == IPROTO_EXECUTE);
 	tx_inject_delay();
-	if (sql_prepare_and_execute(&msg->sql, &response, &fiber()->gc) != 0)
+	bind_count = sql_bind_list_decode(msg->sql.bind, &bind);
+	if (bind_count < 0)
+		goto error;
+	sql = msg->sql.sql_text;
+	sql = mp_decode_str(&sql, &len);
+	if (sql_prepare_and_execute(sql, len, bind, bind_count, &response,
+				    &fiber()->gc) != 0)
 		goto error;
 	/*
 	 * Take an obuf only after execute(). Else the buffer can

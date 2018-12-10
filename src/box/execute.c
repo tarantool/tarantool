@@ -194,27 +194,9 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 	return 0;
 }
 
-/**
- * Parse MessagePack array of SQL parameters and store a result
- * into the @request->bind, bind_count.
- * @param request Request to save decoded parameters.
- * @param data MessagePack array of parameters. Each parameter
- *        either must have scalar type, or must be a map with the
- *        following format: {name: value}. Name - string name of
- *        the named parameter, value - scalar value of the
- *        parameter. Named and positioned parameters can be mixed.
- *        For more details
- *        @sa https://www.sqlite.org/lang_expr.html#varparam.
- * @param region Allocator.
- *
- * @retval  0 Success.
- * @retval -1 Client or memory error.
- */
-static inline int
-sql_bind_list_decode(struct sql_request *request, const char *data,
-		     struct region *region)
+int
+sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 {
-	assert(request != NULL);
 	assert(data != NULL);
 	if (mp_typeof(*data) != MP_ARRAY) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "SQL parameter list");
@@ -228,6 +210,7 @@ sql_bind_list_decode(struct sql_request *request, const char *data,
 			 (int) bind_count);
 		return -1;
 	}
+	struct region *region = &fiber()->gc;
 	uint32_t used = region_used(region);
 	size_t size = sizeof(struct sql_bind) * bind_count;
 	struct sql_bind *bind = (struct sql_bind *) region_alloc(region, size);
@@ -241,14 +224,12 @@ sql_bind_list_decode(struct sql_request *request, const char *data,
 			return -1;
 		}
 	}
-	request->bind_count = bind_count;
-	request->bind = bind;
-	return 0;
+	*out_bind = bind;
+	return bind_count;
 }
 
 int
-xrow_decode_sql(const struct xrow_header *row, struct sql_request *request,
-		struct region *region)
+xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
 {
 	if (row->bodycnt == 0) {
 		diag_set(ClientError, ER_INVALID_MSGPACK, "missing request body");
@@ -268,7 +249,6 @@ error:
 	uint32_t map_size = mp_decode_map(&data);
 	request->sql_text = NULL;
 	request->bind = NULL;
-	request->bind_count = 0;
 	for (uint32_t i = 0; i < map_size; ++i) {
 		uint8_t key = *data;
 		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT) {
@@ -279,12 +259,10 @@ error:
 		const char *value = ++data;     /* skip the key */
 		if (mp_check(&data, end) != 0)  /* check the value */
 			goto error;
-		if (key == IPROTO_SQL_BIND) {
-			if (sql_bind_list_decode(request, value, region) != 0)
-				return -1;
-		} else {
+		if (key == IPROTO_SQL_BIND)
+			request->bind = value;
+		else
 			request->sql_text = value;
-		}
 	}
 	if (request->sql_text == NULL) {
 		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
@@ -500,19 +478,21 @@ sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
 
 /**
  * Bind parameter values to the prepared statement.
- * @param request Parsed SQL request.
  * @param stmt Prepared statement.
+ * @param bind Parameters to bind.
+ * @param bind_count Length of @a bind.
  *
  * @retval  0 Success.
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_bind(const struct sql_request *request, struct sqlite3_stmt *stmt)
+sql_bind(struct sqlite3_stmt *stmt, const struct sql_bind *bind,
+	 uint32_t bind_count)
 {
 	assert(stmt != NULL);
 	uint32_t pos = 1;
-	for (uint32_t i = 0; i < request->bind_count; pos = ++i + 1) {
-		if (sql_bind_column(stmt, &request->bind[i], pos) != 0)
+	for (uint32_t i = 0; i < bind_count; pos = ++i + 1) {
+		if (sql_bind_column(stmt, &bind[i], pos) != 0)
 			return -1;
 	}
 	return 0;
@@ -595,12 +575,10 @@ sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, struct port *port,
 }
 
 int
-sql_prepare_and_execute(const struct sql_request *request,
-			struct sql_response *response, struct region *region)
+sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
+			uint32_t bind_count, struct sql_response *response,
+			struct region *region)
 {
-	const char *sql = request->sql_text;
-	uint32_t len;
-	sql = mp_decode_str(&sql, &len);
 	struct sqlite3_stmt *stmt;
 	sqlite3 *db = sql_get();
 	if (db == NULL) {
@@ -614,7 +592,7 @@ sql_prepare_and_execute(const struct sql_request *request,
 	assert(stmt != NULL);
 	port_tuple_create(&response->port);
 	response->prep_stmt = stmt;
-	if (sql_bind(request, stmt) == 0 &&
+	if (sql_bind(stmt, bind, bind_count) == 0 &&
 	    sql_execute(db, stmt, &response->port, region) == 0)
 		return 0;
 	port_destroy(&response->port);
