@@ -57,8 +57,6 @@ struct xrow_header;
 struct sql_request {
 	/** SQL statement text. */
 	const char *sql_text;
-	/** Length of the SQL statement text. */
-	uint32_t sql_text_len;
 	/** Array of parameters. */
 	struct sql_bind *bind;
 	/** Length of the @bind. */

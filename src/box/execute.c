@@ -283,8 +283,7 @@ error:
 			if (sql_bind_list_decode(request, value, region) != 0)
 				return -1;
 		} else {
-			request->sql_text =
-				mp_decode_str(&value, &request->sql_text_len);
+			request->sql_text = value;
 		}
 	}
 	if (request->sql_text == NULL) {
@@ -600,7 +599,8 @@ sql_prepare_and_execute(const struct sql_request *request,
 			struct sql_response *response, struct region *region)
 {
 	const char *sql = request->sql_text;
-	uint32_t len = request->sql_text_len;
+	uint32_t len;
+	sql = mp_decode_str(&sql, &len);
 	struct sqlite3_stmt *stmt;
 	sqlite3 *db = sql_get();
 	if (db == NULL) {
