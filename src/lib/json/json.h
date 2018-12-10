@@ -30,7 +30,6 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,7 +72,7 @@ struct json_token {
 			int len;
 		};
 		/** Index value. */
-		uint64_t num;
+		int num;
 	};
 };
 

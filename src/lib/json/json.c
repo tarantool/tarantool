@@ -136,7 +136,7 @@ json_parse_integer(struct json_lexer *lexer, struct json_token *token)
 	const char *pos = lexer->src + lexer->offset;
 	assert(pos < end);
 	int len = 0;
-	uint64_t value = 0;
+	int value = 0;
 	char c = *pos;
 	if (! isdigit(c))
 		return lexer->symbol_count + 1;
