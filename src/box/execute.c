@@ -228,52 +228,6 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 	return bind_count;
 }
 
-int
-xrow_decode_sql(const struct xrow_header *row, struct sql_request *request)
-{
-	if (row->bodycnt == 0) {
-		diag_set(ClientError, ER_INVALID_MSGPACK, "missing request body");
-		return 1;
-	}
-	assert(row->bodycnt == 1);
-	const char *data = (const char *) row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
-	assert((end - data) > 0);
-
-	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
-error:
-		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
-		return -1;
-	}
-
-	uint32_t map_size = mp_decode_map(&data);
-	request->sql_text = NULL;
-	request->bind = NULL;
-	for (uint32_t i = 0; i < map_size; ++i) {
-		uint8_t key = *data;
-		if (key != IPROTO_SQL_BIND && key != IPROTO_SQL_TEXT) {
-			mp_check(&data, end);   /* skip the key */
-			mp_check(&data, end);   /* skip the value */
-			continue;
-		}
-		const char *value = ++data;     /* skip the key */
-		if (mp_check(&data, end) != 0)  /* check the value */
-			goto error;
-		if (key == IPROTO_SQL_BIND)
-			request->bind = value;
-		else
-			request->sql_text = value;
-	}
-	if (request->sql_text == NULL) {
-		diag_set(ClientError, ER_MISSING_REQUEST_FIELD,
-			 iproto_key_name(IPROTO_SQL_TEXT));
-		return -1;
-	}
-	if (data != end)
-		goto error;
-	return 0;
-}
-
 /**
  * Serialize a single column of a result set row.
  * @param stmt Prepared and started statement. At least one

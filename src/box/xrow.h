@@ -466,6 +466,25 @@ int
 iproto_reply_error(struct obuf *out, const struct error *e, uint64_t sync,
 		   uint32_t schema_version);
 
+/** EXECUTE request. */
+struct sql_request {
+	/** SQL statement text. */
+	const char *sql_text;
+	/** MessagePack array of parameters. */
+	const char *bind;
+};
+
+/**
+ * Parse the EXECUTE request.
+ * @param row Encoded data.
+ * @param[out] request Request to decode to.
+ *
+ * @retval  0 Sucess.
+ * @retval -1 Format or memory error.
+ */
+int
+xrow_decode_sql(const struct xrow_header *row, struct sql_request *request);
+
 /**
  * Write the SQL header.
  * @param buf Out buffer.

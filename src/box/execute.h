@@ -51,15 +51,6 @@ extern const char *sql_info_key_strs[];
 struct obuf;
 struct region;
 struct sql_bind;
-struct xrow_header;
-
-/** EXECUTE request. */
-struct sql_request {
-	/** SQL statement text. */
-	const char *sql_text;
-	/** MessagePack array of parameters. */
-	const char *bind;
-};
 
 /** Response on EXECUTE request. */
 struct sql_response {
@@ -122,17 +113,6 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind);
  */
 int
 sql_response_dump(struct sql_response *response, int *keys, struct obuf *out);
-
-/**
- * Parse the EXECUTE request.
- * @param row Encoded data.
- * @param[out] request Request to decode to.
- *
- * @retval  0 Sucess.
- * @retval -1 Format or memory error.
- */
-int
-xrow_decode_sql(const struct xrow_header *row, struct sql_request *request);
 
 /**
  * Prepare and execute an SQL statement.
