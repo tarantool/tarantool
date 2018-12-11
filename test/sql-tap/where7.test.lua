@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(2022)
+test:plan(2023)
 
 --!./tcltestrunner.lua
 -- 2008 December 23
@@ -230,14 +230,14 @@ test:do_test(
     "where7-1.20",
     function()
         sql = "SELECT a FROM t1 WHERE a=11 OR b=11"
-        for i = 12, 400 - 1, 1 do
+        for i = 12, 100 do
             sql = sql .. string.format(" OR a=%s OR b=%s", i, i)
         end
         sql = sql .. " ORDER BY a"
         return count_steps(sql)
     end, {
         -- <where7-1.20>
-        
+
         -- </where7-1.20>
     })
 
@@ -245,7 +245,7 @@ test:do_test(
     "where7-1.21",
     function()
         sql = "SELECT a FROM t1 WHERE b=11 OR c=11"
-        for i = 12, 400 - 1, 1 do
+        for i = 12, 100 do
             sql = sql .. string.format(" OR b=%s OR c=%s", i, i)
         end
         sql = sql .. " ORDER BY a"
@@ -260,7 +260,7 @@ test:do_test(
     "where7-1.22",
     function()
         sql = "SELECT a FROM t1 WHERE (b=11 OR c=11"
-        for i = 12, 400 - 1, 1 do
+        for i = 12, 100 do
             sql = sql .. string.format(" OR b=%s OR c=%s", i, i)
         end
         sql = sql .. ") AND d>=0 AND d<9999 ORDER BY a"
@@ -275,7 +275,7 @@ test:do_test(
     "where7-1.23",
     function()
         sql = "SELECT a FROM t1 WHERE (b=11 OR c=11"
-        for i = 12, 400 - 1, 1 do
+        for i = 12, 100 do
             sql = sql .. string.format(" OR (b=%s AND d!=0) OR (c=%s AND d IS NOT NULL)", i, i)
         end
         sql = sql .. ") AND d>=0 AND d<9999 ORDER BY a"
@@ -290,14 +290,14 @@ test:do_test(
     "where7-1.31",
     function()
         sql = "SELECT a FROM t1 WHERE (a=11 AND b=11)"
-        for i = 12, 400 - 1, 1 do
+        for i = 12, 100 do
             sql = sql .. string.format(" OR (a=%s AND b=%s)", i, i)
         end
         sql = sql .. " ORDER BY a"
         return count_steps(sql)
     end, {
         -- <where7-1.31>
-        
+
         -- </where7-1.31>
     })
 
@@ -305,15 +305,27 @@ test:do_test(
     "where7-1.32",
     function()
         sql = "SELECT a FROM t1 WHERE (b=11 AND c=11)"
-        for i = 12, 400 - 1, 1 do
+        for i = 12, 100 do
             sql = sql .. string.format(" OR (b=%s AND c=%s)", i, i)
         end
         sql = sql .. " ORDER BY a"
         return count_steps(sql)
     end, {
         -- <where7-1.32>
-        
+
         -- </where7-1.32>
+    })
+
+test:do_test(
+    "where7-AST-depth-limit",
+    function()
+        sql = "SELECT a FROM t1 WHERE a = 0"
+        for i = 1, 199 do
+            sql = sql .. string.format(" OR a = %s", i)
+        end
+        return test:catchsql(sql)
+    end, {
+        1, "Expression tree is too large (maximum depth 200)"
     })
 
 test:do_test(
