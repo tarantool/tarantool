@@ -1227,9 +1227,12 @@ tx_process_disconnect(struct cmsg *m)
 {
 	struct iproto_connection *con =
 		container_of(m, struct iproto_connection, disconnect_msg);
-	if (con->session != NULL && !rlist_empty(&session_on_disconnect)) {
-		tx_fiber_init(con->session, 0);
-		session_run_on_disconnect_triggers(con->session);
+	if (con->session != NULL) {
+		session_close(con->session);
+		if (! rlist_empty(&session_on_disconnect)) {
+			tx_fiber_init(con->session, 0);
+			session_run_on_disconnect_triggers(con->session);
+		}
 	}
 }
 
