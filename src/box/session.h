@@ -147,6 +147,13 @@ void
 session_set_type(struct session *session, enum session_type type);
 
 /**
+ * Close a session. It will return errors from all virtual methods
+ * and its type is fixed.
+ */
+void
+session_close(struct session *session);
+
+/**
  * Find a session by id.
  */
 struct session *

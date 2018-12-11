@@ -415,6 +415,7 @@ t;
   83: box.error.ROLE_EXISTS
   84: box.error.CREATE_ROLE
   85: box.error.INDEX_EXISTS
+  86: box.error.SESSION_CLOSED
   87: box.error.ROLE_LOOP
   88: box.error.GRANT
   89: box.error.PRIV_GRANTED

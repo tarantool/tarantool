@@ -138,7 +138,7 @@ struct errcode_record {
 	/* 83 */_(ER_ROLE_EXISTS,		"Role '%s' already exists") \
 	/* 84 */_(ER_CREATE_ROLE,		"Failed to create role '%s': %s") \
 	/* 85 */_(ER_INDEX_EXISTS,		"Index '%s' already exists") \
-	/* 86 */_(ER_UNUSED6,			"") \
+	/* 86 */_(ER_SESSION_CLOSED,		"Session is closed") \
 	/* 87 */_(ER_ROLE_LOOP,			"Granting role '%s' to role '%s' would create a loop") \
 	/* 88 */_(ER_GRANT,			"Incorrect grant arguments: %s") \
 	/* 89 */_(ER_PRIV_GRANTED,		"User '%s' already has %s access on %s '%s'") \

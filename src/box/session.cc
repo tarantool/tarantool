@@ -92,10 +92,33 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 	session_destroy(fiber_get_session(fiber()));
 }
 
+static int
+closed_session_push(struct session *session, uint64_t sync, struct port *port)
+{
+	(void) session;
+	(void) sync;
+	(void) port;
+	diag_set(ClientError, ER_SESSION_CLOSED);
+	return -1;
+}
+
+static struct session_vtab closed_session_vtab = {
+	/* .push = */ closed_session_push,
+	/* .fd = */ generic_session_fd,
+	/* .sync = */ generic_session_sync,
+};
+
+void
+session_close(struct session *session)
+{
+	session->vtab = &closed_session_vtab;
+}
+
 void
 session_set_type(struct session *session, enum session_type type)
 {
 	assert(type < session_type_MAX);
+	assert(session->vtab != &closed_session_vtab);
 	session->type = type;
 	session->vtab = &session_vtab_registry[type];
 }
