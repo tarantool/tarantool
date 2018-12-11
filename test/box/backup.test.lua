@@ -70,8 +70,8 @@ box.snapshot()
 do_backup(files)
 box.backup.stop()
 
--- Previous checkpoint must have been removed by garbage collection
--- as soon as box.backup.stop() was called.
+-- Wait for the garbage collector to remove the previous checkpoint.
+test_run:wait_cond(function() return #box.info.gc().checkpoints == 1 end, 10)
 files = box.backup.start(1) -- error: checkpoint not found
 
 -- Check that we can restore from the backup we've just made.
