@@ -1,0 +1,13 @@
+	*** main ***
+1..10
+ok 1 - emitted 10 expected 10
+ok 2 - suppressed 0 expected 0
+ok 3 - emitted 0 expected 0
+ok 4 - suppressed 0 expected 0
+ok 5 - emitted 1 expected 1
+ok 6 - suppressed 10 expected 10
+ok 7 - emitted 1 expected 1
+ok 8 - suppressed 0 expected 0
+ok 9 - emitted 1000 expected 1000
+ok 10 - suppressed 3000 expected 3000
+	*** main: done ***
