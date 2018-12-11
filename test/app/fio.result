@@ -1166,3 +1166,74 @@ fio.rmdir(tmpdir)
 ---
 - true
 ...
+--
+-- gh-3580: Check that error messages are descriptive enough.
+--
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+---
+- true
+...
+fh1:seek(nil, 'a')
+---
+- error: 'builtin/fio.lua: fio.seek(): unknown whence: a'
+...
+fio.open(nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.open(path[, flags[, mode]])'
+...
+fio.open(tmp1, {'A'}, 0777)
+---
+- error: 'builtin/fio.lua: fio.open(): unknown flag: A'
+...
+fio.open(tmp1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, {'A'})
+---
+- error: 'builtin/fio.lua: fio.open(): unknown mode: A'
+...
+fio.pathjoin(nil)
+---
+- error: 'builtin/fio.lua: fio.pathjoin(): undefined path part 1'
+...
+fio.pathjoin('abc', nil)
+---
+- error: 'builtin/fio.lua: fio.pathjoin(): undefined path part 2'
+...
+fio.pathjoin('abc', 'cde', nil)
+---
+- error: 'builtin/fio.lua: fio.pathjoin(): undefined path part 3'
+...
+fio.basename(nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.basename(path[, suffix])'
+...
+fio.abspath(nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.abspath(path)'
+...
+fio.chdir(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.chdir(path)'
+...
+fio.listdir(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.listdir(path)'
+...
+fio.mktree(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.mktree(path[, mode])'
+...
+fio.rmtree(1)
+---
+- error: 'builtin/fio.lua: Usage: fio.rmtree(path)'
+...
+fio.copytree(nil, nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.copytree(from, to)'
+...
+fio.copytree(nil, nil)
+---
+- error: 'builtin/fio.lua: Usage: fio.copytree(from, to)'
+...
+test_run:cmd("clear filter")
+---
+- true
+...

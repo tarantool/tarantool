@@ -381,3 +381,24 @@ ch:get() == hash
 fio.unlink(tmp1)
 fio.unlink(tmp2)
 fio.rmdir(tmpdir)
+
+--
+-- gh-3580: Check that error messages are descriptive enough.
+--
+test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
+fh1:seek(nil, 'a')
+fio.open(nil)
+fio.open(tmp1, {'A'}, 0777)
+fio.open(tmp1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, {'A'})
+fio.pathjoin(nil)
+fio.pathjoin('abc', nil)
+fio.pathjoin('abc', 'cde', nil)
+fio.basename(nil)
+fio.abspath(nil)
+fio.chdir(1)
+fio.listdir(1)
+fio.mktree(1)
+fio.rmtree(1)
+fio.copytree(nil, nil)
+fio.copytree(nil, nil)
+test_run:cmd("clear filter")

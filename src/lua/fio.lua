@@ -126,7 +126,7 @@ fio_methods.seek = function(self, offset, whence)
     end
     if type(whence) == 'string' then
         if fio.c.seek[whence] == nil then
-            error(sprintf("Unknown whence: %s", whence))
+            error(sprintf("fio.seek(): unknown whence: %s", whence))
         end
         whence = fio.c.seek[whence]
     else
@@ -164,7 +164,7 @@ fio.open = function(path, flags, mode)
     local iflag = 0
     local imode = 0
     if type(path) ~= 'string' then
-        error("Usage open(path[, flags[, mode]])")
+        error("Usage: fio.open(path[, flags[, mode]])")
     end
     if type(flags) ~= 'table' then
         flags = { flags }
@@ -179,7 +179,7 @@ fio.open = function(path, flags, mode)
             iflag = bit.bor(iflag, flag)
         else
             if fio.c.flag[ flag ] == nil then
-                error(sprintf("Unknown flag: %s", flag))
+                error(sprintf("fio.open(): unknown flag: %s", flag))
             end
             iflag = bit.bor(iflag, fio.c.flag[ flag ])
         end
@@ -188,7 +188,7 @@ fio.open = function(path, flags, mode)
     for _, m in pairs(mode) do
         if type(m) == 'string' then
             if fio.c.mode[m] == nil then
-                error(sprintf("Unknown mode: %s", m))
+                error(sprintf("fio.open(): unknown mode: %s", m))
             end
             imode = bit.bor(imode, fio.c.mode[m])
         else
@@ -213,7 +213,7 @@ fio.pathjoin = function(...)
     while i <= len do
         local sp = select(i, ...)
         if sp == nil then
-            error("Undefined path part "..i)
+            error("fio.pathjoin(): undefined path part "..i)
         end
 
         sp = tostring(sp)
@@ -233,7 +233,7 @@ fio.pathjoin = function(...)
     while i <= len do
         local sp = select(i, ...)
         if sp == nil then
-            error("Undefined path part")
+            error("fio.pathjoin(): undefined path part "..i)
         end
 
         sp = tostring(sp)
@@ -254,7 +254,7 @@ end
 
 fio.basename = function(path, suffix)
     if type(path) ~= 'string' then
-        error("Usage fio.basename(path[, suffix])")
+        error("Usage: fio.basename(path[, suffix])")
     end
 
     path = tostring(path)
@@ -273,7 +273,7 @@ end
 
 fio.dirname = function(path)
     if type(path) ~= 'string' then
-        error("Usage fio.dirname(path)")
+        error("Usage: fio.dirname(path)")
     end
     path = ffi.new('char[?]', #path + 1, path)
     return ffi.string(ffi.C.dirname(path))
@@ -297,7 +297,7 @@ fio.abspath = function(path)
     -- following established conventions of fio module:
     -- letting nil through and converting path to string
     if path == nil then
-        error("Usage fio.abspath(path)")
+        error("Usage: fio.abspath(path)")
     end
     path = path
     local joined_path = ''
