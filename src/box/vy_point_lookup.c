@@ -287,9 +287,10 @@ done:
 	latency_collect(&lsm->stat.latency, latency);
 
 	if (latency > lsm->env->too_long_threshold) {
-		say_warn("%s: get(%s) => %s took too long: %.3f sec",
-			 vy_lsm_name(lsm), tuple_str(key),
-			 vy_stmt_str(*ret), latency);
+		say_warn_ratelimited("%s: get(%s) => %s "
+				     "took too long: %.3f sec",
+				     vy_lsm_name(lsm), tuple_str(key),
+				     vy_stmt_str(*ret), latency);
 	}
 	return 0;
 }

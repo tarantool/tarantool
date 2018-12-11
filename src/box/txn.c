@@ -292,8 +292,9 @@ txn_write_to_wal(struct txn *txn)
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
 	} else if (stop - start > too_long_threshold) {
-		say_warn("too long WAL write: %d rows at LSN %lld: %.3f sec",
-			 txn->n_rows, res - txn->n_rows + 1, stop - start);
+		say_warn_ratelimited("too long WAL write: %d rows at "
+				     "LSN %lld: %.3f sec", txn->n_rows,
+				     res - txn->n_rows + 1, stop - start);
 	}
 	/*
 	 * Use vclock_sum() from WAL writer as transaction signature.

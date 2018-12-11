@@ -39,6 +39,7 @@
 #include <tarantool_ev.h>
 #include "small/rlist.h"
 #include "fiber_cond.h"
+#include "ratelimit.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -326,6 +327,43 @@ CFORMAT(printf, 5, 0) extern sayfunc_t _say;
 #define panic_status(status, ...)	({ say(S_FATAL, NULL, __VA_ARGS__); exit(status); })
 #define panic(...)			panic_status(EXIT_FAILURE, __VA_ARGS__)
 #define panic_syserror(...)		({ say(S_FATAL, strerror(errno), __VA_ARGS__); exit(EXIT_FAILURE); })
+
+enum {
+	/* 10 messages per 5 seconds. */
+	SAY_RATELIMIT_INTERVAL = 5,
+	SAY_RATELIMIT_BURST = 10,
+};
+
+/**
+ * Wrapper around ratelimit_check() that prints a warning if some
+ * messages are suppressed. It uses ev_monotonic_now() as a time
+ * source.
+ */
+#define say_ratelimit_check(rl) ({					\
+	int suppressed = 0;						\
+	bool ret = ratelimit_check((rl), ev_monotonic_now(loop()),	\
+				   &suppressed);			\
+	if (suppressed > 0)						\
+		say_warn("%d messages suppressed", suppressed);		\
+	ret;								\
+})
+
+/**
+ * Same as say(), but rate limited. If this function is called more
+ * often than SAY_RATELIMIT_BURST times per SAY_RATELIMIT_INTERVAL
+ * seconds, extra messages are suppressed and a warning is printed
+ * to the log.
+ */
+#define say_ratelimited(level, error, format, ...) ({			\
+	static struct ratelimit rl =					\
+		RATELIMIT_INITIALIZER(SAY_RATELIMIT_INTERVAL,		\
+				      SAY_RATELIMIT_BURST);		\
+	if (say_ratelimit_check(&rl))					\
+		say(level, error, format, ##__VA_ARGS__);		\
+})
+
+#define say_warn_ratelimited(format, ...) \
+	say_ratelimited(S_WARN, NULL, format, ##__VA_ARGS__)
 
 /**
  * Format and print a message to Tarantool log file.

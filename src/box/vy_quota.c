@@ -241,8 +241,9 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 
 	double wait_time = ev_monotonic_now(loop()) - wait_start;
 	if (wait_time > q->too_long_threshold) {
-		say_warn("waited for %zu bytes of vinyl memory quota "
-			 "for too long: %.3f sec", size, wait_time);
+		say_warn_ratelimited("waited for %zu bytes of vinyl memory "
+				     "quota for too long: %.3f sec", size,
+				     wait_time);
 	}
 
 	vy_quota_do_use(q, size);
