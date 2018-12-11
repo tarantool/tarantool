@@ -17,12 +17,8 @@ cache:
 git:
     depth: 100500
 
-matrix:
-    allow_failures:
-      - TARGET=coverage
+jobs:
     include:
-      - name: Create and deploy tarball
-        env: TARGET=source
       - name: RelWithDebInfoWError build + test (Linux, gcc)
         env: TARGET=test
       - name: RelWithDebInfoWError build + test (Linux, clang)
@@ -35,36 +31,54 @@ matrix:
         env: TARGET=coverage
       - name: LTO build + test (Linux, gcc)
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+        if: branch = "2.1"
       - name: LTO build + test (Linux, clang)
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+        if: branch = "2.1"
         compiler: clang
       - name: LTO build + test (OS X)
         os: osx
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
+        if: branch = "2.1"
+      - name: Create and deploy tarball
+        env: TARGET=source
+        if: branch = "2.1"
       - name: CentOS 6 build + test + deploy RPM
         env: OS=el DIST=6
+        if: branch = "2.1"
       - name: CentOS 7 build + test + deploy RPM
         env: OS=el DIST=7
+        if: branch = "2.1"
       - name: Fedora 26 build + test + deploy RPM
         env: OS=fedora DIST=26
+        if: branch = "2.1"
       - name: Fedora 27 build + test + deploy RPM
         env: OS=fedora DIST=27
+        if: branch = "2.1"
       - name: Ubuntu Trusty (14.04) build + deploy DEB
         env: OS=ubuntu DIST=trusty
+        if: branch = "2.1"
       - name: Ubuntu Xenial (16.04) build + deploy DEB
         env: OS=ubuntu DIST=xenial
+        if: branch = "2.1"
       - name: Ubuntu Artful (17.10) build + deploy DEB
         env: OS=ubuntu DIST=artful
+        if: branch = "2.1"
       - name: Ubuntu Bionic (18.04) build + deploy DEB
         env: OS=ubuntu DIST=bionic
+        if: branch = "2.1"
       - name: Ubuntu Cosmic (18.10) build + deploy DEB
         env: OS=ubuntu DIST=cosmic
+        if: branch = "2.1"
       - name: Debian Wheezy (7) build + deploy DEB
         env: OS=debian DIST=wheezy
+        if: branch = "2.1"
       - name: Debian Jessie (8) build + deploy DEB
         env: OS=debian DIST=jessie
+        if: branch = "2.1"
       - name: Debian Stretch (9) build + deploy DEB
         env: OS=debian DIST=stretch
+        if: branch = "2.1"
 
 script:
   - make -f .travis.mk ${TARGET}
