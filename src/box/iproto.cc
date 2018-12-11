@@ -1799,7 +1799,7 @@ net_send_greeting(struct cmsg *m)
 		if (nwr > 0) {
 			/* Count statistics. */
 			rmean_collect(rmean_net, IPROTO_SENT, nwr);
-		} else if (! diag_is_empty(&fiber()->diag)) {
+		} else if (nwr < 0 && ! sio_wouldblock(errno)) {
 			diag_log();
 		}
 		assert(iproto_connection_is_idle(con));

@@ -295,8 +295,13 @@ evio_service_listen(struct evio_service *service)
 
 	int fd = service->ev.fd;
 	if (sio_listen(fd)) {
-		if (diag_is_empty(diag_get())) {
-			/* Raise for addr in use to */
+		if (sio_wouldblock(errno)) {
+			/*
+			 * sio_listen() doesn't set the diag
+			 * for EINTR errors. Set the
+			 * diagnostics area, since the caller
+			 * doesn't handle EINTR in any special way.
+			 */
 			diag_set(SocketError, sio_socketname(fd), "listen");
 		}
 		return -1;
