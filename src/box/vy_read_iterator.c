@@ -887,10 +887,11 @@ next_key:
 	latency_collect(&lsm->stat.latency, latency);
 
 	if (latency > lsm->env->too_long_threshold) {
-		say_warn("%s: select(%s, %s) => %s took too long: %.3f sec",
-			 vy_lsm_name(lsm), tuple_str(itr->key),
-			 iterator_type_strs[itr->iterator_type],
-			 vy_stmt_str(stmt), latency);
+		say_warn_ratelimited("%s: select(%s, %s) => %s "
+				     "took too long: %.3f sec",
+				     vy_lsm_name(lsm), tuple_str(itr->key),
+				     iterator_type_strs[itr->iterator_type],
+				     vy_stmt_str(stmt), latency);
 	}
 
 	*result = stmt;

@@ -539,8 +539,9 @@ iproto_connection_is_idle(struct iproto_connection *con)
 static inline void
 iproto_connection_stop_readahead_limit(struct iproto_connection *con)
 {
-	say_warn("stopping input on connection %s, readahead limit is reached",
-		 sio_socketname(con->input.fd));
+	say_warn_ratelimited("stopping input on connection %s, "
+			     "readahead limit is reached",
+			     sio_socketname(con->input.fd));
 	assert(rlist_empty(&con->in_stop_list));
 	ev_io_stop(con->loop, &con->input);
 }
@@ -550,8 +551,9 @@ iproto_connection_stop_msg_max_limit(struct iproto_connection *con)
 {
 	assert(rlist_empty(&con->in_stop_list));
 
-	say_warn("stopping input on connection %s, net_msg_max limit is reached",
-		 sio_socketname(con->input.fd));
+	say_warn_ratelimited("stopping input on connection %s, "
+			     "net_msg_max limit is reached",
+			     sio_socketname(con->input.fd));
 	ev_io_stop(con->loop, &con->input);
 	/*
 	 * Important to add to tail and fetch from head to ensure
