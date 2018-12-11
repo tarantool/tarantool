@@ -136,6 +136,8 @@ add_executable(rmean.test rmean.cc)
 target_link_libraries(rmean.test stat unit)
 add_executable(histogram.test histogram.c)
 target_link_libraries(histogram.test stat unit)
+add_executable(ratelimit.test ratelimit.c)
+target_link_libraries(ratelimit.test unit)
 
 add_executable(say.test say.c)
 target_link_libraries(say.test core unit)
