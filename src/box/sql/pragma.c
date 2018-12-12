@@ -607,12 +607,20 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			pParse->nErr++;
 			goto pragma_out;
 		}
-		if (sql_default_engine_set(zRight) != 0) {
-			pParse->rc = SQL_TARANTOOL_ERROR;
-			pParse->nErr++;
-			goto pragma_out;
+		if (zRight == NULL) {
+			const char *engine_name =
+				sql_storage_engine_strs[current_session()->
+							sql_default_engine];
+			sqlVdbeLoadString(v, 1, engine_name);
+			sqlVdbeAddOp2(v, OP_ResultRow, 1, 1);
+		} else {
+			if (sql_default_engine_set(zRight) != 0) {
+				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->nErr++;
+				goto pragma_out;
+			}
+			sqlVdbeAddOp0(v, OP_Expire);
 		}
-		sqlVdbeAddOp0(v, OP_Expire);
 		break;
 	}
 

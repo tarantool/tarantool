@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 
-test:plan(17)
+test:plan(16)
 
 ---
 --- Prerequisites
@@ -102,17 +102,6 @@ test:do_execsql_test(
     ]], {
 	-- <pragma-5.4>
 	-- </pragma-5.4>
-})
-
----
---- pragma sql_default_engine requires value
----
-test:do_catchsql_test(
-	"pragma-6.1",
-	[[
-        pragma sql_default_engine;
-    ]], {
-	1, "Illegal parameters, 'sql_default_engine' was not specified"
 })
 
 ---
