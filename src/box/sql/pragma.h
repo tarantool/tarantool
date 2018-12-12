@@ -13,7 +13,6 @@
 #define PragTyp_INDEX_LIST                    11
 #define PragTyp_STATS                         15
 #define PragTyp_TABLE_INFO                    17
-#define PragTyp_PARSER_TRACE                  24
 #define PragTyp_DEFAULT_ENGINE                25
 #define PragTyp_COMPOUND_SELECT_LIMIT         26
 
@@ -127,10 +126,10 @@ static const PragmaName aPragmaName[] = {
 	 /* iArg:      */ 0},
 #if defined(SQL_DEBUG)
 	{ /* zName:     */ "parser_trace",
-	 /* ePragTyp:  */ PragTyp_PARSER_TRACE,
-	 /* ePragFlg:  */ 0,
+	 /* ePragTyp:  */ PragTyp_FLAG,
+	 /* ePragFlg:  */ PragFlg_Result0 | PragFlg_NoColumns1,
 	 /* ColNames:  */ 0, 0,
-	 /* iArg:      */ 0},
+	 /* iArg:      */ PARSER_TRACE_FLAG},
 #endif
 	{ /* zName:     */ "recursive_triggers",
 	 /* ePragTyp:  */ PragTyp_FLAG,

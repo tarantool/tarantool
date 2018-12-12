@@ -1522,6 +1522,8 @@ struct sql {
  * Possible values for the sql.flags.
  */
 #define SQL_VdbeTrace      0x00000001	/* True to trace VDBE execution */
+/* Debug print info about SQL query as it parsed */
+#define PARSER_TRACE_FLAG  0x00000002
 #define SQL_FullColNames   0x00000004	/* Show full column names on SELECT */
 #define SQL_ShortColNames  0x00000040	/* Show short columns names */
 #define SQL_CountRows      0x00000080	/* Count rows changed by INSERT, */
