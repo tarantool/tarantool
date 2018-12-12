@@ -311,10 +311,15 @@ gc_set_checkpoint_interval(double interval)
 	/*
 	 * Reconfigure the schedule and wake up the checkpoint
 	 * daemon so that it can readjust.
+	 *
+	 * Note, we must not wake up the checkpoint daemon fiber
+	 * if it's waiting for checkpointing to complete, because
+	 * checkpointing code doesn't tolerate spurious wakeups.
 	 */
 	checkpoint_schedule_cfg(&gc.checkpoint_schedule,
 				ev_monotonic_now(loop()), interval);
-	fiber_wakeup(gc.checkpoint_fiber);
+	if (!gc.checkpoint_is_in_progress)
+		fiber_wakeup(gc.checkpoint_fiber);
 }
 
 void
