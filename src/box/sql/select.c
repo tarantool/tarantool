@@ -45,7 +45,7 @@
 /*
  * Trace output macros
  */
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 /***/ int sqlSelectTrace = 0;
 #define SELECTTRACE(K,P,S,X)  \
   if(sqlSelectTrace&(K))   \
@@ -174,7 +174,7 @@ sqlSelectNew(Parse * pParse,	/* Parsing context */
 	pNew->selFlags = selFlags;
 	pNew->iLimit = 0;
 	pNew->iOffset = 0;
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 	pNew->zSelName[0] = 0;
 	if (user_session->sql_flags & SQL_SelectTrace)
 		sqlSelectTrace = 0xfff;
@@ -208,7 +208,7 @@ sqlSelectNew(Parse * pParse,	/* Parsing context */
 	return pNew;
 }
 
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 /*
  * Set the name of a Select object
  */
@@ -4237,7 +4237,7 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 	 */
 	sql_select_delete(db, pSub1);
 
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 	if (sqlSelectTrace & 0x100) {
 		SELECTTRACE(0x100, pParse, p, ("After flattening:\n"));
 		sqlTreeViewSelect(0, p, 0);
@@ -5467,7 +5467,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		return 1;
 	}
 	memset(&sAggInfo, 0, sizeof(sAggInfo));
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 	pParse->nSelectIndent++;
 	SELECTTRACE(1, pParse, p, ("begin processing:\n"));
 	if (sqlSelectTrace & 0x100) {
@@ -5503,7 +5503,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 	}
 	assert(p->pEList != 0);
 	isAgg = (p->selFlags & SF_Aggregate) != 0;
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 	if (sqlSelectTrace & 0x100) {
 		SELECTTRACE(0x100, pParse, p, ("after name resolution:\n"));
 		sqlTreeViewSelect(0, p, 0);
@@ -5570,7 +5570,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		}
 		sqlVdbeResolveLabel(v, end);
 
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 		SELECTTRACE(1, pParse, p, ("end compound-select processing\n"));
 		pParse->nSelectIndent--;
 #endif
@@ -5618,7 +5618,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		    && pushDownWhereTerms(pParse, pSub, p->pWhere,
 					  pItem->iCursor)
 		    ) {
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 			if (sqlSelectTrace & 0x100) {
 				SELECTTRACE(0x100, pParse, p,
 					    ("After WHERE-clause push-down:\n"));
@@ -5723,7 +5723,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 	pHaving = p->pHaving;
 	sDistinct.isTnct = (p->selFlags & SF_Distinct) != 0;
 
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 	if (sqlSelectTrace & 0x400) {
 		SELECTTRACE(0x400, pParse, p,
 			    ("After all FROM-clause analysis:\n"));
@@ -5756,7 +5756,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		 */
 		assert(sDistinct.isTnct);
 
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 		if (sqlSelectTrace & 0x400) {
 			SELECTTRACE(0x400, pParse, p,
 				    ("Transform DISTINCT into GROUP BY:\n"));
@@ -6408,7 +6408,7 @@ sqlSelect(Parse * pParse,		/* The parser context */
 
 	sqlDbFree(db, sAggInfo.aCol);
 	sqlDbFree(db, sAggInfo.aFunc);
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 	SELECTTRACE(1, pParse, p, ("end processing\n"));
 	pParse->nSelectIndent--;
 #endif

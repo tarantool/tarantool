@@ -1196,7 +1196,7 @@ sql_log(int iErrCode, const char *zFormat, ...)
 	}
 }
 
-#if (defined(SQL_DEBUG) || defined(SQL_ENABLE_SELECTTRACE))
+#if defined(SQL_DEBUG)
 /*
  * A version of printf() that understands %lld.  Used for debugging.
  */

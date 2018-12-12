@@ -39,7 +39,7 @@
 /*
  * Trace output macros
  */
-#ifdef WHERETRACE_ENABLED
+#ifdef SQL_DEBUG
 /***/ extern int sqlWhereTrace;
 #define WHERETRACE(K,X)  if(sqlWhereTrace&(K)) sqlDebugPrintf X
 #else
@@ -444,7 +444,7 @@ struct WhereInfo {
  * where.c:
  */
 Bitmask sqlWhereGetMask(WhereMaskSet *, int);
-#ifdef WHERETRACE_ENABLED
+#ifdef SQL_DEBUG
 void sqlWhereClausePrint(WhereClause * pWC);
 #endif
 WhereTerm *sqlWhereFindTerm(WhereClause * pWC,	/* The WHERE clause to be searched */

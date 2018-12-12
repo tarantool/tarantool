@@ -481,7 +481,6 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	/* Jump to the appropriate pragma handler */
 	switch (pPragma->ePragTyp) {
 
-#ifndef SQL_OMIT_FLAG_PRAGMAS
 	case PragTyp_FLAG:{
 			if (zRight == 0) {
 				setPragmaResultColumnNames(v, pPragma);
@@ -510,9 +509,7 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			}
 			break;
 		}
-#endif				/* SQL_OMIT_FLAG_PRAGMAS */
 
-#ifndef SQL_OMIT_SCHEMA_PRAGMAS
 	case PragTyp_TABLE_INFO:
 		sql_pragma_table_info(pParse, zRight);
 		break;
@@ -554,7 +551,6 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		box_iterator_free(iter);
 		break;
 	}
-#endif				/* SQL_OMIT_SCHEMA_PRAGMAS */
 
 	case PragTyp_FOREIGN_KEY_LIST:{
 		if (zRight == NULL)

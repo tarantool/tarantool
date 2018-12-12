@@ -1,7 +1,5 @@
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-DSQL_DEBUG=1)
-  add_definitions(-DSQL_ENABLE_SELECTTRACE)
-  add_definitions(-DSQL_ENABLE_WHERETRACE)
 endif()
 
 set(EXT_SRC_DIR ${CMAKE_SOURCE_DIR}/extra)

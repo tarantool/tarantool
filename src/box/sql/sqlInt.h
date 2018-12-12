@@ -1290,22 +1290,6 @@ extern const int sqlone;
 #endif
 
 /*
- * SELECTTRACE_ENABLED will be either 1 or 0 depending on whether or not
- * the Select query generator tracing logic is turned on.
- */
-#if defined(SQL_DEBUG) || defined(SQL_ENABLE_SELECTTRACE)
-#define SELECTTRACE_ENABLED
-#else
-#undef SELECTTRACE_ENABLED
-#endif
-
-#if defined(SQL_DEBUG) || defined(SQL_ENABLE_WHERETRACE)
-#define WHERETRACE_ENABLED
-#else
-#undef WHERETRACE_ENABLED
-#endif
-
-/*
  * A convenience macro that returns the number of elements in
  * an array.
  */
@@ -3855,7 +3839,7 @@ Expr *sqlExprDup(sql *, Expr *, int);
 SrcList *sqlSrcListDup(sql *, SrcList *, int);
 IdList *sqlIdListDup(sql *, IdList *);
 Select *sqlSelectDup(sql *, Select *, int);
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
 void sqlSelectSetName(Select *, const char *);
 #else
 #define sqlSelectSetName(A,B)

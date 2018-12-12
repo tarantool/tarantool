@@ -455,11 +455,11 @@ multiselect_op(A) ::= EXCEPT|INTERSECT(OP).  {A = @OP; /*A-overwrites-OP*/}
 %endif SQL_OMIT_COMPOUND_SELECT
 oneselect(A) ::= SELECT(S) distinct(D) selcollist(W) from(X) where_opt(Y)
                  groupby_opt(P) having_opt(Q) orderby_opt(Z) limit_opt(L). {
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
   Token s = S; /*A-overwrites-S*/
 #endif
   A = sqlSelectNew(pParse,W,X,Y,P,Q,Z,D,L.pLimit,L.pOffset);
-#ifdef SELECTTRACE_ENABLED
+#ifdef SQL_DEBUG
   /* Populate the Select.zSelName[] string that is used to help with
   ** query planner debugging, to differentiate between multiple Select
   ** objects in a complex query.
@@ -482,7 +482,7 @@ oneselect(A) ::= SELECT(S) distinct(D) selcollist(W) from(X) where_opt(Y)
       sql_snprintf(sizeof(A->zSelName), A->zSelName, "%.*s", i, z);
     }
   }
-#endif /* SELECTRACE_ENABLED */
+#endif /* SQL_DEBUG */
 }
 oneselect(A) ::= values(A).
 
