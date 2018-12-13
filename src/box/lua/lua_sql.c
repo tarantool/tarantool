@@ -149,18 +149,18 @@ lbox_sql_create_function(struct lua_State *L)
 	      lua_isfunction(L, 3) && lua_isnumber(L, 4) &&
 	      lua_isboolean(L, 5)))
 		return luaL_error(L, "Invalid arguments");
-	enum affinity_type type = AFFINITY_UNDEFINED;
+	enum field_type type;
 	const char *type_arg = lua_tostring(L, 2);
 	if (strcmp(type_arg, "INT") == 0 || strcmp(type_arg, "INTEGER") == 0)
-		type = AFFINITY_INTEGER;
+		type = FIELD_TYPE_INTEGER;
 	else if (strcmp(type_arg, "TEXT") == 0)
-		type = AFFINITY_TEXT;
+		type = FIELD_TYPE_STRING;
 	else if (strcmp(type_arg, "FLOAT") == 0)
-		type = AFFINITY_REAL;
+		type = FIELD_TYPE_NUMBER;
 	else if (strcmp(type_arg, "NUM") == 0)
-		type = AFFINITY_REAL;
+		type = FIELD_TYPE_NUMBER;
 	else if (strcmp(type_arg, "BLOB") == 0)
-		type = AFFINITY_BLOB;
+		type = FIELD_TYPE_SCALAR;
 	else
 		return luaL_error(L, "Unknown type");
 	/* -1 indicates any number of arguments. */

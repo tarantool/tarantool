@@ -1306,14 +1306,15 @@ sqlite3RegisterDateTimeFunctions(void)
 {
 	static FuncDef aDateTimeFuncs[] = {
 #ifndef SQLITE_OMIT_DATETIME_FUNCS
-		DFUNCTION(julianday, -1, 0, 0, juliandayFunc, AFFINITY_REAL),
-		DFUNCTION(date, -1, 0, 0, dateFunc, AFFINITY_REAL),
-		DFUNCTION(time, -1, 0, 0, timeFunc, AFFINITY_REAL),
-		DFUNCTION(datetime, -1, 0, 0, datetimeFunc, AFFINITY_REAL),
-		DFUNCTION(strftime, -1, 0, 0, strftimeFunc, AFFINITY_REAL),
-		DFUNCTION(current_time, 0, 0, 0, ctimeFunc, AFFINITY_REAL),
-		DFUNCTION(current_timestamp, 0, 0, 0, ctimestampFunc, AFFINITY_REAL),
-		DFUNCTION(current_date, 0, 0, 0, cdateFunc, AFFINITY_REAL),
+		DFUNCTION(julianday, -1, 0, 0, juliandayFunc, FIELD_TYPE_NUMBER),
+		DFUNCTION(date, -1, 0, 0, dateFunc, FIELD_TYPE_STRING),
+		DFUNCTION(time, -1, 0, 0, timeFunc, FIELD_TYPE_STRING),
+		DFUNCTION(datetime, -1, 0, 0, datetimeFunc, FIELD_TYPE_STRING),
+		DFUNCTION(strftime, -1, 0, 0, strftimeFunc, FIELD_TYPE_STRING),
+		DFUNCTION(current_time, 0, 0, 0, ctimeFunc, FIELD_TYPE_STRING),
+		DFUNCTION(current_timestamp, 0, 0, 0, ctimestampFunc,
+			  FIELD_TYPE_STRING),
+		DFUNCTION(current_date, 0, 0, 0, cdateFunc, FIELD_TYPE_STRING),
 #else
 		STR_FUNCTION(current_time, 0, "%H:%M:%S", 0, currentTimeFunc),
 		STR_FUNCTION(current_date, 0, "%Y-%m-%d", 0, currentTimeFunc),

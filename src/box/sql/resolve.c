@@ -637,6 +637,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 			} else {
 				is_agg = pDef->xFinalize != 0;
+				pExpr->affinity =
+					sql_field_type_to_affinity(pDef->ret_type);
 				if (pDef->funcFlags & SQLITE_FUNC_UNLIKELY) {
 					ExprSetProperty(pExpr,
 							EP_Unlikely | EP_Skip);
@@ -737,9 +739,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 				pNC->ncFlags |= NC_AllowAgg;
 			}
-			/* FIX ME:  Compute pExpr->affinity based on the expected return
-			 * type of the function
-			 */
 			return WRC_Prune;
 		}
 	case TK_SELECT:

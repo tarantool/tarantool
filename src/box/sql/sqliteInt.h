@@ -732,7 +732,7 @@ sqlite3_memory_used(void);
 int
 sqlite3_create_function_v2(sqlite3 * db,
 			   const char *zFunctionName,
-			   enum affinity_type type,
+			   enum field_type type,
 			   int nArg,
 			   int flags,
 			   void *pApp,
@@ -1660,7 +1660,7 @@ struct FuncDef {
 		FuncDestructor *pDestructor;	/* Reference counted destructor function */
 	} u;
 	/* Return type. */
-	enum affinity_type ret_type;
+	enum field_type ret_type;
 };
 
 /*
@@ -4583,7 +4583,7 @@ void sqlite3RegisterLikeFunctions(sqlite3 *, int);
 int
 sql_is_like_func(struct sqlite3 *db, struct Expr *expr, int *is_like_ci);
 
-int sqlite3CreateFunc(sqlite3 *, const char *, enum affinity_type,
+int sqlite3CreateFunc(sqlite3 *, const char *, enum field_type,
 		      int, int, void *,
 		      void (*)(sqlite3_context *, int, sqlite3_value **),
 		      void (*)(sqlite3_context *, int, sqlite3_value **),

@@ -1608,7 +1608,7 @@ groupConcatFinalize(sqlite3_context * context)
  */
 static inline int
 sqlite3_overload_function(sqlite3 * db, const char *zName,
-			  enum affinity_type type, int nArg)
+			  enum field_type type, int nArg)
 {
 	int rc = SQLITE_OK;
 
@@ -1633,7 +1633,7 @@ sqlite3_overload_function(sqlite3 * db, const char *zName,
 void
 sqlite3RegisterPerConnectionBuiltinFunctions(sqlite3 * db)
 {
-	int rc = sqlite3_overload_function(db, "MATCH", AFFINITY_UNDEFINED, 2);
+	int rc = sqlite3_overload_function(db, "MATCH", FIELD_TYPE_SCALAR, 2);
 	assert(rc == SQLITE_NOMEM || rc == SQLITE_OK);
 	if (rc == SQLITE_NOMEM) {
 		sqlite3OomFault(db);
@@ -1665,9 +1665,9 @@ sqlite3RegisterLikeFunctions(sqlite3 *db, int is_case_insensitive)
 	 * supplied pattern and FALSE otherwise.
 	 */
 	int *is_like_ci = SQLITE_INT_TO_PTR(is_case_insensitive);
-	sqlite3CreateFunc(db, "LIKE", AFFINITY_INTEGER, 2, 0,
+	sqlite3CreateFunc(db, "LIKE", FIELD_TYPE_INTEGER, 2, 0,
 			  is_like_ci, likeFunc, 0, 0, 0);
-	sqlite3CreateFunc(db, "LIKE", AFFINITY_INTEGER, 3, 0,
+	sqlite3CreateFunc(db, "LIKE", FIELD_TYPE_INTEGER, 3, 0,
 			  is_like_ci, likeFunc, 0, 0, 0);
 	setLikeOptFlag(db, "LIKE",
 		       !(is_case_insensitive) ? (SQLITE_FUNC_LIKE |
@@ -1722,82 +1722,76 @@ sqlite3RegisterBuiltinFunctions(void)
 		FUNCTION(soundex, 1, 0, 0, soundexFunc),
 #endif
 		FUNCTION2(unlikely, 1, 0, 0, noopFunc, SQLITE_FUNC_UNLIKELY,
-			  AFFINITY_INTEGER),
+			  FIELD_TYPE_INTEGER),
 		FUNCTION2(likelihood, 2, 0, 0, noopFunc, SQLITE_FUNC_UNLIKELY,
-			  AFFINITY_INTEGER),
+			  FIELD_TYPE_INTEGER),
 		FUNCTION2(likely, 1, 0, 0, noopFunc, SQLITE_FUNC_UNLIKELY,
-			  AFFINITY_INTEGER),
-		FUNCTION(ltrim, 1, 1, 0, trimFunc, AFFINITY_TEXT),
-		FUNCTION(ltrim, 2, 1, 0, trimFunc, AFFINITY_TEXT),
-		FUNCTION(rtrim, 1, 2, 0, trimFunc, AFFINITY_TEXT),
-		FUNCTION(rtrim, 2, 2, 0, trimFunc, AFFINITY_TEXT),
-		FUNCTION(trim, 1, 3, 0, trimFunc, AFFINITY_TEXT),
-		FUNCTION(trim, 2, 3, 0, trimFunc, AFFINITY_TEXT),
-		FUNCTION(min, -1, 0, 1, minmaxFunc, 0),
-		FUNCTION(min, 0, 0, 1, 0, 0),
+			  FIELD_TYPE_INTEGER),
+		FUNCTION(ltrim, 1, 1, 0, trimFunc, FIELD_TYPE_STRING),
+		FUNCTION(ltrim, 2, 1, 0, trimFunc, FIELD_TYPE_STRING),
+		FUNCTION(rtrim, 1, 2, 0, trimFunc, FIELD_TYPE_STRING),
+		FUNCTION(rtrim, 2, 2, 0, trimFunc, FIELD_TYPE_STRING),
+		FUNCTION(trim, 1, 3, 0, trimFunc, FIELD_TYPE_STRING),
+		FUNCTION(trim, 2, 3, 0, trimFunc, FIELD_TYPE_STRING),
+		FUNCTION(min, -1, 0, 1, minmaxFunc, FIELD_TYPE_SCALAR),
+		FUNCTION(min, 0, 0, 1, 0, FIELD_TYPE_SCALAR),
 		AGGREGATE2(min, 1, 0, 1, minmaxStep, minMaxFinalize,
-			   SQLITE_FUNC_MINMAX, 0),
-		FUNCTION(max, -1, 1, 1, minmaxFunc, 0),
-		FUNCTION(max, 0, 1, 1, 0, 0),
+			   SQLITE_FUNC_MINMAX, FIELD_TYPE_SCALAR),
+		FUNCTION(max, -1, 1, 1, minmaxFunc, FIELD_TYPE_SCALAR),
+		FUNCTION(max, 0, 1, 1, 0, FIELD_TYPE_SCALAR),
 		AGGREGATE2(max, 1, 1, 1, minmaxStep, minMaxFinalize,
-			   SQLITE_FUNC_MINMAX, 0),
+			   SQLITE_FUNC_MINMAX, FIELD_TYPE_SCALAR),
 		FUNCTION2(typeof, 1, 0, 0, typeofFunc, SQLITE_FUNC_TYPEOF,
-			  AFFINITY_TEXT),
+			  FIELD_TYPE_STRING),
 		FUNCTION2(length, 1, 0, 0, lengthFunc, SQLITE_FUNC_LENGTH,
-			  AFFINITY_INTEGER),
-		FUNCTION(instr, 2, 0, 0, instrFunc, AFFINITY_INTEGER),
-		FUNCTION(printf, -1, 0, 0, printfFunc, AFFINITY_TEXT),
-		FUNCTION(unicode, 1, 0, 0, unicodeFunc, AFFINITY_TEXT),
-		FUNCTION(char, -1, 0, 0, charFunc, AFFINITY_TEXT),
-		FUNCTION(abs, 1, 0, 0, absFunc, AFFINITY_REAL),
+			  FIELD_TYPE_INTEGER),
+		FUNCTION(instr, 2, 0, 0, instrFunc, FIELD_TYPE_INTEGER),
+		FUNCTION(printf, -1, 0, 0, printfFunc, FIELD_TYPE_STRING),
+		FUNCTION(unicode, 1, 0, 0, unicodeFunc, FIELD_TYPE_STRING),
+		FUNCTION(char, -1, 0, 0, charFunc, FIELD_TYPE_STRING),
+		FUNCTION(abs, 1, 0, 0, absFunc, FIELD_TYPE_NUMBER),
 #ifndef SQLITE_OMIT_FLOATING_POINT
-		FUNCTION(round, 1, 0, 0, roundFunc, AFFINITY_INTEGER),
-		FUNCTION(round, 2, 0, 0, roundFunc, AFFINITY_INTEGER),
+		FUNCTION(round, 1, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
+		FUNCTION(round, 2, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
 #endif
-		FUNCTION(upper, 1, 0, 1, UpperICUFunc, AFFINITY_TEXT),
-		FUNCTION(lower, 1, 0, 1, LowerICUFunc, AFFINITY_TEXT),
-		FUNCTION(hex, 1, 0, 0, hexFunc, AFFINITY_TEXT),
+		FUNCTION(upper, 1, 0, 1, UpperICUFunc, FIELD_TYPE_STRING),
+		FUNCTION(lower, 1, 0, 1, LowerICUFunc, FIELD_TYPE_STRING),
+		FUNCTION(hex, 1, 0, 0, hexFunc, FIELD_TYPE_STRING),
 		FUNCTION2(ifnull, 2, 0, 0, noopFunc, SQLITE_FUNC_COALESCE,
-			  AFFINITY_INTEGER),
-		VFUNCTION(random, 0, 0, 0, randomFunc, AFFINITY_REAL),
-		VFUNCTION(randomblob, 1, 0, 0, randomBlob, AFFINITY_BLOB),
-		FUNCTION(nullif, 2, 0, 1, nullifFunc, 0),
-		FUNCTION(version, 0, 0, 0, sql_func_version, AFFINITY_TEXT),
-		FUNCTION(quote, 1, 0, 0, quoteFunc, AFFINITY_TEXT),
-		VFUNCTION(row_count, 0, 0, 0, sql_row_count, AFFINITY_INTEGER),
-		FUNCTION(replace, 3, 0, 0, replaceFunc, AFFINITY_TEXT),
-		FUNCTION(zeroblob, 1, 0, 0, zeroblobFunc, AFFINITY_BLOB),
-		FUNCTION(substr, 2, 0, 0, substrFunc, AFFINITY_TEXT),
-		FUNCTION(substr, 3, 0, 0, substrFunc, AFFINITY_TEXT),
-		AGGREGATE(sum, 1, 0, 0, sumStep, sumFinalize, 0),
-		AGGREGATE(total, 1, 0, 0, sumStep, totalFinalize, 0),
-		AGGREGATE(avg, 1, 0, 0, sumStep, avgFinalize, 0),
+			  FIELD_TYPE_INTEGER),
+		VFUNCTION(random, 0, 0, 0, randomFunc, FIELD_TYPE_NUMBER),
+		VFUNCTION(randomblob, 1, 0, 0, randomBlob, FIELD_TYPE_SCALAR),
+		FUNCTION(nullif, 2, 0, 1, nullifFunc, FIELD_TYPE_SCALAR),
+		FUNCTION(version, 0, 0, 0, sql_func_version, FIELD_TYPE_STRING),
+		FUNCTION(quote, 1, 0, 0, quoteFunc, FIELD_TYPE_STRING),
+		VFUNCTION(row_count, 0, 0, 0, sql_row_count, FIELD_TYPE_INTEGER),
+		FUNCTION(replace, 3, 0, 0, replaceFunc, FIELD_TYPE_STRING),
+		FUNCTION(zeroblob, 1, 0, 0, zeroblobFunc, FIELD_TYPE_SCALAR),
+		FUNCTION(substr, 2, 0, 0, substrFunc, FIELD_TYPE_STRING),
+		FUNCTION(substr, 3, 0, 0, substrFunc, FIELD_TYPE_STRING),
+		AGGREGATE(sum, 1, 0, 0, sumStep, sumFinalize, FIELD_TYPE_NUMBER),
+		AGGREGATE(total, 1, 0, 0, sumStep, totalFinalize, FIELD_TYPE_NUMBER),
+		AGGREGATE(avg, 1, 0, 0, sumStep, avgFinalize, FIELD_TYPE_NUMBER),
 		AGGREGATE2(count, 0, 0, 0, countStep, countFinalize,
-			   SQLITE_FUNC_COUNT, AFFINITY_INTEGER),
+			   SQLITE_FUNC_COUNT, FIELD_TYPE_INTEGER),
 		AGGREGATE(count, 1, 0, 0, countStep, countFinalize,
-			  AFFINITY_INTEGER),
+			  FIELD_TYPE_INTEGER),
 		AGGREGATE(group_concat, 1, 0, 0, groupConcatStep,
-			  groupConcatFinalize, AFFINITY_TEXT),
+			  groupConcatFinalize, FIELD_TYPE_STRING),
 		AGGREGATE(group_concat, 2, 0, 0, groupConcatStep,
-			  groupConcatFinalize, AFFINITY_TEXT),
+			  groupConcatFinalize, FIELD_TYPE_STRING),
 
-#ifdef SQLITE_CASE_SENSITIVE_LIKE
-		LIKEFUNC(like, 2, 0,SQLITE_FUNC_LIKE | SQLITE_FUNC_CASE,
-			 AFFINITY_INTEGER),
-		LIKEFUNC(like, 3, 0,SQLITE_FUNC_LIKE | SQLITE_FUNC_CASE,
-			 AFFINITY_INTEGER),
-#else
 		LIKEFUNC(like, 2, 1, SQLITE_FUNC_LIKE,
-			AFFINITY_INTEGER),
+			 FIELD_TYPE_INTEGER),
 		LIKEFUNC(like, 3, 1, SQLITE_FUNC_LIKE,
-			AFFINITY_INTEGER),
-#endif
+			 FIELD_TYPE_INTEGER),
 #ifdef SQLITE_ENABLE_UNKNOWN_SQL_FUNCTION
 		FUNCTION(unknown, -1, 0, 0, unknownFunc, 0),
 #endif
-		FUNCTION(coalesce, 1, 0, 0, 0, 0),
-		FUNCTION(coalesce, 0, 0, 0, 0, 0),
-		FUNCTION2(coalesce, -1, 0, 0, noopFunc, SQLITE_FUNC_COALESCE, 0),
+		FUNCTION(coalesce, 1, 0, 0, 0, FIELD_TYPE_SCALAR),
+		FUNCTION(coalesce, 0, 0, 0, 0, FIELD_TYPE_SCALAR),
+		FUNCTION2(coalesce, -1, 0, 0, noopFunc, SQLITE_FUNC_COALESCE,
+			  FIELD_TYPE_SCALAR),
 	};
 	sqlite3AnalyzeFunctions();
 	sqlite3RegisterDateTimeFunctions();

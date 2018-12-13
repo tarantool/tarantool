@@ -750,7 +750,7 @@ sqlite3_interrupt(sqlite3 * db)
 int
 sqlite3CreateFunc(sqlite3 * db,
 		  const char *zFunctionName,
-		  enum affinity_type type,
+		  enum field_type type,
 		  int nArg,
 		  int flags,
 		  void *pUserData,
@@ -820,7 +820,7 @@ sqlite3CreateFunc(sqlite3 * db,
 int
 sqlite3_create_function_v2(sqlite3 * db,
 			   const char *zFunc,
-			   enum affinity_type type,
+			   enum field_type type,
 			   int nArg,
 			   int flags,
 			   void *p,
