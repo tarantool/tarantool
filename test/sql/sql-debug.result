@@ -21,3 +21,25 @@ box.sql.execute('PRAGMA parser_trace')
 box.sql.execute('PRAGMA parser_trace = '.. result[1][1])
 ---
 ...
+--
+-- Make PRAGMA command return the result as a result set.
+--
+box.sql.execute('PRAGMA')
+---
+- - ['case_sensitive_like', 0]
+  - ['count_changes', 0]
+  - ['defer_foreign_keys', 0]
+  - ['full_column_names', 0]
+  - ['parser_trace', 0]
+  - ['recursive_triggers', 1]
+  - ['reverse_unordered_selects', 0]
+  - ['select_trace', 0]
+  - ['short_column_names', 1]
+  - ['sql_trace', 0]
+  - ['vdbe_addoptrace', 0]
+  - ['vdbe_debug', 0]
+  - ['vdbe_eqp', 0]
+  - ['vdbe_listing', 0]
+  - ['vdbe_trace', 0]
+  - ['where_trace', 0]
+...
