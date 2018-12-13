@@ -503,6 +503,13 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 					sqlParserTrace(0, 0);
 			}
 #endif
+			/*
+			 * Reinstall the LIKE and functions. The
+			 * variant of LIKE * used will be case
+			 * sensitive or not depending on the RHS.
+			 */
+			if (mask == LIKE_CASE_SENS_FLAG)
+				sqlRegisterLikeFunctions(db, !is_pragma_set);
 		}
 		break;
 	}
@@ -584,20 +591,6 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		}
 		break;
 	}
-
-		/*
-		 * Reinstall the LIKE and functions. The variant
-		 * of LIKE * used will be case sensitive or not
-		 * depending on the RHS.
-		 */
-	case PragTyp_CASE_SENSITIVE_LIKE:{
-			if (zRight) {
-				int is_like_ci =
-					!(sqlGetBoolean(zRight, 0));
-				sqlRegisterLikeFunctions(db, is_like_ci);
-			}
-			break;
-		}
 
 	case PragTyp_DEFAULT_ENGINE: {
 		if (!token_is_string(pValue)) {

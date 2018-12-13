@@ -1525,6 +1525,8 @@ struct sql {
 /* Debug print info about SQL query as it parsed */
 #define PARSER_TRACE_FLAG  0x00000002
 #define SQL_FullColNames   0x00000004	/* Show full column names on SELECT */
+/* True if LIKE is case sensitive. */
+#define LIKE_CASE_SENS_FLAG 0x00000008
 #define SQL_ShortColNames  0x00000040	/* Show short columns names */
 #define SQL_CountRows      0x00000080	/* Count rows changed by INSERT, */
 					  /*   DELETE, or UPDATE and return */
