@@ -36,7 +36,7 @@ test:do_test(
     "triggerD-1.1",
     function()
         return test:execsql [[
-            CREATE TABLE t1(rowid INT PRIMARY KEY, oid INT, _rowid_ INT, x INT);
+            CREATE TABLE t1(id INT PRIMARY KEY, rowid INT UNIQUE, oid INT, _rowid_ INT, x INT);
             CREATE TABLE log(a TEXT PRIMARY KEY,b INT,c INT,d INT,e INT);
             CREATE TRIGGER r1 BEFORE INSERT ON t1 BEGIN
               INSERT INTO log VALUES('r1', new.rowid, new.oid, new._rowid_, new.x);
@@ -69,7 +69,7 @@ test:do_test(
     "triggerD-1.2",
     function()
         return test:execsql [[
-            INSERT INTO t1 VALUES(100,200,300,400);
+            INSERT INTO t1 VALUES(0, 100,200,300,400);
             SELECT * FROM log
         ]]
     end, {

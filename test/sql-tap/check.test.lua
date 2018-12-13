@@ -420,7 +420,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "check-4.1",
     [[
-        CREATE TABLE t4(x  INT primary key, y INT ,
+        CREATE TABLE t4(x INT UNIQUE, y INT, z INT PRIMARY KEY
           CHECK (
                x+y==11
             OR x*y==12
@@ -437,8 +437,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "check-4.2",
     [[
-        INSERT INTO t4 VALUES(1,10);
-        SELECT * FROM t4
+        INSERT INTO t4 VALUES(1,10,1);
+        SELECT x,y FROM t4
     ]], {
         -- <check-4.2>
         1, 10
@@ -449,7 +449,7 @@ test:do_execsql_test(
     "check-4.3",
     [[
         UPDATE t4 SET x=4, y=3;
-        SELECT * FROM t4
+        SELECT x,y FROM t4
     ]], {
         -- <check-4.3>
         4, 3
@@ -460,7 +460,7 @@ test:do_execsql_test(
     "check-4.4",
     [[
         UPDATE t4 SET x=12, y=2;
-        SELECT * FROM t4
+        SELECT x,y FROM t4
     ]], {
         -- <check-4.4>
         12, 2
@@ -471,7 +471,7 @@ test:do_execsql_test(
     "check-4.5",
     [[
         UPDATE t4 SET x=12, y=-22;
-        SELECT * FROM t4
+        SELECT x,y FROM t4
     ]], {
         -- <check-4.5>
         12, -22
@@ -491,7 +491,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "check-4.7",
     [[
-        SELECT * FROM t4;
+        SELECT x,y FROM t4;
     ]], {
         -- <check-4.7>
         12, -22

@@ -528,7 +528,7 @@ test:do_execsql2_test(
 test:do_execsql_test(
     "table-7.3",
     [[
-        CREATE TABLE savepoint_t(release_t int primary key);
+        CREATE TABLE savepoint_t(id INT PRIMARY KEY AUTOINCREMENT, release_t INT UNIQUE);
         INSERT INTO savepoint_t(release_t) VALUES(10);
         UPDATE savepoint_t SET release_t = 5;
         SELECT release_t FROM savepoint_t;

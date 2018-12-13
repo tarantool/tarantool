@@ -27,7 +27,7 @@ test:do_catchsql_test(
     "quote-1.0",
     [[
         --- CREATE TABLE '@abc' ( '#xyz' int PRIMARY KEY, '!pqr' text );
-        CREATE TABLE "abc5_" ( "#xyz" int PRIMARY KEY, "!pqr" text );
+        CREATE TABLE "abc5_" (id INT PRIMARY KEY, "#xyz" INT UNIQUE, "!pqr" TEXT );
     ]], {
         -- <quote-1.0>
         0
@@ -39,7 +39,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "quote-1.1",
     [[
-        INSERT INTO "abc5_" VALUES(5,'hello')
+        INSERT INTO "abc5_" VALUES(1, 5,'hello')
     ]], {
         -- <quote-1.1>
         0
@@ -52,7 +52,7 @@ test:do_catchsql_test(
         SELECT * FROM "abc5_"
     ]], {
         -- <quote-1.2.1>
-        0, {5, "hello"}
+        0, {1, 5, "hello"}
         -- </quote-1.2.1>
     })
 

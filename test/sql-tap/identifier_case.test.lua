@@ -116,7 +116,7 @@ test:do_test(
     end,
     6)
 
-test:execsql([[create table table1(columnn INT , "columnn" INT primary key)]])
+test:execsql([[create table table1(pk INT PRIMARY KEY AUTOINCREMENT, columnn INT , "columnn" INT UNIQUE)]])
 test:execsql([[insert into table1("columnn", "COLUMNN") values(2,1)]])
 
 

@@ -35,13 +35,13 @@ box.sql.execute("DROP TABLE a;")
 
 -- gh-3566: UPDATE OR IGNORE causes deletion of old entry.
 --
-box.sql.execute("CREATE TABLE tj (s1 INT PRIMARY KEY, s2 INT);")
-box.sql.execute("INSERT INTO tj VALUES (1, 2), (2, 3);")
+box.sql.execute("CREATE TABLE tj (s0 INT PRIMARY KEY, s1 INT UNIQUE, s2 INT);")
+box.sql.execute("INSERT INTO tj VALUES (1, 1, 2), (2, 2, 3);")
 box.sql.execute("CREATE UNIQUE INDEX i ON tj (s2);")
 box.sql.execute("UPDATE OR IGNORE tj SET s1 = s1 + 1;")
-box.sql.execute("SELECT * FROM tj;")
+box.sql.execute("SELECT s1, s2 FROM tj;")
 box.sql.execute("UPDATE OR IGNORE tj SET s2 = s2 + 1;")
-box.sql.execute("SELECT * FROM tj;")
+box.sql.execute("SELECT s1, s2 FROM tj;")
 
 -- gh-3565: INSERT OR REPLACE causes assertion fault.
 --

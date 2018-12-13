@@ -227,7 +227,8 @@ test:do_execsql_test(
         -- </index6-6.0>
     })
 else
-    test:execsql("CREATE TABLE t6(a INT ,b INT , PRIMARY KEY (a,b));")
+    test:execsql("CREATE TABLE t6(id INT PRIMARY KEY AUTOINCREMENT, a INT ,b INT);")
+    test:execsql("CREATE UNIQUE INDEX t6i1 ON t6(a, b);")
     test:execsql("INSERT INTO t6(a,b) VALUES(123,456);")
 end
 
@@ -235,7 +236,7 @@ test:do_execsql_test(
     "index6-6.1",
     [[
         UPDATE OR REPLACE t6 SET b=789;
-        SELECT * FROM t6;
+        SELECT a,b FROM t6;
     ]], {
         -- <index6-6.1>
         123, 789

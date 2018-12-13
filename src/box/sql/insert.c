@@ -1059,12 +1059,7 @@ vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
 {
 	assert(v != NULL);
 	u16 pik_flags = OPFLAG_NCHANGE;
-	if (on_conflict == ON_CONFLICT_ACTION_IGNORE)
-		pik_flags |= OPFLAG_OE_IGNORE;
-	else if (on_conflict == ON_CONFLICT_ACTION_FAIL)
-		pik_flags |= OPFLAG_OE_FAIL;
-	else if (on_conflict == ON_CONFLICT_ACTION_ROLLBACK)
-		pik_flags |= OPFLAG_OE_ROLLBACK;
+	SET_CONFLICT_FLAG(pik_flags, on_conflict);
 	sqlite3VdbeAddOp3(v, OP_MakeRecord, raw_data_reg, tuple_len,
 			  raw_data_reg + tuple_len);
 	sqlite3VdbeAddOp1(v, OP_IdxInsert, raw_data_reg + tuple_len);

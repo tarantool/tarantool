@@ -101,12 +101,12 @@ box.sql.execute("DROP TABLE T1;")
 --
 -- Case 1: Src 'vinyl' table; Dst 'memtx' table
 box.sql.execute("PRAGMA sql_default_engine ('vinyl');")
-box.sql.execute("CREATE TABLE m (s1 TEXT PRIMARY KEY);")
+box.sql.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = DATETIME('now'); END;")
 box.sql.execute("PRAGMA sql_default_engine('memtx');")
-box.sql.execute("CREATE TABLE n (s1 TEXT PRIMARY KEY, s2 REAL);")
-box.sql.execute("INSERT INTO m VALUES ('0');")
-box.sql.execute("INSERT INTO n VALUES ('',null);")
+box.sql.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
+box.sql.execute("INSERT INTO m VALUES (0, '0');")
+box.sql.execute("INSERT INTO n VALUES (0, '',null);")
 box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 
 -- ANALYZE operates with _sql_stat{1,4} tables should work
@@ -117,12 +117,12 @@ box.sql.execute("DROP TABLE n;")
 
 -- Case 2: Src 'memtx' table; Dst 'vinyl' table
 box.sql.execute("PRAGMA sql_default_engine ('memtx');")
-box.sql.execute("CREATE TABLE m (s1 TEXT PRIMARY KEY);")
+box.sql.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = DATETIME('now'); END;")
 box.sql.execute("PRAGMA sql_default_engine('vinyl');")
-box.sql.execute("CREATE TABLE n (s1 TEXT PRIMARY KEY, s2 REAL);")
-box.sql.execute("INSERT INTO m VALUES ('0');")
-box.sql.execute("INSERT INTO n VALUES ('',null);")
+box.sql.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
+box.sql.execute("INSERT INTO m VALUES (0, '0');")
+box.sql.execute("INSERT INTO n VALUES (0, '',null);")
 box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 
 -- ANALYZE operates with _sql_stat{1,4} tables should work

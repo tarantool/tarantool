@@ -40,7 +40,7 @@ test:do_test(
 test:do_execsql_test(
     "bigrow-1.1",
     [[
-        CREATE TABLE t1(a text primary key, b text, c text);
+        CREATE TABLE t1(id INT PRIMARY KEY AUTOINCREMENT, a TEXT UNIQUE, b TEXT, c TEXT);
         --SELECT name FROM sqlite_master
         --  WHERE type='table' OR type='index'
         --  ORDER BY name
@@ -55,7 +55,7 @@ test:do_test(
     "bigrow-1.2",
     function()
         big1 = string.sub(bigstr, 1, 65519 + 1)
-        local sql = "INSERT INTO t1 VALUES('abc',"
+        local sql = "INSERT INTO t1(a,b,c) VALUES('abc',"
         sql = sql .. "'"..big1.."', 'xyz');"
         test:execsql(sql)
         return test:execsql "SELECT a, c FROM t1"
@@ -80,7 +80,7 @@ test:do_test(
     "bigrow-1.4",
     function()
         big2 = string.sub(bigstr, 1, 65520+1)
-        local sql = "INSERT INTO t1 VALUES('abc2',"
+        local sql = "INSERT INTO t1(a,b,c) VALUES('abc2',"
         sql = sql .. "'"..big2.."', 'xyz2');"
         return test:catchsql(sql)
     end, {
@@ -134,7 +134,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "bigrow-1.6",
     [[
-        SELECT * FROM t1
+        SELECT a,b,c FROM t1
     ]], {
         -- <bigrow-1.6>
         big1, "abc", "xyz"
@@ -144,8 +144,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "bigrow-1.7",
     [[
-        INSERT INTO t1 VALUES('1','2','3');
-        INSERT INTO t1 VALUES('A','B','C');
+        INSERT INTO t1(a,b,c) VALUES('1','2','3');
+        INSERT INTO t1(a,b,c) VALUES('A','B','C');
         SELECT b FROM t1 WHERE a=='1';
     ]], {
         -- <bigrow-1.7>

@@ -52,7 +52,7 @@ test:execsql " PRAGMA recursive_triggers = on "
 test:do_execsql_test(
     "triggerC-1.1",
     [[
-        CREATE TABLE t1(a TEXT PRIMARY KEY, b TEXT, c TEXT);
+        CREATE TABLE t1(id INT PRIMARY KEY AUTOINCREMENT, a TEXT UNIQUE, b TEXT, c TEXT);
         CREATE TABLE log(t TEXT PRIMARY KEY, a1 TEXT, b1 TEXT, c1 TEXT, a2 TEXT, b2 TEXT, c2 TEXT);
         CREATE TRIGGER trig1 BEFORE INSERT ON t1 BEGIN
           INSERT INTO log VALUES('before', NULL, NULL, NULL, new.a, new.b, new.c);
@@ -82,7 +82,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "triggerC-1.2",
     [[
-        INSERT INTO t1 VALUES('A', 'B', 'C');
+        INSERT INTO t1 VALUES(1, 'A', 'B', 'C');
         SELECT * FROM log ORDER BY t DESC;
     ]], {
         -- <triggerC-1.2>
@@ -96,7 +96,7 @@ test:do_execsql_test(
         SELECT * FROM t1
     ]], {
         -- <triggerC-1.3>
-        "A", "B", "C"
+        1, "A", "B", "C"
         -- </triggerC-1.3>
     })
 
@@ -118,7 +118,7 @@ test:do_execsql_test(
         SELECT * FROM t1
     ]], {
         -- <triggerC-1.5>
-        "a", "B", "C"
+        1, "a", "B", "C"
         -- </triggerC-1.5>
     })
 
@@ -182,7 +182,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "triggerC-1.11",
     [[
-        CREATE TABLE t5 (a INT primary key, b INT, c INT);
+        CREATE TABLE t5 (a INT UNIQUE, b INT PRIMARY KEY, c INT);
         INSERT INTO t5 values (1, 2, 3);
         CREATE TRIGGER au_tbl AFTER UPDATE ON t5 BEGIN
           UPDATE OR IGNORE t5 SET a = new.a, c = 10;
@@ -206,7 +206,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "triggerC-1.13",
     [[
-        CREATE TABLE t6(a INTEGER PRIMARY KEY, b INT);
+        CREATE TABLE t6(a INT UNIQUE, b INT PRIMARY KEY);
         INSERT INTO t6 VALUES(1, 2);
         create trigger r1 after update on t6 for each row begin
           SELECT 1;
@@ -222,10 +222,11 @@ test:do_execsql_test(
     "triggerC-1.14",
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE cnt(n INT PRIMARY KEY);
-        INSERT INTO cnt VALUES(0);
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT UNIQUE, c INT, d INT, e INT);
+        CREATE TABLE cnt(id INT PRIMARY KEY, n INT UNIQUE);
+        INSERT INTO cnt VALUES(0, 0);
+        CREATE TABLE t1(a INT UNIQUE, b INT UNIQUE, c INT, d INT, e INT PRIMARY KEY);
         CREATE INDEX t1cd ON t1(c,d);
+        CREATE UNIQUE INDEX t1a ON t1(a);
         CREATE TRIGGER t1r1 AFTER UPDATE ON t1 BEGIN UPDATE cnt SET n=n+1; END;
         INSERT INTO t1 VALUES(1,2,3,4,5);
         INSERT INTO t1 VALUES(6,7,8,9,10);
@@ -241,7 +242,7 @@ test:do_catchsql_test(
         UPDATE OR ROLLBACK t1 SET a=100;
     ]], {
         -- <triggerC-1.15>
-        1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
+        1, "Duplicate key exists in unique index 'unique_unnamed_T1_1' in space 'T1'"
         -- </triggerC-1.15>
     })
 
@@ -712,11 +713,12 @@ test:do_test(
     "triggerC-10.1",
     function()
         test:execsql [[
-            CREATE TABLE t10(a TEXT PRIMARY KEY, updatecnt INT DEFAULT 0);
+            CREATE TABLE t10(id INT PRIMARY KEY, a TEXT, updatecnt INT DEFAULT 0);
+            CREATE UNIQUE INDEX t10i1 ON t10(a);
             CREATE TRIGGER t10_bu BEFORE UPDATE OF a ON t10 BEGIN
               UPDATE t10 SET updatecnt = updatecnt+1 WHERE a = old.a;
             END;
-            INSERT INTO t10 VALUES('hello', 0);
+            INSERT INTO t10 VALUES(0, 'hello', 0);
         ]]
         -- Before the problem was fixed, table t10 would contain the tuple
         -- (world, 0) after running the following script (because the value
@@ -728,7 +730,7 @@ test:do_test(
         ]]
     end, {
         -- <triggerC-10.1>
-        "world", 1
+        0, "world", 1
         -- </triggerC-10.1>
     })
 
@@ -739,7 +741,7 @@ test:do_execsql_test(
         SELECT * FROM t10;
     ]], {
         -- <triggerC-10.2>
-        "tcl", 5
+        0, "tcl", 5
         -- </triggerC-10.2>
     })
 
@@ -748,10 +750,11 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE t11(
-              c1 INT PRIMARY KEY,   c2 INT,  c3 INT,  c4 INT,  c5 INT,  c6 INT,  c7 INT,  c8 INT,  c9 INT, c10 INT,
-              c11 INT, c12 INT, c13 INT, c14 INT, c15 INT, c16 INT, c17 INT, c18 INT, c19 INT, c20 INT,
-              c21 INT, c22 INT, c23 INT, c24 INT, c25 INT, c26 INT, c27 INT, c28 INT, c29 INT, c30 INT,
-              c31 INT, c32 INT, c33 INT, c34 INT, c35 INT, c36 INT, c37 INT, c38 INT, c39 INT, c40 INT
+              c0 INT PRIMARY KEY, c1 INT UNIQUE,   c2 INT,  c3 INT,  c4 INT,  c5 INT,  c6 INT,  c7 INT,
+              c8 INT,  c9 INT, c10 INT, c11 INT, c12 INT, c13 INT, c14 INT, c15 INT, c16 INT,
+              c17 INT, c18 INT, c19 INT, c20 INT, c21 INT, c22 INT, c23 INT, c24 INT, c25 INT,
+              c26 INT, c27 INT, c28 INT, c29 INT, c30 INT, c31 INT, c32 INT, c33 INT, c34 INT,
+              c35 INT, c36 INT, c37 INT, c38 INT, c39 INT, c40 INT
             );
 
             CREATE TRIGGER t11_bu BEFORE UPDATE OF c1 ON t11 BEGIN
@@ -759,7 +762,7 @@ test:do_test(
             END;
 
             INSERT INTO t11 VALUES(
-              1,   2,  3,  4,  5,  6,  7,  8,  9, 10,
+              0, 1,   2,  3,  4,  5,  6,  7,  8,  9, 10,
               11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
               21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
               31, 32, 33, 34, 35, 36, 37, 38, 39, 40
@@ -775,7 +778,7 @@ test:do_test(
         ]]
     end, {
         -- <triggerC-10.3>
-        5, 2, 3, 35, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 22, 34, 35, 36, 37, 38, 39, 40
+        0, 5, 2, 3, 35, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 33, 22, 34, 35, 36, 37, 38, 39, 40
         -- </triggerC-10.3>
     })
 

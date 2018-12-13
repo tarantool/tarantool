@@ -2848,6 +2848,20 @@ struct Parse {
 #define OPFLAG_SYSTEMSP      0x20	/* OP_Open**: set if space pointer
 					 * points to system space.
 					 */
+
+/**
+ * Prepare vdbe P5 flags for OP_{IdxInsert, IdxReplace, Update}
+ * by on_conflict action.
+ */
+#define SET_CONFLICT_FLAG(opflag, on_conflict) do { \
+	if (on_conflict == ON_CONFLICT_ACTION_IGNORE) \
+	    opflag |= OPFLAG_OE_IGNORE; \
+	else if (on_conflict == ON_CONFLICT_ACTION_FAIL) \
+	    opflag |= OPFLAG_OE_FAIL; \
+	else if (on_conflict == ON_CONFLICT_ACTION_ROLLBACK) \
+	    opflag |= OPFLAG_OE_ROLLBACK; \
+} while (0)
+
 /* OP_RowData: xferOptimization started processing */
 #ifdef SQLITE_TEST
 #define OPFLAG_XFER_OPT      0x01

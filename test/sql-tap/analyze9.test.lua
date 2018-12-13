@@ -405,6 +405,27 @@ test:do_execsql_test(
 -- The following tests experiment with adding corrupted records to the
 -- 'sample' column of the _sql_stat4 table.
 --
+local get_pk = function (space, record)
+    local pkey = {}
+    for _, part in pairs(space.index[0].parts) do
+        table.insert(pkey, record[part.fieldno])
+    end
+    return pkey
+end
+
+local inject_stat_error_func = function (space_name)
+    local space = box.space[space_name]
+    local record = space:select({"T1", "I1", nil}, {limit = 1})[1]
+    space:delete(get_pk(space, record))
+    local record_new = {}
+    for i = 1,#record-1 do record_new[i] = record[i] end
+    record_new[#record] = ''
+    space:insert(record_new)
+    return 0
+end
+
+box.internal.sql_create_function("inject_stat_error", "INT", inject_stat_error_func)
+
 test:do_execsql_test(
     7.1,
     [[
@@ -417,8 +438,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(null, 4, 4);
         INSERT INTO t1 VALUES(null, 5, 5);
         ANALYZE;
-        UPDATE "_sql_stat4" SET "sample" = '' WHERE "sample" =
-            (SELECT "sample" FROM "_sql_stat4" WHERE "tbl" = 't1' AND "idx" = 'i1' LIMIT 1);
+        SELECT inject_stat_error('_sql_stat4');
         ANALYZE;
     ]])
 
@@ -1050,11 +1070,28 @@ test:do_execsql_test(
         -- </15.4>
     })
 
+local inject_stat_error_func = function (space_name)
+    local space = box.space[space_name]
+    local stats = space:select()
+    for _, stat in pairs(stats) do
+        space:delete(get_pk(space, stat))
+        local new_tuple = {"no such tbl"}
+        for i=2,#stat do
+            table.insert(new_tuple, stat[i])
+        end
+        space:insert(new_tuple)
+    end
+    return 0
+end
+
+box.internal.sql_create_function("inject_stat_error", "INT", inject_stat_error_func)
+
+
 test:do_execsql_test(
     15.7,
     [[
         ANALYZE;
-        UPDATE "_sql_stat1" SET "tbl" = 'no such tbl';
+        SELECT inject_stat_error('_sql_stat1');
     ]])
 
 test:do_execsql_test(

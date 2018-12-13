@@ -158,12 +158,12 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey3-3.6",
     [[
-        CREATE TABLE t6(a INTEGER PRIMARY KEY, b TEXT, c INT, d TEXT, UNIQUE(a, b),
-            FOREIGN KEY(c, d) REFERENCES t6(a, b));
-        INSERT INTO t6 VALUES(1, 'a', 1, 'a');
-        INSERT INTO t6 VALUES(2, 'a', 2, 'a');
-        INSERT INTO t6 VALUES(3, 'a', 1, 'a');
-        INSERT INTO t6 VALUES(5, 'a', 2, 'a');
+        CREATE TABLE t6(a INT UNIQUE, b TEXT, c INT, d TEXT, UNIQUE(a, b),
+            FOREIGN KEY(c, d) REFERENCES t6(a, b), id INT PRIMARY KEY AUTOINCREMENT);
+        INSERT INTO t6(a,b,c,d) VALUES(1, 'a', 1, 'a');
+        INSERT INTO t6(a,b,c,d) VALUES(2, 'a', 2, 'a');
+        INSERT INTO t6(a,b,c,d) VALUES(3, 'a', 1, 'a');
+        INSERT INTO t6(a,b,c,d) VALUES(5, 'a', 2, 'a');
     ]], {
         -- <fkey3-3.6>
         -- </fkey3-3.6>
@@ -172,7 +172,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey3-3.7",
     [[
-        INSERT INTO t6 VALUES(4, 'a', 65, 'a');
+        INSERT INTO t6(a,b,c,d) VALUES(4, 'a', 65, 'a');
     ]], {
         -- <fkey3-3.7>
         1, "FOREIGN KEY constraint failed"
@@ -182,9 +182,9 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey3-3.8",
     [[
-        INSERT INTO t6 VALUES(100, 'one', 100, 'one');
+        INSERT INTO t6(a,b,c,d) VALUES(100, 'one', 100, 'one');
         DELETE FROM t6 WHERE a = 100;
-        SELECT * FROM t6 WHERE a = 100;
+        SELECT a,b,c,d FROM t6 WHERE a = 100;
     ]], {
         -- <fkey3-3.8>
         -- </fkey3-3.8>
@@ -193,7 +193,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey3-3.9",
     [[
-        INSERT INTO t6 VALUES(100, 'one', 100, 'one');
+        INSERT INTO t6(a,b,c,d) VALUES(100, 'one', 100, 'one');
         UPDATE t6 SET c = 1, d = 'a' WHERE a = 100;
     ]], {
         -- <fkey3-3.9>

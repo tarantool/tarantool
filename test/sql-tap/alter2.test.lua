@@ -204,13 +204,13 @@ test:do_execsql_test(
     [[
         DROP TABLE child;
         DROP TABLE parent;
-        CREATE TABLE child (id INT PRIMARY KEY, a INT, b INT);
-        CREATE TABLE parent (id INT PRIMARY KEY, c INT, d INT);
-        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent ON UPDATE CASCADE MATCH PARTIAL;
-        INSERT INTO parent VALUES(1, 2, 3), (3, 4, 5), (6, 7, 8);
-        INSERT INTO child VALUES(1, 1, 1), (3, 2, 2);
+        CREATE TABLE child (id INT UNIQUE, a INT, b INT, z INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE parent (id INT UNIQUE, c INT, d INT, z INT PRIMARY KEY AUTOINCREMENT);
+        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent(id) ON UPDATE CASCADE MATCH PARTIAL;
+        INSERT INTO parent(id, c, d) VALUES(1, 2, 3), (3, 4, 5), (6, 7, 8);
+        INSERT INTO child(id, a, b) VALUES(1, 1, 1), (3, 2, 2);
         UPDATE parent SET id = 5 WHERE id = 1;
-        SELECT * FROM CHILD;
+        SELECT id,a,b FROM CHILD ORDER BY id,a,b;
     ]], {
         -- <alter2-3.2>
         3, 2, 2, 5, 1, 1
@@ -220,7 +220,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "alter2-4.1",
     [[
-        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY REFERENCES child;
+        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY REFERENCES child(id);
     ]], {
         -- <alter2-4.1>
         1, "near \"REFERENCES\": syntax error"
@@ -230,7 +230,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "alter2-4.2",
     [[
-        ALTER TABLE child ADD CONSTRAINT fk () FOREIGN KEY REFERENCES child;
+        ALTER TABLE child ADD CONSTRAINT fk () FOREIGN KEY REFERENCES child(id);
     ]], {
         -- <alter2-4.1>
         1, "near \"(\": syntax error"

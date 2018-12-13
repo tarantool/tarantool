@@ -36,6 +36,7 @@
 #include "sqliteInt.h"
 #include "box/session.h"
 #include "tarantoolInt.h"
+#include "box/tuple_format.h"
 #include "box/schema.h"
 
 void
@@ -112,6 +113,8 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 	int regNew = 0;		/* Content of the NEW.* table in triggers */
 	int regOld = 0;		/* Content of OLD.* table in triggers */
 	int regKey = 0;		/* composite PRIMARY KEY value */
+	/* Count of changed rows. Match aXRef items != -1. */
+	int upd_cols_cnt = 0;
 
 	db = pParse->db;
 	if (pParse->nErr || db->mallocFailed) {
@@ -183,6 +186,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 					goto update_cleanup;
 				}
 				aXRef[j] = i;
+				upd_cols_cnt++;
 				break;
 			}
 		}
@@ -216,7 +220,7 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		regNewPk = ++pParse->nMem;
 	}
 	regNew = pParse->nMem + 1;
-	pParse->nMem += def->field_count;
+	pParse->nMem += def->field_count + 1;
 
 	/* If we are trying to update a view, realize that view into
 	 * an ephemeral table.
@@ -274,11 +278,11 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		nKey = pk_part_count;
 		regKey = iPk;
 	} else {
-		const char *zAff = is_view ? 0 :
-				   sql_space_index_affinity_str(pParse->db, def,
-								pPk->def);
+		const char *aff_str =
+			is_view ? 0 :
+			sql_space_index_affinity_str(pParse->db, def, pPk->def);
 		sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk, pk_part_count,
-				  regKey, zAff, pk_part_count);
+				  regKey, aff_str, pk_part_count);
 		/*
 		 * Set flag to save memory allocating one by
 		 * malloc.
@@ -430,23 +434,67 @@ sqlite3Update(Parse * pParse,		/* The parser context */
 		vdbe_emit_constraint_checks(pParse, pTab, regNewPk + 1,
 					    on_error, labelContinue, aXRef);
 		/* Do FK constraint checks. */
-		if (hasFK)
+		if (hasFK) {
 			fkey_emit_check(pParse, pTab, regOldPk, 0, aXRef);
-		/*
-		 * Delete the index entries associated with the
-		 * current record. It can be already removed by
-		 * trigger or REPLACE conflict action.
-		 */
-		int addr1 = sqlite3VdbeAddOp4Int(v, OP_NotFound, pk_cursor, 0,
-						 regKey, nKey);
-		assert(regNew == regNewPk + 1);
-		sqlite3VdbeAddOp2(v, OP_Delete, pk_cursor, 0);
-		sqlite3VdbeJumpHere(v, addr1);
-		if (hasFK)
+		}
+		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
+			/*
+			 * Delete the index entries associated with the
+			 * current record. It can be already removed by
+			 * trigger or REPLACE conflict action.
+			 */
+			int not_found_lbl =
+				sqlite3VdbeAddOp4Int(v, OP_NotFound, pk_cursor,
+						     0, regKey, nKey);
+			assert(regNew == regNewPk + 1);
+			sqlite3VdbeAddOp2(v, OP_Delete, pk_cursor, 0);
+			sqlite3VdbeJumpHere(v, not_found_lbl);
+		}
+		if (hasFK) {
 			fkey_emit_check(pParse, pTab, 0, regNewPk, aXRef);
-		vdbe_emit_insertion_completion(v, space, regNew,
-					       pTab->def->field_count,
-					       on_error);
+		}
+		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
+			 vdbe_emit_insertion_completion(v, space, regNew,
+							pTab->def->field_count,
+							on_error);
+
+		} else {
+			int key_reg;
+			if (okOnePass) {
+				key_reg = sqlite3GetTempReg(pParse);
+				const char *zAff =
+					sql_space_index_affinity_str(pParse->db,
+								     def,
+								     pPk->def);
+				sqlite3VdbeAddOp4(v, OP_MakeRecord, iPk,
+						  pk_part_count, key_reg, zAff,
+						  pk_part_count);
+			} else {
+				assert(nKey == 0);
+				key_reg = regKey;
+			}
+
+			/* Prepare array of changed fields. */
+			uint32_t upd_cols_sz = upd_cols_cnt * sizeof(uint32_t);
+			uint32_t *upd_cols = sqlite3DbMallocRaw(db, upd_cols_sz);
+			if (upd_cols == NULL)
+				goto update_cleanup;
+			upd_cols_cnt = 0;
+			for (uint32_t i = 0; i < def->field_count; i++) {
+				if (aXRef[i] == -1)
+					continue;
+				upd_cols[upd_cols_cnt++] = i;
+			}
+			int upd_cols_reg = sqlite3GetTempReg(pParse);
+			sqlite3VdbeAddOp4(v, OP_Blob, upd_cols_sz, upd_cols_reg,
+					0, (const char *)upd_cols, P4_DYNAMIC);
+			u16 pik_flags = OPFLAG_NCHANGE;
+			SET_CONFLICT_FLAG(pik_flags, on_error);
+			sqlite3VdbeAddOp4(v, OP_Update, regNew, key_reg,
+					  upd_cols_reg, (char *)space,
+					  P4_SPACEPTR);
+			sqlite3VdbeChangeP5(v, pik_flags);
+		}
 		/*
 		 * Do any ON CASCADE, SET NULL or SET DEFAULT
 		 * operations required to handle rows that refer

@@ -61,10 +61,10 @@ test:plan(26)
 test:catchsql " pragma recursive_triggers = off "
 -- 1.
 ii = 0
-tbl_definitions = { "CREATE TABLE tbl (a INTEGER PRIMARY KEY, b INT );",
-                    "CREATE TABLE tbl (a  INT PRIMARY KEY, b INT );",
-                    "CREATE TABLE tbl (a INT , b  INT PRIMARY KEY);",
-                    "CREATE TABLE tbl (a INT , b INTEGER PRIMARY KEY);" }
+tbl_definitions = { "CREATE TABLE tbl (id INT PRIMARY KEY AUTOINCREMENT, a INTEGER UNIQUE, b INT );",
+                    "CREATE TABLE tbl (id INT PRIMARY KEY AUTOINCREMENT, a INT UNIQUE, b INT );",
+                    "CREATE TABLE tbl (id INT PRIMARY KEY AUTOINCREMENT, a INT, b INT UNIQUE );",
+                    "CREATE TABLE tbl (id INT PRIMARY KEY AUTOINCREMENT, a INT, b INTEGER UNIQUE );"}
 -- Tarantool: temporary tables are not supported so far. #2119
 -- table.insert(tbl_definitions,"CREATE TEMP TABLE tbl (a, b INTEGER PRIMARY KEY);")
 -- table.insert(tbl_definitions,"CREATE TEMP TABLE tbl (a INTEGER PRIMARY KEY, b);")
@@ -81,8 +81,8 @@ for _, tbl_defn in ipairs(tbl_definitions) do
     ]]
     test:execsql(tbl_defn)
     test:execsql [[
-        INSERT INTO tbl VALUES(1, 2);
-        INSERT INTO tbl VALUES(3, 4);
+        INSERT INTO tbl(a, b) VALUES(1, 2);
+        INSERT INTO tbl(a, b) VALUES(3, 4);
     ]]
     test:execsql [[
         CREATE TABLE rlog (idx INTEGER PRIMARY KEY, old_a INT , old_b INT , db_sum_a INT , db_sum_b INT , new_a INT , new_b INT );
@@ -140,8 +140,8 @@ for _, tbl_defn in ipairs(tbl_definitions) do
     test:execsql [[
         DELETE FROM tbl;
         DELETE FROM rlog;
-        INSERT INTO tbl VALUES (100, 100);
-        INSERT INTO tbl VALUES (300, 200);
+        INSERT INTO tbl(a, b) VALUES (100, 100);
+        INSERT INTO tbl(a, b) VALUES (300, 200);
         CREATE TRIGGER delete_before_row BEFORE DELETE ON tbl FOR EACH ROW
           BEGIN
           INSERT INTO rlog VALUES ( (SELECT coalesce(max(idx),0) + 1 FROM rlog),
@@ -203,7 +203,7 @@ for _, tbl_defn in ipairs(tbl_definitions) do
             INSERT INTO other_tbl VALUES(1, 2);
             INSERT INTO other_tbl VALUES(3, 4);
             -- INSERT INTO tbl SELECT * FROM other_tbl;
-            INSERT INTO tbl VALUES(5, 6);
+            INSERT INTO tbl(a,b) VALUES(5, 6);
             DROP TABLE other_tbl;
 
             SELECT * FROM rlog;
@@ -355,8 +355,8 @@ table.insert(when_triggers,"t2 BEFORE INSERT ON tbl WHEN (SELECT count(*) FROM t
 
 test:execsql [[
     CREATE TABLE tbl (a  INT , b  INT PRIMARY KEY, c INT , d INT );
-    CREATE TABLE log (a  INT PRIMARY KEY);
-    INSERT INTO log VALUES (0);
+    CREATE TABLE log (id INT PRIMARY KEY AUTOINCREMENT, a INT);
+    INSERT INTO log VALUES (0, 0);
 ]]
 for _, trig in ipairs(when_triggers) do
     test:execsql("CREATE TRIGGER "..trig.." BEGIN UPDATE log set a = a + 1; END;")
@@ -368,17 +368,17 @@ test:do_test(
         local r = {}
         table.insert(r, test:execsql([[
         INSERT INTO tbl VALUES(0, 1, 0, 0);     -- 1 (ifcapable subquery)
-        SELECT * FROM log;
+        SELECT a FROM log;
         UPDATE log SET a = 0;]])[1])
 
         table.insert(r, test:execsql([[
         INSERT INTO tbl VALUES(0, 2, 0, 0);     -- 0
-        SELECT * FROM log;
+        SELECT a FROM log;
         UPDATE log SET a = 0;]])[1])
 
         table.insert(r, test:execsql([[
         INSERT INTO tbl VALUES(200, 3, 0, 0);     -- 1
-        SELECT * FROM log;
+        SELECT a FROM log;
         UPDATE log SET a = 0;]])[1])
 
         return r

@@ -25,9 +25,9 @@ test:plan(201)
 test:do_execsql_test(
     "triggerB-1.1",
     [[
-        CREATE TABLE x(x INTEGER PRIMARY KEY, y INT NOT NULL);
-        INSERT INTO x VALUES(1, 1);
-        INSERT INTO x VALUES(2, 1);
+        CREATE TABLE x(id INTEGER PRIMARY KEY, x INTEGER UNIQUE, y INT NOT NULL);
+        INSERT INTO x VALUES(1, 1, 1);
+        INSERT INTO x VALUES(2, 2, 1);
         CREATE VIEW vx AS SELECT x, y, 0 AS yy FROM x;
         CREATE TRIGGER tx INSTEAD OF UPDATE OF y ON vx
         BEGIN
@@ -57,7 +57,7 @@ test:do_catchsql_test(
         CREATE TRIGGER ty AFTER INSERT ON x BEGIN
            SELECT wen.x; -- Unrecognized name
         END;
-        INSERT INTO x VALUES(1,2);
+        INSERT INTO x VALUES(3,1,2);
     ]], {
         -- <triggerB-2.1>
         1, "no such column: WEN.X"
@@ -81,8 +81,8 @@ test:do_test(
     "triggerB-2.3",
     function()
         test:execsql [[
-            CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT );
-            INSERT INTO t2 VALUES(1,2);
+            CREATE TABLE t2(id INTEGER PRIMARY KEY, a INTEGER UNIQUE, b INT );
+            INSERT INTO t2 VALUES(1, 1,2);
             CREATE TABLE changes(x  INT PRIMARY KEY,y INT );
             CREATE TRIGGER r1t2 AFTER UPDATE ON t2 BEGIN
               INSERT INTO changes VALUES(new.a, new.b);
@@ -128,17 +128,17 @@ test:do_test(
     function()
         test:execsql [[
             CREATE TABLE t3(
-               c0  TEXT PRIMARY KEY,  c1 TEXT ,  c2 TEXT ,  c3 TEXT ,  c4 TEXT ,  c5 TEXT ,  c6 TEXT ,  c7 TEXT ,  c8 TEXT ,  c9 TEXT ,
-               c10 TEXT , c11 TEXT , c12 TEXT , c13 TEXT , c14 TEXT , c15 TEXT , c16 TEXT , c17 TEXT , c18 TEXT , c19 TEXT ,
-               c20 TEXT , c21 TEXT , c22 TEXT , c23 TEXT , c24 TEXT , c25 TEXT , c26 TEXT , c27 TEXT , c28 TEXT , c29 TEXT ,
-               c30 TEXT , c31 TEXT , c32 TEXT , c33 TEXT , c34 TEXT , c35 TEXT , c36 TEXT , c37 TEXT , c38 TEXT , c39 TEXT ,
-               c40 TEXT , c41 TEXT , c42 TEXT , c43 TEXT , c44 TEXT , c45 TEXT , c46 TEXT , c47 TEXT , c48 TEXT , c49 TEXT ,
-               c50 TEXT , c51 TEXT , c52 TEXT , c53 TEXT , c54 TEXT , c55 TEXT , c56 TEXT , c57 TEXT , c58 TEXT , c59 TEXT ,
-               c60 TEXT , c61 TEXT , c62 TEXT , c63 TEXT , c64 TEXT , c65 TEXT
+               id INT PRIMARY KEY, c0 TEXT UNIQUE,  c1 TEXT ,  c2 TEXT ,  c3 TEXT ,  c4 TEXT ,  c5 TEXT ,  c6 TEXT ,  c7 TEXT ,
+               c8 TEXT ,  c9 TEXT , c10 TEXT , c11 TEXT , c12 TEXT , c13 TEXT , c14 TEXT , c15 TEXT , c16 TEXT , c17 TEXT ,
+               c18 TEXT , c19 TEXT , c20 TEXT , c21 TEXT , c22 TEXT , c23 TEXT , c24 TEXT , c25 TEXT , c26 TEXT , c27 TEXT ,
+               c28 TEXT , c29 TEXT , c30 TEXT , c31 TEXT , c32 TEXT , c33 TEXT , c34 TEXT , c35 TEXT , c36 TEXT , c37 TEXT ,
+               c38 TEXT , c39 TEXT , c40 TEXT , c41 TEXT , c42 TEXT , c43 TEXT , c44 TEXT , c45 TEXT , c46 TEXT , c47 TEXT ,
+               c48 TEXT , c49 TEXT , c50 TEXT , c51 TEXT , c52 TEXT , c53 TEXT , c54 TEXT , c55 TEXT , c56 TEXT , c57 TEXT ,
+               c58 TEXT , c59 TEXT , c60 TEXT , c61 TEXT , c62 TEXT , c63 TEXT , c64 TEXT , c65 TEXT
             );
             CREATE TABLE t3_changes(colnum INT PRIMARY KEY, oldval TEXT , newval TEXT );
             INSERT INTO t3 VALUES(
-               'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9',
+               0, 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9',
                'a10','a11','a12','a13','a14','a15','a16','a17','a18','a19',
                'a20','a21','a22','a23','a24','a25','a26','a27','a28','a29',
                'a30','a31','a32','a33','a34','a35','a36','a37','a38','a39',

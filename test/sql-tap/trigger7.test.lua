@@ -40,7 +40,7 @@ test:do_test(
     "trigger7-2.1",
     function()
         test:execsql [[
-			CREATE TABLE t1(x INT PRIMARY KEY, y INT);
+            CREATE TABLE t1(x INT UNIQUE, y INT, z INT PRIMARY KEY AUTOINCREMENT);
             CREATE TRIGGER r1 AFTER UPDATE OF x ON t1 BEGIN
               SELECT '___update_t1.x___';
             END;

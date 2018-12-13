@@ -25,10 +25,10 @@ test:plan(6)
 test:do_execsql_test(
     "tkt2832-1.1",
     [[
-        CREATE TABLE t1(a INT PRIMARY KEY);
-        INSERT INTO t1 VALUES(2);
-        INSERT INTO t1 VALUES(1);
-        INSERT INTO t1 VALUES(3);
+        CREATE TABLE t1(id INT PRIMARY KEY AUTOINCREMENT, a INT UNIQUE);
+        INSERT INTO t1(a) VALUES(2);
+        INSERT INTO t1(a) VALUES(1);
+        INSERT INTO t1(a) VALUES(3);
     ]], {
         -- <tkt2832-1.1>
         
@@ -40,7 +40,7 @@ test:do_execsql_test(
     "tkt2832-1.2",
     [[
         UPDATE OR REPLACE t1 SET a = 1;
-        SELECT * FROM t1;
+        SELECT a FROM t1;
     ]], {
         -- <tkt2832-1.2>
         1

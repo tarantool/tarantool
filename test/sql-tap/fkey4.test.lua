@@ -8,9 +8,9 @@ test:do_execsql_test(
     "fkey8-1.1",
     [[
         CREATE TABLE p1(a INT PRIMARY KEY);
-        CREATE TABLE c1(b INT PRIMARY KEY REFERENCES p1 ON DELETE CASCADE);
+        CREATE TABLE c1(id INT PRIMARY KEY AUTOINCREMENT, b INT UNIQUE REFERENCES p1 ON DELETE CASCADE);
         INSERT INTO p1 VALUES (1), (2), (3);
-        INSERT INTO c1 VALUES (2);
+        INSERT INTO c1(b) VALUES (2);
         DELETE FROM p1 WHERE a = 2;
         SELECT * FROM c1;
     ]], {
@@ -24,9 +24,9 @@ test:do_catchsql_test(
         DROP TABLE IF EXISTS c1;
         DROP TABLE IF EXISTS p1;
         CREATE TABLE p1(a INT PRIMARY KEY);
-        CREATE TABLE c1(b INT PRIMARY KEY REFERENCES p1 ON DELETE SET NULL);
+        CREATE TABLE c1(id INT PRIMARY KEY AUTOINCREMENT, b INT UNIQUE NOT NULL REFERENCES p1 ON DELETE SET NULL);
         INSERT INTO p1 VALUES (1), (2), (3);
-        INSERT INTO c1 VALUES (2);
+        INSERT INTO c1(b) VALUES (2);
         DELETE FROM p1 WHERE a = 2;
     ]], {
         -- <fkey8-1.2>
@@ -40,11 +40,11 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS c1;
         DROP TABLE IF EXISTS p1;
         CREATE TABLE p1(a INT PRIMARY KEY);
-        CREATE TABLE c1(b INT PRIMARY KEY DEFAULT 3 REFERENCES p1 ON DELETE SET DEFAULT);
+        CREATE TABLE c1(id INT PRIMARY KEY AUTOINCREMENT, b INT UNIQUE DEFAULT 3 REFERENCES p1 ON DELETE SET DEFAULT);
         INSERT INTO p1 VALUES (1), (2), (3);
-        INSERT INTO c1 VALUES (2);
+        INSERT INTO c1(b) VALUES (2);
         DELETE FROM p1 WHERE a = 2;
-        SELECT * FROM c1;
+        SELECT b FROM c1;
     ]], {
         -- <fkey8-1.3>
         3
@@ -152,10 +152,10 @@ test:do_catchsql_test(
         DROP TABLE IF EXISTS cc1;
         DROP TABLE IF EXISTS c1;
         DROP TABLE IF EXISTS p1;
-        CREATE TABLE p1(a INT PRIMARY KEY);
-        CREATE TABLE c1(b INT PRIMARY KEY REFERENCES p1 ON UPDATE SET NULL, c INT);
-        INSERT INTO p1 VALUES (1), (2), (3);
-        INSERT INTO c1 VALUES (2, 1), (3, 2);
+        CREATE TABLE p1(a INT UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE c1(b INT UNIQUE NOT NULL REFERENCES p1(a) ON UPDATE SET NULL, c INT, id INT PRIMARY KEY AUTOINCREMENT);
+        INSERT INTO p1(a) VALUES (1), (2), (3);
+        INSERT INTO c1(b, c) VALUES (2, 1), (3, 2);
         UPDATE OR IGNORE p1 SET a = 4 WHERE a = 2;
     ]], {
         -- <fkey8-1.9>
@@ -168,12 +168,12 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS c1;
         DROP TABLE IF EXISTS p1;
-        CREATE TABLE p1(a INT PRIMARY KEY);
-        CREATE TABLE c1(b INT PRIMARY KEY REFERENCES p1 ON UPDATE CASCADE, c INT);
-        INSERT INTO p1 VALUES (1), (2), (3);
-        INSERT INTO c1 VALUES (2, 1), (3, 2);
+        CREATE TABLE p1(a INT UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE c1(b INT UNIQUE NOT NULL REFERENCES p1(a) ON UPDATE CASCADE, c INT, id INT PRIMARY KEY AUTOINCREMENT);
+        INSERT INTO p1(a) VALUES (1), (2), (3);
+        INSERT INTO c1(b,c) VALUES (2, 1), (3, 2);
         UPDATE OR IGNORE p1 SET a = 4 WHERE a = 2;
-        SELECT * FROM c1;
+        SELECT b,c FROM c1 ORDER BY b,c;
     ]], {
         -- <fkey8-1.10>
         3, 2, 4, 1

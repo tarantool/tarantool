@@ -31,13 +31,13 @@ if (1 > 0)
         "tkt2767-1.1",
         [[
             -- Construct a table with many rows of data
-            CREATE TABLE t1(x  INT primary key);
-            INSERT INTO t1 VALUES(1);
-            INSERT INTO t1 VALUES(2);
-            INSERT INTO t1 SELECT x+2 FROM t1;
-            INSERT INTO t1 SELECT x+4 FROM t1;
-            INSERT INTO t1 SELECT x+8 FROM t1;
-            INSERT INTO t1 SELECT x+16 FROM t1;
+            CREATE TABLE t1(id INT PRIMARY KEY AUTOINCREMENT, x INT UNIQUE);
+            INSERT INTO t1 VALUES(1, 1);
+            INSERT INTO t1 VALUES(2, 2);
+            INSERT INTO t1 (x) SELECT x+2 FROM t1;
+            INSERT INTO t1 (x) SELECT x+4 FROM t1;
+            INSERT INTO t1 (x) SELECT x+8 FROM t1;
+            INSERT INTO t1 (x) SELECT x+16 FROM t1;
 
             -- BEFORE triggers that invoke raise(ignore).  The effect of
             -- these triggers should be to make INSERTs, UPDATEs, and DELETEs
@@ -99,7 +99,7 @@ if (1 > 0)
     test:do_execsql_test(
         "tkt2767-1.4",
         [[
-            INSERT INTO t1 SELECT x+32 FROM t1;
+            INSERT INTO t1 (x) SELECT x+32 FROM t1;
             SELECT count(*), sum(x) FROM t1;
         ]], {
             -- <tkt2767-1.4>

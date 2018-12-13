@@ -4464,6 +4464,106 @@ case OP_IdxInsert: {
 	break;
 }
 
+/* Opcode: Update P1 P2 P3 P4 P5
+ * Synopsis: key=r[P1]
+ *
+ * Process UPDATE operation. Primary key fields can not be
+ * modified.
+ * Under the hood it performs box_update() call.
+ * For the performance sake, it takes whole affected row (P1)
+ * and encodes into msgpack only fields to be updated (P3).
+ *
+ * @param P1 The first field to be updated. Fields are located
+ *           in the range of [P1...] in decoded state.
+ *           Encoded only fields which numbers are presented
+ *           in @P3 array.
+ * @param P2 P2 Encoded key to be passed to box_update().
+ * @param P3 Index of a register with upd_fields blob.
+ *           It's items are numbers of fields to be replaced with
+ *           new values from P1. They must be sorted in ascending
+ *           order.
+ * @param P4 Pointer to the struct space to be updated.
+ * @param P5 Flags. If P5 contains OPFLAG_NCHANGE, then VDBE
+ *           accounts the change in a case of successful
+ *           insertion in nChange counter. If P5 contains
+ *           OPFLAG_OE_IGNORE, then we are processing INSERT OR
+ *           INGORE statement. Thus, in case of conflict we don't
+ *           raise an error.
+ */
+case OP_Update: {
+	struct Mem *new_tuple = &aMem[pOp->p1];
+	if (pOp->p5 & OPFLAG_NCHANGE)
+		p->nChange++;
+
+	struct space *space = pOp->p4.space;
+	assert(pOp->p4type == P4_SPACEPTR);
+
+	struct Mem *key_mem = &aMem[pOp->p2];
+	assert((key_mem->flags & MEM_Blob) != 0);
+
+	struct Mem *upd_fields_mem = &aMem[pOp->p3];
+	assert((upd_fields_mem->flags & MEM_Blob) != 0);
+	uint32_t *upd_fields = (uint32_t *)upd_fields_mem->z;
+	uint32_t upd_fields_cnt = upd_fields_mem->n / sizeof(uint32_t);
+
+	/* Prepare Tarantool update ops msgpack. */
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	bool is_error = false;
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      set_encode_error, &is_error);
+	mpstream_encode_array(&stream, upd_fields_cnt);
+	for (uint32_t i = 0; i < upd_fields_cnt; i++) {
+		uint32_t field_idx = upd_fields[i];
+		assert(field_idx < space->def->field_count);
+		mpstream_encode_array(&stream, 3);
+		mpstream_encode_strn(&stream, "=", 1);
+		mpstream_encode_uint(&stream, field_idx);
+		mpstream_encode_vdbe_mem(&stream, new_tuple + field_idx);
+	}
+	mpstream_flush(&stream);
+	if (is_error) {
+		diag_set(OutOfMemory, stream.pos - stream.buf,
+			"mpstream_flush", "stream");
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+	uint32_t ops_size = region_used(region) - used;
+	const char *ops = region_join(region, ops_size);
+	if (ops == NULL) {
+		diag_set(OutOfMemory, ops_size, "region_join", "raw");
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+
+	assert(rc == SQLITE_OK);
+	if (box_update(space->def->id, 0, key_mem->z, key_mem->z + key_mem->n,
+		       ops, ops + ops_size, 0, NULL) != 0)
+		rc = SQL_TARANTOOL_ERROR;
+
+	if (pOp->p5 & OPFLAG_OE_IGNORE) {
+		/*
+		 * Ignore any kind of fails and do not raise
+		 * error message
+		 */
+		rc = SQLITE_OK;
+		/*
+		 * If we are in trigger, increment ignore raised
+		 * counter.
+		 */
+		if (p->pFrame)
+			p->ignoreRaised++;
+	} else if (pOp->p5 & OPFLAG_OE_FAIL) {
+		p->errorAction = ON_CONFLICT_ACTION_FAIL;
+	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
+		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
+	}
+	if (rc != 0)
+		goto abort_due_to_error;
+	break;
+}
+
 /* Opcode: SInsert P1 P2 P3 * P5
  * Synopsis: space id = P1, key = r[P3], on error goto P2
  *

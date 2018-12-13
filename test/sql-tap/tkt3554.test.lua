@@ -26,7 +26,8 @@ test:plan(4)
 test:do_execsql_test(
     "tkt3544-1.1",
     [[
-        CREATE TABLE test ( obj TEXT, t1 INT , t2 INT , PRIMARY KEY(obj, t1, t2) );
+        CREATE TABLE test (id INT PRIMARY KEY AUTOINCREMENT, obj TEXT, t1 INT , t2 INT);
+        CREATE UNIQUE INDEX testi1 ON test(obj, t1, t2);
 
         CREATE TRIGGER test_insert BEFORE INSERT ON test BEGIN
           UPDATE test SET t1 = new.t1
@@ -49,8 +50,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt3544-1.2",
     [[
-        INSERT INTO test VALUES('a', 10000, 11000);
-        SELECT * FROM test;
+        INSERT INTO test(obj, t1, t2) VALUES('a', 10000, 11000);
+        SELECT obj, t1, t2 FROM test;
     ]], {
         -- <tkt3544-1.2>
         "a", 10000, 11000
@@ -61,9 +62,9 @@ test:do_test(
     "tkt3544-1.3",
     function()
         test:execsql [[
-            INSERT INTO test VALUES('a', 9000, 10500);
+            INSERT INTO test(obj, t1, t2) VALUES('a', 9000, 10500);
         ]]
-        return test:execsql " SELECT * FROM test "
+        return test:execsql " SELECT obj, t1, t2 FROM test "
     end, {
         -- <tkt3544-1.3>
         "a", 9000, 11000
@@ -74,9 +75,9 @@ test:do_test(
     "tkt3544-1.4",
     function()
         test:execsql [[
-            INSERT INTO test VALUES('a', 10000, 12000);
+            INSERT INTO test(obj, t1, t2) VALUES('a', 10000, 12000);
         ]]
-        return test:execsql " SELECT * FROM test "
+        return test:execsql " SELECT obj, t1, t2 FROM test "
     end, {
         -- <tkt3544-1.4>
         "a", 9000, 12000

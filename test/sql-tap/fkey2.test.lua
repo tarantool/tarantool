@@ -7,15 +7,14 @@ test:plan(116)
 test:do_execsql_test(
     "fkey2-1.1",
     [[
-        CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
-        CREATE TABLE t2(c  INT PRIMARY KEY REFERENCES t1(a), d INT);
+        CREATE TABLE t1(a INT UNIQUE, b INT, id INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE t2(c INT UNIQUE REFERENCES t1(a), d INT, id INT PRIMARY KEY AUTOINCREMENT);
 
-        CREATE TABLE t3(a  INT PRIMARY KEY, b INT );
-        CREATE TABLE t4(c  INT PRIMARY KEY REFERENCES t3, d INT );
+        CREATE TABLE t3(a INT UNIQUE, b INT, id INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE t4(c INT UNIQUE REFERENCES t3(a), d INT, id INT PRIMARY KEY AUTOINCREMENT);
 
-        CREATE TABLE t7(a INT , b INTEGER PRIMARY KEY);
-        CREATE TABLE t8(c  INT PRIMARY KEY REFERENCES t7, d INT );
-
+        CREATE TABLE t7(a INT, b INTEGER UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE t8(c INT UNIQUE REFERENCES t7(b), d INT, id INT PRIMARY KEY AUTOINCREMENT);
     ]], {
         -- <fkey2-1.1>
         -- </fkey2-1.1>
@@ -24,7 +23,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey2-1.2",
     [[
-        INSERT INTO t2 VALUES(1, 3);
+        INSERT INTO t2(c,d) VALUES(1, 3);
     ]], {
         -- <fkey2-1.2>
         1, "FOREIGN KEY constraint failed"
@@ -34,7 +33,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.3",
     [[
-        INSERT INTO t1 VALUES(1, 2);
+        INSERT INTO t1(a, b) VALUES(1, 2);
     ]], {
         -- <fkey2-1.3>
         0
@@ -44,7 +43,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.4",
     [[
-        INSERT INTO t2 VALUES(1, 3);
+        INSERT INTO t2(c,d) VALUES(1, 3);
     ]], {
         -- <fkey2-1.4>
         0
@@ -54,7 +53,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.5",
     [[
-        INSERT INTO t2 VALUES(2, 4);
+        INSERT INTO t2(c,d) VALUES(2, 4);
     ]], {
         -- <fkey2-1.5>
         1, "FOREIGN KEY constraint failed"
@@ -64,8 +63,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.6",
     [[
-        INSERT INTO t1 VALUES(3, 5);
-        INSERT INTO t2 VALUES(3, 4);
+        INSERT INTO t1(a,b) VALUES(3, 5);
+        INSERT INTO t2(c,d) VALUES(3, 4);
     ]], {
         -- <fkey2-1.6>
         0
@@ -85,7 +84,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.8",
     [[
-        INSERT INTO t1 VALUES(6, 7);
+        INSERT INTO t1(a,b) VALUES(6, 7);
         UPDATE t2 SET c = 6 WHERE d = 4;
     ]], {
         -- <fkey2-1.8>
@@ -129,7 +128,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.12",
     [[
-        INSERT INTO t4 values (1,3);
+        INSERT INTO t4(c,d) values (1,3);
     ]], {
         -- <fkey2-1.12>
         1, "FOREIGN KEY constraint failed"
@@ -139,7 +138,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.13",
     [[
-        INSERT INTO t3 values (1,2);
+        INSERT INTO t3(a,b) values (1,2);
     ]], {
         -- <fkey2-1.13>
         0
@@ -149,7 +148,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.14",
     [[
-        INSERT INTO t4 values (1,3);
+        INSERT INTO t4(c,d) values (1,3);
     ]], {
         -- <fkey2-1.14>
         0
@@ -159,7 +158,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.15",
     [[
-        INSERT INTO t8 values (1,3);
+        INSERT INTO t8(c,d) values (1,3);
     ]], {
         -- <fkey2-1.15>
         1, "FOREIGN KEY constraint failed"
@@ -169,7 +168,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.16",
     [[
-        INSERT INTO t7 values (2,1);
+        INSERT INTO t7(a,b) values (2,1);
     ]], {
         -- <fkey2-1.16>
         0
@@ -179,7 +178,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.17",
     [[
-        INSERT INTO t8 values (1,3);
+        INSERT INTO t8(c,d) values (1,3);
     ]], {
         -- <fkey2-1.17>
         0
@@ -189,7 +188,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.18",
     [[
-        INSERT INTO t8 values (2,4);
+        INSERT INTO t8(c,d) values (2,4);
     ]], {
         -- <fkey2-1.18>
         1, "FOREIGN KEY constraint failed"
@@ -199,7 +198,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.19",
     [[
-        INSERT INTO t8 values (6,4);
+        INSERT INTO t8(c,d) values (6,4);
     ]], {
         -- <fkey2-1.19>
         1,"FOREIGN KEY constraint failed"
@@ -269,7 +268,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "fkey2-1.26",
     [[
-        INSERT INTO t8 VALUES(666, 54644);
+        INSERT INTO t8(c,d) VALUES(666, 54644);
     ]], {
         -- <fkey2-1.26>
         1, "FOREIGN KEY constraint failed"
@@ -341,17 +340,19 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-3.1",
     [[
-        CREATE TABLE ab(a  INT PRIMARY KEY, b TEXT);
+        CREATE TABLE ab(id INT PRIMARY KEY AUTOINCREMENT, a INT UNIQUE, b TEXT);
         CREATE TABLE cd(
-            c  INT PRIMARY KEY REFERENCES ab ON UPDATE CASCADE ON DELETE CASCADE,
+            id INT PRIMARY KEY AUTOINCREMENT,
+            c  INT UNIQUE REFERENCES ab(a) ON UPDATE CASCADE ON DELETE CASCADE,
             d TEXT);
         CREATE TABLE ef(
-            e  INT PRIMARY KEY REFERENCES cd ON UPDATE CASCADE,
+            id INT PRIMARY KEY AUTOINCREMENT,
+            e  INT UNIQUE REFERENCES cd(c) ON UPDATE CASCADE,
             f TEXT , CHECK (e!=5));
 
-        INSERT INTO ab VALUES(1, 'b');
-        INSERT INTO cd VALUES(1, 'd');
-        INSERT INTO ef VALUES(1, 'e');
+        INSERT INTO ab(a,b) VALUES(1, 'b');
+        INSERT INTO cd(c,d) VALUES(1, 'd');
+        INSERT INTO ef(e,f) VALUES(1, 'e');
     ]], {
     })
 
@@ -368,7 +369,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-3.3",
     [[
-        SELECT * FROM ab;
+        SELECT a,b FROM ab;
     ]], {
         -- <fkey2-3.3>
         1, "b"
@@ -388,7 +389,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-3.5",
     [[
-        SELECT * FROM ef;
+        SELECT e,f FROM ef;
     ]], {
         -- <fkey2-3.5>
         1, "e"
@@ -410,7 +411,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-3.7",
     [[
-        SELECT * FROM ab;
+        SELECT a,b FROM ab;
     ]], {
         -- <fkey2-3.7>
         1, "b"
@@ -424,20 +425,21 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(
-            node  INT PRIMARY KEY,
-            parent  INT REFERENCES t1 ON DELETE CASCADE);
+            id INT PRIMARY KEY AUTOINCREMENT,
+            node  INT UNIQUE NOT NULL,
+            parent  INT REFERENCES t1(node) ON DELETE CASCADE);
         CREATE TABLE t2(node  INT PRIMARY KEY, parent INT );
         CREATE TRIGGER t2t AFTER DELETE ON t2 BEGIN
             DELETE FROM t2 WHERE parent = old.node;
         END;
-        INSERT INTO t1 VALUES(1, NULL);
-        INSERT INTO t1 VALUES(2, 1);
-        INSERT INTO t1 VALUES(3, 1);
-        INSERT INTO t1 VALUES(4, 2);
-        INSERT INTO t1 VALUES(5, 2);
-        INSERT INTO t1 VALUES(6, 3);
-        INSERT INTO t1 VALUES(7, 3);
-        INSERT INTO t2 SELECT * FROM t1;
+        INSERT INTO t1(node, parent) VALUES(1, NULL);
+        INSERT INTO t1(node, parent) VALUES(2, 1);
+        INSERT INTO t1(node, parent) VALUES(3, 1);
+        INSERT INTO t1(node, parent) VALUES(4, 2);
+        INSERT INTO t1(node, parent) VALUES(5, 2);
+        INSERT INTO t1(node, parent) VALUES(6, 3);
+        INSERT INTO t1(node, parent) VALUES(7, 3);
+        INSERT INTO t2(node, parent) SELECT node,parent FROM t1;
     ]], {
         -- <fkey2-4.1>
         -- </fkey2-4.1>
@@ -525,8 +527,8 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
-        CREATE TABLE t1(a  INT PRIMARY KEY, b INT );
-        CREATE TABLE t2(c INTEGER PRIMARY KEY REFERENCES t1, b TEXT);
+        CREATE TABLE t1(a INT UNIQUE, b INT, id INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE t2(id INT PRIMARY KEY AUTOINCREMENT, c INTEGER REFERENCES t1(a), b TEXT);
     ]], {
         -- <fkey2-5.1>
         -- </fkey2-5.1>
@@ -535,7 +537,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey2-5.2",
     [[
-        INSERT INTO t2 VALUES(1, 'A');
+        INSERT INTO t2(c,b) VALUES(1, 'A');
     ]], {
         -- <fkey2-5.2>
         1, "FOREIGN KEY constraint failed"
@@ -545,9 +547,9 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-5.3",
     [[
-        INSERT INTO t1 VALUES(1, 2);
-        INSERT INTO t1 VALUES(2, 3);
-        INSERT INTO t2 VALUES(1, 'A');
+        INSERT INTO t1(a,b) VALUES(1, 2);
+        INSERT INTO t1(a,b) VALUES(2, 3);
+        INSERT INTO t2(c,b) VALUES(1, 'A');
         UPDATE t2 SET c = 2;
     ]], {
         -- <fkey2-5.3>
@@ -668,12 +670,11 @@ test:do_execsql_test(
             ON DELETE SET NULL);
         INSERT INTO pp VALUES(1, 2, 3);
         INSERT INTO pp VALUES(4, 5, 6);
-        INSERT INTO pp VALUES(7, 8, 9);
+        INSERT INTO pp VALUES(7, 1, 9);
         INSERT INTO cc VALUES(6, 'A', 5, 1);
         INSERT INTO cc VALUES(6, 'B', 5, 2);
-        INSERT INTO cc VALUES(9, 'A', 8, 3);
-        INSERT INTO cc VALUES(9, 'B', 8, 4);
-        UPDATE pp SET b = 1 WHERE a = 7;
+        INSERT INTO cc VALUES(3, 'A', 2, 3);
+        INSERT INTO cc VALUES(3, 'B', 2, 4);
         SELECT * FROM cc;
     ]], {
         -- <fkey2-6.6>
@@ -766,13 +767,13 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-8.1",
     [[
-        CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT);
-        CREATE TABLE t2(c INTEGER PRIMARY KEY, d INT, FOREIGN KEY(c) REFERENCES t1(a) ON UPDATE CASCADE);
+        CREATE TABLE t1(a INT UNIQUE, b INT, id INT PRIMARY KEY AUTOINCREMENT);
+        CREATE TABLE t2(id INT PRIMARY KEY AUTOINCREMENT, c INT UNIQUE, d INT, FOREIGN KEY(c) REFERENCES t1(a) ON UPDATE CASCADE);
 
-        INSERT INTO t1 VALUES(10, 100);
-        INSERT INTO t2 VALUES(10, 100);
+        INSERT INTO t1(a,b) VALUES(10, 100);
+        INSERT INTO t2(c,d) VALUES(10, 100);
         UPDATE t1 SET a = 15;
-        SELECT * FROM t2;
+        SELECT c,d FROM t2;
     ]], {
         -- <fkey2-8.1>
         15, 100
@@ -788,12 +789,12 @@ test:do_execsql_test(
     [[
         DROP TABLE IF EXISTS t2;
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(a INT , b TEXT PRIMARY KEY);
+        CREATE TABLE t1(a INT, b TEXT UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);
         CREATE TABLE t2(
-            x TEXT PRIMARY KEY REFERENCES t1 ON UPDATE RESTRICT);
-        INSERT INTO t1 VALUES(1, 'one');
-        INSERT INTO t1 VALUES(2, 'two');
-        INSERT INTO t1 VALUES(3, 'three');
+            x TEXT PRIMARY KEY REFERENCES t1(b) ON UPDATE RESTRICT);
+        INSERT INTO t1(a,b) VALUES(1, 'four');
+        INSERT INTO t1(a,b) VALUES(2, 'two');
+        INSERT INTO t1(a,b) VALUES(3, 'three');
         INSERT INTO t2 VALUES('two');
         UPDATE t1 SET b = 'four' WHERE b = 'one';
     ]], {
@@ -916,14 +917,14 @@ test:do_execsql_test(
             c10 TEXT , c11 TEXT , c12 TEXT , c13 TEXT , c14 TEXT , c15 TEXT , c16 TEXT , c17 TEXT , c18 TEXT , c19 TEXT ,
             c20 TEXT , c21 TEXT , c22 TEXT , c23 TEXT , c24 TEXT , c25 TEXT , c26 TEXT , c27 TEXT , c28 TEXT , c29 TEXT ,
             c30 TEXT , c31 TEXT , c32 TEXT , c33 TEXT , c34 TEXT , c35 TEXT , c36 TEXT , c37 TEXT , c38 TEXT , c39 TEXT ,
-            PRIMARY KEY(c34, c35));
+            UNIQUE(c34, c35), id INT PRIMARY KEY AUTOINCREMENT);
         CREATE TABLE down(
             c00 TEXT , c01 TEXT , c02 TEXT , c03 TEXT , c04 TEXT , c05 TEXT , c06 TEXT , c07 TEXT , c08 TEXT , c09 TEXT ,
             c10 TEXT , c11 TEXT , c12 TEXT , c13 TEXT , c14 TEXT , c15 TEXT , c16 TEXT , c17 TEXT , c18 TEXT , c19 TEXT ,
             c20 TEXT , c21 TEXT , c22 TEXT , c23 TEXT , c24 TEXT , c25 TEXT , c26 TEXT , c27 TEXT , c28 TEXT , c29 TEXT ,
             c30 TEXT , c31 TEXT , c32 TEXT , c33 TEXT , c34 TEXT , c35 TEXT , c36 TEXT , c37 TEXT , c38 TEXT , c39 TEXT ,
-            PRIMARY KEY(c39, c38),
-            FOREIGN KEY(c39, c38) REFERENCES up ON UPDATE CASCADE);
+            UNIQUE(c39, c38),
+            FOREIGN KEY(c39, c38) REFERENCES up(c34,c35) ON UPDATE CASCADE, id INT PRIMARY KEY AUTOINCREMENT);
         INSERT INTO up(c34, c35) VALUES('yes', 'no');
         INSERT INTO down(c39, c38) VALUES('yes', 'no');
         UPDATE up SET c34 = 'possibly';
@@ -1168,8 +1169,8 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-11.1",
     [[
-        CREATE TABLE self(a INT PRIMARY KEY, b INT REFERENCES self(a));
-        INSERT INTO self VALUES(13, 13);
+        CREATE TABLE self(a INT UNIQUE, b INT REFERENCES self(a), id INT PRIMARY KEY AUTOINCREMENT);
+        INSERT INTO self(a,b) VALUES(13, 13);
         UPDATE self SET a = 14, b = 14;
     ]], {
         -- <fkey2-11.1>
@@ -1227,7 +1228,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey2-11.7",
     [[
-        INSERT INTO self VALUES(20, 21);
+        INSERT INTO self(a,b) VALUES(20, 21);
     ]], {
         -- <fkey2-11.7>
         1, "FOREIGN KEY constraint failed"
@@ -1238,8 +1239,8 @@ test:do_execsql_test(
     "fkey2-11.8",
     [[
         DROP TABLE IF EXISTS self;
-        CREATE TABLE self(a INT UNIQUE, b INT PRIMARY KEY REFERENCES self(a));
-        INSERT INTO self VALUES(13, 13);
+        CREATE TABLE self(a INT UNIQUE, b INT UNIQUE REFERENCES self(a), id INT PRIMARY KEY AUTOINCREMENT);
+        INSERT INTO self(a,b) VALUES(13, 13);
         UPDATE self SET a = 14, b = 14;
     ]], {
         -- <fkey2-11.8>
@@ -1297,7 +1298,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey2-11.14",
     [[
-        INSERT INTO self VALUES(20, 21);
+        INSERT INTO self(a,b) VALUES(20, 21);
     ]], {
         -- <fkey2-11.14>
         1, "FOREIGN KEY constraint failed"
@@ -1310,12 +1311,12 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-12.1",
     [[
-        CREATE TABLE tdd08(a INT PRIMARY KEY, b INT);
+        CREATE TABLE tdd08(a INT UNIQUE, b INT, id INT PRIMARY KEY AUTOINCREMENT);
         CREATE UNIQUE INDEX idd08 ON tdd08(a,b);
-        INSERT INTO tdd08 VALUES(200,300);
+        INSERT INTO tdd08(a,b) VALUES(200,300);
 
-        CREATE TABLE tdd08_b(w  INT PRIMARY KEY,x INT ,y INT , FOREIGN KEY(x,y) REFERENCES tdd08(a,b));
-        INSERT INTO tdd08_b VALUES(100,200,300);
+        CREATE TABLE tdd08_b(w INT UNIQUE, x INT ,y INT , FOREIGN KEY(x,y) REFERENCES tdd08(a,b), id INT PRIMARY KEY AUTOINCREMENT);
+        INSERT INTO tdd08_b(w,x,y) VALUES(100,200,300);
     ]], {
         -- <fkey2-12.1>
         -- </fkey2-12.1>
@@ -1334,7 +1335,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-12.3",
     [[
-        SELECT * FROM tdd08;
+        SELECT a,b FROM tdd08;
     ]], {
         -- <fkey2-12.3>
         200, 300
@@ -1344,7 +1345,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "fkey2-12.4",
     [[
-        INSERT INTO tdd08_b VALUES(400,500,300);
+        INSERT INTO tdd08_b(w,x,y) VALUES(400,500,300);
     ]], {
         -- <fkey2-12.4>
         1, "FOREIGN KEY constraint failed"
@@ -1374,16 +1375,16 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "fkey2-13.1",
     [[
-        CREATE TABLE tce71(a INT PRIMARY KEY, b INT);
+        CREATE TABLE tce71(a INT UNIQUE, b INT, id INT PRIMARY KEY AUTOINCREMENT);
         CREATE UNIQUE INDEX ice71 ON tce71(a,b);
-        INSERT INTO tce71 VALUES(100,200);
+        INSERT INTO tce71(a,b) VALUES(100,200);
         CREATE TABLE tce72(w  INT PRIMARY KEY, x INT , y INT , FOREIGN KEY(x,y) REFERENCES tce71(a,b));
         INSERT INTO tce72 VALUES(300,100,200);
         UPDATE tce71 set b = 200 where a = 100;
         SELECT * FROM tce71, tce72;
     ]], {
         -- <fkey2-13.1>
-        100, 200, 300, 100, 200
+        100, 200, 1, 300, 100, 200
         -- </fkey2-13.1>
     })
 

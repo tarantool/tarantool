@@ -105,24 +105,24 @@ box.schema.user.drop('tmp')
 
 -- gh-3644 Foreign key update fails with "unicode_ci".
 -- Check that foreign key update doesn't fail with "unicode_ci".
-box.sql.execute('CREATE TABLE t0 (s1 CHAR(5) COLLATE "unicode_ci" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t0 (s1 CHAR(5) COLLATE "unicode_ci" UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
 box.sql.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 CHAR(5) COLLATE "unicode_ci" REFERENCES t0(s1));')
-box.sql.execute("INSERT INTO t0 VALUES ('a');")
+box.sql.execute("INSERT INTO t0(s1) VALUES ('a');")
 box.sql.execute("INSERT INTO t1 VALUES (1,'a');")
 -- Should't fail.
 box.sql.execute("UPDATE t0 SET s1 = 'A';")
-box.sql.execute("SELECT * FROM t0;")
+box.sql.execute("SELECT s1 FROM t0;")
 box.sql.execute("SELECT * FROM t1;")
 box.sql.execute("DROP TABLE t1;")
 box.sql.execute("DROP TABLE t0;")
 -- Check that foreign key update fails with default collation.
-box.sql.execute('CREATE TABLE t0 (s1 CHAR(5) PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t0 (s1 CHAR(5) UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
 box.sql.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 CHAR(5) REFERENCES t0(s1));')
-box.sql.execute("INSERT INTO t0 VALUES ('a');")
+box.sql.execute("INSERT INTO t0(s1) VALUES ('a');")
 box.sql.execute("INSERT INTO t1 VALUES (1,'a');")
 -- Should fail.
 box.sql.execute("UPDATE t0 SET s1 = 'A';")
 box.sql.execute("SELECT * FROM t1;")
-box.sql.execute("SELECT * FROM t0;")
+box.sql.execute("SELECT s1 FROM t0;")
 box.sql.execute("DROP TABLE t1;")
 box.sql.execute("DROP TABLE t0;")

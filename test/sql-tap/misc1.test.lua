@@ -237,16 +237,19 @@ test:do_test(
 test:do_execsql_test(
     "misc1-4.1",
     [[
+        CREATE TABLE temp(id INT PRIMARY KEY, a TEXT);
         CREATE TABLE t2(a TEXT primary key);
+
         START TRANSACTION;
-        INSERT INTO t2 VALUES('This is a long string to use up a lot of disk -');
-        UPDATE t2 SET a=a||a||a||a;
-        INSERT INTO t2 SELECT '1 - ' || a FROM t2;
-        INSERT INTO t2 SELECT '2 - ' || a FROM t2;
-        INSERT INTO t2 SELECT '3 - ' || a FROM t2;
-        INSERT INTO t2 SELECT '4 - ' || a FROM t2;
-        INSERT INTO t2 SELECT '5 - ' || a FROM t2;
-        INSERT INTO t2 SELECT '6 - ' || a FROM t2;
+        INSERT INTO temp VALUES(0, 'This is a long string to use up a lot of disk -');
+        UPDATE temp SET a=a||a||a||a;
+        INSERT INTO t2 (a) SELECT a FROM temp;
+        INSERT INTO t2 (a) SELECT '1 - ' || a FROM t2;
+        INSERT INTO t2 (a) SELECT '2 - ' || a FROM t2;
+        INSERT INTO t2 (a) SELECT '3 - ' || a FROM t2;
+        INSERT INTO t2 (a) SELECT '4 - ' || a FROM t2;
+        INSERT INTO t2 (a) SELECT '5 - ' || a FROM t2;
+        INSERT INTO t2 (a) SELECT '6 - ' || a FROM t2;
         COMMIT;
         SELECT count(*) FROM t2;
     ]], {
@@ -429,6 +432,7 @@ test:execsql([[
     DROP TABLE t2;
     DROP TABLE t3;
     DROP TABLE t4;
+    DROP TABLE temp;
 ]])
 -- 64-bit integers are represented exactly.
 --
