@@ -996,10 +996,25 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 ssize_t
 xlog_fallocate(struct xlog *log, size_t len)
 {
-#ifdef HAVE_POSIX_FALLOCATE
-	int rc = posix_fallocate(log->fd, log->offset + log->allocated, len);
+#ifdef HAVE_FALLOCATE
+	static bool fallocate_not_supported = false;
+	if (fallocate_not_supported)
+		return 0;
+	/*
+	 * Keep the file size, because it is used to sync
+	 * concurrent readers vs the writer: xlog_cursor
+	 * assumes that everything written before EOF is
+	 * valid data.
+	 */
+	int rc = fallocate(log->fd, FALLOC_FL_KEEP_SIZE,
+			   log->offset + log->allocated, len);
 	if (rc != 0) {
-		errno = rc;
+		if (errno == ENOSYS || errno == EOPNOTSUPP) {
+			say_warn("fallocate is not supported, "
+				 "proceeding without it");
+			fallocate_not_supported = true;
+			return 0;
+		}
 		diag_set(SystemError, "%s: can't allocate disk space",
 			 log->filename);
 		return -1;
@@ -1010,7 +1025,7 @@ xlog_fallocate(struct xlog *log, size_t len)
 	(void)log;
 	(void)len;
 	return 0;
-#endif /* HAVE_POSIX_FALLOCATE */
+#endif /* HAVE_FALLOCATE */
 }
 
 /**
@@ -1832,15 +1847,6 @@ xlog_cursor_next_tx(struct xlog_cursor *i)
 		return -1;
 	if (rc > 0)
 		return 1;
-	if (load_u32(i->rbuf.rpos) == 0) {
-		/*
-		 * Space preallocated with xlog_fallocate().
-		 * Treat as eof and clear the buffer.
-		 */
-		i->read_offset -= ibuf_used(&i->rbuf);
-		ibuf_reset(&i->rbuf);
-		return 1;
-	}
 	if (load_u32(i->rbuf.rpos) == eof_marker) {
 		/* eof marker found */
 		goto eof_found;

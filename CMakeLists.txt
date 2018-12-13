@@ -82,7 +82,7 @@ check_symbol_exists(fdatasync unistd.h HAVE_FDATASYNC)
 check_symbol_exists(pthread_yield pthread.h HAVE_PTHREAD_YIELD)
 check_symbol_exists(sched_yield sched.h HAVE_SCHED_YIELD)
 check_symbol_exists(posix_fadvise fcntl.h HAVE_POSIX_FADVISE)
-check_symbol_exists(posix_fallocate fcntl.h HAVE_POSIX_FALLOCATE)
+check_symbol_exists(fallocate fcntl.h HAVE_FALLOCATE)
 check_symbol_exists(mremap sys/mman.h HAVE_MREMAP)
 
 check_function_exists(sync_file_range HAVE_SYNC_FILE_RANGE)
