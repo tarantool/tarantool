@@ -501,6 +501,26 @@ sql_affinity_to_field_type(enum affinity_type affinity)
 	}
 }
 
+enum affinity_type
+sql_field_type_to_affinity(enum field_type field_type)
+{
+	switch (field_type) {
+		case FIELD_TYPE_INTEGER:
+		case FIELD_TYPE_UNSIGNED:
+			return AFFINITY_INTEGER;
+		case FIELD_TYPE_NUMBER:
+			return AFFINITY_REAL;
+		case FIELD_TYPE_STRING:
+			return AFFINITY_TEXT;
+		case FIELD_TYPE_SCALAR:
+			return AFFINITY_BLOB;
+		case FIELD_TYPE_ANY:
+			return AFFINITY_UNDEFINED;
+		default:
+			unreachable();
+	}
+}
+
 /*
  * Add a new column to the table currently being constructed.
  *
@@ -563,8 +583,7 @@ sqlite3AddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 	 */
 	column_def->nullable_action = ON_CONFLICT_ACTION_DEFAULT;
 	column_def->is_nullable = true;
-	column_def->affinity = type_def->type;
-	column_def->type = sql_affinity_to_field_type(column_def->affinity);
+	column_def->type = type_def->type;
 	p->def->field_count++;
 	pParse->constraintName.n = 0;
 }

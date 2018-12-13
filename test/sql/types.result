@@ -44,8 +44,8 @@ box.sql.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 ...
 box.space.V1:format()
 ---
-- [{'affinity': 67, 'type': 'number', 'nullable_action': 'none', 'name': 'b + a',
-    'is_nullable': true}, {'affinity': 67, 'type': 'number', 'nullable_action': 'none',
+- [{'affinity': 69, 'type': 'number', 'nullable_action': 'none', 'name': 'b + a',
+    'is_nullable': true}, {'affinity': 69, 'type': 'number', 'nullable_action': 'none',
     'name': 'b - a', 'is_nullable': true}]
 ...
 -- gh-2494: index's part also features correct declared type.

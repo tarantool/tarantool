@@ -1634,7 +1634,7 @@ struct sqlite3 {
  * VARCHAR(<number of chars>).
  */
 struct type_def {
-	enum affinity_type type;
+	enum field_type type;
 };
 
 /*
@@ -3449,6 +3449,9 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
  **/
 enum field_type
 sql_affinity_to_field_type(enum affinity_type affinity);
+
+enum affinity_type
+sql_field_type_to_affinity(enum field_type field_type);
 
 /**
  * Compile view, i.e. create struct Select from

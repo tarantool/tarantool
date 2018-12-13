@@ -1002,7 +1002,9 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 		       action_is_nullable(def->fields[i].nullable_action));
 		mpstream_encode_str(&stream, field_type_strs[field->type]);
 		mpstream_encode_str(&stream, "affinity");
-		mpstream_encode_uint(&stream, def->fields[i].affinity);
+		enum affinity_type aff =
+			sql_field_type_to_affinity(def->fields[i].type);
+		mpstream_encode_uint(&stream, aff);
 		mpstream_encode_str(&stream, "is_nullable");
 		mpstream_encode_bool(&stream, def->fields[i].is_nullable);
 		mpstream_encode_str(&stream, "nullable_action");
