@@ -48,6 +48,17 @@
 #include "errinj.h"
 
 /*
+ * FALLOC_FL_KEEP_SIZE flag has existed since fallocate() was
+ * first introduced, but it was not defined in glibc headers
+ * for a while. Define it manually if necessary.
+ */
+#ifdef HAVE_FALLOCATE
+# ifndef FALLOC_FL_KEEP_SIZE
+#  define FALLOC_FL_KEEP_SIZE 0x01
+# endif
+#endif /* HAVE_FALLOCATE */
+
+/*
  * marker is MsgPack fixext2
  * +--------+--------+--------+--------+
  * |  0xd5  |  type  |       data      |
