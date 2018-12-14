@@ -61,3 +61,4 @@ put(threshold / 5)
 wait_checkpoint()
 
 box.cfg{checkpoint_wal_threshold = default_threshold}
+s:drop()
