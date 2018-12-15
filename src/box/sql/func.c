@@ -1223,9 +1223,22 @@ trimFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 	} else if ((zCharSet = sqlite3_value_text(argv[1])) == 0) {
 		return;
 	} else {
-		const unsigned char *z;
-		for (z = zCharSet, nChar = 0; *z; nChar++) {
+		const unsigned char *z = zCharSet;
+		int trim_set_sz = sqlite3_value_bytes(argv[1]);
+		int handled_bytes_cnt = trim_set_sz;
+		nChar = 0;
+		/*
+		* Count the number of UTF-8 characters passing
+		* through the entire char set, but not up
+		* to the '\0' or X'00' character. This allows
+		* to handle trimming set containing such
+		* characters.
+		*/
+		while(handled_bytes_cnt > 0) {
+		const unsigned char *prev_byte = z;
 			SQLITE_SKIP_UTF8(z);
+			handled_bytes_cnt -= (z - prev_byte);
+			nChar++;
 		}
 		if (nChar > 0) {
 			azChar =
@@ -1235,10 +1248,15 @@ trimFunc(sqlite3_context * context, int argc, sqlite3_value ** argv)
 				return;
 			}
 			aLen = (unsigned char *)&azChar[nChar];
-			for (z = zCharSet, nChar = 0; *z; nChar++) {
+			z = zCharSet;
+			nChar = 0;
+			handled_bytes_cnt = trim_set_sz;
+			while(handled_bytes_cnt > 0) {
 				azChar[nChar] = (unsigned char *)z;
 				SQLITE_SKIP_UTF8(z);
 				aLen[nChar] = (u8) (z - azChar[nChar]);
+				handled_bytes_cnt -= aLen[nChar];
+				nChar++;
 			}
 		}
 	}

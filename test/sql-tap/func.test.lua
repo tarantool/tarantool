@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14535)
+test:plan(14547)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -2098,6 +2098,128 @@ test:do_execsql_test(
         -- <func-22.22>
         "null"
         -- </func-22.22>
+    })
+
+-- gh-3543 Check trimming of binary string when X'00' in trimming char set.
+
+test:do_execsql_test(
+    "func-22.23",
+    [[
+        SELECT TRIM(X'004100', X'00');
+    ]], {
+        -- <func-22.23>
+        "A"
+        -- </func-22.23>
+    })
+
+test:do_execsql_test(
+    "func-22.24",
+    [[
+        SELECT TRIM(X'004100', X'0000');
+    ]], {
+        -- <func-22.24>
+        "A"
+        -- </func-22.24>
+    })
+
+test:do_execsql_test(
+    "func-22.25",
+    [[
+        SELECT TRIM(X'004100', X'0042');
+    ]], {
+        -- <func-22.25>
+        "A"
+        -- </func-22.25>
+    })
+
+test:do_execsql_test(
+    "func-22.26",
+    [[
+        SELECT TRIM(X'00004100420000', X'00');
+    ]], {
+        -- <func-22.26>
+        "A\0B"
+        -- </func-22.26>
+    })
+
+test:do_execsql_test(
+    "func-22.27",
+    [[
+        SELECT LTRIM(X'004100', X'00');
+    ]], {
+        -- <func-22.27>
+        "A\0"
+        -- </func-22.27>
+    })
+
+test:do_execsql_test(
+    "func-22.28",
+    [[
+        SELECT LTRIM(X'004100', X'0000');
+    ]], {
+        -- <func-22.28>
+        "A\0"
+        -- </func-22.28>
+    })
+
+test:do_execsql_test(
+    "func-22.29",
+    [[
+        SELECT LTRIM(X'004100', X'0042');
+    ]], {
+        -- <func-22.29>
+        "A\0"
+        -- </func-22.29>
+    })
+
+test:do_execsql_test(
+    "func-22.30",
+    [[
+        SELECT LTRIM(X'00004100420000', X'00');
+    ]], {
+        -- <func-22.30>
+        "A\0B\0\0"
+        -- </func-22.30>
+    })
+
+test:do_execsql_test(
+    "func-22.31",
+    [[
+        SELECT RTRIM(X'004100', X'00');
+    ]], {
+        -- <func-22.31>
+        "\0A"
+        -- </func-22.31>
+    })
+
+test:do_execsql_test(
+    "func-22.32",
+    [[
+        SELECT RTRIM(X'004100', X'0000');
+    ]], {
+        -- <func-22.32>
+        "\0A"
+        -- </func-22.32>
+    })
+
+test:do_execsql_test(
+    "func-22.33",
+    [[
+        SELECT RTRIM(X'004100', X'0042');
+    ]], {
+        -- <func-22.33>
+        "\0A"
+        -- </func-22.33>
+    })
+
+test:do_execsql_test(
+    "func-22.34",
+    [[
+        SELECT RTRIM(X'00004100420000', X'00');
+    ]], {
+        -- <func-22.34>
+        "\0\0A\0B"
+        -- </func-22.34>
     })
 
 -- This is to test the deprecated sqlite3_aggregate_count() API.
