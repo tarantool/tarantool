@@ -77,7 +77,6 @@ enum affinity_type {
     AFFINITY_UNDEFINED = 0,
     AFFINITY_BLOB = 'A',
     AFFINITY_TEXT = 'B',
-    AFFINITY_NUMERIC = 'C',
     AFFINITY_INTEGER = 'D',
     AFFINITY_REAL = 'E',
 };

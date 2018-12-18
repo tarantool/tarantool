@@ -261,7 +261,7 @@ sql_affinity_result(enum affinity_type aff1, enum affinity_type aff2)
 		 */
 		if (sqlite3IsNumericAffinity(aff1)
 		    || sqlite3IsNumericAffinity(aff2)) {
-			return AFFINITY_NUMERIC;
+			return AFFINITY_REAL;
 		} else {
 			return AFFINITY_BLOB;
 		}
@@ -2164,12 +2164,10 @@ sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
 		op = p->op2;
 	switch (op) {
 	case TK_INTEGER:{
-			return aff == AFFINITY_INTEGER
-			    || aff == AFFINITY_NUMERIC;
+			return aff == AFFINITY_INTEGER;
 		}
 	case TK_FLOAT:{
-			return aff == AFFINITY_REAL
-			    || aff == AFFINITY_NUMERIC;
+			return aff == AFFINITY_REAL;
 		}
 	case TK_STRING:{
 			return aff == AFFINITY_TEXT;
@@ -2181,7 +2179,7 @@ sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
 			assert(p->iTable >= 0);	/* p cannot be part of a CHECK constraint */
 			return p->iColumn < 0
 			    && (aff == AFFINITY_INTEGER
-				|| aff == AFFINITY_NUMERIC);
+				|| aff == AFFINITY_REAL);
 		}
 	default:{
 			return 0;
@@ -3696,6 +3694,11 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlite3VdbeAddOp3(v, OP_Column,
 						  pAggInfo->sortingIdxPTab,
 						  pCol->iSorterColumn, target);
+				if (pCol->space_def->fields[pExpr->iAgg].type ==
+				    FIELD_TYPE_NUMBER) {
+					sqlite3VdbeAddOp1(v, OP_RealAffinity,
+							  target);
+				}
 				return target;
 			}
 			/* Otherwise, fall thru into the TK_COLUMN case */
@@ -3881,14 +3884,14 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			testcase(regFree1 == 0);
 			testcase(regFree2 == 0);
 			if (op != TK_CONCAT)
-				pExpr->affinity = AFFINITY_NUMERIC;
+				pExpr->affinity = AFFINITY_REAL;
 			else
 				pExpr->affinity = AFFINITY_TEXT;
 			break;
 		}
 	case TK_UMINUS:{
 			Expr *pLeft = pExpr->pLeft;
-			pExpr->affinity = AFFINITY_NUMERIC;
+			pExpr->affinity = AFFINITY_REAL;
 			assert(pLeft);
 			if (pLeft->op == TK_INTEGER) {
 				expr_code_int(pParse, pLeft, true, target);
@@ -4180,7 +4183,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						     target);
 		}
 	case TK_UPLUS:{
-			pExpr->affinity = AFFINITY_NUMERIC;
+			pExpr->affinity = AFFINITY_REAL;
 			return sqlite3ExprCodeTarget(pParse, pExpr->pLeft,
 						     target);
 		}

@@ -382,15 +382,18 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 	for (uint32_t i = 0; i < field_count; ++i) {
 		struct key_part_def *part = &ephemer_key_parts[i];
 		part->fieldno = i;
-		part->type = FIELD_TYPE_SCALAR;
 		part->nullable_action = ON_CONFLICT_ACTION_NONE;
 		part->is_nullable = true;
 		part->sort_order = SORT_ORDER_ASC;
 		part->path = NULL;
-		if (def != NULL && i < def->part_count)
+		if (def != NULL && i < def->part_count) {
+			assert(def->parts[i].type < field_type_MAX);
+			part->type = def->parts[i].type;
 			part->coll_id = def->parts[i].coll_id;
-		else
+		} else {
 			part->coll_id = COLL_NONE;
+			part->type = FIELD_TYPE_SCALAR;
+		}
 	}
 	struct key_def *ephemer_key_def = key_def_new(ephemer_key_parts,
 						      field_count);

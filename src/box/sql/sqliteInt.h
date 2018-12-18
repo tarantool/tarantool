@@ -1788,7 +1788,7 @@ struct Savepoint {
 #define SAVEPOINT_RELEASE    1
 #define SAVEPOINT_ROLLBACK   2
 
-#define sqlite3IsNumericAffinity(X)  ((X)>=AFFINITY_NUMERIC)
+#define sqlite3IsNumericAffinity(X)  ((X)>=AFFINITY_INTEGER)
 
 /*
  * The AFFINITY_MASK values masks off the significant bits of an

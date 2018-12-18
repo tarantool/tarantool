@@ -311,7 +311,6 @@ applyNumericAffinity(Mem *pRec, int bTryForInt)
  *
  * AFFINITY_INTEGER:
  * AFFINITY_REAL:
- * AFFINITY_NUMERIC:
  *    Try to convert mem to an integer representation or a
  *    floating-point representation if an integer representation
  *    is not possible.  Note that the integer representation is
@@ -346,13 +345,9 @@ mem_apply_affinity(struct Mem *record, enum affinity_type affinity)
 		}
 		return sqlite3VdbeMemIntegerify(record, false);
 	case AFFINITY_REAL:
-		if ((record->flags & MEM_Real) == MEM_Real)
-			return 0;
-		return sqlite3VdbeMemRealify(record);
-	case AFFINITY_NUMERIC:
 		if ((record->flags & (MEM_Real | MEM_Int)) != 0)
 			return 0;
-		return sqlite3VdbeMemNumerify(record);
+		return sqlite3VdbeMemRealify(record);
 	case AFFINITY_TEXT:
 		/*
 		 * Only attempt the conversion to TEXT if there is
@@ -2006,7 +2001,6 @@ case OP_Cast: {                  /* in1 */
 	assert(pOp->p2>=AFFINITY_BLOB && pOp->p2<=AFFINITY_REAL);
 	testcase( pOp->p2==AFFINITY_TEXT);
 	testcase( pOp->p2==AFFINITY_BLOB);
-	testcase( pOp->p2==AFFINITY_NUMERIC);
 	testcase( pOp->p2==AFFINITY_INTEGER);
 	testcase( pOp->p2==AFFINITY_REAL);
 	pIn1 = &aMem[pOp->p1];
@@ -2174,7 +2168,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 	} else {
 		/* Neither operand is NULL.  Do a comparison. */
 		affinity = pOp->p5 & AFFINITY_MASK;
-		if (affinity>=AFFINITY_NUMERIC) {
+		if (affinity>=AFFINITY_INTEGER) {
 			if ((flags1 | flags3)&MEM_Str) {
 				if ((flags1 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
 					applyNumericAffinity(pIn1,0);
@@ -2768,6 +2762,22 @@ case OP_Column: {
 		pDest->z = (char *)zData+aOffset[p2];
 		pDest->flags = MEM_Blob|MEM_Ephem|MEM_Subtype;
 		pDest->subtype = SQL_SUBTYPE_MSGPACK;
+	}
+	if ((pDest->flags & MEM_Int) != 0 &&
+	    pC->eCurType == CURTYPE_TARANTOOL) {
+		enum field_type f = FIELD_TYPE_ANY;
+		/*
+		 * Ephemeral spaces feature only one index
+		 * covering all fields, but ephemeral spaces
+		 * lack format. So, we can fetch type from
+		 * key parts.
+		 */
+		if (pC->uc.pCursor->curFlags & BTCF_TEphemCursor)
+			f = pC->uc.pCursor->index->def->key_def->parts[p2].type;
+		else if (pC->uc.pCursor->curFlags & BTCF_TaCursor)
+			f = pC->uc.pCursor->space->def->fields[p2].type;
+		if (f == FIELD_TYPE_NUMBER)
+			sqlite3VdbeMemSetDouble(pDest, pDest->u.i);
 	}
 	/*
 	 * Add 0 termination (at most for strings)

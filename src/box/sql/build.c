@@ -492,7 +492,6 @@ sql_affinity_to_field_type(enum affinity_type affinity)
 		case AFFINITY_INTEGER:
 			return FIELD_TYPE_INTEGER;
 		case AFFINITY_REAL:
-		case AFFINITY_NUMERIC:
 			return FIELD_TYPE_NUMBER;
 		case AFFINITY_TEXT:
 			return FIELD_TYPE_STRING;

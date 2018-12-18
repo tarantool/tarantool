@@ -158,7 +158,7 @@ lbox_sql_create_function(struct lua_State *L)
 	else if (strcmp(type_arg, "FLOAT") == 0)
 		type = AFFINITY_REAL;
 	else if (strcmp(type_arg, "NUM") == 0)
-		type = AFFINITY_NUMERIC;
+		type = AFFINITY_REAL;
 	else if (strcmp(type_arg, "BLOB") == 0)
 		type = AFFINITY_BLOB;
 	else

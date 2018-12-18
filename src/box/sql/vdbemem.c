@@ -604,8 +604,7 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff)
 {
 	if (pMem->flags & MEM_Null)
 		return SQLITE_OK;
-	if ((pMem->flags & MEM_Blob) != 0 &&
-	    (aff == AFFINITY_REAL || aff == AFFINITY_NUMERIC)) {
+	if ((pMem->flags & MEM_Blob) != 0 && aff == AFFINITY_REAL) {
 		if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i, pMem->n) == 0) {
 			MemSetTypeFlag(pMem, MEM_Real);
 			pMem->u.r = pMem->u.i;
@@ -628,8 +627,6 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff)
 			return 0;
 		}
 		return SQLITE_ERROR;
-	case AFFINITY_NUMERIC:
-		return sqlite3VdbeMemNumerify(pMem);
 	case AFFINITY_INTEGER:
 		if ((pMem->flags & MEM_Blob) != 0) {
 			if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i,
@@ -1321,7 +1318,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 		}
 		if ((op == TK_INTEGER || op == TK_FLOAT)
 		    && affinity == AFFINITY_BLOB) {
-			sqlite3ValueApplyAffinity(pVal, AFFINITY_NUMERIC);
+			sqlite3ValueApplyAffinity(pVal, AFFINITY_REAL);
 		} else {
 			sqlite3ValueApplyAffinity(pVal, affinity);
 		}
@@ -1721,15 +1718,28 @@ void
 mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var)
 {
 	assert(memIsValid(var));
+	int64_t i;
 	if (var->flags & MEM_Null) {
 		mpstream_encode_nil(stream);
 	} else if (var->flags & MEM_Real) {
+		/*
+		 * We can't pass to INT iterator float
+		 * value. Hence, if floating point value
+		 * lacks fractional component, we can
+		 * encode it as INT and successfully
+		 * pass to INT iterator.
+		 */
+		i = var->u.r;
+		if (i == var->u.r)
+			goto encode_int;
 		mpstream_encode_double(stream, var->u.r);
 	} else if (var->flags & MEM_Int) {
+		i = var->u.i;
+encode_int:
 		if (var->u.i >= 0)
-			mpstream_encode_uint(stream, var->u.i);
+			mpstream_encode_uint(stream, i);
 		else
-			mpstream_encode_int(stream, var->u.i);
+			mpstream_encode_int(stream, i);
 	} else if (var->flags & MEM_Str) {
 		mpstream_encode_strn(stream, var->z, var->n);
 	} else if (var->flags & MEM_Bool) {
