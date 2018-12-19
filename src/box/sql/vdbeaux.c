@@ -3231,7 +3231,8 @@ sql_vdbe_mem_alloc_region(Mem *vdbe_mem, uint32_t size)
 	vdbe_mem->z = region_alloc(&fiber()->gc, size);
 	if (vdbe_mem->z == NULL)
 		return SQLITE_NOMEM;
-	MemSetTypeFlag(vdbe_mem, MEM_Blob | MEM_Ephem);
+	vdbe_mem->flags = MEM_Ephem | MEM_Blob;
+	assert(sqlite3VdbeCheckMemInvariants(vdbe_mem));
 	return SQLITE_OK;
 }
 
