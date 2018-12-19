@@ -116,7 +116,8 @@ extern char strict_lua[],
 	trigger_lua[],
 	string_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
-	zone_lua[] /* LuaJIT 2.1 profiler */;
+	zone_lua[], /* LuaJIT 2.1 profiler */
+	packagepath_lua[];
 
 static const char *lua_modules[] = {
 	/* Make it first to affect load of all other modules */
@@ -160,6 +161,7 @@ static const char *lua_modules[] = {
 	/* Profiler */
 	"jit.p", p_lua,
 	"jit.zone", zone_lua,
+	"packagepath", packagepath_lua,
 	NULL
 };
 
