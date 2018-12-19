@@ -141,35 +141,18 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 	if (tuple_format_field_count(format) == 0)
 		return 0; /* Nothing to check */
 
-	/* Check to see if the tuple has a sufficient number of fields. */
-	uint32_t field_count = mp_decode_array(&tuple);
-	if (format->exact_field_count > 0 &&
-	    format->exact_field_count != field_count) {
-		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
-			 (unsigned) field_count,
-			 (unsigned) format->exact_field_count);
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	uint32_t *field_map = region_alloc(region, format->field_map_size);
+	if (field_map == NULL) {
+		diag_set(OutOfMemory, format->field_map_size, "region_alloc",
+			 "field_map");
 		return -1;
 	}
-	if (unlikely(field_count < format->min_field_count)) {
-		diag_set(ClientError, ER_MIN_FIELD_COUNT,
-			 (unsigned) field_count,
-			 (unsigned) format->min_field_count);
+	field_map = (uint32_t *)((char *)field_map + format->field_map_size);
+	if (tuple_init_field_map(format, field_map, tuple, true) != 0)
 		return -1;
-	}
-
-	/* Check field types */
-	struct tuple_field *field = tuple_format_field(format, 0);
-	uint32_t i = 0;
-	uint32_t defined_field_count =
-		MIN(field_count, tuple_format_field_count(format));
-	for (; i < defined_field_count; ++i) {
-		field = tuple_format_field(format, i);
-		if (key_mp_type_validate(field->type, mp_typeof(*tuple),
-					 ER_FIELD_TYPE, i + TUPLE_INDEX_BASE,
-					 tuple_field_is_nullable(field)))
-			return -1;
-		mp_next(&tuple);
-	}
+	region_truncate(region, region_svp);
 	return 0;
 }
 
