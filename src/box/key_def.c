@@ -88,7 +88,7 @@ const char *mp_type_strs[] = {
 	/* .MP_EXT    = */ "extension",
 };
 
-const uint32_t key_mp_type[] = {
+const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_ANY]      =  */ UINT32_MAX,
 	/* [FIELD_TYPE_UNSIGNED] =  */ 1U << MP_UINT,
 	/* [FIELD_TYPE_STRING]   =  */ 1U << MP_STR,
@@ -608,14 +608,12 @@ key_validate_parts(const struct key_def *key_def, const char *key,
 		   uint32_t part_count, bool allow_nullable)
 {
 	for (uint32_t i = 0; i < part_count; i++) {
-		enum mp_type mp_type = mp_typeof(*key);
 		const struct key_part *part = &key_def->parts[i];
-		mp_next(&key);
-
-		if (key_mp_type_validate(part->type, mp_type, ER_KEY_PART_TYPE,
-					 i, key_part_is_nullable(part)
-					 && allow_nullable))
+		if (key_part_validate(part->type, key, i,
+				      key_part_is_nullable(part) &&
+				      allow_nullable))
 			return -1;
+		mp_next(&key);
 	}
 	return 0;
 }

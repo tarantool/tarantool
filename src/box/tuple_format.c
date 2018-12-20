@@ -449,12 +449,14 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 	}
 
 	/* first field is simply accessible, so we do not store offset to it */
-	enum mp_type mp_type = mp_typeof(*pos);
 	struct tuple_field *field = tuple_format_field(format, 0);
 	if (validate &&
-	    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
-				 TUPLE_INDEX_BASE, tuple_field_is_nullable(field)))
+	    !field_mp_type_is_compatible(field->type, mp_typeof(*pos),
+					 tuple_field_is_nullable(field))) {
+		diag_set(ClientError, ER_FIELD_TYPE, TUPLE_INDEX_BASE,
+			 field_type_strs[field->type]);
 		return -1;
+	}
 	mp_next(&pos);
 	/* other fields...*/
 	uint32_t i = 1;
@@ -471,12 +473,14 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 	}
 	for (; i < defined_field_count; ++i) {
 		field = tuple_format_field(format, i);
-		mp_type = mp_typeof(*pos);
 		if (validate &&
-		    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
-					 i + TUPLE_INDEX_BASE,
-					 tuple_field_is_nullable(field)))
+		    !field_mp_type_is_compatible(field->type, mp_typeof(*pos),
+						 tuple_field_is_nullable(field))) {
+			diag_set(ClientError, ER_FIELD_TYPE,
+				 i + TUPLE_INDEX_BASE,
+				 field_type_strs[field->type]);
 			return -1;
+		}
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL) {
 			field_map[field->offset_slot] =
 				(uint32_t) (pos - tuple);

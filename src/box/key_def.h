@@ -392,27 +392,37 @@ key_def_has_collation(const struct key_def *key_def)
 	return false;
 }
 
-/** A helper table for key_mp_type_validate */
-extern const uint32_t key_mp_type[];
+/** A helper table for field_mp_type_is_compatible */
+extern const uint32_t field_mp_type[];
+
+/** Checks if mp_type (MsgPack) is compatible with field type. */
+static inline bool
+field_mp_type_is_compatible(enum field_type type, enum mp_type mp_type,
+			    bool is_nullable)
+{
+	assert(type < field_type_MAX);
+	assert((size_t)mp_type < CHAR_BIT * sizeof(*field_mp_type));
+	uint32_t mask = field_mp_type[type] | (is_nullable * (1U << MP_NIL));
+	return (mask & (1U << mp_type)) != 0;
+}
 
 /**
  * @brief Checks if \a field_type (MsgPack) is compatible \a type (KeyDef).
  * @param type KeyDef type
- * @param field_type MsgPack type
+ * @param key Pointer to MsgPack field to be tested.
  * @param field_no - a field number (is used to store an error message)
  *
  * @retval 0  mp_type is valid.
  * @retval -1 mp_type is invalid.
  */
 static inline int
-key_mp_type_validate(enum field_type key_type, enum mp_type mp_type,
-		     int err, uint32_t field_no, bool is_nullable)
+key_part_validate(enum field_type key_type, const char *key,
+		  uint32_t field_no, bool is_nullable)
 {
-	assert(key_type < field_type_MAX);
-	assert((size_t) mp_type < CHAR_BIT * sizeof(*key_mp_type));
-	uint32_t mask = key_mp_type[key_type] | (is_nullable * (1U << MP_NIL));
-	if (unlikely((mask & (1U << mp_type)) == 0)) {
-		diag_set(ClientError, err, field_no, field_type_strs[key_type]);
+	if (unlikely(!field_mp_type_is_compatible(key_type, mp_typeof(*key),
+						  is_nullable))) {
+		diag_set(ClientError, ER_KEY_PART_TYPE, field_no,
+			 field_type_strs[key_type]);
 		return -1;
 	}
 	return 0;
