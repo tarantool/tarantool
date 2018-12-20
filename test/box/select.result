@@ -619,6 +619,10 @@ collectgarbage('collect')
 ---
 - 0
 ...
+collectgarbage('stop')
+---
+- 0
+...
 s = box.schema.space.create('select', { temporary = true })
 ---
 ...
@@ -644,6 +648,10 @@ ref_count
 ...
 lots_of_links = {}
 ---
+...
+collectgarbage('restart')
+---
+- 0
 ...
 s:drop()
 ---
