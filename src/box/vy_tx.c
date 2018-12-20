@@ -575,6 +575,8 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 		 * index, because the original DELETE doesn't
 		 * contain secondary key parts.
 		 */
+		tx->xm->write_set_size -= tuple_size(stmt);
+		tx->xm->write_set_size += tuple_size(delete_stmt);
 		vy_stmt_counter_acct_tuple(&pk->stat.txw.count, delete_stmt);
 		vy_stmt_counter_unacct_tuple(&pk->stat.txw.count, stmt);
 		v->stmt = delete_stmt;
