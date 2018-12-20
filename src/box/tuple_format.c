@@ -61,9 +61,18 @@ tuple_field_delete(struct tuple_field *field)
 	free(field);
 }
 
+/** Return path to a tuple field. Used for error reporting. */
+static const char *
+tuple_field_path(const struct tuple_field *field)
+{
+	assert(field->token.parent != NULL);
+	assert(field->token.parent->parent == NULL);
+	assert(field->token.type == JSON_TOKEN_NUM);
+	return int2str(field->token.num + TUPLE_INDEX_BASE);
+}
+
 static int
-tuple_format_use_key_part(struct tuple_format *format,
-			  const struct field_def *fields, uint32_t field_count,
+tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
 			  const struct key_part *part, bool is_sequential,
 			  int *current_slot)
 {
@@ -94,9 +103,9 @@ tuple_format_use_key_part(struct tuple_format *format,
 			field->nullable_action = part->nullable_action;
 	} else if (field->nullable_action != part->nullable_action) {
 		diag_set(ClientError, ER_ACTION_MISMATCH,
-				part->fieldno + TUPLE_INDEX_BASE,
-				on_conflict_action_strs[field->nullable_action],
-				on_conflict_action_strs[part->nullable_action]);
+			 tuple_field_path(field),
+			 on_conflict_action_strs[field->nullable_action],
+			 on_conflict_action_strs[part->nullable_action]);
 		return -1;
 	}
 
@@ -111,21 +120,12 @@ tuple_format_use_key_part(struct tuple_format *format,
 		field->type = part->type;
 	} else if (!field_type1_contains_type2(part->type,
 					       field->type)) {
-		const char *name;
-		int fieldno = part->fieldno + TUPLE_INDEX_BASE;
-		if (part->fieldno >= field_count) {
-			name = tt_sprintf("%d", fieldno);
-		} else {
-			const struct field_def *def =
-				&fields[part->fieldno];
-			name = tt_sprintf("'%s'", def->name);
-		}
 		int errcode;
 		if (!field->is_key_part)
 			errcode = ER_FORMAT_MISMATCH_INDEX_PART;
 		else
 			errcode = ER_INDEX_PART_TYPE_MISMATCH;
-		diag_set(ClientError, errcode, name,
+		diag_set(ClientError, errcode, tuple_field_path(field),
 			 field_type_strs[field->type],
 			 field_type_strs[part->type]);
 		return -1;
@@ -190,8 +190,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		const struct key_part *parts_end = part + key_def->part_count;
 
 		for (; part < parts_end; part++) {
-			if (tuple_format_use_key_part(format, fields,
-						      field_count, part,
+			if (tuple_format_use_key_part(format, field_count, part,
 						      is_sequential,
 						      &current_slot) != 0)
 				return -1;
@@ -453,7 +452,7 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 	if (validate &&
 	    !field_mp_type_is_compatible(field->type, mp_typeof(*pos),
 					 tuple_field_is_nullable(field))) {
-		diag_set(ClientError, ER_FIELD_TYPE, TUPLE_INDEX_BASE,
+		diag_set(ClientError, ER_FIELD_TYPE, tuple_field_path(field),
 			 field_type_strs[field->type]);
 		return -1;
 	}
@@ -477,7 +476,7 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 		    !field_mp_type_is_compatible(field->type, mp_typeof(*pos),
 						 tuple_field_is_nullable(field))) {
 			diag_set(ClientError, ER_FIELD_TYPE,
-				 i + TUPLE_INDEX_BASE,
+				 tuple_field_path(field),
 				 field_type_strs[field->type]);
 			return -1;
 		}

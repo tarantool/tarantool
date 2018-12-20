@@ -75,7 +75,7 @@ struct errcode_record {
 	/* 20 */_(ER_INVALID_MSGPACK,		"Invalid MsgPack - %s") \
 	/* 21 */_(ER_PROC_RET,			"msgpack.encode: can not encode Lua type '%s'") \
 	/* 22 */_(ER_TUPLE_NOT_ARRAY,		"Tuple/Key must be MsgPack array") \
-	/* 23 */_(ER_FIELD_TYPE,		"Tuple field %u type does not match one required by operation: expected %s") \
+	/* 23 */_(ER_FIELD_TYPE,		"Tuple field %s type does not match one required by operation: expected %s") \
 	/* 24 */_(ER_INDEX_PART_TYPE_MISMATCH,	"Field %s has type '%s' in one index, but type '%s' in another") \
 	/* 25 */_(ER_SPLICE,			"SPLICE error on field %u: %s") \
 	/* 26 */_(ER_UPDATE_ARG_TYPE,		"Argument type in operation '%c' on field %u does not match field type: expected %s") \
@@ -214,7 +214,7 @@ struct errcode_record {
 	/*159 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
 	/*160 */_(ER_SQL,			"SQL error: %s") \
 	/*161 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
-	/*162 */_(ER_ACTION_MISMATCH,		"Field %d contains %s on conflict action, but %s in index parts") \
+	/*162 */_(ER_ACTION_MISMATCH,		"Field %s contains %s on conflict action, but %s in index parts") \
 	/*163 */_(ER_VIEW_MISSING_SQL,		"Space declared as a view must have SQL statement") \
 	/*164 */_(ER_FOREIGN_KEY_CONSTRAINT,	"Can not commit transaction: deferred foreign keys violations are not resolved") \
 	/*165 */_(ER_NO_SUCH_MODULE,		"Module '%s' does not exist") \
