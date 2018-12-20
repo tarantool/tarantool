@@ -672,6 +672,11 @@ collectgarbage('collect')
 ---
 - 0
 ...
+-- GC should be restarted after it was stopped.
+collectgarbage('restart')
+---
+- 0
+...
 lots_of_links
 ---
 - []
