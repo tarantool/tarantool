@@ -53,8 +53,13 @@ static int (*fiber_invoke)(fiber_func f, va_list ap);
 	void *var_name = NULL; \
 	__sanitizer_start_switch_fiber((will_switch_back) ? &var_name : NULL, \
                                        (bottom), (size))
+#if ASAN_INTERFACE_OLD
 #define ASAN_FINISH_SWITCH_FIBER(var_name) \
 	__sanitizer_finish_switch_fiber(var_name);
+#else
+#define ASAN_FINISH_SWITCH_FIBER(var_name) \
+	__sanitizer_finish_switch_fiber(var_name, 0, 0);
+#endif
 
 #else
 #define ASAN_START_SWITCH_FIBER(var_name, will_switch_back, bottom, size)
