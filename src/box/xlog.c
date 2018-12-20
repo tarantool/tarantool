@@ -719,6 +719,7 @@ xdir_collect_inprogress(struct xdir *xdir)
 		else
 			say_info("removed %s", path);
 	}
+	closedir(dh);
 }
 
 void
