@@ -144,5 +144,7 @@ for k, v in pairs(lots_of_links) do ref_count = ref_count + 1 end
 ref_count
 -- check that tuples are deleted after gc is activated
 collectgarbage('collect')
+-- GC should be restarted after it was stopped.
+collectgarbage('restart')
 lots_of_links
 s:drop()
