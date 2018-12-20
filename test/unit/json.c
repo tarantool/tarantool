@@ -438,16 +438,65 @@ test_path_cmp()
 	footer();
 }
 
+void
+test_path_snprint()
+{
+	header();
+	plan(9);
+
+	struct json_tree tree;
+	int rc = json_tree_create(&tree);
+	fail_if(rc != 0);
+	struct test_struct records[5];
+	const char *path = "[1][20][\"file\"][8]";
+	int path_len = strlen(path);
+
+	int records_idx = 0;
+	struct test_struct *node, *node_tmp;
+	node = test_add_path(&tree, path, path_len, records, &records_idx);
+	fail_if(&node->node != &records[3].node);
+
+	char buf[64];
+	int bufsz = sizeof(buf);
+
+	rc = json_tree_snprint_path(buf, bufsz, &node->node, INDEX_BASE);
+	is(rc, path_len, "full path - retval");
+	is(buf[path_len], '\0', "full path - terminating nul");
+	is(memcmp(buf, path, path_len), 0, "full path - output");
+
+	bufsz = path_len - 5;
+	rc = json_tree_snprint_path(buf, bufsz, &node->node, INDEX_BASE);
+	is(rc, path_len, "truncated path - retval");
+	is(buf[bufsz - 1], '\0', "truncated path - terminating nul");
+	is(memcmp(buf, path, bufsz - 1), 0, "truncated path - output");
+
+	rc = json_tree_snprint_path(buf, 1, &node->node, INDEX_BASE);
+	is(rc, path_len, "1-byte buffer - retval");
+	is(buf[0], '\0', "1-byte buffer - terminating nul");
+
+	rc = json_tree_snprint_path(NULL, 0, &node->node, INDEX_BASE);
+	is(rc, path_len, "0-byte buffer - retval");
+
+	json_tree_foreach_entry_safe(node, &tree.root, struct test_struct,
+				     node, node_tmp)
+		json_tree_del(&tree, &node->node);
+	json_tree_destroy(&tree);
+
+	check_plan();
+	footer();
+}
+
 int
 main()
 {
 	header();
-	plan(4);
+	plan(5);
 
 	test_basic();
 	test_errors();
 	test_tree();
 	test_path_cmp();
+	test_path_snprint();
 
 	int rc = check_plan();
 	footer();

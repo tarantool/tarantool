@@ -254,6 +254,14 @@ int
 json_path_validate(const char *path, int path_len, int index_base);
 
 /**
+ * An snprint-style function to print the path to a token in
+ * a JSON tree.
+ */
+int
+json_tree_snprint_path(char *buf, int size, const struct json_token *token,
+		       int index_base);
+
+/**
  * Initialize a new empty JSON tree.
  *
  * Returns 0 on success, -1 on memory allocation error.

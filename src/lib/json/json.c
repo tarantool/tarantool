@@ -317,6 +317,78 @@ json_path_validate(const char *path, int path_len, int index_base)
 	return rc;
 }
 
+/**
+ * An snprint-style helper to print an individual token key.
+ */
+static int
+json_token_snprint(char *buf, int size, const struct json_token *token,
+		   int index_base)
+{
+	int len = 0;
+	switch (token->type) {
+	case JSON_TOKEN_NUM:
+		len = snprintf(buf, size, "[%d]", token->num + index_base);
+		break;
+	case JSON_TOKEN_STR:
+		len = snprintf(buf, size, "[\"%.*s\"]", token->len, token->str);
+		break;
+	default:
+		unreachable();
+	}
+	return len;
+}
+
+int
+json_tree_snprint_path(char *buf, int size, const struct json_token *token,
+		       int index_base)
+{
+	/* The token must be linked in a tree. */
+	assert(token->parent != NULL);
+
+	/*
+	 * Calculate the length of the final path string by passing
+	 * 0-length buffer to json_token_snprint() routine.
+	 */
+	int len = 0;
+	for (const struct json_token *iter = token;
+	     iter->type != JSON_TOKEN_END; iter = iter->parent)
+		len += json_token_snprint(NULL, 0, iter, index_base);
+
+	/*
+	 * Nothing else to do if the caller is only interested in
+	 * the string length.
+	 */
+	if (size == 0)
+		return len;
+
+	/*
+	 * Write the path to the supplied buffer.
+	 */
+	int pos = len;
+	char last = '\0';
+	for (const struct json_token *iter = token;
+	     iter->type != JSON_TOKEN_END; iter = iter->parent) {
+		pos -= json_token_snprint(NULL, 0, iter, index_base);
+		assert(pos >= 0);
+		if (pos >= size) {
+			/* The token doesn't fit in the buffer. */
+			continue;
+		}
+		int rc = json_token_snprint(buf + pos, size - pos,
+					    iter, index_base);
+		/*
+		 * Restore the character overwritten with
+		 * a terminating nul by json_token_snprint().
+		 */
+		if (last != '\0') {
+			assert(pos + rc < size);
+			buf[pos + rc] = last;
+		}
+		last = buf[pos];
+	}
+	return len;
+}
+
 #define MH_SOURCE 1
 #define mh_name _json
 #define mh_key_t struct json_token *

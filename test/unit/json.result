@@ -1,5 +1,5 @@
 	*** main ***
-1..4
+1..5
 	*** test_basic ***
     1..71
     ok 1 - parse <[1]>
@@ -169,4 +169,17 @@ ok 3 - subtests
     ok 7 - path Data[[1]["FIO"].fname error pos 6 expected 6
 ok 4 - subtests
 	*** test_path_cmp: done ***
+	*** test_path_snprint ***
+    1..9
+    ok 1 - full path - retval
+    ok 2 - full path - terminating nul
+    ok 3 - full path - output
+    ok 4 - truncated path - retval
+    ok 5 - truncated path - terminating nul
+    ok 6 - truncated path - output
+    ok 7 - 1-byte buffer - retval
+    ok 8 - 1-byte buffer - terminating nul
+    ok 9 - 0-byte buffer - retval
+ok 5 - subtests
+	*** test_path_snprint: done ***
 	*** main: done ***
