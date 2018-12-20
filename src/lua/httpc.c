@@ -112,6 +112,8 @@ parse_headers(lua_State *L, char *buffer, size_t len,
 		}
 	}
 
+	free(parser.hdr_name);
+
 	/* headers */
 	lua_settable(L, -3);
 
