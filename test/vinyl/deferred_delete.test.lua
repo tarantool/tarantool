@@ -145,6 +145,10 @@ sk:stat().rows -- 25 old REPLACEs + 25 DELETEs
 sk:select()
 pk:stat().lookup -- 0
 
+-- Check that the global tx memory counter doesn't underflow when
+-- a deferred DELETE statement is generated on commit (gh-3897).
+box.stat.vinyl().memory.tx
+
 box.snapshot()
 sk:compact()
 while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end

@@ -414,6 +414,12 @@ pk:stat().lookup -- 0
 ---
 - 0
 ...
+-- Check that the global tx memory counter doesn't underflow when
+-- a deferred DELETE statement is generated on commit (gh-3897).
+box.stat.vinyl().memory.tx
+---
+- 0
+...
 box.snapshot()
 ---
 - ok
