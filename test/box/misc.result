@@ -63,6 +63,7 @@ t
   - commit
   - ctl
   - error
+  - execute
   - feedback
   - index
   - info
