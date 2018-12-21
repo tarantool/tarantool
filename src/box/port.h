@@ -65,7 +65,6 @@ extern const struct port_vtab port_tuple_vtab;
 static inline struct port_tuple *
 port_tuple(struct port *port)
 {
-	assert(port->vtab == &port_tuple_vtab);
 	return (struct port_tuple *)port;
 }
 

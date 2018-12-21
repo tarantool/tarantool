@@ -82,6 +82,74 @@ struct sql_bind {
 	};
 };
 
+static_assert(sizeof(struct port_sql) <= sizeof(struct port),
+	      "sizeof(struct port_sql) must be <= sizeof(struct port)");
+
+/**
+ * Dump data from port to buffer. Data in port contains tuples,
+ * metadata, or information obtained from an executed SQL query.
+ *
+ * Dumped msgpack structure:
+ * +----------------------------------------------+
+ * | IPROTO_BODY: {                               |
+ * |     IPROTO_METADATA: [                       |
+ * |         {IPROTO_FIELD_NAME: column name1},   |
+ * |         {IPROTO_FIELD_NAME: column name2},   |
+ * |         ...                                  |
+ * |     ],                                       |
+ * |                                              |
+ * |     IPROTO_DATA: [                           |
+ * |         tuple, tuple, tuple, ...             |
+ * |     ]                                        |
+ * | }                                            |
+ * +-------------------- OR ----------------------+
+ * | IPROTO_BODY: {                               |
+ * |     IPROTO_SQL_INFO: {                       |
+ * |         SQL_INFO_ROW_COUNT: number           |
+ * |         SQL_INFO_AUTOINCREMENT_IDS: [        |
+ * |             id, id, id, ...                  |
+ * |         ]                                    |
+ * |     }                                        |
+ * | }                                            |
+ * +-------------------- OR ----------------------+
+ * | IPROTO_BODY: {                               |
+ * |     IPROTO_SQL_INFO: {                       |
+ * |         SQL_INFO_ROW_COUNT: number           |
+ * |     }                                        |
+ * | }                                            |
+ * +----------------------------------------------+
+ * @param port Port that contains SQL response.
+ * @param[out] out Output buffer.
+ *
+ * @retval  0 Success.
+ * @retval -1 Memory error.
+ */
+static int
+port_sql_dump_msgpack(struct port *port, struct obuf *out);
+
+static void
+port_sql_destroy(struct port *base)
+{
+	port_tuple_vtab.destroy(base);
+	sql_finalize(((struct port_sql *)base)->stmt);
+}
+
+const struct port_vtab port_sql_vtab = {
+	/* .dump_msgpack = */ port_sql_dump_msgpack,
+	/* .dump_msgpack_16 = */ NULL,
+	/* .dump_lua = */ NULL,
+	/* .dump_plain = */ NULL,
+	/* .destroy = */ port_sql_destroy,
+};
+
+static void
+port_sql_create(struct port *port, struct sql_stmt *stmt)
+{
+	port_tuple_create(port);
+	((struct port_sql *)port)->stmt = stmt;
+	port->vtab = &port_sql_vtab;
+}
+
 /**
  * Return a string name of a parameter marker.
  * @param Bind to get name.
@@ -504,6 +572,101 @@ sql_get_description(struct sql_stmt *stmt, struct obuf *out,
 	return 0;
 }
 
+static int
+port_sql_dump_msgpack(struct port *port, struct obuf *out)
+{
+	assert(port->vtab == &port_sql_vtab);
+	sql *db = sql_get();
+	struct sql_stmt *stmt = ((struct port_sql *)port)->stmt;
+	int column_count = sql_column_count(stmt);
+	if (column_count > 0) {
+		int keys = 2;
+		int size = mp_sizeof_map(keys);
+		char *pos = (char *) obuf_alloc(out, size);
+		if (pos == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
+			return -1;
+		}
+		pos = mp_encode_map(pos, keys);
+		if (sql_get_description(stmt, out, column_count) != 0)
+			return -1;
+		size = mp_sizeof_uint(IPROTO_DATA);
+		pos = (char *) obuf_alloc(out, size);
+		if (pos == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
+			return -1;
+		}
+		pos = mp_encode_uint(pos, IPROTO_DATA);
+		if (port_tuple_vtab.dump_msgpack(port, out) < 0)
+			return -1;
+	} else {
+		int keys = 1;
+		assert(((struct port_tuple *)port)->size == 0);
+		struct stailq *autoinc_id_list =
+			vdbe_autoinc_id_list((struct Vdbe *)stmt);
+		uint32_t map_size = stailq_empty(autoinc_id_list) ? 1 : 2;
+		int size = mp_sizeof_map(keys) +
+			   mp_sizeof_uint(IPROTO_SQL_INFO) +
+			   mp_sizeof_map(map_size);
+		char *pos = (char *) obuf_alloc(out, size);
+		if (pos == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
+			return -1;
+		}
+		pos = mp_encode_map(pos, keys);
+		pos = mp_encode_uint(pos, IPROTO_SQL_INFO);
+		pos = mp_encode_map(pos, map_size);
+		uint64_t id_count = 0;
+		int changes = db->nChange;
+		size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
+		       mp_sizeof_uint(changes);
+		if (!stailq_empty(autoinc_id_list)) {
+			struct autoinc_id_entry *id_entry;
+			stailq_foreach_entry(id_entry, autoinc_id_list, link) {
+				size += id_entry->id >= 0 ?
+					mp_sizeof_uint(id_entry->id) :
+					mp_sizeof_int(id_entry->id);
+				id_count++;
+			}
+			size += mp_sizeof_uint(SQL_INFO_AUTOINCREMENT_IDS) +
+				mp_sizeof_array(id_count);
+		}
+		char *buf = obuf_alloc(out, size);
+		if (buf == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
+			return -1;
+		}
+		buf = mp_encode_uint(buf, SQL_INFO_ROW_COUNT);
+		buf = mp_encode_uint(buf, changes);
+		if (!stailq_empty(autoinc_id_list)) {
+			buf = mp_encode_uint(buf, SQL_INFO_AUTOINCREMENT_IDS);
+			buf = mp_encode_array(buf, id_count);
+			struct autoinc_id_entry *id_entry;
+			stailq_foreach_entry(id_entry, autoinc_id_list, link) {
+				buf = id_entry->id >= 0 ?
+				      mp_encode_uint(buf, id_entry->id) :
+				      mp_encode_int(buf, id_entry->id);
+			}
+		}
+	}
+	return 0;
+}
+
+/**
+ * Execute prepared SQL statement.
+ *
+ * This function uses region to allocate memory for temporary
+ * objects. After this function, region will be in the same state
+ * in which it was before this function.
+ *
+ * @param db SQL handle.
+ * @param stmt Prepared statement.
+ * @param port Port to store SQL response.
+ * @param region Region to allocate temporary objects.
+ *
+ * @retval  0 Success.
+ * @retval -1 Error.
+ */
 static inline int
 sql_execute(sql *db, struct sql_stmt *stmt, struct port *port,
 	    struct region *region)
@@ -536,15 +699,11 @@ sql_execute(sql *db, struct sql_stmt *stmt, struct port *port,
 
 int
 sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
-			uint32_t bind_count, struct sql_response *response,
+			uint32_t bind_count, struct port *port,
 			struct region *region)
 {
 	struct sql_stmt *stmt;
 	struct sql *db = sql_get();
-	if (db == NULL) {
-		diag_set(ClientError, ER_LOADING);
-		return -1;
-	}
 	if (sql_prepare_v2(db, sql, len, &stmt, NULL) != SQL_OK) {
 		if (db->errCode != SQL_TARANTOOL_ERROR) {
 			const char *err = (char *)sql_value_text(db->pErr);
@@ -555,106 +714,10 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 		return -1;
 	}
 	assert(stmt != NULL);
-	port_tuple_create(&response->port);
-	response->prep_stmt = stmt;
+	port_sql_create(port, stmt);
 	if (sql_bind(stmt, bind, bind_count) == 0 &&
-	    sql_execute(db, stmt, &response->port, region) == 0)
+	    sql_execute(db, stmt, port, region) == 0)
 		return 0;
-	port_destroy(&response->port);
-	sql_finalize(stmt);
+	port_destroy(port);
 	return -1;
-}
-
-int
-sql_response_dump(struct sql_response *response, struct obuf *out)
-{
-	sql *db = sql_get();
-	struct sql_stmt *stmt = (struct sql_stmt *) response->prep_stmt;
-	struct port_tuple *port_tuple = (struct port_tuple *) &response->port;
-	int rc = 0, column_count = sql_column_count(stmt);
-	if (column_count > 0) {
-		int keys = 2;
-		int size = mp_sizeof_map(keys);
-		char *pos = (char *) obuf_alloc(out, size);
-		if (pos == NULL) {
-			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
-			goto err;
-		}
-		pos = mp_encode_map(pos, keys);
-		if (sql_get_description(stmt, out, column_count) != 0) {
-err:
-			rc = -1;
-			goto finish;
-		}
-		size = mp_sizeof_uint(IPROTO_DATA) +
-		       mp_sizeof_array(port_tuple->size);
-		pos = (char *) obuf_alloc(out, size);
-		if (pos == NULL) {
-			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
-			goto err;
-		}
-		pos = mp_encode_uint(pos, IPROTO_DATA);
-		pos = mp_encode_array(pos, port_tuple->size);
-		/*
-		 * Just like SELECT, SQL uses output format compatible
-		 * with Tarantool 1.6
-		 */
-		if (port_dump_msgpack_16(&response->port, out) < 0) {
-			/* Failed port dump destroyes the port. */
-			goto err;
-		}
-	} else {
-		int keys = 1;
-		assert(port_tuple->size == 0);
-		struct stailq *autoinc_id_list =
-			vdbe_autoinc_id_list((struct Vdbe *)stmt);
-		uint32_t map_size = stailq_empty(autoinc_id_list) ? 1 : 2;
-		int size = mp_sizeof_map(keys) +
-			   mp_sizeof_uint(IPROTO_SQL_INFO) +
-			   mp_sizeof_map(map_size);
-		char *pos = (char *) obuf_alloc(out, size);
-		if (pos == NULL) {
-			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
-			goto err;
-		}
-		pos = mp_encode_map(pos, keys);
-		pos = mp_encode_uint(pos, IPROTO_SQL_INFO);
-		pos = mp_encode_map(pos, map_size);
-		uint64_t id_count = 0;
-		int changes = db->nChange;
-		size = mp_sizeof_uint(SQL_INFO_ROW_COUNT) +
-		       mp_sizeof_uint(changes);
-		if (!stailq_empty(autoinc_id_list)) {
-			struct autoinc_id_entry *id_entry;
-			stailq_foreach_entry(id_entry, autoinc_id_list, link) {
-				size += id_entry->id >= 0 ?
-					mp_sizeof_uint(id_entry->id) :
-					mp_sizeof_int(id_entry->id);
-				id_count++;
-			}
-			size += mp_sizeof_uint(SQL_INFO_AUTOINCREMENT_IDS) +
-				mp_sizeof_array(id_count);
-		}
-		char *buf = obuf_alloc(out, size);
-		if (buf == NULL) {
-			diag_set(OutOfMemory, size, "obuf_alloc", "buf");
-			goto err;
-		}
-		buf = mp_encode_uint(buf, SQL_INFO_ROW_COUNT);
-		buf = mp_encode_uint(buf, changes);
-		if (!stailq_empty(autoinc_id_list)) {
-			buf = mp_encode_uint(buf, SQL_INFO_AUTOINCREMENT_IDS);
-			buf = mp_encode_array(buf, id_count);
-			struct autoinc_id_entry *id_entry;
-			stailq_foreach_entry(id_entry, autoinc_id_list, link) {
-				buf = id_entry->id >= 0 ?
-				      mp_encode_uint(buf, id_entry->id) :
-				      mp_encode_int(buf, id_entry->id);
-			}
-		}
-	}
-finish:
-	port_destroy(&response->port);
-	sql_finalize(stmt);
-	return rc;
 }
