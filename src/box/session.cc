@@ -90,6 +90,14 @@ session_on_stop(struct trigger *trigger, void * /* event */)
 	session_destroy(fiber_get_session(fiber()));
 }
 
+void
+session_set_type(struct session *session, enum session_type type)
+{
+	assert(type < session_type_MAX);
+	session->type = type;
+	session->vtab = &session_vtab_registry[type];
+}
+
 struct session *
 session_create(enum session_type type)
 {
@@ -102,7 +110,7 @@ session_create(enum session_type type)
 	}
 	session->id = sid_max();
 	memset(&session->meta, 0, sizeof(session->meta));
-	session->type = type;
+	session_set_type(session, type);
 	/* For on_connect triggers. */
 	credentials_init(&session->credentials, guest_user->auth_token,
 			 guest_user->def->uid);

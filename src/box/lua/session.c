@@ -57,7 +57,8 @@ lbox_session_create(struct lua_State *L)
 		session->meta.fd = luaL_optinteger(L, 1, -1);
 	}
 	/* If a session already exists, simply reset its type */
-	session->type = STR2ENUM(session_type, luaL_optstring(L, 2, "console"));
+	session_set_type(session, STR2ENUM(session_type,
+					   luaL_optstring(L, 2, "console")));
 
 	lua_pushnumber(L, session->id);
 	return 1;

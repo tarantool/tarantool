@@ -86,6 +86,8 @@ struct session {
 	/** Session id. */
 	uint64_t id;
 	enum session_type type;
+	/** Session virtual methods. */
+	const struct session_vtab *vtab;
 	/** Session metadata. */
 	union session_meta meta;
 	/** Session user id and global grants */
@@ -128,6 +130,10 @@ struct session_vtab {
 };
 
 extern struct session_vtab session_vtab_registry[];
+
+/** Change session type and vtab. */
+void
+session_set_type(struct session *session, enum session_type type);
 
 /**
  * Find a session by id.
@@ -291,19 +297,19 @@ access_check_universe(user_access_t access);
 static inline int
 session_push(struct session *session, uint64_t sync, struct port *port)
 {
-	return session_vtab_registry[session->type].push(session, sync, port);
+	return session->vtab->push(session, sync, port);
 }
 
 static inline int
 session_fd(struct session *session)
 {
-	return session_vtab_registry[session->type].fd(session);
+	return session->vtab->fd(session);
 }
 
 static inline int
 session_sync(struct session *session)
 {
-	return session_vtab_registry[session->type].sync(session);
+	return session->vtab->sync(session);
 }
 
 /**
