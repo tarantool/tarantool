@@ -364,7 +364,7 @@ disableTerm(WhereLevel * pLevel, WhereTerm * pTerm)
 }
 
 /*
- * Code an OP_Affinity opcode to apply the column affinity string zAff
+ * Code an OP_ApplyType opcode to apply the column type string types
  * to the n registers starting at base.
  *
  * As an optimization, AFFINITY_BLOB entries (which are no-ops) at the
@@ -396,9 +396,11 @@ codeApplyAffinity(Parse * pParse, int base, int n, char *zAff)
 		n--;
 	}
 
-	/* Code the OP_Affinity opcode if there is anything left to do. */
 	if (n > 0) {
-		sqlite3VdbeAddOp4(v, OP_Affinity, base, n, 0, zAff, n);
+		enum field_type *types =
+			sql_affinity_str_to_field_type_str(zAff, n);
+		sqlite3VdbeAddOp4(v, OP_ApplyType, base, n, 0, (char *)types,
+				  P4_DYNAMIC);
 		sqlite3ExprCacheAffinityChange(pParse, base, n);
 	}
 }

@@ -600,11 +600,12 @@ sqlite3VdbeMemNumerify(Mem * pMem)
  * used (for example) to implement the SQL "cast()" operator.
  */
 int
-sqlite3VdbeMemCast(Mem * pMem, u8 aff)
+sqlite3VdbeMemCast(Mem * pMem, enum field_type type)
 {
+	assert(type < field_type_MAX);
 	if (pMem->flags & MEM_Null)
 		return SQLITE_OK;
-	if ((pMem->flags & MEM_Blob) != 0 && aff == AFFINITY_REAL) {
+	if ((pMem->flags & MEM_Blob) != 0 && type == FIELD_TYPE_NUMBER) {
 		if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i, pMem->n) == 0) {
 			MemSetTypeFlag(pMem, MEM_Real);
 			pMem->u.r = pMem->u.i;
@@ -612,8 +613,8 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff)
 		}
 		return ! sqlite3AtoF(pMem->z, &pMem->u.r, pMem->n);
 	}
-	switch (aff) {
-	case AFFINITY_BLOB:
+	switch (type) {
+	case FIELD_TYPE_SCALAR:
 		if (pMem->flags & MEM_Blob)
 			return SQLITE_OK;
 		if (pMem->flags & MEM_Str) {
@@ -627,7 +628,7 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff)
 			return 0;
 		}
 		return SQLITE_ERROR;
-	case AFFINITY_INTEGER:
+	case FIELD_TYPE_INTEGER:
 		if ((pMem->flags & MEM_Blob) != 0) {
 			if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i,
 				       pMem->n) != 0)
@@ -636,13 +637,13 @@ sqlite3VdbeMemCast(Mem * pMem, u8 aff)
 			return 0;
 		}
 		return sqlite3VdbeMemIntegerify(pMem, true);
-	case AFFINITY_REAL:
+	case FIELD_TYPE_NUMBER:
 		return sqlite3VdbeMemRealify(pMem);
 	default:
-		assert(aff == AFFINITY_TEXT);
+		assert(type == FIELD_TYPE_STRING);
 		assert(MEM_Str == (MEM_Blob >> 3));
 		pMem->flags |= (pMem->flags & MEM_Blob) >> 3;
-		sqlite3ValueApplyAffinity(pMem, AFFINITY_TEXT);
+		sqlite3ValueApplyAffinity(pMem, FIELD_TYPE_STRING);
 		assert(pMem->flags & MEM_Str || pMem->db->mallocFailed);
 		pMem->flags &= ~(MEM_Int | MEM_Real | MEM_Blob | MEM_Zero);
 		return SQLITE_OK;
@@ -1162,7 +1163,7 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
 static int
 valueFromFunction(sqlite3 * db,	/* The database connection */
 		  Expr * p,	/* The expression to evaluate */
-		  u8 aff,	/* Affinity to use */
+		  enum field_type type,
 		  sqlite3_value ** ppVal,	/* Write the new value here */
 		  struct ValueNewStat4Ctx *pCtx	/* Second argument for valueNew() */
     )
@@ -1200,7 +1201,7 @@ valueFromFunction(sqlite3 * db,	/* The database connection */
 		}
 		for (i = 0; i < nVal; i++) {
 			rc = sqlite3ValueFromExpr(db, pList->a[i].pExpr,
-						  aff, &apVal[i]);
+						  type, &apVal[i]);
 			if (apVal[i] == 0 || rc != SQLITE_OK)
 				goto value_from_function_out;
 		}
@@ -1221,7 +1222,7 @@ valueFromFunction(sqlite3 * db,	/* The database connection */
 		rc = ctx.isError;
 		sqlite3ErrorMsg(pCtx->pParse, "%s", sqlite3_value_text(pVal));
 	} else {
-		sqlite3ValueApplyAffinity(pVal, aff);
+		sqlite3ValueApplyAffinity(pVal, type);
 		assert(rc == SQLITE_OK);
 	}
 	pCtx->pParse->rc = rc;
@@ -1254,7 +1255,7 @@ valueFromFunction(sqlite3 * db,	/* The database connection */
 static int
 valueFromExpr(sqlite3 * db,	/* The database connection */
 	      Expr * pExpr,	/* The expression to evaluate */
-	      u8 affinity,	/* Affinity to use */
+	      enum field_type type,
 	      sqlite3_value ** ppVal,	/* Write the new value here */
 	      struct ValueNewStat4Ctx *pCtx	/* Second argument for valueNew() */
     )
@@ -1285,7 +1286,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 		testcase(rc != SQLITE_OK);
 		if (*ppVal) {
 			sqlite3VdbeMemCast(*ppVal, aff);
-			sqlite3ValueApplyAffinity(*ppVal, affinity);
+			sqlite3ValueApplyAffinity(*ppVal, type);
 		}
 		return rc;
 	}
@@ -1316,18 +1317,18 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 				goto no_mem;
 			sqlite3ValueSetStr(pVal, -1, zVal, SQLITE_DYNAMIC);
 		}
-		if ((op == TK_INTEGER || op == TK_FLOAT)
-		    && affinity == AFFINITY_BLOB) {
-			sqlite3ValueApplyAffinity(pVal, AFFINITY_REAL);
+		if ((op == TK_INTEGER || op == TK_FLOAT) &&
+		    type == FIELD_TYPE_SCALAR) {
+			sqlite3ValueApplyAffinity(pVal, FIELD_TYPE_NUMBER);
 		} else {
-			sqlite3ValueApplyAffinity(pVal, affinity);
+			sqlite3ValueApplyAffinity(pVal, type);
 		}
 		if (pVal->flags & (MEM_Int | MEM_Real))
 			pVal->flags &= ~MEM_Str;
 	} else if (op == TK_UMINUS) {
 		/* This branch happens for multiple negative signs.  Ex: -(-5) */
 		if (SQLITE_OK ==
-		    sqlite3ValueFromExpr(db, pExpr->pLeft, affinity, &pVal)
+		    sqlite3ValueFromExpr(db, pExpr->pLeft, type, &pVal)
 		    && pVal != 0) {
 			if ((rc = sqlite3VdbeMemNumerify(pVal)) != SQLITE_OK)
 				return rc;
@@ -1339,7 +1340,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 			} else {
 				pVal->u.i = -pVal->u.i;
 			}
-			sqlite3ValueApplyAffinity(pVal, affinity);
+			sqlite3ValueApplyAffinity(pVal, type);
 		}
 	} else if (op == TK_NULL) {
 		pVal = valueNew(db, pCtx);
@@ -1365,7 +1366,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 #endif
 
 	else if (op == TK_FUNCTION && pCtx != 0) {
-		rc = valueFromFunction(db, pExpr, affinity, &pVal, pCtx);
+		rc = valueFromFunction(db, pExpr, type, &pVal, pCtx);
 	}
 
 	*ppVal = pVal;
@@ -1394,11 +1395,11 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 int
 sqlite3ValueFromExpr(sqlite3 * db,	/* The database connection */
 		     Expr * pExpr,	/* The expression to evaluate */
-		     u8 affinity,	/* Affinity to use */
+		     enum field_type type,
 		     sqlite3_value ** ppVal	/* Write the new value here */
     )
 {
-	return pExpr ? valueFromExpr(db, pExpr, affinity, ppVal, 0) : 0;
+	return pExpr ? valueFromExpr(db, pExpr, type, ppVal, 0) : 0;
 }
 
 /*
@@ -1472,7 +1473,7 @@ sqlite3AnalyzeFunctions(void)
 static int
 stat4ValueFromExpr(Parse * pParse,	/* Parse context */
 		   Expr * pExpr,	/* The expression to extract a value from */
-		   u8 affinity,	/* Affinity to use */
+		   enum field_type type,
 		   struct ValueNewStat4Ctx *pAlloc,	/* How to allocate space.  Or NULL */
 		   sqlite3_value ** ppVal	/* OUT: New value object (or NULL) */
     )
@@ -1502,14 +1503,13 @@ stat4ValueFromExpr(Parse * pParse,	/* Parse context */
 				rc = sqlite3VdbeMemCopy((Mem *) pVal,
 							&v->aVar[iBindVar - 1]);
 				if (rc == SQLITE_OK) {
-					sqlite3ValueApplyAffinity(pVal,
-								  affinity);
+					sqlite3ValueApplyAffinity(pVal, type);
 				}
 				pVal->db = pParse->db;
 			}
 		}
 	} else {
-		rc = valueFromExpr(db, pExpr, affinity, &pVal, pAlloc);
+		rc = valueFromExpr(db, pExpr, type, &pVal, pAlloc);
 	}
 
 	assert(pVal == 0 || pVal->db == db);
@@ -1581,6 +1581,7 @@ sqlite3Stat4ProbeSetValue(Parse * pParse,	/* Parse context */
 			u8 aff = sql_space_index_part_affinity(space->def, idx,
 							       iVal + i);
 			alloc.iVal = iVal + i;
+			aff = sql_affinity_to_field_type(aff);
 			rc = stat4ValueFromExpr(pParse, pElem, aff, &alloc,
 						&pVal);
 			if (!pVal)
@@ -1606,11 +1607,11 @@ sqlite3Stat4ProbeSetValue(Parse * pParse,	/* Parse context */
 int
 sqlite3Stat4ValueFromExpr(Parse * pParse,	/* Parse context */
 			  Expr * pExpr,	/* The expression to extract a value from */
-			  u8 affinity,	/* Affinity to use */
+			  enum field_type type,
 			  sqlite3_value ** ppVal	/* OUT: New value object (or NULL) */
     )
 {
-	return stat4ValueFromExpr(pParse, pExpr, affinity, 0, ppVal);
+	return stat4ValueFromExpr(pParse, pExpr, type, 0, ppVal);
 }
 
 int

@@ -332,12 +332,11 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			 */
 			key_len = 0;
 			struct index *pk = space_index(space, 0);
-			const char *zAff = is_view ? NULL :
-					   sql_space_index_affinity_str(parse->db,
-									space->def,
-									pk->def);
+			enum field_type *types = is_view ? NULL :
+						 sql_index_type_str(parse->db,
+								    pk->def);
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, reg_pk, pk_len,
-					  reg_key, zAff, pk_len);
+					  reg_key, (char *)types, P4_DYNAMIC);
 			/* Set flag to save memory allocating one
 			 * by malloc.
 			 */
@@ -592,13 +591,13 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
 		 * is an integer, then it might be stored in the
 		 * table as an integer (using a compact
 		 * representation) then converted to REAL by an
-		 * OP_RealAffinity opcode. But we are getting
+		 * OP_Realify opcode. But we are getting
 		 * ready to store this value back into an index,
 		 * where it should be converted by to INTEGER
-		 * again.  So omit the OP_RealAffinity opcode if
+		 * again.  So omit the OP_Realify opcode if
 		 * it is present
 		 */
-		sqlite3VdbeDeletePriorOpcode(v, OP_RealAffinity);
+		sqlite3VdbeDeletePriorOpcode(v, OP_Realify);
 	}
 	if (reg_out != 0)
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, reg_base, col_cnt, reg_out);

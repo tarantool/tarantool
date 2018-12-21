@@ -2142,10 +2142,10 @@ sqlite3ExprCanBeNull(const Expr * p)
 
 /*
  * Return TRUE if the given expression is a constant which would be
- * unchanged by OP_Affinity with the affinity given in the second
+ * unchanged by OP_ApplyType with the type given in the second
  * argument.
  *
- * This routine is used to determine if the OP_Affinity operation
+ * This routine is used to determine if the OP_ApplyType operation
  * can be omitted.  When in doubt return FALSE.  A false negative
  * is harmless.  A false positive, however, can result in the wrong
  * answer.
@@ -2854,8 +2854,13 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 						jmpIfDynamic = -1;
 					}
 					r3 = sqlite3ExprCodeTarget(pParse, pE2, r1);
+					enum field_type type =
+						sql_affinity_to_field_type(affinity);
+					enum field_type types[2] =
+						{ type, field_type_MAX };
 	 				sqlite3VdbeAddOp4(v, OP_MakeRecord, r3,
-							  1, r2, &affinity, 1);
+							  1, r2, (char *)types,
+							  sizeof(types));
 					sqlite3ExprCacheAffinityChange(pParse,
 								       r3, 1);
 					sqlite3VdbeAddOp2(v, OP_IdxInsert, r2,
@@ -3168,7 +3173,10 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 * of the RHS using the LHS as a probe.  If found, the result is
 	 * true.
 	 */
-	sqlite3VdbeAddOp4(v, OP_Affinity, rLhs, nVector, 0, zAff, nVector);
+	enum field_type *types = sql_affinity_str_to_field_type_str(zAff,
+								    nVector);
+	sqlite3VdbeAddOp4(v, OP_ApplyType, rLhs, nVector, 0, (char *)types,
+			  P4_DYNAMIC);
 	if (destIfFalse == destIfNull) {
 		/* Combine Step 3 and Step 5 into a single opcode */
 		sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
@@ -3696,7 +3704,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						  pCol->iSorterColumn, target);
 				if (pCol->space_def->fields[pExpr->iAgg].type ==
 				    FIELD_TYPE_NUMBER) {
-					sqlite3VdbeAddOp1(v, OP_RealAffinity,
+					sqlite3VdbeAddOp1(v, OP_Realify,
 							  target);
 				}
 				return target;
@@ -3796,7 +3804,8 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlite3VdbeAddOp2(v, OP_SCopy, inReg, target);
 				inReg = target;
 			}
-			sqlite3VdbeAddOp2(v, OP_Cast, target, pExpr->affinity);
+			sqlite3VdbeAddOp2(v, OP_Cast, target,
+					  sql_affinity_to_field_type(pExpr->affinity));
 			testcase(usedAsColumnCache(pParse, inReg, inReg));
 			sqlite3ExprCacheAffinityChange(pParse, inReg, 1);
 			return inReg;
@@ -4232,14 +4241,14 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 
 #ifndef SQLITE_OMIT_FLOATING_POINT
 			/* If the column has REAL affinity, it may currently be stored as an
-			 * integer. Use OP_RealAffinity to make sure it is really real.
+			 * integer. Use OP_Realify to make sure it is really real.
 			 *
 			 * EVIDENCE-OF: R-60985-57662 SQLite will convert the value back to
 			 * floating point when extracting it from the record.
 			 */
 			if (pExpr->iColumn >= 0 && def->fields[
 				pExpr->iColumn].affinity == AFFINITY_REAL) {
-				sqlite3VdbeAddOp1(v, OP_RealAffinity, target);
+				sqlite3VdbeAddOp1(v, OP_Realify, target);
 			}
 #endif
 			break;

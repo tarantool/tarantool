@@ -1200,7 +1200,7 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	int nLower = -1;
 	int nUpper = index->def->opts.stat->sample_count + 1;
 	int rc = SQLITE_OK;
-	u8 aff = sql_space_index_part_affinity(space->def, p, nEq);
+	enum field_type type = p->key_def->parts[nEq].type;
 
 	sqlite3_value *p1 = 0;	/* Value extracted from pLower */
 	sqlite3_value *p2 = 0;	/* Value extracted from pUpper */
@@ -1209,12 +1209,12 @@ whereRangeSkipScanEst(Parse * pParse,		/* Parsing & code generating context */
 	struct coll *coll = p->key_def->parts[nEq].coll;
 	if (pLower) {
 		rc = sqlite3Stat4ValueFromExpr(pParse, pLower->pExpr->pRight,
-					       aff, &p1);
+					       type, &p1);
 		nLower = 0;
 	}
 	if (pUpper && rc == SQLITE_OK) {
 		rc = sqlite3Stat4ValueFromExpr(pParse, pUpper->pExpr->pRight,
-					       aff, &p2);
+					       type, &p2);
 		nUpper = p2 ? 0 : index->def->opts.stat->sample_count;
 	}
 

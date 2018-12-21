@@ -3453,6 +3453,9 @@ sql_affinity_to_field_type(enum affinity_type affinity);
 enum affinity_type
 sql_field_type_to_affinity(enum field_type field_type);
 
+enum field_type *
+sql_affinity_str_to_field_type_str(const char *affinity_str, uint32_t len);
+
 /**
  * Compile view, i.e. create struct Select from
  * 'CREATE VIEW...' string, and assign cursors to each table from
@@ -4249,16 +4252,20 @@ char *
 sql_space_index_affinity_str(struct sqlite3 *db, struct space_def *space_def,
 			     struct index_def *idx_def);
 
+/** Return string consisting of fields types of given index. */
+enum field_type *
+sql_index_type_str(struct sqlite3 *db, const struct index_def *idx_def);
+
 /**
- * Code an OP_Affinity opcode that will set affinities
+ * Code an OP_ApplyType opcode that will force types
  * for given range of register starting from @reg.
  *
  * @param v VDBE.
  * @param def Definition of table to be used.
- * @param reg Register where affinities will be placed.
+ * @param reg Register where types will be placed.
  */
 void
-sql_emit_table_affinity(struct Vdbe *v, struct space_def *def, int reg);
+sql_emit_table_types(struct Vdbe *v, struct space_def *def, int reg);
 
 /**
  * Return superposition of two affinities.
@@ -4382,8 +4389,9 @@ void sqlite3ValueSetStr(sqlite3_value *, int, const void *,
 void sqlite3ValueSetNull(sqlite3_value *);
 void sqlite3ValueFree(sqlite3_value *);
 sqlite3_value *sqlite3ValueNew(sqlite3 *);
-int sqlite3ValueFromExpr(sqlite3 *, Expr *, u8, sqlite3_value **);
-void sqlite3ValueApplyAffinity(sqlite3_value *, u8);
+int sqlite3ValueFromExpr(sqlite3 *, Expr *, enum field_type type,
+			 sqlite3_value **);
+void sqlite3ValueApplyAffinity(sqlite3_value *, enum field_type type);
 #ifndef SQLITE_AMALGAMATION
 extern const unsigned char sqlite3OpcodeProperty[];
 extern const char sqlite3StrBINARY[];
@@ -4466,7 +4474,7 @@ int sqlite3ResolveOrderGroupBy(Parse *, Select *, ExprList *, const char *);
  * function is capable of transforming these types of expressions into
  * sqlite3_value objects.
  *
- * If parameter iReg is not negative, code an OP_RealAffinity instruction
+ * If parameter iReg is not negative, code an OP_Realify instruction
  * on register iReg. This is used when an equivalent integer value is
  * stored in place of an 8-byte floating point value in order to save
  * space.
@@ -4607,7 +4615,8 @@ int sqlite3ExprCheckIN(Parse *, Expr *);
 void sqlite3AnalyzeFunctions(void);
 int sqlite3Stat4ProbeSetValue(Parse *, struct index_def *, UnpackedRecord **, Expr *, int,
 			      int, int *);
-int sqlite3Stat4ValueFromExpr(Parse *, Expr *, u8, sqlite3_value **);
+int sqlite3Stat4ValueFromExpr(Parse *, Expr *, enum field_type type,
+			      sqlite3_value **);
 void sqlite3Stat4ProbeFree(UnpackedRecord *);
 
 /**

@@ -84,6 +84,11 @@ struct VdbeOp {
 		struct sql_key_info *key_info;
 		/** Used when p4type is P4_SPACEPTR. */
 		struct space *space;
+		/**
+		 * Used to apply types when making a record, or
+		 * doing a cast.
+		 */
+		enum field_type *types;
 	} p4;
 #ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
 	char *zComment;		/* Comment to improve readability */

@@ -70,7 +70,7 @@ test:do_catchsql_test(
         SELECT CAST(x'616263' AS numeric)
     ]], {
         -- <cast-1.5>
-        1, 'Type mismatch: can not convert abc to real'
+        1, 'Type mismatch: can not convert abc to number'
         -- </cast-1.5>
     })
 
@@ -450,7 +450,7 @@ test:do_catchsql_test(
         SELECT CAST('123abc' AS numeric)
     ]], {
         -- <cast-1.45>
-        1, 'Type mismatch: can not convert 123abc to real'
+        1, 'Type mismatch: can not convert 123abc to number'
         -- </cast-1.45>
     })
 
@@ -480,7 +480,7 @@ test:do_catchsql_test(
         SELECT CAST('123.5abc' AS numeric)
     ]], {
         -- <cast-1.51>
-        1, 'Type mismatch: can not convert 123.5abc to real'
+        1, 'Type mismatch: can not convert 123.5abc to number'
         -- </cast-1.51>
     })
 
@@ -561,7 +561,7 @@ test:do_catchsql_test(
         SELECT CAST('abc' AS REAL)
     ]], {
         -- <case-1.66>
-        1, 'Type mismatch: can not convert abc to real'
+        1, 'Type mismatch: can not convert abc to number'
         -- </case-1.66>
     })
 
@@ -875,7 +875,7 @@ test:do_test(
         ]]
     end, {
         -- <cast-4.4>
-        1, 'Type mismatch: can not convert abc to real'
+        1, 'Type mismatch: can not convert abc to number'
         -- </cast-4.4>
     })
 

@@ -520,6 +520,20 @@ sql_field_type_to_affinity(enum field_type field_type)
 	}
 }
 
+enum field_type *
+sql_affinity_str_to_field_type_str(const char *affinity_str, uint32_t len)
+{
+	if (affinity_str == NULL)
+		return NULL;
+	size_t sz = (len + 1) * sizeof(enum field_type);
+	enum field_type *types =
+		(enum field_type *) sqlite3DbMallocRaw(sql_get(), sz);
+	for (uint32_t i = 0; i < len; ++i)
+		types[i] = sql_affinity_to_field_type(affinity_str[i]);
+	types[len] = field_type_MAX;
+	return types;
+}
+
 /*
  * Add a new column to the table currently being constructed.
  *

@@ -993,9 +993,12 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		sqlite3VdbeAddOp2(v, OP_Next, idx_cursor, next_row_addr);
 		/* Add the entry to the stat1 table. */
 		callStatGet(v, stat4_reg, STAT_GET_STAT1, stat1_reg);
-		assert("BBB"[0] == AFFINITY_TEXT);
-		sqlite3VdbeAddOp4(v, OP_MakeRecord, tab_name_reg, 3, tmp_reg,
-				  "BBB", 0);
+		enum field_type types[4] = { FIELD_TYPE_STRING,
+					     FIELD_TYPE_STRING,
+					     FIELD_TYPE_STRING,
+					     field_type_MAX };
+		sqlite3VdbeAddOp4(v, OP_MakeRecord, tab_name_reg, 4, tmp_reg,
+				  (char *)types, sizeof(types));
 		sqlite3VdbeAddOp4(v, OP_IdxInsert, tmp_reg, 0, 0,
 				  (char *)stat1, P4_SPACEPTR);
 		/* Add the entries to the stat4 table. */
