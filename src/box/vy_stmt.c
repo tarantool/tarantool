@@ -86,7 +86,12 @@ vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	if (tuple_validate_raw(format, data) != 0)
 		return NULL;
 
-	return vy_stmt_new_insert(format, data, end);
+	struct tuple *tuple = vy_stmt_new_insert(format, data, end);
+	if (tuple != NULL) {
+		tuple_bless(tuple);
+		tuple_unref(tuple);
+	}
+	return tuple;
 }
 
 struct tuple_format_vtab vy_tuple_format_vtab = {
