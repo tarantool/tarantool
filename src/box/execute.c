@@ -44,6 +44,7 @@
 #include "port.h"
 #include "tuple.h"
 #include "sql/vdbe.h"
+#include "box/lua/execute.h"
 
 const char *sql_info_key_strs[] = {
 	"row count",
@@ -104,7 +105,7 @@ port_sql_destroy(struct port *base)
 const struct port_vtab port_sql_vtab = {
 	/* .dump_msgpack = */ port_sql_dump_msgpack,
 	/* .dump_msgpack_16 = */ NULL,
-	/* .dump_lua = */ NULL,
+	/* .dump_lua = */ port_sql_dump_lua,
 	/* .dump_plain = */ NULL,
 	/* .destroy = */ port_sql_destroy,
 };
