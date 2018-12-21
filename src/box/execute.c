@@ -555,22 +555,29 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 }
 
 int
-sql_response_dump(struct sql_response *response, int *keys, struct obuf *out)
+sql_response_dump(struct sql_response *response, struct obuf *out)
 {
 	sqlite3 *db = sql_get();
 	struct sqlite3_stmt *stmt = (struct sqlite3_stmt *) response->prep_stmt;
 	struct port_tuple *port_tuple = (struct port_tuple *) &response->port;
 	int rc = 0, column_count = sqlite3_column_count(stmt);
 	if (column_count > 0) {
+		int keys = 2;
+		int size = mp_sizeof_map(keys);
+		char *pos = (char *) obuf_alloc(out, size);
+		if (pos == NULL) {
+			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
+			goto err;
+		}
+		pos = mp_encode_map(pos, keys);
 		if (sql_get_description(stmt, out, column_count) != 0) {
 err:
 			rc = -1;
 			goto finish;
 		}
-		*keys = 2;
-		int size = mp_sizeof_uint(IPROTO_DATA) +
-			   mp_sizeof_array(port_tuple->size);
-		char *pos = (char *) obuf_alloc(out, size);
+		size = mp_sizeof_uint(IPROTO_DATA) +
+		       mp_sizeof_array(port_tuple->size);
+		pos = (char *) obuf_alloc(out, size);
 		if (pos == NULL) {
 			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 			goto err;
@@ -586,18 +593,20 @@ err:
 			goto err;
 		}
 	} else {
-		*keys = 1;
+		int keys = 1;
 		assert(port_tuple->size == 0);
 		struct stailq *autoinc_id_list =
 			vdbe_autoinc_id_list((struct Vdbe *)stmt);
 		uint32_t map_size = stailq_empty(autoinc_id_list) ? 1 : 2;
-		int size = mp_sizeof_uint(IPROTO_SQL_INFO) +
+		int size = mp_sizeof_map(keys) +
+			   mp_sizeof_uint(IPROTO_SQL_INFO) +
 			   mp_sizeof_map(map_size);
 		char *pos = (char *) obuf_alloc(out, size);
 		if (pos == NULL) {
 			diag_set(OutOfMemory, size, "obuf_alloc", "pos");
 			goto err;
 		}
+		pos = mp_encode_map(pos, keys);
 		pos = mp_encode_uint(pos, IPROTO_SQL_INFO);
 		pos = mp_encode_map(pos, map_size);
 		uint64_t id_count = 0;

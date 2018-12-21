@@ -52,12 +52,6 @@ enum {
 	IPROTO_HEADER_LEN = 28,
 	/** 7 = sizeof(iproto_body_bin). */
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
-	/**
-	 * Header of message + header of body with one or two
-	 * keys: IPROTO_DATA and IPROTO_METADATA or
-	 * IPROTO_SQL_INFO. 1 == mp_sizeof_map(<=15).
-	 */
-	IPROTO_SQL_HEADER_LEN = IPROTO_HEADER_LEN + 1,
 };
 
 struct xrow_header {
@@ -491,11 +485,10 @@ xrow_decode_sql(const struct xrow_header *row, struct sql_request *request);
  * @param svp Savepoint of the header beginning.
  * @param sync Request sync.
  * @param schema_version Schema version.
- * @param keys Count of keys in the body.
  */
 void
 iproto_reply_sql(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		 uint32_t schema_version, int keys);
+		 uint32_t schema_version);
 
 /**
  * Write an IPROTO_CHUNK header from a specified position in a

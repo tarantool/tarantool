@@ -508,17 +508,11 @@ error:
 
 void
 iproto_reply_sql(struct obuf *buf, struct obuf_svp *svp, uint64_t sync,
-		 uint32_t schema_version, int keys)
+		 uint32_t schema_version)
 {
 	char *pos = (char *) obuf_svp_to_ptr(buf, svp);
 	iproto_header_encode(pos, IPROTO_OK, sync, schema_version,
 			     obuf_size(buf) - svp->used - IPROTO_HEADER_LEN);
-	/*
-	 * MessagePack encodes value <= 15 as
-	 * bitwise OR with 0x80.
-	 */
-	assert(keys <= 15);
-	*(pos + IPROTO_HEADER_LEN) = 0x80 | keys;
 }
 
 void
