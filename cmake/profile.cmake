@@ -1,4 +1,6 @@
-check_library_exists (gcov __gcov_flush  ""  HAVE_GCOV)
+set(CMAKE_REQUIRED_FLAGS "-fprofile-arcs -ftest-coverage")
+check_library_exists("" __gcov_flush "" HAVE_GCOV)
+set(CMAKE_REQUIRED_FLAGS "")
 
 set(ENABLE_GCOV_DEFAULT OFF)
 option(ENABLE_GCOV "Enable integration with gcov, a code coverage program" ${ENABLE_GCOV_DEFAULT})
