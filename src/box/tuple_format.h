@@ -125,7 +125,7 @@ struct tuple_field {
  * @retval boolean nullability attribute
  */
 static inline bool
-tuple_field_is_nullable(const struct tuple_field *tuple_field)
+tuple_field_is_nullable(struct tuple_field *tuple_field)
 {
 	return tuple_field->nullable_action == ON_CONFLICT_ACTION_NONE;
 }
@@ -188,7 +188,7 @@ struct tuple_format {
  * a given format.
  */
 static inline uint32_t
-tuple_format_field_count(const struct tuple_format *format)
+tuple_format_field_count(struct tuple_format *format)
 {
 	const struct json_token *root = &format->fields.root;
 	return root->children != NULL ? root->max_child_idx + 1 : 0;
@@ -212,7 +212,7 @@ tuple_format_field(struct tuple_format *format, uint32_t fieldno)
 extern struct tuple_format **tuple_formats;
 
 static inline uint32_t
-tuple_format_id(const struct tuple_format *format)
+tuple_format_id(struct tuple_format *format)
 {
 	assert(tuple_formats[format->id] == format);
 	return format->id;
@@ -340,7 +340,7 @@ box_tuple_format_unref(box_tuple_format_t *format);
  * tuple + off_i = indexed_field_i;
  */
 int
-tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
+tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple, bool validate);
 
 /**
@@ -355,7 +355,7 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
  * @sa tuple_init_field_map()
  */
 static inline const char *
-tuple_field_raw(const struct tuple_format *format, const char *tuple,
+tuple_field_raw(struct tuple_format *format, const char *tuple,
 		const uint32_t *field_map, uint32_t field_no)
 {
 	if (likely(field_no < format->index_field_count)) {
@@ -366,9 +366,8 @@ tuple_field_raw(const struct tuple_format *format, const char *tuple,
 			return tuple;
 		}
 
-		int32_t offset_slot =
-			tuple_format_field((struct tuple_format *)format,
-					   field_no)->offset_slot;
+		int32_t offset_slot = tuple_format_field(format,
+					field_no)->offset_slot;
 		if (offset_slot != TUPLE_OFFSET_SLOT_NIL) {
 			if (field_map[offset_slot] != 0)
 				return tuple + field_map[offset_slot];
@@ -437,7 +436,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
  * @retval Field data if the field exists or NULL.
  */
 static inline const char *
-tuple_field_by_part_raw(const struct tuple_format *format, const char *data,
+tuple_field_by_part_raw(struct tuple_format *format, const char *data,
 			const uint32_t *field_map, struct key_part *part)
 {
 	return tuple_field_raw(format, data, field_map, part->fieldno);

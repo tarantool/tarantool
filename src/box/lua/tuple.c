@@ -296,7 +296,7 @@ lbox_tuple_to_map(struct lua_State *L)
 	}
 
 	const struct tuple *tuple = lua_checktuple(L, 1);
-	const struct tuple_format *format = tuple_format(tuple);
+	struct tuple_format *format = tuple_format(tuple);
 	const char *pos = tuple_data(tuple);
 	int field_count = (int)mp_decode_array(&pos);
 	int n_named = format->dict->name_count;

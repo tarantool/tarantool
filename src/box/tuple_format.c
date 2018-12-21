@@ -387,8 +387,7 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 	uint32_t format1_field_count = tuple_format_field_count(format1);
 	uint32_t format2_field_count = tuple_format_field_count(format2);
 	for (uint32_t i = 0; i < format1_field_count; ++i) {
-		const struct tuple_field *field1 =
-			tuple_format_field(format1, i);
+		struct tuple_field *field1 = tuple_format_field(format1, i);
 		/*
 		 * The field has a data type in format1, but has
 		 * no data type in format2.
@@ -409,8 +408,7 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 			else
 				return false;
 		}
-		const struct tuple_field *field2 =
-			tuple_format_field(format2, i);
+		struct tuple_field *field2 = tuple_format_field(format2, i);
 		if (! field_type1_contains_type2(field1->type, field2->type))
 			return false;
 		/*
@@ -426,7 +424,7 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 
 /** @sa declaration for details. */
 int
-tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
+tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple, bool validate)
 {
 	if (tuple_format_field_count(format) == 0)
@@ -452,8 +450,7 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 
 	/* first field is simply accessible, so we do not store offset to it */
 	enum mp_type mp_type = mp_typeof(*pos);
-	const struct tuple_field *field =
-		tuple_format_field((struct tuple_format *)format, 0);
+	struct tuple_field *field = tuple_format_field(format, 0);
 	if (validate &&
 	    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,
 				 TUPLE_INDEX_BASE, tuple_field_is_nullable(field)))
@@ -473,7 +470,7 @@ tuple_init_field_map(const struct tuple_format *format, uint32_t *field_map,
 		       format->field_map_size);
 	}
 	for (; i < defined_field_count; ++i) {
-		field = tuple_format_field((struct tuple_format *)format, i);
+		field = tuple_format_field(format, i);
 		mp_type = mp_typeof(*pos);
 		if (validate &&
 		    key_mp_type_validate(field->type, mp_type, ER_FIELD_TYPE,

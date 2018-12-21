@@ -493,8 +493,8 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	}
 
 	bool was_null_met = false;
-	const struct tuple_format *format_a = tuple_format(tuple_a);
-	const struct tuple_format *format_b = tuple_format(tuple_b);
+	struct tuple_format *format_a = tuple_format(tuple_a);
+	struct tuple_format *format_b = tuple_format(tuple_b);
 	const uint32_t *field_map_a = tuple_field_map(tuple_a);
 	const uint32_t *field_map_b = tuple_field_map(tuple_b);
 	struct key_part *end;
@@ -585,7 +585,7 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 	assert(key != NULL || part_count == 0);
 	assert(part_count <= key_def->part_count);
 	struct key_part *part = key_def->parts;
-	const struct tuple_format *format = tuple_format(tuple);
+	struct tuple_format *format = tuple_format(tuple);
 	const char *tuple_raw = tuple_data(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
 	enum mp_type a_type, b_type;
@@ -900,8 +900,8 @@ struct FieldCompare<IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 {
 	inline static int compare(const struct tuple *tuple_a,
 				  const struct tuple *tuple_b,
-				  const struct tuple_format *format_a,
-				  const struct tuple_format *format_b,
+				  struct tuple_format *format_a,
+				  struct tuple_format *format_b,
 				  const char *field_a,
 				  const char *field_b)
 	{
@@ -932,8 +932,8 @@ struct FieldCompare<IDX, TYPE>
 {
 	inline static int compare(const struct tuple *,
 				  const struct tuple *,
-				  const struct tuple_format *,
-				  const struct tuple_format *,
+				  struct tuple_format *,
+				  struct tuple_format *,
 				  const char *field_a,
 				  const char *field_b)
 	{
@@ -1121,7 +1121,7 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 	inline static int
 	compare(const struct tuple *tuple, const char *key,
 		uint32_t part_count, struct key_def *key_def,
-		const struct tuple_format *format, const char *field)
+		struct tuple_format *format, const char *field)
 	{
 		int r;
 		/* static if */
@@ -1149,7 +1149,7 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE> {
 				  const char *key,
 				  uint32_t,
 				  struct key_def *,
-				  const struct tuple_format *,
+				  struct tuple_format *,
 				  const char *field)
 	{
 		return field_compare_with_key<TYPE>(&field, &key);

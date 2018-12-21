@@ -111,7 +111,7 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 	const char *data = tuple_data(tuple);
 	uint32_t part_count = key_def->part_count;
 	uint32_t bsize = mp_sizeof_array(part_count);
-	const struct tuple_format *format = tuple_format(tuple);
+	struct tuple_format *format = tuple_format(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
 	const char *tuple_end = data + tuple->bsize;
 
