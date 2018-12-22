@@ -339,8 +339,8 @@ lookupName(Parse * pParse,	/* The parsing context */
 				if (iCol < (int)pTab->def->field_count) {
 					cnt++;
 					if (iCol < 0) {
-						pExpr->affinity =
-							AFFINITY_INTEGER;
+						pExpr->type =
+							FIELD_TYPE_INTEGER;
 					} else if (pExpr->iTable == 0) {
 						testcase(iCol == 31);
 						testcase(iCol == 32);
@@ -637,8 +637,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 			} else {
 				is_agg = pDef->xFinalize != 0;
-				pExpr->affinity =
-					sql_field_type_to_affinity(pDef->ret_type);
+				pExpr->type = pDef->ret_type;
 				if (pDef->funcFlags & SQLITE_FUNC_UNLIKELY) {
 					ExprSetProperty(pExpr,
 							EP_Unlikely | EP_Skip);

@@ -323,11 +323,10 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 	if (pExpr) {
 		if (iCol >= 0) {
 			pExpr->iTable = regBase + iCol + 1;
-			char affinity = pTab->def->fields[iCol].affinity;
-			pExpr->affinity = affinity;
+			pExpr->type = pTab->def->fields[iCol].type;
 		} else {
 			pExpr->iTable = regBase;
-			pExpr->affinity = AFFINITY_INTEGER;
+			pExpr->type = FIELD_TYPE_INTEGER;
 		}
 	}
 	return pExpr;

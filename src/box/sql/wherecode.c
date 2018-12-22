@@ -422,10 +422,11 @@ updateRangeAffinityStr(Expr * pRight,	/* RHS of comparison */
 {
 	int i;
 	for (i = 0; i < n; i++) {
+		enum field_type type = sql_affinity_to_field_type(zAff[i]);
 		Expr *p = sqlite3VectorFieldSubexpr(pRight, i);
-		enum affinity_type aff = sqlite3ExprAffinity(p);
-		if (sql_affinity_result(aff, zAff[i]) == AFFINITY_BLOB
-		    || sqlite3ExprNeedsNoAffinityChange(p, zAff[i])) {
+		enum field_type expr_type = sql_expr_type(p);
+		if (sql_type_result(expr_type, type) == FIELD_TYPE_SCALAR ||
+		    sql_expr_needs_no_type_change(p, type)) {
 			zAff[i] = AFFINITY_BLOB;
 		}
 	}
@@ -777,16 +778,16 @@ codeAllEqualityTerms(Parse * pParse,	/* Parsing context */
 				VdbeCoverage(v);
 			}
 			if (zAff) {
-				enum affinity_type aff =
-					sqlite3ExprAffinity(pRight);
-				if (sql_affinity_result(aff, zAff[j]) ==
-				    AFFINITY_BLOB) {
+				enum field_type type =
+					sql_expr_type(pRight);
+				enum field_type idx_type =
+					sql_affinity_to_field_type(zAff[j]);
+				if (sql_type_result(type, idx_type) ==
+				    FIELD_TYPE_SCALAR) {
 					zAff[j] = AFFINITY_BLOB;
 				}
-				if (sqlite3ExprNeedsNoAffinityChange
-				    (pRight, zAff[j])) {
+				if (sql_expr_needs_no_type_change(pRight, idx_type))
 					zAff[j] = AFFINITY_BLOB;
-				}
 			}
 		}
 	}
@@ -1165,20 +1166,12 @@ sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about t
 		}
 		struct index_def *idx_pk = space->index[0]->def;
 		int fieldno = idx_pk->key_def->parts[0].fieldno;
-		char affinity = is_format_set ?
-				space->def->fields[fieldno].affinity :
-				AFFINITY_BLOB;
-		if (affinity == AFFINITY_UNDEFINED) {
-			if (idx_pk->key_def->part_count == 1 &&
-			    space->def->fields[fieldno].type ==
-			    FIELD_TYPE_INTEGER)
-				affinity = AFFINITY_INTEGER;
-			else
-				affinity = AFFINITY_BLOB;
-		}
+		enum field_type fd_type = is_format_set ?
+					  space->def->fields[fieldno].type :
+					  FIELD_TYPE_SCALAR;
 
 		uint32_t pk_part_count = idx_pk->key_def->part_count;
-		if (pk_part_count == 1 && affinity == AFFINITY_INTEGER) {
+		if (pk_part_count == 1 && fd_type == FIELD_TYPE_INTEGER) {
 			/* Right now INTEGER PRIMARY KEY is the only option to
 			 * get Tarantool's INTEGER column type. Need special handling
 			 * here: try to loosely convert FLOAT to INT. If RHS type

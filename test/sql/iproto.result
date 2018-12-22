@@ -850,7 +850,7 @@ cn:execute('select * from "test"')
 ---
 - metadata:
   - name: id
-    type: UNKNOWN
+    type: INTEGER
   - name: x
     type: UNKNOWN
   rows:

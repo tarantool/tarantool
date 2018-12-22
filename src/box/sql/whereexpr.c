@@ -269,7 +269,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	pLeft = pList->a[1].pExpr;
 	/* Value might be numeric */
 	if (pLeft->op != TK_COLUMN ||
-	    sqlite3ExprAffinity(pLeft) != AFFINITY_TEXT) {
+	    sql_expr_type(pLeft) != FIELD_TYPE_STRING) {
 		/* IMP: R-02065-49465 The left-hand side of the
 		 * LIKE operator must be the name of an indexed
 		 * column with TEXT affinity.
@@ -748,19 +748,18 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				} else if (pOrTerm->u.leftColumn != iColumn) {
 					okToChngToIN = 0;
 				} else {
-					int affLeft, affRight;
 					/* If the right-hand side is also a column, then the affinities
 					 * of both right and left sides must be such that no type
 					 * conversions are required on the right.  (Ticket #2249)
 					 */
-					affRight =
-					    sqlite3ExprAffinity(pOrTerm->pExpr->
-								pRight);
-					affLeft =
-					    sqlite3ExprAffinity(pOrTerm->pExpr->
-								pLeft);
-					if (affRight != 0
-					    && affRight != affLeft) {
+					enum field_type rhs =
+						sql_expr_type(pOrTerm->pExpr->
+							pRight);
+					enum field_type lhs =
+						sql_expr_type(pOrTerm->pExpr->
+							pLeft);
+					if (rhs != FIELD_TYPE_SCALAR &&
+					    rhs != lhs) {
 						okToChngToIN = 0;
 					} else {
 						pOrTerm->wtFlags |= TERM_OR_OK;
@@ -836,21 +835,17 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 static int
 termIsEquivalence(Parse * pParse, Expr * pExpr)
 {
-	char aff1, aff2;
 	if (!OptimizationEnabled(pParse->db, SQLITE_Transitive))
 		return 0;
 	if (pExpr->op != TK_EQ)
 		return 0;
 	if (ExprHasProperty(pExpr, EP_FromJoin))
 		return 0;
-	aff1 = sqlite3ExprAffinity(pExpr->pLeft);
-	aff2 = sqlite3ExprAffinity(pExpr->pRight);
-	if (aff1 != aff2
-	    && (!sqlite3IsNumericAffinity(aff1)
-		|| !sqlite3IsNumericAffinity(aff2))
-	    ) {
+	enum field_type lhs_type = sql_expr_type(pExpr->pLeft);
+	enum field_type rhs_type = sql_expr_type(pExpr->pRight);
+	if (lhs_type != rhs_type && (!sql_type_is_numeric(lhs_type) ||
+				     !sql_type_is_numeric(rhs_type)))
 		return 0;
-	}
 	uint32_t unused;
 	struct coll *coll1 =
 	    sql_binary_compare_coll_seq(pParse, pExpr->pLeft, pExpr->pRight,

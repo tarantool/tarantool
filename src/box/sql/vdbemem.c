@@ -1281,11 +1281,10 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 	assert((pExpr->flags & EP_TokenOnly) == 0 || pCtx == 0);
 
 	if (op == TK_CAST) {
-		u8 aff = pExpr->affinity;
-		rc = valueFromExpr(db, pExpr->pLeft, aff, ppVal, pCtx);
+		rc = valueFromExpr(db, pExpr->pLeft, pExpr->type, ppVal, pCtx);
 		testcase(rc != SQLITE_OK);
 		if (*ppVal) {
-			sqlite3VdbeMemCast(*ppVal, aff);
+			sqlite3VdbeMemCast(*ppVal, pExpr->type);
 			sqlite3ValueApplyAffinity(*ppVal, type);
 		}
 		return rc;
@@ -1572,17 +1571,14 @@ sqlite3Stat4ProbeSetValue(Parse * pParse,	/* Parse context */
 		alloc.pIdx = idx;
 		alloc.ppRec = ppRec;
 
-		struct space *space = space_by_id(idx->space_id);
-		assert(space != NULL);
 		for (i = 0; i < nElem; i++) {
 			sqlite3_value *pVal = 0;
 			Expr *pElem =
 			    (pExpr ? sqlite3VectorFieldSubexpr(pExpr, i) : 0);
-			u8 aff = sql_space_index_part_affinity(space->def, idx,
-							       iVal + i);
+			enum field_type type =
+				idx->key_def->parts[iVal + i].type;
 			alloc.iVal = iVal + i;
-			aff = sql_affinity_to_field_type(aff);
-			rc = stat4ValueFromExpr(pParse, pElem, aff, &alloc,
+			rc = stat4ValueFromExpr(pParse, pElem, type, &alloc,
 						&pVal);
 			if (!pVal)
 				break;

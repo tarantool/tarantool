@@ -818,16 +818,28 @@ idlist(A) ::= nm(Y).
       memset(p, 0, sizeof(Expr));
       switch (op) {
       case TK_STRING:
-        p->affinity = AFFINITY_TEXT;
+        p->type = FIELD_TYPE_STRING;
         break;
       case TK_BLOB:
-        p->affinity = AFFINITY_BLOB;
+        p->type = FIELD_TYPE_SCALAR;
         break;
       case TK_INTEGER:
-        p->affinity = AFFINITY_INTEGER;
+        p->type = FIELD_TYPE_INTEGER;
         break;
       case TK_FLOAT:
-        p->affinity = AFFINITY_REAL;
+        p->type = FIELD_TYPE_NUMBER;
+        break;
+      case TK_VARIABLE:
+        /*
+         * For variables we set BOOLEAN type since
+         * unassigned bindings will be replaced
+         * with NULL automatically, i.e. without
+         * explicit call of sql_bind_value().
+         */
+        p->type = FIELD_TYPE_BOOLEAN;
+        break;
+      default:
+        p->type = FIELD_TYPE_SCALAR;
         break;
       }
       p->op = (u8)op;
@@ -865,7 +877,7 @@ term(A) ::= FLOAT|BLOB(X). {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= STRING(X).     {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= INTEGER(X). {
   A.pExpr = sqlite3ExprAlloc(pParse->db, TK_INTEGER, &X, 1);
-  A.pExpr->affinity = AFFINITY_INTEGER;
+  A.pExpr->type = FIELD_TYPE_INTEGER;
   A.zStart = X.z;
   A.zEnd = X.z + X.n;
   if( A.pExpr ) A.pExpr->flags |= EP_Leaf;
@@ -898,7 +910,7 @@ expr(A) ::= expr(A) COLLATE id(C). {
 expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
   A.pExpr = sqlite3ExprAlloc(pParse->db, TK_CAST, 0, 1);
-  A.pExpr->affinity = sql_field_type_to_affinity(T.type);
+  A.pExpr->type = T.type;
   sqlite3ExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
 }
 %endif  SQLITE_OMIT_CAST

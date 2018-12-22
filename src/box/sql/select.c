@@ -1432,8 +1432,7 @@ sql_expr_list_to_key_info(struct Parse *parse, struct ExprList *list, int start)
 		sql_expr_coll(parse, item->pExpr, &unused, &id);
 		part->coll_id = id;
 		part->sort_order = item->sort_order;
-		enum affinity_type aff = sqlite3ExprAffinity(item->pExpr);
-		part->type = sql_affinity_to_field_type(aff);
+		part->type = sql_expr_type(item->pExpr);
 	}
 	return key_info;
 }
@@ -1729,38 +1728,31 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 		p = pEList->a[i].pExpr;
 		if (NEVER(p == 0))
 			continue;
-		switch (p->affinity) {
-		case AFFINITY_INTEGER:
+		switch (p->type) {
+		case FIELD_TYPE_INTEGER:
 			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "INTEGER",
 					      SQLITE_TRANSIENT);
 			break;
-		case AFFINITY_REAL:
+		case FIELD_TYPE_NUMBER:
 			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "NUMERIC",
 					      SQLITE_TRANSIENT);
 			break;
-		case AFFINITY_TEXT:
+		case FIELD_TYPE_STRING:
 			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "TEXT",
 					      SQLITE_TRANSIENT);
 			break;
-		case AFFINITY_BLOB:
+		case FIELD_TYPE_SCALAR:
 			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "BLOB",
 					      SQLITE_TRANSIENT);
 			break;
-		default: ;
-			char *type;
-			/*
-			 * For variables we set BOOLEAN type since
-			 * unassigned bindings will be replaced
-			 * with NULL automatically, i.e. without
-			 * explicit call of sql_bind_value().
-			 */
-			if (p->op == TK_VARIABLE) {
+		case FIELD_TYPE_BOOLEAN:
+			if (p->op == TK_VARIABLE)
 				var_pos[var_count++] = i;
-				type = "BOOLEAN";
-			} else {
-				type = "UNKNOWN";
-			}
-			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, type,
+			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "BOOLEAN",
+					      SQLITE_TRANSIENT);
+			break;
+		default:
+			sqlite3VdbeSetColName(v, i, COLNAME_DECLTYPE, "UNKNOWN",
 					      SQLITE_TRANSIENT);
 		}
 		if (pEList->a[i].zName) {
@@ -1976,11 +1968,9 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	a = pSelect->pEList->a;
 	for (uint32_t i = 0; i < pTab->def->field_count; i++) {
 		p = a[i].pExpr;
-		char affinity = sqlite3ExprAffinity(p);
-		if (affinity == 0)
-			affinity = AFFINITY_BLOB;
-		pTab->def->fields[i].affinity = affinity;
-		pTab->def->fields[i].type = sql_affinity_to_field_type(affinity);
+		enum field_type type = sql_expr_type(p);
+		pTab->def->fields[i].affinity = sql_field_type_to_affinity(type);
+		pTab->def->fields[i].type = type;
 		bool is_found;
 		uint32_t coll_id;
 

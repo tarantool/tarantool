@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(9)
+test:plan(12)
 
 test:do_test(
     "lua-tables-prepare-1",
@@ -123,5 +123,41 @@ test:do_execsql_test(
     "lua-tables-9",
     [[SELECT * FROM "t" INDEXED BY "i"]],
     {1, 4, 2, 2, 3, 3, 4, 3})
+
+-- gh-3886: indexes created from Lua are visible
+-- to query optimizer.
+--
+test:do_test(
+    "lua-tables-prepare-10",
+    function()
+        sp = box.schema.space.create("TEST", {
+            engine = 'memtx',
+            format = {
+                { name = 'ID', type = 'unsigned' },
+                { name = 'A', type = 'unsigned' }
+            }})
+        sp:create_index('primary', {parts = {1, 'unsigned' } })
+        sp:create_index('secondary', {parts = {2, 'unsigned' } })
+        sp:insert({1,1})
+        sp:insert({2,2})
+        sp:insert({3,3})
+    end,
+    {})
+
+test:do_eqp_test(
+    11,
+    [[
+        SELECT * FROM test WHERE id = 2;
+    ]], {
+        {0, 0, 0, 'SEARCH TABLE TEST USING PRIMARY KEY (ID=?)'}
+    })
+
+test:do_eqp_test(
+    12,
+    [[
+        SELECT * FROM test WHERE a = 5;
+    ]], {
+        {0, 0, 0, 'SEARCH TABLE TEST USING COVERING INDEX secondary (A=?)'}
+    })
 
 test:finish_test()

@@ -298,7 +298,9 @@ whereScanNext(WhereScan * pScan)
 						/* Verify the affinity and collating sequence match */
 						if ((pTerm->eOperator & WO_ISNULL) == 0) {
 							pX = pTerm->pExpr;
-							if (!sqlite3IndexAffinityOk(pX, pScan->idxaff))
+							enum field_type expr_type =
+								expr_cmp_mutual_type(pX);
+							if (!field_type1_contains_type2(expr_type, pScan->idx_type))
 								continue;
 							if (pScan->is_column_seen) {
 								Parse *pParse =
@@ -367,7 +369,7 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 	pScan->pOrigWC = pWC;
 	pScan->pWC = pWC;
 	pScan->pIdxExpr = 0;
-	pScan->idxaff = 0;
+	pScan->idx_type = FIELD_TYPE_SCALAR;
 	pScan->coll = NULL;
 	pScan->is_column_seen = false;
 	if (idx_def != NULL) {
@@ -380,10 +382,8 @@ whereScanInit(WhereScan * pScan,	/* The WhereScan object being initialized */
 			iColumn = idx_def->key_def->parts[iColumn].fieldno;
 			struct space *sp = space_by_id(idx_def->space_id);
 			assert(sp != NULL);
-			if (sp->def->field_count == 0)
-				pScan->idxaff = AFFINITY_BLOB;
-			else
-				pScan->idxaff = sp->def->fields[iColumn].affinity;
+			if (sp->def->field_count != 0)
+				pScan->idx_type = sp->def->fields[iColumn].type;
 			pScan->coll = idx_def->key_def->parts[j].coll;
 			pScan->is_column_seen = true;
 		} else {
@@ -424,13 +424,13 @@ where_scan_init(struct WhereScan *scan, struct WhereClause *clause,
 	scan->pOrigWC = clause;
 	scan->pWC = clause;
 	scan->pIdxExpr = NULL;
-	scan->idxaff = 0;
+	scan->idx_type = FIELD_TYPE_SCALAR;
 	scan->coll = NULL;
 	scan->is_column_seen = false;
 	if (key_def != NULL) {
 		int j = column;
 		column = key_def->parts[j].fieldno;
-		scan->idxaff = space_def->fields[column].affinity;
+		scan->idx_type = space_def->fields[column].type;
 		uint32_t coll_id = space_def->fields[column].coll_id;
 		struct coll_id *coll = coll_by_id(coll_id);
 		scan->coll = coll != NULL ? coll->coll : NULL;
@@ -692,7 +692,6 @@ termCanDriveIndex(WhereTerm * pTerm,	/* WHERE clause term to check */
 		  Bitmask notReady	/* Tables in outer loops of the join */
     )
 {
-	char aff;
 	if (pTerm->leftCursor != pSrc->iCursor)
 		return 0;
 	if ((pTerm->eOperator & WO_EQ) == 0)
@@ -701,8 +700,9 @@ termCanDriveIndex(WhereTerm * pTerm,	/* WHERE clause term to check */
 		return 0;
 	if (pTerm->u.leftColumn < 0)
 		return 0;
-	aff = pSrc->pTab->aCol[pTerm->u.leftColumn].affinity;
-	if (!sqlite3IndexAffinityOk(pTerm->pExpr, aff))
+	enum field_type type = pSrc->pTab->def->fields[pTerm->u.leftColumn].type;
+	enum field_type expr_type = expr_cmp_mutual_type(pTerm->pExpr);
+	if (!field_type1_contains_type2(expr_type, type))
 		return 0;
 	return 1;
 }
@@ -2261,8 +2261,6 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		/* Test if comparison i of pTerm is compatible with column (i+nEq)
 		 * of the index. If not, exit the loop.
 		 */
-		char aff;	/* Comparison affinity */
-		char idxaff = 0;	/* Indexed columns affinity */
 		struct coll *pColl;	/* Comparison collation sequence */
 		Expr *pLhs = pTerm->pExpr->pLeft->x.pList->a[i].pExpr;
 		Expr *pRhs = pTerm->pExpr->pRight;
@@ -2282,11 +2280,12 @@ whereRangeVectorLen(Parse * pParse,	/* Parsing context */
 		    pLhs->iColumn != (int)parts[i + nEq].fieldno ||
 		    parts[i + nEq].sort_order != parts[nEq].sort_order)
 			break;
-		enum affinity_type rhs_aff = sqlite3ExprAffinity(pRhs);
-		aff = sql_affinity_result(rhs_aff, sqlite3ExprAffinity(pLhs));
-		idxaff =
-		    sqlite3TableColumnAffinity(space->def, pLhs->iColumn);
-		if (aff != idxaff)
+		enum field_type rhs_type = sql_expr_type(pRhs);
+		enum field_type type =
+			sql_type_result(rhs_type, sql_expr_type(pLhs));
+		enum field_type idx_type = pLhs->iColumn >= 0 ?
+			space->def->fields[pLhs->iColumn].type : FIELD_TYPE_INTEGER;
+		if (type != idx_type)
 			break;
 		uint32_t unused;
 		pColl = sql_binary_compare_coll_seq(pParse, pLhs, pRhs, &unused);

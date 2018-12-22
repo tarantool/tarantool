@@ -45,32 +45,8 @@ static void exprCodeBetween(Parse *, Expr *, int,
 			    void (*)(Parse *, Expr *, int, int), int);
 static int exprCodeVector(Parse * pParse, Expr * p, int *piToFree);
 
-char
-sqlite3TableColumnAffinity(struct space_def *def, int idx)
-{
-	assert(idx < (int)def->field_count);
-	return idx >= 0 ? def->fields[idx].affinity :
-	       AFFINITY_INTEGER;
-}
-
-/*
- * Return the 'affinity' of the expression pExpr if any.
- *
- * If pExpr is a column, a reference to a column via an 'AS' alias,
- * or a sub-select with a column as the return value, then the
- * affinity of that column is returned. Otherwise, 0x00 is returned,
- * indicating no affinity for the expression.
- *
- * i.e. the WHERE clause expressions in the following statements all
- * have an affinity:
- *
- * CREATE TABLE t1(a);
- * SELECT * FROM t1 WHERE a;
- * SELECT a AS b FROM t1 WHERE b;
- * SELECT * FROM t1 WHERE (select a from t1);
- */
-char
-sqlite3ExprAffinity(Expr * pExpr)
+enum field_type
+sql_expr_type(struct Expr *pExpr)
 {
 	pExpr = sqlite3ExprSkipCollate(pExpr);
 	uint8_t op = pExpr->op;
@@ -81,27 +57,46 @@ sqlite3ExprAffinity(Expr * pExpr)
 	case TK_SELECT:
 		assert(pExpr->flags & EP_xIsSelect);
 		el = pExpr->x.pSelect->pEList;
-		return sqlite3ExprAffinity(el->a[0].pExpr);
+		return sql_expr_type(el->a[0].pExpr);
 	case TK_CAST:
 		assert(!ExprHasProperty(pExpr, EP_IntValue));
-		return pExpr->affinity;
+		return pExpr->type;
 	case TK_AGG_COLUMN:
 	case TK_COLUMN:
+	case TK_TRIGGER:
 		assert(pExpr->iColumn >= 0);
-		return sqlite3TableColumnAffinity(pExpr->space_def,
-						  pExpr->iColumn);
+		return pExpr->space_def->fields[pExpr->iColumn].type;
 	case TK_SELECT_COLUMN:
 		assert(pExpr->pLeft->flags & EP_xIsSelect);
 		el = pExpr->pLeft->x.pSelect->pEList;
-		return sqlite3ExprAffinity(el->a[pExpr->iColumn].pExpr);
+		return sql_expr_type(el->a[pExpr->iColumn].pExpr);
 	case TK_PLUS:
 	case TK_MINUS:
 	case TK_STAR:
 	case TK_SLASH:
+	case TK_REM:
+	case TK_BITAND:
+	case TK_BITOR:
+	case TK_LSHIFT:
+	case TK_RSHIFT:
 		assert(pExpr->pRight != NULL && pExpr->pLeft != NULL);
-		enum affinity_type lhs_aff = sqlite3ExprAffinity(pExpr->pLeft);
-		enum affinity_type rhs_aff = sqlite3ExprAffinity(pExpr->pRight);
-		return sql_affinity_result(rhs_aff, lhs_aff);
+		enum field_type lhs_type = sql_expr_type(pExpr->pLeft);
+		enum field_type rhs_type = sql_expr_type(pExpr->pRight);
+		return sql_type_result(rhs_type, lhs_type);
+	case TK_CONCAT:
+		return FIELD_TYPE_STRING;
+	case TK_CASE:
+		assert(pExpr->x.pList->nExpr >= 2);
+		/*
+		 * CASE expression comes at least with one
+		 * WHEN and one THEN clauses. So, first
+		 * expression always represents WHEN
+		 * argument, and the second one - THEN.
+		 *
+		 * TODO: We must ensure that all THEN clauses
+		 * have arguments of the same type.
+		 */
+		return sql_expr_type(pExpr->x.pList->a[1].pExpr);
 	case TK_LT:
 	case TK_GT:
 	case TK_EQ:
@@ -111,22 +106,19 @@ sqlite3ExprAffinity(Expr * pExpr)
 	case TK_AND:
 	case TK_OR:
 		/*
-		 * FIXME: should be changed to BOOL type or
-		 * affinity when it is implemented. Now simply
+		 * FIXME: should be changed to BOOL type
+		 * when it is implemented. Now simply
 		 * return INTEGER.
 		 */
-		return AFFINITY_INTEGER;
-	}
-	/*
-	 * In case of unary plus we shouldn't discard
-	 * affinity of operand (since plus always features
-	 * NUMERIC affinity).
-	 */
-	if (op == TK_UPLUS) {
+		return FIELD_TYPE_INTEGER;
+	case TK_UMINUS:
+	case TK_UPLUS:
+	case TK_NO:
+	case TK_BITNOT:
 		assert(pExpr->pRight == NULL);
-		return pExpr->pLeft->affinity;
+		return sql_expr_type(pExpr->pLeft);
 	}
-	return pExpr->affinity;
+	return pExpr->type;
 }
 
 /*
@@ -252,76 +244,35 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id)
 	return coll;
 }
 
-enum affinity_type
-sql_affinity_result(enum affinity_type aff1, enum affinity_type aff2)
+enum field_type
+sql_type_result(enum field_type lhs, enum field_type rhs)
 {
-	if (aff1 && aff2) {
-		/* Both sides of the comparison are columns. If one has numeric
-		 * affinity, use that. Otherwise use no affinity.
-		 */
-		if (sqlite3IsNumericAffinity(aff1)
-		    || sqlite3IsNumericAffinity(aff2)) {
-			return AFFINITY_REAL;
-		} else {
-			return AFFINITY_BLOB;
-		}
-	} else if (!aff1 && !aff2) {
-		/* Neither side of the comparison is a column.  Compare the
-		 * results directly.
-		 */
-		return AFFINITY_BLOB;
-	} else {
-		/* One side is a column, the other is not. Use the columns affinity. */
-		assert(aff1 == 0 || aff2 == 0);
-		return (aff1 + aff2);
-	}
+	if (sql_type_is_numeric(lhs) || sql_type_is_numeric(rhs))
+		return FIELD_TYPE_NUMBER;
+	return FIELD_TYPE_SCALAR;
 }
 
-/*
- * pExpr is a comparison operator.  Return the type affinity that should
- * be applied to both operands prior to doing the comparison.
- */
-static char
-comparisonAffinity(Expr * pExpr)
+enum field_type
+expr_cmp_mutual_type(struct Expr *pExpr)
 {
-	char aff;
 	assert(pExpr->op == TK_EQ || pExpr->op == TK_IN || pExpr->op == TK_LT ||
 	       pExpr->op == TK_GT || pExpr->op == TK_GE || pExpr->op == TK_LE ||
 	       pExpr->op == TK_NE);
 	assert(pExpr->pLeft);
-	aff = sqlite3ExprAffinity(pExpr->pLeft);
+	enum field_type type = sql_expr_type(pExpr->pLeft);
 	if (pExpr->pRight) {
-		enum affinity_type rhs_aff = sqlite3ExprAffinity(pExpr->pRight);
-		aff = sql_affinity_result(rhs_aff, aff);
+		enum field_type rhs_type = sql_expr_type(pExpr->pRight);
+		type = sql_type_result(rhs_type, type);
 	} else if (ExprHasProperty(pExpr, EP_xIsSelect)) {
-		enum affinity_type rhs_aff =
-			sqlite3ExprAffinity(pExpr->x.pSelect->pEList->a[0].pExpr);
-		aff = sql_affinity_result(rhs_aff, aff);
+		enum field_type rhs_type =
+			sql_expr_type(pExpr->x.pSelect->pEList->a[0].pExpr);
+		type = sql_type_result(rhs_type, type);
 	} else {
-		aff = AFFINITY_BLOB;
+		type = FIELD_TYPE_SCALAR;
 	}
-	return aff;
+	return type;
 }
 
-/*
- * pExpr is a comparison expression, eg. '=', '<', IN(...) etc.
- * idx_affinity is the affinity of an indexed column. Return true
- * if the index with affinity idx_affinity may be used to implement
- * the comparison in pExpr.
- */
-int
-sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity)
-{
-	char aff = comparisonAffinity(pExpr);
-	switch (aff) {
-	case AFFINITY_BLOB:
-		return 1;
-	case AFFINITY_TEXT:
-		return idx_affinity == AFFINITY_TEXT;
-	default:
-		return sqlite3IsNumericAffinity(idx_affinity);
-	}
-}
 
 /*
  * Return the P5 value that should be used for a binary comparison
@@ -330,11 +281,11 @@ sqlite3IndexAffinityOk(Expr * pExpr, char idx_affinity)
 static u8
 binaryCompareP5(Expr * pExpr1, Expr * pExpr2, int jumpIfNull)
 {
-	enum affinity_type aff2 = sqlite3ExprAffinity(pExpr2);
-	enum affinity_type aff1 = sqlite3ExprAffinity(pExpr1);
-	enum affinity_type aff = sql_affinity_result(aff1, aff2) |
-				 (u8) jumpIfNull;
-	return aff;
+	enum field_type lhs = sql_expr_type(pExpr2);
+	enum field_type rhs = sql_expr_type(pExpr1);
+	u8 type_mask = sql_field_type_to_affinity(sql_type_result(rhs, lhs)) |
+		       (u8) jumpIfNull;
+	return type_mask;
 }
 
 int
@@ -2140,22 +2091,12 @@ sqlite3ExprCanBeNull(const Expr * p)
 	}
 }
 
-/*
- * Return TRUE if the given expression is a constant which would be
- * unchanged by OP_ApplyType with the type given in the second
- * argument.
- *
- * This routine is used to determine if the OP_ApplyType operation
- * can be omitted.  When in doubt return FALSE.  A false negative
- * is harmless.  A false positive, however, can result in the wrong
- * answer.
- */
-int
-sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
+bool
+sql_expr_needs_no_type_change(const struct Expr *p, enum field_type type)
 {
 	u8 op;
-	if (aff == AFFINITY_BLOB)
-		return 1;
+	if (type == FIELD_TYPE_SCALAR)
+		return true;
 	while (p->op == TK_UPLUS || p->op == TK_UMINUS) {
 		p = p->pLeft;
 	}
@@ -2163,27 +2104,20 @@ sqlite3ExprNeedsNoAffinityChange(const Expr * p, char aff)
 	if (op == TK_REGISTER)
 		op = p->op2;
 	switch (op) {
-	case TK_INTEGER:{
-			return aff == AFFINITY_INTEGER;
-		}
-	case TK_FLOAT:{
-			return aff == AFFINITY_REAL;
-		}
-	case TK_STRING:{
-			return aff == AFFINITY_TEXT;
-		}
-	case TK_BLOB:{
-			return 1;
-		}
-	case TK_COLUMN:{
-			assert(p->iTable >= 0);	/* p cannot be part of a CHECK constraint */
-			return p->iColumn < 0
-			    && (aff == AFFINITY_INTEGER
-				|| aff == AFFINITY_REAL);
-		}
-	default:{
-			return 0;
-		}
+	case TK_INTEGER:
+		return type == FIELD_TYPE_INTEGER;
+	case TK_FLOAT:
+		return type == FIELD_TYPE_NUMBER;
+	case TK_STRING:
+		return type == FIELD_TYPE_STRING;
+	case TK_BLOB:
+		return true;
+	case TK_COLUMN:
+		/* p cannot be part of a CHECK constraint. */
+		assert(p->iTable >= 0);
+		return p->iColumn < 0 && sql_type_is_numeric(type);
+	default:
+		return false;
 	}
 }
 
@@ -2432,14 +2366,14 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 			Expr *pLhs = sqlite3VectorFieldSubexpr(pX->pLeft, i);
 			int iCol = pEList->a[i].pExpr->iColumn;
 			/* RHS table */
-			enum affinity_type idxaff =
-				sqlite3TableColumnAffinity(pTab->def, iCol);
-			enum affinity_type lhs_aff = sqlite3ExprAffinity(pLhs);
+			assert(iCol >= 0);
+			enum field_type idx_type = pTab->def->fields[iCol].type;
+			enum field_type lhs_type = sql_expr_type(pLhs);
 			/*
 			 * Index search is possible only if types
 			 * of columns match.
 			 */
-			if (lhs_aff != idxaff)
+			if (idx_type != lhs_type)
 				affinity_ok = 0;
 		}
 
@@ -2629,13 +2563,13 @@ exprINAffinity(Parse * pParse, Expr * pExpr)
 		int i;
 		for (i = 0; i < nVal; i++) {
 			Expr *pA = sqlite3VectorFieldSubexpr(pLeft, i);
-			char a = sqlite3ExprAffinity(pA);
+			enum field_type lhs = sql_expr_type(pA);
 			if (pSelect) {
 				struct Expr *e = pSelect->pEList->a[i].pExpr;
-				enum affinity_type aff = sqlite3ExprAffinity(e);
-				zRet[i] = sql_affinity_result(aff, a);
+				enum field_type rhs = sql_expr_type(e);
+				zRet[i] = sql_field_type_to_affinity(sql_type_result(rhs, lhs));
 			} else {
-				zRet[i] = a;
+				zRet[i] = sql_field_type_to_affinity(lhs);
 			}
 		}
 		zRet[nVal] = '\0';
@@ -2822,16 +2756,13 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				 * that columns affinity when building index keys. If <expr> is not
 				 * a column, use numeric affinity.
 				 */
-				char affinity;	/* Affinity of the LHS of the IN */
 				int i;
 				ExprList *pList = pExpr->x.pList;
 				struct ExprList_item *pItem;
 				int r1, r2, r3;
 
-				affinity = sqlite3ExprAffinity(pLeft);
-				if (!affinity) {
-					affinity = AFFINITY_BLOB;
-				}
+				enum field_type lhs_type =
+					sql_expr_type(pLeft);
 				bool unused;
 				sql_expr_coll(pParse, pExpr->pLeft,
 					      &unused, &key_info->parts[0].coll_id);
@@ -2854,10 +2785,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 						jmpIfDynamic = -1;
 					}
 					r3 = sqlite3ExprCodeTarget(pParse, pE2, r1);
-					enum field_type type =
-						sql_affinity_to_field_type(affinity);
 					enum field_type types[2] =
-						{ type, field_type_MAX };
+						{ lhs_type, field_type_MAX };
 	 				sqlite3VdbeAddOp4(v, OP_MakeRecord, r3,
 							  1, r2, (char *)types,
 							  sizeof(types));
@@ -3694,7 +3623,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_AGG_COLUMN:{
 			AggInfo *pAggInfo = pExpr->pAggInfo;
 			struct AggInfo_col *pCol = &pAggInfo->aCol[pExpr->iAgg];
-			pExpr->affinity = pCol->pExpr->affinity;
+			pExpr->type = pCol->pExpr->type;
 			if (!pAggInfo->directMode) {
 				assert(pCol->iMem > 0);
 				return pCol->iMem;
@@ -3726,28 +3655,27 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					iTab = pParse->iSelfTab;
 				}
 			}
-			pExpr->affinity =
-				pExpr->space_def->fields[col].affinity;
+			pExpr->type = pExpr->space_def->fields[col].type;
 			return sqlite3ExprCodeGetColumn(pParse,
 							pExpr->space_def, col,
 							iTab, target,
 							pExpr->op2);
 		}
 	case TK_INTEGER:{
-			pExpr->affinity = AFFINITY_INTEGER;
+			pExpr->type = FIELD_TYPE_INTEGER;
 			expr_code_int(pParse, pExpr, false, target);
 			return target;
 		}
 #ifndef SQLITE_OMIT_FLOATING_POINT
 	case TK_FLOAT:{
-			pExpr->affinity = AFFINITY_REAL;
+			pExpr->type = FIELD_TYPE_INTEGER;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			codeReal(v, pExpr->u.zToken, 0, target);
 			return target;
 		}
 #endif
 	case TK_STRING:{
-			pExpr->affinity = AFFINITY_TEXT;
+			pExpr->type = FIELD_TYPE_STRING;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			sqlite3VdbeLoadString(v, target, pExpr->u.zToken);
 			return target;
@@ -3765,7 +3693,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			assert(pExpr->u.zToken[0] == 'x'
 			       || pExpr->u.zToken[0] == 'X');
 			assert(pExpr->u.zToken[1] == '\'');
-			pExpr->affinity = AFFINITY_BLOB;
+			pExpr->type = FIELD_TYPE_SCALAR;
 			z = &pExpr->u.zToken[2];
 			n = sqlite3Strlen30(z) - 1;
 			assert(z[n] == '\'');
@@ -3804,8 +3732,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				sqlite3VdbeAddOp2(v, OP_SCopy, inReg, target);
 				inReg = target;
 			}
-			sqlite3VdbeAddOp2(v, OP_Cast, target,
-					  sql_affinity_to_field_type(pExpr->affinity));
+			sqlite3VdbeAddOp2(v, OP_Cast, target, pExpr->type);
 			testcase(usedAsColumnCache(pParse, inReg, inReg));
 			sqlite3ExprCacheAffinityChange(pParse, inReg, 1);
 			return inReg;
@@ -3848,7 +3775,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				testcase(regFree1 == 0);
 				testcase(regFree2 == 0);
 			}
-			pExpr->affinity = AFFINITY_INTEGER;
+			pExpr->type = FIELD_TYPE_INTEGER;
 			break;
 		}
 	case TK_AND:
@@ -3893,14 +3820,14 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			testcase(regFree1 == 0);
 			testcase(regFree2 == 0);
 			if (op != TK_CONCAT)
-				pExpr->affinity = AFFINITY_REAL;
+				pExpr->type = FIELD_TYPE_NUMBER;
 			else
-				pExpr->affinity = AFFINITY_TEXT;
+				pExpr->type = FIELD_TYPE_STRING;
 			break;
 		}
 	case TK_UMINUS:{
 			Expr *pLeft = pExpr->pLeft;
-			pExpr->affinity = AFFINITY_REAL;
+			pExpr->type = FIELD_TYPE_NUMBER;
 			assert(pLeft);
 			if (pLeft->op == TK_INTEGER) {
 				expr_code_int(pParse, pLeft, true, target);
@@ -3927,7 +3854,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_BITNOT:
 	case TK_NOT:{
-			pExpr->affinity = AFFINITY_INTEGER;
+			pExpr->type = FIELD_TYPE_INTEGER;
 			assert(TK_BITNOT == OP_BitNot);
 			testcase(op == TK_BITNOT);
 			assert(TK_NOT == OP_Not);
@@ -3941,7 +3868,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_ISNULL:
 	case TK_NOTNULL:{
 			int addr;
-			pExpr->affinity = AFFINITY_INTEGER;
+			pExpr->type = FIELD_TYPE_INTEGER;
 			assert(TK_ISNULL == OP_IsNull);
 			testcase(op == TK_ISNULL);
 			assert(TK_NOTNULL == OP_NotNull);
@@ -3965,9 +3892,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						"misuse of aggregate: %s()",
 						pExpr->u.zToken);
 			} else {
-				enum field_type t =
-					pInfo->aFunc->pFunc->ret_type;
-				pExpr->affinity = sql_field_type_to_affinity(t);
+				pExpr->type = pInfo->aFunc->pFunc->ret_type;
 				return pInfo->aFunc[pExpr->iAgg].iMem;
 			}
 			break;
@@ -4005,17 +3930,14 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 
 			if (pDef->ret_type != FIELD_TYPE_SCALAR) {
-				pExpr->affinity =
-					sql_field_type_to_affinity(pDef->ret_type);
+				pExpr->type = pDef->ret_type;
 			} else {
 				/*
 				 * Otherwise, use first arg as
 				 * expression affinity.
 				 */
-				if (pFarg && pFarg->nExpr > 0) {
-					pExpr->affinity =
-						pFarg->a[0].pExpr->affinity;
-				}
+				if (pFarg && pFarg->nExpr > 0)
+					pExpr->type = pFarg->a[0].pExpr->type;
 			}
 			/* Attempt a direct implementation of the built-in COALESCE() and
 			 * IFNULL() functions.  This avoids unnecessary evaluation of
@@ -4160,7 +4082,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_IN:{
 			int destIfFalse = sqlite3VdbeMakeLabel(v);
 			int destIfNull = sqlite3VdbeMakeLabel(v);
-			pExpr->affinity = AFFINITY_INTEGER;
+			pExpr->type = FIELD_TYPE_INTEGER;
 			sqlite3VdbeAddOp2(v, OP_Null, 0, target);
 			sqlite3ExprCodeIN(pParse, pExpr, destIfFalse,
 					  destIfNull);
@@ -4184,18 +4106,18 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		 * Z is stored in pExpr->pList->a[1].pExpr.
 		 */
 	case TK_BETWEEN:{
-			pExpr->affinity = AFFINITY_INTEGER;
+			pExpr->type = FIELD_TYPE_INTEGER;
 			exprCodeBetween(pParse, pExpr, target, 0, 0);
 			return target;
 		}
 	case TK_SPAN:
 	case TK_COLLATE:{
-			pExpr->affinity = AFFINITY_TEXT;
+			pExpr->type = FIELD_TYPE_STRING;
 			return sqlite3ExprCodeTarget(pParse, pExpr->pLeft,
 						     target);
 		}
 	case TK_UPLUS:{
-			pExpr->affinity = AFFINITY_REAL;
+			pExpr->type = FIELD_TYPE_NUMBER;
 			return sqlite3ExprCodeTarget(pParse, pExpr->pLeft,
 						     target);
 		}
@@ -4247,7 +4169,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			 * floating point when extracting it from the record.
 			 */
 			if (pExpr->iColumn >= 0 && def->fields[
-				pExpr->iColumn].affinity == AFFINITY_REAL) {
+				pExpr->iColumn].type == FIELD_TYPE_NUMBER) {
 				sqlite3VdbeAddOp1(v, OP_Realify, target);
 			}
 #endif

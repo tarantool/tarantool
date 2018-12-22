@@ -298,7 +298,8 @@ struct WhereScan {
 	/** Flag is set if actual column was encountered. */
 	bool is_column_seen;
 	Expr *pIdxExpr;		/* Search for this index expression */
-	char idxaff;		/* Must match this affinity, if zCollName!=NULL */
+	/** Must match this type, if zCollName!=NULL */
+	enum field_type idx_type;
 	unsigned char nEquiv;	/* Number of entries in aEquiv[] */
 	unsigned char iEquiv;	/* Next unused slot in aEquiv[] */
 	u32 opMask;		/* Acceptable operators */

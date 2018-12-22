@@ -495,8 +495,12 @@ sql_affinity_to_field_type(enum affinity_type affinity)
 			return FIELD_TYPE_NUMBER;
 		case AFFINITY_TEXT:
 			return FIELD_TYPE_STRING;
-		default:
+		case AFFINITY_BLOB:
 			return FIELD_TYPE_SCALAR;
+		case AFFINITY_UNDEFINED:
+			return FIELD_TYPE_ANY;
+		default:
+			unreachable();
 	}
 }
 

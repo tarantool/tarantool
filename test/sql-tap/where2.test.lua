@@ -653,14 +653,13 @@ test:do_test(
         "where2-6.9",
         function()
             return queryplan([[
-    -- The + operator removes affinity from the rhs.  No conversions
-    -- occur and the comparison is false.  The result is an empty set.
+    -- The + operator doesn't affect RHS.
     --
     SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a=+b;
   ]])
         end, {
             -- <where2-6.9>
-            "nosort", "T2249B", "*", "T2249A", "*"
+            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.9>
         })
 
@@ -673,7 +672,7 @@ test:do_test(
   ]])
         end, {
             -- <where2-6.9.2>
-            "nosort", "T2249B", "*", "T2249A", "*"
+            123, "0123","nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.9.2>
         })
 
@@ -681,9 +680,6 @@ test:do_test(
         "where2-6.10",
         function()
             return queryplan([[
-    -- Use + on both sides of the comparison to disable indices
-    -- completely.  Make sure we get the same result.
-    --
     SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE +a=+b;
   ]])
         end, {
@@ -753,45 +749,36 @@ test:do_test(
     test:do_test(
         "where2-6.12",
         function()
-            -- In this case, the +b disables the affinity conflict and allows
-            -- the OR optimization to be used again.  The result is now an empty
-            -- set, the same as in where2-6.9.
             return queryplan([[
       SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a=+b OR a='hello';
     ]])
         end, {
             -- <where2-6.12>
-            "nosort", "T2249B", "*", "T2249A", "*"
+            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.12>
         })
 
     test:do_test(
         "where2-6.12.2",
         function()
-            -- In this case, the +b disables the affinity conflict and allows
-            -- the OR optimization to be used again.  The result is now an empty
-            -- set, the same as in where2-6.9.
             return queryplan([[
       SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE a='hello' OR +b=a;
     ]])
         end, {
             -- <where2-6.12.2>
-            "nosort", "T2249B", "*", "T2249A", "*"
+            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.12.2>
         })
 
     test:do_test(
         "where2-6.12.3",
         function()
-            -- In this case, the +b disables the affinity conflict and allows
-            -- the OR optimization to be used again.  The result is now an empty
-            -- set, the same as in where2-6.9.
             return queryplan([[
       SELECT b,a FROM t2249b CROSS JOIN t2249a WHERE +b=a OR a='hello';
     ]])
         end, {
             -- <where2-6.12.3>
-            "nosort", "T2249B", "*", "T2249A", "*"
+            123, "0123", "nosort", "T2249B", "*", "T2249A", "*"
             -- </where2-6.12.3>
         })
 
