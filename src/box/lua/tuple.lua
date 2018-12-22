@@ -100,7 +100,7 @@ local tuple_bless = function(tuple)
     -- overflow checked by tuple_bless() in C
     builtin.box_tuple_ref(tuple)
     -- must never fail:
-    return ffi.cast(const_tuple_ref_t, ffi.gc(tuple, tuple_gc))
+    return ffi.gc(ffi.cast(const_tuple_ref_t, tuple), tuple_gc)
 end
 
 local tuple_check = function(tuple, usage)

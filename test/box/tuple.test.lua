@@ -374,4 +374,13 @@ s:drop()
 _, err = s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
 assert(err ~= nil)
 
+--
+-- gh-3902: tuple is collected while it's still in use.
+--
+t1 = box.tuple.new(1)
+t1 = t1:update{{'+', 1, 1}}
+collectgarbage()
+t2 = box.tuple.new(2)
+t1 = t1:update{{'+', 1, 1}}
+
 test_run:cmd("clear filter")
