@@ -727,7 +727,6 @@ where_opt(A) ::= WHERE expr(X).       {A = X.pExpr;}
 
 ////////////////////////// The UPDATE command ////////////////////////////////
 //
-%ifndef SQLITE_ENABLE_UPDATE_DELETE_LIMIT
 cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
         where_opt(W).  {
   sqlite3WithPush(pParse, C, 1);
@@ -738,7 +737,6 @@ cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
   pParse->initiateTTrans = true;
   sqlite3Update(pParse,X,Y,W,R);
 }
-%endif
 
 %type setlist {ExprList*}
 %destructor setlist {sql_expr_list_delete(pParse->db, $$);}

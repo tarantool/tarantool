@@ -579,26 +579,6 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 	}
 #endif
 	switch (pExpr->op) {
-
-#if defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT)
-		/* The special operator TK_ROW means use the rowid for the first
-		 * column in the FROM clause.  This is used by the LIMIT and ORDER BY
-		 * clause processing on UPDATE and DELETE statements.
-		 */
-	case TK_ROW:{
-			SrcList *pSrcList = pNC->pSrcList;
-			struct SrcList_item *pItem;
-			assert(pSrcList && pSrcList->nSrc == 1);
-			pItem = pSrcList->a;
-			pExpr->op = TK_COLUMN;
-			pExpr->pTab = pItem->pTab;
-			pExpr->iTable = pItem->iCursor;
-			pExpr->iColumn = -1;
-			pExpr->affinity = AFFINITY_INTEGER;
-			break;
-		}
-#endif				/* defined(SQLITE_ENABLE_UPDATE_DELETE_LIMIT) */
-
 		/* A lone identifier is the name of a column.
 		 */
 	case TK_ID:{
