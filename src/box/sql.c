@@ -992,7 +992,7 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 		uint32_t cid = def->fields[i].coll_id;
 		struct field_def *field = &def->fields[i];
 		const char *default_str = field->default_value;
-		int base_len = 5;
+		int base_len = 4;
 		if (cid != COLL_NONE)
 			base_len += 1;
 		if (default_str != NULL)
@@ -1004,10 +1004,6 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 		assert(def->fields[i].is_nullable ==
 		       action_is_nullable(def->fields[i].nullable_action));
 		mpstream_encode_str(&stream, field_type_strs[field->type]);
-		mpstream_encode_str(&stream, "affinity");
-		enum affinity_type aff =
-			sql_field_type_to_affinity(def->fields[i].type);
-		mpstream_encode_uint(&stream, aff);
 		mpstream_encode_str(&stream, "is_nullable");
 		mpstream_encode_bool(&stream, def->fields[i].is_nullable);
 		mpstream_encode_str(&stream, "nullable_action");

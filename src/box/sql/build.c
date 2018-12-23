@@ -485,59 +485,6 @@ sql_field_retrieve(Parse *parser, Table *table, uint32_t id)
 	return field;
 }
 
-enum field_type
-sql_affinity_to_field_type(enum affinity_type affinity)
-{
-	switch (affinity) {
-		case AFFINITY_INTEGER:
-			return FIELD_TYPE_INTEGER;
-		case AFFINITY_REAL:
-			return FIELD_TYPE_NUMBER;
-		case AFFINITY_TEXT:
-			return FIELD_TYPE_STRING;
-		case AFFINITY_BLOB:
-			return FIELD_TYPE_SCALAR;
-		case AFFINITY_UNDEFINED:
-			return FIELD_TYPE_ANY;
-		default:
-			unreachable();
-	}
-}
-
-enum affinity_type
-sql_field_type_to_affinity(enum field_type field_type)
-{
-	switch (field_type) {
-		case FIELD_TYPE_INTEGER:
-		case FIELD_TYPE_UNSIGNED:
-			return AFFINITY_INTEGER;
-		case FIELD_TYPE_NUMBER:
-			return AFFINITY_REAL;
-		case FIELD_TYPE_STRING:
-			return AFFINITY_TEXT;
-		case FIELD_TYPE_SCALAR:
-			return AFFINITY_BLOB;
-		case FIELD_TYPE_ANY:
-			return AFFINITY_UNDEFINED;
-		default:
-			unreachable();
-	}
-}
-
-enum field_type *
-sql_affinity_str_to_field_type_str(const char *affinity_str, uint32_t len)
-{
-	if (affinity_str == NULL)
-		return NULL;
-	size_t sz = (len + 1) * sizeof(enum field_type);
-	enum field_type *types =
-		(enum field_type *) sqlite3DbMallocRaw(sql_get(), sz);
-	for (uint32_t i = 0; i < len; ++i)
-		types[i] = sql_affinity_to_field_type(affinity_str[i]);
-	types[len] = field_type_MAX;
-	return types;
-}
-
 /*
  * Add a new column to the table currently being constructed.
  *

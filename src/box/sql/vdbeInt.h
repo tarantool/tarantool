@@ -231,7 +231,6 @@ struct Mem {
 #define MEM_Blob      0x0010	/* Value is a BLOB */
 #define MEM_Bool      0x0020    /* Value is a bool */
 #define MEM_Ptr       0x0040	/* Value is a generic pointer */
-#define MEM_AffMask   0x003f	/* Mask of affinity bits */
 #define MEM_Frame     0x0080	/* Value is a VdbeFrame object */
 #define MEM_Undefined 0x0100	/* Value is undefined */
 #define MEM_Cleared   0x0200	/* NULL set by OP_Null, not from data */
@@ -480,7 +479,7 @@ int sqlite3VdbeMemStringify(Mem *, u8);
 int sqlite3VdbeIntValue(Mem *, int64_t *);
 int sqlite3VdbeMemIntegerify(Mem *, bool is_forced);
 int sqlite3VdbeRealValue(Mem *, double *);
-int sqlite3VdbeIntegerAffinity(Mem *);
+int mem_apply_integer_type(Mem *);
 int sqlite3VdbeMemRealify(Mem *);
 int sqlite3VdbeMemNumerify(Mem *);
 int sqlite3VdbeMemCast(Mem *, enum field_type type);

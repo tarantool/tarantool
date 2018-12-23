@@ -41,33 +41,6 @@
 #include "bit/bit.h"
 #include "box/box.h"
 
-char *
-sql_space_index_affinity_str(struct sqlite3 *db, struct space_def *space_def,
-			     struct index_def *idx_def)
-{
-	uint32_t column_count = idx_def->key_def->part_count;
-	char *aff = (char *)sqlite3DbMallocRaw(db, column_count + 1);
-	if (aff == NULL)
-		return NULL;
-	/*
-	 * Table may occasionally come from non-SQL API, so lets
-	 * gentle process this case by setting default affinity
-	 * for it.
-	 */
-	if (space_def->fields == NULL) {
-		memset(aff, AFFINITY_BLOB, column_count);
-	} else {
-		for (uint32_t i = 0; i < column_count; i++) {
-			aff[i] = sql_space_index_part_affinity(space_def,
-							       idx_def, i);
-			if (aff[i] == AFFINITY_UNDEFINED)
-				aff[i] = AFFINITY_BLOB;
-		}
-	}
-	aff[column_count] = '\0';
-	return aff;
-}
-
 enum field_type *
 sql_index_type_str(struct sqlite3 *db, const struct index_def *idx_def)
 {
@@ -630,7 +603,7 @@ sqlite3Insert(Parse * pParse,	/* Parser context */
 		/* If this is an INSERT on a view with an INSTEAD OF INSERT trigger,
 		 * do not attempt any conversions before assembling the record.
 		 * If this is a real table, attempt conversions as required by the
-		 * table column affinities.
+		 * table column types.
 		 */
 		if (!is_view)
 			sql_emit_table_types(v, pTab->def, regCols + 1);
@@ -1225,12 +1198,12 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	if (dest->def->field_count != src->def->field_count)
 		return 0;
 	for (i = 0; i < (int)dest->def->field_count; i++) {
-		enum affinity_type dest_affinity =
-			dest->def->fields[i].affinity;
-		enum affinity_type src_affinity =
-			src->def->fields[i].affinity;
-		/* Affinity must be the same on all columns. */
-		if (dest_affinity != src_affinity)
+		enum field_type dest_type =
+			dest->def->fields[i].type;
+		enum field_type src_type =
+			src->def->fields[i].type;
+		/* Type must be the same on all columns. */
+		if (dest_type != src_type)
 			return 0;
 		uint32_t id;
 		if (sql_column_collation(dest->def, i, &id) !=

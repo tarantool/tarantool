@@ -280,7 +280,7 @@ sqlite3_value_type(sqlite3_value * pVal)
 		SQLITE_INTEGER,	/* 0x1e */
 		SQLITE_NULL,	/* 0x1f */
 	};
-	return aType[pVal->flags & MEM_AffMask];
+	return aType[pVal->flags & MEM_TypeMask];
 }
 
 /* Make a copy of an sqlite3_value object

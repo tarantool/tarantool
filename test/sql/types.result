@@ -33,20 +33,19 @@ box.sql.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d 
 ...
 box.space.T1:format()
 ---
-- [{'affinity': 66, 'type': 'string', 'nullable_action': 'abort', 'name': 'ID', 'is_nullable': false},
-  {'affinity': 69, 'type': 'number', 'nullable_action': 'none', 'name': 'A', 'is_nullable': true},
-  {'affinity': 68, 'type': 'integer', 'nullable_action': 'none', 'name': 'B', 'is_nullable': true},
-  {'affinity': 66, 'type': 'string', 'nullable_action': 'none', 'name': 'C', 'is_nullable': true},
-  {'affinity': 65, 'type': 'scalar', 'nullable_action': 'none', 'name': 'D', 'is_nullable': true}]
+- [{'type': 'string', 'nullable_action': 'abort', 'name': 'ID', 'is_nullable': false},
+  {'type': 'number', 'nullable_action': 'none', 'name': 'A', 'is_nullable': true},
+  {'type': 'integer', 'nullable_action': 'none', 'name': 'B', 'is_nullable': true},
+  {'type': 'string', 'nullable_action': 'none', 'name': 'C', 'is_nullable': true},
+  {'type': 'scalar', 'nullable_action': 'none', 'name': 'D', 'is_nullable': true}]
 ...
 box.sql.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 ---
 ...
 box.space.V1:format()
 ---
-- [{'affinity': 69, 'type': 'number', 'nullable_action': 'none', 'name': 'b + a',
-    'is_nullable': true}, {'affinity': 69, 'type': 'number', 'nullable_action': 'none',
-    'name': 'b - a', 'is_nullable': true}]
+- [{'type': 'number', 'nullable_action': 'none', 'name': 'b + a', 'is_nullable': true},
+  {'type': 'number', 'nullable_action': 'none', 'name': 'b - a', 'is_nullable': true}]
 ...
 -- gh-2494: index's part also features correct declared type.
 --

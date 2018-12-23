@@ -423,7 +423,7 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 	 * <parent-key1> = <child-key1> AND <parent-key2> = <child-key2> ...
 	 *
 	 * The collation sequence used for the comparison should
-	 * be that of the parent key columns. The affinity of the
+	 * be that of the parent key columns. The type of the
 	 * parent key column should be applied to each child key
 	 * value before the comparison takes place.
 	 */
@@ -783,7 +783,7 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 		 * Create the expression "old.to_col = from_col".
 		 * It is important that the "old.to_col" term is
 		 * on the LHS of the = operator, so that the
-		 * affinity and collation sequence associated with
+		 * type and collation sequence associated with
 		 * the parent table are used for the comparison.
 		 */
 		struct Expr *to_col =

@@ -121,6 +121,19 @@ sql_expr_type(struct Expr *pExpr)
 	return pExpr->type;
 }
 
+enum field_type *
+field_type_sequence_dup(struct Parse *parse, enum field_type *types,
+			uint32_t len)
+{
+	uint32_t sz = (len + 1) * sizeof(enum field_type);
+	enum field_type *ret_types = sqlite3DbMallocRaw(parse->db, sz);
+	if (ret_types == NULL)
+		return NULL;
+	memcpy(ret_types, types, sz);
+	ret_types[len] = field_type_MAX;
+	return ret_types;
+}
+
 /*
  * Set the collating sequence for expression pExpr to be the collating
  * sequence named by pToken.   Return a pointer to a new Expr node that
@@ -283,8 +296,7 @@ binaryCompareP5(Expr * pExpr1, Expr * pExpr2, int jumpIfNull)
 {
 	enum field_type lhs = sql_expr_type(pExpr2);
 	enum field_type rhs = sql_expr_type(pExpr1);
-	u8 type_mask = sql_field_type_to_affinity(sql_type_result(rhs, lhs)) |
-		       (u8) jumpIfNull;
+	u8 type_mask = sql_type_result(rhs, lhs) | (u8) jumpIfNull;
 	return type_mask;
 }
 
@@ -2354,15 +2366,15 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 		pTab = p->pSrc->a[0].pTab;
 		assert(v);	/* sqlite3GetVdbe() has always been previously called */
 
-		int affinity_ok = 1;
+		bool type_is_suitable = true;
 		int i;
 
-		/* Check that the affinity that will be used to perform each
-		 * comparison is the same as the affinity of each column in table
+		/* Check that the type that will be used to perform each
+		 * comparison is the same as the type of each column in table
 		 * on the RHS of the IN operator.  If it not, it is not possible to
 		 * use any index of the RHS table.
 		 */
-		for (i = 0; i < nExpr && affinity_ok; i++) {
+		for (i = 0; i < nExpr && type_is_suitable; i++) {
 			Expr *pLhs = sqlite3VectorFieldSubexpr(pX->pLeft, i);
 			int iCol = pEList->a[i].pExpr->iColumn;
 			/* RHS table */
@@ -2374,10 +2386,10 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 			 * of columns match.
 			 */
 			if (idx_type != lhs_type)
-				affinity_ok = 0;
+				type_is_suitable = false;
 		}
 
-		if (affinity_ok) {
+		if (type_is_suitable) {
 			/*
 			 * Here we need real space since further
 			 * it is used in cursor opening routine.
@@ -2494,7 +2506,7 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 					sqlite3VdbeJumpHere(v, iAddr);
 				}
 			}	/* End loop over indexes */
-		}	/* End if( affinity_ok ) */
+		}
 	}
 
 	/* End attempt to optimize using an index */
@@ -2543,22 +2555,22 @@ sqlite3FindInIndex(Parse * pParse,	/* Parsing context */
 
 /*
  * Argument pExpr is an (?, ?...) IN(...) expression. This
- * function allocates and returns a nul-terminated string containing
- * the affinities to be used for each column of the comparison.
+ * function allocates and returns a terminated string containing
+ * the types to be used for each column of the comparison.
  *
  * It is the responsibility of the caller to ensure that the returned
  * string is eventually freed using sqlite3DbFree().
  */
-static char *
-exprINAffinity(Parse * pParse, Expr * pExpr)
+static enum field_type *
+expr_in_type(Parse *pParse, Expr *pExpr)
 {
 	Expr *pLeft = pExpr->pLeft;
 	int nVal = sqlite3ExprVectorSize(pLeft);
 	Select *pSelect = (pExpr->flags & EP_xIsSelect) ? pExpr->x.pSelect : 0;
-	char *zRet;
 
 	assert(pExpr->op == TK_IN);
-	zRet = sqlite3DbMallocZero(pParse->db, nVal + 1);
+	uint32_t sz = (nVal + 1) * sizeof(enum field_type);
+	enum field_type *zRet = sqlite3DbMallocZero(pParse->db, sz);
 	if (zRet) {
 		int i;
 		for (i = 0; i < nVal; i++) {
@@ -2567,12 +2579,12 @@ exprINAffinity(Parse * pParse, Expr * pExpr)
 			if (pSelect) {
 				struct Expr *e = pSelect->pEList->a[i].pExpr;
 				enum field_type rhs = sql_expr_type(e);
-				zRet[i] = sql_field_type_to_affinity(sql_type_result(rhs, lhs));
+				zRet[i] = sql_type_result(rhs, lhs);
 			} else {
-				zRet[i] = sql_field_type_to_affinity(lhs);
+				zRet[i] = lhs;
 			}
 		}
-		zRet[nVal] = '\0';
+		zRet[nVal] = field_type_MAX;
 	}
 	return zRet;
 }
@@ -2686,12 +2698,12 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 			 * SELECT or the <exprlist>.
 			 *
 			 * If the 'x' expression is a column value, or the SELECT...
-			 * statement returns a column value, then the affinity of that
+			 * statement returns a column value, then the type of that
 			 * column is used to build the index keys. If both 'x' and the
-			 * SELECT... statement are columns, then numeric affinity is used
-			 * if either column has NUMERIC or INTEGER affinity. If neither
-			 * 'x' nor the SELECT... statement are columns, then numeric affinity
-			 * is used.
+			 * SELECT... statement are columns, then NUMBER type is used
+			 * if either column has NUMBER or INTEGER type. If neither
+			 * 'x' nor the SELECT... statement are columns,
+			 * then NUMBER type is used.
 			 */
 			pExpr->iTable = pParse->nTab++;
 			pExpr->is_ephemeral = 1;
@@ -2721,8 +2733,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					int i;
 					sqlite3SelectDestInit(&dest, SRT_Set,
 							      pExpr->iTable, reg_eph);
-					dest.zAffSdst =
-					    exprINAffinity(pParse, pExpr);
+					dest.dest_type =
+						expr_in_type(pParse, pExpr);
 					assert((pExpr->iTable & 0x0000FFFF) ==
 					       pExpr->iTable);
 					pSelect->iLimit = 0;
@@ -2731,12 +2743,12 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 					if (sqlite3Select
 					    (pParse, pSelect, &dest)) {
 						sqlite3DbFree(pParse->db,
-							      dest.zAffSdst);
+							      dest.dest_type);
 						sql_key_info_unref(key_info);
 						return 0;
 					}
 					sqlite3DbFree(pParse->db,
-						      dest.zAffSdst);
+						      dest.dest_type);
 					assert(pEList != 0);
 					assert(pEList->nExpr > 0);
 					for (i = 0; i < nVal; i++) {
@@ -2753,8 +2765,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 				 *
 				 * For each expression, build an index key from the evaluation and
 				 * store it in the temporary table. If <expr> is a column, then use
-				 * that columns affinity when building index keys. If <expr> is not
-				 * a column, use numeric affinity.
+				 * that columns types when building index keys. If <expr> is not
+				 * a column, use NUMBER type.
 				 */
 				int i;
 				ExprList *pList = pExpr->x.pList;
@@ -2790,8 +2802,8 @@ sqlite3CodeSubselect(Parse * pParse,	/* Parsing context */
 	 				sqlite3VdbeAddOp4(v, OP_MakeRecord, r3,
 							  1, r2, (char *)types,
 							  sizeof(types));
-					sqlite3ExprCacheAffinityChange(pParse,
-								       r3, 1);
+					sql_expr_type_cache_change(pParse,
+								   r3, 1);
 					sqlite3VdbeAddOp2(v, OP_IdxInsert, r2,
 							  reg_eph);
 				}
@@ -2942,7 +2954,6 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	int rLhsOrig;		/* LHS values prior to reordering by aiMap[] */
 	Vdbe *v;		/* Statement under construction */
 	int *aiMap = 0;		/* Map from vector field to index column */
-	char *zAff = 0;		/* Affinity string for comparisons */
 	int nVector;		/* Size of vectors for this IN operator */
 	int iDummy;		/* Dummy parameter to exprCodeVector() */
 	Expr *pLeft;		/* The LHS of the IN operator */
@@ -2956,7 +2967,8 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	pLeft = pExpr->pLeft;
 	if (sqlite3ExprCheckIN(pParse, pExpr))
 		return;
-	zAff = exprINAffinity(pParse, pExpr);
+	/* Type sequence for comparisons. */
+	enum field_type *zAff = expr_in_type(pParse, pExpr);
 	nVector = sqlite3ExprVectorSize(pExpr->pLeft);
 	aiMap =
 	    (int *)sqlite3DbMallocZero(pParse->db,
@@ -3102,10 +3114,14 @@ sqlite3ExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	 * of the RHS using the LHS as a probe.  If found, the result is
 	 * true.
 	 */
-	enum field_type *types = sql_affinity_str_to_field_type_str(zAff,
-								    nVector);
-	sqlite3VdbeAddOp4(v, OP_ApplyType, rLhs, nVector, 0, (char *)types,
+	zAff[nVector] = field_type_MAX;
+	sqlite3VdbeAddOp4(v, OP_ApplyType, rLhs, nVector, 0, (char*)zAff,
 			  P4_DYNAMIC);
+	/*
+	 * zAff will be freed at the end of VDBE execution, since
+	 * it was passed with P4_DYNAMIC flag.
+	 */
+	zAff = NULL;
 	if (destIfFalse == destIfNull) {
 		/* Combine Step 3 and Step 5 into a single opcode */
 		sqlite3VdbeAddOp4Int(v, OP_NotFound, pExpr->iTable,
@@ -3494,11 +3510,11 @@ sqlite3ExprCacheClear(Parse * pParse)
 }
 
 /*
- * Record the fact that an affinity change has occurred on iCount
+ * Record the fact that an type change has occurred on iCount
  * registers starting with iStart.
  */
 void
-sqlite3ExprCacheAffinityChange(Parse * pParse, int iStart, int iCount)
+sql_expr_type_cache_change(Parse *pParse, int iStart, int iCount)
 {
 	sqlite3ExprCacheRemove(pParse, iStart, iCount);
 }
@@ -3734,7 +3750,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 			sqlite3VdbeAddOp2(v, OP_Cast, target, pExpr->type);
 			testcase(usedAsColumnCache(pParse, inReg, inReg));
-			sqlite3ExprCacheAffinityChange(pParse, inReg, 1);
+			sql_expr_type_cache_change(pParse, inReg, 1);
 			return inReg;
 		}
 #endif				/* SQLITE_OMIT_CAST */
@@ -3934,7 +3950,7 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			} else {
 				/*
 				 * Otherwise, use first arg as
-				 * expression affinity.
+				 * expression type.
 				 */
 				if (pFarg && pFarg->nExpr > 0)
 					pExpr->type = pFarg->a[0].pExpr->type;
@@ -4162,11 +4178,8 @@ sqlite3ExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					pExpr->iColumn].name, target));
 
 #ifndef SQLITE_OMIT_FLOATING_POINT
-			/* If the column has REAL affinity, it may currently be stored as an
+			/* If the column has type NUMBER, it may currently be stored as an
 			 * integer. Use OP_Realify to make sure it is really real.
-			 *
-			 * EVIDENCE-OF: R-60985-57662 SQLite will convert the value back to
-			 * floating point when extracting it from the record.
 			 */
 			if (pExpr->iColumn >= 0 && def->fields[
 				pExpr->iColumn].type == FIELD_TYPE_NUMBER) {

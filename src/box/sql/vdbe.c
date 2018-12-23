@@ -289,7 +289,7 @@ allocateCursor(
  * if there is an exact integer representation of the quantity.
  */
 static int
-applyNumericAffinity(Mem *pRec, int bTryForInt)
+mem_apply_numeric_type(Mem *pRec, int bTryForInt)
 {
 	double rValue;
 	i64 iValue;
@@ -301,7 +301,7 @@ applyNumericAffinity(Mem *pRec, int bTryForInt)
 	} else {
 		pRec->u.r = rValue;
 		pRec->flags |= MEM_Real;
-		if (bTryForInt) sqlite3VdbeIntegerAffinity(pRec);
+		if (bTryForInt) mem_apply_integer_type(pRec);
 	}
 	return 0;
 }
@@ -382,7 +382,7 @@ int sqlite3_value_numeric_type(sqlite3_value *pVal) {
 	int eType = sqlite3_value_type(pVal);
 	if (eType==SQLITE_TEXT) {
 		Mem *pMem = (Mem*)pVal;
-		applyNumericAffinity(pMem, 0);
+		mem_apply_numeric_type(pMem, 0);
 		eType = sqlite3_value_type(pVal);
 	}
 	return eType;
@@ -393,7 +393,7 @@ int sqlite3_value_numeric_type(sqlite3_value *pVal) {
  * not the internal Mem* type.
  */
 void
-sqlite3ValueApplyAffinity(
+sql_value_apply_type(
 	sqlite3_value *pVal,
 	enum field_type type)
 {
@@ -421,7 +421,7 @@ static u16 SQLITE_NOINLINE computeNumericType(Mem *pMem)
  * Return the numeric type for pMem, either MEM_Int or MEM_Real or both or
  * none.
  *
- * Unlike applyNumericAffinity(), this routine does not modify pMem->flags.
+ * Unlike mem_apply_numeric_type(), this routine does not modify pMem->flags.
  * But it does set pMem->u.r and pMem->u.i appropriately.
  */
 static u16 numericType(Mem *pMem)
@@ -1681,7 +1681,7 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		pOut->u.r = rB;
 		MemSetTypeFlag(pOut, MEM_Real);
 		if (((type1|type2)&MEM_Real)==0 && !bIntint) {
-			sqlite3VdbeIntegerAffinity(pOut);
+			mem_apply_integer_type(pOut);
 		}
 #endif
 	}
@@ -2023,14 +2023,6 @@ case OP_Cast: {                  /* in1 */
  * jump to address P2.  Or if the SQLITE_STOREP2 flag is set in P5, then
  * store the result of comparison in register P2.
  *
- * The AFFINITY_MASK portion of P5 must be an affinity character -
- * AFFINITY_TEXT, AFFINITY_INTEGER, and so forth. An attempt is made
- * to coerce both inputs according to this affinity before the
- * comparison is made. If the AFFINITY_MASK is 0x00, then numeric
- * affinity is used. Note that the affinity conversions are stored
- * back into the input registers P1 and P3.  So this opcode can cause
- * persistent changes to registers P1 and P3.
- *
  * Once any conversions have taken place, and neither value is NULL,
  * the values are compared. If both values are blobs then memcmp() is
  * used to determine the results of the comparison.  If both values
@@ -2046,6 +2038,10 @@ case OP_Cast: {                  /* in1 */
  * of comparison is true.  If either operand is NULL then the result is false.
  * If neither operand is NULL the result is the same as it would be if
  * the SQLITE_NULLEQ flag were omitted from P5.
+ * P5 also can contain type to be applied to operands. Note that
+ * the type conversions are stored back into the input registers
+ * P1 and P3.  So this opcode can cause persistent changes to
+ * registers P1 and P3.
  *
  * If both SQLITE_STOREP2 and SQLITE_KEEPNULL flags are set then the
  * content of r[P2] is only changed if the new value is NULL or 0 (false).
@@ -2072,14 +2068,6 @@ case OP_Cast: {                  /* in1 */
  * If the SQLITE_JUMPIFNULL bit of P5 is set and either reg(P1) or
  * reg(P3) is NULL then the take the jump.  If the SQLITE_JUMPIFNULL
  * bit is clear then fall through if either operand is NULL.
- *
- * The AFFINITY_MASK portion of P5 must be an affinity character -
- * AFFINITY_TEXT, AFFINITY_INTEGER, and so forth. An attempt is made
- * to coerce both inputs according to this affinity before the
- * comparison is made. If the AFFINITY_MASK is 0x00, then numeric
- * affinity is used. Note that the affinity conversions are stored
- * back into the input registers P1 and P3.  So this opcode can cause
- * persistent changes to registers P1 and P3.
  *
  * Once any conversions have taken place, and neither value is NULL,
  * the values are compared. If both values are blobs then memcmp() is
@@ -2119,7 +2107,6 @@ case OP_Le:               /* same as TK_LE, jump, in1, in3 */
 case OP_Gt:               /* same as TK_GT, jump, in1, in3 */
 case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 	int res, res2;      /* Result of the comparison of pIn1 against pIn3 */
-	char affinity;      /* Affinity to use for comparison */
 	u32 flags1;         /* Copy of initial value of pIn1->flags */
 	u32 flags3;         /* Copy of initial value of pIn3->flags */
 
@@ -2164,17 +2151,16 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			break;
 		}
 	} else {
-		/* Neither operand is NULL.  Do a comparison. */
-		affinity = pOp->p5 & AFFINITY_MASK;
-		if (affinity>=AFFINITY_INTEGER) {
+		enum field_type type = pOp->p5 & FIELD_TYPE_MASK;
+		if (sql_type_is_numeric(type)) {
 			if ((flags1 | flags3)&MEM_Str) {
 				if ((flags1 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
-					applyNumericAffinity(pIn1,0);
+					mem_apply_numeric_type(pIn1, 0);
 					testcase( flags3!=pIn3->flags); /* Possible if pIn1==pIn3 */
 					flags3 = pIn3->flags;
 				}
 				if ((flags3 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
-					if (applyNumericAffinity(pIn3,0) != 0) {
+					if (mem_apply_numeric_type(pIn3, 0) != 0) {
 						diag_set(ClientError,
 							 ER_SQL_TYPE_MISMATCH,
 							 sqlite3_value_text(pIn3),
@@ -2194,7 +2180,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 				res = 0;
 				goto compare_op;
 			}
-		} else if (affinity==AFFINITY_TEXT) {
+		} else if (type == FIELD_TYPE_STRING) {
 			if ((flags1 & MEM_Str)==0 && (flags1 & (MEM_Int|MEM_Real))!=0) {
 				testcase( pIn1->flags & MEM_Int);
 				testcase( pIn1->flags & MEM_Real);
@@ -2842,7 +2828,7 @@ case OP_ApplyType: {
  * in an index.  The OP_Column opcode can decode the record later.
  *
  * P4 may be a string that is P2 characters long.  The nth character of the
- * string indicates the column affinity that should be used for the nth
+ * string indicates the column type that should be used for the nth
  * field of the index key.
  *
  * If P4 is NULL then all index fields have type SCALAR.
@@ -2885,8 +2871,7 @@ case OP_MakeRecord: {
 	pOut = &aMem[pOp->p3];
 	memAboutToChange(p, pOut);
 
-	/* Apply the requested affinity to all inputs
-	 */
+	/* Apply the requested types to all inputs */
 	assert(pData0<=pLast);
 	if (types != NULL) {
 		pRec = pData0;
@@ -3520,7 +3505,7 @@ case OP_SeekGT: {       /* jump, in3 */
 		 */
 		pIn3 = &aMem[reg_ipk];
 		if ((pIn3->flags & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
-			applyNumericAffinity(pIn3, 0);
+			mem_apply_numeric_type(pIn3, 0);
 		}
 		int64_t i;
 		if ((pIn3->flags & MEM_Int) == MEM_Int) {

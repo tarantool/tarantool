@@ -587,7 +587,7 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
 		sqlite3ExprCodeGetColumnOfTable(v, space->def, cursor, tabl_col,
 						reg_base + j);
 		/*
-		 * If the column affinity is REAL but the number
+		 * If the column type is NUMBER but the number
 		 * is an integer, then it might be stored in the
 		 * table as an integer (using a compact
 		 * representation) then converted to REAL by an

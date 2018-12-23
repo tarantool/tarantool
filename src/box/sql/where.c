@@ -295,7 +295,7 @@ whereScanNext(WhereScan * pScan)
 					}
 					if ((pTerm->eOperator & pScan->
 					     opMask) != 0) {
-						/* Verify the affinity and collating sequence match */
+						/* Verify the type and collating sequence match */
 						if ((pTerm->eOperator & WO_ISNULL) == 0) {
 							pX = pTerm->pExpr;
 							enum field_type expr_type =
@@ -1137,15 +1137,6 @@ whereRangeAdjust(WhereTerm * pTerm, LogEst nNew)
 		}
 	}
 	return nRet;
-}
-
-enum affinity_type
-sql_space_index_part_affinity(struct space_def *def, struct index_def *idx,
-			      uint32_t partno)
-{
-	assert(partno < idx->key_def->part_count);
-	uint32_t fieldno = idx->key_def->parts[partno].fieldno;
-	return def->fields[fieldno].affinity;
 }
 
 /*

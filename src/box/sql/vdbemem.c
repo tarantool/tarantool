@@ -504,7 +504,7 @@ sqlite3VdbeRealValue(Mem * pMem, double *v)
  * MEM_Int if we can.
  */
 int
-sqlite3VdbeIntegerAffinity(Mem * pMem)
+mem_apply_integer_type(Mem *pMem)
 {
 	int rc;
 	i64 ix;
@@ -584,7 +584,7 @@ sqlite3VdbeMemNumerify(Mem * pMem)
 				return SQLITE_ERROR;
 			pMem->u.r = v;
 			MemSetTypeFlag(pMem, MEM_Real);
-			sqlite3VdbeIntegerAffinity(pMem);
+			mem_apply_integer_type(pMem);
 		}
 	}
 	assert((pMem->flags & (MEM_Int | MEM_Real | MEM_Null)) != 0);
@@ -593,10 +593,10 @@ sqlite3VdbeMemNumerify(Mem * pMem)
 }
 
 /*
- * Cast the datatype of the value in pMem according to the affinity
- * "aff".  Casting is different from applying affinity in that a cast
+ * Cast the datatype of the value in pMem according to the type
+ * @type.  Casting is different from applying type in that a cast
  * is forced.  In other words, the value is converted into the desired
- * affinity even if that results in loss of data.  This routine is
+ * type even if that results in loss of data.  This routine is
  * used (for example) to implement the SQL "cast()" operator.
  */
 int
@@ -643,7 +643,7 @@ sqlite3VdbeMemCast(Mem * pMem, enum field_type type)
 		assert(type == FIELD_TYPE_STRING);
 		assert(MEM_Str == (MEM_Blob >> 3));
 		pMem->flags |= (pMem->flags & MEM_Blob) >> 3;
-		sqlite3ValueApplyAffinity(pMem, FIELD_TYPE_STRING);
+			sql_value_apply_type(pMem, FIELD_TYPE_STRING);
 		assert(pMem->flags & MEM_Str || pMem->db->mallocFailed);
 		pMem->flags &= ~(MEM_Int | MEM_Real | MEM_Blob | MEM_Zero);
 		return SQLITE_OK;
@@ -1152,7 +1152,7 @@ valueNew(sqlite3 * db, struct ValueNewStat4Ctx *p)
  * error occurs, output parameter (*ppVal) is set to point to a value
  * object containing the result before returning SQLITE_OK.
  *
- * Affinity aff is applied to the result of the function before returning.
+ * Type @type is applied to the result of the function before returning.
  * If the result is a text value, the sqlite3_value object uses encoding
  * enc.
  *
@@ -1222,7 +1222,7 @@ valueFromFunction(sqlite3 * db,	/* The database connection */
 		rc = ctx.isError;
 		sqlite3ErrorMsg(pCtx->pParse, "%s", sqlite3_value_text(pVal));
 	} else {
-		sqlite3ValueApplyAffinity(pVal, type);
+		sql_value_apply_type(pVal, type);
 		assert(rc == SQLITE_OK);
 	}
 	pCtx->pParse->rc = rc;
@@ -1285,7 +1285,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 		testcase(rc != SQLITE_OK);
 		if (*ppVal) {
 			sqlite3VdbeMemCast(*ppVal, pExpr->type);
-			sqlite3ValueApplyAffinity(*ppVal, type);
+			sql_value_apply_type(*ppVal, type);
 		}
 		return rc;
 	}
@@ -1318,9 +1318,9 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 		}
 		if ((op == TK_INTEGER || op == TK_FLOAT) &&
 		    type == FIELD_TYPE_SCALAR) {
-			sqlite3ValueApplyAffinity(pVal, FIELD_TYPE_NUMBER);
+			sql_value_apply_type(pVal, FIELD_TYPE_NUMBER);
 		} else {
-			sqlite3ValueApplyAffinity(pVal, type);
+			sql_value_apply_type(pVal, type);
 		}
 		if (pVal->flags & (MEM_Int | MEM_Real))
 			pVal->flags &= ~MEM_Str;
@@ -1339,7 +1339,7 @@ valueFromExpr(sqlite3 * db,	/* The database connection */
 			} else {
 				pVal->u.i = -pVal->u.i;
 			}
-			sqlite3ValueApplyAffinity(pVal, type);
+			sql_value_apply_type(pVal, type);
 		}
 	} else if (op == TK_NULL) {
 		pVal = valueNew(db, pCtx);
@@ -1502,7 +1502,7 @@ stat4ValueFromExpr(Parse * pParse,	/* Parse context */
 				rc = sqlite3VdbeMemCopy((Mem *) pVal,
 							&v->aVar[iBindVar - 1]);
 				if (rc == SQLITE_OK) {
-					sqlite3ValueApplyAffinity(pVal, type);
+					sql_value_apply_type(pVal, type);
 				}
 				pVal->db = pParse->db;
 			}
@@ -1536,7 +1536,7 @@ stat4ValueFromExpr(Parse * pParse,	/* Parse context */
  * vector components that match either of the two latter criteria listed
  * above.
  *
- * Before any value is appended to the record, the affinity of the
+ * Before any value is appended to the record, the type of the
  * corresponding column within index pIdx is applied to it. Before
  * this function returns, output parameter *pnExtract is set to the
  * number of values appended to the record.

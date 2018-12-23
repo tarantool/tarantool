@@ -134,7 +134,7 @@ sqlite3SelectDestInit(SelectDest * pDest, int eDest, int iParm, int reg_eph)
 	pDest->eDest = (u8) eDest;
 	pDest->iSDParm = iParm;
 	pDest->reg_eph = reg_eph;
-	pDest->zAffSdst = 0;
+	pDest->dest_type = NULL;
 	pDest->iSdst = 0;
 	pDest->nSdst = 0;
 }
@@ -1200,18 +1200,16 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 					       regOrig, nResultCol, nPrefixReg);
 			} else {
 				int r1 = sqlite3GetTempReg(pParse);
-				assert(sqlite3Strlen30(pDest->zAffSdst) ==
-				       (unsigned int)nResultCol);
 				enum field_type *types =
-					sql_affinity_str_to_field_type_str(
-						pDest->zAffSdst,
-						strlen(pDest->zAffSdst));
+					field_type_sequence_dup(pParse,
+								pDest->dest_type,
+								nResultCol);
 				sqlite3VdbeAddOp4(v, OP_MakeRecord, regResult,
 						  nResultCol, r1, (char *)types,
 						  P4_DYNAMIC);
-				sqlite3ExprCacheAffinityChange(pParse,
-							       regResult,
-							       nResultCol);
+				sql_expr_type_cache_change(pParse,
+							   regResult,
+							   nResultCol);
 				sqlite3VdbeAddOp2(v, OP_IdxInsert, r1, pDest->reg_eph);
 				sqlite3ReleaseTempReg(pParse, r1);
 			}
@@ -1255,9 +1253,9 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			} else {
 				sqlite3VdbeAddOp2(v, OP_ResultRow, regResult,
 						  nResultCol);
-				sqlite3ExprCacheAffinityChange(pParse,
-							       regResult,
-							       nResultCol);
+				sql_expr_type_cache_change(pParse,
+							   regResult,
+							   nResultCol);
 			}
 			break;
 		}
@@ -1628,16 +1626,13 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			break;
 		}
 	case SRT_Set:{
-			assert((unsigned int)nColumn ==
-			       sqlite3Strlen30(pDest->zAffSdst));
-
 			enum field_type *types =
-				sql_affinity_str_to_field_type_str(pDest->zAffSdst,
-								   strlen(pDest->zAffSdst));
+				field_type_sequence_dup(pParse, pDest->dest_type,
+							nColumn);
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, regRow, nColumn,
 					  regTupleid, (char *)types,
 					  P4_DYNAMIC);
-			sqlite3ExprCacheAffinityChange(pParse, regRow, nColumn);
+			sql_expr_type_cache_change(pParse, regRow, nColumn);
 			sqlite3VdbeAddOp2(v, OP_IdxInsert, regTupleid, pDest->reg_eph);
 			break;
 		}
@@ -1652,9 +1647,9 @@ generateSortTail(Parse * pParse,	/* Parsing context */
 			if (eDest == SRT_Output) {
 				sqlite3VdbeAddOp2(v, OP_ResultRow, pDest->iSdst,
 						  nColumn);
-				sqlite3ExprCacheAffinityChange(pParse,
-							       pDest->iSdst,
-							       nColumn);
+				sql_expr_type_cache_change(pParse,
+							   pDest->iSdst,
+							   nColumn);
 			} else {
 				sqlite3VdbeAddOp1(v, OP_Yield, pDest->iSDParm);
 			}
@@ -1968,9 +1963,7 @@ sqlite3SelectAddColumnTypeAndCollation(Parse * pParse,		/* Parsing contexts */
 	a = pSelect->pEList->a;
 	for (uint32_t i = 0; i < pTab->def->field_count; i++) {
 		p = a[i].pExpr;
-		enum field_type type = sql_expr_type(p);
-		pTab->def->fields[i].affinity = sql_field_type_to_affinity(type);
-		pTab->def->fields[i].type = type;
+		pTab->def->fields[i].type = sql_expr_type(p);
 		bool is_found;
 		uint32_t coll_id;
 
@@ -3090,13 +3083,13 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 			testcase(in->nSdst > 1);
 			r1 = sqlite3GetTempReg(parse);
 			enum field_type *types =
-				sql_affinity_str_to_field_type_str(dest->zAffSdst,
-								   strlen(dest->zAffSdst));
+				field_type_sequence_dup(parse, dest->dest_type,
+							in->nSdst);
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, in->iSdst,
 					  in->nSdst, r1, (char *)types,
 					  P4_DYNAMIC);
-			sqlite3ExprCacheAffinityChange(parse, in->iSdst,
-						       in->nSdst);
+			sql_expr_type_cache_change(parse, in->iSdst,
+						   in->nSdst);
 			sqlite3VdbeAddOp2(v, OP_IdxInsert, r1, dest->reg_eph);
 			sqlite3ReleaseTempReg(parse, r1);
 			break;
@@ -3141,8 +3134,7 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 			assert(dest->eDest == SRT_Output);
 			sqlite3VdbeAddOp2(v, OP_ResultRow, in->iSdst,
 					  in->nSdst);
-			sqlite3ExprCacheAffinityChange(parse, in->iSdst,
-						       in->nSdst);
+			sql_expr_type_cache_change(parse, in->iSdst, in->nSdst);
 			break;
 		}
 	}
@@ -5370,7 +5362,7 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 		sqlite3VdbeAddOp3(v, OP_AggStep0, 0, regAgg, pF->iMem);
 		sqlite3VdbeAppendP4(v, pF->pFunc, P4_FUNCDEF);
 		sqlite3VdbeChangeP5(v, (u8) nArg);
-		sqlite3ExprCacheAffinityChange(pParse, regAgg, nArg);
+		sql_expr_type_cache_change(pParse, regAgg, nArg);
 		sqlite3ReleaseTempRange(pParse, regAgg, nArg);
 		if (addrNext) {
 			sqlite3VdbeResolveLabel(v, addrNext);

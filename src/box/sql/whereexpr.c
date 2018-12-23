@@ -272,7 +272,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	    sql_expr_type(pLeft) != FIELD_TYPE_STRING) {
 		/* IMP: R-02065-49465 The left-hand side of the
 		 * LIKE operator must be the name of an indexed
-		 * column with TEXT affinity.
+		 * column with STRING type.
 		 */
 		return 0;
 	}
@@ -284,7 +284,8 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 		Vdbe *pReprepare = pParse->pReprepare;
 		int iCol = pRight->iColumn;
 		pVal =
-		    sqlite3VdbeGetBoundValue(pReprepare, iCol, AFFINITY_BLOB);
+		    sqlite3VdbeGetBoundValue(pReprepare, iCol,
+					     FIELD_TYPE_SCALAR);
 		if (pVal && sqlite3_value_type(pVal) == SQLITE_TEXT) {
 			z = (char *)sqlite3_value_text(pVal);
 		}
@@ -748,7 +749,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				} else if (pOrTerm->u.leftColumn != iColumn) {
 					okToChngToIN = 0;
 				} else {
-					/* If the right-hand side is also a column, then the affinities
+					/* If the right-hand side is also a column, then the types
 					 * of both right and left sides must be such that no type
 					 * conversions are required on the right.  (Ticket #2249)
 					 */
@@ -824,7 +825,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
  *   1.  The SQLITE_Transitive optimization must be enabled
  *   2.  Must be either an == or an IS operator
  *   3.  Not originating in the ON clause of an OUTER JOIN
- *   4.  The affinities of A and B must be compatible
+ *   4.  The types of A and B must be compatible
  *   5a. Both operands use the same collating sequence OR
  *   5b. The overall collating sequence is BINARY
  * If this routine returns TRUE, that means that the RHS can be substituted
