@@ -47,15 +47,6 @@ const char *mp_type_strs[] = {
 	/* .MP_EXT    = */ "extension",
 };
 
-static const char *affinity_type_strs[] = {
-	/* [UNDEFINED] */ "undefined",
-	/* [BLOB - 'A'] */ "blob",
-	/* [TEXT - 'A'] */ "text",
-	/* [NUMERIC - 'A'] */ "numeric",
-	/* [INTEGER - 'A'] */ "integer",
-	/* [REAL - 'A'] */ "real",
-};
-
 const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_ANY]      =  */ UINT32_MAX,
 	/* [FIELD_TYPE_UNSIGNED] =  */ 1U << MP_UINT,
@@ -70,15 +61,6 @@ const uint32_t field_mp_type[] = {
 	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
 	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
 };
-
-const char *
-affinity_type_str(enum affinity_type type)
-{
-	if (type < 'A')
-		return affinity_type_strs[type];
-	else
-		return affinity_type_strs[type - 'A' + 1];
-}
 
 const char *field_type_strs[] = {
 	/* [FIELD_TYPE_ANY]      = */ "any",
@@ -142,13 +124,11 @@ const struct opt_def field_def_reg[] = {
 		     nullable_action, NULL),
 	OPT_DEF("collation", OPT_UINT32, struct field_def, coll_id),
 	OPT_DEF("default", OPT_STRPTR, struct field_def, default_value),
-	OPT_DEF("affinity", OPT_UINT32, struct field_def, affinity),
 	OPT_END,
 };
 
 const struct field_def field_def_default = {
 	.type = FIELD_TYPE_ANY,
-	.affinity = AFFINITY_UNDEFINED,
 	.name = NULL,
 	.is_nullable = false,
 	.nullable_action = ON_CONFLICT_ACTION_DEFAULT,
