@@ -765,6 +765,13 @@ s.index.i1:select()
 s.index.i2:select()
 s.index.i3:select()
 
+--
+-- gh-3903: index build doesn't work after recovery.
+--
+s.index.i1:drop()
+_ = s:create_index('i1', {parts = {2, 'string'}, unique = false})
+s.index.i1:select()
+
 box.snapshot()
 
 s:drop()

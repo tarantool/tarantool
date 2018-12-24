@@ -2725,7 +2725,6 @@ vinyl_engine_begin_initial_recovery(struct engine *engine,
 	struct vy_env *e = vy_env(engine);
 	assert(e->status == VINYL_OFFLINE);
 	if (recovery_vclock != NULL) {
-		e->xm->lsn = vclock_sum(recovery_vclock);
 		e->recovery_vclock = recovery_vclock;
 		e->recovery = vy_log_begin_recovery(recovery_vclock);
 		if (e->recovery == NULL)
@@ -2787,6 +2786,18 @@ vinyl_engine_end_recovery(struct engine *engine)
 		vy_gc(e, e->recovery, VY_GC_INCOMPLETE, INT64_MAX);
 		vy_recovery_delete(e->recovery);
 		e->recovery = NULL;
+		/*
+		 * During recovery we skip statements that have
+		 * been dumped to disk - see vy_is_committed() -
+		 * so it may turn out that tx_manager::lsn stays
+		 * behind the instance vclock while we need it
+		 * to be up-to-date once recovery is complete,
+		 * because we use it while building an index to
+		 * skip statements inserted after build began -
+		 * see vinyl_space_build_index() - so we reset
+		 * it upon recovery completion.
+		 */
+		e->xm->lsn = vclock_sum(e->recovery_vclock);
 		e->recovery_vclock = NULL;
 		vy_env_complete_recovery(e);
 		break;

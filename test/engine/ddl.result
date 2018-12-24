@@ -2114,6 +2114,24 @@ s.index.i3:select()
   - [4, 'zzz', 'ddd', -666]
   - [1, 'zzz', 'aaa', 999, 'fff']
 ...
+--
+-- gh-3903: index build doesn't work after recovery.
+--
+s.index.i1:drop()
+---
+...
+_ = s:create_index('i1', {parts = {2, 'string'}, unique = false})
+---
+...
+s.index.i1:select()
+---
+- - [3, 'xxx', null, 777, 'ggg']
+  - [5, 'xxx', 'eee', 555, 'hhh']
+  - [2, 'yyy', 'bbb', -888]
+  - [6, 'yyy', null, -444]
+  - [1, 'zzz', 'aaa', 999, 'fff']
+  - [4, 'zzz', 'ddd', -666]
+...
 box.snapshot()
 ---
 - ok
