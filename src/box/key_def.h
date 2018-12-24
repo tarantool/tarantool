@@ -34,16 +34,12 @@
 #include "error.h"
 #include "diag.h"
 #include <msgpuck.h>
-#include <limits.h>
 #include "field_def.h"
 #include "coll_id.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
-
-/* MsgPack type names */
-extern const char *mp_type_strs[];
 
 /* Sorting order of a part. */
 extern const char *sort_order_strs[];
@@ -390,20 +386,6 @@ key_def_has_collation(const struct key_def *key_def)
 			return true;
 	}
 	return false;
-}
-
-/** A helper table for field_mp_type_is_compatible */
-extern const uint32_t field_mp_type[];
-
-/** Checks if mp_type (MsgPack) is compatible with field type. */
-static inline bool
-field_mp_type_is_compatible(enum field_type type, enum mp_type mp_type,
-			    bool is_nullable)
-{
-	assert(type < field_type_MAX);
-	assert((size_t)mp_type < CHAR_BIT * sizeof(*field_mp_type));
-	uint32_t mask = field_mp_type[type] | (is_nullable * (1U << MP_NIL));
-	return (mask & (1U << mp_type)) != 0;
 }
 
 /**

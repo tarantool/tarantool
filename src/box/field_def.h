@@ -33,6 +33,9 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <limits.h>
+#include <msgpuck.h>
 #include "opt_def.h"
 
 #if defined(__cplusplus)
@@ -99,6 +102,12 @@ field_type1_contains_type2(enum field_type type1, enum field_type type2);
 enum field_type
 field_type_by_name(const char *name, size_t len);
 
+/* MsgPack type names */
+extern const char *mp_type_strs[];
+
+/** A helper table for field_mp_type_is_compatible */
+extern const uint32_t field_mp_type[];
+
 extern const struct opt_def field_def_reg[];
 extern const struct field_def field_def_default;
 
@@ -133,6 +142,17 @@ struct field_def {
 	/** AST for parsed default value. */
 	struct Expr *default_value_expr;
 };
+
+/** Checks if mp_type (MsgPack) is compatible with field type. */
+static inline bool
+field_mp_type_is_compatible(enum field_type type, enum mp_type mp_type,
+			    bool is_nullable)
+{
+	assert(type < field_type_MAX);
+	assert((size_t)mp_type < CHAR_BIT * sizeof(*field_mp_type));
+	uint32_t mask = field_mp_type[type] | (is_nullable * (1U << MP_NIL));
+	return (mask & (1U << mp_type)) != 0;
+}
 
 static inline bool
 action_is_nullable(enum on_conflict_action nullable_action)

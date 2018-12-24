@@ -33,6 +33,20 @@
 #include "trivia/util.h"
 #include "key_def.h"
 
+const char *mp_type_strs[] = {
+	/* .MP_NIL    = */ "nil",
+	/* .MP_UINT   = */ "unsigned",
+	/* .MP_INT    = */ "integer",
+	/* .MP_STR    = */ "string",
+	/* .MP_BIN    = */ "blob",
+	/* .MP_ARRAY  = */ "array",
+	/* .MP_MAP    = */ "map",
+	/* .MP_BOOL   = */ "boolean",
+	/* .MP_FLOAT  = */ "float",
+	/* .MP_DOUBLE = */ "double",
+	/* .MP_EXT    = */ "extension",
+};
+
 static const char *affinity_type_strs[] = {
 	/* [UNDEFINED] */ "undefined",
 	/* [BLOB - 'A'] */ "blob",
@@ -40,6 +54,21 @@ static const char *affinity_type_strs[] = {
 	/* [NUMERIC - 'A'] */ "numeric",
 	/* [INTEGER - 'A'] */ "integer",
 	/* [REAL - 'A'] */ "real",
+};
+
+const uint32_t field_mp_type[] = {
+	/* [FIELD_TYPE_ANY]      =  */ UINT32_MAX,
+	/* [FIELD_TYPE_UNSIGNED] =  */ 1U << MP_UINT,
+	/* [FIELD_TYPE_STRING]   =  */ 1U << MP_STR,
+	/* [FIELD_TYPE_NUMBER]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
+		(1U << MP_FLOAT) | (1U << MP_DOUBLE),
+	/* [FIELD_TYPE_INTEGER]  =  */ (1U << MP_UINT) | (1U << MP_INT),
+	/* [FIELD_TYPE_BOOLEAN]  =  */ 1U << MP_BOOL,
+	/* [FIELD_TYPE_SCALAR]   =  */ (1U << MP_UINT) | (1U << MP_INT) |
+		(1U << MP_FLOAT) | (1U << MP_DOUBLE) | (1U << MP_STR) |
+		(1U << MP_BIN) | (1U << MP_BOOL),
+	/* [FIELD_TYPE_ARRAY]    =  */ 1U << MP_ARRAY,
+	/* [FIELD_TYPE_MAP]      =  */ (1U << MP_MAP),
 };
 
 const char *
