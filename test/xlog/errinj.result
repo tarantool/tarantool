@@ -43,7 +43,6 @@ require('fio').glob(name .. "/*.xlog")
 ---
 - - xlog/00000000000000000000.xlog
   - xlog/00000000000000000001.xlog
-  - xlog/00000000000000000002.xlog
 ...
 test_run:cmd('restart server default with cleanup=1')
 -- gh-881 iproto request with wal IO error

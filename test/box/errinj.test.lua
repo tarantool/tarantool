@@ -23,6 +23,24 @@ space:update(1, {{'=', 2, 2}})
 space:get{1}
 space:get{2}
 errinj.set("ERRINJ_WAL_IO", false)
+space:update(1, {{'=', 2, 2}})
+space:truncate()
+
+-- Check that WAL vclock isn't promoted on failed write.
+lsn1 = box.info.vclock[box.info.id]
+errinj.set("ERRINJ_WAL_WRITE_PARTIAL", 0)
+space:insert{1}
+errinj.set("ERRINJ_WAL_WRITE_PARTIAL", -1)
+space:insert{1}
+-- Check vclock was promoted only one time
+box.info.vclock[box.info.id] == lsn1 + 1
+errinj.set("ERRINJ_WAL_WRITE_PARTIAL", 0)
+space:update(1, {{'=', 2, 2}})
+space:get{1}
+errinj.set("ERRINJ_WAL_WRITE_PARTIAL", -1)
+space:update(1, {{'=', 2, 2}})
+-- Check vclock was promoted only two times
+box.info.vclock[box.info.id] == lsn1 + 2
 space:truncate()
 
 -- Check a failed log rotation
