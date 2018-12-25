@@ -82,6 +82,69 @@ box.info.status
 ---
 - running
 ...
+-- gh-2283: test that if replication_skip_conflict is off vclock
+-- is not advanced on errors.
+test_run:cmd("restart server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.space.test:insert{3}
+---
+- [3]
+...
+lsn1 = box.info.vclock[1]
+---
+...
+test_run:cmd("switch default")
+---
+- true
+...
+box.space.test:insert{3, 3}
+---
+- [3, 3]
+...
+box.space.test:insert{4}
+---
+- [4]
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+-- lsn is not promoted
+lsn1 == box.info.vclock[1]
+---
+- true
+...
+box.info.replication[1].upstream.message
+---
+- Duplicate key exists in unique index 'primary' in space 'test'
+...
+box.info.replication[1].upstream.status
+---
+- stopped
+...
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("restart server replica")
+---
+- true
+...
+-- applier is not in follow state
+box.info.replication[1].upstream.message
+---
+- Duplicate key exists in unique index 'primary' in space 'test'
+...
+test_run:cmd("switch default")
+---
+- true
+...
 -- cleanup
 test_run:cmd("stop server replica")
 ---
