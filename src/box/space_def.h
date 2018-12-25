@@ -122,9 +122,14 @@ struct space_def {
  * Free a default value syntax trees of @a defs.
  * @param fields Fields array to destroy.
  * @param field_count Length of @a fields.
+ * @param extern_alloc Fields expression AST allocated externally.
+ *                     (specify false when sql_expr_delete should
+ *                      release default_value_expr memory,
+ *                      true - when shouldn't)
  */
 void
-space_def_destroy_fields(struct field_def *fields, uint32_t field_count);
+space_def_destroy_fields(struct field_def *fields, uint32_t field_count,
+			 bool extern_alloc);
 
 /**
  * Delete the space_def object.

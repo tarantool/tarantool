@@ -452,7 +452,7 @@ space_format_decode(const char *data, uint32_t *out_count,
 	 */
 	memset(region_defs, 0, size);
 	auto fields_guard = make_scoped_guard([=] {
-		space_def_destroy_fields(region_defs, count);
+		space_def_destroy_fields(region_defs, count, false);
 	});
 	for (uint32_t i = 0; i < count; ++i) {
 		field_def_decode(&region_defs[i], &data, space_name, name_len,
@@ -515,7 +515,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 	fields = space_format_decode(format, &field_count, name,
 				     name_len, errcode, region);
 	auto fields_guard = make_scoped_guard([=] {
-		space_def_destroy_fields(fields, field_count);
+		space_def_destroy_fields(fields, field_count, false);
 	});
 	if (exact_field_count != 0 &&
 	    exact_field_count < field_count) {
@@ -540,6 +540,7 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 		space_def_new_xc(id, uid, exact_field_count, name, name_len,
 				 engine_name, engine_name_len, &opts, fields,
 				 field_count);
+	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	if (def->opts.checks != NULL &&
 	    sql_checks_resolve_space_def_reference(def->opts.checks,
 						   def) != 0) {
@@ -551,7 +552,6 @@ space_def_new_from_tuple(struct tuple *tuple, uint32_t errcode,
 			diag_raise();
 		}
 	}
-	auto def_guard = make_scoped_guard([=] { space_def_delete(def); });
 	struct engine *engine = engine_find_xc(def->engine_name);
 	engine_check_space_def_xc(engine, def);
 	def_guard.is_active = false;

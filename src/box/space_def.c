@@ -259,12 +259,13 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 
 /** Free a default value's syntax trees of @a defs. */
 void
-space_def_destroy_fields(struct field_def *fields, uint32_t field_count)
+space_def_destroy_fields(struct field_def *fields, uint32_t field_count,
+			 bool extern_alloc)
 {
 	for (uint32_t i = 0; i < field_count; ++i) {
 		if (fields[i].default_value_expr != NULL) {
 			sql_expr_delete(sql_get(), fields[i].default_value_expr,
-					true);
+					extern_alloc);
 		}
 	}
 }
@@ -274,7 +275,7 @@ space_def_delete(struct space_def *def)
 {
 	space_opts_destroy(&def->opts);
 	tuple_dictionary_unref(def->dict);
-	space_def_destroy_fields(def->fields, def->field_count);
+	space_def_destroy_fields(def->fields, def->field_count, true);
 	TRASH(def);
 	free(def);
 }
