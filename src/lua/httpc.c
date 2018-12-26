@@ -175,6 +175,19 @@ luaT_httpc_request(lua_State *L)
 	if (!lua_isnil(L, -1)) {
 		lua_pushnil(L);
 		while (lua_next(L, -2) != 0) {
+			int header_type = lua_type(L, -1);
+			if (header_type != LUA_TSTRING) {
+				const char *err_msg =
+					"headers must be string or table "\
+					"with \"__tostring\"";
+				if (header_type != LUA_TTABLE) {
+					return luaL_error(L, err_msg);
+				} else if (!luaL_getmetafield(L, -1,
+							      "__tostring")) {
+					return luaL_error(L, err_msg);
+				}
+				lua_pop(L, 1);
+			}
 			if (httpc_set_header(req, "%s: %s",
 					     lua_tostring(L, -2),
 					     lua_tostring(L, -1)) < 0) {
