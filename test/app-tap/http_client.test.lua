@@ -208,6 +208,80 @@ local function test_errors(test)
     test:is(r.status, 595, "GET: response on bad url")
 end
 
+-- gh-3679 allow only headers can be converted to string
+local function test_request_headers(test, url, opts)
+    local exp_err = 'headers must be string or table with "__tostring"'
+    local cases = {
+        {
+            'string header',
+            opts = {headers = {aaa = 'aaa'}},
+            exp_err = nil,
+        },
+        {
+            'header with __tostring() metamethod',
+            opts = {headers = {aaa = setmetatable({}, {
+                __tostring = function(self)
+                    return 'aaa'
+                end})}},
+            exp_err = nil,
+            postrequest_check = function(opts)
+                assert(type(opts.headers.aaa) == 'table',
+                    '"aaa" header was modified in http_client')
+            end,
+        },
+        {
+            'boolean header',
+            opts = {headers = {aaa = true}},
+            exp_err = exp_err,
+        },
+        {
+            'number header',
+            opts = {headers = {aaa = 10}},
+            exp_err = exp_err,
+        },
+        {
+            'cdata header (box.NULL)',
+            opts = {headers = {aaa = box.NULL}},
+            exp_err = exp_err,
+        },
+        {
+            'cdata<uint64_t> header',
+            opts = {headers = {aaa = 10ULL}},
+            exp_err = exp_err,
+        },
+        {
+            'table header w/o metatable',
+            opts = {headers = {aaa = {}}},
+            exp_err = exp_err,
+        },
+        {
+            'table header w/o __tostring() metamethod',
+            opts = {headers = {aaa = setmetatable({}, {})}},
+            exp_err = exp_err,
+        },
+    }
+    test:plan(#cases)
+
+    local http = client:new()
+
+    for _, case in ipairs(cases) do
+        local opts = merge(table.copy(opts), case.opts)
+        local ok, err = pcall(http.get, http, url, opts)
+        if case.postrequest_check ~= nil then
+            case.postrequest_check(opts)
+        end
+        if case.exp_err == nil then
+            -- expect success
+            test:ok(ok, case[1])
+        else
+            -- expect fail
+            assert(type(err) == 'string')
+            err = err:gsub('^builtin/[a-z._]+.lua:[0-9]+: ', '')
+            test:is_deeply({ok, err}, {false, case.exp_err}, case[1])
+        end
+    end
+end
+
 local function test_headers(test, url, opts)
     test:plan(21)
     local http = client:new()
@@ -419,12 +493,13 @@ local function test_concurrent(test, url, opts)
 end
 
 function run_tests(test, sock_family, sock_addr)
-    test:plan(9)
+    test:plan(10)
     local server, url, opts = start_server(test, sock_family, sock_addr)
     test:test("http.client", test_http_client, url, opts)
     test:test("cancel and errinj", test_cancel_and_errinj, url .. 'long_query', opts)
     test:test("basic http post/get", test_post_and_get, url, opts)
     test:test("errors", test_errors)
+    test:test("request_headers", test_request_headers, url, opts)
     test:test("headers", test_headers, url, opts)
     test:test("special methods", test_special_methods, url, opts)
     if sock_family == 'AF_UNIX' and jit.os ~= "Linux" then
