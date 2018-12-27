@@ -211,7 +211,7 @@ void
 test_tree()
 {
 	header();
-	plan(54);
+	plan(58);
 
 	struct json_tree tree;
 	int rc = json_tree_create(&tree);
@@ -398,6 +398,22 @@ test_tree()
 		idx++;
 	}
 	is(idx, cnt, "records iterated count %d of %d", idx, cnt);
+
+	records_idx = 0;
+	node = test_add_path(&tree, path2, strlen(path2), records, &records_idx);
+	fail_if(&node->node != &records[2].node);
+	is(json_token_is_leaf(&records[1].node), false, "interm node is not leaf");
+	is(json_token_is_leaf(&records[2].node), true, "last node is leaf");
+
+	node = test_add_path(&tree, path3, strlen(path3), records, &records_idx);
+	fail_if(&node->node != &records[3].node);
+	is(json_token_is_leaf(&records[2].node), false,
+	   "last node became interm - it can't be leaf anymore");
+	is(json_token_is_leaf(&records[3].node), true, "last node is leaf");
+
+	json_tree_foreach_entry_safe(node, &tree.root, struct test_struct,
+				     node, node_tmp)
+		json_tree_del(&tree, &node->node);
 	json_tree_destroy(&tree);
 
 	check_plan();

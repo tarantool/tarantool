@@ -101,7 +101,7 @@ ok 1 - subtests
 ok 2 - subtests
 	*** test_errors: done ***
 	*** test_tree ***
-    1..54
+    1..58
     ok 1 - add path '[1][10]'
     ok 2 - add path '[1][20].file'
     ok 3 - add path '[1][20].file[2]'
@@ -156,6 +156,10 @@ ok 2 - subtests
     ok 52 - test foreach entry safe order 2: have 2 expected of 2
     ok 53 - test foreach entry safe order 3: have 0 expected of 0
     ok 54 - records iterated count 4 of 4
+    ok 55 - interm node is not leaf
+    ok 56 - last node is leaf
+    ok 57 - last node became interm - it can't be leaf anymore
+    ok 58 - last node is leaf
 ok 3 - subtests
 	*** test_tree: done ***
 	*** test_path_cmp ***

@@ -30,6 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "trivia/util.h"
@@ -252,6 +253,16 @@ json_path_cmp(const char *a, int a_len, const char *b, int b_len,
  */
 int
 json_path_validate(const char *path, int path_len, int index_base);
+
+/**
+ * Test if a given JSON token is a JSON tree leaf, i.e.
+ * has no child nodes.
+ */
+static inline bool
+json_token_is_leaf(struct json_token *token)
+{
+	return token->max_child_idx < 0;
+}
 
 /**
  * An snprint-style function to print the path to a token in
