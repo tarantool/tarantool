@@ -842,8 +842,7 @@ index = s:create_index('string', { type = 'tree', unique =  false, parts = { 2, 
 -- create index on a non-existing field
 index = s:create_index('nosuchfield', { type = 'tree', unique = true, parts = { 3, 'string'}})
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 3)
+- error: Tuple field 3 required by space format is missing
 ...
 s.index.year:drop()
 ---
@@ -864,8 +863,7 @@ s:replace{'Der Baader Meinhof Komplex'}
 ...
 index = s:create_index('year', { type = 'tree', unique = false, parts = { 2, 'unsigned'}})
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s:drop()
 ---

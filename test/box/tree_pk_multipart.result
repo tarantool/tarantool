@@ -490,13 +490,11 @@ i1 = space:create_index('primary', { type = 'tree', parts = {1, 'unsigned', 3, '
 ...
 space:insert{1, 1}
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 3)
+- error: Tuple field 3 required by space format is missing
 ...
 space:replace{1, 1}
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 3)
+- error: Tuple field 3 required by space format is missing
 ...
 space:drop()
 ---

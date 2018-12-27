@@ -91,7 +91,7 @@ struct errcode_record {
 	/* 36 */_(ER_NO_SUCH_SPACE,		"Space '%s' does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		"Field %d was not found in the tuple") \
 	/* 38 */_(ER_EXACT_FIELD_COUNT,		"Tuple field count %u does not match space field count %u") \
-	/* 39 */_(ER_MIN_FIELD_COUNT,		"Tuple field count %u is less than required by space format or defined indexes (expected at least %u)") \
+	/* 39 */_(ER_FIELD_MISSING,		"Tuple field %s required by space format is missing") \
 	/* 40 */_(ER_WAL_IO,			"Failed to write to disk") \
 	/* 41 */_(ER_MORE_THAN_ONE_TUPLE,	"Get() doesn't support partial keys and non-unique indexes") \
 	/* 42 */_(ER_ACCESS_DENIED,		"%s access to %s '%s' is denied for user '%s'") \

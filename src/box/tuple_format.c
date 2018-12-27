@@ -28,6 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "bit/bit.h"
+#include "fiber.h"
 #include "json/json.h"
 #include "tuple_format.h"
 #include "coll_id_cache.h"
@@ -47,6 +49,7 @@ tuple_field_new(void)
 			 "tuple field");
 		return NULL;
 	}
+	field->id = UINT32_MAX;
 	field->token.type = JSON_TOKEN_END;
 	field->type = FIELD_TYPE_ANY;
 	field->offset_slot = TUPLE_OFFSET_SLOT_NIL;
@@ -69,6 +72,24 @@ tuple_field_path(const struct tuple_field *field)
 	assert(field->token.parent->parent == NULL);
 	assert(field->token.type == JSON_TOKEN_NUM);
 	return int2str(field->token.num + TUPLE_INDEX_BASE);
+}
+
+/**
+ * Look up field metadata by identifier.
+ *
+ * Used only for error reporing so we can afford full field
+ * tree traversal here.
+ */
+static struct tuple_field *
+tuple_format_field_by_id(struct tuple_format *format, uint32_t id)
+{
+	struct tuple_field *field;
+	json_tree_foreach_entry_preorder(field, &format->fields.root,
+					 struct tuple_field, token) {
+		if (field->id == id)
+			return field;
+	}
+	return NULL;
 }
 
 static int
@@ -207,6 +228,26 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		return -1;
 	}
 	format->field_map_size = field_map_size;
+
+	size_t required_fields_sz = bitmap_size(format->total_field_count);
+	format->required_fields = calloc(1, required_fields_sz);
+	if (format->required_fields == NULL) {
+		diag_set(OutOfMemory, required_fields_sz,
+			 "malloc", "required field bitmap");
+		return -1;
+	}
+	struct tuple_field *field;
+	json_tree_foreach_entry_preorder(field, &format->fields.root,
+					 struct tuple_field, token) {
+		/*
+		 * Mark all leaf non-nullable fields as required
+		 * by setting the corresponding bit in the bitmap
+		 * of required fields.
+		 */
+		if (json_token_is_leaf(&field->token) &&
+		    !tuple_field_is_nullable(field))
+			bit_set(format->required_fields, field->id);
+	}
 	return 0;
 }
 
@@ -305,6 +346,7 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 		struct tuple_field *field = tuple_field_new();
 		if (field == NULL)
 			goto error;
+		field->id = fieldno;
 		field->token.num = fieldno;
 		field->token.type = JSON_TOKEN_NUM;
 		if (json_tree_add(&format->fields, &format->fields.root,
@@ -324,6 +366,8 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 		format->dict = dict;
 		tuple_dictionary_ref(dict);
 	}
+	format->total_field_count = field_count;
+	format->required_fields = NULL;
 	format->refs = 0;
 	format->id = FORMAT_ID_NIL;
 	format->index_field_count = index_field_count;
@@ -340,6 +384,7 @@ error:
 static inline void
 tuple_format_destroy(struct tuple_format *format)
 {
+	free(format->required_fields);
 	tuple_format_destroy_fields(format);
 	tuple_dictionary_unref(format->dict);
 }
@@ -429,7 +474,10 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 	if (tuple_format_field_count(format) == 0)
 		return 0; /* Nothing to initialize */
 
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
 	const char *pos = tuple;
+	int rc = 0;
 
 	/* Check to see if the tuple has a sufficient number of fields. */
 	uint32_t field_count = mp_decode_array(&pos);
@@ -438,15 +486,32 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
 			 (unsigned) field_count,
 			 (unsigned) format->exact_field_count);
-		return -1;
+		goto error;
 	}
-	if (validate && field_count < format->min_field_count) {
-		diag_set(ClientError, ER_MIN_FIELD_COUNT,
-			 (unsigned) field_count,
-			 (unsigned) format->min_field_count);
-		return -1;
+	/*
+	 * Allocate a field bitmap that will be used for checking
+	 * that all mandatory fields are present.
+	 */
+	void *required_fields = NULL;
+	size_t required_fields_sz = 0;
+	if (validate) {
+		required_fields_sz = bitmap_size(format->total_field_count);
+		required_fields = region_alloc(region, required_fields_sz);
+		if (required_fields == NULL) {
+			diag_set(OutOfMemory, required_fields_sz,
+				 "region", "required field bitmap");
+			goto error;
+		}
+		memcpy(required_fields, format->required_fields,
+		       required_fields_sz);
 	}
-
+	/*
+	 * Initialize the tuple field map and validate field types.
+	 */
+	if (field_count == 0) {
+		/* Empty tuple, nothing to do. */
+		goto skip;
+	}
 	/* first field is simply accessible, so we do not store offset to it */
 	struct tuple_field *field = tuple_format_field(format, 0);
 	if (validate &&
@@ -454,8 +519,10 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 					 tuple_field_is_nullable(field))) {
 		diag_set(ClientError, ER_FIELD_TYPE, tuple_field_path(field),
 			 field_type_strs[field->type]);
-		return -1;
+		goto error;
 	}
+	if (required_fields != NULL)
+		bit_clear(required_fields, field->id);
 	mp_next(&pos);
 	/* other fields...*/
 	uint32_t i = 1;
@@ -478,15 +545,40 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 			diag_set(ClientError, ER_FIELD_TYPE,
 				 tuple_field_path(field),
 				 field_type_strs[field->type]);
-			return -1;
+			goto error;
 		}
 		if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL) {
 			field_map[field->offset_slot] =
 				(uint32_t) (pos - tuple);
 		}
+		if (required_fields != NULL)
+			bit_clear(required_fields, field->id);
 		mp_next(&pos);
 	}
-	return 0;
+skip:
+	/*
+	 * Check the required field bitmap for missing fields.
+	 */
+	if (required_fields != NULL) {
+		struct bit_iterator it;
+		bit_iterator_init(&it, required_fields,
+				  required_fields_sz, true);
+		size_t id = bit_iterator_next(&it);
+		if (id < SIZE_MAX) {
+			/* A field is missing, report an error. */
+			field = tuple_format_field_by_id(format, id);
+			assert(field != NULL);
+			diag_set(ClientError, ER_FIELD_MISSING,
+				 tuple_field_path(field));
+			goto error;
+		}
+	}
+out:
+	region_truncate(region, region_svp);
+	return rc;
+error:
+	rc = -1;
+	goto out;
 }
 
 uint32_t

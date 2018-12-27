@@ -85,6 +85,8 @@ struct tuple_format_vtab {
 
 /** Tuple field meta information for tuple_format. */
 struct tuple_field {
+	/** Unique field identifier. */
+	uint32_t id;
 	/**
 	 * Field type of an indexed field.
 	 * If a field participates in at least one of space indexes
@@ -169,6 +171,16 @@ struct tuple_format {
 	 * index_field_count <= min_field_count <= field_count.
 	 */
 	uint32_t min_field_count;
+	/**
+	 * Total number of formatted fields, including JSON
+	 * path fields. See also tuple_format::fields.
+	 */
+	uint32_t total_field_count;
+	/**
+	 * Bitmap of fields that must be present in a tuple
+	 * conforming to the format. Indexed by tuple_field::id.
+	 */
+	void *required_fields;
 	/**
 	 * Shared names storage used by all formats of a space.
 	 */

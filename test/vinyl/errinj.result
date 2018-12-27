@@ -1634,8 +1634,7 @@ errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
 ...
 s:create_index('sk', {parts = {2, 'unsigned'}}) -- must fail
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0)
 ---
@@ -2087,8 +2086,7 @@ fiber.sleep(0)
 ...
 s:format{{'key', 'unsigned'}, {'value', 'unsigned'}} -- must fail
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s:select()
 ---
@@ -2112,8 +2110,7 @@ fiber.sleep(0)
 ...
 s:create_index('sk', {parts = {2, 'unsigned'}})
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s:select()
 ---

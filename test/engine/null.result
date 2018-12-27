@@ -458,8 +458,7 @@ sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 ...
 s:replace{1, 2} -- error
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 3)
+- error: Tuple field 3 required by space format is missing
 ...
 t1 = s:replace{2, 3, 4}
 ---
@@ -530,18 +529,15 @@ sk = s:create_index('sk', {parts = {2, 'unsigned'}})
 ...
 s:replace{1, 2} -- error
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 5)
+- error: Tuple field 3 required by space format is missing
 ...
 s:replace{2, 3, 4} -- error
 ---
-- error: Tuple field count 3 is less than required by space format or defined indexes
-    (expected at least 5)
+- error: Tuple field 5 required by space format is missing
 ...
 s:replace{3, 4, 5, 6} -- error
 ---
-- error: Tuple field count 4 is less than required by space format or defined indexes
-    (expected at least 5)
+- error: Tuple field 5 required by space format is missing
 ...
 t1 = s:replace{4, 5, 6, 7, 8}
 ---
@@ -1069,8 +1065,7 @@ sk = s:create_index('sk', {parts = {{2, 'unsigned', is_nullable = true}}})
 -- Test tuple_compare_slowpath, tuple_compare_with_key_slowpath.
 s:replace{} -- Fail
 ---
-- error: Tuple field count 0 is less than required by space format or defined indexes
-    (expected at least 1)
+- error: Tuple field 1 required by space format is missing
 ...
 -- Compare full vs not full.
 s:replace{2}
@@ -1769,8 +1764,7 @@ s:format(format)
 -- Field 2 is not nullable.
 s:insert{5}
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s:insert{5, box.NULL}
 ---
@@ -1786,8 +1780,7 @@ s:insert{5, box.NULL}
 ...
 s:insert{5}
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}}
 ---
@@ -1805,8 +1798,7 @@ s:insert{5, box.NULL}
 ...
 s:insert{5}
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=true}}}
 ---
@@ -1849,13 +1841,11 @@ _ = s:delete{5}
 ...
 s:format(format) -- Still fail.
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s.index.secondary:alter{parts={{2, 'unsigned', is_nullable=false}}} -- Still fail.
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 -- Now check we can set nullability to false step by step.
 _ = s:delete{6}
@@ -1873,8 +1863,7 @@ s:insert{5, box.NULL} -- Fail.
 ...
 s:insert{5} -- Fail.
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 format[2].is_nullable = true
 ---
@@ -1891,8 +1880,7 @@ s:insert{5, box.NULL} -- Fail.
 ...
 s:insert{5} -- Fail.
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 format[2].is_nullable = false
 ---
@@ -1906,8 +1894,7 @@ s:select{}
 ...
 s:insert{5} -- Fail.
 ---
-- error: Tuple field count 1 is less than required by space format or defined indexes
-    (expected at least 2)
+- error: Tuple field 2 required by space format is missing
 ...
 s:insert{9, 10} -- Success.
 ---

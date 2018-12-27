@@ -326,33 +326,27 @@ box.internal.collation.drop('test')
 ...
 box.space._collation:auto_increment{'test'}
 ---
-- error: Tuple field count 2 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field 3 required by space format is missing
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU'}
 ---
-- error: Tuple field count 4 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: Tuple field 5 required by space format is missing
 ...
 box.space._collation:auto_increment{'test', 'ADMIN', 'ICU', 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: 'Tuple field 3 type does not match one required by operation: expected unsigned'
 ...
 box.space._collation:auto_increment{42, 0, 'ICU', 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: 'Tuple field 2 type does not match one required by operation: expected string'
 ...
 box.space._collation:auto_increment{'test', 0, 42, 'ru_RU'}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: 'Tuple field 4 type does not match one required by operation: expected string'
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 42}
 ---
-- error: Tuple field count 5 is less than required by space format or defined indexes
-    (expected at least 6)
+- error: 'Tuple field 5 type does not match one required by operation: expected string'
 ...
 box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}} --ok
 ---

@@ -369,7 +369,7 @@ t;
   36: box.error.NO_SUCH_SPACE
   37: box.error.NO_SUCH_FIELD
   38: box.error.EXACT_FIELD_COUNT
-  39: box.error.MIN_FIELD_COUNT
+  39: box.error.FIELD_MISSING
   40: box.error.WAL_IO
   41: box.error.MORE_THAN_ONE_TUPLE
   42: box.error.ACCESS_DENIED
