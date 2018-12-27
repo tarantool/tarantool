@@ -176,6 +176,21 @@ store_bool(void *p, bool b)
 }
 
 /**
+ * @brief Returns the size of memory needed to store a bitmap
+ * of \a bit_count bits.
+ * The function rounds the size up to a multiple of the word
+ * size, which is required by bit_set() and bit_clear().
+ * @param bit_count number of bits in the bitmap
+ * @retval bitmap size, in bytes
+ */
+static inline size_t
+bitmap_size(size_t bit_count)
+{
+	size_t word_count = DIV_ROUND_UP(bit_count, CHAR_BIT * sizeof(long));
+	return word_count * sizeof(long);
+}
+
+/**
  * @brief Test bit \a pos in memory chunk \a data
  * data is considered as a sequence of chars,
  *  although data size must be sizeof(long) aligned

@@ -206,6 +206,20 @@ test_bit_iter_empty(void)
 	footer();
 }
 
+static void
+test_bitmap_size(void)
+{
+	header();
+	fail_unless(bitmap_size(1) == sizeof(long));
+	fail_unless(bitmap_size(10) == sizeof(long));
+	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT) == sizeof(long));
+	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT + 1) == sizeof(long) * 2);
+	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT * 4) == sizeof(long) * 4);
+	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT * 4 - 1) == sizeof(long) * 4);
+	fail_unless(bitmap_size(sizeof(long) * CHAR_BIT * 9 / 2) == sizeof(long) * 5);
+	footer();
+}
+
 int
 main(void)
 {
@@ -216,4 +230,5 @@ main(void)
 	test_index();
 	test_bit_iter();
 	test_bit_iter_empty();
+	test_bitmap_size();
 }
