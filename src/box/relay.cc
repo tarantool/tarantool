@@ -210,6 +210,26 @@ relay_cancel(struct relay *relay)
 	}
 }
 
+/**
+ * Called by a relay thread right before termination.
+ */
+static void
+relay_exit(struct relay *relay)
+{
+	struct errinj *inj = errinj(ERRINJ_RELAY_EXIT_DELAY, ERRINJ_DOUBLE);
+	if (inj != NULL && inj->dparam > 0)
+		fiber_sleep(inj->dparam);
+
+	/*
+	 * Destroy the recovery context. We MUST do it in
+	 * the relay thread, because it contains an xlog
+	 * cursor, which must be closed in the same thread
+	 * that opened it (it uses cord's slab allocator).
+	 */
+	recovery_delete(relay->r);
+	relay->r = NULL;
+}
+
 static void
 relay_stop(struct relay *relay)
 {
@@ -277,6 +297,8 @@ int
 relay_final_join_f(va_list ap)
 {
 	struct relay *relay = va_arg(ap, struct relay *);
+	auto guard = make_scoped_guard([=] { relay_exit(relay); });
+
 	coio_enable();
 	relay_set_cord_name(relay->io.fd);
 
@@ -605,10 +627,7 @@ relay_subscribe_f(va_list ap)
 		    NULL, NULL, cbus_process);
 	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
 
-	struct errinj *inj = errinj(ERRINJ_RELAY_EXIT_DELAY, ERRINJ_DOUBLE);
-	if (inj != NULL && inj->dparam > 0)
-		fiber_sleep(inj->dparam);
-
+	relay_exit(relay);
 	return -1;
 }
 
