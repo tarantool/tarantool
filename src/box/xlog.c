@@ -791,6 +791,8 @@ xlog_clear(struct xlog *l)
 static void
 xlog_destroy(struct xlog *xlog)
 {
+	assert(xlog->obuf.slabc == &cord()->slabc);
+	assert(xlog->zbuf.slabc == &cord()->slabc);
 	obuf_destroy(&xlog->obuf);
 	obuf_destroy(&xlog->zbuf);
 	ZSTD_freeCCtx(xlog->zctx);
@@ -1816,6 +1818,7 @@ xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor,
 int
 xlog_tx_cursor_destroy(struct xlog_tx_cursor *tx_cursor)
 {
+	assert(tx_cursor->rows.slabc == &cord()->slabc);
 	ibuf_destroy(&tx_cursor->rows);
 	return 0;
 }
@@ -2049,6 +2052,7 @@ xlog_cursor_close(struct xlog_cursor *i, bool reuse_fd)
 	assert(xlog_cursor_is_open(i));
 	if (i->fd >= 0 && !reuse_fd)
 		close(i->fd);
+	assert(i->rbuf.slabc == &cord()->slabc);
 	ibuf_destroy(&i->rbuf);
 	if (i->state == XLOG_CURSOR_TX)
 		xlog_tx_cursor_destroy(&i->tx_cursor);
