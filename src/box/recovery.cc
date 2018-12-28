@@ -273,8 +273,6 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 				say_info("%.1fM rows processed",
 					 row_count / 1000000.);
 		} else {
-			say_error("can't apply row: ");
-			diag_log();
 			/*
 			 * Stop recovery if a system error occurred,
 			 * no matter if force_recovery is set or not,
@@ -287,6 +285,10 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 			if (!r->wal_dir.force_recovery ||
 			    !type_assignable(&type_ClientError, e->type))
 				diag_raise();
+
+			say_error("skipping row {%u: %lld}",
+				  (unsigned)row.replica_id, (long long)row.lsn);
+			diag_log();
 		}
 	}
 }

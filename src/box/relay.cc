@@ -406,6 +406,14 @@ relay_schedule_pending_gc(struct relay *relay, const struct vclock *vclock)
 }
 
 static void
+relay_set_error(struct relay *relay, struct error *e)
+{
+	/* Don't override existing error. */
+	if (diag_is_empty(&relay->diag))
+		diag_add_error(&relay->diag, e);
+}
+
+static void
 relay_process_wal_event(struct wal_watcher_msg *msg)
 {
 	assert((msg->events & (WAL_EVENT_WRITE | WAL_EVENT_ROTATE)) != 0);
@@ -428,8 +436,7 @@ relay_process_wal_event(struct wal_watcher_msg *msg)
 		recover_remaining_wals(relay->r, &relay->stream, NULL,
 				       (msg->events & WAL_EVENT_ROTATE) != 0);
 	} catch (Exception *e) {
-		e->log();
-		diag_move(diag_get(), &relay->diag);
+		relay_set_error(relay, e);
 		fiber_cancel(fiber());
 	}
 }
@@ -459,17 +466,8 @@ relay_reader_f(va_list ap)
 			fiber_cond_signal(&relay->reader_cond);
 		}
 	} catch (Exception *e) {
-		if (diag_is_empty(&relay->diag)) {
-			/* Don't override existing error. */
-			diag_move(diag_get(), &relay->diag);
-			fiber_cancel(relay_f);
-		} else if (!fiber_is_cancelled()) {
-			/*
-			 * There is an relay error and this fiber
-			 * fiber has another, log it.
-			 */
-			e->log();
-		}
+		relay_set_error(relay, e);
+		fiber_cancel(relay_f);
 	}
 	ibuf_destroy(&ibuf);
 	return 0;
@@ -486,7 +484,8 @@ relay_send_heartbeat(struct relay *relay)
 	try {
 		relay_send(relay, &row);
 	} catch (Exception *e) {
-		e->log();
+		relay_set_error(relay, e);
+		fiber_cancel(fiber());
 	}
 }
 
@@ -502,21 +501,26 @@ relay_subscribe_f(va_list ap)
 	struct recovery *r = relay->r;
 
 	coio_enable();
-	cbus_endpoint_create(&relay->endpoint, cord_name(cord()),
+	relay_set_cord_name(relay->io.fd);
+
+	/* Create cpipe to tx for propagating vclock. */
+	cbus_endpoint_create(&relay->endpoint, tt_sprintf("relay_%p", relay),
 			     fiber_schedule_cb, fiber());
-	cbus_pair("tx", cord_name(cord()), &relay->tx_pipe, &relay->relay_pipe,
-		  NULL, NULL, cbus_process);
+	cbus_pair("tx", relay->endpoint.name, &relay->tx_pipe,
+		  &relay->relay_pipe, NULL, NULL, cbus_process);
+
 	/* Setup garbage collection trigger. */
 	struct trigger on_close_log = {
 		RLIST_LINK_INITIALIZER, relay_on_close_log_f, relay, NULL
 	};
 	trigger_add(&r->on_close_log, &on_close_log);
-	wal_set_watcher(&relay->wal_watcher, cord_name(cord()),
+
+	/* Setup WAL watcher for sending new rows to the replica. */
+	wal_set_watcher(&relay->wal_watcher, relay->endpoint.name,
 			relay_process_wal_event, cbus_process,
 			WAL_EVENT_WRITE | WAL_EVENT_ROTATE);
 
-	relay_set_cord_name(relay->io.fd);
-
+	/* Start fiber for receiving replica acks. */
 	char name[FIBER_NAME_MAX];
 	snprintf(name, sizeof(name), "%s:%s", fiber()->name, "reader");
 	struct fiber *reader = fiber_new_xc(name, relay_reader_f);
@@ -531,6 +535,10 @@ relay_subscribe_f(va_list ap)
 	 */
 	relay_send_heartbeat(relay);
 
+	/*
+	 * Run the event loop until the connection is broken
+	 * or an error occurs.
+	 */
 	while (!fiber_is_cancelled()) {
 		double timeout = replication_timeout;
 		struct errinj *inj = errinj(ERRINJ_RELAY_REPORT_INTERVAL,
@@ -575,26 +583,33 @@ relay_subscribe_f(va_list ap)
 		relay_schedule_pending_gc(relay, send_vclock);
 	}
 
+	/*
+	 * Log the error that caused the relay to break the loop.
+	 * Don't clear the error for status reporting.
+	 */
+	assert(!diag_is_empty(&relay->diag));
+	diag_add_error(diag_get(), diag_last_error(&relay->diag));
+	diag_log();
 	say_crit("exiting the relay loop");
+
+	/* Clear garbage collector trigger and WAL watcher. */
 	trigger_clear(&on_close_log);
 	wal_clear_watcher(&relay->wal_watcher, cbus_process);
-	if (!fiber_is_dead(reader))
-		fiber_cancel(reader);
+
+	/* Join ack reader fiber. */
+	fiber_cancel(reader);
 	fiber_join(reader);
+
+	/* Destroy cpipe to tx. */
 	cbus_unpair(&relay->tx_pipe, &relay->relay_pipe,
 		    NULL, NULL, cbus_process);
 	cbus_endpoint_destroy(&relay->endpoint, cbus_process);
-	if (!diag_is_empty(&relay->diag)) {
-		/* An error has occurred while reading ACKs of xlog. */
-		diag_move(&relay->diag, diag_get());
-		/* Reference the diag in the status. */
-		diag_add_error(&relay->diag, diag_last_error(diag_get()));
-	}
+
 	struct errinj *inj = errinj(ERRINJ_RELAY_EXIT_DELAY, ERRINJ_DOUBLE);
 	if (inj != NULL && inj->dparam > 0)
 		fiber_sleep(inj->dparam);
 
-	return diag_is_empty(diag_get()) ? 0: -1;
+	return -1;
 }
 
 /** Replication acceptor fiber handler. */
@@ -625,7 +640,7 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 	vclock_copy(&relay->tx.vclock, replica_clock);
 	relay->version_id = replica_version_id;
 
-	int rc = cord_costart(&relay->cord, tt_sprintf("relay_%p", relay),
+	int rc = cord_costart(&relay->cord, "subscribe",
 			      relay_subscribe_f, relay);
 	if (rc == 0)
 		rc = cord_cojoin(&relay->cord);
