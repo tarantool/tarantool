@@ -277,10 +277,12 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 				say_info("%.1fM rows processed",
 					 row_count / 1000000.);
 		} else {
-			say_error("can't apply row: ");
-			diag_log();
 			if (!r->wal_dir.force_recovery)
 				diag_raise();
+
+			say_error("skipping row {%u: %lld}",
+				  (unsigned)row.replica_id, (long long)row.lsn);
+			diag_log();
 		}
 	}
 }
