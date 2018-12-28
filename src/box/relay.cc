@@ -412,10 +412,15 @@ relay_process_wal_event(struct wal_watcher_msg *msg)
 
 	struct relay *relay = container_of(msg->watcher, struct relay,
 					   wal_watcher);
-	if (relay->state != RELAY_FOLLOW) {
+	if (fiber_is_cancelled()) {
 		/*
-		 * Do not try to send anything to the replica
-		 * if it already closed its socket.
+		 * The relay is exiting. Rescanning the WAL at this
+		 * point would be pointless and even dangerous,
+		 * because the relay could have written a packet
+		 * fragment to the socket before being cancelled
+		 * so that writing another row to the socket would
+		 * lead to corrupted replication stream and, as
+		 * a result, permanent replication breakdown.
 		 */
 		return;
 	}
