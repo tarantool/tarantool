@@ -275,7 +275,17 @@ recover_xlog(struct recovery *r, struct xstream *stream,
 		} else {
 			say_error("can't apply row: ");
 			diag_log();
-			if (!r->wal_dir.force_recovery)
+			/*
+			 * Stop recovery if a system error occurred,
+			 * no matter if force_recovery is set or not,
+			 * because in this case we could have written
+			 * a packet fragment to the stream so that
+			 * the next write would corrupt data at the
+			 * receiving end.
+			 */
+			struct error *e = diag_last_error(diag_get());
+			if (!r->wal_dir.force_recovery ||
+			    !type_assignable(&type_ClientError, e->type))
 				diag_raise();
 		}
 	}
