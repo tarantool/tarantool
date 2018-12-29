@@ -29,3 +29,14 @@ box.space.T1.index.I4.parts
 
 box.sql.execute("DROP VIEW v1;")
 box.sql.execute("DROP TABLE t1;")
+
+-- gh-3906: data of type BOOL is displayed as should
+-- during SQL SELECT.
+--
+format = {{ name = 'ID', type = 'unsigned' }, { name = 'A', type = 'boolean' }}
+sp = box.schema.space.create("TEST", { format = format } )
+i = sp:create_index('primary', {parts = {1, 'unsigned' }})
+sp:insert({1, true})
+sp:insert({2, false})
+box.sql.execute("SELECT * FROM test")
+sp:drop()

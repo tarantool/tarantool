@@ -3780,7 +3780,7 @@ sqlite3VdbeMsgpackGet(const unsigned char *buf,	/* Buffer to deserialize from */
 	case MP_BOOL:{
 			assert((unsigned char)*zParse == 0xc2
 			       || (unsigned char)*zParse == 0xc3);
-			pMem->u.i = (unsigned)*zParse - 0xc2;	/* bool -> Integer {0,1} */
+			pMem->u.i = (unsigned char)*zParse - 0xc2;
 			pMem->flags = MEM_Int;
 			break;
 		}
