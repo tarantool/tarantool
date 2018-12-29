@@ -49,6 +49,7 @@
 #include "tarantoolInt.h"
 
 #include "msgpuck/msgpuck.h"
+#include "mpstream.h"
 
 #include "box/schema.h"
 #include "box/space.h"
@@ -2848,7 +2849,6 @@ case OP_Affinity: {
  */
 case OP_MakeRecord: {
 	Mem *pRec;             /* The new record */
-	i64 nByte;             /* Data space required for this record */
 	Mem *pData0;           /* First field to be combined into the record */
 	Mem MAYBE_UNUSED *pLast;  /* Last field of the record */
 	int nField;            /* Number of fields in the record */
@@ -2894,14 +2894,17 @@ case OP_MakeRecord: {
 		}while( zAffinity[0]);
 	}
 
-	/* Loop through the elements that will make up the record to figure
-	 * out how much space is required for the new record.
-	 */
-	nByte = sqlite3VdbeMsgpackRecordLen(pData0, nField);
-
-	if (nByte>db->aLimit[SQLITE_LIMIT_LENGTH]) {
-		goto too_big;
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	uint32_t tuple_size;
+	char *tuple =
+		sql_vdbe_mem_encode_tuple(pData0, nField, &tuple_size, region);
+	if (tuple == NULL) {
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
 	}
+	if ((int64_t)tuple_size > db->aLimit[SQLITE_LIMIT_LENGTH])
+		goto too_big;
 
 	/* In case of ephemeral space, it is possible to save some memory
 	 * allocating one by ordinary malloc: instead of cutting pieces
@@ -2915,21 +2918,25 @@ case OP_MakeRecord: {
 	 * routine.
 	 */
 	if (bIsEphemeral) {
-		rc = sqlite3VdbeMemClearAndResize(pOut, nByte);
+		rc = sqlite3VdbeMemClearAndResize(pOut, tuple_size);
 		pOut->flags = MEM_Blob;
+		pOut->n = tuple_size;
+		memcpy(pOut->z, tuple, tuple_size);
+		region_truncate(region, used);
 	} else {
 		/* Allocate memory on the region for the tuple
 		 * to be passed to Tarantool. Before that, make
 		 * sure previously allocated memory has gone.
 		 */
 		sqlite3VdbeMemRelease(pOut);
-		rc = sql_vdbe_mem_alloc_region(pOut, nByte);
+		pOut->flags = MEM_Blob | MEM_Ephem;
+		pOut->n = tuple_size;
+		pOut->z = tuple;
 	}
 	if (rc)
 		goto no_mem;
-	/* Write the record */
+	assert(sqlite3VdbeCheckMemInvariants(pOut));
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
-	pOut->n = sqlite3VdbeMsgpackRecordPut((u8 *)pOut->z, pData0, nField);
 	REGISTER_TRACE(pOp->p3, pOut);
 	UPDATE_MAX_BLOBSIZE(pOut);
 	break;

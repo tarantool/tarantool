@@ -34,6 +34,7 @@
 #include "sql/sqliteInt.h"
 #include "sql/tarantoolInt.h"
 #include "sql/vdbeInt.h"
+#include "mpstream.h"
 
 #include "index.h"
 #include <info.h>
@@ -268,15 +269,20 @@ int tarantoolSqlite3Previous(BtCursor *pCur, int *pRes)
 int tarantoolSqlite3MovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
 				   int *pRes)
 {
-	int rc, res_success;
-	size_t ks;
-
-	ks = sqlite3VdbeMsgpackRecordLen(pIdxKey->aMem, pIdxKey->nField);
-	if (key_alloc(pCur, ks) != 0)
+	struct region *region = &fiber()->gc;
+	size_t used = region_used(region);
+	uint32_t tuple_size;
+	const char *tuple =
+		sql_vdbe_mem_encode_tuple(pIdxKey->aMem, pIdxKey->nField,
+					  &tuple_size, region);
+	if (tuple == NULL)
 		return SQL_TARANTOOL_ERROR;
-	sqlite3VdbeMsgpackRecordPut((u8 *)pCur->key, pIdxKey->aMem,
-				    pIdxKey->nField);
+	if (key_alloc(pCur, tuple_size) != 0)
+		return SQL_TARANTOOL_ERROR;
+	memcpy(pCur->key, tuple, tuple_size);
+	region_truncate(region, used);
 
+	int rc, res_success;
 	switch (pIdxKey->opcode) {
 	default:
 	  /*  "Unexpected opcode" */
@@ -695,13 +701,6 @@ rename_fail:
 	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
 		"created not via SQL facilities");
 	return SQL_TARANTOOL_ERROR;
-}
-
-/** Callback to forward and error from mpstream methods. */
-static void
-set_encode_error(void *error_ctx)
-{
-	*(bool *)error_ctx = true;
 }
 
 int

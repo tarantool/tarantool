@@ -133,6 +133,17 @@ mpstream_encode_nil(struct mpstream *stream);
 void
 mpstream_encode_bool(struct mpstream *stream, bool val);
 
+void
+mpstream_encode_binl(struct mpstream *stream, uint32_t len);
+
+/** Copies n bytes from memory area src to stream. */
+void
+mpstream_memcpy(struct mpstream *stream, const void *src, uint32_t n);
+
+/** Fills n stream bytes with the constant byte c. */
+void
+mpstream_memset(struct mpstream *stream, int c, uint32_t n);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -40,6 +40,8 @@
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 #include "box/schema.h"
+#include "box/tuple.h"
+#include "mpstream.h"
 
 #ifdef SQLITE_DEBUG
 /*
@@ -1713,4 +1715,67 @@ sqlite3ValueBytes(sqlite3_value * pVal)
 	if (p->flags & MEM_Null)
 		return 0;
 	return valueBytes(pVal);
+}
+
+void
+mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var)
+{
+	assert(memIsValid(var));
+	if (var->flags & MEM_Null) {
+		mpstream_encode_nil(stream);
+	} else if (var->flags & MEM_Real) {
+		mpstream_encode_double(stream, var->u.r);
+	} else if (var->flags & MEM_Int) {
+		if (var->u.i >= 0)
+			mpstream_encode_uint(stream, var->u.i);
+		else
+			mpstream_encode_int(stream, var->u.i);
+	} else if (var->flags & MEM_Str) {
+		mpstream_encode_strn(stream, var->z, var->n);
+	} else if (var->flags & MEM_Bool) {
+		mpstream_encode_bool(stream, var->u.b);
+	} else {
+		/*
+		 * Emit BIN header iff the BLOB doesn't store
+		 * MsgPack content.
+		 */
+		if ((var->flags & MEM_Subtype) == 0 ||
+		     var->subtype != SQL_SUBTYPE_MSGPACK) {
+			uint32_t binl = var->n +
+					((var->flags & MEM_Zero) ?
+					var->u.nZero : 0);
+			mpstream_encode_binl(stream, binl);
+		}
+		mpstream_memcpy(stream, var->z, var->n);
+		if (var->flags & MEM_Zero)
+			mpstream_memset(stream, 0, var->u.nZero);
+	}
+}
+
+char *
+sql_vdbe_mem_encode_tuple(struct Mem *fields, uint32_t field_count,
+			  uint32_t *tuple_size, struct region *region)
+{
+	size_t used = region_used(region);
+	bool is_error = false;
+	struct mpstream stream;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      set_encode_error, &is_error);
+	mpstream_encode_array(&stream, field_count);
+	for (struct Mem *field = fields; field < fields + field_count; field++)
+		mpstream_encode_vdbe_mem(&stream, field);
+	mpstream_flush(&stream);
+	if (is_error) {
+		diag_set(OutOfMemory, stream.pos - stream.buf,
+			 "mpstream_flush", "stream");
+		return NULL;
+	}
+	*tuple_size = region_used(region) - used;
+	char *tuple = region_join(region, *tuple_size);
+	if (tuple == NULL) {
+		diag_set(OutOfMemory, *tuple_size, "region_join", "tuple");
+		return NULL;
+	}
+	mp_tuple_assert(tuple, tuple + *tuple_size);
+	return tuple;
 }

@@ -175,3 +175,33 @@ mpstream_encode_bool(struct mpstream *stream, bool val)
     char *pos = mp_encode_bool(data, val);
     mpstream_advance(stream, pos - data);
 }
+
+void
+mpstream_encode_binl(struct mpstream *stream, uint32_t len)
+{
+	char *data = mpstream_reserve(stream, mp_sizeof_binl(len));
+	if (data == NULL)
+		return;
+	char *pos = mp_encode_binl(data, len);
+	mpstream_advance(stream, pos - data);
+}
+
+void
+mpstream_memcpy(struct mpstream *stream, const void *src, uint32_t n)
+{
+	char *data = mpstream_reserve(stream, n);
+	if (data == NULL)
+		return;
+	memcpy(data, src, n);
+	mpstream_advance(stream, n);
+}
+
+void
+mpstream_memset(struct mpstream *stream, int c, uint32_t n)
+{
+	char *data = mpstream_reserve(stream, n);
+	if (data == NULL)
+		return;
+	memset(data, c, n);
+	mpstream_advance(stream, n);
+}

@@ -526,8 +526,6 @@ int sqlite3VdbeMemExpandBlob(Mem *);
 #define ExpandBlob(P) SQLITE_OK
 #endif
 
-i64 sqlite3VdbeMsgpackRecordLen(Mem * pMem, u32 n);
-u32 sqlite3VdbeMsgpackRecordPut(u8 * pBuf, Mem * pMem, u32 n);
 /**
  * Perform comparison of two keys: one is packed and one is not.
  *
@@ -551,5 +549,37 @@ int sqlite3VdbeCompareMsgpack(const char **key1,
 int sqlite3VdbeRecordCompareMsgpack(const void *key1,
 				    struct UnpackedRecord *key2);
 u32 sqlite3VdbeMsgpackGet(const unsigned char *buf, Mem * pMem);
+
+struct mpstream;
+struct region;
+
+/** Callback to forward and error from mpstream methods. */
+static inline void
+set_encode_error(void *error_ctx)
+{
+	*(bool *)error_ctx = true;
+}
+
+/**
+ * Perform encoding memory variable to stream.
+ * @param stream Initialized mpstream encoder object.
+ * @param var Vdbe memory variable to encode with stream.
+ */
+void
+mpstream_encode_vdbe_mem(struct mpstream *stream, struct Mem *var);
+
+/**
+ * Perform encoding field_count Vdbe memory fields on region as
+ * msgpack array.
+ * @param fields The first Vdbe memory field to encode.
+ * @param field_count Count of fields to encode.
+ * @param[out] tuple_size Size of encoded tuple.
+ * @param region Region to use.
+ * @retval NULL on error, diag message is set.
+ * @retval Pointer to valid tuple on success.
+ */
+char *
+sql_vdbe_mem_encode_tuple(struct Mem *fields, uint32_t field_count,
+			  uint32_t *tuple_size, struct region *region);
 
 #endif				/* !defined(SQLITE_VDBEINT_H) */
