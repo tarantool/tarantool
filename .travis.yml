@@ -49,20 +49,11 @@ jobs:
       - name: CentOS 7 build + test + deploy RPM
         env: OS=el DIST=7
         if: branch = "2.1"
-      - name: Fedora 26 build + test + deploy RPM
-        env: OS=fedora DIST=26
-        if: branch = "2.1"
-      - name: Fedora 27 build + test + deploy RPM
-        env: OS=fedora DIST=27
-        if: branch = "2.1"
       - name: Ubuntu Trusty (14.04) build + deploy DEB
         env: OS=ubuntu DIST=trusty
         if: branch = "2.1"
       - name: Ubuntu Xenial (16.04) build + deploy DEB
         env: OS=ubuntu DIST=xenial
-        if: branch = "2.1"
-      - name: Ubuntu Artful (17.10) build + deploy DEB
-        env: OS=ubuntu DIST=artful
         if: branch = "2.1"
       - name: Ubuntu Bionic (18.04) build + deploy DEB
         env: OS=ubuntu DIST=bionic
