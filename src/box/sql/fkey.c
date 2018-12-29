@@ -194,7 +194,7 @@
 static void
 fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 		   struct fkey_def *fk_def, uint32_t referenced_idx,
-		   int reg_data, int incr_count)
+		   int reg_data, int incr_count, bool is_update)
 {
 	assert(incr_count == -1 || incr_count == 1);
 	struct Vdbe *v = sqlite3GetVdbe(parse_context);
@@ -221,14 +221,6 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 		sqlite3VdbeAddOp2(v, OP_IsNull, reg, ok_label);
 	}
 	uint32_t field_count = fk_def->field_count;
-	int temp_regs = sqlite3GetTempRange(parse_context, field_count);
-	int rec_reg = sqlite3GetTempReg(parse_context);
-	vdbe_emit_open_cursor(parse_context, cursor, referenced_idx, parent);
-	link = fk_def->links;
-	for (uint32_t i = 0; i < field_count; ++i, ++link) {
-		sqlite3VdbeAddOp2(v, OP_Copy, link->child_field + 1 + reg_data,
-				  temp_regs + i);
-	}
 	/*
 	 * If the parent table is the same as the child table, and
 	 * we are about to increment the constraint-counter (i.e.
@@ -253,15 +245,36 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 		}
 		sqlite3VdbeGoto(v, ok_label);
 	}
-	struct index *idx = space_index(parent, referenced_idx);
-	assert(idx != NULL);
-	sqlite3VdbeAddOp4(v, OP_MakeRecord, temp_regs, field_count, rec_reg,
-			  sql_space_index_affinity_str(parse_context->db,
-						       parent->def, idx->def),
-			  P4_DYNAMIC);
-	sqlite3VdbeAddOp4Int(v, OP_Found, cursor, ok_label, rec_reg, 0);
-	sqlite3ReleaseTempReg(parse_context, rec_reg);
-	sqlite3ReleaseTempRange(parse_context, temp_regs, field_count);
+	/**
+	 * Inspect a parent table with OP_Found.
+	 * We mustn't make it for a self-referenced table since
+	 * it's tuple will be modified by the update operation.
+	 * And since the foreign key has already detected a
+	 * conflict, fk counter must be increased.
+	 */
+	if (!(fkey_is_self_referenced(fk_def) && is_update)) {
+		int temp_regs = sqlite3GetTempRange(parse_context, field_count);
+		int rec_reg = sqlite3GetTempReg(parse_context);
+		vdbe_emit_open_cursor(parse_context, cursor, referenced_idx,
+				      parent);
+		link = fk_def->links;
+		for (uint32_t i = 0; i < field_count; ++i, ++link) {
+			sqlite3VdbeAddOp2(v, OP_Copy,
+					  link->child_field + 1 + reg_data,
+					  temp_regs + i);
+		}
+		struct index *idx = space_index(parent, referenced_idx);
+		assert(idx != NULL);
+		sqlite3VdbeAddOp4(v, OP_MakeRecord, temp_regs, field_count,
+				  rec_reg,
+				  sql_space_index_affinity_str(parse_context->db,
+							       parent->def,
+							       idx->def),
+				  P4_DYNAMIC);
+		sqlite3VdbeAddOp4Int(v, OP_Found, cursor, ok_label, rec_reg, 0);
+		sqlite3ReleaseTempReg(parse_context, rec_reg);
+		sqlite3ReleaseTempRange(parse_context, temp_regs, field_count);
+	}
 	struct session *session = current_session();
 	if (!fk_def->is_deferred &&
 	    (session->sql_flags & SQLITE_DeferFKs) == 0 &&
@@ -517,6 +530,7 @@ void
 fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 		int reg_new, const int *changed_cols)
 {
+	bool is_update = changed_cols != NULL;
 	struct sqlite3 *db = parser->db;
 	struct session *user_session = current_session();
 
@@ -534,7 +548,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 	struct fkey *fk;
 	rlist_foreach_entry(fk, &space->child_fkey, child_link) {
 		struct fkey_def *fk_def = fk->def;
-		if (changed_cols != NULL && !fkey_is_self_referenced(fk_def) &&
+		if (is_update && !fkey_is_self_referenced(fk_def) &&
 		    !fkey_is_modified(fk_def, FIELD_LINK_CHILD, changed_cols))
 			continue;
 		parser->nTab++;
@@ -549,7 +563,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 			 * foreign key constraint violation.
 			 */
 			fkey_lookup_parent(parser, parent, fk_def, fk->index_id,
-					   reg_old, -1);
+					   reg_old, -1, is_update);
 		}
 		if (reg_new != 0 && !fkey_action_is_set_null(parser, fk)) {
 			/*
@@ -568,7 +582,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 			 * cause an FK violation.
 			 */
 			fkey_lookup_parent(parser, parent, fk_def, fk->index_id,
-					   reg_new, +1);
+					   reg_new, +1, is_update);
 		}
 	}
 	/*
@@ -577,7 +591,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 	 */
 	rlist_foreach_entry(fk, &space->parent_fkey, parent_link) {
 		struct fkey_def *fk_def = fk->def;
-		if (changed_cols != NULL &&
+		if (is_update &&
 		    !fkey_is_modified(fk_def, FIELD_LINK_PARENT, changed_cols))
 			continue;
 		if (!fk_def->is_deferred &&

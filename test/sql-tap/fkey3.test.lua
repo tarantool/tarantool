@@ -190,15 +190,14 @@ test:do_execsql_test(
         -- </fkey3-3.8>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "fkey3-3.9",
     [[
         INSERT INTO t6 VALUES(100, 'one', 100, 'one');
         UPDATE t6 SET c = 1, d = 'a' WHERE a = 100;
-        DELETE FROM t6 WHERE a = 100;
-        SELECT * FROM t6 WHERE a = 100;
     ]], {
         -- <fkey3-3.9>
+        1, "FOREIGN KEY constraint failed"
         -- </fkey3-3.9>
     })
 
