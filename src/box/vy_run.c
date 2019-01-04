@@ -2382,6 +2382,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 
 	off_t page_offset, next_page_offset = xlog_cursor_pos(&cursor);
 	while ((rc = xlog_cursor_next_tx(&cursor)) == 0) {
+		region_truncate(region, mem_used);
 		page_offset = next_page_offset;
 		next_page_offset = xlog_cursor_pos(&cursor);
 
@@ -2441,7 +2442,6 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		info->row_index_offset = page_row_index_offset;
 		++run->info.page_count;
 		vy_run_acct_page(run, info);
-		region_truncate(region, mem_used);
 	}
 
 	if (prev_tuple != NULL) {
