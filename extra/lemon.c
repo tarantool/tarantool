@@ -598,8 +598,11 @@ struct acttab {
 
 /* Free all memory associated with the given acttab */
 void acttab_free(acttab *p){
-  free( p->aAction );
-  free( p->aLookahead );
+  assert(p);
+  if (p->aAction)
+    free( p->aAction );
+  if (p->aLookahead)
+    free( p->aLookahead );
   free( p );
 }
 
@@ -4255,6 +4258,7 @@ void ReportTable(
     }
   }
   fprintf(out, "};\n"); lineno++;
+  acttab_free(pActtab);
 
   /* Output the yy_shift_ofst[] table */
   n = lemp->nxstate;
