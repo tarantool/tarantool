@@ -1924,6 +1924,38 @@ sql_drop_foreign_key(struct Parse *parse_context)
 }
 
 /**
+ * Position @a _index_cursor onto a last record in _index space
+ * with a specified @a space_id. It corresponds to the latest
+ * created index with the biggest id.
+ * @param parser SQL parser.
+ * @param space_id Space identifier to use as a key for _index.
+ * @param _index_cursor A cursor, opened on _index system space.
+ * @param[out] not_found_addr A VDBE address from which a jump
+ *       happens when a record was not found.
+ *
+ * @return A VDBE address from which a jump happens when a record
+ *         was found.
+ */
+static int
+vdbe_emit_space_index_search(struct Parse *parser, uint32_t space_id,
+			     int _index_cursor, int *not_found_addr)
+{
+	struct Vdbe *v = sqlGetVdbe(parser);
+	int key_reg = ++parser->nMem;
+
+	sqlVdbeAddOp2(v, OP_Integer, space_id, key_reg);
+	int not_found1 = sqlVdbeAddOp4Int(v, OP_SeekLE, _index_cursor, 0,
+					  key_reg, 1);
+	int not_found2 = sqlVdbeAddOp4Int(v, OP_IdxLT, _index_cursor, 0,
+					  key_reg, 1);
+	int found_addr = sqlVdbeAddOp0(v, OP_Goto);
+	sqlVdbeJumpHere(v, not_found1);
+	sqlVdbeJumpHere(v, not_found2);
+	*not_found_addr = sqlVdbeAddOp0(v, OP_Goto);
+	return found_addr;
+}
+
+/**
  * Generate code to determine next free secondary index id in the
  * space identified by @a space_id. Overall VDBE program logic is
  * following:
@@ -1945,20 +1977,17 @@ vdbe_emit_new_sec_index_id(struct Parse *parse, uint32_t space_id,
 			   int _index_cursor)
 {
 	struct Vdbe *v = sqlGetVdbe(parse);
-	int key_reg = ++parse->nMem;
-
-	sqlVdbeAddOp2(v, OP_Integer, space_id, key_reg);
-	int seek_adr = sqlVdbeAddOp4Int(v, OP_SeekLE, _index_cursor, 0,
-					key_reg, 1);
-	sqlVdbeAddOp4Int(v, OP_IdxLT, _index_cursor, 0, key_reg, 1);
+	int not_found_addr, found_addr =
+		vdbe_emit_space_index_search(parse, space_id, _index_cursor,
+					     &not_found_addr);
 	int iid_reg = ++parse->nMem;
+	sqlVdbeJumpHere(v, found_addr);
 	/* Fetch iid from the row and increment it. */
 	sqlVdbeAddOp3(v, OP_Column, _index_cursor, BOX_INDEX_FIELD_ID, iid_reg);
 	sqlVdbeAddOp2(v, OP_AddImm, iid_reg, 1);
 	/* Jump over block assigning wrong index id. */
 	int skip_bad_iid = sqlVdbeAddOp0(v, OP_Goto);
-	sqlVdbeJumpHere(v, seek_adr);
-	sqlVdbeJumpHere(v, seek_adr + 1);
+	sqlVdbeJumpHere(v, not_found_addr);
 	/*
 	 * Absence of any records in _index for that space is
 	 * handled here: to indicate that secondary index can't
@@ -2442,10 +2471,23 @@ sql_create_index(struct Parse *parse) {
 				  (void *)space_by_id(BOX_INDEX_ID),
 				  P4_SPACEPTR);
 		sqlVdbeChangeP5(vdbe, OPFLAG_SEEKEQ);
-		int index_id = vdbe_emit_new_sec_index_id(parse, def->id,
-							  cursor);
+		int index_id;
+		/*
+		 * In case we are creating PRIMARY KEY constraint
+		 * (via ALTER TABLE) we must ensure that table
+		 * doesn't feature any indexes. Otherwise,
+		 * we can immediately halt execution of VDBE.
+		 */
+		if (idx_type == SQL_INDEX_TYPE_CONSTRAINT_PK) {
+			index_id = ++parse->nMem;
+			sqlVdbeAddOp2(vdbe, OP_Integer, 0, index_id);
+		} else {
+			index_id = vdbe_emit_new_sec_index_id(parse, def->id,
+							      cursor);
+		}
 		sqlVdbeAddOp1(vdbe, OP_Close, cursor);
-		vdbe_emit_create_index(parse, def, index->def, def->id, index_id);
+		vdbe_emit_create_index(parse, def, index->def,
+				       def->id, index_id);
 		sqlVdbeChangeP5(vdbe, OPFLAG_NCHANGE);
 		sqlVdbeAddOp0(vdbe, OP_Expire);
 	}

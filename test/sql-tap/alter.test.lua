@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(43)
+test:plan(50)
 
 test:do_execsql_test(
     "alter-1.1",
@@ -517,6 +517,61 @@ test:do_catchsql_test(
         -- </alter-7.11>
     })
 
+test:do_test(
+    "alter-8.1.0",
+    function()
+        format = {}
+        format[1] = { name = 'id', type = 'scalar'}
+        format[2] = { name = 'f2', type = 'scalar'}
+        s = box.schema.create_space('T', {format = format})
+    end,
+    {})
+
+test:do_catchsql_test(
+    "alter-8.1.1",
+    [[
+        ALTER TABLE t ADD CONSTRAINT pk PRIMARY KEY("id");
+    ]], {
+        0
+    })
+
+test:do_test(
+    "alter-8.1.2",
+    function()
+        return box.space.T.index[0].id
+    end, 0)
+
+test:do_catchsql_test(
+    "alter-8.2",
+    [[
+        ALTER TABLE t ADD CONSTRAINT pk1 PRIMARY KEY("f2");
+    ]], {
+        1, "Duplicate key exists in unique index 'primary' in space '_index'"
+    })
+
+test:do_catchsql_test(
+    "alter-8.3.1",
+    [[
+        ALTER TABLE t ADD CONSTRAINT i1 UNIQUE("f2");
+    ]], {
+        0
+    })
+
+test:do_test(
+    "alter-8.3.2",
+    function()
+        i = box.space.T.index[1]
+        return i.id
+    end, 1)
+
+test:do_catchsql_test(
+    "alter-8.4",
+    [[
+        DROP INDEX i1 ON t;
+        DROP INDEX pk ON t;
+    ]], {
+    0
+})
 
 -- Commented due to #2953
 --
