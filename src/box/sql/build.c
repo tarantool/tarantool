@@ -1923,45 +1923,44 @@ sql_drop_foreign_key(struct Parse *parse_context)
 	sqlVdbeChangeP5(sqlGetVdbe(parse_context), OPFLAG_NCHANGE);
 }
 
-/*
- * Generate code to determine next free Iid in the space identified by
- * the iSpaceId. Return register number holding the result.
+/**
+ * Generate code to determine next free secondary index id in the
+ * space identified by @a space_id. Overall VDBE program logic is
+ * following:
+ *
+ * 1 Seek for space id in _index, goto l1 if seeks fails.
+ * 2 Goto l2.
+ * 3 l1: Halt.
+ * 4 l2: Fetch index id from _index record.
+ *
+ * @return Register holding a new index id.
  */
 static int
-getNewIid(Parse * pParse, int iSpaceId, int iCursor)
+vdbe_emit_new_sec_index_id(struct Parse *parse, uint32_t space_id,
+			   int _index_cursor)
 {
-	Vdbe *v = sqlGetVdbe(pParse);
-	int iRes = ++pParse->nMem;
-	int iKey = ++pParse->nMem;
-	int iSeekInst, iGotoInst;
+	struct Vdbe *v = sqlGetVdbe(parse);
+	int key_reg = ++parse->nMem;
 
-	sqlVdbeAddOp2(v, OP_Integer, iSpaceId, iKey);
-	iSeekInst = sqlVdbeAddOp4Int(v, OP_SeekLE, iCursor, 0, iKey, 1);
-	sqlVdbeAddOp4Int(v, OP_IdxLT, iCursor, 0, iKey, 1);
+	sqlVdbeAddOp2(v, OP_Integer, space_id, key_reg);
+	int seek_adr = sqlVdbeAddOp4Int(v, OP_SeekLE, _index_cursor, 0,
+					key_reg, 1);
+	sqlVdbeAddOp4Int(v, OP_IdxLT, _index_cursor, 0, key_reg, 1);
+	/* Jump over Halt block. */
+	int goto_succ_addr = sqlVdbeAddOp0(v, OP_Goto);
+	/* Invalid space id handling block starts here. */
+	sqlVdbeJumpHere(v, seek_adr);
+	sqlVdbeJumpHere(v, seek_adr + 1);
+	sqlVdbeAddOp4(v, OP_Halt, SQL_ERROR, ON_CONFLICT_ACTION_FAIL, 0,
+		      sqlMPrintf(parse->db, "Invalid space id: %d", space_id),
+		      P4_DYNAMIC);
 
-	/*
-	 * If SeekLE succeeds, the control falls through here, skipping
-	 * IdxLt.
-	 *
-	 * If it fails (no entry with the given key prefix: invalid spaceId)
-	 * VDBE jumps to the next code block (jump target is IMM, fixed up
-	 * later with sqlVdbeJumpHere()).
-	 */
-	iGotoInst = sqlVdbeAddOp0(v, OP_Goto);	/* Jump over Halt */
-
-	/* Invalid spaceId detected. Halt now. */
-	sqlVdbeJumpHere(v, iSeekInst);
-	sqlVdbeJumpHere(v, iSeekInst + 1);
-	sqlVdbeAddOp4(v,
-			  OP_Halt, SQL_ERROR, ON_CONFLICT_ACTION_FAIL, 0,
-			  sqlMPrintf(pParse->db, "Invalid space id: %d",
-					 iSpaceId), P4_DYNAMIC);
-
-	/* Fetch iid from the row and ++it. */
-	sqlVdbeJumpHere(v, iGotoInst);
-	sqlVdbeAddOp3(v, OP_Column, iCursor, 1, iRes);
-	sqlVdbeAddOp2(v, OP_AddImm, iRes, 1);
-	return iRes;
+	sqlVdbeJumpHere(v, goto_succ_addr);
+	/* Fetch iid from the row and increment it. */
+	int iid_reg = ++parse->nMem;
+	sqlVdbeAddOp3(v, OP_Column, _index_cursor, BOX_INDEX_FIELD_ID, iid_reg);
+	sqlVdbeAddOp2(v, OP_AddImm, iid_reg, 1);
+	return iid_reg;
 }
 
 /**
@@ -2437,7 +2436,8 @@ sql_create_index(struct Parse *parse) {
 				  (void *)space_by_id(BOX_INDEX_ID),
 				  P4_SPACEPTR);
 		sqlVdbeChangeP5(vdbe, OPFLAG_SEEKEQ);
-		int index_id = getNewIid(parse, def->id, cursor);
+		int index_id = vdbe_emit_new_sec_index_id(parse, def->id,
+							  cursor);
 		sqlVdbeAddOp1(vdbe, OP_Close, cursor);
 		vdbe_emit_create_index(parse, def, index->def, def->id, index_id);
 		sqlVdbeChangeP5(vdbe, OPFLAG_NCHANGE);
