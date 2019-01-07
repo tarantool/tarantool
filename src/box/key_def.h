@@ -516,6 +516,18 @@ bool
 tuple_key_contains_null(struct tuple *tuple, struct key_def *def);
 
 /**
+ * Check that tuple fields match with given key definition
+ * key_def.
+ * @param key_def Key definition.
+ * @param tuple Tuple to validate.
+ *
+ * @retval 0  The tuple is valid.
+ * @retval -1 The tuple is invalid.
+ */
+int
+tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple);
+
+/**
  * Extract key from tuple by given key definition and return
  * buffer allocated on box_txn_alloc with this key. This function
  * has O(n) complexity, where n is the number of key parts.

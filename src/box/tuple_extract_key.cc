@@ -422,3 +422,25 @@ tuple_key_contains_null(struct tuple *tuple, struct key_def *def)
 	}
 	return false;
 }
+
+int
+tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple)
+{
+	for (uint32_t idx = 0; idx < key_def->part_count; idx++) {
+		struct key_part *part = &key_def->parts[idx];
+		const char *field = tuple_field_by_part(tuple, part);
+		if (field == NULL) {
+			if (key_part_is_nullable(part))
+				continue;
+			diag_set(ClientError, ER_FIELD_MISSING,
+				 tt_sprintf("[%d]%.*s",
+					    part->fieldno + TUPLE_INDEX_BASE,
+					    part->path_len, part->path));
+			return -1;
+		}
+		if (key_part_validate(part->type, field, idx,
+				      key_part_is_nullable(part)) != 0)
+			return -1;
+	}
+	return 0;
+}

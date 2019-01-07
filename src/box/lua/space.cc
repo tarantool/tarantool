@@ -30,6 +30,7 @@
  */
 #include "box/lua/space.h"
 #include "box/lua/tuple.h"
+#include "box/lua/key_def.h"
 #include "box/sql/sqlLimit.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
@@ -286,38 +287,7 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 		lua_setfield(L, -2, "name");
 
 		lua_pushstring(L, "parts");
-		lua_newtable(L);
-
-		for (uint32_t j = 0; j < index_def->key_def->part_count; j++) {
-			lua_pushnumber(L, j + 1);
-			lua_newtable(L);
-			const struct key_part *part =
-				&index_def->key_def->parts[j];
-
-			lua_pushstring(L, field_type_strs[part->type]);
-			lua_setfield(L, -2, "type");
-
-			lua_pushnumber(L, part->fieldno + TUPLE_INDEX_BASE);
-			lua_setfield(L, -2, "fieldno");
-
-			if (part->path != NULL) {
-				lua_pushlstring(L, part->path, part->path_len);
-				lua_setfield(L, -2, "path");
-			}
-
-			lua_pushboolean(L, key_part_is_nullable(part));
-			lua_setfield(L, -2, "is_nullable");
-
-			if (part->coll_id != COLL_NONE) {
-				struct coll_id *coll_id =
-					coll_by_id(part->coll_id);
-				assert(coll_id != NULL);
-				lua_pushstring(L, coll_id->name);
-				lua_setfield(L, -2, "collation");
-			}
-
-			lua_settable(L, -3); /* index[k].parts[j] */
-		}
+		luaT_push_key_def(L, index_def->key_def);
 
 		lua_settable(L, -3); /* space.index[k].parts */
 

@@ -59,9 +59,11 @@
 #include "box/lua/console.h"
 #include "box/lua/tuple.h"
 #include "box/lua/execute.h"
+#include "box/lua/key_def.h"
 
 extern char session_lua[],
 	tuple_lua[],
+	key_def_lua[],
 	schema_lua[],
 	load_cfg_lua[],
 	xlog_lua[],
@@ -80,6 +82,7 @@ static const char *lua_sources[] = {
 	"box/console", console_lua,
 	"box/load_cfg", load_cfg_lua,
 	"box/xlog", xlog_lua,
+	"box/key_def", key_def_lua,
 	NULL
 };
 
@@ -311,6 +314,8 @@ box_lua_init(struct lua_State *L)
 	luaopen_net_box(L);
 	lua_pop(L, 1);
 	tarantool_lua_console_init(L);
+	lua_pop(L, 1);
+	luaopen_key_def(L);
 	lua_pop(L, 1);
 
 	/* Load Lua extension */
