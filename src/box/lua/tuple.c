@@ -93,47 +93,65 @@ luaT_istuple(struct lua_State *L, int narg)
 	return *(struct tuple **) data;
 }
 
-int
-luaT_tuple_new(struct lua_State *L, struct tuple_format *format)
+struct tuple *
+luaT_tuple_new(struct lua_State *L, int idx, box_tuple_format_t *format)
+{
+	if (idx != 0 && !lua_istable(L, idx) && !luaT_istuple(L, idx)) {
+		diag_set(IllegalParams, "A tuple or a table expected, got %s",
+			 lua_typename(L, lua_type(L, idx)));
+		return NULL;
+	}
+
+	struct ibuf *buf = tarantool_lua_ibuf;
+	ibuf_reset(buf);
+	struct mpstream stream;
+	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
+		      luamp_error, L);
+	if (idx == 0) {
+		/*
+		 * Create the tuple from lua stack
+		 * objects.
+		 */
+		int argc = lua_gettop(L);
+		mpstream_encode_array(&stream, argc);
+		for (int k = 1; k <= argc; ++k) {
+			luamp_encode(L, luaL_msgpack_default, &stream, k);
+		}
+	} else {
+		/* Create the tuple from a Lua table. */
+		luamp_encode_tuple(L, &tuple_serializer, &stream, idx);
+	}
+	mpstream_flush(&stream);
+	struct tuple *tuple = box_tuple_new(format, buf->buf,
+					    buf->buf + ibuf_used(buf));
+	if (tuple == NULL)
+		return NULL;
+	ibuf_reinit(tarantool_lua_ibuf);
+	return tuple;
+}
+
+static int
+lbox_tuple_new(lua_State *L)
 {
 	int argc = lua_gettop(L);
 	if (argc < 1) {
 		lua_newtable(L); /* create an empty tuple */
 		++argc;
 	}
-	struct ibuf *buf = tarantool_lua_ibuf;
-
-	ibuf_reset(buf);
-	struct mpstream stream;
-	mpstream_init(&stream, buf, ibuf_reserve_cb, ibuf_alloc_cb,
-		      luamp_error, L);
-
-	if (argc == 1 && (lua_istable(L, 1) || luaT_istuple(L, 1))) {
-		/* New format: box.tuple.new({1, 2, 3}) */
-		luamp_encode_tuple(L, &tuple_serializer, &stream, 1);
-	} else {
-		/* Backward-compatible format: box.tuple.new(1, 2, 3). */
-		mpstream_encode_array(&stream, argc);
-		for (int k = 1; k <= argc; ++k) {
-			luamp_encode(L, luaL_msgpack_default, &stream, k);
-		}
-	}
-	mpstream_flush(&stream);
-
-	struct tuple *tuple = box_tuple_new(format, buf->buf,
-					   buf->buf + ibuf_used(buf));
+	/*
+	 * Use backward-compatible parameters format:
+	 * box.tuple.new(1, 2, 3) (idx == 0), or the new one:
+	 * box.tuple.new({1, 2, 3}) (idx == 1).
+	 */
+	int idx = argc == 1 && (lua_istable(L, 1) ||
+		luaT_istuple(L, 1));
+	box_tuple_format_t *fmt = box_tuple_format_default();
+	struct tuple *tuple = luaT_tuple_new(L, idx, fmt);
 	if (tuple == NULL)
 		return luaT_error(L);
 	/* box_tuple_new() doesn't leak on exception, see public API doc */
 	luaT_pushtuple(L, tuple);
-	ibuf_reinit(tarantool_lua_ibuf);
 	return 1;
-}
-
-static int
-lbox_tuple_new(lua_State *L)
-{
-	return luaT_tuple_new(L, box_tuple_format_default());
 }
 
 static int
