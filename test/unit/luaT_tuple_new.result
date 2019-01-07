@@ -1,0 +1,22 @@
+1..19
+	*** test_basic ***
+ok 1 - table: tuple != NULL
+ok 2 - table: check tuple format id
+ok 3 - table: check tuple size
+ok 4 - table: check tuple data
+ok 5 - table: check retvals count
+ok 6 - tuple: tuple != NULL
+ok 7 - tuple: check tuple format id
+ok 8 - tuple: check tuple size
+ok 9 - tuple: check tuple data
+ok 10 - tuple: check retvals count
+ok 11 - objects: tuple != NULL
+ok 12 - objects: check tuple format id
+ok 13 - objects: check tuple size
+ok 14 - objects: check tuple data
+ok 15 - objects: check retvals count
+ok 16 - unexpected type: tuple == NULL
+ok 17 - unexpected type: check retvals count
+ok 18 - unexpected type: check error type
+ok 19 - unexpected type: check error message
+	*** test_basic: done ***

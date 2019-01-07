@@ -507,7 +507,7 @@ lbox_space_frommap(struct lua_State *L)
 
 	lua_replace(L, 1);
 	lua_settop(L, 1);
-	tuple = luaT_tuple_new(L, space->format);
+	tuple = luaT_tuple_new(L, -1, space->format);
 	if (tuple == NULL) {
 		struct error *e = diag_last_error(diag_get());
 		lua_pushnil(L);
