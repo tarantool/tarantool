@@ -1624,6 +1624,16 @@ cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
   sql_create_foreign_key(pParse);
 }
 
+cmd ::= alter_add_constraint(N) unique_spec(U) LP sortlist(X) RP. {
+  create_index_def_init(&pParse->create_index_def, N.table_name, &N.name, X, U,
+                        SORT_ORDER_ASC, false);
+  sql_create_index(pParse);
+}
+
+%type unique_spec {int}
+unique_spec(U) ::= UNIQUE.      { U = SQL_INDEX_TYPE_CONSTRAINT_UNIQUE; }
+unique_spec(U) ::= PRIMARY KEY. { U = SQL_INDEX_TYPE_CONSTRAINT_PK; }
+
 cmd ::= alter_table_start(A) RENAME TO nm(N). {
     rename_entity_def_init(&pParse->rename_entity_def, A, &N);
     sql_alter_table_rename(pParse);

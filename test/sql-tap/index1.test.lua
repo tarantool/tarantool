@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(72)
+test:plan(73)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1033,5 +1033,14 @@ test:do_catchsql_test(
     ]], {
         1, "Can't modify space 'T': can not add a secondary key before primary"
     })
+
+test:do_catchsql_test(
+    "alter-8.2",
+    [[
+        ALTER TABLE t ADD CONSTRAINT pk PRIMARY KEY("id");
+        CREATE UNIQUE INDEX i ON t("id");
+    ]], {
+    0
+})
 
 test:finish_test()
