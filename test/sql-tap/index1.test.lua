@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(70)
+test:plan(72)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1016,5 +1016,22 @@ if (0 > 0)
 
 end
 
+test:do_test(
+    "index-22.1.0",
+    function()
+        format = {}
+        format[1] = { name = 'id', type = 'scalar'}
+        format[2] = { name = 'f2', type = 'scalar'}
+        s = box.schema.create_space('T', {format = format})
+    end,
+    {})
+
+test:do_catchsql_test(
+    "alter-8.1.1",
+    [[
+        CREATE UNIQUE INDEX pk ON t("id");
+    ]], {
+        1, "Can't modify space 'T': can not add a secondary key before primary"
+    })
 
 test:finish_test()
