@@ -1929,9 +1929,14 @@ sql_drop_foreign_key(struct Parse *parse_context)
  * following:
  *
  * 1 Seek for space id in _index, goto l1 if seeks fails.
- * 2 Goto l2.
- * 3 l1: Halt.
- * 4 l2: Fetch index id from _index record.
+ * 2 Fetch index id from _index record.
+ * 3 Goto l2
+ * 4 l1: Generate iid == 1..
+ * 6 l2: Continue index creation.
+ *
+ * Note that we generate iid == 1 in case of index search on
+ * purpose: it allows on_replace_dd_index() raise correct
+ * error - "can not add a secondary key before primary".
  *
  * @return Register holding a new index id.
  */
@@ -1946,20 +1951,21 @@ vdbe_emit_new_sec_index_id(struct Parse *parse, uint32_t space_id,
 	int seek_adr = sqlVdbeAddOp4Int(v, OP_SeekLE, _index_cursor, 0,
 					key_reg, 1);
 	sqlVdbeAddOp4Int(v, OP_IdxLT, _index_cursor, 0, key_reg, 1);
-	/* Jump over Halt block. */
-	int goto_succ_addr = sqlVdbeAddOp0(v, OP_Goto);
-	/* Invalid space id handling block starts here. */
-	sqlVdbeJumpHere(v, seek_adr);
-	sqlVdbeJumpHere(v, seek_adr + 1);
-	sqlVdbeAddOp4(v, OP_Halt, SQL_ERROR, ON_CONFLICT_ACTION_FAIL, 0,
-		      sqlMPrintf(parse->db, "Invalid space id: %d", space_id),
-		      P4_DYNAMIC);
-
-	sqlVdbeJumpHere(v, goto_succ_addr);
-	/* Fetch iid from the row and increment it. */
 	int iid_reg = ++parse->nMem;
+	/* Fetch iid from the row and increment it. */
 	sqlVdbeAddOp3(v, OP_Column, _index_cursor, BOX_INDEX_FIELD_ID, iid_reg);
 	sqlVdbeAddOp2(v, OP_AddImm, iid_reg, 1);
+	/* Jump over block assigning wrong index id. */
+	int skip_bad_iid = sqlVdbeAddOp0(v, OP_Goto);
+	sqlVdbeJumpHere(v, seek_adr);
+	sqlVdbeJumpHere(v, seek_adr + 1);
+	/*
+	 * Absence of any records in _index for that space is
+	 * handled here: to indicate that secondary index can't
+	 * be created before primary.
+	 */
+	sqlVdbeAddOp2(v, OP_Integer, 1, iid_reg);
+	sqlVdbeJumpHere(v, skip_bad_iid);
 	return iid_reg;
 }
 
