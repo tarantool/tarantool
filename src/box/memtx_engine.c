@@ -1312,6 +1312,10 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 			return true;
 		if (old_part->coll != new_part->coll)
 			return true;
+		if (json_path_cmp(old_part->path, old_part->path_len,
+				  new_part->path, new_part->path_len,
+				  TUPLE_INDEX_BASE) != 0)
+			return true;
 	}
 	return false;
 }

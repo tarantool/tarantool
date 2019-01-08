@@ -64,6 +64,12 @@ struct key_part_def {
 	enum on_conflict_action nullable_action;
 	/** Part sort order. */
 	enum sort_order sort_order;
+	/**
+	 * JSON path to indexed data, relative to the field number,
+	 * or NULL if this key part indexes a top-level field.
+	 * This sting is 0-terminated.
+	 */
+	const char *path;
 };
 
 extern const struct key_part_def key_part_def_default;
@@ -82,6 +88,15 @@ struct key_part {
 	enum on_conflict_action nullable_action;
 	/** Part sort order. */
 	enum sort_order sort_order;
+	/**
+	 * JSON path to indexed data, relative to the field number,
+	 * or NULL if this key part index a top-level field.
+	 * This string is not 0-terminated. String memory is
+	 * allocated at the end of key_def.
+	 */
+	char *path;
+	/** The length of JSON path. */
+	uint32_t path_len;
 };
 
 struct key_def;
@@ -148,6 +163,8 @@ struct key_def {
 	uint32_t unique_part_count;
 	/** True, if at least one part can store NULL. */
 	bool is_nullable;
+	/** True if some key part has JSON path. */
+	bool has_json_paths;
 	/**
 	 * True, if some key parts can be absent in a tuple. These
 	 * fields assumed to be MP_NIL.
@@ -241,9 +258,10 @@ box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
 /** \endcond public */
 
 static inline size_t
-key_def_sizeof(uint32_t part_count)
+key_def_sizeof(uint32_t part_count, uint32_t path_pool_size)
 {
-	return sizeof(struct key_def) + sizeof(struct key_part) * part_count;
+	return sizeof(struct key_def) + sizeof(struct key_part) * part_count +
+	       path_pool_size;
 }
 
 /**
@@ -255,9 +273,12 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count);
 
 /**
  * Dump part definitions of the given key def.
+ * The region is used for allocating JSON paths, if any.
+ * Return -1 on memory allocation error, 0 on success.
  */
-void
-key_def_dump_parts(const struct key_def *def, struct key_part_def *parts);
+int
+key_def_dump_parts(const struct key_def *def, struct key_part_def *parts,
+		   struct region *region);
 
 /**
  * Update 'has_optional_parts' of @a key_def with correspondence
@@ -299,11 +320,12 @@ key_def_encode_parts(char *data, const struct key_part_def *parts,
  *  [NUM, STR, ..][NUM, STR, ..]..,
  *  OR
  *  {field=NUM, type=STR, ..}{field=NUM, type=STR, ..}..,
+ * The region is used for allocating JSON paths, if any.
  */
 int
 key_def_decode_parts(struct key_part_def *parts, uint32_t part_count,
 		     const char **data, const struct field_def *fields,
-		     uint32_t field_count);
+		     uint32_t field_count, struct region *region);
 
 /**
  * Returns the part in index_def->parts for the specified fieldno.
@@ -364,6 +386,8 @@ key_validate_parts(const struct key_def *key_def, const char *key,
 static inline bool
 key_def_is_sequential(const struct key_def *key_def)
 {
+	if (key_def->has_json_paths)
+		return false;
 	for (uint32_t part_id = 0; part_id < key_def->part_count; part_id++) {
 		if (key_def->parts[part_id].fieldno != part_id)
 			return false;

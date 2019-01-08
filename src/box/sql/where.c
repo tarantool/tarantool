@@ -2807,6 +2807,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		part.is_nullable = false;
 		part.sort_order = SORT_ORDER_ASC;
 		part.coll_id = COLL_NONE;
+		part.path = NULL;
 
 		struct key_def *key_def = key_def_new(&part, 1);
 		if (key_def == NULL) {

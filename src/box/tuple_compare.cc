@@ -469,7 +469,8 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	struct key_part *part = key_def->parts;
 	const char *tuple_a_raw = tuple_data(tuple_a);
 	const char *tuple_b_raw = tuple_data(tuple_b);
-	if (key_def->part_count == 1 && part->fieldno == 0) {
+	if (key_def->part_count == 1 && part->fieldno == 0 &&
+	    part->path == NULL) {
 		/*
 		 * First field can not be optional - empty tuples
 		 * can not exist.
@@ -1027,7 +1028,7 @@ tuple_compare_create(const struct key_def *def)
 		}
 	}
 	assert(! def->has_optional_parts);
-	if (!key_def_has_collation(def)) {
+	if (!key_def_has_collation(def) && !def->has_json_paths) {
 		/* Precalculated comparators don't use collation */
 		for (uint32_t k = 0;
 		     k < sizeof(cmp_arr) / sizeof(cmp_arr[0]); k++) {
@@ -1247,7 +1248,7 @@ tuple_compare_with_key_create(const struct key_def *def)
 		}
 	}
 	assert(! def->has_optional_parts);
-	if (!key_def_has_collation(def)) {
+	if (!key_def_has_collation(def) && !def->has_json_paths) {
 		/* Precalculated comparators don't use collation */
 		for (uint32_t k = 0;
 		     k < sizeof(cmp_wk_arr) / sizeof(cmp_wk_arr[0]);

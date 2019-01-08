@@ -386,6 +386,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 		part->nullable_action = ON_CONFLICT_ACTION_NONE;
 		part->is_nullable = true;
 		part->sort_order = SORT_ORDER_ASC;
+		part->path = NULL;
 		if (def != NULL && i < def->part_count)
 			part->coll_id = def->parts[i].coll_id;
 		else

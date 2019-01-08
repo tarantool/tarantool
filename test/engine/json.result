@@ -1,0 +1,591 @@
+test_run = require('test_run').new()
+---
+...
+engine = test_run:get_cfg('engine')
+---
+...
+--
+-- gh-1012: Indexes for JSON-defined paths.
+--
+s = box.schema.space.create('withdata', {engine = engine})
+---
+...
+-- Test build field tree conflicts.
+s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 'FIO["fname"]'}, {3, 'str', path = '["FIO"].fname'}}})
+---
+- error: 'Can''t create or modify index ''test1'' in space ''withdata'': same key
+    part is indexed twice'
+...
+s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 666}, {3, 'str', path = '["FIO"]["fname"]'}}})
+---
+- error: 'Wrong index options (field 2): ''path'' must be string'
+...
+s:create_index('test1', {parts = {{2, 'number'}, {3, 'map', path = 'FIO'}}})
+---
+- error: 'Can''t create or modify index ''test1'' in space ''withdata'': field type
+    ''map'' is not supported'
+...
+s:create_index('test1', {parts = {{2, 'number'}, {3, 'array', path = '[1]'}}})
+---
+- error: 'Can''t create or modify index ''test1'' in space ''withdata'': field type
+    ''array'' is not supported'
+...
+s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 'FIO'}, {3, 'str', path = 'FIO.fname'}}})
+---
+- error: Field [3]["FIO"] has type 'string' in one index, but type 'map' in another
+...
+s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = '[1].sname'}, {3, 'str', path = '["FIO"].fname'}}})
+---
+- error: Field 3 has type 'array' in one index, but type 'map' in another
+...
+s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 'FIO....fname'}}})
+---
+- error: 'Wrong index options (field 2): invalid path'
+...
+idx = s:create_index('test1', {parts = {{2, 'number'}, {3, 'str', path = 'FIO.fname', is_nullable = false}, {3, 'str', path = '["FIO"]["sname"]'}}})
+---
+...
+idx ~= nil
+---
+- true
+...
+idx.parts[2].path == 'FIO.fname'
+---
+- true
+...
+-- Test format mismatch.
+format = {{'id', 'unsigned'}, {'meta', 'unsigned'}, {'data', 'array'}, {'age', 'unsigned'}, {'level', 'unsigned'}}
+---
+...
+s:format(format)
+---
+- error: Field 3 has type 'array' in one index, but type 'map' in another
+...
+format = {{'id', 'unsigned'}, {'meta', 'unsigned'}, {'data', 'map'}, {'age', 'unsigned'}, {'level', 'unsigned'}}
+---
+...
+s:format(format)
+---
+...
+s:create_index('test2', {parts = {{2, 'number'}, {3, 'number', path = 'FIO.fname'}, {3, 'str', path = '["FIO"]["sname"]'}}})
+---
+- error: Field [3]["FIO"]["fname"] has type 'string' in one index, but type 'number'
+    in another
+...
+-- Test incompatable tuple insertion.
+s:insert{7, 7, {town = 'London', FIO = 666}, 4, 5}
+---
+- error: 'Tuple field [3]["FIO"] type does not match one required by operation: expected
+    map'
+...
+s:insert{7, 7, {town = 'London', FIO = {fname = 666, sname = 'Bond'}}, 4, 5}
+---
+- error: 'Tuple field [3]["FIO"]["fname"] type does not match one required by operation:
+    expected string'
+...
+s:insert{7, 7, {town = 'London', FIO = {fname = "James"}}, 4, 5}
+---
+- error: Tuple field [3]["FIO"]["sname"] required by space format is missing
+...
+s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
+---
+- [7, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+...
+s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
+---
+- error: Duplicate key exists in unique index 'test1' in space 'withdata'
+...
+s:insert{7, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond', data = "extra"}}, 4, 5}
+---
+- error: Duplicate key exists in unique index 'test1' in space 'withdata'
+...
+s:insert{7, 7, {town = 'Moscow', FIO = {fname = 'Max', sname = 'Isaev', data = "extra"}}, 4, 5}
+---
+- [7, 7, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'data': 'extra', 'sname': 'Isaev'}},
+  4, 5]
+...
+idx:select()
+---
+- - [7, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+  - [7, 7, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'data': 'extra', 'sname': 'Isaev'}},
+    4, 5]
+...
+idx:min()
+---
+- [7, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+...
+idx:max()
+---
+- [7, 7, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'data': 'extra', 'sname': 'Isaev'}},
+  4, 5]
+...
+s:drop()
+---
+...
+-- Test upsert of JSON-indexed data.
+s = box.schema.create_space('withdata', {engine = engine})
+---
+...
+parts = {}
+---
+...
+parts[1] = {1, 'unsigned', path='[2]'}
+---
+...
+pk = s:create_index('pk', {parts = parts})
+---
+...
+s:insert{{1, 2}, 3}
+---
+- [[1, 2], 3]
+...
+s:upsert({{box.null, 2}}, {{'+', 2, 5}})
+---
+...
+s:get(2)
+---
+- [[1, 2], 8]
+...
+s:drop()
+---
+...
+-- Test index creation on space with data.
+s = box.schema.space.create('withdata', {engine = engine})
+---
+...
+pk = s:create_index('primary', { type = 'tree', parts = {{2, 'number'}} })
+---
+...
+s:insert{1, 1, 7, {town = 'London', FIO = 1234}, 4, 5}
+---
+- [1, 1, 7, {'town': 'London', 'FIO': 1234}, 4, 5]
+...
+s:insert{2, 2, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
+---
+- [2, 2, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+...
+s:insert{3, 3, 7, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, 4, 5}
+---
+- [3, 3, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+...
+s:insert{4, 4, 7, {town = 'London', FIO = {1,2,3}}, 4, 5}
+---
+- [4, 4, 7, {'town': 'London', 'FIO': [1, 2, 3]}, 4, 5]
+...
+s:create_index('test1', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]'}, {4, 'str', path = '["FIO"]["sname"]'}}})
+---
+- error: 'Tuple field [4]["FIO"] type does not match one required by operation: expected
+    map'
+...
+_ = s:delete(1)
+---
+...
+s:create_index('test1', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]'}, {4, 'str', path = '["FIO"]["sname"]'}}})
+---
+- error: Duplicate key exists in unique index 'test1' in space 'withdata'
+...
+_ = s:delete(2)
+---
+...
+s:create_index('test1', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]'}, {4, 'str', path = '["FIO"]["sname"]'}}})
+---
+- error: 'Tuple field [4]["FIO"] type does not match one required by operation: expected
+    map'
+...
+_ = s:delete(4)
+---
+...
+idx = s:create_index('test1', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]', is_nullable = true}, {4, 'str', path = '["FIO"]["sname"]'}, {4, 'str', path = '["FIO"]["extra"]', is_nullable = true}}})
+---
+...
+idx ~= nil
+---
+- true
+...
+s:create_index('test2', {parts = {{3, 'number'}, {4, 'number', path = '["FIO"]["fname"]'}}})
+---
+- error: Field [4]["FIO"]["fname"] has type 'string' in one index, but type 'number'
+    in another
+...
+idx2 = s:create_index('test2', {parts = {{3, 'number'}, {4, 'str', path = '["FIO"]["fname"]'}}})
+---
+...
+idx2 ~= nil
+---
+- true
+...
+t = s:insert{5, 5, 7, {town = 'Matrix', FIO = {fname = 'Agent', sname = 'Smith'}}, 4, 5}
+---
+...
+idx:select()
+---
+- - [5, 5, 7, {'town': 'Matrix', 'FIO': {'fname': 'Agent', 'sname': 'Smith'}}, 4,
+    5]
+  - [3, 3, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+...
+idx:min()
+---
+- [5, 5, 7, {'town': 'Matrix', 'FIO': {'fname': 'Agent', 'sname': 'Smith'}}, 4, 5]
+...
+idx:max()
+---
+- [3, 3, 7, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}, 4, 5]
+...
+idx:drop()
+---
+...
+s:drop()
+---
+...
+-- Test complex JSON indexes with nullable fields.
+s = box.schema.space.create('withdata', {engine = engine})
+---
+...
+parts = {}
+---
+...
+parts[1] = {1, 'str', path='[3][2].a'}
+---
+...
+parts[2] = {1, 'unsigned', path = '[3][1]'}
+---
+...
+parts[3] = {2, 'str', path = '[2].d[1]'}
+---
+...
+pk = s:create_index('primary', { type = 'tree', parts =  parts})
+---
+...
+s:insert{{1, 2, {3, {3, a = 'str', b = 5}}}, {'c', {d = {'e', 'f'}, e = 'g'}}, 6, {1, 2, 3}}
+---
+- [[1, 2, [3, {1: 3, 'a': 'str', 'b': 5}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6,
+  [1, 2, 3]]
+...
+s:insert{{1, 2, {3, {a = 'str', b = 1}}}, {'c', {d = {'e', 'f'}, e = 'g'}}, 6}
+---
+- error: Duplicate key exists in unique index 'primary' in space 'withdata'
+...
+parts = {}
+---
+...
+parts[1] = {4, 'unsigned', path='[1]', is_nullable = false}
+---
+...
+parts[2] = {4, 'unsigned', path='[2]', is_nullable = true}
+---
+...
+parts[3] = {4, 'unsigned', path='[4]', is_nullable = true}
+---
+...
+trap_idx = s:create_index('trap', { type = 'tree', parts = parts})
+---
+...
+s:insert{{1, 2, {3, {3, a = 'str2', b = 5}}}, {'c', {d = {'e', 'f'}, e = 'g'}}, 6, {}}
+---
+- error: Tuple field [4][1] required by space format is missing
+...
+parts = {}
+---
+...
+parts[1] = {1, 'unsigned', path='[3][2].b' }
+---
+...
+parts[2] = {3, 'unsigned'}
+---
+...
+crosspart_idx = s:create_index('crosspart', { parts =  parts})
+---
+...
+s:insert{{1, 2, {3, {a = 'str2', b = 2}}}, {'c', {d = {'e', 'f'}, e = 'g'}}, 6, {9, 2, 3}}
+---
+- [[1, 2, [3, {'a': 'str2', 'b': 2}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [9,
+    2, 3]]
+...
+parts = {}
+---
+...
+parts[1] = {1, 'unsigned', path='[3][2].b'}
+---
+...
+num_idx = s:create_index('numeric', {parts =  parts})
+---
+...
+s:insert{{1, 2, {3, {a = 'str3', b = 9}}}, {'c', {d = {'e', 'f'}, e = 'g'}}, 6, {0}}
+---
+- [[1, 2, [3, {'a': 'str3', 'b': 9}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [0]]
+...
+num_idx:get(2)
+---
+- [[1, 2, [3, {'a': 'str2', 'b': 2}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [9,
+    2, 3]]
+...
+num_idx:select()
+---
+- - [[1, 2, [3, {'a': 'str2', 'b': 2}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [
+      9, 2, 3]]
+  - [[1, 2, [3, {1: 3, 'a': 'str', 'b': 5}]], ['c', {'d': ['e', 'f'], 'e': 'g'}],
+    6, [1, 2, 3]]
+  - [[1, 2, [3, {'a': 'str3', 'b': 9}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [
+      0]]
+...
+num_idx:max()
+---
+- [[1, 2, [3, {'a': 'str3', 'b': 9}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [0]]
+...
+num_idx:min()
+---
+- [[1, 2, [3, {'a': 'str2', 'b': 2}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [9,
+    2, 3]]
+...
+crosspart_idx:max() == num_idx:max()
+---
+- true
+...
+crosspart_idx:min() == num_idx:min()
+---
+- true
+...
+trap_idx:max()
+---
+- [[1, 2, [3, {'a': 'str2', 'b': 2}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [9,
+    2, 3]]
+...
+trap_idx:min()
+---
+- [[1, 2, [3, {'a': 'str3', 'b': 9}]], ['c', {'d': ['e', 'f'], 'e': 'g'}], 6, [0]]
+...
+s:drop()
+---
+...
+-- Test index alter.
+s = box.schema.space.create('withdata', {engine = engine})
+---
+...
+pk_simplified = s:create_index('primary', { type = 'tree',  parts = {{1, 'unsigned'}}})
+---
+...
+pk_simplified.path == box.NULL
+---
+- true
+...
+idx = s:create_index('idx', {parts = {{2, 'integer', path = 'a'}}})
+---
+...
+s:insert{31, {a = 1, aa = -1}}
+---
+- [31, {'a': 1, 'aa': -1}]
+...
+s:insert{22, {a = 2, aa = -2}}
+---
+- [22, {'a': 2, 'aa': -2}]
+...
+s:insert{13, {a = 3, aa = -3}}
+---
+- [13, {'a': 3, 'aa': -3}]
+...
+idx:select()
+---
+- - [31, {'a': 1, 'aa': -1}]
+  - [22, {'a': 2, 'aa': -2}]
+  - [13, {'a': 3, 'aa': -3}]
+...
+idx:alter({parts = {{2, 'integer', path = 'aa'}}})
+---
+...
+idx:select()
+---
+- - [13, {'a': 3, 'aa': -3}]
+  - [22, {'a': 2, 'aa': -2}]
+  - [31, {'a': 1, 'aa': -1}]
+...
+s:drop()
+---
+...
+-- Incompatible format change.
+s = box.schema.space.create('withdata')
+---
+...
+i = s:create_index('pk', {parts = {{1, 'integer', path = '[1]'}}})
+---
+...
+s:insert{{-1}}
+---
+- [[-1]]
+...
+i:alter{parts = {{1, 'string', path = '[1]'}}}
+---
+- error: 'Tuple field [1][1] type does not match one required by operation: expected
+    string'
+...
+s:insert{{'a'}}
+---
+- error: 'Tuple field [1][1] type does not match one required by operation: expected
+    integer'
+...
+i:drop()
+---
+...
+i = s:create_index('pk', {parts = {{1, 'integer', path = '[1].FIO'}}})
+---
+...
+s:insert{{{FIO=-1}}}
+---
+- [[{'FIO': -1}]]
+...
+i:alter{parts = {{1, 'integer', path = '[1][1]'}}}
+---
+- error: 'Tuple field [1][1] type does not match one required by operation: expected
+    array'
+...
+i:alter{parts = {{1, 'integer', path = '[1].FIO[1]'}}}
+---
+- error: 'Tuple field [1][1]["FIO"] type does not match one required by operation:
+    expected array'
+...
+s:drop()
+---
+...
+-- Test snapshotting and recovery.
+s = box.schema.space.create('withdata', {engine = engine})
+---
+...
+pk = s:create_index('pk', {parts = {{1, 'integer'}, {3, 'string', path = 'town'}}})
+---
+...
+name = s:create_index('name', {parts = {{3, 'string', path = 'FIO.fname'}, {3, 'string', path = 'FIO.sname'}, {3, 'string', path = 'FIO.extra', is_nullable = true}}})
+---
+...
+s:insert{1, 1, {town = 'Moscow', FIO = {fname = 'Max', sname = 'Isaev'}}}
+---
+- [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+...
+s:insert{1, 777, {town = 'London', FIO = {fname = 'James', sname = 'Bond'}}}
+---
+- [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+...
+s:insert{1, 45, {town = 'Berlin', FIO = {fname = 'Richard', sname = 'Sorge'}}}
+---
+- [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+...
+s:insert{4, 45, {town = 'Berlin', FIO = {fname = 'Max', extra = 'Otto', sname = 'Stierlitz'}}}
+---
+- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+...
+pk:select({1})
+---
+- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+...
+pk:select({1, 'Berlin'})
+---
+- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+...
+name:select({})
+---
+- - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+  - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+...
+name:select({'Max'})
+---
+- - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+...
+name:get({'Max', 'Stierlitz', 'Otto'})
+---
+- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd("restart server default")
+s = box.space["withdata"]
+---
+...
+pk = s.index["pk"]
+---
+...
+name = s.index["name"]
+---
+...
+pk:select({1})
+---
+- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+...
+pk:select({1, 'Berlin'})
+---
+- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+...
+name:select({})
+---
+- - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+  - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+...
+name:select({'Max'})
+---
+- - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+...
+name:get({'Max', 'Stierlitz', 'Otto'})
+---
+- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'extra': 'Otto', 'sname': 'Stierlitz'}}]
+...
+s:replace{4, 45, {town = 'Berlin', FIO = {fname = 'Max', sname = 'Stierlitz'}}}
+---
+- [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz'}}]
+...
+name:select({'Max', 'Stierlitz'})
+---
+- - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz'}}]
+...
+town = s:create_index('town', {unique = false, parts = {{3, 'string', path = 'town'}}})
+---
+...
+town:select({'Berlin'})
+---
+- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+  - [4, 45, {'town': 'Berlin', 'FIO': {'fname': 'Max', 'sname': 'Stierlitz'}}]
+...
+_ = s:delete({4, 'Berlin'})
+---
+...
+town:select({'Berlin'})
+---
+- - [1, 45, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+...
+s:update({1, 'Berlin'}, {{"+", 2, 45}})
+---
+- [1, 90, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+...
+box.snapshot()
+---
+- ok
+...
+s:upsert({1, 90, {town = 'Berlin', FIO = {fname = 'X', sname = 'Y'}}}, {{'+', 2, 1}})
+---
+...
+town:select()
+---
+- - [1, 91, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+...
+name:drop()
+---
+...
+town:select()
+---
+- - [1, 91, {'town': 'Berlin', 'FIO': {'fname': 'Richard', 'sname': 'Sorge'}}]
+  - [1, 777, {'town': 'London', 'FIO': {'fname': 'James', 'sname': 'Bond'}}]
+  - [1, 1, {'town': 'Moscow', 'FIO': {'fname': 'Max', 'sname': 'Isaev'}}]
+...
+s:drop()
+---
+...

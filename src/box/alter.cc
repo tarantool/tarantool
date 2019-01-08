@@ -268,7 +268,7 @@ index_def_new_from_tuple(struct tuple *tuple, struct space *space)
 	});
 	if (key_def_decode_parts(part_def, part_count, &parts,
 				 space->def->fields,
-				 space->def->field_count) != 0)
+				 space->def->field_count, &fiber()->gc) != 0)
 		diag_raise();
 	key_def = key_def_new(part_def, part_count);
 	if (key_def == NULL)

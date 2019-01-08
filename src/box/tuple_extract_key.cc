@@ -8,9 +8,10 @@ enum { MSGPACK_NULL = 0xc0 };
 static inline bool
 key_def_parts_are_sequential(const struct key_def *def, int i)
 {
-	uint32_t fieldno1 = def->parts[i].fieldno + 1;
-	uint32_t fieldno2 = def->parts[i + 1].fieldno;
-	return fieldno1 == fieldno2;
+	const struct key_part *part1 = &def->parts[i];
+	const struct key_part *part2 = &def->parts[i + 1];
+	return part1->fieldno + 1 == part2->fieldno &&
+	       part1->path == NULL && part2->path == NULL;
 }
 
 /** True, if a key con contain two or more parts in sequence. */
@@ -241,7 +242,8 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 			if (!key_def_parts_are_sequential(key_def, i))
 				break;
 		}
-		uint32_t end_fieldno = key_def->parts[i].fieldno;
+		const struct key_part *part = &key_def->parts[i];
+		uint32_t end_fieldno = part->fieldno;
 
 		if (fieldno < current_fieldno) {
 			/* Rewind. */
@@ -283,8 +285,29 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 				current_fieldno++;
 			}
 		}
-		memcpy(key_buf, field, field_end - field);
-		key_buf += field_end - field;
+		const char *src = field;
+		const char *src_end = field_end;
+		if (part->path != NULL) {
+			if (tuple_field_go_to_path(&src, part->path,
+						   part->path_len) != 0) {
+				/*
+				 * The path must be correct as
+				 * it has already been validated
+				 * in key_def_decode_parts.
+				 */
+				unreachable();
+			}
+			assert(src != NULL || has_optional_parts);
+			if (has_optional_parts && src == NULL) {
+				null_count += 1;
+				src = src_end;
+			} else {
+				src_end = src;
+				mp_next(&src_end);
+			}
+		}
+		memcpy(key_buf, src, src_end - src);
+		key_buf += src_end - src;
 		if (has_optional_parts && null_count != 0) {
 			memset(key_buf, MSGPACK_NULL, null_count);
 			key_buf += null_count * mp_sizeof_nil();

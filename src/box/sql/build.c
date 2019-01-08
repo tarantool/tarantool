@@ -2185,6 +2185,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 		part->is_nullable = part->nullable_action == ON_CONFLICT_ACTION_NONE;
 		part->sort_order = SORT_ORDER_ASC;
 		part->coll_id = coll_id;
+		part->path = NULL;
 	}
 	key_def = key_def_new(key_parts, expr_list->nExpr);
 	if (key_def == NULL)
