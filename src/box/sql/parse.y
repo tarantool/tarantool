@@ -172,7 +172,8 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 //
 cmd ::= create_table create_table_args.
 create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
-   sqlStartTable(pParse,&Y,E);
+  create_table_def_init(&pParse->create_table_def, &Y, E);
+  pParse->create_table_def.new_space = sqlStartTable(pParse, &Y, E);
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
@@ -193,10 +194,11 @@ create_table_args ::= LP columnlist RP. {
  *   sql_select_delete(pParse->db, S);
  * }
  */
-columnlist ::= columnlist COMMA tconsdef.
+
+columnlist ::= columnlist COMMA tcons.
 columnlist ::= columnlist COMMA columnname carglist.
 columnlist ::= columnname carglist.
-columnlist ::= tconsdef.
+columnlist ::= tcons.
 columnname(A) ::= nm(A) typedef(Y). {sqlAddColumn(pParse,&A,&Y);}
 
 // An IDENTIFIER can be a generic identifier, or one of several
@@ -245,11 +247,11 @@ nm(A) ::= id(A). {
 // "carglist" is a list of additional constraints that come after the
 // column name and column type in a CREATE TABLE statement.
 //
-carglist ::= carglist cconsdef.
+carglist ::= carglist ccons.
 carglist ::= .
-cconsdef ::= cconsname ccons.
-cconsname ::= CONSTRAINT nm(X).           {pParse->constraintName = X;}
-cconsname ::= .                           {pParse->constraintName.n = 0;}
+%type cconsname { struct Token }
+cconsname(N) ::= CONSTRAINT nm(X). { N = X; }
+cconsname(N) ::= . { N = Token_nil; }
 ccons ::= DEFAULT term(X).            {sqlAddDefaultValue(pParse,&X);}
 ccons ::= DEFAULT LP expr(X) RP.      {sqlAddDefaultValue(pParse,&X);}
 ccons ::= DEFAULT PLUS term(X).       {sqlAddDefaultValue(pParse,&X);}
@@ -271,14 +273,31 @@ ccons ::= NULL onconf(R).        {
         sql_column_add_nullable_action(pParse, R);
 }
 ccons ::= NOT NULL onconf(R).    {sql_column_add_nullable_action(pParse, R);}
-ccons ::= PRIMARY KEY sortorder(Z) autoinc(I).
-                                 {sqlAddPrimaryKey(pParse,0,I,Z);}
-ccons ::= UNIQUE.                {sql_create_index(pParse,0,0,0,0,
-                                                   SORT_ORDER_ASC, false,
-                                                   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
-ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
-ccons ::= REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R).
-                                 {sql_create_foreign_key(pParse, NULL, NULL, NULL, &T, TA, false, M, R);}
+ccons ::= cconsname(N) PRIMARY KEY sortorder(Z) autoinc(I). {
+  pParse->create_table_def.has_autoinc = I;
+  create_index_def_init(&pParse->create_index_def, NULL, &N, NULL,
+                        SQL_INDEX_TYPE_CONSTRAINT_PK, Z, false);
+  sqlAddPrimaryKey(pParse);
+}
+ccons ::= cconsname(N) UNIQUE. {
+  create_index_def_init(&pParse->create_index_def, NULL, &N, NULL,
+                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
+                        false);
+  sql_create_index(pParse);
+}
+
+ccons ::= check_constraint_def .
+
+check_constraint_def ::= cconsname(N) CHECK LP expr(X) RP. {
+  create_ck_def_init(&pParse->create_ck_def, &N, &X);
+  sql_add_check_constraint(pParse);
+}
+
+ccons ::= cconsname(N) REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R). {
+  create_fk_def_init(&pParse->create_fk_def, NULL, &N, NULL, &T, TA, M, R,
+                     false);
+  sql_create_foreign_key(pParse);
+}
 ccons ::= defer_subclause(D).    {fk_constraint_change_defer_mode(pParse, D);}
 ccons ::= COLLATE id(C).        {sqlAddCollateType(pParse, &C);}
 
@@ -324,20 +343,23 @@ init_deferred_pred_opt(A) ::= .                       {A = 0;}
 init_deferred_pred_opt(A) ::= INITIALLY DEFERRED.     {A = 1;}
 init_deferred_pred_opt(A) ::= INITIALLY IMMEDIATE.    {A = 0;}
 
-tconsdef ::= tconsname tcons.
-tconsname ::= CONSTRAINT nm(X).      {pParse->constraintName = X;}
-tconsname ::= .                      {pParse->constraintName.n = 0;}
-tcons ::= PRIMARY KEY LP sortlist(X) autoinc(I) RP.
-                                 {sqlAddPrimaryKey(pParse,X,I,0);}
-tcons ::= UNIQUE LP sortlist(X) RP.
-                                 {sql_create_index(pParse,0,0,X,0,
-                                                   SORT_ORDER_ASC,false,
-                                                   SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
-tcons ::= CHECK LP expr(E) RP .
-                                 {sql_add_check_constraint(pParse,&E);}
-tcons ::= FOREIGN KEY LP eidlist(FA) RP
+tcons ::= cconsname(N) PRIMARY KEY LP sortlist(X) autoinc(I) RP. {
+  pParse->create_table_def.has_autoinc = I;
+  create_index_def_init(&pParse->create_index_def, NULL, &N, X,
+                        SQL_INDEX_TYPE_CONSTRAINT_PK, SORT_ORDER_ASC, false);
+  sqlAddPrimaryKey(pParse);
+}
+tcons ::= cconsname(N) UNIQUE LP sortlist(X) RP. {
+  create_index_def_init(&pParse->create_index_def, NULL, &N, X,
+                        SQL_INDEX_TYPE_CONSTRAINT_UNIQUE, SORT_ORDER_ASC,
+                        false);
+  sql_create_index(pParse);
+}
+tcons ::= check_constraint_def .
+tcons ::= cconsname(N) FOREIGN KEY LP eidlist(FA) RP
           REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R) defer_subclause_opt(D). {
-    sql_create_foreign_key(pParse, NULL, NULL, FA, &T, TA, D, M, R);
+  create_fk_def_init(&pParse->create_fk_def, NULL, &N, FA, &T, TA, M, R, D);
+  sql_create_foreign_key(pParse);
 }
 %type defer_subclause_opt {int}
 defer_subclause_opt(A) ::= .                    {A = 0;}
@@ -360,9 +382,19 @@ resolvetype(A) ::= REPLACE.                  {A = ON_CONFLICT_ACTION_REPLACE;}
 
 ////////////////////////// The DROP TABLE /////////////////////////////////////
 //
-cmd ::= DROP TABLE ifexists(E) fullname(X). {
-  sql_drop_table(pParse, X, 0, E);
+
+cmd ::= DROP TABLE ifexists(E) fullname(X) . {
+  struct Token t = Token_nil;
+  drop_table_def_init(&pParse->drop_table_def, X, &t, E);
+  sql_drop_table(pParse);
 }
+
+cmd ::= DROP VIEW ifexists(E) fullname(X) . {
+  struct Token t = Token_nil;
+  drop_view_def_init(&pParse->drop_view_def, X, &t, E);
+  sql_drop_table(pParse);
+}
+
 %type ifexists {int}
 ifexists(A) ::= IF EXISTS.   {A = 1;}
 ifexists(A) ::= .            {A = 0;}
@@ -371,13 +403,12 @@ ifexists(A) ::= .            {A = 0;}
 //
 cmd ::= createkw(X) VIEW ifnotexists(E) nm(Y) eidlist_opt(C)
           AS select(S). {
-  if (!pParse->parse_only)
-    sql_create_view(pParse, &X, &Y, C, S, E);
-  else
+  if (!pParse->parse_only) {
+    create_view_def_init(&pParse->create_view_def, &Y, &X, C, S, E);
+    sql_create_view(pParse);
+  } else {
     sql_store_select(pParse, S);
-}
-cmd ::= DROP VIEW ifexists(E) fullname(X). {
-  sql_drop_table(pParse, X, 1, E);
+  }
 }
 
 //////////////////////// The SELECT statement /////////////////////////////////
@@ -1314,14 +1345,16 @@ paren_exprlist(A) ::= LP exprlist(X) RP.  {A = X;}
 
 ///////////////////////////// The CREATE INDEX command ///////////////////////
 //
-cmd ::= createkw(S) uniqueflag(U) INDEX ifnotexists(NE) nm(X)
+cmd ::= createkw uniqueflag(U) INDEX ifnotexists(NE) nm(X)
         ON nm(Y) LP sortlist(Z) RP. {
   struct SrcList *src_list = sql_src_list_append(pParse->db,0,&Y);
   if (src_list == NULL) {
     pParse->is_aborted = true;
     return;
   }
-  sql_create_index(pParse, &X, src_list, Z, &S, SORT_ORDER_ASC, NE, U);
+  create_index_def_init(&pParse->create_index_def, src_list, &X, Z, U,
+                        SORT_ORDER_ASC, NE);
+  sql_create_index(pParse);
 }
 
 %type uniqueflag {int}
@@ -1371,8 +1404,9 @@ eidlist(A) ::= nm(Y). {
 
 ///////////////////////////// The DROP INDEX command /////////////////////////
 //
-cmd ::= DROP INDEX ifexists(E) fullname(X) ON nm(Y).   {
-    sql_drop_index(pParse, X, &Y, E);
+cmd ::= DROP INDEX ifexists(E) nm(X) ON fullname(Y).   {
+  drop_index_def_init(&pParse->drop_index_def, Y, &X, E);
+  sql_drop_index(pParse);
 }
 
 ///////////////////////////// The PRAGMA command /////////////////////////////
@@ -1423,7 +1457,9 @@ cmd ::= createkw trigger_decl(A) BEGIN trigger_cmd_list(S) END(Z). {
 trigger_decl(A) ::= TRIGGER ifnotexists(NOERR) nm(B)
                     trigger_time(C) trigger_event(D)
                     ON fullname(E) foreach_clause when_clause(G). {
-  sql_trigger_begin(pParse, &B, C, D.a, D.b, E, G, NOERR);
+  create_trigger_def_init(&pParse->create_trigger_def, E, &B, C, D.a, D.b, G,
+                          NOERR);
+  sql_trigger_begin(pParse);
   A = B; /*A-overwrites-T*/
 }
 
@@ -1558,22 +1594,27 @@ raisetype(A) ::= FAIL.      {A = ON_CONFLICT_ACTION_FAIL;}
 
 ////////////////////////  DROP TRIGGER statement //////////////////////////////
 cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
-  sql_drop_trigger(pParse,X,NOERR);
+  struct Token t = Token_nil;
+  drop_trigger_def_init(&pParse->drop_trigger_def, X, &t, NOERR);
+  sql_drop_trigger(pParse);
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
 cmd ::= ALTER TABLE fullname(X) RENAME TO nm(Z). {
-  sql_alter_table_rename(pParse,X,&Z);
+  rename_entity_def_init(&pParse->rename_entity_def, X, &Z);
+  sql_alter_table_rename(pParse);
 }
 
 cmd ::= ALTER TABLE fullname(X) ADD CONSTRAINT nm(Z) FOREIGN KEY
         LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA) matcharg(M)
         refargs(R) defer_subclause_opt(D). {
-    sql_create_foreign_key(pParse, X, &Z, FA, &T, TA, D, M, R);
+  create_fk_def_init(&pParse->create_fk_def, X, &Z, FA, &T, TA, M, R, D);
+  sql_create_foreign_key(pParse);
 }
 
 cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
-    sql_drop_foreign_key(pParse, X, &Z);
+  drop_fk_def_init(&pParse->drop_fk_def, X, &Z, false);
+  sql_drop_foreign_key(pParse);
 }
 
 //////////////////////// COMMON TABLE EXPRESSIONS ////////////////////////////

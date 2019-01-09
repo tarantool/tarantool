@@ -62,34 +62,31 @@ sqlDeleteTriggerStep(sql * db, TriggerStep * pTriggerStep)
 }
 
 void
-sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
-		  int op, struct IdList *columns, struct SrcList *table,
-		  struct Expr *when, int no_err)
+sql_trigger_begin(struct Parse *parse)
 {
 	/* The new trigger. */
 	struct sql_trigger *trigger = NULL;
 	/* The database connection. */
 	struct sql *db = parse->db;
-	/* The name of the Trigger. */
+	struct create_trigger_def *trigger_def = &parse->create_trigger_def;
+	struct create_entity_def *create_def = &trigger_def->base;
+	struct alter_entity_def *alter_def = &create_def->base;
+	assert(alter_def->entity_type == ENTITY_TYPE_TRIGGER);
+	assert(alter_def->alter_action == ALTER_ACTION_CREATE);
+
 	char *trigger_name = NULL;
-
-	/* pName->z might be NULL, but not pName itself. */
-	assert(name != NULL);
-	assert(op == TK_INSERT || op == TK_UPDATE || op == TK_DELETE);
-	assert(op > 0 && op < 0xff);
-
-	if (table == NULL || db->mallocFailed)
+	if (alter_def->entity_name == NULL || db->mallocFailed)
 		goto trigger_cleanup;
-	assert(table->nSrc == 1);
-
-	trigger_name = sql_name_from_token(db, name);
+	assert(alter_def->entity_name->nSrc == 1);
+	assert(create_def->name.n > 0);
+	trigger_name = sql_name_from_token(db, &create_def->name);
 	if (trigger_name == NULL)
 		goto set_tarantool_error_and_cleanup;
 
 	if (sqlCheckIdentifierName(parse, trigger_name) != 0)
 		goto trigger_cleanup;
 
-	const char *table_name = table->a[0].zName;
+	const char *table_name = alter_def->entity_name->a[0].zName;
 	uint32_t space_id;
 	if (schema_find_id(BOX_SPACE_ID, 2, table_name, strlen(table_name),
 			   &space_id) != 0)
@@ -112,6 +109,7 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 		int name_reg = ++parse->nMem;
 		sqlVdbeAddOp4(parse->pVdbe, OP_String8, 0, name_reg, 0,
 				  name_copy, P4_DYNAMIC);
+		bool no_err = create_def->if_not_exist;
 		if (vdbe_emit_halt_with_presence_test(parse, BOX_TRIGGER_ID, 0,
 						      name_reg, 1,
 						      ER_TRIGGER_EXISTS,
@@ -129,13 +127,14 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	trigger->space_id = space_id;
 	trigger->zName = trigger_name;
 	trigger_name = NULL;
-
-	trigger->op = (u8) op;
-	trigger->tr_tm = tr_tm;
-	trigger->pWhen = sqlExprDup(db, when, EXPRDUP_REDUCE);
-	trigger->pColumns = sqlIdListDup(db, columns);
-	if ((when != NULL && trigger->pWhen == NULL) ||
-	    (columns != NULL && trigger->pColumns == NULL))
+	assert(trigger_def->op == TK_INSERT || trigger_def->op == TK_UPDATE ||
+	       trigger_def->op== TK_DELETE);
+	trigger->op = (u8) trigger_def->op;
+	trigger->tr_tm = trigger_def->tr_tm;
+	trigger->pWhen = sqlExprDup(db, trigger_def->when, EXPRDUP_REDUCE);
+	trigger->pColumns = sqlIdListDup(db, trigger_def->cols);
+	if ((trigger->pWhen != NULL && trigger->pWhen == NULL) ||
+	    (trigger->pColumns != NULL && trigger->pColumns == NULL))
 		goto trigger_cleanup;
 	assert(parse->parsed_ast.trigger == NULL);
 	parse->parsed_ast.trigger = trigger;
@@ -143,9 +142,9 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 
  trigger_cleanup:
 	sqlDbFree(db, trigger_name);
-	sqlSrcListDelete(db, table);
-	sqlIdListDelete(db, columns);
-	sql_expr_delete(db, when, false);
+	sqlSrcListDelete(db, alter_def->entity_name);
+	sqlIdListDelete(db, trigger_def->cols);
+	sql_expr_delete(db, trigger_def->when, false);
 	if (parse->parsed_ast.trigger == NULL)
 		sql_trigger_delete(db, trigger);
 	else
@@ -389,9 +388,14 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 }
 
 void
-sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
+sql_drop_trigger(struct Parse *parser)
 {
-
+	struct drop_entity_def *drop_def = &parser->drop_trigger_def.base;
+	struct alter_entity_def *alter_def = &drop_def->base;
+	assert(alter_def->entity_type == ENTITY_TYPE_TRIGGER);
+	assert(alter_def->alter_action == ALTER_ACTION_DROP);
+	struct SrcList *name = alter_def->entity_name;
+	bool no_err = drop_def->if_exist;
 	sql *db = parser->db;
 	if (db->mallocFailed)
 		goto drop_trigger_cleanup;

@@ -11,3 +11,9 @@ box.execute(';')
 box.execute('')
 box.execute('     ;')
 box.execute('\n\n\n\t\t\t   ')
+
+-- gh-3820: only table constraints can have a name.
+--
+box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 NULL)')
+box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 DEFAULT 300)')
+box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COLLATE "binary")')

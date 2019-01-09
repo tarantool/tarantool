@@ -43,6 +43,7 @@ add_library(sql STATIC
     malloc.c
     os.c
     os_unix.c
+    parse_def.c
     pragma.c
     prepare.c
     printf.c

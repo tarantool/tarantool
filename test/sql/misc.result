@@ -47,3 +47,19 @@ box.execute('\n\n\n\t\t\t   ')
 ---
 - error: Failed to execute an empty SQL statement
 ...
+-- gh-3820: only table constraints can have a name.
+--
+box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 NULL)')
+---
+- error: Keyword 'NULL' is reserved. Please use double quotes if 'NULL' is an identifier.
+...
+box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 DEFAULT 300)')
+---
+- error: Keyword 'DEFAULT' is reserved. Please use double quotes if 'DEFAULT' is an
+    identifier.
+...
+box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COLLATE "binary")')
+---
+- error: Keyword 'COLLATE' is reserved. Please use double quotes if 'COLLATE' is an
+    identifier.
+...
