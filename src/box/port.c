@@ -113,8 +113,11 @@ port_tuple_dump_msgpack(struct port *base, struct obuf *out)
 {
 	struct port_tuple *port = port_tuple(base);
 	char *size_buf = obuf_alloc(out, mp_sizeof_array(port->size));
-	if (size_buf == NULL)
+	if (size_buf == NULL) {
+		diag_set(OutOfMemory, mp_sizeof_array(port->size), "obuf_alloc",
+			 "size_buf");
 		return -1;
+	}
 	mp_encode_array(size_buf, port->size);
 	if (port_tuple_dump_msgpack_16(base, out) < 0)
 		return -1;
