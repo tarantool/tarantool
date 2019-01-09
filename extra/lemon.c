@@ -599,10 +599,8 @@ struct acttab {
 /* Free all memory associated with the given acttab */
 void acttab_free(acttab *p){
   assert(p);
-  if (p->aAction)
-    free( p->aAction );
-  if (p->aLookahead)
-    free( p->aLookahead );
+  free( p->aAction );
+  free( p->aLookahead );
   free( p );
 }
 
