@@ -322,16 +322,6 @@ sql_normalized_name_region_new(struct region *r, const char *name, int len)
 	return res;
 }
 
-/*
- * Generate a Token object from a string
- */
-void
-sqlTokenInit(Token * p, char *z)
-{
-	p->z = z;
-	p->n = sqlStrlen30(z);
-}
-
 /* Convenient short-hand */
 #define UpperToLower sqlUpperToLower
 

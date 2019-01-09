@@ -397,6 +397,6 @@ test:do_catchsql_test(
                 "_index"."id" = "_space"."id" AND
                 "_space"."name"='TEST8';
         ]],
-        {0, {"pk_TEST8_2",0,"unique_C1_1",1}})
+        {0, {"pk_unnamed_TEST8_2",0,"unique_C1_1",1}})
 
 test:finish_test()

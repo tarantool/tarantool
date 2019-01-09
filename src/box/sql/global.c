@@ -223,14 +223,6 @@ SQL_WSD struct sqlConfig sqlConfig = {
 FuncDefHash sqlBuiltinFunctions;
 
 /*
- * Constant tokens for values 0 and 1.
- */
-const Token sqlIntTokens[] = {
-	{"0", 1, false},
-	{"1", 1, false}
-};
-
-/*
  * The value of the "pending" byte must be 0x40000000 (1 byte past the
  * 1-gibabyte boundary) in a compatible database.  sql never uses
  * the database page that contains the pending byte.  It never attempts

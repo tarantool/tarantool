@@ -68,6 +68,7 @@
 #include <stdbool.h>
 
 #include "box/column_mask.h"
+#include "parse_def.h"
 #include "box/field_def.h"
 #include "box/sql.h"
 #include "box/txn.h"
@@ -1868,19 +1869,6 @@ struct UnpackedRecord {
 				 */
 };
 
-/*
- * Possible SQL index types. Note that PK and UNIQUE constraints
- * are implemented as indexes and have their own types:
- * SQL_INDEX_TYPE_CONSTRAINT_PK and
- * SQL_INDEX_TYPE_CONSTRAINT_UNIQUE.
- */
-enum sql_index_type {
-    SQL_INDEX_TYPE_NON_UNIQUE = 0,
-    SQL_INDEX_TYPE_UNIQUE,
-    SQL_INDEX_TYPE_CONSTRAINT_UNIQUE,
-    SQL_INDEX_TYPE_CONSTRAINT_PK,
-};
-
 /**
  * Fetch statistics concerning tuples to be selected:
  * logarithm of number of tuples which has the same key as for
@@ -1909,20 +1897,6 @@ index_field_tuple_est(const struct index_def *idx, uint32_t field);
 #define DEFAULT_TUPLE_COUNT 1048576
 /** [10*log_{2}(1048576)] == 200 */
 #define DEFAULT_TUPLE_LOG_COUNT 200
-
-/*
- * Each token coming out of the lexer is an instance of
- * this structure.  Tokens are also used as part of an expression.
- *
- * Note if Token.z==0 then Token.dyn and Token.n are undefined and
- * may contain random values.  Do not make any assumptions about Token.dyn
- * and Token.n when Token.z==0.
- */
-struct Token {
-	const char *z;		/* Text of the token.  Not NULL-terminated! */
-	unsigned int n;		/* Number of characters in this token */
-	bool isReserved;         /* If reserved keyword or not */
-};
 
 /*
  * An instance of this structure contains information needed to generate
@@ -2622,33 +2596,6 @@ enum ast_type {
 	ast_type_MAX
 };
 
-/**
- * Structure representing foreign keys constraints appeared
- * within CREATE TABLE statement. Used only during parsing.
- */
-struct fk_constraint_parse {
-	/**
-	 * Foreign keys constraint declared in <CREATE TABLE ...>
-	 * statement. They must be coded after space creation.
-	 */
-	struct fk_constraint_def *fk_def;
-	/**
-	 * If inside CREATE TABLE statement we want to declare
-	 * self-referenced FK constraint, we must delay their
-	 * resolution until the end of parsing of all columns.
-	 * E.g.: CREATE TABLE t1(id REFERENCES t1(b), b);
-	 */
-	struct ExprList *selfref_cols;
-	/**
-	 * Still, self-referenced columns might be NULL, if
-	 * we declare FK constraints referencing PK:
-	 * CREATE TABLE t1(id REFERENCES t1) - it is a valid case.
-	 */
-	bool is_self_referenced;
-	/** Organize these structs into linked list. */
-	struct rlist link;
-};
-
 /*
  * An SQL parser context.  A copy of this structure is passed through
  * the parser and down into all the parser action routine in order to
@@ -2683,7 +2630,6 @@ struct Parse {
 	int nLabel;		/* Number of labels used */
 	int *aLabel;		/* Space to hold the labels */
 	ExprList *pConstExpr;	/* Constant expressions */
-	Token constraintName;	/* Name of the constraint currently being parsed */
 	int nMaxArg;		/* Max args passed to user function by sub-program */
 	int nSelect;		/* Number of SELECT statements seen */
 	int nSelectIndent;	/* How far to indent SELECTTRACE() output */
@@ -2738,25 +2684,37 @@ struct Parse {
 	With *pWithToFree;	/* Free this WITH object at the end of the parse */
 	/** Space triggers are being coded for. */
 	struct space *triggered_space;
-	/** A space being constructed by CREATE TABLE */
-	struct space *new_space;
 	/**
-	 * Number of FK constraints declared within
-	 * CREATE TABLE statement.
+	 * One of parse_def structures which are used to
+	 * assemble and carry arguments of DDL routines
+	 * from parse.y
 	 */
-	uint32_t fk_constraint_count;
+	union {
+		struct create_ck_def create_ck_def;
+		struct create_fk_def create_fk_def;
+		struct create_index_def create_index_def;
+		struct create_trigger_def create_trigger_def;
+		struct create_view_def create_view_def;
+		struct rename_entity_def rename_entity_def;
+		struct drop_fk_def drop_fk_def;
+		struct drop_index_def drop_index_def;
+		struct drop_table_def drop_table_def;
+		struct drop_trigger_def drop_trigger_def;
+		struct drop_view_def drop_view_def;
+	};
 	/**
-	 * Foreign key constraint appeared in CREATE TABLE stmt.
+	 * Table def is not part of union since information
+	 * being held must survive till the end of parsing of
+	 * whole CREATE TABLE statement (to pass it to
+	 * sqlEndTable() function).
 	 */
-	struct rlist new_fk_constraint;
+	struct create_table_def create_table_def;
 	/**
 	 * List of all records that were inserted in system spaces
 	 * in current statement.
 	 */
 	struct rlist record_list;
 	bool initiateTTrans;	/* Initiate Tarantool transaction */
-	/** True, if table to be created has AUTOINCREMENT PK. */
-	bool is_new_table_autoinc;
 	/** If set - do not emit byte code at all, just parse.  */
 	bool parse_only;
 	/** Type of parsed_ast member. */
@@ -3255,7 +3213,6 @@ sql_normalized_name_db_new(struct sql *db, const char *name, int len);
 char *
 sql_normalized_name_region_new(struct region *r, const char *name, int len);
 
-void sqlTokenInit(Token *, char *);
 int sqlKeywordCode(const unsigned char *, int);
 int sqlRunParser(Parse *, const char *);
 
@@ -3425,7 +3382,8 @@ void
 sqlSelectAddColumnTypeAndCollation(Parse *, struct space_def *, Select *);
 struct space *sqlResultSetOfSelect(Parse *, Select *);
 
-void sqlStartTable(Parse *, Token *, int);
+struct space *
+sqlStartTable(Parse *, Token *, int);
 void sqlAddColumn(Parse *, Token *, struct type_def *);
 
 /**
@@ -3443,16 +3401,16 @@ void
 sql_column_add_nullable_action(struct Parse *parser,
 			       enum on_conflict_action nullable_action);
 
-void sqlAddPrimaryKey(Parse *, ExprList *, int, enum sort_order);
+void
+sqlAddPrimaryKey(struct Parse *parse);
 
 /**
  * Add a new CHECK constraint to the table currently under
  * construction.
  * @param parser Parsing context.
- * @param span Expression span object.
  */
 void
-sql_add_check_constraint(Parse *parser, ExprSpan *span);
+sql_add_check_constraint(Parse *parser);
 
 void sqlAddDefaultValue(Parse *, ExprSpan *);
 void sqlAddCollateType(Parse *, Token *);
@@ -3500,16 +3458,9 @@ int sqlFaultSim(int);
  * The parser calls this routine in order to create a new VIEW.
  *
  * @param parse_context Current parsing context.
- * @param begin The CREATE token that begins the statement.
- * @param name The token that holds the name of the view.
- * @param aliases Optional list of view column names.
- * @param select A SELECT statement that will become the new view.
- * @param if_exists Suppress error messages if VIEW already exists.
  */
 void
-sql_create_view(struct Parse *parse_context, struct Token *begin,
-		struct Token *name, struct ExprList *aliases,
-		struct Select *select, bool if_exists);
+sql_create_view(struct Parse *parse_context);
 
 /**
  * Compile view, i.e. create struct Select from
@@ -3534,7 +3485,7 @@ void
 sql_store_select(struct Parse *parse_context, struct Select *select);
 
 void
-sql_drop_table(struct Parse *, struct SrcList *, bool, bool);
+sql_drop_table(struct Parse *);
 void sqlInsert(Parse *, SrcList *, Select *, IdList *,
 	       enum on_conflict_action);
 void *sqlArrayAllocate(sql *, void *, int, int *, int *);
@@ -3622,39 +3573,22 @@ void sqlIdListDelete(sql *, IdList *);
  * indexed.  Both will be NULL for a primary key or an index that
  * is created to satisfy a UNIQUE constraint.  If tbl_name and
  * name are NULL, use parse->new_space as the table to be indexed.
- * parse->new_space is a space that is currently being
- * constructed by a CREATE TABLE statement.
- *
- * col_list is a list of columns to be indexed.  col_list will be
- * NULL if this is a primary key or unique-constraint on the most
- * recent column added to the table currently under construction.
+ * parse->create_tale_def->new_space is a space that is currently
+ * being constructed by a CREATE TABLE statement.
  *
  * @param parse All information about this parse.
- * @param token Index name. May be NULL.
- * @param tbl_name Table to index. Use pParse->new_space if NULL.
- * @param col_list A list of columns to be indexed.
- * @param start The CREATE token that begins this statement.
- * @param sort_order Sort order of primary key when pList==NULL.
- * @param if_not_exist Omit error if index already exists.
- * @param idx_type The index type.
  */
 void
-sql_create_index(struct Parse *parse, struct Token *token,
-		 struct SrcList *tbl_name, struct ExprList *col_list,
-		 struct Token *start, enum sort_order sort_order,
-		 bool if_not_exist, enum sql_index_type idx_type);
+sql_create_index(struct Parse *parse);
 
 /**
  * This routine will drop an existing named index.  This routine
  * implements the DROP INDEX statement.
  *
  * @param parse_context Current parsing context.
- * @param index_name_list List containing index name.
- * @param table_token Token representing table name.
- * @param if_exists True, if statement contains 'IF EXISTS' clause.
  */
 void
-sql_drop_index(struct Parse *, struct SrcList *, struct Token *, bool);
+sql_drop_index(struct Parse *parse_context);
 
 int sqlSelect(Parse *, Select *, SelectDest *);
 Select *sqlSelectNew(Parse *, ExprList *, SrcList *, Expr *, ExprList *,
@@ -4091,20 +4025,9 @@ sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
  * After the trigger actions have been parsed, the
  * sql_trigger_finish() function is called to complete the trigger
  * construction process.
- *
- * @param parse The parse context of the CREATE TRIGGER statement.
- * @param name The name of the trigger.
- * @param tr_tm One of TK_BEFORE, TK_AFTER, TK_INSTEAD.
- * @param op One of TK_INSERT, TK_UPDATE, TK_DELETE.
- * @param columns column list if this is an UPDATE OF trigger.
- * @param table The name of the table/view the trigger applies to.
- * @param when  WHEN clause.
- * @param no_err Suppress errors if the trigger already exists.
  */
 void
-sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
-		  int op, struct IdList *columns, struct SrcList *table,
-		  struct Expr *when, int no_err);
+sql_trigger_begin(struct Parse *parse);
 
 /**
  * This routine is called after all of the trigger actions have
@@ -4124,11 +4047,9 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
  * VDBE code.
  *
  * @param parser Parser context.
- * @param name The name of trigger to drop.
- * @param no_err Suppress errors if the trigger already exists.
  */
 void
-sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err);
+sql_drop_trigger(struct Parse *parser);
 
 /**
  * Drop a trigger given a pointer to that trigger.
@@ -4372,39 +4293,18 @@ fk_constraint_change_defer_mode(struct Parse *parse_context, bool is_deferred);
  * OR to handle <CREATE TABLE ...>
  *
  * @param parse_context Parsing context.
- * @param child Name of table to be altered. NULL on CREATE TABLE
- *              statement processing.
- * @param constraint Name of the constraint to be created. May be
- *                   NULL on CREATE TABLE statement processing.
- *                   Then, auto-generated name is used.
- * @param child_cols Columns of child table involved in FK.
- *                   May be NULL on CREATE TABLE statement processing.
- *                   If so, the last column added is used.
- * @param parent Name of referenced table.
- * @param parent_cols List of referenced columns. If NULL, columns
- *                    which make up PK of referenced table are used.
- * @param is_deferred Is FK constraint initially deferred.
- * @param match Value of MATCH clause: SIMPLE, PARTIAL, FULL.
- * @param actions ON DELETE and ON UPDATE resolution algorithms
- *               (e.g. CASCADE, RESTRICT etc).
  */
 void
-sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
-		       struct Token *constraint, struct ExprList *child_cols,
-		       struct Token *parent, struct ExprList *parent_cols,
-		       bool is_deferred, int match, int actions);
+sql_create_foreign_key(struct Parse *parse_context);
 
 /**
  * Function called from parser to handle
  * <ALTER TABLE table DROP CONSTRAINT constraint> SQL statement.
  *
  * @param parse_context Parsing context.
- * @param table Table to be altered.
- * @param constraint Name of constraint to be dropped.
  */
 void
-sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
-		     struct Token *constraint);
+sql_drop_foreign_key(struct Parse *parse_context);
 
 /**
  * Now our SQL implementation can't operate on spaces which
@@ -4693,12 +4593,9 @@ extern int sqlPendingByte;
  * command.
  *
  * @param parse Current parsing context.
- * @param src_tab The table to rename.
- * @param new_name_tk Token containing new name of the table.
  */
 void
-sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
-		       struct Token *new_name_tk);
+sql_alter_table_rename(struct Parse *parse);
 
 /**
  * Return the length (in bytes) of the token that begins at z[0].

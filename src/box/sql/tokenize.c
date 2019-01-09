@@ -468,7 +468,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		sqlOomFault(db);
 		return -1;
 	}
-	assert(pParse->new_space == NULL);
+	assert(pParse->create_table_def.new_space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
@@ -529,7 +529,8 @@ sqlRunParser(Parse * pParse, const char *zSql)
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	parser_space_delete(db, pParse->new_space);
+	parser_space_delete(db, pParse->create_table_def.new_space);
+
 	if (pParse->pWithToFree)
 		sqlWithDelete(db, pParse->pWithToFree);
 	sqlDbFree(db, pParse->pVList);
