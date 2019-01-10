@@ -271,6 +271,17 @@ void
 httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert);
 
 /**
+ * Specify source interface for outgoing traffic
+ * @param req request
+ * @param interface - interface name to use as outgoing network interface.
+ * The name can be an interface name, an IP address, or a host name.
+ * The application does not have to keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_INTERFACE.html
+ */
+void
+httpc_set_interface(struct httpc_request *req, const char *interface);
+
+/**
  * This function does async HTTP request
  * @param request - reference to request object with filled fields
  * @param timeout - timeout of waiting for libcurl api
