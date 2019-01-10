@@ -305,6 +305,12 @@ httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert)
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_SSLCERT, ssl_cert);
 }
 
+void
+httpc_set_interface(struct httpc_request *req, const char *interface)
+{
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_INTERFACE, interface);
+}
+
 int
 httpc_execute(struct httpc_request *req, double timeout)
 {
