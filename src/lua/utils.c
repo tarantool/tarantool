@@ -392,61 +392,143 @@ lua_field_inspect_ucdata(struct lua_State *L, struct luaL_serializer *cfg,
 		lua_pcall(L, 1, 1, 0);
 		/* replace obj with the unpacked value */
 		lua_replace(L, idx);
-		luaL_tofield(L, cfg, idx, field);
+		if (luaL_tofield(L, cfg, idx, field) < 0)
+			luaT_error(L);
 	} /* else ignore lua_gettable exceptions */
 	lua_settop(L, top); /* remove temporary objects */
 }
 
-static void
+/**
+ * A helper structure to simplify safe call of __serialize method.
+ * It passes some arguments into the serializer called via pcall,
+ * and carries out some results.
+ */
+struct lua_serialize_status {
+	/**
+	 * True if an attempt to call __serialize has failed. A
+	 * diag message is set.
+	 */
+	bool is_error;
+	/**
+	 * True, if __serialize exists. Otherwise an ordinary
+	 * default serialization is used.
+	 */
+	bool is_serialize_used;
+	/**
+	 * True, if __serialize not only exists, but also returned
+	 * a new value which should replace the original one. On
+	 * the contrary __serialize could be a string like 'array'
+	 * or 'map' and do not push anything but rather say how to
+	 * interpret the target table. In such a case there is
+	 * nothing to replace with.
+	 */
+	bool is_value_returned;
+	/** Parameters, passed originally to luaL_tofield. */
+	struct luaL_serializer *cfg;
+	struct luaL_field *field;
+};
+
+/**
+ * Call __serialize method of a table object if the former exists.
+ * The function expects 2 values pushed onto the Lua stack: a
+ * value to serialize, and a pointer at a struct
+ * lua_serialize_status object. If __serialize exists, is correct,
+ * and is a function then one value is pushed as a result of
+ * serialization. If it is correct, but just a serialization hint
+ * like 'array' or 'map', then nothing is pushed. Otherwise it is
+ * an error. All the described outcomes can be distinguished via
+ * lua_serialize_status attributes.
+ */
+static int
+lua_field_try_serialize(struct lua_State *L)
+{
+	struct lua_serialize_status *s =
+		(struct lua_serialize_status *) lua_touserdata(L, 2);
+	s->is_serialize_used = (luaL_getmetafield(L, 1, LUAL_SERIALIZE) != 0);
+	s->is_error = false;
+	s->is_value_returned = false;
+	if (! s->is_serialize_used)
+		return 0;
+	struct luaL_serializer *cfg = s->cfg;
+	struct luaL_field *field = s->field;
+	if (lua_isfunction(L, -1)) {
+		/* copy object itself */
+		lua_pushvalue(L, 1);
+		lua_call(L, 1, 1);
+		s->is_error = (luaL_tofield(L, cfg, -1, field) != 0);
+		s->is_value_returned = true;
+		return 1;
+	}
+	if (!lua_isstring(L, -1)) {
+		diag_set(LuajitError, "invalid " LUAL_SERIALIZE " value");
+		s->is_error = true;
+		lua_pop(L, 1);
+		return 0;
+	}
+	const char *type = lua_tostring(L, -1);
+	if (strcmp(type, "array") == 0 || strcmp(type, "seq") == 0 ||
+	    strcmp(type, "sequence") == 0) {
+		field->type = MP_ARRAY; /* Override type */
+		field->size = luaL_arrlen(L, 1);
+		/* YAML: use flow mode if __serialize == 'seq' */
+		if (cfg->has_compact && type[3] == '\0')
+			field->compact = true;
+	} else if (strcmp(type, "map") == 0 || strcmp(type, "mapping") == 0) {
+		field->type = MP_MAP;   /* Override type */
+		field->size = luaL_maplen(L, 1);
+		/* YAML: use flow mode if __serialize == 'map' */
+		if (cfg->has_compact && type[3] == '\0')
+			field->compact = true;
+	} else {
+		diag_set(LuajitError, "invalid " LUAL_SERIALIZE " value");
+		s->is_error = true;
+	}
+	lua_pop(L, 1);
+	return 0;
+}
+
+static int
 lua_field_inspect_table(struct lua_State *L, struct luaL_serializer *cfg,
 			int idx, struct luaL_field *field)
 {
 	assert(lua_type(L, idx) == LUA_TTABLE);
-	const char *type;
 	uint32_t size = 0;
 	uint32_t max = 0;
 
-	/* Try to get field LUAL_SERIALIZER_TYPE from metatable */
-	if (!cfg->encode_load_metatables ||
-	    !luaL_getmetafield(L, idx, LUAL_SERIALIZE))
-		goto skip;
-
-	if (lua_isfunction(L, -1)) {
-		/* copy object itself */
+	if (cfg->encode_load_metatables) {
+		int top = lua_gettop(L);
+		struct lua_serialize_status s;
+		s.cfg = cfg;
+		s.field = field;
+		lua_pushcfunction(L, lua_field_try_serialize);
 		lua_pushvalue(L, idx);
-		lua_call(L, 1, 1);
-		/* replace obj with the unpacked value */
-		lua_replace(L, idx);
-		luaL_tofield(L, cfg, idx, field);
-		return;
-	} else if (!lua_isstring(L, -1)) {
-		luaL_error(L, "invalid " LUAL_SERIALIZE  " value");
+		lua_pushlightuserdata(L, &s);
+		if (lua_pcall(L, 2, 1, 0) != 0) {
+			diag_set(LuajitError, lua_tostring(L, -1));
+			return -1;
+		}
+		if (s.is_error)
+			return -1;
+		/*
+		 * lua_call/pcall always returns the specified
+		 * number of values. Even if the function returned
+		 * less - others are filled with nils. So when a
+		 * nil is not needed, it should be popped
+		 * manually.
+		 */
+		assert(lua_gettop(L) == top + 1);
+		(void) top;
+		if (s.is_serialize_used) {
+			if (s.is_value_returned)
+				lua_replace(L, idx);
+			else
+				lua_pop(L, 1);
+			return 0;
+		}
+		assert(! s.is_value_returned);
+		lua_pop(L, 1);
 	}
 
-	type = lua_tostring(L, -1);
-	if (strcmp(type, "array") == 0 || strcmp(type, "seq") == 0 ||
-	    strcmp(type, "sequence") == 0) {
-		field->type = MP_ARRAY; /* Override type */
-		field->size = luaL_arrlen(L, idx);
-		/* YAML: use flow mode if __serialize == 'seq' */
-		if (cfg->has_compact && type[3] == '\0')
-			field->compact = true;
-		lua_pop(L, 1); /* type */
-
-		return;
-	} else if (strcmp(type, "map") == 0 || strcmp(type, "mapping") == 0) {
-		field->type = MP_MAP;   /* Override type */
-		field->size = luaL_maplen(L, idx);
-		/* YAML: use flow mode if __serialize == 'map' */
-		if (cfg->has_compact && type[3] == '\0')
-			field->compact = true;
-		lua_pop(L, 1); /* type */
-		return;
-	} else {
-		luaL_error(L, "invalid " LUAL_SERIALIZE "  value");
-	}
-
-skip:
 	field->type = MP_ARRAY;
 
 	/* Calculate size and check that table can represent an array */
@@ -465,7 +547,7 @@ skip:
 			}
 			field->type = MP_MAP;
 			field->size = size;
-			return;
+			return 0;
 		}
 		if (k > max)
 			max = k;
@@ -475,15 +557,18 @@ skip:
 	if (cfg->encode_sparse_ratio > 0 &&
 	    max > size * (uint32_t)cfg->encode_sparse_ratio &&
 	    max > (uint32_t)cfg->encode_sparse_safe) {
-		if (!cfg->encode_sparse_convert)
-			luaL_error(L, "excessively sparse array");
+		if (!cfg->encode_sparse_convert) {
+			diag_set(LuajitError, "excessively sparse array");
+			return -1;
+		}
 		field->type = MP_MAP;
 		field->size = size;
-		return;
+		return 0;
 	}
 
 	assert(field->type == MP_ARRAY);
 	field->size = max;
+	return 0;
 }
 
 static void
@@ -496,12 +581,13 @@ lua_field_tostring(struct lua_State *L, struct luaL_serializer *cfg, int idx,
 	lua_call(L, 1, 1);
 	lua_replace(L, idx);
 	lua_settop(L, top);
-	luaL_tofield(L, cfg, idx, field);
+	if (luaL_tofield(L, cfg, idx, field) < 0)
+		luaT_error(L);
 }
 
-void
+int
 luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
-		 struct luaL_field *field)
+	     struct luaL_field *field)
 {
 	if (index < 0)
 		index = lua_gettop(L) + index + 1;
@@ -510,10 +596,12 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 	double intpart;
 	size_t size;
 
-#define CHECK_NUMBER(x) ({\
-	if (!isfinite(x) && !cfg->encode_invalid_numbers) {		\
-		if (!cfg->encode_invalid_as_nil)				\
-			luaL_error(L, "number must not be NaN or Inf");		\
+#define CHECK_NUMBER(x) ({							\
+	if (!isfinite(x) && !cfg->encode_invalid_numbers) {			\
+		if (!cfg->encode_invalid_as_nil) {				\
+			diag_set(LuajitError, "number must not be NaN or Inf");	\
+			return -1;						\
+		}								\
 		field->type = MP_NIL;						\
 	}})
 
@@ -534,94 +622,93 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 			field->dval = num;
 			CHECK_NUMBER(num);
 		}
-		return;
+		return 0;
 	case LUA_TCDATA:
 	{
-		uint32_t ctypeid = 0;
-		void *cdata = luaL_checkcdata(L, index, &ctypeid);
+		GCcdata *cd = cdataV(L->base + index - 1);
+		void *cdata = (void *)cdataptr(cd);
+
 		int64_t ival;
-		switch (ctypeid) {
+		switch (cd->ctypeid) {
 		case CTID_BOOL:
 			field->type = MP_BOOL;
 			field->bval = *(bool*) cdata;
-			return;
+			return 0;
 		case CTID_CCHAR:
 		case CTID_INT8:
 			ival = *(int8_t *) cdata;
 			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
-			return;
+			return 0;
 		case CTID_INT16:
 			ival = *(int16_t *) cdata;
 			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
-			return;
+			return 0;
 		case CTID_INT32:
 			ival = *(int32_t *) cdata;
 			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
-			return;
+			return 0;
 		case CTID_INT64:
 			ival = *(int64_t *) cdata;
 			field->type = (ival >= 0) ? MP_UINT : MP_INT;
 			field->ival = ival;
-			return;
+			return 0;
 		case CTID_UINT8:
 			field->type = MP_UINT;
 			field->ival = *(uint8_t *) cdata;
-			return;
+			return 0;
 		case CTID_UINT16:
 			field->type = MP_UINT;
 			field->ival = *(uint16_t *) cdata;
-			return;
+			return 0;
 		case CTID_UINT32:
 			field->type = MP_UINT;
 			field->ival = *(uint32_t *) cdata;
-			return;
+			return 0;
 		case CTID_UINT64:
 			field->type = MP_UINT;
 			field->ival = *(uint64_t *) cdata;
-			return;
+			return 0;
 		case CTID_FLOAT:
 			field->type = MP_FLOAT;
 			field->fval = *(float *) cdata;
 			CHECK_NUMBER(field->fval);
-			return;
+			return 0;
 		case CTID_DOUBLE:
 			field->type = MP_DOUBLE;
 			field->dval = *(double *) cdata;
 			CHECK_NUMBER(field->dval);
-			return;
+			return 0;
 		case CTID_P_CVOID:
 		case CTID_P_VOID:
 			if (*(void **) cdata == NULL) {
 				field->type = MP_NIL;
-				return;
+				return 0;
 			}
 			/* Fall through */
 		default:
 			field->type = MP_EXT;
-			return;
 		}
-		return;
+		return 0;
 	}
 	case LUA_TBOOLEAN:
 		field->type = MP_BOOL;
 		field->bval = lua_toboolean(L, index);
-		return;
+		return 0;
 	case LUA_TNIL:
 		field->type = MP_NIL;
-		return;
+		return 0;
 	case LUA_TSTRING:
 		field->sval.data = lua_tolstring(L, index, &size);
 		field->sval.len = (uint32_t) size;
 		field->type = MP_STR;
-		return;
+		return 0;
 	case LUA_TTABLE:
 	{
 		field->compact = false;
-		lua_field_inspect_table(L, cfg, index, field);
-		return;
+		return lua_field_inspect_table(L, cfg, index, field);
 	}
 	case LUA_TLIGHTUSERDATA:
 	case LUA_TUSERDATA:
@@ -629,14 +716,14 @@ luaL_tofield(struct lua_State *L, struct luaL_serializer *cfg, int index,
 		field->sval.len = 0;
 		if (lua_touserdata(L, index) == NULL) {
 			field->type = MP_NIL;
-			return;
+			return 0;
 		}
 		/* Fall through */
 	default:
 		field->type = MP_EXT;
-		return;
 	}
 #undef CHECK_NUMBER
+	return 0;
 }
 
 void
