@@ -241,6 +241,7 @@ vy_range_add_slice(struct vy_range *range, struct vy_slice *slice)
 	rlist_add_entry(&range->slices, slice, in_range);
 	range->slice_count++;
 	vy_disk_stmt_counter_add(&range->count, &slice->count);
+	range->version++;
 }
 
 void
@@ -250,6 +251,7 @@ vy_range_add_slice_before(struct vy_range *range, struct vy_slice *slice,
 	rlist_add_tail(&next_slice->in_range, &slice->in_range);
 	range->slice_count++;
 	vy_disk_stmt_counter_add(&range->count, &slice->count);
+	range->version++;
 }
 
 void
@@ -260,6 +262,7 @@ vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
 	rlist_del_entry(slice, in_range);
 	range->slice_count--;
 	vy_disk_stmt_counter_sub(&range->count, &slice->count);
+	range->version++;
 }
 
 /**

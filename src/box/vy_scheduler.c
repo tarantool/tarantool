@@ -1208,7 +1208,6 @@ vy_task_dump_complete(struct vy_task *task)
 		if (!vy_range_is_scheduled(range))
 			vy_range_heap_update(&lsm->range_heap,
 					     &range->heap_node);
-		range->version++;
 	}
 	free(new_slices);
 
@@ -1560,7 +1559,6 @@ vy_task_compaction_complete(struct vy_task *task)
 			break;
 	}
 	range->n_compactions++;
-	range->version++;
 	vy_range_update_compaction_priority(range, &lsm->opts);
 	vy_lsm_acct_range(lsm, range);
 	vy_lsm_acct_compaction(lsm, &compaction_input, &compaction_output);
