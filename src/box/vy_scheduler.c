@@ -503,6 +503,7 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 void
 vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
+	assert(!lsm->is_dropped);
 	assert(lsm->in_dump.pos == UINT32_MAX);
 	assert(lsm->in_compaction.pos == UINT32_MAX);
 	vy_dump_heap_insert(&scheduler->dump_heap, &lsm->in_dump);
@@ -513,6 +514,7 @@ vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 void
 vy_scheduler_remove_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
+	assert(!lsm->is_dropped);
 	assert(lsm->in_dump.pos != UINT32_MAX);
 	assert(lsm->in_compaction.pos != UINT32_MAX);
 	vy_dump_heap_delete(&scheduler->dump_heap, &lsm->in_dump);

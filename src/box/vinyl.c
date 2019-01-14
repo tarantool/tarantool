@@ -749,18 +749,16 @@ vinyl_index_open(struct index *index)
 		diag_set(SystemError, "can not access vinyl data directory");
 		return -1;
 	}
-	int rc;
 	switch (env->status) {
 	case VINYL_ONLINE:
 		/*
 		 * The recovery is complete, simply
 		 * create a new index.
 		 */
-		rc = vy_lsm_create(lsm);
-		if (rc == 0) {
-			/* Make sure reader threads are up and running. */
-			vy_run_env_enable_coio(&env->run_env);
-		}
+		if (vy_lsm_create(lsm) != 0)
+			return -1;
+		/* Make sure reader threads are up and running. */
+		vy_run_env_enable_coio(&env->run_env);
 		break;
 	case VINYL_INITIAL_RECOVERY_REMOTE:
 	case VINYL_FINAL_RECOVERY_REMOTE:
@@ -769,7 +767,8 @@ vinyl_index_open(struct index *index)
 		 * exist locally, and we should create the
 		 * index directory from scratch.
 		 */
-		rc = vy_lsm_create(lsm);
+		if (vy_lsm_create(lsm) != 0)
+			return -1;
 		break;
 	case VINYL_INITIAL_RECOVERY_LOCAL:
 	case VINYL_FINAL_RECOVERY_LOCAL:
@@ -779,17 +778,30 @@ vinyl_index_open(struct index *index)
 		 * have already been created, so try to load
 		 * the index files from it.
 		 */
-		rc = vy_lsm_recover(lsm, env->recovery, &env->run_env,
-				    vclock_sum(env->recovery_vclock),
-				    env->status == VINYL_INITIAL_RECOVERY_LOCAL,
-				    env->force_recovery);
+		if (vy_lsm_recover(lsm, env->recovery, &env->run_env,
+				   vclock_sum(env->recovery_vclock),
+				   env->status == VINYL_INITIAL_RECOVERY_LOCAL,
+				   env->force_recovery) != 0)
+			return -1;
 		break;
 	default:
 		unreachable();
 	}
-	if (rc == 0)
+	/*
+	 * Add the new LSM tree to the scheduler so that it can
+	 * be dumped and compacted.
+	 *
+	 * Note, during local recovery an LSM tree may be marked
+	 * as dropped, which means that it will be dropped before
+	 * recovery is complete. In this case there's no need in
+	 * letting the scheduler know about it.
+	 */
+	if (!lsm->is_dropped)
 		vy_scheduler_add_lsm(&env->scheduler, lsm);
-	return rc;
+	else
+		assert(env->status == VINYL_INITIAL_RECOVERY_LOCAL ||
+		       env->status == VINYL_FINAL_RECOVERY_LOCAL);
+	return 0;
 }
 
 static void
@@ -911,8 +923,6 @@ vinyl_index_commit_drop(struct index *index, int64_t lsn)
 	struct vy_env *env = vy_env(index->engine);
 	struct vy_lsm *lsm = vy_lsm(index);
 
-	vy_scheduler_remove_lsm(&env->scheduler, lsm);
-
 	/*
 	 * We can't abort here, because the index drop request has
 	 * already been written to WAL. So if we fail to write the
@@ -923,6 +933,8 @@ vinyl_index_commit_drop(struct index *index, int64_t lsn)
 	 */
 	if (env->status == VINYL_FINAL_RECOVERY_LOCAL && lsm->is_dropped)
 		return;
+
+	vy_scheduler_remove_lsm(&env->scheduler, lsm);
 
 	lsm->is_dropped = true;
 
