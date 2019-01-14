@@ -1239,7 +1239,12 @@ delete_mems:
 	}
 	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
 	vy_lsm_acct_dump(lsm, &dump_input, &dump_output);
-	scheduler->stat.dump_input += dump_input.bytes;
+	/*
+	 * Indexes of the same space share a memory level so we
+	 * account dump input only when the primary index is dumped.
+	 */
+	if (lsm->index_id == 0)
+		scheduler->stat.dump_input += dump_input.bytes;
 	scheduler->stat.dump_output += dump_output.bytes;
 
 	/* The iterator has been cleaned up in a worker thread. */
