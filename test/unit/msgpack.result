@@ -1633,7 +1633,7 @@ ok 15 - subtests
     ok 282 - buffer overflow on step 70
     # *** test_format: done ***
 ok 16 - subtests
-    1..10
+    1..12
     # *** test_mp_print ***
     ok 1 - mp_snprint return value
     ok 2 - mp_snprint result
@@ -1645,6 +1645,8 @@ ok 16 - subtests
     ok 8 - mp_fprint return value
     ok 9 - mp_fprint result
     ok 10 - mp_fprint I/O error
+    ok 11 - mp_snprint max nesting depth return value
+    ok 12 - mp_snprint max nesting depth result
     # *** test_mp_print: done ***
 ok 17 - subtests
     1..65
