@@ -52,7 +52,7 @@ stat = box.space.test.index.pk:stat()
 _ = var:insert{'put', stat.put.rows}
 ---
 ...
-_ = var:insert{'dump', stat.disk.dump.out.rows}
+_ = var:insert{'dump', stat.disk.dump.output.rows}
 ---
 ...
 test_run:cmd('restart server test with args="2097152"')
@@ -74,7 +74,7 @@ var = box.space.var
 dump_before = var:get('dump')[2]
 ---
 ...
-dump_after = stat.disk.dump.out.rows
+dump_after = stat.disk.dump.output.rows
 ---
 ...
 put_before = var:get('put')[2]

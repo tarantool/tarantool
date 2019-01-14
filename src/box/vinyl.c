@@ -303,13 +303,13 @@ vy_info_append_disk(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "index", stat->index);
 
 	info_table_begin(h, "dump");
-	info_append_int(h, "in", stat->dump.in);
-	info_append_int(h, "out", stat->dump.out);
+	info_append_int(h, "input", stat->dump.input);
+	info_append_int(h, "output", stat->dump.output);
 	info_table_end(h); /* dump */
 
 	info_table_begin(h, "compact");
-	info_append_int(h, "in", stat->compact.in);
-	info_append_int(h, "out", stat->compact.out);
+	info_append_int(h, "input", stat->compact.input);
+	info_append_int(h, "output", stat->compact.output);
 	info_append_int(h, "queue", stat->compact.queue);
 	info_table_end(h); /* compact */
 
@@ -414,13 +414,13 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_table_end(h); /* iterator */
 	info_table_begin(h, "dump");
 	info_append_int(h, "count", stat->disk.dump.count);
-	vy_info_append_stmt_counter(h, "in", &stat->disk.dump.in);
-	vy_info_append_disk_stmt_counter(h, "out", &stat->disk.dump.out);
+	vy_info_append_stmt_counter(h, "input", &stat->disk.dump.input);
+	vy_info_append_disk_stmt_counter(h, "output", &stat->disk.dump.output);
 	info_table_end(h); /* dump */
 	info_table_begin(h, "compact");
 	info_append_int(h, "count", stat->disk.compact.count);
-	vy_info_append_disk_stmt_counter(h, "in", &stat->disk.compact.in);
-	vy_info_append_disk_stmt_counter(h, "out", &stat->disk.compact.out);
+	vy_info_append_disk_stmt_counter(h, "input", &stat->disk.compact.input);
+	vy_info_append_disk_stmt_counter(h, "output", &stat->disk.compact.output);
 	vy_info_append_disk_stmt_counter(h, "queue", &stat->disk.compact.queue);
 	info_table_end(h); /* compact */
 	info_append_int(h, "index_size", lsm->page_index_size);
@@ -476,13 +476,13 @@ vinyl_index_reset_stat(struct index *index)
 
 	/* Dump */
 	stat->disk.dump.count = 0;
-	vy_stmt_counter_reset(&stat->disk.dump.in);
-	vy_disk_stmt_counter_reset(&stat->disk.dump.out);
+	vy_stmt_counter_reset(&stat->disk.dump.input);
+	vy_disk_stmt_counter_reset(&stat->disk.dump.output);
 
 	/* Compaction */
 	stat->disk.compact.count = 0;
-	vy_disk_stmt_counter_reset(&stat->disk.compact.in);
-	vy_disk_stmt_counter_reset(&stat->disk.compact.out);
+	vy_disk_stmt_counter_reset(&stat->disk.compact.input);
+	vy_disk_stmt_counter_reset(&stat->disk.compact.output);
 
 	/* Cache */
 	cache_stat->lookup = 0;
@@ -515,10 +515,10 @@ vinyl_engine_reset_stat(struct engine *engine)
 	memset(&xm->stat, 0, sizeof(xm->stat));
 
 	struct vy_disk_stat *disk_stat = &env->lsm_env.disk_stat;
-	disk_stat->dump.in = 0;
-	disk_stat->dump.out = 0;
-	disk_stat->compact.in = 0;
-	disk_stat->compact.out = 0;
+	disk_stat->dump.input = 0;
+	disk_stat->dump.output = 0;
+	disk_stat->compact.input = 0;
+	disk_stat->compact.output = 0;
 }
 
 /** }}} Introspection */

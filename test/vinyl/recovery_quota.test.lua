@@ -23,7 +23,7 @@ var = box.schema.space.create('var')
 _ = var:create_index('pk', {parts = {1, 'string'}})
 stat = box.space.test.index.pk:stat()
 _ = var:insert{'put', stat.put.rows}
-_ = var:insert{'dump', stat.disk.dump.out.rows}
+_ = var:insert{'dump', stat.disk.dump.output.rows}
 test_run:cmd('restart server test with args="2097152"')
 -- Check that we do not exceed quota.
 stat = box.stat.vinyl()
@@ -32,7 +32,7 @@ stat.memory.level0 <= box.cfg.vinyl_memory or {stat.memory.level0, box.cfg.vinyl
 stat = box.space.test.index.pk:stat()
 var = box.space.var
 dump_before = var:get('dump')[2]
-dump_after = stat.disk.dump.out.rows
+dump_after = stat.disk.dump.output.rows
 put_before = var:get('put')[2]
 put_after = stat.put.rows
 dump_after == 0 or dump_after

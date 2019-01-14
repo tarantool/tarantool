@@ -16,7 +16,7 @@ index = space:create_index('primary', { run_count_per_level = 20 })
 index2 = space:create_index('secondary', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
 ---
 ...
-function dumped_stmt_count() return index:stat().disk.dump.out.rows + index2:stat().disk.dump.out.rows end
+function dumped_stmt_count() return index:stat().disk.dump.output.rows + index2:stat().disk.dump.output.rows end
 ---
 ...
 box.snapshot()
@@ -217,7 +217,7 @@ index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'
 index3 = space:create_index('third', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
 ---
 ...
-function dumped_stmt_count() return index:stat().disk.dump.out.rows + index2:stat().disk.dump.out.rows + index3:stat().disk.dump.out.rows end
+function dumped_stmt_count() return index:stat().disk.dump.output.rows + index2:stat().disk.dump.output.rows + index3:stat().disk.dump.output.rows end
 ---
 ...
 box.snapshot()

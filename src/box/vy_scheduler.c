@@ -1091,8 +1091,8 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_run *new_run = task->new_run;
 	int64_t dump_lsn = new_run->dump_lsn;
-	struct vy_disk_stmt_counter dump_out = new_run->count;
-	struct vy_stmt_counter dump_in;
+	struct vy_disk_stmt_counter dump_output = new_run->count;
+	struct vy_stmt_counter dump_input;
 	struct tuple_format *key_format = lsm->env->key_format;
 	struct vy_mem *mem, *next_mem;
 	struct vy_slice **new_slices, *slice;
@@ -1214,15 +1214,15 @@ delete_mems:
 	 * Delete dumped in-memory trees and account dump in
 	 * LSM tree statistics.
 	 */
-	vy_stmt_counter_reset(&dump_in);
+	vy_stmt_counter_reset(&dump_input);
 	rlist_foreach_entry_safe(mem, &lsm->sealed, in_sealed, next_mem) {
 		if (mem->generation > scheduler->dump_generation)
 			continue;
-		vy_stmt_counter_add(&dump_in, &mem->count);
+		vy_stmt_counter_add(&dump_input, &mem->count);
 		vy_lsm_delete_mem(lsm, mem);
 	}
 	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
-	vy_lsm_acct_dump(lsm, &dump_in, &dump_out);
+	vy_lsm_acct_dump(lsm, &dump_input, &dump_output);
 
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
@@ -1444,8 +1444,8 @@ vy_task_compact_complete(struct vy_task *task)
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_range *range = task->range;
 	struct vy_run *new_run = task->new_run;
-	struct vy_disk_stmt_counter compact_out = new_run->count;
-	struct vy_disk_stmt_counter compact_in;
+	struct vy_disk_stmt_counter compact_output = new_run->count;
+	struct vy_disk_stmt_counter compact_input;
 	struct vy_slice *first_slice = task->first_slice;
 	struct vy_slice *last_slice = task->last_slice;
 	struct vy_slice *slice, *next_slice, *new_slice = NULL;
@@ -1547,12 +1547,12 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_lsm_unacct_range(lsm, range);
 	if (new_slice != NULL)
 		vy_range_add_slice_before(range, new_slice, first_slice);
-	vy_disk_stmt_counter_reset(&compact_in);
+	vy_disk_stmt_counter_reset(&compact_input);
 	for (slice = first_slice; ; slice = next_slice) {
 		next_slice = rlist_next_entry(slice, in_range);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
-		vy_disk_stmt_counter_add(&compact_in, &slice->count);
+		vy_disk_stmt_counter_add(&compact_input, &slice->count);
 		if (slice == last_slice)
 			break;
 	}
@@ -1560,7 +1560,7 @@ vy_task_compact_complete(struct vy_task *task)
 	range->version++;
 	vy_range_update_compact_priority(range, &lsm->opts);
 	vy_lsm_acct_range(lsm, range);
-	vy_lsm_acct_compaction(lsm, &compact_in, &compact_out);
+	vy_lsm_acct_compaction(lsm, &compact_input, &compact_output);
 
 	/*
 	 * Unaccount unused runs and delete compacted slices.

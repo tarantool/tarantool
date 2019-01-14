@@ -205,10 +205,10 @@ box.rollback()
 --
 
 -- dump and compaction totals
-gstat().disk.dump['in'] == istat().disk.dump['in'].bytes
-gstat().disk.dump['out'] == istat().disk.dump['out'].bytes
-gstat().disk.compact['in'] == istat().disk.compact['in'].bytes
-gstat().disk.compact['out'] == istat().disk.compact['out'].bytes
+gstat().disk.dump.input == istat().disk.dump.input.bytes
+gstat().disk.dump.output == istat().disk.dump.output.bytes
+gstat().disk.compact.input == istat().disk.compact.input.bytes
+gstat().disk.compact.output == istat().disk.compact.output.bytes
 
 -- use memory
 st = gstat()

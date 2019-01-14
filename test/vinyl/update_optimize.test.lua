@@ -8,7 +8,7 @@ fiber = require('fiber')
 space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', { run_count_per_level = 20 })
 index2 = space:create_index('secondary', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
-function dumped_stmt_count() return index:stat().disk.dump.out.rows + index2:stat().disk.dump.out.rows end
+function dumped_stmt_count() return index:stat().disk.dump.output.rows + index2:stat().disk.dump.output.rows end
 box.snapshot()
 test_run:cmd("setopt delimiter ';'")
 function wait_for_dump(index, old_count)
@@ -76,7 +76,7 @@ space = box.schema.space.create('test', { engine = 'vinyl' })
 index = space:create_index('primary', { parts = {2, 'unsigned'}, run_count_per_level = 20 } )
 index2 = space:create_index('secondary', { parts = {4, 'unsigned', 3, 'unsigned'}, run_count_per_level = 20 })
 index3 = space:create_index('third', { parts = {5, 'unsigned'}, run_count_per_level = 20 })
-function dumped_stmt_count() return index:stat().disk.dump.out.rows + index2:stat().disk.dump.out.rows + index3:stat().disk.dump.out.rows end
+function dumped_stmt_count() return index:stat().disk.dump.output.rows + index2:stat().disk.dump.output.rows + index3:stat().disk.dump.output.rows end
 box.snapshot()
 index_run_count = index:stat().run_count
 index2_run_count = index2:stat().run_count
