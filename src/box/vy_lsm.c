@@ -239,7 +239,7 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	assert(lsm->env->lsm_count > 0);
 
 	lsm->env->lsm_count--;
-	lsm->env->disk_stat.compaction.queue -=
+	lsm->env->compaction_queue_size -=
 			lsm->stat.disk.compaction.queue.bytes;
 
 	if (lsm->pk != NULL)
@@ -691,11 +691,11 @@ vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run)
 
 	/* Data size is consistent with space.bsize. */
 	if (lsm->index_id == 0)
-		env->disk_stat.data += run->count.bytes;
+		env->disk_data_size += run->count.bytes;
 	/* Index size is consistent with index.bsize. */
-	env->disk_stat.index += bloom_size + page_index_size;
+	env->disk_index_size += bloom_size + page_index_size;
 	if (lsm->index_id > 0)
-		env->disk_stat.index += run->count.bytes;
+		env->disk_index_size += run->count.bytes;
 }
 
 void
@@ -720,11 +720,11 @@ vy_lsm_remove_run(struct vy_lsm *lsm, struct vy_run *run)
 
 	/* Data size is consistent with space.bsize. */
 	if (lsm->index_id == 0)
-		env->disk_stat.data -= run->count.bytes;
+		env->disk_data_size -= run->count.bytes;
 	/* Index size is consistent with index.bsize. */
-	env->disk_stat.index -= bloom_size + page_index_size;
+	env->disk_index_size -= bloom_size + page_index_size;
 	if (lsm->index_id > 0)
-		env->disk_stat.index -= run->count.bytes;
+		env->disk_index_size -= run->count.bytes;
 }
 
 void
@@ -751,7 +751,7 @@ vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range)
 	histogram_collect(lsm->run_hist, range->slice_count);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.queue,
 				 &range->compaction_queue);
-	lsm->env->disk_stat.compaction.queue += range->compaction_queue.bytes;
+	lsm->env->compaction_queue_size += range->compaction_queue.bytes;
 }
 
 void
@@ -760,7 +760,7 @@ vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 	histogram_discard(lsm->run_hist, range->slice_count);
 	vy_disk_stmt_counter_sub(&lsm->stat.disk.compaction.queue,
 				 &range->compaction_queue);
-	lsm->env->disk_stat.compaction.queue -= range->compaction_queue.bytes;
+	lsm->env->compaction_queue_size -= range->compaction_queue.bytes;
 }
 
 void
@@ -771,9 +771,6 @@ vy_lsm_acct_dump(struct vy_lsm *lsm,
 	lsm->stat.disk.dump.count++;
 	vy_stmt_counter_add(&lsm->stat.disk.dump.input, input);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.dump.output, output);
-
-	lsm->env->disk_stat.dump.input += input->bytes;
-	lsm->env->disk_stat.dump.output += output->bytes;
 }
 
 void
@@ -784,9 +781,6 @@ vy_lsm_acct_compaction(struct vy_lsm *lsm,
 	lsm->stat.disk.compaction.count++;
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.input, input);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.output, output);
-
-	lsm->env->disk_stat.compaction.input += input->bytes;
-	lsm->env->disk_stat.compaction.output += output->bytes;
 }
 
 int

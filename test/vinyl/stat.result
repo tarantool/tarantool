@@ -224,23 +224,7 @@ istat()
 ...
 gstat()
 ---
-- disk:
-    dump:
-      input: 0
-      output: 0
-    compaction:
-      input: 0
-      output: 0
-      queue: 0
-    data: 0
-    index: 0
-  memory:
-    tuple_cache: 0
-    tx: 0
-    level0: 0
-    page_index: 0
-    bloom_filter: 0
-  tx:
+- tx:
     conflict: 0
     commit: 0
     rollback: 0
@@ -248,6 +232,21 @@ gstat()
     transactions: 0
     gap_locks: 0
     read_views: 0
+  memory:
+    tuple_cache: 0
+    tx: 0
+    level0: 0
+    page_index: 0
+    bloom_filter: 0
+  disk:
+    data: 0
+    index: 0
+  scheduler:
+    compaction_output: 0
+    compaction_queue: 0
+    dump_output: 0
+    dump_input: 0
+    compaction_input: 0
 ...
 --
 -- Index statistics.
@@ -701,19 +700,19 @@ box.rollback()
 -- Global statistics.
 --
 -- dump and compaction totals
-gstat().disk.dump.input == istat().disk.dump.input.bytes
+gstat().scheduler.dump_input == istat().disk.dump.input.bytes
 ---
 - true
 ...
-gstat().disk.dump.output == istat().disk.dump.output.bytes
+gstat().scheduler.dump_output == istat().disk.dump.output.bytes
 ---
 - true
 ...
-gstat().disk.compaction.input == istat().disk.compaction.input.bytes
+gstat().scheduler.compaction_input == istat().disk.compaction.input.bytes
 ---
 - true
 ...
-gstat().disk.compaction.output == istat().disk.compaction.output.bytes
+gstat().scheduler.compaction_output == istat().disk.compaction.output.bytes
 ---
 - true
 ...
@@ -1074,23 +1073,7 @@ istat()
 ...
 gstat()
 ---
-- disk:
-    dump:
-      input: 0
-      output: 0
-    compaction:
-      input: 0
-      output: 0
-      queue: 0
-    data: 104300
-    index: 1190
-  memory:
-    tuple_cache: 14313
-    tx: 0
-    level0: 262583
-    page_index: 1050
-    bloom_filter: 140
-  tx:
+- tx:
     conflict: 0
     commit: 0
     rollback: 0
@@ -1098,6 +1081,21 @@ gstat()
     transactions: 0
     gap_locks: 0
     read_views: 0
+  memory:
+    tuple_cache: 14313
+    tx: 0
+    level0: 262583
+    page_index: 1050
+    bloom_filter: 140
+  disk:
+    data: 104300
+    index: 1190
+  scheduler:
+    compaction_output: 0
+    compaction_queue: 0
+    dump_output: 0
+    dump_input: 0
+    compaction_input: 0
 ...
 s:drop()
 ---

@@ -206,23 +206,20 @@ struct vy_tx_stat {
 };
 
 /**
- * Global disk statistics.
+ * Scheduler statistics.
  *
- * Fields correspond to those of per LSM tree statistics.
- * All counters are given in bytes, uncompressed.
+ * All byte counters are given without taking into account
+ * disk compression.
  */
-struct vy_disk_stat {
-	int64_t data;
-	int64_t index;
-	struct {
-		int64_t input;
-		int64_t output;
-	} dump;
-	struct {
-		int64_t input;
-		int64_t output;
-		int64_t queue;
-	} compaction;
+struct vy_scheduler_stat {
+	/** Number of bytes read by dump tasks. */
+	int64_t dump_input;
+	/** Number of bytes written by dump tasks. */
+	int64_t dump_output;
+	/** Number of bytes read by compaction tasks. */
+	int64_t compaction_input;
+	/** Number of bytes written by compaction tasks. */
+	int64_t compaction_output;
 };
 
 static inline int
