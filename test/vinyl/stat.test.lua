@@ -320,6 +320,33 @@ gstat()
 
 s:drop()
 
+-- sched stats
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}})
+
+for i = 1, 100 do s:replace{i, i, string.rep('x', 1000)} end
+st = gstat()
+box.snapshot()
+stat_diff(gstat(), st, 'scheduler')
+
+for i = 1, 100, 10 do s:replace{i, i, string.rep('y', 1000)} end
+st = gstat()
+box.snapshot()
+stat_diff(gstat(), st, 'scheduler')
+
+st = gstat()
+i1:compact()
+while i1:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
+stat_diff(gstat(), st, 'scheduler')
+
+st = gstat()
+i2:compact()
+while i2:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
+stat_diff(gstat(), st, 'scheduler')
+
+s:drop()
+
 --
 -- space.bsize, index.len, index.bsize
 --

@@ -504,6 +504,7 @@ void
 vy_scheduler_reset_stat(struct vy_scheduler *scheduler)
 {
 	struct vy_scheduler_stat *stat = &scheduler->stat;
+	stat->dump_count = 0;
 	stat->dump_input = 0;
 	stat->dump_output = 0;
 	stat->compaction_input = 0;
@@ -668,6 +669,7 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	double dump_duration = now - scheduler->dump_start;
 	scheduler->dump_start = now;
 	scheduler->dump_generation = min_generation;
+	scheduler->stat.dump_count++;
 	scheduler->dump_complete_cb(scheduler,
 			min_generation - 1, dump_duration);
 	fiber_cond_signal(&scheduler->dump_cond);
