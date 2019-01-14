@@ -501,6 +501,16 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 }
 
 void
+vy_scheduler_reset_stat(struct vy_scheduler *scheduler)
+{
+	struct vy_scheduler_stat *stat = &scheduler->stat;
+	stat->dump_input = 0;
+	stat->dump_output = 0;
+	stat->compaction_input = 0;
+	stat->compaction_output = 0;
+}
+
+void
 vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
 	assert(!lsm->is_dropped);
@@ -1227,6 +1237,8 @@ delete_mems:
 	}
 	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
 	vy_lsm_acct_dump(lsm, &dump_input, &dump_output);
+	scheduler->stat.dump_input += dump_input.bytes;
+	scheduler->stat.dump_output += dump_output.bytes;
 
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
@@ -1564,6 +1576,8 @@ vy_task_compaction_complete(struct vy_task *task)
 	vy_range_update_compaction_priority(range, &lsm->opts);
 	vy_lsm_acct_range(lsm, range);
 	vy_lsm_acct_compaction(lsm, &compaction_input, &compaction_output);
+	scheduler->stat.compaction_input += compaction_input.bytes;
+	scheduler->stat.compaction_output += compaction_output.bytes;
 
 	/*
 	 * Unaccount unused runs and delete compacted slices.

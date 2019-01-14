@@ -245,6 +245,21 @@ static struct trigger on_replace_vinyl_deferred_delete;
 /** {{{ Introspection */
 
 static void
+vy_info_append_scheduler(struct vy_env *env, struct info_handler *h)
+{
+	struct vy_scheduler_stat *stat = &env->scheduler.stat;
+
+	info_table_begin(h, "scheduler");
+	info_append_int(h, "dump_input", stat->dump_input);
+	info_append_int(h, "dump_output", stat->dump_output);
+	info_append_int(h, "compaction_input", stat->compaction_input);
+	info_append_int(h, "compaction_output", stat->compaction_output);
+	info_append_int(h, "compaction_queue",
+			env->lsm_env.compaction_queue_size);
+	info_table_end(h); /* scheduler */
+}
+
+static void
 vy_info_append_regulator(struct vy_env *env, struct info_handler *h)
 {
 	struct vy_regulator *r = &env->regulator;
@@ -295,24 +310,9 @@ vy_info_append_memory(struct vy_env *env, struct info_handler *h)
 static void
 vy_info_append_disk(struct vy_env *env, struct info_handler *h)
 {
-	struct vy_disk_stat *stat = &env->lsm_env.disk_stat;
-
 	info_table_begin(h, "disk");
-
-	info_append_int(h, "data", stat->data);
-	info_append_int(h, "index", stat->index);
-
-	info_table_begin(h, "dump");
-	info_append_int(h, "input", stat->dump.input);
-	info_append_int(h, "output", stat->dump.output);
-	info_table_end(h); /* dump */
-
-	info_table_begin(h, "compaction");
-	info_append_int(h, "input", stat->compaction.input);
-	info_append_int(h, "output", stat->compaction.output);
-	info_append_int(h, "queue", stat->compaction.queue);
-	info_table_end(h); /* compaction */
-
+	info_append_int(h, "data", env->lsm_env.disk_data_size);
+	info_append_int(h, "index", env->lsm_env.disk_index_size);
 	info_table_end(h); /* disk */
 }
 
@@ -325,6 +325,7 @@ vinyl_engine_stat(struct vinyl_engine *vinyl, struct info_handler *h)
 	vy_info_append_tx(env, h);
 	vy_info_append_memory(env, h);
 	vy_info_append_disk(env, h);
+	vy_info_append_scheduler(env, h);
 	vy_info_append_regulator(env, h);
 	info_end(h);
 }
@@ -514,11 +515,7 @@ vinyl_engine_reset_stat(struct engine *engine)
 	struct tx_manager *xm = env->xm;
 	memset(&xm->stat, 0, sizeof(xm->stat));
 
-	struct vy_disk_stat *disk_stat = &env->lsm_env.disk_stat;
-	disk_stat->dump.input = 0;
-	disk_stat->dump.output = 0;
-	disk_stat->compaction.input = 0;
-	disk_stat->compaction.output = 0;
+	vy_scheduler_reset_stat(&env->scheduler);
 }
 
 /** }}} Introspection */

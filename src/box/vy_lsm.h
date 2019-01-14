@@ -91,8 +91,27 @@ struct vy_lsm_env {
 	size_t bloom_size;
 	/** Size of memory used for page index. */
 	size_t page_index_size;
-	/** Global disk statistics. */
-	struct vy_disk_stat disk_stat;
+	/**
+	 * Size of disk space used for storing data of all spaces,
+	 * in bytes, without taking into account disk compression.
+	 * By 'data' we mean statements stored in primary indexes
+	 * only, which is consistent with space.bsize().
+	 */
+	int64_t disk_data_size;
+	/**
+	 * Size of disk space used for indexing data in all spaces,
+	 * in bytes, without taking into account disk compression.
+	 * This consists of page indexes and bloom filters, which
+	 * are stored in .index files, as well as the total size of
+	 * statements stored in secondary index .run files, which
+	 * is consistent with index.bsize().
+	 */
+	int64_t disk_index_size;
+	/**
+	 * Size of data of all spaces that need to be compacted,
+	 * in bytes, without taking into account disk compression.
+	 */
+	int64_t compaction_queue_size;
 	/** Memory pool for vy_history_node allocations. */
 	struct mempool history_node_pool;
 };

@@ -50,7 +50,7 @@ i:stat().disk.compaction.queue -- none
   rows: 0
   bytes: 0
 ...
-i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
 - true
 ...
@@ -71,7 +71,7 @@ i:stat().disk.compaction.queue -- 30 statements
   rows: 30
   bytes: 411
 ...
-i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
 - true
 ...
@@ -85,7 +85,7 @@ i:stat().disk.compaction.queue -- 40 statements
   rows: 40
   bytes: 548
 ...
-i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
 - true
 ...
@@ -99,7 +99,7 @@ i:stat().disk.compaction.queue -- 50 statements
   rows: 50
   bytes: 685
 ...
-i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
 - true
 ...
@@ -113,7 +113,7 @@ i:stat().disk.compaction.queue -- 50 statements
   rows: 50
   bytes: 685
 ...
-i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().scheduler.compaction_queue
 ---
 - true
 ...
