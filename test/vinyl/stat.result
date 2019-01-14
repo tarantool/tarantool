@@ -1125,7 +1125,7 @@ box.snapshot()
 stat_diff(gstat(), st, 'scheduler')
 ---
 - dump_count: 1
-  dump_input: 208400
+  dump_input: 104200
   dump_output: 103592
 ...
 for i = 1, 100, 10 do s:replace{i, i, string.rep('y', 1000)} end
@@ -1141,7 +1141,7 @@ box.snapshot()
 stat_diff(gstat(), st, 'scheduler')
 ---
 - dump_count: 1
-  dump_input: 21230
+  dump_input: 10420
   dump_output: 10371
 ...
 st = gstat()
