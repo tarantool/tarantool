@@ -361,8 +361,8 @@ pk:stat().disk.compact.count -- 1
 sk:stat().disk.compact.count -- 1
 -- All INSERT+DELETE pairs should have been annihilated,
 -- only padding is left.
-pk:stat().disk.compact.out.rows - PAD2 -- 0
-sk:stat().disk.compact.out.rows - PAD2 -- 0
+pk:stat().disk.compact.output.rows - PAD2 -- 0
+sk:stat().disk.compact.output.rows - PAD2 -- 0
 pk:select(1000, {iterator = 'LE'}) -- empty
 sk:select(1000, {iterator = 'LE'}) -- empty
 s:drop()

@@ -765,28 +765,28 @@ vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 
 void
 vy_lsm_acct_dump(struct vy_lsm *lsm,
-		 const struct vy_stmt_counter *in,
-		 const struct vy_disk_stmt_counter *out)
+		 const struct vy_stmt_counter *input,
+		 const struct vy_disk_stmt_counter *output)
 {
 	lsm->stat.disk.dump.count++;
-	vy_stmt_counter_add(&lsm->stat.disk.dump.in, in);
-	vy_disk_stmt_counter_add(&lsm->stat.disk.dump.out, out);
+	vy_stmt_counter_add(&lsm->stat.disk.dump.input, input);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.dump.output, output);
 
-	lsm->env->disk_stat.dump.in += in->bytes;
-	lsm->env->disk_stat.dump.out += out->bytes;
+	lsm->env->disk_stat.dump.input += input->bytes;
+	lsm->env->disk_stat.dump.output += output->bytes;
 }
 
 void
 vy_lsm_acct_compaction(struct vy_lsm *lsm,
-		       const struct vy_disk_stmt_counter *in,
-		       const struct vy_disk_stmt_counter *out)
+		       const struct vy_disk_stmt_counter *input,
+		       const struct vy_disk_stmt_counter *output)
 {
 	lsm->stat.disk.compact.count++;
-	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.in, in);
-	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.out, out);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.input, input);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.output, output);
 
-	lsm->env->disk_stat.compact.in += in->bytes;
-	lsm->env->disk_stat.compact.out += out->bytes;
+	lsm->env->disk_stat.compact.input += input->bytes;
+	lsm->env->disk_stat.compact.output += output->bytes;
 }
 
 int

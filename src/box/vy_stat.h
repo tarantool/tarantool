@@ -148,18 +148,18 @@ struct vy_lsm_stat {
 			/* Number of completed tasks. */
 			int32_t count;
 			/** Number of input statements. */
-			struct vy_stmt_counter in;
+			struct vy_stmt_counter input;
 			/** Number of output statements. */
-			struct vy_disk_stmt_counter out;
+			struct vy_disk_stmt_counter output;
 		} dump;
 		/** Compaction statistics. */
 		struct {
 			/* Number of completed tasks. */
 			int32_t count;
 			/** Number of input statements. */
-			struct vy_disk_stmt_counter in;
+			struct vy_disk_stmt_counter input;
 			/** Number of output statements. */
-			struct vy_disk_stmt_counter out;
+			struct vy_disk_stmt_counter output;
 			/** Number of statements awaiting compaction. */
 			struct vy_disk_stmt_counter queue;
 		} compact;
@@ -215,12 +215,12 @@ struct vy_disk_stat {
 	int64_t data;
 	int64_t index;
 	struct {
-		int64_t in;
-		int64_t out;
+		int64_t input;
+		int64_t output;
 	} dump;
 	struct {
-		int64_t in;
-		int64_t out;
+		int64_t input;
+		int64_t output;
 		int64_t queue;
 	} compact;
 };

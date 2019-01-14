@@ -157,28 +157,28 @@ istat()
       upserts: 0
       deletes: 0
     dump:
-      in:
+      input:
         rows: 0
         bytes: 0
       count: 0
-      out:
+      output:
         bytes_compressed: 0
         pages: 0
         rows: 0
         bytes: 0
     compact:
-      in:
+      input:
         bytes_compressed: 0
         pages: 0
         rows: 0
         bytes: 0
       count: 0
-      queue:
+      output:
         bytes_compressed: 0
         pages: 0
         rows: 0
         bytes: 0
-      out:
+      queue:
         bytes_compressed: 0
         pages: 0
         rows: 0
@@ -226,12 +226,12 @@ gstat()
 ---
 - disk:
     dump:
-      in: 0
-      out: 0
+      input: 0
+      output: 0
     compact:
-      in: 0
+      input: 0
+      output: 0
       queue: 0
-      out: 0
     data: 0
     index: 0
   memory:
@@ -280,11 +280,11 @@ stat_diff(istat(), st)
   run_count: 1
   disk:
     dump:
-      in:
+      input:
         rows: 25
         bytes: 26525
       count: 1
-      out:
+      output:
         bytes: 26049
         pages: 7
         bytes_compressed: <bytes_compressed>
@@ -320,11 +320,11 @@ stat_diff(istat(), st)
 ---
 - disk:
     dump:
-      in:
+      input:
         rows: 50
         bytes: 53050
       count: 1
-      out:
+      output:
         bytes: 52091
         pages: 13
         bytes_compressed: <bytes_compressed>
@@ -337,13 +337,13 @@ stat_diff(istat(), st)
     statement:
       replaces: 25
     compact:
-      in:
+      input:
         bytes: 78140
         pages: 20
         bytes_compressed: <bytes_compressed>
         rows: 75
       count: 1
-      out:
+      output:
         bytes: 52091
         pages: 13
         bytes_compressed: <bytes_compressed>
@@ -701,19 +701,19 @@ box.rollback()
 -- Global statistics.
 --
 -- dump and compaction totals
-gstat().disk.dump['in'] == istat().disk.dump['in'].bytes
+gstat().disk.dump.input == istat().disk.dump.input.bytes
 ---
 - true
 ...
-gstat().disk.dump['out'] == istat().disk.dump['out'].bytes
+gstat().disk.dump.output == istat().disk.dump.output.bytes
 ---
 - true
 ...
-gstat().disk.compact['in'] == istat().disk.compact['in'].bytes
+gstat().disk.compact.input == istat().disk.compact.input.bytes
 ---
 - true
 ...
-gstat().disk.compact['out'] == istat().disk.compact['out'].bytes
+gstat().disk.compact.output == istat().disk.compact.output.bytes
 ---
 - true
 ...
@@ -1007,28 +1007,28 @@ istat()
       upserts: 0
       deletes: 0
     dump:
-      in:
+      input:
         rows: 0
         bytes: 0
       count: 0
-      out:
+      output:
         bytes_compressed: <bytes_compressed>
         pages: 0
         rows: 0
         bytes: 0
     compact:
-      in:
+      input:
         bytes_compressed: <bytes_compressed>
         pages: 0
         rows: 0
         bytes: 0
       count: 0
-      queue:
+      output:
         bytes_compressed: <bytes_compressed>
         pages: 0
         rows: 0
         bytes: 0
-      out:
+      queue:
         bytes_compressed: <bytes_compressed>
         pages: 0
         rows: 0
@@ -1076,12 +1076,12 @@ gstat()
 ---
 - disk:
     dump:
-      in: 0
-      out: 0
+      input: 0
+      output: 0
     compact:
-      in: 0
+      input: 0
+      output: 0
       queue: 0
-      out: 0
     data: 104300
     index: 1190
   memory:
