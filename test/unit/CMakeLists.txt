@@ -203,3 +203,6 @@ add_executable(checkpoint_schedule.test
     ${PROJECT_SOURCE_DIR}/src/box/checkpoint_schedule.c
 )
 target_link_libraries(checkpoint_schedule.test m unit)
+
+add_executable(sio.test sio.c)
+target_link_libraries(sio.test unit core)

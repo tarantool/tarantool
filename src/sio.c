@@ -36,9 +36,11 @@
 #include <limits.h>
 #include <netinet/in.h> /* TCP_NODELAY */
 #include <netinet/tcp.h> /* TCP_NODELAY */
+#include <arpa/inet.h>
 #include "say.h"
 #include "trivia/util.h"
 #include "exception.h"
+#include "uri.h"
 
 const char *
 sio_socketname(int fd)
@@ -320,4 +322,43 @@ sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
 		}
 	}
 	return name;
+}
+
+int
+sio_uri_to_addr(const char *uri, struct sockaddr *addr)
+{
+	struct uri u;
+	if (uri_parse(&u, uri) != 0 || u.service == NULL)
+		goto invalid_uri;
+	if (u.host_len == strlen(URI_HOST_UNIX) &&
+	    memcmp(u.host, URI_HOST_UNIX, u.host_len) == 0) {
+		struct sockaddr_un *un = (struct sockaddr_un *) addr;
+		if (u.service_len + 1 > sizeof(un->sun_path))
+			goto invalid_uri;
+		memcpy(un->sun_path, u.service, u.service_len);
+		un->sun_path[u.service_len] = 0;
+		un->sun_family = AF_UNIX;
+		return 0;
+	}
+	in_addr_t iaddr;
+	if (u.host_len == 0) {
+		iaddr = htonl(INADDR_ANY);
+	} else if (u.host_len == 9 && memcmp("localhost", u.host, 9) == 0) {
+		iaddr = htonl(INADDR_LOOPBACK);
+	} else {
+		iaddr = inet_addr(tt_cstr(u.host, u.host_len));
+		if (iaddr == (in_addr_t) -1)
+			goto invalid_uri;
+	}
+	struct sockaddr_in *in = (struct sockaddr_in *) addr;
+	int port = htons(atoi(u.service));
+	memset(in, 0, sizeof(*in));
+	in->sin_family = AF_INET;
+	in->sin_addr.s_addr = iaddr;
+	in->sin_port = port;
+	return 0;
+
+invalid_uri:
+	diag_set(SocketError, sio_socketname(-1), "invalid uri \"%s\"", uri);
+	return -1;
 }

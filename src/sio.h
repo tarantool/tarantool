@@ -203,6 +203,13 @@ ssize_t sio_sendto(int fd, const void *buf, size_t len, int flags,
 ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
 		     struct sockaddr *src_addr, socklen_t *addrlen);
 
+/**
+ * Convert a string URI like "ip:port" or "unix/:path" to
+ * sockaddr_in/un structure.
+ */
+int
+sio_uri_to_addr(const char *uri, struct sockaddr *addr);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
