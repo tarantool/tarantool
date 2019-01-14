@@ -374,7 +374,7 @@ lbox_info_gc_call(struct lua_State *L)
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "checkpoint_is_in_progress");
-	lua_pushboolean(L, gc.checkpoint_is_in_progress);
+	lua_pushboolean(L, box_checkpoint_is_in_progress);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, "checkpoints");
