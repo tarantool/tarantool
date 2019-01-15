@@ -126,3 +126,49 @@ box.sql.execute("SELECT * FROM t1;")
 box.sql.execute("SELECT s1 FROM t0;")
 box.sql.execute("DROP TABLE t1;")
 box.sql.execute("DROP TABLE t0;")
+
+-- gh-3937: result of concatination has derived collation.
+--
+box.sql.execute("CREATE TABLE t4a(a TEXT COLLATE \"unicode\", b TEXT COLLATE \"unicode_ci\", c INT PRIMARY KEY);")
+box.sql.execute("INSERT INTO t4a VALUES('ABC','abc',1);")
+box.sql.execute("INSERT INTO t4a VALUES('ghi','ghi',3);")
+-- Only LHS of concatenation has implicitly set collation.
+-- Hence, no collation is used.
+--
+box.sql.execute("SELECT c FROM t4a WHERE (a||'') = b;")
+-- BINARY collation is forced for comparison operator as
+-- a derivation from concatenation.
+--
+box.sql.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'') = b;")
+-- Both operands of concatenation have explicit but different
+-- collations.
+--
+box.sql.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'' COLLATE \"unicode_ci\") = b;")
+box.sql.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'') = b COLLATE \"unicode\";")
+-- No collation is used since LHS and RHS of concatenation
+-- operator have different implicit collations.
+--
+box.sql.execute("SELECT c FROM t4a WHERE (a||'')=(b||'');")
+box.sql.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
+
+box.sql.execute("CREATE TABLE t4b(a TEXT COLLATE \"unicode_ci\", b TEXT COLLATE \"unicode_ci\", c INT PRIMARY KEY);")
+box.sql.execute("INSERT INTO t4b VALUES('BCD','bcd',1);")
+box.sql.execute("INSERT INTO t4b VALUES('ghi','ghi',3);")
+-- Operands have the same implicit collation, so it is derived.
+--
+box.sql.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
+-- Couple of other possible combinations.
+--
+box.sql.execute("SELECT c FROM t4a WHERE (a||b COLLATE \"binary\")=(b||a);")
+box.sql.execute("SELECT c FROM t4a WHERE (a||b COLLATE \"binary\")=(b COLLATE \"unicode_ci\"||a);")
+
+box.sql.execute("INSERT INTO t4b VALUES('abc', 'xxx', 2);")
+box.sql.execute("INSERT INTO t4b VALUES('gHz', 'xxx', 4);")
+-- Results are sorted with case-insensitive order.
+-- Otherwise capital latters come first.
+--
+box.sql.execute("SELECT a FROM t4b ORDER BY a COLLATE \"unicode_ci\" || ''")
+box.sql.execute("SELECT a FROM t4b ORDER BY a || b")
+
+box.space.T4A:drop()
+box.space.T4B:drop()

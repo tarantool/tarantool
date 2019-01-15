@@ -230,6 +230,54 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 			}
 			break;
 		}
+		if (op == TK_CONCAT) {
+			/*
+			 * Procedure below provides compatibility
+			 * checks declared in ANSI SQL 2013:
+			 * chapter 9.5 Result of data type
+			 * combinations.
+			 */
+			bool is_lhs_forced;
+			uint32_t lhs_coll_id;
+			if (sql_expr_coll(parse, p->pLeft, &is_lhs_forced,
+					  &lhs_coll_id, coll) != 0)
+				return -1;
+			bool is_rhs_forced;
+			uint32_t rhs_coll_id;
+			if (sql_expr_coll(parse, p->pRight, &is_rhs_forced,
+					  &rhs_coll_id, coll) != 0)
+				return -1;
+			if (is_lhs_forced && is_rhs_forced) {
+				if (lhs_coll_id != rhs_coll_id) {
+					/*
+					 * Don't set the same error
+					 * several times: this
+					 * function is recursive.
+					 */
+					if (parse->nErr == 0) {
+						diag_set(ClientError,
+							 ER_ILLEGAL_COLLATION_MIX);
+						parse->nErr++;
+						parse->rc = SQL_TARANTOOL_ERROR;
+					}
+					return -1;
+				}
+			}
+			if (is_lhs_forced) {
+				*coll_id = lhs_coll_id;
+				*is_explicit_coll = true;
+				break;
+			}
+			if (is_rhs_forced) {
+				*coll_id = rhs_coll_id;
+				*is_explicit_coll = true;
+				break;
+			}
+			if (rhs_coll_id != lhs_coll_id)
+				break;
+			*coll_id = lhs_coll_id;
+			break;
+		}
 		if (p->flags & EP_Collate) {
 			if (p->pLeft && (p->pLeft->flags & EP_Collate) != 0) {
 				p = p->pLeft;
