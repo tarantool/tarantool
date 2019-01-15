@@ -188,7 +188,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->mem_format = format;
 	tuple_format_ref(lsm->mem_format);
 	lsm->in_dump.pos = UINT32_MAX;
-	lsm->in_compact.pos = UINT32_MAX;
+	lsm->in_compaction.pos = UINT32_MAX;
 	lsm->space_id = index_def->space_id;
 	lsm->index_id = index_def->iid;
 	lsm->group_id = group_id;
@@ -234,13 +234,13 @@ vy_lsm_delete(struct vy_lsm *lsm)
 {
 	assert(lsm->refs == 0);
 	assert(lsm->in_dump.pos == UINT32_MAX);
-	assert(lsm->in_compact.pos == UINT32_MAX);
+	assert(lsm->in_compaction.pos == UINT32_MAX);
 	assert(vy_lsm_read_set_empty(&lsm->read_set));
 	assert(lsm->env->lsm_count > 0);
 
 	lsm->env->lsm_count--;
-	lsm->env->disk_stat.compact.queue -=
-			lsm->stat.disk.compact.queue.bytes;
+	lsm->env->disk_stat.compaction.queue -=
+			lsm->stat.disk.compaction.queue.bytes;
 
 	if (lsm->pk != NULL)
 		vy_lsm_unref(lsm->pk);
@@ -661,13 +661,13 @@ vy_lsm_generation(struct vy_lsm *lsm)
 }
 
 int
-vy_lsm_compact_priority(struct vy_lsm *lsm)
+vy_lsm_compaction_priority(struct vy_lsm *lsm)
 {
 	struct heap_node *n = vy_range_heap_top(&lsm->range_heap);
 	if (n == NULL)
 		return 0;
 	struct vy_range *range = container_of(n, struct vy_range, heap_node);
-	return range->compact_priority;
+	return range->compaction_priority;
 }
 
 void
@@ -749,18 +749,18 @@ void
 vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_collect(lsm->run_hist, range->slice_count);
-	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.queue,
-				 &range->compact_queue);
-	lsm->env->disk_stat.compact.queue += range->compact_queue.bytes;
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.queue,
+				 &range->compaction_queue);
+	lsm->env->disk_stat.compaction.queue += range->compaction_queue.bytes;
 }
 
 void
 vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_discard(lsm->run_hist, range->slice_count);
-	vy_disk_stmt_counter_sub(&lsm->stat.disk.compact.queue,
-				 &range->compact_queue);
-	lsm->env->disk_stat.compact.queue -= range->compact_queue.bytes;
+	vy_disk_stmt_counter_sub(&lsm->stat.disk.compaction.queue,
+				 &range->compaction_queue);
+	lsm->env->disk_stat.compaction.queue -= range->compaction_queue.bytes;
 }
 
 void
@@ -781,12 +781,12 @@ vy_lsm_acct_compaction(struct vy_lsm *lsm,
 		       const struct vy_disk_stmt_counter *input,
 		       const struct vy_disk_stmt_counter *output)
 {
-	lsm->stat.disk.compact.count++;
-	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.input, input);
-	vy_disk_stmt_counter_add(&lsm->stat.disk.compact.output, output);
+	lsm->stat.disk.compaction.count++;
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.input, input);
+	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.output, output);
 
-	lsm->env->disk_stat.compact.input += input->bytes;
-	lsm->env->disk_stat.compact.output += output->bytes;
+	lsm->env->disk_stat.compaction.input += input->bytes;
+	lsm->env->disk_stat.compaction.output += output->bytes;
 }
 
 int
@@ -1061,7 +1061,7 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 				vy_range_add_slice(part, new_slice);
 		}
 		part->needs_compaction = range->needs_compaction;
-		vy_range_update_compact_priority(part, &lsm->opts);
+		vy_range_update_compaction_priority(part, &lsm->opts);
 	}
 
 	/*
@@ -1178,7 +1178,7 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 	 * we don't need to compact the resulting range as long
 	 * as it fits the configured LSM tree shape.
 	 */
-	vy_range_update_compact_priority(result, &lsm->opts);
+	vy_range_update_compaction_priority(result, &lsm->opts);
 	vy_lsm_acct_range(lsm, result);
 	vy_lsm_add_range(lsm, result);
 	lsm->range_tree_version++;
@@ -1206,7 +1206,7 @@ vy_lsm_force_compaction(struct vy_lsm *lsm)
 	while ((range = vy_range_tree_inext(&it)) != NULL) {
 		vy_lsm_unacct_range(lsm, range);
 		range->needs_compaction = true;
-		vy_range_update_compact_priority(range, &lsm->opts);
+		vy_range_update_compaction_priority(range, &lsm->opts);
 		vy_lsm_acct_range(lsm, range);
 	}
 

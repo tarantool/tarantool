@@ -118,7 +118,7 @@ stat_diff(istat(), st)
 st = istat()
 for i = 1, 100, 2 do put(i) end
 box.snapshot()
-wait(istat, st, 'disk.compact.count', 1)
+wait(istat, st, 'disk.compaction.count', 1)
 stat_diff(istat(), st)
 
 -- point lookup from disk + cache put
@@ -174,7 +174,7 @@ stat_diff(istat(), st, 'cache')
 for i = 1, 100 do put(i) end
 st = istat()
 box.snapshot()
-wait(istat, st, 'disk.compact.count', 2)
+wait(istat, st, 'disk.compaction.count', 2)
 st = istat()
 st.range_count -- 2
 st.run_count -- 2
@@ -207,8 +207,8 @@ box.rollback()
 -- dump and compaction totals
 gstat().disk.dump.input == istat().disk.dump.input.bytes
 gstat().disk.dump.output == istat().disk.dump.output.bytes
-gstat().disk.compact.input == istat().disk.compact.input.bytes
-gstat().disk.compact.output == istat().disk.compact.output.bytes
+gstat().disk.compaction.input == istat().disk.compaction.input.bytes
+gstat().disk.compaction.output == istat().disk.compaction.output.bytes
 
 -- use memory
 st = gstat()

@@ -221,7 +221,7 @@ struct vy_lsm {
 	vy_range_tree_t *tree;
 	/** Number of ranges in this LSM tree. */
 	int range_count;
-	/** Heap of ranges, prioritized by compact_priority. */
+	/** Heap of ranges, prioritized by compaction_priority. */
 	heap_t range_heap;
 	/**
 	 * List of all runs created for this LSM tree,
@@ -276,8 +276,8 @@ struct vy_lsm {
 	bool is_dumping;
 	/** Link in vy_scheduler->dump_heap. */
 	struct heap_node in_dump;
-	/** Link in vy_scheduler->compact_heap. */
-	struct heap_node in_compact;
+	/** Link in vy_scheduler->compaction_heap. */
+	struct heap_node in_compaction;
 	/**
 	 * Interval tree containing reads from this LSM tree done by
 	 * all active transactions. Linked by vy_tx_interval->in_lsm.
@@ -404,9 +404,9 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 int64_t
 vy_lsm_generation(struct vy_lsm *lsm);
 
-/** Return max compact_priority among ranges of an LSM tree. */
+/** Return max compaction_priority among ranges of an LSM tree. */
 int
-vy_lsm_compact_priority(struct vy_lsm *lsm);
+vy_lsm_compaction_priority(struct vy_lsm *lsm);
 
 /** Add a run to the list of runs of an LSM tree. */
 void
@@ -436,7 +436,7 @@ vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range);
  * This function updates the following LSM tree statistics:
  *  - vy_lsm::run_hist after a slice is added to or removed from
  *    a range of the LSM tree.
- *  - vy_lsm::stat::disk::compact::queue after compaction priority
+ *  - vy_lsm::stat::disk::compaction::queue after compaction priority
  *    of a range is updated.
  */
 void

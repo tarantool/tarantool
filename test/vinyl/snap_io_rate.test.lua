@@ -37,7 +37,7 @@ rate < box.cfg.snap_io_rate_limit or rate
 fill()
 t1 = fiber.time()
 box.snapshot()
-while s.index.primary:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while s.index.primary:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 t2 = fiber.time()
 
 -- dump + compaction => multiply by 2

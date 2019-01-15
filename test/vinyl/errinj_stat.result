@@ -29,7 +29,7 @@ errinj = box.error.injection
 ---
 ...
 --
--- Check disk.compact.queue stat.
+-- Check disk.compaction.queue stat.
 --
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
@@ -43,14 +43,14 @@ function dump() for i = 1, 10 do s:replace{i} end box.snapshot() end
 dump()
 ---
 ...
-i:stat().disk.compact.queue -- none
+i:stat().disk.compaction.queue -- none
 ---
 - bytes_compressed: <bytes_compressed>
   pages: 0
   rows: 0
   bytes: 0
 ...
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 ---
 - true
 ...
@@ -64,56 +64,56 @@ dump()
 dump()
 ---
 ...
-i:stat().disk.compact.queue -- 30 statements
+i:stat().disk.compaction.queue -- 30 statements
 ---
 - bytes_compressed: <bytes_compressed>
   pages: 3
   rows: 30
   bytes: 411
 ...
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 ---
 - true
 ...
 dump()
 ---
 ...
-i:stat().disk.compact.queue -- 40 statements
+i:stat().disk.compaction.queue -- 40 statements
 ---
 - bytes_compressed: <bytes_compressed>
   pages: 4
   rows: 40
   bytes: 548
 ...
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 ---
 - true
 ...
 dump()
 ---
 ...
-i:stat().disk.compact.queue -- 50 statements
+i:stat().disk.compaction.queue -- 50 statements
 ---
 - bytes_compressed: <bytes_compressed>
   pages: 5
   rows: 50
   bytes: 685
 ...
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 ---
 - true
 ...
 box.stat.reset() -- doesn't affect queue size
 ---
 ...
-i:stat().disk.compact.queue -- 50 statements
+i:stat().disk.compaction.queue -- 50 statements
 ---
 - bytes_compressed: <bytes_compressed>
   pages: 5
   rows: 50
   bytes: 685
 ...
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 ---
 - true
 ...
@@ -121,10 +121,10 @@ errinj.set('ERRINJ_VY_COMPACTION_DELAY', false)
 ---
 - ok
 ...
-while i:stat().disk.compact.count < 2 do fiber.sleep(0.01) end
+while i:stat().disk.compaction.count < 2 do fiber.sleep(0.01) end
 ---
 ...
-i:stat().disk.compact.queue -- none
+i:stat().disk.compaction.queue -- none
 ---
 - bytes_compressed: <bytes_compressed>
   pages: 0

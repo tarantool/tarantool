@@ -355,14 +355,14 @@ s:delete{8}
 for i = 1001, 1000 + PAD2 do s:replace{i, i} end
 box.snapshot()
 -- Wait for compaction.
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
-while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
-pk:stat().disk.compact.count -- 1
-sk:stat().disk.compact.count -- 1
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+pk:stat().disk.compaction.count -- 1
+sk:stat().disk.compaction.count -- 1
 -- All INSERT+DELETE pairs should have been annihilated,
 -- only padding is left.
-pk:stat().disk.compact.output.rows - PAD2 -- 0
-sk:stat().disk.compact.output.rows - PAD2 -- 0
+pk:stat().disk.compaction.output.rows - PAD2 -- 0
+sk:stat().disk.compaction.output.rows - PAD2 -- 0
 pk:select(1000, {iterator = 'LE'}) -- empty
 sk:select(1000, {iterator = 'LE'}) -- empty
 s:drop()
@@ -408,10 +408,10 @@ s:delete{8}
 for i = 1001, 1000 + PAD2 do s:replace{i, i} end
 box.snapshot()
 -- Wait for compaction.
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
-while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
-pk:stat().disk.compact.count -- 1
-sk:stat().disk.compact.count -- 1
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
+pk:stat().disk.compaction.count -- 1
+sk:stat().disk.compaction.count -- 1
 -- If INSERT+DELETE statements stored in the two compacted runs
 -- were annihilated we would see tuples stored in the first run.
 pk:select(1000, {iterator = 'LE'}) -- empty

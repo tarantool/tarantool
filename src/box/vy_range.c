@@ -282,18 +282,18 @@ vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice)
  * ratio.
  *
  * Given a range, this function computes the maximal level that needs
- * to be compacted and sets @compact_priority to the number of runs in
- * this level and all preceding levels.
+ * to be compacted and sets @compaction_priority to the number of runs
+ * in this level and all preceding levels.
  */
 void
-vy_range_update_compact_priority(struct vy_range *range,
-				 const struct index_opts *opts)
+vy_range_update_compaction_priority(struct vy_range *range,
+				    const struct index_opts *opts)
 {
 	assert(opts->run_count_per_level > 0);
 	assert(opts->run_size_ratio > 1);
 
-	range->compact_priority = 0;
-	vy_disk_stmt_counter_reset(&range->compact_queue);
+	range->compaction_priority = 0;
+	vy_disk_stmt_counter_reset(&range->compaction_queue);
 
 	if (range->slice_count <= 1) {
 		/* Nothing to compact. */
@@ -302,8 +302,8 @@ vy_range_update_compact_priority(struct vy_range *range,
 	}
 
 	if (range->needs_compaction) {
-		range->compact_priority = range->slice_count;
-		range->compact_queue = range->count;
+		range->compaction_priority = range->slice_count;
+		range->compaction_queue = range->count;
 		return;
 	}
 
@@ -372,8 +372,8 @@ vy_range_update_compact_priority(struct vy_range *range,
 			 * for compaction. We compact all runs at
 			 * this level and upper levels.
 			 */
-			range->compact_priority = total_run_count;
-			range->compact_queue = total_stmt_count;
+			range->compaction_priority = total_run_count;
+			range->compaction_queue = total_stmt_count;
 			est_new_run_size = total_stmt_count.bytes_compressed;
 		}
 	}
@@ -383,8 +383,8 @@ vy_range_update_compact_priority(struct vy_range *range,
 		 * Do not store more than one run at the last level
 		 * to keep space amplification low.
 		 */
-		range->compact_priority = total_run_count;
-		range->compact_queue = total_stmt_count;
+		range->compaction_priority = total_run_count;
+		range->compaction_queue = total_stmt_count;
 	}
 }
 

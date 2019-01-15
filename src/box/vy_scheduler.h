@@ -75,7 +75,7 @@ struct vy_scheduler {
 	/** Pool of threads for performing background dumps. */
 	struct vy_worker_pool dump_pool;
 	/** Pool of threads for performing background compactions. */
-	struct vy_worker_pool compact_pool;
+	struct vy_worker_pool compaction_pool;
 	/** Queue of processed tasks, linked by vy_task::in_processed. */
 	struct stailq processed_tasks;
 	/**
@@ -85,9 +85,9 @@ struct vy_scheduler {
 	heap_t dump_heap;
 	/**
 	 * Heap of LSM trees, ordered by compaction priority,
-	 * linked by vy_lsm::in_compact.
+	 * linked by vy_lsm::in_compaction.
 	 */
-	heap_t compact_heap;
+	heap_t compaction_heap;
 	/** Last error seen by the scheduler. */
 	struct diag diag;
 	/**

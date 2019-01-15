@@ -497,7 +497,7 @@ box.snapshot()
 - ok
 ...
 --
--- Check that all dump/compact tasks that are in progress at
+-- Check that all dump/compaction tasks that are in progress at
 -- the time when the server stops are aborted immediately.
 --
 s = box.schema.space.create('test', {engine = 'vinyl'})
@@ -961,7 +961,7 @@ c = fiber.channel(1)
 _ = fiber.create(function() box.snapshot() c:put(true) end)
 ---
 ...
-while s.index.pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while s.index.pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 errinj.set('ERRINJ_SNAP_COMMIT_DELAY', false)
@@ -1049,7 +1049,7 @@ s.index.pk:compact()
 while box.stat.ERROR.total - errors == 0 do fiber.sleep(0.001) end
 ---
 ...
-s.index.pk:stat().disk.compact.count -- 0
+s.index.pk:stat().disk.compaction.count -- 0
 ---
 - 0
 ...
@@ -1057,10 +1057,10 @@ errinj.set("ERRINJ_WAL_IO", false)
 ---
 - ok
 ...
-while s.index.pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while s.index.pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
-s.index.pk:stat().disk.compact.count -- 1
+s.index.pk:stat().disk.compaction.count -- 1
 ---
 - 1
 ...

@@ -15,31 +15,31 @@ fiber = require('fiber')
 errinj = box.error.injection
 
 --
--- Check disk.compact.queue stat.
+-- Check disk.compaction.queue stat.
 --
 s = box.schema.space.create('test', {engine = 'vinyl'})
 i = s:create_index('pk', {run_count_per_level = 2})
 function dump() for i = 1, 10 do s:replace{i} end box.snapshot() end
 dump()
-i:stat().disk.compact.queue -- none
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue -- none
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', true)
 dump()
 dump()
-i:stat().disk.compact.queue -- 30 statements
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue -- 30 statements
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 dump()
-i:stat().disk.compact.queue -- 40 statements
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue -- 40 statements
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 dump()
-i:stat().disk.compact.queue -- 50 statements
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue -- 50 statements
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 box.stat.reset() -- doesn't affect queue size
-i:stat().disk.compact.queue -- 50 statements
-i:stat().disk.compact.queue.bytes == box.stat.vinyl().disk.compact.queue
+i:stat().disk.compaction.queue -- 50 statements
+i:stat().disk.compaction.queue.bytes == box.stat.vinyl().disk.compaction.queue
 errinj.set('ERRINJ_VY_COMPACTION_DELAY', false)
-while i:stat().disk.compact.count < 2 do fiber.sleep(0.01) end
-i:stat().disk.compact.queue -- none
+while i:stat().disk.compaction.count < 2 do fiber.sleep(0.01) end
+i:stat().disk.compaction.queue -- none
 s:drop()
 
 test_run:cmd("clear filter")

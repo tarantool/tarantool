@@ -36,7 +36,7 @@ space:delete{2}
 pk:alter{parts = {2, 'unsigned'}} -- error: mem/run not empty
 box.snapshot()
 -- wait for compaction to complete
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.01) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
 pk:alter{parts = {2, 'unsigned'}} -- success: space is empty now
 space:replace{1, 2}
 -- gh-3508 - Altering primary index of a vinyl space doesn't work as expected
