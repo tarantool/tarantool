@@ -78,6 +78,51 @@ errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 fiber.sleep(0.01)
 s:drop()
 
+--
+-- Check dump/compaction time accounting.
+--
+box.stat.reset()
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('pk')
+i:stat().disk.dump.time == 0
+i:stat().disk.compaction.time == 0
+box.stat.vinyl().scheduler.dump_time == 0
+box.stat.vinyl().scheduler.compaction_time == 0
+
+for i = 1, 100 do s:replace{i} end
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+start_time = fiber.time()
+c = fiber.channel(1)
+_ = fiber.create(function() box.snapshot() c:put(true) end)
+fiber.sleep(0.1)
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+c:get()
+i:stat().disk.dump.time >= 0.1
+i:stat().disk.dump.time <= fiber.time() - start_time
+i:stat().disk.compaction.time == 0
+box.stat.vinyl().scheduler.dump_time == i:stat().disk.dump.time
+box.stat.vinyl().scheduler.compaction_time == i:stat().disk.compaction.time
+
+for i = 1, 100, 10 do s:replace{i} end
+box.snapshot()
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+start_time = fiber.time()
+i:compact()
+fiber.sleep(0.1)
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+while i:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
+i:stat().disk.compaction.time >= 0.1
+i:stat().disk.compaction.time <= fiber.time() - start_time
+box.stat.vinyl().scheduler.compaction_time == i:stat().disk.compaction.time
+
+box.stat.reset()
+i:stat().disk.dump.time == 0
+i:stat().disk.compaction.time == 0
+box.stat.vinyl().scheduler.dump_time == 0
+box.stat.vinyl().scheduler.compaction_time == 0
+
+s:drop()
+
 test_run:cmd("clear filter")
 test_run:cmd('switch default')
 test_run:cmd('stop server test')

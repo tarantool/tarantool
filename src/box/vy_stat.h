@@ -147,6 +147,8 @@ struct vy_lsm_stat {
 		struct {
 			/* Number of completed tasks. */
 			int32_t count;
+			/** Time spent on dump tasks, in seconds. */
+			double time;
 			/** Number of input statements. */
 			struct vy_stmt_counter input;
 			/** Number of output statements. */
@@ -156,6 +158,8 @@ struct vy_lsm_stat {
 		struct {
 			/* Number of completed tasks. */
 			int32_t count;
+			/** Time spent on compaction tasks, in seconds. */
+			double time;
 			/** Number of input statements. */
 			struct vy_disk_stmt_counter input;
 			/** Number of output statements. */
@@ -220,10 +224,14 @@ struct vy_scheduler_stat {
 	int32_t tasks_inprogress;
 	/** Number of completed memory dumps. */
 	int32_t dump_count;
+	/** Time spent on dump tasks, in seconds. */
+	double dump_time;
 	/** Number of bytes read by dump tasks. */
 	int64_t dump_input;
 	/** Number of bytes written by dump tasks. */
 	int64_t dump_output;
+	/** Time spent on compaction tasks, in seconds. */
+	double compaction_time;
 	/** Number of bytes read by compaction tasks. */
 	int64_t compaction_input;
 	/** Number of bytes written by compaction tasks. */

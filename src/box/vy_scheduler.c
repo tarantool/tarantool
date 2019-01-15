@@ -169,6 +169,8 @@ struct vy_task {
 	 * a worker thread.
 	 */
 	struct fiber *fiber;
+	/** Time of the task creation. */
+	double start_time;
 	/** Set if the task failed. */
 	bool is_failed;
 	/** In case of task failure the error is stored here. */
@@ -243,6 +245,7 @@ vy_task_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	task->ops = ops;
 	task->scheduler = scheduler;
 	task->worker = worker;
+	task->start_time = ev_monotonic_now(loop());
 	task->lsm = lsm;
 	task->cmp_def = key_def_dup(lsm->cmp_def);
 	if (task->cmp_def == NULL) {
@@ -507,8 +510,10 @@ vy_scheduler_reset_stat(struct vy_scheduler *scheduler)
 	stat->tasks_completed = 0;
 	stat->tasks_failed = 0;
 	stat->dump_count = 0;
+	stat->dump_time = 0;
 	stat->dump_input = 0;
 	stat->dump_output = 0;
+	stat->compaction_time = 0;
 	stat->compaction_input = 0;
 	stat->compaction_output = 0;
 }
@@ -1110,6 +1115,7 @@ vy_task_dump_complete(struct vy_task *task)
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_run *new_run = task->new_run;
 	int64_t dump_lsn = new_run->dump_lsn;
+	double dump_time = ev_monotonic_now(loop()) - task->start_time;
 	struct vy_disk_stmt_counter dump_output = new_run->count;
 	struct vy_stmt_counter dump_input;
 	struct tuple_format *key_format = lsm->env->key_format;
@@ -1240,7 +1246,7 @@ delete_mems:
 		vy_lsm_delete_mem(lsm, mem);
 	}
 	lsm->dump_lsn = MAX(lsm->dump_lsn, dump_lsn);
-	vy_lsm_acct_dump(lsm, &dump_input, &dump_output);
+	vy_lsm_acct_dump(lsm, dump_time, &dump_input, &dump_output);
 	/*
 	 * Indexes of the same space share a memory level so we
 	 * account dump input only when the primary index is dumped.
@@ -1248,6 +1254,7 @@ delete_mems:
 	if (lsm->index_id == 0)
 		scheduler->stat.dump_input += dump_input.bytes;
 	scheduler->stat.dump_output += dump_output.bytes;
+	scheduler->stat.dump_time += dump_time;
 
 	/* The iterator has been cleaned up in a worker thread. */
 	task->wi->iface->close(task->wi);
@@ -1469,6 +1476,7 @@ vy_task_compaction_complete(struct vy_task *task)
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_range *range = task->range;
 	struct vy_run *new_run = task->new_run;
+	double compaction_time = ev_monotonic_now(loop()) - task->start_time;
 	struct vy_disk_stmt_counter compaction_output = new_run->count;
 	struct vy_disk_stmt_counter compaction_input;
 	struct vy_slice *first_slice = task->first_slice;
@@ -1584,9 +1592,11 @@ vy_task_compaction_complete(struct vy_task *task)
 	range->n_compactions++;
 	vy_range_update_compaction_priority(range, &lsm->opts);
 	vy_lsm_acct_range(lsm, range);
-	vy_lsm_acct_compaction(lsm, &compaction_input, &compaction_output);
+	vy_lsm_acct_compaction(lsm, compaction_time,
+			       &compaction_input, &compaction_output);
 	scheduler->stat.compaction_input += compaction_input.bytes;
 	scheduler->stat.compaction_output += compaction_output.bytes;
+	scheduler->stat.compaction_time += compaction_time;
 
 	/*
 	 * Unaccount unused runs and delete compacted slices.

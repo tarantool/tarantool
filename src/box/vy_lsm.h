@@ -473,7 +473,7 @@ vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range);
  * Account dump in LSM tree statistics.
  */
 void
-vy_lsm_acct_dump(struct vy_lsm *lsm,
+vy_lsm_acct_dump(struct vy_lsm *lsm, double time,
 		 const struct vy_stmt_counter *input,
 		 const struct vy_disk_stmt_counter *output);
 
@@ -481,7 +481,7 @@ vy_lsm_acct_dump(struct vy_lsm *lsm,
  * Account compaction in LSM tree statistics.
  */
 void
-vy_lsm_acct_compaction(struct vy_lsm *lsm,
+vy_lsm_acct_compaction(struct vy_lsm *lsm, double time,
 		       const struct vy_disk_stmt_counter *input,
 		       const struct vy_disk_stmt_counter *output);
 
