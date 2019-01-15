@@ -764,21 +764,23 @@ vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 }
 
 void
-vy_lsm_acct_dump(struct vy_lsm *lsm,
+vy_lsm_acct_dump(struct vy_lsm *lsm, double time,
 		 const struct vy_stmt_counter *input,
 		 const struct vy_disk_stmt_counter *output)
 {
 	lsm->stat.disk.dump.count++;
+	lsm->stat.disk.dump.time += time;
 	vy_stmt_counter_add(&lsm->stat.disk.dump.input, input);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.dump.output, output);
 }
 
 void
-vy_lsm_acct_compaction(struct vy_lsm *lsm,
+vy_lsm_acct_compaction(struct vy_lsm *lsm, double time,
 		       const struct vy_disk_stmt_counter *input,
 		       const struct vy_disk_stmt_counter *output)
 {
 	lsm->stat.disk.compaction.count++;
+	lsm->stat.disk.compaction.time += time;
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.input, input);
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.output, output);
 }

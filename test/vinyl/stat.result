@@ -86,9 +86,14 @@ end;
 --
 -- Note, latency measurement is beyond the scope of this test
 -- so we just filter it out.
+--
+-- Filter dump/compaction time as we need error injection to
+-- test them properly.
 function istat()
     local st = box.space.test.index.pk:stat()
     st.latency = nil
+    st.disk.dump.time = nil
+    st.disk.compaction.time = nil
     return st
 end;
 ---
@@ -97,9 +102,14 @@ end;
 --
 -- Note, checking correctness of the load regulator logic is beyond
 -- the scope of this test so we just filter out related statistics.
+--
+-- Filter dump/compaction time as we need error injection to
+-- test them properly.
 function gstat()
     local st = box.stat.vinyl()
     st.regulator = nil
+    st.scheduler.dump_time = nil
+    st.scheduler.compaction_time = nil
     return st
 end;
 ---
@@ -156,17 +166,17 @@ istat()
         pages: 0
         rows: 0
         bytes: 0
-      count: 0
-      output:
-        bytes_compressed: 0
-        pages: 0
-        rows: 0
-        bytes: 0
       queue:
         bytes_compressed: 0
         pages: 0
         rows: 0
         bytes: 0
+      output:
+        bytes_compressed: 0
+        pages: 0
+        rows: 0
+        bytes: 0
+      count: 0
     statement:
       inserts: 0
       replaces: 0
@@ -176,12 +186,12 @@ istat()
       input:
         rows: 0
         bytes: 0
-      count: 0
       output:
         bytes_compressed: 0
         pages: 0
         rows: 0
         bytes: 0
+      count: 0
     bloom_size: 0
     iterator:
       read:
@@ -242,13 +252,13 @@ gstat()
     data: 0
     index: 0
   scheduler:
-    compaction_output: 0
     tasks_inprogress: 0
     dump_output: 0
-    tasks_completed: 0
+    compaction_queue: 0
+    compaction_output: 0
     dump_count: 0
     tasks_failed: 0
-    compaction_queue: 0
+    tasks_completed: 0
     dump_input: 0
     compaction_input: 0
 ...
@@ -1009,17 +1019,17 @@ istat()
         pages: 0
         rows: 0
         bytes: 0
-      count: 0
-      output:
-        bytes_compressed: <bytes_compressed>
-        pages: 0
-        rows: 0
-        bytes: 0
       queue:
         bytes_compressed: <bytes_compressed>
         pages: 0
         rows: 0
         bytes: 0
+      output:
+        bytes_compressed: <bytes_compressed>
+        pages: 0
+        rows: 0
+        bytes: 0
+      count: 0
     statement:
       inserts: 0
       replaces: 100
@@ -1029,12 +1039,12 @@ istat()
       input:
         rows: 0
         bytes: 0
-      count: 0
       output:
         bytes_compressed: <bytes_compressed>
         pages: 0
         rows: 0
         bytes: 0
+      count: 0
     bloom_size: 140
     iterator:
       read:
@@ -1095,13 +1105,13 @@ gstat()
     data: 104300
     index: 1190
   scheduler:
-    compaction_output: 0
     tasks_inprogress: 0
     dump_output: 0
-    tasks_completed: 0
+    compaction_queue: 0
+    compaction_output: 0
     dump_count: 0
     tasks_failed: 0
-    compaction_queue: 0
+    tasks_completed: 0
     dump_input: 0
     compaction_input: 0
 ...
@@ -1131,9 +1141,9 @@ box.snapshot()
 stat_diff(gstat(), st, 'scheduler')
 ---
 - dump_input: 104200
-  dump_count: 1
-  tasks_completed: 2
   dump_output: 103592
+  tasks_completed: 2
+  dump_count: 1
 ...
 for i = 1, 100, 10 do s:replace{i, i, string.rep('y', 1000)} end
 ---
@@ -1148,9 +1158,9 @@ box.snapshot()
 stat_diff(gstat(), st, 'scheduler')
 ---
 - dump_input: 10420
-  dump_count: 1
-  tasks_completed: 2
   dump_output: 10371
+  tasks_completed: 2
+  dump_count: 1
 ...
 st = gstat()
 ---

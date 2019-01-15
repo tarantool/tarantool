@@ -69,9 +69,14 @@ end;
 --
 -- Note, latency measurement is beyond the scope of this test
 -- so we just filter it out.
+--
+-- Filter dump/compaction time as we need error injection to
+-- test them properly.
 function istat()
     local st = box.space.test.index.pk:stat()
     st.latency = nil
+    st.disk.dump.time = nil
+    st.disk.compaction.time = nil
     return st
 end;
 
@@ -79,9 +84,14 @@ end;
 --
 -- Note, checking correctness of the load regulator logic is beyond
 -- the scope of this test so we just filter out related statistics.
+--
+-- Filter dump/compaction time as we need error injection to
+-- test them properly.
 function gstat()
     local st = box.stat.vinyl()
     st.regulator = nil
+    st.scheduler.dump_time = nil
+    st.scheduler.compaction_time = nil
     return st
 end;
 

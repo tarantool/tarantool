@@ -254,8 +254,10 @@ vy_info_append_scheduler(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "tasks_completed", stat->tasks_completed);
 	info_append_int(h, "tasks_failed", stat->tasks_failed);
 	info_append_int(h, "dump_count", stat->dump_count);
+	info_append_double(h, "dump_time", stat->dump_time);
 	info_append_int(h, "dump_input", stat->dump_input);
 	info_append_int(h, "dump_output", stat->dump_output);
+	info_append_double(h, "compaction_time", stat->compaction_time);
 	info_append_int(h, "compaction_input", stat->compaction_input);
 	info_append_int(h, "compaction_output", stat->compaction_output);
 	info_append_int(h, "compaction_queue",
@@ -419,11 +421,13 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_table_end(h); /* iterator */
 	info_table_begin(h, "dump");
 	info_append_int(h, "count", stat->disk.dump.count);
+	info_append_double(h, "time", stat->disk.dump.time);
 	vy_info_append_stmt_counter(h, "input", &stat->disk.dump.input);
 	vy_info_append_disk_stmt_counter(h, "output", &stat->disk.dump.output);
 	info_table_end(h); /* dump */
 	info_table_begin(h, "compaction");
 	info_append_int(h, "count", stat->disk.compaction.count);
+	info_append_double(h, "time", stat->disk.compaction.time);
 	vy_info_append_disk_stmt_counter(h, "input", &stat->disk.compaction.input);
 	vy_info_append_disk_stmt_counter(h, "output", &stat->disk.compaction.output);
 	vy_info_append_disk_stmt_counter(h, "queue", &stat->disk.compaction.queue);
@@ -481,11 +485,13 @@ vinyl_index_reset_stat(struct index *index)
 
 	/* Dump */
 	stat->disk.dump.count = 0;
+	stat->disk.dump.time = 0;
 	vy_stmt_counter_reset(&stat->disk.dump.input);
 	vy_disk_stmt_counter_reset(&stat->disk.dump.output);
 
 	/* Compaction */
 	stat->disk.compaction.count = 0;
+	stat->disk.compaction.time = 0;
 	vy_disk_stmt_counter_reset(&stat->disk.compaction.input);
 	vy_disk_stmt_counter_reset(&stat->disk.compaction.output);
 
