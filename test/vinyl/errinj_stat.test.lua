@@ -42,6 +42,42 @@ while i:stat().disk.compaction.count < 2 do fiber.sleep(0.01) end
 i:stat().disk.compaction.queue -- none
 s:drop()
 
+--
+-- Check task statistics.
+--
+box.stat.reset()
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
+s:replace{1}
+c = fiber.channel(1)
+_ = fiber.create(function() box.snapshot() c:put(true) end)
+fiber.sleep(0.01)
+stat = box.stat.vinyl().scheduler
+stat.tasks_inprogress > 0
+stat.tasks_completed == 0
+stat.tasks_failed == 0
+box.stat.reset() -- doesn't affect tasks_inprogress
+box.stat.vinyl().scheduler.tasks_inprogress > 0
+errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
+c:get()
+stat = box.stat.vinyl().scheduler
+stat.tasks_inprogress == 0
+stat.tasks_completed == 1
+stat.tasks_failed == 0
+errinj.set('ERRINJ_VY_RUN_WRITE', true)
+errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.01)
+s:replace{2}
+box.snapshot()
+stat = box.stat.vinyl().scheduler
+stat.tasks_inprogress == 0
+stat.tasks_completed == 1
+stat.tasks_failed > 0
+errinj.set('ERRINJ_VY_RUN_WRITE', false)
+errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
+fiber.sleep(0.01)
+s:drop()
+
 test_run:cmd("clear filter")
 test_run:cmd('switch default')
 test_run:cmd('stop server test')

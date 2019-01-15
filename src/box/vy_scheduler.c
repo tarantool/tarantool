@@ -504,6 +504,8 @@ void
 vy_scheduler_reset_stat(struct vy_scheduler *scheduler)
 {
 	struct vy_scheduler_stat *stat = &scheduler->stat;
+	stat->tasks_completed = 0;
+	stat->tasks_failed = 0;
 	stat->dump_count = 0;
 	stat->dump_input = 0;
 	stat->dump_output = 0;
@@ -1930,14 +1932,17 @@ vy_schedule(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	if (vy_scheduler_peek_dump(scheduler, ptask) != 0)
 		goto fail;
 	if (*ptask != NULL)
-		return 0;
+		goto found;
 
 	if (vy_scheduler_peek_compaction(scheduler, ptask) != 0)
 		goto fail;
 	if (*ptask != NULL)
-		return 0;
+		goto found;
 
 	/* no task to run */
+	return 0;
+found:
+	scheduler->stat.tasks_inprogress++;
 	return 0;
 fail:
 	assert(!diag_is_empty(diag_get()));
@@ -1949,10 +1954,15 @@ fail:
 static int
 vy_task_complete(struct vy_task *task)
 {
+	struct vy_scheduler *scheduler = task->scheduler;
+
+	assert(scheduler->stat.tasks_inprogress > 0);
+	scheduler->stat.tasks_inprogress--;
+
 	if (task->lsm->is_dropped) {
 		if (task->ops->abort)
 			task->ops->abort(task);
-		return 0;
+		goto out;
 	}
 
 	struct diag *diag = &task->diag;
@@ -1971,11 +1981,14 @@ vy_task_complete(struct vy_task *task)
 		diag_move(diag_get(), diag);
 		goto fail;
 	}
+out:
+	scheduler->stat.tasks_completed++;
 	return 0;
 fail:
 	if (task->ops->abort)
 		task->ops->abort(task);
-	diag_move(diag, &task->scheduler->diag);
+	diag_move(diag, &scheduler->diag);
+	scheduler->stat.tasks_failed++;
 	return -1;
 }
 

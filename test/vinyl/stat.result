@@ -242,10 +242,13 @@ gstat()
     data: 0
     index: 0
   scheduler:
-    compaction_queue: 0
-    dump_count: 0
     compaction_output: 0
+    tasks_inprogress: 0
     dump_output: 0
+    tasks_completed: 0
+    dump_count: 0
+    tasks_failed: 0
+    compaction_queue: 0
     dump_input: 0
     compaction_input: 0
 ...
@@ -1092,10 +1095,13 @@ gstat()
     data: 104300
     index: 1190
   scheduler:
-    compaction_queue: 0
-    dump_count: 0
     compaction_output: 0
+    tasks_inprogress: 0
     dump_output: 0
+    tasks_completed: 0
+    dump_count: 0
+    tasks_failed: 0
+    compaction_queue: 0
     dump_input: 0
     compaction_input: 0
 ...
@@ -1124,8 +1130,9 @@ box.snapshot()
 ...
 stat_diff(gstat(), st, 'scheduler')
 ---
-- dump_count: 1
-  dump_input: 104200
+- dump_input: 104200
+  dump_count: 1
+  tasks_completed: 2
   dump_output: 103592
 ...
 for i = 1, 100, 10 do s:replace{i, i, string.rep('y', 1000)} end
@@ -1140,8 +1147,9 @@ box.snapshot()
 ...
 stat_diff(gstat(), st, 'scheduler')
 ---
-- dump_count: 1
-  dump_input: 10420
+- dump_input: 10420
+  dump_count: 1
+  tasks_completed: 2
   dump_output: 10371
 ...
 st = gstat()
@@ -1156,6 +1164,7 @@ while i1:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
 stat_diff(gstat(), st, 'scheduler')
 ---
 - compaction_input: 112188
+  tasks_completed: 1
   compaction_output: 101984
 ...
 st = gstat()
@@ -1170,6 +1179,7 @@ while i2:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
 stat_diff(gstat(), st, 'scheduler')
 ---
 - compaction_input: 1775
+  tasks_completed: 1
   compaction_output: 1608
 ...
 s:drop()
