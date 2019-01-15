@@ -241,7 +241,9 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	lsm->env->lsm_count--;
 	lsm->env->compaction_queue_size -=
 			lsm->stat.disk.compaction.queue.bytes;
-
+	if (lsm->index_id == 0)
+		lsm->env->compacted_data_size -=
+			lsm->stat.disk.last_level_count.bytes;
 	if (lsm->pk != NULL)
 		vy_lsm_unref(lsm->pk);
 
@@ -752,6 +754,14 @@ vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range)
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.queue,
 				 &range->compaction_queue);
 	lsm->env->compaction_queue_size += range->compaction_queue.bytes;
+	if (!rlist_empty(&range->slices)) {
+		struct vy_slice *slice = rlist_last_entry(&range->slices,
+						struct vy_slice, in_range);
+		vy_disk_stmt_counter_add(&lsm->stat.disk.last_level_count,
+					 &slice->count);
+		if (lsm->index_id == 0)
+			lsm->env->compacted_data_size += slice->count.bytes;
+	}
 }
 
 void
@@ -761,6 +771,14 @@ vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 	vy_disk_stmt_counter_sub(&lsm->stat.disk.compaction.queue,
 				 &range->compaction_queue);
 	lsm->env->compaction_queue_size -= range->compaction_queue.bytes;
+	if (!rlist_empty(&range->slices)) {
+		struct vy_slice *slice = rlist_last_entry(&range->slices,
+						struct vy_slice, in_range);
+		vy_disk_stmt_counter_sub(&lsm->stat.disk.last_level_count,
+					 &slice->count);
+		if (lsm->index_id == 0)
+			lsm->env->compacted_data_size -= slice->count.bytes;
+	}
 }
 
 void

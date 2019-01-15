@@ -139,6 +139,8 @@ struct vy_lsm_stat {
 	struct {
 		/** Number of statements stored on disk. */
 		struct vy_disk_stmt_counter count;
+		/** Number of statements stored in the last LSM level. */
+		struct vy_disk_stmt_counter last_level_count;
 		/** Statement statistics. */
 		struct vy_stmt_stat stmt;
 		/** Run iterator statistics. */
