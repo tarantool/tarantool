@@ -2,6 +2,24 @@ test_run = require('test_run').new()
 fiber = require('fiber')
 
 --
+-- Check that DDL operations are logged in vylog only after successful
+-- WAL write.
+--
+-- If we logged an index creation in the metadata log before WAL write,
+-- WAL failure would result in leaving the index record in vylog forever.
+-- Since we use LSN to identify indexes in vylog, retrying index creation
+-- would then lead to a duplicate index id in vylog and hence inability
+-- to make a snapshot or recover.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+box.error.injection.set('ERRINJ_WAL_IO', true)
+_ = s:create_index('pk')
+box.error.injection.set('ERRINJ_WAL_IO', false)
+_ = s:create_index('pk')
+box.snapshot()
+s:drop()
+
+--
 -- Check that an error to commit a new run to vylog does not
 -- break vinyl permanently.
 --
