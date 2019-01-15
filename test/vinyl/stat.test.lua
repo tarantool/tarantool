@@ -3,7 +3,7 @@ test_run = require('test_run').new()
 -- Since we store LSNs in data files, the data size may differ
 -- from run to run. Deploy a new server to make sure it will be
 -- the same so that we can check it.
-test_run:cmd('create server test with script = "vinyl/info.lua"')
+test_run:cmd('create server test with script = "vinyl/stat.lua"')
 test_run:cmd('start server test')
 test_run:cmd('switch test')
 
