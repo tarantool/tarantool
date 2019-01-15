@@ -108,6 +108,17 @@ struct vy_lsm_env {
 	 */
 	int64_t disk_index_size;
 	/**
+	 * Min size of disk space required to store data of all
+	 * spaces of the database. In other words, the size of
+	 * disk space the database would occupy if all spaces were
+	 * compacted and there were no indexes. Accounted in bytes,
+	 * without taking into account disk compression. Estimated
+	 * as the size of data stored in the last level of primary
+	 * LSM trees. Along with disk_data_size and disk_index_size,
+	 * it can be used for evaluating space amplification.
+	 */
+	int64_t compacted_data_size;
+	/**
 	 * Size of data of all spaces that need to be compacted,
 	 * in bytes, without taking into account disk compression.
 	 */
@@ -457,6 +468,7 @@ vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range);
  *    a range of the LSM tree.
  *  - vy_lsm::stat::disk::compaction::queue after compaction priority
  *    of a range is updated.
+ *  - vy_lsm::stat::disk::last_level_count after a range is compacted.
  */
 void
 vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range);

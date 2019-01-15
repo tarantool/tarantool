@@ -473,6 +473,7 @@ i:stat().disk.statement
 test_run:cmd('restart server test')
 
 fiber = require('fiber')
+digest = require('digest')
 
 s = box.space.test
 i = s.index.primary
@@ -485,6 +486,47 @@ while i:stat().run_count > 1 do fiber.sleep(0.01) end
 i:stat().disk.statement
 
 s:drop()
+
+--
+-- Last level size.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i1 = s:create_index('i1', {parts = {1, 'unsigned'}})
+i2 = s:create_index('i2', {parts = {2, 'unsigned'}})
+
+i1:stat().disk.last_level
+i2:stat().disk.last_level
+box.stat.vinyl().disk.data_compacted
+
+for i = 1, 100 do s:replace{i, i, digest.urandom(100)} end
+box.snapshot()
+
+i1:stat().disk.last_level
+i2:stat().disk.last_level
+box.stat.vinyl().disk.data_compacted
+
+for i = 1, 100, 10 do s:replace{i, i * 1000, digest.urandom(100)} end
+box.snapshot()
+
+i1:stat().disk.last_level
+i2:stat().disk.last_level
+box.stat.vinyl().disk.data_compacted
+
+i1:compact()
+while i1:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
+
+i1:stat().disk.last_level
+box.stat.vinyl().disk.data_compacted
+
+i2:compact()
+while i2:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
+
+i2:stat().disk.last_level
+box.stat.vinyl().disk.data_compacted
+
+s:drop()
+
+box.stat.vinyl().disk.data_compacted
 
 test_run:cmd('switch default')
 test_run:cmd('stop server test')

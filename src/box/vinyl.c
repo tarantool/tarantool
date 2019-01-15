@@ -319,6 +319,7 @@ vy_info_append_disk(struct vy_env *env, struct info_handler *h)
 	info_table_begin(h, "disk");
 	info_append_int(h, "data", env->lsm_env.disk_data_size);
 	info_append_int(h, "index", env->lsm_env.disk_index_size);
+	info_append_int(h, "data_compacted", env->lsm_env.compacted_data_size);
 	info_table_end(h); /* disk */
 }
 
@@ -404,6 +405,8 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 
 	info_table_begin(h, "disk");
 	vy_info_append_disk_stmt_counter(h, NULL, &stat->disk.count);
+	vy_info_append_disk_stmt_counter(h, "last_level",
+					 &stat->disk.last_level_count);
 	info_table_begin(h, "statement");
 	info_append_int(h, "inserts", stat->disk.stmt.inserts);
 	info_append_int(h, "replaces", stat->disk.stmt.replaces);
