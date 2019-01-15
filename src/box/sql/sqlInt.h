@@ -4302,12 +4302,14 @@ const char *sqlErrStr(int);
  * @param[out] is_explicit_coll Flag set if explicit COLLATE
  *             clause is used.
  * @param[out] coll_id Collation identifier.
+ * @param[out] coll Collation object.
  *
- * @retval Pointer to collation.
+ * @retval 0 on success.
+ * @retval -1 in case of error.
  */
-struct coll *
-sql_expr_coll(Parse * pParse, Expr * pExpr, bool *is_explicit_coll,
-	      uint32_t *coll_id);
+int
+sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
+	      struct coll **coll);
 
 Expr *sqlExprAddCollateToken(Parse * pParse, Expr *, const Token *, int);
 Expr *sqlExprAddCollateString(Parse *, Expr *, const char *);
@@ -4639,13 +4641,14 @@ collations_check_compatibility(uint32_t lhs_id, bool is_lhs_forced,
  * @param parser Parser.
  * @param left Left expression.
  * @param right Right expression. Can be NULL.
- * @param[out] coll_id Collation identifier.
+ * @param[out] id Id of resulting collation.
  *
- * @retval Collation object.
+ * @retval 0 on success.
+ * @retval -1 in case of error (e.g. no collation found).
  */
-struct coll *
+int
 sql_binary_compare_coll_seq(Parse *parser, Expr *left, Expr *right,
-			    uint32_t *coll_id);
+			    uint32_t *id);
 int sqlTempInMemory(const sql *);
 #ifndef SQL_OMIT_CTE
 With *sqlWithAdd(Parse *, With *, Token *, ExprList *, Select *);

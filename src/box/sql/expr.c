@@ -192,12 +192,14 @@ sqlExprSkipCollate(Expr * pExpr)
 	return pExpr;
 }
 
-struct coll *
-sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id)
+int
+sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
+	      struct coll **coll)
 {
-	struct coll *coll = NULL;
+	assert(coll != NULL);
 	*is_explicit_coll = false;
 	*coll_id = COLL_NONE;
+	*coll = NULL;
 	while (p != NULL) {
 		int op = p->op;
 		if (op == TK_CAST || op == TK_UPLUS) {
@@ -206,7 +208,9 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id)
 		}
 		if (op == TK_COLLATE ||
 		    (op == TK_REGISTER && p->op2 == TK_COLLATE)) {
-			coll = sql_get_coll_seq(parse, p->u.zToken, coll_id);
+			*coll = sql_get_coll_seq(parse, p->u.zToken, coll_id);
+			if (coll == NULL)
+				return -1;
 			*is_explicit_coll = true;
 			break;
 		}
@@ -221,8 +225,8 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id)
 			 */
 			int j = p->iColumn;
 			if (j >= 0) {
-				coll = sql_column_collation(p->space_def, j,
-							    coll_id);
+				*coll = sql_column_collation(p->space_def, j,
+							     coll_id);
 			}
 			break;
 		}
@@ -257,7 +261,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id)
 			break;
 		}
 	}
-	return coll;
+	return 0;
 }
 
 enum field_type
@@ -339,27 +343,30 @@ illegal_collation_mix:
 	return -1;
 }
 
-struct coll *
+int
 sql_binary_compare_coll_seq(Parse *parser, Expr *left, Expr *right,
-			    uint32_t *coll_id)
+			    uint32_t *id)
 {
 	assert(left != NULL);
+	assert(id != NULL);
 	bool is_lhs_forced;
 	bool is_rhs_forced;
 	uint32_t lhs_coll_id;
 	uint32_t rhs_coll_id;
-	struct coll *lhs_coll = sql_expr_coll(parser, left, &is_lhs_forced,
-					      &lhs_coll_id);
-	struct coll *rhs_coll = sql_expr_coll(parser, right, &is_rhs_forced,
-					      &rhs_coll_id);
+	struct coll *unused;
+	if (sql_expr_coll(parser, left, &is_lhs_forced, &lhs_coll_id,
+			  &unused) != 0)
+		return -1;
+	if (sql_expr_coll(parser, right, &is_rhs_forced, &rhs_coll_id,
+			  &unused) != 0)
+		return -1;
 	if (collations_check_compatibility(lhs_coll_id, is_lhs_forced,
-					   rhs_coll_id, is_rhs_forced,
-					   coll_id) != 0) {
+					   rhs_coll_id, is_rhs_forced, id) != 0) {
 		parser->rc = SQL_TARANTOOL_ERROR;
 		parser->nErr++;
-		return NULL;
+		return -1;
 	}
-	return *coll_id == rhs_coll_id ? rhs_coll : lhs_coll;;
+	return 0;
 }
 
 /*
@@ -376,11 +383,12 @@ codeCompare(Parse * pParse,	/* The parsing (and code generating) context */
     )
 {
 	uint32_t id;
-	struct coll *p4 =
-		sql_binary_compare_coll_seq(pParse, pLeft, pRight, &id);
+	if (sql_binary_compare_coll_seq(pParse, pLeft, pRight, &id) != 0)
+		return -1;
+	struct coll *coll = coll_by_id(id)->coll;
 	int p5 = binaryCompareP5(pLeft, pRight, jumpIfNull);
 	int addr = sqlVdbeAddOp4(pParse->pVdbe, opcode, in2, dest, in1,
-				     (void *)p4, P4_COLLSEQ);
+				     (void *)coll, P4_COLLSEQ);
 	sqlVdbeChangeP5(pParse->pVdbe, (u8) p5);
 	return addr;
 }
@@ -2426,19 +2434,15 @@ sqlFindInIndex(Parse * pParse,	/* Parsing context */
 					Expr *pLhs = sqlVectorFieldSubexpr(pX->pLeft, i);
 					Expr *pRhs = pEList->a[i].pExpr;
 					uint32_t id;
-					struct coll *pReq = sql_binary_compare_coll_seq
-						    (pParse, pLhs, pRhs, &id);
+					if (sql_binary_compare_coll_seq(pParse, pLhs, pRhs, &id) != 0)
+						break;
 					int j;
 
 					for (j = 0; j < nExpr; j++) {
 						if ((int) parts[j].fieldno !=
 						    pRhs->iColumn)
 							continue;
-
-						struct coll *idx_coll =
-							     parts[j].coll;
-						if (pReq != NULL &&
-						    pReq != idx_coll)
+						if (id != parts[j].coll_id)
 							continue;
 						break;
 					}
@@ -2751,9 +2755,9 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 						Expr *p =
 						    sqlVectorFieldSubexpr
 						    (pLeft, i);
-						sql_binary_compare_coll_seq(pParse, p,
-							pEList->a[i].pExpr,
-							&key_info->parts[i].coll_id);
+						if (sql_binary_compare_coll_seq(pParse, p, pEList->a[i].pExpr,
+										&key_info->parts[i].coll_id) != 0)
+							return 0;
 					}
 				}
 			} else if (ALWAYS(pExpr->x.pList != 0)) {
@@ -2772,8 +2776,11 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				enum field_type lhs_type =
 					sql_expr_type(pLeft);
 				bool unused;
-				sql_expr_coll(pParse, pExpr->pLeft,
-					      &unused, &key_info->parts[0].coll_id);
+				struct coll *unused_coll;
+				if (sql_expr_coll(pParse, pExpr->pLeft, &unused,
+						  &key_info->parts[0].coll_id,
+						  &unused_coll) != 0)
+					return 0;
 
 				/* Loop through each expression in <exprlist>. */
 				r1 = sqlGetTempReg(pParse);
@@ -3036,8 +3043,10 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		bool unused;
 		uint32_t id;
 		ExprList *pList = pExpr->x.pList;
-		struct coll *coll = sql_expr_coll(pParse, pExpr->pLeft,
-						   &unused, &id);
+		struct coll *coll;
+		if (sql_expr_coll(pParse, pExpr->pLeft, &unused, &id,
+				  &coll) != 0)
+			goto sqlExprCodeIN_finished;
 		int labelOk = sqlVdbeMakeLabel(v);
 		int r2, regToFree;
 		int regCkNull = 0;
@@ -3169,7 +3178,9 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 		uint32_t id;
 		int r3 = sqlGetTempReg(pParse);
 		Expr *p = sqlVectorFieldSubexpr(pLeft, i);
-		struct coll *pColl = sql_expr_coll(pParse, p, &unused, &id);
+		struct coll *pColl;
+		if (sql_expr_coll(pParse, p, &unused, &id, &pColl) != 0)
+			goto sqlExprCodeIN_finished;
 		/* Tarantool: Replace i -> aiMap [i], since original order of columns
 		 * is preserved.
 		 */
@@ -3998,9 +4009,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				    0 && coll == NULL) {
 					bool unused;
 					uint32_t id;
-					coll = sql_expr_coll(pParse,
-							     pFarg->a[i].pExpr,
-							     &unused, &id);
+					if (sql_expr_coll(pParse,
+							  pFarg->a[i].pExpr,
+							  &unused, &id,
+							  &coll) != 0)
+						return 0;
 				}
 			}
 			if (pFarg) {

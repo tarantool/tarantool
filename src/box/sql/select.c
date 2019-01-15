@@ -1041,10 +1041,12 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 				for (i = 0; i < nResultCol; i++) {
 					bool is_found;
 					uint32_t id;
-					struct coll *coll =
-					    sql_expr_coll(pParse,
+					struct coll *coll;
+					if (sql_expr_coll(pParse,
 							  pEList->a[i].pExpr,
-							  &is_found, &id);
+							  &is_found, &id,
+							  &coll) != 0)
+						break;
 					if (i < nResultCol - 1) {
 						sqlVdbeAddOp3(v, OP_Ne,
 								  regResult + i,
@@ -1426,7 +1428,12 @@ sql_expr_list_to_key_info(struct Parse *parse, struct ExprList *list, int start)
 		struct key_part_def *part = &key_info->parts[i - start];
 		bool unused;
 		uint32_t id;
-		sql_expr_coll(parse, item->pExpr, &unused, &id);
+		struct coll *unused_coll;
+		if (sql_expr_coll(parse, item->pExpr, &unused, &id,
+				  &unused_coll) != 0) {
+			sqlDbFree(parse->db, key_info);
+			return NULL;
+		}
 		part->coll_id = id;
 		part->sort_order = item->sort_order;
 		part->type = sql_expr_type(item->pExpr);
@@ -1963,10 +1970,10 @@ sqlSelectAddColumnTypeAndCollation(struct Parse *pParse,
 		def->fields[i].type = sql_expr_type(p);
 		bool is_found;
 		uint32_t coll_id;
-
+		struct coll *unused;
 		if (def->fields[i].coll_id == COLL_NONE &&
-		    sql_expr_coll(pParse, p, &is_found, &coll_id) &&
-		    coll_id != COLL_NONE)
+		    sql_expr_coll(pParse, p, &is_found, &coll_id,
+				  &unused) == 0 && coll_id != COLL_NONE)
 			def->fields[i].coll_id = coll_id;
 	}
 }
@@ -2209,8 +2216,10 @@ multi_select_coll_seq_r(struct Parse *parser, struct Select *p, int n,
 	 * resolution and we would not have got this far.
 	 */
 	assert(n >= 0 && n < p->pEList->nExpr);
-	sql_expr_coll(parser, p->pEList->a[n].pExpr, &is_current_forced,
-		      &current_coll_id);
+	struct coll *unused;
+	if (sql_expr_coll(parser, p->pEList->a[n].pExpr, &is_current_forced,
+			  &current_coll_id, &unused) != 0)
+		return 0;
 	uint32_t res_coll_id;
 	if (collations_check_compatibility(prior_coll_id, is_prior_forced,
 					   current_coll_id, is_current_forced,
@@ -2266,7 +2275,10 @@ sql_multiselect_orderby_to_key_info(struct Parse *parse, struct Select *s,
 		uint32_t id;
 		bool unused;
 		if ((term->flags & EP_Collate) != 0) {
-			sql_expr_coll(parse, term, &unused, &id);
+			struct coll *unused_coll;
+			if (sql_expr_coll(parse, term, &unused, &id,
+					  &unused_coll) != 0)
+				return 0;
 		} else {
 			id = multi_select_coll_seq(parse, s,
 						   item->u.x.iOrderByCol - 1);
@@ -5312,8 +5324,9 @@ updateAccumulator(Parse * pParse, AggInfo * pAggInfo)
 			uint32_t id;
 			for (j = 0, pItem = pList->a; coll == NULL && j < nArg;
 			     j++, pItem++) {
-				coll = sql_expr_coll(pParse, pItem->pExpr,
-						     &unused, &id);
+				if (sql_expr_coll(pParse, pItem->pExpr,
+						  &unused, &id, &coll) != 0)
+					return;
 			}
 			if (regHit == 0 && pAggInfo->nAccumulator)
 				regHit = ++pParse->nMem;
