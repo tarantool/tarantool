@@ -110,7 +110,7 @@ box.snapshot()
 - ok
 ...
 -- wait for compaction to complete
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.01) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
 ---
 ...
 pk:alter{parts = {2, 'unsigned'}} -- success: space is empty now

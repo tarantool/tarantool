@@ -150,23 +150,7 @@ istat()
     bytes: 0
   disk:
     index_size: 0
-    rows: 0
-    statement:
-      inserts: 0
-      replaces: 0
-      upserts: 0
-      deletes: 0
-    dump:
-      input:
-        rows: 0
-        bytes: 0
-      count: 0
-      output:
-        bytes_compressed: 0
-        pages: 0
-        rows: 0
-        bytes: 0
-    compact:
+    compaction:
       input:
         bytes_compressed: 0
         pages: 0
@@ -183,6 +167,22 @@ istat()
         pages: 0
         rows: 0
         bytes: 0
+    statement:
+      inserts: 0
+      replaces: 0
+      upserts: 0
+      deletes: 0
+    dump:
+      input:
+        rows: 0
+        bytes: 0
+      count: 0
+      output:
+        bytes_compressed: 0
+        pages: 0
+        rows: 0
+        bytes: 0
+    bloom_size: 0
     iterator:
       read:
         bytes_compressed: 0
@@ -196,10 +196,10 @@ istat()
       get:
         rows: 0
         bytes: 0
-    bloom_size: 0
+    bytes: 0
     pages: 0
     bytes_compressed: 0
-    bytes: 0
+    rows: 0
   txw:
     bytes: 0
     rows: 0
@@ -228,7 +228,7 @@ gstat()
     dump:
       input: 0
       output: 0
-    compact:
+    compaction:
       input: 0
       output: 0
       queue: 0
@@ -291,12 +291,12 @@ stat_diff(istat(), st)
         rows: 25
     index_size: 294
     rows: 25
-    bytes: 26049
     bytes_compressed: <bytes_compressed>
+    pages: 7
     bloom_size: 70
     statement:
       replaces: 25
-    pages: 7
+    bytes: 26049
   bytes: 26049
   put:
     rows: 25
@@ -313,7 +313,7 @@ box.snapshot()
 ---
 - ok
 ...
-wait(istat, st, 'disk.compact.count', 1)
+wait(istat, st, 'disk.compaction.count', 1)
 ---
 ...
 stat_diff(istat(), st)
@@ -330,13 +330,7 @@ stat_diff(istat(), st)
         bytes_compressed: <bytes_compressed>
         rows: 50
     index_size: 252
-    rows: 25
-    bytes: 26042
-    bytes_compressed: <bytes_compressed>
-    pages: 6
-    statement:
-      replaces: 25
-    compact:
+    compaction:
       input:
         bytes: 78140
         pages: 20
@@ -348,6 +342,12 @@ stat_diff(istat(), st)
         pages: 13
         bytes_compressed: <bytes_compressed>
         rows: 50
+    rows: 25
+    bytes_compressed: <bytes_compressed>
+    pages: 6
+    statement:
+      replaces: 25
+    bytes: 26042
   put:
     rows: 50
     bytes: 53050
@@ -572,7 +572,7 @@ box.snapshot()
 ---
 - ok
 ...
-wait(istat, st, 'disk.compact.count', 2)
+wait(istat, st, 'disk.compaction.count', 2)
 ---
 ...
 st = istat()
@@ -709,11 +709,11 @@ gstat().disk.dump.output == istat().disk.dump.output.bytes
 ---
 - true
 ...
-gstat().disk.compact.input == istat().disk.compact.input.bytes
+gstat().disk.compaction.input == istat().disk.compaction.input.bytes
 ---
 - true
 ...
-gstat().disk.compact.output == istat().disk.compact.output.bytes
+gstat().disk.compaction.output == istat().disk.compaction.output.bytes
 ---
 - true
 ...
@@ -1000,23 +1000,7 @@ istat()
     bytes: 0
   disk:
     index_size: 1050
-    rows: 100
-    statement:
-      inserts: 0
-      replaces: 100
-      upserts: 0
-      deletes: 0
-    dump:
-      input:
-        rows: 0
-        bytes: 0
-      count: 0
-      output:
-        bytes_compressed: <bytes_compressed>
-        pages: 0
-        rows: 0
-        bytes: 0
-    compact:
+    compaction:
       input:
         bytes_compressed: <bytes_compressed>
         pages: 0
@@ -1033,6 +1017,22 @@ istat()
         pages: 0
         rows: 0
         bytes: 0
+    statement:
+      inserts: 0
+      replaces: 100
+      upserts: 0
+      deletes: 0
+    dump:
+      input:
+        rows: 0
+        bytes: 0
+      count: 0
+      output:
+        bytes_compressed: <bytes_compressed>
+        pages: 0
+        rows: 0
+        bytes: 0
+    bloom_size: 140
     iterator:
       read:
         bytes_compressed: <bytes_compressed>
@@ -1046,10 +1046,10 @@ istat()
       get:
         rows: 0
         bytes: 0
-    bloom_size: 140
+    bytes: 104300
     pages: 25
     bytes_compressed: <bytes_compressed>
-    bytes: 104300
+    rows: 100
   txw:
     bytes: 0
     rows: 0
@@ -1078,7 +1078,7 @@ gstat()
     dump:
       input: 0
       output: 0
-    compact:
+    compaction:
       input: 0
       output: 0
       queue: 0

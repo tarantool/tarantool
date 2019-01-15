@@ -150,7 +150,7 @@ box.snapshot()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 pk:stat().rows -- 5 new REPLACEs
@@ -237,13 +237,13 @@ box.snapshot()
 i1:compact()
 ---
 ...
-while i1:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while i1:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 i2:compact()
 ---
 ...
-while i2:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while i2:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 i1:stat().rows -- 5 new REPLACEs
@@ -427,7 +427,7 @@ box.snapshot()
 sk:compact()
 ---
 ...
-while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 sk:stat().run_count -- 0
@@ -549,7 +549,7 @@ box.snapshot()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 -- Compact the secondary index to cleanup garbage.
@@ -560,7 +560,7 @@ box.snapshot()
 sk:compact()
 ---
 ...
-while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 sk:select()
@@ -628,7 +628,7 @@ box.snapshot()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 sk:select() -- [1, 10, 'c']
@@ -725,7 +725,7 @@ box.stat.reset()
 pk:compact()
 ---
 ...
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 sk:stat().disk.dump.count -- 1

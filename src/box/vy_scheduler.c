@@ -315,19 +315,19 @@ vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
 #undef HEAP_NAME
 
 static bool
-vy_compact_heap_less(struct heap_node *a, struct heap_node *b)
+vy_compaction_heap_less(struct heap_node *a, struct heap_node *b)
 {
-	struct vy_lsm *i1 = container_of(a, struct vy_lsm, in_compact);
-	struct vy_lsm *i2 = container_of(b, struct vy_lsm, in_compact);
+	struct vy_lsm *i1 = container_of(a, struct vy_lsm, in_compaction);
+	struct vy_lsm *i2 = container_of(b, struct vy_lsm, in_compaction);
 	/*
 	 * Prefer LSM trees whose read amplification will be reduced
 	 * most as a result of compaction.
 	 */
-	return vy_lsm_compact_priority(i1) > vy_lsm_compact_priority(i2);
+	return vy_lsm_compaction_priority(i1) > vy_lsm_compaction_priority(i2);
 }
 
-#define HEAP_NAME vy_compact_heap
-#define HEAP_LESS(h, l, r) vy_compact_heap_less(l, r)
+#define HEAP_NAME vy_compaction_heap
+#define HEAP_LESS(h, l, r) vy_compaction_heap_less(l, r)
 
 #include "salad/heap.h"
 
@@ -459,16 +459,16 @@ vy_scheduler_create(struct vy_scheduler *scheduler, int write_threads,
 	 */
 	assert(write_threads > 1);
 	int dump_threads = MAX(1, write_threads / 4);
-	int compact_threads = write_threads - dump_threads;
+	int compaction_threads = write_threads - dump_threads;
 	vy_worker_pool_create(&scheduler->dump_pool,
 			      "dump", dump_threads);
-	vy_worker_pool_create(&scheduler->compact_pool,
-			      "compact", compact_threads);
+	vy_worker_pool_create(&scheduler->compaction_pool,
+			      "compaction", compaction_threads);
 
 	stailq_create(&scheduler->processed_tasks);
 
 	vy_dump_heap_create(&scheduler->dump_heap);
-	vy_compact_heap_create(&scheduler->compact_heap);
+	vy_compaction_heap_create(&scheduler->compaction_heap);
 
 	diag_create(&scheduler->diag);
 	fiber_cond_create(&scheduler->dump_cond);
@@ -490,12 +490,12 @@ vy_scheduler_destroy(struct vy_scheduler *scheduler)
 	fiber_cond_signal(&scheduler->scheduler_cond);
 
 	vy_worker_pool_destroy(&scheduler->dump_pool);
-	vy_worker_pool_destroy(&scheduler->compact_pool);
+	vy_worker_pool_destroy(&scheduler->compaction_pool);
 	diag_destroy(&scheduler->diag);
 	fiber_cond_destroy(&scheduler->dump_cond);
 	fiber_cond_destroy(&scheduler->scheduler_cond);
 	vy_dump_heap_destroy(&scheduler->dump_heap);
-	vy_compact_heap_destroy(&scheduler->compact_heap);
+	vy_compaction_heap_destroy(&scheduler->compaction_heap);
 
 	TRASH(scheduler);
 }
@@ -504,20 +504,22 @@ void
 vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
 	assert(lsm->in_dump.pos == UINT32_MAX);
-	assert(lsm->in_compact.pos == UINT32_MAX);
+	assert(lsm->in_compaction.pos == UINT32_MAX);
 	vy_dump_heap_insert(&scheduler->dump_heap, &lsm->in_dump);
-	vy_compact_heap_insert(&scheduler->compact_heap, &lsm->in_compact);
+	vy_compaction_heap_insert(&scheduler->compaction_heap,
+				  &lsm->in_compaction);
 }
 
 void
 vy_scheduler_remove_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
 	assert(lsm->in_dump.pos != UINT32_MAX);
-	assert(lsm->in_compact.pos != UINT32_MAX);
+	assert(lsm->in_compaction.pos != UINT32_MAX);
 	vy_dump_heap_delete(&scheduler->dump_heap, &lsm->in_dump);
-	vy_compact_heap_delete(&scheduler->compact_heap, &lsm->in_compact);
+	vy_compaction_heap_delete(&scheduler->compaction_heap,
+				  &lsm->in_compaction);
 	lsm->in_dump.pos = UINT32_MAX;
-	lsm->in_compact.pos = UINT32_MAX;
+	lsm->in_compaction.pos = UINT32_MAX;
 }
 
 static void
@@ -526,13 +528,14 @@ vy_scheduler_update_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 	if (lsm->is_dropped) {
 		/* Dropped LSM trees are exempted from scheduling. */
 		assert(lsm->in_dump.pos == UINT32_MAX);
-		assert(lsm->in_compact.pos == UINT32_MAX);
+		assert(lsm->in_compaction.pos == UINT32_MAX);
 		return;
 	}
 	assert(lsm->in_dump.pos != UINT32_MAX);
-	assert(lsm->in_compact.pos != UINT32_MAX);
+	assert(lsm->in_compaction.pos != UINT32_MAX);
 	vy_dump_heap_update(&scheduler->dump_heap, &lsm->in_dump);
-	vy_compact_heap_update(&scheduler->compact_heap, &lsm->in_compact);
+	vy_compaction_heap_update(&scheduler->compaction_heap,
+				  &lsm->in_compaction);
 }
 
 static void
@@ -1200,7 +1203,7 @@ vy_task_dump_complete(struct vy_task *task)
 		slice = new_slices[i];
 		vy_lsm_unacct_range(lsm, range);
 		vy_range_add_slice(range, slice);
-		vy_range_update_compact_priority(range, &lsm->opts);
+		vy_range_update_compaction_priority(range, &lsm->opts);
 		vy_lsm_acct_range(lsm, range);
 		if (!vy_range_is_scheduled(range))
 			vy_range_heap_update(&lsm->range_heap,
@@ -1427,7 +1430,7 @@ err:
 }
 
 static int
-vy_task_compact_execute(struct vy_task *task)
+vy_task_compaction_execute(struct vy_task *task)
 {
 	struct errinj *errinj = errinj(ERRINJ_VY_COMPACTION_DELAY, ERRINJ_BOOL);
 	if (errinj != NULL && errinj->bparam) {
@@ -1438,14 +1441,14 @@ vy_task_compact_execute(struct vy_task *task)
 }
 
 static int
-vy_task_compact_complete(struct vy_task *task)
+vy_task_compaction_complete(struct vy_task *task)
 {
 	struct vy_scheduler *scheduler = task->scheduler;
 	struct vy_lsm *lsm = task->lsm;
 	struct vy_range *range = task->range;
 	struct vy_run *new_run = task->new_run;
-	struct vy_disk_stmt_counter compact_output = new_run->count;
-	struct vy_disk_stmt_counter compact_input;
+	struct vy_disk_stmt_counter compaction_output = new_run->count;
+	struct vy_disk_stmt_counter compaction_input;
 	struct vy_slice *first_slice = task->first_slice;
 	struct vy_slice *last_slice = task->last_slice;
 	struct vy_slice *slice, *next_slice, *new_slice = NULL;
@@ -1547,20 +1550,20 @@ vy_task_compact_complete(struct vy_task *task)
 	vy_lsm_unacct_range(lsm, range);
 	if (new_slice != NULL)
 		vy_range_add_slice_before(range, new_slice, first_slice);
-	vy_disk_stmt_counter_reset(&compact_input);
+	vy_disk_stmt_counter_reset(&compaction_input);
 	for (slice = first_slice; ; slice = next_slice) {
 		next_slice = rlist_next_entry(slice, in_range);
 		vy_range_remove_slice(range, slice);
 		rlist_add_entry(&compacted_slices, slice, in_range);
-		vy_disk_stmt_counter_add(&compact_input, &slice->count);
+		vy_disk_stmt_counter_add(&compaction_input, &slice->count);
 		if (slice == last_slice)
 			break;
 	}
 	range->n_compactions++;
 	range->version++;
-	vy_range_update_compact_priority(range, &lsm->opts);
+	vy_range_update_compaction_priority(range, &lsm->opts);
 	vy_lsm_acct_range(lsm, range);
-	vy_lsm_acct_compaction(lsm, &compact_input, &compact_output);
+	vy_lsm_acct_compaction(lsm, &compaction_input, &compaction_output);
 
 	/*
 	 * Unaccount unused runs and delete compacted slices.
@@ -1586,7 +1589,7 @@ vy_task_compact_complete(struct vy_task *task)
 }
 
 static void
-vy_task_compact_abort(struct vy_task *task)
+vy_task_compaction_abort(struct vy_task *task)
 {
 	struct vy_scheduler *scheduler = task->scheduler;
 	struct vy_lsm *lsm = task->lsm;
@@ -1614,13 +1617,13 @@ vy_task_compact_abort(struct vy_task *task)
 }
 
 static int
-vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
-		    struct vy_lsm *lsm, struct vy_task **p_task)
+vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
+		       struct vy_lsm *lsm, struct vy_task **p_task)
 {
-	static struct vy_task_ops compact_ops = {
-		.execute = vy_task_compact_execute,
-		.complete = vy_task_compact_complete,
-		.abort = vy_task_compact_abort,
+	static struct vy_task_ops compaction_ops = {
+		.execute = vy_task_compaction_execute,
+		.complete = vy_task_compaction_complete,
+		.abort = vy_task_compaction_abort,
 	};
 
 	struct heap_node *range_node;
@@ -1631,7 +1634,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	range_node = vy_range_heap_top(&lsm->range_heap);
 	assert(range_node != NULL);
 	range = container_of(range_node, struct vy_range, heap_node);
-	assert(range->compact_priority > 1);
+	assert(range->compaction_priority > 1);
 
 	if (vy_lsm_split_range(lsm, range) ||
 	    vy_lsm_coalesce_range(lsm, range)) {
@@ -1639,7 +1642,8 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		return 0;
 	}
 
-	struct vy_task *task = vy_task_new(scheduler, worker, lsm, &compact_ops);
+	struct vy_task *task = vy_task_new(scheduler, worker, lsm,
+					   &compaction_ops);
 	if (task == NULL)
 		goto err_task;
 
@@ -1648,7 +1652,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		goto err_run;
 
 	struct vy_stmt_stream *wi;
-	bool is_last_level = (range->compact_priority == range->slice_count);
+	bool is_last_level = (range->compaction_priority == range->slice_count);
 	wi = vy_write_iterator_new(task->cmp_def, lsm->disk_format,
 				   lsm->index_id == 0, is_last_level,
 				   scheduler->read_views,
@@ -1658,7 +1662,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		goto err_wi;
 
 	struct vy_slice *slice;
-	int n = range->compact_priority;
+	int n = range->compaction_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
 		if (vy_write_iterator_new_slice(wi, slice) != 0)
 			goto err_wi_sub;
@@ -1693,7 +1697,7 @@ vy_task_compact_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 
 	say_info("%s: started compacting range %s, runs %d/%d",
 		 vy_lsm_name(lsm), vy_range_str(range),
-                 range->compact_priority, range->slice_count);
+                 range->compaction_priority, range->slice_count);
 	*p_task = task;
 	return 0;
 
@@ -1867,24 +1871,24 @@ no_task:
  * Returns 0 on success, -1 on failure.
  */
 static int
-vy_scheduler_peek_compact(struct vy_scheduler *scheduler,
-			  struct vy_task **ptask)
+vy_scheduler_peek_compaction(struct vy_scheduler *scheduler,
+			     struct vy_task **ptask)
 {
 	struct vy_worker *worker = NULL;
 retry:
 	*ptask = NULL;
-	struct heap_node *pn = vy_compact_heap_top(&scheduler->compact_heap);
+	struct heap_node *pn = vy_compaction_heap_top(&scheduler->compaction_heap);
 	if (pn == NULL)
 		goto no_task; /* nothing to do */
-	struct vy_lsm *lsm = container_of(pn, struct vy_lsm, in_compact);
-	if (vy_lsm_compact_priority(lsm) <= 1)
+	struct vy_lsm *lsm = container_of(pn, struct vy_lsm, in_compaction);
+	if (vy_lsm_compaction_priority(lsm) <= 1)
 		goto no_task; /* nothing to do */
 	if (worker == NULL) {
-		worker = vy_worker_pool_get(&scheduler->compact_pool);
+		worker = vy_worker_pool_get(&scheduler->compaction_pool);
 		if (worker == NULL)
 			return 0; /* all workers are busy */
 	}
-	if (vy_task_compact_new(scheduler, worker, lsm, ptask) != 0) {
+	if (vy_task_compaction_new(scheduler, worker, lsm, ptask) != 0) {
 		vy_worker_pool_put(worker);
 		return -1;
 	}
@@ -1907,7 +1911,7 @@ vy_schedule(struct vy_scheduler *scheduler, struct vy_task **ptask)
 	if (*ptask != NULL)
 		return 0;
 
-	if (vy_scheduler_peek_compact(scheduler, ptask) != 0)
+	if (vy_scheduler_peek_compaction(scheduler, ptask) != 0)
 		goto fail;
 	if (*ptask != NULL)
 		return 0;

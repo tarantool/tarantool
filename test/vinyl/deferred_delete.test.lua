@@ -57,7 +57,7 @@ box.cfg{vinyl_cache = vinyl_cache}
 -- Compact the primary index to generate deferred DELETEs.
 box.snapshot()
 pk:compact()
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 pk:stat().rows -- 5 new REPLACEs
 i1:stat().rows -- 10 old REPLACE + 5 new REPLACEs + 10 deferred DELETEs
 i2:stat().rows -- ditto
@@ -87,9 +87,9 @@ i2:stat().rows -- ditto
 -- Check that they cleanup garbage statements.
 box.snapshot()
 i1:compact()
-while i1:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while i1:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 i2:compact()
-while i2:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while i2:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 i1:stat().rows -- 5 new REPLACEs
 i2:stat().rows -- ditto
 box.stat.reset()
@@ -151,7 +151,7 @@ box.stat.vinyl().memory.tx
 
 box.snapshot()
 sk:compact()
-while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 sk:stat().run_count -- 0
 
 s:drop()
@@ -201,12 +201,12 @@ sk:stat().rows -- 10 old REPLACEs + 5 new REPLACEs
 -- Compact the primary index to generate deferred DELETEs.
 box.snapshot()
 pk:compact()
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 
 -- Compact the secondary index to cleanup garbage.
 box.snapshot()
 sk:compact()
-while sk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 
 sk:select()
 
@@ -234,7 +234,7 @@ box.snapshot()
 
 -- Generate deferred DELETEs.
 pk:compact()
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 
 sk:select() -- [1, 10, 'c']
 box.snapshot()
@@ -280,7 +280,7 @@ box.stat.reset()
 -- Deferred DELETEs won't fit in memory and trigger dump
 -- of the secondary index.
 pk:compact()
-while pk:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while pk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 
 sk:stat().disk.dump.count -- 1
 

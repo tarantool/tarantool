@@ -86,7 +86,7 @@ box.snapshot()
 ---
 - ok
 ...
-while s.index.primary:stat().disk.compact.count == 0 do fiber.sleep(0.001) end
+while s.index.primary:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 ---
 ...
 t2 = fiber.time()

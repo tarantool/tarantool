@@ -162,7 +162,7 @@ struct vy_lsm_stat {
 			struct vy_disk_stmt_counter output;
 			/** Number of statements awaiting compaction. */
 			struct vy_disk_stmt_counter queue;
-		} compact;
+		} compaction;
 	} disk;
 	/** TX write set statistics. */
 	struct {
@@ -222,7 +222,7 @@ struct vy_disk_stat {
 		int64_t input;
 		int64_t output;
 		int64_t queue;
-	} compact;
+	} compaction;
 };
 
 static inline int
