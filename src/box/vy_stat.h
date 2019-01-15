@@ -212,6 +212,12 @@ struct vy_tx_stat {
  * disk compression.
  */
 struct vy_scheduler_stat {
+	/** Number of completed tasks. */
+	int32_t tasks_completed;
+	/** Number of failed tasks. */
+	int32_t tasks_failed;
+	/** Number of tasks in progress. */
+	int32_t tasks_inprogress;
 	/** Number of completed memory dumps. */
 	int32_t dump_count;
 	/** Number of bytes read by dump tasks. */

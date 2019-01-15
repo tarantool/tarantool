@@ -250,6 +250,9 @@ vy_info_append_scheduler(struct vy_env *env, struct info_handler *h)
 	struct vy_scheduler_stat *stat = &env->scheduler.stat;
 
 	info_table_begin(h, "scheduler");
+	info_append_int(h, "tasks_inprogress", stat->tasks_inprogress);
+	info_append_int(h, "tasks_completed", stat->tasks_completed);
+	info_append_int(h, "tasks_failed", stat->tasks_failed);
 	info_append_int(h, "dump_count", stat->dump_count);
 	info_append_int(h, "dump_input", stat->dump_input);
 	info_append_int(h, "dump_output", stat->dump_output);
