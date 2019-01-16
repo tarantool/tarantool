@@ -149,6 +149,12 @@ struct tuple_format {
 	 * ephemeral spaces.
 	 */
 	uint32_t hash;
+	/**
+	 * Counter that grows incrementally on space rebuild
+	 * used for caching offset slot in key_part, for more
+	 * details see key_part::offset_slot_cache.
+	 */
+	uint64_t epoch;
 	/** Reference counter */
 	int refs;
 	/**
@@ -421,26 +427,43 @@ tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len);
  * @param field_map Tuple field map.
  * @param path Relative JSON path to field.
  * @param path_len Length of @a path.
+ * @param offset_slot_hint The pointer to a variable that contains
+ *                         an offset slot. May be NULL.
+ *                         If specified AND value by pointer is
+ *                         not TUPLE_OFFSET_SLOT_NIL is used to
+ *                         access data in a single operation.
+ *                         Else it is initialized with offset_slot
+ *                         of format field by path.
  */
 static inline const char *
 tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			const uint32_t *field_map, uint32_t fieldno,
-			const char *path, uint32_t path_len)
+			const char *path, uint32_t path_len,
+			int32_t *offset_slot_hint)
 {
+	int32_t offset_slot;
+	if (offset_slot_hint != NULL &&
+	    *offset_slot_hint != TUPLE_OFFSET_SLOT_NIL) {
+		offset_slot = *offset_slot_hint;
+		goto offset_slot_access;
+	}
 	if (likely(fieldno < format->index_field_count)) {
+		struct tuple_field *field;
 		if (path == NULL && fieldno == 0) {
 			mp_decode_array(&tuple);
 			return tuple;
 		}
-		struct tuple_field *field =
-			tuple_format_field_by_path(format, fieldno, path,
+		field = tuple_format_field_by_path(format, fieldno, path,
 						   path_len);
 		assert(field != NULL || path != NULL);
 		if (path != NULL && field == NULL)
 			goto parse;
-		int32_t offset_slot = field->offset_slot;
+		offset_slot = field->offset_slot;
 		if (offset_slot == TUPLE_OFFSET_SLOT_NIL)
 			goto parse;
+		if (offset_slot_hint != NULL)
+			*offset_slot_hint = offset_slot;
+offset_slot_access:
 		/* Indexed field */
 		if (field_map[offset_slot] == 0)
 			return NULL;
@@ -478,7 +501,7 @@ tuple_field_raw(struct tuple_format *format, const char *tuple,
 		const uint32_t *field_map, uint32_t field_no)
 {
 	return tuple_field_raw_by_path(format, tuple, field_map, field_no,
-				       NULL, 0);
+				       NULL, 0, NULL);
 }
 
 /**
@@ -513,8 +536,14 @@ static inline const char *
 tuple_field_by_part_raw(struct tuple_format *format, const char *data,
 			const uint32_t *field_map, struct key_part *part)
 {
+	if (unlikely(part->format_epoch != format->epoch)) {
+		assert(format->epoch != 0);
+		part->format_epoch = format->epoch;
+		part->offset_slot_cache = TUPLE_OFFSET_SLOT_NIL;
+	}
 	return tuple_field_raw_by_path(format, data, field_map, part->fieldno,
-				       part->path, part->path_len);
+				       part->path, part->path_len,
+				       &part->offset_slot_cache);
 }
 
 /**

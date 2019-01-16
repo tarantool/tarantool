@@ -528,7 +528,7 @@ tuple_field_by_path(const struct tuple *tuple, uint32_t fieldno,
 {
 	return tuple_field_raw_by_path(tuple_format(tuple), tuple_data(tuple),
 				       tuple_field_map(tuple), fieldno,
-				       path, path_len);
+				       path, path_len, NULL);
 }
 
 /**

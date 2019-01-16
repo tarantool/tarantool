@@ -41,6 +41,7 @@ struct tuple_format **tuple_formats;
 static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size = 0, formats_capacity = 0;
+static uint64_t formats_epoch = 0;
 
 /**
  * Find in format1::fields the field by format2_field's JSON path.
@@ -623,6 +624,7 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 	format->index_field_count = index_field_count;
 	format->exact_field_count = 0;
 	format->min_field_count = 0;
+	format->epoch = 0;
 	return format;
 error:
 	tuple_format_destroy_fields(format);
@@ -735,6 +737,7 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	format->is_temporary = is_temporary;
 	format->is_ephemeral = is_ephemeral;
 	format->exact_field_count = exact_field_count;
+	format->epoch = ++formats_epoch;
 	if (tuple_format_create(format, keys, key_count, space_fields,
 				space_field_count) < 0)
 		goto err;
@@ -1205,5 +1208,5 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 	}
 	return tuple_field_raw_by_path(format, tuple, field_map, fieldno,
 				       path + lexer.offset,
-				       path_len - lexer.offset);
+				       path_len - lexer.offset, NULL);
 }
