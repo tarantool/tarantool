@@ -514,6 +514,24 @@ tuple_field(const struct tuple *tuple, uint32_t fieldno)
 }
 
 /**
+ * Get tuple field by its root field index and relative
+ * JSON path.
+ * @param tuple Tuple to get the field from.
+ * @param fieldno The index of root field.
+ * @param path Relative JSON path to field data.
+ * @param path_len The length of the @path.
+ * @retval Field data if the field exists or NULL.
+ */
+static inline const char *
+tuple_field_by_path(const struct tuple *tuple, uint32_t fieldno,
+		    const char *path, uint32_t path_len)
+{
+	return tuple_field_raw_by_path(tuple_format(tuple), tuple_data(tuple),
+				       tuple_field_map(tuple), fieldno,
+				       path, path_len);
+}
+
+/**
  * Get a field refereed by index @part in tuple.
  * @param tuple Tuple to get the field from.
  * @param part Index part to use.
@@ -527,43 +545,25 @@ tuple_field_by_part(const struct tuple *tuple, struct key_part *part)
 }
 
 /**
- * Get tuple field by its JSON path.
+ * Get tuple field by full JSON path.
+ * Unlike tuple_field_by_path this function works with full JSON
+ * paths, performing root field index resolve on its own.
+ * When the first JSON path token has JSON_TOKEN_STR type, routine
+ * uses tuple format dictionary to get field index by field name.
  * @param tuple Tuple to get field from.
- * @param path Field JSON path.
+ * @param path Full JSON path to field.
  * @param path_len Length of @a path.
  * @param path_hash Hash of @a path.
- * @param[out] field Found field, or NULL, if not found.
  *
- * @retval  0 Success.
- * @retval -1 Error in JSON path.
- */
-static inline int
-tuple_field_by_path(const struct tuple *tuple, const char *path,
-                    uint32_t path_len, uint32_t path_hash,
-                    const char **field)
-{
-	return tuple_field_raw_by_path(tuple_format(tuple), tuple_data(tuple),
-	                               tuple_field_map(tuple), path, path_len,
-	                               path_hash, field);
-}
-
-/**
- * Get tuple field by its name.
- * @param tuple Tuple to get field from.
- * @param name Field name.
- * @param name_len Length of @a name.
- * @param name_hash Hash of @a name.
- *
- * @retval not NULL MessagePack field.
- * @retval     NULL No field with @a name.
+ * @retval field data if field exists or NULL.
  */
 static inline const char *
-tuple_field_by_name(const struct tuple *tuple, const char *name,
-		    uint32_t name_len, uint32_t name_hash)
+tuple_field_by_full_path(const struct tuple *tuple, const char *path,
+			 uint32_t path_len, uint32_t path_hash)
 {
-	return tuple_field_raw_by_name(tuple_format(tuple), tuple_data(tuple),
-				       tuple_field_map(tuple), name, name_len,
-				       name_hash);
+	return tuple_field_raw_by_full_path(tuple_format(tuple), tuple_data(tuple),
+					    tuple_field_map(tuple),
+					    path, path_len, path_hash);
 }
 
 /**

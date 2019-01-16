@@ -879,15 +879,7 @@ tuple_field_go_to_key(const char **field, const char *key, int len)
 	return -1;
 }
 
-/**
- * Retrieve msgpack data by JSON path.
- * @param data Pointer to msgpack with data.
- * @param path The path to process.
- * @param path_len The length of the @path.
- * @retval 0 On success.
- * @retval >0 On path parsing error, invalid character position.
- */
-static int
+int
 tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len)
 {
 	int rc;
@@ -911,14 +903,13 @@ tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len)
 			return 0;
 		}
 	}
-	return rc;
+	return rc != 0 ? -1 : 0;
 }
 
-int
-tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
-                        const uint32_t *field_map, const char *path,
-                        uint32_t path_len, uint32_t path_hash,
-                        const char **field)
+const char *
+tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
+			     const uint32_t *field_map, const char *path,
+			     uint32_t path_len, uint32_t path_hash)
 {
 	assert(path_len > 0);
 	uint32_t fieldno;
@@ -929,22 +920,16 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 	 * use the path as a field name.
 	 */
 	if (tuple_fieldno_by_name(format->dict, path, path_len, path_hash,
-				  &fieldno) == 0) {
-		*field = tuple_field_raw(format, tuple, field_map, fieldno);
-		return 0;
-	}
+				  &fieldno) == 0)
+		return tuple_field_raw(format, tuple, field_map, fieldno);
 	struct json_lexer lexer;
 	struct json_token token;
 	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
-	int rc = json_lexer_next_token(&lexer, &token);
-	if (rc != 0)
-		goto error;
+	if (json_lexer_next_token(&lexer, &token) != 0)
+		return NULL;
 	switch(token.type) {
 	case JSON_TOKEN_NUM: {
-		int index = token.num;
-		*field = tuple_field_raw(format, tuple, field_map, index);
-		if (*field == NULL)
-			return 0;
+		fieldno = token.num;
 		break;
 	}
 	case JSON_TOKEN_STR: {
@@ -961,28 +946,16 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			 */
 			name_hash = field_name_hash(token.str, token.len);
 		}
-		*field = tuple_field_raw_by_name(format, tuple, field_map,
-						 token.str, token.len,
-						 name_hash);
-		if (*field == NULL)
-			return 0;
+		if (tuple_fieldno_by_name(format->dict, token.str, token.len,
+					  name_hash, &fieldno) != 0)
+			return NULL;
 		break;
 	}
 	default:
 		assert(token.type == JSON_TOKEN_END);
-		*field = NULL;
-		return 0;
+		return NULL;
 	}
-	rc = tuple_field_go_to_path(field, path + lexer.offset,
-				    path_len - lexer.offset);
-	if (rc == 0)
-		return 0;
-	/* Setup absolute error position. */
-	rc += lexer.offset;
-
-error:
-	assert(rc > 0);
-	diag_set(ClientError, ER_ILLEGAL_PARAMS,
-		 tt_sprintf("error in path on position %d", rc));
-	return -1;
+	return tuple_field_raw_by_path(format, tuple, field_map, fieldno,
+				       path + lexer.offset,
+				       path_len - lexer.offset);
 }

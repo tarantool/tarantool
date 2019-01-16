@@ -374,6 +374,64 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
 		     const char *tuple, bool validate);
 
 /**
+ * Retrieve msgpack data by JSON path.
+ * @param data[in, out] Pointer to msgpack with data.
+ *                      If the field cannot be retrieved be the
+ *                      specified path @path, it is overwritten
+ *                      with NULL.
+ * @param path The path to process.
+ * @param path_len The length of the @path.
+ * @retval 0 On success.
+ * @retval -1 In case of error in JSON path.
+ */
+int
+tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len);
+
+/**
+ * Get tuple field by field index and relative JSON path.
+ * @param format Tuple format.
+ * @param tuple MessagePack tuple's body.
+ * @param field_map Tuple field map.
+ * @param path Relative JSON path to field.
+ * @param path_len Length of @a path.
+ */
+static inline const char *
+tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
+			const uint32_t *field_map, uint32_t fieldno,
+			const char *path, uint32_t path_len)
+{
+	if (likely(fieldno < format->index_field_count)) {
+		if (fieldno == 0) {
+			mp_decode_array(&tuple);
+			goto parse_path;
+		}
+		struct tuple_field *field = tuple_format_field(format, fieldno);
+		assert(field != NULL);
+		int32_t offset_slot = field->offset_slot;
+		if (offset_slot == TUPLE_OFFSET_SLOT_NIL)
+			goto parse;
+		/* Indexed field */
+		if (field_map[offset_slot] == 0)
+			return NULL;
+		tuple += field_map[offset_slot];
+	} else {
+		uint32_t field_count;
+parse:
+		ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
+		field_count = mp_decode_array(&tuple);
+		if (unlikely(fieldno >= field_count))
+			return NULL;
+		for (uint32_t k = 0; k < fieldno; k++)
+			mp_next(&tuple);
+	}
+parse_path:
+	if (path != NULL &&
+	    unlikely(tuple_field_go_to_path(&tuple, path, path_len) != 0))
+		return NULL;
+	return tuple;
+}
+
+/**
  * Get a field at the specific position in this MessagePack array.
  * Returns a pointer to MessagePack data.
  * @param format tuple format
@@ -388,74 +446,29 @@ static inline const char *
 tuple_field_raw(struct tuple_format *format, const char *tuple,
 		const uint32_t *field_map, uint32_t field_no)
 {
-	if (likely(field_no < format->index_field_count)) {
-		/* Indexed field */
-
-		if (field_no == 0) {
-			mp_decode_array(&tuple);
-			return tuple;
-		}
-
-		int32_t offset_slot = tuple_format_field(format,
-					field_no)->offset_slot;
-		if (offset_slot != TUPLE_OFFSET_SLOT_NIL) {
-			if (field_map[offset_slot] != 0)
-				return tuple + field_map[offset_slot];
-			else
-				return NULL;
-		}
-	}
-	ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
-	uint32_t field_count = mp_decode_array(&tuple);
-	if (unlikely(field_no >= field_count))
-		return NULL;
-	for (uint32_t k = 0; k < field_no; k++)
-		mp_next(&tuple);
-	return tuple;
+	return tuple_field_raw_by_path(format, tuple, field_map, field_no,
+				       NULL, 0);
 }
 
 /**
- * Get tuple field by its name.
+ * Get tuple field by full JSON path.
+ * Unlike tuple_field_raw_by_path this function works with full
+ * JSON paths, performing root field index resolve on its own.
+ * When the first JSON path token has JSON_TOKEN_STR type, routine
+ * uses tuple format dictionary to get field index by field name.
  * @param format Tuple format.
  * @param tuple MessagePack tuple's body.
  * @param field_map Tuple field map.
- * @param name Field name.
- * @param name_len Length of @a name.
- * @param name_hash Hash of @a name.
- *
- * @retval not NULL MessagePack field.
- * @retval     NULL No field with @a name.
- */
-static inline const char *
-tuple_field_raw_by_name(struct tuple_format *format, const char *tuple,
-			const uint32_t *field_map, const char *name,
-			uint32_t name_len, uint32_t name_hash)
-{
-	uint32_t fieldno;
-	if (tuple_fieldno_by_name(format->dict, name, name_len, name_hash,
-				  &fieldno) != 0)
-		return NULL;
-	return tuple_field_raw(format, tuple, field_map, fieldno);
-}
-
-/**
- * Get tuple field by its path.
- * @param format Tuple format.
- * @param tuple MessagePack tuple's body.
- * @param field_map Tuple field map.
- * @param path Field path.
+ * @param path Full JSON path to field.
  * @param path_len Length of @a path.
  * @param path_hash Hash of @a path.
- * @param[out] field Found field, or NULL, if not found.
  *
- * @retval  0 Success.
- * @retval -1 Error in JSON path.
+ * @retval field data if field exists or NULL
  */
-int
-tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
-                        const uint32_t *field_map, const char *path,
-                        uint32_t path_len, uint32_t path_hash,
-                        const char **field);
+const char *
+tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
+			     const uint32_t *field_map, const char *path,
+			     uint32_t path_len, uint32_t path_hash);
 
 /**
  * Get a tuple field pointed to by an index part.
