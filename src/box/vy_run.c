@@ -524,10 +524,8 @@ vy_page_info_decode(struct vy_page_info *page, const struct xrow_header *xrow,
 			page->row_index_offset = mp_decode_uint(&pos);
 			break;
 		default:
-			diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
-				 tt_sprintf("Can't decode page info: "
-					    "unknown key %u", (unsigned)key));
-			return -1;
+			mp_next(&pos); /* unknown key, ignore */
+			break;
 		}
 	}
 	if (key_map) {
@@ -634,10 +632,8 @@ vy_run_info_decode(struct vy_run_info *run_info,
 			vy_stmt_stat_decode(&run_info->stmt_stat, &pos);
 			break;
 		default:
-			diag_set(ClientError, ER_INVALID_INDEX_FILE, filename,
-				"Can't decode run info: unknown key %u",
-				(unsigned)key);
-			return -1;
+			mp_next(&pos); /* unknown key, ignore */
+			break;
 		}
 	}
 	if (key_map) {

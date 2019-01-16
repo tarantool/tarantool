@@ -626,14 +626,9 @@ vy_log_record_decode(struct vy_log_record *record,
 		case VY_LOG_KEY_GC_LSN:
 			record->gc_lsn = mp_decode_uint(&pos);
 			break;
-		case VY_LOG_KEY_TRUNCATE_COUNT:
-			/* Not used anymore, ignore. */
-			break;
 		default:
-			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
-				 tt_sprintf("Bad record: unknown key %u",
-					    (unsigned)key));
-			goto fail;
+			mp_next(&pos); /* unknown key, ignore */
+			break;
 		}
 	}
 	if (record->type == VY_LOG_CREATE_LSM) {
