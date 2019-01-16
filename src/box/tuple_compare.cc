@@ -458,11 +458,12 @@ tuple_common_key_parts(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	return i;
 }
 
-template<bool is_nullable, bool has_optional_parts>
+template<bool is_nullable, bool has_optional_parts, bool has_json_paths>
 static inline int
 tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		       struct key_def *key_def)
 {
+	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || is_nullable);
 	assert(is_nullable == key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
@@ -470,7 +471,7 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	const char *tuple_a_raw = tuple_data(tuple_a);
 	const char *tuple_b_raw = tuple_data(tuple_b);
 	if (key_def->part_count == 1 && part->fieldno == 0 &&
-	    part->path == NULL) {
+	    (!has_json_paths || part->path == NULL)) {
 		/*
 		 * First field can not be optional - empty tuples
 		 * can not exist.
@@ -508,10 +509,17 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		end = part + key_def->part_count;
 
 	for (; part < end; part++) {
-		field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
-						  field_map_a, part);
-		field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
-						  field_map_b, part);
+		if (!has_json_paths) {
+			field_a = tuple_field_raw(format_a, tuple_a_raw,
+						  field_map_a, part->fieldno);
+			field_b = tuple_field_raw(format_b, tuple_b_raw,
+						  field_map_b, part->fieldno);
+		} else {
+			field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
+							  field_map_a, part);
+			field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
+							  field_map_b, part);
+		}
 		assert(has_optional_parts ||
 		       (field_a != NULL && field_b != NULL));
 		if (! is_nullable) {
@@ -558,10 +566,17 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	 */
 	end = key_def->parts + key_def->part_count;
 	for (; part < end; ++part) {
-		field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
-						  field_map_a, part);
-		field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
-						  field_map_b, part);
+		if (!has_json_paths) {
+			field_a = tuple_field_raw(format_a, tuple_a_raw,
+						  field_map_a, part->fieldno);
+			field_b = tuple_field_raw(format_b, tuple_b_raw,
+						  field_map_b, part->fieldno);
+		} else {
+			field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
+							  field_map_a, part);
+			field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
+							  field_map_b, part);
+		}
 		/*
 		 * Extended parts are primary, and they can not
 		 * be absent or be NULLs.
@@ -575,11 +590,12 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	return 0;
 }
 
-template<bool is_nullable, bool has_optional_parts>
+template<bool is_nullable, bool has_optional_parts, bool has_json_paths>
 static inline int
 tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 				uint32_t part_count, struct key_def *key_def)
 {
+	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || is_nullable);
 	assert(is_nullable == key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
@@ -591,9 +607,14 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 	const uint32_t *field_map = tuple_field_map(tuple);
 	enum mp_type a_type, b_type;
 	if (likely(part_count == 1)) {
-		const char *field =
-			tuple_field_by_part_raw(format, tuple_raw, field_map,
-						part);
+		const char *field;
+		if (!has_json_paths) {
+			field = tuple_field_raw(format, tuple_raw, field_map,
+						part->fieldno);
+		} else {
+			field = tuple_field_by_part_raw(format, tuple_raw,
+							field_map, part);
+		}
 		if (! is_nullable) {
 			return tuple_compare_field(field, key, part->type,
 						   part->coll);
@@ -617,9 +638,14 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 	struct key_part *end = part + part_count;
 	int rc;
 	for (; part < end; ++part, mp_next(&key)) {
-		const char *field =
-			tuple_field_by_part_raw(format, tuple_raw,
-						field_map, part);
+		const char *field;
+		if (!has_json_paths) {
+			field = tuple_field_raw(format, tuple_raw, field_map,
+						part->fieldno);
+		} else {
+			field = tuple_field_by_part_raw(format, tuple_raw,
+							field_map, part);
+		}
 		if (! is_nullable) {
 			rc = tuple_compare_field(field, key, part->type,
 						 part->coll);
@@ -1012,19 +1038,31 @@ static const comparator_signature cmp_arr[] = {
 
 #undef COMPARATOR
 
+static const tuple_compare_t compare_slowpath_funcs[] = {
+	tuple_compare_slowpath<false, false, false>,
+	tuple_compare_slowpath<true, false, false>,
+	tuple_compare_slowpath<false, true, false>,
+	tuple_compare_slowpath<true, true, false>,
+	tuple_compare_slowpath<false, false, true>,
+	tuple_compare_slowpath<true, false, true>,
+	tuple_compare_slowpath<false, true, true>,
+	tuple_compare_slowpath<true, true, true>
+};
+
 tuple_compare_t
 tuple_compare_create(const struct key_def *def)
 {
+	int cmp_func_idx = (def->is_nullable ? 1 : 0) +
+			   2 * (def->has_optional_parts ? 1 : 0) +
+			   4 * (def->has_json_paths ? 1 : 0);
 	if (def->is_nullable) {
 		if (key_def_is_sequential(def)) {
 			if (def->has_optional_parts)
 				return tuple_compare_sequential<true, true>;
 			else
 				return tuple_compare_sequential<true, false>;
-		} else if (def->has_optional_parts) {
-			return tuple_compare_slowpath<true, true>;
 		} else {
-			return tuple_compare_slowpath<true, false>;
+			return compare_slowpath_funcs[cmp_func_idx];
 		}
 	}
 	assert(! def->has_optional_parts);
@@ -1044,10 +1082,9 @@ tuple_compare_create(const struct key_def *def)
 				return cmp_arr[k].f;
 		}
 	}
-	if (key_def_is_sequential(def))
-		return tuple_compare_sequential<false, false>;
-	else
-		return tuple_compare_slowpath<false, false>;
+	return key_def_is_sequential(def) ?
+	       tuple_compare_sequential<false, false> :
+	       compare_slowpath_funcs[cmp_func_idx];
 }
 
 /* }}} tuple_compare */
@@ -1229,9 +1266,23 @@ static const comparator_with_key_signature cmp_wk_arr[] = {
 
 #undef KEY_COMPARATOR
 
+static const tuple_compare_with_key_t compare_with_key_slowpath_funcs[] = {
+	tuple_compare_with_key_slowpath<false, false, false>,
+	tuple_compare_with_key_slowpath<true, false, false>,
+	tuple_compare_with_key_slowpath<false, true, false>,
+	tuple_compare_with_key_slowpath<true, true, false>,
+	tuple_compare_with_key_slowpath<false, false, true>,
+	tuple_compare_with_key_slowpath<true, false, true>,
+	tuple_compare_with_key_slowpath<false, true, true>,
+	tuple_compare_with_key_slowpath<true, true, true>
+};
+
 tuple_compare_with_key_t
 tuple_compare_with_key_create(const struct key_def *def)
 {
+	int cmp_func_idx = (def->is_nullable ? 1 : 0) +
+			   2 * (def->has_optional_parts ? 1 : 0) +
+			   4 * (def->has_json_paths ? 1 : 0);
 	if (def->is_nullable) {
 		if (key_def_is_sequential(def)) {
 			if (def->has_optional_parts) {
@@ -1241,10 +1292,8 @@ tuple_compare_with_key_create(const struct key_def *def)
 				return tuple_compare_with_key_sequential<true,
 									 false>;
 			}
-		} else if (def->has_optional_parts) {
-			return tuple_compare_with_key_slowpath<true, true>;
 		} else {
-			return tuple_compare_with_key_slowpath<true, false>;
+			return compare_with_key_slowpath_funcs[cmp_func_idx];
 		}
 	}
 	assert(! def->has_optional_parts);
@@ -1267,10 +1316,9 @@ tuple_compare_with_key_create(const struct key_def *def)
 				return cmp_wk_arr[k].f;
 		}
 	}
-	if (key_def_is_sequential(def))
-		return tuple_compare_with_key_sequential<false, false>;
-	else
-		return tuple_compare_with_key_slowpath<false, false>;
+	return key_def_is_sequential(def) ?
+	       tuple_compare_with_key_sequential<false, false> :
+	       compare_with_key_slowpath_funcs[cmp_func_idx];
 }
 
 /* }}} tuple_compare_with_key */
