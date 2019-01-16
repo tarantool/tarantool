@@ -1101,21 +1101,10 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
     **
     **      expr1 == ?1
     **      expr1 <> ?2
-    **
-    ** But, the RHS of the == or <> is marked with the EP_Generic flag
-    ** so that it may not contribute to the computation of comparison
-    ** affinity or the collating sequence to use for comparison.  Otherwise,
-    ** the semantics would be subtly different from IN or NOT IN.
     */
     Expr *pRHS = Y->a[0].pExpr;
     Y->a[0].pExpr = 0;
     sql_expr_list_delete(pParse->db, Y);
-    /* pRHS cannot be NULL because a malloc error would have been detected
-    ** before now and control would have never reached this point */
-    if( ALWAYS(pRHS) ){
-      pRHS->flags &= ~EP_Collate;
-      pRHS->flags |= EP_Generic;
-    }
     A.pExpr = sqlite3PExpr(pParse, N ? TK_NE : TK_EQ, A.pExpr, pRHS);
   }else{
     A.pExpr = sqlite3PExpr(pParse, TK_IN, A.pExpr, 0);

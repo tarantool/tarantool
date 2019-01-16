@@ -518,8 +518,8 @@ test:do_execsql_test(
     })
 
 -- MUST_WORK_TEST
--- Make sure that when "x IN (?)" is converted into "x==?" that collating
--- sequence and affinity computations do not get messed up.
+-- Make sure that when "x IN (?)" is converted into "x==?":
+-- type and collation sequence should be taken into consideration.
 --
 test:do_execsql_test(
     "in4-4.1",
@@ -571,7 +571,7 @@ test:do_execsql_test(
         SELECT c FROM t4a WHERE a IN (b) ORDER BY c;
     ]], {
         -- <in4-4.5>
-        3
+        1, 3
         -- </in4-4.5>
     })
 
@@ -581,7 +581,7 @@ test:do_execsql_test(
         SELECT c FROM t4a WHERE (a||'') IN (b) ORDER BY c;
     ]], {
         -- <in4-4.6>
-        3
+        1, 3
         -- </in4-4.6>
     })
 

@@ -99,7 +99,7 @@ test:do_execsql_test(
         SELECT x FROM t1 WHERE x IN (1.0);
     ]], {
         -- <2.2>
-        
+        "1"
         -- </2.2>
     })
 
@@ -239,7 +239,7 @@ test:do_execsql_test(
         SELECT x FROM t2 WHERE '1.0' IN (x);
     ]], {
         -- <3.8>
-
+        1
         -- </3.8>
     })
 
@@ -309,7 +309,7 @@ test:do_execsql_test(
         SELECT x FROM t3 WHERE '1' IN (x);
     ]], {
         -- <4.7>
-
+        1
         -- </4.7>
     })
 
@@ -519,6 +519,7 @@ test:do_execsql_test(
         SELECT x, y FROM t5 WHERE '1.0' IN (x);
     ]], {
         -- <6.8>
+        1, "one", 1, "two", 1, "three", 1, "four"
         -- </6.8>
     })
 

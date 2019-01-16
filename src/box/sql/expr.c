@@ -73,8 +73,6 @@ char
 sqlite3ExprAffinity(Expr * pExpr)
 {
 	pExpr = sqlite3ExprSkipCollate(pExpr);
-	if (pExpr->flags & EP_Generic)
-		return 0;
 	uint8_t op = pExpr->op;
 	struct ExprList *el;
 	if (op == TK_REGISTER)
@@ -197,8 +195,6 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id)
 	*coll_id = COLL_NONE;
 	while (p != NULL) {
 		int op = p->op;
-		if (p->flags & EP_Generic)
-			break;
 		if (op == TK_CAST || op == TK_UPLUS) {
 			p = p->pLeft;
 			continue;
