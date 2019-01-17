@@ -1227,10 +1227,8 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_range_add_slice(range, slice);
 		vy_range_update_compaction_priority(range, &lsm->opts);
 		vy_lsm_acct_range(lsm, range);
-		if (!vy_range_is_scheduled(range))
-			vy_range_heap_update(&lsm->range_heap,
-					     &range->heap_node);
 	}
+	vy_range_heap_update_all(&lsm->range_heap);
 	free(new_slices);
 
 delete_mems:
