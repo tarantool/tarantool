@@ -329,7 +329,7 @@ vy_range_update_compaction_priority(struct vy_range *range,
 
 	struct vy_slice *slice;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		uint64_t size = slice->count.bytes_compressed;
+		uint64_t size = slice->count.bytes;
 		/*
 		 * The size of the first level is defined by
 		 * the size of the most recent run.
@@ -377,7 +377,7 @@ vy_range_update_compaction_priority(struct vy_range *range,
 			 */
 			range->compaction_priority = total_run_count;
 			range->compaction_queue = total_stmt_count;
-			est_new_run_size = total_stmt_count.bytes_compressed;
+			est_new_run_size = total_stmt_count.bytes;
 		}
 	}
 
@@ -419,7 +419,7 @@ vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
 	slice = rlist_last_entry(&range->slices, struct vy_slice, in_range);
 
 	/* The range is too small to be split. */
-	if (slice->count.bytes_compressed < opts->range_size * 4 / 3)
+	if (slice->count.bytes < opts->range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
@@ -481,7 +481,7 @@ vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
 	struct vy_range *it;
 
 	/* Size of the coalesced range. */
-	uint64_t total_size = range->count.bytes_compressed;
+	uint64_t total_size = range->count.bytes;
 	/* Coalesce ranges until total_size > max_size. */
 	uint64_t max_size = opts->range_size / 2;
 
@@ -496,7 +496,7 @@ vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
 	for (it = vy_range_tree_next(tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
 	     it = vy_range_tree_next(tree, it)) {
-		uint64_t size = it->count.bytes_compressed;
+		uint64_t size = it->count.bytes;
 		if (total_size + size > max_size)
 			break;
 		total_size += size;
@@ -505,7 +505,7 @@ vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
 	for (it = vy_range_tree_prev(tree, range);
 	     it != NULL && !vy_range_is_scheduled(it);
 	     it = vy_range_tree_prev(tree, it)) {
-		uint64_t size = it->count.bytes_compressed;
+		uint64_t size = it->count.bytes;
 		if (total_size + size > max_size)
 			break;
 		total_size += size;
