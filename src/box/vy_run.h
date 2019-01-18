@@ -185,6 +185,11 @@ struct vy_slice {
 	struct tuple *begin;
 	struct tuple *end;
 	/**
+	 * Random seed used for compaction randomization.
+	 * Lays in range [0, RAND_MAX].
+	 */
+	int seed;
+	/**
 	 * Number of async users of this slice. Slice must not
 	 * be removed until it hits 0. Used by the iterator to
 	 * prevent use-after-free after waiting for IO.

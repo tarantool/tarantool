@@ -323,9 +323,12 @@ _ = s:on_replace(function() end)
 pk = s:create_index('primary', {run_count_per_level = 1})
 sk = s:create_index('secondary', {run_count_per_level = 1, parts = {2, 'unsigned'}})
 PAD1 = 100
-PAD2 = 10
+PAD2 = 15
 -- Create a big run to prevent major compaction.
 for i = 1001, 1000 + PAD1 do s:replace{i, i} end
+box.snapshot()
+-- Some padding to trigger minor compaction.
+for i = 1001, 1000 + PAD2 do s:replace{i, i} end
 box.snapshot()
 -- Generate some INSERT statements and dump them to disk.
 _ = s:insert{1, 1} -- insert
@@ -373,7 +376,7 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 pk = s:create_index('primary', {run_count_per_level = 1})
 sk = s:create_index('secondary', {run_count_per_level = 1, parts = {2, 'unsigned'}})
 PAD1 = 100
-PAD2 = 10
+PAD2 = 15
 -- Create a big run to prevent major compaction.
 for i = 1001, 1000 + PAD1 do s:insert{i, i} end
 _ = s:insert{1, 1}
@@ -384,6 +387,9 @@ _ = s:insert{5, 5}
 _ = s:insert{6, 6}
 _ = s:insert{7, 7}
 _ = s:insert{8, 8}
+box.snapshot()
+-- Some padding to trigger minor compaction.
+for i = 1001, 1000 + PAD2 do s:replace{i, i} end
 box.snapshot()
 -- Generate DELETE+INSERT statements and write them to disk.
 s:delete{1} s:insert{1, 100}
