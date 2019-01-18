@@ -374,6 +374,7 @@ vy_slice_new(int64_t id, struct vy_run *run, struct tuple *begin,
 	memset(slice, 0, sizeof(*slice));
 	slice->id = id;
 	slice->run = run;
+	slice->seed = rand();
 	vy_run_ref(run);
 	run->slice_count++;
 	if (begin != NULL)

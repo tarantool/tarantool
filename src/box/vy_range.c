@@ -388,7 +388,25 @@ vy_range_update_compaction_priority(struct vy_range *range,
 			 * we find an appropriate level for it.
 			 */
 		}
-		if (level_run_count > opts->run_count_per_level) {
+		/*
+		 * Since all ranges constituting an LSM tree have
+		 * the same configuration, they tend to get compacted
+		 * simultaneously, leading to IO load spikes and, as
+		 * a result, distortion of the LSM tree shape and
+		 * increased read amplification. To prevent this from
+		 * happening, we constantly randomize compaction pace
+		 * among ranges by deferring compaction at each LSM
+		 * tree level with some fixed small probability.
+		 *
+		 * Note, we can't use rand() directly here, because
+		 * this function is called on every memory dump and
+		 * scans all LSM tree levels. Instead we use the
+		 * value of rand() from the slice creation time.
+		 */
+		uint32_t max_run_count = opts->run_count_per_level;
+		if (slice->seed < RAND_MAX / 10)
+			max_run_count++;
+		if (level_run_count > max_run_count) {
 			/*
 			 * The number of runs at the current level
 			 * exceeds the configured maximum. Arrange

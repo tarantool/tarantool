@@ -755,11 +755,19 @@ sk = s:create_index('secondary', {run_count_per_level = 1, parts = {2, 'unsigned
 PAD1 = 100
 ---
 ...
-PAD2 = 10
+PAD2 = 15
 ---
 ...
 -- Create a big run to prevent major compaction.
 for i = 1001, 1000 + PAD1 do s:replace{i, i} end
+---
+...
+box.snapshot()
+---
+- ok
+...
+-- Some padding to trigger minor compaction.
+for i = 1001, 1000 + PAD2 do s:replace{i, i} end
 ---
 ...
 box.snapshot()
@@ -887,7 +895,7 @@ sk = s:create_index('secondary', {run_count_per_level = 1, parts = {2, 'unsigned
 PAD1 = 100
 ---
 ...
-PAD2 = 10
+PAD2 = 15
 ---
 ...
 -- Create a big run to prevent major compaction.
@@ -916,6 +924,14 @@ _ = s:insert{7, 7}
 ---
 ...
 _ = s:insert{8, 8}
+---
+...
+box.snapshot()
+---
+- ok
+...
+-- Some padding to trigger minor compaction.
+for i = 1001, 1000 + PAD2 do s:replace{i, i} end
 ---
 ...
 box.snapshot()
