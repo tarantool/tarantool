@@ -450,6 +450,10 @@ vy_lsm_generation(struct vy_lsm *lsm);
 int
 vy_lsm_compaction_priority(struct vy_lsm *lsm);
 
+/** Return the target size of a range in an LSM tree. */
+int64_t
+vy_lsm_range_size(struct vy_lsm *lsm);
+
 /** Add a run to the list of runs of an LSM tree. */
 void
 vy_lsm_add_run(struct vy_lsm *lsm, struct vy_run *run);

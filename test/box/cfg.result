@@ -86,8 +86,6 @@ cfg_filter(box.cfg)
     - 134217728
   - - vinyl_page_size
     - 8192
-  - - vinyl_range_size
-    - 1073741824
   - - vinyl_read_threads
     - 1
   - - vinyl_run_count_per_level
@@ -187,8 +185,6 @@ cfg_filter(box.cfg)
     - 134217728
   - - vinyl_page_size
     - 8192
-  - - vinyl_range_size
-    - 1073741824
   - - vinyl_read_threads
     - 1
   - - vinyl_run_count_per_level

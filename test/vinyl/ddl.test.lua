@@ -3,7 +3,6 @@ test_run = require('test_run').new()
 
 -- sanity checks
 space = box.schema.space.create('test', {engine = 'vinyl' })
-space:create_index('pk', {range_size = 0})
 space:create_index('pk', {page_size = 0})
 space:create_index('pk', {page_size = 8192, range_size = 4096})
 space:create_index('pk', {run_count_per_level = 0})

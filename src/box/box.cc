@@ -577,11 +577,7 @@ box_check_vinyl_options(void)
 		tnt_raise(ClientError, ER_CFG, "vinyl_write_threads",
 			  "must be greater than or equal to 2");
 	}
-	if (range_size <= 0) {
-		tnt_raise(ClientError, ER_CFG, "vinyl_range_size",
-			  "must be greater than 0");
-	}
-	if (page_size <= 0 || page_size > range_size) {
+	if (page_size <= 0 || (range_size > 0 && page_size > range_size)) {
 		tnt_raise(ClientError, ER_CFG, "vinyl_page_size",
 			  "must be greater than 0 and less than "
 			  "or equal to vinyl_range_size");

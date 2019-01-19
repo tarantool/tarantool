@@ -458,6 +458,7 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_table_end(h); /* iterator */
 	info_table_end(h); /* txw */
 
+	info_append_int(h, "range_size", vy_lsm_range_size(lsm));
 	info_append_int(h, "range_count", lsm->range_count);
 	info_append_int(h, "run_count", lsm->run_count);
 	info_append_int(h, "run_avg", lsm->run_count / lsm->range_count);

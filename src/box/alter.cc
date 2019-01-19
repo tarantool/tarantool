@@ -255,12 +255,8 @@ index_opts_decode(struct index_opts *opts, const char *map)
 			  BOX_INDEX_FIELD_OPTS, "distance must be either "\
 			  "'euclid' or 'manhattan'");
 	}
-	if (opts->range_size <= 0) {
-		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
-			  BOX_INDEX_FIELD_OPTS,
-			  "range_size must be greater than 0");
-	}
-	if (opts->page_size <= 0 || opts->page_size > opts->range_size) {
+	if (opts->page_size <= 0 || (opts->range_size > 0 &&
+				     opts->page_size > opts->range_size)) {
 		tnt_raise(ClientError, ER_WRONG_INDEX_OPTIONS,
 			  BOX_INDEX_FIELD_OPTS,
 			  "page_size must be greater than 0 and "

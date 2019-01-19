@@ -129,15 +129,10 @@ test_run:cmd("setopt delimiter ''");
 -- initially stats are empty
 istat()
 ---
-- dumps_per_compaction: 0
-  rows: 0
-  run_avg: 0
-  bytes: 0
-  upsert:
+- upsert:
     squashed: 0
     applied: 0
-  lookup: 0
-  run_count: 0
+  bytes: 0
   cache:
     invalidate:
       rows: 0
@@ -155,10 +150,7 @@ istat()
     get:
       rows: 0
       bytes: 0
-  range_count: 1
-  put:
-    rows: 0
-    bytes: 0
+  run_histogram: '[0]:1'
   disk:
     last_level:
       bytes_compressed: 0
@@ -216,6 +208,12 @@ istat()
     pages: 0
     bytes_compressed: 0
     bytes: 0
+  range_size: 16384
+  rows: 0
+  run_avg: 0
+  dumps_per_compaction: 0
+  lookup: 0
+  range_count: 1
   txw:
     bytes: 0
     rows: 0
@@ -224,7 +222,10 @@ istat()
       get:
         rows: 0
         bytes: 0
-  run_histogram: '[0]:1'
+  run_count: 0
+  put:
+    rows: 0
+    bytes: 0
   memory:
     bytes: 0
     index_size: 0
@@ -295,7 +296,14 @@ wait(istat, st, 'disk.dump.count', 1)
 ...
 stat_diff(istat(), st)
 ---
-- disk:
+- put:
+    rows: 25
+    bytes: 26525
+  rows: 25
+  run_avg: 1
+  run_count: 1
+  dumps_per_compaction: 1
+  disk:
     last_level:
       bytes: 26049
       pages: 7
@@ -319,14 +327,7 @@ stat_diff(istat(), st)
     pages: 7
     bytes_compressed: <bytes_compressed>
     bloom_size: 70
-  rows: 25
-  run_avg: 1
-  run_count: 1
-  dumps_per_compaction: 1
   bytes: 26049
-  put:
-    rows: 25
-    bytes: 26525
 ...
 -- put + dump + compaction
 st = istat()
@@ -344,7 +345,12 @@ wait(istat, st, 'disk.compaction.count', 1)
 ...
 stat_diff(istat(), st)
 ---
-- disk:
+- put:
+    rows: 50
+    bytes: 53050
+  rows: 25
+  bytes: 26042
+  disk:
     last_level:
       bytes: 26042
       pages: 6
@@ -379,11 +385,6 @@ stat_diff(istat(), st)
         pages: 13
         bytes_compressed: <bytes_compressed>
         rows: 50
-  put:
-    rows: 50
-    bytes: 53050
-  rows: 25
-  bytes: 26042
 ...
 -- point lookup from disk + cache put
 st = istat()
@@ -403,7 +404,6 @@ stat_diff(istat(), st)
     put:
       rows: 1
       bytes: 1061
-  lookup: 1
   disk:
     iterator:
       read:
@@ -415,6 +415,7 @@ stat_diff(istat(), st)
       get:
         rows: 1
         bytes: 1061
+  lookup: 1
   memory:
     iterator:
       lookup: 1
@@ -654,17 +655,7 @@ stat_diff(istat(), st)
     put:
       rows: 51
       bytes: 54111
-  disk:
-    iterator:
-      read:
-        bytes: 104300
-        pages: 25
-        bytes_compressed: <bytes_compressed>
-        rows: 100
-      lookup: 2
-      get:
-        rows: 100
-        bytes: 106100
+  lookup: 1
   txw:
     iterator:
       lookup: 1
@@ -677,7 +668,17 @@ stat_diff(istat(), st)
       get:
         rows: 100
         bytes: 106100
-  lookup: 1
+  disk:
+    iterator:
+      read:
+        bytes: 104300
+        pages: 25
+        bytes_compressed: <bytes_compressed>
+        rows: 100
+      lookup: 2
+      get:
+        rows: 100
+        bytes: 106100
   get:
     rows: 100
     bytes: 106100
@@ -1000,15 +1001,10 @@ box.stat.reset()
 ...
 istat()
 ---
-- dumps_per_compaction: 1
-  rows: 306
-  run_avg: 1
-  bytes: 317731
-  upsert:
+- upsert:
     squashed: 0
     applied: 0
-  lookup: 0
-  run_count: 2
+  bytes: 317731
   cache:
     invalidate:
       rows: 0
@@ -1026,10 +1022,7 @@ istat()
     get:
       rows: 0
       bytes: 0
-  range_count: 2
-  put:
-    rows: 0
-    bytes: 0
+  run_histogram: '[1]:2'
   disk:
     last_level:
       bytes_compressed: <bytes_compressed>
@@ -1087,6 +1080,12 @@ istat()
     pages: 25
     bytes_compressed: <bytes_compressed>
     bytes: 104300
+  range_size: 16384
+  rows: 306
+  run_avg: 1
+  dumps_per_compaction: 1
+  lookup: 0
+  range_count: 2
   txw:
     bytes: 0
     rows: 0
@@ -1095,7 +1094,10 @@ istat()
       get:
         rows: 0
         bytes: 0
-  run_histogram: '[1]:2'
+  run_count: 2
+  put:
+    rows: 0
+    bytes: 0
   memory:
     bytes: 213431
     index_size: 49152
