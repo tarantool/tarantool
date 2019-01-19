@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(103)
+test:plan(102)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -45,7 +45,6 @@ invalid('log', ':test:')
 invalid('vinyl_memory', -1)
 invalid('vinyl_read_threads', 0)
 invalid('vinyl_write_threads', 1)
-invalid('vinyl_range_size', 0)
 invalid('vinyl_page_size', 0)
 invalid('vinyl_run_count_per_level', 0)
 invalid('vinyl_run_size_ratio', 1)

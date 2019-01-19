@@ -8,10 +8,6 @@ test_run = require('test_run').new()
 space = box.schema.space.create('test', {engine = 'vinyl' })
 ---
 ...
-space:create_index('pk', {range_size = 0})
----
-- error: 'Wrong index options (field 4): range_size must be greater than 0'
-...
 space:create_index('pk', {page_size = 0})
 ---
 - error: 'Wrong index options (field 4): page_size must be greater than 0 and less
@@ -586,7 +582,6 @@ box.space.test.index.pk
     run_count_per_level: 2
     run_size_ratio: 3.5
     bloom_fpr: 0.05
-    range_size: 1073741824
   name: pk
   type: TREE
 ...

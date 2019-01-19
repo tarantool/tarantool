@@ -437,7 +437,7 @@ vy_range_update_dumps_per_compaction(struct vy_range *range)
  *   4/3 * range_size.
  */
 bool
-vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
+vy_range_needs_split(struct vy_range *range, int64_t range_size,
 		     const char **p_split_key)
 {
 	struct vy_slice *slice;
@@ -451,7 +451,7 @@ vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
 	slice = rlist_last_entry(&range->slices, struct vy_slice, in_range);
 
 	/* The range is too small to be split. */
-	if (slice->count.bytes < opts->range_size * 4 / 3)
+	if (slice->count.bytes < range_size * 4 / 3)
 		return false;
 
 	/* Find the median key in the oldest run (approximately). */
@@ -507,15 +507,15 @@ vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
  */
 bool
 vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
-			const struct index_opts *opts,
-			struct vy_range **p_first, struct vy_range **p_last)
+			int64_t range_size, struct vy_range **p_first,
+			struct vy_range **p_last)
 {
 	struct vy_range *it;
 
 	/* Size of the coalesced range. */
 	uint64_t total_size = range->count.bytes;
 	/* Coalesce ranges until total_size > max_size. */
-	uint64_t max_size = opts->range_size / 2;
+	uint64_t max_size = range_size / 2;
 
 	/*
 	 * We can't coalesce a range that was scheduled for dump

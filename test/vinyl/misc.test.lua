@@ -1,3 +1,4 @@
+test_run = require('test_run').new()
 fiber = require('fiber')
 
 --
@@ -88,3 +89,28 @@ _ = s:create_index('sk', {unique = true, parts = {2, 'unsigned'}})
 s:insert{1, 1, 1}
 s:insert{1, 1, 2} -- error
 s:drop()
+
+--
+-- gh-3944: automatic range size configuration.
+--
+-- Passing range_size explicitly on index creation.
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('pk', {range_size = 0})
+i.options.range_size -- nil
+i:stat().range_size -- 16 MB
+box.space._index:get{s.id, i.id}[5].range_size -- 0
+s:drop()
+-- Inheriting global settings.
+test_run:cmd('create server test with script = "vinyl/stat.lua"')
+test_run:cmd('start server test')
+test_run:cmd('switch test')
+box.cfg.vinyl_range_size -- nil
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('pk')
+i.options.range_size -- nil
+i:stat().range_size -- 16 MB
+box.space._index:get{s.id, i.id}[5].range_size -- nil
+s:drop()
+test_run:cmd('switch default')
+test_run:cmd('stop server test')
+test_run:cmd('cleanup server test')

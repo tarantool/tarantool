@@ -257,13 +257,13 @@ vy_range_update_dumps_per_compaction(struct vy_range *range);
  * Check if a range needs to be split in two.
  *
  * @param range             The range.
- * @param opts              Index options.
+ * @param range_size        Target range size.
  * @param[out] p_split_key  Key to split the range by.
  *
  * @retval true             If the range needs to be split.
  */
 bool
-vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
+vy_range_needs_split(struct vy_range *range, int64_t range_size,
 		     const char **p_split_key);
 
 /**
@@ -272,7 +272,7 @@ vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
  *
  * @param range         The range.
  * @param tree          The range tree.
- * @param opts          Index options.
+ * @param range_size    Target range size.
  * @param[out] p_first  The first range in the tree to coalesce.
  * @param[out] p_last   The last range in the tree to coalesce.
  *
@@ -280,8 +280,8 @@ vy_range_needs_split(struct vy_range *range, const struct index_opts *opts,
  */
 bool
 vy_range_needs_coalesce(struct vy_range *range, vy_range_tree_t *tree,
-			const struct index_opts *opts,
-			struct vy_range **p_first, struct vy_range **p_last);
+			int64_t range_size, struct vy_range **p_first,
+			struct vy_range **p_last);
 
 #if defined(__cplusplus)
 } /* extern "C" */
