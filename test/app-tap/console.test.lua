@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(59)
+test:plan(70)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -77,11 +77,27 @@ test:is(yaml.decode(client:read(EOL)), '', "clear delimiter")
 
 --
 -- gh-3476: yaml.encode encodes 'false' and 'true' incorrectly.
+-- gh-3662: yaml.encode encodes booleans with multiline format.
+-- gh-3583: yaml.encode encodes null incorrectly.
 --
+
 test:is(type(yaml.decode(yaml.encode('false'))), 'string')
 test:is(type(yaml.decode(yaml.encode('true'))), 'string')
 test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string')
 test:is(type(yaml.decode(yaml.encode({a = 'false'})).a), 'string')
+
+test:is(yaml.encode(false), "--- false\n...\n")
+test:is(yaml.encode(true), "--- true\n...\n")
+test:is(yaml.encode('false'), "--- 'false'\n...\n")
+test:is(yaml.encode('true'), "--- 'true'\n...\n")
+test:is(yaml.encode(nil), "--- null\n...\n")
+
+test:is(yaml.decode('false'), false)
+test:is(yaml.decode('no'), false)
+test:is(yaml.decode('true'), true)
+test:is(yaml.decode('yes'), true)
+test:is(yaml.decode('~'), nil)
+test:is(yaml.decode('null'), nil)
 
 box.cfg{
     listen=IPROTO_SOCKET;
