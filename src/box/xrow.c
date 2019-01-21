@@ -102,6 +102,8 @@ error:
 
 	if (mp_typeof(**pos) != MP_MAP)
 		goto error;
+	bool has_tsn = false;
+	uint32_t flags = 0;
 
 	uint32_t size = mp_decode_map(pos);
 	for (uint32_t i = 0; i < size; i++) {
@@ -133,12 +135,30 @@ error:
 		case IPROTO_SCHEMA_VERSION:
 			header->schema_version = mp_decode_uint(pos);
 			break;
+		case IPROTO_TSN:
+			has_tsn = true;
+			header->txn_id = mp_decode_uint(pos);
+			break;
+		case IPROTO_FLAGS:
+			flags = mp_decode_uint(pos);
+			header->is_commit = flags & IPROTO_FLAG_COMMIT;
+			break;
 		default:
 			/* unknown header */
 			mp_next(pos);
 		}
 	}
 	assert(*pos <= end);
+	if (!has_tsn) {
+		/*
+		 * Transaction id is not set so it is a single statement
+		 * transaction.
+		 */
+		header->is_commit = true;
+	}
+	/* Restore transaction id from lsn and transaction serial number. */
+	header->txn_id = header->lsn - header->txn_id;
+
 	/* Nop requests aren't supposed to have a body. */
 	if (*pos < end && header->type != IPROTO_NOP) {
 		const char *body = *pos;
@@ -222,6 +242,27 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 		d = mp_encode_uint(d, IPROTO_TIMESTAMP);
 		d = mp_encode_double(d, header->tm);
 		map_size++;
+	}
+	if (header->txn_id != 0) {
+		if (header->txn_id != header->lsn || !header->is_commit) {
+			/*
+			 * Encode a transaction identifier for multi row
+			 * transaction members.
+			 */
+			d = mp_encode_uint(d, IPROTO_TSN);
+			/*
+			 * Differential encoding: write a transaction serial
+			 * number (it is equal to lsn - transaction id) instead.
+			 */
+			d = mp_encode_uint(d, header->lsn - header->txn_id);
+			map_size++;
+		}
+		if (header->is_commit && header->txn_id != header->lsn) {
+			/* Setup last row for multi row transaction. */
+			d = mp_encode_uint(d, IPROTO_FLAGS);
+			d = mp_encode_uint(d, IPROTO_FLAG_COMMIT);
+			map_size++;
+		}
 	}
 	assert(d <= data + XROW_HEADER_LEN_MAX);
 	mp_encode_map(data, map_size);

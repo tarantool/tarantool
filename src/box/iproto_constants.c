@@ -41,11 +41,11 @@ const unsigned char iproto_key_type[IPROTO_KEY_MAX] =
 		/* 0x05 */	MP_UINT,   /* IPROTO_SCHEMA_VERSION */
 		/* 0x06 */	MP_UINT,   /* IPROTO_SERVER_VERSION */
 		/* 0x07 */	MP_UINT,   /* IPROTO_GROUP_ID */
+		/* 0x08 */	MP_UINT,   /* IPROTO_TSN */
+		/* 0x09 */	MP_UINT,   /* IPROTO_FLAGS */
 	/* }}} */
 
 	/* {{{ unused */
-		/* 0x08 */	MP_UINT,
-		/* 0x09 */	MP_UINT,
 		/* 0x0a */	MP_UINT,
 		/* 0x0b */	MP_UINT,
 		/* 0x0c */	MP_UINT,
@@ -136,8 +136,8 @@ const char *iproto_key_strs[IPROTO_KEY_MAX] = {
 	"schema version",   /* 0x05 */
 	"server version",   /* 0x06 */
 	"group id",         /* 0x07 */
-	NULL,               /* 0x08 */
-	NULL,               /* 0x09 */
+	"tsn",              /* 0x08 */
+	"flags",            /* 0x09 */
 	NULL,               /* 0x0a */
 	NULL,               /* 0x0b */
 	NULL,               /* 0x0c */

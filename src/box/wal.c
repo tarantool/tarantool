@@ -895,12 +895,17 @@ wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
 	       struct xrow_header **row,
 	       struct xrow_header **end)
 {
+	int64_t txn_id = 0;
 	/** Assign LSN to all local rows. */
 	for ( ; row < end; row++) {
 		if ((*row)->replica_id == 0) {
 			(*row)->lsn = vclock_inc(vclock_diff, instance_id) +
 				      vclock_get(base, instance_id);
 			(*row)->replica_id = instance_id;
+			/* Use the lsn of the first local row as txn_id. */
+			txn_id = txn_id == 0 ? (*row)->lsn : txn_id;
+			(*row)->txn_id = txn_id;
+			(*row)->is_commit = row == end - 1;
 		} else {
 			vclock_follow(vclock_diff, (*row)->replica_id,
 				      (*row)->lsn - vclock_get(base,

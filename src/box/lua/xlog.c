@@ -221,6 +221,16 @@ lbox_xlog_parser_iterate(struct lua_State *L)
 		lua_pushnumber(L, row.tm);
 		lua_settable(L, -3); /* timestamp */
 	}
+	if (row.txn_id != row.lsn || !row.is_commit) {
+		lua_pushstring(L, "txn_id");
+		lua_pushnumber(L, row.txn_id);
+		lua_settable(L, -3); /* txn_id */
+	}
+	if (row.is_commit && row.txn_id != row.lsn) {
+		lua_pushstring(L, "commit");
+		lua_pushboolean(L, true);
+		lua_settable(L, -3); /* txn_commit flag */
+	}
 
 	lua_settable(L, -3); /* HEADER */
 
