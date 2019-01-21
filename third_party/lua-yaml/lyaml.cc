@@ -94,6 +94,55 @@ struct lua_yaml_dumper {
    luaL_Buffer yamlbuf;
 };
 
+/**
+ * Verify whether a string represents a boolean literal in YAML.
+ *
+ * Non-standard: only subset of YAML 1.1 boolean literals are
+ * treated as boolean values.
+ *
+ * @param str Literal to check.
+ * @param len Length of @a str.
+ * @param[out] out Result boolean value.
+ *
+ * @retval Whether @a str represents a boolean value.
+ */
+static inline bool
+yaml_is_bool(const char *str, size_t len, bool *out)
+{
+   if ((len == 5 && memcmp(str, "false", 5) == 0) ||
+       (len == 2 && memcmp(str, "no", 2) == 0)) {
+      *out = false;
+      return true;
+   }
+   if ((len == 4 && memcmp(str, "true", 4) == 0) ||
+       (len == 3 && memcmp(str, "yes", 3) == 0)) {
+      *out = true;
+      return true;
+   }
+   return false;
+}
+
+/**
+ * Verify whether a string represents a null literal in YAML.
+ *
+ * Non-standard: don't match an empty string, 'Null' and 'NULL' as
+ * null.
+ *
+ * @param str Literal to check.
+ * @param len Length of @a str.
+ *
+ * @retval Whether @a str represents a null value.
+ */
+static inline bool
+yaml_is_null(const char *str, size_t len)
+{
+   if (len == 1 && str[0] == '~')
+      return true;
+   if (len == 4 && memcmp(str, "null", 4) == 0)
+      return true;
+   return false;
+}
+
 static void generate_error_message(struct lua_yaml_loader *loader) {
    char buf[256];
    luaL_Buffer b;
@@ -209,7 +258,9 @@ static void load_scalar(struct lua_yaml_loader *loader) {
          lua_pushnumber(loader->L, dval);
          return;
       } else if (!strcmp(tag, "bool")) {
-         lua_pushboolean(loader->L, !strcmp(str, "true") || !strcmp(str, "yes"));
+         bool value = false;
+         yaml_is_bool(str, length, &value);
+         lua_pushboolean(loader->L, value);
          return;
       } else if (!strcmp(tag, "binary")) {
          frombase64(loader->L, (const unsigned char *)str, length);
@@ -218,20 +269,20 @@ static void load_scalar(struct lua_yaml_loader *loader) {
    }
 
    if (loader->event.data.scalar.style == YAML_PLAIN_SCALAR_STYLE) {
-      if (!strcmp(str, "~")) {
-         luaL_pushnull(loader->L);
-         return;
-      } else if (!strcmp(str, "true") || !strcmp(str, "yes")) {
-         lua_pushboolean(loader->L, 1);
-         return;
-      } else if (!strcmp(str, "false") || !strcmp(str, "no")) {
-         lua_pushboolean(loader->L, 0);
-         return;
-      } else if (!strcmp(str, "null")) {
-         luaL_pushnull(loader->L);
-         return;
-      } else if (!length) {
+      bool value;
+      if (!length) {
+         /*
+          * Non-standard: an empty value/document is null
+          * according to the standard, but we decode it as an
+          * empty string.
+          */
          lua_pushliteral(loader->L, "");
+         return;
+      } else if (yaml_is_null(str, length)) {
+         luaL_pushnull(loader->L);
+         return;
+      } else if (yaml_is_bool(str, length, &value)) {
+         lua_pushboolean(loader->L, value);
          return;
       }
 
@@ -547,7 +598,6 @@ static int yaml_is_flow_mode(struct lua_yaml_dumper *dumper) {
                (evp->type == YAML_MAPPING_START_EVENT &&
                 evp->data.mapping_start.style == YAML_FLOW_MAPPING_STYLE)) {
             return 1;
-            break;
          }
       }
    }
@@ -564,6 +614,8 @@ static int dump_node(struct lua_yaml_dumper *dumper)
    int is_binary = 0;
    char buf[FPCONV_G_FMT_BUFSIZE];
    struct luaL_field field;
+   bool unused;
+   (void) unused;
 
    int top = lua_gettop(dumper->L);
    luaL_checkfield(dumper->L, dumper->cfg, top, &field);
@@ -596,8 +648,12 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       return dump_table(dumper, &field);
    case MP_STR:
       str = lua_tolstring(dumper->L, -1, &len);
-      if (lua_isnumber(dumper->L, -1)) {
-         /* string is convertible to number, quote it to preserve type */
+      if (yaml_is_null(str, len) || yaml_is_bool(str, len, &unused) ||
+          lua_isnumber(dumper->L, -1)) {
+         /*
+          * The string is convertible to a null, a boolean or
+          * a number, quote it to preserve its type.
+          */
          style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
          break;
       }
@@ -605,12 +661,10 @@ static int dump_node(struct lua_yaml_dumper *dumper)
       if (utf8_check_printable(str, len)) {
          if (yaml_is_flow_mode(dumper)) {
             style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-         } else if (strstr(str, "\n\n") != NULL || strcmp(str, "true") == 0 ||
-		    strcmp(str, "false") == 0) {
+         } else if (strstr(str, "\n\n") != 0) {
             /*
              * Tarantool-specific: use literal style for string
-             * with empty lines and strings representing boolean
-             * types.
+             * with empty lines.
              * Useful for tutorial().
              */
             style = YAML_LITERAL_SCALAR_STYLE;
