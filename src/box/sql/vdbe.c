@@ -3272,8 +3272,10 @@ case OP_OpenTEphemeral: {
 	struct space *space = sql_ephemeral_space_create(pOp->p2,
 							 pOp->p4.key_info);
 
-	if (space == NULL)
+	if (space == NULL) {
+		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
+	}
 	aMem[pOp->p1].u.p = space;
 	aMem[pOp->p1].flags = MEM_Ptr;
 	break;
