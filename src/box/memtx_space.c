@@ -993,7 +993,7 @@ memtx_space_new(struct memtx_engine *memtx,
 		tuple_format_new(&memtx_tuple_format_vtab, memtx, keys, key_count,
 				 def->fields, def->field_count,
 				 def->exact_field_count, def->dict,
-				 def->opts.is_temporary);
+				 def->opts.is_temporary, def->opts.is_ephemeral);
 	if (format == NULL) {
 		free(memtx_space);
 		return NULL;

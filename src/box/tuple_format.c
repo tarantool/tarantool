@@ -34,11 +34,77 @@
 #include "tuple_format.h"
 #include "coll_id_cache.h"
 
+#include "third_party/PMurHash.h"
+
 /** Global table of tuple formats */
 struct tuple_format **tuple_formats;
 static intptr_t recycled_format_ids = FORMAT_ID_NIL;
 
 static uint32_t formats_size = 0, formats_capacity = 0;
+
+static int
+tuple_format_cmp(const struct tuple_format *format1,
+		 const struct tuple_format *format2)
+{
+	struct tuple_format *a = (struct tuple_format *)format1;
+	struct tuple_format *b = (struct tuple_format *)format2;
+	if (a->exact_field_count != b->exact_field_count)
+		return a->exact_field_count - b->exact_field_count;
+	if (tuple_format_field_count(a) != tuple_format_field_count(b))
+		return tuple_format_field_count(a) - tuple_format_field_count(b);
+
+	for (uint32_t i = 0; i < tuple_format_field_count(a); ++i) {
+		struct tuple_field *field_a = tuple_format_field(a, i);
+		struct tuple_field *field_b = tuple_format_field(b, i);
+		if (field_a->type != field_b->type)
+			return (int)field_a->type - (int)field_b->type;
+		if (field_a->coll_id != field_b->coll_id)
+			return (int)field_a->coll_id - (int)field_b->coll_id;
+		if (field_a->nullable_action != field_b->nullable_action)
+			return (int)field_a->nullable_action -
+				(int)field_b->nullable_action;
+		if (field_a->is_key_part != field_b->is_key_part)
+			return (int)field_a->is_key_part -
+				(int)field_b->is_key_part;
+	}
+
+	return 0;
+}
+
+static uint32_t
+tuple_format_hash(struct tuple_format *format)
+{
+#define TUPLE_FIELD_MEMBER_HASH(field, member, h, carry, size) \
+	PMurHash32_Process(&h, &carry, &field->member, \
+			   sizeof(field->member)); \
+	size += sizeof(field->member);
+
+	uint32_t h = 13;
+	uint32_t carry = 0;
+	uint32_t size = 0;
+	for (uint32_t i = 0; i < tuple_format_field_count(format); ++i) {
+		struct tuple_field *f = tuple_format_field(format, i);
+		TUPLE_FIELD_MEMBER_HASH(f, type, h, carry, size)
+		TUPLE_FIELD_MEMBER_HASH(f, coll_id, h, carry, size)
+		TUPLE_FIELD_MEMBER_HASH(f, nullable_action, h, carry, size)
+		TUPLE_FIELD_MEMBER_HASH(f, is_key_part, h, carry, size)
+	}
+#undef TUPLE_FIELD_MEMBER_HASH
+	return PMurHash32_Result(h, carry, size);
+}
+
+#define MH_SOURCE 1
+#define mh_name _tuple_format
+#define mh_key_t struct tuple_format *
+#define mh_node_t struct tuple_format *
+#define mh_arg_t void *
+#define mh_hash(a, arg) ((*(a))->hash)
+#define mh_hash_key(a, arg) ((a)->hash)
+#define mh_cmp(a, b, arg) (tuple_format_cmp(*(a), *(b)))
+#define mh_cmp_key(a, b, arg) (tuple_format_cmp((a), *(b)))
+#include "salad/mhash.h"
+
+static struct mh_tuple_format_t *tuple_formats_hash = NULL;
 
 static struct tuple_field *
 tuple_field_new(void)
@@ -248,6 +314,7 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		    !tuple_field_is_nullable(field))
 			bit_set(format->required_fields, field->id);
 	}
+	format->hash = tuple_format_hash(format);
 	return 0;
 }
 
@@ -276,7 +343,12 @@ tuple_format_register(struct tuple_format *format)
 			formats_capacity = new_capacity;
 			tuple_formats = formats;
 		}
-		if (formats_size == FORMAT_ID_MAX + 1) {
+		uint32_t formats_size_max = FORMAT_ID_MAX + 1;
+		struct errinj *inj = errinj(ERRINJ_TUPLE_FORMAT_COUNT,
+					    ERRINJ_INT);
+		if (inj != NULL && inj->iparam > 0)
+			formats_size_max = inj->iparam;
+		if (formats_size >= formats_size_max) {
 			diag_set(ClientError, ER_TUPLE_FORMAT_LIMIT,
 				 (unsigned) formats_capacity);
 			return -1;
@@ -389,9 +461,80 @@ tuple_format_destroy(struct tuple_format *format)
 	tuple_dictionary_unref(format->dict);
 }
 
+/**
+ * Try to reuse given format. This is only possible for formats
+ * of ephemeral spaces, since we need to be sure that shared
+ * dictionary will never be altered. If it can, then alter can
+ * affect another space, which shares a format with one which is
+ * altered.
+ * @param p_format Double pointer to format. It is updated with
+ * 		   hashed value, if corresponding format was found
+ * 		   in hash table
+ * @retval Returns true if format was found in hash table, false
+ *	   otherwise.
+ *
+ */
+static bool
+tuple_format_reuse(struct tuple_format **p_format)
+{
+	struct tuple_format *format = *p_format;
+	if (!format->is_ephemeral)
+		return false;
+	/*
+	 * These fields do not participate in hashing.
+	 * Make sure they're unset.
+	 */
+	assert(format->dict->name_count == 0);
+	assert(format->is_temporary);
+	mh_int_t key = mh_tuple_format_find(tuple_formats_hash, format,
+					    NULL);
+	if (key != mh_end(tuple_formats_hash)) {
+		struct tuple_format **entry = mh_tuple_format_node(
+			tuple_formats_hash, key);
+		tuple_format_destroy(format);
+		free(format);
+		*p_format = *entry;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * See justification, why ephemeral space's formats are
+ * only feasible for hasing.
+ * @retval 0 on success, even if format wasn't added to hash
+ * 	   -1 in case of error.
+ */
+static int
+tuple_format_add_to_hash(struct tuple_format *format)
+{
+	if(!format->is_ephemeral)
+		return 0;
+	assert(format->dict->name_count == 0);
+	assert(format->is_temporary);
+	mh_int_t key = mh_tuple_format_put(tuple_formats_hash,
+					   (const struct tuple_format **)&format,
+					   NULL, NULL);
+	if (key == mh_end(tuple_formats_hash)) {
+		diag_set(OutOfMemory, 0, "tuple_format_add_to_hash",
+			 "tuple formats hash entry");
+		return -1;
+	}
+	return 0;
+}
+
+static void
+tuple_format_remove_from_hash(struct tuple_format *format)
+{
+	mh_int_t key = mh_tuple_format_find(tuple_formats_hash, format, NULL);
+	if (key != mh_end(tuple_formats_hash))
+		mh_tuple_format_del(tuple_formats_hash, key, NULL);
+}
+
 void
 tuple_format_delete(struct tuple_format *format)
 {
+	tuple_format_remove_from_hash(format);
 	tuple_format_deregister(format);
 	tuple_format_destroy(format);
 	free(format);
@@ -402,7 +545,8 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		 struct key_def * const *keys, uint16_t key_count,
 		 const struct field_def *space_fields,
 		 uint32_t space_field_count, uint32_t exact_field_count,
-		 struct tuple_dictionary *dict, bool is_temporary)
+		 struct tuple_dictionary *dict, bool is_temporary,
+		 bool is_ephemeral)
 {
 	struct tuple_format *format =
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
@@ -411,18 +555,24 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 	format->vtab = *vtab;
 	format->engine = engine;
 	format->is_temporary = is_temporary;
+	format->is_ephemeral = is_ephemeral;
 	format->exact_field_count = exact_field_count;
-	if (tuple_format_register(format) < 0) {
-		tuple_format_destroy(format);
-		free(format);
-		return NULL;
-	}
 	if (tuple_format_create(format, keys, key_count, space_fields,
-				space_field_count) < 0) {
-		tuple_format_delete(format);
-		return NULL;
+				space_field_count) < 0)
+		goto err;
+	if (tuple_format_reuse(&format))
+		return format;
+	if (tuple_format_register(format) < 0)
+		goto err;
+	if (tuple_format_add_to_hash(format) < 0) {
+		tuple_format_deregister(format);
+		goto err;
 	}
 	return format;
+err:
+	tuple_format_destroy(format);
+	free(format);
+	return NULL;
 }
 
 bool
@@ -606,6 +756,18 @@ tuple_format_min_field_count(struct key_def * const *keys, uint16_t key_count,
 	return min_field_count;
 }
 
+int
+tuple_format_init()
+{
+	tuple_formats_hash = mh_tuple_format_new();
+	if (tuple_formats_hash == NULL) {
+		diag_set(OutOfMemory, sizeof(struct mh_tuple_format_t), "malloc",
+			 "tuple format hash");
+		return -1;
+	}
+	return 0;
+}
+
 /** Destroy tuple format subsystem and free resourses */
 void
 tuple_format_free()
@@ -625,6 +787,7 @@ tuple_format_free()
 		}
 	}
 	free(tuple_formats);
+	mh_tuple_format_delete(tuple_formats_hash);
 }
 
 void

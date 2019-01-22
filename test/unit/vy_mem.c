@@ -78,7 +78,8 @@ test_iterator_restore_after_insertion()
 	/* Create format */
 	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
 						       NULL, &key_def, 1, NULL,
-						       0, 0, NULL, false);
+						       0, 0, NULL, false,
+						       false);
 	assert(format != NULL);
 	tuple_format_ref(format);
 

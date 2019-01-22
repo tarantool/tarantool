@@ -22,7 +22,7 @@ vy_iterator_C_test_init(size_t cache_size)
 	vy_cache_env_create(&cache_env, cord_slab_cache());
 	vy_cache_env_set_quota(&cache_env, cache_size);
 	vy_key_format = tuple_format_new(&vy_tuple_format_vtab, NULL, NULL, 0,
-					 NULL, 0, 0, NULL, false);
+					 NULL, 0, 0, NULL, false, false);
 	tuple_format_ref(vy_key_format);
 
 	size_t mem_size = 64 * 1024 * 1024;
@@ -202,7 +202,8 @@ create_test_mem(struct key_def *def)
 	struct key_def * const defs[] = { def };
 	struct tuple_format *format =
 		tuple_format_new(&vy_tuple_format_vtab, NULL, defs,
-				 def->part_count, NULL, 0, 0, NULL, false);
+				 def->part_count, NULL, 0, 0, NULL, false,
+				 false);
 	fail_if(format == NULL);
 
 	/* Create mem */
@@ -220,7 +221,7 @@ create_test_cache(uint32_t *fields, uint32_t *types,
 	assert(*def != NULL);
 	vy_cache_create(cache, &cache_env, *def, true);
 	*format = tuple_format_new(&vy_tuple_format_vtab, NULL, def, 1, NULL, 0,
-				   0, NULL, false);
+				   0, NULL, false, false);
 	tuple_format_ref(*format);
 }
 

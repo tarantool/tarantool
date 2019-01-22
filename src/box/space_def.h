@@ -59,6 +59,11 @@ struct space_opts {
 	 */
 	bool is_temporary;
 	/**
+	 * This flag is set if space is ephemeral and hence
+	 * its format might be re-used.
+	 */
+	bool is_ephemeral;
+	/**
 	 * If the space is a view, then it can't feature any
 	 * indexes, and must have SQL statement. Moreover,
 	 * this flag can't be changed after space creation.

@@ -5,6 +5,19 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 errinj = box.error.injection
 fiber = require('fiber')
 
+-- gh-3924 Check that tuple_formats of ephemeral spaces are
+-- reused.
+box.sql.execute("CREATE TABLE t4 (id INTEGER PRIMARY KEY, a INTEGER);")
+box.sql.execute("INSERT INTO t4 VALUES (1,1)")
+box.sql.execute("INSERT INTO t4 VALUES (2,1)")
+box.sql.execute("INSERT INTO t4 VALUES (3,2)")
+errinj.set('ERRINJ_TUPLE_FORMAT_COUNT', 200)
+errinj.set('ERRINJ_MEMTX_DELAY_GC', true)
+for i = 1, 201 do box.sql.execute("SELECT DISTINCT a FROM t4") end
+errinj.set('ERRINJ_MEMTX_DELAY_GC', false)
+errinj.set('ERRINJ_TUPLE_FORMAT_COUNT', -1)
+box.sql.execute('DROP TABLE t4')
+
 box.sql.execute('create table test (id int primary key, a float, b text)')
 box.schema.user.grant('guest','read,write,execute', 'universe')
 cn = remote.connect(box.cfg.listen)

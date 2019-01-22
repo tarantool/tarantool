@@ -53,6 +53,7 @@ checks_array_decode(const char **str, uint32_t len, char *opt, uint32_t errcode,
 const struct space_opts space_opts_default = {
 	/* .group_id = */ 0,
 	/* .is_temporary = */ false,
+	/* .is_ephemeral = */ false,
 	/* .view = */ false,
 	/* .sql        = */ NULL,
 	/* .checks     = */ NULL,
@@ -262,6 +263,7 @@ space_def_new_ephemeral(uint32_t field_count)
 {
 	struct space_opts opts = space_opts_default;
 	opts.is_temporary = true;
+	opts.is_ephemeral = true;
 	struct space_def *space_def = space_def_new(0, 0, field_count,
 						    "ephemeral",
 						    strlen("ephemeral"),

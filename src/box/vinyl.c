@@ -621,7 +621,8 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 	struct tuple_format *format =
 		tuple_format_new(&vy_tuple_format_vtab, NULL, keys, key_count,
 				 def->fields, def->field_count,
-				 def->exact_field_count, def->dict, false);
+				 def->exact_field_count, def->dict, false,
+				 false);
 	if (format == NULL) {
 		free(space);
 		return NULL;
@@ -3045,7 +3046,7 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 		goto out;
 	ctx->format = tuple_format_new(&vy_tuple_format_vtab, NULL,
 				       &ctx->key_def, 1, NULL, 0, 0, NULL,
-				       false);
+				       false, false);
 	if (ctx->format == NULL)
 		goto out_free_key_def;
 	tuple_format_ref(ctx->format);
