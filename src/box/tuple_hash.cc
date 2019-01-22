@@ -32,6 +32,7 @@
 #include "tuple_hash.h"
 #include "third_party/PMurHash.h"
 #include "coll.h"
+#include <math.h>
 
 /* Tuple and key hasher */
 namespace {
@@ -282,6 +283,34 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		if (coll != NULL)
 			return coll->hash(f, size, ph1, pcarry, coll);
 		break;
+	case MP_FLOAT:
+	case MP_DOUBLE: {
+		/*
+		 * If a floating point number can be stored as an integer,
+		 * convert it to MP_INT/MP_UINT before hashing so that we
+		 * can select integer values by floating point keys and
+		 * vice versa.
+		 */
+		double iptr;
+		double val = mp_typeof(**field) == MP_FLOAT ?
+			     mp_decode_float(field) :
+			     mp_decode_double(field);
+		if (!isfinite(val) || modf(val, &iptr) != 0 ||
+		    val < -exp(63) || val >= exp(64)) {
+			size = *field - f;
+			break;
+		}
+		char *data;
+		char buf[9]; /* enough to store MP_INT/MP_UINT */
+		if (val >= 0)
+			data = mp_encode_uint(buf, (uint64_t)val);
+		else
+			data = mp_encode_int(buf, (int64_t)val);
+		size = data - buf;
+		assert(size <= sizeof(buf));
+		f = buf;
+		break;
+	}
 	default:
 		mp_next(field);
 		size = *field - f;  /* calculate the size of field */
