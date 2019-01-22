@@ -257,6 +257,20 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	return def;
 }
 
+struct space_def*
+space_def_new_ephemeral(uint32_t field_count)
+{
+	struct space_opts opts = space_opts_default;
+	opts.is_temporary = true;
+	struct space_def *space_def = space_def_new(0, 0, field_count,
+						    "ephemeral",
+						    strlen("ephemeral"),
+						    "memtx", strlen("memtx"),
+						    &opts, &field_def_default,
+						    0);
+	return space_def;
+}
+
 /** Free a default value's syntax trees of @a defs. */
 void
 space_def_destroy_fields(struct field_def *fields, uint32_t field_count,

@@ -408,11 +408,7 @@ sql_ephemeral_space_create(uint32_t field_count, struct sql_key_info *key_info)
 	rlist_add_entry(&key_list, ephemer_index_def, link);
 
 	struct space_def *ephemer_space_def =
-		space_def_new(0 /* space id */, 0 /* user id */, field_count,
-			      "ephemeral", strlen("ephemeral"),
-			      "memtx", strlen("memtx"),
-			      &space_opts_default, &field_def_default,
-			      0 /* length of field_def */);
+		space_def_new_ephemeral(field_count);
 	if (ephemer_space_def == NULL) {
 		index_def_delete(ephemer_index_def);
 		return NULL;

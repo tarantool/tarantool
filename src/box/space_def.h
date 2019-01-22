@@ -170,6 +170,15 @@ space_def_new(uint32_t id, uint32_t uid, uint32_t exact_field_count,
 	      uint32_t field_count);
 
 /**
+ * Create a new ephemeral space definition.
+ * @param field_count Number of fields in the space.
+ *
+ * @retval Space definition.
+ */
+struct space_def *
+space_def_new_ephemeral(uint32_t field_count);
+
+/**
  * Size of the space_def.
  * @param name_len Length of the space name.
  * @param fields Fields array of space format.
