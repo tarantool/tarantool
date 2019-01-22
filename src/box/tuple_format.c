@@ -398,17 +398,20 @@ tuple_format_delete(struct tuple_format *format)
 }
 
 struct tuple_format *
-tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
-		 uint16_t key_count, const struct field_def *space_fields,
-		 uint32_t space_field_count, struct tuple_dictionary *dict)
+tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
+		 struct key_def * const *keys, uint16_t key_count,
+		 const struct field_def *space_fields,
+		 uint32_t space_field_count, uint32_t exact_field_count,
+		 struct tuple_dictionary *dict, bool is_temporary)
 {
 	struct tuple_format *format =
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
 	if (format == NULL)
 		return NULL;
 	format->vtab = *vtab;
-	format->engine = NULL;
-	format->is_temporary = false;
+	format->engine = engine;
+	format->is_temporary = is_temporary;
+	format->exact_field_count = exact_field_count;
 	if (tuple_format_register(format) < 0) {
 		tuple_format_destroy(format);
 		free(format);

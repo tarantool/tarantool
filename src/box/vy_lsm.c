@@ -60,8 +60,8 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 		  vy_upsert_thresh_cb upsert_thresh_cb,
 		  void *upsert_thresh_arg)
 {
-	env->key_format = tuple_format_new(&vy_tuple_format_vtab,
-					   NULL, 0, NULL, 0, NULL);
+	env->key_format = tuple_format_new(&vy_tuple_format_vtab, NULL,
+					   NULL, 0, NULL, 0, 0, NULL, false);
 	if (env->key_format == NULL)
 		return -1;
 	tuple_format_ref(env->key_format);
@@ -153,8 +153,9 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 		 */
 		lsm->disk_format = format;
 	} else {
-		lsm->disk_format = tuple_format_new(&vy_tuple_format_vtab,
-						    &cmp_def, 1, NULL, 0, NULL);
+		lsm->disk_format = tuple_format_new(&vy_tuple_format_vtab, NULL,
+						    &cmp_def, 1, NULL, 0, 0,
+						    NULL, false);
 		if (lsm->disk_format == NULL)
 			goto fail_format;
 	}

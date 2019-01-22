@@ -258,18 +258,23 @@ tuple_format_unref(struct tuple_format *format)
 /**
  * Allocate, construct and register a new in-memory tuple format.
  * @param vtab Virtual function table for specific engines.
+ * @param engine Pointer to storage engine.
  * @param keys Array of key_defs of a space.
  * @param key_count The number of keys in @a keys array.
  * @param space_fields Array of fields, defined in a space format.
  * @param space_field_count Length of @a space_fields.
+ * @param exact_field_count Exact field count for format.
+ * @param is_temporary Set if format belongs to temporary space.
  *
  * @retval not NULL Tuple format.
  * @retval     NULL Memory error.
  */
 struct tuple_format *
-tuple_format_new(struct tuple_format_vtab *vtab, struct key_def * const *keys,
-		 uint16_t key_count, const struct field_def *space_fields,
-		 uint32_t space_field_count, struct tuple_dictionary *dict);
+tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
+		 struct key_def * const *keys, uint16_t key_count,
+		 const struct field_def *space_fields,
+		 uint32_t space_field_count, uint32_t exact_field_count,
+		 struct tuple_dictionary *dict, bool is_temporary);
 
 /**
  * Check, if @a format1 can store any tuples of @a format2. For

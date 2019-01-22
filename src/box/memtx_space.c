@@ -990,15 +990,14 @@ memtx_space_new(struct memtx_engine *memtx,
 		keys[key_count++] = index_def->key_def;
 
 	struct tuple_format *format =
-		tuple_format_new(&memtx_tuple_format_vtab, keys, key_count,
-				 def->fields, def->field_count, def->dict);
+		tuple_format_new(&memtx_tuple_format_vtab, memtx, keys, key_count,
+				 def->fields, def->field_count,
+				 def->exact_field_count, def->dict,
+				 def->opts.is_temporary);
 	if (format == NULL) {
 		free(memtx_space);
 		return NULL;
 	}
-	format->engine = memtx;
-	format->is_temporary = def->opts.is_temporary;
-	format->exact_field_count = def->exact_field_count;
 	tuple_format_ref(format);
 
 	if (space_create((struct space *)memtx_space, (struct engine *)memtx,
