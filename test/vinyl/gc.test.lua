@@ -84,7 +84,8 @@ _ = s:create_index('pk', {run_count_per_level = 3})
 function count_runs() return #fio.glob(fio.pathjoin(box.cfg.vinyl_dir, s.id, s.index.pk.id, '*.run')) end
 
 _ = s:replace{1}
-_ = s:replace{2} -- to prevent last-level compaction (gh-3657)
+-- Some padding to prevent last-level compaction (gh-3657).
+for i = 1001, 1010 do s:replace{i} end
 box.snapshot()
 _ = s:replace{3}
 box.snapshot()

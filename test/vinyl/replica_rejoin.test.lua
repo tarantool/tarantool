@@ -8,7 +8,7 @@ test_run = env.new()
 box.schema.user.grant('guest', 'replication')
 _ = box.schema.space.create('test', { id = 9000, engine = 'vinyl' })
 _ = box.space.test:create_index('pk')
-pad = string.rep('x', 15 * 1024)
+pad = string.rep('x', 12 * 1024)
 for i = 1, 100 do box.space.test:replace{i, pad} end
 box.snapshot()
 

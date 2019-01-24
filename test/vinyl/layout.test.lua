@@ -17,12 +17,11 @@ box.snapshot()
 
 space.index.sk:alter{parts = {{2, 'unsigned', is_nullable = true}}}
 
--- Note, the first run is bigger than the second one to prevent
--- last-level compaction (gh-3657).
 space:replace{'ЭЭЭ', box.NULL}
 space:replace{'эээ', box.NULL}
 space:replace{'ёёё', box.NULL}
-space:replace{'ЭЮЯ', 666}
+-- Some padding to prevent last-level compaction (gh-3657).
+for i = 1001, 1010 do space:replace{tostring(i), i} end
 box.snapshot()
 
 space:replace{'ёёё', 123}

@@ -28,10 +28,10 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 function wait_for_dump(index, old_count)
-	while index:stat().run_count == old_count do
+	while index:stat().disk.dump.count == old_count do
 		fiber.sleep(0)
 	end
-	return index:stat().run_count
+	return index:stat().disk.dump.count
 end;
 ---
 ...
@@ -39,10 +39,7 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-index_run_count = index:stat().run_count
----
-...
-index2_run_count = index2:stat().run_count
+dump_count = index:stat().disk.dump.count
 ---
 ...
 old_stmt_count = dumped_stmt_count()
@@ -69,7 +66,7 @@ box.snapshot()
 - ok
 ...
 -- Wait for dump both indexes.
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -93,7 +90,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 space:update({1}, {{'!', 4, 20}}) -- move range containing index field
@@ -104,7 +101,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 space:update({1}, {{'#', 3, 1}}) -- same
@@ -115,7 +112,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -151,7 +148,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 -- Move range that doesn't contain indexed fields.
@@ -163,7 +160,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 space:update({2}, {{'#', 6, 1}}) -- same
@@ -174,7 +171,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -224,13 +221,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = index:stat().run_count
----
-...
-index2_run_count = index2:stat().run_count
----
-...
-index3_run_count = index3:stat().run_count
+dump_count = index:stat().run_count
 ---
 ...
 old_stmt_count = dumped_stmt_count()
@@ -256,7 +247,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -278,7 +269,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 index:update({2}, {{'!', 3, 20}}) -- move range containing all indexes
@@ -289,7 +280,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 index:update({2}, {{'=', 7, 100}, {'+', 5, 10}, {'#', 3, 1}}) -- change two cols but then move range with all indexed fields
@@ -300,7 +291,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -343,7 +334,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -365,7 +356,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -387,7 +378,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -439,7 +430,7 @@ box.snapshot()
 - ok
 ...
 -- Make update of not indexed field with pos > 64.
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 old_stmt_count = dumped_stmt_count()
@@ -453,7 +444,7 @@ box.snapshot()
 - ok
 ...
 -- Check the only primary index to be changed.
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -481,7 +472,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -524,7 +515,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 old_stmt_count = dumped_stmt_count()
@@ -538,7 +529,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 new_stmt_count = dumped_stmt_count()
@@ -604,7 +595,7 @@ box.snapshot()
 ---
 - ok
 ...
-index_run_count = wait_for_dump(index, index_run_count)
+dump_count = wait_for_dump(index, dump_count)
 ---
 ...
 old_stmt_count = dumped_stmt_count()
@@ -728,9 +719,9 @@ s:insert{1, 10}
 ---
 - [1, 10]
 ...
-s:insert{10, 100} -- to prevent last-level compaction (gh-3657)
+-- Some padding to prevent last-level compaction (gh-3657).
+for i = 1001, 1010 do s:replace{i, i} end
 ---
-- [10, 100]
 ...
 box.snapshot()
 ---
@@ -747,11 +738,11 @@ box.snapshot()
 ---
 - ok
 ...
--- Should be 3: INSERT{10, 1} and INSERT{100, 10} in the first run
+-- Should be 12: INSERT{10, 1} and INSERT[1001..1010] in the first run
 -- plus DELETE{10, 1} in the second run.
 s.index.sk:stat().rows
 ---
-- 3
+- 12
 ...
 s:insert{1, 20}
 ---
@@ -760,7 +751,16 @@ s:insert{1, 20}
 s.index.sk:select()
 ---
 - - [1, 20]
-  - [10, 100]
+  - [1001, 1001]
+  - [1002, 1002]
+  - [1003, 1003]
+  - [1004, 1004]
+  - [1005, 1005]
+  - [1006, 1006]
+  - [1007, 1007]
+  - [1008, 1008]
+  - [1009, 1009]
+  - [1010, 1010]
 ...
 s:drop()
 ---

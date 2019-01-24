@@ -321,21 +321,41 @@ vy_range_update_compaction_priority(struct vy_range *range,
 	uint32_t level_run_count = 0;
 	/*
 	 * The target (perfect) size of a run at the current level.
-	 * For the first level, it's the size of the newest run.
-	 * For lower levels it's computed as first level run size
-	 * times run_size_ratio.
+	 * Calculated recurrently: the size of the next level equals
+	 * the size of the previous level times run_size_ratio.
+	 *
+	 * For the last level we want it to be slightly greater
+	 * than the size of the last (biggest, oldest) run so that
+	 * all newer runs are at least run_size_ratio times smaller,
+	 * because in conjunction with the fact that we never store
+	 * more than one run at the last level, this will keep space
+	 * amplification below 2 provided run_count_per_level is not
+	 * greater than (run_size_ratio - 1).
+	 *
+	 * So to calculate the target size of the first level, we
+	 * divide the size of the oldest run by run_size_ratio until
+	 * it exceeds the size of the newest run. Note, DIV_ROUND_UP
+	 * is important here, because if we used integral division,
+	 * then after descending to the last level we would get a
+	 * value slightly less than the last run size, not slightly
+	 * greater, as we wanted to, which could increase space
+	 * amplification by run_count_per_level in the worse case
+	 * scenario.
 	 */
-	uint64_t target_run_size = 0;
+	uint64_t target_run_size;
 
+	uint64_t size;
 	struct vy_slice *slice;
+	slice = rlist_last_entry(&range->slices, struct vy_slice, in_range);
+	size = slice->count.bytes;
+	slice = rlist_first_entry(&range->slices, struct vy_slice, in_range);
+	do {
+		target_run_size = size;
+		size = DIV_ROUND_UP(target_run_size, opts->run_size_ratio);
+	} while (size > (uint64_t)MAX(slice->count.bytes, 1));
+
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		uint64_t size = slice->count.bytes;
-		/*
-		 * The size of the first level is defined by
-		 * the size of the most recent run.
-		 */
-		if (target_run_size == 0)
-			target_run_size = size;
+		size = slice->count.bytes;
 		level_run_count++;
 		total_run_count++;
 		vy_disk_stmt_counter_add(&total_stmt_count, &slice->count);

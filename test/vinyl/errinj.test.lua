@@ -371,7 +371,8 @@ s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk', {run_count_per_level = 10})
 _ = s:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
 s:replace{1, 10}
-s:replace{10, 100} -- to prevent last-level compaction (gh-3657)
+-- Some padding to prevent last-level compaction (gh-3657).
+for i = 1001, 1010 do s:replace{i, i} end
 box.snapshot()
 s:replace{1, 20}
 box.snapshot()
