@@ -1016,9 +1016,9 @@ s:replace{1, 10}
 ---
 - [1, 10]
 ...
-s:replace{10, 100} -- to prevent last-level compaction (gh-3657)
+-- Some padding to prevent last-level compaction (gh-3657).
+for i = 1001, 1010 do s:replace{i, i} end
 ---
-- [10, 100]
 ...
 box.snapshot()
 ---
