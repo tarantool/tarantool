@@ -129,8 +129,7 @@ evio_setsockopt_client(int fd, int family, int type)
 	return 0;
 }
 
-/** Set options for server sockets. */
-static int
+int
 evio_setsockopt_server(int fd, int family, int type)
 {
 	int on = 1;

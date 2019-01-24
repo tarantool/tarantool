@@ -157,6 +157,10 @@ evio_timeout_update(ev_loop *loop, ev_tstamp start, ev_tstamp *delay)
 int
 evio_setsockopt_client(int fd, int family, int type);
 
+/** Set options for server sockets. */
+int
+evio_setsockopt_server(int fd, int family, int type);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
