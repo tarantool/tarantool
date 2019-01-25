@@ -826,7 +826,7 @@ memtx_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
 	xdir_collect_garbage(&memtx->snap_dir, vclock_sum(vclock),
-			     XDIR_GC_USE_COIO);
+			     XDIR_GC_ASYNC);
 }
 
 static int
