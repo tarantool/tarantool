@@ -675,17 +675,7 @@ retry:
 		warn_no_space = false;
 	}
 
-	/* Keep the original error. */
-	struct diag diag;
-	diag_create(&diag);
-	diag_move(diag_get(), &diag);
-	if (xdir_collect_garbage(&writer->wal_dir, gc_lsn,
-				 XDIR_GC_REMOVE_ONE) != 0) {
-		diag_move(&diag, diag_get());
-		goto error;
-	}
-	diag_destroy(&diag);
-
+	xdir_collect_garbage(&writer->wal_dir, gc_lsn, XDIR_GC_REMOVE_ONE);
 	wal_notify_watchers(writer, WAL_EVENT_GC);
 	goto retry;
 error:

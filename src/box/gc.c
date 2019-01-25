@@ -211,20 +211,24 @@ gc_run(void)
 	/*
 	 * Run garbage collection.
 	 *
-	 * The order is important here: we must invoke garbage
-	 * collection for memtx snapshots first and abort if it
-	 * fails - see comment to memtx_engine_collect_garbage().
+	 * It may occur that we proceed to deletion of WAL files
+	 * and other engine files after having failed to delete
+	 * a memtx snap file. If this happens, the corresponding
+	 * checkpoint won't be removed from box.info.gc(), because
+	 * we use snap files to build the checkpoint list, but
+	 * it won't be possible to back it up or recover from it.
+	 * This is OK as unlink() shouldn't normally fail. Besides
+	 * we never remove the last checkpoint and the following
+	 * WALs so this may only affect backup checkpoints.
 	 */
-	int rc = 0;
 	if (run_engine_gc)
-		rc = engine_collect_garbage(&checkpoint->vclock);
+		engine_collect_garbage(&checkpoint->vclock);
 	/*
 	 * Run wal_collect_garbage() even if we don't need to
 	 * delete any WAL files, because we have to apprise
 	 * the WAL thread of the oldest checkpoint signature.
 	 */
-	if (rc == 0)
-		wal_collect_garbage(vclock, &checkpoint->vclock);
+	wal_collect_garbage(vclock, &checkpoint->vclock);
 	latch_unlock(&gc.latch);
 }
 

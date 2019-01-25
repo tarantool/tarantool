@@ -166,8 +166,8 @@ struct engine_vtab {
 	 * fails to delete a snapshot file, because we recover
 	 * checkpoint list by scanning the snapshot directory.
 	 */
-	int (*collect_garbage)(struct engine *engine,
-			       const struct vclock *vclock);
+	void (*collect_garbage)(struct engine *engine,
+				const struct vclock *vclock);
 	/**
 	 * Backup callback. It is supposed to call @cb for each file
 	 * that needs to be backed up in order to restore from the
@@ -337,7 +337,7 @@ engine_commit_checkpoint(const struct vclock *vclock);
 void
 engine_abort_checkpoint(void);
 
-int
+void
 engine_collect_garbage(const struct vclock *vclock);
 
 int
@@ -370,7 +370,7 @@ int generic_engine_begin_checkpoint(struct engine *);
 int generic_engine_wait_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_commit_checkpoint(struct engine *, const struct vclock *);
 void generic_engine_abort_checkpoint(struct engine *);
-int generic_engine_collect_garbage(struct engine *, const struct vclock *);
+void generic_engine_collect_garbage(struct engine *, const struct vclock *);
 int generic_engine_backup(struct engine *, const struct vclock *,
 			  engine_backup_cb, void *);
 void generic_engine_memory_stat(struct engine *, struct engine_memory_stat *);
