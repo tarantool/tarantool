@@ -64,6 +64,7 @@ struct Parse;
 struct Select;
 struct Table;
 struct sql_trigger;
+struct space_def;
 
 /**
  * Perform parsing of provided expression. This is done by
@@ -170,14 +171,6 @@ struct Expr*
 space_column_default_expr(uint32_t space_id, uint32_t fieldno);
 
 /**
- * Get server checks list by space_id.
- * @param space_id Space ID.
- * @retval Checks list.
- */
-struct ExprList *
-space_checks_expr_list(uint32_t space_id);
-
-/**
  * Return the number of bytes required to create a duplicate of the
  * expression passed as the first argument. The second argument is a
  * mask containing EXPRDUP_XXX flags.
@@ -222,35 +215,14 @@ void
 sql_expr_delete(struct sql *db, struct Expr *expr, bool extern_alloc);
 
 /**
- * Create and initialize a new ephemeral SQL Table object.
+ * Create and initialize a new ephemeral space object.
  * @param parser SQL Parser object.
- * @param name Table to create name.
+ * @param name Name of space to be created.
  * @retval NULL on memory allocation error, Parser state changed.
  * @retval not NULL on success.
  */
-struct Table *
-sql_ephemeral_table_new(struct Parse *parser, const char *name);
-
-/**
- * Create and initialize a new ephemeral space_def object.
- * @param parser SQL Parser object.
- * @param name Table to create name.
- * @retval NULL on memory allocation error, Parser state changed.
- * @retval not NULL on success.
- */
-struct space_def *
-sql_ephemeral_space_def_new(struct Parse *parser, const char *name);
-
-/**
- * Rebuild struct def in Table with memory allocated on a single
- * malloc.
- * @param db The database connection.
- * @param table The Table with fragmented def to rebuild.
- * @retval 1 on memory allocation error.
- * @retval 0 on success.
- */
-int
-sql_table_def_rebuild(struct sql *db, struct Table *table);
+struct space *
+sql_ephemeral_space_new(struct Parse *parser, const char *name);
 
 /**
  * Duplicate Expr list.
@@ -298,14 +270,15 @@ sql_expr_list_append(struct sql *db, struct ExprList *expr_list,
  * the column number. Any errors cause an error message to be set
  * in parser.
  * @param parser Parsing context.
- * @param table The table being referenced.
+ * @param def The definition of space being referenced.
  * @param type NC_IsCheck or NC_IdxExpr.
  * @param expr Expression to resolve.  May be NULL.
  * @param expr_list Expression list to resolve.  May be NUL.
  */
 void
-sql_resolve_self_reference(struct Parse *parser, struct Table *table, int type,
-			   struct Expr *expr, struct ExprList *expr_list);
+sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
+			   int type, struct Expr *expr,
+			   struct ExprList *expr_list);
 
 /**
  * Initialize check_list_item.

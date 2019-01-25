@@ -970,7 +970,7 @@ cursor_advance(BtCursor *pCur, int *pRes)
  */
 
 char *
-sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
+sql_encode_table(struct region *region, struct space_def *def, uint32_t *size)
 {
 	size_t used = region_used(region);
 	struct mpstream stream;
@@ -978,7 +978,6 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
 		      set_encode_error, &is_error);
 
-	const struct space_def *def = table->def;
 	assert(def != NULL);
 	uint32_t field_count = def->field_count;
 	mpstream_encode_array(&stream, field_count);
@@ -1029,7 +1028,7 @@ sql_encode_table(struct region *region, struct Table *table, uint32_t *size)
 }
 
 char *
-sql_encode_table_opts(struct region *region, struct Table *table,
+sql_encode_table_opts(struct region *region, struct space_def *def,
 		      const char *sql, uint32_t *size)
 {
 	size_t used = region_used(region);
@@ -1039,8 +1038,8 @@ sql_encode_table_opts(struct region *region, struct Table *table,
 		      set_encode_error, &is_error);
 	int checks_cnt = 0;
 	struct ExprList_item *a;
-	bool is_view = table->def->opts.is_view;
-	struct ExprList *checks = table->def->opts.checks;
+	bool is_view = def->opts.is_view;
+	struct ExprList *checks = def->opts.checks;
 	if (checks != NULL) {
 		checks_cnt = checks->nExpr;
 		a = checks->a;
@@ -1230,7 +1229,14 @@ space_column_default_expr(uint32_t space_id, uint32_t fieldno)
 	return space->def->fields[fieldno].default_value_expr;
 }
 
-struct space_def *
+/**
+ * Create and initialize a new ephemeral space_def object.
+ * @param parser SQL Parser object.
+ * @param name Name of space to be created.
+ * @retval NULL on memory allocation error, Parser state changed.
+ * @retval not NULL on success.
+ */
+static struct space_def *
 sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 {
 	struct space_def *def = NULL;
@@ -1254,49 +1260,24 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 	return def;
 }
 
-Table *
-sql_ephemeral_table_new(Parse *parser, const char *name)
+struct space *
+sql_ephemeral_space_new(Parse *parser, const char *name)
 {
-	sql *db = parser->db;
-	struct space_def *def = NULL;
-	Table *table = sqlDbMallocZero(db, sizeof(Table));
-	if (table != NULL)
-		def = sql_ephemeral_space_def_new(parser, name);
-	if (def == NULL) {
-		sqlDbFree(db, table);
-		return NULL;
-	}
-	table->space = (struct space *) region_alloc(&parser->region,
-						     sizeof(struct space));
-	if (table->space == NULL) {
-		diag_set(OutOfMemory, sizeof(struct space), "region", "space");
+	size_t sz = sizeof(struct space);
+	struct space *space = (struct space *) region_alloc(&parser->region, sz);
+	if (space == NULL) {
+		diag_set(OutOfMemory, sz, "region", "space");
 		parser->rc = SQL_TARANTOOL_ERROR;
 		parser->nErr++;
-		sqlDbFree(db, table);
 		return NULL;
 	}
-	memset(table->space, 0, sizeof(struct space));
-	table->def = def;
-	return table;
-}
 
-int
-sql_table_def_rebuild(struct sql *db, struct Table *pTable)
-{
-	struct space_def *old_def = pTable->def;
-	struct space_def *new_def = NULL;
-	new_def = space_def_new(old_def->id, old_def->uid,
-				old_def->field_count, old_def->name,
-				strlen(old_def->name), old_def->engine_name,
-				strlen(old_def->engine_name), &old_def->opts,
-				old_def->fields, old_def->field_count);
-	if (new_def == NULL) {
-		sqlOomFault(db);
-		return -1;
-	}
-	pTable->def = new_def;
-	pTable->def->opts.is_temporary = false;
-	return 0;
+	memset(space, 0, sz);
+	space->def = sql_ephemeral_space_def_new(parser, name);
+	if (space->def == NULL)
+		return NULL;
+
+	return space;
 }
 
 int
@@ -1353,12 +1334,7 @@ sql_checks_resolve_space_def_reference(ExprList *expr_list,
 	sql_parser_create(&parser, sql_get());
 	parser.parse_only = true;
 
-	Table dummy_table;
-	memset(&dummy_table, 0, sizeof(dummy_table));
-	dummy_table.def = def;
-
-	sql_resolve_self_reference(&parser, &dummy_table, NC_IsCheck, NULL,
-				   expr_list);
+	sql_resolve_self_reference(&parser, def, NC_IsCheck, NULL, expr_list);
 	int rc = 0;
 	if (parser.rc != SQL_OK) {
 		/* Tarantool error may be already set with diag. */

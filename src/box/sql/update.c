@@ -81,7 +81,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	      enum on_conflict_action on_error)
 {
 	int i, j;		/* Loop counters */
-	Table *pTab;		/* The table to be updated */
 	int addrTop = 0;	/* VDBE instruction address of the start of the loop */
 	WhereInfo *pWInfo;	/* Information about the WHERE clause */
 	Vdbe *v;		/* The virtual database engine */
@@ -124,32 +123,32 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 
 	/* Locate the table which we want to update.
 	 */
-	pTab = sql_lookup_table(pParse, pTabList->a);
-	if (pTab == NULL)
+	struct space *space = sql_lookup_space(pParse, pTabList->a);
+	if (space == NULL)
 		goto update_cleanup;
 
 	/* Figure out if we have any triggers and if the table being
 	 * updated is a view.
 	 */
-	trigger = sql_triggers_exist(pTab, TK_UPDATE, pChanges, &tmask);
-	is_view = pTab->def->opts.is_view;
+	trigger = sql_triggers_exist(space->def, TK_UPDATE, pChanges, &tmask);
+	is_view = space->def->opts.is_view;
 	assert(trigger != NULL || tmask == 0);
 
 	if (is_view &&
-	    sql_view_assign_cursors(pParse,pTab->def->opts.sql) != 0) {
+	    sql_view_assign_cursors(pParse, space->def->opts.sql) != 0) {
 		goto update_cleanup;
 	}
 	if (is_view && tmask == 0) {
 		sqlErrorMsg(pParse, "cannot modify %s because it is a view",
-				pTab->def->name);
+				space->def->name);
 		goto update_cleanup;
 	}
 
-	struct space_def *def = pTab->def;
+	struct space_def *def = space->def;
 	/* Allocate cursor on primary index. */
 	int pk_cursor = pParse->nTab++;
 	pTabList->a[0].iCursor = pk_cursor;
-	struct index *pPk = space_index(pTab->space, 0);
+	struct index *pPk = space_index(space, 0);
 	i = sizeof(int) * def->field_count;
 	aXRef = (int *) region_alloc(&pParse->region, i);
 	if (aXRef == NULL) {
@@ -176,7 +175,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			if (strcmp(def->fields[j].name,
 				   pChanges->a[i].zName) == 0) {
 				if (pPk &&
-				    sql_space_column_is_in_pk(pTab->space, j))
+				    sql_space_column_is_in_pk(space, j))
 					is_pk_modified = true;
 				if (aXRef[j] != -1) {
 					sqlErrorMsg(pParse,
@@ -202,7 +201,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 */
 	pTabList->a[0].colUsed = 0;
 
-	hasFK = fkey_is_required(pTab->def->id, aXRef);
+	hasFK = fkey_is_required(space, aXRef);
 
 	/* Begin generating code. */
 	v = sqlGetVdbe(pParse);
@@ -226,13 +225,11 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 * an ephemeral table.
 	 */
 	uint32_t pk_part_count;
-	struct space *space;
 	if (is_view) {
 		sql_materialize_view(pParse, def->name, pWhere, pk_cursor);
 		/* Number of columns from SELECT plus ID.*/
 		pk_part_count = nKey = def->field_count + 1;
 	} else {
-		space = pTab->space;
 		assert(space != NULL);
 		vdbe_emit_open_cursor(pParse, pk_cursor, 0, space);
 		pk_part_count = pPk->def->key_def->part_count;
@@ -298,7 +295,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	/* Initialize the count of updated rows
 	 */
 	if ((user_session->sql_flags & SQL_CountRows)
-	    && !pParse->pTriggerTab) {
+	    && pParse->triggered_space == NULL) {
 		regRowCount = ++pParse->nMem;
 		sqlVdbeAddOp2(v, OP_Integer, 0, regRowCount);
 	}
@@ -333,16 +330,15 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 * information is needed
 	 */
 	if (is_pk_modified || hasFK != 0 || trigger != NULL) {
-		struct space *space = space_by_id(pTab->def->id);
 		assert(space != NULL);
 		u32 oldmask = hasFK ? space->fkey_mask : 0;
 		oldmask |= sql_trigger_colmask(pParse, trigger, pChanges, 0,
 					       TRIGGER_BEFORE | TRIGGER_AFTER,
-					       pTab, on_error);
+					       space, on_error);
 		for (i = 0; i < (int)def->field_count; i++) {
 			if (oldmask == 0xffffffff
 			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0) ||
-				sql_space_column_is_in_pk(pTab->space, i)) {
+				sql_space_column_is_in_pk(space, i)) {
 				testcase(oldmask != 0xffffffff && i == 31);
 				sqlExprCodeGetColumnOfTable(v, def,
 								pk_cursor, i,
@@ -368,7 +364,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 * be used eliminates some redundant opcodes.
 	 */
 	newmask = sql_trigger_colmask(pParse, trigger, pChanges, 1,
-				      TRIGGER_BEFORE, pTab, on_error);
+				      TRIGGER_BEFORE, space, on_error);
 	for (i = 0; i < (int)def->field_count; i++) {
 		j = aXRef[i];
 		if (j >= 0) {
@@ -394,9 +390,9 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 * verified. One could argue that this is wrong.
 	 */
 	if (tmask & TRIGGER_BEFORE) {
-		sql_emit_table_types(v, pTab->def, regNew);
+		sql_emit_table_types(v, space->def, regNew);
 		vdbe_code_row_trigger(pParse, trigger, TK_UPDATE, pChanges,
-				      TRIGGER_BEFORE, pTab, regOldPk,
+				      TRIGGER_BEFORE, space, regOldPk,
 				      on_error, labelContinue);
 
 		/* The row-trigger may have deleted the row being updated. In this
@@ -431,11 +427,11 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 
 	if (!is_view) {
 		assert(regOldPk > 0);
-		vdbe_emit_constraint_checks(pParse, pTab, regNewPk + 1,
+		vdbe_emit_constraint_checks(pParse, space, regNewPk + 1,
 					    on_error, labelContinue, aXRef);
 		/* Do FK constraint checks. */
 		if (hasFK) {
-			fkey_emit_check(pParse, pTab, regOldPk, 0, aXRef);
+			fkey_emit_check(pParse, space, regOldPk, 0, aXRef);
 		}
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			/*
@@ -451,11 +447,11 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			sqlVdbeJumpHere(v, not_found_lbl);
 		}
 		if (hasFK) {
-			fkey_emit_check(pParse, pTab, 0, regNewPk, aXRef);
+			fkey_emit_check(pParse, space, 0, regNewPk, aXRef);
 		}
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			 vdbe_emit_insertion_completion(v, space, regNew,
-							pTab->def->field_count,
+							space->def->field_count,
 							on_error);
 
 		} else {
@@ -500,18 +496,18 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		 * via a foreign key to the row just updated.
 		 */
 		if (hasFK)
-			fkey_emit_actions(pParse, pTab, regOldPk, aXRef);
+			fkey_emit_actions(pParse, space, regOldPk, aXRef);
 	}
 
 	/* Increment the row counter
 	 */
 	if ((user_session->sql_flags & SQL_CountRows)
-	    && !pParse->pTriggerTab) {
+	    && pParse->triggered_space == NULL) {
 		sqlVdbeAddOp2(v, OP_AddImm, regRowCount, 1);
 	}
 
 	vdbe_code_row_trigger(pParse, trigger, TK_UPDATE, pChanges,
-			      TRIGGER_AFTER, pTab, regOldPk, on_error,
+			      TRIGGER_AFTER, space, regOldPk, on_error,
 			      labelContinue);
 
 	/* Repeat the above with the next record to be updated, until
@@ -528,7 +524,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 
 	/* Return the number of rows that were changed. */
 	if (user_session->sql_flags & SQL_CountRows &&
-	    pParse->pTriggerTab == NULL) {
+	    pParse->triggered_space == NULL) {
 		sqlVdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
 		sqlVdbeSetNumCols(v, 1);
 		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows updated",

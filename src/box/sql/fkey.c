@@ -301,20 +301,24 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 	sqlVdbeAddOp1(v, OP_Close, cursor);
 }
 
-/*
- * Return an Expr object that refers to a memory register corresponding
- * to column iCol of table pTab.
+/**
+ * Return an Expr object that refers to a memory register
+ * corresponding to column iCol of given space.
  *
- * regBase is the first of an array of register that contains the data
- * for pTab.  regBase+1 holds the first column.
+ * regBase is the first of an array of register that contains
+ * the data for given space.  regBase+1 holds the first column.
  * regBase+2 holds the second column, and so forth.
+ *
+ * @param pParse Parsing and code generating context.
+ * @param def Definition of space whose content is at r[regBase]...
+ * @param regBase Contents of table defined by def.
+ * @param iCol Which column of space is desired.
+ * @return an Expr object that refers to a memory register
+ *         corresponding to column iCol of given space.
  */
 static Expr *
-exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
-		  Table * pTab,	/* The table whose content is at r[regBase]... */
-		  int regBase,	/* Contents of table pTab */
-		  i16 iCol	/* Which column of pTab is desired */
-    )
+space_field_register(Parse *pParse, struct space_def *def, int regBase,
+		     i16 iCol)
 {
 	Expr *pExpr;
 	sql *db = pParse->db;
@@ -323,7 +327,7 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
 	if (pExpr) {
 		if (iCol >= 0) {
 			pExpr->iTable = regBase + iCol + 1;
-			pExpr->type = pTab->def->fields[iCol].type;
+			pExpr->type = def->fields[iCol].type;
 		} else {
 			pExpr->iTable = regBase;
 			pExpr->type = FIELD_TYPE_INTEGER;
@@ -392,14 +396,15 @@ exprTableColumn(sql * db, struct space_def *def, int cursor, i16 column)
  * this file as "I.2" and "D.2".
  * @param parser SQL parser.
  * @param src The child table to be scanned.
- * @param tab Parent table.
+ * @param def Parent space definition.
  * @param fkey The foreign key linking src to tab.
  * @param reg_data Register from which parent row data starts.
  * @param incr_count Amount to increment deferred counter by.
  */
 static void
-fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
-		   struct fkey_def *fkey, int reg_data, int incr_count)
+fkey_scan_children(struct Parse *parser, struct SrcList *src,
+		   struct space_def *def, struct fkey_def *fkey, int reg_data,
+		   int incr_count)
 {
 	assert(incr_count == -1 || incr_count == 1);
 	struct sql *db = parser->db;
@@ -414,7 +419,7 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 		VdbeCoverage(v);
 	}
 
-	struct space *child_space = space_by_id(fkey->child_id);
+	struct space *child_space = src->a[0].space;
 	assert(child_space != NULL);
 	/*
 	 * Create an Expr object representing an SQL expression
@@ -430,7 +435,7 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 	for (uint32_t i = 0; i < fkey->field_count; i++) {
 		uint32_t fieldno = fkey->links[i].parent_field;
 		struct Expr *pexpr =
-			exprTableRegister(parser, tab, reg_data, fieldno);
+			space_field_register(parser, def, reg_data, fieldno);
 		fieldno = fkey->links[i].child_field;
 		const char *field_name = child_space->def->fields[fieldno].name;
 		struct Expr *chexpr = sqlExpr(db, TK_ID, field_name);
@@ -447,14 +452,14 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 	 *     NOT( $current_a==a AND $current_b==b AND ... )
 	 *     The primary key is (a,b,...)
 	 */
-	if (tab->def->id == fkey->child_id && incr_count > 0) {
+	if (def->id == fkey->child_id && incr_count > 0) {
 		struct Expr *expr = NULL, *pexpr, *chexpr, *eq;
 		for (uint32_t i = 0; i < fkey->field_count; i++) {
 			uint32_t fieldno = fkey->links[i].parent_field;
-			pexpr = exprTableRegister(parser, tab, reg_data,
-						  fieldno);
-			chexpr = exprTableColumn(db, tab->def,
-						 src->a[0].iCursor, fieldno);
+			pexpr = space_field_register(parser, def, reg_data,
+						     fieldno);
+			chexpr = exprTableColumn(db, def, src->a[0].iCursor,
+						 fieldno);
 			eq = sqlPExpr(parser, TK_EQ, pexpr, chexpr);
 			expr = sqlExprAnd(db, expr, eq);
 		}
@@ -525,7 +530,7 @@ fkey_action_is_set_null(struct Parse *parse_context, const struct fkey *fkey)
 }
 
 void
-fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
+fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
 		int reg_new, const int *changed_cols)
 {
 	bool is_update = changed_cols != NULL;
@@ -541,7 +546,6 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 	 * Loop through all the foreign key constraints for which
 	 * tab is the child table.
 	 */
-	struct space *space = space_by_id(tab->def->id);
 	assert(space != NULL);
 	struct fkey *fk;
 	rlist_foreach_entry(fk, &space->child_fkey, child_link) {
@@ -616,28 +620,18 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 		struct SrcList_item *item = src->a;
 		struct space *child = space_by_id(fk->def->child_id);
 		assert(child != NULL);
-		/*
-		 * Create surrogate struct Table wrapper around
-		 * space_def to support legacy interface.
-		 */
-		struct Table fake_tab;
-		memset(&fake_tab, 0, sizeof(fake_tab));
-		fake_tab.def = child->def;
-		fake_tab.space = child;
-		/* Prevent from deallocationg fake_tab. */
-		fake_tab.nTabRef = 2;
-		item->pTab = &fake_tab;
+		item->space = child;
 		item->zName = sqlDbStrDup(db, child->def->name);
 		item->iCursor = parser->nTab++;
 
 		if (reg_new != 0) {
-			fkey_scan_children(parser, src, tab, fk->def, reg_new,
-					   -1);
+			fkey_scan_children(parser, src, space->def, fk->def,
+					   reg_new, -1);
 		}
 		if (reg_old != 0) {
 			enum fkey_action action = fk_def->on_update;
-			fkey_scan_children(parser, src, tab, fk->def, reg_old,
-					   1);
+			fkey_scan_children(parser, src, space->def, fk->def,
+				           reg_old, 1);
 			/*
 			 * If this is a deferred FK constraint, or
 			 * a CASCADE or SET NULL action applies,
@@ -676,9 +670,8 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 }
 
 bool
-fkey_is_required(uint32_t space_id, const int *changes)
+fkey_is_required(struct space *space, const int *changes)
 {
-	struct space *space = space_by_id(space_id);
 	if (changes == NULL) {
 		/*
 		 * A DELETE operation. FK processing is required
@@ -737,7 +730,7 @@ fkey_is_required(uint32_t space_id, const int *changes)
  * foreign key object by fkey_delete().
  *
  * @param pParse Parse context.
- * @param pTab Table being updated or deleted from.
+ * @param def Definition of space being updated or deleted from.
  * @param fkey Foreign key to get action for.
  * @param is_update True if action is on update.
  *
@@ -745,8 +738,8 @@ fkey_is_required(uint32_t space_id, const int *changes)
  * @retval NULL on failure.
  */
 static struct sql_trigger *
-fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
-		    bool is_update)
+fkey_action_trigger(struct Parse *pParse, struct space_def *def,
+		    struct fkey *fkey, bool is_update)
 {
 	struct sql *db = pParse->db;
 	struct fkey_def *fk_def = fkey->def;
@@ -774,7 +767,7 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 		struct field_def *child_fields = child_space->def->fields;
 
 		uint32_t pcol = fk_def->links[i].parent_field;
-		sqlTokenInit(&t_to_col, pTab->def->fields[pcol].name);
+		sqlTokenInit(&t_to_col, def->fields[pcol].name);
 
 		uint32_t chcol = fk_def->links[i].child_field;
 		sqlTokenInit(&t_from_col, child_fields[chcol].name);
@@ -932,7 +925,7 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 }
 
 void
-fkey_emit_actions(struct Parse *parser, struct Table *tab, int reg_old,
+fkey_emit_actions(struct Parse *parser, struct space *space, int reg_old,
 		  const int *changes)
 {
 	/*
@@ -941,7 +934,6 @@ fkey_emit_actions(struct Parse *parser, struct Table *tab, int reg_old,
 	 * this operation (either update or delete),
 	 * invoke the associated trigger sub-program.
 	 */
-	struct space *space = space_by_id(tab->def->id);
 	assert(space != NULL);
 	struct fkey *fk;
 	rlist_foreach_entry(fk, &space->parent_fkey, parent_link)  {
@@ -949,10 +941,11 @@ fkey_emit_actions(struct Parse *parser, struct Table *tab, int reg_old,
 		    !fkey_is_modified(fk->def, FIELD_LINK_PARENT, changes))
 			continue;
 		struct sql_trigger *pAct =
-			fkey_action_trigger(parser, tab, fk, changes != NULL);
+			fkey_action_trigger(parser, space->def, fk,
+					    changes != NULL);
 		if (pAct == NULL)
 			continue;
-		vdbe_code_row_trigger_direct(parser, pAct, tab, reg_old,
+		vdbe_code_row_trigger_direct(parser, pAct, space, reg_old,
 					     ON_CONFLICT_ACTION_ABORT, 0);
 	}
 }

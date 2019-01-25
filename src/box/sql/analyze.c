@@ -1591,11 +1591,11 @@ const log_est_t default_tuple_est[] = {DEFAULT_TUPLE_LOG_COUNT,
 				       33, 32, 30, 28, 26, 23};
 
 LogEst
-sql_space_tuple_log_count(struct Table *tab)
+sql_space_tuple_log_count(struct space *space)
 {
-	struct space *space = space_by_id(tab->def->id);
-	if (space == NULL)
-		return tab->tuple_log_count;
+	if (space == NULL || space->index_map == NULL)
+		return 0;
+
 	struct index *pk = space_index(space, 0);
 	assert(sqlLogEst(DEFAULT_TUPLE_COUNT) == DEFAULT_TUPLE_LOG_COUNT);
 	/* If space represents VIEW, return default number. */

@@ -558,14 +558,14 @@ checkColumnOverlap(IdList * pIdList, ExprList * pEList)
 }
 
 struct sql_trigger *
-sql_triggers_exist(struct Table *table, int op, struct ExprList *changes_list,
-		   int *mask_ptr)
+sql_triggers_exist(struct space_def *space_def, int op,
+		   struct ExprList *changes_list, int *mask_ptr)
 {
 	int mask = 0;
 	struct sql_trigger *trigger_list = NULL;
 	struct session *user_session = current_session();
 	if ((user_session->sql_flags & SQL_EnableTrigger) != 0)
-		trigger_list = space_trigger_list(table->def->id);
+		trigger_list = space_trigger_list(space_def->id);
 	for (struct sql_trigger *p = trigger_list; p != NULL; p = p->next) {
 		if (p->op == op && checkColumnOverlap(p->pColumns,
 						      changes_list) != 0)
@@ -614,7 +614,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 	Vdbe *v = pParse->pVdbe;
 	sql *db = pParse->db;
 
-	assert(pParse->pTriggerTab && pParse->pToplevel);
+	assert(pParse->triggered_space != NULL && pParse->pToplevel != NULL);
 	assert(pStepList);
 	assert(v != 0);
 
@@ -748,7 +748,7 @@ transferParseError(Parse * pTo, Parse * pFrom)
  *
  * @param parser Current parse context.
  * @param trigger sql_trigger to code.
- * @param table trigger is attached to.
+ * @param space Trigger is attached to.
  * @param orconf ON CONFLICT policy to code trigger program with.
  *
  * @retval not NULL on success.
@@ -756,7 +756,7 @@ transferParseError(Parse * pTo, Parse * pFrom)
  */
 static TriggerPrg *
 sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
-			struct Table *table, int orconf)
+			struct space *space, int orconf)
 {
 	Parse *pTop = sqlParseToplevel(parser);
 	/* Database handle. */
@@ -768,7 +768,7 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	Parse *pSubParse;	/* Parse context for sub-vdbe */
 	int iEndTrigger = 0;	/* Label to jump to if WHEN is false */
 
-	assert(trigger->zName == NULL || table->def->id == trigger->space_id);
+	assert(trigger->zName == NULL || space->def->id == trigger->space_id);
 	assert(pTop->pVdbe);
 
 	/* Allocate the TriggerPrg and SubProgram objects. To ensure that they
@@ -799,7 +799,7 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	sql_parser_create(pSubParse, db);
 	memset(&sNC, 0, sizeof(sNC));
 	sNC.pParse = pSubParse;
-	pSubParse->pTriggerTab = table;
+	pSubParse->triggered_space = space;
 	pSubParse->pToplevel = pTop;
 	pSubParse->eTriggerOp = trigger->op;
 	pSubParse->nQueryLoop = parser->nQueryLoop;
@@ -814,7 +814,7 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 			     (trigger->op == TK_UPDATE ? "UPDATE" : ""),
 			     (trigger->op == TK_INSERT ? "INSERT" : ""),
 			     (trigger->op == TK_DELETE ? "DELETE" : ""),
-			      table->def->name));
+			      space->def->name));
 #ifndef SQL_OMIT_TRACE
 		sqlVdbeChangeP4(v, -1,
 				    sqlMPrintf(db, "-- TRIGGER %s",
@@ -864,7 +864,6 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 		sqlVdbeDelete(v);
 	}
 
-	assert(!pSubParse->pZombieTab);
 	assert(!pSubParse->pTriggerPrg && !pSubParse->nMaxArg);
 	sql_parser_destroy(pSubParse);
 	sqlStackFree(db, pSubParse);
@@ -888,12 +887,12 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
  */
 static TriggerPrg *
 sql_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
-		struct Table *table, int orconf)
+		struct space *space, int orconf)
 {
 	Parse *pRoot = sqlParseToplevel(parser);
 	TriggerPrg *pPrg;
 
-	assert(trigger->zName == NULL || table->def->id == trigger->space_id);
+	assert(trigger->zName == NULL || space->def->id == trigger->space_id);
 
 	/*
 	 * It may be that this trigger has already been coded (or
@@ -911,20 +910,20 @@ sql_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
 	 * a new one.
 	 */
 	if (pPrg == NULL)
-		pPrg = sql_row_trigger_program(parser, trigger, table, orconf);
+		pPrg = sql_row_trigger_program(parser, trigger, space, orconf);
 
 	return pPrg;
 }
 
 void
 vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
-			     struct Table *table, int reg, int orconf,
+			     struct space *space, int reg, int orconf,
 			     int ignore_jump)
 {
 	/* Main VM. */
 	struct Vdbe *v = sqlGetVdbe(parser);
 
-	TriggerPrg *pPrg = sql_row_trigger(parser, trigger, table, orconf);
+	TriggerPrg *pPrg = sql_row_trigger(parser, trigger, space, orconf);
 	assert(pPrg != NULL || parser->nErr != 0 ||
 	       parser->db->mallocFailed != 0);
 
@@ -962,7 +961,7 @@ vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
 void
 vdbe_code_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
 		      int op, struct ExprList *changes_list, int tr_tm,
-		      struct Table *table, int reg, int orconf, int ignore_jump)
+		      struct space *space, int reg, int orconf, int ignore_jump)
 {
 	assert(op == TK_UPDATE || op == TK_INSERT || op == TK_DELETE);
 	assert(tr_tm == TRIGGER_BEFORE || tr_tm == TRIGGER_AFTER);
@@ -972,7 +971,7 @@ vdbe_code_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
 		/* Determine whether we should code trigger. */
 		if (p->op == op && p->tr_tm == tr_tm &&
 		    checkColumnOverlap(p->pColumns, changes_list)) {
-			vdbe_code_row_trigger_direct(parser, p, table, reg,
+			vdbe_code_row_trigger_direct(parser, p, space, reg,
 						     orconf, ignore_jump);
 		}
 	}
@@ -981,7 +980,7 @@ vdbe_code_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
 u32
 sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
 		    ExprList *changes_list, int new, int tr_tm,
-		    Table *table, int orconf)
+		    struct space *space, int orconf)
 {
 	const int op = changes_list != NULL ? TK_UPDATE : TK_DELETE;
 	u32 mask = 0;
@@ -991,7 +990,7 @@ sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
 		if (p->op == op && (tr_tm & p->tr_tm)
 		    && checkColumnOverlap(p->pColumns, changes_list)) {
 			TriggerPrg *prg =
-				sql_row_trigger(parser, p, table, orconf);
+				sql_row_trigger(parser, p, space, orconf);
 			if (prg != NULL)
 				mask |= prg->aColmask[new];
 		}

@@ -35,14 +35,14 @@
 #include "sqlInt.h"
 #include "tarantoolInt.h"
 
-struct Table *
-sql_lookup_table(struct Parse *parse, struct SrcList_item *tbl_name)
+struct space *
+sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 {
-	assert(tbl_name != NULL);
-	assert(tbl_name->pTab == NULL);
-	struct space *space = space_by_name(tbl_name->zName);
+	assert(space_name != NULL);
+	assert(space_name->space == NULL);
+	struct space *space = space_by_name(space_name->zName);
 	if (space == NULL) {
-		sqlErrorMsg(parse, "no such table: %s", tbl_name->zName);
+		sqlErrorMsg(parse, "no such table: %s", space_name->zName);
 		return NULL;
 	}
 	assert(space != NULL);
@@ -53,16 +53,10 @@ sql_lookup_table(struct Parse *parse, struct SrcList_item *tbl_name)
 		parse->nErr++;
 		return NULL;
 	}
-	struct Table *table = sqlDbMallocZero(parse->db, sizeof(*table));
-	if (table == NULL)
-		return NULL;
-	table->def = space->def;
-	table->space = space;
-	table->nTabRef = 1;
-	tbl_name->pTab = table;
-	if (sqlIndexedByLookup(parse, tbl_name) != 0)
-		table = NULL;
-	return table;
+	space_name->space = space;
+	if (sqlIndexedByLookup(parse, space_name) != 0)
+		space = NULL;
+	return space;
 }
 
 void
@@ -149,21 +143,18 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	/* True if there are triggers or FKs or subqueries in the
 	 * WHERE clause.
 	 */
-	struct Table *table = sql_lookup_table(parse, tab_list->a);
-	if (table == NULL)
+	struct space *space = sql_lookup_space(parse, tab_list->a);
+	if (space == NULL)
 		goto delete_from_cleanup;
-	assert(table->space != NULL);
-	trigger_list = sql_triggers_exist(table, TK_DELETE, NULL, NULL);
-	bool is_complex = trigger_list != NULL ||
-			  fkey_is_required(table->def->id, NULL);
-	struct space *space = table->space;
+	trigger_list = sql_triggers_exist(space->def, TK_DELETE, NULL, NULL);
+	bool is_complex = trigger_list != NULL || fkey_is_required(space, NULL);
 	bool is_view = space->def->opts.is_view;
 
 	/* If table is really a view, make sure it has been
 	 * initialized.
 	 */
 	if (is_view) {
-		if (sql_view_assign_cursors(parse, table->def->opts.sql) != 0)
+		if (sql_view_assign_cursors(parse, space->def->opts.sql) != 0)
 			goto delete_from_cleanup;
 
 		if (trigger_list == NULL) {
@@ -243,7 +234,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		int eph_cursor = parse->nTab++;
 		int addr_eph_open = sqlVdbeCurrentAddr(v);
 		if (is_view) {
-			pk_len = table->def->field_count;
+			pk_len = space->def->field_count;
 			parse->nMem += pk_len;
 			sqlVdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
 					  pk_len);
@@ -380,7 +371,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (one_pass != ONEPASS_OFF) {
 			/* OP_Found will use an unpacked key. */
 			assert(key_len == pk_len);
-			assert(pk_info != NULL || table->def->opts.is_view);
+			assert(pk_info != NULL || space->def->opts.is_view);
 			sqlVdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
 
@@ -402,7 +393,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		    && one_pass != ONEPASS_OFF)
 			idx_noseek = one_pass_cur[1];
 
-		sql_generate_row_delete(parse, table, trigger_list, tab_cursor,
+		sql_generate_row_delete(parse, space, trigger_list, tab_cursor,
 					reg_key, key_len, true,
 					ON_CONFLICT_ACTION_DEFAULT, one_pass,
 					idx_noseek);
@@ -421,7 +412,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 	/* Return the number of rows that were deleted. */
 	if ((user_session->sql_flags & SQL_CountRows) != 0 &&
-	    parse->pTriggerTab != NULL) {
+	    parse->triggered_space != NULL) {
 		sqlVdbeAddOp2(v, OP_ResultRow, reg_count, 1);
 		sqlVdbeSetNumCols(v, 1);
 		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows deleted",
@@ -434,7 +425,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 }
 
 void
-sql_generate_row_delete(struct Parse *parse, struct Table *table,
+sql_generate_row_delete(struct Parse *parse, struct space *space,
 			struct sql_trigger *trigger_list, int cursor,
 			int reg_pk, short npk, bool need_update_count,
 			enum on_conflict_action onconf, u8 mode,
@@ -463,31 +454,30 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	/* If there are any triggers to fire, allocate a range of registers to
 	 * use for the old.* references in the triggers.
 	 */
-	if (table != NULL &&
-	    (fkey_is_required(table->def->id, NULL) || trigger_list != NULL)) {
+	if (space != NULL &&
+	   (fkey_is_required(space, NULL) || trigger_list != NULL)) {
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
 		uint32_t mask =
 			sql_trigger_colmask(parse, trigger_list, 0, 0,
 					    TRIGGER_BEFORE | TRIGGER_AFTER,
-					    table, onconf);
-		struct space *space = space_by_id(table->def->id);
+					    space, onconf);
 		assert(space != NULL);
 		mask |= space->fkey_mask;
 		first_old_reg = parse->nMem + 1;
-		parse->nMem += (1 + (int)table->def->field_count);
+		parse->nMem += (1 + (int)space->def->field_count);
 
 		/* Populate the OLD.* pseudo-table register array.
 		 * These values will be used by any BEFORE and
 		 * AFTER triggers that exist.
 		 */
 		sqlVdbeAddOp2(v, OP_Copy, reg_pk, first_old_reg);
-		for (int i = 0; i < (int)table->def->field_count; i++) {
+		for (int i = 0; i < (int)space->def->field_count; i++) {
 			testcase(mask != 0xffffffff && iCol == 31);
 			testcase(mask != 0xffffffff && iCol == 32);
 			if (mask == 0xffffffff
 			    || (i <= 31 && (mask & MASKBIT32(i)) != 0)) {
-				sqlExprCodeGetColumnOfTable(v, table->def,
+				sqlExprCodeGetColumnOfTable(v, space->def,
 								cursor, i,
 								first_old_reg +
 								i + 1);
@@ -497,7 +487,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		/* Invoke BEFORE DELETE trigger programs. */
 		int addr_start = sqlVdbeCurrentAddr(v);
 		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, NULL,
-				      TRIGGER_BEFORE, table, first_old_reg,
+				      TRIGGER_BEFORE, space, first_old_reg,
 				      onconf, label);
 
 		/* If any BEFORE triggers were coded, then seek
@@ -517,7 +507,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		 * constraints attached to other tables) are not
 		 * violated by deleting this row.
 		 */
-		fkey_emit_check(parse, table, first_old_reg, 0, NULL);
+		fkey_emit_check(parse, space, first_old_reg, 0, NULL);
 	}
 
 	/* Delete the index and table entries. Skip this step if
@@ -525,7 +515,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	 * of the DELETE statement is to fire the INSTEAD OF
 	 * triggers).
 	 */
-	if (table == NULL || !table->def->opts.is_view) {
+	if (space == NULL || !space->def->opts.is_view) {
 		uint8_t p5 = 0;
 		sqlVdbeAddOp2(v, OP_Delete, cursor,
 				  (need_update_count ? OPFLAG_NCHANGE : 0));
@@ -540,18 +530,18 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		sqlVdbeChangeP5(v, p5);
 	}
 
-	if (table != NULL) {
+	if (space != NULL) {
 		/* Do any ON CASCADE, SET NULL or SET DEFAULT
 		 * operations required to handle rows (possibly
 		 * in other tables) that refer via a foreign
 		 * key to the row just deleted.
 		 */
 
-		fkey_emit_actions(parse, table, first_old_reg, NULL);
+		fkey_emit_actions(parse, space, first_old_reg, NULL);
 
 		/* Invoke AFTER DELETE trigger programs. */
 		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, 0,
-				      TRIGGER_AFTER, table, first_old_reg,
+				      TRIGGER_AFTER, space, first_old_reg,
 				      onconf, label);
 	}
 

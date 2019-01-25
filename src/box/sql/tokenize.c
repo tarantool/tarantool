@@ -416,6 +416,27 @@ sql_token(const char *z, int *type, bool *is_reserved)
 	return i;
 }
 
+/**
+ * This function is called to release parsing artifacts
+ * during table creation. The only objects allocated using
+ * malloc are index defs and check constraints.
+ * Note that this functions can't be called on ordinary
+ * space object. It's purpose is to clean-up parser->new_space.
+ *
+ * @param db Database handler.
+ * @param space Space to be deleted.
+ */
+static void
+parser_space_delete(struct sql *db, struct space *space)
+{
+	if (space == NULL || db == NULL || db->pnBytesFreed == 0)
+		return;
+	assert(space->def->opts.is_temporary);
+	for (uint32_t i = 0; i < space->index_count; ++i)
+		index_def_delete(space->index[i]->def);
+	sql_expr_list_delete(db, space->def->opts.checks);
+}
+
 /*
  * Run the parser on the given SQL string.  The parser structure is
  * passed in.  An SQL_ status code is returned.  If an error occurs
@@ -449,7 +470,7 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		sqlOomFault(db);
 		return SQL_NOMEM_BKPT;
 	}
-	assert(pParse->pNewTable == 0);
+	assert(pParse->new_space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
 	assert(pParse->nVar == 0);
 	assert(pParse->pVList == 0);
@@ -529,16 +550,10 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	sqlDeleteTable(db, pParse->pNewTable);
-
+	parser_space_delete(db, pParse->new_space);
 	if (pParse->pWithToFree)
 		sqlWithDelete(db, pParse->pWithToFree);
 	sqlDbFree(db, pParse->pVList);
-	while (pParse->pZombieTab) {
-		Table *p = pParse->pZombieTab;
-		pParse->pZombieTab = p->pNextZombie;
-		sqlDeleteTable(db, p);
-	}
 	assert(nErr == 0 || pParse->rc != SQL_OK);
 	return nErr;
 }

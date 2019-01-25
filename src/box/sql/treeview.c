@@ -222,9 +222,9 @@ sqlTreeViewSelect(TreeView * pView, const Select * p, u8 moreToFollow)
 				if (pItem->zName) {
 					sqlXPrintf(&x, " %s", pItem->zName);
 				}
-				if (pItem->pTab) {
+				if (pItem->space != NULL) {
 					sqlXPrintf(&x, " tabname=%Q",
-						       pItem->pTab->def->name);
+						       pItem->space->def->name);
 				}
 				if (pItem->zAlias) {
 					sqlXPrintf(&x, " (AS %s)",

@@ -580,7 +580,6 @@ isDistinctRedundant(Parse * pParse,		/* Parsing context */
 		    WhereClause * pWC,		/* The WHERE clause */
 		    ExprList * pDistinct)	/* The result set that needs to be DISTINCT */
 {
-	Table *pTab;
 	int iBase;
 
 	/* If there is more than one table or sub-select in the FROM clause of
@@ -590,7 +589,7 @@ isDistinctRedundant(Parse * pParse,		/* Parsing context */
 	if (pTabList->nSrc != 1)
 		return 0;
 	iBase = pTabList->a[0].iCursor;
-	pTab = pTabList->a[0].pTab;
+	struct space *space = pTabList->a[0].space;
 
 	/* If any of the expressions is an IPK column on table iBase, then return
 	 * true. Note: The (p->iTable==iBase) part of this test may be false if the
@@ -601,7 +600,7 @@ isDistinctRedundant(Parse * pParse,		/* Parsing context */
 		if (p->op == TK_COLUMN && p->iTable == iBase && p->iColumn < 0)
 			return 1;
 	}
-	if (pTab->space == NULL)
+	if (space == NULL)
 		return 0;
 	/* Loop through all indices on the table, checking each to see if it makes
 	 * the DISTINCT qualifier redundant. It does so if:
@@ -616,8 +615,8 @@ isDistinctRedundant(Parse * pParse,		/* Parsing context */
 	 *   3. All of those index columns for which the WHERE clause does not
 	 *      contain a "col=X" term are subject to a NOT NULL constraint.
 	 */
-	for (uint32_t j = 0; j < pTab->space->index_count; ++j) {
-		struct index_def *def = pTab->space->index[j]->def;
+	for (uint32_t j = 0; j < space->index_count; ++j) {
+		struct index_def *def = space->index[j]->def;
 		if (!def->opts.is_unique)
 			continue;
 		uint32_t col_count = def->key_def->part_count;
@@ -629,7 +628,7 @@ isDistinctRedundant(Parse * pParse,		/* Parsing context */
 						 i) < 0)
 					break;
 				uint32_t x = def->key_def->parts[i].fieldno;
-				if (pTab->def->fields[x].is_nullable)
+				if (space->def->fields[x].is_nullable)
 					break;
 			}
 		}
@@ -1676,13 +1675,13 @@ whereLoopPrint(WhereLoop * p, WhereClause * pWC)
 	WhereInfo *pWInfo = pWC->pWInfo;
 	int nb = 1 + (pWInfo->pTabList->nSrc + 3) / 4;
 	struct SrcList_item *pItem = pWInfo->pTabList->a + p->iTab;
-	Table *pTab = pItem->pTab;
+	struct space_def *space_def = pItem->space->def;
 	Bitmask mAll = (((Bitmask) 1) << (nb * 4)) - 1;
 #ifdef SQL_DEBUG
 	sqlDebugPrintf("%c%2d.%0*llx.%0*llx", p->cId,
 			   p->iTab, nb, p->maskSelf, nb, p->prereq & mAll);
 	sqlDebugPrintf(" %12s",
-			   pItem->zAlias ? pItem->zAlias : pTab->def->name);
+			   pItem->zAlias ? pItem->zAlias : space_def->name);
 #endif
 	const char *zName;
 	if (p->index_def != NULL && (zName = p->index_def->name) != NULL) {
@@ -2768,20 +2767,19 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 	int b;			/* A boolean value */
 	LogEst rSize;		/* number of rows in the table */
 	WhereClause *pWC;	/* The parsed WHERE clause */
-	Table *pTab;		/* Table being queried */
 
 	pNew = pBuilder->pNew;
 	pWInfo = pBuilder->pWInfo;
 	pTabList = pWInfo->pTabList;
 	pSrc = pTabList->a + pNew->iTab;
-	pTab = pSrc->pTab;
 	pWC = pBuilder->pWC;
 
+	struct space *space = pSrc->space;
 	if (pSrc->pIBIndex) {
 		/* An INDEXED BY clause specifies a particular index to use */
 		probe = pSrc->pIBIndex;
-	} else if (pTab->space->index_count != 0) {
-		probe = pTab->space->index[0]->def;
+	} else if (space->index_count != 0) {
+		probe = space->index[0]->def;
 	} else {
 		/* There is no INDEXED BY clause.  Create a fake Index object in local
 		 * variable fake_index to represent the primary key index.  Make this
@@ -2792,7 +2790,7 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 
 		struct key_part_def part;
 		part.fieldno = 0;
-		part.type = pTab->def->fields[0].type;
+		part.type = space->def->fields[0].type;
 		part.nullable_action = ON_CONFLICT_ACTION_ABORT;
 		part.is_nullable = false;
 		part.sort_order = SORT_ORDER_ASC;
@@ -2809,7 +2807,7 @@ tnt_error:
 
 		struct index_opts opts;
 		index_opts_create(&opts);
-		fake_index = index_def_new(pTab->def->id, 0,"fake_autoindex",
+		fake_index = index_def_new(space->def->id, 0,"fake_autoindex",
 					   sizeof("fake_autoindex") - 1,
 					   TREE, &opts, key_def, NULL);
 		key_def_delete(key_def);
@@ -2825,7 +2823,7 @@ tnt_error:
 			goto tnt_error;
 		}
 		stat->tuple_log_est = (log_est_t *) ((char *) (stat + 1));
-		stat->tuple_log_est[0] = sql_space_tuple_log_count(pTab);
+		stat->tuple_log_est[0] = sql_space_tuple_log_count(pSrc->space);
 		stat->tuple_log_est[1] = 0;
 		fake_index->opts.stat = stat;
 
@@ -2892,10 +2890,10 @@ tnt_error:
 	 * index is considered.
 	 */
 	uint32_t idx_count = fake_index == NULL || pSrc->pIBIndex != NULL ?
-			     pTab->space->index_count : 1;
+			     space->index_count : 1;
 	for (uint32_t i = 0; i < idx_count; iSortIdx++, i++) {
 		if (i > 0)
-			probe = pTab->space->index[i]->def;
+			probe = space->index[i]->def;
 		rSize = index_field_tuple_est(probe, 0);
 		pNew->nEq = 0;
 		pNew->nBtm = 0;
@@ -4074,7 +4072,7 @@ where_loop_builder_shortcut(struct WhereLoopBuilder *builder)
 		return 0;
 	assert(where_info->pTabList->nSrc >= 1);
 	struct SrcList_item *item = where_info->pTabList->a;
-	struct space_def *space_def = item->pTab->def;
+	struct space_def *space_def = item->space->def;
 	assert(space_def != NULL);
 	if (item->fg.isIndexedBy)
 		return 0;
@@ -4096,7 +4094,7 @@ where_loop_builder_shortcut(struct WhereLoopBuilder *builder)
 		loop->rRun = 33;
 	} else {
 		assert(loop->aLTermSpace == loop->aLTerm);
-		struct space *space = space_by_id(space_def->id);
+		struct space *space = item->space;
 		if (space != NULL) {
 			for (uint32_t i = 0; i < space->index_count; ++i) {
 				struct index_def *idx_def =
@@ -4550,10 +4548,10 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	 */
 	for (ii = 0, pLevel = pWInfo->a; ii < nTabList; ii++, pLevel++) {
 		struct SrcList_item *pTabItem = &pTabList->a[pLevel->iFrom];
-		Table *pTab = pTabItem->pTab;
+		struct space_def *space_def = pTabItem->space->def;
 		pLoop = pLevel->pWLoop;
-		struct space *space = space_cache_find(pTabItem->pTab->def->id);
-		if (pTab->def->id == 0 || pTab->def->opts.is_view) {
+		struct space *space = space_cache_find(space_def->id);
+		if (space_def->id == 0 || space_def->opts.is_view) {
 			/* Do nothing */
 		} else if ((pLoop->wsFlags & WHERE_IDX_ONLY) == 0 &&
 			   (wctrlFlags & WHERE_OR_SUBCLAUSE) == 0) {
@@ -4564,10 +4562,6 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 					      space);
 			VdbeComment((v, "%s", space->def->name));
 			assert(pTabItem->iCursor == pLevel->iTabCur);
-			testcase(pWInfo->eOnePass == ONEPASS_OFF
-				 && pTab->nCol == BMS - 1);
-			testcase(pWInfo->eOnePass == ONEPASS_OFF
-				 && pTab->nCol == BMS);
 			sqlVdbeChangeP5(v, bFordelete);
 #ifdef SQL_ENABLE_COLUMN_USED_MASK
 			sqlVdbeAddOp4Dup8(v, OP_ColumnsUsed,
@@ -4603,15 +4597,16 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 				op = 0;
 			} else if (pWInfo->eOnePass != ONEPASS_OFF) {
 				iIndexCur = iAuxArg;
-				if (pTabItem->pTab->space->index_count != 0) {
+				if (pTabItem->space->index_count != 0) {
 					uint32_t iid = 0;
-					struct index *pJ = pTabItem->pTab->space->index[iid];
+					struct index *pJ =
+						pTabItem->space->index[iid];
 					assert(wctrlFlags &
 					       WHERE_ONEPASS_DESIRED);
 					while (pJ->def->iid != idx_def->iid) {
 						iIndexCur++;
 						iid++;
-						pJ = pTabItem->pTab->space->index[iid];
+						pJ = pTabItem->space->index[iid];
 					}
 				} else {
 					for(uint32_t i = 0;
@@ -4816,7 +4811,7 @@ sqlWhereEnd(WhereInfo * pWInfo)
 			sqlVdbeJumpHere(v, addr);
 		}
 		VdbeModuleComment((v, "End WHERE-loop%d: %s", i,
-				   pWInfo->pTabList->a[pLevel->iFrom].pTab->
+				   pWInfo->pTabList->a[pLevel->iFrom].space->
 				   def->name));
 	}
 
@@ -4830,8 +4825,7 @@ sqlWhereEnd(WhereInfo * pWInfo)
 		int k, last;
 		VdbeOp *pOp;
 		struct SrcList_item *pTabItem = &pTabList->a[pLevel->iFrom];
-		Table *pTab MAYBE_UNUSED = pTabItem->pTab;
-		assert(pTab != 0);
+		assert(pTabItem->space != NULL);
 		pLoop = pLevel->pWLoop;
 
 		/* For a co-routine, change all OP_Column references to the table of
@@ -4871,7 +4865,8 @@ sqlWhereEnd(WhereInfo * pWInfo)
 				if (pOp->opcode == OP_Column) {
 					int x = pOp->p2;
 					assert(def == NULL ||
-					       def->space_id == pTab->def->id);
+					       def->space_id ==
+					       pTabItem->space->def->id);
 					if (x >= 0) {
 						pOp->p2 = x;
 						pOp->p1 = pLevel->iIdxCur;

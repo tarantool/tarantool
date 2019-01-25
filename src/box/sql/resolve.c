@@ -185,8 +185,8 @@ sqlMatchSpanName(const char *zSpan,
  *
  *    pExpr->iTable        Set to the cursor number for the table obtained
  *                         from pSrcList.
- *    pExpr->pTab          Points to the Table structure of X.Y (even if
- *                         X and/or Y are implied.)
+ *    pExpr->space_def     Points to the space_def structure of X.Y
+ *                         (even if X and/or Y are implied.)
  *    pExpr->iColumn       Set to the column number within the table.
  *    pExpr->op            Set to TK_COLUMN.
  *    pExpr->pLeft         Any expression this points to is deleted
@@ -218,7 +218,6 @@ lookupName(Parse * pParse,	/* The parsing context */
 	struct SrcList_item *pMatch = 0;	/* The matching pSrcList item */
 	NameContext *pTopNC = pNC;	/* First namecontext in the list */
 	int isTrigger = 0;	/* True if resolved to a trigger column */
-	Table *pTab = 0;	/* Table hold the row */
 
 	assert(pNC);		/* the name context cannot be NULL. */
 	assert(zCol);		/* The Z in X.Y.Z cannot be NULL */
@@ -237,9 +236,10 @@ lookupName(Parse * pParse,	/* The parsing context */
 		if (pSrcList) {
 			for (i = 0, pItem = pSrcList->a; i < pSrcList->nSrc;
 			     i++, pItem++) {
-				pTab = pItem->pTab;
-				assert(pTab != 0 && pTab->def->name != NULL);
-				assert(pTab->def->field_count > 0);
+				assert(pItem->space != NULL &&
+				       pItem->space->def->name != NULL);
+				struct space_def *space_def = pItem->space->def;
+				assert(space_def->field_count > 0);
 				if (pItem->pSelect
 				    && (pItem->pSelect->
 					selFlags & SF_NestedFrom) != 0) {
@@ -262,7 +262,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 				if (zTab) {
 					const char *zTabName =
 					    pItem->zAlias ? pItem->
-					    zAlias : pTab->def->name;
+					    zAlias : space_def->name;
 					assert(zTabName != 0);
 					if (strcmp(zTabName, zTab) != 0) {
 						continue;
@@ -271,9 +271,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 				if (0 == (cntTab++)) {
 					pMatch = pItem;
 				}
-				for (j = 0; j < (int)pTab->def->field_count;
+				for (j = 0; j < (int)space_def->field_count;
 				     j++) {
-					if (strcmp(pTab->def->fields[j].name,
+					if (strcmp(space_def->fields[j].name,
 						   zCol) == 0) {
 						/* If there has been exactly one prior match and this match
 						 * is for the right-hand table of a NATURAL JOIN or is in a
@@ -298,7 +298,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 			}
 			if (pMatch) {
 				pExpr->iTable = pMatch->iCursor;
-				pExpr->space_def = pMatch->pTab->def;
+				pExpr->space_def = pMatch->space->def;
 				/* RIGHT JOIN not (yet) supported */
 				assert((pMatch->fg.jointype & JT_RIGHT) == 0);
 				if ((pMatch->fg.jointype & JT_LEFT) != 0) {
@@ -310,33 +310,32 @@ lookupName(Parse * pParse,	/* The parsing context */
 		/* If we have not already resolved the name, then maybe
 		 * it is a new.* or old.* trigger argument reference
 		 */
-		if (zTab != 0 && cntTab == 0
-		    && pParse->pTriggerTab != 0) {
+		if (zTab != NULL && cntTab == 0 &&
+		    pParse->triggered_space != NULL) {
 			int op = pParse->eTriggerOp;
 			assert(op == TK_DELETE || op == TK_UPDATE
 			       || op == TK_INSERT);
+			struct space_def *space_def = NULL;
 			if (op != TK_DELETE && sqlStrICmp("new", zTab) == 0) {
 				pExpr->iTable = 1;
-				pTab = pParse->pTriggerTab;
+				space_def = pParse->triggered_space->def;
 			} else if (op != TK_INSERT
 				   && sqlStrICmp("old", zTab) == 0) {
 				pExpr->iTable = 0;
-				pTab = pParse->pTriggerTab;
-			} else {
-				pTab = 0;
+				space_def = pParse->triggered_space->def;
 			}
 
-			if (pTab) {
+			if (space_def != NULL) {
 				int iCol;
 				cntTab++;
 				for (iCol = 0; iCol <
-				     (int)pTab->def->field_count; iCol++) {
-					if (strcmp(pTab->def->fields[iCol].name,
+				     (int)space_def->field_count; iCol++) {
+					if (strcmp(space_def->fields[iCol].name,
 						   zCol) == 0) {
 						break;
 					}
 				}
-				if (iCol < (int)pTab->def->field_count) {
+				if (iCol < (int)space_def->field_count) {
 					cnt++;
 					if (iCol < 0) {
 						pExpr->type =
@@ -357,7 +356,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 						     : (((u32) 1) << iCol));
 					}
 					pExpr->iColumn = (i16) iCol;
-					pExpr->space_def = pTab->def;
+					pExpr->space_def = space_def;
 					isTrigger = 1;
 				}
 			}
@@ -489,7 +488,7 @@ sqlCreateColumnExpr(sql * db, SrcList * pSrc, int iSrc, int iCol)
 	Expr *p = sqlExprAlloc(db, TK_COLUMN, 0, 0);
 	if (p) {
 		struct SrcList_item *pItem = &pSrc->a[iSrc];
-		p->space_def = pItem->pTab->def;
+		p->space_def = pItem->space->def;
 		p->iTable = pItem->iCursor;
 		p->iColumn = (ynVar) iCol;
 		testcase(iCol == BMS);
@@ -1591,20 +1590,24 @@ sqlResolveSelectNames(Parse * pParse,	/* The parser context */
 }
 
 void
-sql_resolve_self_reference(struct Parse *parser, struct Table *table, int type,
-			   struct Expr *expr, struct ExprList *expr_list)
+sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
+			   int type, struct Expr *expr,
+			   struct ExprList *expr_list)
 {
-	/* Fake SrcList for parser->pNewTable */
+	/* Fake SrcList for parser->new_space */
 	SrcList sSrc;
-	/* Name context for parser->pNewTable */
+	/* Name context for parser->new_space */
 	NameContext sNC;
 
 	assert(type == NC_IsCheck || type == NC_IdxExpr);
 	memset(&sNC, 0, sizeof(sNC));
 	memset(&sSrc, 0, sizeof(sSrc));
 	sSrc.nSrc = 1;
-	sSrc.a[0].zName = table->def->name;
-	sSrc.a[0].pTab = table;
+	sSrc.a[0].zName = def->name;
+	struct space tmp_space;
+	memset(&tmp_space, 0, sizeof(tmp_space));
+	tmp_space.def = def;
+	sSrc.a[0].space = &tmp_space;
 	sSrc.a[0].iCursor = -1;
 	sNC.pParse = parser;
 	sNC.pSrcList = &sSrc;
