@@ -1469,7 +1469,7 @@ wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
 /* Primitive types. */
 %type typedef {struct type_def}
 typedef(A) ::= TEXT . { A.type = AFFINITY_TEXT; }
-typedef(A) ::= BLOB . { A.type = AFFINITY_BLOB; }
+typedef(A) ::= BLOB_KW . { A.type = AFFINITY_BLOB; }
 typedef(A) ::= DATE . { A.type = AFFINITY_REAL; }
 typedef(A) ::= TIME . { A.type = AFFINITY_REAL; }
 typedef(A) ::= DATETIME . { A.type = AFFINITY_REAL; }
@@ -1496,8 +1496,8 @@ typedef(A) ::= VARCHAR char_len(B) . {
 
 %type number_typedef {struct type_def}
 typedef(A) ::= number_typedef(A) .
-number_typedef(A) ::= FLOAT|REAL|DOUBLE . { A.type = AFFINITY_REAL; }
-number_typedef(A) ::= INT|INTEGER . { A.type = AFFINITY_INTEGER; }
+number_typedef(A) ::= FLOAT_KW|REAL|DOUBLE . { A.type = AFFINITY_REAL; }
+number_typedef(A) ::= INT|INTEGER_KW . { A.type = AFFINITY_INTEGER; }
 
 %type number_len_typedef {struct type_def}
 number_typedef(A) ::= DECIMAL|NUMERIC|NUM number_len_typedef(B) . {
