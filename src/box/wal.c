@@ -554,7 +554,8 @@ wal_collect_garbage_f(struct cbus_call_msg *data)
 	struct wal_writer *writer = &wal_writer_singleton;
 	struct wal_gc_msg *msg = (struct wal_gc_msg *)data;
 	vclock_copy(&writer->checkpoint_vclock, msg->checkpoint_vclock);
-	xdir_collect_garbage(&writer->wal_dir, vclock_sum(msg->wal_vclock), 0);
+	xdir_collect_garbage(&writer->wal_dir, vclock_sum(msg->wal_vclock),
+			     XDIR_GC_ASYNC);
 	return 0;
 }
 

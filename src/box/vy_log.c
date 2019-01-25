@@ -1069,7 +1069,7 @@ vy_log_collect_garbage(const struct vclock *vclock)
 	vclock = vy_log_prev_checkpoint(vclock);
 	if (vclock == NULL)
 		return;
-	xdir_collect_garbage(&vy_log.dir, vclock_sum(vclock), XDIR_GC_USE_COIO);
+	xdir_collect_garbage(&vy_log.dir, vclock_sum(vclock), XDIR_GC_ASYNC);
 }
 
 int64_t

@@ -200,7 +200,7 @@ enum {
 	 * Delete files in coio threads so as not to block
 	 * the caller thread.
 	 */
-	XDIR_GC_USE_COIO = 1 << 0,
+	XDIR_GC_ASYNC = 1 << 0,
 	/**
 	 * Return after removing a file.
 	 */
