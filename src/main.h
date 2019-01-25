@@ -40,6 +40,9 @@ extern "C" {
 double tarantool_uptime(void);
 
 void
+tarantool_exit(int);
+
+void
 load_cfg();
 
 #if defined(__cplusplus)

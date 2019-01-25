@@ -95,6 +95,7 @@ static struct fiber *on_shutdown_fiber = NULL;
 static bool is_shutting_down = false;
 /** A trigger which will break the event loop on shutdown. */
 static struct trigger break_loop_trigger;
+static int exit_code = 0;
 
 double
 tarantool_uptime(void)
@@ -134,9 +135,10 @@ on_shutdown_f(va_list ap)
 	return 0;
 }
 
-static void
-tarantool_exit(void)
+void
+tarantool_exit(int code)
 {
+	start_loop = false;
 	if (is_shutting_down) {
 		/*
 		 * We are already running on_shutdown triggers,
@@ -146,6 +148,7 @@ tarantool_exit(void)
 		return;
 	}
 	is_shutting_down = true;
+	exit_code = code;
 	fiber_call(on_shutdown_fiber);
 }
 
@@ -165,8 +168,7 @@ signal_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	 */
 	if (pid_file)
 		say_crit("got signal %d - %s", w->signum, strsignal(w->signum));
-	start_loop = false;
-	tarantool_exit();
+	tarantool_exit(0);
 }
 
 static void
@@ -849,5 +851,5 @@ main(int argc, char **argv)
 	if (start_loop)
 		say_crit("exiting the event loop");
 	/* freeing resources */
-	return 0;
+	return exit_code;
 }

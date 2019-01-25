@@ -38,6 +38,8 @@ double
 tarantool_uptime(void);
 typedef int32_t pid_t;
 pid_t getpid(void);
+void
+tarantool_exit(int);
 ]]
 
 local fio = require("fio")
@@ -48,6 +50,16 @@ dostring = function(s, ...)
         error(message, 2)
     end
     return chunk(...)
+end
+
+local fiber = require("fiber")
+os.exit = function(code)
+    code = (type(code) == 'number') and code or 0
+    ffi.C.tarantool_exit(code)
+    -- Make sure we yield even if the code after
+    -- os.exit() never yields. After on_shutdown
+    -- fiber completes, we will never wake up again.
+    while true do fiber.yield() end
 end
 
 local function uptime()
