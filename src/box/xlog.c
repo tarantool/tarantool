@@ -663,7 +663,7 @@ xdir_format_filename(struct xdir *dir, int64_t signature,
 	return filename;
 }
 
-int
+void
 xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 {
 	struct vclock *vclock;
@@ -680,10 +680,6 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 			if (errno != ENOENT) {
 				say_syserror("error while removing %s",
 					     filename);
-				diag_set(SystemError,
-					 "failed to unlink file '%s'",
-					 filename);
-				return -1;
 			}
 		} else
 			say_info("removed %s", filename);
@@ -693,7 +689,6 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 		if (flags & XDIR_GC_REMOVE_ONE)
 			break;
 	}
-	return 0;
 }
 
 void

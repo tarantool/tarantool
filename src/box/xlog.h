@@ -211,7 +211,7 @@ enum {
  * Remove files whose signature is less than specified.
  * For possible values of @flags see XDIR_GC_*.
  */
-int
+void
 xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags);
 
 /**

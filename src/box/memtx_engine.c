@@ -821,23 +821,12 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 	memtx->checkpoint = NULL;
 }
 
-static int
+static void
 memtx_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	/*
-	 * We recover the checkpoint list by scanning the snapshot
-	 * directory so deletion of an xlog file or a file that
-	 * belongs to another engine without the corresponding snap
-	 * file would result in a corrupted checkpoint on the list.
-	 * That said, we have to abort garbage collection if we
-	 * fail to delete a snap file.
-	 */
-	if (xdir_collect_garbage(&memtx->snap_dir, vclock_sum(vclock),
-				 XDIR_GC_USE_COIO) != 0)
-		return -1;
-
-	return 0;
+	xdir_collect_garbage(&memtx->snap_dir, vclock_sum(vclock),
+			     XDIR_GC_USE_COIO);
 }
 
 static int

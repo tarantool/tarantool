@@ -3317,7 +3317,7 @@ vy_gc(struct vy_env *env, struct vy_recovery *recovery,
 	}
 }
 
-static int
+static void
 vinyl_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 {
 	struct vy_env *env = vy_env(engine);
@@ -3329,11 +3329,10 @@ vinyl_engine_collect_garbage(struct engine *engine, const struct vclock *vclock)
 	struct vy_recovery *recovery = vy_recovery_new(vy_log_signature(), 0);
 	if (recovery == NULL) {
 		say_error("failed to recover vylog for garbage collection");
-		return 0;
+		return;
 	}
 	vy_gc(env, recovery, VY_GC_DROPPED, vclock_sum(vclock));
 	vy_recovery_delete(recovery);
-	return 0;
 }
 
 /* }}} Garbage collection */
