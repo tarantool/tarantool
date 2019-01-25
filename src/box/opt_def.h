@@ -48,6 +48,7 @@ enum opt_type {
 	OPT_STRPTR,	/* char*  */
 	OPT_ENUM,	/* enum */
 	OPT_ARRAY,	/* array */
+	OPT_LEGACY,	/* any type, skipped */
 	opt_type_MAX,
 };
 
@@ -105,6 +106,9 @@ struct opt_def {
 #define OPT_DEF_ARRAY(key, opts, field, to_array) \
 	 { key, OPT_ARRAY, offsetof(opts, field), sizeof(((opts *)0)->field), \
 	   NULL, 0, NULL, 0, {(void *)to_array} }
+
+#define OPT_DEF_LEGACY(key) \
+	{ key, OPT_LEGACY, 0, 0, NULL, 0, NULL, 0, {NULL} }
 
 #define OPT_END {NULL, opt_type_MAX, 0, 0, NULL, 0, NULL, 0, {NULL}}
 

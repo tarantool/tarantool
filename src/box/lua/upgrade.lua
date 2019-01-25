@@ -616,6 +616,22 @@ local function upgrade_to_2_1_0()
     upgrade_priv_to_2_1_0()
 end
 
+--------------------------------------------------------------------------------
+-- Tarantool 2.1.1
+--------------------------------------------------------------------------------
+
+local function upgrade_to_2_1_1()
+    local _index = box.space[box.schema.INDEX_ID]
+    for _, index in _index:pairs() do
+        local opts = index.opts
+        if opts['sql'] ~= nil then
+            opts['sql'] = nil
+            _index:replace(box.tuple.new({index.id, index.iid, index.name,
+                                        index.type, opts, index.parts}))
+        end
+    end
+end
+
 local function get_version()
     local version = box.space._schema:get{'version'}
     if version == nil then
@@ -643,7 +659,8 @@ local function upgrade(options)
         {version = mkversion(1, 7, 7), func = upgrade_to_1_7_7, auto = true},
         {version = mkversion(1, 10, 0), func = upgrade_to_1_10_0, auto = true},
         {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2, auto = true},
-        {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true}
+        {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true},
+        {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1, auto = true}
     }
 
     for _, handler in ipairs(handlers) do
