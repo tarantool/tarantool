@@ -62,6 +62,7 @@ const struct opt_def index_opts_reg[] = {
 	OPT_DEF("run_size_ratio", OPT_FLOAT, struct index_opts, run_size_ratio),
 	OPT_DEF("bloom_fpr", OPT_FLOAT, struct index_opts, bloom_fpr),
 	OPT_DEF("lsn", OPT_INT64, struct index_opts, lsn),
+	OPT_DEF_LEGACY("sql"),
 	OPT_END,
 };
 

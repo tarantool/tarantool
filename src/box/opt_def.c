@@ -45,6 +45,7 @@ const char *opt_type_strs[] = {
 	/* [OPT_STRPTR] = */ "string",
 	/* [OPT_ENUM]   = */ "enum",
 	/* [OPT_ARRAY]  = */ "array",
+	/* [OPT_LEGACY] = */ "legacy",
 };
 
 static int
@@ -144,6 +145,9 @@ opt_set(void *opts, const struct opt_def *def, const char **val,
 		assert(def->to_array != NULL);
 		if (def->to_array(val, ival, opt, errcode, field_no) != 0)
 			return -1;
+		break;
+	case OPT_LEGACY:
+		mp_next(val);
 		break;
 	default:
 		unreachable();
