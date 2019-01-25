@@ -73,6 +73,7 @@ local function set_system_triggers(val)
     box.space._collation:run_triggers(val)
     box.space._schema:run_triggers(val)
     box.space._cluster:run_triggers(val)
+    box.space._fk_constraint:run_triggers(val)
 end
 
 --------------------------------------------------------------------------------
@@ -92,6 +93,7 @@ local function erase()
     truncate(box.space._trigger)
     truncate(box.space._schema)
     truncate(box.space._cluster)
+    truncate(box.space._fk_constraint)
 end
 
 local function create_sysview(source_id, target_id)
