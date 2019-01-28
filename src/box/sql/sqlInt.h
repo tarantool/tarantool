@@ -4110,11 +4110,74 @@ void
 sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 		     struct Token *constraint);
 
+/**
+ * Counts the trail bytes for a UTF-8 lead byte of a valid UTF-8
+ * sequence.
+ *
+ * Note that implementation is borrowed from ICU library.
+ * It is not directly included from icu/utf8.h owing to the
+ * fact that different versions of ICU treat incorrect byte
+ * sequences in different ways. We like this implementation
+ * but don't like that it could give different results depending
+ * on version of library. And that's why we inlined these macros.
+ *
+ * @param lead_byte The first byte of a UTF-8 sequence.
+ */
+#define SQL_UTF8_COUNT_TRAIL_BYTES(lead_byte) \
+	(((uint8_t)(lead_byte) >= 0xc2) + ((uint8_t)(lead_byte) >= 0xe0) + \
+	((uint8_t)(lead_byte) >= 0xf0))
+
+/**
+ * Advance the string offset from one code point boundary to the
+ * next. (Post-incrementing iteration.)
+ *
+ * After the whole string is traversed, (str + i) points to the
+ * position right after the last element of the string (*).
+ *
+ * If resulting offset > byte_size then resulting offset is set
+ * to byte_size. This is to provide (*) in cases where it might
+ * be violated.
+ *
+ * SQL_UTF8_FWD_1 sometimes is used to get the size of utf-8
+ * character sub-sequence and we don't want to get summary size
+ * which exceeds total string size (in bytes). Consider example:
+ *
+ * '0xE0' - this is invalid utf-8 string because it consists only
+ * of first byte of 3 byte sequence. After traverse, the
+ * offset == 2 and we set it to 1, to keep (*).
+ *
+ * @param s const uint8_t * string.
+ * @param i string offset.
+ * @param byte_size byte size of the string.
+ */
+#define SQL_UTF8_FWD_1(str, i, byte_size) \
+	(i) += 1 + SQL_UTF8_COUNT_TRAIL_BYTES((str)[i]); \
+	(i) = (i) <= (byte_size) ? (i) : (byte_size);
+
 void sqlDetach(Parse *, Expr *);
 int sqlAtoF(const char *z, double *, int);
 int sqlGetInt32(const char *, int *);
 int sqlAtoi(const char *);
-int sqlUtf8CharLen(const char *pData, int nByte);
+
+/**
+ * Return number of symbols in the given string.
+ *
+ * Number of symbols != byte size of string because some symbols
+ * are encoded with more than one byte. Also note that all
+ * symbols from 'str' to 'str + byte_len' would be counted,
+ * even if there is a '\0' somewhere between them.
+ *
+ * This function is implemented to be fast and indifferent to
+ * correctness of string being processed. If input string has
+ * even one invalid utf-8 sequence, then the resulting length
+ * could be arbitary in these boundaries (0 < len < byte_len).
+ * @param str String to be counted.
+ * @param byte_len Byte length of given string.
+ * @return number of symbols in the given string.
+ */
+int
+sql_utf8_char_count(const unsigned char *str, int byte_len);
+
 u32 sqlUtf8Read(const u8 **);
 LogEst sqlLogEst(u64);
 LogEst sqlLogEstAdd(LogEst, LogEst);

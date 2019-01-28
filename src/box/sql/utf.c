@@ -157,30 +157,15 @@ sqlUtf8Read(const unsigned char **pz	/* Pointer to string from which to read cha
  */
 /* #define TRANSLATE_TRACE 1 */
 
-/*
- * pZ is a UTF-8 encoded unicode string. If nByte is less than zero,
- * return the number of unicode characters in pZ up to (but not including)
- * the first 0x00 byte. If nByte is not less than zero, return the
- * number of unicode characters in the first nByte of pZ (or up to
- * the first 0x00, whichever comes first).
- */
 int
-sqlUtf8CharLen(const char *zIn, int nByte)
+sql_utf8_char_count(const unsigned char *str, int byte_len)
 {
-	int r = 0;
-	const u8 *z = (const u8 *)zIn;
-	const u8 *zTerm;
-	if (nByte >= 0) {
-		zTerm = &z[nByte];
-	} else {
-		zTerm = (const u8 *)(-1);
+	int symbol_count = 0;
+	for (int i = 0; i < byte_len;) {
+		SQL_UTF8_FWD_1(str, i, byte_len);
+		symbol_count++;
 	}
-	assert(z <= zTerm);
-	while (*z != 0 && z < zTerm) {
-		SQL_SKIP_UTF8(z);
-		r++;
-	}
-	return r;
+	return symbol_count;
 }
 
 /* This test function is not currently used by the automated test-suite.

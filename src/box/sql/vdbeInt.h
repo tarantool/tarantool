@@ -192,7 +192,7 @@ struct Mem {
 	u32 flags;		/* Some combination of MEM_Null, MEM_Str, MEM_Dyn, etc. */
 	/** Subtype for this value. */
 	enum sql_subtype subtype;
-	int n;			/* Number of characters in string value, excluding '\0' */
+	int n;			/* size (in bytes) of string value, excluding trailing '\0' */
 	char *z;		/* String or BLOB value */
 	/* ShallowCopy only needs to copy the information above */
 	char *zMalloc;		/* Space to hold MEM_Str or MEM_Blob if szMalloc>0 */

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14547)
+test:plan(14586)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -2663,5 +2663,222 @@ test:do_execsql_test(
     "func-36",
     [[VALUES (LENGTH(RANDOMBLOB(0)))]],
     {""})
+
+-- gh-3542
+-- In SQL '\0' is NOT a end-of-string signal. Tests below ensures
+-- that all functions which work with strings behave this way.
+
+-- LENGTH
+test:do_execsql_test(
+    "func-37",
+    "SELECT LENGTH(CHAR(00));",
+    {1})
+
+test:do_execsql_test(
+    "func-38",
+    "SELECT LENGTH(CHAR(00, 65));",
+    {2})
+
+test:do_execsql_test(
+    "func-39",
+    "SELECT LENGTH(CHAR(00, 65, 00));",
+    {3})
+
+test:do_execsql_test(
+    "func-40",
+    "SELECT LENGTH(CHAR(00, 65, 00, 65));",
+    {4})
+
+test:do_execsql_test(
+    "func-41",
+    "SELECT LENGTH(CHAR(65, 00, 65, 00, 65));",
+    {5})
+
+test:do_execsql_test(
+    "func-42",
+    "SELECT LENGTH('ሴ' || CHAR(00) || 'ሴ');",
+    {3})
+
+-- LIKE (exact match)
+test:do_execsql_test(
+    "func-43",
+    "SELECT CHAR(00) LIKE CHAR(00);",
+    {1})
+
+test:do_execsql_test(
+    "func-44",
+    "SELECT CHAR(00) LIKE CHAR(65);",
+    {0})
+
+test:do_execsql_test(
+    "func-45",
+    "SELECT CHAR(00,65) LIKE CHAR(00,65);",
+    {1})
+
+test:do_execsql_test(
+    "func-46",
+    "SELECT CHAR(00,65) LIKE CHAR(00,66);",
+    {0})
+
+test:do_execsql_test(
+    "func-47",
+    "SELECT CHAR(00,65, 00) LIKE CHAR(00,65,00);",
+    {1})
+
+test:do_execsql_test(
+    "func-48",
+    "SELECT CHAR(00,65,00) LIKE CHAR(00,65);",
+    {0})
+
+test:do_execsql_test(
+    "func-49",
+    "SELECT CHAR(65,00,65,00,65) LIKE CHAR(65,00,65,00,65);",
+    {1})
+
+test:do_execsql_test(
+    "func-50",
+    "SELECT CHAR(65,00,65,00,65) LIKE CHAR(65,00,65,00,66);",
+    {0})
+
+-- LIKE ('%' and '_')
+test:do_execsql_test(
+    "func-51",
+    "SELECT CHAR(00) LIKE '_';",
+    {1})
+
+test:do_execsql_test(
+    "func-52",
+    "SELECT CHAR(00) LIKE '__';",
+    {0})
+
+test:do_execsql_test(
+    "func-53",
+    "SELECT CHAR(00,65) LIKE '__';",
+    {1})
+
+test:do_execsql_test(
+    "func-54",
+    "SELECT CHAR(00,65) LIKE '_A';",
+    {1})
+
+test:do_execsql_test(
+    "func-55",
+    "SELECT CHAR(00,65,00) LIKE '%';",
+    {1})
+
+test:do_execsql_test(
+    "func-56",
+    "SELECT CHAR(00,65,00) LIKE '%A';",
+    {0})
+
+test:do_execsql_test(
+    "func-57",
+    "SELECT CHAR(65,00,65,00,65) LIKE '%A';",
+    {1})
+
+test:do_execsql_test(
+    "func-58",
+    "SELECT CHAR(65,00,65,00,65) LIKE '%B';",
+    {0})
+
+-- LIKE (ESCAPE symbols)
+test:do_execsql_test(
+    "func-59",
+    "SELECT CHAR(00) || '_' LIKE '_#_' ESCAPE '#';",
+    {1})
+
+test:do_execsql_test(
+    "func-60",
+    "SELECT CHAR(00) || '_' LIKE '_#%' ESCAPE '#';",
+    {0})
+
+-- REPLACE
+test:do_execsql_test(
+    "func-62",
+    "SELECT REPLACE(CHAR(00,65,00,65), CHAR(00), CHAR(65));",
+    {'AAAA'})
+
+test:do_execsql_test(
+    "func-63",
+    "SELECT REPLACE(CHAR(00,65,00,65), CHAR(65), CHAR(00));",
+    {string.char(00,00,00,00)})
+
+-- SUBSTR
+test:do_execsql_test(
+    "func-64",
+    "SELECT SUBSTR(CHAR(65,00,66,67), 3, 2);",
+    {string.char(66,67)})
+
+test:do_execsql_test(
+    "func-65",
+    "SELECT SUBSTR(CHAR(00,00,00,65), 1, 4);",
+    {string.char(00,00,00,65)})
+
+-- UPPER
+test:do_execsql_test(
+    "func-66",
+    "SELECT UPPER(CHAR(00,97,00,98,00));",
+    {string.char(00,65,00,66,00)})
+
+-- LOWER
+test:do_execsql_test(
+    "func-67",
+    "SELECT LOWER(CHAR(00,65,00,66,00));",
+    {string.char(00,97,00,98,00)})
+
+-- HEX
+test:do_execsql_test(
+    "func-68",
+    "SELECT HEX(CHAR(00,65,00,65,00));",
+    {'0041004100'})
+
+-- TRIM
+test:do_execsql_test(
+    "func-69",
+    "SELECT TRIM(CHAR(32,00,32,00,32));",
+    {string.char(00,32,00)})
+
+-- LTRIM
+test:do_execsql_test(
+    "func-70",
+    "SELECT LTRIM(CHAR(32,00,32,00,32));",
+    {string.char(00,32,00,32)})
+
+-- RTRIM
+test:do_execsql_test(
+    "func-71",
+    "SELECT RTRIM(CHAR(32,00,32,00,32));",
+    {string.char(32,00,32,00)})
+
+-- GROUP_CONCAT
+test:do_execsql_test(
+    "func-72",
+    "CREATE TABLE t100(a INT PRIMARY KEY, b CHAR); \
+     INSERT INTO t100 VALUES (1, CHAR(00)); \
+     INSERT INTO t100 VALUES (2, CHAR(65, 00, 65)); \
+     INSERT INTO t100 VALUES (3, CHAR(00)); \
+     SELECT GROUP_CONCAT(b, '') FROM t100;",
+    {string.char(00,65,00,65,00)})
+
+-- INSTR
+test:do_execsql_test(
+    "func-73",
+    "SELECT INSTR(CHAR(00,65,00,66,00), CHAR(65));",
+    {2})
+
+test:do_execsql_test(
+    "func-74",
+    "SELECT INSTR(CHAR(00,65,00,66,00), CHAR(66));",
+    {4})
+
+test:do_execsql_test(
+    "func-75",
+    "SELECT INSTR(CHAR(00,65,00,66,00), CHAR(00));",
+    {1})
+
+test:do_execsql_test(
+    "func-76",
+    "SELECT INSTR(CHAR(65,66), CHAR(00));",
+    {0})
 
 test:finish_test()

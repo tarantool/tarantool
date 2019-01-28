@@ -150,11 +150,7 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 			const unsigned char *z = sql_value_text(argv[0]);
 			if (z == 0)
 				return;
-			len = 0;
-			while (*z) {
-				len++;
-				SQL_SKIP_UTF8(z);
-			}
+			len = sql_utf8_char_count(z, sql_value_bytes(argv[0]));
 			sql_result_int(context, len);
 			break;
 		}
@@ -340,11 +336,8 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 		if (z == 0)
 			return;
 		len = 0;
-		if (p1 < 0) {
-			for (z2 = z; *z2; len++) {
-				SQL_SKIP_UTF8(z2);
-			}
-		}
+		if (p1 < 0)
+			len = sql_utf8_char_count(z, sql_value_bytes(argv[0]));
 	}
 #ifdef SQL_SUBSTR_COMPATIBILITY
 	/* If SUBSTR_COMPATIBILITY is defined then substr(X,0,N) work the same as
@@ -388,13 +381,27 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 	assert(p1 >= 0 && p2 >= 0);
 	if (p0type != SQL_BLOB) {
-		while (*z && p1) {
-			SQL_SKIP_UTF8(z);
+		/*
+		 * In the code below 'cnt' and 'n_chars' is
+		 * used because '\0' is not supposed to be
+		 * end-of-string symbol.
+		 */
+		int byte_size = sql_value_bytes(argv[0]);
+		int n_chars = sql_utf8_char_count(z, byte_size);
+		int cnt = 0;
+		int i = 0;
+		while (cnt < n_chars && p1) {
+			SQL_UTF8_FWD_1(z, i, byte_size);
+			cnt++;
 			p1--;
 		}
-		for (z2 = z; *z2 && p2; p2--) {
-			SQL_SKIP_UTF8(z2);
+		z += i;
+		i = 0;
+		for (z2 = z; cnt < n_chars && p2; p2--) {
+			SQL_UTF8_FWD_1(z2, i, byte_size);
+			cnt++;
 		}
+		z2 += i;
 		sql_result_text64(context, (char *)z, z2 - z,
 				      SQL_TRANSIENT);
 	} else {
@@ -620,8 +627,14 @@ enum pattern_match_status {
  * This routine is usually quick, but can be N**2 in the worst
  * case.
  *
+ * 'pattern_end' and 'string_end' params are used to determine
+ * the end of strings, because '\0' is not supposed to be
+ * end-of-string signal.
+ *
  * @param pattern String containing comparison pattern.
  * @param string String being compared.
+ * @param pattern_end Ptr to pattern last symbol.
+ * @param string_end Ptr to string last symbol.
  * @param is_like_ci true if LIKE is case insensitive.
  * @param match_other The escape char for LIKE.
  *
@@ -630,6 +643,8 @@ enum pattern_match_status {
 static int
 sql_utf8_pattern_compare(const char *pattern,
 			 const char *string,
+			 const char *pattern_end,
+			 const char *string_end,
 			 const int is_like_ci,
 			 UChar32 match_other)
 {
@@ -637,8 +652,6 @@ sql_utf8_pattern_compare(const char *pattern,
 	UChar32 c, c2;
 	/* One past the last escaped input char. */
 	const char *zEscaped = 0;
-	const char *pattern_end = pattern + strlen(pattern);
-	const char *string_end = string + strlen(string);
 	UErrorCode status = U_ZERO_ERROR;
 
 	while (pattern < pattern_end) {
@@ -721,6 +734,8 @@ sql_utf8_pattern_compare(const char *pattern,
 				}
 				bMatch = sql_utf8_pattern_compare(pattern,
 								  string,
+								  pattern_end,
+								  string_end,
 								  is_like_ci,
 								  match_other);
 				if (bMatch != NO_MATCH)
@@ -768,7 +783,9 @@ sql_utf8_pattern_compare(const char *pattern,
 int
 sql_strlike_cs(const char *zPattern, const char *zStr, unsigned int esc)
 {
-	return sql_utf8_pattern_compare(zPattern, zStr, 0, esc);
+	return sql_utf8_pattern_compare(zPattern, zStr,
+		                        zPattern + strlen(zPattern),
+		                        zStr + strlen(zStr), 0, esc);
 }
 
 /**
@@ -778,7 +795,9 @@ sql_strlike_cs(const char *zPattern, const char *zStr, unsigned int esc)
 int
 sql_strlike_ci(const char *zPattern, const char *zStr, unsigned int esc)
 {
-	return sql_utf8_pattern_compare(zPattern, zStr, 1, esc);
+	return sql_utf8_pattern_compare(zPattern, zStr,
+		                        zPattern + strlen(zPattern),
+		                        zStr + strlen(zStr), 1, esc);
 }
 
 /**
@@ -802,7 +821,6 @@ int sql_like_count = 0;
 static void
 likeFunc(sql_context *context, int argc, sql_value **argv)
 {
-	const char *zA, *zB;
 	u32 escape = SQL_END_OF_STRING;
 	int nPat;
 	sql *db = sql_context_db_handle(context);
@@ -818,8 +836,10 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 		return;
 	}
 #endif
-	zB = (const char *) sql_value_text(argv[0]);
-	zA = (const char *) sql_value_text(argv[1]);
+	const char *zB = (const char *) sql_value_text(argv[0]);
+	const char *zA = (const char *) sql_value_text(argv[1]);
+	const char *zB_end = zB + sql_value_bytes(argv[0]);
+	const char *zA_end = zA + sql_value_bytes(argv[1]);
 
 	/*
 	 * Limit the length of the LIKE pattern to avoid problems
@@ -848,7 +868,7 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 			return;
 		const char *const err_msg =
 			"ESCAPE expression must be a single character";
-		if (sqlUtf8CharLen((char *)zEsc, -1) != 1) {
+		if (sql_utf8_char_count(zEsc, sql_value_bytes(argv[2])) != 1) {
 			sql_result_error(context, err_msg, -1);
 			return;
 		}
@@ -860,7 +880,8 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	sql_like_count++;
 #endif
 	int res;
-	res = sql_utf8_pattern_compare(zB, zA, is_like_ci, escape);
+	res = sql_utf8_pattern_compare(zB, zA, zB_end, zA_end,
+				       is_like_ci, escape);
 	if (res == INVALID_PATTERN) {
 		const char *const err_msg =
 			"LIKE pattern can only contain UTF-8 characters";
@@ -1135,12 +1156,12 @@ replaceFunc(sql_context * context, int argc, sql_value ** argv)
 		       || sql_context_db_handle(context)->mallocFailed);
 		return;
 	}
-	if (zPattern[0] == 0) {
+	nPattern = sql_value_bytes(argv[1]);
+	if (nPattern == 0) {
 		assert(sql_value_type(argv[1]) != SQL_NULL);
 		sql_result_value(context, argv[0]);
 		return;
 	}
-	nPattern = sql_value_bytes(argv[1]);
 	assert(zPattern == sql_value_text(argv[1]));	/* No encoding change */
 	zRep = sql_value_text(argv[2]);
 	if (zRep == 0)
@@ -1225,8 +1246,6 @@ trimFunc(sql_context * context, int argc, sql_value ** argv)
 	} else {
 		const unsigned char *z = zCharSet;
 		int trim_set_sz = sql_value_bytes(argv[1]);
-		int handled_bytes_cnt = trim_set_sz;
-		nChar = 0;
 		/*
 		* Count the number of UTF-8 characters passing
 		* through the entire char set, but not up
@@ -1234,12 +1253,7 @@ trimFunc(sql_context * context, int argc, sql_value ** argv)
 		* to handle trimming set containing such
 		* characters.
 		*/
-		while(handled_bytes_cnt > 0) {
-		const unsigned char *prev_byte = z;
-			SQL_SKIP_UTF8(z);
-			handled_bytes_cnt -= (z - prev_byte);
-			nChar++;
-		}
+		nChar = sql_utf8_char_count(z, trim_set_sz);
 		if (nChar > 0) {
 			azChar =
 			    contextMalloc(context,
@@ -1249,12 +1263,13 @@ trimFunc(sql_context * context, int argc, sql_value ** argv)
 			}
 			aLen = (unsigned char *)&azChar[nChar];
 			z = zCharSet;
+			i = 0;
 			nChar = 0;
-			handled_bytes_cnt = trim_set_sz;
+			int handled_bytes_cnt = trim_set_sz;
 			while(handled_bytes_cnt > 0) {
-				azChar[nChar] = (unsigned char *)z;
-				SQL_SKIP_UTF8(z);
-				aLen[nChar] = (u8) (z - azChar[nChar]);
+				azChar[nChar] = (unsigned char *)(z + i);
+				SQL_UTF8_FWD_1(z, i, trim_set_sz);
+				aLen[nChar] = (u8) (z + i - azChar[nChar]);
 				handled_bytes_cnt -= aLen[nChar];
 				nChar++;
 			}
@@ -1595,8 +1610,8 @@ groupConcatFinalize(sql_context * context)
 			sql_result_error_nomem(context);
 		} else {
 			sql_result_text(context,
-					    sqlStrAccumFinish(pAccum), -1,
-					    sql_free);
+					    sqlStrAccumFinish(pAccum),
+					    pAccum->nChar, sql_free);
 		}
 	}
 }
