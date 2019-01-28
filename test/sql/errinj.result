@@ -205,6 +205,30 @@ box.error.injection.set("ERRINJ_WAL_IO", true)
 ---
 - ok
 ...
+t = box.space._trigger:get('T1T')
+---
+...
+t_new = t:totable()
+---
+...
+t_new[3]['sql'] = 'CREATE TRIGGER t1t INSERT ON t1 BEGIN INSERT INTO t2 VALUES (2, 2); END;'
+---
+...
+_ = box.space._trigger:replace(t, t_new)
+---
+- error: Failed to write to disk
+...
+box.error.injection.set("ERRINJ_WAL_IO", false)
+---
+- ok
+...
+_ = box.space._trigger:replace(t, t_new)
+---
+...
+box.error.injection.set("ERRINJ_WAL_IO", true)
+---
+- ok
+...
 box.sql.execute("DROP TRIGGER t1t;")
 ---
 - error: Failed to write to disk

@@ -3581,7 +3581,8 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 			diag_raise();
 
 		on_commit->data = old_trigger;
-		on_rollback->data = new_trigger;
+		on_rollback->data =
+			old_tuple == NULL ? new_trigger : old_trigger;
 		new_trigger_guard.is_active = false;
 	}
 
