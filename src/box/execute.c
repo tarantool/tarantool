@@ -30,6 +30,7 @@
  */
 #include "execute.h"
 
+#include "bind.h"
 #include "iproto_constants.h"
 #include "sql/sqlInt.h"
 #include "sql/sqlLimit.h"
@@ -44,42 +45,8 @@
 #include "tuple.h"
 #include "sql/vdbe.h"
 
-const char *sql_type_strs[] = {
-	NULL,
-	"INTEGER",
-	"FLOAT",
-	"TEXT",
-	"BLOB",
-	"NULL",
-};
-
 const char *sql_info_key_strs[] = {
 	"row count",
-};
-
-/**
- * Name and value of an SQL prepared statement parameter.
- * @todo: merge with sql_value.
- */
-struct sql_bind {
-	/** Bind name. NULL for ordinal binds. */
-	const char *name;
-	/** Length of the @name. */
-	uint32_t name_len;
-	/** Ordinal position of the bind, for ordinal binds. */
-	uint32_t pos;
-
-	/** Byte length of the value. */
-	uint32_t bytes;
-	/** SQL type of the value. */
-	uint8_t type;
-	/** Bind value. */
-	union {
-		double d;
-		int64_t i64;
-		/** For string or blob. */
-		const char *s;
-	};
 };
 
 static_assert(sizeof(struct port_sql) <= sizeof(struct port),
@@ -148,152 +115,6 @@ port_sql_create(struct port *port, struct sql_stmt *stmt)
 	port_tuple_create(port);
 	((struct port_sql *)port)->stmt = stmt;
 	port->vtab = &port_sql_vtab;
-}
-
-/**
- * Return a string name of a parameter marker.
- * @param Bind to get name.
- * @retval Zero terminated name.
- */
-static inline const char *
-sql_bind_name(const struct sql_bind *bind)
-{
-	if (bind->name)
-		return tt_sprintf("'%.*s'", bind->name_len, bind->name);
-	else
-		return tt_sprintf("%d", (int) bind->pos);
-}
-
-/**
- * Decode a single bind column from the binary protocol packet.
- * @param[out] bind Bind to decode to.
- * @param i Ordinal bind number.
- * @param packet MessagePack encoded parameter value. Either
- *        scalar or map: {string_name: scalar_value}.
- *
- * @retval  0 Success.
- * @retval -1 Memory or client error.
- */
-static inline int
-sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
-{
-	bind->pos = i + 1;
-	if (mp_typeof(**packet) == MP_MAP) {
-		uint32_t len = mp_decode_map(packet);
-		/*
-		 * A named parameter is an MP_MAP with
-		 * one key - {'name': value}.
-		 * Report parse error otherwise.
-		 */
-		if (len != 1 || mp_typeof(**packet) != MP_STR) {
-			diag_set(ClientError, ER_INVALID_MSGPACK,
-				 "SQL bind parameter");
-			return -1;
-		}
-		bind->name = mp_decode_str(packet, &bind->name_len);
-	} else {
-		bind->name = NULL;
-		bind->name_len = 0;
-	}
-	switch (mp_typeof(**packet)) {
-	case MP_UINT: {
-		uint64_t n = mp_decode_uint(packet);
-		if (n > INT64_MAX) {
-			diag_set(ClientError, ER_SQL_BIND_VALUE,
-				 sql_bind_name(bind), "INTEGER");
-			return -1;
-		}
-		bind->i64 = (int64_t) n;
-		bind->type = SQL_INTEGER;
-		bind->bytes = sizeof(bind->i64);
-		break;
-	}
-	case MP_INT:
-		bind->i64 = mp_decode_int(packet);
-		bind->type = SQL_INTEGER;
-		bind->bytes = sizeof(bind->i64);
-		break;
-	case MP_STR:
-		bind->s = mp_decode_str(packet, &bind->bytes);
-		bind->type = SQL_TEXT;
-		break;
-	case MP_DOUBLE:
-		bind->d = mp_decode_double(packet);
-		bind->type = SQL_FLOAT;
-		bind->bytes = sizeof(bind->d);
-		break;
-	case MP_FLOAT:
-		bind->d = mp_decode_float(packet);
-		bind->type = SQL_FLOAT;
-		bind->bytes = sizeof(bind->d);
-		break;
-	case MP_NIL:
-		mp_decode_nil(packet);
-		bind->type = SQL_NULL;
-		bind->bytes = 1;
-		break;
-	case MP_BOOL:
-		/* sql doesn't support boolean. Use int instead. */
-		bind->i64 = mp_decode_bool(packet) ? 1 : 0;
-		bind->type = SQL_INTEGER;
-		bind->bytes = sizeof(bind->i64);
-		break;
-	case MP_BIN:
-		bind->s = mp_decode_bin(packet, &bind->bytes);
-		bind->type = SQL_BLOB;
-		break;
-	case MP_EXT:
-		bind->s = *packet;
-		mp_next(packet);
-		bind->bytes = *packet - bind->s;
-		bind->type = SQL_BLOB;
-		break;
-	case MP_ARRAY:
-		diag_set(ClientError, ER_SQL_BIND_TYPE, "ARRAY",
-			 sql_bind_name(bind));
-		return -1;
-	case MP_MAP:
-		diag_set(ClientError, ER_SQL_BIND_TYPE, "MAP",
-			 sql_bind_name(bind));
-		return -1;
-	default:
-		unreachable();
-	}
-	return 0;
-}
-
-int
-sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
-{
-	assert(data != NULL);
-	if (mp_typeof(*data) != MP_ARRAY) {
-		diag_set(ClientError, ER_INVALID_MSGPACK, "SQL parameter list");
-		return -1;
-	}
-	uint32_t bind_count = mp_decode_array(&data);
-	if (bind_count == 0)
-		return 0;
-	if (bind_count > SQL_BIND_PARAMETER_MAX) {
-		diag_set(ClientError, ER_SQL_BIND_PARAMETER_MAX,
-			 (int) bind_count);
-		return -1;
-	}
-	struct region *region = &fiber()->gc;
-	uint32_t used = region_used(region);
-	size_t size = sizeof(struct sql_bind) * bind_count;
-	struct sql_bind *bind = (struct sql_bind *) region_alloc(region, size);
-	if (bind == NULL) {
-		diag_set(OutOfMemory, size, "region_alloc", "struct sql_bind");
-		return -1;
-	}
-	for (uint32_t i = 0; i < bind_count; ++i) {
-		if (sql_bind_decode(&bind[i], i, &data) != 0) {
-			region_truncate(region, used);
-			return -1;
-		}
-	}
-	*out_bind = bind;
-	return bind_count;
 }
 
 /**
@@ -429,95 +250,6 @@ sql_row_to_port(struct sql_stmt *stmt, int column_count,
 error:
 	region_truncate(region, svp);
 	return -1;
-}
-
-/**
- * Bind SQL parameter value to its position.
- * @param stmt Prepared statement.
- * @param p Parameter value.
- * @param pos Ordinal bind position.
- *
- * @retval  0 Success.
- * @retval -1 SQL error.
- */
-static inline int
-sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
-		uint32_t pos)
-{
-	int rc;
-	if (p->name != NULL) {
-		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);
-		if (pos == 0) {
-			diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
-				 sql_bind_name(p));
-			return -1;
-		}
-	}
-	switch (p->type) {
-	case SQL_INTEGER:
-		rc = sql_bind_int64(stmt, pos, p->i64);
-		break;
-	case SQL_FLOAT:
-		rc = sql_bind_double(stmt, pos, p->d);
-		break;
-	case SQL_TEXT:
-		/*
-		 * Parameters are allocated within message pack,
-		 * received from the iproto thread. IProto thread
-		 * now is waiting for the response and it will not
-		 * free the packet until sql_finalize. So
-		 * there is no need to copy the packet and we can
-		 * use SQL_STATIC.
-		 */
-		rc = sql_bind_text64(stmt, pos, p->s, p->bytes,
-					 SQL_STATIC);
-		break;
-	case SQL_NULL:
-		rc = sql_bind_null(stmt, pos);
-		break;
-	case SQL_BLOB:
-		rc = sql_bind_blob64(stmt, pos, (const void *) p->s,
-					 p->bytes, SQL_STATIC);
-		break;
-	default:
-		unreachable();
-	}
-	if (rc == SQL_OK)
-		return 0;
-
-	switch (rc) {
-	case SQL_NOMEM:
-		diag_set(OutOfMemory, p->bytes, "vdbe", "bind value");
-		break;
-	case SQL_TOOBIG:
-	default:
-		diag_set(ClientError, ER_SQL_BIND_VALUE, sql_bind_name(p),
-			 sql_type_strs[p->type]);
-		break;
-	}
-	return -1;
-}
-
-/**
- * Bind parameter values to the prepared statement.
- * @param stmt Prepared statement.
- * @param bind Parameters to bind.
- * @param bind_count Length of @a bind.
- *
- * @retval  0 Success.
- * @retval -1 Client or memory error.
- */
-static inline int
-sql_bind(struct sql_stmt *stmt, const struct sql_bind *bind,
-	 uint32_t bind_count)
-{
-	assert(stmt != NULL);
-	uint32_t pos = 1;
-	for (uint32_t i = 0; i < bind_count; pos = ++i + 1) {
-		if (sql_bind_column(stmt, &bind[i], pos) != 0)
-			return -1;
-	}
-	return 0;
 }
 
 /**
