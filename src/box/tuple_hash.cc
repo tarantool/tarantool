@@ -268,6 +268,7 @@ uint32_t
 tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 		 struct coll *coll)
 {
+	char buf[9]; /* enough to store MP_INT/MP_UINT */
 	const char *f = *field;
 	uint32_t size;
 
@@ -301,7 +302,6 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 			break;
 		}
 		char *data;
-		char buf[9]; /* enough to store MP_INT/MP_UINT */
 		if (val >= 0)
 			data = mp_encode_uint(buf, (uint64_t)val);
 		else
