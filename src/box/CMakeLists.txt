@@ -116,6 +116,7 @@ add_library(box STATIC
     relay.cc
     journal.c
     sql.c
+    bind.c
     execute.c
     wal.c
     call.c

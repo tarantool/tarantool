@@ -49,6 +49,7 @@
 #include "memory.h"
 #include "random.h"
 
+#include "bind.h"
 #include "port.h"
 #include "box.h"
 #include "call.h"
