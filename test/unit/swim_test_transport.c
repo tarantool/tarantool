@@ -34,6 +34,8 @@
 #include "fiber.h"
 #include <errno.h>
 #include <sys/socket.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 
 enum {
 	/**
@@ -84,6 +86,18 @@ static inline void
 swim_test_packet_delete(struct swim_test_packet *p)
 {
 	free(p);
+}
+
+/** Fully duplicate a packet on new memory. */
+static inline struct swim_test_packet *
+swim_test_packet_dup(struct swim_test_packet *p)
+{
+	int size = sizeof(struct swim_test_packet) + p->size;
+	struct swim_test_packet *res = (struct swim_test_packet *) malloc(size);
+	assert(res != NULL);
+	memcpy(res, p, size);
+	rlist_create(&res->in_queue);
+	return res;
 }
 
 /** Fake file descriptor. */
@@ -291,19 +305,42 @@ swim_test_is_drop(double rate)
 	return ((double) rand() / RAND_MAX) * 100 < rate;
 }
 
+/**
+ * Move @a p packet, originated from @a src descriptor's send
+ * queue, to @a dst descriptor's recv queue. The function checks
+ * if @a dst is opened, and tries a chance to drop the packet, if
+ * drop rate is not 0.
+ */
+static inline void
+swim_move_packet(struct swim_fd *src, struct swim_fd *dst,
+		 struct swim_test_packet *p)
+{
+	if (dst->is_opened && !swim_test_is_drop(dst->drop_rate) &&
+	    !swim_test_is_drop(src->drop_rate))
+		rlist_add_tail_entry(&dst->recv_queue, p, in_queue);
+	else
+		swim_test_packet_delete(p);
+}
+
 static inline void
 swim_fd_send_packet(struct swim_fd *fd)
 {
 	assert(! rlist_empty(&fd->send_queue));
-	struct swim_test_packet *p =
+	struct swim_fd *dst;
+	struct swim_test_packet *dup, *p =
 		rlist_shift_entry(&fd->send_queue, struct swim_test_packet,
 				  in_queue);
-	struct swim_fd *dst = &swim_fd[ntohs(p->dst.sin_port)];
-	if (dst->is_opened && !swim_test_is_drop(dst->drop_rate) &&
-	    !swim_test_is_drop(fd->drop_rate))
-		rlist_add_tail_entry(&dst->recv_queue, p, in_queue);
-	else
+	if (p->dst.sin_addr.s_addr == INADDR_BROADCAST &&
+	    p->dst.sin_port == 0) {
+		rlist_foreach_entry(dst, &swim_fd_active, in_active) {
+			dup = swim_test_packet_dup(p);
+			swim_move_packet(fd, dst, dup);
+		}
 		swim_test_packet_delete(p);
+	} else {
+		dst = &swim_fd[ntohs(p->dst.sin_port)];
+		swim_move_packet(fd, dst, p);
+	}
 }
 
 /**
@@ -351,4 +388,47 @@ swim_test_transport_do_loop_step(struct ev_loop *loop)
 		 * add a new message into another send queue.
 		 */
 	} while (ev_pending_count(loop) > 0);
+}
+
+int
+swim_getifaddrs(struct ifaddrs **ifaddrs)
+{
+	/*
+	 * This is a fake implementation of getifaddrs. It always
+	 * returns two interfaces. First is a normal broadcast,
+	 * which is later used to send a packet to all the opened
+	 * descriptors. Second is a dummy interface leading to
+	 * nowhere. The latter is used just for testing that the
+	 * real SWIM code correctly iterates through the
+	 * interface list.
+	 */
+	int size = (sizeof(struct ifaddrs) + sizeof(struct sockaddr_in)) * 2;
+	struct ifaddrs *iface = (struct ifaddrs *) calloc(1, size);
+	assert(iface != NULL);
+	struct ifaddrs *iface_next = &iface[1];
+	iface->ifa_next = iface_next;
+
+	struct sockaddr_in *broadaddr = (struct sockaddr_in *) &iface_next[1];
+	broadaddr->sin_family = AF_INET;
+	broadaddr->sin_addr.s_addr = INADDR_BROADCAST;
+	iface->ifa_flags = IFF_UP | IFF_BROADCAST;
+	iface->ifa_broadaddr = (struct sockaddr *) broadaddr;
+
+	struct sockaddr_in *dummy_addr = &broadaddr[1];
+	dummy_addr->sin_family = AF_INET;
+	iface_next->ifa_flags = IFF_UP;
+	iface_next->ifa_addr = (struct sockaddr *) dummy_addr;
+
+	*ifaddrs = iface;
+	return 0;
+}
+
+void
+swim_freeifaddrs(struct ifaddrs *ifaddrs)
+{
+	/*
+	 * The whole list is packed into a single allocation
+	 * above.
+	 */
+	free(ifaddrs);
 }

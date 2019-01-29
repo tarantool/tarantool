@@ -31,6 +31,8 @@
 #include "swim_transport.h"
 #include "evio.h"
 #include "diag.h"
+#include <ifaddrs.h>
+#include <net/if.h>
 
 ssize_t
 swim_transport_send(struct swim_transport *transport, const void *data,
@@ -109,4 +111,19 @@ swim_transport_create(struct swim_transport *transport)
 {
 	transport->fd = -1;
 	memset(&transport->addr, 0, sizeof(transport->addr));
+}
+
+int
+swim_getifaddrs(struct ifaddrs **ifaddrs)
+{
+	if (getifaddrs(ifaddrs) == 0)
+		return 0;
+	diag_set(SystemError, "failed to take an interface list by getifaddrs");
+	return -1;
+}
+
+void
+swim_freeifaddrs(struct ifaddrs *ifaddrs)
+{
+	freeifaddrs(ifaddrs);
 }

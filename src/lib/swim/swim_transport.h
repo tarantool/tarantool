@@ -34,6 +34,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+struct ifaddrs;
+
 /** Transport implementation. */
 struct swim_transport {
 	/** Socket. */
@@ -76,5 +78,16 @@ swim_transport_destroy(struct swim_transport *transport);
 
 void
 swim_transport_create(struct swim_transport *transport);
+
+/**
+ * Get a list of network interfaces. Just a wrapper around
+ * getifaddrs, but setting diag.
+ */
+int
+swim_getifaddrs(struct ifaddrs **ifaddrs);
+
+/** Delete an interface list created earlier with getifaddrs. */
+void
+swim_freeifaddrs(struct ifaddrs *ifaddrs);
 
 #endif /* TARANTOOL_SWIM_TRANSPORT_H_INCLUDED */

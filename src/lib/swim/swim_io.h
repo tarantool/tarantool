@@ -247,4 +247,36 @@ swim_task_destroy(struct swim_task *task)
 	rlist_del_entry(task, in_queue_output);
 }
 
+/**
+ * Broadcast task. Besides usual task fields, stores a list of
+ * interfaces available for broadcast packets. The task works
+ * asynchronously just like its ancestor, because even broadcast
+ * packets can not be sent without explicit permission from libev
+ * in a form of EV_WRITE event.
+ *
+ * Despite usually having multiple network interfaces supporting
+ * broadcast, there is only one task to send a packet to all of
+ * them. The same task works multiple times, each time sending a
+ * packet to one interface. After completion it is self-deleted.
+ * There are no any concrete reason behind that except stint on
+ * memory for multiple tasks.
+ */
+struct swim_bcast_task {
+	/** Base structure. */
+	struct swim_task base;
+	/** Port to use for broadcast, in network byte order. */
+	int port;
+	/** A list of interfaces. */
+	struct ifaddrs *addrs;
+	/** A next interface to send to. */
+	struct ifaddrs *i;
+};
+
+/**
+ * Create a new broadcast task with a specified port. The port is
+ * expected to have host byte order.
+ */
+struct swim_bcast_task *
+swim_bcast_task_new(int port, const char *desc);
+
 #endif /* TARANTOOL_SWIM_IO_H_INCLUDED */

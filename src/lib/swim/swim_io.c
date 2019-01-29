@@ -33,6 +33,8 @@
 #include "swim_ev.h"
 #include "fiber.h"
 #include "sio.h"
+#include <ifaddrs.h>
+#include <net/if.h>
 
 /**
  * Allocate memory for meta. The same as mere alloc, but moves
@@ -103,6 +105,101 @@ swim_task_send(struct swim_task *task, const struct sockaddr_in *dst,
 {
 	task->dst = *dst;
 	swim_task_schedule(task, scheduler);
+}
+
+/** Delete a broadcast task. */
+static void
+swim_bcast_task_delete(struct swim_bcast_task *task)
+{
+	swim_freeifaddrs(task->addrs);
+	swim_task_destroy(&task->base);
+	free(task);
+}
+
+/** Delete broadcast task on its cancelation. */
+static void
+swim_bcast_task_delete_cb(struct swim_task *task,
+			  struct swim_scheduler *scheduler, int rc)
+{
+	(void) scheduler;
+	(void) rc;
+	swim_bcast_task_delete((struct swim_bcast_task *) task);
+}
+
+/**
+ * Write down a next available broadcast address into the task
+ * destination field.
+ * @param task Broadcast task to update.
+ * @retval 0 Success. @a dst field is updated.
+ * @retval -1 No more addresses.
+ */
+static int
+swim_bcast_task_next_addr(struct swim_bcast_task *task)
+{
+	for (struct ifaddrs *i = task->i; i != NULL; i = i->ifa_next) {
+		int flags = i->ifa_flags;
+		if ((flags & IFF_UP) == 0)
+			continue;
+
+		if ((flags & IFF_BROADCAST) != 0 &&
+		    i->ifa_broadaddr->sa_family == AF_INET) {
+			task->base.dst =
+				*(struct sockaddr_in *) i->ifa_broadaddr;
+		} else if (i->ifa_addr != NULL &&
+			   i->ifa_addr->sa_family == AF_INET) {
+			task->base.dst = *(struct sockaddr_in *) i->ifa_addr;
+		} else {
+			continue;
+		}
+		task->base.dst.sin_port = task->port;
+		task->i = task->i->ifa_next;
+		return 0;
+	}
+	return -1;
+}
+
+/**
+ * Callback on send completion. If there are more broadcast
+ * addresses to use, then the task is rescheduled.
+ */
+static void
+swim_bcast_task_complete(struct swim_task *base_task,
+			 struct swim_scheduler *scheduler, int rc)
+{
+	(void) rc;
+	struct swim_bcast_task *task = (struct swim_bcast_task *) base_task;
+	if (swim_bcast_task_next_addr(task) != 0)
+		swim_bcast_task_delete(task);
+	else
+		swim_task_schedule(base_task, scheduler);
+}
+
+struct swim_bcast_task *
+swim_bcast_task_new(int port, const char *desc)
+{
+	struct swim_bcast_task *task =
+		(struct swim_bcast_task *) malloc(sizeof(*task));
+	if (task == NULL) {
+		diag_set(OutOfMemory, sizeof(*task), "malloc", "task");
+		return NULL;
+	}
+	struct ifaddrs *addrs;
+	if (swim_getifaddrs(&addrs) != 0) {
+		free(task);
+		return NULL;
+	}
+	task->port = htons(port);
+	task->addrs = addrs;
+	task->i = addrs;
+	swim_task_create(&task->base, swim_bcast_task_complete,
+			 swim_bcast_task_delete_cb, desc);
+	if (swim_bcast_task_next_addr(task) != 0) {
+		diag_set(SwimError, "broadcast has failed - no available "\
+			 "interfaces");
+		swim_bcast_task_delete(task);
+		return NULL;
+	}
+	return task;
 }
 
 /**
