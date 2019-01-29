@@ -605,6 +605,17 @@ sql_column_value(sql_stmt *,
 int
 sql_finalize(sql_stmt * pStmt);
 
+/*
+ * Terminate the current execution of an SQL statement and reset
+ * it back to its starting state so that it can be reused.
+ *
+ * @param stmt VDBE program.
+ * @retval SQL_OK On success.
+ * @retval sql_ret_code Error code on error.
+ */
+int
+sql_reset(struct sql_stmt *stmt);
+
 int
 sql_exec(sql *,	/* An open database */
 	     const char *sql,	/* SQL to be evaluated */
@@ -639,7 +650,6 @@ sql_exec(sql *,	/* An open database */
 #define SQL_IOERR_GETTEMPPATH       (SQL_IOERR | (25<<8))
 #define SQL_IOERR_CONVPATH          (SQL_IOERR | (26<<8))
 #define SQL_IOERR_VNODE             (SQL_IOERR | (27<<8))
-#define SQL_CONSTRAINT_CHECK        (SQL_CONSTRAINT | (1<<8))
 #define SQL_CONSTRAINT_FOREIGNKEY   (SQL_CONSTRAINT | (3<<8))
 #define SQL_CONSTRAINT_FUNCTION     (SQL_CONSTRAINT | (4<<8))
 #define SQL_CONSTRAINT_NOTNULL      (SQL_CONSTRAINT | (5<<8))
@@ -943,7 +953,6 @@ sql_init_db(sql **db);
 
 int
 sql_close(sql *);
-
 
 /**
  * Get number of the named parameter in the prepared sql
@@ -2610,7 +2619,11 @@ struct Parse {
 	int nMem;		/* Number of memory cells used so far */
 	int nOpAlloc;		/* Number of slots allocated for Vdbe.aOp[] */
 	int szOpAlloc;		/* Bytes of memory space allocated for Vdbe.aOp[] */
-	int ckBase;		/* Base register of data during check constraints */
+	/*
+	 * The register with vdbe_field_ref to generate an
+	 * alternative Vdbe code (during check constraints).
+	 */
+	int vdbe_field_ref_reg;
 	int iSelfTab;		/* Table of an index whose exprs are being coded */
 	int iCacheLevel;	/* ColCache valid when aColCache[].iLevel<=iCacheLevel */
 	int iCacheCnt;		/* Counter used to generate aColCache[].lru values */
@@ -3907,6 +3920,24 @@ vdbe_emit_constraint_checks(struct Parse *parse_context,
 			    enum on_conflict_action on_conflict,
 			    int ignore_label, int *upd_cols);
 
+/**
+ * Gnerate code to make check constraints tests on tuple insertion
+ * on INSERT, REPLACE or UPDATE operations.
+ * @param parser Current parsing context.
+ * @param expr Check constraint AST.
+ * @param name Check constraint name to raise an informative
+ *             error.
+ * @param expr_str Ck constraint expression source string to
+ *                 raise an informative error.
+ * @param vdbe_field_ref_reg The VDBE register with prepared
+ *                           vdbe_field_ref_reg pointer inside is
+ *                           initialized with a tuple to be
+ *                           inserted.
+ */
+void
+vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
+			const char *name, const char *expr_str,
+			int vdbe_field_ref_reg);
 /**
  * This routine generates code to finish the INSERT or UPDATE
  * operation that was started by a prior call to

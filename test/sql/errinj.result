@@ -490,7 +490,8 @@ _ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<
 ...
 box.execute("INSERT INTO \"test\" VALUES(5);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_01'
+- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_01'':
+    X<5'
 ...
 errinj.set("ERRINJ_WAL_IO", true)
 ---
@@ -521,7 +522,8 @@ _ = box.space._ck_constraint:delete({s.id, 'CK_CONSTRAINT_01'})
 ...
 box.execute("INSERT INTO \"test\" VALUES(6);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_01'
+- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_01'':
+    X<=5'
 ...
 errinj.set("ERRINJ_WAL_IO", false)
 ---
@@ -557,11 +559,13 @@ _ = box.space._ck_constraint:insert({s.id, 'Xgreater10', false, 'SQL', 'X > 10'}
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: Xgreater10'
+- error: 'Failed to execute SQL statement: Check constraint failed ''Xgreater10'':
+    X > 10'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 10);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: XlessY'
+- error: 'Failed to execute SQL statement: Check constraint failed ''XlessY'': X <
+    Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 100);")
 ---
@@ -584,11 +588,13 @@ errinj.set("ERRINJ_WAL_IO", false)
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: Xgreater10'
+- error: 'Failed to execute SQL statement: Check constraint failed ''Xgreater10'':
+    X > 10'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 10);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: XlessY'
+- error: 'Failed to execute SQL statement: Check constraint failed ''XlessY'': X <
+    Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 100);")
 ---

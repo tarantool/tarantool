@@ -55,7 +55,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(6,7, 2);
     ]], {
         -- <check-1.3>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
+        1, "Failed to execute SQL statement: Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
         -- </check-1.3>
     })
 
@@ -75,7 +75,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4,3, 2);
     ]], {
         -- <check-1.5>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_2_T1"
+        1, "Failed to execute SQL statement: Check constraint failed 'CK_CONSTRAINT_2_T1': y>x"
         -- </check-1.5>
     })
 
@@ -147,7 +147,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=7 WHERE x==2
     ]], {
         -- <check-1.12>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
+        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
         -- </check-1.12>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=5 WHERE x==2
     ]], {
         -- <check-1.14>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
+        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
         -- </check-1.14>
     })
 
@@ -206,9 +206,9 @@ test:do_execsql_test(
     [[
         CREATE TABLE t2(
           id  INT primary key,
-          x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
+          x SCALAR CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
           y REAL CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='number' ),
-          z TEXT CONSTRAINT three CHECK( typeof(coalesce(z,''))=='string' )
+          z SCALAR CONSTRAINT three CHECK( typeof(coalesce(z,''))=='string' )
         );
     ]], {
         -- <check-2.1>
@@ -246,7 +246,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(3, 1.1, NULL, NULL);
     ]], {
         -- <check-2.4>
-        1, "Failed to execute SQL statement: CHECK constraint failed: ONE"
+        1, "Failed to execute SQL statement: Check constraint failed 'ONE': typeof(coalesce(x,0))=='integer'"
         -- </check-2.4>
     })
 
@@ -256,7 +256,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(4, NULL, 5, NULL);
     ]], {
         -- <check-2.5>
-        1, "Failed to execute SQL statement: CHECK constraint failed: TWO"
+        1, "Failed to execute SQL statement: Check constraint failed 'TWO': typeof(coalesce(y,0.1))=='number'"
         -- </check-2.5>
     })
 
@@ -266,7 +266,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(5, NULL, NULL, 3.14159);
     ]], {
         -- <check-2.6>
-        1, "Failed to execute SQL statement: CHECK constraint failed: THREE"
+        1, "Failed to execute SQL statement: Check constraint failed 'THREE': typeof(coalesce(z,''))=='string'"
         -- </check-2.6>
     })
 
@@ -413,7 +413,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(111,222,333);
     ]], {
         -- <check-3.9>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T3"
+        1, "Failed to execute SQL statement: Check constraint failed 'CK_CONSTRAINT_1_T3': t3.x<25"
         -- </check-3.9>
     })
 
@@ -484,7 +484,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=1;
     ]], {
         -- <check-4.6>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T4"
+        1, "Check constraint failed 'CK_CONSTRAINT_1_T4': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
         -- </check-4.6>
     })
 
@@ -504,7 +504,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T4"
+        1, "Check constraint failed 'CK_CONSTRAINT_1_T4': x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x==y+10"
         -- </check-4.9>
     })
 
@@ -581,7 +581,7 @@ test:do_catchsql_test(
         UPDATE OR FAIL t1 SET x=7-x, y=y+1;
     ]], {
         -- <check-6.5>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
+        1, "Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
         -- </check-6.5>
     })
 
@@ -603,7 +603,7 @@ test:do_catchsql_test(
         INSERT OR ROLLBACK INTO t1 VALUES(8,40.0, 10);
     ]], {
         -- <check-6.7>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
+        1, "Failed to execute SQL statement: Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
         -- </check-6.7>
     })
 
@@ -636,7 +636,7 @@ test:do_catchsql_test(
         REPLACE INTO t1 VALUES(6,7, 11);
     ]], {
         -- <check-6.12>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
+        1, "Failed to execute SQL statement: Check constraint failed 'CK_CONSTRAINT_1_T1': x<5"
         -- </check-6.12>
     })
 
@@ -700,7 +700,7 @@ test:do_catchsql_test(
     7.3,
     " INSERT INTO t6 VALUES(11) ", {
         -- <7.3>
-        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T6"
+        1, "Failed to execute SQL statement: Check constraint failed 'CK_CONSTRAINT_1_T6': myfunc(a)"
         -- </7.3>
     })
 

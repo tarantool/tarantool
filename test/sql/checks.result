@@ -73,7 +73,12 @@ box.space._ck_constraint:count({})
 ...
 box.execute("INSERT INTO \"test\" VALUES(5);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_01'
+- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_01'':
+    X<5'
+...
+box.space.test:insert({5})
+---
+- error: 'Check constraint failed ''CK_CONSTRAINT_01'': X<5'
 ...
 box.space._ck_constraint:replace({513, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5'})
 ---
@@ -85,7 +90,12 @@ box.execute("INSERT INTO \"test\" VALUES(5);")
 ...
 box.execute("INSERT INTO \"test\" VALUES(6);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_01'
+- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_01'':
+    X<=5'
+...
+box.space.test:insert({6})
+---
+- error: 'Check constraint failed ''CK_CONSTRAINT_01'': X<=5'
 ...
 -- Can't drop table with check constraints.
 box.space.test:delete({5})
@@ -118,15 +128,27 @@ box.space._ck_constraint:count()
 ...
 box.execute("INSERT INTO t1 VALUES (7, 1, 1)")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: ONE'
+- error: 'Failed to execute SQL statement: Check constraint failed ''ONE'': x<5'
+...
+box.space.T1:insert({7, 1, 1})
+---
+- error: 'Check constraint failed ''ONE'': x<5'
 ...
 box.execute("INSERT INTO t1 VALUES (2, 1, 1)")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: TWO'
+- error: 'Failed to execute SQL statement: Check constraint failed ''TWO'': y>x'
+...
+box.space.T1:insert({2, 1, 1})
+---
+- error: 'Check constraint failed ''TWO'': y>x'
 ...
 box.execute("INSERT INTO t1 VALUES (2, 4, 1)")
 ---
 - row_count: 1
+...
+box.space.T1:update({1}, {{'+', 1, 5}})
+---
+- error: 'Check constraint failed ''ONE'': x<5'
 ...
 box.execute("DROP TABLE t1")
 ---
@@ -164,14 +186,14 @@ _ = box.space._ck_constraint:insert({s.id, 'physics', false, 'SQL', 'X<Y'})
 ...
 box.execute("INSERT INTO \"test\" VALUES(2, 1);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
+- error: 'Failed to execute SQL statement: Check constraint failed ''physics'': X<Y'
 ...
 s:format({{name='Y', type='integer'}, {name='X', type='integer'}})
 ---
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
+- error: 'Failed to execute SQL statement: Check constraint failed ''physics'': X<Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(2, 1);")
 ---
@@ -182,7 +204,7 @@ s:truncate()
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
+- error: 'Failed to execute SQL statement: Check constraint failed ''physics'': X<Y'
 ...
 s:format({})
 ---
@@ -214,11 +236,11 @@ _ = box.space._ck_constraint:insert({s.id, 'conflict', false, 'SQL', 'X>10'})
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: conflict'
+- error: 'Failed to execute SQL statement: Check constraint failed ''conflict'': X>10'
 ...
 box.execute("INSERT INTO \"test\" VALUES(11, 11);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
+- error: 'Failed to execute SQL statement: Check constraint failed ''physics'': X<Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(12, 11);")
 ---
@@ -269,11 +291,13 @@ box.space._ck_constraint:select()[1].code
 ...
 box.execute("INSERT INTO t1 VALUES('1 a')")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1'
+- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_1_T1'':
+    x LIKE ''1  a'''
 ...
 box.execute("INSERT INTO t1 VALUES('1   a')")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1'
+- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_1_T1'':
+    x LIKE ''1  a'''
 ...
 box.execute("INSERT INTO t1 VALUES('1  a')")
 ---
@@ -282,6 +306,284 @@ box.execute("INSERT INTO t1 VALUES('1  a')")
 box.execute("DROP TABLE t1")
 ---
 - row_count: 1
+...
+--
+-- Test binding reset on new insertion
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+s:format({{name='X', type='any'}, {name='Y', type='integer'}, {name='Z', type='integer', is_nullable=true}})
+---
+...
+ck_not_null = box.space._ck_constraint:insert({s.id, 'ZnotNULL', false, 'SQL', 'X = 1 AND Z IS NOT NULL'})
+---
+...
+s:insert({2, 1})
+---
+- error: 'Check constraint failed ''ZnotNULL'': X = 1 AND Z IS NOT NULL'
+...
+s:insert({1, 1})
+---
+- error: 'Check constraint failed ''ZnotNULL'': X = 1 AND Z IS NOT NULL'
+...
+s:insert({1, 1, box.NULL})
+---
+- error: 'Check constraint failed ''ZnotNULL'': X = 1 AND Z IS NOT NULL'
+...
+s:insert({2, 1, 3})
+---
+- error: 'Check constraint failed ''ZnotNULL'': X = 1 AND Z IS NOT NULL'
+...
+s:insert({1, 1})
+---
+- error: 'Check constraint failed ''ZnotNULL'': X = 1 AND Z IS NOT NULL'
+...
+s:insert({1, 1, 3})
+---
+- [1, 1, 3]
+...
+s:drop()
+---
+...
+--
+-- Test ck constraint corner cases
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+_ = s:create_index('pk')
+---
+...
+s:format({{name='X', type='any'}, {name='Y', type='integer'}, {name='Z', type='integer', is_nullable=true}})
+---
+...
+ck_not_null = box.space._ck_constraint:insert({s.id, 'ZnotNULL', false, 'SQL', 'Z IS NOT NULL'})
+---
+...
+s:insert({1, 2, box.NULL})
+---
+- error: 'Check constraint failed ''ZnotNULL'': Z IS NOT NULL'
+...
+s:insert({1, 2})
+---
+- error: 'Check constraint failed ''ZnotNULL'': Z IS NOT NULL'
+...
+_ = box.space._ck_constraint:delete({s.id, 'ZnotNULL'})
+---
+...
+_ = box.space._ck_constraint:insert({s.id, 'XlessY', false, 'SQL', 'X < Y and Y < Z'})
+---
+...
+s:insert({'1', 2})
+---
+- error: 'Tuple field 1 type does not match one required by operation: expected unsigned'
+...
+s:insert({})
+---
+- error: Tuple field 1 required by space format is missing
+...
+s:insert({2, 1})
+---
+- error: 'Check constraint failed ''XlessY'': X < Y and Y < Z'
+...
+s:insert({1, 2})
+---
+- [1, 2]
+...
+s:insert({2, 3, 1})
+---
+- error: 'Check constraint failed ''XlessY'': X < Y and Y < Z'
+...
+s:insert({2, 3, 4})
+---
+- [2, 3, 4]
+...
+s:update({2}, {{'+', 2, 3}})
+---
+- error: 'Check constraint failed ''XlessY'': X < Y and Y < Z'
+...
+s:update({2}, {{'+', 2, 3}, {'+', 3, 3}})
+---
+- [2, 6, 7]
+...
+s:replace({2, 1, 3})
+---
+- error: 'Check constraint failed ''XlessY'': X < Y and Y < Z'
+...
+box.snapshot()
+---
+- ok
+...
+s = box.space["test"]
+---
+...
+s:update({2}, {{'+', 2, 3}})
+---
+- error: 'Check constraint failed ''XlessY'': X < Y and Y < Z'
+...
+s:update({2}, {{'+', 2, 3}, {'+', 3, 3}})
+---
+- [2, 9, 10]
+...
+s:replace({2, 1, 3})
+---
+- error: 'Check constraint failed ''XlessY'': X < Y and Y < Z'
+...
+s:drop()
+---
+...
+--
+-- Test complex CHECK constraints.
+--
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+s:format({{name='X', type='integer'}, {name='Y', type='integer'}, {name='Z', type='integer'}})
+---
+...
+_ = s:create_index('pk', {parts = {3, 'integer'}})
+---
+...
+_ = s:create_index('unique', {parts = {1, 'integer'}})
+---
+...
+_ = box.space._ck_constraint:insert({s.id, 'complex1', false, 'SQL', 'x+y==11 OR x*y==12 OR x/y BETWEEN 5 AND 8 OR -x == y+10'})
+---
+...
+s:insert({1, 10, 1})
+---
+- [1, 10, 1]
+...
+s:update({1}, {{'=', 1, 4}, {'=', 2, 3}})
+---
+- [4, 3, 1]
+...
+s:update({1}, {{'=', 1, 12}, {'=', 2, 2}})
+---
+- [12, 2, 1]
+...
+s:update({1}, {{'=', 1, 12}, {'=', 2, -22}})
+---
+- [12, -22, 1]
+...
+s:update({1}, {{'=', 1, 0}, {'=', 2, 1}})
+---
+- error: 'Check constraint failed ''complex1'': x+y==11 OR x*y==12 OR x/y BETWEEN
+    5 AND 8 OR -x == y+10'
+...
+s:get({1})
+---
+- [12, -22, 1]
+...
+s:update({1}, {{'=', 1, 0}, {'=', 2, 2}})
+---
+- error: 'Check constraint failed ''complex1'': x+y==11 OR x*y==12 OR x/y BETWEEN
+    5 AND 8 OR -x == y+10'
+...
+s:get({1})
+---
+- [12, -22, 1]
+...
+s:drop()
+---
+...
+s = box.schema.create_space('test', {engine = engine})
+---
+...
+s:format({{name='X', type='integer'}, {name='Z', type='any'}})
+---
+...
+_ = s:create_index('pk', {parts = {1, 'integer'}})
+---
+...
+_ = box.space._ck_constraint:insert({s.id, 'complex2', false, 'SQL', 'typeof(coalesce(z,0))==\'integer\''})
+---
+...
+s:insert({1, 'string'})
+---
+- error: 'Check constraint failed ''complex2'': typeof(coalesce(z,0))==''integer'''
+...
+s:insert({1, {map=true}})
+---
+- error: 'Check constraint failed ''complex2'': typeof(coalesce(z,0))==''integer'''
+...
+s:insert({1, {'a', 'r','r','a','y'}})
+---
+- error: 'Check constraint failed ''complex2'': typeof(coalesce(z,0))==''integer'''
+...
+s:insert({1, 3.14})
+---
+- error: 'Check constraint failed ''complex2'': typeof(coalesce(z,0))==''integer'''
+...
+s:insert({1, 666})
+---
+- [1, 666]
+...
+s:drop()
+---
+...
+--
+-- Test large tuple.
+--
+s = box.schema.create_space('test')
+---
+...
+_ = s:create_index('pk', {parts = {1, 'integer'}})
+---
+...
+format65 = {}
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+for i = 1,66 do
+        table.insert(format65, {name='X'..i, type='integer', is_nullable = true})
+end
+test_run:cmd("setopt delimiter ''");
+---
+...
+s:format(format65)
+---
+...
+_ = box.space._ck_constraint:insert({s.id, 'X1is666andX65is666', false, 'SQL', 'X1 == 666 and X65 == 666 and X63 IS NOT NULL'})
+---
+...
+s:insert(s:frommap({X1 = 1, X65 = 1}))
+---
+- error: 'Check constraint failed ''X1is666andX65is666'': X1 == 666 and X65 == 666
+    and X63 IS NOT NULL'
+...
+s:insert(s:frommap({X1 = 666, X65 = 1}))
+---
+- error: 'Check constraint failed ''X1is666andX65is666'': X1 == 666 and X65 == 666
+    and X63 IS NOT NULL'
+...
+s:insert(s:frommap({X1 = 1, X65 = 666}))
+---
+- error: 'Check constraint failed ''X1is666andX65is666'': X1 == 666 and X65 == 666
+    and X63 IS NOT NULL'
+...
+s:insert(s:frommap({X1 = 666, X65 = 666}))
+---
+- error: 'Check constraint failed ''X1is666andX65is666'': X1 == 666 and X65 == 666
+    and X63 IS NOT NULL'
+...
+s:insert(s:frommap({X1 = 666, X65 = 666, X63 = 1}))
+---
+- [666, null, null, null, null, null, null, null, null, null, null, null, null, null,
+  null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+  null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+  null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+  null, null, null, null, null, null, 1, null, 666]
+...
+s:drop()
+---
 ...
 test_run:cmd("clear filter")
 ---

@@ -140,7 +140,6 @@ struct SubProgram {
 /* Error message codes for OP_Halt */
 #define P5_ConstraintNotNull 1
 #define P5_ConstraintUnique  2
-#define P5_ConstraintCheck   3
 #define P5_ConstraintFK      4
 
 /*

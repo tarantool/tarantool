@@ -40,7 +40,9 @@ extern "C" {
 
 struct space;
 struct space_def;
+struct sql_stmt;
 struct Expr;
+struct trigger;
 
 /** Supported languages of ck constraint. */
 enum ck_constraint_language {
@@ -86,12 +88,11 @@ struct ck_constraint {
 	/** The check constraint definition. */
 	struct ck_constraint_def *def;
 	/**
-	 * The check constraint expression AST is built for
-	 * ck_constraint::def::expr_str with sql_expr_compile
-	 * and resolved with sql_resolve_self_reference for
-	 * space with space[ck_constraint::space_id] definition.
+	 * Precompiled reusable VDBE program for processing check
+	 * constraints and setting bad exitcode and error
+	 * message when ck condition unsatisfied.
 	 */
-	struct Expr *expr;
+	struct sql_stmt *stmt;
 	/**
 	 * Organize check constraint structs into linked list
 	 * with space::ck_constraint.
@@ -182,6 +183,23 @@ ck_constraint_new(struct ck_constraint_def *ck_constraint_def,
  */
 void
 ck_constraint_delete(struct ck_constraint *ck_constraint);
+
+/**
+ * Ck constraint trigger function. It is expected to be executed
+ * in space::on_replace trigger.
+ *
+ * It performs all ck constraints defined for a given space
+ * running the precompiled bytecode to test a new tuple
+ * before it will be inserted in destination space.
+ * The trigger data stores space identifier instead of space
+ * pointer to make ck constraint independent of specific space
+ * object version.
+ *
+ * Raises an exception when some ck constraint is unsatisfied.
+ * The diag message is set.
+ */
+void
+ck_constraint_on_replace_trigger(struct trigger *trigger, void *event);
 
 /**
  * Find check constraint object in space by given name and

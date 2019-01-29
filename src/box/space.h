@@ -202,6 +202,8 @@ struct space {
 	 * ck_constraint::link.
 	 */
 	struct rlist ck_constraint;
+	/** Trigger that performs ck constraint validation. */
+	struct trigger *ck_constraint_trigger;
 	/**
 	 * Lists of foreign key constraints. In SQL terms child
 	 * space is the "from" table i.e. the table that contains

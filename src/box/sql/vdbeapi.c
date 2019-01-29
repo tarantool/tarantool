@@ -132,30 +132,17 @@ sql_finalize(sql_stmt * pStmt)
 	return rc;
 }
 
-/*
- * Terminate the current execution of an SQL statement and reset it
- * back to its starting state so that it can be reused. A success code from
- * the prior execution is returned.
- *
- * This routine sets the error code and string returned by
- * sql_errcode(), sql_errmsg() and sql_errmsg16().
- */
 int
 sql_reset(sql_stmt * pStmt)
 {
-	int rc;
-	if (pStmt == 0) {
-		rc = SQL_OK;
-	} else {
-		Vdbe *v = (Vdbe *) pStmt;
-		sql *db = v->db;
-		checkProfileCallback(db, v);
-		rc = sqlVdbeReset(v);
-		sqlVdbeRewind(v);
-		assert((rc & (db->errMask)) == rc);
-		rc = sqlApiExit(db, rc);
-	}
-	return rc;
+	assert(pStmt != NULL);
+	struct Vdbe *v = (Vdbe *) pStmt;
+	struct sql *db = v->db;
+	checkProfileCallback(db, v);
+	int rc = sqlVdbeReset(v);
+	sqlVdbeRewind(v);
+	assert((rc & (db->errMask)) == rc);
+	return sqlApiExit(db, rc);
 }
 
 /*

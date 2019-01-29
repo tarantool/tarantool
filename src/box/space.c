@@ -43,6 +43,7 @@
 #include "xrow.h"
 #include "iproto_constants.h"
 #include "schema.h"
+#include "ck_constraint.h"
 
 int
 access_check_space(struct space *space, user_access_t access)
@@ -207,6 +208,7 @@ space_new_ephemeral(struct space_def *def, struct rlist *key_list)
 void
 space_delete(struct space *space)
 {
+	assert(space->ck_constraint_trigger == NULL);
 	for (uint32_t j = 0; j <= space->index_id_max; j++) {
 		struct index *index = space->index_map[j];
 		if (index != NULL)

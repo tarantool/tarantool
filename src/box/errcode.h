@@ -248,6 +248,7 @@ struct errcode_record {
 	/*193 */_(ER_CK_DEF_UNSUPPORTED,	"%s are prohibited in a ck constraint definition") \
 	/*194 */_(ER_MULTIKEY_INDEX_MISMATCH,	"Field %s is used as multikey in one index and as single key in another") \
 	/*195 */_(ER_CREATE_CK_CONSTRAINT,	"Failed to create check constraint '%s': %s") \
+	/*196 */_(ER_CK_CONSTRAINT_FAILED,	"Check constraint failed '%s': %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

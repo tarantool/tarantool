@@ -798,51 +798,26 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	sqlDbFree(db, aRegIdx);
 }
 
-/*
- * Meanings of bits in of pWalker->eCode for checkConstraintUnchanged()
- */
-#define CKCNSTRNT_COLUMN   0x01	/* CHECK constraint uses a changing column */
-
-/* This is the Walker callback from checkConstraintUnchanged().  Set
- * bit 0x01 of pWalker->eCode if
- * pWalker->eCode to 0 if this expression node references any of the
- * columns that are being modifed by an UPDATE statement.
- */
-static int
-checkConstraintExprNode(Walker * pWalker, Expr * pExpr)
+void
+vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
+			const char *name, const char *expr_str,
+			int vdbe_field_ref_reg)
 {
-	if (pExpr->op == TK_COLUMN) {
-		assert(pExpr->iColumn >= 0 || pExpr->iColumn == -1);
-		if (pExpr->iColumn >= 0) {
-			if (pWalker->u.aiCol[pExpr->iColumn] >= 0) {
-				pWalker->eCode |= CKCNSTRNT_COLUMN;
-			}
-		}
-	}
-	return WRC_Continue;
-}
-
-/*
- * pExpr is a CHECK constraint on a row that is being UPDATE-ed.  The
- * only columns that are modified by the UPDATE are those for which
- * aiChng[i]>=0.
- *
- * Return true if CHECK constraint pExpr does not use any of the
- * changing columns.  In other words, return true if this CHECK constraint
- * can be skipped when validating the new row in the UPDATE statement.
- */
-static int
-checkConstraintUnchanged(Expr * pExpr, int *aiChng)
-{
-	Walker w;
-	memset(&w, 0, sizeof(w));
-	w.eCode = 0;
-	w.xExprCallback = checkConstraintExprNode;
-	w.u.aiCol = aiChng;
-	sqlWalkExpr(&w, pExpr);
-	testcase(w.eCode == 0);
-	testcase(w.eCode == CKCNSTRNT_COLUMN);
-	return !w.eCode;
+	parser->vdbe_field_ref_reg = vdbe_field_ref_reg;
+	struct Vdbe *v = sqlGetVdbe(parser);
+	const char *ck_constraint_name = sqlDbStrDup(parser->db, name);
+	VdbeNoopComment((v, "BEGIN: ck constraint %s test",
+			ck_constraint_name));
+	int check_is_passed = sqlVdbeMakeLabel(v);
+	sqlExprIfTrue(parser, expr, check_is_passed, SQL_JUMPIFNULL);
+	sqlMayAbort(parser);
+	const char *fmt = tnt_errcode_desc(ER_CK_CONSTRAINT_FAILED);
+	const char *error_msg = tt_sprintf(fmt, ck_constraint_name, expr_str);
+	sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR, ON_CONFLICT_ACTION_ABORT,
+		      0, sqlDbStrDup(parser->db, error_msg), P4_DYNAMIC);
+	sqlVdbeChangeP5(v, ER_CK_CONSTRAINT_FAILED);
+	VdbeNoopComment((v, "END: ck constraint %s test", ck_constraint_name));
+	sqlVdbeResolveLabel(v, check_is_passed);
 }
 
 void
@@ -911,35 +886,6 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 		default:
 			unreachable();
 		}
-	}
-	/*
-	 * For CHECK constraint and for INSERT/UPDATE conflict
-	 * action DEFAULT and ABORT in fact has the same meaning.
-	 */
-	if (on_conflict == ON_CONFLICT_ACTION_DEFAULT)
-		on_conflict = ON_CONFLICT_ACTION_ABORT;
-	/* Test all CHECK constraints. */
-	enum on_conflict_action on_conflict_check = on_conflict;
-	if (on_conflict == ON_CONFLICT_ACTION_REPLACE)
-		on_conflict_check = ON_CONFLICT_ACTION_ABORT;
-	if (!rlist_empty(&space->ck_constraint))
-		parse_context->ckBase = new_tuple_reg;
-	struct ck_constraint *ck_constraint;
-	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
-		struct Expr *expr = ck_constraint->expr;
-		if (is_update && checkConstraintUnchanged(expr, upd_cols) != 0)
-			continue;
-		int all_ok = sqlVdbeMakeLabel(v);
-		sqlExprIfTrue(parse_context, expr, all_ok, SQL_JUMPIFNULL);
-		if (on_conflict == ON_CONFLICT_ACTION_IGNORE) {
-			sqlVdbeGoto(v, ignore_label);
-		} else {
-			char *name = ck_constraint->def->name;
-			sqlHaltConstraint(parse_context, SQL_CONSTRAINT_CHECK,
-					  on_conflict_check, name, P4_TRANSIENT,
-					  P5_ConstraintCheck);
-		}
-		sqlVdbeResolveLabel(v, all_ok);
 	}
 	sql_emit_table_types(v, space->def, new_tuple_reg);
 	/*
