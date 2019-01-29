@@ -1531,6 +1531,19 @@ swim_probe_member(struct swim *swim, const char *uri)
 	return 0;
 }
 
+int
+swim_broadcast(struct swim *swim, int port)
+{
+	assert(swim_is_configured(swim));
+	if (port < 0)
+		port = ntohs(swim->self->addr.sin_port);
+	struct swim_bcast_task *t = swim_bcast_task_new(port, "broadcast ping");
+	if (t == NULL)
+		return -1;
+	swim_send_ping(swim, &t->base, &t->base.dst);
+	return 0;
+}
+
 void
 swim_info(struct swim *swim, struct info_handler *info)
 {

@@ -136,6 +136,22 @@ swim_remove_member(struct swim *swim, const struct tt_uuid *uuid);
 int
 swim_probe_member(struct swim *swim, const char *uri);
 
+/**
+ * Broadcast a ping to all interfaces supporting IPv4 with a
+ * specified @a port.
+ * @param swim SWIM instance to broadcast from.
+ * @param port Port to send to. If < 0, then the current port of
+ *        @a swim is used.
+ *
+ * @retval 0 Success. The broadcast packet was scheduled and at
+ *         least one suitable intefrace was detected. But it does
+ *         not mean, that the packet will be sent successfully.
+ * @retval -1 Error. OOM, or there was not found an interface,
+ *         supporting IPv4.
+ */
+int
+swim_broadcast(struct swim *swim, int port);
+
 /** Dump member statuses into @a info. */
 void
 swim_info(struct swim *swim, struct info_handler *info);

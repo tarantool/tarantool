@@ -33,6 +33,7 @@
 #include "fiber.h"
 #include "uuid/tt_uuid.h"
 #include "unit.h"
+#include "uri/uri.h"
 #include "swim/swim.h"
 #include "swim/swim_ev.h"
 #include "swim_test_transport.h"
@@ -618,6 +619,35 @@ swim_test_uri_update(void)
 	swim_cluster_delete(cluster);
 	swim_finish_test();
 }
+static void
+swim_test_broadcast(void)
+{
+	swim_start_test(6);
+	int size = 4;
+	struct swim_cluster *cluster = swim_cluster_new(size);
+	struct swim *s0 = swim_cluster_node(cluster, 0);
+	struct swim *s1 = swim_cluster_node(cluster, 1);
+	const char *s1_uri = swim_member_uri(swim_self(s1));
+	struct uri u;
+	fail_if(uri_parse(&u, s1_uri) != 0 || u.service == NULL);
+	int port = atoi(u.service);
+	is(swim_broadcast(s0, port), 0, "S1 chooses to broadcast with port %d",
+	   port);
+	is(swim_cluster_wait_status(cluster, 1, 0, MEMBER_ALIVE, 1), 0,
+	   "S2 receives the broadcast from S1");
+	swim_run_for(1);
+	is(swim_cluster_member_status(cluster, 2, 0), swim_member_status_MAX,
+	   "others don't");
+
+	is(swim_broadcast(s0, 0), 0, "S1 broadcasts ping without port");
+	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_ALIVE, 0), 0,
+	   "now everyone sees S1");
+	is(swim_cluster_wait_fullmesh(cluster, size), 0,
+	   "fullmesh is reached, and no one link was added explicitly");
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
 
 static int
 main_f(va_list ap)
@@ -642,6 +672,7 @@ main_f(va_list ap)
 	swim_test_packet_loss();
 	swim_test_quit();
 	swim_test_uri_update();
+	swim_test_broadcast();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

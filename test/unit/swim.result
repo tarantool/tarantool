@@ -1,3 +1,4 @@
+# Looks like you planned 14 tests but ran 15.
 	*** main_f ***
 1..14
 	*** swim_test_one_link ***
@@ -137,4 +138,14 @@ ok 13 - subtests
     ok 2 - S2 still keeps new S1's URI, even received the old one from S3
 ok 14 - subtests
 	*** swim_test_uri_update: done ***
+	*** swim_test_broadcast ***
+    1..6
+    ok 1 - S1 chooses to broadcast with port 2
+    ok 2 - S2 receives the broadcast from S1
+    ok 3 - others don't
+    ok 4 - S1 broadcasts ping without port
+    ok 5 - now everyone sees S1
+    ok 6 - fullmesh is reached, and no one link was added explicitly
+ok 15 - subtests
+	*** swim_test_broadcast: done ***
 	*** main_f: done ***
