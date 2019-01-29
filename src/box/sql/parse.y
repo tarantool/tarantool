@@ -316,7 +316,7 @@ tcons ::= UNIQUE LP sortlist(X) RP.
                                  {sql_create_index(pParse,0,0,X,0,
                                                    SORT_ORDER_ASC,false,
                                                    SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
-tcons ::= CHECK LP expr(E) RP onconf.
+tcons ::= CHECK LP expr(E) RP .
                                  {sql_add_check_constraint(pParse,&E);}
 tcons ::= FOREIGN KEY LP eidlist(FA) RP
           REFERENCES nm(T) eidlist_opt(TA) refargs(R) defer_subclause_opt(D). {

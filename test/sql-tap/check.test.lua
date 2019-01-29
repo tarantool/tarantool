@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(58)
+test:plan(61)
 
 --!./tcltestrunner.lua
 -- 2005 November 2
@@ -770,6 +770,41 @@ test:do_execsql_test(
         -- <8.1>
 
         -- </8.1>
+    })
+
+-- gh-3345 : the test checks that ON CONFLICT REPLACE
+-- is not allowed for CHECK constraint.
+test:do_catchsql_test(
+    9.1,
+    [[
+        CREATE TABLE t101 (a INT primary key, b INT, CHECK(b < 10)
+        ON CONFLICT REPLACE)
+    ]], {
+        -- <9.1>
+        1, "keyword \"ON\" is reserved"
+        -- </9.1>
+    })
+
+test:do_catchsql_test(
+    9.2,
+    [[
+        CREATE TABLE t101 (a INT primary key, b INT, CHECK(b < 10)
+        ON CONFLICT ABORT)
+    ]], {
+        -- <9.2>
+        1, "keyword \"ON\" is reserved"
+        -- </9.2>
+    })
+
+test:do_catchsql_test(
+    9.3,
+    [[
+        CREATE TABLE t101 (a INT primary key, b INT, CHECK(b < 10)
+        ON CONFLICT ROLLBACK)
+    ]], {
+        -- <9.3>
+        1, "keyword \"ON\" is reserved"
+        -- </9.3>
     })
 
 test:finish_test()
