@@ -10,11 +10,12 @@ local urilib   = require('uri')
 local internal = require('net.box.lib')
 local trigger  = require('internal.trigger')
 
-local band          = bit.band
-local max           = math.max
-local fiber_clock   = fiber.clock
-local fiber_self    = fiber.self
-local decode        = msgpack.decode_unchecked
+local band              = bit.band
+local max               = math.max
+local fiber_clock       = fiber.clock
+local fiber_self        = fiber.self
+local decode            = msgpack.decode_unchecked
+local decode_map_header = msgpack.decode_map_header
 
 local table_new           = require('table.new')
 local check_iterator_type = box.internal.check_iterator_type
@@ -483,8 +484,8 @@ local function create_transport(host, port, user, password, callback,
     -- @retval nil, error Error occured.
     -- @retval not nil Future object.
     --
-    local function perform_async_request(buffer, method, on_push, on_push_ctx,
-                                         ...)
+    local function perform_async_request(buffer, skip_header, method, on_push,
+                                         on_push_ctx, ...)
         if state ~= 'active' and state ~= 'fetch_schema' then
             return nil, box.error.new({code = last_errno or E_NO_CONNECTION,
                                        reason = last_error})
@@ -497,12 +498,13 @@ local function create_transport(host, port, user, password, callback,
         local id = next_request_id
         method_encoder[method](send_buf, id, ...)
         next_request_id = next_id(id)
-        -- Request in most cases has maximum 8 members:
-        -- method, buffer, id, cond, errno, response, on_push,
-        -- on_push_ctx.
-        local request = setmetatable(table_new(0, 8), request_mt)
+        -- Request in most cases has maximum 9 members:
+        -- method, buffer, skip_header, id, cond, errno, response,
+        -- on_push, on_push_ctx.
+        local request = setmetatable(table_new(0, 9), request_mt)
         request.method = method
         request.buffer = buffer
+        request.skip_header = skip_header
         request.id = id
         request.cond = fiber.cond()
         requests[id] = request
@@ -516,10 +518,11 @@ local function create_transport(host, port, user, password, callback,
     -- @retval nil, error Error occured.
     -- @retval not nil Response object.
     --
-    local function perform_request(timeout, buffer, method, on_push,
-                                   on_push_ctx, ...)
+    local function perform_request(timeout, buffer, skip_header, method,
+                                   on_push, on_push_ctx, ...)
         local request, err =
-            perform_async_request(buffer, method, on_push, on_push_ctx, ...)
+            perform_async_request(buffer, skip_header, method, on_push,
+                                  on_push_ctx, ...)
         if not request then
             return nil, err
         end
@@ -551,6 +554,15 @@ local function create_transport(host, port, user, password, callback,
         if buffer ~= nil then
             -- Copy xrow.body to user-provided buffer
             local body_len = body_end - body_rpos
+            if request.skip_header then
+                -- Skip {[IPROTO_DATA_KEY] = ...} wrapper.
+                local map_len, key
+                map_len, body_rpos = decode_map_header(body_rpos, body_len)
+                assert(map_len == 1)
+                key, body_rpos = decode(body_rpos)
+                assert(key == IPROTO_DATA_KEY)
+                body_len = body_end - body_rpos
+            end
             local wpos = buffer:alloc(body_len)
             ffi.copy(wpos, body_rpos, body_len)
             body_len = tonumber(body_len)
@@ -1047,18 +1059,19 @@ end
 
 function remote_methods:_request(method, opts, ...)
     local transport = self._transport
-    local on_push, on_push_ctx, buffer, deadline
+    local on_push, on_push_ctx, buffer, skip_header, deadline
     -- Extract options, set defaults, check if the request is
     -- async.
     if opts then
         buffer = opts.buffer
+        skip_header = opts.skip_header
         if opts.is_async then
             if opts.on_push or opts.on_push_ctx then
                 error('To handle pushes in an async request use future:pairs()')
             end
             local res, err =
-                transport.perform_async_request(buffer, method, table.insert,
-                                                {}, ...)
+                transport.perform_async_request(buffer, skip_header, method,
+                                                table.insert, {}, ...)
             if err then
                 box.error(err)
             end
@@ -1084,8 +1097,9 @@ function remote_methods:_request(method, opts, ...)
         transport.wait_state('active', timeout)
         timeout = deadline and max(0, deadline - fiber_clock())
     end
-    local res, err = transport.perform_request(timeout, buffer, method,
-                                               on_push, on_push_ctx, ...)
+    local res, err = transport.perform_request(timeout, buffer, skip_header,
+                                               method, on_push, on_push_ctx,
+                                               ...)
     if err then
         box.error(err)
     end
@@ -1288,10 +1302,10 @@ function console_methods:eval(line, timeout)
     end
     if self.protocol == 'Binary' then
         local loader = 'return require("console").eval(...)'
-        res, err = pr(timeout, nil, 'eval', nil, nil, loader, {line})
+        res, err = pr(timeout, nil, false, 'eval', nil, nil, loader, {line})
     else
         assert(self.protocol == 'Lua console')
-        res, err = pr(timeout, nil, 'inject', nil, nil, line..'$EOF$\n')
+        res, err = pr(timeout, nil, false, 'inject', nil, nil, line..'$EOF$\n')
     end
     if err then
         box.error(err)

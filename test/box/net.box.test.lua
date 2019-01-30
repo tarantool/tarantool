@@ -12,7 +12,7 @@ function x_select(cn, space_id, index_id, iterator, offset, limit, key, opts)
                             offset, limit, key)
     return ret
 end
-function x_fatal(cn) cn._transport.perform_request(nil, nil, 'inject', nil, nil, '\x80') end
+function x_fatal(cn) cn._transport.perform_request(nil, nil, false, 'inject', nil, nil, '\x80') end
 test_run:cmd("setopt delimiter ''");
 
 LISTEN = require('uri').parse(box.cfg.listen)
@@ -626,8 +626,19 @@ c.space.test:replace({2}, {buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
+-- replace + skip_header
+c.space.test:replace({2}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
 -- insert
 c.space.test:insert({3}, {buffer = ibuf})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
+-- insert + skip_header
+_ = space:delete({3})
+c.space.test:insert({3}, {buffer = ibuf, skip_header = true})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
@@ -639,8 +650,21 @@ c.space.test.index.primary:update({3}, {}, {buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
+-- update + skip_header
+c.space.test:update({3}, {}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+c.space.test.index.primary:update({3}, {}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
 -- upsert
 c.space.test:upsert({4}, {}, {buffer = ibuf})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
+-- upsert + skip_header
+c.space.test:upsert({4}, {}, {buffer = ibuf, skip_header = true})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
@@ -649,13 +673,31 @@ c.space.test:upsert({4}, {}, {buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
+-- delete + skip_header
+c.space.test:upsert({4}, {}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
 -- select
 c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
+-- select + skip_header
+c.space.test.index.primary:select({3}, {iterator = 'LE', buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
 -- select
 len = c.space.test:select({}, {buffer = ibuf})
+ibuf.rpos + len == ibuf.wpos
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+ibuf.rpos == ibuf.wpos
+len
+result
+
+-- select + skip_header
+len = c.space.test:select({}, {buffer = ibuf, skip_header = true})
 ibuf.rpos + len == ibuf.wpos
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 ibuf.rpos == ibuf.wpos
@@ -673,6 +715,17 @@ c:call("echo", nil, {buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
+-- call + skip_header
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+c:call("echo", {}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+c:call("echo", nil, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
 -- eval
 c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
@@ -681,6 +734,29 @@ c:eval("echo(...)", {}, {buffer = ibuf})
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 c:eval("echo(...)", nil, {buffer = ibuf})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
+-- eval + skip_header
+c:eval("echo(...)", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+c:eval("echo(...)", {}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+c:eval("echo(...)", nil, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+
+-- make several request into a buffer with skip_header, then read
+-- results
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+c:call("echo", {1, 2, 3}, {buffer = ibuf, skip_header = true})
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
+result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
+result
 result, ibuf.rpos = msgpack.decode_unchecked(ibuf.rpos)
 result
 
@@ -1079,7 +1155,7 @@ c.space.test:delete{1}
 --
 -- Break a connection to test reconnect_after.
 --
-_ = c._transport.perform_request(nil, nil, 'inject', nil, nil, '\x80')
+_ = c._transport.perform_request(nil, nil, false, 'inject', nil, nil, '\x80')
 c.state
 while not c:is_connected() do fiber.sleep(0.01) end
 c:ping()
@@ -1312,7 +1388,7 @@ finalize_long()
 --
 c = net:connect(box.cfg.listen, {reconnect_after = 0.01})
 future = c:call('long_function', {1, 2, 3}, {is_async = true})
-_ = c._transport.perform_request(nil, nil, 'inject', nil, nil, '\x80')
+_ = c._transport.perform_request(nil, nil, false, 'inject', nil, nil, '\x80')
 while not c:is_connected() do fiber.sleep(0.01) end
 finalize_long()
 future:wait_result(100)
@@ -1369,7 +1445,7 @@ c:ping()
 -- new attempts to read any data - the connection is closed
 -- already.
 --
-f = fiber.create(c._transport.perform_request, nil, nil, 'call_17', nil, nil, 'long', {}) c._transport.perform_request(nil, nil, 'inject', nil, nil, '\x80')
+f = fiber.create(c._transport.perform_request, nil, nil, false, 'call_17', nil, nil, 'long', {}) c._transport.perform_request(nil, nil, false, 'inject', nil, nil, '\x80')
 while f:status() ~= 'dead' do fiber.sleep(0.01) end
 c:close()
 
@@ -1379,7 +1455,7 @@ c:close()
 --
 c = net:connect(box.cfg.listen)
 data = msgpack.encode(18400000000000000000)..'aaaaaaa'
-c._transport.perform_request(nil, nil, 'inject', nil, nil, data)
+c._transport.perform_request(nil, nil, false, 'inject', nil, nil, data)
 c:close()
 test_run:grep_log('default', 'too big packet size in the header') ~= nil
 
