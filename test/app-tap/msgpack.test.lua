@@ -49,9 +49,188 @@ local function test_misc(test, s)
     test:ok(not st and e:match("null"), "null ibuf")
 end
 
+local function test_decode_array_map_header(test, s)
+    local ffi = require('ffi')
+
+    local usage_err = 'Usage: msgpack%.decode_[^_(]+_header%(ptr, size%)'
+    local end_of_buffer_err = 'msgpack%.decode_[^_]+_header: unexpected end ' ..
+        'of buffer'
+    local non_positive_size_err = 'msgpack.decode_[^_]+_header: ' ..
+        'non%-positive size'
+
+    local decode_cases = {
+        {
+            'fixarray',
+            func = s.decode_array_header,
+            data = ffi.cast('char *', '\x94'),
+            size = 1,
+            exp_len = 4,
+            exp_rewind = 1,
+        },
+        {
+            'array 16',
+            func = s.decode_array_header,
+            data = ffi.cast('char *', '\xdc\x00\x04'),
+            size = 3,
+            exp_len = 4,
+            exp_rewind = 3,
+        },
+        {
+            'array 32',
+            func = s.decode_array_header,
+            data = ffi.cast('char *', '\xdd\x00\x00\x00\x04'),
+            size = 5,
+            exp_len = 4,
+            exp_rewind = 5,
+        },
+        {
+            'truncated array 16',
+            func = s.decode_array_header,
+            data = ffi.cast('char *', '\xdc\x00'),
+            size = 2,
+            exp_err = end_of_buffer_err,
+        },
+        {
+            'truncated array 32',
+            func = s.decode_array_header,
+            data = ffi.cast('char *', '\xdd\x00\x00\x00'),
+            size = 4,
+            exp_err = end_of_buffer_err,
+        },
+        {
+            'fixmap',
+            func = s.decode_map_header,
+            data = ffi.cast('char *', '\x84'),
+            size = 1,
+            exp_len = 4,
+            exp_rewind = 1,
+        },
+        {
+            'map 16',
+            func = s.decode_map_header,
+            data = ffi.cast('char *', '\xde\x00\x04'),
+            size = 3,
+            exp_len = 4,
+            exp_rewind = 3,
+        },
+        {
+            'array 32',
+            func = s.decode_map_header,
+            data = ffi.cast('char *', '\xdf\x00\x00\x00\x04'),
+            size = 5,
+            exp_len = 4,
+            exp_rewind = 5,
+        },
+        {
+            'truncated map 16',
+            func = s.decode_map_header,
+            data = ffi.cast('char *', '\xde\x00'),
+            size = 2,
+            exp_err = end_of_buffer_err,
+        },
+        {
+            'truncated map 32',
+            func = s.decode_map_header,
+            data = ffi.cast('char *', '\xdf\x00\x00\x00'),
+            size = 4,
+            exp_err = end_of_buffer_err,
+        },
+    }
+
+    local bad_api_cases = {
+        {
+            'wrong msgpack type',
+            data = ffi.cast('char *', '\xc0'),
+            size = 1,
+            exp_err = 'msgpack.decode_[^_]+_header: unexpected msgpack type',
+        },
+        {
+            'zero size buffer',
+            data = ffi.cast('char *', ''),
+            size = 0,
+            exp_err = non_positive_size_err,
+        },
+        {
+            'negative size buffer',
+            data = ffi.cast('char *', ''),
+            size = -1,
+            exp_err = non_positive_size_err,
+        },
+        {
+            'size is nil',
+            data = ffi.cast('char *', ''),
+            size = nil,
+            exp_err = 'bad argument',
+        },
+        {
+            'no arguments',
+            args = {},
+            exp_err = usage_err,
+        },
+        {
+            'one argument',
+            args = {ffi.cast('char *', '')},
+            exp_err = usage_err,
+        },
+        {
+            'data is nil',
+            args = {nil, 1},
+            exp_err = 'expected cdata as 1 argument',
+        },
+        {
+            'data is not cdata',
+            args = {1, 1},
+            exp_err = 'expected cdata as 1 argument',
+        },
+        {
+            'data with wrong cdata type',
+            args = {box.tuple.new(), 1},
+            exp_err = "msgpack.decode_[^_]+_header: 'char %*' expected",
+        },
+        {
+            'size has wrong type',
+            args = {ffi.cast('char *', ''), 'eee'},
+            exp_err = 'bad argument',
+        },
+    }
+
+    test:plan(#decode_cases + 2 * #bad_api_cases)
+
+    -- Decode cases.
+    for _, case in ipairs(decode_cases) do
+        if case.exp_err ~= nil then
+            local ok, err = pcall(case.func, case.data, case.size)
+            local description = ('bad; %s'):format(case[1])
+            test:ok(ok == false and err:match(case.exp_err), description)
+        else
+            local len, new_buf = case.func(case.data, case.size)
+            local rewind = new_buf - case.data
+            local description = ('good; %s'):format(case[1])
+            test:is_deeply({len, rewind}, {case.exp_len, case.exp_rewind},
+                description)
+        end
+    end
+
+    -- Bad api usage cases.
+    for _, func_name in ipairs({'decode_array_header', 'decode_map_header'}) do
+        for _, case in ipairs(bad_api_cases) do
+            local ok, err
+            if case.args ~= nil then
+                local args_len = table.maxn(case.args)
+                ok, err = pcall(s[func_name], unpack(case.args, 1, args_len))
+            else
+                ok, err = pcall(s[func_name], case.data, case.size)
+            end
+            local description = ('%s bad api usage; %s'):format(func_name,
+                                                                case[1])
+            test:ok(ok == false and err:match(case.exp_err), description)
+        end
+    end
+end
+
 tap.test("msgpack", function(test)
     local serializer = require('msgpack')
-    test:plan(10)
+    test:plan(11)
     test:test("unsigned", common.test_unsigned, serializer)
     test:test("signed", common.test_signed, serializer)
     test:test("double", common.test_double, serializer)
@@ -62,4 +241,5 @@ tap.test("msgpack", function(test)
     test:test("ucdata", common.test_ucdata, serializer)
     test:test("offsets", test_offsets, serializer)
     test:test("misc", test_misc, serializer)
+    test:test("decode_array_map", test_decode_array_map_header, serializer)
 end)

@@ -422,6 +422,86 @@ lua_ibuf_msgpack_decode(lua_State *L)
 	return 2;
 }
 
+/**
+ * Verify and set arguments: data and size.
+ *
+ * Always return 0. In case of any fail raise a Lua error.
+ */
+static int
+verify_decode_header_args(lua_State *L, const char *func_name,
+			  const char **data_p, ptrdiff_t *size_p)
+{
+	/* Verify arguments count. */
+	if (lua_gettop(L) != 2)
+		return luaL_error(L, "Usage: %s(ptr, size)", func_name);
+
+	/* Verify ptr type. */
+	uint32_t ctypeid;
+	const char *data = *(char **) luaL_checkcdata(L, 1, &ctypeid);
+	if (ctypeid != CTID_CHAR_PTR)
+		return luaL_error(L, "%s: 'char *' expected", func_name);
+
+	/* Verify size type and value. */
+	ptrdiff_t size = (ptrdiff_t) luaL_checkinteger(L, 2);
+	if (size <= 0)
+		return luaL_error(L, "%s: non-positive size", func_name);
+
+	*data_p = data;
+	*size_p = size;
+
+	return 0;
+}
+
+/**
+ * msgpack.decode_array_header(buf.rpos, buf:size())
+ * -> arr_len, new_rpos
+ */
+static int
+lua_decode_array_header(lua_State *L)
+{
+	const char *func_name = "msgpack.decode_array_header";
+	const char *data;
+	ptrdiff_t size;
+	verify_decode_header_args(L, func_name, &data, &size);
+
+	if (mp_typeof(*data) != MP_ARRAY)
+		return luaL_error(L, "%s: unexpected msgpack type", func_name);
+
+	if (mp_check_array(data, data + size) > 0)
+		return luaL_error(L, "%s: unexpected end of buffer", func_name);
+
+	uint32_t len = mp_decode_array(&data);
+
+	lua_pushinteger(L, len);
+	*(const char **) luaL_pushcdata(L, CTID_CHAR_PTR) = data;
+	return 2;
+}
+
+/**
+ * msgpack.decode_map_header(buf.rpos, buf:size())
+ * -> map_len, new_rpos
+ */
+static int
+lua_decode_map_header(lua_State *L)
+{
+	const char *func_name = "msgpack.decode_map_header";
+	const char *data;
+	ptrdiff_t size;
+	verify_decode_header_args(L, func_name, &data, &size);
+
+	if (mp_typeof(*data) != MP_MAP)
+		return luaL_error(L, "%s: unexpected msgpack type", func_name);
+
+	if (mp_check_map(data, data + size) > 0)
+		return luaL_error(L, "%s: unexpected end of buffer", func_name);
+
+	uint32_t len = mp_decode_map(&data);
+
+	lua_pushinteger(L, len);
+	*(const char **) luaL_pushcdata(L, CTID_CHAR_PTR) = data;
+	return 2;
+}
+
 static int
 lua_msgpack_new(lua_State *L);
 
@@ -430,6 +510,8 @@ static const luaL_Reg msgpacklib[] = {
 	{ "decode", lua_msgpack_decode },
 	{ "decode_unchecked", lua_msgpack_decode_unchecked },
 	{ "ibuf_decode", lua_ibuf_msgpack_decode },
+	{ "decode_array_header", lua_decode_array_header },
+	{ "decode_map_header", lua_decode_map_header },
 	{ "new", lua_msgpack_new },
 	{ NULL, NULL }
 };
