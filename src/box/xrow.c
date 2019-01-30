@@ -1170,6 +1170,35 @@ xrow_encode_vclock(struct xrow_header *row, const struct vclock *vclock)
 	return 0;
 }
 
+int
+xrow_encode_subscribe_response(struct xrow_header *row,
+			       const struct tt_uuid *replicaset_uuid,
+			       const struct vclock *vclock)
+{
+	memset(row, 0, sizeof(*row));
+	size_t size = mp_sizeof_map(2) +
+		      mp_sizeof_uint(IPROTO_VCLOCK) + mp_sizeof_vclock(vclock) +
+		      mp_sizeof_uint(IPROTO_CLUSTER_UUID) +
+		      mp_sizeof_str(UUID_STR_LEN);
+	char *buf = (char *) region_alloc(&fiber()->gc, size);
+	if (buf == NULL) {
+		diag_set(OutOfMemory, size, "region_alloc", "buf");
+		return -1;
+	}
+	char *data = buf;
+	data = mp_encode_map(data, 2);
+	data = mp_encode_uint(data, IPROTO_VCLOCK);
+	data = mp_encode_vclock(data, vclock);
+	data = mp_encode_uint(data, IPROTO_CLUSTER_UUID);
+	data = xrow_encode_uuid(data, replicaset_uuid);
+	assert(data <= buf + size);
+	row->body[0].iov_base = buf;
+	row->body[0].iov_len = (data - buf);
+	row->bodycnt = 1;
+	row->type = IPROTO_OK;
+	return 0;
+}
+
 void
 xrow_encode_timestamp(struct xrow_header *row, uint32_t replica_id, double tm)
 {

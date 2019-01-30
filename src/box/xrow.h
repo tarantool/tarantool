@@ -349,6 +349,37 @@ xrow_decode_vclock(struct xrow_header *row, struct vclock *vclock)
 }
 
 /**
+ * Encode a response to subscribe request.
+ * @param row[out] Row to encode into.
+ * @param replicaset_uuid.
+ * @param vclock.
+ *
+ * @retval 0 Success.
+ * @retval -1 Memory error.
+ */
+int
+xrow_encode_subscribe_response(struct xrow_header *row,
+			      const struct tt_uuid *replicaset_uuid,
+			      const struct vclock *vclock);
+
+/**
+ * Decode a response to subscribe request.
+ * @param row Row to decode.
+ * @param[out] replicaset_uuid.
+ * @param[out] vclock.
+ *
+ * @retval 0 Success.
+ * @retval -1 Memory or format error.
+ */
+static inline int
+xrow_decode_subscribe_response(struct xrow_header *row,
+			       struct tt_uuid *replicaset_uuid,
+			       struct vclock *vclock)
+{
+	return xrow_decode_subscribe(row, replicaset_uuid, NULL, vclock, NULL);
+}
+
+/**
  * Encode a heartbeat message.
  * @param row[out] Row to encode into.
  * @param replica_id Instance id.
@@ -756,6 +787,26 @@ static inline void
 xrow_decode_vclock_xc(struct xrow_header *row, struct vclock *vclock)
 {
 	if (xrow_decode_vclock(row, vclock) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_encode_subscribe_response. */
+static inline void
+xrow_encode_subscribe_response_xc(struct xrow_header *row,
+				  const struct tt_uuid *replicaset_uuid,
+				  const struct vclock *vclock)
+{
+	if (xrow_encode_subscribe_response(row, replicaset_uuid, vclock) != 0)
+		diag_raise();
+}
+
+/** @copydoc xrow_decode_subscribe_response. */
+static inline void
+xrow_decode_subscribe_response_xc(struct xrow_header *row,
+				  struct tt_uuid *replicaset_uuid,
+				  struct vclock *vclock)
+{
+	if (xrow_decode_subscribe_response(row, replicaset_uuid, vclock) != 0)
 		diag_raise();
 }
 

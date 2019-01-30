@@ -1584,18 +1584,6 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	/* Check permissions */
 	access_check_universe_xc(PRIV_R);
 
-	/**
-	 * Check that the given UUID matches the UUID of the
-	 * replica set this replica belongs to. Used to handshake
-	 * replica connect, and refuse a connection from a replica
-	 * which belongs to a different replica set.
-	 */
-	if (!tt_uuid_is_equal(&replicaset_uuid, &REPLICASET_UUID)) {
-		tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
-			  tt_uuid_str(&REPLICASET_UUID),
-			  tt_uuid_str(&replicaset_uuid));
-	}
-
 	/* Check replica uuid */
 	struct replica *replica = replica_by_uuid(&replica_uuid);
 	if (replica == NULL || replica->id == REPLICA_ID_NIL) {
@@ -1620,9 +1608,17 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
 	 * and identify ourselves with our own replica id.
+	 *
+	 * Tarantool > 2.1.1 master doesn't check that replica
+	 * has the same cluster id. Instead it sends its cluster
+	 * id to replica, and replica checks that its cluster id
+	 * matches master's one. Older versions will just ignore
+	 * the additional field.
 	 */
 	struct xrow_header row;
-	xrow_encode_vclock_xc(&row, &replicaset.vclock);
+	xrow_encode_subscribe_response_xc(&row,
+					  &REPLICASET_UUID,
+					  &replicaset.vclock);
 	/*
 	 * Identify the message with the replica id of this
 	 * instance, this is the only way for a replica to find

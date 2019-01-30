@@ -391,6 +391,7 @@ applier_subscribe(struct applier *applier)
 	struct ibuf *ibuf = &applier->ibuf;
 	struct xrow_header row;
 	struct vclock remote_vclock_at_subscribe;
+	struct tt_uuid cluster_id = uuid_nil;
 
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
 				 &replicaset.vclock);
@@ -408,9 +409,26 @@ applier_subscribe(struct applier *applier)
 		/*
 		 * In case of successful subscribe, the server
 		 * responds with its current vclock.
+		 *
+		 * Tarantool > 2.1.1 also sends its cluster id to
+		 * the replica, and replica has to check whether
+		 * its and master's cluster ids match.
 		 */
 		vclock_create(&remote_vclock_at_subscribe);
-		xrow_decode_vclock_xc(&row, &remote_vclock_at_subscribe);
+		xrow_decode_subscribe_response_xc(&row,
+						  &cluster_id,
+						  &remote_vclock_at_subscribe);
+		/*
+		 * If master didn't send us its cluster id
+		 * assume that it has done all the checks.
+		 * In this case cluster_id will remain zero.
+		 */
+		if (!tt_uuid_is_nil(&cluster_id) &&
+		    !tt_uuid_is_equal(&cluster_id, &REPLICASET_UUID)) {
+			tnt_raise(ClientError, ER_REPLICASET_UUID_MISMATCH,
+				  tt_uuid_str(&cluster_id),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
 	}
 	/*
 	 * Tarantool < 1.6.7:
