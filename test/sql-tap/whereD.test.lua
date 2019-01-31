@@ -234,10 +234,10 @@ local function do_searchcount_test(tn, sql, res)
     test:do_test(
         tn,
         function()
-            local sql_search_count = box.sql.debug().sql_search_count
+            local sql_search_count = box.stat.sql().sql_search_count
             local r = test:execsql(sql)
             table.insert(r, "search")
-            table.insert(r, box.sql.debug().sql_search_count - sql_search_count)
+            table.insert(r, box.stat.sql().sql_search_count - sql_search_count)
             return r
         end,
         res)

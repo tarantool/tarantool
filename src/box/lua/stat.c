@@ -42,6 +42,7 @@
 #include "box/iproto.h"
 #include "box/engine.h"
 #include "box/vinyl.h"
+#include "box/sql.h"
 #include "info/info.h"
 #include "lua/info.h"
 #include "lua/utils.h"
@@ -187,6 +188,15 @@ lbox_stat_net_call(struct lua_State *L)
 	return 1;
 }
 
+static int
+lbox_stat_sql(struct lua_State *L)
+{
+	struct info_handler info;
+	luaT_info_handler_create(&info, L);
+	sql_debug_info(&info);
+	return 1;
+}
+
 static const struct luaL_Reg lbox_stat_meta [] = {
 	{"__index", lbox_stat_index},
 	{"__call",  lbox_stat_call},
@@ -206,6 +216,7 @@ box_lua_stat_init(struct lua_State *L)
 	static const struct luaL_Reg statlib [] = {
 		{"vinyl", lbox_stat_vinyl},
 		{"reset", lbox_stat_reset},
+		{"sql", lbox_stat_sql},
 		{NULL, NULL}
 	};
 

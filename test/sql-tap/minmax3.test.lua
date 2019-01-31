@@ -24,9 +24,9 @@ test:plan(47)
 --
 
 local function count(sql)
-    local sql_search_count = box.sql.debug().sql_search_count
+    local sql_search_count = box.stat.sql().sql_search_count
     local r = test:execsql(sql)
-    table.insert(r, box.sql.debug().sql_search_count - sql_search_count)
+    table.insert(r, box.stat.sql().sql_search_count - sql_search_count)
     return r
 end
 

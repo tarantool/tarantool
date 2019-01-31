@@ -59,7 +59,7 @@ test:do_execsql_test(
 test:do_test(
     "minmax2-1.1",
     function()
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT min(x) FROM t1"
     end, {
         -- <minmax2-1.1>
@@ -70,13 +70,13 @@ test:do_test(
 test:do_test(
     "minmax2-1.2",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 19)
 
 test:do_test(
     "minmax2-1.3",
     function()
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT max(x) FROM t1"
     end, {
         -- <minmax2-1.3>
@@ -87,14 +87,14 @@ test:do_test(
 test:do_test(
     "minmax2-1.4",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 19)
 
 test:do_test(
     "minmax2-1.5",
     function()
         test:execsql "CREATE INDEX t1i1 ON t1(x DESC)"
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT min(x) FROM t1"
     end, {
         -- <minmax2-1.5>
@@ -105,13 +105,13 @@ test:do_test(
 test:do_test(
     "minmax2-1.6",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 1)
 
 test:do_test(
     "minmax2-1.7",
     function()
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT max(x) FROM t1"
     end, {
         -- <minmax2-1.7>
@@ -122,13 +122,13 @@ test:do_test(
 test:do_test(
     "minmax2-1.8",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 0)
 
 test:do_test(
     "minmax2-1.9",
     function()
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT max(y) FROM t1"
     end, {
         -- <minmax2-1.9>
@@ -139,7 +139,7 @@ test:do_test(
 test:do_test(
     "minmax2-1.10",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 19)
 
 test:do_test(
@@ -149,7 +149,7 @@ test:do_test(
             CREATE TABLE t2(a INTEGER PRIMARY KEY, b INT );
             INSERT INTO t2 SELECT x, y FROM t1;
         ]]
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT min(a) FROM t2"
     end, {
         -- <minmax2-2.0>
@@ -160,13 +160,13 @@ test:do_test(
 test:do_test(
     "minmax2-2.1",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 0)
 
 test:do_test(
     "minmax2-2.2",
     function()
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT max(a) FROM t2"
     end, {
         -- <minmax2-2.2>
@@ -177,7 +177,7 @@ test:do_test(
 test:do_test(
     "minmax2-2.3",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 0)
 
 test:do_test(
@@ -186,7 +186,7 @@ test:do_test(
         test:execsql "INSERT INTO t2 VALUES((SELECT max(a) FROM t2)+1,999)"
 
 
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql "SELECT max(a) FROM t2"
     end, {
         -- <minmax2-3.0>
@@ -197,7 +197,7 @@ test:do_test(
 test:do_test(
     "minmax2-3.1",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 0)
 
 test:do_test(
@@ -206,7 +206,7 @@ test:do_test(
         test:execsql "INSERT INTO t2 VALUES((SELECT max(a) FROM t2)+1,999)"
 
 
-        sql_search_count = box.sql.debug().sql_search_count
+        sql_search_count = box.stat.sql().sql_search_count
         return test:execsql " SELECT b FROM t2 WHERE a=(SELECT max(a) FROM t2) "
 
 
@@ -220,7 +220,7 @@ test:do_test(
 test:do_test(
     "minmax2-3.3",
     function()
-        return box.sql.debug().sql_search_count - sql_search_count
+        return box.stat.sql().sql_search_count - sql_search_count
     end, 1)
 
 test:do_execsql_test(

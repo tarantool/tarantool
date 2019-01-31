@@ -193,9 +193,9 @@ test:do_test(
 -- Do an SQL statement.  Append the search count to the end of the result.
 --
 local function count(sql)
-    local sql_sort_count = box.sql.debug().sql_sort_count
+    local sql_sort_count = box.stat.sql().sql_sort_count
     local r = test:execsql(sql)
-    table.insert(r, box.sql.debug().sql_sort_count - sql_sort_count)
+    table.insert(r, box.stat.sql().sql_sort_count - sql_sort_count)
     return r
 end
 

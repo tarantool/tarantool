@@ -326,9 +326,9 @@ function test.do_select_tests(self, label, tests)
 end
 
 function test.sf_execsql(self, sql)
-    local old = box.sql.debug().sql_search_count
+    local old = box.stat.sql().sql_search_count
     local r = test:execsql(sql)
-    local new = box.sql.debug().sql_search_count - old
+    local new = box.stat.sql().sql_search_count - old
 
     return {new, r}
 end
