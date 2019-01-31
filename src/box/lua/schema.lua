@@ -575,6 +575,78 @@ local function update_index_parts_1_6_0(parts)
     return result
 end
 
+--
+-- Get field index by format field name.
+--
+local function format_field_index_by_name(format, name)
+    for k, v in pairs(format) do
+        if v.name == name then
+            return k
+        end
+    end
+    return nil
+end
+
+--
+-- Get field 0-based index and relative JSON path to data by
+-- field 1-based index or full JSON path. A particular case of a
+-- full JSON path is the format field name.
+--
+local function format_field_resolve(format, path, part_idx)
+    assert(type(path) == 'number' or type(path) == 'string')
+    local idx = nil
+    local relative_path = nil
+    local field_name = nil
+    -- Path doesn't require resolve.
+    if type(path) == 'number' then
+        idx = path
+        goto done
+    end
+    -- An attempt to interpret a path as the full field name.
+    idx = format_field_index_by_name(format, path)
+    if idx ~= nil then
+        relative_path = nil
+        goto done
+    end
+    -- Check if the initial part of the JSON path is a token of
+    -- the form [%d].
+    field_name = string.match(path, "^%[(%d+)%]")
+    idx = tonumber(field_name)
+    if idx ~= nil then
+        relative_path = string.sub(path, string.len(field_name) + 3)
+        goto done
+    end
+    -- Check if the initial part of the JSON path is a token of
+    -- the form ["%s"] or ['%s'].
+    field_name = string.match(path, '^%["([^%]]+)"%]') or
+                 string.match(path, "^%['([^%]]+)'%]")
+    idx = format_field_index_by_name(format, field_name)
+    if idx ~= nil then
+        relative_path = string.sub(path, string.len(field_name) + 5)
+        goto done
+    end
+    -- Check if the initial part of the JSON path is a string
+    -- token: assume that it ends with .*[ or .*.
+    field_name = string.match(path, "^([^.[]+)")
+    idx = format_field_index_by_name(format, field_name)
+    if idx ~= nil then
+        relative_path = string.sub(path, string.len(field_name) + 1)
+        goto done
+    end
+    -- Can't resolve field index by path.
+    assert(idx == nil)
+    box.error(box.error.ILLEGAL_PARAMS, "options.parts[" .. part_idx .. "]: " ..
+              "field was not found by name '" .. path .. "'")
+
+::done::
+    if idx <= 0 then
+        box.error(box.error.ILLEGAL_PARAMS,
+                  "options.parts[" .. part_idx .. "]: " ..
+                  "field (number) must be one-based")
+    end
+    return idx - 1, relative_path
+end
+
 local function update_index_parts(format, parts)
     if type(parts) ~= "table" then
         box.error(box.error.ILLEGAL_PARAMS,
@@ -622,25 +694,16 @@ local function update_index_parts(format, parts)
                 end
             end
         end
-        if type(part.field) ~= 'number' and type(part.field) ~= 'string' then
-            box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts[" .. i .. "]: field (name or number) is expected")
-        elseif type(part.field) == 'string' then
-            for k,v in pairs(format) do
-                if v.name == part.field then
-                    part.field = k
-                    break
-                end
-            end
-            if type(part.field) == 'string' then
-                box.error(box.error.ILLEGAL_PARAMS,
-                          "options.parts[" .. i .. "]: field was not found by name '" .. part.field .. "'")
-            end
-        elseif part.field == 0 then
-            box.error(box.error.ILLEGAL_PARAMS,
-                      "options.parts[" .. i .. "]: field (number) must be one-based")
+        if type(part.field) == 'number' or type(part.field) == 'string' then
+            local idx, path = format_field_resolve(format, part.field, i)
+            part.field = idx
+            part.path = path or part.path
+            parts_can_be_simplified = parts_can_be_simplified and part.path == nil
+        else
+            box.error(box.error.ILLEGAL_PARAMS, "options.parts[" .. i .. "]: " ..
+                      "field (name or number) is expected")
         end
-        local fmt = format[part.field]
+        local fmt = format[part.field + 1]
         if part.type == nil then
             if fmt and fmt.type then
                 part.type = fmt.type
@@ -666,7 +729,6 @@ local function update_index_parts(format, parts)
                 parts_can_be_simplified = false
             end
         end
-        part.field = part.field - 1
         table.insert(result, part)
     end
     return result, parts_can_be_simplified

@@ -34,6 +34,33 @@ idx:min()
 idx:max()
 s:drop()
 
+-- Test user-friendly index creation interface.
+s = box.schema.space.create('withdata', {engine = engine})
+format = {{'data', 'map'}, {'meta', 'str'}}
+s:format(format)
+s:create_index('pk_invalid', {parts = {{']sad.FIO["sname"]', 'str'}}})
+s:create_index('pk_unexistent', {parts = {{'unexistent.FIO["sname"]', 'str'}}})
+pk = s:create_index('pk', {parts = {{'data.FIO["sname"]', 'str'}}})
+pk ~= nil
+sk2 = s:create_index('sk2', {parts = {{'["data"].FIO["sname"]', 'str'}}})
+sk2 ~= nil
+sk3 = s:create_index('sk3', {parts = {{'[\'data\'].FIO["sname"]', 'str'}}})
+sk3 ~= nil
+sk4 = s:create_index('sk4', {parts = {{'[1].FIO["sname"]', 'str'}}})
+sk4 ~= nil
+pk.fieldno == sk2.fieldno
+sk2.fieldno == sk3.fieldno
+sk3.fieldno == sk4.fieldno
+pk.path == sk2.path
+sk2.path == sk3.path
+sk3.path == sk4.path
+s:insert{{town = 'London', FIO = {fname = 'James', sname = 'Bond'}}, "mi6"}
+s:insert{{town = 'Moscow', FIO = {fname = 'Max', sname = 'Isaev', data = "extra"}}, "test"}
+pk:get({'Bond'}) == sk2:get({'Bond'})
+sk2:get({'Bond'}) == sk3:get({'Bond'})
+sk3:get({'Bond'}) == sk4:get({'Bond'})
+s:drop()
+
 -- Test upsert of JSON-indexed data.
 s = box.schema.create_space('withdata', {engine = engine})
 parts = {}
