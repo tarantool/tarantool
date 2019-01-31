@@ -48,15 +48,6 @@ testprefix = "analyze3"
 --               have been fixed.
 --
 
-local function eqp(sql)
-    return test:execsql("EXPLAIN QUERY PLAN"..sql)
-end
-
-local function sf_execsql(sql, db)
-    r = test:execsql(sql)
-    return {box.sql.debug().sql_search_count, r}
-end
-
 ---------------------------------------------------------------------------
 --
 -- analyze3-1.1.1: 

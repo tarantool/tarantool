@@ -110,21 +110,11 @@ sqlerror:
 	return lua_error(L);
 }
 
-static int
-lua_sql_debug(struct lua_State *L)
-{
-	struct info_handler info;
-	luaT_info_handler_create(&info, L);
-	sql_debug_info(&info);
-	return 1;
-}
-
 void
 box_lua_sql_init(struct lua_State *L)
 {
 	static const struct luaL_Reg module_funcs [] = {
 		{"execute", lua_sql_execute},
-		{"debug", lua_sql_debug},
 		{NULL, NULL}
 	};
 

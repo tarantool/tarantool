@@ -5,9 +5,9 @@ test:plan(39)
 local function do_xfer_test(test, test_func, test_name, func, exp, opts)
     local opts = opts or {}
     local exp_xfer_count = opts.exp_xfer_count
-    local before = box.sql.debug().sql_xfer_count
+    local before = box.stat.sql().sql_xfer_count
     test_func(test, test_name, func, exp)
-    local after = box.sql.debug().sql_xfer_count
+    local after = box.stat.sql().sql_xfer_count
     test:is(after - before, exp_xfer_count,
                    test_name .. '-xfer-count')
 end
