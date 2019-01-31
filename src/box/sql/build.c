@@ -318,7 +318,6 @@ sqlStartTable(Parse *pParse, Token *pName, int noErr)
 		goto cleanup;
 	}
 
-	pParse->sNameToken = *pName;
 	if (sqlCheckIdentifierName(pParse, zName) != 0)
 		goto cleanup;
 
@@ -844,7 +843,7 @@ error:
  * iCursor is a cursor to access _space.
  */
 static void
-createSpace(Parse * pParse, int iSpaceId, char *zStmt)
+createSpace(Parse * pParse, int iSpaceId)
 {
 	Vdbe *v = sqlGetVdbe(pParse);
 	int iFirstCol = ++pParse->nMem;
@@ -852,7 +851,7 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 	struct region *region = &pParse->region;
 	uint32_t table_opts_stmt_sz = 0;
 	struct space *space = pParse->new_space;
-	char *table_opts_stmt = sql_encode_table_opts(region, space->def, zStmt,
+	char *table_opts_stmt = sql_encode_table_opts(region, space->def,
 						      &table_opts_stmt_sz);
 	if (table_opts_stmt == NULL)
 		goto error;
@@ -1163,19 +1162,8 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 	struct Vdbe *v = sqlGetVdbe(pParse);
 	if (NEVER(v == 0))
 		return;
-
-	/* Text of the CREATE VIEW statement. */
-	char *stmt = NULL;
-	if (new_space->def->opts.is_view) {
-		struct Token *pEnd2 = &pParse->sLastToken;
-		int n = pEnd2->z - pParse->sNameToken.z;
-		if (pEnd2->z[0] != ';')
-			n += pEnd2->n;
-		stmt = sqlMPrintf(db, "CREATE VIEW %.*s", n,
-				      pParse->sNameToken.z);
-	}
 	int reg_space_id = getNewSpaceId(pParse);
-	createSpace(pParse, reg_space_id, stmt);
+	createSpace(pParse, reg_space_id);
 	/* Indexes aren't required for VIEW's.. */
 	if (!new_space->def->opts.is_view) {
 		for (uint32_t i = 0; i < new_space->index_count; ++i) {
