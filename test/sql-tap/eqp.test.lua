@@ -140,9 +140,9 @@ test:do_eqp_test(
         -- <1.9>
         {3, 0, 0, "SCAN TABLE T3"},
         {1, 0, 0, "COMPOUND SUBQUERIES 2 AND 3 USING TEMP B-TREE (EXCEPT)"},
-        {0, 0, 1, "SCAN SUBQUERY 1"},
-        {0, 1, 0, "SCAN TABLE T3"},
-        
+        {0, 0, 0,"SCAN TABLE T3"},
+        {0, 1, 1,"SCAN SUBQUERY 1"},
+
         -- </1.9>
     })
 

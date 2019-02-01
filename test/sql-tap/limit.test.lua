@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(103)
+test:plan(111)
 
 --!./tcltestrunner.lua
 -- 2001 November 6
@@ -78,56 +78,75 @@ test:do_execsql_test(
         -- </limit-1.2.2>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "limit-1.2.3",
     [[
         SELECT x FROM t1 ORDER BY x+1 LIMIT 5 OFFSET -2
     ]], {
-        -- <limit-1.2.3>
-        0, 1, 2, 3, 4
-        -- </limit-1.2.3>
+        -- <limit-1.2.13>
+        1 ,"Only positive integers are allowed in the OFFSET clause"
+        -- </limit-1.2.13>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "limit-1.2.4",
     [[
         SELECT x FROM t1 ORDER BY x+1 LIMIT 2, -5
     ]], {
         -- <limit-1.2.4>
-        2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+        1, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-1.2.4>
     })
 
 test:do_execsql_test(
     "limit-1.2.5",
     [[
-        SELECT x FROM t1 ORDER BY x+1 LIMIT -2, 5
+        SELECT x FROM t1 ORDER BY x+1 LIMIT 2, 1000
     ]], {
-        -- <limit-1.2.5>
-        0, 1, 2, 3, 4
-        -- </limit-1.2.5>
-    })
+    -- <limit-1.2.5>
+    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+    -- </limit-1.2.5>
+})
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "limit-1.2.6",
     [[
-        SELECT x FROM t1 ORDER BY x+1 LIMIT -2, -5
+        SELECT x FROM t1 ORDER BY x+1 LIMIT -2, 5
     ]], {
         -- <limit-1.2.6>
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-        20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31
+        1, "Only positive integers are allowed in the OFFSET clause"
         -- </limit-1.2.6>
     })
 
 test:do_execsql_test(
     "limit-1.2.7",
     [[
+        SELECT x FROM t1 ORDER BY x+1 LIMIT 0, 5
+    ]], {
+    -- <limit-1.2.7>
+    0, 1, 2, 3, 4
+    -- </limit-1.2.7>
+})
+
+test:do_catchsql_test(
+    "limit-1.2.8",
+    [[
+        SELECT x FROM t1 ORDER BY x+1 LIMIT -2, -5
+    ]], {
+        -- <limit-1.2.8>
+        1, "Only positive integers are allowed in the LIMIT clause"
+        -- </limit-1.2.8>
+    })
+
+test:do_execsql_test(
+    "limit-1.2.9",
+    [[
         SELECT x FROM t1 ORDER BY x LIMIT 2, 5
     ]], {
-        -- <limit-1.2.7>
+        -- <limit-1.2.9>
         2, 3, 4, 5, 6
-        -- </limit-1.2.7>
+        -- </limit-1.2.9>
     })
 
 test:do_execsql_test(
@@ -359,55 +378,95 @@ test:do_execsql_test(
         -- </limit-6.1>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "limit-6.2",
     [[
         SELECT * FROM t6 LIMIT -1 OFFSET -1;
     ]], {
         -- <limit-6.2>
-        1, 2, 3, 4
+        1, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.2>
     })
 
-test:do_execsql_test(
-    "limit-6.3",
+test:do_catchsql_test(
+    "limit-6.3.1",
     [[
         SELECT * FROM t6 LIMIT 2 OFFSET -123;
     ]], {
         -- <limit-6.3>
-        1, 2
+        1, "Only positive integers are allowed in the OFFSET clause"
         -- </limit-6.3>
     })
 
 test:do_execsql_test(
-    "limit-6.4",
+    "limit-6.3.2",
+    [[
+        SELECT * FROM t6 LIMIT 2 OFFSET 0;
+    ]], {
+    -- <limit-6.3>
+    1, 2
+    -- </limit-6.3>
+})
+
+test:do_catchsql_test(
+    "limit-6.4.1",
     [[
         SELECT * FROM t6 LIMIT -432 OFFSET 2;
     ]], {
         -- <limit-6.4>
-        3, 4
+        1, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.4>
     })
 
 test:do_execsql_test(
-    "limit-6.5",
+    "limit-6.4.2",
+    [[
+        SELECT * FROM t6 LIMIT 1000 OFFSET 2;
+    ]], {
+    -- <limit-6.4>
+    3, 4
+    -- </limit-6.4>
+})
+
+test:do_catchsql_test(
+    "limit-6.5.1",
     [[
         SELECT * FROM t6 LIMIT -1
     ]], {
         -- <limit-6.5>
-        1, 2, 3, 4
+        1, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.5>
     })
 
 test:do_execsql_test(
-    "limit-6.6",
+    "limit-6.5.2",
+    [[
+        SELECT * FROM t6 LIMIT '12'
+    ]], {
+    -- <limit-6.5>
+    1, 2, 3, 4
+    -- </limit-6.5>
+})
+
+test:do_catchsql_test(
+    "limit-6.6.1",
     [[
         SELECT * FROM t6 LIMIT -1 OFFSET 1
     ]], {
         -- <limit-6.6>
-        2, 3, 4
+        1, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.6>
     })
+
+test:do_execsql_test(
+    "limit-6.6.2",
+    [[
+        SELECT * FROM t6 LIMIT 111 OFFSET 1
+    ]], {
+    -- <limit-6.6>
+    2, 3, 4
+    -- </limit-6.6>
+})
 
 test:do_execsql_test(
     "limit-6.7",
@@ -660,13 +719,13 @@ test:do_test(
 test:do_test(
     "limit-10.3",
     function()
-        local limit = -1
+        local limit = 111
         return test:execsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
     end, {
-        -- <limit-10.3>
-        9, 8, 7, 6, 5, 4, 3, 2, 1, 0
-        -- </limit-10.3>
-    })
+    -- <limit-10.3.2>
+    9, 8, 7, 6, 5, 4, 3, 2, 1, 0
+    -- </limit-10.3.2>
+})
 
 test:do_test(
     "limit-10.4",
@@ -677,7 +736,7 @@ test:do_test(
         end)}
     end, {
         -- <limit-10.4>
-        0, "datatype mismatch"
+        0, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-10.4>
     })
 
@@ -690,7 +749,7 @@ test:do_test(
         end)}
     end, {
         -- <limit-10.5>
-        0, "datatype mismatch"
+        0, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-10.5>
     })
 
@@ -1259,24 +1318,44 @@ test:do_execsql_test(
         -- </limit-14.4>
     })
 
-test:do_execsql_test(
-    "limit-14.6",
+test:do_catchsql_test(
+    "limit-14.6.1",
     [[
         SELECT 123 LIMIT -1 OFFSET 0
     ]], {
-        -- <limit-14.6>
-        123
-        -- </limit-14.6>
+        -- <limit-14.6.1>
+        1, "Only positive integers are allowed in the LIMIT clause"
+        -- </limit-14.6.1>
     })
 
 test:do_execsql_test(
-    "limit-14.7",
+    "limit-14.6.2",
+    [[
+        SELECT 123 LIMIT 21 OFFSET 0
+    ]], {
+    -- <limit-14.6.2>
+    123
+    -- </limit-14.6.2>
+})
+
+test:do_catchsql_test(
+    "limit-14.7.1",
     [[
         SELECT 123 LIMIT -1 OFFSET 1
     ]], {
-        -- <limit-14.7>
-        
-        -- </limit-14.7>
+        -- <limit-14.7.1>
+        1, "Only positive integers are allowed in the LIMIT clause"
+        -- </limit-14.7.1>
     })
+
+test:do_execsql_test(
+    "limit-14.7.2",
+    [[
+        SELECT 123 LIMIT 111 OFFSET 1
+    ]], {
+    -- <limit-14.7.2>
+
+    -- </limit-14.7.2>
+})
 
 test:finish_test()

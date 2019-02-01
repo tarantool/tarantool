@@ -125,7 +125,7 @@ cn:execute('   ;')
 - error: 'Failed to execute SQL statement: syntax error: empty request'
 ...
 --
--- Parmaeters bindig.
+-- gh-3467: allow only positive integers under limit clause.
 --
 cn:execute('select * from test where id = ?', {1})
 ---
@@ -139,6 +139,64 @@ cn:execute('select * from test where id = ?', {1})
   rows:
   - [1, 2, '3']
 ...
+cn:execute('select * from test limit ?', {2})
+---
+- metadata:
+  - name: ID
+    type: INTEGER
+  - name: A
+    type: NUMERIC
+  - name: B
+    type: TEXT
+  rows:
+  - [1, 2, '3']
+  - [7, 8.5, '9']
+...
+cn:execute('select * from test limit ?', {-2})
+---
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
+...
+cn:execute('select * from test limit ?', {2.7})
+---
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
+...
+cn:execute('select * from test limit ?', {'Hello'})
+---
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
+...
+cn:execute('select * from test limit 1 offset ?', {2})
+---
+- metadata:
+  - name: ID
+    type: INTEGER
+  - name: A
+    type: NUMERIC
+  - name: B
+    type: TEXT
+  rows:
+  - [10, 11, null]
+...
+cn:execute('select * from test limit 1 offset ?', {-2})
+---
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    OFFSET clause'
+...
+cn:execute('select * from test limit 1 offset ?', {2.7})
+---
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    OFFSET clause'
+...
+cn:execute('select * from test limit 1 offset ?', {'Hello'})
+---
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    OFFSET clause'
+...
+--
+-- Parameters binding.
+--
 parameters = {}
 ---
 ...

@@ -45,10 +45,22 @@ cn:execute('')
 cn:execute('   ;')
 
 --
--- Parmaeters bindig.
+-- gh-3467: allow only positive integers under limit clause.
 --
-
 cn:execute('select * from test where id = ?', {1})
+cn:execute('select * from test limit ?', {2})
+cn:execute('select * from test limit ?', {-2})
+cn:execute('select * from test limit ?', {2.7})
+cn:execute('select * from test limit ?', {'Hello'})
+
+cn:execute('select * from test limit 1 offset ?', {2})
+cn:execute('select * from test limit 1 offset ?', {-2})
+cn:execute('select * from test limit 1 offset ?', {2.7})
+cn:execute('select * from test limit 1 offset ?', {'Hello'})
+
+--
+-- Parameters binding.
+--
 parameters = {}
 parameters[1] = {}
 parameters[1][':value'] = 1

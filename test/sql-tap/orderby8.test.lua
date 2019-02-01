@@ -44,7 +44,7 @@ for i=1,200 do
     rs = rs..", x+"..i
     test:do_execsql_test(
         "1."..i,
-        "SELECT x FROM (SELECT "..rs.." FROM t1 ORDER BY x LIMIT -1)",
+        "SELECT x FROM (SELECT "..rs.." FROM t1 ORDER BY x LIMIT 100)",
         {
             1, 2, 3, 4, 5, 6, 7, 8, 9
     })

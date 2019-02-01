@@ -842,7 +842,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-9.7",
     [[
-        SELECT x FROM (SELECT x FROM t1 LIMIT -1) LIMIT 3;
+        SELECT x FROM (SELECT x FROM t1 LIMIT 101) LIMIT 3;
     ]], {
         -- <select6-9.7>
         1, 2, 3
@@ -852,7 +852,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-9.8",
     [[
-        SELECT x FROM (SELECT x FROM t1 LIMIT -1);
+        SELECT x FROM (SELECT x FROM t1 LIMIT 101);
     ]], {
         -- <select6-9.8>
         1, 2, 3, 4
@@ -862,7 +862,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-9.9",
     [[
-        SELECT x FROM (SELECT x FROM t1 LIMIT -1 OFFSET 1);
+        SELECT x FROM (SELECT x FROM t1 LIMIT 10-1 OFFSET 1);
     ]], {
         -- <select6-9.9>
         2, 3, 4
@@ -872,7 +872,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-9.10",
     [[
-        SELECT x, y FROM (SELECT x, (SELECT 10+x) y FROM t1 LIMIT -1 OFFSET 1);
+        SELECT x, y FROM (SELECT x, (SELECT 10+x) y FROM t1 LIMIT 9-1 OFFSET 1);
     ]], {
         -- <select6-9.10>
         2, 12, 3, 13, 4, 14
@@ -882,7 +882,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-9.11",
     [[
-        SELECT x, y FROM (SELECT x, (SELECT 10)+x y FROM t1 LIMIT -1 OFFSET 1);
+        SELECT x, y FROM (SELECT x, (SELECT 10)+x y FROM t1 LIMIT 7-1 OFFSET 1);
     ]], {
         -- <select6-9.11>
         2, 12, 3, 13, 4, 14

@@ -69,7 +69,7 @@ test:do_execsql_test(
         SELECT DISTINCT artist,sum(timesplayed) AS total      
         FROM songs      
         GROUP BY LOWER(artist)      
-        LIMIT -1 OFFSET 2
+        LIMIT 1000 OFFSET 2
     ]], subrange(result, 5, #result))
 
 test:finish_test()

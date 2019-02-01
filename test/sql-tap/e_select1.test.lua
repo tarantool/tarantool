@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(523)
+test:plan(520)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -2176,7 +2176,7 @@ for _, val in ipairs({
         "e_select-9.2."..tn,
         select,
         {
-            1, "datatype mismatch"})
+            1, "Only positive integers are allowed in the LIMIT clause"})
 end
 
 -- EVIDENCE-OF: R-03014-26414 If the LIMIT expression evaluates to a
@@ -2186,9 +2186,9 @@ end
 test:do_select_tests(
     "e_select-9.4",
     {
-        {"1", "SELECT b FROM f1 ORDER BY a LIMIT -1 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
-        {"2", "SELECT b FROM f1 ORDER BY a LIMIT length('abc')-100 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
-        {"3", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT count(*) FROM f1)/2 - 14 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
+        {"1", "SELECT b FROM f1 ORDER BY a LIMIT 10000 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
+        {"2", "SELECT b FROM f1 ORDER BY a LIMIT 123+length('abc')-100 ", {"a",  "b",  "c",  "d",  "e",  "f",  "g",  "h",  "i",  "j",  "k",  "l",  "m",  "n",  "o",  "p",  "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"}},
+        {"3", "SELECT b FROM f1 ORDER BY a LIMIT (SELECT count(*) FROM f1)/2 - 10 ", {"a",  "b",  "c"}},
     })
 
 -- EVIDENCE-OF: R-33750-29536 Otherwise, the SELECT returns the first N
@@ -2230,7 +2230,7 @@ for _, val in ipairs({
     test:do_catchsql_test(
         "e_select-9.7."..tn,
         select, {
-            1, "datatype mismatch"
+            1, "Only positive integers are allowed in the OFFSET clause"
         })
 
 end
@@ -2270,9 +2270,7 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select-9.10",
     {
-        {"1", "SELECT b FROM f1 ORDER BY a LIMIT 5 OFFSET -1 ", {"a", "b", "c", "d", "e"}},
-        {"2", "SELECT b FROM f1 ORDER BY a LIMIT 5 OFFSET -500 ", {"a", "b", "c", "d", "e"}},
-        {"3", "SELECT b FROM f1 ORDER BY a LIMIT 5 OFFSET 0  ", {"a", "b", "c", "d", "e"}},
+        {"1", "SELECT b FROM f1 ORDER BY a LIMIT 5 OFFSET 0 ", {"a", "b", "c", "d", "e"}},
     })
 
 -- EVIDENCE-OF: R-19509-40356 Instead of a separate OFFSET clause, the
@@ -2293,9 +2291,8 @@ test:do_select_tests(
         {"7", "SELECT b FROM f1 ORDER BY a LIMIT '1'||'5', 3 ", {"p", "q", "r"}},
         {"8", "SELECT b FROM f1 ORDER BY a LIMIT 20, 10 ", {"u", "v", "w", "x", "y", "z"}},
         {"9", "SELECT a FROM f1 ORDER BY a DESC LIMIT 18+4, 100 ", {4, 3, 2, 1}},
-        {"10", "SELECT b FROM f1 ORDER BY a LIMIT -1, 5 ", {"a", "b", "c", "d", "e"}},
-        {"11", "SELECT b FROM f1 ORDER BY a LIMIT -500, 5 ", {"a", "b", "c", "d", "e"}},
-        {"12", "SELECT b FROM f1 ORDER BY a LIMIT 0, 5 ", {"a", "b", "c", "d", "e"}},
+        {"10", "SELECT b FROM f1 ORDER BY a LIMIT 0, 5 ", {"a", "b", "c", "d", "e"}},
+        {"11", "SELECT b FROM f1 ORDER BY a LIMIT 500-500, 5 ", {"a", "b", "c", "d", "e"}},
     })
 
 test:finish_test()

@@ -2075,7 +2075,6 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 	Vdbe *v = 0;
 	int iLimit = 0;
 	int iOffset;
-	int n;
 	if (p->iLimit)
 		return;
 
@@ -2098,24 +2097,32 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 		p->iLimit = iLimit = ++pParse->nMem;
 		v = sqlite3GetVdbe(pParse);
 		assert(v != 0);
-		if (sqlite3ExprIsInteger(p->pLimit, &n)) {
-			sqlite3VdbeAddOp2(v, OP_Integer, n, iLimit);
-			VdbeComment((v, "LIMIT counter"));
-			if (n == 0) {
-				sqlite3VdbeGoto(v, iBreak);
-			} else if (n >= 0
-				   && p->nSelectRow > sqlite3LogEst((u64) n)) {
-				p->nSelectRow = sqlite3LogEst((u64) n);
-				p->selFlags |= SF_FixedLimit;
-			}
-		} else {
-			sqlite3ExprCode(pParse, p->pLimit, iLimit);
-			sqlite3VdbeAddOp1(v, OP_MustBeInt, iLimit);
-			VdbeCoverage(v);
-			VdbeComment((v, "LIMIT counter"));
-			sqlite3VdbeAddOp2(v, OP_IfNot, iLimit, iBreak);
-			VdbeCoverage(v);
-		}
+		int positive_limit_label = sqlite3VdbeMakeLabel(v);
+		int halt_label = sqlite3VdbeMakeLabel(v);
+		sqlite3ExprCode(pParse, p->pLimit, iLimit);
+		sqlite3VdbeAddOp2(v, OP_MustBeInt, iLimit, halt_label);
+		/* If LIMIT clause >= 0 continue execution */
+		int r1 = sqlite3GetTempReg(pParse);
+		sqlite3VdbeAddOp2(v, OP_Integer, 0, r1);
+		sqlite3VdbeAddOp3(v, OP_Ge, r1, positive_limit_label, iLimit);
+		/* Otherwise return an error and stop */
+		const char *wrong_limit_error =
+			"Only positive integers are allowed "
+			"in the LIMIT clause";
+		sqlite3VdbeResolveLabel(v, halt_label);
+		sqlite3VdbeAddOp4(v, OP_Halt,
+				  SQL_TARANTOOL_ERROR,
+				  0, 0,
+				  wrong_limit_error,
+				  P4_STATIC);
+
+		sqlite3VdbeResolveLabel(v, positive_limit_label);
+		sqlite3ReleaseTempReg(pParse, r1);
+		VdbeCoverage(v);
+		VdbeComment((v, "LIMIT counter"));
+		sqlite3VdbeAddOp2(v, OP_IfNot, iLimit, iBreak);
+		VdbeCoverage(v);
+
 		if ((p->selFlags & SF_SingleRow) != 0) {
 			if (ExprHasProperty(p->pLimit, EP_System)) {
 				/*
@@ -2150,10 +2157,30 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 			}
 		}
 		if (p->pOffset) {
+			int positive_offset_label = sqlite3VdbeMakeLabel(v);
+			int offset_error_label = sqlite3VdbeMakeLabel(v);
 			p->iOffset = iOffset = ++pParse->nMem;
 			pParse->nMem++;	/* Allocate an extra register for limit+offset */
 			sqlite3ExprCode(pParse, p->pOffset, iOffset);
-			sqlite3VdbeAddOp1(v, OP_MustBeInt, iOffset);
+			sqlite3VdbeAddOp2(v, OP_MustBeInt, iOffset, offset_error_label);
+			/* If OFFSET clause >= 0 continue execution */
+            		int r1 = sqlite3GetTempReg(pParse);
+            		sqlite3VdbeAddOp2(v, OP_Integer, 0, r1);
+
+            		sqlite3VdbeAddOp3(v, OP_Ge, r1, positive_offset_label, iOffset);
+			/* Otherwise return an error and stop */
+			const char *wrong_offset_error =
+				"Only positive integers are allowed "
+				"in the OFFSET clause";
+			sqlite3VdbeResolveLabel(v, offset_error_label);
+			sqlite3VdbeAddOp4(v, OP_Halt,
+					  SQL_TARANTOOL_ERROR,
+					  0, 0,
+					  wrong_offset_error,
+					  P4_STATIC);
+
+			sqlite3VdbeResolveLabel(v, positive_offset_label);
+            		sqlite3ReleaseTempReg(pParse, r1);
 			VdbeCoverage(v);
 			VdbeComment((v, "OFFSET counter"));
 			sqlite3VdbeAddOp3(v, OP_OffsetLimit, iLimit,

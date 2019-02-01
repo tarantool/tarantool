@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(67)
+test:plan(65)
 
 --!./tcltestrunner.lua
 -- 2014 January 11
@@ -663,8 +663,6 @@ limit_test(9.4, 20, -1)
 limit_test(9.5, 5, 5)
 limit_test(9.6, 0, -1)
 limit_test(9.7, 40, -1)
-limit_test(9.8, -1, -1)
-limit_test(9.9, -1, -1)
 -- #--------------------------------------------------------------------------
 -- # Test the ORDER BY clause on recursive tables.
 -- #

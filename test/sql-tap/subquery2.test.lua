@@ -132,7 +132,7 @@ test:do_execsql_test(
     2.2,
     [[
         SELECT * 
-        FROM (SELECT * FROM t4 ORDER BY a LIMIT -1 OFFSET 1) 
+        FROM (SELECT * FROM t4 ORDER BY a LIMIT 1000000 OFFSET 1)
         LIMIT (SELECT a FROM t5)
     ]], {
         -- <2.2>

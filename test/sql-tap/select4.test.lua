@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(103)
+test:plan(105)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -984,25 +984,43 @@ test:do_execsql_test(
         -- </select4-10.3>
     })
 
-test:do_execsql_test(
-    "select4-10.4",
+test:do_catchsql_test(
+    "select4-10.4.1",
     [[
         SELECT DISTINCT log FROM t1 ORDER BY log LIMIT -1
     ]], {
-        -- <select4-10.4>
-        0, 1, 2, 3, 4, 5
-        -- </select4-10.4>
+        -- <select4-10.4.1>
+    1,"Only positive integers are allowed in the LIMIT clause"
+        -- </select4-10.4.1>
     })
-
 test:do_execsql_test(
-    "select4-10.5",
+    "select4-10.4.2",
+    [[
+        SELECT DISTINCT log FROM t1 ORDER BY log LIMIT 111
+    ]], {
+    -- <select4-10.4.2>
+    0, 1, 2, 3, 4, 5
+    -- </select4-10.4.2>
+})
+
+test:do_catchsql_test(
+    "select4-10.5.1",
     [[
         SELECT DISTINCT log FROM t1 ORDER BY log LIMIT -1 OFFSET 2
     ]], {
-        -- <select4-10.5>
-        2, 3, 4, 5
-        -- </select4-10.5>
+        -- <select4-10.5.1>
+        1,"Only positive integers are allowed in the LIMIT clause"
+        -- </select4-10.5.1>
     })
+test:do_execsql_test(
+    "select4-10.5.2",
+    [[
+        SELECT DISTINCT log FROM t1 ORDER BY log LIMIT 111 OFFSET 2
+    ]], {
+    -- <select4-10.5.2>
+    2, 3, 4, 5
+    -- </select4-10.5.2>
+})
 
 test:do_execsql_test(
     "select4-10.6",
