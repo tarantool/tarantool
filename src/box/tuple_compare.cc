@@ -509,16 +509,16 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		end = part + key_def->part_count;
 
 	for (; part < end; part++) {
-		if (!has_json_paths) {
-			field_a = tuple_field_raw(format_a, tuple_a_raw,
-						  field_map_a, part->fieldno);
-			field_b = tuple_field_raw(format_b, tuple_b_raw,
-						  field_map_b, part->fieldno);
-		} else {
+		if (has_json_paths) {
 			field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
 							  field_map_a, part);
 			field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
 							  field_map_b, part);
+		} else {
+			field_a = tuple_field_raw(format_a, tuple_a_raw,
+						  field_map_a, part->fieldno);
+			field_b = tuple_field_raw(format_b, tuple_b_raw,
+						  field_map_b, part->fieldno);
 		}
 		assert(has_optional_parts ||
 		       (field_a != NULL && field_b != NULL));
@@ -566,16 +566,16 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 	 */
 	end = key_def->parts + key_def->part_count;
 	for (; part < end; ++part) {
-		if (!has_json_paths) {
-			field_a = tuple_field_raw(format_a, tuple_a_raw,
-						  field_map_a, part->fieldno);
-			field_b = tuple_field_raw(format_b, tuple_b_raw,
-						  field_map_b, part->fieldno);
-		} else {
+		if (has_json_paths) {
 			field_a = tuple_field_by_part_raw(format_a, tuple_a_raw,
 							  field_map_a, part);
 			field_b = tuple_field_by_part_raw(format_b, tuple_b_raw,
 							  field_map_b, part);
+		} else {
+			field_a = tuple_field_raw(format_a, tuple_a_raw,
+						  field_map_a, part->fieldno);
+			field_b = tuple_field_raw(format_b, tuple_b_raw,
+						  field_map_b, part->fieldno);
 		}
 		/*
 		 * Extended parts are primary, and they can not
@@ -608,12 +608,12 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 	enum mp_type a_type, b_type;
 	if (likely(part_count == 1)) {
 		const char *field;
-		if (!has_json_paths) {
-			field = tuple_field_raw(format, tuple_raw, field_map,
-						part->fieldno);
-		} else {
+		if (has_json_paths) {
 			field = tuple_field_by_part_raw(format, tuple_raw,
 							field_map, part);
+		} else {
+			field = tuple_field_raw(format, tuple_raw, field_map,
+						part->fieldno);
 		}
 		if (! is_nullable) {
 			return tuple_compare_field(field, key, part->type,
@@ -639,12 +639,12 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 	int rc;
 	for (; part < end; ++part, mp_next(&key)) {
 		const char *field;
-		if (!has_json_paths) {
-			field = tuple_field_raw(format, tuple_raw, field_map,
-						part->fieldno);
-		} else {
+		if (has_json_paths) {
 			field = tuple_field_by_part_raw(format, tuple_raw,
 							field_map, part);
+		} else {
+			field = tuple_field_raw(format, tuple_raw, field_map,
+						part->fieldno);
 		}
 		if (! is_nullable) {
 			rc = tuple_compare_field(field, key, part->type,
