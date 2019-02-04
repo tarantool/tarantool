@@ -338,8 +338,12 @@ httpc_execute(struct httpc_request *req, double timeout)
 	case CURLE_OK:
 		curl_easy_getinfo(req->curl_request.easy, CURLINFO_RESPONSE_CODE, &longval);
 		req->status = (int) longval;
-		/* TODO: get real response string from resp->headers */
-		req->reason = "Ok";
+
+		if (req->status >= 100 && req->status < 400)
+			req->reason = "Ok";
+		else
+			req->reason = "Unknown";
+
 		if (req->status == 200) {
 			++env->stat.http_200_responses;
 		} else {

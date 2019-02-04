@@ -62,12 +62,13 @@ local function stop_server(test, server)
 end
 
 local function test_http_client(test, url, opts)
-    test:plan(9)
+    test:plan(10)
 
     test:isnil(rawget(_G, 'http'), "global namespace is not polluted");
     test:isnil(rawget(_G, 'http.client'), "global namespace is not polluted");
     local r = client.get(url, opts)
     test:is(r.status, 200, 'simple 200')
+    test:is(r.reason, 'Ok', '200 - Ok')
     test:is(r.proto[1], 1, 'proto major http 1.1')
     test:is(r.proto[2], 1, 'proto major http 1.1')
     test:ok(r.body:match("hello") ~= nil, "body")
@@ -104,7 +105,7 @@ local function test_cancel_and_errinj(test, url, opts)
 end
 
 local function test_post_and_get(test, url, opts)
-    test:plan(19)
+    test:plan(21)
 
     local http = client.new()
     test:ok(http ~= nil, "client is created")
@@ -159,6 +160,7 @@ local function test_post_and_get(test, url, opts)
 
     r = responses.absent_get
     test:is(r.status, 500, "GET: absent method http code page exists")
+    test:is(r.reason, 'Unknown', '500 - Unknown')
     test:is(r.body, "No such method", "GET: absent method right body")
 
     r = responses.empty_post
@@ -180,6 +182,7 @@ local function test_post_and_get(test, url, opts)
 
     r = responses.bad_get
     test:is(r.status, 404, "GET: http page not exists")
+    test:is(r.reason, 'Unknown', '404 - Unknown')
     test:isnt(r.body:len(), 0, "GET: not empty body page not exists")
     test:ok(string.find(r.body, "Not Found"),
                 "GET: right body page not exists")
