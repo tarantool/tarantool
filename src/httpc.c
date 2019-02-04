@@ -41,6 +41,7 @@
 #define HTTP_ACCEPT_HEADER	"Accept:"
 #define HTTP_CONNECTION_HEADER	"Connection:"
 #define HTTP_KEEP_ALIVE_HEADER	"Keep-Alive:"
+#define MAX_HEADER_LEN 8192
 
 /**
  * libcurl callback for CURLOPT_WRITEFUNCTION
@@ -176,9 +177,14 @@ httpc_request_delete(struct httpc_request *req)
 int
 httpc_set_header(struct httpc_request *req, const char *fmt, ...)
 {
+	static __thread char header[MAX_HEADER_LEN + 1];
 	va_list ap;
 	va_start(ap, fmt);
-	const char *header = tt_vsprintf(fmt, ap);
+	int rc = vsnprintf(header, MAX_HEADER_LEN + 1, fmt, ap);
+	if (rc > MAX_HEADER_LEN) {
+		diag_set(IllegalParams, "header is too large");
+		return -1;
+	}
 	va_end(ap);
 
 	/**
