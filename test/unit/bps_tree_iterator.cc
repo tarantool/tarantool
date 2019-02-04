@@ -10,24 +10,28 @@
 struct elem_t {
 	long first;
 	long second;
-	bool operator!= (const struct elem_t& another) const
-	{
-		return first != another.first || second != another.second;
-	}
 };
 
+static bool equal(const elem_t &a, const elem_t &b);
 static int compare(const elem_t &a, const elem_t &b);
 static int compare_key(const elem_t &a, long b);
 
 #define BPS_TREE_NAME test
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 1024 /* value is to low specially for tests */
+#define BPS_TREE_IDENTICAL(a, b) equal(a, b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare_key(a, b)
 #define bps_tree_elem_t struct elem_t
 #define bps_tree_key_t long
 #define bps_tree_arg_t int
 #include "salad/bps_tree.h"
+
+static bool
+equal(const elem_t &a, const elem_t &b)
+{
+	return a.first == b.first && a.second == b.second;
+}
 
 static int compare(const elem_t &a, const elem_t &b)
 {
@@ -501,7 +505,7 @@ iterator_freeze_check()
 		}
 		int tested_count = 0;
 		while ((e = test_iterator_get_elem(&tree, &iterator1))) {
-			if (*e != comp_buf1[tested_count]) {
+			if (!equal(*e, comp_buf1[tested_count])) {
 				fail("version restore failed (1)", "true");
 			}
 			tested_count++;
@@ -523,7 +527,7 @@ iterator_freeze_check()
 
 		tested_count = 0;
 		while ((e = test_iterator_get_elem(&tree, &iterator2))) {
-			if (*e != comp_buf1[tested_count]) {
+			if (!equal(*e, comp_buf1[tested_count])) {
 				fail("version restore failed (1)", "true");
 			}
 			tested_count++;

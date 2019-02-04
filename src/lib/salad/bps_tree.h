@@ -275,6 +275,14 @@
 #endif
 
 /**
+ * Test if bps_tree_elem_t a and b represent exactly the
+ * same data.
+ */
+#ifndef BPS_TREE_IDENTICAL
+#define BPS_TREE_IDENTICAL(a, b) (a == b)
+#endif
+
+/**
  * A switch to define the type of search in an array elements.
  * By default, bps_tree uses binary search to find a particular
  * element in a block. But if the element type is simple
@@ -4592,7 +4600,7 @@ bps_tree_debug_check_block(const struct bps_tree *tree, struct bps_block *block,
 						       inner->child_ids[i]);
 			bps_tree_elem_t calc_max_elem =
 				bps_tree_debug_find_max_elem(tree, tmp_block);
-			if (inner->elems[i] != calc_max_elem)
+			if (!BPS_TREE_IDENTICAL(inner->elems[i], calc_max_elem))
 				result |= 0x4000;
 		}
 		if (block->size > 1) {
@@ -4651,7 +4659,8 @@ bps_tree_debug_check(const struct bps_tree *tree)
 		return result;
 	}
 	struct bps_block *root = bps_tree_root(tree);
-	if (tree->max_elem != bps_tree_debug_find_max_elem(tree, root))
+	bps_tree_elem_t elem = bps_tree_debug_find_max_elem(tree, root);
+	if (!BPS_TREE_IDENTICAL(tree->max_elem, elem))
 		result |= 0x8;
 	size_t calc_count = 0;
 	bps_tree_block_id_t expected_prev_id = (bps_tree_block_id_t)(-1);
@@ -5016,16 +5025,22 @@ bps_tree_debug_check_move_to_right_leaf(struct bps_tree *tree, bool assertme)
 					assert(!assertme);
 				}
 
-				if (a.header.size)
-					if (ma != a.elems[a.header.size - 1]) {
+				if (a.header.size) {
+					bps_tree_elem_t elem =
+						a.elems[a.header.size - 1];
+					if (!BPS_TREE_IDENTICAL(ma, elem)) {
 						result |= (1 << 5);
 						assert(!assertme);
 					}
-				if (b.header.size)
-					if (mb != b.elems[b.header.size - 1]) {
+				}
+				if (b.header.size) {
+					bps_tree_elem_t elem =
+						b.elems[b.header.size - 1];
+					if (!BPS_TREE_IDENTICAL(mb, elem)) {
 						result |= (1 << 5);
 						assert(!assertme);
 					}
+				}
 
 				c = 0;
 				for (unsigned int u = 0;
@@ -5113,16 +5128,22 @@ bps_tree_debug_check_move_to_left_leaf(struct bps_tree *tree, bool assertme)
 					assert(!assertme);
 				}
 
-				if (a.header.size)
-					if (ma != a.elems[a.header.size - 1]) {
+				if (a.header.size) {
+					bps_tree_elem_t elem =
+						a.elems[a.header.size - 1];
+					if (!BPS_TREE_IDENTICAL(ma, elem)) {
 						result |= (1 << 7);
 						assert(!assertme);
 					}
-				if (b.header.size)
-					if (mb != b.elems[b.header.size - 1]) {
+				}
+				if (b.header.size) {
+					bps_tree_elem_t elem =
+						b.elems[b.header.size - 1];
+					if (!BPS_TREE_IDENTICAL(mb, elem)) {
 						result |= (1 << 7);
 						assert(!assertme);
 					}
+				}
 
 				c = 0;
 				for (unsigned int u = 0;
@@ -5224,21 +5245,24 @@ bps_tree_debug_check_insert_and_move_to_right_leaf(struct bps_tree *tree,
 						assert(!assertme);
 					}
 
-					if (i - u + 1)
-						if (ma
-							!= a.elems[a.header.size
-								- 1]) {
+					if (i - u + 1) {
+						bps_tree_elem_t elem =
+							a.elems[a.header.size - 1];
+						if (!BPS_TREE_IDENTICAL(ma,
+									elem)) {
 							result |= (1 << 9);
 							assert(!assertme);
 						}
-					if (j + u)
-						if (mb
-							!= b.elems[b.header.size
-								- 1]) {
+					}
+					if (j + u) {
+						bps_tree_elem_t elem =
+							b.elems[b.header.size - 1];
+						if (!BPS_TREE_IDENTICAL(mb,
+									elem)) {
 							result |= (1 << 9);
 							assert(!assertme);
 						}
-
+					}
 					c = 0;
 					for (unsigned int v = 0;
 						v < (unsigned int) a.header.size;
@@ -5340,20 +5364,24 @@ bps_tree_debug_check_insert_and_move_to_left_leaf(struct bps_tree *tree,
 						assert(!assertme);
 					}
 
-					if (i + u)
-						if (ma
-							!= a.elems[a.header.size
-								- 1]) {
+					if (i + u) {
+						bps_tree_elem_t elem =
+							a.elems[a.header.size - 1];
+						if (!BPS_TREE_IDENTICAL(ma,
+									elem)) {
 							result |= (1 << 11);
 							assert(!assertme);
 						}
-					if (j - u + 1)
-						if (mb
-							!= b.elems[b.header.size
-								- 1]) {
+					}
+					if (j - u + 1) {
+						bps_tree_elem_t elem =
+							b.elems[b.header.size - 1];
+						if (!BPS_TREE_IDENTICAL(mb,
+									elem)) {
 							result |= (1 << 11);
 							assert(!assertme);
 						}
+					}
 
 					c = 0;
 					for (unsigned int v = 0;
