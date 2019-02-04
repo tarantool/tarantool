@@ -602,6 +602,27 @@ f = nil
 l = nil
 l1 = nil
 
+-- gh-3948 fiber.join() blocks if fiber is cancelled.
+function another_func() ch1:get() end
+test_run:cmd("setopt delimiter ';'")
+function func()
+    local fib = fiber.create(another_func)
+    fib:set_joinable(true)
+    ch2:put(1)
+    fib:join()
+end;
+test_run:cmd("setopt delimiter ''");
+
+ch1 = fiber.channel(1)
+ch2 = fiber.channel(1)
+
+f = fiber.create(func)
+ch2:get()
+f:cancel()
+ch1:put(1)
+
+while f:status() ~= 'dead' do fiber.sleep(0.01) end
+
 -- cleanup
 test_run:cmd("clear filter")
 
