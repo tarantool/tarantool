@@ -392,9 +392,14 @@ fiber_join(struct fiber *fiber)
 	assert(fiber->flags & FIBER_IS_JOINABLE);
 
 	if (! fiber_is_dead(fiber)) {
-		rlist_add_tail_entry(&fiber->wake, fiber(), state);
-
 		do {
+			/*
+			 * In case fiber is cancelled during yield
+			 * it will be removed from wake queue by a
+			 * wakeup following the cancel, so we have
+			 * to put it back in.
+			 */
+			rlist_add_tail_entry(&fiber->wake, fiber(), state);
 			fiber_yield();
 		} while (! fiber_is_dead(fiber));
 	}
