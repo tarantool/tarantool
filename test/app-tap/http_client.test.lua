@@ -206,7 +206,7 @@ local function test_errors(test)
 end
 
 local function test_headers(test, url, opts)
-    test:plan(19)
+    test:plan(21)
     local http = client:new()
     local r = http:get(url .. 'headers', opts)
     test:is(type(r.headers["set-cookie"]), 'string', "set-cookie check")
@@ -231,6 +231,25 @@ local function test_headers(test, url, opts)
     local r = http:get(url .. 'headers', opts)
     test:is(r.headers["very_very_very_long_headers_name1"], "true", "truncated max_header_name_length")
     opts["max_header_name_length"] = nil
+
+    -- Send large headers.
+    local MAX_HEADER_NAME = 8192
+    local hname = 'largeheader'
+
+    -- "${hname}: ${hvalue}" is 8192 bytes length
+    local hvalue = string.rep('x', MAX_HEADER_NAME - hname:len() - 2)
+    local headers = {[hname] = hvalue}
+    local r = http:post(url, nil, merge(opts, {headers = headers}))
+    test:is(r.headers[hname], hvalue, '8192 bytes header: success')
+
+    -- "${hname}: ${hvalue}" is 8193 bytes length
+    local exp_err = 'header is too large'
+    local hvalue = string.rep('x', MAX_HEADER_NAME - hname:len() - 1)
+    local headers = {[hname] = hvalue}
+    local ok, err = pcall(http.post, http, url, nil,
+                          merge(opts, {headers = headers}))
+    test:is_deeply({ok, tostring(err)}, {false, exp_err},
+                   '8193 KiB header: error')
 end
 
 local function test_special_methods(test, url, opts)
