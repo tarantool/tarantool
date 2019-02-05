@@ -514,24 +514,6 @@ tuple_field(const struct tuple *tuple, uint32_t fieldno)
 }
 
 /**
- * Get tuple field by its root field index and relative
- * JSON path.
- * @param tuple Tuple to get the field from.
- * @param fieldno The index of root field.
- * @param path Relative JSON path to field data.
- * @param path_len The length of the @path.
- * @retval Field data if the field exists or NULL.
- */
-static inline const char *
-tuple_field_by_path(const struct tuple *tuple, uint32_t fieldno,
-		    const char *path, uint32_t path_len)
-{
-	return tuple_field_raw_by_path(tuple_format(tuple), tuple_data(tuple),
-				       tuple_field_map(tuple), fieldno,
-				       path, path_len, NULL);
-}
-
-/**
  * Get a field refereed by index @part in tuple.
  * @param tuple Tuple to get the field from.
  * @param part Index part to use.
