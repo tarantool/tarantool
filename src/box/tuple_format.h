@@ -418,7 +418,7 @@ tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
  * @retval -1 In case of error in JSON path.
  */
 int
-tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len);
+tuple_go_to_path(const char **data, const char *path, uint32_t path_len);
 
 /**
  * Get tuple field by field index and relative JSON path.
@@ -478,7 +478,7 @@ parse:
 		for (uint32_t k = 0; k < fieldno; k++)
 			mp_next(&tuple);
 		if (path != NULL &&
-		    unlikely(tuple_field_go_to_path(&tuple, path,
+		    unlikely(tuple_go_to_path(&tuple, path,
 						    path_len) != 0))
 			return NULL;
 	}
@@ -539,6 +539,10 @@ tuple_field_by_part_raw(struct tuple_format *format, const char *data,
 	if (unlikely(part->format_epoch != format->epoch)) {
 		assert(format->epoch != 0);
 		part->format_epoch = format->epoch;
+		/*
+		 * Clear the offset slot cache, since it's stale.
+		 * The cache will be reset by the lookup.
+		 */
 		part->offset_slot_cache = TUPLE_OFFSET_SLOT_NIL;
 	}
 	return tuple_field_raw_by_path(format, data, field_map, part->fieldno,

@@ -1131,7 +1131,7 @@ tuple_field_go_to_key(const char **field, const char *key, int len)
 }
 
 int
-tuple_field_go_to_path(const char **data, const char *path, uint32_t path_len)
+tuple_go_to_path(const char **data, const char *path, uint32_t path_len)
 {
 	int rc;
 	struct json_lexer lexer;
