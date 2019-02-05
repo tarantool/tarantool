@@ -646,10 +646,10 @@ int tarantoolSqlite3RenameTrigger(const char *trig_name,
 		return SQL_TARANTOOL_ERROR;
 	assert(tuple != NULL);
 	assert(tuple_field_count(tuple) == 3);
-	const char *field = box_tuple_field(tuple, BOX_TRIGGER_FIELD_SPACE_ID);
+	const char *field = tuple_field(tuple, BOX_TRIGGER_FIELD_SPACE_ID);
 	assert(mp_typeof(*field) == MP_UINT);
 	uint32_t space_id = mp_decode_uint(&field);
-	field = box_tuple_field(tuple, BOX_TRIGGER_FIELD_OPTS);
+	field = tuple_field(tuple, BOX_TRIGGER_FIELD_OPTS);
 	assert(mp_typeof(*field) == MP_MAP);
 	mp_decode_map(&field);
 	const char *sql_str = mp_decode_str(&field, &key_len);
