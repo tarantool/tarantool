@@ -2070,6 +2070,9 @@ box_init(void)
 	 */
 	session_init();
 
+	if (module_init() != 0)
+		diag_raise();
+
 	if (tuple_init(lua_hash) != 0)
 		diag_raise();
 
@@ -2097,8 +2100,6 @@ box_cfg_xc(void)
 
 	gc_init();
 	engine_init();
-	if (module_init() != 0)
-		diag_raise();
 	schema_init();
 	replication_init();
 	port_init();
