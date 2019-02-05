@@ -533,7 +533,7 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
  * @retval Field data if the field exists or NULL.
  */
 static inline const char *
-tuple_field_by_part_raw(struct tuple_format *format, const char *data,
+tuple_field_raw_by_part(struct tuple_format *format, const char *data,
 			const uint32_t *field_map, struct key_part *part)
 {
 	if (unlikely(part->format_epoch != format->epoch)) {

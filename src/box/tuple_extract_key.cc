@@ -130,7 +130,7 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 			field = tuple_field_raw(format, data, field_map,
 						key_def->parts[i].fieldno);
 		} else {
-			field = tuple_field_by_part_raw(format, data, field_map,
+			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i]);
 		}
 		if (has_optional_parts && field == NULL) {
@@ -177,7 +177,7 @@ tuple_extract_key_slowpath(const struct tuple *tuple,
 			field = tuple_field_raw(format, data, field_map,
 						key_def->parts[i].fieldno);
 		} else {
-			field = tuple_field_by_part_raw(format, data, field_map,
+			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i]);
 		}
 		if (has_optional_parts && field == NULL) {

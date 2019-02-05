@@ -540,7 +540,7 @@ tuple_field_by_path(const struct tuple *tuple, uint32_t fieldno,
 static inline const char *
 tuple_field_by_part(const struct tuple *tuple, struct key_part *part)
 {
-	return tuple_field_by_part_raw(tuple_format(tuple), tuple_data(tuple),
+	return tuple_field_raw_by_part(tuple_format(tuple), tuple_data(tuple),
 				       tuple_field_map(tuple), part);
 }
 

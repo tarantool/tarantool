@@ -107,7 +107,7 @@ struct key_part {
 	 * the indexed field (tuple_field::offset_slot).
 	 * Valid only if key_part::format_epoch equals the epoch
 	 * of the tuple format. This value is updated in
-	 * tuple_field_by_part_raw to always store the
+	 * tuple_field_raw_by_part to always store the
 	 * offset corresponding to the last used tuple format.
 	 */
 	int32_t offset_slot_cache;
