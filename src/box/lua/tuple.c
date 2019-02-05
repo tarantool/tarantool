@@ -463,8 +463,11 @@ lbox_tuple_field_by_path(struct lua_State *L)
 	const char *field = NULL, *path = lua_tolstring(L, 2, &len);
 	if (len == 0)
 		return 0;
-	field = tuple_field_by_full_path(tuple, path, (uint32_t)len,
-					 lua_hashstring(L, 2));
+	field = tuple_field_raw_by_full_path(tuple_format(tuple),
+					     tuple_data(tuple),
+					     tuple_field_map(tuple),
+					     path, (uint32_t)len,
+					     lua_hashstring(L, 2));
 	if (field == NULL)
 		return 0;
 	luamp_decode(L, luaL_msgpack_default, &field);

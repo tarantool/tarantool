@@ -545,28 +545,6 @@ tuple_field_by_part(const struct tuple *tuple, struct key_part *part)
 }
 
 /**
- * Get tuple field by full JSON path.
- * Unlike tuple_field_by_path this function works with full JSON
- * paths, performing root field index resolve on its own.
- * When the first JSON path token has JSON_TOKEN_STR type, routine
- * uses tuple format dictionary to get field index by field name.
- * @param tuple Tuple to get field from.
- * @param path Full JSON path to field.
- * @param path_len Length of @a path.
- * @param path_hash Hash of @a path.
- *
- * @retval field data if field exists or NULL.
- */
-static inline const char *
-tuple_field_by_full_path(const struct tuple *tuple, const char *path,
-			 uint32_t path_len, uint32_t path_hash)
-{
-	return tuple_field_raw_by_full_path(tuple_format(tuple), tuple_data(tuple),
-					    tuple_field_map(tuple),
-					    path, path_len, path_hash);
-}
-
-/**
  * @brief Tuple Interator
  */
 struct tuple_iterator {
