@@ -499,6 +499,104 @@ tuple_field_count(const struct tuple *tuple)
 }
 
 /**
+ * Retrieve msgpack data by JSON path.
+ * @param data[in, out] Pointer to msgpack with data.
+ *                      If the field cannot be retrieved be the
+ *                      specified path @path, it is overwritten
+ *                      with NULL.
+ * @param path The path to process.
+ * @param path_len The length of the @path.
+ * @retval 0 On success.
+ * @retval -1 In case of error in JSON path.
+ */
+int
+tuple_go_to_path(const char **data, const char *path, uint32_t path_len);
+
+/**
+ * Get tuple field by field index and relative JSON path.
+ * @param format Tuple format.
+ * @param tuple MessagePack tuple's body.
+ * @param field_map Tuple field map.
+ * @param path Relative JSON path to field.
+ * @param path_len Length of @a path.
+ * @param offset_slot_hint The pointer to a variable that contains
+ *                         an offset slot. May be NULL.
+ *                         If specified AND value by pointer is
+ *                         not TUPLE_OFFSET_SLOT_NIL is used to
+ *                         access data in a single operation.
+ *                         Else it is initialized with offset_slot
+ *                         of format field by path.
+ */
+static inline const char *
+tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
+			const uint32_t *field_map, uint32_t fieldno,
+			const char *path, uint32_t path_len,
+			int32_t *offset_slot_hint)
+{
+	int32_t offset_slot;
+	if (offset_slot_hint != NULL &&
+	    *offset_slot_hint != TUPLE_OFFSET_SLOT_NIL) {
+		offset_slot = *offset_slot_hint;
+		goto offset_slot_access;
+	}
+	if (likely(fieldno < format->index_field_count)) {
+		struct tuple_field *field;
+		if (path == NULL && fieldno == 0) {
+			mp_decode_array(&tuple);
+			return tuple;
+		}
+		field = tuple_format_field_by_path(format, fieldno, path,
+						   path_len);
+		assert(field != NULL || path != NULL);
+		if (path != NULL && field == NULL)
+			goto parse;
+		offset_slot = field->offset_slot;
+		if (offset_slot == TUPLE_OFFSET_SLOT_NIL)
+			goto parse;
+		if (offset_slot_hint != NULL)
+			*offset_slot_hint = offset_slot;
+offset_slot_access:
+		/* Indexed field */
+		if (field_map[offset_slot] == 0)
+			return NULL;
+		tuple += field_map[offset_slot];
+	} else {
+		uint32_t field_count;
+parse:
+		ERROR_INJECT(ERRINJ_TUPLE_FIELD, return NULL);
+		field_count = mp_decode_array(&tuple);
+		if (unlikely(fieldno >= field_count))
+			return NULL;
+		for (uint32_t k = 0; k < fieldno; k++)
+			mp_next(&tuple);
+		if (path != NULL &&
+		    unlikely(tuple_go_to_path(&tuple, path,
+						    path_len) != 0))
+			return NULL;
+	}
+	return tuple;
+}
+
+/**
+ * Get a field at the specific position in this MessagePack array.
+ * Returns a pointer to MessagePack data.
+ * @param format tuple format
+ * @param tuple a pointer to MessagePack array
+ * @param field_map a pointer to the LAST element of field map
+ * @param field_no the index of field to return
+ *
+ * @returns field data if field exists or NULL
+ * @sa tuple_init_field_map()
+ */
+static inline const char *
+tuple_field_raw(struct tuple_format *format, const char *tuple,
+		const uint32_t *field_map, uint32_t field_no)
+{
+	return tuple_field_raw_by_path(format, tuple, field_map, field_no,
+				       NULL, 0, NULL);
+}
+
+/**
  * Get a field at the specific index in this tuple.
  * @param tuple tuple
  * @param fieldno the index of field to return
@@ -511,6 +609,52 @@ tuple_field(const struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
 			       tuple_field_map(tuple), fieldno);
+}
+
+/**
+ * Get tuple field by full JSON path.
+ * Unlike tuple_field_raw_by_path this function works with full
+ * JSON paths, performing root field index resolve on its own.
+ * When the first JSON path token has JSON_TOKEN_STR type, routine
+ * uses tuple format dictionary to get field index by field name.
+ * @param format Tuple format.
+ * @param tuple MessagePack tuple's body.
+ * @param field_map Tuple field map.
+ * @param path Full JSON path to field.
+ * @param path_len Length of @a path.
+ * @param path_hash Hash of @a path.
+ *
+ * @retval field data if field exists or NULL
+ */
+const char *
+tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
+			     const uint32_t *field_map, const char *path,
+			     uint32_t path_len, uint32_t path_hash);
+
+/**
+ * Get a tuple field pointed to by an index part.
+ * @param format Tuple format.
+ * @param tuple A pointer to MessagePack array.
+ * @param field_map A pointer to the LAST element of field map.
+ * @param part Index part to use.
+ * @retval Field data if the field exists or NULL.
+ */
+static inline const char *
+tuple_field_raw_by_part(struct tuple_format *format, const char *data,
+			const uint32_t *field_map, struct key_part *part)
+{
+	if (unlikely(part->format_epoch != format->epoch)) {
+		assert(format->epoch != 0);
+		part->format_epoch = format->epoch;
+		/*
+		 * Clear the offset slot cache, since it's stale.
+		 * The cache will be reset by the lookup.
+		 */
+		part->offset_slot_cache = TUPLE_OFFSET_SLOT_NIL;
+	}
+	return tuple_field_raw_by_path(format, data, field_map, part->fieldno,
+				       part->path, part->path_len,
+				       &part->offset_slot_cache);
 }
 
 /**

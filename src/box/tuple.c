@@ -48,26 +48,6 @@ enum {
 	OBJSIZE_MIN = 16,
 };
 
-/**
- * Container for big reference counters. Contains array of big
- * reference counters, size of this array and number of non-zero
- * big reference counters. When reference counter of tuple becomes
- * more than 32767, field refs of this tuple becomes index of big
- * reference counter in big reference counter array and field
- * is_bigref is set true. The moment big reference becomes equal
- * 32767 it is set to 0, refs of the tuple becomes 32767 and
- * is_bigref becomes false. Big reference counter can be equal to
- * 0 or be more than 32767.
- */
-static struct bigref_list {
-	/** Free-list of big reference counters. */
-	uint32_t *refs;
-	/** Capacity of the array. */
-	uint16_t capacity;
-	/** Index of first free element. */
-	uint16_t vacant_index;
-} bigref_list;
-
 static const double ALLOC_FACTOR = 1.05;
 
 /**
@@ -156,13 +136,6 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 	return 0;
 }
 
-/** Initialize big references container. */
-static inline void
-bigref_list_create(void)
-{
-	memset(&bigref_list, 0, sizeof(bigref_list));
-}
-
 /**
  * Incremented on every snapshot and is used to distinguish tuples
  * which were created after start of a snapshot (these tuples can
@@ -200,67 +173,7 @@ tuple_next(struct tuple_iterator *it)
 	return NULL;
 }
 
-int
-tuple_init(field_name_hash_f hash)
-{
-	if (tuple_format_init() != 0)
-		return -1;
-
-	field_name_hash = hash;
-	/*
-	 * Create a format for runtime tuples
-	 */
-	tuple_format_runtime = tuple_format_new(&tuple_format_runtime_vtab, NULL,
-						NULL, 0, NULL, 0, 0, NULL, false,
-						false);
-	if (tuple_format_runtime == NULL)
-		return -1;
-
-	/* Make sure this one stays around. */
-	tuple_format_ref(tuple_format_runtime);
-
-	small_alloc_create(&runtime_alloc, &cord()->slabc, OBJSIZE_MIN,
-			   ALLOC_FACTOR);
-
-	mempool_create(&tuple_iterator_pool, &cord()->slabc,
-		       sizeof(struct tuple_iterator));
-
-	box_tuple_last = NULL;
-
-	bigref_list_create();
-
-	if (coll_id_cache_init() != 0)
-		return -1;
-
-	return 0;
-}
-
-void
-tuple_arena_create(struct slab_arena *arena, struct quota *quota,
-		   uint64_t arena_max_size, uint32_t slab_size,
-		   const char *arena_name)
-{
-	/*
-	 * Ensure that quota is a multiple of slab_size, to
-	 * have accurate value of quota_used_ratio.
-	 */
-	size_t prealloc = small_align(arena_max_size, slab_size);
-
-	say_info("mapping %zu bytes for %s tuple arena...", prealloc,
-		 arena_name);
-
-	if (slab_arena_create(arena, quota, prealloc, slab_size,
-			      MAP_PRIVATE) != 0) {
-		if (errno == ENOMEM) {
-			panic("failed to preallocate %zu bytes: Cannot "\
-			      "allocate memory, check option '%s_memory' in box.cfg(..)", prealloc,
-			      arena_name);
-		} else {
-			panic_syserror("failed to preallocate %zu bytes for %s"\
-				       " tuple arena", prealloc, arena_name);
-		}
-	}
-}
+/** {{{ Bigref - allow tuple reference counter to be > 2^16 */
 
 enum {
 	BIGREF_FACTOR = 2,
@@ -272,6 +185,33 @@ enum {
 	 */
 	BIGREF_MAX_CAPACITY = UINT16_MAX >> 1
 };
+
+/**
+ * Container for big reference counters. Contains array of big
+ * reference counters, size of this array and number of non-zero
+ * big reference counters. When reference counter of tuple becomes
+ * more than 32767, field refs of this tuple becomes index of big
+ * reference counter in big reference counter array and field
+ * is_bigref is set true. The moment big reference becomes equal
+ * 32767 it is set to 0, refs of the tuple becomes 32767 and
+ * is_bigref becomes false. Big reference counter can be equal to
+ * 0 or be more than 32767.
+ */
+static struct bigref_list {
+	/** Free-list of big reference counters. */
+	uint32_t *refs;
+	/** Capacity of the array. */
+	uint16_t capacity;
+	/** Index of first free element. */
+	uint16_t vacant_index;
+} bigref_list;
+
+/** Initialize big references container. */
+static inline void
+bigref_list_create(void)
+{
+	memset(&bigref_list, 0, sizeof(bigref_list));
+}
 
 /** Destroy big references and free memory that was allocated. */
 static inline void
@@ -348,6 +288,70 @@ tuple_unref_slow(struct tuple *tuple)
 	}
 }
 
+/* }}} Bigref */
+
+int
+tuple_init(field_name_hash_f hash)
+{
+	if (tuple_format_init() != 0)
+		return -1;
+
+	field_name_hash = hash;
+	/*
+	 * Create a format for runtime tuples
+	 */
+	tuple_format_runtime = tuple_format_new(&tuple_format_runtime_vtab, NULL,
+						NULL, 0, NULL, 0, 0, NULL, false,
+						false);
+	if (tuple_format_runtime == NULL)
+		return -1;
+
+	/* Make sure this one stays around. */
+	tuple_format_ref(tuple_format_runtime);
+
+	small_alloc_create(&runtime_alloc, &cord()->slabc, OBJSIZE_MIN,
+			   ALLOC_FACTOR);
+
+	mempool_create(&tuple_iterator_pool, &cord()->slabc,
+		       sizeof(struct tuple_iterator));
+
+	box_tuple_last = NULL;
+
+	bigref_list_create();
+
+	if (coll_id_cache_init() != 0)
+		return -1;
+
+	return 0;
+}
+
+void
+tuple_arena_create(struct slab_arena *arena, struct quota *quota,
+		   uint64_t arena_max_size, uint32_t slab_size,
+		   const char *arena_name)
+{
+	/*
+	 * Ensure that quota is a multiple of slab_size, to
+	 * have accurate value of quota_used_ratio.
+	 */
+	size_t prealloc = small_align(arena_max_size, slab_size);
+
+	say_info("mapping %zu bytes for %s tuple arena...", prealloc,
+		 arena_name);
+
+	if (slab_arena_create(arena, quota, prealloc, slab_size,
+			      MAP_PRIVATE) != 0) {
+		if (errno == ENOMEM) {
+			panic("failed to preallocate %zu bytes: Cannot "\
+			      "allocate memory, check option '%s_memory' in box.cfg(..)", prealloc,
+			      arena_name);
+		} else {
+			panic_syserror("failed to preallocate %zu bytes for %s"\
+				       " tuple arena", prealloc, arena_name);
+		}
+	}
+}
+
 void
 tuple_arena_destroy(struct slab_arena *arena)
 {
@@ -372,6 +376,170 @@ tuple_free(void)
 
 	bigref_list_destroy();
 }
+
+/* {{{ tuple_field_* getters */
+
+/**
+ * Propagate @a field to MessagePack(field)[index].
+ * @param[in][out] field Field to propagate.
+ * @param index 0-based index to propagate to.
+ *
+ * @retval  0 Success, the index was found.
+ * @retval -1 Not found.
+ */
+static inline int
+tuple_field_go_to_index(const char **field, uint64_t index)
+{
+	enum mp_type type = mp_typeof(**field);
+	if (type == MP_ARRAY) {
+		uint32_t count = mp_decode_array(field);
+		if (index >= count)
+			return -1;
+		for (; index > 0; --index)
+			mp_next(field);
+		return 0;
+	} else if (type == MP_MAP) {
+		index += TUPLE_INDEX_BASE;
+		uint64_t count = mp_decode_map(field);
+		for (; count > 0; --count) {
+			type = mp_typeof(**field);
+			if (type == MP_UINT) {
+				uint64_t value = mp_decode_uint(field);
+				if (value == index)
+					return 0;
+			} else if (type == MP_INT) {
+				int64_t value = mp_decode_int(field);
+				if (value >= 0 && (uint64_t)value == index)
+					return 0;
+			} else {
+				/* Skip key. */
+				mp_next(field);
+			}
+			/* Skip value. */
+			mp_next(field);
+		}
+	}
+	return -1;
+}
+
+/**
+ * Propagate @a field to MessagePack(field)[key].
+ * @param[in][out] field Field to propagate.
+ * @param key Key to propagate to.
+ * @param len Length of @a key.
+ *
+ * @retval  0 Success, the index was found.
+ * @retval -1 Not found.
+ */
+static inline int
+tuple_field_go_to_key(const char **field, const char *key, int len)
+{
+	enum mp_type type = mp_typeof(**field);
+	if (type != MP_MAP)
+		return -1;
+	uint64_t count = mp_decode_map(field);
+	for (; count > 0; --count) {
+		type = mp_typeof(**field);
+		if (type == MP_STR) {
+			uint32_t value_len;
+			const char *value = mp_decode_str(field, &value_len);
+			if (value_len == (uint)len &&
+			    memcmp(value, key, len) == 0)
+				return 0;
+		} else {
+			/* Skip key. */
+			mp_next(field);
+		}
+		/* Skip value. */
+		mp_next(field);
+	}
+	return -1;
+}
+
+int
+tuple_go_to_path(const char **data, const char *path, uint32_t path_len)
+{
+	int rc;
+	struct json_lexer lexer;
+	struct json_token token;
+	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
+	while ((rc = json_lexer_next_token(&lexer, &token)) == 0) {
+		switch (token.type) {
+		case JSON_TOKEN_NUM:
+			rc = tuple_field_go_to_index(data, token.num);
+			break;
+		case JSON_TOKEN_STR:
+			rc = tuple_field_go_to_key(data, token.str, token.len);
+			break;
+		default:
+			assert(token.type == JSON_TOKEN_END);
+			return 0;
+		}
+		if (rc != 0) {
+			*data = NULL;
+			return 0;
+		}
+	}
+	return rc != 0 ? -1 : 0;
+}
+
+const char *
+tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
+			     const uint32_t *field_map, const char *path,
+			     uint32_t path_len, uint32_t path_hash)
+{
+	assert(path_len > 0);
+	uint32_t fieldno;
+	/*
+	 * It is possible, that a field has a name as
+	 * well-formatted JSON. For example 'a.b.c.d' or '[1]' can
+	 * be field name. To save compatibility at first try to
+	 * use the path as a field name.
+	 */
+	if (tuple_fieldno_by_name(format->dict, path, path_len, path_hash,
+				  &fieldno) == 0)
+		return tuple_field_raw(format, tuple, field_map, fieldno);
+	struct json_lexer lexer;
+	struct json_token token;
+	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
+	if (json_lexer_next_token(&lexer, &token) != 0)
+		return NULL;
+	switch(token.type) {
+	case JSON_TOKEN_NUM: {
+		fieldno = token.num;
+		break;
+	}
+	case JSON_TOKEN_STR: {
+		/* First part of a path is a field name. */
+		uint32_t name_hash;
+		if (path_len == (uint32_t) token.len) {
+			name_hash = path_hash;
+		} else {
+			/*
+			 * If a string is "field....", then its
+			 * precalculated juajit hash can not be
+			 * used. A tuple dictionary hashes only
+			 * name, not path.
+			 */
+			name_hash = field_name_hash(token.str, token.len);
+		}
+		if (tuple_fieldno_by_name(format->dict, token.str, token.len,
+					  name_hash, &fieldno) != 0)
+			return NULL;
+		break;
+	}
+	default:
+		assert(token.type == JSON_TOKEN_END);
+		return NULL;
+	}
+	return tuple_field_raw_by_path(format, tuple, field_map, fieldno,
+				       path + lexer.offset,
+				       path_len - lexer.offset, NULL);
+}
+
+/* }}} tuple_field_* getters */
+
+/* {{{ box_tuple_* */
 
 box_tuple_format_t *
 box_tuple_format_default(void)
@@ -558,6 +726,8 @@ box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 		return NULL;
 	return tuple_bless(ret);
 }
+
+/* }}} box_tuple_* */
 
 int
 tuple_snprint(char *buf, int size, const struct tuple *tuple)
