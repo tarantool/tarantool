@@ -565,6 +565,17 @@ json_tree_lookup_path(struct json_tree *tree, struct json_token *root,
 	json_lexer_create(&lexer, path, path_len, index_base);
 	while ((rc = json_lexer_next_token(&lexer, &token)) == 0 &&
 	       token.type != JSON_TOKEN_END && ret != NULL) {
+		/*
+		 * We could skip intermediate lookups by computing
+		 * a rolling hash of all tokens produced by the
+		 * lexer. But then we would still have to traverse
+		 * the path back to ensure it is equal to the
+		 * found to the found one. For that we would have
+		 * to keep the stack of lexer tokens somewhere.
+		 * Given the complications of the alternative,
+		 * intermediate lookups don't seem to be so big of
+		 * a problem.
+		 */
 		ret = json_tree_lookup(tree, ret, &token);
 	}
 	if (rc != 0 || token.type != JSON_TOKEN_END)
