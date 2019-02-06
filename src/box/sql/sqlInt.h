@@ -329,7 +329,6 @@ struct sql_vfs {
 		      int flags, int *pOutFlags);
 	int (*xDelete) (sql_vfs *, const char *zName, int syncDir);
 	int (*xRandomness) (sql_vfs *, int nByte, char *zOut);
-	int (*xSleep) (sql_vfs *, int microseconds);
 	int (*xCurrentTime) (sql_vfs *, double *);
 	int (*xGetLastError) (sql_vfs *, int, char *);
 	/*
@@ -825,7 +824,6 @@ struct sql_io_methods {
 #define SQL_FCNTL_VFSNAME                11
 #define SQL_FCNTL_POWERSAFE_OVERWRITE    12
 #define SQL_FCNTL_PRAGMA                 13
-#define SQL_FCNTL_BUSYHANDLER            14
 #define SQL_FCNTL_TEMPFILENAME           15
 #define SQL_FCNTL_MMAP_SIZE              16
 #define SQL_FCNTL_TRACE                  17
@@ -834,9 +832,6 @@ struct sql_io_methods {
 
 int
 sql_os_init(void);
-
-int
-sql_busy_timeout(sql *, int ms);
 
 sql_int64
 sql_soft_heap_limit64(sql_int64 N);
@@ -1311,22 +1306,6 @@ extern const int sqlone;
 #endif
 
 /*
- * An instance of the following structure is used to store the busy-handler
- * callback for a given sql handle.
- *
- * The sql.busyHandler member of the sql struct contains the busy
- * callback for the database handle. Each pager opened via the sql
- * handle is passed a pointer to sql.busyHandler. The busy-handler
- * callback is currently invoked only from within pager.c.
- */
-typedef struct BusyHandler BusyHandler;
-struct BusyHandler {
-	int (*xFunc) (void *, int);	/* The busy callback */
-	void *pArg;		/* First arg to busy callback */
-	int nBusy;		/* Incremented with each busy call */
-};
-
-/*
  * A convenience macro that returns the number of elements in
  * an array.
  */
@@ -1553,8 +1532,6 @@ struct sql {
 	unsigned nProgressOps;	/* Number of opcodes for progress callback */
 #endif
 	Hash aFunc;		/* Hash table of connection functions */
-	BusyHandler busyHandler;	/* Busy callback */
-	int busyTimeout;	/* Busy handler timeout, in msec */
 	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */
 };
 
@@ -1574,16 +1551,13 @@ struct sql {
 #define SQL_WhereTrace     0x00008000       /* Debug info about optimizer's work */
 #define SQL_VdbeListing    0x00000400	/* Debug listings of VDBE programs */
 #define SQL_VdbeAddopTrace 0x00001000	/* Trace sqlVdbeAddOp() calls */
-#define SQL_ReadUncommitted 0x0004000	/* For shared-cache mode */
 #define SQL_ReverseOrder   0x00020000	/* Reverse unordered SELECTs */
 #define SQL_RecTriggers    0x00040000	/* Enable recursive triggers */
 #define SQL_AutoIndex      0x00100000	/* Enable automatic indexes */
 #define SQL_PreferBuiltin  0x00200000	/* Preference to built-in funcs */
 #define SQL_EnableTrigger  0x01000000	/* True to enable triggers */
 #define SQL_DeferFKs       0x02000000	/* Defer all FK constraints */
-#define SQL_QueryOnly      0x04000000	/* Disable database changes */
 #define SQL_VdbeEQP        0x08000000	/* Debug EXPLAIN QUERY PLAN */
-#define SQL_NoCkptOnClose  0x80000000	/* No checkpoint on close()/DETACH */
 
 /*
  * Bits of the sql.dbOptFlags field that are used by the

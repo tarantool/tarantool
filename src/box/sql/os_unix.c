@@ -1988,23 +1988,6 @@ unixRandomness(sql_vfs * NotUsed, int nBuf, char *zBuf)
 	return nBuf;
 }
 
-/*
- * Sleep for a little while.  Return the amount of time slept.
- * The argument is the number of microseconds we want to sleep.
- * The return value is the number of microseconds of sleep actually
- * requested from the underlying operating system, a number which
- * might be greater than or equal to the argument, but not less
- * than the argument.
- */
-static int
-unixSleep(sql_vfs * NotUsed, int microseconds)
-{
-	int seconds = (microseconds + 999999) / 1000000;
-	sleep(seconds);
-	UNUSED_PARAMETER(NotUsed);
-	return seconds * 1000000;
-}
-
 /* Fake system time in seconds since 1970. */
 int sql_current_time = 0;
 
@@ -2078,7 +2061,6 @@ unixGetLastError(sql_vfs * NotUsed, int NotUsed2, char *NotUsed3)
     unixOpen,             /* xOpen */                       \
     unixDelete,           /* xDelete */                     \
     unixRandomness,       /* xRandomness */                 \
-    unixSleep,            /* xSleep */                      \
     NULL,                 /* xCurrentTime */                \
     unixGetLastError,     /* xGetLastError */               \
     unixCurrentTimeInt64, /* xCurrentTimeInt64 */           \

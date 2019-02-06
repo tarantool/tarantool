@@ -664,7 +664,6 @@ int sqlVdbeExec(Vdbe *p)
 	p->iCurrentTime = 0;
 	assert(p->explain==0);
 	p->pResultSet = 0;
-	db->busyHandler.nBusy = 0;
 	if (db->u1.isInterrupted) goto abort_due_to_interrupt;
 	sqlVdbeIOTraceSql(p);
 #ifndef SQL_OMIT_PROGRESS_CALLBACK

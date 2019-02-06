@@ -146,7 +146,6 @@ int sqlOsUnfetch(sql_file *, i64, void *);
  */
 int sqlOsOpen(sql_vfs *, const char *, sql_file *, int, int *);
 int sqlOsRandomness(sql_vfs *, int, char *);
-int sqlOsSleep(sql_vfs *, int);
 int sqlOsGetLastError(sql_vfs *);
 int sqlOsCurrentTimeInt64(sql_vfs *, sql_int64 *);
 

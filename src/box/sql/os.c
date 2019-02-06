@@ -129,12 +129,6 @@ sqlOsRandomness(sql_vfs * pVfs, int nByte, char *zBufOut)
 }
 
 int
-sqlOsSleep(sql_vfs * pVfs, int nMicro)
-{
-	return pVfs->xSleep(pVfs, nMicro);
-}
-
-int
 sqlOsGetLastError(sql_vfs * pVfs)
 {
 	return pVfs->xGetLastError ? pVfs->xGetLastError(pVfs, 0, 0) : 0;

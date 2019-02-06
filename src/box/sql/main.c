@@ -640,43 +640,6 @@ sqlErrStr(int rc)
 	return zErr;
 }
 
-/*
- * This routine implements a busy callback that sleeps and tries
- * again until a timeout value is reached.  The timeout value is
- * an integer number of milliseconds passed in as the first
- * argument.
- */
-static int
-sqlDefaultBusyCallback(void *ptr,	/* Database connection */
-			  int count)	/* Number of times table has been busy */
-{
-	sql *db = (sql *) ptr;
-	int timeout = ((sql *) ptr)->busyTimeout;
-	if ((count + 1) * 1000 > timeout) {
-		return 0;
-	}
-	sqlOsSleep(db->pVfs, 1000000);
-	return 1;
-}
-
-/*
- * This routine sets the busy callback for an Sqlite database to the
- * given callback function with the given argument.
- */
-int
-sql_busy_handler(sql * db, int (*xBusy) (void *, int), void *pArg)
-{
-#ifdef SQL_ENABLE_API_ARMOR
-	if (!sqlSafetyCheckOk(db))
-		return SQL_MISUSE_BKPT;
-#endif
-	db->busyHandler.xFunc = xBusy;
-	db->busyHandler.pArg = pArg;
-	db->busyHandler.nBusy = 0;
-	db->busyTimeout = 0;
-	return SQL_OK;
-}
-
 #ifndef SQL_OMIT_PROGRESS_CALLBACK
 /*
  * This routine sets the progress callback for an Sqlite database to the
@@ -704,26 +667,6 @@ sql_progress_handler(sql * db,
 	}
 }
 #endif
-
-/*
- * This routine installs a default busy handler that waits for the
- * specified number of milliseconds before returning 0.
- */
-int
-sql_busy_timeout(sql * db, int ms)
-{
-#ifdef SQL_ENABLE_API_ARMOR
-	if (!sqlSafetyCheckOk(db))
-		return SQL_MISUSE_BKPT;
-#endif
-	if (ms > 0) {
-		sql_busy_handler(db, sqlDefaultBusyCallback, (void *)db);
-		db->busyTimeout = ms;
-	} else {
-		sql_busy_handler(db, 0, 0);
-	}
-	return SQL_OK;
-}
 
 /*
  * Cause any pending operation to stop at its earliest opportunity.
@@ -1675,25 +1618,6 @@ sqlIoerrnomemError(int lineno)
 	return reportError(SQL_IOERR_NOMEM, lineno, "I/O OOM error");
 }
 #endif
-
-/*
- * Sleep for a little while.  Return the amount of time slept.
- */
-int
-sql_sleep(int ms)
-{
-	sql_vfs *pVfs;
-	int rc;
-	pVfs = sql_vfs_find(0);
-	if (pVfs == 0)
-		return 0;
-
-	/* This function works in milliseconds, but the underlying OsSleep()
-	 * API uses microseconds. Hence the 1000's.
-	 */
-	rc = (sqlOsSleep(pVfs, 1000 * ms) / 1000);
-	return rc;
-}
 
 /*
  * Enable or disable the extended result codes.

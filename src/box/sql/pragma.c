@@ -391,14 +391,30 @@ sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
 	struct space *space = space_by_name(tbl_name);
 	if (space == NULL)
 		return;
-	parse->nMem = 5;
+	parse->nMem = 3;
 	struct Vdbe *v = sqlGetVdbe(parse);
 	for (uint32_t i = 0; i < space->index_count; ++i) {
 		struct index *idx = space->index[i];
-		sqlVdbeMultiLoad(v, 1, "isisi", i, idx->def->name,
+		sqlVdbeMultiLoad(v, 1, "isi", i, idx->def->name,
 				     idx->def->opts.is_unique);
-		sqlVdbeAddOp2(v, OP_ResultRow, 1, 5);
+		sqlVdbeAddOp2(v, OP_ResultRow, 1, 3);
 	}
+}
+
+/*
+ * @brief Check whether the specified token is a string or ID.
+ * @param token - token to be examined
+ * @return true - if the token value is enclosed into quotes (')
+ * @return false in other cases
+ * The empty value is considered to be a string.
+ */
+static bool
+token_is_string(const struct Token* token)
+{
+	if (!token || token->n == 0)
+		return true;
+	return token->n >= 2 && token->z[0] == '\'' &&
+	       token->z[token->n - 1] == '\'';
 }
 
 /*
@@ -448,7 +464,6 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		zRight = sqlNameFromToken(db, pValue);
 	}
 	zTable = sqlNameFromToken(db, pValue2);
-	db->busyHandler.nBusy = 0;
 
 	/* Locate the pragma in the lookup table */
 	pPragma = pragmaLocate(zLeft);
@@ -601,6 +616,13 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		}
 
 	case PragTyp_DEFAULT_ENGINE: {
+		if (!token_is_string(pValue)) {
+			diag_set(ClientError, ER_ILLEGAL_PARAMS,
+				 "string value is expected");
+			pParse->rc = SQL_TARANTOOL_ERROR;
+			pParse->nErr++;
+			goto pragma_out;
+		}
 		if (sql_default_engine_set(zRight) != 0) {
 			pParse->rc = SQL_TARANTOOL_ERROR;
 			pParse->nErr++;
@@ -621,23 +643,8 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		break;
 	}
 
-	/* *   PRAGMA busy_timeout *   PRAGMA busy_timeout = N *
-	 *
-	 * Call sql_busy_timeout(db, N).  Return the current
-	 * timeout value * if one is set.  If no busy handler
-	 * or a different busy handler is set * then 0 is
-	 * returned.  Setting the busy_timeout to 0 or negative *
-	 * disables the timeout.
-	 */
-	/* case PragTyp_BUSY_TIMEOUT */
-	default:{
-			assert(pPragma->ePragTyp == PragTyp_BUSY_TIMEOUT);
-			if (zRight) {
-				sql_busy_timeout(db, sqlAtoi(zRight));
-			}
-			returnSingleInt(v, db->busyTimeout);
-			break;
-		}
+	default:
+		unreachable();
 	}			/* End of the PRAGMA switch */
 
 	/* The following block is a no-op unless SQL_DEBUG is
