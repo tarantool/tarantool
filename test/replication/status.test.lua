@@ -64,6 +64,7 @@ replica.uuid == box.space._cluster:get(replica_id)[2]
 -- replica.lsn == box.info.vclock[replica_id]
 replica.lsn == 0
 replica.upstream == nil
+replica.downstream.status == 'follow'
 replica.downstream.vclock[master_id] == box.info.vclock[master_id]
 replica.downstream.vclock[replica_id] == box.info.vclock[replica_id]
 
