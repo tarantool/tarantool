@@ -172,6 +172,10 @@ replica.upstream == nil
 ---
 - true
 ...
+replica.downstream.status == 'follow'
+---
+- true
+...
 replica.downstream.vclock[master_id] == box.info.vclock[master_id]
 ---
 - true
