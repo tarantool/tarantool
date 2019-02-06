@@ -37,6 +37,10 @@ server.test_option(script + " 1 2 3 --help")
 server.test_option(script + " --help 1 2 3")
 server.test_option("-V " + script + " 1 2 3")
 
+# gh-3966: os.exit() hangs if called by a command from the argument list.
+server.test_option("-e \"print(1) os.exit() print(2)\"")
+server.test_option("-e \"print(1)\" -e \"os.exit()\" -e \"print(1)\" -e \"os.exit()\" -e \"print(1)\"")
+
 server.test_option("-e \"print('Hello')\" " + script + " 1 2 3")
 server.test_option("-e \"a = 10\" " + \
                    "-e print(a) " + \
@@ -50,5 +54,3 @@ server.test_option("-e \"print(rawget(_G, 'log') == nil)\" " + \
                    " 1 2 3 --help")
 
 sys.stdout.clear_all_filters()
-# Args filter cleanup
-# vim: syntax=python

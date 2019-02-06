@@ -118,6 +118,12 @@ Compiler: cc
 C_FLAGS: flags
 CXX_FLAGS: flags
 
+tarantool -e print(1) os.exit() print(2)
+1
+
+tarantool -e print(1) -e os.exit() -e print(1) -e os.exit() -e print(1)
+1
+
 tarantool -e print('Hello') ${SOURCEDIR}/test/box-py/args.lua 1 2 3
 Hello
 arg[-1] => tarantool

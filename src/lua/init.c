@@ -664,7 +664,8 @@ tarantool_lua_run_script(char *path, bool interactive,
 	 * Run an auxiliary event loop to re-schedule run_script fiber.
 	 * When this fiber finishes, it will call ev_break to stop the loop.
 	 */
-	ev_run(loop(), 0);
+	if (start_loop)
+		ev_run(loop(), 0);
 	/* The fiber running the startup script has ended. */
 	script_fiber = NULL;
 }
