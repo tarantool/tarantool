@@ -130,6 +130,21 @@ struct vy_run {
 	/** Max LSN stored on disk. */
 	int64_t dump_lsn;
 	/**
+	 * Number of dumps it took to create this run.
+	 *
+	 * If the run was produced by a memory dump, it is 1.
+	 * If the run was produced by a minor compaction, it
+	 * is is the sum of dump counts of compacted runs.
+	 * If the run was produced by a major compaction, it
+	 * is is the sum of dump counts of compacted runs
+	 * minus the dump count of the last (greatest) run.
+	 *
+	 * This way, by looking at the last level run in an LSM
+	 * tree, we can tell how many dumps it took to compact
+	 * it last time.
+	 */
+	uint32_t dump_count;
+	/**
 	 * Run reference counter, the run is deleted once it hits 0.
 	 * A new run is created with the reference counter set to 1.
 	 * A run is referenced by each slice created for it and each

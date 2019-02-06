@@ -139,7 +139,7 @@ result
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {2: 8, 9: 20}]
+          tuple: [5, {2: 8, 16: 1, 9: 20}]
       - HEADER:
           type: INSERT
         BODY:
@@ -164,7 +164,7 @@ result
       - HEADER:
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 6, 9: 20}]
+          tuple: [5, {0: 2, 2: 6, 16: 1, 9: 20}]
       - HEADER:
           type: INSERT
         BODY:
@@ -204,7 +204,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {0: 2, 2: 10, 9: 23}]
+          tuple: [5, {0: 2, 2: 10, 16: 1, 9: 23}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT
@@ -224,7 +224,7 @@ result
           timestamp: <timestamp>
           type: INSERT
         BODY:
-          tuple: [5, {2: 12, 9: 23}]
+          tuple: [5, {2: 12, 16: 1, 9: 23}]
       - HEADER:
           timestamp: <timestamp>
           type: INSERT

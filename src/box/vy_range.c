@@ -411,6 +411,18 @@ vy_range_update_compaction_priority(struct vy_range *range,
 	}
 }
 
+void
+vy_range_update_dumps_per_compaction(struct vy_range *range)
+{
+	if (!rlist_empty(&range->slices)) {
+		struct vy_slice *slice = rlist_last_entry(&range->slices,
+						struct vy_slice, in_range);
+		range->dumps_per_compaction = slice->run->dump_count;
+	} else {
+		range->dumps_per_compaction = 0;
+	}
+}
+
 /**
  * Return true and set split_key accordingly if the range needs to be
  * split in two.

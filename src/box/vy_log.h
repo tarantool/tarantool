@@ -96,7 +96,7 @@ enum vy_log_record_type {
 	VY_LOG_PREPARE_RUN		= 4,
 	/**
 	 * Commit a vinyl run file creation.
-	 * Requires vy_log_record::lsm_id, run_id, dump_lsn.
+	 * Requires vy_log_record::lsm_id, run_id, dump_lsn, dump_count.
 	 *
 	 * Written after a run file was successfully created.
 	 */
@@ -271,6 +271,8 @@ struct vy_log_record {
 	 * that uses this run.
 	 */
 	int64_t gc_lsn;
+	/** For runs: number of dumps it took to create the run. */
+	uint32_t dump_count;
 	/** Link in vy_log::tx. */
 	struct stailq_entry in_tx;
 };
@@ -389,6 +391,8 @@ struct vy_run_recovery_info {
 	 * that uses this run.
 	 */
 	int64_t gc_lsn;
+	/** Number of dumps it took to create the run. */
+	uint32_t dump_count;
 	/**
 	 * True if the run was not committed (there's
 	 * VY_LOG_PREPARE_RUN, but no VY_LOG_CREATE_RUN).
@@ -710,7 +714,8 @@ vy_log_prepare_run(int64_t lsm_id, int64_t run_id)
 
 /** Helper to log a vinyl run creation. */
 static inline void
-vy_log_create_run(int64_t lsm_id, int64_t run_id, int64_t dump_lsn)
+vy_log_create_run(int64_t lsm_id, int64_t run_id,
+		  int64_t dump_lsn, uint32_t dump_count)
 {
 	struct vy_log_record record;
 	vy_log_record_init(&record);
@@ -718,6 +723,7 @@ vy_log_create_run(int64_t lsm_id, int64_t run_id, int64_t dump_lsn)
 	record.lsm_id = lsm_id;
 	record.run_id = run_id;
 	record.dump_lsn = dump_lsn;
+	record.dump_count = dump_count;
 	vy_log_write(&record);
 }
 

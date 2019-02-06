@@ -353,6 +353,7 @@ vy_lsm_recover_run(struct vy_lsm *lsm, struct vy_run_recovery_info *run_info,
 		return NULL;
 
 	run->dump_lsn = run_info->dump_lsn;
+	run->dump_count = run_info->dump_count;
 	if (vy_run_recover(run, lsm->env->path,
 			   lsm->space_id, lsm->index_id) != 0 &&
 	    (!force_recovery ||
@@ -638,6 +639,7 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 					    (long long)range->id));
 			return -1;
 		}
+		vy_range_update_dumps_per_compaction(range);
 		vy_lsm_acct_range(lsm, range);
 	}
 	if (prev == NULL) {
@@ -753,6 +755,7 @@ void
 vy_lsm_acct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_collect(lsm->run_hist, range->slice_count);
+	lsm->sum_dumps_per_compaction += range->dumps_per_compaction;
 	vy_disk_stmt_counter_add(&lsm->stat.disk.compaction.queue,
 				 &range->compaction_queue);
 	lsm->env->compaction_queue_size += range->compaction_queue.bytes;
@@ -770,6 +773,7 @@ void
 vy_lsm_unacct_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	histogram_discard(lsm->run_hist, range->slice_count);
+	lsm->sum_dumps_per_compaction -= range->dumps_per_compaction;
 	vy_disk_stmt_counter_sub(&lsm->stat.disk.compaction.queue,
 				 &range->compaction_queue);
 	lsm->env->compaction_queue_size -= range->compaction_queue.bytes;
@@ -1078,6 +1082,7 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 		}
 		part->needs_compaction = range->needs_compaction;
 		vy_range_update_compaction_priority(part, &lsm->opts);
+		vy_range_update_dumps_per_compaction(part);
 	}
 
 	/*
@@ -1195,6 +1200,7 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 	 * as it fits the configured LSM tree shape.
 	 */
 	vy_range_update_compaction_priority(result, &lsm->opts);
+	vy_range_update_dumps_per_compaction(result);
 	vy_lsm_acct_range(lsm, result);
 	vy_lsm_add_range(lsm, result);
 	lsm->range_tree_version++;
