@@ -528,6 +528,69 @@ s:drop()
 
 box.stat.vinyl().disk.data_compacted
 
+--
+-- Number of dumps needed to trigger major compaction in
+-- an LSM tree range.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('primary', {page_size = 128, range_size = 8192, run_count_per_level = 1, run_size_ratio = 2})
+
+test_run:cmd("setopt delimiter ';'")
+function dump(a, b)
+    for i = a, b do
+        s:replace{i, digest.urandom(100)}
+    end
+    box.snapshot()
+end;
+function wait_compaction(count)
+    test_run:wait_cond(function()
+        return i:stat().disk.compaction.count == count
+    end, 10)
+end;
+test_run:cmd("setopt delimiter ''");
+
+dump(1, 100)
+i:stat().dumps_per_compaction -- 1
+
+dump(1, 100) -- compaction
+dump(1, 100) -- split + compaction
+wait_compaction(3)
+i:stat().range_count -- 2
+i:stat().dumps_per_compaction -- 1
+
+dump(1, 10)
+dump(1, 40) -- compaction in range 1
+wait_compaction(4)
+i:stat().dumps_per_compaction -- 1
+
+dump(90, 100)
+dump(60, 100) -- compaction in range 2
+wait_compaction(5)
+i:stat().dumps_per_compaction -- 2
+
+-- Forcing compaction manually doesn't affect dumps_per_compaction.
+dump(40, 60)
+i:compact()
+wait_compaction(7)
+i:stat().dumps_per_compaction -- 2
+
+test_run:cmd('restart server test')
+
+fiber = require('fiber')
+digest = require('digest')
+
+s = box.space.test
+i = s.index.primary
+
+i:stat().dumps_per_compaction -- 2
+for i = 1, 100 do s:replace{i, digest.urandom(100)} end
+box.snapshot()
+test_run:wait_cond(function() return i:stat().disk.compaction.count == 2 end, 10)
+
+i:stat().dumps_per_compaction -- 1
+
+s:drop()
+
 test_run:cmd('switch default')
 test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')

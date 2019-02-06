@@ -1192,7 +1192,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * Log change in metadata.
 	 */
 	vy_log_tx_begin();
-	vy_log_create_run(lsm->id, new_run->id, dump_lsn);
+	vy_log_create_run(lsm->id, new_run->id, dump_lsn, new_run->dump_count);
 	for (range = begin_range, i = 0; range != end_range;
 	     range = vy_range_tree_next(lsm->tree, range), i++) {
 		assert(i < lsm->range_count);
@@ -1225,6 +1225,7 @@ vy_task_dump_complete(struct vy_task *task)
 		vy_lsm_unacct_range(lsm, range);
 		vy_range_add_slice(range, slice);
 		vy_range_update_compaction_priority(range, &lsm->opts);
+		vy_range_update_dumps_per_compaction(range);
 		vy_lsm_acct_range(lsm, range);
 	}
 	vy_range_heap_update_all(&lsm->range_heap);
@@ -1395,6 +1396,7 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	if (new_run == NULL)
 		goto err_run;
 
+	new_run->dump_count = 1;
 	new_run->dump_lsn = dump_lsn;
 
 	/*
@@ -1527,7 +1529,8 @@ vy_task_compaction_complete(struct vy_task *task)
 	rlist_foreach_entry(run, &unused_runs, in_unused)
 		vy_log_drop_run(run->id, gc_lsn);
 	if (new_slice != NULL) {
-		vy_log_create_run(lsm->id, new_run->id, new_run->dump_lsn);
+		vy_log_create_run(lsm->id, new_run->id, new_run->dump_lsn,
+				  new_run->dump_count);
 		vy_log_insert_slice(range->id, new_run->id, new_slice->id,
 				    tuple_data_or_null(new_slice->begin),
 				    tuple_data_or_null(new_slice->end));
@@ -1588,6 +1591,7 @@ vy_task_compaction_complete(struct vy_task *task)
 	}
 	range->n_compactions++;
 	vy_range_update_compaction_priority(range, &lsm->opts);
+	vy_range_update_dumps_per_compaction(range);
 	vy_lsm_acct_range(lsm, range);
 	vy_lsm_acct_compaction(lsm, compaction_time,
 			       &compaction_input, &compaction_output);
@@ -1692,12 +1696,14 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		goto err_wi;
 
 	struct vy_slice *slice;
+	int32_t dump_count = 0;
 	int n = range->compaction_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
 		if (vy_write_iterator_new_slice(wi, slice) != 0)
 			goto err_wi_sub;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,
 					slice->run->dump_lsn);
+		dump_count += slice->run->dump_count;
 		/* Remember the slices we are compacting. */
 		if (task->first_slice == NULL)
 			task->first_slice = slice;
@@ -1708,6 +1714,17 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	}
 	assert(n == 0);
 	assert(new_run->dump_lsn >= 0);
+	if (range->compaction_priority == range->slice_count)
+		dump_count -= slice->run->dump_count;
+	/*
+	 * Do not update dumps_per_compaction in case compaction
+	 * was triggered manually to avoid unexpected side effects,
+	 * such as splitting/coalescing ranges for no good reason.
+	 */
+	if (range->needs_compaction)
+		new_run->dump_count = slice->run->dump_count;
+	else
+		new_run->dump_count = dump_count;
 
 	range->needs_compaction = false;
 

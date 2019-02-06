@@ -463,6 +463,8 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 	info_append_int(h, "run_avg", lsm->run_count / lsm->range_count);
 	histogram_snprint(buf, sizeof(buf), lsm->run_hist);
 	info_append_str(h, "run_histogram", buf);
+	info_append_int(h, "dumps_per_compaction",
+			vy_lsm_dumps_per_compaction(lsm));
 
 	info_end(h);
 }

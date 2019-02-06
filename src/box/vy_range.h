@@ -119,6 +119,11 @@ struct vy_range {
 	bool needs_compaction;
 	/** Number of times the range was compacted. */
 	int n_compactions;
+	/**
+	 * Number of dumps it takes to trigger major compaction in
+	 * this range, see vy_run::dump_count for more details.
+	 */
+	int dumps_per_compaction;
 	/** Link in vy_lsm->tree. */
 	rb_node(struct vy_range) tree_node;
 	/** Link in vy_lsm->range_heap. */
@@ -241,6 +246,12 @@ vy_range_remove_slice(struct vy_range *range, struct vy_slice *slice);
 void
 vy_range_update_compaction_priority(struct vy_range *range,
 				    const struct index_opts *opts);
+
+/**
+ * Update the value of range->dumps_per_compaction.
+ */
+void
+vy_range_update_dumps_per_compaction(struct vy_range *range);
 
 /**
  * Check if a range needs to be split in two.
