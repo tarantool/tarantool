@@ -94,7 +94,7 @@ logpath = fio.pathjoin(fio.cwd(), 'panic.log')
 grep_file_tail(logpath, 256, "LSN for 1 is used twice or COMMIT order is broken: confirmed: 1, new: 1, req: {.*}")
 ---
 - 'LSN for 1 is used twice or COMMIT order is broken: confirmed: 1, new: 1, req: {type:
-  ''REPLACE'', lsn: 1, space_id: 272, index_id: 0, tuple: ["t0", "v1"]}'
+  ''REPLACE'', replica_id: 1, lsn: 1, space_id: 272, index_id: 0, tuple: ["t0", "v1"]}'
 ...
 test_run:cmd('cleanup server panic')
 ---
@@ -162,7 +162,8 @@ test_run:cmd("push filter 'confirmed: "..lsn..", new: "..lsn.."' to '<lsn>'")
 grep_file_tail(logpath, 256, "(LSN for 1 is used twice or COMMIT order is broken: confirmed: "..lsn..", new: "..lsn.."), req: ({.*})")
 ---
 - 'LSN for 1 is used twice or COMMIT order is broken: <lsn>'
-- '{type: ''INSERT'', lsn: <lsn>, space_id: <space_id>, index_id: 0, tuple: [2, "v1"]}'
+- '{type: ''INSERT'', replica_id: 1, lsn: <lsn>, space_id: <space_id>, index_id: 0, tuple: [2,
+  "v1"]}'
 ...
 test_run:cmd("clear filter")
 ---
