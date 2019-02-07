@@ -623,9 +623,11 @@ request_str(const struct request *request)
 	char *buf = tt_static_buf();
 	char *end = buf + TT_STATIC_BUF_LEN;
 	char *pos = buf;
-	pos += snprintf(pos, end - pos, "{type: '%s', lsn: %lld, "\
+	pos += snprintf(pos, end - pos, "{type: '%s', "
+			"replica_id: %u, lsn: %lld, "
 			"space_id: %u, index_id: %u",
 			iproto_type_name(request->type),
+			(unsigned) request->header->replica_id,
 			(long long) request->header->lsn,
 			(unsigned) request->space_id,
 			(unsigned) request->index_id);
