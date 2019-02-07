@@ -244,6 +244,7 @@ test_request_str()
 {
 	plan(1);
 	struct xrow_header header;
+	header.replica_id = 5;
 	header.lsn = 100;
 	struct request request;
 	request.header = &header;
@@ -263,7 +264,8 @@ test_request_str()
 	request.ops = pos;
 	pos = mp_encode_array(pos, 1);
 	pos = mp_encode_uint(pos, 400);
-	is(strcmp("{type: 'SELECT', lsn: 100, space_id: 512, index_id: 1, "\
+	is(strcmp("{type: 'SELECT', replica_id: 5, lsn: 100, "
+		  "space_id: 512, index_id: 1, "
 		  "key: [200], tuple: [300], ops: [400]}",
 		  request_str(&request)), 0, "request_str");
 
