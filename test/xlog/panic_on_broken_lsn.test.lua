@@ -17,6 +17,13 @@ function grep_file_tail(filepath, bytes, pattern)
     fh:close()
     return string.match(line, pattern)
 end;
+function grep_broken_lsn(logpath, lsn)
+    local msg = grep_file_tail(logpath, 256,
+        string.format("LSN for 1 is used twice or COMMIT order is broken: " ..
+                      "confirmed: %d, new: %d, req: ({.*})", lsn, lsn))
+    msg = string.gsub(msg, string.format('lsn: %d, ', lsn), '')
+    return msg
+end;
 test_run:cmd("setopt delimiter ''");
 
 -- Testing case of panic on recovery
@@ -39,17 +46,15 @@ fio.unlink(xlogs[#xlogs])
 
 test_run:cmd('start server panic with crash_expected=True')
 
-logpath = fio.pathjoin(fio.cwd(), 'panic.log')
-
 -- Check that log contains the mention of broken LSN and the request printout
-grep_file_tail(logpath, 256, "LSN for 1 is used twice or COMMIT order is broken: confirmed: 1, new: 1, req: {.*}")
+grep_broken_lsn(fio.pathjoin(fio.cwd(), 'panic.log'), 1)
 
 test_run:cmd('cleanup server panic')
 test_run:cmd('delete server panic')
 
 -- Testing case of panic on joining a new replica
 box.schema.user.grant('guest', 'replication')
-_ = box.schema.space.create('test')
+_ = box.schema.space.create('test', {id = 9000})
 _ = box.space.test:create_index('pk')
 box.space.test:auto_increment{'v0'}
 lsn = box.info.vclock[1]
@@ -62,12 +67,8 @@ fiber = require('fiber')
 while box.info.replication[2] == nil do fiber.sleep(0.001) end
 box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", -1)
 
-logpath = fio.pathjoin(fio.cwd(), 'replica.log')
 -- Check that log contains the mention of broken LSN and the request printout
-test_run:cmd("push filter 'lsn: "..lsn..", space_id: [0-9]+' to 'lsn: <lsn>, space_id: <space_id>'")
-test_run:cmd("push filter 'confirmed: "..lsn..", new: "..lsn.."' to '<lsn>'")
-grep_file_tail(logpath, 256, "(LSN for 1 is used twice or COMMIT order is broken: confirmed: "..lsn..", new: "..lsn.."), req: ({.*})")
-test_run:cmd("clear filter")
+grep_broken_lsn(fio.pathjoin(fio.cwd(), 'replica.log'), lsn)
 
 test_run:cmd('cleanup server replica')
 test_run:cmd('delete server replica')
