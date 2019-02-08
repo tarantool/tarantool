@@ -109,4 +109,18 @@ key_update_can_be_skipped(uint64_t key_mask, uint64_t update_mask)
 	return (key_mask & update_mask) == 0;
 }
 
+/**
+ * Test a bit in the bitmask corresponding to a column fieldno.
+ * @param column_mask Mask to test.
+ * @param fieldno Fieldno number to test (index base must be 0).
+ * @retval true If bit corresponding to a column fieldno.
+ * @retval false if bit is not set or fieldno > 64.
+ */
+static inline bool
+column_mask_fieldno_is_set(uint64_t column_mask, uint32_t fieldno)
+{
+	uint64_t mask = (uint64_t) 1 << (fieldno < 63 ? fieldno : 63);
+	return (column_mask & mask) != 0;
+}
+
 #endif

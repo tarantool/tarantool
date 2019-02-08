@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "alter.h"
+#include "column_mask.h"
 #include "schema.h"
 #include "user.h"
 #include "space.h"
@@ -3748,13 +3749,6 @@ fk_constraint_remove(struct rlist *child_fk_list, const char *fk_name)
 }
 
 /**
- * FIXME: as sql legacy temporary we use such mask throughout
- * SQL code. It should be replaced later with regular
- * mask from column_mask.h
- */
-#define FKEY_MASK(x) (((x)>31) ? 0xffffffff : ((uint64_t)1<<(x)))
-
-/**
  * Set bits of @mask which correspond to fields involved in
  * given foreign key constraint.
  *
@@ -3767,7 +3761,7 @@ static inline void
 fk_constraint_set_mask(const struct fk_constraint *fk, uint64_t *mask, int type)
 {
 	for (uint32_t i = 0; i < fk->def->field_count; ++i)
-		*mask |= FKEY_MASK(fk->def->links[i].fields[type]);
+		column_mask_set_fieldno(mask, fk->def->links[i].fields[type]);
 }
 
 /**

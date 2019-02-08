@@ -340,20 +340,13 @@ lookupName(Parse * pParse,	/* The parsing context */
 					if (iCol < 0) {
 						pExpr->type =
 							FIELD_TYPE_INTEGER;
-					} else if (pExpr->iTable == 0) {
-						testcase(iCol == 31);
-						testcase(iCol == 32);
-						pParse->oldmask |=
-						    (iCol >=
-						     32 ? 0xffffffff
-						     : (((u32) 1) << iCol));
 					} else {
-						testcase(iCol == 31);
-						testcase(iCol == 32);
-						pParse->newmask |=
-						    (iCol >=
-						     32 ? 0xffffffff
-						     : (((u32) 1) << iCol));
+						uint64_t *mask =
+							pExpr->iTable == 0 ?
+							&pParse->oldmask :
+							&pParse->newmask;
+						column_mask_set_fieldno(mask,
+									iCol);
 					}
 					pExpr->iColumn = (i16) iCol;
 					pExpr->space_def = space_def;

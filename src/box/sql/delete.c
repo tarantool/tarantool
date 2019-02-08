@@ -464,7 +464,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 	   (fk_constraint_is_required(space, NULL) || trigger_list != NULL)) {
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
-		uint32_t mask =
+		uint64_t mask =
 			sql_trigger_colmask(parse, trigger_list, 0, 0,
 					    TRIGGER_BEFORE | TRIGGER_AFTER,
 					    space, onconf);
@@ -479,10 +479,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 		 */
 		sqlVdbeAddOp2(v, OP_Copy, reg_pk, first_old_reg);
 		for (int i = 0; i < (int)space->def->field_count; i++) {
-			testcase(mask != 0xffffffff && iCol == 31);
-			testcase(mask != 0xffffffff && iCol == 32);
-			if (mask == 0xffffffff
-			    || (i <= 31 && (mask & MASKBIT32(i)) != 0)) {
+			if (column_mask_fieldno_is_set(mask, i)) {
 				sqlExprCodeGetColumnOfTable(v, space->def,
 								cursor, i,
 								first_old_reg +

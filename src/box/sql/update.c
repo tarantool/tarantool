@@ -100,7 +100,6 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	/* List of triggers on pTab, if required. */
 	struct sql_trigger *trigger;
 	int tmask;		/* Mask of TRIGGER_BEFORE|TRIGGER_AFTER */
-	int newmask;		/* Mask of NEW.* columns accessed by BEFORE triggers */
 	int iEph = 0;		/* Ephemeral table holding all primary key values */
 	int nKey = 0;		/* Number of elements in regKey */
 	int aiCurOnePass[2];	/* The write cursors opened by WHERE_ONEPASS */
@@ -338,18 +337,15 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 */
 	if (is_pk_modified || hasFK != 0 || trigger != NULL) {
 		assert(space != NULL);
-		u32 oldmask = hasFK ? space->fk_constraint_mask : 0;
+		uint64_t oldmask = hasFK ? space->fk_constraint_mask : 0;
 		oldmask |= sql_trigger_colmask(pParse, trigger, pChanges, 0,
 					       TRIGGER_BEFORE | TRIGGER_AFTER,
 					       space, on_error);
 		for (i = 0; i < (int)def->field_count; i++) {
-			if (oldmask == 0xffffffff
-			    || (i < 32 && (oldmask & MASKBIT32(i)) != 0) ||
-				sql_space_column_is_in_pk(space, i)) {
-				testcase(oldmask != 0xffffffff && i == 31);
-				sqlExprCodeGetColumnOfTable(v, def,
-								pk_cursor, i,
-								regOld + i);
+			if (column_mask_fieldno_is_set(oldmask, i) ||
+			    sql_space_column_is_in_pk(space, i)) {
+				sqlExprCodeGetColumnOfTable(v, def, pk_cursor,
+							    i, regOld + i);
 			} else {
 				sqlVdbeAddOp2(v, OP_Null, 0, regOld + i);
 			}
@@ -370,22 +366,20 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 * may have modified them). So not loading those that are not going to
 	 * be used eliminates some redundant opcodes.
 	 */
-	newmask = sql_trigger_colmask(pParse, trigger, pChanges, 1,
-				      TRIGGER_BEFORE, space, on_error);
+	uint64_t newmask = sql_trigger_colmask(pParse, trigger, pChanges, 1,
+					       TRIGGER_BEFORE, space, on_error);
 	for (i = 0; i < (int)def->field_count; i++) {
 		j = aXRef[i];
 		if (j >= 0) {
 			sqlExprCode(pParse, pChanges->a[j].pExpr,
 					regNew + i);
-		} else if (0 == (tmask & TRIGGER_BEFORE) || i > 31
-			   || (newmask & MASKBIT32(i))) {
+		} else if ((tmask & TRIGGER_BEFORE) == 0 ||
+			   column_mask_fieldno_is_set(newmask, i) != 0) {
 			/* This branch loads the value of a column that will not be changed
 			 * into a register. This is done if there are no BEFORE triggers, or
 			 * if there are one or more BEFORE triggers that use this value via
 			 * a new.* reference in a trigger program.
 			 */
-			testcase(i == 31);
-			testcase(i == 32);
 			sqlExprCodeGetColumnToReg(pParse, def, i,
 						      pk_cursor, regNew + i);
 		} else {

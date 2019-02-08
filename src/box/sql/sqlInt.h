@@ -67,6 +67,7 @@
 
 #include <stdbool.h>
 
+#include "box/column_mask.h"
 #include "box/field_def.h"
 #include "box/sql.h"
 #include "box/txn.h"
@@ -2578,22 +2579,24 @@ struct SelectDest {
 #endif
 
 /*
- * At least one instance of the following structure is created for each
- * trigger that may be fired while parsing an INSERT, UPDATE or DELETE
- * statement. All such objects are stored in the linked list headed at
- * Parse.pTriggerPrg and deleted once statement compilation has been
- * completed.
+ * At least one instance of the following structure is created for
+ * each trigger that may be fired while parsing an INSERT, UPDATE
+ * or DELETE statement. All such objects are stored in the linked
+ * list headed at Parse.pTriggerPrg and deleted once statement
+ * compilation has been completed.
  *
- * A Vdbe sub-program that implements the body and WHEN clause of trigger
- * TriggerPrg.pTrigger, assuming a default ON CONFLICT clause of
- * TriggerPrg.orconf, is stored in the TriggerPrg.pProgram variable.
- * The Parse.pTriggerPrg list never contains two entries with the same
- * values for both pTrigger and orconf.
+ * A Vdbe sub-program that implements the body and WHEN clause of
+ * trigger TriggerPrg.pTrigger, assuming a default ON CONFLICT
+ * clause of TriggerPrg.orconf, is stored in the
+ * TriggerPrg.pProgram variable. The Parse.pTriggerPrg list never
+ * contains two entries with the same values for both pTrigger
+ * and orconf.
  *
- * The TriggerPrg.aColmask[0] variable is set to a mask of old.* columns
- * accessed (or set to 0 for triggers fired as a result of INSERT
- * statements). Similarly, the TriggerPrg.aColmask[1] variable is set to
- * a mask of new.* columns used by the program.
+ * The TriggerPrg.column_mask[0] variable is set to a mask of
+ * old.* columns accessed (or set to 0 for triggers fired as a
+ * result of INSERT statements). Similarly, the
+ * TriggerPrg.column_mask[1] variable is set to a mask of new.*
+ * columns used by the program.
  */
 struct TriggerPrg {
 	/** Trigger this program was coded from. */
@@ -2601,7 +2604,8 @@ struct TriggerPrg {
 	TriggerPrg *pNext;	/* Next entry in Parse.pTriggerPrg list */
 	SubProgram *pProgram;	/* Program implementing pTrigger/orconf */
 	int orconf;		/* Default ON CONFLICT policy */
-	u32 aColmask[2];	/* Masks of old.*, new.* columns accessed */
+	/* Masks of old.*, new.* columns accessed. */
+	uint64_t column_mask[2];
 };
 
 enum ast_type {
@@ -2680,8 +2684,10 @@ struct Parse {
 	int nSelectIndent;	/* How far to indent SELECTTRACE() output */
 	Parse *pToplevel;	/* Parse structure for main program (or NULL) */
 	u32 nQueryLoop;		/* Est number of iterations of a query (10*log2(N)) */
-	u32 oldmask;		/* Mask of old.* columns referenced */
-	u32 newmask;		/* Mask of new.* columns referenced */
+	/* Mask of old.* columns referenced. */
+	uint64_t oldmask;
+	/* Mask of new.* columns referenced. */
+	uint64_t newmask;
 	u8 eTriggerOp;		/* TK_UPDATE, TK_INSERT or TK_DELETE */
 	u8 eOrconf;		/* Default ON CONFLICT policy for trigger steps */
 	/** Region to make SQL temp allocations. */
@@ -4069,7 +4075,7 @@ TriggerStep *sqlTriggerDeleteStep(sql *, Token *, Expr *);
  *
  * @retval mask value.
  */
-u32
+uint64_t
 sql_trigger_colmask(Parse *parser, struct sql_trigger *trigger,
 		    ExprList *changes_list, int new, int tr_tm,
 		    struct space *space, int orconf);
