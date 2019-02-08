@@ -29,6 +29,15 @@ function grep_file_tail(filepath, bytes, pattern)
 end;
 ---
 ...
+function grep_broken_lsn(logpath, lsn)
+    local msg = grep_file_tail(logpath, 256,
+        string.format("LSN for 1 is used twice or COMMIT order is broken: " ..
+                      "confirmed: %d, new: %d, req: ({.*})", lsn, lsn))
+    msg = string.gsub(msg, string.format('lsn: %d, ', lsn), '')
+    return msg
+end;
+---
+...
 test_run:cmd("setopt delimiter ''");
 ---
 - true
@@ -87,14 +96,10 @@ test_run:cmd('start server panic with crash_expected=True')
 ---
 - false
 ...
-logpath = fio.pathjoin(fio.cwd(), 'panic.log')
----
-...
 -- Check that log contains the mention of broken LSN and the request printout
-grep_file_tail(logpath, 256, "LSN for 1 is used twice or COMMIT order is broken: confirmed: 1, new: 1, req: {.*}")
+grep_broken_lsn(fio.pathjoin(fio.cwd(), 'panic.log'), 1)
 ---
-- 'LSN for 1 is used twice or COMMIT order is broken: confirmed: 1, new: 1, req: {type:
-  ''REPLACE'', replica_id: 1, lsn: 1, space_id: 272, index_id: 0, tuple: ["t0", "v1"]}'
+- '{type: ''REPLACE'', replica_id: 1, space_id: 272, index_id: 0, tuple: ["t0", "v1"]}'
 ...
 test_run:cmd('cleanup server panic')
 ---
@@ -108,7 +113,7 @@ test_run:cmd('delete server panic')
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-_ = box.schema.space.create('test')
+_ = box.schema.space.create('test', {id = 9000})
 ---
 ...
 _ = box.space.test:create_index('pk')
@@ -147,27 +152,10 @@ box.error.injection.set("ERRINJ_RELAY_BREAK_LSN", -1)
 ---
 - ok
 ...
-logpath = fio.pathjoin(fio.cwd(), 'replica.log')
----
-...
 -- Check that log contains the mention of broken LSN and the request printout
-test_run:cmd("push filter 'lsn: "..lsn..", space_id: [0-9]+' to 'lsn: <lsn>, space_id: <space_id>'")
+grep_broken_lsn(fio.pathjoin(fio.cwd(), 'replica.log'), lsn)
 ---
-- true
-...
-test_run:cmd("push filter 'confirmed: "..lsn..", new: "..lsn.."' to '<lsn>'")
----
-- true
-...
-grep_file_tail(logpath, 256, "(LSN for 1 is used twice or COMMIT order is broken: confirmed: "..lsn..", new: "..lsn.."), req: ({.*})")
----
-- 'LSN for 1 is used twice or COMMIT order is broken: <lsn>'
-- '{type: ''INSERT'', replica_id: 1, lsn: <lsn>, space_id: <space_id>, index_id: 0, tuple: [2,
-  "v1"]}'
-...
-test_run:cmd("clear filter")
----
-- true
+- '{type: ''INSERT'', replica_id: 1, space_id: 9000, index_id: 0, tuple: [2, "v1"]}'
 ...
 test_run:cmd('cleanup server replica')
 ---
