@@ -52,16 +52,24 @@ extern int wal_dir_lock;
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-void
-wal_thread_start();
-
+/**
+ * Start WAL thread and initialize WAL writer.
+ */
 int
 wal_init(enum wal_mode wal_mode, const char *wal_dirname, int64_t wal_max_rows,
-	 int64_t wal_max_size, const struct tt_uuid *instance_uuid,
-	 const struct vclock *vclock, const struct vclock *first_checkpoint_vclock);
+	 int64_t wal_max_size, const struct tt_uuid *instance_uuid);
 
+/**
+ * Setup WAL writer as journaling subsystem.
+ */
+int
+wal_enable(void);
+
+/**
+ * Stop WAL thread and free WAL writer resources.
+ */
 void
-wal_thread_stop();
+wal_free(void);
 
 /**
  * A notification message sent from the WAL to a watcher
