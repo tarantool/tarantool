@@ -6,15 +6,22 @@ ffi.cdef[[
            const char *needle,   size_t needle_len);
     int memcmp(const char *mem1, const char *mem2, size_t num);
     int isspace(int c);
+    void
+    string_strip_helper(const char *inp, size_t inp_len, const char *chars,
+                        size_t chars_len, bool lstrip, bool rstrip,
+                        size_t *newstart, size_t *newlen);
 ]]
 
-local c_char_ptr = ffi.typeof('const char *')
+local c_char_ptr     = ffi.typeof('const char *')
+local strip_newstart = ffi.new("unsigned long[1]")
+local strip_newlen   = ffi.new("unsigned long[1]")
 
 local memcmp  = ffi.C.memcmp
 local memmem  = ffi.C.memmem
 local isspace = ffi.C.isspace
 
 local err_string_arg = "bad argument #%d to '%s' (%s expected, got %s)"
+local space_chars    = ' \t\n\v\f\r'
 
 local function string_split_empty(inp, maxsplit)
     local p = c_char_ptr(inp)
@@ -339,25 +346,67 @@ local function string_fromhex(inp)
     return ffi.string(res, len)
 end
 
-local function string_strip(inp)
+local function string_strip(inp, chars)
     if type(inp) ~= 'string' then
         error(err_string_arg:format(1, "string.strip", 'string', type(inp)), 2)
     end
-    return (string.gsub(inp, "^%s*(.-)%s*$", "%1"))
+    if inp == '' then
+        return inp
+    end
+    if chars == nil then
+        chars = space_chars
+    elseif type(chars) ~= 'string' then
+        error(err_string_arg:format(2, "string.strip", 'string', type(chars)), 2)
+    elseif chars == '' then
+        return inp
+    end
+
+    local casted_inp = c_char_ptr(inp)
+    ffi.C.string_strip_helper(inp, #inp, chars, #chars, true, true,
+                              strip_newstart, strip_newlen)
+    return ffi.string(casted_inp + strip_newstart[0], strip_newlen[0])
 end
 
-local function string_lstrip(inp)
+local function string_lstrip(inp, chars)
     if type(inp) ~= 'string' then
         error(err_string_arg:format(1, "string.lstrip", 'string', type(inp)), 2)
     end
-    return (string.gsub(inp, "^%s*(.-)", "%1"))
+    if inp == '' then
+        return inp
+    end
+    if chars == nil then
+        chars = space_chars
+    elseif type(chars) ~= 'string' then
+        error(err_string_arg:format(2, "string.lstrip", 'string', type(chars)), 2)
+    elseif chars == '' then
+        return inp
+    end
+
+    local casted_inp = c_char_ptr(inp)
+    ffi.C.string_strip_helper(inp, #inp, chars, #chars, true, false,
+                              strip_newstart, strip_newlen)
+    return ffi.string(casted_inp + strip_newstart[0], strip_newlen[0])
 end
 
-local function string_rstrip(inp)
+local function string_rstrip(inp, chars)
     if type(inp) ~= 'string' then
         error(err_string_arg:format(1, "string.rstrip", 'string', type(inp)), 2)
     end
-    return (string.gsub(inp, "(.-)%s*$", "%1"))
+    if inp == '' then
+        return inp
+    end
+    if chars == nil then
+        chars = space_chars
+    elseif type(chars) ~= 'string' then
+        error(err_string_arg:format(2, "string.rstrip", 'string', type(chars)), 2)
+    elseif chars == '' then
+        return inp
+    end
+
+    local casted_inp = c_char_ptr(inp)
+    ffi.C.string_strip_helper(inp, #inp, chars, #chars, false, true,
+                              strip_newstart, strip_newlen)
+    return ffi.string(casted_inp + strip_newstart[0], strip_newlen[0])
 end
 
 

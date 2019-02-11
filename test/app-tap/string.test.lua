@@ -134,18 +134,76 @@ test:test("fromhex", function(test)
 end)
 
 test:test("strip", function(test)
-    test:plan(6)
-    local str = "  hello hello "
-    test:is(string.len(string.strip(str)), 11, "strip")
-    test:is(string.len(string.lstrip(str)), 12, "lstrip")
-    test:is(string.len(string.rstrip(str)), 13, "rstrip")
+    test:plan(45)
+    local str = "  Hello world! "
+    test:is(string.strip(str), "Hello world!", "strip (without chars)")
+    test:is(string.lstrip(str), "Hello world! ", "lstrip (without chars)")
+    test:is(string.rstrip(str), "  Hello world!", "rstrip (without chars)")
+    str = ""
+    test:is(string.strip(str), str, "strip (0-len inp without chars)")
+    test:is(string.lstrip(str), str, "lstrip (0-len inp without chars)")
+    test:is(string.rstrip(str), str, "rstrip (0-len inp without chars)")
+    str = " "
+    test:is(string.strip(str), "", "strip (1-len inp without chars)")
+    test:is(string.lstrip(str), "", "lstrip (1-len inp without chars)")
+    test:is(string.rstrip(str), "", "rstrip (1-len inp without chars)")
+    str = "\t\v"
+    test:is(string.strip(str), "", "strip (strip everything without chars)")
+    test:is(string.lstrip(str), "", "lstrip (strip everything without chars)")
+    test:is(string.rstrip(str), "", "rstrip (strip everything without chars)")
+    str = "hello"
+    test:is(string.strip(str), str, "strip (strip nothing without chars)")
+    test:is(string.lstrip(str), str, "lstrip (strip nothing without chars)")
+    test:is(string.rstrip(str), str, "rstrip (strip nothing without chars)")
+    str = " \t\n\v\f\rTEST \t\n\v\f\r"
+    test:is(string.strip(str), "TEST", "strip (all space characters without chars)")
+    test:is(string.lstrip(str), "TEST \t\n\v\f\r", "lstrip (all space characters without chars)")
+    test:is(string.rstrip(str), " \t\n\v\f\rTEST", "rstrip (all space characters without chars)")
+
+    local chars = "#\0"
+    str = "##Hello world!#"
+    test:is(string.strip(str, chars), "Hello world!", "strip (with chars)")
+    test:is(string.lstrip(str, chars), "Hello world!#", "lstrip (with chars)")
+    test:is(string.rstrip(str, chars), "##Hello world!", "rstrip (with chars)")
+    str = ""
+    test:is(string.strip(str, chars), str, "strip (0-len inp with chars)")
+    test:is(string.lstrip(str, chars), str, "lstrip (0-len inp with chars)")
+    test:is(string.rstrip(str, chars), str, "rstrip (0-len inp with chars)")
+    str = "#"
+    test:is(string.strip(str, chars), "", "strip (1-len inp with chars)")
+    test:is(string.lstrip(str, chars), "", "lstrip (1-len inp with chars)")
+    test:is(string.rstrip(str, chars), "", "rstrip (1-len inp with chars)")
+    str = "##"
+    test:is(string.strip(str, chars), "", "strip (strip everything with chars)")
+    test:is(string.lstrip(str, chars), "", "lstrip (strip everything with chars)")
+    test:is(string.rstrip(str, chars), "", "rstrip (strip everything with chars)")
+    str = "hello"
+    test:is(string.strip(str, chars), str, "strip (strip nothing with chars)")
+    test:is(string.lstrip(str, chars), str, "lstrip (strip nothing with chars)")
+    test:is(string.rstrip(str, chars), str, "rstrip (strip nothing with chars)")
+    str = "\0\0\0TEST\0"
+    test:is(string.strip(str, chars), "TEST", "strip (embedded 0s with chars)")
+    test:is(string.lstrip(str, chars), "TEST\0", "lstrip (embedded 0s with chars)")
+    test:is(string.rstrip(str, chars), "\0\0\0TEST", "rstrip (embedded 0s with chars)")
+    chars = ""
+    test:is(string.strip(str, chars), str, "strip (0-len chars)")
+    test:is(string.lstrip(str, chars), str, "lstrip (0-len chars)")
+    test:is(string.rstrip(str, chars), str, "rstrip (0-len chars)")
+
     local _, err = pcall(string.strip, 12)
-    test:ok(err and err:match("%(string expected, got number%)"))
+    test:ok(err and err:match("#1 to '.-%.strip' %(string expected, got number%)"), "strip err 1")
     _, err = pcall(string.lstrip, 12)
-    test:ok(err and err:match("%(string expected, got number%)"))
+    test:ok(err and err:match("#1 to '.-%.lstrip' %(string expected, got number%)"), "lstrip err 1")
     _, err = pcall(string.rstrip, 12)
-    test:ok(err and err:match("%(string expected, got number%)"))
-end )
+    test:ok(err and err:match("#1 to '.-%.rstrip' %(string expected, got number%)"), "rstrip err 1")
+
+    _, err = pcall(string.strip, "foo", 12)
+    test:ok(err and err:match("#2 to '.-%.strip' %(string expected, got number%)"), "strip err 2")
+    _, err = pcall(string.lstrip, "foo", 12)
+    test:ok(err and err:match("#2 to '.-%.lstrip' %(string expected, got number%)"), "lstrip err 2")
+    _, err = pcall(string.rstrip, "foo", 12)
+    test:ok(err and err:match("#2 to '.-%.rstrip' %(string expected, got number%)"), "rstrip err 2")
+end)
 
 test:test("unicode", function(test)
     test:plan(104)

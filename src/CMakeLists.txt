@@ -183,6 +183,7 @@ set (server_sources
      lua/httpc.c
      lua/utf8.c
      lua/info.c
+     lua/string.c
      ${lua_sources}
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/lyaml.cc
      ${PROJECT_SOURCE_DIR}/third_party/lua-yaml/b64.c
@@ -200,6 +201,7 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/coio_task.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
     ${CMAKE_SOURCE_DIR}/src/lua/error.h
+    ${CMAKE_SOURCE_DIR}/src/lua/string.h
     ${CMAKE_SOURCE_DIR}/src/box/txn.h
     ${CMAKE_SOURCE_DIR}/src/box/key_def.h
     ${CMAKE_SOURCE_DIR}/src/box/field_def.h
