@@ -57,6 +57,7 @@
 
 static const char *tuplelib_name = "box.tuple";
 static const char *tuple_iteratorlib_name = "box.tuple.iterator";
+static struct luaL_serializer tuple_serializer;
 
 extern char tuple_lua[]; /* Lua source */
 
@@ -108,7 +109,7 @@ lbox_tuple_new(lua_State *L)
 
 	if (argc == 1 && (lua_istable(L, 1) || luaT_istuple(L, 1))) {
 		/* New format: box.tuple.new({1, 2, 3}) */
-		luamp_encode_tuple(L, luaL_msgpack_default, &stream, 1);
+		luamp_encode_tuple(L, &tuple_serializer, &stream, 1);
 	} else {
 		/* Backward-compatible format: box.tuple.new(1, 2, 3). */
 		luamp_encode_array(luaL_msgpack_default, &stream, argc);
@@ -537,6 +538,15 @@ box_lua_tuple_init(struct lua_State *L)
 	lua_pop(L, 1);
 
 	luamp_set_encode_extension(luamp_encode_extension_box);
+
+	/*
+	 * Create special serializer for box.tuple.new().
+	 * Disable storage optimization for excessively
+	 * sparse arrays as a tuple always must be regular
+	 * MP_ARRAY.
+	 */
+	luaL_serializer_create(&tuple_serializer);
+	tuple_serializer.encode_sparse_ratio = 0;
 
 	/* Get CTypeID for `struct tuple' */
 	int rc = luaL_cdef(L, "struct tuple;");

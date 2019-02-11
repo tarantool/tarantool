@@ -241,6 +241,13 @@ luaL_checkserializer(struct lua_State *L) {
 }
 
 /**
+ * Initialize serializer with default parameters.
+ * @param cfg Serializer to inherit configuration.
+ */
+void
+luaL_serializer_create(struct luaL_serializer *cfg);
+
+/**
  * Parse configuration table into @a cfg.
  * @param L Lua stack.
  * @param cfg Serializer to inherit configuration.

@@ -214,6 +214,15 @@ static struct {
 	{ NULL, 0, 0, 0},
 };
 
+void
+luaL_serializer_create(struct luaL_serializer *cfg)
+{
+	for (int i = 0; OPTIONS[i].name != NULL; i++) {
+		int *pval = (int *) ((char *) cfg + OPTIONS[i].offset);
+		*pval = OPTIONS[i].defvalue;
+	}
+}
+
 /**
  * Configure one field in @a cfg.
  * @param L Lua stack.
