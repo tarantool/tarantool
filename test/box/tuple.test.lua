@@ -384,3 +384,29 @@ t2 = box.tuple.new(2)
 t1 = t1:update{{'+', 1, 1}}
 
 test_run:cmd("clear filter")
+
+--
+-- gh-3882: Inappropriate storage optimization for sparse arrays
+--          in box.tuple.new.
+--
+t = {}
+t[1] = 1
+t[2] = 2
+t[11] = 11
+box.tuple.new(t)
+
+s2 = box.schema.space.create('test')
+test_run:cmd("setopt delimiter ';'")
+s2:format({{name="a", type="str"}, {name="b", type="str", is_nullable=true},
+           {name="c", type="str", is_nullable=true},
+           {name="d", type="str", is_nullable=true},
+           {name="e", type="str", is_nullable=true},
+           {name="f", type="str", is_nullable=true},
+           {name="g", type="str", is_nullable=true},
+           {name="h", type="str", is_nullable=true},
+           {name="i", type="str", is_nullable=true},
+           {name="j", type="str", is_nullable=true},
+           {name="k", type="str", is_nullable=true}});
+test_run:cmd("setopt delimiter ''");
+s2:frommap({a="1", k="11"})
+s2:drop()
