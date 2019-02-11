@@ -4,12 +4,25 @@ box.schema.user.grant('guest', 'replication')
 
 s = box.schema.space.create('test', { engine = 'vinyl' })
 _ = s:create_index('pk', {run_count_per_level = 1})
+_ = s:create_index('sk', {unique = false, parts = {2, 'unsigned'}})
 
--- Send > 2 MB to replica.
-pad = string.rep('x', 1100)
-for i = 1,1000 do s:insert{i, pad} end
+test_run:cmd("setopt delimiter ';'")
+pad = string.rep('x', 10000);
+function fill()
+    for i = 1, 50 do
+        box.begin()
+        for j = 1, 10 do
+            s:replace{math.random(100), math.random(100), pad}
+        end
+        box.commit()
+    end
+end;
+test_run:cmd("setopt delimiter ''");
+
+-- Send > 1 MB to replica.
+fill()
 box.snapshot()
-for i = 1001,2000 do s:insert{i, pad} end
+fill()
 
 -- Replica has memory limit set to 1 MB so replication would hang
 -- if the scheduler didn't work on the destination.
@@ -26,7 +39,7 @@ _ = test_run:wait_lsn('replica', 'default')
 
 -- Check vinyl_timeout is ignored on 'subscribe' (gh-3087).
 _ = test_run:cmd("stop server replica")
-for i = 2001,3000 do s:insert{i, pad} end
+fill()
 _ = test_run:cmd("start server replica")
 _ = test_run:wait_lsn('replica', 'default')
 
@@ -36,7 +49,7 @@ _ = test_run:cmd("stop server replica")
 _ = test_run:cmd("cleanup server replica")
 
 box.snapshot()
-for i = 3001,4000 do s:insert{i, pad} end
+fill()
 
 _ = test_run:cmd("start server replica") -- join
 _ = test_run:cmd("stop server replica")
