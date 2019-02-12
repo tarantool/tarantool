@@ -255,6 +255,12 @@ vy_quota_set_rate_limit(struct vy_quota *q, enum vy_quota_resource_type type,
 			size_t rate);
 
 /**
+ * Return the rate limit applied to a consumer of the given type.
+ */
+size_t
+vy_quota_get_rate_limit(struct vy_quota *q, enum vy_quota_consumer_type type);
+
+/**
  * Consume @size bytes of memory. In contrast to vy_quota_use()
  * this function does not throttle the caller.
  */
