@@ -2347,7 +2347,8 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 	 * the transaction to be sent to read view or aborted, we call
 	 * it before checking for conflicts.
 	 */
-	if (vy_quota_use(&env->quota, tx->write_size, timeout) != 0)
+	if (vy_quota_use(&env->quota, VY_QUOTA_CONSUMER_TX,
+			 tx->write_size, timeout) != 0)
 		return -1;
 
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
@@ -2356,8 +2357,8 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	vy_quota_adjust(&env->quota, tx->write_size,
-			mem_used_after - mem_used_before);
+	vy_quota_adjust(&env->quota, VY_QUOTA_CONSUMER_TX,
+			tx->write_size, mem_used_after - mem_used_before);
 	vy_regulator_check_dump_watermark(&env->regulator);
 	return rc;
 }
@@ -2382,7 +2383,8 @@ vinyl_engine_commit(struct engine *engine, struct txn *txn)
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	/* We can't abort the transaction at this point, use force. */
-	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_TX,
+			   mem_used_after - mem_used_before);
 	vy_regulator_check_dump_watermark(&env->regulator);
 
 	txn->engine_tx = NULL;
@@ -3194,7 +3196,8 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	 * quota accounting.
 	 */
 	size_t reserved = tx->write_size;
-	if (vy_quota_use(&env->quota, reserved, TIMEOUT_INFINITY) != 0)
+	if (vy_quota_use(&env->quota, VY_QUOTA_CONSUMER_TX,
+			 reserved, TIMEOUT_INFINITY) != 0)
 		unreachable();
 
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
@@ -3213,7 +3216,7 @@ vinyl_space_apply_initial_join_row(struct space *space, struct request *request)
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	size_t used = mem_used_after - mem_used_before;
-	vy_quota_adjust(&env->quota, reserved, used);
+	vy_quota_adjust(&env->quota, VY_QUOTA_CONSUMER_TX, reserved, used);
 	vy_regulator_check_dump_watermark(&env->regulator);
 	return rc;
 }
@@ -3534,7 +3537,7 @@ vy_squash_process(struct vy_squash *squash)
 		 * so there's no need in invalidating the cache.
 		 */
 		vy_mem_commit_stmt(mem, region_stmt);
-		vy_quota_force_use(&env->quota,
+		vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_TX,
 				   mem_used_after - mem_used_before);
 		vy_regulator_check_dump_watermark(&env->regulator);
 	}
@@ -4010,9 +4013,10 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
 	/* Consume memory quota. Throttle if it is exceeded. */
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_TX,
+			   mem_used_after - mem_used_before);
 	vy_regulator_check_dump_watermark(&env->regulator);
-	vy_quota_wait(&env->quota);
+	vy_quota_wait(&env->quota, VY_QUOTA_CONSUMER_TX);
 	return rc;
 }
 
@@ -4138,7 +4142,8 @@ vy_build_recover(struct vy_env *env, struct vy_lsm *lsm, struct vy_lsm *pk)
 
 	mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_TX,
+			   mem_used_after - mem_used_before);
 	return rc;
 }
 
@@ -4354,7 +4359,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 	 */
 	struct vy_env *env = vy_env(space->engine);
 	if (is_first_statement)
-		vy_quota_wait(&env->quota);
+		vy_quota_wait(&env->quota, VY_QUOTA_CONSUMER_COMPACTION);
 
 	/* Create the deferred DELETE statement. */
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
@@ -4441,7 +4446,8 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 	}
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
-	vy_quota_force_use(&env->quota, mem_used_after - mem_used_before);
+	vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_COMPACTION,
+			   mem_used_after - mem_used_before);
 	vy_regulator_check_dump_watermark(&env->regulator);
 
 	tuple_unref(delete);

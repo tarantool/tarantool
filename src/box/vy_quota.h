@@ -110,6 +110,50 @@ vy_rate_limit_refill(struct vy_rate_limit *rl, double time)
 typedef void
 (*vy_quota_exceeded_f)(struct vy_quota *quota);
 
+/**
+ * Apart from memory usage accounting and limiting, vy_quota is
+ * responsible for consumption rate limiting (aka throttling).
+ * There are multiple rate limits, each of which is associated
+ * with a particular resource type. Different kinds of consumers
+ * respect different limits. The following enumeration defines
+ * the resource types for which vy_quota enables throttling.
+ *
+ * See also vy_quota_consumer_resource_map.
+ */
+enum vy_quota_resource_type {
+	/**
+	 * The goal of disk-based throttling is to keep LSM trees
+	 * in a good shape so that read and space amplification
+	 * stay within bounds. It is enabled when compaction does
+	 * not keep up with dumps.
+	 */
+	VY_QUOTA_RESOURCE_DISK = 0,
+	/**
+	 * Memory-based throttling is needed to avoid long stalls
+	 * caused by hitting the hard memory limit. It is set so
+	 * that by the time the hard limit is hit, the last memory
+	 * dump will have completed.
+	 */
+	VY_QUOTA_RESOURCE_MEMORY = 1,
+
+	vy_quota_resource_type_MAX,
+};
+
+/**
+ * Quota consumer type determines how a quota consumer will be
+ * rate limited.
+ *
+ * See also vy_quota_consumer_resource_map.
+ */
+enum vy_quota_consumer_type {
+	/** Transaction processor. */
+	VY_QUOTA_CONSUMER_TX = 0,
+	/** Compaction job. */
+	VY_QUOTA_CONSUMER_COMPACTION = 1,
+
+	vy_quota_consumer_type_MAX,
+};
+
 struct vy_quota_wait_node {
 	/** Link in vy_quota::wait_queue. */
 	struct rlist in_wait_queue;
@@ -117,6 +161,11 @@ struct vy_quota_wait_node {
 	struct fiber *fiber;
 	/** Amount of requested memory. */
 	size_t size;
+	/**
+	 * Ticket assigned to this fiber when it was put to
+	 * sleep, see vy_quota::wait_ticket for more details.
+	 */
+	int64_t ticket;
 };
 
 /**
@@ -144,13 +193,23 @@ struct vy_quota {
 	 */
 	vy_quota_exceeded_f quota_exceeded_cb;
 	/**
-	 * Queue of consumers waiting for quota, linked by
-	 * vy_quota_wait_node::state. Newcomers are added
-	 * to the tail.
+	 * Monotonically growing counter assigned to consumers
+	 * waiting for quota. It is used for balancing wakeups
+	 * among wait queues: if two fibers from different wait
+	 * queues may proceed, the one with the lowest ticket
+	 * will be picked.
+	 *
+	 * See also vy_quota_wait_node::ticket.
 	 */
-	struct rlist wait_queue;
-	/** Rate limit state. */
-	struct vy_rate_limit rate_limit;
+	int64_t wait_ticket;
+	/**
+	 * Queue of consumers waiting for quota, one per each
+	 * consumer type, linked by vy_quota_wait_node::state.
+	 * Newcomers are added to the tail.
+	 */
+	struct rlist wait_queue[vy_quota_consumer_type_MAX];
+	/** Rate limit state, one per each resource type. */
+	struct vy_rate_limit rate_limit[vy_quota_resource_type_MAX];
 	/**
 	 * Periodic timer that is used for refilling the rate
 	 * limit value.
@@ -188,18 +247,20 @@ void
 vy_quota_set_limit(struct vy_quota *q, size_t limit);
 
 /**
- * Set the max rate at which quota may be consumed,
- * in bytes per second.
+ * Set the rate limit corresponding to the resource of the given
+ * type. The rate limit is given in bytes per second.
  */
 void
-vy_quota_set_rate_limit(struct vy_quota *q, size_t rate);
+vy_quota_set_rate_limit(struct vy_quota *q, enum vy_quota_resource_type type,
+			size_t rate);
 
 /**
  * Consume @size bytes of memory. In contrast to vy_quota_use()
  * this function does not throttle the caller.
  */
 void
-vy_quota_force_use(struct vy_quota *q, size_t size);
+vy_quota_force_use(struct vy_quota *q, enum vy_quota_consumer_type type,
+		   size_t size);
 
 /**
  * Release @size bytes of memory.
@@ -242,7 +303,8 @@ vy_quota_release(struct vy_quota *q, size_t size);
  * account while estimating the size of a memory allocation.
  */
 int
-vy_quota_use(struct vy_quota *q, size_t size, double timeout);
+vy_quota_use(struct vy_quota *q, enum vy_quota_consumer_type type,
+	     size_t size, double timeout);
 
 /**
  * Adjust quota after allocating memory.
@@ -253,15 +315,16 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout);
  * See also vy_quota_use().
  */
 void
-vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used);
+vy_quota_adjust(struct vy_quota *q, enum vy_quota_consumer_type type,
+		size_t reserved, size_t used);
 
 /**
  * Block the caller until the quota is not exceeded.
  */
 static inline void
-vy_quota_wait(struct vy_quota *q)
+vy_quota_wait(struct vy_quota *q, enum vy_quota_consumer_type type)
 {
-	vy_quota_use(q, 0, TIMEOUT_INFINITY);
+	vy_quota_use(q, type, 0, TIMEOUT_INFINITY);
 }
 
 #if defined(__cplusplus)
