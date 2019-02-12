@@ -287,7 +287,13 @@ vy_quota_use(struct vy_quota *q, enum vy_quota_consumer_type type,
 		return -1;
 	}
 
-	if (vy_quota_may_use(q, type, size)) {
+	/*
+	 * Proceed only if there is enough quota available *and*
+	 * the wait queue is empty. The latter is necessary to ensure
+	 * fairness and avoid starvation among fibers queued earlier.
+	 */
+	if (rlist_empty(&q->wait_queue[type]) &&
+	    vy_quota_may_use(q, type, size)) {
 		vy_quota_do_use(q, type, size);
 		return 0;
 	}
