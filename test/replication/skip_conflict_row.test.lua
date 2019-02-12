@@ -46,8 +46,45 @@ test_run:cmd("switch default")
 test_run:cmd("restart server replica")
 -- applier is not in follow state
 box.info.replication[1].upstream.message
+
+--
+-- gh-3977: check that NOP is written instead of conflicting row.
+--
+replication = box.cfg.replication
+box.cfg{replication_skip_conflict = true, replication = {}}
+box.cfg{replication = replication}
 test_run:cmd("switch default")
 
+-- test if nop were really written
+box.space.test:truncate()
+test_run:cmd("restart server replica")
+test_run:cmd("switch replica")
+box.info.replication[1].upstream.status
+-- write some conflicting records on slave
+for i = 1, 10 do box.space.test:insert({i, 'r'}) end
+box.cfg{replication_skip_conflict = true}
+v1 = box.info.vclock[1]
+
+-- write some conflicting records on master
+test_run:cmd("switch default")
+for i = 1, 10 do box.space.test:insert({i, 'm'}) end
+
+test_run:cmd("switch replica")
+-- lsn should be incremented
+v1 == box.info.vclock[1] - 10
+-- and state is follow
+box.info.replication[1].upstream.status
+
+-- restart server and check replication continues from nop-ed vclock
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+for i = 11, 20 do box.space.test:insert({i, 'm'}) end
+test_run:cmd("start server replica")
+test_run:cmd("switch replica")
+box.info.replication[1].upstream.status
+box.space.test:select({11}, {iterator = "GE"})
+
+test_run:cmd("switch default")
 -- cleanup
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")

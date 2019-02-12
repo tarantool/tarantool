@@ -544,18 +544,28 @@ applier_subscribe(struct applier *applier)
 			int res = xstream_write(applier->subscribe_stream, &row);
 			if (res != 0) {
 				struct error *e = diag_last_error(diag_get());
-				/**
-				 * Silently skip ER_TUPLE_FOUND error if such
-				 * option is set in config.
+				/*
+				 * In case of ER_TUPLE_FOUND error and enabled
+				 * replication_skip_conflict configuration
+				 * option, skip applying the foreign row and
+				 * replace it with NOP in the local write ahead
+				 * log.
 				 */
 				if (e->type == &type_ClientError &&
 				    box_error_code(e) == ER_TUPLE_FOUND &&
-				    replication_skip_conflict)
+				    replication_skip_conflict) {
 					diag_clear(diag_get());
-				else {
-					latch_unlock(latch);
-					diag_raise();
+					struct xrow_header nop;
+					nop.type = IPROTO_NOP;
+					nop.bodycnt = 0;
+					nop.replica_id = row.replica_id;
+					nop.lsn = row.lsn;
+					res = xstream_write(applier->subscribe_stream, &nop);
 				}
+			}
+			if (res != 0) {
+				latch_unlock(latch);
+				diag_raise();
 			}
 		}
 		latch_unlock(latch);

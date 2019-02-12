@@ -141,6 +141,107 @@ box.info.replication[1].upstream.message
 ---
 - Duplicate key exists in unique index 'primary' in space 'test'
 ...
+--
+-- gh-3977: check that NOP is written instead of conflicting row.
+--
+replication = box.cfg.replication
+---
+...
+box.cfg{replication_skip_conflict = true, replication = {}}
+---
+...
+box.cfg{replication = replication}
+---
+...
+test_run:cmd("switch default")
+---
+- true
+...
+-- test if nop were really written
+box.space.test:truncate()
+---
+...
+test_run:cmd("restart server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.info.replication[1].upstream.status
+---
+- follow
+...
+-- write some conflicting records on slave
+for i = 1, 10 do box.space.test:insert({i, 'r'}) end
+---
+...
+box.cfg{replication_skip_conflict = true}
+---
+...
+v1 = box.info.vclock[1]
+---
+...
+-- write some conflicting records on master
+test_run:cmd("switch default")
+---
+- true
+...
+for i = 1, 10 do box.space.test:insert({i, 'm'}) end
+---
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+-- lsn should be incremented
+v1 == box.info.vclock[1] - 10
+---
+- true
+...
+-- and state is follow
+box.info.replication[1].upstream.status
+---
+- follow
+...
+-- restart server and check replication continues from nop-ed vclock
+test_run:cmd("switch default")
+---
+- true
+...
+test_run:cmd("stop server replica")
+---
+- true
+...
+for i = 11, 20 do box.space.test:insert({i, 'm'}) end
+---
+...
+test_run:cmd("start server replica")
+---
+- true
+...
+test_run:cmd("switch replica")
+---
+- true
+...
+box.info.replication[1].upstream.status
+---
+- follow
+...
+box.space.test:select({11}, {iterator = "GE"})
+---
+- - [11, 'm']
+  - [12, 'm']
+  - [13, 'm']
+  - [14, 'm']
+  - [15, 'm']
+  - [16, 'm']
+  - [17, 'm']
+  - [18, 'm']
+  - [19, 'm']
+  - [20, 'm']
+...
 test_run:cmd("switch default")
 ---
 - true
