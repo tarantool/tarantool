@@ -30,9 +30,11 @@
  */
 #include "memtx_rtree.h"
 
+#include <salad/rtree.h>
 #include <small/small.h>
 #include <small/mempool.h>
 
+#include "index.h"
 #include "errinj.h"
 #include "fiber.h"
 #include "trivia/util.h"
@@ -40,6 +42,12 @@
 #include "tuple.h"
 #include "space.h"
 #include "memtx_engine.h"
+
+struct memtx_rtree_index {
+	struct index base;
+	unsigned dimension;
+	struct rtree tree;
+};
 
 /* {{{ Utilities. *************************************************/
 
@@ -329,7 +337,7 @@ static const struct index_vtab memtx_rtree_index_vtab = {
 	/* .end_build = */ generic_index_end_build,
 };
 
-struct memtx_rtree_index *
+struct index *
 memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	assert(def->iid > 0);
@@ -373,5 +381,5 @@ memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def)
 	rtree_init(&index->tree, index->dimension, MEMTX_EXTENT_SIZE,
 		   memtx_index_extent_alloc, memtx_index_extent_free, memtx,
 		   distance_type);
-	return index;
+	return &index->base;
 }

@@ -30,26 +30,16 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include <stddef.h>
-#include <stdint.h>
-
-#include <salad/rtree.h>
-
-#include "index.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct index;
+struct index_def;
 struct memtx_engine;
 
-struct memtx_rtree_index {
-	struct index base;
-	unsigned dimension;
-	struct rtree tree;
-};
-
-struct memtx_rtree_index *
+struct index *
 memtx_rtree_index_new(struct memtx_engine *memtx, struct index_def *def);
 
 #if defined(__cplusplus)

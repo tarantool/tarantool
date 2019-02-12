@@ -31,6 +31,7 @@
 #include "memtx_hash.h"
 #include "say.h"
 #include "fiber.h"
+#include "index.h"
 #include "tuple.h"
 #include "memtx_engine.h"
 #include "space.h"
@@ -38,6 +39,44 @@
 #include "errinj.h"
 
 #include <small/mempool.h>
+
+static inline bool
+memtx_hash_equal(struct tuple *tuple_a, struct tuple *tuple_b,
+		 struct key_def *key_def)
+{
+	return tuple_compare(tuple_a, tuple_b, key_def) == 0;
+}
+
+static inline bool
+memtx_hash_equal_key(struct tuple *tuple, const char *key,
+		     struct key_def *key_def)
+{
+	return tuple_compare_with_key(tuple, key, key_def->part_count,
+				      key_def) == 0;
+}
+
+#define LIGHT_NAME _index
+#define LIGHT_DATA_TYPE struct tuple *
+#define LIGHT_KEY_TYPE const char *
+#define LIGHT_CMP_ARG_TYPE struct key_def *
+#define LIGHT_EQUAL(a, b, c) memtx_hash_equal(a, b, c)
+#define LIGHT_EQUAL_KEY(a, b, c) memtx_hash_equal_key(a, b, c)
+
+#include "salad/light.h"
+
+#undef LIGHT_NAME
+#undef LIGHT_DATA_TYPE
+#undef LIGHT_KEY_TYPE
+#undef LIGHT_CMP_ARG_TYPE
+#undef LIGHT_EQUAL
+#undef LIGHT_EQUAL_KEY
+
+struct memtx_hash_index {
+	struct index base;
+	struct light_index_core hash_table;
+	struct memtx_gc_task gc_task;
+	struct light_index_iterator gc_iterator;
+};
 
 /* {{{ MemtxHash Iterators ****************************************/
 
@@ -447,7 +486,7 @@ static const struct index_vtab memtx_hash_index_vtab = {
 	/* .end_build = */ generic_index_end_build,
 };
 
-struct memtx_hash_index *
+struct index *
 memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	if (!mempool_is_initialized(&memtx->hash_iterator_pool)) {
@@ -471,7 +510,7 @@ memtx_hash_index_new(struct memtx_engine *memtx, struct index_def *def)
 	light_index_create(&index->hash_table, MEMTX_EXTENT_SIZE,
 			   memtx_index_extent_alloc, memtx_index_extent_free,
 			   memtx, index->base.def->key_def);
-	return index;
+	return &index->base;
 }
 
 /* }}} */

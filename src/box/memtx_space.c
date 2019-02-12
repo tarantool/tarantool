@@ -716,21 +716,21 @@ sequence_data_index_create_snapshot_iterator(struct index *index)
 static struct index *
 sequence_data_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
-	struct memtx_hash_index *index = memtx_hash_index_new(memtx, def);
+	struct index *index = memtx_hash_index_new(memtx, def);
 	if (index == NULL)
 		return NULL;
 
 	static struct index_vtab vtab;
 	static bool vtab_initialized;
 	if (!vtab_initialized) {
-		vtab = *index->base.vtab;
+		vtab = *index->vtab;
 		vtab.create_snapshot_iterator =
 			sequence_data_index_create_snapshot_iterator;
 		vtab_initialized = true;
 	}
 
-	index->base.vtab = &vtab;
-	return &index->base;
+	index->vtab = &vtab;
+	return index;
 }
 
 static struct index *
@@ -751,13 +751,13 @@ memtx_space_create_index(struct space *space, struct index_def *index_def)
 
 	switch (index_def->type) {
 	case HASH:
-		return (struct index *)memtx_hash_index_new(memtx, index_def);
+		return memtx_hash_index_new(memtx, index_def);
 	case TREE:
-		return (struct index *)memtx_tree_index_new(memtx, index_def);
+		return memtx_tree_index_new(memtx, index_def);
 	case RTREE:
-		return (struct index *)memtx_rtree_index_new(memtx, index_def);
+		return memtx_rtree_index_new(memtx, index_def);
 	case BITSET:
-		return (struct index *)memtx_bitset_index_new(memtx, index_def);
+		return memtx_bitset_index_new(memtx, index_def);
 	default:
 		unreachable();
 		return NULL;

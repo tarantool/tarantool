@@ -31,35 +31,15 @@
  * SUCH DAMAGE.
  */
 
-/**
- * @brief Index API wrapper for bitset_index
- * @see bitset/index.h
- */
-#include "index.h"
-#include "bitset/index.h"
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct index;
+struct index_def;
 struct memtx_engine;
 
-#ifndef OLD_GOOD_BITSET
-struct matras;
-struct mh_bitset_index_t;
-#endif /*#ifndef OLD_GOOD_BITSET*/
-
-struct memtx_bitset_index {
-	struct index base;
-	struct tt_bitset_index index;
-#ifndef OLD_GOOD_BITSET
-	struct matras *id_to_tuple;
-	struct mh_bitset_index_t *tuple_to_id;
-	uint32_t spare_id;
-#endif /*#ifndef OLD_GOOD_BITSET*/
-};
-
-struct memtx_bitset_index *
+struct index *
 memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def);
 
 #if defined(__cplusplus)
