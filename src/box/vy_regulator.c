@@ -101,7 +101,8 @@ vy_regulator_trigger_dump(struct vy_regulator *regulator)
 	size_t max_write_rate = (double)mem_left / (mem_used + 1) *
 					regulator->dump_bandwidth;
 	max_write_rate = MIN(max_write_rate, regulator->dump_bandwidth);
-	vy_quota_set_rate_limit(quota, max_write_rate);
+	vy_quota_set_rate_limit(quota, VY_QUOTA_RESOURCE_MEMORY,
+				max_write_rate);
 }
 
 static void
@@ -202,7 +203,8 @@ void
 vy_regulator_start(struct vy_regulator *regulator)
 {
 	regulator->quota_used_last = regulator->quota->used;
-	vy_quota_set_rate_limit(regulator->quota, regulator->dump_bandwidth);
+	vy_quota_set_rate_limit(regulator->quota, VY_QUOTA_RESOURCE_MEMORY,
+				regulator->dump_bandwidth);
 	ev_timer_start(loop(), &regulator->timer);
 }
 
@@ -253,7 +255,8 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
 	 * limit to the dump bandwidth rather than disabling it
 	 * completely.
 	 */
-	vy_quota_set_rate_limit(regulator->quota, regulator->dump_bandwidth);
+	vy_quota_set_rate_limit(regulator->quota, VY_QUOTA_RESOURCE_MEMORY,
+				regulator->dump_bandwidth);
 }
 
 void
@@ -263,5 +266,6 @@ vy_regulator_reset_dump_bandwidth(struct vy_regulator *regulator, size_t max)
 	regulator->dump_bandwidth = VY_DUMP_BANDWIDTH_DEFAULT;
 	if (max > 0 && regulator->dump_bandwidth > max)
 		regulator->dump_bandwidth = max;
-	vy_quota_set_rate_limit(regulator->quota, regulator->dump_bandwidth);
+	vy_quota_set_rate_limit(regulator->quota, VY_QUOTA_RESOURCE_MEMORY,
+				regulator->dump_bandwidth);
 }

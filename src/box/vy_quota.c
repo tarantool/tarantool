@@ -52,6 +52,45 @@
 static const double VY_QUOTA_TIMER_PERIOD = 0.1;
 
 /**
+ * Bit mask of resources used by a particular consumer type.
+ */
+static unsigned
+vy_quota_consumer_resource_map[] = {
+	/**
+	 * Transaction throttling pursues two goals. First, it is
+	 * capping memory consumption rate so that the hard memory
+	 * limit will not be hit before memory dump has completed
+	 * (memory-based throttling). Second, we must make sure
+	 * that compaction jobs keep up with dumps to keep read and
+	 * space amplification within bounds (disk-based throttling).
+	 * Transactions ought to respect them both.
+	 */
+	[VY_QUOTA_CONSUMER_TX] = (1 << VY_QUOTA_RESOURCE_DISK) |
+				 (1 << VY_QUOTA_RESOURCE_MEMORY),
+	/**
+	 * Compaction jobs may need some quota too, because they
+	 * may generate deferred DELETEs for secondary indexes.
+	 * Apparently, we must not impose the rate limit that is
+	 * supposed to speed up compaction on them (disk-based),
+	 * however they still have to respect memory-based throttling
+	 * to avoid long stalls.
+	 */
+	[VY_QUOTA_CONSUMER_COMPACTION] = (1 << VY_QUOTA_RESOURCE_MEMORY),
+};
+
+/**
+ * Check if the rate limit corresponding to resource @resource_type
+ * should be applied to a consumer of type @consumer_type.
+ */
+static inline bool
+vy_rate_limit_is_applicable(enum vy_quota_consumer_type consumer_type,
+			    enum vy_quota_resource_type resource_type)
+{
+	return (vy_quota_consumer_resource_map[consumer_type] &
+					(1 << resource_type)) != 0;
+}
+
+/**
  * Return true if the requested amount of memory may be consumed
  * right now, false if consumers have to wait.
  *
@@ -60,7 +99,8 @@ static const double VY_QUOTA_TIMER_PERIOD = 0.1;
  * it can start memory reclaim immediately.
  */
 static inline bool
-vy_quota_may_use(struct vy_quota *q, size_t size)
+vy_quota_may_use(struct vy_quota *q, enum vy_quota_consumer_type type,
+		 size_t size)
 {
 	if (!q->is_enabled)
 		return true;
@@ -68,8 +108,12 @@ vy_quota_may_use(struct vy_quota *q, size_t size)
 		q->quota_exceeded_cb(q);
 		return false;
 	}
-	if (!vy_rate_limit_may_use(&q->rate_limit))
-		return false;
+	for (int i = 0; i < vy_quota_resource_type_MAX; i++) {
+		struct vy_rate_limit *rl = &q->rate_limit[i];
+		if (vy_rate_limit_is_applicable(type, i) &&
+		    !vy_rate_limit_may_use(rl))
+			return false;
+	}
 	return true;
 }
 
@@ -77,10 +121,15 @@ vy_quota_may_use(struct vy_quota *q, size_t size)
  * Consume the given amount of memory without checking the limit.
  */
 static inline void
-vy_quota_do_use(struct vy_quota *q, size_t size)
+vy_quota_do_use(struct vy_quota *q, enum vy_quota_consumer_type type,
+		size_t size)
 {
 	q->used += size;
-	vy_rate_limit_use(&q->rate_limit, size);
+	for (int i = 0; i < vy_quota_resource_type_MAX; i++) {
+		struct vy_rate_limit *rl = &q->rate_limit[i];
+		if (vy_rate_limit_is_applicable(type, i))
+			vy_rate_limit_use(rl, size);
+	}
 }
 
 /**
@@ -88,11 +137,16 @@ vy_quota_do_use(struct vy_quota *q, size_t size)
  * This function is an exact opposite of vy_quota_do_use().
  */
 static inline void
-vy_quota_do_unuse(struct vy_quota *q, size_t size)
+vy_quota_do_unuse(struct vy_quota *q, enum vy_quota_consumer_type type,
+		  size_t size)
 {
 	assert(q->used >= size);
 	q->used -= size;
-	vy_rate_limit_unuse(&q->rate_limit, size);
+	for (int i = 0; i < vy_quota_resource_type_MAX; i++) {
+		struct vy_rate_limit *rl = &q->rate_limit[i];
+		if (vy_rate_limit_is_applicable(type, i))
+			vy_rate_limit_unuse(rl, size);
+	}
 }
 
 /**
@@ -112,17 +166,31 @@ vy_quota_check_limit(struct vy_quota *q)
 static void
 vy_quota_signal(struct vy_quota *q)
 {
-	if (!rlist_empty(&q->wait_queue)) {
+	/*
+	 * To prevent starvation, wake up a consumer that has
+	 * waited most irrespective of its type.
+	 */
+	struct vy_quota_wait_node *oldest = NULL;
+	for (int i = 0; i < vy_quota_consumer_type_MAX; i++) {
+		struct rlist *wq = &q->wait_queue[i];
+		if (rlist_empty(wq))
+			continue;
+
 		struct vy_quota_wait_node *n;
-		n = rlist_first_entry(&q->wait_queue,
-				      struct vy_quota_wait_node, in_wait_queue);
+		n = rlist_first_entry(wq, struct vy_quota_wait_node,
+				      in_wait_queue);
 		/*
 		 * No need in waking up a consumer if it will have
 		 * to go back to sleep immediately.
 		 */
-		if (vy_quota_may_use(q, n->size))
-			fiber_wakeup(n->fiber);
+		if (!vy_quota_may_use(q, i, n->size))
+			continue;
+
+		if (oldest == NULL || oldest->ticket > n->ticket)
+			oldest = n;
 	}
+	if (oldest != NULL)
+		fiber_wakeup(oldest->fiber);
 }
 
 static void
@@ -133,7 +201,8 @@ vy_quota_timer_cb(ev_loop *loop, ev_timer *timer, int events)
 
 	struct vy_quota *q = timer->data;
 
-	vy_rate_limit_refill(&q->rate_limit, VY_QUOTA_TIMER_PERIOD);
+	for (int i = 0; i < vy_quota_resource_type_MAX; i++)
+		vy_rate_limit_refill(&q->rate_limit[i], VY_QUOTA_TIMER_PERIOD);
 	vy_quota_signal(q);
 }
 
@@ -146,8 +215,11 @@ vy_quota_create(struct vy_quota *q, size_t limit,
 	q->used = 0;
 	q->too_long_threshold = TIMEOUT_INFINITY;
 	q->quota_exceeded_cb = quota_exceeded_cb;
-	rlist_create(&q->wait_queue);
-	vy_rate_limit_create(&q->rate_limit);
+	q->wait_ticket = 0;
+	for (int i = 0; i < vy_quota_consumer_type_MAX; i++)
+		rlist_create(&q->wait_queue[i]);
+	for (int i = 0; i < vy_quota_resource_type_MAX; i++)
+		vy_rate_limit_create(&q->rate_limit[i]);
 	ev_timer_init(&q->timer, vy_quota_timer_cb, 0, VY_QUOTA_TIMER_PERIOD);
 	q->timer.data = q;
 }
@@ -176,15 +248,17 @@ vy_quota_set_limit(struct vy_quota *q, size_t limit)
 }
 
 void
-vy_quota_set_rate_limit(struct vy_quota *q, size_t rate)
+vy_quota_set_rate_limit(struct vy_quota *q, enum vy_quota_resource_type type,
+			size_t rate)
 {
-	vy_rate_limit_set(&q->rate_limit, rate);
+	vy_rate_limit_set(&q->rate_limit[type], rate);
 }
 
 void
-vy_quota_force_use(struct vy_quota *q, size_t size)
+vy_quota_force_use(struct vy_quota *q, enum vy_quota_consumer_type type,
+		   size_t size)
 {
-	vy_quota_do_use(q, size);
+	vy_quota_do_use(q, type, size);
 	vy_quota_check_limit(q);
 }
 
@@ -201,7 +275,8 @@ vy_quota_release(struct vy_quota *q, size_t size)
 }
 
 int
-vy_quota_use(struct vy_quota *q, size_t size, double timeout)
+vy_quota_use(struct vy_quota *q, enum vy_quota_consumer_type type,
+	     size_t size, double timeout)
 {
 	/*
 	 * Fail early if the configured memory limit never allows
@@ -212,8 +287,8 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 		return -1;
 	}
 
-	if (vy_quota_may_use(q, size)) {
-		vy_quota_do_use(q, size);
+	if (vy_quota_may_use(q, type, size)) {
+		vy_quota_do_use(q, type, size);
 		return 0;
 	}
 
@@ -224,8 +299,9 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 	struct vy_quota_wait_node wait_node = {
 		.fiber = fiber(),
 		.size = size,
+		.ticket = ++q->wait_ticket,
 	};
-	rlist_add_tail_entry(&q->wait_queue, &wait_node, in_wait_queue);
+	rlist_add_tail_entry(&q->wait_queue[type], &wait_node, in_wait_queue);
 
 	do {
 		double now = ev_monotonic_now(loop());
@@ -235,7 +311,7 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 			diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
 			return -1;
 		}
-	} while (!vy_quota_may_use(q, size));
+	} while (!vy_quota_may_use(q, type, size));
 
 	rlist_del_entry(&wait_node, in_wait_queue);
 
@@ -246,7 +322,7 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 				     wait_time);
 	}
 
-	vy_quota_do_use(q, size);
+	vy_quota_do_use(q, type, size);
 	/*
 	 * Blocked consumers are awaken one by one to preserve
 	 * the order they were put to sleep. It's a responsibility
@@ -258,14 +334,15 @@ vy_quota_use(struct vy_quota *q, size_t size, double timeout)
 }
 
 void
-vy_quota_adjust(struct vy_quota *q, size_t reserved, size_t used)
+vy_quota_adjust(struct vy_quota *q, enum vy_quota_consumer_type type,
+		size_t reserved, size_t used)
 {
 	if (reserved > used) {
-		vy_quota_do_unuse(q, reserved - used);
+		vy_quota_do_unuse(q, type, reserved - used);
 		vy_quota_signal(q);
 	}
 	if (reserved < used) {
-		vy_quota_do_use(q, used - reserved);
+		vy_quota_do_use(q, type, used - reserved);
 		vy_quota_check_limit(q);
 	}
 }
