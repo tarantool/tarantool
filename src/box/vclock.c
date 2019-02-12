@@ -41,7 +41,7 @@ vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
 {
 	assert(lsn >= 0);
 	assert(replica_id < VCLOCK_MAX);
-	int64_t prev_lsn = vclock->lsn[replica_id];
+	int64_t prev_lsn = vclock_get(vclock, replica_id);
 	assert(lsn > prev_lsn);
 	/* Easier add each time than check. */
 	vclock->map |= 1 << replica_id;
@@ -159,7 +159,8 @@ vclock_from_string(struct vclock *vclock, const char *str)
 			errno = 0;
 			lsn = strtoll(p, (char **)  &p, 10);
 			if (errno != 0 || lsn < 0 || lsn > INT64_MAX ||
-			    replica_id >= VCLOCK_MAX || vclock->lsn[replica_id] > 0)
+			    replica_id >= VCLOCK_MAX ||
+			    vclock_get(vclock, replica_id) > 0)
 				goto error;
 			vclock->map |= 1 << replica_id;
 			vclock->lsn[replica_id] = lsn;
