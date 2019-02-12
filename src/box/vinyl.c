@@ -274,6 +274,8 @@ vy_info_append_regulator(struct vy_env *env, struct info_handler *h)
 	info_append_int(h, "write_rate", r->write_rate);
 	info_append_int(h, "dump_bandwidth", r->dump_bandwidth);
 	info_append_int(h, "dump_watermark", r->dump_watermark);
+	info_append_int(h, "rate_limit", vy_quota_get_rate_limit(r->quota,
+							VY_QUOTA_CONSUMER_TX));
 	info_table_end(h); /* regulator */
 }
 
@@ -532,6 +534,7 @@ vinyl_engine_reset_stat(struct engine *engine)
 	memset(&xm->stat, 0, sizeof(xm->stat));
 
 	vy_scheduler_reset_stat(&env->scheduler);
+	vy_regulator_reset_stat(&env->regulator);
 }
 
 /** }}} Introspection */
@@ -2480,6 +2483,9 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	 */
 	vy_regulator_dump_complete(&env->regulator, mem_dumped, dump_duration);
 	vy_quota_release(quota, mem_dumped);
+
+	vy_regulator_update_rate_limit(&env->regulator, &scheduler->stat,
+				       scheduler->compaction_pool.size);
 }
 
 static struct vy_squash_queue *

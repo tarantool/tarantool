@@ -35,6 +35,8 @@
 #include <stddef.h>
 #include <tarantool_ev.h>
 
+#include "vy_stat.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
@@ -107,6 +109,16 @@ struct vy_regulator {
 	 * but vy_regulator_dump_complete() hasn't been called yet.
 	 */
 	bool dump_in_progress;
+	/**
+	 * Snapshot of scheduler statistics taken at the time of
+	 * the last rate limit update.
+	 */
+	struct vy_scheduler_stat sched_stat_last;
+	/**
+	 * Scheduler statistics for the most recent few dumps.
+	 * Used for calculating the rate limit.
+	 */
+	struct vy_scheduler_stat sched_stat_recent;
 };
 
 void
@@ -145,6 +157,21 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
  */
 void
 vy_regulator_reset_dump_bandwidth(struct vy_regulator *regulator, size_t max);
+
+/**
+ * Called when global statistics are reset by box.stat.reset().
+ */
+void
+vy_regulator_reset_stat(struct vy_regulator *regulator);
+
+/**
+ * Set transaction rate limit so as to ensure that compaction
+ * will keep up with dumps.
+ */
+void
+vy_regulator_update_rate_limit(struct vy_regulator *regulator,
+			       const struct vy_scheduler_stat *stat,
+			       int compaction_threads);
 
 #if defined(__cplusplus)
 } /* extern "C" */

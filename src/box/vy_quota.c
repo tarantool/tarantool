@@ -254,6 +254,18 @@ vy_quota_set_rate_limit(struct vy_quota *q, enum vy_quota_resource_type type,
 	vy_rate_limit_set(&q->rate_limit[type], rate);
 }
 
+size_t
+vy_quota_get_rate_limit(struct vy_quota *q, enum vy_quota_consumer_type type)
+{
+	size_t rate = SIZE_MAX;
+	for (int i = 0; i < vy_quota_resource_type_MAX; i++) {
+		struct vy_rate_limit *rl = &q->rate_limit[i];
+		if (vy_rate_limit_is_applicable(type, i))
+			rate = MIN(rate, rl->rate);
+	}
+	return rate;
+}
+
 void
 vy_quota_force_use(struct vy_quota *q, enum vy_quota_consumer_type type,
 		   size_t size)
