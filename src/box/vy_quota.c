@@ -294,26 +294,19 @@ vy_quota_use(struct vy_quota *q, enum vy_quota_consumer_type type,
 
 	/* Wait for quota. */
 	double wait_start = ev_monotonic_now(loop());
-	double deadline = wait_start + timeout;
-
 	struct vy_quota_wait_node wait_node = {
 		.fiber = fiber(),
 		.size = size,
 		.ticket = ++q->wait_ticket,
 	};
 	rlist_add_tail_entry(&q->wait_queue[type], &wait_node, in_wait_queue);
-
-	do {
-		double now = ev_monotonic_now(loop());
-		fiber_yield_timeout(deadline - now);
-		if (now >= deadline) {
-			rlist_del_entry(&wait_node, in_wait_queue);
-			diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
-			return -1;
-		}
-	} while (!vy_quota_may_use(q, type, size));
-
+	bool timed_out = fiber_yield_timeout(timeout);
 	rlist_del_entry(&wait_node, in_wait_queue);
+
+	if (timed_out) {
+		diag_set(ClientError, ER_VY_QUOTA_TIMEOUT);
+		return -1;
+	}
 
 	double wait_time = ev_monotonic_now(loop()) - wait_start;
 	if (wait_time > q->too_long_threshold) {
