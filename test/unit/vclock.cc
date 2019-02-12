@@ -308,7 +308,7 @@ test_fromstring_one(const char *str, uint32_t count, const int64_t *lsns)
 	vclock_create(&check);
 	for (uint32_t node_id = 0; node_id < count; node_id++) {
 		if (lsns[node_id] >= 0)
-			check.lsn[node_id] = lsns[node_id];
+			vclock_follow(&check, node_id, lsns[node_id]);
 	}
 
 	return (rc != 0 || vclock_compare(&vclock, &check) != 0);

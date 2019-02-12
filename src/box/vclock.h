@@ -48,7 +48,7 @@ extern "C" {
 
 enum {
 	/**
-	 * The maximum number of components in vclock
+	 * The maximum number of components in vclock, should be power of two.
 	 */
 	VCLOCK_MAX = 32,
 
@@ -129,7 +129,9 @@ vclock_iterator_next(struct vclock_iterator *it)
 static inline void
 vclock_create(struct vclock *vclock)
 {
-	memset(vclock, 0, sizeof(*vclock));
+	vclock->signature = 0;
+	vclock->map = 0;
+	vclock->lsn[0] = 0;
 }
 
 /**
@@ -139,8 +141,9 @@ vclock_create(struct vclock *vclock)
 static inline void
 vclock_clear(struct vclock *vclock)
 {
-	memset(vclock, 0, sizeof(*vclock));
 	vclock->signature = -1;
+	vclock->map = 0;
+	vclock->lsn[0] = 0;
 }
 
 /**
@@ -156,16 +159,24 @@ vclock_is_set(const struct vclock *vclock)
 static inline int64_t
 vclock_get(const struct vclock *vclock, uint32_t replica_id)
 {
-	if (replica_id >= VCLOCK_MAX)
-		return 0;
-	return vclock->lsn[replica_id];
+	/*
+	 * If replica_id does not fit in VCLOCK_MAX - 1 then
+	 * let result be undefined.
+	 */
+	replica_id &= VCLOCK_MAX - 1;
+	/* Evaluate a bitmask to avoid branching. */
+	int64_t mask = 0 - ((vclock->map >> replica_id) & 0x1);
+	return mask & vclock->lsn[replica_id];
 }
 
 static inline int64_t
 vclock_inc(struct vclock *vclock, uint32_t replica_id)
 {
 	/* Easier add each time than check. */
-	vclock->map |= 1 << replica_id;
+	if (((vclock->map >> replica_id) & 0x01) == 0) {
+		vclock->lsn[replica_id] = 0;
+		vclock->map |= 1 << replica_id;
+	}
 	vclock->signature++;
 	return ++vclock->lsn[replica_id];
 }
@@ -173,7 +184,13 @@ vclock_inc(struct vclock *vclock, uint32_t replica_id)
 static inline void
 vclock_copy(struct vclock *dst, const struct vclock *src)
 {
-	*dst = *src;
+	/*
+	 * Set the last bit of map because bit_clz_u32 returns
+	 * undefined result if zero passed.
+	 */
+	unsigned int max_pos = VCLOCK_MAX - bit_clz_u32(src->map | 0x01);
+	memcpy(dst, src, offsetof(struct vclock, lsn) +
+			 sizeof(*dst->lsn) * max_pos);
 }
 
 static inline uint32_t
@@ -253,8 +270,8 @@ vclock_compare(const struct vclock *a, const struct vclock *b)
 	for (size_t replica_id = bit_iterator_next(&it); replica_id < VCLOCK_MAX;
 	     replica_id = bit_iterator_next(&it)) {
 
-		int64_t lsn_a = a->lsn[replica_id];
-		int64_t lsn_b = b->lsn[replica_id];
+		int64_t lsn_a = vclock_get(a, replica_id);
+		int64_t lsn_b = vclock_get(b, replica_id);
 		le = le && lsn_a <= lsn_b;
 		ge = ge && lsn_a >= lsn_b;
 		if (!ge && !le)
