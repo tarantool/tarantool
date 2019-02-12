@@ -228,6 +228,20 @@ int64_t
 vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn);
 
 /**
+ * Merge all diff changes into the destination
+ * vclock and after reset the diff.
+ */
+static inline void
+vclock_merge(struct vclock *dst, struct vclock *diff)
+{
+	struct vclock_iterator it;
+	vclock_iterator_init(&it, diff);
+	vclock_foreach(&it, item)
+		vclock_follow(dst, item.id, vclock_get(dst, item.id) + item.lsn);
+	vclock_create(diff);
+}
+
+/**
  * \brief Format vclock to YAML-compatible string representation:
  * { replica_id: lsn, replica_id:lsn })
  * \param vclock vclock

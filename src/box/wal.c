@@ -727,17 +727,25 @@ wal_writer_begin_rollback(struct wal_writer *writer)
 	cpipe_push(&writer->tx_prio_pipe, &writer->in_rollback);
 }
 
+/*
+ * Assign lsn and replica identifier for local writes and track
+ * row into vclock_diff.
+ */
 static void
-wal_assign_lsn(struct vclock *vclock, struct xrow_header **row,
+wal_assign_lsn(struct vclock *vclock_diff, struct vclock *base,
+	       struct xrow_header **row,
 	       struct xrow_header **end)
 {
 	/** Assign LSN to all local rows. */
 	for ( ; row < end; row++) {
 		if ((*row)->replica_id == 0) {
-			(*row)->lsn = vclock_inc(vclock, instance_id);
+			(*row)->lsn = vclock_inc(vclock_diff, instance_id) +
+				      vclock_get(base, instance_id);
 			(*row)->replica_id = instance_id;
 		} else {
-			vclock_follow_xrow(vclock, *row);
+			vclock_follow(vclock_diff, (*row)->replica_id,
+				      (*row)->lsn - vclock_get(base,
+							       (*row)->replica_id));
 		}
 	}
 }
@@ -750,13 +758,12 @@ wal_write_to_disk(struct cmsg *msg)
 	struct error *error;
 
 	/*
-	 * In order not to promote writer's vclock in case of an error,
-	 * we create a copy to assign LSNs before rows are actually
-	 * written. After successful xlog flush we update writer's vclock
-	 * to the last written vclock value.
+	 * Track all vclock changes made by this batch into
+	 * vclock_diff variable and then apply it into writers'
+	 * vclock after each xlog flush.
 	 */
-	struct vclock vclock;
-	vclock_copy(&vclock, &writer->vclock);
+	struct vclock vclock_diff;
+	vclock_create(&vclock_diff);
 
 	struct errinj *inj = errinj(ERRINJ_WAL_DELAY, ERRINJ_BOOL);
 	while (inj != NULL && inj->bparam)
@@ -765,18 +772,21 @@ wal_write_to_disk(struct cmsg *msg)
 	if (writer->in_rollback.route != NULL) {
 		/* We're rolling back a failed write. */
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
+		vclock_copy(&wal_msg->vclock, &writer->vclock);
 		return;
 	}
 
 	/* Xlog is only rotated between queue processing  */
 	if (wal_opt_rotate(writer) != 0) {
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
+		vclock_copy(&wal_msg->vclock, &writer->vclock);
 		return wal_writer_begin_rollback(writer);
 	}
 
 	/* Ensure there's enough disk space before writing anything. */
 	if (wal_fallocate(writer, wal_msg->approx_len) != 0) {
 		stailq_concat(&wal_msg->rollback, &wal_msg->commit);
+		vclock_copy(&wal_msg->vclock, &writer->vclock);
 		return wal_writer_begin_rollback(writer);
 	}
 
@@ -809,14 +819,16 @@ wal_write_to_disk(struct cmsg *msg)
 	struct journal_entry *entry;
 	struct stailq_entry *last_committed = NULL;
 	stailq_foreach_entry(entry, &wal_msg->commit, fifo) {
-		wal_assign_lsn(&vclock, entry->rows, entry->rows + entry->n_rows);
-		entry->res = vclock_sum(&vclock);
+		wal_assign_lsn(&vclock_diff, &writer->vclock,
+			       entry->rows, entry->rows + entry->n_rows);
+		entry->res = vclock_sum(&vclock_diff) +
+			     vclock_sum(&writer->vclock);
 		int rc = xlog_write_entry(l, entry);
 		if (rc < 0)
 			goto done;
 		if (rc > 0) {
 			last_committed = &entry->fifo;
-			vclock_copy(&writer->vclock, &vclock);
+			vclock_merge(&writer->vclock, &vclock_diff);
 		}
 		/* rc == 0: the write is buffered in xlog_tx */
 	}
@@ -824,7 +836,7 @@ wal_write_to_disk(struct cmsg *msg)
 		goto done;
 
 	last_committed = stailq_last(&wal_msg->commit);
-	vclock_copy(&writer->vclock, &vclock);
+	vclock_merge(&writer->vclock, &vclock_diff);
 
 done:
 	error = diag_last_error(diag_get());
@@ -977,7 +989,11 @@ wal_write_in_wal_mode_none(struct journal *journal,
 			   struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
-	wal_assign_lsn(&writer->vclock, entry->rows, entry->rows + entry->n_rows);
+	struct vclock vclock_diff;
+	vclock_create(&vclock_diff);
+	wal_assign_lsn(&vclock_diff, &writer->vclock, entry->rows,
+		       entry->rows + entry->n_rows);
+	vclock_merge(&writer->vclock, &vclock_diff);
 	vclock_copy(&replicaset.vclock, &writer->vclock);
 	return vclock_sum(&writer->vclock);
 }
