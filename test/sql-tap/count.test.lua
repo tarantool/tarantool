@@ -13,7 +13,7 @@ test:plan(30)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing "SELECT count(*)" statements.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -30,7 +30,7 @@ test:plan(30)
 --
 -- do_test count-0.1 {
 --   db eval {
---      SELECT count(*) FROM sqlite_master;
+--      SELECT count(*) FROM sql_master;
 --   }
 -- } {0}
 iTest = 0
@@ -208,7 +208,7 @@ test:do_test(
     end, 0)
 
 -- ifcapable vtab {
---   register_echo_module [sqlite3_connection_pointer db]
+--   register_echo_module [sql_connection_pointer db]
 --   do_test count-2.14 {
 --     execsql { CREATE VIRTUAL TABLE techo USING echo(t1); }
 --     uses_op_count {SELECT count(*) FROM techo}

@@ -319,7 +319,7 @@ test:do_execsql_test(
 --   SELECT * FROM t1 WHERE likely(a=?)
 -- } {0 0 0 {SCAN TABLE t1}}
 -- 2015-06-18
--- Ticket [https://www.sqlite.org/see/tktview/472f0742a1868fb58862bc588ed70]
+-- Ticket [https://www.sql.org/see/tktview/472f0742a1868fb58862bc588ed70]
 --
 
 test:do_execsql_test(

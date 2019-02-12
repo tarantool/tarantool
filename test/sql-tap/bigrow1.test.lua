@@ -13,7 +13,7 @@ test:plan(60)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is stressing the library by putting large amounts
 -- of data in a single row of a table.
 --
@@ -41,7 +41,7 @@ test:do_execsql_test(
     "bigrow-1.1",
     [[
         CREATE TABLE t1(id INT PRIMARY KEY AUTOINCREMENT, a TEXT UNIQUE, b TEXT, c TEXT);
-        --SELECT name FROM sqlite_master
+        --SELECT name FROM sql_master
         --  WHERE type='table' OR type='index'
         --  ORDER BY name
     ]], {

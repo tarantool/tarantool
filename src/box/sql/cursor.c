@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "tarantoolInt.h"
 #include "box/tuple.h"
 
@@ -51,7 +51,7 @@ sql_cursor_cleanup(struct BtCursor *cursor)
  * Initialize memory that will be converted into a BtCursor object.
  */
 void
-sqlite3CursorZero(BtCursor * p)
+sqlCursorZero(BtCursor * p)
 {
 	memset(p, 0, sizeof(*p));
 }
@@ -63,7 +63,7 @@ sql_cursor_close(struct BtCursor *cursor)
 	assert((cursor->curFlags & BTCF_TaCursor) ||
 	       (cursor->curFlags & BTCF_TEphemCursor));
 	if (cursor->curFlags & BTCF_TEphemCursor)
-		tarantoolSqlite3EphemeralDrop(cursor);
+		tarantoolsqlEphemeralDrop(cursor);
 	sql_cursor_cleanup(cursor);
 }
 
@@ -74,13 +74,13 @@ sql_cursor_close(struct BtCursor *cursor)
  * This is a verification routine is used only within assert() statements.
  */
 int
-sqlite3CursorIsValid(BtCursor *pCur)
+sqlCursorIsValid(BtCursor *pCur)
 {
 	return pCur && pCur->eState == CURSOR_VALID;
 }
 #endif				/* NDEBUG */
 int
-sqlite3CursorIsValidNN(BtCursor *pCur)
+sqlCursorIsValidNN(BtCursor *pCur)
 {
 	assert(pCur != 0);
 	return pCur->eState == CURSOR_VALID;
@@ -91,15 +91,15 @@ sqlite3CursorIsValidNN(BtCursor *pCur)
  * pointing.  "amt" bytes will be transferred into pBuf[].  The transfer
  * begins at "offset".
  *
- * For sqlite3CursorPayload(), the caller must ensure that pCur is pointing
+ * For sqlCursorPayload(), the caller must ensure that pCur is pointing
  * to a valid row in the table.
  *
- * Return SQLITE_OK on success or an error code if anything goes
+ * Return SQL_OK on success or an error code if anything goes
  * wrong.  An error is returned if "offset+amt" is larger than
  * the available payload.
  */
 int
-sqlite3CursorPayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf)
+sqlCursorPayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf)
 {
 	assert(pCur->eState == CURSOR_VALID);
 	assert((pCur->curFlags & BTCF_TaCursor) ||
@@ -107,10 +107,10 @@ sqlite3CursorPayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf)
 
 	const void *pPayload;
 	u32 sz;
-	pPayload = tarantoolSqlite3PayloadFetch(pCur, &sz);
+	pPayload = tarantoolsqlPayloadFetch(pCur, &sz);
 	assert((uptr) (offset + amt) <= sz);
 	memcpy(pBuf, pPayload + offset, amt);
-	return SQLITE_OK;
+	return SQL_OK;
 }
 
 /* Move the cursor so that it points to an entry near the key
@@ -138,7 +138,7 @@ sqlite3CursorPayload(BtCursor *pCur, u32 offset, u32 amt, void *pBuf)
  */
 
 int
-sqlite3CursorMovetoUnpacked(BtCursor * pCur,	/* The cursor to be moved */
+sqlCursorMovetoUnpacked(BtCursor * pCur,	/* The cursor to be moved */
 			   UnpackedRecord * pIdxKey,	/* Unpacked index key */
 			   int *pRes	/* Write search results here */
     )
@@ -148,11 +148,11 @@ sqlite3CursorMovetoUnpacked(BtCursor * pCur,	/* The cursor to be moved */
 	assert((pCur->curFlags & BTCF_TaCursor) ||
 	       (pCur->curFlags & BTCF_TEphemCursor));
 
-	return tarantoolSqlite3MovetoUnpacked(pCur, pIdxKey, pRes);
+	return tarantoolsqlMovetoUnpacked(pCur, pIdxKey, pRes);
 }
 
 int
-sqlite3CursorNext(BtCursor *pCur, int *pRes)
+sqlCursorNext(BtCursor *pCur, int *pRes)
 {
 	assert(pRes != 0);
 	assert(*pRes == 0 || *pRes == 1);
@@ -160,11 +160,11 @@ sqlite3CursorNext(BtCursor *pCur, int *pRes)
 	       (pCur->curFlags & BTCF_TEphemCursor));
 
 	*pRes = 0;
-	return tarantoolSqlite3Next(pCur, pRes);
+	return tarantoolsqlNext(pCur, pRes);
 }
 
 int
-sqlite3CursorPrevious(BtCursor *pCur, int *pRes)
+sqlCursorPrevious(BtCursor *pCur, int *pRes)
 {
 	assert(pRes != 0);
 	assert(*pRes == 0 || *pRes == 1);
@@ -172,5 +172,5 @@ sqlite3CursorPrevious(BtCursor *pCur, int *pRes)
 	       (pCur->curFlags & BTCF_TEphemCursor));
 
 	*pRes = 0;
-	return tarantoolSqlite3Previous(pCur, pRes);
+	return tarantoolsqlPrevious(pCur, pRes);
 }

@@ -13,7 +13,7 @@ test:plan(14)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for N-way joins (N>2) which make
 -- use of USING or NATURAL JOIN.  For such joins, the USING and

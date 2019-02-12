@@ -35,7 +35,7 @@
  * resolve all identifiers by associating them with a particular
  * table and column.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -64,7 +64,7 @@ incrAggFunctionDepth(Expr * pExpr, int N)
 		memset(&w, 0, sizeof(w));
 		w.xExprCallback = incrAggDepth;
 		w.u.n = N;
-		sqlite3WalkExpr(&w, pExpr);
+		sqlWalkExpr(&w, pExpr);
 	}
 }
 
@@ -98,20 +98,20 @@ resolveAlias(Parse * pParse,	/* Parsing context */
 {
 	Expr *pOrig;		/* The iCol-th column of the result set */
 	Expr *pDup;		/* Copy of pOrig */
-	sqlite3 *db;		/* The database connection */
+	sql *db;		/* The database connection */
 
 	assert(iCol >= 0 && iCol < pEList->nExpr);
 	pOrig = pEList->a[iCol].pExpr;
 	assert(pOrig != 0);
 	db = pParse->db;
-	pDup = sqlite3ExprDup(db, pOrig, 0);
+	pDup = sqlExprDup(db, pOrig, 0);
 	if (pDup == 0)
 		return;
 	if (zType[0] != 'G')
 		incrAggFunctionDepth(pDup, nSubquery);
 	if (pExpr->op == TK_COLLATE) {
 		pDup =
-		    sqlite3ExprAddCollateString(pParse, pDup, pExpr->u.zToken);
+		    sqlExprAddCollateString(pParse, pDup, pExpr->u.zToken);
 	}
 	ExprSetProperty(pDup, EP_Alias);
 
@@ -119,18 +119,18 @@ resolveAlias(Parse * pParse,	/* Parsing context */
 	 * prevents ExprDelete() from deleting the Expr structure itself,
 	 * allowing it to be repopulated by the memcpy() on the following line.
 	 * The pExpr->u.zToken might point into memory that will be freed by the
-	 * sqlite3DbFree(db, pDup) on the last line of this block, so be sure to
-	 * make a copy of the token before doing the sqlite3DbFree().
+	 * sqlDbFree(db, pDup) on the last line of this block, so be sure to
+	 * make a copy of the token before doing the sqlDbFree().
 	 */
 	ExprSetProperty(pExpr, EP_Static);
 	sql_expr_delete(db, pExpr, false);
 	memcpy(pExpr, pDup, sizeof(*pExpr));
 	if (!ExprHasProperty(pExpr, EP_IntValue) && pExpr->u.zToken != 0) {
 		assert((pExpr->flags & (EP_Reduced | EP_TokenOnly)) == 0);
-		pExpr->u.zToken = sqlite3DbStrDup(db, pExpr->u.zToken);
+		pExpr->u.zToken = sqlDbStrDup(db, pExpr->u.zToken);
 		pExpr->flags |= EP_MemToken;
 	}
-	sqlite3DbFree(db, pDup);
+	sqlDbFree(db, pDup);
 }
 
 /*
@@ -160,14 +160,14 @@ nameInUsingClause(IdList * pUsing, const char *zCol)
  * match anything.
  */
 int
-sqlite3MatchSpanName(const char *zSpan,
+sqlMatchSpanName(const char *zSpan,
 		     const char *zCol, const char *zTab
 	)
 {
 	int n;
 	for (n = 0; ALWAYS(zSpan[n]) && zSpan[n] != '.'; n++) {
 	}
-	if (zTab && (sqlite3StrNICmp(zSpan, zTab, n) != 0 || zTab[n] != 0)) {
+	if (zTab && (sqlStrNICmp(zSpan, zTab, n) != 0 || zTab[n] != 0)) {
 		return 0;
 	}
 	zSpan += n + 1;
@@ -213,7 +213,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 	int cnt = 0;		/* Number of matching column names */
 	int cntTab = 0;		/* Number of matching table names */
 	int nSubquery = 0;	/* How many levels of subquery */
-	sqlite3 *db = pParse->db;	/* The database connection */
+	sql *db = pParse->db;	/* The database connection */
 	struct SrcList_item *pItem;	/* Use for looping over pSrcList items */
 	struct SrcList_item *pMatch = 0;	/* The matching pSrcList item */
 	NameContext *pTopNC = pNC;	/* First namecontext in the list */
@@ -246,7 +246,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 					int hit = 0;
 					pEList = pItem->pSelect->pEList;
 					for (j = 0; j < pEList->nExpr; j++) {
-						if (sqlite3MatchSpanName
+						if (sqlMatchSpanName
 						    (pEList->a[j].zSpan, zCol,
 						     zTab)) {
 							cnt++;
@@ -315,11 +315,11 @@ lookupName(Parse * pParse,	/* The parsing context */
 			int op = pParse->eTriggerOp;
 			assert(op == TK_DELETE || op == TK_UPDATE
 			       || op == TK_INSERT);
-			if (op != TK_DELETE && sqlite3StrICmp("new", zTab) == 0) {
+			if (op != TK_DELETE && sqlStrICmp("new", zTab) == 0) {
 				pExpr->iTable = 1;
 				pTab = pParse->pTriggerTab;
 			} else if (op != TK_INSERT
-				   && sqlite3StrICmp("old", zTab) == 0) {
+				   && sqlStrICmp("old", zTab) == 0) {
 				pExpr->iTable = 0;
 				pTab = pParse->pTriggerTab;
 			} else {
@@ -377,9 +377,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 		 *
 		 * The ability to use an output result-set column in the WHERE, GROUP BY,
 		 * or HAVING clauses, or as part of a larger expression in the ORDER BY
-		 * clause is not standard SQL.  This is a (goofy) SQLite extension, that
+		 * clause is not standard SQL.  This is a (goofy) sql extension, that
 		 * is supported for backwards compatibility only. Hence, we issue a warning
-		 * on sqlite3_log() whenever the capability is used.
+		 * on sql_log() whenever the capability is used.
 		 */
 		if ((pEList = pNC->pEList) != 0 && zTab == 0 && cnt == 0) {
 			for (j = 0; j < pEList->nExpr; j++) {
@@ -393,13 +393,13 @@ lookupName(Parse * pParse,	/* The parsing context */
 					pOrig = pEList->a[j].pExpr;
 					if ((pNC->ncFlags & NC_AllowAgg) == 0
 					    && ExprHasProperty(pOrig, EP_Agg)) {
-						sqlite3ErrorMsg(pParse,
+						sqlErrorMsg(pParse,
 								"misuse of aliased aggregate %s",
 								zAs);
 						return WRC_Abort;
 					}
-					if (sqlite3ExprVectorSize(pOrig) != 1) {
-						sqlite3ErrorMsg(pParse,
+					if (sqlExprVectorSize(pOrig) != 1) {
+						sqlErrorMsg(pParse,
 								"row value misused");
 						return WRC_Abort;
 					}
@@ -430,9 +430,9 @@ lookupName(Parse * pParse,	/* The parsing context */
 		const char *zErr;
 		zErr = cnt == 0 ? "no such column" : "ambiguous column name";
 		if (zTab) {
-			sqlite3ErrorMsg(pParse, "%s: %s.%s", zErr, zTab, zCol);
+			sqlErrorMsg(pParse, "%s: %s.%s", zErr, zTab, zCol);
 		} else {
-			sqlite3ErrorMsg(pParse, "%s: %s", zErr, zCol);
+			sqlErrorMsg(pParse, "%s: %s", zErr, zCol);
 		}
 		pTopNC->nErr++;
 	}
@@ -484,9 +484,9 @@ lookupName(Parse * pParse,	/* The parsing context */
  * from datasource iSrc in SrcList pSrc.
  */
 Expr *
-sqlite3CreateColumnExpr(sqlite3 * db, SrcList * pSrc, int iSrc, int iCol)
+sqlCreateColumnExpr(sql * db, SrcList * pSrc, int iSrc, int iCol)
 {
-	Expr *p = sqlite3ExprAlloc(db, TK_COLUMN, 0, 0);
+	Expr *p = sqlExprAlloc(db, TK_COLUMN, 0, 0);
 	if (p) {
 		struct SrcList_item *pItem = &pSrc->a[iSrc];
 		p->space_def = pItem->pTab->def;
@@ -521,7 +521,7 @@ notValid(Parse * pParse,	/* Leave error message here */
 			zIn = "CHECK constraints";
 		else
 			unreachable();
-		sqlite3ErrorMsg(pParse, "%s prohibited in %s", zMsg, zIn);
+		sqlErrorMsg(pParse, "%s prohibited in %s", zMsg, zIn);
 	}
 }
 
@@ -536,7 +536,7 @@ exprProbability(Expr * p)
 	double r = -1.0;
 	if (p->op != TK_FLOAT)
 		return -1;
-	sqlite3AtoF(p->u.zToken, &r, sqlite3Strlen30(p->u.zToken));
+	sqlAtoF(p->u.zToken, &r, sqlStrlen30(p->u.zToken));
 	assert(r >= 0.0);
 	if (r > 1.0)
 		return -1;
@@ -544,7 +544,7 @@ exprProbability(Expr * p)
 }
 
 /*
- * This routine is callback for sqlite3WalkExpr().
+ * This routine is callback for sqlWalkExpr().
  *
  * Resolve symbolic names into TK_COLUMN operators for the current
  * node in the expression tree.  Return 0 to continue the search down
@@ -625,11 +625,11 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 
 			assert(!ExprHasProperty(pExpr, EP_xIsSelect));
 			zId = pExpr->u.zToken;
-			nId = sqlite3Strlen30(zId);
-			pDef = sqlite3FindFunction(pParse->db, zId, n, 0);
+			nId = sqlStrlen30(zId);
+			pDef = sqlFindFunction(pParse->db, zId, n, 0);
 			if (pDef == 0) {
 				pDef =
-				    sqlite3FindFunction(pParse->db, zId, -2,0);
+				    sqlFindFunction(pParse->db, zId, -2,0);
 				if (pDef == 0) {
 					no_such_func = 1;
 				} else {
@@ -638,7 +638,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			} else {
 				is_agg = pDef->xFinalize != 0;
 				pExpr->type = pDef->ret_type;
-				if (pDef->funcFlags & SQLITE_FUNC_UNLIKELY) {
+				if (pDef->funcFlags & SQL_FUNC_UNLIKELY) {
 					ExprSetProperty(pExpr,
 							EP_Unlikely | EP_Skip);
 					if (n == 2) {
@@ -646,7 +646,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 						    exprProbability(pList->a[1].
 								    pExpr);
 						if (pExpr->iTable < 0) {
-							sqlite3ErrorMsg(pParse,
+							sqlErrorMsg(pParse,
 									"second argument to likelihood() must be a "
 									"constant between 0.0 and 1.0");
 							pNC->nErr++;
@@ -668,15 +668,15 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 					}
 				}
 				if (pDef->
-				    funcFlags & (SQLITE_FUNC_CONSTANT |
-						 SQLITE_FUNC_SLOCHNG)) {
+				    funcFlags & (SQL_FUNC_CONSTANT |
+						 SQL_FUNC_SLOCHNG)) {
 					/* For the purposes of the EP_ConstFunc flag, date and time
 					 * functions and other functions that change slowly are considered
 					 * constant because they are constant for the duration of one query
 					 */
 					ExprSetProperty(pExpr, EP_ConstFunc);
 				}
-				if ((pDef->funcFlags & SQLITE_FUNC_CONSTANT) ==
+				if ((pDef->funcFlags & SQL_FUNC_CONSTANT) ==
 				    0) {
 					/* Date/time functions that use 'now', and other functions
 					 * that might change over time cannot be used
@@ -688,35 +688,35 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 			}
 			if (is_agg && (pNC->ncFlags & NC_AllowAgg) == 0) {
-				sqlite3ErrorMsg(pParse,
+				sqlErrorMsg(pParse,
 						"misuse of aggregate function %.*s()",
 						nId, zId);
 				pNC->nErr++;
 				is_agg = 0;
 			} else if (no_such_func && pParse->db->init.busy == 0
-#ifdef SQLITE_ENABLE_UNKNOWN_SQL_FUNCTION
+#ifdef SQL_ENABLE_UNKNOWN_SQL_FUNCTION
 				   && pParse->explain == 0
 #endif
 			    ) {
-				sqlite3ErrorMsg(pParse,
+				sqlErrorMsg(pParse,
 						"no such function: %.*s", nId,
 						zId);
 				pNC->nErr++;
 			} else if (wrong_num_args) {
-				sqlite3ErrorMsg(pParse,
+				sqlErrorMsg(pParse,
 						"wrong number of arguments to function %.*s()",
 						nId, zId);
 				pNC->nErr++;
 			}
 			if (is_agg)
 				pNC->ncFlags &= ~NC_AllowAgg;
-			sqlite3WalkExprList(pWalker, pList);
+			sqlWalkExprList(pWalker, pList);
 			if (is_agg) {
 				NameContext *pNC2 = pNC;
 				pExpr->op = TK_AGG_FUNCTION;
 				pExpr->op2 = 0;
 				while (pNC2
-				       && !sqlite3FunctionUsesThisSrc(pExpr,
+				       && !sqlFunctionUsesThisSrc(pExpr,
 								      pNC2->
 								      pSrcList))
 				{
@@ -725,15 +725,15 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 				assert(pDef != 0);
 				if (pNC2) {
-					assert(SQLITE_FUNC_MINMAX ==
+					assert(SQL_FUNC_MINMAX ==
 					       NC_MinMaxAgg);
 					testcase((pDef->
 						  funcFlags &
-						  SQLITE_FUNC_MINMAX) != 0);
+						  SQL_FUNC_MINMAX) != 0);
 					pNC2->ncFlags |=
 					    NC_HasAgg | (pDef->
 							 funcFlags &
-							 SQLITE_FUNC_MINMAX);
+							 SQL_FUNC_MINMAX);
 
 				}
 				pNC->ncFlags |= NC_AllowAgg;
@@ -749,7 +749,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				int nRef = pNC->nRef;
 				notValid(pParse, pNC, "subqueries",
 					 NC_IsCheck | NC_IdxExpr);
-				sqlite3WalkSelect(pWalker, pExpr->x.pSelect);
+				sqlWalkSelect(pWalker, pExpr->x.pSelect);
 				assert(pNC->nRef >= nRef);
 				if (nRef != pNC->nRef) {
 					ExprSetProperty(pExpr, EP_VarSelect);
@@ -774,20 +774,20 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			if (pParse->db->mallocFailed)
 				break;
 			assert(pExpr->pLeft != 0);
-			nLeft = sqlite3ExprVectorSize(pExpr->pLeft);
+			nLeft = sqlExprVectorSize(pExpr->pLeft);
 			if (pExpr->op == TK_BETWEEN) {
 				nRight =
-				    sqlite3ExprVectorSize(pExpr->x.pList->a[0].
+				    sqlExprVectorSize(pExpr->x.pList->a[0].
 							  pExpr);
 				if (nRight == nLeft) {
 					nRight =
-					    sqlite3ExprVectorSize(pExpr->x.
+					    sqlExprVectorSize(pExpr->x.
 								  pList->a[1].
 								  pExpr);
 				}
 			} else {
 				assert(pExpr->pRight != 0);
-				nRight = sqlite3ExprVectorSize(pExpr->pRight);
+				nRight = sqlExprVectorSize(pExpr->pRight);
 			}
 			if (nLeft != nRight) {
 				testcase(pExpr->op == TK_EQ);
@@ -797,7 +797,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				testcase(pExpr->op == TK_GT);
 				testcase(pExpr->op == TK_GE);
 				testcase(pExpr->op == TK_BETWEEN);
-				sqlite3ErrorMsg(pParse, "row value misused");
+				sqlErrorMsg(pParse, "row value misused");
 			}
 			break;
 		}
@@ -867,11 +867,11 @@ resolveOrderByTermToExprList(Parse * pParse,	/* Parsing context for error messag
 	int i;			/* Loop counter */
 	ExprList *pEList;	/* The columns of the result set */
 	NameContext nc;		/* Name context for resolving pE */
-	sqlite3 *db;		/* Database connection */
+	sql *db;		/* Database connection */
 	int rc;			/* Return code from subprocedures */
 	u8 savedSuppErr;	/* Saved value of db->suppressErr */
 
-	assert(sqlite3ExprIsInteger(pE, &i) == 0);
+	assert(sqlExprIsInteger(pE, &i) == 0);
 	pEList = pSelect->pEList;
 
 	/* Resolve all names in the ORDER BY term expression
@@ -885,7 +885,7 @@ resolveOrderByTermToExprList(Parse * pParse,	/* Parsing context for error messag
 	db = pParse->db;
 	savedSuppErr = db->suppressErr;
 	db->suppressErr = 1;
-	rc = sqlite3ResolveExprNames(&nc, pE);
+	rc = sqlResolveExprNames(&nc, pE);
 	db->suppressErr = savedSuppErr;
 	if (rc)
 		return 0;
@@ -895,7 +895,7 @@ resolveOrderByTermToExprList(Parse * pParse,	/* Parsing context for error messag
 	 * result-set entry.
 	 */
 	for (i = 0; i < pEList->nExpr; i++) {
-		if (sqlite3ExprCompare(pEList->a[i].pExpr, pE, -1) < 2) {
+		if (sqlExprCompare(pEList->a[i].pExpr, pE, -1) < 2) {
 			return i + 1;
 		}
 	}
@@ -914,7 +914,7 @@ resolveOutOfRangeError(Parse * pParse,	/* The error context into which to write 
 		       int mx	/* Largest permissible value of i */
     )
 {
-	sqlite3ErrorMsg(pParse,
+	sqlErrorMsg(pParse,
 			"%r %s BY term out of range - should be "
 			"between 1 and %d", i, zType, mx);
 }
@@ -942,16 +942,16 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	int i;
 	ExprList *pOrderBy;
 	ExprList *pEList;
-	sqlite3 *db;
+	sql *db;
 	int moreToDo = 1;
 
 	pOrderBy = pSelect->pOrderBy;
 	if (pOrderBy == 0)
 		return 0;
 	db = pParse->db;
-#if SQLITE_MAX_COLUMN
-	if (pOrderBy->nExpr > db->aLimit[SQLITE_LIMIT_COLUMN]) {
-		sqlite3ErrorMsg(pParse, "too many terms in ORDER BY clause");
+#if SQL_MAX_COLUMN
+	if (pOrderBy->nExpr > db->aLimit[SQL_LIMIT_COLUMN]) {
+		sqlErrorMsg(pParse, "too many terms in ORDER BY clause");
 		return 1;
 	}
 #endif
@@ -974,8 +974,8 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 			Expr *pE, *pDup;
 			if (pItem->done)
 				continue;
-			pE = sqlite3ExprSkipCollate(pItem->pExpr);
-			if (sqlite3ExprIsInteger(pE, &iCol)) {
+			pE = sqlExprSkipCollate(pItem->pExpr);
+			if (sqlExprIsInteger(pE, &iCol)) {
 				if (iCol <= 0 || iCol > pEList->nExpr) {
 					resolveOutOfRangeError(pParse, "ORDER",
 							       i + 1,
@@ -985,7 +985,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 			} else {
 				iCol = resolveAsName(pParse, pEList, pE);
 				if (iCol == 0) {
-					pDup = sqlite3ExprDup(db, pE, 0);
+					pDup = sqlExprDup(db, pE, 0);
 					if (!db->mallocFailed) {
 						assert(pDup);
 						iCol =
@@ -999,7 +999,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 				/* Convert the ORDER BY term into an integer column number iCol,
 				 * taking care to preserve the COLLATE clause if it exists
 				 */
-				Expr *pNew = sqlite3Expr(db, TK_INTEGER, 0);
+				Expr *pNew = sqlExpr(db, TK_INTEGER, 0);
 				if (pNew == 0)
 					return 1;
 				pNew->flags |= EP_IntValue;
@@ -1025,7 +1025,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	}
 	for (i = 0; i < pOrderBy->nExpr; i++) {
 		if (pOrderBy->a[i].done == 0) {
-			sqlite3ErrorMsg(pParse,
+			sqlErrorMsg(pParse,
 					"%r ORDER BY term does not match any "
 					"column in the result set", i + 1);
 			return 1;
@@ -1045,28 +1045,28 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
  * return non-zero.  Return zero if no errors are seen.
  */
 int
-sqlite3ResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages here */
+sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages here */
 			   Select * pSelect,	/* The SELECT statement containing the clause */
 			   ExprList * pOrderBy,	/* The ORDER BY or GROUP BY clause to be processed */
 			   const char *zType	/* "ORDER" or "GROUP" */
     )
 {
 	int i;
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 	ExprList *pEList;
 	struct ExprList_item *pItem;
 
 	if (pOrderBy == 0 || pParse->db->mallocFailed)
 		return 0;
-#if SQLITE_MAX_COLUMN
-	if (pOrderBy->nExpr > db->aLimit[SQLITE_LIMIT_COLUMN]) {
-		sqlite3ErrorMsg(pParse, "too many terms in %s BY clause",
+#if SQL_MAX_COLUMN
+	if (pOrderBy->nExpr > db->aLimit[SQL_LIMIT_COLUMN]) {
+		sqlErrorMsg(pParse, "too many terms in %s BY clause",
 				zType);
 		return 1;
 	}
 #endif
 	pEList = pSelect->pEList;
-	assert(pEList != 0);	/* sqlite3SelectNew() guarantees this */
+	assert(pEList != 0);	/* sqlSelectNew() guarantees this */
 	for (i = 0, pItem = pOrderBy->a; i < pOrderBy->nExpr; i++, pItem++) {
 		if (pItem->u.x.iOrderByCol) {
 			if (pItem->u.x.iOrderByCol > pEList->nExpr) {
@@ -1093,7 +1093,7 @@ sqlite3ResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error mess
  * the order-by term is an identifier that corresponds to the AS-name of
  * a result-set expression, then the term resolves to a copy of the
  * result-set expression.  Otherwise, the expression is resolved in
- * the usual way - using sqlite3ResolveExprNames().
+ * the usual way - using sqlResolveExprNames().
  *
  * This routine returns the number of errors.  If errors occur, then
  * an appropriate error message might be left in pParse.  (OOM errors
@@ -1118,22 +1118,22 @@ resolveOrderGroupBy(NameContext * pNC,	/* The name context of the SELECT stateme
 	pParse = pNC->pParse;
 	for (i = 0, pItem = pOrderBy->a; i < pOrderBy->nExpr; i++, pItem++) {
 		Expr *pE = pItem->pExpr;
-		Expr *pE2 = sqlite3ExprSkipCollate(pE);
+		Expr *pE2 = sqlExprSkipCollate(pE);
 		if (zType[0] != 'G') {
 			iCol = resolveAsName(pParse, pSelect->pEList, pE2);
 			if (iCol > 0) {
 				/* If an AS-name match is found, mark this ORDER BY column as being
 				 * a copy of the iCol-th result-set column.  The subsequent call to
-				 * sqlite3ResolveOrderGroupBy() will convert the expression to a
+				 * sqlResolveOrderGroupBy() will convert the expression to a
 				 * copy of the iCol-th result-set expression.
 				 */
 				pItem->u.x.iOrderByCol = (u16) iCol;
 				continue;
 			}
 		}
-		if (sqlite3ExprIsInteger(pE2, &iCol)) {
+		if (sqlExprIsInteger(pE2, &iCol)) {
 			/* The ORDER BY term is an integer constant.  Again, set the column
-			 * number so that sqlite3ResolveOrderGroupBy() will convert the
+			 * number so that sqlResolveOrderGroupBy() will convert the
 			 * order-by term to a copy of the result-set expression
 			 */
 			if (iCol < 1 || iCol > 0xffff) {
@@ -1147,17 +1147,17 @@ resolveOrderGroupBy(NameContext * pNC,	/* The name context of the SELECT stateme
 
 		/* Otherwise, treat the ORDER BY term as an ordinary expression */
 		pItem->u.x.iOrderByCol = 0;
-		if (sqlite3ResolveExprNames(pNC, pE)) {
+		if (sqlResolveExprNames(pNC, pE)) {
 			return 1;
 		}
 		for (j = 0; j < pSelect->pEList->nExpr; j++) {
-			if (sqlite3ExprCompare
+			if (sqlExprCompare
 			    (pE, pSelect->pEList->a[j].pExpr, -1) == 0) {
 				pItem->u.x.iOrderByCol = j + 1;
 			}
 		}
 	}
-	return sqlite3ResolveOrderGroupBy(pParse, pSelect, pOrderBy, zType);
+	return sqlResolveOrderGroupBy(pParse, pSelect, pOrderBy, zType);
 }
 
 /*
@@ -1174,7 +1174,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 	int i;			/* Loop counter */
 	ExprList *pGroupBy;	/* The GROUP BY clause */
 	Select *pLeftmost;	/* Left-most of SELECT of a compound */
-	sqlite3 *db;		/* Database connection */
+	sql *db;		/* Database connection */
 
 	assert(p != 0);
 	if (p->selFlags & SF_Resolved) {
@@ -1184,16 +1184,16 @@ resolveSelectStep(Walker * pWalker, Select * p)
 	pParse = pWalker->pParse;
 	db = pParse->db;
 
-	/* Normally sqlite3SelectExpand() will be called first and will have
+	/* Normally sqlSelectExpand() will be called first and will have
 	 * already expanded this SELECT.  However, if this is a subquery within
-	 * an expression, sqlite3ResolveExprNames() will be called without a
-	 * prior call to sqlite3SelectExpand().  When that happens, let
-	 * sqlite3SelectPrep() do all of the processing for this SELECT.
-	 * sqlite3SelectPrep() will invoke both sqlite3SelectExpand() and
+	 * an expression, sqlResolveExprNames() will be called without a
+	 * prior call to sqlSelectExpand().  When that happens, let
+	 * sqlSelectPrep() do all of the processing for this SELECT.
+	 * sqlSelectPrep() will invoke both sqlSelectExpand() and
 	 * this routine in the correct order.
 	 */
 	if ((p->selFlags & SF_Expanded) == 0) {
-		sqlite3SelectPrep(pParse, p, pOuterNC);
+		sqlSelectPrep(pParse, p, pOuterNC);
 		return (pParse->nErr
 			|| db->mallocFailed) ? WRC_Abort : WRC_Prune;
 	}
@@ -1211,8 +1211,8 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		 */
 		memset(&sNC, 0, sizeof(sNC));
 		sNC.pParse = pParse;
-		if (sqlite3ResolveExprNames(&sNC, p->pLimit) ||
-		    sqlite3ResolveExprNames(&sNC, p->pOffset)) {
+		if (sqlResolveExprNames(&sNC, p->pLimit) ||
+		    sqlResolveExprNames(&sNC, p->pOffset)) {
 			return WRC_Abort;
 		}
 
@@ -1248,7 +1248,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 				for (pNC = pOuterNC; pNC; pNC = pNC->pNext)
 					nRef += pNC->nRef;
 
-				sqlite3ResolveSelectNames(pParse,
+				sqlResolveSelectNames(pParse,
 							  pItem->pSelect,
 							  pOuterNC);
 				if (pParse->nErr || db->mallocFailed)
@@ -1262,7 +1262,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			}
 		}
 
-		/* Set up the local name-context to pass to sqlite3ResolveExprNames() to
+		/* Set up the local name-context to pass to sqlResolveExprNames() to
 		 * resolve the result-set expression list.
 		 */
 		bool is_all_select_agg = true;
@@ -1274,10 +1274,10 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		for (i = 0; i < p->pEList->nExpr; ++i, ++item) {
 			u16 has_agg_flag = sNC.ncFlags & NC_HasAgg;
 			sNC.ncFlags &= ~NC_HasAgg;
-			if (sqlite3ResolveExprNames(&sNC, item->pExpr) != 0)
+			if (sqlResolveExprNames(&sNC, item->pExpr) != 0)
 				return WRC_Abort;
 			if ((sNC.ncFlags & NC_HasAgg) == 0 &&
-			    !sqlite3ExprIsConstantOrFunction(item->pExpr, 0)) {
+			    !sqlExprIsConstantOrFunction(item->pExpr, 0)) {
 				is_all_select_agg = false;
 				sNC.ncFlags |= has_agg_flag;
 				break;
@@ -1290,7 +1290,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		 */
 		for (; i < p->pEList->nExpr; ++i, ++item) {
 			assert(! is_all_select_agg);
-			if (sqlite3ResolveExprNames(&sNC, item->pExpr) != 0)
+			if (sqlResolveExprNames(&sNC, item->pExpr) != 0)
 				return WRC_Abort;
 		}
 
@@ -1327,7 +1327,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		if (p->pHaving != NULL && pGroupBy == NULL) {
 			sNC.ncFlags |= NC_AllowAgg;
 			if (is_all_select_agg &&
-			    sqlite3ResolveExprNames(&sNC, p->pHaving) != 0)
+			    sqlResolveExprNames(&sNC, p->pHaving) != 0)
 				return WRC_Abort;
 			if ((sNC.ncFlags & NC_HasAgg) == 0 ||
 			    (sNC.ncFlags & NC_HasUnaggregatedId) != 0) {
@@ -1348,20 +1348,20 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			 */
 			sql_expr_delete(db, p->pLimit, false);
 			p->pLimit =
-			    sqlite3ExprAlloc(db, TK_INTEGER,
-					     &sqlite3IntTokens[1], 0);
+			    sqlExprAlloc(db, TK_INTEGER,
+					     &sqlIntTokens[1], 0);
 		} else {
-			if (sqlite3ResolveExprNames(&sNC, p->pHaving))
+			if (sqlResolveExprNames(&sNC, p->pHaving))
 				return WRC_Abort;
 		}
-		if (sqlite3ResolveExprNames(&sNC, p->pWhere))
+		if (sqlResolveExprNames(&sNC, p->pWhere))
 			return WRC_Abort;
 
 		/* Resolve names in table-valued-function arguments */
 		for (i = 0; i < p->pSrc->nSrc; i++) {
 			struct SrcList_item *pItem = &p->pSrc->a[i];
 			if (pItem->fg.isTabFunc
-			    && sqlite3ResolveExprListNames(&sNC,
+			    && sqlResolveExprListNames(&sNC,
 							   pItem->u1.pFuncArg)
 			    ) {
 				return WRC_Abort;
@@ -1418,7 +1418,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			for (i = 0, pItem = pGroupBy->a; i < pGroupBy->nExpr;
 			     i++, pItem++) {
 				if (ExprHasProperty(pItem->pExpr, EP_Agg)) {
-					sqlite3ErrorMsg(pParse,
+					sqlErrorMsg(pParse,
 							"aggregate functions are not allowed in "
 							"the GROUP BY clause");
 					return WRC_Abort;
@@ -1430,7 +1430,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		 * number of expressions in the select list.
 		 */
 		if (p->pNext && p->pEList->nExpr != p->pNext->pEList->nExpr) {
-			sqlite3SelectWrongNumTermsError(pParse, p->pNext);
+			sqlSelectWrongNumTermsError(pParse, p->pNext);
 			return WRC_Abort;
 		}
 
@@ -1499,7 +1499,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
  * if errors is returned.
  */
 int
-sqlite3ResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. */
+sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. */
 			Expr * pExpr	/* The expression to be analyzed. */
     )
 {
@@ -1508,10 +1508,10 @@ sqlite3ResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions i
 
 	if (pExpr == 0)
 		return 0;
-#if SQLITE_MAX_EXPR_DEPTH>0
+#if SQL_MAX_EXPR_DEPTH>0
 	{
 		Parse *pParse = pNC->pParse;
-		if (sqlite3ExprCheckHeight
+		if (sqlExprCheckHeight
 		    (pParse, pExpr->nHeight + pNC->pParse->nHeight)) {
 			return 1;
 		}
@@ -1527,8 +1527,8 @@ sqlite3ResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions i
 	w.walkerDepth = 0;
 	w.eCode = 0;
 	w.u.pNC = pNC;
-	sqlite3WalkExpr(&w, pExpr);
-#if SQLITE_MAX_EXPR_DEPTH>0
+	sqlWalkExpr(&w, pExpr);
+#if SQL_MAX_EXPR_DEPTH>0
 	pNC->pParse->nHeight -= pExpr->nHeight;
 #endif
 	if (pNC->nErr > 0 || w.pParse->nErr > 0) {
@@ -1543,18 +1543,18 @@ sqlite3ResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions i
 
 /*
  * Resolve all names for all expression in an expression list.  This is
- * just like sqlite3ResolveExprNames() except that it works for an expression
+ * just like sqlResolveExprNames() except that it works for an expression
  * list rather than a single expression.
  */
 int
-sqlite3ResolveExprListNames(NameContext * pNC,	/* Namespace to resolve expressions in. */
+sqlResolveExprListNames(NameContext * pNC,	/* Namespace to resolve expressions in. */
 			    ExprList * pList	/* The expression list to be analyzed. */
     )
 {
 	int i;
 	if (pList) {
 		for (i = 0; i < pList->nExpr; i++) {
-			if (sqlite3ResolveExprNames(pNC, pList->a[i].pExpr))
+			if (sqlResolveExprNames(pNC, pList->a[i].pExpr))
 				return WRC_Abort;
 		}
 	}
@@ -1567,14 +1567,14 @@ sqlite3ResolveExprListNames(NameContext * pNC,	/* Namespace to resolve expressio
  * subqueries in expressions, and subqueries used as FROM clause
  * terms.
  *
- * See sqlite3ResolveExprNames() for a description of the kinds of
+ * See sqlResolveExprNames() for a description of the kinds of
  * transformations that occur.
  *
  * All SELECT statements should have been expanded using
- * sqlite3SelectExpand() prior to invoking this routine.
+ * sqlSelectExpand() prior to invoking this routine.
  */
 void
-sqlite3ResolveSelectNames(Parse * pParse,	/* The parser context */
+sqlResolveSelectNames(Parse * pParse,	/* The parser context */
 			  Select * p,	/* The SELECT statement being coded. */
 			  NameContext * pOuterNC	/* Name context for parent SELECT statement */
     )
@@ -1587,7 +1587,7 @@ sqlite3ResolveSelectNames(Parse * pParse,	/* The parser context */
 	w.xSelectCallback = resolveSelectStep;
 	w.pParse = pParse;
 	w.u.pNC = pOuterNC;
-	sqlite3WalkSelect(&w, p);
+	sqlWalkSelect(&w, p);
 }
 
 void
@@ -1609,8 +1609,8 @@ sql_resolve_self_reference(struct Parse *parser, struct Table *table, int type,
 	sNC.pParse = parser;
 	sNC.pSrcList = &sSrc;
 	sNC.ncFlags = type;
-	if (sqlite3ResolveExprNames(&sNC, expr) != 0)
+	if (sqlResolveExprNames(&sNC, expr) != 0)
 		return;
 	if (expr_list != NULL)
-		sqlite3ResolveExprListNames(&sNC, expr_list);
+		sqlResolveExprListNames(&sNC, expr_list);
 }

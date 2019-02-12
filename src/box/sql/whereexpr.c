@@ -38,7 +38,7 @@
  * analyzing Expr objects in the WHERE clause.
  */
 #include "coll.h"
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "whereInt.h"
 
 /* Forward declarations */
@@ -48,20 +48,20 @@ static void exprAnalyze(SrcList *, WhereClause *, int);
  * Deallocate all memory associated with a WhereOrInfo object.
  */
 static void
-whereOrInfoDelete(sqlite3 * db, WhereOrInfo * p)
+whereOrInfoDelete(sql * db, WhereOrInfo * p)
 {
-	sqlite3WhereClauseClear(&p->wc);
-	sqlite3DbFree(db, p);
+	sqlWhereClauseClear(&p->wc);
+	sqlDbFree(db, p);
 }
 
 /*
  * Deallocate all memory associated with a WhereAndInfo object.
  */
 static void
-whereAndInfoDelete(sqlite3 * db, WhereAndInfo * p)
+whereAndInfoDelete(sql * db, WhereAndInfo * p)
 {
-	sqlite3WhereClauseClear(&p->wc);
-	sqlite3DbFree(db, p);
+	sqlWhereClauseClear(&p->wc);
+	sqlDbFree(db, p);
 }
 
 /*
@@ -91,9 +91,9 @@ whereClauseInsert(WhereClause * pWC, Expr * p, u16 wtFlags)
 	testcase(wtFlags & TERM_VIRTUAL);
 	if (pWC->nTerm >= pWC->nSlot) {
 		WhereTerm *pOld = pWC->a;
-		sqlite3 *db = pWC->pWInfo->pParse->db;
+		sql *db = pWC->pWInfo->pParse->db;
 		pWC->a =
-		    sqlite3DbMallocRawNN(db,
+		    sqlDbMallocRawNN(db,
 					 sizeof(pWC->a[0]) * pWC->nSlot * 2);
 		if (pWC->a == 0) {
 			if (wtFlags & TERM_DYNAMIC) {
@@ -104,18 +104,18 @@ whereClauseInsert(WhereClause * pWC, Expr * p, u16 wtFlags)
 		}
 		memcpy(pWC->a, pOld, sizeof(pWC->a[0]) * pWC->nTerm);
 		if (pOld != pWC->aStatic) {
-			sqlite3DbFree(db, pOld);
+			sqlDbFree(db, pOld);
 		}
 		pWC->nSlot =
-		    sqlite3DbMallocSize(db, pWC->a) / sizeof(pWC->a[0]);
+		    sqlDbMallocSize(db, pWC->a) / sizeof(pWC->a[0]);
 	}
 	pTerm = &pWC->a[idx = pWC->nTerm++];
 	if (p && ExprHasProperty(p, EP_Unlikely)) {
-		pTerm->truthProb = sqlite3LogEst(p->iTable) - 270;
+		pTerm->truthProb = sqlLogEst(p->iTable) - 270;
 	} else {
 		pTerm->truthProb = 1;
 	}
-	pTerm->pExpr = sqlite3ExprSkipCollate(p);
+	pTerm->pExpr = sqlExprSkipCollate(p);
 	pTerm->wtFlags = wtFlags;
 	pTerm->pWC = pWC;
 	pTerm->iParent = -1;
@@ -218,7 +218,7 @@ operatorMask(int op)
 	return c;
 }
 
-#ifndef SQLITE_OMIT_LIKE_OPTIMIZATION
+#ifndef SQL_OMIT_LIKE_OPTIMIZATION
 /**
  * Check to see if the given expression is a LIKE operator that
  * can be optimized using inequality constraints.
@@ -255,8 +255,8 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	/* Number of non-wildcard prefix characters. */
 	int cnt;
 	/* Database connection. */
-	sqlite3 *db = pParse->db;
-	sqlite3_value *pVal = 0;
+	sql *db = pParse->db;
+	sql_value *pVal = 0;
 	/* Opcode of pRight. */
 	int op;
 	/* Result code to return. */
@@ -278,18 +278,18 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	}
 	assert(pLeft->iColumn != (-1));	/* Because IPK never has AFF_TEXT */
 
-	pRight = sqlite3ExprSkipCollate(pList->a[0].pExpr);
+	pRight = sqlExprSkipCollate(pList->a[0].pExpr);
 	op = pRight->op;
 	if (op == TK_VARIABLE) {
 		Vdbe *pReprepare = pParse->pReprepare;
 		int iCol = pRight->iColumn;
 		pVal =
-		    sqlite3VdbeGetBoundValue(pReprepare, iCol,
+		    sqlVdbeGetBoundValue(pReprepare, iCol,
 					     FIELD_TYPE_SCALAR);
-		if (pVal && sqlite3_value_type(pVal) == SQLITE_TEXT) {
-			z = (char *)sqlite3_value_text(pVal);
+		if (pVal && sql_value_type(pVal) == SQL_TEXT) {
+			z = (char *)sql_value_text(pVal);
 		}
-		sqlite3VdbeSetVarmask(pParse->pVdbe, iCol);
+		sqlVdbeSetVarmask(pParse->pVdbe, iCol);
 		assert(pRight->op == TK_VARIABLE || pRight->op == TK_REGISTER);
 	} else if (op == TK_STRING) {
 		z = pRight->u.zToken;
@@ -303,27 +303,27 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 			Expr *pPrefix;
 			*pisComplete = c == MATCH_ALL_WILDCARD &&
 				       z[cnt + 1] == 0;
-			pPrefix = sqlite3Expr(db, TK_STRING, z);
+			pPrefix = sqlExpr(db, TK_STRING, z);
 			if (pPrefix)
 				pPrefix->u.zToken[cnt] = 0;
 			*ppPrefix = pPrefix;
 			if (op == TK_VARIABLE) {
 				Vdbe *v = pParse->pVdbe;
-				sqlite3VdbeSetVarmask(v, pRight->iColumn);
+				sqlVdbeSetVarmask(v, pRight->iColumn);
 				if (*pisComplete && pRight->u.zToken[1]) {
 					/* If the rhs of the LIKE expression is a variable, and the current
 					 * value of the variable means there is no need to invoke the LIKE
 					 * function, then no OP_Variable will be added to the program.
-					 * This causes problems for the sqlite3_bind_parameter_name()
+					 * This causes problems for the sql_bind_parameter_name()
 					 * API. To work around them, add a dummy OP_Variable here.
 					 */
-					int r1 = sqlite3GetTempReg(pParse);
-					sqlite3ExprCodeTarget(pParse, pRight,
+					int r1 = sqlGetTempReg(pParse);
+					sqlExprCodeTarget(pParse, pRight,
 							      r1);
-					sqlite3VdbeChangeP3(v,
-							    sqlite3VdbeCurrentAddr
+					sqlVdbeChangeP3(v,
+							    sqlVdbeCurrentAddr
 							    (v) - 1, 0);
-					sqlite3ReleaseTempReg(pParse, r1);
+					sqlReleaseTempReg(pParse, r1);
 				}
 			}
 		} else {
@@ -332,10 +332,10 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	}
 
 	rc = (z != 0);
-	sqlite3ValueFree(pVal);
+	sqlValueFree(pVal);
 	return rc;
 }
-#endif				/* SQLITE_OMIT_LIKE_OPTIMIZATION */
+#endif				/* SQL_OMIT_LIKE_OPTIMIZATION */
 
 /*
  * If the pBase expression originated in the ON or USING clause of
@@ -406,7 +406,7 @@ whereCombineDisjuncts(SrcList * pSrc,	/* the FROM clause */
     )
 {
 	u16 eOp = pOne->eOperator | pTwo->eOperator;
-	sqlite3 *db;		/* Database connection (for malloc) */
+	sql *db;		/* Database connection (for malloc) */
 	Expr *pNew;		/* New virtual expression */
 	int op;			/* Operator for the combined expression */
 	int idxNew;		/* Index in pWC of the next virtual term */
@@ -420,9 +420,9 @@ whereCombineDisjuncts(SrcList * pSrc,	/* the FROM clause */
 		return;
 	assert(pOne->pExpr->pLeft != 0 && pOne->pExpr->pRight != 0);
 	assert(pTwo->pExpr->pLeft != 0 && pTwo->pExpr->pRight != 0);
-	if (sqlite3ExprCompare(pOne->pExpr->pLeft, pTwo->pExpr->pLeft, -1))
+	if (sqlExprCompare(pOne->pExpr->pLeft, pTwo->pExpr->pLeft, -1))
 		return;
-	if (sqlite3ExprCompare(pOne->pExpr->pRight, pTwo->pExpr->pRight, -1))
+	if (sqlExprCompare(pOne->pExpr->pRight, pTwo->pExpr->pRight, -1))
 		return;
 	/* If we reach this point, it means the two subterms can be combined */
 	if ((eOp & (eOp - 1)) != 0) {
@@ -434,7 +434,7 @@ whereCombineDisjuncts(SrcList * pSrc,	/* the FROM clause */
 		}
 	}
 	db = pWC->pWInfo->pParse->db;
-	pNew = sqlite3ExprDup(db, pOne->pExpr, 0);
+	pNew = sqlExprDup(db, pOne->pExpr, 0);
 	if (pNew == 0)
 		return;
 	for (op = TK_EQ; eOp != (WO_EQ << (op - TK_EQ)); op++) {
@@ -445,7 +445,7 @@ whereCombineDisjuncts(SrcList * pSrc,	/* the FROM clause */
 	exprAnalyze(pSrc, pWC, idxNew);
 }
 
-#if !defined(SQLITE_OMIT_OR_OPTIMIZATION)
+#if !defined(SQL_OMIT_OR_OPTIMIZATION)
 /*
  * Analyze a term that consists of two or more OR-connected
  * subterms.  So in:
@@ -536,7 +536,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 {
 	WhereInfo *pWInfo = pWC->pWInfo;	/* WHERE clause processing context */
 	Parse *pParse = pWInfo->pParse;	/* Parser context */
-	sqlite3 *db = pParse->db;	/* Database connection */
+	sql *db = pParse->db;	/* Database connection */
 	WhereTerm *pTerm = &pWC->a[idxTerm];	/* The term to be analyzed */
 	Expr *pExpr = pTerm->pExpr;	/* The expression of the term */
 	int i;			/* Loop counters */
@@ -554,15 +554,15 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 	assert((pTerm->wtFlags & (TERM_DYNAMIC | TERM_ORINFO | TERM_ANDINFO)) ==
 	       0);
 	assert(pExpr->op == TK_OR);
-	pTerm->u.pOrInfo = pOrInfo = sqlite3DbMallocZero(db, sizeof(*pOrInfo));
+	pTerm->u.pOrInfo = pOrInfo = sqlDbMallocZero(db, sizeof(*pOrInfo));
 	if (pOrInfo == 0)
 		return;
 	pTerm->wtFlags |= TERM_ORINFO;
 	pOrWc = &pOrInfo->wc;
 	memset(pOrWc->aStatic, 0, sizeof(pOrWc->aStatic));
-	sqlite3WhereClauseInit(pOrWc, pWInfo);
-	sqlite3WhereSplit(pOrWc, pExpr, TK_OR);
-	sqlite3WhereExprAnalyze(pSrc, pOrWc);
+	sqlWhereClauseInit(pOrWc, pWInfo);
+	sqlWhereSplit(pOrWc, pExpr, TK_OR);
+	sqlWhereExprAnalyze(pSrc, pOrWc);
 	if (db->mallocFailed)
 		return;
 	assert(pOrWc->nTerm >= 2);
@@ -579,7 +579,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 			assert((pOrTerm->
 				wtFlags & (TERM_ANDINFO | TERM_ORINFO)) == 0);
 			chngToIN = 0;
-			pAndInfo = sqlite3DbMallocRawNN(db, sizeof(*pAndInfo));
+			pAndInfo = sqlDbMallocRawNN(db, sizeof(*pAndInfo));
 			if (pAndInfo) {
 				WhereClause *pAndWC;
 				WhereTerm *pAndTerm;
@@ -591,10 +591,10 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				pAndWC = &pAndInfo->wc;
 				memset(pAndWC->aStatic, 0,
 				       sizeof(pAndWC->aStatic));
-				sqlite3WhereClauseInit(pAndWC, pWC->pWInfo);
-				sqlite3WhereSplit(pAndWC, pOrTerm->pExpr,
+				sqlWhereClauseInit(pAndWC, pWC->pWInfo);
+				sqlWhereSplit(pAndWC, pOrTerm->pExpr,
 						  TK_AND);
-				sqlite3WhereExprAnalyze(pSrc, pAndWC);
+				sqlWhereExprAnalyze(pSrc, pAndWC);
 				pAndWC->pOuter = pWC;
 				if (!db->mallocFailed) {
 					for (j = 0, pAndTerm = pAndWC->a;
@@ -605,7 +605,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 						    (pAndTerm->pExpr->op)
 						    || pAndTerm->eOperator ==
 						    WO_MATCH) {
-							b |= sqlite3WhereGetMask
+							b |= sqlWhereGetMask
 							    (&pWInfo->sMaskSet,
 							     pAndTerm->
 							     leftCursor);
@@ -620,11 +620,11 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 			 */
 		} else {
 			Bitmask b;
-			b = sqlite3WhereGetMask(&pWInfo->sMaskSet,
+			b = sqlWhereGetMask(&pWInfo->sMaskSet,
 						pOrTerm->leftCursor);
 			if (pOrTerm->wtFlags & TERM_VIRTUAL) {
 				WhereTerm *pOther = &pOrWc->a[pOrTerm->iParent];
-				b |= sqlite3WhereGetMask(&pWInfo->sMaskSet,
+				b |= sqlWhereGetMask(&pWInfo->sMaskSet,
 							 pOther->leftCursor);
 			}
 			indexable &= b;
@@ -704,7 +704,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 					continue;
 				}
 				if ((chngToIN &
-				     sqlite3WhereGetMask(&pWInfo->sMaskSet,
+				     sqlWhereGetMask(&pWInfo->sMaskSet,
 							 pOrTerm->
 							 leftCursor)) == 0) {
 					/* This term must be of the form t1.a==t2.b where t2 is in the
@@ -732,7 +732,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				assert(j == 1);
 				assert(IsPowerOfTwo(chngToIN));
 				assert(chngToIN ==
-				       sqlite3WhereGetMask(&pWInfo->sMaskSet,
+				       sqlWhereGetMask(&pWInfo->sMaskSet,
 							   iCursor));
 				break;
 			}
@@ -787,15 +787,15 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 				assert(pOrTerm->leftCursor == iCursor);
 				assert(pOrTerm->u.leftColumn == iColumn);
 				pDup =
-				    sqlite3ExprDup(db, pOrTerm->pExpr->pRight,
+				    sqlExprDup(db, pOrTerm->pExpr->pRight,
 						   0);
 				pList = sql_expr_list_append(pWInfo->pParse->db,
 							     pList, pDup);
 				pLeft = pOrTerm->pExpr->pLeft;
 			}
 			assert(pLeft != 0);
-			pDup = sqlite3ExprDup(db, pLeft, 0);
-			pNew = sqlite3PExpr(pParse, TK_IN, pDup, 0);
+			pDup = sqlExprDup(db, pLeft, 0);
+			pNew = sqlPExpr(pParse, TK_IN, pDup, 0);
 			if (pNew) {
 				int idxNew;
 				transferJoinMarkings(pNew, pExpr);
@@ -816,13 +816,13 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 		}
 	}
 }
-#endif				/* !SQLITE_OMIT_OR_OPTIMIZATION */
+#endif				/* !SQL_OMIT_OR_OPTIMIZATION */
 
 /*
  * We already know that pExpr is a binary operator where both operands are
  * column references.  This routine checks to see if pExpr is an equivalence
  * relation:
- *   1.  The SQLITE_Transitive optimization must be enabled
+ *   1.  The SQL_Transitive optimization must be enabled
  *   2.  Must be either an == or an IS operator
  *   3.  Not originating in the ON clause of an OUTER JOIN
  *   4.  The types of A and B must be compatible
@@ -836,7 +836,7 @@ exprAnalyzeOrTerm(SrcList * pSrc,	/* the FROM clause */
 static int
 termIsEquivalence(Parse * pParse, Expr * pExpr)
 {
-	if (!OptimizationEnabled(pParse->db, SQLITE_Transitive))
+	if (!OptimizationEnabled(pParse->db, SQL_Transitive))
 		return 0;
 	if (pExpr->op != TK_EQ)
 		return 0;
@@ -871,11 +871,11 @@ exprSelectUsage(WhereMaskSet * pMaskSet, Select * pS)
 	Bitmask mask = 0;
 	while (pS) {
 		SrcList *pSrc = pS->pSrc;
-		mask |= sqlite3WhereExprListUsage(pMaskSet, pS->pEList);
-		mask |= sqlite3WhereExprListUsage(pMaskSet, pS->pGroupBy);
-		mask |= sqlite3WhereExprListUsage(pMaskSet, pS->pOrderBy);
-		mask |= sqlite3WhereExprUsage(pMaskSet, pS->pWhere);
-		mask |= sqlite3WhereExprUsage(pMaskSet, pS->pHaving);
+		mask |= sqlWhereExprListUsage(pMaskSet, pS->pEList);
+		mask |= sqlWhereExprListUsage(pMaskSet, pS->pGroupBy);
+		mask |= sqlWhereExprListUsage(pMaskSet, pS->pOrderBy);
+		mask |= sqlWhereExprUsage(pMaskSet, pS->pWhere);
+		mask |= sqlWhereExprUsage(pMaskSet, pS->pHaving);
 		if (ALWAYS(pSrc != 0)) {
 			int i;
 			for (i = 0; i < pSrc->nSrc; i++) {
@@ -883,7 +883,7 @@ exprSelectUsage(WhereMaskSet * pMaskSet, Select * pS)
 				    exprSelectUsage(pMaskSet,
 						    pSrc->a[i].pSelect);
 				mask |=
-				    sqlite3WhereExprUsage(pMaskSet,
+				    sqlWhereExprUsage(pMaskSet,
 							  pSrc->a[i].pOn);
 			}
 		}
@@ -979,7 +979,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	/* Parsing context. */
 	Parse *pParse = pWInfo->pParse;
 	/* Database connection. */
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 
 	if (db->mallocFailed) {
 		return;
@@ -988,29 +988,29 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	pMaskSet = &pWInfo->sMaskSet;
 	pExpr = pTerm->pExpr;
 	assert(pExpr->op != TK_AS && pExpr->op != TK_COLLATE);
-	prereqLeft = sqlite3WhereExprUsage(pMaskSet, pExpr->pLeft);
+	prereqLeft = sqlWhereExprUsage(pMaskSet, pExpr->pLeft);
 	op = pExpr->op;
 	if (op == TK_IN) {
 		assert(pExpr->pRight == 0);
-		if (sqlite3ExprCheckIN(pParse, pExpr))
+		if (sqlExprCheckIN(pParse, pExpr))
 			return;
 		if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 			pTerm->prereqRight =
 			    exprSelectUsage(pMaskSet, pExpr->x.pSelect);
 		} else {
 			pTerm->prereqRight =
-			    sqlite3WhereExprListUsage(pMaskSet, pExpr->x.pList);
+			    sqlWhereExprListUsage(pMaskSet, pExpr->x.pList);
 		}
 	} else if (op == TK_ISNULL) {
 		pTerm->prereqRight = 0;
 	} else {
 		pTerm->prereqRight =
-		    sqlite3WhereExprUsage(pMaskSet, pExpr->pRight);
+		    sqlWhereExprUsage(pMaskSet, pExpr->pRight);
 	}
-	prereqAll = sqlite3WhereExprUsage(pMaskSet, pExpr);
+	prereqAll = sqlWhereExprUsage(pMaskSet, pExpr);
 	if (ExprHasProperty(pExpr, EP_FromJoin)) {
 		Bitmask x =
-		    sqlite3WhereGetMask(pMaskSet, pExpr->iRightJoinTable);
+		    sqlWhereGetMask(pMaskSet, pExpr->iRightJoinTable);
 		prereqAll |= x;
 		extraRight = x - 1;	/* ON clause terms may not be used with an index
 					 * on left table of a LEFT JOIN.  Ticket #3015
@@ -1022,8 +1022,8 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	pTerm->eOperator = 0;
 	if (allowedOp(op)) {
 		int iCur, iColumn;
-		Expr *pLeft = sqlite3ExprSkipCollate(pExpr->pLeft);
-		Expr *pRight = sqlite3ExprSkipCollate(pExpr->pRight);
+		Expr *pLeft = sqlExprSkipCollate(pExpr->pLeft);
+		Expr *pRight = sqlExprSkipCollate(pExpr->pRight);
 		u16 opMask =
 		    (pTerm->prereqRight & prereqLeft) == 0 ? WO_ALL : WO_EQUIV;
 
@@ -1046,7 +1046,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			assert(pTerm->iField == 0);
 			if (pTerm->leftCursor >= 0) {
 				int idxNew;
-				pDup = sqlite3ExprDup(db, pExpr, 0);
+				pDup = sqlExprDup(db, pExpr, 0);
 				if (db->mallocFailed) {
 					sql_expr_delete(db, pDup, false);
 					return;
@@ -1080,7 +1080,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			    (operatorMask(pDup->op) + eExtraOp) & opMask;
 		}
 	}
-#ifndef SQLITE_OMIT_BETWEEN_OPTIMIZATION
+#ifndef SQL_OMIT_BETWEEN_OPTIMIZATION
 	/* If a term is the BETWEEN operator, create two new virtual terms
 	 * that define the range that the BETWEEN implements.  For example:
 	 *
@@ -1105,10 +1105,10 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		for (i = 0; i < 2; i++) {
 			Expr *pNewExpr;
 			int idxNew;
-			pNewExpr = sqlite3PExpr(pParse, ops[i],
-						sqlite3ExprDup(db, pExpr->pLeft,
+			pNewExpr = sqlPExpr(pParse, ops[i],
+						sqlExprDup(db, pExpr->pLeft,
 							       0),
-						sqlite3ExprDup(db,
+						sqlExprDup(db,
 							       pList->a[i].
 							       pExpr, 0));
 			transferJoinMarkings(pNewExpr, pExpr);
@@ -1121,9 +1121,9 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			markTermAsChild(pWC, idxNew, idxTerm);
 		}
 	}
-#endif				/* SQLITE_OMIT_BETWEEN_OPTIMIZATION */
+#endif				/* SQL_OMIT_BETWEEN_OPTIMIZATION */
 
-#if !defined(SQLITE_OMIT_OR_OPTIMIZATION)
+#if !defined(SQL_OMIT_OR_OPTIMIZATION)
 	/* Analyze a term that is composed of two or more subterms connected by
 	 * an OR operator.
 	 */
@@ -1132,9 +1132,9 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		exprAnalyzeOrTerm(pSrc, pWC, idxTerm);
 		pTerm = &pWC->a[idxTerm];
 	}
-#endif				/* SQLITE_OMIT_OR_OPTIMIZATION */
+#endif				/* SQL_OMIT_OR_OPTIMIZATION */
 
-#ifndef SQLITE_OMIT_LIKE_OPTIMIZATION
+#ifndef SQL_OMIT_LIKE_OPTIMIZATION
 	/*
 	 * Add constraints to reduce the search space on a LIKE
 	 * operator.
@@ -1164,7 +1164,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		const u16 wtFlags = TERM_LIKEOPT | TERM_VIRTUAL | TERM_DYNAMIC;
 
 		pLeft = pExpr->x.pList->a[1].pExpr;
-		pStr2 = sqlite3ExprDup(db, pStr1, 0);
+		pStr2 = sqlExprDup(db, pStr1, 0);
 
 		/*
 		 * Convert the lower bound to upper-case and the
@@ -1177,15 +1177,15 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			char c;
 			pTerm->wtFlags |= TERM_LIKE;
 			for (i = 0; (c = pStr1->u.zToken[i]) != 0; i++) {
-				pStr1->u.zToken[i] = sqlite3Toupper(c);
-				pStr2->u.zToken[i] = sqlite3Tolower(c);
+				pStr1->u.zToken[i] = sqlToupper(c);
+				pStr2->u.zToken[i] = sqlTolower(c);
 			}
 		}
 
 		if (!db->mallocFailed) {
 			u8 c, *pC;	/* Last character before the first wildcard */
 			pC = (u8 *) & pStr2->u.
-			    zToken[sqlite3Strlen30(pStr2->u.zToken) - 1];
+			    zToken[sqlStrlen30(pStr2->u.zToken) - 1];
 			c = *pC;
 			if (noCase) {
 				/* The point is to increment the last character before the first
@@ -1196,28 +1196,28 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 				 */
 				if (c == 'A' - 1)
 					isComplete = 0;
-				c = sqlite3UpperToLower[c];
+				c = sqlUpperToLower[c];
 			}
 			*pC = c + 1;
 		}
-		pNewExpr1 = sqlite3ExprDup(db, pLeft, 0);
+		pNewExpr1 = sqlExprDup(db, pLeft, 0);
 		if (noCase) {
 			pNewExpr1 =
-				sqlite3ExprAddCollateString(pParse, pNewExpr1,
+				sqlExprAddCollateString(pParse, pNewExpr1,
 							    "unicode_ci");
 		}
-		pNewExpr1 = sqlite3PExpr(pParse, TK_GE, pNewExpr1, pStr1);
+		pNewExpr1 = sqlPExpr(pParse, TK_GE, pNewExpr1, pStr1);
 		transferJoinMarkings(pNewExpr1, pExpr);
 		idxNew1 = whereClauseInsert(pWC, pNewExpr1, wtFlags);
 		testcase(idxNew1 == 0);
 		exprAnalyze(pSrc, pWC, idxNew1);
-		pNewExpr2 = sqlite3ExprDup(db, pLeft, 0);
+		pNewExpr2 = sqlExprDup(db, pLeft, 0);
 		if (noCase) {
 			pNewExpr2 =
-				sqlite3ExprAddCollateString(pParse, pNewExpr2,
+				sqlExprAddCollateString(pParse, pNewExpr2,
 							    "unicode_ci");
 		}
-		pNewExpr2 = sqlite3PExpr(pParse, TK_LT, pNewExpr2, pStr2);
+		pNewExpr2 = sqlPExpr(pParse, TK_LT, pNewExpr2, pStr2);
 		transferJoinMarkings(pNewExpr2, pExpr);
 		idxNew2 = whereClauseInsert(pWC, pNewExpr2, wtFlags);
 		testcase(idxNew2 == 0);
@@ -1228,7 +1228,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 			markTermAsChild(pWC, idxNew2, idxTerm);
 		}
 	}
-#endif				/* SQLITE_OMIT_LIKE_OPTIMIZATION */
+#endif				/* SQL_OMIT_LIKE_OPTIMIZATION */
 
 	/* If there is a vector == or IS term - e.g. "(a, b) == (?, ?)" - create
 	 * new terms for each component comparison - "a = ?" and "b = ?".  The
@@ -1239,21 +1239,21 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	 * is not a sub-select.
 	 */
 	if (pWC->op == TK_AND && pExpr->op == TK_EQ
-	    && sqlite3ExprIsVector(pExpr->pLeft)
+	    && sqlExprIsVector(pExpr->pLeft)
 	    && ((pExpr->pLeft->flags & EP_xIsSelect) == 0
 		|| (pExpr->pRight->flags & EP_xIsSelect) == 0)) {
-		int nLeft = sqlite3ExprVectorSize(pExpr->pLeft);
+		int nLeft = sqlExprVectorSize(pExpr->pLeft);
 		int i;
-		assert(nLeft == sqlite3ExprVectorSize(pExpr->pRight));
+		assert(nLeft == sqlExprVectorSize(pExpr->pRight));
 		for (i = 0; i < nLeft; i++) {
 			int idxNew;
 			Expr *pNew;
 			Expr *pLeft =
-			    sqlite3ExprForVectorField(pParse, pExpr->pLeft, i);
+			    sqlExprForVectorField(pParse, pExpr->pLeft, i);
 			Expr *pRight =
-			    sqlite3ExprForVectorField(pParse, pExpr->pRight, i);
+			    sqlExprForVectorField(pParse, pExpr->pRight, i);
 
-			pNew = sqlite3PExpr(pParse, pExpr->op, pLeft, pRight);
+			pNew = sqlPExpr(pParse, pExpr->op, pLeft, pRight);
 			transferJoinMarkings(pNew, pExpr);
 			idxNew = whereClauseInsert(pWC, pNew, TERM_DYNAMIC);
 			exprAnalyze(pSrc, pWC, idxNew);
@@ -1274,7 +1274,7 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	if (pWC->op == TK_AND && pExpr->op == TK_IN && pTerm->iField == 0
 	    && pExpr->pLeft->op == TK_VECTOR && pExpr->x.pSelect->pPrior == 0) {
 		int i;
-		for (i = 0; i < sqlite3ExprVectorSize(pExpr->pLeft); i++) {
+		for (i = 0; i < sqlExprVectorSize(pExpr->pLeft); i++) {
 			int idxNew;
 			idxNew = whereClauseInsert(pWC, pExpr, TERM_VIRTUAL);
 			pWC->a[idxNew].iField = i + 1;
@@ -1297,9 +1297,9 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		int idxNew;
 		WhereTerm *pNewTerm;
 
-		pNewExpr = sqlite3PExpr(pParse, TK_GT,
-					sqlite3ExprDup(db, pLeft, 0),
-					sqlite3ExprAlloc(db, TK_NULL, 0, 0));
+		pNewExpr = sqlPExpr(pParse, TK_GT,
+					sqlExprDup(db, pLeft, 0),
+					sqlExprAlloc(db, TK_NULL, 0, 0));
 
 		idxNew = whereClauseInsert(pWC, pNewExpr,
 					   TERM_VIRTUAL | TERM_DYNAMIC |
@@ -1348,17 +1348,17 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
  * all terms of the WHERE clause.
  */
 void
-sqlite3WhereSplit(WhereClause * pWC, Expr * pExpr, u8 op)
+sqlWhereSplit(WhereClause * pWC, Expr * pExpr, u8 op)
 {
-	Expr *pE2 = sqlite3ExprSkipCollate(pExpr);
+	Expr *pE2 = sqlExprSkipCollate(pExpr);
 	pWC->op = op;
 	if (pE2 == 0)
 		return;
 	if (pE2->op != op) {
 		whereClauseInsert(pWC, pExpr, 0);
 	} else {
-		sqlite3WhereSplit(pWC, pE2->pLeft, op);
-		sqlite3WhereSplit(pWC, pE2->pRight, op);
+		sqlWhereSplit(pWC, pE2->pLeft, op);
+		sqlWhereSplit(pWC, pE2->pRight, op);
 	}
 }
 
@@ -1366,7 +1366,7 @@ sqlite3WhereSplit(WhereClause * pWC, Expr * pExpr, u8 op)
  * Initialize a preallocated WhereClause structure.
  */
 void
-sqlite3WhereClauseInit(WhereClause * pWC,	/* The WhereClause to be initialized */
+sqlWhereClauseInit(WhereClause * pWC,	/* The WhereClause to be initialized */
 		       WhereInfo * pWInfo	/* The WHERE processing context */
     )
 {
@@ -1380,14 +1380,14 @@ sqlite3WhereClauseInit(WhereClause * pWC,	/* The WhereClause to be initialized *
 /*
  * Deallocate a WhereClause structure.  The WhereClause structure
  * itself is not freed.  This routine is the inverse of
- * sqlite3WhereClauseInit().
+ * sqlWhereClauseInit().
  */
 void
-sqlite3WhereClauseClear(WhereClause * pWC)
+sqlWhereClauseClear(WhereClause * pWC)
 {
 	int i;
 	WhereTerm *a;
-	sqlite3 *db = pWC->pWInfo->pParse->db;
+	sql *db = pWC->pWInfo->pParse->db;
 	for (i = pWC->nTerm - 1, a = pWC->a; i >= 0; i--, a++) {
 		if (a->wtFlags & TERM_DYNAMIC) {
 			sql_expr_delete(db, a->pExpr, false);
@@ -1399,7 +1399,7 @@ sqlite3WhereClauseClear(WhereClause * pWC)
 		}
 	}
 	if (pWC->a != pWC->aStatic) {
-		sqlite3DbFree(db, pWC->a);
+		sqlDbFree(db, pWC->a);
 	}
 }
 
@@ -1409,36 +1409,36 @@ sqlite3WhereClauseClear(WhereClause * pWC)
  * tree.
  */
 Bitmask
-sqlite3WhereExprUsage(WhereMaskSet * pMaskSet, Expr * p)
+sqlWhereExprUsage(WhereMaskSet * pMaskSet, Expr * p)
 {
 	Bitmask mask;
 	if (p == 0)
 		return 0;
 	if (p->op == TK_COLUMN) {
-		mask = sqlite3WhereGetMask(pMaskSet, p->iTable);
+		mask = sqlWhereGetMask(pMaskSet, p->iTable);
 		return mask;
 	}
 	assert(!ExprHasProperty(p, EP_TokenOnly));
-	mask = p->pRight ? sqlite3WhereExprUsage(pMaskSet, p->pRight) : 0;
+	mask = p->pRight ? sqlWhereExprUsage(pMaskSet, p->pRight) : 0;
 	if (p->pLeft)
-		mask |= sqlite3WhereExprUsage(pMaskSet, p->pLeft);
+		mask |= sqlWhereExprUsage(pMaskSet, p->pLeft);
 	if (ExprHasProperty(p, EP_xIsSelect)) {
 		mask |= exprSelectUsage(pMaskSet, p->x.pSelect);
 	} else if (p->x.pList) {
-		mask |= sqlite3WhereExprListUsage(pMaskSet, p->x.pList);
+		mask |= sqlWhereExprListUsage(pMaskSet, p->x.pList);
 	}
 	return mask;
 }
 
 Bitmask
-sqlite3WhereExprListUsage(WhereMaskSet * pMaskSet, ExprList * pList)
+sqlWhereExprListUsage(WhereMaskSet * pMaskSet, ExprList * pList)
 {
 	int i;
 	Bitmask mask = 0;
 	if (pList) {
 		for (i = 0; i < pList->nExpr; i++) {
 			mask |=
-			    sqlite3WhereExprUsage(pMaskSet, pList->a[i].pExpr);
+			    sqlWhereExprUsage(pMaskSet, pList->a[i].pExpr);
 		}
 	}
 	return mask;
@@ -1453,7 +1453,7 @@ sqlite3WhereExprListUsage(WhereMaskSet * pMaskSet, ExprList * pList)
  * so that the added virtual terms are never processed.
  */
 void
-sqlite3WhereExprAnalyze(SrcList * pTabList,	/* the FROM clause */
+sqlWhereExprAnalyze(SrcList * pTabList,	/* the FROM clause */
 			WhereClause * pWC	/* the WHERE clause to be analyzed */
     )
 {
@@ -1468,7 +1468,7 @@ sqlite3WhereExprAnalyze(SrcList * pTabList,	/* the FROM clause */
  * new WHERE clause terms.
  */
 void
-sqlite3WhereTabFuncArgs(Parse * pParse,	/* Parsing context */
+sqlWhereTabFuncArgs(Parse * pParse,	/* Parsing context */
 			struct SrcList_item *pItem,	/* The FROM clause term to process */
 			WhereClause * pWC	/* Xfer function arguments to here */
     )
@@ -1490,19 +1490,19 @@ sqlite3WhereTabFuncArgs(Parse * pParse,	/* Parsing context */
 			k++;
 		}
 		if (k >= (int)pTab->def->field_count) {
-			sqlite3ErrorMsg(pParse,
+			sqlErrorMsg(pParse,
 					"too many arguments on %s() - max %d",
 					pTab->def->name, j);
 			return;
 		}
-		pColRef = sqlite3ExprAlloc(pParse->db, TK_COLUMN, 0, 0);
+		pColRef = sqlExprAlloc(pParse->db, TK_COLUMN, 0, 0);
 		if (pColRef == 0)
 			return;
 		pColRef->iTable = pItem->iCursor;
 		pColRef->iColumn = k++;
 		pColRef->space_def = pTab->def;
-		pTerm = sqlite3PExpr(pParse, TK_EQ, pColRef,
-				     sqlite3ExprDup(pParse->db,
+		pTerm = sqlPExpr(pParse, TK_EQ, pColRef,
+				     sqlExprDup(pParse->db,
 						    pArgs->a[j].pExpr, 0));
 		whereClauseInsert(pWC, pTerm, TERM_DYNAMIC);
 	}

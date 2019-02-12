@@ -16,7 +16,7 @@ testprefix = "analyze9"
 --
 -------------------------------------------------------------------------
 --
--- This file contains automated tests used to verify that the sqlite_stat4
+-- This file contains automated tests used to verify that the sql_stat4
 -- functionality is working.
 --
 
@@ -376,7 +376,7 @@ test:do_execsql_test(
     })
 
 ---------------------------------------------------------------------------
--- This was also crashing (corrupt sqlite_stat4 table).
+-- This was also crashing (corrupt sql_stat4 table).
 
 test:do_execsql_test(
     6.1,

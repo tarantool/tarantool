@@ -72,7 +72,7 @@ algorithm is suboptimal, especially if there are many rows on the RHS.
 
 The following procedure computes the same answer as the simple full-scan
 algorithm, though it does so with less work in the common case.  This
-is the algorithm that is implemented in SQLite.
+is the algorithm that is implemented in sql.
 
   1.  If the RHS is a constant list of length 1 or 2, then rewrite the
       IN operator as a simple expression.  Implement

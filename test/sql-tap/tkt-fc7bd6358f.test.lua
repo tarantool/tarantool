@@ -13,11 +13,11 @@ test:plan(50)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [fc7bd6358f]:
 --
 -- The following SQL yields an incorrect result (zero rows) in all
--- versions of SQLite between 3.6.14 and 3.7.15.2:
+-- versions of sql between 3.6.14 and 3.7.15.2:
 --
 --    CREATE TABLE t(textid TEXT);
 --    INSERT INTO t VALUES('12');

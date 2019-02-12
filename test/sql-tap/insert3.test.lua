@@ -13,7 +13,7 @@ test:plan(18)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing corner cases of the INSERT statement.
 --
 -- $Id: insert3.test,v 1.9 2009/04/23 14:58:40 danielk1977 Exp $

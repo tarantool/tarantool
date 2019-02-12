@@ -14,7 +14,7 @@ test:plan(14)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specfically
+-- This file implements regression tests for sql library. Specfically
 -- it tests that the different storage classes (integer, real, text etc.)
 -- all work correctly.
 --
@@ -153,12 +153,12 @@ test:do_execsql_test(
 -- # Check that all the record sizes are as we expected.
 -- ifcapable legacyformat {
 --   do_test types-2.1.9 {
---     set root [db eval {select rootpage from sqlite_master where name = 't1'}]
+--     set root [db eval {select rootpage from sql_master where name = 't1'}]
 --     record_sizes $root
 --   } {3 3 3 4 4 6 6 10 10}
 -- } else {
 --   do_test types-2.1.9 {
---     set root [db eval {select rootpage from sqlite_master where name = 't1'}]
+--     set root [db eval {select rootpage from sql_master where name = 't1'}]
 --     record_sizes $root
 --   } {2 3 3 4 4 6 6 10 10}
 -- }
@@ -189,12 +189,12 @@ test:do_execsql_test(
 -- # Check that all the record sizes are as we expected.
 -- ifcapable legacyformat {
 --   do_test types-2.2.3 {
---     set root [db eval {select rootpage from sqlite_master where name = 't2'}]
+--     set root [db eval {select rootpage from sql_master where name = 't2'}]
 --     record_sizes $root
 --   } {3 10 10}
 -- } else {
 --   do_test types-2.2.3 {
---     set root [db eval {select rootpage from sqlite_master where name = 't2'}]
+--     set root [db eval {select rootpage from sql_master where name = 't2'}]
 --     record_sizes $root
 --   } {2 10 10}
 -- }
@@ -222,7 +222,7 @@ test:do_execsql_test(
 
 -- # Check that all the record sizes are as we expected.
 -- do_test types-2.3.3 {
---   set root [db eval {select rootpage from sqlite_master where name = 't3'}]
+--   set root [db eval {select rootpage from sql_master where name = 't3'}]
 --   record_sizes $root
 -- } {2}
 -- Insert a couple of strings.

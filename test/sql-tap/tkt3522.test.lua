@@ -13,7 +13,7 @@ test:plan(2)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file is a verification that the bugs identified in ticket
 -- #3522 have been fixed.

@@ -13,14 +13,14 @@ test:plan(58)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for miscellanous features that were
 -- left out of other test files.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
--- Mimic the SQLite 2 collation type NUMERIC.
+-- Mimic the sql 2 collation type NUMERIC.
 
 -- Test the creation and use of tables that have a large number
 -- of columns.
@@ -573,7 +573,7 @@ if (0 > 0) then
         function()
             test:execsql("START TRANSACTION")
             test:execsql("UPDATE t1 SET a=0 WHERE 0")
-            sqlite3("db2", "test.db")
+            sql("db2", "test.db")
             rc = X(371, "X!cmd", [=[["catch","db2 eval {SELECT count(*) FROM t1}","msg"]]=])
             return table.insert(rc,msg) or rc
             -- v2 result: {1 {database is locked}}
@@ -725,7 +725,7 @@ if 0>0 then
         return X(0, "X!expr", [=[["?:",[">",["lhs"],["rhs"]],3,["-",1]]]=])
     end
 
-    -- Mimic the SQLite 2 collation type TEXT.
+    -- Mimic the sql 2 collation type TEXT.
     db("collate", "text", "text_collate")
     local function numeric_collate(lhs, rhs)
         return X(34, "X!cmd", [=[["string","compare",["lhs"],["rhs"]]]=])
@@ -812,7 +812,7 @@ test:do_execsql_test(
 
 
 -- #
--- # The following tests can only work if the current SQLite VFS has the concept
+-- # The following tests can only work if the current sql VFS has the concept
 -- # of a current directory.
 -- #
 -- ifcapable curdir {
@@ -871,7 +871,7 @@ test:do_execsql_test(
 test:do_test(
     "misc1-16.1",
     function()
-        --catchsql {SELECT name FROM sqlite_master LIMIT 1}
+        --catchsql {SELECT name FROM sql_master LIMIT 1}
         return test:catchsql([[
             CREATE TABLE test(a integer, primary key(a));
         ]])
@@ -963,11 +963,11 @@ if (0 > 0) then
         })
 end
 
--- Do not need sqlite3_sleep
+-- Do not need sql_sleep
 --test:do_test(
 --    "misc1-18.1",
 --    function()
---        n = sqlite3_sleep(100)
+--        n = sql_sleep(100)
 --        return (n >= 100)
 --    end, {
 --        -- <misc1-18.1>
@@ -995,7 +995,7 @@ end
 --   CREATE TABLE t19d AS SELECT * FROM t19c UNION ALL SELECT 1234;
 --   SELECT x, typeof(x) FROM t19d;
 -- } {1234 text}
--- # 2014-05-16:  Tests for the SQLITE_TESTCTRL_FAULT_INSTALL feature.
+-- # 2014-05-16:  Tests for the sql_TESTCTRL_FAULT_INSTALL feature.
 -- #
 -- unset -nocomplain fault_callbacks
 -- set fault_callbacks {}
@@ -1004,17 +1004,17 @@ end
 --   return 0
 -- }
 -- do_test misc1-19.1 {
---   sqlite3_test_control_fault_install fault_callback
+--   sql_test_control_fault_install fault_callback
 --   set fault_callbacks
 -- } {0}
 -- do_test misc1-19.2 {
---   sqlite3_test_control_fault_install
+--   sql_test_control_fault_install
 --   set fault_callbacks
 -- } {0}
 -- MUST_WORK_TEST
 if (0 > 0) then
     -- 2015-01-26:  Valgrind-detected over-read.
-    -- Reported on sqlite-users@sqlite.org by Michal Zalewski.  Found by afl-fuzz
+    -- Reported on sql-users@sql.org by Michal Zalewski.  Found by afl-fuzz
     -- presumably.
     --
     test:do_execsql_test(
@@ -1054,10 +1054,10 @@ test:do_catchsql_test(
 -- # 2015-04-19: NULL pointer dereference on a corrupt schema
 -- #
 -- db close
--- sqlite3 db :memory:
+-- sql db :memory:
 -- do_execsql_test misc1-23.1 {
 --   CREATE TABLE t1(x INT );
---   UPDATE sqlite_master SET sql='CREATE table t(d CHECK(T(#0)';
+--   UPDATE sql_master SET sql='CREATE table t(d CHECK(T(#0)';
 --   BEGIN;
 --   CREATE TABLE t2(y INT );
 --   ROLLBACK;
@@ -1067,20 +1067,20 @@ test:do_catchsql_test(
 -- #
 -- db close
 -- database_may_be_corrupt
--- sqlite3 db :memory:
+-- sql db :memory:
 -- do_catchsql_test misc1-23.2 {
 --   CREATE TABLE t1(x  INT UNIQUE);
---   UPDATE sqlite_master SET sql='CREATE TABLE IF not EXISTS t(c)';
+--   UPDATE sql_master SET sql='CREATE TABLE IF not EXISTS t(c)';
 --   BEGIN;
 --   CREATE TABLE t2(x INT );
 --   ROLLBACK;
 --   DROP TABLE F;
 -- } {1 {no such table: F}}
 -- db close
--- sqlite3 db :memory:
+-- sql db :memory:
 -- do_catchsql_test misc1-23.3 {
 --   CREATE TABLE t1(x  INT UNIQUE);
---   UPDATE sqlite_master SET sql='CREATE table y(a TEXT, a TEXT)';
+--   UPDATE sql_master SET sql='CREATE table y(a TEXT, a TEXT)';
 --   BEGIN;
 --   CREATE TABLE t2(y INT );
 --   ROLLBACK;
@@ -1090,7 +1090,7 @@ test:do_catchsql_test(
 -- # buffer, upsetting valgrind.
 -- #
 -- do_test misc1-24.0 {
---   list [catch { sqlite3_prepare_v2 db ! -1 dummy } msg] $msg
+--   list [catch { sql_prepare_v2 db ! -1 dummy } msg] $msg
 -- } {1 {(1) unrecognized token: "!}}
 
 

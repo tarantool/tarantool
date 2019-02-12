@@ -36,13 +36,13 @@
  * or VDBE.  The VDBE implements an abstract machine that runs a
  * simple program to access and modify the underlying database.
  */
-#ifndef SQLITE_VDBE_H
-#define SQLITE_VDBE_H
+#ifndef SQL_VDBE_H
+#define SQL_VDBE_H
 #include <stdio.h>
 
 /*
  * A single VDBE is an opaque structure named "Vdbe".  Only routines
- * in the source file sqliteVdbe.c are allowed to see the insides
+ * in the source file sqlVdbe.c are allowed to see the insides
  * of this structure.
  */
 typedef struct Vdbe Vdbe;
@@ -73,7 +73,7 @@ struct VdbeOp {
 		i64 *pI64;	/* Used when p4type is P4_INT64 */
 		double *pReal;	/* Used when p4type is P4_REAL */
 		FuncDef *pFunc;	/* Used when p4type is P4_FUNCDEF */
-		sqlite3_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
+		sql_context *pCtx;	/* Used when p4type is P4_FUNCCTX */
 		struct coll *pColl;	/* Used when p4type is P4_COLLSEQ */
 		Mem *pMem;	/* Used when p4type is P4_MEM */
 		bool b;         /* Used when p4type is P4_BOOL */
@@ -90,14 +90,14 @@ struct VdbeOp {
 		 */
 		enum field_type *types;
 	} p4;
-#ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
+#ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 	char *zComment;		/* Comment to improve readability */
 #endif
 #ifdef VDBE_PROFILE
 	u32 cnt;		/* Number of times this instruction was executed */
 	u64 cycles;		/* Total time spent executing this instruction */
 #endif
-#ifdef SQLITE_VDBE_COVERAGE
+#ifdef SQL_VDBE_COVERAGE
 	int iSrcLine;		/* Source-code line that generated this opcode */
 #endif
 };
@@ -119,7 +119,7 @@ struct SubProgram {
  * Allowed values of VdbeOp.p4type
  */
 #define P4_NOTUSED    0		/* The P4 parameter is not used */
-#define P4_DYNAMIC  (-1)	/* Pointer to a string obtained from sqliteMalloc() */
+#define P4_DYNAMIC  (-1)	/* Pointer to a string obtained from sqlMalloc() */
 #define P4_STATIC   (-2)	/* Pointer to a static string */
 #define P4_COLLSEQ  (-3)	/* P4 is a pointer to a CollSeq structure */
 #define P4_FUNCDEF  (-4)	/* P4 is a pointer to a FuncDef structure */
@@ -131,7 +131,7 @@ struct SubProgram {
 #define P4_INTARRAY (-12)	/* P4 is a vector of 32-bit integers */
 #define P4_SUBPROGRAM  (-13)	/* P4 is a pointer to a SubProgram structure */
 #define P4_ADVANCE  (-14)	/* P4 is a pointer to BtreeNext() or BtreePrev() */
-#define P4_FUNCCTX  (-16)	/* P4 is a pointer to an sqlite3_context object */
+#define P4_FUNCCTX  (-16)	/* P4 is a pointer to an sql_context object */
 #define P4_BOOL     (-17)	/* P4 is a bool value */
 #define P4_PTR      (-18)	/* P4 is a generic pointer */
 #define P4_KEYINFO  (-19)       /* P4 is a pointer to sql_key_info structure. */
@@ -152,7 +152,7 @@ struct SubProgram {
 #define COLNAME_DATABASE 2
 #define COLNAME_TABLE    3
 #define COLNAME_COLUMN   4
-#ifdef SQLITE_ENABLE_COLUMN_METADATA
+#ifdef SQL_ENABLE_COLUMN_METADATA
 #define COLNAME_N        5	/* Number of COLNAME_xxx symbols */
 #else
 #define COLNAME_N      2	/* Store the name and decltype */
@@ -174,7 +174,7 @@ struct SubProgram {
  * Prototypes for the VDBE interface.  See comments on the implementation
  * for a description of what each of these routines does.
  */
-Vdbe *sqlite3VdbeCreate(Parse *);
+Vdbe *sqlVdbeCreate(Parse *);
 
 /**
  * Allocate and initialize SQL-specific struct which completes
@@ -208,32 +208,32 @@ sql_vdbe_prepare(struct Vdbe *vdbe);
 struct stailq *
 vdbe_autoinc_id_list(struct Vdbe *vdbe);
 
-int sqlite3VdbeAddOp0(Vdbe *, int);
-int sqlite3VdbeAddOp1(Vdbe *, int, int);
-int sqlite3VdbeAddOp2(Vdbe *, int, int, int);
-int sqlite3VdbeGoto(Vdbe *, int);
-int sqlite3VdbeLoadString(Vdbe *, int, const char *);
-void sqlite3VdbeMultiLoad(Vdbe *, int, const char *, ...);
-int sqlite3VdbeAddOp3(Vdbe *, int, int, int, int);
-int sqlite3VdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
-int sqlite3VdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
-int sqlite3VdbeAddOp4Int(Vdbe *, int, int, int, int, int);
-void sqlite3VdbeEndCoroutine(Vdbe *, int);
-#if defined(SQLITE_DEBUG) && !defined(SQLITE_TEST_REALLOC_STRESS)
-void sqlite3VdbeVerifyNoResultRow(Vdbe * p);
+int sqlVdbeAddOp0(Vdbe *, int);
+int sqlVdbeAddOp1(Vdbe *, int, int);
+int sqlVdbeAddOp2(Vdbe *, int, int, int);
+int sqlVdbeGoto(Vdbe *, int);
+int sqlVdbeLoadString(Vdbe *, int, const char *);
+void sqlVdbeMultiLoad(Vdbe *, int, const char *, ...);
+int sqlVdbeAddOp3(Vdbe *, int, int, int, int);
+int sqlVdbeAddOp4(Vdbe *, int, int, int, int, const char *zP4, int);
+int sqlVdbeAddOp4Dup8(Vdbe *, int, int, int, int, const u8 *, int);
+int sqlVdbeAddOp4Int(Vdbe *, int, int, int, int, int);
+void sqlVdbeEndCoroutine(Vdbe *, int);
+#if defined(SQL_DEBUG) && !defined(SQL_TEST_REALLOC_STRESS)
+void sqlVdbeVerifyNoResultRow(Vdbe * p);
 #else
-#define sqlite3VdbeVerifyNoResultRow(A)
+#define sqlVdbeVerifyNoResultRow(A)
 #endif
-void sqlite3VdbeChangeOpcode(Vdbe *, u32 addr, u8);
-void sqlite3VdbeChangeP1(Vdbe *, u32 addr, int P1);
-void sqlite3VdbeChangeP2(Vdbe *, u32 addr, int P2);
-void sqlite3VdbeChangeP3(Vdbe *, u32 addr, int P3);
-void sqlite3VdbeChangeP5(Vdbe *, int P5);
-void sqlite3VdbeJumpHere(Vdbe *, int addr);
-int sqlite3VdbeChangeToNoop(Vdbe *, int addr);
-int sqlite3VdbeDeletePriorOpcode(Vdbe *, u8 op);
-void sqlite3VdbeChangeP4(Vdbe *, int addr, const char *zP4, int N);
-void sqlite3VdbeAppendP4(Vdbe *, void *pP4, int p4type);
+void sqlVdbeChangeOpcode(Vdbe *, u32 addr, u8);
+void sqlVdbeChangeP1(Vdbe *, u32 addr, int P1);
+void sqlVdbeChangeP2(Vdbe *, u32 addr, int P2);
+void sqlVdbeChangeP3(Vdbe *, u32 addr, int P3);
+void sqlVdbeChangeP5(Vdbe *, int P5);
+void sqlVdbeJumpHere(Vdbe *, int addr);
+int sqlVdbeChangeToNoop(Vdbe *, int addr);
+int sqlVdbeDeletePriorOpcode(Vdbe *, u8 op);
+void sqlVdbeChangeP4(Vdbe *, int addr, const char *zP4, int N);
+void sqlVdbeAppendP4(Vdbe *, void *pP4, int p4type);
 
 /**
  * Set the P4 on the most recently added opcode to the key_def for the
@@ -244,34 +244,34 @@ void sqlite3VdbeAppendP4(Vdbe *, void *pP4, int p4type);
 void
 sql_vdbe_set_p4_key_def(struct Parse *parse, struct key_def *key_def);
 
-VdbeOp *sqlite3VdbeGetOp(Vdbe *, int);
-int sqlite3VdbeMakeLabel(Vdbe *);
-void sqlite3VdbeRunOnlyOnce(Vdbe *);
-void sqlite3VdbeDelete(Vdbe *);
-void sqlite3VdbeClearObject(sqlite3 *, Vdbe *);
-void sqlite3VdbeMakeReady(Vdbe *, Parse *);
-int sqlite3VdbeFinalize(Vdbe *);
-void sqlite3VdbeResolveLabel(Vdbe *, int);
-int sqlite3VdbeCurrentAddr(Vdbe *);
-#ifdef SQLITE_DEBUG
-int sqlite3VdbeAssertMayAbort(Vdbe *, int);
+VdbeOp *sqlVdbeGetOp(Vdbe *, int);
+int sqlVdbeMakeLabel(Vdbe *);
+void sqlVdbeRunOnlyOnce(Vdbe *);
+void sqlVdbeDelete(Vdbe *);
+void sqlVdbeClearObject(sql *, Vdbe *);
+void sqlVdbeMakeReady(Vdbe *, Parse *);
+int sqlVdbeFinalize(Vdbe *);
+void sqlVdbeResolveLabel(Vdbe *, int);
+int sqlVdbeCurrentAddr(Vdbe *);
+#ifdef SQL_DEBUG
+int sqlVdbeAssertMayAbort(Vdbe *, int);
 #endif
-void sqlite3VdbeResetStepResult(Vdbe *);
-void sqlite3VdbeRewind(Vdbe *);
-int sqlite3VdbeReset(Vdbe *);
-void sqlite3VdbeSetNumCols(Vdbe *, int);
-int sqlite3VdbeSetColName(Vdbe *, int, int, const char *, void (*)(void *));
-void sqlite3VdbeCountChanges(Vdbe *);
-sqlite3 *sqlite3VdbeDb(Vdbe *);
-void sqlite3VdbeSetSql(Vdbe *, const char *z, int n, int);
-void sqlite3VdbeSwap(Vdbe *, Vdbe *);
-VdbeOp *sqlite3VdbeTakeOpArray(Vdbe *, int *, int *);
-sqlite3_value *sqlite3VdbeGetBoundValue(Vdbe *, int, u8);
-void sqlite3VdbeSetVarmask(Vdbe *, int);
-#ifndef SQLITE_OMIT_TRACE
-char *sqlite3VdbeExpandSql(Vdbe *, const char *);
+void sqlVdbeResetStepResult(Vdbe *);
+void sqlVdbeRewind(Vdbe *);
+int sqlVdbeReset(Vdbe *);
+void sqlVdbeSetNumCols(Vdbe *, int);
+int sqlVdbeSetColName(Vdbe *, int, int, const char *, void (*)(void *));
+void sqlVdbeCountChanges(Vdbe *);
+sql *sqlVdbeDb(Vdbe *);
+void sqlVdbeSetSql(Vdbe *, const char *z, int n, int);
+void sqlVdbeSwap(Vdbe *, Vdbe *);
+VdbeOp *sqlVdbeTakeOpArray(Vdbe *, int *, int *);
+sql_value *sqlVdbeGetBoundValue(Vdbe *, int, u8);
+void sqlVdbeSetVarmask(Vdbe *, int);
+#ifndef SQL_OMIT_TRACE
+char *sqlVdbeExpandSql(Vdbe *, const char *);
 #endif
-int sqlite3MemCompare(const Mem *, const Mem *, const struct coll *);
+int sqlMemCompare(const Mem *, const Mem *, const struct coll *);
 
 /**
  * Perform unpacking of provided message pack.
@@ -280,32 +280,32 @@ int sqlite3MemCompare(const Mem *, const Mem *, const struct coll *);
  * @param key The binary record
  * @param dest Populate this structure before returning.
  */
-void sqlite3VdbeRecordUnpackMsgpack(struct key_def *key_def,
+void sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,
 				    const void *msgpack,
 				    struct UnpackedRecord *dest);
 
-int sqlite3VdbeRecordCompare(struct sqlite3 *db, int key_count,
+int sqlVdbeRecordCompare(struct sql *db, int key_count,
 			     const void *key1, UnpackedRecord *key2);
-UnpackedRecord *sqlite3VdbeAllocUnpackedRecord(struct sqlite3 *,
+UnpackedRecord *sqlVdbeAllocUnpackedRecord(struct sql *,
 					       struct key_def *);
 int sql_vdbe_mem_alloc_region(Mem *, uint32_t);
 
-void sqlite3VdbeLinkSubProgram(Vdbe *, SubProgram *);
+void sqlVdbeLinkSubProgram(Vdbe *, SubProgram *);
 
-/* Use SQLITE_ENABLE_COMMENTS to enable generation of extra comments on
+/* Use SQL_ENABLE_COMMENTS to enable generation of extra comments on
  * each VDBE opcode.
  *
- * Use the SQLITE_ENABLE_MODULE_COMMENTS macro to see some extra no-op
+ * Use the SQL_ENABLE_MODULE_COMMENTS macro to see some extra no-op
  * comments in VDBE programs that show key decision points in the code
  * generator.
  */
-#ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
-void sqlite3VdbeComment(Vdbe *, const char *, ...);
-#define VdbeComment(X)  sqlite3VdbeComment X
-void sqlite3VdbeNoopComment(Vdbe *, const char *, ...);
-#define VdbeNoopComment(X)  sqlite3VdbeNoopComment X
-#ifdef SQLITE_ENABLE_MODULE_COMMENTS
-#define VdbeModuleComment(X)  sqlite3VdbeNoopComment X
+#ifdef SQL_ENABLE_EXPLAIN_COMMENTS
+void sqlVdbeComment(Vdbe *, const char *, ...);
+#define VdbeComment(X)  sqlVdbeComment X
+void sqlVdbeNoopComment(Vdbe *, const char *, ...);
+#define VdbeNoopComment(X)  sqlVdbeNoopComment X
+#ifdef SQL_ENABLE_MODULE_COMMENTS
+#define VdbeModuleComment(X)  sqlVdbeNoopComment X
 #else
 #define VdbeModuleComment(X)
 #endif
@@ -318,7 +318,7 @@ void sqlite3VdbeNoopComment(Vdbe *, const char *, ...);
 /*
  * The VdbeCoverage macros are used to set a coverage testing point
  * for VDBE branch instructions.  The coverage testing points are line
- * numbers in the sqlite3.c source file.  VDBE branch coverage testing
+ * numbers in the sql.c source file.  VDBE branch coverage testing
  * only works with an amalagmation build.  That's ok since a VDBE branch
  * coverage build designed for testing the test suite only.  No application
  * should ever ship with VDBE branch coverage measuring turned on.
@@ -333,16 +333,16 @@ void sqlite3VdbeNoopComment(Vdbe *, const char *, ...);
  *    VdbeCoverageNeverTaken(v)        // Previous branch is never taken
  *
  * Every VDBE branch operation must be tagged with one of the macros above.
- * If not, then when "make test" is run with -DSQLITE_VDBE_COVERAGE and
- * -DSQLITE_DEBUG then an ALWAYS() will fail in the vdbeTakeBranch()
+ * If not, then when "make test" is run with -DSQL_VDBE_COVERAGE and
+ * -DSQL_DEBUG then an ALWAYS() will fail in the vdbeTakeBranch()
  * routine in vdbe.c, alerting the developer to the missed tag.
  */
-#ifdef SQLITE_VDBE_COVERAGE
-void sqlite3VdbeSetLineNumber(Vdbe *, int);
-#define VdbeCoverage(v) sqlite3VdbeSetLineNumber(v,__LINE__)
-#define VdbeCoverageIf(v,x) if(x)sqlite3VdbeSetLineNumber(v,__LINE__)
-#define VdbeCoverageAlwaysTaken(v) sqlite3VdbeSetLineNumber(v,2);
-#define VdbeCoverageNeverTaken(v) sqlite3VdbeSetLineNumber(v,1);
+#ifdef SQL_VDBE_COVERAGE
+void sqlVdbeSetLineNumber(Vdbe *, int);
+#define VdbeCoverage(v) sqlVdbeSetLineNumber(v,__LINE__)
+#define VdbeCoverageIf(v,x) if(x)sqlVdbeSetLineNumber(v,__LINE__)
+#define VdbeCoverageAlwaysTaken(v) sqlVdbeSetLineNumber(v,2);
+#define VdbeCoverageNeverTaken(v) sqlVdbeSetLineNumber(v,1);
 #define VDBE_OFFSET_LINENO(x) (__LINE__+x)
 #else
 #define VdbeCoverage(v)
@@ -352,10 +352,10 @@ void sqlite3VdbeSetLineNumber(Vdbe *, int);
 #define VDBE_OFFSET_LINENO(x) 0
 #endif
 
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-void sqlite3VdbeScanStatus(Vdbe *, int, int, int, LogEst, const char *);
+#ifdef SQL_ENABLE_STMT_SCANSTATUS
+void sqlVdbeScanStatus(Vdbe *, int, int, int, LogEst, const char *);
 #else
-#define sqlite3VdbeScanStatus(a,b,c,d,e)
+#define sqlVdbeScanStatus(a,b,c,d,e)
 #endif
 
-#endif				/* SQLITE_VDBE_H */
+#endif				/* SQL_VDBE_H */

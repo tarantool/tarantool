@@ -38,7 +38,7 @@ test:do_test(
     end,
     {1})
 
--- check sqlite polymorphism
+-- check sql polymorphism
 test:do_test(
     "lua_sql-1.3",
     function ()

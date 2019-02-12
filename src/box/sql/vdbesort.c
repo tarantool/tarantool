@@ -40,11 +40,11 @@
  * exceeds the available memory.
  *
  * Here is the (internal, non-API) interface between this module and the
- * rest of the SQLite system:
+ * rest of the sql system:
  *
- *    sqlite3VdbeSorterInit()       Create a new VdbeSorter object.
+ *    sqlVdbeSorterInit()       Create a new VdbeSorter object.
  *
- *    sqlite3VdbeSorterWrite()      Add a single new row to the VdbeSorter
+ *    sqlVdbeSorterWrite()      Add a single new row to the VdbeSorter
  *                                  object.  The row is a binary blob in the
  *                                  OP_MakeRecord format that contains both
  *                                  the ORDER BY key columns and result columns
@@ -52,27 +52,27 @@
  *                                  the complete record for an index entry
  *                                  in the case of a CREATE INDEX.
  *
- *    sqlite3VdbeSorterRewind()     Sort all content previously added.
+ *    sqlVdbeSorterRewind()     Sort all content previously added.
  *                                  Position the read cursor on the
  *                                  first sorted element.
  *
- *    sqlite3VdbeSorterNext()       Advance the read cursor to the next sorted
+ *    sqlVdbeSorterNext()       Advance the read cursor to the next sorted
  *                                  element.
  *
- *    sqlite3VdbeSorterRowkey()     Return the complete binary blob for the
+ *    sqlVdbeSorterRowkey()     Return the complete binary blob for the
  *                                  row currently under the read cursor.
  *
- *    sqlite3VdbeSorterCompare()    Compare the binary blob for the row
+ *    sqlVdbeSorterCompare()    Compare the binary blob for the row
  *                                  currently under the read cursor against
  *                                  another binary blob X and report if
  *                                  X is strictly less than the read cursor.
  *                                  Used to enforce uniqueness in a
  *                                  CREATE UNIQUE INDEX statement.
  *
- *    sqlite3VdbeSorterClose()      Close the VdbeSorter object and reclaim
+ *    sqlVdbeSorterClose()      Close the VdbeSorter object and reclaim
  *                                  all resources.
  *
- *    sqlite3VdbeSorterReset()      Refurbish the VdbeSorter for reuse.  This
+ *    sqlVdbeSorterReset()      Refurbish the VdbeSorter for reuse.  This
  *                                  is like Close() followed by Init() only
  *                                  much faster.
  *
@@ -119,7 +119,7 @@
  * itself.
  *
  * The sorter is running in multi-threaded mode if (a) the library was built
- * with pre-processor symbol SQLITE_MAX_WORKER_THREADS set to a value greater
+ * with pre-processor symbol SQL_MAX_WORKER_THREADS set to a value greater
  * than zero, and (b) worker threads have been enabled at runtime by calling
  * "PRAGMA threads=N" with some value of N greater than 0.
  *
@@ -156,16 +156,16 @@
  * thread to merge the output of each of the others to a single PMA for
  * the main thread to read from.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "vdbeInt.h"
 
 /*
- * If SQLITE_DEBUG_SORTER_THREADS is defined, this module outputs various
+ * If SQL_DEBUG_SORTER_THREADS is defined, this module outputs various
  * messages to stderr that may be helpful in understanding the performance
  * characteristics of the sorter in multi-threaded mode.
  */
 #if 0
-#define SQLITE_DEBUG_SORTER_THREADS 1
+#define SQL_DEBUG_SORTER_THREADS 1
 #endif
 
 /*
@@ -173,7 +173,7 @@
  * to a level 0 PMA. The purpose of this limit is to prevent various integer
  * overflows. 512MiB.
  */
-#define SQLITE_MAX_PMASZ    (1<<29)
+#define SQL_MAX_PMASZ    (1<<29)
 
 /*
  * Private objects used by the sorter
@@ -192,7 +192,7 @@ typedef struct IncrMerger IncrMerger;	/* Read & merge multiple PMAs */
  * stored in the file.
  */
 struct SorterFile {
-	sqlite3_file *pFd;	/* File handle */
+	sql_file *pFd;	/* File handle */
 	i64 iEof;		/* Bytes of data stored in pFd */
 };
 
@@ -286,7 +286,7 @@ struct MergeEngine {
  * Exactly VdbeSorter.nTask instances of this object are allocated
  * as part of each VdbeSorter object. Instances are never allocated any
  * other way. VdbeSorter.nTask is set to the number of worker threads allowed
- * (see SQLITE_CONFIG_WORKER_THREADS) plus one (the main thread).  Thus for
+ * (see SQL_CONFIG_WORKER_THREADS) plus one (the main thread).  Thus for
  * single-threaded operation, there is exactly one instance of this object
  * and for multi-threaded operation there are two or more instances.
  *
@@ -304,8 +304,8 @@ struct MergeEngine {
  *      active background thread (since doing so causes the main thread
  *      to block until it finishes).
  *
- *   2. If SQLITE_DEBUG_SORTER_THREADS is defined, to determine if a call
- *      to sqlite3ThreadJoin() is likely to block. Cases that are likely to
+ *   2. If SQL_DEBUG_SORTER_THREADS is defined, to determine if a call
+ *      to sqlThreadJoin() is likely to block. Cases that are likely to
  *      block provoke debugging output.
  *
  * In both cases, the effects of the main thread seeing (bDone==0) even
@@ -315,7 +315,7 @@ struct MergeEngine {
 typedef int (*SorterCompare) (SortSubtask *, bool *, const void *,
 			      const void *);
 struct SortSubtask {
-	SQLiteThread *pThread;	/* Background thread, if any */
+	sqlThread *pThread;	/* Background thread, if any */
 	int bDone;		/* Set if thread is finished but not joined */
 	VdbeSorter *pSorter;	/* Sorter that owns this sub-task */
 	UnpackedRecord *pUnpacked;	/* Space to unpack a record */
@@ -331,7 +331,7 @@ struct SortSubtask {
  * sorter cursor created by the VDBE.
  *
  * mxKeysize:
- *   As records are added to the sorter by calls to sqlite3VdbeSorterWrite(),
+ *   As records are added to the sorter by calls to sqlVdbeSorterWrite(),
  *   this variable is updated so as to be set to the size on disk of the
  *   largest record in the sorter.
  */
@@ -342,7 +342,7 @@ struct VdbeSorter {
 	int pgsz;		/* Main database page size */
 	PmaReader *pReader;	/* Readr data from here after Rewind() */
 	MergeEngine *pMerger;	/* Or here, if bUseThreads==0 */
-	sqlite3 *db;		/* Database connection */
+	sql *db;		/* Database connection */
 	struct key_def *key_def;
 	UnpackedRecord *pUnpacked;	/* Used by VdbeSorterCompare() */
 	SorterList list;	/* List of in-memory records */
@@ -373,7 +373,7 @@ struct PmaReader {
 	i64 iEof;		/* 1 byte past EOF for this PmaReader */
 	int nAlloc;		/* Bytes of space at aAlloc */
 	int nKey;		/* Number of bytes in key */
-	sqlite3_file *pFd;	/* File handle we are reading from */
+	sql_file *pFd;	/* File handle we are reading from */
 	u8 *aAlloc;		/* Space for aKey if aBuffer and pMap wont work */
 	u8 *aKey;		/* Pointer to current key */
 	u8 *aBuffer;		/* Current read buffer */
@@ -439,7 +439,7 @@ struct PmaWriter {
 	int iBufStart;		/* First byte of buffer to write */
 	int iBufEnd;		/* Last byte of buffer to write */
 	i64 iWriteOff;		/* Offset of start of buffer in file */
-	sqlite3_file *pFd;	/* File handle to write to */
+	sql_file *pFd;	/* File handle to write to */
 };
 
 /*
@@ -454,7 +454,7 @@ struct PmaWriter {
  * Or, if using the single large allocation method (VdbeSorter.list.aMemory!=0),
  * then while records are being accumulated the list is linked using the
  * SorterRecord.u.iNext offset. This is because the aMemory[] array may
- * be sqlite3Realloc()ed while records are being accumulated. Once the VM
+ * be sqlRealloc()ed while records are being accumulated. Once the VM
  * has finished passing records to the sorter, or when the in-memory buffer
  * is full, the list is sorted. As part of the sorting process, it is
  * converted to use the SorterRecord.u.pNext pointers. See function
@@ -489,10 +489,10 @@ static void vdbeIncrFree(IncrMerger *);
 static void
 vdbePmaReaderClear(PmaReader * pReadr)
 {
-	sqlite3_free(pReadr->aAlloc);
-	sqlite3_free(pReadr->aBuffer);
+	sql_free(pReadr->aAlloc);
+	sql_free(pReadr->aBuffer);
 	if (pReadr->aMap)
-		sqlite3OsUnfetch(pReadr->pFd, 0, pReadr->aMap);
+		sqlOsUnfetch(pReadr->pFd, 0, pReadr->aMap);
 	vdbeIncrFree(pReadr->pIncr);
 	memset(pReadr, 0, sizeof(PmaReader));
 }
@@ -500,7 +500,7 @@ vdbePmaReaderClear(PmaReader * pReadr)
 /*
  * Read the next nByte bytes of data from the PMA p.
  * If successful, set *ppOut to point to a buffer containing the data
- * and return SQLITE_OK. Otherwise, if an error occurs, return an SQLite
+ * and return SQL_OK. Otherwise, if an error occurs, return an sql
  * error code.
  *
  * The buffer returned in *ppOut is only valid until the
@@ -518,7 +518,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 	if (p->aMap) {
 		*ppOut = &p->aMap[p->iReadOff];
 		p->iReadOff += nByte;
-		return SQLITE_OK;
+		return SQL_OK;
 	}
 
 	assert(p->aBuffer);
@@ -530,7 +530,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 	iBuf = p->iReadOff % p->nBuffer;
 	if (iBuf == 0) {
 		int nRead;	/* Bytes to read from disk */
-		int rc;		/* sqlite3OsRead() return code */
+		int rc;		/* sqlOsRead() return code */
 
 		/* Determine how many bytes of data to read. */
 		if ((p->iEof - p->iReadOff) > (i64) p->nBuffer) {
@@ -541,9 +541,9 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 		assert(nRead > 0);
 
 		/* Readr data from the file. Return early if an error occurs. */
-		rc = sqlite3OsRead(p->pFd, p->aBuffer, nRead, p->iReadOff);
-		assert(rc != SQLITE_IOERR_SHORT_READ);
-		if (rc != SQLITE_OK)
+		rc = sqlOsRead(p->pFd, p->aBuffer, nRead, p->iReadOff);
+		assert(rc != SQL_IOERR_SHORT_READ);
+		if (rc != SQL_OK)
 			return rc;
 	}
 	nAvail = p->nBuffer - iBuf;
@@ -568,9 +568,9 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 			int nNew = MAX(128, p->nAlloc * 2);
 			while (nByte > nNew)
 				nNew = nNew * 2;
-			aNew = sqlite3Realloc(p->aAlloc, nNew);
+			aNew = sqlRealloc(p->aAlloc, nNew);
 			if (!aNew)
-				return SQLITE_NOMEM_BKPT;
+				return SQL_NOMEM_BKPT;
 			p->nAlloc = nNew;
 			p->aAlloc = aNew;
 		}
@@ -594,7 +594,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 			if (nRem > p->nBuffer)
 				nCopy = p->nBuffer;
 			rc = vdbePmaReadBlob(p, nCopy, &aNext);
-			if (rc != SQLITE_OK)
+			if (rc != SQL_OK)
 				return rc;
 			assert(aNext != p->aAlloc);
 			memcpy(&p->aAlloc[nByte - nRem], aNext, nCopy);
@@ -604,7 +604,7 @@ vdbePmaReadBlob(PmaReader * p,	/* PmaReader from which to take the blob */
 		*ppOut = p->aAlloc;
 	}
 
-	return SQLITE_OK;
+	return SQL_OK;
 }
 
 /*
@@ -617,12 +617,12 @@ vdbePmaReadVarint(PmaReader * p, u64 * pnOut)
 	int iBuf;
 
 	if (p->aMap) {
-		p->iReadOff += sqlite3GetVarint(&p->aMap[p->iReadOff], pnOut);
+		p->iReadOff += sqlGetVarint(&p->aMap[p->iReadOff], pnOut);
 	} else {
 		iBuf = p->iReadOff % p->nBuffer;
 		if (iBuf && (p->nBuffer - iBuf) >= 9) {
 			p->iReadOff +=
-			    sqlite3GetVarint(&p->aBuffer[iBuf], pnOut);
+			    sqlGetVarint(&p->aBuffer[iBuf], pnOut);
 		} else {
 			u8 aVarint[16], *a;
 			int i = 0, rc;
@@ -632,32 +632,32 @@ vdbePmaReadVarint(PmaReader * p, u64 * pnOut)
 					return rc;
 				aVarint[(i++) & 0xf] = a[0];
 			} while ((a[0] & 0x80) != 0);
-			sqlite3GetVarint(aVarint, pnOut);
+			sqlGetVarint(aVarint, pnOut);
 		}
 	}
 
-	return SQLITE_OK;
+	return SQL_OK;
 }
 
 /*
  * Attempt to memory map file pFile. If successful, set *pp to point to the
- * new mapping and return SQLITE_OK. If the mapping is not attempted
+ * new mapping and return SQL_OK. If the mapping is not attempted
  * (because the file is too large or the VFS layer is configured not to use
- * mmap), return SQLITE_OK and set *pp to NULL.
+ * mmap), return SQL_OK and set *pp to NULL.
  *
- * Or, if an error occurs, return an SQLite error code. The final value of
+ * Or, if an error occurs, return an sql error code. The final value of
  * *pp is undefined in this case.
  */
 static int
 vdbeSorterMapFile(SortSubtask * pTask, SorterFile * pFile, u8 ** pp)
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	if (pFile->iEof <= (i64) (pTask->pSorter->db->nMaxSorterMmap)) {
-		sqlite3_file *pFd = pFile->pFd;
+		sql_file *pFd = pFile->pFd;
 		if (pFd->pMethods->iVersion >= 3) {
-			rc = sqlite3OsFetch(pFd, 0, (int)pFile->iEof,
+			rc = sqlOsFetch(pFd, 0, (int)pFile->iEof,
 					    (void **)pp);
-			testcase(rc != SQLITE_OK);
+			testcase(rc != SQL_OK);
 		}
 	}
 	return rc;
@@ -665,8 +665,8 @@ vdbeSorterMapFile(SortSubtask * pTask, SorterFile * pFile, u8 ** pp)
 
 /*
  * Attach PmaReader pReadr to file pFile (if it is not already attached to
- * that file) and seek it to offset iOff within the file.  Return SQLITE_OK
- * if successful, or an SQLite error code if an error occurs.
+ * that file) and seek it to offset iOff within the file.  Return SQL_OK
+ * if successful, or an sql error code if an error occurs.
  */
 static int
 vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
@@ -675,14 +675,14 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 		  i64 iOff	/* Offset in pFile */
     )
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 
 	assert(pReadr->pIncr == 0 || pReadr->pIncr->bEof == 0);
 
-	if (sqlite3FaultSim(201))
-		return SQLITE_IOERR_READ;
+	if (sqlFaultSim(201))
+		return SQL_IOERR_READ;
 	if (pReadr->aMap) {
-		sqlite3OsUnfetch(pReadr->pFd, 0, pReadr->aMap);
+		sqlOsUnfetch(pReadr->pFd, 0, pReadr->aMap);
 		pReadr->aMap = 0;
 	}
 	pReadr->iReadOff = iOff;
@@ -690,23 +690,23 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 	pReadr->pFd = pFile->pFd;
 
 	rc = vdbeSorterMapFile(pTask, pFile, &pReadr->aMap);
-	if (rc == SQLITE_OK && pReadr->aMap == 0) {
+	if (rc == SQL_OK && pReadr->aMap == 0) {
 		int pgsz = pTask->pSorter->pgsz;
 		int iBuf = pReadr->iReadOff % pgsz;
 		if (pReadr->aBuffer == 0) {
-			pReadr->aBuffer = (u8 *) sqlite3Malloc(pgsz);
+			pReadr->aBuffer = (u8 *) sqlMalloc(pgsz);
 			if (pReadr->aBuffer == 0)
-				rc = SQLITE_NOMEM_BKPT;
+				rc = SQL_NOMEM_BKPT;
 			pReadr->nBuffer = pgsz;
 		}
-		if (rc == SQLITE_OK && iBuf) {
+		if (rc == SQL_OK && iBuf) {
 			int nRead = pgsz - iBuf;
 			if ((pReadr->iReadOff + nRead) > pReadr->iEof) {
 				nRead = (int)(pReadr->iEof - pReadr->iReadOff);
 			}
-			rc = sqlite3OsRead(pReadr->pFd, &pReadr->aBuffer[iBuf],
+			rc = sqlOsRead(pReadr->pFd, &pReadr->aBuffer[iBuf],
 					   nRead, pReadr->iReadOff);
-			testcase(rc != SQLITE_OK);
+			testcase(rc != SQL_OK);
 		}
 	}
 
@@ -714,13 +714,13 @@ vdbePmaReaderSeek(SortSubtask * pTask,	/* Task context */
 }
 
 /*
- * Advance PmaReader pReadr to the next key in its PMA. Return SQLITE_OK if
- * no error occurs, or an SQLite error code if one does.
+ * Advance PmaReader pReadr to the next key in its PMA. Return SQL_OK if
+ * no error occurs, or an sql error code if one does.
  */
 static int
 vdbePmaReaderNext(PmaReader * pReadr)
 {
-	int rc = SQLITE_OK;	/* Return Code */
+	int rc = SQL_OK;	/* Return Code */
 	u64 nRec = 0;		/* Size of record in bytes */
 
 	if (pReadr->iReadOff >= pReadr->iEof) {
@@ -728,7 +728,7 @@ vdbePmaReaderNext(PmaReader * pReadr)
 		int bEof = 1;
 		if (pIncr) {
 			rc = vdbeIncrSwap(pIncr);
-			if (rc == SQLITE_OK && pIncr->bEof == 0) {
+			if (rc == SQL_OK && pIncr->bEof == 0) {
 				rc = vdbePmaReaderSeek(pIncr->pTask, pReadr,
 						       &pIncr->aFile[0],
 						       pIncr->iStartOff);
@@ -739,18 +739,18 @@ vdbePmaReaderNext(PmaReader * pReadr)
 		if (bEof) {
 			/* This is an EOF condition */
 			vdbePmaReaderClear(pReadr);
-			testcase(rc != SQLITE_OK);
+			testcase(rc != SQL_OK);
 			return rc;
 		}
 	}
 
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		rc = vdbePmaReadVarint(pReadr, &nRec);
 	}
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		pReadr->nKey = (int)nRec;
 		rc = vdbePmaReadBlob(pReadr, (int)nRec, &pReadr->aKey);
-		testcase(rc != SQLITE_OK);
+		testcase(rc != SQL_OK);
 	}
 
 	return rc;
@@ -781,14 +781,14 @@ vdbePmaReaderInit(SortSubtask * pTask,	/* Task context */
 	assert(pReadr->aMap == 0);
 
 	rc = vdbePmaReaderSeek(pTask, pReadr, pFile, iStart);
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		u64 nByte = 0;	/* Size of PMA in bytes */
 		rc = vdbePmaReadVarint(pReadr, &nByte);
 		pReadr->iEof = pReadr->iReadOff + nByte;
 		*pnByte += nByte;
 	}
 
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		rc = vdbePmaReaderNext(pReadr);
 	}
 	return rc;
@@ -805,7 +805,7 @@ vdbePmaReaderInit(SortSubtask * pTask,	/* Task context */
  * version of key2 and *pbKey2Cached set to true before returning.
  *
  * If an OOM error is encountered, (pTask->pUnpacked->error_rc) is set
- * to SQLITE_NOMEM.
+ * to SQL_NOMEM.
  *
  * @param task Subtask context (for key_def).
  * @param key2_cached True if pTask->pUnpacked is key2.
@@ -820,11 +820,11 @@ vdbeSorterCompare(struct SortSubtask *task, bool *key2_cached,
 {
 	struct UnpackedRecord *r2 = task->pUnpacked;
 	if (!*key2_cached) {
-		sqlite3VdbeRecordUnpackMsgpack(task->pSorter->key_def,
+		sqlVdbeRecordUnpackMsgpack(task->pSorter->key_def,
 					       key2, r2);
 		*key2_cached = 1;
 	}
-	return sqlite3VdbeRecordCompareMsgpack(key1, r2);
+	return sqlVdbeRecordCompareMsgpack(key1, r2);
 }
 
 /*
@@ -844,32 +844,32 @@ vdbeSorterCompare(struct SortSubtask *task, bool *key2_cached,
  * The sorter can guarantee a stable sort when running in single-threaded
  * mode, but not in multi-threaded mode.
  *
- * SQLITE_OK is returned if successful, or an SQLite error code otherwise.
+ * SQL_OK is returned if successful, or an sql error code otherwise.
  */
 int
-sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
+sqlVdbeSorterInit(sql * db,	/* Database connection (for malloc()) */
 		      VdbeCursor * pCsr	/* Cursor that holds the new sorter */
     )
 {
 	int pgsz;		/* Page size of main database */
 	int i;			/* Used to iterate through aTask[] */
 	VdbeSorter *pSorter;	/* The new sorter */
-	int rc = SQLITE_OK;
-#if SQLITE_MAX_WORKER_THREADS==0
+	int rc = SQL_OK;
+#if SQL_MAX_WORKER_THREADS==0
 #define nWorker 0
 #else
 	int nWorker;
 #endif
 
 	/* Initialize the upper limit on the number of worker threads */
-#if SQLITE_MAX_WORKER_THREADS>0
-	nWorker = db->aLimit[SQLITE_LIMIT_WORKER_THREADS];
+#if SQL_MAX_WORKER_THREADS>0
+	nWorker = db->aLimit[SQL_LIMIT_WORKER_THREADS];
 #endif
 
 	/* Do not allow the total number of threads (main thread + all workers)
 	 * to exceed the maximum merge count
 	 */
-#if SQLITE_MAX_WORKER_THREADS>=SORTER_MAX_MERGE_COUNT
+#if SQL_MAX_WORKER_THREADS>=SORTER_MAX_MERGE_COUNT
 	if (nWorker >= SORTER_MAX_MERGE_COUNT) {
 		nWorker = SORTER_MAX_MERGE_COUNT - 1;
 	}
@@ -878,10 +878,10 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 	assert(pCsr->key_def != NULL);
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 
-	pSorter = (VdbeSorter *) sqlite3DbMallocZero(db, sizeof(VdbeSorter));
+	pSorter = (VdbeSorter *) sqlDbMallocZero(db, sizeof(VdbeSorter));
 	pCsr->uc.pSorter = pSorter;
 	if (pSorter == 0) {
-		rc = SQLITE_NOMEM_BKPT;
+		rc = SQL_NOMEM_BKPT;
 	} else {
 		pSorter->key_def = pCsr->key_def;
 		pSorter->pgsz = pgsz = 1024;
@@ -894,28 +894,28 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
 			pTask->pSorter = pSorter;
 		}
 
-		if (!sqlite3TempInMemory(db)) {
+		if (!sqlTempInMemory(db)) {
 			i64 mxCache;	/* Cache size in bytes */
-			u32 szPma = sqlite3GlobalConfig.szPma;
+			u32 szPma = sqlGlobalConfig.szPma;
 			pSorter->mnPmaSize = szPma * pgsz;
 
-			mxCache = SQLITE_DEFAULT_CACHE_SIZE;
+			mxCache = SQL_DEFAULT_CACHE_SIZE;
 			mxCache = mxCache * -1024;
-			mxCache = MIN(mxCache, SQLITE_MAX_PMASZ);
+			mxCache = MIN(mxCache, SQL_MAX_PMASZ);
 			pSorter->mxPmaSize =
 			    MAX(pSorter->mnPmaSize, (int)mxCache);
 
 			/* EVIDENCE-OF: R-26747-61719 When the application provides any amount of
-			 * scratch memory using SQLITE_CONFIG_SCRATCH, SQLite avoids unnecessary
+			 * scratch memory using SQL_CONFIG_SCRATCH, sql avoids unnecessary
 			 * large heap allocations.
 			 */
-			if (sqlite3GlobalConfig.pScratch == 0) {
+			if (sqlGlobalConfig.pScratch == 0) {
 				assert(pSorter->iMemory == 0);
 				pSorter->nMemory = pgsz;
 				pSorter->list.aMemory =
-				    (u8 *) sqlite3Malloc(pgsz);
+				    (u8 *) sqlMalloc(pgsz);
 				if (!pSorter->list.aMemory)
-					rc = SQLITE_NOMEM_BKPT;
+					rc = SQL_NOMEM_BKPT;
 			}
 		}
 
@@ -935,13 +935,13 @@ sqlite3VdbeSorterInit(sqlite3 * db,	/* Database connection (for malloc()) */
  * Free the list of sorted records starting at pRecord.
  */
 static void
-vdbeSorterRecordFree(sqlite3 * db, SorterRecord * pRecord)
+vdbeSorterRecordFree(sql * db, SorterRecord * pRecord)
 {
 	SorterRecord *p;
 	SorterRecord *pNext;
 	for (p = pRecord; p; p = pNext) {
 		pNext = p->u.pNext;
-		sqlite3DbFree(db, p);
+		sqlDbFree(db, p);
 	}
 }
 
@@ -950,15 +950,15 @@ vdbeSorterRecordFree(sqlite3 * db, SorterRecord * pRecord)
  * fields of *pTask are zeroed before returning.
  */
 static void
-vdbeSortSubtaskCleanup(sqlite3 * db, SortSubtask * pTask)
+vdbeSortSubtaskCleanup(sql * db, SortSubtask * pTask)
 {
-	sqlite3DbFree(db, pTask->pUnpacked);
-#if SQLITE_MAX_WORKER_THREADS>0
+	sqlDbFree(db, pTask->pUnpacked);
+#if SQL_MAX_WORKER_THREADS>0
 	/* pTask->list.aMemory can only be non-zero if it was handed memory
-	 * from the main thread.  That only occurs SQLITE_MAX_WORKER_THREADS>0
+	 * from the main thread.  That only occurs SQL_MAX_WORKER_THREADS>0
 	 */
 	if (pTask->list.aMemory) {
-		sqlite3_free(pTask->list.aMemory);
+		sql_free(pTask->list.aMemory);
 	} else
 #endif
 	{
@@ -966,21 +966,21 @@ vdbeSortSubtaskCleanup(sqlite3 * db, SortSubtask * pTask)
 		vdbeSorterRecordFree(0, pTask->list.pList);
 	}
 	if (pTask->file.pFd) {
-		sqlite3OsCloseFree(pTask->file.pFd);
+		sqlOsCloseFree(pTask->file.pFd);
 	}
 	if (pTask->file2.pFd) {
-		sqlite3OsCloseFree(pTask->file2.pFd);
+		sqlOsCloseFree(pTask->file2.pFd);
 	}
 	memset(pTask, 0, sizeof(SortSubtask));
 }
 
-#ifdef SQLITE_DEBUG_SORTER_THREADS
+#ifdef SQL_DEBUG_SORTER_THREADS
 static void
 vdbeSorterWorkDebug(SortSubtask * pTask, const char *zEvent)
 {
 	i64 t;
 	int iTask = (pTask - pTask->pSorter->aTask);
-	sqlite3OsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
+	sqlOsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
 	fprintf(stderr, "%lld:%d %s\n", t, iTask, zEvent);
 }
 
@@ -988,7 +988,7 @@ static void
 vdbeSorterRewindDebug(const char *zEvent)
 {
 	i64 t;
-	sqlite3OsCurrentTimeInt64(sqlite3_vfs_find(0), &t);
+	sqlOsCurrentTimeInt64(sql_vfs_find(0), &t);
 	fprintf(stderr, "%lld:X %s\n", t, zEvent);
 }
 
@@ -997,7 +997,7 @@ vdbeSorterPopulateDebug(SortSubtask * pTask, const char *zEvent)
 {
 	i64 t;
 	int iTask = (pTask - pTask->pSorter->aTask);
-	sqlite3OsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
+	sqlOsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
 	fprintf(stderr, "%lld:bg%d %s\n", t, iTask, zEvent);
 }
 
@@ -1006,7 +1006,7 @@ vdbeSorterBlockDebug(SortSubtask * pTask, int bBlocked, const char *zEvent)
 {
 	if (bBlocked) {
 		i64 t;
-		sqlite3OsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
+		sqlOsCurrentTimeInt64(pTask->pSorter->db->pVfs, &t);
 		fprintf(stderr, "%lld:main %s\n", t, zEvent);
 	}
 }
@@ -1017,23 +1017,23 @@ vdbeSorterBlockDebug(SortSubtask * pTask, int bBlocked, const char *zEvent)
 #define vdbeSorterBlockDebug(x,y,z)
 #endif
 
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 /*
  * Join thread pTask->thread.
  */
 static int
 vdbeSorterJoinThread(SortSubtask * pTask)
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	if (pTask->pThread) {
-#ifdef SQLITE_DEBUG_SORTER_THREADS
+#ifdef SQL_DEBUG_SORTER_THREADS
 		int bDone = pTask->bDone;
 #endif
-		void *pRet = SQLITE_INT_TO_PTR(SQLITE_ERROR);
+		void *pRet = SQL_INT_TO_PTR(SQL_ERROR);
 		vdbeSorterBlockDebug(pTask, !bDone, "enter");
-		(void)sqlite3ThreadJoin(pTask->pThread, &pRet);
+		(void)sqlThreadJoin(pTask->pThread, &pRet);
 		vdbeSorterBlockDebug(pTask, !bDone, "exit");
-		rc = SQLITE_PTR_TO_INT(pRet);
+		rc = SQL_PTR_TO_INT(pRet);
 		assert(pTask->bDone == 1);
 		pTask->bDone = 0;
 		pTask->pThread = 0;
@@ -1051,7 +1051,7 @@ vdbeSorterCreateThread(SortSubtask * pTask,	/* Thread will use this task object 
     )
 {
 	assert(pTask->pThread == 0 && pTask->bDone == 0);
-	return sqlite3ThreadCreate(&pTask->pThread, xTask, pIn);
+	return sqlThreadCreate(&pTask->pThread, xTask, pIn);
 }
 
 /*
@@ -1075,14 +1075,14 @@ vdbeSorterJoinAll(VdbeSorter * pSorter, int rcin)
 	for (i = pSorter->nTask - 1; i >= 0; i--) {
 		SortSubtask *pTask = &pSorter->aTask[i];
 		int rc2 = vdbeSorterJoinThread(pTask);
-		if (rc == SQLITE_OK)
+		if (rc == SQL_OK)
 			rc = rc2;
 	}
 	return rc;
 }
 #else
 #define vdbeSorterJoinAll(x,rcin) (rcin)
-#define vdbeSorterJoinThread(pTask) SQLITE_OK
+#define vdbeSorterJoinThread(pTask) SQL_OK
 #endif
 
 /*
@@ -1106,7 +1106,7 @@ vdbeMergeEngineNew(int nReader)
 	nByte = sizeof(MergeEngine) + N * (sizeof(int) + sizeof(PmaReader));
 
 	pNew =
-	    sqlite3FaultSim(100) ? 0 : (MergeEngine *) sqlite3MallocZero(nByte);
+	    sqlFaultSim(100) ? 0 : (MergeEngine *) sqlMallocZero(nByte);
 	if (pNew) {
 		pNew->nTree = N;
 		pNew->pTask = 0;
@@ -1128,7 +1128,7 @@ vdbeMergeEngineFree(MergeEngine * pMerger)
 			vdbePmaReaderClear(&pMerger->aReadr[i]);
 		}
 	}
-	sqlite3_free(pMerger);
+	sql_free(pMerger);
 }
 
 /*
@@ -1139,17 +1139,17 @@ static void
 vdbeIncrFree(IncrMerger * pIncr)
 {
 	if (pIncr) {
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 		if (pIncr->bUseThread) {
 			vdbeSorterJoinThread(pIncr->pTask);
 			if (pIncr->aFile[0].pFd)
-				sqlite3OsCloseFree(pIncr->aFile[0].pFd);
+				sqlOsCloseFree(pIncr->aFile[0].pFd);
 			if (pIncr->aFile[1].pFd)
-				sqlite3OsCloseFree(pIncr->aFile[1].pFd);
+				sqlOsCloseFree(pIncr->aFile[1].pFd);
 		}
 #endif
 		vdbeMergeEngineFree(pIncr->pMerger);
-		sqlite3_free(pIncr);
+		sql_free(pIncr);
 	}
 }
 
@@ -1157,15 +1157,15 @@ vdbeIncrFree(IncrMerger * pIncr)
  * Reset a sorting cursor back to its original empty state.
  */
 void
-sqlite3VdbeSorterReset(sqlite3 * db, VdbeSorter * pSorter)
+sqlVdbeSorterReset(sql * db, VdbeSorter * pSorter)
 {
 	int i;
-	(void)vdbeSorterJoinAll(pSorter, SQLITE_OK);
+	(void)vdbeSorterJoinAll(pSorter, SQL_OK);
 	assert(pSorter->bUseThreads || pSorter->pReader == 0);
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 	if (pSorter->pReader) {
 		vdbePmaReaderClear(pSorter->pReader);
-		sqlite3DbFree(db, pSorter->pReader);
+		sqlDbFree(db, pSorter->pReader);
 		pSorter->pReader = 0;
 	}
 #endif
@@ -1184,28 +1184,28 @@ sqlite3VdbeSorterReset(sqlite3 * db, VdbeSorter * pSorter)
 	pSorter->bUsePMA = 0;
 	pSorter->iMemory = 0;
 	pSorter->mxKeysize = 0;
-	sqlite3DbFree(db, pSorter->pUnpacked);
+	sqlDbFree(db, pSorter->pUnpacked);
 	pSorter->pUnpacked = 0;
 }
 
 /*
- * Free any cursor components allocated by sqlite3VdbeSorterXXX routines.
+ * Free any cursor components allocated by sqlVdbeSorterXXX routines.
  */
 void
-sqlite3VdbeSorterClose(sqlite3 * db, VdbeCursor * pCsr)
+sqlVdbeSorterClose(sql * db, VdbeCursor * pCsr)
 {
 	VdbeSorter *pSorter;
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
 	if (pSorter) {
-		sqlite3VdbeSorterReset(db, pSorter);
-		sqlite3_free(pSorter->list.aMemory);
-		sqlite3DbFree(db, pSorter);
+		sqlVdbeSorterReset(db, pSorter);
+		sql_free(pSorter->list.aMemory);
+		sqlDbFree(db, pSorter);
 		pCsr->uc.pSorter = 0;
 	}
 }
 
-#if SQLITE_MAX_MMAP_SIZE>0
+#if SQL_MAX_MMAP_SIZE>0
 /*
  * The first argument is a file-handle open on a temporary file. The file
  * is guaranteed to be nByte bytes or smaller in size. This function
@@ -1216,16 +1216,16 @@ sqlite3VdbeSorterClose(sqlite3 * db, VdbeCursor * pCsr)
  * the specific VFS implementation.
  */
 static void
-vdbeSorterExtendFile(sqlite3 * db, sqlite3_file * pFd, i64 nByte)
+vdbeSorterExtendFile(sql * db, sql_file * pFd, i64 nByte)
 {
 	if (nByte <= (i64) (db->nMaxSorterMmap) && pFd->pMethods->iVersion >= 3) {
 		void *p = 0;
 		int chunksize = 4 * 1024;
-		sqlite3OsFileControlHint(pFd, SQLITE_FCNTL_CHUNK_SIZE,
+		sqlOsFileControlHint(pFd, SQL_FCNTL_CHUNK_SIZE,
 					 &chunksize);
-		sqlite3OsFileControlHint(pFd, SQLITE_FCNTL_SIZE_HINT, &nByte);
-		sqlite3OsFetch(pFd, 0, (int)nByte, &p);
-		sqlite3OsUnfetch(pFd, 0, p);
+		sqlOsFileControlHint(pFd, SQL_FCNTL_SIZE_HINT, &nByte);
+		sqlOsFetch(pFd, 0, (int)nByte, &p);
+		sqlOsUnfetch(pFd, 0, p);
 	}
 }
 #else
@@ -1234,24 +1234,24 @@ vdbeSorterExtendFile(sqlite3 * db, sqlite3_file * pFd, i64 nByte)
 
 /*
  * Allocate space for a file-handle and open a temporary file. If successful,
- * set *ppFd to point to the malloc'd file-handle and return SQLITE_OK.
- * Otherwise, set *ppFd to 0 and return an SQLite error code.
+ * set *ppFd to point to the malloc'd file-handle and return SQL_OK.
+ * Otherwise, set *ppFd to 0 and return an sql error code.
  */
 static int
-vdbeSorterOpenTempFile(sqlite3 * db,	/* Database handle doing sort */
+vdbeSorterOpenTempFile(sql * db,	/* Database handle doing sort */
 		       i64 nExtend,	/* Attempt to extend file to this size */
-		       sqlite3_file ** ppFd)
+		       sql_file ** ppFd)
 {
 	int rc;
-	if (sqlite3FaultSim(202))
-		return SQLITE_IOERR_ACCESS;
-	rc = sqlite3OsOpenMalloc(db->pVfs, 0, ppFd,
-				 SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
-				 SQLITE_OPEN_EXCLUSIVE |
-				 SQLITE_OPEN_DELETEONCLOSE, &rc);
-	if (rc == SQLITE_OK) {
-		i64 max = SQLITE_MAX_MMAP_SIZE;
-		sqlite3OsFileControlHint(*ppFd, SQLITE_FCNTL_MMAP_SIZE,
+	if (sqlFaultSim(202))
+		return SQL_IOERR_ACCESS;
+	rc = sqlOsOpenMalloc(db->pVfs, 0, ppFd,
+				 SQL_OPEN_READWRITE | SQL_OPEN_CREATE |
+				 SQL_OPEN_EXCLUSIVE |
+				 SQL_OPEN_DELETEONCLOSE, &rc);
+	if (rc == SQL_OK) {
+		i64 max = SQL_MAX_MMAP_SIZE;
+		sqlOsFileControlHint(*ppFd, SQL_FCNTL_MMAP_SIZE,
 					 (void *)&max);
 		if (nExtend > 0) {
 			vdbeSorterExtendFile(db, *ppFd, nExtend);
@@ -1262,22 +1262,22 @@ vdbeSorterOpenTempFile(sqlite3 * db,	/* Database handle doing sort */
 
 /*
  * If it has not already been allocated, allocate the UnpackedRecord
- * structure at pTask->pUnpacked. Return SQLITE_OK if successful (or
- * if no allocation was required), or SQLITE_NOMEM otherwise.
+ * structure at pTask->pUnpacked. Return SQL_OK if successful (or
+ * if no allocation was required), or SQL_NOMEM otherwise.
  */
 static int
 vdbeSortAllocUnpacked(SortSubtask * pTask)
 {
 	if (pTask->pUnpacked == 0) {
 		pTask->pUnpacked =
-			sqlite3VdbeAllocUnpackedRecord(pTask->pSorter->db,
+			sqlVdbeAllocUnpackedRecord(pTask->pSorter->db,
 						       pTask->pSorter->key_def);
 		if (pTask->pUnpacked == 0)
-			return SQLITE_NOMEM_BKPT;
+			return SQL_NOMEM_BKPT;
 		pTask->pUnpacked->nField = pTask->pSorter->key_def->part_count;
 		pTask->pUnpacked->errCode = 0;
 	}
-	return SQLITE_OK;
+	return SQL_OK;
 }
 
 /*
@@ -1335,7 +1335,7 @@ vdbeSorterGetCompare(VdbeSorter * p)
 
 /*
  * Sort the linked list of records headed at pTask->pList. Return
- * SQLITE_OK if successful, or an SQLite error code (i.e. SQLITE_NOMEM) if
+ * SQL_OK if successful, or an sql error code (i.e. SQL_NOMEM) if
  * an error occurs.
  */
 static int
@@ -1347,16 +1347,16 @@ vdbeSorterSort(SortSubtask * pTask, SorterList * pList)
 	int rc;
 
 	rc = vdbeSortAllocUnpacked(pTask);
-	if (rc != SQLITE_OK)
+	if (rc != SQL_OK)
 		return rc;
 
 	p = pList->pList;
 	pTask->xCompare = vdbeSorterGetCompare(pTask->pSorter);
 
 	aSlot =
-	    (SorterRecord **) sqlite3MallocZero(64 * sizeof(SorterRecord *));
+	    (SorterRecord **) sqlMallocZero(64 * sizeof(SorterRecord *));
 	if (!aSlot) {
-		return SQLITE_NOMEM_BKPT;
+		return SQL_NOMEM_BKPT;
 	}
 
 	while (p) {
@@ -1366,7 +1366,7 @@ vdbeSorterSort(SortSubtask * pTask, SorterList * pList)
 				pNext = 0;
 			} else {
 				assert(p->u.iNext <
-				       sqlite3MallocSize(pList->aMemory));
+				       sqlMallocSize(pList->aMemory));
 				pNext =
 				    (SorterRecord *) & pList->aMemory[p->u.
 								      iNext];
@@ -1392,9 +1392,9 @@ vdbeSorterSort(SortSubtask * pTask, SorterList * pList)
 	}
 	pList->pList = p;
 
-	sqlite3_free(aSlot);
-	assert(pTask->pUnpacked->errCode == SQLITE_OK
-	       || pTask->pUnpacked->errCode == SQLITE_NOMEM);
+	sql_free(aSlot);
+	assert(pTask->pUnpacked->errCode == SQL_OK
+	       || pTask->pUnpacked->errCode == SQL_NOMEM);
 	return pTask->pUnpacked->errCode;
 }
 
@@ -1402,16 +1402,16 @@ vdbeSorterSort(SortSubtask * pTask, SorterList * pList)
  * Initialize a PMA-writer object.
  */
 static void
-vdbePmaWriterInit(sqlite3_file * pFd,	/* File handle to write to */
+vdbePmaWriterInit(sql_file * pFd,	/* File handle to write to */
 		  PmaWriter * p,	/* Object to populate */
 		  int nBuf,	/* Buffer size */
 		  i64 iStart	/* Offset of pFd to begin writing at */
     )
 {
 	memset(p, 0, sizeof(PmaWriter));
-	p->aBuffer = (u8 *) sqlite3Malloc(nBuf);
+	p->aBuffer = (u8 *) sqlMalloc(nBuf);
 	if (!p->aBuffer) {
-		p->eFWErr = SQLITE_NOMEM_BKPT;
+		p->eFWErr = SQL_NOMEM_BKPT;
 	} else {
 		p->iBufEnd = p->iBufStart = (iStart % nBuf);
 		p->iWriteOff = iStart - p->iBufStart;
@@ -1421,8 +1421,8 @@ vdbePmaWriterInit(sqlite3_file * pFd,	/* File handle to write to */
 }
 
 /*
- * Write nData bytes of data to the PMA. Return SQLITE_OK
- * if successful, or an SQLite error code if an error occurs.
+ * Write nData bytes of data to the PMA. Return SQL_OK
+ * if successful, or an sql error code if an error occurs.
  */
 static void
 vdbePmaWriteBlob(PmaWriter * p, u8 * pData, int nData)
@@ -1437,7 +1437,7 @@ vdbePmaWriteBlob(PmaWriter * p, u8 * pData, int nData)
 		memcpy(&p->aBuffer[p->iBufEnd], &pData[nData - nRem], nCopy);
 		p->iBufEnd += nCopy;
 		if (p->iBufEnd == p->nBuffer) {
-			p->eFWErr = sqlite3OsWrite(p->pFd,
+			p->eFWErr = sqlOsWrite(p->pFd,
 						   &p->aBuffer[p->iBufStart],
 						   p->iBufEnd - p->iBufStart,
 						   p->iWriteOff + p->iBufStart);
@@ -1453,8 +1453,8 @@ vdbePmaWriteBlob(PmaWriter * p, u8 * pData, int nData)
 /*
  * Flush any buffered data to disk and clean up the PMA-writer object.
  * The results of using the PMA-writer after this call are undefined.
- * Return SQLITE_OK if flushing the buffered data succeeds or is not
- * required. Otherwise, return an SQLite error code.
+ * Return SQL_OK if flushing the buffered data succeeds or is not
+ * required. Otherwise, return an sql error code.
  *
  * Before returning, set *piEof to the offset immediately following the
  * last byte written to the file.
@@ -1464,13 +1464,13 @@ vdbePmaWriterFinish(PmaWriter * p, i64 * piEof)
 {
 	int rc;
 	if (p->eFWErr == 0 && ALWAYS(p->aBuffer) && p->iBufEnd > p->iBufStart) {
-		p->eFWErr = sqlite3OsWrite(p->pFd,
+		p->eFWErr = sqlOsWrite(p->pFd,
 					   &p->aBuffer[p->iBufStart],
 					   p->iBufEnd - p->iBufStart,
 					   p->iWriteOff + p->iBufStart);
 	}
 	*piEof = (p->iWriteOff + p->iBufEnd);
-	sqlite3_free(p->aBuffer);
+	sql_free(p->aBuffer);
 	rc = p->eFWErr;
 	memset(p, 0, sizeof(PmaWriter));
 	return rc;
@@ -1478,21 +1478,21 @@ vdbePmaWriterFinish(PmaWriter * p, i64 * piEof)
 
 /*
  * Write value iVal encoded as a varint to the PMA. Return
- * SQLITE_OK if successful, or an SQLite error code if an error occurs.
+ * SQL_OK if successful, or an sql error code if an error occurs.
  */
 static void
 vdbePmaWriteVarint(PmaWriter * p, u64 iVal)
 {
 	int nByte;
 	u8 aByte[10];
-	nByte = sqlite3PutVarint(aByte, iVal);
+	nByte = sqlPutVarint(aByte, iVal);
 	vdbePmaWriteBlob(p, aByte, nByte);
 }
 
 /*
  * Write the current contents of in-memory linked-list pList to a level-0
- * PMA in the temp file belonging to sub-task pTask. Return SQLITE_OK if
- * successful, or an SQLite error code otherwise.
+ * PMA in the temp file belonging to sub-task pTask. Return SQL_OK if
+ * successful, or an sql error code otherwise.
  *
  * The format of a PMA is:
  *
@@ -1506,16 +1506,16 @@ vdbePmaWriteVarint(PmaWriter * p, u64 iVal)
 static int
 vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 {
-	sqlite3 *db = pTask->pSorter->db;
-	int rc = SQLITE_OK;	/* Return code */
+	sql *db = pTask->pSorter->db;
+	int rc = SQL_OK;	/* Return code */
 	PmaWriter writer;	/* Object used to write to the file */
 
-#ifdef SQLITE_DEBUG
+#ifdef SQL_DEBUG
 	/* Set iSz to the expected size of file pTask->file after writing the PMA.
 	 * This is used by an assert() statement at the end of this function.
 	 */
 	i64 iSz =
-	    pList->szPMA + sqlite3VarintLen(pList->szPMA) + pTask->file.iEof;
+	    pList->szPMA + sqlVarintLen(pList->szPMA) + pTask->file.iEof;
 #endif
 
 	vdbeSorterWorkDebug(pTask, "enter");
@@ -1525,23 +1525,23 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 	/* If the first temporary PMA file has not been opened, open it now. */
 	if (pTask->file.pFd == 0) {
 		rc = vdbeSorterOpenTempFile(db, 0, &pTask->file.pFd);
-		assert(rc != SQLITE_OK || pTask->file.pFd);
+		assert(rc != SQL_OK || pTask->file.pFd);
 		assert(pTask->file.iEof == 0);
 		assert(pTask->nPMA == 0);
 	}
 
 	/* Try to get the file to memory map */
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		vdbeSorterExtendFile(db, pTask->file.pFd,
 				     pTask->file.iEof + pList->szPMA + 9);
 	}
 
 	/* Sort the list */
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		rc = vdbeSorterSort(pTask, pList);
 	}
 
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		SorterRecord *p;
 		SorterRecord *pNext = 0;
 
@@ -1554,15 +1554,15 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
 			vdbePmaWriteVarint(&writer, p->nVal);
 			vdbePmaWriteBlob(&writer, SRVAL(p), p->nVal);
 			if (pList->aMemory == 0)
-				sqlite3_free(p);
+				sql_free(p);
 		}
 		pList->pList = p;
 		rc = vdbePmaWriterFinish(&writer, &pTask->file.iEof);
 	}
 
 	vdbeSorterWorkDebug(pTask, "exit");
-	assert(rc != SQLITE_OK || pList->pList == 0);
-	assert(rc != SQLITE_OK || pTask->file.iEof == iSz);
+	assert(rc != SQL_OK || pList->pList == 0);
+	assert(rc != SQL_OK || pTask->file.iEof == iSz);
 	return rc;
 }
 
@@ -1571,7 +1571,7 @@ vdbeSorterListToPMA(SortSubtask * pTask, SorterList * pList)
  * Set *pbEof to true there is no next entry because
  * the MergeEngine has reached the end of all its inputs.
  *
- * Return SQLITE_OK if successful or an error code if an error occurs.
+ * Return SQL_OK if successful or an error code if an error occurs.
  */
 static int
 vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the next row */
@@ -1586,7 +1586,7 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 	rc = vdbePmaReaderNext(&pMerger->aReadr[iPrev]);
 
 	/* Update contents of aTree[] */
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		int i;		/* Index of aTree[] to recalculate */
 		PmaReader *pReadr1;	/* First PmaReader to compare */
 		PmaReader *pReadr2;	/* Second PmaReader to compare */
@@ -1647,10 +1647,10 @@ vdbeMergeEngineStep(MergeEngine * pMerger,	/* The merge engine to advance to the
 		*pbEof = (pMerger->aReadr[pMerger->aTree[1]].pFd == 0);
 	}
 
-	return (rc == SQLITE_OK ? pTask->pUnpacked->errCode : rc);
+	return (rc == SQL_OK ? pTask->pUnpacked->errCode : rc);
 }
 
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 /*
  * The main routine for background threads that write level-0 PMAs.
  */
@@ -1662,9 +1662,9 @@ vdbeSorterFlushThread(void *pCtx)
 	assert(pTask->bDone == 0);
 	rc = vdbeSorterListToPMA(pTask, &pTask->list);
 	pTask->bDone = 1;
-	return SQLITE_INT_TO_PTR(rc);
+	return SQL_INT_TO_PTR(rc);
 }
-#endif				/* SQLITE_MAX_WORKER_THREADS>0 */
+#endif				/* SQL_MAX_WORKER_THREADS>0 */
 
 /*
  * Flush the current contents of VdbeSorter.list to a new PMA, possibly
@@ -1673,11 +1673,11 @@ vdbeSorterFlushThread(void *pCtx)
 static int
 vdbeSorterFlushPMA(VdbeSorter * pSorter)
 {
-#if SQLITE_MAX_WORKER_THREADS==0
+#if SQL_MAX_WORKER_THREADS==0
 	pSorter->bUsePMA = 1;
 	return vdbeSorterListToPMA(&pSorter->aTask[0], &pSorter->list);
 #else
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	int i;
 	SortSubtask *pTask = 0;	/* Thread context used to create new PMA */
 	int nWorker = (pSorter->nTask - 1);
@@ -1702,11 +1702,11 @@ vdbeSorterFlushPMA(VdbeSorter * pSorter)
 		if (pTask->bDone) {
 			rc = vdbeSorterJoinThread(pTask);
 		}
-		if (rc != SQLITE_OK || pTask->pThread == 0)
+		if (rc != SQL_OK || pTask->pThread == 0)
 			break;
 	}
 
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		if (i == nWorker) {
 			/* Use the foreground thread for this operation */
 			rc = vdbeSorterListToPMA(&pSorter->aTask[nWorker],
@@ -1727,12 +1727,12 @@ vdbeSorterFlushPMA(VdbeSorter * pSorter)
 			pSorter->list.szPMA = 0;
 			if (aMem) {
 				pSorter->list.aMemory = aMem;
-				pSorter->nMemory = sqlite3MallocSize(aMem);
+				pSorter->nMemory = sqlMallocSize(aMem);
 			} else if (pSorter->list.aMemory) {
 				pSorter->list.aMemory =
-				    sqlite3Malloc(pSorter->nMemory);
+				    sqlMalloc(pSorter->nMemory);
 				if (!pSorter->list.aMemory)
-					return SQLITE_NOMEM_BKPT;
+					return SQL_NOMEM_BKPT;
 			}
 
 			rc = vdbeSorterCreateThread(pTask,
@@ -1742,19 +1742,19 @@ vdbeSorterFlushPMA(VdbeSorter * pSorter)
 	}
 
 	return rc;
-#endif				/* SQLITE_MAX_WORKER_THREADS!=0 */
+#endif				/* SQL_MAX_WORKER_THREADS!=0 */
 }
 
 /*
  * Add a record to the sorter.
  */
 int
-sqlite3VdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
+sqlVdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 		       Mem * pVal	/* Memory cell containing record */
     )
 {
 	VdbeSorter *pSorter;
-	int rc = SQLITE_OK;	/* Return Code */
+	int rc = SQL_OK;	/* Return Code */
 	SorterRecord *pNew;	/* New list element */
 	int bFlush;		/* True to flush contents of memory to PMA */
 	int nReq;		/* Bytes of memory required */
@@ -1788,10 +1788,10 @@ sqlite3VdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 	 *     than (page-size * cache-size), or
 	 *
 	 *   * The total memory allocated for the in-memory list is greater
-	 *     than (page-size * 10) and sqlite3HeapNearlyFull() returns true.
+	 *     than (page-size * 10) and sqlHeapNearlyFull() returns true.
 	 */
 	nReq = pVal->n + sizeof(SorterRecord);
-	nPMA = pVal->n + sqlite3VarintLen(pVal->n);
+	nPMA = pVal->n + sqlVarintLen(pVal->n);
 	if (pSorter->mxPmaSize) {
 		if (pSorter->list.aMemory) {
 			bFlush = pSorter->iMemory
@@ -1799,14 +1799,14 @@ sqlite3VdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 		} else {
 			bFlush = ((pSorter->list.szPMA > pSorter->mxPmaSize)
 				  || (pSorter->list.szPMA > pSorter->mnPmaSize
-				      && sqlite3HeapNearlyFull())
+				      && sqlHeapNearlyFull())
 			    );
 		}
 		if (bFlush) {
 			rc = vdbeSorterFlushPMA(pSorter);
 			pSorter->list.szPMA = 0;
 			pSorter->iMemory = 0;
-			assert(rc != SQLITE_OK || pSorter->list.pList == 0);
+			assert(rc != SQL_OK || pSorter->list.pList == 0);
 		}
 	}
 
@@ -1830,9 +1830,9 @@ sqlite3VdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 			if (nNew < nMin)
 				nNew = nMin;
 
-			aNew = sqlite3Realloc(pSorter->list.aMemory, nNew);
+			aNew = sqlRealloc(pSorter->list.aMemory, nNew);
 			if (!aNew)
-				return SQLITE_NOMEM_BKPT;
+				return SQL_NOMEM_BKPT;
 			pSorter->list.pList = (SorterRecord *) & aNew[iListOff];
 			pSorter->list.aMemory = aNew;
 			pSorter->nMemory = nNew;
@@ -1847,9 +1847,9 @@ sqlite3VdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 				  pSorter->list.aMemory);
 		}
 	} else {
-		pNew = (SorterRecord *) sqlite3Malloc(nReq);
+		pNew = (SorterRecord *) sqlMalloc(nReq);
 		if (pNew == 0) {
-			return SQLITE_NOMEM_BKPT;
+			return SQL_NOMEM_BKPT;
 		}
 		pNew->u.pNext = pSorter->list.pList;
 	}
@@ -1869,7 +1869,7 @@ sqlite3VdbeSorterWrite(const VdbeCursor * pCsr,	/* Sorter cursor */
 static int
 vdbeIncrPopulate(IncrMerger * pIncr)
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	int rc2;
 	i64 iStart = pIncr->iStartOff;
 	SorterFile *pOut = &pIncr->aFile[1];
@@ -1881,7 +1881,7 @@ vdbeIncrPopulate(IncrMerger * pIncr)
 	vdbeSorterPopulateDebug(pTask, "enter");
 
 	vdbePmaWriterInit(pOut->pFd, &writer, pTask->pSorter->pgsz, iStart);
-	while (rc == SQLITE_OK) {
+	while (rc == SQL_OK) {
 		int dummy;
 		PmaReader *pReader = &pMerger->aReadr[pMerger->aTree[1]];
 		int nKey = pReader->nKey;
@@ -1892,7 +1892,7 @@ vdbeIncrPopulate(IncrMerger * pIncr)
 		 */
 		if (pReader->pFd == 0)
 			break;
-		if ((iEof + nKey + sqlite3VarintLen(nKey)) >
+		if ((iEof + nKey + sqlVarintLen(nKey)) >
 		    (iStart + pIncr->mxSz))
 			break;
 
@@ -1904,13 +1904,13 @@ vdbeIncrPopulate(IncrMerger * pIncr)
 	}
 
 	rc2 = vdbePmaWriterFinish(&writer, &pOut->iEof);
-	if (rc == SQLITE_OK)
+	if (rc == SQL_OK)
 		rc = rc2;
 	vdbeSorterPopulateDebug(pTask, "exit");
 	return rc;
 }
 
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 /*
  * The main routine for background threads that populate aFile[1] of
  * multi-threaded IncrMerger objects.
@@ -1919,7 +1919,7 @@ static void *
 vdbeIncrPopulateThread(void *pCtx)
 {
 	IncrMerger *pIncr = (IncrMerger *) pCtx;
-	void *pRet = SQLITE_INT_TO_PTR(vdbeIncrPopulate(pIncr));
+	void *pRet = SQL_INT_TO_PTR(vdbeIncrPopulate(pIncr));
 	pIncr->pTask->bDone = 1;
 	return pRet;
 }
@@ -1951,24 +1951,24 @@ vdbeIncrBgPopulate(IncrMerger * pIncr)
  * been exhausted, this function also launches a new background thread
  * to populate the new aFile[1].
  *
- * SQLITE_OK is returned on success, or an SQLite error code otherwise.
+ * SQL_OK is returned on success, or an sql error code otherwise.
  */
 static int
 vdbeIncrSwap(IncrMerger * pIncr)
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 	if (pIncr->bUseThread) {
 		rc = vdbeSorterJoinThread(pIncr->pTask);
 
-		if (rc == SQLITE_OK) {
+		if (rc == SQL_OK) {
 			SorterFile f0 = pIncr->aFile[0];
 			pIncr->aFile[0] = pIncr->aFile[1];
 			pIncr->aFile[1] = f0;
 		}
 
-		if (rc == SQLITE_OK) {
+		if (rc == SQL_OK) {
 			if (pIncr->aFile[0].iEof == pIncr->iStartOff) {
 				pIncr->bEof = 1;
 			} else {
@@ -2000,9 +2000,9 @@ vdbeIncrMergerNew(SortSubtask * pTask,	/* The thread that will be using the new 
 		  IncrMerger ** ppOut	/* Write the new IncrMerger here */
     )
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	IncrMerger *pIncr = *ppOut = (IncrMerger *)
-	    (sqlite3FaultSim(100) ? 0 : sqlite3MallocZero(sizeof(*pIncr)));
+	    (sqlFaultSim(100) ? 0 : sqlMallocZero(sizeof(*pIncr)));
 	if (pIncr) {
 		pIncr->pMerger = pMerger;
 		pIncr->pTask = pTask;
@@ -2012,12 +2012,12 @@ vdbeIncrMergerNew(SortSubtask * pTask,	/* The thread that will be using the new 
 		pTask->file2.iEof += pIncr->mxSz;
 	} else {
 		vdbeMergeEngineFree(pMerger);
-		rc = SQLITE_NOMEM_BKPT;
+		rc = SQL_NOMEM_BKPT;
 	}
 	return rc;
 }
 
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 /*
  * Set the "use-threads" flag on object pIncr.
  */
@@ -2027,7 +2027,7 @@ vdbeIncrMergerSetThreads(IncrMerger * pIncr)
 	pIncr->bUseThread = 1;
 	pIncr->pTask->file2.iEof -= pIncr->mxSz;
 }
-#endif				/* SQLITE_MAX_WORKER_THREADS>0 */
+#endif				/* SQL_MAX_WORKER_THREADS>0 */
 
 /*
  * Recompute pMerger->aTree[iOut] by comparing the next keys on the
@@ -2084,7 +2084,7 @@ vdbeMergeEngineCompare(MergeEngine * pMerger,	/* Merge engine containing PmaRead
  * and vdbePmaReaderIncrMergeInit().
  *
  * Only INCRINIT_NORMAL is valid in single-threaded builds (when
- * SQLITE_MAX_WORKER_THREADS==0).  The other values are only used
+ * SQL_MAX_WORKER_THREADS==0).  The other values are only used
  * when there exists one or more separate worker threads.
  */
 #define INCRINIT_NORMAL 0
@@ -2114,7 +2114,7 @@ static int vdbePmaReaderIncrInit(PmaReader * pReadr, int eMode);
  * vdbePmaReaderIncrMergeInit() to initialize each PmaReader that feeds data
  * to pMerger.
  *
- * SQLITE_OK is returned if successful, or an SQLite error code otherwise.
+ * SQL_OK is returned if successful, or an sql error code otherwise.
  */
 static int
 vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
@@ -2122,19 +2122,19 @@ vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
 		    int eMode	/* One of the INCRINIT_XXX constants */
     )
 {
-	int rc = SQLITE_OK;	/* Return code */
+	int rc = SQL_OK;	/* Return code */
 	int i;			/* For looping over PmaReader objects */
 	int nTree = pMerger->nTree;
 
 	/* eMode is always INCRINIT_NORMAL in single-threaded mode */
-	assert(SQLITE_MAX_WORKER_THREADS > 0 || eMode == INCRINIT_NORMAL);
+	assert(SQL_MAX_WORKER_THREADS > 0 || eMode == INCRINIT_NORMAL);
 
 	/* Verify that the MergeEngine is assigned to a single thread */
 	assert(pMerger->pTask == 0);
 	pMerger->pTask = pTask;
 
 	for (i = 0; i < nTree; i++) {
-		if (SQLITE_MAX_WORKER_THREADS > 0 && eMode == INCRINIT_ROOT) {
+		if (SQL_MAX_WORKER_THREADS > 0 && eMode == INCRINIT_ROOT) {
 			/* PmaReaders should be normally initialized in order, as if they are
 			 * reading from the same temp file this makes for more linear file IO.
 			 * However, in the INCRINIT_ROOT case, if PmaReader aReadr[nTask-1] is
@@ -2148,7 +2148,7 @@ vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
 			rc = vdbePmaReaderIncrInit(&pMerger->aReadr[i],
 						   INCRINIT_NORMAL);
 		}
-		if (rc != SQLITE_OK)
+		if (rc != SQL_OK)
 			return rc;
 	}
 
@@ -2189,18 +2189,18 @@ vdbeMergeEngineInit(SortSubtask * pTask,	/* Thread that will run pMerger */
  * In this case vdbePmaReaderNext() is called on all child PmaReaders and
  * the current PmaReader set to point to the first key in its range.
  *
- * SQLITE_OK is returned if successful, or an SQLite error code otherwise.
+ * SQL_OK is returned if successful, or an sql error code otherwise.
  */
 static int
 vdbePmaReaderIncrMergeInit(PmaReader * pReadr, int eMode)
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	IncrMerger *pIncr = pReadr->pIncr;
 	SortSubtask *pTask = pIncr->pTask;
-	sqlite3 *db = pTask->pSorter->db;
+	sql *db = pTask->pSorter->db;
 
 	/* eMode is always INCRINIT_NORMAL in single-threaded mode */
-	assert(SQLITE_MAX_WORKER_THREADS > 0 || eMode == INCRINIT_NORMAL);
+	assert(SQL_MAX_WORKER_THREADS > 0 || eMode == INCRINIT_NORMAL);
 
 	rc = vdbeMergeEngineInit(pTask, pIncr->pMerger, eMode);
 
@@ -2208,13 +2208,13 @@ vdbePmaReaderIncrMergeInit(PmaReader * pReadr, int eMode)
 	 * requires two temp files to itself, whereas a single-threaded object
 	 * only requires a region of pTask->file2.
 	 */
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		int mxSz = pIncr->mxSz;
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 		if (pIncr->bUseThread) {
 			rc = vdbeSorterOpenTempFile(db, mxSz,
 						    &pIncr->aFile[0].pFd);
-			if (rc == SQLITE_OK) {
+			if (rc == SQL_OK) {
 				rc = vdbeSorterOpenTempFile(db, mxSz,
 							    &pIncr->aFile[1].
 							    pFd);
@@ -2229,15 +2229,15 @@ vdbePmaReaderIncrMergeInit(PmaReader * pReadr, int eMode)
 							    &pTask->file2.pFd);
 				pTask->file2.iEof = 0;
 			}
-			if (rc == SQLITE_OK) {
+			if (rc == SQL_OK) {
 				pIncr->aFile[1].pFd = pTask->file2.pFd;
 				pIncr->iStartOff = pTask->file2.iEof;
 				pTask->file2.iEof += mxSz;
 			}
 			}
 	}
-#if SQLITE_MAX_WORKER_THREADS>0
-	if (rc == SQLITE_OK && pIncr->bUseThread) {
+#if SQL_MAX_WORKER_THREADS>0
+	if (rc == SQL_OK && pIncr->bUseThread) {
 		/* Use the current thread to populate aFile[1], even though this
 		 * PmaReader is multi-threaded. If this is an INCRINIT_TASK object,
 		 * then this function is already running in background thread
@@ -2253,15 +2253,15 @@ vdbePmaReaderIncrMergeInit(PmaReader * pReadr, int eMode)
 	}
 #endif
 
-	if (rc == SQLITE_OK
-	    && (SQLITE_MAX_WORKER_THREADS == 0 || eMode != INCRINIT_TASK)) {
+	if (rc == SQL_OK
+	    && (SQL_MAX_WORKER_THREADS == 0 || eMode != INCRINIT_TASK)) {
 		rc = vdbePmaReaderNext(pReadr);
 	}
 
 	return rc;
 }
 
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 /*
  * The main routine for vdbePmaReaderIncrMergeInit() operations run in
  * background threads.
@@ -2271,7 +2271,7 @@ vdbePmaReaderBgIncrInit(void *pCtx)
 {
 	PmaReader *pReader = (PmaReader *) pCtx;
 	void *pRet =
-	    SQLITE_INT_TO_PTR(vdbePmaReaderIncrMergeInit(pReader, INCRINIT_TASK)
+	    SQL_INT_TO_PTR(vdbePmaReaderIncrMergeInit(pReader, INCRINIT_TASK)
 	    );
 	pReader->pIncr->pTask->bDone = 1;
 	return pRet;
@@ -2293,9 +2293,9 @@ static int
 vdbePmaReaderIncrInit(PmaReader * pReadr, int eMode)
 {
 	IncrMerger *pIncr = pReadr->pIncr;	/* Incremental merger */
-	int rc = SQLITE_OK;	/* Return code */
+	int rc = SQL_OK;	/* Return code */
 	if (pIncr) {
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 		assert(pIncr->bUseThread == 0 || eMode == INCRINIT_TASK);
 		if (pIncr->bUseThread) {
 			void *pCtx = (void *)pReadr;
@@ -2314,8 +2314,8 @@ vdbePmaReaderIncrInit(PmaReader * pReadr, int eMode)
 /*
  * Allocate a new MergeEngine object to merge the contents of nPMA level-0
  * PMAs from pTask->file. If no error occurs, set *ppOut to point to
- * the new object and return SQLITE_OK. Or, if an error does occur, set *ppOut
- * to NULL and return an SQLite error code.
+ * the new object and return SQL_OK. Or, if an error does occur, set *ppOut
+ * to NULL and return an sql error code.
  *
  * When this function is called, *piOffset is set to the offset of the
  * first PMA to read from pTask->file. Assuming no error occurs, it is
@@ -2333,13 +2333,13 @@ vdbeMergeEngineLevel0(SortSubtask * pTask,	/* Sorter task to read from */
 	MergeEngine *pNew;	/* Merge engine to return */
 	i64 iOff = *piOffset;
 	int i;
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 
 	*ppOut = pNew = vdbeMergeEngineNew(nPMA);
 	if (pNew == 0)
-		rc = SQLITE_NOMEM_BKPT;
+		rc = SQL_NOMEM_BKPT;
 
-	for (i = 0; i < nPMA && rc == SQLITE_OK; i++) {
+	for (i = 0; i < nPMA && rc == SQL_OK; i++) {
 		i64 nDummy = 0;
 		PmaReader *pReadr = &pNew->aReadr[i];
 		rc = vdbePmaReaderInit(pTask, &pTask->file, iOff, pReadr,
@@ -2347,7 +2347,7 @@ vdbeMergeEngineLevel0(SortSubtask * pTask,	/* Sorter task to read from */
 		iOff = pReadr->iEof;
 	}
 
-	if (rc != SQLITE_OK) {
+	if (rc != SQL_OK) {
 		vdbeMergeEngineFree(pNew);
 		*ppOut = 0;
 	}
@@ -2382,7 +2382,7 @@ vdbeSorterTreeDepth(int nPMA)
  * to vdbeSorterTreeDepth()). pLeaf is the iSeq'th leaf to be added to the
  * tree, counting from zero. This function adds pLeaf to the tree.
  *
- * If successful, SQLITE_OK is returned. If an error occurs, an SQLite error
+ * If successful, SQL_OK is returned. If an error occurs, an sql error
  * code is returned and pLeaf is freed.
  */
 static int
@@ -2393,7 +2393,7 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
 		    MergeEngine * pLeaf	/* Leaf to add to tree */
     )
 {
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	int nDiv = 1;
 	int i;
 	MergeEngine *p = pRoot;
@@ -2405,7 +2405,7 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
 		nDiv = nDiv * SORTER_MAX_MERGE_COUNT;
 	}
 
-	for (i = 1; i < nDepth && rc == SQLITE_OK; i++) {
+	for (i = 1; i < nDepth && rc == SQL_OK; i++) {
 		int iIter = (iSeq / nDiv) % SORTER_MAX_MERGE_COUNT;
 		PmaReader *pReadr = &p->aReadr[iIter];
 
@@ -2413,19 +2413,19 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
 			MergeEngine *pNew =
 			    vdbeMergeEngineNew(SORTER_MAX_MERGE_COUNT);
 			if (pNew == 0) {
-				rc = SQLITE_NOMEM_BKPT;
+				rc = SQL_NOMEM_BKPT;
 			} else {
 				rc = vdbeIncrMergerNew(pTask, pNew,
 						       &pReadr->pIncr);
 			}
 		}
-		if (rc == SQLITE_OK) {
+		if (rc == SQL_OK) {
 			p = pReadr->pIncr->pMerger;
 			nDiv = nDiv / SORTER_MAX_MERGE_COUNT;
 		}
 	}
 
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		p->aReadr[iSeq % SORTER_MAX_MERGE_COUNT].pIncr = pIncr;
 	} else {
 		vdbeIncrFree(pIncr);
@@ -2439,9 +2439,9 @@ vdbeSorterAddToTree(SortSubtask * pTask,	/* Task context */
  * files. It builds a tree of MergeEngine/IncrMerger/PmaReader objects that
  * can be used to incrementally merge all PMAs on disk.
  *
- * If successful, SQLITE_OK is returned and *ppOut set to point to the
+ * If successful, SQL_OK is returned and *ppOut set to point to the
  * MergeEngine object at the root of the tree before returning. Or, if an
- * error occurs, an SQLite error code is returned and the final value
+ * error occurs, an sql error code is returned and the final value
  * of *ppOut is undefined.
  */
 static int
@@ -2450,10 +2450,10 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
     )
 {
 	MergeEngine *pMain = 0;
-	int rc = SQLITE_OK;
+	int rc = SQL_OK;
 	int iTask;
 
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 	/* If the sorter uses more than one task, then create the top-level
 	 * MergeEngine here. This MergeEngine will read data from exactly
 	 * one PmaReader per sub-task.
@@ -2462,14 +2462,14 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 	if (pSorter->nTask > 1) {
 		pMain = vdbeMergeEngineNew(pSorter->nTask);
 		if (pMain == 0)
-			rc = SQLITE_NOMEM_BKPT;
+			rc = SQL_NOMEM_BKPT;
 	}
 #endif
 
-	for (iTask = 0; rc == SQLITE_OK && iTask < pSorter->nTask; iTask++) {
+	for (iTask = 0; rc == SQL_OK && iTask < pSorter->nTask; iTask++) {
 		SortSubtask *pTask = &pSorter->aTask[iTask];
-		assert(pTask->nPMA > 0 || SQLITE_MAX_WORKER_THREADS > 0);
-		if (SQLITE_MAX_WORKER_THREADS == 0 || pTask->nPMA) {
+		assert(pTask->nPMA > 0 || SQL_MAX_WORKER_THREADS > 0);
+		if (SQL_MAX_WORKER_THREADS == 0 || pTask->nPMA) {
 			MergeEngine *pRoot = 0;	/* Root node of tree for this task */
 			int nDepth = vdbeSorterTreeDepth(pTask->nPMA);
 			i64 iReadOff = 0;
@@ -2483,8 +2483,8 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 				pRoot =
 				    vdbeMergeEngineNew(SORTER_MAX_MERGE_COUNT);
 				if (pRoot == 0)
-					rc = SQLITE_NOMEM_BKPT;
-				for (i = 0; i < pTask->nPMA && rc == SQLITE_OK;
+					rc = SQL_NOMEM_BKPT;
+				for (i = 0; i < pTask->nPMA && rc == SQL_OK;
 				     i += SORTER_MAX_MERGE_COUNT) {
 					MergeEngine *pMerger = 0;	/* New level-0 PMA merger */
 					int nReader;	/* Number of level-0 PMAs to merge */
@@ -2496,7 +2496,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 								   nReader,
 								   &iReadOff,
 								   &pMerger);
-					if (rc == SQLITE_OK) {
+					if (rc == SQL_OK) {
 						rc = vdbeSorterAddToTree(pTask,
 									 nDepth,
 									 iSeq++,
@@ -2506,8 +2506,8 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 				}
 			}
 
-			if (rc == SQLITE_OK) {
-#if SQLITE_MAX_WORKER_THREADS>0
+			if (rc == SQL_OK) {
+#if SQL_MAX_WORKER_THREADS>0
 				if (pMain != 0) {
 					rc = vdbeIncrMergerNew(pTask, pRoot,
 							       &pMain->
@@ -2525,7 +2525,7 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 		}
 	}
 
-	if (rc != SQLITE_OK) {
+	if (rc != SQL_OK) {
 		vdbeMergeEngineFree(pMain);
 		pMain = 0;
 	}
@@ -2534,13 +2534,13 @@ vdbeSorterMergeTreeBuild(VdbeSorter * pSorter,	/* The VDBE cursor that implement
 }
 
 /*
- * This function is called as part of an sqlite3VdbeSorterRewind() operation
+ * This function is called as part of an sqlVdbeSorterRewind() operation
  * on a sorter that has written two or more PMAs to temporary files. It sets
  * up either VdbeSorter.pMerger (for single threaded sorters) or pReader
  * (for multi-threaded sorters) so that it can be used to iterate through
  * all records stored in the sorter.
  *
- * SQLITE_OK is returned if successful, or an SQLite error code otherwise.
+ * SQL_OK is returned if successful, or an sql error code otherwise.
  */
 static int
 vdbeSorterSetupMerge(VdbeSorter * pSorter)
@@ -2548,8 +2548,8 @@ vdbeSorterSetupMerge(VdbeSorter * pSorter)
 	int rc;			/* Return code */
 	SortSubtask *pTask0 = &pSorter->aTask[0];
 	MergeEngine *pMain = 0;
-#if SQLITE_MAX_WORKER_THREADS
-	sqlite3 *db = pTask0->pSorter->db;
+#if SQL_MAX_WORKER_THREADS
+	sql *db = pTask0->pSorter->db;
 	int i;
 	SorterCompare xCompare = vdbeSorterGetCompare(pSorter);
 	for (i = 0; i < pSorter->nTask; i++) {
@@ -2558,8 +2558,8 @@ vdbeSorterSetupMerge(VdbeSorter * pSorter)
 #endif
 
 	rc = vdbeSorterMergeTreeBuild(pSorter, &pMain);
-	if (rc == SQLITE_OK) {
-#if SQLITE_MAX_WORKER_THREADS
+	if (rc == SQL_OK) {
+#if SQL_MAX_WORKER_THREADS
 		assert(pSorter->bUseThreads == 0 || pSorter->nTask > 1);
 		if (pSorter->bUseThreads) {
 			int iTask;
@@ -2567,19 +2567,19 @@ vdbeSorterSetupMerge(VdbeSorter * pSorter)
 			SortSubtask *pLast =
 			    &pSorter->aTask[pSorter->nTask - 1];
 			rc = vdbeSortAllocUnpacked(pLast);
-			if (rc == SQLITE_OK) {
+			if (rc == SQL_OK) {
 				pReadr =
-				    (PmaReader *) sqlite3DbMallocZero(db,
+				    (PmaReader *) sqlDbMallocZero(db,
 								      sizeof
 								      (PmaReader));
 				pSorter->pReader = pReadr;
 				if (pReadr == 0)
-					rc = SQLITE_NOMEM_BKPT;
+					rc = SQL_NOMEM_BKPT;
 			}
-			if (rc == SQLITE_OK) {
+			if (rc == SQL_OK) {
 				rc = vdbeIncrMergerNew(pLast, pMain,
 						       &pReadr->pIncr);
-				if (rc == SQLITE_OK) {
+				if (rc == SQL_OK) {
 					vdbeIncrMergerSetThreads(pReadr->pIncr);
 					for (iTask = 0;
 					     iTask < (pSorter->nTask - 1);
@@ -2595,7 +2595,7 @@ vdbeSorterSetupMerge(VdbeSorter * pSorter)
 						}
 					}
 					for (iTask = 0;
-					     rc == SQLITE_OK
+					     rc == SQL_OK
 					     && iTask < pSorter->nTask;
 					     iTask++) {
 						/* Check that:
@@ -2618,7 +2618,7 @@ vdbeSorterSetupMerge(VdbeSorter * pSorter)
 				}
 				pMain = 0;
 			}
-			if (rc == SQLITE_OK) {
+			if (rc == SQL_OK) {
 				rc = vdbePmaReaderIncrMergeInit(pReadr,
 								INCRINIT_ROOT);
 			}
@@ -2632,22 +2632,22 @@ vdbeSorterSetupMerge(VdbeSorter * pSorter)
 		}
 	}
 
-	if (rc != SQLITE_OK) {
+	if (rc != SQL_OK) {
 		vdbeMergeEngineFree(pMain);
 	}
 	return rc;
 }
 
 /*
- * Once the sorter has been populated by calls to sqlite3VdbeSorterWrite,
+ * Once the sorter has been populated by calls to sqlVdbeSorterWrite,
  * this function is called to prepare for iterating through the records
  * in sorted order.
  */
 int
-sqlite3VdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
+sqlVdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
 {
 	VdbeSorter *pSorter;
-	int rc = SQLITE_OK;	/* Return code */
+	int rc = SQL_OK;	/* Return code */
 
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
@@ -2684,7 +2684,7 @@ sqlite3VdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
 	 * incrementally read and merge all remaining PMAs.
 	 */
 	assert(pSorter->pReader == 0);
-	if (rc == SQLITE_OK) {
+	if (rc == SQL_OK) {
 		rc = vdbeSorterSetupMerge(pSorter);
 		*pbEof = 0;
 	}
@@ -2697,7 +2697,7 @@ sqlite3VdbeSorterRewind(const VdbeCursor * pCsr, int *pbEof)
  * Advance to the next element in the sorter.
  */
 int
-sqlite3VdbeSorterNext(sqlite3 * db, const VdbeCursor * pCsr, int *pbEof)
+sqlVdbeSorterNext(sql * db, const VdbeCursor * pCsr, int *pbEof)
 {
 	VdbeSorter *pSorter;
 	int rc;			/* Return code */
@@ -2710,7 +2710,7 @@ sqlite3VdbeSorterNext(sqlite3 * db, const VdbeCursor * pCsr, int *pbEof)
 		assert(pSorter->pReader == 0 || pSorter->pMerger == 0);
 		assert(pSorter->bUseThreads == 0 || pSorter->pReader);
 		assert(pSorter->bUseThreads == 1 || pSorter->pMerger);
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 		if (pSorter->bUseThreads) {
 			rc = vdbePmaReaderNext(pSorter->pReader);
 			*pbEof = (pSorter->pReader->pFd == 0);
@@ -2728,7 +2728,7 @@ sqlite3VdbeSorterNext(sqlite3 * db, const VdbeCursor * pCsr, int *pbEof)
 		if (pSorter->list.aMemory == 0)
 			vdbeSorterRecordFree(db, pFree);
 		*pbEof = !pSorter->list.pList;
-		rc = SQLITE_OK;
+		rc = SQL_OK;
 	}
 	return rc;
 }
@@ -2745,7 +2745,7 @@ vdbeSorterRowkey(const VdbeSorter * pSorter,	/* Sorter object */
 	void *pKey;
 	if (pSorter->bUsePMA) {
 		PmaReader *pReader;
-#if SQLITE_MAX_WORKER_THREADS>0
+#if SQL_MAX_WORKER_THREADS>0
 		if (pSorter->bUseThreads) {
 			pReader = pSorter->pReader;
 		} else
@@ -2768,7 +2768,7 @@ vdbeSorterRowkey(const VdbeSorter * pSorter,	/* Sorter object */
  * Copy the current sorter key into the memory cell pOut.
  */
 int
-sqlite3VdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
+sqlVdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
 {
 	VdbeSorter *pSorter;
 	void *pKey;
@@ -2777,14 +2777,14 @@ sqlite3VdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
 	assert(pCsr->eCurType == CURTYPE_SORTER);
 	pSorter = pCsr->uc.pSorter;
 	pKey = vdbeSorterRowkey(pSorter, &nKey);
-	if (sqlite3VdbeMemClearAndResize(pOut, nKey)) {
-		return SQLITE_NOMEM_BKPT;
+	if (sqlVdbeMemClearAndResize(pOut, nKey)) {
+		return SQL_NOMEM_BKPT;
 	}
 	pOut->n = nKey;
 	MemSetTypeFlag(pOut, MEM_Blob);
 	memcpy(pOut->z, pKey, nKey);
 
-	return SQLITE_OK;
+	return SQL_OK;
 }
 
 /*
@@ -2795,7 +2795,7 @@ sqlite3VdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
  * If the sorter cursor key contains any NULL values, consider it to be
  * less than pVal. Even if pVal also contains NULL values.
  *
- * If an error occurs, return an SQLite error code (i.e. SQLITE_NOMEM).
+ * If an error occurs, return an sql error code (i.e. SQL_NOMEM).
  * Otherwise, set *pRes to a negative, zero or positive value if the
  * key in pVal is smaller than, equal to or larger than the current sorter
  * key.
@@ -2804,7 +2804,7 @@ sqlite3VdbeSorterRowkey(const VdbeCursor * pCsr, Mem * pOut)
  * turn is used to verify uniqueness when constructing a UNIQUE INDEX.
  */
 int
-sqlite3VdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
+sqlVdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 			 Mem * pVal,	/* Value to compare to current sorter key */
 			 int nKeyCol,	/* Compare this many columns */
 			 int *pRes	/* OUT: Result of comparison */
@@ -2821,22 +2821,22 @@ sqlite3VdbeSorterCompare(const VdbeCursor * pCsr,	/* Sorter cursor */
 	r2 = pSorter->pUnpacked;
 	if (r2 == 0) {
 		r2 = pSorter->pUnpacked =
-			sqlite3VdbeAllocUnpackedRecord(pSorter->db,  pCsr->key_def);
+			sqlVdbeAllocUnpackedRecord(pSorter->db,  pCsr->key_def);
 		if (r2 == 0)
-			return SQLITE_NOMEM_BKPT;
+			return SQL_NOMEM_BKPT;
 		r2->nField = nKeyCol;
 	}
 	assert(r2->nField == nKeyCol);
 
 	pKey = vdbeSorterRowkey(pSorter, &nKey);
-	sqlite3VdbeRecordUnpackMsgpack(pCsr->key_def, pKey, r2);
+	sqlVdbeRecordUnpackMsgpack(pCsr->key_def, pKey, r2);
 	for (i = 0; i < nKeyCol; i++) {
 		if (r2->aMem[i].flags & MEM_Null) {
 			*pRes = -1;
-			return SQLITE_OK;
+			return SQL_OK;
 		}
 	}
 
-	*pRes = sqlite3VdbeRecordCompareMsgpack(pVal->z, r2);
-	return SQLITE_OK;
+	*pRes = sqlVdbeRecordCompareMsgpack(pVal->z, r2);
+	return SQL_OK;
 }

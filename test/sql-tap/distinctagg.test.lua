@@ -13,7 +13,7 @@ test:plan(6)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script is the DISTINCT modifier on aggregate functions.
 --
 -- $Id: distinctagg.test,v 1.3 2009/02/09 13:19:28 drh Exp $

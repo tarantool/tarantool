@@ -38,7 +38,7 @@
 #include "box/fkey.h"
 #include "box/schema.h"
 #include "box/coll_id_cache.h"
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
 #include "box/schema.h"
@@ -69,7 +69,7 @@
  * if the omitFull parameter it 1.
  *
  * Note that the values returned are one less that the values that
- * should be passed into sqlite3BtreeSetSafetyLevel().  The is done
+ * should be passed into sqlBtreeSetSafetyLevel().  The is done
  * to support legacy SQL code.  The safety level used to be boolean
  * and older scripts may have used numbers 0 for OFF and 1 for ON.
  */
@@ -83,13 +83,13 @@ getSafetyLevel(const char *z, int omitFull, u8 dflt)
 	static const u8 iValue[] = { 1, 0, 0, 0, 1, 1, 3, 2 };
 	/* on no off false yes true extra full */
 	int i, n;
-	if (sqlite3Isdigit(*z)) {
-		return (u8) sqlite3Atoi(z);
+	if (sqlIsdigit(*z)) {
+		return (u8) sqlAtoi(z);
 	}
-	n = sqlite3Strlen30(z);
+	n = sqlStrlen30(z);
 	for (i = 0; i < ArraySize(iLength); i++) {
 		if (iLength[i] == n
-		    && sqlite3StrNICmp(&zText[iOffset[i]], z, n) == 0
+		    && sqlStrNICmp(&zText[iOffset[i]], z, n) == 0
 		    && (!omitFull || iValue[i] <= 1)
 		    ) {
 			return iValue[i];
@@ -102,12 +102,12 @@ getSafetyLevel(const char *z, int omitFull, u8 dflt)
  * Interpret the given string as a boolean value.
  */
 u8
-sqlite3GetBoolean(const char *z, u8 dflt)
+sqlGetBoolean(const char *z, u8 dflt)
 {
 	return getSafetyLevel(z, 1, dflt) != 0;
 }
 
-/* The sqlite3GetBoolean() function is used by other modules but the
+/* The sqlGetBoolean() function is used by other modules but the
  * remainder of this file is specific to PRAGMA processing.  So omit
  * the rest of the file if PRAGMAs are omitted from the build.
  */
@@ -121,15 +121,15 @@ setPragmaResultColumnNames(Vdbe * v,	/* The query under construction */
     )
 {
 	u8 n = pPragma->nPragCName;
-	sqlite3VdbeSetNumCols(v, n == 0 ? 1 : n);
+	sqlVdbeSetNumCols(v, n == 0 ? 1 : n);
 	if (n == 0) {
-		sqlite3VdbeSetColName(v, 0, COLNAME_NAME, pPragma->zName,
-				      SQLITE_STATIC);
+		sqlVdbeSetColName(v, 0, COLNAME_NAME, pPragma->zName,
+				      SQL_STATIC);
 	} else {
 		int i, j;
 		for (i = 0, j = pPragma->iPragCName; i < n; i++, j++) {
-			sqlite3VdbeSetColName(v, i, COLNAME_NAME, pragCName[j],
-					      SQLITE_STATIC);
+			sqlVdbeSetColName(v, i, COLNAME_NAME, pragCName[j],
+					      SQL_STATIC);
 		}
 	}
 }
@@ -140,9 +140,9 @@ setPragmaResultColumnNames(Vdbe * v,	/* The query under construction */
 static void
 returnSingleInt(Vdbe * v, i64 value)
 {
-	sqlite3VdbeAddOp4Dup8(v, OP_Int64, 0, 1, 0, (const u8 *)&value,
+	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, 1, 0, (const u8 *)&value,
 			      P4_INT64);
-	sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 1);
+	sqlVdbeAddOp2(v, OP_ResultRow, 1, 1);
 }
 
 /*
@@ -156,7 +156,7 @@ pragmaLocate(const char *zName)
 	upr = ArraySize(aPragmaName) - 1;
 	while (lwr <= upr) {
 		mid = (lwr + upr) / 2;
-		rc = sqlite3_stricmp(zName, aPragmaName[mid].zName);
+		rc = sql_stricmp(zName, aPragmaName[mid].zName);
 		if (rc == 0)
 			break;
 		if (rc < 0) {
@@ -264,7 +264,7 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 	parse->nMem = 6;
 	if (space->def->opts.is_view)
 		sql_view_assign_cursors(parse, space->def->opts.sql);
-	struct Vdbe *v = sqlite3GetVdbe(parse);
+	struct Vdbe *v = sqlGetVdbe(parse);
 	struct field_def *field = space->def->fields;
 	for (uint32_t i = 0, k; i < space->def->field_count; ++i, ++field) {
 		if (!sql_space_column_is_in_pk(space, i)) {
@@ -275,11 +275,11 @@ sql_pragma_table_info(struct Parse *parse, const char *tbl_name)
 			struct key_def *kdef = pk->def->key_def;
 			k = key_def_find_by_fieldno(kdef, i) - kdef->parts + 1;
 		}
-		sqlite3VdbeMultiLoad(v, 1, "issisi", i, field->name,
+		sqlVdbeMultiLoad(v, 1, "issisi", i, field->name,
 				     field_type_strs[field->type],
 				     !field->is_nullable, field->default_value,
 				     k);
-		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 6);
+		sqlVdbeAddOp2(v, OP_ResultRow, 1, 6);
 	}
 }
 
@@ -300,21 +300,21 @@ sql_pragma_table_stats(struct space *space, void *data)
 	struct index *pk = space_index(space, 0);
 	if (pk == NULL)
 		return 0;
-	struct Vdbe *v = sqlite3GetVdbe(parse);
-	LogEst tuple_count_est = sqlite3LogEst(index_size(pk));
+	struct Vdbe *v = sqlGetVdbe(parse);
+	LogEst tuple_count_est = sqlLogEst(index_size(pk));
 	size_t avg_tuple_size_pk = sql_index_tuple_size(space, pk);
 	parse->nMem = 4;
-	sqlite3VdbeMultiLoad(v, 1, "ssii", space->def->name, 0,
+	sqlVdbeMultiLoad(v, 1, "ssii", space->def->name, 0,
 			     avg_tuple_size_pk, tuple_count_est);
-	sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
+	sqlVdbeAddOp2(v, OP_ResultRow, 1, 4);
 	for (uint32_t i = 0; i < space->index_count; ++i) {
 		struct index *idx = space->index[i];
 		assert(idx != NULL);
 		size_t avg_tuple_size_idx = sql_index_tuple_size(space, idx);
-		sqlite3VdbeMultiLoad(v, 2, "sii", idx->def->name,
+		sqlVdbeMultiLoad(v, 2, "sii", idx->def->name,
 				     avg_tuple_size_idx,
 				     index_field_tuple_est(idx->def, 0));
-		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 4);
+		sqlVdbeAddOp2(v, OP_ResultRow, 1, 4);
 	}
 	return 0;
 }
@@ -354,7 +354,7 @@ sql_pragma_index_info(struct Parse *parse,
 	struct index *idx = space_index(space, iid);
 	assert(idx != NULL);
 	parse->nMem = 6;
-	struct Vdbe *v = sqlite3GetVdbe(parse);
+	struct Vdbe *v = sqlGetVdbe(parse);
 	assert(v != NULL);
 	uint32_t part_count = idx->def->key_def->part_count;
 	assert(parse->nMem <= pragma->nPragCName);
@@ -369,11 +369,11 @@ sql_pragma_index_info(struct Parse *parse,
 			c_n = "BINARY";
 		uint32_t fieldno = part->fieldno;
 		enum field_type type = space->def->fields[fieldno].type;
-		sqlite3VdbeMultiLoad(v, 1, "iisiss", i, fieldno,
+		sqlVdbeMultiLoad(v, 1, "iisiss", i, fieldno,
 				     space->def->fields[fieldno].name,
 				     part->sort_order, c_n,
 				     field_type_strs[type]);
-		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, parse->nMem);
+		sqlVdbeAddOp2(v, OP_ResultRow, 1, parse->nMem);
 	}
 }
 
@@ -392,12 +392,12 @@ sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
 	if (space == NULL)
 		return;
 	parse->nMem = 5;
-	struct Vdbe *v = sqlite3GetVdbe(parse);
+	struct Vdbe *v = sqlGetVdbe(parse);
 	for (uint32_t i = 0; i < space->index_count; ++i) {
 		struct index *idx = space->index[i];
-		sqlite3VdbeMultiLoad(v, 1, "isisi", i, idx->def->name,
+		sqlVdbeMultiLoad(v, 1, "isisi", i, idx->def->name,
 				     idx->def->opts.is_unique);
-		sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 5);
+		sqlVdbeAddOp2(v, OP_ResultRow, 1, 5);
 	}
 }
 
@@ -417,7 +417,7 @@ sql_pragma_index_list(struct Parse *parse, const char *tbl_name)
  * id and pId2 is any empty string.
  */
 void
-sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
+sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	      Token * pValue,	/* Token for <value>, or NULL */
 	      Token * pValue2,	/* Token for <value2>, or NULL */
 	      int minusFlag	/* True if a '-' sign preceded <value> */
@@ -426,34 +426,34 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	char *zLeft = 0;	/* Nul-terminated UTF-8 string <id> */
 	char *zRight = 0;	/* Nul-terminated UTF-8 string <value>, or NULL */
 	char *zTable = 0;	/* Nul-terminated UTF-8 string <value2> or NULL */
-	sqlite3 *db = pParse->db;	/* The database connection */
-	Vdbe *v = sqlite3GetVdbe(pParse);	/* Prepared statement */
+	sql *db = pParse->db;	/* The database connection */
+	Vdbe *v = sqlGetVdbe(pParse);	/* Prepared statement */
 	const PragmaName *pPragma;	/* The pragma */
 	struct session *user_session = current_session();
 
 	if (v == 0)
 		return;
-	sqlite3VdbeRunOnlyOnce(v);
+	sqlVdbeRunOnlyOnce(v);
 	pParse->nMem = 2;
 
-	zLeft = sqlite3NameFromToken(db, pId);
+	zLeft = sqlNameFromToken(db, pId);
 	if (!zLeft) {
 		printActivePragmas(user_session);
 		return;
 	}
 
 	if (minusFlag) {
-		zRight = sqlite3MPrintf(db, "-%T", pValue);
+		zRight = sqlMPrintf(db, "-%T", pValue);
 	} else {
-		zRight = sqlite3NameFromToken(db, pValue);
+		zRight = sqlNameFromToken(db, pValue);
 	}
-	zTable = sqlite3NameFromToken(db, pValue2);
+	zTable = sqlNameFromToken(db, pValue2);
 	db->busyHandler.nBusy = 0;
 
 	/* Locate the pragma in the lookup table */
 	pPragma = pragmaLocate(zLeft);
 	if (pPragma == 0) {
-		sqlite3ErrorMsg(pParse, "no such pragma: %s", zLeft);
+		sqlErrorMsg(pParse, "no such pragma: %s", zLeft);
 		goto pragma_out;
 	}
 	/* Register the result column names for pragmas that return results */
@@ -465,7 +465,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	/* Jump to the appropriate pragma handler */
 	switch (pPragma->ePragTyp) {
 
-#ifndef SQLITE_OMIT_FLAG_PRAGMAS
+#ifndef SQL_OMIT_FLAG_PRAGMAS
 	case PragTyp_FLAG:{
 			if (zRight == 0) {
 				setPragmaResultColumnNames(v, pPragma);
@@ -478,7 +478,7 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 								 * or clear.
 								 */
 
-				if (sqlite3GetBoolean(zRight, 0)) {
+				if (sqlGetBoolean(zRight, 0)) {
 					user_session->sql_flags |= mask;
 				} else {
 					user_session->sql_flags &= ~mask;
@@ -490,13 +490,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				 * all * compiled SQL statements after
 				 * modifying a pragma value.
 				 */
-				sqlite3VdbeAddOp0(v, OP_Expire);
+				sqlVdbeAddOp0(v, OP_Expire);
 			}
 			break;
 		}
-#endif				/* SQLITE_OMIT_FLAG_PRAGMAS */
+#endif				/* SQL_OMIT_FLAG_PRAGMAS */
 
-#ifndef SQLITE_OMIT_SCHEMA_PRAGMAS
+#ifndef SQL_OMIT_SCHEMA_PRAGMAS
 	case PragTyp_TABLE_INFO:
 		sql_pragma_table_info(pParse, zRight);
 		break;
@@ -532,13 +532,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			const char *str = tuple_field_cstr(tuple, 1);
 			assert(str != NULL);
 			/* this procedure should reallocate and copy str */
-			sqlite3VdbeMultiLoad(v, 1, "is", i, str);
-			sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 2);
+			sqlVdbeMultiLoad(v, 1, "is", i, str);
+			sqlVdbeAddOp2(v, OP_ResultRow, 1, 2);
 		}
 		box_iterator_free(iter);
 		break;
 	}
-#endif				/* SQLITE_OMIT_SCHEMA_PRAGMAS */
+#endif				/* SQL_OMIT_SCHEMA_PRAGMAS */
 
 	case PragTyp_FOREIGN_KEY_LIST:{
 		if (zRight == NULL)
@@ -561,13 +561,13 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 				uint32_t pr_fl = fdef->links[j].parent_field;
 				const char *parent_col =
 					parent->def->fields[pr_fl].name;
-				sqlite3VdbeMultiLoad(v, 1, "iissssss", i, j,
+				sqlVdbeMultiLoad(v, 1, "iissssss", i, j,
 						     parent->def->name,
 						     child_col, parent_col,
 						     fkey_action_strs[fdef->on_delete],
 						     fkey_action_strs[fdef->on_update],
 						     "NONE");
-				sqlite3VdbeAddOp2(v, OP_ResultRow, 1, 8);
+				sqlVdbeAddOp2(v, OP_ResultRow, 1, 8);
 			}
 			++i;
 		}
@@ -576,10 +576,10 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 #ifndef NDEBUG
 	case PragTyp_PARSER_TRACE:{
 			if (zRight) {
-				if (sqlite3GetBoolean(zRight, 0)) {
-					sqlite3ParserTrace(stdout, "parser: ");
+				if (sqlGetBoolean(zRight, 0)) {
+					sqlParserTrace(stdout, "parser: ");
 				} else {
-					sqlite3ParserTrace(0, 0);
+					sqlParserTrace(0, 0);
 				}
 			}
 			break;
@@ -594,8 +594,8 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	case PragTyp_CASE_SENSITIVE_LIKE:{
 			if (zRight) {
 				int is_like_ci =
-					!(sqlite3GetBoolean(zRight, 0));
-				sqlite3RegisterLikeFunctions(db, is_like_ci);
+					!(sqlGetBoolean(zRight, 0));
+				sqlRegisterLikeFunctions(db, is_like_ci);
 			}
 			break;
 		}
@@ -606,24 +606,24 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			pParse->nErr++;
 			goto pragma_out;
 		}
-		sqlite3VdbeAddOp0(v, OP_Expire);
+		sqlVdbeAddOp0(v, OP_Expire);
 		break;
 	}
 
 	case PragTyp_COMPOUND_SELECT_LIMIT: {
 		if (zRight != NULL) {
-			sqlite3_limit(db, SQL_LIMIT_COMPOUND_SELECT,
-				      sqlite3Atoi(zRight));
+			sql_limit(db, SQL_LIMIT_COMPOUND_SELECT,
+				      sqlAtoi(zRight));
 		}
 		int retval =
-			sqlite3_limit(db, SQL_LIMIT_COMPOUND_SELECT, -1);
+			sql_limit(db, SQL_LIMIT_COMPOUND_SELECT, -1);
 		returnSingleInt(v, retval);
 		break;
 	}
 
 	/* *   PRAGMA busy_timeout *   PRAGMA busy_timeout = N *
 	 *
-	 * Call sqlite3_busy_timeout(db, N).  Return the current
+	 * Call sql_busy_timeout(db, N).  Return the current
 	 * timeout value * if one is set.  If no busy handler
 	 * or a different busy handler is set * then 0 is
 	 * returned.  Setting the busy_timeout to 0 or negative *
@@ -633,14 +633,14 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	default:{
 			assert(pPragma->ePragTyp == PragTyp_BUSY_TIMEOUT);
 			if (zRight) {
-				sqlite3_busy_timeout(db, sqlite3Atoi(zRight));
+				sql_busy_timeout(db, sqlAtoi(zRight));
 			}
 			returnSingleInt(v, db->busyTimeout);
 			break;
 		}
 	}			/* End of the PRAGMA switch */
 
-	/* The following block is a no-op unless SQLITE_DEBUG is
+	/* The following block is a no-op unless SQL_DEBUG is
 	 * defined. Its only * purpose is to execute assert()
 	 * statements to verify that if the * PragFlg_NoColumns1 flag
 	 * is set and the caller specified an argument * to the PRAGMA,
@@ -648,10 +648,10 @@ sqlite3Pragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	 * instructions to the VM.
 	 */
 	if ((pPragma->mPragFlg & PragFlg_NoColumns1) && zRight) {
-		sqlite3VdbeVerifyNoResultRow(v);
+		sqlVdbeVerifyNoResultRow(v);
 	}
  pragma_out:
-	sqlite3DbFree(db, zLeft);
-	sqlite3DbFree(db, zRight);
-	sqlite3DbFree(db, zTable);
+	sqlDbFree(db, zLeft);
+	sqlDbFree(db, zRight);
+	sqlDbFree(db, zTable);
 }

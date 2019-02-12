@@ -13,7 +13,7 @@ test:plan(6)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #2192 has been
 -- fixed.  
@@ -96,7 +96,7 @@ test:do_execsql_test(
 test:do_test(
     "tkt2192-1.2",
     function()
-        -- set ::sqlite_addop_trace 1
+        -- set ::sql_addop_trace 1
         return test:execsql [[
             select * from summary;
         ]]

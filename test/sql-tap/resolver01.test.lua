@@ -73,7 +73,7 @@ test:do_catchsql_test(
         -- </resolver01-1.4>
     })
 
--- SQLite allows the WHERE clause to reference output columns if there is
+-- sql allows the WHERE clause to reference output columns if there is
 -- no other way to resolve the name.
 --
 test:do_catchsql_test(
@@ -99,7 +99,7 @@ test:do_catchsql_test(
 -- The "ORDER BY y COLLATE nocase" form works the same as "ORDER BY y".
 -- The "y" binds more tightly to output columns than to input columns.
 --
--- This is for compatibility with SQL92 and with historical SQLite behavior.
+-- This is for compatibility with SQL92 and with historical sql behavior.
 -- Note that PostgreSQL considers "y COLLATE nocase" to be an expression
 -- and thus PostgreSQL treats this case as if it where the 3.x case below.
 --
@@ -251,8 +251,8 @@ test:do_test(
 -- Test cases for ticket [1c69be2dafc28]:  Make sure the GROUP BY binds
 -- more tightly to the input tables in all cases.
 --
--- This first case case has been wrong in SQLite for time out of mind.
--- For SQLite version 3.7.17 the answer was two rows, which is wrong.
+-- This first case case has been wrong in sql for time out of mind.
+-- For sql version 3.7.17 the answer was two rows, which is wrong.
 --
 test:do_execsql_test(
     "resolver01-5.1",
@@ -280,7 +280,7 @@ test:do_execsql_test(
         -- </resolver01-5.2>
     })
 
--- This case is not allowed in standard SQL, but SQLite allows and does
+-- This case is not allowed in standard SQL, but sql allows and does
 -- the sensible thing.
 --
 test:do_execsql_test(

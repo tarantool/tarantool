@@ -14,7 +14,7 @@ test:plan(28)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the INSERT statement.
 --
 -- $Id: insert.test,v 1.31 2007/04/05 11:25:59 drh Exp $
@@ -30,12 +30,12 @@ test:do_catchsql_test("insert-1.1", [[
   -- </insert-1.1>
 })
 
--- # Try to insert into sqlite_master
+-- # Try to insert into sql_master
 -- #
 -- do_test insert-1.2 {
---   set v [catch {execsql {INSERT INTO sqlite_master VALUES(1,2,3,4)}} msg]
+--   set v [catch {execsql {INSERT INTO sql_master VALUES(1,2,3,4)}} msg]
 --   lappend v $msg
--- } {1 {table sqlite_master may not be modified}}
+-- } {1 {table sql_master may not be modified}}
 -- Try to insert the wrong number of entries.
 --
 test:do_test("insert-1.3", function()
@@ -195,7 +195,7 @@ end, {
 --     SELECT * from test2;
 --   }
 -- } {}
--- # Update for sqlite3 v3:
+-- # Update for sql v3:
 -- # Change the 111 to '111' in the following two test cases, because
 -- # the default value is being inserted as a string. TODO: It shouldn't be.
 -- do_test insert-3.2 {
@@ -324,7 +324,7 @@ test:do_execsql_test("insert-4.7", [[
   --   #
   --   # Update for v3 - the first table now begins on page 2 of each file, not 3.
   --   execsql {
-  --     SELECT rootpage FROM sqlite_temp_master WHERE name='t4';
+  --     SELECT rootpage FROM sql_temp_master WHERE name='t4';
   --   }
   -- } {2}
   test:do_test("insert-5.6", function()
@@ -359,7 +359,7 @@ test:do_execsql_test("insert-4.7", [[
 -- Ticket #334:  REPLACE statement corrupting indices.
 --
 -- if X(0, "X!capable", [["conflict"]]) then
-  -- The REPLACE command is not available if SQLITE_OMIT_CONFLICT is 
+  -- The REPLACE command is not available if sql_OMIT_CONFLICT is
   -- defined at compilation time.
   test:do_execsql_test("insert-6.1", [[
     CREATE TABLE t1(a INTEGER PRIMARY KEY, b INT UNIQUE);
@@ -485,7 +485,7 @@ test:do_execsql_test("insert-4.7", [[
 --   SELECT quote(a), quote(b), quote(c) FROM t11b;
 -- } {123456789 '123456789' '123456789'}
 -- # More columns of input than there are columns in the table.
--- # Ticket http://www.sqlite.org/src/info/e9654505cfda9361
+-- # Ticket http://www.sql.org/src/info/e9654505cfda9361
 -- #
 -- do_execsql_test insert-12.1 {
 --   CREATE TABLE t12a(a INT,b INT,c INT,d INT,e INT,f INT,g INT);

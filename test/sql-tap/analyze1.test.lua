@@ -13,7 +13,7 @@ test:plan(38)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 -- This file implements tests for the ANALYZE command.
 --
 
@@ -48,17 +48,17 @@ test:do_execsql_test(
 --         CREATE INDEX stat1"idx" ON _sql_stat1(idx);
 --     ]], {
 --         -- <analyze-1.6.2>
---         1, "table sqlite_stat1 may not be indexed"
+--         1, "table sql_stat1 may not be indexed"
 --         -- </analyze-1.6.2>
 --     })
 
 -- test:do_catchsql_test(
 --     "analyze-1.6.3",
 --     [[
---         CREATE INDEX main.stat1idx ON SQLite_stat1(idx);
+--         CREATE INDEX main.stat1idx ON sql_stat1(idx);
 --     ]], {
 --         -- <analyze-1.6.3>
---         1, "table sqlite_stat1 may not be indexed"
+--         1, "table sql_stat1 may not be indexed"
 --         -- </analyze-1.6.3>
 --     })
 
@@ -288,7 +288,7 @@ test:do_execsql_test(
 --     "analyze-3.11",
 --     [[
 --         DROP INDEX "foolish ' name";
---         SELECT "idx", "stat" FROM sqlite_stat1 ORDER BY "idx";
+--         SELECT "idx", "stat" FROM sql_stat1 ORDER BY "idx";
 --     ]], {
 --         -- <analyze-3.11>
 --         "another foolish ' name", "2 1", "t3i1", "5 3", "t3i2", "5 3 1 1 1", "t3i3", "5 5 2 1 1"
@@ -299,14 +299,14 @@ test:do_execsql_test(
 --     "analyze-3.11",
 --     [[
 --         DROP TABLE "silly "" name";
---         SELECT "idx", "stat" FROM sqlite_stat1 ORDER BY "idx";
+--         SELECT "idx", "stat" FROM sql_stat1 ORDER BY "idx";
 --     ]], {
 --         -- <analyze-3.11>
 --         "t3i1", "5 3", "t3i2", "5 3 1 1 1", "t3i3", "5 5 2 1 1"
 --         -- </analyze-3.11>
 --     })
 
--- Try corrupting the sqlite_stat1 table and make sure that
+-- Try corrupting the sql_stat1 table and make sure that
 -- the database is still able to function.
 --
 test:do_execsql_test(
@@ -349,7 +349,7 @@ test:do_execsql_test(
 
 
 -- Verify that DROP TABLE and DROP INDEX remove entries from the 
--- sqlite_stat1, sqlite_stat3 and sqlite_stat4 tables.
+-- sql_stat1, sql_stat3 and sql_stat4 tables.
 --
 test:do_execsql_test(
     "analyze-5.0",
@@ -552,13 +552,13 @@ test:do_execsql_test(
 -- do_test analyze-99.1 {
 --   execsql {
 --     PRAGMA writable_schema=on;
---     UPDATE sqlite_master SET sql='nonsense' WHERE name='sqlite_stat1';
+--     UPDATE sql_master SET sql='nonsense' WHERE name='sql_stat1';
 --   }
 --   db close
---   catch { sqlite3 db test.db }
+--   catch { sql db test.db }
 --   catchsql {
 --     ANALYZE
 --   }
--- } {1 {malformed database schema (sqlite_stat1)}}
+-- } {1 {malformed database schema (sql_stat1)}}
 
 test:finish_test()

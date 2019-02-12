@@ -13,7 +13,7 @@ test:plan(17)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests issues relating to firing an INSTEAD OF trigger on a VIEW
 -- when one tries to UPDATE or DELETE from the view.  Does the WHERE
 -- clause of the UPDATE or DELETE statement get passed down correctly
@@ -329,7 +329,7 @@ test:do_test(
 -- # Only run the reamining tests if memory debugging is turned on.
 -- #
 -- ifcapable !memdebug {
---    puts "Skipping triggerA malloc tests: not compiled with -DSQLITE_MEMDEBUG..."
+--    puts "Skipping triggerA malloc tests: not compiled with -Dsql_MEMDEBUG..."
 --    finish_test
 --    return
 -- }
@@ -339,15 +339,15 @@ test:do_test(
 -- db close
 -- forcedelete test.db-triggerA
 -- copy_file test.db test.db-triggerA
--- sqlite3 db test.db
+-- sql db test.db
 -- # Run malloc tests on the INSTEAD OF trigger firing.
 -- #
 -- do_malloc_test triggerA-3 -tclprep {
 --   db close
 --   forcedelete test.db test.db-journal
 --   forcecopy test.db-triggerA test.db
---   sqlite3 db test.db
---   sqlite3_extended_result_codes db 1
+--   sql db test.db
+--   sql_extended_result_codes db 1
 --   db eval {SELECT * FROM v5; -- warm up the cache}
 -- } -sqlbody {
 --    DELETE FROM v5 WHERE x=5;

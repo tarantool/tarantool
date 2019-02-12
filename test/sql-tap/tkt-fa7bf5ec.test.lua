@@ -13,13 +13,13 @@ test:plan(1)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [fa7bf5ec94801e7e2030e41eefe5d9dd96eaacfd] has
 -- been resolved.
 --
--- The problem described by this ticket was that the sqlite3ExprCompare()
+-- The problem described by this ticket was that the sqlExprCompare()
 -- function was saying that expressions (x='a') and (x='A') were identical
--- because it was using sqlite3StrICmp() instead of strcmp() to compare string
+-- because it was using sqlStrICmp() instead of strcmp() to compare string
 -- literals.  That was causing the query optimizer for aggregate queries to 
 -- believe that both count() operations were identical, and thus only 
 -- computing the first count() and making a copy of the result for the 

@@ -39,7 +39,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct sqlite3;
+struct sql;
 
 enum fkey_action {
 	FKEY_NO_ACTION = 0,

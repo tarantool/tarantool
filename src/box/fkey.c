@@ -30,7 +30,7 @@
  */
 #include "fkey.h"
 #include "sql.h"
-#include "sql/sqliteInt.h"
+#include "sql/sqlInt.h"
 
 const char *fkey_action_strs[] = {
 	/* [FKEY_ACTION_RESTRICT]    = */ "no_action",

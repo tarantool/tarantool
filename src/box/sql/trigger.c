@@ -34,19 +34,19 @@
  */
 
 #include "box/schema.h"
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
 #include "box/session.h"
 
-/* See comment in sqliteInt.h */
+/* See comment in sqlInt.h */
 int sqlSubProgramsRemaining;
 
 /*
  * Delete a linked list of TriggerStep structures.
  */
 void
-sqlite3DeleteTriggerStep(sqlite3 * db, TriggerStep * pTriggerStep)
+sqlDeleteTriggerStep(sql * db, TriggerStep * pTriggerStep)
 {
 	while (pTriggerStep) {
 		TriggerStep *pTmp = pTriggerStep;
@@ -55,9 +55,9 @@ sqlite3DeleteTriggerStep(sqlite3 * db, TriggerStep * pTriggerStep)
 		sql_expr_delete(db, pTmp->pWhere, false);
 		sql_expr_list_delete(db, pTmp->pExprList);
 		sql_select_delete(db, pTmp->pSelect);
-		sqlite3IdListDelete(db, pTmp->pIdList);
+		sqlIdListDelete(db, pTmp->pIdList);
 
-		sqlite3DbFree(db, pTmp);
+		sqlDbFree(db, pTmp);
 	}
 }
 
@@ -69,7 +69,7 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	/* The new trigger. */
 	struct sql_trigger *trigger = NULL;
 	/* The database connection. */
-	struct sqlite3 *db = parse->db;
+	struct sql *db = parse->db;
 	/* The name of the Trigger. */
 	char *trigger_name = NULL;
 
@@ -82,11 +82,11 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 		goto trigger_cleanup;
 	assert(table->nSrc == 1);
 
-	trigger_name = sqlite3NameFromToken(db, name);
+	trigger_name = sqlNameFromToken(db, name);
 	if (trigger_name == NULL)
 		goto trigger_cleanup;
 
-	if (sqlite3CheckIdentifierName(parse, trigger_name) != SQLITE_OK)
+	if (sqlCheckIdentifierName(parse, trigger_name) != SQL_OK)
 		goto trigger_cleanup;
 
 	const char *table_name = table->a[0].zName;
@@ -100,17 +100,17 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	}
 
 	if (!parse->parse_only) {
-		struct Vdbe *v = sqlite3GetVdbe(parse);
+		struct Vdbe *v = sqlGetVdbe(parse);
 		if (v != NULL)
-			sqlite3VdbeCountChanges(v);
+			sqlVdbeCountChanges(v);
 		const char *error_msg =
 			tt_sprintf(tnt_errcode_desc(ER_TRIGGER_EXISTS),
 				   trigger_name);
-		char *name_copy = sqlite3DbStrDup(db, trigger_name);
+		char *name_copy = sqlDbStrDup(db, trigger_name);
 		if (name_copy == NULL)
 			goto trigger_cleanup;
 		int name_reg = ++parse->nMem;
-		sqlite3VdbeAddOp4(parse->pVdbe, OP_String8, 0, name_reg, 0,
+		sqlVdbeAddOp4(parse->pVdbe, OP_String8, 0, name_reg, 0,
 				  name_copy, P4_DYNAMIC);
 		if (vdbe_emit_halt_with_presence_test(parse, BOX_TRIGGER_ID, 0,
 						      name_reg, 1,
@@ -121,7 +121,7 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	}
 
 	/* Build the Trigger object. */
-	trigger = (struct sql_trigger *)sqlite3DbMallocZero(db,
+	trigger = (struct sql_trigger *)sqlDbMallocZero(db,
 							    sizeof(struct
 								   sql_trigger));
 	if (trigger == NULL)
@@ -132,8 +132,8 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 
 	trigger->op = (u8) op;
 	trigger->tr_tm = tr_tm;
-	trigger->pWhen = sqlite3ExprDup(db, when, EXPRDUP_REDUCE);
-	trigger->pColumns = sqlite3IdListDup(db, columns);
+	trigger->pWhen = sqlExprDup(db, when, EXPRDUP_REDUCE);
+	trigger->pColumns = sqlIdListDup(db, columns);
 	if ((when != NULL && trigger->pWhen == NULL) ||
 	    (columns != NULL && trigger->pColumns == NULL))
 		goto trigger_cleanup;
@@ -142,9 +142,9 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	parse->parsed_ast_type = AST_TYPE_TRIGGER;
 
  trigger_cleanup:
-	sqlite3DbFree(db, trigger_name);
-	sqlite3SrcListDelete(db, table);
-	sqlite3IdListDelete(db, columns);
+	sqlDbFree(db, trigger_name);
+	sqlSrcListDelete(db, table);
+	sqlIdListDelete(db, columns);
 	sql_expr_delete(db, when, false);
 	if (parse->parsed_ast.trigger == NULL)
 		sql_trigger_delete(db, trigger);
@@ -166,7 +166,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 	/* Trigger being finished. */
 	struct sql_trigger *trigger = parse->parsed_ast.trigger;
 	/* The database. */
-	struct sqlite3 *db = parse->db;
+	struct sql *db = parse->db;
 
 	parse->parsed_ast.trigger = NULL;
 	if (NEVER(parse->nErr) || trigger == NULL)
@@ -180,7 +180,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 
 	/* Trigger name for error reporting. */
 	struct Token trigger_name_token;
-	sqlite3TokenInit(&trigger_name_token, trigger->zName);
+	sqlTokenInit(&trigger_name_token, trigger->zName);
 
 	/*
 	 * Generate byte code to insert a new trigger into
@@ -188,12 +188,12 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 	 */
 	if (!parse->parse_only) {
 		/* Make an entry in the _trigger space. */
-		struct Vdbe *v = sqlite3GetVdbe(parse);
+		struct Vdbe *v = sqlGetVdbe(parse);
 		if (v == 0)
 			goto cleanup;
 
 		char *sql_str =
-			sqlite3MPrintf(db, "CREATE TRIGGER %s", token->z);
+			sqlMPrintf(db, "CREATE TRIGGER %s", token->z);
 		if (db->mallocFailed)
 			goto cleanup;
 
@@ -209,32 +209,32 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 		uint32_t opts_buff_sz = mp_sizeof_map(1) +
 					mp_sizeof_str(sql_len) +
 					mp_sizeof_str(sql_str_len);
-		char *opts_buff = (char *) sqlite3DbMallocRaw(db, opts_buff_sz);
+		char *opts_buff = (char *) sqlDbMallocRaw(db, opts_buff_sz);
 		if (opts_buff == NULL)
 			goto cleanup;
 
 		char *data = mp_encode_map(opts_buff, 1);
 		data = mp_encode_str(data, "sql", sql_len);
 		data = mp_encode_str(data, sql_str, sql_str_len);
-		sqlite3DbFree(db, sql_str);
+		sqlDbFree(db, sql_str);
 
-		trigger_name = sqlite3DbStrDup(db, trigger_name);
+		trigger_name = sqlDbStrDup(db, trigger_name);
 		if (trigger_name == NULL) {
-			sqlite3DbFree(db, opts_buff);
+			sqlDbFree(db, opts_buff);
 			goto cleanup;
 		}
 
-		sqlite3VdbeAddOp4(v, OP_String8, 0, first_col, 0,
+		sqlVdbeAddOp4(v, OP_String8, 0, first_col, 0,
 				  trigger_name, P4_DYNAMIC);
-		sqlite3VdbeAddOp2(v, OP_Integer, trigger->space_id,
+		sqlVdbeAddOp2(v, OP_Integer, trigger->space_id,
 				  first_col + 1);
-		sqlite3VdbeAddOp4(v, OP_Blob, opts_buff_sz, first_col + 2,
+		sqlVdbeAddOp4(v, OP_Blob, opts_buff_sz, first_col + 2,
 				  SQL_SUBTYPE_MSGPACK, opts_buff, P4_DYNAMIC);
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
-		sqlite3VdbeAddOp4(v, OP_IdxInsert, record, 0, 0,
+		sqlVdbeAddOp3(v, OP_MakeRecord, first_col, 3, record);
+		sqlVdbeAddOp4(v, OP_IdxInsert, record, 0, 0,
 				  (char *)_trigger, P4_SPACEPTR);
 
-		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 
 		sql_set_multi_write(parse, false);
 	} else {
@@ -246,7 +246,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 cleanup:
 	sql_trigger_delete(db, trigger);
 	assert(parse->parsed_ast.trigger == NULL || parse->parse_only);
-	sqlite3DeleteTriggerStep(db, step_list);
+	sqlDeleteTriggerStep(db, step_list);
 }
 
 /*
@@ -257,10 +257,10 @@ cleanup:
  * body of a TRIGGER.
  */
 TriggerStep *
-sqlite3TriggerSelectStep(sqlite3 * db, Select * pSelect)
+sqlTriggerSelectStep(sql * db, Select * pSelect)
 {
 	TriggerStep *pTriggerStep =
-	    sqlite3DbMallocZero(db, sizeof(TriggerStep));
+	    sqlDbMallocZero(db, sizeof(TriggerStep));
 	if (pTriggerStep == 0) {
 		sql_select_delete(db, pSelect);
 		return 0;
@@ -278,7 +278,7 @@ sqlite3TriggerSelectStep(sqlite3 * db, Select * pSelect)
  * If an OOM error occurs, NULL is returned and db->mallocFailed is set.
  */
 static TriggerStep *
-triggerStepAllocate(sqlite3 * db,	/* Database connection */
+triggerStepAllocate(sql * db,	/* Database connection */
 		    u8 op,	/* Trigger opcode */
 		    Token * pName	/* The target name */
     )
@@ -286,11 +286,11 @@ triggerStepAllocate(sqlite3 * db,	/* Database connection */
 	TriggerStep *pTriggerStep;
 
 	pTriggerStep =
-	    sqlite3DbMallocZero(db, sizeof(TriggerStep) + pName->n + 1);
+	    sqlDbMallocZero(db, sizeof(TriggerStep) + pName->n + 1);
 	if (pTriggerStep) {
 		char *z = (char *)&pTriggerStep[1];
 		memcpy(z, pName->z, pName->n);
-		sqlite3NormalizeName(z);
+		sqlNormalizeName(z);
 		pTriggerStep->zTarget = z;
 		pTriggerStep->op = op;
 	}
@@ -305,7 +305,7 @@ triggerStepAllocate(sqlite3 * db,	/* Database connection */
  * body of a trigger.
  */
 TriggerStep *
-sqlite3TriggerInsertStep(sqlite3 * db,	/* The database connection */
+sqlTriggerInsertStep(sql * db,	/* The database connection */
 			 Token * pTableName,	/* Name of the table into which we insert */
 			 IdList * pColumn,	/* List of columns in pTableName to insert into */
 			 Select * pSelect,	/* A SELECT statement that supplies values */
@@ -322,11 +322,11 @@ sqlite3TriggerInsertStep(sqlite3 * db,	/* The database connection */
 	pTriggerStep = triggerStepAllocate(db, TK_INSERT, pTableName);
 	if (pTriggerStep) {
 		pTriggerStep->pSelect =
-		    sqlite3SelectDup(db, pSelect, EXPRDUP_REDUCE);
+		    sqlSelectDup(db, pSelect, EXPRDUP_REDUCE);
 		pTriggerStep->pIdList = pColumn;
 		pTriggerStep->orconf = orconf;
 	} else {
-		sqlite3IdListDelete(db, pColumn);
+		sqlIdListDelete(db, pColumn);
 	}
 	sql_select_delete(db, pSelect);
 
@@ -339,7 +339,7 @@ sqlite3TriggerInsertStep(sqlite3 * db,	/* The database connection */
  * sees an UPDATE statement inside the body of a CREATE TRIGGER.
  */
 TriggerStep *
-sqlite3TriggerUpdateStep(sqlite3 * db,	/* The database connection */
+sqlTriggerUpdateStep(sql * db,	/* The database connection */
 			 Token * pTableName,	/* Name of the table to be updated */
 			 ExprList * pEList,	/* The SET clause: list of column and new values */
 			 Expr * pWhere,	/* The WHERE clause */
@@ -356,7 +356,7 @@ sqlite3TriggerUpdateStep(sqlite3 * db,	/* The database connection */
 		pTriggerStep->pExprList =
 		    sql_expr_list_dup(db, pEList, EXPRDUP_REDUCE);
 		pTriggerStep->pWhere =
-		    sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
+		    sqlExprDup(db, pWhere, EXPRDUP_REDUCE);
 		pTriggerStep->orconf = orconf;
 	}
 	sql_expr_list_delete(db, pEList);
@@ -370,7 +370,7 @@ sqlite3TriggerUpdateStep(sqlite3 * db,	/* The database connection */
  * sees a DELETE statement inside the body of a CREATE TRIGGER.
  */
 TriggerStep *
-sqlite3TriggerDeleteStep(sqlite3 * db,	/* Database connection */
+sqlTriggerDeleteStep(sql * db,	/* Database connection */
 			 Token * pTableName,	/* The table from which rows are deleted */
 			 Expr * pWhere	/* The WHERE clause */
     )
@@ -380,7 +380,7 @@ sqlite3TriggerDeleteStep(sqlite3 * db,	/* Database connection */
 	pTriggerStep = triggerStepAllocate(db, TK_DELETE, pTableName);
 	if (pTriggerStep) {
 		pTriggerStep->pWhere =
-		    sqlite3ExprDup(db, pWhere, EXPRDUP_REDUCE);
+		    sqlExprDup(db, pWhere, EXPRDUP_REDUCE);
 		pTriggerStep->orconf = ON_CONFLICT_ACTION_DEFAULT;
 	}
 	sql_expr_delete(db, pWhere, false);
@@ -388,23 +388,23 @@ sqlite3TriggerDeleteStep(sqlite3 * db,	/* Database connection */
 }
 
 void
-sql_trigger_delete(struct sqlite3 *db, struct sql_trigger *trigger)
+sql_trigger_delete(struct sql *db, struct sql_trigger *trigger)
 {
 	if (trigger == NULL)
 		return;
-	sqlite3DeleteTriggerStep(db, trigger->step_list);
-	sqlite3DbFree(db, trigger->zName);
+	sqlDeleteTriggerStep(db, trigger->step_list);
+	sqlDbFree(db, trigger->zName);
 	sql_expr_delete(db, trigger->pWhen, false);
-	sqlite3IdListDelete(db, trigger->pColumns);
-	sqlite3DbFree(db, trigger);
+	sqlIdListDelete(db, trigger->pColumns);
+	sqlDbFree(db, trigger);
 }
 
 void
 vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 		       bool account_changes)
 {
-	sqlite3 *db = parser->db;
-	struct Vdbe *v = sqlite3GetVdbe(parser);
+	sql *db = parser->db;
+	struct Vdbe *v = sqlGetVdbe(parser);
 	if (v == NULL)
 		return;
 	/*
@@ -413,38 +413,38 @@ vdbe_code_drop_trigger(struct Parse *parser, const char *trigger_name,
 	 */
 	int trig_name_reg = ++parser->nMem;
 	int record_to_delete = ++parser->nMem;
-	sqlite3VdbeAddOp4(v, OP_String8, 0, trig_name_reg, 0,
-			  sqlite3DbStrDup(db, trigger_name), P4_DYNAMIC);
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, trig_name_reg, 1,
+	sqlVdbeAddOp4(v, OP_String8, 0, trig_name_reg, 0,
+			  sqlDbStrDup(db, trigger_name), P4_DYNAMIC);
+	sqlVdbeAddOp3(v, OP_MakeRecord, trig_name_reg, 1,
 			  record_to_delete);
-	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_TRIGGER_ID,
+	sqlVdbeAddOp2(v, OP_SDelete, BOX_TRIGGER_ID,
 			  record_to_delete);
 	if (account_changes)
-		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 }
 
 void
 sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
 {
 
-	sqlite3 *db = parser->db;
+	sql *db = parser->db;
 	if (db->mallocFailed)
 		goto drop_trigger_cleanup;
 
-	struct Vdbe *v = sqlite3GetVdbe(parser);
+	struct Vdbe *v = sqlGetVdbe(parser);
 	if (v != NULL)
-		sqlite3VdbeCountChanges(v);
+		sqlVdbeCountChanges(v);
 
 	assert(name->nSrc == 1);
 	const char *trigger_name = name->a[0].zName;
 	const char *error_msg =
 		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_TRIGGER),
 			   trigger_name);
-	char *name_copy = sqlite3DbStrDup(db, trigger_name);
+	char *name_copy = sqlDbStrDup(db, trigger_name);
 	if (name_copy == NULL)
 		goto drop_trigger_cleanup;
 	int name_reg = ++parser->nMem;
-	sqlite3VdbeAddOp4(v, OP_String8, 0, name_reg, 0, name_copy, P4_DYNAMIC);
+	sqlVdbeAddOp4(v, OP_String8, 0, name_reg, 0, name_copy, P4_DYNAMIC);
 	if (vdbe_emit_halt_with_presence_test(parser, BOX_TRIGGER_ID, 0,
 					      name_reg, 1, ER_NO_SUCH_TRIGGER,
 					      error_msg, no_err, OP_Found) != 0)
@@ -453,7 +453,7 @@ sql_drop_trigger(struct Parse *parser, struct SrcList *name, bool no_err)
 	vdbe_code_drop_trigger(parser, trigger_name, true);
 
  drop_trigger_cleanup:
-	sqlite3SrcListDelete(db, name);
+	sqlSrcListDelete(db, name);
 }
 
 int
@@ -551,7 +551,7 @@ checkColumnOverlap(IdList * pIdList, ExprList * pEList)
 	if (pIdList == 0 || NEVER(pEList == 0))
 		return 1;
 	for (e = 0; e < pEList->nExpr; e++) {
-		if (sqlite3IdListIndex(pIdList, pEList->a[e].zName) >= 0)
+		if (sqlIdListIndex(pIdList, pEList->a[e].zName) >= 0)
 			return 1;
 	}
 	return 0;
@@ -564,7 +564,7 @@ sql_triggers_exist(struct Table *table, int op, struct ExprList *changes_list,
 	int mask = 0;
 	struct sql_trigger *trigger_list = NULL;
 	struct session *user_session = current_session();
-	if ((user_session->sql_flags & SQLITE_EnableTrigger) != 0)
+	if ((user_session->sql_flags & SQL_EnableTrigger) != 0)
 		trigger_list = space_trigger_list(table->def->id);
 	for (struct sql_trigger *p = trigger_list; p != NULL; p = p->next) {
 		if (p->op == op && checkColumnOverlap(p->pColumns,
@@ -585,14 +585,14 @@ targetSrcList(Parse * pParse,	/* The parsing context */
 	      TriggerStep * pStep	/* The trigger containing the target token */
     )
 {
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 	SrcList *pSrc;		/* SrcList to be returned */
 
-	pSrc = sqlite3SrcListAppend(db, 0, 0);
+	pSrc = sqlSrcListAppend(db, 0, 0);
 	if (pSrc) {
 		assert(pSrc->nSrc > 0);
 		pSrc->a[pSrc->nSrc - 1].zName =
-		    sqlite3DbStrDup(db, pStep->zTarget);
+		    sqlDbStrDup(db, pStep->zTarget);
 	}
 	return pSrc;
 }
@@ -612,7 +612,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 {
 	TriggerStep *pStep;
 	Vdbe *v = pParse->pVdbe;
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 
 	assert(pParse->pTriggerTab && pParse->pToplevel);
 	assert(pStepList);
@@ -622,7 +622,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 	sqlSubProgramsRemaining--;
 
 	if (sqlSubProgramsRemaining == 0) {
-		sqlite3ErrorMsg(pParse,
+		sqlErrorMsg(pParse,
 				"Maximum number of chained trigger activations exceeded.");
 	}
 
@@ -645,23 +645,23 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 
 		switch (pStep->op) {
 		case TK_UPDATE:{
-				sqlite3Update(pParse,
+				sqlUpdate(pParse,
 					      targetSrcList(pParse, pStep),
 					      sql_expr_list_dup(db,
 								pStep->pExprList,
 								0),
-					      sqlite3ExprDup(db, pStep->pWhere,
+					      sqlExprDup(db, pStep->pWhere,
 							     0),
 					      pParse->eOrconf);
 				break;
 			}
 		case TK_INSERT:{
-				sqlite3Insert(pParse,
+				sqlInsert(pParse,
 					      targetSrcList(pParse, pStep),
-					      sqlite3SelectDup(db,
+					      sqlSelectDup(db,
 							       pStep->pSelect,
 							       0),
-					      sqlite3IdListDup(db,
+					      sqlIdListDup(db,
 							       pStep->pIdList),
 					      pParse->eOrconf);
 				break;
@@ -669,7 +669,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 		case TK_DELETE:{
 				sql_table_delete_from(pParse,
 						      targetSrcList(pParse, pStep),
-						      sqlite3ExprDup(db,
+						      sqlExprDup(db,
 								     pStep->pWhere,
 								     0)
 				    );
@@ -679,15 +679,15 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 			assert(pStep->op == TK_SELECT); {
 				SelectDest sDest;
 				Select *pSelect =
-				    sqlite3SelectDup(db, pStep->pSelect, 0);
-				sqlite3SelectDestInit(&sDest, SRT_Discard, 0, -1);
-				sqlite3Select(pParse, pSelect, &sDest);
+				    sqlSelectDup(db, pStep->pSelect, 0);
+				sqlSelectDestInit(&sDest, SRT_Discard, 0, -1);
+				sqlSelect(pParse, pSelect, &sDest);
 				sql_select_delete(db, pSelect);
 				break;
 			}
 		}
 		if (pStep->op != TK_SELECT) {
-			sqlite3VdbeAddOp0(v, OP_ResetCount);
+			sqlVdbeAddOp0(v, OP_ResetCount);
 		}
 	}
 
@@ -696,7 +696,7 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 	return 0;
 }
 
-#ifdef SQLITE_ENABLE_EXPLAIN_COMMENTS
+#ifdef SQL_ENABLE_EXPLAIN_COMMENTS
 /*
  * This function is used to add VdbeComment() annotations to a VDBE
  * program. It is not used in production code, only for debugging.
@@ -737,7 +737,7 @@ transferParseError(Parse * pTo, Parse * pFrom)
 		pTo->nErr = pFrom->nErr;
 		pTo->rc = pFrom->rc;
 	} else {
-		sqlite3DbFree(pFrom->db, pFrom->zErrMsg);
+		sqlDbFree(pFrom->db, pFrom->zErrMsg);
 	}
 	pFrom->zErrMsg = NULL;
 }
@@ -758,9 +758,9 @@ static TriggerPrg *
 sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 			struct Table *table, int orconf)
 {
-	Parse *pTop = sqlite3ParseToplevel(parser);
+	Parse *pTop = sqlParseToplevel(parser);
 	/* Database handle. */
-	sqlite3 *db = parser->db;
+	sql *db = parser->db;
 	TriggerPrg *pPrg;	/* Value to return */
 	Expr *pWhen = 0;	/* Duplicate of trigger WHEN expression */
 	NameContext sNC;	/* Name context for sub-vdbe */
@@ -775,15 +775,15 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	 * are freed if an error occurs, link them into the Parse.pTriggerPrg
 	 * list of the top-level Parse object sooner rather than later.
 	 */
-	pPrg = sqlite3DbMallocZero(db, sizeof(TriggerPrg));
+	pPrg = sqlDbMallocZero(db, sizeof(TriggerPrg));
 	if (!pPrg)
 		return 0;
 	pPrg->pNext = pTop->pTriggerPrg;
 	pTop->pTriggerPrg = pPrg;
-	pPrg->pProgram = pProgram = sqlite3DbMallocZero(db, sizeof(SubProgram));
+	pPrg->pProgram = pProgram = sqlDbMallocZero(db, sizeof(SubProgram));
 	if (!pProgram)
 		return 0;
-	sqlite3VdbeLinkSubProgram(pTop->pVdbe, pProgram);
+	sqlVdbeLinkSubProgram(pTop->pVdbe, pProgram);
 	pPrg->trigger = trigger;
 	pPrg->orconf = orconf;
 	pPrg->aColmask[0] = 0xffffffff;
@@ -793,7 +793,7 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	 * Allocate and populate a new Parse context to use for
 	 * coding the trigger sub-program.
 	 */
-	pSubParse = sqlite3StackAllocZero(db, sizeof(Parse));
+	pSubParse = sqlStackAllocZero(db, sizeof(Parse));
 	if (!pSubParse)
 		return 0;
 	sql_parser_create(pSubParse, db);
@@ -805,7 +805,7 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 	pSubParse->nQueryLoop = parser->nQueryLoop;
 
 	/* Temporary VM. */
-	struct Vdbe *v = sqlite3GetVdbe(pSubParse);
+	struct Vdbe *v = sqlGetVdbe(pSubParse);
 	if (v != NULL) {
 		VdbeComment((v, "Start: %s.%s (%s %s%s%s ON %s)",
 			     trigger->zName, onErrorText(orconf),
@@ -815,9 +815,9 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 			     (trigger->op == TK_INSERT ? "INSERT" : ""),
 			     (trigger->op == TK_DELETE ? "DELETE" : ""),
 			      table->def->name));
-#ifndef SQLITE_OMIT_TRACE
-		sqlite3VdbeChangeP4(v, -1,
-				    sqlite3MPrintf(db, "-- TRIGGER %s",
+#ifndef SQL_OMIT_TRACE
+		sqlVdbeChangeP4(v, -1,
+				    sqlMPrintf(db, "-- TRIGGER %s",
 						   trigger->zName),
 				    P4_DYNAMIC);
 #endif
@@ -829,13 +829,13 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 		 * inserted at the end of the program.
 		 */
 		if (trigger->pWhen != NULL) {
-			pWhen = sqlite3ExprDup(db, trigger->pWhen, 0);
-			if (SQLITE_OK == sqlite3ResolveExprNames(&sNC, pWhen)
+			pWhen = sqlExprDup(db, trigger->pWhen, 0);
+			if (SQL_OK == sqlResolveExprNames(&sNC, pWhen)
 			    && db->mallocFailed == 0) {
-				iEndTrigger = sqlite3VdbeMakeLabel(v);
-				sqlite3ExprIfFalse(pSubParse, pWhen,
+				iEndTrigger = sqlVdbeMakeLabel(v);
+				sqlExprIfFalse(pSubParse, pWhen,
 						   iEndTrigger,
-						   SQLITE_JUMPIFNULL);
+						   SQL_JUMPIFNULL);
 			}
 			sql_expr_delete(db, pWhen, false);
 		}
@@ -845,15 +845,15 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 
 		/* Insert an OP_Halt at the end of the sub-program. */
 		if (iEndTrigger)
-			sqlite3VdbeResolveLabel(v, iEndTrigger);
-		sqlite3VdbeAddOp0(v, OP_Halt);
+			sqlVdbeResolveLabel(v, iEndTrigger);
+		sqlVdbeAddOp0(v, OP_Halt);
 		VdbeComment((v, "End: %s.%s", trigger->zName,
 			     onErrorText(orconf)));
 
 		transferParseError(parser, pSubParse);
 		if (db->mallocFailed == 0) {
 			pProgram->aOp =
-			    sqlite3VdbeTakeOpArray(v, &pProgram->nOp,
+			    sqlVdbeTakeOpArray(v, &pProgram->nOp,
 						   &pTop->nMaxArg);
 		}
 		pProgram->nMem = pSubParse->nMem;
@@ -861,13 +861,13 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 		pProgram->token = (void *)trigger;
 		pPrg->aColmask[0] = pSubParse->oldmask;
 		pPrg->aColmask[1] = pSubParse->newmask;
-		sqlite3VdbeDelete(v);
+		sqlVdbeDelete(v);
 	}
 
 	assert(!pSubParse->pZombieTab);
 	assert(!pSubParse->pTriggerPrg && !pSubParse->nMaxArg);
 	sql_parser_destroy(pSubParse);
-	sqlite3StackFree(db, pSubParse);
+	sqlStackFree(db, pSubParse);
 
 	return pPrg;
 }
@@ -890,7 +890,7 @@ static TriggerPrg *
 sql_row_trigger(struct Parse *parser, struct sql_trigger *trigger,
 		struct Table *table, int orconf)
 {
-	Parse *pRoot = sqlite3ParseToplevel(parser);
+	Parse *pRoot = sqlParseToplevel(parser);
 	TriggerPrg *pPrg;
 
 	assert(trigger->zName == NULL || table->def->id == trigger->space_id);
@@ -922,7 +922,7 @@ vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
 			     int ignore_jump)
 {
 	/* Main VM. */
-	struct Vdbe *v = sqlite3GetVdbe(parser);
+	struct Vdbe *v = sqlGetVdbe(parser);
 
 	TriggerPrg *pPrg = sql_row_trigger(parser, trigger, table, orconf);
 	assert(pPrg != NULL || parser->nErr != 0 ||
@@ -938,9 +938,9 @@ vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
 
 	struct session *user_session = current_session();
 	bool is_recursive = (trigger->zName && !(user_session->sql_flags &
-						 SQLITE_RecTriggers));
+						 SQL_RecTriggers));
 
-	sqlite3VdbeAddOp4(v, OP_Program, reg, ignore_jump,
+	sqlVdbeAddOp4(v, OP_Program, reg, ignore_jump,
 			  ++parser->nMem, (const char *)pPrg->pProgram,
 			  P4_SUBPROGRAM);
 	VdbeComment((v, "Call: %s.%s", (trigger->zName ? trigger->zName :
@@ -956,7 +956,7 @@ vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
 	 * key action, and (b) the flag to enable
 	 * recursive triggers is clear.
 	 */
-	sqlite3VdbeChangeP5(v, (u8)is_recursive);
+	sqlVdbeChangeP5(v, (u8)is_recursive);
 }
 
 void

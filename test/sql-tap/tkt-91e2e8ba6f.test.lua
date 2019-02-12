@@ -11,7 +11,7 @@ test:plan(7)
 --
 -------------------------------------------------------------------------
 --
--- This file contains tests for SQLite. Specifically, it tests that SQLite
+-- This file contains tests for sql. Specifically, it tests that sql
 -- does not crash and an error is returned if localhost() fails. This 
 -- is the problem reported by ticket 91e2e8ba6f.
 --

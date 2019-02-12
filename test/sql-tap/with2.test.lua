@@ -13,7 +13,7 @@ test:plan(59)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the WITH clause.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -358,7 +358,7 @@ genstmt(255), {
         -- </4.4>
     })
 
--- nLimit = sqlite3_limit("db", "SQLITE_LIMIT_COLUMN", -1)
+-- nLimit = sql_limit("db", "sql_LIMIT_COLUMN", -1)
 -- Tarantool: max number of columns in result set
 -- test:do_execsql_test(
 --     4.5,

@@ -13,7 +13,7 @@ test:plan(35)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing that the optimizations that disable
 -- ORDER BY clauses when the natural order of a query is correct.
 --
@@ -744,7 +744,7 @@ test:do_execsql_test(
         -- </6.0>
     })
 
--- # Here is a test for a query-planner problem reported on the SQLite
+-- # Here is a test for a query-planner problem reported on the sql
 -- # mailing list on 2014-09-18 by "Merike".  Beginning with version 3.8.0,
 -- # a separate sort was being used rather than using the single-column
 -- # index.  This was due to an oversight in the indexMightHelpWithOrderby()

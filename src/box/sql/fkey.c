@@ -34,7 +34,7 @@
  * support to compiled SQL statements.
  */
 #include "coll.h"
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "box/fkey.h"
 #include "box/schema.h"
 #include "box/session.h"
@@ -43,9 +43,9 @@
  * Deferred and Immediate FKs
  * --------------------------
  *
- * Foreign keys in SQLite come in two flavours: deferred and immediate.
+ * Foreign keys in sql come in two flavours: deferred and immediate.
  * If an immediate foreign key constraint is violated,
- * SQLITE_CONSTRAINT_FOREIGNKEY is returned and the current
+ * SQL_CONSTRAINT_FOREIGNKEY is returned and the current
  * statement transaction rolled back. If a
  * deferred foreign key constraint is violated, no action is taken
  * immediately. However if the application attempts to commit the
@@ -111,7 +111,7 @@
  * is that the counter used is stored as part of each individual statement
  * object (struct Vdbe). If, after the statement has run, its immediate
  * constraint counter is greater than zero,
- * it returns SQLITE_CONSTRAINT_FOREIGNKEY
+ * it returns SQL_CONSTRAINT_FOREIGNKEY
  * and the statement transaction is rolled back. An exception is an INSERT
  * statement that inserts a single row only (no triggers). In this case,
  * instead of using a counter, an exception is thrown immediately if the
@@ -197,9 +197,9 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 		   int reg_data, int incr_count, bool is_update)
 {
 	assert(incr_count == -1 || incr_count == 1);
-	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
 	int cursor = parse_context->nTab - 1;
-	int ok_label = sqlite3VdbeMakeLabel(v);
+	int ok_label = sqlVdbeMakeLabel(v);
 	/*
 	 * If incr_count is less than zero, then check at runtime
 	 * if there are any outstanding constraints to resolve.
@@ -212,13 +212,13 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 	 * parent table.
 	 */
 	if (incr_count < 0) {
-		sqlite3VdbeAddOp2(v, OP_FkIfZero, fk_def->is_deferred,
+		sqlVdbeAddOp2(v, OP_FkIfZero, fk_def->is_deferred,
 				  ok_label);
 	}
 	struct field_link *link = fk_def->links;
 	for (uint32_t i = 0; i < fk_def->field_count; ++i, ++link) {
 		int reg = link->child_field + reg_data + 1;
-		sqlite3VdbeAddOp2(v, OP_IsNull, reg, ok_label);
+		sqlVdbeAddOp2(v, OP_IsNull, reg, ok_label);
 	}
 	uint32_t field_count = fk_def->field_count;
 	/*
@@ -235,15 +235,15 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 	 * key values are).
 	 */
 	if (fkey_is_self_referenced(fk_def) && incr_count == 1) {
-		int jump = sqlite3VdbeCurrentAddr(v) + field_count + 1;
+		int jump = sqlVdbeCurrentAddr(v) + field_count + 1;
 		link = fk_def->links;
 		for (uint32_t i = 0; i < field_count; ++i, ++link) {
 			int chcol = link->child_field + 1 + reg_data;
 			int pcol = link->parent_field + 1 + reg_data;
-			sqlite3VdbeAddOp3(v, OP_Ne, chcol, jump, pcol);
-			sqlite3VdbeChangeP5(v, SQLITE_JUMPIFNULL);
+			sqlVdbeAddOp3(v, OP_Ne, chcol, jump, pcol);
+			sqlVdbeChangeP5(v, SQL_JUMPIFNULL);
 		}
-		sqlite3VdbeGoto(v, ok_label);
+		sqlVdbeGoto(v, ok_label);
 	}
 	/**
 	 * Inspect a parent table with OP_Found.
@@ -253,30 +253,30 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 	 * conflict, fk counter must be increased.
 	 */
 	if (!(fkey_is_self_referenced(fk_def) && is_update)) {
-		int temp_regs = sqlite3GetTempRange(parse_context, field_count);
-		int rec_reg = sqlite3GetTempReg(parse_context);
+		int temp_regs = sqlGetTempRange(parse_context, field_count);
+		int rec_reg = sqlGetTempReg(parse_context);
 		vdbe_emit_open_cursor(parse_context, cursor, referenced_idx,
 				      parent);
 		link = fk_def->links;
 		for (uint32_t i = 0; i < field_count; ++i, ++link) {
-			sqlite3VdbeAddOp2(v, OP_Copy,
+			sqlVdbeAddOp2(v, OP_Copy,
 					  link->child_field + 1 + reg_data,
 					  temp_regs + i);
 		}
 		struct index *idx = space_index(parent, referenced_idx);
 		assert(idx != NULL);
-		sqlite3VdbeAddOp4(v, OP_MakeRecord, temp_regs, field_count,
+		sqlVdbeAddOp4(v, OP_MakeRecord, temp_regs, field_count,
 				  rec_reg,
 				  (char *) sql_index_type_str(parse_context->db,
 							      idx->def),
 				  P4_DYNAMIC);
-		sqlite3VdbeAddOp4Int(v, OP_Found, cursor, ok_label, rec_reg, 0);
-		sqlite3ReleaseTempReg(parse_context, rec_reg);
-		sqlite3ReleaseTempRange(parse_context, temp_regs, field_count);
+		sqlVdbeAddOp4Int(v, OP_Found, cursor, ok_label, rec_reg, 0);
+		sqlReleaseTempReg(parse_context, rec_reg);
+		sqlReleaseTempRange(parse_context, temp_regs, field_count);
 	}
 	struct session *session = current_session();
 	if (!fk_def->is_deferred &&
-	    (session->sql_flags & SQLITE_DeferFKs) == 0 &&
+	    (session->sql_flags & SQL_DeferFKs) == 0 &&
 	    parse_context->pToplevel == NULL && !parse_context->isMultiWrite) {
 		/*
 		 * If this is an INSERT statement that will insert
@@ -287,18 +287,18 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 		 * transaction.
 		 */
 		assert(incr_count == 1);
-		sqlite3HaltConstraint(parse_context,
-				      SQLITE_CONSTRAINT_FOREIGNKEY,
+		sqlHaltConstraint(parse_context,
+				      SQL_CONSTRAINT_FOREIGNKEY,
 				      ON_CONFLICT_ACTION_ABORT, 0, P4_STATIC,
 				      P5_ConstraintFK);
 	} else {
 		if (incr_count > 0 && !fk_def->is_deferred)
-			sqlite3MayAbort(parse_context);
-		sqlite3VdbeAddOp2(v, OP_FkCounter, fk_def->is_deferred,
+			sqlMayAbort(parse_context);
+		sqlVdbeAddOp2(v, OP_FkCounter, fk_def->is_deferred,
 				  incr_count);
 	}
-	sqlite3VdbeResolveLabel(v, ok_label);
-	sqlite3VdbeAddOp1(v, OP_Close, cursor);
+	sqlVdbeResolveLabel(v, ok_label);
+	sqlVdbeAddOp1(v, OP_Close, cursor);
 }
 
 /*
@@ -317,9 +317,9 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
     )
 {
 	Expr *pExpr;
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 
-	pExpr = sqlite3Expr(db, TK_REGISTER, 0);
+	pExpr = sqlExpr(db, TK_REGISTER, 0);
 	if (pExpr) {
 		if (iCol >= 0) {
 			pExpr->iTable = regBase + iCol + 1;
@@ -343,9 +343,9 @@ exprTableRegister(Parse * pParse,	/* Parsing and code generating context */
  * @retval NULL on error.
  */
 static Expr *
-exprTableColumn(sqlite3 * db, struct space_def *def, int cursor, i16 column)
+exprTableColumn(sql * db, struct space_def *def, int cursor, i16 column)
 {
-	Expr *pExpr = sqlite3Expr(db, TK_COLUMN, 0);
+	Expr *pExpr = sqlExpr(db, TK_COLUMN, 0);
 	if (pExpr) {
 		pExpr->space_def = def;
 		pExpr->iTable = cursor;
@@ -402,14 +402,14 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 		   struct fkey_def *fkey, int reg_data, int incr_count)
 {
 	assert(incr_count == -1 || incr_count == 1);
-	struct sqlite3 *db = parser->db;
+	struct sql *db = parser->db;
 	struct Expr *where = NULL;
 	/* Address of OP_FkIfZero. */
 	int fkifzero_label = 0;
-	struct Vdbe *v = sqlite3GetVdbe(parser);
+	struct Vdbe *v = sqlGetVdbe(parser);
 
 	if (incr_count < 0) {
-		fkifzero_label = sqlite3VdbeAddOp2(v, OP_FkIfZero,
+		fkifzero_label = sqlVdbeAddOp2(v, OP_FkIfZero,
 						   fkey->is_deferred, 0);
 		VdbeCoverage(v);
 	}
@@ -433,9 +433,9 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 			exprTableRegister(parser, tab, reg_data, fieldno);
 		fieldno = fkey->links[i].child_field;
 		const char *field_name = child_space->def->fields[fieldno].name;
-		struct Expr *chexpr = sqlite3Expr(db, TK_ID, field_name);
-		struct Expr *eq = sqlite3PExpr(parser, TK_EQ, pexpr, chexpr);
-		where = sqlite3ExprAnd(db, where, eq);
+		struct Expr *chexpr = sqlExpr(db, TK_ID, field_name);
+		struct Expr *eq = sqlPExpr(parser, TK_EQ, pexpr, chexpr);
+		where = sqlExprAnd(db, where, eq);
 	}
 
 	/*
@@ -455,11 +455,11 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 						  fieldno);
 			chexpr = exprTableColumn(db, tab->def,
 						 src->a[0].iCursor, fieldno);
-			eq = sqlite3PExpr(parser, TK_EQ, pexpr, chexpr);
-			expr = sqlite3ExprAnd(db, expr, eq);
+			eq = sqlPExpr(parser, TK_EQ, pexpr, chexpr);
+			expr = sqlExprAnd(db, expr, eq);
 		}
-		struct Expr *pNe = sqlite3PExpr(parser, TK_NOT, expr, 0);
-		where = sqlite3ExprAnd(db, where, pNe);
+		struct Expr *pNe = sqlPExpr(parser, TK_NOT, expr, 0);
+		where = sqlExprAnd(db, where, pNe);
 	}
 
 	/* Resolve the references in the WHERE clause. */
@@ -467,7 +467,7 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 	memset(&namectx, 0, sizeof(namectx));
 	namectx.pSrcList = src;
 	namectx.pParse = parser;
-	sqlite3ResolveExprNames(&namectx, where);
+	sqlResolveExprNames(&namectx, where);
 
 	/*
 	 * Create VDBE to loop through the entries in src that
@@ -476,15 +476,15 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src, struct Table *tab,
 	 * counter.
 	 */
 	struct WhereInfo *info =
-		sqlite3WhereBegin(parser, src, where, NULL, NULL, 0, 0);
-	sqlite3VdbeAddOp2(v, OP_FkCounter, fkey->is_deferred, incr_count);
+		sqlWhereBegin(parser, src, where, NULL, NULL, 0, 0);
+	sqlVdbeAddOp2(v, OP_FkCounter, fkey->is_deferred, incr_count);
 	if (info != NULL)
-		sqlite3WhereEnd(info);
+		sqlWhereEnd(info);
 
 	/* Clean up the WHERE clause constructed above. */
 	sql_expr_delete(db, where, false);
 	if (fkifzero_label != 0)
-		sqlite3VdbeJumpHere(v, fkifzero_label);
+		sqlVdbeJumpHere(v, fkifzero_label);
 }
 
 /**
@@ -512,7 +512,7 @@ fkey_is_modified(const struct fkey_def *fkey, int type, const int *changes)
 static bool
 fkey_action_is_set_null(struct Parse *parse_context, const struct fkey *fkey)
 {
-	struct Parse *top_parse = sqlite3ParseToplevel(parse_context);
+	struct Parse *top_parse = sqlParseToplevel(parse_context);
 	if (top_parse->pTriggerPrg != NULL) {
 		struct sql_trigger *trigger = top_parse->pTriggerPrg->trigger;
 		if ((trigger == fkey->on_delete_trigger &&
@@ -529,7 +529,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 		int reg_new, const int *changed_cols)
 {
 	bool is_update = changed_cols != NULL;
-	struct sqlite3 *db = parser->db;
+	struct sql *db = parser->db;
 	struct session *user_session = current_session();
 
 	/*
@@ -593,7 +593,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 		    !fkey_is_modified(fk_def, FIELD_LINK_PARENT, changed_cols))
 			continue;
 		if (!fk_def->is_deferred &&
-		    (user_session->sql_flags & SQLITE_DeferFKs) == 0 &&
+		    (user_session->sql_flags & SQL_DeferFKs) == 0 &&
 		    parser->pToplevel == NULL && !parser->isMultiWrite) {
 			assert(reg_old == 0 && reg_new != 0);
 			/*
@@ -608,9 +608,9 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 		/*
 		 * Create a SrcList structure containing the child
 		 * table. We need the child table as a SrcList for
-		 * sqlite3WhereBegin().
+		 * sqlWhereBegin().
 		 */
-		struct SrcList *src = sqlite3SrcListAppend(db, NULL, NULL);
+		struct SrcList *src = sqlSrcListAppend(db, NULL, NULL);
 		if (src == NULL)
 			continue;
 		struct SrcList_item *item = src->a;
@@ -627,7 +627,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 		/* Prevent from deallocationg fake_tab. */
 		fake_tab.nTabRef = 2;
 		item->pTab = &fake_tab;
-		item->zName = sqlite3DbStrDup(db, child->def->name);
+		item->zName = sqlDbStrDup(db, child->def->name);
 		item->iCursor = parser->nTab++;
 
 		if (reg_new != 0) {
@@ -655,7 +655,7 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 			 * within the action trigger).
 			 *
 			 * Note 2: At first glance it may seem
-			 * like SQLite could simply omit all
+			 * like sql could simply omit all
 			 * OP_FkCounter related scans when either
 			 * CASCADE or SET NULL applies. The
 			 * trouble starts if the CASCADE or SET
@@ -669,9 +669,9 @@ fkey_emit_check(struct Parse *parser, struct Table *tab, int reg_old,
 			if (!fk_def->is_deferred &&
 			    action != FKEY_ACTION_CASCADE &&
 			    action != FKEY_ACTION_SET_NULL)
-				sqlite3MayAbort(parser);
+				sqlMayAbort(parser);
 		}
-		sqlite3SrcListDelete(db, src);
+		sqlSrcListDelete(db, src);
 	}
 }
 
@@ -748,7 +748,7 @@ static struct sql_trigger *
 fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 		    bool is_update)
 {
-	struct sqlite3 *db = pParse->db;
+	struct sql *db = pParse->db;
 	struct fkey_def *fk_def = fkey->def;
 	enum fkey_action action = is_update ? fk_def->on_update :
 					      fk_def->on_delete;
@@ -774,10 +774,10 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 		struct field_def *child_fields = child_space->def->fields;
 
 		uint32_t pcol = fk_def->links[i].parent_field;
-		sqlite3TokenInit(&t_to_col, pTab->def->fields[pcol].name);
+		sqlTokenInit(&t_to_col, pTab->def->fields[pcol].name);
 
 		uint32_t chcol = fk_def->links[i].child_field;
-		sqlite3TokenInit(&t_from_col, child_fields[chcol].name);
+		sqlTokenInit(&t_from_col, child_fields[chcol].name);
 
 		/*
 		 * Create the expression "old.to_col = from_col".
@@ -787,13 +787,13 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 		 * the parent table are used for the comparison.
 		 */
 		struct Expr *to_col =
-			sqlite3PExpr(pParse, TK_DOT,
-				     sqlite3ExprAlloc(db, TK_ID, &t_old, 0),
-				     sqlite3ExprAlloc(db, TK_ID, &t_to_col, 0));
+			sqlPExpr(pParse, TK_DOT,
+				     sqlExprAlloc(db, TK_ID, &t_old, 0),
+				     sqlExprAlloc(db, TK_ID, &t_to_col, 0));
 		struct Expr *from_col =
-			sqlite3ExprAlloc(db, TK_ID, &t_from_col, 0);
-		struct Expr *eq = sqlite3PExpr(pParse, TK_EQ, to_col, from_col);
-		where = sqlite3ExprAnd(db, where, eq);
+			sqlExprAlloc(db, TK_ID, &t_from_col, 0);
+		struct Expr *eq = sqlPExpr(pParse, TK_EQ, to_col, from_col);
+		where = sqlExprAnd(db, where, eq);
 
 		/*
 		 * For ON UPDATE, construct the next term of the
@@ -811,50 +811,50 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 		 *        no_action_needed(colN))
 		 */
 		if (is_update) {
-			struct Expr *old_val = sqlite3PExpr(pParse, TK_DOT,
-				sqlite3ExprAlloc(db, TK_ID, &t_old, 0),
-				sqlite3ExprAlloc(db, TK_ID, &t_to_col, 0));
-			struct Expr *new_val = sqlite3PExpr(pParse, TK_DOT,
-				sqlite3ExprAlloc(db, TK_ID, &t_new, 0),
-				sqlite3ExprAlloc(db, TK_ID, &t_to_col, 0));
-			struct Expr *old_is_null = sqlite3PExpr(
+			struct Expr *old_val = sqlPExpr(pParse, TK_DOT,
+				sqlExprAlloc(db, TK_ID, &t_old, 0),
+				sqlExprAlloc(db, TK_ID, &t_to_col, 0));
+			struct Expr *new_val = sqlPExpr(pParse, TK_DOT,
+				sqlExprAlloc(db, TK_ID, &t_new, 0),
+				sqlExprAlloc(db, TK_ID, &t_to_col, 0));
+			struct Expr *old_is_null = sqlPExpr(
 				pParse, TK_ISNULL,
-				sqlite3ExprDup(db, old_val, 0), NULL);
-			eq = sqlite3PExpr(pParse, TK_EQ, old_val,
-				sqlite3ExprDup(db, new_val, 0));
+				sqlExprDup(db, old_val, 0), NULL);
+			eq = sqlPExpr(pParse, TK_EQ, old_val,
+				sqlExprDup(db, new_val, 0));
 			struct Expr *new_non_null =
-				sqlite3PExpr(pParse, TK_NOTNULL, new_val, NULL);
+				sqlPExpr(pParse, TK_NOTNULL, new_val, NULL);
 			struct Expr *non_null_eq =
-				sqlite3PExpr(pParse, TK_AND, new_non_null, eq);
+				sqlPExpr(pParse, TK_AND, new_non_null, eq);
 			struct Expr *no_action_needed =
-				sqlite3PExpr(pParse, TK_OR, old_is_null,
+				sqlPExpr(pParse, TK_OR, old_is_null,
 					     non_null_eq);
-			when = sqlite3ExprAnd(db, when, no_action_needed);
+			when = sqlExprAnd(db, when, no_action_needed);
 		}
 
 		if (action != FKEY_ACTION_RESTRICT &&
 		    (action != FKEY_ACTION_CASCADE || is_update)) {
 			struct Expr *new, *d;
 			if (action == FKEY_ACTION_CASCADE) {
-				new = sqlite3PExpr(pParse, TK_DOT,
-						   sqlite3ExprAlloc(db, TK_ID,
+				new = sqlPExpr(pParse, TK_DOT,
+						   sqlExprAlloc(db, TK_ID,
 								    &t_new, 0),
-						   sqlite3ExprAlloc(db, TK_ID,
+						   sqlExprAlloc(db, TK_ID,
 								    &t_to_col,
 								    0));
 			} else if (action == FKEY_ACTION_SET_DEFAULT) {
 				d = child_fields[chcol].default_value_expr;
 				if (d != NULL) {
-					new = sqlite3ExprDup(db, d, 0);
+					new = sqlExprDup(db, d, 0);
 				} else {
-					new = sqlite3ExprAlloc(db, TK_NULL,
+					new = sqlExprAlloc(db, TK_NULL,
 							       NULL, 0);
 				}
 			} else {
-				new = sqlite3ExprAlloc(db, TK_NULL, NULL, 0);
+				new = sqlExprAlloc(db, TK_NULL, NULL, 0);
 			}
 			list = sql_expr_list_append(db, list, new);
-			sqlite3ExprListSetName(pParse, list, &t_from_col, 0);
+			sqlExprListSetName(pParse, list, &t_from_col, 0);
 		}
 	}
 
@@ -865,34 +865,34 @@ fkey_action_trigger(struct Parse *pParse, struct Table *pTab, struct fkey *fkey,
 		struct Token err;
 		err.z = space_name;
 		err.n = name_len;
-		struct Expr *r = sqlite3Expr(db, TK_RAISE, "FOREIGN KEY "\
+		struct Expr *r = sqlExpr(db, TK_RAISE, "FOREIGN KEY "\
 					     "constraint failed");
 		if (r != NULL)
 			r->on_conflict_action = ON_CONFLICT_ACTION_ABORT;
-		select = sqlite3SelectNew(pParse,
+		select = sqlSelectNew(pParse,
 					  sql_expr_list_append(db, NULL, r),
-					  sqlite3SrcListAppend(db, NULL, &err),
+					  sqlSrcListAppend(db, NULL, &err),
 					  where, NULL, NULL, NULL, 0, NULL,
 					  NULL);
 		where = NULL;
 	}
 
-	trigger = (struct sql_trigger *) sqlite3DbMallocZero(db,
+	trigger = (struct sql_trigger *) sqlDbMallocZero(db,
 							     sizeof(*trigger));
 	if (trigger != NULL) {
 		size_t step_size = sizeof(TriggerStep) + name_len + 1;
-		trigger->step_list = sqlite3DbMallocZero(db, step_size);
+		trigger->step_list = sqlDbMallocZero(db, step_size);
 		step = trigger->step_list;
 		step->zTarget = (char *) &step[1];
 		memcpy((char *) step->zTarget, space_name, name_len);
 
-		step->pWhere = sqlite3ExprDup(db, where, EXPRDUP_REDUCE);
+		step->pWhere = sqlExprDup(db, where, EXPRDUP_REDUCE);
 		step->pExprList = sql_expr_list_dup(db, list, EXPRDUP_REDUCE);
-		step->pSelect = sqlite3SelectDup(db, select, EXPRDUP_REDUCE);
+		step->pSelect = sqlSelectDup(db, select, EXPRDUP_REDUCE);
 		if (when != NULL) {
-			when = sqlite3PExpr(pParse, TK_NOT, when, 0);
+			when = sqlPExpr(pParse, TK_NOT, when, 0);
 			trigger->pWhen =
-				sqlite3ExprDup(db, when, EXPRDUP_REDUCE);
+				sqlExprDup(db, when, EXPRDUP_REDUCE);
 		}
 	}
 

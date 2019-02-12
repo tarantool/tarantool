@@ -13,7 +13,7 @@ test:plan(293)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [38cb5df375078d3f9711482d2a1615d09f6b3f33] has
 -- been resolved.
 --

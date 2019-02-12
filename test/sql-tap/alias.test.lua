@@ -14,7 +14,7 @@ test:plan(9)
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script is correct code generation of aliased result-set
 -- values.  See ticket #3343.
 --

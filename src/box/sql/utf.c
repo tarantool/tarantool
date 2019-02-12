@@ -42,23 +42,23 @@
  *
  *
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include <assert.h>
 #include "vdbeInt.h"
 
-#if !defined(SQLITE_AMALGAMATION) && SQLITE_BYTEORDER==0
+#if !defined(SQL_AMALGAMATION) && SQL_BYTEORDER==0
 /*
- * The following constant value is used by the SQLITE_BIGENDIAN and
- * SQLITE_LITTLEENDIAN macros.
+ * The following constant value is used by the SQL_BIGENDIAN and
+ * SQL_LITTLEENDIAN macros.
  */
-const int sqlite3one = 1;
-#endif				/* SQLITE_AMALGAMATION && SQLITE_BYTEORDER==0 */
+const int sqlone = 1;
+#endif				/* SQL_AMALGAMATION && SQL_BYTEORDER==0 */
 
 /*
  * This lookup table is used to help decode the first byte of
  * a multi-byte UTF8 character.
  */
-static const unsigned char sqlite3Utf8Trans1[] = {
+static const unsigned char sqlUtf8Trans1[] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -119,7 +119,7 @@ static const unsigned char sqlite3Utf8Trans1[] = {
 #define READ_UTF8(zIn, zTerm, c)                           \
   c = *(zIn++);                                            \
   if( c>=0xc0 ){                                           \
-    c = sqlite3Utf8Trans1[c-0xc0];                         \
+    c = sqlUtf8Trans1[c-0xc0];                         \
     while( zIn!=zTerm && (*zIn & 0xc0)==0x80 ){            \
       c = (c<<6) + (0x3f & *(zIn++));                      \
     }                                                      \
@@ -128,7 +128,7 @@ static const unsigned char sqlite3Utf8Trans1[] = {
         || (c&0xFFFFFFFE)==0xFFFE ){  c = 0xFFFD; }        \
   }
 u32
-sqlite3Utf8Read(const unsigned char **pz	/* Pointer to string from which to read char */
+sqlUtf8Read(const unsigned char **pz	/* Pointer to string from which to read char */
     )
 {
 	unsigned int c;
@@ -138,7 +138,7 @@ sqlite3Utf8Read(const unsigned char **pz	/* Pointer to string from which to read
 	 */
 	c = *((*pz)++);
 	if (c >= 0xc0) {
-		c = sqlite3Utf8Trans1[c - 0xc0];
+		c = sqlUtf8Trans1[c - 0xc0];
 		while ((*(*pz) & 0xc0) == 0x80) {
 			c = (c << 6) + (0x3f & *((*pz)++));
 		}
@@ -153,7 +153,7 @@ sqlite3Utf8Read(const unsigned char **pz	/* Pointer to string from which to read
 
 /*
  * If the TRANSLATE_TRACE macro is defined, the value of each Mem is
- * printed on stderr on the way into and out of sqlite3VdbeMemTranslate().
+ * printed on stderr on the way into and out of sqlVdbeMemTranslate().
  */
 /* #define TRANSLATE_TRACE 1 */
 
@@ -165,7 +165,7 @@ sqlite3Utf8Read(const unsigned char **pz	/* Pointer to string from which to read
  * the first 0x00, whichever comes first).
  */
 int
-sqlite3Utf8CharLen(const char *zIn, int nByte)
+sqlUtf8CharLen(const char *zIn, int nByte)
 {
 	int r = 0;
 	const u8 *z = (const u8 *)zIn;
@@ -177,7 +177,7 @@ sqlite3Utf8CharLen(const char *zIn, int nByte)
 	}
 	assert(z <= zTerm);
 	while (*z != 0 && z < zTerm) {
-		SQLITE_SKIP_UTF8(z);
+		SQL_SKIP_UTF8(z);
 		r++;
 	}
 	return r;
@@ -186,7 +186,7 @@ sqlite3Utf8CharLen(const char *zIn, int nByte)
 /* This test function is not currently used by the automated test-suite.
  * Hence it is only available in debug builds.
  */
-#if defined(SQLITE_TEST) && defined(SQLITE_DEBUG)
+#if defined(SQL_TEST) && defined(SQL_DEBUG)
 /*
  * Translate UTF-8 to UTF-8.
  *
@@ -197,14 +197,14 @@ sqlite3Utf8CharLen(const char *zIn, int nByte)
  * overruns the input.
  */
 int
-sqlite3Utf8To8(unsigned char *zIn)
+sqlUtf8To8(unsigned char *zIn)
 {
 	unsigned char *zOut = zIn;
 	unsigned char *zStart = zIn;
 	u32 c;
 
 	while (zIn[0] && zOut <= zIn) {
-		c = sqlite3Utf8Read((const u8 **)&zIn);
+		c = sqlUtf8Read((const u8 **)&zIn);
 		if (c != 0xfffd) {
 			WRITE_UTF8(zOut, c);
 		}

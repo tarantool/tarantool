@@ -13,7 +13,7 @@ test:plan(1279)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing date and time functions.
 --
 -- $Id: date.test,v 1.34 2009/04/16 12:58:03 drh Exp $
@@ -224,7 +224,7 @@ datetest(5.13, "datetime('1994-04-16 14:00:00Zulu')", "NULL")
 datetest(5.14, "datetime('1994-04-16 14:00:00Z +05:00')", "NULL")
 datetest(5.15, "datetime('1994-04-16 14:00:00 +05:00 Z')", "NULL")
 
--- TBI to be implemented sqlite_current_time
+-- TBI to be implemented sql_current_time
 
 -- localtime->utc and utc->localtime conversions.  These tests only work
 -- if the localtime is in the US Eastern Time (the time in Charlotte, NC
@@ -238,7 +238,7 @@ datetest(5.15, "datetime('1994-04-16 14:00:00 +05:00 Z')", "NULL")
 --
 -- It might be argued that this is masking a problem on non-Vista Windows
 -- platform.  A ticket has already been opened for this issue 
--- (http://www.sqlite.org/cvstrac/tktview?tn=2322).  This is just to prevent
+-- (http://www.sql.org/cvstrac/tktview?tn=2322).  This is just to prevent
 -- more confusion/reports of the issue.
 --
 -- $tzoffset_old should be 5 if DST is working correctly.
@@ -311,11 +311,11 @@ datetest(5.15, "datetime('1994-04-16 14:00:00 +05:00 Z')", "NULL")
 --    datetest(6.13, "datetime('2000-07-01 12:00:00','localtime')", "2000-07-01 08:00:00")
 --    datetest(6.14, "datetime('1969-07-01 12:00:00','localtime')", "1969-07-01 07:00:00")
 --    datetest(6.15, "datetime('2039-07-01 12:00:00','localtime')", "2039-07-01 07:00:00")
---    sqlite_current_time = test:execsql "SELECT strftime('%s','2000-07-01 12:34:56')"
+--    sql_current_time = test:execsql "SELECT strftime('%s','2000-07-01 12:34:56')"
 --    datetest(6.16, "datetime('now','localtime')", "2000-07-01 08:34:56")
 --    datetest(6.17, "datetime('now','localtimex')", "NULL")
 --    datetest(6.18, "datetime('now','localtim')", "NULL")
---    sqlite_current_time = 0
+--    sql_current_time = 0
 --end
 -- These two are a bit of a scam. They are added to ensure that 100% of
 -- the date.c file is covered by testing, even when the time-zone
@@ -415,7 +415,7 @@ datetest(13.34, "date('2001-01-01','-1.5 years')", "1999-07-02")
 -- # Put a floating point number in the database so that we can manipulate
 -- # raw bits using the hexio interface.
 -- #
--- if {0==[sqlite3 -has-codec]} {
+-- if {0==[sql -has-codec]} {
 --   do_test date-14.1 {
 --     execsql {
 --       CREATE TABLE t1(x FLOAT );
@@ -423,7 +423,7 @@ datetest(13.34, "date('2001-01-01','-1.5 years')", "1999-07-02")
 --     }
 --     db close
 --     hexio_write test.db 2040 4142ba32bffffff9
---     sqlite3 db test.db
+--     sql db test.db
 --     db eval {SELECT * FROM t1}
 --   } {2454629.5}
 --   # Changing the least significant byte of the floating point value between
@@ -433,7 +433,7 @@ datetest(13.34, "date('2001-01-01','-1.5 years')", "1999-07-02")
 --   for {set i 0} {$i<=255} {incr i} {
 --     db close
 --     hexio_write test.db 2047 [format %02x $i]
---     sqlite3 db test.db
+--     sql db test.db
 --     do_test date-14.2.$i {
 --       set date [db one {SELECT datetime(x) FROM t1}]
 --       expr {$date eq "2008-06-12 00:00:00" || $date eq "2008-06-11 23:59:59"}
@@ -445,7 +445,7 @@ datetest(13.34, "date('2001-01-01','-1.5 years')", "1999-07-02")
 --
 -- EVIDENCE-OF: R-34818-13664 The 'now' argument to date and time
 -- functions always returns exactly the same value for multiple
--- invocations within the same sqlite3_step() call.
+-- invocations within the same sql_step() call.
 --
 local function sleeper()
     -- after 100 ms

@@ -13,7 +13,7 @@ test:plan(9)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- The tests in this file were used while developing the SQLite 4 code. 
+-- The tests in this file were used while developing the sql 4 code.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]

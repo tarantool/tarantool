@@ -30,17 +30,17 @@
  */
 
 /*
- * Main file for the SQLite library.  The routines in this file
+ * Main file for the sql library.  The routines in this file
  * implement the programmer interface to the library.  Routines in
- * other files are for internal use by SQLite and should not be
+ * other files are for internal use by sql and should not be
  * accessed by users of the library.
  */
 
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "box/session.h"
 
 /*
- * Execute SQL code.  Return one of the SQLITE_ success/failure
+ * Execute SQL code.  Return one of the SQL_ success/failure
  * codes.  Also write an error message into memory obtained from
  * malloc() and make *pzErrMsg point to that message.
  *
@@ -50,34 +50,34 @@
  * is invoked, even for queries.
  */
 int
-sqlite3_exec(sqlite3 * db,	/* The database on which the SQL executes */
+sql_exec(sql * db,	/* The database on which the SQL executes */
 	     const char *zSql,	/* The SQL to be executed */
-	     sqlite3_callback xCallback,	/* Invoke this callback routine */
+	     sql_callback xCallback,	/* Invoke this callback routine */
 	     void *pArg,	/* First argument to xCallback() */
 	     char **pzErrMsg	/* Write error messages here */
     )
 {
-	int rc = SQLITE_OK;	/* Return code */
+	int rc = SQL_OK;	/* Return code */
 	const char *zLeftover;	/* Tail of unprocessed SQL */
-	sqlite3_stmt *pStmt = 0;	/* The current SQL statement */
+	sql_stmt *pStmt = 0;	/* The current SQL statement */
 	char **azCols = 0;	/* Names of result columns */
 	int callbackIsInit;	/* True if callback data is initialized */
 	struct session *user_session = current_session();
 
-	if (!sqlite3SafetyCheckOk(db))
-		return SQLITE_MISUSE_BKPT;
+	if (!sqlSafetyCheckOk(db))
+		return SQL_MISUSE_BKPT;
 	if (zSql == 0)
 		zSql = "";
 
-	sqlite3Error(db, SQLITE_OK);
-	while (rc == SQLITE_OK && zSql[0]) {
+	sqlError(db, SQL_OK);
+	while (rc == SQL_OK && zSql[0]) {
 		int nCol;
 		char **azVals = 0;
 
 		pStmt = 0;
-		rc = sqlite3_prepare_v2(db, zSql, -1, &pStmt, &zLeftover);
-		assert(rc == SQLITE_OK || pStmt == 0);
-		if (rc != SQLITE_OK) {
+		rc = sql_prepare_v2(db, zSql, -1, &pStmt, &zLeftover);
+		assert(rc == SQL_OK || pStmt == 0);
+		if (rc != SQL_OK) {
 			continue;
 		}
 		if (!pStmt) {
@@ -87,19 +87,19 @@ sqlite3_exec(sqlite3 * db,	/* The database on which the SQL executes */
 		}
 
 		callbackIsInit = 0;
-		nCol = sqlite3_column_count(pStmt);
+		nCol = sql_column_count(pStmt);
 
 		while (1) {
 			int i;
-			rc = sqlite3_step(pStmt);
+			rc = sql_step(pStmt);
 			/* Invoke the callback function if required */
-			if (xCallback && (SQLITE_ROW == rc ||
-					  (SQLITE_DONE == rc && !callbackIsInit
+			if (xCallback && (SQL_ROW == rc ||
+					  (SQL_DONE == rc && !callbackIsInit
 					   && user_session->
-					   sql_flags & SQLITE_NullCallback))) {
+					   sql_flags & SQL_NullCallback))) {
 				if (!callbackIsInit) {
 					azCols =
-					    sqlite3DbMallocZero(db,
+					    sqlDbMallocZero(db,
 								2 * nCol *
 								sizeof(const
 								       char *) +
@@ -110,73 +110,73 @@ sqlite3_exec(sqlite3 * db,	/* The database on which the SQL executes */
 					for (i = 0; i < nCol; i++) {
 						azCols[i] =
 						    (char *)
-						    sqlite3_column_name(pStmt,
+						    sql_column_name(pStmt,
 									i);
-						/* sqlite3VdbeSetColName() installs column names as UTF8
-						 * strings so there is no way for sqlite3_column_name() to fail.
+						/* sqlVdbeSetColName() installs column names as UTF8
+						 * strings so there is no way for sql_column_name() to fail.
 						 */
 						assert(azCols[i] != 0);
 					}
 					callbackIsInit = 1;
 				}
-				if (rc == SQLITE_ROW) {
+				if (rc == SQL_ROW) {
 					azVals = &azCols[nCol];
 					for (i = 0; i < nCol; i++) {
 						azVals[i] =
 						    (char *)
-						    sqlite3_column_text(pStmt,
+						    sql_column_text(pStmt,
 									i);
 						if (!azVals[i]
 						    &&
-						    sqlite3_column_type(pStmt,
+						    sql_column_type(pStmt,
 									i) !=
-						    SQLITE_NULL) {
-							sqlite3OomFault(db);
+						    SQL_NULL) {
+							sqlOomFault(db);
 							goto exec_out;
 						}
 					}
 				}
 				if (xCallback(pArg, nCol, azVals, azCols)) {
 					/* EVIDENCE-OF: R-38229-40159 If the callback function to
-					 * sqlite3_exec() returns non-zero, then sqlite3_exec() will
-					 * return SQLITE_ABORT.
+					 * sql_exec() returns non-zero, then sql_exec() will
+					 * return SQL_ABORT.
 					 */
-					rc = SQLITE_ABORT;
-					sqlite3VdbeFinalize((Vdbe *) pStmt);
+					rc = SQL_ABORT;
+					sqlVdbeFinalize((Vdbe *) pStmt);
 					pStmt = 0;
-					sqlite3Error(db, SQLITE_ABORT);
+					sqlError(db, SQL_ABORT);
 					goto exec_out;
 				}
 			}
 
-			if (rc != SQLITE_ROW) {
-				rc = sqlite3VdbeFinalize((Vdbe *) pStmt);
+			if (rc != SQL_ROW) {
+				rc = sqlVdbeFinalize((Vdbe *) pStmt);
 				pStmt = 0;
 				zSql = zLeftover;
-				while (sqlite3Isspace(zSql[0]))
+				while (sqlIsspace(zSql[0]))
 					zSql++;
 				break;
 			}
 		}
 
-		sqlite3DbFree(db, azCols);
+		sqlDbFree(db, azCols);
 		azCols = 0;
 	}
 
  exec_out:
 	if (pStmt)
-		sqlite3VdbeFinalize((Vdbe *) pStmt);
-	sqlite3DbFree(db, azCols);
+		sqlVdbeFinalize((Vdbe *) pStmt);
+	sqlDbFree(db, azCols);
 
-	rc = sqlite3ApiExit(db, rc);
-	if (rc != SQLITE_OK && pzErrMsg) {
-		int nErrMsg = 1 + sqlite3Strlen30(sqlite3_errmsg(db));
-		*pzErrMsg = sqlite3Malloc(nErrMsg);
+	rc = sqlApiExit(db, rc);
+	if (rc != SQL_OK && pzErrMsg) {
+		int nErrMsg = 1 + sqlStrlen30(sql_errmsg(db));
+		*pzErrMsg = sqlMalloc(nErrMsg);
 		if (*pzErrMsg) {
-			memcpy(*pzErrMsg, sqlite3_errmsg(db), nErrMsg);
+			memcpy(*pzErrMsg, sql_errmsg(db), nErrMsg);
 		} else {
-			rc = SQLITE_NOMEM_BKPT;
-			sqlite3Error(db, SQLITE_NOMEM);
+			rc = SQL_NOMEM_BKPT;
+			sqlError(db, SQL_NOMEM);
 		}
 	} else if (pzErrMsg) {
 		*pzErrMsg = 0;

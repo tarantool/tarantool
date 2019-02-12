@@ -13,7 +13,7 @@ test:plan(36)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing that an index may be used as a covering
 -- index when there are OR expressions in the WHERE clause. 
 --
@@ -226,7 +226,7 @@ test:do_execsql_test(
 
 -- Similar to [do_execsql_test], except that two elements are appended
 -- to the result - the string "search" and the number of times test variable
--- sqlite3_search_count is incremented by running the supplied SQL. e.g.
+-- sql_search_count is incremented by running the supplied SQL. e.g.
 --
 --   do_searchcount_test 1.0 { SELECT * FROM t1 } {x y search 2}
 --

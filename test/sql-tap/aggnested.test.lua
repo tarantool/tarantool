@@ -13,7 +13,7 @@ test:plan(7)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for processing aggregate queries with 
 -- subqueries in which the subqueries hold the aggregate functions
@@ -70,10 +70,10 @@ test:do_execsql_test("aggnested-1.4",
     })
 
 -- # This test case is a copy of the one in
--- # http://www.mail-archive.com/sqlite-users@sqlite.org/msg70787.html
+-- # http://www.mail-archive.com/sql-users@sql.org/msg70787.html
 -- #
 -- do_test aggnested-2.0 {
---   sqlite3 db2 :memory:
+--   sql db2 :memory:
 --   db2 eval {
 --     CREATE TABLE t1 (A1 INTEGER NOT NULL,A2 INTEGER NOT NULL,A3 INTEGER NOT 
 --     NULL,A4 INTEGER NOT NULL,PRIMARY KEY(A1));

@@ -25,7 +25,7 @@ ffi.cdef[[
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the use of indices in WHERE clauses
 -- based on recent changes to the optimizer.
 --
@@ -918,10 +918,10 @@ test:do_test(
             -- <where2-7.4>
             --1, 2, 3, 2, 3, "sort"
             -- This is tahter strange, but when pk was deleted from secondary indexes
-            -- sqlite became able to optimize sort using information that i9y is unique and
+            -- sql became able to optimize sort using information that i9y is unique and
             -- there is nothing to sort here.
             -- todo: It seems like this kind of optimization was appliable until removing pk and
-            -- it is a bug in sqlite optimizer.
+            -- it is a bug in sql optimizer.
             1, 2, 3, 2, 3, "nosort"
             -- </where2-7.4>
         })

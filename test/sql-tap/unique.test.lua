@@ -13,7 +13,7 @@ test:plan(32)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the CREATE UNIQUE INDEX statement,
 -- and primary keys, and the UNIQUE constraint on table columns
 --
@@ -24,7 +24,7 @@ test:plan(32)
 if (0 > 0)
  then
     -- Try to create a table with two primary keys.
-    -- (This is allowed in SQLite even that it is not valid SQL)
+    -- (This is allowed in sql even that it is not valid SQL)
 end
 test:do_catchsql_test(
     "unique-1.1",
@@ -74,7 +74,7 @@ test:do_catchsql_test(
         -- </unique-1.3>
     })
 
--- verify_ex_errcode unique-1.3b SQLITE_CONSTRAINT_PRIMARYKEY
+-- verify_ex_errcode unique-1.3b sql_CONSTRAINT_PRIMARYKEY
 test:do_execsql_test(
     "unique-1.4",
     [[
@@ -95,7 +95,7 @@ test:do_catchsql_test(
         -- </unique-1.5>
     })
 
--- verify_ex_errcode unique-1.5b SQLITE_CONSTRAINT_UNIQUE
+-- verify_ex_errcode unique-1.5b sql_CONSTRAINT_UNIQUE
 test:do_execsql_test(
     "unique-1.6",
     [[
@@ -171,7 +171,7 @@ test:do_catchsql_test(
         -- </unique-2.3>
     })
 
--- verify_ex_errcode unique-2.3b SQLITE_CONSTRAINT_UNIQUE
+-- verify_ex_errcode unique-2.3b sql_CONSTRAINT_UNIQUE
 test:do_catchsql_test(
     "unique-2.4",
     [[
@@ -226,7 +226,7 @@ test:do_catchsql_test(
         -- </unique-2.8>
     })
 
--- verify_ex_errcode unique-2.8b SQLITE_CONSTRAINT_UNIQUE
+-- verify_ex_errcode unique-2.8b sql_CONSTRAINT_UNIQUE
 test:do_catchsql_test(
     "unique-2.9",
     [[
@@ -291,7 +291,7 @@ test:do_catchsql_test(
         -- </unique-3.4>
     })
 
--- verify_ex_errcode unique-3.4b SQLITE_CONSTRAINT_UNIQUE
+-- verify_ex_errcode unique-3.4b sql_CONSTRAINT_UNIQUE
 --integrity_check unique-3.5
 -- Make sure NULLs are distinct as far as the UNIQUE tests are
 -- concerned.
@@ -405,7 +405,7 @@ test:do_catchsql_test(
     })
 end
 
--- verify_ex_errcode unique-4.10b SQLITE_CONSTRAINT_UNIQUE
+-- verify_ex_errcode unique-4.10b sql_CONSTRAINT_UNIQUE
 --integrity_check unique-4.99
 -- Test the error message generation logic.  In particular, make sure we
 -- do not overflow the static buffer used to generate the error message.
@@ -448,7 +448,7 @@ test:do_catchsql_test(
         -- </unique-5.2>
     })
 
--- verify_ex_errcode unique-5.2b SQLITE_CONSTRAINT_UNIQUE
+-- verify_ex_errcode unique-5.2b sql_CONSTRAINT_UNIQUE
 
 
 test:finish_test()

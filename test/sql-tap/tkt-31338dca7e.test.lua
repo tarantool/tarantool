@@ -13,7 +13,7 @@ test:plan(11)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket [31338dca7e] has been
 -- fixed.  Ticket [31338dca7e] demonstrates problems with the OR-clause
@@ -113,7 +113,7 @@ test:execsql([[
 test:do_test(
     "tkt-31338-3.1",
     function()
-        -- foreach x [db eval {SELECT name FROM sqlite_master WHERE type='table'}] {
+        -- foreach x [db eval {SELECT name FROM sql_master WHERE type='table'}] {
         --    db eval "DROP TABLE $x"
         -- }
         return test:execsql [[

@@ -14,7 +14,7 @@ test:plan(4)
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library. This file 
+-- This file implements regression tests for sql library. This file
 -- implements tests for ANALYZE to verify that multiple rows containing
 -- a NULL value count as distinct rows for the purposes of analyze 
 -- statistics.

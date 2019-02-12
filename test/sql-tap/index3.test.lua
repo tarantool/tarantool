@@ -13,7 +13,7 @@ test:plan(2)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the CREATE INDEX statement.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -97,10 +97,10 @@ test:do_execsql_test(
 -- #
 -- do_test index3-99.1 {
 --   execsql {
---     UPDATE sqlite_master SET sql='nonsense' WHERE name='t1d'
+--     UPDATE sql_master SET sql='nonsense' WHERE name='t1d'
 --   }
 --   db close
---   catch { sqlite3 db test.db }
+--   catch { sql db test.db }
 --   catchsql { DROP INDEX t1c }
 -- } {1 {malformed database schema (t1d)}}
 test:finish_test()

@@ -13,7 +13,7 @@ test:plan(22)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for left outer joins containing ON
 -- clauses that restrict the scope of the left term of the join.
@@ -215,7 +215,7 @@ test:do_execsql_test(
         -- </join5-2.12>
     })
 
--- Ticket https://www.sqlite.org/src/tktview/6f2222d550f5b0ee7ed37601
+-- Ticket https://www.sql.org/src/tktview/6f2222d550f5b0ee7ed37601
 -- Incorrect output on a LEFT JOIN.
 --
 test:do_execsql_test(
@@ -290,7 +290,7 @@ test:do_execsql_test(
         -- </join5-3.3>
     })
 
--- Ticket https://www.sqlite.org/src/tktview/c2a19d81652f40568c770c43 on
+-- Ticket https://www.sql.org/src/tktview/c2a19d81652f40568c770c43 on
 -- 2015-08-20.  LEFT JOIN and the push-down optimization.
 --
 test:do_execsql_test(

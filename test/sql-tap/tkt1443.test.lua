@@ -13,7 +13,7 @@ test:plan(3)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #1433 has been
 -- fixed.  
@@ -50,7 +50,7 @@ test:plan(3)
 test:do_test(
     "tkt1443-1.0",
     function()
-        --sqlite3("db", ":memory:")
+        --sql("db", ":memory:")
         return test:execsql(string.format([[
             CREATE TABLE Items(
                 itemId integer primary key,

@@ -13,7 +13,7 @@ test:plan(111)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the UPDATE statement.
 --
 -- $Id: update.test,v 1.19 2008/04/10 18:44:36 drh Exp $
@@ -33,9 +33,9 @@ test:do_catchsql_test("update-1.1", [[
 -- #
 -- do_test update-2.1 {
 --   set v [catch \
--- #        {execsql {UPDATE sqlite_master SET name='xyz' WHERE name='123'}} msg]
+-- #        {execsql {UPDATE sql_master SET name='xyz' WHERE name='123'}} msg]
 --   lappend v $msg
--- } {1 {table sqlite_master may not be modified}}
+-- } {1 {table sql_master may not be modified}}
 -- Create a table to work with
 --
 test:do_test("update-3.1", function()
@@ -1097,7 +1097,7 @@ test:do_catchsql_test("update-10.10", [[
 -- } {1 {no such column: nosuchcol}}
 -- } ;# ifcapable {trigger}
 -- MUST_WORK_TEST
--- # Ticket [https://www.sqlite.org/src/tktview/43107840f1c02] on 2014-10-29
+-- # Ticket [https://www.sql.org/src/tktview/43107840f1c02] on 2014-10-29
 -- # An assertion fault on UPDATE
 -- #
 -- do_execsql_test update-15.1 {

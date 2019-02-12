@@ -13,7 +13,7 @@ test:plan(15)
 --    May you share freely, never taking more than you give.
 --
 ---------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing corner cases of the DEFAULT syntax
 -- on table definitions.
 --
@@ -158,7 +158,7 @@ test:do_execsql_test(
 
 -- Do now allow bound parameters in new DEFAULT values. 
 -- Silently convert bound parameters to NULL in DEFAULT causes
--- in the sqlite_master table, for backwards compatibility.
+-- in the sql_master table, for backwards compatibility.
 --
 test:execsql("DROP TABLE IF EXISTS t1")
 test:execsql("DROP TABLE IF EXISTS t2")

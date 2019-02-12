@@ -13,7 +13,7 @@ test:plan(26)
 --    May you share freely, never taking more than you give.
 --
 ---------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script is testing of transitive WHERE clause constraints
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -396,7 +396,7 @@ test:do_execsql_test(
 --
 -- db close
 -- forcedelete test.db
--- sqlite3 db test.db
+-- sql db test.db
 test:do_execsql_test(
     "transitive1-500",
     [[

@@ -13,7 +13,7 @@ test:plan(47)
 --    May you share freely, never taking more than you give.
 --
 ---------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script is testing the AUTOINCREMENT features.
 --
 -- $Id: autoinc.test,v 1.14 2009/06/23 20:28:54 drh Exp $
@@ -25,7 +25,7 @@ test:plan(47)
 --
 
 -- Add a table with the AUTOINCREMENT feature.  Verify that the
--- SQLITE_SEQUENCE table gets created.
+-- sql_SEQUENCE table gets created.
 --
 test:do_execsql_test(
     "autoinc-1.2",
@@ -53,7 +53,7 @@ test:do_execsql_test(
 --     "autoinc-1.4",
 --     function()
 --         db("close")
---         sqlite3("db", "test.db")
+--         sql("db", "test.db")
 --         return test:execsql([[
 --             SELECT * FROM _sequence;
 --         ]])
@@ -63,7 +63,7 @@ test:do_execsql_test(
 --         -- </autoinc-1.4>
 --     })
 
--- We are not allowed to drop the sqlite_sequence table.
+-- We are not allowed to drop the sql_sequence table.
 --
 test:do_catchsql_test(
     "autoinc-1.5",
@@ -86,7 +86,7 @@ test:do_execsql_test(
     })
 
 -- Insert an entries into the t1 table and make sure the largest key
--- is always recorded in the sqlite_sequence table.
+-- is always recorded in the sql_sequence table.
 --
 test:do_execsql_test(
     "autoinc-2.1",
@@ -232,7 +232,7 @@ test:do_execsql_test(
         -- </autoinc-2.14>
     })
 
--- # Manually change the autoincrement values in sqlite_sequence.
+-- # Manually change the autoincrement values in sql_sequence.
 -- #
 test:do_execsql_test(
     "autoinc-2.20",
@@ -325,7 +325,7 @@ test:do_execsql_test(
     })
 
 -- When a table with an AUTOINCREMENT is deleted, the corresponding entry
--- in the SQLITE_SEQUENCE table should also be deleted.  But the SQLITE_SEQUENCE
+-- in the sql_SEQUENCE table should also be deleted.  But the sql_SEQUENCE
 -- table itself should remain behind.
 --
 test:do_execsql_test(
@@ -377,11 +377,11 @@ test:do_execsql_test(
 -- test:do_execsql_test(
 --     "autoinc-4.1",
 --     [[
---         SELECT 1, name FROM sqlite_master WHERE type='table';
---         SELECT 2, name FROM sqlite_temp_master WHERE type='table';
+--         SELECT 1, name FROM sql_master WHERE type='table';
+--         SELECT 2, name FROM sql_temp_master WHERE type='table';
 --     ]], {
 --         -- <autoinc-4.1>
---         1, "sqlite_sequence"
+--         1, "sql_sequence"
 --         -- </autoinc-4.1>
 --     })
 
@@ -390,19 +390,19 @@ test:do_execsql_test(
 --     [[
 --         CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT, y INT );
 --         CREATE TEMP TABLE t3(a INTEGER PRIMARY KEY AUTOINCREMENT, b);
---         SELECT 1, name FROM sqlite_master WHERE type='table';
---         SELECT 2, name FROM sqlite_temp_master WHERE type='table';
+--         SELECT 1, name FROM sql_master WHERE type='table';
+--         SELECT 2, name FROM sql_temp_master WHERE type='table';
 --     ]], {
 --         -- <autoinc-4.2>
---         1, "sqlite_sequence", 1, "t1", 2, "t3", 2, "sqlite_sequence"
+--         1, "sql_sequence", 1, "t1", 2, "t3", 2, "sql_sequence"
 --         -- </autoinc-4.2>
 --     })
 
 -- test:do_execsql_test(
 --     "autoinc-4.3",
 --     [[
---         SELECT 1, * FROM main.sqlite_sequence;
---         SELECT 2, * FROM temp.sqlite_sequence;
+--         SELECT 1, * FROM main.sql_sequence;
+--         SELECT 2, * FROM temp.sql_sequence;
 --     ]], {
 --         -- <autoinc-4.3>
 
@@ -438,8 +438,8 @@ test:do_execsql_test(
 -- test:do_execsql_test(
 --     "autoinc-4.5",
 --     [[
---         SELECT 1, * FROM main.sqlite_sequence;
---         SELECT 2, * FROM temp.sqlite_sequence;
+--         SELECT 1, * FROM main.sql_sequence;
+--         SELECT 2, * FROM temp.sql_sequence;
 --     ]], {
 --         -- <autoinc-4.5>
 --         1, "t1", 11, 2, "t3", 21
@@ -450,8 +450,8 @@ test:do_execsql_test(
 --     "autoinc-4.6",
 --     [[
 --         INSERT INTO t1 SELECT * FROM t3;
---         SELECT 1, * FROM main.sqlite_sequence;
---         SELECT 2, * FROM temp.sqlite_sequence;
+--         SELECT 1, * FROM main.sql_sequence;
+--         SELECT 2, * FROM temp.sql_sequence;
 --     ]], {
 --         -- <autoinc-4.6>
 --         1, "t1", 21, 2, "t3", 21
@@ -462,8 +462,8 @@ test:do_execsql_test(
 --     "autoinc-4.7",
 --     [[
 --         INSERT INTO t3 SELECT x+100, y  FROM t1;
---         SELECT 1, * FROM main.sqlite_sequence;
---         SELECT 2, * FROM temp.sqlite_sequence;
+--         SELECT 1, * FROM main.sql_sequence;
+--         SELECT 2, * FROM temp.sql_sequence;
 --     ]], {
 --         -- <autoinc-4.7>
 --         1, "t1", 21, 2, "t3", 121
@@ -474,8 +474,8 @@ test:do_execsql_test(
 --     "autoinc-4.8",
 --     [[
 --         DROP TABLE t3;
---         SELECT 1, * FROM main.sqlite_sequence;
---         SELECT 2, * FROM temp.sqlite_sequence;
+--         SELECT 1, * FROM main.sql_sequence;
+--         SELECT 2, * FROM temp.sql_sequence;
 --     ]], {
 --         -- <autoinc-4.8>
 --         1, "t1", 21
@@ -488,8 +488,8 @@ test:do_execsql_test(
 --         CREATE TEMP TABLE t2(p INTEGER PRIMARY KEY AUTOINCREMENT, q);
 --         INSERT INTO t2 SELECT * FROM t1;
 --         DROP TABLE t1;
---         SELECT 1, * FROM main.sqlite_sequence;
---         SELECT 2, * FROM temp.sqlite_sequence;
+--         SELECT 1, * FROM main.sql_sequence;
+--         SELECT 2, * FROM temp.sql_sequence;
 --     ]], {
 --         -- <autoinc-4.9>
 --         2, "t2", 21
@@ -500,8 +500,8 @@ test:do_execsql_test(
 --     "autoinc-4.10",
 --     [[
 --         DROP TABLE t2;
---         SELECT 1, * FROM main.sqlite_sequence;
---         SELECT 2, * FROM temp.sqlite_sequence;
+--         SELECT 1, * FROM main.sql_sequence;
+--         SELECT 2, * FROM temp.sql_sequence;
 --     ]], {
 --         -- <autoinc-4.10>
 
@@ -566,7 +566,7 @@ test:do_catchsql_test(
     })
 
 -- Ticket #3148
--- Make sure the sqlite_sequence table is not damaged when doing
+-- Make sure the sql_sequence table is not damaged when doing
 -- an empty insert - an INSERT INTO ... SELECT ... where the SELECT
 -- clause returns an empty set.
 --
@@ -642,7 +642,7 @@ test:do_test(
 
 test:catchsql(" pragma recursive_triggers = off ")
 -- Ticket #3928.  Make sure that triggers to not make extra slots in
--- the SQLITE_SEQUENCE table.
+-- the sql_SEQUENCE table.
 --
 test:do_test(
     "autoinc-3928.1",

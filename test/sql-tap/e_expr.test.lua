@@ -55,7 +55,7 @@ box.internal.sql_create_function("REGEXP", "INT", regexfunc)
 --                    precedence value. Operators that group more tightly
 --                    have lower numeric precedences.
 --
---   ::oplist         A list of all SQL operators supported by SQLite.
+--   ::oplist         A list of all SQL operators supported by sql.
 --
 local operations = {
     {"||", "cat"},
@@ -118,7 +118,7 @@ end
 -- in the documentation exist and that the relative precedences of the
 -- operators are also as the documentation suggests.
 --
--- EVIDENCE-OF: R-15514-65163 SQLite understands the following binary
+-- EVIDENCE-OF: R-15514-65163 sql understands the following binary
 -- operators, in order from highest to lowest precedence: || * / % + -
 -- << >> & | < <= > >= = == != <> IS IS
 -- NOT IN LIKE MATCH REGEXP AND OR
@@ -157,14 +157,14 @@ for _, op1 in ipairs(oplist) do
             local C = val[4]
             local testname = string.format("e_expr-1.%s.%s.%s", opname[op1], opname[op2], tn)
             -- If ?op2 groups more tightly than ?op1, then the result
-            -- of executing ?sql1 whould be the same as executing ?sql3.
+            -- of executing ?sql1 whould be the same as executing ?sql.
             -- If ?op1 groups more tightly, or if ?op1 and ?op2 have
             -- the same precedence, then executing ?sql1 should return
             -- the same value as ?sql2.
             --
             local sql1 = string.format("SELECT %s %s %s %s %s", A, op1, B, op2, C)
             local sql2 = string.format("SELECT (%s %s %s) %s %s", A, op1, B, op2, C)
-            local sql3 = string.format("SELECT %s %s (%s %s %s)", A, op1, B, op2, C)
+            local sql = string.format("SELECT %s %s (%s %s %s)", A, op1, B, op2, C)
             -- Some cases may fail due to wrong type conversions.
             -- For instance: SELECT 1 + (1 || -1)
             -- After concatenation we'he got: 1 + '1-1'.
@@ -172,7 +172,7 @@ for _, op1 in ipairs(oplist) do
             -- expression results in error.
             --
             local is_ok1, a2 = pcall(test.execsql, test, sql2)
-            local is_ok2, a3 = pcall(test.execsql, test, sql3)
+            local is_ok2, a3 = pcall(test.execsql, test, sql)
             if is_ok1 and is_ok2 then
                 test:do_execsql_test(
                     testname,
@@ -1078,26 +1078,26 @@ test:do_execsql_test(
 -- MUST_WORK_TEST prepared statements
 if (0>0) then
     local function parameter_test(tn, sql, params, result)
-        stmt = sqlite3_prepare_v2("db", sql, -1)
+        stmt = sql_prepare_v2("db", sql, -1)
         for _ in X(0, "X!foreach", [=[["number name",["params"]]]=]) do
-            nm = sqlite3_bind_parameter_name(stmt, number)
+            nm = sql_bind_parameter_name(stmt, number)
             X(480, "X!cmd", [=[["do_test",[["tn"],".name.",["number"]],[["list","set","",["nm"]]],["name"]]]=])
-            sqlite3_bind_int(stmt, number, ((-1) * number))
+            sql_bind_int(stmt, number, ((-1) * number))
         end
-        sqlite3_step(stmt)
+        sql_step(stmt)
         res = {  }
-        for _ in X(0, "X!for", [=[["set i 0","$i < [sqlite3_column_count $stmt]","incr i"]]=]) do
-            table.insert(res,sqlite3_column_text(stmt, i))
+        for _ in X(0, "X!for", [=[["set i 0","$i < [sql_column_count $stmt]","incr i"]]=]) do
+            table.insert(res,sql_column_text(stmt, i))
         end
-        rc = sqlite3_finalize(stmt)
-        X(491, "X!cmd", [=[["do_test",[["tn"],".rc"],[["list","set","",["rc"]]],"SQLITE_OK"]]=])
+        rc = sql_finalize(stmt)
+        X(491, "X!cmd", [=[["do_test",[["tn"],".rc"],[["list","set","",["rc"]]],"sql_OK"]]=])
         X(492, "X!cmd", [=[["do_test",[["tn"],".res"],[["list","set","",["res"]]],["result"]]]=])
     end
 
     -- EVIDENCE-OF: R-11620-22743 A colon followed by an identifier name
     -- holds a spot for a named parameter with the name :AAAA.
     --
-    -- Identifiers in SQLite consist of alphanumeric, '_' and '$' characters,
+    -- Identifiers in sql consist of alphanumeric, '_' and '$' characters,
     -- and any UTF characters with codepoints larger than 127 (non-ASCII
     -- characters).
     --
@@ -1121,25 +1121,25 @@ if (0>0) then
     ]], "1 @เอศขูเอล", -1)
     parameter_test("e_expr-11.3.6", "SELECT @", "1 @", -1)
     -- EVIDENCE-OF: R-14068-49671 Parameters that are not assigned values
-    -- using sqlite3_bind() are treated as NULL.
+    -- using sql_bind() are treated as NULL.
     --
     test:do_test(
         "e_expr-11.7.1",
         function()
-            stmt = sqlite3_prepare_v2("db", " SELECT ?, :a, @b, ?d ", -1)
-            sqlite3_step(stmt)
-            return { sqlite3_column_type(stmt, 0), sqlite3_column_type(stmt, 1), sqlite3_column_type(stmt, 2), sqlite3_column_type(stmt, 3) }
+            stmt = sql_prepare_v2("db", " SELECT ?, :a, @b, ?d ", -1)
+            sql_step(stmt)
+            return { sql_column_type(stmt, 0), sql_column_type(stmt, 1), sql_column_type(stmt, 2), sql_column_type(stmt, 3) }
         end, {
             -- <e_expr-11.7.1>
             "NULL", "NULL", "NULL", "NULL"
             -- </e_expr-11.7.1>
         })
 
-    test:do_sqlite3_finalize_test(
+    test:do_sql_finalize_test(
         "e_expr-11.7.1",
         stmt, {
             -- <e_expr-11.7.1>
-            "SQLITE_OK"
+            "sql_OK"
             -- </e_expr-11.7.1>
         })
 end
@@ -1885,7 +1885,7 @@ test:do_execsql_test(
         -- </e_expr-14.4.3>
     })
 
--- EVIDENCE-OF: R-23648-58527 SQLite only understands upper/lower case
+-- EVIDENCE-OF: R-23648-58527 sql only understands upper/lower case
 -- for ASCII characters by default.
 --
 -- EVIDENCE-OF: R-04532-11527 The LIKE operator is case sensitive by
@@ -1896,7 +1896,7 @@ test:do_execsql_test(
 -- '&aelig;'&nbsp;LIKE&nbsp;'&AElig;' is FALSE.
 --
 --   The restriction to ASCII characters does not apply if the ICU
---   library is compiled in. When ICU is enabled SQLite does not act
+--   library is compiled in. When ICU is enabled sql does not act
 --   as it does "by default".
 --
 test:do_execsql_test(
@@ -2171,7 +2171,7 @@ test:do_test(
         -- </e_expr-15.1.4>
     })
 --db("close")
---sqlite3("db", "test.db")
+--sql("db", "test.db")
 -- EVIDENCE-OF: R-22868-25880 The LIKE operator can be made case
 -- sensitive using the case_sensitive_like pragma.
 --
@@ -2337,7 +2337,7 @@ if 0>0 then
     db("nullvalue", "")
 end
 
---sqlite3("db", "test.db")
+--sql("db", "test.db")
 -- EVIDENCE-OF: R-41650-20872 No regexp() user function is defined by
 -- default and so use of the REGEXP operator will normally result in an
 -- error message.
@@ -2405,7 +2405,7 @@ test:do_test(
         -- </e_expr-18.2.4>
     })
 
---sqlite3("db", "test.db")
+--sql("db", "test.db")
 -- EVIDENCE-OF: R-42037-37826 The default match() function implementation
 -- raises an exception and is not really useful for anything.
 --
@@ -2486,7 +2486,7 @@ test:do_test(
         "Y", "X"
         -- </e_expr-19.2.4>
     })
---sqlite3("db", "test.db")
+--sql("db", "test.db")
 ---------------------------------------------------------------------------
 -- Test cases for the testable statements related to the CASE expression.
 --
@@ -3045,7 +3045,7 @@ do_qexpr_test("e_expr-27.4.2", " CAST(456 AS blob) ", "X'343536'")
 do_qexpr_test("e_expr-27.4.3", " CAST(1.78 AS blob) ", "X'312E3738'")
 
 -- EVIDENCE-OF: R-22235-47006 Casting an INTEGER or REAL value into TEXT
--- renders the value as if via sqlite3_snprintf() except that the
+-- renders the value as if via sql_snprintf() except that the
 -- resulting TEXT uses the encoding of the database connection.
 --
 do_expr_test("e_expr-28.2.1", " CAST (1 AS text)   ", "text", "1")
@@ -3178,7 +3178,7 @@ do_expr_test("e_expr-32.2.4", [[
 -- Test statements related to the EXISTS and NOT EXISTS operators.
 --
 
---sqlite3("db", "test.db")
+--sql("db", "test.db")
 test:do_execsql_test(
     "e_expr-34.1",
     [[
@@ -3272,7 +3272,7 @@ end
 --
 -- catch { db close }
 -- forcedelete test.db
--- sqlite3 db test.db
+-- sql db test.db
 test:catchsql "DROP TABLE t22;"
 test:do_execsql_test(
     "e_expr-35.0",

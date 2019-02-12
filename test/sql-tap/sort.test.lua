@@ -14,7 +14,7 @@ test:plan(60)
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the sorter (code in vdbesort.c).
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -759,7 +759,7 @@ test:do_execsql_test(
 ---------------------------------------------------------------------------
 -- Sort some large ( > 4KiB) records.
 --
--- MUST_WORK_TEST? special sqlite functions (sqlite3_soft_heap_limit, sqlite3_test_control...)
+-- MUST_WORK_TEST? special sql functions (sql_soft_heap_limit, sql_test_control...)
 if (0 > 0) then
 local function cksum(x)
     local i1 = 1
@@ -793,7 +793,7 @@ box.internal.sql_create_function("cksum", cksum)
         test:do_test(
             "sort-14."..tn,
             function()
-                sqlite3_test_control("SQLITE_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
+                sql_test_control("sql_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
                 prev = ""
                 X(536, "X!cmd", [=[["db","eval"," SELECT * FROM t11 ORDER BY b ","\n         if {$b != [cksum $a]} {error \"checksum failed\"}\n         if {[string compare $b $prev] < 0} {error \"sort failed\"}\n         set prev $b\n       "]]=])
                 return X(541, "X!cmd", [=[["set","",""]]=])
@@ -806,17 +806,17 @@ box.internal.sql_create_function("cksum", cksum)
     --
     for _ in X(0, "X!foreach", [=[["tn mmap_limit nWorker tmpstore coremutex fakeheap softheaplimit","\n             1          0       3     file      true    false             0\n             2          0       3     file      true     true             0\n             3          0       0     file      true    false             0\n             4    1000000       3     file      true    false             0\n             5          0       0   memory     false     true             0\n             6          0       0     file     false     true       1000000     \n             7          0       0     file     false     true         10000\n   "]]=]) do
         db("close")
-        sqlite3_shutdown()
+        sql_shutdown()
         if coremutex then
-            sqlite3_config("multithread")
+            sql_config("multithread")
         else
-            sqlite3_config("singlethread")
+            sql_config("singlethread")
         end
-        sqlite3_initialize()
+        sql_initialize()
         X(558, "X!cmd", [=[["sorter_test_fakeheap",["fakeheap"]]]=])
-        sqlite3_soft_heap_limit(softheaplimit)
+        sql_soft_heap_limit(softheaplimit)
         reset_db()
-        sqlite3_test_control("SQLITE_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
+        sql_test_control("sql_TESTCTRL_SORTER_MMAP", "db", mmap_limit)
         test:execsql(string.format("PRAGMA temp_store = %s; PRAGMA threads = '%s'", tmpstore, nWorker))
         ten = string.rep("X", 10300)
         one = string.rep("y", 200)
@@ -870,13 +870,13 @@ box.internal.sql_create_function("cksum", cksum)
         X(605, "X!cmd", [=[["sorter_test_fakeheap","0"]]=])
     end
     db("close")
-    sqlite3_shutdown()
+    sql_shutdown()
     X(617, "X!cmd", [=[["set","t(0)","singlethread"]]=])
     X(618, "X!cmd", [=[["set","t(1)","multithread"]]=])
     X(619, "X!cmd", [=[["set","t(2)","serialized"]]=])
-    sqlite3_config(X(620, "X!expr", [=[["t($sqlite_options(threadsafe))"]]=]))
-    sqlite3_initialize()
-    sqlite3_soft_heap_limit(0)
+    sql_config(X(620, "X!expr", [=[["t($sql_options(threadsafe))"]]=]))
+    sql_initialize()
+    sql_soft_heap_limit(0)
     reset_db()
     test:do_catchsql_test(
         16.1,
@@ -915,7 +915,7 @@ box.internal.sql_create_function("cksum", cksum)
     test:do_execsql_test(
         17.1,
         [[
-            SELECT * FROM sqlite_master ORDER BY sql;
+            SELECT * FROM sql_master ORDER BY sql;
         ]], {
             -- <17.1>
             

@@ -13,7 +13,7 @@ test:plan(80)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the IN and BETWEEN operator.
 --
 -- $Id: in.test,v 1.22 2008/08/04 03:51:24 danielk1977 Exp $

@@ -13,7 +13,7 @@ test:plan(40)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for the special processing associated
 -- with INTEGER PRIMARY KEY columns.
@@ -54,7 +54,7 @@ test:do_execsql_test(
     [[
         DROP TABLE t1;
         CREATE TABLE t1(a INTEGER PRIMARY KEY, b TEXT, c TEXT);
-        --SELECT name FROM sqlite_master
+        --SELECT name FROM sql_master
         --  WHERE type='index' AND tbl_name='t1';
     ]], {
         -- <intpkey-1.2>
@@ -371,9 +371,9 @@ test:do_execsql_test(
 -- Do an SQL statement.  Append the search count to the end of the result.
 --
 local function count(sql)
-    sqlite_search_count = 0
+    sql_search_count = 0
     local r = test:execsql(sql)
-    table.insert(r, sqlite_search_count)
+    table.insert(r, sql_search_count)
     return r
 end
 

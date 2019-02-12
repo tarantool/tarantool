@@ -13,7 +13,7 @@ test:plan(31)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for miscellanous features that were
 -- left out of other test files.
@@ -206,7 +206,7 @@ test:do_execsql_test(
 --     set fd [open test.db w]
 --     puts $fd "This is not really a database"
 --     close $fd
---     sqlite3 db test.db
+--     sql db test.db
 --     catchsql {
 --       CREATE TABLE t1(a INT ,b INT ,c INT );
 --     }
@@ -259,13 +259,13 @@ test:do_execsql_test(
 --
 -- db close
 -- forcedelete test.db
--- sqlite3 db test.db
+-- sql db test.db
 test:drop_all_tables()
 -- do_test misc5-6.1 {
 --   catchsql {
---     SELECT * FROM sqlite_master 
+--     SELECT * FROM sql_master
 --     UNION ALL 
---     SELECT * FROM sqlite_master
+--     SELECT * FROM sql_master
 --     LIMIT (SELECT count(*) FROM blah);
 --   }
 -- } {1 {no such table: blah}}
@@ -307,10 +307,10 @@ test:do_test(
 -- # schema.
 -- #
 -- do_test misc5-7.2 {
---   sqlite3 db2 :memory:
+--   sql db2 :memory:
 --   catchsql {
 --     CREATE TABLE t1(x  INT UNIQUE);
---     UPDATE sqlite_master SET sql='CREATE table t(o CHECK(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((;VALUES(o)';
+--     UPDATE sql_master SET sql='CREATE table t(o CHECK(((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((;VALUES(o)';
 --     BEGIN;
 --     CREATE TABLE t2(y INT );
 --     ROLLBACK;
@@ -323,17 +323,17 @@ test:do_test(
 -- ifcapable compound {
 --   do_test misc5-9.1 {
 --     execsql {
---       SELECT name, type FROM sqlite_master WHERE name IS NULL
+--       SELECT name, type FROM sql_master WHERE name IS NULL
 --       UNION
---       SELECT type, name FROM sqlite_master WHERE type IS NULL
+--       SELECT type, name FROM sql_master WHERE type IS NULL
 --       ORDER BY 1, 2, 1, 2, 1, 2
 --     }
 --   } {}
 --   do_test misc5-9.2 {
 --     execsql {
---       SELECT name, type FROM sqlite_master WHERE name IS NULL
+--       SELECT name, type FROM sql_master WHERE name IS NULL
 --       UNION
---       SELECT type, name FROM sqlite_master WHERE type IS NULL
+--       SELECT type, name FROM sql_master WHERE type IS NULL
 --       ORDER BY 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2
 --     }
 --   } {}

@@ -13,7 +13,7 @@ test:plan(282)
 --    May you share freely, never taking more than you give.
 --
 -----------------------------------------------------------------
--- This file implements regression tests for SQLite library. The
+-- This file implements regression tests for sql library. The
 -- focus of this file is testing the LIKE operator and
 -- in particular the optimizations that occur to help this
 -- operator run faster.

@@ -13,12 +13,12 @@ test:plan(22)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the printf() SQL function.
 --
 --
 -- EVIDENCE-OF: R-63057-40065 The printf(FORMAT,...) SQL function works
--- like the sqlite3_mprintf() C-language function and the printf()
+-- like the sql_mprintf() C-language function and the printf()
 -- function from the standard C library.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

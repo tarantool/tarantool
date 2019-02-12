@@ -33,7 +33,7 @@
 #include "lua/utils.h"
 
 #include "box/lua/call.h"
-#include "box/sql/sqliteInt.h"
+#include "box/sql/sqlInt.h"
 #include "box/sql/vdbeInt.h"
 
 struct lua_sql_func_info {
@@ -48,57 +48,57 @@ struct lua_sql_func_info {
  * (see lbox_sql_create_function).
  */
 static void
-lua_sql_call(sqlite3_context *pCtx, int nVal, sqlite3_value **apVal) {
+lua_sql_call(sql_context *pCtx, int nVal, sql_value **apVal) {
 	lua_State *L = lua_newthread(tarantool_L);
 	int coro_ref = luaL_ref(tarantool_L, LUA_REGISTRYINDEX);
-	struct lua_sql_func_info *func_info = sqlite3_user_data(pCtx);
+	struct lua_sql_func_info *func_info = sql_user_data(pCtx);
 
 	lua_rawgeti(L, LUA_REGISTRYINDEX, func_info->func_ref);
 	for (int i = 0; i < nVal; i++) {
-		sqlite3_value *param = apVal[i];
-		switch (sqlite3_value_type(param)) {
-		case SQLITE_INTEGER:
-			luaL_pushint64(L, sqlite3_value_int64(param));
+		sql_value *param = apVal[i];
+		switch (sql_value_type(param)) {
+		case SQL_INTEGER:
+			luaL_pushint64(L, sql_value_int64(param));
 			break;
-		case SQLITE_FLOAT:
-			lua_pushnumber(L, sqlite3_value_double(param));
+		case SQL_FLOAT:
+			lua_pushnumber(L, sql_value_double(param));
 			break;
-		case SQLITE_TEXT:
-			lua_pushstring(L, (const char *) sqlite3_value_text(param));
+		case SQL_TEXT:
+			lua_pushstring(L, (const char *) sql_value_text(param));
 			break;
-		case SQLITE_BLOB:
-			lua_pushlstring(L, sqlite3_value_blob(param),
-					(size_t) sqlite3_value_bytes(param));
+		case SQL_BLOB:
+			lua_pushlstring(L, sql_value_blob(param),
+					(size_t) sql_value_bytes(param));
 			break;
-		case SQLITE_NULL:
+		case SQL_NULL:
 			lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_nil_ref);
 			break;
 		default:
-			sqlite3_result_error(pCtx, "Unsupported type passed "
+			sql_result_error(pCtx, "Unsupported type passed "
 					     "to Lua", -1);
 			goto error;
 		}
 	}
 	if (lua_pcall(L, lua_gettop(L) - 1, 1, 0) != 0){
-		sqlite3_result_error(pCtx, lua_tostring(L, -1), -1);
+		sql_result_error(pCtx, lua_tostring(L, -1), -1);
 		goto error;
 	}
 	switch(lua_type(L, -1)) {
 	case LUA_TBOOLEAN:
-		sqlite3_result_int(pCtx, lua_toboolean(L, -1));
+		sql_result_int(pCtx, lua_toboolean(L, -1));
 		break;
 	case LUA_TNUMBER:
-		sqlite3_result_double(pCtx, lua_tonumber(L, -1));
+		sql_result_double(pCtx, lua_tonumber(L, -1));
 		break;
 	case LUA_TSTRING:
-		sqlite3_result_text(pCtx, lua_tostring(L, -1), -1,
-				    SQLITE_TRANSIENT);
+		sql_result_text(pCtx, lua_tostring(L, -1), -1,
+				    SQL_TRANSIENT);
 		break;
 	case LUA_TNIL:
-		sqlite3_result_null(pCtx);
+		sql_result_null(pCtx);
 		break;
 	default:
-		sqlite3_result_error(pCtx, "Unsupported type returned from Lua",
+		sql_result_error(pCtx, "Unsupported type returned from Lua",
 				     -1);
 		goto error;
 	}
@@ -120,7 +120,7 @@ lua_sql_destroy(void *p)
  * A helper to register lua function in SQL during runtime.
  * It makes available queries like this: "SELECT lua_func(arg);"
  *
- * sqlite3_create_function *p argument is used to store func ref
+ * sql_create_function *p argument is used to store func ref
  * to lua function (it identifies actual lua func to call if there
  * are many of them). SQL function must have name and type of
  * returning value. Additionally, it can feature number of
@@ -129,7 +129,7 @@ lua_sql_destroy(void *p)
 int
 lbox_sql_create_function(struct lua_State *L)
 {
-	struct sqlite3 *db = sql_get();
+	struct sql *db = sql_get();
 	if (db == NULL)
 		return luaL_error(L, "Please call box.cfg{} first");
 	int argc = lua_gettop(L);
@@ -182,17 +182,17 @@ lbox_sql_create_function(struct lua_State *L)
 		return luaL_error(L, "out of memory");
 	memcpy(normalized_name, name, name_len);
 	normalized_name[name_len] = '\0';
-	sqlite3NormalizeName(normalized_name);
+	sqlNormalizeName(normalized_name);
 	struct lua_sql_func_info *func_info =
 		(struct lua_sql_func_info *) malloc(sizeof(*func_info));
 	if (func_info == NULL)
 		return luaL_error(L, "out of memory");
 	func_info->func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-	int rc = sqlite3_create_function_v2(db, normalized_name, type, func_arg_num,
-					   is_deterministic ? SQLITE_DETERMINISTIC : 0,
+	int rc = sql_create_function_v2(db, normalized_name, type, func_arg_num,
+					   is_deterministic ? SQL_DETERMINISTIC : 0,
 					   func_info, lua_sql_call, NULL, NULL,
 					   lua_sql_destroy);
 	if (rc != 0)
-		return luaL_error(L, sqlite3ErrStr(rc));
+		return luaL_error(L, sqlErrStr(rc));
 	return 0;
 }

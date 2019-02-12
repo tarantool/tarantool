@@ -16,7 +16,7 @@ testprefix = "analyze3"
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library. This file 
+-- This file implements regression tests for sql library. This file
 -- implements tests for range and LIKE constraints that use bound variables
 -- instead of literal constant arguments.
 --
@@ -36,7 +36,7 @@ testprefix = "analyze3"
 --               query may produce a superior outcome.
 --
 -- analyze3-4.*: Test that SQL or authorization callback errors occuring
---               within sqlite3Reprepare() are handled correctly.
+--               within sqlReprepare() are handled correctly.
 --
 -- analyze3-5.*: Check that the query plans of applicable statements are
 --               invalidated if the values of SQL parameter are modified
@@ -54,7 +54,7 @@ end
 
 local function sf_execsql(sql, db)
     r = test:execsql(sql)
-    return {box.sql.debug().sqlite_search_count, r}
+    return {box.sql.debug().sql_search_count, r}
 end
 
 ---------------------------------------------------------------------------
@@ -67,8 +67,8 @@ end
 -- analyze3-1.1.2 - 3.1.3
 --   Show that there are two possible plans for querying the table with
 --   a range constraint on the indexed column - "full table scan" or "use 
---   the index". When the range is specified using literal values, SQLite
---   is able to pick the best plan based on the samples in sqlite_stat3.
+--   the index". When the range is specified using literal values, sql
+--   is able to pick the best plan based on the samples in sql_stat3.
 --
 -- analyze3-1.1.4 - 3.1.9
 --   Show that using SQL variables produces the same results as using
@@ -337,7 +337,7 @@ test:do_test(
 
 -- Same tests a third time. This time, column x has INTEGER affinity and
 -- is not the leftmost column of the table. This triggered a bug causing
--- SQLite to use sub-optimal query plans in 3.6.18 and earlier.
+-- sql to use sub-optimal query plans in 3.6.18 and earlier.
 --
 test:do_execsql_test(
     "analyze3-1.3.1",
@@ -638,7 +638,7 @@ test:do_eqp_test(
 
 -------------------------------------------------------------------------------
 -- 2015-04-20.
--- Memory leak in sqlite3Stat4ProbeFree().  (Discovered while fuzzing.)
+-- Memory leak in sqlStat4ProbeFree().  (Discovered while fuzzing.)
 --
 test:do_execsql_test(
     "analyze-7.1",

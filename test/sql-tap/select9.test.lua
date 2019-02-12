@@ -15,12 +15,12 @@ test.silent = true
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 --
 -- $Id: select9.test,v 1.4 2008/07/01 14:39:35 danielk1977 Exp $
 -- The tests in this file are focused on test compound SELECT statements 
 -- that have any or all of an ORDER BY, LIMIT or OFFSET clauses. As of
--- version 3.6.0, SQLite contains code to use SQL indexes where possible 
+-- version 3.6.0, sql contains code to use SQL indexes where possible
 -- to optimize such statements.
 --
 -- TODO Points:
@@ -358,11 +358,11 @@ test:do_execsql_test(
 -- SortCallback opcode.  If the program does not contain the SortCallback
 -- opcode it appends "sort"
 --
--- TODO: need access to sqlite_sort_count vatiable
+-- TODO: need access to sql_sort_count vatiable
 --local function cksort(sql)
---    sqlite_sort_count = 0
+--    sql_sort_count = 0
 --    data = test:execsql(sql)
---    if sqlite_sort_count then
+--    if sql_sort_count then
 --        x = "sort"
 --    end
 --    table.insert(data,x) or data
@@ -382,7 +382,7 @@ test:do_execsql_test(
 --
 -- It turns out that it is.
 --
--- TODO: need access to sqlite_sort_count vatiable
+-- TODO: need access to sql_sort_count vatiable
 --test:do_test(
 --    "select9-3.1",
 --    function()
@@ -398,7 +398,7 @@ test:do_execsql_test(
 --   execsql { CREATE INDEX i1 ON t1(a) }
 --   cksort { SELECT a FROM t1 ORDER BY 1 }
 -- } {1 2 3 4 5 6 7 8 9 10 nosort}
--- TODO: need access to sqlite_sort_count vatiable
+-- TODO: need access to sql_sort_count vatiable
 --test:do_test(
 --    "select9-3.3",
 --    function()
@@ -428,7 +428,7 @@ test:do_execsql_test(
 -- This block of tests is the same as the preceding one, except that
 -- "UNION" is tested instead of "UNION ALL".
 --
--- TODO: need access to sqlite_sort_count vatiable
+-- TODO: need access to sql_sort_count vatiable
 --test:do_test(
 --    "select9-4.1",
 --    function()
@@ -444,7 +444,7 @@ test:do_execsql_test(
 --   execsql { CREATE INDEX i1 ON t1(a) }
 --   cksort { SELECT a FROM t1 ORDER BY 1 }
 -- } {1 2 3 4 5 6 7 8 9 10 nosort}
--- TODO: need access to sqlite_sort_count vatiable
+-- TODO: need access to sql_sort_count vatiable
 --test:do_test(
 --    "select9-4.3",
 --    function()
@@ -475,7 +475,7 @@ test:do_execsql_test(
 -- are planned efficiently.  This detects a problem reported on the mailing
 -- list on 2012-04-26.  See
 --
---  http://www.mail-archive.com/sqlite-users%40sqlite.org/msg69746.html
+--  http://www.mail-archive.com/sql-users%40sql.org/msg69746.html
 --
 -- For additional information.
 --

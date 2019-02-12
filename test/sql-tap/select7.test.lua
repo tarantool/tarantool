@@ -11,7 +11,7 @@ test:plan(18)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing compute SELECT statements and nested
 -- views.
 --
@@ -68,14 +68,14 @@ test:do_execsql_test(
 -- ifcapable subquery {
 --   # do_test select7-3.1 {
 --   #   catchsql {
---   #     SELECT * FROM (SELECT * FROM sqlite_master) GROUP BY name
+--   #     SELECT * FROM (SELECT * FROM sql_master) GROUP BY name
 --   #   }
 --   # } {1 {GROUP BY may only be used on aggregate queries}}
 --   do_test select7-3.1 {
 --     catchsql {
---       SELECT * FROM (SELECT * FROM sqlite_master) GROUP BY name
+--       SELECT * FROM (SELECT * FROM sql_master) GROUP BY name
 --     }
---   } [list 0 [execsql {SELECT * FROM sqlite_master ORDER BY name}]]
+--   } [list 0 [execsql {SELECT * FROM sql_master ORDER BY name}]]
 -- }
 -- Ticket #2018 - Make sure names are resolved correctly on all
 -- SELECT statements of a compound subquery.

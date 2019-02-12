@@ -44,22 +44,19 @@ sql_init();
 void
 sql_load_schema();
 
-void
-sql_free();
-
 /**
- * struct sqlite3 *
+ * struct sql *
  * sql_get();
  *
  * Currently, this is the only SQL execution interface provided.
  * If not yet initialised, returns NULL.
- * Use the regular sqlite3_* API with this handle, but
- * don't do anything finicky like sqlite3_close.
- * Behind the scenes, this sqlite was rigged to use Tarantool
+ * Use the regular sql_* API with this handle, but
+ * don't do anything finicky like sql_close.
+ * Behind the scenes, this sql was rigged to use Tarantool
  * as a data source.
  * @retval SQL handle.
  */
-struct sqlite3 *
+struct sql *
 sql_get();
 
 struct Expr;
@@ -81,7 +78,7 @@ struct sql_trigger;
  * @retval not NULL Expr AST pointer on success.
  */
 struct Expr *
-sql_expr_compile(struct sqlite3 *db, const char *expr, int expr_len);
+sql_expr_compile(struct sql *db, const char *expr, int expr_len);
 
 /**
  * This routine executes parser on 'CREATE VIEW ...' statement
@@ -92,7 +89,7 @@ sql_expr_compile(struct sqlite3 *db, const char *expr, int expr_len);
  * @retval AST of SELECT statement on success, NULL otherwise.
  */
 struct Select *
-sql_view_compile(struct sqlite3 *db, const char *view_stmt);
+sql_view_compile(struct sql *db, const char *view_stmt);
 
 /**
  * Perform parsing of provided SQL request and construct trigger AST.
@@ -103,7 +100,7 @@ sql_view_compile(struct sqlite3 *db, const char *view_stmt);
  * @retval not NULL sql_trigger AST pointer on success.
  */
 struct sql_trigger *
-sql_trigger_compile(struct sqlite3 *db, const char *sql);
+sql_trigger_compile(struct sql *db, const char *sql);
 
 /**
  * Free AST pointed by trigger.
@@ -111,7 +108,7 @@ sql_trigger_compile(struct sqlite3 *db, const char *sql);
  * @param trigger AST object.
  */
 void
-sql_trigger_delete(struct sqlite3 *db, struct sql_trigger *trigger);
+sql_trigger_delete(struct sql *db, struct sql_trigger *trigger);
 
 /**
  * Get server triggers list by space_id.
@@ -201,7 +198,7 @@ int
 sql_expr_sizeof(struct Expr *p, int flags);
 
 /**
- * This function is similar to sqlite3ExprDup(), except that if pzBuffer
+ * This function is similar to sqlExprDup(), except that if pzBuffer
  * is not NULL then *pzBuffer is assumed to point to a buffer large enough
  * to store the copy of expression p, the copies of p->u.zToken
  * (if applicable), and the copies of the p->pLeft and p->pRight expressions,
@@ -213,7 +210,7 @@ sql_expr_sizeof(struct Expr *p, int flags);
  * @param pzBuffer If not NULL, then buffer to store duplicate.
  */
 struct Expr *
-sql_expr_dup(struct sqlite3 *db, struct Expr *p, int flags, char **buffer);
+sql_expr_dup(struct sql *db, struct Expr *p, int flags, char **buffer);
 
 /**
  * Free AST pointed by expr.
@@ -222,7 +219,7 @@ sql_expr_dup(struct sqlite3 *db, struct Expr *p, int flags, char **buffer);
  * @param extern_alloc True if skeleton was allocated externally.
  */
 void
-sql_expr_delete(struct sqlite3 *db, struct Expr *expr, bool extern_alloc);
+sql_expr_delete(struct sql *db, struct Expr *expr, bool extern_alloc);
 
 /**
  * Create and initialize a new ephemeral SQL Table object.
@@ -253,7 +250,7 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name);
  * @retval 0 on success.
  */
 int
-sql_table_def_rebuild(struct sqlite3 *db, struct Table *table);
+sql_table_def_rebuild(struct sql *db, struct Table *table);
 
 /**
  * Duplicate Expr list.
@@ -269,7 +266,7 @@ sql_table_def_rebuild(struct sqlite3 *db, struct Table *table);
  * @retval not NULL on success.
  */
 struct ExprList *
-sql_expr_list_dup(struct sqlite3 *db, struct ExprList *p, int flags);
+sql_expr_list_dup(struct sql *db, struct ExprList *p, int flags);
 
 /**
  * Free AST pointed by expr list.
@@ -277,7 +274,7 @@ sql_expr_list_dup(struct sqlite3 *db, struct ExprList *p, int flags);
  * @param expr_list Root pointer of ExprList.
  */
 void
-sql_expr_list_delete(struct sqlite3 *db, struct ExprList *expr_list);
+sql_expr_list_delete(struct sql *db, struct ExprList *expr_list);
 
 /**
  * Add a new element to the end of an expression list.
@@ -288,7 +285,7 @@ sql_expr_list_delete(struct sqlite3 *db, struct ExprList *expr_list);
  * @retval not NULL on success.
  */
 struct ExprList *
-sql_expr_list_append(struct sqlite3 *db, struct ExprList *expr_list,
+sql_expr_list_append(struct sql *db, struct ExprList *expr_list,
 		     struct Expr *expr);
 
 /**
@@ -351,10 +348,10 @@ sql_checks_update_space_def_reference(struct ExprList *expr_list,
  * A number of service allocations are performed on the region,
  * which is also cleared in the destroy function.
  * @param parser object to initialize.
- * @param db SQLite object.
+ * @param db sql object.
  */
 void
-sql_parser_create(struct Parse *parser, struct sqlite3 *db);
+sql_parser_create(struct Parse *parser, struct sql *db);
 
 /**
  * Release the parser object resources.
@@ -371,7 +368,7 @@ sql_parser_destroy(struct Parse *parser);
  * @param select Select to be freed.
  */
 void
-sql_select_delete(struct sqlite3 *db, struct Select *select);
+sql_select_delete(struct sql *db, struct Select *select);
 
 /**
  * Collect all table names within given select, including
@@ -386,7 +383,7 @@ struct SrcList *
 sql_select_expand_from_tables(struct Select *select);
 
 /**
- * Temporary getter in order to avoid including sqliteInt.h
+ * Temporary getter in order to avoid including sqlInt.h
  * in alter.cc.
  *
  * @param list List to be examined.
@@ -396,7 +393,7 @@ int
 sql_src_list_entry_count(const struct SrcList *list);
 
 /**
- * Temporary getter in order to avoid including sqliteInt.h
+ * Temporary getter in order to avoid including sqlInt.h
  * in alter.cc.
  *
  * @param list List to be examined.
@@ -408,7 +405,7 @@ sql_src_list_entry_name(const struct SrcList *list, int i);
 
 /** Delete an entire SrcList including all its substructure. */
 void
-sqlite3SrcListDelete(struct sqlite3 *db, struct SrcList *list);
+sqlSrcListDelete(struct sql *db, struct SrcList *list);
 
 
 #if defined(__cplusplus)

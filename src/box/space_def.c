@@ -311,7 +311,7 @@ checks_array_decode(const char **str, uint32_t len, char *opt, uint32_t errcode,
 	char *errmsg = tt_static_buf();
 	struct ExprList *checks = NULL;
 	const char **map = str;
-	struct sqlite3 *db = sql_get();
+	struct sql *db = sql_get();
 	for (uint32_t i = 0; i < len; i++) {
 		checks = sql_expr_list_append(db, checks, NULL);
 		if (checks == NULL) {

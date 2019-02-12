@@ -14,8 +14,8 @@ test:plan(15)
 --
 -------------------------------------------------------------------------
 --
--- This file implements tests for SQLite library.  The focus of the tests
--- in this file is testing the capabilities of sqlite_stat3.
+-- This file implements tests for sql library.  The focus of the tests
+-- in this file is testing the capabilities of sql_stat3.
 --
 
 testprefix = "analyze8"

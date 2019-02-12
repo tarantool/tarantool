@@ -33,7 +33,7 @@
  * This file contains C code routines that used to generate VDBE code
  * that implements the ALTER TABLE command.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "box/box.h"
 #include "box/schema.h"
 
@@ -42,8 +42,8 @@ sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
 		       struct Token *new_name_tk)
 {
 	assert(src_tab->nSrc == 1);
-	struct sqlite3 *db = parse->db;
-	char *new_name = sqlite3NameFromToken(db, new_name_tk);
+	struct sql *db = parse->db;
+	char *new_name = sqlNameFromToken(db, new_name_tk);
 	if (new_name == NULL)
 		goto exit_rename_table;
 	/* Check that new name isn't occupied by another table. */
@@ -64,14 +64,14 @@ sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
 	}
 	sql_set_multi_write(parse, false);
 	/* Drop and reload the internal table schema. */
-	struct Vdbe *v = sqlite3GetVdbe(parse);
-	sqlite3VdbeAddOp4(v, OP_RenameTable, space->def->id, 0, 0, new_name,
+	struct Vdbe *v = sqlGetVdbe(parse);
+	sqlVdbeAddOp4(v, OP_RenameTable, space->def->id, 0, 0, new_name,
 			  P4_DYNAMIC);
 exit_rename_table:
-	sqlite3SrcListDelete(db, src_tab);
+	sqlSrcListDelete(db, src_tab);
 	return;
 tnt_error:
-	sqlite3DbFree(db, new_name);
+	sqlDbFree(db, new_name);
 	parse->rc = SQL_TARANTOOL_ERROR;
 	parse->nErr++;
 	goto exit_rename_table;
@@ -83,7 +83,7 @@ tnt_error:
  * above, except for CREATE TRIGGER, not CREATE INDEX and CREATE TABLE.
  */
 char*
-rename_trigger(sqlite3 *db, char const *sql_stmt, char const *table_name,
+rename_trigger(sql *db, char const *sql_stmt, char const *table_name,
 	       bool *is_quoted)
 {
 	assert(sql_stmt);
@@ -140,7 +140,7 @@ rename_trigger(sqlite3 *db, char const *sql_stmt, char const *table_name,
 	/* Variable tname now contains the token that is the old table-name
 	 * in the CREATE TRIGGER statement.
 	 */
-	new_sql_stmt = sqlite3MPrintf(db, "%.*s\"%w\"%s",
+	new_sql_stmt = sqlMPrintf(db, "%.*s\"%w\"%s",
 				      (int)((tname.z) - sql_stmt), sql_stmt,
 				      table_name, tname.z + tname.n);
 	return new_sql_stmt;

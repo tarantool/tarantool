@@ -14,7 +14,7 @@ test:plan(5)
 --
 -------------------------------------------------------------------------
 --
--- Testing of function factoring and the SQLITE_DETERMINISTIC flag.
+-- Testing of function factoring and the sql_DETERMINISTIC flag.
 --
 
 -- Verify that constant string expressions that get factored into initializing
@@ -47,7 +47,7 @@ test:do_execsql_test(
         -- </func5-1.1>
     })
 
--- Verify that SQLITE_DETERMINISTIC functions get factored out of the
+-- Verify that sql_DETERMINISTIC functions get factored out of the
 -- evaluation loop whereas non-deterministic functions do not.  counter1()
 -- is marked as non-deterministic and so is not factored out of the loop,
 -- and it really is non-deterministic, returning a different result each

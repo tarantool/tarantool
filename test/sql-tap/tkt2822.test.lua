@@ -42,15 +42,15 @@ test:plan(36)
 -- attempted first on the left-most SELECT.  If that doesn't
 -- work, we move to the right, one by one.
 --
--- Rule (3) is not in standard SQL - it is an SQLite extension,
+-- Rule (3) is not in standard SQL - it is an sql extension,
 -- though one copied from PostgreSQL.  The rule for compound
 -- queries where a search is made of SELECTs to the right
 -- if the left-most SELECT does not match is not a part of
--- standard SQL either.  This extension is unique to SQLite
+-- standard SQL either.  This extension is unique to sql
 -- as far as we know.
 --
 -- Rule (2) was added by the changes ticket #2822.  Prior to
--- that changes, SQLite did not support rule (2), making it
+-- that changes, sql did not support rule (2), making it
 -- technically in violation of standard SQL semantics.  
 -- No body noticed because rule (3) has the same effect as
 -- rule (2) except in some obscure cases.
@@ -351,7 +351,7 @@ test:do_execsql_test(
     })
 
 -- More error message tests.  This is really more of a test of the
--- %r ordinal value formatting capablity added to sqlite3_snprintf()
+-- %r ordinal value formatting capablity added to sql_snprintf()
 -- by ticket #2822.
 --
 test:do_test(

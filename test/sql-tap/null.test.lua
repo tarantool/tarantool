@@ -13,7 +13,7 @@ test:plan(45)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for proper treatment of the special
 -- value NULL.
@@ -247,7 +247,7 @@ test:do_execsql_test(
 -- of an ORDER BY clause to bind to either SELECT of a UNION.
 -- The left-most SELECT is preferred.  In standard SQL, only
 -- the left SELECT can be used.  The ability to match an ORDER
--- BY term to the right SELECT is an SQLite extension.
+-- BY term to the right SELECT is an sql extension.
 --
 test:do_execsql_test(
     "null-6.1",

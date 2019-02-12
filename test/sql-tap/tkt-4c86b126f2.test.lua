@@ -13,13 +13,13 @@ test:plan(2)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [4c86b126f22ad548fee0125337bdc9366912d9ac].
 --
--- When SQLite is compiled using SQLITE_ENABLE_STAT3 or SQLITE_ENABLE_STAT4,
+-- When sql is compiled using sql_ENABLE_STAT3 or sql_ENABLE_STAT4,
 -- it gets the wrong answer...
 --
--- The problem was introduced in SQLite 3.8.1.
+-- The problem was introduced in sql 3.8.1.
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 test:do_execsql_test(

@@ -50,7 +50,7 @@ test:do_test(
         ]]
         -- db close
         -- set_file_format 4
-        -- sqlite3 db test.db
+        -- sql db test.db
         return test:execsql [[
             START TRANSACTION;
             INSERT INTO t1 VALUES(1, '1', 'I',   'one');

@@ -15,7 +15,7 @@ testprefix = "analyzeD"
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 -- This file implements tests for the ANALYZE command.
 --
 -- Set up a table with the following properties:
@@ -60,7 +60,7 @@ test:do_test(
         	-- </1.1>
     })
 
--- With full ANALYZE data, SQLite sees that c=150 (5 rows) is better than
+-- With full ANALYZE data, sql sees that c=150 (5 rows) is better than
 -- a=3001 (7 rows).
 --
 test:do_execsql_test(
@@ -83,7 +83,7 @@ test:do_test(
     })
 
 -- Without stat1, because 3001 is larger than all samples in the stat4
--- table, SQLite things that a=3001 matches just 1 row. So it (incorrectly)
+-- table, sql things that a=3001 matches just 1 row. So it (incorrectly)
 -- chooses it over the c=150 index (5 rows). Even with stat1 data, things
 -- worked this way before commit [e6f7f97dbc].
 --
@@ -127,7 +127,7 @@ test:do_test(
    	})
 
 -- Same test as 1.4, except this time the 7 rows that match the a=? condition 
--- do not feature larger values than all rows in the stat4 table. So SQLite
+-- do not feature larger values than all rows in the stat4 table. So sql
 -- gets this right, even without stat1 data.
 test:do_execsql_test(
 	1.8,

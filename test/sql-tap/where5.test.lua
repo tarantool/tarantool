@@ -13,7 +13,7 @@ test:plan(50)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing NULL comparisons in the WHERE clause.
 -- See ticket #2404.
 --

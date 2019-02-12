@@ -13,7 +13,7 @@ test:plan(129)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for joins, including outer joins, where
 -- there are a large number of tables involved in the join.

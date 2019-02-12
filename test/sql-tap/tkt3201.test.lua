@@ -13,7 +13,7 @@ test:plan(8)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 -- Specifically, it tests that bug #3201 has been fixed.
 --
 -- $Id: tkt3201.test,v 1.3 2008/07/12 14:52:21 drh Exp $

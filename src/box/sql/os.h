@@ -33,44 +33,44 @@
  *
  * This header file (together with is companion C source-code file
  * "os.c") attempt to abstract the underlying operating system so that
- * the SQLite library will work on POSIX.
+ * the sql library will work on POSIX.
  *
- * This header file is #include-ed by sqliteInt.h and thus ends up
+ * This header file is #include-ed by sqlInt.h and thus ends up
  * being included by every source file.
  */
-#ifndef _SQLITE_OS_H_
-#define _SQLITE_OS_H_
+#ifndef _SQL_OS_H_
+#define _SQL_OS_H_
 
 /*
  * The default size of a disk sector
  */
-#ifndef SQLITE_DEFAULT_SECTOR_SIZE
-#define SQLITE_DEFAULT_SECTOR_SIZE 4096
+#ifndef SQL_DEFAULT_SECTOR_SIZE
+#define SQL_DEFAULT_SECTOR_SIZE 4096
 #endif
 
 /*
  * Temporary files are named starting with this prefix followed by 16 random
  * alphanumeric characters, and no file extension. They are stored in the
  * OS's standard temporary file directory, and are deleted prior to exit.
- * If sqlite is being embedded in another program, you may wish to change the
+ * If sql is being embedded in another program, you may wish to change the
  * prefix to reflect your program's name, so that if your program exits
  * prematurely, old temporary files can be easily identified. This can be done
- * using -DSQLITE_TEMP_FILE_PREFIX=myprefix_ on the compiler command line.
+ * using -DSQL_TEMP_FILE_PREFIX=myprefix_ on the compiler command line.
  *
- * 2006-10-31:  The default prefix used to be "sqlite_".  But then
- * Mcafee started using SQLite in their anti-virus product and it
- * started putting files with the "sqlite" name in the c:/temp folder.
+ * 2006-10-31:  The default prefix used to be "sql_".  But then
+ * Mcafee started using sql in their anti-virus product and it
+ * started putting files with the "sql" name in the c:/temp folder.
  * This annoyed many windows users.  Those users would then do a
- * Google search for "sqlite", find the telephone numbers of the
+ * Google search for "sql", find the telephone numbers of the
  * developers and call to wake them up at night and complain.
- * For this reason, the default name prefix is changed to be "sqlite"
+ * For this reason, the default name prefix is changed to be "sql"
  * spelled backwards.  So the temp files are still identified, but
  * anybody smart enough to figure out the code is also likely smart
  * enough to know that calling the developer will not help get rid
  * of the file.
  */
-#ifndef SQLITE_TEMP_FILE_PREFIX
-#define SQLITE_TEMP_FILE_PREFIX "etilqs_"
+#ifndef SQL_TEMP_FILE_PREFIX
+#define SQL_TEMP_FILE_PREFIX "etilqs_"
 #endif
 
 /*
@@ -121,41 +121,41 @@
  * 1GB boundary.
  *
  */
-#define PENDING_BYTE      sqlite3PendingByte
+#define PENDING_BYTE      sqlPendingByte
 #define RESERVED_BYTE     (PENDING_BYTE+1)
 #define SHARED_FIRST      (PENDING_BYTE+2)
 #define SHARED_SIZE       510
 
 /*
- * Wrapper around OS specific sqlite3_os_init() function.
+ * Wrapper around OS specific sql_os_init() function.
  */
-int sqlite3OsInit(void);
+int sqlOsInit(void);
 
 /*
- * Functions for accessing sqlite3_file methods
+ * Functions for accessing sql_file methods
  */
-void sqlite3OsClose(sqlite3_file *);
-int sqlite3OsRead(sqlite3_file *, void *, int amt, i64 offset);
-int sqlite3OsWrite(sqlite3_file *, const void *, int amt, i64 offset);
-void sqlite3OsFileControlHint(sqlite3_file *, int, void *);
-int sqlite3OsFetch(sqlite3_file * id, i64, int, void **);
-int sqlite3OsUnfetch(sqlite3_file *, i64, void *);
+void sqlOsClose(sql_file *);
+int sqlOsRead(sql_file *, void *, int amt, i64 offset);
+int sqlOsWrite(sql_file *, const void *, int amt, i64 offset);
+void sqlOsFileControlHint(sql_file *, int, void *);
+int sqlOsFetch(sql_file * id, i64, int, void **);
+int sqlOsUnfetch(sql_file *, i64, void *);
 
 /*
- * Functions for accessing sqlite3_vfs methods
+ * Functions for accessing sql_vfs methods
  */
-int sqlite3OsOpen(sqlite3_vfs *, const char *, sqlite3_file *, int, int *);
-int sqlite3OsRandomness(sqlite3_vfs *, int, char *);
-int sqlite3OsSleep(sqlite3_vfs *, int);
-int sqlite3OsGetLastError(sqlite3_vfs *);
-int sqlite3OsCurrentTimeInt64(sqlite3_vfs *, sqlite3_int64 *);
+int sqlOsOpen(sql_vfs *, const char *, sql_file *, int, int *);
+int sqlOsRandomness(sql_vfs *, int, char *);
+int sqlOsSleep(sql_vfs *, int);
+int sqlOsGetLastError(sql_vfs *);
+int sqlOsCurrentTimeInt64(sql_vfs *, sql_int64 *);
 
 /*
  * Convenience functions for opening and closing files using
- * sqlite3_malloc() to obtain space for the file-handle structure.
+ * sql_malloc() to obtain space for the file-handle structure.
  */
-int sqlite3OsOpenMalloc(sqlite3_vfs *, const char *, sqlite3_file **, int,
+int sqlOsOpenMalloc(sql_vfs *, const char *, sql_file **, int,
 			int *);
-void sqlite3OsCloseFree(sqlite3_file *);
+void sqlOsCloseFree(sql_file *);
 
-#endif				/* _SQLITE_OS_H_ */
+#endif				/* _SQL_OS_H_ */

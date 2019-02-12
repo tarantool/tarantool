@@ -1502,14 +1502,14 @@ update_view_references(struct Select *select, int update_value,
 		uint32_t space_id;
 		if (schema_find_id(BOX_SPACE_ID, 2, space_name,
 				   strlen(space_name), &space_id) != 0) {
-			sqlite3SrcListDelete(sql_get(), list);
+			sqlSrcListDelete(sql_get(), list);
 			return -1;
 		}
 		if (space_id == BOX_ID_NIL) {
 			if (! suppress_error) {
 				assert(not_found_space != NULL);
 				*not_found_space = tt_sprintf("%s", space_name);
-				sqlite3SrcListDelete(sql_get(), list);
+				sqlSrcListDelete(sql_get(), list);
 				return -1;
 			}
 			continue;
@@ -1518,7 +1518,7 @@ update_view_references(struct Select *select, int update_value,
 		assert(space->def->view_ref_count > 0 || update_value > 0);
 		space->def->view_ref_count += update_value;
 	}
-	sqlite3SrcListDelete(sql_get(), list);
+	sqlSrcListDelete(sql_get(), list);
 	return 0;
 }
 
@@ -3729,7 +3729,7 @@ fkey_grab_by_name(struct rlist *list, const char *fkey_name)
 }
 
 /**
- * FIXME: as SQLite legacy temporary we use such mask throught
+ * FIXME: as sql legacy temporary we use such mask throught
  * SQL code. It should be replaced later with regular
  * mask from column_mask.h
  */

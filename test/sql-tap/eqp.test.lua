@@ -512,7 +512,7 @@ test:do_eqp_test(
 -- lang_explain.html page are correct.
 --
 test:drop_all_tables()
--- EVIDENCE-OF: R-47779-47605 sqlite> EXPLAIN QUERY PLAN SELECT a, b
+-- EVIDENCE-OF: R-47779-47605 sql> EXPLAIN QUERY PLAN SELECT a, b
 -- FROM t1 WHERE a=1;
 -- 0|0|0|SCAN TABLE T1
 --
@@ -525,8 +525,8 @@ test:do_execsql_test(
 test:do_eqp_test("5.1.1", "SELECT a, b FROM t1 WHERE a=1", {
     {0, 0, 0, "SCAN TABLE T1"},
 })
--- EVIDENCE-OF: R-55852-17599 sqlite> CREATE INDEX i1 ON t1(a);
--- sqlite> EXPLAIN QUERY PLAN SELECT a, b FROM t1 WHERE a=1;
+-- EVIDENCE-OF: R-55852-17599 sql> CREATE INDEX i1 ON t1(a);
+-- sql> EXPLAIN QUERY PLAN SELECT a, b FROM t1 WHERE a=1;
 -- 0|0|0|SEARCH TABLE T1 USING COVERING INDEX i1
 --
 test:do_execsql_test(
@@ -538,8 +538,8 @@ test:do_execsql_test(
 test:do_eqp_test("5.2.1", "SELECT a, b FROM t1 WHERE a=1", {
     {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
 })
--- EVIDENCE-OF: R-21179-11011 sqlite> CREATE INDEX i2 ON t1(a, b);
--- sqlite> EXPLAIN QUERY PLAN SELECT a, b FROM t1 WHERE a=1;
+-- EVIDENCE-OF: R-21179-11011 sql> CREATE INDEX i2 ON t1(a, b);
+-- sql> EXPLAIN QUERY PLAN SELECT a, b FROM t1 WHERE a=1;
 -- 0|0|0|SEARCH TABLE T1 USING COVERING INDEX i2 (a=?)
 --
 test:do_execsql_test(
@@ -554,7 +554,7 @@ test:do_eqp_test("5.3.1", "SELECT a, b FROM t1 WHERE a=1", {
     {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
     --{0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
 })
--- EVIDENCE-OF: R-09991-48941 sqlite> EXPLAIN QUERY PLAN
+-- EVIDENCE-OF: R-09991-48941 sql> EXPLAIN QUERY PLAN
 -- SELECT t1.*, t2.* FROM t1, t2 WHERE t1.a=1 AND t1.b>2;
 -- 0|0|0|SEARCH TABLE T1 USING COVERING INDEX i2 (a=? AND b>?)
 -- 0|1|1|SCAN TABLE T2
@@ -569,7 +569,7 @@ test:do_eqp_test("5.4.1", "SELECT t1.a, t2.c FROM t1, t2 WHERE t1.a=1 AND t1.b>2
     {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=? AND B>?)"},
     {0, 1, 1, "SCAN TABLE T2"},
 })
--- EVIDENCE-OF: R-33626-61085 sqlite> EXPLAIN QUERY PLAN
+-- EVIDENCE-OF: R-33626-61085 sql> EXPLAIN QUERY PLAN
 -- SELECT t1.*, t2.* FROM t2, t1 WHERE t1.a=1 AND t1.b>2;
 -- 0|0|1|SEARCH TABLE T1 USING COVERING INDEX i2 (a=? AND b>?)
 -- 0|1|0|SCAN TABLE T2
@@ -578,8 +578,8 @@ test:do_eqp_test(5.5, "SELECT t1.a, t2.c FROM t2, t1 WHERE t1.a=1 AND t1.b>2", {
     {0, 0, 1, "SEARCH TABLE T1 USING COVERING INDEX I2 (A=? AND B>?)"},
     {0, 1, 0, "SCAN TABLE T2"},
 })
--- EVIDENCE-OF: R-04002-25654 sqlite> CREATE INDEX i3 ON t1(b);
--- sqlite> EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=1 OR b=2;
+-- EVIDENCE-OF: R-04002-25654 sql> CREATE INDEX i3 ON t1(b);
+-- sql> EXPLAIN QUERY PLAN SELECT * FROM t1 WHERE a=1 OR b=2;
 -- 0|0|0|SEARCH TABLE T1 USING COVERING INDEX i2 (a=?)
 -- 0|0|0|SEARCH TABLE T1 USING COVERING INDEX i3 (b=?)
 --
@@ -596,7 +596,7 @@ test:do_eqp_test("5.6.1", "SELECT a, b FROM t1 WHERE a=1 OR b=2", {
     {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I1 (A=?)"},
     {0, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I3 (B=?)"},
 })
--- EVIDENCE-OF: R-24577-38891 sqlite> EXPLAIN QUERY PLAN
+-- EVIDENCE-OF: R-24577-38891 sql> EXPLAIN QUERY PLAN
 -- SELECT c, d FROM t2 ORDER BY c;
 -- 0|0|0|SCAN TABLE T2
 -- 0|0|0|USE TEMP B-TREE FOR ORDER BY
@@ -605,8 +605,8 @@ test:do_eqp_test(5.7, "SELECT c, d FROM t2 ORDER BY c", {
     {0, 0, 0, "SCAN TABLE T2"},
     {0, 0, 0, "USE TEMP B-TREE FOR ORDER BY"},
 })
--- EVIDENCE-OF: R-58157-12355 sqlite> CREATE INDEX i4 ON t2(c);
--- sqlite> EXPLAIN QUERY PLAN SELECT c, d FROM t2 ORDER BY c;
+-- EVIDENCE-OF: R-58157-12355 sql> CREATE INDEX i4 ON t2(c);
+-- sql> EXPLAIN QUERY PLAN SELECT c, d FROM t2 ORDER BY c;
 -- 0|0|0|SCAN TABLE T2 USING COVERING INDEX i4
 --
 test:do_execsql_test(
@@ -618,7 +618,7 @@ test:do_execsql_test(
 test:do_eqp_test("5.8.1", "SELECT c, d FROM t2 ORDER BY c", {
     {0, 0, 0, "SCAN TABLE T2 USING COVERING INDEX I4"},
 })
--- EVIDENCE-OF: R-13931-10421 sqlite> EXPLAIN QUERY PLAN SELECT
+-- EVIDENCE-OF: R-13931-10421 sql> EXPLAIN QUERY PLAN SELECT
 -- (SELECT b FROM t1 WHERE a=0), (SELECT a FROM t1 WHERE b=t2.c) FROM t2;
 -- 0|0|0|SCAN TABLE T2
 -- 0|0|0|EXECUTE SCALAR SUBQUERY 1
@@ -638,7 +638,7 @@ test:do_eqp_test(5.9, [[
     {0, 0, 0, "EXECUTE CORRELATED SCALAR SUBQUERY 2"},
     {2, 0, 0, "SEARCH TABLE T1 USING COVERING INDEX I3 (B=?)"},
 })
--- EVIDENCE-OF: R-50892-45943 sqlite> EXPLAIN QUERY PLAN
+-- EVIDENCE-OF: R-50892-45943 sql> EXPLAIN QUERY PLAN
 -- SELECT count(*) FROM (SELECT max(b) AS x FROM t1 GROUP BY a) GROUP BY x;
 -- 1|0|0|SCAN TABLE T1 USING COVERING INDEX i2
 -- 0|0|0|SCAN SUBQUERY 1
@@ -651,7 +651,7 @@ test:do_eqp_test(5.10, [[
     {0, 0, 0, "SCAN SUBQUERY 1"},
     {0, 0, 0, "USE TEMP B-TREE FOR GROUP BY"},
 })
--- EVIDENCE-OF: R-46219-33846 sqlite> EXPLAIN QUERY PLAN
+-- EVIDENCE-OF: R-46219-33846 sql> EXPLAIN QUERY PLAN
 -- SELECT * FROM (SELECT * FROM t2 WHERE c=1), t1;
 -- 0|0|0|SEARCH TABLE T2 USING COVERING INDEX i4 (c=?)
 -- 0|1|1|SCAN TABLE T1
@@ -660,7 +660,7 @@ test:do_eqp_test(5.11, "SELECT a, b FROM (SELECT * FROM t2 WHERE c=1), t1", {
     {0, 0, 0, "SEARCH TABLE T2 USING COVERING INDEX I4 (C=?)"},
     {0, 1, 1, "SCAN TABLE T1"},
 })
--- EVIDENCE-OF: R-37879-39987 sqlite> EXPLAIN QUERY PLAN
+-- EVIDENCE-OF: R-37879-39987 sql> EXPLAIN QUERY PLAN
 -- SELECT a FROM t1 UNION SELECT c FROM t2;
 -- 1|0|0|SCAN TABLE T1
 -- 2|0|0|SCAN TABLE T2
@@ -671,7 +671,7 @@ test:do_eqp_test(5.12, "SELECT a,b FROM t1 UNION SELECT c, 99 FROM t2", {
     {2, 0, 0, "SCAN TABLE T2"},
     {0, 0, 0, "COMPOUND SUBQUERIES 1 AND 2 USING TEMP B-TREE (UNION)"},
 })
--- EVIDENCE-OF: R-44864-63011 sqlite> EXPLAIN QUERY PLAN
+-- EVIDENCE-OF: R-44864-63011 sql> EXPLAIN QUERY PLAN
 -- SELECT a FROM t1 EXCEPT SELECT d FROM t2 ORDER BY 1;
 -- 1|0|0|SCAN TABLE T1 USING COVERING INDEX i2
 -- 2|0|0|SCAN TABLE T2 2|0|0|USE TEMP B-TREE FOR ORDER BY
@@ -690,11 +690,11 @@ test:do_eqp_test(5.13, "SELECT a FROM t1 EXCEPT SELECT d FROM t2 ORDER BY 1", {
 -- #
 -- set boilerplate {
 --   proc explain_query_plan {db sql} {
---     set stmt [sqlite3_prepare_v2 db $sql -1 DUMMY]
+--     set stmt [sql_prepare_v2 db $sql -1 DUMMY]
 --     print_explain_query_plan $stmt
---     sqlite3_finalize $stmt
+--     sql_finalize $stmt
 --   }
---   sqlite3 db test.db
+--   sql db test.db
 --   explain_query_plan db {%SQL%}
 --   db close
 --   exit
@@ -755,7 +755,7 @@ if (0 > 0)
         ]])
 
     --db("close")
-    --sqlite3("db", "test.db")
+    --sql("db", "test.db")
     test:do_eqp_test(7.4, "SELECT count(*) FROM t1", {
        {0, 0, 0, "SCAN TABLE T1"}
    })

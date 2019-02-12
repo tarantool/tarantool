@@ -13,7 +13,7 @@ test:plan(11)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 -- This particular file does testing of casting strings into numeric
 -- values.
 --
@@ -27,7 +27,7 @@ for _, enc in ipairs({"utf8"}) do
         "numcast-"..enc..".0",
         function()
             --db("close")
-            --sqlite3("db", ":memory:")
+            --sql("db", ":memory:")
             --test:execsql("PRAGMA encoding='"..enc.."'")
             local x = "utf8"--test:execsql("PRAGMA encoding")[1]
             x = string.lower(x)

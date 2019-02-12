@@ -30,7 +30,7 @@
  */
 
 /*
- * This file contains C code routines that are called by the SQLite parser
+ * This file contains C code routines that are called by the sql parser
  * when syntax rules are reduced.  The routines in this file handle the
  * following kinds of SQL syntax:
  *
@@ -43,7 +43,7 @@
  *     COMMIT
  *     ROLLBACK
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 #include "box/box.h"
@@ -106,9 +106,9 @@ void
 sql_finish_coding(struct Parse *parse_context)
 {
 	assert(parse_context->pToplevel == NULL);
-	struct sqlite3 *db = parse_context->db;
-	struct Vdbe *v = sqlite3GetVdbe(parse_context);
-	sqlite3VdbeAddOp0(v, OP_Halt);
+	struct sql *db = parse_context->db;
+	struct Vdbe *v = sqlGetVdbe(parse_context);
+	sqlVdbeAddOp0(v, OP_Halt);
 	/*
 	 * In case statement "CREATE TABLE ..." fails it can
 	 * left some records in system spaces that shouldn't be
@@ -124,30 +124,30 @@ sql_finish_coding(struct Parse *parse_context)
 			rlist_shift_entry(&parse_context->record_list,
 					  struct saved_record, link);
 		/* Set P2 of SInsert. */
-		sqlite3VdbeChangeP2(v, record->insertion_opcode, v->nOp);
+		sqlVdbeChangeP2(v, record->insertion_opcode, v->nOp);
 		MAYBE_UNUSED const char *comment =
 			"Delete entry from %s if CREATE TABLE fails";
 		rlist_foreach_entry(record, &parse_context->record_list, link) {
 			int record_reg = ++parse_context->nMem;
-			sqlite3VdbeAddOp3(v, OP_MakeRecord, record->reg_key,
+			sqlVdbeAddOp3(v, OP_MakeRecord, record->reg_key,
 					  record->reg_key_count, record_reg);
-			sqlite3VdbeAddOp2(v, OP_SDelete, record->space_id,
+			sqlVdbeAddOp2(v, OP_SDelete, record->space_id,
 					  record_reg);
 			MAYBE_UNUSED struct space *space =
 				space_by_id(record->space_id);
 			VdbeComment((v, comment, space_name(space)));
 			/* Set P2 of SInsert. */
-			sqlite3VdbeChangeP2(v, record->insertion_opcode,
+			sqlVdbeChangeP2(v, record->insertion_opcode,
 					    v->nOp);
 		}
-		sqlite3VdbeAddOp1(v, OP_Halt, SQL_TARANTOOL_ERROR);
+		sqlVdbeAddOp1(v, OP_Halt, SQL_TARANTOOL_ERROR);
 		VdbeComment((v,
 			     "Exit with an error if CREATE statement fails"));
 	}
 
 	if (db->mallocFailed || parse_context->nErr != 0) {
-		if (parse_context->rc == SQLITE_OK)
-			parse_context->rc = SQLITE_ERROR;
+		if (parse_context->rc == SQL_OK)
+			parse_context->rc = SQL_ERROR;
 		return;
 	}
 	/*
@@ -155,12 +155,12 @@ sql_finish_coding(struct Parse *parse_context)
 	 * of the vdbe program
 	 */
 	assert(!parse_context->isMultiWrite ||
-	       sqlite3VdbeAssertMayAbort(v, parse_context->mayAbort));
+	       sqlVdbeAssertMayAbort(v, parse_context->mayAbort));
 	int last_instruction = v->nOp;
 	if (parse_context->initiateTTrans)
-		sqlite3VdbeAddOp0(v, OP_TTransaction);
+		sqlVdbeAddOp0(v, OP_TTransaction);
 	if (parse_context->pConstExpr != NULL) {
-		assert(sqlite3VdbeGetOp(v, 0)->opcode == OP_Init);
+		assert(sqlVdbeGetOp(v, 0)->opcode == OP_Init);
 		/*
 		 * Code constant expressions that where
 		 * factored out of inner loops.
@@ -168,7 +168,7 @@ sql_finish_coding(struct Parse *parse_context)
 		struct ExprList *exprs = parse_context->pConstExpr;
 		parse_context->okConstFactor = 0;
 		for (int i = 0; i < exprs->nExpr; ++i) {
-			sqlite3ExprCode(parse_context, exprs->a[i].pExpr,
+			sqlExprCode(parse_context, exprs->a[i].pExpr,
 					exprs->a[i].u. iConstExprReg);
 		}
 	}
@@ -185,16 +185,16 @@ sql_finish_coding(struct Parse *parse_context)
 	 */
 	if (parse_context->initiateTTrans ||
 	    parse_context->pConstExpr != NULL) {
-		sqlite3VdbeChangeP2(v, 0, last_instruction);
-		sqlite3VdbeGoto(v, 1);
+		sqlVdbeChangeP2(v, 0, last_instruction);
+		sqlVdbeGoto(v, 1);
 	}
 	/* Get the VDBE program ready for execution. */
 	if (parse_context->nErr == 0 && !db->mallocFailed) {
 		assert(parse_context->iCacheLevel == 0);
-		sqlite3VdbeMakeReady(v, parse_context);
-		parse_context->rc = SQLITE_DONE;
+		sqlVdbeMakeReady(v, parse_context);
+		parse_context->rc = SQL_DONE;
 	} else {
-		parse_context->rc = SQLITE_ERROR;
+		parse_context->rc = SQL_ERROR;
 	}
 }
 /**
@@ -240,7 +240,7 @@ sql_space_column_is_in_pk(struct space *space, uint32_t column)
  * @param tab Table to be deleted.
  */
 static void
-table_delete(struct sqlite3 *db, struct Table *tab)
+table_delete(struct sql *db, struct Table *tab)
 {
 	/*
 	 * There are three possible cases:
@@ -280,11 +280,11 @@ table_delete(struct sqlite3 *db, struct Table *tab)
 	} else if (tab->def->id == 0) {
 		space_def_delete(tab->def);
 	}
-	sqlite3DbFree(db, tab);
+	sqlDbFree(db, tab);
 }
 
 void
-sqlite3DeleteTable(sqlite3 * db, Table * pTable)
+sqlDeleteTable(sql * db, Table * pTable)
 {
 	/* Do not delete the table until the reference count reaches zero. */
 	if (!pTable)
@@ -297,7 +297,7 @@ sqlite3DeleteTable(sqlite3 * db, Table * pTable)
 /*
  * Given a token, return a string that consists of the text of that
  * token.  Space to hold the returned string
- * is obtained from sqliteMalloc() and must be freed by the calling
+ * is obtained from sqlMalloc() and must be freed by the calling
  * function.
  *
  * Any quotation marks (ex:  "name", 'name', [name], or `name`) that
@@ -308,12 +308,12 @@ sqlite3DeleteTable(sqlite3 * db, Table * pTable)
  * is \000 terminated and is persistent.
  */
 char *
-sqlite3NameFromToken(sqlite3 * db, Token * pName)
+sqlNameFromToken(sql * db, Token * pName)
 {
 	char *zName;
 	if (pName) {
-		zName = sqlite3DbStrNDup(db, (char *)pName->z, pName->n);
-		sqlite3NormalizeName(zName);
+		zName = sqlDbStrNDup(db, (char *)pName->z, pName->n);
+		sqlNormalizeName(zName);
 	} else {
 		zName = 0;
 	}
@@ -329,17 +329,17 @@ sqlite3NameFromToken(sqlite3 * db, Token * pName)
  * characters or have length greater than BOX_NAME_MAX.
  */
 int
-sqlite3CheckIdentifierName(Parse *pParse, char *zName)
+sqlCheckIdentifierName(Parse *pParse, char *zName)
 {
 	ssize_t len = strlen(zName);
 
 	if (len > BOX_NAME_MAX || identifier_check(zName, len) != 0) {
-		sqlite3ErrorMsg(pParse,
+		sqlErrorMsg(pParse,
 				"identifier name is invalid: %s",
 				zName);
-		return SQLITE_ERROR;
+		return SQL_ERROR;
 	}
-	return SQLITE_OK;
+	return SQL_OK;
 }
 
 struct index *
@@ -386,7 +386,7 @@ sql_table_new(Parse *parser, char *name)
  * The new table record is initialized and put in pParse->pNewTable.
  * As more of the CREATE TABLE statement is parsed, additional action
  * routines will be called to add more information to this record.
- * At the end of the CREATE TABLE statement, the sqlite3EndTable() routine
+ * At the end of the CREATE TABLE statement, the sqlEndTable() routine
  * is called to complete the construction of the new table record.
  *
  * @param pParse Parser context.
@@ -394,28 +394,28 @@ sql_table_new(Parse *parser, char *name)
  * @param noErr Do nothing if table already exists.
  */
 void
-sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
+sqlStartTable(Parse *pParse, Token *pName, int noErr)
 {
 	Table *pTable;
 	char *zName = 0;	/* The name of the new table */
-	sqlite3 *db = pParse->db;
-	struct Vdbe *v = sqlite3GetVdbe(pParse);
+	sql *db = pParse->db;
+	struct Vdbe *v = sqlGetVdbe(pParse);
 	if (v == NULL)
 		goto cleanup;
-	sqlite3VdbeCountChanges(v);
+	sqlVdbeCountChanges(v);
 
-	zName = sqlite3NameFromToken(db, pName);
+	zName = sqlNameFromToken(db, pName);
 
 	pParse->sNameToken = *pName;
 	if (zName == 0)
 		return;
-	if (sqlite3CheckIdentifierName(pParse, zName) != SQLITE_OK)
+	if (sqlCheckIdentifierName(pParse, zName) != SQL_OK)
 		goto cleanup;
 
 	struct space *space = space_by_name(zName);
 	if (space != NULL) {
 		if (!noErr) {
-			sqlite3ErrorMsg(pParse, "table %s already exists",
+			sqlErrorMsg(pParse, "table %s already exists",
 					zName);
 		} else {
 			assert(!db->init.busy || CORRUPT_DB);
@@ -430,11 +430,11 @@ sqlite3StartTable(Parse *pParse, Token *pName, int noErr)
 	assert(pParse->pNewTable == 0);
 	pParse->pNewTable = pTable;
 
-	if (!db->init.busy && (v = sqlite3GetVdbe(pParse)) != 0)
+	if (!db->init.busy && (v = sqlGetVdbe(pParse)) != 0)
 		sql_set_multi_write(pParse, true);
 
  cleanup:
-	sqlite3DbFree(db, zName);
+	sqlDbFree(db, zName);
 	return;
 }
 
@@ -453,7 +453,7 @@ sql_field_retrieve(Parse *parser, Table *table, uint32_t id)
 {
 	struct field_def *field;
 	assert(table->def != NULL);
-	assert(id < SQLITE_MAX_COLUMN);
+	assert(id < SQL_MAX_COLUMN);
 
 	if (id >= table->def->exact_field_count) {
 		uint32_t columns_new = table->def->exact_field_count;
@@ -489,23 +489,23 @@ sql_field_retrieve(Parse *parser, Table *table, uint32_t id)
  * Add a new column to the table currently being constructed.
  *
  * The parser calls this routine once for each column declaration
- * in a CREATE TABLE statement.  sqlite3StartTable() gets called
+ * in a CREATE TABLE statement.  sqlStartTable() gets called
  * first to get things going.  Then this routine is called for each
  * column.
  */
 void
-sqlite3AddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
+sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 {
 	assert(type_def != NULL);
 	Table *p;
 	int i;
 	char *z;
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 	if ((p = pParse->pNewTable) == 0)
 		return;
-#if SQLITE_MAX_COLUMN
-	if ((int)p->def->field_count + 1 > db->aLimit[SQLITE_LIMIT_COLUMN]) {
-		sqlite3ErrorMsg(pParse, "too many columns on %s",
+#if SQL_MAX_COLUMN
+	if ((int)p->def->field_count + 1 > db->aLimit[SQL_LIMIT_COLUMN]) {
+		sqlErrorMsg(pParse, "too many columns on %s",
 				p->def->name);
 		return;
 	}
@@ -530,10 +530,10 @@ sqlite3AddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 	}
 	memcpy(z, pName->z, pName->n);
 	z[pName->n] = 0;
-	sqlite3NormalizeName(z);
+	sqlNormalizeName(z);
 	for (i = 0; i < (int)p->def->field_count; i++) {
 		if (strcmp(z, p->def->fields[i].name) == 0) {
-			sqlite3ErrorMsg(pParse, "duplicate column name: %s", z);
+			sqlErrorMsg(pParse, "duplicate column name: %s", z);
 			return;
 		}
 	}
@@ -589,16 +589,16 @@ sql_column_add_nullable_action(struct Parse *parser,
  * parsing a CREATE TABLE statement.
  */
 void
-sqlite3AddDefaultValue(Parse * pParse, ExprSpan * pSpan)
+sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 {
 	Table *p;
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 	p = pParse->pNewTable;
 	assert(p->def->opts.is_temporary);
 	if (p != 0) {
-		if (!sqlite3ExprIsConstantOrFunction
+		if (!sqlExprIsConstantOrFunction
 		    (pSpan->pExpr, db->init.busy)) {
-			sqlite3ErrorMsg(pParse,
+			sqlErrorMsg(pParse,
 					"default value of column [%s] is not constant",
 					p->def->fields[p->def->field_count - 1].name);
 		} else {
@@ -655,7 +655,7 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
  * index for the key.  No index is created for INTEGER PRIMARY KEYs.
  */
 void
-sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
+sqlAddPrimaryKey(Parse * pParse,	/* Parsing context */
 		     ExprList * pList,	/* List of field names to be indexed */
 		     int autoInc,	/* True if the AUTOINCREMENT keyword is present */
 		     enum sort_order sortOrder
@@ -667,7 +667,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	if (pTab == 0)
 		goto primary_key_exit;
 	if (sql_table_primary_key(pTab) != NULL) {
-		sqlite3ErrorMsg(pParse,
+		sqlErrorMsg(pParse,
 				"table \"%s\" has more than one primary key",
 				pTab->def->name);
 		goto primary_key_exit;
@@ -679,10 +679,10 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 		nTerm = pList->nExpr;
 		for (i = 0; i < nTerm; i++) {
 			Expr *pCExpr =
-			    sqlite3ExprSkipCollate(pList->a[i].pExpr);
+			    sqlExprSkipCollate(pList->a[i].pExpr);
 			assert(pCExpr != 0);
 			if (pCExpr->op != TK_ID) {
-				sqlite3ErrorMsg(pParse, "expressions prohibited"
+				sqlErrorMsg(pParse, "expressions prohibited"
 							" in PRIMARY KEY");
 				goto primary_key_exit;
 			}
@@ -701,12 +701,12 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 	    sortOrder != SORT_ORDER_DESC) {
 		assert(autoInc == 0 || autoInc == 1);
 		pParse->is_new_table_autoinc = autoInc;
-		struct sqlite3 *db = pParse->db;
+		struct sql *db = pParse->db;
 		struct ExprList *list;
 		struct Token token;
-		sqlite3TokenInit(&token, pTab->def->fields[iCol].name);
+		sqlTokenInit(&token, pTab->def->fields[iCol].name);
 		list = sql_expr_list_append(db, NULL,
-					    sqlite3ExprAlloc(db, TK_ID,
+					    sqlExprAlloc(db, TK_ID,
 							     &token, 0));
 		if (list == NULL)
 			goto primary_key_exit;
@@ -715,7 +715,7 @@ sqlite3AddPrimaryKey(Parse * pParse,	/* Parsing context */
 		if (db->mallocFailed)
 			goto primary_key_exit;
 	} else if (autoInc) {
-		sqlite3ErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
+		sqlErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
 				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
 		goto primary_key_exit;
 	} else {
@@ -746,7 +746,7 @@ sql_add_check_constraint(struct Parse *parser, struct ExprSpan *span)
 	struct Table *table = parser->pNewTable;
 	if (table != NULL) {
 		expr->u.zToken =
-			sqlite3DbStrNDup(parser->db, (char *)span->zStart,
+			sqlDbStrNDup(parser->db, (char *)span->zStart,
 					 (int)(span->zEnd - span->zStart));
 		if (expr->u.zToken == NULL)
 			goto release_expr;
@@ -754,11 +754,11 @@ sql_add_check_constraint(struct Parse *parser, struct ExprSpan *span)
 			sql_expr_list_append(parser->db,
 					     table->def->opts.checks, expr);
 		if (table->def->opts.checks == NULL) {
-			sqlite3DbFree(parser->db, expr->u.zToken);
+			sqlDbFree(parser->db, expr->u.zToken);
 			goto release_expr;
 		}
 		if (parser->constraintName.n) {
-			sqlite3ExprListSetName(parser, table->def->opts.checks,
+			sqlExprListSetName(parser, table->def->opts.checks,
 					       &parser->constraintName, 1);
 		}
 	} else {
@@ -772,14 +772,14 @@ release_expr:
  * to the CollSeq given.
  */
 void
-sqlite3AddCollateType(Parse * pParse, Token * pToken)
+sqlAddCollateType(Parse * pParse, Token * pToken)
 {
 	Table *p = pParse->pNewTable;
 	if (p == NULL)
 		return;
 	uint32_t i = p->def->field_count - 1;
-	sqlite3 *db = pParse->db;
-	char *zColl = sqlite3NameFromToken(db, pToken);
+	sql *db = pParse->db;
+	char *zColl = sqlNameFromToken(db, pToken);
 	if (!zColl)
 		return;
 	uint32_t *coll_id = &p->def->fields[i].coll_id;
@@ -797,7 +797,7 @@ sqlite3AddCollateType(Parse * pParse, Token * pToken)
 			}
 		}
 	}
-	sqlite3DbFree(db, zColl);
+	sqlDbFree(db, zColl);
 }
 
 struct coll *
@@ -843,7 +843,7 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 		      struct space *space)
 {
 	assert(space != NULL);
-	return sqlite3VdbeAddOp4(parse_context->pVdbe, OP_IteratorOpen, cursor,
+	return sqlVdbeAddOp4(parse_context->pVdbe, OP_IteratorOpen, cursor,
 				 index_id, 0, (void *) space, P4_SPACEPTR);
 }
 
@@ -855,10 +855,10 @@ vdbe_emit_open_cursor(struct Parse *parse_context, int cursor, int index_id,
 static int
 getNewSpaceId(Parse * pParse)
 {
-	Vdbe *v = sqlite3GetVdbe(pParse);
+	Vdbe *v = sqlGetVdbe(pParse);
 	int iRes = ++pParse->nMem;
 
-	sqlite3VdbeAddOp1(v, OP_IncMaxid, iRes);
+	sqlVdbeAddOp1(v, OP_IncMaxid, iRes);
 	return iRes;
 }
 
@@ -878,7 +878,7 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 		       const struct index_def *idx_def, int space_id_reg,
 		       int index_id_reg)
 {
-	struct Vdbe *v = sqlite3GetVdbe(parse);
+	struct Vdbe *v = sqlGetVdbe(parse);
 	int entry_reg = ++parse->nMem;
 	/*
 	 * Entry in _index space contains 6 fields.
@@ -897,7 +897,7 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 						   &index_parts_sz);
 	if (index_parts == NULL)
 		goto error;
-	char *raw = sqlite3DbMallocRaw(parse->db,
+	char *raw = sqlDbMallocRaw(parse->db,
 				       index_opts_sz +index_parts_sz);
 	if (raw == NULL)
 		return;
@@ -908,29 +908,29 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 	index_parts = raw;
 
 	if (parse->pNewTable != NULL) {
-		sqlite3VdbeAddOp2(v, OP_SCopy, space_id_reg, entry_reg);
-		sqlite3VdbeAddOp2(v, OP_Integer, idx_def->iid, entry_reg + 1);
+		sqlVdbeAddOp2(v, OP_SCopy, space_id_reg, entry_reg);
+		sqlVdbeAddOp2(v, OP_Integer, idx_def->iid, entry_reg + 1);
 	} else {
 		/*
 		 * An existing table is being modified;
 		 * space_id_reg is literal, but index_id_reg is
 		 * register.
 		 */
-		sqlite3VdbeAddOp2(v, OP_Integer, space_id_reg, entry_reg);
-		sqlite3VdbeAddOp2(v, OP_SCopy, index_id_reg, entry_reg + 1);
+		sqlVdbeAddOp2(v, OP_Integer, space_id_reg, entry_reg);
+		sqlVdbeAddOp2(v, OP_SCopy, index_id_reg, entry_reg + 1);
 	}
-	sqlite3VdbeAddOp4(v, OP_String8, 0, entry_reg + 2, 0,
-			  sqlite3DbStrDup(parse->db, idx_def->name),
+	sqlVdbeAddOp4(v, OP_String8, 0, entry_reg + 2, 0,
+			  sqlDbStrDup(parse->db, idx_def->name),
 			  P4_DYNAMIC);
-	sqlite3VdbeAddOp4(v, OP_String8, 0, entry_reg + 3, 0, "tree",
+	sqlVdbeAddOp4(v, OP_String8, 0, entry_reg + 3, 0, "tree",
 			  P4_STATIC);
-	sqlite3VdbeAddOp4(v, OP_Blob, index_opts_sz, entry_reg + 4,
+	sqlVdbeAddOp4(v, OP_Blob, index_opts_sz, entry_reg + 4,
 			  SQL_SUBTYPE_MSGPACK, index_opts, P4_DYNAMIC);
 	/* opts and parts are co-located, hence STATIC. */
-	sqlite3VdbeAddOp4(v, OP_Blob, index_parts_sz, entry_reg + 5,
+	sqlVdbeAddOp4(v, OP_Blob, index_parts_sz, entry_reg + 5,
 			  SQL_SUBTYPE_MSGPACK, index_parts, P4_STATIC);
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, entry_reg, 6, tuple_reg);
-	sqlite3VdbeAddOp3(v, OP_SInsert, BOX_INDEX_ID, 0, tuple_reg);
+	sqlVdbeAddOp3(v, OP_MakeRecord, entry_reg, 6, tuple_reg);
+	sqlVdbeAddOp3(v, OP_SInsert, BOX_INDEX_ID, 0, tuple_reg);
 	save_record(parse, BOX_INDEX_ID, entry_reg, 2, v->nOp - 1);
 	return;
 error:
@@ -948,7 +948,7 @@ static void
 createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 {
 	struct Table *table = pParse->pNewTable;
-	Vdbe *v = sqlite3GetVdbe(pParse);
+	Vdbe *v = sqlGetVdbe(pParse);
 	int iFirstCol = ++pParse->nMem;
 	int iRecord = (pParse->nMem += 7);
 	struct region *region = &pParse->region;
@@ -961,7 +961,7 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 	char *table_stmt = sql_encode_table(region, table, &table_stmt_sz);
 	if (table_stmt == NULL)
 		goto error;
-	char *raw = sqlite3DbMallocRaw(pParse->db,
+	char *raw = sqlDbMallocRaw(pParse->db,
 				       table_stmt_sz + table_opts_stmt_sz);
 	if (raw == NULL)
 		return;
@@ -972,25 +972,25 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 	memcpy(raw, table_stmt, table_stmt_sz);
 	table_stmt = raw;
 
-	sqlite3VdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */ );
-	sqlite3VdbeAddOp2(v, OP_Integer, effective_user()->uid,
+	sqlVdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */ );
+	sqlVdbeAddOp2(v, OP_Integer, effective_user()->uid,
 			  iFirstCol + 1 /* owner */ );
-	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 2 /* name */ , 0,
-			  sqlite3DbStrDup(pParse->db, table->def->name),
+	sqlVdbeAddOp4(v, OP_String8, 0, iFirstCol + 2 /* name */ , 0,
+			  sqlDbStrDup(pParse->db, table->def->name),
 			  P4_DYNAMIC);
-	sqlite3VdbeAddOp4(v, OP_String8, 0, iFirstCol + 3 /* engine */ , 0,
-			  sqlite3DbStrDup(pParse->db, table->def->engine_name),
+	sqlVdbeAddOp4(v, OP_String8, 0, iFirstCol + 3 /* engine */ , 0,
+			  sqlDbStrDup(pParse->db, table->def->engine_name),
 			  P4_DYNAMIC);
-	sqlite3VdbeAddOp2(v, OP_Integer, table->def->field_count,
+	sqlVdbeAddOp2(v, OP_Integer, table->def->field_count,
 			  iFirstCol + 4 /* field_count */ );
-	sqlite3VdbeAddOp4(v, OP_Blob, table_opts_stmt_sz, iFirstCol + 5,
+	sqlVdbeAddOp4(v, OP_Blob, table_opts_stmt_sz, iFirstCol + 5,
 			  SQL_SUBTYPE_MSGPACK, table_opts_stmt, P4_DYNAMIC);
 	/* zOpts and zFormat are co-located, hence STATIC */
-	sqlite3VdbeAddOp4(v, OP_Blob, table_stmt_sz, iFirstCol + 6,
+	sqlVdbeAddOp4(v, OP_Blob, table_stmt_sz, iFirstCol + 6,
 			  SQL_SUBTYPE_MSGPACK, table_stmt, P4_STATIC);
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
-	sqlite3VdbeAddOp3(v, OP_SInsert, BOX_SPACE_ID, 0, iRecord);
-	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	sqlVdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
+	sqlVdbeAddOp3(v, OP_SInsert, BOX_SPACE_ID, 0, iRecord);
+	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	save_record(pParse, BOX_SPACE_ID, iFirstCol, 1, v->nOp - 1);
 	return;
 error:
@@ -1001,8 +1001,8 @@ error:
 int
 emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 {
-	Vdbe *v = sqlite3GetVdbe(pParse);
-	sqlite3 *db = pParse->db;
+	Vdbe *v = sqlGetVdbe(pParse);
+	sql *db = pParse->db;
 	int first_col = pParse->nMem + 1;
 	pParse->nMem += 10; /* 9 fields + new record pointer  */
 
@@ -1011,33 +1011,33 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 	const bool const_false = false;
 
 	/* 1. New sequence id  */
-	sqlite3VdbeAddOp2(v, OP_SCopy, reg_seq_id, first_col + 1);
+	sqlVdbeAddOp2(v, OP_SCopy, reg_seq_id, first_col + 1);
 	/* 2. user is  */
-	sqlite3VdbeAddOp2(v, OP_Integer, effective_user()->uid, first_col + 2);
+	sqlVdbeAddOp2(v, OP_Integer, effective_user()->uid, first_col + 2);
 	/* 3. New sequence name  */
-        sqlite3VdbeAddOp4(v, OP_String8, 0, first_col + 3, 0,
-			  sqlite3DbStrDup(pParse->db, seq_name), P4_DYNAMIC);
+        sqlVdbeAddOp4(v, OP_String8, 0, first_col + 3, 0,
+			  sqlDbStrDup(pParse->db, seq_name), P4_DYNAMIC);
 
 	/* 4. Step  */
-	sqlite3VdbeAddOp2(v, OP_Integer, 1, first_col + 4);
+	sqlVdbeAddOp2(v, OP_Integer, 1, first_col + 4);
 
 	/* 5. Minimum  */
-	sqlite3VdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 5, 0,
+	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 5, 0,
 			      (unsigned char*)&min_usigned_long_long, P4_INT64);
 	/* 6. Maximum  */
-	sqlite3VdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 6, 0,
+	sqlVdbeAddOp4Dup8(v, OP_Int64, 0, first_col + 6, 0,
 			      (unsigned char*)&max_usigned_long_long, P4_INT64);
 	/* 7. Start  */
-	sqlite3VdbeAddOp2(v, OP_Integer, 1, first_col + 7);
+	sqlVdbeAddOp2(v, OP_Integer, 1, first_col + 7);
 
 	/* 8. Cache  */
-	sqlite3VdbeAddOp2(v, OP_Integer, 0, first_col + 8);
+	sqlVdbeAddOp2(v, OP_Integer, 0, first_col + 8);
 
 	/* 9. Cycle  */
-	sqlite3VdbeAddOp2(v, OP_Bool, 0, first_col + 9);
-	sqlite3VdbeChangeP4(v, -1, (char*)&const_false, P4_BOOL);
+	sqlVdbeAddOp2(v, OP_Bool, 0, first_col + 9);
+	sqlVdbeChangeP4(v, -1, (char*)&const_false, P4_BOOL);
 
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col + 1, 9, first_col);
+	sqlVdbeAddOp3(v, OP_MakeRecord, first_col + 1, 9, first_col);
 
 	if (db->mallocFailed)
 		return -1;
@@ -1048,22 +1048,22 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 int
 emitNewSysSpaceSequenceRecord(Parse *pParse, int space_id, const char reg_seq_id)
 {
-	Vdbe *v = sqlite3GetVdbe(pParse);
+	Vdbe *v = sqlGetVdbe(pParse);
 	const bool const_true = true;
 	int first_col = pParse->nMem + 1;
 	pParse->nMem += 4; /* 3 fields + new record pointer  */
 
 	/* 1. Space id  */
-	sqlite3VdbeAddOp2(v, OP_SCopy, space_id, first_col + 1);
+	sqlVdbeAddOp2(v, OP_SCopy, space_id, first_col + 1);
 	
 	/* 2. Sequence id  */
-	sqlite3VdbeAddOp2(v, OP_IntCopy, reg_seq_id, first_col + 2);
+	sqlVdbeAddOp2(v, OP_IntCopy, reg_seq_id, first_col + 2);
 
 	/* 3. True, which is 1 in SQL  */
-	sqlite3VdbeAddOp2(v, OP_Bool, 0, first_col + 3);
-	sqlite3VdbeChangeP4(v, -1, (char*)&const_true, P4_BOOL);
+	sqlVdbeAddOp2(v, OP_Bool, 0, first_col + 3);
+	sqlVdbeChangeP4(v, -1, (char*)&const_true, P4_BOOL);
 
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, first_col + 1, 3, first_col);
+	sqlVdbeAddOp3(v, OP_MakeRecord, first_col + 1, 3, first_col);
 
 	return first_col;
 }
@@ -1080,17 +1080,17 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 {
 	assert(parse_context != NULL);
 	assert(fk != NULL);
-	struct Vdbe *vdbe = sqlite3GetVdbe(parse_context);
+	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
 	assert(vdbe != NULL);
 	/*
 	 * Occupy registers for 8 fields: each member in
 	 * _constraint space plus one for final msgpack tuple.
 	 */
-	int constr_tuple_reg = sqlite3GetTempRange(parse_context, 10);
-	char *name_copy = sqlite3DbStrDup(parse_context->db, fk->name);
+	int constr_tuple_reg = sqlGetTempRange(parse_context, 10);
+	char *name_copy = sqlDbStrDup(parse_context->db, fk->name);
 	if (name_copy == NULL)
 		return;
-	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg, 0, name_copy,
+	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg, 0, name_copy,
 			  P4_DYNAMIC);
 	/*
 	 * In case we are adding FK constraints during execution
@@ -1098,17 +1098,17 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 	 * id, but we know register where it will be stored.
 	 */
 	if (parse_context->pNewTable != NULL) {
-		sqlite3VdbeAddOp2(vdbe, OP_SCopy, fk->child_id,
+		sqlVdbeAddOp2(vdbe, OP_SCopy, fk->child_id,
 				  constr_tuple_reg + 1);
 	} else {
-		sqlite3VdbeAddOp2(vdbe, OP_Integer, fk->child_id,
+		sqlVdbeAddOp2(vdbe, OP_Integer, fk->child_id,
 				  constr_tuple_reg + 1);
 	}
 	if (parse_context->pNewTable != NULL && fkey_is_self_referenced(fk)) {
-		sqlite3VdbeAddOp2(vdbe, OP_SCopy, fk->parent_id,
+		sqlVdbeAddOp2(vdbe, OP_SCopy, fk->parent_id,
 				  constr_tuple_reg + 2);
 	} else {
-		sqlite3VdbeAddOp2(vdbe, OP_Integer, fk->parent_id,
+		sqlVdbeAddOp2(vdbe, OP_Integer, fk->parent_id,
 				  constr_tuple_reg + 2);
 	}
 	/*
@@ -1123,13 +1123,13 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 					      ER_CONSTRAINT_EXISTS, error_msg,
 					      false, OP_NoConflict) != 0)
 		return;
-	sqlite3VdbeAddOp2(vdbe, OP_Bool, 0, constr_tuple_reg + 3);
-	sqlite3VdbeChangeP4(vdbe, -1, (char*)&fk->is_deferred, P4_BOOL);
-	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 4, 0,
+	sqlVdbeAddOp2(vdbe, OP_Bool, 0, constr_tuple_reg + 3);
+	sqlVdbeChangeP4(vdbe, -1, (char*)&fk->is_deferred, P4_BOOL);
+	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 4, 0,
 			  fkey_match_strs[fk->match], P4_STATIC);
-	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 5, 0,
+	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 5, 0,
 			  fkey_action_strs[fk->on_delete], P4_STATIC);
-	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 6, 0,
+	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 6, 0,
 			  fkey_action_strs[fk->on_update], P4_STATIC);
 	struct region *region = &parse_context->region;
 	uint32_t parent_links_size = 0;
@@ -1148,7 +1148,7 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 	 * interprets it as static memory, and the second one -
 	 * as dynamic and releases memory.
 	 */
-	char *raw = sqlite3DbMallocRaw(parse_context->db,
+	char *raw = sqlDbMallocRaw(parse_context->db,
 				       parent_links_size + child_links_size);
 	if (raw == NULL)
 		return;
@@ -1158,20 +1158,20 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 	memcpy(raw, child_links, child_links_size);
 	child_links = raw;
 
-	sqlite3VdbeAddOp4(vdbe, OP_Blob, child_links_size, constr_tuple_reg + 7,
+	sqlVdbeAddOp4(vdbe, OP_Blob, child_links_size, constr_tuple_reg + 7,
 			  SQL_SUBTYPE_MSGPACK, child_links, P4_STATIC);
-	sqlite3VdbeAddOp4(vdbe, OP_Blob, parent_links_size,
+	sqlVdbeAddOp4(vdbe, OP_Blob, parent_links_size,
 			  constr_tuple_reg + 8, SQL_SUBTYPE_MSGPACK,
 			  parent_links, P4_DYNAMIC);
-	sqlite3VdbeAddOp3(vdbe, OP_MakeRecord, constr_tuple_reg, 9,
+	sqlVdbeAddOp3(vdbe, OP_MakeRecord, constr_tuple_reg, 9,
 			  constr_tuple_reg + 9);
-	sqlite3VdbeAddOp3(vdbe, OP_SInsert, BOX_FK_CONSTRAINT_ID, 0,
+	sqlVdbeAddOp3(vdbe, OP_SInsert, BOX_FK_CONSTRAINT_ID, 0,
 			  constr_tuple_reg + 9);
 	if (parse_context->pNewTable == NULL)
-		sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
+		sqlVdbeChangeP5(vdbe, OPFLAG_NCHANGE);
 	save_record(parse_context, BOX_FK_CONSTRAINT_ID, constr_tuple_reg, 2,
 		    vdbe->nOp - 1);
-	sqlite3ReleaseTempRange(parse_context, constr_tuple_reg, 10);
+	sqlReleaseTempRange(parse_context, constr_tuple_reg, 10);
 	return;
 error:
 	parse_context->nErr++;
@@ -1229,13 +1229,13 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
  * the new table will match the result set of the SELECT.
  */
 void
-sqlite3EndTable(Parse * pParse,	/* Parse context */
+sqlEndTable(Parse * pParse,	/* Parse context */
 		Token * pEnd,	/* The ')' before options in the CREATE TABLE */
 		Select * pSelect	/* Select from a "CREATE ... AS SELECT" */
     )
 {
 	Table *p;		/* The new table */
-	sqlite3 *db = pParse->db;	/* The database connection */
+	sql *db = pParse->db;	/* The database connection */
 
 	if (pEnd == 0 && pSelect == 0) {
 		return;
@@ -1249,7 +1249,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 
 	if (!p->def->opts.is_view) {
 		if (sql_table_primary_key(p) == NULL) {
-			sqlite3ErrorMsg(pParse,
+			sqlErrorMsg(pParse,
 					"PRIMARY KEY missing on table %s",
 					p->def->name);
 			goto cleanup;
@@ -1272,7 +1272,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 	/*
 	 * If not initializing, then create new Tarantool space.
 	 */
-	struct Vdbe *v = sqlite3GetVdbe(pParse);
+	struct Vdbe *v = sqlGetVdbe(pParse);
 	if (NEVER(v == 0))
 		return;
 
@@ -1283,7 +1283,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		int n = pEnd2->z - pParse->sNameToken.z;
 		if (pEnd2->z[0] != ';')
 			n += pEnd2->n;
-		stmt = sqlite3MPrintf(db, "CREATE VIEW %.*s", n,
+		stmt = sqlMPrintf(db, "CREATE VIEW %.*s", n,
 				      pParse->sNameToken.z);
 	}
 	int reg_space_id = getNewSpaceId(pParse);
@@ -1305,11 +1305,11 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		assert(reg_space_id != 0);
 		/* Do an insertion into _sequence. */
 		int reg_seq_id = ++pParse->nMem;
-		sqlite3VdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
+		sqlVdbeAddOp2(v, OP_NextSequenceId, 0, reg_seq_id);
 		int reg_seq_record =
 			emitNewSysSequenceRecord(pParse, reg_seq_id,
 						 p->def->name);
-		sqlite3VdbeAddOp3(v, OP_SInsert, BOX_SEQUENCE_ID, 0,
+		sqlVdbeAddOp3(v, OP_SInsert, BOX_SEQUENCE_ID, 0,
 				  reg_seq_record);
 		save_record(pParse, BOX_SEQUENCE_ID, reg_seq_record + 1, 1,
 			    v->nOp - 1);
@@ -1317,7 +1317,7 @@ sqlite3EndTable(Parse * pParse,	/* Parse context */
 		int reg_space_seq_record =
 			emitNewSysSpaceSequenceRecord(pParse, reg_space_id,
 						      reg_seq_id);
-		sqlite3VdbeAddOp3(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID, 0,
+		sqlVdbeAddOp3(v, OP_SInsert, BOX_SPACE_SEQUENCE_ID, 0,
 				  reg_space_seq_record);
 		save_record(pParse, BOX_SPACE_SEQUENCE_ID,
 			    reg_space_seq_record + 1, 1, v->nOp - 1);
@@ -1367,30 +1367,30 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 		struct Token *name, struct ExprList *aliases,
 		struct Select *select, bool if_exists)
 {
-	struct sqlite3 *db = parse_context->db;
+	struct sql *db = parse_context->db;
 	struct Table *sel_tab = NULL;
 	if (parse_context->nVar > 0) {
-		sqlite3ErrorMsg(parse_context,
+		sqlErrorMsg(parse_context,
 				"parameters are not allowed in views");
 		goto create_view_fail;
 	}
-	sqlite3StartTable(parse_context, name, if_exists);
+	sqlStartTable(parse_context, name, if_exists);
 	struct Table *p = parse_context->pNewTable;
 	if (p == NULL || parse_context->nErr != 0)
 		goto create_view_fail;
-	sel_tab = sqlite3ResultSetOfSelect(parse_context, select);
+	sel_tab = sqlResultSetOfSelect(parse_context, select);
 	if (sel_tab == NULL)
 		goto create_view_fail;
 	if (aliases != NULL) {
 		if ((int)sel_tab->def->field_count != aliases->nExpr) {
-			sqlite3ErrorMsg(parse_context, "expected %d columns "\
+			sqlErrorMsg(parse_context, "expected %d columns "\
 					"for '%s' but got %d", aliases->nExpr,
 					p->def->name,
 					sel_tab->def->field_count);
 			goto create_view_fail;
 		}
-		sqlite3ColumnsFromExprList(parse_context, aliases, p);
-		sqlite3SelectAddColumnTypeAndCollation(parse_context, p,
+		sqlColumnsFromExprList(parse_context, aliases, p);
+		sqlSelectAddColumnTypeAndCollation(parse_context, p,
 						       select);
 	} else {
 		assert(sel_tab->def->opts.is_temporary);
@@ -1412,7 +1412,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	int n = end.z - begin->z;
 	assert(n > 0);
 	const char *z = begin->z;
-	while (sqlite3Isspace(z[n - 1]))
+	while (sqlIsspace(z[n - 1]))
 		n--;
 	end.z = &z[n - 1];
 	end.n = 1;
@@ -1424,11 +1424,11 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 		goto create_view_fail;
 	}
 
-	/* Use sqlite3EndTable() to add the view to the Tarantool.  */
-	sqlite3EndTable(parse_context, &end, 0);
+	/* Use sqlEndTable() to add the view to the Tarantool.  */
+	sqlEndTable(parse_context, &end, 0);
 
  create_view_fail:
-	sqlite3DbFree(db, sel_tab);
+	sqlDbFree(db, sel_tab);
 	sql_expr_list_delete(db, aliases);
 	sql_select_delete(db, select);
 	return;
@@ -1438,11 +1438,11 @@ int
 sql_view_assign_cursors(struct Parse *parse, const char *view_stmt)
 {
 	assert(view_stmt != NULL);
-	struct sqlite3 *db = parse->db;
+	struct sql *db = parse->db;
 	struct Select *select = sql_view_compile(db, view_stmt);
 	if (select == NULL)
 		return -1;
-	sqlite3SrcListAssignCursors(parse, select->pSrc);
+	sqlSrcListAssignCursors(parse, select->pSrc);
 	sql_select_delete(db, select);
 	return 0;
 }
@@ -1450,7 +1450,7 @@ sql_view_assign_cursors(struct Parse *parse, const char *view_stmt)
 void
 sql_store_select(struct Parse *parse_context, struct Select *select)
 {
-	Select *select_copy = sqlite3SelectDup(parse_context->db, select, 0);
+	Select *select_copy = sqlSelectDup(parse_context->db, select, 0);
 	parse_context->parsed_ast_type = AST_TYPE_SELECT;
 	parse_context->parsed_ast.select = select_copy;
 }
@@ -1468,17 +1468,17 @@ static struct Expr *
 sql_id_eq_str_expr(struct Parse *parse, const char *col_name,
 		   const char *col_value)
 {
-	struct sqlite3 *db = parse->db;
+	struct sql *db = parse->db;
 
-	struct Expr *col_name_expr = sqlite3Expr(db, TK_ID, col_name);
+	struct Expr *col_name_expr = sqlExpr(db, TK_ID, col_name);
 	if (col_name_expr == NULL)
 		return NULL;
-	struct Expr *col_value_expr = sqlite3Expr(db, TK_STRING, col_value);
+	struct Expr *col_value_expr = sqlExpr(db, TK_STRING, col_value);
 	if (col_value_expr == NULL) {
 		sql_expr_delete(db, col_name_expr, false);
 		return NULL;
 	}
-	return sqlite3PExpr(parse, TK_EQ, col_name_expr, col_value_expr);
+	return sqlPExpr(parse, TK_EQ, col_name_expr, col_value_expr);
 }
 
 void
@@ -1486,21 +1486,21 @@ vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
 			   const char *idx_name, const char *table_name)
 {
 	assert(idx_name != NULL || table_name != NULL);
-	struct sqlite3 *db = parse->db;
+	struct sql *db = parse->db;
 	assert(!db->mallocFailed);
 	struct SrcList *src_list = sql_alloc_src_list(db);
 	if (src_list != NULL)
-		src_list->a[0].zName = sqlite3DbStrDup(db, stat_table_name);
+		src_list->a[0].zName = sqlDbStrDup(db, stat_table_name);
 	struct Expr *where = NULL;
 	if (idx_name != NULL) {
 		struct Expr *expr = sql_id_eq_str_expr(parse, "idx", idx_name);
 		if (expr != NULL)
-			where = sqlite3ExprAnd(db, expr, where);
+			where = sqlExprAnd(db, expr, where);
 	}
 	if (table_name != NULL) {
 		struct Expr *expr = sql_id_eq_str_expr(parse, "tbl", table_name);
 		if (expr != NULL)
-			where = sqlite3ExprAnd(db, expr, where);
+			where = sqlExprAnd(db, expr, where);
 	}
 	/**
 	 * On memory allocation error sql_table delete_from
@@ -1531,7 +1531,7 @@ sql_clear_stat_spaces(struct Parse *parse, const char *table_name,
  *
  * @param parse_context Parsing context.
  * @param constraint_name Name of FK constraint to be dropped.
- *        Must be allocated on head by sqlite3DbMalloc().
+ *        Must be allocated on head by sqlDbMalloc().
  *        It will be freed in VDBE.
  * @param child_id Id of table which constraint belongs to.
  */
@@ -1539,12 +1539,12 @@ static void
 vdbe_emit_fkey_drop(struct Parse *parse_context, char *constraint_name,
 		    uint32_t child_id)
 {
-	struct Vdbe *vdbe = sqlite3GetVdbe(parse_context);
+	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
 	assert(vdbe != NULL);
-	int key_reg = sqlite3GetTempRange(parse_context, 3);
-	sqlite3VdbeAddOp4(vdbe, OP_String8, 0, key_reg, 0, constraint_name,
+	int key_reg = sqlGetTempRange(parse_context, 3);
+	sqlVdbeAddOp4(vdbe, OP_String8, 0, key_reg, 0, constraint_name,
 			  P4_DYNAMIC);
-	sqlite3VdbeAddOp2(vdbe, OP_Integer, child_id,  key_reg + 1);
+	sqlVdbeAddOp2(vdbe, OP_Integer, child_id,  key_reg + 1);
 	const char *error_msg =
 		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT),
 			   constraint_name);
@@ -1553,13 +1553,13 @@ vdbe_emit_fkey_drop(struct Parse *parse_context, char *constraint_name,
 					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
 					      error_msg, false,
 					      OP_Found) != 0) {
-		sqlite3DbFree(parse_context->db, constraint_name);
+		sqlDbFree(parse_context->db, constraint_name);
 		return;
 	}
-	sqlite3VdbeAddOp3(vdbe, OP_MakeRecord, key_reg, 2, key_reg + 2);
-	sqlite3VdbeAddOp2(vdbe, OP_SDelete, BOX_FK_CONSTRAINT_ID, key_reg + 2);
+	sqlVdbeAddOp3(vdbe, OP_MakeRecord, key_reg, 2, key_reg + 2);
+	sqlVdbeAddOp2(vdbe, OP_SDelete, BOX_FK_CONSTRAINT_ID, key_reg + 2);
 	VdbeComment((vdbe, "Delete FK constraint %s", constraint_name));
-	sqlite3ReleaseTempRange(parse_context, key_reg, 3);
+	sqlReleaseTempRange(parse_context, key_reg, 3);
 }
 
 /**
@@ -1575,7 +1575,7 @@ static void
 sql_code_drop_table(struct Parse *parse_context, struct space *space,
 		    bool is_view)
 {
-	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
 	/*
 	 * Drop all triggers associated with the table being
@@ -1600,34 +1600,34 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	int idx_rec_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
 	int space_id = space->def->id;
-	sqlite3VdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
-	sqlite3VdbeAddOp1(v, OP_CheckViewReferences, space_id_reg);
+	sqlVdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
+	sqlVdbeAddOp1(v, OP_CheckViewReferences, space_id_reg);
 	if (space->sequence != NULL) {
 		/* Delete entry from _sequence_data. */
 		int sequence_id_reg = ++parse_context->nMem;
-		sqlite3VdbeAddOp2(v, OP_Integer, space->sequence->def->id,
+		sqlVdbeAddOp2(v, OP_Integer, space->sequence->def->id,
 				  sequence_id_reg);
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
+		sqlVdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
 				  idx_rec_reg);
-		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_DATA_ID,
+		sqlVdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_DATA_ID,
 				  idx_rec_reg);
 		VdbeComment((v, "Delete entry from _sequence_data"));
 		/* Delete entry from _space_sequence. */
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1,
+		sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1,
 				  idx_rec_reg);
-		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SPACE_SEQUENCE_ID,
+		sqlVdbeAddOp2(v, OP_SDelete, BOX_SPACE_SEQUENCE_ID,
 				  idx_rec_reg);
 		VdbeComment((v, "Delete entry from _space_sequence"));
 		/* Delete entry by id from _sequence. */
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
+		sqlVdbeAddOp3(v, OP_MakeRecord, sequence_id_reg, 1,
 				  idx_rec_reg);
-		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_ID, idx_rec_reg);
+		sqlVdbeAddOp2(v, OP_SDelete, BOX_SEQUENCE_ID, idx_rec_reg);
 		VdbeComment((v, "Delete entry from _sequence"));
 	}
 	/* Delete all child FK constraints. */
 	struct fkey *child_fk;
 	rlist_foreach_entry (child_fk, &space->child_fkey, child_link) {
-		char *fk_name_dup = sqlite3DbStrDup(v->db, child_fk->def->name);
+		char *fk_name_dup = sqlDbStrDup(v->db, child_fk->def->name);
 		if (fk_name_dup == NULL)
 			return;
 		vdbe_emit_fkey_drop(parse_context, fk_name_dup, space_id);
@@ -1645,32 +1645,32 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 			 * secondary exist.
 			 */
 			for (uint32_t i = 1; i < index_count; ++i) {
-				sqlite3VdbeAddOp2(v, OP_Integer,
+				sqlVdbeAddOp2(v, OP_Integer,
 						  space->index[i]->def->iid,
 						  space_id_reg + 1);
-				sqlite3VdbeAddOp3(v, OP_MakeRecord,
+				sqlVdbeAddOp3(v, OP_MakeRecord,
 						  space_id_reg, 2, idx_rec_reg);
-				sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID,
+				sqlVdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID,
 						  idx_rec_reg);
 				VdbeComment((v,
 					     "Remove secondary index iid = %u",
 					     space->index[i]->def->iid));
 			}
 		}
-		sqlite3VdbeAddOp2(v, OP_Integer, 0, space_id_reg + 1);
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2,
+		sqlVdbeAddOp2(v, OP_Integer, 0, space_id_reg + 1);
+		sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2,
 				  idx_rec_reg);
-		sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, idx_rec_reg);
+		sqlVdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, idx_rec_reg);
 		VdbeComment((v, "Remove primary index"));
 	}
 	/* Delete records about the space from the _truncate. */
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1, idx_rec_reg);
-	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_TRUNCATE_ID, idx_rec_reg);
+	sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1, idx_rec_reg);
+	sqlVdbeAddOp2(v, OP_SDelete, BOX_TRUNCATE_ID, idx_rec_reg);
 	VdbeComment((v, "Delete entry from _truncate"));
 	/* Eventually delete entry from _space. */
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1, idx_rec_reg);
-	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_SPACE_ID, idx_rec_reg);
-	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 1, idx_rec_reg);
+	sqlVdbeAddOp2(v, OP_SDelete, BOX_SPACE_ID, idx_rec_reg);
+	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	VdbeComment((v, "Delete entry from _space"));
 }
 
@@ -1686,22 +1686,22 @@ void
 sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	       bool is_view, bool if_exists)
 {
-	struct Vdbe *v = sqlite3GetVdbe(parse_context);
-	struct sqlite3 *db = parse_context->db;
+	struct Vdbe *v = sqlGetVdbe(parse_context);
+	struct sql *db = parse_context->db;
 	if (v == NULL || db->mallocFailed) {
 		goto exit_drop_table;
 	}
-	sqlite3VdbeCountChanges(v);
+	sqlVdbeCountChanges(v);
 	assert(parse_context->nErr == 0);
 	assert(table_name_list->nSrc == 1);
 	const char *space_name = table_name_list->a[0].zName;
 	struct space *space = space_by_name(space_name);
 	if (space == NULL) {
 		if (!is_view && !if_exists)
-			sqlite3ErrorMsg(parse_context, "no such table: %s",
+			sqlErrorMsg(parse_context, "no such table: %s",
 					space_name);
 		if (is_view && !if_exists)
-			sqlite3ErrorMsg(parse_context, "no such view: %s",
+			sqlErrorMsg(parse_context, "no such view: %s",
 					space_name);
 		goto exit_drop_table;
 	}
@@ -1710,12 +1710,12 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	 * and DROP VIEW is not used on a table.
 	 */
 	if (is_view && !space->def->opts.is_view) {
-		sqlite3ErrorMsg(parse_context, "use DROP TABLE to delete table %s",
+		sqlErrorMsg(parse_context, "use DROP TABLE to delete table %s",
 				space_name);
 		goto exit_drop_table;
 	}
 	if (!is_view && space->def->opts.is_view) {
-		sqlite3ErrorMsg(parse_context, "use DROP VIEW to delete view %s",
+		sqlErrorMsg(parse_context, "use DROP VIEW to delete view %s",
 				space_name);
 		goto exit_drop_table;
 	}
@@ -1748,7 +1748,7 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	sql_code_drop_table(parse_context, space, is_view);
 
  exit_drop_table:
-	sqlite3SrcListDelete(db, table_name_list);
+	sqlSrcListDelete(db, table_name_list);
 }
 
 /**
@@ -1788,7 +1788,7 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		       struct Token *parent, struct ExprList *parent_cols,
 		       bool is_deferred, int actions)
 {
-	struct sqlite3 *db = parse_context->db;
+	struct sql *db = parse_context->db;
 	/*
 	 * When this function is called second time during
 	 * <CREATE TABLE ...> statement (i.e. at VDBE runtime),
@@ -1838,7 +1838,7 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		rlist_add_entry(&parse_context->new_fkey, fk, link);
 	}
 	assert(parent != NULL);
-	parent_name = sqlite3NameFromToken(db, parent);
+	parent_name = sqlNameFromToken(db, parent);
 	if (parent_name == NULL)
 		goto exit_create_fk;
 	/*
@@ -1862,7 +1862,7 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		}
 	} else {
 		if (parent_space->def->opts.is_view) {
-			sqlite3ErrorMsg(parse_context,
+			sqlErrorMsg(parse_context,
 					"referenced table can't be view");
 			goto exit_create_fk;
 		}
@@ -1870,15 +1870,15 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	if (constraint == NULL && !is_alter) {
 		if (parse_context->constraintName.n == 0) {
 			constraint_name =
-				sqlite3MPrintf(db, "FK_CONSTRAINT_%d_%s",
+				sqlMPrintf(db, "FK_CONSTRAINT_%d_%s",
 					       ++parse_context->fkey_count,
 					       new_tab->def->name);
 		} else {
 			struct Token *cnstr_nm = &parse_context->constraintName;
-			constraint_name = sqlite3NameFromToken(db, cnstr_nm);
+			constraint_name = sqlNameFromToken(db, cnstr_nm);
 		}
 	} else {
-		constraint_name = sqlite3NameFromToken(db, constraint);
+		constraint_name = sqlNameFromToken(db, constraint);
 	}
 	if (constraint_name == NULL)
 		goto exit_create_fk;
@@ -1963,7 +1963,7 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	/*
 	 * In case of CREATE TABLE processing, all foreign keys
 	 * constraints must be created after space itself, so
-	 * lets delay it until sqlite3EndTable() call and simply
+	 * lets delay it until sqlEndTable() call and simply
 	 * maintain list of all FK constraints inside parser.
 	 */
 	if (!is_alter) {
@@ -1979,8 +1979,8 @@ exit_create_fk:
 	sql_expr_list_delete(db, child_cols);
 	if (!is_self_referenced)
 		sql_expr_list_delete(db, parent_cols);
-	sqlite3DbFree(db, parent_name);
-	sqlite3DbFree(db, constraint_name);
+	sqlDbFree(db, parent_name);
+	sqlDbFree(db, constraint_name);
 	return;
 tnt_error:
 	parse_context->rc = SQL_TARANTOOL_ERROR;
@@ -2011,7 +2011,7 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 		parse_context->nErr++;
 		return;
 	}
-	char *constraint_name = sqlite3NameFromToken(parse_context->db,
+	char *constraint_name = sqlNameFromToken(parse_context->db,
 						     constraint);
 	if (constraint_name != NULL)
 		vdbe_emit_fkey_drop(parse_context, constraint_name,
@@ -2022,7 +2022,7 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 	 * ALTER TABLE DROP CONSTRAINT statement, since whole
 	 * DROP TABLE always returns 1 (one) as a row count.
 	 */
-	sqlite3VdbeChangeP5(sqlite3GetVdbe(parse_context), OPFLAG_NCHANGE);
+	sqlVdbeChangeP5(sqlGetVdbe(parse_context), OPFLAG_NCHANGE);
 }
 
 /*
@@ -2032,14 +2032,14 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 static int
 getNewIid(Parse * pParse, int iSpaceId, int iCursor)
 {
-	Vdbe *v = sqlite3GetVdbe(pParse);
+	Vdbe *v = sqlGetVdbe(pParse);
 	int iRes = ++pParse->nMem;
 	int iKey = ++pParse->nMem;
 	int iSeekInst, iGotoInst;
 
-	sqlite3VdbeAddOp2(v, OP_Integer, iSpaceId, iKey);
-	iSeekInst = sqlite3VdbeAddOp4Int(v, OP_SeekLE, iCursor, 0, iKey, 1);
-	sqlite3VdbeAddOp4Int(v, OP_IdxLT, iCursor, 0, iKey, 1);
+	sqlVdbeAddOp2(v, OP_Integer, iSpaceId, iKey);
+	iSeekInst = sqlVdbeAddOp4Int(v, OP_SeekLE, iCursor, 0, iKey, 1);
+	sqlVdbeAddOp4Int(v, OP_IdxLT, iCursor, 0, iKey, 1);
 
 	/*
 	 * If SeekLE succeeds, the control falls through here, skipping
@@ -2047,22 +2047,22 @@ getNewIid(Parse * pParse, int iSpaceId, int iCursor)
 	 *
 	 * If it fails (no entry with the given key prefix: invalid spaceId)
 	 * VDBE jumps to the next code block (jump target is IMM, fixed up
-	 * later with sqlite3VdbeJumpHere()).
+	 * later with sqlVdbeJumpHere()).
 	 */
-	iGotoInst = sqlite3VdbeAddOp0(v, OP_Goto);	/* Jump over Halt */
+	iGotoInst = sqlVdbeAddOp0(v, OP_Goto);	/* Jump over Halt */
 
 	/* Invalid spaceId detected. Halt now. */
-	sqlite3VdbeJumpHere(v, iSeekInst);
-	sqlite3VdbeJumpHere(v, iSeekInst + 1);
-	sqlite3VdbeAddOp4(v,
-			  OP_Halt, SQLITE_ERROR, ON_CONFLICT_ACTION_FAIL, 0,
-			  sqlite3MPrintf(pParse->db, "Invalid space id: %d",
+	sqlVdbeJumpHere(v, iSeekInst);
+	sqlVdbeJumpHere(v, iSeekInst + 1);
+	sqlVdbeAddOp4(v,
+			  OP_Halt, SQL_ERROR, ON_CONFLICT_ACTION_FAIL, 0,
+			  sqlMPrintf(pParse->db, "Invalid space id: %d",
 					 iSpaceId), P4_DYNAMIC);
 
 	/* Fetch iid from the row and ++it. */
-	sqlite3VdbeJumpHere(v, iGotoInst);
-	sqlite3VdbeAddOp3(v, OP_Column, iCursor, 1, iRes);
-	sqlite3VdbeAddOp2(v, OP_AddImm, iRes, 1);
+	sqlVdbeJumpHere(v, iGotoInst);
+	sqlVdbeAddOp3(v, OP_Column, iCursor, 1, iRes);
+	sqlVdbeAddOp2(v, OP_AddImm, iRes, 1);
 	return iRes;
 }
 
@@ -2141,7 +2141,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 		if (parse->nErr > 0)
 			goto cleanup;
 
-		struct Expr *column_expr = sqlite3ExprSkipCollate(expr);
+		struct Expr *column_expr = sqlExprSkipCollate(expr);
 		if (column_expr->op != TK_COLUMN) {
 			diag_set(ClientError, ER_UNSUPPORTED, "Tarantool",
 				 "functional indexes");
@@ -2215,17 +2215,17 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	struct index *index = NULL;
 	/* Name of the index. */
 	char *name = NULL;
-	struct sqlite3 *db = parse->db;
+	struct sql *db = parse->db;
 	assert(!db->init.busy);
 
 	if (db->mallocFailed || parse->nErr > 0)
 		goto exit_create_index;
 	if (idx_type == SQL_INDEX_TYPE_UNIQUE ||
 	    idx_type == SQL_INDEX_TYPE_NON_UNIQUE) {
-		Vdbe *v = sqlite3GetVdbe(parse);
+		Vdbe *v = sqlGetVdbe(parse);
 		if (v == NULL)
 			goto exit_create_index;
-		sqlite3VdbeCountChanges(v);
+		sqlVdbeCountChanges(v);
 	}
 
 	/*
@@ -2257,7 +2257,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	}
 
 	if (def->opts.is_view) {
-		sqlite3ErrorMsg(parse, "views can not be indexed");
+		sqlErrorMsg(parse, "views can not be indexed");
 		goto exit_create_index;
 	}
 	/*
@@ -2282,12 +2282,12 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	 */
 	if (token != NULL) {
 		assert(token->z != NULL);
-		name = sqlite3NameFromToken(db, token);
+		name = sqlNameFromToken(db, token);
 		if (name == NULL)
 			goto exit_create_index;
 		if (sql_space_index_by_name(space, name) != NULL) {
 			if (!if_not_exist) {
-				sqlite3ErrorMsg(parse,
+				sqlErrorMsg(parse,
 						"index %s.%s already exists",
 						def->name, name);
 			}
@@ -2297,7 +2297,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		char *constraint_name = NULL;
 		if (parse->constraintName.z != NULL)
 			constraint_name =
-				sqlite3NameFromToken(db,
+				sqlNameFromToken(db,
 						     &parse->constraintName);
 
 	       /*
@@ -2321,16 +2321,16 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		uint32_t idx_count = space->index_count;
 		if (constraint_name == NULL ||
 		    strcmp(constraint_name, "") == 0) {
-			name = sqlite3MPrintf(db, prefix, def->name,
+			name = sqlMPrintf(db, prefix, def->name,
 					      idx_count + 1);
 		} else {
-			name = sqlite3MPrintf(db, prefix,
+			name = sqlMPrintf(db, prefix,
 					      constraint_name, idx_count + 1);
 		}
-		sqlite3DbFree(db, constraint_name);
+		sqlDbFree(db, constraint_name);
 	}
 
-	if (name == NULL || sqlite3CheckIdentifierName(parse, name) != 0)
+	if (name == NULL || sqlCheckIdentifierName(parse, name) != 0)
 		goto exit_create_index;
 
 	if (tbl_name != NULL && space_is_system(space)) {
@@ -2350,16 +2350,16 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	if (col_list == NULL) {
 		struct Token prev_col;
 		uint32_t last_field = def->field_count - 1;
-		sqlite3TokenInit(&prev_col, def->fields[last_field].name);
+		sqlTokenInit(&prev_col, def->fields[last_field].name);
 		col_list = sql_expr_list_append(parse->db, NULL,
-						sqlite3ExprAlloc(db, TK_ID,
+						sqlExprAlloc(db, TK_ID,
 								 &prev_col, 0));
 		if (col_list == NULL)
 			goto exit_create_index;
 		assert(col_list->nExpr == 1);
-		sqlite3ExprListSetSortOrder(col_list, sort_order);
+		sqlExprListSetSortOrder(col_list, sort_order);
 	} else {
-		sqlite3ExprListCheckLength(parse, col_list, "index");
+		sqlExprListCheckLength(parse, col_list, "index");
 	}
 
 	index = (struct index *) region_alloc(&parse->region, sizeof(*index));
@@ -2496,23 +2496,23 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		Vdbe *vdbe;
 		int cursor = parse->nTab++;
 
-		vdbe = sqlite3GetVdbe(parse);
+		vdbe = sqlGetVdbe(parse);
 		if (vdbe == 0)
 			goto exit_create_index;
 
 		sql_set_multi_write(parse, true);
-		sqlite3VdbeAddOp4(vdbe, OP_IteratorOpen, cursor, 0, 0,
+		sqlVdbeAddOp4(vdbe, OP_IteratorOpen, cursor, 0, 0,
 				  (void *)space_by_id(BOX_INDEX_ID),
 				  P4_SPACEPTR);
-		sqlite3VdbeChangeP5(vdbe, OPFLAG_SEEKEQ);
+		sqlVdbeChangeP5(vdbe, OPFLAG_SEEKEQ);
 
 		assert(start != NULL);
 		int index_id = getNewIid(parse, def->id, cursor);
-		sqlite3VdbeAddOp1(vdbe, OP_Close, cursor);
+		sqlVdbeAddOp1(vdbe, OP_Close, cursor);
 		vdbe_emit_create_index(parse, def, index->def,
 				       def->id, index_id);
-		sqlite3VdbeChangeP5(vdbe, OPFLAG_NCHANGE);
-		sqlite3VdbeAddOp0(vdbe, OP_Expire);
+		sqlVdbeChangeP5(vdbe, OPFLAG_NCHANGE);
+		sqlVdbeAddOp0(vdbe, OP_Expire);
 	}
 
 	if (tbl_name != NULL)
@@ -2525,31 +2525,31 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	if (index != NULL && index->def != NULL)
 		index_def_delete(index->def);
 	sql_expr_list_delete(db, col_list);
-	sqlite3SrcListDelete(db, tbl_name);
-	sqlite3DbFree(db, name);
+	sqlSrcListDelete(db, tbl_name);
+	sqlDbFree(db, name);
 }
 
 void
 sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	       struct Token *table_token, bool if_exists)
 {
-	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
-	struct sqlite3 *db = parse_context->db;
+	struct sql *db = parse_context->db;
 	/* Never called with prior errors. */
 	assert(parse_context->nErr == 0);
 	assert(table_token != NULL);
-	const char *table_name = sqlite3NameFromToken(db, table_token);
+	const char *table_name = sqlNameFromToken(db, table_token);
 	if (db->mallocFailed) {
 		goto exit_drop_index;
 	}
-	sqlite3VdbeCountChanges(v);
+	sqlVdbeCountChanges(v);
 	assert(index_name_list->nSrc == 1);
 	assert(table_token->n > 0);
 	struct space *space = space_by_name(table_name);
 	if (space == NULL) {
 		if (!if_exists)
-			sqlite3ErrorMsg(parse_context, "no such space: %s",
+			sqlErrorMsg(parse_context, "no such space: %s",
 					table_name);
 		goto exit_drop_index;
 	}
@@ -2558,7 +2558,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 						 strlen(index_name));
 	if (index_id == BOX_ID_NIL) {
 		if (!if_exists)
-			sqlite3ErrorMsg(parse_context, "no such index: %s.%s",
+			sqlErrorMsg(parse_context, "no such index: %s.%s",
 					table_name, index_name);
 		goto exit_drop_index;
 	}
@@ -2573,19 +2573,19 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	sql_clear_stat_spaces(parse_context, table_name, index->def->name);
 	int record_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
-	sqlite3VdbeAddOp2(v, OP_Integer, space->def->id, space_id_reg);
-	sqlite3VdbeAddOp2(v, OP_Integer, index_id, space_id_reg + 1);
-	sqlite3VdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2, record_reg);
-	sqlite3VdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, record_reg);
-	sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+	sqlVdbeAddOp2(v, OP_Integer, space->def->id, space_id_reg);
+	sqlVdbeAddOp2(v, OP_Integer, index_id, space_id_reg + 1);
+	sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2, record_reg);
+	sqlVdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, record_reg);
+	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
  exit_drop_index:
-	sqlite3SrcListDelete(db, index_name_list);
-	sqlite3DbFree(db, (void *) table_name);
+	sqlSrcListDelete(db, index_name_list);
+	sqlDbFree(db, (void *) table_name);
 }
 
 /*
  * pArray is a pointer to an array of objects. Each object in the
- * array is szEntry bytes in size. This routine uses sqlite3DbRealloc()
+ * array is szEntry bytes in size. This routine uses sqlDbRealloc()
  * to extend the array so that there is space for a new object at the end.
  *
  * When this function is called, *pnEntry contains the current size of
@@ -2601,7 +2601,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
  * unchanged and a copy of pArray returned.
  */
 void *
-sqlite3ArrayAllocate(sqlite3 * db,	/* Connection to notify of malloc failures */
+sqlArrayAllocate(sql * db,	/* Connection to notify of malloc failures */
 		     void *pArray,	/* Array of objects.  Might be reallocated */
 		     int szEntry,	/* Size of each object in the array */
 		     int *pnEntry,	/* Number of objects currently in use */
@@ -2612,7 +2612,7 @@ sqlite3ArrayAllocate(sqlite3 * db,	/* Connection to notify of malloc failures */
 	int n = *pnEntry;
 	if ((n & (n - 1)) == 0) {
 		int sz = (n == 0) ? 1 : 2 * n;
-		void *pNew = sqlite3DbRealloc(db, pArray, sz * szEntry);
+		void *pNew = sqlDbRealloc(db, pArray, sz * szEntry);
 		if (pNew == 0) {
 			*pIdx = -1;
 			return pArray;
@@ -2633,22 +2633,22 @@ sqlite3ArrayAllocate(sqlite3 * db,	/* Connection to notify of malloc failures */
  * A new IdList is returned, or NULL if malloc() fails.
  */
 IdList *
-sqlite3IdListAppend(sqlite3 * db, IdList * pList, Token * pToken)
+sqlIdListAppend(sql * db, IdList * pList, Token * pToken)
 {
 	int i;
 	if (pList == 0) {
-		pList = sqlite3DbMallocZero(db, sizeof(IdList));
+		pList = sqlDbMallocZero(db, sizeof(IdList));
 		if (pList == 0)
 			return 0;
 	}
-	pList->a = sqlite3ArrayAllocate(db,
+	pList->a = sqlArrayAllocate(db,
 					pList->a,
 					sizeof(pList->a[0]), &pList->nId, &i);
 	if (i < 0) {
-		sqlite3IdListDelete(db, pList);
+		sqlIdListDelete(db, pList);
 		return 0;
 	}
-	pList->a[i].zName = sqlite3NameFromToken(db, pToken);
+	pList->a[i].zName = sqlNameFromToken(db, pToken);
 	return pList;
 }
 
@@ -2656,16 +2656,16 @@ sqlite3IdListAppend(sqlite3 * db, IdList * pList, Token * pToken)
  * Delete an IdList.
  */
 void
-sqlite3IdListDelete(sqlite3 * db, IdList * pList)
+sqlIdListDelete(sql * db, IdList * pList)
 {
 	int i;
 	if (pList == 0)
 		return;
 	for (i = 0; i < pList->nId; i++) {
-		sqlite3DbFree(db, pList->a[i].zName);
+		sqlDbFree(db, pList->a[i].zName);
 	}
-	sqlite3DbFree(db, pList->a);
-	sqlite3DbFree(db, pList);
+	sqlDbFree(db, pList->a);
+	sqlDbFree(db, pList);
 }
 
 /*
@@ -2673,7 +2673,7 @@ sqlite3IdListDelete(sqlite3 * db, IdList * pList)
  * if not found.
  */
 int
-sqlite3IdListIndex(IdList * pList, const char *zName)
+sqlIdListIndex(IdList * pList, const char *zName)
 {
 	int i;
 	if (pList == 0)
@@ -2693,7 +2693,7 @@ sqlite3IdListIndex(IdList * pList, const char *zName)
  * For example, suppose a SrcList initially contains two entries: A,B.
  * To append 3 new entries onto the end, do this:
  *
- *    sqlite3SrcListEnlarge(db, pSrclist, 3, 2);
+ *    sqlSrcListEnlarge(db, pSrclist, 3, 2);
  *
  * After the call above it would contain:  A, B, nil, nil, nil.
  * If the iStart argument had been 1 instead of 2, then the result
@@ -2705,7 +2705,7 @@ sqlite3IdListIndex(IdList * pList, const char *zName)
  * db->mallocFailed flag will be set to true.
  */
 SrcList *
-sqlite3SrcListEnlarge(sqlite3 * db,	/* Database connection to notify of OOM errors */
+sqlSrcListEnlarge(sql * db,	/* Database connection to notify of OOM errors */
 		      SrcList * pSrc,	/* The SrcList to be enlarged */
 		      int nExtra,	/* Number of new slots to add to pSrc->a[] */
 		      int iStart	/* Index in pSrc->a[] of first new slot */
@@ -2724,7 +2724,7 @@ sqlite3SrcListEnlarge(sqlite3 * db,	/* Database connection to notify of OOM erro
 		SrcList *pNew;
 		int nAlloc = pSrc->nSrc * 2 + nExtra;
 		int nGot;
-		pNew = sqlite3DbRealloc(db, pSrc,
+		pNew = sqlDbRealloc(db, pSrc,
 					sizeof(*pSrc) + (nAlloc -
 							 1) *
 					sizeof(pSrc->a[0]));
@@ -2734,7 +2734,7 @@ sqlite3SrcListEnlarge(sqlite3 * db,	/* Database connection to notify of OOM erro
 		}
 		pSrc = pNew;
 		nGot =
-		    (sqlite3DbMallocSize(db, pNew) -
+		    (sqlDbMallocSize(db, pNew) -
 		     sizeof(*pSrc)) / sizeof(pSrc->a[0]) + 1;
 		pSrc->nAlloc = nGot;
 	}
@@ -2758,11 +2758,11 @@ sqlite3SrcListEnlarge(sqlite3 * db,	/* Database connection to notify of OOM erro
 }
 
 SrcList *
-sql_alloc_src_list(sqlite3 *db)
+sql_alloc_src_list(sql *db)
 {
 	SrcList *pList;
 
-	pList = sqlite3DbMallocRawNN(db, sizeof(SrcList));
+	pList = sqlDbMallocRawNN(db, sizeof(SrcList));
 	if (pList == 0)
 		return NULL;
 	pList->nAlloc = 1;
@@ -2791,23 +2791,23 @@ sql_alloc_src_list(sqlite3 *db)
  *
  * In other words, if call like this:
  *
- *         sqlite3SrcListAppend(D,A,B,0);
+ *         sqlSrcListAppend(D,A,B,0);
  *
  * Then B is a table name and the database name is unspecified.  If called
  * like this:
  *
- *         sqlite3SrcListAppend(D,A,B,C);
+ *         sqlSrcListAppend(D,A,B,C);
  *
  * Then C is the table name and B is the database name.  If C is defined
  * then so is B.  In other words, we never have a case where:
  *
- *         sqlite3SrcListAppend(D,A,0,C);
+ *         sqlSrcListAppend(D,A,0,C);
  *
  * Both pTable and pDatabase are assumed to be quoted.  They are dequoted
  * before being added to the SrcList.
  */
 SrcList *
-sqlite3SrcListAppend(sqlite3 * db,	/* Connection to notify of malloc failures */
+sqlSrcListAppend(sql * db,	/* Connection to notify of malloc failures */
 		     SrcList * pList,	/* Append to this SrcList. NULL creates a new SrcList */
 		     Token * pTable	/* Table to append */
     )
@@ -2819,14 +2819,14 @@ sqlite3SrcListAppend(sqlite3 * db,	/* Connection to notify of malloc failures */
 		if (pList == 0)
 			return 0;
 	} else {
-		pList = sqlite3SrcListEnlarge(db, pList, 1, pList->nSrc);
+		pList = sqlSrcListEnlarge(db, pList, 1, pList->nSrc);
 	}
 	if (db->mallocFailed) {
-		sqlite3SrcListDelete(db, pList);
+		sqlSrcListDelete(db, pList);
 		return 0;
 	}
 	pItem = &pList->a[pList->nSrc - 1];
-	pItem->zName = sqlite3NameFromToken(db, pTable);
+	pItem->zName = sqlNameFromToken(db, pTable);
 	return pList;
 }
 
@@ -2834,7 +2834,7 @@ sqlite3SrcListAppend(sqlite3 * db,	/* Connection to notify of malloc failures */
  * Assign VdbeCursor index numbers to all tables in a SrcList
  */
 void
-sqlite3SrcListAssignCursors(Parse * pParse, SrcList * pList)
+sqlSrcListAssignCursors(Parse * pParse, SrcList * pList)
 {
 	int i;
 	struct SrcList_item *pItem;
@@ -2845,7 +2845,7 @@ sqlite3SrcListAssignCursors(Parse * pParse, SrcList * pList)
 				break;
 			pItem->iCursor = pParse->nTab++;
 			if (pItem->pSelect) {
-				sqlite3SrcListAssignCursors(pParse,
+				sqlSrcListAssignCursors(pParse,
 							    pItem->pSelect->
 							    pSrc);
 			}
@@ -2854,25 +2854,25 @@ sqlite3SrcListAssignCursors(Parse * pParse, SrcList * pList)
 }
 
 void
-sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
+sqlSrcListDelete(sql * db, SrcList * pList)
 {
 	int i;
 	struct SrcList_item *pItem;
 	if (pList == 0)
 		return;
 	for (pItem = pList->a, i = 0; i < pList->nSrc; i++, pItem++) {
-		sqlite3DbFree(db, pItem->zName);
-		sqlite3DbFree(db, pItem->zAlias);
+		sqlDbFree(db, pItem->zName);
+		sqlDbFree(db, pItem->zAlias);
 		if (pItem->fg.isIndexedBy)
-			sqlite3DbFree(db, pItem->u1.zIndexedBy);
+			sqlDbFree(db, pItem->u1.zIndexedBy);
 		if (pItem->fg.isTabFunc)
 			sql_expr_list_delete(db, pItem->u1.pFuncArg);
-		sqlite3DeleteTable(db, pItem->pTab);
+		sqlDeleteTable(db, pItem->pTab);
 		sql_select_delete(db, pItem->pSelect);
 		sql_expr_delete(db, pItem->pOn, false);
-		sqlite3IdListDelete(db, pItem->pUsing);
+		sqlIdListDelete(db, pItem->pUsing);
 	}
-	sqlite3DbFree(db, pList);
+	sqlDbFree(db, pList);
 }
 
 /*
@@ -2892,7 +2892,7 @@ sqlite3SrcListDelete(sqlite3 * db, SrcList * pList)
  * term added.
  */
 SrcList *
-sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
+sqlSrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 			     SrcList * p,	/* The left part of the FROM clause already seen */
 			     Token * pTable,	/* Name of the table to add to the FROM clause */
 			     Token * pAlias,	/* The right-hand side of the AS subexpression */
@@ -2902,21 +2902,21 @@ sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
     )
 {
 	struct SrcList_item *pItem;
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 	if (!p && (pOn || pUsing)) {
-		sqlite3ErrorMsg(pParse, "a JOIN clause is required before %s",
+		sqlErrorMsg(pParse, "a JOIN clause is required before %s",
 				(pOn ? "ON" : "USING")
 		    );
 		goto append_from_error;
 	}
-	p = sqlite3SrcListAppend(db, p, pTable);
+	p = sqlSrcListAppend(db, p, pTable);
 	if (p == 0 || NEVER(p->nSrc == 0)) {
 		goto append_from_error;
 	}
 	pItem = &p->a[p->nSrc - 1];
 	assert(pAlias != 0);
 	if (pAlias->n) {
-		pItem->zAlias = sqlite3NameFromToken(db, pAlias);
+		pItem->zAlias = sqlNameFromToken(db, pAlias);
 	}
 	pItem->pSelect = pSubquery;
 	pItem->pOn = pOn;
@@ -2926,7 +2926,7 @@ sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
  append_from_error:
 	assert(p == 0);
 	sql_expr_delete(db, pOn, false);
-	sqlite3IdListDelete(db, pUsing);
+	sqlIdListDelete(db, pUsing);
 	sql_select_delete(db, pSubquery);
 	return 0;
 }
@@ -2936,7 +2936,7 @@ sqlite3SrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
  * element of the source-list passed as the second argument.
  */
 void
-sqlite3SrcListIndexedBy(Parse * pParse, SrcList * p, Token * pIndexedBy)
+sqlSrcListIndexedBy(Parse * pParse, SrcList * p, Token * pIndexedBy)
 {
 	assert(pIndexedBy != 0);
 	if (p && ALWAYS(p->nSrc > 0)) {
@@ -2951,7 +2951,7 @@ sqlite3SrcListIndexedBy(Parse * pParse, SrcList * p, Token * pIndexedBy)
 			pItem->fg.notIndexed = 1;
 		} else {
 			pItem->u1.zIndexedBy =
-			    sqlite3NameFromToken(pParse->db, pIndexedBy);
+			    sqlNameFromToken(pParse->db, pIndexedBy);
 			pItem->fg.isIndexedBy = (pItem->u1.zIndexedBy != 0);
 		}
 	}
@@ -2962,7 +2962,7 @@ sqlite3SrcListIndexedBy(Parse * pParse, SrcList * p, Token * pIndexedBy)
  * table-valued-function.
  */
 void
-sqlite3SrcListFuncArgs(Parse * pParse, SrcList * p, ExprList * pList)
+sqlSrcListFuncArgs(Parse * pParse, SrcList * p, ExprList * pList)
 {
 	if (p) {
 		struct SrcList_item *pItem = &p->a[p->nSrc - 1];
@@ -2992,7 +2992,7 @@ sqlite3SrcListFuncArgs(Parse * pParse, SrcList * p, ExprList * pList)
  * operator with A.  This routine shifts that operator over to B.
  */
 void
-sqlite3SrcListShiftJoinType(SrcList * p)
+sqlSrcListShiftJoinType(SrcList * p)
 {
 	if (p) {
 		int i;
@@ -3007,27 +3007,27 @@ void
 sql_transaction_begin(struct Parse *parse_context)
 {
 	assert(parse_context != NULL);
-	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
 	if (v != NULL)
-		sqlite3VdbeAddOp0(v, OP_TransactionBegin);
+		sqlVdbeAddOp0(v, OP_TransactionBegin);
 }
 
 void
 sql_transaction_commit(struct Parse *parse_context)
 {
 	assert(parse_context != NULL);
-	struct Vdbe *v = sqlite3GetVdbe(parse_context);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
 	if (v != NULL)
-		sqlite3VdbeAddOp0(v, OP_TransactionCommit);
+		sqlVdbeAddOp0(v, OP_TransactionCommit);
 }
 
 void
 sql_transaction_rollback(Parse *pParse)
 {
 	assert(pParse != 0);
-	struct Vdbe *v = sqlite3GetVdbe(pParse);
+	struct Vdbe *v = sqlGetVdbe(pParse);
 	if (v != NULL)
-		sqlite3VdbeAddOp0(v, OP_TransactionRollback);
+		sqlVdbeAddOp0(v, OP_TransactionRollback);
 }
 
 /*
@@ -3035,22 +3035,22 @@ sql_transaction_rollback(Parse *pParse)
  * release or rollback an SQL savepoint.
  */
 void
-sqlite3Savepoint(Parse * pParse, int op, Token * pName)
+sqlSavepoint(Parse * pParse, int op, Token * pName)
 {
-	char *zName = sqlite3NameFromToken(pParse->db, pName);
+	char *zName = sqlNameFromToken(pParse->db, pName);
 	if (zName) {
-		Vdbe *v = sqlite3GetVdbe(pParse);
+		Vdbe *v = sqlGetVdbe(pParse);
 		if (!v) {
-			sqlite3DbFree(pParse->db, zName);
+			sqlDbFree(pParse->db, zName);
 			return;
 		}
 		if (op == SAVEPOINT_BEGIN &&
-			sqlite3CheckIdentifierName(pParse, zName)
-				!= SQLITE_OK) {
-			sqlite3ErrorMsg(pParse, "bad savepoint name");
+			sqlCheckIdentifierName(pParse, zName)
+				!= SQL_OK) {
+			sqlErrorMsg(pParse, "bad savepoint name");
 			return;
 		}
-		sqlite3VdbeAddOp4(v, OP_Savepoint, op, 0, 0, zName, P4_DYNAMIC);
+		sqlVdbeAddOp4(v, OP_Savepoint, op, 0, 0, zName, P4_DYNAMIC);
 	}
 }
 
@@ -3061,7 +3061,7 @@ sqlite3Savepoint(Parse * pParse, int op, Token * pName)
 void
 sql_set_multi_write(struct Parse *parse_context, bool is_set)
 {
-	Parse *pToplevel = sqlite3ParseToplevel(parse_context);
+	Parse *pToplevel = sqlParseToplevel(parse_context);
 	pToplevel->isMultiWrite |= is_set;
 }
 
@@ -3078,23 +3078,23 @@ sql_set_multi_write(struct Parse *parse_context, bool is_set)
  * go a little faster.  But taking advantage of this time dependency
  * makes it more difficult to prove that the code is correct (in
  * particular, it prevents us from writing an effective
- * implementation of sqlite3AssertMayAbort()) and so we have chosen
+ * implementation of sqlAssertMayAbort()) and so we have chosen
  * to take the safe route and skip the optimization.
  */
 void
-sqlite3MayAbort(Parse * pParse)
+sqlMayAbort(Parse * pParse)
 {
-	Parse *pToplevel = sqlite3ParseToplevel(pParse);
+	Parse *pToplevel = sqlParseToplevel(pParse);
 	pToplevel->mayAbort = 1;
 }
 
 /*
- * Code an OP_Halt that causes the vdbe to return an SQLITE_CONSTRAINT
+ * Code an OP_Halt that causes the vdbe to return an SQL_CONSTRAINT
  * error. The onError parameter determines which (if any) of the statement
  * and/or current transaction is rolled back.
  */
 void
-sqlite3HaltConstraint(Parse * pParse,	/* Parsing context */
+sqlHaltConstraint(Parse * pParse,	/* Parsing context */
 		      int errCode,	/* extended error code */
 		      int onError,	/* Constraint type */
 		      char *p4,	/* Error message */
@@ -3102,41 +3102,41 @@ sqlite3HaltConstraint(Parse * pParse,	/* Parsing context */
 		      u8 p5Errmsg	/* P5_ErrMsg type */
     )
 {
-	Vdbe *v = sqlite3GetVdbe(pParse);
-	assert((errCode & 0xff) == SQLITE_CONSTRAINT);
+	Vdbe *v = sqlGetVdbe(pParse);
+	assert((errCode & 0xff) == SQL_CONSTRAINT);
 	if (onError == ON_CONFLICT_ACTION_ABORT) {
-		sqlite3MayAbort(pParse);
+		sqlMayAbort(pParse);
 	}
-	sqlite3VdbeAddOp4(v, OP_Halt, errCode, onError, 0, p4, p4type);
-	sqlite3VdbeChangeP5(v, p5Errmsg);
+	sqlVdbeAddOp4(v, OP_Halt, errCode, onError, 0, p4, p4type);
+	sqlVdbeChangeP5(v, p5Errmsg);
 }
 
-#ifndef SQLITE_OMIT_CTE
+#ifndef SQL_OMIT_CTE
 /*
  * This routine is invoked once per CTE by the parser while parsing a
  * WITH clause.
  */
 With *
-sqlite3WithAdd(Parse * pParse,	/* Parsing context */
+sqlWithAdd(Parse * pParse,	/* Parsing context */
 	       With * pWith,	/* Existing WITH clause, or NULL */
 	       Token * pName,	/* Name of the common-table */
 	       ExprList * pArglist,	/* Optional column name list for the table */
 	       Select * pQuery	/* Query used to initialize the table */
     )
 {
-	sqlite3 *db = pParse->db;
+	sql *db = pParse->db;
 	With *pNew;
 	char *zName;
 
 	/* Check that the CTE name is unique within this WITH clause. If
 	 * not, store an error in the Parse structure.
 	 */
-	zName = sqlite3NameFromToken(pParse->db, pName);
+	zName = sqlNameFromToken(pParse->db, pName);
 	if (zName && pWith) {
 		int i;
 		for (i = 0; i < pWith->nCte; i++) {
 			if (strcmp(zName, pWith->a[i].zName) == 0) {
-				sqlite3ErrorMsg(pParse,
+				sqlErrorMsg(pParse,
 						"duplicate WITH table name: %s",
 						zName);
 			}
@@ -3146,16 +3146,16 @@ sqlite3WithAdd(Parse * pParse,	/* Parsing context */
 	if (pWith) {
 		int nByte =
 		    sizeof(*pWith) + (sizeof(pWith->a[1]) * pWith->nCte);
-		pNew = sqlite3DbRealloc(db, pWith, nByte);
+		pNew = sqlDbRealloc(db, pWith, nByte);
 	} else {
-		pNew = sqlite3DbMallocZero(db, sizeof(*pWith));
+		pNew = sqlDbMallocZero(db, sizeof(*pWith));
 	}
 	assert((pNew != 0 && zName != 0) || db->mallocFailed);
 
 	if (db->mallocFailed) {
 		sql_expr_list_delete(db, pArglist);
 		sql_select_delete(db, pQuery);
-		sqlite3DbFree(db, zName);
+		sqlDbFree(db, zName);
 		pNew = pWith;
 	} else {
 		pNew->a[pNew->nCte].pSelect = pQuery;
@@ -3172,7 +3172,7 @@ sqlite3WithAdd(Parse * pParse,	/* Parsing context */
  * Free the contents of the With object passed as the second argument.
  */
 void
-sqlite3WithDelete(sqlite3 * db, With * pWith)
+sqlWithDelete(sql * db, With * pWith)
 {
 	if (pWith) {
 		int i;
@@ -3180,13 +3180,13 @@ sqlite3WithDelete(sqlite3 * db, With * pWith)
 			struct Cte *pCte = &pWith->a[i];
 			sql_expr_list_delete(db, pCte->pCols);
 			sql_select_delete(db, pCte->pSelect);
-			sqlite3DbFree(db, pCte->zName);
+			sqlDbFree(db, pCte->zName);
 		}
-		sqlite3DbFree(db, pWith);
+		sqlDbFree(db, pWith);
 	}
 }
 
-#endif				/* !defined(SQLITE_OMIT_CTE) */
+#endif				/* !defined(SQL_OMIT_CTE) */
 
 int
 vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
@@ -3196,27 +3196,27 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 				  int cond_opcode)
 {
 	assert(cond_opcode == OP_NoConflict || cond_opcode == OP_Found);
-	struct Vdbe *v = sqlite3GetVdbe(parser);
+	struct Vdbe *v = sqlGetVdbe(parser);
 	assert(v != NULL);
 
-	struct sqlite3 *db = parser->db;
-	char *error = sqlite3DbStrDup(db, error_src);
+	struct sql *db = parser->db;
+	char *error = sqlDbStrDup(db, error_src);
 	if (error == NULL)
 		return -1;
 
 	int cursor = parser->nTab++;
 	vdbe_emit_open_cursor(parser, cursor, index_id, space_by_id(space_id));
-	sqlite3VdbeChangeP5(v, OPFLAG_SYSTEMSP);
-	int label = sqlite3VdbeCurrentAddr(v);
-	sqlite3VdbeAddOp4Int(v, cond_opcode, cursor, label + 3, key_reg,
+	sqlVdbeChangeP5(v, OPFLAG_SYSTEMSP);
+	int label = sqlVdbeCurrentAddr(v);
+	sqlVdbeAddOp4Int(v, cond_opcode, cursor, label + 3, key_reg,
 			     key_len);
 	if (no_error) {
-		sqlite3VdbeAddOp0(v, OP_Halt);
+		sqlVdbeAddOp0(v, OP_Halt);
 	} else {
-		sqlite3VdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,0, 0, error,
+		sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,0, 0, error,
 				  P4_DYNAMIC);
-		sqlite3VdbeChangeP5(v, tarantool_error_code);
+		sqlVdbeChangeP5(v, tarantool_error_code);
 	}
-	sqlite3VdbeAddOp1(v, OP_Close, cursor);
+	sqlVdbeAddOp1(v, OP_Close, cursor);
 	return 0;
 }

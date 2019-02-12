@@ -13,7 +13,7 @@ test:plan(10)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing OR expressions where terms can be
 -- factored from either side of the OR and combined into a single new
 -- AND term that is beneficial to the search.  Examples:

@@ -17,7 +17,7 @@ test:plan(22)
 -- Test that ticket [b75a9ca6b0] has been fixed.
 --
 -- Ticket [b75a9ca6b0] concerns queries that have both a GROUP BY
--- and an ORDER BY.  This code verifies that SQLite is able to
+-- and an ORDER BY.  This code verifies that sql is able to
 -- optimize out the ORDER BY in some circumstances, but retains the
 -- ORDER BY when necessary.
 --

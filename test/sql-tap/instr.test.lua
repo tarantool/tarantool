@@ -13,7 +13,7 @@ test:plan(65)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the built-in INSTR() functions.
 --
 -- EVIDENCE-OF: R-27549-59611 The instr(X,Y) function finds the first

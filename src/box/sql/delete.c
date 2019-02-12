@@ -32,7 +32,7 @@
 #include "box/box.h"
 #include "box/session.h"
 #include "box/schema.h"
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "tarantoolInt.h"
 
 struct Table *
@@ -42,7 +42,7 @@ sql_lookup_table(struct Parse *parse, struct SrcList_item *tbl_name)
 	assert(tbl_name->pTab == NULL);
 	struct space *space = space_by_name(tbl_name->zName);
 	if (space == NULL) {
-		sqlite3ErrorMsg(parse, "no such table: %s", tbl_name->zName);
+		sqlErrorMsg(parse, "no such table: %s", tbl_name->zName);
 		return NULL;
 	}
 	assert(space != NULL);
@@ -53,14 +53,14 @@ sql_lookup_table(struct Parse *parse, struct SrcList_item *tbl_name)
 		parse->nErr++;
 		return NULL;
 	}
-	struct Table *table = sqlite3DbMallocZero(parse->db, sizeof(*table));
+	struct Table *table = sqlDbMallocZero(parse->db, sizeof(*table));
 	if (table == NULL)
 		return NULL;
 	table->def = space->def;
 	table->space = space;
 	table->nTabRef = 1;
 	tbl_name->pTab = table;
-	if (sqlite3IndexedByLookup(parse, tbl_name) != 0)
+	if (sqlIndexedByLookup(parse, tbl_name) != 0)
 		table = NULL;
 	return table;
 }
@@ -69,20 +69,20 @@ void
 sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 		     int cursor)
 {
-	struct sqlite3 *db = parse->db;
-	where = sqlite3ExprDup(db, where, 0);
-	struct SrcList *from = sqlite3SrcListAppend(db, NULL, NULL);
+	struct sql *db = parse->db;
+	where = sqlExprDup(db, where, 0);
+	struct SrcList *from = sqlSrcListAppend(db, NULL, NULL);
 	if (from != NULL) {
 		assert(from->nSrc == 1);
-		from->a[0].zName = sqlite3DbStrDup(db, name);
+		from->a[0].zName = sqlDbStrDup(db, name);
 		assert(from->a[0].pOn == NULL);
 		assert(from->a[0].pUsing == NULL);
 	}
-	struct Select *select = sqlite3SelectNew(parse, NULL, from, where, NULL,
+	struct Select *select = sqlSelectNew(parse, NULL, from, where, NULL,
 						 NULL, NULL, 0, NULL, NULL);
 	struct SelectDest dest;
-	sqlite3SelectDestInit(&dest, SRT_EphemTab, cursor, ++parse->nMem);
-	sqlite3Select(parse, select, &dest);
+	sqlSelectDestInit(&dest, SRT_EphemTab, cursor, ++parse->nMem);
+	sqlSelect(parse, select, &dest);
 	sql_select_delete(db, select);
 }
 
@@ -91,7 +91,7 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 {
 	assert(tab_list->nSrc == 1);
 
-	struct Vdbe *v = sqlite3GetVdbe(parse);
+	struct Vdbe *v = sqlGetVdbe(parse);
 	if (v == NULL)
 		goto cleanup;
 
@@ -115,9 +115,9 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 		diag_set(ClientError, ER_SQL, err_msg);
 		goto tarantool_error;
 	}
-	sqlite3VdbeAddOp2(v, OP_Clear, space->def->id, true);
+	sqlVdbeAddOp2(v, OP_Clear, space->def->id, true);
 cleanup:
-	sqlite3SrcListDelete(parse->db, tab_list);
+	sqlSrcListDelete(parse->db, tab_list);
 	return;
 
 tarantool_error:
@@ -130,7 +130,7 @@ void
 sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		      struct Expr *where)
 {
-	struct sqlite3 *db = parse->db;
+	struct sql *db = parse->db;
 	if (parse->nErr || db->mallocFailed)
 		goto delete_from_cleanup;
 
@@ -167,7 +167,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			goto delete_from_cleanup;
 
 		if (trigger_list == NULL) {
-			sqlite3ErrorMsg(parse, "cannot modify %s because it is a"
+			sqlErrorMsg(parse, "cannot modify %s because it is a"
 					" view", space->def->name);
 			goto delete_from_cleanup;
 		}
@@ -179,11 +179,11 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	parse->nTab += space->index_count;
 
 	/* Begin generating code.  */
-	struct Vdbe *v = sqlite3GetVdbe(parse);
+	struct Vdbe *v = sqlGetVdbe(parse);
 	if (v == NULL)
 		goto delete_from_cleanup;
 
-	sqlite3VdbeCountChanges(v);
+	sqlVdbeCountChanges(v);
 	sql_set_multi_write(parse, true);
 
 	/* If we are trying to delete from a view, realize that
@@ -199,9 +199,9 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	 */
 	int reg_count = -1;
 	struct session *user_session = current_session();
-	if (user_session->sql_flags & SQLITE_CountRows) {
+	if (user_session->sql_flags & SQL_CountRows) {
 		reg_count = ++parse->nMem;
-		sqlite3VdbeAddOp2(v, OP_Integer, 0, reg_count);
+		sqlVdbeAddOp2(v, OP_Integer, 0, reg_count);
 	}
 	/* Special case: A DELETE without a WHERE clause deletes
 	 * everything. It is easier just to erase the whole table.
@@ -209,8 +209,8 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	if (where == NULL && !is_complex) {
 		assert(!is_view);
 
-		sqlite3VdbeAddOp1(v, OP_Clear, space->def->id);
-		sqlite3VdbeChangeP5(v, OPFLAG_NCHANGE);
+		sqlVdbeAddOp1(v, OP_Clear, space->def->id);
+		sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 
 		/* Do not start Tarantool's transaction in case of
 		 * truncate optimization. This is workaround until
@@ -224,7 +224,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		memset(&nc, 0, sizeof(nc));
 		nc.pParse = parse;
 		nc.pSrcList = tab_list;
-		if (sqlite3ResolveExprNames(&nc, where))
+		if (sqlResolveExprNames(&nc, where))
 			goto delete_from_cleanup;
 		uint16_t wcf = WHERE_ONEPASS_DESIRED | WHERE_DUPLICATES_OK |
 			WHERE_SEEK_TABLE;
@@ -241,11 +241,11 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		int reg_pk = parse->nMem + 1;
 		int pk_len;
 		int eph_cursor = parse->nTab++;
-		int addr_eph_open = sqlite3VdbeCurrentAddr(v);
+		int addr_eph_open = sqlVdbeCurrentAddr(v);
 		if (is_view) {
 			pk_len = table->def->field_count;
 			parse->nMem += pk_len;
-			sqlite3VdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
+			sqlVdbeAddOp2(v, OP_OpenTEphemeral, reg_eph,
 					  pk_len);
 		} else {
                         assert(space->index_count > 0);
@@ -255,7 +255,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
                                 goto delete_from_cleanup;
                         pk_len = pk_info->part_count;
                         parse->nMem += pk_len;
-			sqlite3VdbeAddOp4(v, OP_OpenTEphemeral, reg_eph,
+			sqlVdbeAddOp4(v, OP_OpenTEphemeral, reg_eph,
 					  pk_len, 0,
 					  (char *)pk_info, P4_KEYINFO);
 		}
@@ -273,39 +273,39 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 * of rows may be deleted.
 		 */
 		struct WhereInfo *winfo =
-		    sqlite3WhereBegin(parse, tab_list, where, NULL, NULL, wcf,
+		    sqlWhereBegin(parse, tab_list, where, NULL, NULL, wcf,
 				      tab_cursor + 1);
 		if (winfo == NULL)
 			goto delete_from_cleanup;
 
 		/* The write cursors opened by WHERE_ONEPASS */
 		int one_pass_cur[2];
-		int one_pass = sqlite3WhereOkOnePass(winfo, one_pass_cur);
+		int one_pass = sqlWhereOkOnePass(winfo, one_pass_cur);
 		assert(one_pass != ONEPASS_MULTI);
 		/* Tarantool: see comment in
-		 * sqlite3WhereOkOnePass.
+		 * sqlWhereOkOnePass.
 		 */
 		/* assert(is_complex || one_pass != ONEPASS_OFF); */
 
 		/* Keep track of the number of rows to be
 		 * deleted.
 		 */
-		if (user_session->sql_flags & SQLITE_CountRows)
-			sqlite3VdbeAddOp2(v, OP_AddImm, reg_count, 1);
+		if (user_session->sql_flags & SQL_CountRows)
+			sqlVdbeAddOp2(v, OP_AddImm, reg_count, 1);
 
 		/* Extract the primary key for the current row */
 		if (!is_view) {
 			struct key_part_def *part = pk_info->parts;
 			for (int i = 0; i < pk_len; i++, part++) {
 				struct space_def *def = space->def;
-				sqlite3ExprCodeGetColumnOfTable(v, def,
+				sqlExprCodeGetColumnOfTable(v, def,
 								tab_cursor,
 								part->fieldno,
 								reg_pk + i);
 			}
 		} else {
 			for (int i = 0; i < pk_len; i++) {
-				sqlite3VdbeAddOp3(v, OP_Column, tab_cursor,
+				sqlVdbeAddOp3(v, OP_Column, tab_cursor,
 						  i, reg_pk + i);
 			}
 		}
@@ -321,7 +321,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			reg_key = reg_pk;
 			/* OP_Found will use an unpacked key */
 			key_len = pk_len;
-			sqlite3VdbeChangeToNoop(v, addr_eph_open);
+			sqlVdbeChangeToNoop(v, addr_eph_open);
 		} else {
 			/* Add the PK key for this row to the
 			 * temporary table.
@@ -335,13 +335,13 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			enum field_type *types = is_view ? NULL :
 						 sql_index_type_str(parse->db,
 								    pk->def);
-			sqlite3VdbeAddOp4(v, OP_MakeRecord, reg_pk, pk_len,
+			sqlVdbeAddOp4(v, OP_MakeRecord, reg_pk, pk_len,
 					  reg_key, (char *)types, P4_DYNAMIC);
 			/* Set flag to save memory allocating one
 			 * by malloc.
 			 */
-			sqlite3VdbeChangeP5(v, 1);
-			sqlite3VdbeAddOp2(v, OP_IdxInsert, reg_key, reg_eph);
+			sqlVdbeChangeP5(v, 1);
+			sqlVdbeAddOp2(v, OP_IdxInsert, reg_key, reg_eph);
 		}
 
 		/* If this DELETE cannot use the ONEPASS strategy,
@@ -349,9 +349,9 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		 */
 		int addr_bypass = 0;
 		if (one_pass != ONEPASS_OFF)
-			addr_bypass = sqlite3VdbeMakeLabel(v);
+			addr_bypass = sqlVdbeMakeLabel(v);
 		else
-			sqlite3WhereEnd(winfo);
+			sqlWhereEnd(winfo);
 
 		/* Unless this is a view, open cursors for the
 		 * table we are deleting from and all its indices.
@@ -362,15 +362,15 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		if (!is_view) {
 			int iAddrOnce = 0;
 			if (one_pass == ONEPASS_MULTI) {
-				iAddrOnce = sqlite3VdbeAddOp0(v, OP_Once);
+				iAddrOnce = sqlVdbeAddOp0(v, OP_Once);
 				VdbeCoverage(v);
 			}
-			sqlite3VdbeAddOp4(v, OP_IteratorOpen, tab_cursor, 0, 0,
+			sqlVdbeAddOp4(v, OP_IteratorOpen, tab_cursor, 0, 0,
 					  (void *) space, P4_SPACEPTR);
 			VdbeComment((v, "%s", space->index[0]->def->name));
 
 			if (one_pass == ONEPASS_MULTI)
-				sqlite3VdbeJumpHere(v, iAddrOnce);
+				sqlVdbeJumpHere(v, iAddrOnce);
 		}
 
 		/* Set up a loop over the primary-keys that were
@@ -381,16 +381,16 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			/* OP_Found will use an unpacked key. */
 			assert(key_len == pk_len);
 			assert(pk_info != NULL || table->def->opts.is_view);
-			sqlite3VdbeAddOp4Int(v, OP_NotFound, tab_cursor,
+			sqlVdbeAddOp4Int(v, OP_NotFound, tab_cursor,
 					     addr_bypass, reg_key, key_len);
 
 			VdbeCoverage(v);
 		} else {
-			sqlite3VdbeAddOp3(v, OP_IteratorOpen,
+			sqlVdbeAddOp3(v, OP_IteratorOpen,
 					  eph_cursor, 0, reg_eph);
-			addr_loop = sqlite3VdbeAddOp1(v, OP_Rewind, eph_cursor);
+			addr_loop = sqlVdbeAddOp1(v, OP_Rewind, eph_cursor);
 			VdbeCoverage(v);
-			sqlite3VdbeAddOp2(v, OP_RowData, eph_cursor, reg_key);
+			sqlVdbeAddOp2(v, OP_RowData, eph_cursor, reg_key);
 		}
 
 		/* Delete the row */
@@ -409,27 +409,27 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 
 		/* End of the loop over all primary-keys. */
 		if (one_pass != ONEPASS_OFF) {
-			sqlite3VdbeResolveLabel(v, addr_bypass);
-			sqlite3WhereEnd(winfo);
+			sqlVdbeResolveLabel(v, addr_bypass);
+			sqlWhereEnd(winfo);
 		} else {
-			sqlite3VdbeAddOp2(v, OP_Next, eph_cursor,
+			sqlVdbeAddOp2(v, OP_Next, eph_cursor,
 					  addr_loop + 1);
 			VdbeCoverage(v);
-			sqlite3VdbeJumpHere(v, addr_loop);
+			sqlVdbeJumpHere(v, addr_loop);
 		}
 	}
 
 	/* Return the number of rows that were deleted. */
-	if ((user_session->sql_flags & SQLITE_CountRows) != 0 &&
+	if ((user_session->sql_flags & SQL_CountRows) != 0 &&
 	    parse->pTriggerTab != NULL) {
-		sqlite3VdbeAddOp2(v, OP_ResultRow, reg_count, 1);
-		sqlite3VdbeSetNumCols(v, 1);
-		sqlite3VdbeSetColName(v, 0, COLNAME_NAME, "rows deleted",
-				      SQLITE_STATIC);
+		sqlVdbeAddOp2(v, OP_ResultRow, reg_count, 1);
+		sqlVdbeSetNumCols(v, 1);
+		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows deleted",
+				      SQL_STATIC);
 	}
 
  delete_from_cleanup:
-	sqlite3SrcListDelete(db, tab_list);
+	sqlSrcListDelete(db, tab_list);
 	sql_expr_delete(db, where, false);
 }
 
@@ -453,9 +453,9 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	 * already deleted it), do not attempt to delete it or
 	 * fire any DELETE triggers.
 	 */
-	int label = sqlite3VdbeMakeLabel(v);
+	int label = sqlVdbeMakeLabel(v);
 	if (mode == ONEPASS_OFF) {
-		sqlite3VdbeAddOp4Int(v, OP_NotFound, cursor, label, reg_pk, npk);
+		sqlVdbeAddOp4Int(v, OP_NotFound, cursor, label, reg_pk, npk);
 		VdbeCoverageIf(v, opSeek == OP_NotFound);
 	}
 
@@ -481,13 +481,13 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		 * These values will be used by any BEFORE and
 		 * AFTER triggers that exist.
 		 */
-		sqlite3VdbeAddOp2(v, OP_Copy, reg_pk, first_old_reg);
+		sqlVdbeAddOp2(v, OP_Copy, reg_pk, first_old_reg);
 		for (int i = 0; i < (int)table->def->field_count; i++) {
 			testcase(mask != 0xffffffff && iCol == 31);
 			testcase(mask != 0xffffffff && iCol == 32);
 			if (mask == 0xffffffff
 			    || (i <= 31 && (mask & MASKBIT32(i)) != 0)) {
-				sqlite3ExprCodeGetColumnOfTable(v, table->def,
+				sqlExprCodeGetColumnOfTable(v, table->def,
 								cursor, i,
 								first_old_reg +
 								i + 1);
@@ -495,7 +495,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		}
 
 		/* Invoke BEFORE DELETE trigger programs. */
-		int addr_start = sqlite3VdbeCurrentAddr(v);
+		int addr_start = sqlVdbeCurrentAddr(v);
 		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, NULL,
 				      TRIGGER_BEFORE, table, first_old_reg,
 				      onconf, label);
@@ -506,8 +506,8 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 		 * cursor or of already deleted the row that the
 		 * cursor was pointing to.
 		 */
-		if (addr_start < sqlite3VdbeCurrentAddr(v)) {
-			sqlite3VdbeAddOp4Int(v, OP_NotFound, cursor, label,
+		if (addr_start < sqlVdbeCurrentAddr(v)) {
+			sqlVdbeAddOp4Int(v, OP_NotFound, cursor, label,
 					     reg_pk, npk);
 			VdbeCoverageIf(v, opSeek == OP_NotFound);
 		}
@@ -527,17 +527,17 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	 */
 	if (table == NULL || !table->def->opts.is_view) {
 		uint8_t p5 = 0;
-		sqlite3VdbeAddOp2(v, OP_Delete, cursor,
+		sqlVdbeAddOp2(v, OP_Delete, cursor,
 				  (need_update_count ? OPFLAG_NCHANGE : 0));
 		if (mode != ONEPASS_OFF)
-			sqlite3VdbeChangeP5(v, OPFLAG_AUXDELETE);
+			sqlVdbeChangeP5(v, OPFLAG_AUXDELETE);
 
 		if (idx_noseek >= 0)
-			sqlite3VdbeAddOp1(v, OP_Delete, idx_noseek);
+			sqlVdbeAddOp1(v, OP_Delete, idx_noseek);
 
 		if (mode == ONEPASS_MULTI)
 			p5 |= OPFLAG_SAVEPOSITION;
-		sqlite3VdbeChangeP5(v, p5);
+		sqlVdbeChangeP5(v, p5);
 	}
 
 	if (table != NULL) {
@@ -559,7 +559,7 @@ sql_generate_row_delete(struct Parse *parse, struct Table *table,
 	 * any BEFORE trigger programs were invoked. Or if a trigger program
 	 * throws a RAISE(IGNORE) exception.
 	 */
-	sqlite3VdbeResolveLabel(v, label);
+	sqlVdbeResolveLabel(v, label);
 	VdbeModuleComment((v, "END: GenRowDel()"));
 }
 
@@ -569,7 +569,7 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
 {
 	struct Vdbe *v = parse->pVdbe;
 	int col_cnt = index->def->key_def->part_count;
-	int reg_base = sqlite3GetTempRange(parse, col_cnt);
+	int reg_base = sqlGetTempRange(parse, col_cnt);
 	if (prev != NULL && reg_base != reg_prev)
 		prev = NULL;
 	struct space *space = space_by_id(index->def->space_id);
@@ -584,7 +584,7 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
 			continue;
 		}
 		uint32_t tabl_col = index->def->key_def->parts[j].fieldno;
-		sqlite3ExprCodeGetColumnOfTable(v, space->def, cursor, tabl_col,
+		sqlExprCodeGetColumnOfTable(v, space->def, cursor, tabl_col,
 						reg_base + j);
 		/*
 		 * If the column type is NUMBER but the number
@@ -597,11 +597,11 @@ sql_generate_index_key(struct Parse *parse, struct index *index, int cursor,
 		 * again.  So omit the OP_Realify opcode if
 		 * it is present
 		 */
-		sqlite3VdbeDeletePriorOpcode(v, OP_Realify);
+		sqlVdbeDeletePriorOpcode(v, OP_Realify);
 	}
 	if (reg_out != 0)
-		sqlite3VdbeAddOp3(v, OP_MakeRecord, reg_base, col_cnt, reg_out);
+		sqlVdbeAddOp3(v, OP_MakeRecord, reg_base, col_cnt, reg_out);
 
-	sqlite3ReleaseTempRange(parse, reg_base, col_cnt);
+	sqlReleaseTempRange(parse, reg_base, col_cnt);
 	return reg_base;
 }

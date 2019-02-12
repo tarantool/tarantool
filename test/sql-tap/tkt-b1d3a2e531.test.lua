@@ -13,7 +13,7 @@ test:plan(11)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for foreign keys. Specifically, it tests
 -- that ticket b1d3a2e531 has been fixed.

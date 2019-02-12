@@ -11,7 +11,7 @@ test:plan(2)
 --
 -------------------------------------------------------------------------
 --
--- This file contains tests for SQLite. Specifically, it tests that SQLite
+-- This file contains tests for sql. Specifically, it tests that sql
 -- does not crash and an error is returned if localhost() fails. This 
 -- is the problem reported by ticket bd484a090c.
 --
@@ -31,7 +31,7 @@ test:do_test(
     end, 0)
 
 -- TBI to be implemented feature
---sqlite3_test_control("SQLITE_TESTCTRL_LOCALTIME_FAULT", 1)
+--sql_test_control("sql_TESTCTRL_LOCALTIME_FAULT", 1)
 --test:do_catchsql_test(
 --    2.1,
 --    [[
@@ -52,6 +52,6 @@ test:do_test(
 --        -- </2.2>
 --    })
 
---sqlite3_test_control("SQLITE_TESTCTRL_LOCALTIME_FAULT", 0)
+--sql_test_control("sql_TESTCTRL_LOCALTIME_FAULT", 0)
 test:finish_test()
 

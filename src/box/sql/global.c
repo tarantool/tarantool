@@ -33,16 +33,16 @@
  *
  * This file contains definitions of global variables and constants.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 
 /* An array to map all upper-case characters into their corresponding
  * lower-case character.
  *
- * SQLite only considers US-ASCII (or EBCDIC) characters.  We do not
+ * sql only considers US-ASCII (or EBCDIC) characters.  We do not
  * handle case conversions for the UTF character set since the tables
- * involved are nearly as big or bigger than SQLite itself.
+ * involved are nearly as big or bigger than sql itself.
  */
-const unsigned char sqlite3UpperToLower[] = {
+const unsigned char sqlUpperToLower[] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
 	18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
 	36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
@@ -72,7 +72,7 @@ const unsigned char sqlite3UpperToLower[] = {
 };
 
 /*
- * The following 256 byte lookup table is used to support SQLites built-in
+ * The following 256 byte lookup table is used to support sqls built-in
  * equivalents to the following standard library functions:
  *
  *   isspace()                        0x01
@@ -81,7 +81,7 @@ const unsigned char sqlite3UpperToLower[] = {
  *   isalnum()                        0x06
  *   isxdigit()                       0x08
  *   toupper()                        0x20
- *   SQLite identifier character      0x40
+ *   sql identifier character      0x40
  *   Quote character                  0x80
  *
  * Bit 0x20 is set if the mapped character requires translation to upper
@@ -91,15 +91,15 @@ const unsigned char sqlite3UpperToLower[] = {
  *
  *   (x & ~(map[x]&0x20))
  *
- * The equivalent of tolower() is implemented using the sqlite3UpperToLower[]
- * array. tolower() is used more often than toupper() by SQLite.
+ * The equivalent of tolower() is implemented using the sqlUpperToLower[]
+ * array. tolower() is used more often than toupper() by sql.
  *
  * Bit 0x40 is set if the character is non-alphanumeric and can be used in an
- * SQLite identifier.  Identifiers are alphanumerics, "_", "$", and any
+ * sql identifier.  Identifiers are alphanumerics, "_", "$", and any
  * non-ASCII UTF character. Hence the test for whether or not a character is
  * part of an identifier is 0x46.
  */
-const unsigned char sqlite3CtypeMap[256] = {
+const unsigned char sqlCtypeMap[256] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* 00..07    ........ */
 	0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00,	/* 08..0f    ........ */
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	/* 10..17    ........ */
@@ -142,39 +142,39 @@ const unsigned char sqlite3CtypeMap[256] = {
  * disabled by default.
  *
  * EVIDENCE-OF: R-38799-08373 URI filenames can be enabled or disabled
- * using the SQLITE_USE_URI=1 or SQLITE_USE_URI=0 compile-time options.
+ * using the SQL_USE_URI=1 or SQL_USE_URI=0 compile-time options.
  *
  * EVIDENCE-OF: R-43642-56306 By default, URI handling is globally
  * disabled. The default value may be changed by compiling with the
- * SQLITE_USE_URI symbol defined.
+ * SQL_USE_URI symbol defined.
  */
-#ifndef SQLITE_USE_URI
-#define  SQLITE_USE_URI 0
+#ifndef SQL_USE_URI
+#define  SQL_USE_URI 0
 #endif
 
 /* EVIDENCE-OF: R-38720-18127 The default setting is determined by the
- * SQLITE_ALLOW_COVERING_INDEX_SCAN compile-time option, or is "on" if
+ * SQL_ALLOW_COVERING_INDEX_SCAN compile-time option, or is "on" if
  * that compile-time option is omitted.
  */
-#ifndef SQLITE_ALLOW_COVERING_INDEX_SCAN
-#define SQLITE_ALLOW_COVERING_INDEX_SCAN 1
+#ifndef SQL_ALLOW_COVERING_INDEX_SCAN
+#define SQL_ALLOW_COVERING_INDEX_SCAN 1
 #endif
 
 /* The minimum PMA size is set to this value multiplied by the database
  * page size in bytes.
  */
-#ifndef SQLITE_SORTER_PMASZ
-#define SQLITE_SORTER_PMASZ 250
+#ifndef SQL_SORTER_PMASZ
+#define SQL_SORTER_PMASZ 250
 #endif
 
 /*
  * The following singleton contains the global configuration for
- * the SQLite library.
+ * the sql library.
  */
-SQLITE_WSD struct Sqlite3Config sqlite3Config = {
-	SQLITE_DEFAULT_MEMSTATUS,	/* bMemstat */
-	SQLITE_USE_URI,		/* bOpenUri */
-	SQLITE_ALLOW_COVERING_INDEX_SCAN,	/* bUseCis */
+SQL_WSD struct sqlConfig sqlConfig = {
+	SQL_DEFAULT_MEMSTATUS,	/* bMemstat */
+	SQL_USE_URI,		/* bOpenUri */
+	SQL_ALLOW_COVERING_INDEX_SCAN,	/* bUseCis */
 	0x7ffffffe,		/* mxStrlen */
 	0,			/* neverCorrupt */
 	512,			/* szLookaside */
@@ -183,32 +183,32 @@ SQLITE_WSD struct Sqlite3Config sqlite3Config = {
 	(void *)0,		/* pHeap */
 	0,			/* nHeap */
 	0, 0,			/* mnHeap, mxHeap */
-	SQLITE_DEFAULT_MMAP_SIZE,	/* szMmap */
-	SQLITE_MAX_MMAP_SIZE,	/* mxMmap */
+	SQL_DEFAULT_MMAP_SIZE,	/* szMmap */
+	SQL_MAX_MMAP_SIZE,	/* mxMmap */
 	(void *)0,		/* pScratch */
 	0,			/* szScratch */
 	0,			/* nScratch */
 	(void *)0,		/* pPage */
 	0,			/* szPage */
-	SQLITE_DEFAULT_PCACHE_INITSZ,	/* nPage */
+	SQL_DEFAULT_PCACHE_INITSZ,	/* nPage */
 	0,			/* mxParserStack */
 	0,			/* sharedCacheEnabled */
-	SQLITE_SORTER_PMASZ,	/* szPma */
+	SQL_SORTER_PMASZ,	/* szPma */
 	/* All the rest should always be initialized to zero */
 	0,			/* isInit */
 	0,			/* inProgress */
 	0,			/* isMallocInit */
 	0,			/* xLog */
 	0,			/* pLogArg */
-#ifdef SQLITE_ENABLE_SQLLOG
+#ifdef SQL_ENABLE_SQLLOG
 	0,			/* xSqllog */
 	0,			/* pSqllogArg */
 #endif
-#ifdef SQLITE_VDBE_COVERAGE
+#ifdef SQL_VDBE_COVERAGE
 	0,			/* xVdbeBranch */
 	0,			/* pVbeBranchArg */
 #endif
-#ifndef SQLITE_UNTESTABLE
+#ifndef SQL_UNTESTABLE
 	0,			/* xTestCallback */
 #endif
 	0,			/* bLocaltimeFault */
@@ -220,19 +220,19 @@ SQLITE_WSD struct Sqlite3Config sqlite3Config = {
  * database connections.  After initialization, this table is
  * read-only.
  */
-FuncDefHash sqlite3BuiltinFunctions;
+FuncDefHash sqlBuiltinFunctions;
 
 /*
  * Constant tokens for values 0 and 1.
  */
-const Token sqlite3IntTokens[] = {
+const Token sqlIntTokens[] = {
 	{"0", 1, false},
 	{"1", 1, false}
 };
 
 /*
  * The value of the "pending" byte must be 0x40000000 (1 byte past the
- * 1-gibabyte boundary) in a compatible database.  SQLite never uses
+ * 1-gibabyte boundary) in a compatible database.  sql never uses
  * the database page that contains the pending byte.  It never attempts
  * to read or write that page.  The pending byte page is set aside
  * for use by the VFS layers as space for managing file locks.
@@ -240,7 +240,7 @@ const Token sqlite3IntTokens[] = {
  * During testing, it is often desirable to move the pending byte to
  * a different position in the file.  This allows code that has to
  * deal with the pending byte to run on files that are much smaller
- * than 1 GiB.  The sqlite3_test_control() interface can be used to
+ * than 1 GiB.  The sql_test_control() interface can be used to
  * move the pending byte.
  *
  * IMPORTANT:  Changing the pending byte to any value other than
@@ -248,8 +248,8 @@ const Token sqlite3IntTokens[] = {
  * Changing the pending byte during operation will result in undefined
  * and incorrect behavior.
  */
-#ifndef SQLITE_OMIT_WSD
-int sqlite3PendingByte = 0x40000000;
+#ifndef SQL_OMIT_WSD
+int sqlPendingByte = 0x40000000;
 #endif
 
 #include "opcodes.h"
@@ -259,9 +259,9 @@ int sqlite3PendingByte = 0x40000000;
  * from the comments following the "case OP_xxxx:" statements in
  * the vdbe.c file.
  */
-const unsigned char sqlite3OpcodeProperty[] = OPFLG_INITIALIZER;
+const unsigned char sqlOpcodeProperty[] = OPFLG_INITIALIZER;
 
 /*
  * Name of the default collating sequence
  */
-const char sqlite3StrBINARY[] = "BINARY";
+const char sqlStrBINARY[] = "BINARY";

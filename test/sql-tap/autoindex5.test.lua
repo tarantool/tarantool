@@ -14,7 +14,7 @@ test:plan(1)
 --
 ---------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script is testing automatic index creation logic,
 -- and specifically ensuring that automatic indexes can be used with
 -- co-routine subqueries.

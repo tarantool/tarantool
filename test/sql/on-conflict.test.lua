@@ -2,7 +2,7 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 --
--- Check that original SQLite ON CONFLICT clause is really
+-- Check that original sql ON CONFLICT clause is really
 -- disabled.
 --
 box.sql.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT ABORT)")

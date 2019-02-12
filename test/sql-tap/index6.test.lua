@@ -70,7 +70,7 @@ test:plan(14)
 -- do_test index6-1.10 {
 --   execsql {
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --   }
 -- } {{} 20 t1a {14 1} t1b {10 1} ok}
 -- # STAT1 shows the partial indices have a reduced number of
@@ -80,7 +80,7 @@ test:plan(14)
 --   execsql {
 --     UPDATE t1 SET a=b;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --   }
 -- } {{} 20 t1a {20 1} t1b {10 1} ok}
 -- do_test index6-1.11 {
@@ -88,7 +88,7 @@ test:plan(14)
 --     UPDATE t1 SET a=NULL WHERE b%3!=0;
 --     UPDATE t1 SET b=b+100;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --   }
 -- } {{} 20 t1a {6 1} t1b {20 1} ok}
 -- do_test index6-1.12 {
@@ -96,21 +96,21 @@ test:plan(14)
 --     UPDATE t1 SET a=CASE WHEN b%3!=0 THEN b END;
 --     UPDATE t1 SET b=b-100;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --   }
 -- } {{} 20 t1a {13 1} t1b {10 1} ok}
 -- do_test index6-1.13 {
 --   execsql {
 --     DELETE FROM t1 WHERE b BETWEEN 8 AND 12;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --   }
 -- } {{} 15 t1a {10 1} t1b {8 1} ok}
 -- do_test index6-1.15 {
 --   execsql {
 --     CREATE INDEX t1c ON t1(c);
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --   }
 -- } {t1a {10 1} t1b {8 1} t1c {15 1} ok}
 -- # Queries use partial indices as appropriate times.
@@ -207,7 +207,7 @@ test:plan(14)
 --                                /* ^^^^^-- ignored */
 --   ANALYZE;
 --   SELECT count(*) FROM t3 WHERE t3.b BETWEEN 5 AND 10;
---   SELECT stat+0 FROM sqlite_stat1 WHERE idx='t3b';
+--   SELECT stat+0 FROM sql_stat1 WHERE idx='t3b';
 -- } {6 6}
 -- Test case for ticket [2ea3e9fe6379fc3f6ce7e090ce483c1a3a80d6c9] from
 -- 2014-04-13: Partial index causes assertion fault on UPDATE OR REPLACE.
@@ -248,7 +248,7 @@ test:do_execsql_test(
 -- Test case for ticket [2326c258d02ead33d69faa63de8f4686b9b1b9d9] on
 -- 2015-02-24.  Any use of a partial index qualifying constraint inside
 -- the ON clause of a LEFT JOIN was causing incorrect results for all
--- versions of SQLite 3.8.0 through 3.8.8.
+-- versions of sql 3.8.0 through 3.8.8.
 --
 test:do_execsql_test(
     "index6-7.0",

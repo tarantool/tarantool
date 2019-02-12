@@ -14,7 +14,7 @@ test:plan(92)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for joins, including outer joins.
 --
@@ -50,9 +50,9 @@ test:do_execsql_test(
     })
 
 -- # A FROM clause of the form:  "<table>, <table> ON <expr>" is not
--- # allowed by the SQLite syntax diagram, nor by any other SQL database
+-- # allowed by the sql syntax diagram, nor by any other SQL database
 -- # engine that we are aware of.  Nevertheless, historic versions of
--- # SQLite have allowed it.  We need to continue to support it moving
+-- # sql have allowed it.  We need to continue to support it moving
 -- # forward to prevent breakage of legacy applications.  Though, we will
 -- # not advertise it as being supported.
 -- #
@@ -1072,9 +1072,9 @@ jointest("join-12.6", 66, {1, 'at most 64 tables in a join'})
 jointest("join-12.7", 127, {1, 'at most 64 tables in a join'})
 jointest("join-12.8", 128, {1, 'at most 64 tables in a join'})
 jointest("join-12.9", 1000, {1, 'at most 64 tables in a join'})
--- If SQLite is built with SQLITE_MEMDEBUG, then the huge number of realloc()
+-- If sql is built with sql_MEMDEBUG, then the huge number of realloc()
 -- calls made by the following test cases are too time consuming to run.
--- Without SQLITE_MEMDEBUG, realloc() is fast enough that these are not
+-- Without sql_MEMDEBUG, realloc() is fast enough that these are not
 -- a problem.
 --if X(0, "X!capable", [["pragma&&compileoption_diags"]]) then
 --    if X(703, "X!cmd", [=[["expr","[lsearch [db eval {PRAGMA compile_options}] MEMDEBUG]<0"]]=])

@@ -34,8 +34,8 @@
  * This file contains inline asm code for retrieving "high-performance"
  * counters for x86 class CPUs.
  */
-#ifndef SQLITE_HWTIME_H
-#define SQLITE_HWTIME_H
+#ifndef SQL_HWTIME_H
+#define SQL_HWTIME_H
 
 /*
  * The following routine only works on pentium-class (or newer) processors.
@@ -48,19 +48,19 @@
 
 #if defined(__GNUC__)
 
-__inline__ sqlite_uint64
-sqlite3Hwtime(void)
+__inline__ sql_uint64
+sqlHwtime(void)
 {
 	unsigned int lo, hi;
 	__asm__ __volatile__("rdtsc":"=a"(lo), "=d"(hi));
-	return (sqlite_uint64) hi << 32 | lo;
+	return (sql_uint64) hi << 32 | lo;
 }
 
 #elif defined(_MSC_VER)
 
 __declspec(naked)
-__inline sqlite_uint64 __cdecl
-sqlite3Hwtime(void)
+__inline sql_uint64 __cdecl
+sqlHwtime(void)
 {
 	__asm {
 		rdtsc ret;
@@ -71,8 +71,8 @@ sqlite3Hwtime(void)
 
 #elif (defined(__GNUC__) && defined(__x86_64__))
 
-__inline__ sqlite_uint64
-sqlite3Hwtime(void)
+__inline__ sql_uint64
+sqlHwtime(void)
 {
 	unsigned long val;
 	__asm__ __volatile__("rdtsc":"=A"(val));
@@ -81,8 +81,8 @@ sqlite3Hwtime(void)
 
 #elif (defined(__GNUC__) && defined(__ppc__))
 
-__inline__ sqlite_uint64
-sqlite3Hwtime(void)
+__inline__ sql_uint64
+sqlHwtime(void)
 {
 	unsigned long long retval;
 	unsigned long junk;
@@ -97,21 +97,21 @@ sqlite3Hwtime(void)
 
 #else
 
-#error Need implementation of sqlite3Hwtime() for your platform.
+#error Need implementation of sqlHwtime() for your platform.
 
   /*
-   * To compile without implementing sqlite3Hwtime() for your platform,
+   * To compile without implementing sqlHwtime() for your platform,
    * you can remove the above #error and use the following
    * stub function.  You will lose timing support for many
    * of the debugging and testing utilities, but it should at
    * least compile and run.
    */
-sqlite_uint64
-sqlite3Hwtime(void)
+sql_uint64
+sqlHwtime(void)
 {
-	return ((sqlite_uint64) 0);
+	return ((sql_uint64) 0);
 }
 
 #endif
 
-#endif				/* !defined(SQLITE_HWTIME_H) */
+#endif				/* !defined(SQL_HWTIME_H) */

@@ -14,7 +14,7 @@ test:plan(13)
 --
 -------------------------------------------------------------------------
 --
--- This file implements tests for SQLite library.  The focus of the tests
+-- This file implements tests for sql library.  The focus of the tests
 -- in this file a corner-case query planner optimization involving the
 -- join order of two tables of different sizes.
 --

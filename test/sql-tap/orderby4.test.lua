@@ -13,11 +13,11 @@ test:plan(6)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing that the optimizations that disable
 -- ORDER BY clauses work correctly on multi-value primary keys and
 -- unique indices when only some prefix of the terms in the key are
--- used.  See ticket http://www.sqlite.org/src/info/a179fe74659
+-- used.  See ticket http://www.sql.org/src/info/a179fe74659
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]

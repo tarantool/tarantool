@@ -2,59 +2,59 @@
 #include "box/sql.h"
 #include "lua/msgpack.h"
 
-#include "box/sql/sqliteInt.h"
+#include "box/sql/sqlInt.h"
 #include <info.h>
 #include "lua/info.h"
 #include "lua/utils.h"
 
 static void
-lua_push_column_names(struct lua_State *L, struct sqlite3_stmt *stmt)
+lua_push_column_names(struct lua_State *L, struct sql_stmt *stmt)
 {
-	int column_count = sqlite3_column_count(stmt);
+	int column_count = sql_column_count(stmt);
 	lua_createtable(L, column_count, 0);
 	for (int i = 0; i < column_count; i++) {
-		const char *name = sqlite3_column_name(stmt, i);
+		const char *name = sql_column_name(stmt, i);
 		lua_pushstring(L, name == NULL ? "" : name);
 		lua_rawseti(L, -2, i+1);
 	}
 }
 
 static void
-lua_push_row(struct lua_State *L, struct sqlite3_stmt *stmt)
+lua_push_row(struct lua_State *L, struct sql_stmt *stmt)
 {
-	int column_count = sqlite3_column_count(stmt);
+	int column_count = sql_column_count(stmt);
 
 	lua_createtable(L, column_count, 0);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_array_metatable_ref);
 	lua_setmetatable(L, -2);
 
 	for (int i = 0; i < column_count; i++) {
-		int type = sqlite3_column_type(stmt, i);
+		int type = sql_column_type(stmt, i);
 		switch (type) {
-		case SQLITE_INTEGER:
-			luaL_pushint64(L, sqlite3_column_int64(stmt, i));
+		case SQL_INTEGER:
+			luaL_pushint64(L, sql_column_int64(stmt, i));
 			break;
-		case SQLITE_FLOAT:
-			lua_pushnumber(L, sqlite3_column_double(stmt, i));
+		case SQL_FLOAT:
+			lua_pushnumber(L, sql_column_double(stmt, i));
 			break;
-		case SQLITE_TEXT: {
-			const void *text = sqlite3_column_text(stmt, i);
+		case SQL_TEXT: {
+			const void *text = sql_column_text(stmt, i);
 			lua_pushlstring(L, text,
-					sqlite3_column_bytes(stmt, i));
+					sql_column_bytes(stmt, i));
 			break;
 		}
-		case SQLITE_BLOB: {
-			const void *blob = sqlite3_column_blob(stmt, i);
+		case SQL_BLOB: {
+			const void *blob = sql_column_blob(stmt, i);
 			if (sql_column_subtype(stmt,i) == SQL_SUBTYPE_MSGPACK) {
 				luamp_decode(L, luaL_msgpack_default,
 					     (const char **)&blob);
 			} else {
 				lua_pushlstring(L, blob,
-					sqlite3_column_bytes(stmt, i));
+					sql_column_bytes(stmt, i));
 			}
 			break;
 		}
-		case SQLITE_NULL:
+		case SQL_NULL:
 			lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_nil_ref);
 			break;
 		default:
@@ -67,7 +67,7 @@ lua_push_row(struct lua_State *L, struct sqlite3_stmt *stmt)
 static int
 lua_sql_execute(struct lua_State *L)
 {
-	sqlite3 *db = sql_get();
+	sql *db = sql_get();
 	if (db == NULL)
 		return luaL_error(L, "not ready");
 
@@ -76,15 +76,15 @@ lua_sql_execute(struct lua_State *L)
 	if (sql == NULL)
 		return luaL_error(L, "usage: box.sql.execute(sqlstring)");
 
-	struct sqlite3_stmt *stmt;
-	if (sqlite3_prepare_v2(db, sql, length, &stmt, &sql) != SQLITE_OK)
+	struct sql_stmt *stmt;
+	if (sql_prepare_v2(db, sql, length, &stmt, &sql) != SQL_OK)
 		goto sqlerror;
 	assert(stmt != NULL);
 
 	int rc;
 	int retval_count;
-	if (sqlite3_column_count(stmt) == 0) {
-		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW);
+	if (sql_column_count(stmt) == 0) {
+		while ((rc = sql_step(stmt)) == SQL_ROW);
 		retval_count = 0;
 	} else {
 		lua_newtable(L);
@@ -94,19 +94,19 @@ lua_sql_execute(struct lua_State *L)
 		lua_rawseti(L, -2, 0);
 
 		int row_count = 0;
-		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		while ((rc = sql_step(stmt)) == SQL_ROW) {
 			lua_push_row(L, stmt);
 			lua_rawseti(L, -2, ++row_count);
 		}
 		retval_count = 1;
 	}
-        if (rc != SQLITE_OK && rc != SQLITE_DONE)
+        if (rc != SQL_OK && rc != SQL_DONE)
 		goto sqlerror;
-	sqlite3_finalize(stmt);
+	sql_finalize(stmt);
 	return retval_count;
 sqlerror:
-	lua_pushstring(L, sqlite3_errmsg(db));
-	sqlite3_finalize(stmt);
+	lua_pushstring(L, sql_errmsg(db));
+	sql_finalize(stmt);
 	return lua_error(L);
 }
 
@@ -120,7 +120,7 @@ lua_sql_debug(struct lua_State *L)
 }
 
 void
-box_lua_sqlite_init(struct lua_State *L)
+box_lua_sql_init(struct lua_State *L)
 {
 	static const struct luaL_Reg module_funcs [] = {
 		{"execute", lua_sql_execute},

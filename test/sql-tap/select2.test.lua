@@ -13,7 +13,7 @@ test:plan(16)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the SELECT statement.
 --
 -- $Id: select2.test,v 1.28 2009/01/15 15:23:59 drh Exp $
@@ -145,42 +145,42 @@ test:do_execsql_test(
         -- </select2-3.2c>
     })
 
--- TODO: need access to sqlite_search_count vatiable
+-- TODO: need access to sql_search_count vatiable
 --test:do_test(
 --    "select2-3.2d",
 --    function()
---        sqlite_search_count = 0
+--        sql_search_count = 0
 --        test:execsql "SELECT * FROM tbl2 WHERE 1000=f2"
---        return sqlite_search_count
+--        return sql_search_count
 --    end, {
 --        -- <select2-3.2d>
 --        1
 --        -- </select2-3.2d>
 --    })
 
--- TODO: need access to sqlite_search_count vatiable
+-- TODO: need access to sql_search_count vatiable
 --test:do_test(
 --    "select2-3.2e",
 --    function()
---        sqlite_search_count = 0
+--        sql_search_count = 0
 --        test:execsql "SELECT * FROM tbl2 WHERE f2=1000"
---        return sqlite_search_count
+--        return sql_search_count
 --    end, {
 --        -- <select2-3.2e>
 --        1
 --        -- </select2-3.2e>
 --    })
 
--- TODO: need access to sqlite_search_count vatiable
+-- TODO: need access to sql_search_count vatiable
 -- Make sure queries run faster with an index than without
 --
 --test:do_test(
 --    "select2-3.3",
 --    function()
 --        test:execsql "DROP INDEX idx1"
---        sqlite_search_count = 0
+--        sql_search_count = 0
 --        test:execsql "SELECT f1 FROM tbl2 WHERE f2==2000"
---        return sqlite_search_count
+--        return sql_search_count
 --    end, {
 --        -- <select2-3.3>
 --        29999

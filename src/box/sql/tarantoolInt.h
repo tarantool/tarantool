@@ -1,7 +1,7 @@
 /*
  * Tarantool interface, external linkage.
  *
- * Note: functions with "sqlite3" prefix in their names become static in
+ * Note: functions with "sql" prefix in their names become static in
  * amalgamated build with the help of a custom preprocessor tool,
  * that's why we are using a weird naming schema.
  */
@@ -16,7 +16,7 @@ const char *tarantoolErrorMessage();
 int is_tarantool_error(int rc);
 
 /* Storage interface. */
-const void *tarantoolSqlite3PayloadFetch(BtCursor * pCur, u32 * pAmt);
+const void *tarantoolsqlPayloadFetch(BtCursor * pCur, u32 * pAmt);
 
 /**
  * Try to get a current tuple field using its field map.
@@ -28,20 +28,20 @@ const void *tarantoolSqlite3PayloadFetch(BtCursor * pCur, u32 * pAmt);
  *         offset to @a fieldno.
  */
 const void *
-tarantoolSqlite3TupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size);
+tarantoolsqlTupleColumnFast(BtCursor *pCur, u32 fieldno, u32 *field_size);
 
-int tarantoolSqlite3First(BtCursor * pCur, int *pRes);
-int tarantoolSqlite3Last(BtCursor * pCur, int *pRes);
-int tarantoolSqlite3Next(BtCursor * pCur, int *pRes);
-int tarantoolSqlite3Previous(BtCursor * pCur, int *pRes);
-int tarantoolSqlite3MovetoUnpacked(BtCursor * pCur, UnpackedRecord * pIdxKey,
+int tarantoolsqlFirst(BtCursor * pCur, int *pRes);
+int tarantoolsqlLast(BtCursor * pCur, int *pRes);
+int tarantoolsqlNext(BtCursor * pCur, int *pRes);
+int tarantoolsqlPrevious(BtCursor * pCur, int *pRes);
+int tarantoolsqlMovetoUnpacked(BtCursor * pCur, UnpackedRecord * pIdxKey,
 				   int *pRes);
-int tarantoolSqlite3Count(BtCursor * pCur, i64 * pnEntry);
-int tarantoolSqlite3Insert(struct space *space, const char *tuple,
+int tarantoolsqlCount(BtCursor * pCur, i64 * pnEntry);
+int tarantoolsqlInsert(struct space *space, const char *tuple,
 			   const char *tuple_end);
-int tarantoolSqlite3Replace(struct space *space, const char *tuple,
+int tarantoolsqlReplace(struct space *space, const char *tuple,
 			    const char *tuple_end);
-int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
+int tarantoolsqlDelete(BtCursor * pCur, u8 flags);
 
 /**
  * Delete entry from space by its key.
@@ -51,14 +51,14 @@ int tarantoolSqlite3Delete(BtCursor * pCur, u8 flags);
  * @param key Key of record to be deleted.
  * @param key_size Size of key.
  *
- * @retval SQLITE_OK on success, SQL_TARANTOOL_DELETE_FAIL
+ * @retval SQL_OK on success, SQL_TARANTOOL_DELETE_FAIL
  *         otherwise.
  */
 int
 sql_delete_by_key(struct space *space, uint32_t iid, char *key,
 		  uint32_t key_size);
 
-int tarantoolSqlite3ClearTable(struct space *space, uint32_t *tuple_count);
+int tarantoolsqlClearTable(struct space *space, uint32_t *tuple_count);
 
 /**
  * Rename the table in _space.
@@ -71,7 +71,7 @@ int
 sql_rename_table(uint32_t space_id, const char *new_name);
 
 /* Alter trigger statement after rename table. */
-int tarantoolSqlite3RenameTrigger(const char *zTriggerName,
+int tarantoolsqlRenameTrigger(const char *zTriggerName,
 				  const char *zOldName, const char *zNewName);
 
 /**
@@ -98,17 +98,17 @@ sql_ephemeral_space_create(uint32_t filed_count, struct sql_key_info *key_info);
  * @param tuple Tuple to be inserted.
  * @param tuple_end End of tuple to be inserted.
  *
- * @retval SQLITE_OK on success, SQLITE_TARANTOOL_ERROR otherwise.
+ * @retval SQL_OK on success, SQL_TARANTOOL_ERROR otherwise.
  */
-int tarantoolSqlite3EphemeralInsert(struct space *space, const char *tuple,
+int tarantoolsqlEphemeralInsert(struct space *space, const char *tuple,
 				    const char *tuple_end);
-int tarantoolSqlite3EphemeralDelete(BtCursor * pCur);
-int tarantoolSqlite3EphemeralCount(BtCursor * pCur, i64 * pnEntry);
-int tarantoolSqlite3EphemeralDrop(BtCursor * pCur);
-int tarantoolSqlite3EphemeralClearTable(BtCursor * pCur);
+int tarantoolsqlEphemeralDelete(BtCursor * pCur);
+int tarantoolsqlEphemeralCount(BtCursor * pCur, i64 * pnEntry);
+int tarantoolsqlEphemeralDrop(BtCursor * pCur);
+int tarantoolsqlEphemeralClearTable(BtCursor * pCur);
 
 /**
- * Performs exactly as extract_key + sqlite3VdbeCompareMsgpack,
+ * Performs exactly as extract_key + sqlVdbeCompareMsgpack,
  * only faster.
  *
  * @param pCur cursor which point to tuple to compare.
@@ -117,7 +117,7 @@ int tarantoolSqlite3EphemeralClearTable(BtCursor * pCur);
  * @retval Comparison result.
  */
 int
-tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
+tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 			      struct UnpackedRecord *unpacked);
 
 /**
@@ -126,7 +126,7 @@ tarantoolSqlite3IdxKeyCompare(struct BtCursor *cursor,
  * @param[out] New space id, available for usage.
  */
 int
-tarantoolSqlite3IncrementMaxid(uint64_t *space_max_id);
+tarantoolsqlIncrementMaxid(uint64_t *space_max_id);
 
 /**
  * Encode format as entry to be inserted to _space on @region.

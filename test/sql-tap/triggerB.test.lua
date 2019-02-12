@@ -13,7 +13,7 @@ test:plan(201)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests updating tables with constraints within a trigger.  Ticket #3055.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

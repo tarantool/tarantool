@@ -40,8 +40,8 @@
  * Trace output macros
  */
 #ifdef WHERETRACE_ENABLED
-/***/ extern int sqlite3WhereTrace;
-#define WHERETRACE(K,X)  if(sqlite3WhereTrace&(K)) sqlite3DebugPrintf X
+/***/ extern int sqlWhereTrace;
+#define WHERETRACE(K,X)  if(sqlWhereTrace&(K)) sqlDebugPrintf X
 #else
 #define WHERETRACE(K,X)
 #endif
@@ -86,7 +86,7 @@ struct WhereLevel {
 	int addrCont;		/* Jump here to continue with the next loop cycle */
 	int addrFirst;		/* First instruction of interior of the loop */
 	int addrBody;		/* Beginning of the body of this loop */
-#ifndef SQLITE_LIKE_DOESNT_MATCH_BLOBS
+#ifndef SQL_LIKE_DOESNT_MATCH_BLOBS
 	u32 iLikeRepCntr;	/* LIKE range processing counter register (times 2) */
 	int addrLikeRep;	/* LIKE range processing address */
 #endif
@@ -106,7 +106,7 @@ struct WhereLevel {
 	} u;
 	struct WhereLoop *pWLoop;	/* The selected WhereLoop object */
 	Bitmask notReady;	/* FROM entries not usable at this level */
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
+#ifdef SQL_ENABLE_STMT_SCANSTATUS
 	int addrVisit;		/* Address at which row is visited */
 #endif
 };
@@ -128,7 +128,7 @@ struct WhereLevel {
 struct WhereLoop {
 	Bitmask prereq;		/* Bitmask of other loops that must run first */
 	Bitmask maskSelf;	/* Bitmask identifying table iTab */
-#ifdef SQLITE_DEBUG
+#ifdef SQL_DEBUG
 	char cId;		/* Symbolic ID of this loop for debugging use */
 #endif
 	u8 iTab;		/* Position in FROM clause of table for this loop */
@@ -249,7 +249,7 @@ struct WherePath {
  * would be mapped into integers 0 through 7.
  *
  * The number of terms in a join is limited by the number of bits
- * in prereqRight and prereqAll.  The default is 64 bits, hence SQLite
+ * in prereqRight and prereqAll.  The default is 64 bits, hence sql
  * is only able to process joins with 64 or fewer tables.
  */
 struct WhereTerm {
@@ -274,7 +274,7 @@ struct WhereTerm {
 /*
  * Allowed values of WhereTerm.wtFlags
  */
-#define TERM_DYNAMIC    0x01	/* Need to call sqlite3ExprDelete(db, pExpr) */
+#define TERM_DYNAMIC    0x01	/* Need to call sqlExprDelete(db, pExpr) */
 #define TERM_VIRTUAL    0x02	/* Added by the optimizer.  Do not code */
 #define TERM_CODED      0x04	/* This term is already coded */
 #define TERM_COPIED     0x08	/* Has a child */
@@ -327,7 +327,7 @@ struct WhereClause {
 	int nTerm;		/* Number of terms */
 	int nSlot;		/* Number of entries in a[] */
 	WhereTerm *a;		/* Each a[] describes a term of the WHERE cluase */
-#if defined(SQLITE_SMALL_STACK)
+#if defined(SQL_SMALL_STACK)
 	WhereTerm aStatic[1];	/* Initial static space for a[] */
 #else
 	WhereTerm aStatic[8];	/* Initial static space for a[] */
@@ -421,7 +421,7 @@ struct WhereInfo {
 	int iContinue;		/* Jump here to continue with next record */
 	int iBreak;		/* Jump here to break out of the loop */
 	int savedNQueryLoop;	/* pParse->nQueryLoop outside the WHERE loop */
-	u16 wctrlFlags;		/* Flags originally passed to sqlite3WhereBegin() */
+	u16 wctrlFlags;		/* Flags originally passed to sqlWhereBegin() */
 	u8 nLevel;		/* Number of nested loop */
 	i8 nOBSat;		/* Number of ORDER BY terms satisfied by indices */
 	u8 sorted;		/* True if really sorted (not just grouped) */
@@ -443,11 +443,11 @@ struct WhereInfo {
  *
  * where.c:
  */
-Bitmask sqlite3WhereGetMask(WhereMaskSet *, int);
+Bitmask sqlWhereGetMask(WhereMaskSet *, int);
 #ifdef WHERETRACE_ENABLED
-void sqlite3WhereClausePrint(WhereClause * pWC);
+void sqlWhereClausePrint(WhereClause * pWC);
 #endif
-WhereTerm *sqlite3WhereFindTerm(WhereClause * pWC,	/* The WHERE clause to be searched */
+WhereTerm *sqlWhereFindTerm(WhereClause * pWC,	/* The WHERE clause to be searched */
 				int iCur,	/* Cursor number of LHS */
 				int iColumn,	/* Column number of LHS */
 				Bitmask notReady,	/* RHS must not overlap with this mask */
@@ -455,35 +455,35 @@ WhereTerm *sqlite3WhereFindTerm(WhereClause * pWC,	/* The WHERE clause to be sea
 				struct index_def *idx_def);
 
 /* wherecode.c: */
-int sqlite3WhereExplainOneScan(Parse * pParse,	/* Parse context */
+int sqlWhereExplainOneScan(Parse * pParse,	/* Parse context */
 			       SrcList * pTabList,	/* Table list this loop refers to */
 			       WhereLevel * pLevel,	/* Scan to write OP_Explain opcode for */
 			       int iLevel,	/* Value for "level" column of output */
 			       int iFrom,	/* Value for "from" column of output */
-			       u16 wctrlFlags	/* Flags passed to sqlite3WhereBegin() */
+			       u16 wctrlFlags	/* Flags passed to sqlWhereBegin() */
     );
-#ifdef SQLITE_ENABLE_STMT_SCANSTATUS
-void sqlite3WhereAddScanStatus(Vdbe * v,	/* Vdbe to add scanstatus entry to */
+#ifdef SQL_ENABLE_STMT_SCANSTATUS
+void sqlWhereAddScanStatus(Vdbe * v,	/* Vdbe to add scanstatus entry to */
 			       SrcList * pSrclist,	/* FROM clause pLvl reads data from */
 			       WhereLevel * pLvl,	/* Level to add scanstatus() entry for */
 			       int addrExplain	/* Address of OP_Explain (or 0) */
     );
 #else
-#define sqlite3WhereAddScanStatus(a, b, c, d) ((void)d)
+#define sqlWhereAddScanStatus(a, b, c, d) ((void)d)
 #endif
-Bitmask sqlite3WhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the WHERE clause */
+Bitmask sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the WHERE clause */
 				     int iLevel,	/* Which level of pWInfo->a[] should be coded */
 				     Bitmask notReady	/* Which tables are currently available */
     );
 
 /* whereexpr.c: */
-void sqlite3WhereClauseInit(WhereClause *, WhereInfo *);
-void sqlite3WhereClauseClear(WhereClause *);
-void sqlite3WhereSplit(WhereClause *, Expr *, u8);
-Bitmask sqlite3WhereExprUsage(WhereMaskSet *, Expr *);
-Bitmask sqlite3WhereExprListUsage(WhereMaskSet *, ExprList *);
-void sqlite3WhereExprAnalyze(SrcList *, WhereClause *);
-void sqlite3WhereTabFuncArgs(Parse *, struct SrcList_item *, WhereClause *);
+void sqlWhereClauseInit(WhereClause *, WhereInfo *);
+void sqlWhereClauseClear(WhereClause *);
+void sqlWhereSplit(WhereClause *, Expr *, u8);
+Bitmask sqlWhereExprUsage(WhereMaskSet *, Expr *);
+Bitmask sqlWhereExprListUsage(WhereMaskSet *, ExprList *);
+void sqlWhereExprAnalyze(SrcList *, WhereClause *);
+void sqlWhereTabFuncArgs(Parse *, struct SrcList_item *, WhereClause *);
 
 /*
  * Bitmasks for the operators on WhereTerm objects.  These are all
@@ -492,12 +492,12 @@ void sqlite3WhereTabFuncArgs(Parse *, struct SrcList_item *, WhereClause *);
  * particular WhereTerms within a WhereClause.
  *
  * Value constraints:
- *     WO_EQ    == SQLITE_INDEX_CONSTRAINT_EQ
- *     WO_LT    == SQLITE_INDEX_CONSTRAINT_LT
- *     WO_LE    == SQLITE_INDEX_CONSTRAINT_LE
- *     WO_GT    == SQLITE_INDEX_CONSTRAINT_GT
- *     WO_GE    == SQLITE_INDEX_CONSTRAINT_GE
- *     WO_MATCH == SQLITE_INDEX_CONSTRAINT_MATCH
+ *     WO_EQ    == SQL_INDEX_CONSTRAINT_EQ
+ *     WO_LT    == SQL_INDEX_CONSTRAINT_LT
+ *     WO_LE    == SQL_INDEX_CONSTRAINT_LE
+ *     WO_GT    == SQL_INDEX_CONSTRAINT_GT
+ *     WO_GE    == SQL_INDEX_CONSTRAINT_GE
+ *     WO_MATCH == SQL_INDEX_CONSTRAINT_MATCH
  */
 #define WO_IN     0x0001
 #define WO_EQ     0x0002

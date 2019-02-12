@@ -13,7 +13,7 @@ test:plan(61)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing CHECK constraints
 --
 -- $Id: check.test,v 1.13 2009/06/05 17:09:12 drh Exp $
@@ -228,7 +228,7 @@ test:do_execsql_test(
     })
 
 --db("close")
---sqlite3("db", "test.db")
+--sql("db", "test.db")
 test:do_execsql_test(
     "check-2.3",
     [[
@@ -324,11 +324,11 @@ test:do_catchsql_test(
     })
 
 
---    MUST_WORK_TEST use smth instead of sqlite_master
+--    MUST_WORK_TEST use smth instead of sql_master
 --    test:do_execsql_test(
 --        "check-3.2",
 --        [[
---            SELECT name FROM sqlite_master ORDER BY name
+--            SELECT name FROM sql_master ORDER BY name
 --        ]], {
 --            -- <check-3.2>
 --            "t1", "t2"
@@ -348,11 +348,11 @@ test:do_catchsql_test(
         -- </check-3.3>
     })
 
---    MUST_WORK_TEST use smth instead of sqlite_master
+--    MUST_WORK_TEST use smth instead of sql_master
 --    test:do_execsql_test(
 --        "check-3.4",
 --        [[
---            SELECT name FROM sqlite_master ORDER BY name
+--            SELECT name FROM sql_master ORDER BY name
 --        ]], {
 --            -- <check-3.4>
 --            "t1", "t2"
@@ -372,11 +372,11 @@ test:do_catchsql_test(
         -- </check-3.5>
     })
 
---    MUST_WORK_TEST use smth instead of sqlite_master
+--    MUST_WORK_TEST use smth instead of sql_master
 --    test:do_execsql_test(
 --        "check-3.6",
 --        [[
---            SELECT name FROM sqlite_master ORDER BY name
+--            SELECT name FROM sql_master ORDER BY name
 --        ]], {
 --            -- <check-3.6>
 --            "t1", "t2"
@@ -709,7 +709,7 @@ if (0 > 0) then
 test:do_test(
     7.4,
     function()
-        --sqlite3("db2", "test.db")
+        --sql("db2", "test.db")
         return test:execsql(" SELECT * FROM t6 ") --, "db2")
     end, {
         -- <7.4>

@@ -50,7 +50,7 @@ test:do_execsql_test(
         -- </tkt2391.3>
     })
 
--- This demonstrates the bug. Creating the index causes SQLite to ignore
+-- This demonstrates the bug. Creating the index causes sql to ignore
 -- the "COLLATE nocase" clause and use the default collation sequence 
 -- for column "foldername" instead (happens to be BINARY in this case).
 --

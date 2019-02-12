@@ -31,8 +31,8 @@
 #include "execute.h"
 
 #include "iproto_constants.h"
-#include "sql/sqliteInt.h"
-#include "sql/sqliteLimit.h"
+#include "sql/sqlInt.h"
+#include "sql/sqlLimit.h"
 #include "errcode.h"
 #include "small/region.h"
 #include "small/obuf.h"
@@ -59,7 +59,7 @@ const char *sql_info_key_strs[] = {
 
 /**
  * Name and value of an SQL prepared statement parameter.
- * @todo: merge with sqlite3_value.
+ * @todo: merge with sql_value.
  */
 struct sql_bind {
 	/** Bind name. NULL for ordinal binds. */
@@ -136,49 +136,49 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 			return -1;
 		}
 		bind->i64 = (int64_t) n;
-		bind->type = SQLITE_INTEGER;
+		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	}
 	case MP_INT:
 		bind->i64 = mp_decode_int(packet);
-		bind->type = SQLITE_INTEGER;
+		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_STR:
 		bind->s = mp_decode_str(packet, &bind->bytes);
-		bind->type = SQLITE_TEXT;
+		bind->type = SQL_TEXT;
 		break;
 	case MP_DOUBLE:
 		bind->d = mp_decode_double(packet);
-		bind->type = SQLITE_FLOAT;
+		bind->type = SQL_FLOAT;
 		bind->bytes = sizeof(bind->d);
 		break;
 	case MP_FLOAT:
 		bind->d = mp_decode_float(packet);
-		bind->type = SQLITE_FLOAT;
+		bind->type = SQL_FLOAT;
 		bind->bytes = sizeof(bind->d);
 		break;
 	case MP_NIL:
 		mp_decode_nil(packet);
-		bind->type = SQLITE_NULL;
+		bind->type = SQL_NULL;
 		bind->bytes = 1;
 		break;
 	case MP_BOOL:
-		/* SQLite doesn't support boolean. Use int instead. */
+		/* sql doesn't support boolean. Use int instead. */
 		bind->i64 = mp_decode_bool(packet) ? 1 : 0;
-		bind->type = SQLITE_INTEGER;
+		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_BIN:
 		bind->s = mp_decode_bin(packet, &bind->bytes);
-		bind->type = SQLITE_BLOB;
+		bind->type = SQL_BLOB;
 		break;
 	case MP_EXT:
 		bind->s = *packet;
 		mp_next(packet);
 		bind->bytes = *packet - bind->s;
-		bind->type = SQLITE_BLOB;
+		bind->type = SQL_BLOB;
 		break;
 	case MP_ARRAY:
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "ARRAY",
@@ -231,7 +231,7 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
 /**
  * Serialize a single column of a result set row.
  * @param stmt Prepared and started statement. At least one
- *        sqlite3_step must be called.
+ *        sql_step must be called.
  * @param i Column number.
  * @param region Allocator for column value.
  *
@@ -239,14 +239,14 @@ sql_bind_list_decode(const char *data, struct sql_bind **out_bind)
  * @retval -1 Out of memory when resizing the output buffer.
  */
 static inline int
-sql_column_to_messagepack(struct sqlite3_stmt *stmt, int i,
+sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 			  struct region *region)
 {
 	size_t size;
-	int type = sqlite3_column_type(stmt, i);
+	int type = sql_column_type(stmt, i);
 	switch (type) {
-	case SQLITE_INTEGER: {
-		int64_t n = sqlite3_column_int64(stmt, i);
+	case SQL_INTEGER: {
+		int64_t n = sql_column_int64(stmt, i);
 		if (n >= 0)
 			size = mp_sizeof_uint(n);
 		else
@@ -260,8 +260,8 @@ sql_column_to_messagepack(struct sqlite3_stmt *stmt, int i,
 			mp_encode_int(pos, n);
 		break;
 	}
-	case SQLITE_FLOAT: {
-		double d = sqlite3_column_double(stmt, i);
+	case SQL_FLOAT: {
+		double d = sql_column_double(stmt, i);
 		size = mp_sizeof_double(d);
 		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
@@ -269,21 +269,21 @@ sql_column_to_messagepack(struct sqlite3_stmt *stmt, int i,
 		mp_encode_double(pos, d);
 		break;
 	}
-	case SQLITE_TEXT: {
-		uint32_t len = sqlite3_column_bytes(stmt, i);
+	case SQL_TEXT: {
+		uint32_t len = sql_column_bytes(stmt, i);
 		size = mp_sizeof_str(len);
 		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
 			goto oom;
 		const char *s;
-		s = (const char *)sqlite3_column_text(stmt, i);
+		s = (const char *)sql_column_text(stmt, i);
 		mp_encode_str(pos, s, len);
 		break;
 	}
-	case SQLITE_BLOB: {
-		uint32_t len = sqlite3_column_bytes(stmt, i);
+	case SQL_BLOB: {
+		uint32_t len = sql_column_bytes(stmt, i);
 		const char *s =
-			(const char *)sqlite3_column_blob(stmt, i);
+			(const char *)sql_column_blob(stmt, i);
 		if (sql_column_subtype(stmt, i) == SQL_SUBTYPE_MSGPACK) {
 			size = len;
 			char *pos = (char *)region_alloc(region, size);
@@ -299,7 +299,7 @@ sql_column_to_messagepack(struct sqlite3_stmt *stmt, int i,
 		}
 		break;
 	}
-	case SQLITE_NULL: {
+	case SQL_NULL: {
 		size = mp_sizeof_nil();
 		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)
@@ -317,9 +317,9 @@ oom:
 }
 
 /**
- * Convert sqlite3 row into a tuple and append to a port.
+ * Convert sql row into a tuple and append to a port.
  * @param stmt Started prepared statement. At least one
- *        sqlite3_step must be done.
+ *        sql_step must be done.
  * @param column_count Statement's column count.
  * @param region Runtime allocator for temporary objects.
  * @param port Port to store tuples.
@@ -328,7 +328,7 @@ oom:
  * @retval -1 Memory error.
  */
 static inline int
-sql_row_to_port(struct sqlite3_stmt *stmt, int column_count,
+sql_row_to_port(struct sql_stmt *stmt, int column_count,
 		struct region *region, struct port *port)
 {
 	assert(column_count > 0);
@@ -373,12 +373,12 @@ error:
  * @retval -1 SQL error.
  */
 static inline int
-sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
+sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		uint32_t pos)
 {
 	int rc;
 	if (p->name != NULL) {
-		pos = sqlite3_bind_parameter_lindex(stmt, p->name, p->name_len);
+		pos = sql_bind_parameter_lindex(stmt, p->name, p->name_len);
 		if (pos == 0) {
 			diag_set(ClientError, ER_SQL_BIND_NOT_FOUND,
 				 sql_bind_name(p));
@@ -386,42 +386,42 @@ sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
 		}
 	}
 	switch (p->type) {
-	case SQLITE_INTEGER:
-		rc = sqlite3_bind_int64(stmt, pos, p->i64);
+	case SQL_INTEGER:
+		rc = sql_bind_int64(stmt, pos, p->i64);
 		break;
-	case SQLITE_FLOAT:
-		rc = sqlite3_bind_double(stmt, pos, p->d);
+	case SQL_FLOAT:
+		rc = sql_bind_double(stmt, pos, p->d);
 		break;
-	case SQLITE_TEXT:
+	case SQL_TEXT:
 		/*
 		 * Parameters are allocated within message pack,
 		 * received from the iproto thread. IProto thread
 		 * now is waiting for the response and it will not
-		 * free the packet until sqlite3_finalize. So
+		 * free the packet until sql_finalize. So
 		 * there is no need to copy the packet and we can
-		 * use SQLITE_STATIC.
+		 * use SQL_STATIC.
 		 */
-		rc = sqlite3_bind_text64(stmt, pos, p->s, p->bytes,
-					 SQLITE_STATIC);
+		rc = sql_bind_text64(stmt, pos, p->s, p->bytes,
+					 SQL_STATIC);
 		break;
-	case SQLITE_NULL:
-		rc = sqlite3_bind_null(stmt, pos);
+	case SQL_NULL:
+		rc = sql_bind_null(stmt, pos);
 		break;
-	case SQLITE_BLOB:
-		rc = sqlite3_bind_blob64(stmt, pos, (const void *) p->s,
-					 p->bytes, SQLITE_STATIC);
+	case SQL_BLOB:
+		rc = sql_bind_blob64(stmt, pos, (const void *) p->s,
+					 p->bytes, SQL_STATIC);
 		break;
 	default:
 		unreachable();
 	}
-	if (rc == SQLITE_OK)
+	if (rc == SQL_OK)
 		return 0;
 
 	switch (rc) {
-	case SQLITE_NOMEM:
+	case SQL_NOMEM:
 		diag_set(OutOfMemory, p->bytes, "vdbe", "bind value");
 		break;
-	case SQLITE_TOOBIG:
+	case SQL_TOOBIG:
 	default:
 		diag_set(ClientError, ER_SQL_BIND_VALUE, sql_bind_name(p),
 			 sql_type_strs[p->type]);
@@ -440,7 +440,7 @@ sql_bind_column(struct sqlite3_stmt *stmt, const struct sql_bind *p,
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_bind(struct sqlite3_stmt *stmt, const struct sql_bind *bind,
+sql_bind(struct sql_stmt *stmt, const struct sql_bind *bind,
 	 uint32_t bind_count)
 {
 	assert(stmt != NULL);
@@ -462,7 +462,7 @@ sql_bind(struct sqlite3_stmt *stmt, const struct sql_bind *bind,
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
+sql_get_description(struct sql_stmt *stmt, struct obuf *out,
 		    int column_count)
 {
 	assert(column_count > 0);
@@ -479,8 +479,8 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 		size_t size = mp_sizeof_map(2) +
 			      mp_sizeof_uint(IPROTO_FIELD_NAME) +
 			      mp_sizeof_uint(IPROTO_FIELD_TYPE);
-		const char *name = sqlite3_column_name(stmt, i);
-		const char *type = sqlite3_column_datatype(stmt, i);
+		const char *name = sql_column_name(stmt, i);
+		const char *type = sql_column_datatype(stmt, i);
 		/*
 		 * Can not fail, since all column names are
 		 * preallocated during prepare phase and the
@@ -504,25 +504,25 @@ sql_get_description(struct sqlite3_stmt *stmt, struct obuf *out,
 }
 
 static inline int
-sql_execute(sqlite3 *db, struct sqlite3_stmt *stmt, struct port *port,
+sql_execute(sql *db, struct sql_stmt *stmt, struct port *port,
 	    struct region *region)
 {
-	int rc, column_count = sqlite3_column_count(stmt);
+	int rc, column_count = sql_column_count(stmt);
 	if (column_count > 0) {
 		/* Either ROW or DONE or ERROR. */
-		while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		while ((rc = sql_step(stmt)) == SQL_ROW) {
 			if (sql_row_to_port(stmt, column_count, region,
 					    port) != 0)
 				return -1;
 		}
-		assert(rc == SQLITE_DONE || rc != SQLITE_OK);
+		assert(rc == SQL_DONE || rc != SQL_OK);
 	} else {
 		/* No rows. Either DONE or ERROR. */
-		rc = sqlite3_step(stmt);
-		assert(rc != SQLITE_ROW && rc != SQLITE_OK);
+		rc = sql_step(stmt);
+		assert(rc != SQL_ROW && rc != SQL_OK);
 	}
-	if (rc != SQLITE_DONE) {
-		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
+	if (rc != SQL_DONE) {
+		diag_set(ClientError, ER_SQL_EXECUTE, sql_errmsg(db));
 		return -1;
 	}
 	return 0;
@@ -533,14 +533,14 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 			uint32_t bind_count, struct sql_response *response,
 			struct region *region)
 {
-	struct sqlite3_stmt *stmt;
-	sqlite3 *db = sql_get();
+	struct sql_stmt *stmt;
+	struct sql *db = sql_get();
 	if (db == NULL) {
 		diag_set(ClientError, ER_LOADING);
 		return -1;
 	}
-	if (sqlite3_prepare_v2(db, sql, len, &stmt, NULL) != SQLITE_OK) {
-		diag_set(ClientError, ER_SQL_EXECUTE, sqlite3_errmsg(db));
+	if (sql_prepare_v2(db, sql, len, &stmt, NULL) != SQL_OK) {
+		diag_set(ClientError, ER_SQL_EXECUTE, sql_errmsg(db));
 		return -1;
 	}
 	assert(stmt != NULL);
@@ -550,17 +550,17 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 	    sql_execute(db, stmt, &response->port, region) == 0)
 		return 0;
 	port_destroy(&response->port);
-	sqlite3_finalize(stmt);
+	sql_finalize(stmt);
 	return -1;
 }
 
 int
 sql_response_dump(struct sql_response *response, struct obuf *out)
 {
-	sqlite3 *db = sql_get();
-	struct sqlite3_stmt *stmt = (struct sqlite3_stmt *) response->prep_stmt;
+	sql *db = sql_get();
+	struct sql_stmt *stmt = (struct sql_stmt *) response->prep_stmt;
 	struct port_tuple *port_tuple = (struct port_tuple *) &response->port;
-	int rc = 0, column_count = sqlite3_column_count(stmt);
+	int rc = 0, column_count = sql_column_count(stmt);
 	if (column_count > 0) {
 		int keys = 2;
 		int size = mp_sizeof_map(keys);
@@ -644,6 +644,6 @@ err:
 	}
 finish:
 	port_destroy(&response->port);
-	sqlite3_finalize(stmt);
+	sql_finalize(stmt);
 	return rc;
 }

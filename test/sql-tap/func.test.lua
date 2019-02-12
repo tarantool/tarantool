@@ -13,7 +13,7 @@ test:plan(14547)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing built-in functions.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -1041,15 +1041,15 @@ test:do_execsql_test(
     -- </func-9.13-utf8>
 })
 
--- Use the "sqlite_register_test_function" TCL command which is part of
+-- Use the "sql_register_test_function" TCL command which is part of
 -- the text fixture in order to verify correct operation of some of
 -- the user-defined SQL function APIs that are not used by the built-in
 -- functions.
 --
 -- MUST_WORK_TEST testfunc not implemented
 if 0 > 0 then
-DB = sqlite3_connection_pointer("db")
-X(525, "X!cmd", [=[["sqlite_register_test_function",["::DB"],"testfunc"]]=])
+DB = sql_connection_pointer("db")
+X(525, "X!cmd", [=[["sql_register_test_function",["::DB"],"testfunc"]]=])
 test:do_catchsql_test(
     "func-10.1",
     [[
@@ -1124,14 +1124,14 @@ test:do_execsql_test(
 end
 
 
--- # Test the built-in sqlite_version(*) SQL function.
+-- # Test the built-in sql_version(*) SQL function.
 -- #
 -- do_test func-11.1 {
 --   execsql {
---     SELECT sqlite_version(*);
+--     SELECT sql_version(*);
 --   }
--- } [sqlite3 -version]
--- Test that destructors passed to sqlite3 by calls to sqlite3_result_text()
+-- } [sql -version]
+-- Test that destructors passed to sql by calls to sql_result_text()
 -- etc. are called. These tests use two special user-defined functions
 -- (implemented in func.c) only available in test builds. 
 --
@@ -1300,19 +1300,19 @@ test:do_execsql_test(
 test:do_test(
     "func-13.7",
     function()
-        DB = sqlite3_connection_pointer("db")
+        DB = sql_connection_pointer("db")
         sql = "SELECT test_auxdata( ? , a ) FROM t4;"
-        STMT = sqlite3_prepare(DB, sql, -1, "TAIL")
-        sqlite3_bind_text(STMT, 1, "hello\0", -1)
+        STMT = sql_prepare(DB, sql, -1, "TAIL")
+        sql_bind_text(STMT, 1, "hello\0", -1)
         res = {  }
-        while X(690, "X!cmd", [=[["expr"," \"SQLITE_ROW\"==[sqlite3_step $STMT] "]]=])
+        while X(690, "X!cmd", [=[["expr"," \"sql_ROW\"==[sql_step $STMT] "]]=])
  do
-            table.insert(res,sqlite3_column_text(STMT, 0))
+            table.insert(res,sql_column_text(STMT, 0))
         end
-        return table.insert(res,sqlite3_finalize(STMT)) or res
+        return table.insert(res,sql_finalize(STMT)) or res
     end, {
         -- <func-13.7>
-        "0 0", "1 0", "SQLITE_OK"
+        "0 0", "1 0", "sql_OK"
         -- </func-13.7>
     })
 
@@ -1454,10 +1454,10 @@ test:do_test(
         test:execsql([[
             CREATE TABLE tbl2(id integer primary key, a INT, b INT);
         ]])
-        STMT = sqlite3_prepare(DB, "INSERT INTO tbl2 VALUES(1, ?, ?)", -1, "TAIL")
-        sqlite3_bind_blob(STMT, 1, "abc", 3)
-        sqlite3_step(STMT)
-        sqlite3_finalize(STMT)
+        STMT = sql_prepare(DB, "INSERT INTO tbl2 VALUES(1, ?, ?)", -1, "TAIL")
+        sql_bind_blob(STMT, 1, "abc", 3)
+        sql_step(STMT)
+        sql_finalize(STMT)
         return test:execsql([[
             SELECT quote(a), quote(b) FROM tbl2;
         ]])
@@ -2222,12 +2222,12 @@ test:do_execsql_test(
         -- </func-22.34>
     })
 
--- This is to test the deprecated sqlite3_aggregate_count() API.
+-- This is to test the deprecated sql_aggregate_count() API.
 --
 --test:do_test(
 --    "func-23.1",
 --    function()
---        sqlite3_create_aggregate("db")
+--        sql_create_aggregate("db")
 --        return test:execsql([[
 --            SELECT legacy_count() FROM t6;
 --        ]])
@@ -2306,11 +2306,11 @@ local midargs = ""
 -- ["unset","-nocomplain","midres"]
 local midres = ""
 -- ["unset","-nocomplain","result"]
-local SQLITE_LIMIT_FUNCTION_ARG = 6
+local sql_LIMIT_FUNCTION_ARG = 6
 -- MUST_WORK_TEST test should be rewritten
 if 0>0 then
---for {set i 1} {$i<[sqlite3_limit db SQLITE_LIMIT_FUNCTION_ARG -1]} {incr i} {
-for i = 1, SQLITE_LIMIT_FUNCTION_ARG, 1 do
+--for {set i 1} {$i<[sql_limit db sql_LIMIT_FUNCTION_ARG -1]} {incr i} {
+for i = 1, sql_LIMIT_FUNCTION_ARG, 1 do
     midargs = midargs .. ",'/"..i.."'"
     midres = midres .. "/"..i
     result = digest.md5_hex(string.format("this%sprogram%sis%sfree%ssoftware%s",
@@ -2383,7 +2383,7 @@ test:do_execsql_test(
         -- </func-24.12>
     })
 
--- Tests to verify ticket http://www.sqlite.org/src/tktview/55746f9e65f8587c0
+-- Tests to verify ticket http://www.sql.org/src/tktview/55746f9e65f8587c0
 test:do_execsql_test(
     "func-24.13",
     [[
@@ -2420,7 +2420,7 @@ test:do_execsql_test(
         -- </func-25.1>
     })
 
--- Try to misuse the sqlite3_create_function() interface.  Verify that
+-- Try to misuse the sql_create_function() interface.  Verify that
 -- errors are returned.
 --
 test:do_test(
@@ -2441,7 +2441,7 @@ test:do_test(
     "func-26.2",
     function()
         a = ""
-        for _ in X(0, "X!for", [=[["set i 1","$i<=$::SQLITE_MAX_FUNCTION_ARG","incr i"]]=]) do
+        for _ in X(0, "X!for", [=[["set i 1","$i<=$::sql_MAX_FUNCTION_ARG","incr i"]]=]) do
             table.insert(a,i)
         end
         return test:execsql(string.format([[
@@ -2457,7 +2457,7 @@ test:do_test(
     "func-26.3",
     function()
         a = ""
-        for _ in X(0, "X!for", [=[["set i 1","$i<=$::SQLITE_MAX_FUNCTION_ARG+1","incr i"]]=]) do
+        for _ in X(0, "X!for", [=[["set i 1","$i<=$::sql_MAX_FUNCTION_ARG+1","incr i"]]=]) do
             table.insert(a,i)
         end
         return test:catchsql(string.format([[
@@ -2473,7 +2473,7 @@ test:do_test(
     "func-26.4",
     function()
         a = ""
-        for _ in X(0, "X!for", [=[["set i 1","$i<=$::SQLITE_MAX_FUNCTION_ARG-1","incr i"]]=]) do
+        for _ in X(0, "X!for", [=[["set i 1","$i<=$::sql_MAX_FUNCTION_ARG-1","incr i"]]=]) do
             table.insert(a,i)
         end
         return test:catchsql(string.format([[

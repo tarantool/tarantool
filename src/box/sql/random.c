@@ -31,27 +31,27 @@
 
 /*
  * This file contains code to implement a pseudo-random number
- * generator (PRNG) for SQLite.
+ * generator (PRNG) for sql.
  *
  * Random numbers are used by some of the database backends in order
  * to generate random integer keys for tables or random filenames.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 
 /* All threads share a single random number generator.
  * This structure is the current state of the generator.
  */
-static SQLITE_WSD struct sqlite3PrngType {
+static SQL_WSD struct sqlPrngType {
 	unsigned char isInit;	/* True if initialized */
 	unsigned char i, j;	/* State variables */
 	unsigned char s[256];	/* State variables */
-} sqlite3Prng;
+} sqlPrng;
 
 /*
  * Return N random bytes.
  */
 void
-sqlite3_randomness(int N, void *pBuf)
+sql_randomness(int N, void *pBuf)
 {
 	unsigned char t;
 	unsigned char *zBuf = pBuf;
@@ -60,18 +60,18 @@ sqlite3_randomness(int N, void *pBuf)
 	 * state vector.  If writable static data is unsupported on the target,
 	 * we have to locate the state vector at run-time.  In the more common
 	 * case where writable static data is supported, wsdPrng can refer directly
-	 * to the "sqlite3Prng" state vector declared above.
+	 * to the "sqlPrng" state vector declared above.
 	 */
-#ifdef SQLITE_OMIT_WSD
-	struct sqlite3PrngType *p =
-	    &GLOBAL(struct sqlite3PrngType, sqlite3Prng);
+#ifdef SQL_OMIT_WSD
+	struct sqlPrngType *p =
+	    &GLOBAL(struct sqlPrngType, sqlPrng);
 #define wsdPrng p[0]
 #else
-#define wsdPrng sqlite3Prng
+#define wsdPrng sqlPrng
 #endif
 
-#ifndef SQLITE_OMIT_AUTOINIT
-	if (sqlite3_initialize())
+#ifndef SQL_OMIT_AUTOINIT
+	if (sql_initialize())
 		return;
 #endif
 
@@ -85,7 +85,7 @@ sqlite3_randomness(int N, void *pBuf)
 	 * not need to contain a lot of randomness since we are not
 	 * trying to do secure encryption or anything like that...
 	 *
-	 * Nothing in this file or anywhere else in SQLite does any kind of
+	 * Nothing in this file or anywhere else in sql does any kind of
 	 * encryption.  The RC4 algorithm is being used as a PRNG (pseudo-random
 	 * number generator) not as an encryption device.
 	 */
@@ -94,7 +94,7 @@ sqlite3_randomness(int N, void *pBuf)
 		char k[256];
 		wsdPrng.j = 0;
 		wsdPrng.i = 0;
-		sqlite3OsRandomness(sqlite3_vfs_find(0), 256, k);
+		sqlOsRandomness(sql_vfs_find(0), 256, k);
 		for (i = 0; i < 256; i++) {
 			wsdPrng.s[i] = (u8) i;
 		}
@@ -119,31 +119,31 @@ sqlite3_randomness(int N, void *pBuf)
 	} while (--N);
 }
 
-#ifndef SQLITE_UNTESTABLE
+#ifndef SQL_UNTESTABLE
 /*
  * For testing purposes, we sometimes want to preserve the state of
  * PRNG and restore the PRNG to its saved state at a later time, or
  * to reset the PRNG to its initial state.  These routines accomplish
  * those tasks.
  *
- * The sqlite3_test_control() interface calls these routines to
+ * The sql_test_control() interface calls these routines to
  * control the PRNG.
  */
-static SQLITE_WSD struct sqlite3PrngType sqlite3SavedPrng;
+static SQL_WSD struct sqlPrngType sqlSavedPrng;
 void
-sqlite3PrngSaveState(void)
+sqlPrngSaveState(void)
 {
-	memcpy(&GLOBAL(struct sqlite3PrngType, sqlite3SavedPrng),
-	       &GLOBAL(struct sqlite3PrngType, sqlite3Prng), sizeof(sqlite3Prng)
+	memcpy(&GLOBAL(struct sqlPrngType, sqlSavedPrng),
+	       &GLOBAL(struct sqlPrngType, sqlPrng), sizeof(sqlPrng)
 	    );
 }
 
 void
-sqlite3PrngRestoreState(void)
+sqlPrngRestoreState(void)
 {
-	memcpy(&GLOBAL(struct sqlite3PrngType, sqlite3Prng),
-	       &GLOBAL(struct sqlite3PrngType, sqlite3SavedPrng),
-	       sizeof(sqlite3Prng)
+	memcpy(&GLOBAL(struct sqlPrngType, sqlPrng),
+	       &GLOBAL(struct sqlPrngType, sqlSavedPrng),
+	       sizeof(sqlPrng)
 	    );
 }
-#endif				/* SQLITE_UNTESTABLE */
+#endif				/* SQL_UNTESTABLE */

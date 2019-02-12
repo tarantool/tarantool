@@ -13,7 +13,7 @@ test:plan(17)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. The
+-- This file implements regression tests for sql library. The
 -- focus of this file is testing the reverse_select_order pragma.
 --
 -- $Id: whereA.test,v 1.3 2009/06/10 19:33:29 drh Exp $
@@ -53,7 +53,7 @@ test:do_test(
     "whereA-1.3",
     function()
         --db close
-        --sqlite3 db test.db
+        --sql db test.db
         return test:execsql [[
             PRAGMA reverse_unordered_selects=1;
             SELECT * FROM t1;
@@ -66,7 +66,7 @@ test:do_test(
 
 -- do_test whereA-1.4 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   db eval {
 --     PRAGMA reverse_unordered_selects=1;
 --     SELECT * FROM t1 ORDER BY rowid;

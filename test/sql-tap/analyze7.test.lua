@@ -142,7 +142,7 @@ test:do_execsql_test(
         -- </analyze7-3.2.1>
     })
 
--- SQLite comes up with a different estimated
+-- sql comes up with a different estimated
 -- row count for (c=2) than it does for (c=?).
 test:do_execsql_test(
     "analyze7-3.2.2",

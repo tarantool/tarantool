@@ -31,24 +31,24 @@
 
 /*
  *
- * This module implements the sqlite3_status() interface and related
+ * This module implements the sql_status() interface and related
  * functionality.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "vdbeInt.h"
 /*
  * Variables in which to record status information.
  */
-#if SQLITE_PTRSIZE>4
-typedef sqlite3_int64 sqlite3StatValueType;
+#if SQL_PTRSIZE>4
+typedef sql_int64 sqlStatValueType;
 #else
-typedef u32 sqlite3StatValueType;
+typedef u32 sqlStatValueType;
 #endif
-typedef struct sqlite3StatType sqlite3StatType;
-static SQLITE_WSD struct sqlite3StatType {
-	sqlite3StatValueType nowValue[10];	/* Current value */
-	sqlite3StatValueType mxValue[10];	/* Maximum value */
-} sqlite3Stat = { {
+typedef struct sqlStatType sqlStatType;
+static SQL_WSD struct sqlStatType {
+	sqlStatValueType nowValue[10];	/* Current value */
+	sqlStatValueType mxValue[10];	/* Maximum value */
+} sqlStat = { {
 0,}, {
 0,}};
 
@@ -57,21 +57,21 @@ static SQLITE_WSD struct sqlite3StatType {
  * state vector.  If writable static data is unsupported on the target,
  * we have to locate the state vector at run-time.  In the more common
  * case where writable static data is supported, wsdStat can refer directly
- * to the "sqlite3Stat" state vector declared above.
+ * to the "sqlStat" state vector declared above.
  */
-#ifdef SQLITE_OMIT_WSD
-#define wsdStatInit  sqlite3StatType *x = &GLOBAL(sqlite3StatType,sqlite3Stat)
+#ifdef SQL_OMIT_WSD
+#define wsdStatInit  sqlStatType *x = &GLOBAL(sqlStatType,sqlStat)
 #define wsdStat x[0]
 #else
 #define wsdStatInit
-#define wsdStat sqlite3Stat
+#define wsdStat sqlStat
 #endif
 
 /*
  * Return the current value of a status parameter.
  */
-sqlite3_int64
-sqlite3StatusValue(int op)
+sql_int64
+sqlStatusValue(int op)
 {
 	wsdStatInit;
 	assert(op >= 0 && op < ArraySize(wsdStat.nowValue));
@@ -90,7 +90,7 @@ sqlite3StatusValue(int op)
  * mark is unchanged.  N must be non-negative for StatusDown().
  */
 void
-sqlite3StatusUp(int op, int N)
+sqlStatusUp(int op, int N)
 {
 	wsdStatInit;
 	assert(op >= 0 && op < ArraySize(wsdStat.nowValue));
@@ -102,7 +102,7 @@ sqlite3StatusUp(int op, int N)
 }
 
 void
-sqlite3StatusDown(int op, int N)
+sqlStatusDown(int op, int N)
 {
 	wsdStatInit;
 	assert(N >= 0);
@@ -115,18 +115,18 @@ sqlite3StatusDown(int op, int N)
  * Adjust the highwater mark if necessary.
  */
 void
-sqlite3StatusHighwater(int op, int X)
+sqlStatusHighwater(int op, int X)
 {
-	sqlite3StatValueType newValue;
+	sqlStatValueType newValue;
 	wsdStatInit;
 	assert(X >= 0);
-	newValue = (sqlite3StatValueType) X;
+	newValue = (sqlStatValueType) X;
 	assert(op >= 0 && op < ArraySize(wsdStat.nowValue));
 
-	assert(op == SQLITE_STATUS_MALLOC_SIZE
-	       || op == SQLITE_STATUS_PAGECACHE_SIZE
-	       || op == SQLITE_STATUS_SCRATCH_SIZE
-	       || op == SQLITE_STATUS_PARSER_STACK);
+	assert(op == SQL_STATUS_MALLOC_SIZE
+	       || op == SQL_STATUS_PAGECACHE_SIZE
+	       || op == SQL_STATUS_SCRATCH_SIZE
+	       || op == SQL_STATUS_PARSER_STACK);
 	if (newValue > wsdStat.mxValue[op]) {
 		wsdStat.mxValue[op] = newValue;
 	}
@@ -136,36 +136,36 @@ sqlite3StatusHighwater(int op, int X)
  * Query status information.
  */
 int
-sqlite3_status64(int op,
-		 sqlite3_int64 * pCurrent,
-		 sqlite3_int64 * pHighwater, int resetFlag)
+sql_status64(int op,
+		 sql_int64 * pCurrent,
+		 sql_int64 * pHighwater, int resetFlag)
 {
 	wsdStatInit;
 	if (op < 0 || op >= ArraySize(wsdStat.nowValue)) {
-		return SQLITE_MISUSE_BKPT;
+		return SQL_MISUSE_BKPT;
 	}
-#ifdef SQLITE_ENABLE_API_ARMOR
+#ifdef SQL_ENABLE_API_ARMOR
 	if (pCurrent == 0 || pHighwater == 0)
-		return SQLITE_MISUSE_BKPT;
+		return SQL_MISUSE_BKPT;
 #endif
 	*pCurrent = wsdStat.nowValue[op];
 	*pHighwater = wsdStat.mxValue[op];
 	if (resetFlag) {
 		wsdStat.mxValue[op] = wsdStat.nowValue[op];
 	}
-	return SQLITE_OK;
+	return SQL_OK;
 }
 
 int
-sqlite3_status(int op, int *pCurrent, int *pHighwater, int resetFlag)
+sql_status(int op, int *pCurrent, int *pHighwater, int resetFlag)
 {
-	sqlite3_int64 iCur = 0, iHwtr = 0;
+	sql_int64 iCur = 0, iHwtr = 0;
 	int rc;
-#ifdef SQLITE_ENABLE_API_ARMOR
+#ifdef SQL_ENABLE_API_ARMOR
 	if (pCurrent == 0 || pHighwater == 0)
-		return SQLITE_MISUSE_BKPT;
+		return SQL_MISUSE_BKPT;
 #endif
-	rc = sqlite3_status64(op, &iCur, &iHwtr, resetFlag);
+	rc = sql_status64(op, &iCur, &iHwtr, resetFlag);
 	if (rc == 0) {
 		*pCurrent = (int)iCur;
 		*pHighwater = (int)iHwtr;
@@ -177,21 +177,21 @@ sqlite3_status(int op, int *pCurrent, int *pHighwater, int resetFlag)
  * Query status information for a single database connection
  */
 int
-sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desired */
+sql_db_status(sql * db,	/* The database connection whose status is desired */
 		  int op,	/* Status verb */
 		  int *pCurrent,	/* Write current value here */
 		  int *pHighwater,	/* Write high-water mark here */
 		  int resetFlag	/* Reset high-water mark if true */
     )
 {
-	int rc = SQLITE_OK;	/* Return code */
-#ifdef SQLITE_ENABLE_API_ARMOR
-	if (!sqlite3SafetyCheckOk(db) || pCurrent == 0 || pHighwater == 0) {
-		return SQLITE_MISUSE_BKPT;
+	int rc = SQL_OK;	/* Return code */
+#ifdef SQL_ENABLE_API_ARMOR
+	if (!sqlSafetyCheckOk(db) || pCurrent == 0 || pHighwater == 0) {
+		return SQL_MISUSE_BKPT;
 	}
 #endif
 	switch (op) {
-	case SQLITE_DBSTATUS_LOOKASIDE_USED:{
+	case SQL_DBSTATUS_LOOKASIDE_USED:{
 			*pCurrent = db->lookaside.nOut;
 			*pHighwater = db->lookaside.mxOut;
 			if (resetFlag) {
@@ -200,21 +200,21 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 			break;
 		}
 
-	case SQLITE_DBSTATUS_LOOKASIDE_HIT:
-	case SQLITE_DBSTATUS_LOOKASIDE_MISS_SIZE:
-	case SQLITE_DBSTATUS_LOOKASIDE_MISS_FULL:{
-			testcase(op == SQLITE_DBSTATUS_LOOKASIDE_HIT);
-			testcase(op == SQLITE_DBSTATUS_LOOKASIDE_MISS_SIZE);
-			testcase(op == SQLITE_DBSTATUS_LOOKASIDE_MISS_FULL);
-			assert((op - SQLITE_DBSTATUS_LOOKASIDE_HIT) >= 0);
-			assert((op - SQLITE_DBSTATUS_LOOKASIDE_HIT) < 3);
+	case SQL_DBSTATUS_LOOKASIDE_HIT:
+	case SQL_DBSTATUS_LOOKASIDE_MISS_SIZE:
+	case SQL_DBSTATUS_LOOKASIDE_MISS_FULL:{
+			testcase(op == SQL_DBSTATUS_LOOKASIDE_HIT);
+			testcase(op == SQL_DBSTATUS_LOOKASIDE_MISS_SIZE);
+			testcase(op == SQL_DBSTATUS_LOOKASIDE_MISS_FULL);
+			assert((op - SQL_DBSTATUS_LOOKASIDE_HIT) >= 0);
+			assert((op - SQL_DBSTATUS_LOOKASIDE_HIT) < 3);
 			*pCurrent = 0;
 			*pHighwater =
 			    db->lookaside.anStat[op -
-						 SQLITE_DBSTATUS_LOOKASIDE_HIT];
+						 SQL_DBSTATUS_LOOKASIDE_HIT];
 			if (resetFlag) {
 				db->lookaside.anStat[op -
-						     SQLITE_DBSTATUS_LOOKASIDE_HIT]
+						     SQL_DBSTATUS_LOOKASIDE_HIT]
 				    = 0;
 			}
 			break;
@@ -225,8 +225,8 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 		 * by all pagers associated with the given database connection.  The
 		 * highwater mark is meaningless and is returned as zero.
 		 */
-	case SQLITE_DBSTATUS_CACHE_USED_SHARED:
-	case SQLITE_DBSTATUS_CACHE_USED:{
+	case SQL_DBSTATUS_CACHE_USED_SHARED:
+	case SQL_DBSTATUS_CACHE_USED:{
 			int totalUsed = 0;
 			*pCurrent = totalUsed;
 			*pHighwater = 0;
@@ -237,7 +237,7 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 		 * *pCurrent gets an accurate estimate of the amount of memory used
 		 * to store the schema for database. *pHighwater is set to zero.
 		 */
-	case SQLITE_DBSTATUS_SCHEMA_USED:{
+	case SQL_DBSTATUS_SCHEMA_USED:{
 			int nByte = 0;	/* Used to accumulate return value */
 
 			*pHighwater = 0;
@@ -250,14 +250,14 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 		 * to store all prepared statements.
 		 * *pHighwater is set to zero.
 		 */
-	case SQLITE_DBSTATUS_STMT_USED:{
+	case SQL_DBSTATUS_STMT_USED:{
 			struct Vdbe *pVdbe;	/* Used to iterate through VMs */
 			int nByte = 0;	/* Used to accumulate return value */
 
 			db->pnBytesFreed = &nByte;
 			for (pVdbe = db->pVdbe; pVdbe; pVdbe = pVdbe->pNext) {
-				sqlite3VdbeClearObject(db, pVdbe);
-				sqlite3DbFree(db, pVdbe);
+				sqlVdbeClearObject(db, pVdbe);
+				sqlDbFree(db, pVdbe);
 			}
 			db->pnBytesFreed = 0;
 
@@ -273,14 +273,14 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 		 * pagers the database handle is connected to. *pHighwater is always set
 		 * to zero.
 		 */
-	case SQLITE_DBSTATUS_CACHE_HIT:
-	case SQLITE_DBSTATUS_CACHE_MISS:
-	case SQLITE_DBSTATUS_CACHE_WRITE:{
+	case SQL_DBSTATUS_CACHE_HIT:
+	case SQL_DBSTATUS_CACHE_MISS:
+	case SQL_DBSTATUS_CACHE_WRITE:{
 			int nRet = 0;
-			assert(SQLITE_DBSTATUS_CACHE_MISS ==
-			       SQLITE_DBSTATUS_CACHE_HIT + 1);
-			assert(SQLITE_DBSTATUS_CACHE_WRITE ==
-			       SQLITE_DBSTATUS_CACHE_HIT + 2);
+			assert(SQL_DBSTATUS_CACHE_MISS ==
+			       SQL_DBSTATUS_CACHE_HIT + 1);
+			assert(SQL_DBSTATUS_CACHE_WRITE ==
+			       SQL_DBSTATUS_CACHE_HIT + 2);
 
 			*pHighwater = 0;	/* IMP: R-42420-56072
 			*/
@@ -294,7 +294,7 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 		 * key constraints.  Set *pCurrent to zero if all foreign key constraints
 		 * have been satisfied.  The *pHighwater is always set to zero.
 		 */
-	case SQLITE_DBSTATUS_DEFERRED_FKS:{
+	case SQL_DBSTATUS_DEFERRED_FKS:{
 			*pHighwater = 0;	/* IMP: R-11967-56545
 			*/
 			const struct txn *ptxn = in_txn();
@@ -309,7 +309,7 @@ sqlite3_db_status(sqlite3 * db,	/* The database connection whose status is desir
 		}
 
 	default:{
-			rc = SQLITE_ERROR;
+			rc = SQL_ERROR;
 		}
 	}
 	return rc;

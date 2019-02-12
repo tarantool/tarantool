@@ -31,10 +31,10 @@
 
 /*
  * This is the header file for the generic hash-table implementation
- * used in SQLite.
+ * used in sql.
  */
-#ifndef SQLITE_HASH_H
-#define SQLITE_HASH_H
+#ifndef SQL_HASH_H
+#define SQL_HASH_H
 
 /* Forward declarations of structures. */
 typedef struct Hash Hash;
@@ -87,10 +87,10 @@ struct HashElem {
 /*
  * Access routines.  To delete, insert a NULL pointer.
  */
-void sqlite3HashInit(Hash *);
-void *sqlite3HashInsert(Hash *, const char *pKey, void *pData);
-void *sqlite3HashFind(const Hash *, const char *pKey);
-void sqlite3HashClear(Hash *);
+void sqlHashInit(Hash *);
+void *sqlHashInsert(Hash *, const char *pKey, void *pData);
+void *sqlHashFind(const Hash *, const char *pKey);
+void sqlHashClear(Hash *);
 
 /*
  * Macros for looping over all elements of a hash table.  The idiom is
@@ -99,20 +99,20 @@ void sqlite3HashClear(Hash *);
  *   Hash h;
  *   HashElem *p;
  *   ...
- *   for(p=sqliteHashFirst(&h); p; p=sqliteHashNext(p)){
- *     SomeStructure *pData = sqliteHashData(p);
+ *   for(p=sqlHashFirst(&h); p; p=sqlHashNext(p)){
+ *     SomeStructure *pData = sqlHashData(p);
  *     // do something with pData
  *   }
  */
-#define sqliteHashFirst(H)  ((H)->first)
-#define sqliteHashNext(E)   ((E)->next)
-#define sqliteHashData(E)   ((E)->data)
-/* #define sqliteHashKey(E)    ((E)->pKey) // NOT USED */
-/* #define sqliteHashKeysize(E) ((E)->nKey)  // NOT USED */
+#define sqlHashFirst(H)  ((H)->first)
+#define sqlHashNext(E)   ((E)->next)
+#define sqlHashData(E)   ((E)->data)
+/* #define sqlHashKey(E)    ((E)->pKey) // NOT USED */
+/* #define sqlHashKeysize(E) ((E)->nKey)  // NOT USED */
 
 /*
  * Number of entries in a hash table
  */
-/* #define sqliteHashCount(H)  ((H)->count) // NOT USED */
+/* #define sqlHashCount(H)  ((H)->count) // NOT USED */
 
-#endif				/* SQLITE_HASH_H */
+#endif				/* SQL_HASH_H */

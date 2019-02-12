@@ -13,7 +13,7 @@ test:plan(83)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the join reordering optimization
 -- in cases that include a LEFT JOIN.
 --
@@ -117,7 +117,7 @@ test:do_test(
 -- the names of the table and index used
 --
 local function queryplan(sql)
-    -- sqlite_sort_count = 0
+    -- sql_sort_count = 0
     data = test:execsql(sql)
     eqp = test:execsql("EXPLAIN QUERY PLAN "..sql)
     for i,v in ipairs(eqp) do

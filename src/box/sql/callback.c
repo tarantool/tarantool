@@ -36,7 +36,7 @@
  */
 
 #include "box/coll_id_cache.h"
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "box/session.h"
 
 struct coll *
@@ -124,8 +124,8 @@ functionSearch(int h,		/* Hash of the name */
     )
 {
 	FuncDef *p;
-	for (p = sqlite3BuiltinFunctions.a[h]; p; p = p->u.pHash) {
-		if (sqlite3StrICmp(p->zName, zFunc) == 0) {
+	for (p = sqlBuiltinFunctions.a[h]; p; p = p->u.pHash) {
+		if (sqlStrICmp(p->zName, zFunc) == 0) {
 			return p;
 		}
 	}
@@ -136,7 +136,7 @@ functionSearch(int h,		/* Hash of the name */
  * Insert a new FuncDef into a FuncDefHash hash table.
  */
 void
-sqlite3InsertBuiltinFuncs(FuncDef * aDef,	/* List of global functions to be inserted */
+sqlInsertBuiltinFuncs(FuncDef * aDef,	/* List of global functions to be inserted */
 			  int nDef	/* Length of the apDef[] list */
     )
 {
@@ -144,10 +144,10 @@ sqlite3InsertBuiltinFuncs(FuncDef * aDef,	/* List of global functions to be inse
 	for (i = 0; i < nDef; i++) {
 		FuncDef *pOther;
 		const char *zName = aDef[i].zName;
-		int nName = sqlite3Strlen30(zName);
+		int nName = sqlStrlen30(zName);
 		int h =
-		    (sqlite3UpperToLower[(u8) zName[0]] +
-		     nName) % SQLITE_FUNC_HASH_SZ;
+		    (sqlUpperToLower[(u8) zName[0]] +
+		     nName) % SQL_FUNC_HASH_SZ;
 		pOther = functionSearch(h, zName);
 		if (pOther) {
 			assert(pOther != &aDef[i] && pOther->pNext != &aDef[i]);
@@ -155,8 +155,8 @@ sqlite3InsertBuiltinFuncs(FuncDef * aDef,	/* List of global functions to be inse
 			pOther->pNext = &aDef[i];
 		} else {
 			aDef[i].pNext = 0;
-			aDef[i].u.pHash = sqlite3BuiltinFunctions.a[h];
-			sqlite3BuiltinFunctions.a[h] = &aDef[i];
+			aDef[i].u.pHash = sqlBuiltinFunctions.a[h];
+			sqlBuiltinFunctions.a[h] = &aDef[i];
 		}
 	}
 }
@@ -181,7 +181,7 @@ sqlite3InsertBuiltinFuncs(FuncDef * aDef,	/* List of global functions to be inse
  * match that requested.
  */
 FuncDef *
-sqlite3FindFunction(sqlite3 * db,	/* An open database */
+sqlFindFunction(sql * db,	/* An open database */
 		    const char *zName,	/* Name of the function.  zero-terminated */
 		    int nArg,	/* Number of arguments.  -1 means any number */
 		    u8 createFlag	/* Create new entry if true and does not otherwise exist */
@@ -196,11 +196,11 @@ sqlite3FindFunction(sqlite3 * db,	/* An open database */
 
 	assert(nArg >= (-2));
 	assert(nArg >= (-1) || createFlag == 0);
-	nName = sqlite3Strlen30(zName);
+	nName = sqlStrlen30(zName);
 
 	/* First search for a match amongst the application-defined functions.
 	 */
-	p = (FuncDef *) sqlite3HashFind(&db->aFunc, zName);
+	p = (FuncDef *) sqlHashFind(&db->aFunc, zName);
 	while (p) {
 		int score = matchQuality(p, nArg);
 		if (score > bestScore) {
@@ -212,7 +212,7 @@ sqlite3FindFunction(sqlite3 * db,	/* An open database */
 
 	/* If no match is found, search the built-in functions.
 	 *
-	 * If the SQLITE_PreferBuiltin flag is set, then search the built-in
+	 * If the SQL_PreferBuiltin flag is set, then search the built-in
 	 * functions even if a prior app-defined function was found.  And give
 	 * priority to built-in functions.
 	 *
@@ -224,10 +224,10 @@ sqlite3FindFunction(sqlite3 * db,	/* An open database */
 	 */
 	if (!createFlag &&
 	    (pBest == 0
-	     || (user_session->sql_flags & SQLITE_PreferBuiltin) != 0)) {
+	     || (user_session->sql_flags & SQL_PreferBuiltin) != 0)) {
 		bestScore = 0;
-		h = (sqlite3UpperToLower[(u8) zName[0]] +
-		     nName) % SQLITE_FUNC_HASH_SZ;
+		h = (sqlUpperToLower[(u8) zName[0]] +
+		     nName) % SQL_FUNC_HASH_SZ;
 		p = functionSearch(h, zName);
 		while (p) {
 			int score = matchQuality(p, nArg);
@@ -245,18 +245,18 @@ sqlite3FindFunction(sqlite3 * db,	/* An open database */
 	 */
 	if (createFlag && bestScore < FUNC_PERFECT_MATCH &&
 	    (pBest =
-	     sqlite3DbMallocZero(db, sizeof(*pBest) + nName + 1)) != 0) {
+	     sqlDbMallocZero(db, sizeof(*pBest) + nName + 1)) != 0) {
 		FuncDef *pOther;
 		pBest->zName = (const char *)&pBest[1];
 		pBest->nArg = (u16) nArg;
 		pBest->funcFlags = 0;
 		memcpy((char *)&pBest[1], zName, nName + 1);
 		pOther =
-		    (FuncDef *) sqlite3HashInsert(&db->aFunc, pBest->zName,
+		    (FuncDef *) sqlHashInsert(&db->aFunc, pBest->zName,
 						  pBest);
 		if (pOther == pBest) {
-			sqlite3DbFree(db, pBest);
-			sqlite3OomFault(db);
+			sqlDbFree(db, pBest);
+			sqlOomFault(db);
 			return 0;
 		} else {
 			pBest->pNext = pOther;

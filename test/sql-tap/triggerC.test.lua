@@ -45,7 +45,7 @@ test:execsql " PRAGMA recursive_triggers = on "
 ---------------------------------------------------------------------------
 -- This block of tests, triggerC-1.*, are not aimed at any specific
 -- property of the triggers sub-system. They were created to debug
--- specific problems while modifying SQLite to support recursive
+-- specific problems while modifying sql to support recursive
 -- triggers. They are left here in case they can help debug the
 -- same problems again.
 --
@@ -326,9 +326,9 @@ end
 
 --         INSERT INTO t22 VALUES(1);
 --         SELECT count(*) FROM t22;
---     ]], (SQLITE_MAX_TRIGGER_DEPTH / 2)), {
+--     ]], (sql_MAX_TRIGGER_DEPTH / 2)), {
 --         -- <triggerC-2.2>
---         (SQLITE_MAX_TRIGGER_DEPTH / 2)
+--         (sql_MAX_TRIGGER_DEPTH / 2)
 --         -- </triggerC-2.2>
 --     })
 
@@ -349,14 +349,14 @@ end
 
 --         INSERT INTO t23 VALUES(1);
 --         SELECT count(*) FROM t23;
---     ]], (SQLITE_MAX_TRIGGER_DEPTH / 2)), {
+--     ]], (sql_MAX_TRIGGER_DEPTH / 2)), {
 --         -- <triggerC-2.3>
---         (SQLITE_MAX_TRIGGER_DEPTH / 2)
+--         (sql_MAX_TRIGGER_DEPTH / 2)
 --         -- </triggerC-2.3>
 --     })
 
 -------------------------------------------------------------------------
--- This block of tests, triggerC-3.*, test that SQLite throws an exception
+-- This block of tests, triggerC-3.*, test that sql throws an exception
 -- when it detects excessive recursion.
 --
 test:do_execsql_test(
@@ -703,7 +703,7 @@ test:do_execsql_test(
 -- by the values in the new.* array, even if those values were not
 -- themselves written by the parent UPDATE statement.
 --
--- Technically speaking this was not a bug. The SQLite documentation says
+-- Technically speaking this was not a bug. The sql documentation says
 -- that if a BEFORE UPDATE or BEFORE DELETE trigger modifies or deletes the
 -- row that the parent statement is operating on the results are undefined.
 -- But as of 3.6.21 behaviour is restored to the way it was in versions
@@ -877,7 +877,7 @@ test:do_test(
 -- do_test triggerC-12.1 {
 --   db close
 --   forcedelete test.db
---   sqlite3 db test.db
+--   sql db test.db
 test:execsql(
     [[
     DROP TABLE t1;
@@ -914,7 +914,7 @@ test:do_catchsql_test(
 
 ---------------------------------------------------------------------------
 -- The following tests seek to verify that constant values (i.e. literals)
--- are not factored out of loops within trigger programs. SQLite does
+-- are not factored out of loops within trigger programs. sql does
 -- not factor constants out of loops within trigger programs as it may only
 -- do so in code generated before the first table or index is opened. And
 -- by the time a trigger program is coded, at least one table or index has

@@ -13,7 +13,7 @@ test:plan(74)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing VIEW statements.
 --
 -- $Id: view.test,v 1.39 2008/12/14 14:45:21 danielk1977 Exp $
@@ -89,7 +89,7 @@ test:do_test(
     "view-1.3.1",
     function()
         --db("close")
-        --sqlite3("db", "test.db")
+        --sql("db", "test.db")
         return test:execsql [[
             SELECT * FROM v1 ORDER BY a;
         ]]
@@ -419,7 +419,7 @@ test:do_execsql_test(
         -- </view-5.2>
     })
 
--- Verify that the view v5 gets flattened.  see sqliteFlattenSubquery().
+-- Verify that the view v5 gets flattened.  see sqlFlattenSubquery().
 -- This will only work if EXPLAIN is enabled.
 -- Ticket #272
 --
@@ -525,7 +525,7 @@ if (0 > 0)
         "view-7.2",
         function()
             db("close")
-            sqlite3("db", "test.db")
+            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM test;
             ]]
@@ -557,7 +557,7 @@ if (0 > 0)
         "view-7.4",
         function()
             db("close")
-            sqlite3("db", "test.db")
+            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM test;
             ]]
@@ -589,7 +589,7 @@ if (0 > 0)
         "view-7.6",
         function()
             db("close")
-            sqlite3("db", "test.db")
+            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM test;
             ]]
@@ -618,7 +618,7 @@ if (0 > 0)
         "view-8.2",
         function()
             db("close")
-            sqlite3("db", "test.db")
+            sql("db", "test.db")
             return test:execsql [[
                 SELECT * FROM v6 ORDER BY xyz;
             ]]
@@ -942,10 +942,10 @@ test:do_catchsql_test(
         -- </view-16.1>
     })
 
--- do not insert sql statement in sqlite_master
+-- do not insert sql statement in sql_master
 -- do_test view-16.2 {
 --   execsql {
---     SELECT sql FROM sqlite_master WHERE name='v1'
+--     SELECT sql FROM sql_master WHERE name='v1'
 --   }
 -- } {{CREATE VIEW v1 AS SELECT a AS 'xyz', b+c AS 'pqr', c-b FROM t1}}
 test:do_catchsql_test(
@@ -1085,7 +1085,7 @@ if (0 > 0)
  then
     -- Ticket #d58ccbb3f1b"]],":"],"Prevent","Table.nRef","overflow.
     --db("close")
-    --sqlite3("db", ":memory:")
+    --sql("db", ":memory:")
     test:execsql([[
         drop view v1;
         drop view v2;
@@ -1137,7 +1137,7 @@ if (0 > 0)
 
 
     --db("close")
-    --sqlite3("db", ":memory:")
+    --sql("db", ":memory:")
     test:do_execsql_test(
         "view-22.1",
         [[

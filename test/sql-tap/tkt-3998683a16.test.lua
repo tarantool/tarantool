@@ -14,7 +14,7 @@ test:plan(1)
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [3998683a16a7076e08f5585c1f4816414c8c653a] where in
 -- floating point values with a decimal point at the beginning or end
 -- of the mantissa are used.

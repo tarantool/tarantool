@@ -29,8 +29,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef SQLITE_CURSOR_H
-#define SQLITE_CURSOR_H
+#ifndef SQL_CURSOR_H
+#define SQL_CURSOR_H
 
 typedef struct BtCursor BtCursor;
 
@@ -52,7 +52,7 @@ struct BtCursor {
 	char *key;		/* Saved key that was cursor last known position */
 };
 
-void sqlite3CursorZero(BtCursor *);
+void sqlCursorZero(BtCursor *);
 
 /**
  * Close a cursor and invalidate its state. In case of
@@ -60,11 +60,11 @@ void sqlite3CursorZero(BtCursor *);
  */
 void
 sql_cursor_close(struct BtCursor *cursor);
-int sqlite3CursorMovetoUnpacked(BtCursor *, UnpackedRecord * pUnKey, int *pRes);
+int sqlCursorMovetoUnpacked(BtCursor *, UnpackedRecord * pUnKey, int *pRes);
 
-int sqlite3CursorNext(BtCursor *, int *pRes);
-int sqlite3CursorPrevious(BtCursor *, int *pRes);
-int sqlite3CursorPayload(BtCursor *, u32 offset, u32 amt, void *);
+int sqlCursorNext(BtCursor *, int *pRes);
+int sqlCursorPrevious(BtCursor *, int *pRes);
+int sqlCursorPayload(BtCursor *, u32 offset, u32 amt, void *);
 
 /**
  * Release tuple, free iterator, invalidate cursor's state.
@@ -76,9 +76,9 @@ void
 sql_cursor_cleanup(struct BtCursor *cursor);
 
 #ifndef NDEBUG
-int sqlite3CursorIsValid(BtCursor *);
+int sqlCursorIsValid(BtCursor *);
 #endif
-int sqlite3CursorIsValidNN(BtCursor *);
+int sqlCursorIsValidNN(BtCursor *);
 
 /*
  * Legal values for BtCursor.curFlags
@@ -106,24 +106,24 @@ int sqlite3CursorIsValidNN(BtCursor *);
  */
 #define get2byte(x)   ((x)[0]<<8 | (x)[1])
 #define put2byte(p,v) ((p)[0] = (u8)((v)>>8), (p)[1] = (u8)(v))
-#define get4byte sqlite3Get4byte
-#define put4byte sqlite3Put4byte
+#define get4byte sqlGet4byte
+#define put4byte sqlPut4byte
 
 /*
  * get2byteAligned(), unlike get2byte(), requires that its argument point to a
  * two-byte aligned address.  get2bytea() is only used for accessing the
  * cell addresses in a btree header.
  */
-#if SQLITE_BYTEORDER==4321
+#if SQL_BYTEORDER==4321
 #define get2byteAligned(x)  (*(u16*)(x))
-#elif SQLITE_BYTEORDER==1234 && !defined(SQLITE_DISABLE_INTRINSIC) \
+#elif SQL_BYTEORDER==1234 && !defined(SQL_DISABLE_INTRINSIC) \
     && GCC_VERSION>=4008000
 #define get2byteAligned(x)  __builtin_bswap16(*(u16*)(x))
-#elif SQLITE_BYTEORDER==1234 && !defined(SQLITE_DISABLE_INTRINSIC) \
+#elif SQL_BYTEORDER==1234 && !defined(SQL_DISABLE_INTRINSIC) \
     && defined(_MSC_VER) && _MSC_VER>=1300
 #define get2byteAligned(x)  _byteswap_ushort(*(u16*)(x))
 #else
 #define get2byteAligned(x)  ((x)[0]<<8 | (x)[1])
 #endif
 
-#endif				/* SQLITE_CURSOR_H */
+#endif				/* SQL_CURSOR_H */

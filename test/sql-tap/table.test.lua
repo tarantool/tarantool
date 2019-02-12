@@ -13,12 +13,12 @@ test:plan(78)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the CREATE TABLE statement.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
--- Create a basic table and verify it is added to sqlite_master
+-- Create a basic table and verify it is added to sql_master
 --
 test:do_execsql_test(
     "table-1.1",
@@ -34,24 +34,24 @@ test:do_execsql_test(
     })
 
 --   execsql {
---     SELECT sql FROM sqlite_master WHERE type!='meta'
+--     SELECT sql FROM sql_master WHERE type!='meta'
 --   }
 -- } {{CREATE TABLE test1 (
 --       one varchar(10),
 --       two text
 --     )}}
--- # Verify the other fields of the sqlite_master file.
+-- # Verify the other fields of the sql_master file.
 -- #
 -- do_test table-1.3 {
---   execsql {SELECT name, tbl_name, type FROM sqlite_master WHERE type!='meta'}
+--   execsql {SELECT name, tbl_name, type FROM sql_master WHERE type!='meta'}
 -- } {test1 test1 table}
 -- # Close and reopen the database.  Verify that everything is
 -- # still the same.
 -- #
 -- do_test table-1.4 {
 --   db close
---   sqlite3 db test.db
---   execsql {SELECT name, tbl_name, type from sqlite_master WHERE type!='meta'}
+--   sql db test.db
+--   execsql {SELECT name, tbl_name, type from sql_master WHERE type!='meta'}
 -- } {test1 test1 table}
 -- Drop the database and make sure it disappears.
 --
@@ -59,7 +59,7 @@ test:do_test(
     "table-1.5",
     function()
         return test:execsql "DROP TABLE test1"
-        --execsql {SELECT * FROM sqlite_master WHERE type!='meta'}
+        --execsql {SELECT * FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-1.5>
         
@@ -71,8 +71,8 @@ test:do_test(
 -- #
 -- do_test table-1.6 {
 --   db close
---   sqlite3 db test.db
---   execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
+--   sql db test.db
+--   execsql {SELECT name FROM sql_master WHERE type!='meta'}
 -- } {}
 -- Repeat the above steps, but this time quote the table name.
 --
@@ -80,7 +80,7 @@ test:do_test(
     "table-1.10",
     function()
         return test:execsql [[CREATE TABLE "create" (f1 int primary key)]]
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-1.10>
         
@@ -92,7 +92,7 @@ test:do_test(
     "table-1.11",
     function()
         return test:execsql [[DROP TABLE "create"]]
-        --execsql {SELECT name FROM "sqlite_master" WHERE type!='meta'}
+        --execsql {SELECT name FROM "sql_master" WHERE type!='meta'}
     end, {
         -- <table-1.11>
         
@@ -103,7 +103,7 @@ test:do_test(
     "table-1.12",
     function()
         return test:execsql [[CREATE TABLE test1("f1 ho" int primary key)]]
-        --execsql {SELECT name as "X" FROM sqlite_master WHERE type!='meta'}
+        --execsql {SELECT name as "X" FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-1.12>
         
@@ -115,7 +115,7 @@ test:do_test(
     "table-1.13",
     function()
         return test:execsql [[DROP TABLE "TEST1"]]
-        --execsql {SELECT name FROM "sqlite_master" WHERE type!='meta'}
+        --execsql {SELECT name FROM "sql_master" WHERE type!='meta'}
     end, {
         -- <table-1.13>
         
@@ -136,15 +136,15 @@ test:do_test(
     })
 
 -- do_test table-2.1b {
---   set v [catch {execsql {CREATE TABLE sqlite_master(two text)}} msg]
+--   set v [catch {execsql {CREATE TABLE sql_master(two text)}} msg]
 --   lappend v $msg
--- } {1 {object name reserved for internal use: sqlite_master}}
+-- } {1 {object name reserved for internal use: sql_master}}
 -- do_test table-2.1c {
 --   db close
---   sqlite3 db test.db
---   set v [catch {execsql {CREATE TABLE sqlite_master(two text)}} msg]
+--   sql db test.db
+--   set v [catch {execsql {CREATE TABLE sql_master(two text)}} msg]
 --   lappend v $msg
--- } {1 {object name reserved for internal use: sqlite_master}}
+-- } {1 {object name reserved for internal use: sql_master}}
 test:do_catchsql_test(
     "table-2.1d",
     [[
@@ -168,7 +168,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "table-2.1f",
     [[
-        DROP TABLE test2; --SELECT name FROM sqlite_master WHERE type!='meta'
+        DROP TABLE test2; --SELECT name FROM sql_master WHERE type!='meta'
     ]], {
         -- <table-2.1f>
         
@@ -192,12 +192,12 @@ test:do_test(
 --} {1 {there is already an index named test3}}
 -- do_test table-2.2b {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   set v [catch {execsql {CREATE TABLE test3(two text)}} msg]
 --   lappend v $msg
 -- } {1 {there is already an index named test3}}
 -- do_test table-2.2c {
---   execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+--   execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
 -- } {test2 test3}
 test:do_test(
     "table-2.2d",
@@ -211,13 +211,13 @@ test:do_test(
     })
 
 -- do_test table-2.2e {
---   execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+--   execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
 -- } {test2 test3}
 test:do_test(
     "table-2.2f",
     function()
         return test:execsql "DROP TABLE test2; DROP TABLE test3"
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <table-2.2f>
         
@@ -252,7 +252,7 @@ test:do_test(
     "table-3.1",
     function()
         return test:execsql(big_table)
-        --execsql {SELECT sql FROM sqlite_master WHERE type=='table'}
+        --execsql {SELECT sql FROM sql_master WHERE type=='table'}
     end, {
         -- <table-3.1>
         
@@ -292,7 +292,7 @@ test:do_catchsql_test(
 
 -- do_test table-3.5 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   set v [catch {execsql {CREATE TABLE Big(xyz foo)}} msg]
 --   lappend v $msg
 -- } {1 {table Big already exists}}
@@ -300,7 +300,7 @@ test:do_test(
     "table-3.6",
     function()
         return test:execsql "DROP TABLE big"
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-3.6>
         
@@ -324,14 +324,14 @@ test:do_test(
             sql = sql .. "last_field text)"
             test:execsql(sql)
         end
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
         return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
     end, r)
 
 -- do_test table-4.1b {
 --   db close
---   sqlite3 db test.db
---   execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+--   sql db test.db
+--   execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
 -- } $r
 -- Drop the even numbered tables
 --
@@ -347,7 +347,7 @@ test:do_test(
             local sql = "DROP TABLE "..string.format("TEST%03d", i)..""
             test:execsql(sql)
         end
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
         return test:execsql([[SELECT "name" FROM "_space" WHERE "id">500]])
     end, r)
 
@@ -361,7 +361,7 @@ test:do_test(
             local sql = "DROP TABLE "..string.format("test%03d", i)
             test:execsql(sql)
         end
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
         return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
     end, {
         -- <table-4.3>
@@ -391,11 +391,11 @@ test:do_catchsql_test(
         -- </table-5.1.2>
     })
 
--- # Try to drop sqlite_master
+-- # Try to drop sql_master
 -- #
 -- do_test table-5.2 {
---   catchsql {DROP TABLE IF EXISTS sqlite_master}
--- } {1 {table sqlite_master may not be dropped}}
+--   catchsql {DROP TABLE IF EXISTS sql_master}
+-- } {1 {table sql_master may not be dropped}}
 
 -- Dropping sql_statN tables is OK.
 --
@@ -424,11 +424,11 @@ if (0 > 0)
         function()
             db("close")
             forcedelete("test.db")
-            sqlite3("db", "test.db")
+            sql("db", "test.db")
             return test:execsql [[
                 CREATE TABLE t0(a,b);
                 CREATE INDEX t ON t0(a);
-                UPDATE sqlite_master SET sql='CREATE TABLE a.b(a UNIQUE';
+                UPDATE sql_master SET sql='CREATE TABLE a.b(a UNIQUE';
                 --START TRANSACTION;
                 --CREATE TABLE t1(x);
                 --ROLLBACK;
@@ -442,7 +442,7 @@ if (0 > 0)
 
     db("close")
     forcedelete("test.db")
-    sqlite3("db", "test.db")
+    sql("db", "test.db")
     X(313, "X!cmd", [=[["Make","sure","an","EXPLAIN","does","not","really","create","a","new","table"]]=])
 end
 test:do_test(
@@ -452,7 +452,7 @@ test:do_test(
 
 
         return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-5.3>
         
@@ -469,7 +469,7 @@ test:do_test(
 
 
         return test:execsql [[SELECT "name" FROM "_space" WHERE "id">500]]
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta'}
     end, {
         -- <table-5.4>
         "TEST1"
@@ -564,7 +564,7 @@ test:do_execsql2_test(
 
 -- do_test table-8.1.1 {
 --   execsql {
---     SELECT sql FROM sqlite_master WHERE name='t2';
+--     SELECT sql FROM sql_master WHERE name='t2';
 --   }
 -- } {{CREATE TABLE t2(
 --   "desc" TEXT,
@@ -593,7 +593,7 @@ test:do_execsql2_test(
 -- # from {{CREATE TABLE 't4"abc'(cnt NUMERIC,"max(b+c)" NUMERIC)}}).
 -- do_test table-8.3.1 {
 --   execsql {
---     SELECT sql FROM sqlite_master WHERE name='t4"abc'
+--     SELECT sql FROM sql_master WHERE name='t4"abc'
 --   }
 -- } {{CREATE TABLE "t4""abc"(cnt,"max(b+c)")}}
 -- ifcapable tempdb {
@@ -606,7 +606,7 @@ test:do_execsql2_test(
 -- }
 -- do_test table-8.5 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   execsql2 {
 --     SELECT * FROM [t4"abc];
 --   }
@@ -663,7 +663,7 @@ test:do_catchsql_test(
 --   execsql {
 --     CREATE TABLE t10("col.1" [char.3]);
 --     CREATE TABLE t11 AS SELECT * FROM t10;
---     SELECT sql FROM sqlite_master WHERE name = 't11';
+--     SELECT sql FROM sql_master WHERE name = 't11';
 --   }
 -- } {{CREATE TABLE t11("col.1" TEXT)}}
 -- do_test table-8.10 {
@@ -678,7 +678,7 @@ test:do_catchsql_test(
 --       g BIG INTEGER
 --     );
 --     CREATE TABLE t13 AS SELECT * FROM t12;
---     SELECT sql FROM sqlite_master WHERE name = 't13';
+--     SELECT sql FROM sql_master WHERE name = 't13';
 --   }
 -- } {{CREATE TABLE t13(
 --   a INT,
@@ -936,7 +936,7 @@ test:do_execsql_test(
 -- } {}
 -- do_test table-12.2 {
 --   execsql {
---     SELECT sql FROM sqlite_master WHERE tbl_name = 't8'
+--     SELECT sql FROM sql_master WHERE tbl_name = 't8'
 --   }
 -- } {{CREATE TABLE t8(b NUM,h,i INT,j)}}
 ----------------------------------------------------------------------
@@ -1033,7 +1033,7 @@ end
 --   } {1 {database table is locked}}
 -- }
 -- Create and drop 2000 tables. This is to check that the balance_shallow()
--- routine works correctly on the sqlite_master table. At one point it
+-- routine works correctly on the sql_master table. At one point it
 -- contained a bug that would prevent the right-child pointer of the
 -- child page from being copied to the root page.
 --
@@ -1076,7 +1076,7 @@ test:do_test(
 -- # The problem appears to be the use of an aggregate function as part of
 -- # the default value for a column. This problem has been in the code since
 -- # at least 2006-01-01 and probably before that. This problem was detected
--- # and reported on the sqlite-users@sqlite.org mailing list by Zsbán Ambrus. 
+-- # and reported on the sql-users@sql.org mailing list by Zsbán Ambrus.
 -- #
 -- do_execsql_test table-16.1 {
 --   CREATE TABLE t16(x DEFAULT(max(1)));
@@ -1113,7 +1113,7 @@ test:do_test(
 -- do_catchsql_test table-16.7 {
 --   INSERT INTO t16 DEFAULT VALUES;
 -- } {1 {unknown function: group_concat()}}
--- # Ticket [https://www.sqlite.org/src/info/094d39a4c95ee4abbc417f04214617675ba15c63]
+-- # Ticket [https://www.sql.org/src/info/094d39a4c95ee4abbc417f04214617675ba15c63]
 -- # describes a assertion fault that occurs on a CREATE TABLE .. AS SELECT statement.
 -- # the following test verifies that the problem has been fixed.
 -- #
@@ -1130,9 +1130,9 @@ test:do_test(
 --   SELECT p, q, '|' FROM t3 ORDER BY p;
 -- } {1 1 | 2 2 |}
 -- # 2015-06-16
--- # Ticket [https://www.sqlite.org/src/tktview/873cae2b6e25b1991ce5e9b782f9cd0409b96063]
+-- # Ticket [https://www.sql.org/src/tktview/873cae2b6e25b1991ce5e9b782f9cd0409b96063]
 -- # Make sure a CREATE TABLE AS statement correctly rolls back partial changes to the
--- # sqlite_master table when the SELECT on the right-hand side aborts.
+-- # sql_master table when the SELECT on the right-hand side aborts.
 -- #
 -- do_catchsql_test table-18.1 {
 --   DROP TABLE IF EXISTS t1;
@@ -1144,13 +1144,13 @@ test:do_test(
 --   PRAGMA integrity_check;
 -- } {ok}
 -- # 2015-09-09
--- # Ticket [https://www.sqlite.org/src/info/acd12990885d9276]
--- # "CREATE TABLE ... AS SELECT ... FROM sqlite_master" fails because the row
--- # in the sqlite_master table for the next table is initially populated
+-- # Ticket [https://www.sql.org/src/info/acd12990885d9276]
+-- # "CREATE TABLE ... AS SELECT ... FROM sql_master" fails because the row
+-- # in the sql_master table for the next table is initially populated
 -- # with a NULL instead of a record created by OP_Record.
 -- #
 -- do_execsql_test table-19.1 {
---   CREATE TABLE t19 AS SELECT * FROM sqlite_master;
+--   CREATE TABLE t19 AS SELECT * FROM sql_master;
 --   SELECT name FROM t19 ORDER BY name;
 -- } {{} savepoint t10 t11 t12 t13 t16 t2 t3 t3\"xyz t4\"abc t7 t8 t9 tablet8 test1 weird}
 

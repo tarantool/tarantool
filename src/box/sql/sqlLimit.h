@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_SQL_SQLITELIMIT_H_INCLUDED
-#define TARANTOOL_SQL_SQLITELIMIT_H_INCLUDED
+#ifndef TARANTOOL_SQL_sqlLIMIT_H_INCLUDED
+#define TARANTOOL_SQL_sqlLIMIT_H_INCLUDED
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -33,7 +33,7 @@
 
 /*
  *
- * This file defines various limits of what SQLite can process.
+ * This file defines various limits of what sql can process.
  */
 #include "trivia/util.h"
 
@@ -51,8 +51,8 @@ enum {
  * The hard limit is the ability of a 32-bit signed integer
  * to count the size: 2^31-1 or 2147483647.
  */
-#ifndef SQLITE_MAX_LENGTH
-#define SQLITE_MAX_LENGTH 1000000000
+#ifndef SQL_MAX_LENGTH
+#define SQL_MAX_LENGTH 1000000000
 #endif
 
 /*
@@ -72,15 +72,15 @@ enum {
  * that is the case, there is no point in having more than a few
  * dozen values in any of the other situations described above.
  */
-#ifndef SQLITE_MAX_COLUMN
-#define SQLITE_MAX_COLUMN 2000
+#ifndef SQL_MAX_COLUMN
+#define SQL_MAX_COLUMN 2000
 #endif
 /*
  * tt_static_buf() is used to store bitmask for used columns in a table during
  * SQL parsing stage. The following statement checks if static buffer is big
  * enough to store the bitmask.
  */
-#if SQLITE_MAX_COLUMN > TT_STATIC_BUF_LEN * 8
+#if SQL_MAX_COLUMN > TT_STATIC_BUF_LEN * 8
 #error "Bitmask for used table columns cannot fit into static buffer"
 #endif
 
@@ -91,13 +91,13 @@ enum {
  * turn the limit off.  That is no longer true.  It is not possible
  * to turn this limit off.
  */
-#ifndef SQLITE_MAX_SQL_LENGTH
-#define SQLITE_MAX_SQL_LENGTH 1000000000
+#ifndef SQL_MAX_SQL_LENGTH
+#define SQL_MAX_SQL_LENGTH 1000000000
 #endif
 
 /*
  * The maximum depth of an expression tree. This is limited to
- * some extent by SQLITE_MAX_SQL_LENGTH. But sometime you might
+ * some extent by sql_MAX_SQL_LENGTH. But sometime you might
  * want to place more severe limits on the complexity of an
  * expression.
  *
@@ -105,8 +105,8 @@ enum {
  * But that is no longer true.  The limit is now strictly enforced
  * at all times.
  */
-#ifndef SQLITE_MAX_EXPR_DEPTH
-#define SQLITE_MAX_EXPR_DEPTH 200
+#ifndef SQL_MAX_EXPR_DEPTH
+#define SQL_MAX_EXPR_DEPTH 200
 #endif
 
 /*
@@ -125,15 +125,15 @@ enum {
  * The maximum number of opcodes in a VDBE program.
  * Not currently enforced.
  */
-#ifndef SQLITE_MAX_VDBE_OP
-#define SQLITE_MAX_VDBE_OP 25000
+#ifndef SQL_MAX_VDBE_OP
+#define SQL_MAX_VDBE_OP 25000
 #endif
 
 /*
  * The maximum number of arguments to an SQL function.
  */
-#ifndef SQLITE_MAX_FUNCTION_ARG
-#define SQLITE_MAX_FUNCTION_ARG 127
+#ifndef SQL_MAX_FUNCTION_ARG
+#define SQL_MAX_FUNCTION_ARG 127
 #endif
 
 /*
@@ -143,10 +143,10 @@ enum {
  * IMPLEMENTATION-OF: R-30185-15359 The default suggested cache size is -2000,
  * which means the cache size is limited to 2048000 bytes of memory.
  * IMPLEMENTATION-OF: R-48205-43578 The default suggested cache size can be
- * altered using the SQLITE_DEFAULT_CACHE_SIZE compile-time options.
+ * altered using the sql_DEFAULT_CACHE_SIZE compile-time options.
  */
-#ifndef SQLITE_DEFAULT_CACHE_SIZE
-#define SQLITE_DEFAULT_CACHE_SIZE  -2000
+#ifndef SQL_DEFAULT_CACHE_SIZE
+#define SQL_DEFAULT_CACHE_SIZE  -2000
 #endif
 
 /*
@@ -155,15 +155,15 @@ enum {
  * counted using a signed 8-bit integer which has a maximum value of 127
  * and we have to allow 2 extra counts for the "main" and "temp" databases.
  */
-#ifndef SQLITE_MAX_ATTACHED
-#define SQLITE_MAX_ATTACHED 10
+#ifndef SQL_MAX_ATTACHED
+#define SQL_MAX_ATTACHED 10
 #endif
 
 /*
  * Maximum length (in bytes) of the pattern in a LIKE operator.
  */
-#ifndef SQLITE_MAX_LIKE_PATTERN_LENGTH
-#define SQLITE_MAX_LIKE_PATTERN_LENGTH 50000
+#ifndef SQL_MAX_LIKE_PATTERN_LENGTH
+#define SQL_MAX_LIKE_PATTERN_LENGTH 50000
 #endif
 
 /*
@@ -173,8 +173,8 @@ enum {
  * fire any triggers. A value of 0 means that no trigger programs at all
  * may be executed.
  */
-#ifndef SQLITE_MAX_TRIGGER_DEPTH
-#define SQLITE_MAX_TRIGGER_DEPTH 1000
+#ifndef SQL_MAX_TRIGGER_DEPTH
+#define SQL_MAX_TRIGGER_DEPTH 1000
 #endif
 
 /*
@@ -184,4 +184,4 @@ enum {
  */
 #define SQL_MAX_COMPILING_TRIGGERS 30
 
-#endif /* TARANTOOL_SQL_SQLITELIMIT_H_INCLUDED */
+#endif /* TARANTOOL_SQL_sqlLIMIT_H_INCLUDED */

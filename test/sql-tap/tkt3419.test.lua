@@ -14,7 +14,7 @@ test:plan(6)
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the fix for ticket #3419.
 -- Ticket #3419 is really a duplication of #3408 and had already
 -- been fixed by the time it was reported.  But it never hurts to

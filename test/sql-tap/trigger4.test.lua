@@ -46,7 +46,7 @@ test:do_execsql_test(
 -- } {1 3}
 -- do_test trigger4-1.3 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   execsql {
 --     insert into test values(4,5,6);
 --     select * from test1;
@@ -75,7 +75,7 @@ test:do_execsql_test(
 -- } {1 3 4 6}
 -- do_test trigger4-2.3 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   execsql {
 --     update test set b=66 where id=4;
 --     select * from test1;
@@ -94,7 +94,7 @@ test:do_execsql_test(
 -- } {1 {no such table: main.test2}}
 -- do_test trigger4-3.2 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   catchsql {
 --     insert into test values(7,8,9);
 --   }
@@ -123,7 +123,7 @@ test:do_execsql_test(
 -- } {7 9}
 -- do_test trigger4-3.7 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   execsql {
 --     update test set b=99 where id=7;
 --     select * from test2;
@@ -133,7 +133,7 @@ test:do_execsql_test(
 --     db close
 --     forcedelete trigtest.db
 --     forcedelete trigtest.db-journal
---     sqlite3 db trigtest.db
+--     sql db trigtest.db
 --     catchsql {drop table tbl; drop view vw}
 --     execsql {
 -- 	create table tbl(a integer primary key, b integer);

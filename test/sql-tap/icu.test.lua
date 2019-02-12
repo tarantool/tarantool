@@ -133,7 +133,7 @@ if (0 > 0)
     -- Test that it is not possible to call the ICU regex() function with 
     -- anything other than exactly two arguments. See also:
     --
-    --   http://src.chromium.org/viewvc/chrome/trunk/src/third_party/sqlite/icu-regexp.patch?revision=34807&view=markup
+    --   http://src.chromium.org/viewvc/chrome/trunk/src/third_party/sql/icu-regexp.patch?revision=34807&view=markup
     --
     test:do_catchsql_test(
         "icu-5.1",

@@ -13,7 +13,7 @@ test:plan(14)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script testing the tokenizer
 --
 -- $Id: tokenize.test,v 1.1 2008/07/08 00:06:51 drh Exp $

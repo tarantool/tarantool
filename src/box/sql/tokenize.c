@@ -41,7 +41,7 @@
 #include <unicode/uchar.h>
 
 #include "say.h"
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "tarantoolInt.h"
 
 /* Character classes for tokenizing
@@ -109,10 +109,10 @@ static const char sql_ascii_class[] = {
  *
  * Used by keywordhash.h
  */
-#define charMap(X) sqlite3UpperToLower[(unsigned char)X]
+#define charMap(X) sqlUpperToLower[(unsigned char)X]
 
 /*
- * The sqlite3KeywordCode function looks up an identifier to determine if
+ * The sqlKeywordCode function looks up an identifier to determine if
  * it is a keyword.  If it is a keyword, the token code of that keyword is
  * returned.  If the input is not a keyword, TK_ID is returned.
  *
@@ -124,7 +124,7 @@ static const char sql_ascii_class[] = {
  */
 #include "keywordhash.h"
 
-#define maybe_utf8(c) ((sqlite3CtypeMap[c] & 0x40) != 0)
+#define maybe_utf8(c) ((sqlCtypeMap[c] & 0x40) != 0)
 
 /**
  * Return true if current symbol is space.
@@ -135,7 +135,7 @@ static const char sql_ascii_class[] = {
 static inline bool
 sql_is_space_char(const char *z)
 {
-	if (sqlite3Isspace(z[0]))
+	if (sqlIsspace(z[0]))
 		return true;
 	if (maybe_utf8(*(unsigned char*)z)) {
 		UChar32 c;
@@ -160,7 +160,7 @@ sql_skip_spaces(const char *z)
 {
 	int idx = 0;
 	while (true) {
-		if (sqlite3Isspace(z[idx])) {
+		if (sqlIsspace(z[idx])) {
 			idx += 1;
 		} else if (maybe_utf8(*(unsigned char *)(z + idx))) {
 			UChar32 c;
@@ -307,7 +307,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		}
 		FALLTHROUGH;
 	case CC_DOT:
-		if (!sqlite3Isdigit(z[1])) {
+		if (!sqlIsdigit(z[1])) {
 			*type = TK_DOT;
 			return 1;
 		}
@@ -319,24 +319,24 @@ sql_token(const char *z, int *type, bool *is_reserved)
 	case CC_DIGIT:
 		*type = TK_INTEGER;
 		if (z[0] == '0' && (z[1] == 'x' || z[1] == 'X') &&
-		    sqlite3Isxdigit(z[2])) {
-			for (i = 3; sqlite3Isxdigit(z[i]); i++) {
+		    sqlIsxdigit(z[2])) {
+			for (i = 3; sqlIsxdigit(z[i]); i++) {
 			}
 			return i;
 		}
-		for (i = 0; sqlite3Isdigit(z[i]); i++) {
+		for (i = 0; sqlIsdigit(z[i]); i++) {
 		}
 		if (z[i] == '.') {
-			while (sqlite3Isdigit(z[++i])) {
+			while (sqlIsdigit(z[++i])) {
 			}
 			*type = TK_FLOAT;
 		}
 		if ((z[i] == 'e' || z[i] == 'E') &&
-		    (sqlite3Isdigit(z[i + 1])
+		    (sqlIsdigit(z[i + 1])
 		     || ((z[i + 1] == '+' || z[i + 1] == '-') &&
-			 sqlite3Isdigit(z[i + 2])))) {
+			 sqlIsdigit(z[i + 2])))) {
 			i += 2;
-			while (sqlite3Isdigit(z[i]))
+			while (sqlIsdigit(z[i]))
 				i++;
 			*type = TK_FLOAT;
 		}
@@ -348,7 +348,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 		return i;
 	case CC_VARNUM:
 		*type = TK_VARIABLE;
-		for (i = 1; sqlite3Isdigit(z[i]); i++) {
+		for (i = 1; sqlIsdigit(z[i]); i++) {
 		}
 		return i;
 	case CC_DOLLAR:
@@ -382,7 +382,7 @@ sql_token(const char *z, int *type, bool *is_reserved)
 	case CC_X:
 		if (z[1] == '\'') {
 			*type = TK_BLOB;
-			for (i = 2; sqlite3Isxdigit(z[i]); i++) {
+			for (i = 2; sqlIsxdigit(z[i]); i++) {
 			}
 			if (z[i] != '\'' || i % 2) {
 				*type = TK_ILLEGAL;
@@ -418,36 +418,36 @@ sql_token(const char *z, int *type, bool *is_reserved)
 
 /*
  * Run the parser on the given SQL string.  The parser structure is
- * passed in.  An SQLITE_ status code is returned.  If an error occurs
+ * passed in.  An SQL_ status code is returned.  If an error occurs
  * then an and attempt is made to write an error message into
- * memory obtained from sqlite3_malloc() and to make *pzErrMsg point to that
+ * memory obtained from sql_malloc() and to make *pzErrMsg point to that
  * error message.
  */
 int
-sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
+sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 {
 	int nErr = 0;		/* Number of errors encountered */
 	int i;			/* Loop counter */
 	void *pEngine;		/* The LEMON-generated LALR(1) parser */
 	int tokenType;		/* type of the next token */
 	int lastTokenParsed = -1;	/* type of the previous token */
-	sqlite3 *db = pParse->db;	/* The database connection */
+	sql *db = pParse->db;	/* The database connection */
 	int mxSqlLen;		/* Max length of an SQL string */
 
 	assert(zSql != 0);
-	mxSqlLen = db->aLimit[SQLITE_LIMIT_SQL_LENGTH];
+	mxSqlLen = db->aLimit[SQL_LIMIT_SQL_LENGTH];
 	if (db->nVdbeActive == 0) {
 		db->u1.isInterrupted = 0;
 	}
-	pParse->rc = SQLITE_OK;
+	pParse->rc = SQL_OK;
 	pParse->zTail = zSql;
 	i = 0;
 	assert(pzErrMsg != 0);
-	/* sqlite3ParserTrace(stdout, "parser: "); */
-	pEngine = sqlite3ParserAlloc(sqlite3Malloc);
+	/* sqlParserTrace(stdout, "parser: "); */
+	pEngine = sqlParserAlloc(sqlMalloc);
 	if (pEngine == 0) {
-		sqlite3OomFault(db);
-		return SQLITE_NOMEM_BKPT;
+		sqlOomFault(db);
+		return SQL_NOMEM_BKPT;
 	}
 	assert(pParse->pNewTable == 0);
 	assert(pParse->parsed_ast.trigger == NULL);
@@ -462,7 +462,7 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 				      &pParse->sLastToken.isReserved);
 			i += pParse->sLastToken.n;
 			if (i > mxSqlLen) {
-				pParse->rc = SQLITE_TOOBIG;
+				pParse->rc = SQL_TOOBIG;
 				break;
 			}
 		} else {
@@ -481,70 +481,70 @@ sqlite3RunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 			assert(tokenType == TK_SPACE
 			       || tokenType == TK_ILLEGAL);
 			if (db->u1.isInterrupted) {
-				pParse->rc = SQLITE_INTERRUPT;
+				pParse->rc = SQL_INTERRUPT;
 				break;
 			}
 			if (tokenType == TK_ILLEGAL) {
-				sqlite3ErrorMsg(pParse,
+				sqlErrorMsg(pParse,
 						"unrecognized token: \"%T\"",
 						&pParse->sLastToken);
 				break;
 			}
 		} else {
-			sqlite3Parser(pEngine, tokenType, pParse->sLastToken,
+			sqlParser(pEngine, tokenType, pParse->sLastToken,
 				      pParse);
 			lastTokenParsed = tokenType;
-			if (pParse->rc != SQLITE_OK || db->mallocFailed)
+			if (pParse->rc != SQL_OK || db->mallocFailed)
 				break;
 		}
 	}
 	assert(nErr == 0);
 	pParse->zTail = &zSql[i];
 #ifdef YYTRACKMAXSTACKDEPTH
-	sqlite3StatusHighwater(SQLITE_STATUS_PARSER_STACK,
-			       sqlite3ParserStackPeak(pEngine)
+	sqlStatusHighwater(SQL_STATUS_PARSER_STACK,
+			       sqlParserStackPeak(pEngine)
 	    );
 #endif				/* YYDEBUG */
-	sqlite3ParserFree(pEngine, sqlite3_free);
+	sqlParserFree(pEngine, sql_free);
 	if (db->mallocFailed) {
-		pParse->rc = SQLITE_NOMEM_BKPT;
+		pParse->rc = SQL_NOMEM_BKPT;
 	}
-	if (pParse->rc != SQLITE_OK && pParse->rc != SQLITE_DONE
+	if (pParse->rc != SQL_OK && pParse->rc != SQL_DONE
 	    && pParse->zErrMsg == 0) {
 		const char *error;
 		if (is_tarantool_error(pParse->rc) &&
 		    tarantoolErrorMessage() != NULL)
 			error = tarantoolErrorMessage();
 		else
-			error = sqlite3ErrStr(pParse->rc);
-		pParse->zErrMsg = sqlite3MPrintf(db, "%s", error);
+			error = sqlErrStr(pParse->rc);
+		pParse->zErrMsg = sqlMPrintf(db, "%s", error);
 	}
 	assert(pzErrMsg != 0);
 	if (pParse->zErrMsg) {
 		*pzErrMsg = pParse->zErrMsg;
-		sqlite3_log(pParse->rc, "%s", *pzErrMsg);
+		sql_log(pParse->rc, "%s", *pzErrMsg);
 		nErr++;
 	}
 	if (pParse->pVdbe != NULL && pParse->nErr > 0) {
-		sqlite3VdbeDelete(pParse->pVdbe);
+		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;
 	}
-	sqlite3DeleteTable(db, pParse->pNewTable);
+	sqlDeleteTable(db, pParse->pNewTable);
 
 	if (pParse->pWithToFree)
-		sqlite3WithDelete(db, pParse->pWithToFree);
-	sqlite3DbFree(db, pParse->pVList);
+		sqlWithDelete(db, pParse->pWithToFree);
+	sqlDbFree(db, pParse->pVList);
 	while (pParse->pZombieTab) {
 		Table *p = pParse->pZombieTab;
 		pParse->pZombieTab = p->pNextZombie;
-		sqlite3DeleteTable(db, p);
+		sqlDeleteTable(db, p);
 	}
-	assert(nErr == 0 || pParse->rc != SQLITE_OK);
+	assert(nErr == 0 || pParse->rc != SQL_OK);
 	return nErr;
 }
 
 struct Expr *
-sql_expr_compile(sqlite3 *db, const char *expr, int expr_len)
+sql_expr_compile(sql *db, const char *expr, int expr_len)
 {
 	const char *outer = "SELECT ";
 	int len = strlen(outer) + expr_len;
@@ -562,7 +562,7 @@ sql_expr_compile(sqlite3 *db, const char *expr, int expr_len)
 	sprintf(stmt, "%s%.*s", outer, expr_len, expr);
 
 	char *sql_error = NULL;
-	if (sqlite3RunParser(&parser, stmt, &sql_error) != SQLITE_OK ||
+	if (sqlRunParser(&parser, stmt, &sql_error) != SQL_OK ||
 	    parser.parsed_ast_type != AST_TYPE_EXPR) {
 		diag_set(ClientError, ER_SQL, sql_error);
 	} else {
@@ -575,7 +575,7 @@ end:
 }
 
 struct Select *
-sql_view_compile(struct sqlite3 *db, const char *view_stmt)
+sql_view_compile(struct sql *db, const char *view_stmt)
 {
 	struct Parse parser;
 	sql_parser_create(&parser, db);
@@ -584,7 +584,7 @@ sql_view_compile(struct sqlite3 *db, const char *view_stmt)
 	struct Select *select = NULL;
 
 	char *unused;
-	if (sqlite3RunParser(&parser, view_stmt, &unused) != SQLITE_OK ||
+	if (sqlRunParser(&parser, view_stmt, &unused) != SQL_OK ||
 	    parser.parsed_ast_type != AST_TYPE_SELECT) {
 		diag_set(ClientError, ER_SQL_EXECUTE, view_stmt);
 	} else {
@@ -597,14 +597,14 @@ sql_view_compile(struct sqlite3 *db, const char *view_stmt)
 }
 
 struct sql_trigger *
-sql_trigger_compile(struct sqlite3 *db, const char *sql)
+sql_trigger_compile(struct sql *db, const char *sql)
 {
 	struct Parse parser;
 	sql_parser_create(&parser, db);
 	parser.parse_only = true;
 	char *sql_error = NULL;
 	struct sql_trigger *trigger = NULL;
-	if (sqlite3RunParser(&parser, sql, &sql_error) != SQLITE_OK ||
+	if (sqlRunParser(&parser, sql, &sql_error) != SQL_OK ||
 	    parser.parsed_ast_type != AST_TYPE_TRIGGER) {
 	    if (parser.rc != SQL_TARANTOOL_ERROR)
 		diag_set(ClientError, ER_SQL, sql_error);

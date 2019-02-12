@@ -30,7 +30,7 @@
  */
 #include "box/lua/space.h"
 #include "box/lua/tuple.h"
-#include "box/sql/sqliteLimit.h"
+#include "box/sql/sqlLimit.h"
 #include "lua/utils.h"
 #include "lua/trigger.h"
 

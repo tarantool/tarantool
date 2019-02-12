@@ -13,7 +13,7 @@ test:plan(8)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the use of indices in WHERE clauses.
 -- This file was created when support for optimizing IS NULL phrases
 -- was added.  And so the principle purpose of this file is to test
@@ -46,12 +46,12 @@ test:do_execsql_test(
 
 -- Do an SQL statement.  Append the search count to the end of the result.
 -- local function count(sql)
---     sqlite_search_count = 0
+--     sql_search_count = 0
 --     return test:execsql sql
 -- end
 
 -- # Verify that queries use an index.  We are using the special variable
--- # "sqlite_search_count" which tallys the number of executions of MoveTo
+-- # "sql_search_count" which tallys the number of executions of MoveTo
 -- # and Next operators in the VDBE.  By verifing that the search count is
 -- # small we can be assured that indices are being used properly.
 -- #

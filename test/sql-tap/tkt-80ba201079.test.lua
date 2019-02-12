@@ -13,7 +13,7 @@ test:plan(11)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [80ba201079ea608071d22a57856b940ea3ac53ce] is
 -- resolved.  That ticket is about an incorrect result that appears when
 -- an index is added.  The root cause is that a constant is being used

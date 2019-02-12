@@ -14,7 +14,7 @@ test:plan(1)
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [7a31705a7e6c95d514e6f20a6900f436bbc9fed8] in the
 -- name resolver has been fixed.
 --

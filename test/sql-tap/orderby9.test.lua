@@ -13,7 +13,7 @@ test:plan(4)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 -- 
 -- This file seeks to verify that expressions (and especially functions)
 -- that are in both the ORDER BY clause and the result set are only

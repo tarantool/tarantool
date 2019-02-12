@@ -13,7 +13,7 @@ test:plan(26)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that affinities and collation sequences are correctly applied
 -- in aggregate queries.
 --

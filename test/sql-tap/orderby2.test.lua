@@ -13,7 +13,7 @@ test:plan(9)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing that the optimizations that disable
 -- ORDER BY clauses when the natural order of a query is correct.
 --
@@ -52,7 +52,7 @@ test:do_test(
     })
 
 -- Tarantool: no-rowid changes query plan to use ORDER BY.
--- Verified w/ vanilla SQLite. Comment the case.
+-- Verified w/ vanilla sql. Comment the case.
 --do_test 1.1b {
 --  db eval {
 --    EXPLAIN QUERY PLAN

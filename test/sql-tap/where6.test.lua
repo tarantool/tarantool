@@ -13,7 +13,7 @@ test:plan(20)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing that terms in the ON clause of
 -- a LEFT OUTER JOIN are not used with indices.  See ticket #3015.
 --

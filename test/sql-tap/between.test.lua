@@ -13,7 +13,7 @@ test:plan(11)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the use of indices in WHERE clauses
 -- when the WHERE clause contains the BETWEEN operator.
 --
@@ -51,10 +51,10 @@ test:do_test(
 -- is done.  Then it appends the names of the table and index used.
 --
 local function queryplan(sql)
-    local sqlite_sort_count = box.sql.debug().sql_sort_count
+    local sql_sort_count = box.sql.debug().sql_sort_count
     local data = test:execsql(sql)
     local x = "nosort"
-    if box.sql.debug().sql_sort_count - sqlite_sort_count then
+    if box.sql.debug().sql_sort_count - sql_sort_count then
         x = "sort"
     end
     table.insert(data,x)

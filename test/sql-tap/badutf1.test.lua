@@ -13,9 +13,9 @@ test:plan(23)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 --
--- This file checks to make sure SQLite is able to gracefully
+-- This file checks to make sure sql is able to gracefully
 -- handle malformed UTF-8.
 --
 -- $Id: badutf.test,v 1.2 2007/09/12 17:01:45 danielk1977 Exp $
@@ -94,12 +94,12 @@ test:do_test(
 
 -- commented as it uses utf16
 if 0>0 then
-sqlite3("db2", "")
+sql("db2", "")
 test:do_test(
     "badutf-1.10",
     function()
         test:execsql "PRAGMA encoding='UTF16be'"
-        return sqlite3_exec("db2", "SELECT hex('%80') AS x")
+        return sql_exec("db2", "SELECT hex('%80') AS x")
     end, {
         -- <badutf-1.10>
         0, "x 0080"
@@ -109,7 +109,7 @@ test:do_test(
 test:do_test(
     "badutf-1.11",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%81') AS x")
+        return sql_exec("db2", "SELECT hex('%81') AS x")
     end, {
         -- <badutf-1.11>
         0, "x 0081"
@@ -119,7 +119,7 @@ test:do_test(
 test:do_test(
     "badutf-1.12",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%bf') AS x")
+        return sql_exec("db2", "SELECT hex('%bf') AS x")
     end, {
         -- <badutf-1.12>
         0, "x 00BF"
@@ -129,7 +129,7 @@ test:do_test(
 test:do_test(
     "badutf-1.13",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%c0') AS x")
+        return sql_exec("db2", "SELECT hex('%c0') AS x")
     end, {
         -- <badutf-1.13>
         0, "x FFFD"
@@ -139,7 +139,7 @@ test:do_test(
 test:do_test(
     "badutf-1.14",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%c1') AS x")
+        return sql_exec("db2", "SELECT hex('%c1') AS x")
     end, {
         -- <badutf-1.14>
         0, "x FFFD"
@@ -149,7 +149,7 @@ test:do_test(
 test:do_test(
     "badutf-1.15",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%c0%bf') AS x")
+        return sql_exec("db2", "SELECT hex('%c0%bf') AS x")
     end, {
         -- <badutf-1.15>
         0, "x FFFD"
@@ -159,7 +159,7 @@ test:do_test(
 test:do_test(
     "badutf-1.16",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%c1%bf') AS x")
+        return sql_exec("db2", "SELECT hex('%c1%bf') AS x")
     end, {
         -- <badutf-1.16>
         0, "x FFFD"
@@ -169,7 +169,7 @@ test:do_test(
 test:do_test(
     "badutf-1.17",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%c3%bf') AS x")
+        return sql_exec("db2", "SELECT hex('%c3%bf') AS x")
     end, {
         -- <badutf-1.17>
         0, "x 00FF"
@@ -179,7 +179,7 @@ test:do_test(
 test:do_test(
     "badutf-1.18",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%e0') AS x")
+        return sql_exec("db2", "SELECT hex('%e0') AS x")
     end, {
         -- <badutf-1.18>
         0, "x FFFD"
@@ -189,7 +189,7 @@ test:do_test(
 test:do_test(
     "badutf-1.19",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%f0') AS x")
+        return sql_exec("db2", "SELECT hex('%f0') AS x")
     end, {
         -- <badutf-1.19>
         0, "x FFFD"
@@ -199,7 +199,7 @@ test:do_test(
 test:do_test(
     "badutf-1.20",
     function()
-        return sqlite3_exec("db2", "SELECT hex('%ff') AS x")
+        return sql_exec("db2", "SELECT hex('%ff') AS x")
     end, {
         -- <badutf-1.20>
         0, "x FFFD"

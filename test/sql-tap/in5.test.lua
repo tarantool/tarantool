@@ -256,7 +256,7 @@ test:do_test(
     )
 
 ---------------------------------------------------------------------------
--- At one point SQLite was removing the DISTINCT keyword from expressions
+-- At one point sql was removing the DISTINCT keyword from expressions
 -- similar to:
 --
 --   <expr1> IN (SELECT DISTINCT <expr2> FROM...)

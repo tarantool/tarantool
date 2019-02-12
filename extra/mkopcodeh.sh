@@ -317,10 +317,10 @@ while [ "$i" -le "$mxTk" ]; do
 done
 printf '%s\n' "}"
 printf '%s\n' ""
-printf '%s\n' "/* The sqlite3P2Values() routine is able to run faster if it knows"
+printf '%s\n' "/* The sqlP2Values() routine is able to run faster if it knows"
 printf '%s\n' "** the value of the largest JUMP opcode.  The smaller the maximum"
 printf '%s\n' "** JUMP opcode the better, so the mkopcodeh.sh script that"
 printf '%s\n' "** generated this include file strives to group all JUMP opcodes"
 printf '%s\n' "** together near the beginning of the list."
 printf '%s\n' "*/"
-printf '%s\n' "#define SQLITE_MX_JUMP_OPCODE  $mxJump  /* Maximum JUMP opcode */"
+printf '%s\n' "#define SQL_MX_JUMP_OPCODE  $mxJump  /* Maximum JUMP opcode */"

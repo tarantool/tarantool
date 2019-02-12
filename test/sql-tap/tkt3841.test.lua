@@ -16,7 +16,7 @@ test:plan(1)
 --
 -- Ticket #3841
 --
--- The sqlite3_aggregate_count() is not being reset when an aggregate
+-- The sql_aggregate_count() is not being reset when an aggregate
 -- functio is used in a correlated subquery.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

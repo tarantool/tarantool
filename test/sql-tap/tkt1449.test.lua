@@ -13,7 +13,7 @@ test:plan(3)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests to verify that ticket #1449 has been
 -- fixed.  
@@ -27,7 +27,7 @@ test:plan(3)
 
 -- The following schema generated problems in ticket #1449.  We've retained
 -- the original schema here because it is some unbelievably complex, it seemed
--- like a good test case for SQLite.
+-- like a good test case for sql.
 --
 test:do_execsql_test(
     "tkt1449-1.1",

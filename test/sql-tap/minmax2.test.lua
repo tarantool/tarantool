@@ -13,7 +13,7 @@ test:plan(49)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing SELECT statements that contain
 -- aggregate min() and max() functions and which are handled as
 -- as a special case.  This file makes sure that the min/max

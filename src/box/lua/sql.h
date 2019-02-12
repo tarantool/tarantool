@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_LUA_SQLITE_H
-#define INCLUDES_TARANTOOL_LUA_SQLITE_H
+#ifndef INCLUDES_TARANTOOL_LUA_SQL_H
+#define INCLUDES_TARANTOOL_LUA_SQL_H
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -37,7 +37,7 @@ extern "C" {
 
 struct lua_State;
 
-void box_lua_sqlite_init(struct lua_State *L);
+void box_lua_sql_init(struct lua_State *L);
 
 #ifdef __cplusplus
 }

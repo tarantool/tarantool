@@ -14,7 +14,7 @@ test:plan(11)
 --
 -------------------------------------------------------------------------
 --
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 -- Specifically, it tests that bug #3334 has been fixed by the
 -- addition of restriction (19) to the subquery flattener optimization.
 --

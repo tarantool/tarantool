@@ -13,7 +13,7 @@ test:plan(170)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 --
 -- $Id: selectB.test,v 1.10 2009/04/02 16:59:47 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

@@ -382,7 +382,7 @@ cn:execute(sql, parameters)
 --
 -- Errors during parameters binding.
 --
--- Try value > INT64_MAX. SQLite can't bind it, since it has no
+-- Try value > INT64_MAX. sql can't bind it, since it has no
 -- suitable method in its bind API.
 cn:execute('select ? as big_uint', {0xefffffffffffffff})
 ---

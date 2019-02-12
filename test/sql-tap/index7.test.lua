@@ -85,7 +85,7 @@ end
 -- do_test index7-1.10 {
 --   execsql {
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --     PRAGMA integrity_check;
 --   }
 -- } {t1 {20 1} t1a {14 1} t1b {10 1} ok}
@@ -96,7 +96,7 @@ end
 --   execsql {
 --     UPDATE t1 SET a=b;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --     PRAGMA integrity_check;
 --   }
 -- } {t1 {20 1} t1a {20 1} t1b {10 1} ok}
@@ -105,7 +105,7 @@ end
 --     UPDATE t1 SET a=NULL WHERE b%3!=0;
 --     UPDATE t1 SET b=b+100;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --     PRAGMA integrity_check;
 --   }
 -- } {t1 {20 1} t1a {6 1} t1b {20 1} ok}
@@ -114,7 +114,7 @@ end
 --     UPDATE t1 SET a=CASE WHEN b%3!=0 THEN b END;
 --     UPDATE t1 SET b=b-100;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --     PRAGMA integrity_check;
 --   }
 -- } {t1 {20 1} t1a {13 1} t1b {10 1} ok}
@@ -122,7 +122,7 @@ end
 --   execsql {
 --     DELETE FROM t1 WHERE b BETWEEN 8 AND 12;
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --     PRAGMA integrity_check;
 --   }
 -- } {t1 {15 1} t1a {10 1} t1b {8 1} ok}
@@ -130,7 +130,7 @@ end
 --   execsql {
 --     CREATE INDEX t1c ON t1(c);
 --     ANALYZE;
---     SELECT idx, stat FROM sqlite_stat1 ORDER BY idx;
+--     SELECT idx, stat FROM sql_stat1 ORDER BY idx;
 --     PRAGMA integrity_check;
 --   }
 -- } {t1 {15 1} t1a {10 1} t1b {8 1} t1c {15 1} ok}
@@ -232,7 +232,7 @@ end
 --                                /* ^^^^^-- ignored */
 --   ANALYZE;
 --   SELECT count(*) FROM t3 WHERE t3.b BETWEEN 5 AND 10;
---   SELECT stat+0 FROM sqlite_stat1 WHERE idx='t3b';
+--   SELECT stat+0 FROM sql_stat1 WHERE idx='t3b';
 -- } {6 6}
 -- Verify that the problem identified by ticket [98d973b8f5] has been fixed.
 --

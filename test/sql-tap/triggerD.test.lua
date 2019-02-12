@@ -211,7 +211,7 @@ test:do_test(
 -- #    CREATE TRIGGER xyz.trig BEFORE UPDATE ON xyz.tab BEGIN ...
 -- #
 -- # But a long-standing bug does allow it.  And the "xyz.tab" slips into
--- # the sqlite_master table.  We cannot fix the bug simply by disallowing
+-- # the sql_master table.  We cannot fix the bug simply by disallowing
 -- # "xyz.tab" since that could break legacy applications.  We have to
 -- # fix the system so that the "xyz." on "xyz.tab" is ignored.
 -- # Verify that this is the case.
@@ -219,7 +219,7 @@ test:do_test(
 -- do_test triggerD-4.1 {
 --   db close
 --   forcedelete test.db test2.db
---   sqlite3 db test.db
+--   sql db test.db
 --   db eval {
 --     CREATE TABLE t1(x INT);
 --     ATTACH 'test2.db' AS db2;
@@ -233,7 +233,7 @@ test:do_test(
 --   }
 -- } {123}
 -- do_test triggerD-4.2 {
---   sqlite3 db2 test2.db
+--   sql db2 test2.db
 --   db2 eval {
 --     INSERT INTO t2 VALUES(234);
 --     SELECT * FROM log;

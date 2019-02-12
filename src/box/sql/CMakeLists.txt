@@ -1,7 +1,7 @@
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  add_definitions(-DSQLITE_DEBUG=1)
-  add_definitions(-DSQLITE_ENABLE_SELECTTRACE)
-  add_definitions(-DSQLITE_ENABLE_WHERETRACE)
+  add_definitions(-DSQL_DEBUG=1)
+  add_definitions(-DSQL_ENABLE_SELECTTRACE)
+  add_definitions(-DSQL_ENABLE_WHERETRACE)
 endif()
 
 set(EXT_SRC_DIR ${CMAKE_SOURCE_DIR}/extra)
@@ -12,14 +12,14 @@ set(SQL_BIN_DIR ${CMAKE_BINARY_DIR}/src/box/sql)
 include_directories(${SQL_SRC_DIR})
 include_directories(${SQL_BIN_DIR})
 
-add_definitions(-DSQLITE_MAX_WORKER_THREADS=0)
-add_definitions(-DSQLITE_OMIT_AUTOMATIC_INDEX)
+add_definitions(-DSQL_MAX_WORKER_THREADS=0)
+add_definitions(-DSQL_OMIT_AUTOMATIC_INDEX)
 
 set(TEST_DEFINITIONS
-    SQLITE_NO_SYNC=1
-    SQLITE_TEST=1
-    SQLITE_PRIVATE=
-    SQLITE_CORE=1
+    SQL_NO_SYNC=1
+    SQL_TEST=1
+    SQL_PRIVATE=
+    SQL_CORE=1
 )
 
 add_library(sql STATIC

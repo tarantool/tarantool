@@ -13,13 +13,13 @@ test:plan(70)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the CREATE INDEX statement.
 --
 -- $Id: index.test,v 1.43 2008/01/16 18:20:42 danielk1977 Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
--- Create a basic index and verify it is added to sqlite_master
+-- Create a basic index and verify it is added to sql_master
 --
 test:do_test(
     "index-1.1",
@@ -44,22 +44,22 @@ test:do_execsql_test(
     })
 
 -- do_test index-1.1b {
---   execsql {SELECT name, sql, tbl_name, type FROM sqlite_master 
+--   execsql {SELECT name, sql, tbl_name, type FROM sql_master
 --            WHERE name='index1'}
 -- } {index1 {CREATE INDEX index1 ON test1(f1)} test1 index}
 --do_test index-1.1c {
 --  db close
---  sqlite3 db test.db
+--  sql db test.db
 --  execsql {SELECT name FROM _index WHERE name='index1'}
 --} {index1}
--- execsql {SELECT name, sql, tbl_name, type FROM sqlite_master 
+-- execsql {SELECT name, sql, tbl_name, type FROM sql_master
 --          WHERE name='index1'}
 --} {index1 {CREATE INDEX index1 ON test1(f1)} test1 index}
 --do_test index-1.1d {
 --  db close
---  sqlite3 db test.db
+--  sql db test.db
 --  execsql {SELECT name FROM _space WHERE name='test1'}
---execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+--execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
 --} {test1}
 -- Verify that the index dies with the table
 --
@@ -68,7 +68,7 @@ test:do_test(
     function()
         test:execsql "DROP TABLE test1"
         return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1']]
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-1.2>
         
@@ -256,7 +256,7 @@ test:do_test(
     function()
         test:execsql "DROP TABLE test1"
         return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1']]
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-4.13>
         
@@ -264,14 +264,14 @@ test:do_test(
     })
 
 -- integrity_check index-4.14
--- # Do not allow indices to be added to sqlite_master
+-- # Do not allow indices to be added to sql_master
 -- #
 -- do_test index-5.1 {
---   set v [catch {execsql {CREATE INDEX index1 ON sqlite_master(name)}} msg]
+--   set v [catch {execsql {CREATE INDEX index1 ON sql_master(name)}} msg]
 --   lappend v $msg
--- } {1 {table sqlite_master may not be indexed}}
+-- } {1 {table sql_master may not be indexed}}
 -- do_test index-5.2 {
---   execsql {SELECT name FROM sqlite_master WHERE type!='meta'}
+--   execsql {SELECT name FROM sql_master WHERE type!='meta'}
 -- } {}
 -- Do not allow indices with duplicate names to be added
 --
@@ -329,7 +329,7 @@ test:do_test(
         test:execsql "DROP TABLE test1"
         test:execsql "DROP TABLE test2"
         return test:execsql [[SELECT "name" FROM "_space" WHERE "name"='TEST1' OR "name"='TEST2']]
-        --execsql {SELECT name FROM sqlite_master WHERE type!='meta' ORDER BY name}
+        --execsql {SELECT name FROM sql_master WHERE type!='meta' ORDER BY name}
     end, {
         -- <index-6.3>
         
@@ -569,7 +569,7 @@ test:do_execsql_test(
 --
 -- Tarantool: WITHOUT ROWID is by default, so search count is less
 -- by one. Expected result changed {0.1 2} -> {0.1 1}
--- MUST_WORK_TEST uses internal variables (sqlite_search_count)
+-- MUST_WORK_TEST uses internal variables (sql_search_count)
 if 0>0 then
 test:do_test(
     "index-11.1",
@@ -585,8 +585,8 @@ test:do_test(
         for i = 1, 50, 1 do
             test:execsql(string.format("INSERT INTO t3 VALUES('x%sx',%s,0.%s)", i, i, i))
         end
-        sqlite_search_count = 0
-        return X(381, "X!cmd", [=[["concat",[["execsql","SELECT c FROM t3 WHERE b==10"]],["sqlite_search_count"]]]=])
+        sql_search_count = 0
+        return X(381, "X!cmd", [=[["concat",[["execsql","SELECT c FROM t3 WHERE b==10"]],["sql_search_count"]]]=])
     end, {
         -- <index-11.1>
         0.1, 1
@@ -599,7 +599,7 @@ end
 -- same number they should compare equal to one another.  Verify that this
 -- is true in indices.
 --
--- Updated for sqlite3 v3: SQLite will now store these values as numbers
+-- Updated for sql v3: sql will now store these values as numbers
 -- (because the affinity of column a is NUMERIC) so the quirky
 -- representations are not retained. i.e. '+1.0' becomes '1'.
 test:do_execsql_test(
@@ -702,7 +702,7 @@ test:do_execsql_test(
 
 -- do_test index-13.2 {
 --   set ::idxlist [execsql {
---     SELECT name FROM sqlite_master WHERE type="index" AND tbl_name="t5";
+--     SELECT name FROM sql_master WHERE type="index" AND tbl_name="t5";
 --   }]
 --   llength $::idxlist
 -- } {3}

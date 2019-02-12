@@ -13,7 +13,7 @@ test:plan(6)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing the CREATE INDEX statement.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -57,9 +57,9 @@ test:do_execsql_test(
 --
 
 -- MUST_WORK_TEST limit memory
---soft_limit = sqlite3_soft_heap_limit(50000)
+--soft_limit = sql_soft_heap_limit(50000)
 --db("close")
---sqlite3("db", "test.db")
+--sql("db", "test.db")
 --test:do_execsql_test(
 --    1.4,
 --    [[
@@ -70,7 +70,7 @@ test:do_execsql_test(
 ---- do_execsql_test 1.5 {
 ----   PRAGMA integrity_check
 ---- } {ok}
---sqlite3_soft_heap_limit(soft_limit)
+--sql_soft_heap_limit(soft_limit)
 
 
 -- Tarantool: x is PK now, so NULL is not allowed.

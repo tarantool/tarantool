@@ -13,7 +13,7 @@ test:plan(10)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing that the optimizations that disable
 -- ORDER BY clauses work correctly
 --
@@ -145,9 +145,9 @@ test:do_execsql_test(
 --   CREATE TABLE t2(a INT,b INT,c INT);
 --   CREATE INDEX t2bc ON t2(b,c);
 --   ANALYZE;
---   INSERT INTO sqlite_stat1 VALUES('t1','t1bc','1000000 10 9');
---   INSERT INTO sqlite_stat1 VALUES('t2','t2bc','100 10 5');
---   ANALYZE sqlite_master;
+--   INSERT INTO sql_stat1 VALUES('t1','t1bc','1000000 10 9');
+--   INSERT INTO sql_stat1 VALUES('t2','t2bc','100 10 5');
+--   ANALYZE sql_master;
 --   EXPLAIN QUERY PLAN
 --   SELECT * FROM t2 WHERE a=0 ORDER BY a, b, c;
 -- } {~/B-TREE/}

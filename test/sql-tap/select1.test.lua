@@ -236,7 +236,7 @@ string.format([[
         -- </select1-2.0>
     })
 
--- Error messges from sqliteExprCheck
+-- Error messges from sqlExprCheck
 --
 test:do_catchsql_test(
     "select1-2.1",
@@ -1192,7 +1192,7 @@ test:do_test(
         return x
     end, {
         -- <select1-6.9.7>
-        "A.F1", 11, "A.F2", 22, "sqlite_subquery.5", 5, "sqlite_subquery.6", 6
+        "A.F1", 11, "A.F2", 22, "sql_subquery.5", 5, "sql_subquery.6", 6
         -- </select1-6.9.7>
     })
 
@@ -1556,7 +1556,7 @@ test:do_execsql_test(
 
 -- Check the behavior when the result set is empty
 --
--- SQLite v3 always sets r(*).
+-- sql v3 always sets r(*).
 --
 -- do_test select1-9.1 {
 --   catch {unset r}
@@ -2008,24 +2008,24 @@ test:do_test(
 
 
 
--- foreach tab [db eval {SELECT name FROM sqlite_master WHERE type = 'table'}] {
+-- foreach tab [db eval {SELECT name FROM sql_master WHERE type = 'table'}] {
 --   db eval "DROP TABLE $tab"
 -- }
 -- db close
--- sqlite3 db test.db
+-- sql db test.db
 -- do_test select1-14.1 {
 --   execsql { 
---     SELECT * FROM sqlite_master WHERE rowid>10; 
---     SELECT * FROM sqlite_master WHERE rowid=10;
---     SELECT * FROM sqlite_master WHERE rowid<10;
---     SELECT * FROM sqlite_master WHERE rowid<=10;
---     SELECT * FROM sqlite_master WHERE rowid>=10;
---     SELECT * FROM sqlite_master;
+--     SELECT * FROM sql_master WHERE rowid>10;
+--     SELECT * FROM sql_master WHERE rowid=10;
+--     SELECT * FROM sql_master WHERE rowid<10;
+--     SELECT * FROM sql_master WHERE rowid<=10;
+--     SELECT * FROM sql_master WHERE rowid>=10;
+--     SELECT * FROM sql_master;
 --   }
 -- } {}
 -- do_test select1-14.2 {
 --   execsql { 
---     SELECT 10 IN (SELECT rowid FROM sqlite_master);
+--     SELECT 10 IN (SELECT rowid FROM sql_master);
 --   }
 -- } {0}
 
@@ -2052,7 +2052,7 @@ test:do_test(
         })
 
     -- do_test select1-15.2 {
-    --   sqlite3 db2 test.db
+    --   sql db2 test.db
     --   execsql { DROP INDEX i1 } db2
     --   db2 close
     -- } {}
@@ -2081,7 +2081,7 @@ test:do_catchsql_test(
 
 -- # 2015-04-17:  assertion fix.
 -- do_catchsql_test select1-16.2 {
---   SELECT 1 FROM sqlite_master LIMIT 1,#1;
+--   SELECT 1 FROM sql_master LIMIT 1,#1;
 -- } {1 {near "#1": syntax error}}
 test:finish_test()
 

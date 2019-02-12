@@ -13,9 +13,9 @@ test:plan(3)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
--- This file contains test cases that were contributed on the sqlite-users
+-- This file contains test cases that were contributed on the sql-users
 -- mailing list on 2013-06-05 by Mi Chen at mi.chen@echostar.com.
 --
 -- At the time it was contributed, this test failed on trunk, but 

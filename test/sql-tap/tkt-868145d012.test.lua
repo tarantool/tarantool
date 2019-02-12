@@ -13,7 +13,7 @@ test:plan(3)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. Specifically,
+-- This file implements regression tests for sql library. Specifically,
 -- it tests that ticket [868145d012a1] is fixed.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

@@ -32,14 +32,14 @@
 /*
  *
  * This file contains code used to insert the values of host parameters
- * (aka "wildcards") into the SQL text output by sqlite3_trace().
+ * (aka "wildcards") into the SQL text output by sql_trace().
  *
  * The Vdbe parse-tree explainer is also found here.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include "vdbeInt.h"
 
-#ifndef SQLITE_OMIT_TRACE
+#ifndef SQL_OMIT_TRACE
 
 /*
  * zSql is a zero-terminated string of UTF-8 SQL text.  Return the number of
@@ -71,13 +71,13 @@ findNextHostParameter(const char *zSql, int *pnToken)
 
 /*
  * This function returns a pointer to a nul-terminated string in memory
- * obtained from sqlite3DbMalloc(). If sqlite3.nVdbeExec is 1, then the
+ * obtained from sqlDbMalloc(). If sql.nVdbeExec is 1, then the
  * string contains a copy of zRawSql but with host parameters expanded to
- * their current bindings. Or, if sqlite3.nVdbeExec is greater than 1,
+ * their current bindings. Or, if sql.nVdbeExec is greater than 1,
  * then the returned string holds a copy of zRawSql with "-- " prepended
  * to each line of text.
  *
- * If the SQLITE_TRACE_SIZE_LIMIT macro is defined to an integer, then
+ * If the SQL_TRACE_SIZE_LIMIT macro is defined to an integer, then
  * then long strings and blobs are truncated to that many bytes.  This
  * can be used to prevent unreasonably large trace strings when dealing
  * with large (multi-megabyte) strings and blobs.
@@ -94,11 +94,11 @@ findNextHostParameter(const char *zSql, int *pnToken)
  * the value as a literal in place of the host parameter name.
  */
 char *
-sqlite3VdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
+sqlVdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 		     const char *zRawSql	/* Raw text of the SQL statement */
     )
 {
-	sqlite3 *db;		/* The database connection */
+	sql *db;		/* The database connection */
 	int idx = 0;		/* Index of a host parameter */
 	int nextIndex = 1;	/* Index of next ? host parameter */
 	int n;			/* Length of a token prefix */
@@ -109,32 +109,32 @@ sqlite3VdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 	char zBase[100];	/* Initial working space */
 
 	db = p->db;
-	sqlite3StrAccumInit(&out, 0, zBase, sizeof(zBase),
-			    db->aLimit[SQLITE_LIMIT_LENGTH]);
+	sqlStrAccumInit(&out, 0, zBase, sizeof(zBase),
+			    db->aLimit[SQL_LIMIT_LENGTH]);
 	if (db->nVdbeExec > 1) {
 		while (*zRawSql) {
 			const char *zStart = zRawSql;
 			while (*(zRawSql++) != '\n' && *zRawSql) ;
-			sqlite3StrAccumAppend(&out, "-- ", 3);
+			sqlStrAccumAppend(&out, "-- ", 3);
 			assert((zRawSql - zStart) > 0);
-			sqlite3StrAccumAppend(&out, zStart,
+			sqlStrAccumAppend(&out, zStart,
 					      (int)(zRawSql - zStart));
 		}
 	} else if (p->nVar == 0) {
-		sqlite3StrAccumAppend(&out, zRawSql, sqlite3Strlen30(zRawSql));
+		sqlStrAccumAppend(&out, zRawSql, sqlStrlen30(zRawSql));
 	} else {
 		while (zRawSql[0]) {
 			n = findNextHostParameter(zRawSql, &nToken);
 			assert(n > 0);
-			sqlite3StrAccumAppend(&out, zRawSql, n);
+			sqlStrAccumAppend(&out, zRawSql, n);
 			zRawSql += n;
 			assert(zRawSql[0] || nToken == 0);
 			if (nToken == 0)
 				break;
 			if (zRawSql[0] == '?') {
 				if (nToken > 1) {
-					assert(sqlite3Isdigit(zRawSql[1]));
-					sqlite3GetInt32(&zRawSql[1], &idx);
+					assert(sqlIsdigit(zRawSql[1]));
+					sqlGetInt32(&zRawSql[1], &idx);
 				} else {
 					idx = nextIndex;
 				}
@@ -146,7 +146,7 @@ sqlite3VdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 				testcase(zRawSql[0] == '@');
 				testcase(zRawSql[0] == '#');
 				idx =
-				    sqlite3VdbeParameterIndex(p, zRawSql,
+				    sqlVdbeParameterIndex(p, zRawSql,
 							      nToken);
 				assert(idx > 0);
 			}
@@ -155,17 +155,17 @@ sqlite3VdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 			assert(idx > 0 && idx <= p->nVar);
 			pVar = &p->aVar[idx - 1];
 			if (pVar->flags & MEM_Null) {
-				sqlite3StrAccumAppend(&out, "NULL", 4);
+				sqlStrAccumAppend(&out, "NULL", 4);
 			} else if (pVar->flags & MEM_Int) {
-				sqlite3XPrintf(&out, "%lld", pVar->u.i);
+				sqlXPrintf(&out, "%lld", pVar->u.i);
 			} else if (pVar->flags & MEM_Real) {
-				sqlite3XPrintf(&out, "%!.15g", pVar->u.r);
+				sqlXPrintf(&out, "%!.15g", pVar->u.r);
 			} else if (pVar->flags & MEM_Str) {
 				int nOut;	/* Number of bytes of the string text to include in output */
 				nOut = pVar->n;
-#ifdef SQLITE_TRACE_SIZE_LIMIT
-				if (nOut > SQLITE_TRACE_SIZE_LIMIT) {
-					nOut = SQLITE_TRACE_SIZE_LIMIT;
+#ifdef SQL_TRACE_SIZE_LIMIT
+				if (nOut > SQL_TRACE_SIZE_LIMIT) {
+					nOut = SQL_TRACE_SIZE_LIMIT;
 					while (nOut < pVar->n
 					       && (pVar->z[nOut] & 0xc0) ==
 					       0x80) {
@@ -173,33 +173,33 @@ sqlite3VdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 					}
 				}
 #endif
-				sqlite3XPrintf(&out, "'%.*q'", nOut, pVar->z);
-#ifdef SQLITE_TRACE_SIZE_LIMIT
+				sqlXPrintf(&out, "'%.*q'", nOut, pVar->z);
+#ifdef SQL_TRACE_SIZE_LIMIT
 				if (nOut < pVar->n) {
-					sqlite3XPrintf(&out, "/*+%d bytes*/",
+					sqlXPrintf(&out, "/*+%d bytes*/",
 						       pVar->n - nOut);
 				}
 #endif
 			} else if (pVar->flags & MEM_Zero) {
-				sqlite3XPrintf(&out, "zeroblob(%d)",
+				sqlXPrintf(&out, "zeroblob(%d)",
 					       pVar->u.nZero);
 			} else {
 				int nOut;	/* Number of bytes of the blob to include in output */
 				assert(pVar->flags & MEM_Blob);
-				sqlite3StrAccumAppend(&out, "x'", 2);
+				sqlStrAccumAppend(&out, "x'", 2);
 				nOut = pVar->n;
-#ifdef SQLITE_TRACE_SIZE_LIMIT
-				if (nOut > SQLITE_TRACE_SIZE_LIMIT)
-					nOut = SQLITE_TRACE_SIZE_LIMIT;
+#ifdef SQL_TRACE_SIZE_LIMIT
+				if (nOut > SQL_TRACE_SIZE_LIMIT)
+					nOut = SQL_TRACE_SIZE_LIMIT;
 #endif
 				for (i = 0; i < nOut; i++) {
-					sqlite3XPrintf(&out, "%02x",
+					sqlXPrintf(&out, "%02x",
 						       pVar->z[i] & 0xff);
 				}
-				sqlite3StrAccumAppend(&out, "'", 1);
-#ifdef SQLITE_TRACE_SIZE_LIMIT
+				sqlStrAccumAppend(&out, "'", 1);
+#ifdef SQL_TRACE_SIZE_LIMIT
 				if (nOut < pVar->n) {
-					sqlite3XPrintf(&out, "/*+%d bytes*/",
+					sqlXPrintf(&out, "/*+%d bytes*/",
 						       pVar->n - nOut);
 				}
 #endif
@@ -207,8 +207,8 @@ sqlite3VdbeExpandSql(Vdbe * p,	/* The prepared statement being evaluated */
 		}
 	}
 	if (out.accError)
-		sqlite3StrAccumReset(&out);
-	return sqlite3StrAccumFinish(&out);
+		sqlStrAccumReset(&out);
+	return sqlStrAccumFinish(&out);
 }
 
-#endif				/* #ifndef SQLITE_OMIT_TRACE */
+#endif				/* #ifndef SQL_OMIT_TRACE */

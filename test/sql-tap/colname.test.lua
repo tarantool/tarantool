@@ -13,9 +13,9 @@ test:plan(63)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 --
--- The focus of this file is testing how SQLite generates the names
+-- The focus of this file is testing how sql generates the names
 -- of columns in a result set.
 --
 -- $Id: colname.test,v 1.7 2009/06/02 15:47:38 drh Exp $
@@ -434,12 +434,12 @@ test:do_execsql2_test(
         -- </colname-4.13>
     })
 
--- MUST_WORK_TEST avoid using sqlite_master
+-- MUST_WORK_TEST avoid using sql_master
 -- ticket #3229
 --    test:do_test(
 --        "colname-5.1",
 --        function()
---            return lreplace( test:execsql("SELECT x.* FROM sqlite_master X LIMIT 1;"), 3, 3,"x")
+--            return lreplace( test:execsql("SELECT x.* FROM sql_master X LIMIT 1;"), 3, 3,"x")
 --        end, {
 --            -- <colname-5.1>
 --            "table", "tabc", "tabc", "x", "CREATE TABLE tabc(a INT,b INT,c INT)"
@@ -452,7 +452,7 @@ test:do_test(
     "colname-6.1",
     function()
         --db("close")
-        --sqlite3("db", "test.db")
+        --sql("db", "test.db")
         -- instead of reconnect to database
         -- we are just turning settings to default state
         test:execsql([[

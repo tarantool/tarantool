@@ -19,7 +19,7 @@ test:plan(3)
 -- ["source",[["testdir"],"\/tester.tcl"]]
 
 
--- The tests in this file were written before SQLite supported recursive
+-- The tests in this file were written before sql supported recursive
 -- trigger invocation, and some tests depend on that to pass. So disable
 -- recursive triggers for this file.
 test:catchsql " pragma recursive_triggers = off "

@@ -14,7 +14,7 @@ test:plan(34)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- This file implements tests for miscellanous features that were
 -- left out of other test files.
@@ -89,7 +89,7 @@ test:do_test(
 
 
 
--- Tests of the sqliteAtoF() function in util.c
+-- Tests of the sqlAtoF() function in util.c
 --
 test:do_execsql_test(
     "misc3-2.1",

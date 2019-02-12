@@ -13,7 +13,7 @@ test:plan(194)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. 
+-- This file implements regression tests for sql library.
 --
 -- The focus of this file is testing the compound-SELECT merge
 -- optimization.  Or, in other words, making sure that all
@@ -2449,7 +2449,7 @@ test:do_execsql_test(
 
 local function strip_rnd(explain)
     for i, val in ipairs(explain) do
-        explain[i] = string.gsub(val, "sqlite_sq_[0123456789ABCDEF]*", "sqlite_sq")
+        explain[i] = string.gsub(val, "sql_sq_[0123456789ABCDEF]*", "sql_sq")
     end
     return explain
 end

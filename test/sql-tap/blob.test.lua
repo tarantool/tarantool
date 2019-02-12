@@ -13,7 +13,7 @@ test:plan(20)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.
+-- This file implements regression tests for sql library.
 --
 -- $Id: blob.test,v 1.8 2009/04/28 18:00:27 drh Exp $
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
@@ -253,14 +253,14 @@ test:do_test(
 -- Try to bind a blob value to a prepared statement.
 -- Tarantool won't support attaching to multiple DBs
 -- do_test blob-3.0 {
---   sqlite3 db2 test.db
---   set DB [sqlite3_connection_pointer db2]
---   set STMT [sqlite3_prepare $DB "DELETE FROM t1 WHERE a = ?" -1 DUMMY]
---   sqlite3_bind_blob $STMT 1 "\x12\x34\x56" 3
---   sqlite3_step $STMT
--- } {SQLITE_DONE}
+--   sql db2 test.db
+--   set DB [sql_connection_pointer db2]
+--   set STMT [sql_prepare $DB "DELETE FROM t1 WHERE a = ?" -1 DUMMY]
+--   sql_bind_blob $STMT 1 "\x12\x34\x56" 3
+--   sql_step $STMT
+-- } {sql_DONE}
 -- do_test blob-3.1 {
---   sqlite3_finalize $STMT
+--   sql_finalize $STMT
 --   db2 close
 -- } {}
 -- MUST_WORK_TEST

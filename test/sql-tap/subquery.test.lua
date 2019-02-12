@@ -13,7 +13,7 @@ test:plan(73)
 --    May you share freely, never taking more than you give.
 --
 ---------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script is testing correlated subqueries
 --
 -- $Id: subquery.test,v 1.17 2009/01/09 01:12:28 drh Exp $
@@ -383,7 +383,7 @@ test:do_test(
     })
 
 -- Tarantool: no-rowid is implied for the table, so query plan contains
--- scan over t4i. Verified w/ vanilla SQLite. Comment this case
+-- scan over t4i. Verified w/ vanilla sql. Comment this case
 --do_test subquery-2.5.3.2 {
 -- Verify that the t4i index was not used in the previous query
 --  execsql {
@@ -651,7 +651,7 @@ test:do_execsql_test(
 --------------------------------------------------------------------
 -- These tests - subquery-4.* - use the TCL statement cache to try 
 -- and expose bugs to do with re-using statements that have been 
--- passed to sqlite3_reset().
+-- passed to sql_reset().
 --
 -- One problem was that VDBE memory cells were not being initialized
 -- to NULL on the second and subsequent executions.

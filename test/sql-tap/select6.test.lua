@@ -13,7 +13,7 @@ test:plan(88)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this file is testing SELECT statements that contain
 -- subqueries in their FROM clause.
 --
@@ -657,7 +657,7 @@ test:do_execsql2_test(
 -- The following procedure compiles the SQL given as an argument and returns
 -- TRUE if that SQL uses any transient tables and returns FALSE if no
 -- transient tables are used.  This is used to make sure that the
--- sqliteFlattenSubquery() routine in select.c is doing its job.
+-- sqlFlattenSubquery() routine in select.c is doing its job.
 --
 
 

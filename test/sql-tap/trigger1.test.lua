@@ -23,8 +23,8 @@ test:plan(33)
 -- trigger1-1.5: Dropped triggers are restored if the transaction is rolled back
 -- trigger1-1.6: Error if dropped trigger doesn't exist
 -- trigger1-1.7: Dropping the table automatically drops all triggers
--- trigger1-1.8: A trigger created on a TEMP table is not inserted into sqlite_master
--- trigger1-1.9: Ensure that we cannot create a trigger on sqlite_master
+-- trigger1-1.8: A trigger created on a TEMP table is not inserted into sql_master
+-- trigger1-1.9: Ensure that we cannot create a trigger on sql_master
 -- trigger1-1.10:
 -- trigger1-1.11:
 -- trigger1-1.12: Ensure that INSTEAD OF triggers cannot be created on tables
@@ -39,7 +39,7 @@ test:do_catchsql_test(
     "trigger1-1.1.1",
     [[
         CREATE TRIGGER trig UPDATE ON no_such_table BEGIN
-          SELECT * from sqlite_master;
+          SELECT * from sql_master;
         END;
     ]], {
         -- <trigger1-1.1.1>
@@ -51,7 +51,7 @@ test:do_catchsql_test(
     "trigger1-1.1.2",
     [[
         CREATE TRIGGER trig UPDATE ON no_such_table BEGIN
-          SELECT * from sqlite_master;
+          SELECT * from sql_master;
         END;
     ]], {
         -- <trigger1-1.1.2>
@@ -68,7 +68,7 @@ test:do_catchsql_test(
     "trigger1-1.1.3",
     [[
         CREATE TRIGGER trig UPDATE ON t1 FOR EACH STATEMENT BEGIN
-           SELECT * FROM sqlite_master;
+           SELECT * FROM sql_master;
         END;
     ]], {
         -- <trigger1-1.1.3>
@@ -85,7 +85,7 @@ test:do_catchsql_test(
     "trigger1-1.2.0",
     [[
         CREATE TRIGGER IF NOT EXISTS tr1 DELETE ON t1 BEGIN
-            SELECT * FROM sqlite_master;
+            SELECT * FROM sql_master;
          END
     ]], {
         -- <trigger1-1.2.0>
@@ -97,7 +97,7 @@ test:do_catchsql_test(
     "trigger1-1.2.1",
     [[
         CREATE TRIGGER tr1 DELETE ON t1 BEGIN
-            SELECT * FROM sqlite_master;
+            SELECT * FROM sql_master;
          END
     ]], {
         -- <trigger1-1.2.1>
@@ -109,7 +109,7 @@ test:do_catchsql_test(
     "trigger1-1.2.2",
     [[
         CREATE TRIGGER tr1 DELETE ON t1 BEGIN
-            SELECT * FROM sqlite_master;
+            SELECT * FROM sql_master;
          END
     ]], {
         -- <trigger1-1.2.2>
@@ -121,17 +121,17 @@ test:do_catchsql_test(
 --     catchsql {
 --         BEGIN;
 --         CREATE TRIGGER tr2 INSERT ON t1 BEGIN
---             SELECT * from sqlite_master; END;
+--             SELECT * from sql_master; END;
 --         ROLLBACK;
 --         CREATE TRIGGER tr2 INSERT ON t1 BEGIN
---             SELECT * from sqlite_master; END;
+--             SELECT * from sql_master; END;
 --     }
 -- } {0 {}}
 -- do_test trigger1-1.4 {
 --     catchsql {
 --         DROP TRIGGER IF EXISTS tr1;
 --         CREATE TRIGGER tr1 DELETE ON t1 BEGIN
---             SELECT * FROM sqlite_master;
+--             SELECT * FROM sql_master;
 --         END
 --     }
 -- } {0 {}}
@@ -190,8 +190,8 @@ test:do_catchsql_test(
 -- }
 -- do_test trigger1-1.9 {
 --   catchsql {
---     CREATE TRIGGER tr1 AFTER UPDATE ON sqlite_master BEGIN
---        SELECT * FROM sqlite_master;
+--     CREATE TRIGGER tr1 AFTER UPDATE ON sql_master BEGIN
+--        SELECT * FROM sql_master;
 --     END;
 --   }
 -- } {1 {cannot create trigger on system table}}
@@ -336,7 +336,7 @@ test:do_catchsql_test(
 --   } {1 {no such table: main.t2}}
 -- do_test trigger1-3.3 {
 --   db close
---   set rc [catch {sqlite3 db test.db} err]
+--   set rc [catch {sql db test.db} err]
 --   if {$rc} {lappend rc $err}
 --   set rc
 -- } {0}
@@ -393,7 +393,7 @@ test:do_catchsql_test(
 --   } {1 2 3 4 3 4}
 --   do_test trigger1-3.9 {
 --     db close
---     sqlite3 db test.db
+--     sql db test.db
 --     execsql {
 --       INSERT INTO t1 VALUES(5,6);
 --       SELECT * FROM t1 UNION ALL SELECT * FROM t2;
@@ -410,7 +410,7 @@ test:do_catchsql_test(
 --   } {1 2 3 4 3 4}
 --   do_test trigger1-3.9 {
 --     db close
---     sqlite3 db test.db
+--     sql db test.db
 --     execsql {
 --       INSERT INTO t1 VALUES(5,6);
 --       SELECT * FROM t1;
@@ -428,7 +428,7 @@ test:do_catchsql_test(
 --     }
 --   } {3 4 7 8}
 --   do_test trigger1-4.2 {
---     sqlite3 db2 test.db
+--     sql db2 test.db
 --     execsql {
 --       INSERT INTO t1 VALUES(9,10);
 --     } db2;
@@ -445,7 +445,7 @@ test:do_catchsql_test(
 --   } {3 4 7 8}
 --   do_test trigger1-4.4 {
 --     db close
---     sqlite3 db test.db
+--     sql db test.db
 --     execsql {
 --       SELECT * FROM t2;
 --     };
@@ -475,7 +475,7 @@ view_v1 = "view v1"
 
 
 -- do_test trigger1-6.1 {
---   execsql {SELECT type, name FROM sqlite_master}
+--   execsql {SELECT type, name FROM sql_master}
 -- } [concat $view_v1 {table t2}]
 test:do_execsql_test(
     "trigger1-6.2",
@@ -499,7 +499,7 @@ test:do_catchsql_test(
         -- </trigger1-6.3>
     })
 
--- verify_ex_errcode trigger1-6.3b SQLITE_CONSTRAINT_TRIGGER
+-- verify_ex_errcode trigger1-6.3b sql_CONSTRAINT_TRIGGER
 test:do_execsql_test(
     "trigger1-6.4",
     [[
@@ -512,13 +512,13 @@ test:do_execsql_test(
 
 -- do_test trigger1-6.5 {
 --   db close
---   sqlite3 db test.db
---   execsql {SELECT type, name FROM sqlite_master}
+--   sql db test.db
+--   execsql {SELECT type, name FROM sql_master}
 -- } [concat $view_v1 {table t2 trigger t2}]
 -- do_test trigger1-6.6 {
 --   execsql {
 --     DROP TRIGGER t2;
---     SELECT type, name FROM sqlite_master;
+--     SELECT type, name FROM sql_master;
 --   }
 -- } [concat $view_v1 {table t2}]
 -- do_test trigger1-6.7 {
@@ -526,7 +526,7 @@ test:do_execsql_test(
 -- } {3 4 7 8}
 -- do_test trigger1-6.8 {
 --   db close
---   sqlite3 db test.db
+--   sql db test.db
 --   execsql {SELECT * FROM t2}
 -- } {3 4 7 8}
 test:execsql "DROP TRIGGER IF EXISTS t2"

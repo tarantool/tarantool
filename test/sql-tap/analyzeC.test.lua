@@ -223,7 +223,7 @@ test:do_execsql_test(
     })
 
 -- The sz=NNN parameter works even if there is other extraneous text
--- in the sqlite_stat1.stat column.
+-- in the sql_stat1.stat column.
 --
 test:do_execsql_test(
     5.0,

@@ -1,5 +1,5 @@
 #!/usr/bin/env tarantool
--- The maximum number of columns in SQLite is 2000. This test checks it.
+-- The maximum number of columns in sql is 2000. This test checks it.
 
 test = require("sqltester")
 test:plan(2)

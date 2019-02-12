@@ -13,7 +13,7 @@ test:plan(2)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library.  The
+-- This file implements regression tests for sql library.  The
 -- focus of this script is a test of the DELETE command where a
 -- large number of rows are deleted.
 --

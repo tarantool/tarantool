@@ -10,13 +10,13 @@
 
 printf '%s\n' "/* Automatically generated.  Do not edit */"
 printf '%s\n' "/* See the tool/mkopcodec.sh script for details. */"
-printf '%s\n' "#include \"sqliteInt.h\""
-printf '%s\n' "#if defined(SQLITE_ENABLE_EXPLAIN_COMMENTS) || defined(SQLITE_DEBUG)"
+printf '%s\n' "#include \"sqlInt.h\""
+printf '%s\n' "#if defined(SQL_ENABLE_EXPLAIN_COMMENTS) || defined(SQL_DEBUG)"
 printf '%s\n' "# define OpHelp(X) \"\\0\" X"
 printf '%s\n' "#else"
 printf '%s\n' "# define OpHelp(X)"
 printf '%s\n' "#endif"
-printf '%s\n' "const char *sqlite3OpcodeName(int i){"
+printf '%s\n' "const char *sqlOpcodeName(int i){"
 printf '%s\n' " static const char *const azName[] = {"
 mx=0
 

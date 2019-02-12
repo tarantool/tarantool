@@ -13,7 +13,7 @@ test:plan(398)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. The focus
+-- This file implements regression tests for sql library. The focus
 -- of this file is testing the interaction of manifest types, type affinity
 -- and comparison expressions.
 --

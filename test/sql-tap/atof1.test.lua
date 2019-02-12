@@ -14,7 +14,7 @@ test:plan(9999)
 --
 -------------------------------------------------------------------------
 -- 
--- Tests of the sqlite3AtoF() function.
+-- Tests of the sqlAtoF() function.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
@@ -28,7 +28,7 @@ for i = 1, 10000 - 1, 1 do
 --    local xf = string.format("%.32e", x)
 --    print("\nxf "..xf.." x "..x)
 --    -- Verify that text->real conversions get exactly same ieee754 floating-
---    -- point value in SQLite as they do in TCL.
+--    -- point value in sql as they do in TCL.
 --    --
 --    test:do_test(
 --        "atof1-1."..i..".1",

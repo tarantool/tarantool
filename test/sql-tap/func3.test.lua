@@ -13,14 +13,14 @@ test:plan(25)
 --    May you share freely, never taking more than you give.
 --
 -------------------------------------------------------------------------
--- This file implements regression tests for SQLite library. The
+-- This file implements regression tests for sql library. The
 -- focus of this file is testing that destructor functions associated
--- with functions created using sqlite3_create_function_v2() is 
+-- with functions created using sql_create_function_v2() is
 -- correctly invoked.
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
--- MUST_WORK_TEST built-in functions check desrtoy api of sqlite3_create_function_v2
+-- MUST_WORK_TEST built-in functions check desrtoy api of sql_create_function_v2
 
 -- EVIDENCE-OF: R-41921-05214 The likelihood(X,Y) function returns
 -- argument X unchanged.
@@ -130,7 +130,7 @@ test:do_catchsql_test(
 
 -- EVIDENCE-OF: R-28535-44631 The likelihood(X) function is a no-op that
 -- the code generator optimizes away so that it consumes no CPU cycles
--- during run-time (that is, during calls to sqlite3_step()).
+-- during run-time (that is, during calls to sql_step()).
 --
 test:do_test(
     "func3-5.20",
@@ -203,7 +203,7 @@ test:do_execsql_test(
 
 -- EVIDENCE-OF: R-22887-63324 The unlikely(X) function is a no-op that
 -- the code generator optimizes away so that it consumes no CPU cycles at
--- run-time (that is, during calls to sqlite3_step()).
+-- run-time (that is, during calls to sql_step()).
 --
 test:do_test(
     "func3-5.39",
@@ -276,7 +276,7 @@ test:do_execsql_test(
 
 -- EVIDENCE-OF: R-43464-09689 The likely(X) function is a no-op that the
 -- code generator optimizes away so that it consumes no CPU cycles at
--- run-time (that is, during calls to sqlite3_step()).
+-- run-time (that is, during calls to sql_step()).
 --
 test:do_test(
     "func3-5.59",

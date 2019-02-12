@@ -68,7 +68,7 @@ struct sql_response {
  *        the named parameter, value - scalar value of the
  *        parameter. Named and positioned parameters can be mixed.
  *        For more details
- *        @sa https://www.sqlite.org/lang_expr.html#varparam.
+ *        @sa https://www.sql.org/lang_expr.html#varparam.
  * @param[out] out_bind Pointer to save decoded parameters.
  *
  * @retval  >= 0 Number of decoded parameters.

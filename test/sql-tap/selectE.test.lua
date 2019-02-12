@@ -21,11 +21,11 @@ test:plan(7)
 -- drh added on 2013-05-06 15:21:16:
 --
 -- In the code shown below (which is intended to be run from the
--- sqlite3.exe command-line tool) the three SELECT statements should all
+-- sql.exe command-line tool) the three SELECT statements should all
 -- generate the same answer. But the third one does not. It is as if the
 -- COLLATE clause on the ORDER BY somehow got pulled into the EXCEPT
 -- operator. Note that the ".print" commands are instructions to the
--- sqlite3.exe shell program to output delimiter lines so that you can more
+-- sql.exe shell program to output delimiter lines so that you can more
 -- easily tell where the output of one query ends and the next query
 -- begins. 
 -- 
@@ -41,7 +41,7 @@ test:plan(7)
 --     .print -----
 --     SELECT a FROM t1 EXCEPT SELECT a FROM t2 ORDER BY a COLLATE nocase;
 -- 
--- Bisecting shows that this problem was introduced in SQLite version 3.6.0
+-- Bisecting shows that this problem was introduced in sql version 3.6.0
 -- by check-in [8bbfa97837a74ef] on 2008-06-15. 
 --
 -- ["set","testdir",[["file","dirname",["argv0"]]]]

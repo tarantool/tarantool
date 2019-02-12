@@ -35,12 +35,12 @@ test:do_execsql_test(
         ANALYZE;
     ]])
 
--- Note: tests 7 to 12 might be unstable - as they assume SQLite will
+-- Note: tests 7 to 12 might be unstable - as they assume sql will
 -- prefer the expression to the right of the AND clause. Which of
 -- course could change.
 --
 -- Note 2: tests 9 and 10 depend on the tcl interface creating functions
--- without the SQLITE_DETERMINISTIC flag set.
+-- without the sql_DETERMINISTIC flag set.
 --
 
 where_clauses_x = {"x = 4 AND y = 19", "x = '4' AND y = '19'", 

@@ -59,7 +59,7 @@ test:do_test(
 test:do_test(
     "tkt2927-2.2",
     function()
-        --set sqlite_addop_trace 1
+        --set sql_addop_trace 1
         return test:execsql [[
             SELECT a, b FROM t1
             UNION ALL

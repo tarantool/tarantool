@@ -16,8 +16,8 @@ json = require("json")
 --
 -------------------------------------------------------------------------
 --
--- This file implements tests for SQLite library.  The focus of the tests
--- in this file is the use of the sqlite_stat4 histogram data on tables
+-- This file implements tests for sql library.  The focus of the tests
+-- in this file is the use of the sql_stat4 histogram data on tables
 -- with many repeated values and only a few distinct values.
 --
 

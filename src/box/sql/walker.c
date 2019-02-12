@@ -33,7 +33,7 @@
  * This file contains routines used for walking the parser tree for
  * an SQL statement.
  */
-#include "sqliteInt.h"
+#include "sqlInt.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -56,7 +56,7 @@
  * The return value from this routine is WRC_Abort to abandon the tree walk
  * and WRC_Continue to continue.
  */
-static SQLITE_NOINLINE int
+static SQL_NOINLINE int
 walkExpr(Walker * pWalker, Expr * pExpr)
 {
 	int rc;
@@ -71,33 +71,33 @@ walkExpr(Walker * pWalker, Expr * pExpr)
 	if (pExpr->pRight && walkExpr(pWalker, pExpr->pRight))
 		return WRC_Abort;
 	if (ExprHasProperty(pExpr, EP_xIsSelect)) {
-		if (sqlite3WalkSelect(pWalker, pExpr->x.pSelect))
+		if (sqlWalkSelect(pWalker, pExpr->x.pSelect))
 			return WRC_Abort;
 	} else if (pExpr->x.pList) {
-		if (sqlite3WalkExprList(pWalker, pExpr->x.pList))
+		if (sqlWalkExprList(pWalker, pExpr->x.pList))
 			return WRC_Abort;
 	}
 	return WRC_Continue;
 }
 
 int
-sqlite3WalkExpr(Walker * pWalker, Expr * pExpr)
+sqlWalkExpr(Walker * pWalker, Expr * pExpr)
 {
 	return pExpr ? walkExpr(pWalker, pExpr) : WRC_Continue;
 }
 
 /*
- * Call sqlite3WalkExpr() for every expression in list p or until
+ * Call sqlWalkExpr() for every expression in list p or until
  * an abort request is seen.
  */
 int
-sqlite3WalkExprList(Walker * pWalker, ExprList * p)
+sqlWalkExprList(Walker * pWalker, ExprList * p)
 {
 	int i;
 	struct ExprList_item *pItem;
 	if (p) {
 		for (i = p->nExpr, pItem = p->a; i > 0; i--, pItem++) {
-			if (sqlite3WalkExpr(pWalker, pItem->pExpr))
+			if (sqlWalkExpr(pWalker, pItem->pExpr))
 				return WRC_Abort;
 		}
 	}
@@ -111,21 +111,21 @@ sqlite3WalkExprList(Walker * pWalker, ExprList * p)
  * Return WRC_Abort or WRC_Continue.
  */
 int
-sqlite3WalkSelectExpr(Walker * pWalker, Select * p)
+sqlWalkSelectExpr(Walker * pWalker, Select * p)
 {
-	if (sqlite3WalkExprList(pWalker, p->pEList))
+	if (sqlWalkExprList(pWalker, p->pEList))
 		return WRC_Abort;
-	if (sqlite3WalkExpr(pWalker, p->pWhere))
+	if (sqlWalkExpr(pWalker, p->pWhere))
 		return WRC_Abort;
-	if (sqlite3WalkExprList(pWalker, p->pGroupBy))
+	if (sqlWalkExprList(pWalker, p->pGroupBy))
 		return WRC_Abort;
-	if (sqlite3WalkExpr(pWalker, p->pHaving))
+	if (sqlWalkExpr(pWalker, p->pHaving))
 		return WRC_Abort;
-	if (sqlite3WalkExprList(pWalker, p->pOrderBy))
+	if (sqlWalkExprList(pWalker, p->pOrderBy))
 		return WRC_Abort;
-	if (sqlite3WalkExpr(pWalker, p->pLimit))
+	if (sqlWalkExpr(pWalker, p->pLimit))
 		return WRC_Abort;
-	if (sqlite3WalkExpr(pWalker, p->pOffset))
+	if (sqlWalkExpr(pWalker, p->pOffset))
 		return WRC_Abort;
 	return WRC_Continue;
 }
@@ -138,7 +138,7 @@ sqlite3WalkSelectExpr(Walker * pWalker, Select * p)
  * WRC_Abort or WRC_Continue;
  */
 int
-sqlite3WalkSelectFrom(Walker * pWalker, Select * p)
+sqlWalkSelectFrom(Walker * pWalker, Select * p)
 {
 	SrcList *pSrc;
 	int i;
@@ -147,11 +147,11 @@ sqlite3WalkSelectFrom(Walker * pWalker, Select * p)
 	pSrc = p->pSrc;
 	if (ALWAYS(pSrc)) {
 		for (i = pSrc->nSrc, pItem = pSrc->a; i > 0; i--, pItem++) {
-			if (sqlite3WalkSelect(pWalker, pItem->pSelect)) {
+			if (sqlWalkSelect(pWalker, pItem->pSelect)) {
 				return WRC_Abort;
 			}
 			if (pItem->fg.isTabFunc
-			    && sqlite3WalkExprList(pWalker, pItem->u1.pFuncArg)
+			    && sqlWalkExprList(pWalker, pItem->u1.pFuncArg)
 			    ) {
 				return WRC_Abort;
 			}
@@ -161,8 +161,8 @@ sqlite3WalkSelectFrom(Walker * pWalker, Select * p)
 }
 
 /*
- * Call sqlite3WalkExpr() for every expression in Select statement p.
- * Invoke sqlite3WalkSelect() for subqueries in the FROM clause and
+ * Call sqlWalkExpr() for every expression in Select statement p.
+ * Invoke sqlWalkSelect() for subqueries in the FROM clause and
  * on the compound select chain, p->pPrior.
  *
  * If it is not NULL, the xSelectCallback() callback is invoked before
@@ -177,7 +177,7 @@ sqlite3WalkSelectFrom(Walker * pWalker, Select * p)
  * is a no-op returning WRC_Continue.
  */
 int
-sqlite3WalkSelect(Walker * pWalker, Select * p)
+sqlWalkSelect(Walker * pWalker, Select * p)
 {
 	int rc;
 	if (p == 0
@@ -193,8 +193,8 @@ sqlite3WalkSelect(Walker * pWalker, Select * p)
 			if (rc)
 				break;
 		}
-		if (sqlite3WalkSelectExpr(pWalker, p)
-		    || sqlite3WalkSelectFrom(pWalker, p)
+		if (sqlWalkSelectExpr(pWalker, p)
+		    || sqlWalkSelectFrom(pWalker, p)
 		    ) {
 			pWalker->walkerDepth--;
 			return WRC_Abort;
