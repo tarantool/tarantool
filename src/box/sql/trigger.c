@@ -248,142 +248,101 @@ cleanup:
 	sqlDeleteTriggerStep(db, step_list);
 }
 
-/*
- * Turn a SELECT statement (that the pSelect parameter points to) into
- * a trigger step.  Return a pointer to a TriggerStep structure.
- *
- * The parser calls this routine when it finds a SELECT statement in
- * body of a TRIGGER.
- */
-TriggerStep *
-sqlTriggerSelectStep(sql * db, Select * pSelect)
+struct TriggerStep *
+sql_trigger_select_step(struct sql *db, struct Select *select)
 {
-	TriggerStep *pTriggerStep =
-	    sqlDbMallocZero(db, sizeof(TriggerStep));
-	if (pTriggerStep == 0) {
-		sql_select_delete(db, pSelect);
-		return 0;
+	struct TriggerStep *trigger_step =
+		sqlDbMallocZero(db, sizeof(struct TriggerStep));
+	if (trigger_step == NULL) {
+		sql_select_delete(db, select);
+		diag_set(OutOfMemory, sizeof(struct TriggerStep),
+			 "sqlDbMallocZero", "trigger_step");
+		return NULL;
 	}
-	pTriggerStep->op = TK_SELECT;
-	pTriggerStep->pSelect = pSelect;
-	pTriggerStep->orconf = ON_CONFLICT_ACTION_DEFAULT;
-	return pTriggerStep;
+	trigger_step->op = TK_SELECT;
+	trigger_step->pSelect = select;
+	trigger_step->orconf = ON_CONFLICT_ACTION_DEFAULT;
+	return trigger_step;
 }
 
 /*
  * Allocate space to hold a new trigger step.  The allocated space
- * holds both the TriggerStep object and the TriggerStep.target.z string.
+ * holds both the TriggerStep object and the TriggerStep.target.z
+ * string.
  *
- * If an OOM error occurs, NULL is returned and db->mallocFailed is set.
+ * @param db The database connection.
+ * @param op Trigger opcode.
+ * @param target_name The target name token.
+ * @retval Not NULL TriggerStep object on success.
+ * @retval NULL Otherwise. The diag message is set.
  */
-static TriggerStep *
-triggerStepAllocate(sql * db,	/* Database connection */
-		    u8 op,	/* Trigger opcode */
-		    Token * pName	/* The target name */
-    )
+static struct TriggerStep *
+sql_trigger_step_new(struct sql *db, u8 op, struct Token *target_name)
 {
-	TriggerStep *pTriggerStep;
-
-	pTriggerStep =
-	    sqlDbMallocZero(db, sizeof(TriggerStep) + pName->n + 1);
-	if (pTriggerStep) {
-		char *z = (char *)&pTriggerStep[1];
-		memcpy(z, pName->z, pName->n);
-		sqlNormalizeName(z);
-		pTriggerStep->zTarget = z;
-		pTriggerStep->op = op;
+	int size = sizeof(struct TriggerStep) + target_name->n + 1;
+	struct TriggerStep *trigger_step = sqlDbMallocZero(db, size);
+	if (trigger_step == NULL) {
+		diag_set(OutOfMemory, size, "sqlDbMallocZero", "trigger_step");
+		return NULL;
 	}
-	return pTriggerStep;
+	char *z = (char *)&trigger_step[1];
+	memcpy(z, target_name->z, target_name->n);
+	sqlNormalizeName(z);
+	trigger_step->zTarget = z;
+	trigger_step->op = op;
+	return trigger_step;
 }
 
-/*
- * Build a trigger step out of an INSERT statement.  Return a pointer
- * to the new trigger step.
- *
- * The parser calls this routine when it sees an INSERT inside the
- * body of a trigger.
- */
-TriggerStep *
-sqlTriggerInsertStep(sql * db,	/* The database connection */
-			 Token * pTableName,	/* Name of the table into which we insert */
-			 IdList * pColumn,	/* List of columns in pTableName to insert into */
-			 Select * pSelect,	/* A SELECT statement that supplies values */
-			 u8 orconf	/* The conflict algorithm
-					 * (ON_CONFLICT_ACTION_ABORT, _REPLACE,
-					 * etc.)
-					 */
-    )
+struct TriggerStep *
+sql_trigger_insert_step(struct sql *db, struct Token *table_name,
+			struct IdList *column_list, struct Select *select,
+			enum on_conflict_action orconf)
 {
-	TriggerStep *pTriggerStep;
-
-	assert(pSelect != 0 || db->mallocFailed);
-
-	pTriggerStep = triggerStepAllocate(db, TK_INSERT, pTableName);
-	if (pTriggerStep) {
-		pTriggerStep->pSelect =
-		    sqlSelectDup(db, pSelect, EXPRDUP_REDUCE);
-		pTriggerStep->pIdList = pColumn;
-		pTriggerStep->orconf = orconf;
+	assert(select != NULL || db->mallocFailed);
+	struct TriggerStep *trigger_step =
+		sql_trigger_step_new(db, TK_INSERT, table_name);
+	if (trigger_step != NULL) {
+		trigger_step->pSelect =
+			sqlSelectDup(db, select, EXPRDUP_REDUCE);
+		trigger_step->pIdList = column_list;
+		trigger_step->orconf = orconf;
 	} else {
-		sqlIdListDelete(db, pColumn);
+		sqlIdListDelete(db, column_list);
 	}
-	sql_select_delete(db, pSelect);
-
-	return pTriggerStep;
+	sql_select_delete(db, select);
+	return trigger_step;
 }
 
-/*
- * Construct a trigger step that implements an UPDATE statement and return
- * a pointer to that trigger step.  The parser calls this routine when it
- * sees an UPDATE statement inside the body of a CREATE TRIGGER.
- */
-TriggerStep *
-sqlTriggerUpdateStep(sql * db,	/* The database connection */
-			 Token * pTableName,	/* Name of the table to be updated */
-			 ExprList * pEList,	/* The SET clause: list of column and new values */
-			 Expr * pWhere,	/* The WHERE clause */
-			 u8 orconf	/* The conflict algorithm.
-					 * (ON_CONFLICT_ACTION_ABORT, _IGNORE,
-					 * etc)
-					 */
-    )
+struct TriggerStep *
+sql_trigger_update_step(struct sql *db, struct Token *table_name,
+		        struct ExprList *new_list, struct Expr *where,
+			enum on_conflict_action orconf)
 {
-	TriggerStep *pTriggerStep;
-
-	pTriggerStep = triggerStepAllocate(db, TK_UPDATE, pTableName);
-	if (pTriggerStep) {
-		pTriggerStep->pExprList =
-		    sql_expr_list_dup(db, pEList, EXPRDUP_REDUCE);
-		pTriggerStep->pWhere =
-		    sqlExprDup(db, pWhere, EXPRDUP_REDUCE);
-		pTriggerStep->orconf = orconf;
+	struct TriggerStep *trigger_step =
+		sql_trigger_step_new(db, TK_UPDATE, table_name);
+	if (trigger_step != NULL) {
+		trigger_step->pExprList =
+		    sql_expr_list_dup(db, new_list, EXPRDUP_REDUCE);
+		trigger_step->pWhere = sqlExprDup(db, where, EXPRDUP_REDUCE);
+		trigger_step->orconf = orconf;
 	}
-	sql_expr_list_delete(db, pEList);
-	sql_expr_delete(db, pWhere, false);
-	return pTriggerStep;
+	sql_expr_list_delete(db, new_list);
+	sql_expr_delete(db, where, false);
+	return trigger_step;
 }
 
-/*
- * Construct a trigger step that implements a DELETE statement and return
- * a pointer to that trigger step.  The parser calls this routine when it
- * sees a DELETE statement inside the body of a CREATE TRIGGER.
- */
-TriggerStep *
-sqlTriggerDeleteStep(sql * db,	/* Database connection */
-			 Token * pTableName,	/* The table from which rows are deleted */
-			 Expr * pWhere	/* The WHERE clause */
-    )
+struct TriggerStep *
+sql_trigger_delete_step(struct sql *db, struct Token *table_name,
+			struct Expr *where)
 {
-	TriggerStep *pTriggerStep;
-
-	pTriggerStep = triggerStepAllocate(db, TK_DELETE, pTableName);
-	if (pTriggerStep) {
-		pTriggerStep->pWhere =
-		    sqlExprDup(db, pWhere, EXPRDUP_REDUCE);
-		pTriggerStep->orconf = ON_CONFLICT_ACTION_DEFAULT;
+	struct TriggerStep *trigger_step =
+		sql_trigger_step_new(db, TK_DELETE, table_name);
+	if (trigger_step != NULL) {
+		trigger_step->pWhere = sqlExprDup(db, where, EXPRDUP_REDUCE);
+		trigger_step->orconf = ON_CONFLICT_ACTION_DEFAULT;
 	}
-	sql_expr_delete(db, pWhere, false);
-	return pTriggerStep;
+	sql_expr_delete(db, where, false);
+	return trigger_step;
 }
 
 void
