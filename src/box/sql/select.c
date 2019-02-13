@@ -974,23 +974,33 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 			 * saving space and CPU cycles.
 			 */
 			ecelFlags |= (SQL_ECEL_OMITREF | SQL_ECEL_REF);
-			/* This optimization is temporary disabled. It seems
-			 * that it was possible to create table with n columns and
-			 * insert tuple with m columns, where m < n. Contrary, Tarantool
-			 * doesn't allow to alter the number of fields in tuple
-			 * to be inserted. This may be uncommented by delaying the
-			 * creation of table until insertion of first tuple,
-			 * so that the number of fields in tuple can be precisely calculated.
+			/*
+			 * Format for ephemeral space has been
+			 * already set with field count calculated
+			 * as orderBy->nExpr + pEList->nExpr + 1,
+			 * where pEList is a select list.
+			 * Since we want to reduce number of fields
+			 * in format of ephemeral space, we should
+			 * fix corresponding opcode's argument.
+			 * Otherwise, tuple format won't match
+			 * space format.
 			 */
-			/*for (i = pSort->nOBSat; i < pSort->pOrderBy->nExpr; i++) {
-				int j;
-				if ((j =
-				     pSort->pOrderBy->a[i].u.x.iOrderByCol) >
-				    0) {
+			uint32_t excess_field_count = 0;
+			for (i = pSort->nOBSat; i < pSort->pOrderBy->nExpr;
+			     i++) {
+				int j = pSort->pOrderBy->a[i].u.x.iOrderByCol;
+				if (j > 0) {
+					excess_field_count++;
 					pEList->a[j - 1].u.x.iOrderByCol =
-					    (u16) (i + 1 - pSort->nOBSat);
+						(u16) (i + 1 - pSort->nOBSat);
 				}
-			}*/
+			}
+			struct VdbeOp *open_eph_op =
+				sqlVdbeGetOp(v, pSort->addrSortIndex);
+			assert(open_eph_op->p2 - excess_field_count > 0);
+			sqlVdbeChangeP2(v, pSort->addrSortIndex,
+					open_eph_op->p2 -
+					excess_field_count);
 			regOrig = 0;
 			assert(eDest == SRT_Set || eDest == SRT_Mem
 			       || eDest == SRT_Coroutine

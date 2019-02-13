@@ -1759,7 +1759,7 @@ sqlRegisterBuiltinFunctions(void)
 		FUNCTION(hex, 1, 0, 0, hexFunc, FIELD_TYPE_STRING),
 		FUNCTION2(ifnull, 2, 0, 0, noopFunc, SQL_FUNC_COALESCE,
 			  FIELD_TYPE_INTEGER),
-		VFUNCTION(random, 0, 0, 0, randomFunc, FIELD_TYPE_NUMBER),
+		VFUNCTION(random, 0, 0, 0, randomFunc, FIELD_TYPE_INTEGER),
 		VFUNCTION(randomblob, 1, 0, 0, randomBlob, FIELD_TYPE_SCALAR),
 		FUNCTION(nullif, 2, 0, 1, nullifFunc, FIELD_TYPE_SCALAR),
 		FUNCTION(version, 0, 0, 0, sql_func_version, FIELD_TYPE_STRING),
