@@ -304,7 +304,7 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
 			     mp_decode_float(field) :
 			     mp_decode_double(field);
 		if (!isfinite(val) || modf(val, &iptr) != 0 ||
-		    val < -exp(63) || val >= exp(64)) {
+		    val < -exp2(63) || val >= exp2(64)) {
 			size = *field - f;
 			break;
 		}
