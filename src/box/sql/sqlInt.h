@@ -3661,7 +3661,26 @@ int sqlExprCodeExprList(Parse *, ExprList *, int, int, u8);
 void sqlExprIfTrue(Parse *, Expr *, int, int);
 void sqlExprIfFalse(Parse *, Expr *, int, int);
 
-char *sqlNameFromToken(sql *, Token *);
+/**
+ * Given a token, return a string that consists of the text of
+ * that token. Space to hold the returned string is obtained
+ * from sqlMalloc() and must be freed by the calling function.
+ *
+ * Any quotation marks (ex:  "name", 'name', [name], or `name`)
+ * that surround the body of the token are removed.
+ *
+ * Tokens are often just pointers into the original SQL text and
+ * so are not \000 terminated and are not persistent. The returned
+ * string is \000 terminated and is persistent.
+ *
+ * @param db The database connection.
+ * @param name_token The source token with text.
+ * @retval Not NULL Formatted name on new memory.
+ * @retval NULL Error. Diag message is set.
+ */
+char *
+sql_name_from_token(struct sql *db, struct Token *name_token);
+
 int sqlExprCompare(Expr *, Expr *, int);
 int sqlExprListCompare(ExprList *, ExprList *, int);
 int sqlExprImpliesExpr(Expr *, Expr *, int);

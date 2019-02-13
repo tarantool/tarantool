@@ -43,9 +43,9 @@ sql_alter_table_rename(struct Parse *parse, struct SrcList *src_tab,
 {
 	assert(src_tab->nSrc == 1);
 	struct sql *db = parse->db;
-	char *new_name = sqlNameFromToken(db, new_name_tk);
+	char *new_name = sql_name_from_token(db, new_name_tk);
 	if (new_name == NULL)
-		goto exit_rename_table;
+		goto tnt_error;
 	/* Check that new name isn't occupied by another table. */
 	if (space_by_name(new_name) != NULL) {
 		diag_set(ClientError, ER_SPACE_EXISTS, new_name);
