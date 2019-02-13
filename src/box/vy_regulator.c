@@ -393,8 +393,22 @@ vy_regulator_update_rate_limit(struct vy_regulator *regulator,
 
 	double rate = 0.75 * compaction_threads * recent->dump_input /
 						  recent->compaction_time;
+	/*
+	 * We can't simply use (size_t)MIN(rate, SIZE_MAX) to cast
+	 * the rate from double to size_t here, because on a 64-bit
+	 * system SIZE_MAX equals 2^64-1, which can't be represented
+	 * as double without loss of precision and hence is rounded
+	 * up to 2^64, which in turn can't be converted back to size_t.
+	 * So we first convert the rate to uint64_t using exp2(64) to
+	 * check if it fits and only then cast the uint64_t to size_t.
+	 */
+	uint64_t rate64;
+	if (rate < exp2(64))
+		rate64 = rate;
+	else
+		rate64 = UINT64_MAX;
 	vy_quota_set_rate_limit(regulator->quota, VY_QUOTA_RESOURCE_DISK,
-				MIN(rate, SIZE_MAX));
+				(size_t)MIN(rate64, SIZE_MAX));
 
 	/*
 	 * Periodically rotate statistics for quicker adaptation
