@@ -82,9 +82,9 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 		goto trigger_cleanup;
 	assert(table->nSrc == 1);
 
-	trigger_name = sqlNameFromToken(db, name);
+	trigger_name = sql_name_from_token(db, name);
 	if (trigger_name == NULL)
-		goto trigger_cleanup;
+		goto set_tarantool_error_and_cleanup;
 
 	if (sqlCheckIdentifierName(parse, trigger_name) != 0)
 		goto trigger_cleanup;

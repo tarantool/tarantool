@@ -1110,32 +1110,33 @@ vdbe_emit_analyze_table(struct Parse *parse, struct space *space)
 void
 sqlAnalyze(Parse * pParse, Token * pName)
 {
-	sql *db = pParse->db;
+	struct sql *db = pParse->db;
 	if (pName == NULL) {
 		/* Form 1:  Analyze everything */
 		sql_analyze_database(pParse);
 	} else {
 		/* Form 2:  Analyze table named */
-		char *z = sqlNameFromToken(db, pName);
-		if (z != NULL) {
-			struct space *sp = space_by_name(z);
-			if (sp != NULL) {
-				if (sp->def->opts.is_view) {
-					diag_set(ClientError,
-						 ER_SQL_ANALYZE_ARGUMENT,
-						 sp->def->name);
-					pParse->is_aborted = true;
-				} else {
-					vdbe_emit_analyze_table(pParse, sp);
-				}
-			} else {
-				diag_set(ClientError, ER_NO_SUCH_SPACE, z);
-				pParse->is_aborted = true;
-			}
-			sqlDbFree(db, z);
+		char *z = sql_name_from_token(db, pName);
+		if (z == NULL) {
+			pParse->is_aborted = true;
+			return;
 		}
+		struct space *sp = space_by_name(z);
+		if (sp != NULL) {
+			if (sp->def->opts.is_view) {
+				diag_set(ClientError, ER_SQL_ANALYZE_ARGUMENT,
+					 sp->def->name);
+				pParse->is_aborted = true;
+			} else {
+				vdbe_emit_analyze_table(pParse, sp);
+			}
+		} else {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, z);
+			pParse->is_aborted = true;
+		}
+		sqlDbFree(db, z);
 	}
-	Vdbe *v = sqlGetVdbe(pParse);
+	struct Vdbe *v = sqlGetVdbe(pParse);
 	if (v != NULL)
 		sqlVdbeAddOp0(v, OP_Expire);
 }

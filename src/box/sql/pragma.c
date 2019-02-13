@@ -423,19 +423,31 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	sqlVdbeRunOnlyOnce(v);
 	pParse->nMem = 2;
 
-	zLeft = sqlNameFromToken(db, pId);
-	if (!zLeft) {
+	if (pId == NULL) {
 		vdbe_emit_pragma_status(pParse);
 		return;
 	}
-
+	zLeft = sql_name_from_token(db, pId);
+	if (zLeft == NULL) {
+		pParse->is_aborted = true;
+		goto pragma_out;
+	}
 	if (minusFlag) {
 		zRight = sqlMPrintf(db, "-%T", pValue);
-	} else {
-		zRight = sqlNameFromToken(db, pValue);
+	} else if (pValue != NULL) {
+		zRight = sql_name_from_token(db, pValue);
+		if (zRight == NULL) {
+			pParse->is_aborted = true;
+			goto pragma_out;
+		}
 	}
-	zTable = sqlNameFromToken(db, pValue2);
-
+	if (pValue2 != NULL) {
+		zTable = sql_name_from_token(db, pValue2);
+		if (zTable == NULL) {
+			pParse->is_aborted = true;
+			goto pragma_out;
+		}
+	}
 	/* Locate the pragma in the lookup table */
 	pPragma = pragmaLocate(zLeft);
 	if (pPragma == 0) {
