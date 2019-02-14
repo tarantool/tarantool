@@ -1436,6 +1436,16 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 
 	itr->search_started = false;
 	itr->search_ended = false;
+
+	/*
+	 * Make sure the format we use to create tuples won't
+	 * go away if DDL is called while the iterator is used.
+	 *
+	 * XXX: Please remove this kludge when proper DDL locking
+	 * is implemented on transaction management level or multi
+	 * version data dictionary is in place.
+	 */
+	tuple_format_ref(format);
 }
 
 /**
@@ -1602,6 +1612,7 @@ void
 vy_run_iterator_close(struct vy_run_iterator *itr)
 {
 	vy_run_iterator_stop(itr);
+	tuple_format_unref(itr->format);
 	TRASH(itr);
 }
 
