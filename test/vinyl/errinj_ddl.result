@@ -596,3 +596,47 @@ s:select()
 s:drop()
 ---
 ...
+--
+-- gh-4000: index iterator crashes if used throughout DDL.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('pk')
+---
+...
+_ = s:create_index('sk', {parts = {2, 'unsigned'}})
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+box.snapshot()
+---
+- ok
+...
+errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0.01)
+---
+- ok
+...
+c = fiber.channel(1)
+---
+...
+_ = fiber.create(function() c:put(s.index.sk:select()) end)
+---
+...
+s.index.sk:alter{parts = {2, 'number'}}
+---
+...
+errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0)
+---
+- ok
+...
+c:get()
+---
+- - [1, 1]
+...
+s:drop()
+---
+...
