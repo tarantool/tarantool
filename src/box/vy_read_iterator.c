@@ -720,7 +720,7 @@ vy_read_iterator_restore(struct vy_read_iterator *itr)
 
 	itr->mem_list_version = itr->lsm->mem_list_version;
 	itr->range_tree_version = itr->lsm->range_tree_version;
-	itr->curr_range = vy_range_tree_find_by_key(itr->lsm->tree,
+	itr->curr_range = vy_range_tree_find_by_key(&itr->lsm->range_tree,
 			itr->iterator_type, itr->last_stmt ?: itr->key);
 	itr->range_version = itr->curr_range->version;
 
@@ -751,8 +751,9 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 
 	assert(range != NULL);
 	while (true) {
-		range = dir > 0 ? vy_range_tree_next(itr->lsm->tree, range) :
-				  vy_range_tree_prev(itr->lsm->tree, range);
+		range = dir > 0 ?
+			vy_range_tree_next(&itr->lsm->range_tree, range) :
+			vy_range_tree_prev(&itr->lsm->range_tree, range);
 		assert(range != NULL);
 
 		if (itr->last_stmt == NULL)

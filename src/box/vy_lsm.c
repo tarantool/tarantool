@@ -142,13 +142,6 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	}
 	lsm->env = lsm_env;
 
-	lsm->tree = malloc(sizeof(*lsm->tree));
-	if (lsm->tree == NULL) {
-		diag_set(OutOfMemory, sizeof(*lsm->tree),
-			 "malloc", "vy_range_tree_t");
-		goto fail_tree;
-	}
-
 	struct key_def *key_def = key_def_dup(index_def->key_def);
 	if (key_def == NULL)
 		goto fail_key_def;
@@ -193,7 +186,7 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 	lsm->commit_lsn = -1;
 	vy_cache_create(&lsm->cache, cache_env, cmp_def, index_def->iid == 0);
 	rlist_create(&lsm->sealed);
-	vy_range_tree_new(lsm->tree);
+	vy_range_tree_new(&lsm->range_tree);
 	vy_range_heap_create(&lsm->range_heap);
 	rlist_create(&lsm->runs);
 	lsm->pk = pk;
@@ -224,8 +217,6 @@ fail_format:
 fail_cmp_def:
 	key_def_delete(key_def);
 fail_key_def:
-	free(lsm->tree);
-fail_tree:
 	free(lsm);
 fail:
 	return NULL;
@@ -270,7 +261,7 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	rlist_foreach_entry_safe(run, &lsm->runs, in_lsm, next_run)
 		vy_lsm_remove_run(lsm, run);
 
-	vy_range_tree_iter(lsm->tree, NULL, vy_range_tree_free_cb, NULL);
+	vy_range_tree_iter(&lsm->range_tree, NULL, vy_range_tree_free_cb, NULL);
 	vy_range_heap_destroy(&lsm->range_heap);
 	tuple_format_unref(lsm->disk_format);
 	key_def_delete(lsm->cmp_def);
@@ -279,7 +270,6 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	vy_lsm_stat_destroy(&lsm->stat);
 	vy_cache_destroy(&lsm->cache);
 	tuple_format_unref(lsm->mem_format);
-	free(lsm->tree);
 	TRASH(lsm);
 	free(lsm);
 }
@@ -628,8 +618,8 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 	 * does not have holes or overlaps.
 	 */
 	struct vy_range *range, *prev = NULL;
-	for (range = vy_range_tree_first(lsm->tree); range != NULL;
-	     prev = range, range = vy_range_tree_next(lsm->tree, range)) {
+	for (range = vy_range_tree_first(&lsm->range_tree); range != NULL;
+	     prev = range, range = vy_range_tree_next(&lsm->range_tree, range)) {
 		if (prev == NULL && range->begin != NULL) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Range %lld is leftmost but "
@@ -775,7 +765,7 @@ vy_lsm_add_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	assert(range->heap_node.pos == UINT32_MAX);
 	vy_range_heap_insert(&lsm->range_heap, &range->heap_node);
-	vy_range_tree_insert(lsm->tree, range);
+	vy_range_tree_insert(&lsm->range_tree, range);
 	lsm->range_count++;
 }
 
@@ -784,7 +774,7 @@ vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	assert(range->heap_node.pos != UINT32_MAX);
 	vy_range_heap_delete(&lsm->range_heap, &range->heap_node);
-	vy_range_tree_remove(lsm->tree, range);
+	vy_range_tree_remove(&lsm->range_tree, range);
 	lsm->range_count--;
 }
 
@@ -1182,8 +1172,8 @@ bool
 vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	struct vy_range *first, *last;
-	if (!vy_range_needs_coalesce(range, lsm->tree, vy_lsm_range_size(lsm),
-				     &first, &last))
+	if (!vy_range_needs_coalesce(range, &lsm->range_tree,
+				     vy_lsm_range_size(lsm), &first, &last))
 		return false;
 
 	struct vy_range *result = vy_range_new(vy_log_next_id(),
@@ -1192,7 +1182,7 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 		goto fail_range;
 
 	struct vy_range *it;
-	struct vy_range *end = vy_range_tree_next(lsm->tree, last);
+	struct vy_range *end = vy_range_tree_next(&lsm->range_tree, last);
 
 	/*
 	 * Log change in metadata.
@@ -1201,7 +1191,8 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 	vy_log_insert_range(lsm->id, result->id,
 			    tuple_data_or_null(result->begin),
 			    tuple_data_or_null(result->end));
-	for (it = first; it != end; it = vy_range_tree_next(lsm->tree, it)) {
+	for (it = first; it != end;
+	     it = vy_range_tree_next(&lsm->range_tree, it)) {
 		struct vy_slice *slice;
 		rlist_foreach_entry(slice, &it->slices, in_range)
 			vy_log_delete_slice(slice->id);
@@ -1221,7 +1212,7 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 	 */
 	it = first;
 	while (it != end) {
-		struct vy_range *next = vy_range_tree_next(lsm->tree, it);
+		struct vy_range *next = vy_range_tree_next(&lsm->range_tree, it);
 		vy_lsm_unacct_range(lsm, it);
 		vy_lsm_remove_range(lsm, it);
 		rlist_splice(&result->slices, &it->slices);
@@ -1262,7 +1253,7 @@ vy_lsm_force_compaction(struct vy_lsm *lsm)
 	struct vy_range *range;
 	struct vy_range_tree_iterator it;
 
-	vy_range_tree_ifirst(lsm->tree, &it);
+	vy_range_tree_ifirst(&lsm->range_tree, &it);
 	while ((range = vy_range_tree_inext(&it)) != NULL) {
 		vy_lsm_unacct_range(lsm, range);
 		range->needs_compaction = true;

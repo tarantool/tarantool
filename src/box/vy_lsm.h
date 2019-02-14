@@ -248,7 +248,7 @@ struct vy_lsm {
 	 * Tree of all ranges of this LSM tree, linked by
 	 * vy_range->tree_node, ordered by vy_range->begin.
 	 */
-	vy_range_tree_t *tree;
+	vy_range_tree_t range_tree;
 	/** Number of ranges in this LSM tree. */
 	int range_count;
 	/** Sum dumps_per_compaction across all ranges. */
