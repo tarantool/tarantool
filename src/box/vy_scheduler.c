@@ -1158,13 +1158,13 @@ vy_task_dump_complete(struct vy_task *task)
 		tuple_unref(min_key);
 		goto fail;
 	}
-	begin_range = vy_range_tree_psearch(lsm->tree, min_key);
-	end_range = vy_range_tree_psearch(lsm->tree, max_key);
+	begin_range = vy_range_tree_psearch(&lsm->range_tree, min_key);
+	end_range = vy_range_tree_psearch(&lsm->range_tree, max_key);
 	/*
 	 * If min_key == max_key, the slice has to span over at
 	 * least one range.
 	 */
-	end_range = vy_range_tree_next(lsm->tree, end_range);
+	end_range = vy_range_tree_next(&lsm->range_tree, end_range);
 	tuple_unref(min_key);
 	tuple_unref(max_key);
 
@@ -1178,7 +1178,7 @@ vy_task_dump_complete(struct vy_task *task)
 		goto fail;
 	}
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(lsm->tree, range), i++) {
+	     range = vy_range_tree_next(&lsm->range_tree, range), i++) {
 		slice = vy_slice_new(vy_log_next_id(), new_run,
 				     range->begin, range->end, lsm->cmp_def);
 		if (slice == NULL)
@@ -1194,7 +1194,7 @@ vy_task_dump_complete(struct vy_task *task)
 	vy_log_tx_begin();
 	vy_log_create_run(lsm->id, new_run->id, dump_lsn, new_run->dump_count);
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(lsm->tree, range), i++) {
+	     range = vy_range_tree_next(&lsm->range_tree, range), i++) {
 		assert(i < lsm->range_count);
 		slice = new_slices[i];
 		vy_log_insert_slice(range->id, new_run->id, slice->id,
@@ -1219,7 +1219,7 @@ vy_task_dump_complete(struct vy_task *task)
 	 * in memory and on disk.
 	 */
 	for (range = begin_range, i = 0; range != end_range;
-	     range = vy_range_tree_next(lsm->tree, range), i++) {
+	     range = vy_range_tree_next(&lsm->range_tree, range), i++) {
 		assert(i < lsm->range_count);
 		slice = new_slices[i];
 		vy_lsm_unacct_range(lsm, range);
