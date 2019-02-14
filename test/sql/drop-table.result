@@ -27,7 +27,7 @@ box.sql.execute("DROP TABLE zzzoobar")
 -- Table does not exist anymore. Should error here.
 box.sql.execute("INSERT INTO zzzoobar VALUES (111, 222, 'c3', 444)")
 ---
-- error: 'no such table: ZZZOOBAR'
+- error: Space 'ZZZOOBAR' does not exist
 ...
 -- gh-3712: if space features sequence, data from _sequence_data
 -- must be deleted before space is dropped.
@@ -92,7 +92,7 @@ box.sql.execute('CREATE TABLE t1 (id INT PRIMARY KEY, a INT)')
 -- Error: no such table.
 box.sql.execute('DROP TABLE t1')
 ---
-- error: 'no such table: T1'
+- error: Space 'T1' does not exist
 ...
 box.session.su('admin')
 ---

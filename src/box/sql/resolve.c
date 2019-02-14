@@ -425,14 +425,18 @@ lookupName(Parse * pParse,	/* The parsing context */
 	 * cnt==0 means there was not match.  cnt>1 means there were two or
 	 * more matches.  Either way, we have an error.
 	 */
-	if (cnt != 1) {
-		const char *zErr;
-		zErr = cnt == 0 ? "no such column" : "ambiguous column name";
+	if (cnt > 1) {
 		if (zTab) {
-			sqlErrorMsg(pParse, "%s: %s.%s", zErr, zTab, zCol);
+			sqlErrorMsg(pParse, "ambiguous column name: %s.%s",
+				    zTab, zCol);
 		} else {
-			sqlErrorMsg(pParse, "%s: %s", zErr, zCol);
+			sqlErrorMsg(pParse, "ambiguous column name: %s", zCol);
 		}
+		pTopNC->nErr++;
+	}
+	if (cnt == 0) {
+		diag_set(ClientError, ER_NO_SUCH_FIELD_NAME, zCol);
+		sql_parser_error(pParse);
 		pTopNC->nErr++;
 	}
 
@@ -697,9 +701,8 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				   && pParse->explain == 0
 #endif
 			    ) {
-				sqlErrorMsg(pParse,
-						"no such function: %.*s", nId,
-						zId);
+				diag_set(ClientError, ER_NO_SUCH_FUNCTION, zId);
+				sql_parser_error(pParse);
 				pNC->nErr++;
 			} else if (wrong_num_args) {
 				sqlErrorMsg(pParse,

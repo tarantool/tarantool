@@ -88,7 +88,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY z ORDER BY y
     ]], {
         -- <select5-2.1.1>
-        1, "no such column: Z"
+        1, "Field 'Z' doesn't exist"
         -- </select5-2.1.1>
     })
 
@@ -98,7 +98,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY z(y) ORDER BY y
     ]], {
         -- <select5-2.2>
-        1, "no such function: Z"
+        1, "Function 'Z' does not exist"
         -- </select5-2.2>
     })
 
@@ -118,7 +118,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY y HAVING z(y)<3 ORDER BY y
     ]], {
         -- <select5-2.4>
-        1, "no such function: Z"
+        1, "Function 'Z' does not exist"
         -- </select5-2.4>
     })
 
@@ -128,7 +128,7 @@ test:do_catchsql_test(
         SELECT y, count(*) FROM t1 GROUP BY y HAVING count(*)<z ORDER BY y
     ]], {
         -- <select5-2.5>
-        1, "no such column: Z"
+        1, "Field 'Z' doesn't exist"
         -- </select5-2.5>
     })
 

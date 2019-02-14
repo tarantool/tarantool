@@ -75,7 +75,7 @@ data = {
     { 4,  [[ "COLUMNN" ]], {0} },
     { 5,  [[ "columnn" ]], {0} },
     { 6,  [[ "Columnn" ]], {0} },
-    { 7,  [[ "columNN" ]], {1, "/duplicate column name/"} }
+    { 7,  [[ "columNN" ]], {1, "Space field 'columNN' is duplicate"} }
 }
 
 for _, row in ipairs(data) do

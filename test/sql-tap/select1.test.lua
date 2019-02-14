@@ -13,7 +13,7 @@ test:do_catchsql_test(
         SELECT * FROM test1
     ]], {
         -- <select1-1.1>
-        1, "no such table: TEST1"
+        1, "Space 'TEST1' does not exist"
         -- </select1-1.1>
     })
 
@@ -25,7 +25,7 @@ test:do_catchsql_test(
         SELECT * FROM test1, test2
     ]], {
         -- <select1-1.2>
-        1, "no such table: TEST2"
+        1, "Space 'TEST2' does not exist"
         -- </select1-1.2>
     })
 
@@ -35,7 +35,7 @@ test:do_catchsql_test(
         SELECT * FROM test2, test1
     ]], {
         -- <select1-1.3>
-        1, "no such table: TEST2"
+        1, "Space 'TEST2' does not exist"
         -- </select1-1.3>
     })
 
@@ -519,7 +519,7 @@ test:do_catchsql_test(
         SELECT XYZZY(f1) FROM test1
     ]], {
         -- <select1-2.18>
-        1, "no such function: XYZZY"
+        1, "Function 'XYZZY' does not exist"
         -- </select1-2.18>
     })
 
@@ -1391,7 +1391,7 @@ test:do_catchsql2_test(
                 ORDER BY a;
             ]], {
                 -- <select1-6.23>
-                1,"no such column: X"
+                1,"Field 'X' doesn't exist"
                 -- </select1-6.23>
             })
 
@@ -1795,7 +1795,7 @@ test:do_catchsql_test(
         SELECT t5.* FROM t3, t4;
     ]], {
         -- <select1-11.10>
-        1, "no such table: T5"
+        1, "Space 'T5' does not exist"
         -- </select1-11.10>
     })
 
@@ -1805,7 +1805,7 @@ test:do_catchsql_test(
         SELECT t3.* FROM t3 AS x, t4;
     ]], {
         -- <select1-11.11>
-        1, "no such table: T3"
+        1, "Space 'T3' does not exist"
         -- </select1-11.11>
     })
 

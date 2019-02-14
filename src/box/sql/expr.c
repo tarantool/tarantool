@@ -3936,8 +3936,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			}
 #endif
 			if (pDef == 0 || pDef->xFinalize != 0) {
-				sqlErrorMsg(pParse,
-						"unknown function: %s()", zId);
+				diag_set(ClientError, ER_NO_SUCH_FUNCTION,
+					 zId);
+				sql_parser_error(pParse);
 				break;
 			}
 

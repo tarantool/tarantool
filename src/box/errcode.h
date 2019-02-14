@@ -87,7 +87,7 @@ struct errcode_record {
 	/* 32 */_(ER_PROC_LUA,			"%s") \
 	/* 33 */_(ER_NO_SUCH_PROC,		"Procedure '%.*s' is not defined") \
 	/* 34 */_(ER_NO_SUCH_TRIGGER,		"Trigger '%s' doesn't exist") \
-	/* 35 */_(ER_NO_SUCH_INDEX,		"No index #%u is defined in space '%s'") \
+	/* 35 */_(ER_NO_SUCH_INDEX_ID,		"No index #%u is defined in space '%s'") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		"Space '%s' does not exist") \
 	/* 37 */_(ER_NO_SUCH_FIELD,		"Field %d was not found in the tuple") \
 	/* 38 */_(ER_EXACT_FIELD_COUNT,		"Tuple field count %u does not match space field count %u") \
@@ -200,12 +200,12 @@ struct errcode_record {
 	/*145 */_(ER_NO_SUCH_SEQUENCE,		"Sequence '%s' does not exist") \
 	/*146 */_(ER_SEQUENCE_EXISTS,		"Sequence '%s' already exists") \
 	/*147 */_(ER_SEQUENCE_OVERFLOW,		"Sequence '%s' has overflowed") \
-	/*148 */_(ER_UNUSED5,			"") \
+	/*148 */_(ER_NO_SUCH_INDEX_NAME,	"No index '%s' is defined in space '%s'") \
 	/*149 */_(ER_SPACE_FIELD_IS_DUPLICATE,	"Space field '%s' is duplicate") \
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
 	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of the space '%s' can not contain nullable parts") \
-	/*153 */_(ER_UNUSED,			"") \
+	/*153 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' doesn't exist") \
 	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 	/*155 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
 	/*156 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
@@ -227,6 +227,7 @@ struct errcode_record {
 	/*172 */_(ER_ROWID_OVERFLOW,            "Rowid is overflowed: too many entries in ephemeral space") \
 	/*173 */_(ER_DROP_COLLATION,		"Can't drop collation %s : %s") \
 	/*174 */_(ER_ILLEGAL_COLLATION_MIX,	"Illegal mix of collations") \
+	/*175 */_(ER_SQL_NO_SUCH_PRAGMA,	"Pragma '%s' does not exist") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

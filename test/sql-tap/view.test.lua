@@ -69,7 +69,7 @@ if (0 > 0)
             SELECT * FROM v1 ORDER BY a;
         ]], {
             -- <view-1.2>
-            1, "no such table: v1"
+            1, "Space 'V1' does not exist"
             -- </view-1.2>
         })
 
@@ -106,7 +106,7 @@ test:do_catchsql_test(
         SELECT * FROM v1 ORDER BY a;
     ]], {
         -- <view-1.4>
-        1, "no such table: V1"
+        1, "Space 'V1' does not exist"
         -- </view-1.4>
     })
 
@@ -951,7 +951,7 @@ test:do_catchsql_test(
         DROP VIEW nosuchview
     ]], {
         -- <view-17.1>
-        1, "no such view: NOSUCHVIEW"
+        1, "Space 'NOSUCHVIEW' does not exist"
         -- </view-17.1>
     })
 

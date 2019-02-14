@@ -580,7 +580,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 JOIN t2 ON t3.a=t2.b;
     ]], {
         -- <join-3.6>
-        1, "no such column: T3.A"
+        1, "Field 'A' doesn't exist"
         -- </join-3.6>
     })
 

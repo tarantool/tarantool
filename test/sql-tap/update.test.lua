@@ -25,7 +25,7 @@ test:do_catchsql_test("update-1.1", [[
   UPDATE test1 SET f2=5 WHERE f1<1
 ]], {
   -- <update-1.1>
-  1, "no such table: TEST1"
+  1, "Space 'TEST1' does not exist"
   -- </update-1.1>
 })
 
@@ -58,7 +58,7 @@ test:do_catchsql_test("update-3.2", [[
   UPDATE test1 SET f1=f3*2 WHERE f2==32
 ]], {
   -- <update-3.2>
-  1, "no such column: F3"
+  1, "Field 'F3' doesn't exist"
   -- </update-3.2>
 })
 
@@ -66,7 +66,7 @@ test:do_catchsql_test("update-3.3", [[
   UPDATE test1 SET f1=test2.f1*2 WHERE f2==32
 ]], {
   -- <update-3.3>
-  1, "no such column: TEST2.F1"
+  1, "Field 'F1' doesn't exist"
   -- </update-3.3>
 })
 
@@ -74,7 +74,7 @@ test:do_catchsql_test("update-3.4", [[
   UPDATE test1 SET f3=f1*2 WHERE f2==32
 ]], {
   -- <update-3.4>
-  1, "no such column: F3"
+  1, "Field 'F3' doesn't exist"
   -- </update-3.4>
 })
 
@@ -854,7 +854,7 @@ test:do_catchsql_test("update-9.1", [[
   UPDATE test1 SET x=11 WHERE f1=1025
 ]], {
   -- <update-9.1>
-  1, "no such column: X"
+  1, "Field 'X' doesn't exist"
   -- </update-9.1>
 })
 
@@ -862,7 +862,7 @@ test:do_catchsql_test("update-9.2", [[
   UPDATE test1 SET f1=x(11) WHERE f1=1025
 ]], {
   -- <update-9.2>
-  1, "no such function: X"
+  1, "Function 'X' does not exist"
   -- </update-9.2>
 })
 
@@ -870,7 +870,7 @@ test:do_catchsql_test("update-9.3", [[
   UPDATE test1 SET f1=11 WHERE x=1025
 ]], {
   -- <update-9.3>
-  1, "no such column: X"
+  1, "Field 'X' doesn't exist"
   -- </update-9.3>
 })
 
@@ -878,7 +878,7 @@ test:do_catchsql_test("update-9.4", [[
   UPDATE test1 SET f1=11 WHERE x(f1)=1025
 ]], {
   -- <update-9.4>
-  1, "no such function: X"
+  1, "Function 'X' does not exist"
   -- </update-9.4>
 })
 

@@ -343,8 +343,8 @@ sqlStartTable(Parse *pParse, Token *pName, int noErr)
 	struct space *space = space_by_name(zName);
 	if (space != NULL) {
 		if (!noErr) {
-			sqlErrorMsg(pParse, "table %s already exists",
-					zName);
+			diag_set(ClientError, ER_SPACE_EXISTS, zName);
+			sql_parser_error(pParse);
 		} else {
 			assert(!db->init.busy || CORRUPT_DB);
 		}
@@ -461,7 +461,8 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 	sqlNormalizeName(z);
 	for (uint32_t i = 0; i < def->field_count; i++) {
 		if (strcmp(z, def->fields[i].name) == 0) {
-			sqlErrorMsg(pParse, "duplicate column name: %s", z);
+			diag_set(ClientError, ER_SPACE_FIELD_IS_DUPLICATE, z);
+			sql_parser_error(pParse);
 			return;
 		}
 	}
@@ -1602,12 +1603,10 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	const char *space_name = table_name_list->a[0].zName;
 	struct space *space = space_by_name(space_name);
 	if (space == NULL) {
-		if (!is_view && !if_exists)
-			sqlErrorMsg(parse_context, "no such table: %s",
-					space_name);
-		if (is_view && !if_exists)
-			sqlErrorMsg(parse_context, "no such view: %s",
-					space_name);
+		if (!if_exists) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
+			sql_parser_error(parse_context);
+		}
 		goto exit_drop_table;
 	}
 	/*
@@ -2187,9 +2186,8 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			goto exit_create_index;
 		if (sql_space_index_by_name(space, name) != NULL) {
 			if (!if_not_exist) {
-				sqlErrorMsg(parse,
-						"index %s.%s already exists",
-						def->name, name);
+				diag_set(ClientError, ER_INDEX_EXISTS, name);
+				sql_parser_error(parse);
 			}
 			goto exit_create_index;
 		}
@@ -2447,18 +2445,21 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	assert(table_token->n > 0);
 	struct space *space = space_by_name(table_name);
 	if (space == NULL) {
-		if (!if_exists)
-			sqlErrorMsg(parse_context, "no such space: %s",
-					table_name);
+		if (!if_exists) {
+			diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
+			sql_parser_error(parse_context);
+		}
 		goto exit_drop_index;
 	}
 	const char *index_name = index_name_list->a[0].zName;
 	uint32_t index_id = box_index_id_by_name(space->def->id, index_name,
 						 strlen(index_name));
 	if (index_id == BOX_ID_NIL) {
-		if (!if_exists)
-			sqlErrorMsg(parse_context, "no such index: %s.%s",
-					table_name, index_name);
+		if (!if_exists) {
+			diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
+				 index_name, table_name);
+			sql_parser_error(parse_context);
+		}
 		goto exit_drop_index;
 	}
 	struct index *index = space_index(space, index_id);

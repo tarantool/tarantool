@@ -163,7 +163,7 @@ box.sql.execute("select upper('1', 2)")
 ...
 box.sql.execute("select upper(\"1\")")
 ---
-- error: 'no such column: 1'
+- error: Field '1' doesn't exist
 ...
 box.sql.execute("select upper()")
 ---

@@ -537,7 +537,7 @@ test:do_catchsql_test("6.3.2", [[
     INSERT INTO t2 SELECT a, b FROM abc;
 ]], {
     -- <6.3>
-    1, "no such table: ABC"
+    1, "Space 'ABC' does not exist"
     -- </6.3>
 })
 
@@ -600,7 +600,7 @@ test:do_catchsql_test("6.10", [[
     SELECT * FROM x
 ]], {
     -- <6.10>
-    1, "no such column: C"
+    1, "Field 'C' doesn't exist"
     -- </6.10>
 })
 

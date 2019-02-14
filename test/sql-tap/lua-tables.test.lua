@@ -40,7 +40,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "lua-tables-4",
     [[SELECT * from t1]],
-    {1, "no such table: T1"}
+    {1, "Space 'T1' does not exist"}
 )
 
 test:do_catchsql_test(

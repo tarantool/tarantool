@@ -795,7 +795,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT x
     ]], {
         -- <limit-12.3>
-        1, "no such column: X"
+        1, "Field 'X' doesn't exist"
         -- </limit-12.3>
     })
 
@@ -805,7 +805,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 LIMIT 1 OFFSET x
     ]], {
         -- <limit-12.4>
-        1, "no such column: X"
+        1, "Field 'X' doesn't exist"
         -- </limit-12.4>
     })
 

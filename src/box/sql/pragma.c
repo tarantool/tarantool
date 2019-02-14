@@ -468,7 +468,8 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 	/* Locate the pragma in the lookup table */
 	pPragma = pragmaLocate(zLeft);
 	if (pPragma == 0) {
-		sqlErrorMsg(pParse, "no such pragma: %s", zLeft);
+		diag_set(ClientError, ER_SQL_NO_SUCH_PRAGMA, zLeft);
+		sql_parser_error(pParse);
 		goto pragma_out;
 	}
 	/* Register the result column names for pragmas that return results */

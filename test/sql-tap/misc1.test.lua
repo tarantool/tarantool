@@ -423,7 +423,7 @@ test:do_catchsql_test(
         SELECT t1.*;
     ]], {
         -- <misc1-8.2>
-        1, "no such table: T1"
+        1, "Space 'T1' does not exist"
         -- </misc1-8.2>
     })
 
@@ -887,7 +887,7 @@ test:do_catchsql_test(
         CREATE TABLE test(a integer, primary key(a));
     ]], {
         -- <misc1-16.2>
-        1, "table TEST already exists"
+        1, "Space 'TEST' already exists"
         -- </misc1-16.2>
     })
 

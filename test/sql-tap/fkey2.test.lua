@@ -309,7 +309,7 @@ test:do_catchsql_test(
         INSERT INTO t9 VALUES(1, 3);
     ]], {
         -- <fkey2-1.29>
-        1, "no such table: T9"
+        1, "Space 'T9' does not exist"
         -- </fkey2-1.29>
     })
 

@@ -60,7 +60,7 @@ test:do_catchsql_test(
     "indexed-by-1.3",
     "SELECT b FROM t1 INDEXED BY t1ix1 WHERE b <= 5", {
         -- <indexed-by-1.3>
-        1, "no such index: T1IX1"
+        1, "No index 'T1IX1' is defined in space 'T1'"
         -- <indexed-by-1.3>
     })
 
@@ -68,7 +68,7 @@ test:do_catchsql_test(
     "indexed-by-1.4",
     "SELECT b FROM t1 INDEXED BY t1ix2 WHERE b <= 5", {
         -- <indexed-by-1.4>
-        1, "no such index: T1IX2"
+        1, "No index 'T1IX2' is defined in space 'T1'"
         -- <indexed-by-1.4>
     })
 
@@ -103,7 +103,7 @@ test:do_catchsql_test(
     "indexed-by-1.7",
     "DELETE FROM t1 INDEXED BY t1ix1 WHERE b <= 5", {
         -- <indexed-by-1.7>
-        1, "no such index: T1IX1"
+        1, "No index 'T1IX1' is defined in space 'T1'"
         -- <indexed-by-1.7>
     })
 
@@ -111,7 +111,7 @@ test:do_catchsql_test(
     "indexed-by-1.8",
     "DELETE FROM t1 INDEXED BY t1ix2 WHERE b <= 5", {
         -- <indexed-by-1.8>
-        1, "no such index: T1IX2"
+        1, "No index 'T1IX2' is defined in space 'T1'"
         -- <indexed-by-1.8>
     })
 
@@ -145,7 +145,7 @@ test:do_catchsql_test(
     "indexed-by-1.11",
     "UPDATE t1 INDEXED BY t1ix1 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.11>
-        1, "no such index: T1IX1"
+        1, "No index 'T1IX1' is defined in space 'T1'"
         -- <indexed-by-1.11>
     })
 
@@ -153,7 +153,7 @@ test:do_catchsql_test(
     "indexed-by-1.12",
     "UPDATE t1 INDEXED BY t1ix2 SET b = 20 WHERE b = 10", {
         -- <indexed-by-1.12>
-        1, "no such index: T1IX2"
+        1, "No index 'T1IX2' is defined in space 'T1'"
         -- <indexed-by-1.12>
     })
 

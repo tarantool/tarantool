@@ -25,7 +25,7 @@ test:do_catchsql_test(
     [[
         pragma query_only;
     ]], {
-        1, "no such pragma: QUERY_ONLY"
+        1, "Pragma 'QUERY_ONLY' does not exist"
 })
 
 ---
@@ -36,7 +36,7 @@ test:do_catchsql_test(
 	[[
         pragma read_uncommitted;
     ]], {
-	1, "no such pragma: READ_UNCOMMITTED"
+	1, "Pragma 'READ_UNCOMMITTED' does not exist"
 })
 
 ---

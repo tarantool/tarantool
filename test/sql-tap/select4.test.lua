@@ -411,7 +411,7 @@ test:do_catchsql_test(
         ORDER BY log;
     ]], {
         -- <select4-5.1>
-        1, "no such table: T2"
+        1, "Space 'T2' does not exist"
         -- </select4-5.1>
     })
 

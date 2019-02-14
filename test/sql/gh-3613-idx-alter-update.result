@@ -28,7 +28,7 @@ box.snapshot()
 test_run:cmd('restart server default')
 box.sql.execute('DROP INDEX i ON j3')
 ---
-- error: 'no such index: J3.I'
+- error: No index 'I' is defined in space 'J3'
 ...
 box.sql.execute('CREATE INDEX i ON j3 (s1)')
 ---

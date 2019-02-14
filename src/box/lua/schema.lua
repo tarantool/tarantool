@@ -947,7 +947,7 @@ box.schema.index.alter = function(space_id, index_id, options)
         box.error(box.error.NO_SUCH_SPACE, '#'..tostring(space_id))
     end
     if space.index[index_id] == nil then
-        box.error(box.error.NO_SUCH_INDEX, index_id, space.name)
+        box.error(box.error.NO_SUCH_INDEX_ID, index_id, space.name)
     end
     if options == nil then
         return
@@ -1175,7 +1175,7 @@ box.internal.check_index_arg = check_index_arg -- for net.box
 local function check_primary_index(space)
     local pk = space.index[0]
     if pk == nil then
-        box.error(box.error.NO_SUCH_INDEX, 0, space.name)
+        box.error(box.error.NO_SUCH_INDEX_ID, 0, space.name)
     end
     return pk
 end

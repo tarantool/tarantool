@@ -18,7 +18,7 @@ test:do_catchsql_test(
     "index-info-1.1",
     "PRAGMA index_xinfo (t1.a);",
     {
-        1, "no such pragma: INDEX_XINFO",
+        1, "Pragma 'INDEX_XINFO' does not exist",
     })
 
 -- Case: old index_info syntax is banned.

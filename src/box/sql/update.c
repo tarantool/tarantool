@@ -190,8 +190,9 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			}
 		}
 		if (j >= (int)def->field_count) {
-			sqlErrorMsg(pParse, "no such column: %s",
-					pChanges->a[i].zName);
+			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME,
+				 pChanges->a[i].zName);
+			sql_parser_error(pParse);
 			goto update_cleanup;
 		}
 	}

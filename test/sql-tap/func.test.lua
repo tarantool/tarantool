@@ -2550,7 +2550,7 @@ test:do_test(
         ]])
     end, {
         -- <func-28.1>
-        1, "unknown function: NOSUCHFUNC()"
+        1, "Function 'NOSUCHFUNC' does not exist"
         -- </func-28.1>
     })
 

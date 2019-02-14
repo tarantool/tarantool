@@ -97,7 +97,7 @@ test:do_test(
         return test:catchsql "CREATE INDEX index1 ON test1(f4)"
     end, {
         -- <index-2.1b>
-        1, "no such column: F4"
+        1, "Field 'F4' doesn't exist"
         -- </index-2.1b>
     })
 
@@ -115,7 +115,7 @@ test:do_test(
         return table.insert(v,msg) or v
     end, {
         -- <index-2.2>
-        1, "no such column: F4"
+        1, "Field 'F4' doesn't exist"
         -- </index-2.2>
     })
 
@@ -411,7 +411,7 @@ test:do_catchsql_test(
         DROP INDEX index1 ON test1
     ]], {
         -- <index-8.1>
-        1, "no such index: TEST1.INDEX1"
+        1, "No index 'INDEX1' is defined in space 'TEST1'"
         -- </index-8.1>
     })
 

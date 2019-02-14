@@ -365,7 +365,7 @@ t;
   32: box.error.PROC_LUA
   33: box.error.NO_SUCH_PROC
   34: box.error.NO_SUCH_TRIGGER
-  35: box.error.NO_SUCH_INDEX
+  35: box.error.NO_SUCH_INDEX_ID
   36: box.error.NO_SUCH_SPACE
   37: box.error.NO_SUCH_FIELD
   38: box.error.EXACT_FIELD_COUNT
@@ -477,10 +477,12 @@ t;
   145: box.error.NO_SUCH_SEQUENCE
   146: box.error.SEQUENCE_EXISTS
   147: box.error.SEQUENCE_OVERFLOW
+  148: box.error.NO_SUCH_INDEX_NAME
   149: box.error.SPACE_FIELD_IS_DUPLICATE
   150: box.error.CANT_CREATE_COLLATION
   151: box.error.WRONG_COLLATION_OPTIONS
   152: box.error.NULLABLE_PRIMARY
+  153: box.error.NO_SUCH_FIELD_NAME
   154: box.error.TRANSACTION_YIELD
   155: box.error.NO_SUCH_GROUP
   156: box.error.SQL_BIND_VALUE
@@ -502,6 +504,7 @@ t;
   172: box.error.ROWID_OVERFLOW
   173: box.error.DROP_COLLATION
   174: box.error.ILLEGAL_COLLATION_MIX
+  175: box.error.SQL_NO_SUCH_PRAGMA
 ...
 test_run:cmd("setopt delimiter ''");
 ---

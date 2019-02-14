@@ -83,7 +83,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 WHERE x = substr('145', 2, 1) AND y = func(1, 2, 3);
     ]], {
         -- <2.1>
-        1, "no such function: FUNC"
+        1, "Function 'FUNC' does not exist"
         -- </2.1>
     })
 
@@ -93,7 +93,7 @@ test:do_catchsql_test(
         UPDATE t1 SET y=y+1 WHERE x = substr('145', 2, 1) AND y = func(1, 2, 3)
     ]], {
         -- <2.2>
-        1, "no such function: FUNC"
+        1, "Function 'FUNC' does not exist"
         -- </2.2>
     })
 

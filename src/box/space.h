@@ -263,7 +263,7 @@ index_find(struct space *space, uint32_t index_id)
 {
 	struct index *index = space_index(space, index_id);
 	if (index == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_INDEX, index_id,
+		diag_set(ClientError, ER_NO_SUCH_INDEX_ID, index_id,
 			 space_name(space));
 		diag_log();
 	}

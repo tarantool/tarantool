@@ -172,7 +172,7 @@ test:do_catchsql_test(
             INSERT INTO t3 (a,b,c)VALUES(1,2,3)
     ]], {
         -- <insert3-3.2>
-        1, "no such column: NOSUCHCOL"
+        1, "Field 'NOSUCHCOL' doesn't exist"
         -- </insert3-3.2>
 })
 
@@ -195,7 +195,7 @@ test:do_catchsql_test(
             INSERT INTO t4 (a,b,c)VALUES(1,2,3)
     ]], {
         -- <insert3-3.4>
-        1, "no such column: NOSUCHCOL"
+        1, "Field 'NOSUCHCOL' doesn't exist"
         -- </insert3-3.4>
 })
 

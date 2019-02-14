@@ -40,5 +40,5 @@ box.sql.execute("DROP TABLE t1")
 --
 box.sql.execute("CREATE TABLE tx (a INT, PRIMARY KEY (b));")
 ---
-- error: 'no such column: B'
+- error: Field 'B' doesn't exist
 ...

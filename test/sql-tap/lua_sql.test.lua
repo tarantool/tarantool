@@ -53,7 +53,7 @@ test:do_test(
 test:do_catchsql_test(
     "lua_sql-1.0",
     "select func3(1)",
-    {1, "no such function: FUNC3"})
+    {1, "Function 'FUNC3' does not exist"})
 
 
 -- check for different types

@@ -34,12 +34,12 @@ box.sql.execute('SELECT float')
 -- check 'VALUES' against ID (should fail)
 box.sql.execute('VALUES(TheColumnName)')
 ---
-- error: 'no such column: THECOLUMNNAME'
+- error: Field 'THECOLUMNNAME' doesn't exist
 ...
 -- check 'SELECT' against ID (should fail)
 box.sql.execute('SELECT TheColumnName')
 ---
-- error: 'no such column: THECOLUMNNAME'
+- error: Field 'THECOLUMNNAME' doesn't exist
 ...
 -- check 'VALUES' well-formed expression  (returns value)
 box.sql.execute('VALUES(-0.5e-2)')

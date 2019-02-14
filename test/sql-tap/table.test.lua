@@ -131,7 +131,7 @@ test:do_test(
         return test:catchsql "CREATE TABLE test2(id primary key, two text default 'hi')"
     end, {
         -- <table-2.1>
-        1, "table TEST2 already exists"
+        1, "Space 'TEST2' already exists"
         -- </table-2.1>
     })
 
@@ -266,7 +266,7 @@ test:do_catchsql_test(
         CREATE TABLE BIG(xyz int primary key)
     ]], {
         -- <table-3.2>
-        1, "table BIG already exists"
+        1, "Space 'BIG' already exists"
         -- </table-3.2>
     })
 
@@ -276,7 +276,7 @@ test:do_catchsql_test(
         CREATE TABLE biG(xyz int primary key)
     ]], {
         -- <table-3.3>
-        1, "table BIG already exists"
+        1, "Space 'BIG' already exists"
         -- </table-3.3>
     })
 
@@ -286,7 +286,7 @@ test:do_catchsql_test(
         CREATE TABLE bIg(xyz int primary key)
     ]], {
         -- <table-3.4>
-        1, "table BIG already exists"
+        1, "Space 'BIG' already exists"
         -- </table-3.4>
     })
 
@@ -377,7 +377,7 @@ test:do_catchsql_test(
         DROP TABLE test009
     ]], {
         -- <table-5.1.1>
-        1, "no such table: TEST009"
+        1, "Space 'TEST009' does not exist"
         -- </table-5.1.1>
     })
 
@@ -650,7 +650,7 @@ test:do_catchsql_test(
         SELECT * FROM t5;
     ]], {
         -- <table-8.7>
-        1, "no such table: T5"
+        1, "Space 'T5' does not exist"
         -- </table-8.7>
     })
 
@@ -697,7 +697,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(a int primary key,b int,a int);
     ]], {
         -- <table-9.1>
-        1, "duplicate column name: A"
+        1, "Space field 'A' is duplicate"
         -- </table-9.1>
     })
 
@@ -707,7 +707,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(a varchar(100) primary key, b blob, a integer);
     ]], {
         -- <table-9.2>
-        1, "duplicate column name: A"
+        1, "Space field 'A' is duplicate"
         -- </table-9.2>
     })
 

@@ -403,7 +403,7 @@ test:do_catchsql_test(
         SELECT * FROM t1;
     ]], {
         -- <alter-7.6>
-        1, "no such table: T1"
+        1, "Space 'T1' does not exist"
         -- </alter-7.6>
     })
 

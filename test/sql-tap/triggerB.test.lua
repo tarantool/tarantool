@@ -60,7 +60,7 @@ test:do_catchsql_test(
         INSERT INTO x VALUES(3,1,2);
     ]], {
         -- <triggerB-2.1>
-        1, "no such column: WEN.X"
+        1, "Field 'X' doesn't exist"
         -- </triggerB-2.1>
     })
 
@@ -73,7 +73,7 @@ test:do_catchsql_test(
         UPDATE x SET y=y+1;
     ]], {
         -- <triggerB-2.2>
-        1, "no such column: DLO.X"
+        1, "Field 'X' doesn't exist"
         -- </triggerB-2.2>
     })
 
@@ -111,7 +111,7 @@ test:do_test(
         ]]
     end, {
         -- <triggerB-2.4>
-        1, "no such column: OLD.C"
+        1, "Field 'C' doesn't exist"
         -- </triggerB-2.4>
     })
 

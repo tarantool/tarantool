@@ -92,7 +92,7 @@ cn:execute('delete from test where a = 12')
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
 ---
-- error: 'Failed to execute SQL statement: no such table: NOT_EXISTING_TABLE'
+- error: 'Failed to execute SQL statement: Space ''NOT_EXISTING_TABLE'' does not exist'
 ...
 cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 ---
