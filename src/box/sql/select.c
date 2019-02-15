@@ -4191,10 +4191,14 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		pList = pParent->pEList;
 		for (i = 0; i < pList->nExpr; i++) {
 			if (pList->a[i].zName == 0) {
-				char *zName =
-				    sqlDbStrDup(db, pList->a[i].zSpan);
-				sqlNormalizeName(zName);
-				pList->a[i].zName = zName;
+				char *str = pList->a[i].zSpan;
+				int len = strlen(str);
+				char *name =
+					sql_normalized_name_db_new(db, str,
+								   len);
+				if (name == NULL)
+					pParse->is_aborted = true;
+				pList->a[i].zName = name;
 			}
 		}
 		if (pSub->pOrderBy) {

@@ -388,3 +388,21 @@ errinj.set("ERRINJ_WAL_DELAY", false)
 ---
 - ok
 ...
+--
+-- gh-3931: Store regular identifiers in case-normal form
+--
+errinj = box.error.injection
+---
+...
+errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", true)
+---
+- ok
+...
+box.sql.execute("CREATE TABLE hello (id INT primary key,x INT,y INT);")
+---
+- error: 'string conversion to the uppercase failed: U_MEMORY_ALLOCATION_ERROR'
+...
+errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", false)
+---
+- ok
+...

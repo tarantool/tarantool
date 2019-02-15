@@ -279,15 +279,22 @@ sql_trigger_select_step(struct sql *db, struct Select *select)
 static struct TriggerStep *
 sql_trigger_step_new(struct sql *db, u8 op, struct Token *target_name)
 {
-	int size = sizeof(struct TriggerStep) + target_name->n + 1;
+	int name_size =
+		sql_normalize_name(NULL, 0, target_name->z, target_name->n);
+	if (name_size < 0)
+		return NULL;
+	int size = sizeof(struct TriggerStep) + name_size;
 	struct TriggerStep *trigger_step = sqlDbMallocZero(db, size);
 	if (trigger_step == NULL) {
 		diag_set(OutOfMemory, size, "sqlDbMallocZero", "trigger_step");
 		return NULL;
 	}
 	char *z = (char *)&trigger_step[1];
-	memcpy(z, target_name->z, target_name->n);
-	sqlNormalizeName(z);
+	if (sql_normalize_name(z, name_size, target_name->z,
+			       target_name->n) < 0) {
+		sqlDbFree(db, trigger_step);
+		return NULL;
+	}
 	trigger_step->zTarget = z;
 	trigger_step->op = op;
 	return trigger_step;

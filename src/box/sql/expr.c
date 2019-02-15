@@ -886,58 +886,117 @@ sqlExprSetHeightAndFlags(Parse * pParse, Expr * p)
 #define exprSetHeight(y)
 #endif				/* SQL_MAX_EXPR_DEPTH>0 */
 
+/**
+ * Allocate a new empty expression object with reserved extra
+ * memory.
+ * @param db SQL context.
+ * @param op Expression value type.
+ * @param extra_size Extra size, needed to be allocated together
+ *        with the expression.
+ * @retval Not NULL Success. An empty expression.
+ * @retval NULL Error. A diag message is set.
+ */
+static struct Expr *
+sql_expr_new_empty(struct sql *db, int op, int extra_size)
+{
+	struct Expr *e = sqlDbMallocRawNN(db, sizeof(*e) + extra_size);
+	if (e == NULL) {
+		diag_set(OutOfMemory, sizeof(*e), "sqlDbMallocRawNN", "e");
+		return NULL;
+	}
+	memset(e, 0, sizeof(*e));
+	e->op = (u8)op;
+	e->iAgg = -1;
+#if SQL_MAX_EXPR_DEPTH > 0
+	e->nHeight = 1;
+#endif
+	return e;
+}
+
+/**
+ * Try to convert a token of a specified type to integer.
+ * @param op Token type.
+ * @param token Token itself.
+ * @param[out] res Result integer.
+ * @retval 0 Success. @A res stores a result.
+ * @retval -1 Error. Can not be converted. No diag.
+ */
+static inline int
+sql_expr_token_to_int(int op, const struct Token *token, int *res)
+{
+	if (op == TK_INTEGER && token->z != NULL &&
+	    sqlGetInt32(token->z, res) > 0)
+		return 0;
+	return -1;
+}
+
+/** Create an expression of a constant integer. */
+static inline struct Expr *
+sql_expr_new_int(struct sql *db, int value)
+{
+	struct Expr *e = sql_expr_new_empty(db, TK_INTEGER, 0);
+	if (e != NULL) {
+		e->flags |= EP_IntValue;
+		e->u.iValue = value;
+	}
+	return e;
+}
+
 struct Expr *
 sql_expr_new(struct sql *db, int op, const struct Token *token)
 {
 	int extra_sz = 0;
-	int val = 0;
 	if (token != NULL) {
-		if (op != TK_INTEGER || token->z == NULL ||
-		    sqlGetInt32(token->z, &val) == 0) {
-			extra_sz = token->n + 1;
-			assert(val >= 0);
-		}
+		int val;
+		if (sql_expr_token_to_int(op, token, &val) == 0)
+			return sql_expr_new_int(db, val);
+		extra_sz = token->n + 1;
 	}
-	struct Expr *expr = sqlDbMallocRawNN(db, sizeof(*expr) + extra_sz);
-	if (expr == NULL) {
-		diag_set(OutOfMemory, sizeof(*expr), "sqlDbMallocRawNN",
-			 "expr");
-		return NULL;
-	}
-
-	memset(expr, 0, sizeof(*expr));
-	expr->op = (u8)op;
-	expr->iAgg = -1;
-#if SQL_MAX_EXPR_DEPTH > 0
-	expr->nHeight = 1;
-#endif
-	if (token == NULL)
-		return expr;
-
-	if (extra_sz == 0) {
-		expr->flags |= EP_IntValue;
-		expr->u.iValue = val;
-	} else {
-		expr->u.zToken = (char *)&expr[1];
-		assert(token->z != NULL || token->n == 0);
-		memcpy(expr->u.zToken, token->z, token->n);
-		expr->u.zToken[token->n] = '\0';
-	}
-	return expr;
+	struct Expr *e = sql_expr_new_empty(db, op, extra_sz);
+	if (e == NULL || token == NULL)
+		return e;
+	e->u.zToken = (char *) &e[1];
+	assert(token->z != NULL || token->n == 0);
+	memcpy(e->u.zToken, token->z, token->n);
+	e->u.zToken[token->n] = '\0';
+	return e;
 }
 
 struct Expr *
 sql_expr_new_dequoted(struct sql *db, int op, const struct Token *token)
 {
-	struct Expr *e = sql_expr_new(db, op, token);
-	if (e == NULL || (e->flags & EP_IntValue) != 0 || e->u.zToken == NULL)
+	int extra_size = 0;
+	bool is_name = false;
+	if (token != NULL) {
+		int val;
+		assert(token->z != NULL || token->n == 0);
+		if (sql_expr_token_to_int(op, token, &val) == 0)
+			return sql_expr_new_int(db, val);
+		is_name = op == TK_ID || op == TK_COLLATE || op == TK_FUNCTION;
+		if (is_name) {
+			extra_size = sql_normalize_name(NULL, 0, token->z,
+							token->n);
+			if (extra_size < 0)
+				return NULL;
+		} else {
+			extra_size = token->n + 1;
+		}
+	}
+	struct Expr *e = sql_expr_new_empty(db, op, extra_size);
+	if (e == NULL || token == NULL || token->n == 0)
 		return e;
-	if (e->u.zToken[0] == '"')
+	e->u.zToken = (char *) &e[1];
+	if (token->z[0] == '"')
 		e->flags |= EP_DblQuoted;
-	if (e->op == TK_ID || e->op == TK_COLLATE || e->op == TK_FUNCTION)
-		sqlNormalizeName(e->u.zToken);
-	else
+	if (! is_name) {
+		memcpy(e->u.zToken, token->z, token->n);
+		e->u.zToken[token->n] = '\0';
 		sqlDequote(e->u.zToken);
+	} else if (sql_normalize_name(e->u.zToken, extra_size, token->z,
+				      token->n) < 0) {
+		sql_expr_delete(db, e, false);
+		return NULL;
+	}
 	return e;
 }
 
@@ -1831,19 +1890,22 @@ sqlExprListSetName(Parse * pParse,	/* Parsing context */
 		       int dequote	/* True to cause the name to be dequoted */
     )
 {
-	assert(pList != 0 || pParse->db->mallocFailed != 0);
-	if (pList) {
-		struct ExprList_item *pItem;
-		assert(pList->nExpr > 0);
-		pItem = &pList->a[pList->nExpr - 1];
-		assert(pItem->zName == 0);
-		pItem->zName = sqlDbStrNDup(pParse->db, pName->z, pName->n);
-		if (dequote)
-			sqlNormalizeName(pItem->zName);
-		/* n = 0 in case of select * */
-		if (pName->n != 0)
-			sqlCheckIdentifierName(pParse, pItem->zName);
+	struct sql *db = pParse->db;
+	assert(pList != NULL || db->mallocFailed != 0);
+	if (pList == NULL || pName->n == 0)
+		return;
+	assert(pList->nExpr > 0);
+	struct ExprList_item *item = &pList->a[pList->nExpr - 1];
+	assert(item->zName == NULL);
+	if (dequote) {
+		item->zName = sql_normalized_name_db_new(db, pName->z, pName->n);
+		if (item->zName == NULL)
+			pParse->is_aborted = true;
+	} else {
+		item->zName = sqlDbStrNDup(db, pName->z, pName->n);
 	}
+	if (item->zName != NULL)
+		sqlCheckIdentifierName(pParse, item->zName);
 }
 
 /*

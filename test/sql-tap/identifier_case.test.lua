@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(71)
+test:plan(73)
 
 local test_prefix = "identifier_case-"
 
@@ -13,8 +13,10 @@ local data = {
     { 6,  [[ "Table1" ]], {0} },
     -- non ASCII characters case is not supported
     { 7,  [[ русский ]], {0} },
-    { 8,  [[ Русский ]], {0} },
-    { 9,  [[ "русский" ]], {"/already exists/"} },
+    { 8,  [[ "русский" ]], {0} },
+    { 9,  [[ Großschreibweise ]], {0} },
+    { 10,  [[ Русский ]], {"/already exists/"} },
+    { 11,  [[ Grossschreibweise ]], {"/already exists/"} },
 }
 
 for _, row in ipairs(data) do
@@ -35,7 +37,7 @@ data = {
     { 5, [[ "table1" ]], {5}},
     { 6, [[ "Table1" ]], {6}},
     { 7, [[ русский ]], {7}},
-    { 8, [[ Русский ]], {8}},
+    { 8, [[ "русский" ]], {8}},
 }
 
 for _, row in ipairs(data) do
@@ -66,7 +68,7 @@ test:do_test(
     function ()
         return test:drop_all_tables()
     end,
-    3)
+    4)
 
 data = {
     { 1,  [[ columnn ]], {0} },
