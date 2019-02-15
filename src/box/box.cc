@@ -1509,6 +1509,9 @@ box_process_join(struct ev_io *io, struct xrow_header *header)
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
 
+	say_info("joining replica %s at %s",
+		 tt_uuid_str(&instance_uuid), sio_socketname(io->fd));
+
 	/*
 	 * Initial stream: feed replica with dirty data from engines.
 	 */
@@ -1600,6 +1603,9 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 			  "wal_mode = 'none'");
 	}
 
+	struct vclock vclock;
+	vclock_create(&vclock);
+	vclock_copy(&vclock, &replicaset.vclock);
 	/*
 	 * Send a response to SUBSCRIBE request, tell
 	 * the replica how many rows we have in stock for it,
@@ -1612,9 +1618,7 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	 * the additional field.
 	 */
 	struct xrow_header row;
-	xrow_encode_subscribe_response_xc(&row,
-					  &REPLICASET_UUID,
-					  &replicaset.vclock);
+	xrow_encode_subscribe_response_xc(&row, &REPLICASET_UUID, &vclock);
 	/*
 	 * Identify the message with the replica id of this
 	 * instance, this is the only way for a replica to find
@@ -1625,6 +1629,11 @@ box_process_subscribe(struct ev_io *io, struct xrow_header *header)
 	row.replica_id = self->id;
 	row.sync = header->sync;
 	coio_write_xrow(io, &row);
+
+	say_info("subscribed replica %s at %s",
+		 tt_uuid_str(&replica_uuid), sio_socketname(io->fd));
+	say_info("remote vclock %s local vclock %s",
+		 vclock_to_string(&replica_clock), vclock_to_string(&vclock));
 
 	/*
 	 * Process SUBSCRIBE request via replication relay
@@ -1848,6 +1857,9 @@ bootstrap(const struct tt_uuid *instance_uuid,
 		INSTANCE_UUID = *instance_uuid;
 	else
 		tt_uuid_create(&INSTANCE_UUID);
+
+	say_info("instance uuid %s", tt_uuid_str(&INSTANCE_UUID));
+
 	/*
 	 * Begin listening on the socket to enable
 	 * master-master replication leader election.
@@ -1905,6 +1917,8 @@ local_recovery(const struct tt_uuid *instance_uuid,
 			  tt_uuid_str(&INSTANCE_UUID));
 	}
 
+	say_info("instance uuid %s", tt_uuid_str(&INSTANCE_UUID));
+
 	struct wal_stream wal_stream;
 	wal_stream_create(&wal_stream, cfg_geti64("rows_per_wal"));
 
@@ -1930,6 +1944,7 @@ local_recovery(const struct tt_uuid *instance_uuid,
 	 * not attempt to apply these rows twice.
 	 */
 	recovery_scan(recovery, &replicaset.vclock, &gc.vclock);
+	say_info("instance vclock %s", vclock_to_string(&replicaset.vclock));
 
 	if (wal_dir_lock >= 0) {
 		box_listen();

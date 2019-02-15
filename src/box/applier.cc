@@ -207,11 +207,12 @@ applier_connect(struct applier *applier)
 	}
 
 	if (applier->version_id != greeting.version_id) {
-		say_info("remote master is %u.%u.%u at %s",
+		say_info("remote master %s at %s running Tarantool %u.%u.%u",
+			 tt_uuid_str(&greeting.uuid),
+			 sio_strfaddr(&applier->addr, applier->addr_len),
 			 version_id_major(greeting.version_id),
 			 version_id_minor(greeting.version_id),
-			 version_id_patch(greeting.version_id),
-			 sio_strfaddr(&applier->addr, applier->addr_len));
+			 version_id_patch(greeting.version_id));
 	}
 
 	/* Save the remote instance version and UUID on connect. */
@@ -393,8 +394,11 @@ applier_subscribe(struct applier *applier)
 	struct vclock remote_vclock_at_subscribe;
 	struct tt_uuid cluster_id = uuid_nil;
 
+	struct vclock vclock;
+	vclock_create(&vclock);
+	vclock_copy(&vclock, &replicaset.vclock);
 	xrow_encode_subscribe_xc(&row, &REPLICASET_UUID, &INSTANCE_UUID,
-				 &replicaset.vclock);
+				 &vclock);
 	coio_write_xrow(coio, &row);
 
 	/* Read SUBSCRIBE response */
@@ -429,6 +433,11 @@ applier_subscribe(struct applier *applier)
 				  tt_uuid_str(&cluster_id),
 				  tt_uuid_str(&REPLICASET_UUID));
 		}
+
+		say_info("subscribed");
+		say_info("remote vclock %s local vclock %s",
+			 vclock_to_string(&remote_vclock_at_subscribe),
+			 vclock_to_string(&vclock));
 	}
 	/*
 	 * Tarantool < 1.6.7:
