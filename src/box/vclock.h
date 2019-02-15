@@ -245,10 +245,9 @@ vclock_merge(struct vclock *dst, struct vclock *diff)
  * \brief Format vclock to YAML-compatible string representation:
  * { replica_id: lsn, replica_id:lsn })
  * \param vclock vclock
- * \return fomatted string. This pointer should be passed to free(3) to
- * release the allocated storage when it is no longer needed.
+ * \return fomatted string, stored in a static buffer.
  */
-char *
+const char *
 vclock_to_string(const struct vclock *vclock);
 
 /**

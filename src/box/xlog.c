@@ -151,20 +151,12 @@ xlog_meta_format(const struct xlog_meta *meta, char *buf, int size)
 		meta->filetype, v13, PACKAGE_VERSION,
 		tt_uuid_str(&meta->instance_uuid));
 	if (vclock_is_set(&meta->vclock)) {
-		char *vstr = vclock_to_string(&meta->vclock);
-		if (vstr == NULL)
-			return -1;
-		SNPRINT(total, snprintf, buf, size,
-			VCLOCK_KEY ": %s\n", vstr);
-		free(vstr);
+		SNPRINT(total, snprintf, buf, size, VCLOCK_KEY ": %s\n",
+			vclock_to_string(&meta->vclock));
 	}
 	if (vclock_is_set(&meta->prev_vclock)) {
-		char *vstr = vclock_to_string(&meta->prev_vclock);
-		if (vstr == NULL)
-			return -1;
-		SNPRINT(total, snprintf, buf, size,
-			PREV_VCLOCK_KEY ": %s\n", vstr);
-		free(vstr);
+		SNPRINT(total, snprintf, buf, size, PREV_VCLOCK_KEY ": %s\n",
+			vclock_to_string(&meta->prev_vclock));
 	}
 	SNPRINT(total, snprintf, buf, size, "\n");
 	assert(total > 0);

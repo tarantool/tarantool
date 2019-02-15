@@ -249,11 +249,10 @@ test_tostring_one(uint32_t count, const int64_t *lsns, const char *res)
 		if (lsns[node_id] > 0)
 			vclock_follow(&vclock, node_id, lsns[node_id]);
 	}
-	char *str = vclock_to_string(&vclock);
+	const char *str = vclock_to_string(&vclock);
 	int result = strcmp(str, res);
 	if (result)
 		diag("\n!!!new result!!! %s\n", str);
-	free(str);
 	return !result;
 }
 

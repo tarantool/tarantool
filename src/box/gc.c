@@ -294,10 +294,8 @@ gc_advance(const struct vclock *vclock)
 		consumer->is_inactive = true;
 		gc_tree_remove(&gc.consumers, consumer);
 
-		char *vclock_str = vclock_to_string(&consumer->vclock);
-		say_crit("deactivated WAL consumer %s at %s",
-			 consumer->name, vclock_str);
-		free(vclock_str);
+		say_crit("deactivated WAL consumer %s at %s", consumer->name,
+			 vclock_to_string(&consumer->vclock));
 
 		consumer = next;
 	}

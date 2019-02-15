@@ -686,9 +686,9 @@ replicaset_needs_rejoin(struct replica **master)
 		const char *uuid_str = tt_uuid_str(&replica->uuid);
 		const char *addr_str = sio_strfaddr(&applier->addr,
 						applier->addr_len);
-		char *local_vclock_str = vclock_to_string(&replicaset.vclock);
-		char *remote_vclock_str = vclock_to_string(&ballot->vclock);
-		char *gc_vclock_str = vclock_to_string(&ballot->gc_vclock);
+		const char *local_vclock_str = vclock_to_string(&replicaset.vclock);
+		const char *remote_vclock_str = vclock_to_string(&ballot->vclock);
+		const char *gc_vclock_str = vclock_to_string(&ballot->gc_vclock);
 
 		say_info("can't follow %s at %s: required %s available %s",
 			 uuid_str, addr_str, local_vclock_str, gc_vclock_str);
@@ -703,7 +703,7 @@ replicaset_needs_rejoin(struct replica **master)
 				 "replica has local rows: local %s remote %s",
 				 uuid_str, addr_str, local_vclock_str,
 				 remote_vclock_str);
-			goto next;
+			continue;
 		}
 
 		/* Prefer a master with the max vclock. */
@@ -711,10 +711,6 @@ replicaset_needs_rejoin(struct replica **master)
 		    vclock_sum(&ballot->vclock) >
 		    vclock_sum(&leader->applier->ballot.vclock))
 			leader = replica;
-next:
-		free(local_vclock_str);
-		free(remote_vclock_str);
-		free(gc_vclock_str);
 	}
 	if (leader == NULL)
 		return false;
