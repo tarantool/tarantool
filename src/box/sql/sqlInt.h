@@ -1493,7 +1493,6 @@ struct sql {
 	u8 mallocFailed;	/* True if we have seen a malloc failure */
 	u8 bBenignMalloc;	/* Do not require OOMs if true */
 	u8 dfltLockMode;	/* Default locking-mode for attached dbs */
-	u8 suppressErr;		/* Do not issue error messages if true */
 	u8 mTrace;		/* zero or more sql_TRACE flags */
 	u32 magic;		/* Magic number for detect library misuse */
 	/** Value returned by sql_row_count(). */

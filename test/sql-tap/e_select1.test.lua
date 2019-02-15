@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(520)
+test:plan(516)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -2063,17 +2063,15 @@ test:do_select_tests(
     "e_select-8.13",
     {
         {"1", "SELECT a FROM d5 UNION ALL SELECT c FROM d6 UNION ALL SELECT e FROM d7 ORDER BY a", {1, 2, 3, 4, 5, 6}},
-        {"2", "SELECT a FROM d5 UNION ALL SELECT c FROM d6 UNION ALL SELECT e FROM d7 ORDER BY c", {1, 2, 3, 4, 5, 6}},
-        {"3", "SELECT a FROM d5 UNION ALL SELECT c FROM d6 UNION ALL SELECT e FROM d7 ORDER BY e", {1, 2, 3, 4, 5, 6}},
-        {"4", "SELECT a FROM d5 UNION ALL SELECT c FROM d6 UNION ALL SELECT e FROM d7 ORDER BY 1", {1, 2, 3, 4, 5, 6}},
-        {"5", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY b ", {"f",  1,   "c", 4,   4, "c",   1, "f"}},
-        {"6", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY 2 ", {"f",  1,   "c", 4,   4, "c",   1, "f"}},
-        {"7", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY a ", {1, "f",   4, "c",   "c", 4,   "f", 1}},
-        {"8", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY 1 ", {1, "f",   4, "c",   "c", 4,   "f", 1}},
-        {"9", "SELECT a, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY a+1 ", {"f",  2,   "c", 5,   4, "c",   1, "f"}},
-        {"10", "SELECT a, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY 2 ", {"f",  2,   "c", 5,   4, "c",   1, "f"}},
-        {"11", "SELECT a+1, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY a+1 ", {2, "f",   5, "c",   "c", 5,   "f", 2}},
-        {"12", "SELECT a+1, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY 1 ", {2, "f",   5, "c",   "c", 5,   "f", 2}},
+        {"2", "SELECT a FROM d5 UNION ALL SELECT c FROM d6 UNION ALL SELECT e FROM d7 ORDER BY 1", {1, 2, 3, 4, 5, 6}},
+        {"3", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY b ", {"f",  1,   "c", 4,   4, "c",   1, "f"}},
+        {"4", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY 2 ", {"f",  1,   "c", 4,   4, "c",   1, "f"}},
+        {"5", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY a ", {1, "f",   4, "c",   "c", 4,   "f", 1}},
+        {"6", "SELECT a, b FROM d5 UNION ALL SELECT b, a FROM d5 ORDER BY 1 ", {1, "f",   4, "c",   "c", 4,   "f", 1}},
+        {"7", "SELECT a, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY a+1 ", {"f",  2,   "c", 5,   4, "c",   1, "f"}},
+        {"8", "SELECT a, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY 2 ", {"f",  2,   "c", 5,   4, "c",   1, "f"}},
+        {"9", "SELECT a+1, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY a+1 ", {2, "f",   5, "c",   "c", 5,   "f", 2}},
+        {"10", "SELECT a+1, b FROM d5 UNION ALL SELECT b, a+1 FROM d5 ORDER BY 1 ", {2, "f",   5, "c",   "c", 5,   "f", 2}},
     })
 
 -- EVIDENCE-OF: R-39265-04070 If no matching expression can be found in
@@ -2101,9 +2099,7 @@ end
 test:do_select_tests(
     "e_select-8.15",
     {
-        {"1", "SELECT a, b FROM d5 UNION ALL SELECT c-1, d FROM d6 ORDER BY a, d ", {1, "e",   1, "f",   4, "b",   4, "c"}},
-        {"2", "SELECT a, b FROM d5 UNION ALL SELECT c-1, d FROM d6 ORDER BY c-1, b ", {1, "e",   1, "f",   4, "b",   4, "c"}},
-        {"3", "SELECT a, b FROM d5 UNION ALL SELECT c-1, d FROM d6 ORDER BY 1, 2 ", {1, "e",   1, "f",   4, "b",   4, "c"}},
+        {"1", "SELECT a, b FROM d5 UNION ALL SELECT c-1, d FROM d6 ORDER BY 1, 2 ", {1, "e",   1, "f",   4, "b",   4, "c"}},
     })
 
 ---------------------------------------------------------------------------

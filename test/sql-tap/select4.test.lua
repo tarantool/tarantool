@@ -631,8 +631,8 @@ test:do_execsql_test(
     "select4-6.3",
     [[
         SELECT NULL UNION SELECT NULL UNION
-        SELECT 1 UNION SELECT 2 as "X"
-        ORDER BY x;
+        SELECT 1 UNION SELECT 2
+        ORDER BY 1;
     ]], {
         -- <select4-6.3>
         "", 1, 2
@@ -643,8 +643,8 @@ test:do_execsql_test(
     "select4-6.3.1",
     [[
         SELECT NULL UNION ALL SELECT NULL UNION ALL
-        SELECT 1 UNION ALL SELECT 2 as "X"
-        ORDER BY x;
+        SELECT 1 UNION ALL SELECT 2
+        ORDER BY 1;
     ]], {
         -- <select4-6.3.1>
         "", "", 1, 2

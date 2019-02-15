@@ -1382,7 +1382,7 @@ test:do_catchsql2_test(
                 -- </select1-6.22>
             })
 
-        test:do_execsql_test(
+        test:do_catchsql_test(
             "select1-6.23",
             [[
                 SELECT a FROM t6 WHERE b IN 
@@ -1391,7 +1391,7 @@ test:do_catchsql2_test(
                 ORDER BY a;
             ]], {
                 -- <select1-6.23>
-                "b", "d"
+                1,"no such column: X"
                 -- </select1-6.23>
             })
 

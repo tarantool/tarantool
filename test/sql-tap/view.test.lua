@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(74)
+test:plan(73)
 
 --!./tcltestrunner.lua
 -- 2002 February 26
@@ -323,22 +323,6 @@ test:do_execsql2_test(
         -- <view-3.4>
         "A", 2, "A", 3, "A", 5, "A", 6
         -- </view-3.4>
-    })
-
-
-test:do_execsql2_test(
-    "view-3.5",
-    [[
-        CREATE VIEW v4 AS
-          SELECT a, b FROM t1
-          UNION
-          SELECT b AS x, a AS y FROM t1
-          ORDER BY x, y;
-        SELECT b FROM v4 ORDER BY b LIMIT 4;
-    ]], {
-        -- <view-3.5>
-        "B", 2, "B", 3, "B", 5, "B", 6
-        -- </view-3.5>
     })
 
 -- X(237, "X!cmd", [=[["ifcapable","compound"]]=])

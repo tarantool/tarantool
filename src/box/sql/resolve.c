@@ -866,9 +866,7 @@ resolveOrderByTermToExprList(Parse * pParse,	/* Parsing context for error messag
 	int i;			/* Loop counter */
 	ExprList *pEList;	/* The columns of the result set */
 	NameContext nc;		/* Name context for resolving pE */
-	sql *db;		/* Database connection */
 	int rc;			/* Return code from subprocedures */
-	u8 savedSuppErr;	/* Saved value of db->suppressErr */
 
 	assert(sqlExprIsInteger(pE, &i) == 0);
 	pEList = pSelect->pEList;
@@ -881,11 +879,7 @@ resolveOrderByTermToExprList(Parse * pParse,	/* Parsing context for error messag
 	nc.pEList = pEList;
 	nc.ncFlags = NC_AllowAgg;
 	nc.nErr = 0;
-	db = pParse->db;
-	savedSuppErr = db->suppressErr;
-	db->suppressErr = 1;
 	rc = sqlResolveExprNames(&nc, pE);
-	db->suppressErr = savedSuppErr;
 	if (rc)
 		return 0;
 

@@ -236,14 +236,10 @@ sqlErrorMsg(Parse * pParse, const char *zFormat, ...)
 	va_start(ap, zFormat);
 	zMsg = sqlVMPrintf(db, zFormat, ap);
 	va_end(ap);
-	if (db->suppressErr) {
-		sqlDbFree(db, zMsg);
-	} else {
-		pParse->nErr++;
-		sqlDbFree(db, pParse->zErrMsg);
-		pParse->zErrMsg = zMsg;
-		pParse->rc = SQL_ERROR;
-	}
+	pParse->nErr++;
+	sqlDbFree(db, pParse->zErrMsg);
+	pParse->zErrMsg = zMsg;
+	pParse->rc = SQL_ERROR;
 }
 
 /*

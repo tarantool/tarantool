@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(36)
+test:plan(30)
 
 --!./tcltestrunner.lua
 -- 2007 Dec 4
@@ -163,19 +163,6 @@ test:do_execsql_test(
         -- </tkt2822-3.2>
     })
 
--- Test that if a match cannot be found in the leftmost SELECT, an
--- attempt is made to find a match in subsequent SELECT statements.
---
-test:do_execsql_test(
-    "tkt2822-3.3",
-    [[
-        SELECT a, b, c FROM t1 UNION ALL SELECT a AS x, b, c FROM t2 ORDER BY x;
-    ]], {
-        -- <tkt2822-3.3>
-        1, 3, 9, 2, 6, 18, 3, 9, 27, 4, 12, 36, 5, 15, 45, 6, 18, 54
-        -- </tkt2822-3.3>
-    })
-
 test:do_test(
     "tkt2822-3.4",
     function()
@@ -293,61 +280,6 @@ test:do_execsql_test(
         -- <tkt2822-6.1>
         1, 7, 1, 8, 7, 2, 9, 2
         -- </tkt2822-6.1>
-    })
-
-test:do_execsql_test(
-    "tkt2822-6.2",
-    [[
-        SELECT p PX, q QX FROM t6a UNION ALL SELECT x XX, y YX FROM t6b
-        ORDER BY PX, YX
-    ]], {
-        -- <tkt2822-6.2>
-        1, 7, 1, 8, 7, 2, 9, 2
-        -- </tkt2822-6.2>
-    })
-
-test:do_execsql_test(
-    "tkt2822-6.3",
-    [[
-        SELECT p PX, q QX FROM t6a UNION ALL SELECT x XX, y YX FROM t6b
-        ORDER BY XX, QX
-    ]], {
-        -- <tkt2822-6.3>
-        1, 7, 1, 8, 7, 2, 9, 2
-        -- </tkt2822-6.3>
-    })
-
-test:do_execsql_test(
-    "tkt2822-6.4",
-    [[
-        SELECT p PX, q QX FROM t6a UNION ALL SELECT x XX, y YX FROM t6b
-        ORDER BY QX, XX
-    ]], {
-        -- <tkt2822-6.4>
-        7, 2, 9, 2, 1, 7, 1, 8
-        -- </tkt2822-6.4>
-    })
-
-test:do_execsql_test(
-    "tkt2822-6.5",
-    [[
-        SELECT p PX, q QX FROM t6a UNION ALL SELECT x XX, y YX FROM t6b
-        ORDER BY t6b.x, QX
-    ]], {
-        -- <tkt2822-6.5>
-        1, 7, 1, 8, 7, 2, 9, 2
-        -- </tkt2822-6.5>
-    })
-
-test:do_execsql_test(
-    "tkt2822-6.6",
-    [[
-        SELECT p PX, q QX FROM t6a UNION ALL SELECT x XX, y YX FROM t6b
-        ORDER BY t6a.q, XX
-    ]], {
-        -- <tkt2822-6.6>
-        7, 2, 9, 2, 1, 7, 1, 8
-        -- </tkt2822-6.6>
     })
 
 -- More error message tests.  This is really more of a test of the

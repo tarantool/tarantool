@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(170)
+test:plan(162)
 
 --!./tcltestrunner.lua
 -- 2008 June 24
@@ -318,28 +318,6 @@ for ii = 3, 6, 1 do
     test:do_execsql_test(
         "selectB-"..ii..".9",
         [[
-            SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            EXCEPT 
-            SELECT c FROM t1
-            ORDER BY c DESC
-        ]], {
-            27, 24, 15, 9
-        })
-
-    test:do_execsql_test(
-        "selectB-"..ii..".10",
-        [[
-            SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            UNION 
-            SELECT c FROM t1
-            ORDER BY c DESC
-        ]], {
-            27, 24, 18, 15, 12, 9, 6
-        })
-
-    test:do_execsql_test(
-        "selectB-"..ii..".11",
-        [[
             SELECT c FROM t1
             UNION 
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
@@ -349,7 +327,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".12",
+        "selectB-"..ii..".10",
         [[
             SELECT c FROM t1 UNION SELECT e FROM t2 UNION ALL SELECT f FROM t2
             ORDER BY c
@@ -358,7 +336,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".13",
+        "selectB-"..ii..".11",
         [[
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
             UNION 
@@ -369,29 +347,29 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
+        "selectB-"..ii..".12",
+        [[
+            SELECT c FROM t1
+            INTERSECT 
+            SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
+            ORDER BY 1
+        ]], {
+            6, 18
+        })
+
+    test:do_execsql_test(
+        "selectB-"..ii..".13",
+        [[
+            SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
+            INTERSECT 
+            SELECT c FROM t1
+            ORDER BY 1
+        ]], {
+            6, 18
+        })
+
+    test:do_execsql_test(
         "selectB-"..ii..".14",
-        [[
-            SELECT c FROM t1
-            INTERSECT 
-            SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            ORDER BY 1
-        ]], {
-            6, 18
-        })
-
-    test:do_execsql_test(
-        "selectB-"..ii..".15",
-        [[
-            SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
-            INTERSECT 
-            SELECT c FROM t1
-            ORDER BY 1
-        ]], {
-            6, 18
-        })
-
-    test:do_execsql_test(
-        "selectB-"..ii..".16",
         [[
             SELECT * FROM (SELECT e FROM t2 UNION ALL SELECT f FROM t2)
             INTERSECT 
@@ -402,7 +380,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".17",
+        "selectB-"..ii..".15",
         [[
             SELECT * FROM (
               SELECT a FROM t1 UNION ALL SELECT d FROM t2 LIMIT 4
@@ -412,7 +390,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".18",
+        "selectB-"..ii..".16",
         [[
             SELECT * FROM (
               SELECT a FROM t1 UNION ALL SELECT d FROM t2 LIMIT 4 OFFSET 2
@@ -422,7 +400,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".19",
+        "selectB-"..ii..".17",
         [[
             SELECT * FROM (
               SELECT DISTINCT (a/10) FROM t1 UNION ALL SELECT DISTINCT(d%2) FROM t2
@@ -432,7 +410,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".20",
+        "selectB-"..ii..".18",
         [[
             SELECT DISTINCT * FROM (
               SELECT DISTINCT (a/10) FROM t1 UNION ALL SELECT DISTINCT(d%2) FROM t2
@@ -442,7 +420,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".21",
+        "selectB-"..ii..".19",
         [[
             SELECT * FROM (SELECT a,b,c FROM t1 UNION ALL SELECT d,e,f FROM t2) ORDER BY a+b
         ]], {
@@ -450,7 +428,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".22",
+        "selectB-"..ii..".20",
         [[
             SELECT * FROM (SELECT 345 UNION ALL SELECT d FROM t2) ORDER BY 1;
         ]], {
@@ -458,7 +436,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".23",
+        "selectB-"..ii..".21",
         [[
             SELECT x, y FROM (
               SELECT a AS x, b AS y FROM t1
@@ -472,7 +450,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".24",
+        "selectB-"..ii..".22",
         [[
             SELECT x, y FROM (
               SELECT a AS x, b AS y FROM t1
@@ -486,7 +464,7 @@ for ii = 3, 6, 1 do
         })
 
     test:do_execsql_test(
-        "selectB-"..ii..".25",
+        "selectB-"..ii..".23",
         [[
             SELECT x+y FROM (
               SELECT a AS x, b AS y FROM t1

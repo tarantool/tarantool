@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(65)
+test:plan(64)
 
 --!./tcltestrunner.lua
 -- 2014 January 11
@@ -795,17 +795,6 @@ test:do_execsql_test("10.7.2", [[
   -- <10.7.2>
   1, 2, 3, 4, 5
   -- </10.7.2>
-})
-
-test:do_execsql_test("10.7.3", [[
-  WITH t(a) AS (
-    SELECT 1 AS b UNION ALL SELECT a+1 AS c FROM t WHERE a<5 ORDER BY c
-  ) 
-  SELECT * FROM t
-]], {
-  -- <10.7.3>
-  1, 2, 3, 4, 5
-  -- </10.7.3>
 })
 
 -- # Test COLLATE clauses attached to ORDER BY.
