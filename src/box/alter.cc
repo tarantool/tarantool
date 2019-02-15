@@ -2850,6 +2850,7 @@ on_replace_dd_schema(struct trigger * /* trigger */, void *event)
 		tt_uuid uu;
 		tuple_field_uuid_xc(new_tuple, BOX_CLUSTER_FIELD_UUID, &uu);
 		REPLICASET_UUID = uu;
+		say_info("cluster uuid %s", tt_uuid_str(&uu));
 	} else if (strcmp(key, "version") == 0) {
 		if (new_tuple != NULL) {
 			uint32_t major, minor, patch;

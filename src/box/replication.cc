@@ -197,6 +197,9 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 		instance_id = replica_id;
 	}
 	replicaset.replica_by_id[replica_id] = replica;
+
+	say_info("assigned id %d to replica %s",
+		 replica->id, tt_uuid_str(&replica->uuid));
 }
 
 void
@@ -214,6 +217,8 @@ replica_clear_id(struct replica *replica)
 	 */
 	replicaset.replica_by_id[replica->id] = NULL;
 	replica->id = REPLICA_ID_NIL;
+	say_info("removed replica %s", tt_uuid_str(&replica->uuid));
+
 	/*
 	 * The replica will never resubscribe so we don't need to keep
 	 * WALs for it anymore. Unregister it with the garbage collector
