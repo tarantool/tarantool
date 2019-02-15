@@ -3200,7 +3200,57 @@ void sqlTreeViewWith(TreeView *, const With *);
 
 void sqlSetString(char **, sql *, const char *);
 void sqlDequote(char *);
-void sqlNormalizeName(char *z);
+
+/**
+ * Perform SQL name normalization: cast name to the upper-case
+ * (via Unicode Character Folding). Casing is locale-independent
+ * and context-sensitive. The result may be longer or shorter
+ * than the original. The source string and the destination buffer
+ * must not overlap.
+ * For example, ß is converted to SS.
+ * The result is similar to SQL UPPER function.
+ *
+ * @param dst A buffer for the result string. The result will be
+ *        0-terminated if the buffer is large enough. The contents
+ *        is undefined in case of failure.
+ * @param dst_size The size of the buffer (number of bytes). If it
+ *        is 0, then dest may be NULL and the function will only
+ *        return the length of the result without writing any of
+ *        the result string
+ * @param src The original string.
+ * @param src_len The length of the original string.
+ * @retval The count of bytes written(or need to be written) on
+ *         success.
+ * @retval < 0 Otherwise. The diag message is set.
+ */
+int
+sql_normalize_name(char *dst, int dst_size, const char *src, int src_len);
+
+/**
+ * Duplicate a normalized version of @a name onto an sqlMalloc.
+ * For normalization rules @sa sql_normalize_name().
+ * @param db SQL context.
+ * @param name Source string.
+ * @param len Length of @a name.
+ * @retval Not NULL Success. A normalized string is returned.
+ * @retval NULL Error. A diag message is set.
+ */
+char *
+sql_normalized_name_db_new(struct sql *db, const char *name, int len);
+
+/**
+ * Duplicate a normalized version of @a name onto a region @a r.
+ * For normalization rules @sa sql_normalize_name().
+ * @param r Region allocator.
+ * @param name Source string.
+ * @param len Length of @a name.
+ * @retval Not NULL Success. A normalized string is returned.
+ * @retval NULL Error. A diag message is set. Region is not
+ *         truncated back.
+ */
+char *
+sql_normalized_name_region_new(struct region *r, const char *name, int len);
+
 void sqlTokenInit(Token *, char *);
 int sqlKeywordCode(const unsigned char *, int);
 int sqlRunParser(Parse *, const char *);
@@ -3747,12 +3797,16 @@ void sqlExprIfFalse(Parse *, Expr *, int, int);
  * string is \000 terminated and is persistent.
  *
  * @param db The database connection.
- * @param name_token The source token with text.
+ * @param t The source token with text.
  * @retval Not NULL Formatted name on new memory.
  * @retval NULL Error. Diag message is set.
  */
-char *
-sql_name_from_token(struct sql *db, struct Token *name_token);
+static inline char *
+sql_name_from_token(struct sql *db, struct Token *t)
+{
+	assert(t != NULL && t->z != NULL);
+	return sql_normalized_name_db_new(db, t->z, t->n);
+}
 
 int sqlExprCompare(Expr *, Expr *, int);
 int sqlExprListCompare(ExprList *, ExprList *, int);

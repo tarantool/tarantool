@@ -139,3 +139,11 @@ box.sql.execute("INSERT INTO t VALUES (2);")
 box.sql.execute("UPDATE t SET id = 2;")
 -- Finish drop space.
 errinj.set("ERRINJ_WAL_DELAY", false)
+
+--
+-- gh-3931: Store regular identifiers in case-normal form
+--
+errinj = box.error.injection
+errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", true)
+box.sql.execute("CREATE TABLE hello (id INT primary key,x INT,y INT);")
+errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", false)

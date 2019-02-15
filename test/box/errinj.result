@@ -22,6 +22,8 @@ errinj.info()
     state: false
   ERRINJ_SNAP_WRITE_ROW_TIMEOUT:
     state: 0
+  ERRINJ_SQL_NAME_NORMALIZATION:
+    state: false
   ERRINJ_VY_SCHED_TIMEOUT:
     state: 0
   ERRINJ_WAL_WRITE_PARTIAL:

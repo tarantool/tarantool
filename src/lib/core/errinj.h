@@ -126,6 +126,7 @@ struct errinj {
 	_(ERRINJ_TUPLE_FORMAT_COUNT, ERRINJ_INT, {.iparam = -1}) \
 	_(ERRINJ_MEMTX_DELAY_GC, ERRINJ_BOOL, {.bparam = false}) \
 	_(ERRINJ_SIO_READ_MAX, ERRINJ_INT, {.iparam = -1}) \
+	_(ERRINJ_SQL_NAME_NORMALIZATION, ERRINJ_BOOL, {.bparam = false}) \
 
 ENUM0(errinj_id, ERRINJ_LIST);
 extern struct errinj errinjs[];

@@ -229,20 +229,6 @@ sql_space_column_is_in_pk(struct space *space, uint32_t column)
 	return false;
 }
 
-char *
-sql_name_from_token(struct sql *db, struct Token *name_token)
-{
-	assert(name_token != NULL && name_token->z != NULL);
-	char *name = sqlDbStrNDup(db, name_token->z, name_token->n);
-	if (name == NULL) {
-		diag_set(OutOfMemory, name_token->n + 1, "sqlDbStrNDup",
-			 "name");
-		return NULL;
-	}
-	sqlNormalizeName(name);
-	return name;
-}
-
 /*
  * This routine is used to check if the UTF-8 string zName is a legal
  * unqualified name for an identifier.
@@ -445,16 +431,11 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 	if (sql_field_retrieve(pParse, def, def->field_count) == NULL)
 		return;
 	struct region *region = &pParse->region;
-	z = region_alloc(region, pName->n + 1);
+	z = sql_normalized_name_region_new(region, pName->z, pName->n);
 	if (z == NULL) {
-		diag_set(OutOfMemory, pName->n + 1,
-			 "region_alloc", "z");
 		pParse->is_aborted = true;
 		return;
 	}
-	memcpy(z, pName->z, pName->n);
-	z[pName->n] = 0;
-	sqlNormalizeName(z);
 	for (uint32_t i = 0; i < def->field_count; i++) {
 		if (strcmp(z, def->fields[i].name) == 0) {
 			diag_set(ClientError, ER_SPACE_FIELD_IS_DUPLICATE, z);
