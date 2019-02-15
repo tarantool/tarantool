@@ -77,6 +77,8 @@ local function set_system_triggers(val)
     box.space._user:run_triggers(val)
     box.space._func:run_triggers(val)
     box.space._priv:run_triggers(val)
+    box.space._schema:run_triggers(val)
+    box.space._cluster:run_triggers(val)
 end
 
 --------------------------------------------------------------------------------
@@ -93,9 +95,8 @@ local function erase()
     truncate(box.space._sequence)
     truncate(box.space._truncate)
     truncate(box.space._collation)
-    --truncate(box.space._schema)
-    box.space._schema:delete('version')
-    box.space._schema:delete('max_id')
+    truncate(box.space._schema)
+    truncate(box.space._cluster)
 end
 
 local function initial()

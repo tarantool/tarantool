@@ -3,13 +3,12 @@ box.internal.bootstrap()
 ...
 box.space._schema:select{}
 ---
-- - ['cluster', '<cluster uuid>']
-  - ['max_id', 511]
+- - ['max_id', 511]
   - ['version', 1, 10, 2]
 ...
 box.space._cluster:select{}
 ---
-- - [1, '<server uuid>']
+- []
 ...
 box.space._space:select{}
 ---
