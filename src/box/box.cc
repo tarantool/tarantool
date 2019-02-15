@@ -1661,7 +1661,7 @@ box_set_replicaset_uuid(const struct tt_uuid *replicaset_uuid)
 	else
 		tt_uuid_create(&uu);
 	/* Save replica set UUID in _schema */
-	if (boxk(IPROTO_REPLACE, BOX_SCHEMA_ID, "[%s%s]", "cluster",
+	if (boxk(IPROTO_INSERT, BOX_SCHEMA_ID, "[%s%s]", "cluster",
 		 tt_uuid_str(&uu)))
 		diag_raise();
 }
@@ -1735,10 +1735,6 @@ bootstrap_master(const struct tt_uuid *replicaset_uuid)
 	engine_bootstrap_xc();
 
 	uint32_t replica_id = 1;
-
-	/* Unregister a local replica if it was registered by bootstrap.bin */
-	if (boxk(IPROTO_DELETE, BOX_CLUSTER_ID, "[%u]", 1) != 0)
-		diag_raise();
 
 	/* Register the first replica in the replica set */
 	box_register_replica(replica_id, &INSTANCE_UUID);
