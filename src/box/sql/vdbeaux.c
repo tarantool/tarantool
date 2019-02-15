@@ -1284,6 +1284,15 @@ displayComment(const Op * pOp,	/* The opcode to be commented */
 static char *
 displayP4(Op * pOp, char *zTemp, int nTemp)
 {
+	/*
+	 * Msgpack is subtype, not type of P4, so lets consider
+	 * it as special case. We should decode msgpack to display
+	 * it in a readable form.
+	 */
+	if (pOp->opcode == OP_Blob && pOp->p3 == SQL_SUBTYPE_MSGPACK) {
+		mp_snprint(zTemp, nTemp, pOp->p4.z);
+		return zTemp;
+	}
 	char *zP4 = zTemp;
 	StrAccum x;
 	assert(nTemp >= 20);
@@ -1416,8 +1425,8 @@ void
 sqlVdbePrintOp(FILE * pOut, int pc, Op * pOp)
 {
 	char *zP4;
-	char zPtr[50];
-	char zCom[100];
+	char zPtr[256];
+	char zCom[256];
 	static const char *zFormat1 =
 	    "%4d> %4d %-13s %4d %4d %4d %-13s %.2X %s\n";
 	if (pOut == 0)
@@ -1674,12 +1683,13 @@ sqlVdbeList(Vdbe * p)
 		pMem->u.i = pOp->p3;	/* P3 */
 		pMem++;
 
-		if (sqlVdbeMemClearAndResize(pMem, 100)) {	/* P4 */
+		if (sqlVdbeMemClearAndResize(pMem, 256)) {
 			assert(p->db->mallocFailed);
 			return SQL_ERROR;
 		}
 		pMem->flags = MEM_Str | MEM_Term;
 		zP4 = displayP4(pOp, pMem->z, pMem->szMalloc);
+
 		if (zP4 != pMem->z) {
 			pMem->n = 0;
 			sqlVdbeMemSetStr(pMem, zP4, -1, 1, 0);
