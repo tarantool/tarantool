@@ -35,6 +35,7 @@
 #include <ctype.h>
 
 #include "diag.h"
+#include "trivia/util.h"
 
 int64_t
 vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
@@ -50,64 +51,31 @@ vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn)
 	return prev_lsn;
 }
 
-CFORMAT(printf, 4, 0) static inline int
-rsnprintf(char **buf, char **pos, char **end, const char *fmt, ...)
+static int
+vclock_snprint(char *buf, int size, const struct vclock *vclock)
 {
-	int rc = 0;
-	va_list ap;
-
-	while (1) {
-		va_start(ap, fmt);
-		int n = vsnprintf(*pos, *end - *pos, fmt, ap);
-		va_end(ap);
-		assert(n > -1); /* glibc >= 2.0.6, see vsnprintf(3) */
-		if (n < *end - *pos) {
-			*pos += n;
-			break;
-		}
-
-		/* Reallocate buffer */
-		ptrdiff_t cap = (*end - *buf) > 0 ? (*end - *buf) : 32;
-		while (cap <= *pos - *buf + n)
-			cap *= 2;
-		char *chunk = (char *) realloc(*buf, cap);
-		if (chunk == NULL) {
-			diag_set(OutOfMemory, cap, "malloc", "vclock");
-			free(*buf);
-			*buf = *end = *pos = NULL;
-			rc = -1;
-			break;
-		}
-		*pos = chunk + (*pos - *buf);
-		*end = chunk + cap;
-		*buf = chunk;
-	}
-
-	return rc;
-}
-
-char *
-vclock_to_string(const struct vclock *vclock)
-{
-	(void) vclock;
-	char *buf = NULL, *pos = NULL, *end = NULL;
-
-	if (rsnprintf(&buf, &pos, &end, "{") != 0)
-		return NULL;
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size, "{");
 
 	const char *sep = "";
 	struct vclock_iterator it;
 	vclock_iterator_init(&it, vclock);
 	vclock_foreach(&it, replica) {
-		if (rsnprintf(&buf, &pos, &end, "%s%u: %lld", sep,
-			      replica.id, (long long) replica.lsn) != 0)
-			return NULL;
+		SNPRINT(total, snprintf, buf, size, "%s%u: %lld",
+			sep, (unsigned)replica.id, (long long)replica.lsn);
 		sep = ", ";
 	}
 
-	if (rsnprintf(&buf, &pos, &end, "}") != 0)
-		return NULL;
+	SNPRINT(total, snprintf, buf, size, "}");
+	return total;
+}
 
+const char *
+vclock_to_string(const struct vclock *vclock)
+{
+	char *buf = tt_static_buf();
+	if (vclock_snprint(buf, TT_STATIC_BUF_LEN, vclock) < 0)
+		return "<failed to format vclock>";
 	return buf;
 }
 
