@@ -1,0 +1,25 @@
+	*** main ***
+1..1
+	*** check_uri_to_addr ***
+    1..18
+    ok 1 - invalid uri is detected
+    ok 2 - too long UNIX path
+    ok 3 - UNIX
+    ok 4 - UNIX path
+    ok 5 - UNIX family
+    ok 6 - localhost
+    ok 7 - localhost family
+    ok 8 - localhost address
+    ok 9 - localhost port
+    ok 10 - 'any'
+    ok 11 - 'any' family
+    ok 12 - 'any' address
+    ok 13 - 'any' port
+    ok 14 - IP
+    ok 15 - IP family
+    ok 16 - IP address
+    ok 17 - IP port
+    ok 18 - invalid IP
+ok 1 - subtests
+	*** check_uri_to_addr: done ***
+	*** main: done ***
