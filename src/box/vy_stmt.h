@@ -220,13 +220,6 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 }
 
 /**
- * Free the tuple of a vinyl space.
- * @pre tuple->refs  == 0
- */
-void
-vy_tuple_delete(struct tuple_format *format, struct tuple *tuple);
-
-/**
  * Duplicate the statememnt.
  *
  * @param stmt statement
