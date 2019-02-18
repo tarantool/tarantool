@@ -295,6 +295,30 @@ coll_def_snfingerprint(char *buffer, int size, const struct coll_def *def)
 	return total;
 }
 
+bool
+coll_can_merge(const struct coll *first, const struct coll *second)
+{
+	/*
+	 * If collations are identical, there's no point in using
+	 * them together in the same key def for the same field.
+	 */
+	if (first == second)
+		return false;
+	/*
+	 * If the first collation is binary or s0, there can't be
+	 * a collation that would differentiate keys equal in terms
+	 * of it. Hence we don't need to merge a key part using the
+	 * second collation into a key def using the first collation
+	 * for the same field. Otherwise, there's no guarantee that
+	 * such a key doesn't exist so we allow to merge them.
+	 */
+	if (first == NULL || first->collator == NULL ||
+	    ucol_getStrength(first->collator) == UCOL_DEFAULT)
+		return false;
+	return true;
+
+}
+
 struct coll *
 coll_new(const struct coll_def *def)
 {

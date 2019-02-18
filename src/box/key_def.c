@@ -38,6 +38,7 @@
 #include "schema_def.h"
 #include "coll_id_cache.h"
 #include "small/region.h"
+#include "coll/coll.h"
 
 const char *sort_order_strs[] = { "asc", "desc", "undef" };
 
@@ -623,6 +624,24 @@ key_def_contains(const struct key_def *first, const struct key_def *second)
 	return true;
 }
 
+/**
+ * Return true if to_merge can be merged into key_def.
+ */
+static bool
+key_def_can_merge(const struct key_def *key_def,
+		  const struct key_part *to_merge)
+{
+	const struct key_part *part = key_def_find(key_def, to_merge);
+	if (part == NULL)
+		return true;
+	/*
+	 * If both key_def and to_merge have the same field, then
+	 * we can merge to_merge into key_def only if its collation
+	 * may impose a strict order on otherwise equal keys.
+	 */
+	return coll_can_merge(part->coll, to_merge->coll);
+}
+
 struct key_def *
 key_def_merge(const struct key_def *first, const struct key_def *second)
 {
@@ -639,7 +658,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	part = second->parts;
 	end = part + second->part_count;
 	for (; part != end; part++) {
-		if (key_def_find(first, part) != NULL)
+		if (!key_def_can_merge(first, part))
 			--new_part_count;
 		else
 			sz += part->path_len;
@@ -677,7 +696,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	part = second->parts;
 	end = part + second->part_count;
 	for (; part != end; part++) {
-		if (key_def_find(first, part) != NULL)
+		if (!key_def_can_merge(first, part))
 			continue;
 		key_def_set_part(new_def, pos++, part->fieldno, part->type,
 				 part->nullable_action, part->coll,

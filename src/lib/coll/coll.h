@@ -34,6 +34,7 @@
 #include "coll_def.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -69,6 +70,17 @@ struct coll {
 	 */
 	const char fingerprint[0];
 };
+
+/**
+ * Return true if a key part using the second collation can be
+ * merged into a key def using the first collation for the same
+ * field. Using the two collations together for the same field
+ * in the same key def only makes sense if the second collation
+ * may impose a strict order on keys equal in terms of the first
+ * collation.
+ */
+bool
+coll_can_merge(const struct coll *first, const struct coll *second);
 
 /**
  * Create a collation by definition. Can return an existing
