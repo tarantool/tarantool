@@ -163,3 +163,13 @@ box.sql.execute("SELECT CAST('abc' AS BLOB) || 'x';")
 ---
 - error: 'Inconsistent types: expected BLOB got TEXT'
 ...
+-- Result of BLOBs concatenation must be BLOB.
+--
+box.sql.execute("SELECT TYPEOF(CAST('abc' AS BLOB) || CAST('cda' AS BLOB))")
+---
+- - ['blob']
+...
+box.sql.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
+---
+- - ['blob']
+...

@@ -1587,7 +1587,10 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 	if (sqlVdbeMemGrow(pOut, (int)nByte+2, pOut==pIn2)) {
 		goto no_mem;
 	}
-	MemSetTypeFlag(pOut, MEM_Str);
+	if (pIn1->flags & MEM_Str)
+		MemSetTypeFlag(pOut, MEM_Str);
+	else
+		MemSetTypeFlag(pOut, MEM_Blob);
 	if (pOut!=pIn2) {
 		memcpy(pOut->z, pIn2->z, pIn2->n);
 	}

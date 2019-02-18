@@ -52,3 +52,7 @@ box.sql.execute("SELECt 'a' || 'b' || 1;")
 --
 box.sql.execute("SELECT 'abc' || CAST('x' AS BLOB);")
 box.sql.execute("SELECT CAST('abc' AS BLOB) || 'x';")
+-- Result of BLOBs concatenation must be BLOB.
+--
+box.sql.execute("SELECT TYPEOF(CAST('abc' AS BLOB) || CAST('cda' AS BLOB))")
+box.sql.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
