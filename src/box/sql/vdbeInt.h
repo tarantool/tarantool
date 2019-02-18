@@ -253,6 +253,15 @@ struct Mem {
 #define MEM_Zero 0x0000
 #endif
 
+/**
+ * In contrast to Mem_TypeMask, this one allows to get
+ * pure type of memory cell, i.e. without _Dyn/_Zero and other
+ * auxiliary flags.
+ */
+enum {
+	MEM_PURE_TYPE_MASK = 0x1f
+};
+
 
 /* Return TRUE if Mem X contains dynamically allocated content - anything
  * that needs to be deallocated to avoid a leak.

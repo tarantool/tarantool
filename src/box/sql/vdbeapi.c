@@ -280,7 +280,7 @@ sql_value_type(sql_value * pVal)
 		SQL_INTEGER,	/* 0x1e */
 		SQL_NULL,	/* 0x1f */
 	};
-	return aType[pVal->flags & MEM_TypeMask];
+	return aType[pVal->flags & MEM_PURE_TYPE_MASK];
 }
 
 /* Make a copy of an sql_value object
