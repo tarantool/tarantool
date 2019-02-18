@@ -94,14 +94,7 @@ vy_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	return tuple;
 }
 
-struct tuple_format_vtab vy_tuple_format_vtab = {
-	vy_tuple_delete,
-	vy_tuple_new,
-};
-
-size_t vy_max_tuple_size = 1024 * 1024;
-
-void
+static void
 vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	say_debug("%s(%p)", __func__, tuple);
@@ -118,6 +111,13 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 #endif
 	free(tuple);
 }
+
+struct tuple_format_vtab vy_tuple_format_vtab = {
+	vy_tuple_delete,
+	vy_tuple_new,
+};
+
+size_t vy_max_tuple_size = 1024 * 1024;
 
 /**
  * Allocate a vinyl statement object on base of the struct tuple
