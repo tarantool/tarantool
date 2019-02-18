@@ -277,10 +277,8 @@ tx_manager_mem_used(struct tx_manager *xm);
 /**
  * Abort all rw transactions that affect the given LSM tree
  * and haven't reached WAL yet.
- *
- * Returns 0 on success, -1 on memory allocation error.
  */
-int
+void
 tx_manager_abort_writers(struct tx_manager *xm, struct vy_lsm *lsm);
 
 /** Initialize a tx object. */
