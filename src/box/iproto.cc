@@ -670,6 +670,11 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 		 */
 		return NULL;
 	}
+	/* Update buffer size if readahead has changed. */
+	if (new_ibuf->start_capacity != iproto_readahead) {
+		ibuf_destroy(new_ibuf);
+		ibuf_create(new_ibuf, cord_slab_cache(), iproto_readahead);
+	}
 
 	ibuf_reserve_xc(new_ibuf, to_read + con->parse_size);
 	/*
