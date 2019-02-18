@@ -1038,17 +1038,15 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
  * before the trigger was installed so that DDL doesn't miss
  * their working set.
  */
-static int
+static void
 vy_abort_writers_for_ddl(struct vy_env *env, struct vy_lsm *lsm)
 {
-	if (tx_manager_abort_writers(env->xm, lsm) != 0)
-		return -1;
+	tx_manager_abort_writers(env->xm, lsm);
 	/*
 	 * Wait for prepared transactions to complete
 	 * (we can't abort them as they reached WAL).
 	 */
 	wal_sync();
-	return 0;
 }
 
 /** Argument passed to vy_check_format_on_replace(). */
@@ -1109,10 +1107,6 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	 */
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
 
-	struct tuple *key = vy_stmt_new_select(pk->env->key_format, NULL, 0);
-	if (key == NULL)
-		return -1;
-
 	struct trigger on_replace;
 	struct vy_check_format_ctx ctx;
 	ctx.format = format;
@@ -1121,13 +1115,12 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	trigger_create(&on_replace, vy_check_format_on_replace, &ctx, NULL);
 	trigger_add(&space->on_replace, &on_replace);
 
-	int rc = vy_abort_writers_for_ddl(env, pk);
-	if (rc != 0)
-		goto out;
+	vy_abort_writers_for_ddl(env, pk);
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
+	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
 			      &env->xm->p_committed_read_view);
+	int rc;
 	int loops = 0;
 	struct tuple *tuple;
 	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
@@ -1151,10 +1144,9 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 			break;
 	}
 	vy_read_iterator_close(&itr);
-out:
+
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
-	tuple_unref(key);
 	return rc;
 }
 
@@ -4183,10 +4175,6 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	 * may yield, we install an on_replace trigger to forward
 	 * DML requests issued during the build.
 	 */
-	struct tuple *key = vy_stmt_new_select(pk->env->key_format, NULL, 0);
-	if (key == NULL)
-		return -1;
-
 	struct trigger on_replace;
 	struct vy_build_ctx ctx;
 	ctx.lsm = new_lsm;
@@ -4198,13 +4186,12 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
 	trigger_add(&src_space->on_replace, &on_replace);
 
-	int rc = vy_abort_writers_for_ddl(env, pk);
-	if (rc != 0)
-		goto out;
+	vy_abort_writers_for_ddl(env, pk);
 
 	struct vy_read_iterator itr;
-	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, key,
+	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
 			      &env->xm->p_committed_read_view);
+	int rc;
 	int loops = 0;
 	struct tuple *tuple;
 	int64_t build_lsn = env->xm->lsn;
@@ -4260,10 +4247,9 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 		diag_move(&ctx.diag, diag_get());
 		rc = -1;
 	}
-out:
+
 	diag_destroy(&ctx.diag);
 	trigger_clear(&on_replace);
-	tuple_unref(key);
 	return rc;
 }
 

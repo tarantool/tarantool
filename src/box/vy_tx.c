@@ -1056,21 +1056,17 @@ vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
 	return 0;
 }
 
-int
+void
 tx_manager_abort_writers(struct tx_manager *xm, struct vy_lsm *lsm)
 {
-	struct tuple *key = vy_stmt_new_select(lsm->env->key_format, NULL, 0);
-	if (key == NULL)
-		return -1;
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
 		assert(!vy_tx_is_ro(tx));
 		if (tx->state == VINYL_TX_READY &&
-		    write_set_search_key(&tx->write_set, lsm, key) != NULL)
+		    write_set_search_key(&tx->write_set, lsm,
+					 lsm->env->empty_key) != NULL)
 			tx->state = VINYL_TX_ABORT;
 	}
-	tuple_unref(key);
-	return 0;
 }
 
 void
