@@ -131,3 +131,35 @@ box.sql.execute("SELECT * FROM test")
 sp:drop()
 ---
 ...
+-- gh-3544: concatenation operator accepts only TEXT and BLOB.
+--
+box.sql.execute("SELECT 'abc' || 1;")
+---
+- error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
+...
+box.sql.execute("SELECT 'abc' || 1.123;")
+---
+- error: 'Inconsistent types: expected TEXT or BLOB got REAL'
+...
+box.sql.execute("SELECT 1 || 'abc';")
+---
+- error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
+...
+box.sql.execute("SELECT 1.123 || 'abc';")
+---
+- error: 'Inconsistent types: expected TEXT or BLOB got REAL'
+...
+box.sql.execute("SELECt 'a' || 'b' || 1;")
+---
+- error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
+...
+-- What is more, they must be of the same type.
+--
+box.sql.execute("SELECT 'abc' || CAST('x' AS BLOB);")
+---
+- error: 'Inconsistent types: expected TEXT got BLOB'
+...
+box.sql.execute("SELECT CAST('abc' AS BLOB) || 'x';")
+---
+- error: 'Inconsistent types: expected BLOB got TEXT'
+...

@@ -40,3 +40,15 @@ sp:insert({1, true})
 sp:insert({2, false})
 box.sql.execute("SELECT * FROM test")
 sp:drop()
+
+-- gh-3544: concatenation operator accepts only TEXT and BLOB.
+--
+box.sql.execute("SELECT 'abc' || 1;")
+box.sql.execute("SELECT 'abc' || 1.123;")
+box.sql.execute("SELECT 1 || 'abc';")
+box.sql.execute("SELECT 1.123 || 'abc';")
+box.sql.execute("SELECt 'a' || 'b' || 1;")
+-- What is more, they must be of the same type.
+--
+box.sql.execute("SELECT 'abc' || CAST('x' AS BLOB);")
+box.sql.execute("SELECT CAST('abc' AS BLOB) || 'x';")

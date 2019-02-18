@@ -686,11 +686,11 @@ test:do_test(
             DROP TRIGGER t3928r2;
             CREATE TRIGGER t3928r3 BEFORE UPDATE ON t3928
               WHEN new.b=='456' BEGIN
-                 INSERT INTO t3928(b) VALUES('before-int-' || new.b);
+                 INSERT INTO t3928(b) VALUES('before-int-' || CAST(new.b AS TEXT));
             END;
             CREATE TRIGGER t3928r4 AFTER UPDATE ON t3928
               WHEN new.b=='456' BEGIN
-                 INSERT INTO t3928(b) VALUES('after-int-' || new.b);
+                 INSERT INTO t3928(b) VALUES('after-int-' || CAST(new.b AS TEXT));
             END;
             DELETE FROM t3928 WHERE a!=1;
             UPDATE t3928 SET b=456 WHERE a=1;
@@ -725,12 +725,12 @@ test:do_test(
             DELETE FROM t3928;
             CREATE TABLE t3928c(y INTEGER PRIMARY KEY AUTOINCREMENT, z TEXT);
             CREATE TRIGGER t3928br1 BEFORE DELETE ON t3928b BEGIN
-              INSERT INTO t3928(b) VALUES('before-del-'||old.x);
-              INSERT INTO t3928c(z) VALUES('before-del-'||old.x);
+              INSERT INTO t3928(b) VALUES('before-del-'|| CAST(old.x AS TEXT));
+              INSERT INTO t3928c(z) VALUES('before-del-'|| CAST(old.x AS TEXT));
             END;
             CREATE TRIGGER t3928br2 AFTER DELETE ON t3928b BEGIN
-              INSERT INTO t3928(b) VALUES('after-del-'||old.x);
-              INSERT INTO t3928c(z) VALUES('after-del-'||old.x);
+              INSERT INTO t3928(b) VALUES('after-del-'|| CAST(old.x AS TEXT));
+              INSERT INTO t3928c(z) VALUES('after-del-'|| CAST(old.x AS TEXT));
             END;
             DELETE FROM t3928b;
             SELECT * FROM t3928 ORDER BY a;

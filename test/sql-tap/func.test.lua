@@ -475,7 +475,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "func-4.10",
     [[
-        SELECT 'x' || round(c,a) || 'y' FROM t1 ORDER BY a
+        SELECT 'x' || CAST(round(c,a) AS TEXT) || 'y' FROM t1 ORDER BY a
     ]], {
         -- <func-4.10>
         0, {"x3.0y", "x-12345.68y", "x-5.0y"}
@@ -863,7 +863,7 @@ test:do_test(
 test:do_execsql_test(
     "func-8.2",
     [[
-        SELECT max('z+'||a||'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP') FROM t2;
+        SELECT max('z+'|| CAST(a AS TEXT) ||'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP') FROM t2;
     ]], {
         -- <func-8.2>
         "z+67890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP"

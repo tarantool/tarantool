@@ -230,6 +230,7 @@ struct errcode_record {
 	/*175 */_(ER_SQL_NO_SUCH_PRAGMA,	"Pragma '%s' does not exist") \
 	/*176 */_(ER_SQL_CANT_RESOLVE_FIELD,	"Can’t resolve field '%s'") \
 	/*177 */_(ER_INDEX_EXISTS_IN_SPACE,	"Index '%s' already exists in space '%s'") \
+	/*178 */_(ER_INCONSISTENT_TYPES,	"Inconsistent types: expected %s got %s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

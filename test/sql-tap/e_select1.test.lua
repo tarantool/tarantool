@@ -875,7 +875,7 @@ test:do_select_tests(
                 0, -22.18, -2.2, -23.18, "suiters", 1, 68, "", 67, "quartets", 0, -31.3,
                 -1.04, -32.3, "aspen", 0, 1, 63, 0, "-26"}},
 
-        {"3", "SELECT 32*32, d||e FROM z2", {1024, "", 1024, "36.06.0"}},
+        {"3", "SELECT 32*32, CAST(d AS TEXT) || CAST(e AS TEXT) FROM z2", {1024, "", 1024, "36.06.0"}},
     })
 
 -- Test cases e_select-4.5.* and e_select-4.6.* together show that:
@@ -1136,7 +1136,7 @@ test:do_select_tests(
         {"1.1", "SELECT up FROM c1 GROUP BY up HAVING count(*)>3", {"x"}},
         {"1.2", "SELECT up FROM c1 GROUP BY up HAVING sum(down)>16", {"y"}},
         {"1.3", "SELECT up FROM c1 GROUP BY up HAVING sum(down)<16", {"x"}},
-        {"1.4", "SELECT up||down FROM c1 GROUP BY (down<5) HAVING max(down)<10", {"x4"}},
+        {"1.4", "SELECT up|| CAST(down AS TEXT) FROM c1 GROUP BY (down<5) HAVING max(down)<10", {"x4"}},
 
         {"2.1", "SELECT up FROM c1 GROUP BY up HAVING down>10", {"y"}},
         {"2.2", "SELECT up FROM c1 GROUP BY up HAVING up='y'", {"y"}},

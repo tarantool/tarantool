@@ -619,6 +619,32 @@ vdbe_add_new_autoinc_id(struct Vdbe *vdbe, int64_t id)
 	return 0;
 }
 
+/**
+ * Simple type to str convertor. It is used to simplify
+ * error reporting.
+ */
+static char *
+mem_type_to_str(const struct Mem *p)
+{
+	assert(p != NULL);
+	switch (p->flags & MEM_PURE_TYPE_MASK) {
+	case MEM_Null:
+		return "NULL";
+	case MEM_Str:
+		return "TEXT";
+	case MEM_Int:
+		return "INTEGER";
+	case MEM_Real:
+		return "REAL";
+	case MEM_Blob:
+		return "BLOB";
+	case MEM_Bool:
+		return "BOOLEAN";
+	default:
+		unreachable();
+	}
+}
+
 /*
  * Execute as much of a VDBE program as we can.
  * This is the core of sql_step().
@@ -1515,6 +1541,9 @@ case OP_ResultRow: {
  * It is illegal for P1 and P3 to be the same register. Sometimes,
  * if P3 is the same register as P2, the implementation is able
  * to avoid a memcpy().
+ *
+ * Concatenation operator accepts only arguments of string-like
+ * types (i.e. TEXT and BLOB).
  */
 case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 	i64 nByte;
@@ -1527,9 +1556,30 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 		sqlVdbeMemSetNull(pOut);
 		break;
 	}
+	/*
+	 * Concatenation operation can be applied only to
+	 * strings and blobs.
+	 */
+	uint32_t str_type_p1 = pIn1->flags & (MEM_Blob | MEM_Str);
+	uint32_t str_type_p2 = pIn2->flags & (MEM_Blob | MEM_Str);
+	if (str_type_p1 == 0 || str_type_p2 == 0) {
+		char *inconsistent_type = str_type_p1 == 0 ?
+					  mem_type_to_str(pIn1) :
+					  mem_type_to_str(pIn2);
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or BLOB",
+			 inconsistent_type);
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
+
+	/* Moreover, both operands must be of the same type. */
+	if (str_type_p1 != str_type_p2) {
+		diag_set(ClientError, ER_INCONSISTENT_TYPES,
+			 mem_type_to_str(pIn2), mem_type_to_str(pIn1));
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
 	if (ExpandBlob(pIn1) || ExpandBlob(pIn2)) goto no_mem;
-	Stringify(pIn1);
-	Stringify(pIn2);
 	nByte = pIn1->n + pIn2->n;
 	if (nByte>db->aLimit[SQL_LIMIT_LENGTH]) {
 		goto too_big;

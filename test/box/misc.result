@@ -507,6 +507,7 @@ t;
   175: box.error.SQL_NO_SUCH_PRAGMA
   176: box.error.SQL_CANT_RESOLVE_FIELD
   177: box.error.INDEX_EXISTS_IN_SPACE
+  178: box.error.INCONSISTENT_TYPES
 ...
 test_run:cmd("setopt delimiter ''");
 ---

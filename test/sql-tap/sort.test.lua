@@ -238,7 +238,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-2.1.1",
     [[
-        UPDATE t1 SET v='x' || -flt;
+        UPDATE t1 SET v='x' || CAST(-flt AS TEXT);
         UPDATE t1 SET v='x-2b' where v=='x-0.123';
         SELECT v FROM t1 ORDER BY v;
     ]], {
@@ -338,7 +338,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-4.2",
     [[
-        SELECT n||'' FROM t1 ORDER BY 1;
+        SELECT CAST(n AS TEXT) || '' FROM t1 ORDER BY 1;
     ]], {
         -- <sort-4.2>
         "1", "10", "11", "12", "2", "3", "4", "5", "6", "7", "8", "9"
@@ -358,7 +358,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "sort-4.4",
     [[
-        SELECT n||'' FROM t1 ORDER BY 1 DESC;
+        SELECT CAST(n AS TEXT) || '' FROM t1 ORDER BY 1 DESC;
     ]], {
         -- <sort-4.4>
         "9", "8", "7", "6", "5", "4", "3", "2", "12", "11", "10", "1"
