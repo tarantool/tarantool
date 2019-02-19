@@ -532,7 +532,9 @@ sqlVdbeMemIntegerify(Mem * pMem, bool is_forced)
 		MemSetTypeFlag(pMem, MEM_Int);
 		return 0;
 	} else if ((pMem->flags & MEM_Real) != 0 && is_forced) {
-		pMem->u.i = (int) pMem->u.r;
+		if (pMem->u.r >= INT64_MAX || pMem->u.r < INT64_MIN)
+			return -1;
+		pMem->u.i = (int64_t) pMem->u.r;
 		MemSetTypeFlag(pMem, MEM_Int);
 		return 0;
 	}
