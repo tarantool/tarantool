@@ -41,7 +41,6 @@
 
 #include "replication.h"
 #include "tuple_bloom.h"
-#include "tuple_compare.h"
 #include "xlog.h"
 #include "xrow.h"
 #include "vy_history.h"

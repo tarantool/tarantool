@@ -41,7 +41,6 @@
 #include "errcode.h"
 #include "key_def.h"
 #include "tuple.h"
-#include "tuple_hash.h"
 #include "salad/bloom.h"
 #include "trivia/util.h"
 #include "third_party/PMurHash.h"

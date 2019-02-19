@@ -30,12 +30,11 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "key_def.h"
-#include "tuple.h"
-
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
+
+struct key_def;
 
 /**
  * Initialize tuple_hash() and key_hash() function for the key_def
@@ -43,59 +42,6 @@ extern "C" {
  */
 void
 key_def_set_hash_func(struct key_def *def);
-
-/**
- * Compute hash of a tuple field.
- * @param ph1 - pointer to running hash
- * @param pcarry - pointer to carry
- * @param field - pointer to field data
- * @param coll - collation to use for hashing strings or NULL
- * @return size of processed data
- *
- * This function updates @ph1 and @pcarry and advances @field
- * by the number of processed bytes.
- */
-uint32_t
-tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
-		 struct coll *coll);
-
-/**
- * Compute hash of a key part.
- * @param ph1 - pointer to running hash
- * @param pcarry - pointer to carry
- * @param tuple - tuple to hash
- * @param part - key part
- * @return size of processed data
- *
- * This function updates @ph1 and @pcarry.
- */
-uint32_t
-tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
-		    struct key_part *part);
-
-/**
- * Calculates a common hash value for a tuple
- * @param tuple - a tuple
- * @param key_def - key_def for field description
- * @return - hash value
- */
-static inline uint32_t
-tuple_hash(const struct tuple *tuple, struct key_def *key_def)
-{
-	return key_def->tuple_hash(tuple, key_def);
-}
-
-/**
- * Calculate a common hash value for a key
- * @param key - full key (msgpack fields w/o array marker)
- * @param key_def - key_def for field description
- * @return - hash value
- */
-static inline uint32_t
-key_hash(const char *key, struct key_def *key_def)
-{
-	return key_def->key_hash(key, key_def);
-}
 
 #if defined(__cplusplus)
 } /* extern "C" */
