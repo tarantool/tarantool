@@ -1049,7 +1049,7 @@ static const tuple_compare_t compare_slowpath_funcs[] = {
 	tuple_compare_slowpath<true, true, true>
 };
 
-tuple_compare_t
+static tuple_compare_t
 tuple_compare_create(const struct key_def *def)
 {
 	int cmp_func_idx = (def->is_nullable ? 1 : 0) +
@@ -1277,7 +1277,7 @@ static const tuple_compare_with_key_t compare_with_key_slowpath_funcs[] = {
 	tuple_compare_with_key_slowpath<true, true, true>
 };
 
-tuple_compare_with_key_t
+static tuple_compare_with_key_t
 tuple_compare_with_key_create(const struct key_def *def)
 {
 	int cmp_func_idx = (def->is_nullable ? 1 : 0) +
@@ -1322,3 +1322,10 @@ tuple_compare_with_key_create(const struct key_def *def)
 }
 
 /* }}} tuple_compare_with_key */
+
+void
+key_def_set_compare_func(struct key_def *def)
+{
+	def->tuple_compare = tuple_compare_create(def);
+	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
+}

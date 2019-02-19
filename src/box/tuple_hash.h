@@ -42,7 +42,7 @@ extern "C" {
  * @param key_def key definition
  */
 void
-tuple_hash_func_set(struct key_def *def);
+key_def_set_hash_func(struct key_def *def);
 
 /**
  * Compute hash of a tuple field.

@@ -222,7 +222,7 @@ uint32_t
 key_hash_slowpath(const char *key, struct key_def *key_def);
 
 void
-tuple_hash_func_set(struct key_def *key_def) {
+key_def_set_hash_func(struct key_def *key_def) {
 	if (key_def->is_nullable || key_def->has_json_paths)
 		goto slowpath;
 	/*

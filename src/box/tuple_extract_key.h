@@ -41,7 +41,7 @@ struct key_def;
  * @param key_def key definition
  */
 void
-tuple_extract_key_set(struct key_def *key_def);
+key_def_set_extract_func(struct key_def *key_def);
 
 #if defined(__cplusplus)
 } /* extern "C" */

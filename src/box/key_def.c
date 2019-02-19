@@ -129,12 +129,11 @@ key_def_delete(struct key_def *def)
 }
 
 static void
-key_def_set_cmp(struct key_def *def)
+key_def_set_func(struct key_def *def)
 {
-	def->tuple_compare = tuple_compare_create(def);
-	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
-	tuple_hash_func_set(def);
-	tuple_extract_key_set(def);
+	key_def_set_compare_func(def);
+	key_def_set_hash_func(def);
+	key_def_set_extract_func(def);
 }
 
 static void
@@ -208,7 +207,7 @@ key_def_new(const struct key_part_def *parts, uint32_t part_count)
 				 &path_pool, TUPLE_OFFSET_SLOT_NIL, 0);
 	}
 	assert(path_pool == (char *)def + sz);
-	key_def_set_cmp(def);
+	key_def_set_func(def);
 	return def;
 }
 
@@ -261,7 +260,7 @@ box_key_def_new(uint32_t *fields, uint32_t *types, uint32_t part_count)
 				 NULL, COLL_NONE, SORT_ORDER_ASC, NULL, 0,
 				 NULL, TUPLE_OFFSET_SLOT_NIL, 0);
 	}
-	key_def_set_cmp(key_def);
+	key_def_set_func(key_def);
 	return key_def;
 }
 
@@ -333,7 +332,7 @@ key_def_update_optionality(struct key_def *def, uint32_t min_field_count)
 		if (def->has_optional_parts)
 			break;
 	}
-	key_def_set_cmp(def);
+	key_def_set_func(def);
 }
 
 int
@@ -686,7 +685,7 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 				 part->offset_slot_cache, part->format_epoch);
 	}
 	assert(path_pool == (char *)new_def + sz);
-	key_def_set_cmp(new_def);
+	key_def_set_func(new_def);
 	return new_def;
 }
 

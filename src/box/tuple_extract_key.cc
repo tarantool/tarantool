@@ -356,7 +356,7 @@ static const tuple_extract_key_t extract_key_slowpath_funcs[] = {
  * Initialize tuple_extract_key() and tuple_extract_key_raw()
  */
 void
-tuple_extract_key_set(struct key_def *key_def)
+key_def_set_extract_func(struct key_def *key_def)
 {
 	if (key_def_is_sequential(key_def)) {
 		if (key_def->has_optional_parts) {
