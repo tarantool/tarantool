@@ -1503,7 +1503,7 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 	if (!lsm->check_is_unique)
 		return 0;
 	if (lsm->key_def->is_nullable &&
-	    vy_tuple_key_contains_null(stmt, lsm->key_def))
+	    tuple_key_contains_null(stmt, lsm->key_def))
 		return 0;
 	struct tuple *key = vy_stmt_extract_key(stmt, lsm->key_def,
 						lsm->env->key_format);

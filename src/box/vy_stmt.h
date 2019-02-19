@@ -669,28 +669,6 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt);
 const char *
 vy_stmt_str(const struct tuple *stmt);
 
-/**
- * Check if a key of @a tuple contains NULL.
- * @param tuple Tuple to check.
- * @param def Key def to check by.
- * @retval Does the key contain NULL or not?
- */
-static inline bool
-vy_tuple_key_contains_null(const struct tuple *tuple, struct key_def *def)
-{
-	struct tuple_format *format = tuple_format(tuple);
-	const char *data = tuple_data(tuple);
-	const uint32_t *field_map = tuple_field_map(tuple);
-	for (struct key_part *part = def->parts, *end = part + def->part_count;
-	     part < end; ++part) {
-		const char *field =
-			tuple_field_raw_by_part(format, data, field_map, part);
-		if (field == NULL || mp_typeof(*field) == MP_NIL)
-			return true;
-	}
-	return false;
-}
-
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */

@@ -464,6 +464,15 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
 	     const struct key_part *parts2, uint32_t part_count2);
 
 /**
+ * Check if a key of @a tuple contains NULL.
+ * @param tuple Tuple to check.
+ * @param def Key def to check by.
+ * @retval Does the key contain NULL or not?
+ */
+bool
+tuple_key_contains_null(const struct tuple *tuple, struct key_def *def);
+
+/**
  * Extract key from tuple by given key definition and return
  * buffer allocated on box_txn_alloc with this key. This function
  * has O(n) complexity, where n is the number of key parts.
