@@ -1053,8 +1053,13 @@ function remote_methods:_request(method, opts, ...)
             if opts.on_push or opts.on_push_ctx then
                 error('To handle pushes in an async request use future:pairs()')
             end
-            return transport.perform_async_request(buffer, method, table.insert,
-                                                   {}, ...)
+            local res, err =
+                transport.perform_async_request(buffer, method, table.insert,
+                                                {}, ...)
+            if err then
+                box.error(err)
+            end
+            return res
         end
         if opts.timeout then
             -- conn.space:request(, { timeout = timeout })
