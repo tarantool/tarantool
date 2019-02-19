@@ -1161,6 +1161,11 @@ finalize_long()
 future:wait_result(100)
 
 c:close()
+--
+-- Check that is_async does not work on a closed connection.
+--
+c:call('any_func', {}, {is_async = true})
+
 box.schema.user.revoke('guest', 'execute', 'universe')
 c = net:connect(box.cfg.listen)
 
