@@ -401,7 +401,7 @@ vy_mem_iterator_seek(struct vy_mem_iterator *itr, const struct tuple *last_key)
 	tree_key.stmt = key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
-	if (tuple_field_count(key) > 0) {
+	if (!vy_stmt_is_empty_key(key)) {
 		if (iterator_type == ITER_LE || iterator_type == ITER_GT) {
 			itr->curr_pos =
 				vy_mem_tree_upper_bound(&itr->mem->tree,

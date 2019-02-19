@@ -197,8 +197,7 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 		struct tuple *key, struct tuple **ret)
 {
 	/* All key parts must be set for a point lookup. */
-	assert(vy_stmt_type(key) != IPROTO_SELECT ||
-	       tuple_field_count(key) >= lsm->cmp_def->part_count);
+	assert(vy_stmt_is_full_key(key, lsm->cmp_def));
 
 	*ret = NULL;
 	double start_time = ev_monotonic_now(loop());
@@ -301,7 +300,7 @@ int
 vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
 		    struct tuple *key, struct tuple **ret)
 {
-	assert(tuple_field_count(key) >= lsm->cmp_def->part_count);
+	assert(vy_stmt_is_full_key(key, lsm->cmp_def));
 
 	int rc;
 	struct vy_history history;

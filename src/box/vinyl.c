@@ -1374,7 +1374,7 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 	int rc;
 	struct tuple *tuple;
 
-	if (tuple_field_count(key) >= lsm->cmp_def->part_count) {
+	if (vy_stmt_is_full_key(key, lsm->cmp_def)) {
 		/*
 		 * Use point lookup for a full key.
 		 */

@@ -1273,7 +1273,7 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 	struct vy_run_iterator_pos end_pos = {run->info.page_count, 0};
 	bool equal_found = false;
 	int rc;
-	if (tuple_field_count(key) > 0) {
+	if (!vy_stmt_is_empty_key(key)) {
 		rc = vy_run_iterator_search(itr, iterator_type, key,
 					    &itr->curr_pos, &equal_found);
 		if (rc != 0 || itr->search_ended)

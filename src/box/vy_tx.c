@@ -943,7 +943,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 int
 vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 {
-	assert(tuple_field_count(stmt) >= lsm->cmp_def->part_count);
+	assert(vy_stmt_is_full_key(stmt, lsm->cmp_def));
 
 	if (vy_tx_is_in_read_view(tx)) {
 		/* No point in tracking reads. */
@@ -1102,7 +1102,7 @@ vy_txw_iterator_seek(struct vy_txw_iterator *itr,
 	struct vy_lsm *lsm = itr->lsm;
 	struct write_set_key k = { lsm, key };
 	struct txv *txv;
-	if (tuple_field_count(key) > 0) {
+	if (!vy_stmt_is_empty_key(key)) {
 		if (iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &k);
 		else if (iterator_type == ITER_GE || iterator_type == ITER_GT)
