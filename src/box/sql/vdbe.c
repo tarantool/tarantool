@@ -1667,13 +1667,13 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		iB = pIn2->u.i;
 		bIntint = 1;
 		switch( pOp->opcode) {
-		case OP_Add:       if (sqlAddInt64(&iB,iA)) goto fp_math;  break;
-		case OP_Subtract:  if (sqlSubInt64(&iB,iA)) goto fp_math;  break;
-		case OP_Multiply:  if (sqlMulInt64(&iB,iA)) goto fp_math;  break;
+		case OP_Add:       if (sqlAddInt64(&iB,iA)) goto integer_overflow; break;
+		case OP_Subtract:  if (sqlSubInt64(&iB,iA)) goto integer_overflow; break;
+		case OP_Multiply:  if (sqlMulInt64(&iB,iA)) goto integer_overflow; break;
 		case OP_Divide: {
 			if (iA == 0)
 				goto division_by_zero;
-			if (iA==-1 && iB==SMALLEST_INT64) goto fp_math;
+			if (iA==-1 && iB==SMALLEST_INT64) goto integer_overflow;
 			iB /= iA;
 			break;
 		}
@@ -1689,7 +1689,6 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		MemSetTypeFlag(pOut, MEM_Int);
 	} else {
 		bIntint = 0;
-	fp_math:
 		if (sqlVdbeRealValue(pIn1, &rA) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn1), "numeric");
@@ -1745,6 +1744,10 @@ arithmetic_result_is_null:
 
 division_by_zero:
 	diag_set(ClientError, ER_SQL_EXECUTE, "division by zero");
+	rc = SQL_TARANTOOL_ERROR;
+	goto abort_due_to_error;
+integer_overflow:
+	diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
 	rc = SQL_TARANTOOL_ERROR;
 	goto abort_due_to_error;
 }
