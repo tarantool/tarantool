@@ -56,3 +56,21 @@ box.sql.execute('SELECT CAST(9223372036854775807.0 AS INTEGER);')
 ---
 - error: 'Type mismatch: can not convert 9.22337203685478e+18 to integer'
 ...
+-- gh-3810: make sure that if space contains integers in range
+-- [INT64_MAX, UINT64_MAX], they are handled inside SQL in a
+-- proper way, which now means that an error is raised.
+--
+box.sql.execute('CREATE TABLE t (id INT PRIMARY KEY);')
+---
+...
+box.space.T:insert({9223372036854775809})
+---
+- [9223372036854775808]
+...
+box.sql.execute('SELECT * FROM t;')
+---
+- error: 'Failed to execute SQL statement: integer is overflowed'
+...
+box.space.T:drop()
+---
+...

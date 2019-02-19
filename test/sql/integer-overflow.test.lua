@@ -24,3 +24,11 @@ box.sql.execute('SELECT CAST(\'9223372036854775808\' AS INTEGER);')
 -- with error due to conversion = 8.
 --
 box.sql.execute('SELECT CAST(9223372036854775807.0 AS INTEGER);')
+-- gh-3810: make sure that if space contains integers in range
+-- [INT64_MAX, UINT64_MAX], they are handled inside SQL in a
+-- proper way, which now means that an error is raised.
+--
+box.sql.execute('CREATE TABLE t (id INT PRIMARY KEY);')
+box.space.T:insert({9223372036854775809})
+box.sql.execute('SELECT * FROM t;')
+box.space.T:drop()

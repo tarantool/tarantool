@@ -2791,8 +2791,11 @@ case OP_Column: {
 		sqlVdbeMemSetNull(pDest);
 	}
 	uint32_t unused;
-	vdbe_decode_msgpack_into_mem((const char *)(zData + aOffset[p2]),
-				     pDest, &unused);
+	if (vdbe_decode_msgpack_into_mem((const char *)(zData + aOffset[p2]),
+					 pDest, &unused) != 0) {
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
+	}
 	/* MsgPack map, array or extension (unsupported in sql).
 	 * Wrap it in a blob verbatim.
 	 */

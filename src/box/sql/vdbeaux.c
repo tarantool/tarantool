@@ -3725,12 +3725,12 @@ vdbe_decode_msgpack_into_mem(const char *buf, struct Mem *mem, uint32_t *len)
 	case MP_UINT: {
 		uint64_t v = mp_decode_uint(&buf);
 		if (v > INT64_MAX) {
-			mem->u.r = v;
-			mem->flags = MEM_Real;
-		} else {
-			mem->u.i = v;
-			mem->flags = MEM_Int;
+			diag_set(ClientError, ER_SQL_EXECUTE,
+				 "integer is overflowed");
+			return -1;
 		}
+		mem->u.i = v;
+		mem->flags = MEM_Int;
 		break;
 	}
 	case MP_INT: {
