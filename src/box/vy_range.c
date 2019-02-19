@@ -81,8 +81,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
 			  const struct tuple *key)
 {
-	uint32_t key_field_count = tuple_field_count(key);
-	if (key_field_count == 0) {
+	if (vy_stmt_is_empty_key(key)) {
 		switch (iterator_type) {
 		case ITER_LT:
 		case ITER_LE:
@@ -125,7 +124,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		range = vy_range_tree_psearch(tree, key);
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
-		    key_field_count < range->cmp_def->part_count &&
+		    !vy_stmt_is_full_key(key, range->cmp_def) &&
 		    vy_stmt_compare_with_key(key, range->begin,
 					     range->cmp_def) == 0)
 			range = vy_range_tree_prev(tree, range);

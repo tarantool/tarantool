@@ -220,6 +220,44 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 }
 
 /**
+ * Return the number of key parts defined in the given vinyl
+ * statement.
+ *
+ * If the statement represents a tuple, we assume that it has
+ * all key parts defined.
+ */
+static inline uint32_t
+vy_stmt_key_part_count(const struct tuple *stmt, struct key_def *key_def)
+{
+	if (vy_stmt_type(stmt) == IPROTO_SELECT) {
+		uint32_t part_count = tuple_field_count(stmt);
+		assert(part_count <= key_def->part_count);
+		return part_count;
+	}
+	return key_def->part_count;
+}
+
+/**
+ * Return true if the given vinyl statement contains all
+ * key parts, i.e. can be used for an exact match lookup.
+ */
+static inline bool
+vy_stmt_is_full_key(const struct tuple *stmt, struct key_def *key_def)
+{
+	return vy_stmt_key_part_count(stmt, key_def) == key_def->part_count;
+}
+
+/**
+ * Return true if the given vinyl statement stores an empty
+ * (match all) key.
+ */
+static inline bool
+vy_stmt_is_empty_key(const struct tuple *stmt)
+{
+	return tuple_field_count(stmt) == 0;
+}
+
+/**
  * Duplicate the statememnt.
  *
  * @param stmt statement

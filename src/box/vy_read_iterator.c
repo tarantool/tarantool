@@ -208,7 +208,7 @@ vy_read_iterator_is_exact_match(struct vy_read_iterator *itr,
 	return itr->last_stmt == NULL && stmt != NULL &&
 		(type == ITER_EQ || type == ITER_REQ ||
 		 type == ITER_GE || type == ITER_LE) &&
-		tuple_field_count(key) >= cmp_def->part_count &&
+		vy_stmt_is_full_key(key, cmp_def) &&
 		vy_stmt_compare(stmt, key, cmp_def) == 0;
 }
 
@@ -445,7 +445,7 @@ vy_read_iterator_advance(struct vy_read_iterator *itr)
 {
 	if (itr->last_stmt != NULL && (itr->iterator_type == ITER_EQ ||
 				       itr->iterator_type == ITER_REQ) &&
-	    tuple_field_count(itr->key) >= itr->lsm->cmp_def->part_count) {
+	    vy_stmt_is_full_key(itr->key, itr->lsm->cmp_def)) {
 		/*
 		 * There may be one statement at max satisfying
 		 * EQ with a full key.
@@ -678,7 +678,7 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 	itr->key = key;
 	itr->read_view = rv;
 
-	if (tuple_field_count(key) == 0) {
+	if (vy_stmt_is_empty_key(key)) {
 		/*
 		 * Strictly speaking, a GT/LT iterator should return
 		 * nothing if the key is empty, because every key is

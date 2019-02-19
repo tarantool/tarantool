@@ -53,10 +53,8 @@ vy_read_interval_cmpl(const struct vy_read_interval *a,
 		return -1;
 	if (!a->left_belongs && b->left_belongs)
 		return 1;
-	uint32_t a_parts = tuple_field_count(a->left);
-	uint32_t b_parts = tuple_field_count(b->left);
-	a_parts = MIN(a_parts, cmp_def->part_count);
-	b_parts = MIN(b_parts, cmp_def->part_count);
+	uint32_t a_parts = vy_stmt_key_part_count(a->left, cmp_def);
+	uint32_t b_parts = vy_stmt_key_part_count(b->left, cmp_def);
 	if (a->left_belongs)
 		return a_parts < b_parts ? -1 : a_parts > b_parts;
 	else
@@ -76,10 +74,8 @@ vy_read_interval_cmpr(const struct vy_read_interval *a,
 		return 1;
 	if (!a->right_belongs && b->right_belongs)
 		return -1;
-	uint32_t a_parts = tuple_field_count(a->right);
-	uint32_t b_parts = tuple_field_count(b->right);
-	a_parts = MIN(a_parts, cmp_def->part_count);
-	b_parts = MIN(b_parts, cmp_def->part_count);
+	uint32_t a_parts = vy_stmt_key_part_count(a->right, cmp_def);
+	uint32_t b_parts = vy_stmt_key_part_count(b->right, cmp_def);
 	if (a->right_belongs)
 		return a_parts > b_parts ? -1 : a_parts < b_parts;
 	else
@@ -102,10 +98,8 @@ vy_read_interval_should_merge(const struct vy_read_interval *l,
 		return true;
 	if (!l->right_belongs && !r->left_belongs)
 		return false;
-	uint32_t l_parts = tuple_field_count(l->right);
-	uint32_t r_parts = tuple_field_count(r->left);
-	l_parts = MIN(l_parts, cmp_def->part_count);
-	r_parts = MIN(r_parts, cmp_def->part_count);
+	uint32_t l_parts = vy_stmt_key_part_count(l->right, cmp_def);
+	uint32_t r_parts = vy_stmt_key_part_count(r->left, cmp_def);
 	if (l->right_belongs)
 		return l_parts <= r_parts;
 	else

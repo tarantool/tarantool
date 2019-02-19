@@ -270,13 +270,15 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 			 * Regardless of order, the statement is the first in
 			 * sequence of statements that is equal to the key.
 			 */
-			boundary_level = tuple_field_count(key);
+			boundary_level = vy_stmt_key_part_count(key,
+							cache->cmp_def);
 		}
 	} else {
 		assert(prev_stmt != NULL);
 		if (order == ITER_EQ || order == ITER_REQ) {
 			/* that is the last statement that is equal to key */
-			boundary_level = tuple_field_count(key);
+			boundary_level = vy_stmt_key_part_count(key,
+							cache->cmp_def);
 		} else {
 			/* that is the last statement */
 			boundary_level = 0;
@@ -527,7 +529,8 @@ static inline bool
 vy_cache_iterator_is_stop(struct vy_cache_iterator *itr,
 			  struct vy_cache_entry *entry)
 {
-	uint8_t key_level = tuple_field_count(itr->key);
+	uint8_t key_level = vy_stmt_key_part_count(itr->key,
+						   itr->cache->cmp_def);
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
@@ -556,7 +559,8 @@ static inline bool
 vy_cache_iterator_is_end_stop(struct vy_cache_iterator *itr,
 			      struct vy_cache_entry *last_entry)
 {
-	uint8_t key_level = tuple_field_count(itr->key);
+	uint8_t key_level = vy_stmt_key_part_count(itr->key,
+						   itr->cache->cmp_def);
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
@@ -644,7 +648,7 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr,
 	*entry = NULL;
 	itr->cache->stat.lookup++;
 
-	if (tuple_field_count(key) > 0) {
+	if (!vy_stmt_is_empty_key(key)) {
 		bool exact;
 		itr->curr_pos = iterator_type == ITER_EQ ||
 				iterator_type == ITER_GE ||
