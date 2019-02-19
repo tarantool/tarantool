@@ -1121,18 +1121,25 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	assert(mp_typeof(*data) == MP_ARRAY);
+	struct tuple *tuple = NULL;
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	uint32_t *field_map, field_map_size;
+	if (tuple_field_map_create(format, data, true, &field_map,
+				   &field_map_size) != 0)
+		goto end;
+
 	size_t tuple_len = end - data;
-	size_t total = sizeof(struct memtx_tuple) + format->field_map_size +
-		tuple_len;
+	size_t total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
 
 	ERROR_INJECT(ERRINJ_TUPLE_ALLOC, {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
-		return NULL;
+		goto end;
 	});
 	if (unlikely(total > memtx->max_tuple_size)) {
 		diag_set(ClientError, ER_MEMTX_MAX_TUPLE_SIZE, total);
 		error_log(diag_last_error(diag_get()));
-		return NULL;
+		goto end;
 	}
 
 	struct memtx_tuple *memtx_tuple;
@@ -1144,9 +1151,9 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	}
 	if (memtx_tuple == NULL) {
 		diag_set(OutOfMemory, total, "slab allocator", "memtx_tuple");
-		return NULL;
+		goto end;
 	}
-	struct tuple *tuple = &memtx_tuple->base;
+	tuple = &memtx_tuple->base;
 	tuple->refs = 0;
 	memtx_tuple->version = memtx->snapshot_version;
 	assert(tuple_len <= UINT32_MAX); /* bsize is UINT32_MAX */
@@ -1158,15 +1165,13 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 * tuple base, not from memtx_tuple, because the struct
 	 * tuple is not the first field of the memtx_tuple.
 	 */
-	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
+	tuple->data_offset = sizeof(struct tuple) + field_map_size;
 	char *raw = (char *) tuple + tuple->data_offset;
-	uint32_t *field_map = (uint32_t *) raw;
+	memcpy(raw - field_map_size, field_map, field_map_size);
 	memcpy(raw, data, tuple_len);
-	if (tuple_init_field_map(format, field_map, raw, true)) {
-		memtx_tuple_delete(format, tuple);
-		return NULL;
-	}
 	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
+end:
+	region_truncate(region, region_svp);
 	return tuple;
 }
 

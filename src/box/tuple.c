@@ -75,30 +75,34 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 
 	mp_tuple_assert(data, end);
-	size_t data_len = end - data;
-	size_t total = sizeof(struct tuple) + format->field_map_size +
-		data_len;
+	struct tuple *tuple = NULL;
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
+	uint32_t *field_map, field_map_size;
+	if (tuple_field_map_create(format, data, true, &field_map,
+				   &field_map_size) != 0)
+		goto end;
 
-	struct tuple *tuple = (struct tuple *) smalloc(&runtime_alloc, total);
+	size_t data_len = end - data;
+	size_t total = sizeof(struct tuple) + field_map_size + data_len;
+	tuple = (struct tuple *) smalloc(&runtime_alloc, total);
 	if (tuple == NULL) {
 		diag_set(OutOfMemory, (unsigned) total,
 			 "malloc", "tuple");
-		return NULL;
+		goto end;
 	}
 
 	tuple->refs = 0;
 	tuple->bsize = data_len;
 	tuple->format_id = tuple_format_id(format);
 	tuple_format_ref(format);
-	tuple->data_offset = sizeof(struct tuple) + format->field_map_size;
+	tuple->data_offset = sizeof(struct tuple) + field_map_size;
 	char *raw = (char *) tuple + tuple->data_offset;
-	uint32_t *field_map = (uint32_t *) raw;
+	memcpy(raw - field_map_size, field_map, field_map_size);
 	memcpy(raw, data, data_len);
-	if (tuple_init_field_map(format, field_map, raw, true)) {
-		runtime_tuple_delete(format, tuple);
-		return NULL;
-	}
 	say_debug("%s(%zu) = %p", __func__, data_len, tuple);
+end:
+	region_truncate(region, region_svp);
 	return tuple;
 }
 
@@ -122,17 +126,12 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	uint32_t *field_map = region_alloc(region, format->field_map_size);
-	if (field_map == NULL) {
-		diag_set(OutOfMemory, format->field_map_size, "region_alloc",
-			 "field_map");
-		return -1;
-	}
-	field_map = (uint32_t *)((char *)field_map + format->field_map_size);
-	if (tuple_init_field_map(format, field_map, tuple, true) != 0)
-		return -1;
+	uint32_t *field_map, field_map_size;
+	int rc = tuple_field_map_create(format, tuple, true, &field_map,
+					&field_map_size);
+	assert(rc != 0 || field_map_size == format->field_map_size);
 	region_truncate(region, region_svp);
-	return 0;
+	return rc;
 }
 
 /**

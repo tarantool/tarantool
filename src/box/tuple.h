@@ -450,7 +450,9 @@ tuple_delete(struct tuple *tuple)
 
 /**
  * Check tuple data correspondence to space format.
- * Actually checks everything that checks tuple_init_field_map.
+ * Actually, checks everything that is checked by
+ * tuple_field_map_create.
+ *
  * @param format Format to which the tuple must match.
  * @param tuple  MessagePack array.
  *
@@ -478,7 +480,7 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
  * Return a field map for the tuple.
  * @param tuple tuple
  * @returns a field map for the tuple.
- * @sa tuple_init_field_map()
+ * @sa tuple_field_map_create()
  */
 static inline const uint32_t *
 tuple_field_map(const struct tuple *tuple)
@@ -586,7 +588,7 @@ parse:
  * @param field_no the index of field to return
  *
  * @returns field data if field exists or NULL
- * @sa tuple_init_field_map()
+ * @sa tuple_field_map_create()
  */
 static inline const char *
 tuple_field_raw(struct tuple_format *format, const char *tuple,

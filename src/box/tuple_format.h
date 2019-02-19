@@ -386,12 +386,15 @@ box_tuple_format_unref(box_tuple_format_t *format);
 /** \endcond public */
 
 /**
- * Fill the field map of tuple with field offsets.
+ * Allocate a field map for the given tuple on the region.
+ *
  * @param format    Tuple format.
- * @param field_map A pointer behind the last element of the field
- *                  map.
  * @param tuple     MessagePack array.
  * @param validate  If set, validate the tuple against the format.
+ * @param field_map[out] The pointer to store field map
+ *                       allocation.
+ * @param field_map_size[out] The pointer to variable to store
+ *                            field map size.
  *
  * @retval  0 Success.
  * @retval -1 Format error.
@@ -403,8 +406,9 @@ box_tuple_format_unref(box_tuple_format_t *format);
  * tuple + off_i = indexed_field_i;
  */
 int
-tuple_init_field_map(struct tuple_format *format, uint32_t *field_map,
-		     const char *tuple, bool validate);
+tuple_field_map_create(struct tuple_format *format, const char *tuple,
+		       bool validate, uint32_t **field_map,
+		       uint32_t *field_map_size);
 
 /**
  * Initialize tuple format subsystem.

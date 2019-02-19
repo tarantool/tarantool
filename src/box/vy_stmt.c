@@ -286,27 +286,9 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	for (int i = 0; i < op_count; ++i)
 		ops_size += ops[i].iov_len;
 
-	/*
-	 * Allocate stmt. Offsets: one per key part + offset of the
-	 * statement end.
-	 */
-	size_t mpsize = (tuple_end - tuple_begin);
-	size_t bsize = mpsize + ops_size;
-	struct tuple *stmt = vy_stmt_alloc(format, bsize);
-	if (stmt == NULL)
-		return NULL;
-	/* Copy MsgPack data */
-	char *raw = (char *) tuple_data(stmt);
-	char *wpos = raw;
-	memcpy(wpos, tuple_begin, mpsize);
-	wpos += mpsize;
-	for (struct iovec *op = ops, *end = ops + op_count;
-	     op != end; ++op) {
-		memcpy(wpos, op->iov_base, op->iov_len);
-		wpos += op->iov_len;
-	}
-	vy_stmt_set_type(stmt, type);
-
+	struct tuple *stmt = NULL;
+	struct region *region = &fiber()->gc;
+	size_t region_svp = region_used(region);
 	/*
 	 * Calculate offsets for key parts.
 	 *
@@ -320,10 +302,33 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	 * tuples inserted into a space are validated explicitly
 	 * with tuple_validate() anyway.
 	 */
-	if (tuple_init_field_map(format, (uint32_t *) raw, raw, false)) {
-		tuple_unref(stmt);
-		return NULL;
+	uint32_t *field_map, field_map_size;
+	if (tuple_field_map_create(format, tuple_begin, false, &field_map,
+				   &field_map_size) != 0)
+		goto end;
+	/*
+	 * Allocate stmt. Offsets: one per key part + offset of the
+	 * statement end.
+	 */
+	size_t mpsize = (tuple_end - tuple_begin);
+	size_t bsize = mpsize + ops_size;
+	stmt = vy_stmt_alloc(format, bsize);
+	if (stmt == NULL)
+		goto end;
+	/* Copy MsgPack data */
+	char *raw = (char *) tuple_data(stmt);
+	char *wpos = raw;
+	memcpy(wpos - field_map_size, field_map, field_map_size);
+	memcpy(wpos, tuple_begin, mpsize);
+	wpos += mpsize;
+	for (struct iovec *op = ops, *end = ops + op_count;
+	     op != end; ++op) {
+		memcpy(wpos, op->iov_base, op->iov_len);
+		wpos += op->iov_len;
 	}
+	vy_stmt_set_type(stmt, type);
+end:
+	region_truncate(region, region_svp);
 	return stmt;
 }
 
@@ -523,7 +528,7 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 	 * Perform simultaneous parsing of the tuple and
 	 * format::fields tree traversal to copy indexed field
 	 * data and initialize field map. In many details the code
-	 * above works like tuple_init_field_map, read it's
+	 * above works like tuple_field_map_create, read it's
 	 * comments for more details.
 	 */
 	uint32_t frames_sz = format->fields_depth * sizeof(struct mp_frame);
