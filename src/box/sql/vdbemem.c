@@ -1634,8 +1634,8 @@ sql_stat4_column(struct sql *db, const char *record, uint32_t col_num,
 			return -1;
 		}
 	}
-	sqlVdbeMsgpackGet((const unsigned char *) a, mem);
-	return 0;
+	uint32_t unused;
+	return vdbe_decode_msgpack_into_mem(a, mem, &unused);
 }
 
 /*

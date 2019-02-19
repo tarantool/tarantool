@@ -556,7 +556,18 @@ int sqlVdbeCompareMsgpack(const char **key1,
  */
 int sqlVdbeRecordCompareMsgpack(const void *key1,
 				    struct UnpackedRecord *key2);
-u32 sqlVdbeMsgpackGet(const unsigned char *buf, Mem * pMem);
+
+/**
+ * Decode msgpack and save value into VDBE memory cell.
+ *
+ * @param buf Buffer to deserialize msgpack from.
+ * @param mem Memory cell to write value into.
+ * @param len[out] Length of decoded part.
+ * @retval Return code: < 0 in case of error.
+ * @retval 0 on success.
+ */
+int
+vdbe_decode_msgpack_into_mem(const char *buf, struct Mem *mem, uint32_t *len);
 
 struct mpstream;
 struct region;

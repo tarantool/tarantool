@@ -3698,79 +3698,74 @@ sqlVdbeRecordCompareMsgpack(const void *key1,
 	return key2->default_rc;
 }
 
-u32
-sqlVdbeMsgpackGet(const unsigned char *buf,	/* Buffer to deserialize from */
-		      Mem * pMem)		/* Memory cell to write value into */
+int
+vdbe_decode_msgpack_into_mem(const char *buf, struct Mem *mem, uint32_t *len)
 {
-	const char *zParse = (const char *)buf;
-	switch (mp_typeof(*zParse)) {
+	const char *start_buf = buf;
+	switch (mp_typeof(*buf)) {
 	case MP_ARRAY:
 	case MP_MAP:
 	case MP_EXT:
-	default:{
-			pMem->flags = 0;
-			return 0;
-		}
-	case MP_NIL:{
-			mp_decode_nil((const char **)&zParse);	/*  Still need to promote zParse.  */
-			pMem->flags = MEM_Null;
-			break;
-		}
-	case MP_BOOL:{
-			assert((unsigned char)*zParse == 0xc2
-			       || (unsigned char)*zParse == 0xc3);
-			pMem->u.i = (unsigned char)*zParse - 0xc2;
-			pMem->flags = MEM_Int;
-			break;
-		}
-	case MP_UINT:{
-			uint64_t v = mp_decode_uint(&zParse);
-			if (v > INT64_MAX) {
-				/*
-				 * If the value exceeds i64 range, convert to double (lossy).
-				 */
-				pMem->u.r = v;
-				pMem->flags = MEM_Real;
-			} else {
-				pMem->u.i = v;
-				pMem->flags = MEM_Int;
-			}
-			break;
-		}
-	case MP_INT:{
-			pMem->u.i = mp_decode_int(&zParse);
-			pMem->flags = MEM_Int;
-			break;
-		}
-	case MP_STR:{
-			/* XXX u32->int */
-			pMem->n = (int)mp_decode_strl((const char **)&zParse);
-			pMem->flags = MEM_Str | MEM_Ephem;
- install_blob:
-			pMem->z = (char *)zParse;
-			zParse += pMem->n;
-			break;
-		}
-	case MP_BIN:{
-			/* XXX u32->int */
-			pMem->n = (int)mp_decode_binl((const char **)&zParse);
-			pMem->flags = MEM_Blob | MEM_Ephem;
-			goto install_blob;
-		}
-	case MP_FLOAT:{
-			pMem->u.r = mp_decode_float(&zParse);
-			pMem->flags =
-			    sqlIsNaN(pMem->u.r) ? MEM_Null : MEM_Real;
-			break;
-		}
-	case MP_DOUBLE:{
-			pMem->u.r = mp_decode_double(&zParse);
-			pMem->flags =
-			    sqlIsNaN(pMem->u.r) ? MEM_Null : MEM_Real;
-			break;
-		}
+	default: {
+		mem->flags = 0;
+		break;
 	}
-	return (u32) (zParse - (const char *)buf);
+	case MP_NIL: {
+		mp_decode_nil(&buf);
+		mem->flags = MEM_Null;
+		break;
+	}
+	case MP_BOOL: {
+		assert((unsigned char)*buf == 0xc2 ||
+		       (unsigned char)*buf == 0xc3);
+		mem->u.i = (unsigned char)*buf - 0xc2;
+		mem->flags = MEM_Int;
+		break;
+	}
+	case MP_UINT: {
+		uint64_t v = mp_decode_uint(&buf);
+		if (v > INT64_MAX) {
+			mem->u.r = v;
+			mem->flags = MEM_Real;
+		} else {
+			mem->u.i = v;
+			mem->flags = MEM_Int;
+		}
+		break;
+	}
+	case MP_INT: {
+		mem->u.i = mp_decode_int(&buf);
+		mem->flags = MEM_Int;
+		break;
+	}
+	case MP_STR: {
+		/* XXX u32->int */
+		mem->n = (int) mp_decode_strl(&buf);
+		mem->flags = MEM_Str | MEM_Ephem;
+install_blob:
+		mem->z = (char *)buf;
+		buf += mem->n;
+		break;
+	}
+	case MP_BIN: {
+		/* XXX u32->int */
+		mem->n = (int) mp_decode_binl(&buf);
+		mem->flags = MEM_Blob | MEM_Ephem;
+		goto install_blob;
+	}
+	case MP_FLOAT: {
+		mem->u.r = mp_decode_float(&buf);
+		mem->flags = sqlIsNaN(mem->u.r) ? MEM_Null : MEM_Real;
+		break;
+	}
+	case MP_DOUBLE: {
+		mem->u.r = mp_decode_double(&buf);
+		mem->flags = sqlIsNaN(mem->u.r) ? MEM_Null : MEM_Real;
+		break;
+	}
+	}
+	*len = (uint32_t)(buf - start_buf);
+	return 0;
 }
 
 void
@@ -3788,7 +3783,8 @@ sqlVdbeRecordUnpackMsgpack(struct key_def *key_def,	/* Information about the rec
 	while (n--) {
 		pMem->szMalloc = 0;
 		pMem->z = 0;
-		u32 sz = sqlVdbeMsgpackGet((u8 *) zParse, pMem);
+		uint32_t sz = 0;
+		vdbe_decode_msgpack_into_mem(zParse, pMem, &sz);
 		if (sz == 0) {
 			/* MsgPack array, map or ext. Treat as blob. */
 			pMem->z = (char *)zParse;

@@ -2790,8 +2790,9 @@ case OP_Column: {
 	if (VdbeMemDynamic(pDest)) {
 		sqlVdbeMemSetNull(pDest);
 	}
-
-	sqlVdbeMsgpackGet(zData+aOffset[p2], pDest);
+	uint32_t unused;
+	vdbe_decode_msgpack_into_mem((const char *)(zData + aOffset[p2]),
+				     pDest, &unused);
 	/* MsgPack map, array or extension (unsupported in sql).
 	 * Wrap it in a blob verbatim.
 	 */
