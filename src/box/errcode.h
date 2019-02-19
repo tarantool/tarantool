@@ -89,7 +89,7 @@ struct errcode_record {
 	/* 34 */_(ER_NO_SUCH_TRIGGER,		"Trigger '%s' doesn't exist") \
 	/* 35 */_(ER_NO_SUCH_INDEX_ID,		"No index #%u is defined in space '%s'") \
 	/* 36 */_(ER_NO_SUCH_SPACE,		"Space '%s' does not exist") \
-	/* 37 */_(ER_NO_SUCH_FIELD,		"Field %d was not found in the tuple") \
+	/* 37 */_(ER_NO_SUCH_FIELD_NO,		"Field %d was not found in the tuple") \
 	/* 38 */_(ER_EXACT_FIELD_COUNT,		"Tuple field count %u does not match space field count %u") \
 	/* 39 */_(ER_FIELD_MISSING,		"Tuple field %s required by space format is missing") \
 	/* 40 */_(ER_WAL_IO,			"Failed to write to disk") \
@@ -205,7 +205,7 @@ struct errcode_record {
 	/*150 */_(ER_CANT_CREATE_COLLATION,	"Failed to initialize collation: %s.") \
 	/*151 */_(ER_WRONG_COLLATION_OPTIONS,	"Wrong collation options (field %u): %s") \
 	/*152 */_(ER_NULLABLE_PRIMARY,		"Primary index of the space '%s' can not contain nullable parts") \
-	/*153 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' doesn't exist") \
+	/*153 */_(ER_NO_SUCH_FIELD_NAME,	"Field '%s' was not found in the space '%s' format") \
 	/*154 */_(ER_TRANSACTION_YIELD,		"Transaction has been aborted by a fiber yield") \
 	/*155 */_(ER_NO_SUCH_GROUP,		"Replication group '%s' does not exist") \
 	/*156 */_(ER_SQL_BIND_VALUE,            "Bind value for parameter %s is out of range for type %s") \
@@ -228,6 +228,8 @@ struct errcode_record {
 	/*173 */_(ER_DROP_COLLATION,		"Can't drop collation %s : %s") \
 	/*174 */_(ER_ILLEGAL_COLLATION_MIX,	"Illegal mix of collations") \
 	/*175 */_(ER_SQL_NO_SUCH_PRAGMA,	"Pragma '%s' does not exist") \
+	/*176 */_(ER_SQL_CANT_RESOLVE_FIELD,	"Can’t resolve field '%s'") \
+	/*177 */_(ER_INDEX_EXISTS_IN_SPACE,	"Index '%s' already exists in space '%s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

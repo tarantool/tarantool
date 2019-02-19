@@ -367,7 +367,7 @@ t;
   34: box.error.NO_SUCH_TRIGGER
   35: box.error.NO_SUCH_INDEX_ID
   36: box.error.NO_SUCH_SPACE
-  37: box.error.NO_SUCH_FIELD
+  37: box.error.NO_SUCH_FIELD_NO
   38: box.error.EXACT_FIELD_COUNT
   39: box.error.FIELD_MISSING
   40: box.error.WAL_IO
@@ -505,6 +505,8 @@ t;
   173: box.error.DROP_COLLATION
   174: box.error.ILLEGAL_COLLATION_MIX
   175: box.error.SQL_NO_SUCH_PRAGMA
+  176: box.error.SQL_CANT_RESOLVE_FIELD
+  177: box.error.INDEX_EXISTS_IN_SPACE
 ...
 test_run:cmd("setopt delimiter ''");
 ---

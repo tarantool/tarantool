@@ -2186,7 +2186,8 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			goto exit_create_index;
 		if (sql_space_index_by_name(space, name) != NULL) {
 			if (!if_not_exist) {
-				diag_set(ClientError, ER_INDEX_EXISTS, name);
+				diag_set(ClientError, ER_INDEX_EXISTS_IN_SPACE,
+					 name, def->name);
 				sql_parser_error(parse);
 			}
 			goto exit_create_index;

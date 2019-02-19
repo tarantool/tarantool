@@ -1391,7 +1391,7 @@ test:do_catchsql2_test(
                 ORDER BY a;
             ]], {
                 -- <select1-6.23>
-                1,"Field 'X' doesn't exist"
+                1,"Can’t resolve field 'X'"
                 -- </select1-6.23>
             })
 

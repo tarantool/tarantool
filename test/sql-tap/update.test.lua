@@ -58,7 +58,7 @@ test:do_catchsql_test("update-3.2", [[
   UPDATE test1 SET f1=f3*2 WHERE f2==32
 ]], {
   -- <update-3.2>
-  1, "Field 'F3' doesn't exist"
+  1, "Can’t resolve field 'F3'"
   -- </update-3.2>
 })
 
@@ -66,7 +66,7 @@ test:do_catchsql_test("update-3.3", [[
   UPDATE test1 SET f1=test2.f1*2 WHERE f2==32
 ]], {
   -- <update-3.3>
-  1, "Field 'F1' doesn't exist"
+  1, "Field 'F1' was not found in the space 'TEST2' format"
   -- </update-3.3>
 })
 
@@ -74,7 +74,7 @@ test:do_catchsql_test("update-3.4", [[
   UPDATE test1 SET f3=f1*2 WHERE f2==32
 ]], {
   -- <update-3.4>
-  1, "Field 'F3' doesn't exist"
+  1, "Field 'F3' was not found in the space 'TEST1' format"
   -- </update-3.4>
 })
 
@@ -854,7 +854,7 @@ test:do_catchsql_test("update-9.1", [[
   UPDATE test1 SET x=11 WHERE f1=1025
 ]], {
   -- <update-9.1>
-  1, "Field 'X' doesn't exist"
+  1, "Field 'X' was not found in the space 'TEST1' format"
   -- </update-9.1>
 })
 
@@ -870,7 +870,7 @@ test:do_catchsql_test("update-9.3", [[
   UPDATE test1 SET f1=11 WHERE x=1025
 ]], {
   -- <update-9.3>
-  1, "Field 'X' doesn't exist"
+  1, "Can’t resolve field 'X'"
   -- </update-9.3>
 })
 

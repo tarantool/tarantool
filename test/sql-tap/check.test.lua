@@ -344,7 +344,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.3>
-        1, "Failed to create space 'T3': Field 'Q' doesn't exist"
+        1, "Failed to create space 'T3': Can’t resolve field 'Q'"
         -- </check-3.3>
     })
 
@@ -368,7 +368,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.5>
-        1, "Failed to create space 'T3': Field 'X' doesn't exist"
+        1, "Failed to create space 'T3': Field 'X' was not found in the space 'T2' format"
         -- </check-3.5>
     })
 

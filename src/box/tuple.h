@@ -739,7 +739,7 @@ tuple_next_with_type(struct tuple_iterator *it, enum mp_type type)
 	uint32_t fieldno = it->fieldno;
 	const char *field = tuple_next(it);
 	if (field == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_FIELD, it->fieldno);
+		diag_set(ClientError, ER_NO_SUCH_FIELD_NO, it->fieldno);
 		return NULL;
 	}
 	if (mp_typeof(*field) != type) {
@@ -804,7 +804,7 @@ tuple_field_with_type(const struct tuple *tuple, uint32_t fieldno,
 {
 	const char *field = tuple_field(tuple, fieldno);
 	if (field == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_FIELD,
+		diag_set(ClientError, ER_NO_SUCH_FIELD_NO,
 			 fieldno + TUPLE_INDEX_BASE);
 		return NULL;
 	}
@@ -840,7 +840,7 @@ tuple_field_i64(const struct tuple *tuple, uint32_t fieldno, int64_t *out)
 {
 	const char *field = tuple_field(tuple, fieldno);
 	if (field == NULL) {
-		diag_set(ClientError, ER_NO_SUCH_FIELD, fieldno);
+		diag_set(ClientError, ER_NO_SUCH_FIELD_NO, fieldno);
 		return -1;
 	}
 	uint64_t val;

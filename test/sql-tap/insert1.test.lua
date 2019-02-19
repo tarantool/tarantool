@@ -240,7 +240,7 @@ end, {
     SELECT * FROM t3 ORDER BY a;
   ]], {
     -- <insert-4.3>
-    1, "Field 'A' doesn't exist"
+    1, "Field 'A' was not found in the space 'T3' format"
     -- </insert-4.3>
   })
 

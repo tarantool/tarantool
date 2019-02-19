@@ -40,5 +40,5 @@ box.sql.execute("DROP TABLE t1")
 --
 box.sql.execute("CREATE TABLE tx (a INT, PRIMARY KEY (b));")
 ---
-- error: Field 'B' doesn't exist
+- error: Can’t resolve field 'B'
 ...

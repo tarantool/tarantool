@@ -97,7 +97,7 @@ test:do_test(
         return test:catchsql "CREATE INDEX index1 ON test1(f4)"
     end, {
         -- <index-2.1b>
-        1, "Field 'F4' doesn't exist"
+        1, "Can’t resolve field 'F4'"
         -- </index-2.1b>
     })
 
@@ -115,7 +115,7 @@ test:do_test(
         return table.insert(v,msg) or v
     end, {
         -- <index-2.2>
-        1, "Field 'F4' doesn't exist"
+        1, "Can’t resolve field 'F4'"
         -- </index-2.2>
     })
 

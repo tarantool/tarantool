@@ -2733,7 +2733,7 @@ priv_def_create_from_tuple(struct priv_def *priv, struct tuple *tuple)
 
 	const char *data = tuple_field(tuple, BOX_PRIV_FIELD_OBJECT_ID);
 	if (data == NULL) {
-		tnt_raise(ClientError, ER_NO_SUCH_FIELD,
+		tnt_raise(ClientError, ER_NO_SUCH_FIELD_NO,
 			  BOX_PRIV_FIELD_OBJECT_ID + TUPLE_INDEX_BASE);
 	}
 	/*

@@ -191,7 +191,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		}
 		if (j >= (int)def->field_count) {
 			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME,
-				 pChanges->a[i].zName);
+				 pChanges->a[i].zName, def->name);
 			sql_parser_error(pParse);
 			goto update_cleanup;
 		}
