@@ -30,6 +30,7 @@
  */
 #include <assert.h>
 #include "field_def.h"
+#include "cfg.h"
 #include "sql.h"
 #include "sql/sqlInt.h"
 #include "sql/tarantoolInt.h"
@@ -1167,18 +1168,44 @@ char *
 sql_encode_index_opts(struct region *region, const struct index_opts *opts,
 		      uint32_t *size)
 {
-	int unique_len = strlen("unique");
-	*size = mp_sizeof_map(1) + mp_sizeof_str(unique_len) +
-		mp_sizeof_bool(opts->is_unique);
-	char *mem = (char *) region_alloc(region, *size);
-	if (mem == NULL) {
-		diag_set(OutOfMemory, *size, "region_alloc", "mem");
+	size_t used = region_used(region);
+	struct mpstream stream;
+	bool is_error = false;
+	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
+		      set_encode_error, &is_error);
+	/*
+	 * In case of vinyl engine we must inherit global
+	 * (i.e. set via box.cfg) params such as bloom_fpr,
+	 * page_size etc.
+	 */
+	uint8_t current_engine = current_session()->sql_default_engine;
+	uint32_t map_sz = current_engine == SQL_STORAGE_ENGINE_VINYL ? 6 : 1;
+	mpstream_encode_map(&stream, map_sz);
+	mpstream_encode_str(&stream, "unique");
+	mpstream_encode_bool(&stream, opts->is_unique);
+	if (current_engine == SQL_STORAGE_ENGINE_VINYL) {
+		mpstream_encode_str(&stream, "range_size");
+		mpstream_encode_uint(&stream, cfg_geti64("vinyl_range_size"));
+		mpstream_encode_str(&stream, "page_size");
+		mpstream_encode_uint(&stream, cfg_geti64("vinyl_page_size"));
+		mpstream_encode_str(&stream, "run_count_per_level");
+		mpstream_encode_uint(&stream, cfg_geti("vinyl_run_count_per_level"));
+		mpstream_encode_str(&stream, "run_size_ratio");
+		mpstream_encode_double(&stream, cfg_getd("vinyl_run_size_ratio"));
+		mpstream_encode_str(&stream, "bloom_fpr");
+		mpstream_encode_double(&stream, cfg_getd("vinyl_bloom_fpr"));
+	}
+	mpstream_flush(&stream);
+	if (is_error) {
+		diag_set(OutOfMemory, stream.pos - stream.buf,
+			 "mpstream_flush", "stream");
 		return NULL;
 	}
-	char *pos = mp_encode_map(mem, 1);
-	pos = mp_encode_str(pos, "unique", unique_len);
-	pos = mp_encode_bool(pos, opts->is_unique);
-	return mem;
+	*size = region_used(region) - used;
+	char *raw = region_join(region, *size);
+	if (raw == NULL)
+		diag_set(OutOfMemory, *size, "region_join", "raw");
+	return raw;
 }
 
 void
