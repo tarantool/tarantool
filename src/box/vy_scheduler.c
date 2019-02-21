@@ -278,11 +278,8 @@ vy_task_delete(struct vy_task *task)
 }
 
 static bool
-vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
+vy_dump_heap_less(struct vy_lsm *i1, struct vy_lsm *i2)
 {
-	struct vy_lsm *i1 = container_of(a, struct vy_lsm, in_dump);
-	struct vy_lsm *i2 = container_of(b, struct vy_lsm, in_dump);
-
 	/*
 	 * LSM trees that are currently being dumped or can't be
 	 * scheduled for dump right now are moved off the top of
@@ -311,17 +308,14 @@ vy_dump_heap_less(struct heap_node *a, struct heap_node *b)
 
 #define HEAP_NAME vy_dump_heap
 #define HEAP_LESS(h, l, r) vy_dump_heap_less(l, r)
+#define heap_value_t struct vy_lsm
+#define heap_value_attr in_dump
 
 #include "salad/heap.h"
 
-#undef HEAP_LESS
-#undef HEAP_NAME
-
 static bool
-vy_compaction_heap_less(struct heap_node *a, struct heap_node *b)
+vy_compaction_heap_less(struct vy_lsm *i1, struct vy_lsm *i2)
 {
-	struct vy_lsm *i1 = container_of(a, struct vy_lsm, in_compaction);
-	struct vy_lsm *i2 = container_of(b, struct vy_lsm, in_compaction);
 	/*
 	 * Prefer LSM trees whose read amplification will be reduced
 	 * most as a result of compaction.
@@ -331,11 +325,10 @@ vy_compaction_heap_less(struct heap_node *a, struct heap_node *b)
 
 #define HEAP_NAME vy_compaction_heap
 #define HEAP_LESS(h, l, r) vy_compaction_heap_less(l, r)
+#define heap_value_t struct vy_lsm
+#define heap_value_attr in_compaction
 
 #include "salad/heap.h"
-
-#undef HEAP_LESS
-#undef HEAP_NAME
 
 static void
 vy_worker_pool_start(struct vy_worker_pool *pool)
@@ -523,9 +516,8 @@ vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 	assert(!lsm->is_dropped);
 	assert(lsm->in_dump.pos == UINT32_MAX);
 	assert(lsm->in_compaction.pos == UINT32_MAX);
-	vy_dump_heap_insert(&scheduler->dump_heap, &lsm->in_dump);
-	vy_compaction_heap_insert(&scheduler->compaction_heap,
-				  &lsm->in_compaction);
+	vy_dump_heap_insert(&scheduler->dump_heap, lsm);
+	vy_compaction_heap_insert(&scheduler->compaction_heap, lsm);
 }
 
 void
@@ -534,9 +526,8 @@ vy_scheduler_remove_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 	assert(!lsm->is_dropped);
 	assert(lsm->in_dump.pos != UINT32_MAX);
 	assert(lsm->in_compaction.pos != UINT32_MAX);
-	vy_dump_heap_delete(&scheduler->dump_heap, &lsm->in_dump);
-	vy_compaction_heap_delete(&scheduler->compaction_heap,
-				  &lsm->in_compaction);
+	vy_dump_heap_delete(&scheduler->dump_heap, lsm);
+	vy_compaction_heap_delete(&scheduler->compaction_heap, lsm);
 	lsm->in_dump.pos = UINT32_MAX;
 	lsm->in_compaction.pos = UINT32_MAX;
 }
@@ -552,9 +543,8 @@ vy_scheduler_update_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 	}
 	assert(lsm->in_dump.pos != UINT32_MAX);
 	assert(lsm->in_compaction.pos != UINT32_MAX);
-	vy_dump_heap_update(&scheduler->dump_heap, &lsm->in_dump);
-	vy_compaction_heap_update(&scheduler->compaction_heap,
-				  &lsm->in_compaction);
+	vy_dump_heap_update(&scheduler->dump_heap, lsm);
+	vy_compaction_heap_update(&scheduler->compaction_heap, lsm);
 }
 
 static void
@@ -653,11 +643,9 @@ vy_scheduler_complete_dump(struct vy_scheduler *scheduler)
 	}
 
 	int64_t min_generation = scheduler->generation;
-	struct heap_node *pn = vy_dump_heap_top(&scheduler->dump_heap);
-	if (pn != NULL) {
-		struct vy_lsm *lsm = container_of(pn, struct vy_lsm, in_dump);
+	struct vy_lsm *lsm = vy_dump_heap_top(&scheduler->dump_heap);
+	if (lsm != NULL)
 		min_generation = vy_lsm_generation(lsm);
-	}
 	if (min_generation == scheduler->dump_generation) {
 		/*
 		 * There are still LSM trees that must be dumped
@@ -1637,7 +1625,7 @@ out:
 	task->wi->iface->close(task->wi);
 
 	assert(range->heap_node.pos == UINT32_MAX);
-	vy_range_heap_insert(&lsm->range_heap, &range->heap_node);
+	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_scheduler_update_lsm(scheduler, lsm);
 
 	say_info("%s: completed compacting range %s",
@@ -1676,7 +1664,7 @@ vy_task_compaction_abort(struct vy_task *task)
 	}
 
 	assert(range->heap_node.pos == UINT32_MAX);
-	vy_range_heap_insert(&lsm->range_heap, &range->heap_node);
+	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_scheduler_update_lsm(scheduler, lsm);
 }
 
@@ -1689,15 +1677,10 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 		.complete = vy_task_compaction_complete,
 		.abort = vy_task_compaction_abort,
 	};
-
-	struct heap_node *range_node;
-	struct vy_range *range;
-
 	assert(!lsm->is_dropped);
 
-	range_node = vy_range_heap_top(&lsm->range_heap);
-	assert(range_node != NULL);
-	range = container_of(range_node, struct vy_range, heap_node);
+	struct vy_range *range = vy_range_heap_top(&lsm->range_heap);
+	assert(range != NULL);
 	assert(range->compaction_priority > 1);
 
 	if (vy_lsm_split_range(lsm, range) ||
@@ -1768,8 +1751,8 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	 * Remove the range we are going to compact from the heap
 	 * so that it doesn't get selected again.
 	 */
-	vy_range_heap_delete(&lsm->range_heap, range_node);
-	range_node->pos = UINT32_MAX;
+	vy_range_heap_delete(&lsm->range_heap, range);
+	range->heap_node.pos = UINT32_MAX;
 	vy_scheduler_update_lsm(scheduler, lsm);
 
 	say_info("%s: started compacting range %s, runs %d/%d",
@@ -1888,8 +1871,8 @@ retry:
 	/*
 	 * Look up the oldest LSM tree eligible for dump.
 	 */
-	struct heap_node *pn = vy_dump_heap_top(&scheduler->dump_heap);
-	if (pn == NULL) {
+	struct vy_lsm *lsm = vy_dump_heap_top(&scheduler->dump_heap);
+	if (lsm == NULL) {
 		/*
 		 * There is no LSM tree and so no task to schedule.
 		 * Complete the current dump round.
@@ -1897,7 +1880,6 @@ retry:
 		vy_scheduler_complete_dump(scheduler);
 		goto no_task;
 	}
-	struct vy_lsm *lsm = container_of(pn, struct vy_lsm, in_dump);
 	if (!lsm->is_dumping && lsm->pin_count == 0 &&
 	    vy_lsm_generation(lsm) == scheduler->dump_generation) {
 		/*
@@ -1965,10 +1947,9 @@ vy_scheduler_peek_compaction(struct vy_scheduler *scheduler,
 	struct vy_worker *worker = NULL;
 retry:
 	*ptask = NULL;
-	struct heap_node *pn = vy_compaction_heap_top(&scheduler->compaction_heap);
-	if (pn == NULL)
+	struct vy_lsm *lsm = vy_compaction_heap_top(&scheduler->compaction_heap);
+	if (lsm == NULL)
 		goto no_task; /* nothing to do */
-	struct vy_lsm *lsm = container_of(pn, struct vy_lsm, in_compaction);
 	if (vy_lsm_compaction_priority(lsm) <= 1)
 		goto no_task; /* nothing to do */
 	if (worker == NULL) {
