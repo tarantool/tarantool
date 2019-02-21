@@ -680,10 +680,9 @@ vy_lsm_generation(struct vy_lsm *lsm)
 int
 vy_lsm_compaction_priority(struct vy_lsm *lsm)
 {
-	struct heap_node *n = vy_range_heap_top(&lsm->range_heap);
-	if (n == NULL)
+	struct vy_range *range = vy_range_heap_top(&lsm->range_heap);
+	if (range == NULL)
 		return 0;
-	struct vy_range *range = container_of(n, struct vy_range, heap_node);
 	/*
 	 * There's no point in compacting dropped LSM trees. Moreover, since we
 	 * don't commit a new run for a dropped LSM tree so as not to mess with
@@ -782,7 +781,7 @@ void
 vy_lsm_add_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	assert(range->heap_node.pos == UINT32_MAX);
-	vy_range_heap_insert(&lsm->range_heap, &range->heap_node);
+	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_range_tree_insert(&lsm->range_tree, range);
 	lsm->range_count++;
 }
@@ -791,7 +790,7 @@ void
 vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range)
 {
 	assert(range->heap_node.pos != UINT32_MAX);
-	vy_range_heap_delete(&lsm->range_heap, &range->heap_node);
+	vy_range_heap_delete(&lsm->range_heap, range);
 	vy_range_tree_remove(&lsm->range_tree, range);
 	lsm->range_count--;
 }

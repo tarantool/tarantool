@@ -18,19 +18,15 @@ struct test_type {
 		struct heap_node node;
 };
 
-int test_type_less(const heap_t *heap,
-			const struct heap_node *a,
-			const struct heap_node *b) {
-
-	const struct test_type *left = (struct test_type *)((char *)a -
-					offsetof(struct test_type, node));
-	const struct test_type *right = (struct test_type *)((char *)b -
-					offsetof(struct test_type, node));
+int test_type_less(const struct test_type *left, const struct test_type *right)
+{
 	return left->val1 < right->val1;
 }
 
 #define HEAP_NAME test_heap
-#define HEAP_LESS(h, a, b) test_type_less(h, a, b)
+#define HEAP_LESS(h, a, b) test_type_less(a, b)
+#define heap_value_t struct test_type
+#define heap_value_attr node
 
 #include "salad/heap.h"
 
@@ -54,7 +50,7 @@ test_iterator_create()
 
 	value = (struct test_type *)malloc(sizeof(struct test_type));
 	value->val1 = 0;
-	test_heap_insert(&heap, &value->node);
+	test_heap_insert(&heap, value);
 
 	struct heap_iterator it;
 	test_heap_iterator_init(&heap, &it);
@@ -71,17 +67,16 @@ static void
 test_iterator_empty()
 {
 	header();
-	struct heap_node *nd;
 	heap_t heap;
 	test_heap_create(&heap);
 
 	struct heap_iterator it;
 	test_heap_iterator_init(&heap, &it);
 
-	nd = test_heap_iterator_next(&it);
+	struct test_type *t = test_heap_iterator_next(&it);
 
-	if (nd != NULL)
-		fail("incorrect node", "nd != NULL");
+	if (t != NULL)
+		fail("incorrect node", "t != NULL");
 
 	free_all_nodes(&heap);
 
@@ -93,15 +88,14 @@ static void
 test_iterator_small()
 {
 	header();
-	struct test_type *value, *root_value;
-	struct heap_node *test_node;
+	struct test_type *value;
 	heap_t heap;
 	test_heap_create(&heap);
 
 	for (uint32_t i = 4; i > 0; --i) {
 		value = (struct test_type *)malloc(sizeof(struct test_type));
 		value->val1 = i;
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 	}
 
 	struct heap_iterator it;
@@ -109,16 +103,11 @@ test_iterator_small()
 	memset((void *)used_key, 0, sizeof(used_key));
 
 	test_heap_iterator_init(&heap, &it);
-	test_node = NULL;
 	for (uint32_t i = 0; i < 4; ++i) {
-		test_node = test_heap_iterator_next(&it);
+		value = test_heap_iterator_next(&it);
 
-		if (test_node == NULL)
-			fail("NULL returned from iterator",
-			     "test_node == NULL");
-
-		value = (struct test_type *)((char *)test_node -
-					offsetof(struct test_type, node));
+		if (value == NULL)
+			fail("NULL returned from iterator", "value == NULL");
 		uint32_t val = value->val1;
 		if (val < 1 || val > 5)
 			fail("from iterator returned incorrect value",
@@ -135,10 +124,9 @@ test_iterator_small()
 	if (!f)
 		fail("some node was skipped", "!f");
 
-	test_node = test_heap_iterator_next(&it);
-	if (test_node != NULL)
-		fail("after all iterator returns not NULL",
-		     "test_node != NULL");
+	value = test_heap_iterator_next(&it);
+	if (value != NULL)
+		fail("after all iterator returns not NULL", "value != NULL");
 
 	free_all_nodes(&heap);
 	footer();
@@ -149,15 +137,14 @@ test_iterator_large()
 {
 	header();
 	uint32_t const TEST_CASE_SIZE = 1000;
-	struct test_type *value, *root_value;
-	struct heap_node *test_node;
+	struct test_type *value;
 	heap_t heap;
 	test_heap_create(&heap);
 
 	for (uint32_t i = TEST_CASE_SIZE; i > 0; --i) {
 		value = (struct test_type *)malloc(sizeof(struct test_type));
 		value->val1 = i;
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 	}
 
 	struct heap_iterator it;
@@ -165,16 +152,12 @@ test_iterator_large()
 	memset((void *)used_key, 0, sizeof(used_key));
 
 	test_heap_iterator_init(&heap, &it);
-	test_node = NULL;
 	for (uint32_t i = 0; i < TEST_CASE_SIZE; ++i) {
-		test_node = test_heap_iterator_next(&it);
+		value = test_heap_iterator_next(&it);
 
-		if (test_node == NULL)
-			fail("NULL returned from iterator",
-			     "test_node == NULL");
+		if (value == NULL)
+			fail("NULL returned from iterator", "value == NULL");
 
-		value = (struct test_type *)((char *)test_node -
-						offsetof(struct test_type, node));
 		uint32_t val = value->val1;
 		if (val == 0 || val > TEST_CASE_SIZE)
 			fail("from iterator returned incorrect value",
@@ -192,10 +175,10 @@ test_iterator_large()
 	if (!f)
 		fail("some node was skipped", "!f");
 
-	test_node = test_heap_iterator_next(&it);
-	if (test_node != NULL)
+	value = test_heap_iterator_next(&it);
+	if (value != NULL)
 		fail("after all iterator returns not nil",
-		     "test_node != NULL");
+		     "value != NULL");
 
 	free_all_nodes(&heap);
 	footer();

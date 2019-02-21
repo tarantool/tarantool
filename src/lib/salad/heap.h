@@ -75,9 +75,8 @@
  * my_type instances.
  * The function below is example of valid comparator by value:
  *
- * int test_type_less(const heap_t *heap,
- *			const struct heap_node *a,
- *			const struct heap_node *b) {
+ * bool test_type_less(const heap_t *heap, const struct heap_node *a,
+ *		       const struct heap_node *b) {
  *
  *	const struct my_type *left = (struct my_type *)((char *)a -
  *					offsetof(struct my_type, vnode));
@@ -93,6 +92,15 @@
 #error "HEAP_LESS must be defined"
 #endif
 
+/** Structure, stored in the heap. */
+#ifndef heap_value_t
+#error "heap_value_t must be defined"
+#endif
+
+/** Name of heap_node attribute in heap_value_t. */
+#ifndef heap_value_attr
+#error "heap_value_attr must be defined"
+#endif
 
 /**
  * Tools for name substitution:
@@ -153,6 +161,15 @@ struct heap_iterator {
 
 #ifndef HEAP_FORWARD_DECLARATION
 
+#ifndef container_of
+#define container_of(ptr, type, member) ({ \
+	const typeof( ((type *)0)->member  ) *__mptr = (ptr); \
+	(type *)( (char *)__mptr - offsetof(type,member)  );})
+#endif
+
+#define node_to_value(n) container_of(n, heap_value_t, heap_value_attr)
+#define value_to_node(v) (&(v)->heap_value_attr)
+
 /* Extern API that is the most usefull part. */
 
 /**
@@ -170,32 +187,32 @@ HEAP(destroy)(heap_t *heap);
 /**
  * Return min value.
  */
-static inline struct heap_node *
+static inline heap_value_t *
 HEAP(top)(heap_t *heap);
 
 /**
  * Erase min value.
  */
-static inline struct heap_node *
+static inline heap_value_t *
 HEAP(pop)(heap_t *heap);
 
 /**
  * Insert value.
  */
 static inline int
-HEAP(insert)(heap_t *heap, struct heap_node *nd);
+HEAP(insert)(heap_t *heap, heap_value_t *value);
 
 /**
  * Delete node from heap.
  */
 static inline void
-HEAP(delete)(heap_t *heap, struct heap_node *value_node);
+HEAP(delete)(heap_t *heap, heap_value_t *value);
 
 /**
- * Heapify tree after update of value under value_node pointer.
+ * Heapify tree after update of value.
  */
 static inline void
-HEAP(update)(heap_t *heap, struct heap_node *value_node);
+HEAP(update)(heap_t *heap, heap_value_t *value);
 
 /**
  * Heapify tree after updating all values.
@@ -212,10 +229,16 @@ HEAP(iterator_init)(heap_t *heap, struct heap_iterator *it);
 /**
  * Heap iterator next.
  */
-static inline struct heap_node *
-HEAP(iterator_next) (struct heap_iterator *it);
+static inline heap_value_t *
+HEAP(iterator_next)(struct heap_iterator *it);
 
 /* Routines. Functions below are useless for ordinary user. */
+
+/**
+ * Heapify tree after update of value having @a node attribute.
+ */
+static inline void
+HEAP(update_node)(heap_t *heap, struct heap_node *node);
 
 /*
  * Update backlink in the give heap_node structure.
@@ -266,6 +289,13 @@ HEAP(destroy)(heap_t *heap)
 	free(heap->harr);
 }
 
+static inline void
+HEAP(update_node)(heap_t *heap, struct heap_node *node)
+{
+	HEAP(sift_down)(heap, node);
+	HEAP(sift_up)(heap, node);
+}
+
 /*
  * Update backlink in the give heap_node structure.
  */
@@ -283,7 +313,8 @@ HEAP(sift_up)(heap_t *heap, struct heap_node *node)
 {
 	heap_off_t curr_pos = node->pos, parent = (curr_pos - 1) / 2;
 
-	while (curr_pos > 0 && HEAP_LESS(heap, node, heap->harr[parent])) {
+	while (curr_pos > 0 && HEAP_LESS(heap, node_to_value(node),
+					 node_to_value(heap->harr[parent]))) {
 
 		node = heap->harr[curr_pos];
 		heap->harr[curr_pos] = heap->harr[parent];
@@ -311,13 +342,13 @@ HEAP(sift_down)(heap_t *heap, struct heap_node *node)
 		right = 2 * curr_pos + 2;
 		min_child = left;
 		if (right < heap->size &&
-		    HEAP_LESS(heap, heap->harr[right], heap->harr[left]))
+		    HEAP_LESS(heap, node_to_value(heap->harr[right]),
+			      node_to_value(heap->harr[left])))
 			min_child = right;
 
 		if (left >= heap->size ||
-		    HEAP_LESS(heap,
-			      heap->harr[curr_pos],
-			      heap->harr[min_child]) )
+		    HEAP_LESS(heap, node_to_value(heap->harr[curr_pos]),
+			      node_to_value(heap->harr[min_child])))
 			return;
 
 		node = heap->harr[curr_pos];
@@ -350,16 +381,13 @@ HEAP(reserve)(heap_t *heap)
  * Insert value.
  */
 static inline int
-HEAP(insert)(heap_t *heap, struct heap_node *node)
+HEAP(insert)(heap_t *heap, heap_value_t *value)
 {
-	(void) heap;
-	assert(heap);
-
 	if (heap->size + 1 > heap->capacity) {
 		if (HEAP(reserve)(heap))
 			return -1;
 	}
-
+	struct heap_node *node = value_to_node(value);
 	heap->harr[heap->size] = node;
 	HEAP(update_link)(heap, heap->size++);
 	HEAP(sift_up)(heap, node); /* heapify */
@@ -371,25 +399,24 @@ HEAP(insert)(heap_t *heap, struct heap_node *node)
  * Return min value without removing it from heap.
  * If heap is empty, return NULL.
  */
-static inline struct heap_node *
+static inline heap_value_t *
 HEAP(top)(heap_t *heap)
 {
 	if (heap->size == 0)
 		return NULL;
-	return heap->harr[0];
+	return node_to_value(heap->harr[0]);
 }
 
 /**
  * Erase min value. Returns delete value.
  */
-static inline struct heap_node *
+static inline heap_value_t *
 HEAP(pop)(heap_t *heap)
 {
 	if (heap->size == 0)
 		return NULL;
-
-	struct heap_node *res = heap->harr[0];
-	HEAP(delete)(heap, heap->harr[0]);
+	heap_value_t *res = node_to_value(heap->harr[0]);
+	HEAP(delete)(heap, res);
 	return res;
 }
 
@@ -397,32 +424,27 @@ HEAP(pop)(heap_t *heap)
  * Delete node from heap.
  */
 static inline void
-HEAP(delete)(heap_t *heap, struct heap_node *value_node)
+HEAP(delete)(heap_t *heap, heap_value_t *value)
 {
 	if (heap->size == 0)
 		return;
 
 	heap->size--;
 
-	heap_off_t curr_pos = value_node->pos;
+	heap_off_t curr_pos = value_to_node(value)->pos;
 
 	if (curr_pos == heap->size)
 		return;
 
 	heap->harr[curr_pos] = heap->harr[heap->size];
 	HEAP(update_link)(heap, curr_pos);
-	HEAP(update)(heap, heap->harr[curr_pos]);
+	HEAP(update_node)(heap, heap->harr[curr_pos]);
 }
 
-/**
- * Heapify tree after update of value under value_node pointer.
- */
 static inline void
-HEAP(update)(heap_t *heap, struct heap_node *value_node)
+HEAP(update)(heap_t *heap, heap_value_t *value)
 {
-	/* heapify */
-	HEAP(sift_down)(heap, value_node);
-	HEAP(sift_up)(heap, value_node);
+	HEAP(update_node)(heap, value_to_node(value));
 }
 
 /**
@@ -455,12 +477,12 @@ HEAP(iterator_init)(heap_t *heap, struct heap_iterator *it)
 /**
  * Heap iterator next.
  */
-static inline struct heap_node *
+static inline heap_value_t *
 HEAP(iterator_next)(struct heap_iterator *it)
 {
 	if (it->curr_pos == it->heap->size)
 		return NULL;
-	return it->heap->harr[it->curr_pos++];
+	return node_to_value(it->heap->harr[it->curr_pos++]);
 }
 
 /**
@@ -478,18 +500,25 @@ HEAP(check)(heap_t *heap)
 		right = 2 * curr_pos + 2;
 		min_child = left;
 		if (right < heap->size &&
-		    HEAP_LESS(heap, heap->harr[right], heap->harr[left]))
+		    HEAP_LESS(heap, node_to_value(heap->harr[right]),
+			      node_to_value(heap->harr[left])))
 			min_child = right;
 
-		if (HEAP_LESS(heap,
-			      heap->harr[min_child],
-			      heap->harr[curr_pos]))
+		if (HEAP_LESS(heap, node_to_value(heap->harr[min_child]),
+			      node_to_value(heap->harr[curr_pos])))
 			return -1;
 	}
 
 	return 0;
 }
 
+#undef node_to_value
+#undef value_to_node
+#undef heap_value_t
+#undef heap_value_attr
+
 #endif /* HEAP_FORWARD_DECLARATION */
 
 #undef HEAP_FORWARD_DECLARATION
+#undef HEAP_NAME
+#undef HEAP_LESS
