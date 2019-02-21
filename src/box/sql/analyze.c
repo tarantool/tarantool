@@ -358,7 +358,7 @@ static const FuncDef statInitFuncdef = {
 	0,			/* xFinalize */
 	"stat_init",		/* zName */
 	{0},
-	0
+	0, false
 };
 
 /*
@@ -614,7 +614,7 @@ static const FuncDef statPushFuncdef = {
 	0,			/* xFinalize */
 	"stat_push",		/* zName */
 	{0},
-	0
+	0, false
 };
 
 #define STAT_GET_STAT1 0	/* "stat" column of stat1 table */
@@ -742,7 +742,7 @@ static const FuncDef statGetFuncdef = {
 	0,			/* xFinalize */
 	"stat_get",		/* zName */
 	{0},
-	0
+	0, false
 };
 
 static void

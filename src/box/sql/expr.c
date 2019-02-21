@@ -278,6 +278,29 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 			*coll_id = lhs_coll_id;
 			break;
 		}
+		if (op == TK_FUNCTION) {
+			uint32_t arg_count = p->x.pList == NULL ? 0 :
+					     p->x.pList->nExpr;
+			struct FuncDef *func = sqlFindFunction(parse->db,
+							       p->u.zToken,
+							       arg_count, 0);
+			if (func == NULL)
+				break;
+			if (func->is_coll_derived) {
+				/*
+				 * Now we use quite straightforward
+				 * approach assuming that resulting
+				 * collation is derived from first
+				 * argument. It is true at least for
+				 * built-in functions: trim, upper,
+				 * lower, replace, substr.
+				 */
+				assert(func->ret_type == FIELD_TYPE_STRING);
+				p = p->x.pList->a->pExpr;
+				continue;
+			}
+			break;
+		}
 		if (p->flags & EP_Collate) {
 			if (p->pLeft && (p->pLeft->flags & EP_Collate) != 0) {
 				p = p->pLeft;
