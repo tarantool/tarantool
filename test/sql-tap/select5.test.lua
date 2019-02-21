@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(44)
+test:plan(46)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -536,6 +536,29 @@ test:do_execsql_test(
     -- <select5-9.12>
     ""
     -- </select5-9.12>
+})
+
+-- gh-3932: bytecode is not emmited if aggregate is placed only
+-- in HAVING clause.
+--
+test:do_execsql_test(
+    "select5-9.13",
+    [[
+        SELECT 1 FROM te40 HAVING SUM(s1) < 0;
+    ]], {
+    -- <select5-9.13>
+    -- </select5-9.13>
+})
+
+test:do_execsql_test(
+    "select5-9.13.2",
+    [[
+            CREATE TABLE jj (s1 INT, s2 VARCHAR(1), PRIMARY KEY(s1));
+            INSERT INTO jj VALUES(1, 'A'), (2, 'a');
+            SELECT 1 FROM jj HAVING avg(s2) = 1 AND avg(s2) = 0;
+    ]], {
+    -- <select5-9.13.2>
+    -- </select5-9.13.2>
 })
 
 test:finish_test()

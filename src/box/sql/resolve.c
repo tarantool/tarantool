@@ -1295,12 +1295,16 @@ resolveSelectStep(Walker * pWalker, Select * p)
 				return WRC_Abort;
 		}
 
-		/* If there are no aggregate functions in the result-set, and no GROUP BY
-		 * expression, do not allow aggregates in any of the other expressions.
+		/*
+		 * If there are no aggregate functions in the
+		 * result-set, and no GROUP BY or HAVING
+		 * expression, do not allow aggregates in any
+		 * of the other expressions.
 		 */
 		assert((p->selFlags & SF_Aggregate) == 0);
 		pGroupBy = p->pGroupBy;
-		if (pGroupBy || (sNC.ncFlags & NC_HasAgg) != 0) {
+		if (pGroupBy != NULL || p->pHaving != NULL ||
+		    (sNC.ncFlags & NC_HasAgg) != 0) {
 			assert(NC_MinMaxAgg == SF_MinMaxAgg);
 			p->selFlags |=
 			    SF_Aggregate | (sNC.ncFlags & NC_MinMaxAgg);
