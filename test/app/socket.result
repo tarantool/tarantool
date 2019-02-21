@@ -517,6 +517,23 @@ sc:writable()
 ---
 - true
 ...
+-- gh-3979 Check for errors when argument is negative.
+sc:read(-1)
+---
+- error: 'builtin/socket.lua: socket:read(): limit can not be negative'
+...
+sc:sysread(-1)
+---
+- error: 'builtin/socket.lua: socket:sysread(): size can not be negative'
+...
+sc:read(-100)
+---
+- error: 'builtin/socket.lua: socket:read(): limit can not be negative'
+...
+sc:sysread(-100)
+---
+- error: 'builtin/socket.lua: socket:sysread(): size can not be negative'
+...
 sc:send('abc')
 ---
 - 3

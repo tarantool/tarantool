@@ -284,6 +284,9 @@ local function socket_sysread(self, arg1, arg2)
     end
 
     local size = arg1 or buffer.READAHEAD
+    if size < 0 then
+        error('socket:sysread(): size can not be negative')
+    end
 
     local buf = buffer.IBUF_SHARED
     buf:reset()
@@ -655,7 +658,10 @@ local function check_delimiter(self, limit, eols)
 end
 
 local function read(self, limit, timeout, check, ...)
-    assert(limit >= 0)
+    if limit < 0 then
+        error('socket:read(): limit can not be negative')
+    end
+
     limit = math.min(limit, LIMIT_INFINITY)
     local rbuf = self.rbuf
     if rbuf == nil then
