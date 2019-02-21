@@ -2088,6 +2088,7 @@ box_cfg_xc(void)
 	box_check_replicaset_uuid(&replicaset_uuid);
 
 	box_set_net_msg_max();
+	box_set_readahead();
 	box_set_too_long_threshold();
 	box_set_replication_timeout();
 	box_set_replication_connect_timeout();
