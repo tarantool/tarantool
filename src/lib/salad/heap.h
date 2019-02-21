@@ -367,6 +367,8 @@ HEAP(sift_down)(heap_t *heap, struct heap_node *node)
 static inline int
 HEAP(reserve)(heap_t *heap)
 {
+	if (heap->capacity > heap->size)
+		return 0;
 	heap_off_t capacity = heap->capacity == 0 ? HEAP_INITIAL_CAPACITY :
 		heap->capacity << 1;
 	void *harr = realloc(heap->harr, sizeof(struct heap_node *) * capacity);
@@ -383,10 +385,8 @@ HEAP(reserve)(heap_t *heap)
 static inline int
 HEAP(insert)(heap_t *heap, heap_value_t *value)
 {
-	if (heap->size + 1 > heap->capacity) {
-		if (HEAP(reserve)(heap))
-			return -1;
-	}
+	if (HEAP(reserve)(heap))
+		return -1;
 	struct heap_node *node = value_to_node(value);
 	heap->harr[heap->size] = node;
 	HEAP(update_link)(heap, heap->size++);
