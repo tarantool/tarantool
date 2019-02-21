@@ -21,7 +21,7 @@ local EOL = "\n...\n"
 
 test = tap.test("console")
 
-test:plan(70)
+test:plan(72)
 
 -- Start console and connect to it
 local server = console.listen(CONSOLE_SOCKET)
@@ -270,6 +270,18 @@ box.session.on_auth(nil, console_on_auth_error)
 box.session.on_connect(nil, console_on_connect)
 box.session.on_disconnect(nil, console_on_disconnect)
 box.session.on_auth(nil, console_on_auth)
+
+
+--
+-- gh-2027: Fix custom delimiter for telnet connection.
+--
+client = socket.tcp_connect("unix/", CONSOLE_SOCKET)
+_ = client:read(128)
+client:write("console = require('console'); console.delimiter('#');\n")
+test:is(yaml.decode(client:read(EOL))[1], nil, "session type")
+client:write("box.NULL#\r\n")
+test:is(yaml.decode(client:read(EOL))[1], box.NULL, "test new delimiter")
+client:close()
 
 --
 -- gh-2642 "box.session.type()"
