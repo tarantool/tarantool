@@ -159,6 +159,13 @@ type(sa:read(0))
 sa:read(1, .01)
 sc:writable()
 
+-- gh-3979 Check for errors when argument is negative.
+
+sc:read(-1)
+sc:sysread(-1)
+sc:read(-100)
+sc:sysread(-100)
+
 sc:send('abc')
 sa:read(3)
 
