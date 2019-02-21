@@ -141,13 +141,13 @@ struct vy_range {
  */
 #define HEAP_NAME vy_range_heap
 static inline bool
-vy_range_heap_less(struct heap_node *a, struct heap_node *b)
+vy_range_heap_less(struct vy_range *r1, struct vy_range *r2)
 {
-	struct vy_range *r1 = container_of(a, struct vy_range, heap_node);
-	struct vy_range *r2 = container_of(b, struct vy_range, heap_node);
 	return r1->compaction_priority > r2->compaction_priority;
 }
 #define HEAP_LESS(h, l, r) vy_range_heap_less(l, r)
+#define heap_value_t struct vy_range
+#define heap_value_attr heap_node
 #include "salad/heap.h"
 #undef HEAP_LESS
 #undef HEAP_NAME

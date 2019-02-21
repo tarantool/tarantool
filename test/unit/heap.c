@@ -10,7 +10,6 @@
 
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
-#undef HEAP_FORWARD_DECLARATION
 
 const uint32_t TEST_CASE_SIZE = 1000;
 
@@ -24,21 +23,18 @@ struct test_type {
 /* If set, order by test_type->val2, otherwise by test_type->val1. */
 static bool order_by_val2;
 
-int test_type_less(const heap_t *heap,
-		   const struct heap_node *a,
-		   const struct heap_node *b) {
-
-	const struct test_type *left =
-		(struct test_type *)((char *)a - offsetof(struct test_type, node));
-	const struct test_type *right =
-		(struct test_type *)((char *)b - offsetof(struct test_type, node));
+int
+test_type_less(const struct test_type *left, const struct test_type *right)
+{
 	if (order_by_val2)
 		return left->val2 < right->val2;
 	return left->val1 < right->val1;
 }
 
 #define HEAP_NAME test_heap
-#define HEAP_LESS(h, a, b) test_type_less(h, a, b)
+#define HEAP_LESS(h, a, b) test_type_less(a, b)
+#define heap_value_t struct test_type
+#define heap_value_attr node
 
 #include "salad/heap.h"
 
@@ -63,10 +59,9 @@ test_insert_1_to_3()
 	for (uint32_t i = 0; i < 4; ++i) {
 		value = (struct test_type *)malloc(sizeof(struct test_type));
 		value->val1 = i;
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 		if (root_value->val1 != 0) {
 			fail("check that min.val1 is incorrect",
 			     "root_value->val1 != 0");
@@ -94,10 +89,9 @@ test_insert_3_to_1()
 	for (uint32_t i = 3; i > 0; --i) {
 		value = (struct test_type *)malloc(sizeof(struct test_type));
 		value->val1 = i;
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 		if (root_value->val1 != i) {
 			fail("check that min.val1 is incorrect",
 			     "root_value->val1 != i");
@@ -125,10 +119,9 @@ test_insert_50_to_150_mod_100()
 	for (uint32_t i = 50; i < 150; ++i) {
 		value = (struct test_type *)malloc(sizeof(struct test_type));
 		value->val1 = i % 100;
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 
 		if (i < 100 && root_value->val1 != 50) {
 			fail("min.val1 is incorrect",
@@ -146,8 +139,7 @@ test_insert_50_to_150_mod_100()
 	}
 
 	for (int i = 0; i < 100; ++i) {
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 		test_heap_pop(&heap);
 		free(root_value);
 	}
@@ -170,10 +162,9 @@ test_insert_many_random()
 		value->val1 = rand();
 
 		ans = (value->val1 < ans ? value->val1 : ans);
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 		if (root_value->val1 != ans) {
 			fail("min.val1 is incorrect", "root_value->val1 != ans");
 		}
@@ -204,9 +195,8 @@ test_insert_10_to_1_pop()
 		value = (struct test_type *)malloc(sizeof(struct test_type));
 		value->val1 = i;
 
-		test_heap_insert(&heap, &value->node);
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		test_heap_insert(&heap, value);
+		root_value = test_heap_top(&heap);
 		if (root_value->val1 != i) {
 			fail("check that min.val1 is correct failed",
 			     "root_value->val1 != i");
@@ -218,8 +208,7 @@ test_insert_10_to_1_pop()
 	}
 
 	for (uint32_t i = 1; i <= 10; ++i) {
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 
 		test_heap_pop(&heap);
 		if (root_value->val1 != i) {
@@ -272,10 +261,9 @@ test_insert_many_pop_many_random()
 		keys[keys_it++] = value->val1 = rand();
 		ans = (value->val1 < ans ? value->val1 : ans);
 
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 		if (root_value->val1 != ans) {
 			fail("check that min.val1 is correct failed",
 			     "root_value->val1 != ans");
@@ -302,8 +290,7 @@ test_insert_many_pop_many_random()
 
 	uint32_t full_size = heap.size;
 	for (uint32_t i = 0; i < TEST_CASE_SIZE; ++i) {
-		root_value = container_of(test_heap_top(&heap),
-					  struct test_type, node);
+		root_value = test_heap_top(&heap);
 
 		test_heap_pop(&heap);
 
@@ -346,12 +333,11 @@ test_insert_pop_workload()
 			value = (struct test_type *)
 				malloc(sizeof(struct test_type));
 			value->val1 = rand();
-			test_heap_insert(&heap, &value->node);
+			test_heap_insert(&heap, value);
 		}
 		else {
 			current_size--;
-			root_value = container_of(test_heap_top(&heap),
-						  struct test_type, node);
+			root_value = test_heap_top(&heap);
 
 			test_heap_pop(&heap);
 			free(root_value);
@@ -383,7 +369,7 @@ test_pop_last()
 	test_heap_create(&heap);
 
 	value = (struct test_type *)malloc(sizeof(struct test_type));
-	test_heap_insert(&heap, &value->node);
+	test_heap_insert(&heap, value);
 
 	test_heap_pop(&heap);
 	if (heap.size != 0) {
@@ -421,11 +407,11 @@ test_insert_update_workload()
 			value->val1 = rand();
 
 			nodes[current_size++] = value;
-			test_heap_insert(&heap, &value->node);
+			test_heap_insert(&heap, value);
 		}
 		else {
 			nodes[nodes_it]->val1 = rand();
-			test_heap_update(&heap, &(nodes[nodes_it]->node));
+			test_heap_update(&heap, nodes[nodes_it]);
 			nodes_it++;
 		}
 
@@ -471,10 +457,10 @@ test_random_delete_workload()
 			value->val1 = rand();
 
 			nodes[current_size++] = value;
-			test_heap_insert(&heap, &value->node);
+			test_heap_insert(&heap, value);
 		}
 		else {
-			test_heap_delete(&heap, &(nodes[nodes_it]->node));
+			test_heap_delete(&heap, nodes[nodes_it]);
 			current_size--;
 			nodes_it++;
 		}
@@ -507,10 +493,10 @@ test_delete_last_node()
 		value = (struct test_type *)
 			malloc(sizeof(struct test_type));
 		value->val1 = 0;
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 	}
 
-	test_heap_delete(&heap, &value->node);
+	test_heap_delete(&heap, value);
 	if (test_heap_check(&heap)) {
 		fail("check heap invariants failed", "test_heap_check(&heap)");
 	}
@@ -529,7 +515,7 @@ test_heapify()
 		struct test_type *value = malloc(sizeof(struct test_type));
 		value->val1 = rand();
 		value->val2 = rand();
-		test_heap_insert(&heap, &value->node);
+		test_heap_insert(&heap, value);
 	}
 
 	order_by_val2 = true;
