@@ -21,7 +21,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.0>
-		1, "near \"BEGIN\": syntax error"
+		1, "Syntax error near 'BEGIN'"
 		-- <start-transaction-1.0>
 	})
 
@@ -46,7 +46,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.1>
-		1, "near \"BEGIN\": syntax error"
+		1, "Syntax error near 'BEGIN'"
 		-- <start-transaction-1.1>
 	})
 
@@ -94,7 +94,7 @@ test:do_catchsql_test(
 		COMMIT TRANSACTION;
 	]], {
 		-- <start-transaction-1.6>
-		1, "keyword \"TRANSACTION\" is reserved"
+		1, "Keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
 		-- <start-transaction-1.6>
 	})
 
@@ -119,7 +119,7 @@ test:do_catchsql_test(
 		END;
 	]], {
 		-- <start-transaction-1.8>
-		1, "keyword \"END\" is reserved"
+		1, "Keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
 		-- <start-transaction-1.8>
 	})
 
@@ -144,7 +144,7 @@ test:do_catchsql_test(
 		END TRANSACTION;
 	]], {
 		-- <start-transaction-1.10>
-		1, "keyword \"END\" is reserved"
+		1, "Keyword 'END' is reserved. Please use double quotes if 'END' is an identifier."
 		-- <start-transaction-1.10>
 	})
 
@@ -193,7 +193,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.14>
-		1, "keyword \"TRANSACTION\" is reserved"
+		1, "Keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
 		-- <start-transaction-1.14>
 	})
 
@@ -246,7 +246,7 @@ test:do_catchsql_test(
 		COMMIT;
 	]], {
 		-- <start-transaction-1.18>
-		1, "keyword \"TRANSACTION\" is reserved"
+		1, "Keyword 'TRANSACTION' is reserved. Please use double quotes if 'TRANSACTION' is an identifier."
 		-- <start-transaction-1.18>
 	})
 

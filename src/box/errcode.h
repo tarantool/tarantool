@@ -231,6 +231,13 @@ struct errcode_record {
 	/*176 */_(ER_SQL_CANT_RESOLVE_FIELD,	"Can’t resolve field '%s'") \
 	/*177 */_(ER_INDEX_EXISTS_IN_SPACE,	"Index '%s' already exists in space '%s'") \
 	/*178 */_(ER_INCONSISTENT_TYPES,	"Inconsistent types: expected %s got %s") \
+	/*179 */_(ER_SQL_SYNTAX,		"Syntax error in %s: %s") \
+	/*180 */_(ER_SQL_STACK_OVERFLOW,	"Failed to parse SQL statement: parser stack limit reached") \
+	/*181 */_(ER_SQL_SELECT_WILDCARD,	"Failed to expand '*' in SELECT statement without FROM clause") \
+	/*182 */_(ER_SQL_STATEMENT_EMPTY,	"Failed to execute an empty SQL statement") \
+	/*183 */_(ER_SQL_KEYWORD_IS_RESERVED,	"Keyword '%.*s' is reserved. Please use double quotes if '%.*s' is an identifier.") \
+	/*184 */_(ER_SQL_UNRECOGNIZED_SYNTAX,	"Syntax error near '%.*s'") \
+	/*185 */_(ER_SQL_UNKNOWN_TOKEN,		"Syntax error: unrecognized token: '%.*s'") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

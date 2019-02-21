@@ -72,7 +72,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-1.1.3>
-        1, [[near "STATEMENT": syntax error]]
+        1, [[Syntax error near 'STATEMENT']]
         -- </trigger1-1.1.3>
     })
 
@@ -297,7 +297,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-2.1>
-        1, [[near ";": syntax error]]
+        1, [[Syntax error near ';']]
         -- </trigger1-2.1>
     })
 
@@ -310,7 +310,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-2.2>
-        1, [[near ";": syntax error]]
+        1, [[Syntax error near ';']]
         -- </trigger1-2.2>
     })
 
@@ -809,7 +809,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.4>
-        1, "the NOT INDEXED clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "Syntax error in trigger body: the NOT INDEXED clause is not allowed on UPDATE or DELETE statements within triggers"
         -- </trigger1-16.4>
     })
 
@@ -821,7 +821,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.5>
-        1, "the INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "Syntax error in trigger body: the INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
         -- </trigger1-16.5>
     })
 
@@ -833,7 +833,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.6>
-        1, "the NOT INDEXED clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "Syntax error in trigger body: the NOT INDEXED clause is not allowed on UPDATE or DELETE statements within triggers"
         -- </trigger1-16.6>
     })
 
@@ -845,7 +845,7 @@ test:do_catchsql_test(
         END;
     ]], {
         -- <trigger1-16.7>
-        1, "the INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
+        1, "Syntax error in trigger body: the INDEXED BY clause is not allowed on UPDATE or DELETE statements within triggers"
         -- </trigger1-16.7>
     })
 

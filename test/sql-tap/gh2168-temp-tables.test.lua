@@ -8,7 +8,7 @@ test:do_catchsql_test(
 		CREATE TEMP TABLE tmp1 (id INTEGER PRIMARY KEY);
 	]], {
 		-- <trigger2-10.1>
-	1, "near \"TEMP\": syntax error"	
+	1, "Syntax error near 'TEMP'"
 		-- <trigger2-10.1>
 });
 
@@ -23,7 +23,7 @@ test:do_catchsql_test(
 		END;
 	]], {
 		-- <trigger2-10.1>
-	1, "near \"TEMP\": syntax error"	
+	1, "Syntax error near 'TEMP'"
 		-- <trigger2-10.1>
 });
 

@@ -13,37 +13,37 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 --
 box.sql.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT ABORT)")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.sql.execute("CREATE TABLE q (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT FAIL)")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.sql.execute("CREATE TABLE p (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT IGNORE)")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.sql.execute("CREATE TABLE g (id INTEGER PRIMARY KEY, v INTEGER UNIQUE ON CONFLICT REPLACE)")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.sql.execute("CREATE TABLE e (id INTEGER PRIMARY KEY ON CONFLICT REPLACE, v INTEGER)")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY ON CONFLICT REPLACE)")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.sql.execute("CREATE TABLE t2(a INT PRIMARY KEY ON CONFLICT IGNORE)")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 -- CHECK constraint is illegal with REPLACE option.
 --
 box.sql.execute("CREATE TABLE t (id INTEGER PRIMARY KEY, a INTEGER CHECK (a > 5) ON CONFLICT REPLACE);")
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 --
 -- gh-3473: Primary key can't be declared with NULL.

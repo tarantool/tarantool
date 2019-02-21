@@ -994,7 +994,7 @@ test:do_catchsql_test(
         CREATE INDEX temp.i21 ON t6(c);
     ]], {
         -- <index-21.1>
-        1, "near \".\": syntax error"
+        1, "Syntax error near '.'"
         -- </index-21.1>
     })
 

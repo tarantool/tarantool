@@ -14,23 +14,23 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 -- All of these tests should throw error "near "COLLATE": syntax error"
 box.sql.execute("SELECT 1 LIMIT 1 COLLATE BINARY;")
 ---
-- error: 'near "COLLATE": syntax error'
+- error: Syntax error near 'COLLATE'
 ...
 box.sql.execute("SELECT 1 LIMIT 1 COLLATE BINARY OFFSET 1;")
 ---
-- error: 'near "COLLATE": syntax error'
+- error: Syntax error near 'COLLATE'
 ...
 box.sql.execute("SELECT 1 LIMIT 1 OFFSET 1 COLLATE BINARY;")
 ---
-- error: 'near "COLLATE": syntax error'
+- error: Syntax error near 'COLLATE'
 ...
 box.sql.execute("SELECT 1 LIMIT 1, 1 COLLATE BINARY;")
 ---
-- error: 'near "COLLATE": syntax error'
+- error: Syntax error near 'COLLATE'
 ...
 box.sql.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
 ---
-- error: 'near "COLLATE": syntax error'
+- error: Syntax error near 'COLLATE'
 ...
 -- gh-3052: upper/lower support only default locale
 -- For tr-TR result depends on collation
@@ -102,7 +102,7 @@ cn = remote.connect(box.cfg.listen)
 ...
 cn:execute('select 1 limit ? collate not_exist', {1})
 ---
-- error: 'Failed to execute SQL statement: near "COLLATE": syntax error'
+- error: 'Failed to execute SQL statement: Syntax error near ''COLLATE'''
 ...
 cn:close()
 ---

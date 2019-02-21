@@ -299,7 +299,7 @@ test:do_test(
         return test:catchsql(sql)
     end, {
         -- <misc5-7.1>
-        1, "parser stack overflow"
+        1, "Failed to parse SQL statement: parser stack limit reached"
         -- </misc5-7.1>
     })
 
@@ -347,7 +347,7 @@ test:do_catchsql_test(
         SELECT 123abc
     ]], {
         -- <misc5-10.1>
-        1, [[unrecognized token: "123abc"]]
+        1, [[Syntax error: unrecognized token: '123abc']]
         -- </misc5-10.1>
     })
 
@@ -357,7 +357,7 @@ test:do_catchsql_test(
         SELECT 1*123.4e5ghi;
     ]], {
         -- <misc5-10.2>
-        1, [[unrecognized token: "123.4e5ghi"]]
+        1, [[Syntax error: unrecognized token: '123.4e5ghi']]
         -- </misc5-10.2>
     })
 

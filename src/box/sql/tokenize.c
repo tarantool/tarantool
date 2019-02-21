@@ -506,9 +506,10 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 				break;
 			}
 			if (tokenType == TK_ILLEGAL) {
-				sqlErrorMsg(pParse,
-						"unrecognized token: \"%T\"",
-						&pParse->sLastToken);
+				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
+					 pParse->sLastToken.n,
+					 pParse->sLastToken.z);
+				sql_parser_error(pParse);
 				break;
 			}
 		} else {

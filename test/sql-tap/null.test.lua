@@ -517,7 +517,7 @@ test:do_catchsql_test(
     ]],
     {
     -- <index-1.3>
-    1, "near \"1\": syntax error"
+    1, "Syntax error near '1'"
     -- <index-1.3>
     })
 
@@ -528,7 +528,7 @@ test:do_catchsql_test(
     ]],
     {
     -- <index-1.3>
-    1, "near \"1\": syntax error"
+    1, "Syntax error near '1'"
     -- <index-1.3>
     })
 
@@ -539,7 +539,7 @@ test:do_catchsql_test(
     ]],
     {
     -- <index-1.3>
-    1, "near \"1\": syntax error"
+    1, "Syntax error near '1'"
     -- <index-1.3>
     })
 
@@ -550,7 +550,7 @@ test:do_catchsql_test(
     ]],
     {
     -- <index-1.3>
-    1, "near \"1\": syntax error"
+    1, "Syntax error near '1'"
     -- <index-1.3>
     })
 

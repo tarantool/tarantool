@@ -281,7 +281,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-2.10>
-        1,"near \",\": syntax error"
+        1,"Syntax error near ','"
         -- </check-2.10>
     })
 
@@ -295,7 +295,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-2.10>
-        1,"near \",\": syntax error"
+        1,"Syntax error near ','"
         -- </check-2.10>
     })
 
@@ -781,7 +781,7 @@ test:do_catchsql_test(
         ON CONFLICT REPLACE)
     ]], {
         -- <9.1>
-        1, "keyword \"ON\" is reserved"
+        1, "Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
         -- </9.1>
     })
 
@@ -792,7 +792,7 @@ test:do_catchsql_test(
         ON CONFLICT ABORT)
     ]], {
         -- <9.2>
-        1, "keyword \"ON\" is reserved"
+        1, "Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
         -- </9.2>
     })
 
@@ -803,7 +803,7 @@ test:do_catchsql_test(
         ON CONFLICT ROLLBACK)
     ]], {
         -- <9.3>
-        1, "keyword \"ON\" is reserved"
+        1, "Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier."
         -- </9.3>
     })
 

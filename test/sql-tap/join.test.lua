@@ -570,7 +570,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 USING(a) 
     ]], {
         -- <join-3.5>
-        1, "a JOIN clause is required before USING"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </join-3.5>
     })
 

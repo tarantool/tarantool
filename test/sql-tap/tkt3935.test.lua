@@ -57,7 +57,7 @@ test:do_catchsql_test(
         SELECT a FROM (t1) AS t ON b USING(a) 
     ]], {
         -- <tkt3935.4>
-        1, "a JOIN clause is required before ON"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </tkt3935.4>
     })
 
@@ -67,7 +67,7 @@ test:do_catchsql_test(
         SELECT a FROM (t1) AS t ON b 
     ]], {
         -- <tkt3935.5>
-        1, "a JOIN clause is required before ON"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </tkt3935.5>
     })
 
@@ -77,7 +77,7 @@ test:do_catchsql_test(
         SELECT a FROM (SELECT * FROM t1) AS t ON b USING(a) 
     ]], {
         -- <tkt3935.6>
-        1, "a JOIN clause is required before ON"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </tkt3935.6>
     })
 
@@ -87,7 +87,7 @@ test:do_catchsql_test(
         SELECT a FROM (SELECT * FROM t1) AS t ON b 
     ]], {
         -- <tkt3935.7>
-        1, "a JOIN clause is required before ON"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </tkt3935.7>
     })
 
@@ -97,7 +97,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t ON b 
     ]], {
         -- <tkt3935.8>
-        1, "a JOIN clause is required before ON"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </tkt3935.8>
     })
 
@@ -107,7 +107,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t ON b USING(a) 
     ]], {
         -- <tkt3935.9>
-        1, "a JOIN clause is required before ON"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </tkt3935.9>
     })
 
@@ -117,7 +117,7 @@ test:do_catchsql_test(
         SELECT a FROM t1 AS t USING(a) 
     ]], {
         -- <tkt3935.10>
-        1, "a JOIN clause is required before USING"
+        1, "Syntax error in FROM clause: a JOIN clause is required before ON and USING"
         -- </tkt3935.10>
     })
 

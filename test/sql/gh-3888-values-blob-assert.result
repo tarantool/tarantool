@@ -16,20 +16,20 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 -- check 'VALUES' against typedef keywords (should fail)
 box.sql.execute('VALUES(scalar)')
 ---
-- error: 'near "scalar": syntax error'
+- error: Syntax error near 'scalar'
 ...
 box.sql.execute('VALUES(float)')
 ---
-- error: 'near "float": syntax error'
+- error: Syntax error near 'float'
 ...
 -- check 'SELECT' against typedef keywords (should fail)
 box.sql.execute('SELECT scalar')
 ---
-- error: 'near "scalar": syntax error'
+- error: Syntax error near 'scalar'
 ...
 box.sql.execute('SELECT float')
 ---
-- error: 'near "float": syntax error'
+- error: Syntax error near 'float'
 ...
 -- check 'VALUES' against ID (should fail)
 box.sql.execute('VALUES(TheColumnName)')

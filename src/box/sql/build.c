@@ -2823,9 +2823,9 @@ sqlSrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 	struct SrcList_item *pItem;
 	sql *db = pParse->db;
 	if (!p && (pOn || pUsing)) {
-		sqlErrorMsg(pParse, "a JOIN clause is required before %s",
-				(pOn ? "ON" : "USING")
-		    );
+		diag_set(ClientError, ER_SQL_SYNTAX, "FROM clause",
+			 "a JOIN clause is required before ON and USING");
+		sql_parser_error(pParse);
 		goto append_from_error;
 	}
 	p = sqlSrcListAppend(db, p, pTable);

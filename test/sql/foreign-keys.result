@@ -358,19 +358,21 @@ box.sql.execute('CREATE TABLE t1 (id INT PRIMARY KEY);')
 ...
 box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE RESTRICT);')
 ---
-- error: keyword "DELETE" is reserved
+- error: Keyword 'DELETE' is reserved. Please use double quotes if 'DELETE' is an
+    identifier.
 ...
 box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE CASCADE);')
 ---
-- error: keyword "DELETE" is reserved
+- error: Keyword 'DELETE' is reserved. Please use double quotes if 'DELETE' is an
+    identifier.
 ...
 box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON UPDATE RESTRICT ON DELETE RESTRICT);')
 ---
-- error: keyword "ON" is reserved
+- error: Keyword 'ON' is reserved. Please use double quotes if 'ON' is an identifier.
 ...
 box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE MATCH FULL);')
 ---
-- error: keyword "MATCH" is reserved
+- error: Keyword 'MATCH' is reserved. Please use double quotes if 'MATCH' is an identifier.
 ...
 box.space.T1:drop()
 ---

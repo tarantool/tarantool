@@ -620,7 +620,7 @@ test:do_catchsql_test(
 		CREATE TEMP TABLE t1(a INTEGER PRIMARY KEY, b VARCHAR(10));
 	]], {
 	-- <temp>
-	1, "near \"TEMP\": syntax error"
+	1, "Syntax error near 'TEMP'"
 	-- <temp>
 	})
 
@@ -630,7 +630,7 @@ test:do_catchsql_test(
 		CREATE TEMPORARY TABLE t1(a INTEGER PRIMARY KEY, b VARCHAR(10));
 	]], {
 	-- <temporary>
-	1, "near \"TEMPORARY\": syntax error"
+	1, "Syntax error near 'TEMPORARY'"
 	-- <temporary>
 	})
 
@@ -1257,7 +1257,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <table-22.1>
-        1,"keyword \"CONSTRAINT\" is reserved"
+        1,"Keyword 'CONSTRAINT' is reserved. Please use double quotes if 'CONSTRAINT' is an identifier."
         -- </table-22.1>
     })
 
@@ -1322,7 +1322,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <table-22.6>
-        1,"keyword \"CONSTRAINT\" is reserved"
+        1,"Keyword 'CONSTRAINT' is reserved. Please use double quotes if 'CONSTRAINT' is an identifier."
         -- </table-22.6>
     })
 
@@ -1336,7 +1336,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <table-22.7>
-        1,"keyword \"CONSTRAINT\" is reserved"
+        1,"Keyword 'CONSTRAINT' is reserved. Please use double quotes if 'CONSTRAINT' is an identifier."
         -- </table-22.7>
     })
 

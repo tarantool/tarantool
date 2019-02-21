@@ -238,7 +238,7 @@ for _, kw in ipairs(bannedkws) do
     test:do_catchsql_test(
         "bannedkw1-"..kw..".1",
         query, {
-            1, 'keyword "'..kw..'" is reserved'
+            1, "Keyword '"..kw.."' is reserved. Please use double quotes if '"..kw.."' is an identifier."
         })
 end
 

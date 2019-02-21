@@ -30,7 +30,7 @@ t = {513, 1, 'test', 'memtx', 0, opts, format}
 s = box.space._space:insert(t)
 ---
 - error: 'Wrong space options (field 5): invalid expression specified (SQL error:
-    near "<": syntax error)'
+    Syntax error near ''<'')'
 ...
 opts = {checks = {{expr = 'X>5'}}}
 ---

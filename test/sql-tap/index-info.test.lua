@@ -26,7 +26,7 @@ test:do_catchsql_test(
     "index-info-1.2",
     "PRAGMA index_info = t1.a;",
     {
-        1, "near \".\": syntax error",
+        1, "Syntax error near '.'",
     })
 
 -- Case: single column index with an integer column.

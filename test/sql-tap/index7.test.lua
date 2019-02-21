@@ -292,7 +292,7 @@ test:do_catchsql_test(
         CREATE TABLE t1 (a INTEGER PRIMARY KEY, b INTEGER);
         CREATE UNIQUE INDEX i ON t1 (a) WHERE a = 3;
     ]], {
-        1, "keyword \"WHERE\" is reserved"
+        1, "Keyword 'WHERE' is reserved. Please use double quotes if 'WHERE' is an identifier."
     })
 
 -- Currently, when a user tries to create index (or primary key,

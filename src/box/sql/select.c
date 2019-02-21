@@ -2092,8 +2092,9 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 		if((p->pLimit->flags & EP_Collate) != 0 ||
 		   (p->pOffset != NULL &&
 		   (p->pOffset->flags & EP_Collate) != 0)) {
-			sqlErrorMsg(pParse, "near \"COLLATE\": "\
-						"syntax error");
+			diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX,
+				 sizeof("COLLATE"), "COLLATE");
+			sql_parser_error(pParse);
 			return;
 		}
 		p->iLimit = iLimit = ++pParse->nMem;
@@ -5049,11 +5050,11 @@ selectExpander(Walker * pWalker, Select * p)
 						diag_set(ClientError,
 							 ER_NO_SUCH_SPACE,
 							 zTName);
-						sql_parser_error(pParse);
 					} else {
-						sqlErrorMsg(pParse,
-								"no tables specified");
+						diag_set(ClientError,
+							 ER_SQL_SELECT_WILDCARD);
 					}
+					sql_parser_error(pParse);
 				}
 			}
 		}

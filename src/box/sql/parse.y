@@ -33,13 +33,16 @@
   UNUSED_PARAMETER(yymajor);  /* Silence some compiler warnings */
   assert( TOKEN.z[0] );  /* The tokenizer always gives us a token */
   if (yypParser->is_fallback_failed && TOKEN.isReserved) {
-    sqlErrorMsg(pParse, "keyword \"%T\" is reserved", &TOKEN);
+    diag_set(ClientError, ER_SQL_KEYWORD_IS_RESERVED, TOKEN.n, TOKEN.z,
+             TOKEN.n, TOKEN.z);
   } else {
-    sqlErrorMsg(pParse, "near \"%T\": syntax error", &TOKEN);
+    diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX, TOKEN.n, TOKEN.z);
   }
+  sql_parser_error(pParse);
 }
 %stack_overflow {
-  sqlErrorMsg(pParse, "parser stack overflow");
+  diag_set(ClientError, ER_SQL_STACK_OVERFLOW);
+  sql_parser_error(pParse);
 }
 
 // The name of the generated procedure that implements the parser
@@ -114,7 +117,8 @@ ecmd ::= explain cmdx SEMI. {
 		sql_finish_coding(pParse);
 }
 ecmd ::= SEMI. {
-  sqlErrorMsg(pParse, "syntax error: empty request");
+  diag_set(ClientError, ER_SQL_STATEMENT_EMPTY);
+  sql_parser_error(pParse);
 }
 explain ::= .
 explain ::= EXPLAIN.              { pParse->explain = 1; }
@@ -227,7 +231,8 @@ columnname(A) ::= nm(A) typedef(Y). {sqlAddColumn(pParse,&A,&Y);}
 %type nm {Token}
 nm(A) ::= id(A). {
   if(A.isReserved) {
-    sqlErrorMsg(pParse, "keyword \"%T\" is reserved", &A);
+    diag_set(ClientError, ER_SQL_KEYWORD_IS_RESERVED, A.n, A.z, A.n, A.z);
+    sql_parser_error(pParse);
   }
 }
 
@@ -897,14 +902,17 @@ expr(A) ::= VARIABLE(X).     {
   } else if (!(X.z[0]=='#' && sqlIsdigit(X.z[1]))) {
     u32 n = X.n;
     spanExpr(&A, pParse, TK_VARIABLE, X);
-    if (A.pExpr->u.zToken[0] == '?' && n > 1)
-        sqlErrorMsg(pParse, "near \"%T\": syntax error", &t);
-    else
-        sqlExprAssignVarNumber(pParse, A.pExpr, n);
+    if (A.pExpr->u.zToken[0] == '?' && n > 1) {
+      diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX, t.n, t.z);
+      sql_parser_error(pParse);
+    } else {
+      sqlExprAssignVarNumber(pParse, A.pExpr, n);
+    }
   }else{
     assert( t.n>=2 );
     spanSet(&A, &t, &t);
-    sqlErrorMsg(pParse, "near \"%T\": syntax error", &t);
+    diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX, t.n, t.z);
+    sql_parser_error(pParse);
     A.pExpr = NULL;
   }
 }
@@ -1378,14 +1386,15 @@ trnm(A) ::= nm DOT nm(X). {
 //
 tridxby ::= .
 tridxby ::= INDEXED BY nm. {
-  sqlErrorMsg(pParse,
-        "the INDEXED BY clause is not allowed on UPDATE or DELETE statements "
-        "within triggers");
+  diag_set(ClientError, ER_SQL_SYNTAX, "trigger body", "the INDEXED BY clause "\
+           "is not allowed on UPDATE or DELETE statements within triggers");
+  sql_parser_error(pParse);
 }
 tridxby ::= NOT INDEXED. {
-  sqlErrorMsg(pParse,
-        "the NOT INDEXED clause is not allowed on UPDATE or DELETE statements "
-        "within triggers");
+  diag_set(ClientError, ER_SQL_SYNTAX, "trigger body", "the NOT INDEXED "\
+           "clause is not allowed on UPDATE or DELETE statements within "\
+           "triggers");
+  sql_parser_error(pParse);
 }
 
 

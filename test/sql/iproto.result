@@ -96,7 +96,7 @@ cn:execute('insert into not_existing_table values ("kek")')
 ...
 cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 ---
-- error: 'Failed to execute SQL statement: near "qwerty": syntax error'
+- error: 'Failed to execute SQL statement: Syntax error near ''qwerty'''
 ...
 -- Empty result.
 cn:execute('select id as identifier from test where a = 5;')
@@ -109,7 +109,7 @@ cn:execute('select id as identifier from test where a = 5;')
 -- netbox API errors.
 cn:execute(100)
 ---
-- error: 'Failed to execute SQL statement: near "100": syntax error'
+- error: 'Failed to execute SQL statement: Syntax error near ''100'''
 ...
 cn:execute('select 1', nil, {dry_run = true})
 ---
@@ -118,11 +118,11 @@ cn:execute('select 1', nil, {dry_run = true})
 -- Empty request.
 cn:execute('')
 ---
-- error: 'Failed to execute SQL statement: syntax error: empty request'
+- error: 'Failed to execute SQL statement: Failed to execute an empty SQL statement'
 ...
 cn:execute('   ;')
 ---
-- error: 'Failed to execute SQL statement: syntax error: empty request'
+- error: 'Failed to execute SQL statement: Failed to execute an empty SQL statement'
 ...
 --
 -- gh-3467: allow only positive integers under limit clause.
@@ -567,7 +567,7 @@ cn:execute('drop table if exists test3')
 --
 cn:execute('select ?1, ?2, ?3', {1, 2, 3})
 ---
-- error: 'Failed to execute SQL statement: near "?1": syntax error'
+- error: 'Failed to execute SQL statement: Syntax error near ''?1'''
 ...
 cn:execute('select $name, $name2', {1, 2})
 ---

@@ -128,7 +128,7 @@ test:do_catchsql_test(
         SELECT count(DISTINCT *) FROM t2
     ]], {
         -- <count-2.2>
-        1, [[near "*": syntax error]]
+        1, [[Syntax error near '*']]
         -- </count-2.2>
     })
 

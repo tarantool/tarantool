@@ -178,7 +178,7 @@ test:do_catchsql_test(3.6, [[
   SELECT * FROM tmp;
 ]], {
   -- <3.6>
-  1, [[keyword "SELECT" is reserved]]
+  1, [[Keyword 'SELECT' is reserved. Please use double quotes if 'SELECT' is an identifier.]]
   -- </3.6>
 })
 
@@ -1018,7 +1018,7 @@ test:do_catchsql_test(13.1, [[
   SELECT i FROM c;
 ]], {
   -- <13.1>
-  1, "no tables specified"
+  1, "Failed to expand '*' in SELECT statement without FROM clause"
   -- </13.1>
 })
 
@@ -1027,7 +1027,7 @@ test:do_catchsql_test(13.2, [[
   SELECT i FROM c;
 ]], {
   -- <13.2>
-  1, "no tables specified"
+  1, "Failed to expand '*' in SELECT statement without FROM clause"
   -- </13.2>
 })
 

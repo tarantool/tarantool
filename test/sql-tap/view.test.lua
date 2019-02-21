@@ -293,7 +293,7 @@ test:do_catchsql_test(
         CREATE VIEW v1err(x,y DESC,z) AS SELECT a, b+c, c-b FROM t1;
     ]], {
         -- <view-3.3.4>
-        1, [[keyword "DESC" is reserved]]
+        1, [[Keyword 'DESC' is reserved. Please use double quotes if 'DESC' is an identifier.]]
         -- </view-3.3.4>
     })
 
@@ -961,7 +961,7 @@ test:do_catchsql_test(
         DROP VIEW main.nosuchview
     ]], {
         -- <view-17.2>
-        1, "near \".\": syntax error"
+        1, "Syntax error near '.'"
         -- </view-17.2>
     })
 

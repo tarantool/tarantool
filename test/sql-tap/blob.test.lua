@@ -72,7 +72,7 @@ test:do_catchsql_test(
         SELECT X'01020k304', 100
     ]], {
         -- <blob-1.4>
-        1, [[unrecognized token: "X'01020k304'"]]
+        1, [[Syntax error: unrecognized token: 'X'01020k304'']]
         -- </blob-1.4>
     })
 
@@ -81,7 +81,7 @@ test:do_catchsql_test(
     [[
         SELECT X'01020, 100]], {
         -- <blob-1.5>
-        1, [[unrecognized token: "X'01020, 100"]]
+        1, [[Syntax error: unrecognized token: 'X'01020, 100']]
         -- </blob-1.5>
     })
 
@@ -91,7 +91,7 @@ test:do_catchsql_test(
         SELECT X'01020 100'
     ]], {
         -- <blob-1.6>
-        1, [[unrecognized token: "X'01020 100'"]]
+        1, [[Syntax error: unrecognized token: 'X'01020 100'']]
         -- </blob-1.6>
     })
 
@@ -101,7 +101,7 @@ test:do_catchsql_test(
         SELECT X'01001'
     ]], {
         -- <blob-1.7>
-        1, [[unrecognized token: "X'01001'"]]
+        1, [[Syntax error: unrecognized token: 'X'01001'']]
         -- </blob-1.7>
     })
 
@@ -111,7 +111,7 @@ test:do_catchsql_test(
         SELECT x'012/45'
     ]], {
         -- <blob-1.8>
-        1, [[unrecognized token: "x'012/45'"]]
+        1, [[Syntax error: unrecognized token: 'x'012/45'']]
         -- </blob-1.8>
     })
 
@@ -121,7 +121,7 @@ test:do_catchsql_test(
         SELECT x'012:45'
     ]], {
         -- <blob-1.9>
-        1, [[unrecognized token: "x'012:45'"]]
+        1, [[Syntax error: unrecognized token: 'x'012:45'']]
         -- </blob-1.9>
     })
 
@@ -131,7 +131,7 @@ test:do_catchsql_test(
         SELECT x'012@45'
     ]], {
         -- <blob-1.10>
-        1, [[unrecognized token: "x'012@45'"]]
+        1, [[Syntax error: unrecognized token: 'x'012@45'']]
         -- </blob-1.10>
     })
 
@@ -141,7 +141,7 @@ test:do_catchsql_test(
         SELECT x'012G45'
     ]], {
         -- <blob-1.11>
-        1, [[unrecognized token: "x'012G45'"]]
+        1, [[Syntax error: unrecognized token: 'x'012G45'']]
         -- </blob-1.11>
     })
 
@@ -151,7 +151,7 @@ test:do_catchsql_test(
         SELECT x'012`45'
     ]], {
         -- <blob-1.12>
-        1, [[unrecognized token: "x'012`45'"]]
+        1, [[Syntax error: unrecognized token: 'x'012`45'']]
         -- </blob-1.12>
     })
 
@@ -161,7 +161,7 @@ test:do_catchsql_test(
         SELECT x'012g45'
     ]], {
         -- <blob-1.13>
-        1, [[unrecognized token: "x'012g45'"]]
+        1, [[Syntax error: unrecognized token: 'x'012g45'']]
         -- </blob-1.13>
     })
 

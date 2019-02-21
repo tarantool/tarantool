@@ -182,7 +182,7 @@ test:do_catchsql_test("select3-2.13", [[
   SELECT log, count(*) FROM t1 GROUP BY ORDER BY log;
 ]], {
   -- <select3-2.13>
-  1, [[keyword "ORDER" is reserved]]
+  1, [[Keyword 'ORDER' is reserved. Please use double quotes if 'ORDER' is an identifier.]]
   -- </select3-2.13>
 })
 
@@ -190,7 +190,7 @@ test:do_catchsql_test("select3-2.14", [[
   SELECT log, count(*) FROM t1 GROUP BY;
 ]], {
   -- <select3-2.14>
-  1, [[near ";": syntax error]]
+  1, [[Syntax error near ';']]
   -- </select3-2.14>
 })
 

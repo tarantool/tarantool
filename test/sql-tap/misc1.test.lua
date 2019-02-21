@@ -271,7 +271,7 @@ test:do_catchsql_test(
         UPDATE t3 SET a=0 WHEREwww b=2;
     ]], {
         -- <misc1-5.1>
-        1, [[near "WHEREwww": syntax error]]
+        1, [[Syntax error near 'WHEREwww']]
         -- </misc1-5.1>
     })
 
@@ -413,7 +413,7 @@ test:do_catchsql_test(
         SELECT *;
     ]], {
         -- <misc1-8.1>
-        1, "no tables specified"
+        1, "Failed to expand '*' in SELECT statement without FROM clause"
         -- </misc1-8.1>
     })
 
@@ -1037,7 +1037,7 @@ test:do_catchsql_test(
         select''like''like''like#0;
     ]], {
         -- <misc1-21.1>
-        1, [[near "#0": syntax error]]
+        1, [[Syntax error near '#0']]
         -- </misc1-21.1>
     })
 
@@ -1047,7 +1047,7 @@ test:do_catchsql_test(
         VALUES(0,0x0MATCH#0;
     ]], {
         -- <misc1-21.2>
-        1, [[near ";": syntax error]]
+        1, [[Syntax error near ';']]
         -- </misc1-21.2>
     })
 

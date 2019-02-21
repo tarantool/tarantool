@@ -508,6 +508,12 @@ t;
   176: box.error.SQL_CANT_RESOLVE_FIELD
   177: box.error.INDEX_EXISTS_IN_SPACE
   178: box.error.INCONSISTENT_TYPES
+  179: box.error.SQL_SYNTAX
+  180: box.error.SQL_STACK_OVERFLOW
+  181: box.error.SQL_SELECT_WILDCARD
+  182: box.error.SQL_STATEMENT_EMPTY
+  184: box.error.SQL_UNRECOGNIZED_SYNTAX
+  185: box.error.SQL_UNKNOWN_TOKEN
 ...
 test_run:cmd("setopt delimiter ''");
 ---
