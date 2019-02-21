@@ -274,6 +274,7 @@ local dynamic_cfg_skip_at_load = {
     instance_uuid           = true,
     replicaset_uuid         = true,
     net_msg_max             = true,
+    readahead               = true,
 }
 
 local function convert_gb(size)
