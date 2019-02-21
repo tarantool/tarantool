@@ -1,5 +1,5 @@
 	*** main_f ***
-1..17
+1..18
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -64,14 +64,16 @@ ok 4 - subtests
 ok 5 - subtests
 	*** swim_test_add_remove: done ***
 	*** swim_test_basic_failure_detection ***
-    1..7
+    1..9
     ok 1 - node is added as alive
-    ok 2 - member still is not dead after 2 noacks
-    ok 3 - but it is dead after one more
-    ok 4 - after 2 more unacks the member still is not deleted - dissemination TTD keeps it
-    ok 5 - but it is dropped after 2 rounds when TTD gets 0
-    ok 6 - fullmesh is restored
-    ok 7 - a member is added back on an ACK
+    ok 2 - member still is not suspected after 1 noack
+    ok 3 - but it is suspected after one more
+    ok 4 - it is not dead after 2 more noacks
+    ok 5 - but it is dead after one more
+    ok 6 - after 2 more unacks the member still is not deleted - dissemination TTD keeps it
+    ok 7 - but it is dropped after 2 rounds when TTD gets 0
+    ok 8 - fullmesh is restored
+    ok 9 - a member is added back on an ACK
 ok 6 - subtests
 	*** swim_test_basic_failure_detection: done ***
 	*** swim_test_probe ***
@@ -82,7 +84,7 @@ ok 7 - subtests
 	*** swim_test_probe: done ***
 	*** swim_test_refute ***
     1..4
-    ok 1 - S2 increments its own incarnation to refute its death
+    ok 1 - S2 increments its own incarnation to refute its suspicion
     ok 2 - new incarnation has reached S1 with a next round message
     ok 3 - after restart S2's incarnation is 0 again
     ok 4 - S2 learned its old bigger incarnation 1 from S0
@@ -91,9 +93,9 @@ ok 8 - subtests
 	*** swim_test_basic_gossip ***
     1..4
     ok 1 - S1 still thinks that S2 is alive
-    ok 2 - but one more second, and a third ack timed out - S1 sees S2 as dead
+    ok 2 - but one more second, and a second ack timed out - S1 sees S2 as suspected
     ok 3 - S3 still thinks that S2 is alive
-    ok 4 - S3 learns about dead S2 from S1
+    ok 4 - S3 learns about suspected S2 from S1
 ok 9 - subtests
 	*** swim_test_basic_gossip: done ***
 	*** swim_test_too_big_packet ***
@@ -177,4 +179,10 @@ ok 16 - subtests
     ok 11 - S3 learns S1's payload from S2
 ok 17 - subtests
 	*** swim_test_payload_refutation: done ***
+	*** swim_test_indirect_ping ***
+    1..2
+    ok 1 - S1 is still alive everywhere
+    ok 2 - as well as S2 - they communicated via S3
+ok 18 - subtests
+	*** swim_test_indirect_ping: done ***
 	*** main_f: done ***

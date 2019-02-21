@@ -240,7 +240,7 @@ swim_test_add_remove(void)
 static void
 swim_test_basic_failure_detection(void)
 {
-	swim_start_test(7);
+	swim_start_test(9);
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_set_ack_timeout(cluster, 0.5);
 
@@ -248,8 +248,15 @@ swim_test_basic_failure_detection(void)
 	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_ALIVE,
 	   "node is added as alive");
 	swim_cluster_block_io(cluster, 1);
-	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 2.4), -1,
-	   "member still is not dead after 2 noacks");
+	/* Roll one round to send a first ping. */
+	swim_run_for(1);
+
+	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_SUSPECTED, 0.9), -1,
+	   "member still is not suspected after 1 noack");
+	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_SUSPECTED, 0.1), 0,
+	   "but it is suspected after one more");
+	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 1.4), -1,
+	   "it is not dead after 2 more noacks");
 	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 0.1), 0,
 	   "but it is dead after one more");
 
@@ -304,34 +311,35 @@ swim_test_basic_gossip(void)
 	swim_cluster_add_link(cluster, 1, 0);
 	swim_cluster_set_drop(cluster, 1, 100);
 	/*
-	 * Wait two no-ACKs on S1 from S2. +1 sec to send a first
+	 * Wait one no-ACK on S1 from S2. +1 sec to send a first
 	 * ping.
 	 */
-	swim_run_for(20 + 1);
+	swim_run_for(10 + 1);
 	swim_cluster_add_link(cluster, 0, 2);
 	swim_cluster_add_link(cluster, 2, 1);
 	/*
 	 * After 10 seconds (one ack timeout) S1 should see S2 as
-	 * dead. But S3 still should see S2 as alive. To prevent
-	 * S1 from informing S3 about that the S3 IO is blocked
-	 * for a short time.
+	 * suspected. But S3 still should see S2 as alive. To
+	 * prevent S1 from informing S3 about that the S3 IO is
+	 * blocked for a short time.
 	 */
 	swim_run_for(9);
 	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_ALIVE,
 	   "S1 still thinks that S2 is alive");
 	swim_cluster_block_io(cluster, 2);
 	swim_run_for(1);
-	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_DEAD, "but one "\
-	   "more second, and a third ack timed out - S1 sees S2 as dead");
+	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_SUSPECTED,
+	   "but one more second, and a second ack timed out - S1 sees S2 as "\
+	   "suspected");
 	is(swim_cluster_member_status(cluster, 2, 1), MEMBER_ALIVE,
 	   "S3 still thinks that S2 is alive");
 	swim_cluster_unblock_io(cluster, 2);
 	/*
-	 * At most after two round steps S1 sends 'S2 is dead' to
-	 * S3.
+	 * At most after two round steps S1 sends
+	 * 'S2 is suspected' to S3.
 	 */
-	is(swim_cluster_wait_status(cluster, 2, 1, MEMBER_DEAD, 2), 0,
-	   "S3 learns about dead S2 from S1");
+	is(swim_cluster_wait_status(cluster, 2, 1, MEMBER_SUSPECTED, 2), 0,
+	   "S3 learns about suspected S2 from S1");
 
 	swim_cluster_delete(cluster);
 	swim_finish_test();
@@ -363,10 +371,14 @@ swim_test_refute(void)
 
 	swim_cluster_add_link(cluster, 0, 1);
 	swim_cluster_set_drop(cluster, 1, 100);
-	fail_if(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 7) != 0);
+	/* Roll one round to send a first ping. */
+	swim_run_for(1);
+
+	fail_if(swim_cluster_wait_status(cluster, 0, 1,
+					 MEMBER_SUSPECTED, 4) != 0);
 	swim_cluster_set_drop(cluster, 1, 0);
 	is(swim_cluster_wait_incarnation(cluster, 1, 1, 1, 1), 0,
-	   "S2 increments its own incarnation to refute its death");
+	   "S2 increments its own incarnation to refute its suspicion");
 	is(swim_cluster_wait_incarnation(cluster, 0, 1, 1, 1), 0,
 	   "new incarnation has reached S1 with a next round message");
 
@@ -386,7 +398,7 @@ swim_test_too_big_packet(void)
 	swim_start_test(3);
 	int size = 50;
 	double ack_timeout = 1;
-	double first_dead_timeout = 20;
+	double first_dead_timeout = 30;
 	double everywhere_dead_timeout = size;
 	int drop_id = size / 2;
 
@@ -465,7 +477,9 @@ swim_test_undead(void)
 	swim_cluster_add_link(cluster, 0, 1);
 	swim_cluster_add_link(cluster, 1, 0);
 	swim_cluster_set_drop(cluster, 1, 100);
-	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 4), 0,
+	/* Roll one round to send a first ping. */
+	swim_run_for(1);
+	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 5), 0,
 	   "member S2 is dead");
 	swim_run_for(5);
 	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_DEAD,
@@ -833,10 +847,33 @@ swim_test_payload_refutation(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_indirect_ping(void)
+{
+	swim_start_test(2);
+	uint16_t cluster_size = 3;
+	struct swim_cluster *cluster = swim_cluster_new(cluster_size);
+	swim_cluster_set_ack_timeout(cluster, 1);
+	for (int i = 0; i < cluster_size; ++i) {
+		for (int j = i + 1; j < cluster_size; ++j)
+			swim_cluster_interconnect(cluster, i, j);
+	}
+	swim_cluster_set_drop_channel(cluster, 0, 1, true);
+	swim_cluster_set_drop_channel(cluster, 1, 0, true);
+	swim_run_for(10);
+	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_ALIVE, 0),
+	   0, "S1 is still alive everywhere");
+	is(swim_cluster_wait_status_everywhere(cluster, 1, MEMBER_ALIVE, 0),
+	   0, "as well as S2 - they communicated via S3");
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(17);
+	swim_start_test(18);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -859,6 +896,7 @@ main_f(va_list ap)
 	swim_test_broadcast();
 	swim_test_payload_basic();
 	swim_test_payload_refutation();
+	swim_test_indirect_ping();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

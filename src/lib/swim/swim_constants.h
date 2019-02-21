@@ -38,6 +38,12 @@ enum swim_member_status {
 	/** The instance is ok, responds to requests. */
 	MEMBER_ALIVE = 0,
 	/**
+	 * If a member has not responded to a ping, it is declared
+	 * as suspected to be dead. After more failed pings it
+	 * is finally dead.
+	 */
+	MEMBER_SUSPECTED,
+	/**
 	 * The member is considered dead. It will disappear from
 	 * the membership after some unacknowledged pings.
 	 */

@@ -37,6 +37,7 @@
 
 const char *swim_member_status_strs[] = {
 	"alive",
+	"suspected",
 	"dead",
 	"left",
 };

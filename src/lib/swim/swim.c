@@ -59,11 +59,22 @@
  * ping. Replies are processed out of the main cycle,
  * asynchronously.
  *
- * Random selection provides even network load of ~1 message on
- * each member per one protocol step regardless of the cluster
- * size. Without randomness each member would receive a network
- * load of N messages in each protocol step, where N is the
- * cluster size.
+ * When a member unacknowledged too many pings, its status is
+ * changed to 'suspected'. The SWIM paper describes suspicion
+ * subcomponent as a protection against false-positive detection
+ * of alive members as dead. It happens when a member is
+ * overloaded and responds to pings too slow, or when the network
+ * is in trouble and packets can not go through some channels.
+ * When a member is suspected, another instance pings it
+ * indirectly via other members. It sends a fixed number of pings
+ * to the suspected one in parallel via additional hops selected
+ * randomly among other members.
+ *
+ * Random selection in all the components provides even network
+ * load of ~1 message on each member per one protocol step
+ * regardless of the cluster size. Without randomness each member
+ * would receive a network load of N messages in each protocol
+ * step, where N is the cluster size.
  *
  * To speed up propagation of new information by means of a few
  * random messages SWIM proposes a kind of fairness: when
@@ -143,11 +154,17 @@ enum {
 	 */
 	ACK_TIMEOUT_DEFAULT = 30,
 	/**
-	 * If a member has not been responding to pings this
-	 * number of times, it is considered dead. According to
-	 * the SWIM paper, for a member it is sufficient to miss
-	 * one direct ping, and an arbitrary but fixed number of
-	 * simultaneous indirect pings, to be considered dead.
+	 * If an alive member has not been responding to pings
+	 * this number of times, it is suspected to be dead. To
+	 * confirm the death it should fail more pings.
+	 */
+	NO_ACKS_TO_SUSPECT = 2,
+	/**
+	 * If a suspected member has not been responding to pings
+	 * this number of times, it is considered dead. According
+	 * to the SWIM paper, for a member it is sufficient to
+	 * miss one direct ping, and an arbitrary but fixed number
+	 * of simultaneous indirect pings, to be considered dead.
 	 * Seems too little, so here it is bigger.
 	 */
 	NO_ACKS_TO_DEAD = 3,
@@ -161,6 +178,13 @@ enum {
 	 * anti-entropy components.
 	 */
 	NO_ACKS_TO_GC = 2,
+	/**
+	 * Number of pings sent indirectly to a member via other
+	 * members when it did not answer on a regular ping. The
+	 * messages are sent in parallel and via different
+	 * members.
+	 */
+	INDIRECT_PING_COUNT = 2,
 };
 
 /**
@@ -464,10 +488,20 @@ swim_cached_round_msg_invalidate(struct swim *swim)
 
 /** Put the member into a list of ACK waiters. */
 static void
-swim_wait_ack(struct swim *swim, struct swim_member *member)
+swim_wait_ack(struct swim *swim, struct swim_member *member,
+	      bool was_ping_indirect)
 {
 	if (heap_node_is_stray(&member->in_wait_ack_heap)) {
-		member->ping_deadline = swim_time() + swim->wait_ack_tick.at;
+		double timeout = swim->wait_ack_tick.at;
+		/*
+		 * Direct ping is two trips: PING + ACK.
+		 * Indirect ping is four trips: PING,
+		 * FORWARD PING, ACK, FORWARD ACK. This is why x2
+		 * for indirects.
+		 */
+		if (was_ping_indirect)
+			timeout *= 2;
+		member->ping_deadline = swim_time() + timeout;
 		wait_ack_heap_insert(&swim->wait_ack_heap, member);
 		swim_ev_timer_start(loop(), &swim->wait_ack_tick);
 	}
@@ -597,7 +631,7 @@ swim_ping_task_complete(struct swim_task *task,
 	struct swim *swim = swim_by_scheduler(scheduler);
 	struct swim_member *m = container_of(task, struct swim_member,
 					     ping_task);
-	swim_wait_ack(swim, m);
+	swim_wait_ack(swim, m, false);
 }
 
 /** Free member's resources. */
@@ -1052,7 +1086,7 @@ swim_complete_step(struct swim_task *task,
 			 * dissemination and failure detection
 			 * sections.
 			 */
-			swim_wait_ack(swim, m);
+			swim_wait_ack(swim, m, false);
 			swim_decrease_event_ttd(swim);
 		}
 	}
@@ -1061,13 +1095,16 @@ swim_complete_step(struct swim_task *task,
 /** Schedule send of a failure detection message. */
 static void
 swim_send_fd_msg(struct swim *swim, struct swim_task *task,
-		 const struct sockaddr_in *dst, enum swim_fd_msg_type type)
+		 const struct sockaddr_in *dst, enum swim_fd_msg_type type,
+		 const struct sockaddr_in *proxy)
 {
 	/*
 	 * Reset packet allocator in case if task is being reused.
 	 */
 	assert(! swim_task_is_scheduled(task));
 	swim_packet_create(&task->packet);
+	if (proxy != NULL)
+		swim_task_set_proxy(task, proxy);
 	char *header = swim_packet_alloc(&task->packet, 1);
 	int map_size = swim_encode_src_uuid(swim, &task->packet);
 	map_size += swim_encode_failure_detection(swim, &task->packet, type);
@@ -1083,7 +1120,26 @@ static inline void
 swim_send_ack(struct swim *swim, struct swim_task *task,
 	      const struct sockaddr_in *dst)
 {
-	swim_send_fd_msg(swim, task, dst, SWIM_FD_MSG_ACK);
+	swim_send_fd_msg(swim, task, dst, SWIM_FD_MSG_ACK, NULL);
+}
+
+/**
+ * Schedule an indirect ack through @a proxy. Indirect ACK is sent
+ * only when this instance receives an indirect ping. It means
+ * that another member tries to reach this one via other nodes,
+ * and inexplicably failed to do it directly.
+ */
+static inline int
+swim_send_indirect_ack(struct swim *swim, const struct sockaddr_in *dst,
+		       const struct sockaddr_in *proxy)
+{
+	struct swim_task *task =
+		swim_task_new(swim_task_delete_cb, swim_task_delete_cb,
+			      "indirect ack");
+	if (task == NULL)
+		return -1;
+	swim_send_fd_msg(swim, task, dst, SWIM_FD_MSG_ACK, proxy);
+	return 0;
 }
 
 /** Schedule send of a ping. */
@@ -1091,7 +1147,77 @@ static inline void
 swim_send_ping(struct swim *swim, struct swim_task *task,
 	       const struct sockaddr_in *dst)
 {
-	swim_send_fd_msg(swim, task, dst, SWIM_FD_MSG_PING);
+	swim_send_fd_msg(swim, task, dst, SWIM_FD_MSG_PING, NULL);
+}
+
+/** Indirect ping task completion callback. */
+static void
+swim_iping_task_complete(struct swim_task *task,
+			 struct swim_scheduler *scheduler, int rc)
+{
+	if (rc < 0)
+		goto finish;
+	struct swim *swim = swim_by_scheduler(scheduler);
+	struct swim_member *m = swim_find_member(swim, &task->uuid);
+	/*
+	 * A member can be already removed, probably manually, so
+	 * check for NULL. Additionally it is possible that before
+	 * this indirect ping managed to get EV_WRITE, already an
+	 * ACK was received and the member is alive again. Then
+	 * nothing to do.
+	 */
+	if (m != NULL && m->status != MEMBER_ALIVE)
+		swim_wait_ack(swim, m, true);
+finish:
+	swim_task_delete_cb(task, scheduler, rc);
+}
+
+/**
+ * Schedule a number of indirect pings to a member @a dst.
+ * Indirect pings are used when direct pings are not acked too
+ * long. The SWIM paper explains that it is a protection against
+ * false-positive failure detection when a node sends ACKs too
+ * slow, or the network is in trouble. Then other nodes can try to
+ * access it via different channels and members. The algorithm is
+ * simple - choose a fixed number of random members and send pings
+ * to the suspected member via them in parallel.
+ */
+static inline int
+swim_send_indirect_pings(struct swim *swim, const struct swim_member *dst)
+{
+	struct mh_swim_table_t *t = swim->members;
+	int member_count = mh_size(t);
+	int rnd = swim_scaled_rand(0, member_count - 1);
+	mh_int_t rc = mh_swim_table_random(t, rnd), end = mh_end(t);
+	for (int member_i = 0, task_i = 0; member_i < member_count &&
+	     task_i < INDIRECT_PING_COUNT; ++member_i) {
+		struct swim_member *m = *mh_swim_table_node(t, rc);
+		/*
+		 * It makes no sense to send an indirect ping via
+		 * self and via destination - it would be just
+		 * direct ping then.
+		 */
+		if (m != swim->self && !swim_inaddr_eq(&dst->addr, &m->addr)) {
+			struct swim_task *t =
+				swim_task_new(swim_iping_task_complete,
+					      swim_task_delete_cb,
+					      "indirect ping");
+			if (t == NULL)
+				return -1;
+			t->uuid = dst->uuid;
+			swim_task_set_proxy(t, &m->addr);
+			swim_send_fd_msg(swim, t, &dst->addr, SWIM_FD_MSG_PING,
+					 &m->addr);
+		}
+		/*
+		 * First random member could be chosen too close
+		 * to the hash end. Here the cycle is wrapped.
+		 */
+		rc = mh_next(t, rc);
+		if (rc == end)
+			rc = mh_first(t);
+	}
+	return 0;
 }
 
 /**
@@ -1116,6 +1242,14 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 		++m->unacknowledged_pings;
 		switch (m->status) {
 		case MEMBER_ALIVE:
+			if (m->unacknowledged_pings < NO_ACKS_TO_SUSPECT)
+				break;
+			m->status = MEMBER_SUSPECTED;
+			swim_on_member_update(swim, m);
+			if (swim_send_indirect_pings(swim, m) != 0)
+				diag_log();
+			break;
+		case MEMBER_SUSPECTED:
 			if (m->unacknowledged_pings >= NO_ACKS_TO_DEAD) {
 				m->status = MEMBER_DEAD;
 				swim_on_member_update(swim, m);
@@ -1303,7 +1437,8 @@ swim_process_anti_entropy(struct swim *swim, const char **pos, const char *end)
 static int
 swim_process_failure_detection(struct swim *swim, const char **pos,
 			       const char *end, const struct sockaddr_in *src,
-			       const struct tt_uuid *uuid)
+			       const struct tt_uuid *uuid,
+			       const struct sockaddr_in *proxy)
 {
 	const char *prefix = "invalid failure detection message:";
 	struct swim_failure_detection_def def;
@@ -1348,8 +1483,13 @@ swim_process_failure_detection(struct swim *swim, const char **pos,
 
 	switch (def.type) {
 	case SWIM_FD_MSG_PING:
-		if (! swim_task_is_scheduled(&member->ack_task))
+		if (proxy != NULL) {
+			if (swim_send_indirect_ack(swim, &member->addr,
+						   proxy) != 0)
+				diag_log();
+		} else if (! swim_task_is_scheduled(&member->ack_task)) {
 			swim_send_ack(swim, &member->ack_task, &member->addr);
+		}
 		break;
 	case SWIM_FD_MSG_ACK:
 		member->unacknowledged_pings = 0;
@@ -1421,7 +1561,6 @@ swim_on_input(struct swim_scheduler *scheduler, const char *pos,
 	      const char *end, const struct sockaddr_in *src,
 	      const struct sockaddr_in *proxy)
 {
-	(void) proxy;
 	const char *prefix = "invalid message:";
 	struct swim *swim = swim_by_scheduler(scheduler);
 	struct tt_uuid uuid;
@@ -1453,7 +1592,8 @@ swim_on_input(struct swim_scheduler *scheduler, const char *pos,
 			break;
 		case SWIM_FAILURE_DETECTION:
 			if (swim_process_failure_detection(swim, &pos, end,
-							   src, &uuid) != 0)
+							   src, &uuid,
+							   proxy) != 0)
 				goto error;
 			break;
 		case SWIM_DISSEMINATION:
