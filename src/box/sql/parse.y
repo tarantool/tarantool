@@ -51,7 +51,7 @@
 //
 %include {
 #include "sqlInt.h"
-#include "box/fkey.h"
+#include "box/fk_constraint.h"
 
 /*
 ** Disable all error recovery processing in the parser push-down
@@ -268,7 +268,7 @@ ccons ::= UNIQUE.                {sql_create_index(pParse,0,0,0,0,
 ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
 ccons ::= REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R).
                                  {sql_create_foreign_key(pParse, NULL, NULL, NULL, &T, TA, false, M, R);}
-ccons ::= defer_subclause(D).    {fkey_change_defer_mode(pParse, D);}
+ccons ::= defer_subclause(D).    {fk_constraint_change_defer_mode(pParse, D);}
 ccons ::= COLLATE id(C).        {sqlAddCollateType(pParse, &C);}
 
 // The optional AUTOINCREMENT keyword
