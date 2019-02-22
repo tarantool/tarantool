@@ -1363,6 +1363,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 		cmp = vy_stmt_compare_with_key(key, slice->begin, cmp_def);
 		if (cmp < 0 && iterator_type == ITER_EQ) {
 			vy_run_iterator_stop(itr);
+			*ret = NULL;
 			return 0;
 		}
 		if (cmp < 0 || (cmp == 0 && iterator_type != ITER_GT)) {

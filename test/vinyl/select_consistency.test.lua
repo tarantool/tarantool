@@ -34,10 +34,20 @@ function gen_update()
 end;
 
 function dml_loop()
+    local insert = true
     while not stop do
-        gen_insert()
+        if s:len() >= MAX_KEY then
+            insert = false
+        end
+        if s:len() <= MAX_KEY / 2 then
+            insert = true
+        end
+        if insert then
+            gen_insert()
+        else
+            gen_delete()
+        end
         gen_update()
-        gen_delete()
         fiber.sleep(0)
     end
     ch:put(true)
