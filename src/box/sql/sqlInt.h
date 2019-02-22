@@ -2618,12 +2618,12 @@ enum ast_type {
  * Structure representing foreign keys constraints appeared
  * within CREATE TABLE statement. Used only during parsing.
  */
-struct fkey_parse {
+struct fk_constraint_parse {
 	/**
 	 * Foreign keys constraint declared in <CREATE TABLE ...>
 	 * statement. They must be coded after space creation.
 	 */
-	struct fkey_def *fkey;
+	struct fk_constraint_def *fk_def;
 	/**
 	 * If inside CREATE TABLE statement we want to declare
 	 * self-referenced FK constraint, we must delay their
@@ -2736,11 +2736,11 @@ struct Parse {
 	 * Number of FK constraints declared within
 	 * CREATE TABLE statement.
 	 */
-	uint32_t fkey_count;
+	uint32_t fk_constraint_count;
 	/**
 	 * Foreign key constraint appeared in CREATE TABLE stmt.
 	 */
-	struct rlist new_fkey;
+	struct rlist new_fk_constraint;
 	/**
 	 * List of all records that were inserted in system spaces
 	 * in current statement.
@@ -4100,7 +4100,7 @@ int sqlJoinType(Parse *, Token *, Token *, Token *);
  * @param is_deferred Change defer mode to this value.
  */
 void
-fkey_change_defer_mode(struct Parse *parse_context, bool is_deferred);
+fk_constraint_change_defer_mode(struct Parse *parse_context, bool is_deferred);
 
 /**
  * Function called from parser to handle
@@ -4686,7 +4686,7 @@ void sqlWithPush(Parse *, With *, u8);
  * @param changed_cols Array of updated columns. Can be NULL.
  */
 void
-fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
+fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 		int reg_new, const int *changed_cols);
 
 /**
@@ -4698,7 +4698,7 @@ fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
  * param changes Array of numbers of changed columns.
  */
 void
-fkey_emit_actions(struct Parse *parser, struct space *space, int reg_old,
+fk_constraint_emit_actions(struct Parse *parser, struct space *space, int reg_old,
 		  const int *changes);
 
 /**
@@ -4716,7 +4716,7 @@ fkey_emit_actions(struct Parse *parser, struct space *space, int reg_old,
  * @retval True, if any foreign key processing will be required.
  */
 bool
-fkey_is_required(struct space *space, const int *changes);
+fk_constraint_is_required(struct space *space, const int *changes);
 
 /*
  * Available fault injectors.  Should be numbered beginning with 0.

@@ -163,8 +163,8 @@ space_create(struct space *space, struct engine *engine,
 		space->index_map[index_def->iid] = index;
 	}
 	space_fill_index_map(space);
-	rlist_create(&space->parent_fkey);
-	rlist_create(&space->child_fkey);
+	rlist_create(&space->parent_fk_constraint);
+	rlist_create(&space->child_fk_constraint);
 	return 0;
 
 fail_free_indexes:
@@ -223,8 +223,8 @@ space_delete(struct space *space)
 	 * on_replace_dd_trigger on deletion from _trigger.
 	 */
 	assert(space->sql_triggers == NULL);
-	assert(rlist_empty(&space->parent_fkey));
-	assert(rlist_empty(&space->child_fkey));
+	assert(rlist_empty(&space->parent_fk_constraint));
+	assert(rlist_empty(&space->child_fk_constraint));
 	space->vtab->destroy(space);
 }
 

@@ -134,13 +134,13 @@
  * coding an INSERT operation. The functions used by the UPDATE/DELETE
  * generation code to query for this information are:
  *
- *   fkey_is_required() - Test to see if FK processing is required.
+ *   fk_constraint_is_required() - Test to see if FK processing is required.
  *
  * Externally accessible module functions
  * --------------------------------------
  *
- *   fkey_emit_check()   - Check for foreign key violations.
- *   fkey_emit_actions()  - Code triggers for ON UPDATE/ON DELETE actions.
+ *   fk_constraint_emit_check()   - Check for foreign key violations.
+ *   fk_constraint_emit_actions()  - Code triggers for ON UPDATE/ON DELETE actions.
  *
  * VDBE Calling Convention
  * -----------------------
@@ -161,7 +161,7 @@
 /**
  * This function is called when a row is inserted into or deleted
  * from the child table of foreign key constraint. If an SQL
- * UPDATE is executed on the child table of fkey, this function is
+ * UPDATE is executed on the child table of fk_constraint, this function is
  * invoked twice for each row affected - once to "delete" the old
  * row, and then again to "insert" the new row.
  *
@@ -192,8 +192,8 @@
  * @param incr_count Increment constraint counter by this value.
  */
 static void
-fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
-		   struct fkey_def *fk_def, uint32_t referenced_idx,
+fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
+		   struct fk_constraint_def *fk_def, uint32_t referenced_idx,
 		   int reg_data, int incr_count, bool is_update)
 {
 	assert(incr_count == -1 || incr_count == 1);
@@ -234,7 +234,7 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 	 * NULL (at this point it is known that none of the child
 	 * key values are).
 	 */
-	if (fkey_is_self_referenced(fk_def) && incr_count == 1) {
+	if (fk_constraint_is_self_referenced(fk_def) && incr_count == 1) {
 		int jump = sqlVdbeCurrentAddr(v) + field_count + 1;
 		link = fk_def->links;
 		for (uint32_t i = 0; i < field_count; ++i, ++link) {
@@ -252,7 +252,7 @@ fkey_lookup_parent(struct Parse *parse_context, struct space *parent,
 	 * And since the foreign key has already detected a
 	 * conflict, fk counter must be increased.
 	 */
-	if (!(fkey_is_self_referenced(fk_def) && is_update)) {
+	if (!(fk_constraint_is_self_referenced(fk_def) && is_update)) {
 		int temp_regs = sqlGetTempRange(parse_context, field_count);
 		int rec_reg = sqlGetTempReg(parse_context);
 		vdbe_emit_open_cursor(parse_context, cursor, referenced_idx,
@@ -360,8 +360,8 @@ exprTableColumn(sql * db, struct space_def *def, int cursor, i16 column)
 
 /*
  * This function is called to generate code executed when a row is
- * deleted from the parent table of foreign key constraint @a fkey
- * and, if @a fkey is deferred, when a row is inserted into the
+ * deleted from the parent table of foreign key constraint @a fk_constraint
+ * and, if @a fk_constraint is deferred, when a row is inserted into the
  * same table. When generating code for an SQL UPDATE operation,
  * this function may be called twice - once to "delete" the old
  * row and once to "insert" the new row.
@@ -397,14 +397,14 @@ exprTableColumn(sql * db, struct space_def *def, int cursor, i16 column)
  * @param parser SQL parser.
  * @param src The child table to be scanned.
  * @param def Parent space definition.
- * @param fkey The foreign key linking src to tab.
+ * @param fk_constraint The foreign key linking src to tab.
  * @param reg_data Register from which parent row data starts.
  * @param incr_count Amount to increment deferred counter by.
  */
 static void
-fkey_scan_children(struct Parse *parser, struct SrcList *src,
-		   struct space_def *def, struct fkey_def *fkey, int reg_data,
-		   int incr_count)
+fk_constraint_scan_children(struct Parse *parser, struct SrcList *src,
+		   struct space_def *def, struct fk_constraint_def *fk_def,
+		   int reg_data, int incr_count)
 {
 	assert(incr_count == -1 || incr_count == 1);
 	struct sql *db = parser->db;
@@ -415,7 +415,7 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src,
 
 	if (incr_count < 0) {
 		fkifzero_label = sqlVdbeAddOp2(v, OP_FkIfZero,
-						   fkey->is_deferred, 0);
+						   fk_def->is_deferred, 0);
 		VdbeCoverage(v);
 	}
 
@@ -432,11 +432,11 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src,
 	 * parent key column should be applied to each child key
 	 * value before the comparison takes place.
 	 */
-	for (uint32_t i = 0; i < fkey->field_count; i++) {
-		uint32_t fieldno = fkey->links[i].parent_field;
+	for (uint32_t i = 0; i < fk_def->field_count; i++) {
+		uint32_t fieldno = fk_def->links[i].parent_field;
 		struct Expr *pexpr =
 			space_field_register(parser, def, reg_data, fieldno);
-		fieldno = fkey->links[i].child_field;
+		fieldno = fk_def->links[i].child_field;
 		const char *field_name = child_space->def->fields[fieldno].name;
 		struct Expr *chexpr = sqlExpr(db, TK_ID, field_name);
 		struct Expr *eq = sqlPExpr(parser, TK_EQ, pexpr, chexpr);
@@ -452,10 +452,10 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src,
 	 *     NOT( $current_a==a AND $current_b==b AND ... )
 	 *     The primary key is (a,b,...)
 	 */
-	if (def->id == fkey->child_id && incr_count > 0) {
+	if (def->id == fk_def->child_id && incr_count > 0) {
 		struct Expr *expr = NULL, *pexpr, *chexpr, *eq;
-		for (uint32_t i = 0; i < fkey->field_count; i++) {
-			uint32_t fieldno = fkey->links[i].parent_field;
+		for (uint32_t i = 0; i < fk_def->field_count; i++) {
+			uint32_t fieldno = fk_def->links[i].parent_field;
 			pexpr = space_field_register(parser, def, reg_data,
 						     fieldno);
 			chexpr = exprTableColumn(db, def, src->a[0].iCursor,
@@ -482,7 +482,7 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src,
 	 */
 	struct WhereInfo *info =
 		sqlWhereBegin(parser, src, where, NULL, NULL, 0, 0);
-	sqlVdbeAddOp2(v, OP_FkCounter, fkey->is_deferred, incr_count);
+	sqlVdbeAddOp2(v, OP_FkCounter, fk_def->is_deferred, incr_count);
 	if (info != NULL)
 		sqlWhereEnd(info);
 
@@ -493,18 +493,19 @@ fkey_scan_children(struct Parse *parser, struct SrcList *src,
 }
 
 /**
- * Detect if @a fkey columns of @a type intersect with @a changes.
- * @param fkey FK constraint definition.
+ * Detect if @a fk_constraint columns of @a type intersect with @a changes.
+ * @param fk_constraint FK constraint definition.
  * @param changes Array indicating modified columns.
  *
  * @retval true, if any of the columns that are part of the key
  *         or @a type for FK constraint are modified.
  */
 static bool
-fkey_is_modified(const struct fkey_def *fkey, int type, const int *changes)
+fk_constraint_is_modified(const struct fk_constraint_def *fk_def, int type,
+			  const int *changes)
 {
-	for (uint32_t i = 0; i < fkey->field_count; ++i) {
-		if (changes[fkey->links[i].fields[type]] >= 0)
+	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
+		if (changes[fk_def->links[i].fields[type]] >= 0)
 			return true;
 	}
 	return false;
@@ -515,23 +516,24 @@ fkey_is_modified(const struct fkey_def *fkey, int type, const int *changes)
  * used to code a trigger that is really a "SET NULL" action.
  */
 static bool
-fkey_action_is_set_null(struct Parse *parse_context, const struct fkey *fkey)
+fk_constraint_action_is_set_null(struct Parse *parse_context,
+				 const struct fk_constraint *fk)
 {
 	struct Parse *top_parse = sqlParseToplevel(parse_context);
 	if (top_parse->pTriggerPrg != NULL) {
 		struct sql_trigger *trigger = top_parse->pTriggerPrg->trigger;
-		if ((trigger == fkey->on_delete_trigger &&
-		     fkey->def->on_delete == FKEY_ACTION_SET_NULL) ||
-		    (trigger == fkey->on_update_trigger &&
-		     fkey->def->on_update == FKEY_ACTION_SET_NULL))
+		if ((trigger == fk->on_delete_trigger &&
+		     fk->def->on_delete == FKEY_ACTION_SET_NULL) ||
+		    (trigger == fk->on_update_trigger &&
+		     fk->def->on_update == FKEY_ACTION_SET_NULL))
 			return true;
 	}
 	return false;
 }
 
 void
-fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
-		int reg_new, const int *changed_cols)
+fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
+			 int reg_new, const int *changed_cols)
 {
 	bool is_update = changed_cols != NULL;
 	struct sql *db = parser->db;
@@ -547,11 +549,11 @@ fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
 	 * tab is the child table.
 	 */
 	assert(space != NULL);
-	struct fkey *fk;
-	rlist_foreach_entry(fk, &space->child_fkey, child_link) {
-		struct fkey_def *fk_def = fk->def;
-		if (is_update && !fkey_is_self_referenced(fk_def) &&
-		    !fkey_is_modified(fk_def, FIELD_LINK_CHILD, changed_cols))
+	struct fk_constraint *fk;
+	rlist_foreach_entry(fk, &space->child_fk_constraint, in_child_space) {
+		struct fk_constraint_def *fk_def = fk->def;
+		if (is_update && !fk_constraint_is_self_referenced(fk_def) &&
+		    !fk_constraint_is_modified(fk_def, FIELD_LINK_CHILD, changed_cols))
 			continue;
 		parser->nTab++;
 		struct space *parent = space_by_id(fk_def->parent_id);
@@ -564,10 +566,10 @@ fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
 			 * child row resolves an outstanding
 			 * foreign key constraint violation.
 			 */
-			fkey_lookup_parent(parser, parent, fk_def, fk->index_id,
-					   reg_old, -1, is_update);
+			fk_constraint_lookup_parent(parser, parent, fk_def, fk->index_id,
+						    reg_old, -1, is_update);
 		}
-		if (reg_new != 0 && !fkey_action_is_set_null(parser, fk)) {
+		if (reg_new != 0 && !fk_constraint_action_is_set_null(parser, fk)) {
 			/*
 			 * A row is being added to the child
 			 * table. If a parent row cannot be found,
@@ -583,18 +585,20 @@ fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
 			 * not possible for adding this row to
 			 * cause an FK violation.
 			 */
-			fkey_lookup_parent(parser, parent, fk_def, fk->index_id,
-					   reg_new, +1, is_update);
+			fk_constraint_lookup_parent(parser, parent,
+						    fk_def, fk->index_id,
+						    reg_new, +1, is_update);
 		}
 	}
 	/*
 	 * Loop through all the foreign key constraints that
 	 * refer to this table.
 	 */
-	rlist_foreach_entry(fk, &space->parent_fkey, parent_link) {
-		struct fkey_def *fk_def = fk->def;
+	rlist_foreach_entry(fk, &space->parent_fk_constraint, in_parent_space) {
+		struct fk_constraint_def *fk_def = fk->def;
 		if (is_update &&
-		    !fkey_is_modified(fk_def, FIELD_LINK_PARENT, changed_cols))
+		    !fk_constraint_is_modified(fk_def, FIELD_LINK_PARENT,
+					       changed_cols))
 			continue;
 		if (!fk_def->is_deferred &&
 		    (user_session->sql_flags & SQL_DeferFKs) == 0 &&
@@ -625,13 +629,13 @@ fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
 		item->iCursor = parser->nTab++;
 
 		if (reg_new != 0) {
-			fkey_scan_children(parser, src, space->def, fk->def,
-					   reg_new, -1);
+			fk_constraint_scan_children(parser, src, space->def,
+						    fk->def, reg_new, -1);
 		}
 		if (reg_old != 0) {
-			enum fkey_action action = fk_def->on_update;
-			fkey_scan_children(parser, src, space->def, fk->def,
-				           reg_old, 1);
+			enum fk_constraint_action action = fk_def->on_update;
+			fk_constraint_scan_children(parser, src, space->def,
+						    fk->def, reg_old, 1);
 			/*
 			 * If this is a deferred FK constraint, or
 			 * a CASCADE or SET NULL action applies,
@@ -670,28 +674,28 @@ fkey_emit_check(struct Parse *parser, struct space *space, int reg_old,
 }
 
 bool
-fkey_is_required(struct space *space, const int *changes)
+fk_constraint_is_required(struct space *space, const int *changes)
 {
 	if (changes == NULL) {
 		/*
 		 * A DELETE operation. FK processing is required
 		 * if space is child or parent.
 		 */
-		return ! rlist_empty(&space->parent_fkey) ||
-		       ! rlist_empty(&space->child_fkey);
+		return ! rlist_empty(&space->parent_fk_constraint) ||
+		       ! rlist_empty(&space->child_fk_constraint);
 	}
 	/*
 	 * This is an UPDATE. FK processing is only required if
 	 * the operation modifies one or more child or parent key
 	 * columns.
 	 */
-	struct fkey *fk;
-	rlist_foreach_entry(fk, &space->child_fkey, child_link) {
-		if (fkey_is_modified(fk->def, FIELD_LINK_CHILD, changes))
+	struct fk_constraint *fk;
+	rlist_foreach_entry(fk, &space->child_fk_constraint, in_child_space) {
+		if (fk_constraint_is_modified(fk->def, FIELD_LINK_CHILD, changes))
 			return true;
 	}
-	rlist_foreach_entry(fk, &space->parent_fkey, parent_link) {
-		if (fkey_is_modified(fk->def, FIELD_LINK_PARENT, changes))
+	rlist_foreach_entry(fk, &space->parent_fk_constraint, in_parent_space) {
+		if (fk_constraint_is_modified(fk->def, FIELD_LINK_PARENT, changes))
 			return true;
 	}
 	return false;
@@ -700,20 +704,20 @@ fkey_is_required(struct space *space, const int *changes)
 /**
  * This function is called when an UPDATE or DELETE operation is
  * being compiled on table pTab, which is the parent table of
- * foreign-key fkey.
+ * foreign-key fk_constraint.
  * If the current operation is an UPDATE, then the pChanges
  * parameter is passed a pointer to the list of columns being
  * modified. If it is a DELETE, pChanges is passed a NULL pointer.
  *
  * It returns a pointer to a sql_trigger structure containing a
  * trigger equivalent to the ON UPDATE or ON DELETE action
- * specified by fkey.
+ * specified by fk_constraint.
  * If the action is "NO ACTION" or "RESTRICT", then a NULL pointer
  * is returned (these actions require no special handling by the
  * triggers sub-system, code for them is created by
- * fkey_scan_children()).
+ * fk_constraint_scan_children()).
  *
- * For example, if fkey is the foreign key and pTab is table "p"
+ * For example, if fk_constraint is the foreign key and pTab is table "p"
  * in the following schema:
  *
  *   CREATE TABLE p(pk PRIMARY KEY);
@@ -727,26 +731,26 @@ fkey_is_required(struct space *space, const int *changes)
  *
  * The returned pointer is cached as part of the foreign key
  * object. It is eventually freed along with the rest of the
- * foreign key object by fkey_delete().
+ * foreign key object by fk_constraint_delete().
  *
  * @param pParse Parse context.
  * @param def Definition of space being updated or deleted from.
- * @param fkey Foreign key to get action for.
+ * @param fk_constraint Foreign key to get action for.
  * @param is_update True if action is on update.
  *
  * @retval not NULL on success.
  * @retval NULL on failure.
  */
 static struct sql_trigger *
-fkey_action_trigger(struct Parse *pParse, struct space_def *def,
-		    struct fkey *fkey, bool is_update)
+fk_constraint_action_trigger(struct Parse *pParse, struct space_def *def,
+		    struct fk_constraint *fk, bool is_update)
 {
 	struct sql *db = pParse->db;
-	struct fkey_def *fk_def = fkey->def;
-	enum fkey_action action = is_update ? fk_def->on_update :
-					      fk_def->on_delete;
-	struct sql_trigger *trigger = is_update ? fkey->on_update_trigger :
-						  fkey->on_delete_trigger;
+	struct fk_constraint_def *fk_def = fk->def;
+	enum fk_constraint_action action = (is_update ? fk_def->on_update :
+					    fk_def->on_delete);
+	struct sql_trigger *trigger = is_update ? fk->on_update_trigger :
+						  fk->on_delete_trigger;
 	if (action == FKEY_NO_ACTION || trigger != NULL)
 		return trigger;
 	struct TriggerStep *step = NULL;
@@ -915,18 +919,18 @@ fkey_action_trigger(struct Parse *pParse, struct space_def *def,
 
 	step->trigger = trigger;
 	if (is_update) {
-		fkey->on_update_trigger = trigger;
+		fk->on_update_trigger = trigger;
 		trigger->op = TK_UPDATE;
 	} else {
-		fkey->on_delete_trigger = trigger;
+		fk->on_delete_trigger = trigger;
 		trigger->op = TK_DELETE;
 	}
 	return trigger;
 }
 
 void
-fkey_emit_actions(struct Parse *parser, struct space *space, int reg_old,
-		  const int *changes)
+fk_constraint_emit_actions(struct Parse *parser, struct space *space,
+			   int reg_old, const int *changes)
 {
 	/*
 	 * Iterate through all FKs that refer to table tab.
@@ -935,13 +939,13 @@ fkey_emit_actions(struct Parse *parser, struct space *space, int reg_old,
 	 * invoke the associated trigger sub-program.
 	 */
 	assert(space != NULL);
-	struct fkey *fk;
-	rlist_foreach_entry(fk, &space->parent_fkey, parent_link)  {
+	struct fk_constraint *fk;
+	rlist_foreach_entry(fk, &space->parent_fk_constraint, in_parent_space)  {
 		if (changes != NULL &&
-		    !fkey_is_modified(fk->def, FIELD_LINK_PARENT, changes))
+		    !fk_constraint_is_modified(fk->def, FIELD_LINK_PARENT, changes))
 			continue;
 		struct sql_trigger *pAct =
-			fkey_action_trigger(parser, space->def, fk,
+			fk_constraint_action_trigger(parser, space->def, fk,
 					    changes != NULL);
 		if (pAct == NULL)
 			continue;

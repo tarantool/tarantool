@@ -32,7 +32,7 @@
 #include "sql.h"
 #include "sql/sqlInt.h"
 
-const char *fkey_action_strs[] = {
+const char *fk_constraint_action_strs[] = {
 	/* [FKEY_ACTION_RESTRICT]    = */ "no_action",
 	/* [FKEY_ACTION_SET_NULL]    = */ "set_null",
 	/* [FKEY_ACTION_SET_DEFAULT] = */ "set_default",
@@ -40,17 +40,17 @@ const char *fkey_action_strs[] = {
 	/* [FKEY_ACTION_NO_ACTION]   = */ "restrict"
 };
 
-const char *fkey_match_strs[] = {
+const char *fk_constraint_match_strs[] = {
 	/* [FKEY_MATCH_SIMPLE]  = */ "simple",
 	/* [FKEY_MATCH_PARTIAL] = */ "partial",
 	/* [FKEY_MATCH_FULL]    = */ "full"
 };
 
 void
-fkey_delete(struct fkey *fkey)
+fk_constraint_delete(struct fk_constraint *fk)
 {
-	sql_trigger_delete(sql_get(), fkey->on_delete_trigger);
-	sql_trigger_delete(sql_get(), fkey->on_update_trigger);
-	free(fkey->def);
-	free(fkey);
+	sql_trigger_delete(sql_get(), fk->on_delete_trigger);
+	sql_trigger_delete(sql_get(), fk->on_update_trigger);
+	free(fk->def);
+	free(fk);
 }

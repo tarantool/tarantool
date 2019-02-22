@@ -192,14 +192,14 @@ struct space {
 	 * other words the table that is named in the REFERENCES
 	 * clause.
 	 */
-	struct rlist parent_fkey;
-	struct rlist child_fkey;
+	struct rlist parent_fk_constraint;
+	struct rlist child_fk_constraint;
 	/**
 	 * Mask indicates which fields are involved in foreign
 	 * key constraint checking routine. Includes fields
 	 * of parent constraints as well as child ones.
 	 */
-	uint64_t fkey_mask;
+	uint64_t fk_constraint_mask;
 };
 
 /** Initialize a base space instance. */

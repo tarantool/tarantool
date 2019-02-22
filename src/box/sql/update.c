@@ -202,7 +202,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 */
 	pTabList->a[0].colUsed = 0;
 
-	hasFK = fkey_is_required(space, aXRef);
+	hasFK = fk_constraint_is_required(space, aXRef);
 
 	/* Begin generating code. */
 	v = sqlGetVdbe(pParse);
@@ -332,7 +332,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	 */
 	if (is_pk_modified || hasFK != 0 || trigger != NULL) {
 		assert(space != NULL);
-		u32 oldmask = hasFK ? space->fkey_mask : 0;
+		u32 oldmask = hasFK ? space->fk_constraint_mask : 0;
 		oldmask |= sql_trigger_colmask(pParse, trigger, pChanges, 0,
 					       TRIGGER_BEFORE | TRIGGER_AFTER,
 					       space, on_error);
@@ -432,7 +432,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 					    on_error, labelContinue, aXRef);
 		/* Do FK constraint checks. */
 		if (hasFK) {
-			fkey_emit_check(pParse, space, regOldPk, 0, aXRef);
+			fk_constraint_emit_check(pParse, space, regOldPk, 0, aXRef);
 		}
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			/*
@@ -448,7 +448,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 			sqlVdbeJumpHere(v, not_found_lbl);
 		}
 		if (hasFK) {
-			fkey_emit_check(pParse, space, 0, regNewPk, aXRef);
+			fk_constraint_emit_check(pParse, space, 0, regNewPk, aXRef);
 		}
 		if (on_error == ON_CONFLICT_ACTION_REPLACE) {
 			 vdbe_emit_insertion_completion(v, space, regNew,
@@ -497,7 +497,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		 * via a foreign key to the row just updated.
 		 */
 		if (hasFK)
-			fkey_emit_actions(pParse, space, regOldPk, aXRef);
+			fk_constraint_emit_actions(pParse, space, regOldPk, aXRef);
 	}
 
 	/* Increment the row counter

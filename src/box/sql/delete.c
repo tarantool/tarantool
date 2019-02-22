@@ -96,7 +96,7 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 		diag_set(ClientError, ER_NO_SUCH_SPACE, tab_name);
 		goto tarantool_error;
 	}
-	if (! rlist_empty(&space->parent_fkey)) {
+	if (! rlist_empty(&space->parent_fk_constraint)) {
 		const char *err_msg =
 			tt_sprintf("can not truncate space '%s' because other "
 				   "objects depend on it", space->def->name);
@@ -148,7 +148,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 	if (space == NULL)
 		goto delete_from_cleanup;
 	trigger_list = sql_triggers_exist(space->def, TK_DELETE, NULL, NULL);
-	bool is_complex = trigger_list != NULL || fkey_is_required(space, NULL);
+	bool is_complex = trigger_list != NULL || fk_constraint_is_required(space, NULL);
 	bool is_view = space->def->opts.is_view;
 
 	/* If table is really a view, make sure it has been
@@ -456,7 +456,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 	 * use for the old.* references in the triggers.
 	 */
 	if (space != NULL &&
-	   (fkey_is_required(space, NULL) || trigger_list != NULL)) {
+	   (fk_constraint_is_required(space, NULL) || trigger_list != NULL)) {
 		/* Mask of OLD.* columns in use */
 		/* TODO: Could use temporary registers here. */
 		uint32_t mask =
@@ -464,7 +464,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 					    TRIGGER_BEFORE | TRIGGER_AFTER,
 					    space, onconf);
 		assert(space != NULL);
-		mask |= space->fkey_mask;
+		mask |= space->fk_constraint_mask;
 		first_old_reg = parse->nMem + 1;
 		parse->nMem += (1 + (int)space->def->field_count);
 
@@ -508,7 +508,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 		 * constraints attached to other tables) are not
 		 * violated by deleting this row.
 		 */
-		fkey_emit_check(parse, space, first_old_reg, 0, NULL);
+		fk_constraint_emit_check(parse, space, first_old_reg, 0, NULL);
 	}
 
 	/* Delete the index and table entries. Skip this step if
@@ -538,7 +538,7 @@ sql_generate_row_delete(struct Parse *parse, struct space *space,
 		 * key to the row just deleted.
 		 */
 
-		fkey_emit_actions(parse, space, first_old_reg, NULL);
+		fk_constraint_emit_actions(parse, space, first_old_reg, NULL);
 
 		/* Invoke AFTER DELETE trigger programs. */
 		vdbe_code_row_trigger(parse, trigger_list, TK_DELETE, 0,

@@ -943,7 +943,7 @@ vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
 			  ++parser->nMem, (const char *)pPrg->pProgram,
 			  P4_SUBPROGRAM);
 	VdbeComment((v, "Call: %s.%s", (trigger->zName ? trigger->zName :
-					"fkey"),
+					"fk_constraint"),
 		     onErrorText(orconf)));
 
 	/*

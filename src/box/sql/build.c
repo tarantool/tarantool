@@ -992,7 +992,8 @@ emitNewSysSpaceSequenceRecord(Parse *pParse, int space_id, const char reg_seq_id
  * @param fk Foreign key to be created.
  */
 static void
-vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
+vdbe_emit_fk_constraint_create(struct Parse *parse_context,
+			       const struct fk_constraint_def *fk)
 {
 	assert(parse_context != NULL);
 	assert(fk != NULL);
@@ -1020,7 +1021,7 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 		sqlVdbeAddOp2(vdbe, OP_Integer, fk->child_id,
 				  constr_tuple_reg + 1);
 	}
-	if (parse_context->new_space != NULL && fkey_is_self_referenced(fk)) {
+	if (parse_context->new_space != NULL && fk_constraint_is_self_referenced(fk)) {
 		sqlVdbeAddOp2(vdbe, OP_SCopy, fk->parent_id,
 				  constr_tuple_reg + 2);
 	} else {
@@ -1042,19 +1043,19 @@ vdbe_emit_fkey_create(struct Parse *parse_context, const struct fkey_def *fk)
 	sqlVdbeAddOp2(vdbe, OP_Bool, 0, constr_tuple_reg + 3);
 	sqlVdbeChangeP4(vdbe, -1, (char*)&fk->is_deferred, P4_BOOL);
 	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 4, 0,
-			  fkey_match_strs[fk->match], P4_STATIC);
+			  fk_constraint_match_strs[fk->match], P4_STATIC);
 	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 5, 0,
-			  fkey_action_strs[fk->on_delete], P4_STATIC);
+			  fk_constraint_action_strs[fk->on_delete], P4_STATIC);
 	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 6, 0,
-			  fkey_action_strs[fk->on_update], P4_STATIC);
+			  fk_constraint_action_strs[fk->on_update], P4_STATIC);
 	struct region *region = &parse_context->region;
 	uint32_t parent_links_size = 0;
-	char *parent_links = fkey_encode_links(region, fk, FIELD_LINK_PARENT,
+	char *parent_links = fk_constraint_encode_links(region, fk, FIELD_LINK_PARENT,
 					       &parent_links_size);
 	if (parent_links == NULL)
 		goto error;
 	uint32_t child_links_size = 0;
-	char *child_links = fkey_encode_links(region, fk, FIELD_LINK_CHILD,
+	char *child_links = fk_constraint_encode_links(region, fk, FIELD_LINK_CHILD,
 					      &child_links_size);
 	if (child_links == NULL)
 		goto error;
@@ -1229,24 +1230,25 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 			    reg_space_seq_record + 1, 1, v->nOp - 1);
 	}
 	/* Code creation of FK constraints, if any. */
-	struct fkey_parse *fk_parse;
-	rlist_foreach_entry(fk_parse, &pParse->new_fkey, link) {
-		struct fkey_def *fk = fk_parse->fkey;
+	struct fk_constraint_parse *fk_parse;
+	rlist_foreach_entry(fk_parse, &pParse->new_fk_constraint, link) {
+
+		struct fk_constraint_def *fk_def = fk_parse->fk_def;
 		if (fk_parse->selfref_cols != NULL) {
 			struct ExprList *cols = fk_parse->selfref_cols;
-			for (uint32_t i = 0; i < fk->field_count; ++i) {
+			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
 				if (resolve_link(pParse, new_space->def,
 						 cols->a[i].zName,
-						 &fk->links[i].parent_field,
-						 fk->name) != 0)
+						 &fk_def->links[i].parent_field,
+						 fk_def->name) != 0)
 					return;
 			}
-			fk->parent_id = reg_space_id;
+			fk_def->parent_id = reg_space_id;
 		} else if (fk_parse->is_self_referenced) {
 			struct index *pk = sql_space_primary_key(new_space);
-			if (pk->def->key_def->part_count != fk->field_count) {
+			if (pk->def->key_def->part_count != fk_def->field_count) {
 				diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
-					 fk->name, "number of columns in "\
+					 fk_def->name, "number of columns in "\
 					 "foreign key does not match the "\
 					 "number of columns in the primary "\
 					 "index of referenced table");
@@ -1254,14 +1256,14 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 				pParse->nErr++;
 				return;
 			}
-			for (uint32_t i = 0; i < fk->field_count; ++i) {
-				fk->links[i].parent_field =
+			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
+				fk_def->links[i].parent_field =
 					pk->def->key_def->parts[i].fieldno;
 			}
-			fk->parent_id = reg_space_id;
+			fk_def->parent_id = reg_space_id;
 		}
-		fk->child_id = reg_space_id;
-		vdbe_emit_fkey_create(pParse, fk);
+		fk_def->child_id = reg_space_id;
+		vdbe_emit_fk_constraint_create(pParse, fk_def);
 	}
 cleanup:
 	sql_expr_list_delete(db, new_space->def->opts.checks);
@@ -1442,7 +1444,7 @@ sql_clear_stat_spaces(struct Parse *parse, const char *table_name,
  * @param child_id Id of table which constraint belongs to.
  */
 static void
-vdbe_emit_fkey_drop(struct Parse *parse_context, char *constraint_name,
+vdbe_emit_fk_constraint_drop(struct Parse *parse_context, char *constraint_name,
 		    uint32_t child_id)
 {
 	struct Vdbe *vdbe = sqlGetVdbe(parse_context);
@@ -1531,12 +1533,14 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 		VdbeComment((v, "Delete entry from _sequence"));
 	}
 	/* Delete all child FK constraints. */
-	struct fkey *child_fk;
-	rlist_foreach_entry (child_fk, &space->child_fkey, child_link) {
+	struct fk_constraint *child_fk;
+	rlist_foreach_entry(child_fk, &space->child_fk_constraint,
+			    in_child_space) {
+
 		char *fk_name_dup = sqlDbStrDup(v->db, child_fk->def->name);
 		if (fk_name_dup == NULL)
 			return;
-		vdbe_emit_fkey_drop(parse_context, fk_name_dup, space_id);
+		vdbe_emit_fk_constraint_drop(parse_context, fk_name_dup, space_id);
 	}
 	/*
 	 * Drop all _space and _index entries that refer to the
@@ -1638,9 +1642,10 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	 *    removing indexes from _index space and eventually
 	 *    tuple with corresponding space_id from _space.
 	 */
-	struct fkey *fk;
-	rlist_foreach_entry(fk, &space->parent_fkey, parent_link) {
-		if (! fkey_is_self_referenced(fk->def)) {
+	struct fk_constraint *fk;
+	rlist_foreach_entry(fk, &space->parent_fk_constraint, in_parent_space) {
+
+		if (! fk_constraint_is_self_referenced(fk->def)) {
 			diag_set(ClientError, ER_DROP_SPACE, space_name,
 				 "other objects depend on it");
 			parse_context->rc = SQL_TARANTOOL_ERROR;
@@ -1731,15 +1736,15 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 			goto tnt_error;
 		}
 	} else {
-		struct fkey_parse *fk = region_alloc(&parse_context->region,
-						     sizeof(*fk));
-		if (fk == NULL) {
-			diag_set(OutOfMemory, sizeof(*fk), "region_alloc",
-				 "fk");
+		struct fk_constraint_parse *fk_parse =
+			region_alloc(&parse_context->region, sizeof(*fk_parse));
+		if (fk_parse == NULL) {
+			diag_set(OutOfMemory, sizeof(*fk_parse), "region_alloc",
+				 "struct fk_constraint_parse");
 			goto tnt_error;
 		}
-		memset(fk, 0, sizeof(*fk));
-		rlist_add_entry(&parse_context->new_fkey, fk, link);
+		memset(fk_parse, 0, sizeof(*fk_parse));
+		rlist_add_entry(&parse_context->new_fk_constraint, fk_parse, link);
 	}
 	assert(parent != NULL);
 	parent_name = sqlNameFromToken(db, parent);
@@ -1755,11 +1760,11 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	struct space *parent_space = space_by_name(parent_name);
 	if (parent_space == NULL) {
 		if (is_self_referenced) {
-			struct fkey_parse *fk =
-				rlist_first_entry(&parse_context->new_fkey,
-						  struct fkey_parse, link);
-			fk->selfref_cols = parent_cols;
-			fk->is_self_referenced = true;
+			struct fk_constraint_parse *fk_parse =
+				rlist_first_entry(&parse_context->new_fk_constraint,
+						  struct fk_constraint_parse, link);
+			fk_parse->selfref_cols = parent_cols;
+			fk_parse->is_self_referenced = true;
 		} else {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, parent_name);;
 			goto tnt_error;
@@ -1775,7 +1780,7 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		if (parse_context->constraintName.n == 0) {
 			constraint_name =
 				sqlMPrintf(db, "FK_CONSTRAINT_%d_%s",
-					       ++parse_context->fkey_count,
+					       ++parse_context->fk_constraint_count,
 					       space->def->name);
 		} else {
 			struct Token *cnstr_nm = &parse_context->constraintName;
@@ -1809,30 +1814,32 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		}
 	}
 	int name_len = strlen(constraint_name);
-	size_t fk_size = fkey_def_sizeof(child_cols_count, name_len);
-	struct fkey_def *fk = region_alloc(&parse_context->region, fk_size);
-	if (fk == NULL) {
-		diag_set(OutOfMemory, fk_size, "region", "struct fkey");
+	size_t fk_def_sz = fk_constraint_def_sizeof(child_cols_count, name_len);
+	struct fk_constraint_def *fk_def = region_alloc(&parse_context->region,
+							fk_def_sz);
+	if (fk_def == NULL) {
+		diag_set(OutOfMemory, fk_def_sz, "region",
+			 "struct fk_constraint_def");
 		goto tnt_error;
 	}
-	fk->field_count = child_cols_count;
-	fk->child_id = child_space != NULL ? child_space->def->id : 0;
-	fk->parent_id = parent_space != NULL ? parent_space->def->id : 0;
-	fk->is_deferred = is_deferred;
-	fk->match = (enum fkey_match) match;
-	fk->on_update = (enum fkey_action) ((actions >> 8) & 0xff);
-	fk->on_delete = (enum fkey_action) (actions & 0xff);
-	fk->links = (struct field_link *) ((char *) fk->name + name_len + 1);
+	fk_def->field_count = child_cols_count;
+	fk_def->child_id = child_space != NULL ? child_space->def->id : 0;
+	fk_def->parent_id = parent_space != NULL ? parent_space->def->id : 0;
+	fk_def->is_deferred = is_deferred;
+	fk_def->match = (enum fk_constraint_match) match;
+	fk_def->on_update = (enum fk_constraint_action) ((actions >> 8) & 0xff);
+	fk_def->on_delete = (enum fk_constraint_action) (actions & 0xff);
+	fk_def->links = (struct field_link *) ((char *) fk_def->name + name_len + 1);
 	/* Fill links map. */
-	for (uint32_t i = 0; i < fk->field_count; ++i) {
+	for (uint32_t i = 0; i < fk_def->field_count; ++i) {
 		if (!is_self_referenced && parent_cols == NULL) {
 			struct key_def *pk_def =
 				parent_space->index[0]->def->key_def;
-			fk->links[i].parent_field = pk_def->parts[i].fieldno;
+			fk_def->links[i].parent_field = pk_def->parts[i].fieldno;
 		} else if (!is_self_referenced &&
 			   columnno_by_name(parse_context, parent_space,
 					    parent_cols->a[i].zName,
-					    &fk->links[i].parent_field,
+					    &fk_def->links[i].parent_field,
 					    constraint_name) != 0) {
 			goto exit_create_fk;
 		}
@@ -1845,25 +1852,25 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 				 * added), so we can break
 				 * immediately.
 				 */
-				fk->links[0].child_field =
+				fk_def->links[0].child_field =
 					space->def->field_count - 1;
 				break;
 			}
 			if (resolve_link(parse_context, space->def,
 					 child_cols->a[i].zName,
-					 &fk->links[i].child_field,
+					 &fk_def->links[i].child_field,
 					 constraint_name) != 0)
 				goto exit_create_fk;
 		/* In case of ALTER parent table must exist. */
 		} else if (columnno_by_name(parse_context, child_space,
 					    child_cols->a[i].zName,
-					    &fk->links[i].child_field,
+					    &fk_def->links[i].child_field,
 					    constraint_name) != 0) {
 			goto exit_create_fk;
 		}
 	}
-	memcpy(fk->name, constraint_name, name_len);
-	fk->name[name_len] = '\0';
+	memcpy(fk_def->name, constraint_name, name_len);
+	fk_def->name[name_len] = '\0';
 	/*
 	 * In case of CREATE TABLE processing, all foreign keys
 	 * constraints must be created after space itself, so
@@ -1871,12 +1878,12 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	 * maintain list of all FK constraints inside parser.
 	 */
 	if (!is_alter) {
-		struct fkey_parse *parse_fk =
-			rlist_first_entry(&parse_context->new_fkey,
-					  struct fkey_parse, link);
-		parse_fk->fkey = fk;
+		struct fk_constraint_parse *fk_parse =
+			rlist_first_entry(&parse_context->new_fk_constraint,
+					  struct fk_constraint_parse, link);
+		fk_parse->fk_def= fk_def;
 	} else {
-		vdbe_emit_fkey_create(parse_context, fk);
+		vdbe_emit_fk_constraint_create(parse_context, fk_def);
 	}
 
 exit_create_fk:
@@ -1893,13 +1900,14 @@ tnt_error:
 }
 
 void
-fkey_change_defer_mode(struct Parse *parse_context, bool is_deferred)
+fk_constraint_change_defer_mode(struct Parse *parse_context, bool is_deferred)
 {
 	if (parse_context->db->init.busy ||
-	    rlist_empty(&parse_context->new_fkey))
+	    rlist_empty(&parse_context->new_fk_constraint))
 		return;
-	rlist_first_entry(&parse_context->new_fkey, struct fkey_parse,
-			  link)->fkey->is_deferred = is_deferred;
+	rlist_first_entry(&parse_context->new_fk_constraint,
+			  struct fk_constraint_parse,
+			  link)->fk_def->is_deferred = is_deferred;
 }
 
 void
@@ -1918,7 +1926,7 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 	char *constraint_name = sqlNameFromToken(parse_context->db,
 						     constraint);
 	if (constraint_name != NULL)
-		vdbe_emit_fkey_drop(parse_context, constraint_name,
+		vdbe_emit_fk_constraint_drop(parse_context, constraint_name,
 				    child->def->id);
 	/*
 	 * We account changes to row count only if drop of

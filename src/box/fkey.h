@@ -33,7 +33,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "space.h"
+#include "small/rlist.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -41,20 +41,20 @@ extern "C" {
 
 struct sql;
 
-enum fkey_action {
+enum fk_constraint_action {
 	FKEY_NO_ACTION = 0,
 	FKEY_ACTION_SET_NULL,
 	FKEY_ACTION_SET_DEFAULT,
 	FKEY_ACTION_CASCADE,
 	FKEY_ACTION_RESTRICT,
-	fkey_action_MAX
+	fk_constraint_action_MAX
 };
 
-enum fkey_match {
+enum fk_constraint_match {
 	FKEY_MATCH_SIMPLE = 0,
 	FKEY_MATCH_PARTIAL,
 	FKEY_MATCH_FULL,
-	fkey_match_MAX
+	fk_constraint_match_MAX
 };
 
 enum {
@@ -62,9 +62,9 @@ enum {
 	FIELD_LINK_CHILD = 1,
 };
 
-extern const char *fkey_action_strs[];
+extern const char *fk_constraint_action_strs[];
 
-extern const char *fkey_match_strs[];
+extern const char *fk_constraint_match_strs[];
 
 /** Structure describing field dependencies for foreign keys. */
 struct field_link {
@@ -82,7 +82,7 @@ struct field_link {
 };
 
 /** Definition of foreign key constraint. */
-struct fkey_def {
+struct fk_constraint_def {
 	/** Id of space containing the REFERENCES clause (child). */
 	uint32_t child_id;
 	/** Id of space that the key points to (parent). */
@@ -92,11 +92,11 @@ struct fkey_def {
 	/** True if constraint checking is deferred till COMMIT. */
 	bool is_deferred;
 	/** Match condition for foreign key. SIMPLE by default. */
-	enum fkey_match match;
+	enum fk_constraint_match match;
 	/** ON DELETE action. NO ACTION by default. */
-	enum fkey_action on_delete;
+	enum fk_constraint_action on_delete;
 	/** ON UPDATE action. NO ACTION by default. */
-	enum fkey_action on_update;
+	enum fk_constraint_action on_update;
 	/** Mapping of fields in child to fields in parent. */
 	struct field_link *links;
 	/** Name of the constraint. */
@@ -104,46 +104,47 @@ struct fkey_def {
 };
 
 /** Structure representing foreign key relationship. */
-struct fkey {
-	struct fkey_def *def;
+struct fk_constraint {
+	struct fk_constraint_def *def;
 	/** Index id of referenced index in parent space. */
 	uint32_t index_id;
 	/** Triggers for actions. */
 	struct sql_trigger *on_delete_trigger;
 	struct sql_trigger *on_update_trigger;
 	/** Links for parent and child lists. */
-	struct rlist parent_link;
-	struct rlist child_link;
+	struct rlist in_parent_space;
+	struct rlist in_child_space;
 };
 
 /**
- * Alongside with struct fkey_def itself, we reserve memory for
+ * Alongside with struct fk_constraint_def itself, we reserve memory for
  * string containing its name and for array of links.
  * Memory layout:
- * +-------------------------+ <- Allocated memory starts here
- * |     struct fkey_def     |
- * |-------------------------|
- * |        name + \0        |
- * |-------------------------|
- * |          links          |
- * +-------------------------+
+ * +----------------------------------+ <- Allocated memory starts here
+ * |     struct fk_constraint_def     |
+ * |----------------------------------|
+ * |             name + \0            |
+ * |----------------------------------|
+ * |             links                |
+ * +----------------------------------+
  */
 static inline size_t
-fkey_def_sizeof(uint32_t links_count, uint32_t name_len)
+fk_constraint_def_sizeof(uint32_t link_count, uint32_t name_len)
 {
-	return sizeof(struct fkey) + links_count * sizeof(struct field_link) +
-	       name_len + 1;
+	return sizeof(struct fk_constraint) +
+		link_count * sizeof(struct field_link) +
+		name_len + 1;
 }
 
 static inline bool
-fkey_is_self_referenced(const struct fkey_def *fkey)
+fk_constraint_is_self_referenced(const struct fk_constraint_def *fk_c)
 {
-	return fkey->child_id == fkey->parent_id;
+	return fk_c->child_id == fk_c->parent_id;
 }
 
 /** Release memory for foreign key and its triggers, if any. */
 void
-fkey_delete(struct fkey *fkey);
+fk_constraint_delete(struct fk_constraint *fkey);
 
 #if defined(__cplusplus)
 } /* extern "C" */

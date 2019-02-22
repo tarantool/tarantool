@@ -564,24 +564,26 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			break;
 		int i = 0;
 		pParse->nMem = 8;
-		struct fkey *fkey;
-		rlist_foreach_entry(fkey, &space->child_fkey, child_link) {
-			struct fkey_def *fdef = fkey->def;
-			for (uint32_t j = 0; j < fdef->field_count; j++) {
+		struct fk_constraint *fk_c;
+		rlist_foreach_entry(fk_c, &space->child_fk_constraint,
+				    in_child_space) {
+
+			struct fk_constraint_def *fk_def = fk_c->def;
+			for (uint32_t j = 0; j < fk_def->field_count; j++) {
 				struct space *parent =
-					space_by_id(fdef->parent_id);
+					space_by_id(fk_def->parent_id);
 				assert(parent != NULL);
-				uint32_t ch_fl = fdef->links[j].child_field;
+				uint32_t ch_fl = fk_def->links[j].child_field;
 				const char *child_col =
 					space->def->fields[ch_fl].name;
-				uint32_t pr_fl = fdef->links[j].parent_field;
+				uint32_t pr_fl = fk_def->links[j].parent_field;
 				const char *parent_col =
 					parent->def->fields[pr_fl].name;
 				sqlVdbeMultiLoad(v, 1, "iissssss", i, j,
 						     parent->def->name,
 						     child_col, parent_col,
-						     fkey_action_strs[fdef->on_delete],
-						     fkey_action_strs[fdef->on_update],
+						     fk_constraint_action_strs[fk_def->on_delete],
+						     fk_constraint_action_strs[fk_def->on_update],
 						     "NONE");
 				sqlVdbeAddOp2(v, OP_ResultRow, 1, 8);
 			}

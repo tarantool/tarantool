@@ -1084,8 +1084,8 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
 }
 
 char *
-fkey_encode_links(struct region *region, const struct fkey_def *def, int type,
-		  uint32_t *size)
+fk_constraint_encode_links(struct region *region, const struct fk_constraint_def *def,
+			   int type, uint32_t *size)
 {
 	size_t used = region_used(region);
 	struct mpstream stream;

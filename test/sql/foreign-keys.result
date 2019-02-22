@@ -174,13 +174,13 @@ t = box.space._fk_constraint:insert(t)
 --
 box.sql.execute("DROP INDEX i1 on t1;")
 ---
-- error: 'Can''t modify space ''T1'': can not drop referenced index'
+- error: 'Can''t modify space ''T1'': can not drop a referenced index'
 ...
 -- Referenced index can't be altered as well, if alter leads to
 -- rebuild of index (e.g. index still can be renamed).
 box.space._index:replace{512, 1, 'I1', 'tree', {unique = true}, {{field = 0, type = 'unsigned', is_nullable = true}}}
 ---
-- error: 'Can''t modify space ''T1'': can not alter referenced index'
+- error: 'Can''t modify space ''T1'': can not alter a referenced index'
 ...
 box.space._index:replace{512, 1, 'I2', 'tree', {unique = true}, {{field = 1, type = 'unsigned', is_nullable = true}}}
 ---

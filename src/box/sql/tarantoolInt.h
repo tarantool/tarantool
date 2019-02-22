@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-struct fkey_def;
+struct fk_constraint_def;
 
 /* Misc */
 const char *tarantoolErrorMessage();
@@ -166,8 +166,9 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
  * @retval not NULL Pointer to msgpack on success.
  */
 char *
-fkey_encode_links(struct region *region, const struct fkey_def *def, int type,
-		  uint32_t *size);
+fk_constraint_encode_links(struct region *region,
+			   const struct fk_constraint_def *def, int type,
+			   uint32_t *size);
 
 /**
  * Encode index parts of given foreign key constraint into

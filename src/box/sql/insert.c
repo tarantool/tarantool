@@ -745,7 +745,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		 */
 		vdbe_emit_constraint_checks(pParse, space, regIns + 1,
 					    on_error, endOfLoop, 0);
-		fkey_emit_check(pParse, space, 0, regIns, 0);
+		fk_constraint_emit_check(pParse, space, 0, regIns, 0);
 		vdbe_emit_insertion_completion(v, space, regIns + 1,
 					       space->def->field_count,
 					       on_error);
@@ -1244,7 +1244,7 @@ xferOptimization(Parse * pParse,	/* Parser context */
 	 * So the extra complication to make this rule less restrictive is probably
 	 * not worth the effort.  Ticket [6284df89debdfa61db8073e062908af0c9b6118e]
 	 */
-	if (!rlist_empty(&dest->child_fkey))
+	if (!rlist_empty(&dest->child_fk_constraint))
 		return 0;
 	if ((user_session->sql_flags & SQL_CountRows) != 0) {
 		return 0;	/* xfer opt does not play well with PRAGMA count_changes */
