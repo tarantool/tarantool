@@ -514,8 +514,8 @@ void
 vy_scheduler_add_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
 	assert(!lsm->is_dropped);
-	assert(lsm->in_dump.pos == UINT32_MAX);
-	assert(lsm->in_compaction.pos == UINT32_MAX);
+	assert(heap_node_is_stray(&lsm->in_dump));
+	assert(heap_node_is_stray(&lsm->in_compaction));
 	vy_dump_heap_insert(&scheduler->dump_heap, lsm);
 	vy_compaction_heap_insert(&scheduler->compaction_heap, lsm);
 }
@@ -524,12 +524,10 @@ void
 vy_scheduler_remove_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
 	assert(!lsm->is_dropped);
-	assert(lsm->in_dump.pos != UINT32_MAX);
-	assert(lsm->in_compaction.pos != UINT32_MAX);
+	assert(! heap_node_is_stray(&lsm->in_dump));
+	assert(! heap_node_is_stray(&lsm->in_compaction));
 	vy_dump_heap_delete(&scheduler->dump_heap, lsm);
 	vy_compaction_heap_delete(&scheduler->compaction_heap, lsm);
-	lsm->in_dump.pos = UINT32_MAX;
-	lsm->in_compaction.pos = UINT32_MAX;
 }
 
 static void
@@ -537,12 +535,12 @@ vy_scheduler_update_lsm(struct vy_scheduler *scheduler, struct vy_lsm *lsm)
 {
 	if (lsm->is_dropped) {
 		/* Dropped LSM trees are exempted from scheduling. */
-		assert(lsm->in_dump.pos == UINT32_MAX);
-		assert(lsm->in_compaction.pos == UINT32_MAX);
+		assert(heap_node_is_stray(&lsm->in_dump));
+		assert(heap_node_is_stray(&lsm->in_compaction));
 		return;
 	}
-	assert(lsm->in_dump.pos != UINT32_MAX);
-	assert(lsm->in_compaction.pos != UINT32_MAX);
+	assert(! heap_node_is_stray(&lsm->in_dump));
+	assert(! heap_node_is_stray(&lsm->in_compaction));
 	vy_dump_heap_update(&scheduler->dump_heap, lsm);
 	vy_compaction_heap_update(&scheduler->compaction_heap, lsm);
 }
@@ -1601,7 +1599,7 @@ vy_task_compaction_complete(struct vy_task *task)
 	/* The iterator has been cleaned up in worker. */
 	task->wi->iface->close(task->wi);
 
-	assert(range->heap_node.pos == UINT32_MAX);
+	assert(heap_node_is_stray(&range->heap_node));
 	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_scheduler_update_lsm(scheduler, lsm);
 
@@ -1633,7 +1631,7 @@ vy_task_compaction_abort(struct vy_task *task)
 
 	vy_run_discard(task->new_run);
 
-	assert(range->heap_node.pos == UINT32_MAX);
+	assert(heap_node_is_stray(&range->heap_node));
 	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_scheduler_update_lsm(scheduler, lsm);
 }
@@ -1722,7 +1720,6 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	 * so that it doesn't get selected again.
 	 */
 	vy_range_heap_delete(&lsm->range_heap, range);
-	range->heap_node.pos = UINT32_MAX;
 	vy_scheduler_update_lsm(scheduler, lsm);
 
 	say_info("%s: started compacting range %s, runs %d/%d",

@@ -197,7 +197,7 @@ vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
 	}
 	range->cmp_def = cmp_def;
 	rlist_create(&range->slices);
-	range->heap_node.pos = UINT32_MAX;
+	heap_node_create(&range->heap_node);
 	return range;
 }
 

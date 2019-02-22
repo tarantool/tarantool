@@ -126,7 +126,8 @@
 #define HEAP_STRUCTURES
 
 enum {
-	HEAP_INITIAL_CAPACITY = 8
+	HEAP_INITIAL_CAPACITY = 8,
+	HEAP_NODE_STRAY_POS = UINT32_MAX,
 };
 
 typedef uint32_t heap_off_t;
@@ -148,6 +149,20 @@ typedef struct heap_core_structure heap_t;
 struct heap_node {
 	heap_off_t pos;
 };
+
+/** Initialize a heap node with default values. */
+static inline void
+heap_node_create(struct heap_node *node)
+{
+	node->pos = HEAP_NODE_STRAY_POS;
+}
+
+/** Check if a heap node does not belong to any heap. */
+static inline bool
+heap_node_is_stray(const struct heap_node *node)
+{
+	return node->pos == HEAP_NODE_STRAY_POS;
+}
 
 /**
  * Heap iterator structure.
@@ -429,9 +444,11 @@ HEAP(delete)(heap_t *heap, heap_value_t *value)
 	if (heap->size == 0)
 		return;
 
+	struct heap_node *node = value_to_node(value);
+	assert(! heap_node_is_stray(node));
 	heap->size--;
-
-	heap_off_t curr_pos = value_to_node(value)->pos;
+	heap_off_t curr_pos = node->pos;
+	heap_node_create(node);
 
 	if (curr_pos == heap->size)
 		return;

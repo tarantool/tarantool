@@ -196,8 +196,8 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 		vy_lsm_ref(pk);
 	lsm->mem_format = format;
 	tuple_format_ref(lsm->mem_format);
-	lsm->in_dump.pos = UINT32_MAX;
-	lsm->in_compaction.pos = UINT32_MAX;
+	heap_node_create(&lsm->in_dump);
+	heap_node_create(&lsm->in_compaction);
 	lsm->space_id = index_def->space_id;
 	lsm->index_id = index_def->iid;
 	lsm->group_id = group_id;
@@ -240,8 +240,8 @@ void
 vy_lsm_delete(struct vy_lsm *lsm)
 {
 	assert(lsm->refs == 0);
-	assert(lsm->in_dump.pos == UINT32_MAX);
-	assert(lsm->in_compaction.pos == UINT32_MAX);
+	assert(heap_node_is_stray(&lsm->in_dump));
+	assert(heap_node_is_stray(&lsm->in_compaction));
 	assert(vy_lsm_read_set_empty(&lsm->read_set));
 	assert(lsm->env->lsm_count > 0);
 
@@ -764,7 +764,7 @@ vy_lsm_remove_run(struct vy_lsm *lsm, struct vy_run *run)
 void
 vy_lsm_add_range(struct vy_lsm *lsm, struct vy_range *range)
 {
-	assert(range->heap_node.pos == UINT32_MAX);
+	assert(heap_node_is_stray(&range->heap_node));
 	vy_range_heap_insert(&lsm->range_heap, range);
 	vy_range_tree_insert(&lsm->range_tree, range);
 	lsm->range_count++;
@@ -773,7 +773,7 @@ vy_lsm_add_range(struct vy_lsm *lsm, struct vy_range *range)
 void
 vy_lsm_remove_range(struct vy_lsm *lsm, struct vy_range *range)
 {
-	assert(range->heap_node.pos != UINT32_MAX);
+	assert(! heap_node_is_stray(&range->heap_node));
 	vy_range_heap_delete(&lsm->range_heap, range);
 	vy_range_tree_remove(&lsm->range_tree, range);
 	lsm->range_count--;

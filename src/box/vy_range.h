@@ -156,7 +156,7 @@ vy_range_heap_less(struct vy_range *r1, struct vy_range *r2)
 static inline bool
 vy_range_is_scheduled(struct vy_range *range)
 {
-	return range->heap_node.pos == UINT32_MAX;
+	return heap_node_is_stray(&range->heap_node);
 }
 
 /**
