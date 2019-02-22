@@ -6004,6 +6004,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef BPS_TREE_BRANCH_TRACE
 
 /* {{{ Macros for custom naming of structs and functions */
+#undef _api_name
 #undef _bps
 #undef _bps_tree
 #undef _BPS
