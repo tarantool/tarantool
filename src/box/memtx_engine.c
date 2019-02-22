@@ -176,14 +176,9 @@ static void
 memtx_engine_shutdown(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	if (mempool_is_initialized(&memtx->tree_iterator_pool))
-		mempool_destroy(&memtx->tree_iterator_pool);
+	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
-	if (mempool_is_initialized(&memtx->hash_iterator_pool))
-		mempool_destroy(&memtx->hash_iterator_pool);
-	if (mempool_is_initialized(&memtx->bitset_iterator_pool))
-		mempool_destroy(&memtx->bitset_iterator_pool);
 	mempool_destroy(&memtx->index_extent_pool);
 	slab_cache_destroy(&memtx->index_slab_cache);
 	small_alloc_destroy(&memtx->alloc);
@@ -1069,6 +1064,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 	slab_cache_create(&memtx->index_slab_cache, &memtx->arena);
 	mempool_create(&memtx->index_extent_pool, &memtx->index_slab_cache,
 		       MEMTX_EXTENT_SIZE);
+	mempool_create(&memtx->iterator_pool, cord_slab_cache(),
+		       MEMTX_ITERATOR_SIZE);
 	memtx->num_reserved_extents = 0;
 	memtx->reserved_extents = NULL;
 

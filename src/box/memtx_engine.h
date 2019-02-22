@@ -87,6 +87,14 @@ enum memtx_recovery_state {
 /** Memtx extents pool, available to statistics. */
 extern struct mempool memtx_index_extent_pool;
 
+/**
+ * The size of the biggest memtx iterator. Used with
+ * mempool_create. This is the size of the block that will be
+ * allocated for each iterator (except rtree index iterator that
+ * is significantly bigger so has own pool).
+ */
+#define MEMTX_ITERATOR_SIZE (152)
+
 struct memtx_engine {
 	struct engine base;
 	/** Engine recovery state. */
@@ -129,14 +137,14 @@ struct memtx_engine {
 	size_t max_tuple_size;
 	/** Incremented with each next snapshot. */
 	uint32_t snapshot_version;
-	/** Memory pool for tree index iterator. */
-	struct mempool tree_iterator_pool;
 	/** Memory pool for rtree index iterator. */
 	struct mempool rtree_iterator_pool;
-	/** Memory pool for hash index iterator. */
-	struct mempool hash_iterator_pool;
-	/** Memory pool for bitset index iterator. */
-	struct mempool bitset_iterator_pool;
+	/**
+	 * Memory pool for all index iterators except rtree.
+	 * The latter is significantly larger so it has its
+	 * own memory pool.
+	 */
+	struct mempool iterator_pool;
 	/**
 	 * Garbage collection fiber. Used for asynchronous
 	 * destruction of dropped indexes.

@@ -119,6 +119,10 @@ struct tree_iterator {
 	struct mempool *pool;
 };
 
+static_assert(sizeof(struct tree_iterator) <= MEMTX_ITERATOR_SIZE,
+	      "sizeof(struct tree_iterator) must be less than or equal "
+	      "to MEMTX_ITERATOR_SIZE");
+
 static void
 tree_iterator_free(struct iterator *iterator);
 
@@ -560,14 +564,14 @@ memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 		key = NULL;
 	}
 
-	struct tree_iterator *it = mempool_alloc(&memtx->tree_iterator_pool);
+	struct tree_iterator *it = mempool_alloc(&memtx->iterator_pool);
 	if (it == NULL) {
 		diag_set(OutOfMemory, sizeof(struct tree_iterator),
 			 "memtx_tree_index", "iterator");
 		return NULL;
 	}
 	iterator_create(&it->base, base);
-	it->pool = &memtx->tree_iterator_pool;
+	it->pool = &memtx->iterator_pool;
 	it->base.next = tree_iterator_start;
 	it->base.free = tree_iterator_free;
 	it->type = type;
@@ -744,11 +748,6 @@ static const struct index_vtab memtx_tree_index_vtab = {
 struct index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
-	if (!mempool_is_initialized(&memtx->tree_iterator_pool)) {
-		mempool_create(&memtx->tree_iterator_pool, cord_slab_cache(),
-			       sizeof(struct tree_iterator));
-	}
-
 	struct memtx_tree_index *index =
 		(struct memtx_tree_index *)calloc(1, sizeof(*index));
 	if (index == NULL) {

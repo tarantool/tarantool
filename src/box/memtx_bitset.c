@@ -175,6 +175,10 @@ struct bitset_index_iterator {
 	struct mempool *pool;
 };
 
+static_assert(sizeof(struct bitset_index_iterator) <= MEMTX_ITERATOR_SIZE,
+	      "sizeof(struct bitset_index_iterator) must be less than or equal "
+	      "to MEMTX_ITERATOR_SIZE");
+
 static struct bitset_index_iterator *
 bitset_index_iterator(struct iterator *it)
 {
@@ -331,7 +335,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	(void) part_count;
 
 	struct bitset_index_iterator *it;
-	it = mempool_alloc(&memtx->bitset_iterator_pool);
+	it = mempool_alloc(&memtx->iterator_pool);
 	if (!it) {
 		diag_set(OutOfMemory, sizeof(*it),
 			 "memtx_bitset_index", "iterator");
@@ -339,7 +343,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 
 	iterator_create(&it->base, base);
-	it->pool = &memtx->bitset_iterator_pool;
+	it->pool = &memtx->iterator_pool;
 	it->base.next = bitset_index_iterator_next;
 	it->base.free = bitset_index_iterator_free;
 
@@ -402,7 +406,7 @@ memtx_bitset_index_create_iterator(struct index *base, enum iterator_type type,
 	return (struct iterator *)it;
 fail:
 	tt_bitset_expr_destroy(&expr);
-	mempool_free(&memtx->bitset_iterator_pool, it);
+	mempool_free(&memtx->iterator_pool, it);
 	return NULL;
 }
 
@@ -505,11 +509,6 @@ memtx_bitset_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
 	assert(def->iid > 0);
 	assert(!def->opts.is_unique);
-
-	if (!mempool_is_initialized(&memtx->bitset_iterator_pool)) {
-		mempool_create(&memtx->bitset_iterator_pool, cord_slab_cache(),
-			       sizeof(struct bitset_index_iterator));
-	}
 
 	struct memtx_bitset_index *index =
 		(struct memtx_bitset_index *)calloc(1, sizeof(*index));
