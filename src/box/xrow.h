@@ -59,11 +59,32 @@ struct xrow_header {
 
 	uint32_t type;
 	uint32_t replica_id;
+	/**
+	 * Replication group identifier. 0 - replicaset,
+	 * 1 - replica-local.
+         */
 	uint32_t group_id;
 	uint64_t sync;
-	int64_t lsn; /* LSN must be signed for correct comparison */
+	/** Log sequence number.
+	 * LSN must be signed for correct comparison
+	 */
+	int64_t lsn;
+	/** Timestamp. Used only when writing to the write ahead
+	 * log.
+	 */
 	double tm;
-	int64_t txn_id;
+	/*
+	 * Transaction identifier. LSN of the first row in the
+	 * transaction.
+	 */
+	int64_t tsn;
+	/**
+	 * True for the last row in a multi-statement transaction,
+	 * or single-statement transaction. Is only encoded in the
+	 * write ahead log for multi-statement transactions.
+	 * Single-statement transactions do not encode
+	 * tsn and is_commit flag to save space.
+	 */
 	bool is_commit;
 
 	int bodycnt;

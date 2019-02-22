@@ -131,7 +131,7 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 struct txn *
 txn_begin(bool is_autocommit)
 {
-	static int64_t txn_id = 0;
+	static int64_t tsn = 0;
 	assert(! in_txn());
 	struct txn *txn = region_alloc_object(&fiber()->gc, struct txn);
 	if (txn == NULL) {
@@ -145,7 +145,7 @@ txn_begin(bool is_autocommit)
 	txn->has_triggers  = false;
 	txn->is_aborted = false;
 	txn->in_sub_stmt = 0;
-	txn->id = ++txn_id;
+	txn->id = ++tsn;
 	txn->signature = -1;
 	txn->engine = NULL;
 	txn->engine_tx = NULL;

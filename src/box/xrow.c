@@ -137,7 +137,7 @@ error:
 			break;
 		case IPROTO_TSN:
 			has_tsn = true;
-			header->txn_id = mp_decode_uint(pos);
+			header->tsn = mp_decode_uint(pos);
 			break;
 		case IPROTO_FLAGS:
 			flags = mp_decode_uint(pos);
@@ -157,7 +157,7 @@ error:
 		header->is_commit = true;
 	}
 	/* Restore transaction id from lsn and transaction serial number. */
-	header->txn_id = header->lsn - header->txn_id;
+	header->tsn = header->lsn - header->tsn;
 
 	/* Nop requests aren't supposed to have a body. */
 	if (*pos < end && header->type != IPROTO_NOP) {
@@ -243,8 +243,21 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 		d = mp_encode_double(d, header->tm);
 		map_size++;
 	}
-	if (header->txn_id != 0) {
-		if (header->txn_id != header->lsn || !header->is_commit) {
+	/*
+	 * We do not encode tsn and is_commit flags for
+	 * single-statement transactions to save space in the
+	 * binary log. We also encode tsn as a diff from lsn
+	 * to save space in every multi-statement transaction row.
+	 * The rules when encoding are simple:
+	 * - if tsn is *not* encoded, it's a single-statement
+	 *   transaction, tsn = lsn, is_commit = true
+	 * - if tsn is present, it's a multi-statement
+	 *   transaction, tsn = tsn + lsn, check is_commit
+	 *   flag to find transaction boundary (last row in the
+	 *   transaction stream).
+	 */
+	if (header->tsn != 0) {
+		if (header->tsn != header->lsn || !header->is_commit) {
 			/*
 			 * Encode a transaction identifier for multi row
 			 * transaction members.
@@ -254,10 +267,10 @@ xrow_header_encode(const struct xrow_header *header, uint64_t sync,
 			 * Differential encoding: write a transaction serial
 			 * number (it is equal to lsn - transaction id) instead.
 			 */
-			d = mp_encode_uint(d, header->lsn - header->txn_id);
+			d = mp_encode_uint(d, header->lsn - header->tsn);
 			map_size++;
 		}
-		if (header->is_commit && header->txn_id != header->lsn) {
+		if (header->is_commit && header->tsn != header->lsn) {
 			/* Setup last row for multi row transaction. */
 			d = mp_encode_uint(d, IPROTO_FLAGS);
 			d = mp_encode_uint(d, IPROTO_FLAG_COMMIT);

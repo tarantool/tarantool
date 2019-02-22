@@ -215,7 +215,7 @@ test_xrow_header_encode_decode()
 	header.lsn = 400;
 	header.tm = 123.456;
 	header.bodycnt = 0;
-	header.txn_id = header.lsn;
+	header.tsn = header.lsn;
 	header.is_commit = true;
 	uint64_t sync = 100500;
 	struct iovec vec[1];
