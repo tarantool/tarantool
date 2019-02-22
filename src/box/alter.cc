@@ -33,7 +33,7 @@
 #include "user.h"
 #include "space.h"
 #include "index.h"
-#include "fkey.h"
+#include "fk_constraint.h"
 #include "func.h"
 #include "coll_id_cache.h"
 #include "coll_id_def.h"

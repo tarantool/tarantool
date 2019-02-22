@@ -35,7 +35,7 @@ add_library(sql STATIC
     delete.c
     expr.c
     fault.c
-    fkey.c
+    fk_constraint.c
     func.c
     global.c
     hash.c

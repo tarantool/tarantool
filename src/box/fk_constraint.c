@@ -28,7 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "fkey.h"
+#include "fk_constraint.h"
 #include "sql.h"
 #include "sql/sqlInt.h"
 

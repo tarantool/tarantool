@@ -35,7 +35,7 @@
 #include "box/index.h"
 #include "box/box.h"
 #include "box/tuple.h"
-#include "box/fkey.h"
+#include "box/fk_constraint.h"
 #include "box/schema.h"
 #include "box/coll_id_cache.h"
 #include "sqlInt.h"

@@ -35,7 +35,7 @@
  */
 #include "coll.h"
 #include "sqlInt.h"
-#include "box/fkey.h"
+#include "box/fk_constraint.h"
 #include "box/schema.h"
 #include "box/session.h"
 

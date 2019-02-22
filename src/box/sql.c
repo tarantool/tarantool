@@ -51,7 +51,7 @@
 #include "session.h"
 #include "xrow.h"
 #include "iproto_constants.h"
-#include "fkey.h"
+#include "fk_constraint.h"
 #include "mpstream.h"
 
 static sql *db = NULL;

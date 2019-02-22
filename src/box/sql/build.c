@@ -47,7 +47,7 @@
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 #include "box/box.h"
-#include "box/fkey.h"
+#include "box/fk_constraint.h"
 #include "box/sequence.h"
 #include "box/session.h"
 #include "box/identifier.h"

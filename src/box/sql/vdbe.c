@@ -41,7 +41,7 @@
  */
 #include "box/box.h"
 #include "box/error.h"
-#include "box/fkey.h"
+#include "box/fk_constraint.h"
 #include "box/txn.h"
 #include "box/session.h"
 #include "sqlInt.h"

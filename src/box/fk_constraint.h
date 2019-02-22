@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BOX_FKEY_H_INCLUDED
-#define TARANTOOL_BOX_FKEY_H_INCLUDED
+#ifndef TARANTOOL_BOX_FK_CONSTRAINT_H_INCLUDED
+#define TARANTOOL_BOX_FK_CONSTRAINT_H_INCLUDED
 /*
  * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -150,4 +150,4 @@ fk_constraint_delete(struct fk_constraint *fkey);
 } /* extern "C" */
 #endif /* __cplusplus */
 
-#endif /* TARANTOOL_BOX_FKEY_H_INCLUDED */
+#endif /* TARANTOOL_BOX_FK_CONSTRAINT_H_INCLUDED */
