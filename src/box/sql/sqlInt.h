@@ -4121,14 +4121,15 @@ fkey_change_defer_mode(struct Parse *parse_context, bool is_deferred);
  * @param parent_cols List of referenced columns. If NULL, columns
  *                    which make up PK of referenced table are used.
  * @param is_deferred Is FK constraint initially deferred.
- * @param actions ON DELETE, UPDATE and INSERT resolution
- *                algorithms (e.g. CASCADE, RESTRICT etc).
+ * @param match Value of MATCH clause: SIMPLE, PARTIAL, FULL.
+ * @param actions ON DELETE and ON UPDATE resolution algorithms
+ *               (e.g. CASCADE, RESTRICT etc).
  */
 void
 sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		       struct Token *constraint, struct ExprList *child_cols,
 		       struct Token *parent, struct ExprList *parent_cols,
-		       bool is_deferred, int actions);
+		       bool is_deferred, int match, int actions);
 
 /**
  * Function called from parser to handle

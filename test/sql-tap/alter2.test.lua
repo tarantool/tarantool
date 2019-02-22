@@ -188,7 +188,7 @@ test:do_execsql_test(
         DROP TABLE parent;
         CREATE TABLE child (id INT PRIMARY KEY, a INT, b INT);
         CREATE TABLE parent (id INT PRIMARY KEY, c INT, d INT);
-        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent ON DELETE CASCADE MATCH FULL;
+        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent MATCH FULL ON DELETE CASCADE;
         INSERT INTO parent VALUES(1, 2, 3), (3, 4, 5), (6, 7, 8);
         INSERT INTO child VALUES(1, 1, 1), (3, 2, 2);
         DELETE FROM parent WHERE id = 1;
@@ -206,7 +206,7 @@ test:do_execsql_test(
         DROP TABLE parent;
         CREATE TABLE child (id INT UNIQUE, a INT, b INT, z INT PRIMARY KEY AUTOINCREMENT);
         CREATE TABLE parent (id INT UNIQUE, c INT, d INT, z INT PRIMARY KEY AUTOINCREMENT);
-        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent(id) ON UPDATE CASCADE MATCH PARTIAL;
+        ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES parent(id) MATCH PARTIAL ON UPDATE CASCADE;
         INSERT INTO parent(id, c, d) VALUES(1, 2, 3), (3, 4, 5), (6, 7, 8);
         INSERT INTO child(id, a, b) VALUES(1, 1, 1), (3, 2, 2);
         UPDATE parent SET id = 5 WHERE id = 1;

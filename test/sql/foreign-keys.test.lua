@@ -154,11 +154,20 @@ box.space.PARENT:drop()
 -- ON UPDATE clauses.
 --
 box.sql.execute('CREATE TABLE tp (id INT PRIMARY KEY, a INT UNIQUE)')
-box.sql.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) ON DELETE SET NULL MATCH FULL)')
+box.sql.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) MATCH FULL ON DELETE SET NULL)')
 box.sql.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id) MATCH PARTIAL ON DELETE CASCADE ON UPDATE SET NULL')
 box.space._fk_constraint:select{}
 box.sql.execute('DROP TABLE tc')
 box.sql.execute('DROP TABLE tp')
+
+-- gh-3475: ON UPDATE and ON DELETE clauses must appear once;
+-- MATCH clause must come first.
+box.sql.execute('CREATE TABLE t1 (id INT PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE RESTRICT);')
+box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE CASCADE);')
+box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON UPDATE RESTRICT ON DELETE RESTRICT);')
+box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE MATCH FULL);')
+box.space.T1:drop()
 
 --- Clean-up SQL DD hash.
 -test_run:cmd('restart server default with cleanup=1')

@@ -1690,7 +1690,7 @@ void
 sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		       struct Token *constraint, struct ExprList *child_cols,
 		       struct Token *parent, struct ExprList *parent_cols,
-		       bool is_deferred, int actions)
+		       bool is_deferred, int match, int actions)
 {
 	struct sql *db = parse_context->db;
 	/*
@@ -1819,7 +1819,7 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	fk->child_id = child_space != NULL ? child_space->def->id : 0;
 	fk->parent_id = parent_space != NULL ? parent_space->def->id : 0;
 	fk->is_deferred = is_deferred;
-	fk->match = (enum fkey_match) ((actions >> 16) & 0xff);
+	fk->match = (enum fkey_match) match;
 	fk->on_update = (enum fkey_action) ((actions >> 8) & 0xff);
 	fk->on_delete = (enum fkey_action) (actions & 0xff);
 	fk->links = (struct field_link *) ((char *) fk->name + name_len + 1);

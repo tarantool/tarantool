@@ -266,8 +266,8 @@ ccons ::= UNIQUE.                {sql_create_index(pParse,0,0,0,0,
                                                    SORT_ORDER_ASC, false,
                                                    SQL_INDEX_TYPE_CONSTRAINT_UNIQUE);}
 ccons ::= CHECK LP expr(X) RP.   {sql_add_check_constraint(pParse,&X);}
-ccons ::= REFERENCES nm(T) eidlist_opt(TA) refargs(R).
-                                 {sql_create_foreign_key(pParse, NULL, NULL, NULL, &T, TA, false, R);}
+ccons ::= REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R).
+                                 {sql_create_foreign_key(pParse, NULL, NULL, NULL, &T, TA, false, M, R);}
 ccons ::= defer_subclause(D).    {fkey_change_defer_mode(pParse, D);}
 ccons ::= COLLATE id(C).        {sqlAddCollateType(pParse, &C);}
 
@@ -282,17 +282,23 @@ autoinc(X) ::= AUTOINCR.  {X = 1;}
 // check fails.
 //
 %type refargs {int}
-refargs(A) ::= .                  { A = FKEY_NO_ACTION; }
-refargs(A) ::= refargs(A) refarg(Y). { A = (A & ~Y.mask) | Y.value; }
-%type refarg {struct {int value; int mask;}}
-refarg(A) ::= MATCH matcharg(X).     { A.value = X<<16; A.mask = 0xff0000; }
-refarg(A) ::= ON INSERT refact.      { A.value = 0;     A.mask = 0x000000; }
-refarg(A) ::= ON DELETE refact(X).   { A.value = X;     A.mask = 0x0000ff; }
-refarg(A) ::= ON UPDATE refact(X).   { A.value = X<<8;  A.mask = 0x00ff00; }
+refargs(A) ::= refact_update(X) . { A = (X << 8); }
+refargs(A) ::= refact_delete(X) . { A = X; }
+refargs(A) ::= refact_delete(X) refact_update(Y) . { A = (Y << 8) | (X) ; }
+refargs(A) ::= refact_update(X) refact_delete(Y) . { A = (X << 8) | (Y) ; }
+refargs(A) ::= . { A = 0; }
+
+%type refact_update {int}
+refact_update(A) ::= ON UPDATE refact(X). { A = X; }
+%type refact_delete {int}
+refact_delete(A) ::= ON DELETE refact(X). { A = X; }
+
 %type matcharg {int}
-matcharg(A) ::= SIMPLE.  { A = FKEY_MATCH_SIMPLE; }
-matcharg(A) ::= PARTIAL. { A = FKEY_MATCH_PARTIAL; }
-matcharg(A) ::= FULL.    { A = FKEY_MATCH_FULL; }
+matcharg(A) ::= MATCH SIMPLE.  { A = FKEY_MATCH_SIMPLE; }
+matcharg(A) ::= MATCH PARTIAL. { A = FKEY_MATCH_PARTIAL; }
+matcharg(A) ::= MATCH FULL.    { A = FKEY_MATCH_FULL; }
+matcharg(A) ::= .              { A = FKEY_MATCH_SIMPLE; }
+
 %type refact {int}
 refact(A) ::= SET NULL.              { A = FKEY_ACTION_SET_NULL; }
 refact(A) ::= SET DEFAULT.           { A = FKEY_ACTION_SET_DEFAULT; }
@@ -319,8 +325,8 @@ tcons ::= UNIQUE LP sortlist(X) RP.
 tcons ::= CHECK LP expr(E) RP .
                                  {sql_add_check_constraint(pParse,&E);}
 tcons ::= FOREIGN KEY LP eidlist(FA) RP
-          REFERENCES nm(T) eidlist_opt(TA) refargs(R) defer_subclause_opt(D). {
-    sql_create_foreign_key(pParse, NULL, NULL, FA, &T, TA, D, R);
+          REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R) defer_subclause_opt(D). {
+    sql_create_foreign_key(pParse, NULL, NULL, FA, &T, TA, D, M, R);
 }
 %type defer_subclause_opt {int}
 defer_subclause_opt(A) ::= .                    {A = 0;}
@@ -1448,9 +1454,9 @@ cmd ::= ALTER TABLE fullname(X) RENAME TO nm(Z). {
 }
 
 cmd ::= ALTER TABLE fullname(X) ADD CONSTRAINT nm(Z) FOREIGN KEY
-        LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA) refargs(R)
-        defer_subclause_opt(D). {
-    sql_create_foreign_key(pParse, X, &Z, FA, &T, TA, D, R);
+        LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA) matcharg(M)
+        refargs(R) defer_subclause_opt(D). {
+    sql_create_foreign_key(pParse, X, &Z, FA, &T, TA, D, M, R);
 }
 
 cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {
