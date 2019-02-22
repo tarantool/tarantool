@@ -293,7 +293,7 @@ test:do_catchsql_test(
         CREATE VIEW v1err(x,y DESC,z) AS SELECT a, b+c, c-b FROM t1;
     ]], {
         -- <view-3.3.4>
-        1, [[syntax error after column name "y"]]
+        1, [[keyword "DESC" is reserved]]
         -- </view-3.3.4>
     })
 

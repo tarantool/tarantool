@@ -1247,17 +1247,9 @@ uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
   static ExprList *parserAddExprIdListTerm(
     Parse *pParse,
     ExprList *pPrior,
-    Token *pIdToken,
-    int hasCollate,
-    int sortOrder
+    Token *pIdToken
   ){
     ExprList *p = sql_expr_list_append(pParse->db, pPrior, NULL);
-    if( (hasCollate || sortOrder != SORT_ORDER_UNDEF)
-        && pParse->db->init.busy==0
-    ){
-      sqlErrorMsg(pParse, "syntax error after column name \"%.*s\"",
-                         pIdToken->n, pIdToken->z);
-    }
     sqlExprListSetName(pParse, p, pIdToken, 1);
     return p;
   }
@@ -1265,16 +1257,12 @@ uniqueflag(A) ::= .        {A = SQL_INDEX_TYPE_NON_UNIQUE;}
 
 eidlist_opt(A) ::= .                         {A = 0;}
 eidlist_opt(A) ::= LP eidlist(X) RP.         {A = X;}
-eidlist(A) ::= eidlist(A) COMMA nm(Y) collate(C) sortorder(Z).  {
-  A = parserAddExprIdListTerm(pParse, A, &Y, C, Z);
+eidlist(A) ::= eidlist(A) COMMA nm(Y).  {
+  A = parserAddExprIdListTerm(pParse, A, &Y);
 }
-eidlist(A) ::= nm(Y) collate(C) sortorder(Z). {
-  A = parserAddExprIdListTerm(pParse, 0, &Y, C, Z); /*A-overwrites-Y*/
+eidlist(A) ::= nm(Y). {
+  A = parserAddExprIdListTerm(pParse, 0, &Y); /*A-overwrites-Y*/
 }
-
-%type collate {int}
-collate(C) ::= .              {C = 0;}
-collate(C) ::= COLLATE id.   {C = 1;}
 
 
 ///////////////////////////// The DROP INDEX command /////////////////////////
