@@ -623,6 +623,12 @@ ch1:put(1)
 
 while f:status() ~= 'dead' do fiber.sleep(0.01) end
 
+--
+-- Test if fiber join() does not crash
+-- if unjoinable
+--
+fiber.join(fiber.self())
+
 -- cleanup
 test_run:cmd("clear filter")
 

@@ -676,10 +676,14 @@ lbox_fiber_join(struct lua_State *L)
 {
 	struct fiber *fiber = lbox_checkfiber(L, 1);
 	struct lua_State *child_L = fiber->storage.lua.stack;
-	fiber_join(fiber);
 	struct error *e = NULL;
 	int num_ret = 0;
 	int coro_ref = 0;
+
+	if (!(fiber->flags & FIBER_IS_JOINABLE))
+		luaL_error(L, "the fiber is not joinable");
+	fiber_join(fiber);
+
 	if (child_L != NULL) {
 		coro_ref = lua_tointeger(child_L, -1);
 		lua_pop(child_L, 1);
