@@ -417,7 +417,7 @@ struct fiber {
 	struct ipc_wait_pad *wait_pad;
 	/** Exception which caused this fiber's death. */
 	struct diag diag;
-	char name[FIBER_NAME_MAX];
+	char name[FIBER_NAME_MAX + 1];
 };
 
 enum { FIBER_CALL_STACK = 16 };
