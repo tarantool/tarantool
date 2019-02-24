@@ -211,7 +211,8 @@ sqlErrorWithMsg(sql * db, int err_code, const char *zFormat, ...)
 }
 
 /*
- * Add an error message to pParse->zErrMsg and increment pParse->nErr.
+ * Add an error to the diagnostics area, increment pParse->nErr
+ * and set pParse->rc.
  * The following formatting characters are allowed:
  *
  *      %s      Insert a string
@@ -236,10 +237,10 @@ sqlErrorMsg(Parse * pParse, const char *zFormat, ...)
 	va_start(ap, zFormat);
 	zMsg = sqlVMPrintf(db, zFormat, ap);
 	va_end(ap);
+	diag_set(ClientError, ER_SQL_PARSER_GENERIC, zMsg);
+	sqlDbFree(db, zMsg);
 	pParse->nErr++;
-	sqlDbFree(db, pParse->zErrMsg);
-	pParse->zErrMsg = zMsg;
-	pParse->rc = SQL_ERROR;
+	pParse->rc = SQL_TARANTOOL_ERROR;
 }
 
 void

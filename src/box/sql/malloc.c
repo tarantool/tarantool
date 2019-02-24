@@ -51,14 +51,13 @@ sql_sized_malloc(int nByte)
 	assert(nByte > 0);
 	nByte = ROUND8(nByte);
 	p = malloc(nByte + 8);
-	if (p) {
-		p[0] = nByte;
-		p++;
-	} else {
-		testcase(sqlGlobalConfig.xLog != 0);
-		sql_log(SQL_NOMEM,
-			    "failed to allocate %u bytes of memory", nByte);
+	if (p == NULL) {
+		sql_get()->mallocFailed = 1;
+		diag_set(OutOfMemory, nByte, "malloc", "p");
+		return NULL;
 	}
+	p[0] = nByte;
+	p++;
 	return (void *)p;
 }
 
@@ -111,15 +110,13 @@ sql_sized_realloc(void *pPrior, int nByte)
 	assert(nByte == ROUND8(nByte));	/* EV: R-46199-30249 */
 	p--;
 	p = realloc(p, nByte + 8);
-	if (p) {
-		p[0] = nByte;
-		p++;
-	} else {
-		testcase(sqlGlobalConfig.xLog != 0);
-		sql_log(SQL_NOMEM,
-			    "failed memory resize %u to %u bytes",
-			    sql_sized_sizeof(pPrior), nByte);
+	if (p == NULL) {
+		sql_get()->mallocFailed = 1;
+		diag_set(OutOfMemory, nByte, "realloc", "p");
+		return NULL;
 	}
+	p[0] = nByte;
+	p++;
 	return (void *)p;
 }
 

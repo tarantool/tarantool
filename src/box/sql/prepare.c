@@ -102,9 +102,8 @@ sqlPrepare(sql * db,	/* Database handle. */
 
 	if (sParse.rc == SQL_DONE)
 		sParse.rc = SQL_OK;
-	if (db->mallocFailed) {
-		sParse.rc = SQL_NOMEM;
-	}
+	if (db->mallocFailed)
+		sParse.rc = SQL_TARANTOOL_ERROR;
 	if (pzTail) {
 		*pzTail = sParse.zTail;
 	}

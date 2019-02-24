@@ -194,7 +194,8 @@ sql_finish_coding(struct Parse *parse_context)
 		sqlVdbeMakeReady(v, parse_context);
 		parse_context->rc = SQL_DONE;
 	} else {
-		parse_context->rc = SQL_ERROR;
+		if (parse_context->rc != SQL_TARANTOOL_ERROR)
+			parse_context->rc = SQL_ERROR;
 	}
 }
 /**

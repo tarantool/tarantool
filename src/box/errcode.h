@@ -238,6 +238,7 @@ struct errcode_record {
 	/*183 */_(ER_SQL_KEYWORD_IS_RESERVED,	"Keyword '%.*s' is reserved. Please use double quotes if '%.*s' is an identifier.") \
 	/*184 */_(ER_SQL_UNRECOGNIZED_SYNTAX,	"Syntax error near '%.*s'") \
 	/*185 */_(ER_SQL_UNKNOWN_TOKEN,		"Syntax error: unrecognized token: '%.*s'") \
+	/*186 */_(ER_SQL_PARSER_GENERIC,	"%s") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

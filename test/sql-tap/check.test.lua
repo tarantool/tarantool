@@ -319,7 +319,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.1>
-        1, "Failed to create space 'T3': SQL error: subqueries prohibited in CHECK constraints"
+        1, "Failed to create space 'T3': subqueries prohibited in CHECK constraints"
         -- </check-3.1>
     })
 

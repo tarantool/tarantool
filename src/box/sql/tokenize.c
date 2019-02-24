@@ -483,7 +483,9 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 				      &pParse->sLastToken.isReserved);
 			i += pParse->sLastToken.n;
 			if (i > mxSqlLen) {
-				pParse->rc = SQL_TOOBIG;
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 "string or blob too big");
+				pParse->rc = SQL_TARANTOOL_ERROR;
 				break;
 			}
 		} else {
@@ -501,10 +503,6 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 		if (tokenType >= TK_SPACE) {
 			assert(tokenType == TK_SPACE
 			       || tokenType == TK_ILLEGAL);
-			if (db->u1.isInterrupted) {
-				pParse->rc = SQL_INTERRUPT;
-				break;
-			}
 			if (tokenType == TK_ILLEGAL) {
 				diag_set(ClientError, ER_SQL_UNKNOWN_TOKEN,
 					 pParse->sLastToken.n,
@@ -529,7 +527,7 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 #endif				/* YYDEBUG */
 	sqlParserFree(pEngine, sql_free);
 	if (db->mallocFailed) {
-		pParse->rc = SQL_NOMEM;
+		pParse->rc = SQL_TARANTOOL_ERROR;
 	}
 	if (pParse->rc != SQL_OK && pParse->rc != SQL_DONE
 	    && pParse->zErrMsg == 0) {
