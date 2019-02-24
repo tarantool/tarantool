@@ -8,7 +8,7 @@ language: cpp
 os: linux
 compiler: gcc
 
-osx_image: xcode9
+osx_image: xcode10.2
 
 cache:
     directories:
@@ -24,11 +24,16 @@ jobs:
       - name: RelWithDebInfoWError build + test (Linux, clang)
         env: TARGET=test
         compiler: clang
-      - name: RelWithDebInfoWError build + test (OS X)
+      - name: RelWithDebInfoWError build + test (OS X Mojave 10.14)
         env: TARGET=test
         os: osx
       - name: Debug build + test + coverage (Linux, gcc)
         env: TARGET=coverage
+      - name: RelWithDebInfoWError build + test (OS X High Sierra 10.13)
+        env: TARGET=test
+        os: osx
+        osx_image: xcode9.4
+        if: branch = "2.1"
       - name: LTO build + test (Linux, gcc)
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
         if: branch = "2.1"
@@ -36,7 +41,7 @@ jobs:
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
         if: branch = "2.1"
         compiler: clang
-      - name: LTO build + test (OS X)
+      - name: LTO build + test (OS X Mojave 10.14)
         os: osx
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
         if: branch = "2.1"
