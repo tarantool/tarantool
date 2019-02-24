@@ -202,7 +202,7 @@ macro(luajit_build)
         endif()
         set(luajit_ldflags
             ${luajit_ldflags} -Wl,-macosx_version_min,${luajit_osx_deployment_target})
-    endif ()
+    endif()
     if (ENABLE_GCOV)
         set (luajit_ccdebug ${luajit_ccdebug} -fprofile-arcs -ftest-coverage)
     endif()
@@ -233,7 +233,12 @@ macro(luajit_build)
         CCOPT="${luajit_ccopt}"
         CCDEBUG="${luajit_ccdebug}"
         XCFLAGS="${luajit_xcflags}"
-        Q='')
+        Q=''
+        # We need to set MACOSX_DEPLOYMENT_TARGET to at least 10.6,
+        # because 10.4 SDK (which is set by default in LuaJIT's
+        # Makefile) is not longer included in Mac OS X Mojave 10.14.
+        # See also https://github.com/LuaJIT/LuaJIT/issues/484
+        MACOSX_DEPLOYMENT_TARGET="${luajit_osx_deployment_target}")
     if (${PROJECT_BINARY_DIR} STREQUAL ${PROJECT_SOURCE_DIR})
         add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/third_party/luajit/src/libluajit.a
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/third_party/luajit
