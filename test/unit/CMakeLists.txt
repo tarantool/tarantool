@@ -123,9 +123,9 @@ add_executable(find_path.test find_path.c
 )
 
 add_executable(reflection_c.test reflection_c.c unit.c
-    ${CMAKE_SOURCE_DIR}/src/reflection.c)
+    ${CMAKE_SOURCE_DIR}/src/lib/core/reflection.c)
 add_executable(reflection_cxx.test reflection_cxx.cc unit.c
-    ${CMAKE_SOURCE_DIR}/src/reflection.c)
+    ${CMAKE_SOURCE_DIR}/src/lib/core/reflection.c)
 add_executable(csv.test csv.c)
 target_link_libraries(csv.test csv)
 

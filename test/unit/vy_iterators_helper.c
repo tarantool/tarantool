@@ -1,7 +1,7 @@
 #include "vy_iterators_helper.h"
 #include "memory.h"
 #include "fiber.h"
-#include "tt_uuid.h"
+#include "uuid/tt_uuid.h"
 #include "say.h"
 
 struct tt_uuid INSTANCE_UUID;

@@ -34,7 +34,7 @@ extern "C" {
 #include "trivia/util.h"
 #include "box/xrow.h"
 #include "box/iproto_constants.h"
-#include "tt_uuid.h"
+#include "uuid/tt_uuid.h"
 #include "version.h"
 #include "random.h"
 #include "memory.h"

@@ -1,0 +1,48 @@
+set(core_sources
+    diag.c
+    say.c
+    memory.c
+    clock.c
+    fiber.c
+    backtrace.cc
+    cbus.c
+    fiber_pool.c
+    fiber_cond.c
+    fiber_channel.c
+    latch.c
+    sio.c
+    evio.c
+    coio.cc
+    coio_task.c
+    coio_file.c
+    coio_buf.cc
+    fio.c
+    exception.cc
+    errinj.c
+    reflection.c
+    assoc.c
+    util.c
+    random.c
+    trigger.cc
+    coll.c
+    coll_def.c
+    mpstream.c
+    port.c
+)
+
+if (TARGET_OS_NETBSD)
+    # A workaround for "undefined reference to `__gcc_personality_v0'"
+    # on x86_64-rumprun-netbsd-gcc
+    set_source_files_properties(util.c PROPERTIES COMPILE_FLAGS
+        -fno-exceptions)
+endif()
+
+add_library(core STATIC ${core_sources})
+
+target_link_libraries(core salad small uri ${LIBEV_LIBRARIES}
+                      ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES}
+                      ${MSGPUCK_LIBRARIES})
+
+if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
+    target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})
+endif()

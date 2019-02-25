@@ -30,7 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "tt_uuid.h"
+#include "uuid/tt_uuid.h"
 #include "trigger.h"
 #include <stdint.h>
 #define RB_COMPACT 1

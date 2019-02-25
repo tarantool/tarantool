@@ -33,7 +33,6 @@
 #include "trivia/util.h"
 #include "memory.h"
 #include "fiber.h"
-#include "tt_uuid.h"
 #include "small/quota.h"
 #include "small/small.h"
 

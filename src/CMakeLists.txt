@@ -73,64 +73,8 @@ if(NOT "${DL_LIBRARY}" STREQUAL "DL_LIBRARY-NOTFOUND")
     set(generic_libraries ${generic_libraries} dl)
 endif()
 
-set (core_sources
-     diag.c
-     say.c
-     memory.c
-     clock.c
-     fiber.c
-     backtrace.cc
-     cbus.c
-     fiber_pool.c
-     fiber_cond.c
-     fiber_channel.c
-     latch.c
-     sio.c
-     evio.c
-     coio.cc
-     coio_task.c
-     coio_file.c
-     coio_buf.cc
-     fio.c
-     cbus.c
-     exception.cc
-     errinj.c
-     reflection.c
-     assoc.c
-     util.c
-     random.c
-     trigger.cc
-     coll.c
-     coll_def.c
-     mpstream.c
-     port.c
- )
-
-if (TARGET_OS_NETBSD)
-    # A workaround for "undefined reference to `__gcc_personality_v0'"
-    # on x86_64-rumprun-netbsd-gcc
-    set_source_files_properties(util.c PROPERTIES COMPILE_FLAGS
-        -fno-exceptions)
-endif ()
-
-add_library(core STATIC ${core_sources})
-target_link_libraries(core
-    salad small uri
-    ${LIBEV_LIBRARIES}
-    ${LIBEIO_LIBRARIES}
-    ${LIBCORO_LIBRARIES}
-    ${MSGPUCK_LIBRARIES}
-    ${generic_libraries})
-
 add_library(stat STATIC rmean.c latency.c histogram.c)
 target_link_libraries(stat core)
-
-if (ENABLE_BACKTRACE AND NOT TARGET_OS_DARWIN)
-    target_link_libraries(core gcc_s ${UNWIND_LIBRARIES})
-endif()
-
-add_library(uuid STATIC tt_uuid.c)
-target_link_libraries(uuid core bit)
 
 add_library(scramble STATIC scramble.c)
 target_link_libraries(scramble core misc)
@@ -182,11 +126,11 @@ set (server_sources
 set(api_headers
     ${CMAKE_BINARY_DIR}/src/trivia/config.h
     ${CMAKE_SOURCE_DIR}/src/trivia/util.h
-    ${CMAKE_SOURCE_DIR}/src/say.h
-    ${CMAKE_SOURCE_DIR}/src/fiber.h
-    ${CMAKE_SOURCE_DIR}/src/fiber_cond.h
-    ${CMAKE_SOURCE_DIR}/src/coio.h
-    ${CMAKE_SOURCE_DIR}/src/coio_task.h
+    ${CMAKE_SOURCE_DIR}/src/lib/core/say.h
+    ${CMAKE_SOURCE_DIR}/src/lib/core/fiber.h
+    ${CMAKE_SOURCE_DIR}/src/lib/core/fiber_cond.h
+    ${CMAKE_SOURCE_DIR}/src/lib/core/coio.h
+    ${CMAKE_SOURCE_DIR}/src/lib/core/coio_task.h
     ${CMAKE_SOURCE_DIR}/src/lua/utils.h
     ${CMAKE_SOURCE_DIR}/src/lua/error.h
     ${CMAKE_SOURCE_DIR}/src/lua/string.h
@@ -203,8 +147,8 @@ set(api_headers
     ${CMAKE_SOURCE_DIR}/src/box/error.h
     ${CMAKE_SOURCE_DIR}/src/box/lua/call.h
     ${CMAKE_SOURCE_DIR}/src/box/lua/tuple.h
-    ${CMAKE_SOURCE_DIR}/src/latch.h
-    ${CMAKE_SOURCE_DIR}/src/clock.h
+    ${CMAKE_SOURCE_DIR}/src/lib/core/latch.h
+    ${CMAKE_SOURCE_DIR}/src/lib/core/clock.h
 )
 rebuild_module_api(${api_headers})
 

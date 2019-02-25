@@ -40,7 +40,7 @@
 #include "fiber_cond.h"
 #include "trigger.h"
 #include "trivia/util.h"
-#include "tt_uuid.h"
+#include "uuid/tt_uuid.h"
 #include "uri/uri.h"
 
 #include "xrow.h"

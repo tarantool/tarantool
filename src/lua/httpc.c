@@ -39,7 +39,7 @@
 #include "say.h"
 #include "lua/utils.h"
 #include "lua/httpc.h"
-#include "src/fiber.h"
+#include "core/fiber.h"
 
 /** Internal util functions
  * {{{

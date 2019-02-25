@@ -35,7 +35,7 @@
 #include <stddef.h>
 #include <sys/uio.h> /* struct iovec */
 
-#include "tt_uuid.h"
+#include "uuid/tt_uuid.h"
 #include "diag.h"
 #include "vclock.h"
 

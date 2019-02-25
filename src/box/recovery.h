@@ -35,7 +35,6 @@
 #include "third_party/tarantool_ev.h"
 #include "xlog.h"
 #include "vclock.h"
-#include "tt_uuid.h"
 
 #if defined(__cplusplus)
 extern "C" {

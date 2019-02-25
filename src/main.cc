@@ -67,7 +67,6 @@
 #include "box/error.h"
 #include "scoped_guard.h"
 #include "random.h"
-#include "tt_uuid.h"
 #include "cfg.h"
 #include "version.h"
 #include <readline/readline.h>
