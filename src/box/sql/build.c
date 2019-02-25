@@ -2603,76 +2603,43 @@ sqlIdListIndex(IdList * pList, const char *zName)
 	return -1;
 }
 
-/*
- * Expand the space allocazted for the given SrcList object by
- * creating nExtra new slots beginning at iStart.  iStart is zero based.
- * New slots are zeroed.
- *
- * For example, suppose a SrcList initially contains two entries: A,B.
- * To append 3 new entries onto the end, do this:
- *
- *    sqlSrcListEnlarge(db, pSrclist, 3, 2);
- *
- * After the call above it would contain:  A, B, nil, nil, nil.
- * If the iStart argument had been 1 instead of 2, then the result
- * would have been:  A, nil, nil, nil, B.  To prepend the new slots,
- * the iStart value would be 0.  The result then would
- * be: nil, nil, nil, A, B.
- *
- * If a memory allocation fails the SrcList is unchanged.  The
- * db->mallocFailed flag will be set to true.
- */
-SrcList *
-sqlSrcListEnlarge(sql * db,	/* Database connection to notify of OOM errors */
-		      SrcList * pSrc,	/* The SrcList to be enlarged */
-		      int nExtra,	/* Number of new slots to add to pSrc->a[] */
-		      int iStart	/* Index in pSrc->a[] of first new slot */
-    )
+struct SrcList *
+sql_src_list_enlarge(struct sql *db, struct SrcList *src_list, int new_slots,
+		     int start_idx)
 {
-	int i;
+	assert(start_idx >= 0);
+	assert(new_slots >= 1);
+	assert(src_list != NULL);
+	assert(start_idx <= src_list->nSrc);
 
-	/* Sanity checking on calling parameters */
-	assert(iStart >= 0);
-	assert(nExtra >= 1);
-	assert(pSrc != 0);
-	assert(iStart <= pSrc->nSrc);
-
-	/* Allocate additional space if needed */
-	if ((u32) pSrc->nSrc + nExtra > pSrc->nAlloc) {
-		SrcList *pNew;
-		int nAlloc = pSrc->nSrc * 2 + nExtra;
-		int nGot;
-		pNew = sqlDbRealloc(db, pSrc,
-					sizeof(*pSrc) + (nAlloc -
-							 1) *
-					sizeof(pSrc->a[0]));
-		if (pNew == 0) {
-			assert(db->mallocFailed);
-			return pSrc;
+	/* Allocate additional space if needed. */
+	if (src_list->nSrc + new_slots > (int)src_list->nAlloc) {
+		int to_alloc = src_list->nSrc * 2 + new_slots;
+		int size = sizeof(*src_list) +
+			   (to_alloc - 1) * sizeof(src_list->a[0]);
+		src_list = sqlDbRealloc(db, src_list, size);
+		if (src_list == NULL) {
+			diag_set(OutOfMemory, size, "sqlDbRealloc", "src_list");
+			return NULL;
 		}
-		pSrc = pNew;
-		nGot =
-		    (sqlDbMallocSize(db, pNew) -
-		     sizeof(*pSrc)) / sizeof(pSrc->a[0]) + 1;
-		pSrc->nAlloc = nGot;
+		src_list->nAlloc = to_alloc;
 	}
 
-	/* Move existing slots that come after the newly inserted slots
-	 * out of the way
+	/*
+	 * Move existing slots that come after the newly inserted
+	 * slots out of the way.
 	 */
-	for (i = pSrc->nSrc - 1; i >= iStart; i--) {
-		pSrc->a[i + nExtra] = pSrc->a[i];
-	}
-	pSrc->nSrc += nExtra;
+	memmove(&src_list->a[start_idx + new_slots], &src_list->a[start_idx],
+		(src_list->nSrc - start_idx) * sizeof(src_list->a[0]));
+	src_list->nSrc += new_slots;
 
-	/* Zero the newly allocated slots */
-	memset(&pSrc->a[iStart], 0, sizeof(pSrc->a[0]) * nExtra);
-	for (i = iStart; i < iStart + nExtra; i++) {
-		pSrc->a[i].iCursor = -1;
-	}
+	/* Zero the newly allocated slots. */
+	memset(&src_list->a[start_idx], 0, sizeof(src_list->a[0]) * new_slots);
+	for (int i = start_idx; i < start_idx + new_slots; i++)
+		src_list->a[i].iCursor = -1;
 
-	/* Return a pointer to the enlarged SrcList */
-	return pSrc;
+	/* Return a pointer to the enlarged SrcList. */
+	return src_list;
 }
 
 struct SrcList *
@@ -2738,11 +2705,13 @@ sqlSrcListAppend(sql * db,	/* Connection to notify of malloc failures */
 		if (pList == 0)
 			return 0;
 	} else {
-		pList = sqlSrcListEnlarge(db, pList, 1, pList->nSrc);
-	}
-	if (db->mallocFailed) {
-		sqlSrcListDelete(db, pList);
-		return 0;
+		struct SrcList *new_list =
+			sql_src_list_enlarge(db, pList, 1, pList->nSrc);
+		if (new_list == NULL) {
+			sqlSrcListDelete(db, pList);
+			return NULL;
+		}
+		pList = new_list;
 	}
 	pItem = &pList->a[pList->nSrc - 1];
 	pItem->zName = sqlNameFromToken(db, pTable);

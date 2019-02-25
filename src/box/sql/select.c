@@ -279,14 +279,18 @@ src_list_append_unique(struct sql *db, struct SrcList *list,
 		if (name != NULL && strcmp(new_name, name) == 0)
 			return list;
 	}
-	list = sqlSrcListEnlarge(db, list, 1, list->nSrc);
-	if (db->mallocFailed) {
+	struct SrcList *new_list =
+		sql_src_list_enlarge(db, list, 1, list->nSrc);
+	if (new_list == NULL) {
 		sqlSrcListDelete(db, list);
 		return NULL;
 	}
+	list = new_list;
 	struct SrcList_item *pItem = &list->a[list->nSrc - 1];
 	pItem->zName = sqlDbStrNDup(db, new_name, strlen(new_name));
 	if (pItem->zName == NULL) {
+		diag_set(OutOfMemory, strlen(new_name), "sqlDbStrNDup",
+			 "pItem->zName");
 		sqlSrcListDelete(db, list);
 		return NULL;
 	}
@@ -4143,12 +4147,14 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		 * for the two elements in the FROM clause of the subquery.
 		 */
 		if (nSubSrc > 1) {
-			pParent->pSrc = pSrc =
-			    sqlSrcListEnlarge(db, pSrc, nSubSrc - 1,
-						  iFrom + 1);
-			if (db->mallocFailed) {
+			struct SrcList *new_list =
+				sql_src_list_enlarge(db, pSrc, nSubSrc - 1,
+						     iFrom + 1);
+			if (new_list == NULL) {
+				pParse->is_aborted = true;
 				break;
 			}
+			pParent->pSrc = pSrc = new_list;
 		}
 
 		/* Transfer the FROM clause terms from the subquery into the
