@@ -1666,6 +1666,7 @@ box_free(void)
 		tuple_free();
 		port_free();
 #endif
+		iproto_free();
 		replication_free();
 		sequence_free();
 		gc_free();
