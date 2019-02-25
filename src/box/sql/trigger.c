@@ -587,12 +587,13 @@ targetSrcList(Parse * pParse,	/* The parsing context */
 	sql *db = pParse->db;
 	SrcList *pSrc;		/* SrcList to be returned */
 
-	pSrc = sqlSrcListAppend(db, 0, 0);
-	if (pSrc) {
-		assert(pSrc->nSrc > 0);
-		pSrc->a[pSrc->nSrc - 1].zName =
-		    sqlDbStrDup(db, pStep->zTarget);
+	pSrc = sql_src_list_append(db, 0, 0);
+	if (pSrc == NULL) {
+		pParse->is_aborted = true;
+		return NULL;
 	}
+	assert(pSrc->nSrc > 0);
+	pSrc->a[pSrc->nSrc - 1].zName = sqlDbStrDup(db, pStep->zTarget);
 	return pSrc;
 }
 
