@@ -618,9 +618,11 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 		 * table. We need the child table as a SrcList for
 		 * sqlWhereBegin().
 		 */
-		struct SrcList *src = sqlSrcListAppend(db, NULL, NULL);
-		if (src == NULL)
-			continue;
+		struct SrcList *src = sql_src_list_append(db, NULL, NULL);
+		if (src == NULL) {
+			parser->is_aborted = true;
+			return;
+		}
 		struct SrcList_item *item = src->a;
 		struct space *child = space_by_id(fk->def->child_id);
 		assert(child != NULL);
@@ -866,11 +868,12 @@ fk_constraint_action_trigger(struct Parse *pParse, struct space_def *def,
 					     "constraint failed");
 		if (r != NULL)
 			r->on_conflict_action = ON_CONFLICT_ACTION_ABORT;
-		select = sqlSelectNew(pParse,
-					  sql_expr_list_append(db, NULL, r),
-					  sqlSrcListAppend(db, NULL, &err),
-					  where, NULL, NULL, NULL, 0, NULL,
-					  NULL);
+		struct SrcList *src_list = sql_src_list_append(db, NULL, &err);
+		if (src_list == NULL)
+			pParse->is_aborted = true;
+		select = sqlSelectNew(pParse, sql_expr_list_append(db, NULL, r),
+				      src_list, where, NULL, NULL, NULL, 0,
+				      NULL, NULL);
 		where = NULL;
 	}
 

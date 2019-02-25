@@ -2658,64 +2658,26 @@ sql_src_list_new(struct sql *db)
 	return src_list;
 }
 
-/*
- * Append a new table name to the given SrcList.  Create a new SrcList if
- * need be.  A new entry is created in the SrcList even if pTable is NULL.
- *
- * A SrcList is returned, or NULL if there is an OOM error.  The returned
- * SrcList might be the same as the SrcList that was input or it might be
- * a new one.  If an OOM error does occurs, then the prior value of pList
- * that is input to this routine is automatically freed.
- *
- * If pDatabase is not null, it means that the table has an optional
- * database name prefix.  Like this:  "database.table".  The pDatabase
- * points to the table name and the pTable points to the database name.
- * The SrcList.a[].zName field is filled with the table name which might
- * come from pTable (if pDatabase is NULL) or from pDatabase.
- * SrcList.a[].zDatabase is filled with the database name from pTable,
- * or with NULL if no database is specified.
- *
- * In other words, if call like this:
- *
- *         sqlSrcListAppend(D,A,B,0);
- *
- * Then B is a table name and the database name is unspecified.  If called
- * like this:
- *
- *         sqlSrcListAppend(D,A,B,C);
- *
- * Then C is the table name and B is the database name.  If C is defined
- * then so is B.  In other words, we never have a case where:
- *
- *         sqlSrcListAppend(D,A,0,C);
- *
- * Both pTable and pDatabase are assumed to be quoted.  They are dequoted
- * before being added to the SrcList.
- */
-SrcList *
-sqlSrcListAppend(sql * db,	/* Connection to notify of malloc failures */
-		     SrcList * pList,	/* Append to this SrcList. NULL creates a new SrcList */
-		     Token * pTable	/* Table to append */
-    )
+struct SrcList *
+sql_src_list_append(struct sql *db, struct SrcList *list,
+		    struct Token *name_token)
 {
-	struct SrcList_item *pItem;
-	assert(db != 0);
-	if (pList == 0) {
-		pList = sql_src_list_new(db);
-		if (pList == 0)
-			return 0;
+	if (list == NULL) {
+		list = sql_src_list_new(db);
+		if (list == NULL)
+			return NULL;
 	} else {
 		struct SrcList *new_list =
-			sql_src_list_enlarge(db, pList, 1, pList->nSrc);
+			sql_src_list_enlarge(db, list, 1, list->nSrc);
 		if (new_list == NULL) {
-			sqlSrcListDelete(db, pList);
+			sqlSrcListDelete(db, list);
 			return NULL;
 		}
-		pList = new_list;
+		list = new_list;
 	}
-	pItem = &pList->a[pList->nSrc - 1];
-	pItem->zName = sqlNameFromToken(db, pTable);
-	return pList;
+	struct SrcList_item *item = &list->a[list->nSrc - 1];
+	item->zName = sqlNameFromToken(db, name_token);
+	return list;
 }
 
 /*
@@ -2807,10 +2769,12 @@ sqlSrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 		pParse->is_aborted = true;
 		goto append_from_error;
 	}
-	p = sqlSrcListAppend(db, p, pTable);
-	if (p == 0 || NEVER(p->nSrc == 0)) {
+	p = sql_src_list_append(db, p, pTable);
+	if (p == NULL) {
+		pParse->is_aborted = true;
 		goto append_from_error;
 	}
+	assert(p->nSrc != 0);
 	pItem = &p->a[p->nSrc - 1];
 	assert(pAlias != 0);
 	if (pAlias->n) {

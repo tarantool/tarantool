@@ -70,14 +70,16 @@ sql_materialize_view(struct Parse *parse, const char *name, struct Expr *where,
 		     int cursor)
 {
 	struct sql *db = parse->db;
-	where = sqlExprDup(db, where, 0);
-	struct SrcList *from = sqlSrcListAppend(db, NULL, NULL);
-	if (from != NULL) {
-		assert(from->nSrc == 1);
-		from->a[0].zName = sqlDbStrDup(db, name);
-		assert(from->a[0].pOn == NULL);
-		assert(from->a[0].pUsing == NULL);
+	struct SrcList *from = sql_src_list_append(db, NULL, NULL);
+	if (from == NULL) {
+		parse->is_aborted = true;
+		return;
 	}
+	where = sqlExprDup(db, where, 0);
+	assert(from->nSrc == 1);
+	from->a[0].zName = sqlDbStrDup(db, name);
+	assert(from->a[0].pOn == NULL);
+	assert(from->a[0].pUsing == NULL);
 	struct Select *select = sqlSelectNew(parse, NULL, from, where, NULL,
 						 NULL, NULL, 0, NULL, NULL);
 	struct SelectDest dest;

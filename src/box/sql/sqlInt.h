@@ -3450,7 +3450,21 @@ sql_src_list_enlarge(struct sql *db, struct SrcList *src_list, int new_slots,
 struct SrcList *
 sql_src_list_new(struct sql *db);
 
-SrcList *sqlSrcListAppend(sql *, SrcList *, Token *);
+/**
+ * Append a new table name to the given list. Create a new
+ * SrcList if need be. A new entry is created in the list even
+ * if name_token is NULL.
+ *
+ * @param db The database connection.
+ * @param list Append to this SrcList. NULL creates a new SrcList.
+ * @param name_token Token representing table name.
+ * @retval Not NULL A new SrcList or updated @a list.
+ * @retval NULL Error. A diag message is set. @A list is deleted.
+ */
+struct SrcList *
+sql_src_list_append(struct sql *db, struct SrcList *list,
+		    struct Token *name_token);
+
 SrcList *sqlSrcListAppendFromTerm(Parse *, SrcList *, Token *,
 				      Token *, Select *, Expr *, IdList *);
 void sqlSrcListIndexedBy(Parse *, SrcList *, Token *);

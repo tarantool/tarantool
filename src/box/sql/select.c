@@ -256,7 +256,7 @@ findRightmost(Select * p)
 
 
 /**
- * Work the same as sqlSrcListAppend(), but before adding to
+ * Work the same as sql_src_list_append(), but before adding to
  * list provide check on name duplicates: only values with unique
  * names are appended. Moreover, names of tables are not
  * normalized: it is parser's business and in struct Select they
@@ -4124,9 +4124,9 @@ flattenSubquery(Parse * pParse,		/* Parsing context */
 		} else {
 			assert(pParent != p);	/* 2nd and subsequent times through the loop */
 			pSrc = pParent->pSrc =
-			    sqlSrcListAppend(db, 0, 0);
-			if (pSrc == 0) {
-				assert(db->mallocFailed);
+			    sql_src_list_append(db, 0, 0);
+			if (pSrc == NULL) {
+				pParse->is_aborted = true;
 				break;
 			}
 		}
