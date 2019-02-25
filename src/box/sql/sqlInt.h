@@ -3413,8 +3413,17 @@ void *sqlArrayAllocate(sql *, void *, int, int *, int *);
 IdList *sqlIdListAppend(sql *, IdList *, Token *);
 int sqlIdListIndex(IdList *, const char *);
 SrcList *sqlSrcListEnlarge(sql *, SrcList *, int, int);
-SrcList *
-sql_alloc_src_list(sql *db);
+
+/**
+ * Allocate a new empty SrcList object.
+ *
+ * @param db The database connection.
+ * @retval Not NULL List pointer on success.
+ * @retval NULL Otherwise. The diag message is set.
+ */
+struct SrcList *
+sql_src_list_new(struct sql *db);
+
 SrcList *sqlSrcListAppend(sql *, SrcList *, Token *);
 SrcList *sqlSrcListAppendFromTerm(Parse *, SrcList *, Token *,
 				      Token *, Select *, Expr *, IdList *);
