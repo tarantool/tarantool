@@ -2141,3 +2141,16 @@ iproto_set_msg_max(int new_iproto_msg_max)
 	iproto_do_cfg(&cfg_msg);
 	cpipe_set_max_input(&net_pipe, new_iproto_msg_max / 2);
 }
+
+void
+iproto_free()
+{
+	tt_pthread_cancel(net_cord.id);
+	tt_pthread_join(net_cord.id, NULL);
+	/*
+	* Close socket descriptor to prevent hot standby instance
+	* failing to bind in case it tries to bind before socket
+	* is closed by OS.
+	*/
+	close(binary.ev.fd);
+}
