@@ -2152,5 +2152,6 @@ iproto_free()
 	* failing to bind in case it tries to bind before socket
 	* is closed by OS.
 	*/
-	close(binary.ev.fd);
+	if (evio_service_is_active(&binary))
+		close(binary.ev.fd);
 }
