@@ -3070,27 +3070,6 @@ struct TreeView {
 }
 
 /*
- * The sql_*_BKPT macros are substitutes for the error codes with
- * the same name but without the _BKPT suffix.  These macros invoke
- * routines that report the line-number on which the error originated
- * using sql_log().  The routines also provide a convenient place
- * to set a debugger breakpoint.
- */
-int sqlMisuseError(int);
-int sqlCantopenError(int);
-#define SQL_MISUSE_BKPT sqlMisuseError(__LINE__)
-#define SQL_CANTOPEN_BKPT sqlCantopenError(__LINE__)
-#ifdef SQL_DEBUG
-int sqlNomemError(int);
-int sqlIoerrnomemError(int);
-#define SQL_NOMEM_BKPT sqlNomemError(__LINE__)
-#define SQL_IOERR_NOMEM_BKPT sqlIoerrnomemError(__LINE__)
-#else
-#define SQL_NOMEM_BKPT SQL_NOMEM
-#define SQL_IOERR_NOMEM_BKPT SQL_IOERR_NOMEM
-#endif
-
-/*
  * FTS4 is really an extension for FTS3.  It is enabled using the
  * sql_ENABLE_FTS3 macro.  But to avoid confusion we also call
  * the sql_ENABLE_FTS4 macro to serve as an alias for sql_ENABLE_FTS3.

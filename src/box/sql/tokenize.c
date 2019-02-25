@@ -468,7 +468,7 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 	pEngine = sqlParserAlloc(sqlMalloc);
 	if (pEngine == 0) {
 		sqlOomFault(db);
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	}
 	assert(pParse->new_space == NULL);
 	assert(pParse->parsed_ast.trigger == NULL);
@@ -528,7 +528,7 @@ sqlRunParser(Parse * pParse, const char *zSql, char **pzErrMsg)
 #endif				/* YYDEBUG */
 	sqlParserFree(pEngine, sql_free);
 	if (db->mallocFailed) {
-		pParse->rc = SQL_NOMEM_BKPT;
+		pParse->rc = SQL_NOMEM;
 	}
 	if (pParse->rc != SQL_OK && pParse->rc != SQL_DONE
 	    && pParse->zErrMsg == 0) {

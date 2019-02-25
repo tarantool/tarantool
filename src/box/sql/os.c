@@ -170,7 +170,7 @@ sqlOsOpenMalloc(sql_vfs * pVfs,
 			*ppFile = pFile;
 		}
 	} else {
-		rc = SQL_NOMEM_BKPT;
+		rc = SQL_NOMEM;
 	}
 	return rc;
 }
@@ -194,7 +194,7 @@ sqlOsInit(void)
 {
 	void *p = sql_malloc(10);
 	if (p == 0)
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	sql_free(p);
 	return sql_os_init();
 }
@@ -263,7 +263,7 @@ sql_vfs_register(sql_vfs * pVfs, int makeDflt)
 #endif
 #ifdef SQL_ENABLE_API_ARMOR
 	if (pVfs == 0)
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 #endif
 
 	vfsUnlink(pVfs);

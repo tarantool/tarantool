@@ -65,7 +65,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	struct session *user_session = current_session();
 
 	if (!sqlSafetyCheckOk(db))
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 	if (zSql == 0)
 		zSql = "";
 
@@ -175,7 +175,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 		if (*pzErrMsg) {
 			memcpy(*pzErrMsg, sql_errmsg(db), nErrMsg);
 		} else {
-			rc = SQL_NOMEM_BKPT;
+			rc = SQL_NOMEM;
 			sqlError(db, SQL_NOMEM);
 		}
 	} else if (pzErrMsg) {

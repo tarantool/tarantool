@@ -5520,7 +5520,7 @@ default: {          /* This is really OP_Noop and OP_Explain */
 	 * an error of some kind.
 	 */
 abort_due_to_error:
-	if (db->mallocFailed) rc = SQL_NOMEM_BKPT;
+	if (db->mallocFailed) rc = SQL_NOMEM;
 	assert(rc);
 	if (p->zErrMsg==0 && rc!=SQL_IOERR_NOMEM) {
 		const char *msg;
@@ -5565,7 +5565,7 @@ too_big:
 no_mem:
 	sqlOomFault(db);
 	sqlVdbeError(p, "out of memory");
-	rc = SQL_NOMEM_BKPT;
+	rc = SQL_NOMEM;
 	goto abort_due_to_error;
 
 	/* Jump to here if the sql_interrupt() API sets the interrupt
@@ -5573,7 +5573,7 @@ no_mem:
 	 */
 abort_due_to_interrupt:
 	assert(db->u1.isInterrupted);
-	rc = db->mallocFailed ? SQL_NOMEM_BKPT : SQL_INTERRUPT;
+	rc = db->mallocFailed ? SQL_NOMEM : SQL_INTERRUPT;
 	p->rc = rc;
 	sqlVdbeError(p, "%s", sqlErrStr(rc));
 	goto abort_due_to_error;

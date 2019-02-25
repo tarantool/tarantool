@@ -472,7 +472,7 @@ findInodeInfo(unixFile * pFile,	/* Unix file with file desc used in the key */
 	if (pInode == 0) {
 		pInode = sql_malloc64(sizeof(*pInode));
 		if (pInode == 0) {
-			return SQL_NOMEM_BKPT;
+			return SQL_NOMEM;
 		}
 		memset(pInode, 0, sizeof(*pInode));
 		memcpy(&pInode->fileId, &fileId, sizeof(fileId));
@@ -1033,7 +1033,7 @@ openDirectory(const char *zFilename, int *pFd)
 	*pFd = fd;
 	if (fd >= 0)
 		return SQL_OK;
-	return unixLogError(SQL_CANTOPEN_BKPT, "openDirectory", zDirname);
+	return unixLogError(SQL_CANTOPEN, "openDirectory", zDirname);
 }
 
 /*
@@ -1816,7 +1816,7 @@ unixOpen(sql_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 		} else {
 			pUnused = sql_malloc64(sizeof(*pUnused));
 			if (!pUnused) {
-				return SQL_NOMEM_BKPT;
+				return SQL_NOMEM;
 			}
 		}
 		p->pUnused = pUnused;
@@ -1882,7 +1882,7 @@ unixOpen(sql_vfs * pVfs,	/* The VFS for which this is the xOpen method */
 			fd = robust_open(zName, openFlags, openMode);
 		}
 		if (fd < 0) {
-			rc = unixLogError(SQL_CANTOPEN_BKPT, "open", zName);
+			rc = unixLogError(SQL_CANTOPEN, "open", zName);
 			goto open_finished;
 		}
 		

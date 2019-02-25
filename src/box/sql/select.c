@@ -1931,7 +1931,7 @@ sqlColumnsFromExprList(Parse * parse, ExprList * expr_list,
 	}
 cleanup:
 	sqlHashClear(&ht);
-	int rc = db->mallocFailed ? SQL_NOMEM_BKPT : SQL_OK;
+	int rc = db->mallocFailed ? SQL_NOMEM : SQL_OK;
 	if (rc != SQL_OK) {
 		/*
 		 * pTable->def could be not temporal in
@@ -1939,7 +1939,7 @@ cleanup:
 		 */
 		space_def->fields = NULL;
 		space_def->field_count = 0;
-		rc = SQL_NOMEM_BKPT;
+		rc = SQL_NOMEM;
 	}
 	return rc;
 
@@ -3330,7 +3330,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 			if (j == nOrderBy) {
 				Expr *pNew = sqlExpr(db, TK_INTEGER, 0);
 				if (pNew == 0)
-					return SQL_NOMEM_BKPT;
+					return SQL_NOMEM;
 				pNew->flags |= EP_IntValue;
 				pNew->u.iValue = i;
 				pOrderBy = sql_expr_list_append(pParse->db,
@@ -4640,7 +4640,7 @@ withExpand(Walker * pWalker, struct SrcList_item *pFrom)
 			return WRC_Abort;
 		pFrom->pSelect = sqlSelectDup(db, pCte->pSelect, 0);
 		if (db->mallocFailed)
-			return SQL_NOMEM_BKPT;
+			return SQL_NOMEM;
 		assert(pFrom->pSelect);
 
 		/* Check if this is a recursive CTE. */

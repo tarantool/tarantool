@@ -128,7 +128,7 @@ sql_get_table_cb(void *pArg, int nCol, char **argv, char **colv)
 	return 0;
 
  malloc_failed:
-	p->rc = SQL_NOMEM_BKPT;
+	p->rc = SQL_NOMEM;
 	return 1;
 }
 
@@ -155,7 +155,7 @@ sql_get_table(sql * db,		/* The database on which the SQL executes */
 
 #ifdef SQL_ENABLE_API_ARMOR
 	if (!sqlSafetyCheckOk(db) || pazResult == 0)
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 #endif
 	*pazResult = 0;
 	if (pnColumn)
@@ -173,7 +173,7 @@ sql_get_table(sql * db,		/* The database on which the SQL executes */
 	res.azResult = sql_malloc64(sizeof(char *) * res.nAlloc);
 	if (res.azResult == 0) {
 		db->errCode = SQL_NOMEM;
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	}
 	res.azResult[0] = 0;
 	rc = sql_exec(db, zSql, sql_get_table_cb, &res, pzErrMsg);
@@ -204,7 +204,7 @@ sql_get_table(sql * db,		/* The database on which the SQL executes */
 		if (azNew == 0) {
 			sql_free_table(&res.azResult[1]);
 			db->errCode = SQL_NOMEM;
-			return SQL_NOMEM_BKPT;
+			return SQL_NOMEM;
 		}
 		res.azResult = azNew;
 	}

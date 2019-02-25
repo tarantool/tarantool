@@ -1760,7 +1760,7 @@ whereLoopResize(sql * db, WhereLoop * p, int n)
 	n = (n + 7) & ~7;
 	paNew = sqlDbMallocRawNN(db, sizeof(p->aLTerm[0]) * n);
 	if (paNew == 0)
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	memcpy(paNew, p->aLTerm, sizeof(p->aLTerm[0]) * p->nLSlot);
 	if (p->aLTerm != p->aLTermSpace)
 		sqlDbFree(db, p->aLTerm);
@@ -1781,7 +1781,7 @@ whereLoopXfer(sql * db, WhereLoop * pTo, WhereLoop * pFrom)
 		pTo->nBtm = 0;
 		pTo->nTop = 0;
 		pTo->index_def = NULL;
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	}
 	memcpy(pTo, pFrom, WHERE_LOOP_XFER_SZ);
 	memcpy(pTo->aLTerm, pFrom->aLTerm,
@@ -2098,7 +2098,7 @@ whereLoopInsert(WhereLoopBuilder * pBuilder, WhereLoop * pTemplate)
 		/* Allocate a new WhereLoop to add to the end of the list */
 		*ppPrev = p = sqlDbMallocRawNN(db, sizeof(WhereLoop));
 		if (p == 0)
-			return SQL_NOMEM_BKPT;
+			return SQL_NOMEM;
 		whereLoopInit(p);
 		p->pNextLoop = 0;
 	} else {
@@ -2327,7 +2327,7 @@ whereLoopAddBtreeIndex(WhereLoopBuilder * pBuilder,	/* The WhereLoop factory */
 
 	pNew = pBuilder->pNew;
 	if (db->mallocFailed)
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	WHERETRACE(0x800, ("BEGIN addBtreeIdx(%s), nEq=%d\n",
 			   probe->name, pNew->nEq));
 
@@ -3623,7 +3623,7 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 	nSpace += sizeof(LogEst) * nOrderBy;
 	pSpace = sqlDbMallocRawNN(db, nSpace);
 	if (pSpace == 0)
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	aTo = (WherePath *) pSpace;
 	aFrom = aTo + mxChoice;
 	memset(aFrom, 0, sizeof(aFrom[0]));

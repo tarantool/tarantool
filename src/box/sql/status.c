@@ -142,11 +142,11 @@ sql_status64(int op,
 {
 	wsdStatInit;
 	if (op < 0 || op >= ArraySize(wsdStat.nowValue)) {
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 	}
 #ifdef SQL_ENABLE_API_ARMOR
 	if (pCurrent == 0 || pHighwater == 0)
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 #endif
 	*pCurrent = wsdStat.nowValue[op];
 	*pHighwater = wsdStat.mxValue[op];
@@ -163,7 +163,7 @@ sql_status(int op, int *pCurrent, int *pHighwater, int resetFlag)
 	int rc;
 #ifdef SQL_ENABLE_API_ARMOR
 	if (pCurrent == 0 || pHighwater == 0)
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 #endif
 	rc = sql_status64(op, &iCur, &iHwtr, resetFlag);
 	if (rc == 0) {
@@ -187,7 +187,7 @@ sql_db_status(sql * db,	/* The database connection whose status is desired */
 	int rc = SQL_OK;	/* Return code */
 #ifdef SQL_ENABLE_API_ARMOR
 	if (!sqlSafetyCheckOk(db) || pCurrent == 0 || pHighwater == 0) {
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 	}
 #endif
 	switch (op) {

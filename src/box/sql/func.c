@@ -1614,7 +1614,7 @@ sql_overload_function(sql * db, const char *zName,
 
 #ifdef SQL_ENABLE_API_ARMOR
 	if (!sqlSafetyCheckOk(db) || zName == 0 || nArg < -2) {
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 	}
 #endif
 	if (sqlFindFunction(db, zName, nArg, 0) == 0) {

@@ -103,7 +103,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 	if (sParse.rc == SQL_DONE)
 		sParse.rc = SQL_OK;
 	if (db->mallocFailed) {
-		sParse.rc = SQL_NOMEM_BKPT;
+		sParse.rc = SQL_NOMEM;
 	}
 	if (pzTail) {
 		*pzTail = sParse.zTail;
@@ -203,11 +203,11 @@ sqlLockAndPrepare(sql * db,		/* Database handle. */
 
 #ifdef SQL_ENABLE_API_ARMOR
 	if (ppStmt == 0)
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 #endif
 	*ppStmt = 0;
 	if (!sqlSafetyCheckOk(db) || zSql == 0) {
-		return SQL_MISUSE_BKPT;
+		return SQL_MISUSE;
 	}
 	rc = sqlPrepare(db, zSql, nBytes, saveSqlFlag, pOld, ppStmt,
 			    pzTail);

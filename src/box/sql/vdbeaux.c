@@ -208,7 +208,7 @@ growOpArray(Vdbe * v, int nOp)
 		p->nOpAlloc = p->szOpAlloc / sizeof(Op);
 		v->aOp = pNew;
 	}
-	return (pNew ? SQL_OK : SQL_NOMEM_BKPT);
+	return (pNew ? SQL_OK : SQL_NOMEM);
 }
 
 #ifdef SQL_DEBUG
@@ -1570,7 +1570,7 @@ sqlVdbeList(Vdbe * p)
 	releaseMemArray(pMem, 8);
 	p->pResultSet = 0;
 
-	if (p->rc == SQL_NOMEM_BKPT) {
+	if (p->rc == SQL_NOMEM) {
 		/* This happens if a malloc() inside a call to sql_column_text() or
 		 * sql_column_text16() failed.
 		 */
@@ -2175,7 +2175,7 @@ sqlVdbeSetColName(Vdbe * p,			/* Vdbe being configured */
 	assert(var < COLNAME_N);
 	if (p->db->mallocFailed) {
 		assert(!zName || xDel != SQL_DYNAMIC);
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	}
 	assert(p->aColName != 0);
 	assert(var == COLNAME_NAME || var == COLNAME_DECLTYPE);
@@ -2342,7 +2342,7 @@ sqlVdbeHalt(Vdbe * p)
 	 */
 
 	if (db->mallocFailed) {
-		p->rc = SQL_NOMEM_BKPT;
+		p->rc = SQL_NOMEM;
 	}
 	closeTopFrameCursors(p);
 	if (p->magic != VDBE_MAGIC_RUN) {
@@ -2506,7 +2506,7 @@ sqlVdbeHalt(Vdbe * p)
 	p->magic = VDBE_MAGIC_HALT;
 	checkActiveVdbeCnt(db);
 	if (db->mallocFailed) {
-		p->rc = SQL_NOMEM_BKPT;
+		p->rc = SQL_NOMEM;
 	}
 
 	assert(db->nVdbeActive > 0 || box_txn() ||

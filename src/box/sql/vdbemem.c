@@ -130,7 +130,7 @@ sqlVdbeMemGrow(Mem * pMem, int n, int bPreserve)
 			sqlVdbeMemSetNull(pMem);
 			pMem->z = 0;
 			pMem->szMalloc = 0;
-			return SQL_NOMEM_BKPT;
+			return SQL_NOMEM;
 		} else {
 			pMem->szMalloc =
 			    sqlDbMallocSize(pMem->db, pMem->zMalloc);
@@ -191,7 +191,7 @@ sqlVdbeMemMakeWriteable(Mem * pMem)
 			return SQL_NOMEM;
 		if (pMem->szMalloc == 0 || pMem->z != pMem->zMalloc) {
 			if (sqlVdbeMemGrow(pMem, pMem->n + 2, 1)) {
-				return SQL_NOMEM_BKPT;
+				return SQL_NOMEM;
 			}
 			pMem->z[pMem->n] = 0;
 			pMem->z[pMem->n + 1] = 0;
@@ -224,7 +224,7 @@ sqlVdbeMemExpandBlob(Mem * pMem)
 		nByte = 1;
 	}
 	if (sqlVdbeMemGrow(pMem, nByte, 1)) {
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	}
 
 	memset(&pMem->z[pMem->n], 0, pMem->u.nZero);
@@ -242,7 +242,7 @@ static SQL_NOINLINE int
 vdbeMemAddTerminator(Mem * pMem)
 {
 	if (sqlVdbeMemGrow(pMem, pMem->n + 2, 1)) {
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	}
 	pMem->z[pMem->n] = 0;
 	pMem->z[pMem->n + 1] = 0;
@@ -293,7 +293,7 @@ sqlVdbeMemStringify(Mem * pMem, u8 bForce)
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
 	if (sqlVdbeMemClearAndResize(pMem, nByte)) {
-		return SQL_NOMEM_BKPT;
+		return SQL_NOMEM;
 	}
 	if (fg & MEM_Int) {
 		sql_snprintf(nByte, pMem->z, "%lld", pMem->u.i);
@@ -929,7 +929,7 @@ sqlVdbeMemSetStr(Mem * pMem,	/* Memory cell to set to string value */
 		testcase(nAlloc == 31);
 		testcase(nAlloc == 32);
 		if (sqlVdbeMemClearAndResize(pMem, MAX(nAlloc, 32))) {
-			return SQL_NOMEM_BKPT;
+			return SQL_NOMEM;
 		}
 		memcpy(pMem->z, z, nAlloc);
 	} else if (xDel == SQL_DYNAMIC) {
@@ -1198,7 +1198,7 @@ valueFromFunction(sql * db,	/* The database connection */
 							   sizeof(apVal[0]) *
 							   nVal);
 		if (apVal == 0) {
-			rc = SQL_NOMEM_BKPT;
+			rc = SQL_NOMEM;
 			goto value_from_function_out;
 		}
 		for (i = 0; i < nVal; i++) {
@@ -1211,7 +1211,7 @@ valueFromFunction(sql * db,	/* The database connection */
 
 	pVal = valueNew(db, pCtx);
 	if (pVal == 0) {
-		rc = SQL_NOMEM_BKPT;
+		rc = SQL_NOMEM;
 		goto value_from_function_out;
 	}
 
@@ -1380,7 +1380,7 @@ valueFromExpr(sql * db,	/* The database connection */
 	if (pCtx == 0)
 		sqlValueFree(pVal);
 
-	return SQL_NOMEM_BKPT;
+	return SQL_NOMEM;
 }
 
 /*
