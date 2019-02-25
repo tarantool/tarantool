@@ -37,7 +37,7 @@
 #include <stdbool.h>
 #include "tarantool_ev.h"
 #include "sio.h"
-#include "uri.h"
+#include "uri/uri.h"
 
 #if defined(__cplusplus)
 extern "C" {

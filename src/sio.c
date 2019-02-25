@@ -40,7 +40,7 @@
 #include "say.h"
 #include "trivia/util.h"
 #include "exception.h"
-#include "uri.h"
+#include "uri/uri.h"
 
 const char *
 sio_socketname(int fd)
