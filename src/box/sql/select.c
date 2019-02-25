@@ -315,7 +315,7 @@ sql_select_expand_from_tables(struct Select *select)
 {
 	assert(select != NULL);
 	struct Walker walker;
-	struct SrcList *table_names = sql_alloc_src_list(sql_get());
+	struct SrcList *table_names = sql_src_list_new(sql_get());
 	if (table_names == NULL)
 		return NULL;
 	memset(&walker, 0, sizeof(walker));
