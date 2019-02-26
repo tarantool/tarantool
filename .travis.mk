@@ -90,7 +90,7 @@ coverage_debian: deps_debian test_coverage_debian_no_deps
 
 deps_osx:
 	brew update
-	brew install openssl readline curl icu4c --force
+	brew install openssl readline curl icu4c libiconv --force
 	python2 -V || brew install python2 --force
 	###################################################
 	# Temporary workaround to curl version from
