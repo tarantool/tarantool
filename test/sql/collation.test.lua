@@ -314,3 +314,44 @@ box.space.JJ:drop()
 box.internal.collation.create('c', 'ICU', 'unicode')
 box.space._collation.index.name:get({'c'})
 box.internal.collation.drop('c')
+
+--
+-- gh-4007 Feature request for a new collation
+--
+-- Default unicode collation deals with russian letters
+s = box.schema.space.create('t1')
+s:format({{name='s1', type='string', collation = 'unicode'}})
+idx = s:create_index('pk', {unique = true, type='tree', parts={{'s1', collation = 'unicode'}}})
+s:insert{'Ё'}
+s:insert{'Е'}
+s:insert{'ё'}
+s:insert{'е'}
+-- all 4 letters are in the table
+s:select{}
+s:drop()
+
+-- unicode_ci collation doesn't distinguish russian letters 'Е' and 'Ё'
+s = box.schema.space.create('t1')
+s:format({{name='s1', type='string', collation = 'unicode_ci'}})
+idx = s:create_index('pk', {unique = true, type='tree', parts={{'s1', collation = 'unicode_ci'}}})
+s:insert{'Ё'}
+-- the following calls should fail
+s:insert{'е'}
+s:insert{'Е'}
+s:insert{'ё'}
+-- return single 'Ё'
+s:select{}
+s:drop()
+
+-- unicode_s2 collation does distinguish russian letters 'Е' and 'Ё'
+s = box.schema.space.create('t1')
+s:format({{name='s1', type='string', collation = 'unicode_ky_s1'}})
+idx = s:create_index('pk', {unique = true, type='tree', parts={{'s1', collation = 'unicode_ky_s1'}}})
+s:insert{'Ё'}
+s:insert{'е'}
+-- the following calls should fail
+s:insert{'Е'}
+s:insert{'ё'}
+-- return two: 'Ё' and 'е'
+s:select{}
+s:drop()

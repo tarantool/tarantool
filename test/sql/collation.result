@@ -1141,8 +1141,119 @@ box.internal.collation.create('c', 'ICU', 'unicode')
 ...
 box.space._collation.index.name:get({'c'})
 ---
-- [4, 'c', 1, 'ICU', 'unicode', {'strength': 'tertiary'}]
+- [277, 'c', 1, 'ICU', 'unicode', {'strength': 'tertiary'}]
 ...
 box.internal.collation.drop('c')
+---
+...
+--
+-- gh-4007 Feature request for a new collation
+--
+-- Default unicode collation deals with russian letters
+s = box.schema.space.create('t1')
+---
+...
+s:format({{name='s1', type='string', collation = 'unicode'}})
+---
+...
+idx = s:create_index('pk', {unique = true, type='tree', parts={{'s1', collation = 'unicode'}}})
+---
+...
+s:insert{'Ё'}
+---
+- ['Ё']
+...
+s:insert{'Е'}
+---
+- ['Е']
+...
+s:insert{'ё'}
+---
+- ['ё']
+...
+s:insert{'е'}
+---
+- ['е']
+...
+-- all 4 letters are in the table
+s:select{}
+---
+- - ['е']
+  - ['Е']
+  - ['ё']
+  - ['Ё']
+...
+s:drop()
+---
+...
+-- unicode_ci collation doesn't distinguish russian letters 'Е' and 'Ё'
+s = box.schema.space.create('t1')
+---
+...
+s:format({{name='s1', type='string', collation = 'unicode_ci'}})
+---
+...
+idx = s:create_index('pk', {unique = true, type='tree', parts={{'s1', collation = 'unicode_ci'}}})
+---
+...
+s:insert{'Ё'}
+---
+- ['Ё']
+...
+-- the following calls should fail
+s:insert{'е'}
+---
+- error: Duplicate key exists in unique index 'pk' in space 't1'
+...
+s:insert{'Е'}
+---
+- error: Duplicate key exists in unique index 'pk' in space 't1'
+...
+s:insert{'ё'}
+---
+- error: Duplicate key exists in unique index 'pk' in space 't1'
+...
+-- return single 'Ё'
+s:select{}
+---
+- - ['Ё']
+...
+s:drop()
+---
+...
+-- unicode_s2 collation does distinguish russian letters 'Е' and 'Ё'
+s = box.schema.space.create('t1')
+---
+...
+s:format({{name='s1', type='string', collation = 'unicode_ky_s1'}})
+---
+...
+idx = s:create_index('pk', {unique = true, type='tree', parts={{'s1', collation = 'unicode_ky_s1'}}})
+---
+...
+s:insert{'Ё'}
+---
+- ['Ё']
+...
+s:insert{'е'}
+---
+- ['е']
+...
+-- the following calls should fail
+s:insert{'Е'}
+---
+- error: Duplicate key exists in unique index 'pk' in space 't1'
+...
+s:insert{'ё'}
+---
+- error: Duplicate key exists in unique index 'pk' in space 't1'
+...
+-- return two: 'Ё' and 'е'
+s:select{}
+---
+- - ['е']
+  - ['Ё']
+...
+s:drop()
 ---
 ...

@@ -4,7 +4,7 @@ box.internal.bootstrap()
 box.space._schema:select{}
 ---
 - - ['max_id', 511]
-  - ['version', 2, 1, 2]
+  - ['version', 2, 1, 3]
 ...
 box.space._cluster:select{}
 ---

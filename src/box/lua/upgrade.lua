@@ -652,6 +652,118 @@ local function upgrade_to_2_1_2()
     update_collation_strength_field()
 end
 
+-- Add new collations
+local function upgrade_to_2_1_3()
+    local coll_lst = {
+        {name="af", loc_str="af"},  -- Afrikaans
+        {name="am", loc_str="am"},  -- Amharic (no character changes, just re-ordering)
+        {name="ar", loc_str="ar"},  -- Arabic (use only "standard")
+        {name="as", loc_str="as"},  -- Assamese
+        {name="az", loc_str="az"},  -- Azerbaijani (Azeri)
+        {name="be", loc_str="be"},  -- Belarusian
+        {name="bn", loc_str="bn"},  -- Bengali (Bangla actually)
+        {name="bs", loc_str="bs"},  -- Bosnian (tailored as Croatian)
+        {name="bs_Cyrl", loc_str="bs_Cyrl"}, -- Bosnian in Cyrillic (tailored as Serbian)
+        {name="ca", loc_str="ca"},  -- Catalan
+        {name="cs", loc_str="cs"},  -- Czech
+        {name="cy", loc_str="cy"},  -- Welsh
+        {name="da", loc_str="da"},  -- Danish
+        {name="de__phonebook", loc_str="de_DE_u_co_phonebk"}, -- German (umlaut as 'ae', 'oe', 'ue')
+        {name="de_AT_phonebook", loc_str="de_AT_u_co_phonebk"}, -- Austrian German (umlaut primary greater)
+        {name="dsb", loc_str="dsb"}, -- Lower Sorbian
+        {name="ee", loc_str="ee"},  -- Ewe
+        {name="eo", loc_str="eo"},  -- Esperanto
+        {name="es", loc_str="es"},  -- Spanish
+        {name="es__traditional", loc_str="es_u_co_trad"}, -- Spanish ('ch' and 'll' as a grapheme)
+        {name="et", loc_str="et"},  -- Estonian
+        {name="fa", loc_str="fa"},  -- Persian
+        {name="fi", loc_str="fi"},  -- Finnish (v and w are primary equal)
+        {name="fi__phonebook", loc_str="fi_u_co_phonebk"}, -- Finnish (v and w as separate characters)
+        {name="fil", loc_str="fil"}, -- Filipino
+        {name="fo", loc_str="fo"},  -- Faroese
+        {name="fr_CA", loc_str="fr_CA"}, -- Canadian French
+        {name="gu", loc_str="gu"},  -- Gujarati
+        {name="ha", loc_str="ha"},  -- Hausa
+        {name="haw", loc_str="haw"}, -- Hawaiian
+        {name="he", loc_str="he"},  -- Hebrew
+        {name="hi", loc_str="hi"},  -- Hindi
+        {name="hr", loc_str="hr"},  -- Croatian
+        {name="hu", loc_str="hu"},  -- Hungarian
+        {name="hy", loc_str="hy"},  -- Armenian
+        {name="ig", loc_str="ig"},  -- Igbo
+        {name="is", loc_str="is"},  -- Icelandic
+        {name="ja", loc_str="ja"},  -- Japanese
+        {name="kk", loc_str="kk"},  -- Kazakh
+        {name="kl", loc_str="kl"},  -- Kalaallisut
+        {name="kn", loc_str="kn"},  -- Kannada
+        {name="ko", loc_str="ko"},  -- Korean
+        {name="kok", loc_str="kok"}, -- Konkani
+        {name="ky", loc_str="ky"},  -- Kyrgyz
+        {name="lkt", loc_str="lkt"}, -- Lakota
+        {name="ln", loc_str="ln"},  -- Lingala
+        {name="lt", loc_str="lt"},  -- Lithuanian
+        {name="lv", loc_str="lv"},  -- Latvian
+        {name="mk", loc_str="mk"},  -- Macedonian
+        {name="ml", loc_str="ml"},  -- Malayalam
+        {name="mr", loc_str="mr"},  -- Marathi
+        {name="mt", loc_str="mt"},  -- Maltese
+        {name="nb", loc_str="nb"},  -- Norwegian Bokmal
+        {name="nn", loc_str="nn"},  -- Norwegian Nynorsk
+        {name="nso", loc_str="nso"}, -- Northern Sotho
+        {name="om", loc_str="om"},  -- Oromo
+        {name="or", loc_str="or"},  -- Oriya (Odia)
+        {name="pa", loc_str="pa"},  -- Punjabi
+        {name="pl", loc_str="pl"},  -- Polish
+        {name="ro", loc_str="ro"},  -- Romanian
+        {name="sa", loc_str="sa"},  -- Sanskrit
+        {name="se", loc_str="se"},  -- Northern Sami
+        {name="si", loc_str="si"},  -- Sinhala
+        {name="si__dictionary", loc_str="si_u_co_dict"}, -- Sinhala (U+0DA5 = U+0DA2,0DCA,0DA4)
+        {name="sk", loc_str="sk"},  -- Slovak
+        {name="sl", loc_str="sl"},  -- Slovenian
+        {name="sq", loc_str="sq"},  -- Albanian (just "standard")
+        {name="sr", loc_str="sr"},  -- Serbian
+        {name="sr_Latn", loc_str="sr_Latn"}, -- Serbian in Latin (tailored as Croatian)
+        {name="sv", loc_str="sv"},  -- Swedish (v and w are primary equal)
+        {name="sv__reformed", loc_str="sv_u_co_reformed"}, -- Swedish (v and w as separate characters)
+        {name="ta", loc_str="ta"},  -- Tamil
+        {name="te", loc_str="te"},  -- Telugu
+        {name="th", loc_str="th"},  -- Thai
+        {name="tn", loc_str="tn"},  -- Tswana
+        {name="to", loc_str="to"},  -- Tonga
+        {name="tr", loc_str="tr"},  -- Turkish
+        {name="ug_Cyrl", loc_str="ug"}, -- Uyghur in Cyrillic - is there such locale?
+        {name="uk", loc_str="uk"},  -- Ukrainian
+        {name="ur", loc_str="ur"},  -- Urdu
+        {name="vi", loc_str="vi"},  -- Vietnamese
+        {name="vo", loc_str="vo"},  -- Volapük
+        {name="wae", loc_str="wae"}, -- Walser
+        {name="wo", loc_str="wo"},  -- Wolof
+        {name="yo", loc_str="yo"},  -- Yoruba
+        {name="zh", loc_str="zh"},  -- Chinese
+        {name="zh__big5han", loc_str="zh_u_co_big5han"},  -- Chinese (ideographs: big5 order)
+        {name="zh__gb2312han", loc_str="zh_u_co_gb2312"}, -- Chinese (ideographs: GB-2312 order)
+        {name="zh__pinyin", loc_str="zh_u_co_pinyin"}, -- Chinese (ideographs: pinyin order)
+        {name="zh__stroke", loc_str="zh_u_co_stroke"}, -- Chinese (ideographs: stroke order)
+        {name="zh__zhuyin", loc_str="zh_u_co_zhuyin"}, -- Chinese (ideographs: zhuyin order)
+    }
+    local coll_strengths = {
+        {s="s1", opt={strength='primary'}},
+        {s="s2", opt={strength='secondary'}},
+        {s="s3", opt={strength='tertiary'}}
+    }
+
+    local id = 4
+    for _, collation in ipairs(coll_lst) do
+        for i, strength in ipairs(coll_strengths) do
+            local coll_name = 'unicode_' .. collation.name .. "_" .. strength.s
+            log.info("creating collation %s", coll_name)
+            box.space._collation:replace{id, coll_name, ADMIN, "ICU", collation.loc_str, strength.opt }
+            id = id + 1
+        end
+    end
+end
+
 local function get_version()
     local version = box.space._schema:get{'version'}
     if version == nil then
@@ -681,7 +793,8 @@ local function upgrade(options)
         {version = mkversion(1, 10, 2), func = upgrade_to_1_10_2, auto = true},
         {version = mkversion(2, 1, 0), func = upgrade_to_2_1_0, auto = true},
         {version = mkversion(2, 1, 1), func = upgrade_to_2_1_1, auto = true},
-        {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2, auto = true}
+        {version = mkversion(2, 1, 2), func = upgrade_to_2_1_2, auto = true},
+        {version = mkversion(2, 1, 3), func = upgrade_to_2_1_3, auto = true},
     }
 
     for _, handler in ipairs(handlers) do
