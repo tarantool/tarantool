@@ -4624,10 +4624,6 @@ void sqlParser(void *, int, Token, Parse *);
 int sqlParserStackPeak(void *);
 #endif
 
-#ifdef SQL_TEST
-int sqlUtf8To8(unsigned char *);
-#endif
-
 void sqlInvalidFunction(sql_context *, int, sql_value **);
 sql_int64 sqlStmtCurrentTime(sql_context *);
 int sqlVdbeParameterIndex(Vdbe *, const char *, int);

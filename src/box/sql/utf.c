@@ -43,16 +43,6 @@
  *
  */
 #include "sqlInt.h"
-#include <assert.h>
-#include "vdbeInt.h"
-
-#if !defined(SQL_AMALGAMATION) && SQL_BYTEORDER==0
-/*
- * The following constant value is used by the SQL_BIGENDIAN and
- * SQL_LITTLEENDIAN macros.
- */
-const int sqlone = 1;
-#endif				/* SQL_AMALGAMATION && SQL_BYTEORDER==0 */
 
 /*
  * This lookup table is used to help decode the first byte of
@@ -69,64 +59,6 @@ static const unsigned char sqlUtf8Trans1[] = {
 	0x00, 0x01, 0x02, 0x03, 0x00, 0x01, 0x00, 0x00,
 };
 
-#define WRITE_UTF8(zOut, c) {                          \
-  if( c<0x00080 ){                                     \
-    *zOut++ = (u8)(c&0xFF);                            \
-  }                                                    \
-  else if( c<0x00800 ){                                \
-    *zOut++ = 0xC0 + (u8)((c>>6)&0x1F);                \
-    *zOut++ = 0x80 + (u8)(c & 0x3F);                   \
-  }                                                    \
-  else if( c<0x10000 ){                                \
-    *zOut++ = 0xE0 + (u8)((c>>12)&0x0F);               \
-    *zOut++ = 0x80 + (u8)((c>>6) & 0x3F);              \
-    *zOut++ = 0x80 + (u8)(c & 0x3F);                   \
-  }else{                                               \
-    *zOut++ = 0xF0 + (u8)((c>>18) & 0x07);             \
-    *zOut++ = 0x80 + (u8)((c>>12) & 0x3F);             \
-    *zOut++ = 0x80 + (u8)((c>>6) & 0x3F);              \
-    *zOut++ = 0x80 + (u8)(c & 0x3F);                   \
-  }                                                    \
-}
-
-/*
- * Translate a single UTF-8 character.  Return the unicode value.
- *
- * During translation, assume that the byte that zTerm points
- * is a 0x00.
- *
- * Write a pointer to the next unread byte back into *pzNext.
- *
- * Notes On Invalid UTF-8:
- *
- *  *  This routine never allows a 7-bit character (0x00 through 0x7f) to
- *     be encoded as a multi-byte character.  Any multi-byte character that
- *     attempts to encode a value between 0x00 and 0x7f is rendered as 0xfffd.
- *
- *  *  This routine never allows a UTF16 surrogate value to be encoded.
- *     If a multi-byte character attempts to encode a value between
- *     0xd800 and 0xe000 then it is rendered as 0xfffd.
- *
- *  *  Bytes in the range of 0x80 through 0xbf which occur as the first
- *     byte of a character are interpreted as single-byte characters
- *     and rendered as themselves even though they are technically
- *     invalid characters.
- *
- *  *  This routine accepts over-length UTF8 encodings
- *     for unicode values 0x80 and greater.  It does not change over-length
- *     encodings to 0xfffd as some systems recommend.
- */
-#define READ_UTF8(zIn, zTerm, c)                           \
-  c = *(zIn++);                                            \
-  if( c>=0xc0 ){                                           \
-    c = sqlUtf8Trans1[c-0xc0];                         \
-    while( zIn!=zTerm && (*zIn & 0xc0)==0x80 ){            \
-      c = (c<<6) + (0x3f & *(zIn++));                      \
-    }                                                      \
-    if( c<0x80                                             \
-        || (c&0xFFFFF800)==0xD800                          \
-        || (c&0xFFFFFFFE)==0xFFFE ){  c = 0xFFFD; }        \
-  }
 u32
 sqlUtf8Read(const unsigned char **pz	/* Pointer to string from which to read char */
     )
@@ -151,12 +83,6 @@ sqlUtf8Read(const unsigned char **pz	/* Pointer to string from which to read cha
 	return c;
 }
 
-/*
- * If the TRANSLATE_TRACE macro is defined, the value of each Mem is
- * printed on stderr on the way into and out of sqlVdbeMemTranslate().
- */
-/* #define TRANSLATE_TRACE 1 */
-
 int
 sql_utf8_char_count(const unsigned char *str, int byte_len)
 {
@@ -167,35 +93,3 @@ sql_utf8_char_count(const unsigned char *str, int byte_len)
 	}
 	return symbol_count;
 }
-
-/* This test function is not currently used by the automated test-suite.
- * Hence it is only available in debug builds.
- */
-#if defined(SQL_TEST) && defined(SQL_DEBUG)
-/*
- * Translate UTF-8 to UTF-8.
- *
- * This has the effect of making sure that the string is well-formed
- * UTF-8.  Miscoded characters are removed.
- *
- * The translation is done in-place and aborted if the output
- * overruns the input.
- */
-int
-sqlUtf8To8(unsigned char *zIn)
-{
-	unsigned char *zOut = zIn;
-	unsigned char *zStart = zIn;
-	u32 c;
-
-	while (zIn[0] && zOut <= zIn) {
-		c = sqlUtf8Read((const u8 **)&zIn);
-		if (c != 0xfffd) {
-			WRITE_UTF8(zOut, c);
-		}
-	}
-	*zOut = 0;
-	return (int)(zOut - zStart);
-}
-#endif
-
