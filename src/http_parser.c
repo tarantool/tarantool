@@ -30,7 +30,6 @@
  */
 
 #include <string.h>
-#include "httpc.h"
 #include "http_parser.h"
 
 #define LF     (unsigned char) '\n'
