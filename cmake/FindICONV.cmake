@@ -23,7 +23,7 @@ endif()
 if (TARGET_OS_LINUX)
     set(ICONV_LIBRARY "")
 else()
-    find_library(ICONV_LIBRARY ${ICONV_LIB_NAME}
+    find_library(ICONV_LIBRARY NAMES ${ICONV_LIB_NAME}
         HINTS ${ICONV_FIND_LIBRARY_HINTS}
         ${ICONV_FIND_OPTS})
     if(NOT ICONV_LIBRARY)
