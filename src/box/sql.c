@@ -38,7 +38,7 @@
 #include "mpstream.h"
 
 #include "index.h"
-#include <info.h>
+#include "info/info.h"
 #include "schema.h"
 #include "box.h"
 #include "txn.h"

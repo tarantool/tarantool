@@ -37,7 +37,7 @@
 #include "iproto_constants.h"
 #include "txn.h"
 #include "rmean.h"
-#include "info.h"
+#include "info/info.h"
 
 /* {{{ Utilities. **********************************************/
 

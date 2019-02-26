@@ -67,7 +67,7 @@
 #include "index.h"
 #include "schema.h"
 #include "xstream.h"
-#include "info.h"
+#include "info/info.h"
 #include "column_mask.h"
 #include "trigger.h"
 #include "session.h"

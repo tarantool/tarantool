@@ -42,7 +42,7 @@
 #include "box/iproto.h"
 #include "box/engine.h"
 #include "box/vinyl.h"
-#include <info.h>
+#include "info/info.h"
 #include "lua/info.h"
 #include "lua/utils.h"
 

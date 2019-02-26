@@ -41,7 +41,7 @@
 #include "box/iproto.h"
 #include "box/wal.h"
 #include "box/replication.h"
-#include <info.h>
+#include "info/info.h"
 #include "box/gc.h"
 #include "box/engine.h"
 #include "box/vinyl.h"

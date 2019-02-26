@@ -3,7 +3,7 @@
 #include "lua/msgpack.h"
 
 #include "box/sql/sqlInt.h"
-#include <info.h>
+#include "info/info.h"
 #include "lua/info.h"
 #include "lua/utils.h"
 

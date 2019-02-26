@@ -31,7 +31,7 @@
 #include "box/lua/index.h"
 #include "lua/utils.h"
 #include "lua/info.h"
-#include <info.h>
+#include "info/info.h"
 #include "box/box.h"
 #include "box/index.h"
 #include "box/lua/tuple.h"

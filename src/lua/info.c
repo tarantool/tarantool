@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 #include "lua/info.h"
-#include <info.h>
+#include "info/info.h"
 #include "lua/utils.h"
 
 static void
