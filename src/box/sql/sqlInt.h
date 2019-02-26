@@ -3222,13 +3222,80 @@ void sqlClearTempRegCache(Parse *);
 #ifdef SQL_DEBUG
 int sqlNoTempsInRange(Parse *, int, int);
 #endif
-Expr *sqlExprAlloc(sql *, int, const Token *, int);
-Expr *sqlExpr(sql *, int, const char *);
-Expr *sqlExprInteger(sql *, int);
+
+/**
+ * Construct a new expression. Memory for this node and for the
+ * token argument is a single allocation obtained from
+ * sqlDbMalloc(). The calling function is responsible for making
+ * sure the node eventually gets freed.
+ *
+ * Special case: If op==TK_INTEGER and token points to a string
+ * that can be translated into a 32-bit integer, then the token is
+ * not stored in u.zToken. Instead, the integer values is written
+ * into u.iValue and the EP_IntValue flag is set. No extra storage
+ * is allocated to hold the integer text.
+ *
+ * @param db The database connection.
+ * @param op Expression opcode (TK_*).
+ * @param token Source token. Might be NULL.
+ * @retval Not NULL New expression object on success.
+ * @retval NULL Otherwise. The diag message is set.
+ */
+struct Expr *
+sql_expr_new(struct sql *db, int op, const struct Token *token);
+
+/**
+ * The same as @sa sql_expr_new, but normalizes name, stored in
+ * @a token. Quotes are removed if they are presented.
+ */
+struct Expr *
+sql_expr_new_dequoted(struct sql *db, int op, const struct Token *token);
+
+/**
+ * The same as @a sql_expr_new, but takes const char instead of
+ * Token. Just sugar to do not touch tokens in many places.
+ */
+static inline struct Expr *
+sql_expr_new_named(struct sql *db, int op, const char *name)
+{
+	struct Token name_token;
+	sqlTokenInit(&name_token, (char *)name);
+	return sql_expr_new(db, op, &name_token);
+}
+
+/**
+ * The same as @a sql_expr_new, but a result expression has no
+ * name.
+ */
+static inline struct Expr *
+sql_expr_new_anon(struct sql *db, int op)
+{
+	return sql_expr_new_named(db, op, NULL);
+}
+
 void sqlExprAttachSubtrees(sql *, Expr *, Expr *, Expr *);
 Expr *sqlPExpr(Parse *, int, Expr *, Expr *);
 void sqlPExprAddSelect(Parse *, Expr *, Select *);
-Expr *sqlExprAnd(sql *, Expr *, Expr *);
+
+/**
+ * Join two expressions using an AND operator. If either
+ * expression is NULL, then just return the other expression.
+ *
+ * If one side or the other of the AND is known to be false, then
+ * instead of returning an AND expression, just return a constant
+ * expression with a value of false.
+ *
+ * @param db The database connection.
+ * @param left_expr The left-branch expresion to join.
+ * @param right_expr The right-branch expression to join.
+ * @retval Not NULL New expression root node pointer on success.
+ * @retval NULL Error. A diag message is set.
+ * @retval NULL Not an error. Both arguments were NULL.
+ */
+struct Expr *
+sql_and_expr_new(struct sql *db, struct Expr *left_expr,
+		 struct Expr *right_expr);
+
 Expr *sqlExprFunction(Parse *, ExprList *, Token *);
 void sqlExprAssignVarNumber(Parse *, Expr *, u32);
 ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
@@ -4745,7 +4812,21 @@ void sqlAppendChar(StrAccum *, int, char);
 char *sqlStrAccumFinish(StrAccum *);
 void sqlStrAccumReset(StrAccum *);
 void sqlSelectDestInit(SelectDest *, int, int, int);
-Expr *sqlCreateColumnExpr(sql *, SrcList *, int, int);
+
+/*
+ * Create an expression to load @a column from datasource
+ * @a src_idx in @a src_list.
+ *
+ * @param db The database connection.
+ * @param src_list The source list described with FROM clause.
+ * @param src_idx The resource index to use in src_list.
+ * @param column The column index.
+ * @retval Not NULL Success. An expression to load @a column.
+ * @retval NULL Error. A diag message is set.
+ */
+struct Expr *
+sql_expr_new_column(struct sql *db, struct SrcList *src_list, int src_idx,
+		    int column);
 
 int sqlExprCheckIN(Parse *, Expr *);
 

@@ -537,12 +537,20 @@ selcollist(A) ::= sclp(A) expr(X) as(Y).     {
    sqlExprListSetSpan(pParse,A,&X);
 }
 selcollist(A) ::= sclp(A) STAR. {
-  Expr *p = sqlExpr(pParse->db, TK_ASTERISK, 0);
+  struct Expr *p = sql_expr_new_anon(pParse->db, TK_ASTERISK);
+  if (p == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
   A = sql_expr_list_append(pParse->db, A, p);
 }
 selcollist(A) ::= sclp(A) nm(X) DOT STAR. {
+  struct Expr *pLeft = sql_expr_new_dequoted(pParse->db, TK_ID, &X);
+  if (pLeft == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
   Expr *pRight = sqlPExpr(pParse, TK_ASTERISK, 0, 0);
-  Expr *pLeft = sqlExprAlloc(pParse->db, TK_ID, &X, 1);
   Expr *pDot = sqlPExpr(pParse, TK_DOT, pLeft, pRight);
   A = sql_expr_list_append(pParse->db,A, pDot);
 }
@@ -903,15 +911,28 @@ term(A) ::= NULL(X).        {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 expr(A) ::= id(X).          {spanExpr(&A,pParse,TK_ID,X); /*A-overwrites-X*/}
 expr(A) ::= JOIN_KW(X).     {spanExpr(&A,pParse,TK_ID,X); /*A-overwrites-X*/}
 expr(A) ::= nm(X) DOT nm(Y). {
-  Expr *temp1 = sqlExprAlloc(pParse->db, TK_ID, &X, 1);
-  Expr *temp2 = sqlExprAlloc(pParse->db, TK_ID, &Y, 1);
+  struct Expr *temp1 = sql_expr_new_dequoted(pParse->db, TK_ID, &X);
+  if (temp1 == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
+  struct Expr *temp2 = sql_expr_new_dequoted(pParse->db, TK_ID, &Y);
+  if (temp2 == NULL) {
+    sql_expr_delete(pParse->db, temp1, false);
+    pParse->is_aborted = true;
+    return;
+  }
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
   A.pExpr = sqlPExpr(pParse, TK_DOT, temp1, temp2);
 }
 term(A) ::= FLOAT|BLOB(X). {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= STRING(X).     {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= INTEGER(X). {
-  A.pExpr = sqlExprAlloc(pParse->db, TK_INTEGER, &X, 1);
+  A.pExpr = sql_expr_new_dequoted(pParse->db, TK_INTEGER, &X);
+  if (A.pExpr == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
   A.pExpr->type = FIELD_TYPE_INTEGER;
   A.zStart = X.z;
   A.zEnd = X.z + X.n;
@@ -949,7 +970,11 @@ expr(A) ::= expr(A) COLLATE id(C). {
 %ifndef SQL_OMIT_CAST
 expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   spanSet(&A,&X,&Y); /*A-overwrites-X*/
-  A.pExpr = sqlExprAlloc(pParse->db, TK_CAST, 0, 1);
+  A.pExpr = sql_expr_new_dequoted(pParse->db, TK_CAST, NULL);
+  if (A.pExpr == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
   A.pExpr->type = T.type;
   sqlExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
 }
@@ -1151,7 +1176,11 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
     ** regardless of the value of expr1.
     */
     sql_expr_delete(pParse->db, A.pExpr, false);
-    A.pExpr = sqlExprAlloc(pParse->db, TK_INTEGER,&sqlIntTokens[N],1);
+    A.pExpr = sql_expr_new_dequoted(pParse->db, TK_INTEGER, &sqlIntTokens[N]);
+    if (A.pExpr == NULL) {
+      pParse->is_aborted = true;
+      return;
+    }
   }else if( Y->nExpr==1 ){
     /* Expressions of the form:
     **
@@ -1492,10 +1521,12 @@ expr(A) ::= RAISE(X) LP IGNORE RP(Y).  {
 }
 expr(A) ::= RAISE(X) LP raisetype(T) COMMA STRING(Z) RP(Y).  {
   spanSet(&A,&X,&Y);  /*A-overwrites-X*/
-  A.pExpr = sqlExprAlloc(pParse->db, TK_RAISE, &Z, 1);
-  if( A.pExpr ) {
-    A.pExpr->on_conflict_action = (enum on_conflict_action) T;
+  A.pExpr = sql_expr_new_dequoted(pParse->db, TK_RAISE, &Z);
+  if(A.pExpr == NULL) {
+    pParse->is_aborted = true;
+    return;
   }
+  A.pExpr->on_conflict_action = (enum on_conflict_action) T;
 }
 
 %type raisetype {int}
