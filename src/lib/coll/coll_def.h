@@ -44,7 +44,7 @@ extern const char *coll_type_strs[];
 
 /** Maximal length of locale name. */
 enum {
-	COLL_LOCALE_LEN_MAX = 16,
+	COLL_LOCALE_LEN_MAX = 30,
 };
 
 /*
