@@ -319,7 +319,11 @@ endif()
 # it to libraries list in case of static build.
 #
 if(BUILD_STATIC)
-    find_library(Z_LIBRARY libz.a)
+    if(DEFINED ZLIB_ROOT)
+        find_library(Z_LIBRARY libz.a HINTS "${ZLIB_ROOT}/lib")
+    else()
+        find_library(Z_LIBRARY libz.a)
+    endif()
     set(OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} ${Z_LIBRARY})
 endif()
 

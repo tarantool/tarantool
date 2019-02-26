@@ -4,16 +4,36 @@
 # ICONV_LIBRARIES
 #
 
+if(DEFINED ICONV_ROOT)
+    set(ICONV_FIND_OPTS NO_CMAKE NO_CMAKE_SYSTEM_PATH)
+    set(ICONV_FIND_LIBRARY_HINTS "${ICONV_ROOT}/lib")
+    set(ICONV_FIND_PATH_HINTS "${ICONV_ROOT}/include")
+else()
+    set(ICONV_FIND_OPTS)
+    set(ICONV_FIND_LIBRARY_HINTS)
+    set(ICONV_FIND_PATH_HINTS)
+endif()
+
+if(BUILD_STATIC)
+    set(ICONV_LIB_NAME libiconv.a)
+else()
+    set(ICONV_LIB_NAME iconv)
+endif()
+
 if (TARGET_OS_LINUX)
     set(ICONV_LIBRARY "")
 else()
-    find_library(ICONV_LIBRARY iconv)
+    find_library(ICONV_LIBRARY ${ICONV_LIB_NAME}
+        HINTS ${ICONV_FIND_LIBRARY_HINTS}
+        ${ICONV_FIND_OPTS})
     if(NOT ICONV_LIBRARY)
         message(WARNING "iconv library not found")
         set(ICONV_LIBRARY "")
     endif()
 endif()
-find_path(ICONV_INCLUDE_DIR iconv.h)
+find_path(ICONV_INCLUDE_DIR iconv.h
+    HINTS ${ICONV_FIND_PATH_HINTS}
+    ${ICONV_FIND_OPTS})
 if(NOT ICONV_INCLUDE_DIR)
     message(FATAL_ERROR "iconv include header not found")
 endif()

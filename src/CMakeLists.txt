@@ -291,6 +291,9 @@ if(BUILD_STATIC)
         set (common_libraries ${common_libraries} "libgomp.a")
         set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -fno-openmp")
     endif()
+    if (TARGET_OS_DARWIN)
+        set (common_libraries ${common_libraries} "-framework Security")
+    endif()
 endif()
 
 # Exports syntax is toolchain-dependent, preprocessing is necessary

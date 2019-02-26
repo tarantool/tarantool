@@ -7,7 +7,7 @@ if (NOT (CMAKE_C_COMPILER_ID STREQUAL CMAKE_CXX_COMPILER_ID))
                     "The final binary may be unusable.")
 endif()
 
-# We support building with Clang and gcc. First check 
+# We support building with Clang and gcc. First check
 # what we're using for build.
 #
 if (CMAKE_C_COMPILER_ID STREQUAL Clang)
@@ -17,7 +17,7 @@ if (CMAKE_C_COMPILER_ID STREQUAL Clang)
 endif()
 
 #
-# Hard coding the compiler version is ugly from cmake POV, but 
+# Hard coding the compiler version is ugly from cmake POV, but
 # at least gives user a friendly error message. The most critical
 # demand for C++ compiler is support of C++11 lambdas, added
 # only in version 4.5 https://gcc.gnu.org/projects/cxx0x.html
@@ -34,9 +34,9 @@ if (CMAKE_COMPILER_IS_GNUCC)
                    ")
        endif()
 else()
-     if (BUILD_STATIC)
-           message(FATAL_ERROR "Static build is supported for GCC only")
-     endif()
+    if (BUILD_STATIC AND NOT TARGET_OS_DARWIN)
+        message(FATAL_ERROR "Static build is supported for GCC only")
+    endif()
 endif()
 
 #

@@ -136,8 +136,10 @@ signal_sigwinch_cb(ev_loop *loop, struct ev_signal *w, int revents)
 	(void) loop;
 	(void) w;
 	(void) revents;
+#if defined(HAVE_GNU_READLINE)
 	if (rl_instream)
 		rl_resize_terminal();
+#endif
 }
 
 #if defined(__linux__) && defined(__amd64)

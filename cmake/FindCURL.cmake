@@ -16,12 +16,16 @@
 #   CURL_FOUND          - True if curl found.
 #   CURL_VERSION_STRING - the version of curl found (since CMake 2.8.8)
 
-if(BUILD_STATIC)
+if(BUILD_STATIC AND NOT TARGET_OS_DARWIN)
     set(CURL_LIB_NAME libcurl.a)
     set(NGHTTP2_LIB_NAME libnghttp2.a)
 else()
     set(CURL_LIB_NAME curl)
     set(NGHTTP2_LIB_NAME nghttp2)
+endif()
+
+if (TARGET_OS_DARWIN)
+    set(NGHTTP2_LIB_NAME apple_nghttp2)
 endif()
 
 # Always links pthread and dl dynamically.
@@ -34,7 +38,7 @@ find_library(NGHTTP2_LIBRARY NAMES ${NGHTTP2_LIB_NAME})
 find_library(PTHREAD_LIBRARY NAMES ${PTHREAD_LIB_NAME})
 find_library(DL_LIBRARY NAMES ${DL_LIB_NAME})
 
-if(DEFINED CURL_ROOT)
+if(DEFINED CURL_ROOT AND NOT TARGET_OS_DARWIN)
     set(CURL_FIND_OPTS NO_CMAKE NO_CMAKE_SYSTEM_PATH)
     set(CURL_FIND_LIBRARY_HINTS "${CURL_ROOT}/lib")
     set(CURL_FIND_PATH_HINTS "${CURL_ROOT}/include")
@@ -100,6 +104,9 @@ if(CURL_FOUND)
   endif()
   set(CURL_INCLUDE_DIRS ${CURL_INCLUDE_DIR})
   set(CMAKE_REQUIRED_LIBRARIES ${CURL_LIBRARIES})
+  if (TARGET_OS_DARWIN)
+      set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} "-framework Security")
+  endif()
   set(CMAKE_REQUIRED_INCLUDES ${CURL_INCLUDE_DIRS})
   check_c_source_runs("
     #include <curl/curl.h>

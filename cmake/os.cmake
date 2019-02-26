@@ -118,6 +118,25 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
                 set(ICU_ROOT ${HOMEBREW_ICU4C})
             endif()
         endif()
+
+        if (NOT DEFINED ICONV_ROOT)
+            execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix libiconv
+                OUTPUT_VARIABLE HOMEBREW_ICONV
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if (HOMEBREW_ICONV)
+                message(STATUS "Setting ICONV root to ${HOMEBREW_ICONV}")
+                set(ICONV_ROOT ${HOMEBREW_ICONV})
+            endif()
+        endif()
+        if (NOT DEFINED ZLIB_ROOT)
+            execute_process(COMMAND ${HOMEBREW_EXECUTABLE} --prefix zlib
+                OUTPUT_VARIABLE HOMEBREW_ZLIB
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if (HOMEBREW_ZLIB)
+                message(STATUS "Setting ZLIB root to ${HOMEBREW_ZLIB}")
+                set(ZLIB_ROOT ${HOMEBREW_ZLIB})
+            endif()
+        endif()
     endif()
 else()
     message (FATAL_ERROR "Unsupported platform -- ${CMAKE_SYSTEM_NAME}")
