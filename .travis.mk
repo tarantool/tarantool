@@ -46,7 +46,7 @@ test_ubuntu: deps_ubuntu
 
 deps_osx:
 	brew update
-	brew install openssl readline curl icu4c --force
+	brew install openssl readline curl icu4c libiconv --force
 
 test_osx: deps_osx
 	cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfoWError
