@@ -37,7 +37,7 @@
 #include "sqlInt.h"
 #include "vdbeInt.h"
 #include "version.h"
-#include "coll.h"
+#include "coll/coll.h"
 #include <unicode/ustring.h>
 #include <unicode/ucasemap.h>
 #include <unicode/ucnv.h>

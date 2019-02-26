@@ -30,7 +30,7 @@
  */
 #include "tuple_compare.h"
 #include "tuple.h"
-#include "coll.h"
+#include "coll/coll.h"
 #include "trivia/util.h" /* NOINLINE */
 #include <math.h>
 

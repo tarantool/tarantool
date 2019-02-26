@@ -37,7 +37,7 @@
  * so is applicable.  Because this module is responsible for selecting
  * indices, you might also think of this module as the "query optimizer".
  */
-#include "coll.h"
+#include "coll/coll.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"

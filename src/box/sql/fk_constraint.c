@@ -33,7 +33,7 @@
  * This file contains code used by the compiler to add foreign key
  * support to compiled SQL statements.
  */
-#include "coll.h"
+#include "coll/coll.h"
 #include "sqlInt.h"
 #include "box/fk_constraint.h"
 #include "box/schema.h"

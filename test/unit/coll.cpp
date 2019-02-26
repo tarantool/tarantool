@@ -7,8 +7,8 @@
 #include <diag.h>
 #include <fiber.h>
 #include <memory.h>
-#include "coll_def.h"
-#include "coll.h"
+#include "coll/coll_def.h"
+#include "coll/coll.h"
 #include "unit.h"
 #include "third_party/PMurHash.h"
 

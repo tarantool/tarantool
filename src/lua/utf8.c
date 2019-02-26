@@ -30,7 +30,7 @@
  */
 #include <unicode/ucasemap.h>
 #include <unicode/uchar.h>
-#include <coll.h>
+#include "coll/coll.h"
 #include "lua/utils.h"
 #include "lua/utf8.h"
 #include "diag.h"

@@ -24,8 +24,6 @@ set(core_sources
     util.c
     random.c
     trigger.cc
-    coll.c
-    coll_def.c
     mpstream.c
     port.c
 )

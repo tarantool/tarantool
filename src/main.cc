@@ -58,7 +58,7 @@
 #include <say.h>
 #include <rmean.h>
 #include <limits.h>
-#include "coll.h"
+#include "coll/coll.h"
 #include "trivia/util.h"
 #include "backtrace.h"
 #include "tt_pthread.h"

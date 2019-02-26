@@ -30,7 +30,7 @@
  */
 #include "coll_id.h"
 #include "coll_id_def.h"
-#include "coll.h"
+#include "coll/coll.h"
 #include "error.h"
 #include "diag.h"
 

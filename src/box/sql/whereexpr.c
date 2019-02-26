@@ -38,7 +38,7 @@
  * analyzing Expr objects in the WHERE clause.
  */
 #include "box/coll_id_cache.h"
-#include "coll.h"
+#include "coll/coll.h"
 #include "sqlInt.h"
 #include "whereInt.h"
 

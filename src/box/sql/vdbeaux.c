@@ -34,7 +34,7 @@
  * a VDBE (or an "sql_stmt" as it is known to the outside world.)
  */
 #include "fiber.h"
-#include "coll.h"
+#include "coll/coll.h"
 #include "box/session.h"
 #include "box/schema.h"
 #include "box/tuple_format.h"

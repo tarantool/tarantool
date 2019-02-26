@@ -33,7 +33,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <coll_def.h>
+#include "coll/coll_def.h"
 #include "opt_def.h"
 
 /** Collation identifier definition. */

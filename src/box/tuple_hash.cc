@@ -32,7 +32,7 @@
 #include "tuple_hash.h"
 #include "tuple.h"
 #include "third_party/PMurHash.h"
-#include "coll.h"
+#include "coll/coll.h"
 #include <math.h>
 
 /* Tuple and key hasher */

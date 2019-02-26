@@ -33,7 +33,7 @@
  * This file contains C code routines that are called by the parser
  * to handle SELECT statements in sql.
  */
-#include "coll.h"
+#include "coll/coll.h"
 #include "sqlInt.h"
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
