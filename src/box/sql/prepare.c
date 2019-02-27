@@ -311,7 +311,6 @@ sql_parser_destroy(Parse *parser)
 		db->lookaside.bDisable -= parser->disableLookaside;
 	}
 	parser->disableLookaside = 0;
-	sqlDbFree(db, parser->zErrMsg);
 	switch (parser->parsed_ast_type) {
 	case AST_TYPE_SELECT:
 		sql_select_delete(db, parser->parsed_ast.select);

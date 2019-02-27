@@ -689,25 +689,6 @@ onErrorText(int onError)
 }
 #endif
 
-/*
- * Parse context structure pFrom has just been used to create a sub-vdbe
- * (trigger program). If an error has occurred, transfer error information
- * from pFrom to pTo.
- */
-static void
-transferParseError(Parse * pTo, Parse * pFrom)
-{
-	assert(pFrom->zErrMsg == 0 || pFrom->is_aborted);
-	assert(pTo->zErrMsg == 0 || pTo->is_aborted);
-	if (!pTo->is_aborted) {
-		pTo->zErrMsg = pFrom->zErrMsg;
-		pTo->is_aborted = pFrom->is_aborted;
-	} else {
-		sqlDbFree(pFrom->db, pFrom->zErrMsg);
-	}
-	pFrom->zErrMsg = NULL;
-}
-
 /**
  * Create and populate a new TriggerPrg object with a sub-program
  * implementing trigger pTrigger with ON CONFLICT policy orconf.
@@ -816,7 +797,8 @@ sql_row_trigger_program(struct Parse *parser, struct sql_trigger *trigger,
 		VdbeComment((v, "End: %s.%s", trigger->zName,
 			     onErrorText(orconf)));
 
-		transferParseError(parser, pSubParse);
+		if (!parser->is_aborted)
+			parser->is_aborted = pSubParse->is_aborted;
 		if (db->mallocFailed == 0) {
 			pProgram->aOp =
 			    sqlVdbeTakeOpArray(v, &pProgram->nOp,
