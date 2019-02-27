@@ -1417,7 +1417,6 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		 *
 		 * This optimization also only applies if the (x1 OR x2 OR ...) term
 		 * is not contained in the ON clause of a LEFT JOIN.
-		 * See ticket http://www.sql.org/src/info/f2369304e4
 		 */
 		if (pWC->nTerm > 1) {
 			int iTerm;

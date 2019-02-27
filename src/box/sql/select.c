@@ -4449,8 +4449,7 @@ sqlIndexedByLookup(Parse * pParse, struct SrcList_item *pFrom)
  * This transformation is necessary because the multiSelectOrderBy() routine
  * above that generates the code for a compound SELECT with an ORDER BY clause
  * uses a merge algorithm that requires the same collating sequence on the
- * result columns as on the ORDER BY clause.  See ticket
- * http://www.sql.org/src/info/6709574d2a
+ * result columns as on the ORDER BY clause.
  *
  * This transformation is only needed for EXCEPT, INTERSECT, and UNION.
  * The UNION ALL operator works fine with multiSelectOrderBy() even when
