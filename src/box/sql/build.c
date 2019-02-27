@@ -837,20 +837,22 @@ error:
 
 }
 
-/*
+/**
  * Generate code to create a new space.
- * iSpaceId is a register storing the id of the space.
- * iCursor is a cursor to access _space.
+ *
+ * @param space_id_reg is a register storing the id of the space.
+ * @param table Table containing meta-information of space to be
+ *              created.
  */
 static void
-createSpace(Parse * pParse, int iSpaceId)
+vdbe_emit_space_create(struct Parse *pParse, int space_id_reg,
+		       struct space *space)
 {
 	Vdbe *v = sqlGetVdbe(pParse);
 	int iFirstCol = ++pParse->nMem;
-	int iRecord = (pParse->nMem += 7);
+	int tuple_reg = (pParse->nMem += 7);
 	struct region *region = &pParse->region;
 	uint32_t table_opts_stmt_sz = 0;
-	struct space *space = pParse->new_space;
 	char *table_opts_stmt = sql_encode_table_opts(region, space->def,
 						      &table_opts_stmt_sz);
 	if (table_opts_stmt == NULL)
@@ -870,7 +872,7 @@ createSpace(Parse * pParse, int iSpaceId)
 	memcpy(raw, table_stmt, table_stmt_sz);
 	table_stmt = raw;
 
-	sqlVdbeAddOp2(v, OP_SCopy, iSpaceId, iFirstCol /* spaceId */ );
+	sqlVdbeAddOp2(v, OP_SCopy, space_id_reg, iFirstCol /* spaceId */ );
 	sqlVdbeAddOp2(v, OP_Integer, effective_user()->uid,
 			  iFirstCol + 1 /* owner */ );
 	sqlVdbeAddOp4(v, OP_String8, 0, iFirstCol + 2 /* name */ , 0,
@@ -886,8 +888,8 @@ createSpace(Parse * pParse, int iSpaceId)
 	/* zOpts and zFormat are co-located, hence STATIC */
 	sqlVdbeAddOp4(v, OP_Blob, table_stmt_sz, iFirstCol + 6,
 			  SQL_SUBTYPE_MSGPACK, table_stmt, P4_STATIC);
-	sqlVdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, iRecord);
-	sqlVdbeAddOp3(v, OP_SInsert, BOX_SPACE_ID, 0, iRecord);
+	sqlVdbeAddOp3(v, OP_MakeRecord, iFirstCol, 7, tuple_reg);
+	sqlVdbeAddOp3(v, OP_SInsert, BOX_SPACE_ID, 0, tuple_reg);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 	save_record(pParse, BOX_SPACE_ID, iFirstCol, 1, v->nOp - 1);
 	return;
@@ -1132,15 +1134,13 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 	if (new_space == NULL)
 		return;
 	assert(!db->init.busy);
+	assert(!new_space->def->opts.is_view);
 
-	if (!new_space->def->opts.is_view) {
-		if (sql_space_primary_key(new_space) == NULL) {
-			diag_set(ClientError, ER_CREATE_SPACE,
-				 new_space->def->name,
-				 "PRIMARY KEY missing");
-			pParse->is_aborted = true;
-			goto cleanup;
-		}
+	if (sql_space_primary_key(new_space) == NULL) {
+		diag_set(ClientError, ER_CREATE_SPACE, new_space->def->name,
+			 "PRIMARY KEY missing");
+		pParse->is_aborted = true;
+		goto cleanup;
 	}
 
 	/*
@@ -1163,14 +1163,11 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 	if (NEVER(v == 0))
 		return;
 	int reg_space_id = getNewSpaceId(pParse);
-	createSpace(pParse, reg_space_id);
-	/* Indexes aren't required for VIEW's.. */
-	if (!new_space->def->opts.is_view) {
-		for (uint32_t i = 0; i < new_space->index_count; ++i) {
-			struct index *idx = new_space->index[i];
-			vdbe_emit_create_index(pParse, new_space->def, idx->def,
-					       reg_space_id, idx->def->iid);
-		}
+	vdbe_emit_space_create(pParse, reg_space_id, new_space);
+	for (uint32_t i = 0; i < new_space->index_count; ++i) {
+		struct index *idx = new_space->index[i];
+		vdbe_emit_create_index(pParse, new_space->def, idx->def,
+				       reg_space_id, idx->def->iid);
 	}
 
 	/*
@@ -1301,9 +1298,8 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 		parse_context->is_aborted = true;
 		goto create_view_fail;
 	}
-
-	/* Use sqlEndTable() to add the view to the Tarantool.  */
-	sqlEndTable(parse_context, &end, 0);
+	vdbe_emit_space_create(parse_context, getNewSpaceId(parse_context),
+			       space);
 
  create_view_fail:
 	sql_expr_list_delete(db, aliases);
