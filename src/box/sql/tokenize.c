@@ -525,8 +525,6 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	sqlParserFree(pEngine, sql_free);
 	if (db->mallocFailed)
 		pParse->is_aborted = true;
-	if (pParse->is_aborted && pParse->zErrMsg == 0)
-		pParse->zErrMsg = sqlMPrintf(db, "%s", tarantoolErrorMessage());
 	if (pParse->pVdbe != NULL && pParse->is_aborted) {
 		sqlVdbeDelete(pParse->pVdbe);
 		pParse->pVdbe = 0;

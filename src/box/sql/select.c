@@ -5480,12 +5480,11 @@ vdbe_code_raise_on_multiple_rows(struct Parse *parser, int limit_reg, int end_ma
  * The results are returned according to the SelectDest structure.
  * See comments in sqlInt.h for further information.
  *
- * This routine returns the number of errors.  If any errors are
- * encountered, then an appropriate error message is left in
- * pParse->zErrMsg.
- *
  * This routine does NOT free the Select structure passed in.  The
  * calling function needs to do that.
+ *
+ * @retval 0 on success.
+ * @retval != 0 on error.
  */
 int
 sqlSelect(Parse * pParse,		/* The parser context */
