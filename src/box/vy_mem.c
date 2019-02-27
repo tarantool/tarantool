@@ -310,6 +310,7 @@ vy_mem_iterator_step(struct vy_mem_iterator *itr)
 static int
 vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 {
+	/* Skip to the first statement visible in the read view. */
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	struct key_def *cmp_def = itr->mem->cmp_def;
@@ -322,25 +323,52 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 			return 1;
 		}
 	}
-	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
-		struct vy_mem_tree_iterator prev_pos = itr->curr_pos;
-		vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
-
-		while (!vy_mem_tree_iterator_is_invalid(&prev_pos)) {
-			const struct tuple *prev_stmt =
-				*vy_mem_tree_iterator_get_elem(&itr->mem->tree,
-							       &prev_pos);
-			if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
-			    vy_stmt_flags(prev_stmt) & VY_STMT_SKIP_READ ||
-			    vy_tuple_compare(itr->curr_stmt, prev_stmt,
-					     cmp_def) != 0)
-				break;
-			itr->curr_pos = prev_pos;
-			itr->curr_stmt = prev_stmt;
-			vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
-		}
+	if (iterator_direction(itr->iterator_type) > 0)
+		return 0;
+	/*
+	 * Since statements are sorted by LSN in descending order,
+	 * for LE/LT iterator we must skip to the statement with
+	 * max LSN visible in the read view.
+	 */
+	struct vy_mem_tree_iterator prev_pos = itr->curr_pos;
+	vy_mem_tree_iterator_prev(&itr->mem->tree, &prev_pos);
+	if (vy_mem_tree_iterator_is_invalid(&prev_pos)) {
+		/* No more statements. */
+		return 0;
 	}
-	assert(itr->curr_stmt != NULL);
+	const struct tuple *prev_stmt;
+	prev_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &prev_pos);
+	if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
+	    vy_tuple_compare(itr->curr_stmt, prev_stmt, cmp_def) != 0) {
+		/*
+		 * The next statement is either invisible in
+		 * the read view or for another key.
+		 */
+		return 0;
+	}
+	/*
+	 * We could iterate linearly until a statement invisible
+	 * in the read view is found, but there's a good chance
+	 * that this key is frequently updated and so the iteration
+	 * is going to take long. So instead we look it up - it's
+	 * pretty cheap anyway.
+	 */
+	struct tree_mem_key tree_key;
+	tree_key.stmt = itr->curr_stmt;
+	tree_key.lsn = (**itr->read_view).vlsn;
+	itr->curr_pos = vy_mem_tree_lower_bound(&itr->mem->tree,
+						&tree_key, NULL);
+	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
+	itr->curr_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+							&itr->curr_pos);
+
+	/* Skip VY_STMT_SKIP_READ statements, if any. */
+	while (vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ) {
+		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
+		assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
+		itr->curr_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+								&itr->curr_pos);
+	}
 	return 0;
 }
 
@@ -450,12 +478,18 @@ vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
 	struct key_def *cmp_def = itr->mem->cmp_def;
 
 	const struct tuple *prev_stmt = itr->curr_stmt;
-	do {
-		if (vy_mem_iterator_step(itr) != 0) {
-			itr->curr_stmt = NULL;
-			return 1;
-		}
-	} while (vy_tuple_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0);
+	if (vy_mem_iterator_step(itr) != 0) {
+		itr->curr_stmt = NULL;
+		return 1;
+	}
+	/*
+	 * If we are still on the same key after making a step,
+	 * there's a good chance there's a lot of statements
+	 * for this key so instead of iterating further we simply
+	 * look up the next key - it's pretty cheap anyway.
+	 */
+	if (vy_tuple_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0)
+		return vy_mem_iterator_seek(itr, itr->curr_stmt);
 
 	if (itr->iterator_type == ITER_EQ &&
 	    vy_stmt_compare(itr->key, itr->curr_stmt, cmp_def) != 0) {
