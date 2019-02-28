@@ -228,7 +228,7 @@ test:do_test(
 --
 local big_table = [[CREATE TABLE big(
   f1 varchar(20),
-  f2 char(10),
+  f2 varchar(10),
   f3 varchar(30) primary key,
   f4 text,
   f5 text,
@@ -893,7 +893,7 @@ test:do_execsql_test(
         CREATE TABLE t7(
            a integer primary key,
            b numeric(5,10),
-           c char(8),
+           c VARCHAR(8),
            d VARCHAR(9),
            e blob,
            f BLOB,
@@ -1405,7 +1405,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE T23(
            id INT PRIMARY KEY,
-           u CHAR
+           u VARCHAR(1)
         );
     ]], {
         -- <table-23.2>

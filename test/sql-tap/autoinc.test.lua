@@ -805,7 +805,7 @@ test:do_test(
 test:do_catchsql_test(
     "autoinc-gh-3670",
     [[
-        CREATE TABLE t1 (s1 INT PRIMARY KEY AUTOINCREMENT, s2 CHAR(10));
+        CREATE TABLE t1 (s1 INT PRIMARY KEY AUTOINCREMENT, s2 VARCHAR(10));
         INSERT INTO t1 VALUES (1, 'a');
         INSERT INTO t1 SELECT s2, s2 FROM t1;
     ]], {

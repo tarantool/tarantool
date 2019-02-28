@@ -229,7 +229,7 @@ test:do_test(
     "resolver01-4.1",
     function ()
         test:execsql([[
-            CREATE TABLE t4(m CHAR(2) primary key);
+            CREATE TABLE t4(m VARCHAR(2) primary key);
             INSERT INTO t4 VALUES('az');
             INSERT INTO t4 VALUES('by');
             INSERT INTO t4 VALUES('cx');
@@ -257,7 +257,7 @@ test:do_test(
 test:do_execsql_test(
     "resolver01-5.1",
     [[
-        CREATE TABLE t5(m CHAR(2) primary key);
+        CREATE TABLE t5(m VARCHAR(2) primary key);
         INSERT INTO t5 VALUES('ax');
         INSERT INTO t5 VALUES('bx');
         INSERT INTO t5 VALUES('cy');

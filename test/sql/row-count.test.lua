@@ -4,10 +4,10 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- Test cases concerning row count calculations.
 --
-box.sql.execute("CREATE TABLE t1 (s1 CHAR(10) PRIMARY KEY);")
+box.sql.execute("CREATE TABLE t1 (s1 VARCHAR(10) PRIMARY KEY);")
 box.sql.execute("SELECT ROW_COUNT();")
 box.sql.execute("SELECT ROW_COUNT();")
-box.sql.execute("CREATE TABLE t2 (s1 CHAR(10) PRIMARY KEY, s2 CHAR(10) REFERENCES t1 ON DELETE CASCADE);")
+box.sql.execute("CREATE TABLE t2 (s1 VARCHAR(10) PRIMARY KEY, s2 VARCHAR(10) REFERENCES t1 ON DELETE CASCADE);")
 box.sql.execute("SELECT ROW_COUNT();")
 box.sql.execute("CREATE TABLE t3 (i1 INT UNIQUE, i2 INT, i3 INT PRIMARY KEY);")
 box.sql.execute("INSERT INTO t3 VALUES (0, 0, 0);")

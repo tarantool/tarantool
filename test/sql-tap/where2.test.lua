@@ -631,7 +631,7 @@ test:do_test(
         "where2-6.7",
         function()
             test:execsql [[
-                CREATE TABLE t2249a(a TEXT PRIMARY KEY, x CHAR(100));
+                CREATE TABLE t2249a(a TEXT PRIMARY KEY, x VARCHAR(100));
                 CREATE TABLE t2249b(b INTEGER PRIMARY KEY);
                 INSERT INTO t2249a(a) VALUES('0123');
                 INSERT INTO t2249b VALUES(123);
@@ -1273,7 +1273,7 @@ test:do_execsql_test(
         "where2-12.1",
         function ()
             local data = test:execsql([[
-                CREATE TABLE t12(x INTEGER PRIMARY KEY, y INT, z CHAR(100));
+                CREATE TABLE t12(x INTEGER PRIMARY KEY, y INT, z VARCHAR(100));
                 CREATE INDEX t12y ON t12(y);
                 EXPLAIN QUERY PLAN
                   SELECT a.x, b.x

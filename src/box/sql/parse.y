@@ -1487,21 +1487,13 @@ typedef(A) ::= BLOB_KW . { A.type = FIELD_TYPE_SCALAR; }
  typedef(A) ::= DATETIME . { A.type = FIELD_TYPE_NUMBER; }
 */
 
-%type char_len {int}
-typedef(A) ::= CHAR . {
-  A.type = FIELD_TYPE_STRING;
-}
 
 char_len(A) ::= LP INTEGER(B) RP . {
   (void) A;
   (void) B;
 }
 
-typedef(A) ::= CHAR char_len(B) . {
-  A.type = FIELD_TYPE_STRING;
-  (void) B;
-}
-
+%type char_len {int}
 typedef(A) ::= VARCHAR char_len(B) . {
   A.type = FIELD_TYPE_STRING;
   (void) B;

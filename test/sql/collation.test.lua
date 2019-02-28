@@ -14,7 +14,7 @@ box.sql.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
 
 -- gh-3052: upper/lower support only default locale
 -- For tr-TR result depends on collation
-box.sql.execute([[CREATE TABLE tu (descriptor CHAR(50) PRIMARY KEY, letter CHAR(50))]]);
+box.sql.execute([[CREATE TABLE tu (descriptor VARCHAR(50) PRIMARY KEY, letter VARCHAR(50))]]);
 box.internal.collation.create('TURKISH', 'ICU', 'tr-TR', {strength='primary'});
 box.sql.execute([[INSERT INTO tu VALUES ('Latin Capital Letter I U+0049','I');]])
 box.sql.execute([[INSERT INTO tu VALUES ('Latin Small Letter I U+0069','i');]])
@@ -105,8 +105,8 @@ box.schema.user.drop('tmp')
 
 -- gh-3644 Foreign key update fails with "unicode_ci".
 -- Check that foreign key update doesn't fail with "unicode_ci".
-box.sql.execute('CREATE TABLE t0 (s1 CHAR(5) COLLATE "unicode_ci" UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
-box.sql.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 CHAR(5) COLLATE "unicode_ci" REFERENCES t0(s1));')
+box.sql.execute('CREATE TABLE t0 (s1 VARCHAR(5) COLLATE "unicode_ci" UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
+box.sql.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 VARCHAR(5) COLLATE "unicode_ci" REFERENCES t0(s1));')
 box.sql.execute("INSERT INTO t0(s1) VALUES ('a');")
 box.sql.execute("INSERT INTO t1 VALUES (1,'a');")
 -- Should't fail.
@@ -116,8 +116,8 @@ box.sql.execute("SELECT * FROM t1;")
 box.sql.execute("DROP TABLE t1;")
 box.sql.execute("DROP TABLE t0;")
 -- Check that foreign key update fails with default collation.
-box.sql.execute('CREATE TABLE t0 (s1 CHAR(5) UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
-box.sql.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 CHAR(5) REFERENCES t0(s1));')
+box.sql.execute('CREATE TABLE t0 (s1 VARCHAR(5) UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
+box.sql.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 VARCHAR(5) REFERENCES t0(s1));')
 box.sql.execute("INSERT INTO t0(s1) VALUES ('a');")
 box.sql.execute("INSERT INTO t1 VALUES (1,'a');")
 -- Should fail.
@@ -175,7 +175,7 @@ box.space.T4B:drop()
 
 -- gh-3537 Duplicate key error for an index that is not unique
 -- pk - default, sc - unicode_ci
-box.sql.execute('CREATE TABLE t3 (s1 CHAR(5) PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3 (s1 VARCHAR(5) PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3 ON t3 (s1 collate "unicode_ci");')
 box.sql.execute("INSERT INTO t3 VALUES ('a');")
 box.sql.execute("INSERT INTO t3 VALUES ('A');")
@@ -183,7 +183,7 @@ box.sql.execute("SELECT * FROM t3;")
 box.sql.execute("DROP TABLE t3;")
 
 -- pk - binary, sc - unicode
-box.sql.execute('CREATE TABLE t3b (s1 CHAR(5) collate "binary" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3b (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3b ON t3b (s1 collate "unicode");')
 box.sql.execute("INSERT INTO t3b VALUES ('a');")
 box.sql.execute("INSERT INTO t3b VALUES ('A');")
@@ -191,7 +191,7 @@ box.sql.execute("SELECT * FROM t3b;")
 box.sql.execute("DROP TABLE t3b;")
 
 -- pk - binary, sc - unicode (make dup)
-box.sql.execute('CREATE TABLE t3b (s1 CHAR(5) collate "binary" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3b (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3b ON t3b (s1 collate "unicode");')
 box.sql.execute("INSERT INTO t3b VALUES ('a');")
 box.sql.execute("INSERT INTO t3b VALUES ('A');")
@@ -200,7 +200,7 @@ box.sql.execute("SELECT * FROM t3b;")
 box.sql.execute("DROP TABLE t3b;")
 
 -- pk - unicode, sc - binary
-box.sql.execute('CREATE TABLE t3c (s1 CHAR(5) collate "unicode" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3c (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3c ON t3c (s1 collate "binary");')
 box.sql.execute("INSERT INTO t3c VALUES ('a');")
 box.sql.execute("INSERT INTO t3c VALUES ('A');")
@@ -208,7 +208,7 @@ box.sql.execute("SELECT * FROM t3c;")
 box.sql.execute("DROP TABLE t3c;")
 
 -- pk - unicode, sc - binary (make dup)
-box.sql.execute('CREATE TABLE t3c (s1 CHAR(5) collate "unicode" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3c (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3c ON t3c (s1 collate "binary");')
 box.sql.execute("INSERT INTO t3c VALUES ('a');")
 box.sql.execute("INSERT INTO t3c VALUES ('A');")
@@ -217,7 +217,7 @@ box.sql.execute("SELECT * FROM t3c;")
 box.sql.execute("DROP TABLE t3c;")
 
 -- pk - binary, sc - unicode_ci
-box.sql.execute('CREATE TABLE t3d (s1 CHAR(5) collate "binary" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3d (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3d ON t3d (s1 collate "unicode_ci");')
 box.sql.execute("INSERT INTO t3d VALUES ('a');")
 box.sql.execute("INSERT INTO t3d VALUES ('A');")
@@ -225,7 +225,7 @@ box.sql.execute("SELECT * FROM t3d;")
 box.sql.execute("DROP TABLE t3d;")
 
 -- pk - binary, sc - unicode_ci (make dup)
-box.sql.execute('CREATE TABLE t3d (s1 CHAR(5) collate "binary" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3d (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3d ON t3d (s1 collate "unicode_ci");')
 box.sql.execute("INSERT INTO t3d VALUES ('a');")
 box.sql.execute("INSERT INTO t3d VALUES ('A');")
@@ -234,7 +234,7 @@ box.sql.execute("SELECT * FROM t3d;")
 box.sql.execute("DROP TABLE t3d;")
 
 -- pk - unicode_ci, sc - binary (should fail)
-box.sql.execute('CREATE TABLE t3e (s1 CHAR(5) collate "unicode_ci" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3e (s1 VARCHAR(5) collate "unicode_ci" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3e ON t3e (s1 collate "binary");')
 box.sql.execute("INSERT INTO t3e VALUES ('a');")
 box.sql.execute("INSERT INTO t3e VALUES ('A');")
@@ -242,7 +242,7 @@ box.sql.execute("SELECT * FROM t3e;")
 box.sql.execute("DROP TABLE t3e;")
 
 -- pk - unicode, sc - unicode_ci
-box.sql.execute('CREATE TABLE t3f (s1 CHAR(5) collate "unicode" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3f (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3f ON t3f (s1 collate "unicode_ci");')
 box.sql.execute("INSERT INTO t3f VALUES ('a');")
 box.sql.execute("INSERT INTO t3f VALUES ('A');")
@@ -250,7 +250,7 @@ box.sql.execute("SELECT * FROM t3f;")
 box.sql.execute("DROP TABLE t3f;")
 
 -- pk - unicode, sc - unicode_ci (make dup)
-box.sql.execute('CREATE TABLE t3f (s1 CHAR(5) collate "unicode" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3f (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3f ON t3f (s1 collate "unicode_ci");')
 box.sql.execute("INSERT INTO t3f VALUES ('a');")
 box.sql.execute("INSERT INTO t3f VALUES ('A');")
@@ -259,7 +259,7 @@ box.sql.execute("SELECT * FROM t3f;")
 box.sql.execute("DROP TABLE t3f;")
 
 -- pk - unicode_ci, sc - unicode (should fail)
-box.sql.execute('CREATE TABLE t3g (s1 CHAR(5) collate "unicode_ci" PRIMARY KEY);')
+box.sql.execute('CREATE TABLE t3g (s1 VARCHAR(5) collate "unicode_ci" PRIMARY KEY);')
 box.sql.execute('CREATE INDEX i3g ON t3g (s1 collate "unicode");')
 box.sql.execute("INSERT INTO t3g VALUES ('a');")
 box.sql.execute("INSERT INTO t3g VALUES ('A');")
@@ -267,14 +267,14 @@ box.sql.execute("SELECT * FROM t3g;")
 box.sql.execute("DROP TABLE t3g;")
 
 -- pk - default, sc - multipart
-box.sql.execute('CREATE TABLE qms1 (w CHAR(5) PRIMARY KEY, n CHAR(5), q CHAR(5), s INTEGER);')
+box.sql.execute('CREATE TABLE qms1 (w VARCHAR(5) PRIMARY KEY, n VARCHAR(5), q VARCHAR(5), s INTEGER);')
 box.sql.execute('CREATE INDEX iqms1 ON qms1 (w collate "unicode_ci", n);')
 box.sql.execute("INSERT INTO qms1 VALUES ('www', 'nnn', 'qqq', 1);")
 box.sql.execute("INSERT INTO qms1 VALUES ('WWW', 'nnn', 'qqq', 2);")
 box.sql.execute("SELECT * FROM qms1;")
 box.sql.execute("DROP TABLE qms1;")
 
-box.sql.execute('CREATE TABLE qms2 (w CHAR(5) PRIMARY KEY, n CHAR(5), q CHAR(5), s INTEGER);')
+box.sql.execute('CREATE TABLE qms2 (w VARCHAR(5) PRIMARY KEY, n VARCHAR(5), q VARCHAR(5), s INTEGER);')
 box.sql.execute('CREATE INDEX iqms2 ON qms2 (w collate "unicode", n);')
 box.sql.execute("INSERT INTO qms2 VALUES ('www', 'nnn', 'qqq', 1);")
 box.sql.execute("INSERT INTO qms2 VALUES ('WWW', 'nnn', 'qqq', 2);")
@@ -282,14 +282,14 @@ box.sql.execute("SELECT * FROM qms2;")
 box.sql.execute("DROP TABLE qms2;")
 
 -- pk - multipart, sc overlaps with pk
-box.sql.execute('CREATE TABLE qms3 (w CHAR(5), n CHAR(5), q CHAR(5), s INTEGER, CONSTRAINT pk_qms3 PRIMARY KEY(w, n, q));')
+box.sql.execute('CREATE TABLE qms3 (w VARCHAR(5), n VARCHAR(5), q VARCHAR(5), s INTEGER, CONSTRAINT pk_qms3 PRIMARY KEY(w, n, q));')
 box.sql.execute('CREATE INDEX iqms3 ON qms3 (w collate "unicode_ci", s);')
 box.sql.execute("INSERT INTO qms3 VALUES ('www', 'nnn', 'qqq', 1);")
 box.sql.execute("INSERT INTO qms3 VALUES ('WWW', 'nnn', 'qqq', 2);")
 box.sql.execute("SELECT * FROM qms3;")
 box.sql.execute("DROP TABLE qms3;")
 
-box.sql.execute('CREATE TABLE qms4 (w CHAR(5), n CHAR(5), q CHAR(5), s INTEGER, CONSTRAINT pk_qms4 PRIMARY KEY(w, n, q));')
+box.sql.execute('CREATE TABLE qms4 (w VARCHAR(5), n VARCHAR(5), q VARCHAR(5), s INTEGER, CONSTRAINT pk_qms4 PRIMARY KEY(w, n, q));')
 box.sql.execute('CREATE INDEX iqms4 ON qms4 (w collate "unicode", s);')
 box.sql.execute("INSERT INTO qms4 VALUES ('www', 'nnn', 'qqq', 1);")
 box.sql.execute("INSERT INTO qms4 VALUES ('WWW', 'nnn', 'qqq', 2);")

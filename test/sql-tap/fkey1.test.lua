@@ -241,9 +241,9 @@ test:do_select_tests(
         {"0",
             [[
                 CREATE TABLE T12 (A INTEGER PRIMARY KEY,
-                    B CHAR(5) UNIQUE);
+                    B VARCHAR(5) UNIQUE);
                 CREATE TABLE T13 (A INTEGER PRIMARY KEY,
-                    B CHAR(5) UNIQUE,
+                    B VARCHAR(5) UNIQUE,
                     FOREIGN KEY (B) REFERENCES T12 (B) ON UPDATE SET NULL);
                 INSERT INTO T12 VALUES (1,'a');
                 INSERT INTO T13 VALUES (1,'a');

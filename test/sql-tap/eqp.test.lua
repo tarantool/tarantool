@@ -727,8 +727,8 @@ test:drop_all_tables()
 test:do_execsql_test(
     7.0,
     [[
-        CREATE TABLE t1(idt1  INT primary key, a INT, b INT, ex CHAR(100));
-        CREATE TABLE t2(idt2  INT primary key, a INT, b INT, ex CHAR(100));
+        CREATE TABLE t1(idt1  INT primary key, a INT, b INT, ex VARCHAR(100));
+        CREATE TABLE t2(idt2  INT primary key, a INT, b INT, ex VARCHAR(100));
         CREATE INDEX i1 ON t2(a);
     ]])
 

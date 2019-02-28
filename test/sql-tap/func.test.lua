@@ -2853,7 +2853,7 @@ test:do_execsql_test(
 -- GROUP_CONCAT
 test:do_execsql_test(
     "func-72",
-    "CREATE TABLE t100(a INT PRIMARY KEY, b CHAR); \
+    "CREATE TABLE t100(a INT PRIMARY KEY, b VARCHAR(5)); \
      INSERT INTO t100 VALUES (1, CHAR(00)); \
      INSERT INTO t100 VALUES (2, CHAR(65, 00, 65)); \
      INSERT INTO t100 VALUES (3, CHAR(00)); \

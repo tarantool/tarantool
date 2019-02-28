@@ -209,7 +209,7 @@ local like_testcases =
 {
     {"2.0",
     [[
-        CREATE TABLE tx1 (s1 CHAR(5) PRIMARY KEY);
+        CREATE TABLE tx1 (s1 VARCHAR(5) PRIMARY KEY);
         CREATE INDEX I1 on tx1(s1 collate "unicode_ci");
         INSERT INTO tx1 VALUES('aaa');
         INSERT INTO tx1 VALUES('Aab');

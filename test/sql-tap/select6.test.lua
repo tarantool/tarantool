@@ -1059,8 +1059,8 @@ test:do_execsql_test(
     [[
         DROP TABLE t1;
         DROP TABLE t2;
-        CREATE TABLE t1 (s1 INT PRIMARY KEY, u CHAR UNIQUE);
-        CREATE TABLE t2 (s1 INT PRIMARY KEY, u CHAR);
+        CREATE TABLE t1 (s1 INT PRIMARY KEY, u VARCHAR(1) UNIQUE);
+        CREATE TABLE t2 (s1 INT PRIMARY KEY, u VARCHAR(1));
         INSERT INTO t1 VALUES (1,'');
         INSERT INTO t2 VALUES (1,'');
         SELECT COUNT(*) FROM t1 WHERE u IN
@@ -1075,7 +1075,7 @@ test:do_execsql_test(
     12.2,
     [[
         DROP TABLE t1;
-        CREATE TABLE t1 (s1 INT PRIMARY KEY, u CHAR);
+        CREATE TABLE t1 (s1 INT PRIMARY KEY, u VARCHAR(1));
         INSERT INTO t1 VALUES (1,'');
         SELECT COUNT(*) FROM t1 WHERE u IN
                 (SELECT u FROM t2 WHERE u IN (SELECT u FROM t1));
