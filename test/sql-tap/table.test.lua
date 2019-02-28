@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(78)
+test:plan(77)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -945,6 +945,9 @@ test:do_execsql_test(
 -- Test the ability to have default values of CURRENT_TIME, CURRENT_DATE
 -- and CURRENT_TIMESTAMP.
 --
+--  Disabled until #3694 is resolved.
+--
+if false then
 test:do_execsql_test(
     "table-13.1",
     [[
@@ -960,6 +963,7 @@ test:do_execsql_test(
         
         -- </table-13.1>
     })
+end
 
 ----------------------------------------------------------------------
 -- Test cases table-14.*

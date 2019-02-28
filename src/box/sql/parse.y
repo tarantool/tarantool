@@ -931,8 +931,10 @@ expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
   }
 }
 
-type_func(A) ::= DATE(A) .
-type_func(A) ::= DATETIME(A) .
+/*
+ * type_func(A) ::= DATE(A) .
+ * type_func(A) ::= DATETIME(A) .
+ */
 type_func(A) ::= CHAR(A) .
 expr(A) ::= type_func(X) LP distinct(D) exprlist(Y) RP(E). {
   if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
@@ -949,10 +951,12 @@ expr(A) ::= id(X) LP STAR RP(E). {
   A.pExpr = sqlExprFunction(pParse, 0, &X);
   spanSet(&A,&X,&E);
 }
-term(A) ::= CTIME_KW(OP). {
-  A.pExpr = sqlExprFunction(pParse, 0, &OP);
-  spanSet(&A, &OP, &OP);
-}
+/*
+ * term(A) ::= CTIME_KW(OP). {
+ *   A.pExpr = sqlExprFunction(pParse, 0, &OP);
+ *   spanSet(&A, &OP, &OP);
+ * }
+ */
 
 %include {
   /* This routine constructs a binary expression node out of two ExprSpan
@@ -1474,9 +1478,14 @@ wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
 %type typedef {struct type_def}
 typedef(A) ::= TEXT . { A.type = FIELD_TYPE_STRING; }
 typedef(A) ::= BLOB_KW . { A.type = FIELD_TYPE_SCALAR; }
-typedef(A) ::= DATE . { A.type = FIELD_TYPE_NUMBER; }
-typedef(A) ::= TIME . { A.type = FIELD_TYPE_NUMBER; }
-typedef(A) ::= DATETIME . { A.type = FIELD_TYPE_NUMBER; }
+/**
+ * Time-like types are temporary disabled, until they are
+ * implemented as a native Tarantool types (gh-3694).
+ *
+ typedef(A) ::= DATE . { A.type = FIELD_TYPE_NUMBER; }
+ typedef(A) ::= TIME . { A.type = FIELD_TYPE_NUMBER; }
+ typedef(A) ::= DATETIME . { A.type = FIELD_TYPE_NUMBER; }
+*/
 
 %type char_len {int}
 typedef(A) ::= CHAR . {

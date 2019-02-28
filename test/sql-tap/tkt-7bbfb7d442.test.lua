@@ -91,7 +91,7 @@ if (1 > 0)
               InventoryControlId INTEGER,
               SKU INTEGER NOT NULL PRIMARY KEY,
               Variant INTEGER NOT NULL DEFAULT 0,
-              ControlDate DATE NOT NULL,
+              ControlDate TEXT NOT NULL,
               ControlState INTEGER NOT NULL DEFAULT -1,
               DeliveredQty TEXT
             );
@@ -161,7 +161,7 @@ if (1 > 0)
 
 
             INSERT INTO InventoryControl(SKU, Variant, ControlDate) SELECT 
-                II.SKU AS SKU, II.Variant AS Variant, julianday('2011-08-30') AS ControlDate
+                II.SKU AS SKU, II.Variant AS Variant, '2011-08-30' AS ControlDate
                 FROM InventoryItem II;
         ]])
 

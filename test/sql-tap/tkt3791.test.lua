@@ -1,6 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(1)
+--test:plan(1)
+test:plan(0)
 
 --!./tcltestrunner.lua
 -- 2009 April 2
@@ -21,9 +22,9 @@ test:plan(1)
 -- ["set","testdir",[["file","dirname",["argv0"]]]]
 -- ["source",[["testdir"],"\/tester.tcl"]]
 -- MUST_WORK_TEST
-if (0 > 0)
- then
-end
+-- Disabled until #3694 is resolved.
+--
+if (0 > 0) then
 test:do_test(
     "tkt3791-1.1",
     function()
@@ -37,6 +38,7 @@ test:do_test(
         1, 19
         -- </tkt3791-1.1>
     })
+end
 
 test:finish_test()
 

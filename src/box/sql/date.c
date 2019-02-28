@@ -69,7 +69,11 @@
 #include <assert.h>
 #include <time.h>
 
-#ifndef SQL_OMIT_DATETIME_FUNCS
+/*
+ * Till time-like types are implemented as native Tarantool
+ * types, built-in functions below make no sense.
+ */
+#if 0
 
 /*
  * A structure for holding a single date and time.
@@ -1305,7 +1309,7 @@ void
 sqlRegisterDateTimeFunctions(void)
 {
 	static FuncDef aDateTimeFuncs[] = {
-#ifndef SQL_OMIT_DATETIME_FUNCS
+#if 0
 		DFUNCTION(julianday, -1, 0, 0, juliandayFunc, FIELD_TYPE_NUMBER),
 		DFUNCTION(date, -1, 0, 0, dateFunc, FIELD_TYPE_STRING),
 		DFUNCTION(time, -1, 0, 0, timeFunc, FIELD_TYPE_STRING),
@@ -1315,7 +1319,6 @@ sqlRegisterDateTimeFunctions(void)
 		DFUNCTION(current_timestamp, 0, 0, 0, ctimestampFunc,
 			  FIELD_TYPE_STRING),
 		DFUNCTION(current_date, 0, 0, 0, cdateFunc, FIELD_TYPE_STRING),
-#else
 		STR_FUNCTION(current_time, 0, "%H:%M:%S", 0, currentTimeFunc),
 		STR_FUNCTION(current_date, 0, "%Y-%m-%d", 0, currentTimeFunc),
 		STR_FUNCTION(current_timestamp, 0, "%Y-%m-%d %H:%M:%S", 0,

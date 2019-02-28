@@ -1,6 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(1279)
+-- test:plan(1279)
+test:plan(0)
 
 --!./tcltestrunner.lua
 -- 2003 October 31
@@ -26,7 +27,9 @@ test:plan(1279)
 -- at compile-time
 --
 
-
+-- Disabled until #3694 is resolved.
+--
+if false then
 local function datetest(tnum, expr, result)
     test:do_test(
         "date-"..tnum,
@@ -478,7 +481,7 @@ test:do_test(
         1
         -- </date-15.2>
     })
-
+end -- if false
 
 
 test:finish_test()
