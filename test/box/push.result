@@ -501,10 +501,16 @@ s:drop()
 -- gh-3859: box.session.push() succeeds even after the connection
 -- is closed.
 --
+chan_func = fiber.channel()
+---
+...
 chan_push = fiber.channel()
 ---
 ...
 chan_disconnected = fiber.channel()
+---
+...
+on_disconnect = box.session.on_disconnect(function() chan_disconnected:put(true) end)
 ---
 ...
 test_run:cmd("setopt delimiter ';'")
@@ -512,7 +518,7 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 function do_long_and_push()
-    box.session.on_disconnect(function() chan_disconnected:put(true) end)
+    chan_func:put(true)
     chan_push:get()
     ok, err = box.session.push(100)
     chan_push:put(err)
@@ -532,6 +538,10 @@ box.schema.user.grant('guest', 'execute', 'function', 'do_long_and_push')
 f = fiber.create(function() c:call('do_long_and_push') end)
 ---
 ...
+chan_func:get()
+---
+- true
+...
 c:close()
 ---
 ...
@@ -548,5 +558,8 @@ chan_push:get()
 - Session is closed
 ...
 box.schema.func.drop('do_long_and_push')
+---
+...
+box.session.on_disconnect(nil, on_disconnect)
 ---
 ...
