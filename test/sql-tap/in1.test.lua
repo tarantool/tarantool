@@ -623,7 +623,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "in-11.1",
     [[
-        CREATE TABLE t6(a  INT PRIMARY KEY,b NUMERIC);
+        CREATE TABLE t6(a  INT PRIMARY KEY,b FLOAT);
         INSERT INTO t6 VALUES(1,2);
         INSERT INTO t6 VALUES(2,3);
         SELECT * FROM t6 WHERE b IN (2);

@@ -321,7 +321,7 @@ test:do_execsql_test(
         CREATE TABLE t1(x  INT primary key, y BLOB);    -- affinity of t1.y is NONE
         INSERT INTO t1 VALUES(1,'99');
 
-        CREATE TABLE t2(a  INT primary key, b NUMERIC);  -- affinity of t2.b is NUMERIC
+        CREATE TABLE t2(a  INT primary key, b FLOAT);  -- affinity of t2.b is NUMERIC
         CREATE INDEX t2b ON t2(b);
         INSERT INTO t2 VALUES(2,99);
 
@@ -618,7 +618,7 @@ test:do_execsql_test(
         DROP TABLE t1;
         DROP TABLE t2;
 
-        CREATE TABLE t1(x  INT primary key, y NUMERIC);  -- affinity of t1.y is NUMERIC
+        CREATE TABLE t1(x  INT primary key, y FLOAT);  -- affinity of t1.y is NUMERIC
         INSERT INTO t1 VALUES(1,99);
 
         CREATE TABLE t2(a  INT primary key, b BLOB);  -- affinity of t2.b is NONE

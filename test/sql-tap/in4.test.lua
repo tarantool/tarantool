@@ -588,7 +588,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "in4-4.11",
     [[
-        CREATE TABLE t4b(a TEXT, b NUMERIC, c  INT PRIMARY KEY);
+        CREATE TABLE t4b(a TEXT, b FLOAT, c  INT PRIMARY KEY);
         INSERT INTO t4b VALUES('1.0',1,4);
         SELECT c FROM t4b WHERE a=b;
     ]], {

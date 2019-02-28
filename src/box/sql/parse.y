@@ -1504,20 +1504,26 @@ typedef(A) ::= number_typedef(A) .
 number_typedef(A) ::= FLOAT_KW|REAL|DOUBLE . { A.type = FIELD_TYPE_NUMBER; }
 number_typedef(A) ::= INT|INTEGER_KW . { A.type = FIELD_TYPE_INTEGER; }
 
-%type number_len_typedef {struct type_def}
-number_typedef(A) ::= DECIMAL|NUMERIC|NUM number_len_typedef(B) . {
-  A.type = FIELD_TYPE_NUMBER;
-  (void) B;
-}
-
-number_len_typedef(A) ::= . { (void) A; }
-number_len_typedef(A) ::= LP INTEGER(B) RP . {
-  (void) A;
-  (void) B;
-}
-
-number_len_typedef(A) ::= LP INTEGER(B) COMMA INTEGER(C) RP . {
-  (void) A;
-  (void) B;
-  (void) C;
-}
+/**
+ * NUMERIC type is temporary disabled. To be enabled when
+ * it will be implemented as native Tarantool type.
+ *
+ * %type number_len_typedef {struct type_def}
+ * number_typedef(A) ::= DECIMAL|NUMERIC|NUM number_len_typedef(B) . {
+ *   A.type = FIELD_TYPE_NUMBER;
+ *   (void) B;
+ * }
+ *
+ *
+ * number_len_typedef(A) ::= . { (void) A; }
+ * number_len_typedef(A) ::= LP INTEGER(B) RP . {
+ *   (void) A;
+ *   (void) B;
+ * }
+ *
+ * number_len_typedef(A) ::= LP INTEGER(B) COMMA INTEGER(C) RP . {
+ *   (void) A;
+ *   (void) B;
+ *   (void) C;
+ *}
+ */

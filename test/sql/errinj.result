@@ -239,7 +239,7 @@ box.sql.execute("DROP TABLE t2;")
 -- Tests which are aimed at verifying work of commit/rollback
 -- triggers on _fk_constraint space.
 --
-box.sql.execute("CREATE TABLE t3 (id NUMERIC PRIMARY KEY, a INT REFERENCES t3, b INT UNIQUE);")
+box.sql.execute("CREATE TABLE t3 (id FLOAT PRIMARY KEY, a INT REFERENCES t3, b INT UNIQUE);")
 ---
 ...
 t = box.space._fk_constraint:select{}[1]:totable()

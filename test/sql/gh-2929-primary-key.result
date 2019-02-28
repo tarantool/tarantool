@@ -20,15 +20,15 @@ box.sql.execute("CREATE TABLE t2(a INT UNIQUE, b INT)")
 ---
 - error: PRIMARY KEY missing on table T2
 ...
-box.sql.execute("CREATE TABLE t3(a NUM)")
+box.sql.execute("CREATE TABLE t3(a FLOAT)")
 ---
 - error: PRIMARY KEY missing on table T3
 ...
-box.sql.execute("CREATE TABLE t4(a DECIMAL, b TEXT)")
+box.sql.execute("CREATE TABLE t4(a FLOAT, b TEXT)")
 ---
 - error: PRIMARY KEY missing on table T4
 ...
-box.sql.execute("CREATE TABLE t5(a DECIMAL, b NUM UNIQUE)")
+box.sql.execute("CREATE TABLE t5(a FLOAT, b FLOAT UNIQUE)")
 ---
 - error: PRIMARY KEY missing on table T5
 ...

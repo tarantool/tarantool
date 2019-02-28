@@ -892,7 +892,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t7(
            a integer primary key,
-           b numeric(5,10),
+           b FLOAT,
            c VARCHAR(8),
            d VARCHAR(9),
            e blob,

@@ -67,7 +67,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "cast-1.5",
     [[
-        SELECT CAST(x'616263' AS numeric)
+        SELECT CAST(x'616263' AS FLOAT)
     ]], {
         -- <cast-1.5>
         1, 'Type mismatch: can not convert abc to number'
@@ -147,7 +147,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.15",
     [[
-        SELECT CAST(NULL AS numeric)
+        SELECT CAST(NULL AS FLOAT)
     ]], {
         -- <cast-1.15>
         ""
@@ -157,7 +157,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.16",
     [[
-        SELECT typeof(CAST(NULL AS numeric))
+        SELECT typeof(CAST(NULL AS FLOAT))
     ]], {
         -- <cast-1.16>
         "null"
@@ -247,7 +247,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.25",
     [[
-        SELECT CAST(123 AS numeric)
+        SELECT CAST(123 AS FLOAT)
     ]], {
         -- <cast-1.25>
         123
@@ -257,7 +257,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.26",
     [[
-        SELECT typeof(CAST(123 AS numeric))
+        SELECT typeof(CAST(123 AS FLOAT))
     ]], {
         -- <cast-1.26>
         "real"
@@ -347,7 +347,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.35",
     [[
-        SELECT CAST(123.456 AS numeric)
+        SELECT CAST(123.456 AS FLOAT)
     ]], {
         -- <cast-1.35>
         123.456
@@ -357,7 +357,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.36",
     [[
-        SELECT typeof(CAST(123.456 AS numeric))
+        SELECT typeof(CAST(123.456 AS FLOAT))
     ]], {
         -- <cast-1.36>
         "real"
@@ -447,7 +447,7 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "cast-1.45",
     [[
-        SELECT CAST('123abc' AS numeric)
+        SELECT CAST('123abc' AS FLOAT)
     ]], {
         -- <cast-1.45>
         1, 'Type mismatch: can not convert 123abc to number'
@@ -477,7 +477,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "cast-1.51",
     [[
-        SELECT CAST('123.5abc' AS numeric)
+        SELECT CAST('123.5abc' AS FLOAT)
     ]], {
         -- <cast-1.51>
         1, 'Type mismatch: can not convert 123.5abc to number'
@@ -625,7 +625,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.2",
     [[
-        SELECT CAST(9223372036854774800 AS numeric)
+        SELECT CAST(9223372036854774800 AS FLOAT)
     ]], {
         -- <cast-3.2>
         9223372036854774784
@@ -660,7 +660,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.6",
     [[
-        SELECT CAST(-9223372036854774800 AS numeric)
+        SELECT CAST(-9223372036854774800 AS float)
     ]], {
         -- <cast-3.6>
         -9223372036854774784
@@ -695,7 +695,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.12",
     [[
-        SELECT CAST('9223372036854774800' AS numeric)
+        SELECT CAST('9223372036854774800' AS FLOAT)
     ]], {
         -- <cast-3.12>
         9223372036854774784
@@ -732,7 +732,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-3.16",
     [[
-        SELECT CAST('-9223372036854774800' AS numeric)
+        SELECT CAST('-9223372036854774800' AS FLOAT)
     ]], {
         -- <cast-3.16>
         -9223372036854774784
@@ -770,7 +770,7 @@ if true then --test:execsql("PRAGMA encoding")[1][1]=="UTF-8" then
     test:do_execsql_test(
         "cast-3.22",
         [[
-            SELECT CAST(x'39323233333732303336383534373734383030' AS numeric)
+            SELECT CAST(x'39323233333732303336383534373734383030' AS FLOAT)
         ]], {
             -- <cast-3.22>
             9223372036854774784
@@ -796,7 +796,7 @@ end
 test:do_execsql_test(
     "case-3.31",
     [[
-        SELECT CAST(NULL AS numeric)
+        SELECT CAST(NULL AS FLOAT)
     ]], {
         -- <case-3.31>
         ""
