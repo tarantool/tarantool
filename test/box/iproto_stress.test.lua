@@ -4,7 +4,7 @@ fiber = require('fiber')
 net_box = require('net.box')
 
 net_msg_max = box.cfg.net_msg_max
-box.cfg{net_msg_max = 64}
+box.cfg{net_msg_max = 16}
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 
@@ -33,7 +33,7 @@ function worker(i)
 end;
 test_run:cmd("setopt delimiter ''");
 
-for i = 1,400 do fiber.create(worker, i) end
+for i = 1, 100 do fiber.create(worker, i) end
 fiber.sleep(0.1)
 
 -- check that iproto doesn't deplete tx fiber pool on wal stall (see gh-1892)
@@ -41,8 +41,7 @@ box.error.injection.set("ERRINJ_WAL_DELAY", true)
 fiber.sleep(0.1)
 box.error.injection.set("ERRINJ_WAL_DELAY", false)
 
-attempt = 0
-while n_workers > 0 and attempt < 100 do fiber.sleep(0.1) attempt = attempt + 1 end
+test_run:wait_cond(function() return n_workers == 0 end, 60)
 n_workers -- 0
 n_errors -- 0
 
