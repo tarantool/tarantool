@@ -63,6 +63,12 @@ size_t
 iproto_mem_used(void);
 
 /**
+ * Return the number of active iproto connections.
+ */
+size_t
+iproto_connection_count(void);
+
+/**
  * Reset network statistics.
  */
 void
