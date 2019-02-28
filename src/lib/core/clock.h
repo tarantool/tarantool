@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_CLOCK_H_INCLUDED
-#define TARANTOOL_CLOCK_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_CLOCK_H_INCLUDED
+#define TARANTOOL_LIB_CORE_CLOCK_H_INCLUDED
 /*
  * Copyright 2010-2016 Tarantool AUTHORS: please see AUTHORS file.
  *
@@ -56,4 +56,4 @@ uint64_t clock_thread64(void);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_clock_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_CLOCK_H_INCLUDED */

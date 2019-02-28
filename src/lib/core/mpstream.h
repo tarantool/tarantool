@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_MPSTREAM_H_INCLUDED
-#define TARANTOOL_MPSTREAM_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_MPSTREAM_H_INCLUDED
+#define TARANTOOL_LIB_CORE_MPSTREAM_H_INCLUDED
 /*
  * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -148,4 +148,4 @@ mpstream_memset(struct mpstream *stream, int c, uint32_t n);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_MPSTREAM_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_MPSTREAM_H_INCLUDED */

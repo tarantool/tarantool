@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_UUID_H_INCLUDED
-#define TARANTOOL_UUID_H_INCLUDED
+#ifndef TARANTOOL_LIB_UUID_UUID_H_INCLUDED
+#define TARANTOOL_LIB_UUID_UUID_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -183,4 +183,4 @@ tt_uuid_from_strl(const char *in, size_t len, struct tt_uuid *uu);
 } /* extern "C" */
 #endif
 
-#endif /* TARANTOOL_UUID_H_INCLUDED */
+#endif /* TARANTOOL_LIB_UUID_UUID_H_INCLUDED */

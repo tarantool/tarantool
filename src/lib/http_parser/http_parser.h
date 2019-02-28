@@ -1,3 +1,5 @@
+#ifndef TARANTOOL_LIB_HTTP_PARSER_HTTP_PARSER_H_INCLUDED
+#define TARANTOOL_LIB_HTTP_PARSER_HTTP_PARSER_H_INCLUDED
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -29,11 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef TARANTOOL_HTTP_PARSER_H
-#define TARANTOOL_HTTP_PARSER_H
-
-#define HEADER_NAME_LEN 32
-
 enum {
 	HTTP_PARSE_OK,
 	HTTP_PARSE_CONTINUE,
@@ -58,11 +55,11 @@ struct http_parser {
  * @param bufp pointer to buffer with data
  * @param end_buf
  * @return	HTTP_DONE - line was parsed
- * 		HTTP_OK - header was read
- * 		HTTP_PARSE_INVALID - error during parsing
+ *		HTTP_OK - header was read
+ *		HTTP_PARSE_INVALID - error during parsing
  */
 int
 http_parse_header_line(struct http_parser *prsr, char **bufp,
 		       const char *end_buf, int max_hname_len);
 
-#endif //TARANTOOL_HTTP_PARSER_H
+#endif /* TARANTOOL_LIB_HTTP_PARSER_HTTP_PARSER_H_INCLUDED */

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_COLL_DEF_H_INCLUDED
-#define TARANTOOL_COLL_DEF_H_INCLUDED
+#ifndef TARANTOOL_LIB_COLL_COLL_DEF_H_INCLUDED
+#define TARANTOOL_LIB_COLL_COLL_DEF_H_INCLUDED
 /*
  * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -117,4 +117,4 @@ struct coll_def {
 	char locale[COLL_LOCALE_LEN_MAX + 1];
 };
 
-#endif /* TARANTOOL_COLL_DEF_H_INCLUDED */
+#endif /* TARANTOOL_LIB_COLL_COLL_DEF_H_INCLUDED */

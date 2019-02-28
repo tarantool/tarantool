@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_SALAD_RTREE_H
-#define INCLUDES_TARANTOOL_SALAD_RTREE_H
+#ifndef TARANTOOL_LIB_SALAD_RTREE_H_INCLUDED
+#define TARANTOOL_LIB_SALAD_RTREE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -337,4 +337,4 @@ rtree_iterator_next(struct rtree_iterator *itr);
 } /* extern "C" { */
 #endif /* defined(__cplusplus) */
 
-#endif /* #ifndef INCLUDES_TARANTOOL_SALAD_RTREE_H */
+#endif /* #ifndef TARANTOOL_LIB_SALAD_RTREE_H_INCLUDED */

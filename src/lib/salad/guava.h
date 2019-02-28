@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_LIB_GUAVA_H_INCLUDED
-#define TARANTOOL_LIB_GUAVA_H_INCLUDED
+#ifndef TARANTOOL_LIB_SALAD_GUAVA_H_INCLUDED
+#define TARANTOOL_LIB_SALAD_GUAVA_H_INCLUDED
 
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
@@ -45,4 +45,4 @@ guava(int64_t state, int32_t buckets);
 } /* extern C */
 #endif
 
-#endif /* TARANTOOL_LIB_GUAVA_H_INCLUDED */
+#endif /* TARANTOOL_LIB_SALAD_GUAVA_H_INCLUDED */

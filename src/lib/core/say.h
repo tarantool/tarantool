@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_SAY_H_INCLUDED
-#define TARANTOOL_SAY_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_SAY_H_INCLUDED
+#define TARANTOOL_LIB_CORE_SAY_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -480,4 +480,4 @@ say_format_plain(struct log *log, char *buf, int len, int level,
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_SAY_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_SAY_H_INCLUDED */

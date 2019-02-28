@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_FIBER_CHANNEL_H_INCLUDED
-#define TARANTOOL_FIBER_CHANNEL_H_INCLUDED 1
+#ifndef TARANTOOL_LIB_CORE_FIBER_CHANNEL_H_INCLUDED
+#define TARANTOOL_LIB_CORE_FIBER_CHANNEL_H_INCLUDED 1
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -389,4 +389,4 @@ fiber_channel_put_xc(struct fiber_channel *ch, void *data)
 
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_FIBER_CHANNEL_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_FIBER_CHANNEL_H_INCLUDED */

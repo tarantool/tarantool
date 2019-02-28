@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_CSV_H_INCLUDED
-#define TARANTOOL_CSV_H_INCLUDED
+#ifndef TARANTOOL_LIB_CSV_CSV_H_INCLUDED
+#define TARANTOOL_LIB_CSV_CSV_H_INCLUDED
 /*
  * Copyright 2010-2016 Tarantool AUTHORS: please see AUTHORS file.
  *
@@ -179,5 +179,5 @@ csv_iterator_get_field_len(struct csv_iterator *it)
 #if defined(__cplusplus)
 }
 #endif /* extern "C" */
-#endif
+#endif /* TARANTOOL_LIB_CSV_CSV_H_INCLUDED */
 

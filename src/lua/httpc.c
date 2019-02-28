@@ -138,6 +138,8 @@ parse_headers(lua_State *L, char *buffer, size_t len,
 /** lib Lua API {{{
  */
 
+enum { MAX_HTTP_HEADER_NAME_LEN = 32 };
+
 static int
 luaT_httpc_request(lua_State *L)
 {
@@ -153,7 +155,7 @@ luaT_httpc_request(lua_State *L)
 		return luaT_error(L);
 
 	double timeout = TIMEOUT_INFINITY;
-	int max_header_name_length = HEADER_NAME_LEN;
+	int max_header_name_length = MAX_HTTP_HEADER_NAME_LEN;
 	if (lua_isstring(L, 4)) {
 		size_t len = 0;
 		const char *body = lua_tolstring(L, 4, &len);

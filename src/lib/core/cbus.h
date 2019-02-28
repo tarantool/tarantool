@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_CBUS_H_INCLUDED
-#define TARANTOOL_CBUS_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_CBUS_H_INCLUDED
+#define TARANTOOL_LIB_CORE_CBUS_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -444,4 +444,4 @@ cbus_unpair(struct cpipe *dest_pipe, struct cpipe *src_pipe,
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_CBUS_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_CBUS_H_INCLUDED */

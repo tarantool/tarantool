@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_RANDOM_H
-#define INCLUDES_TARANTOOL_RANDOM_H
+#ifndef TARANTOOL_LIB_CORE_RANDOM_H_INCLUDED
+#define TARANTOOL_LIB_CORE_RANDOM_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -48,4 +48,4 @@ random_bytes(char *buf, size_t size);
 #if defined(__cplusplus)
 }
 #endif /* extern "C" */
-#endif /* INCLUDES_TARANTOOL_RANDOM_H */
+#endif /* TARANTOOL_LIB_CORE_RANDOM_H_INCLUDED */

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_FIO_H_INCLUDED
-#define TARANTOOL_FIO_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_FIO_H_INCLUDED
+#define TARANTOOL_LIB_CORE_FIO_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -234,5 +234,5 @@ fio_batch_write(struct fio_batch *batch, int fd);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_FIO_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_FIO_H_INCLUDED */
 

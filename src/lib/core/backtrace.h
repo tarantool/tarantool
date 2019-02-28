@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_BACKTRACE_H_INCLUDED
-#define TARANTOOL_BACKTRACE_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_BACKTRACE_H_INCLUDED
+#define TARANTOOL_LIB_CORE_BACKTRACE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -58,4 +58,4 @@ backtrace_proc_cache_clear();
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_BACKTRACE_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_BACKTRACE_H_INCLUDED */

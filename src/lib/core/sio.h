@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_SIO_H_INCLUDED
-#define TARANTOOL_SIO_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_SIO_H_INCLUDED
+#define TARANTOOL_LIB_CORE_SIO_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -214,4 +214,4 @@ sio_uri_to_addr(const char *uri, struct sockaddr *addr);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_SIO_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_SIO_H_INCLUDED */

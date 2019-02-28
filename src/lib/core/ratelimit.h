@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_RATELIMIT_H_INCLUDED
-#define TARANTOOL_RATELIMIT_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_RATELIMIT_H_INCLUDED
+#define TARANTOOL_LIB_CORE_RATELIMIT_H_INCLUDED
 /*
  * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -101,4 +101,4 @@ ratelimit_check(struct ratelimit *rl, double now, int *suppressed)
 } /* extern "C" */
 #endif
 
-#endif /* TARANTOOL_RATELIMIT_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_RATELIMIT_H_INCLUDED */

@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_REFLECTION_H_INCLUDED
-#define TARANTOOL_REFLECTION_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_REFLECTION_H_INCLUDED
+#define TARANTOOL_LIB_CORE_REFLECTION_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -276,4 +276,4 @@ method_invoke(const struct method_info *method, T *object, Args... args)
 
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_REFLECTION_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_REFLECTION_H_INCLUDED */

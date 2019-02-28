@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_COIO_TASK_H_INCLUDED
-#define TARANTOOL_COIO_TASK_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_COIO_TASK_H_INCLUDED
+#define TARANTOOL_LIB_CORE_COIO_TASK_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -173,4 +173,4 @@ coio_getaddrinfo(const char *host, const char *port,
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_COIO_TASK_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_COIO_TASK_H_INCLUDED */

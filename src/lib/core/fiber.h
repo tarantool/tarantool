@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_FIBER_H_INCLUDED
-#define TARANTOOL_FIBER_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_FIBER_H_INCLUDED
+#define TARANTOOL_LIB_CORE_FIBER_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -669,4 +669,4 @@ region_aligned_alloc_cb(void *ctx, size_t size)
 }
 
 
-#endif /* TARANTOOL_FIBER_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_FIBER_H_INCLUDED */

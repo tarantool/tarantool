@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_COIO_FILE_H
-#define INCLUDES_TARANTOOL_COIO_FILE_H
+#ifndef TARANTOOL_LIB_CORE_COIO_FILE_H_INCLUDED
+#define TARANTOOL_LIB_CORE_COIO_FILE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -88,4 +88,4 @@ int	coio_copyfile(const char *source, const char *dest);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_COIO_FILE_H */
+#endif /* TARANTOOL_LIB_CORE_COIO_FILE_H_INCLUDED */

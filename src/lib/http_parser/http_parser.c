@@ -28,9 +28,8 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#include <string.h>
 #include "http_parser.h"
+#include <string.h>
 
 #define LF     (unsigned char) '\n'
 #define CR     (unsigned char) '\r'

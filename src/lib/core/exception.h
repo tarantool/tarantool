@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_EXCEPTION_H_INCLUDED
-#define TARANTOOL_EXCEPTION_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_EXCEPTION_H_INCLUDED
+#define TARANTOOL_LIB_CORE_EXCEPTION_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -178,4 +178,4 @@ exception_init();
 
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_EXCEPTION_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_EXCEPTION_H_INCLUDED */

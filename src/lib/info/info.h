@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_INFO_H
-#define INCLUDES_TARANTOOL_INFO_H
+#ifndef INCLUDES_TARANTOOL_LIB_INFO_INFO_H
+#define INCLUDES_TARANTOOL_LIB_INFO_INFO_H
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -188,4 +188,4 @@ info_table_end(struct info_handler *info)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_INFO_H */
+#endif /* INCLUDES_TARANTOOL_LIB_INFO_INFO_H */

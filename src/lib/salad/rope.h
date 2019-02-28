@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_ROPE_H
-#define INCLUDES_TARANTOOL_ROPE_H
+#ifndef TARANTOOL_LIB_SALAD_ROPE_H_INCLUDED
+#define TARANTOOL_LIB_SALAD_ROPE_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -269,4 +269,4 @@ rope_pretty_print(struct rope *rope, void (*print_leaf)(void *, size_t));
 }
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_ROPE_H */
+#endif /* TARANTOOL_LIB_SALAD_ROPE_H_INCLUDED */

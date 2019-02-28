@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_PORT_H
-#define INCLUDES_TARANTOOL_PORT_H
+#ifndef TARANTOOL_LIB_CORE_PORT_H_INCLUDED
+#define TARANTOOL_LIB_CORE_PORT_H_INCLUDED
 /*
  * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -124,4 +124,4 @@ port_dump_plain(struct port *port, uint32_t *size)
 } /* extern "C" */
 #endif /* defined __cplusplus */
 
-#endif /* INCLUDES_TARANTOOL_PORT_H */
+#endif /* TARANTOOL_LIB_CORE_PORT_H_INCLUDED */

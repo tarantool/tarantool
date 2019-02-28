@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_EVIO_H_INCLUDED
-#define TARANTOOL_EVIO_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_EVIO_H_INCLUDED
+#define TARANTOOL_LIB_CORE_EVIO_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -165,4 +165,4 @@ evio_setsockopt_server(int fd, int family, int type);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_EVIO_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_EVIO_H_INCLUDED */

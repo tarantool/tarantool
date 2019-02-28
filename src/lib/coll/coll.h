@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_COLL_H_INCLUDED
-#define TARANTOOL_COLL_H_INCLUDED
+#ifndef TARANTOOL_LIB_COLL_COLL_H_INCLUDED
+#define TARANTOOL_LIB_COLL_COLL_H_INCLUDED
 /*
  * Copyright 2010-2018, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -104,4 +104,4 @@ coll_free();
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_COLL_H_INCLUDED */
+#endif /* TARANTOOL_LIB_COLL_COLL_H_INCLUDED */

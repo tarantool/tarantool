@@ -1,5 +1,5 @@
-#ifndef INCLUDES_TARANTOOL_TRIGGER_H
-#define INCLUDES_TARANTOOL_TRIGGER_H
+#ifndef TARANTOOL_LIB_CORE_TRIGGER_H_INCLUDED
+#define TARANTOOL_LIB_CORE_TRIGGER_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -130,4 +130,4 @@ trigger_run_xc(struct rlist *list, void *event)
 
 #endif /* defined(__cplusplus) */
 
-#endif /* INCLUDES_TARANTOOL_TRIGGER_H */
+#endif /* TARANTOOL_LIB_CORE_TRIGGER_H_INCLUDED */

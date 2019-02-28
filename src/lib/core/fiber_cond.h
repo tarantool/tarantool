@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_FIBER_COND_H_INCLUDED
-#define TARANTOOL_FIBER_COND_H_INCLUDED 1
+#ifndef TARANTOOL_LIB_CORE_FIBER_COND_H_INCLUDED
+#define TARANTOOL_LIB_CORE_FIBER_COND_H_INCLUDED 1
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -141,4 +141,4 @@ fiber_cond_wait_deadline(struct fiber_cond *cond, double deadline);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_FIBER_COND_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_FIBER_COND_H_INCLUDED */

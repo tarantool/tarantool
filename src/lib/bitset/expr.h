@@ -1,6 +1,5 @@
 #ifndef TARANTOOL_LIB_BITSET_EXPR_H_INCLUDED
 #define TARANTOOL_LIB_BITSET_EXPR_H_INCLUDED
-
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *

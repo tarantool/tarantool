@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_LATCH_H_INCLUDED
-#define TARANTOOL_LATCH_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_LATCH_H_INCLUDED
+#define TARANTOOL_LIB_CORE_LATCH_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -230,4 +230,4 @@ box_latch_unlock(box_latch_t *latch);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_LATCH_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_LATCH_H_INCLUDED */

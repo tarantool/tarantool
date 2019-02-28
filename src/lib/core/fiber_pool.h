@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_FIBER_POOL_H_INCLUDED
-#define TARANTOOL_FIBER_POOL_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_FIBER_POOL_H_INCLUDED
+#define TARANTOOL_LIB_CORE_FIBER_POOL_H_INCLUDED
 /*
  * Copyright 2010-2017, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -102,4 +102,4 @@ fiber_pool_destroy(struct fiber_pool *pool);
 }
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_FIBER_POOL_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_FIBER_POOL_H_INCLUDED */

@@ -1,7 +1,7 @@
-#ifndef TARANTOOL_BLOOM_H_INCLUDED
-#define TARANTOOL_BLOOM_H_INCLUDED
+#ifndef TARANTOOL_LIB_SALAD_BLOOM_H_INCLUDED
+#define TARANTOOL_LIB_SALAD_BLOOM_H_INCLUDED
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -210,4 +210,4 @@ bloom_maybe_has(const struct bloom *bloom, bloom_hash_t hash)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_BLOOM_H_INCLUDED */
+#endif /* TARANTOOL_LIB_SALAD_BLOOM_H_INCLUDED */

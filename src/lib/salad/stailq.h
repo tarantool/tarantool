@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_STAILQ_H_INCLUDED
-#define TARANTOOL_STAILQ_H_INCLUDED
+#ifndef TARANTOOL_LIB_SALAD_STAILQ_H_INCLUDED
+#define TARANTOOL_LIB_SALAD_STAILQ_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -262,4 +262,4 @@ stailq_cut_tail(struct stailq *head, struct stailq_entry *last,
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_STAILQ_H_INCLUDED */
+#endif /* TARANTOOL_LIB_SALAD_STAILQ_H_INCLUDED */

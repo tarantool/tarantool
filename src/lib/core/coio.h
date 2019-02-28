@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_COIO_H_INCLUDED
-#define TARANTOOL_COIO_H_INCLUDED
+#ifndef TARANTOOL_LIB_CORE_COIO_H_INCLUDED
+#define TARANTOOL_LIB_CORE_COIO_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -236,4 +236,4 @@ coio_write_fd_timeout(int fd, const void *data, size_t size, ev_tstamp timeout);
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
 
-#endif /* TARANTOOL_COIO_H_INCLUDED */
+#endif /* TARANTOOL_LIB_CORE_COIO_H_INCLUDED */

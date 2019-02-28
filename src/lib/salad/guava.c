@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#include "lib/salad/guava.h"
+#include "guava.h"
 
 #include <stdint.h>
 

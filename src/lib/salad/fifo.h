@@ -1,5 +1,5 @@
-#ifndef TARANTOOL_FIFO_H_INCLUDED
-#define TARANTOOL_FIFO_H_INCLUDED
+#ifndef TARANTOOL_LIB_SALAD_FIFO_H_INCLUDED
+#define TARANTOOL_LIB_SALAD_FIFO_H_INCLUDED
 /*
  * Copyright 2010-2016, Tarantool AUTHORS, please see AUTHORS file.
  *
@@ -107,4 +107,4 @@ fifo_pop(struct fifo *q) {
 
 #undef FIFO_WATERMARK
 
-#endif /* TARANTOOL_FIFO_H_INCLUDED */
+#endif /* TARANTOOL_LIB_SALAD_FIFO_H_INCLUDED */
