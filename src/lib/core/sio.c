@@ -294,7 +294,7 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen)
 }
 
 const char *
-sio_strfaddr(struct sockaddr *addr, socklen_t addrlen)
+sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 {
 	static __thread char name[NI_MAXHOST + _POSIX_PATH_MAX + 2];
 	switch (addr->sa_family) {

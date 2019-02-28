@@ -71,7 +71,7 @@ sio_wouldblock(int err)
  * May garble errno. Used for error reporting.
  */
 const char *
-sio_strfaddr(struct sockaddr *addr, socklen_t addrlen);
+sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen);
 
 /**
  * Return a filled in struct sockaddr provided the file
