@@ -122,10 +122,6 @@ static fiber_cond ro_cond;
  */
 static bool is_orphan;
 
-/* Use the shared instance of xstream for all appliers */
-static struct xstream join_stream;
-static struct xstream subscribe_stream;
-
 /**
  * The pool of fibers in the transaction processor thread
  * working on incoming messages from net, wal and other
@@ -201,22 +197,6 @@ box_process_rw(struct request *request, struct space *space,
 		tuple_bless(tuple);
 	tuple_unref(tuple);
 	return rc;
-}
-
-/**
- * Process a no-op request.
- *
- * A no-op request does not affect any space, but it
- * promotes vclock and is written to WAL.
- */
-static int
-process_nop(struct request *request)
-{
-	assert(request->type == IPROTO_NOP);
-	struct txn *txn = txn_begin_stmt(NULL);
-	if (txn == NULL)
-		return -1;
-	return txn_commit_stmt(txn, request);
 }
 
 void
@@ -312,29 +292,18 @@ recovery_journal_create(struct recovery_journal *journal, struct vclock *v)
 	journal->vclock = v;
 }
 
-static inline void
-apply_row(struct xstream *stream, struct xrow_header *row)
-{
-	(void) stream;
-	struct request request;
-	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
-	if (request.type == IPROTO_NOP) {
-		if (process_nop(&request) != 0)
-			diag_raise();
-		return;
-	}
-	struct space *space = space_cache_find_xc(request.space_id);
-	if (box_process_rw(&request, space, NULL) != 0) {
-		say_error("error applying row: %s", request_str(&request));
-		diag_raise();
-	}
-}
-
 static void
 apply_wal_row(struct xstream *stream, struct xrow_header *row)
 {
-	apply_row(stream, row);
-
+	struct request request;
+	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
+	if (request.type != IPROTO_NOP) {
+		struct space *space = space_cache_find_xc(request.space_id);
+		if (box_process_rw(&request, space, NULL) != 0) {
+			say_error("error applying row: %s", request_str(&request));
+			diag_raise();
+		}
+	}
 	struct wal_stream *xstream =
 		container_of(stream, struct wal_stream, base);
 	/**
@@ -357,17 +326,6 @@ wal_stream_create(struct wal_stream *ctx, size_t wal_max_rows)
 	 * so we can't afford many of them during recovery.
 	 */
 	ctx->yield = (wal_max_rows >> 4)  + 1;
-}
-
-static void
-apply_initial_join_row(struct xstream *stream, struct xrow_header *row)
-{
-	(void) stream;
-	struct request request;
-	xrow_decode_dml_xc(row, &request, dml_request_key_map(row->type));
-	struct space *space = space_cache_find_xc(request.space_id);
-	/* no access checks here - applier always works with admin privs */
-	space_apply_initial_join_row_xc(space, &request);
 }
 
 /* {{{ configuration bindings */
@@ -663,9 +621,7 @@ cfg_get_replication(int *p_count)
 
 	for (int i = 0; i < count; i++) {
 		const char *source = cfg_getarr_elem("replication", i);
-		struct applier *applier = applier_new(source,
-						      &join_stream,
-						      &subscribe_stream);
+		struct applier *applier = applier_new(source);
 		if (applier == NULL) {
 			/* Delete created appliers */
 			while (--i >= 0)
@@ -2138,8 +2094,6 @@ box_cfg_xc(void)
 	box_set_replication_sync_lag();
 	box_set_replication_sync_timeout();
 	box_set_replication_skip_conflict();
-	xstream_create(&join_stream, apply_initial_join_row);
-	xstream_create(&subscribe_stream, apply_row);
 
 	struct gc_checkpoint *checkpoint = gc_last_checkpoint();
 
