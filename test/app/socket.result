@@ -2804,8 +2804,10 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 echo_fiber = nil
+channel = fiber.channel()
 server = socket.tcp_server('localhost', 0, { handler = function(s)
     echo_fiber = fiber.self()
+    channel:put(true)
     while true do
         local b = s:read(1, 0.1)
         if b ~= nil then
@@ -2825,6 +2827,10 @@ addr = server:name()
 client = socket.tcp_connect(addr.host, addr.port)
 ---
 ...
+channel:get()
+---
+- true
+...
 echo_fiber ~= nil
 ---
 - true
@@ -2833,7 +2839,7 @@ client:write('hello')
 ---
 - 5
 ...
-client:read(5, 0.1) == 'hello'
+client:read(5, 5) == 'hello'
 ---
 - true
 ...
@@ -2848,7 +2854,7 @@ client:write('world')
 ---
 - 5
 ...
-client:read(5, 0.1) == 'world'
+client:read(5, 5) == 'world'
 ---
 - true
 ...
@@ -2856,7 +2862,7 @@ client:read(5, 0.1) == 'world'
 fiber.cancel(echo_fiber)
 ---
 ...
-client:read(1, 0.1) == ''
+client:read(1, 5) == ''
 ---
 - true
 ...

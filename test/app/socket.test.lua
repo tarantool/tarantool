@@ -954,8 +954,10 @@ listening_socket:close()
 --gh-3344 connection should not fail is there is a spurious wakeup for io fiber
 test_run:cmd("setopt delimiter ';'")
 echo_fiber = nil
+channel = fiber.channel()
 server = socket.tcp_server('localhost', 0, { handler = function(s)
     echo_fiber = fiber.self()
+    channel:put(true)
     while true do
         local b = s:read(1, 0.1)
         if b ~= nil then
@@ -966,17 +968,18 @@ end, name = 'echoserv'});
 test_run:cmd("setopt delimiter ''");
 addr = server:name()
 client = socket.tcp_connect(addr.host, addr.port)
+channel:get()
 echo_fiber ~= nil
 client:write('hello')
-client:read(5, 0.1) == 'hello'
+client:read(5, 5) == 'hello'
 -- send spurious wakeup
 fiber.wakeup(echo_fiber)
 fiber.sleep(0)
 client:write('world')
-client:read(5, 0.1) == 'world'
+client:read(5, 5) == 'world'
 -- cancel fiber
 fiber.cancel(echo_fiber)
-client:read(1, 0.1) == ''
+client:read(1, 5) == ''
 server:close()
 
 test_run:cmd("clear filter")
