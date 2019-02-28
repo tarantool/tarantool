@@ -2060,6 +2060,12 @@ iproto_mem_used(void)
 	return slab_cache_used(&net_cord.slabc) + slab_cache_used(&net_slabc);
 }
 
+size_t
+iproto_connection_count(void)
+{
+	return mempool_count(&iproto_connection_pool);
+}
+
 void
 iproto_reset_stat(void)
 {

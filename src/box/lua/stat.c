@@ -140,6 +140,10 @@ static int
 lbox_stat_net_index(struct lua_State *L)
 {
 	luaL_checkstring(L, -1);
+	if (strcmp("CONNECTIONS", lua_tostring(L, -1)) == 0) {
+		lua_pushnumber(L, iproto_connection_count());
+		return 1;
+	}
 	return rmean_foreach(rmean_net, seek_stat_item, L);
 }
 
@@ -148,6 +152,11 @@ lbox_stat_net_call(struct lua_State *L)
 {
 	lua_newtable(L);
 	rmean_foreach(rmean_net, set_stat_item, L);
+
+	lua_pushstring(L, "CONNECTIONS");
+	lua_pushnumber(L, iproto_connection_count());
+	lua_settable(L, -3);
+
 	return 1;
 }
 
