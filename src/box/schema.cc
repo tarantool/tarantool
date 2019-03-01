@@ -69,6 +69,7 @@ uint32_t schema_version = 0;
  */
 uint32_t space_cache_version = 0;
 
+struct rlist on_schema_init = RLIST_HEAD_INITIALIZER(on_schema_init);
 struct rlist on_alter_space = RLIST_HEAD_INITIALIZER(on_alter_space);
 struct rlist on_alter_sequence = RLIST_HEAD_INITIALIZER(on_alter_sequence);
 
@@ -500,6 +501,12 @@ schema_init()
 		init_system_space(space);
 		trigger_run_xc(&on_alter_space, space);
 	}
+
+	/*
+	 * Run the triggers right after creating all the system
+	 * space stubs.
+	 */
+	trigger_run(&on_schema_init, NULL);
 }
 
 void

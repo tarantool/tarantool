@@ -44,6 +44,9 @@ extern "C" {
 extern uint32_t schema_version;
 extern uint32_t space_cache_version;
 
+/** Triggers invoked after schema initialization. */
+extern struct rlist on_schema_init;
+
 /**
  * Lock of schema modification
  */
