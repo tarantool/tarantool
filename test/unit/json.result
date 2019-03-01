@@ -101,7 +101,7 @@ ok 1 - subtests
 ok 2 - subtests
 	*** test_errors: done ***
 	*** test_tree ***
-    1..58
+    1..65
     ok 1 - add path '[1][10]'
     ok 2 - add path '[1][20].file'
     ok 3 - add path '[1][20].file[2]'
@@ -160,17 +160,25 @@ ok 2 - subtests
     ok 56 - last node is leaf
     ok 57 - last node became interm - it can't be leaf anymore
     ok 58 - last node is leaf
+    ok 59 - add path '[1][10]'
+    ok 60 - lookup any token in non-multikey node
+    ok 61 - add path '[1][*]["data"]'
+    ok 62 - lookup path '[1][*]["data"]'
+    ok 63 - lookup numeric token in multikey node
+    ok 64 - lookup any token in multikey node
+    ok 65 - lookup string token in multikey node
 ok 3 - subtests
 	*** test_tree: done ***
 	*** test_path_cmp ***
-    1..7
+    1..8
     ok 1 - path cmp result "Data[1]["FIO"].fname" with "Data[1]["FIO"].fname": have 0, expected 0
     ok 2 - path cmp result "Data[1]["FIO"].fname" with "["Data"][1].FIO["fname"]": have 0, expected 0
     ok 3 - path cmp result "Data[1]["FIO"].fname" with "Data[1]": have 1, expected 1
     ok 4 - path cmp result "Data[1]["FIO"].fname" with "Data[1]["FIO"].fname[1]": have -1, expected -1
     ok 5 - path cmp result "Data[1]["FIO"].fname" with "Data[1]["Info"].fname[1]": have -1, expected -1
-    ok 6 - path Data[1]["FIO"].fname is valid
-    ok 7 - path Data[[1]["FIO"].fname error pos 6 expected 6
+    ok 6 - path cmp result "Data[*]["FIO"].fname[*]" with "["Data"][*].FIO["fname"][*]": have 0, expected 0
+    ok 7 - path Data[1]["FIO"].fname is valid
+    ok 8 - path Data[[1]["FIO"].fname error pos 6 expected 6
 ok 4 - subtests
 	*** test_path_cmp: done ***
 	*** test_path_snprint ***

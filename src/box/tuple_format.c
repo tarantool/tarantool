@@ -233,6 +233,11 @@ tuple_format_add_field(struct tuple_format *format, uint32_t fieldno,
 	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
 	while ((rc = json_lexer_next_token(&lexer, &field->token)) == 0 &&
 	       field->token.type != JSON_TOKEN_END) {
+		if (field->token.type == JSON_TOKEN_ANY) {
+			diag_set(ClientError, ER_UNSUPPORTED,
+				"Tarantool", "multikey indexes");
+			goto fail;
+		}
 		enum field_type expected_type =
 			field->token.type == JSON_TOKEN_STR ?
 			FIELD_TYPE_MAP : FIELD_TYPE_ARRAY;

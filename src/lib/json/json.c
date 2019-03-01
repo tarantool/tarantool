@@ -226,10 +226,14 @@ json_lexer_next_token(struct json_lexer *lexer, struct json_token *token)
 		if (lexer->offset == lexer->src_len)
 			return lexer->symbol_count;
 		c = json_current_char(lexer);
-		if (c == '"' || c == '\'')
+		if (c == '"' || c == '\'') {
 			rc = json_parse_string(lexer, token, c);
-		else
+		} else if (c == '*') {
+			json_skip_char(lexer);
+			token->type = JSON_TOKEN_ANY;
+		} else {
 			rc = json_parse_integer(lexer, token);
+		}
 		if (rc != 0)
 			return rc;
 		/*
@@ -270,7 +274,7 @@ json_token_cmp(const struct json_token *a, const struct json_token *b)
 	} else if (a->type == JSON_TOKEN_NUM) {
 		ret = a->num - b->num;
 	} else {
-		unreachable();
+		assert(a->type == JSON_TOKEN_ANY);
 	}
 	return ret;
 }
@@ -331,6 +335,9 @@ json_token_snprint(char *buf, int size, const struct json_token *token,
 		break;
 	case JSON_TOKEN_STR:
 		len = snprintf(buf, size, "[\"%.*s\"]", token->len, token->str);
+		break;
+	case JSON_TOKEN_ANY:
+		len = snprintf(buf, size, "[*]");
 		break;
 	default:
 		unreachable();
@@ -420,6 +427,9 @@ json_token_hash(struct json_token *token)
 	} else if (token->type == JSON_TOKEN_NUM) {
 		data = &token->num;
 		data_size = sizeof(token->num);
+	} else if (token->type == JSON_TOKEN_ANY) {
+		data = "*";
+		data_size = 1;
 	} else {
 		unreachable();
 	}

@@ -66,6 +66,7 @@ struct json_lexer {
 enum json_token_type {
 	JSON_TOKEN_NUM,
 	JSON_TOKEN_STR,
+	JSON_TOKEN_ANY,
 	/** Lexer reached end of path. */
 	JSON_TOKEN_END,
 };
@@ -98,6 +99,10 @@ struct json_token {
 	 * array match [token.num] index for JSON_TOKEN_NUM type
 	 * and are allocated sequentially for JSON_TOKEN_STR child
 	 * tokens.
+	 *
+	 * JSON_TOKEN_ANY is exclusive. If it's present, it must
+	 * be the only one and have index 0 in the children array.
+	 * It will be returned by lookup by any key.
 	 */
 	struct json_token **children;
 	/** Allocation size of children array. */
@@ -265,6 +270,16 @@ json_token_is_leaf(struct json_token *token)
 }
 
 /**
+ * Test if a given JSON token is multikey.
+ */
+static inline bool
+json_token_is_multikey(struct json_token *token)
+{
+	return token->max_child_idx == 0 &&
+	       token->children[0]->type == JSON_TOKEN_ANY;
+}
+
+/**
  * An snprint-style function to print the path to a token in
  * a JSON tree.
  */
@@ -307,11 +322,24 @@ json_tree_lookup(struct json_tree *tree, struct json_token *parent,
 		 const struct json_token *token)
 {
 	struct json_token *ret = NULL;
-	if (likely(token->type == JSON_TOKEN_NUM)) {
-		ret = (int)token->num < parent->children_capacity ?
-		      parent->children[token->num] : NULL;
-	} else {
+	if (unlikely(json_token_is_multikey(parent))) {
+		assert(parent->max_child_idx == 0);
+		return parent->children[0];
+	}
+	switch (token->type) {
+	case JSON_TOKEN_NUM:
+		if (likely(token->num <= parent->max_child_idx))
+			ret = parent->children[token->num];
+		break;
+	case JSON_TOKEN_ANY:
+		if (likely(parent->max_child_idx >= 0))
+			ret = parent->children[parent->max_child_idx];
+		break;
+	case JSON_TOKEN_STR:
 		ret = json_tree_lookup_slowpath(tree, parent, token);
+		break;
+	default:
+		unreachable();
 	}
 	return ret;
 }

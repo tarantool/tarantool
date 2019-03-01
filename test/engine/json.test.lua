@@ -192,3 +192,10 @@ town:select()
 name:drop()
 town:select()
 s:drop()
+
+--
+-- gh-1260: Multikey indexes
+--
+s = box.schema.space.create('withdata')
+idx = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname'}}})
+s:drop()
