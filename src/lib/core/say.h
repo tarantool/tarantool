@@ -196,6 +196,13 @@ log_say(struct log *log, int level, const char *filename,
 	int line, const char *error, const char *format, ...);
 
 /**
+ * Default logger type info.
+ * @retval say_logger_type.
+ */
+enum say_logger_type
+log_type();
+
+/**
  * Set log level. Can be used dynamically.
  *
  * @param log   log object

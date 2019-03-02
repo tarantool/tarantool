@@ -65,6 +65,7 @@ mp_encode_float
 mp_decode_double
 mp_decode_float
 
+log_type
 say_set_log_level
 say_logrotate
 say_set_log_format
