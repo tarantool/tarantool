@@ -3,6 +3,11 @@
 local test = require('tap').test('log')
 test:plan(24)
 
+-- gh-3946: Assertion failure when using log_format() before box.cfg()
+local log = require('log')
+log.log_format('json')
+log.log_format('plain')
+
 --
 -- Check that Tarantool creates ADMIN session for #! script
 --
@@ -12,7 +17,6 @@ box.cfg{
     log=filename,
     memtx_memory=107374182,
 }
-local log = require('log')
 local fio = require('fio')
 local json = require('json')
 local fiber = require('fiber')

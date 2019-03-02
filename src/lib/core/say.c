@@ -161,6 +161,12 @@ level_to_syslog_priority(int level)
 	}
 }
 
+enum say_logger_type
+log_type()
+{
+	return log_default->type;
+}
+
 void
 log_set_level(struct log *log, enum say_level level)
 {
@@ -171,9 +177,7 @@ void
 log_set_format(struct log *log, log_format_func_t format_func)
 {
 	assert(format_func == say_format_plain ||
-	       log->type == SAY_LOGGER_STDERR ||
-	       log->type == SAY_LOGGER_PIPE || log->type == SAY_LOGGER_FILE);
-
+	       log->type != SAY_LOGGER_SYSLOG);
 	log->format_func = format_func;
 }
 

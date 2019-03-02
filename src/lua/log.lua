@@ -4,6 +4,18 @@ local ffi = require('ffi')
 ffi.cdef[[
     typedef void (*sayfunc_t)(int level, const char *filename, int line,
                const char *error, const char *format, ...);
+
+    enum say_logger_type {
+        SAY_LOGGER_BOOT,
+        SAY_LOGGER_STDERR,
+        SAY_LOGGER_FILE,
+        SAY_LOGGER_PIPE,
+        SAY_LOGGER_SYSLOG
+    };
+
+    enum say_logger_type
+    log_type();
+
     void
     say_set_log_level(int new_level);
 
@@ -117,6 +129,9 @@ end
 
 local function log_format(format_name)
     if format_name == "json" then
+        if ffi.C.log_type() == ffi.C.SAY_LOGGER_SYSLOG then
+            error("log_format: 'json' can't be used with syslog logger")
+        end
         ffi.C.say_set_log_format(ffi.C.SF_JSON)
     elseif format_name == "plain" then
         ffi.C.say_set_log_format(ffi.C.SF_PLAIN)
