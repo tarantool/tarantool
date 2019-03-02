@@ -137,7 +137,10 @@ check_function_exists(getprogname HAVE_GETPROGNAME)
 #
 # Enable 'make tags' target.
 #
-add_custom_target(tags COMMAND ${CTAGS} -R -f tags
+list(APPEND tagsExclude "--exclude=.git/*")
+list(APPEND tagsExclude "--exclude=.pc/*")
+list(APPEND tagsExclude "--exclude=patches/*")
+add_custom_target(tags COMMAND ${CTAGS} -R ${tagsExclude} -f tags
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_custom_target(ctags DEPENDS tags)
 
