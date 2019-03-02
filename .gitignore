@@ -6,10 +6,13 @@ _CPack_Packages
 *.gcno
 *.gcda
 *.gcov
+patches/
 coverage/
 coverage.info
 *.o
 *.reject
+*.orig
+*.rej
 *.so
 *~
 *.swp*
