@@ -1065,7 +1065,7 @@ test:do_catchsql_test(16.1, [[
   SELECT * FROM i;
 ]], {
   -- <16.1>
-  1, "recursive aggregate queries not supported"
+  1, "Tarantool does not support recursive aggregate queries"
   -- </16.1>
 })
 

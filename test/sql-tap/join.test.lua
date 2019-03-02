@@ -480,7 +480,7 @@ test:do_catchsql_test(
         SELECT * FROM t1 NATURAL RIGHT OUTER JOIN t2;
     ]], {
         -- <join-2.3>
-        1, "RIGHT and FULL OUTER JOINs are not currently supported"
+        1, "Tarantool does not support RIGHT and FULL OUTER JOINs"
         -- </join-2.3>
     })
 

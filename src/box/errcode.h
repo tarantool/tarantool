@@ -239,6 +239,7 @@ struct errcode_record {
 	/*184 */_(ER_SQL_UNRECOGNIZED_SYNTAX,	"Syntax error near '%.*s'") \
 	/*185 */_(ER_SQL_UNKNOWN_TOKEN,		"Syntax error: unrecognized token: '%.*s'") \
 	/*186 */_(ER_SQL_PARSER_GENERIC,	"%s") \
+	/*187 */_(ER_SQL_ANALYZE_ARGUMENT,	"ANALYZE statement argument %s is not a base table") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

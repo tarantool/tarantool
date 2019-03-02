@@ -515,6 +515,7 @@ t;
   184: box.error.SQL_UNRECOGNIZED_SYNTAX
   185: box.error.SQL_UNKNOWN_TOKEN
   186: box.error.SQL_PARSER_GENERIC
+  187: box.error.SQL_ANALYZE_ARGUMENT
 ...
 test_run:cmd("setopt delimiter ''");
 ---
