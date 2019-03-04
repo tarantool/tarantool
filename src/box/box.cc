@@ -222,6 +222,11 @@ process_nop(struct request *request)
 void
 box_set_ro(bool ro)
 {
+	if (ro == is_ro)
+		return; /* nothing to do */
+	if (ro)
+		engine_switch_to_ro();
+
 	is_ro = ro;
 	fiber_cond_broadcast(&ro_cond);
 }
@@ -252,6 +257,8 @@ box_set_orphan(bool orphan)
 {
 	if (is_orphan == orphan)
 		return; /* nothing to do */
+	if (orphan)
+		engine_switch_to_ro();
 
 	is_orphan = orphan;
 	fiber_cond_broadcast(&ro_cond);
