@@ -86,7 +86,7 @@ mp_decode_vclock(const char **data, struct vclock *vclock)
 
 int
 xrow_header_decode(struct xrow_header *header, const char **pos,
-		   const char *end)
+		   const char *end, bool end_is_exact)
 {
 	memset(header, 0, sizeof(struct xrow_header));
 	const char *tmp = *pos;
@@ -145,6 +145,10 @@ error:
 		header->bodycnt = 1;
 		header->body[0].iov_base = (void *) body;
 		header->body[0].iov_len = *pos - body;
+	}
+	if (end_is_exact && *pos < end) {
+		diag_set(ClientError, ER_INVALID_MSGPACK, "packet body");
+		return -1;
 	}
 	return 0;
 }
