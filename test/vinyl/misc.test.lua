@@ -114,3 +114,42 @@ s:drop()
 test_run:cmd('switch default')
 test_run:cmd('stop server test')
 test_run:cmd('cleanup server test')
+
+--
+-- gh-4016: local rw transactions are aborted when the instance
+-- switches to read-only mode.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+s:replace({1, 1})
+test_run:cmd("setopt delimiter ';'")
+-- Start rw transaction.
+ch1 = fiber.channel(1);
+_ = fiber.create(function()
+    box.begin()
+    s:replace{1, 2}
+    ch1:get()
+    local status, err = pcall(box.commit)
+    ch1:put(status or err)
+end);
+-- Start ro transaction.
+ch2 = fiber.channel(1);
+_ = fiber.create(function()
+    box.begin()
+    s:select()
+    ch2:get()
+    local status, err = pcall(box.commit)
+    ch2:put(status or err)
+end);
+test_run:cmd("setopt delimiter ''");
+-- Switch to ro mode.
+box.cfg{read_only = true}
+-- Resume the transactions.
+ch1:put(true)
+ch2:put(true)
+ch1:get()
+ch2:get()
+-- Cleanup.
+box.cfg{read_only = false}
+s:select()
+s:drop()

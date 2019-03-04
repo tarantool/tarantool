@@ -428,3 +428,33 @@ _ = fiber.create(function() box.snapshot() end)
 
 test_run:cmd("restart server default")
 box.space.test:drop()
+
+--
+-- Check that remote transactions are not aborted when an instance
+-- switches to read-only mode (gh-4016).
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+s:replace{1, 1}
+box.schema.user.grant('guest', 'replication')
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server replica")
+
+test_run:cmd("switch replica")
+box.error.injection.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0.1)
+
+test_run:cmd("switch default")
+s:update({1}, {{'+', 2, 1}})
+
+test_run:cmd("switch replica")
+box.cfg{read_only = true}
+
+test_run:cmd("switch default")
+vclock = test_run:get_vclock("default")
+_ = test_run:wait_vclock("replica", vclock)
+
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+box.schema.user.revoke('guest', 'replication')
+s:drop()
