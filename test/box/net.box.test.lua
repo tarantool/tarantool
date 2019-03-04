@@ -540,6 +540,17 @@ test_run:cmd("setopt delimiter ''");
 test_run:grep_log("default", "ER_NO_SUCH_PROC")
 box.schema.user.revoke('guest', 'execute', 'universe')
 
+--
+-- gh-3900: tarantool can be crashed by sending gibberish to a
+-- binary socket
+--
+socket = require("socket")
+sock = socket.tcp_connect(LISTEN.host, LISTEN.service)
+data = string.fromhex("6783000000000000000000000000000000000000000000800000C8000000000000000000000000000000000000000000FFFF210100373208000000FFFF000055AAEB66486472530D02000000000010A0350001008000001000000000000000000000000000D05700")
+sock:write(data)
+sock:close()
+test_run:grep_log('default', 'ER_INVALID_MSGPACK.*')
+
 -- gh-983 selecting a lot of data crashes the server or hangs the
 -- connection
 

@@ -1157,7 +1157,7 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 {
 	uint8_t type;
 
-	if (xrow_header_decode(&msg->header, pos, reqend))
+	if (xrow_header_decode(&msg->header, pos, reqend, true))
 		goto error;
 	assert(*pos == reqend);
 

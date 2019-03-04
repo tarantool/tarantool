@@ -1801,7 +1801,7 @@ xlog_tx_cursor_next_row(struct xlog_tx_cursor *tx_cursor,
 	/* Return row from xlog tx buffer */
 	int rc = xrow_header_decode(xrow,
 				    (const char **)&tx_cursor->rows.rpos,
-				    (const char *)tx_cursor->rows.wpos);
+				    (const char *)tx_cursor->rows.wpos, false);
 	if (rc != 0) {
 		diag_set(XlogError, "can't parse row");
 		/* Discard remaining row data */
