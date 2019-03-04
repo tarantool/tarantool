@@ -833,8 +833,15 @@ vy_tx_rollback(struct vy_tx *tx)
 	mempool_free(&xm->tx_mempool, tx);
 }
 
+void *
+vy_tx_begin_statement(struct vy_tx *tx)
+{
+	assert(tx->state == VINYL_TX_READY);
+	return stailq_last(&tx->log);
+}
+
 void
-vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp)
+vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 {
 	assert(tx->state == VINYL_TX_READY);
 	struct stailq_entry *last = svp;

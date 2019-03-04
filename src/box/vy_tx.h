@@ -311,20 +311,23 @@ void
 vy_tx_rollback(struct vy_tx *tx);
 
 /**
+ * Begin a statement in the vinyl transaction manager.
  * Return the save point corresponding to the current
  * transaction state. The transaction can be rolled back
- * to a save point with vy_tx_rollback_to_savepoint().
+ * to a save point with vy_tx_rollback_statement().
  */
-static inline void *
-vy_tx_savepoint(struct vy_tx *tx)
-{
-	assert(tx->state == VINYL_TX_READY);
-	return stailq_last(&tx->log);
-}
+void *
+vy_tx_begin_statement(struct vy_tx *tx);
 
-/** Rollback a transaction to a given save point. */
+/**
+ * Rollback a transaction statement.
+ *
+ * @param tx   Transaction in question.
+ * @param svp  Save point to rollback to, as returned by
+ *             vy_tx_begin_statement().
+ */
 void
-vy_tx_rollback_to_savepoint(struct vy_tx *tx, void *svp);
+vy_tx_rollback_statement(struct vy_tx *tx, void *svp);
 
 /**
  * Remember a read interval in the conflict manager index.
