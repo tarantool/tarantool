@@ -65,6 +65,14 @@ engine_shutdown(void)
 	}
 }
 
+void
+engine_switch_to_ro(void)
+{
+	struct engine *engine;
+	engine_foreach(engine)
+		engine->vtab->switch_to_ro(engine);
+}
+
 int
 engine_bootstrap(void)
 {
@@ -251,6 +259,12 @@ generic_engine_rollback(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
 	(void)txn;
+}
+
+void
+generic_engine_switch_to_ro(struct engine *engine)
+{
+	(void)engine;
 }
 
 int

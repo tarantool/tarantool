@@ -942,6 +942,7 @@ static const struct engine_vtab memtx_engine_vtab = {
 	/* .commit = */ generic_engine_commit,
 	/* .rollback_statement = */ memtx_engine_rollback_statement,
 	/* .rollback = */ memtx_engine_rollback,
+	/* .switch_to_ro = */ generic_engine_switch_to_ro,
 	/* .bootstrap = */ memtx_engine_bootstrap,
 	/* .begin_initial_recovery = */ memtx_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ memtx_engine_begin_final_recovery,
