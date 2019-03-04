@@ -837,6 +837,8 @@ void *
 vy_tx_begin_statement(struct vy_tx *tx)
 {
 	assert(tx->state == VINYL_TX_READY);
+	if (stailq_empty(&tx->log))
+		rlist_add_entry(&tx->xm->writers, tx, in_writers);
 	return stailq_last(&tx->log);
 }
 
@@ -1057,8 +1059,6 @@ vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
 	tx->write_set_version++;
 	tx->write_size += tuple_size(stmt);
 	vy_stmt_counter_acct_tuple(&lsm->stat.txw.count, stmt);
-	if (stailq_empty(&tx->log))
-		rlist_add_entry(&tx->xm->writers, tx, in_writers);
 	stailq_add_tail_entry(&tx->log, v, next_in_log);
 	return 0;
 }
@@ -1068,7 +1068,6 @@ tx_manager_abort_writers(struct tx_manager *xm, struct vy_lsm *lsm)
 {
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
-		assert(!vy_tx_is_ro(tx));
 		if (tx->state == VINYL_TX_READY &&
 		    write_set_search_key(&tx->write_set, lsm,
 					 lsm->env->empty_key) != NULL)
