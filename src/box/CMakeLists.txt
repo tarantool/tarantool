@@ -13,6 +13,7 @@ lua_source(lua_sources lua/upgrade.lua)
 lua_source(lua_sources lua/console.lua)
 lua_source(lua_sources lua/xlog.lua)
 lua_source(lua_sources lua/key_def.lua)
+lua_source(lua_sources lua/merger.lua)
 set(bin_sources)
 bin_source(bin_sources bootstrap.snap bootstrap.h)
 
@@ -144,6 +145,7 @@ add_library(box STATIC
     lua/xlog.c
     lua/execute.c
     lua/key_def.c
+    lua/merger.c
     ${bin_sources})
 
 target_link_libraries(box box_error tuple stat xrow xlog vclock crc32 scramble
