@@ -46,6 +46,7 @@
 #include "iterator_type.h"
 #include "salad/stailq.h"
 #include "schema.h" /* space_cache_version */
+#include "session.h"
 #include "space.h"
 #include "trigger.h"
 #include "trivia/util.h"
@@ -309,6 +310,7 @@ vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 	tx->write_size = 0;
 	tx->xm = xm;
 	tx->state = VINYL_TX_READY;
+	tx->is_applier_session = false;
 	tx->read_view = (struct vy_read_view *)xm->p_global_read_view;
 	vy_tx_read_set_new(&tx->read_set);
 	tx->psn = 0;
@@ -407,6 +409,11 @@ vy_tx_begin(struct tx_manager *xm)
 		return NULL;
 	}
 	vy_tx_create(xm, tx);
+
+	struct session *session = fiber_get_session(fiber());
+	if (session != NULL && session->type == SESSION_TYPE_APPLIER)
+		tx->is_applier_session = true;
+
 	return tx;
 }
 
@@ -1064,13 +1071,24 @@ vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
 }
 
 void
-tx_manager_abort_writers(struct tx_manager *xm, struct vy_lsm *lsm)
+tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct vy_lsm *lsm)
 {
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
 		if (tx->state == VINYL_TX_READY &&
 		    write_set_search_key(&tx->write_set, lsm,
 					 lsm->env->empty_key) != NULL)
+			tx->state = VINYL_TX_ABORT;
+	}
+}
+
+void
+tx_manager_abort_writers_for_ro(struct tx_manager *xm)
+{
+	struct vy_tx *tx;
+	rlist_foreach_entry(tx, &xm->writers, in_writers) {
+		/* Applier ignores ro flag. */
+		if (tx->state == VINYL_TX_READY && !tx->is_applier_session)
 			tx->state = VINYL_TX_ABORT;
 	}
 }

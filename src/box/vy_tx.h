@@ -161,6 +161,8 @@ struct vy_tx {
 	size_t write_size;
 	/** Current state of the transaction.*/
 	enum tx_state state;
+	/** Set if the transaction was started by an applier. */
+	bool is_applier_session;
 	/**
 	 * The read view of this transaction. When a transaction
 	 * is started, it is set to the "read committed" state,
@@ -276,10 +278,18 @@ tx_manager_mem_used(struct tx_manager *xm);
 
 /**
  * Abort all rw transactions that affect the given LSM tree
- * and haven't reached WAL yet.
+ * and haven't reached WAL yet. Called before executing a DDL
+ * operation.
  */
 void
-tx_manager_abort_writers(struct tx_manager *xm, struct vy_lsm *lsm);
+tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct vy_lsm *lsm);
+
+/**
+ * Abort all local rw transactions that haven't reached WAL yet.
+ * Called before switching to read-only mode.
+ */
+void
+tx_manager_abort_writers_for_ro(struct tx_manager *xm);
 
 /** Initialize a tx object. */
 void

@@ -70,7 +70,6 @@
 #include "info.h"
 #include "column_mask.h"
 #include "trigger.h"
-#include "session.h"
 #include "wal.h" /* wal_mode() */
 
 /**
@@ -1035,7 +1034,7 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 static void
 vy_abort_writers_for_ddl(struct vy_env *env, struct vy_lsm *lsm)
 {
-	tx_manager_abort_writers(env->xm, lsm);
+	tx_manager_abort_writers_for_ddl(env->xm, lsm);
 	/*
 	 * Wait for prepared transactions to complete
 	 * (we can't abort them as they reached WAL).
@@ -2329,8 +2328,8 @@ vinyl_engine_prepare(struct engine *engine, struct txn *txn)
 	 * available for the admin to track the lag so let the applier
 	 * wait as long as necessary for memory dump to complete.
 	 */
-	double timeout = (current_session()->type != SESSION_TYPE_APPLIER ?
-			  env->timeout : TIMEOUT_INFINITY);
+	double timeout = (tx->is_applier_session ?
+			  TIMEOUT_INFINITY : env->timeout);
 	/*
 	 * Reserve quota needed by the transaction before allocating
 	 * memory. Since this may yield, which opens a time window for
@@ -2416,6 +2415,13 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	struct vy_tx *tx = txn->engine_tx;
 	assert(tx != NULL);
 	vy_tx_rollback_statement(tx, stmt->engine_savepoint);
+}
+
+static void
+vinyl_engine_switch_to_ro(struct engine *engine)
+{
+	struct vy_env *env = vy_env(engine);
+	tx_manager_abort_writers_for_ro(env->xm);
 }
 
 /* }}} Public API of transaction control */
@@ -4457,7 +4463,7 @@ static const struct engine_vtab vinyl_engine_vtab = {
 	/* .commit = */ vinyl_engine_commit,
 	/* .rollback_statement = */ vinyl_engine_rollback_statement,
 	/* .rollback = */ vinyl_engine_rollback,
-	/* .switch_to_ro = */ generic_engine_switch_to_ro,
+	/* .switch_to_ro = */ vinyl_engine_switch_to_ro,
 	/* .bootstrap = */ vinyl_engine_bootstrap,
 	/* .begin_initial_recovery = */ vinyl_engine_begin_initial_recovery,
 	/* .begin_final_recovery = */ vinyl_engine_begin_final_recovery,
