@@ -205,13 +205,14 @@ tuple_format_field_by_id(struct tuple_format *format, uint32_t id)
  */
 static struct tuple_field *
 tuple_format_add_field(struct tuple_format *format, uint32_t fieldno,
-		       const char *path, uint32_t path_len, char **path_pool)
+		       const char *path, uint32_t path_len, bool is_sequential,
+		       int *current_slot, char **path_pool)
 {
 	struct tuple_field *field = NULL;
 	struct tuple_field *parent = tuple_format_field(format, fieldno);
 	assert(parent != NULL);
 	if (path == NULL)
-		return parent;
+		goto end;
 	field = tuple_field_new();
 	if (field == NULL)
 		goto fail;
@@ -279,12 +280,23 @@ tuple_format_add_field(struct tuple_format *format, uint32_t fieldno,
 	assert(parent != NULL);
 	/* Update tree depth information. */
 	format->fields_depth = MAX(format->fields_depth, token_count + 1);
-end:
+cleanup:
 	tuple_field_delete(field);
+end:
+	/*
+	 * In the tuple, store only offsets necessary to access
+	 * fields of non-sequential keys. First field is always
+	 * simply accessible, so we don't store an offset for it.
+	 */
+	if (parent != NULL && parent->offset_slot == TUPLE_OFFSET_SLOT_NIL &&
+	    is_sequential == false && (fieldno > 0 || path != NULL)) {
+		*current_slot = *current_slot - 1;
+		parent->offset_slot = *current_slot;
+	}
 	return parent;
 fail:
 	parent = NULL;
-	goto end;
+	goto cleanup;
 }
 
 static int
@@ -295,7 +307,8 @@ tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
 	assert(part->fieldno < tuple_format_field_count(format));
 	struct tuple_field *field =
 		tuple_format_add_field(format, part->fieldno, part->path,
-				       part->path_len, path_pool);
+				       part->path_len, is_sequential,
+				       current_slot, path_pool);
 	if (field == NULL)
 		return -1;
 	/*
@@ -350,17 +363,6 @@ tuple_format_use_key_part(struct tuple_format *format, uint32_t field_count,
 		return -1;
 	}
 	field->is_key_part = true;
-	/*
-	 * In the tuple, store only offsets necessary to access
-	 * fields of non-sequential keys. First field is always
-	 * simply accessible, so we don't store an offset for it.
-	 */
-	if (field->offset_slot == TUPLE_OFFSET_SLOT_NIL &&
-	    is_sequential == false &&
-	    (part->fieldno > 0 || part->path != NULL)) {
-		*current_slot = *current_slot - 1;
-		field->offset_slot = *current_slot;
-	}
 	return 0;
 }
 
