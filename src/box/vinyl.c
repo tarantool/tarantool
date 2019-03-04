@@ -2404,7 +2404,7 @@ vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 	struct vy_tx *tx = txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
-	stmt->engine_savepoint = vy_tx_savepoint(tx);
+	stmt->engine_savepoint = vy_tx_begin_statement(tx);
 	return 0;
 }
 
@@ -2415,7 +2415,7 @@ vinyl_engine_rollback_statement(struct engine *engine, struct txn *txn,
 	(void)engine;
 	struct vy_tx *tx = txn->engine_tx;
 	assert(tx != NULL);
-	vy_tx_rollback_to_savepoint(tx, stmt->engine_savepoint);
+	vy_tx_rollback_statement(tx, stmt->engine_savepoint);
 }
 
 /* }}} Public API of transaction control */
