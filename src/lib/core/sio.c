@@ -293,6 +293,16 @@ sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen)
 	return 0;
 }
 
+int
+sio_getsockname(int fd, struct sockaddr *addr, socklen_t *addrlen)
+{
+	if (getsockname(fd, addr, addrlen) < 0) {
+		diag_set(SocketError, sio_socketname(fd), "getsockname");
+		return -1;
+	}
+	return 0;
+}
+
 const char *
 sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 {

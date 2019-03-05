@@ -78,6 +78,26 @@ check_uri_to_addr(void)
 	footer();
 }
 
+static void
+check_auto_bind(void)
+{
+	header();
+	plan(3);
+
+	struct sockaddr_in addr;
+	socklen_t addrlen = sizeof(addr);
+	sio_uri_to_addr("127.0.0.1:0", (struct sockaddr *) &addr);
+	int fd = sio_socket(AF_INET, SOCK_STREAM, 0);
+	is(sio_bind(fd, (struct sockaddr *) &addr, sizeof(addr)), 0,
+	   "bind to 0 works");
+	is(sio_getsockname(fd, (struct sockaddr *) &addr, &addrlen), 0,
+	   "getsockname works on 0 bind");
+	isnt(addr.sin_port, 0, "a real port is returned");
+
+	check_plan();
+	footer();
+}
+
 int
 main(void)
 {
@@ -85,8 +105,9 @@ main(void)
 	fiber_init(fiber_c_invoke);
 
 	header();
-	plan(1);
+	plan(2);
 	check_uri_to_addr();
+	check_auto_bind();
 	int rc = check_plan();
 	footer();
 

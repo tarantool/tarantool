@@ -87,6 +87,21 @@ int
 sio_getpeername(int fd, struct sockaddr *addr, socklen_t *addrlen);
 
 /**
+ * Fill @a addr with a real address currently bound to @a fd
+ * socket.
+ *
+ * @param fd Socket.
+ * @param[out] addr An address structure to fill.
+ * @param[in][out] addlen On input it is a size of @a addr as a
+ *                 buffer. On output it becomes a size of a new
+ *                 content of @a addr.
+ * @retval 0 Success.
+ * @retval -1 Error.
+ */
+int
+sio_getsockname(int fd, struct sockaddr *addr, socklen_t *addrlen);
+
+/**
  * Advance write position in the iovec array
  * based on its current value and the number of
  * bytes written.
