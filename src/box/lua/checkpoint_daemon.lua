@@ -2,7 +2,6 @@
 
 local log = require 'log'
 local fiber = require 'fiber'
-local fio = require 'fio'
 local yaml = require 'yaml'
 local errno = require 'errno'
 local digest = require 'digest'
@@ -16,44 +15,11 @@ local daemon = {
     control = nil;
 }
 
--- create snapshot, return true if no errors
 local function snapshot()
     log.info("making snapshot...")
     local s, e = pcall(function() box.snapshot() end)
-    if s then
-        return true
-    end
-    -- don't complain in the log if the snapshot already exists
-    if errno() == errno.EEXIST then
-        return false
-    end
-    log.error("error while creating snapshot: %s", e)
-    return false
-end
-
--- check filesystem and current time
-local function process(self)
-
-    if daemon.checkpoint_interval == nil then
-        return false
-    end
-
-    if not(daemon.checkpoint_interval > 0) then
-        return false
-    end
-
-    local checkpoints = box.info.gc().checkpoints
-    local last_checkpoint = checkpoints[#checkpoints]
-
-    local last_snap = fio.pathjoin(box.cfg.memtx_dir,
-            string.format('%020d.snap', last_checkpoint.signature))
-    local snstat = fio.stat(last_snap)
-    if snstat == nil then
-        log.error("can't stat %s: %s", last_snap, errno.strerror())
-        return false
-    end
-    if snstat.mtime + daemon.checkpoint_interval <= fiber.time() then
-        return snapshot()
+    if not s then
+        log.error("error while creating snapshot: %s", e)
     end
 end
 
@@ -82,10 +48,7 @@ local function daemon_fiber(self)
             offset = random % self.checkpoint_interval
             log.info("reloaded") -- continue
         elseif msg == nil and box.info.status == 'running' then
-            local s, e = pcall(process, self)
-            if not s then
-                log.error(e)
-            end
+            snapshot()
             offset = 0
         end
     end
