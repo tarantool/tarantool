@@ -24,7 +24,10 @@ help()
       \help show this screen
       \quit quit interactive console
 ...
-cfg_filter(box.cfg)
+test_helpers = require('test_helpers')
+---
+...
+test_helpers.cfg_filter(box.cfg)
 ---
 - - - background
     - false

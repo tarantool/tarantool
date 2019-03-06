@@ -1,3 +1,4 @@
+local engine_long_module = {}
 
 function string_function()
     local random_number
@@ -10,7 +11,7 @@ function string_function()
     return random_string
 end
 
-function delete_replace_update(engine_name, iterations)
+function engine_long_module.delete_replace_update(engine_name, iterations)
     local string_value
     if (box.space._space.index.name:select{'tester'}[1] ~= nil) then
         box.space.tester:drop()
@@ -69,7 +70,7 @@ function delete_replace_update(engine_name, iterations)
     return {counter, random_number, string_value_2, string_value_3}
 end
 
-function delete_insert(engine_name, iterations)
+function engine_long_module.delete_insert(engine_name, iterations)
     local string_value
     if (box.space._space.index.name:select{'tester'}[1] ~= nil) then
         box.space.tester:drop()
@@ -107,3 +108,5 @@ function delete_insert(engine_name, iterations)
     box.space.tester:drop()
     return {counter, string_value_2}
 end
+
+return engine_long_module

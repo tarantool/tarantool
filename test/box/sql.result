@@ -227,6 +227,9 @@ space = nil
 net_box = require('net.box')
 ---
 ...
+test_helpers = require('test_helpers')
+---
+...
 -- Prepare spaces
 box.schema.user.create('test', { password = 'test' })
 ---
@@ -275,7 +278,7 @@ space:insert{'Kytes', 'Tomas'}
 ---
 - ['Kytes', 'Tomas']
 ...
-sorted(space.index.secondary:select('Richard'))
+test_helpers.sorted(space.index.secondary:select('Richard'))
 ---
 - - ['Doe', 'Richard']
   - ['Roe', 'Richard']
@@ -284,7 +287,7 @@ sorted(space.index.secondary:select('Richard'))
 -- A test case for Bug#729879
 -- "Zero limit is treated the same as no limit"
 -- https://bugs.launchpad.net/tarantool/+bug/729879
-sorted(space.index.secondary:select('Richard', { limit = 0 }))
+test_helpers.sorted(space.index.secondary:select('Richard', { limit = 0 }))
 ---
 - []
 ...
@@ -301,7 +304,7 @@ space:insert{'Britney'}
 ---
 - error: Tuple field 2 required by space format is missing
 ...
-sorted(space.index.secondary:select('Anything'))
+test_helpers.sorted(space.index.secondary:select('Anything'))
 ---
 - []
 ...
@@ -309,7 +312,7 @@ space:insert{'Stephanie'}
 ---
 - error: Tuple field 2 required by space format is missing
 ...
-sorted(space.index.secondary:select('Anything'))
+test_helpers.sorted(space.index.secondary:select('Anything'))
 ---
 - []
 ...
@@ -321,11 +324,11 @@ space:select{'Spears'}
 ---
 - - ['Spears', 'Britney']
 ...
-sorted(space.index.secondary:select('Anything'))
+test_helpers.sorted(space.index.secondary:select('Anything'))
 ---
 - []
 ...
-sorted(space.index.secondary:select('Britney'))
+test_helpers.sorted(space.index.secondary:select('Britney'))
 ---
 - - ['Spears', 'Britney']
 ...
@@ -385,7 +388,7 @@ space:select{'key3'}
 ---
 - - ['key3', 'part1', 'part2_b']
 ...
-sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part1'))
 ---
 - - ['key1', 'part1', 'part2']
   - ['key2', 'part1', 'part2_a']
@@ -418,7 +421,7 @@ space:select{'key3'}
 ---
 - - ['key3', 'part1', 'part2_b']
 ...
-sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part1'))
 ---
 - - ['key1', 'part1', 'part2']
   - ['key2', 'part1', 'part2_a']
@@ -492,33 +495,33 @@ space:select{21234567}
 ---
 - - [21234567, 'part1', 'part2_a']
 ...
-sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part1'))
 ---
 - - [1234567, 'part1', 'part2']
   - [11234567, 'part1', 'part2']
   - [21234567, 'part1', 'part2_a']
 ...
-sorted(space.index.secondary:select('part1_a'))
+test_helpers.sorted(space.index.secondary:select('part1_a'))
 ---
 - - [31234567, 'part1_a', 'part2']
   - [41234567, 'part1_a', 'part2_a']
 ...
-sorted(space.index.secondary:select('part_none'))
+test_helpers.sorted(space.index.secondary:select('part_none'))
 ---
 - []
 ...
-sorted(s.index[1]:select({'part1', 'part2'}))
+test_helpers.sorted(s.index[1]:select({'part1', 'part2'}))
 ---
 - - [1234567, 'part1', 'part2']
   - [11234567, 'part1', 'part2']
 ...
-sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part1'))
 ---
 - - [1234567, 'part1', 'part2']
   - [11234567, 'part1', 'part2']
   - [21234567, 'part1', 'part2_a']
 ...
-sorted(space.index.secondary:select('part2'))
+test_helpers.sorted(space.index.secondary:select('part2'))
 ---
 - []
 ...
@@ -593,19 +596,22 @@ s = box.space.tweedledum
 ---
 ...
 -- Bug#929654 - secondary hash index is not built with build_indexes()
-sorted(space.index.secondary:select('hello'))
+test_helpers = require('test_helpers')
+---
+...
+test_helpers.sorted(space.index.secondary:select('hello'))
 ---
 - - [1, 'hello']
 ...
-sorted(space.index.secondary:select('brave'))
+test_helpers.sorted(space.index.secondary:select('brave'))
 ---
 - - [2, 'brave']
 ...
-sorted(space.index.secondary:select('new'))
+test_helpers.sorted(space.index.secondary:select('new'))
 ---
 - - [3, 'new']
 ...
-sorted(space.index.secondary:select('world'))
+test_helpers.sorted(space.index.secondary:select('world'))
 ---
 - - [4, 'world']
 ...
@@ -629,7 +635,7 @@ space:select{'Spears'}
 ---
 - - ['Spears', 'Britney']
 ...
-sorted(space.index.secondary:select('Britney'))
+test_helpers.sorted(space.index.secondary:select('Britney'))
 ---
 - - ['Spears', 'Britney']
 ...
@@ -712,7 +718,7 @@ space:insert{15, 'duplicate three'}
 ---
 - [15, 'duplicate three']
 ...
-sorted(space.index.secondary:select('duplicate one'))
+test_helpers.sorted(space.index.secondary:select('duplicate one'))
 ---
 - - [1, 'duplicate one']
   - [2, 'duplicate one']
@@ -720,7 +726,7 @@ sorted(space.index.secondary:select('duplicate one'))
   - [4, 'duplicate one']
   - [5, 'duplicate one']
 ...
-sorted(space.index.secondary:select('duplicate two'))
+test_helpers.sorted(space.index.secondary:select('duplicate two'))
 ---
 - - [6, 'duplicate two']
   - [7, 'duplicate two']
@@ -728,7 +734,7 @@ sorted(space.index.secondary:select('duplicate two'))
   - [9, 'duplicate two']
   - [10, 'duplicate two']
 ...
-sorted(space.index.secondary:select('duplicate three'))
+test_helpers.sorted(space.index.secondary:select('duplicate three'))
 ---
 - - [11, 'duplicate three']
   - [12, 'duplicate three']

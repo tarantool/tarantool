@@ -90,6 +90,7 @@ box.space.test1:drop()
 box.schema.user.drop('test')
 space = nil
 net_box = require('net.box')
+test_helpers = require('test_helpers')
 
 -- Prepare spaces
 box.schema.user.create('test', { password = 'test' })
@@ -110,13 +111,13 @@ space:insert{'Roe', 'Richard'}
 space:insert{'Woe', 'Richard'}
 space:insert{'Major', 'Tomas'}
 space:insert{'Kytes', 'Tomas'}
-sorted(space.index.secondary:select('Richard'))
+test_helpers.sorted(space.index.secondary:select('Richard'))
 
 
 -- A test case for Bug#729879
 -- "Zero limit is treated the same as no limit"
 -- https://bugs.launchpad.net/tarantool/+bug/729879
-sorted(space.index.secondary:select('Richard', { limit = 0 }))
+test_helpers.sorted(space.index.secondary:select('Richard', { limit = 0 }))
 s:truncate()
 
 
@@ -128,13 +129,13 @@ s:truncate()
 -- get away with it.
 
 space:insert{'Britney'}
-sorted(space.index.secondary:select('Anything'))
+test_helpers.sorted(space.index.secondary:select('Anything'))
 space:insert{'Stephanie'}
-sorted(space.index.secondary:select('Anything'))
+test_helpers.sorted(space.index.secondary:select('Anything'))
 space:insert{'Spears', 'Britney'}
 space:select{'Spears'}
-sorted(space.index.secondary:select('Anything'))
-sorted(space.index.secondary:select('Britney'))
+test_helpers.sorted(space.index.secondary:select('Anything'))
+test_helpers.sorted(space.index.secondary:select('Britney'))
 
 s.index[0]:select('Spears', { limit = 100, iterator = 'GE' })
 s.index[1]:select('Britney', { limit = 100, iterator = 'GE' })
@@ -156,7 +157,7 @@ s.index[1]:select{}
 space:select{'key1'}
 space:select{'key2'}
 space:select{'key3'}
-sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part1'))
 
 s.index[1]:select('part1', { limit = 100, iterator = 'GE' })
 s.index[0]:select('key2', { limit = 100, iterator = 'GE' })
@@ -164,7 +165,7 @@ s.index[1]:select({ 'part1', 'part2_a' }, { limit = 1, iterator = 'GE' })
 space:select{'key1'}
 space:select{'key2'}
 space:select{'key3'}
-sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part1'))
 
 space:delete('key1')
 space:delete('key2')
@@ -188,14 +189,14 @@ l
 space:select{1234567}
 space:select{11234567}
 space:select{21234567}
-sorted(space.index.secondary:select('part1'))
-sorted(space.index.secondary:select('part1_a'))
-sorted(space.index.secondary:select('part_none'))
+test_helpers.sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part1_a'))
+test_helpers.sorted(space.index.secondary:select('part_none'))
 
-sorted(s.index[1]:select({'part1', 'part2'}))
+test_helpers.sorted(s.index[1]:select({'part1', 'part2'}))
 
-sorted(space.index.secondary:select('part1'))
-sorted(space.index.secondary:select('part2'))
+test_helpers.sorted(space.index.secondary:select('part1'))
+test_helpers.sorted(space.index.secondary:select('part2'))
 
 -- cleanup
 space:delete(1234567)
@@ -226,10 +227,11 @@ space = conn.space.tweedledum
 s = box.space.tweedledum
 
 -- Bug#929654 - secondary hash index is not built with build_indexes()
-sorted(space.index.secondary:select('hello'))
-sorted(space.index.secondary:select('brave'))
-sorted(space.index.secondary:select('new'))
-sorted(space.index.secondary:select('world'))
+test_helpers = require('test_helpers')
+test_helpers.sorted(space.index.secondary:select('hello'))
+test_helpers.sorted(space.index.secondary:select('brave'))
+test_helpers.sorted(space.index.secondary:select('new'))
+test_helpers.sorted(space.index.secondary:select('world'))
 s:truncate()
 
 -- A test case for: http://bugs.launchpad.net/bugs/735140
@@ -240,7 +242,7 @@ s.index.secondary:alter{type = 'tree', unique = false}
 
 space:insert{'Spears', 'Britney'}
 space:select{'Spears'}
-sorted(space.index.secondary:select('Britney'))
+test_helpers.sorted(space.index.secondary:select('Britney'))
 -- try to insert the incoplete tuple
 space:replace{'Spears'}
 -- check that nothing has been updated
@@ -268,9 +270,9 @@ space:insert{14, 'duplicate three'}
 space:insert{15, 'duplicate three'}
 
 
-sorted(space.index.secondary:select('duplicate one'))
-sorted(space.index.secondary:select('duplicate two'))
-sorted(space.index.secondary:select('duplicate three'))
+test_helpers.sorted(space.index.secondary:select('duplicate one'))
+test_helpers.sorted(space.index.secondary:select('duplicate two'))
+test_helpers.sorted(space.index.secondary:select('duplicate three'))
 
 space:delete(1)
 space:delete(2)
