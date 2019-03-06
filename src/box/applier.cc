@@ -427,6 +427,170 @@ applier_join(struct applier *applier)
 }
 
 /**
+ * A helper struct to link xrow objects in a list.
+ */
+struct applier_tx_row {
+	/* Next transaction row. */
+	struct stailq_entry next;
+	/* xrow_header struct for the current transaction row. */
+	struct xrow_header row;
+};
+
+static struct applier_tx_row *
+applier_read_tx_row(struct applier *applier)
+{
+	struct ev_io *coio = &applier->io;
+	struct ibuf *ibuf = &applier->ibuf;
+
+	struct applier_tx_row *tx_row = (struct applier_tx_row *)
+		region_alloc(&fiber()->gc, sizeof(struct applier_tx_row));
+
+	if (tx_row == NULL)
+		tnt_raise(OutOfMemory, sizeof(struct applier_tx_row),
+			  "region", "struct applier_tx_row");
+
+	struct xrow_header *row = &tx_row->row;
+
+	double timeout = replication_disconnect_timeout();
+	/*
+	 * Tarantool < 1.7.7 does not send periodic heartbeat
+	 * messages so we can't assume that if we haven't heard
+	 * from the master for quite a while the connection is
+	 * broken - the master might just be idle.
+	 */
+	if (applier->version_id < version_id(1, 7, 7))
+		coio_read_xrow(coio, ibuf, row);
+	else
+		coio_read_xrow_timeout_xc(coio, ibuf, row, timeout);
+
+	applier->lag = ev_now(loop()) - row->tm;
+	applier->last_row_time = ev_monotonic_now(loop());
+	return tx_row;
+}
+
+/**
+ * Read one transaction from network using applier's input buffer.
+ * Transaction rows are placed onto fiber gc region.
+ * We could not use applier input buffer to store rows because
+ * rpos is adjusted as xrow is decoded and the corresponding
+ * network input space is reused for the next xrow.
+ */
+static void
+applier_read_tx(struct applier *applier, struct stailq *rows)
+{
+	int64_t tsn = 0;
+
+	stailq_create(rows);
+	do {
+		struct applier_tx_row *tx_row = applier_read_tx_row(applier);
+		struct xrow_header *row = &tx_row->row;
+
+		if (iproto_type_is_error(row->type))
+			xrow_decode_error_xc(row);
+
+		/* Replication request. */
+		if (row->replica_id == REPLICA_ID_NIL ||
+		    row->replica_id >= VCLOCK_MAX) {
+			/*
+			 * A safety net, this can only occur
+			 * if we're fed a strangely broken xlog.
+			 */
+			tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
+				  int2str(row->replica_id),
+				  tt_uuid_str(&REPLICASET_UUID));
+		}
+		if (tsn == 0) {
+			/*
+			 * Transaction id must be derived from the log sequence
+			 * number of the first row in the transaction.
+			 */
+			tsn = row->tsn;
+			if (row->lsn != tsn)
+				tnt_raise(ClientError, ER_PROTOCOL,
+					  "Transaction id must be equal to "
+					  "LSN of the first row in the "
+					  "transaction.");
+		}
+		if (tsn != row->tsn)
+			tnt_raise(ClientError, ER_UNSUPPORTED,
+				  "replication",
+				  "interleaving transactions");
+
+		assert(row->bodycnt <= 1);
+		if (row->bodycnt == 1 && !row->is_commit) {
+			/*
+			 * Save row body to gc region.
+			 * Not done for single-statement
+			 * transactions knowing that the input
+			 * buffer will not be used while the
+			 * transaction is applied.
+			 */
+			void *new_base = region_alloc(&fiber()->gc,
+						      row->body->iov_len);
+			if (new_base == NULL)
+				tnt_raise(OutOfMemory, row->body->iov_len,
+					  "region", "xrow body");
+			memcpy(new_base, row->body->iov_base,
+			       row->body->iov_len);
+			/* Adjust row body pointers. */
+			row->body->iov_base = new_base;
+		}
+		stailq_add_tail(rows, &tx_row->next);
+
+	} while (!stailq_last_entry(rows, struct applier_tx_row,
+				    next)->row.is_commit);
+}
+
+/**
+ * Apply all rows in the rows queue as a single transaction.
+ *
+ * Return 0 for success or -1 in case of an error.
+ */
+static int
+applier_apply_tx(struct stailq *rows)
+{
+	int res = 0;
+	/**
+	 * Explicitly begin the transaction so that we can
+	 * control fiber->gc in ase of apply conflict and safely
+	 * allocate IPROTO_NOP on gc.
+	 */
+	struct txn *txn = txn_begin(false);
+	struct applier_tx_row *item;
+	if (txn == NULL)
+		diag_raise();
+	stailq_foreach_entry(item, rows, next) {
+		struct xrow_header *row = &item->row;
+		res = apply_row(row);
+		if (res != 0) {
+			struct error *e = diag_last_error(diag_get());
+			/*
+			 * In case of ER_TUPLE_FOUND error and enabled
+			 * replication_skip_conflict configuration
+			 * option, skip applying the foreign row and
+			 * replace it with NOP in the local write ahead
+			 * log.
+			 */
+			if (e->type == &type_ClientError &&
+			    box_error_code(e) == ER_TUPLE_FOUND &&
+			    replication_skip_conflict) {
+				diag_clear(diag_get());
+				row->type = IPROTO_NOP;
+				row->bodycnt = 0;
+				res = apply_row(row);
+			}
+		}
+		if (res != 0)
+			break;
+	}
+	if (res == 0)
+		res = txn_commit(txn);
+	else
+		txn_rollback();
+	return res;
+}
+
+/**
  * Execute and process SUBSCRIBE request (follow updates from a master).
  */
 static void
@@ -555,36 +719,14 @@ applier_subscribe(struct applier *applier)
 			applier_set_state(applier, APPLIER_FOLLOW);
 		}
 
-		/*
-		 * Tarantool < 1.7.7 does not send periodic heartbeat
-		 * messages so we can't assume that if we haven't heard
-		 * from the master for quite a while the connection is
-		 * broken - the master might just be idle.
-		 */
-		if (applier->version_id < version_id(1, 7, 7)) {
-			coio_read_xrow(coio, ibuf, &row);
-		} else {
-			double timeout = replication_disconnect_timeout();
-			coio_read_xrow_timeout_xc(coio, ibuf, &row, timeout);
-		}
+		struct stailq rows;
+		applier_read_tx(applier, &rows);
 
-		if (iproto_type_is_error(row.type))
-			xrow_decode_error_xc(&row);  /* error */
-		/* Replication request. */
-		if (row.replica_id == REPLICA_ID_NIL ||
-		    row.replica_id >= VCLOCK_MAX) {
-			/*
-			 * A safety net, this can only occur
-			 * if we're fed a strangely broken xlog.
-			 */
-			tnt_raise(ClientError, ER_UNKNOWN_REPLICA,
-				  int2str(row.replica_id),
-				  tt_uuid_str(&REPLICASET_UUID));
-		}
-
-		applier->lag = ev_now(loop()) - row.tm;
+		struct xrow_header *first_row =
+			&stailq_first_entry(&rows, struct applier_tx_row,
+					    next)->row;
 		applier->last_row_time = ev_monotonic_now(loop());
-		struct replica *replica = replica_by_id(row.replica_id);
+		struct replica *replica = replica_by_id(first_row->replica_id);
 		struct latch *latch = (replica ? &replica->order_latch :
 				       &replicaset.applier.order_latch);
 		/*
@@ -594,33 +736,11 @@ applier_subscribe(struct applier *applier)
 		 * that belong to the same server id.
 		 */
 		latch_lock(latch);
-		if (vclock_get(&replicaset.vclock, row.replica_id) < row.lsn) {
-			int res = apply_row(&row);
-			if (res != 0) {
-				struct error *e = diag_last_error(diag_get());
-				/*
-				 * In case of ER_TUPLE_FOUND error and enabled
-				 * replication_skip_conflict configuration
-				 * option, skip applying the foreign row and
-				 * replace it with NOP in the local write ahead
-				 * log.
-				 */
-				if (e->type == &type_ClientError &&
-				    box_error_code(e) == ER_TUPLE_FOUND &&
-				    replication_skip_conflict) {
-					diag_clear(diag_get());
-					struct xrow_header nop;
-					nop.type = IPROTO_NOP;
-					nop.bodycnt = 0;
-					nop.replica_id = row.replica_id;
-					nop.lsn = row.lsn;
-					res = apply_row(&nop);
-				}
-			}
-			if (res != 0) {
-				latch_unlock(latch);
-				diag_raise();
-			}
+		if (vclock_get(&replicaset.vclock, first_row->replica_id) <
+		    first_row->lsn &&
+		    applier_apply_tx(&rows) != 0) {
+			latch_unlock(latch);
+			diag_raise();
 		}
 		latch_unlock(latch);
 
