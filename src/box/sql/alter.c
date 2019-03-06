@@ -73,7 +73,6 @@ exit_rename_table:
 tnt_error:
 	sqlDbFree(db, new_name);
 	parse->is_aborted = true;
-	parse->nErr++;
 	goto exit_rename_table;
 }
 

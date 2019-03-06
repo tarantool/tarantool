@@ -116,7 +116,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 	int upd_cols_cnt = 0;
 
 	db = pParse->db;
-	if (pParse->nErr || db->mallocFailed) {
+	if (pParse->is_aborted || db->mallocFailed) {
 		goto update_cleanup;
 	}
 	assert(pTabList->nSrc == 1);
@@ -192,7 +192,7 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		if (j >= (int)def->field_count) {
 			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME,
 				 pChanges->a[i].zName, def->name);
-			sql_parser_error(pParse);
+			pParse->is_aborted = true;
 			goto update_cleanup;
 		}
 	}

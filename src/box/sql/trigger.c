@@ -155,7 +155,6 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 
 set_tarantool_error_and_cleanup:
 	parse->is_aborted = true;
-	parse->nErr++;
 	goto trigger_cleanup;
 }
 
@@ -169,7 +168,7 @@ sql_trigger_finish(struct Parse *parse, struct TriggerStep *step_list,
 	struct sql *db = parse->db;
 
 	parse->parsed_ast.trigger = NULL;
-	if (NEVER(parse->nErr) || trigger == NULL)
+	if (NEVER(parse->is_aborted) || trigger == NULL)
 		goto cleanup;
 	char *trigger_name = trigger->zName;
 	trigger->step_list = step_list;
@@ -730,11 +729,10 @@ onErrorText(int onError)
 static void
 transferParseError(Parse * pTo, Parse * pFrom)
 {
-	assert(pFrom->zErrMsg == 0 || pFrom->nErr);
-	assert(pTo->zErrMsg == 0 || pTo->nErr);
-	if (pTo->nErr == 0) {
+	assert(pFrom->zErrMsg == 0 || pFrom->is_aborted);
+	assert(pTo->zErrMsg == 0 || pTo->is_aborted);
+	if (!pTo->is_aborted) {
 		pTo->zErrMsg = pFrom->zErrMsg;
-		pTo->nErr = pFrom->nErr;
 		pTo->is_aborted = pFrom->is_aborted;
 	} else {
 		sqlDbFree(pFrom->db, pFrom->zErrMsg);
@@ -924,7 +922,7 @@ vdbe_code_row_trigger_direct(struct Parse *parser, struct sql_trigger *trigger,
 	struct Vdbe *v = sqlGetVdbe(parser);
 
 	TriggerPrg *pPrg = sql_row_trigger(parser, trigger, space, orconf);
-	assert(pPrg != NULL || parser->nErr != 0 ||
+	assert(pPrg != NULL || parser->is_aborted ||
 	       parser->db->mallocFailed != 0);
 
 	/*

@@ -2663,7 +2663,6 @@ struct Parse {
 	u8 nColCache;		/* Number of entries in aColCache[] */
 	int nRangeReg;		/* Size of the temporary register block */
 	int iRangeReg;		/* First register in temporary register block */
-	int nErr;		/* Number of errors seen */
 	int nTab;		/* Number of previously allocated VDBE cursors */
 	int nMem;		/* Number of memory cells used so far */
 	int nOpAlloc;		/* Number of slots allocated for Vdbe.aOp[] */
@@ -3200,14 +3199,6 @@ void sqlNormalizeName(char *z);
 void sqlTokenInit(Token *, char *);
 int sqlKeywordCode(const unsigned char *, int);
 int sqlRunParser(Parse *, const char *);
-
-/**
- * Increment error counter.
- *
- * @param parse_context Current parsing context.
- */
-void
-sql_parser_error(struct Parse *parse_context);
 
 /**
  * This routine is called after a single SQL statement has been

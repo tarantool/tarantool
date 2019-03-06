@@ -38,11 +38,11 @@
   } else {
     diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX, TOKEN.n, TOKEN.z);
   }
-  sql_parser_error(pParse);
+  pParse->is_aborted = true;
 }
 %stack_overflow {
   diag_set(ClientError, ER_SQL_STACK_OVERFLOW);
-  sql_parser_error(pParse);
+  pParse->is_aborted = true;
 }
 
 // The name of the generated procedure that implements the parser
@@ -118,7 +118,7 @@ ecmd ::= explain cmdx SEMI. {
 }
 ecmd ::= SEMI. {
   diag_set(ClientError, ER_SQL_STATEMENT_EMPTY);
-  sql_parser_error(pParse);
+  pParse->is_aborted = true;
 }
 explain ::= .
 explain ::= EXPLAIN.              { pParse->explain = 1; }
@@ -232,7 +232,7 @@ columnname(A) ::= nm(A) typedef(Y). {sqlAddColumn(pParse,&A,&Y);}
 nm(A) ::= id(A). {
   if(A.isReserved) {
     diag_set(ClientError, ER_SQL_KEYWORD_IS_RESERVED, A.n, A.z, A.n, A.z);
-    sql_parser_error(pParse);
+    pParse->is_aborted = true;
   }
 }
 
@@ -906,7 +906,7 @@ expr(A) ::= VARIABLE(X).     {
     spanExpr(&A, pParse, TK_VARIABLE, X);
     if (A.pExpr->u.zToken[0] == '?' && n > 1) {
       diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX, t.n, t.z);
-      sql_parser_error(pParse);
+      pParse->is_aborted = true;
     } else {
       sqlExprAssignVarNumber(pParse, A.pExpr, n);
     }
@@ -914,7 +914,7 @@ expr(A) ::= VARIABLE(X).     {
     assert( t.n>=2 );
     spanSet(&A, &t, &t);
     diag_set(ClientError, ER_SQL_UNRECOGNIZED_SYNTAX, t.n, t.z);
-    sql_parser_error(pParse);
+    pParse->is_aborted = true;
     A.pExpr = NULL;
   }
 }
@@ -1390,13 +1390,13 @@ tridxby ::= .
 tridxby ::= INDEXED BY nm. {
   diag_set(ClientError, ER_SQL_SYNTAX, "trigger body", "the INDEXED BY clause "\
            "is not allowed on UPDATE or DELETE statements within triggers");
-  sql_parser_error(pParse);
+  pParse->is_aborted = true;
 }
 tridxby ::= NOT INDEXED. {
   diag_set(ClientError, ER_SQL_SYNTAX, "trigger body", "the NOT INDEXED "\
            "clause is not allowed on UPDATE or DELETE statements within "\
            "triggers");
-  sql_parser_error(pParse);
+  pParse->is_aborted = true;
 }
 
 

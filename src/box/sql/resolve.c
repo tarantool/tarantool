@@ -441,7 +441,7 @@ lookupName(Parse * pParse,	/* The parsing context */
 			diag_set(ClientError, ER_NO_SUCH_FIELD_NAME, zCol,
 				 zTab);
 		}
-		sql_parser_error(pParse);
+		pParse->is_aborted = true;
 		pTopNC->nErr++;
 	}
 
@@ -707,7 +707,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 #endif
 			    ) {
 				diag_set(ClientError, ER_NO_SUCH_FUNCTION, zId);
-				sql_parser_error(pParse);
+				pParse->is_aborted = true;
 				pNC->nErr++;
 			} else if (wrong_num_args) {
 				sqlErrorMsg(pParse,
@@ -809,7 +809,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			break;
 		}
 	}
-	return (pParse->nErr
+	return (pParse->is_aborted
 		|| pParse->db->mallocFailed) ? WRC_Abort : WRC_Continue;
 }
 
@@ -1195,7 +1195,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 	 */
 	if ((p->selFlags & SF_Expanded) == 0) {
 		sqlSelectPrep(pParse, p, pOuterNC);
-		return (pParse->nErr
+		return (pParse->is_aborted
 			|| db->mallocFailed) ? WRC_Abort : WRC_Prune;
 	}
 
@@ -1252,7 +1252,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 				sqlResolveSelectNames(pParse,
 							  pItem->pSelect,
 							  pOuterNC);
-				if (pParse->nErr || db->mallocFailed)
+				if (pParse->is_aborted || db->mallocFailed)
 					return WRC_Abort;
 
 				for (pNC = pOuterNC; pNC; pNC = pNC->pNext)
@@ -1340,7 +1340,6 @@ resolveSelectStep(Walker * pWalker, Select * p)
 					 "argument must appear in the GROUP BY "
 					 "clause or be used in an aggregate "
 					 "function");
-				pParse->nErr++;
 				pParse->is_aborted = true;
 				return WRC_Abort;
 			}
@@ -1536,7 +1535,7 @@ sqlResolveExprNames(NameContext * pNC,	/* Namespace to resolve expressions in. *
 #if SQL_MAX_EXPR_DEPTH>0
 	pNC->pParse->nHeight -= pExpr->nHeight;
 #endif
-	if (pNC->nErr > 0 || w.pParse->nErr > 0) {
+	if (pNC->nErr > 0 || w.pParse->is_aborted) {
 		ExprSetProperty(pExpr, EP_Error);
 	}
 	if (pNC->ncFlags & NC_HasAgg) {

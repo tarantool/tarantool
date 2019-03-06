@@ -92,7 +92,6 @@ save_record(struct Parse *parser, uint32_t space_id, int reg_key,
 		diag_set(OutOfMemory, sizeof(*record), "region_alloc",
 			 "record");
 		parser->is_aborted = true;
-		parser->nErr++;
 		return;
 	}
 	record->space_id = space_id;
@@ -145,10 +144,10 @@ sql_finish_coding(struct Parse *parse_context)
 			     "Exit with an error if CREATE statement fails"));
 	}
 
-	if (db->mallocFailed || parse_context->nErr != 0) {
+	if (db->mallocFailed)
 		parse_context->is_aborted = true;
+	if (parse_context->is_aborted)
 		return;
-	}
 	/*
 	 * Begin by generating some termination code at the end
 	 * of the vdbe program
@@ -188,7 +187,7 @@ sql_finish_coding(struct Parse *parse_context)
 		sqlVdbeGoto(v, 1);
 	}
 	/* Get the VDBE program ready for execution. */
-	if (parse_context->nErr == 0 && !db->mallocFailed) {
+	if (!parse_context->is_aborted && !db->mallocFailed) {
 		assert(parse_context->iCacheLevel == 0);
 		sqlVdbeMakeReady(v, parse_context);
 	} else {
@@ -342,7 +341,7 @@ sqlStartTable(Parse *pParse, Token *pName, int noErr)
 	if (space != NULL) {
 		if (!noErr) {
 			diag_set(ClientError, ER_SPACE_EXISTS, zName);
-			sql_parser_error(pParse);
+			pParse->is_aborted = true;
 		} else {
 			assert(!db->init.busy || CORRUPT_DB);
 		}
@@ -395,7 +394,6 @@ sql_field_retrieve(Parse *parser, struct space_def *space_def, uint32_t id)
 				sizeof(space_def->fields[0]),
 				"region_alloc", "sql_field_retrieve");
 			parser->is_aborted = true;
-			parser->nErr++;
 			return NULL;
 		}
 
@@ -451,7 +449,6 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 		diag_set(OutOfMemory, pName->n + 1,
 			 "region_alloc", "z");
 		pParse->is_aborted = true;
-		pParse->nErr++;
 		return;
 	}
 	memcpy(z, pName->z, pName->n);
@@ -460,7 +457,7 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 	for (uint32_t i = 0; i < def->field_count; i++) {
 		if (strcmp(z, def->fields[i].name) == 0) {
 			diag_set(ClientError, ER_SPACE_FIELD_IS_DUPLICATE, z);
-			sql_parser_error(pParse);
+			pParse->is_aborted = true;
 			return;
 		}
 	}
@@ -499,7 +496,6 @@ sql_column_add_nullable_action(struct Parse *parser,
 							   nullable_action]);
 		diag_set(ClientError, ER_SQL, err_msg);
 		parser->is_aborted = true;
-		parser->nErr++;
 		return;
 	}
 	field->nullable_action = nullable_action;
@@ -541,7 +537,6 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 					 "region_alloc",
 					 "field->default_value");
 				pParse->is_aborted = true;
-				pParse->nErr++;
 				return;
 			}
 			strncpy(field->default_value, pSpan->zStart,
@@ -560,7 +555,6 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
 	    field->nullable_action != ON_CONFLICT_ACTION_DEFAULT) {
 		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name);
 		parser->is_aborted = true;
-		parser->nErr++;
 		return -1;
 	} else if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
 		field->nullable_action = ON_CONFLICT_ACTION_ABORT;
@@ -649,7 +643,7 @@ sqlAddPrimaryKey(Parse * pParse,	/* Parsing context */
 		sql_create_index(pParse, 0, 0, pList, 0, sortOrder, false,
 				 SQL_INDEX_TYPE_CONSTRAINT_PK);
 		pList = 0;
-		if (pParse->nErr > 0)
+		if (pParse->is_aborted)
 			goto primary_key_exit;
 	}
 
@@ -849,7 +843,6 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 	return;
 error:
 	parse->is_aborted = true;
-	parse->nErr++;
 
 }
 
@@ -908,7 +901,6 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 	save_record(pParse, BOX_SPACE_ID, iFirstCol, 1, v->nOp - 1);
 	return;
 error:
-	pParse->nErr++;
 	pParse->is_aborted = true;
 }
 
@@ -1089,7 +1081,6 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	sqlReleaseTempRange(parse_context, constr_tuple_reg, 10);
 	return;
 error:
-	parse_context->nErr++;
 	parse_context->is_aborted = true;
 }
 
@@ -1119,7 +1110,6 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
 		 tt_sprintf("unknown column %s in foreign key definition",
 			    field_name));
 	parse_context->is_aborted = true;
-	parse_context->nErr++;
 	return -1;
 }
 
@@ -1251,7 +1241,6 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 					 "number of columns in the primary "\
 					 "index of referenced table");
 				pParse->is_aborted = true;
-				pParse->nErr++;
 				return;
 			}
 			for (uint32_t i = 0; i < fk_def->field_count; ++i) {
@@ -1281,7 +1270,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	}
 	sqlStartTable(parse_context, name, if_exists);
 	struct space *space = parse_context->new_space;
-	if (space == NULL || parse_context->nErr != 0)
+	if (space == NULL || parse_context->is_aborted)
 		goto create_view_fail;
 
 	struct space *select_res_space =
@@ -1327,7 +1316,6 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	if (space->def->opts.sql == NULL) {
 		diag_set(OutOfMemory, n, "strndup", "opts.sql");
 		parse_context->is_aborted = true;
-		parse_context->nErr++;
 		goto create_view_fail;
 	}
 
@@ -1600,14 +1588,14 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 		goto exit_drop_table;
 	}
 	sqlVdbeCountChanges(v);
-	assert(parse_context->nErr == 0);
+	assert(!parse_context->is_aborted);
 	assert(table_name_list->nSrc == 1);
 	const char *space_name = table_name_list->a[0].zName;
 	struct space *space = space_by_name(space_name);
 	if (space == NULL) {
 		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, space_name);
-			sql_parser_error(parse_context);
+			parse_context->is_aborted = true;
 		}
 		goto exit_drop_table;
 	}
@@ -1647,7 +1635,6 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 			diag_set(ClientError, ER_DROP_SPACE, space_name,
 				 "other objects depend on it");
 			parse_context->is_aborted = true;
-			parse_context->nErr++;
 			goto exit_drop_table;
 		}
 	}
@@ -1683,7 +1670,6 @@ columnno_by_name(struct Parse *parse_context, const struct space *space,
 			 tt_sprintf("foreign key refers to nonexistent field %s",
 				    column_name));
 		parse_context->is_aborted = true;
-		parse_context->nErr++;
 		return -1;
 	}
 	return 0;
@@ -1893,7 +1879,6 @@ exit_create_fk:
 	return;
 tnt_error:
 	parse_context->is_aborted = true;
-	parse_context->nErr++;
 	goto exit_create_fk;
 }
 
@@ -1918,7 +1903,6 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 	if (child == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
 		parse_context->is_aborted = true;
-		parse_context->nErr++;
 		return;
 	}
 	char *constraint_name = sqlNameFromToken(parse_context->db,
@@ -2045,7 +2029,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 		struct Expr *expr = expr_list->a[i].pExpr;
 		sql_resolve_self_reference(parse, space_def, NC_IdxExpr,
 					   expr, 0);
-		if (parse->nErr > 0)
+		if (parse->is_aborted)
 			goto cleanup;
 
 		struct Expr *column_expr = sqlExprSkipCollate(expr);
@@ -2097,7 +2081,6 @@ cleanup:
 	return rc;
 tnt_error:
 	parse->is_aborted = true;
-	++parse->nErr;
 	goto cleanup;
 }
 
@@ -2125,7 +2108,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	struct sql *db = parse->db;
 	assert(!db->init.busy);
 
-	if (db->mallocFailed || parse->nErr > 0)
+	if (db->mallocFailed || parse->is_aborted)
 		goto exit_create_index;
 	if (idx_type == SQL_INDEX_TYPE_UNIQUE ||
 	    idx_type == SQL_INDEX_TYPE_NON_UNIQUE) {
@@ -2148,7 +2131,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			if (! if_not_exist) {
 				diag_set(ClientError, ER_NO_SUCH_SPACE, name);
 				parse->is_aborted = true;
-				parse->nErr++;
 			}
 			goto exit_create_index;
 		}
@@ -2194,7 +2176,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 			if (!if_not_exist) {
 				diag_set(ClientError, ER_INDEX_EXISTS_IN_SPACE,
 					 name, def->name);
-				sql_parser_error(parse);
+				parse->is_aborted = true;
 			}
 			goto exit_create_index;
 		}
@@ -2241,7 +2223,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	if (tbl_name != NULL && space_is_system(space)) {
 		diag_set(ClientError, ER_MODIFY_INDEX, name, def->name,
 			 "can't create index on system space");
-		parse->nErr++;
 		parse->is_aborted = true;
 		goto exit_create_index;
 	}
@@ -2271,7 +2252,6 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(*index), "region", "index");
 		parse->is_aborted = true;
-		parse->nErr++;
 		goto exit_create_index;
 	}
 	memset(index, 0, sizeof(*index));
@@ -2441,7 +2421,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	assert(v != NULL);
 	struct sql *db = parse_context->db;
 	/* Never called with prior errors. */
-	assert(parse_context->nErr == 0);
+	assert(!parse_context->is_aborted);
 	assert(table_token != NULL);
 	const char *table_name = sqlNameFromToken(db, table_token);
 	if (db->mallocFailed) {
@@ -2454,7 +2434,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 	if (space == NULL) {
 		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
-			sql_parser_error(parse_context);
+			parse_context->is_aborted = true;
 		}
 		goto exit_drop_index;
 	}
@@ -2465,7 +2445,7 @@ sql_drop_index(struct Parse *parse_context, struct SrcList *index_name_list,
 		if (!if_exists) {
 			diag_set(ClientError, ER_NO_SUCH_INDEX_NAME,
 				 index_name, table_name);
-			sql_parser_error(parse_context);
+			parse_context->is_aborted = true;
 		}
 		goto exit_drop_index;
 	}
@@ -2823,7 +2803,7 @@ sqlSrcListAppendFromTerm(Parse * pParse,	/* Parsing context */
 	if (!p && (pOn || pUsing)) {
 		diag_set(ClientError, ER_SQL_SYNTAX, "FROM clause",
 			 "a JOIN clause is required before ON and USING");
-		sql_parser_error(pParse);
+		pParse->is_aborted = true;
 		goto append_from_error;
 	}
 	p = sqlSrcListAppend(db, p, pTable);

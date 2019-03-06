@@ -2799,7 +2799,6 @@ whereLoopAddBtree(WhereLoopBuilder * pBuilder,	/* WHERE clause information */
 		struct key_def *key_def = key_def_new(&part, 1);
 		if (key_def == NULL) {
 tnt_error:
-			pWInfo->pParse->nErr++;
 			pWInfo->pParse->is_aborted = true;
 			return SQL_TARANTOOL_ERROR;
 		}
@@ -4458,7 +4457,7 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	    (user_session->sql_flags & SQL_ReverseOrder) != 0) {
 		pWInfo->revMask = ALLBITS;
 	}
-	if (pParse->nErr || NEVER(db->mallocFailed)) {
+	if (pParse->is_aborted || NEVER(db->mallocFailed)) {
 		goto whereBeginError;
 	}
 #ifdef SQL_DEBUG

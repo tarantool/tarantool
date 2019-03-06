@@ -43,7 +43,7 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 	struct space *space = space_by_name(space_name->zName);
 	if (space == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, space_name->zName);
-		sql_parser_error(parse);
+		parse->is_aborted = true;
 		return NULL;
 	}
 	assert(space != NULL);
@@ -51,7 +51,6 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
 			 "space without format");
 		parse->is_aborted = true;
-		parse->nErr++;
 		return NULL;
 	}
 	space_name->space = space;
@@ -117,7 +116,6 @@ cleanup:
 
 tarantool_error:
 	parse->is_aborted = true;
-	parse->nErr++;
 	goto cleanup;
 }
 
@@ -126,7 +124,7 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 		      struct Expr *where)
 {
 	struct sql *db = parse->db;
-	if (parse->nErr || db->mallocFailed)
+	if (parse->is_aborted || db->mallocFailed)
 		goto delete_from_cleanup;
 
 	assert(tab_list->nSrc == 1);

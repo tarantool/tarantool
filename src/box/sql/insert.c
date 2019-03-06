@@ -277,7 +277,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 
 	db = pParse->db;
 	memset(&dest, 0, sizeof(dest));
-	if (pParse->nErr || db->mallocFailed) {
+	if (pParse->is_aborted || db->mallocFailed) {
 		goto insert_cleanup;
 	}
 
@@ -426,7 +426,7 @@ sqlInsert(Parse * pParse,	/* Parser context */
 		dest.nSdst = space_def->field_count;
 		rc = sqlSelect(pParse, pSelect, &dest);
 		regFromSelect = dest.iSdst;
-		if (rc || db->mallocFailed || pParse->nErr)
+		if (rc || db->mallocFailed || pParse->is_aborted)
 			goto insert_cleanup;
 		sqlVdbeEndCoroutine(v, regYield);
 		sqlVdbeJumpHere(v, addrTop - 1);	/* label B: */
