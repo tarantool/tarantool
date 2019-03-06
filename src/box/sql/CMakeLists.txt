@@ -50,7 +50,6 @@ add_library(sql STATIC
     resolve.c
     select.c
     status.c
-    table.c
     tokenize.c
     treeview.c
     trigger.c

@@ -878,9 +878,6 @@ sql_sql(sql_stmt * pStmt);
 int
 sql_vfs_register(sql_vfs *, int makeDflt);
 
-void
-sql_free_table(char **result);
-
 #define SQL_STMTSTATUS_FULLSCAN_STEP     1
 #define SQL_STMTSTATUS_SORT              2
 #define SQL_STMTSTATUS_AUTOINDEX         3
