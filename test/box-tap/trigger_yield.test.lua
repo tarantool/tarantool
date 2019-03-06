@@ -7,8 +7,8 @@ box.cfg{
 
 fiber = require('fiber')
 
-box.schema.space.create('test', {if_not_exists = true})
-box.space.test:create_index('pk', {if_not_exists = true})
+box.schema.space.create('test')
+box.space.test:create_index('pk')
 
 box.space.test:truncate()
 
@@ -27,4 +27,5 @@ for _,f in pairs(fibers) do
     while f:status() ~= 'dead' do fiber.sleep(0.0001) end
 end
 print('done: '..box.space.test:len())
+box.space.test:drop()
 os.exit()
