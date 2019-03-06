@@ -99,14 +99,13 @@ sqlPrepare(sql * db,	/* Database handle. */
 	}
 	assert(0 == sParse.nQueryLoop);
 
-	if (sParse.rc == SQL_DONE)
-		sParse.rc = SQL_OK;
 	if (db->mallocFailed)
-		sParse.rc = SQL_TARANTOOL_ERROR;
+		sParse.is_aborted = true;
 	if (pzTail) {
 		*pzTail = sParse.zTail;
 	}
-	rc = sParse.rc;
+	if (sParse.is_aborted)
+		rc = SQL_TARANTOOL_ERROR;
 
 	if (rc == SQL_OK && sParse.pVdbe && sParse.explain) {
 		static const char *const azColName[] = {

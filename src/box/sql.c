@@ -1275,7 +1275,7 @@ sql_ephemeral_space_def_new(struct Parse *parser, const char *name)
 	if (def == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc",
 			 "sql_ephemeral_space_def_new");
-		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->is_aborted = true;
 		parser->nErr++;
 		return NULL;
 	}
@@ -1294,7 +1294,7 @@ sql_ephemeral_space_new(Parse *parser, const char *name)
 	struct space *space = (struct space *) region_alloc(&parser->region, sz);
 	if (space == NULL) {
 		diag_set(OutOfMemory, sz, "region", "space");
-		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->is_aborted = true;
 		parser->nErr++;
 		return NULL;
 	}
@@ -1362,13 +1362,7 @@ sql_checks_resolve_space_def_reference(ExprList *expr_list,
 	parser.parse_only = true;
 
 	sql_resolve_self_reference(&parser, def, NC_IsCheck, NULL, expr_list);
-	int rc = 0;
-	if (parser.rc != SQL_OK) {
-		/* Tarantool error may be already set with diag. */
-		if (parser.rc != SQL_TARANTOOL_ERROR)
-			diag_set(ClientError, ER_SQL, parser.zErrMsg);
-		rc = -1;
-	}
+	int rc = parser.is_aborted ? -1 : 0;
 	sql_parser_destroy(&parser);
 	return rc;
 }

@@ -506,7 +506,7 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		box_iterator_t* iter;
 		iter = box_index_iterator(space->def->id, 0,ITER_ALL, key_buf, key_end);
 		if (iter == NULL) {
-			pParse->rc = SQL_TARANTOOL_ERROR;
+			pParse->is_aborted = true;
 			pParse->nErr++;
 			goto pragma_out;
 		}
@@ -565,7 +565,7 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 		if (!token_is_string(pValue)) {
 			diag_set(ClientError, ER_ILLEGAL_PARAMS,
 				 "string value is expected");
-			pParse->rc = SQL_TARANTOOL_ERROR;
+			pParse->is_aborted = true;
 			pParse->nErr++;
 			goto pragma_out;
 		}
@@ -577,7 +577,7 @@ sqlPragma(Parse * pParse, Token * pId,	/* First part of [schema.]id field */
 			sqlVdbeAddOp2(v, OP_ResultRow, 1, 1);
 		} else {
 			if (sql_default_engine_set(zRight) != 0) {
-				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->is_aborted = true;
 				pParse->nErr++;
 				goto pragma_out;
 			}

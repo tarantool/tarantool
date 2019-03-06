@@ -154,7 +154,7 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	return;
 
 set_tarantool_error_and_cleanup:
-	parse->rc = SQL_TARANTOOL_ERROR;
+	parse->is_aborted = true;
 	parse->nErr++;
 	goto trigger_cleanup;
 }
@@ -735,7 +735,7 @@ transferParseError(Parse * pTo, Parse * pFrom)
 	if (pTo->nErr == 0) {
 		pTo->zErrMsg = pFrom->zErrMsg;
 		pTo->nErr = pFrom->nErr;
-		pTo->rc = pFrom->rc;
+		pTo->is_aborted = pFrom->is_aborted;
 	} else {
 		sqlDbFree(pFrom->db, pFrom->zErrMsg);
 	}

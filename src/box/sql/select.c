@@ -2235,7 +2235,7 @@ multi_select_coll_seq_r(struct Parse *parser, struct Select *p, int n,
 	if (collations_check_compatibility(prior_coll_id, is_prior_forced,
 					   current_coll_id, is_current_forced,
 					   &res_coll_id) != 0) {
-		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->is_aborted = true;
 		parser->nErr++;
 		return 0;
 	}

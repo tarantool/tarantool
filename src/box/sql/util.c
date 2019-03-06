@@ -212,7 +212,7 @@ sqlErrorWithMsg(sql * db, int err_code, const char *zFormat, ...)
 
 /*
  * Add an error to the diagnostics area, increment pParse->nErr
- * and set pParse->rc.
+ * and set pParse->is_aborted.
  * The following formatting characters are allowed:
  *
  *      %s      Insert a string
@@ -240,14 +240,14 @@ sqlErrorMsg(Parse * pParse, const char *zFormat, ...)
 	diag_set(ClientError, ER_SQL_PARSER_GENERIC, zMsg);
 	sqlDbFree(db, zMsg);
 	pParse->nErr++;
-	pParse->rc = SQL_TARANTOOL_ERROR;
+	pParse->is_aborted = true;
 }
 
 void
 sql_parser_error(struct Parse *parse_context)
 {
 	parse_context->nErr++;
-	parse_context->rc = SQL_TARANTOOL_ERROR;
+	parse_context->is_aborted = true;
 }
 
 /*

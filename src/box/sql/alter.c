@@ -72,7 +72,7 @@ exit_rename_table:
 	return;
 tnt_error:
 	sqlDbFree(db, new_name);
-	parse->rc = SQL_TARANTOOL_ERROR;
+	parse->is_aborted = true;
 	parse->nErr++;
 	goto exit_rename_table;
 }

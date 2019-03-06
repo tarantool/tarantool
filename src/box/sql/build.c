@@ -91,7 +91,7 @@ save_record(struct Parse *parser, uint32_t space_id, int reg_key,
 	if (record == NULL) {
 		diag_set(OutOfMemory, sizeof(*record), "region_alloc",
 			 "record");
-		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->is_aborted = true;
 		parser->nErr++;
 		return;
 	}
@@ -146,8 +146,7 @@ sql_finish_coding(struct Parse *parse_context)
 	}
 
 	if (db->mallocFailed || parse_context->nErr != 0) {
-		if (parse_context->rc == SQL_OK)
-			parse_context->rc = SQL_ERROR;
+		parse_context->is_aborted = true;
 		return;
 	}
 	/*
@@ -192,10 +191,8 @@ sql_finish_coding(struct Parse *parse_context)
 	if (parse_context->nErr == 0 && !db->mallocFailed) {
 		assert(parse_context->iCacheLevel == 0);
 		sqlVdbeMakeReady(v, parse_context);
-		parse_context->rc = SQL_DONE;
 	} else {
-		if (parse_context->rc != SQL_TARANTOOL_ERROR)
-			parse_context->rc = SQL_ERROR;
+		parse_context->is_aborted = true;
 	}
 }
 /**
@@ -397,7 +394,7 @@ sql_field_retrieve(Parse *parser, struct space_def *space_def, uint32_t id)
 			diag_set(OutOfMemory, columns_new *
 				sizeof(space_def->fields[0]),
 				"region_alloc", "sql_field_retrieve");
-			parser->rc = SQL_TARANTOOL_ERROR;
+			parser->is_aborted = true;
 			parser->nErr++;
 			return NULL;
 		}
@@ -453,7 +450,7 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 	if (z == NULL) {
 		diag_set(OutOfMemory, pName->n + 1,
 			 "region_alloc", "z");
-		pParse->rc = SQL_TARANTOOL_ERROR;
+		pParse->is_aborted = true;
 		pParse->nErr++;
 		return;
 	}
@@ -501,7 +498,7 @@ sql_column_add_nullable_action(struct Parse *parser,
 				   on_conflict_action_strs[field->
 							   nullable_action]);
 		diag_set(ClientError, ER_SQL, err_msg);
-		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->is_aborted = true;
 		parser->nErr++;
 		return;
 	}
@@ -543,7 +540,7 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 				diag_set(OutOfMemory, default_length + 1,
 					 "region_alloc",
 					 "field->default_value");
-				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->is_aborted = true;
 				pParse->nErr++;
 				return;
 			}
@@ -562,7 +559,7 @@ field_def_create_for_pk(struct Parse *parser, struct field_def *field,
 	if (field->nullable_action != ON_CONFLICT_ACTION_ABORT &&
 	    field->nullable_action != ON_CONFLICT_ACTION_DEFAULT) {
 		diag_set(ClientError, ER_NULLABLE_PRIMARY, space_name);
-		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->is_aborted = true;
 		parser->nErr++;
 		return -1;
 	} else if (field->nullable_action == ON_CONFLICT_ACTION_DEFAULT) {
@@ -851,7 +848,7 @@ vdbe_emit_create_index(struct Parse *parse, struct space_def *def,
 	save_record(parse, BOX_INDEX_ID, entry_reg, 2, v->nOp - 1);
 	return;
 error:
-	parse->rc = SQL_TARANTOOL_ERROR;
+	parse->is_aborted = true;
 	parse->nErr++;
 
 }
@@ -912,7 +909,7 @@ createSpace(Parse * pParse, int iSpaceId, char *zStmt)
 	return;
 error:
 	pParse->nErr++;
-	pParse->rc = SQL_TARANTOOL_ERROR;
+	pParse->is_aborted = true;
 }
 
 int
@@ -1093,7 +1090,7 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 	return;
 error:
 	parse_context->nErr++;
-	parse_context->rc = SQL_TARANTOOL_ERROR;
+	parse_context->is_aborted = true;
 }
 
 /**
@@ -1121,7 +1118,7 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
 	diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, fk_name,
 		 tt_sprintf("unknown column %s in foreign key definition",
 			    field_name));
-	parse_context->rc = SQL_TARANTOOL_ERROR;
+	parse_context->is_aborted = true;
 	parse_context->nErr++;
 	return -1;
 }
@@ -1253,7 +1250,7 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 					 "foreign key does not match the "\
 					 "number of columns in the primary "\
 					 "index of referenced table");
-				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->is_aborted = true;
 				pParse->nErr++;
 				return;
 			}
@@ -1329,7 +1326,7 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 	space->def->opts.sql = strndup(begin->z, n);
 	if (space->def->opts.sql == NULL) {
 		diag_set(OutOfMemory, n, "strndup", "opts.sql");
-		parse_context->rc = SQL_TARANTOOL_ERROR;
+		parse_context->is_aborted = true;
 		parse_context->nErr++;
 		goto create_view_fail;
 	}
@@ -1649,7 +1646,7 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 		if (! fk_constraint_is_self_referenced(fk->def)) {
 			diag_set(ClientError, ER_DROP_SPACE, space_name,
 				 "other objects depend on it");
-			parse_context->rc = SQL_TARANTOOL_ERROR;
+			parse_context->is_aborted = true;
 			parse_context->nErr++;
 			goto exit_drop_table;
 		}
@@ -1685,7 +1682,7 @@ columnno_by_name(struct Parse *parse_context, const struct space *space,
 		diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, fk_name,
 			 tt_sprintf("foreign key refers to nonexistent field %s",
 				    column_name));
-		parse_context->rc = SQL_TARANTOOL_ERROR;
+		parse_context->is_aborted = true;
 		parse_context->nErr++;
 		return -1;
 	}
@@ -1895,7 +1892,7 @@ exit_create_fk:
 	sqlDbFree(db, constraint_name);
 	return;
 tnt_error:
-	parse_context->rc = SQL_TARANTOOL_ERROR;
+	parse_context->is_aborted = true;
 	parse_context->nErr++;
 	goto exit_create_fk;
 }
@@ -1920,7 +1917,7 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 	struct space *child = space_by_name(table_name);
 	if (child == NULL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
-		parse_context->rc = SQL_TARANTOOL_ERROR;
+		parse_context->is_aborted = true;
 		parse_context->nErr++;
 		return;
 	}
@@ -2099,7 +2096,7 @@ cleanup:
 		key_def_delete(key_def);
 	return rc;
 tnt_error:
-	parse->rc = SQL_TARANTOOL_ERROR;
+	parse->is_aborted = true;
 	++parse->nErr;
 	goto cleanup;
 }
@@ -2150,7 +2147,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		if (space == NULL) {
 			if (! if_not_exist) {
 				diag_set(ClientError, ER_NO_SUCH_SPACE, name);
-				parse->rc = SQL_TARANTOOL_ERROR;
+				parse->is_aborted = true;
 				parse->nErr++;
 			}
 			goto exit_create_index;
@@ -2245,7 +2242,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		diag_set(ClientError, ER_MODIFY_INDEX, name, def->name,
 			 "can't create index on system space");
 		parse->nErr++;
-		parse->rc = SQL_TARANTOOL_ERROR;
+		parse->is_aborted = true;
 		goto exit_create_index;
 	}
 
@@ -2273,7 +2270,7 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	index = (struct index *) region_alloc(&parse->region, sizeof(*index));
 	if (index == NULL) {
 		diag_set(OutOfMemory, sizeof(*index), "region", "index");
-		parse->rc = SQL_TARANTOOL_ERROR;
+		parse->is_aborted = true;
 		parse->nErr++;
 		goto exit_create_index;
 	}

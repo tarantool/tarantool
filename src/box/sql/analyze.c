@@ -907,7 +907,7 @@ vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 		if (jump_addrs == NULL) {
 			diag_set(OutOfMemory, sizeof(int) * part_count,
 				 "region", "jump_addrs");
-			parse->rc = SQL_TARANTOOL_ERROR;
+			parse->is_aborted = true;
 			parse->nErr++;
 			return;
 		}
@@ -1130,7 +1130,7 @@ sqlAnalyze(Parse * pParse, Token * pName)
 				}
 			} else {
 				diag_set(ClientError, ER_NO_SUCH_SPACE, z);
-				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->is_aborted = true;
 				pParse->nErr++;
 			}
 			sqlDbFree(db, z);

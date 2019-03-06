@@ -1203,7 +1203,7 @@ valueFromFunction(sql * db,	/* The database connection */
 		goto value_from_function_out;
 	}
 
-	assert(pCtx->pParse->rc == SQL_OK);
+	assert(!pCtx->pParse->is_aborted);
 	memset(&ctx, 0, sizeof(ctx));
 	ctx.pOut = pVal;
 	ctx.pFunc = pFunc;
@@ -1215,7 +1215,8 @@ valueFromFunction(sql * db,	/* The database connection */
 		sql_value_apply_type(pVal, type);
 		assert(rc == SQL_OK);
 	}
-	pCtx->pParse->rc = rc;
+	if (rc != SQL_OK)
+		pCtx->pParse->is_aborted = true;
 
  value_from_function_out:
 	if (rc != SQL_OK) {

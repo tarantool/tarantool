@@ -50,7 +50,7 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 	if (space->def->field_count == 0) {
 		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
 			 "space without format");
-		parse->rc = SQL_TARANTOOL_ERROR;
+		parse->is_aborted = true;
 		parse->nErr++;
 		return NULL;
 	}
@@ -116,7 +116,7 @@ cleanup:
 	return;
 
 tarantool_error:
-	parse->rc = SQL_TARANTOOL_ERROR;
+	parse->is_aborted = true;
 	parse->nErr++;
 	goto cleanup;
 }

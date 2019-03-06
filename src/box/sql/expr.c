@@ -258,7 +258,7 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 						diag_set(ClientError,
 							 ER_ILLEGAL_COLLATION_MIX);
 						parse->nErr++;
-						parse->rc = SQL_TARANTOOL_ERROR;
+						parse->is_aborted = true;
 					}
 					return -1;
 				}
@@ -433,7 +433,7 @@ sql_binary_compare_coll_seq(Parse *parser, Expr *left, Expr *right,
 		return -1;
 	if (collations_check_compatibility(lhs_coll_id, is_lhs_forced,
 					   rhs_coll_id, is_rhs_forced, id) != 0) {
-		parser->rc = SQL_TARANTOOL_ERROR;
+		parser->is_aborted = true;
 		parser->nErr++;
 		return -1;
 	}

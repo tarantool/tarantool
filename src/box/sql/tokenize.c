@@ -460,7 +460,6 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	if (db->nVdbeActive == 0) {
 		db->u1.isInterrupted = 0;
 	}
-	pParse->rc = SQL_OK;
 	pParse->zTail = zSql;
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */
@@ -484,7 +483,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			if (i > mxSqlLen) {
 				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
 					 "string or blob too big");
-				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->is_aborted = true;
 				break;
 			}
 		} else {
@@ -513,7 +512,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 			sqlParser(pEngine, tokenType, pParse->sLastToken,
 				      pParse);
 			lastTokenParsed = tokenType;
-			if (pParse->rc != SQL_OK || db->mallocFailed)
+			if (pParse->is_aborted || db->mallocFailed)
 				break;
 		}
 	}
@@ -524,11 +523,9 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	    );
 #endif				/* YYDEBUG */
 	sqlParserFree(pEngine, sql_free);
-	if (db->mallocFailed) {
-		pParse->rc = SQL_TARANTOOL_ERROR;
-	}
-	if (pParse->rc != SQL_OK && pParse->rc != SQL_DONE
-	    && pParse->zErrMsg == 0)
+	if (db->mallocFailed)
+		pParse->is_aborted = true;
+	if (pParse->is_aborted && pParse->zErrMsg == 0)
 		pParse->zErrMsg = sqlMPrintf(db, "%s", tarantoolErrorMessage());
 	if (pParse->pVdbe != NULL && pParse->nErr > 0) {
 		sqlVdbeDelete(pParse->pVdbe);
@@ -538,7 +535,7 @@ sqlRunParser(Parse * pParse, const char *zSql)
 	if (pParse->pWithToFree)
 		sqlWithDelete(db, pParse->pWithToFree);
 	sqlDbFree(db, pParse->pVList);
-	return pParse->nErr > 0 || pParse->rc == SQL_TARANTOOL_ERROR ? -1 : 0;
+	return pParse->is_aborted ? -1 : 0;
 }
 
 struct Expr *

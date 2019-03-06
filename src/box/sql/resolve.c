@@ -1341,7 +1341,7 @@ resolveSelectStep(Walker * pWalker, Select * p)
 					 "clause or be used in an aggregate "
 					 "function");
 				pParse->nErr++;
-				pParse->rc = SQL_TARANTOOL_ERROR;
+				pParse->is_aborted = true;
 				return WRC_Abort;
 			}
 			/*
