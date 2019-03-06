@@ -14,18 +14,18 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
 ...
 -- check 'VALUES' against typedef keywords (should fail)
-box.sql.execute('VALUES(blob)')
+box.sql.execute('VALUES(scalar)')
 ---
-- error: 'near "blob": syntax error'
+- error: 'near "scalar": syntax error'
 ...
 box.sql.execute('VALUES(float)')
 ---
 - error: 'near "float": syntax error'
 ...
 -- check 'SELECT' against typedef keywords (should fail)
-box.sql.execute('SELECT blob')
+box.sql.execute('SELECT scalar')
 ---
-- error: 'near "blob": syntax error'
+- error: 'near "scalar": syntax error'
 ...
 box.sql.execute('SELECT float')
 ---

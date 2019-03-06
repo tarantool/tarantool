@@ -3034,15 +3034,13 @@ test:do_execsql_test(
 --
 do_expr_test("e_expr-27.2.1", " CAST(NULL AS integer) ", "null", "")
 do_expr_test("e_expr-27.2.2", " CAST(NULL AS text) ", "null", "")
-do_expr_test("e_expr-27.2.3", " CAST(NULL AS blob) ", "null", "")
+do_expr_test("e_expr-27.2.3", " CAST(NULL AS SCALAR) ", "null", "")
 do_expr_test("e_expr-27.2.4", " CAST(NULL AS numeric) ", "null", "")
--- EVIDENCE-OF: R-22956-37754 Casting to a BLOB consists of first casting
--- the value to TEXT in the encoding of the database connection, then
--- interpreting the resulting byte sequence as a BLOB instead of as TEXT.
+-- Casting to a SCALAR doesn't affect original value.
 --
-do_qexpr_test("e_expr-27.4.1", " CAST('ghi' AS blob) ", "X'676869'")
-do_qexpr_test("e_expr-27.4.2", " CAST(456 AS blob) ", "X'343536'")
-do_qexpr_test("e_expr-27.4.3", " CAST(1.78 AS blob) ", "X'312E3738'")
+do_qexpr_test("e_expr-27.4.1", " CAST('ghi' AS SCALAR) ", "X'676869'")
+do_qexpr_test("e_expr-27.4.2", " CAST(456 AS SCALAR) ", "X'343536'")
+do_qexpr_test("e_expr-27.4.3", " CAST(1.78 AS SCALAR) ", "X'312E3738'")
 
 -- EVIDENCE-OF: R-22235-47006 Casting an INTEGER or REAL value into TEXT
 -- renders the value as if via sql_snprintf() except that the
@@ -3170,7 +3168,7 @@ do_expr_test("e_expr-32.2.4", [[
   CAST(9223372036854775807 AS NUMERIC)
 ]], "real", 9223372036854775807)
 -- EVIDENCE-OF: R-64550-29191 Note that the result from casting any
--- non-BLOB value into a BLOB and the result from casting any BLOB value
+-- non-BLOB value into a SCALAR and the result from casting any SCALAR value
 -- into a non-BLOB value may be different depending on whether the
 -- database encoding is UTF-8
 --

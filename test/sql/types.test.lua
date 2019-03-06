@@ -11,7 +11,7 @@ box.sql.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 
 -- gh-3104: real type is stored in space format.
 --
-box.sql.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d BLOB);")
+box.sql.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d SCALAR);")
 box.space.T1:format()
 box.sql.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 box.space.V1:format()
@@ -50,9 +50,8 @@ box.sql.execute("SELECT 1.123 || 'abc';")
 box.sql.execute("SELECt 'a' || 'b' || 1;")
 -- What is more, they must be of the same type.
 --
-box.sql.execute("SELECT 'abc' || CAST('x' AS BLOB);")
-box.sql.execute("SELECT CAST('abc' AS BLOB) || 'x';")
+box.sql.execute("SELECT 'abc' || randomblob(5);")
+box.sql.execute("SELECT randomblob(5) || 'x';")
 -- Result of BLOBs concatenation must be BLOB.
 --
-box.sql.execute("SELECT TYPEOF(CAST('abc' AS BLOB) || CAST('cda' AS BLOB))")
 box.sql.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")

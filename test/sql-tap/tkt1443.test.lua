@@ -85,7 +85,7 @@ test:do_test(
             CREATE TABLE Users (
                 userId INTEGER PRIMARY KEY,
                 "user" TEXT UNIQUE,
-                salt  BLOB,
+                salt  SCALAR,
                 password  TEXT
             );
             INSERT INTO Users VALUES(1, 'test', 'æ%s',

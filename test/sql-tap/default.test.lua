@@ -28,7 +28,7 @@ test:do_execsql_test(
 		CREATE TABLE t1(
 		rowid INTEGER PRIMARY KEY AUTOINCREMENT, 
 		a INTEGER,
-		b BLOB DEFAULT x'6869'
+		b SCALAR DEFAULT x'6869'
 		);
 		INSERT INTO t1(a) VALUES(1);
 		SELECT a, b from t1;

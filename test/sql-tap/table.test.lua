@@ -495,8 +495,8 @@ test:do_catchsql_test(
           key int,
           "14_vac" int,
           fuzzy_dog_12 varchar(10),
-          beginn blob,
-          endd blob
+          beginn SCALAR,
+          endd SCALAR
         )
     ]=], {
         -- <table-7.1>
@@ -551,8 +551,8 @@ test:do_execsql2_test(
           key int,
           "14_vac" int,
           fuzzy_dog_12 varchar(10),
-          beginn blob,
-          endd blob
+          beginn SCALAR,
+          endd SCALAR
         );
         INSERT INTO t2 SELECT * from weird;
         SELECT * FROM t2;
@@ -704,7 +704,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "table-9.2",
     [[
-        CREATE TABLE t6(a varchar(100) primary key, b blob, a integer);
+        CREATE TABLE t6(a varchar(100) primary key, b SCALAR, a integer);
     ]], {
         -- <table-9.2>
         1, "Space field 'A' is duplicate"
@@ -895,8 +895,8 @@ test:do_execsql_test(
            b FLOAT,
            c VARCHAR(8),
            d VARCHAR(9),
-           e blob,
-           f BLOB,
+           e SCALAR,
+           f SCALAR,
            g Text,
            h text
         );
@@ -1142,7 +1142,7 @@ test:do_test(
 --   DROP TABLE IF EXISTS t1;
 --   BEGIN;
 --   CREATE TABLE t1 AS SELECT zeroblob(2e20);
--- } {1 {string or blob too big}}
+-- } {1 {string or SCALAR too big}}
 -- do_execsql_test table-18.2 {
 --   COMMIT;
 --   PRAGMA integrity_check;

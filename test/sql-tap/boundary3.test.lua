@@ -26,7 +26,7 @@ test:do_test(
     "boundary3-1.1",
     function()
         return test:execsql([[
-            CREATE TABLE t1(rowid  INT primary key, a FLOAT ,x BLOB);
+            CREATE TABLE t1(rowid  INT primary key, a FLOAT ,x SCALAR);
             INSERT INTO t1(rowid,a,x) VALUES(-8388609,1,'ffffffffff7fffff');
             INSERT INTO t1(rowid,a,x) VALUES(-36028797018963969,2,'ff7fffffffffffff');
             INSERT INTO t1(rowid,a,x) VALUES(9223372036854775806,3,'7fffffffffffffff');

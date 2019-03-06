@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(175)
+test:plan(176)
 
 --!./tcltestrunner.lua
 -- 2009 January 29
@@ -54,6 +54,7 @@ local bannedkws = {
 	"asc",
 	"begin",
 	"between",
+	"blob",
 	"by",
 	"case",
 	"check",

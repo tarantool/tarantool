@@ -364,8 +364,6 @@ mem_apply_type(struct Mem *record, enum field_type type)
 		record->flags &= ~(MEM_Real | MEM_Int);
 		return 0;
 	case FIELD_TYPE_SCALAR:
-		if (record->flags & (MEM_Str | MEM_Blob))
-			record->flags |= MEM_Blob;
 		return 0;
 	default:
 		return -1;

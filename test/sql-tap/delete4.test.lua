@@ -56,7 +56,7 @@ test:do_execsql_test(
     2.1,
     [[
         DROP TABLE IF EXISTS t1;
-        CREATE TABLE t1(x INTEGER PRIMARY KEY, y INT , z BLOB);
+        CREATE TABLE t1(x INTEGER PRIMARY KEY, y INT , z SCALAR);
         INSERT INTO t1 VALUES(1, 0, randomblob(200));
         INSERT INTO t1 VALUES(2, 1, randomblob(200));
         INSERT INTO t1 VALUES(3, 0, randomblob(200));

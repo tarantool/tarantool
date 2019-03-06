@@ -178,7 +178,7 @@ box.sql.execute("DROP TABLE barfoo")
 ---
 ...
 -- attempt to create a table lacking PRIMARY KEY
-box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x BLOB)")
+box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x SCALAR)")
 ---
 - error: PRIMARY KEY missing on table WITHOUT_ROWID_LACKING_PRIMARY_KEY
 ...

@@ -22,7 +22,7 @@ testprefix = "index4"
 test:do_execsql_test(
     1.1,
     [[
-        CREATE TABLE t1(x BLOB primary key);
+        CREATE TABLE t1(x SCALAR primary key);
         START TRANSACTION;
           INSERT INTO t1 VALUES(randomblob(102));
           INSERT INTO t1 SELECT randomblob(102) FROM t1;     --     2
@@ -78,7 +78,7 @@ test:do_execsql_test(
     1.6,
     [[
           DROP TABLE t1;
-          CREATE TABLE t1(x BLOB primary key);
+          CREATE TABLE t1(x SCALAR primary key);
         START TRANSACTION;
           INSERT INTO t1 VALUES('a');
           INSERT INTO t1 VALUES('b');

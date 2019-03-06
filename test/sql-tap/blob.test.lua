@@ -170,7 +170,7 @@ test:do_test(
     "blob-2.0",
     function()
         test:execsql [[
-            CREATE TABLE t1(a BLOB primary key, b BLOB);
+            CREATE TABLE t1(a SCALAR primary key, b SCALAR);
             INSERT INTO t1 VALUES(X'123456', x'7890ab');
             INSERT INTO t1 VALUES(X'CDEF12', x'345678');
         ]]
@@ -186,7 +186,7 @@ test:do_test(
         -- </blob-2.0>
     })
 
--- An index on a blob column
+-- An index on a SCALAR column
 test:do_test(
     "blob-2.1",
     function()

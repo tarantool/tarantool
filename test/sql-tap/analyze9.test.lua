@@ -391,7 +391,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(null, 4, 4);
         INSERT INTO t1 VALUES(null, 5, 5);
         ANALYZE;
-        CREATE TABLE x1(tbl TEXT, idx TEXT , neq TEXT, nlt TEXT, ndlt TEXT, sample BLOB, PRIMARY KEY(tbl, idx, sample));
+        CREATE TABLE x1(tbl TEXT, idx TEXT , neq TEXT, nlt TEXT, ndlt TEXT, sample SCALAR, PRIMARY KEY(tbl, idx, sample));
         INSERT INTO x1 SELECT * FROM "_sql_stat4";
         DELETE FROM "_sql_stat4";
         INSERT INTO "_sql_stat4" SELECT * FROM x1;

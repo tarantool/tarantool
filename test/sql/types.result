@@ -28,7 +28,7 @@ box.sql.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 ...
 -- gh-3104: real type is stored in space format.
 --
-box.sql.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d BLOB);")
+box.sql.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d SCALAR);")
 ---
 ...
 box.space.T1:format()
@@ -155,20 +155,16 @@ box.sql.execute("SELECt 'a' || 'b' || 1;")
 ...
 -- What is more, they must be of the same type.
 --
-box.sql.execute("SELECT 'abc' || CAST('x' AS BLOB);")
+box.sql.execute("SELECT 'abc' || randomblob(5);")
 ---
 - error: 'Inconsistent types: expected TEXT got BLOB'
 ...
-box.sql.execute("SELECT CAST('abc' AS BLOB) || 'x';")
+box.sql.execute("SELECT randomblob(5) || 'x';")
 ---
 - error: 'Inconsistent types: expected BLOB got TEXT'
 ...
 -- Result of BLOBs concatenation must be BLOB.
 --
-box.sql.execute("SELECT TYPEOF(CAST('abc' AS BLOB) || CAST('cda' AS BLOB))")
----
-- - ['blob']
-...
 box.sql.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
 ---
 - - ['blob']

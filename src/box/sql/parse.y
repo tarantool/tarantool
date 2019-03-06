@@ -1477,7 +1477,7 @@ wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
 ////////////////////////////// TYPE DECLARATION ///////////////////////////////
 %type typedef {struct type_def}
 typedef(A) ::= TEXT . { A.type = FIELD_TYPE_STRING; }
-typedef(A) ::= BLOB_KW . { A.type = FIELD_TYPE_SCALAR; }
+typedef(A) ::= SCALAR . { A.type = FIELD_TYPE_SCALAR; }
 /**
  * Time-like types are temporary disabled, until they are
  * implemented as a native Tarantool types (gh-3694).

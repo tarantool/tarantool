@@ -271,12 +271,12 @@ test:do_test(
             DROP TABLE IF EXISTS t1;
             DROP TABLE IF EXISTS t1;
 
-            CREATE TABLE t1(id  INT primary key, a BLOB, b FLOAT ,c TEXT);
+            CREATE TABLE t1(id  INT primary key, a SCALAR, b FLOAT ,c TEXT);
             CREATE UNIQUE INDEX t1_i1 ON t1(a);        /* no affinity */
             CREATE UNIQUE INDEX t1_i2 ON t1(b);        /* numeric affinity */
             CREATE UNIQUE INDEX t1_i3 ON t1(c);        /* text affinity */
 
-            CREATE TABLE t2(id  INT primary key, x BLOB, y FLOAT, z TEXT);
+            CREATE TABLE t2(id  INT primary key, x SCALAR, y FLOAT, z TEXT);
             CREATE UNIQUE INDEX t2_i1 ON t2(x);        /* no affinity */
             CREATE UNIQUE INDEX t2_i2 ON t2(y);        /* numeric affinity */
             CREATE UNIQUE INDEX t2_i3 ON t2(z);        /* text affinity */
@@ -318,9 +318,8 @@ test:do_test(
 test:do_test(
     "in3-3.4",
     function()
-        -- BLOB is compatible with TEXT, however index can't
-        -- be used since under the hood BLOB is SCALAR (which
-        -- can contain not only STRING values) and TEXT is STRING.
+        -- SCALAR is compatible with TEXT, however index can't
+        -- be used since SCALAR can accept not only string values.
         return exec_neph(" SELECT x IN (SELECT c FROM t1) FROM t2 ")
     end, {
         -- <in3-3.4>

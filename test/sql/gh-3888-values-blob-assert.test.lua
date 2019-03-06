@@ -9,11 +9,11 @@ engine = test_run:get_cfg('engine')
 box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- check 'VALUES' against typedef keywords (should fail)
-box.sql.execute('VALUES(blob)')
+box.sql.execute('VALUES(scalar)')
 box.sql.execute('VALUES(float)')
 
 -- check 'SELECT' against typedef keywords (should fail)
-box.sql.execute('SELECT blob')
+box.sql.execute('SELECT scalar')
 box.sql.execute('SELECT float')
 
 -- check 'VALUES' against ID (should fail)

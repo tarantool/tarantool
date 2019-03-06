@@ -22,7 +22,7 @@ test:plan(82)
 -- Only run these tests if the build includes the CAST operator
 
 
--- Tests for the CAST( AS blob), CAST( AS text) and CAST( AS numeric) built-ins
+-- Tests for the CAST( AS SCALAR), CAST( AS text) and CAST( AS numeric) built-ins
 --
 test:do_execsql_test(
     "cast-1.1",
@@ -77,7 +77,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "cast-1.7",
     [[
-        SELECT CAST(x'616263' AS blob)
+        SELECT CAST(x'616263' AS SCALAR)
     ]], {
         -- <cast-1.7>
         "abc"
@@ -87,7 +87,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.8",
     [[
-        SELECT typeof(CAST(x'616263' AS blob))
+        SELECT typeof(CAST(x'616263' AS SCALAR))
     ]], {
         -- <cast-1.8>
         "blob"
@@ -167,7 +167,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.17",
     [[
-        SELECT CAST(NULL AS blob)
+        SELECT CAST(NULL AS SCALAR)
     ]], {
         -- <cast-1.17>
         ""
@@ -177,7 +177,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.18",
     [[
-        SELECT typeof(CAST(NULL AS blob))
+        SELECT typeof(CAST(NULL AS SCALAR))
     ]], {
         -- <cast-1.18>
         "null"
@@ -267,20 +267,20 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.27",
     [[
-        SELECT CAST(123 AS blob)
+        SELECT CAST(123 AS SCALAR)
     ]], {
         -- <cast-1.27>
-        "123"
+        123
         -- </cast-1.27>
     })
 
 test:do_execsql_test(
     "cast-1.28",
     [[
-        SELECT typeof(CAST(123 AS blob))
+        SELECT typeof(CAST(123 AS SCALAR))
     ]], {
         -- <cast-1.28>
-        "blob"
+        "integer"
         -- </cast-1.28>
     })
 
@@ -367,20 +367,20 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cast-1.37",
     [[
-        SELECT CAST(123.456 AS blob)
+        SELECT CAST(123.456 AS SCALAR)
     ]], {
         -- <cast-1.37>
-        "123.456"
+        123.456
         -- </cast-1.37>
     })
 
 test:do_execsql_test(
     "cast-1.38",
     [[
-        SELECT typeof(CAST(123.456 AS blob))
+        SELECT typeof(CAST(123.456 AS SCALAR))
     ]], {
         -- <cast-1.38>
-        "blob"
+        "real"
         -- </cast-1.38>
     })
 
@@ -457,10 +457,10 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "cast-1.48",
     [[
-        SELECT typeof(CAST('123abc' AS blob))
+        SELECT typeof(CAST('123abc' AS SCALAR))
     ]], {
         -- <cast-1.48>
-        "blob"
+        "text"
         -- </cast-1.48>
     })
 

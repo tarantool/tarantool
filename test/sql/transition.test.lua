@@ -63,7 +63,7 @@ box.sql.execute("DROP TABLE foobar")
 box.sql.execute("DROP TABLE barfoo")
 
 -- attempt to create a table lacking PRIMARY KEY
-box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x BLOB)")
+box.sql.execute("CREATE TABLE without_rowid_lacking_primary_key(x SCALAR)")
 
 -- create a table with implicit indices (used to SEGFAULT)
 box.sql.execute("CREATE TABLE implicit_indices(a INT PRIMARY KEY,b INT,c INT,d TEXT UNIQUE)")

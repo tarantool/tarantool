@@ -25,7 +25,7 @@ test:plan(93)
 --
 test:execsql [[
     CREATE TABLE t1(id integer primary key --autoincrement
-    , t text, b blob)
+    , t text, b SCALAR)
 ]]
 
 local function substr_test(id, string, i1, i2, result)

@@ -617,19 +617,7 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 	}
 	switch (type) {
 	case FIELD_TYPE_SCALAR:
-		if (pMem->flags & MEM_Blob)
-			return SQL_OK;
-		if (pMem->flags & MEM_Str) {
-			MemSetTypeFlag(pMem, MEM_Blob);
-			return SQL_OK;
-		}
-		if (pMem->flags & MEM_Int || pMem->flags & MEM_Real) {
-			if (sqlVdbeMemStringify(pMem, 1) != 0)
-				return -1;
-			MemSetTypeFlag(pMem, MEM_Blob);
-			return 0;
-		}
-		return SQL_ERROR;
+		return 0;
 	case FIELD_TYPE_INTEGER:
 		if ((pMem->flags & MEM_Blob) != 0) {
 			if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i,

@@ -129,7 +129,7 @@ test:do_execsql_test(
         CREATE TABLE t1(x  INT primary key, y TEXT);    -- affinity of t1.y is TEXT
         INSERT INTO t1 VALUES(1,99);
 
-        CREATE TABLE t2(a  INT primary key, b BLOB);  -- affinity of t2.b is NONE
+        CREATE TABLE t2(a  INT primary key, b SCALAR);  -- affinity of t2.b is NONE
         CREATE INDEX t2b ON t2(b);
         INSERT INTO t2 VALUES(2, 99);
 
@@ -222,10 +222,10 @@ test:do_execsql_test(
         DROP TABLE t1;
         DROP TABLE t2;
 
-        CREATE TABLE t1(x  INT primary key, y BLOB);    -- affinity of t1.y is NONE
+        CREATE TABLE t1(x  INT primary key, y SCALAR);    -- affinity of t1.y is NONE
         INSERT INTO t1 VALUES(1,99);
 
-        CREATE TABLE t2(a  INT primary key, b BLOB);  -- affinity of t2.b is NONE
+        CREATE TABLE t2(a  INT primary key, b SCALAR);  -- affinity of t2.b is NONE
         CREATE INDEX t2b ON t2(b);
         INSERT INTO t2 VALUES(2,'99');
 
@@ -318,7 +318,7 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t1;
         DROP TABLE IF EXISTS t2;
 
-        CREATE TABLE t1(x  INT primary key, y BLOB);    -- affinity of t1.y is NONE
+        CREATE TABLE t1(x  INT primary key, y SCALAR);    -- affinity of t1.y is NONE
         INSERT INTO t1 VALUES(1,'99');
 
         CREATE TABLE t2(a  INT primary key, b FLOAT);  -- affinity of t2.b is NUMERIC
@@ -418,7 +418,7 @@ test:do_execsql_test(
         DROP TABLE t1;
         DROP TABLE t2;
 
-        CREATE TABLE t1(x  INT primary key, y BLOB);    -- affinity of t1.y is NONE
+        CREATE TABLE t1(x  INT primary key, y SCALAR);    -- affinity of t1.y is NONE
         INSERT INTO t1 VALUES(1,'99');
 
         CREATE TABLE t2(a  INT primary key, b INT);  -- affinity of t2.b is INTEGER
@@ -518,7 +518,7 @@ test:do_execsql_test(
         DROP TABLE t1;
         DROP TABLE t2;
 
-        CREATE TABLE t1(x  INT primary key, y BLOB);    -- affinity of t1.y is NONE
+        CREATE TABLE t1(x  INT primary key, y SCALAR);    -- affinity of t1.y is NONE
         INSERT INTO t1 VALUES(1,'99');
 
         CREATE TABLE t2(a  INT primary key, b FLOAT);  -- affinity of t2.b is REAL
@@ -621,7 +621,7 @@ test:do_execsql_test(
         CREATE TABLE t1(x  INT primary key, y FLOAT);  -- affinity of t1.y is NUMERIC
         INSERT INTO t1 VALUES(1,99);
 
-        CREATE TABLE t2(a  INT primary key, b BLOB);  -- affinity of t2.b is NONE
+        CREATE TABLE t2(a  INT primary key, b SCALAR);  -- affinity of t2.b is NONE
         CREATE INDEX t2b ON t2(b);
         INSERT INTO t2 VALUES(2,'99');
 
@@ -721,7 +721,7 @@ test:do_execsql_test(
         CREATE TABLE t1(x  INT primary key, y INT);  -- affinity of t1.y is INTEGER
         INSERT INTO t1 VALUES(1,99);
 
-        CREATE TABLE t2(a  INT primary key, b BLOB);  -- affinity of t2.b is NONE
+        CREATE TABLE t2(a  INT primary key, b SCALAR);  -- affinity of t2.b is NONE
         CREATE INDEX t2b ON t2(b);
         INSERT INTO t2 VALUES(2,'99');
 
@@ -821,7 +821,7 @@ test:do_execsql_test(
         CREATE TABLE t1(x  INT primary key, y FLOAT);  -- affinity of t1.y is REAL
         INSERT INTO t1 VALUES(1,99.0);
 
-        CREATE TABLE t2(a  INT primary key, b BLOB);  -- affinity of t2.b is NONE
+        CREATE TABLE t2(a  INT primary key, b SCALAR);  -- affinity of t2.b is NONE
         CREATE INDEX t2b ON t2(b);
         INSERT INTO t2 VALUES(2,'99');
 
