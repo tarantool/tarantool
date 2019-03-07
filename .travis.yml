@@ -55,6 +55,10 @@ matrix:
         env: OS=debian DIST=jessie
       - name: Debian Stretch (9) build + deploy DEB
         env: OS=debian DIST=stretch
+      - name: Debian Buster (10) build + deploy DEB
+        env: OS=debian DIST=buster
+      - name: Debian Sid (unstable) build + deploy DEB
+        env: OS=debian DIST=sid
 
 script:
   - make -f .travis.mk ${TARGET}
