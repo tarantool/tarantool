@@ -291,8 +291,6 @@ void sqlCoverage(int);
  */
 #define IS_BIG_INT(X)  (((X)&~(i64)0xffffffff)!=0)
 
-#define SQL_LIKE_DOESNT_MATCH_BLOBS
-
 #include "hash.h"
 #include "parse.h"
 #include <stdio.h>

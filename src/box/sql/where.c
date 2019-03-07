@@ -4778,14 +4778,6 @@ sqlWhereEnd(WhereInfo * pWInfo)
 			sqlVdbeJumpHere(v, pLevel->addrSkip);
 			sqlVdbeJumpHere(v, pLevel->addrSkip - 2);
 		}
-#ifndef SQL_LIKE_DOESNT_MATCH_BLOBS
-		if (pLevel->addrLikeRep) {
-			sqlVdbeAddOp2(v, OP_DecrJumpZero,
-					  (int)(pLevel->iLikeRepCntr >> 1),
-					  pLevel->addrLikeRep);
-			VdbeCoverage(v);
-		}
-#endif
 		if (pLevel->iLeftJoin) {
 			int ws = pLoop->wsFlags;
 			addr =

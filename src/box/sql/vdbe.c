@@ -1201,14 +1201,6 @@ case OP_String: {          /* out2 */
 	pOut->z = pOp->p4.z;
 	pOut->n = pOp->p1;
 	UPDATE_MAX_BLOBSIZE(pOut);
-#ifndef SQL_LIKE_DOESNT_MATCH_BLOBS
-	if (pOp->p3>0) {
-		assert(pOp->p3<=(p->nMem+1 - p->nCursor));
-		pIn3 = &aMem[pOp->p3];
-		assert(pIn3->flags & MEM_Int);
-		if (pIn3->u.i==pOp->p5) pOut->flags = MEM_Blob|MEM_Static|MEM_Term;
-	}
-#endif
 	break;
 }
 

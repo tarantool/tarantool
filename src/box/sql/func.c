@@ -826,7 +826,6 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	sql *db = sql_context_db_handle(context);
 	int is_like_ci = SQL_PTR_TO_INT(sql_user_data(context));
 
-#ifdef SQL_LIKE_DOESNT_MATCH_BLOBS
 	if (sql_value_type(argv[0]) == SQL_BLOB
 	    || sql_value_type(argv[1]) == SQL_BLOB) {
 #ifdef SQL_TEST
@@ -835,7 +834,6 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 		sql_result_int(context, 0);
 		return;
 	}
-#endif
 	const char *zB = (const char *) sql_value_text(argv[0]);
 	const char *zA = (const char *) sql_value_text(argv[1]);
 	const char *zB_end = zB + sql_value_bytes(argv[0]);
