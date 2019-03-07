@@ -1,0 +1,29 @@
+box.info.lsn
+---
+- 0
+...
+box.space._schema:delete('dummy')
+---
+...
+box.info.lsn
+---
+- 123456789123
+...
+box.space._schema:delete('dummy')
+---
+...
+box.snapshot()
+---
+- ok
+...
+box.info.lsn
+---
+- 123456789124
+...
+box.space._schema:delete('dummy')
+---
+...
+box.snapshot()
+---
+- ok
+...
