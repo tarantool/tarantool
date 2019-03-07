@@ -165,7 +165,7 @@ vclock_get(const struct vclock *vclock, uint32_t replica_id)
 	 */
 	replica_id &= VCLOCK_MAX - 1;
 	/* Evaluate a bitmask to avoid branching. */
-	int64_t mask = 0 - ((vclock->map >> replica_id) & 0x1);
+	int64_t mask = 0ULL - ((vclock->map >> replica_id) & 0x1);
 	return mask & vclock->lsn[replica_id];
 }
 
