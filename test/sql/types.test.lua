@@ -55,3 +55,18 @@ box.sql.execute("SELECT randomblob(5) || 'x';")
 -- Result of BLOBs concatenation must be BLOB.
 --
 box.sql.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
+
+-- gh-3954: LIKE accepts only arguments of type TEXT and NULLs.
+--
+box.sql.execute("CREATE TABLE t1 (s SCALAR PRIMARY KEY);")
+box.sql.execute("INSERT INTO t1 VALUES (randomblob(5));")
+box.sql.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
+box.sql.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
+box.sql.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
+box.sql.execute("SELECT s LIKE NULL FROM t1;")
+box.sql.execute("DELETE FROM t1;")
+box.sql.execute("INSERT INTO t1 VALUES (1);")
+box.sql.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
+box.sql.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
+box.sql.execute("SELECT NULL LIKE s FROM t1;")
+box.space.T1:drop()

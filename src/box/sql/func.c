@@ -809,6 +809,9 @@ sql_strlike_ci(const char *zPattern, const char *zStr, unsigned int esc)
  *       A LIKE B
  *
  * are implemented as like(B,A).
+ *
+ * Both arguments (A and B) must be of type TEXT. If one arguments
+ * is NULL then result is NULL as well.
  */
 static void
 likeFunc(sql_context *context, int argc, sql_value **argv)
@@ -817,10 +820,19 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	int nPat;
 	sql *db = sql_context_db_handle(context);
 	int is_like_ci = SQL_PTR_TO_INT(sql_user_data(context));
+	int rhs_type = sql_value_type(argv[0]);
+	int lhs_type = sql_value_type(argv[1]);
 
-	if (sql_value_type(argv[0]) == SQL_BLOB
-	    || sql_value_type(argv[1]) == SQL_BLOB) {
-		sql_result_int(context, 0);
+	if (lhs_type != SQL_TEXT || rhs_type != SQL_TEXT) {
+		if (lhs_type == SQL_NULL || rhs_type == SQL_NULL)
+			return;
+		char *inconsistent_type = rhs_type != SQL_TEXT ?
+					  mem_type_to_str(argv[0]) :
+					  mem_type_to_str(argv[1]);
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT",
+			 inconsistent_type);
+		context->fErrorOrAux = 1;
+		context->isError = SQL_TARANTOOL_ERROR;
 		return;
 	}
 	const char *zB = (const char *) sql_value_text(argv[0]);

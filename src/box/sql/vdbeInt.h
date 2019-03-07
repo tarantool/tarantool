@@ -262,6 +262,12 @@ enum {
 	MEM_PURE_TYPE_MASK = 0x1f
 };
 
+/**
+ * Simple type to str convertor. It is used to simplify
+ * error reporting.
+ */
+char *
+mem_type_to_str(const struct Mem *p);
 
 /* Return TRUE if Mem X contains dynamically allocated content - anything
  * that needs to be deallocated to avoid a leak.

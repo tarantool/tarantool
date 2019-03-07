@@ -617,11 +617,7 @@ vdbe_add_new_autoinc_id(struct Vdbe *vdbe, int64_t id)
 	return 0;
 }
 
-/**
- * Simple type to str convertor. It is used to simplify
- * error reporting.
- */
-static char *
+char *
 mem_type_to_str(const struct Mem *p)
 {
 	assert(p != NULL);
