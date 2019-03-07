@@ -122,7 +122,7 @@ struct errcode_record {
 	/* 67 */_(ER_REPLICA_ID_IS_RESERVED,	"Can't initialize replica id with a reserved value %u") \
 	/* 68 */_(ER_INVALID_ORDER,		"Invalid LSN order for instance %u: previous LSN = %llu, new lsn = %llu") \
 	/* 69 */_(ER_MISSING_REQUEST_FIELD,	"Missing mandatory field '%s' in request") \
-	/* 70 */_(ER_IDENTIFIER,		"Invalid identifier '%s' (expected printable symbols only)") \
+	/* 70 */_(ER_IDENTIFIER,		"Invalid identifier '%s' (expected printable symbols only or it is too long)") \
 	/* 71 */_(ER_DROP_FUNCTION,		"Can't drop function %u: %s") \
 	/* 72 */_(ER_ITERATOR_TYPE,		"Unknown iterator type '%s'") \
 	/* 73 */_(ER_REPLICA_MAX,		"Replica count limit reached: %u") \
@@ -240,6 +240,12 @@ struct errcode_record {
 	/*185 */_(ER_SQL_UNKNOWN_TOKEN,		"Syntax error: unrecognized token: '%.*s'") \
 	/*186 */_(ER_SQL_PARSER_GENERIC,	"%s") \
 	/*187 */_(ER_SQL_ANALYZE_ARGUMENT,	"ANALYZE statement argument %s is not a base table") \
+	/*188 */_(ER_SQL_COLUMN_COUNT_MAX,	"Failed to create space '%s': space column count %d exceeds the limit (%d)") \
+	/*189 */_(ER_HEX_LITERAL_MAX,		"Hex literal %s%s length %d exceeds the supported limit (%d)") \
+	/*190 */_(ER_INT_LITERAL_MAX,		"Integer literal %s%s exceeds the supported range %lld - %lld") \
+	/*191 */_(ER_SQL_PARSER_LIMIT,		"%s %d exceeds the limit (%d)") \
+	/*192 */_(ER_INDEX_DEF_UNSUPPORTED,	"%s are prohibited in an index definition") \
+	/*193 */_(ER_CK_DEF_UNSUPPORTED,	"%s are prohibited in a CHECK constraint definition") \
 
 /*
  * !IMPORTANT! Please follow instructions at start of the file

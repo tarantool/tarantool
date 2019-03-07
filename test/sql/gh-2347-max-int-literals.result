@@ -20,9 +20,11 @@ box.sql.execute("select (-9223372036854775808)")
 ...
 box.sql.execute("select (9223372036854775808)")
 ---
-- error: 'oversized integer: 9223372036854775808'
+- error: Integer literal 9223372036854775808 exceeds the supported range -9223372036854775808
+    - 9223372036854775807
 ...
 box.sql.execute("select (-9223372036854775809)")
 ---
-- error: 'oversized integer: -9223372036854775809'
+- error: Integer literal -9223372036854775809 exceeds the supported range -9223372036854775808
+    - 9223372036854775807
 ...

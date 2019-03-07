@@ -18,19 +18,19 @@ box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT UNIQUE)")
 ...
 box.sql.execute("CREATE TABLE t2(a INT UNIQUE, b INT)")
 ---
-- error: PRIMARY KEY missing on table T2
+- error: 'Failed to create space ''T2'': PRIMARY KEY missing'
 ...
 box.sql.execute("CREATE TABLE t3(a FLOAT)")
 ---
-- error: PRIMARY KEY missing on table T3
+- error: 'Failed to create space ''T3'': PRIMARY KEY missing'
 ...
 box.sql.execute("CREATE TABLE t4(a FLOAT, b TEXT)")
 ---
-- error: PRIMARY KEY missing on table T4
+- error: 'Failed to create space ''T4'': PRIMARY KEY missing'
 ...
 box.sql.execute("CREATE TABLE t5(a FLOAT, b FLOAT UNIQUE)")
 ---
-- error: PRIMARY KEY missing on table T5
+- error: 'Failed to create space ''T5'': PRIMARY KEY missing'
 ...
 box.sql.execute("DROP TABLE t1")
 ---

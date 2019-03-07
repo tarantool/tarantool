@@ -58,7 +58,7 @@ test:do_catchsql_test(
     "gh2548-select-compound-limit-2",
     select_string_last, {
         -- <gh2548-select-compound-limit-2>
-        1, "Too many UNION or EXCEPT or INTERSECT operations (limit 30 is set)"
+        1, "The number of UNION or EXCEPT or INTERSECT operations 31 exceeds the limit (30)"
         -- </gh2548-select-compound-limit-2>
     })
 

@@ -481,8 +481,8 @@ sqlRunParser(Parse * pParse, const char *zSql)
 				      &pParse->sLastToken.isReserved);
 			i += pParse->sLastToken.n;
 			if (i > mxSqlLen) {
-				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
-					 "string or blob too big");
+				diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+					 "SQL command length", i, mxSqlLen);
 				pParse->is_aborted = true;
 				break;
 			}

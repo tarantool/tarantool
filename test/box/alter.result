@@ -367,7 +367,7 @@ s:drop()
 ...
 box.schema.space.create('')
 ---
-- error: Invalid identifier '' (expected printable symbols only)
+- error: Invalid identifier '' (expected printable symbols only or it is too long)
 ...
 -- valid identifiers
 box.schema.space.create('_Abcde'):drop()
@@ -438,7 +438,7 @@ i:drop()
 ...
 space:create_index('')
 ---
-- error: Invalid identifier '' (expected printable symbols only)
+- error: Invalid identifier '' (expected printable symbols only or it is too long)
 ...
 space:drop()
 ---

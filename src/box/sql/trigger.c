@@ -86,7 +86,7 @@ sql_trigger_begin(struct Parse *parse, struct Token *name, int tr_tm,
 	if (trigger_name == NULL)
 		goto trigger_cleanup;
 
-	if (sqlCheckIdentifierName(parse, trigger_name) != SQL_OK)
+	if (sqlCheckIdentifierName(parse, trigger_name) != 0)
 		goto trigger_cleanup;
 
 	const char *table_name = table->a[0].zName;

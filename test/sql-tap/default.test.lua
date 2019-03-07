@@ -66,7 +66,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-1.3>
-	1, "default value of column [Y] is not constant"
+	1, "Failed to create space 'T3': default value of column 'Y' is not constant"
 	-- </default-1.3>
 })
 
@@ -173,7 +173,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.2>
-	1, "default value of column [B] is not constant"
+	1, "Failed to create space 'T2': default value of column 'B' is not constant"
 	-- </default-4.2>
 })
 
@@ -187,7 +187,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.3>
-	1, "default value of column [B] is not constant"
+	1, "Failed to create space 'T2': default value of column 'B' is not constant"
 	-- </default-4.3>
 })
 
@@ -201,7 +201,7 @@ test:do_catchsql_test(
 	);
 	]], {
 	-- <default-4.4>
-	1, "default value of column [B] is not constant"
+	1, "Failed to create space 'T2': default value of column 'B' is not constant"
 	-- </default-4.4>
 })
 
@@ -214,7 +214,7 @@ test:do_catchsql_test(
         CREATE TABLE t6(id INTEGER PRIMARY KEY, b TEXT DEFAULT(id));
     ]], {
     -- <default-5.1>
-    1, "default value of column [B] is not constant"
+    1, "Failed to create space 'T6': default value of column 'B' is not constant"
     -- </default-5.1>
 })
 

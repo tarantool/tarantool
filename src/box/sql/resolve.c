@@ -510,30 +510,6 @@ sqlCreateColumnExpr(sql * db, SrcList * pSrc, int iSrc, int iCol)
 }
 
 /*
- * Report an error that an expression is not valid for some set of
- * pNC->ncFlags values determined by validMask.
- */
-static void
-notValid(Parse * pParse,	/* Leave error message here */
-	 NameContext * pNC,	/* The name context */
-	 const char *zMsg,	/* Type of error */
-	 int validMask		/* Set of contexts for which prohibited */
-    )
-{
-	assert((validMask & ~(NC_IsCheck | NC_IdxExpr)) == 0);
-	if ((pNC->ncFlags & validMask) != 0) {
-		const char *zIn;
-		if (pNC->ncFlags & NC_IdxExpr)
-			zIn = "index expressions";
-		else if (pNC->ncFlags & NC_IsCheck)
-			zIn = "CHECK constraints";
-		else
-			unreachable();
-		sqlErrorMsg(pParse, "%s prohibited in %s", zMsg, zIn);
-	}
-}
-
-/*
  * Expression p should encode a floating point value between 1.0 and 0.0.
  * Return 1024 times this value.  Or return -1 if p is not a floating point
  * value between 1.0 and 0.0.
@@ -605,7 +581,11 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			Expr *pRight;
 
 			/* if( pSrcList==0 ) break; */
-			notValid(pParse, pNC, "the \".\" operator", NC_IdxExpr);
+			if (pNC->ncFlags & NC_IdxExpr) {
+				diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED,
+					 "Expressions");
+				pParse->is_aborted = true;
+			}
 			pRight = pExpr->pRight;
 			if (pRight->op == TK_ID) {
 				zTable = pExpr->pLeft->u.zToken;
@@ -646,6 +626,9 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			} else {
 				is_agg = pDef->xFinalize != 0;
 				pExpr->type = pDef->ret_type;
+				const char *err_msg =
+					"second argument to likelihood() must "\
+					"be a constant between 0.0 and 1.0";
 				if (pDef->funcFlags & SQL_FUNC_UNLIKELY) {
 					ExprSetProperty(pExpr,
 							EP_Unlikely | EP_Skip);
@@ -654,9 +637,11 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 						    exprProbability(pList->a[1].
 								    pExpr);
 						if (pExpr->iTable < 0) {
-							sqlErrorMsg(pParse,
-									"second argument to likelihood() must be a "
-									"constant between 0.0 and 1.0");
+							diag_set(ClientError,
+								 ER_ILLEGAL_PARAMS,
+								 err_msg);
+							pParse->is_aborted =
+								true;
 							pNC->nErr++;
 						}
 					} else {
@@ -690,9 +675,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 					 * that might change over time cannot be used
 					 * in an index.
 					 */
-					notValid(pParse, pNC,
-						 "non-deterministic functions",
-						 NC_IdxExpr);
+					assert((pNC->ncFlags & NC_IdxExpr) == 0);
 				}
 			}
 			if (is_agg && (pNC->ncFlags & NC_AllowAgg) == 0) {
@@ -754,8 +737,13 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			testcase(pExpr->op == TK_IN);
 			if (ExprHasProperty(pExpr, EP_xIsSelect)) {
 				int nRef = pNC->nRef;
-				notValid(pParse, pNC, "subqueries",
-					 NC_IsCheck | NC_IdxExpr);
+				assert((pNC->ncFlags & NC_IdxExpr) == 0);
+				if (pNC->ncFlags & NC_IsCheck) {
+					diag_set(ClientError,
+						 ER_CK_DEF_UNSUPPORTED,
+						 "Subqueries");
+					pParse->is_aborted = true;
+				}
 				sqlWalkSelect(pWalker, pExpr->x.pSelect);
 				assert(pNC->nRef >= nRef);
 				if (nRef != pNC->nRef) {
@@ -766,8 +754,12 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			break;
 		}
 	case TK_VARIABLE:{
-			notValid(pParse, pNC, "parameters",
-				 NC_IsCheck | NC_IdxExpr);
+			assert((pNC->ncFlags & NC_IsCheck) == 0);
+			if (pNC->ncFlags & NC_IdxExpr) {
+				diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED,
+					 "Parameter markers");
+				pParse->is_aborted = true;
+			}
 			break;
 		}
 	case TK_BETWEEN:
@@ -952,7 +944,10 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	db = pParse->db;
 #if SQL_MAX_COLUMN
 	if (pOrderBy->nExpr > db->aLimit[SQL_LIMIT_COLUMN]) {
-		sqlErrorMsg(pParse, "too many terms in ORDER BY clause");
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+			 "The number of terms in ORDER BY clause",
+			 pOrderBy->nExpr, db->aLimit[SQL_LIMIT_COLUMN]);
+		pParse->is_aborted = true;
 		return 1;
 	}
 #endif
@@ -1042,8 +1037,7 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
  * field) then convert that term into a copy of the corresponding result set
  * column.
  *
- * If any errors are detected, add an error message to pParse and
- * return non-zero.  Return zero if no errors are seen.
+ * @retval 0 On success, not 0 elsewhere.
  */
 int
 sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages here */
@@ -1061,8 +1055,11 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
 		return 0;
 #if SQL_MAX_COLUMN
 	if (pOrderBy->nExpr > db->aLimit[SQL_LIMIT_COLUMN]) {
-		sqlErrorMsg(pParse, "too many terms in %s BY clause",
-				zType);
+		const char *err = tt_sprintf("The number of terms in %s BY "\
+					     "clause", zType);
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT, err,
+			 pOrderBy->nExpr, db->aLimit[SQL_LIMIT_COLUMN]);
+		pParse->is_aborted = true;
 		return 1;
 	}
 #endif
@@ -1096,9 +1093,7 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
  * result-set expression.  Otherwise, the expression is resolved in
  * the usual way - using sqlResolveExprNames().
  *
- * This routine returns the number of errors.  If errors occur, then
- * an appropriate error message might be left in pParse.  (OOM errors
- * excepted.)
+ * @retval 0 On success, not 0 elsewhere.
  */
 static int
 resolveOrderGroupBy(NameContext * pNC,	/* The name context of the SELECT statement */

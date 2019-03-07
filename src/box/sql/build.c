@@ -262,19 +262,28 @@ sqlNameFromToken(sql * db, Token * pName)
  * (e.g. table, index, column name of a real table)
  * All names are legal except those that cantain non-printable
  * characters or have length greater than BOX_NAME_MAX.
+ *
+ * @param pParse Parser context.
+ * @param zName Identifier to check.
+ *
+ * @retval 0 on success.
+ * @retval -1 on error.
  */
 int
 sqlCheckIdentifierName(Parse *pParse, char *zName)
 {
 	ssize_t len = strlen(zName);
-
-	if (len > BOX_NAME_MAX || identifier_check(zName, len) != 0) {
-		sqlErrorMsg(pParse,
-				"identifier name is invalid: %s",
-				zName);
-		return SQL_ERROR;
+	if (len > BOX_NAME_MAX) {
+		diag_set(ClientError, ER_IDENTIFIER,
+			 tt_cstr(zName, BOX_INVALID_NAME_MAX));
+		pParse->is_aborted = true;
+		return -1;
 	}
-	return SQL_OK;
+	if (identifier_check(zName, len) != 0) {
+		pParse->is_aborted = true;
+		return -1;
+	}
+	return 0;
 }
 
 /**
@@ -334,7 +343,7 @@ sqlStartTable(Parse *pParse, Token *pName, int noErr)
 	pParse->sNameToken = *pName;
 	if (zName == 0)
 		return;
-	if (sqlCheckIdentifierName(pParse, zName) != SQL_OK)
+	if (sqlCheckIdentifierName(pParse, zName) != 0)
 		goto cleanup;
 
 	struct space *space = space_by_name(zName);
@@ -432,7 +441,9 @@ sqlAddColumn(Parse * pParse, Token * pName, struct type_def *type_def)
 
 #if SQL_MAX_COLUMN
 	if ((int)def->field_count + 1 > db->aLimit[SQL_LIMIT_COLUMN]) {
-		sqlErrorMsg(pParse, "too many columns on %s", def->name);
+		diag_set(ClientError, ER_SQL_COLUMN_COUNT_MAX, def->name,
+			 def->field_count + 1, db->aLimit[SQL_LIMIT_COLUMN]);
+		pParse->is_aborted = true;
 		return;
 	}
 #endif
@@ -521,9 +532,12 @@ sqlAddDefaultValue(Parse * pParse, ExprSpan * pSpan)
 		struct space_def *def = pParse->new_space->def;
 		if (!sqlExprIsConstantOrFunction
 		    (pSpan->pExpr, db->init.busy)) {
-			sqlErrorMsg(pParse,
-					"default value of column [%s] is not constant",
-					def->fields[def->field_count - 1].name);
+			const char *column_name =
+				def->fields[def->field_count - 1].name;
+			diag_set(ClientError, ER_CREATE_SPACE, def->name,
+				 tt_sprintf("default value of column '%s' is "\
+					    "not constant", column_name));
+			pParse->is_aborted = true;
 		} else {
 			assert(def != NULL);
 			struct field_def *field =
@@ -588,9 +602,9 @@ sqlAddPrimaryKey(Parse * pParse,	/* Parsing context */
 	if (space == NULL)
 		goto primary_key_exit;
 	if (sql_space_primary_key(space) != NULL) {
-		sqlErrorMsg(pParse,
-				"table \"%s\" has more than one primary key",
-				space->def->name);
+		diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
+			 "primary key has been already declared");
+		pParse->is_aborted = true;
 		goto primary_key_exit;
 	}
 	if (pList == NULL) {
@@ -603,8 +617,9 @@ sqlAddPrimaryKey(Parse * pParse,	/* Parsing context */
 			    sqlExprSkipCollate(pList->a[i].pExpr);
 			assert(pCExpr != 0);
 			if (pCExpr->op != TK_ID) {
-				sqlErrorMsg(pParse, "expressions prohibited"
-							" in PRIMARY KEY");
+				diag_set(ClientError, ER_INDEX_DEF_UNSUPPORTED,
+					 "Expressions");
+				pParse->is_aborted = true;
 				goto primary_key_exit;
 			}
 			const char *name = pCExpr->u.zToken;
@@ -636,8 +651,10 @@ sqlAddPrimaryKey(Parse * pParse,	/* Parsing context */
 		if (db->mallocFailed)
 			goto primary_key_exit;
 	} else if (autoInc) {
-		sqlErrorMsg(pParse, "AUTOINCREMENT is only allowed on an "
-				"INTEGER PRIMARY KEY or INT PRIMARY KEY");
+		diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
+			 "AUTOINCREMENT is only allowed on an INTEGER PRIMARY "\
+			 "KEY or INT PRIMARY KEY");
+		pParse->is_aborted = true;
 		goto primary_key_exit;
 	} else {
 		sql_create_index(pParse, 0, 0, pList, 0, sortOrder, false,
@@ -1144,9 +1161,10 @@ sqlEndTable(Parse * pParse,	/* Parse context */
 
 	if (!new_space->def->opts.is_view) {
 		if (sql_space_primary_key(new_space) == NULL) {
-			sqlErrorMsg(pParse,
-					"PRIMARY KEY missing on table %s",
-					new_space->def->name);
+			diag_set(ClientError, ER_CREATE_SPACE,
+				 new_space->def->name,
+				 "PRIMARY KEY missing");
+			pParse->is_aborted = true;
 			goto cleanup;
 		}
 	}
@@ -1264,8 +1282,10 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 {
 	struct sql *db = parse_context->db;
 	if (parse_context->nVar > 0) {
-		sqlErrorMsg(parse_context,
-				"parameters are not allowed in views");
+		diag_set(ClientError, ER_CREATE_SPACE,
+			 sqlNameFromToken(db, name),
+			 "parameters are not allowed in views");
+		parse_context->is_aborted = true;
 		goto create_view_fail;
 	}
 	sqlStartTable(parse_context, name, if_exists);
@@ -1279,10 +1299,10 @@ sql_create_view(struct Parse *parse_context, struct Token *begin,
 		goto create_view_fail;
 	if (aliases != NULL) {
 		if ((int)select_res_space->def->field_count != aliases->nExpr) {
-			sqlErrorMsg(parse_context, "expected %d columns "\
-					"for '%s' but got %d", aliases->nExpr,
-					space->def->name,
-					select_res_space->def->field_count);
+			diag_set(ClientError, ER_CREATE_SPACE, space->def->name,
+				 "number of aliases doesn't match provided "\
+				 "columns");
+			parse_context->is_aborted = true;
 			goto create_view_fail;
 		}
 		sqlColumnsFromExprList(parse_context, aliases, space->def);
@@ -1604,13 +1624,15 @@ sql_drop_table(struct Parse *parse_context, struct SrcList *table_name_list,
 	 * and DROP VIEW is not used on a table.
 	 */
 	if (is_view && !space->def->opts.is_view) {
-		sqlErrorMsg(parse_context, "use DROP TABLE to delete table %s",
-				space_name);
+		diag_set(ClientError, ER_DROP_SPACE, space_name,
+			 "use DROP TABLE");
+		parse_context->is_aborted = true;
 		goto exit_drop_table;
 	}
 	if (!is_view && space->def->opts.is_view) {
-		sqlErrorMsg(parse_context, "use DROP VIEW to delete view %s",
-				space_name);
+		diag_set(ClientError, ER_DROP_SPACE, space_name,
+			 "use DROP VIEW");
+		parse_context->is_aborted = true;
 		goto exit_drop_table;
 	}
 	/*
@@ -1753,12 +1775,6 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 			diag_set(ClientError, ER_NO_SUCH_SPACE, parent_name);;
 			goto tnt_error;
 		}
-	} else {
-		if (parent_space->def->opts.is_view) {
-			sqlErrorMsg(parse_context,
-					"referenced table can't be view");
-			goto exit_create_fk;
-		}
 	}
 	if (constraint == NULL && !is_alter) {
 		if (parse_context->constraintName.n == 0) {
@@ -1775,6 +1791,11 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 	}
 	if (constraint_name == NULL)
 		goto exit_create_fk;
+	if (!is_self_referenced && parent_space->def->opts.is_view) {
+		diag_set(ClientError, ER_CREATE_FK_CONSTRAINT, constraint_name,
+			"referenced space can't be VIEW");
+		goto tnt_error;
+	}
 	const char *error_msg = "number of columns in foreign key does not "
 				"match the number of columns in the primary "
 				"index of referenced table";
@@ -2144,7 +2165,10 @@ sql_create_index(struct Parse *parse, struct Token *token,
 	struct space_def *def = space->def;
 
 	if (def->opts.is_view) {
-		sqlErrorMsg(parse, "views can not be indexed");
+		diag_set(ClientError, ER_MODIFY_INDEX,
+			 sqlNameFromToken(db, token), def->name,
+			 "views can not be indexed");
+		parse->is_aborted = true;
 		goto exit_create_index;
 	}
 	/*
@@ -2245,7 +2269,12 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		assert(col_list->nExpr == 1);
 		sqlExprListSetSortOrder(col_list, sort_order);
 	} else {
-		sqlExprListCheckLength(parse, col_list, "index");
+		if (col_list->nExpr > db->aLimit[SQL_LIMIT_COLUMN]) {
+			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+				 "The number of columns in index",
+				 col_list->nExpr, db->aLimit[SQL_LIMIT_COLUMN]);
+			parse->is_aborted = true;
+		}
 	}
 
 	index = (struct index *) region_alloc(&parse->region, sizeof(*index));
@@ -2942,11 +2971,8 @@ sqlSavepoint(Parse * pParse, int op, Token * pName)
 			return;
 		}
 		if (op == SAVEPOINT_BEGIN &&
-			sqlCheckIdentifierName(pParse, zName)
-				!= SQL_OK) {
-			sqlErrorMsg(pParse, "bad savepoint name");
+		    sqlCheckIdentifierName(pParse, zName) != 0)
 			return;
-		}
 		sqlVdbeAddOp4(v, OP_Savepoint, op, 0, 0, zName, P4_DYNAMIC);
 	}
 }

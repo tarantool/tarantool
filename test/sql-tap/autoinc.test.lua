@@ -561,7 +561,7 @@ test:do_catchsql_test(
         CREATE TABLE t8(x TEXT PRIMARY KEY AUTOINCREMENT);
     ]], {
         -- <autoinc-7.2>
-        1, "AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY or INT PRIMARY KEY"
+        1, "Failed to create space 'T8': AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY or INT PRIMARY KEY"
         -- </autoinc-7.2>
     })
 

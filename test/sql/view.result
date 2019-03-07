@@ -19,7 +19,7 @@ box.sql.execute("CREATE VIEW v1 AS SELECT a+b FROM t1;");
 -- View can't have any indexes.
 box.sql.execute("CREATE INDEX i1 on v1(a);");
 ---
-- error: views can not be indexed
+- error: 'Can''t create or modify index ''I1'' in space ''V1'': views can not be indexed'
 ...
 v1 = box.space.V1;
 ---

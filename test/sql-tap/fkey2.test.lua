@@ -729,7 +729,7 @@ test:do_catchsql_test(
         CREATE TABLE c(x  INT PRIMARY KEY REFERENCES v(y));
     ]], {
         -- <fkey2-7.2>
-        1, "referenced table can't be view"
+        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_C': referenced space can't be VIEW"
         -- </fkey2-7.2>
     })
 
@@ -1157,7 +1157,7 @@ test:do_catchsql_test(
         CREATE TABLE t1(x INT PRIMARY KEY REFERENCES v);
     ]], {
         -- <fkey2-10.20>
-        1, "referenced table can't be view"
+        1, "Failed to create foreign key constraint 'FK_CONSTRAINT_1_T1': referenced space can't be VIEW"
         -- </fkey2-10.20>
     })
 

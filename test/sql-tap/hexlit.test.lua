@@ -107,7 +107,7 @@ test:do_catchsql_test(
         SELECT 0x10000000000000000;
     ]], {
         -- <hexlist-400>
-        1, "hex literal too big: 0x10000000000000000"
+        1, "Hex literal 0x10000000000000000 length 17 exceeds the supported limit (16)"
         -- </hexlist-400>
     })
 
@@ -119,7 +119,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(1+0x10000000000000000);
     ]], {
         -- <hexlist-410>
-        1, "hex literal too big: 0x10000000000000000"
+        1, "Hex literal 0x10000000000000000 length 17 exceeds the supported limit (16)"
         -- </hexlist-410>
     })
 

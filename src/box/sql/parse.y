@@ -410,9 +410,10 @@ cmd ::= select(X).  {
         (mxSelect = pParse->db->aLimit[SQL_LIMIT_COMPOUND_SELECT])>0 &&
         cnt>mxSelect
       ){
-        sqlErrorMsg(pParse, "Too many UNION or EXCEPT or INTERSECT "
-                        "operations (limit %d is set)",
-                        pParse->db->aLimit[SQL_LIMIT_COMPOUND_SELECT]);
+         diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of UNION or "\
+                  "EXCEPT or INTERSECT operations", cnt,
+                  pParse->db->aLimit[SQL_LIMIT_COMPOUND_SELECT]);
+         pParse->is_aborted = true;
       }
     }
   }
@@ -744,7 +745,11 @@ cmd ::= with(C) UPDATE orconf(R) fullname(X) indexed_opt(I) SET setlist(Y)
         where_opt(W).  {
   sqlWithPush(pParse, C, 1);
   sqlSrcListIndexedBy(pParse, X, &I);
-  sqlExprListCheckLength(pParse,Y,"set list");
+  if (Y != NULL && Y->nExpr > pParse->db->aLimit[SQL_LIMIT_COLUMN]) {
+    diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of columns in set "\
+             "list", Y->nExpr, pParse->db->aLimit[SQL_LIMIT_COLUMN]);
+    pParse->is_aborted = true;
+  }
   sqlSubProgramsRemaining = SQL_MAX_COMPILING_TRIGGERS;
   /* Instruct SQL to initate Tarantool's transaction.  */
   pParse->initiateTTrans = true;
@@ -932,7 +937,11 @@ expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
 %endif  SQL_OMIT_CAST
 expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
   if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
-    sqlErrorMsg(pParse, "too many arguments on function %T", &X);
+    const char *err =
+      tt_sprintf("Number of arguments to function %.*s", X.n, X.z);
+    diag_set(ClientError, ER_SQL_PARSER_LIMIT, err, Y->nExpr,
+             pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]);
+    pParse->is_aborted = true;
   }
   A.pExpr = sqlExprFunction(pParse, Y, &X);
   spanSet(&A,&X,&E);
@@ -948,7 +957,11 @@ expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
 type_func(A) ::= CHAR(A) .
 expr(A) ::= type_func(X) LP distinct(D) exprlist(Y) RP(E). {
   if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
-    sqlErrorMsg(pParse, "too many arguments on function %T", &X);
+    const char *err =
+      tt_sprintf("Number of arguments to function %.*s", X.n, X.z);
+    diag_set(ClientError, ER_SQL_PARSER_LIMIT, err, Y->nExpr,
+             pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG]);
+    pParse->is_aborted = true;
   }
   A.pExpr = sqlExprFunction(pParse, Y, &X);
   spanSet(&A,&X,&E);

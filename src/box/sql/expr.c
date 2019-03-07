@@ -746,19 +746,24 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
  * Check that argument nHeight is less than or equal to the maximum
  * expression depth allowed. If it is not, leave an error message in
  * pParse.
+ *
+ * @param pParse Parser context.
+ * @param zName Depth to check.
+ *
+ * @retval 0 on success.
+ * @retval -1 on error.
  */
 int
 sqlExprCheckHeight(Parse * pParse, int nHeight)
 {
-	int rc = SQL_OK;
 	int mxHeight = pParse->db->aLimit[SQL_LIMIT_EXPR_DEPTH];
 	if (nHeight > mxHeight) {
-		sqlErrorMsg(pParse,
-				"Expression tree is too large (maximum depth %d)",
-				mxHeight);
-		rc = SQL_ERROR;
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "Number of nodes "\
+			 "in expression tree", nHeight, mxHeight);
+		pParse->is_aborted = true;
+		return -1;
 	}
-	return rc;
+	return 0;
 }
 
 /* The following three functions, heightOfExpr(), heightOfExprList()
@@ -1197,9 +1202,9 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			testcase(i == SQL_BIND_PARAMETER_MAX - 1);
 			testcase(i == SQL_BIND_PARAMETER_MAX);
 			if (!is_ok || i < 1 || i > SQL_BIND_PARAMETER_MAX) {
-				sqlErrorMsg(pParse,
-						"variable number must be between $1 and $%d",
-						SQL_BIND_PARAMETER_MAX);
+				diag_set(ClientError, ER_SQL_BIND_PARAMETER_MAX,
+					 SQL_BIND_PARAMETER_MAX);
+				pParse->is_aborted = true;
 				return;
 			}
 			if (x > pParse->nVar) {
@@ -1227,7 +1232,9 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 	}
 	pExpr->iColumn = x;
 	if (x > SQL_BIND_PARAMETER_MAX) {
-		sqlErrorMsg(pParse, "too many SQL variables");
+		diag_set(ClientError, ER_SQL_BIND_PARAMETER_MAX,
+			 SQL_BIND_PARAMETER_MAX);
+		pParse->is_aborted = true;
 	}
 }
 
@@ -1903,22 +1910,6 @@ sqlExprListSetSpan(Parse * pParse,	/* Parsing context */
 		pItem->zSpan = sqlDbStrNDup(db, (char *)pSpan->zStart,
 						(int)(pSpan->zEnd -
 						      pSpan->zStart));
-	}
-}
-
-/*
- * If the expression list pEList contains more than iLimit elements,
- * leave an error message in pParse.
- */
-void
-sqlExprListCheckLength(Parse * pParse,
-			   ExprList * pEList, const char *zObject)
-{
-	int mx = pParse->db->aLimit[SQL_LIMIT_COLUMN];
-	testcase(pEList && pEList->nExpr == mx);
-	testcase(pEList && pEList->nExpr == mx + 1);
-	if (pEList && pEList->nExpr > mx) {
-		sqlErrorMsg(pParse, "too many columns in %s", zObject);
 	}
 }
 
@@ -3355,15 +3346,15 @@ expr_code_int(struct Parse *parse, struct Expr *expr, bool is_neg,
 		int c = sql_dec_or_hex_to_i64(z, &value);
 		if (c == 1 || (c == 2 && !is_neg) ||
 		    (is_neg && value == SMALLEST_INT64)) {
+			const char *sign = is_neg ? "-" : "";
 			if (sql_strnicmp(z, "0x", 2) == 0) {
-				sqlErrorMsg(parse,
-						"hex literal too big: %s%s",
-						is_neg ? "-" : "", z);
+				diag_set(ClientError, ER_HEX_LITERAL_MAX, sign,
+					 z, strlen(z) - 2, 16);
 			} else {
-				sqlErrorMsg(parse,
-						"oversized integer: %s%s",
-						is_neg ? "-" : "", z);
+				diag_set(ClientError, ER_INT_LITERAL_MAX, sign,
+					 z, INT64_MIN, INT64_MAX);
 			}
+			parse->is_aborted = true;
 		} else {
 			if (is_neg)
 				value = c == 2 ? SMALLEST_INT64 : -value;

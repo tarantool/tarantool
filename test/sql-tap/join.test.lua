@@ -1067,11 +1067,11 @@ end
 jointest("join-12.2", 30, {0, {1}})
 jointest("join-12.3", 63, {0, {1}})
 jointest("join-12.4", 64, {0, {1}})
-jointest("join-12.5", 65, {1, 'at most 64 tables in a join'})
-jointest("join-12.6", 66, {1, 'at most 64 tables in a join'})
-jointest("join-12.7", 127, {1, 'at most 64 tables in a join'})
-jointest("join-12.8", 128, {1, 'at most 64 tables in a join'})
-jointest("join-12.9", 1000, {1, 'at most 64 tables in a join'})
+jointest("join-12.5", 65, {1, 'The number of tables in a join 65 exceeds the limit (64)'})
+jointest("join-12.6", 66, {1, 'The number of tables in a join 66 exceeds the limit (64)'})
+jointest("join-12.7", 127, {1, 'The number of tables in a join 127 exceeds the limit (64)'})
+jointest("join-12.8", 128, {1, 'The number of tables in a join 128 exceeds the limit (64)'})
+jointest("join-12.9", 1000, {1, 'The number of tables in a join 1000 exceeds the limit (64)'})
 -- If sql is built with sql_MEMDEBUG, then the huge number of realloc()
 -- calls made by the following test cases are too time consuming to run.
 -- Without sql_MEMDEBUG, realloc() is fast enough that these are not
@@ -1079,10 +1079,10 @@ jointest("join-12.9", 1000, {1, 'at most 64 tables in a join'})
 --if X(0, "X!capable", [["pragma&&compileoption_diags"]]) then
 --    if X(703, "X!cmd", [=[["expr","[lsearch [db eval {PRAGMA compile_options}] MEMDEBUG]<0"]]=])
 -- then
-jointest("join-12.10", 65534, {1, 'at most 64 tables in a join'})
-jointest("join-12.11", 65535, {1, 'at most 64 tables in a join'})
-jointest("join-12.12", 65536, {1, 'at most 64 tables in a join'})
-jointest("join-12.13", 65537, {1, 'at most 64 tables in a join'})
+jointest("join-12.10", 65534, {1, 'The number of tables in a join 65534 exceeds the limit (64)'})
+jointest("join-12.11", 65535, {1, 'The number of tables in a join 65535 exceeds the limit (64)'})
+jointest("join-12.12", 65536, {1, 'The number of tables in a join 65536 exceeds the limit (64)'})
+jointest("join-12.13", 65537, {1, 'The number of tables in a join 65537 exceeds the limit (64)'})
 --    end
 --end
 
