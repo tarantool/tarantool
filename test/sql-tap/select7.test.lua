@@ -179,7 +179,7 @@ test:do_catchsql_test(
     "select7-6.2",
     sql, {
         -- <select7-6.2>
-        1, "Too many UNION or EXCEPT or INTERSECT operations (limit 30 is set)"
+        1, "The number of UNION or EXCEPT or INTERSECT operations 33 exceeds the limit (30)"
         -- </select7-6.2>
     })
 

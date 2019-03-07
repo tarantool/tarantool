@@ -139,8 +139,9 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		goto update_cleanup;
 	}
 	if (is_view && tmask == 0) {
-		sqlErrorMsg(pParse, "cannot modify %s because it is a view",
-				space->def->name);
+		diag_set(ClientError, ER_ALTER_SPACE, space->def->name,
+			 "space is a view");
+		pParse->is_aborted = true;
 		goto update_cleanup;
 	}
 

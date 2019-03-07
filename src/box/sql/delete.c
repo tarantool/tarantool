@@ -110,8 +110,8 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 	}
 	if (space->def->opts.is_view) {
 		const char *err_msg =
-			tt_sprintf("can not truncate space '%s' because it is "
-				   "a view", space->def->name);
+			tt_sprintf("can not truncate space '%s' because space "\
+				   "is a view", space->def->name);
 		diag_set(ClientError, ER_SQL, err_msg);
 		goto tarantool_error;
 	}
@@ -163,8 +163,9 @@ sql_table_delete_from(struct Parse *parse, struct SrcList *tab_list,
 			goto delete_from_cleanup;
 
 		if (trigger_list == NULL) {
-			sqlErrorMsg(parse, "cannot modify %s because it is a"
-					" view", space->def->name);
+			diag_set(ClientError, ER_ALTER_SPACE, space->def->name,
+				 "space is a view");
+			parse->is_aborted = true;
 			goto delete_from_cleanup;
 		}
 	}

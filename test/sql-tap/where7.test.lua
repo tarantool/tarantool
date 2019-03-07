@@ -325,7 +325,7 @@ test:do_test(
         end
         return test:catchsql(sql)
     end, {
-        1, "Expression tree is too large (maximum depth 200)"
+        1, "Number of nodes in expression tree 201 exceeds the limit (200)"
     })
 
 test:do_test(

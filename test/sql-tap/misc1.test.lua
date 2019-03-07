@@ -348,7 +348,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <misc1-7.1>
-        1, [[table "ERROR1" has more than one primary key]]
+        1, [[Failed to create space 'ERROR1': primary key has been already declared]]
         -- </misc1-7.1>
     })
 
@@ -361,7 +361,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <misc1-7.2>
-        1, [[table "ERROR1" has more than one primary key]]
+        1, [[Failed to create space 'ERROR1': primary key has been already declared]]
         -- </misc1-7.2>
     })
 
@@ -897,7 +897,7 @@ test:do_catchsql_test(
         CREATE TABLE test2(a text primary key, b text, primary key(a,b));
     ]], {
         -- <misc1-16.3>
-        1, [[table "TEST2" has more than one primary key]]
+        1, [[Failed to create space 'TEST2': primary key has been already declared]]
         -- </misc1-16.3>
     })
 

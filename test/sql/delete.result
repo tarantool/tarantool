@@ -93,7 +93,7 @@ box.sql.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 ...
 box.sql.execute("TRUNCATE TABLE v1;")
 ---
-- error: 'SQL error: can not truncate space ''V1'' because it is a view'
+- error: 'SQL error: can not truncate space ''V1'' because space is a view'
 ...
 -- Can't truncate table with FK.
 box.sql.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")

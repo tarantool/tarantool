@@ -516,6 +516,12 @@ t;
   185: box.error.SQL_UNKNOWN_TOKEN
   186: box.error.SQL_PARSER_GENERIC
   187: box.error.SQL_ANALYZE_ARGUMENT
+  188: box.error.SQL_COLUMN_COUNT_MAX
+  189: box.error.HEX_LITERAL_MAX
+  190: box.error.INT_LITERAL_MAX
+  191: box.error.SQL_PARSER_LIMIT
+  192: box.error.INDEX_DEF_UNSUPPORTED
+  193: box.error.CK_DEF_UNSUPPORTED
 ...
 test_run:cmd("setopt delimiter ''");
 ---

@@ -30,15 +30,18 @@ box.sql.execute('SELECT (9223372036854775807 + 1);')
 --
 box.sql.execute('SELECT 9223372036854775808;')
 ---
-- error: 'oversized integer: 9223372036854775808'
+- error: Integer literal 9223372036854775808 exceeds the supported range -9223372036854775808
+    - 9223372036854775807
 ...
 box.sql.execute('SELECT -9223372036854775809;')
 ---
-- error: 'oversized integer: -9223372036854775809'
+- error: Integer literal -9223372036854775809 exceeds the supported range -9223372036854775808
+    - 9223372036854775807
 ...
 box.sql.execute('SELECT 9223372036854775808 - 1;')
 ---
-- error: 'oversized integer: 9223372036854775808'
+- error: Integer literal 9223372036854775808 exceeds the supported range -9223372036854775808
+    - 9223372036854775807
 ...
 -- Test that CAST may also leads to overflow.
 --

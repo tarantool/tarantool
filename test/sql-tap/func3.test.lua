@@ -104,7 +104,7 @@ test:do_catchsql_test(
         SELECT likelihood(123, 1.000001);
     ]], {
         -- <func3-5.8>
-        1, "second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
         -- </func3-5.8>
     })
 
@@ -114,7 +114,7 @@ test:do_catchsql_test(
         SELECT likelihood(123, -0.000001);
     ]], {
         -- <func3-5.9>
-        1, "second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
         -- </func3-5.9>
     })
 
@@ -124,7 +124,7 @@ test:do_catchsql_test(
         SELECT likelihood(123, 0.5+0.3);
     ]], {
         -- <func3-5.10>
-        1, "second argument to likelihood() must be a constant between 0.0 and 1.0"
+        1, "Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
         -- </func3-5.10>
     })
 

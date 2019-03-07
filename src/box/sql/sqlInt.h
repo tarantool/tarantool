@@ -4648,7 +4648,6 @@ sql_int64 sqlStmtCurrentTime(sql_context *);
 int sqlVdbeParameterIndex(Vdbe *, const char *, int);
 int sqlTransferBindings(sql_stmt *, sql_stmt *);
 int sqlReprepare(Vdbe *);
-void sqlExprListCheckLength(Parse *, ExprList *, const char *);
 
 /**
  * This function verifies that two collations (to be more precise

@@ -4286,7 +4286,9 @@ sqlWhereBegin(Parse * pParse,	/* The parser context */
 	 */
 	testcase(pTabList->nSrc == BMS);
 	if (pTabList->nSrc > BMS) {
-		sqlErrorMsg(pParse, "at most %d tables in a join", BMS);
+		diag_set(ClientError, ER_SQL_PARSER_LIMIT, "The number of "\
+			 "tables in a join", pTabList->nSrc, BMS);
+		pParse->is_aborted = true;
 		return 0;
 	}
 

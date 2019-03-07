@@ -363,7 +363,7 @@ sql = 'select '..string.rep('?, ', box.schema.SQL_BIND_PARAMETER_MAX)..'?'
 ...
 cn:execute(sql)
 ---
-- error: 'Failed to execute SQL statement: too many SQL variables'
+- error: 'Failed to execute SQL statement: SQL bind parameter limit reached: 65000'
 ...
 -- Try too many parameter values.
 sql = 'select ?'
@@ -571,8 +571,7 @@ cn:execute('select ?1, ?2, ?3', {1, 2, 3})
 ...
 cn:execute('select $name, $name2', {1, 2})
 ---
-- error: 'Failed to execute SQL statement: variable number must be between $1 and
-    $65000'
+- error: 'Failed to execute SQL statement: SQL bind parameter limit reached: 65000'
 ...
 parameters = {}
 ---

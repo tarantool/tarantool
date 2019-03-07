@@ -77,7 +77,7 @@ test:do_catchsql_test("insert-1.4", [[
   INSERT INTO test1(one,four) VALUES(1,2)
 ]], {
   -- <insert-1.4>
-  1, "table TEST1 has no column named FOUR"
+  1, "Field 'FOUR' was not found in the space 'TEST1' format"
   -- </insert-1.4>
 })
 
