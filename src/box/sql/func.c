@@ -801,14 +801,6 @@ sql_strlike_ci(const char *zPattern, const char *zStr, unsigned int esc)
 }
 
 /**
- * Count the number of times that the LIKE operator gets called.
- * This is used for testing only.
- */
-#ifdef SQL_TEST
-int sql_like_count = 0;
-#endif
-
-/**
  * Implementation of the like() SQL function. This function
  * implements the built-in LIKE operator. The first argument to
  * the function is the pattern and the second argument is the
@@ -828,9 +820,6 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 
 	if (sql_value_type(argv[0]) == SQL_BLOB
 	    || sql_value_type(argv[1]) == SQL_BLOB) {
-#ifdef SQL_TEST
-		sql_like_count++;
-#endif
 		sql_result_int(context, 0);
 		return;
 	}
@@ -874,9 +863,6 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	}
 	if (!zA || !zB)
 		return;
-#ifdef SQL_TEST
-	sql_like_count++;
-#endif
 	int res;
 	res = sql_utf8_pattern_compare(zB, zA, zB_end, zA_end,
 				       is_like_ci, escape);
