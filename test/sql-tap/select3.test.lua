@@ -157,7 +157,7 @@ test:do_catchsql_test("select3-2.10", [[
   SELECT log, count(*) FROM t1 GROUP BY 0 ORDER BY log;
 ]], {
   -- <select3-2.10>
-  1, "1st GROUP BY term out of range - should be between 1 and 2"
+  1, "Error at GROUP BY in place 1: term out of range - should be between 1 and 2"
   -- </select3-2.10>
 })
 
@@ -165,7 +165,7 @@ test:do_catchsql_test("select3-2.11", [[
   SELECT log, count(*) FROM t1 GROUP BY 3 ORDER BY log;
 ]], {
   -- <select3-2.11>
-  1, "1st GROUP BY term out of range - should be between 1 and 2"
+  1, "Error at GROUP BY in place 1: term out of range - should be between 1 and 2"
   -- </select3-2.11>
 })
 

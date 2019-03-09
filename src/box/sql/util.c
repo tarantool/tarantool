@@ -211,38 +211,6 @@ sqlErrorWithMsg(sql * db, int err_code, const char *zFormat, ...)
 }
 
 /*
- * Add an error to the diagnostics area and set
- * pParse->is_aborted.
- * The following formatting characters are allowed:
- *
- *      %s      Insert a string
- *      %z      A string that should be freed after use
- *      %d      Insert an integer
- *      %T      Insert a token
- *      %S      Insert the first element of a SrcList
- *
- * This function should be used to report any error that occurs while
- * compiling an SQL statement (i.e. within sql_prepare()). The
- * last thing the sql_prepare() function does is copy the error
- * stored by this function into the database handle using sqlError().
- * Functions sqlError() or sqlErrorWithMsg() should be used
- * during statement execution (sql_step() etc.).
- */
-void
-sqlErrorMsg(Parse * pParse, const char *zFormat, ...)
-{
-	char *zMsg;
-	va_list ap;
-	sql *db = pParse->db;
-	va_start(ap, zFormat);
-	zMsg = sqlVMPrintf(db, zFormat, ap);
-	va_end(ap);
-	diag_set(ClientError, ER_SQL_PARSER_GENERIC, zMsg);
-	sqlDbFree(db, zMsg);
-	pParse->is_aborted = true;
-}
-
-/*
  * Convert an SQL-style quoted string into a normal string by removing
  * the quote characters.  The conversion is done in-place.  If the
  * input does not begin with a quote character, then this routine

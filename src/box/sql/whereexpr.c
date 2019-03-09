@@ -1496,12 +1496,12 @@ sqlWhereTabFuncArgs(Parse * pParse,	/* Parsing context */
 	for (j = k = 0; j < pArgs->nExpr; j++) {
 		while (k < (int)space_def->field_count)
 			k++;
-		if (k >= (int)space_def->field_count) {
-			sqlErrorMsg(pParse,
-					"too many arguments on %s() - max %d",
-					space_def->name, j);
-			return;
-		}
+		/*
+		 * This assert replaces error. At the moment, this
+		 * error cannot appear due to this function being
+		 * unused.
+		 */
+		assert(k < (int)space_def->field_count);
 		pColRef = sqlExprAlloc(pParse->db, TK_COLUMN, 0, 0);
 		if (pColRef == 0)
 			return;

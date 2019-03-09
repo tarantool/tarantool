@@ -3193,7 +3193,6 @@ void sqlTreeViewWith(TreeView *, const With *);
 #endif
 
 void sqlSetString(char **, sql *, const char *);
-void sqlErrorMsg(Parse *, const char *, ...);
 void sqlDequote(char *);
 void sqlNormalizeName(char *z);
 void sqlTokenInit(Token *, char *);
@@ -4428,14 +4427,13 @@ int sqlCodeSubselect(Parse *, Expr *, int);
 void sqlSelectPrep(Parse *, Select *, NameContext *);
 
 /**
- * Error message for when two or more terms of a compound select
- * have different size result sets.
+ * Returns name of the connection operator.
  *
- * @param parse Parsing context.
- * @param p Select struct to analyze.
+ * @param id ID of the connection operator.
+ * @retval Name of the connection operator.
  */
-void
-sqlSelectWrongNumTermsError(struct Parse *parse, struct Select *p);
+const char *
+sql_select_op_name(int id);
 
 int sqlMatchSpanName(const char *, const char *, const char *);
 int sqlResolveExprNames(NameContext *, Expr *);
@@ -4884,7 +4882,6 @@ int sqlExprVectorSize(Expr * pExpr);
 int sqlExprIsVector(Expr * pExpr);
 Expr *sqlVectorFieldSubexpr(Expr *, int);
 Expr *sqlExprForVectorField(Parse *, Expr *, int);
-void sqlVectorErrorMsg(Parse *, Expr *);
 
 /* Tarantool: right now query compilation is invoked on top of
  * fiber's stack. Need to limit number of nested programs under

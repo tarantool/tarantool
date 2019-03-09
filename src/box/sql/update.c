@@ -179,10 +179,15 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 				    sql_space_column_is_in_pk(space, j))
 					is_pk_modified = true;
 				if (aXRef[j] != -1) {
-					sqlErrorMsg(pParse,
-							"set id list: duplicate"
-							" column name %s",
-							pChanges->a[i].zName);
+					const char *err =
+						"set id list: duplicate "\
+						"column name %s";
+					err = tt_sprintf(err,
+							 pChanges->a[i].zName);
+					diag_set(ClientError,
+						 ER_SQL_PARSER_GENERIC,
+						 err);
+					pParse->is_aborted = true;
 					goto update_cleanup;
 				}
 				aXRef[j] = i;

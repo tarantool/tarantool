@@ -1,9 +1,9 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(36)
+test:plan(45)
 
 test:execsql([[
-	CREATE TABLE t0 (i INT PRIMARY KEY);
+	CREATE TABLE t0 (i INT PRIMARY KEY, a INT);
 	CREATE VIEW v0 AS SELECT * FROM t0;
 ]])
 format = {}
@@ -79,7 +79,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
 	"sql-errors-1.7",
 	[[
-		CREATE VIEW v7(a,b) AS SELECT * FROM t0;
+		CREATE VIEW v7(a,b,c) AS SELECT * FROM t0;
 	]], {
 		-- <sql-errors-1.7>
 		1,"Failed to create space 'V7': number of aliases doesn't match provided columns"
@@ -414,6 +414,96 @@ test:do_catchsql_test(
 		-- <sql-errors-1.36>
 		1,"Illegal parameters, second argument to likelihood() must be a constant between 0.0 and 1.0"
 		-- </sql-errors-1.36>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.37",
+	[[
+		CREATE TRIGGER r0 AFTER INSERT ON t0 BEGIN INSERT INTO t0.i VALUES (2); END;
+	]], {
+		-- <sql-errors-1.37>
+		1,"qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"
+		-- </sql-errors-1.37>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.38",
+	[[
+		UPDATE t0 SET (i, a) = (100,1,1);
+	]], {
+		-- <sql-errors-1.38>
+		1,"2 columns assigned 3 values"
+		-- </sql-errors-1.38>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.39",
+	[[
+		SELECT * FROM t0();
+	]], {
+		-- <sql-errors-1.39>
+		1,"'T0' is not a function"
+		-- </sql-errors-1.39>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.40",
+	[[
+		SELECT $0;
+	]], {
+		-- <sql-errors-1.40>
+		1,"Index of binding slots must start from 1"
+		-- </sql-errors-1.40>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.41",
+	[[
+		SELECT (1,2,3) == (1,2,3,4);
+	]], {
+		-- <sql-errors-1.41>
+		1,"row value misused"
+		-- </sql-errors-1.41>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.42",
+	[[
+		SELECT (1, 2);
+	]], {
+		-- <sql-errors-1.42>
+		1,"row value misused"
+		-- </sql-errors-1.42>
+	})
+
+test:do_catchsql_test(
+	"sql-errors-1.43",
+	[[
+		SELECT (i,a) AS m FROM t0 WHERE m < 1;
+	]], {
+		-- <sql-errors-1.43>
+		1,"row value misused"
+		-- </sql-errors-1.43>
+	})
+
+test:do_execsql_test(
+	"sql-errors-1.44",
+	[[
+		SELECT (1, 2, 3) < (1, 2, 4);
+	]], {
+		-- <sql-errors-1.44>
+		1
+		-- </sql-errors-1.44>
+	})
+
+test:do_execsql_test(
+	"sql-errors-1.45",
+	[[
+		SELECT (1, 2, 3) < (1, 2, 2);
+	]], {
+		-- <sql-errors-1.45>
+		0
+		-- </sql-errors-1.45>
 	})
 
 test:finish_test()

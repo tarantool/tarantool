@@ -1208,15 +1208,9 @@ valueFromFunction(sql * db,	/* The database connection */
 	ctx.pOut = pVal;
 	ctx.pFunc = pFunc;
 	pFunc->xSFunc(&ctx, nVal, apVal);
-	if (ctx.isError) {
-		rc = ctx.isError;
-		sqlErrorMsg(pCtx->pParse, "%s", sql_value_text(pVal));
-	} else {
-		sql_value_apply_type(pVal, type);
-		assert(rc == SQL_OK);
-	}
-	if (rc != SQL_OK)
-		pCtx->pParse->is_aborted = true;
+	assert(!ctx.isError);
+	sql_value_apply_type(pVal, type);
+	assert(rc == SQL_OK);
 
  value_from_function_out:
 	if (rc != SQL_OK) {

@@ -840,7 +840,7 @@ test:do_catchsql_test(
         SELECT * FROM t5 ORDER BY 3;
     ]], {
         -- <select1-4.10.1>
-        1, "1st ORDER BY term out of range - should be between 1 and 2"
+        1, "Error at ORDER BY in place 1: term out of range - should be between 1 and 2"
         -- </select1-4.10.1>
     })
 
@@ -850,7 +850,7 @@ test:do_catchsql_test(
         SELECT * FROM t5 ORDER BY -1;
     ]], {
         -- <select1-4.10.2>
-        1, "1st ORDER BY term out of range - should be between 1 and 2"
+        1, "Error at ORDER BY in place 1: term out of range - should be between 1 and 2"
         -- </select1-4.10.2>
     })
 
@@ -1334,7 +1334,7 @@ test:do_catchsql2_test(
             ORDER BY f2+101;
         ]], {
             -- <select1-6.11>
-            1, "1st ORDER BY term does not match any column in the result set"
+            1, "Error at ORDER BY in place 1: term does not match any column in the result set"
             -- </select1-6.11>
         })
 

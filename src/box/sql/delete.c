@@ -102,10 +102,10 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 		goto tarantool_error;
 	}
 	if (! rlist_empty(&space->parent_fk_constraint)) {
-		const char *err_msg =
-			tt_sprintf("can not truncate space '%s' because other "
-				   "objects depend on it", space->def->name);
-		diag_set(ClientError, ER_SQL, err_msg);
+		const char *err = "can not truncate space '%s' because other "
+				  "objects depend on it";
+		diag_set(ClientError, ER_SQL,
+			 tt_sprintf(err, space->def->name));
 		goto tarantool_error;
 	}
 	if (space->def->opts.is_view) {

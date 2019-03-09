@@ -904,7 +904,9 @@ expr(A) ::= VARIABLE(X).     {
   Token t = X;
   if (pParse->parse_only) {
     spanSet(&A, &t, &t);
-    sqlErrorMsg(pParse, "bindings are not allowed in DDL");
+    diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+             "bindings are not allowed in DDL");
+    pParse->is_aborted = true;
     A.pExpr = NULL;
   } else if (!(X.z[0]=='#' && sqlIsdigit(X.z[1]))) {
     u32 n = X.n;
@@ -1390,9 +1392,9 @@ trigger_cmd_list(A) ::= trigger_cmd(A) SEMI. {
 trnm(A) ::= nm(A).
 trnm(A) ::= nm DOT nm(X). {
   A = X;
-  sqlErrorMsg(pParse,
-        "qualified table names are not allowed on INSERT, UPDATE, and DELETE "
-        "statements within triggers");
+  diag_set(ClientError, ER_SQL_PARSER_GENERIC, "qualified table names are not "\
+           "allowed on INSERT, UPDATE, and DELETE statements within triggers");
+  pParse->is_aborted = true;
 }
 
 // Disallow the INDEX BY and NOT INDEXED clauses on UPDATE and DELETE

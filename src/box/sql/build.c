@@ -499,13 +499,12 @@ sql_column_add_nullable_action(struct Parse *parser,
 	if (field->nullable_action != ON_CONFLICT_ACTION_DEFAULT &&
 	    nullable_action != field->nullable_action) {
 		/* Prevent defining nullable_action many times. */
-		const char *err_msg =
-			tt_sprintf("NULL declaration for column '%s' of table "
-				   "'%s' has been already set to '%s'",
-				   field->name, def->name,
-				   on_conflict_action_strs[field->
-							   nullable_action]);
-		diag_set(ClientError, ER_SQL, err_msg);
+		const char *err = "NULL declaration for column '%s' of table "
+				  "'%s' has been already set to '%s'";
+		const char *action =
+			on_conflict_action_strs[field->nullable_action];
+		err = tt_sprintf(err, field->name, def->name, action);
+		diag_set(ClientError, ER_SQL, err);
 		parser->is_aborted = true;
 		return;
 	}
@@ -3057,11 +3056,12 @@ sqlWithAdd(Parse * pParse,	/* Parsing context */
 	zName = sqlNameFromToken(pParse->db, pName);
 	if (zName && pWith) {
 		int i;
+		const char *err = "Ambiguous table name in WITH query: %s";
 		for (i = 0; i < pWith->nCte; i++) {
 			if (strcmp(zName, pWith->a[i].zName) == 0) {
-				sqlErrorMsg(pParse,
-						"duplicate WITH table name: %s",
-						zName);
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf(err, zName));
+				pParse->is_aborted = true;
 			}
 		}
 	}

@@ -390,16 +390,21 @@ lookupName(Parse * pParse,	/* The parsing context */
 					assert(pExpr->x.pList == 0);
 					assert(pExpr->x.pSelect == 0);
 					pOrig = pEList->a[j].pExpr;
+					const char *err = "misuse of aliased "\
+							  "aggregate %s";
 					if ((pNC->ncFlags & NC_AllowAgg) == 0
 					    && ExprHasProperty(pOrig, EP_Agg)) {
-						sqlErrorMsg(pParse,
-								"misuse of aliased aggregate %s",
-								zAs);
+						diag_set(ClientError,
+							 ER_SQL_PARSER_GENERIC,
+							 tt_sprintf(err, zAs));
+						pParse->is_aborted = true;
 						return WRC_Abort;
 					}
 					if (sqlExprVectorSize(pOrig) != 1) {
-						sqlErrorMsg(pParse,
-								"row value misused");
+						diag_set(ClientError,
+							 ER_SQL_PARSER_GENERIC,
+							 "row value misused");
+						pParse->is_aborted = true;
 						return WRC_Abort;
 					}
 					resolveAlias(pParse, pEList, j, pExpr,
@@ -426,12 +431,15 @@ lookupName(Parse * pParse,	/* The parsing context */
 	 * more matches.  Either way, we have an error.
 	 */
 	if (cnt > 1) {
+		const char *err;
 		if (zTab) {
-			sqlErrorMsg(pParse, "ambiguous column name: %s.%s",
-				    zTab, zCol);
+			err = tt_sprintf("ambiguous column name: %s.%s", zTab,
+					 zCol);
 		} else {
-			sqlErrorMsg(pParse, "ambiguous column name: %s", zCol);
+			err = tt_sprintf("ambiguous column name: %s", zCol);
 		}
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC, err);
+		pParse->is_aborted = true;
 		pTopNC->nErr++;
 	}
 	if (cnt == 0) {
@@ -626,7 +634,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 			} else {
 				is_agg = pDef->xFinalize != 0;
 				pExpr->type = pDef->ret_type;
-				const char *err_msg =
+				const char *err =
 					"second argument to likelihood() must "\
 					"be a constant between 0.0 and 1.0";
 				if (pDef->funcFlags & SQL_FUNC_UNLIKELY) {
@@ -639,7 +647,7 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 						if (pExpr->iTable < 0) {
 							diag_set(ClientError,
 								 ER_ILLEGAL_PARAMS,
-								 err_msg);
+								 err);
 							pParse->is_aborted =
 								true;
 							pNC->nErr++;
@@ -679,9 +687,11 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				}
 			}
 			if (is_agg && (pNC->ncFlags & NC_AllowAgg) == 0) {
-				sqlErrorMsg(pParse,
-						"misuse of aggregate function %.*s()",
-						nId, zId);
+				const char *err =
+					tt_sprintf("misuse of aggregate "\
+						   "function %.*s()", nId, zId);
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC, err);
+				pParse->is_aborted = true;
 				pNC->nErr++;
 				is_agg = 0;
 			} else if (no_such_func && pParse->db->init.busy == 0
@@ -693,9 +703,11 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				pParse->is_aborted = true;
 				pNC->nErr++;
 			} else if (wrong_num_args) {
-				sqlErrorMsg(pParse,
-						"wrong number of arguments to function %.*s()",
-						nId, zId);
+				const char *err = "wrong number of arguments "\
+						  "to function %.*s()";
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf(err, nId, zId));
+				pParse->is_aborted = true;
 				pNC->nErr++;
 			}
 			if (is_agg)
@@ -796,7 +808,9 @@ resolveExprStep(Walker * pWalker, Expr * pExpr)
 				testcase(pExpr->op == TK_GT);
 				testcase(pExpr->op == TK_GE);
 				testcase(pExpr->op == TK_BETWEEN);
-				sqlErrorMsg(pParse, "row value misused");
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 "row value misused");
+				pParse->is_aborted = true;
 			}
 			break;
 		}
@@ -898,21 +912,6 @@ resolveOrderByTermToExprList(Parse * pParse,	/* Parsing context for error messag
 }
 
 /*
- * Generate an ORDER BY or GROUP BY term out-of-range error.
- */
-static void
-resolveOutOfRangeError(Parse * pParse,	/* The error context into which to write the error */
-		       const char *zType,	/* "ORDER" or "GROUP" */
-		       int i,	/* The index (1-based) of the term out of range */
-		       int mx	/* Largest permissible value of i */
-    )
-{
-	sqlErrorMsg(pParse,
-			"%r %s BY term out of range - should be "
-			"between 1 and %d", i, zType, mx);
-}
-
-/*
  * Analyze the ORDER BY clause in a compound SELECT statement.   Modify
  * each term of the ORDER BY clause is a constant integer between 1
  * and N where N is the number of columns in the compound SELECT.
@@ -973,9 +972,15 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 			pE = sqlExprSkipCollate(pItem->pExpr);
 			if (sqlExprIsInteger(pE, &iCol)) {
 				if (iCol <= 0 || iCol > pEList->nExpr) {
-					resolveOutOfRangeError(pParse, "ORDER",
-							       i + 1,
-							       pEList->nExpr);
+					const char *err =
+						"Error at ORDER BY in place "\
+						"%d: term out of range - "\
+						"should be between 1 and %d";
+					err = tt_sprintf(err, i + 1,
+							 pEList->nExpr);
+					diag_set(ClientError,
+						 ER_SQL_PARSER_GENERIC, err);
+					pParse->is_aborted = true;
 					return 1;
 				}
 			} else {
@@ -1021,9 +1026,12 @@ resolveCompoundOrderBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	}
 	for (i = 0; i < pOrderBy->nExpr; i++) {
 		if (pOrderBy->a[i].done == 0) {
-			sqlErrorMsg(pParse,
-					"%r ORDER BY term does not match any "
-					"column in the result set", i + 1);
+			const char *err = "Error at ORDER BY in place %d: "\
+					  "term does not match any column in "\
+					  "the result set";
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 tt_sprintf(err, i + 1));
+			pParse->is_aborted = true;
 			return 1;
 		}
 	}
@@ -1068,8 +1076,14 @@ sqlResolveOrderGroupBy(Parse * pParse,	/* Parsing context.  Leave error messages
 	for (i = 0, pItem = pOrderBy->a; i < pOrderBy->nExpr; i++, pItem++) {
 		if (pItem->u.x.iOrderByCol) {
 			if (pItem->u.x.iOrderByCol > pEList->nExpr) {
-				resolveOutOfRangeError(pParse, zType, i + 1,
-						       pEList->nExpr);
+				const char *err = "Error at %s BY in place "\
+						  "%d: term out of range - "\
+						  "should be between 1 and %d";
+				err = tt_sprintf(err, zType, i + 1,
+						 pEList->nExpr);
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 err);
+				pParse->is_aborted = true;
 				return 1;
 			}
 			resolveAlias(pParse, pEList, pItem->u.x.iOrderByCol - 1,
@@ -1133,8 +1147,13 @@ resolveOrderGroupBy(NameContext * pNC,	/* The name context of the SELECT stateme
 			 * order-by term to a copy of the result-set expression
 			 */
 			if (iCol < 1 || iCol > 0xffff) {
-				resolveOutOfRangeError(pParse, zType, i + 1,
-						       nResult);
+				const char *err = "Error at %s BY in place "\
+						  "%d: term out of range - "\
+						  "should be between 1 and %d";
+				err = tt_sprintf(err, zType, i + 1, nResult);
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 err);
+				pParse->is_aborted = true;
 				return 1;
 			}
 			pItem->u.x.iOrderByCol = (u16) iCol;
@@ -1414,12 +1433,15 @@ resolveSelectStep(Walker * pWalker, Select * p)
 			    || db->mallocFailed) {
 				return WRC_Abort;
 			}
+			const char *err_msg = "aggregate functions are not "\
+					      "allowed in the GROUP BY clause";
 			for (i = 0, pItem = pGroupBy->a; i < pGroupBy->nExpr;
 			     i++, pItem++) {
 				if (ExprHasProperty(pItem->pExpr, EP_Agg)) {
-					sqlErrorMsg(pParse,
-							"aggregate functions are not allowed in "
-							"the GROUP BY clause");
+					diag_set(ClientError,
+						 ER_SQL_PARSER_GENERIC,
+						 err_msg);
+					pParse->is_aborted = true;
 					return WRC_Abort;
 				}
 			}
@@ -1429,10 +1451,23 @@ resolveSelectStep(Walker * pWalker, Select * p)
 		 * number of expressions in the select list.
 		 */
 		if (p->pNext && p->pEList->nExpr != p->pNext->pEList->nExpr) {
-			sqlSelectWrongNumTermsError(pParse, p->pNext);
+			if (p->pNext->selFlags & SF_Values) {
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 "all VALUES must have the same "\
+					 "number of terms");
+			} else {
+				const char *err =
+					"SELECTs to the left and right of %s "\
+					"do not have the same number of "\
+					"result columns";
+				const char *op =
+					sql_select_op_name(p->pNext->op);
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf(err, op));
+			}
+			pParse->is_aborted = true;
 			return WRC_Abort;
 		}
-
 		/* Advance to the next term of the compound
 		 */
 		p = p->pPrior;
