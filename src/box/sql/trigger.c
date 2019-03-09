@@ -621,8 +621,9 @@ codeTriggerProgram(Parse * pParse,	/* The parser context */
 	sqlSubProgramsRemaining--;
 
 	if (sqlSubProgramsRemaining == 0) {
-		sqlErrorMsg(pParse,
-				"Maximum number of chained trigger activations exceeded.");
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC, "Maximum number "\
+			 "of chained trigger activations exceeded.");
+		pParse->is_aborted = true;
 	}
 
 	for (pStep = pStepList; pStep; pStep = pStep->pNext) {

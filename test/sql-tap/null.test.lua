@@ -295,7 +295,7 @@ test:do_catchsql_test(
         select b from t1 union select c from t1 order by t1.a;
     ]], {
         -- <null-6.5>
-        1, "1st ORDER BY term does not match any column in the result set"
+        1, "Error at ORDER BY in place 1: term does not match any column in the result set"
         -- </null-6.5>
     })
 
@@ -305,7 +305,7 @@ test:do_catchsql_test(
         select b from t1 union select c from t1 order by t1.a;
     ]], {
         -- <null-6.6>
-        1, "1st ORDER BY term does not match any column in the result set"
+        1, "Error at ORDER BY in place 1: term does not match any column in the result set"
         -- </null-6.6>
     })
 

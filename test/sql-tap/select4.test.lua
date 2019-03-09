@@ -450,7 +450,7 @@ test:do_catchsql_test(
         ORDER BY "xyzzy";
     ]], {
         -- <select4-5.2c>
-        1, "1st ORDER BY term does not match any column in the result set"
+        1, "Error at ORDER BY in place 1: term does not match any column in the result set"
         -- </select4-5.2c>
     })
 
@@ -463,7 +463,7 @@ test:do_catchsql_test(
         ORDER BY "xyzzy";
     ]], {
         -- <select4-5.2d>
-        1, "1st ORDER BY term does not match any column in the result set"
+        1, "Error at ORDER BY in place 1: term does not match any column in the result set"
         -- </select4-5.2d>
     })
 
@@ -515,7 +515,7 @@ test:do_catchsql_test(
         ORDER BY 2;
     ]], {
         -- <select4-5.2h>
-        1, "1st ORDER BY term out of range - should be between 1 and 1"
+        1, "Error at ORDER BY in place 1: term out of range - should be between 1 and 1"
         -- </select4-5.2h>
     })
 

@@ -1855,13 +1855,13 @@ test:do_catchsql_test(
     "e_select-8.7.1.1",
     "SELECT x FROM d1 UNION ALL SELECT a FROM d2 ORDER BY x*z",
     {
-        1, "1st ORDER BY term does not match any column in the result set"})
+        1, "Error at ORDER BY in place 1: term does not match any column in the result set"})
 
 test:do_catchsql_test(
     "e_select-8.7.1.2",
     "SELECT x,z FROM d1 UNION ALL SELECT a,b FROM d2 ORDER BY x, x/z",
     {
-        1, "2nd ORDER BY term does not match any column in the result set"})
+        1, "Error at ORDER BY in place 2: term does not match any column in the result set"})
 
 test:do_select_tests(
     "e_select-8.7.2",
@@ -2077,12 +2077,12 @@ test:do_select_tests(
 -- EVIDENCE-OF: R-39265-04070 If no matching expression can be found in
 -- the result columns of any constituent SELECT, it is an error.
 --
-for _, val in ipairs({{1, "SELECT a FROM d5 UNION SELECT c FROM d6 ORDER BY a+1", "1st"},
-    {2, "SELECT a FROM d5 UNION SELECT c FROM d6 ORDER BY a, a+1", "2nd"},
-    {3, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY \"hello\"", "1st"},
-    {4, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY blah", "1st"},
-    {5, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY c,d,c+d", "3rd"},
-    {6, "SELECT * FROM d5 EXCEPT SELECT * FROM d7 ORDER BY 1,2,b,a/b", "4th"}}) do
+for _, val in ipairs({{1, "SELECT a FROM d5 UNION SELECT c FROM d6 ORDER BY a+1", "1"},
+    {2, "SELECT a FROM d5 UNION SELECT c FROM d6 ORDER BY a, a+1", "2"},
+    {3, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY \"hello\"", "1"},
+    {4, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY blah", "1"},
+    {5, "SELECT * FROM d5 INTERSECT SELECT * FROM d6 ORDER BY c,d,c+d", "3"},
+    {6, "SELECT * FROM d5 EXCEPT SELECT * FROM d7 ORDER BY 1,2,b,a/b", "4"}}) do
     local tn = val[1]
     local select = val[2]
     local err_param = val[3]
@@ -2090,7 +2090,7 @@ for _, val in ipairs({{1, "SELECT a FROM d5 UNION SELECT c FROM d6 ORDER BY a+1"
         "e_select-8.14."..tn,
         select,
         {
-            1, string.format("%s ORDER BY term does not match any column in the result set", err_param)})
+            1, string.format("Error at ORDER BY in place %s: term does not match any column in the result set", err_param)})
 end
 -- EVIDENCE-OF: R-03407-11483 Each term of the ORDER BY clause is
 -- processed separately and may be matched against result columns from

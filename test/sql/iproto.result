@@ -571,7 +571,8 @@ cn:execute('select ?1, ?2, ?3', {1, 2, 3})
 ...
 cn:execute('select $name, $name2', {1, 2})
 ---
-- error: 'Failed to execute SQL statement: SQL bind parameter limit reached: 65000'
+- error: 'Failed to execute SQL statement: Index of binding slots must start from
+    1'
 ...
 parameters = {}
 ---

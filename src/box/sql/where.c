@@ -3913,11 +3913,7 @@ wherePathSolver(WhereInfo * pWInfo, LogEst nRowEst)
 		nFrom = nTo;
 	}
 
-	if (nFrom == 0) {
-		sqlErrorMsg(pParse, "no query solution");
-		sqlDbFree(db, pSpace);
-		return SQL_ERROR;
-	}
+	assert(nFrom != 0);
 
 	/* Find the lowest cost path.  pFrom will be left pointing to that path */
 	pFrom = aFrom;

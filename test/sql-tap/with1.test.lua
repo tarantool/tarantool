@@ -134,7 +134,7 @@ test:do_catchsql_test(3.2, [[
   SELECT * FROM tmp;
 ]], {
   -- <3.2>
-  1, "duplicate WITH table name: TMP"
+  1, "Ambiguous table name in WITH query: TMP"
   -- </3.2>
 })
 
@@ -782,7 +782,7 @@ test:do_catchsql_test("10.7.1", [[
   SELECT * FROM t
 ]], {
   -- <10.7.1>
-  1, "1st ORDER BY term does not match any column in the result set"
+  1, "Error at ORDER BY in place 1: term does not match any column in the result set"
   -- </10.7.1>
 })
 

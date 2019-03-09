@@ -667,10 +667,12 @@ codeVectorCompare(Parse * pParse,	/* Code generator context */
 	u8 op = pExpr->op;
 	int addrDone = sqlVdbeMakeLabel(v);
 
-	if (nLeft != sqlExprVectorSize(pRight)) {
-		sqlErrorMsg(pParse, "row value misused");
-		return;
-	}
+	/*
+	 * Situation when vectors have different dimensions is
+	 * filtred way before - during expr resolution:
+	 * see resolveExprStep().
+	 */
+	assert(nLeft == sqlExprVectorSize(pRight));
 	assert(pExpr->op == TK_EQ || pExpr->op == TK_NE
 	       || pExpr->op == TK_LT || pExpr->op == TK_GT
 	       || pExpr->op == TK_LE || pExpr->op == TK_GE);
@@ -1201,7 +1203,14 @@ sqlExprAssignVarNumber(Parse * pParse, Expr * pExpr, u32 n)
 			testcase(i == 1);
 			testcase(i == SQL_BIND_PARAMETER_MAX - 1);
 			testcase(i == SQL_BIND_PARAMETER_MAX);
-			if (!is_ok || i < 1 || i > SQL_BIND_PARAMETER_MAX) {
+			if (i < 1) {
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 "Index of binding slots must start "\
+					 "from 1");
+				pParse->is_aborted = true;
+				return;
+			}
+			if (!is_ok || i > SQL_BIND_PARAMETER_MAX) {
 				diag_set(ClientError, ER_SQL_BIND_PARAMETER_MAX,
 					 SQL_BIND_PARAMETER_MAX);
 				pParse->is_aborted = true;
@@ -1785,8 +1794,10 @@ sqlExprListAppendVector(Parse * pParse,	/* Parsing context */
 	 */
 	if (pExpr->op != TK_SELECT
 	    && pColumns->nId != (n = sqlExprVectorSize(pExpr))) {
-		sqlErrorMsg(pParse, "%d columns assigned %d values",
-				pColumns->nId, n);
+		const char *err = tt_sprintf("%d columns assigned %d values",
+					     pColumns->nId, n);
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC, err);
+		pParse->is_aborted = true;
 		goto vector_append_error;
 	}
 
@@ -2669,41 +2680,6 @@ expr_in_type(Parse *pParse, Expr *pExpr)
 }
 
 /*
- * Load the Parse object passed as the first argument with an error
- * message of the form:
- *
- *   "sub-select returns N columns - expected M"
- */
-void
-sqlSubselectError(Parse * pParse, int nActual, int nExpect)
-{
-	const char *zFmt = "sub-select returns %d columns - expected %d";
-	sqlErrorMsg(pParse, zFmt, nActual, nExpect);
-}
-
-/*
- * Expression pExpr is a vector that has been used in a context where
- * it is not permitted. If pExpr is a sub-select vector, this routine
- * loads the Parse object with a message of the form:
- *
- *   "sub-select returns N columns - expected 1"
- *
- * Or, if it is a regular scalar vector:
- *
- *   "row value misused"
- */
-void
-sqlVectorErrorMsg(Parse * pParse, Expr * pExpr)
-{
-	if (pExpr->flags & EP_xIsSelect) {
-		sqlSubselectError(pParse, pExpr->x.pSelect->pEList->nExpr,
-				      1);
-	} else {
-		sqlErrorMsg(pParse, "row value misused");
-	}
-}
-
-/*
  * Generate code for scalar subqueries used as a subquery expression, EXISTS,
  * or IN operators.  Examples:
  *
@@ -2984,15 +2960,23 @@ int
 sqlExprCheckIN(Parse * pParse, Expr * pIn)
 {
 	int nVector = sqlExprVectorSize(pIn->pLeft);
+	const char *err;
 	if ((pIn->flags & EP_xIsSelect)) {
 		if (nVector != pIn->x.pSelect->pEList->nExpr) {
-			sqlSubselectError(pParse,
-					      pIn->x.pSelect->pEList->nExpr,
-					      nVector);
+			err = "sub-select returns %d columns - expected %d";
+			int expr_count = pIn->x.pSelect->pEList->nExpr;
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 tt_sprintf(err, expr_count, nVector));
+			pParse->is_aborted = true;
 			return 1;
 		}
 	} else if (nVector != 1) {
-		sqlVectorErrorMsg(pParse, pIn->pLeft);
+		assert((pIn->pLeft->flags & EP_xIsSelect) != 0);
+		int expr_count = pIn->pLeft->x.pSelect->pEList->nExpr;
+		err = tt_sprintf("sub-select returns %d columns - expected 1",
+				 expr_count);
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC, err);
+		pParse->is_aborted = true;
 		return 1;
 	}
 	return 0;
@@ -3990,9 +3974,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			AggInfo *pInfo = pExpr->pAggInfo;
 			if (pInfo == 0) {
 				assert(!ExprHasProperty(pExpr, EP_IntValue));
-				sqlErrorMsg(pParse,
-						"misuse of aggregate: %s()",
-						pExpr->u.zToken);
+				const char *err = "misuse of aggregate: %s()";
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf(err, pExpr->u.zToken));
+				pParse->is_aborted = true;
 			} else {
 				pExpr->type = pInfo->aFunc->pFunc->ret_type;
 				return pInfo->aFunc[pExpr->iAgg].iMem;
@@ -4159,7 +4144,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			testcase(op == TK_SELECT);
 			if (op == TK_SELECT
 			    && (nCol = pExpr->x.pSelect->pEList->nExpr) != 1) {
-				sqlSubselectError(pParse, nCol, 1);
+				const char *err = "sub-select returns %d "\
+						  "columns - expected 1";
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf(err, nCol));
+				pParse->is_aborted = true;
 			} else {
 				return sqlCodeSubselect(pParse, pExpr, 0);
 			}
@@ -4178,9 +4167,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 						 sqlExprVectorSize(pExpr->
 								       pLeft))
 			    ) {
-				sqlErrorMsg(pParse,
-						"%d columns assigned %d values",
-						pExpr->iTable, n);
+				const char *err =
+					"%d columns assigned %d values";
+				diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+					 tt_sprintf(err, pExpr->iTable, n));
+				pParse->is_aborted = true;
 			}
 			return pExpr->pLeft->iTable + pExpr->iColumn;
 		}
@@ -4279,7 +4270,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 
 	case TK_VECTOR:{
-			sqlErrorMsg(pParse, "row value misused");
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+				 "row value misused");
+			pParse->is_aborted = true;
 			break;
 		}
 
@@ -4379,8 +4372,9 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_RAISE:
 		if (pParse->triggered_space == NULL) {
-			sqlErrorMsg(pParse, "RAISE() may only be used "
-					"within a trigger-program");
+			diag_set(ClientError, ER_SQL_PARSER_GENERIC, "RAISE() "\
+				 "may only be used within a trigger-program");
+			pParse->is_aborted = true;
 			return 0;
 		}
 		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_ABORT)
