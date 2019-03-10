@@ -140,8 +140,10 @@ struct txn {
 	int64_t id;
 	/** List of statements in a transaction. */
 	struct stailq stmts;
-	/** Total number of WAL rows in this txn. */
-	int n_rows;
+	/** Number of new rows without an assigned lsn. */
+	int n_local_rows;
+	/** Number of rows with an already assigned lsn. */
+	int n_remote_rows;
 	/**
 	 * True if this transaction is running in autocommit mode
 	 * (statement end causes an automatic transaction commit).
