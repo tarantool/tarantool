@@ -1313,11 +1313,20 @@ sql_bind_blob(sql_stmt * pStmt,
 		  int i, const void *zData, int nData, void (*xDel) (void *)
     )
 {
-#ifdef SQL_ENABLE_API_ARMOR
-	if (nData < 0)
-		return SQL_MISUSE;
-#endif
-	return bindText(pStmt, i, zData, nData, xDel);
+	struct Vdbe *p = (Vdbe *) pStmt;
+	int rc = vdbeUnbind(p, i);
+	if (rc == SQL_OK) {
+		if (zData != 0) {
+			struct Mem *var = &p->aVar[i - 1];
+			rc = sqlVdbeMemSetStr(var, zData, nData, 0, xDel);
+			if (rc == SQL_OK)
+				rc = sql_bind_type(p, i, "BLOB");
+			rc = sqlApiExit(p->db, rc);
+		}
+	} else if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT) {
+		xDel((void *)zData);
+	}
+	return rc;
 }
 
 int
@@ -1331,7 +1340,7 @@ sql_bind_blob64(sql_stmt * pStmt,
 	if (nData > 0x7fffffff) {
 		return invokeValueDestructor(zData, xDel, 0);
 	} else {
-		return bindText(pStmt, i, zData, (int)nData, xDel);
+		return sql_bind_blob(pStmt, i, zData, (int)nData, xDel);
 	}
 }
 
