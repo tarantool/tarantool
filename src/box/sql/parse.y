@@ -809,10 +809,21 @@ insert_cmd(A) ::= REPLACE.            {A = ON_CONFLICT_ACTION_REPLACE;}
 
 idlist_opt(A) ::= .                       {A = 0;}
 idlist_opt(A) ::= LP idlist(X) RP.    {A = X;}
-idlist(A) ::= idlist(A) COMMA nm(Y).
-    {A = sqlIdListAppend(pParse->db,A,&Y);}
-idlist(A) ::= nm(Y).
-    {A = sqlIdListAppend(pParse->db,0,&Y); /*A-overwrites-Y*/}
+idlist(A) ::= idlist(A) COMMA nm(Y). {
+  A = sql_id_list_append(pParse->db,A,&Y);
+  if (A == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
+}
+idlist(A) ::= nm(Y). {
+  /* A-overwrites-Y. */
+  A = sql_id_list_append(pParse->db,0,&Y);
+  if (A == NULL) {
+    pParse->is_aborted = true;
+    return;
+  }
+}
 
 /////////////////////////// Expression Processing /////////////////////////////
 //

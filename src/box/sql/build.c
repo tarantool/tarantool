@@ -2544,30 +2544,25 @@ sqlArrayAllocate(sql * db,	/* Connection to notify of malloc failures */
 	return pArray;
 }
 
-/*
- * Append a new element to the given IdList.  Create a new IdList if
- * need be.
- *
- * A new IdList is returned, or NULL if malloc() fails.
- */
-IdList *
-sqlIdListAppend(sql * db, IdList * pList, Token * pToken)
+struct IdList *
+sql_id_list_append(struct sql *db, struct IdList *list,
+		   struct Token *name_token)
 {
+	if (list == NULL &&
+	    (list = sqlDbMallocZero(db, sizeof(*list))) == NULL) {
+		diag_set(OutOfMemory, sizeof(*list), "sqlDbMallocZero", "list");
+		return NULL;
+	}
 	int i;
-	if (pList == 0) {
-		pList = sqlDbMallocZero(db, sizeof(IdList));
-		if (pList == 0)
-			return 0;
+	list->a = sqlArrayAllocate(db, list->a, sizeof(list->a[0]),
+				   &list->nId, &i);
+	if (i >= 0) {
+		list->a[i].zName = sqlNameFromToken(db, name_token);
+		if (list->a[i].zName != NULL)
+			return list;
 	}
-	pList->a = sqlArrayAllocate(db,
-					pList->a,
-					sizeof(pList->a[0]), &pList->nId, &i);
-	if (i < 0) {
-		sqlIdListDelete(db, pList);
-		return 0;
-	}
-	pList->a[i].zName = sqlNameFromToken(db, pToken);
-	return pList;
+	sqlIdListDelete(db, list);
+	return NULL;
 }
 
 /*
