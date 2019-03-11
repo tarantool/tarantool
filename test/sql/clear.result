@@ -29,13 +29,13 @@ box.execute("SELECT * FROM zoobar")
 ---
 - metadata:
   - name: C1
-    type: INTEGER
+    type: integer
   - name: C2
-    type: INTEGER
+    type: integer
   - name: C3
-    type: TEXT
+    type: string
   - name: C4
-    type: INTEGER
+    type: integer
   rows:
   - [2, 1, 'c3', 444]
   - [4, 2, 'c3', 444]
@@ -148,13 +148,13 @@ box.execute("SELECT * from zoobar")
 ---
 - metadata:
   - name: C1
-    type: INTEGER
+    type: integer
   - name: C2
-    type: INTEGER
+    type: integer
   - name: C3
-    type: TEXT
+    type: string
   - name: C4
-    type: INTEGER
+    type: integer
   rows: []
 ...
 -- Cleanup

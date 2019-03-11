@@ -142,7 +142,7 @@ box.execute("SELECT * FROM T")
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -150,7 +150,7 @@ box.execute("SELECT * FROM T")
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...

@@ -13,7 +13,7 @@ box.execute('select 1;')
 ---
 - metadata:
   - name: '1'
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...

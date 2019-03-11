@@ -102,7 +102,7 @@ box.execute("SELECT * FROM t2;")
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -143,7 +143,7 @@ box.execute("SELECT * FROM t2;")
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   rows:
   - [1]
   - [2]
@@ -175,7 +175,7 @@ box.execute("SELECT * FROM t2;")
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -212,7 +212,7 @@ box.execute("SELECT * FROM t2;")
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   rows:
   - [1]
   - [2]
@@ -450,13 +450,13 @@ box.execute("SELECT * FROM t;")
 ---
 - metadata:
   - name: S1
-    type: INTEGER
+    type: integer
   - name: S2
-    type: INTEGER
+    type: integer
   - name: S3
-    type: INTEGER
+    type: integer
   - name: S4
-    type: INTEGER
+    type: integer
   rows:
   - [1, 1, 6, 1]
 ...

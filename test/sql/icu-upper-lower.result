@@ -26,10 +26,10 @@ upper_lower_test([[
 - metadata:
   - name: lower('     Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq
       olacaq. ')
-    type: TEXT
+    type: string
   - name: upper('     Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq
       olacaq. ')
-    type: TEXT
+    type: string
   rows:
   - ['     zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq olacaq. ',
     '     ZƏFƏR, JAKETINI DƏ, PAPAĞINI DA GÖTÜR, BU AXŞAM HAVA ÇOX SOYUQ OLACAQ. ']
@@ -40,9 +40,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     The quick brown fox jumps over the lazy dog. ')
-    type: TEXT
+    type: string
   - name: upper('     The quick brown fox jumps over the lazy dog. ')
-    type: TEXT
+    type: string
   rows:
   - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
       JUMPS OVER THE LAZY DOG. ']
@@ -54,9 +54,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     The quick brown fox jumps over the lazy dog. ')
-    type: TEXT
+    type: string
   - name: upper('     The quick brown fox jumps over the lazy dog. ')
-    type: TEXT
+    type: string
   rows:
   - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
       JUMPS OVER THE LAZY DOG. ']
@@ -69,10 +69,10 @@ upper_lower_test([[
 - metadata:
   - name: lower('     Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ
       փառք ')
-    type: TEXT
+    type: string
   - name: upper('     Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ
       փառք ')
-    type: TEXT
+    type: string
   rows:
   - ['     բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ փառք ', '     ԲԵԼ
       ԴՂՅԱԿԻ ՁԱԽ ԺԱՄՆ ՕՖ ԱԶԳՈՒԹՅԱՆԸ ՑՊԱՀԱՆՋ ՉՃՇՏԱԾ ՎՆԱՍ ԷՐ ԵՒ ՓԱՌՔ ']
@@ -85,10 +85,10 @@ upper_lower_test([[
 - metadata:
   - name: lower('     У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу
       з юшкай ')
-    type: TEXT
+    type: string
   - name: upper('     У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу
       з юшкай ')
-    type: TEXT
+    type: string
   rows:
   - ['     у іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу з юшкай ',
     '     У ІЎІ ХУДЫ ЖВАВЫ ЧОРТ У ЗЯЛЁНАЙ КАМІЗЭЛЬЦЫ ПАБЕГ ПАД’ЕСЦІ ФАРШУ З ЮШКАЙ ']
@@ -101,10 +101,10 @@ upper_lower_test([[
 - metadata:
   - name: lower('     Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
       ')
-    type: TEXT
+    type: string
   - name: upper('     Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
       ')
-    type: TEXT
+    type: string
   rows:
   - ['     τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός ', '     ΤΆΧΙΣΤΗ
       ΑΛΏΠΗΞ ΒΑΦΉΣ ΨΗΜΈΝΗ ΓΗ, ΔΡΑΣΚΕΛΊΖΕΙ ΥΠΈΡ ΝΩΘΡΟΎ ΚΥΝΌΣ ']
@@ -117,10 +117,10 @@ upper_lower_test([[
 - metadata:
   - name: lower('     Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin
       bhig ')
-    type: TEXT
+    type: string
   - name: upper('     Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin
       bhig ')
-    type: TEXT
+    type: string
   rows:
   - ['     chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin bhig ',
     '     CHUAIGH BÉ MHÓRSHÁCH LE DLÚTHSPÁD FÍORFHINN TRÍ HATA MO DHEA-PHORCÁIN BHIG ']
@@ -132,9 +132,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     Quiere la boca exhausta vid, kiwi, piña y fugaz jamón ')
-    type: TEXT
+    type: string
   - name: upper('     Quiere la boca exhausta vid, kiwi, piña y fugaz jamón ')
-    type: TEXT
+    type: string
   rows:
   - ['     quiere la boca exhausta vid, kiwi, piña y fugaz jamón ', '     QUIERE LA
       BOCA EXHAUSTA VID, KIWI, PIÑA Y FUGAZ JAMÓN ']
@@ -146,9 +146,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ')
-    type: TEXT
+    type: string
   - name: upper('     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ')
-    type: TEXT
+    type: string
   rows:
   - ['     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ', '     키스의 고유조건은 입술끼리 만나야 하고 특별한
       기술은 필요치 않다 ']
@@ -160,9 +160,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus ')
-    type: TEXT
+    type: string
   - name: upper('     Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus ')
-    type: TEXT
+    type: string
   rows:
   - ['     glāžšķūņa rūķīši dzērumā čiepj baha koncertflīģeļu vākus ', '     GLĀŽŠĶŪŅA
       RŪĶĪŠI DZĒRUMĀ ČIEPJ BAHA KONCERTFLĪĢEĻU VĀKUS ']
@@ -175,10 +175,10 @@ upper_lower_test([[
 - metadata:
   - name: lower('     Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
       ')
-    type: TEXT
+    type: string
   - name: upper('     Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
       ')
-    type: TEXT
+    type: string
   rows:
   - ['     zwölf große boxkämpfer jagen viktor quer über den sylter deich ', '     ZWÖLF
       GROSSE BOXKÄMPFER JAGEN VIKTOR QUER ÜBER DEN SYLTER DEICH ']
@@ -190,9 +190,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     Pchnąć w tę łódź jeża lub ośm skrzyń fig. ')
-    type: TEXT
+    type: string
   - name: upper('     Pchnąć w tę łódź jeża lub ośm skrzyń fig. ')
-    type: TEXT
+    type: string
   rows:
   - ['     pchnąć w tę łódź jeża lub ośm skrzyń fig. ', '     PCHNĄĆ W TĘ ŁÓDŹ JEŻA
       LUB OŚM SKRZYŃ FIG. ']
@@ -204,9 +204,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів! ')
-    type: TEXT
+    type: string
   - name: upper('     Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів! ')
-    type: TEXT
+    type: string
   rows:
   - ['     чуєш їх, доцю, га? кумедна ж ти, прощайся без ґольфів! ', '     ЧУЄШ ЇХ,
       ДОЦЮ, ГА? КУМЕДНА Ж ТИ, ПРОЩАЙСЯ БЕЗ ҐОЛЬФІВ! ']
@@ -218,9 +218,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     Příliš žluťoučký kůň úpěl ďábelské ódy ')
-    type: TEXT
+    type: string
   - name: upper('     Příliš žluťoučký kůň úpěl ďábelské ódy ')
-    type: TEXT
+    type: string
   rows:
   - ['     příliš žluťoučký kůň úpěl ďábelské ódy ', '     PŘÍLIŠ ŽLUŤOUČKÝ KŮŇ ÚPĚL
       ĎÁBELSKÉ ÓDY ']
@@ -233,10 +233,10 @@ upper_lower_test([[
 - metadata:
   - name: lower('     Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
       ')
-    type: TEXT
+    type: string
   - name: upper('     Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
       ')
-    type: TEXT
+    type: string
   rows:
   - ['     laŭ ludoviko zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj ', '     LAŬ
       LUDOVIKO ZAMENHOF BONGUSTAS FREŜA ĈEĤA MANĜAĴO KUN SPICOJ ']
@@ -248,9 +248,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: lower('     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ')
-    type: TEXT
+    type: string
   - name: upper('     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ')
-    type: TEXT
+    type: string
   rows:
   - ['     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ', '     いろはにほへと
       ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ']
@@ -262,9 +262,9 @@ upper_lower_test([[
 ---
 - metadata:
   - name: 'lower(''     Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ '')'
-    type: TEXT
+    type: string
   - name: 'upper(''     Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ '')'
-    type: TEXT
+    type: string
   rows:
   - ['     pijamalı hasta yağız şoföre çabucak güvendi. extra: i̇ ', '     PIJAMALI
       HASTA YAĞIZ ŞOFÖRE ÇABUCAK GÜVENDI. EXTRA: İ ']

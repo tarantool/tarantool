@@ -27,11 +27,11 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: Y
-    type: BLOB
+    type: scalar
   - name: x + y
-    type: NUMERIC
+    type: number
   rows:
   - [1, 1, 2]
   - [2, 2, 4]
@@ -44,11 +44,11 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: Y
-    type: BLOB
+    type: scalar
   - name: x + y
-    type: NUMERIC
+    type: number
   rows:
   - [1, 1, 2]
   - [2, 2, 4]
@@ -57,11 +57,11 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: Y
-    type: BLOB
+    type: scalar
   - name: x + y
-    type: NUMERIC
+    type: number
   rows:
   - [1, 1, 2]
   - [2, 2, 4]
@@ -70,11 +70,11 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: Y
-    type: BLOB
+    type: scalar
   - name: x + y
-    type: NUMERIC
+    type: number
   rows:
   - [1, 1, 2]
   - [2, 2, 4]
@@ -83,11 +83,11 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: Y
-    type: BLOB
+    type: scalar
   - name: x + y
-    type: NUMERIC
+    type: number
   rows:
   - [1, 1, 2]
   - [2, 2, 4]
@@ -112,11 +112,11 @@ box.execute('SELECT a, id + 2, b FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
 - metadata:
   - name: A
-    type: BLOB
+    type: scalar
   - name: id + 2
-    type: NUMERIC
+    type: number
   - name: B
-    type: INTEGER
+    type: integer
   rows:
   - ['abc', 3, 1]
   - ['hello', 4, 2]
@@ -131,11 +131,11 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
 - metadata:
   - name: A
-    type: TEXT
+    type: string
   - name: id + 2 * b
-    type: NUMERIC
+    type: number
   - name: A
-    type: BLOB
+    type: scalar
   rows:
   - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
@@ -146,11 +146,11 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
 - metadata:
   - name: A
-    type: TEXT
+    type: string
   - name: id + 2 * b
-    type: NUMERIC
+    type: number
   - name: A
-    type: BLOB
+    type: scalar
   rows:
   - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
@@ -161,11 +161,11 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
 - metadata:
   - name: A
-    type: TEXT
+    type: string
   - name: id + 2 * b
-    type: NUMERIC
+    type: number
   - name: A
-    type: BLOB
+    type: scalar
   rows:
   - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
@@ -180,11 +180,11 @@ box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: y + 3 * b
-    type: NUMERIC
+    type: number
   - name: B
-    type: INTEGER
+    type: integer
   rows:
   - [1, 4, 1]
   - [2, 8, 2]
@@ -193,11 +193,11 @@ box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: y + 3 * b
-    type: NUMERIC
+    type: number
   - name: B
-    type: INTEGER
+    type: integer
   rows:
   - [1, 4, 1]
   - [2, 8, 2]
@@ -206,11 +206,11 @@ box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   - name: y + 3 * b
-    type: NUMERIC
+    type: number
   - name: B
-    type: INTEGER
+    type: integer
   rows:
   - [1, 4, 1]
   - [2, 8, 2]

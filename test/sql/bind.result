@@ -60,11 +60,11 @@ execute('SELECT * FROM test WHERE id = :value', parameters)
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: NUMERIC
+    type: number
   - name: B
-    type: TEXT
+    type: string
   rows:
   - [1, 2, '3']
 ...
@@ -156,7 +156,7 @@ execute('SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3', parameters)
   - name: '@value2'
     type: INTEGER
   - name: '?'
-    type: BOOLEAN
+    type: boolean
   - name: :value3
     type: INTEGER
   rows:

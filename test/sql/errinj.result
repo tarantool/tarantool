@@ -122,7 +122,7 @@ select_res
 ---
 - metadata:
   - name: '1'
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -211,9 +211,9 @@ box.execute("SELECT * from t1");
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: INTEGER
+    type: integer
   rows:
   - [3, 3]
 ...
@@ -221,9 +221,9 @@ box.execute("SELECT * from t2");
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: INTEGER
+    type: integer
   rows:
   - [1, 1]
 ...
@@ -279,9 +279,9 @@ box.execute("SELECT * from t1");
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: INTEGER
+    type: integer
   rows:
   - [3, 3]
 ...
@@ -289,9 +289,9 @@ box.execute("SELECT * from t2");
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: INTEGER
+    type: integer
   rows:
   - [1, 1]
 ...

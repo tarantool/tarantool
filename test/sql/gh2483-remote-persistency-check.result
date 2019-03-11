@@ -29,7 +29,7 @@ box.execute([[SELECT * FROM t]])
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -43,7 +43,7 @@ c = require('net.box').connect(os.getenv("LISTEN"))
 -- Which could obviously lead to access denied error.
 c:eval([[ return box.execute('SELECT * FROM t') ]])
 ---
-- {'metadata': [{'name': 'ID', 'type': 'INTEGER'}], 'rows': [[1]]}
+- {'metadata': [{'name': 'ID', 'type': 'integer'}], 'rows': [[1]]}
 ...
 -- sql.execute([[SELECT * FROM t]])
 box.execute([[DROP TABLE t]])

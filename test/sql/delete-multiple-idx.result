@@ -47,11 +47,11 @@ box.execute("SELECT * FROM t3;");
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: X
-    type: INTEGER
+    type: integer
   - name: Y
-    type: INTEGER
+    type: integer
   rows:
   - [6, 234, 567]
 ...

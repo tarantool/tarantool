@@ -138,9 +138,9 @@ box.execute("SELECT * FROM test")
 ---
 - metadata:
   - name: ID
-    type: UNKNOWN
+    type: unsigned
   - name: A
-    type: BOOLEAN
+    type: boolean
   rows:
   - [1, 1]
   - [2, 0]
@@ -186,7 +186,7 @@ box.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
 ---
 - metadata:
   - name: column1
-    type: TEXT
+    type: string
   rows:
   - ['blob']
 ...
@@ -216,7 +216,7 @@ box.execute("SELECT s LIKE NULL FROM t1;")
 ---
 - metadata:
   - name: s LIKE NULL
-    type: INTEGER
+    type: integer
   rows:
   - [null]
 ...
@@ -240,7 +240,7 @@ box.execute("SELECT NULL LIKE s FROM t1;")
 ---
 - metadata:
   - name: NULL LIKE s
-    type: INTEGER
+    type: integer
   rows:
   - [null]
 ...
