@@ -37,6 +37,11 @@
 #include "fiber.h"
 #include "errinj.h"
 
+/** The HTTP headers that may be set automatically. */
+#define HTTP_ACCEPT_HEADER	"Accept:"
+#define HTTP_CONNECTION_HEADER	"Connection:"
+#define HTTP_KEEP_ALIVE_HEADER	"Keep-Alive:"
+
 /**
  * libcurl callback for CURLOPT_WRITEFUNCTION
  * @see https://curl.haxx.se/libcurl/c/CURLOPT_WRITEFUNCTION.html
@@ -106,6 +111,8 @@ httpc_request_new(struct httpc_env *env, const char *method,
 	}
 	memset(req, 0, sizeof(*req));
 	req->env = env;
+	req->set_connection_header = true;
+	req->set_keep_alive_header = true;
 	region_create(&req->resp_headers, &cord()->slabc);
 	region_create(&req->resp_body, &cord()->slabc);
 
@@ -129,8 +136,7 @@ httpc_request_new(struct httpc_env *env, const char *method,
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_POSTFIELDS, "");
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_POSTFIELDSIZE, 0);
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_CUSTOMREQUEST, method);
-		if (httpc_set_header(req, "Accept: */*") < 0)
-			goto error;
+		req->set_accept_header = true;
 	} else {
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_CUSTOMREQUEST, method);
 	}
@@ -150,9 +156,6 @@ httpc_request_new(struct httpc_env *env, const char *method,
 	ibuf_create(&req->body, &cord()->slabc, 1);
 
 	return req;
-error:
-	mempool_free(&env->req_pool, req);
-	return NULL;
 }
 
 void
@@ -177,6 +180,20 @@ httpc_set_header(struct httpc_request *req, const char *fmt, ...)
 	va_start(ap, fmt);
 	const char *header = tt_vsprintf(fmt, ap);
 	va_end(ap);
+
+	/**
+	 * Update flags for automanaged headers: no need to
+	 * set them automatically later.
+	 */
+	if (strncasecmp(header, HTTP_ACCEPT_HEADER,
+			strlen(HTTP_ACCEPT_HEADER)) == 0)
+		req->set_accept_header = false;
+	else if (strncasecmp(header, HTTP_CONNECTION_HEADER,
+		 strlen(HTTP_CONNECTION_HEADER)) == 0)
+		req->set_connection_header = false;
+	else if (strncasecmp(header, HTTP_KEEP_ALIVE_HEADER,
+			     strlen(HTTP_KEEP_ALIVE_HEADER)) == 0)
+		req->set_keep_alive_header = false;
 
 	struct curl_slist *l = curl_slist_append(req->headers, header);
 	if (l == NULL) {
@@ -207,7 +224,7 @@ httpc_set_body(struct httpc_request *req, const char *body, size_t size)
 	return 0;
 }
 
-int
+void
 httpc_set_keepalive(struct httpc_request *req, long idle, long interval)
 {
 #if LIBCURL_VERSION_NUM >= 0x071900
@@ -216,22 +233,13 @@ httpc_set_keepalive(struct httpc_request *req, long idle, long interval)
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_TCP_KEEPALIVE, 1L);
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_TCP_KEEPIDLE, idle);
 		curl_easy_setopt(req->curl_request.easy, CURLOPT_TCP_KEEPINTVL, interval);
-		if (httpc_set_header(req, "Connection: Keep-Alive") < 0 ||
-		    httpc_set_header(req, "Keep-Alive: timeout=%d",
-				     (int) idle) < 0) {
-			return -1;
-		}
-	} else {
-		if (httpc_set_header(req, "Connection: close") < 0) {
-			return -1;
-		}
+		req->keep_alive_timeout = idle;
 	}
 #else
 	(void) req;
 	(void) idle;
 	(void) interval;
 #endif
-	return 0;
 }
 
 void
@@ -309,6 +317,18 @@ int
 httpc_execute(struct httpc_request *req, double timeout)
 {
 	struct httpc_env *env = req->env;
+	if (req->set_accept_header &&
+	    httpc_set_header(req, "Accept: */*") != 0)
+		return -1;
+	if (req->set_connection_header &&
+	    httpc_set_header(req, "Connection: %s",
+			     req->keep_alive_timeout > 0 ?
+			     "Keep-Alive" : "close") != 0)
+		return -1;
+	if (req->set_keep_alive_header && req->keep_alive_timeout > 0 &&
+	    httpc_set_header(req, "Keep-Alive: timeout=%ld",
+			     req->keep_alive_timeout) != 0)
+		return -1;
 
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_WRITEDATA, (void *) req);
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_HEADERDATA, (void *) req);
