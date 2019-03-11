@@ -109,6 +109,27 @@ struct httpc_request {
 	struct region resp_headers;
 	/** buffer of body */
 	struct region resp_body;
+	/**
+	 * Idle delay, in seconds, that the operating system will
+	 * wait while the connection is idle before sending
+	 * keepalive probes.
+	 */
+	long keep_alive_timeout;
+	/**
+	 * True when connection header must be set before
+	 * execution automatically.
+	 */
+	bool set_connection_header;
+	/**
+	 * True when accept Any MIME header must be set
+	 * before execution automatically.
+	 */
+	bool set_accept_header;
+	/**
+	 * True when Keep-Alive header must be set before
+	 * execution automatically.
+	 */
+	bool set_keep_alive_header;
 };
 
 /**
@@ -156,7 +177,7 @@ httpc_set_body(struct httpc_request *req, const char *body, size_t size);
  * @details Does nothing on libcurl < 7.25.0
  * @see https://curl.haxx.se/libcurl/c/CURLOPT_TCP_KEEPALIVE.html
  */
-int
+void
 httpc_set_keepalive(struct httpc_request *req, long idle, long interval);
 
 /**

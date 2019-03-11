@@ -253,11 +253,7 @@ luaT_httpc_request(lua_State *L)
 		keepalive_interval = (long) lua_tonumber(L, -1);
 	lua_pop(L, 1);
 
-	if (httpc_set_keepalive(req, keepalive_idle,
-				keepalive_interval) < 0) {
-		httpc_request_delete(req);
-		return luaT_error(L);
-	}
+	httpc_set_keepalive(req, keepalive_idle, keepalive_interval);
 
 	lua_getfield(L, 5, "low_speed_limit");
 	if (!lua_isnil(L, -1))

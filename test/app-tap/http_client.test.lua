@@ -80,6 +80,38 @@ local function test_http_client(test, url, opts)
     test:is(r.status, 200, 'request')
 end
 
+--
+-- gh-3955: Check that httpc module doesn't redefine http headers
+--          set explicitly by the caller.
+--
+local function test_http_client_headers_redefine(test, url, opts)
+    test:plan(9)
+    local opts = table.deepcopy(opts)
+    -- Test defaults
+    opts.headers = {['Connection'] = nil, ['Accept'] = nil}
+    local r = client.post(url, nil, opts)
+    test:is(r.status, 200, 'simple 200')
+    test:is(r.headers['connection'], 'close', 'Default Connection header')
+    test:is(r.headers['accept'], '*/*', 'Default Accept header for POST request')
+    -- Test that in case of conflicting headers, user variant is
+    -- prefered
+    opts.headers={['Connection'] = 'close'}
+    opts.keepalive_idle = 2
+    opts.keepalive_interval = 1
+    local r = client.get(url, opts)
+    test:is(r.status, 200, 'simple 200')
+    test:is(r.headers['connection'], 'close', 'Redefined Connection header')
+    test:is(r.headers['keep_alive'], 'timeout=2',
+            'Automatically set Keep-Alive header')
+    -- Test that user-defined Connection and Acept headers
+    -- are used
+    opts.headers={['Connection'] = 'Keep-Alive', ['Accept'] = 'text/html'}
+    local r = client.get(url, opts)
+    test:is(r.status, 200, 'simple 200')
+    test:is(r.headers['accept'], 'text/html', 'Redefined Accept header')
+    test:is(r.headers['connection'], 'Keep-Alive', 'Redefined Connection header')
+end
+
 local function test_cancel_and_errinj(test, url, opts)
     test:plan(3)
     local ch = fiber.channel(1)
@@ -493,9 +525,11 @@ local function test_concurrent(test, url, opts)
 end
 
 function run_tests(test, sock_family, sock_addr)
-    test:plan(10)
+    test:plan(11)
     local server, url, opts = start_server(test, sock_family, sock_addr)
     test:test("http.client", test_http_client, url, opts)
+    test:test("http.client headers redefine", test_http_client_headers_redefine,
+              url, opts)
     test:test("cancel and errinj", test_cancel_and_errinj, url .. 'long_query', opts)
     test:test("basic http post/get", test_post_and_get, url, opts)
     test:test("errors", test_errors)
