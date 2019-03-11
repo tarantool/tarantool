@@ -3416,7 +3416,21 @@ sql_drop_table(struct Parse *, struct SrcList *, bool, bool);
 void sqlInsert(Parse *, SrcList *, Select *, IdList *,
 	       enum on_conflict_action);
 void *sqlArrayAllocate(sql *, void *, int, int *, int *);
-IdList *sqlIdListAppend(sql *, IdList *, Token *);
+
+/**
+ * Append a new element to the given IdList. Create a new IdList
+ * if need be.
+ *
+ * @param db The database connection.
+ * @param list The pointer to existent Id list if exists.
+ * @param name_token The token containing name.
+ * @retval Not NULL A new list or updated @a list.
+ * @retval NULL Error. Diag message is set.
+ */
+struct IdList *
+sql_id_list_append(struct sql *db, struct IdList *list,
+		   struct Token *name_token);
+
 int sqlIdListIndex(IdList *, const char *);
 
 /**

@@ -1674,9 +1674,11 @@ sqlIdListDup(sql * db, IdList * p)
 		sqlDbFree(db, pNew);
 		return 0;
 	}
-	/* Note that because the size of the allocation for p->a[] is not
-	 * necessarily a power of two, sqlIdListAppend() may not be called
-	 * on the duplicate created by this function.
+	/*
+	 * Note that because the size of the allocation for p->a[]
+	 * is not necessarily a power of two, sql_id_list_append()
+	 * may not be called on the duplicate created by this
+	 * function.
 	 */
 	for (i = 0; i < p->nId; i++) {
 		struct IdList_item *pNewItem = &pNew->a[i];
