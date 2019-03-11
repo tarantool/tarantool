@@ -30,7 +30,7 @@ box.execute("SELECT e FROM t1")
 ---
 - metadata:
   - name: E
-    type: INTEGER
+    type: integer
   rows:
   - [7]
   - [8]
@@ -55,7 +55,7 @@ box.execute("SELECT e FROM t2")
 ---
 - metadata:
   - name: E
-    type: INTEGER
+    type: integer
   rows:
   - [6]
   - [7]

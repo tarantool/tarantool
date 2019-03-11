@@ -32,7 +32,7 @@ ch:get()
 ---
 - metadata:
   - name: WAITFOR(0.2)
-    type: INTEGER
+    type: integer
   rows:
   - [0.2]
 ...

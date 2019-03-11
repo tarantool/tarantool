@@ -297,7 +297,7 @@ box.execute("SELECT * FROM v2;")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   rows: []
 ...
 box.space.V2:drop()

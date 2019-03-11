@@ -39,9 +39,9 @@ box.execute("SELECT * FROM t1;");
 ---
 - metadata:
   - name: A
-    type: INTEGER
+    type: integer
   - name: B
-    type: INTEGER
+    type: integer
   rows:
   - [2, 4]
 ...
@@ -108,6 +108,19 @@ box.execute("ROLLBACK")
 ---
 - rowcount: 0
 ...
+box.execute("SELECT * FROM t1")
+---
+- metadata:
+  - name: ID
+    type: integer
+  - name: A
+    type: integer
+  - name: B
+    type: string
+  rows:
+  - [1, 1, 'one']
+  - [2, 2, 'two']
+...
 -- Can't truncate view.
 box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 ---
@@ -148,18 +161,18 @@ box.execute("SELECT * FROM t1;")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: INTEGER
+    type: integer
   - name: B
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT * FROM t2;")
 ---
 - metadata:
   - name: X
-    type: INTEGER
+    type: integer
   rows: []
 ...
 -- Cleanup.

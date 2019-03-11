@@ -18,7 +18,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -26,7 +26,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...
@@ -38,7 +38,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -54,7 +54,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -66,7 +66,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -78,7 +78,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -90,7 +90,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -102,7 +102,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -115,7 +115,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [2]
 ...
@@ -127,7 +127,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [4]
 ...
@@ -143,7 +143,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...
@@ -159,7 +159,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -174,7 +174,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -190,7 +190,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -224,7 +224,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -232,7 +232,7 @@ box.execute("SELECT * FROM tt2;")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   rows: []
 ...
 box.execute("DROP TABLE tt1;")
@@ -254,7 +254,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...
@@ -266,7 +266,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...
@@ -278,7 +278,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...
@@ -287,7 +287,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...
@@ -309,7 +309,7 @@ box.execute("SELECT ROW_COUNT();")
 ---
 - metadata:
   - name: ROW_COUNT()
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...

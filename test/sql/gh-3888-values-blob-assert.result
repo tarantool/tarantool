@@ -47,7 +47,7 @@ box.execute('VALUES(-0.5e-2)')
 ---
 - metadata:
   - name: column1
-    type: NUMERIC
+    type: number
   rows:
   - [-0.005]
 ...
@@ -55,7 +55,7 @@ box.execute('SELECT X\'507265766564\'')
 ---
 - metadata:
   - name: X'507265766564'
-    type: BLOB
+    type: scalar
   rows:
   - ['Preved']
 ...
@@ -64,7 +64,7 @@ box.execute('SELECT 3.14')
 ---
 - metadata:
   - name: '3.14'
-    type: INTEGER
+    type: integer
   rows:
   - [3.14]
 ...
@@ -72,7 +72,7 @@ box.execute('SELECT X\'4D6564766564\'')
 ---
 - metadata:
   - name: X'4D6564766564'
-    type: BLOB
+    type: scalar
   rows:
   - ['Medved']
 ...

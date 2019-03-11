@@ -42,9 +42,9 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 ---
 - metadata:
   - name: name
-    type: TEXT
+    type: string
   - name: opts
-    type: UNKNOWN
+    type: map
   rows:
   - ['TT_AD', {'sql': 'CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END'}]
   - ['TT_AI', {'sql': 'CREATE TRIGGER tt_ai AFTER INSERT ON t BEGIN SELECT 1; END'}]
@@ -63,8 +63,8 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 ---
 - metadata:
   - name: name
-    type: TEXT
+    type: string
   - name: opts
-    type: UNKNOWN
+    type: map
   rows: []
 ...

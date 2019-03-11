@@ -35,7 +35,7 @@ box.execute("SELECT e FROM t1");
 ---
 - metadata:
   - name: E
-    type: INTEGER
+    type: integer
   rows:
   - [7]
   - [8]

@@ -63,11 +63,11 @@ box.execute([[SELECT descriptor, upper(letter) AS upper,lower(letter) AS lower F
 ---
 - metadata:
   - name: DESCRIPTOR
-    type: TEXT
+    type: string
   - name: UPPER
-    type: TEXT
+    type: string
   - name: LOWER
-    type: TEXT
+    type: string
   rows:
   - ['Latin Capital Letter I U+0049', 'I', 'i']
   - ['Latin Capital Letter I With Dot Above U+0130', 'İ', 'i̇']
@@ -79,11 +79,11 @@ box.execute([[SELECT descriptor, upper(letter COLLATE "TURKISH") AS upper,lower(
 ---
 - metadata:
   - name: DESCRIPTOR
-    type: TEXT
+    type: string
   - name: UPPER
-    type: TEXT
+    type: string
   - name: LOWER
-    type: TEXT
+    type: string
   rows:
   - ['Latin Capital Letter I U+0049', 'I', 'ı']
   - ['Latin Capital Letter I With Dot Above U+0130', 'İ', 'i']
@@ -106,11 +106,11 @@ box.execute([[SELECT descriptor, upper(letter), letter FROM tu where UPPER(lette
 ---
 - metadata:
   - name: DESCRIPTOR
-    type: TEXT
+    type: string
   - name: upper(letter)
-    type: TEXT
+    type: string
   - name: LETTER
-    type: TEXT
+    type: string
   rows:
   - ['German Small Letter Sharp S U+00DF', 'SS', 'ß']
 ...
@@ -119,11 +119,11 @@ box.execute([[SELECT descriptor, upper(letter COLLATE "GERMAN"), letter FROM tu 
 ---
 - metadata:
   - name: DESCRIPTOR
-    type: TEXT
+    type: string
   - name: upper(letter COLLATE "GERMAN")
-    type: TEXT
+    type: string
   - name: LETTER
-    type: TEXT
+    type: string
   rows:
   - ['German Small Letter Sharp S U+00DF', 'SS', 'ß']
 ...
@@ -229,26 +229,26 @@ box.execute("SELECT * FROM t WHERE a = b;")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: TEXT
+    type: string
   - name: B
-    type: TEXT
+    type: string
   - name: C
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = b;")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: TEXT
+    type: string
   - name: B
-    type: TEXT
+    type: string
   - name: C
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT * FROM t WHERE b = c;")
@@ -259,26 +259,26 @@ box.execute("SELECT * FROM t WHERE b COLLATE \"binary\" = c;")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: TEXT
+    type: string
   - name: B
-    type: TEXT
+    type: string
   - name: C
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT * FROM t WHERE a = c;")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: TEXT
+    type: string
   - name: B
-    type: TEXT
+    type: string
   - name: C
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT * FROM t WHERE a COLLATE \"binary\" = c COLLATE \"unicode\";")
@@ -304,28 +304,28 @@ box.execute("SELECT b FROM t UNION SELECT a FROM t;")
 ---
 - metadata:
   - name: B
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT a FROM t UNION SELECT c FROM t;")
 ---
 - metadata:
   - name: A
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT c COLLATE \"binary\" FROM t UNION SELECT a FROM t;")
 ---
 - metadata:
   - name: c COLLATE "binary"
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT b COLLATE \"unicode\" FROM t UNION SELECT a FROM t;")
 ---
 - metadata:
   - name: b COLLATE "unicode"
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("DROP TABLE t;")
@@ -382,7 +382,7 @@ box.execute("SELECT s1 FROM t0;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['A']
 ...
@@ -390,9 +390,9 @@ box.execute("SELECT * FROM t1;")
 ---
 - metadata:
   - name: S1
-    type: INTEGER
+    type: integer
   - name: S0
-    type: TEXT
+    type: string
   rows:
   - [1, 'a']
 ...
@@ -432,9 +432,9 @@ box.execute("SELECT * FROM t1;")
 ---
 - metadata:
   - name: S1
-    type: INTEGER
+    type: integer
   - name: S0
-    type: TEXT
+    type: string
   rows:
   - [1, 'a']
 ...
@@ -442,7 +442,7 @@ box.execute("SELECT s1 FROM t0;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['a']
 ...
@@ -475,7 +475,7 @@ box.execute("SELECT c FROM t4a WHERE (a||'') = b;")
 ---
 - metadata:
   - name: C
-    type: INTEGER
+    type: integer
   rows:
   - [1]
   - [3]
@@ -487,7 +487,7 @@ box.execute("SELECT c FROM t4a WHERE (a COLLATE \"binary\"||'') = b;")
 ---
 - metadata:
   - name: C
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -509,7 +509,7 @@ box.execute("SELECT c FROM t4a WHERE (a||'')=(b||'');")
 ---
 - metadata:
   - name: C
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -517,7 +517,7 @@ box.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
 ---
 - metadata:
   - name: C
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -539,7 +539,7 @@ box.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
 ---
 - metadata:
   - name: C
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -549,7 +549,7 @@ box.execute("SELECT c FROM t4a WHERE (a||b COLLATE \"binary\")=(b||a);")
 ---
 - metadata:
   - name: C
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -572,7 +572,7 @@ box.execute("SELECT a FROM t4b ORDER BY a COLLATE \"unicode_ci\" || ''")
 ---
 - metadata:
   - name: A
-    type: TEXT
+    type: string
   rows:
   - ['abc']
   - ['BCD']
@@ -583,7 +583,7 @@ box.execute("SELECT a FROM t4b ORDER BY a || b")
 ---
 - metadata:
   - name: A
-    type: TEXT
+    type: string
   rows:
   - ['abc']
   - ['BCD']
@@ -618,7 +618,7 @@ box.execute("SELECT * FROM t3;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['A']
   - ['a']
@@ -648,7 +648,7 @@ box.execute("SELECT * FROM t3b;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['A']
   - ['a']
@@ -683,7 +683,7 @@ box.execute("SELECT * FROM t3b;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['A']
   - ['a']
@@ -713,7 +713,7 @@ box.execute("SELECT * FROM t3c;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['a']
   - ['A']
@@ -748,7 +748,7 @@ box.execute("SELECT * FROM t3c;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['a']
   - ['A']
@@ -778,7 +778,7 @@ box.execute("SELECT * FROM t3d;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['A']
   - ['a']
@@ -813,7 +813,7 @@ box.execute("SELECT * FROM t3d;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['A']
   - ['a']
@@ -844,7 +844,7 @@ box.execute("SELECT * FROM t3e;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['a']
 ...
@@ -873,7 +873,7 @@ box.execute("SELECT * FROM t3f;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['a']
   - ['A']
@@ -908,7 +908,7 @@ box.execute("SELECT * FROM t3f;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['a']
   - ['A']
@@ -939,7 +939,7 @@ box.execute("SELECT * FROM t3g;")
 ---
 - metadata:
   - name: S1
-    type: TEXT
+    type: string
   rows:
   - ['a']
 ...
@@ -968,13 +968,13 @@ box.execute("SELECT * FROM qms1;")
 ---
 - metadata:
   - name: W
-    type: TEXT
+    type: string
   - name: N
-    type: TEXT
+    type: string
   - name: Q
-    type: TEXT
+    type: string
   - name: S
-    type: INTEGER
+    type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
   - ['www', 'nnn', 'qqq', 1]
@@ -1003,13 +1003,13 @@ box.execute("SELECT * FROM qms2;")
 ---
 - metadata:
   - name: W
-    type: TEXT
+    type: string
   - name: N
-    type: TEXT
+    type: string
   - name: Q
-    type: TEXT
+    type: string
   - name: S
-    type: INTEGER
+    type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
   - ['www', 'nnn', 'qqq', 1]
@@ -1039,13 +1039,13 @@ box.execute("SELECT * FROM qms3;")
 ---
 - metadata:
   - name: W
-    type: TEXT
+    type: string
   - name: N
-    type: TEXT
+    type: string
   - name: Q
-    type: TEXT
+    type: string
   - name: S
-    type: INTEGER
+    type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
   - ['www', 'nnn', 'qqq', 1]
@@ -1074,13 +1074,13 @@ box.execute("SELECT * FROM qms4;")
 ---
 - metadata:
   - name: W
-    type: TEXT
+    type: string
   - name: N
-    type: TEXT
+    type: string
   - name: Q
-    type: TEXT
+    type: string
   - name: S
-    type: INTEGER
+    type: integer
   rows:
   - ['WWW', 'nnn', 'qqq', 2]
   - ['www', 'nnn', 'qqq', 1]
@@ -1104,7 +1104,7 @@ box.execute("SELECT DISTINCT trim(s2) FROM jj;")
 ---
 - metadata:
   - name: trim(s2)
-    type: TEXT
+    type: string
   rows:
   - ['A']
 ...
@@ -1116,7 +1116,7 @@ box.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
 ---
 - metadata:
   - name: replace(s2, 'S', 's')
-    type: TEXT
+    type: string
   rows:
   - ['A']
   - ['as']
@@ -1125,7 +1125,7 @@ box.execute("SELECT DISTINCT substr(s2, 1, 1) FROM jj;")
 ---
 - metadata:
   - name: substr(s2, 1, 1)
-    type: TEXT
+    type: string
   rows:
   - ['A']
 ...

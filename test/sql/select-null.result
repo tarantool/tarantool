@@ -30,11 +30,11 @@ box.execute("SELECT * FROM t3")
 ---
 - metadata:
   - name: ID
-    type: INTEGER
+    type: integer
   - name: A
-    type: TEXT
+    type: string
   - name: B
-    type: TEXT
+    type: string
   rows:
   - [1, 'abc', null]
   - [2, null, 'xyz']

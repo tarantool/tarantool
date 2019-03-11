@@ -39,13 +39,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
@@ -55,13 +55,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
@@ -70,13 +70,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['bar', 2, 42, 'awesome']
 ...
@@ -84,13 +84,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foobar', 1000, 42, 'awesome']
 ...
@@ -98,13 +98,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['bar', 2, 42, 'awesome']
   - ['foobar', 1000, 42, 'awesome']
@@ -113,39 +113,39 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows: []
 ...
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foo', 1, 42, 'awesome']
 ...
@@ -153,13 +153,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
@@ -168,13 +168,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
@@ -183,13 +183,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
@@ -198,13 +198,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foo', 1, 42, 'awesome']
 ...
@@ -212,7 +212,7 @@ box.execute("SELECT count(*) FROM foobar")
 ---
 - metadata:
   - name: count(*)
-    type: INTEGER
+    type: integer
   rows:
   - [3]
 ...
@@ -220,7 +220,7 @@ box.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
 ---
 - metadata:
   - name: count(*)
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -228,13 +228,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 ---
 - metadata:
   - name: BAR
-    type: BLOB
+    type: scalar
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['bar', 2, 42, 'awesome']
   - ['foo', 1, 42, 'awesome']
@@ -244,13 +244,13 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 ---
 - metadata:
   - name: BAR
-    type: BLOB
+    type: scalar
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: '42'
-    type: INTEGER
+    type: integer
   - name: '''awesome'''
-    type: TEXT
+    type: string
   rows:
   - ['foobar', 1000, 42, 'awesome']
   - ['foo', 1, 42, 'awesome']
@@ -265,7 +265,7 @@ box.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
 ---
 - metadata:
   - name: COUNT(*)
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -273,7 +273,7 @@ box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ---
 - metadata:
   - name: COUNT(*)
-    type: INTEGER
+    type: integer
   rows:
   - [1]
 ...
@@ -285,7 +285,7 @@ box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ---
 - metadata:
   - name: COUNT(*)
-    type: INTEGER
+    type: integer
   rows:
   - [0]
 ...
@@ -321,9 +321,9 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 ---
 - metadata:
   - name: name
-    type: TEXT
+    type: string
   - name: opts
-    type: UNKNOWN
+    type: map
   rows:
   - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
         INTO barfoo VALUES (''trigger test'', 9999); END'}]
@@ -341,7 +341,7 @@ box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
 - metadata:
   - name: A
-    type: BLOB
+    type: scalar
   rows:
   - [840]
   - [880]
@@ -360,9 +360,9 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 ---
 - metadata:
   - name: name
-    type: TEXT
+    type: string
   - name: opts
-    type: UNKNOWN
+    type: map
   rows:
   - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
         INTO barfoo VALUES (''trigger test'', 9999); END'}]
@@ -376,9 +376,9 @@ box.execute("SELECT * FROM barfoo WHERE foo = 9999");
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: NUMERIC
+    type: number
   rows: []
 ...
 -- and still persistent
@@ -386,9 +386,9 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 ---
 - metadata:
   - name: name
-    type: TEXT
+    type: string
   - name: opts
-    type: UNKNOWN
+    type: map
   rows:
   - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
         INTO barfoo VALUES (''trigger test'', 9999); END'}]
@@ -408,9 +408,9 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 ---
 - metadata:
   - name: name
-    type: TEXT
+    type: string
   - name: opts
-    type: UNKNOWN
+    type: map
   rows: []
 ...
 -- prove barfoo2 still exists
@@ -423,9 +423,9 @@ box.execute("SELECT * FROM barfoo")
 ---
 - metadata:
   - name: BAR
-    type: TEXT
+    type: string
   - name: FOO
-    type: NUMERIC
+    type: number
   rows:
   - ['foo', 1]
   - ['bar', 2]
@@ -435,9 +435,9 @@ box.execute("SELECT * FROM foobar");
 ---
 - metadata:
   - name: FOO
-    type: INTEGER
+    type: integer
   - name: BAR
-    type: TEXT
+    type: string
   rows:
   - [2, 'bar']
   - [1000, 'foobar']
@@ -446,7 +446,7 @@ box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
 - metadata:
   - name: A
-    type: BLOB
+    type: scalar
   rows:
   - [840]
   - [880]

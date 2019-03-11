@@ -37,9 +37,9 @@ c:execute("SELECT * FROM t1;")
 ---
 - metadata:
   - name: S1
-    type: INTEGER
+    type: integer
   - name: S2
-    type: INTEGER
+    type: integer
   rows:
   - [1, 1]
 ...

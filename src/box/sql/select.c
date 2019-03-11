@@ -1757,33 +1757,10 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 		p = pEList->a[i].pExpr;
 		if (NEVER(p == 0))
 			continue;
-		switch (p->type) {
-		case FIELD_TYPE_INTEGER:
-			sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, "INTEGER",
-					      SQL_TRANSIENT);
-			break;
-		case FIELD_TYPE_NUMBER:
-			sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, "NUMERIC",
-					      SQL_TRANSIENT);
-			break;
-		case FIELD_TYPE_STRING:
-			sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, "TEXT",
-					      SQL_TRANSIENT);
-			break;
-		case FIELD_TYPE_SCALAR:
-			sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, "BLOB",
-					      SQL_TRANSIENT);
-			break;
-		case FIELD_TYPE_BOOLEAN:
-			if (p->op == TK_VARIABLE)
-				var_pos[var_count++] = i;
-			sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, "BOOLEAN",
-					      SQL_TRANSIENT);
-			break;
-		default:
-			sqlVdbeSetColName(v, i, COLNAME_DECLTYPE, "UNKNOWN",
-					      SQL_TRANSIENT);
-		}
+		if (p->op == TK_VARIABLE)
+			var_pos[var_count++] = i;
+		sqlVdbeSetColName(v, i, COLNAME_DECLTYPE,
+				  field_type_strs[p->type], SQL_TRANSIENT);
 		if (pEList->a[i].zName) {
 			char *zName = pEList->a[i].zName;
 			sqlVdbeSetColName(v, i, COLNAME_NAME, zName,
