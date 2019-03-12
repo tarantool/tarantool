@@ -239,6 +239,7 @@ vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
 struct tuple *
 vy_key_new(struct tuple_format *format, const char *key, uint32_t part_count)
 {
+	assert(vy_stmt_is_key_format(format));
 	assert(part_count == 0 || key != NULL);
 	/* Key don't have field map */
 	assert(format->field_map_size == 0);
@@ -259,7 +260,6 @@ vy_key_new(struct tuple_format *format, const char *key, uint32_t part_count)
 	char *data = mp_encode_array(raw, part_count);
 	memcpy(data, key, key_size);
 	assert(data + key_size == raw + bsize);
-	vy_stmt_set_type(stmt, IPROTO_SELECT);
 	return stmt;
 }
 
@@ -856,6 +856,10 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt)
 	uint32_t mp_size;
 	if (stmt == NULL) {
 		SNPRINT(total, snprintf, buf, size, "<NULL>");
+		return total;
+	}
+	if (vy_stmt_type(stmt) == 0) {
+		SNPRINT(total, mp_snprint, buf, size, tuple_data(stmt));
 		return total;
 	}
 	SNPRINT(total, snprintf, buf, size, "%s(",

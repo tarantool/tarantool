@@ -71,7 +71,15 @@ struct vy_stmt_env {
 	 * @see box.cfg.vinyl_max_tuple_size
 	 */
 	size_t max_tuple_size;
-	/** Tuple format for keys. */
+	/**
+	 * Tuple format used for creating key statements (e.g.
+	 * statements read from secondary index runs). It doesn't
+	 * impose any restrictions on tuple fields, neither does
+	 * it setup offset map.
+	 *
+	 * Note, all key statements must use this format, because
+	 * vy_stmt_is_key() is built upon that assumption.
+	 */
 	struct tuple_format *key_format;
 };
 
@@ -133,12 +141,9 @@ enum {
 };
 
 /**
- * There are two groups of statements:
+ * A vinyl statement can have either key or tuple format.
  *
- *  - SELECT is "key" statement.
- *  - DELETE, UPSERT and REPLACE are "tuple" statements.
- *
- * REPLACE/UPSERT/DELETE statements structure:
+ * Tuple statement structure:
  *                               data_offset
  *                                    ^
  * +----------------------------------+
@@ -154,7 +159,7 @@ enum {
  * indexed then before MessagePack data are stored offsets only for field 3 and
  * field 5.
  *
- * SELECT statements structure.
+ * Key statement structure:
  * +--------------+-----------------+
  * | array header | part1 ... partN |  -  MessagePack data
  * +--------------+-----------------+
@@ -164,7 +169,7 @@ enum {
 struct vy_stmt {
 	struct tuple base;
 	int64_t lsn;
-	uint8_t  type; /* IPROTO_SELECT/REPLACE/UPSERT/DELETE */
+	uint8_t  type; /* IPROTO_INSERT/REPLACE/UPSERT/DELETE */
 	uint8_t flags;
 	/**
 	 * Offsets array concatenated with MessagePack fields
@@ -239,6 +244,21 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 	*((uint8_t *)stmt - 1) = n;
 }
 
+/** Return true if the given format is a key format. */
+static inline bool
+vy_stmt_is_key_format(const struct tuple_format *format)
+{
+	struct vy_stmt_env *env = format->engine;
+	return env->key_format == format;
+}
+
+/** Return true if the vinyl statement has key format. */
+static inline bool
+vy_stmt_is_key(const struct tuple *stmt)
+{
+	return vy_stmt_is_key_format(tuple_format(stmt));
+}
+
 /**
  * Return the number of key parts defined in the given vinyl
  * statement.
@@ -249,7 +269,7 @@ vy_stmt_set_n_upserts(struct tuple *stmt, uint8_t n)
 static inline uint32_t
 vy_stmt_key_part_count(const struct tuple *stmt, struct key_def *key_def)
 {
-	if (vy_stmt_type(stmt) == IPROTO_SELECT) {
+	if (vy_stmt_is_key(stmt)) {
 		uint32_t part_count = tuple_field_count(stmt);
 		assert(part_count <= key_def->part_count);
 		return part_count;
@@ -348,8 +368,8 @@ static inline int
 vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 		struct key_def *key_def)
 {
-	bool a_is_tuple = vy_stmt_type(a) != IPROTO_SELECT;
-	bool b_is_tuple = vy_stmt_type(b) != IPROTO_SELECT;
+	bool a_is_tuple = !vy_stmt_is_key(a);
+	bool b_is_tuple = !vy_stmt_is_key(b);
 	if (a_is_tuple && b_is_tuple) {
 		return tuple_compare(a, b, key_def);
 	} else if (a_is_tuple && !b_is_tuple) {
@@ -374,7 +394,7 @@ static inline int
 vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 			     struct key_def *key_def)
 {
-	if (vy_stmt_type(stmt) != IPROTO_SELECT) {
+	if (!vy_stmt_is_key(stmt)) {
 		uint32_t part_count = mp_decode_array(&key);
 		return tuple_compare_with_key(stmt, key, part_count, key_def);
 	}
@@ -564,7 +584,7 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
 
 /**
  * Extract the key from a tuple by the given key definition
- * and store the result in a SELECT statement allocated with
+ * and store the result in a key statement allocated with
  * malloc().
  */
 struct tuple *
@@ -573,7 +593,7 @@ vy_stmt_extract_key(const struct tuple *stmt, struct key_def *key_def,
 
 /**
  * Extract the key from msgpack by the given key definition
- * and store the result in a SELECT statement allocated with
+ * and store the result in a key statement allocated with
  * malloc().
  */
 struct tuple *

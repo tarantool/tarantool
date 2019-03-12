@@ -86,7 +86,7 @@ test_iterator_restore_after_insertion()
 	struct slab_cache *slab_cache = cord_slab_cache();
 	lsregion_create(&lsregion, slab_cache->arena);
 
-	struct tuple *select_key = vy_key_new(format, NULL, 0);
+	struct tuple *select_key = vy_key_new(stmt_env.key_format, NULL, 0);
 
 	struct mempool history_node_pool;
 	mempool_create(&history_node_pool, cord_slab_cache(),

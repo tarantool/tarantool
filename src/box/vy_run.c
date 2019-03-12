@@ -1250,7 +1250,7 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 	struct key_def *key_def = itr->key_def;
 	if (iterator_type == ITER_EQ && bloom != NULL) {
 		bool need_lookup;
-		if (vy_stmt_type(key) == IPROTO_SELECT) {
+		if (vy_stmt_is_key(key)) {
 			const char *data = tuple_data(key);
 			uint32_t part_count = mp_decode_array(&data);
 			need_lookup = tuple_bloom_maybe_has_key(bloom, data,
