@@ -441,7 +441,6 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 			 "malloc", "required field bitmap");
 		return -1;
 	}
-	format->min_tuple_size = mp_sizeof_array(format->index_field_count);
 	struct tuple_field *field;
 	json_tree_foreach_entry_preorder(field, &format->fields.root,
 					 struct tuple_field, token) {
@@ -453,44 +452,6 @@ tuple_format_create(struct tuple_format *format, struct key_def * const *keys,
 		if (json_token_is_leaf(&field->token) &&
 		    !tuple_field_is_nullable(field))
 			bit_set(format->required_fields, field->id);
-
-		/*
-		 * Update format::min_tuple_size by field.
-		 * Skip fields not involved in index.
-		 */
-		if (!field->is_key_part)
-			continue;
-		if (field->token.type == JSON_TOKEN_NUM) {
-			/*
-			 * Account a gap between omitted array
-			 * items.
-			 */
-			struct json_token **neighbors =
-				field->token.parent->children;
-			for (int i = field->token.sibling_idx - 1; i >= 0; i--) {
-				if (neighbors[i] != NULL &&
-				    json_tree_entry(neighbors[i],
-						    struct tuple_field,
-						    token)->is_key_part)
-					break;
-				format->min_tuple_size += mp_sizeof_nil();
-			}
-		} else {
-			/* Account a key string for map member. */
-			assert(field->token.type == JSON_TOKEN_STR);
-			format->min_tuple_size +=
-				mp_sizeof_str(field->token.len);
-		}
-		int max_child_idx = field->token.max_child_idx;
-		if (json_token_is_leaf(&field->token)) {
-			format->min_tuple_size += mp_sizeof_nil();
-		} else if (field->type == FIELD_TYPE_ARRAY) {
-			format->min_tuple_size +=
-				mp_sizeof_array(max_child_idx + 1);
-		} else if (field->type == FIELD_TYPE_MAP) {
-			format->min_tuple_size +=
-				mp_sizeof_map(max_child_idx + 1);
-		}
 	}
 	format->hash = tuple_format_hash(format);
 	return 0;
@@ -623,7 +584,6 @@ tuple_format_alloc(struct key_def * const *keys, uint16_t key_count,
 	format->total_field_count = field_count;
 	format->required_fields = NULL;
 	format->fields_depth = 1;
-	format->min_tuple_size = 0;
 	format->refs = 0;
 	format->id = FORMAT_ID_NIL;
 	format->index_field_count = index_field_count;

@@ -203,11 +203,6 @@ struct tuple_format {
 	 */
 	struct tuple_dictionary *dict;
 	/**
-	 * The size of a minimal tuple conforming to the format
-	 * and filled with nils.
-	 */
-	uint32_t min_tuple_size;
-	/**
 	 * A maximum depth of format::fields subtree.
 	 */
 	uint32_t fields_depth;
