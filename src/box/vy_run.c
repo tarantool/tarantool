@@ -2654,9 +2654,9 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
  * Free resources.
  */
 static void
-vy_slice_stream_close(struct vy_stmt_stream *virt_stream)
+vy_slice_stream_stop(struct vy_stmt_stream *virt_stream)
 {
-	assert(virt_stream->iface->close == vy_slice_stream_close);
+	assert(virt_stream->iface->stop == vy_slice_stream_stop);
 	struct vy_slice_stream *stream = (struct vy_slice_stream *)virt_stream;
 	if (stream->page != NULL) {
 		vy_page_delete(stream->page);
@@ -2671,8 +2671,8 @@ vy_slice_stream_close(struct vy_stmt_stream *virt_stream)
 static const struct vy_stmt_stream_iface vy_slice_stream_iface = {
 	.start = vy_slice_stream_search,
 	.next = vy_slice_stream_next,
-	.stop = NULL,
-	.close = vy_slice_stream_close
+	.stop = vy_slice_stream_stop,
+	.close = NULL,
 };
 
 void
