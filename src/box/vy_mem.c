@@ -146,7 +146,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 
 	const struct tuple *result;
 	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-	if (vy_tuple_compare(result, stmt, mem->cmp_def) != 0)
+	if (vy_stmt_compare(result, stmt, mem->cmp_def) != 0)
 		return NULL;
 	return result;
 }
@@ -195,7 +195,7 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 	const struct tuple **older = vy_mem_tree_iterator_get_elem(&mem->tree,
 								   &inserted);
 	if (older == NULL || vy_stmt_type(*older) != IPROTO_UPSERT ||
-	    vy_tuple_compare(stmt, *older, mem->cmp_def) != 0)
+	    vy_stmt_compare(stmt, *older, mem->cmp_def) != 0)
 		return 0;
 	uint8_t n_upserts = vy_stmt_n_upserts(*older);
 	/*
@@ -339,7 +339,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	const struct tuple *prev_stmt;
 	prev_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &prev_pos);
 	if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
-	    vy_tuple_compare(itr->curr_stmt, prev_stmt, cmp_def) != 0) {
+	    vy_stmt_compare(itr->curr_stmt, prev_stmt, cmp_def) != 0) {
 		/*
 		 * The next statement is either invisible in
 		 * the read view or for another key.
@@ -488,7 +488,7 @@ vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
 	 * for this key so instead of iterating further we simply
 	 * look up the next key - it's pretty cheap anyway.
 	 */
-	if (vy_tuple_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0)
+	if (vy_stmt_compare(prev_stmt, itr->curr_stmt, cmp_def) == 0)
 		return vy_mem_iterator_seek(itr, itr->curr_stmt);
 
 	if (itr->iterator_type == ITER_EQ &&
@@ -523,7 +523,7 @@ next:
 
 	const struct tuple *next_stmt;
 	next_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
-	if (vy_tuple_compare(itr->curr_stmt, next_stmt, cmp_def) != 0)
+	if (vy_stmt_compare(itr->curr_stmt, next_stmt, cmp_def) != 0)
 		return 1;
 
 	itr->curr_pos = next_pos;
@@ -577,8 +577,7 @@ vy_mem_iterator_skip(struct vy_mem_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_tuple_compare(itr->curr_stmt, last_stmt,
-			      itr->mem->cmp_def) > 0))
+	     vy_stmt_compare(itr->curr_stmt, last_stmt, itr->mem->cmp_def) > 0))
 		return 0;
 
 	vy_history_cleanup(history);

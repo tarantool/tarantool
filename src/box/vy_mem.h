@@ -90,7 +90,7 @@ static int
 vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
 		struct key_def *cmp_def)
 {
-	int res = vy_tuple_compare(a, b, cmp_def);
+	int res = vy_stmt_compare(a, b, cmp_def);
 	if (res)
 		return res;
 	int64_t a_lsn = vy_stmt_lsn(a), b_lsn = vy_stmt_lsn(b);

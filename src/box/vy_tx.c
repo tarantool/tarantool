@@ -68,7 +68,7 @@ write_set_cmp(struct txv *a, struct txv *b)
 {
 	int rc = a->lsm < b->lsm ? -1 : a->lsm > b->lsm;
 	if (rc == 0)
-		return vy_tuple_compare(a->stmt, b->stmt, a->lsm->cmp_def);
+		return vy_stmt_compare(a->stmt, b->stmt, a->lsm->cmp_def);
 	return rc;
 }
 
@@ -1213,8 +1213,8 @@ vy_txw_iterator_skip(struct vy_txw_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_txv == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_tuple_compare(itr->curr_txv->stmt, last_stmt,
-			      itr->lsm->cmp_def) > 0))
+	     vy_stmt_compare(itr->curr_txv->stmt, last_stmt,
+			     itr->lsm->cmp_def) > 0))
 		return 0;
 
 	vy_history_cleanup(history);

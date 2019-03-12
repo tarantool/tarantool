@@ -449,21 +449,21 @@ vy_slice_cut(struct vy_slice *slice, int64_t id, struct tuple *begin,
 	*result = NULL;
 
 	if (begin != NULL && slice->end != NULL &&
-	    vy_key_compare(begin, slice->end, cmp_def) >= 0)
+	    vy_stmt_compare(begin, slice->end, cmp_def) >= 0)
 		return 0; /* no intersection: begin >= slice->end */
 
 	if (end != NULL && slice->begin != NULL &&
-	    vy_key_compare(end, slice->begin, cmp_def) <= 0)
+	    vy_stmt_compare(end, slice->begin, cmp_def) <= 0)
 		return 0; /* no intersection: end <= slice->end */
 
 	/* begin = MAX(begin, slice->begin) */
 	if (slice->begin != NULL &&
-	    (begin == NULL || vy_key_compare(begin, slice->begin, cmp_def) < 0))
+	    (begin == NULL || vy_stmt_compare(begin, slice->begin, cmp_def) < 0))
 		begin = slice->begin;
 
 	/* end = MIN(end, slice->end) */
 	if (slice->end != NULL &&
-	    (end == NULL || vy_key_compare(end, slice->end, cmp_def) > 0))
+	    (end == NULL || vy_stmt_compare(end, slice->end, cmp_def) > 0))
 		end = slice->end;
 
 	*result = vy_slice_new(id, slice->run, begin, end, cmp_def);
@@ -1206,8 +1206,8 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 				return -1;
 			if (vy_stmt_lsn(test_stmt) > (**itr->read_view).vlsn ||
 			    vy_stmt_flags(test_stmt) & VY_STMT_SKIP_READ ||
-			    vy_tuple_compare(itr->curr_stmt, test_stmt,
-					     cmp_def) != 0) {
+			    vy_stmt_compare(itr->curr_stmt, test_stmt,
+					    cmp_def) != 0) {
 				tuple_unref(test_stmt);
 				break;
 			}
@@ -1219,8 +1219,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 	/* Check if the result is within the slice boundaries. */
 	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
 		if (slice->begin != NULL &&
-		    vy_tuple_compare_with_key(itr->curr_stmt, slice->begin,
-					      cmp_def) < 0) {
+		    vy_stmt_compare(itr->curr_stmt, slice->begin, cmp_def) < 0) {
 			vy_run_iterator_stop(itr);
 			return 0;
 		}
@@ -1228,8 +1227,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
 		       iterator_type == ITER_EQ);
 		if (slice->end != NULL &&
-		    vy_tuple_compare_with_key(itr->curr_stmt, slice->end,
-					      cmp_def) >= 0) {
+		    vy_stmt_compare(itr->curr_stmt, slice->end, cmp_def) >= 0) {
 			vy_run_iterator_stop(itr);
 			return 0;
 		}
@@ -1360,7 +1358,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 		 *         | ge  | begin | ge  |
 		 *         | eq  |    stop     |
 		 */
-		cmp = vy_stmt_compare_with_key(key, slice->begin, cmp_def);
+		cmp = vy_stmt_compare(key, slice->begin, cmp_def);
 		if (cmp < 0 && iterator_type == ITER_EQ) {
 			vy_run_iterator_stop(itr);
 			*ret = NULL;
@@ -1387,7 +1385,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 		 * > end   | lt  | end   | lt  |
 		 *         | le  | end   | lt  |
 		 */
-		cmp = vy_stmt_compare_with_key(key, slice->end, cmp_def);
+		cmp = vy_stmt_compare(key, slice->end, cmp_def);
 		if (cmp > 0 || (cmp == 0 && iterator_type != ITER_LT)) {
 			iterator_type = ITER_LT;
 			key = slice->end;
@@ -1480,7 +1478,7 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret)
 
 		if (vy_run_iterator_read(itr, itr->curr_pos, &next_key) != 0)
 			return -1;
-	} while (vy_tuple_compare(itr->curr_stmt, next_key, itr->cmp_def) == 0);
+	} while (vy_stmt_compare(itr->curr_stmt, next_key, itr->cmp_def) == 0);
 
 	tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = next_key;
@@ -1521,7 +1519,7 @@ next:
 	if (vy_run_iterator_read(itr, next_pos, &next_key) != 0)
 		return -1;
 
-	if (vy_tuple_compare(itr->curr_stmt, next_key, itr->cmp_def) != 0) {
+	if (vy_stmt_compare(itr->curr_stmt, next_key, itr->cmp_def) != 0) {
 		tuple_unref(next_key);
 		return 0;
 	}
@@ -1571,8 +1569,7 @@ vy_run_iterator_skip(struct vy_run_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_tuple_compare(itr->curr_stmt, last_stmt,
-			      itr->cmp_def) > 0))
+	     vy_stmt_compare(itr->curr_stmt, last_stmt, itr->cmp_def) > 0))
 		return 0;
 
 	vy_history_cleanup(history);
@@ -2585,8 +2582,8 @@ vy_slice_stream_search(struct vy_stmt_stream *virt_stream)
 					stream->is_primary);
 		if (fnd_key == NULL)
 			return -1;
-		int cmp = vy_tuple_compare_with_key(fnd_key,
-				stream->slice->begin, stream->cmp_def);
+		int cmp = vy_stmt_compare(fnd_key, stream->slice->begin,
+					  stream->cmp_def);
 		if (cmp < 0)
 			beg = mid + 1;
 		else
@@ -2637,8 +2634,7 @@ vy_slice_stream_next(struct vy_stmt_stream *virt_stream, struct tuple **ret)
 	/* Check that the tuple is not out of slice bounds = */
 	if (stream->slice->end != NULL &&
 	    stream->page_no >= stream->slice->last_page_no &&
-	    vy_tuple_compare_with_key(tuple, stream->slice->end,
-				      stream->cmp_def) >= 0) {
+	    vy_stmt_compare(tuple, stream->slice->end, stream->cmp_def) >= 0) {
 		tuple_unref(tuple);
 		return 0;
 	}

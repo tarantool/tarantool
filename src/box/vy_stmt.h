@@ -321,94 +321,9 @@ vy_stmt_unref_if_possible(struct tuple *stmt)
 }
 
 /**
- * Specialized comparators are faster than general-purpose comparators.
- * For example, vy_stmt_compare - slowest comparator because it in worst case
- * checks all combinations of key and tuple types, but
- * vy_key_compare - fastest comparator, because it shouldn't check statement
- * types.
+ * Compare two vinyl statements taking into account their
+ * formats (key or tuple).
  */
-
-/**
- * Compare SELECT/DELETE statements using the key definition
- * @param a left operand (SELECT/DELETE)
- * @param b right operand (SELECT/DELETE)
- * @param cmp_def key definition, with primary parts
- *
- * @retval 0   if a == b
- * @retval > 0 if a > b
- * @retval < 0 if a < b
- *
- * @sa key_compare()
- */
-static inline int
-vy_key_compare(const struct tuple *a, const struct tuple *b,
-	       struct key_def *cmp_def)
-{
-	assert(vy_stmt_type(a) == IPROTO_SELECT);
-	assert(vy_stmt_type(b) == IPROTO_SELECT);
-	return key_compare(tuple_data(a), tuple_data(b), cmp_def);
-}
-
-/**
- * Compare REPLACE/UPSERTS statements.
- * @param a left operand (REPLACE/UPSERT)
- * @param b right operand (REPLACE/UPSERT)
- * @param cmp_def key definition with primary parts
- *
- * @retval 0   if a == b
- * @retval > 0 if a > b
- * @retval < 0 if a < b
- *
- * @sa tuple_compare()
- */
-static inline int
-vy_tuple_compare(const struct tuple *a, const struct tuple *b,
-		 struct key_def *cmp_def)
-{
-	enum iproto_type type;
-	type = vy_stmt_type(a);
-	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
-	       type == IPROTO_UPSERT || type == IPROTO_DELETE);
-	type = vy_stmt_type(b);
-	assert(type == IPROTO_INSERT || type == IPROTO_REPLACE ||
-	       type == IPROTO_UPSERT || type == IPROTO_DELETE);
-	(void)type;
-	return tuple_compare(a, b, cmp_def);
-}
-
-/**
- * Compare REPLACE/UPSERT with SELECT/DELETE using the key
- * definition
- * @param tuple Left operand (REPLACE/UPSERT)
- * @param key   MessagePack array of key fields, right operand.
- *
- * @retval > 0  tuple > key.
- * @retval == 0 tuple == key in all fields
- * @retval == 0 tuple is prefix of key
- * @retval == 0 key is a prefix of tuple
- * @retval < 0  tuple < key.
- *
- * @sa tuple_compare_with_key()
- */
-static inline int
-vy_tuple_compare_with_raw_key(const struct tuple *tuple, const char *key,
-			      struct key_def *key_def)
-{
-	uint32_t part_count = mp_decode_array(&key);
-	return tuple_compare_with_key(tuple, key, part_count, key_def);
-}
-
-/** @sa vy_tuple_compare_with_raw_key(). */
-static inline int
-vy_tuple_compare_with_key(const struct tuple *tuple, const struct tuple *key,
-			  struct key_def *key_def)
-{
-	const char *key_mp = tuple_data(key);
-	uint32_t part_count = mp_decode_array(&key_mp);
-	return tuple_compare_with_key(tuple, key_mp, part_count, key_def);
-}
-
-/** @sa tuple_compare. */
 static inline int
 vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 		struct key_def *key_def)
@@ -416,34 +331,34 @@ vy_stmt_compare(const struct tuple *a, const struct tuple *b,
 	bool a_is_tuple = vy_stmt_type(a) != IPROTO_SELECT;
 	bool b_is_tuple = vy_stmt_type(b) != IPROTO_SELECT;
 	if (a_is_tuple && b_is_tuple) {
-		return vy_tuple_compare(a, b, key_def);
+		return tuple_compare(a, b, key_def);
 	} else if (a_is_tuple && !b_is_tuple) {
-		return vy_tuple_compare_with_key(a, b, key_def);
+		const char *key = tuple_data(b);
+		uint32_t part_count = mp_decode_array(&key);
+		return tuple_compare_with_key(a, key, part_count, key_def);
 	} else if (!a_is_tuple && b_is_tuple) {
-		return -vy_tuple_compare_with_key(b, a, key_def);
+		const char *key = tuple_data(a);
+		uint32_t part_count = mp_decode_array(&key);
+		return -tuple_compare_with_key(b, key, part_count, key_def);
 	} else {
 		assert(!a_is_tuple && !b_is_tuple);
-		return vy_key_compare(a, b, key_def);
+		return key_compare(tuple_data(a), tuple_data(b), key_def);
 	}
 }
 
-/** @sa tuple_compare_with_raw_key. */
+/**
+ * Compare a vinyl statement (key or tuple) with a raw key
+ * (msgpack array).
+ */
 static inline int
 vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 			     struct key_def *key_def)
 {
-	if (vy_stmt_type(stmt) != IPROTO_SELECT)
-		return vy_tuple_compare_with_raw_key(stmt, key, key_def);
+	if (vy_stmt_type(stmt) != IPROTO_SELECT) {
+		uint32_t part_count = mp_decode_array(&key);
+		return tuple_compare_with_key(stmt, key, part_count, key_def);
+	}
 	return key_compare(tuple_data(stmt), key, key_def);
-}
-
-/** @sa tuple_compare_with_key. */
-static inline int
-vy_stmt_compare_with_key(const struct tuple *stmt, const struct tuple *key,
-			 struct key_def *key_def)
-{
-	assert(vy_stmt_type(key) == IPROTO_SELECT);
-	return vy_stmt_compare_with_raw_key(stmt, tuple_data(key), key_def);
 }
 
 /**

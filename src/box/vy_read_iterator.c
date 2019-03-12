@@ -148,17 +148,17 @@ vy_read_iterator_range_is_done(struct vy_read_iterator *itr,
 	int dir = iterator_direction(itr->iterator_type);
 
 	if (dir > 0 && range->end != NULL &&
-	    (next_key == NULL || vy_tuple_compare_with_key(next_key,
-					range->end, cmp_def) >= 0) &&
+	    (next_key == NULL || vy_stmt_compare(next_key, range->end,
+						 cmp_def) >= 0) &&
 	    (itr->iterator_type != ITER_EQ ||
-	     vy_stmt_compare_with_key(itr->key, range->end, cmp_def) >= 0))
+	     vy_stmt_compare(itr->key, range->end, cmp_def) >= 0))
 		return true;
 
 	if (dir < 0 && range->begin != NULL &&
-	    (next_key == NULL || vy_tuple_compare_with_key(next_key,
-					range->begin, cmp_def) < 0) &&
+	    (next_key == NULL || vy_stmt_compare(next_key, range->begin,
+						 cmp_def) < 0) &&
 	    (itr->iterator_type != ITER_REQ ||
-	     vy_stmt_compare_with_key(itr->key, range->begin, cmp_def) <= 0))
+	     vy_stmt_compare(itr->key, range->begin, cmp_def) <= 0))
 		return true;
 
 	return false;
@@ -185,7 +185,7 @@ vy_read_iterator_cmp_stmt(struct vy_read_iterator *itr,
 	if (a == NULL && b == NULL)
 		return 0;
 	return iterator_direction(itr->iterator_type) *
-		vy_tuple_compare(a, b, itr->lsm->cmp_def);
+		vy_stmt_compare(a, b, itr->lsm->cmp_def);
 }
 
 /**
@@ -763,12 +763,12 @@ vy_read_iterator_next_range(struct vy_read_iterator *itr)
 		 * Make sure the next statement falls in the range.
 		 */
 		if (dir > 0 && (range->end == NULL ||
-				vy_tuple_compare_with_key(itr->last_stmt,
-						range->end, cmp_def) < 0))
+				vy_stmt_compare(itr->last_stmt, range->end,
+						cmp_def) < 0))
 			break;
 		if (dir < 0 && (range->begin == NULL ||
-				vy_tuple_compare_with_key(itr->last_stmt,
-						range->begin, cmp_def) > 0))
+				vy_stmt_compare(itr->last_stmt, range->begin,
+						cmp_def) > 0))
 			break;
 	}
 	itr->curr_range = range;

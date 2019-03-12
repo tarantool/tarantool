@@ -205,7 +205,7 @@ check_key:
 	 * Check that key hasn't been changed after applying operations.
 	 */
 	if (!key_update_can_be_skipped(cmp_def->column_mask, column_mask) &&
-	    vy_tuple_compare(old_stmt, result_stmt, cmp_def) != 0) {
+	    vy_stmt_compare(old_stmt, result_stmt, cmp_def) != 0) {
 		/*
 		 * Key has been changed: ignore this UPSERT and
 		 * @retval the old stmt.

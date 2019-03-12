@@ -370,8 +370,8 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 							&inserted);
 		assert(*prev_check_entry != NULL);
 		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
-		int cmp = vy_tuple_compare(prev_stmt, prev_check_stmt,
-					   cache->cmp_def);
+		int cmp = vy_stmt_compare(prev_stmt, prev_check_stmt,
+					  cache->cmp_def);
 
 		if (entry->flags & flag) {
 			/* The found entry must be exactly prev_stmt. (2) */
@@ -722,8 +722,8 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 	if (itr->search_started &&
 	    (itr->curr_stmt == NULL || last_stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_tuple_compare(itr->curr_stmt, last_stmt,
-			      itr->cache->cmp_def) > 0))
+	     vy_stmt_compare(itr->curr_stmt, last_stmt,
+			     itr->cache->cmp_def) > 0))
 		return 0;
 
 	*stop = false;

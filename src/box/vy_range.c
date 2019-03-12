@@ -63,8 +63,8 @@ vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 		return 1;
 
 	assert(range_a->cmp_def == range_b->cmp_def);
-	return vy_key_compare(range_a->begin, range_b->begin,
-			      range_a->cmp_def);
+	return vy_stmt_compare(range_a->begin, range_b->begin,
+			       range_a->cmp_def);
 }
 
 int
@@ -73,7 +73,7 @@ vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range)
 	/* Any key > -inf. */
 	if (range->begin == NULL)
 		return 1;
-	return vy_stmt_compare_with_key(stmt, range->begin, range->cmp_def);
+	return vy_stmt_compare(stmt, range->begin, range->cmp_def);
 }
 
 struct vy_range *
@@ -125,8 +125,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		/* switch to previous for case (4) */
 		if (range != NULL && range->begin != NULL &&
 		    !vy_stmt_is_full_key(key, range->cmp_def) &&
-		    vy_stmt_compare_with_key(key, range->begin,
-					     range->cmp_def) == 0)
+		    vy_stmt_compare(key, range->begin, range->cmp_def) == 0)
 			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
@@ -160,8 +159,8 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		if (range != NULL) {
 			/* fix curr_range for cases 2 and 3 */
 			if (range->begin != NULL &&
-			    vy_stmt_compare_with_key(key, range->begin,
-						     range->cmp_def) != 0) {
+			    vy_stmt_compare(key, range->begin,
+					    range->cmp_def) != 0) {
 				struct vy_range *prev;
 				prev = vy_range_tree_prev(tree, range);
 				if (prev != NULL)

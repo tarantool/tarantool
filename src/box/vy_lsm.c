@@ -405,7 +405,7 @@ vy_lsm_recover_slice(struct vy_lsm *lsm, struct vy_range *range,
 			goto out;
 	}
 	if (begin != NULL && end != NULL &&
-	    vy_key_compare(begin, end, lsm->cmp_def) >= 0) {
+	    vy_stmt_compare(begin, end, lsm->cmp_def) >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("begin >= end for slice %lld",
 				    (long long)slice_info->id));
@@ -451,7 +451,7 @@ vy_lsm_recover_range(struct vy_lsm *lsm,
 			goto out;
 	}
 	if (begin != NULL && end != NULL &&
-	    vy_key_compare(begin, end, lsm->cmp_def) >= 0) {
+	    vy_stmt_compare(begin, end, lsm->cmp_def) >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("begin >= end for range %lld",
 				    (long long)range_info->id));
@@ -632,8 +632,8 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 		int cmp = 0;
 		if (prev != NULL &&
 		    (prev->end == NULL || range->begin == NULL ||
-		     (cmp = vy_key_compare(prev->end, range->begin,
-					   lsm->cmp_def)) != 0)) {
+		     (cmp = vy_stmt_compare(prev->end, range->begin,
+					    lsm->cmp_def)) != 0)) {
 			const char *errmsg = cmp > 0 ?
 				"Nearby ranges %lld and %lld overlap" :
 				"Keys between ranges %lld and %lld not spanned";

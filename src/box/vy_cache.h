@@ -74,7 +74,7 @@ static inline int
 vy_cache_tree_cmp(struct vy_cache_entry *a,
 		  struct vy_cache_entry *b, struct key_def *cmp_def)
 {
-	return vy_tuple_compare(a->stmt, b->stmt, cmp_def);
+	return vy_stmt_compare(a->stmt, b->stmt, cmp_def);
 }
 
 /**

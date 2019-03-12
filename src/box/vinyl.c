@@ -1305,7 +1305,7 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		return -1;
 
 	if (*result == NULL ||
-	    vy_tuple_compare(*result, tuple, lsm->key_def) != 0) {
+	    vy_stmt_compare(*result, tuple, lsm->key_def) != 0) {
 		/*
 		 * If a tuple read from a secondary index doesn't
 		 * match the tuple corresponding to it in the
@@ -1524,7 +1524,7 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 	 * fail here.
 	 */
 	if (found != NULL && vy_stmt_type(stmt) == IPROTO_REPLACE &&
-	    vy_tuple_compare(stmt, found, lsm->pk->key_def) == 0) {
+	    vy_stmt_compare(stmt, found, lsm->pk->key_def) == 0) {
 		tuple_unref(found);
 		return 0;
 	}
@@ -1729,7 +1729,7 @@ vy_check_update(struct space *space, const struct vy_lsm *pk,
 		uint64_t column_mask)
 {
 	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
-	    vy_tuple_compare(old_tuple, new_tuple, pk->key_def) != 0) {
+	    vy_stmt_compare(old_tuple, new_tuple, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 index_name_by_id(space, pk->index_id),
 			 space_name(space));
@@ -3513,7 +3513,7 @@ vy_squash_process(struct vy_squash *squash)
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
 		const struct tuple *mem_stmt;
 		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_tuple_compare(result, mem_stmt, lsm->cmp_def) != 0 ||
+		if (vy_stmt_compare(result, mem_stmt, lsm->cmp_def) != 0 ||
 		    vy_stmt_type(mem_stmt) != IPROTO_UPSERT)
 			break;
 		assert(vy_stmt_lsn(mem_stmt) >= MAX_LSN);
