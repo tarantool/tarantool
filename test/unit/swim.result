@@ -19,7 +19,7 @@ ok 2 - subtests
 ok 3 - subtests
 	*** swim_test_uuid_update: done ***
 	*** swim_test_cfg ***
-    1..15
+    1..16
     ok 1 - first cfg failed - no URI
     ok 2 - diag says 'mandatory'
     ok 3 - first cfg failed - no UUID
@@ -27,14 +27,15 @@ ok 3 - subtests
     ok 5 - configured first time
     ok 6 - second time can omit URI, UUID
     ok 7 - hearbeat is dynamic
-    ok 8 - can not use invalid URI
-    ok 9 - diag says 'invalid uri'
-    ok 10 - can not use domain names
-    ok 11 - diag says 'invalid uri'
-    ok 12 - UNIX sockets are not supported
-    ok 13 - diag says 'only IP'
-    ok 14 - can not bind to an occupied port
-    ok 15 - diag says 'bind'
+    ok 8 - URI is unchanged after recfg with NULL URI
+    ok 9 - can not use invalid URI
+    ok 10 - diag says 'invalid uri'
+    ok 11 - can not use domain names
+    ok 12 - diag says 'invalid uri'
+    ok 13 - UNIX sockets are not supported
+    ok 14 - diag says 'only IP'
+    ok 15 - can not bind to an occupied port
+    ok 16 - diag says 'bind'
 ok 4 - subtests
 	*** swim_test_cfg: done ***
 	*** swim_test_add_remove ***

@@ -202,6 +202,10 @@ struct swim_task {
 	struct sockaddr_in dst;
 	/** Place in a queue of tasks. */
 	struct rlist in_queue_output;
+	/**
+	 * A short description of the packet content. For logging.
+	 */
+	const char *desc;
 };
 
 /**
@@ -214,7 +218,7 @@ swim_task_send(struct swim_task *task, const struct sockaddr_in *dst,
 /** Initialize the task, without scheduling. */
 void
 swim_task_create(struct swim_task *task, swim_task_f complete,
-		 swim_task_f cancel);
+		 swim_task_f cancel, const char *desc);
 
 /** Destroy the task, pop from the queue. */
 static inline void

@@ -79,6 +79,13 @@ swim_test_packet_new(const char *data, int size, const struct sockaddr_in *src,
 	return p;
 }
 
+/** Free packet memory. */
+static inline void
+swim_test_packet_delete(struct swim_test_packet *p)
+{
+	free(p);
+}
+
 /** Fake file descriptor. */
 struct swim_fd {
 	/** File descriptor number visible to libev. */
@@ -123,9 +130,9 @@ swim_fd_close(struct swim_fd *fd)
 {
 	struct swim_test_packet *i, *tmp;
 	rlist_foreach_entry_safe(i, &fd->recv_queue, in_queue, tmp)
-		free(i);
+		swim_test_packet_delete(i);
 	rlist_foreach_entry_safe(i, &fd->send_queue, in_queue, tmp)
-		free(i);
+		swim_test_packet_delete(i);
 	rlist_del_entry(fd, in_opened);
 }
 
@@ -189,7 +196,7 @@ swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
 	*addr_size = sizeof(p->src);
 	ssize_t result = MIN((size_t) p->size, size);
 	memcpy(buffer, p->data, result);
-	free(p);
+	swim_test_packet_delete(p);
 	return result;
 }
 

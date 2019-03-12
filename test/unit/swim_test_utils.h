@@ -74,11 +74,9 @@ swim_cluster_add_link(struct swim_cluster *cluster, int to_id, int from_id);
 bool
 swim_cluster_is_fullmesh(struct swim_cluster *cluster);
 
-/**
- * Wait for fullmesh at most @a max_steps event loop iterations.
- */
+/** Wait for fullmesh at most @a timeout fake seconds. */
 int
-swim_cluster_wait_fullmesh(struct swim_cluster *cluster, int max_steps);
+swim_cluster_wait_fullmesh(struct swim_cluster *cluster, double timeout);
 
 #define swim_start_test(n) { \
 	header(); \

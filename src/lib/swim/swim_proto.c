@@ -289,6 +289,7 @@ swim_meta_def_decode(struct swim_meta_def *def, const char **pos,
 	if (swim_decode_map(pos, end, &size, prefix, "root") != 0)
 		return -1;
 	memset(def, 0, sizeof(*def));
+	def->src.sin_family = AF_INET;
 	for (uint32_t i = 0; i < size; ++i) {
 		uint64_t key;
 		if (swim_decode_uint(pos, end, &key, prefix, "a key") != 0)
