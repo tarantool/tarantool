@@ -6,7 +6,7 @@
 
 struct tt_uuid INSTANCE_UUID;
 
-struct tuple_format *vy_key_format = NULL;
+struct vy_stmt_env stmt_env;
 struct vy_mem_env mem_env;
 struct vy_cache_env cache_env;
 
@@ -19,12 +19,9 @@ vy_iterator_C_test_init(size_t cache_size)
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	tuple_init(NULL);
+	vy_stmt_env_create(&stmt_env);
 	vy_cache_env_create(&cache_env, cord_slab_cache());
 	vy_cache_env_set_quota(&cache_env, cache_size);
-	vy_key_format = tuple_format_new(&vy_tuple_format_vtab, NULL, NULL, 0,
-					 NULL, 0, 0, NULL, false, false);
-	tuple_format_ref(vy_key_format);
-
 	size_t mem_size = 64 * 1024 * 1024;
 	vy_mem_env_create(&mem_env, mem_size);
 }
@@ -33,8 +30,8 @@ void
 vy_iterator_C_test_finish()
 {
 	vy_mem_env_destroy(&mem_env);
-	tuple_format_unref(vy_key_format);
 	vy_cache_env_destroy(&cache_env);
+	vy_stmt_env_destroy(&stmt_env);
 	tuple_free();
 	fiber_free();
 	memory_free();
@@ -122,7 +119,7 @@ vy_new_simple_stmt(struct tuple_format *format,
 	case IPROTO_SELECT: {
 		const char *key = buf;
 		uint part_count = mp_decode_array(&key);
-		ret = vy_stmt_new_select(vy_key_format, key, part_count);
+		ret = vy_stmt_new_select(stmt_env.key_format, key, part_count);
 		fail_if(ret == NULL);
 		break;
 	}
@@ -199,11 +196,8 @@ struct vy_mem *
 create_test_mem(struct key_def *def)
 {
 	/* Create format */
-	struct key_def * const defs[] = { def };
-	struct tuple_format *format =
-		tuple_format_new(&vy_tuple_format_vtab, NULL, defs,
-				 def->part_count, NULL, 0, 0, NULL, false,
-				 false);
+	struct tuple_format *format;
+	format = vy_stmt_format_new(&stmt_env, &def, 1, NULL, 0, 0, NULL);
 	fail_if(format == NULL);
 
 	/* Create mem */
@@ -220,8 +214,7 @@ create_test_cache(uint32_t *fields, uint32_t *types,
 	*def = box_key_def_new(fields, types, key_cnt);
 	assert(*def != NULL);
 	vy_cache_create(cache, &cache_env, *def, true);
-	*format = tuple_format_new(&vy_tuple_format_vtab, NULL, def, 1, NULL, 0,
-				   0, NULL, false, false);
+	*format = vy_stmt_format_new(&stmt_env, def, 1, NULL, 0, 0, NULL);
 	tuple_format_ref(*format);
 }
 

@@ -49,6 +49,7 @@ extern "C" {
 struct xrow_header;
 struct region;
 struct tuple_format;
+struct tuple_dictionary;
 struct iovec;
 
 #define MAX_LSN (INT64_MAX / 2)
@@ -61,14 +62,33 @@ static_assert(VY_UPSERT_THRESHOLD <= UINT8_MAX, "n_upserts max value");
 static_assert(VY_UPSERT_INF == VY_UPSERT_THRESHOLD + 1,
 	      "inf must be threshold + 1");
 
-/** Vinyl statement vtable. */
-extern struct tuple_format_vtab vy_tuple_format_vtab;
+/** Vinyl statement environment. */
+struct vy_stmt_env {
+	/** Vinyl statement vtable. */
+	struct tuple_format_vtab tuple_format_vtab;
+	/**
+	 * Max tuple size
+	 * @see box.cfg.vinyl_max_tuple_size
+	 */
+	size_t max_tuple_size;
+	/** Tuple format for keys. */
+	struct tuple_format *key_format;
+};
 
-/**
- * Max tuple size
- * @see box.cfg.vinyl_max_tuple_size
- */
-extern size_t vy_max_tuple_size;
+/** Initialize a vinyl statement environment. */
+void
+vy_stmt_env_create(struct vy_stmt_env *env);
+
+/** Destroy a vinyl statement environment. */
+void
+vy_stmt_env_destroy(struct vy_stmt_env *env);
+
+/** Create a vinyl statement format. */
+struct tuple_format *
+vy_stmt_format_new(struct vy_stmt_env *env, struct key_def *const *keys,
+		   uint16_t key_count, const struct field_def *fields,
+		   uint32_t field_count, uint32_t exact_field_count,
+		   struct tuple_dictionary *dict);
 
 /** Statement flags. */
 enum {

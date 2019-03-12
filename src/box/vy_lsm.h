@@ -130,7 +130,7 @@ struct vy_lsm_env {
 /** Create a common LSM tree environment. */
 int
 vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
-		  int64_t *p_generation,
+		  int64_t *p_generation, struct tuple_format *key_format,
 		  vy_upsert_thresh_cb upsert_thresh_cb,
 		  void *upsert_thresh_arg);
 
@@ -333,9 +333,10 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm);
 
 /** Allocate a new LSM tree object. */
 struct vy_lsm *
-vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
-	   struct vy_mem_env *mem_env, struct index_def *index_def,
-	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id);
+vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_stmt_env *stmt_env,
+	   struct vy_cache_env *cache_env, struct vy_mem_env *mem_env,
+	   struct index_def *index_def, struct tuple_format *format,
+	   struct vy_lsm *pk, uint32_t group_id);
 
 /** Free an LSM tree object. */
 void

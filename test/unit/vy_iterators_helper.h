@@ -51,8 +51,7 @@
 #define STMT_TEMPLATE_DEFERRED_DELETE(lsn, type, ...) \
 STMT_TEMPLATE_FLAGS(lsn, type, VY_STMT_DEFERRED_DELETE, __VA_ARGS__)
 
-extern struct tuple_format_vtab vy_tuple_format_vtab;
-extern struct tuple_format *vy_key_format;
+extern struct vy_stmt_env stmt_env;
 extern struct vy_mem_env mem_env;
 extern struct vy_cache_env cache_env;
 

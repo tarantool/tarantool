@@ -112,12 +112,34 @@ vy_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	free(tuple);
 }
 
-struct tuple_format_vtab vy_tuple_format_vtab = {
-	vy_tuple_delete,
-	vy_tuple_new,
-};
+void
+vy_stmt_env_create(struct vy_stmt_env *env)
+{
+	env->tuple_format_vtab.tuple_new = vy_tuple_new;
+	env->tuple_format_vtab.tuple_delete = vy_tuple_delete;
+	env->max_tuple_size = 1024 * 1024;
+	env->key_format = vy_stmt_format_new(env, NULL, 0, NULL, 0, 0, NULL);
+	if (env->key_format == NULL)
+		panic("failed to create vinyl key format");
+	tuple_format_ref(env->key_format);
+}
 
-size_t vy_max_tuple_size = 1024 * 1024;
+void
+vy_stmt_env_destroy(struct vy_stmt_env *env)
+{
+	tuple_format_unref(env->key_format);
+}
+
+struct tuple_format *
+vy_stmt_format_new(struct vy_stmt_env *env, struct key_def *const *keys,
+		   uint16_t key_count, const struct field_def *fields,
+		   uint32_t field_count, uint32_t exact_field_count,
+		   struct tuple_dictionary *dict)
+{
+	return tuple_format_new(&env->tuple_format_vtab, env, keys, key_count,
+				fields, field_count, exact_field_count, dict,
+				false, false);
+}
 
 /**
  * Allocate a vinyl statement object on base of the struct tuple
@@ -132,9 +154,10 @@ size_t vy_max_tuple_size = 1024 * 1024;
 static struct tuple *
 vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 {
+	struct vy_stmt_env *env = format->engine;
 	uint32_t total_size = sizeof(struct vy_stmt) + format->field_map_size +
 		bsize;
-	if (unlikely(total_size > vy_max_tuple_size)) {
+	if (unlikely(total_size > env->max_tuple_size)) {
 		diag_set(ClientError, ER_VINYL_MAX_TUPLE_SIZE,
 			 (unsigned) total_size);
 		error_log(diag_last_error(diag_get()));

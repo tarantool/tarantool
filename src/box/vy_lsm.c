@@ -70,23 +70,17 @@ static const int64_t VY_MAX_RANGE_SIZE = 2LL * 1024 * 1024 * 1024;
 
 int
 vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
-		  int64_t *p_generation,
+		  int64_t *p_generation, struct tuple_format *key_format,
 		  vy_upsert_thresh_cb upsert_thresh_cb,
 		  void *upsert_thresh_arg)
 {
-	env->key_format = tuple_format_new(&vy_tuple_format_vtab, NULL,
-					   NULL, 0, NULL, 0, 0, NULL, false,
-					   false);
-	if (env->key_format == NULL)
+	env->empty_key = vy_stmt_new_select(key_format, NULL, 0);
+	if (env->empty_key == NULL)
 		return -1;
-	tuple_format_ref(env->key_format);
-	env->empty_key = vy_stmt_new_select(env->key_format, NULL, 0);
-	if (env->empty_key == NULL) {
-		tuple_format_unref(env->key_format);
-		return -1;
-	}
 	env->path = path;
 	env->p_generation = p_generation;
+	env->key_format = key_format;
+	tuple_format_ref(key_format);
 	env->upsert_thresh_cb = upsert_thresh_cb;
 	env->upsert_thresh_arg = upsert_thresh_arg;
 	env->too_long_threshold = TIMEOUT_INFINITY;
@@ -124,9 +118,10 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm)
 }
 
 struct vy_lsm *
-vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
-	   struct vy_mem_env *mem_env, struct index_def *index_def,
-	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id)
+vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_stmt_env *stmt_env,
+	   struct vy_cache_env *cache_env, struct vy_mem_env *mem_env,
+	   struct index_def *index_def, struct tuple_format *format,
+	   struct vy_lsm *pk, uint32_t group_id)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -161,9 +156,8 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
 		 */
 		lsm->disk_format = format;
 	} else {
-		lsm->disk_format = tuple_format_new(&vy_tuple_format_vtab, NULL,
-						    &cmp_def, 1, NULL, 0, 0,
-						    NULL, false, false);
+		lsm->disk_format = vy_stmt_format_new(stmt_env, &cmp_def, 1,
+						      NULL, 0, 0, NULL);
 		if (lsm->disk_format == NULL)
 			goto fail_format;
 	}

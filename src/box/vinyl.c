@@ -104,6 +104,8 @@ struct vy_env {
 	struct mempool iterator_pool;
 	/** Memory quota */
 	struct vy_quota     quota;
+	/** Statement environment. */
+	struct vy_stmt_env stmt_env;
 	/** Common LSM tree environment. */
 	struct vy_lsm_env lsm_env;
 	/** Environment for cache subsystem */
@@ -601,6 +603,7 @@ static struct space *
 vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 			  struct rlist *key_list)
 {
+	struct vy_env *env = vy_env(engine);
 	struct space *space = malloc(sizeof(*space));
 	if (space == NULL) {
 		diag_set(OutOfMemory, sizeof(*space),
@@ -623,11 +626,10 @@ vinyl_engine_create_space(struct engine *engine, struct space_def *def,
 	rlist_foreach_entry(index_def, key_list, link)
 		keys[key_count++] = index_def->key_def;
 
-	struct tuple_format *format =
-		tuple_format_new(&vy_tuple_format_vtab, NULL, keys, key_count,
-				 def->fields, def->field_count,
-				 def->exact_field_count, def->dict, false,
-				 false);
+	struct tuple_format *format;
+	format = vy_stmt_format_new(&env->stmt_env, keys, key_count,
+				    def->fields, def->field_count,
+				    def->exact_field_count, def->dict);
 	if (format == NULL) {
 		free(space);
 		return NULL;
@@ -717,9 +719,9 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		pk = vy_lsm(space_index(space, 0));
 		assert(pk != NULL);
 	}
-	struct vy_lsm *lsm = vy_lsm_new(&env->lsm_env, &env->cache_env,
-					&env->mem_env, index_def,
-					space->format, pk,
+	struct vy_lsm *lsm = vy_lsm_new(&env->lsm_env, &env->stmt_env,
+					&env->cache_env, &env->mem_env,
+					index_def, space->format, pk,
 					space_group_id(space));
 	if (lsm == NULL) {
 		free(index);
@@ -2521,6 +2523,7 @@ vy_env_new(const char *path, size_t memory,
 	if (e->squash_queue == NULL)
 		goto error_squash_queue;
 
+	vy_stmt_env_create(&e->stmt_env);
 	vy_mem_env_create(&e->mem_env, memory);
 	vy_scheduler_create(&e->scheduler, write_threads,
 			    vy_env_dump_complete_cb,
@@ -2528,6 +2531,7 @@ vy_env_new(const char *path, size_t memory,
 
 	if (vy_lsm_env_create(&e->lsm_env, e->path,
 			      &e->scheduler.generation,
+			      e->stmt_env.key_format,
 			      vy_squash_schedule, e) != 0)
 		goto error_lsm_env;
 
@@ -2569,6 +2573,7 @@ vy_env_delete(struct vy_env *e)
 	vy_lsm_env_destroy(&e->lsm_env);
 	vy_mem_env_destroy(&e->mem_env);
 	vy_cache_env_destroy(&e->cache_env);
+	vy_stmt_env_destroy(&e->stmt_env);
 	vy_quota_destroy(&e->quota);
 	if (e->recovery != NULL)
 		vy_recovery_delete(e->recovery);
@@ -2641,8 +2646,7 @@ vinyl_engine_set_memory(struct vinyl_engine *vinyl, size_t size)
 void
 vinyl_engine_set_max_tuple_size(struct vinyl_engine *vinyl, size_t max_size)
 {
-	(void)vinyl;
-	vy_max_tuple_size = max_size;
+	vinyl->env->stmt_env.max_tuple_size = max_size;
 }
 
 void
@@ -3057,9 +3061,8 @@ vy_send_lsm(struct vy_join_ctx *ctx, struct vy_lsm_recovery_info *lsm_info)
 				   lsm_info->key_part_count);
 	if (ctx->key_def == NULL)
 		goto out;
-	ctx->format = tuple_format_new(&vy_tuple_format_vtab, NULL,
-				       &ctx->key_def, 1, NULL, 0, 0, NULL,
-				       false, false);
+	ctx->format = vy_stmt_format_new(&ctx->env->stmt_env, &ctx->key_def, 1,
+					 NULL, 0, 0, NULL);
 	if (ctx->format == NULL)
 		goto out_free_key_def;
 	tuple_format_ref(ctx->format);

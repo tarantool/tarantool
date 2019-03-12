@@ -66,7 +66,8 @@ test_basic()
 
 	int rc;
 	struct vy_lsm_env lsm_env;
-	rc = vy_lsm_env_create(&lsm_env, ".", &generation, NULL, NULL);
+	rc = vy_lsm_env_create(&lsm_env, ".", &generation,
+			       stmt_env.key_format, NULL, NULL);
 	is(rc, 0, "vy_lsm_env_create");
 
 	struct vy_run_env run_env;
@@ -83,10 +84,8 @@ test_basic()
 	isnt(key_def, NULL, "key_def is not NULL");
 
 	vy_cache_create(&cache, &cache_env, key_def, true);
-	struct tuple_format *format = tuple_format_new(&vy_tuple_format_vtab,
-						       NULL, &key_def, 1, NULL,
-						       0, 0, NULL, false,
-						       false);
+	struct tuple_format *format = vy_stmt_format_new(&stmt_env, &key_def, 1,
+							 NULL, 0, 0, NULL);
 	isnt(format, NULL, "tuple_format_new is not NULL");
 	tuple_format_ref(format);
 
@@ -95,7 +94,7 @@ test_basic()
 		index_def_new(512, 0, "primary", sizeof("primary") - 1, TREE,
 			      &index_opts, key_def, NULL);
 
-	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &cache_env, &mem_env,
+	struct vy_lsm *pk = vy_lsm_new(&lsm_env, &stmt_env, &cache_env, &mem_env,
 				       index_def, format, NULL, 0);
 	isnt(pk, NULL, "lsm is not NULL")
 
