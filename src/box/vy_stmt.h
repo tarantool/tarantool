@@ -426,27 +426,6 @@ char *
 vy_key_dup(const char *key);
 
 /**
- * Create a new surrogate DELETE from @a key using format.
- *
- * Example:
- * key: {a3, a5}
- * key_def: { 3, 5 }
- * result: {nil, nil, a3, nil, a5}
- *
- * @param key     MessagePack array with key fields.
- * @param cmp_def Key definition of the result statement (incudes
- *                primary key parts).
- * @param format  Target tuple format.
- *
- * @retval not NULL Success.
- * @retval     NULL Memory or format error.
- */
-struct tuple *
-vy_stmt_new_surrogate_delete_from_key(const char *key,
-				      struct key_def *cmp_def,
-				      struct tuple_format *format);
-
-/**
  * Create a new surrogate DELETE from @a tuple using @a format.
  * A surrogate tuple has format->field_count fields from the source
  * with all unindexed fields replaced with MessagePack NIL.
@@ -502,6 +481,20 @@ vy_stmt_new_replace(struct tuple_format *format, const char *tuple,
  */
 struct tuple *
 vy_stmt_new_insert(struct tuple_format *format, const char *tuple_begin,
+		   const char *tuple_end);
+
+/**
+ * Create the DELETE statement from raw MessagePack data.
+ * @param format Format of a tuple for offsets generating.
+ * @param tuple_begin MessagePack data that contain an array of fields WITH the
+ *                    array header.
+ * @param tuple_end End of the array that begins from @param tuple_begin.
+ *
+ * @retval NULL     Memory allocation error.
+ * @retval not NULL Success.
+ */
+struct tuple *
+vy_stmt_new_delete(struct tuple_format *format, const char *tuple_begin,
 		   const char *tuple_end);
 
  /**
@@ -656,8 +649,7 @@ vy_stmt_encode_secondary(const struct tuple *value, struct key_def *cmp_def,
  * @retval NULL on error
  */
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
-	       struct tuple_format *format, bool is_primary);
+vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format);
 
 /**
  * Format a statement into string.

@@ -370,6 +370,14 @@ vy_stmt_new_insert(struct tuple_format *format, const char *tuple_begin,
 }
 
 struct tuple *
+vy_stmt_new_delete(struct tuple_format *format, const char *tuple_begin,
+		   const char *tuple_end)
+{
+	return vy_stmt_new_with_ops(format, tuple_begin, tuple_end,
+				    NULL, 0, IPROTO_DELETE);
+}
+
+struct tuple *
 vy_stmt_replace_from_upsert(const struct tuple *upsert)
 {
 	assert(vy_stmt_type(upsert) == IPROTO_UPSERT);
@@ -390,122 +398,6 @@ vy_stmt_replace_from_upsert(const struct tuple *upsert)
 	vy_stmt_set_type(replace, IPROTO_REPLACE);
 	vy_stmt_set_lsn(replace, vy_stmt_lsn(upsert));
 	return replace;
-}
-
-static struct tuple *
-vy_stmt_new_surrogate_from_key(const char *key, enum iproto_type type,
-			       const struct key_def *cmp_def,
-			       struct tuple_format *format)
-{
-	/* UPSERT can't be surrogate. */
-	assert(type != IPROTO_UPSERT);
-	struct region *region = &fiber()->gc;
-	size_t region_svp = region_used(region);
-
-	uint32_t field_count = format->index_field_count;
-	uint32_t iov_sz = sizeof(struct iovec) * format->total_field_count;
-	struct iovec *iov = region_alloc(region, iov_sz);
-	if (iov == NULL) {
-		diag_set(OutOfMemory, iov_sz, "region",
-			 "iov for surrogate key");
-		return NULL;
-	}
-	memset(iov, 0, iov_sz);
-	uint32_t part_count = mp_decode_array(&key);
-	assert(part_count == cmp_def->part_count);
-	assert(part_count <= format->total_field_count);
-	/**
-	 * Calculate bsize using format::min_tuple_size tuple
-	 * where parts_count nulls replaced with extracted keys.
-	 */
-	uint32_t bsize = format->min_tuple_size - mp_sizeof_nil() * part_count;
-	for (uint32_t i = 0; i < part_count; ++i) {
-		const struct key_part *part = &cmp_def->parts[i];
-		assert(part->fieldno < field_count);
-		struct tuple_field *field =
-			tuple_format_field_by_path(format, part->fieldno,
-						   part->path, part->path_len);
-		assert(field != NULL);
-		const char *svp = key;
-		iov[field->id].iov_base = (char *) key;
-		mp_next(&key);
-		iov[field->id].iov_len = key - svp;
-		bsize += key - svp;
-	}
-
-	struct tuple *stmt = vy_stmt_alloc(format, bsize);
-	if (stmt == NULL)
-		goto out;
-
-	char *raw = (char *) tuple_data(stmt);
-	uint32_t *field_map = (uint32_t *) raw;
-	memset((char *)field_map - format->field_map_size, 0,
-	       format->field_map_size);
-	char *wpos = mp_encode_array(raw, field_count);
-	struct tuple_field *field;
-	json_tree_foreach_entry_preorder(field, &format->fields.root,
-					 struct tuple_field, token) {
-		/*
-		 * Do not restore fields not involved in index
-		 * (except gaps in the mp array that may be filled
-		 * with nils later).
-		 */
-		if (!field->is_key_part)
-			continue;
-		if (field->token.type == JSON_TOKEN_NUM) {
-			/*
-			 * Write nil istead of omitted array
-			 * members.
-			 */
-			struct json_token **neighbors =
-				field->token.parent->children;
-			for (int i = field->token.sibling_idx - 1; i >= 0; i--) {
-				if (neighbors[i] != NULL &&
-				    json_tree_entry(neighbors[i],
-						    struct tuple_field,
-						    token)->is_key_part)
-					break;
-				wpos = mp_encode_nil(wpos);
-			}
-		} else {
-			/* Write a key string for map member. */
-			assert(field->token.type == JSON_TOKEN_STR);
-			const char *str = field->token.str;
-			uint32_t len = field->token.len;
-			wpos = mp_encode_str(wpos, str, len);
-		}
-		int max_child_idx = field->token.max_child_idx;
-		if (json_token_is_leaf(&field->token)) {
-			if (iov[field->id].iov_len == 0) {
-				wpos = mp_encode_nil(wpos);
-			} else {
-				memcpy(wpos, iov[field->id].iov_base,
-				       iov[field->id].iov_len);
-				uint32_t data_offset = wpos - raw;
-				int32_t slot = field->offset_slot;
-				if (slot != TUPLE_OFFSET_SLOT_NIL)
-					field_map[slot] = data_offset;
-				wpos += iov[field->id].iov_len;
-			}
-		} else if (field->type == FIELD_TYPE_ARRAY) {
-			wpos = mp_encode_array(wpos, max_child_idx + 1);
-		} else if (field->type == FIELD_TYPE_MAP) {
-			wpos = mp_encode_map(wpos, max_child_idx + 1);
-		}
-	}
-	assert(wpos == raw + bsize);
-	vy_stmt_set_type(stmt, type);
-out:
-	region_truncate(region, region_svp);
-	return stmt;
-}
-
-struct tuple *
-vy_stmt_new_surrogate_delete_from_key(const char *key, struct key_def *cmp_def,
-				      struct tuple_format *format)
-{
-	return vy_stmt_new_surrogate_from_key(key, IPROTO_DELETE,
-					      cmp_def, format);
 }
 
 struct tuple *
@@ -747,8 +639,6 @@ int
 vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
 		       uint32_t space_id, struct xrow_header *xrow)
 {
-	assert(!vy_stmt_is_key(value));
-
 	memset(xrow, 0, sizeof(*xrow));
 	enum iproto_type type = vy_stmt_type(value);
 	xrow->type = type;
@@ -762,8 +652,9 @@ vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
 	const char *extracted = NULL;
 	switch (type) {
 	case IPROTO_DELETE:
-		/* extract key */
-		extracted = tuple_extract_key(value, key_def, &size);
+		extracted = vy_stmt_is_key(value) ?
+			    tuple_data_range(value, &size) :
+			    tuple_extract_key(value, key_def, &size);
 		if (extracted == NULL)
 			return -1;
 		request.key = extracted;
@@ -828,9 +719,9 @@ vy_stmt_encode_secondary(const struct tuple *value, struct key_def *cmp_def,
 }
 
 struct tuple *
-vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
-	       struct tuple_format *format, bool is_primary)
+vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 {
+	struct vy_stmt_env *env = format->engine;
 	struct request request;
 	uint64_t key_map = dml_request_key_map(xrow->type);
 	key_map &= ~(1ULL << IPROTO_SPACE_ID); /* space_id is optional */
@@ -840,14 +731,10 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 	struct iovec ops;
 	switch (request.type) {
 	case IPROTO_DELETE:
-		if (is_primary)
-			stmt = vy_stmt_new_surrogate_from_key(request.key,
-							      IPROTO_DELETE,
-							      key_def, format);
-		else
-			stmt = vy_stmt_new_with_ops(format, request.key,
-						    request.key_end,
-						    NULL, 0, IPROTO_DELETE);
+		/* Always use key format for DELETE statements. */
+		stmt = vy_stmt_new_with_ops(env->key_format,
+					    request.key, request.key_end,
+					    NULL, 0, IPROTO_DELETE);
 		break;
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:

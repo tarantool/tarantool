@@ -1721,8 +1721,8 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		}
 	} else {
 		assert(lsm->index_id == 0);
-		delete = vy_stmt_new_surrogate_delete_from_key(request->key,
-						pk->key_def, pk->mem_format);
+		delete = vy_stmt_new_delete(pk->env->key_format,
+					    request->key, request->key_end);
 		if (delete == NULL)
 			return -1;
 		if (space->index_count > 1)

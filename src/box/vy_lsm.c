@@ -899,7 +899,8 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	lsm->stat.memory.count.bytes += tuple_size(stmt);
 
 	/* Abort transaction if format was changed by DDL */
-	if (format_id != tuple_format_id(mem->format)) {
+	if (!vy_stmt_is_key(stmt) &&
+	    format_id != tuple_format_id(mem->format)) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}

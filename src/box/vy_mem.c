@@ -215,7 +215,8 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) != IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
-	assert(stmt->format_id == tuple_format_id(mem->format));
+	assert(vy_stmt_is_key(stmt) ||
+	       stmt->format_id == tuple_format_id(mem->format));
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);

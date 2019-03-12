@@ -248,8 +248,6 @@ struct vy_run_iterator {
 	 * pages.
 	 */
 	struct tuple_format *format;
-	/** Set if this iterator is for a primary index. */
-	bool is_primary;
 	/** The run slice to iterate. */
 	struct vy_slice *slice;
 
@@ -523,7 +521,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
 		     const struct tuple *key, const struct vy_read_view **rv,
 		     struct key_def *cmp_def, struct key_def *key_def,
-		     struct tuple_format *format, bool is_primary);
+		     struct tuple_format *format);
 
 /**
  * Advance a run iterator to the next key.
@@ -575,8 +573,6 @@ struct vy_slice_stream {
 	struct key_def *cmp_def;
 	/** Format for allocating REPLACE and DELETE tuples read from pages. */
 	struct tuple_format *format;
-	/** Set if this iterator is for a primary index. */
-	bool is_primary;
 };
 
 /**
@@ -584,8 +580,7 @@ struct vy_slice_stream {
  */
 void
 vy_slice_stream_open(struct vy_slice_stream *stream, struct vy_slice *slice,
-		     struct key_def *cmp_def, struct tuple_format *format,
-		     bool is_primary);
+		     struct key_def *cmp_def, struct tuple_format *format);
 
 /**
  * Run_writer fills a created run with statements one by one,

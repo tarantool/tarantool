@@ -622,8 +622,7 @@ vy_read_iterator_add_disk(struct vy_read_iterator *itr)
 				     &lsm->stat.disk.iterator, slice,
 				     iterator_type, itr->key,
 				     itr->read_view, lsm->cmp_def,
-				     lsm->key_def, lsm->disk_format,
-				     lsm->index_id == 0);
+				     lsm->key_def, lsm->disk_format);
 	}
 }
 
