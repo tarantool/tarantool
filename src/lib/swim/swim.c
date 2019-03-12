@@ -973,6 +973,12 @@ swim_member_by_uuid(struct swim *swim, const struct tt_uuid *uuid)
 	return swim_find_member(swim, uuid);
 }
 
+enum swim_member_status
+swim_member_status(const struct swim_member *member)
+{
+	return member->status;
+}
+
 struct swim_iterator *
 swim_iterator_open(struct swim *swim)
 {

@@ -36,6 +36,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <stdbool.h>
+#include "swim_constants.h"
 
 /**
  * SWIM binary protocol structures and helpers. Below is a picture
@@ -65,14 +66,6 @@
  * | }                                                           |
  * +-------------------------------------------------------------+
  */
-
-enum swim_member_status {
-	/** The instance is ok, responds to requests. */
-	MEMBER_ALIVE = 0,
-	swim_member_status_MAX,
-};
-
-extern const char *swim_member_status_strs[];
 
 /**
  * SWIM member attributes from anti-entropy and dissemination

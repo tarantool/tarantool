@@ -50,7 +50,7 @@ static int test_result;
 static void
 swim_test_one_link(void)
 {
-	swim_start_test(2);
+	swim_start_test(6);
 	/*
 	 * Run a simple cluster of two elements. One of them
 	 * learns about another explicitly. Another should add the
@@ -61,6 +61,15 @@ swim_test_one_link(void)
 	is(swim_cluster_wait_fullmesh(cluster, 0.9), -1,
 	   "no rounds - no fullmesh");
 	is(swim_cluster_wait_fullmesh(cluster, 0.1), 0, "one link");
+
+	is(swim_cluster_member_status(cluster, 0, 0), MEMBER_ALIVE,
+	   "self 0 is alive");
+	is(swim_cluster_member_status(cluster, 1, 1), MEMBER_ALIVE,
+	   "self 1 is alive");
+	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_ALIVE,
+	   "0 sees 1 as alive");
+	is(swim_cluster_member_status(cluster, 1, 0), MEMBER_ALIVE,
+	   "1 sees 0 as alive");
 	swim_cluster_delete(cluster);
 
 	swim_finish_test();

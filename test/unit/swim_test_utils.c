@@ -31,7 +31,6 @@
 #include "swim_test_utils.h"
 #include "swim_test_ev.h"
 #include "swim_test_transport.h"
-#include "swim/swim.h"
 #include "swim/swim_ev.h"
 #include "uuid/tt_uuid.h"
 #include "trivia/util.h"
@@ -85,6 +84,27 @@ swim_cluster_add_link(struct swim_cluster *cluster, int to_id, int from_id)
 	const struct swim_member *from = swim_self(cluster->node[from_id]);
 	return swim_add_member(cluster->node[to_id], swim_member_uri(from),
 			       swim_member_uuid(from));
+}
+
+static const struct swim_member *
+swim_cluster_member_view(struct swim_cluster *cluster, int node_id,
+			 int member_id)
+{
+	struct swim *node = cluster->node[node_id];
+	const struct swim_member *member = swim_self(cluster->node[member_id]);
+	const struct tt_uuid *member_uuid = swim_member_uuid(member);
+	return swim_member_by_uuid(node, member_uuid);
+}
+
+enum swim_member_status
+swim_cluster_member_status(struct swim_cluster *cluster, int node_id,
+			   int member_id)
+{
+	const struct swim_member *m =
+		swim_cluster_member_view(cluster, node_id, member_id);
+	if (m == NULL)
+		return swim_member_status_MAX;
+	return swim_member_status(m);
 }
 
 struct swim *

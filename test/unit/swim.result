@@ -1,9 +1,13 @@
 	*** main_f ***
 1..5
 	*** swim_test_one_link ***
-    1..2
+    1..6
     ok 1 - no rounds - no fullmesh
     ok 2 - one link
+    ok 3 - self 0 is alive
+    ok 4 - self 1 is alive
+    ok 5 - 0 sees 1 as alive
+    ok 6 - 1 sees 0 as alive
 ok 1 - subtests
 	*** swim_test_one_link: done ***
 	*** swim_test_sequence ***

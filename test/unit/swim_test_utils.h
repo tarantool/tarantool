@@ -31,9 +31,9 @@
  * SUCH DAMAGE.
  */
 #include <stdbool.h>
+#include "swim/swim.h"
 
 struct swim_cluster;
-struct swim;
 
 /**
  * Create a new cluster of SWIM instances. Instances are assigned
@@ -70,6 +70,10 @@ swim_cluster_unblock_io(struct swim_cluster *cluster, int i);
  */
 int
 swim_cluster_add_link(struct swim_cluster *cluster, int to_id, int from_id);
+
+enum swim_member_status
+swim_cluster_member_status(struct swim_cluster *cluster, int node_id,
+			   int member_id);
 
 /**
  * Check if in the cluster every instance knowns the about other
