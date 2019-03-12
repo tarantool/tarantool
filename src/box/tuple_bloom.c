@@ -70,6 +70,39 @@ tuple_bloom_builder_delete(struct tuple_bloom_builder *builder)
 	free(builder);
 }
 
+/**
+ * Add a tuple hash to a hash array unless it's already there.
+ * Reallocate the array if necessary.
+ */
+static int
+tuple_hash_array_add(struct tuple_hash_array *hash_arr, uint32_t hash)
+{
+	if (hash_arr->count > 0 &&
+	    hash_arr->values[hash_arr->count - 1] == hash) {
+		/*
+		 * This part is already in the bloom, proceed
+		 * to the next one. Note, this check only works
+		 * if tuples are added in the order defined by
+		 * the key definition.
+		 */
+		return 0;
+	}
+	if (hash_arr->count >= hash_arr->capacity) {
+		uint32_t capacity = MAX(hash_arr->capacity * 2, 1024U);
+		uint32_t *values = realloc(hash_arr->values,
+					   capacity * sizeof(*values));
+		if (values == NULL) {
+			diag_set(OutOfMemory, capacity * sizeof(*values),
+				 "malloc", "tuple hash array");
+			return -1;
+		}
+		hash_arr->capacity = capacity;
+		hash_arr->values = values;
+	}
+	hash_arr->values[hash_arr->count++] = hash;
+	return 0;
+}
+
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 			const struct tuple *tuple, struct key_def *key_def)
@@ -81,33 +114,11 @@ tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 	uint32_t total_size = 0;
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
-		struct tuple_hash_array *hash_arr = &builder->parts[i];
 		total_size += tuple_hash_key_part(&h, &carry, tuple,
 						  &key_def->parts[i]);
 		uint32_t hash = PMurHash32_Result(h, carry, total_size);
-		if (hash_arr->count > 0 &&
-		    hash_arr->values[hash_arr->count - 1] == hash) {
-			/*
-			 * This part is already in the bloom, proceed
-			 * to the next one. Note, this check only works
-			 * if tuples are added in the order defined by
-			 * the key definition.
-			 */
-			continue;
-		}
-		if (hash_arr->count >= hash_arr->capacity) {
-			uint32_t capacity = MAX(hash_arr->capacity * 2, 1024U);
-			uint32_t *values = realloc(hash_arr->values,
-						   capacity * sizeof(*values));
-			if (values == NULL) {
-				diag_set(OutOfMemory, capacity * sizeof(*values),
-					 "malloc", "tuple hash array");
-				return -1;
-			}
-			hash_arr->capacity = capacity;
-			hash_arr->values = values;
-		}
-		hash_arr->values[hash_arr->count++] = hash;
+		if (tuple_hash_array_add(&builder->parts[i], hash) != 0)
+			return -1;
 	}
 	return 0;
 }
