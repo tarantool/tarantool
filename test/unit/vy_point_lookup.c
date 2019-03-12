@@ -191,9 +191,9 @@ test_basic()
 		tmpl_val.upsert_value = 8;
 		vy_mem_insert_template(run_mem, &tmpl_val);
 	}
-	struct vy_stmt_stream *write_stream
-		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					true, true, &read_views, NULL);
+	struct vy_stmt_stream *write_stream;
+	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
+					     &read_views, NULL);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	struct vy_run *run = vy_run_new(&run_env, 1);
 	isnt(run, NULL, "vy_run_new");
@@ -222,9 +222,8 @@ test_basic()
 		tmpl_val.upsert_value = 4;
 		vy_mem_insert_template(run_mem, &tmpl_val);
 	}
-	write_stream
-		= vy_write_iterator_new(pk->cmp_def, pk->disk_format,
-					true, true, &read_views, NULL);
+	write_stream = vy_write_iterator_new(pk->cmp_def, true, true,
+					     &read_views, NULL);
 	vy_write_iterator_new_mem(write_stream, run_mem);
 	run = vy_run_new(&run_env, 2);
 	isnt(run, NULL, "vy_run_new");

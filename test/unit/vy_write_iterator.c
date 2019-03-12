@@ -105,8 +105,7 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 	test_handler_create(&handler, mem->format);
 
 	struct vy_stmt_stream *wi;
-	wi = vy_write_iterator_new(key_def, mem->format, is_primary,
-				   is_last_level, &rv_list,
+	wi = vy_write_iterator_new(key_def, is_primary, is_last_level, &rv_list,
 				   is_primary ? &handler.base : NULL);
 	fail_if(wi == NULL);
 	fail_if(vy_write_iterator_new_mem(wi, mem) != 0);

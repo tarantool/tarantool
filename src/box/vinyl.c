@@ -3003,14 +3003,14 @@ vy_send_range(struct vy_join_ctx *ctx,
 	/* Create a write iterator. */
 	struct rlist fake_read_views;
 	rlist_create(&fake_read_views);
-	ctx->wi = vy_write_iterator_new(ctx->key_def, ctx->format,
-					true, true, &fake_read_views, NULL);
+	ctx->wi = vy_write_iterator_new(ctx->key_def, true, true,
+					&fake_read_views, NULL);
 	if (ctx->wi == NULL) {
 		rc = -1;
 		goto out;
 	}
 	rlist_foreach_entry(slice, &ctx->slices, in_join) {
-		rc = vy_write_iterator_new_slice(ctx->wi, slice);
+		rc = vy_write_iterator_new_slice(ctx->wi, slice, ctx->format);
 		if (rc != 0)
 			goto out_delete_wi;
 	}

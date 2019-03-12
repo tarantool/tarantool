@@ -168,8 +168,6 @@ struct vy_write_iterator {
 	heap_t src_heap;
 	/** Index key definition used to store statements on disk. */
 	struct key_def *cmp_def;
-	/** Format to allocate new REPLACE and DELETE tuples from vy_run */
-	struct tuple_format *format;
 	/* There is no LSM tree level older than the one we're writing to. */
 	bool is_last_level;
 	/**
@@ -339,9 +337,8 @@ static const struct vy_stmt_stream_iface vy_slice_stream_iface;
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(struct key_def *cmp_def, struct tuple_format *format,
-		      bool is_primary, bool is_last_level,
-		      struct rlist *read_views,
+vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
+		      bool is_last_level, struct rlist *read_views,
 		      struct vy_deferred_delete_handler *handler)
 {
 	/*
@@ -378,8 +375,6 @@ vy_write_iterator_new(struct key_def *cmp_def, struct tuple_format *format,
 	vy_source_heap_create(&stream->src_heap);
 	rlist_create(&stream->src_list);
 	stream->cmp_def = cmp_def;
-	stream->format = format;
-	tuple_format_ref(stream->format);
 	stream->is_primary = is_primary;
 	stream->is_last_level = is_last_level;
 	stream->deferred_delete_handler = handler;
@@ -449,7 +444,6 @@ vy_write_iterator_close(struct vy_stmt_stream *vstream)
 	rlist_foreach_entry_safe(src, &stream->src_list, in_src_list, tmp)
 		vy_write_iterator_delete_src(stream, src);
 	vy_source_heap_destroy(&stream->src_heap);
-	tuple_format_unref(stream->format);
 	free(stream);
 }
 
@@ -474,14 +468,15 @@ vy_write_iterator_new_mem(struct vy_stmt_stream *vstream, struct vy_mem *mem)
  */
 NODISCARD int
 vy_write_iterator_new_slice(struct vy_stmt_stream *vstream,
-			    struct vy_slice *slice)
+			    struct vy_slice *slice,
+			    struct tuple_format *disk_format)
 {
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
 	struct vy_write_src *src = vy_write_iterator_new_src(stream);
 	if (src == NULL)
 		return -1;
 	vy_slice_stream_open(&src->slice_stream, slice, stream->cmp_def,
-			     stream->format, stream->is_primary);
+			     disk_format, stream->is_primary);
 	return 0;
 }
 
@@ -927,11 +922,11 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		 * so as not to trigger optimization #5 on the next
 		 * compaction.
 		 */
-		uint32_t size;
-		const char *data = tuple_data_range(rv->tuple, &size);
-		struct tuple *copy = is_first_insert ?
-			vy_stmt_new_insert(stream->format, data, data + size) :
-			vy_stmt_new_replace(stream->format, data, data + size);
+		struct tuple *copy = vy_stmt_dup(rv->tuple);
+		if (is_first_insert)
+			vy_stmt_set_type(copy, IPROTO_INSERT);
+		else
+			vy_stmt_set_type(copy, IPROTO_REPLACE);
 		if (copy == NULL)
 			return -1;
 		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->tuple));

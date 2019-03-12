@@ -239,7 +239,6 @@ struct vy_deferred_delete_handler {
  * Open an empty write iterator. To add sources to the iterator
  * use vy_write_iterator_add_* functions.
  * @param cmp_def - key definition for tuple compare.
- * @param format - dormat to allocate new REPLACE and DELETE tuples from vy_run.
  * @param LSM tree is_primary - set if this iterator is for a primary index.
  * @param is_last_level - there is no older level than the one we're writing to.
  * @param read_views - Opened read views.
@@ -249,9 +248,8 @@ struct vy_deferred_delete_handler {
  * @return the iterator or NULL on error (diag is set).
  */
 struct vy_stmt_stream *
-vy_write_iterator_new(struct key_def *cmp_def, struct tuple_format *format,
-		      bool is_primary, bool is_last_level,
-		      struct rlist *read_views,
+vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
+		      bool is_last_level, struct rlist *read_views,
 		      struct vy_deferred_delete_handler *handler);
 
 /**
@@ -267,7 +265,8 @@ vy_write_iterator_new_mem(struct vy_stmt_stream *stream, struct vy_mem *mem);
  */
 NODISCARD int
 vy_write_iterator_new_slice(struct vy_stmt_stream *stream,
-			    struct vy_slice *slice);
+			    struct vy_slice *slice,
+			    struct tuple_format *disk_format);
 
 #endif /* INCLUDES_TARANTOOL_BOX_VY_WRITE_STREAM_H */
 

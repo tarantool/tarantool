@@ -1393,9 +1393,8 @@ vy_task_dump_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	 */
 	struct vy_stmt_stream *wi;
 	bool is_last_level = (lsm->run_count == 0);
-	wi = vy_write_iterator_new(task->cmp_def, lsm->disk_format,
-				   lsm->index_id == 0, is_last_level,
-				   scheduler->read_views, NULL);
+	wi = vy_write_iterator_new(task->cmp_def, lsm->index_id == 0,
+				   is_last_level, scheduler->read_views, NULL);
 	if (wi == NULL)
 		goto err_wi;
 	rlist_foreach_entry(mem, &lsm->sealed, in_sealed) {
@@ -1668,9 +1667,8 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 
 	struct vy_stmt_stream *wi;
 	bool is_last_level = (range->compaction_priority == range->slice_count);
-	wi = vy_write_iterator_new(task->cmp_def, lsm->disk_format,
-				   lsm->index_id == 0, is_last_level,
-				   scheduler->read_views,
+	wi = vy_write_iterator_new(task->cmp_def, lsm->index_id == 0,
+				   is_last_level, scheduler->read_views,
 				   lsm->index_id > 0 ? NULL :
 				   &task->deferred_delete_handler);
 	if (wi == NULL)
@@ -1680,7 +1678,8 @@ vy_task_compaction_new(struct vy_scheduler *scheduler, struct vy_worker *worker,
 	int32_t dump_count = 0;
 	int n = range->compaction_priority;
 	rlist_foreach_entry(slice, &range->slices, in_range) {
-		if (vy_write_iterator_new_slice(wi, slice) != 0)
+		if (vy_write_iterator_new_slice(wi, slice,
+						lsm->disk_format) != 0)
 			goto err_wi_sub;
 		new_run->dump_lsn = MAX(new_run->dump_lsn,
 					slice->run->dump_lsn);
