@@ -3936,10 +3936,11 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 
 	/* Forward the statement to the new LSM tree. */
 	if (stmt->old_tuple != NULL) {
-		struct tuple *delete = vy_stmt_new_surrogate_delete(format,
-							stmt->old_tuple);
+		struct tuple *delete = vy_stmt_extract_key(stmt->old_tuple,
+					lsm->cmp_def, lsm->env->key_format);
 		if (delete == NULL)
 			goto err;
+		vy_stmt_set_type(delete, IPROTO_DELETE);
 		int rc = vy_tx_set(tx, lsm, delete);
 		tuple_unref(delete);
 		if (rc != 0)
@@ -4077,10 +4078,11 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	struct tuple *delete = NULL;
 	struct tuple *insert = NULL;
 	if (old_tuple != NULL) {
-		delete = vy_stmt_new_surrogate_delete(lsm->mem_format,
-						      old_tuple);
+		delete = vy_stmt_extract_key(old_tuple, lsm->cmp_def,
+					     lsm->env->key_format);
 		if (delete == NULL)
 			return -1;
+		vy_stmt_set_type(delete, IPROTO_DELETE);
 	}
 	enum iproto_type type = vy_stmt_type(mem_stmt);
 	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
@@ -4388,8 +4390,8 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 
 	/* Create the deferred DELETE statement. */
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
-	struct tuple *delete = vy_stmt_new_surrogate_delete_raw(pk->mem_format,
-						delete_data, delete_data_end);
+	struct tuple *delete = vy_stmt_new_delete(pk->mem_format, delete_data,
+						  delete_data_end);
 	if (delete == NULL)
 		diag_raise();
 	/*
