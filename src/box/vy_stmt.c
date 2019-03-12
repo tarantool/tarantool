@@ -747,6 +747,8 @@ int
 vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
 		       uint32_t space_id, struct xrow_header *xrow)
 {
+	assert(!vy_stmt_is_key(value));
+
 	memset(xrow, 0, sizeof(*xrow));
 	enum iproto_type type = vy_stmt_type(value);
 	xrow->type = type;
@@ -803,7 +805,9 @@ vy_stmt_encode_secondary(const struct tuple *value, struct key_def *cmp_def,
 	memset(&request, 0, sizeof(request));
 	request.type = type;
 	uint32_t size;
-	const char *extracted = tuple_extract_key(value, cmp_def, &size);
+	const char *extracted = vy_stmt_is_key(value) ?
+				tuple_data_range(value, &size) :
+				tuple_extract_key(value, cmp_def, &size);
 	if (extracted == NULL)
 		return -1;
 	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
@@ -833,27 +837,23 @@ vy_stmt_decode(struct xrow_header *xrow, const struct key_def *key_def,
 	if (xrow_decode_dml(xrow, &request, key_map) != 0)
 		return NULL;
 	struct tuple *stmt = NULL;
-	const char *key;
-	(void) key;
 	struct iovec ops;
 	switch (request.type) {
 	case IPROTO_DELETE:
-		/* extract key */
-		stmt = vy_stmt_new_surrogate_from_key(request.key,
-						      IPROTO_DELETE,
-						      key_def, format);
+		if (is_primary)
+			stmt = vy_stmt_new_surrogate_from_key(request.key,
+							      IPROTO_DELETE,
+							      key_def, format);
+		else
+			stmt = vy_stmt_new_with_ops(format, request.key,
+						    request.key_end,
+						    NULL, 0, IPROTO_DELETE);
 		break;
 	case IPROTO_INSERT:
 	case IPROTO_REPLACE:
-		if (is_primary) {
-			stmt = vy_stmt_new_with_ops(format, request.tuple,
-						    request.tuple_end,
-						    NULL, 0, request.type);
-		} else {
-			stmt = vy_stmt_new_surrogate_from_key(request.tuple,
-							      request.type,
-							      key_def, format);
-		}
+		stmt = vy_stmt_new_with_ops(format, request.tuple,
+					    request.tuple_end,
+					    NULL, 0, request.type);
 		break;
 	case IPROTO_UPSERT:
 		ops.iov_base = (char *)request.ops;

@@ -709,6 +709,43 @@ key_def_merge(const struct key_def *first, const struct key_def *second)
 	return new_def;
 }
 
+struct key_def *
+key_def_find_pk_in_cmp_def(const struct key_def *cmp_def,
+			   const struct key_def *pk_def,
+			   struct region *region)
+{
+	struct key_def *extracted_def = NULL;
+	size_t region_svp = region_used(region);
+
+	/* First, dump primary key parts as is. */
+	struct key_part_def *parts = region_alloc(region,
+			pk_def->part_count * sizeof(*parts));
+	if (parts == NULL) {
+		diag_set(OutOfMemory, pk_def->part_count * sizeof(*parts),
+			 "region", "key def parts");
+		goto out;
+	}
+	if (key_def_dump_parts(pk_def, parts, region) != 0)
+		goto out;
+	/*
+	 * Second, update field numbers to match the primary key
+	 * parts in a secondary key.
+	 */
+	for (uint32_t i = 0; i < pk_def->part_count; i++) {
+		const struct key_part *part = key_def_find(cmp_def,
+							   &pk_def->parts[i]);
+		assert(part != NULL);
+		parts[i].fieldno = part - cmp_def->parts;
+		parts[i].path = NULL;
+	}
+
+	/* Finally, allocate the new key definition. */
+	extracted_def = key_def_new(parts, pk_def->part_count);
+out:
+	region_truncate(region, region_svp);
+	return extracted_def;
+}
+
 int
 key_validate_parts(const struct key_def *key_def, const char *key,
 		   uint32_t part_count, bool allow_nullable)

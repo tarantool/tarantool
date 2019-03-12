@@ -719,10 +719,9 @@ vinyl_space_create_index(struct space *space, struct index_def *index_def)
 		pk = vy_lsm(space_index(space, 0));
 		assert(pk != NULL);
 	}
-	struct vy_lsm *lsm = vy_lsm_new(&env->lsm_env, &env->stmt_env,
-					&env->cache_env, &env->mem_env,
-					index_def, space->format, pk,
-					space_group_id(space));
+	struct vy_lsm *lsm = vy_lsm_new(&env->lsm_env, &env->cache_env,
+					&env->mem_env, index_def, space->format,
+					pk, space_group_id(space));
 	if (lsm == NULL) {
 		free(index);
 		return NULL;
@@ -1301,13 +1300,36 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 			  const struct vy_read_view **rv,
 			  struct tuple *tuple, struct tuple **result)
 {
+	int rc = 0;
 	assert(lsm->index_id > 0);
 
-	if (vy_point_lookup(lsm->pk, tx, rv, tuple, result) != 0)
-		return -1;
+	/*
+	 * Lookup the full tuple by a secondary statement.
+	 * There are two cases: the secondary statement may be
+	 * a key, if we got this tuple from disk, in which case
+	 * we need to extract the primary key parts from it; or
+	 * it may be a full tuple, if we got this tuple from
+	 * the tuple cache or level 0, in which case we may pass
+	 * it immediately to the iterator.
+	 */
+	struct tuple *key;
+	if (vy_stmt_is_key(tuple)) {
+		key = vy_stmt_extract_key(tuple, lsm->pk_in_cmp_def,
+					  lsm->env->key_format);
+		if (key == NULL)
+			return -1;
+	} else {
+		key = tuple;
+		tuple_ref(key);
+	}
+
+	if (vy_point_lookup(lsm->pk, tx, rv, key, result) != 0) {
+		rc = -1;
+		goto out;
+	}
 
 	if (*result == NULL ||
-	    vy_stmt_compare(*result, tuple, lsm->key_def) != 0) {
+	    vy_stmt_compare(*result, tuple, lsm->cmp_def) != 0) {
 		/*
 		 * If a tuple read from a secondary index doesn't
 		 * match the tuple corresponding to it in the
@@ -1327,7 +1349,7 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		 * the tuple cache implementation.
 		 */
 		vy_cache_on_write(&lsm->cache, tuple, NULL);
-		return 0;
+		goto out;
 	}
 
 	/*
@@ -1340,13 +1362,15 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	 */
 	if (tx != NULL && vy_tx_track_point(tx, lsm->pk, *result) != 0) {
 		tuple_unref(*result);
-		return -1;
+		rc = -1;
+		goto out;
 	}
 
 	if ((*rv)->vlsn == INT64_MAX)
-		vy_cache_add(&lsm->pk->cache, *result, NULL, tuple, ITER_EQ);
-
-	return 0;
+		vy_cache_add(&lsm->pk->cache, *result, NULL, key, ITER_EQ);
+out:
+	tuple_unref(key);
+	return rc;
 }
 
 /**

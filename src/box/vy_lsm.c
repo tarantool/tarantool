@@ -118,10 +118,9 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm)
 }
 
 struct vy_lsm *
-vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_stmt_env *stmt_env,
-	   struct vy_cache_env *cache_env, struct vy_mem_env *mem_env,
-	   struct index_def *index_def, struct tuple_format *format,
-	   struct vy_lsm *pk, uint32_t group_id)
+vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
+	   struct vy_mem_env *mem_env, struct index_def *index_def,
+	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id)
 {
 	static int64_t run_buckets[] = {
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 100,
@@ -156,10 +155,20 @@ vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_stmt_env *stmt_env,
 		 */
 		lsm->disk_format = format;
 	} else {
-		lsm->disk_format = vy_stmt_format_new(stmt_env, &cmp_def, 1,
-						      NULL, 0, 0, NULL);
-		if (lsm->disk_format == NULL)
-			goto fail_format;
+		/*
+		 * To save disk space, we do not store full tuples
+		 * in secondary index runs. Instead we only store
+		 * extended keys (i.e. keys consisting of secondary
+		 * and primary index parts). This is enough to look
+		 * up a full tuple in the primary index.
+		 */
+		lsm->disk_format = lsm_env->key_format;
+
+		lsm->pk_in_cmp_def = key_def_find_pk_in_cmp_def(lsm->cmp_def,
+								pk->key_def,
+								&fiber()->gc);
+		if (lsm->pk_in_cmp_def == NULL)
+			goto fail_pk_in_cmp_def;
 	}
 	tuple_format_ref(lsm->disk_format);
 
@@ -208,7 +217,9 @@ fail_run_hist:
 	vy_lsm_stat_destroy(&lsm->stat);
 fail_stat:
 	tuple_format_unref(lsm->disk_format);
-fail_format:
+	if (lsm->pk_in_cmp_def != NULL)
+		key_def_delete(lsm->pk_in_cmp_def);
+fail_pk_in_cmp_def:
 	key_def_delete(cmp_def);
 fail_cmp_def:
 	key_def_delete(key_def);
@@ -262,6 +273,8 @@ vy_lsm_delete(struct vy_lsm *lsm)
 	tuple_format_unref(lsm->disk_format);
 	key_def_delete(lsm->cmp_def);
 	key_def_delete(lsm->key_def);
+	if (lsm->pk_in_cmp_def != NULL)
+		key_def_delete(lsm->pk_in_cmp_def);
 	histogram_delete(lsm->run_hist);
 	vy_lsm_stat_destroy(&lsm->stat);
 	vy_cache_destroy(&lsm->cache);

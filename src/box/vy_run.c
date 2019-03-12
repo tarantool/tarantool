@@ -2139,7 +2139,8 @@ vy_run_writer_start_page(struct vy_run_writer *writer,
 	if (run->info.page_count >= writer->page_info_capacity &&
 	    vy_run_alloc_page_info(run, &writer->page_info_capacity) != 0)
 		return -1;
-	const char *key = tuple_extract_key(first_stmt, writer->cmp_def, NULL);
+	const char *key = vy_stmt_is_key(first_stmt) ? tuple_data(first_stmt) :
+			  tuple_extract_key(first_stmt, writer->cmp_def, NULL);
 	if (key == NULL)
 		return -1;
 	if (run->info.page_count == 0) {
@@ -2289,7 +2290,9 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 	}
 
 	assert(writer->last_stmt != NULL);
-	const char *key = tuple_extract_key(writer->last_stmt,
+	const char *key = vy_stmt_is_key(writer->last_stmt) ?
+		          tuple_data(writer->last_stmt) :
+			  tuple_extract_key(writer->last_stmt,
 					    writer->cmp_def, NULL);
 	if (key == NULL)
 		goto out;
@@ -2360,6 +2363,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 	int64_t max_lsn = 0;
 	int64_t min_lsn = INT64_MAX;
 	struct tuple *prev_tuple = NULL;
+	char *page_min_key = NULL;
 
 	struct tuple_bloom_builder *bloom_builder = NULL;
 	if (opts->bloom_fpr < 1) {
@@ -2377,7 +2381,6 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		if (run->info.page_count == page_info_capacity &&
 		    vy_run_alloc_page_info(run, &page_info_capacity) != 0)
 			goto close_err;
-		const char *page_min_key = NULL;
 		uint32_t page_row_count = 0;
 		uint64_t page_row_index_offset = 0;
 		uint64_t row_offset = xlog_cursor_tx_pos(&cursor);
@@ -2400,7 +2403,8 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 				tuple_unref(tuple);
 				goto close_err;
 			}
-			key = tuple_extract_key(tuple, cmp_def, NULL);
+			key = vy_stmt_is_key(tuple) ? tuple_data(tuple) :
+			      tuple_extract_key(tuple, cmp_def, NULL);
 			if (prev_tuple != NULL)
 				tuple_unref(prev_tuple);
 			prev_tuple = tuple;
@@ -2411,8 +2415,11 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 				if (run->info.min_key == NULL)
 					goto close_err;
 			}
-			if (page_min_key == NULL)
-				page_min_key = key;
+			if (page_min_key == NULL) {
+				page_min_key = vy_key_dup(key);
+				if (page_min_key == NULL)
+					goto close_err;
+			}
 			if (xrow.lsn > max_lsn)
 				max_lsn = xrow.lsn;
 			if (xrow.lsn < min_lsn)
@@ -2429,11 +2436,9 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 		info->row_index_offset = page_row_index_offset;
 		++run->info.page_count;
 		vy_run_acct_page(run, info);
-	}
 
-	if (prev_tuple != NULL) {
-		tuple_unref(prev_tuple);
-		prev_tuple = NULL;
+		free(page_min_key);
+		page_min_key = NULL;
 	}
 
 	if (key != NULL) {
@@ -2444,6 +2449,10 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 	run->info.max_lsn = max_lsn;
 	run->info.min_lsn = min_lsn;
 
+	if (prev_tuple != NULL) {
+		tuple_unref(prev_tuple);
+		prev_tuple = NULL;
+	}
 	region_truncate(region, mem_used);
 	run->fd = cursor.fd;
 	xlog_cursor_close(&cursor, true);
@@ -2473,6 +2482,8 @@ close_err:
 	region_truncate(region, mem_used);
 	if (prev_tuple != NULL)
 		tuple_unref(prev_tuple);
+	if (page_min_key != NULL)
+		free(page_min_key);
 	if (bloom_builder != NULL)
 		tuple_bloom_builder_delete(bloom_builder);
 	if (xlog_cursor_is_open(&cursor))

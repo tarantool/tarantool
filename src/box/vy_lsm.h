@@ -200,6 +200,12 @@ struct vy_lsm {
 	/** Key definition passed by the user. */
 	struct key_def *key_def;
 	/**
+	 * Key definition to extract primary key parts from
+	 * a secondary key. NULL if this LSM tree corresponds
+	 * to a primary index.
+	 */
+	struct key_def *pk_in_cmp_def;
+	/**
 	 * If the following flag is set, the index this LSM tree
 	 * is created for is unique and it must be checked for
 	 * duplicates on INSERT. Otherwise, the check can be skipped,
@@ -333,10 +339,9 @@ vy_lsm_mem_tree_size(struct vy_lsm *lsm);
 
 /** Allocate a new LSM tree object. */
 struct vy_lsm *
-vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_stmt_env *stmt_env,
-	   struct vy_cache_env *cache_env, struct vy_mem_env *mem_env,
-	   struct index_def *index_def, struct tuple_format *format,
-	   struct vy_lsm *pk, uint32_t group_id);
+vy_lsm_new(struct vy_lsm_env *lsm_env, struct vy_cache_env *cache_env,
+	   struct vy_mem_env *mem_env, struct index_def *index_def,
+	   struct tuple_format *format, struct vy_lsm *pk, uint32_t group_id);
 
 /** Free an LSM tree object. */
 void
