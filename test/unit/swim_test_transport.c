@@ -91,10 +91,17 @@ struct swim_fd {
 	/** File descriptor number visible to libev. */
 	int evfd;
 	/**
-	 * Link in the list of opened descriptors. Used to feed
-	 * them all EV_WRITE.
+	 * True, if the descriptor is opened and can receive new
+	 * messages. Regardless of blocked or not. In case of
+	 * blocked, new messages are queued, but not delivered.
 	 */
-	struct rlist in_opened;
+	bool is_opened;
+
+	/**
+	 * Link in the list of opened and non-blocked descriptors.
+	 * Used to feed them all EV_WRITE.
+	 */
+	struct rlist in_active;
 	/** Queue of received, but not processed packets. */
 	struct rlist recv_queue;
 	/** Queue of sent, but not received packets. */
@@ -104,23 +111,22 @@ struct swim_fd {
 /** Table of fake file descriptors. */
 static struct swim_fd swim_fd[FAKE_FD_NUMBER];
 /**
- * List of opened file descriptors. Used to avoid fullscan of the
+ * List of active file descriptors. Used to avoid fullscan of the
  * table.
  */
-static RLIST_HEAD(swim_fd_opened);
+static RLIST_HEAD(swim_fd_active);
 
 /** Open a fake file descriptor. */
 static inline int
 swim_fd_open(struct swim_fd *fd)
 {
-	if (! rlist_empty(&fd->in_opened)) {
+	if (fd->is_opened) {
 		errno = EADDRINUSE;
 		diag_set(SocketError, "test_socket:1", "bind");
 		return -1;
 	}
-	rlist_add_tail_entry(&swim_fd_opened, fd, in_opened);
-	rlist_create(&fd->recv_queue);
-	rlist_create(&fd->send_queue);
+	fd->is_opened = true;
+	rlist_add_tail_entry(&swim_fd_active, fd, in_active);
 	return 0;
 }
 
@@ -128,12 +134,15 @@ swim_fd_open(struct swim_fd *fd)
 static inline void
 swim_fd_close(struct swim_fd *fd)
 {
+	if (! fd->is_opened)
+		return;
 	struct swim_test_packet *i, *tmp;
 	rlist_foreach_entry_safe(i, &fd->recv_queue, in_queue, tmp)
 		swim_test_packet_delete(i);
 	rlist_foreach_entry_safe(i, &fd->send_queue, in_queue, tmp)
 		swim_test_packet_delete(i);
-	rlist_del_entry(fd, in_opened);
+	rlist_del_entry(fd, in_active);
+	fd->is_opened = false;
 }
 
 void
@@ -141,7 +150,8 @@ swim_test_transport_init(void)
 {
 	for (int i = 0, evfd = FAKE_FD_BASE; i < FAKE_FD_NUMBER; ++i, ++evfd) {
 		swim_fd[i].evfd = evfd;
-		rlist_create(&swim_fd[i].in_opened);
+		swim_fd[i].is_opened = false;
+		rlist_create(&swim_fd[i].in_active);
 		rlist_create(&swim_fd[i].recv_queue);
 		rlist_create(&swim_fd[i].send_queue);
 	}
@@ -173,6 +183,7 @@ swim_transport_send(struct swim_transport *transport, const void *data,
 		swim_test_packet_new(data, size, &transport->addr,
 				     (const struct sockaddr_in *) addr);
 	struct swim_fd *src = &swim_fd[transport->fd - FAKE_FD_BASE];
+	assert(src->is_opened);
 	rlist_add_tail_entry(&src->send_queue, p, in_queue);
 	return size;
 }
@@ -189,6 +200,7 @@ swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
 	 * Pop a packet from a receving queue.
 	 */
 	struct swim_fd *dst = &swim_fd[transport->fd - FAKE_FD_BASE];
+	assert(dst->is_opened);
 	struct swim_test_packet *p =
 		rlist_shift_entry(&dst->recv_queue, struct swim_test_packet,
 				  in_queue);
@@ -237,16 +249,16 @@ void
 swim_test_transport_block_fd(int fd)
 {
 	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
-	assert(! rlist_empty(&sfd->in_opened));
-	rlist_del_entry(sfd, in_opened);
+	assert(! rlist_empty(&sfd->in_active));
+	rlist_del_entry(sfd, in_active);
 }
 
 void
 swim_test_transport_unblock_fd(int fd)
 {
 	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
-	assert(rlist_empty(&sfd->in_opened));
-	rlist_add_tail_entry(&swim_fd_opened, sfd, in_opened);
+	if (sfd->is_opened && rlist_empty(&sfd->in_active))
+		rlist_add_tail_entry(&swim_fd_active, sfd, in_active);
 }
 
 /** Send one packet to destination's recv queue. */
@@ -258,8 +270,11 @@ swim_fd_send_packet(struct swim_fd *fd)
 	struct swim_test_packet *p =
 		rlist_shift_entry(&fd->send_queue, struct swim_test_packet,
 				  in_queue);
-	int dst_i = ntohs(p->dst.sin_port);
-	rlist_add_tail_entry(&swim_fd[dst_i].recv_queue, p, in_queue);
+	struct swim_fd *dst = &swim_fd[ntohs(p->dst.sin_port)];
+	if (dst->is_opened)
+		rlist_add_tail_entry(&dst->recv_queue, p, in_queue);
+	else
+		swim_test_packet_delete(p);
 }
 
 void
@@ -270,11 +285,11 @@ swim_transport_do_loop_step(struct ev_loop *loop)
 	 * Reversed because libev invokes events in reversed
 	 * order. So this reverse + libev reverse = normal order.
 	 */
-	rlist_foreach_entry_reverse(fd, &swim_fd_opened, in_opened) {
+	rlist_foreach_entry_reverse(fd, &swim_fd_active, in_active) {
 		swim_fd_send_packet(fd);
 		ev_feed_fd_event(loop, fd->evfd, EV_WRITE);
 	}
-	rlist_foreach_entry_reverse(fd, &swim_fd_opened, in_opened) {
+	rlist_foreach_entry_reverse(fd, &swim_fd_active, in_active) {
 		if (!rlist_empty(&fd->recv_queue))
 			ev_feed_fd_event(loop, fd->evfd, EV_READ);
 	}
