@@ -41,6 +41,7 @@
 #include <small/lsregion.h>
 
 #include "error.h"
+#include "tuple_bloom.h"
 #include "tuple_format.h"
 #include "xrow.h"
 #include "fiber.h"
@@ -660,6 +661,34 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
 	/* Cleanup memory allocated by tuple_extract_key_raw(). */
 	region_truncate(region, region_svp);
 	return key;
+}
+
+int
+vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
+			  const struct tuple *stmt, struct key_def *key_def)
+{
+	if (vy_stmt_is_key(stmt)) {
+		const char *data = tuple_data(stmt);
+		uint32_t part_count = mp_decode_array(&data);
+		return tuple_bloom_builder_add_key(builder, data,
+						   part_count, key_def);
+	} else {
+		return tuple_bloom_builder_add(builder, stmt, key_def);
+	}
+}
+
+bool
+vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
+			const struct tuple *stmt, struct key_def *key_def)
+{
+	if (vy_stmt_is_key(stmt)) {
+		const char *data = tuple_data(stmt);
+		uint32_t part_count = mp_decode_array(&data);
+		return tuple_bloom_maybe_has_key(bloom, data,
+						 part_count, key_def);
+	} else {
+		return tuple_bloom_maybe_has(bloom, stmt, key_def);
+	}
 }
 
 /**

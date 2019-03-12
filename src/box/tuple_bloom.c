@@ -123,6 +123,29 @@ tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 	return 0;
 }
 
+int
+tuple_bloom_builder_add_key(struct tuple_bloom_builder *builder,
+			    const char *key, uint32_t part_count,
+			    struct key_def *key_def)
+{
+	(void)part_count;
+	assert(part_count >= key_def->part_count);
+	assert(builder->part_count == key_def->part_count);
+
+	uint32_t h = HASH_SEED;
+	uint32_t carry = 0;
+	uint32_t total_size = 0;
+
+	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		total_size += tuple_hash_field(&h, &carry, &key,
+					       key_def->parts[i].coll);
+		uint32_t hash = PMurHash32_Result(h, carry, total_size);
+		if (tuple_hash_array_add(&builder->parts[i], hash) != 0)
+			return -1;
+	}
+	return 0;
+}
+
 struct tuple_bloom *
 tuple_bloom_new(struct tuple_bloom_builder *builder, double fpr)
 {

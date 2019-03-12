@@ -1248,22 +1248,11 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 
 	struct tuple_bloom *bloom = run->info.bloom;
 	struct key_def *key_def = itr->key_def;
-	if (iterator_type == ITER_EQ && bloom != NULL) {
-		bool need_lookup;
-		if (vy_stmt_is_key(key)) {
-			const char *data = tuple_data(key);
-			uint32_t part_count = mp_decode_array(&data);
-			need_lookup = tuple_bloom_maybe_has_key(bloom, data,
-							part_count, key_def);
-		} else {
-			need_lookup = tuple_bloom_maybe_has(bloom, key,
-							    key_def);
-		}
-		if (!need_lookup) {
-			itr->search_ended = true;
-			itr->stat->bloom_hit++;
-			return 0;
-		}
+	if (iterator_type == ITER_EQ && bloom != NULL &&
+	    !vy_stmt_bloom_maybe_has(bloom, key, key_def)) {
+		itr->search_ended = true;
+		itr->stat->bloom_hit++;
+		return 0;
 	}
 
 	itr->stat->lookup++;
@@ -2177,10 +2166,10 @@ vy_run_writer_start_page(struct vy_run_writer *writer,
 static int
 vy_run_writer_write_to_page(struct vy_run_writer *writer, struct tuple *stmt)
 {
-	if (writer->bloom != NULL) {
-		tuple_bloom_builder_add(writer->bloom, stmt,
-					writer->key_def);
-	}
+	if (writer->bloom != NULL &&
+	    vy_stmt_bloom_builder_add(writer->bloom, stmt,
+				      writer->key_def) != 0)
+		return -1;
 	if (writer->last_stmt != NULL)
 		vy_stmt_unref_if_possible(writer->last_stmt);
 	writer->last_stmt = stmt;
@@ -2405,9 +2394,11 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 							     format, iid == 0);
 			if (tuple == NULL)
 				goto close_err;
-			if (bloom_builder != NULL) {
-				tuple_bloom_builder_add(bloom_builder, tuple,
-							key_def);
+			if (bloom_builder != NULL &&
+			    vy_stmt_bloom_builder_add(bloom_builder, tuple,
+						      key_def) != 0) {
+				tuple_unref(tuple);
+				goto close_err;
 			}
 			key = tuple_extract_key(tuple, cmp_def, NULL);
 			if (prev_tuple != NULL)

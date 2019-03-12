@@ -136,6 +136,19 @@ tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 			const struct tuple *tuple, struct key_def *key_def);
 
 /**
+ * Add a key hash to a tuple bloom filter builder.
+ * @param builder - bloom filter builder
+ * @param key - key to add
+ * @param part_count - number of parts in the key
+ * @param key_def - key definition
+ * @return 0 on success, -1 on OOM
+ */
+int
+tuple_bloom_builder_add_key(struct tuple_bloom_builder *builder,
+			    const char *key, uint32_t part_count,
+			    struct key_def *key_def);
+
+/**
  * Create a new tuple bloom filter.
  * @param builder - bloom filter builder
  * @param fpr - desired false positive rate

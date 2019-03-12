@@ -50,6 +50,8 @@ struct xrow_header;
 struct region;
 struct tuple_format;
 struct tuple_dictionary;
+struct tuple_bloom;
+struct tuple_bloom_builder;
 struct iovec;
 
 #define MAX_LSN (INT64_MAX / 2)
@@ -600,6 +602,22 @@ struct tuple *
 vy_stmt_extract_key_raw(const char *data, const char *data_end,
 			struct key_def *key_def,
 			struct tuple_format *format);
+
+/**
+ * Add a statement hash to a bloom filter builder.
+ * See tuple_bloom_builder_add() for more details.
+ */
+int
+vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
+			  const struct tuple *stmt, struct key_def *key_def);
+
+/**
+ * Check if a statement hash is present in a bloom filter.
+ * See tuple_bloom_maybe_has() for more details.
+ */
+bool
+vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
+			const struct tuple *stmt, struct key_def *key_def);
 
 /**
  * Encode vy_stmt for a primary key as xrow_header
