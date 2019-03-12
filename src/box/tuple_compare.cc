@@ -425,39 +425,6 @@ tuple_compare_field_with_hint(const char *field_a, enum mp_type a_type,
 	}
 }
 
-uint32_t
-tuple_common_key_parts(const struct tuple *tuple_a, const struct tuple *tuple_b,
-		       struct key_def *key_def)
-{
-	uint32_t i;
-	struct tuple_format *tuple_a_format = tuple_format(tuple_a);
-	struct tuple_format *tuple_b_format = tuple_format(tuple_b);
-	const char *tuple_a_raw = tuple_data(tuple_a);
-	const char *tuple_b_raw = tuple_data(tuple_b);
-	const uint32_t *tuple_a_field_map = tuple_field_map(tuple_a);
-	const uint32_t *tuple_b_field_map = tuple_field_map(tuple_b);
-	for (i = 0; i < key_def->part_count; i++) {
-		struct key_part *part = (struct key_part *)&key_def->parts[i];
-		const char *field_a =
-			tuple_field_raw_by_part(tuple_a_format, tuple_a_raw,
-						tuple_a_field_map, part);
-		const char *field_b =
-			tuple_field_raw_by_part(tuple_b_format, tuple_b_raw,
-						tuple_b_field_map, part);
-		enum mp_type a_type = field_a != NULL ?
-				      mp_typeof(*field_a) : MP_NIL;
-		enum mp_type b_type = field_b != NULL ?
-				      mp_typeof(*field_b) : MP_NIL;
-		if (a_type == MP_NIL && b_type == MP_NIL)
-			continue;
-		if (a_type == MP_NIL || b_type == MP_NIL ||
-		    tuple_compare_field_with_hint(field_a, a_type,
-				field_b, b_type, part->type, part->coll) != 0)
-			break;
-	}
-	return i;
-}
-
 template<bool is_nullable, bool has_optional_parts, bool has_json_paths>
 static inline int
 tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,

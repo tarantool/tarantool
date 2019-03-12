@@ -512,17 +512,6 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 }
 
 /**
- * Return the length of the longest common prefix of two tuples.
- * @param tuple_a first tuple
- * @param tuple_b second tuple
- * @param key_def key defintion
- * @return number of key parts the two tuples have in common
- */
-uint32_t
-tuple_common_key_parts(const struct tuple *tuple_a, const struct tuple *tuple_b,
-		       struct key_def *key_def);
-
-/**
  * Compare keys using the key definition.
  * @param key_a key parts with MessagePack array header
  * @param part_count_a the number of parts in the key_a

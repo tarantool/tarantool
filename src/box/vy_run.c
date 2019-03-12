@@ -2178,11 +2178,8 @@ static int
 vy_run_writer_write_to_page(struct vy_run_writer *writer, struct tuple *stmt)
 {
 	if (writer->bloom != NULL) {
-		uint32_t hashed_parts = writer->last_stmt == NULL ? 0 :
-			tuple_common_key_parts(stmt, writer->last_stmt,
-					       writer->key_def);
 		tuple_bloom_builder_add(writer->bloom, stmt,
-					writer->key_def, hashed_parts);
+					writer->key_def);
 	}
 	if (writer->last_stmt != NULL)
 		vy_stmt_unref_if_possible(writer->last_stmt);
@@ -2409,11 +2406,8 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 			if (tuple == NULL)
 				goto close_err;
 			if (bloom_builder != NULL) {
-				uint32_t hashed_parts = prev_tuple == NULL ? 0 :
-					tuple_common_key_parts(prev_tuple,
-							       tuple, key_def);
 				tuple_bloom_builder_add(bloom_builder, tuple,
-							key_def, hashed_parts);
+							key_def);
 			}
 			key = tuple_extract_key(tuple, cmp_def, NULL);
 			if (prev_tuple != NULL)

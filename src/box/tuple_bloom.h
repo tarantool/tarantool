@@ -80,9 +80,27 @@ struct tuple_hash_array {
  * Tuple bloom filter builder.
  *
  * Construction of a bloom filter proceeds as follows.
- * First all tuple hashes are stored in a builder object.
- * Once all hashes have been stored, a bloom filter of
- * the optimal size and all the hashes are added to it.
+ *
+ * First, tuples of the target set are added to a builder object.
+ * For further calculations to be correct, tuples MUST be added
+ * in the order defined by the provided key definition. The builder
+ * object stores hashes of all added tuples for each partial key,
+ * e.g. for tuple (1, 2, 3) it stores hashes of (1), (1, 2), and
+ * (1, 2, 3) in separate arrays. It doesn't store the same hash
+ * multiple times in the same array (that's what the order is
+ * required for), thus it knows how many unique encounters of each
+ * partial key are there.
+ *
+ * Once all tuples have been hashed, the builder can be used to
+ * create a bloom filter having the given false positive rate
+ * for all lookups, both by full and by partial key. Since when
+ * checking a tuple against a bloom filter, we check not only the
+ * full key bloom, but also all partial key blooms, the actual
+ * FPR of checking keys consisting of i parts will be equal to
+ * the multiplication of FPRs of individual bloom filters storing
+ * hashes of parts <= i. This allows us to use smaller FPR for
+ * partial bloom filters and hence reduce the bloom filter size.
+ * For more details, see tuple_bloom_new() implementation.
  */
 struct tuple_bloom_builder {
 	/** Number of key parts. */
@@ -111,14 +129,11 @@ tuple_bloom_builder_delete(struct tuple_bloom_builder *builder);
  * @param builder - bloom filter builder
  * @param tuple - tuple to add
  * @param key_def - key definition
- * @param hashed_parts - number of key parts that have already
- *  been added to the builder
  * @return 0 on success, -1 on OOM
  */
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			const struct tuple *tuple, struct key_def *key_def,
-			uint32_t hashed_parts);
+			const struct tuple *tuple, struct key_def *key_def);
 
 /**
  * Create a new tuple bloom filter.

@@ -72,8 +72,7 @@ tuple_bloom_builder_delete(struct tuple_bloom_builder *builder)
 
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			const struct tuple *tuple, struct key_def *key_def,
-			uint32_t hashed_parts)
+			const struct tuple *tuple, struct key_def *key_def)
 {
 	assert(builder->part_count == key_def->part_count);
 
@@ -82,17 +81,20 @@ tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 	uint32_t total_size = 0;
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
+		struct tuple_hash_array *hash_arr = &builder->parts[i];
 		total_size += tuple_hash_key_part(&h, &carry, tuple,
 						  &key_def->parts[i]);
-		if (i < hashed_parts) {
+		uint32_t hash = PMurHash32_Result(h, carry, total_size);
+		if (hash_arr->count > 0 &&
+		    hash_arr->values[hash_arr->count - 1] == hash) {
 			/*
 			 * This part is already in the bloom, proceed
-			 * to the next one. Note, we can't skip to
-			 * hashed_parts, as we need to compute the hash.
+			 * to the next one. Note, this check only works
+			 * if tuples are added in the order defined by
+			 * the key definition.
 			 */
 			continue;
 		}
-		struct tuple_hash_array *hash_arr = &builder->parts[i];
 		if (hash_arr->count >= hash_arr->capacity) {
 			uint32_t capacity = MAX(hash_arr->capacity * 2, 1024U);
 			uint32_t *values = realloc(hash_arr->values,
@@ -105,7 +107,6 @@ tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 			hash_arr->capacity = capacity;
 			hash_arr->values = values;
 		}
-		uint32_t hash = PMurHash32_Result(h, carry, total_size);
 		hash_arr->values[hash_arr->count++] = hash;
 	}
 	return 0;
