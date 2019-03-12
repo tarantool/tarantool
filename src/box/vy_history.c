@@ -74,8 +74,7 @@ vy_history_cleanup(struct vy_history *history)
 
 int
 vy_history_apply(struct vy_history *history, struct key_def *cmp_def,
-		 struct tuple_format *format, bool keep_delete,
-		 int *upserts_applied, struct tuple **ret)
+		 bool keep_delete, int *upserts_applied, struct tuple **ret)
 {
 	*ret = NULL;
 	*upserts_applied = 0;
@@ -101,7 +100,7 @@ vy_history_apply(struct vy_history *history, struct key_def *cmp_def,
 	}
 	while (node != NULL) {
 		struct tuple *stmt = vy_apply_upsert(node->stmt, curr_stmt,
-						     cmp_def, format, true);
+						     cmp_def, true);
 		++*upserts_applied;
 		if (curr_stmt != NULL)
 			tuple_unref(curr_stmt);

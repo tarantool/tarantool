@@ -805,7 +805,7 @@ vy_read_iterator_apply_history(struct vy_read_iterator *itr,
 	}
 
 	int upserts_applied = 0;
-	int rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
+	int rc = vy_history_apply(&history, lsm->cmp_def,
 				  true, &upserts_applied, ret);
 
 	lsm->stat.upsert.applied += upserts_applied;

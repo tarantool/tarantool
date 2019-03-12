@@ -977,8 +977,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		older = vy_mem_older_lsn(mem, stmt);
 		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
 		struct tuple *upserted =
-			vy_apply_upsert(stmt, older, lsm->cmp_def,
-					lsm->mem_format, false);
+			vy_apply_upsert(stmt, older, lsm->cmp_def, false);
 		lsm->stat.upsert.applied++;
 
 		if (upserted == NULL) {

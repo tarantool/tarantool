@@ -842,7 +842,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		assert(!stream->is_last_level || hint == NULL ||
 		       vy_stmt_type(hint) != IPROTO_UPSERT);
 		struct tuple *applied = vy_apply_upsert(h->tuple, hint,
-				stream->cmp_def, stream->format, false);
+							stream->cmp_def, false);
 		if (applied == NULL)
 			return -1;
 		vy_stmt_unref_if_possible(h->tuple);
@@ -856,7 +856,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		       vy_stmt_type(h->tuple) == IPROTO_UPSERT);
 		assert(result->tuple != NULL);
 		struct tuple *applied = vy_apply_upsert(h->tuple, result->tuple,
-					stream->cmp_def, stream->format, false);
+							stream->cmp_def, false);
 		if (applied == NULL)
 			return -1;
 		vy_stmt_unref_if_possible(result->tuple);

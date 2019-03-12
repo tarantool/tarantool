@@ -4068,7 +4068,7 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 			return -1;
 	} else if (type == IPROTO_UPSERT) {
 		struct tuple *new_tuple = vy_apply_upsert(mem_stmt, old_tuple,
-					pk->cmp_def, pk->mem_format, true);
+							  pk->cmp_def, true);
 		if (new_tuple == NULL)
 			return -1;
 		uint32_t data_len;

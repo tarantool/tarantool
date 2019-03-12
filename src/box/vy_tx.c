@@ -481,7 +481,7 @@ vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
 		vy_cache_on_write(&lsm->cache, stmt, &deleted);
 		if (deleted != NULL) {
 			struct tuple *applied = vy_apply_upsert(stmt, deleted,
-					mem->cmp_def, mem->format, false);
+							mem->cmp_def, false);
 			tuple_unref(deleted);
 			if (applied != NULL) {
 				assert(vy_stmt_type(applied) == IPROTO_REPLACE);
@@ -998,8 +998,7 @@ vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
 		       old_type == IPROTO_DELETE);
 		(void) old_type;
 
-		applied = vy_apply_upsert(stmt, old->stmt, lsm->cmp_def,
-					  lsm->mem_format, true);
+		applied = vy_apply_upsert(stmt, old->stmt, lsm->cmp_def, true);
 		lsm->stat.upsert.applied++;
 		if (applied == NULL)
 			return -1;

@@ -272,7 +272,7 @@ done:
 
 	if (rc == 0) {
 		int upserts_applied;
-		rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
+		rc = vy_history_apply(&history, lsm->cmp_def,
 				      false, &upserts_applied, ret);
 		lsm->stat.upsert.applied += upserts_applied;
 	}
@@ -319,7 +319,7 @@ vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
 done:
 	if (rc == 0) {
 		int upserts_applied;
-		rc = vy_history_apply(&history, lsm->cmp_def, lsm->mem_format,
+		rc = vy_history_apply(&history, lsm->cmp_def,
 				      true, &upserts_applied, ret);
 		lsm->stat.upsert.applied += upserts_applied;
 	}

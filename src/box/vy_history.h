@@ -155,8 +155,7 @@ vy_history_cleanup(struct vy_history *history);
  */
 int
 vy_history_apply(struct vy_history *history, struct key_def *cmp_def,
-		 struct tuple_format *format, bool keep_delete,
-		 int *upserts_applied, struct tuple **ret);
+		 bool keep_delete, int *upserts_applied, struct tuple **ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */

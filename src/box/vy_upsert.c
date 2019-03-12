@@ -88,8 +88,7 @@ vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 
 struct tuple *
 vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
-		struct key_def *cmp_def, struct tuple_format *format,
-		bool suppress_error)
+		struct key_def *cmp_def, bool suppress_error)
 {
 	/*
 	 * old_stmt - previous (old) version of stmt
@@ -106,6 +105,8 @@ vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
 		 */
 		return vy_stmt_replace_from_upsert(new_stmt);
 	}
+
+	struct tuple_format *format = tuple_format(new_stmt);
 
 	/*
 	 * Unpack UPSERT operation from the new stmt
