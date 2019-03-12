@@ -31,6 +31,7 @@
 #include "swim_test_utils.h"
 #include "swim_test_ev.h"
 #include "swim/swim.h"
+#include "swim/swim_ev.h"
 #include "uuid/tt_uuid.h"
 #include "trivia/util.h"
 #include "fiber.h"
@@ -111,7 +112,7 @@ swim1_contains_swim2(struct swim *s1, struct swim *s2)
 		}
 	}
 	swim_iterator_close(it);
-	return false;
+	return true;
 }
 
 bool
@@ -129,13 +130,15 @@ swim_cluster_is_fullmesh(struct swim_cluster *cluster)
 }
 
 int
-swim_cluster_wait_fullmesh(struct swim_cluster *cluster, int max_steps)
+swim_cluster_wait_fullmesh(struct swim_cluster *cluster, double timeout)
 {
-	while (! swim_cluster_is_fullmesh(cluster) && max_steps > 0) {
+	double deadline = swim_time() + timeout;
+	while (! swim_cluster_is_fullmesh(cluster)) {
+		if (swim_time() >= deadline)
+			return -1;
 		swim_do_loop_step(loop());
-		--max_steps;
 	}
-	return max_steps < 0 ? -1 : 0;
+	return 0;
 }
 
 bool

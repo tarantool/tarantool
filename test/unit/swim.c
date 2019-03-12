@@ -109,7 +109,7 @@ swim_test_uuid_update(void)
 static void
 swim_test_cfg(void)
 {
-	swim_start_test(15);
+	swim_start_test(16);
 
 	struct swim *s = swim_new();
 	assert(s != NULL);
@@ -123,6 +123,9 @@ swim_test_cfg(void)
 	is(swim_cfg(s, uri, -1, &uuid), 0, "configured first time");
 	is(swim_cfg(s, NULL, -1, NULL), 0, "second time can omit URI, UUID");
 	is(swim_cfg(s, NULL, 2, NULL), 0, "hearbeat is dynamic");
+	const char *self_uri = swim_member_uri(swim_self(s));
+	is(strcmp(self_uri, uri), 0, "URI is unchanged after recfg with NULL "\
+	   "URI");
 
 	struct swim *s2 = swim_new();
 	assert(s2 != NULL);

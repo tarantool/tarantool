@@ -57,11 +57,12 @@ swim_packet_create(struct swim_packet *packet)
 
 void
 swim_task_create(struct swim_task *task, swim_task_f complete,
-		 swim_task_f cancel)
+		 swim_task_f cancel, const char *desc)
 {
 	memset(task, 0, sizeof(*task));
 	task->complete = complete;
 	task->cancel = cancel;
+	task->desc = desc;
 	swim_packet_create(&task->packet);
 	rlist_create(&task->in_queue_output);
 }
@@ -170,9 +171,9 @@ swim_scheduler_on_output(struct ev_loop *loop, struct ev_io *io, int events)
 	struct swim_task *task =
 		rlist_shift_entry(&scheduler->queue_output, struct swim_task,
 				  in_queue_output);
-	say_verbose("SWIM %d: send to %s", swim_scheduler_fd(scheduler),
-		    sio_strfaddr((struct sockaddr *) &task->dst,
-				 sizeof(task->dst)));
+	say_verbose("SWIM %d: send %s to %s", swim_scheduler_fd(scheduler),
+		    task->desc, sio_strfaddr((struct sockaddr *) &task->dst,
+					     sizeof(task->dst)));
 	struct swim_meta_header_bin header;
 	swim_meta_header_bin_create(&header, &scheduler->transport.addr);
 	memcpy(task->packet.meta, &header, sizeof(header));
