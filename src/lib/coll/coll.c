@@ -133,6 +133,30 @@ coll_bin_hash(const char *s, size_t s_len, uint32_t *ph, uint32_t *pcarry,
 	return s_len;
 }
 
+static size_t
+coll_icu_hint(const char *s, size_t s_len, char *buf, size_t buf_len,
+	      struct coll *coll)
+{
+	assert(coll->type == COLL_TYPE_ICU);
+	UCharIterator itr;
+	uiter_setUTF8(&itr, s, s_len);
+	uint32_t state[2] = {0, 0};
+	UErrorCode status = U_ZERO_ERROR;
+	return ucol_nextSortKeyPart(coll->collator, &itr, state,
+				    (uint8_t *)buf, buf_len, &status);
+}
+
+static size_t
+coll_bin_hint(const char *s, size_t s_len, char *buf, size_t buf_len,
+	      struct coll *coll)
+{
+	(void)coll;
+	assert(coll->type == COLL_TYPE_BINARY);
+	size_t len = MIN(s_len, buf_len);
+	memcpy(buf, s, len);
+	return len;
+}
+
 /**
  * Set up ICU collator and init cmp and hash members of collation.
  * @param coll Collation to set up.
@@ -242,6 +266,7 @@ coll_icu_init_cmp(struct coll *coll, const struct coll_def *def)
 	}
 	coll->cmp = coll_icu_cmp;
 	coll->hash = coll_icu_hash;
+	coll->hint = coll_icu_hint;
 	return 0;
 }
 
@@ -356,6 +381,7 @@ coll_new(const struct coll_def *def)
 		coll->collator = NULL;
 		coll->cmp = coll_bin_cmp;
 		coll->hash = coll_bin_hash;
+		coll->hint = coll_bin_hint;
 		break;
 	default:
 		unreachable();

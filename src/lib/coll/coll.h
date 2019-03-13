@@ -48,6 +48,9 @@ typedef int (*coll_cmp_f)(const char *s, size_t s_len, const char *t,
 typedef uint32_t (*coll_hash_f)(const char *s, size_t s_len, uint32_t *ph,
 				uint32_t *pcarry, struct coll *coll);
 
+typedef size_t (*coll_hint_f)(const char *s, size_t s_len, char *buf,
+			      size_t buf_len, struct coll *coll);
+
 struct UCollator;
 
 /**
@@ -61,7 +64,16 @@ struct coll {
 	struct UCollator *collator;
 	/** String comparator. */
 	coll_cmp_f cmp;
+	/** String hash function. */
 	coll_hash_f hash;
+	/**
+	 * String comparison hint.
+	 *
+	 * This function copies a sort key for a string to
+	 * the given buffer and returns the number of bytes
+	 * copied. Sort keys may be compared using strcmp().
+	 */
+	coll_hint_f hint;
 	/** Reference counter. */
 	int refs;
 	/**

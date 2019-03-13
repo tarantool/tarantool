@@ -117,6 +117,27 @@ struct key_def;
 struct tuple;
 
 /**
+ * Tuple comparison hint h(t) is such a function of tuple t that
+ * the following conditions always hold for any pair of tuples
+ * t1 and t2:
+ *
+ *   if h(t1) < h(t2) then t1 < t2;
+ *   if h(t1) > h(t2) then t1 > t2;
+ *   if h(t1) == h(t2) then t1 may or may not be equal to t2.
+ *
+ * These rules mean that instead of direct tuple vs tuple
+ * (or tuple vs key) comparison one may compare their hints
+ * first and only if theirs hints equal compare the tuples
+ * themselves.
+ */
+typedef uint64_t hint_t;
+
+/**
+ * Reserved value to use when comparison hint is undefined.
+ */
+#define HINT_NONE ((hint_t)UINT64_MAX)
+
+/**
  * Get is_nullable property of key_part.
  * @param key_part for which attribute is being fetched
  *
@@ -133,10 +154,23 @@ typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
 					const char *key,
 					uint32_t part_count,
 					struct key_def *key_def);
+/** @copydoc tuple_compare_with_key_hinted() */
+typedef int (*tuple_compare_with_key_hinted_t)(const struct tuple *tuple,
+					       hint_t tuple_hint,
+					       const char *key,
+					       uint32_t part_count,
+					       hint_t key_hint,
+					       struct key_def *key_def);
 /** @copydoc tuple_compare() */
 typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
 			       const struct tuple *tuple_b,
 			       struct key_def *key_def);
+/** @copydoc tuple_compare_hinted() */
+typedef int (*tuple_compare_hinted_t)(const struct tuple *tuple_a,
+				      hint_t tuple_a_hint,
+				      const struct tuple *tuple_b,
+				      hint_t tuple_b_hint,
+				      struct key_def *key_def);
 /** @copydoc tuple_extract_key() */
 typedef char *(*tuple_extract_key_t)(const struct tuple *tuple,
 				     struct key_def *key_def,
@@ -152,13 +186,23 @@ typedef uint32_t (*tuple_hash_t)(const struct tuple *tuple,
 /** @copydoc key_hash() */
 typedef uint32_t (*key_hash_t)(const char *key,
 				struct key_def *key_def);
+/** @copydoc tuple_hint() */
+typedef hint_t (*tuple_hint_t)(const struct tuple *tuple,
+			       struct key_def *key_def);
+/** @copydoc key_hint() */
+typedef hint_t (*key_hint_t)(const char *key, uint32_t part_count,
+			     struct key_def *key_def);
 
 /* Definition of a multipart key. */
 struct key_def {
 	/** @see tuple_compare() */
 	tuple_compare_t tuple_compare;
+	/** @see tuple_compare_hinted() */
+	tuple_compare_hinted_t tuple_compare_hinted;
 	/** @see tuple_compare_with_key() */
 	tuple_compare_with_key_t tuple_compare_with_key;
+	/** @see tuple_compare_with_key_hinted() */
+	tuple_compare_with_key_hinted_t tuple_compare_with_key_hinted;
 	/** @see tuple_extract_key() */
 	tuple_extract_key_t tuple_extract_key;
 	/** @see tuple_extract_key_raw() */
@@ -167,6 +211,10 @@ struct key_def {
 	tuple_hash_t tuple_hash;
 	/** @see key_hash() */
 	key_hash_t key_hash;
+	/** @see tuple_hint() */
+	tuple_hint_t tuple_hint;
+	/** @see key_hint() */
+	key_hint_t key_hint;
 	/**
 	 * Minimal part count which always is unique. For example,
 	 * if a secondary index is unique, then
@@ -558,6 +606,26 @@ tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
 }
 
 /**
+ * Compare tuples using the key definition and comparison hints.
+ * @param tuple_a first tuple
+ * @param tuple_a_hint comparison hint of @a tuple_a
+ * @param tuple_b second tuple
+ * @param tuple_b_hint comparison hint of @a tuple_b
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
+ * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
+ * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
+ */
+static inline int
+tuple_compare_hinted(const struct tuple *tuple_a, hint_t tuple_a_hint,
+		     const struct tuple *tuple_b, hint_t tuple_b_hint,
+		     struct key_def *key_def)
+{
+	return key_def->tuple_compare_hinted(tuple_a, tuple_a_hint, tuple_b,
+					     tuple_b_hint, key_def);
+}
+
+/**
  * @brief Compare tuple with key using the key definition.
  * @param tuple tuple
  * @param key key parts without MessagePack array header
@@ -573,6 +641,29 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
 		       uint32_t part_count, struct key_def *key_def)
 {
 	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
+}
+
+/**
+ * Compare tuple with key using the key definition and
+ * comparison hints
+ * @param tuple tuple
+ * @param tuple_hint comparison hint of @a tuple
+ * @param key key parts without MessagePack array header
+ * @param part_count the number of parts in @a key
+ * @param key_hint comparison hint of @a key
+ * @param key_def key definition
+ * @retval 0  if key_fields(tuple) == parts(key)
+ * @retval <0 if key_fields(tuple) < parts(key)
+ * @retval >0 if key_fields(tuple) > parts(key)
+ */
+static inline int
+tuple_compare_with_key_hinted(const struct tuple *tuple, hint_t tuple_hint,
+			      const char *key, uint32_t part_count,
+			      hint_t key_hint, struct key_def *key_def)
+{
+	return key_def->tuple_compare_with_key_hinted(tuple, tuple_hint, key,
+						      part_count, key_hint,
+						      key_def);
 }
 
 /**
@@ -626,6 +717,30 @@ static inline uint32_t
 key_hash(const char *key, struct key_def *key_def)
 {
 	return key_def->key_hash(key, key_def);
+}
+
+ /*
+ * Get comparison hint for a tuple.
+ * @param tuple - tuple to compute the hint for
+ * @param key_def - key_def used for tuple comparison
+ * @return - hint value
+ */
+static inline hint_t
+tuple_hint(const struct tuple *tuple, struct key_def *key_def)
+{
+	return key_def->tuple_hint(tuple, key_def);
+}
+
+/**
+ * Get a comparison hint of a key.
+ * @param key - key to compute the hint for
+ * @param key_def - key_def used for tuple comparison
+ * @return - hint value
+ */
+static inline hint_t
+key_hint(const char *key, uint32_t part_count, struct key_def *key_def)
+{
+	return key_def->key_hint(key, part_count, key_def);
 }
 
 #if defined(__cplusplus)
