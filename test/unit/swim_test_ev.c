@@ -54,7 +54,6 @@ static int event_id = 0;
  */
 enum swim_event_type {
 	SWIM_EVENT_TIMER,
-	SWIM_EVENT_FD_UNBLOCK,
 	SWIM_EVENT_BRK,
 };
 
@@ -203,52 +202,6 @@ swim_timer_event_new(struct ev_watcher *watcher, double delay)
 	mh_int_t rc = mh_i64ptr_put(events_hash, &node, NULL, NULL);
 	(void) rc;
 	assert(rc != mh_end(events_hash));
-}
-
-/**
- * SWIM fake transport's event. It is used to block a fake file
- * descriptor for a delay. Right after a block that event is
- * generated to unblock the descriptor later.
- */
-struct swim_fd_unblock_event {
-	struct swim_event base;
-	/** A fake file descriptor to unlock. */
-	int fd;
-};
-
-/** Delete a fd unblock event. */
-static void
-swim_fd_unblock_event_delete(struct swim_event *e)
-{
-	assert(e->type == SWIM_EVENT_FD_UNBLOCK);
-	swim_event_destroy(e);
-	free(e);
-}
-
-/** Process and delete a fd unblock event. */
-static void
-swim_fd_unblock_event_process(struct swim_event *e, struct ev_loop *loop)
-{
-	(void) loop;
-	assert(e->type == SWIM_EVENT_FD_UNBLOCK);
-	struct swim_fd_unblock_event *fe = (struct swim_fd_unblock_event *) e;
-	swim_test_transport_unblock_fd(fe->fd);
-	swim_fd_unblock_event_delete(e);
-}
-
-void
-swim_test_ev_block_fd(int fd, double delay)
-{
-	struct swim_fd_unblock_event *e =
-		(struct swim_fd_unblock_event *) malloc(sizeof(*e));
-	assert(e != NULL);
-	/* Block now. */
-	swim_test_transport_block_fd(fd);
-	/* Unblock after delay. */
-	swim_event_create(&e->base, SWIM_EVENT_FD_UNBLOCK, delay,
-			  swim_fd_unblock_event_process,
-			  swim_fd_unblock_event_delete);
-	e->fd = fd;
 }
 
 /**

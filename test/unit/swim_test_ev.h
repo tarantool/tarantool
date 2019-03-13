@@ -88,10 +88,6 @@ swim_test_ev_init(void);
 void
 swim_test_ev_free(void);
 
-/** Block a file descriptor @a fd for @a delay fake seconds. */
-void
-swim_test_ev_block_fd(int fd, double delay);
-
 /**
  * Stop the event loop after @a delay fake seconds. It does not
  * affect other events, so the loop can stop earlier multiple

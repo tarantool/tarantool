@@ -201,9 +201,14 @@ swim_test_add_remove(void)
 	 * removed from s1 after the message is scheduled but
 	 * before its completion.
 	 */
-	swim_cluster_block_io(cluster, 0, 2);
-	swim_do_loop_step(loop());
+	swim_cluster_block_io(cluster, 0);
+	swim_run_for(1);
+	/*
+	 * Now the message from s1 is in 'fly', round step is not
+	 * finished.
+	 */
 	swim_remove_member(s1, swim_member_uuid(s2_self));
+	swim_cluster_unblock_io(cluster, 0);
 	is(swim_cluster_wait_fullmesh(cluster, 1), 0,
 	   "back in fullmesh after a member removal in the middle of a step");
 

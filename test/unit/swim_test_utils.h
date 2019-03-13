@@ -58,7 +58,11 @@ swim_cluster_node(struct swim_cluster *cluster, int i);
 
 /** Block IO on a SWIM instance with id @a i. */
 void
-swim_cluster_block_io(struct swim_cluster *cluster, int i, double delay);
+swim_cluster_block_io(struct swim_cluster *cluster, int i);
+
+/** Unblock IO on a SWIM instance with id @a i. */
+void
+swim_cluster_unblock_io(struct swim_cluster *cluster, int i);
 
 /**
  * Explicitly add a member of id @a from_id to a member of id
@@ -77,6 +81,10 @@ swim_cluster_is_fullmesh(struct swim_cluster *cluster);
 /** Wait for fullmesh at most @a timeout fake seconds. */
 int
 swim_cluster_wait_fullmesh(struct swim_cluster *cluster, double timeout);
+
+/** Process SWIM events for @a duration fake seconds. */
+void
+swim_run_for(double duration);
 
 #define swim_start_test(n) { \
 	header(); \

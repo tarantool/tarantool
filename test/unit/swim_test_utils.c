@@ -30,6 +30,7 @@
  */
 #include "swim_test_utils.h"
 #include "swim_test_ev.h"
+#include "swim_test_transport.h"
 #include "swim/swim.h"
 #include "swim/swim_ev.h"
 #include "uuid/tt_uuid.h"
@@ -94,9 +95,15 @@ swim_cluster_node(struct swim_cluster *cluster, int i)
 }
 
 void
-swim_cluster_block_io(struct swim_cluster *cluster, int i, double delay)
+swim_cluster_block_io(struct swim_cluster *cluster, int i)
 {
-	swim_test_ev_block_fd(swim_fd(cluster->node[i]), delay);
+	swim_test_transport_block_fd(swim_fd(cluster->node[i]));
+}
+
+void
+swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
+{
+	swim_test_transport_unblock_fd(swim_fd(cluster->node[i]));
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */
@@ -172,6 +179,24 @@ swim_cluster_wait_fullmesh(struct swim_cluster *cluster, double timeout)
 {
 	return swim_wait_timeout(timeout, cluster, swim_loop_check_fullmesh,
 				 NULL);
+}
+
+/**
+ * Wrapper to run the loop until timeout with an unreachable
+ * condition.
+ */
+static bool
+swim_loop_check_false(struct swim_cluster *cluster, void *data)
+{
+	(void) data;
+	(void) cluster;
+	return false;
+}
+
+void
+swim_run_for(double duration)
+{
+	swim_wait_timeout(duration, NULL, swim_loop_check_false, NULL);
 }
 
 bool
