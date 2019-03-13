@@ -129,16 +129,49 @@ swim_cluster_is_fullmesh(struct swim_cluster *cluster)
 	return true;
 }
 
-int
-swim_cluster_wait_fullmesh(struct swim_cluster *cluster, double timeout)
+typedef bool (*swim_loop_check_f)(struct swim_cluster *cluster, void *data);
+
+/**
+ * Run the event loop until timeout happens or a custom
+ * test-defined condition is met.
+ * @param timeout Maximal number of bogus seconds to run the loop
+ *        for.
+ * @param cluster Cluster to test for a condition.
+ * @param check Function condition-checker. It should return true,
+ *        when the condition is met.
+ * @param data Arbitrary test data passed to @a check without
+ *        changes.
+ *
+ * @retval -1 Timeout, condition is not satisfied.
+ * @retval 0 Success, condition is met before timeout.
+ */
+static int
+swim_wait_timeout(double timeout, struct swim_cluster *cluster,
+		  swim_loop_check_f check, void *data)
 {
+	swim_ev_set_brk(timeout);
 	double deadline = swim_time() + timeout;
-	while (! swim_cluster_is_fullmesh(cluster)) {
+	while (! check(cluster, data)) {
 		if (swim_time() >= deadline)
 			return -1;
 		swim_do_loop_step(loop());
 	}
 	return 0;
+}
+
+/** Wrapper to check a cluster for fullmesh for timeout. */
+static bool
+swim_loop_check_fullmesh(struct swim_cluster *cluster, void *data)
+{
+	(void) data;
+	return swim_cluster_is_fullmesh(cluster);
+}
+
+int
+swim_cluster_wait_fullmesh(struct swim_cluster *cluster, double timeout)
+{
+	return swim_wait_timeout(timeout, cluster, swim_loop_check_fullmesh,
+				 NULL);
 }
 
 bool

@@ -1,8 +1,9 @@
 	*** main_f ***
 1..5
 	*** swim_test_one_link ***
-    1..1
-    ok 1 - one link
+    1..2
+    ok 1 - no rounds - no fullmesh
+    ok 2 - one link
 ok 1 - subtests
 	*** swim_test_one_link: done ***
 	*** swim_test_sequence ***

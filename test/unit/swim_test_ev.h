@@ -37,6 +37,47 @@ struct ev_loop;
  * speed up events processing while keeping SWIM unaware that it
  * works in a simulation. Libev is used a little, just to store
  * some IO events.
+ *
+ * The test event loop works as follows. It has a global watch and
+ * a heap of events sorted by deadlines. An event is either a
+ * libev event like EV_TIMER, or an internal test event.
+ *
+ * On each iteration it takes all the next events with the nearest
+ * and equal deadline, and sets the global watch with the deadline
+ * value. It simulates time flow. All the events with that
+ * deadline are processed. An event processing usually means
+ * calling a libev callback set by a SWIM instance beforehand.
+ *
+ * For example, if event deadlines and the watch are:
+ *
+ *     watch = 0
+ *     queue = [1, 1, 1, 5, 5, 6, 7, 7, 7]
+ *
+ * Then the queue is dispatched as follows:
+ *
+ *     1) watch = 1
+ *        process first 3 events
+ *        queue = [5, 5, 6, 7, 7, 7]
+ *
+ *     2) watch = 5
+ *        process next 2 events
+ *        queue = [6, 7, 7, 7]
+ *
+ *     3) watch = 6
+ *        process a next event
+ *        queue = [7, 7, 7]
+ *
+ *     4) watch = 7
+ *        process next 3 events
+ *        queue = []
+ *
+ * The loop provides an API to make one iteration, do one loop
+ * step. For example, the sequence above is played in 4 loop
+ * steps. The unit tests can either do explicitly step by step,
+ * calling that API method. Or use wrappers with 'timeouts', which
+ * in fact do the same, but until the global watch equals a
+ * certain value. Usually after each loop step a test checks some
+ * conditions.
  */
 
 /** Initialize test event processing system. */
@@ -50,6 +91,14 @@ swim_test_ev_free(void);
 /** Block a file descriptor @a fd for @a delay fake seconds. */
 void
 swim_test_ev_block_fd(int fd, double delay);
+
+/**
+ * Stop the event loop after @a delay fake seconds. It does not
+ * affect other events, so the loop can stop earlier multiple
+ * times.
+ */
+void
+swim_ev_set_brk(double delay);
 
 /** Play one step of event loop, process generated events. */
 void

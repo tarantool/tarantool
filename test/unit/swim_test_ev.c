@@ -55,6 +55,7 @@ static int event_id = 0;
 enum swim_event_type {
 	SWIM_EVENT_TIMER,
 	SWIM_EVENT_FD_UNBLOCK,
+	SWIM_EVENT_BRK,
 };
 
 struct swim_event;
@@ -248,6 +249,46 @@ swim_test_ev_block_fd(int fd, double delay)
 			  swim_fd_unblock_event_process,
 			  swim_fd_unblock_event_delete);
 	e->fd = fd;
+}
+
+/**
+ * Breakpoint event for debug. It does nothing but stops the event
+ * loop after a timeout to allow highlevel API to check some
+ * cases. The main feature is that a test can choose that timeout,
+ * while natural SWIM events usually are out of control. That
+ * events allows to check conditions between natural events.
+ */
+struct swim_brk_event {
+	struct swim_event base;
+};
+
+/** Delete a breakpoint event. */
+static void
+swim_brk_event_delete(struct swim_event *e)
+{
+	assert(e->type == SWIM_EVENT_BRK);
+	swim_event_destroy(e);
+	free(e);
+}
+
+/**
+ * Breakpoint event processing is nothing but the event deletion.
+ */
+static void
+swim_brk_event_process(struct swim_event *e, struct ev_loop *loop)
+{
+	(void) loop;
+	assert(e->type == SWIM_EVENT_BRK);
+	swim_brk_event_delete(e);
+}
+
+void
+swim_ev_set_brk(double delay)
+{
+	struct swim_brk_event *e = (struct swim_brk_event *) malloc(sizeof(*e));
+	assert(e != NULL);
+	swim_event_create(&e->base, SWIM_EVENT_BRK, delay,
+			  swim_brk_event_process, swim_brk_event_delete);
 }
 
 /** Implementation of global time visible in SWIM. */
