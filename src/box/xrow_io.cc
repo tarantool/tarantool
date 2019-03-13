@@ -71,7 +71,7 @@ coio_read_xrow_timeout_xc(struct ev_io *coio, struct ibuf *in,
 	/* Read fixed header */
 	if (ibuf_used(in) < 1)
 		coio_breadn_timeout(coio, in, 1, delay);
-	coio_timeout_update(start, &delay);
+	coio_timeout_update(&start, &delay);
 
 	/* Read length */
 	if (mp_typeof(*in->rpos) != MP_UINT) {
@@ -81,7 +81,7 @@ coio_read_xrow_timeout_xc(struct ev_io *coio, struct ibuf *in,
 	ssize_t to_read = mp_check_uint(in->rpos, in->wpos);
 	if (to_read > 0)
 		coio_breadn_timeout(coio, in, to_read, delay);
-	coio_timeout_update(start, &delay);
+	coio_timeout_update(&start, &delay);
 
 	uint32_t len = mp_decode_uint((const char **) &in->rpos);
 
