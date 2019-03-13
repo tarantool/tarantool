@@ -88,7 +88,7 @@ coio_timeout_init(ev_tstamp *start, ev_tstamp *delay,
 }
 
 static inline void
-coio_timeout_update(ev_tstamp start, ev_tstamp *delay)
+coio_timeout_update(ev_tstamp *start, ev_tstamp *delay)
 {
 	return evio_timeout_update(loop(), start, delay);
 }

@@ -143,9 +143,10 @@ evio_timeout_init(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay,
 }
 
 static inline void
-evio_timeout_update(ev_loop *loop, ev_tstamp start, ev_tstamp *delay)
+evio_timeout_update(ev_loop *loop, ev_tstamp *start, ev_tstamp *delay)
 {
-	ev_tstamp elapsed = ev_monotonic_now(loop) - start;
+	ev_tstamp elapsed = ev_monotonic_now(loop) - *start;
+	*start += elapsed;
 	*delay = (elapsed >= *delay) ? 0 : *delay - elapsed;
 }
 

@@ -208,7 +208,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		if (!uri->host_hint) freeaddrinfo(ai);
 		else free(ai_local.ai_addr);
 	});
-	evio_timeout_update(loop(), start, &delay);
+	evio_timeout_update(loop(), &start, &delay);
 
 	coio_timeout_init(&start, &delay, timeout);
 	assert(! evio_has_fd(coio));
@@ -230,7 +230,7 @@ coio_connect_timeout(struct ev_io *coio, struct uri *uri, struct sockaddr *addr,
 		}
 		ai = ai->ai_next;
 		ev_now_update(loop);
-		coio_timeout_update(start, &delay);
+		coio_timeout_update(&start, &delay);
 	}
 
 	tnt_raise(SocketError, sio_socketname(coio->fd), "connection failed");
@@ -271,7 +271,7 @@ coio_accept(struct ev_io *coio, struct sockaddr *addr,
 		fiber_testcancel();
 		if (is_timedout)
 			tnt_raise(TimedOut);
-		coio_timeout_update(start, &delay);
+		coio_timeout_update(&start, &delay);
 	}
 }
 
@@ -329,7 +329,7 @@ coio_read_ahead_timeout(struct ev_io *coio, void *buf, size_t sz,
 		fiber_testcancel();
 		if (is_timedout)
 			tnt_raise(TimedOut);
-		coio_timeout_update(start, &delay);
+		coio_timeout_update(&start, &delay);
 	}
 }
 
@@ -422,7 +422,7 @@ coio_write_timeout(struct ev_io *coio, const void *buf, size_t sz,
 
 		if (is_timedout)
 			tnt_raise(TimedOut);
-		coio_timeout_update(start, &delay);
+		coio_timeout_update(&start, &delay);
 	}
 }
 
@@ -492,7 +492,7 @@ coio_writev_timeout(struct ev_io *coio, struct iovec *iov, int iovcnt,
 
 		if (is_timedout)
 			tnt_raise(TimedOut);
-		coio_timeout_update(start, &delay);
+		coio_timeout_update(&start, &delay);
 	}
 	return total;
 }
@@ -536,7 +536,7 @@ coio_sendto_timeout(struct ev_io *coio, const void *buf, size_t sz, int flags,
 		fiber_testcancel();
 		if (is_timedout)
 			tnt_raise(TimedOut);
-		coio_timeout_update(start, &delay);
+		coio_timeout_update(&start, &delay);
 	}
 }
 
@@ -580,7 +580,7 @@ coio_recvfrom_timeout(struct ev_io *coio, void *buf, size_t sz, int flags,
 		fiber_testcancel();
 		if (is_timedout)
 			tnt_raise(TimedOut);
-		coio_timeout_update(start, &delay);
+		coio_timeout_update(&start, &delay);
 	}
 }
 
@@ -751,7 +751,7 @@ coio_write_fd_timeout(int fd, const void *data, size_t size, ev_tstamp timeout)
 		}
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			coio_wait(fd, COIO_WRITE, delay);
-			evio_timeout_update(loop, start, &delay);
+			evio_timeout_update(loop, &start, &delay);
 		} else if (errno != EINTR) {
 			diag_set(SocketError, sio_socketname(fd), "write");
 			return -1;
