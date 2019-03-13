@@ -637,13 +637,16 @@ relay_subscribe(struct replica *replica, int fd, uint64_t sync,
 	/*
 	 * Register the replica with the garbage collector
 	 * unless it has already been registered by initial
-	 * join.
+	 * join or subscribe. Otherwise update the consumer
+	 * state with the current replica vclock.
 	 */
 	if (replica->gc == NULL) {
 		replica->gc = gc_consumer_register(replica_clock, "replica %s",
 						   tt_uuid_str(&replica->uuid));
 		if (replica->gc == NULL)
 			diag_raise();
+	} else {
+		gc_consumer_advance(replica->gc, replica_clock);
 	}
 
 	relay_start(relay, fd, sync, relay_send_row);
