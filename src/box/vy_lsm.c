@@ -74,7 +74,7 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 		  vy_upsert_thresh_cb upsert_thresh_cb,
 		  void *upsert_thresh_arg)
 {
-	env->empty_key = vy_stmt_new_select(key_format, NULL, 0);
+	env->empty_key = vy_key_new(key_format, NULL, 0);
 	if (env->empty_key == NULL)
 		return -1;
 	env->path = path;

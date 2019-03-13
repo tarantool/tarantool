@@ -117,9 +117,7 @@ vy_new_simple_stmt(struct tuple_format *format,
 		break;
 	}
 	case IPROTO_SELECT: {
-		const char *key = buf;
-		uint part_count = mp_decode_array(&key);
-		ret = vy_stmt_new_select(stmt_env.key_format, key, part_count);
+		ret = vy_key_from_msgpack(stmt_env.key_format, buf);
 		fail_if(ret == NULL);
 		break;
 	}

@@ -236,20 +236,8 @@ vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
 	return mem_stmt;
 }
 
-/**
- * Create the key statement from raw MessagePack data.
- * @param format     Format of an index.
- * @param key        MessagePack data that contain an array of
- *                   fields WITHOUT the array header.
- * @param part_count Count of the key fields that will be saved as
- *                   result.
- *
- * @retval not NULL Success.
- * @retval     NULL Memory allocation error.
- */
 struct tuple *
-vy_stmt_new_select(struct tuple_format *format, const char *key,
-		   uint32_t part_count)
+vy_key_new(struct tuple_format *format, const char *key, uint32_t part_count)
 {
 	assert(part_count == 0 || key != NULL);
 	/* Key don't have field map */
@@ -649,7 +637,7 @@ vy_stmt_extract_key(const struct tuple *stmt, struct key_def *key_def,
 		return NULL;
 	uint32_t part_count = mp_decode_array(&key_raw);
 	assert(part_count == key_def->part_count);
-	struct tuple *key = vy_stmt_new_select(format, key_raw, part_count);
+	struct tuple *key = vy_key_new(format, key_raw, part_count);
 	/* Cleanup memory allocated by tuple_extract_key(). */
 	region_truncate(region, region_svp);
 	return key;
@@ -668,7 +656,7 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
 		return NULL;
 	uint32_t part_count = mp_decode_array(&key_raw);
 	assert(part_count == key_def->part_count);
-	struct tuple *key = vy_stmt_new_select(format, key_raw, part_count);
+	struct tuple *key = vy_key_new(format, key_raw, part_count);
 	/* Cleanup memory allocated by tuple_extract_key_raw(). */
 	region_truncate(region, region_svp);
 	return key;

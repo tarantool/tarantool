@@ -1435,8 +1435,8 @@ vy_get_by_raw_key(struct vy_lsm *lsm, struct vy_tx *tx,
 		  const char *key_raw, uint32_t part_count,
 		  struct tuple **result)
 {
-	struct tuple *key = vy_stmt_new_select(lsm->env->key_format,
-					       key_raw, part_count);
+	struct tuple *key = vy_key_new(lsm->env->key_format,
+				       key_raw, part_count);
 	if (key == NULL)
 		return -1;
 	int rc = vy_get(lsm, tx, rv, key, result);
@@ -3799,7 +3799,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 			 "mempool", "struct vinyl_iterator");
 		return NULL;
 	}
-	it->key = vy_stmt_new_select(lsm->env->key_format, key, part_count);
+	it->key = vy_key_new(lsm->env->key_format, key, part_count);
 	if (it->key == NULL) {
 		mempool_free(&env->iterator_pool, it);
 		return NULL;

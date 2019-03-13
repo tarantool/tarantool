@@ -382,7 +382,7 @@ vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
 }
 
 /**
- * Create the SELECT statement from raw MessagePack data.
+ * Create a key statement from raw MessagePack data.
  * @param format     Format of an index.
  * @param key        MessagePack data that contain an array of
  *                   fields WITHOUT the array header.
@@ -393,8 +393,7 @@ vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
  * @retval not NULL Success.
  */
 struct tuple *
-vy_stmt_new_select(struct tuple_format *format, const char *key,
-		   uint32_t part_count);
+vy_key_new(struct tuple_format *format, const char *key, uint32_t part_count);
 
 /**
  * Copy the key in a new memory area.
@@ -549,7 +548,7 @@ vy_stmt_upsert_ops(const struct tuple *tuple, uint32_t *mp_size)
 }
 
 /**
- * Create the SELECT statement from MessagePack array.
+ * Create a key statement from MessagePack array.
  * @param format  Format of an index.
  * @param key     MessagePack array of key fields.
  *
@@ -559,13 +558,8 @@ vy_stmt_upsert_ops(const struct tuple *tuple, uint32_t *mp_size)
 static inline struct tuple *
 vy_key_from_msgpack(struct tuple_format *format, const char *key)
 {
-	uint32_t part_count;
-	/*
-	 * The statement already is a key, so simply copy it in
-	 * the new struct vy_stmt as SELECT.
-	 */
-	part_count = mp_decode_array(&key);
-	return vy_stmt_new_select(format, key, part_count);
+	uint32_t part_count = mp_decode_array(&key);
+	return vy_key_new(format, key, part_count);
 }
 
 /**
