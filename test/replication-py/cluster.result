@@ -196,6 +196,10 @@ box.info.vclock[2] == 2
 ---
 - true
 ...
+box.space._cluster:delete{2} ~= nil
+---
+- true
+...
 -------------------------------------------------------------
 JOIN replica to read-only master
 -------------------------------------------------------------
@@ -215,4 +219,8 @@ Cleanup
 -------------------------------------------------------------
 box.schema.user.revoke('guest', 'replication')
 ---
+...
+box.space._cluster:delete{2} ~= nil
+---
+- true
 ...

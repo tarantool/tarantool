@@ -17,24 +17,12 @@ Make a full mesh
 server 1 connected
 server 1 connected
 server 1 connected
-box.info.vclock
----
-- {1: 4}
-...
 server 2 connected
 server 2 connected
 server 2 connected
-box.info.vclock
----
-- {1: 4}
-...
 server 3 connected
 server 3 connected
 server 3 connected
-box.info.vclock
----
-- {1: 4}
-...
 done
 ----------------------------------------------------------------------
 Test inserts
@@ -54,8 +42,8 @@ Insert records
 inserted 60 records
 
 Synchronize
-server 3 done
-server 3 done
+server 1 done
+server 2 done
 server 3 done
 done
 
