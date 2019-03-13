@@ -226,6 +226,10 @@ def receive_response():
         resp_len = s.recv(5)
         resp_len = msgpack.loads(resp_len)
         resp_headerbody = s.recv(resp_len)
+        # wait for the whole data
+        while len(resp_headerbody) < resp_len:
+            chunk = s.recv(resp_len - len(resp_headerbody))
+            resp_headerbody = resp_headerbody + chunk
         unpacker = msgpack.Unpacker(use_list = True)
         unpacker.feed(resp_headerbody)
         resp_header = unpacker.unpack()
@@ -317,6 +321,7 @@ c.close()
 
 admin("space:drop()")
 admin("space2:drop()")
+admin("box.space._cluster:delete{2} ~= nil")
 
 #
 # gh-1280 Segmentation fault on space.select(tuple()) or space.select([2])

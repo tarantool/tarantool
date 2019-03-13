@@ -137,6 +137,10 @@ space:drop()
 space2:drop()
 ---
 ...
+box.space._cluster:delete{2} ~= nil
+---
+- true
+...
 space = box.schema.create_space('gh1280', { engine = 'vinyl' })
 ---
 ...

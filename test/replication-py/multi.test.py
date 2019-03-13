@@ -55,7 +55,6 @@ for server in cluster:
                 fiber.sleep(0.01)
             end;""", server2.id)
         print 'server', server.id, "connected"
-    server.admin("box.info.vclock")
 
 print 'done'
 
@@ -84,7 +83,7 @@ print 'Synchronize'
 for server1 in cluster:
     for server2 in cluster:
         server1.wait_lsn(server2.id, server2.get_lsn(server2.id))
-    print 'server', server.id, 'done'
+    print 'server', server1.id, 'done'
 print 'done'
 print
 

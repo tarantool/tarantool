@@ -239,6 +239,7 @@ replica.admin('box.info.vclock[%d] == 2' % replica_id)
 
 replica.stop()
 replica.cleanup()
+master.admin('box.space._cluster:delete{%d} ~= nil' % replica_id)
 
 print '-------------------------------------------------------------'
 print 'JOIN replica to read-only master'
@@ -288,5 +289,5 @@ print '-------------------------------------------------------------'
 
 # Cleanup
 sys.stdout.pop_filter()
-
 master.admin("box.schema.user.revoke('guest', 'replication')")
+master.admin('box.space._cluster:delete{2} ~= nil')
