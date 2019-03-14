@@ -356,17 +356,14 @@ fio.mktree = function(path, mode)
     local path = string.gsub(path, '^/', '')
     local dirs = string.split(path, "/")
 
-    if #dirs == 1 then
-        return fio.mkdir(path, mode)
-    end
-    local st, err
     local current_dir = "/"
     for i, dir in ipairs(dirs) do
         current_dir = fio.pathjoin(current_dir, dir)
         if not fio.stat(current_dir) then
-            st, err = fio.mkdir(current_dir, mode)
+            local st, err = fio.mkdir(current_dir, mode)
             if err ~= nil  then
-                return false, "Error create dir " .. current_dir .. err
+                return false, string.format("Error creating directory %s: %s",
+                    current_dir, tostring(err))
             end
         end
     end
