@@ -226,6 +226,19 @@ fio.stat(tree) ~= nil
 fio.stat(tmp2) ~= nil
 fio.mktree(tree2, tonumber('0777', 8))
 
+-- check mktree error reporting
+tmp3 = fio.pathjoin(tmpdir, '5')
+fio.mkdir(tmp3)
+fio.chmod(tmp3, tonumber('500', 8))
+tree123 = fio.pathjoin(tmp3, '1/2/3')
+st, err = fio.mktree(tree123)
+st
+err:match('Permission denied') ~= nil
+tree4 = fio.pathjoin(tmp3, '4')
+st, err = fio.mktree(tree4)
+st
+err:match('Permission denied') ~= nil
+
 -- copy and copytree
 file1 = fio.pathjoin(tmp1, 'file.1')
 file2 = fio.pathjoin(tmp2, 'file.2')
