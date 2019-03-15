@@ -268,6 +268,13 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
 }
 
 void
+vy_regulator_set_memory_limit(struct vy_regulator *regulator, size_t limit)
+{
+	vy_quota_set_limit(regulator->quota, limit);
+	vy_regulator_update_dump_watermark(regulator);
+}
+
+void
 vy_regulator_reset_dump_bandwidth(struct vy_regulator *regulator, size_t max)
 {
 	histogram_reset(regulator->dump_bandwidth_hist);

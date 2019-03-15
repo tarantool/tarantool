@@ -2663,7 +2663,7 @@ vinyl_engine_set_memory(struct vinyl_engine *vinyl, size_t size)
 			 "cannot decrease memory size at runtime");
 		return -1;
 	}
-	vy_quota_set_limit(&vinyl->env->quota, size);
+	vy_regulator_set_memory_limit(&vinyl->env->regulator, size);
 	return 0;
 }
 
