@@ -1434,3 +1434,19 @@ test_run:wait_log('default', 'readahead limit is reached', 1024, 0.1)
 
 s:drop()
 box.cfg{readahead = readahead}
+
+--
+-- related to gh-4040: log corrupted rows
+--
+log_level = box.cfg.log_level
+box.cfg{log_level=6}
+sock = socket.tcp_connect(LISTEN.host, LISTEN.service)
+-- we need to have a packet with correctly encoded length,
+-- so that it bypasses iproto length check, but cannot be
+-- decoded in xrow_header_decode
+-- 0x14 = 20, sha1 digest is 20 bytes long
+data = string.fromhex('14'..require('digest').sha1_hex('asdf'))
+sock:write(data)
+sock:close()
+test_run:grep_log('default', 'Corrupted row is: .*')
+box.cfg{log_level=log_level}
