@@ -463,6 +463,8 @@ oneselect(A) ::= SELECT(S) distinct(D) selcollist(W) from(X) where_opt(Y)
 #ifdef SQL_DEBUG
   Token s = S; /*A-overwrites-S*/
 #endif
+  if (L.pLimit != NULL)
+    sql_expr_check_sort_orders(pParse, Z);
   A = sqlSelectNew(pParse,W,X,Y,P,Q,Z,D,L.pLimit,L.pOffset);
 #ifdef SQL_DEBUG
   /* Populate the Select.zSelName[] string that is used to help with

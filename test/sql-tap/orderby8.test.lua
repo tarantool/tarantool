@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(201)
+test:plan(203)
 
 --!./tcltestrunner.lua
 -- 2015-01-19
@@ -49,5 +49,30 @@ for i=1,200 do
             1, 2, 3, 4, 5, 6, 7, 8, 9
     })
 end
+
+-- Tests to check that ORDER BY + LIMIT + (ASC + DESC, different
+-- sorting orders) are forbidden. Such combination is forbidden
+-- because currently it returns data in wrong sorting order.
+-- It will be fixed when multi-directional would be introduced:
+-- https://github.com/tarantool/tarantool/issues/3309
+
+test:do_catchsql_test(
+    "1.201",
+    [[
+        CREATE TABLE t2 (id INT PRIMARY KEY, a INT, b INT);
+        INSERT INTO t2 VALUES (1, 2, 1), (2, -3, 5), (3, 2, -3), (4, 2, 12);
+        SELECT * FROM t2 ORDER BY a ASC, b DESC LIMIT 5;
+    ]],
+    {1, "ORDER BY with LIMIT does not support different sorting orders"}
+)
+
+test:do_catchsql_test(
+    "1.202",
+    [[
+        SELECT * FROM t2 ORDER BY a, b DESC LIMIT 5;
+    ]],
+    {1, "ORDER BY with LIMIT does not support different sorting orders"}
+
+)
 
 test:finish_test()

@@ -3250,6 +3250,24 @@ ExprList *sqlExprListAppendVector(Parse *, ExprList *, IdList *, Expr *);
  */
 void sqlExprListSetSortOrder(ExprList *, enum sort_order sort_order);
 
+/**
+ * Check if sorting orders are the same in ORDER BY and raise an
+ * error if they are not.
+ *
+ * This check is needed only for ORDER BY + LIMIT, because
+ * currently ORDER BY + LIMIT + ASC + DESC produces incorrectly
+ * sorted results and thus forbidden. In future, we will
+ * support different sorting orders in
+ * ORDER BY + LIMIT (e.g. ORDER BY col1 ASC, col2 DESC LIMIT ...)
+ * and remove this check.
+ * @param parse Parsing context.
+ * @param expr_list Expression list with  ORDER BY clause
+ * at the end.
+ */
+void
+sql_expr_check_sort_orders(struct Parse *parse,
+			   const struct ExprList *expr_list);
+
 void sqlExprListSetName(Parse *, ExprList *, Token *, int);
 void sqlExprListSetSpan(Parse *, ExprList *, ExprSpan *);
 u32 sqlExprListFlags(const ExprList *);
