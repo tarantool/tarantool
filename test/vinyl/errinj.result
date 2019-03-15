@@ -827,16 +827,20 @@ errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", true)
 ---
 - ok
 ...
-f = fiber.create(do_read)
+_ = fiber.create(do_read)
 ---
 ...
-f:status()
+test_run:wait_cond(function() return sk:stat().disk.iterator.get.rows > 0 end, 60)
 ---
-- suspended
+- true
 ...
-ret
+pk:stat().disk.iterator.get.rows -- 0
 ---
-- null
+- 0
+...
+sk:stat().disk.iterator.get.rows -- 1
+---
+- 1
 ...
 s:replace{2, 2}
 ---
@@ -846,8 +850,17 @@ errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", false)
 ---
 - ok
 ...
-while ret == nil do fiber.sleep(0.01) end
+test_run:wait_cond(function() return pk:stat().get.rows > 0 end, 60)
 ---
+- true
+...
+pk:stat().get.rows -- 1
+---
+- 1
+...
+sk:stat().get.rows -- 1
+---
+- 1
 ...
 ret
 ---
