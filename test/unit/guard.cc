@@ -2,6 +2,8 @@
 #include "fiber.h"
 #include "unit.h"
 
+static struct fiber_attr default_attr;
+
 static void
 sigsegf_handler(int signo)
 {
@@ -17,7 +19,7 @@ stack_break_f(char *ptr)
 	memset(block, 0xff, 2048);
 	sum += block[block[4]];
 	ptrdiff_t stack_diff = ptr > block ? ptr - block : block - ptr;
-	if (stack_diff < 65536)
+	if (stack_diff < (ptrdiff_t)default_attr.stack_size)
 		sum += stack_break_f(ptr);
 	return sum;
 }
@@ -49,6 +51,7 @@ int main()
 {
 	memory_init();
 	fiber_init(fiber_cxx_invoke);
+	fiber_attr_create(&default_attr);
 	struct fiber *fmain = fiber_new_xc("main", main_f);
 	fiber_wakeup(fmain);
 	ev_run(loop(), 0);

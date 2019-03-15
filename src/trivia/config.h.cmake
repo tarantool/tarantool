@@ -70,6 +70,7 @@
  */
 #define MAP_ANONYMOUS MAP_ANON
 #endif
+#cmakedefine HAVE_MADV_DONTNEED 1
 /*
  * Defined if O_DSYNC mode exists for open(2).
  */

@@ -348,6 +348,19 @@ struct fiber {
 	struct slab *stack_slab;
 	/** Coro stack addr. */
 	void *stack;
+#ifdef HAVE_MADV_DONTNEED
+	/**
+	 * We want to keep total stack memory usage low while still
+	 * allowing tasks that need a greater than average stack.
+	 * To achieve that, we write some poison values to stack
+	 * at "watermark" position and call madvise(MADV_DONTNEED)
+	 * when a fiber is recycled in case a poison value has been
+	 * overwritten. This allows to keep per-fiber stack memory
+	 * usage below the watermark while avoiding any performance
+	 * penalty if there are no tasks eager for stack.
+	 */
+	void *stack_watermark;
+#endif
 	/** Coro stack size. */
 	size_t stack_size;
 	/** Valgrind stack id. */
