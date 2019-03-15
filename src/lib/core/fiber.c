@@ -96,6 +96,8 @@ enum {
 	FIBER_STACK_SIZE_MINIMAL = 16384,
 	/* Default fiber stack size in bytes */
 	FIBER_STACK_SIZE_DEFAULT = 524288,
+	/* Stack size watermark in bytes. */
+	FIBER_STACK_SIZE_WATERMARK = 65536,
 };
 
 /** Default fiber attributes */
@@ -103,6 +105,28 @@ static const struct fiber_attr fiber_attr_default = {
        .stack_size = FIBER_STACK_SIZE_DEFAULT,
        .flags = FIBER_DEFAULT_FLAGS
 };
+
+#ifdef HAVE_MADV_DONTNEED
+/*
+ * Random values generated with uuid.
+ * Used for stack poisoning.
+ */
+static const uint64_t poison_pool[] = {
+	0x74f31d37285c4c37, 0xb10269a05bf10c29,
+	0x0994d845bd284e0f, 0x9ffd4f7129c184df,
+	0x357151e6711c4415, 0x8c5e5f41aafe6f28,
+	0x6917dd79e78049d5, 0xba61957c65ca2465,
+};
+
+/*
+ * We poison by 8 bytes as it's natural for stack
+ * step on x86-64. Also 128 byte gap between poison
+ * values should cover common cases.
+ */
+#define POISON_SIZE	(sizeof(poison_pool) / sizeof(poison_pool[0]))
+#define POISON_OFF	(128 / sizeof(poison_pool[0]))
+
+#endif /* HAVE_MADV_DONTNEED */
 
 void
 fiber_attr_create(struct fiber_attr *fiber_attr)
@@ -155,6 +179,9 @@ fiber_attr_getstacksize(struct fiber_attr *fiber_attr)
 
 static void
 fiber_recycle(struct fiber *fiber);
+
+static void
+fiber_stack_recycle(struct fiber *fiber);
 
 static void
 fiber_destroy(struct cord *cord, struct fiber *f);
@@ -624,6 +651,7 @@ fiber_recycle(struct fiber *fiber)
 	/* no pending wakeup */
 	assert(rlist_empty(&fiber->state));
 	bool has_custom_stack = fiber->flags & FIBER_CUSTOM_STACK;
+	fiber_stack_recycle(fiber);
 	fiber_reset(fiber);
 	fiber->name[0] = '\0';
 	fiber->f = NULL;
@@ -710,6 +738,114 @@ page_align_up(void *ptr)
 	return page_align_down(ptr + page_size - 1);
 }
 
+#ifdef HAVE_MADV_DONTNEED
+/**
+ * Check if stack poison values are present starting from
+ * the address provided.
+ */
+static bool
+stack_has_watermark(void *addr)
+{
+	const uint64_t *src = poison_pool;
+	const uint64_t *dst = addr;
+	size_t i;
+
+	for (i = 0; i < POISON_SIZE; i++) {
+		if (*dst != src[i])
+			return false;
+		dst += POISON_OFF;
+	}
+	return true;
+}
+
+/**
+ * Put stack poison values starting from the address provided.
+ */
+static void
+stack_put_watermark(void *addr)
+{
+	const uint64_t *src = poison_pool;
+	uint64_t *dst = addr;
+	size_t i;
+
+	for (i = 0; i < POISON_SIZE; i++) {
+		*dst = src[i];
+		dst += POISON_OFF;
+	}
+}
+
+/**
+ * Free stack memory above the watermark when a fiber is recycled.
+ * To avoid a pointless syscall invocation in case the fiber hasn't
+ * touched memory above the watermark, we only call madvise() if
+ * the fiber has overwritten a poison value.
+ */
+static void
+fiber_stack_recycle(struct fiber *fiber)
+{
+	if (fiber->stack_watermark == NULL ||
+	    stack_has_watermark(fiber->stack_watermark))
+		return;
+	/*
+	 * When dropping pages make sure the page containing
+	 * the watermark isn't touched since we're updating
+	 * it anyway.
+	 */
+	void *start, *end;
+	if (stack_direction < 0) {
+		start = fiber->stack;
+		end = page_align_down(fiber->stack_watermark);
+	} else {
+		start = page_align_up(fiber->stack_watermark);
+		end = fiber->stack + fiber->stack_size;
+	}
+	madvise(start, end - start, MADV_DONTNEED);
+	stack_put_watermark(fiber->stack_watermark);
+}
+
+/**
+ * Initialize fiber stack watermark.
+ */
+static void
+fiber_stack_watermark_create(struct fiber *fiber)
+{
+	assert(fiber->stack_watermark == NULL);
+
+	/* No tracking on custom stacks for simplicity. */
+	if (fiber->flags & FIBER_CUSTOM_STACK)
+		return;
+
+	/*
+	 * We don't expect the whole stack usage in regular
+	 * loads, let's try to minimize rss pressure.
+	 */
+	madvise(fiber->stack, fiber->stack_size, MADV_DONTNEED);
+
+	/*
+	 * To increase probability of stack overflow detection
+	 * we put the first mark at a random position.
+	 */
+	size_t offset = rand() % POISON_OFF * sizeof(poison_pool[0]);
+	if (stack_direction < 0) {
+		fiber->stack_watermark  = fiber->stack + fiber->stack_size;
+		fiber->stack_watermark -= FIBER_STACK_SIZE_WATERMARK;
+		fiber->stack_watermark += offset;
+	} else {
+		fiber->stack_watermark  = fiber->stack;
+		fiber->stack_watermark += FIBER_STACK_SIZE_WATERMARK;
+		fiber->stack_watermark -= page_size;
+		fiber->stack_watermark += offset;
+	}
+	stack_put_watermark(fiber->stack_watermark);
+}
+#else
+static void
+fiber_stack_watermark_create(struct fiber *fiber)
+{
+	(void)fiber;
+}
+#endif /* HAVE_MADV_DONTNEED */
+
 static int
 fiber_stack_create(struct fiber *fiber, size_t stack_size)
 {
@@ -751,6 +887,7 @@ fiber_stack_create(struct fiber *fiber, size_t stack_size)
 						  fiber->stack_size);
 
 	mprotect(guard, page_size, PROT_NONE);
+	fiber_stack_watermark_create(fiber);
 	return 0;
 }
 
@@ -923,6 +1060,7 @@ cord_create(struct cord *cord, const char *name)
 	cord->sched.stack = NULL;
 	cord->sched.stack_size = 0;
 #endif
+	cord->sched.stack_watermark = NULL;
 }
 
 void
