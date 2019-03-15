@@ -29,8 +29,8 @@ t = {513, 1, 'test', 'memtx', 0, opts, format}
 ...
 s = box.space._space:insert(t)
 ---
-- error: 'Wrong space options (field 5): invalid expression specified (SQL error:
-    Syntax error near ''<'')'
+- error: 'Wrong space options (field 5): invalid expression specified (Syntax error
+    near ''<'')'
 ...
 opts = {checks = {{expr = 'X>5'}}}
 ---
@@ -122,8 +122,8 @@ box.sql.execute("DROP TABLE w2;")
 --
 box.sql.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
 ---
-- error: 'Wrong space options (field 5): invalid expression specified (SQL error:
-    bindings are not allowed in DDL)'
+- error: 'Wrong space options (field 5): invalid expression specified (bindings are
+    not allowed in DDL)'
 ...
 opts = {checks = {{expr = '?>5', name = 'ONE'}}}
 ---
@@ -136,8 +136,8 @@ t = {513, 1, 'test', 'memtx', 0, opts, format}
 ...
 s = box.space._space:insert(t)
 ---
-- error: 'Wrong space options (field 5): invalid expression specified (SQL error:
-    bindings are not allowed in DDL)'
+- error: 'Wrong space options (field 5): invalid expression specified (bindings are
+    not allowed in DDL)'
 ...
 test_run:cmd("clear filter")
 ---

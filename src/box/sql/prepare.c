@@ -52,7 +52,6 @@ sqlPrepare(sql * db,	/* Database handle. */
 	       const char **pzTail	/* OUT: End of parsed string */
     )
 {
-	char *zErrMsg = 0;	/* Error message */
 	int rc = SQL_OK;	/* Result code */
 	Parse sParse;		/* Parsing context */
 	sql_parser_create(&sParse, db);
@@ -89,14 +88,14 @@ sqlPrepare(sql * db,	/* Database handle. */
 		}
 		zSqlCopy = sqlDbStrNDup(db, zSql, nBytes);
 		if (zSqlCopy) {
-			sqlRunParser(&sParse, zSqlCopy, &zErrMsg);
+			sqlRunParser(&sParse, zSqlCopy);
 			sParse.zTail = &zSql[sParse.zTail - zSqlCopy];
 			sqlDbFree(db, zSqlCopy);
 		} else {
 			sParse.zTail = &zSql[nBytes];
 		}
 	} else {
-		sqlRunParser(&sParse, zSql, &zErrMsg);
+		sqlRunParser(&sParse, zSql);
 	}
 	assert(0 == sParse.nQueryLoop);
 
@@ -168,11 +167,7 @@ sqlPrepare(sql * db,	/* Database handle. */
 		*ppStmt = (sql_stmt *) sParse.pVdbe;
 	}
 
-	if (zErrMsg) {
-		sqlErrorWithMsg(db, rc, "%s", zErrMsg);
-	} else {
-		sqlError(db, rc);
-	}
+	db->errCode = rc;
 
 	/* Delete any TriggerPrg structures allocated while parsing this statement. */
 	while (sParse.pTriggerPrg) {

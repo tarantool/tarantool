@@ -3198,7 +3198,7 @@ void sqlDequote(char *);
 void sqlNormalizeName(char *z);
 void sqlTokenInit(Token *, char *);
 int sqlKeywordCode(const unsigned char *, int);
-int sqlRunParser(Parse *, const char *, char **);
+int sqlRunParser(Parse *, const char *);
 
 /**
  * Increment error counter.
