@@ -14,15 +14,15 @@ index = space:create_index('primary')
 help()
 ---
 - - |
-    To get help, see the Tarantool manual at https://tarantool.org/doc/
-    To start the interactive Tarantool tutorial, type 'tutorial()'
+    To get help, see the Tarantool manual at http://tarantool.io/en/doc/
+    To start the interactive Tarantool tutorial, type 'tutorial()' here.
 
     Available backslash commands:
 
-      \set language <language> for setting language
-      \set delimiter <delimiter> for setting delimiter
-      \help show this screen
-      \quit quit interactive console
+      \set language <language> -- for setting language (lua or sql)
+      \set delimiter <delimiter> -- for setting end-of-line delimiter
+      \help -- show this screen
+      \quit -- quit interactive console
 ...
 cfg_filter(box.cfg)
 ---
