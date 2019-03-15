@@ -95,7 +95,7 @@ enum {
 	/* The minimum allowable fiber stack size in bytes */
 	FIBER_STACK_SIZE_MINIMAL = 16384,
 	/* Default fiber stack size in bytes */
-	FIBER_STACK_SIZE_DEFAULT = 65536
+	FIBER_STACK_SIZE_DEFAULT = 524288,
 };
 
 /** Default fiber attributes */
