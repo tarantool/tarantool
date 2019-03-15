@@ -157,6 +157,12 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
 			   size_t mem_dumped, double dump_duration);
 
 /**
+ * Set memory limit and update the dump watermark accordingly.
+ */
+void
+vy_regulator_set_memory_limit(struct vy_regulator *regulator, size_t limit);
+
+/**
  * Reset dump bandwidth histogram and update initial estimate.
  * Called when box.cfg.snap_io_rate_limit is updated.
  */
