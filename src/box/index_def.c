@@ -291,6 +291,11 @@ index_def_is_valid(struct index_def *index_def, const char *space_name)
 			 space_name, "too many key parts");
 		return false;
 	}
+	if (index_def->iid == 0 && key_def_is_multikey(index_def->key_def)) {
+		diag_set(ClientError, ER_MODIFY_INDEX, index_def->name,
+			 space_name, "primary key cannot be multikey");
+		return false;
+	}
 	for (uint32_t i = 0; i < index_def->key_def->part_count; i++) {
 		assert(index_def->key_def->parts[i].type < field_type_MAX);
 		if (index_def->key_def->parts[i].fieldno > BOX_INDEX_FIELD_MAX) {

@@ -115,6 +115,7 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 	assert(has_optional_parts == key_def->has_optional_parts);
 	assert(contains_sequential_parts ==
 	       key_def_contains_sequential_parts(key_def));
+	assert(!key_def_is_multikey(key_def));
 	assert(mp_sizeof_nil() == 1);
 	const char *data = tuple_data(tuple);
 	uint32_t part_count = key_def->part_count;
@@ -234,6 +235,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
+	assert(!key_def_is_multikey(key_def));
 	assert(mp_sizeof_nil() == 1);
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc(&fiber()->gc, data_end - data);
@@ -310,7 +312,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 		const char *src_end = field_end;
 		if (has_json_paths && part->path != NULL) {
 			if (tuple_go_to_path(&src, part->path,
-						   part->path_len) != 0) {
+					     part->path_len, -1) != 0) {
 				/*
 				 * The path must be correct as
 				 * it has already been validated
@@ -349,6 +351,7 @@ static void
 key_def_set_extract_func_plain(struct key_def *def)
 {
 	assert(!def->has_json_paths);
+	assert(!key_def_is_multikey(def));
 	if (key_def_is_sequential(def)) {
 		assert(contains_sequential_parts || def->part_count == 1);
 		def->tuple_extract_key = tuple_extract_key_sequential

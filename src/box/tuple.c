@@ -453,7 +453,8 @@ tuple_field_go_to_key(const char **field, const char *key, int len)
 }
 
 int
-tuple_go_to_path(const char **data, const char *path, uint32_t path_len)
+tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
+		 int multikey_idx)
 {
 	int rc;
 	struct json_lexer lexer;
@@ -461,6 +462,11 @@ tuple_go_to_path(const char **data, const char *path, uint32_t path_len)
 	json_lexer_create(&lexer, path, path_len, TUPLE_INDEX_BASE);
 	while ((rc = json_lexer_next_token(&lexer, &token)) == 0) {
 		switch (token.type) {
+		case JSON_TOKEN_ANY:
+			if (multikey_idx < 0)
+				return -1;
+			token.num = multikey_idx;
+			FALLTHROUGH;
 		case JSON_TOKEN_NUM:
 			rc = tuple_field_go_to_index(data, token.num);
 			break;
@@ -530,7 +536,24 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 	}
 	return tuple_field_raw_by_path(format, tuple, field_map, fieldno,
 				       path + lexer.offset,
-				       path_len - lexer.offset, NULL);
+				       path_len - lexer.offset, NULL, -1);
+}
+
+uint32_t
+tuple_raw_multikey_count(struct tuple_format *format, const char *data,
+			       const uint32_t *field_map,
+			       struct key_def *key_def)
+{
+	assert(key_def_is_multikey(key_def));
+	const char *array_raw =
+		tuple_field_raw_by_path(format, data, field_map,
+					key_def->multikey_fieldno,
+					key_def->multikey_path,
+					key_def->multikey_path_len, NULL, -1);
+	if (array_raw == NULL)
+		return 0;
+	assert(mp_typeof(*array_raw) == MP_ARRAY);
+	return mp_decode_array(&array_raw);
 }
 
 /* }}} tuple_field_* getters */

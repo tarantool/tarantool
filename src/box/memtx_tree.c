@@ -584,6 +584,139 @@ memtx_tree_index_replace(struct index *base, struct tuple *old_tuple,
 	return 0;
 }
 
+/**
+ * Perform tuple insertion by given multikey index.
+ * In case of replacement, all old tuple entries are deleted
+ * by all it's multikey indexes.
+ */
+static int
+memtx_tree_index_replace_multikey_one(struct memtx_tree_index *index,
+			struct tuple *old_tuple, struct tuple *new_tuple,
+			enum dup_replace_mode mode, int multikey_idx,
+			struct tuple **replaced_tuple)
+{
+	struct memtx_tree_data new_data, dup_data;
+	new_data.tuple = new_tuple;
+	new_data.hint = multikey_idx;
+	dup_data.tuple = NULL;
+	if (memtx_tree_insert(&index->tree, new_data, &dup_data) != 0) {
+		diag_set(OutOfMemory, MEMTX_EXTENT_SIZE, "memtx_tree_index",
+			 "replace");
+		return -1;
+	}
+	int errcode = 0;
+	if (dup_data.tuple == new_tuple) {
+		/*
+		 * When tuple contains the same key multiple
+		 * times, the previous key occurrence is pushed
+		 * out of the index.
+		 */
+		dup_data.tuple = NULL;
+	} else if ((errcode = replace_check_dup(old_tuple, dup_data.tuple,
+					        mode)) != 0) {
+		/* Rollback replace. */
+		memtx_tree_delete(&index->tree, new_data);
+		if (dup_data.tuple != NULL)
+			memtx_tree_insert(&index->tree, dup_data, NULL);
+		struct space *sp = space_cache_find(index->base.def->space_id);
+		if (sp != NULL) {
+			diag_set(ClientError, errcode, index->base.def->name,
+				 space_name(sp));
+		}
+		return -1;
+	}
+	*replaced_tuple = dup_data.tuple;
+	return 0;
+}
+
+/**
+ * Rollback the sequence of memtx_tree_index_replace_multikey_one
+ * insertions with multikey indexes [0, err_multikey_idx - 1]
+ * where the err_multikey_idx is the first multikey index where
+ * error has been raised.
+ *
+ * This routine can't fail because all replaced_tuple (when
+ * specified) nodes in tree are already allocated (they might be
+ * overridden with new_tuple, but they definitely present) and
+ * delete operation is fault-tolerant.
+ */
+static void
+memtx_tree_index_replace_multikey_rollback(struct memtx_tree_index *index,
+			struct tuple *new_tuple, struct tuple *replaced_tuple,
+			int err_multikey_idx)
+{
+	struct memtx_tree_data data;
+	if (replaced_tuple != NULL) {
+		/* Restore replaced tuple index occurrences. */
+		struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+		data.tuple = replaced_tuple;
+		uint32_t multikey_count =
+			tuple_multikey_count(replaced_tuple, cmp_def);
+		for (int i = 0; (uint32_t) i < multikey_count; i++) {
+			data.hint = i;
+			memtx_tree_insert(&index->tree, data, NULL);
+		}
+	}
+	/*
+	 * Rollback new_tuple insertion by multikey index
+	 * [0, multikey_idx).
+	 */
+	data.tuple = new_tuple;
+	for (int i = 0; i < err_multikey_idx; i++) {
+		data.hint = i;
+		memtx_tree_delete_identical(&index->tree, data);
+	}
+}
+
+static int
+memtx_tree_index_replace_multikey(struct index *base, struct tuple *old_tuple,
+			struct tuple *new_tuple, enum dup_replace_mode mode,
+			struct tuple **result)
+{
+	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	*result = NULL;
+	if (new_tuple != NULL) {
+		int multikey_idx = 0, err = 0;
+		uint32_t multikey_count =
+			tuple_multikey_count(new_tuple, cmp_def);
+		for (; (uint32_t) multikey_idx < multikey_count;
+		     multikey_idx++) {
+			struct tuple *replaced_tuple;
+			err = memtx_tree_index_replace_multikey_one(index,
+						old_tuple, new_tuple, mode,
+						multikey_idx, &replaced_tuple);
+			if (err != 0)
+				break;
+			if (replaced_tuple != NULL) {
+				assert(*result == NULL ||
+				       *result == replaced_tuple);
+				*result = replaced_tuple;
+			}
+		}
+		if (err != 0) {
+			memtx_tree_index_replace_multikey_rollback(index,
+					new_tuple, *result, multikey_idx);
+			return -1;
+		}
+		if (*result != NULL) {
+			assert(old_tuple == NULL || old_tuple == *result);
+			old_tuple = *result;
+		}
+	}
+	if (old_tuple != NULL) {
+		struct memtx_tree_data data;
+		data.tuple = old_tuple;
+		uint32_t multikey_count =
+			tuple_multikey_count(old_tuple, cmp_def);
+		for (int i = 0; (uint32_t) i < multikey_count; i++) {
+			data.hint = i;
+			memtx_tree_delete_identical(&index->tree, data);
+		}
+	}
+	return 0;
+}
+
 static struct iterator *
 memtx_tree_index_create_iterator(struct index *base, enum iterator_type type,
 				 const char *key, uint32_t part_count)
@@ -655,11 +788,11 @@ memtx_tree_index_reserve(struct index *base, uint32_t size_hint)
 	return 0;
 }
 
+/** Initialize the next element of the index build_array. */
 static int
-memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
+memtx_tree_index_build_array_append(struct memtx_tree_index *index,
+				    struct tuple *tuple, hint_t hint)
 {
-	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
-	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	if (index->build_array == NULL) {
 		index->build_array = malloc(MEMTX_EXTENT_SIZE);
 		if (index->build_array == NULL) {
@@ -673,7 +806,7 @@ memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
 	assert(index->build_array_size <= index->build_array_alloc_size);
 	if (index->build_array_size == index->build_array_alloc_size) {
 		index->build_array_alloc_size = index->build_array_alloc_size +
-					index->build_array_alloc_size / 2;
+				DIV_ROUND_UP(index->build_array_alloc_size, 2);
 		struct memtx_tree_data *tmp =
 			realloc(index->build_array,
 				index->build_array_alloc_size * sizeof(*tmp));
@@ -687,8 +820,60 @@ memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
 	struct memtx_tree_data *elem =
 		&index->build_array[index->build_array_size++];
 	elem->tuple = tuple;
-	elem->hint = tuple_hint(tuple, cmp_def);
+	elem->hint = hint;
 	return 0;
+}
+
+static int
+memtx_tree_index_build_next(struct index *base, struct tuple *tuple)
+{
+	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	return memtx_tree_index_build_array_append(index, tuple,
+						   tuple_hint(tuple, cmp_def));
+}
+
+static int
+memtx_tree_index_build_next_multikey(struct index *base, struct tuple *tuple)
+{
+	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	uint32_t multikey_count = tuple_multikey_count(tuple, cmp_def);
+	for (uint32_t multikey_idx = 0; multikey_idx < multikey_count;
+	     multikey_idx++) {
+		if (memtx_tree_index_build_array_append(index, tuple,
+							multikey_idx) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+/**
+ * Process build_array of specified index and remove duplicates
+ * of equal tuples (in terms of index's cmp_def and have same
+ * tuple pointer). The build_array is expected to be sorted.
+ */
+static void
+memtx_tree_index_build_array_deduplicate(struct memtx_tree_index *index)
+{
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
+	size_t w_idx = 0, r_idx = 1;
+	while (r_idx < index->build_array_size) {
+		if (index->build_array[w_idx].tuple !=
+		    index->build_array[r_idx].tuple ||
+		    tuple_compare_hinted(index->build_array[w_idx].tuple,
+					index->build_array[w_idx].hint,
+					index->build_array[r_idx].tuple,
+					index->build_array[r_idx].hint,
+					cmp_def) != 0) {
+			/* Do not override the element itself. */
+			if (++w_idx == r_idx)
+				continue;
+			index->build_array[w_idx] = index->build_array[r_idx];
+		}
+		r_idx++;
+	}
+	index->build_array_size = w_idx + 1;
 }
 
 static void
@@ -698,6 +883,16 @@ memtx_tree_index_end_build(struct index *base)
 	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	qsort_arg(index->build_array, index->build_array_size,
 		  sizeof(index->build_array[0]), memtx_tree_qcompare, cmp_def);
+	if (key_def_is_multikey(cmp_def)) {
+		/*
+		 * Multikey index may have equal(in terms of
+		 * cmp_def) keys inserted by different multikey
+		 * offsets. We must deduplicate them because
+		 * the following memtx_tree_build assumes that
+		 * all keys are unique.
+		 */
+		memtx_tree_index_build_array_deduplicate(index);
+	}
 	memtx_tree_build(&index->tree, index->build_array,
 			 index->build_array_size);
 
@@ -793,6 +988,36 @@ static const struct index_vtab memtx_tree_index_vtab = {
 	/* .end_build = */ memtx_tree_index_end_build,
 };
 
+static const struct index_vtab memtx_tree_index_multikey_vtab = {
+	/* .destroy = */ memtx_tree_index_destroy,
+	/* .commit_create = */ generic_index_commit_create,
+	/* .abort_create = */ generic_index_abort_create,
+	/* .commit_modify = */ generic_index_commit_modify,
+	/* .commit_drop = */ generic_index_commit_drop,
+	/* .update_def = */ memtx_tree_index_update_def,
+	/* .depends_on_pk = */ memtx_tree_index_depends_on_pk,
+	/* .def_change_requires_rebuild = */
+		memtx_index_def_change_requires_rebuild,
+	/* .size = */ memtx_tree_index_size,
+	/* .bsize = */ memtx_tree_index_bsize,
+	/* .min = */ generic_index_min,
+	/* .max = */ generic_index_max,
+	/* .random = */ memtx_tree_index_random,
+	/* .count = */ memtx_tree_index_count,
+	/* .get = */ memtx_tree_index_get,
+	/* .replace = */ memtx_tree_index_replace_multikey,
+	/* .create_iterator = */ memtx_tree_index_create_iterator,
+	/* .create_snapshot_iterator = */
+		memtx_tree_index_create_snapshot_iterator,
+	/* .stat = */ generic_index_stat,
+	/* .compact = */ generic_index_compact,
+	/* .reset_stat = */ generic_index_reset_stat,
+	/* .begin_build = */ memtx_tree_index_begin_build,
+	/* .reserve = */ memtx_tree_index_reserve,
+	/* .build_next = */ memtx_tree_index_build_next_multikey,
+	/* .end_build = */ memtx_tree_index_end_build,
+};
+
 struct index *
 memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 {
@@ -803,8 +1028,11 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 			 "malloc", "struct memtx_tree_index");
 		return NULL;
 	}
+	const struct index_vtab *vtab = key_def_is_multikey(def->key_def) ?
+					&memtx_tree_index_multikey_vtab :
+					&memtx_tree_index_vtab;
 	if (index_create(&index->base, (struct engine *)memtx,
-			 &memtx_tree_index_vtab, def) != 0) {
+			 vtab, def) != 0) {
 		free(index);
 		return NULL;
 	}

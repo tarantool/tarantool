@@ -179,6 +179,11 @@ luaT_key_def_set_part(struct lua_State *L, struct key_part_def *part,
 			diag_set(IllegalParams, "invalid path");
 			return -1;
 		}
+		if ((size_t)json_path_multikey_offset(path, path_len,
+					      TUPLE_INDEX_BASE) != path_len) {
+			diag_set(IllegalParams, "multikey path is unsupported");
+			return -1;
+		}
 		char *tmp = region_alloc(region, path_len + 1);
 		if (tmp == NULL) {
 			diag_set(OutOfMemory, path_len + 1, "region", "path");

@@ -701,6 +701,11 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 	}
+	if (key_def_is_multikey(index_def->key_def)) {
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "Vinyl", "multikey indexes");
+		return -1;
+	}
 	return 0;
 }
 
@@ -1018,6 +1023,8 @@ vinyl_index_def_change_requires_rebuild(struct index *index,
 				  TUPLE_INDEX_BASE) != 0)
 			return true;
 	}
+	assert(key_def_is_multikey(old_cmp_def) ==
+	       key_def_is_multikey(new_cmp_def));
 	return false;
 }
 

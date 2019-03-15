@@ -1192,8 +1192,9 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	size_t total = sizeof(struct memtx_tuple) + format->field_map_size +
-		tuple->bsize;
+	const uint32_t *field_map = tuple_field_map(tuple);
+	size_t total = sizeof(struct memtx_tuple) + tuple->bsize +
+		       field_map_get_size(field_map, format->field_map_size);
 	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
@@ -1330,5 +1331,7 @@ memtx_index_def_change_requires_rebuild(struct index *index,
 				  TUPLE_INDEX_BASE) != 0)
 			return true;
 	}
+	assert(key_def_is_multikey(old_cmp_def) ==
+	       key_def_is_multikey(new_cmp_def));
 	return false;
 }

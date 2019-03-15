@@ -32,8 +32,10 @@
  */
 #include <assert.h>
 #include <stdint.h>
+#include <stddef.h>
 
 struct region;
+struct field_map_builder_slot;
 
 /**
  * A field map is a special area is reserved before tuple's
@@ -46,13 +48,15 @@ struct region;
  * offset_slot(s) is performed on tuple_format creation on index
  * create or alter (see tuple_format_create()).
  *
- *              4b          4b       MessagePack data.
- *           +------+----+------+---------------------------+
- *    tuple: | offN | .. | off1 | header ..|key1|..|keyN|.. |
- *           +--+---+----+--+---+---------------------------+
- *           |     ...    |                 ^       ^
- *           |            +-----------------+       |
- *           +--------------------------------------+
+ *        4b   4b      4b          4b       MessagePack data.
+ *       +-----------+------+----+------+------------------------+
+ *tuple: |cnt|off1|..| offN | .. | off1 | header ..|key1|..|keyN||
+ *       +-----+-----+--+---+----+--+---+------------------------+
+ * ext1  ^     |        |   ...     |                 ^       ^
+ *       +-----|--------+           |                 |       |
+ * indirection |                    +-----------------+       |
+ *             +----------------------------------------------+
+ *             (offset_slot = N, extent_slot = 1) --> offset
  *
  * This field_map_builder class is used for tuple field_map
  * construction. It encapsulates field_map build logic and size
@@ -60,6 +64,14 @@ struct region;
  *
  * Each field offset is a positive number, except the case when
  * a field is not in the tuple. In this case offset is 0.
+ *
+ * In case of multikey index, the slot may refer to the
+ * "field_map_extent" sequence that contains an additional
+ * sequence of length defined before (the count of keys in the
+ * multikey index for given tuple). In such case offset slot
+ * represents int32_t negative value - the offset relative to
+ * the field_map pointer. The i-th extent's slot contains the
+ * positive offset of the i-th key field of the multikey index.
  */
 struct field_map_builder {
 	/**
@@ -67,12 +79,60 @@ struct field_map_builder {
 	 * Its elements are accessible by negative indexes
 	 * that coinciding with offset_slot(s).
 	 */
-	uint32_t *slots;
+	struct field_map_builder_slot *slots;
 	/**
 	 * The count of slots in field_map_builder::slots
 	 * allocation.
 	 */
 	uint32_t slot_count;
+	/**
+	 * Total size of memory is allocated for field_map
+	 * extents.
+	 */
+	uint32_t extents_size;
+};
+
+/**
+ * Internal stucture representing field_map extent.
+ * (see field_map_builder description).
+ */
+struct field_map_builder_slot_extent {
+	/**
+	 * Count of field_map_builder_slot_extent::offset[]
+	 * elements.
+	 */
+	uint32_t size;
+	/** Data offset in tuple array. */
+	uint32_t offset[0];
+};
+
+/**
+ * Instead of using uint32_t offset slots directly the
+ * field_map_builder uses this structure as a storage atom.
+ * When there is a need to initialize an extent, the
+ * field_map_builder allocates a new memory chunk and sets
+ * field_map_builder_slot::pointer (instead of real field_map
+ * reallocation).
+ *
+ * On field_map_build, all of the field_map_builder_slot_extent(s)
+ * are dumped to the same memory chunk that the regular field_map
+ * slots and corresponding slots are initialized with negative
+ * extent offset.
+ *
+ * The allocated memory is accounted for in extents_size.
+ */
+struct field_map_builder_slot {
+	/**
+	 * True when this slot must be interpret as
+	 * extent pointer.
+	 */
+	bool has_extent;
+	union {
+		/** Data offset in tuple. */
+		uint32_t offset;
+		/** Pointer to field_map extent. */
+		struct field_map_builder_slot_extent *extent;
+	};
 };
 
 /**
@@ -82,10 +142,39 @@ struct field_map_builder {
  * When a field is not in the data tuple, its offset is 0.
  */
 static inline uint32_t
-field_map_get_offset(const uint32_t *field_map, int32_t offset_slot)
+field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
+		     int multikey_idx)
 {
-	return field_map[offset_slot];
+	uint32_t offset;
+	if (multikey_idx >= 0 && field_map[offset_slot] > 0) {
+		assert((int32_t)field_map[offset_slot] < 0);
+		/**
+		 * The field_map extent has the following
+		 * structure: [size=N|slot1|slot2|..|slotN]
+		 */
+		uint32_t *extent = (uint32_t *)((char *)field_map +
+					(int32_t)field_map[offset_slot]);
+		if ((uint32_t)multikey_idx >= extent[0])
+			return 0;
+		offset = extent[multikey_idx + 1];
+	} else {
+		offset = field_map[offset_slot];
+	}
+	return offset;
 }
+
+/**
+ * Get size of the tuple field_map using
+ * field_map pointer and format root field_map size.
+ *
+ * In case of multikey indexes the real field_map size may be
+ * greater than the size of format root field_map. To calculate
+ * the total size of the field_map extentions, routine relies
+ * on the fact that all field_map slots that has an extention
+ * use negative offset as a marker.
+ */
+uint32_t
+field_map_get_size(const uint32_t *field_map, uint32_t format_field_map_sz);
 
 /**
  * Initialize field_map_builder.
@@ -105,19 +194,52 @@ field_map_builder_create(struct field_map_builder *builder,
 			 struct region *region);
 
 /**
+ * Internal function to allocate field map extent by offset_slot
+ * and count of multikey keys.
+ */
+struct field_map_builder_slot_extent *
+field_map_builder_slot_extent_new(struct field_map_builder *builder,
+				  int32_t offset_slot, uint32_t multikey_count,
+				  struct region *region);
+
+/**
  * Set data offset for a field identified by unique offset_slot.
+ *
+ * When multikey_idx > 0 this routine initialize corresponding
+ * field_map_builder_slot_extent is identified by multikey_idx
+ * and multikey_count. Performs allocation on region when
+ * required.
  *
  * The offset_slot argument must be negative and offset must be
  * positive (by definition).
  */
-static inline void
+static inline int
 field_map_builder_set_slot(struct field_map_builder *builder,
-			   int32_t offset_slot, uint32_t offset)
+			   int32_t offset_slot, uint32_t offset,
+			   int32_t multikey_idx, uint32_t multikey_count,
+			   struct region *region)
 {
 	assert(offset_slot < 0);
 	assert((uint32_t)-offset_slot <= builder->slot_count);
 	assert(offset > 0);
-	builder->slots[offset_slot] = offset;
+	assert(multikey_idx < (int32_t)multikey_count);
+	if (multikey_idx == -1) {
+		builder->slots[offset_slot].offset = offset;
+	} else {
+		struct field_map_builder_slot_extent *extent;
+		if (builder->slots[offset_slot].has_extent) {
+			extent = builder->slots[offset_slot].extent;
+			assert(extent != NULL);
+			assert(extent->size == multikey_count);
+		} else {
+			extent = field_map_builder_slot_extent_new(builder,
+					offset_slot, multikey_count, region);
+			if (extent == NULL)
+				return -1;
+		}
+		extent->offset[multikey_idx] = offset;
+	}
+	return 0;
 }
 
 /**
@@ -126,7 +248,8 @@ field_map_builder_set_slot(struct field_map_builder *builder,
 static inline uint32_t
 field_map_build_size(struct field_map_builder *builder)
 {
-	return builder->slot_count * sizeof(uint32_t);
+	return builder->slot_count * sizeof(uint32_t) +
+	       builder->extents_size;
 }
 
 /**

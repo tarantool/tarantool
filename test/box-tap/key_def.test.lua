@@ -129,6 +129,15 @@ local key_def_new_cases = {
         exp_err = 'invalid path',
     },
     {
+        'Multikey JSON path',
+        parts = {{
+            fieldno = 1,
+            type = 'string',
+            path = '[*]',
+        }},
+        exp_err = 'multikey path is unsupported',
+    },
+    {
         'Success case; one part',
         parts = {{
             fieldno = 1,

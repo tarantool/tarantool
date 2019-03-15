@@ -111,12 +111,21 @@ struct tuple_field {
 	int32_t offset_slot;
 	/** True if this field is used by an index. */
 	bool is_key_part;
+	/** True if this field is used by multikey index. */
+	bool is_multikey_part;
 	/** Action to perform if NULL constraint failed. */
 	enum on_conflict_action nullable_action;
 	/** Collation definition for string comparison */
 	struct coll *coll;
 	/** Collation identifier. */
 	uint32_t coll_id;
+	/**
+	 * Bitmap of fields that must be present in a tuple
+	 * conforming to the multikey subtree. Not NULL only
+	 * when tuple_field:token.type == JSON_TOKEN_ANY.
+	 * Indexed by tuple_field::id.
+	 */
+	void *multikey_required_fields;
 	/** Link in tuple_format::fields. */
 	struct json_token token;
 };
@@ -170,7 +179,9 @@ struct tuple_format {
 	 */
 	bool is_ephemeral;
 	/**
-	 * Size of field map of tuple in bytes.
+	 * Size of minimal field map of tuple where each indexed
+	 * field has own offset slot (in bytes). The real tuple
+	 * field_map may be bigger in case of multikey indexes.
 	 * \sa struct field_map_builder
 	 */
 	uint16_t field_map_size;
@@ -452,6 +463,12 @@ struct tuple_format_iterator {
 	 */
 	struct mp_stack stack;
 	/**
+	 * The pointer to the stack frame representing an array
+	 * filed that has JSON_TOKEN_ANY child, i.e. the root
+	 * of the multikey index.
+	 */
+	struct mp_frame *multikey_frame;
+	/**
 	 * The pointer to the parent node in the format::fields
 	 * JSON tree. Is required for relative lookup for the
 	 * next field.
@@ -468,6 +485,12 @@ struct tuple_format_iterator {
 	 * Not NULL iff validate == true.
 	 */
 	void *required_fields;
+	/**
+	 * Field bitmap that is used for checking that all
+	 * mandatory fields of multikey subtree are present.
+	 * Not NULL iff validate == true.
+	 */
+	void *multikey_required_fields;
 };
 
 /** Tuple format iterator next method's returning entry. */
@@ -499,6 +522,18 @@ struct tuple_format_iterator_entry {
 	 * (field->type in FIELD_TYPE_ARRAY, FIELD_TYPE_MAP).
 	 */
 	int count;
+	/**
+	 * Number of multikey items. Is defined when iterator is
+	 * positioned on tuple field is related to format's
+	 * multikey subtree (there was a parent field1 that
+	 * json_token_is_multikey(&field1->token) == true)
+	 */
+	int multikey_count;
+	/**
+	 * Index of the key in the multikey array. Is defined
+	 * when multikey_count is defined.
+	 */
+	int multikey_idx;
 };
 
 /**

@@ -39,6 +39,16 @@ extern "C" {
 struct key_def;
 
 /**
+ * Hints are now used for two purposes - passing the index of the
+ * key used in the case of multikey index and to speed up the
+ * comparators.
+ *
+ * Scenario I. Pass the multikey index of the key to comparator.
+ * In the case of multikey index arises an ambiguity: which key
+ * should be used in the comparison. Hints act as an non-negative
+ * numeric index of key to use.
+ *
+ * Scenario II. Speed up comparators.
  * Tuple comparison hint h(t) is such a function of tuple t that
  * the following conditions always hold for any pair of tuples
  * t1 and t2:

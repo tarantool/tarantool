@@ -214,6 +214,34 @@ struct key_def {
 	bool has_optional_parts;
 	/** Key fields mask. @sa column_mask.h for details. */
 	uint64_t column_mask;
+	/**
+	 * In case of the multikey index, a pointer to the
+	 * JSON path string, the path to the root node of
+	 * multikey index that contains the array having
+	 * index placeholder sign [*].
+	 *
+	 * This pointer duplicates the JSON path of some key_part.
+	 * This path is not 0-terminated. Moreover, it is only
+	 * JSON path subpath so key_def::multikey_path_len must
+	 * be directly used in all cases.
+	 *
+	 * This field is not NULL iff this is multikey index
+	 * key definition.
+	 */
+	const char *multikey_path;
+	/**
+	 * The length of the key_def::multikey_path.
+	 * Valid when key_def_is_multikey(key_def) is true,
+	 * undefined otherwise.
+	 */
+	uint32_t multikey_path_len;
+	/**
+	 * The index of the root field of the multikey JSON
+	 * path index key_def::multikey_path.
+	 * Valid when key_def_is_multikey(key_def) is true,
+	 * undefined otherwise.
+	*/
+	uint32_t multikey_fieldno;
 	/** The size of the 'parts' array. */
 	uint32_t part_count;
 	/** Description of parts of a multipart index. */
@@ -450,6 +478,12 @@ key_def_is_sequential(const struct key_def *key_def)
 			return false;
 	}
 	return true;
+}
+
+static inline bool
+key_def_is_multikey(const struct key_def *key_def)
+{
+	return key_def->multikey_path != NULL;
 }
 
 /**

@@ -522,6 +522,7 @@ t;
   191: box.error.SQL_PARSER_LIMIT
   192: box.error.INDEX_DEF_UNSUPPORTED
   193: box.error.CK_DEF_UNSUPPORTED
+  194: box.error.MULTIKEY_INDEX_MISMATCH
 ...
 test_run:cmd("setopt delimiter ''");
 ---

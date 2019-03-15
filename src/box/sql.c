@@ -782,7 +782,8 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 			} else {
 				uint32_t field_offset =
 					field_map_get_offset(field_map,
-							     field->offset_slot);
+							     field->offset_slot,
+							     -1);
 				p = base + field_offset;
 			}
 		}
