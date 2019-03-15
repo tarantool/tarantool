@@ -202,6 +202,12 @@ s:drop()
 s = box.schema.space.create('test', {engine = 'vinyl'})
 pk = s:create_index('pk', {run_count_per_level = 10})
 sk = s:create_index('sk', {run_count_per_level = 10, parts = {2, 'unsigned'}, unique = false})
+
+-- Write a run big enough to prevent major compaction from kicking in
+-- (run_count_per_level is ignored on the last level - see gh-3657).
+dummy_rows = 100
+for i = 1001, 1000 + dummy_rows do s:replace{i, i} end
+
 for i = 1, 10 do s:replace{i, i} end
 box.snapshot()
 
@@ -211,10 +217,10 @@ for i = 1, 10, 2 do s:delete{i} end
 for i = 2, 10, 2 do s:replace{i, i * 100} end
 box.commit()
 
-sk:select()
+sk:select({1000}, {iterator = 'le'})
 
-pk:stat().rows -- 10 old REPLACEs + 5 DELETEs + 5 new REPLACEs
-sk:stat().rows -- 10 old REPLACEs + 5 new REPLACEs
+pk:stat().rows - dummy_rows -- 10 old REPLACEs + 5 DELETEs + 5 new REPLACEs
+sk:stat().rows - dummy_rows -- 10 old REPLACEs + 5 new REPLACEs
 
 -- Compact the primary index to generate deferred DELETEs.
 box.snapshot()
@@ -226,10 +232,10 @@ box.snapshot()
 sk:compact()
 while sk:stat().disk.compaction.count == 0 do fiber.sleep(0.001) end
 
-sk:select()
+sk:select({1000}, {iterator = 'le'})
 
-pk:stat().rows -- 5 new REPLACEs
-sk:stat().rows -- ditto
+pk:stat().rows - dummy_rows -- 5 new REPLACEs
+sk:stat().rows - dummy_rows -- ditto
 
 s:drop()
 
