@@ -192,3 +192,8 @@ while f2:status() ~= 'dead' do fiber.sleep(0.01) end
 last_read
 
 space:drop()
+
+-- Collect all iterators to make sure no read views are left behind,
+-- as they might disrupt the following test run.
+collectgarbage()
+box.stat.vinyl().tx.read_views -- 0
