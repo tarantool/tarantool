@@ -1937,6 +1937,9 @@ s:select{1}
 ---
 - - [1, 4]
 ...
+itr = nil
+---
+...
 s:drop()
 ---
 ...
@@ -2306,4 +2309,14 @@ box.commit()
 ...
 s:drop()
 ---
+...
+-- Collect all iterators to make sure no read views are left behind,
+-- as they might disrupt the following test run.
+collectgarbage()
+---
+- 0
+...
+box.stat.vinyl().tx.read_views -- 0
+---
+- 0
 ...

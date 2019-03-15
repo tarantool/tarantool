@@ -653,6 +653,7 @@ iterator_next(itr)
 for i=1,10 do s:upsert({i, 1}, {{'+', 2, 1}}) end
 iterator_next(itr)
 s:select{1}
+itr = nil
 
 s:drop()
 
@@ -814,3 +815,8 @@ c:get() -- error
 box.commit()
 
 s:drop()
+
+-- Collect all iterators to make sure no read views are left behind,
+-- as they might disrupt the following test run.
+collectgarbage()
+box.stat.vinyl().tx.read_views -- 0
