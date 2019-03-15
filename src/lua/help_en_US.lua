@@ -1,4 +1,4 @@
---- help (en_US)
+--- help (en_US) 2.x
 
 return {
     help = [[
@@ -7,8 +7,8 @@ To start the interactive Tarantool tutorial, type 'tutorial()' here.
 
 Available backslash commands:
 
-  \set language <language> -- for setting language (Lua by default)
-  \set delimiter <delimiter> -- for setting delimiter
+  \set language <language> -- for setting language (lua or sql)
+  \set delimiter <delimiter> -- for setting end-of-line delimiter
   \help -- show this screen
   \quit -- quit interactive console
 ]];
@@ -159,39 +159,7 @@ When you’re ready to go to the next screen, enter <tutorial("next")>.
 ]];
 
 [[
-Tutorial -- Screen #6 -- Delimiters
-===================================
-
-This is just to prepare for later exercises
-which will go over many lines. There is a
-Tarantool instruction that means <don’t execute
-every time I type Enter; wait until I type a
-special string called the "delimiter".>
-More in the Tarantool manual:
-http://tarantool.io/en/doc/2.1/reference/reference_lua/console/#console-delimiter
-
-Request #6 is:
-
-console = require("console"); console.delimiter("!")
-----------------------------------------------------
-
-It’s not an exercise -- just do it.
-Cancelling the delimiter could be done with
-console.delimiter("")!
-but you’ll see "!" in following exercises.
-
-You'll need a custom delimiter only in the online trial console at
-http://tarantool.io.
-Tarantool console in production is smarter. It can tell when a multi-line
-request has not ended (for example, if it sees that a function declaration
-does not have an end keyword, as we'll be writing on the next screen).
-
-When you’re ready to go to the next screen, enter <tutorial("next")!>.
-Yes, <tutorial("next")!> now has to end with an exclamation mark too!
-]];
-
-[[
-Tutorial -- Screen #7 -- Simple functions
+Tutorial -- Screen #6 -- Simple functions
 =========================================
 
 A function, or a stored procedure that returns a value,
@@ -199,23 +167,29 @@ is a named set of Lua requests whose simplest form is
 function function_name () body end
 More in the Lua manual: http://www.lua.org/pil/5.html
 
-Request #7 is:
+Request #6 is:
 
 n = 0
 function func ()
 for i=1,100,1 do n = n + i end
 return n
-end!
-func()!
+end
+func()
 ------------------------------
 
 This defines a function which sums all the numbers
 between 1 and 100, and returns the final result.
-The request "func()!" invokes the function.
+The request "func()" invokes the function.
+
+Notice that the Tarantool console is smart enough to tell when
+a multi-line request has not ended, for example when it sees that
+a function declaration does not have an end keyword.
+
+To proceed, enter <tutorial("next")>.
 ]];
 
 [[
-Tutorial -- Screen #8 -- Improved functions
+Tutorial -- Screen #7 -- Improved functions
 ===========================================
 
 Improve the simple function by avoiding globals.
@@ -223,53 +197,52 @@ The variable n could be passed as a parameter
 and the variable i could be declared as local.
 More in the Lua manual: http://www.lua.org/pil/4.2.html
 
-Request #8 is:
+Request #7 is:
 
 function func (n)
 local i
 for i=1,100,1 do n = n + i end
 return n
-end!
-func(0)!
+end
+func(0)
 ------------------------------
 ]];
 
 [[
-Tutorial -- Screen #9 -- Comments
+Tutorial -- Screen #8 -- Comments
 =================================
 
 There are several ways to add comments, but
 one will do: (minus sign) (minus sign) comment-text.
 More in the Lua manual: http://www.lua.org/pil/1.3.html
 
-Request #9 is:
+Request #8 is:
 
 -- func is a function which returns a sum.
 -- n is a parameter. i is a local variable.
--- "!" is a delimiter (introduced in Screen #6)
--- func is a function (introduced in Screen #7)
--- n is a parameter (introduced in Screen #8)
+-- func is a function (introduced in Screen #6)
+-- n is a parameter (introduced in Screen #7)
 -- "n = n + 1" is an operator usage (introduced in Screen #4)
 -- "for ... do ... end" is a loop (introduced in Screen #3)
 function func(n) -- n is a parameter
 local i -- i is a local variable
 for i=1,100,1 do n = n + i end
 return n
-end!
+end
 -- invoke the function
-func(0)!
+func(0)
 -------------------------------------------
 
-Obviously it will work, so just type <tutorial("next")!> now.
+Obviously it will work, so just type <tutorial("next")> now.
 ]];
 
 [[
-Tutorial -- Screen #10 -- Modules
+Tutorial -- Screen #9 -- Modules
 =================================
 
 Many developers have gone to the trouble of making modules,
-i.e. packages of functions that have a general utility.
-In the Lua world, modules are called "rocks".
+i.e. distributable packages of functions that have a general
+utility. In the Lua world, modules are called "rocks".
 More in the Luarocks list: http://luarocks.org/
 
 Most modules have to be "required", with the syntax
@@ -285,20 +258,20 @@ you’ll invoke a module’s function.
 (At a different level you’ll have to use a ":"
 operator, as you’ll see in later examples.)
 
-Request #10 is:
+Request #9 is:
 
-fiber = require("fiber")!
-fiber!
-fiber.status()!
--------------------------
+fiber = require("fiber")
+fiber
+fiber.status()
+------------------------
 
 First you’ll see a list of functions, one of which is "status".
 Then you’ll see the fiber's current status (the fiber is running now).
-More on fibers on the next screen, so type <tutorial("next")!> now.
+More on fibers on the next screen, so type <tutorial("next")> now.
 ]];
 
 [[
-Tutorial -- Screen #11 -- The fiber module
+Tutorial -- Screen #10 -- The fiber module
 ==========================================
 
 Make a function that will run like a daemon in the
@@ -311,36 +284,36 @@ That’s what a properly designed fiber will do.
 More in the Tarantool manual:
 http://tarantool.io/en/doc/2.1/reference/reference_lua/fiber/
 
-Request #11 is:
+Request #10 is:
 
-fiber = require("fiber")!
-gvar = 0!
+fiber = require("fiber")
+gvar = 0
 function function_x()
 for i=0,600,1 do
 gvar = gvar + 1
 fiber.sleep(1)
 end
-end!
-fid = fiber.create(function_x)!
-gvar!
--------------------------------
+end
+fid = fiber.create(function_x)
+gvar
+------------------------------
 
 The fiber.sleep(1) function will go to sleep for
 one second, which is one way of yielding.
 So the "for i=0,600,1" loop will go on for about 600 seconds (10 minutes).
 During waking moments, gvar will go up by 1 -- and
 gvar is deliberately a global variable. So it’s
-possible to monitor it: slowly type "gvar!" a few
+possible to monitor it: slowly type "gvar" a few
 times and notice how the value mysteriously increases.
 ]];
 
 [[
-Tutorial -- Screen #12 -- The socket module
+Tutorial -- Screen #11 -- The socket module
 ===========================================
 
 Connect to the Internet and send a message to Tarantool's web-site.
 
-Request #12 is:
+Request #11 is:
 
 function socket_get ()
 local socket, sock, result
@@ -350,8 +323,8 @@ sock:send("GET / HTTP/1.0\r\nHost: tarantool.io\r\n\r\n")
 result = sock:read(17)
 sock:close()
 return result
-end!
-socket_get()!
+end
+socket_get()
 --------------------------------
 
 Briefly these requests are opening a socket
@@ -364,7 +337,7 @@ http://tarantool.io/en/doc/2.1/reference/reference_lua/socket/
 ]];
 
 [[
-Tutorial -- Screen #13 -- The box module
+Tutorial -- Screen #12 -- The box module
 ========================================
 
 So far you’ve seen Tarantool in action as a
@@ -380,17 +353,17 @@ powers -- so you can start manipulating data immediately.
 More in the Tarantool manual:
 http://tarantool.io/en/doc/2.1/book/box/
 
-Request #13 is:
+Request #12 is:
 
-box.schema.space.create("tutor")!
-box.space.tutor:create_index("primary",{})!
-box.space.tutor:replace{1,"First tuple"}!
-box.space.tutor:replace{2,"Second tuple"}!
-box.space.tutor:replace{3,"Third tuple"}!
-box.space.tutor:replace{4,"Fourth tuple"}!
-box.space.tutor:replace{5,"Fifth tuple"}!
-box.space.tutor!
--------------------------------------------
+box.schema.space.create("tutor")
+box.space.tutor:create_index("primary",{})
+box.space.tutor:replace{1,"First tuple"}
+box.space.tutor:replace{2,"Second tuple"}
+box.space.tutor:replace{3,"Third tuple"}
+box.space.tutor:replace{4,"Fourth tuple"}
+box.space.tutor:replace{5,"Fifth tuple"}
+box.space.tutor
+------------------------------------------
 
 Please ignore all the requests except the last one.
 You’ll see a description of a space named tutor.
@@ -409,7 +382,7 @@ named tutor, and it has one index on the first field.
 ]];
 
 [[
-Tutorial -- Screen #14 -- box.select()
+Tutorial -- Screen #13 -- box.select()
 ======================================
 
 The most common data-manipulation function is box.select().
@@ -423,7 +396,7 @@ know how to make functions and loops in Lua, it’s simple
 to figure out how to search and display the first five
 tuples in the database.
 
-Request #14 is:
+Request #13 is:
 
 -- This function will select and display 5 tuples in space=tutor
 function database_display (space_name)
@@ -434,18 +407,18 @@ for i=1,5,1 do
 result = result .. t[i][1] .. " " .. t[i][2] .. "\n"
 end
 return result
-end!
-database_display("tutor")!
+end
+database_display("tutor")
 --------------------------
 
 So select() is returning a set of tuples into a Lua table
 named t, and the loop is going to print each element of
-the table. That is, when you call database_display()! you’ll
+the table. That is, when you call database_display() you’ll
 see a display of what’s in the tuples.
 ]];
 
 [[
-Tutorial -- Screen #15 -- box.replace()
+Tutorial -- Screen #14 -- box.replace()
 =======================================
 
 Pick any of the tuples that were displayed on the last screen.
@@ -460,10 +433,10 @@ but box.replace() will cause a write to a log, and log
 information can later be consolidated with another box
 function (box.snapshot).
 
-Request #15 is:
+Request #14 is:
 
-box.space.tutor:replace{1, "My First Piece Of Data"}!
------------------------------------------------------
+box.space.tutor:replace{1, "My First Piece Of Data"}
+----------------------------------------------------
 
 If there is already a "tuple" (our equivalent of a record)
 whose number is equal to 1, it will be replaced with your
@@ -472,7 +445,7 @@ The display will be the formal description of the new tuple.
 ]];
 
 [[
-Tutorial -- Screen #16 -- Create your own space
+Tutorial -- Screen #15 -- Create your own space
 ===============================================
 
 You’ve now selected and replaced tuples from the
@@ -485,10 +458,10 @@ Suppose that you want to create your own.
 More in the Tarantool manual:
 http://tarantool.io/en/doc/2.1/book/getting_started/using_docker/#creating-a-database
 
-Request #16 is:
+Request #15 is:
 
-box.schema.space.create("test", {engine="memtx"})!
---------------------------------------------------
+box.schema.space.create("test", {engine="memtx"})
+-------------------------------------------------
 
 The new space’s name will be "test" and the engine
 will be "memtx" -- the engine which keeps all tuples
@@ -498,7 +471,7 @@ default engine anyway, specifying it does no harm.
 ]];
 
 [[
-Tutorial -- Screen #17 -- Create your own index
+Tutorial -- Screen #16 -- Create your own index
 ===============================================
 
 Having a space isn’t enough -- you must have at
@@ -509,11 +482,11 @@ fields must be unique, for identification purposes.
 More in the Tarantool manual:
 http://tarantool.io/en/doc/2.1/book/box/data_model/#index
 
-Request #17 is:
+Request #16 is:
 
-box.space.test:create_index("primary",{unique = true, parts = {1, "NUM"}})!
-box.space.test:create_index("secondary",{parts = {2, "STR"}})!
---------------------------------------------------------------
+box.space.test:create_index("primary",{unique = true, parts = {1, "NUM"}})
+box.space.test:create_index("secondary",{parts = {2, "STR"}})
+-------------------------------------------------------------
 
 This means the first index will be named primary,
 will be unique, will be on the first field of each
@@ -524,7 +497,7 @@ in order by string value.
 ]];
 
 [[
-Tutorial -- Screen #18 -- Insert multiple tuples
+Tutorial -- Screen #17 -- Insert multiple tuples
 ================================================
 
 In a loop, put some tuples in your new space.
@@ -535,41 +508,41 @@ Use a function in the Lua string library to make
 values for the second field.
 More in the Lua manual: http://www.lua.org/pil/20.html
 
-Request #18 is:
+Request #17 is:
 
 for i=65,70,1 do
 box.space.test:replace{i, string.char(i)}
-end!
+end
 -----------------------------------------
 
 Tip: to select the tuples later, use the function
-that you created earlier: database_display("test")!
+that you created earlier: database_display("test")
 ]];
 
 [[
-Tutorial -- Screen #19 -- Become another user
+Tutorial -- Screen #18 -- Become another user
 =============================================
 
 Remember, you’re currently "admin" -- administrator.
 Now switch to being "guest", a much less powerful user.
 
-Request #19 is:
+Request #18 is:
 
-box.session.su("guest") -- switch user to "guest"!
-box.space.test:replace{100,""} -- try to add a tuple!
------------------------------------------------------
+box.session.su("guest") -- switch user to "guest"
+box.space.test:replace{100,""} -- try to add a tuple
+----------------------------------------------------
 
 The result will be an error message telling you that
 you don’t have the privilege to do that any more.
 That’s good news. It shows that Tarantool prevents
 unauthorized users from working with databases.
-But you can say box.session.su("admin")! to become
+But you can say box.session.su("admin") to become
 a powerful user again, because for this tutorial
 the "admin" user isn’t protected by a password.
 ]];
 
 [[
-Tutorial -- Screen #20 -- The bigger Tutorials
+Tutorial -- Screen #19 -- The bigger Tutorials
 ==============================================
 
 You can continue to type in whatever Lua instructions,
@@ -585,11 +558,11 @@ Indexed pattern search.
 
 See http://tarantool.io/en/doc/2.1/tutorials/lua_tutorials/
 
-Request #20 is:
+Request #19 is:
 
 ((Whatever you want. Enjoy!))
 
-When you’re finished, don’t type <tutorial("next")!>, just wander off
+When you’re finished, don’t type <tutorial("next")>, just wander off
 and have a nice day.
 ]];
     }; --[[ tutorial ]]--
