@@ -1,22 +1,22 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- create space
-box.sql.execute("CREATE TABLE t(id INT PRIMARY KEY)")
+box.execute("CREATE TABLE t(id INT PRIMARY KEY)")
 
-box.sql.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t BEGIN SELECT 1; END")
-box.sql.execute("CREATE TRIGGER tt_au AFTER UPDATE ON t BEGIN SELECT 1; END")
-box.sql.execute("CREATE TRIGGER tt_bi BEFORE INSERT ON t BEGIN SELECT 1; END")
-box.sql.execute("CREATE TRIGGER tt_ai AFTER INSERT ON t BEGIN SELECT 1; END")
-box.sql.execute("CREATE TRIGGER tt_bd BEFORE DELETE ON t BEGIN SELECT 1; END")
-box.sql.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_au AFTER UPDATE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bi BEFORE INSERT ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_ai AFTER INSERT ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bd BEFORE DELETE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END")
 
 -- check that these triggers exist
-box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
+box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 
 -- drop table
-box.sql.execute("DROP TABLE t")
+box.execute("DROP TABLE t")
 
 -- check that triggers were dropped with deleted table
-box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
+box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")

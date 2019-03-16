@@ -731,12 +731,10 @@ test:do_test(
     "limit-10.4",
     function()
         local limit = 1.5
-        return {pcall(function()
-            return test:execsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
-        end)}
+        return test:catchsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
     end, {
         -- <limit-10.4>
-        0, "Only positive integers are allowed in the LIMIT clause"
+        1, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-10.4>
     })
 
@@ -744,12 +742,10 @@ test:do_test(
     "limit-10.5",
     function()
         local limit = "'hello world'"
-        return {pcall(function()
-            return test:execsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
-        end)}
+        return test:catchsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
     end, {
         -- <limit-10.5>
-        0, "Only positive integers are allowed in the LIMIT clause"
+        1, "Only positive integers are allowed in the LIMIT clause"
         -- </limit-10.5>
     })
 

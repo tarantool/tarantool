@@ -6,33 +6,34 @@ test_run = env.new()
 ...
 -- gh-3018: typeless columns are prohibited.
 --
-box.sql.execute("CREATE TABLE t1 (id PRIMARY KEY);")
+box.execute("CREATE TABLE t1 (id PRIMARY KEY);")
 ---
 - error: Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an
     identifier.
 ...
-box.sql.execute("CREATE TABLE t1 (a, id INT PRIMARY KEY);")
+box.execute("CREATE TABLE t1 (a, id INT PRIMARY KEY);")
 ---
 - error: Syntax error near ','
 ...
-box.sql.execute("CREATE TABLE t1 (id PRIMARY KEY, a INT);")
+box.execute("CREATE TABLE t1 (id PRIMARY KEY, a INT);")
 ---
 - error: Keyword 'PRIMARY' is reserved. Please use double quotes if 'PRIMARY' is an
     identifier.
 ...
-box.sql.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a);")
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a);")
 ---
 - error: Syntax error near ')'
 ...
-box.sql.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 ---
 - error: Keyword 'UNIQUE' is reserved. Please use double quotes if 'UNIQUE' is an
     identifier.
 ...
 -- gh-3104: real type is stored in space format.
 --
-box.sql.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d SCALAR);")
+box.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d SCALAR);")
 ---
+- rowcount: 1
 ...
 box.space.T1:format()
 ---
@@ -42,8 +43,9 @@ box.space.T1:format()
   {'type': 'string', 'nullable_action': 'none', 'name': 'C', 'is_nullable': true},
   {'type': 'scalar', 'nullable_action': 'none', 'name': 'D', 'is_nullable': true}]
 ...
-box.sql.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
+box.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 ---
+- rowcount: 1
 ...
 box.space.V1:format()
 ---
@@ -52,17 +54,21 @@ box.space.V1:format()
 ...
 -- gh-2494: index's part also features correct declared type.
 --
-box.sql.execute("CREATE INDEX i1 ON t1 (a);")
+box.execute("CREATE INDEX i1 ON t1 (a);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE INDEX i2 ON t1 (b);")
+box.execute("CREATE INDEX i2 ON t1 (b);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE INDEX i3 ON t1 (c);")
+box.execute("CREATE INDEX i3 ON t1 (c);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE INDEX i4 ON t1 (id, c, b, a, d);")
+box.execute("CREATE INDEX i4 ON t1 (id, c, b, a, d);")
 ---
+- rowcount: 1
 ...
 box.space.T1.index.I1.parts
 ---
@@ -100,11 +106,13 @@ box.space.T1.index.I4.parts
     is_nullable: true
     fieldno: 5
 ...
-box.sql.execute("DROP VIEW v1;")
+box.execute("DROP VIEW v1;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t1;")
+box.execute("DROP TABLE t1;")
 ---
+- rowcount: 1
 ...
 -- gh-3906: data of type BOOL is displayed as should
 -- during SQL SELECT.
@@ -126,9 +134,15 @@ sp:insert({2, false})
 ---
 - [2, false]
 ...
-box.sql.execute("SELECT * FROM test")
+box.execute("SELECT * FROM test")
 ---
-- - [1, 1]
+- metadata:
+  - name: ID
+    type: UNKNOWN
+  - name: A
+    type: BOOLEAN
+  rows:
+  - [1, 1]
   - [2, 0]
 ...
 sp:drop()
@@ -136,83 +150,99 @@ sp:drop()
 ...
 -- gh-3544: concatenation operator accepts only TEXT and BLOB.
 --
-box.sql.execute("SELECT 'abc' || 1;")
+box.execute("SELECT 'abc' || 1;")
 ---
 - error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
 ...
-box.sql.execute("SELECT 'abc' || 1.123;")
+box.execute("SELECT 'abc' || 1.123;")
 ---
 - error: 'Inconsistent types: expected TEXT or BLOB got REAL'
 ...
-box.sql.execute("SELECT 1 || 'abc';")
+box.execute("SELECT 1 || 'abc';")
 ---
 - error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
 ...
-box.sql.execute("SELECT 1.123 || 'abc';")
+box.execute("SELECT 1.123 || 'abc';")
 ---
 - error: 'Inconsistent types: expected TEXT or BLOB got REAL'
 ...
-box.sql.execute("SELECt 'a' || 'b' || 1;")
+box.execute("SELECt 'a' || 'b' || 1;")
 ---
 - error: 'Inconsistent types: expected TEXT or BLOB got INTEGER'
 ...
 -- What is more, they must be of the same type.
 --
-box.sql.execute("SELECT 'abc' || randomblob(5);")
+box.execute("SELECT 'abc' || randomblob(5);")
 ---
 - error: 'Inconsistent types: expected TEXT got BLOB'
 ...
-box.sql.execute("SELECT randomblob(5) || 'x';")
+box.execute("SELECT randomblob(5) || 'x';")
 ---
 - error: 'Inconsistent types: expected BLOB got TEXT'
 ...
 -- Result of BLOBs concatenation must be BLOB.
 --
-box.sql.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
+box.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
 ---
-- - ['blob']
+- metadata:
+  - name: column1
+    type: TEXT
+  rows:
+  - ['blob']
 ...
 -- gh-3954: LIKE accepts only arguments of type TEXT and NULLs.
 --
-box.sql.execute("CREATE TABLE t1 (s SCALAR PRIMARY KEY);")
+box.execute("CREATE TABLE t1 (s SCALAR PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO t1 VALUES (randomblob(5));")
+box.execute("INSERT INTO t1 VALUES (randomblob(5));")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
----
-- error: 'Inconsistent types: expected TEXT got BLOB'
-...
-box.sql.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
+box.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
 ---
 - error: 'Inconsistent types: expected TEXT got BLOB'
 ...
-box.sql.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
+box.execute("SELECT * FROM t1 WHERE 'blob' LIKE s;")
 ---
 - error: 'Inconsistent types: expected TEXT got BLOB'
 ...
-box.sql.execute("SELECT s LIKE NULL FROM t1;")
+box.execute("SELECT * FROM t1 WHERE 'blob' LIKE x'0000';")
 ---
-- - [null]
+- error: 'Inconsistent types: expected TEXT got BLOB'
 ...
-box.sql.execute("DELETE FROM t1;")
+box.execute("SELECT s LIKE NULL FROM t1;")
 ---
+- metadata:
+  - name: s LIKE NULL
+    type: INTEGER
+  rows:
+  - [null]
 ...
-box.sql.execute("INSERT INTO t1 VALUES (1);")
+box.execute("DELETE FROM t1;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
+box.execute("INSERT INTO t1 VALUES (1);")
+---
+- rowcount: 1
+...
+box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 ---
 - error: 'Inconsistent types: expected TEXT got INTEGER'
 ...
-box.sql.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
+box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 ---
 - error: 'Inconsistent types: expected TEXT got INTEGER'
 ...
-box.sql.execute("SELECT NULL LIKE s FROM t1;")
+box.execute("SELECT NULL LIKE s FROM t1;")
 ---
-- - [null]
+- metadata:
+  - name: NULL LIKE s
+    type: INTEGER
+  rows:
+  - [null]
 ...
 box.space.T1:drop()
 ---

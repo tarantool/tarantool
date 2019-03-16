@@ -30,7 +30,7 @@ test:do_catchsql_test(
         DELETE FROM p1 WHERE a = 2;
     ]], {
         -- <fkey8-1.2>
-        1, "NOT NULL constraint failed: C1.B"
+        1, "Failed to execute SQL statement: NOT NULL constraint failed: C1.B"
         -- </fkey8-1.2>
     })
 
@@ -83,7 +83,7 @@ test:do_catchsql_test(
         DELETE FROM p1 WHERE a = 2;
     ]], {
         -- <fkey8-1.5>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey8-1.5>
     })
 
@@ -159,7 +159,7 @@ test:do_catchsql_test(
         UPDATE OR IGNORE p1 SET a = 4 WHERE a = 2;
     ]], {
         -- <fkey8-1.9>
-        1, "NOT NULL constraint failed: C1.B"
+        1, "Failed to execute SQL statement: NOT NULL constraint failed: C1.B"
         -- </fkey8-1.9>
     })
 
@@ -203,7 +203,7 @@ test:do_catchsql_test(
         INSERT OR REPLACE INTO p1 VALUES(2, 'two');
     ]], {
         -- <fkey8-2.2>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey8-2.2>
     })
 
@@ -278,7 +278,7 @@ test:do_catchsql_test(
         DELETE FROM p3 WHERE a=1;
     ]], {
         -- <fkey8-4.3>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey8-4.3>
     })
 

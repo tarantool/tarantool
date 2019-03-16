@@ -4,8 +4,9 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 fiber = require('fiber')
 ---
@@ -14,57 +15,110 @@ fiber = require('fiber')
 -- executing SQL queries.
 --
 -- box.cfg()
-box.sql.execute('CREATE TABLE test (id INT PRIMARY KEY, x INTEGER, y INTEGER)')
+box.execute('CREATE TABLE test (id INT PRIMARY KEY, x INTEGER, y INTEGER)')
 ---
+- rowcount: 1
 ...
-box.sql.execute('INSERT INTO test VALUES (1, 1, 1), (2, 2, 2)')
+box.execute('INSERT INTO test VALUES (1, 1, 1), (2, 2, 2)')
 ---
+- rowcount: 2
 ...
-box.sql.execute('SELECT x, y, x + y FROM test ORDER BY y')
+box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
-- - [1, 1, 2]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: Y
+    type: BLOB
+  - name: x + y
+    type: NUMERIC
+  rows:
+  - [1, 1, 2]
   - [2, 2, 4]
 ...
 fiber.info()[fiber.self().id()].memory.used
 ---
 - 0
 ...
-box.sql.execute('SELECT x, y, x + y FROM test ORDER BY y')
+box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
-- - [1, 1, 2]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: Y
+    type: BLOB
+  - name: x + y
+    type: NUMERIC
+  rows:
+  - [1, 1, 2]
   - [2, 2, 4]
 ...
-box.sql.execute('SELECT x, y, x + y FROM test ORDER BY y')
+box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
-- - [1, 1, 2]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: Y
+    type: BLOB
+  - name: x + y
+    type: NUMERIC
+  rows:
+  - [1, 1, 2]
   - [2, 2, 4]
 ...
-box.sql.execute('SELECT x, y, x + y FROM test ORDER BY y')
+box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
-- - [1, 1, 2]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: Y
+    type: BLOB
+  - name: x + y
+    type: NUMERIC
+  rows:
+  - [1, 1, 2]
   - [2, 2, 4]
 ...
-box.sql.execute('SELECT x, y, x + y FROM test ORDER BY y')
+box.execute('SELECT x, y, x + y FROM test ORDER BY y')
 ---
-- - [1, 1, 2]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: Y
+    type: BLOB
+  - name: x + y
+    type: NUMERIC
+  rows:
+  - [1, 1, 2]
   - [2, 2, 4]
 ...
 fiber.info()[fiber.self().id()].memory.used
 ---
 - 0
 ...
-box.sql.execute('CREATE TABLE test2 (id INT PRIMARY KEY, a TEXT, b INTEGER)')
+box.execute('CREATE TABLE test2 (id INT PRIMARY KEY, a TEXT, b INTEGER)')
 ---
+- rowcount: 1
 ...
-box.sql.execute('INSERT INTO test2 VALUES (1, \'abc\', 1), (2, \'hello\', 2)')
+box.execute('INSERT INTO test2 VALUES (1, \'abc\', 1), (2, \'hello\', 2)')
 ---
+- rowcount: 2
 ...
-box.sql.execute('INSERT INTO test2 VALUES (3, \'test\', 3), (4, \'xx\', 4)')
+box.execute('INSERT INTO test2 VALUES (3, \'test\', 3), (4, \'xx\', 4)')
 ---
+- rowcount: 2
 ...
-box.sql.execute('SELECT a, id + 2, b FROM test2 WHERE b < id * 2 ORDER BY a ')
+box.execute('SELECT a, id + 2, b FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
-- - ['abc', 3, 1]
+- metadata:
+  - name: A
+    type: BLOB
+  - name: id + 2
+    type: NUMERIC
+  - name: B
+    type: INTEGER
+  rows:
+  - ['abc', 3, 1]
   - ['hello', 4, 2]
   - ['test', 5, 3]
   - ['xx', 6, 4]
@@ -73,23 +127,47 @@ fiber.info()[fiber.self().id()].memory.used
 ---
 - 0
 ...
-box.sql.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
+box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
-- - ['abc', 3, 'abc']
+- metadata:
+  - name: A
+    type: TEXT
+  - name: id + 2 * b
+    type: NUMERIC
+  - name: A
+    type: BLOB
+  rows:
+  - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
   - ['test', 9, 'test']
   - ['xx', 12, 'xx']
 ...
-box.sql.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
+box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
-- - ['abc', 3, 'abc']
+- metadata:
+  - name: A
+    type: TEXT
+  - name: id + 2 * b
+    type: NUMERIC
+  - name: A
+    type: BLOB
+  rows:
+  - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
   - ['test', 9, 'test']
   - ['xx', 12, 'xx']
 ...
-box.sql.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
+box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
-- - ['abc', 3, 'abc']
+- metadata:
+  - name: A
+    type: TEXT
+  - name: id + 2 * b
+    type: NUMERIC
+  - name: A
+    type: BLOB
+  rows:
+  - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
   - ['test', 9, 'test']
   - ['xx', 12, 'xx']
@@ -98,19 +176,43 @@ fiber.info()[fiber.self().id()].memory.used
 ---
 - 0
 ...
-box.sql.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
+box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 ---
-- - [1, 4, 1]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: y + 3 * b
+    type: NUMERIC
+  - name: B
+    type: INTEGER
+  rows:
+  - [1, 4, 1]
   - [2, 8, 2]
 ...
-box.sql.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
+box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 ---
-- - [1, 4, 1]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: y + 3 * b
+    type: NUMERIC
+  - name: B
+    type: INTEGER
+  rows:
+  - [1, 4, 1]
   - [2, 8, 2]
 ...
-box.sql.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
+box.execute('SELECT x, y + 3 * b, b FROM test2, test WHERE b = x')
 ---
-- - [1, 4, 1]
+- metadata:
+  - name: X
+    type: INTEGER
+  - name: y + 3 * b
+    type: NUMERIC
+  - name: B
+    type: INTEGER
+  rows:
+  - [1, 4, 1]
   - [2, 8, 2]
 ...
 fiber.info()[fiber.self().id()].memory.used
@@ -118,9 +220,11 @@ fiber.info()[fiber.self().id()].memory.used
 - 0
 ...
 -- Cleanup
-box.sql.execute('DROP TABLE test')
+box.execute('DROP TABLE test')
 ---
+- rowcount: 1
 ...
-box.sql.execute('DROP TABLE test2')
+box.execute('DROP TABLE test2')
 ---
+- rowcount: 1
 ...

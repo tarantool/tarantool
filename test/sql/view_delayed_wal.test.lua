@@ -1,6 +1,6 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 fiber = require('fiber')
 
 -- View reference counters are incremented before firing
@@ -8,8 +8,8 @@ fiber = require('fiber')
 -- it is impossible to create view on dropped (but not written
 -- into WAL) space.
 --
-box.sql.execute('CREATE TABLE t1(id INT PRIMARY KEY)')
-function create_view() box.sql.execute('CREATE VIEW v1 AS SELECT * FROM t1') end
+box.execute('CREATE TABLE t1(id INT PRIMARY KEY)')
+function create_view() box.execute('CREATE VIEW v1 AS SELECT * FROM t1') end
 function drop_index_t1() box.space._index:delete{box.space.T1.id, 0} end
 function drop_space_t1() box.space._space:delete{box.space.T1.id} end
 box.error.injection.set("ERRINJ_WAL_DELAY", true)
@@ -26,8 +26,8 @@ box.space.V1
 -- dropping view, since view reference counter of space to be
 -- dropped is checked before firing on_commit trigger.
 --
-box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY)')
-box.sql.execute('CREATE VIEW view2 AS SELECT * FROM t2')
+box.execute('CREATE TABLE t2 (id INT PRIMARY KEY)')
+box.execute('CREATE VIEW view2 AS SELECT * FROM t2')
 
 function drop_view() box.space._space:delete{box.space.VIEW2.id} end
 function drop_index_t2() box.space._index:delete{box.space.T2.id, 0} end

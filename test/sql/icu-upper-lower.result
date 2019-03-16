@@ -4,15 +4,16 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
 - true
 ...
 upper_lower_test = function (str)
-    return box.sql.execute(string.format("select lower('%s'), upper('%s')", str, str))
+    return box.execute(string.format("select lower('%s'), upper('%s')", str, str))
 end;
 ---
 ...
@@ -22,14 +23,28 @@ upper_lower_test([[
     Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq olacaq.
 ]]);
 ---
-- - ['     zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq olacaq. ',
+- metadata:
+  - name: lower('     Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq
+      olacaq. ')
+    type: TEXT
+  - name: upper('     Zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq
+      olacaq. ')
+    type: TEXT
+  rows:
+  - ['     zəfər, jaketini də, papağını da götür, bu axşam hava çox soyuq olacaq. ',
     '     ZƏFƏR, JAKETINI DƏ, PAPAĞINI DA GÖTÜR, BU AXŞAM HAVA ÇOX SOYUQ OLACAQ. ']
 ...
 upper_lower_test([[
     The quick brown fox jumps over the lazy dog.
 ]]);
 ---
-- - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
+- metadata:
+  - name: lower('     The quick brown fox jumps over the lazy dog. ')
+    type: TEXT
+  - name: upper('     The quick brown fox jumps over the lazy dog. ')
+    type: TEXT
+  rows:
+  - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
       JUMPS OVER THE LAZY DOG. ']
 ...
 -- English
@@ -37,7 +52,13 @@ upper_lower_test([[
     The quick brown fox jumps over the lazy dog.
 ]]);
 ---
-- - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
+- metadata:
+  - name: lower('     The quick brown fox jumps over the lazy dog. ')
+    type: TEXT
+  - name: upper('     The quick brown fox jumps over the lazy dog. ')
+    type: TEXT
+  rows:
+  - ['     the quick brown fox jumps over the lazy dog. ', '     THE QUICK BROWN FOX
       JUMPS OVER THE LAZY DOG. ']
 ...
 -- Armenian
@@ -45,7 +66,15 @@ upper_lower_test([[
     Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ փառք
 ]]);
 ---
-- - ['     բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ փառք ', '     ԲԵԼ
+- metadata:
+  - name: lower('     Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ
+      փառք ')
+    type: TEXT
+  - name: upper('     Բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ
+      փառք ')
+    type: TEXT
+  rows:
+  - ['     բել դղյակի ձախ ժամն օֆ ազգությանը ցպահանջ չճշտած վնաս էր եւ փառք ', '     ԲԵԼ
       ԴՂՅԱԿԻ ՁԱԽ ԺԱՄՆ ՕՖ ԱԶԳՈՒԹՅԱՆԸ ՑՊԱՀԱՆՋ ՉՃՇՏԱԾ ՎՆԱՍ ԷՐ ԵՒ ՓԱՌՔ ']
 ...
 -- Belarussian
@@ -53,7 +82,15 @@ upper_lower_test([[
     У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу з юшкай
 ]]);
 ---
-- - ['     у іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу з юшкай ',
+- metadata:
+  - name: lower('     У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу
+      з юшкай ')
+    type: TEXT
+  - name: upper('     У Іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу
+      з юшкай ')
+    type: TEXT
+  rows:
+  - ['     у іўі худы жвавы чорт у зялёнай камізэльцы пабег пад’есці фаршу з юшкай ',
     '     У ІЎІ ХУДЫ ЖВАВЫ ЧОРТ У ЗЯЛЁНАЙ КАМІЗЭЛЬЦЫ ПАБЕГ ПАД’ЕСЦІ ФАРШУ З ЮШКАЙ ']
 ...
 -- Greek
@@ -61,7 +98,15 @@ upper_lower_test([[
     Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
 ]]);
 ---
-- - ['     τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός ', '     ΤΆΧΙΣΤΗ
+- metadata:
+  - name: lower('     Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
+      ')
+    type: TEXT
+  - name: upper('     Τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός
+      ')
+    type: TEXT
+  rows:
+  - ['     τάχιστη αλώπηξ βαφής ψημένη γη, δρασκελίζει υπέρ νωθρού κυνός ', '     ΤΆΧΙΣΤΗ
       ΑΛΏΠΗΞ ΒΑΦΉΣ ΨΗΜΈΝΗ ΓΗ, ΔΡΑΣΚΕΛΊΖΕΙ ΥΠΈΡ ΝΩΘΡΟΎ ΚΥΝΌΣ ']
 ...
 -- Irish
@@ -69,7 +114,15 @@ upper_lower_test([[
     Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin bhig
 ]]);
 ---
-- - ['     chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin bhig ',
+- metadata:
+  - name: lower('     Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin
+      bhig ')
+    type: TEXT
+  - name: upper('     Chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin
+      bhig ')
+    type: TEXT
+  rows:
+  - ['     chuaigh bé mhórshách le dlúthspád fíorfhinn trí hata mo dhea-phorcáin bhig ',
     '     CHUAIGH BÉ MHÓRSHÁCH LE DLÚTHSPÁD FÍORFHINN TRÍ HATA MO DHEA-PHORCÁIN BHIG ']
 ...
 -- Spain
@@ -77,7 +130,13 @@ upper_lower_test([[
     Quiere la boca exhausta vid, kiwi, piña y fugaz jamón
 ]]);
 ---
-- - ['     quiere la boca exhausta vid, kiwi, piña y fugaz jamón ', '     QUIERE LA
+- metadata:
+  - name: lower('     Quiere la boca exhausta vid, kiwi, piña y fugaz jamón ')
+    type: TEXT
+  - name: upper('     Quiere la boca exhausta vid, kiwi, piña y fugaz jamón ')
+    type: TEXT
+  rows:
+  - ['     quiere la boca exhausta vid, kiwi, piña y fugaz jamón ', '     QUIERE LA
       BOCA EXHAUSTA VID, KIWI, PIÑA Y FUGAZ JAMÓN ']
 ...
 -- Korean
@@ -85,7 +144,13 @@ upper_lower_test([[
     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다
 ]]);
 ---
-- - ['     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ', '     키스의 고유조건은 입술끼리 만나야 하고 특별한
+- metadata:
+  - name: lower('     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ')
+    type: TEXT
+  - name: upper('     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ')
+    type: TEXT
+  rows:
+  - ['     키스의 고유조건은 입술끼리 만나야 하고 특별한 기술은 필요치 않다 ', '     키스의 고유조건은 입술끼리 만나야 하고 특별한
       기술은 필요치 않다 ']
 ...
 -- Latvian
@@ -93,7 +158,13 @@ upper_lower_test([[
     Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus
 ]]);
 ---
-- - ['     glāžšķūņa rūķīši dzērumā čiepj baha koncertflīģeļu vākus ', '     GLĀŽŠĶŪŅA
+- metadata:
+  - name: lower('     Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus ')
+    type: TEXT
+  - name: upper('     Glāžšķūņa rūķīši dzērumā čiepj Baha koncertflīģeļu vākus ')
+    type: TEXT
+  rows:
+  - ['     glāžšķūņa rūķīši dzērumā čiepj baha koncertflīģeļu vākus ', '     GLĀŽŠĶŪŅA
       RŪĶĪŠI DZĒRUMĀ ČIEPJ BAHA KONCERTFLĪĢEĻU VĀKUS ']
 ...
 -- German
@@ -101,7 +172,15 @@ upper_lower_test([[
     Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
 ]]);
 ---
-- - ['     zwölf große boxkämpfer jagen viktor quer über den sylter deich ', '     ZWÖLF
+- metadata:
+  - name: lower('     Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
+      ')
+    type: TEXT
+  - name: upper('     Zwölf große Boxkämpfer jagen Viktor quer über den Sylter Deich
+      ')
+    type: TEXT
+  rows:
+  - ['     zwölf große boxkämpfer jagen viktor quer über den sylter deich ', '     ZWÖLF
       GROSSE BOXKÄMPFER JAGEN VIKTOR QUER ÜBER DEN SYLTER DEICH ']
 ...
 -- Polish
@@ -109,7 +188,13 @@ upper_lower_test([[
     Pchnąć w tę łódź jeża lub ośm skrzyń fig.
 ]]);
 ---
-- - ['     pchnąć w tę łódź jeża lub ośm skrzyń fig. ', '     PCHNĄĆ W TĘ ŁÓDŹ JEŻA
+- metadata:
+  - name: lower('     Pchnąć w tę łódź jeża lub ośm skrzyń fig. ')
+    type: TEXT
+  - name: upper('     Pchnąć w tę łódź jeża lub ośm skrzyń fig. ')
+    type: TEXT
+  rows:
+  - ['     pchnąć w tę łódź jeża lub ośm skrzyń fig. ', '     PCHNĄĆ W TĘ ŁÓDŹ JEŻA
       LUB OŚM SKRZYŃ FIG. ']
 ...
 -- Ukrainian
@@ -117,7 +202,13 @@ upper_lower_test([[
     Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів!
 ]]);
 ---
-- - ['     чуєш їх, доцю, га? кумедна ж ти, прощайся без ґольфів! ', '     ЧУЄШ ЇХ,
+- metadata:
+  - name: lower('     Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів! ')
+    type: TEXT
+  - name: upper('     Чуєш їх, доцю, га? Кумедна ж ти, прощайся без ґольфів! ')
+    type: TEXT
+  rows:
+  - ['     чуєш їх, доцю, га? кумедна ж ти, прощайся без ґольфів! ', '     ЧУЄШ ЇХ,
       ДОЦЮ, ГА? КУМЕДНА Ж ТИ, ПРОЩАЙСЯ БЕЗ ҐОЛЬФІВ! ']
 ...
 -- Czech
@@ -125,7 +216,13 @@ upper_lower_test([[
     Příliš žluťoučký kůň úpěl ďábelské ódy
 ]]);
 ---
-- - ['     příliš žluťoučký kůň úpěl ďábelské ódy ', '     PŘÍLIŠ ŽLUŤOUČKÝ KŮŇ ÚPĚL
+- metadata:
+  - name: lower('     Příliš žluťoučký kůň úpěl ďábelské ódy ')
+    type: TEXT
+  - name: upper('     Příliš žluťoučký kůň úpěl ďábelské ódy ')
+    type: TEXT
+  rows:
+  - ['     příliš žluťoučký kůň úpěl ďábelské ódy ', '     PŘÍLIŠ ŽLUŤOUČKÝ KŮŇ ÚPĚL
       ĎÁBELSKÉ ÓDY ']
 ...
 -- Esperanto
@@ -133,7 +230,15 @@ upper_lower_test([[
     Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
 ]]);
 ---
-- - ['     laŭ ludoviko zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj ', '     LAŬ
+- metadata:
+  - name: lower('     Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
+      ')
+    type: TEXT
+  - name: upper('     Laŭ Ludoviko Zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj
+      ')
+    type: TEXT
+  rows:
+  - ['     laŭ ludoviko zamenhof bongustas freŝa ĉeĥa manĝaĵo kun spicoj ', '     LAŬ
       LUDOVIKO ZAMENHOF BONGUSTAS FREŜA ĈEĤA MANĜAĴO KUN SPICOJ ']
 ...
 -- Japanese
@@ -141,7 +246,13 @@ upper_lower_test([[
     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす
 ]]);
 ---
-- - ['     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ', '     いろはにほへと
+- metadata:
+  - name: lower('     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ')
+    type: TEXT
+  - name: upper('     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ')
+    type: TEXT
+  rows:
+  - ['     いろはにほへと ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ', '     いろはにほへと
       ちりぬるを わかよたれそ つねならむ うゐのおくやま けふこえて あさきゆめみし ゑひもせす ']
 ...
 -- Turkish
@@ -149,7 +260,13 @@ upper_lower_test([[
     Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ
 ]]);
 ---
-- - ['     pijamalı hasta yağız şoföre çabucak güvendi. extra: i̇ ', '     PIJAMALI
+- metadata:
+  - name: 'lower(''     Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ '')'
+    type: TEXT
+  - name: 'upper(''     Pijamalı hasta yağız şoföre çabucak güvendi. EXTRA: İ '')'
+    type: TEXT
+  rows:
+  - ['     pijamalı hasta yağız şoföre çabucak güvendi. extra: i̇ ', '     PIJAMALI
       HASTA YAĞIZ ŞOFÖRE ÇABUCAK GÜVENDI. EXTRA: İ ']
 ...
 test_run:cmd("setopt delimiter ''");
@@ -157,15 +274,15 @@ test_run:cmd("setopt delimiter ''");
 - true
 ...
 -- Bad test cases
-box.sql.execute("select upper('1', 2)")
+box.execute("select upper('1', 2)")
 ---
 - error: wrong number of arguments to function UPPER()
 ...
-box.sql.execute("select upper(\"1\")")
+box.execute("select upper(\"1\")")
 ---
 - error: Can’t resolve field '1'
 ...
-box.sql.execute("select upper()")
+box.execute("select upper()")
 ---
 - error: wrong number of arguments to function UPPER()
 ...

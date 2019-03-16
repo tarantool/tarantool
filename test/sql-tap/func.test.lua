@@ -1598,7 +1598,7 @@ test:do_catchsql_test(
         SELECT sum(x) - ((1<<62)*2.0+1) from t6;
     ]], {
         -- <func-18.12>
-        1, "integer overflow"
+        1, "Failed to execute SQL statement: integer overflow"
         -- </func-18.12>
     })
 
@@ -1653,7 +1653,7 @@ test:do_catchsql_test(
             SELECT 10 AS x);
     ]], {
         -- <func-18.15>
-        1, "integer overflow"
+        1, "Failed to execute SQL statement: integer overflow"
         -- </func-18.15>
     })
 
@@ -1665,7 +1665,7 @@ test:do_catchsql_test(
             SELECT -10 AS x);
     ]], {
         -- <func-18.18>
-        1, "integer overflow"
+        1, "Failed to execute SQL statement: integer overflow"
         -- </func-18.18>
     })
 
@@ -1730,7 +1730,7 @@ test:do_catchsql_test(
         SELECT abs(-9223372036854775807-1);
     ]], {
         -- <func-18.32>
-        1, "integer overflow"
+        1, "Failed to execute SQL statement: integer overflow"
         -- </func-18.32>
     })
 
@@ -1752,7 +1752,7 @@ test:do_catchsql_test(
         SELECT 'abc' MATCH 'xyz';
     ]], {
         -- <func-19.2>
-        1, "unable to use function MATCH in the requested context"
+        1, "Failed to execute SQL statement: unable to use function MATCH in the requested context"
         -- </func-19.2>
     })
 
@@ -1762,7 +1762,7 @@ test:do_catchsql_test(
         SELECT 'abc' NOT MATCH 'xyz';
     ]], {
         -- <func-19.3>
-        1, "unable to use function MATCH in the requested context"
+        1, "Failed to execute SQL statement: unable to use function MATCH in the requested context"
         -- </func-19.3>
     })
 

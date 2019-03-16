@@ -1,11 +1,11 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 
 test_run:cmd("setopt delimiter ';'")
 
 upper_lower_test = function (str)
-    return box.sql.execute(string.format("select lower('%s'), upper('%s')", str, str))
+    return box.execute(string.format("select lower('%s'), upper('%s')", str, str))
 end;
 
 -- Some pangrams
@@ -80,7 +80,7 @@ upper_lower_test([[
 test_run:cmd("setopt delimiter ''");
 
 -- Bad test cases
-box.sql.execute("select upper('1', 2)")
-box.sql.execute("select upper(\"1\")")
-box.sql.execute("select upper()")
+box.execute("select upper('1', 2)")
+box.execute("select upper(\"1\")")
+box.execute("select upper()")
 

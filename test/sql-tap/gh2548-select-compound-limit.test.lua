@@ -14,41 +14,41 @@ for _, term in ipairs({'UNION', 'UNION ALL', 'INTERSECT', 'EXCEPT'}) do
                  function()
                      for i = 1,table_count do
                          drop_string = 'DROP TABLE IF EXISTS t' .. i .. ';\n'
-                         box.sql.execute(drop_string)
+                         box.execute(drop_string)
                      end
 
                      for i = 1,table_count do
                          create_string = 'CREATE TABLE t' .. i .. ' (s1 int primary key, s2 int);\n'
-                         box.sql.execute(create_string)
+                         box.execute(create_string)
                      end
 
                      for i = 1,table_count do
                          insert_string = 'INSERT INTO t' .. i .. ' VALUES (0,' .. i .. ');\n'
-                         box.sql.execute(insert_string)
+                         box.execute(insert_string)
                      end
 
                      for i = 1,table_count-1 do
                          if i > 1 then select_string = select_string .. ' ' .. term .. ' ' end
                          select_string = select_string .. 'SELECT * FROM t' .. i
                      end
-                     return pcall( function() box.sql.execute(select_string) end)
+                     return pcall( function() box.execute(select_string) end)
                  end,
                  true)
     test:do_test("Negative COMPOUND "..term,
                  function()
                      select_string = select_string .. ' ' .. term ..' ' .. 'SELECT * FROM t' .. table_count
-                     return  pcall(function() box.sql.execute(select_string) end)
+                     return  pcall(function() box.execute(select_string) end)
                  end,
                  false)
 
     select_string_last = select_string
 
---    if not pcall(function() box.sql.execute(select_string) end) then
+--    if not pcall(function() box.execute(select_string) end) then
 --        print('not ok')
 --    end
 
 --    select_string = select_string .. ' ' .. term ..' ' .. 'SELECT * FROM t' .. table_count
---    if pcall(function() box.sql.execute(select_string) end) then
+--    if pcall(function() box.execute(select_string) end) then
 --        print('not ok')
 --    end
 end

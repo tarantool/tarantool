@@ -6,10 +6,10 @@ test_run:cmd('restart server default with cleanup=1')
 -- Check that tuple inserted into _fk_constraint is FK constrains
 -- valid data.
 --
-box.sql.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b INT);")
-box.sql.execute("CREATE UNIQUE INDEX i1 ON t1(a);")
-box.sql.execute("CREATE TABLE t2 (a INT, b INT, id INT PRIMARY KEY);")
-box.sql.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b INT);")
+box.execute("CREATE UNIQUE INDEX i1 ON t1(a);")
+box.execute("CREATE TABLE t2 (a INT, b INT, id INT PRIMARY KEY);")
+box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 
 -- Parent and child spaces must exist.
 --
@@ -26,7 +26,7 @@ t = {'fk_1', child_id, view_id, false, 'simple', 'restrict', 'restrict', {0}, {1
 box.space._fk_constraint:insert(t)
 t = {'fk_1', view_id, parent_id, false, 'simple', 'restrict', 'restrict', {0}, {1}}
 box.space._fk_constraint:insert(t)
-box.sql.execute("DROP VIEW v1;")
+box.execute("DROP VIEW v1;")
 
 -- Match clause can be only one of: simple, partial, full.
 --
@@ -43,10 +43,10 @@ box.space._fk_constraint:insert(t)
 -- Temporary restriction (until SQL triggers work from Lua):
 -- referencing space must be empty.
 --
-box.sql.execute("INSERT INTO t2 VALUES (1, 2, 3);")
+box.execute("INSERT INTO t2 VALUES (1, 2, 3);")
 t = {'fk_1', child_id, parent_id, false, 'simple', 'restrict', 'restrict', {2}, {1}}
 box.space._fk_constraint:insert(t)
-box.sql.execute("DELETE FROM t2;")
+box.execute("DELETE FROM t2;")
 
 -- Links must be specififed correctly.
 --
@@ -84,7 +84,7 @@ t = box.space._fk_constraint:insert(t)
 -- Implicitly referenced index can't be dropped,
 -- ergo - space can't be dropped until it is referenced.
 --
-box.sql.execute("DROP INDEX i1 on t1;")
+box.execute("DROP INDEX i1 on t1;")
 
 -- Referenced index can't be altered as well, if alter leads to
 -- rebuild of index (e.g. index still can be renamed).
@@ -108,8 +108,8 @@ box.space.T1:drop()
 -- Create several constraints to make sure that they are held
 -- as linked lists correctly including self-referencing constraints.
 --
-box.sql.execute("CREATE TABLE child (id INT PRIMARY KEY, a INT);")
-box.sql.execute("CREATE TABLE parent (a INT, id INT PRIMARY KEY);")
+box.execute("CREATE TABLE child (id INT PRIMARY KEY, a INT);")
+box.execute("CREATE TABLE parent (a INT, id INT PRIMARY KEY);")
 
 parent_id = box.space._space.index.name:select('PARENT')[1]['id']
 child_id = box.space._space.index.name:select('CHILD')[1]['id']
@@ -153,20 +153,20 @@ box.space.PARENT:drop()
 -- Check that parser correctly handles MATCH, ON DELETE and
 -- ON UPDATE clauses.
 --
-box.sql.execute('CREATE TABLE tp (id INT PRIMARY KEY, a INT UNIQUE)')
-box.sql.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) MATCH FULL ON DELETE SET NULL)')
-box.sql.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id) MATCH PARTIAL ON DELETE CASCADE ON UPDATE SET NULL')
+box.execute('CREATE TABLE tp (id INT PRIMARY KEY, a INT UNIQUE)')
+box.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) MATCH FULL ON DELETE SET NULL)')
+box.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id) MATCH PARTIAL ON DELETE CASCADE ON UPDATE SET NULL')
 box.space._fk_constraint:select{}
-box.sql.execute('DROP TABLE tc')
-box.sql.execute('DROP TABLE tp')
+box.execute('DROP TABLE tc')
+box.execute('DROP TABLE tp')
 
 -- gh-3475: ON UPDATE and ON DELETE clauses must appear once;
 -- MATCH clause must come first.
-box.sql.execute('CREATE TABLE t1 (id INT PRIMARY KEY);')
-box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE RESTRICT);')
-box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE CASCADE);')
-box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON UPDATE RESTRICT ON DELETE RESTRICT);')
-box.sql.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE MATCH FULL);')
+box.execute('CREATE TABLE t1 (id INT PRIMARY KEY);')
+box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE RESTRICT);')
+box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE CASCADE);')
+box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON UPDATE RESTRICT ON DELETE RESTRICT);')
+box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE MATCH FULL);')
 box.space.T1:drop()
 
 --- Clean-up SQL DD hash.

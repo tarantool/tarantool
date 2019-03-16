@@ -58,7 +58,7 @@ local function queryplan(sql)
         x = "sort"
     end
     table.insert(data,x)
-    local eqp = box.sql.execute("EXPLAIN QUERY PLAN "..sql.."")
+    local eqp = box.execute("EXPLAIN QUERY PLAN "..sql.."").rows
     -- puts eqp=$eqp
     for i, val in ipairs(eqp) do
         --local a = val[1]

@@ -7,23 +7,23 @@ for _, table_count in ipairs({30, 31}) do
     for i = 1,table_count do
         -- First table for uniform triggers check
         drop_string = 'DROP TABLE IF EXISTS t' .. i .. ';'
-        box.sql.execute(drop_string)
+        box.execute(drop_string)
 
         create_string = 'CREATE TABLE t' .. i .. ' (s1 INT UNIQUE, s2 INT, s3 INT PRIMARY KEY);'
-        box.sql.execute(create_string)
+        box.execute(create_string)
 
         insert_string = 'INSERT INTO t' .. i .. ' VALUES (0,' .. i .. ', 0);'
-        box.sql.execute(insert_string)
+        box.execute(insert_string)
 
         -- Second table for triggers mixture check
         drop_string = 'DROP TABLE IF EXISTS tt' .. i .. ';'
-        box.sql.execute(drop_string)
+        box.execute(drop_string)
 
         create_string = 'CREATE TABLE tt' .. i .. ' (s1 INT UNIQUE, s2 INT, s3 INT PRIMARY KEY);'
-        box.sql.execute(create_string)
+        box.execute(create_string)
 
         insert_string = 'INSERT INTO tt' .. i .. ' VALUES (0,' .. i .. ', 0);'
-        box.sql.execute(insert_string)
+        box.execute(insert_string)
     end
 
     -- And ON DELETE|UPDATE|INSERT triggers
@@ -33,21 +33,21 @@ for _, table_count in ipairs({30, 31}) do
             .. ' FOR EACH ROW '
         create_string = create_string .. ' BEGIN DELETE FROM t' .. i+1
             .. '; END'
-        box.sql.execute(create_string)
+        box.execute(create_string)
 
         create_string = 'CREATE TRIGGER tu' .. i
         create_string = create_string .. ' BEFORE UPDATE ON t' .. i
             .. ' FOR EACH ROW '
         create_string = create_string .. ' BEGIN UPDATE t' .. i+1 ..
             ' SET s1=s1+1; END'
-        box.sql.execute(create_string)
+        box.execute(create_string)
 
         create_string = 'CREATE TRIGGER ti' .. i
         create_string = create_string .. ' BEFORE INSERT ON t' .. i
             .. ' FOR EACH ROW '
         create_string = create_string .. ' BEGIN INSERT INTO t' .. i+1
             .. ' (s1) SELECT max(s1)+1 FROM t' .. i+1 .. '; END'
-        box.sql.execute(create_string)
+        box.execute(create_string)
 
         -- Try triggers mixture: DELETE triggers UPDATE, which triggers
         -- INSERT, which triggers DELETE etc.
@@ -70,12 +70,13 @@ for _, table_count in ipairs({30, 31}) do
                     ' SET s1=s1+1; END'
             end
         end
-        box.sql.execute(create_string)
+        box.execute(create_string)
     end
 
     function check(sql)
         msg = ''
         local _, msg = pcall(function () test:execsql(sql) end)
+        msg = tostring(msg)
         test:do_test(sql,
                      function()
                          return true

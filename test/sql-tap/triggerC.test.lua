@@ -165,7 +165,7 @@ test:do_test(
         return test:catchsql " DELETE FROM t4 "
     end, {
         -- <triggerC-1.9>
-        1, "delete is not supported"
+        1, "Failed to execute SQL statement: delete is not supported"
         -- </triggerC-1.9>
     })
 
@@ -199,7 +199,7 @@ test:do_catchsql_test(
         UPDATE OR REPLACE t5 SET a = 4 WHERE a = 1
     ]], {
         -- <triggerC-1.12>
-        1, "too many levels of trigger recursion"
+        1, "Failed to execute SQL statement: too many levels of trigger recursion"
         -- </triggerC-1.12>
     })
 
@@ -285,7 +285,7 @@ tests =   { {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 WHEN (new.a>0) BEGIN
 
             {[[ CREATE TRIGGER t2_trig BEFORE INSERT ON t2 BEGIN
                   INSERT INTO t2 VALUES(new.a - 1);
-                END;]], {1, "too many levels of trigger recursion"}},
+                END;]], {1, "Failed to execute SQL statement: too many levels of trigger recursion"}},
 
             {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 WHEN (new.a>0) BEGIN
                   INSERT OR IGNORE INTO t2 VALUES(new.a);
@@ -293,7 +293,7 @@ tests =   { {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 WHEN (new.a>0) BEGIN
 
             {[[  CREATE TRIGGER t2_trig BEFORE INSERT ON t2 WHEN (new.a>0) BEGIN
                    INSERT OR IGNORE INTO t2 VALUES(new.a);
-                 END;]], {1, "too many levels of trigger recursion"}}}
+                 END;]], {1, "Failed to execute SQL statement: too many levels of trigger recursion"}}}
 
 for n, v in ipairs(tests) do
     test:do_test(
@@ -382,7 +382,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(0,0)
     ]], {
         -- <triggerC-3.1.2>
-        1, "too many levels of trigger recursion"
+        1, "Failed to execute SQL statement: too many levels of trigger recursion"
         -- </triggerC-3.1.2>
     })
 
@@ -411,7 +411,7 @@ test:do_catchsql_test(
         INSERT INTO t3b VALUES(1);
     ]], {
         -- <triggerC-3.1.3>
-        1, "too many levels of trigger recursion"
+        1, "Failed to execute SQL statement: too many levels of trigger recursion"
         -- </triggerC-3.1.3>
     })
 
@@ -908,7 +908,7 @@ test:do_catchsql_test(
         UPDATE t12 SET a=a+1, b=b+1;
     ]], {
         -- <triggerC-13.2>
-        1, "too many levels of trigger recursion"
+        1, "Failed to execute SQL statement: too many levels of trigger recursion"
         -- </triggerC-13.2>
     })
 

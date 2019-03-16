@@ -7,20 +7,25 @@ engine = test_run:get_cfg('engine')
 nb = require('net.box')
 ---
 ...
-box.sql.execute("PRAGMA sql_default_engine='"..engine.."'")
+box.execute("PRAGMA sql_default_engine='"..engine.."'")
 ---
+- rowcount: 0
 ...
-box.sql.execute("CREATE TABLE t1 (s1 INT PRIMARY KEY, s2 INT UNIQUE);")
+box.execute("CREATE TABLE t1 (s1 INT PRIMARY KEY, s2 INT UNIQUE);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
+box.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO t1 VALUES (1, 1);")
+box.execute("INSERT INTO t1 VALUES (1, 1);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO t2 VALUES (1);")
+box.execute("INSERT INTO t2 VALUES (1);")
 ---
+- rowcount: 1
 ...
 box.schema.user.grant('guest','read', 'space', 'T1')
 ---
@@ -58,8 +63,9 @@ c:execute('SELECT * FROM t1, t2 WHERE t1.s1 = t2.s1')
 ---
 - error: Read access to space 'T1' is denied for user 'guest'
 ...
-box.sql.execute("CREATE VIEW v AS SELECT * FROM t1")
+box.execute("CREATE VIEW v AS SELECT * FROM t1")
 ---
+- rowcount: 1
 ...
 box.schema.user.grant('guest','read', 'space', 'V')
 ---
@@ -71,8 +77,9 @@ c:execute('SELECT * FROM v')
 ---
 - error: Read access to space 'T1' is denied for user 'guest'
 ...
-box.sql.execute('CREATE TABLE t3 (s1 INT PRIMARY KEY, fk INT, FOREIGN KEY (fk) REFERENCES t1(s2))')
+box.execute('CREATE TABLE t3 (s1 INT PRIMARY KEY, fk INT, FOREIGN KEY (fk) REFERENCES t1(s2))')
 ---
+- rowcount: 1
 ...
 box.schema.user.grant('guest','read','space', 'T3')
 ---
@@ -94,15 +101,19 @@ box.schema.user.revoke('guest','read','space', 'T2')
 box.schema.user.revoke('guest','read','space', 'T3')
 ---
 ...
-box.sql.execute('DROP VIEW v')
+box.execute('DROP VIEW v')
 ---
+- rowcount: 1
 ...
-box.sql.execute('DROP TABLE t3')
+box.execute('DROP TABLE t3')
 ---
+- rowcount: 1
 ...
-box.sql.execute('DROP TABLE t2')
+box.execute('DROP TABLE t2')
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t1")
+box.execute("DROP TABLE t1")
 ---
+- rowcount: 1
 ...

@@ -1,6 +1,6 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 
 work_dir = 'sql/upgrade/1.10/'
 test_run:cmd('create server upgrade with script="sql/upgrade/upgrade.lua", workdir="' .. work_dir .. '"')
@@ -24,10 +24,10 @@ box.space._space.index['name']:get('T1')
 box.space._index:get({box.space._space.index['name']:get('T1').id, 0})
 
 -- test system tables functionality
-box.sql.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
-box.sql.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
-box.sql.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
-box.sql.execute("CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2); END;")
+box.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
+box.execute("CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2); END;")
 box.space._space.index['name']:get('T')
 box.space._space.index['name']:get('T_OUT')
 t1t = box.space._trigger:get('T1T')
@@ -39,15 +39,15 @@ t2t.opts
 assert(t1t.space_id == t2t.space_id)
 assert(t1t.space_id == box.space.T.id)
 
-box.sql.execute("INSERT INTO T VALUES(1);")
+box.execute("INSERT INTO T VALUES(1);")
 box.space.T:select()
 box.space.T_OUT:select()
-box.sql.execute("SELECT * FROM T")
-box.sql.execute("SELECT * FROM T")
+box.execute("SELECT * FROM T")
+box.execute("SELECT * FROM T")
 
 
-box.sql.execute("DROP TABLE T;")
-box.sql.execute("DROP TABLE T_OUT;")
+box.execute("DROP TABLE T;")
+box.execute("DROP TABLE T_OUT;")
 
 
 test_run:switch('default')

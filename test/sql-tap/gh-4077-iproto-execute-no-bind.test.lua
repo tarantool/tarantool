@@ -20,7 +20,7 @@ box.cfg({
 })
 
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
-box.sql.execute('create table T(ID int primary key)')
+box.execute('create table T(ID int primary key)')
 
 local test = tap.test('gh-4077-iproto-execute-no-bind')
 test:plan(3)
@@ -66,7 +66,7 @@ local exp_res = {{1}}
 local res = box.space.T:pairs():map(box.tuple.totable):totable()
 test:is_deeply(res, exp_res, 'verify inserted data')
 
-box.sql.execute('drop table T')
+box.execute('drop table T')
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 
 os.exit(test:check() == true and 0 or 1)
