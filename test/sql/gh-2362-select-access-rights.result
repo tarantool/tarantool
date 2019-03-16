@@ -46,8 +46,7 @@ c = nb.connect(box.cfg.listen)
 ...
 c:execute("SELECT * FROM t1;")
 ---
-- error: 'Failed to execute SQL statement: Read access to space ''T1'' is denied for
-    user ''guest'''
+- error: Read access to space 'T1' is denied for user 'guest'
 ...
 box.schema.user.grant('guest','read', 'space', 'T2')
 ---
@@ -57,8 +56,7 @@ c = nb.connect(box.cfg.listen)
 ...
 c:execute('SELECT * FROM t1, t2 WHERE t1.s1 = t2.s1')
 ---
-- error: 'Failed to execute SQL statement: Read access to space ''T1'' is denied for
-    user ''guest'''
+- error: Read access to space 'T1' is denied for user 'guest'
 ...
 box.sql.execute("CREATE VIEW v AS SELECT * FROM t1")
 ---
@@ -71,8 +69,7 @@ v = nb.connect(box.cfg.listen)
 ...
 c:execute('SELECT * FROM v')
 ---
-- error: 'Failed to execute SQL statement: Read access to space ''T1'' is denied for
-    user ''guest'''
+- error: Read access to space 'T1' is denied for user 'guest'
 ...
 box.sql.execute('CREATE TABLE t3 (s1 INT PRIMARY KEY, fk INT, FOREIGN KEY (fk) REFERENCES t1(s2))')
 ---
@@ -85,8 +82,7 @@ v = nb.connect(box.cfg.listen)
 ...
 c:execute('INSERT INTO t3 VALUES (1, 1)')
 ---
-- error: 'Failed to execute SQL statement: Read access to space ''T1'' is denied for
-    user ''guest'''
+- error: Read access to space 'T1' is denied for user 'guest'
 ...
 -- Cleanup
 box.schema.user.revoke('guest','read','space', 'V')
