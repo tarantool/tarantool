@@ -16,6 +16,8 @@ local function flatten(arr)
         for _, v in ipairs(arr) do
             if type(v) == "table" then
                 flatten(v)
+            elseif box.tuple.is(v) then
+                flatten(v:totable())
             else
                 table.insert(result, v)
             end
@@ -169,11 +171,16 @@ test.do_test = do_test
 
 local function execsql_one_by_one(sql)
     local queries = sql_tokenizer.split_sql(sql)
-    local last_res = nil
+    local last_res_rows = nil
+    local last_res_metadata = nil
     for _, query in pairs(queries) do
-        last_res = box.sql.execute(query) or last_res
+        local new_res = box.execute(query)
+        if new_res ~= nil and new_res.rows ~= nil then
+            last_res_rows = new_res.rows
+            last_res_metadata = new_res.metadata
+        end
     end
-    return last_res
+    return last_res_rows, last_res_metadata
 end
 
 local function execsql(self, sql)
@@ -196,6 +203,9 @@ local function catchsql(self, sql, expect)
         r[1] = 0
     else
         r[1] = 1
+        if type(r[2]) == 'cdata' then
+            r[2] = tostring(r[2])
+        end
     end
     return r
 end
@@ -221,12 +231,11 @@ local function do_execsql2_test(self, label, sql, expect)
 end
 test.do_execsql2_test = do_execsql2_test
 
-local function flattern_with_column_names(result)
+local function flattern_with_column_names(result, metadata)
     local ret = {}
-    local columns = result[0]
     for i = 1, #result, 1 do
-        for j = 1, #columns, 1 do
-            table.insert(ret, columns[j])
+        for j = 1, #metadata, 1 do
+            table.insert(ret, metadata[j].name)
             table.insert(ret, result[i][j])
         end
     end
@@ -252,10 +261,10 @@ function test.do_catchsql_set_test(self, testcases, prefix)
 end
 
 local function execsql2(self, sql)
-    local result = execsql_one_by_one(sql)
+    local result, metadata = execsql_one_by_one(sql)
     if type(result) ~= 'table' then return end
     -- shift rows down, revealing column names
-    result = flattern_with_column_names(result)
+    result = flattern_with_column_names(result, metadata)
     return result
 end
 test.execsql2 = execsql2
@@ -272,6 +281,9 @@ local function catchsql2(self, sql)
     -- 0 means ok
     -- 1 means not ok
     r[1] = r[1] == true and 0 or 1
+    if r[1] == 1 then
+        r[2] = tostring(r[2])
+    end
     return r
 end
 test.catchsql2 = catchsql2
@@ -403,7 +415,11 @@ test.do_eqp_test = function (self, label, sql, result)
     test:do_test(
         label,
         function()
-            return execsql_one_by_one("EXPLAIN QUERY PLAN "..sql)
+            local result = execsql_one_by_one("EXPLAIN QUERY PLAN "..sql)
+            for k,v in pairs(result) do
+                result[k] = v:totable()
+            end
+            return result
         end,
         result)
 end
@@ -424,7 +440,7 @@ box.cfg{
 }
 
 local engine = test_run and test_run:get_cfg('engine') or 'memtx'
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 
 function test.engine(self)
     return engine

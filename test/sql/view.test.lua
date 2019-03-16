@@ -1,17 +1,17 @@
 test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 
 -- Verify that constraints on 'view' option are working.
 
 -- box.cfg()
 
 -- Create space and view.
-box.sql.execute("CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a, b));");
-box.sql.execute("CREATE VIEW v1 AS SELECT a+b FROM t1;");
+box.execute("CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a, b));");
+box.execute("CREATE VIEW v1 AS SELECT a+b FROM t1;");
 
 -- View can't have any indexes.
-box.sql.execute("CREATE INDEX i1 on v1(a);");
+box.execute("CREATE INDEX i1 on v1(a);");
 v1 = box.space.V1;
 v1:create_index('primary', {parts = {1, 'string'}})
 v1:create_index('secondary', {parts = {1, 'string'}})
@@ -35,7 +35,7 @@ box.space._space:replace(v1);
 box.schema.create_space('view', {view = true})
 
 -- Space referenced by a view can't be renamed.
-box.sql.execute("ALTER TABLE t1 RENAME TO new_name;")
+box.execute("ALTER TABLE t1 RENAME TO new_name;")
 
 -- View can be created via straight insertion into _space.
 sp = box.schema.create_space('test');
@@ -53,70 +53,70 @@ raw_sp[6].sql = 'SELECT 1;';
 sp = box.space._space:replace(raw_sp);
 
 -- Can't drop space via Lua if at least one view refers to it.
-box.sql.execute('CREATE TABLE t2(id INT PRIMARY KEY);');
-box.sql.execute('CREATE VIEW v2 AS SELECT * FROM t2;');
+box.execute('CREATE TABLE t2(id INT PRIMARY KEY);');
+box.execute('CREATE VIEW v2 AS SELECT * FROM t2;');
 box.space.T2:drop();
-box.sql.execute('DROP VIEW v2;');
-box.sql.execute('DROP TABLE t2;');
+box.execute('DROP VIEW v2;');
+box.execute('DROP TABLE t2;');
 
 -- Check that alter transfers reference counter.
-box.sql.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY);");
-box.sql.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
-box.sql.execute("DROP TABLE t2;");
+box.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY);");
+box.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
+box.execute("DROP TABLE t2;");
 sp = box.space._space:get{box.space.T2.id};
 sp = box.space._space:replace(sp);
-box.sql.execute("DROP TABLE t2;");
-box.sql.execute("DROP VIEW v2;");
-box.sql.execute("DROP TABLE t2;");
+box.execute("DROP TABLE t2;");
+box.execute("DROP VIEW v2;");
+box.execute("DROP TABLE t2;");
 
 -- gh-3849: failed to create VIEW in form of AS VALUES (const);
 --
-box.sql.execute("CREATE VIEW cv AS VALUES(1);")
-box.sql.execute("CREATE VIEW cv1 AS VALUES('k', 1);")
-box.sql.execute("CREATE VIEW cv2 AS VALUES((VALUES((SELECT 1))));")
-box.sql.execute("CREATE VIEW cv3 AS VALUES(1+2, 1+2);")
-box.sql.execute("DROP VIEW cv;")
-box.sql.execute("DROP VIEW cv1;")
-box.sql.execute("DROP VIEW cv2;")
-box.sql.execute("DROP VIEW cv3;")
+box.execute("CREATE VIEW cv AS VALUES(1);")
+box.execute("CREATE VIEW cv1 AS VALUES('k', 1);")
+box.execute("CREATE VIEW cv2 AS VALUES((VALUES((SELECT 1))));")
+box.execute("CREATE VIEW cv3 AS VALUES(1+2, 1+2);")
+box.execute("DROP VIEW cv;")
+box.execute("DROP VIEW cv1;")
+box.execute("DROP VIEW cv2;")
+box.execute("DROP VIEW cv3;")
 
 -- gh-3815: AS VALUES syntax didn't incerement VIEW reference
 -- counter. Moreover, tables within sub-select were not accounted
 -- as well.
 --
-box.sql.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
-box.sql.execute("CREATE VIEW bv (wombat) AS VALUES ((SELECT 'k' FROM b));")
-box.sql.execute("DROP TABLE b;")
-box.sql.execute("DROP VIEW bv;")
-box.sql.execute("DROP TABLE b;")
+box.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
+box.execute("CREATE VIEW bv (wombat) AS VALUES ((SELECT 'k' FROM b));")
+box.execute("DROP TABLE b;")
+box.execute("DROP VIEW bv;")
+box.execute("DROP TABLE b;")
 
-box.sql.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
-box.sql.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
-box.sql.execute("CREATE VIEW bcv AS SELECT * FROM b WHERE s1 IN (SELECT * FROM c);")
-box.sql.execute("DROP TABLE c;")
-box.sql.execute("DROP VIEW bcv;")
-box.sql.execute("DROP TABLE c;")
+box.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
+box.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
+box.execute("CREATE VIEW bcv AS SELECT * FROM b WHERE s1 IN (SELECT * FROM c);")
+box.execute("DROP TABLE c;")
+box.execute("DROP VIEW bcv;")
+box.execute("DROP TABLE c;")
 
-box.sql.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
-box.sql.execute("CREATE VIEW bcv(x, y) AS VALUES((SELECT 'k' FROM b), (VALUES((SELECT 1 FROM b WHERE s1 IN (VALUES((SELECT 1 + c.s1 FROM c)))))))")
-box.sql.execute("DROP TABLE c;")
+box.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
+box.execute("CREATE VIEW bcv(x, y) AS VALUES((SELECT 'k' FROM b), (VALUES((SELECT 1 FROM b WHERE s1 IN (VALUES((SELECT 1 + c.s1 FROM c)))))))")
+box.execute("DROP TABLE c;")
 box.space.BCV:drop()
-box.sql.execute("DROP TABLE c;")
-box.sql.execute("DROP TABLE b;")
+box.execute("DROP TABLE c;")
+box.execute("DROP TABLE b;")
 
 -- gh-3814: make sure that recovery of view processed without
 -- unexpected errors.
 --
 box.snapshot()
-box.sql.execute("CREATE TABLE t2 (id INT PRIMARY KEY);")
-box.sql.execute("CREATE VIEW v2 AS SELECT * FROM t2;")
+box.execute("CREATE TABLE t2 (id INT PRIMARY KEY);")
+box.execute("CREATE VIEW v2 AS SELECT * FROM t2;")
 test_run:cmd('restart server default')
 
-box.sql.execute("DROP TABLE t2;")
-box.sql.execute("SELECT * FROM v2;")
+box.execute("DROP TABLE t2;")
+box.execute("SELECT * FROM v2;")
 box.space.V2:drop()
 box.space.T2:drop()
 
 -- Cleanup
-box.sql.execute("DROP VIEW v1;");
-box.sql.execute("DROP TABLE t1;");
+box.execute("DROP VIEW v1;");
+box.execute("DROP TABLE t1;");

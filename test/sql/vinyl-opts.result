@@ -13,11 +13,13 @@ test_run:cmd("switch test")
 ---
 - true
 ...
-box.sql.execute('pragma sql_default_engine= \'vinyl\'')
+box.execute('pragma sql_default_engine= \'vinyl\'')
 ---
+- rowcount: 0
 ...
-box.sql.execute('CREATE TABLE v1 (id INT PRIMARY KEY, b INT);')
+box.execute('CREATE TABLE v1 (id INT PRIMARY KEY, b INT);')
 ---
+- rowcount: 1
 ...
 box.space.V1.index[0].options
 ---
@@ -27,8 +29,9 @@ box.space.V1.index[0].options
   bloom_fpr: 0.1
   range_size: 536870912
 ...
-box.sql.execute('CREATE INDEX i1 ON v1(b);')
+box.execute('CREATE INDEX i1 ON v1(b);')
 ---
+- rowcount: 1
 ...
 box.space.V1.index[1].options
 ---

@@ -4,39 +4,47 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 -- box.cfg()
 -- create space
-box.sql.execute("CREATE TABLE zoobar (c1 INT, c2 INT PRIMARY KEY, c3 TEXT, c4 INT)")
+box.execute("CREATE TABLE zoobar (c1 INT, c2 INT PRIMARY KEY, c3 TEXT, c4 INT)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE UNIQUE INDEX zoobar2 ON zoobar(c1, c4)")
+box.execute("CREATE UNIQUE INDEX zoobar2 ON zoobar(c1, c4)")
 ---
+- rowcount: 1
 ...
 -- Debug
--- box.sql.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
+-- box.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 -- Seed entry
-box.sql.execute("INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
+box.execute("INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 ---
+- rowcount: 1
 ...
 -- PK must be unique
-box.sql.execute("INSERT INTO zoobar VALUES (112, 222, 'c3', 444)")
+box.execute("INSERT INTO zoobar VALUES (112, 222, 'c3', 444)")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_ZOOBAR_1' in space 'ZOOBAR'
+- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_ZOOBAR_1''
+    in space ''ZOOBAR'''
 ...
 -- Unique index must be respected
-box.sql.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
+box.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
 ---
-- error: Duplicate key exists in unique index 'ZOOBAR2' in space 'ZOOBAR'
+- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''ZOOBAR2''
+    in space ''ZOOBAR'''
 ...
 -- Cleanup
-box.sql.execute("DROP INDEX zoobar2 ON zoobar")
+box.execute("DROP INDEX zoobar2 ON zoobar")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE zoobar")
+box.execute("DROP TABLE zoobar")
 ---
+- rowcount: 1
 ...
 -- Debug
 -- require("console").start()

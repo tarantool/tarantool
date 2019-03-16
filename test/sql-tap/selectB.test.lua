@@ -25,11 +25,11 @@ local function test_transform(testname, sql1, sql2, results)
     -- opcodes only (line[2]) of explain command)
     local vdbe1 = {  }
     local vdbe2 = {  }
-    local data = box.sql.execute("explain "..sql1)
+    local data = box.execute("explain "..sql1)
     for i, line in ipairs(data) do
         table.insert(vdbe1, line[2])
     end
-    data = box.sql.execute("explain "..sql2)
+    data = box.execute("explain "..sql2)
     for i, line in ipairs(data) do
         table.insert(vdbe2, line[2])
     end

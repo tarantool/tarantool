@@ -24,7 +24,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2, 3, 2);
     ]], {
         -- <alter2-1.2>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </alter2-1.2>
     })
 
@@ -45,7 +45,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(2, 3, 2);
     ]], {
         -- <alter2-1.4>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </alter2-1.4>
     })
 
@@ -83,7 +83,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4, 2, 1);
     ]], {
         -- <alter2-1.6>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </alter2-1.6>
     })
 
@@ -143,7 +143,7 @@ test:do_catchsql_test(
         INSERT INTO parent VALUES(1, 2, 3);
     ]], {
         -- <alter2-2.1>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </alter2-2.1>
     })
 
@@ -154,7 +154,7 @@ test:do_catchsql_test(
         INSERT INTO child VALUES(2, 1, 1);
     ]], {
         -- <alter2-2.2>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </alter2-2.2>
     })
 
@@ -165,7 +165,7 @@ test:do_catchsql_test(
         INSERT INTO parent VALUES(3, 4, 2);
     ]], {
         -- <alter2-2.3>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </alter2-2.3>
     })
 

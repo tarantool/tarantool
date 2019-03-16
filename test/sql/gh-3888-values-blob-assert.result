@@ -10,52 +10,69 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 -- check 'VALUES' against typedef keywords (should fail)
-box.sql.execute('VALUES(scalar)')
+box.execute('VALUES(scalar)')
 ---
 - error: Syntax error near 'scalar'
 ...
-box.sql.execute('VALUES(float)')
+box.execute('VALUES(float)')
 ---
 - error: Syntax error near 'float'
 ...
 -- check 'SELECT' against typedef keywords (should fail)
-box.sql.execute('SELECT scalar')
+box.execute('SELECT scalar')
 ---
 - error: Syntax error near 'scalar'
 ...
-box.sql.execute('SELECT float')
+box.execute('SELECT float')
 ---
 - error: Syntax error near 'float'
 ...
 -- check 'VALUES' against ID (should fail)
-box.sql.execute('VALUES(TheColumnName)')
+box.execute('VALUES(TheColumnName)')
 ---
 - error: Can’t resolve field 'THECOLUMNNAME'
 ...
 -- check 'SELECT' against ID (should fail)
-box.sql.execute('SELECT TheColumnName')
+box.execute('SELECT TheColumnName')
 ---
 - error: Can’t resolve field 'THECOLUMNNAME'
 ...
 -- check 'VALUES' well-formed expression  (returns value)
-box.sql.execute('VALUES(-0.5e-2)')
+box.execute('VALUES(-0.5e-2)')
 ---
-- - [-0.005]
+- metadata:
+  - name: column1
+    type: NUMERIC
+  rows:
+  - [-0.005]
 ...
-box.sql.execute('SELECT X\'507265766564\'')
+box.execute('SELECT X\'507265766564\'')
 ---
-- - ['Preved']
+- metadata:
+  - name: X'507265766564'
+    type: BLOB
+  rows:
+  - ['Preved']
 ...
 -- check 'SELECT' well-formed expression  (return value)
-box.sql.execute('SELECT 3.14')
+box.execute('SELECT 3.14')
 ---
-- - [3.14]
+- metadata:
+  - name: '3.14'
+    type: INTEGER
+  rows:
+  - [3.14]
 ...
-box.sql.execute('SELECT X\'4D6564766564\'')
+box.execute('SELECT X\'4D6564766564\'')
 ---
-- - ['Medved']
+- metadata:
+  - name: X'4D6564766564'
+    type: BLOB
+  rows:
+  - ['Medved']
 ...

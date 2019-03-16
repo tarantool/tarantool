@@ -83,7 +83,6 @@ t
   - slab
   - snapshot
   - space
-  - sql
   - stat
   - tuple
 ...

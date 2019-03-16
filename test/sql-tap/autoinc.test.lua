@@ -531,7 +531,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL,1);
     ]], {
         -- <autoinc-6.2>
-        1, "Sequence 'T6' has overflowed"
+        1, "Failed to execute SQL statement: Sequence 'T6' has overflowed"
         -- </autoinc-6.2>
     })
 
@@ -810,7 +810,7 @@ test:do_catchsql_test(
         INSERT INTO t1 SELECT s2, s2 FROM t1;
     ]], {
         -- <autoinc-gh-3670>
-        1, "datatype mismatch"
+        1, "Failed to execute SQL statement: datatype mismatch"
         -- </autoinc-gh-3670>
     })
 

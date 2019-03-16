@@ -499,13 +499,13 @@ test:do_test(
         test:execsql("CREATE INDEX i2 ON t1(e);")
 
         for i = 0, 100 do
-            box.sql.execute(string.format("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', %s, %s);", i, math.floor(i / 2)))
+            box.execute(string.format("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', %s, %s);", i, math.floor(i / 2)))
         end;
         for i = 0, 20 do
-            box.sql.execute("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', 101, "..i..");")
+            box.execute("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', 101, "..i..");")
         end;
         for i = 102, 200 do
-            box.sql.execute(string.format("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', %s, %s);", i, math.floor(i / 2)))
+            box.execute(string.format("INSERT INTO t1 VALUES(null, 'x', 'y', 'z', %s, %s);", i, math.floor(i / 2)))
         end;
 
         test:execsql("ANALYZE;")

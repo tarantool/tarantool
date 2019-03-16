@@ -4,44 +4,51 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 -- Creating tables.
-box.sql.execute("CREATE TABLE t1(id INTEGER PRIMARY KEY, a INTEGER)")
+box.execute("CREATE TABLE t1(id INTEGER PRIMARY KEY, a INTEGER)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TABLE t2(object INTEGER PRIMARY KEY, price INTEGER, count INTEGER)")
+box.execute("CREATE TABLE t2(object INTEGER PRIMARY KEY, price INTEGER, count INTEGER)")
 ---
+- rowcount: 1
 ...
 -- Expressions that're supposed to create functional indexes
 -- should return certain message.
-box.sql.execute("CREATE INDEX i1 ON t1(a+1)")
+box.execute("CREATE INDEX i1 ON t1(a+1)")
 ---
 - error: Tarantool does not support functional indexes
 ...
-box.sql.execute("CREATE INDEX i2 ON t1(a)")
+box.execute("CREATE INDEX i2 ON t1(a)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE INDEX i3 ON t2(price + 100)")
----
-- error: Tarantool does not support functional indexes
-...
-box.sql.execute("CREATE INDEX i4 ON t2(price)")
----
-...
-box.sql.execute("CREATE INDEX i5 ON t2(count + 1)")
+box.execute("CREATE INDEX i3 ON t2(price + 100)")
 ---
 - error: Tarantool does not support functional indexes
 ...
-box.sql.execute("CREATE INDEX i6 ON t2(count * price)")
+box.execute("CREATE INDEX i4 ON t2(price)")
+---
+- rowcount: 1
+...
+box.execute("CREATE INDEX i5 ON t2(count + 1)")
+---
+- error: Tarantool does not support functional indexes
+...
+box.execute("CREATE INDEX i6 ON t2(count * price)")
 ---
 - error: Tarantool does not support functional indexes
 ...
 -- Cleaning up.
-box.sql.execute("DROP TABLE t1")
+box.execute("DROP TABLE t1")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t2")
+box.execute("DROP TABLE t2")
 ---
+- rowcount: 1
 ...

@@ -25,14 +25,14 @@ local function is_distinct_noop(sql)
     local sql2 = string.gsub(sql, "DISTINCT", "")
     local program1 = {  }
     local program2 = {  }
-    local r = box.sql.execute("EXPLAIN "..sql1)
+    local r = box.execute("EXPLAIN "..sql1).rows
     for _, val in ipairs(r) do
         local opcode = val[2]
         if opcode ~= "Noop" then
             table.insert(program1, opcode)
         end
     end
-    r = box.sql.execute("EXPLAIN "..sql2)
+    r = box.execute("EXPLAIN "..sql2).rows
     for _, val in ipairs(r) do
         local opcode = val[2]
         if opcode ~= "Noop" then
@@ -63,7 +63,7 @@ local function do_temptables_test(tn, sql, temptables)
         tn,
         function()
             local ret = {}
-            local r = box.sql.execute("EXPLAIN "..sql)
+            local r = box.execute("EXPLAIN "..sql).rows
             for _, val in ipairs(r) do
                 local opcode = val[2]
                 local p5 = val[7]

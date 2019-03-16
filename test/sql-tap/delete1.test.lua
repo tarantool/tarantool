@@ -151,7 +151,7 @@ test:do_test(
 test:do_test(
     "delete1-6.1.1",
     function()
-        box.sql.execute([[delete from "t" where "id"=2]])
+        box.execute([[delete from "t" where "id"=2]])
         return s:count()
     end,
     2)
@@ -159,7 +159,7 @@ test:do_test(
 test:do_test(
     "delete1-6.1",
     function()
-        box.sql.execute([[delete from "t"]])
+        box.execute([[delete from "t"]])
 	return s:count()
     end,
     0)

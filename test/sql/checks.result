@@ -11,8 +11,9 @@ test_run:cmd("push filter ".."'\\.lua.*:[0-9]+: ' to '.lua...\"]:<line>: '")
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 --
 -- gh-3272: Move SQL CHECK into server
@@ -109,18 +110,18 @@ s = box.space._space:insert(t)
 --
 -- gh-3611: Segfault on table creation with check referencing this table
 --
-box.sql.execute("CREATE TABLE w2 (s1 INT PRIMARY KEY, CHECK ((SELECT COUNT(*) FROM w2) = 0));")
+box.execute("CREATE TABLE w2 (s1 INT PRIMARY KEY, CHECK ((SELECT COUNT(*) FROM w2) = 0));")
 ---
 - error: 'Failed to create space ''W2'': Space ''W2'' does not exist'
 ...
-box.sql.execute("DROP TABLE w2;")
+box.execute("DROP TABLE w2;")
 ---
 - error: Space 'W2' does not exist
 ...
 --
 -- gh-3653: Dissallow bindings for DDL
 --
-box.sql.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
+box.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
 ---
 - error: 'Wrong space options (field 5): invalid expression specified (bindings are
     not allowed in DDL)'

@@ -4,55 +4,66 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 box.cfg{}
 ---
 ...
-box.sql.execute("CREATE TABLE t1 (s1 INTEGER PRIMARY KEY AUTOINCREMENT, s2 INTEGER, CHECK (s1 <> 19));");
+box.execute("CREATE TABLE t1 (s1 INTEGER PRIMARY KEY AUTOINCREMENT, s2 INTEGER, CHECK (s1 <> 19));");
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TABLE t2 (s1 INTEGER PRIMARY KEY AUTOINCREMENT, s2 INTEGER, CHECK (s1 <> 19 AND s1 <> 25));");
+box.execute("CREATE TABLE t2 (s1 INTEGER PRIMARY KEY AUTOINCREMENT, s2 INTEGER, CHECK (s1 <> 19 AND s1 <> 25));");
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TABLE t3 (s1 INTEGER PRIMARY KEY AUTOINCREMENT, s2 INTEGER, CHECK (s1 < 10));");
+box.execute("CREATE TABLE t3 (s1 INTEGER PRIMARY KEY AUTOINCREMENT, s2 INTEGER, CHECK (s1 < 10));");
 ---
+- rowcount: 1
 ...
-box.sql.execute("insert into t1 values (18, null);")
+box.execute("insert into t1 values (18, null);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("insert into t1(s2) values (null);")
+box.execute("insert into t1(s2) values (null);")
 ---
-- error: 'CHECK constraint failed: T1'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: T1'
 ...
-box.sql.execute("insert into t2 values (18, null);")
+box.execute("insert into t2 values (18, null);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("insert into t2(s2) values (null);")
+box.execute("insert into t2(s2) values (null);")
 ---
-- error: 'CHECK constraint failed: T2'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: T2'
 ...
-box.sql.execute("insert into t2 values (24, null);")
+box.execute("insert into t2 values (24, null);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("insert into t2(s2) values (null);")
+box.execute("insert into t2(s2) values (null);")
 ---
-- error: 'CHECK constraint failed: T2'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: T2'
 ...
-box.sql.execute("insert into t3 values (9, null)")
+box.execute("insert into t3 values (9, null)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("insert into t3(s2) values (null)")
+box.execute("insert into t3(s2) values (null)")
 ---
-- error: 'CHECK constraint failed: T3'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: T3'
 ...
-box.sql.execute("DROP TABLE t1")
+box.execute("DROP TABLE t1")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t2")
+box.execute("DROP TABLE t2")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t3")
+box.execute("DROP TABLE t3")
 ---
+- rowcount: 1
 ...

@@ -7,8 +7,9 @@ test_run = env.new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 -- Get invariant part of the tuple; name and opts don't change.
  function immutable_part(data) local r = {} for i, l in pairs(data) do table.insert(r, {l.name, l.opts}) end return r end
@@ -17,14 +18,17 @@ box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
 --
 -- gh-3273: Move Triggers to server
 --
-box.sql.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TABLE t2(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t2(x INTEGER PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
+box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
 ---
+- rowcount: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -64,18 +68,21 @@ immutable_part(box.space._trigger:select())
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1);
         END; '}
 ...
-box.sql.execute("DROP TABLE T1;")
+box.execute("DROP TABLE T1;")
 ---
+- rowcount: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
 - []
 ...
-box.sql.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
+box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
 ---
+- rowcount: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -87,15 +94,21 @@ space_id = box.space._space.index["name"]:get('T1').id
 ---
 ...
 -- Test, didn't trigger t1t degrade.
-box.sql.execute("INSERT INTO t1 VALUES(1);")
+box.execute("INSERT INTO t1 VALUES(1);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT * FROM t2;")
+box.execute("SELECT * FROM t2;")
 ---
-- - [1]
+- metadata:
+  - name: X
+    type: INTEGER
+  rows:
+  - [1]
 ...
-box.sql.execute("DELETE FROM t2;")
+box.execute("DELETE FROM t2;")
 ---
+- rowcount: 1
 ...
 -- Test triggers.
 tuple = {"T2T", space_id, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(2); END;"}}
@@ -122,21 +135,28 @@ immutable_part(box.space._trigger:select())
     - {'sql': 'CREATE TRIGGER t3t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(3);
         END;'}
 ...
-box.sql.execute("INSERT INTO t1 VALUES(2);")
+box.execute("INSERT INTO t1 VALUES(2);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT * FROM t2;")
+box.execute("SELECT * FROM t2;")
 ---
-- - [1]
+- metadata:
+  - name: X
+    type: INTEGER
+  rows:
+  - [1]
   - [2]
   - [3]
 ...
-box.sql.execute("DELETE FROM t2;")
+box.execute("DELETE FROM t2;")
 ---
+- rowcount: 3
 ...
 -- Test t1t after t2t and t3t drop.
-box.sql.execute("DROP TRIGGER T2T;")
+box.execute("DROP TRIGGER T2T;")
 ---
+- rowcount: 1
 ...
 _ = box.space._trigger:delete("T3T")
 ---
@@ -147,22 +167,30 @@ immutable_part(box.space._trigger:select())
     - {'sql': 'CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1);
         END; '}
 ...
-box.sql.execute("INSERT INTO t1 VALUES(3);")
+box.execute("INSERT INTO t1 VALUES(3);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT * FROM t2;")
+box.execute("SELECT * FROM t2;")
 ---
-- - [1]
+- metadata:
+  - name: X
+    type: INTEGER
+  rows:
+  - [1]
 ...
-box.sql.execute("DELETE FROM t2;")
+box.execute("DELETE FROM t2;")
 ---
+- rowcount: 1
 ...
 -- Insert new SQL t2t and t3t.
-box.sql.execute([[CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(2); END; ]])
+box.execute([[CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(2); END; ]])
 ---
+- rowcount: 1
 ...
-box.sql.execute([[CREATE TRIGGER t3t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(3); END; ]])
+box.execute([[CREATE TRIGGER t3t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(3); END; ]])
 ---
+- rowcount: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -176,29 +204,37 @@ immutable_part(box.space._trigger:select())
     - {'sql': 'CREATE TRIGGER t3t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(3);
         END; '}
 ...
-box.sql.execute("INSERT INTO t1 VALUES(4);")
+box.execute("INSERT INTO t1 VALUES(4);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT * FROM t2;")
+box.execute("SELECT * FROM t2;")
 ---
-- - [1]
+- metadata:
+  - name: X
+    type: INTEGER
+  rows:
+  - [1]
   - [2]
   - [3]
 ...
 -- Clean up.
-box.sql.execute("DROP TABLE t1;")
+box.execute("DROP TABLE t1;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t2;")
+box.execute("DROP TABLE t2;")
 ---
+- rowcount: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
 - []
 ...
 -- Test target tables restricts.
-box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY,b INT);")
+box.execute("CREATE TABLE t1(a INT PRIMARY KEY,b INT);")
 ---
+- rowcount: 1
 ...
 space_id = box.space.T1.id
 ---
@@ -210,8 +246,9 @@ box.space._trigger:insert(tuple)
 ---
 - error: 'SQL error: cannot create INSTEAD OF trigger on space: T1'
 ...
-box.sql.execute("CREATE VIEW V1 AS SELECT * FROM t1;")
+box.execute("CREATE VIEW V1 AS SELECT * FROM t1;")
 ---
+- rowcount: 1
 ...
 space_id = box.space.V1.id
 ---
@@ -240,161 +277,210 @@ box.space._trigger:insert(tuple)
 ---
 - error: 'SQL error: cannot create trigger on system table'
 ...
-box.sql.execute("DROP VIEW V1;")
+box.execute("DROP VIEW V1;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE T1;")
+box.execute("DROP TABLE T1;")
 ---
+- rowcount: 1
 ...
 --
 -- gh-3531: Assertion with trigger and two storage engines
 --
 -- Case 1: Src 'vinyl' table; Dst 'memtx' table
-box.sql.execute("PRAGMA sql_default_engine ('vinyl');")
+box.execute("PRAGMA sql_default_engine ('vinyl');")
 ---
+- rowcount: 0
 ...
-box.sql.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
+box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
+box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("PRAGMA sql_default_engine('memtx');")
+box.execute("PRAGMA sql_default_engine('memtx');")
 ---
+- rowcount: 0
 ...
-box.sql.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
+box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO m VALUES (0, '0');")
+box.execute("INSERT INTO m VALUES (0, '0');")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO n VALUES (0, '',null);")
+box.execute("INSERT INTO n VALUES (0, '',null);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
+box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
 - error: A multi-statement transaction can not use multiple storage engines
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE m;")
-box.sql.execute("DROP TABLE m;")
+box.execute("DROP TABLE m;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE n;")
+box.execute("DROP TABLE n;")
 ---
+- rowcount: 1
 ...
 -- Case 2: Src 'memtx' table; Dst 'vinyl' table
-box.sql.execute("PRAGMA sql_default_engine ('memtx');")
+box.execute("PRAGMA sql_default_engine ('memtx');")
 ---
+- rowcount: 0
 ...
-box.sql.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
+box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
+box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("PRAGMA sql_default_engine('vinyl');")
+box.execute("PRAGMA sql_default_engine('vinyl');")
 ---
+- rowcount: 0
 ...
-box.sql.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
+box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO m VALUES (0, '0');")
+box.execute("INSERT INTO m VALUES (0, '0');")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO n VALUES (0, '',null);")
+box.execute("INSERT INTO n VALUES (0, '',null);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
+box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
 - error: A multi-statement transaction can not use multiple storage engines
 ...
 -- ANALYZE banned in gh-4069
 -- box.sql.execute("ANALYZE n;")
-box.sql.execute("DROP TABLE m;")
+box.execute("DROP TABLE m;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE n;")
+box.execute("DROP TABLE n;")
 ---
+- rowcount: 1
 ...
 -- Test SQL Transaction with LUA
-box.sql.execute("PRAGMA sql_default_engine ('memtx');")
+box.execute("PRAGMA sql_default_engine ('memtx');")
 ---
+- rowcount: 0
 ...
-box.sql.execute("CREATE TABLE test (id INT PRIMARY KEY)")
+box.execute("CREATE TABLE test (id INT PRIMARY KEY)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("PRAGMA sql_default_engine='vinyl'")
+box.execute("PRAGMA sql_default_engine='vinyl'")
 ---
+- rowcount: 0
 ...
-box.sql.execute("CREATE TABLE test2 (id INT PRIMARY KEY)")
+box.execute("CREATE TABLE test2 (id INT PRIMARY KEY)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO test2 VALUES (2)")
+box.execute("INSERT INTO test2 VALUES (2)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("START TRANSACTION")
+box.execute("START TRANSACTION")
 ---
+- rowcount: 0
 ...
-box.sql.execute("INSERT INTO test VALUES (1)")
+box.execute("INSERT INTO test VALUES (1)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT * FROM test2")
+box.execute("SELECT * FROM test2")
 ---
 - error: A multi-statement transaction can not use multiple storage engines
 ...
-box.sql.execute("ROLLBACK;")
+box.execute("ROLLBACK;")
 ---
+- rowcount: 0
 ...
-box.sql.execute("DROP TABLE test;")
+box.execute("DROP TABLE test;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE test2;")
+box.execute("DROP TABLE test2;")
 ---
+- rowcount: 1
 ...
 --
 -- gh-3536: Some triggers cause error messages and/or half-finished updates
 --
-box.sql.execute("CREATE TABLE t (s1 INT, s2 INT, s3 INT, s4 INT PRIMARY KEY);")
+box.execute("CREATE TABLE t (s1 INT, s2 INT, s3 INT, s4 INT PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE VIEW v AS SELECT s1, s2 FROM t;")
+box.execute("CREATE VIEW v AS SELECT s1, s2 FROM t;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TRIGGER tv INSTEAD OF UPDATE ON v BEGIN UPDATE t SET s3 = new.s1 WHERE s1 = old.s1; END;")
+box.execute("CREATE TRIGGER tv INSTEAD OF UPDATE ON v BEGIN UPDATE t SET s3 = new.s1 WHERE s1 = old.s1; END;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO t VALUES (1,1,1,1);")
+box.execute("INSERT INTO t VALUES (1,1,1,1);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("UPDATE v SET s2 = s1 + 1;")
+box.execute("UPDATE v SET s2 = s1 + 1;")
 ---
+- rowcount: 0
 ...
-box.sql.execute("UPDATE v SET s1 = s1 + 5;")
+box.execute("UPDATE v SET s1 = s1 + 5;")
 ---
+- rowcount: 0
 ...
-box.sql.execute("SELECT * FROM t;")
+box.execute("SELECT * FROM t;")
 ---
-- - [1, 1, 6, 1]
+- metadata:
+  - name: S1
+    type: INTEGER
+  - name: S2
+    type: INTEGER
+  - name: S3
+    type: INTEGER
+  - name: S4
+    type: INTEGER
+  rows:
+  - [1, 1, 6, 1]
 ...
-box.sql.execute("DROP VIEW v;")
+box.execute("DROP VIEW v;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t;")
+box.execute("DROP TABLE t;")
 ---
+- rowcount: 1
 ...
 --
 -- gh-3653: Dissallow bindings for DDL
 --
-box.sql.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
+box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
 ---
+- rowcount: 1
 ...
 space_id = box.space.T1.id
 ---
 ...
-box.sql.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 WHEN new.a = ? BEGIN SELECT 1; END;")
+box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 WHEN new.a = ? BEGIN SELECT 1; END;")
 ---
-- error: bindings are not allowed in DDL
+- error: 'Failed to execute SQL statement: bindings are not allowed in DDL'
 ...
 tuple = {"TR1", space_id, {sql = [[CREATE TRIGGER tr1 AFTER INSERT ON t1 WHEN new.a = ? BEGIN SELECT 1; END;]]}}
 ---
@@ -403,6 +489,7 @@ box.space._trigger:insert(tuple)
 ---
 - error: bindings are not allowed in DDL
 ...
-box.sql.execute("DROP TABLE t1;")
+box.execute("DROP TABLE t1;")
 ---
+- rowcount: 1
 ...

@@ -86,10 +86,10 @@ test:do_execsql_test(
 test:do_test(
 	"pragma-3.3",
 	function()
-		old_value = box.sql.execute('PRAGMA case_sensitive_like')
-		box.sql.execute('PRAGMA case_sensitive_like = 1')
-		new_value = box.sql.execute('PRAGMA case_sensitive_like')
-		box.sql.execute('PRAGMA case_sensitive_like = '.. old_value[1][1])
+		old_value = box.execute('PRAGMA case_sensitive_like').rows
+		box.execute('PRAGMA case_sensitive_like = 1')
+		new_value = box.execute('PRAGMA case_sensitive_like').rows
+		box.execute('PRAGMA case_sensitive_like = '.. old_value[1][1])
 		return new_value[1][1]
 	end,
 	-- <pragma-3.3>

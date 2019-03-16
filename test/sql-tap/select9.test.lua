@@ -61,8 +61,9 @@ end
 
 local function test_compound_select(testname, sql, result)
     local nCol = 1
-    local A = box.sql.execute(sql) --test.box(sql)
-    nCol = #A[0]
+    local A = box.execute(sql) --test.box(sql)
+    nCol = #A.metadata
+    A = A.rows
     local nRow = #result / nCol
     local compound_sql = sql
     test:do_execsql_test(

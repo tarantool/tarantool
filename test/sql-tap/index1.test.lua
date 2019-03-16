@@ -112,7 +112,7 @@ test:do_test(
             end)
         v = v == true and {0} or {1}
         test:execsql("DROP TABLE test1")
-        return table.insert(v,msg) or v
+        return table.insert(v,tostring(msg)) or v
     end, {
         -- <index-2.2>
         1, "Can’t resolve field 'F4'"

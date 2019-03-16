@@ -6,12 +6,12 @@ test_run = require('test_run').new()
 
 -- Check that "PRAGMA parser_trace" returns 0 or 1 if called
 -- without parameter.
-result = box.sql.execute('PRAGMA parser_trace')
-box.sql.execute('PRAGMA parser_trace = 1')
-box.sql.execute('PRAGMA parser_trace')
-box.sql.execute('PRAGMA parser_trace = '.. result[1][1])
+result = box.execute('PRAGMA parser_trace').rows
+box.execute('PRAGMA parser_trace = 1')
+box.execute('PRAGMA parser_trace')
+box.execute('PRAGMA parser_trace = '.. result[1][1])
 
 --
 -- Make PRAGMA command return the result as a result set.
 --
-box.sql.execute('PRAGMA')
+box.execute('PRAGMA')

@@ -7,159 +7,343 @@ test_run = env.new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 -- create space
-box.sql.execute("CREATE TABLE foobar (foo INT PRIMARY KEY, bar TEXT)")
+box.execute("CREATE TABLE foobar (foo INT PRIMARY KEY, bar TEXT)")
 ---
+- rowcount: 1
 ...
 -- prepare data
-box.sql.execute("INSERT INTO foobar VALUES (1, 'foo')")
+box.execute("INSERT INTO foobar VALUES (1, 'foo')")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO foobar VALUES (2, 'bar')")
+box.execute("INSERT INTO foobar VALUES (2, 'bar')")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
+box.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
+box.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_FOOBAR_1' in space 'FOOBAR'
+- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_FOOBAR_1''
+    in space ''FOOBAR'''
 ...
 -- simple select
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
 ---
-- - ['foo', 1, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
   - ['foobar', 1000, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar LIMIT 2")
 ---
-- - ['foo', 1, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=2")
 ---
-- - ['bar', 2, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['bar', 2, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>2")
 ---
-- - ['foobar', 1000, 42, 'awesome']
-...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
----
-- - ['bar', 2, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
   - ['foobar', 1000, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>=2")
 ---
-- []
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['bar', 2, 42, 'awesome']
+  - ['foobar', 1000, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo=10000")
 ---
-- []
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows: []
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo>10000")
 ---
-- - ['foo', 1, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows: []
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2")
 ---
-- - ['foo', 1, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foo', 1, 42, 'awesome']
+...
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<2.001")
+---
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<=2")
 ---
-- - ['foo', 1, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE foo<100")
 ---
-- - ['foo', 1, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar WHERE bar='foo'")
 ---
-- - ['foo', 1, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foo', 1, 42, 'awesome']
 ...
-box.sql.execute("SELECT count(*) FROM foobar")
+box.execute("SELECT count(*) FROM foobar")
 ---
-- - [3]
+- metadata:
+  - name: count(*)
+    type: INTEGER
+  rows:
+  - [3]
 ...
-box.sql.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
+box.execute("SELECT count(*) FROM foobar WHERE bar='foo'")
 ---
-- - [1]
+- metadata:
+  - name: count(*)
+    type: INTEGER
+  rows:
+  - [1]
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 ---
-- - ['bar', 2, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: BLOB
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['bar', 2, 42, 'awesome']
   - ['foo', 1, 42, 'awesome']
   - ['foobar', 1000, 42, 'awesome']
 ...
-box.sql.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
+box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 ---
-- - ['foobar', 1000, 42, 'awesome']
+- metadata:
+  - name: BAR
+    type: BLOB
+  - name: FOO
+    type: INTEGER
+  - name: '42'
+    type: INTEGER
+  - name: '''awesome'''
+    type: TEXT
+  rows:
+  - ['foobar', 1000, 42, 'awesome']
   - ['foo', 1, 42, 'awesome']
   - ['bar', 2, 42, 'awesome']
 ...
 -- updates
-box.sql.execute("REPLACE INTO foobar VALUES (1, 'cacodaemon')")
+box.execute("REPLACE INTO foobar VALUES (1, 'cacodaemon')")
 ---
+- rowcount: 2
 ...
-box.sql.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
+box.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
 ---
-- - [1]
+- metadata:
+  - name: COUNT(*)
+    type: INTEGER
+  rows:
+  - [1]
 ...
-box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
+box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ---
-- - [1]
+- metadata:
+  - name: COUNT(*)
+    type: INTEGER
+  rows:
+  - [1]
 ...
-box.sql.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
+box.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
+box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ---
-- - [0]
+- metadata:
+  - name: COUNT(*)
+    type: INTEGER
+  rows:
+  - [0]
 ...
 -- multi-index
 -- create space
-box.sql.execute("CREATE TABLE barfoo (bar TEXT, foo FLOAT PRIMARY KEY)")
+box.execute("CREATE TABLE barfoo (bar TEXT, foo FLOAT PRIMARY KEY)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE UNIQUE INDEX barfoo2 ON barfoo(bar)")
+box.execute("CREATE UNIQUE INDEX barfoo2 ON barfoo(bar)")
 ---
+- rowcount: 1
 ...
 -- prepare data
-box.sql.execute("INSERT INTO barfoo VALUES ('foo', 1)")
+box.execute("INSERT INTO barfoo VALUES ('foo', 1)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO barfoo VALUES ('bar', 2)")
+box.execute("INSERT INTO barfoo VALUES ('bar', 2)")
 ---
+- rowcount: 1
 ...
-box.sql.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
+box.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 ---
+- rowcount: 1
 ...
 -- create a trigger
-box.sql.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
+box.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
 ---
+- rowcount: 1
 ...
-box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
+box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 ---
-- - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
+- metadata:
+  - name: name
+    type: TEXT
+  - name: opts
+    type: UNKNOWN
+  rows:
+  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
         INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- Many entries
-box.sql.execute("CREATE TABLE t1(a INT,b INT,c INT,PRIMARY KEY(b,c));")
+box.execute("CREATE TABLE t1(a INT,b INT,c INT,PRIMARY KEY(b,c));")
 ---
+- rowcount: 1
 ...
-box.sql.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000) INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;")
+box.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000) INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;")
 ---
+- rowcount: 1000
 ...
-box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
+box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
-- - [840]
+- metadata:
+  - name: A
+    type: BLOB
+  rows:
+  - [840]
   - [880]
   - [920]
   - [960]
@@ -172,59 +356,99 @@ box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ...
 test_run:cmd('restart server default');
 -- prove that trigger survived
-box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
+box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 ---
-- - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
+- metadata:
+  - name: name
+    type: TEXT
+  - name: opts
+    type: UNKNOWN
+  rows:
+  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
         INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- ... functional
-box.sql.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
+box.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
 ---
 - error: 'Type mismatch: can not convert foobar trigger test to integer'
 ...
-box.sql.execute("SELECT * FROM barfoo WHERE foo = 9999");
+box.execute("SELECT * FROM barfoo WHERE foo = 9999");
 ---
-- []
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: NUMERIC
+  rows: []
 ...
 -- and still persistent
-box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
+box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 ---
-- - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
+- metadata:
+  - name: name
+    type: TEXT
+  - name: opts
+    type: UNKNOWN
+  rows:
+  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
         INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- and can be dropped just once
-box.sql.execute("DROP TRIGGER tfoobar")
+box.execute("DROP TRIGGER tfoobar")
 ---
+- rowcount: 1
 ...
 -- Should error
-box.sql.execute("DROP TRIGGER tfoobar")
+box.execute("DROP TRIGGER tfoobar")
 ---
 - error: Trigger 'TFOOBAR' doesn't exist
 ...
 -- Should be empty
-box.sql.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
+box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 ---
-- []
+- metadata:
+  - name: name
+    type: TEXT
+  - name: opts
+    type: UNKNOWN
+  rows: []
 ...
 -- prove barfoo2 still exists
-box.sql.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
+box.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
-- error: Duplicate key exists in unique index 'pk_unnamed_BARFOO_1' in space 'BARFOO'
+- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_BARFOO_1''
+    in space ''BARFOO'''
 ...
-box.sql.execute("SELECT * FROM barfoo")
+box.execute("SELECT * FROM barfoo")
 ---
-- - ['foo', 1]
+- metadata:
+  - name: BAR
+    type: TEXT
+  - name: FOO
+    type: NUMERIC
+  rows:
+  - ['foo', 1]
   - ['bar', 2]
   - ['foobar', 1000]
 ...
-box.sql.execute("SELECT * FROM foobar");
+box.execute("SELECT * FROM foobar");
 ---
-- - [2, 'bar']
+- metadata:
+  - name: FOO
+    type: INTEGER
+  - name: BAR
+    type: TEXT
+  rows:
+  - [2, 'bar']
   - [1000, 'foobar']
 ...
-box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
+box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
-- - [840]
+- metadata:
+  - name: A
+    type: BLOB
+  rows:
+  - [840]
   - [880]
   - [920]
   - [960]
@@ -236,12 +460,15 @@ box.sql.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
   - [161]
 ...
 -- cleanup
-box.sql.execute("DROP TABLE foobar")
+box.execute("DROP TABLE foobar")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE barfoo")
+box.execute("DROP TABLE barfoo")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE t1")
+box.execute("DROP TABLE t1")
 ---
+- rowcount: 1
 ...

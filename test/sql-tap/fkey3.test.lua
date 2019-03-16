@@ -122,7 +122,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(2, 2, 5, 2);
     ]], {
         -- <fkey3-3.2>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-3.2>
     })
 
@@ -132,7 +132,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(2, 3, 5, 2);
     ]], {
         -- <fkey3-3.3>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-3.3>
     })
 
@@ -151,7 +151,7 @@ test:do_catchsql_test(
         INSERT INTO t4 VALUES(2, 1);
     ]], {
         -- <fkey3-3.5>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-3.5>
     })
 
@@ -175,7 +175,7 @@ test:do_catchsql_test(
         INSERT INTO t6(a,b,c,d) VALUES(4, 'a', 65, 'a');
     ]], {
         -- <fkey3-3.7>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-3.7>
     })
 
@@ -197,7 +197,7 @@ test:do_catchsql_test(
         UPDATE t6 SET c = 1, d = 'a' WHERE a = 100;
     ]], {
         -- <fkey3-3.9>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-3.9>
     })
 
@@ -219,7 +219,7 @@ test:do_catchsql_test(
         INSERT INTO t7 VALUES('x', 450, 'x', 4);
     ]], {
         -- <fkey3-3.11>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-3.11>
     })
 
@@ -229,7 +229,7 @@ test:do_catchsql_test(
         INSERT INTO t7 VALUES('x', 450, 'x', 451);
     ]], {
         -- <fkey3-3.12>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-3.12>
     })
 
@@ -253,7 +253,7 @@ test:do_catchsql_test(
         UPDATE t8 SET d = 2;
     ]], {
         -- <fkey3-6.2>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-6.2>
     })
 
@@ -282,7 +282,7 @@ test:do_catchsql_test(
         UPDATE TestTable SET parent_id=1000 WHERE id=2;
     ]], {
         -- <fkey3-6.4>
-        1, "FOREIGN KEY constraint failed"
+        1, "Failed to execute SQL statement: FOREIGN KEY constraint failed"
         -- </fkey3-6.4>
     })
 

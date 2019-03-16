@@ -4,8 +4,9 @@ test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 ---
 ...
-box.sql.execute('pragma sql_default_engine=\''..engine..'\'')
+box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
+- rowcount: 0
 ...
 work_dir = 'sql/upgrade/1.10/'
 ---
@@ -66,17 +67,21 @@ box.space._index:get({box.space._space.index['name']:get('T1').id, 0})
 - [512, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned']]]
 ...
 -- test system tables functionality
-box.sql.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
+box.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
+box.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2); END;")
+box.execute("CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2); END;")
 ---
+- rowcount: 1
 ...
 box.space._space.index['name']:get('T')
 ---
@@ -120,8 +125,9 @@ assert(t1t.space_id == box.space.T.id)
 ---
 - true
 ...
-box.sql.execute("INSERT INTO T VALUES(1);")
+box.execute("INSERT INTO T VALUES(1);")
 ---
+- rowcount: 1
 ...
 box.space.T:select()
 ---
@@ -132,19 +138,29 @@ box.space.T_OUT:select()
 - - [1]
   - [2]
 ...
-box.sql.execute("SELECT * FROM T")
+box.execute("SELECT * FROM T")
 ---
-- - [1]
+- metadata:
+  - name: X
+    type: INTEGER
+  rows:
+  - [1]
 ...
-box.sql.execute("SELECT * FROM T")
+box.execute("SELECT * FROM T")
 ---
-- - [1]
+- metadata:
+  - name: X
+    type: INTEGER
+  rows:
+  - [1]
 ...
-box.sql.execute("DROP TABLE T;")
+box.execute("DROP TABLE T;")
 ---
+- rowcount: 1
 ...
-box.sql.execute("DROP TABLE T_OUT;")
+box.execute("DROP TABLE T_OUT;")
 ---
+- rowcount: 1
 ...
 test_run:switch('default')
 ---

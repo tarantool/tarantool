@@ -722,7 +722,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL);
     ]], {
         -- <table-10.1>
-        1, "NOT NULL constraint failed: T6.A"
+        1, "Failed to execute SQL statement: NOT NULL constraint failed: T6.A"
         -- </table-10.1>
     })
 
@@ -977,7 +977,7 @@ end
 -- MUST_WORK_TEST database should be locked #2554
 if 0>0 then
 local function try_drop_t9()
-    box.sql.execute("DROP TABLE t9;")
+    box.execute("DROP TABLE t9;")
     return 1
 end
 box.internal.sql_create_function("try_drop_t9", try_drop_t9)
@@ -1211,7 +1211,7 @@ test:do_catchsql_test(
         INSERT INTO T21 VALUES(1, 2, 2);
     ]], {
         -- <table-21.2>
-        1, "Duplicate key exists in unique index 'pk_unnamed_T21_1' in space 'T21'"
+        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T21_1' in space 'T21'"
         -- </table-21.2>
     })
 
@@ -1221,7 +1221,7 @@ test:do_catchsql_test(
         INSERT INTO T21 VALUES(1, -1, 1);
     ]], {
         -- <table-21.3>
-        1, "CHECK constraint failed: T21"
+        1, "Failed to execute SQL statement: CHECK constraint failed: T21"
         -- </table-21.3>
     })
 
@@ -1231,7 +1231,7 @@ test:do_catchsql_test(
         INSERT INTO T21 VALUES(1, 1, -1);
     ]], {
         -- <table-21.4>
-        1, "CHECK constraint failed: T21"
+        1, "Failed to execute SQL statement: CHECK constraint failed: T21"
         -- </table-21.4>
     })
 
@@ -1283,7 +1283,7 @@ test:do_catchsql_test(
         INSERT INTO T22 VALUES(2, 1, 1);
     ]], {
         -- <table-22.3>
-        1,"Duplicate key exists in unique index 'unique_ONE_2' in space 'T22'"
+        1,"Failed to execute SQL statement: Duplicate key exists in unique index 'unique_ONE_2' in space 'T22'"
         -- </table-22.3>
     })
 
@@ -1308,7 +1308,7 @@ test:do_catchsql_test(
         INSERT INTO T24 VALUES(2, 1, 1);
     ]], {
         -- <table-22.5>
-        1, "Duplicate key exists in unique index 'unique_TWO_2' in space 'T24'"
+        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'unique_TWO_2' in space 'T24'"
         -- </table-22.5>
     })
 
@@ -1362,7 +1362,7 @@ test:do_catchsql_test(
         INSERT INTO T28 VALUES(11);
     ]], {
         -- <table-22.9>
-        1,"Duplicate key exists in unique index 'pk_unnamed_T28_1' in space 'T28'"
+        1,"Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T28_1' in space 'T28'"
         -- </table-22.9>
     })
 
@@ -1372,7 +1372,7 @@ test:do_catchsql_test(
         INSERT INTO T28 VALUES(0);
     ]], {
         -- <table-22.10>
-        1, "CHECK constraint failed: CHECK1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CHECK1"
         -- </table-22.10>
     })
 
@@ -1382,7 +1382,7 @@ test:do_catchsql_test(
         INSERT INTO T28 VALUES(9);
     ]], {
         -- <table-22.11>
-        1, "CHECK constraint failed: CHECK2"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CHECK2"
         -- </table-22.11>
     })
 

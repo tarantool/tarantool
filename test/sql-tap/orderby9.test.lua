@@ -41,6 +41,9 @@ test:do_test(
         -- separately for the result set and the ORDER BY clause, then the output
         -- order will be random.
         local l1 = test:execsql("SELECT random() AS y FROM t1 ORDER BY 1;")
+        -- Big random() numbers are cdata, but cdata numbers can
+        -- not be compared nor sorted correctly.
+        for k,_ in pairs(l1) do l1[k] = tonumber(l1[k]) end
         local l2 = table.deepcopy(l1)
         table.sort(l1)
         return test.is_deeply_regex(l1, l2)
@@ -50,6 +53,7 @@ test:do_test(
     1.1,
     function()
         local l1 = test:execsql("SELECT random() AS y FROM t1 ORDER BY random();")
+        for k,_ in pairs(l1) do l1[k] = tonumber(l1[k]) end
         local l2 = table.deepcopy(l1)
         table.sort(l1)
         return test.is_deeply_regex(l1, l2)
@@ -59,6 +63,7 @@ test:do_test(
     1.2,
     function()
         local l1 = test:execsql("SELECT random() AS y FROM t1 ORDER BY +random();")
+        for k,_ in pairs(l1) do l1[k] = tonumber(l1[k]) end
         local l2 = table.deepcopy(l1)
         table.sort(l1)
         return test.is_deeply_regex(l1, l2)

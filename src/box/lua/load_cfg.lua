@@ -505,17 +505,14 @@ end
 box.cfg = locked(load_cfg)
 
 --
--- This makes possible do box.sql.execute without calling box.cfg
+-- This makes possible do box.execute without calling box.cfg
 -- manually. The load_cfg call overwrites following table and
 -- metatable.
 --
-box.sql = {}
-setmetatable(box.sql, {
-    __index = function(table, index)
-        load_cfg()
-        return box.sql[index]
-    end,
-})
+function box.execute(...)
+    load_cfg()
+    return box.execute(...)
+end
 
 -- gh-810:
 -- hack luajit default cpath

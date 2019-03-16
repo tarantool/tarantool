@@ -131,14 +131,4 @@ box.cfg{net_msg_max = 2}
 box.cfg{net_msg_max = old + 1000}
 box.cfg{net_msg_max = old}
 
---
--- gh-3266: box.cfg{} still not optional on 2.0 brach
---
--- box.sql defined with __index function in metatable overridden
--- with first box.cfg() call
---
-box.cfg()
-assert(next(box.sql) ~= nil)
-assert(getmetatable(box.sql) == nil)
-
 test_run:cmd("clear filter")

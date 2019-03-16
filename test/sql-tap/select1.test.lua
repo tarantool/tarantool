@@ -1567,22 +1567,20 @@ test:do_execsql_test(
 test:do_test(
     "select1-9.2",
     function()
-        local r = box.sql.execute "SELECT * FROM test1 WHERE f1<0"
-        return r[0]
+        return box.execute("SELECT * FROM test1 WHERE f1<0").metadata
     end, {
         -- <select1-9.2>
-        "F1", "F2"
+        {name = F1, type = INTEGER},{name = F2, type = INTEGER}
         -- </select1-9.2>
     })
 
 test:do_test(
         "select1-9.3",
         function()
-            local r = box.sql.execute "SELECT * FROM test1 WHERE f1<(select count(*) from test2)"
-            return r[0]
+            return box.execute("SELECT * FROM test1 WHERE f1<(select count(*) from test2)").metadata
         end, {
             -- <select1-9.3>
-            "F1", "F2"
+            {name = F1, type = INTEGER},{name = F2, type = INTEGER}
             -- </select1-9.3>
         })
 
@@ -1591,22 +1589,20 @@ test:do_test(
 test:do_test(
     "select1-9.4",
     function()
-        local r = box.sql.execute "SELECT * FROM test1 ORDER BY f1"
-        return r[0]
+        return box.execute("SELECT * FROM test1 ORDER BY f1").metadata
     end, {
         -- <select1-9.4>
-        "F1", "F2"
+        {name = F1, type = INTEGER},{name = F2, type = INTEGER}
         -- </select1-9.4>
     })
 
 test:do_test(
     "select1-9.5",
     function()
-        local r = box.sql.execute "SELECT * FROM test1 WHERE f1<0 ORDER BY f1"
-        return r[0]
+        return box.execute("SELECT * FROM test1 WHERE f1<0 ORDER BY f1").metadata
     end, {
         -- <select1-9.5>
-        "F1", "F2"
+        {name = F1, type = INTEGER},{name = F2, type = INTEGER}
         -- </select1-9.5>
     })
 
