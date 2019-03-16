@@ -289,6 +289,14 @@ res.metadata
 res = cn:execute("EXPLAIN QUERY PLAN SELECT COUNT(*) FROM t1")
 res.metadata
 
+-- When pragma count_changes is on, statements INSERT, REPLACE and
+-- UPDATE returns number of changed columns. Make sure that this
+-- result has a column type.
+cn:execute("PRAGMA count_changes = 1;")
+cn:execute("INSERT INTO t1 VALUES (1), (2), (3);")
+cn:execute("REPLACE INTO t1 VALUES (2), (3), (4), (5);")
+cn:execute("UPDATE t1 SET id = id + 100 WHERE id > 10;")
+
 cn:close()
 box.sql.execute('DROP TABLE t1')
 

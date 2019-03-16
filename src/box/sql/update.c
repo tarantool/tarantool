@@ -530,6 +530,8 @@ sqlUpdate(Parse * pParse,		/* The parser context */
 		sqlVdbeSetNumCols(v, 1);
 		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows updated",
 				      SQL_STATIC);
+		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "INTEGER",
+				  SQL_STATIC);
 	}
 
  update_cleanup:
