@@ -794,8 +794,14 @@ sqlInsert(Parse * pParse,	/* Parser context */
 	    pParse->triggered_space == NULL) {
 		sqlVdbeAddOp2(v, OP_ResultRow, regRowCount, 1);
 		sqlVdbeSetNumCols(v, 1);
-		sqlVdbeSetColName(v, 0, COLNAME_NAME, "rows inserted",
-				      SQL_STATIC);
+		const char *column_name;
+		if (on_error == ON_CONFLICT_ACTION_REPLACE)
+			column_name = "rows replaced";
+		else
+			column_name = "rows inserted";
+		sqlVdbeSetColName(v, 0, COLNAME_NAME, column_name, SQL_STATIC);
+		sqlVdbeSetColName(v, 0, COLNAME_DECLTYPE, "INTEGER",
+				  SQL_STATIC);
 	}
 
  insert_cleanup:
