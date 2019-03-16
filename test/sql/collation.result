@@ -102,7 +102,7 @@ cn = remote.connect(box.cfg.listen)
 ...
 cn:execute('select 1 limit ? collate not_exist', {1})
 ---
-- error: 'Failed to execute SQL statement: Syntax error near ''COLLATE'''
+- error: Syntax error near 'COLLATE'
 ...
 cn:close()
 ---

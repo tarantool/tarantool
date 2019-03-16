@@ -523,7 +523,12 @@ sql_execute(sql *db, struct sql_stmt *stmt, struct port *port,
 		assert(rc != SQL_ROW && rc != SQL_OK);
 	}
 	if (rc != SQL_DONE) {
-		diag_set(ClientError, ER_SQL_EXECUTE, sql_errmsg(db));
+		if (db->errCode != SQL_TARANTOOL_ERROR) {
+			const char *err = (char *)sql_value_text(db->pErr);
+			if (err == NULL)
+				err = sqlErrStr(db->errCode);
+			diag_set(ClientError, ER_SQL_EXECUTE, err);
+		}
 		return -1;
 	}
 	return 0;
@@ -541,7 +546,12 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 		return -1;
 	}
 	if (sql_prepare_v2(db, sql, len, &stmt, NULL) != SQL_OK) {
-		diag_set(ClientError, ER_SQL_EXECUTE, sql_errmsg(db));
+		if (db->errCode != SQL_TARANTOOL_ERROR) {
+			const char *err = (char *)sql_value_text(db->pErr);
+			if (err == NULL)
+				err = sqlErrStr(db->errCode);
+			diag_set(ClientError, ER_SQL_EXECUTE, err);
+		}
 		return -1;
 	}
 	assert(stmt != NULL);

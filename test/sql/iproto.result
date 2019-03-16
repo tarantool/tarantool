@@ -92,11 +92,11 @@ cn:execute('delete from test where a = 12')
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
 ---
-- error: 'Failed to execute SQL statement: Space ''NOT_EXISTING_TABLE'' does not exist'
+- error: Space 'NOT_EXISTING_TABLE' does not exist
 ...
 cn:execute('insert qwerty gjsdjq  q  qwd qmq;; q;qwd;')
 ---
-- error: 'Failed to execute SQL statement: Syntax error near ''qwerty'''
+- error: Syntax error near 'qwerty'
 ...
 -- Empty result.
 cn:execute('select id as identifier from test where a = 5;')
@@ -109,7 +109,7 @@ cn:execute('select id as identifier from test where a = 5;')
 -- netbox API errors.
 cn:execute(100)
 ---
-- error: 'Failed to execute SQL statement: Syntax error near ''100'''
+- error: Syntax error near '100'
 ...
 cn:execute('select 1', nil, {dry_run = true})
 ---
@@ -118,11 +118,11 @@ cn:execute('select 1', nil, {dry_run = true})
 -- Empty request.
 cn:execute('')
 ---
-- error: 'Failed to execute SQL statement: Failed to execute an empty SQL statement'
+- error: Failed to execute an empty SQL statement
 ...
 cn:execute('   ;')
 ---
-- error: 'Failed to execute SQL statement: Failed to execute an empty SQL statement'
+- error: Failed to execute an empty SQL statement
 ...
 --
 -- gh-3467: allow only positive integers under limit clause.
@@ -154,18 +154,15 @@ cn:execute('select * from test limit ?', {2})
 ...
 cn:execute('select * from test limit ?', {-2})
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    LIMIT clause'
+- error: Only positive integers are allowed in the LIMIT clause
 ...
 cn:execute('select * from test limit ?', {2.7})
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    LIMIT clause'
+- error: Only positive integers are allowed in the LIMIT clause
 ...
 cn:execute('select * from test limit ?', {'Hello'})
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    LIMIT clause'
+- error: Only positive integers are allowed in the LIMIT clause
 ...
 cn:execute('select * from test limit 1 offset ?', {2})
 ---
@@ -181,18 +178,15 @@ cn:execute('select * from test limit 1 offset ?', {2})
 ...
 cn:execute('select * from test limit 1 offset ?', {-2})
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    OFFSET clause'
+- error: Only positive integers are allowed in the OFFSET clause
 ...
 cn:execute('select * from test limit 1 offset ?', {2.7})
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    OFFSET clause'
+- error: Only positive integers are allowed in the OFFSET clause
 ...
 cn:execute('select * from test limit 1 offset ?', {'Hello'})
 ---
-- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
-    OFFSET clause'
+- error: Only positive integers are allowed in the OFFSET clause
 ...
 --
 -- Parameters binding.
@@ -363,7 +357,7 @@ sql = 'select '..string.rep('?, ', box.schema.SQL_BIND_PARAMETER_MAX)..'?'
 ...
 cn:execute(sql)
 ---
-- error: 'Failed to execute SQL statement: SQL bind parameter limit reached: 65000'
+- error: 'SQL bind parameter limit reached: 65000'
 ...
 -- Try too many parameter values.
 sql = 'select ?'
@@ -567,12 +561,11 @@ cn:execute('drop table if exists test3')
 --
 cn:execute('select ?1, ?2, ?3', {1, 2, 3})
 ---
-- error: 'Failed to execute SQL statement: Syntax error near ''?1'''
+- error: Syntax error near '?1'
 ...
 cn:execute('select $name, $name2', {1, 2})
 ---
-- error: 'Failed to execute SQL statement: Index of binding slots must start from
-    1'
+- error: Index of binding slots must start from 1
 ...
 parameters = {}
 ---
