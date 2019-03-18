@@ -66,6 +66,22 @@ static int (*fiber_invoke)(fiber_func f, va_list ap);
 #define ASAN_FINISH_SWITCH_FIBER(var_name)
 #endif
 
+#define fiber_madvise(addr, len, advice)				\
+({									\
+	int err = madvise((addr), (len), (advice));			\
+	if (err)							\
+		say_syserror("madvise");				\
+	err;								\
+})
+
+#define fiber_mprotect(addr, len, prot)					\
+({									\
+	int err = mprotect((addr), (len), (prot));			\
+	if (err)							\
+		say_syserror("mprotect");				\
+	err;								\
+})
+
 /*
  * Defines a handler to be executed on exit from cord's thread func,
  * accessible via cord()->on_exit (normally NULL). It is used to
@@ -799,7 +815,7 @@ fiber_stack_recycle(struct fiber *fiber)
 		start = page_align_up(fiber->stack_watermark);
 		end = fiber->stack + fiber->stack_size;
 	}
-	madvise(start, end - start, MADV_DONTNEED);
+	fiber_madvise(start, end - start, MADV_DONTNEED);
 	stack_put_watermark(fiber->stack_watermark);
 }
 
@@ -819,7 +835,7 @@ fiber_stack_watermark_create(struct fiber *fiber)
 	 * We don't expect the whole stack usage in regular
 	 * loads, let's try to minimize rss pressure.
 	 */
-	madvise(fiber->stack, fiber->stack_size, MADV_DONTNEED);
+	fiber_madvise(fiber->stack, fiber->stack_size, MADV_DONTNEED);
 
 	/*
 	 * To increase probability of stack overflow detection
@@ -886,7 +902,7 @@ fiber_stack_create(struct fiber *fiber, size_t stack_size)
 						  (char *)fiber->stack +
 						  fiber->stack_size);
 
-	mprotect(guard, page_size, PROT_NONE);
+	fiber_mprotect(guard, page_size, PROT_NONE);
 	fiber_stack_watermark_create(fiber);
 	return 0;
 }
@@ -904,7 +920,7 @@ fiber_stack_destroy(struct fiber *fiber, struct slab_cache *slabc)
 			guard = page_align_down(fiber->stack - page_size);
 		else
 			guard = page_align_up(fiber->stack + fiber->stack_size);
-		mprotect(guard, page_size, PROT_READ | PROT_WRITE);
+		fiber_mprotect(guard, page_size, PROT_READ | PROT_WRITE);
 		slab_put(slabc, fiber->stack_slab);
 	}
 }
