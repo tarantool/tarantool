@@ -78,10 +78,10 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	struct tuple *tuple = NULL;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	uint32_t *field_map, field_map_size;
-	if (tuple_field_map_create(format, data, true, &field_map,
-				   &field_map_size) != 0)
+	struct field_map_builder builder;
+	if (tuple_field_map_create(format, data, true, &builder) != 0)
 		goto end;
+	uint32_t field_map_size = field_map_build_size(&builder);
 
 	size_t data_len = end - data;
 	size_t total = sizeof(struct tuple) + field_map_size + data_len;
@@ -98,7 +98,7 @@ runtime_tuple_new(struct tuple_format *format, const char *data, const char *end
 	tuple_format_ref(format);
 	tuple->data_offset = sizeof(struct tuple) + field_map_size;
 	char *raw = (char *) tuple + tuple->data_offset;
-	memcpy(raw - field_map_size, field_map, field_map_size);
+	field_map_build(&builder, raw - field_map_size);
 	memcpy(raw, data, data_len);
 	say_debug("%s(%zu) = %p", __func__, data_len, tuple);
 end:
@@ -126,10 +126,8 @@ tuple_validate_raw(struct tuple_format *format, const char *tuple)
 
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	uint32_t *field_map, field_map_size;
-	int rc = tuple_field_map_create(format, tuple, true, &field_map,
-					&field_map_size);
-	assert(rc != 0 || field_map_size == format->field_map_size);
+	struct field_map_builder builder;
+	int rc = tuple_field_map_create(format, tuple, true, &builder);
 	region_truncate(region, region_svp);
 	return rc;
 }

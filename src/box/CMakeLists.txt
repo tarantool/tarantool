@@ -35,6 +35,7 @@ target_link_libraries(xrow server core small vclock misc box_error
 
 add_library(tuple STATIC
     tuple.c
+    field_map.c
     tuple_format.c
     tuple_update.c
     tuple_compare.cc

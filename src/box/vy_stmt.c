@@ -314,10 +314,11 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	 * tuples inserted into a space are validated explicitly
 	 * with tuple_validate() anyway.
 	 */
-	uint32_t *field_map, field_map_size;
-	if (tuple_field_map_create(format, tuple_begin, false, &field_map,
-				   &field_map_size) != 0)
+	struct field_map_builder builder;
+	if (tuple_field_map_create(format, tuple_begin, false, &builder) != 0)
 		goto end;
+	uint32_t field_map_size = field_map_build_size(&builder);
+	assert(field_map_size == format->field_map_size);
 	/*
 	 * Allocate stmt. Offsets: one per key part + offset of the
 	 * statement end.
@@ -330,7 +331,7 @@ vy_stmt_new_with_ops(struct tuple_format *format, const char *tuple_begin,
 	/* Copy MsgPack data */
 	char *raw = (char *) tuple_data(stmt);
 	char *wpos = raw;
-	memcpy(wpos - field_map_size, field_map, field_map_size);
+	field_map_build(&builder, wpos - field_map_size);
 	memcpy(wpos, tuple_begin, mpsize);
 	wpos += mpsize;
 	for (struct iovec *op = ops, *end = ops + op_count;

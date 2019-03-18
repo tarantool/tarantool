@@ -1135,10 +1135,10 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	struct tuple *tuple = NULL;
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	uint32_t *field_map, field_map_size;
-	if (tuple_field_map_create(format, data, true, &field_map,
-				   &field_map_size) != 0)
+	struct field_map_builder builder;
+	if (tuple_field_map_create(format, data, true, &builder) != 0)
 		goto end;
+	uint32_t field_map_size = field_map_build_size(&builder);
 
 	size_t tuple_len = end - data;
 	size_t total = sizeof(struct memtx_tuple) + field_map_size + tuple_len;
@@ -1178,7 +1178,7 @@ memtx_tuple_new(struct tuple_format *format, const char *data, const char *end)
 	 */
 	tuple->data_offset = sizeof(struct tuple) + field_map_size;
 	char *raw = (char *) tuple + tuple->data_offset;
-	memcpy(raw - field_map_size, field_map, field_map_size);
+	field_map_build(&builder, raw - field_map_size);
 	memcpy(raw, data, tuple_len);
 	say_debug("%s(%zu) = %p", __func__, tuple_len, memtx_tuple);
 end:

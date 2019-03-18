@@ -36,6 +36,7 @@
 #include "errinj.h"
 #include "json/json.h"
 #include "tuple_dictionary.h"
+#include "field_map.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -170,7 +171,7 @@ struct tuple_format {
 	bool is_ephemeral;
 	/**
 	 * Size of field map of tuple in bytes.
-	 * \sa struct tuple
+	 * \sa struct field_map_builder
 	 */
 	uint16_t field_map_size;
 	/**
@@ -386,10 +387,8 @@ box_tuple_format_unref(box_tuple_format_t *format);
  * @param format    Tuple format.
  * @param tuple     MessagePack array.
  * @param validate  If set, validate the tuple against the format.
- * @param field_map[out] The pointer to store field map
- *                       allocation.
- * @param field_map_size[out] The pointer to variable to store
- *                            field map size.
+ * @param builder[out] The pointer to field map builder object to
+ *                     be prepared.
  *
  * @retval  0 Success.
  * @retval -1 Format error.
@@ -402,8 +401,7 @@ box_tuple_format_unref(box_tuple_format_t *format);
  */
 int
 tuple_field_map_create(struct tuple_format *format, const char *tuple,
-		       bool validate, uint32_t **field_map,
-		       uint32_t *field_map_size);
+		       bool validate, struct field_map_builder *builder);
 
 /**
  * Initialize tuple format subsystem.

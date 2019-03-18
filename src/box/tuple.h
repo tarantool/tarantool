@@ -540,6 +540,7 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 		goto offset_slot_access;
 	}
 	if (likely(fieldno < format->index_field_count)) {
+		uint32_t offset;
 		struct tuple_field *field;
 		if (path == NULL && fieldno == 0) {
 			mp_decode_array(&tuple);
@@ -557,9 +558,10 @@ tuple_field_raw_by_path(struct tuple_format *format, const char *tuple,
 			*offset_slot_hint = offset_slot;
 offset_slot_access:
 		/* Indexed field */
-		if (field_map[offset_slot] == 0)
+		offset = field_map_get_offset(field_map, offset_slot);
+		if (offset == 0)
 			return NULL;
-		tuple += field_map[offset_slot];
+		tuple += offset;
 	} else {
 		uint32_t field_count;
 parse:

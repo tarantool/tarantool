@@ -773,28 +773,15 @@ tuple_format1_can_store_format2_tuples(struct tuple_format *format1,
 /** @sa declaration for details. */
 int
 tuple_field_map_create(struct tuple_format *format, const char *tuple,
-		       bool validate, uint32_t **field_map,
-		       uint32_t *field_map_size)
+		       bool validate, struct field_map_builder *builder)
 {
-	if (tuple_format_field_count(format) == 0) {
-		*field_map = NULL;
-		*field_map_size = 0;
-		return 0; /* Nothing to initialize */
-	}
 	struct region *region = &fiber()->gc;
-	*field_map_size = format->field_map_size;
-	*field_map = region_alloc(region, *field_map_size);
-	if (*field_map == NULL) {
-		diag_set(OutOfMemory, *field_map_size, "region_alloc",
-			 "field_map");
+	if (field_map_builder_create(builder, format->field_map_size,
+				     region) != 0)
 		return -1;
-	}
-	*field_map = (uint32_t *)((char *)*field_map + *field_map_size);
-	/*
-	 * Nullify field map to be able to detect by 0,
-	 * which key fields are absent in tuple_field().
-	 */
-	memset((char *)*field_map - *field_map_size, 0, *field_map_size);
+	if (tuple_format_field_count(format) == 0)
+		return 0; /* Nothing to initialize */
+
 	uint32_t field_count;
 	struct tuple_format_iterator it;
 	uint8_t flags = validate ? TUPLE_FORMAT_ITERATOR_VALIDATE : 0;
@@ -807,11 +794,10 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 		if (entry.field == NULL)
 			continue;
 		if (entry.field->offset_slot != TUPLE_OFFSET_SLOT_NIL) {
-			(*field_map)[entry.field->offset_slot] =
-							entry.data - tuple;
+		    field_map_builder_set_slot(builder, entry.field->offset_slot,
+		    			       entry.data - tuple);
 		}
 	}
-	*field_map = (uint32_t *)((char *)*field_map - *field_map_size);
 	return entry.data == NULL ? 0 : -1;
 }
 
