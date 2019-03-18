@@ -856,6 +856,12 @@ fiber_stack_watermark_create(struct fiber *fiber)
 }
 #else
 static void
+fiber_stack_recycle(struct fiber *fiber)
+{
+	(void)fiber;
+}
+
+static void
 fiber_stack_watermark_create(struct fiber *fiber)
 {
 	(void)fiber;
@@ -1076,7 +1082,10 @@ cord_create(struct cord *cord, const char *name)
 	cord->sched.stack = NULL;
 	cord->sched.stack_size = 0;
 #endif
+
+#ifdef HAVE_MADV_DONTNEED
 	cord->sched.stack_watermark = NULL;
+#endif
 }
 
 void
