@@ -675,13 +675,11 @@ done:
 	return 0;
 }
 
-const char *
-request_str(const struct request *request)
+static int
+request_snprint(char *buf, int size, const struct request *request)
 {
-	char *buf = tt_static_buf();
-	char *end = buf + TT_STATIC_BUF_LEN;
-	char *pos = buf;
-	pos += snprintf(pos, end - pos, "{type: '%s', "
+	int total = 0;
+	SNPRINT(total, snprintf, buf, size, "{type: '%s', "
 			"replica_id: %u, lsn: %lld, "
 			"space_id: %u, index_id: %u",
 			iproto_type_name(request->type),
@@ -690,18 +688,27 @@ request_str(const struct request *request)
 			(unsigned) request->space_id,
 			(unsigned) request->index_id);
 	if (request->key != NULL) {
-		pos += snprintf(pos, end - pos, ", key: ");
-		pos += mp_snprint(pos, end - pos, request->key);
+		SNPRINT(total, snprintf, buf, size, ", key: ");
+		SNPRINT(total, mp_snprint, buf, size, request->key);
 	}
 	if (request->tuple != NULL) {
-		pos += snprintf(pos, end - pos, ", tuple: ");
-		pos += mp_snprint(pos, end - pos, request->tuple);
+		SNPRINT(total, snprintf, buf, size, ", tuple: ");
+		SNPRINT(total, mp_snprint, buf, size, request->tuple);
 	}
 	if (request->ops != NULL) {
-		pos += snprintf(pos, end - pos, ", ops: ");
-		pos += mp_snprint(pos, end - pos, request->ops);
+		SNPRINT(total, snprintf, buf, size, ", ops: ");
+		SNPRINT(total, mp_snprint, buf, size, request->ops);
 	}
-	pos += snprintf(pos, end - pos, "}");
+	SNPRINT(total, snprintf, buf, size, "}");
+	return total;
+}
+
+const char *
+request_str(const struct request *request)
+{
+	char *buf = tt_static_buf();
+	if (request_snprint(buf, TT_STATIC_BUF_LEN, request) < 0)
+		return "<failed to format request>";
 	return buf;
 }
 

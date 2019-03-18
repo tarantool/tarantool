@@ -6,7 +6,7 @@ local socket = require('socket')
 local fio = require('fio')
 local uuid = require('uuid')
 local msgpack = require('msgpack')
-test:plan(102)
+test:plan(104)
 
 --------------------------------------------------------------------------------
 -- Invalid values
@@ -565,6 +565,25 @@ os.remove(path)
 os.exit(0)
 ]]
 test:is(run_script(code), 0, "log_nonblock")
+
+--
+-- Crash (instead of panic) when trying to recover a huge tuple.
+--
+dir = fio.tempdir()
+code1 = string.format([[
+box.cfg{wal_dir = '%s', memtx_dir = '%s', memtx_max_tuple_size = 10 * 1024 * 1024}
+box.schema.space.create('test')
+box.space.test:create_index('primary')
+box.space.test:insert{1, string.rep('x', 1024 * 1024)}
+os.exit(0)
+]], dir, dir)
+code2 = string.format([[
+box.cfg{wal_dir = '%s', memtx_dir = '%s', memtx_max_tuple_size = 10 * 1024}
+os.exit(0)
+]], dir, dir)
+test:is(run_script(code1), 0, "create huge tuple")
+test:is(run_script(code2), PANIC, "panic on huge tuple recovery")
+fio.rmtree(dir)
 
 test:check()
 os.exit(0)
