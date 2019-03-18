@@ -2860,25 +2860,25 @@ test:do_execsql_test(
      SELECT GROUP_CONCAT(b, '') FROM t100;",
     {string.char(00,65,00,65,00)})
 
--- INSTR
+-- POSITION
 test:do_execsql_test(
     "func-73",
-    "SELECT INSTR(CHAR(00,65,00,66,00), CHAR(65));",
+    "SELECT POSITION(CHAR(65), CHAR(00,65,00,66,00));",
     {2})
 
 test:do_execsql_test(
     "func-74",
-    "SELECT INSTR(CHAR(00,65,00,66,00), CHAR(66));",
+    "SELECT POSITION(CHAR(66), CHAR(00,65,00,66,00));",
     {4})
 
 test:do_execsql_test(
     "func-75",
-    "SELECT INSTR(CHAR(00,65,00,66,00), CHAR(00));",
+    "SELECT POSITION(CHAR(00), CHAR(00,65,00,66,00));",
     {1})
 
 test:do_execsql_test(
     "func-76",
-    "SELECT INSTR(CHAR(65,66), CHAR(00));",
+    "SELECT POSITION(CHAR(00), CHAR(65,66));",
     {0})
 
 test:finish_test()

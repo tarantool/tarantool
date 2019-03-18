@@ -38,6 +38,7 @@
 #include "vdbeInt.h"
 #include "version.h"
 #include "coll/coll.h"
+#include "tarantoolInt.h"
 #include <unicode/ustring.h>
 #include <unicode/ucasemap.h>
 #include <unicode/ucnv.h>
@@ -211,61 +212,140 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 }
 
-/*
- * Implementation of the instr() function.
+/**
+ * Implementation of the position() function.
  *
- * instr(haystack,needle) finds the first occurrence of needle
- * in haystack and returns the number of previous characters plus 1,
- * or 0 if needle does not occur within haystack.
+ * position(needle, haystack) finds the first occurrence of needle
+ * in haystack and returns the number of previous characters
+ * plus 1, or 0 if needle does not occur within haystack.
  *
- * If both haystack and needle are BLOBs, then the result is one more than
- * the number of bytes in haystack prior to the first occurrence of needle,
- * or 0 if needle never occurs in haystack.
+ * If both haystack and needle are BLOBs, then the result is one
+ * more than the number of bytes in haystack prior to the first
+ * occurrence of needle, or 0 if needle never occurs in haystack.
  */
 static void
-instrFunc(sql_context * context, int argc, sql_value ** argv)
+position_func(struct sql_context *context, int argc, struct Mem **argv)
 {
-	const unsigned char *zHaystack;
-	const unsigned char *zNeedle;
-	int nHaystack;
-	int nNeedle;
-	int typeHaystack, typeNeedle;
-	int N = 1;
-	int isText;
-
 	UNUSED_PARAMETER(argc);
-	typeHaystack = sql_value_type(argv[0]);
-	typeNeedle = sql_value_type(argv[1]);
-	if (typeHaystack == SQL_NULL || typeNeedle == SQL_NULL)
+	struct Mem *needle = argv[0];
+	struct Mem *haystack = argv[1];
+	int needle_type = sql_value_type(needle);
+	int haystack_type = sql_value_type(haystack);
+
+	if (haystack_type == SQL_NULL || needle_type == SQL_NULL)
 		return;
-	nHaystack = sql_value_bytes(argv[0]);
-	nNeedle = sql_value_bytes(argv[1]);
-	if (nNeedle > 0) {
-		if (typeHaystack == SQL_BLOB && typeNeedle == SQL_BLOB) {
-			zHaystack = sql_value_blob(argv[0]);
-			zNeedle = sql_value_blob(argv[1]);
-			assert(zNeedle != 0);
-			assert(zHaystack != 0 || nHaystack == 0);
-			isText = 0;
-		} else {
-			zHaystack = sql_value_text(argv[0]);
-			zNeedle = sql_value_text(argv[1]);
-			isText = 1;
-			if (zHaystack == 0 || zNeedle == 0)
-				return;
-		}
-		while (nNeedle <= nHaystack
-		       && memcmp(zHaystack, zNeedle, nNeedle) != 0) {
-			N++;
-			do {
-				nHaystack--;
-				zHaystack++;
-			} while (isText && (zHaystack[0] & 0xc0) == 0x80);
-		}
-		if (nNeedle > nHaystack)
-			N = 0;
+	/*
+	 * Position function can be called only with string
+	 * or blob params.
+	 */
+	struct Mem *inconsistent_type_arg = NULL;
+	if (needle_type != SQL_TEXT && needle_type != SQL_BLOB)
+		inconsistent_type_arg = needle;
+	if (haystack_type != SQL_TEXT && haystack_type != SQL_BLOB)
+		inconsistent_type_arg = haystack;
+	if (inconsistent_type_arg != NULL) {
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or BLOB",
+			 mem_type_to_str(inconsistent_type_arg));
+		context->isError = SQL_TARANTOOL_ERROR;
+		context->fErrorOrAux = 1;
+		return;
 	}
-	sql_result_int(context, N);
+	/*
+	 * Both params of Position function must be of the same
+	 * type.
+	 */
+	if (haystack_type != needle_type) {
+		diag_set(ClientError, ER_INCONSISTENT_TYPES,
+			 mem_type_to_str(needle), mem_type_to_str(haystack));
+		context->isError = SQL_TARANTOOL_ERROR;
+		context->fErrorOrAux = 1;
+		return;
+	}
+
+	int n_needle_bytes = sql_value_bytes(needle);
+	int n_haystack_bytes = sql_value_bytes(haystack);
+	int position = 1;
+	if (n_needle_bytes > 0) {
+		const unsigned char *haystack_str;
+		const unsigned char *needle_str;
+		if (haystack_type == SQL_BLOB) {
+			needle_str = sql_value_blob(needle);
+			haystack_str = sql_value_blob(haystack);
+			assert(needle_str != NULL);
+			assert(haystack_str != NULL || n_haystack_bytes == 0);
+			/*
+			 * Naive implementation of substring
+			 * searching: matching time O(n * m).
+			 * Can be improved.
+			 */
+			while (n_needle_bytes <= n_haystack_bytes &&
+			       memcmp(haystack_str, needle_str, n_needle_bytes) != 0) {
+				position++;
+				n_haystack_bytes--;
+				haystack_str++;
+			}
+			if (n_needle_bytes > n_haystack_bytes)
+				position = 0;
+		} else {
+			/*
+			 * Code below handles not only simple
+			 * cases like position('a', 'bca'), but
+			 * also more complex ones:
+			 * position('a', 'bcá' COLLATE "unicode_ci")
+			 * To do so, we need to use comparison
+			 * window, which has constant character
+			 * size, but variable byte size.
+			 * Character size is equal to
+			 * needle char size.
+			 */
+			haystack_str = sql_value_text(haystack);
+			needle_str = sql_value_text(needle);
+
+			int n_needle_chars =
+				sql_utf8_char_count(needle_str, n_needle_bytes);
+			int n_haystack_chars =
+				sql_utf8_char_count(haystack_str,
+						    n_haystack_bytes);
+
+			if (n_haystack_chars < n_needle_chars) {
+				position = 0;
+				goto finish;
+			}
+			/*
+			 * Comparison window is determined by
+			 * beg_offset and end_offset. beg_offset
+			 * is offset in bytes from haystack
+			 * beginning to window beginning.
+			 * end_offset is offset in bytes from
+			 * haystack beginning to window end.
+			 */
+			int end_offset = 0;
+			for (int c = 0; c < n_needle_chars; c++) {
+				SQL_UTF8_FWD_1(haystack_str, end_offset,
+					       n_haystack_bytes);
+			}
+			int beg_offset = 0;
+			struct coll *coll = sqlGetFuncCollSeq(context);
+			int c;
+			for (c = 0; c + n_needle_chars <= n_haystack_chars; c++) {
+				if (coll->cmp((const char *) haystack_str + beg_offset,
+					      end_offset - beg_offset,
+					      (const char *) needle_str,
+					      n_needle_bytes, coll) == 0)
+					goto finish;
+				position++;
+				/* Update offsets. */
+				SQL_UTF8_FWD_1(haystack_str, beg_offset,
+					       n_haystack_bytes);
+				SQL_UTF8_FWD_1(haystack_str, end_offset,
+					       n_haystack_bytes);
+			}
+			/* Needle was not found in the haystack. */
+			position = 0;
+		}
+	}
+finish:
+	sql_result_int(context, position);
 }
 
 /*
@@ -1756,7 +1836,7 @@ sqlRegisterBuiltinFunctions(void)
 			  FIELD_TYPE_STRING),
 		FUNCTION2(length, 1, 0, 0, lengthFunc, SQL_FUNC_LENGTH,
 			  FIELD_TYPE_INTEGER),
-		FUNCTION(instr, 2, 0, 0, instrFunc, FIELD_TYPE_INTEGER),
+		FUNCTION(position, 2, 0, 1, position_func, FIELD_TYPE_INTEGER),
 		FUNCTION(printf, -1, 0, 0, printfFunc, FIELD_TYPE_STRING),
 		FUNCTION(unicode, 1, 0, 0, unicodeFunc, FIELD_TYPE_STRING),
 		FUNCTION(char, -1, 0, 0, charFunc, FIELD_TYPE_STRING),
