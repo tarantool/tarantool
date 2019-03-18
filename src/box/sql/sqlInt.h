@@ -1660,7 +1660,13 @@ struct FuncDestructor {
 #define SQL_FUNC_LIKE     0x0004	/* Candidate for the LIKE optimization */
 #define SQL_FUNC_CASE     0x0008	/* Case-sensitive LIKE-type function */
 #define SQL_FUNC_EPHEM    0x0010	/* Ephemeral.  Delete with VDBE */
-#define SQL_FUNC_NEEDCOLL 0x0020	/* sqlGetFuncCollSeq() might be called */
+#define SQL_FUNC_NEEDCOLL 0x0020	/* sqlGetFuncCollSeq() might be called.
+					 * The flag is set when the collation
+					 * of function arguments should be
+					 * determined, using rules in
+					 * collations_check_compatibility()
+					 * function.
+					 */
 #define SQL_FUNC_LENGTH   0x0040	/* Built-in length() function */
 #define SQL_FUNC_TYPEOF   0x0080	/* Built-in typeof() function */
 #define SQL_FUNC_COUNT    0x0100	/* Built-in count(*) aggregate */

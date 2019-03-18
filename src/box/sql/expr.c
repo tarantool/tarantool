@@ -4081,16 +4081,48 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					testcase(i == 31);
 					constMask |= MASKBIT32(i);
 				}
-				if ((pDef->funcFlags & SQL_FUNC_NEEDCOLL) !=
-				    0 && coll == NULL) {
-					bool unused;
-					uint32_t id;
+			}
+			/*
+			 * Function arguments may have different
+			 * collations. The following code
+			 * checks if they are compatible and
+			 * finds the collation to be used. This
+			 * is done using ANSI rules from
+			 * collations_check_compatibility().
+			 */
+			if ((pDef->funcFlags & SQL_FUNC_NEEDCOLL) != 0) {
+				struct coll *unused = NULL;
+				uint32_t curr_id = COLL_NONE;
+				bool is_curr_forced = false;
+
+				uint32_t next_id = COLL_NONE;
+				bool is_next_forced = false;
+
+				if (sql_expr_coll(pParse, pFarg->a[0].pExpr,
+						  &is_curr_forced, &curr_id,
+						  &unused) != 0)
+					return 0;
+
+				for (int j = 1; j < nFarg; j++) {
 					if (sql_expr_coll(pParse,
-							  pFarg->a[i].pExpr,
-							  &unused, &id,
-							  &coll) != 0)
+							  pFarg->a[j].pExpr,
+							  &is_next_forced,
+							  &next_id,
+							  &unused) != 0)
 						return 0;
+
+					if (collations_check_compatibility(
+						curr_id, is_curr_forced,
+						next_id, is_next_forced,
+						&curr_id) != 0) {
+						pParse->is_aborted = true;
+						return 0;
+					}
+					is_curr_forced = curr_id == next_id ?
+							 is_next_forced :
+							 is_curr_forced;
 				}
+				coll = coll_by_id(curr_id)->coll;
 			}
 			if (pFarg) {
 				if (constMask) {
