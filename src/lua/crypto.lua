@@ -58,7 +58,7 @@ end
 local digests = {}
 for class, name in pairs({
     md2 = 'MD2', md4 = 'MD4', md5 = 'MD5',
-    sha = 'SHA', sha1 = 'SHA1', sha224 = 'SHA224',
+    sha1 = 'SHA1', sha224 = 'SHA224',
     sha256 = 'SHA256', sha384 = 'SHA384', sha512 = 'SHA512',
     dss = 'DSS', dss1 = 'DSS1', mdc2 = 'MDC2', ripemd160 = 'RIPEMD160'}) do
     local digest = ffi.C.EVP_get_digestbyname(class)

@@ -36,7 +36,6 @@ local BASE64_NOWRAP = 2
 local BASE64_URLSAFE = 7
 
 local digest_shortcuts = {
-    sha     = 'SHA',
     sha224  = 'SHA224',
     sha256  = 'SHA256',
     sha384  = 'SHA384',
