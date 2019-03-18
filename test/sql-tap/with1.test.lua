@@ -595,11 +595,11 @@ test:do_execsql_test("8.2-soduko", [[
 
     /* The tricky bit. */
     x(s, ind) AS (
-      SELECT sud, instr(sud, '.') FROM input
+      SELECT sud, position('.', sud) FROM input
       UNION ALL
       SELECT
         substr(s, 1, ind-1) || z || substr(s, ind+1),
-        instr( substr(s, 1, ind-1) || z || substr(s, ind+1), '.' )
+        position('.', substr(s, 1, ind-1) || z || substr(s, ind+1))
        FROM x, digits AS z
       WHERE ind>0
         AND NOT EXISTS (

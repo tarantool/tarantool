@@ -30,7 +30,7 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(3,'pqr','fuzzy',99);
         INSERT INTO t1 VALUES(4,'abcdefg','xy',22);
         INSERT INTO t1 VALUES(5,'shoe','mayer',2953);
-        SELECT x FROM t1 WHERE c=instr('abcdefg',b) OR a='abcdefg' ORDER BY +x;       
+        SELECT x FROM t1 WHERE c=position(b, 'abcdefg') OR a='abcdefg' ORDER BY +x;
     ]], {
         -- <func5-1.1>
         2, 4
@@ -40,7 +40,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func5-1.2",
     [[
-        SELECT x FROM t1 WHERE a='abcdefg' OR c=instr('abcdefg',b) ORDER BY +x; 
+        SELECT x FROM t1 WHERE a='abcdefg' OR c=position(b, 'abcdefg') ORDER BY +x;
     ]], {
         -- <func5-1.1>
         2, 4
