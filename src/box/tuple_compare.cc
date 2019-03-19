@@ -1005,55 +1005,6 @@ static const comparator_signature cmp_arr[] = {
 
 #undef COMPARATOR
 
-static const tuple_compare_t compare_slowpath_funcs[] = {
-	tuple_compare_slowpath<false, false, false>,
-	tuple_compare_slowpath<true, false, false>,
-	tuple_compare_slowpath<false, true, false>,
-	tuple_compare_slowpath<true, true, false>,
-	tuple_compare_slowpath<false, false, true>,
-	tuple_compare_slowpath<true, false, true>,
-	tuple_compare_slowpath<false, true, true>,
-	tuple_compare_slowpath<true, true, true>
-};
-
-static tuple_compare_t
-tuple_compare_create(const struct key_def *def)
-{
-	int cmp_func_idx = (def->is_nullable ? 1 : 0) +
-			   2 * (def->has_optional_parts ? 1 : 0) +
-			   4 * (def->has_json_paths ? 1 : 0);
-	if (def->is_nullable) {
-		if (key_def_is_sequential(def)) {
-			if (def->has_optional_parts)
-				return tuple_compare_sequential<true, true>;
-			else
-				return tuple_compare_sequential<true, false>;
-		} else {
-			return compare_slowpath_funcs[cmp_func_idx];
-		}
-	}
-	assert(! def->has_optional_parts);
-	if (!key_def_has_collation(def) && !def->has_json_paths) {
-		/* Precalculated comparators don't use collation */
-		for (uint32_t k = 0;
-		     k < sizeof(cmp_arr) / sizeof(cmp_arr[0]); k++) {
-			uint32_t i = 0;
-			for (; i < def->part_count; i++)
-				if (def->parts[i].fieldno !=
-				    cmp_arr[k].p[i * 2] ||
-				    def->parts[i].type !=
-				    cmp_arr[k].p[i * 2 + 1])
-					break;
-			if (i == def->part_count &&
-			    cmp_arr[k].p[i * 2] == UINT32_MAX)
-				return cmp_arr[k].f;
-		}
-	}
-	return key_def_is_sequential(def) ?
-	       tuple_compare_sequential<false, false> :
-	       compare_slowpath_funcs[cmp_func_idx];
-}
-
 /* }}} tuple_compare */
 
 /* {{{ tuple_compare_with_key */
@@ -1233,66 +1184,114 @@ static const comparator_with_key_signature cmp_wk_arr[] = {
 
 #undef KEY_COMPARATOR
 
-static const tuple_compare_with_key_t compare_with_key_slowpath_funcs[] = {
-	tuple_compare_with_key_slowpath<false, false, false>,
-	tuple_compare_with_key_slowpath<true, false, false>,
-	tuple_compare_with_key_slowpath<false, true, false>,
-	tuple_compare_with_key_slowpath<true, true, false>,
-	tuple_compare_with_key_slowpath<false, false, true>,
-	tuple_compare_with_key_slowpath<true, false, true>,
-	tuple_compare_with_key_slowpath<false, true, true>,
-	tuple_compare_with_key_slowpath<true, true, true>
-};
+/* }}} tuple_compare_with_key */
 
-static tuple_compare_with_key_t
-tuple_compare_with_key_create(const struct key_def *def)
+static void
+key_def_set_compare_func_fast(struct key_def *def)
 {
-	int cmp_func_idx = (def->is_nullable ? 1 : 0) +
-			   2 * (def->has_optional_parts ? 1 : 0) +
-			   4 * (def->has_json_paths ? 1 : 0);
-	if (def->is_nullable) {
-		if (key_def_is_sequential(def)) {
-			if (def->has_optional_parts) {
-				return tuple_compare_with_key_sequential<true,
-									 true>;
-			} else {
-				return tuple_compare_with_key_sequential<true,
-									 false>;
-			}
-		} else {
-			return compare_with_key_slowpath_funcs[cmp_func_idx];
-		}
-	}
-	assert(! def->has_optional_parts);
-	if (!key_def_has_collation(def) && !def->has_json_paths) {
-		/* Precalculated comparators don't use collation */
-		for (uint32_t k = 0;
-		     k < sizeof(cmp_wk_arr) / sizeof(cmp_wk_arr[0]);
-		     k++) {
+	assert(!def->is_nullable);
+	assert(!def->has_optional_parts);
+	assert(!def->has_json_paths);
+	assert(!key_def_has_collation(def));
 
-			uint32_t i = 0;
-			for (; i < def->part_count; i++) {
-				if (def->parts[i].fieldno !=
-				    cmp_wk_arr[k].p[i * 2] ||
-				    def->parts[i].type !=
-				    cmp_wk_arr[k].p[i * 2 + 1]) {
-					break;
-				}
-			}
-			if (i == def->part_count)
-				return cmp_wk_arr[k].f;
+	tuple_compare_t cmp = NULL;
+	tuple_compare_with_key_t cmp_wk = NULL;
+	bool is_sequential = key_def_is_sequential(def);
+
+	/*
+	 * Use pre-compiled comparators if available, otherwise
+	 * fall back on generic comparators.
+	 */
+	for (uint32_t k = 0; k < lengthof(cmp_arr); k++) {
+		uint32_t i = 0;
+		for (; i < def->part_count; i++)
+			if (def->parts[i].fieldno != cmp_arr[k].p[i * 2] ||
+			    def->parts[i].type != cmp_arr[k].p[i * 2 + 1])
+				break;
+		if (i == def->part_count && cmp_arr[k].p[i * 2] == UINT32_MAX) {
+			cmp = cmp_arr[k].f;
+			break;
 		}
 	}
-	return key_def_is_sequential(def) ?
-	       tuple_compare_with_key_sequential<false, false> :
-	       compare_with_key_slowpath_funcs[cmp_func_idx];
+	for (uint32_t k = 0; k < lengthof(cmp_wk_arr); k++) {
+		uint32_t i = 0;
+		for (; i < def->part_count; i++) {
+			if (def->parts[i].fieldno != cmp_wk_arr[k].p[i * 2] ||
+			    def->parts[i].type != cmp_wk_arr[k].p[i * 2 + 1])
+				break;
+		}
+		if (i == def->part_count) {
+			cmp_wk = cmp_wk_arr[k].f;
+			break;
+		}
+	}
+	if (cmp == NULL) {
+		cmp = is_sequential ?
+			tuple_compare_sequential<false, false> :
+			tuple_compare_slowpath<false, false, false>;
+	}
+	if (cmp_wk == NULL) {
+		cmp_wk = is_sequential ?
+			tuple_compare_with_key_sequential<false, false> :
+			tuple_compare_with_key_slowpath<false, false, false>;
+	}
+
+	def->tuple_compare = cmp;
+	def->tuple_compare_with_key = cmp_wk;
 }
 
-/* }}} tuple_compare_with_key */
+template<bool is_nullable, bool has_optional_parts>
+static void
+key_def_set_compare_func_plain(struct key_def *def)
+{
+	assert(!def->has_json_paths);
+	if (key_def_is_sequential(def)) {
+		def->tuple_compare = tuple_compare_sequential
+					<is_nullable, has_optional_parts>;
+		def->tuple_compare_with_key = tuple_compare_with_key_sequential
+					<is_nullable, has_optional_parts>;
+	} else {
+		def->tuple_compare = tuple_compare_slowpath
+				<is_nullable, has_optional_parts, false>;
+		def->tuple_compare_with_key = tuple_compare_with_key_slowpath
+				<is_nullable, has_optional_parts, false>;
+	}
+}
+
+template<bool is_nullable, bool has_optional_parts>
+static void
+key_def_set_compare_func_json(struct key_def *def)
+{
+	assert(def->has_json_paths);
+	def->tuple_compare = tuple_compare_slowpath
+			<is_nullable, has_optional_parts, true>;
+	def->tuple_compare_with_key = tuple_compare_with_key_slowpath
+			<is_nullable, has_optional_parts, true>;
+}
 
 void
 key_def_set_compare_func(struct key_def *def)
 {
-	def->tuple_compare = tuple_compare_create(def);
-	def->tuple_compare_with_key = tuple_compare_with_key_create(def);
+	if (!key_def_has_collation(def) &&
+	    !def->is_nullable && !def->has_json_paths) {
+		key_def_set_compare_func_fast(def);
+	} else if (!def->has_json_paths) {
+		if (def->is_nullable && def->has_optional_parts) {
+			key_def_set_compare_func_plain<true, true>(def);
+		} else if (def->is_nullable && !def->has_optional_parts) {
+			key_def_set_compare_func_plain<true, false>(def);
+		} else {
+			assert(!def->is_nullable && !def->has_optional_parts);
+			key_def_set_compare_func_plain<false, false>(def);
+		}
+	} else {
+		if (def->is_nullable && def->has_optional_parts) {
+			key_def_set_compare_func_json<true, true>(def);
+		} else if (def->is_nullable && !def->has_optional_parts) {
+			key_def_set_compare_func_json<true, false>(def);
+		} else {
+			assert(!def->is_nullable && !def->has_optional_parts);
+			key_def_set_compare_func_json<false, false>(def);
+		}
+	}
 }
