@@ -87,7 +87,7 @@ mp_compare_bool(const char *field_a, const char *field_b)
 }
 
 static int
-mp_compare_integer_with_hint(const char *field_a, enum mp_type a_type,
+mp_compare_integer_with_type(const char *field_a, enum mp_type a_type,
 			     const char *field_b, enum mp_type b_type)
 {
 	assert(mp_classof(a_type) == MP_CLASS_NUMBER);
@@ -245,7 +245,7 @@ mp_compare_double_any_number(double lhs, const char *rhs,
 }
 
 static int
-mp_compare_number_with_hint(const char *lhs, enum mp_type lhs_type,
+mp_compare_number_with_type(const char *lhs, enum mp_type lhs_type,
 			    const char *rhs, enum mp_type rhs_type)
 {
 	assert(mp_classof(lhs_type) == MP_CLASS_NUMBER);
@@ -273,13 +273,13 @@ mp_compare_number_with_hint(const char *lhs, enum mp_type lhs_type,
 		);
 	}
 	assert(lhs_type == MP_INT || lhs_type == MP_UINT);
-	return mp_compare_integer_with_hint(lhs, lhs_type, rhs, rhs_type);
+	return mp_compare_integer_with_type(lhs, lhs_type, rhs, rhs_type);
 }
 
 static inline int
 mp_compare_number(const char *lhs, const char *rhs)
 {
-	return mp_compare_number_with_hint(lhs, mp_typeof(*lhs),
+	return mp_compare_number_with_type(lhs, mp_typeof(*lhs),
 					   rhs, mp_typeof(*rhs));
 }
 
@@ -325,7 +325,7 @@ static mp_compare_f mp_class_comparators[] = {
 };
 
 static int
-mp_compare_scalar_with_hint(const char *field_a, enum mp_type a_type,
+mp_compare_scalar_with_type(const char *field_a, enum mp_type a_type,
 			    const char *field_b, enum mp_type b_type)
 {
 	enum mp_class a_class = mp_classof(a_type);
@@ -340,7 +340,7 @@ mp_compare_scalar_with_hint(const char *field_a, enum mp_type a_type,
 static inline int
 mp_compare_scalar(const char *field_a, const char *field_b)
 {
-	return mp_compare_scalar_with_hint(field_a, mp_typeof(*field_a),
+	return mp_compare_scalar_with_type(field_a, mp_typeof(*field_a),
 					   field_b, mp_typeof(*field_b));
 }
 
@@ -352,7 +352,7 @@ mp_compare_scalar_coll(const char *field_a, const char *field_b,
 	enum mp_type type_b = mp_typeof(*field_b);
 	if (type_a == MP_STR && type_b == MP_STR)
 		return mp_compare_str_coll(field_a, field_b, coll);
-	return mp_compare_scalar_with_hint(field_a, type_a, field_b, type_b);
+	return mp_compare_scalar_with_type(field_a, type_a, field_b, type_b);
 }
 
 /**
@@ -376,7 +376,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
 		       mp_compare_str_coll(field_a, field_b, coll) :
 		       mp_compare_str(field_a, field_b);
 	case FIELD_TYPE_INTEGER:
-		return mp_compare_integer_with_hint(field_a,
+		return mp_compare_integer_with_type(field_a,
 						    mp_typeof(*field_a),
 						    field_b,
 						    mp_typeof(*field_b));
@@ -395,7 +395,7 @@ tuple_compare_field(const char *field_a, const char *field_b,
 }
 
 static int
-tuple_compare_field_with_hint(const char *field_a, enum mp_type a_type,
+tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 			      const char *field_b, enum mp_type b_type,
 			      int8_t type, struct coll *coll)
 {
@@ -407,17 +407,17 @@ tuple_compare_field_with_hint(const char *field_a, enum mp_type a_type,
 		       mp_compare_str_coll(field_a, field_b, coll) :
 		       mp_compare_str(field_a, field_b);
 	case FIELD_TYPE_INTEGER:
-		return mp_compare_integer_with_hint(field_a, a_type,
+		return mp_compare_integer_with_type(field_a, a_type,
 						    field_b, b_type);
 	case FIELD_TYPE_NUMBER:
-		return mp_compare_number_with_hint(field_a, a_type,
+		return mp_compare_number_with_type(field_a, a_type,
 						   field_b, b_type);
 	case FIELD_TYPE_BOOLEAN:
 		return mp_compare_bool(field_a, field_b);
 	case FIELD_TYPE_SCALAR:
 		return coll != NULL ?
 		       mp_compare_scalar_coll(field_a, field_b, coll) :
-		       mp_compare_scalar_with_hint(field_a, a_type,
+		       mp_compare_scalar_with_type(field_a, a_type,
 						   field_b, b_type);
 	default:
 		unreachable();
@@ -456,7 +456,7 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 			return b_type == MP_NIL ? 0 : -1;
 		else if (b_type == MP_NIL)
 			return 1;
-		return tuple_compare_field_with_hint(tuple_a_raw,  a_type,
+		return tuple_compare_field_with_type(tuple_a_raw,  a_type,
 						     tuple_b_raw, b_type,
 						     part->type, part->coll);
 	}
@@ -511,7 +511,7 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			rc = tuple_compare_field_with_hint(field_a, a_type,
+			rc = tuple_compare_field_with_type(field_a, a_type,
 							   field_b, b_type,
 							   part->type,
 							   part->coll);
@@ -596,7 +596,7 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			return tuple_compare_field_with_hint(field, a_type, key,
+			return tuple_compare_field_with_type(field, a_type, key,
 							     b_type, part->type,
 							     part->coll);
 		}
@@ -632,7 +632,7 @@ tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			rc = tuple_compare_field_with_hint(field, a_type, key,
+			rc = tuple_compare_field_with_type(field, a_type, key,
 							   b_type, part->type,
 							   part->coll);
 			if (rc != 0)
@@ -662,7 +662,7 @@ key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			return tuple_compare_field_with_hint(key_a, a_type,
+			return tuple_compare_field_with_type(key_a, a_type,
 							     key_b, b_type,
 							     part->type,
 							     part->coll);
@@ -688,7 +688,7 @@ key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			rc = tuple_compare_field_with_hint(key_a, a_type, key_b,
+			rc = tuple_compare_field_with_type(key_a, a_type, key_b,
 							   b_type, part->type,
 							   part->coll);
 			if (rc != 0)
@@ -797,7 +797,7 @@ tuple_compare_sequential(const struct tuple *tuple_a,
 		} else if (b_type == MP_NIL) {
 			return 1;
 		} else {
-			rc = tuple_compare_field_with_hint(key_a, a_type, key_b,
+			rc = tuple_compare_field_with_type(key_a, a_type, key_b,
 							   b_type, part->type,
 							   part->coll);
 			if (rc != 0)
