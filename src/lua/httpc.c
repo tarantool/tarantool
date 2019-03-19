@@ -243,6 +243,26 @@ luaT_httpc_request(lua_State *L)
 		httpc_set_ssl_cert(req, lua_tostring(L, -1));
 	lua_pop(L, 1);
 
+	lua_getfield(L, 5, "proxy");
+	if (!lua_isnil(L, -1))
+		httpc_set_proxy(req, lua_tostring(L, -1));
+	lua_pop(L, 1);
+
+	lua_getfield(L, 5, "proxy_port");
+	if (!lua_isnil(L, -1))
+		httpc_set_proxy_port(req, (long) lua_tonumber(L, -1));
+	lua_pop(L, 1);
+
+	lua_getfield(L, 5, "proxy_user_pwd");
+	if (!lua_isnil(L, -1))
+		httpc_set_proxy_user_pwd(req, lua_tostring(L, -1));
+	lua_pop(L, 1);
+
+	lua_getfield(L, 5, "no_proxy");
+	if (!lua_isnil(L, -1))
+		httpc_set_no_proxy(req, lua_tostring(L, -1));
+	lua_pop(L, 1);
+
 	long keepalive_idle = 0;
 	long keepalive_interval = 0;
 
