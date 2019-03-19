@@ -53,6 +53,12 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 		parse->is_aborted = true;
 		return NULL;
 	}
+	if (space->index_count == 0 && !space->def->opts.is_view) {
+		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
+			 "spaces without primary key");
+		parse->is_aborted = true;
+		return NULL;
+	}
 	space_name->space = space;
 	if (sqlIndexedByLookup(parse, space_name) != 0)
 		space = NULL;
