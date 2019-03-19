@@ -325,6 +325,30 @@ httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert)
 }
 
 void
+httpc_set_proxy(struct httpc_request *req, const char *proxy)
+{
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_PROXY, proxy);
+}
+
+void
+httpc_set_proxy_port(struct httpc_request *req, long port)
+{
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_PROXYPORT, port);
+}
+
+void
+httpc_set_proxy_user_pwd(struct httpc_request *req, const char *user_pwd)
+{
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_PROXYUSERPWD, user_pwd);
+}
+
+void
+httpc_set_no_proxy(struct httpc_request *req, const char *no_proxy)
+{
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_NOPROXY, no_proxy);
+}
+
+void
 httpc_set_interface(struct httpc_request *req, const char *interface)
 {
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_INTERFACE, interface);
@@ -402,6 +426,7 @@ httpc_execute(struct httpc_request *req, double timeout)
 		req->reason = curl_easy_strerror(req->curl_request.code);
 		++env->stat.failed_requests;
 		break;
+	case CURLE_COULDNT_RESOLVE_PROXY:
 	case CURLE_COULDNT_RESOLVE_HOST:
 	case CURLE_COULDNT_CONNECT:
 		/* 595 Connection Problem (AnyEvent non-standard) */

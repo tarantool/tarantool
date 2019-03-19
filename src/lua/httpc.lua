@@ -258,6 +258,15 @@ end
 --
 --      ssl_cert - set path to the file with SSL client certificate;
 --
+--      proxy - set a proxy to use;
+--
+--      proxy_port - set a port number the proxy listens on;
+--
+--      proxy_user_pwd - set a user name and a password to use
+--          in authentication;
+--
+--      no_proxy - disable proxy use for specific hosts;
+--
 --      headers - a table of HTTP headers;
 --
 --      keepalive_idle & keepalive_interval -

@@ -292,6 +292,66 @@ void
 httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert);
 
 /**
+ * Specify a proxy to use (optionally may be prefixed with a scheme -
+ * e.g. http:// or https://).
+ *
+ * If this option is not set a value from the corresponding
+ * environment variable will be used. Environment variable names are:
+ * 'http_proxy', 'https_proxy', 'ftp_proxy' etc. 'all_proxy' variable
+ * is used if no protocol specific proxy was set.
+ *
+ * Setting this option to an empty string will explicitly disable the
+ * use of a proxy, even if there is an environment variable set for it.
+ *
+ * @param req request
+ * @param proxy - a host name or an IP address. The application does not
+ * have to keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_PROXY.html
+ */
+void
+httpc_set_proxy(struct httpc_request *req, const char *proxy);
+
+/**
+ * Specify a port number the proxy listens on
+ * @param req request
+ * @param port - a port number the proxy listens on
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_PROXYPORT.html
+ */
+void
+httpc_set_proxy_port(struct httpc_request *req, long port);
+
+/**
+ * Specify a user name and a password to use in authentication
+ * @param req request
+ * @param user_pwd - a login details string for the connection.
+ * The format is: [user name]:[password]. The application does not
+ * have to keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_USERPWD.html
+ */
+void
+httpc_set_proxy_user_pwd(struct httpc_request *req, const char *user_pwd);
+
+/**
+ * Specify a comma separated list of host names that do not require a proxy
+ * to get reached, even if one is specified by 'proxy' option. The only
+ * wildcard available is a single * character, which matches all hosts, and
+ * effectively disables the proxy.
+ *
+ * 'no_proxy' environment variable will be used if this option is not set.
+ *
+ * Setting this option to an empty string will
+ * explicitly enable the proxy for all host names, even if there is an
+ * environment variable set for it.
+ *
+ * @param req request
+ * @param no_proxy - a comma separated list of host names. The application
+ * does not have to keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_NOPROXY.html
+ */
+void
+httpc_set_no_proxy(struct httpc_request *req, const char *no_proxy);
+
+/**
  * Specify source interface for outgoing traffic
  * @param req request
  * @param interface - interface name to use as outgoing network interface.
