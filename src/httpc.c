@@ -321,6 +321,24 @@ httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert)
 }
 
 void
+httpc_set_proxy(struct httpc_request *req, const char *proxy)
+{
+    curl_easy_setopt(req->curl_request.easy, CURLOPT_PROXY, proxy);
+}
+
+void
+httpc_set_proxy_port(struct httpc_request *req, long port)
+{
+    curl_easy_setopt(req->curl_request.easy, CURLOPT_PROXYPORT, port);
+}
+
+void
+httpc_set_proxy_userpwd(struct httpc_request *req, const char *userpwd)
+{
+    curl_easy_setopt(req->curl_request.easy, CURLOPT_PROXYUSERPWD, userpwd);
+}
+
+void
 httpc_set_interface(struct httpc_request *req, const char *interface)
 {
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_INTERFACE, interface);

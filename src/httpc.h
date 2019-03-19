@@ -292,6 +292,36 @@ void
 httpc_set_ssl_cert(struct httpc_request *req, const char *ssl_cert);
 
 /**
+ * Specify a proxy to use
+ * @param req request
+ * @param proxy - a host name or an IP address. The application does not
+ * have to keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_PROXY.html
+ */
+void
+httpc_set_proxy(struct httpc_request *req, const char *proxy);
+
+/**
+ * Specify a port number the proxy listens on
+ * @param req request
+ * @param port - a port number the proxy listens on
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_PROXYPORT.html
+ */
+void
+httpc_set_proxy_port(struct httpc_request *req, long port);
+
+/**
+ * Specify a user name and a password to use in authentication
+ * @param req request
+ * @param userpwd - a login details string for the connection.
+ * The format is: [user name]:[password]. The application does not
+ * have to keep the string around after setting this option.
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_USERPWD.html
+ */
+void
+httpc_set_proxy_userpwd(struct httpc_request *req, const char *userpwd);
+
+/**
  * Specify source interface for outgoing traffic
  * @param req request
  * @param interface - interface name to use as outgoing network interface.
