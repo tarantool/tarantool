@@ -1,0 +1,296 @@
+netbox = require('net.box')
+---
+...
+test_run = require('test_run').new()
+---
+...
+box.execute('CREATE TABLE test (id INT PRIMARY KEY, a FLOAT, b TEXT)')
+---
+- row_count: 1
+...
+box.space.TEST:replace{1, 2, '3'}
+---
+- [1, 2, '3']
+...
+box.space.TEST:replace{7, 8.5, '9'}
+---
+- [7, 8.5, '9']
+...
+box.space.TEST:replace{10, 11, box.NULL}
+---
+- [10, 11, null]
+...
+remote = test_run:get_cfg('remote') == 'true'
+---
+...
+execute = nil
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+if remote then
+	box.schema.user.grant('guest','read, write, execute', 'universe')
+	box.schema.user.grant('guest', 'create', 'space')
+	cn = netbox.connect(box.cfg.listen)
+	execute = function(...) return cn:execute(...) end
+else
+	execute = box.execute
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+--
+-- gh-3401: box.execute parameter binding.
+--
+parameters = {}
+---
+...
+parameters[1] = {}
+---
+...
+parameters[1][':value'] = 1
+---
+...
+execute('SELECT * FROM test WHERE id = :value', parameters)
+---
+- metadata:
+  - name: ID
+    type: integer
+  - name: A
+    type: number
+  - name: B
+    type: string
+  rows:
+  - [1, 2, '3']
+...
+execute('SELECT ?, ?, ?', {1, 2, 3})
+---
+- metadata:
+  - name: '?'
+    type: INTEGER
+  - name: '?'
+    type: INTEGER
+  - name: '?'
+    type: INTEGER
+  rows:
+  - [1, 2, 3]
+...
+parameters = {}
+---
+...
+parameters[1] = 10
+---
+...
+parameters[2] = {}
+---
+...
+parameters[2]['@value2'] = 12
+---
+...
+parameters[3] = {}
+---
+...
+parameters[3][':value1'] = 11
+---
+...
+execute('SELECT ?, :value1, @value2', parameters)
+---
+- metadata:
+  - name: '?'
+    type: INTEGER
+  - name: :value1
+    type: INTEGER
+  - name: '@value2'
+    type: INTEGER
+  rows:
+  - [10, 11, 12]
+...
+parameters = {}
+---
+...
+parameters[1] = {}
+---
+...
+parameters[1][':value3'] = 1
+---
+...
+parameters[2] = 2
+---
+...
+parameters[3] = {}
+---
+...
+parameters[3][':value1'] = 3
+---
+...
+parameters[4] = 4
+---
+...
+parameters[5] = 5
+---
+...
+parameters[6] = {}
+---
+...
+parameters[6]['@value2'] = 6
+---
+...
+execute('SELECT :value3, ?, :value1, ?, ?, @value2, ?, :value3', parameters)
+---
+- metadata:
+  - name: :value3
+    type: INTEGER
+  - name: '?'
+    type: INTEGER
+  - name: :value1
+    type: INTEGER
+  - name: '?'
+    type: INTEGER
+  - name: '?'
+    type: INTEGER
+  - name: '@value2'
+    type: INTEGER
+  - name: '?'
+    type: boolean
+  - name: :value3
+    type: INTEGER
+  rows:
+  - [1, 2, 3, 4, 5, 6, null, 1]
+...
+-- Try not-integer types.
+msgpack = require('msgpack')
+---
+...
+execute('SELECT ?, ?, ?, ?, ?', {'abc', -123.456, msgpack.NULL, true, false})
+---
+- metadata:
+  - name: '?'
+    type: TEXT
+  - name: '?'
+    type: NUMERIC
+  - name: '?'
+    type: BOOLEAN
+  - name: '?'
+    type: INTEGER
+  - name: '?'
+    type: INTEGER
+  rows:
+  - ['abc', -123.456, null, 1, 0]
+...
+-- Try to replace '?' in meta with something meaningful.
+execute('SELECT ? AS kek, ? AS kek2', {1, 2})
+---
+- metadata:
+  - name: KEK
+    type: INTEGER
+  - name: KEK2
+    type: INTEGER
+  rows:
+  - [1, 2]
+...
+-- Try to bind not existing name.
+parameters = {}
+---
+...
+parameters[1] = {}
+---
+...
+parameters[1]['name'] = 300
+---
+...
+execute('SELECT ? AS kek', parameters)
+---
+- error: Parameter 'name' was not found in the statement
+...
+-- Try too many parameters in a statement.
+sql = 'SELECT '..string.rep('?, ', box.schema.SQL_BIND_PARAMETER_MAX)..'?'
+---
+...
+execute(sql)
+---
+- error: 'SQL bind parameter limit reached: 65000'
+...
+-- Try too many parameter values.
+sql = 'SELECT ?'
+---
+...
+parameters = {}
+---
+...
+for i = 1, box.schema.SQL_BIND_PARAMETER_MAX + 1 do parameters[i] = i end
+---
+...
+execute(sql, parameters)
+---
+- error: 'SQL bind parameter limit reached: 65001'
+...
+--
+-- Errors during parameters binding.
+--
+-- Try value > INT64_MAX. sql can't bind it, since it has no
+-- suitable method in its bind API.
+execute('SELECT ? AS big_uint', {0xefffffffffffffff})
+---
+- error: Bind value for parameter 1 is out of range for type INTEGER
+...
+-- Bind incorrect parameters.
+ok, err = pcall(execute, 'SELECT ?', { {1, 2, 3} })
+---
+...
+ok
+---
+- false
+...
+parameters = {}
+---
+...
+parameters[1] = {}
+---
+...
+parameters[1][100] = 200
+---
+...
+ok, err = pcall(execute, 'SELECT ?', parameters)
+---
+...
+ok
+---
+- false
+...
+parameters = {}
+---
+...
+parameters[1] = {}
+---
+...
+parameters[1][':value'] = {kek = 300}
+---
+...
+execute('SELECT :value', parameters)
+---
+- error: Bind value type MAP for parameter ':value' is not supported
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+if remote then
+	cn:close()
+	box.schema.user.revoke('guest', 'read, write, execute', 'universe')
+	box.schema.user.revoke('guest', 'create', 'space')
+end;
+---
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+box.execute('DROP TABLE test')
+---
+- row_count: 1
+...
