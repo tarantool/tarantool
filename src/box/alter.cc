@@ -1501,13 +1501,8 @@ update_view_references(struct Select *select, int update_value,
 		const char *space_name = sql_src_list_entry_name(list, i);
 		if (space_name == NULL)
 			continue;
-		uint32_t space_id;
-		if (schema_find_id(BOX_SPACE_ID, 2, space_name,
-				   strlen(space_name), &space_id) != 0) {
-			sqlSrcListDelete(sql_get(), list);
-			return -1;
-		}
-		if (space_id == BOX_ID_NIL) {
+		struct space *space = space_by_name(space_name);
+		if (space == NULL) {
 			if (! suppress_error) {
 				assert(not_found_space != NULL);
 				*not_found_space = tt_sprintf("%s", space_name);
@@ -1516,7 +1511,6 @@ update_view_references(struct Select *select, int update_value,
 			}
 			continue;
 		}
-		struct space *space = space_by_id(space_id);
 		assert(space->def->view_ref_count > 0 || update_value > 0);
 		space->def->view_ref_count += update_value;
 	}

@@ -104,6 +104,19 @@ box.space.BCV:drop()
 box.sql.execute("DROP TABLE c;")
 box.sql.execute("DROP TABLE b;")
 
+-- gh-3814: make sure that recovery of view processed without
+-- unexpected errors.
+--
+box.snapshot()
+box.sql.execute("CREATE TABLE t2 (id INT PRIMARY KEY);")
+box.sql.execute("CREATE VIEW v2 AS SELECT * FROM t2;")
+test_run:cmd('restart server default')
+
+box.sql.execute("DROP TABLE t2;")
+box.sql.execute("SELECT * FROM v2;")
+box.space.V2:drop()
+box.space.T2:drop()
+
 -- Cleanup
 box.sql.execute("DROP VIEW v1;");
 box.sql.execute("DROP TABLE t1;");
