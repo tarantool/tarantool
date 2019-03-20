@@ -839,11 +839,11 @@ end
 -- 4. If @a opts.replica is set, record.HEADER.replica_id should
 --    not be nil and should be in @a opts.replica list.
 --
--- Once a record with LSN >= @a opts.to is found the loop stops
--- (even if a file contains next records with smaller LSN from
--- another replicas). Note however that this function is called
--- once for each xlog / snap file, so even when it stops on LSN
--- >= @a opts.to on a current file a next file will be processed.
+-- If @a opts.replica is set and is a singleton list and a record
+-- **from this replica** with LSN >= @a opts.to is found the loop
+-- stops. Note however that this function is called once for each
+-- xlog / snap file, so even when it stops on LSN >= @a opts.to on
+-- a current file a next file will be processed.
 local function filter_xlog(gen, param, state, opts, cb)
     local spaces = opts.spaces
     local from, to, spaces = opts.from, opts.to, opts.space
@@ -852,11 +852,11 @@ local function filter_xlog(gen, param, state, opts, cb)
     for lsn, record in gen, param, state do
         local sid = record.BODY and record.BODY.space_id
         local rid = record.HEADER.replica_id
-        if lsn >= to then
+        if replicas and #replicas == 1 and replicas[1] == rid and lsn >= to then
             -- stop, as we've finished reading tuple with lsn == to
             -- and the next lsn's will be bigger
             break
-        elseif (lsn < from) or
+        elseif (lsn < from) or (lsn >= to) or
            (not spaces and sid and sid < 512 and not show_system) or
            (spaces and (sid == nil or not find_in_list(sid, spaces))) or
            (replicas and not find_in_list(rid, replicas)) then
