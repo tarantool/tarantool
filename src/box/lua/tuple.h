@@ -37,6 +37,7 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct tuple;
+struct tuple_format;
 typedef struct tuple box_tuple_t;
 struct lua_State;
 struct mpstream;
@@ -67,7 +68,7 @@ luaT_istuple(struct lua_State *L, int idx);
 /** \endcond public */
 
 int
-lbox_tuple_new(struct lua_State *L);
+luaT_tuple_new(struct lua_State *L, struct tuple_format *format);
 
 static inline int
 luaT_pushtupleornil(struct lua_State *L, struct tuple *tuple)
