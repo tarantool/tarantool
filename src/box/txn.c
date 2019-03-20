@@ -191,7 +191,6 @@ txn_begin_stmt(struct space *space)
 		diag_set(ClientError, ER_SUB_STMT_MAX);
 		return NULL;
 	}
-
 	struct txn_stmt *stmt = txn_stmt_new(txn);
 	if (stmt == NULL) {
 		if (txn->is_autocommit && txn->in_sub_stmt == 0)
@@ -430,7 +429,7 @@ txn_abort(struct txn *txn)
 int
 txn_check_singlestatement(struct txn *txn, const char *where)
 {
-	if (!txn->is_autocommit || !txn_is_first_statement(txn)) {
+	if (!txn_is_first_statement(txn)) {
 		diag_set(ClientError, ER_UNSUPPORTED,
 			 where, "multi-statement transactions");
 		return -1;

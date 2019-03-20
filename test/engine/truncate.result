@@ -24,14 +24,13 @@ box.begin()
 ...
 s:truncate()
 ---
-- error: DDL does not support multi-statement transactions
 ...
 box.commit()
 ---
 ...
 s:select()
 ---
-- - [123]
+- []
 ...
 s:drop()
 ---

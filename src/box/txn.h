@@ -309,9 +309,8 @@ void
 txn_rollback_stmt();
 
 /**
- * Raise an error if this is a multi-statement
- * transaction: DDL can not be part of a multi-statement
- * transaction and must be run in autocommit mode.
+ * Raise an error if this is a multi-statement transaction: DDL
+ * can not be part of a multi-statement transaction.
  */
 int
 txn_check_singlestatement(struct txn *txn, const char *where);

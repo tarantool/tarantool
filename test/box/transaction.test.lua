@@ -41,27 +41,22 @@ f = fiber.create(sloppy);
 -- ensure it's rolled back automatically
 while f:status() ~= 'dead' do fiber.sleep(0) end;
 -- transactions and system spaces
+-- some operation involves more than one ddl spaces, so they should fail
 box.begin() box.schema.space.create('test');
-box.rollback();
-box.begin() box.schema.func.create('test');
 box.rollback();
 box.begin() box.schema.user.create('test');
 box.rollback();
-box.begin() box.schema.user.grant('guest', 'read', 'space', '_priv');
-box.rollback();
-box.begin() box.space._user:delete{box.schema.GUEST_ID};
-box.rollback();
-box.begin() box.space._space:delete{box.schema.CLUSTER_ID};
-box.rollback();
-box.begin() box.space._sequence:insert{1, 1, 'test', 1, 1, 2, 1, 0, false};
-box.rollback();
-box.begin() box.space._schema:insert{'test'};
-box.rollback();
-box.begin() box.space._cluster:insert{123456789, 'abc'};
-box.rollback();
+-- but this is Ok now
+box.begin() box.schema.func.create('test') box.rollback();
+box.begin() box.schema.user.grant('guest', 'read', 'space', '_priv') box.rollback();
+space = box.schema.space.create('test');
+box.begin() box.space._space:delete{space.id} box.rollback();
+box.begin() box.space._space:delete{space.id} box.commit();
+box.begin() box.space._sequence:insert{1, 1, 'test', 1, 1, 2, 1, 0, false} box.rollback();
+box.begin() box.space._schema:insert{'test'} box.rollback();
+box.begin() box.space._cluster:insert{30, '00000000-0000-0000-0000-000000000001'} box.rollback();
 s = box.schema.space.create('test');
-box.begin() index = s:create_index('primary');
-box.rollback();
+box.begin() index = s:create_index('primary') box.rollback();
 index = s:create_index('primary');
 t = nil
 function multi()

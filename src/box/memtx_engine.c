@@ -384,15 +384,7 @@ static int
 memtx_engine_begin(struct engine *engine, struct txn *txn)
 {
 	(void)engine;
-	/*
-	 * Register a trigger to rollback transaction on yield.
-	 * This must be done in begin(), since it's
-	 * the first thing txn invokes after txn->n_stmts++,
-	 * to match with trigger_clear() in rollbackStatement().
-	 */
-	if (txn->is_autocommit == false) {
-		memtx_init_txn(txn);
-	}
+	(void)txn;
 	return 0;
 }
 
@@ -404,15 +396,9 @@ memtx_engine_begin_statement(struct engine *engine, struct txn *txn)
 	if (txn->engine_tx == NULL) {
 		struct space *space = txn_last_stmt(txn)->space;
 
-		if (space->def->id > BOX_SYSTEM_ID_MAX &&
-		    ! rlist_empty(&space->on_replace)) {
-			/**
-			 * A space on_replace trigger may initiate
-			 * a yield.
-			 */
-			assert(txn->is_autocommit);
+		if (space->def->id > BOX_SYSTEM_ID_MAX)
+			/* Setup triggers for non-ddl transactions. */
 			memtx_init_txn(txn);
-		}
 	}
 	return 0;
 }

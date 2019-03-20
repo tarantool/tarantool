@@ -849,28 +849,24 @@ test:do_catchsql_test(
         -- </trigger1-16.7>
     })
 
-test:do_catchsql_test(
+test:do_execsql_test(
     "trigger1-16.8",
     [[
         START TRANSACTION;
           CREATE TRIGGER tr168 INSERT ON tA BEGIN
             INSERT INTO t16 values(1);
           END;
+        ROLLBACK;
    ]], {
-        1, [[Space _trigger does not support multi-statement transactions]]
 })
 
-test:execsql [[
-    ROLLBACK;
-]]
-
-test:do_catchsql_test(
+test:do_execsql_test(
     "trigger1-16.9",
     [[
         START TRANSACTION;
           DROP TRIGGER t16err3;
+        ROLLBACK;
    ]], {
-        1, [[Space _trigger does not support multi-statement transactions]]
 })
 -- MUST_WORK_TEST
 -- #-------------------------------------------------------------------------

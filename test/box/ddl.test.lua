@@ -131,8 +131,7 @@ c = box.space._collation:get{1}:totable()
 c[2] = 'unicode_test'
 box.space._collation:replace(c)
 
-box.begin() box.internal.collation.create('test2', 'ICU', 'ru_RU')
-box.rollback()
+box.begin() box.internal.collation.create('test2', 'ICU', 'ru_RU') box.rollback()
 
 box.internal.collation.create('test', 'ICU', 'ru_RU')
 box.internal.collation.exists('test')
@@ -260,6 +259,7 @@ _ = fiber.create(function()
     c:put(true)
 end);
 
+-- Should be Ok for now
 box.begin()
     test_latch:create_index("sec2", {unique = true, parts = {2, 'unsigned'}})
 box.commit();

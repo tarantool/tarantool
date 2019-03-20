@@ -50,10 +50,11 @@ box.sql.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b TEXT);")
 box.sql.execute("INSERT INTO t1 VALUES(1, 1, 'one');")
 box.sql.execute("INSERT INTO t1 VALUES(2, 2, 'two');")
 
--- Can't truncate in transaction.
+-- Truncate rollback
 box.sql.execute("START TRANSACTION")
 box.sql.execute("TRUNCATE TABLE t1;")
 box.sql.execute("ROLLBACK")
+box.sql.execute("SELECT * FROM t1")
 
 -- Can't truncate view.
 box.sql.execute("CREATE VIEW v1 AS SELECT * FROM t1;")

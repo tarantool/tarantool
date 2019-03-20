@@ -759,6 +759,9 @@ i3:select()
 
 -- Check that recovery works.
 inspector:cmd("restart server default")
+test_run = require('test_run')
+inspector = test_run.new()
+engine = inspector:get_cfg('engine')
 
 s = box.space.test
 s.index.i1:select()
@@ -775,3 +778,55 @@ s.index.i1:select()
 box.snapshot()
 
 s:drop()
+
+-- test ddl operation within begin/commit/rollback
+-- acquire free space id
+space = box.schema.space.create('ddl_test', {engine = engine})
+id = space.id
+space:drop()
+
+inspector:cmd("setopt delimiter ';'")
+box.begin()
+s = box.schema.space.create('ddl_test', {engine = engine, id = id})
+box.rollback();
+
+box.begin()
+s = box.schema.space.create('ddl_test', {engine = engine, id = id})
+box.commit();
+
+box.begin()
+s:create_index('pk')
+box.rollback();
+
+box.begin()
+s:create_index('pk')
+box.commit();
+
+s:replace({1});
+s:replace({2});
+s:replace({3});
+
+box.begin()
+s:truncate()
+box.commit();
+s:select();
+
+box.begin()
+box.schema.user.grant('guest', 'write', 'space', 'ddl_test')
+box.rollback();
+
+box.begin()
+box.schema.user.grant('guest', 'write', 'space', 'ddl_test')
+box.commit();
+
+box.begin()
+box.schema.user.revoke('guest', 'write', 'space', 'ddl_test')
+box.rollback();
+
+box.begin()
+box.schema.user.revoke('guest', 'write', 'space', 'ddl_test')
+box.commit();
+
+-- index and space drop are not currently supported (because of truncate)
+s.index.pk:drop();
+s:drop();
