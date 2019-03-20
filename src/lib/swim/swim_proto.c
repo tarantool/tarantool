@@ -33,6 +33,7 @@
 #include "say.h"
 #include "version.h"
 #include "diag.h"
+#include <sys/socket.h> /* AF_INET for FreeBSD. */
 
 const char *swim_member_status_strs[] = {
 	"alive",

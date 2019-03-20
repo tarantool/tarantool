@@ -33,6 +33,8 @@
 #include "trivia/util.h"
 #include "uuid/tt_uuid.h"
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <stdbool.h>
 
 /**
