@@ -828,35 +828,59 @@ local function eval()
     return 0
 end
 
-local function cat()
-    local options = keyword_arguments
-    local from, to, spaces = options.from, options.to, options.space
-    local show_system, cat_format = options['show-system'], options.format
-    local replicas = options.replica
+-- Call a callback @a cb for each record that matches all of the
+-- following conditions:
+--
+-- 1. opts.from <= record.HEADER.lsn < opts.to.
+-- 2. If @a opts.space and @a opts['show-system'] are not set,
+--    record.BODY.space_id should be nil or >= 512.
+-- 3. If @a opts.space is set, record.BODY.space_id should not be
+--    nil and should be in @a opts.space list.
+-- 4. If @a opts.replica is set, record.HEADER.replica_id should
+--    not be nil and should be in @a opts.replica list.
+--
+-- Once a record with LSN >= @a opts.to is found the loop stops
+-- (even if a file contains next records with smaller LSN from
+-- another replicas). Note however that this function is called
+-- once for each xlog / snap file, so even when it stops on LSN
+-- >= @a opts.to on a current file a next file will be processed.
+local function filter_xlog(gen, param, state, opts, cb)
+    local spaces = opts.spaces
+    local from, to, spaces = opts.from, opts.to, opts.space
+    local show_system, replicas = opts['show-system'], opts.replica
 
-    local format_cb   = cat_formats[cat_format]
-    local is_printed  = false
+    for lsn, record in gen, param, state do
+        local sid = record.BODY and record.BODY.space_id
+        local rid = record.HEADER.replica_id
+        if lsn >= to then
+            -- stop, as we've finished reading tuple with lsn == to
+            -- and the next lsn's will be bigger
+            break
+        elseif (lsn < from) or
+           (not spaces and sid and sid < 512 and not show_system) or
+           (spaces and (sid == nil or not find_in_list(sid, spaces))) or
+           (replicas and not find_in_list(rid, replicas)) then
+            -- pass this tuple
+        else
+            cb(record)
+        end
+    end
+end
+
+local function cat()
+    local opts = keyword_arguments
+    local cat_format = opts.format
+    local format_cb = cat_formats[cat_format]
+    local is_printed = false
     for id, file in ipairs(positional_arguments) do
         log.error("Processing file '%s'", file)
-        for lsn, record in xlog.pairs(file) do
-            local sid = record.BODY and record.BODY.space_id
-            local rid = record.HEADER.replica_id
-            if lsn >= to then
-                -- stop, as we've finished reading tuple with lsn == to
-                -- and the next lsn's will be bigger
-                break
-            elseif (lsn < from) or
-               (not spaces and sid and sid < 512 and not show_system) or
-               (spaces and (sid == nil or not find_in_list(sid, spaces))) or
-               (replicas and not find_in_list(rid, replicas)) then
-                -- pass this tuple
-            else
-                is_printed = true
-                format_cb(record)
-                io.stdout:flush()
-            end
-        end
-        if options.format == 'yaml' and is_printed then
+        local gen, param, state = xlog.pairs(file)
+        filter_xlog(gen, param, state, opts, function(record)
+            is_printed = true
+            format_cb(record)
+            io.stdout:flush()
+        end)
+        if opts.format == 'yaml' and is_printed then
             is_printed = false
             print('...\n')
         end
@@ -864,11 +888,8 @@ local function cat()
 end
 
 local function play()
-    local options = keyword_arguments
-    local from, to, spaces = options.from, options.to, options.space
-    local show_system = options['show-system']
+    local opts = keyword_arguments
     local uri = table.remove(positional_arguments, 1)
-    local replicas = options.replica
 
     if uri == nil then
         error("Empty URI is provided")
@@ -879,19 +900,10 @@ local function play()
     end
     for id, file in ipairs(positional_arguments) do
         log.info(("Processing file '%s'"):format(file))
-        for lsn, record in xlog.pairs(file) do
+        local gen, param, state = xlog.pairs(file)
+        filter_xlog(gen, param, state, opts, function(record)
             local sid = record.BODY and record.BODY.space_id
-            local rid = record.HEADER.replica_id
-            if lsn >= to then
-                -- stop, as we've finished reading tuple with lsn == to
-                -- and the next lsn's will be bigger
-                break
-            elseif (lsn < from) or sid == nil or
-               (not spaces and sid < 512 and not show_system) or
-               (spaces and not find_in_list(sid, spaces)) or
-               (replicas and not find_in_list(rid, replicas)) then
-                -- pass this tuple
-            else
+            if sid ~= nil then
                 local args, so = {}, remote.space[sid]
                 if so == nil then
                     error(("No space #%s, stopping"):format(sid))
@@ -902,7 +914,7 @@ local function play()
                 table.insert(args, record.BODY.operations)
                 so[record.HEADER.type:lower()](unpack(args))
             end
-        end
+        end)
     end
     remote:close()
 end
@@ -1289,8 +1301,9 @@ usage = function(command, verbose)
     usage_commands(commands, verbose)
     os.exit(1)
 end
+
 -- parse parameters and put the result into positional/keyword_arguments
-do
+local function populate_arguments()
     local function keyword_arguments_populate(ka)
         ka                = ka                or {}
         ka.from           = ka.from           or 0
@@ -1336,11 +1349,24 @@ do
     keyword_arguments = keyword_arguments_populate(parameters)
 end
 
-local cmd_pair = commands[command_name]
-if #arg < 2 then
-    log.error("Not enough arguments for '%s' command\n", command_name)
-    usage(command_name)
+local function main()
+    populate_arguments()
+    local cmd_pair = commands[command_name]
+    if #arg < 2 then
+        log.error("Not enough arguments for '%s' command\n", command_name)
+        usage(command_name)
+    end
+    cmd_pair.process(cmd_pair.func)
 end
-cmd_pair.process(cmd_pair.func)
+
+if rawget(_G, 'TARANTOOLCTL_UNIT_TEST') then
+    return {
+        internal = {
+            filter_xlog = filter_xlog,
+        }
+    }
+end
+
+main()
 
 -- vim: syntax=lua

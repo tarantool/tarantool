@@ -7,7 +7,11 @@ local uuid     = require('uuid')
 local yaml     = require('yaml')
 local errno    = require('errno')
 local fiber    = require('fiber')
-local test_run = require('test_run').new()
+local ok, test_run = pcall(require, 'test_run')
+test_run = ok and test_run.new() or nil
+
+local BUILDDIR = os.getenv('BUILDDIR') or '.'
+local TARANTOOLCTL_PATH = ('%s/extra/dist/tarantoolctl'):format(BUILDDIR)
 
 local function recursive_rmdir(path)
     path = fio.abspath(path)
@@ -156,8 +160,19 @@ local function check_ok(test, dir, cmd, args, e_res, e_stdout, e_stderr)
     end
 end
 
+local function merge(...)
+    local res = {}
+    for i = 1, select('#', ...) do
+        local t = select(i, ...)
+        for k, v in pairs(t) do
+            res[k] = v
+        end
+    end
+    return res
+end
+
 local test = tap.test('tarantoolctl')
-test:plan(7)
+test:plan(8)
 
 -- basic start/stop test
 -- must be stopped afterwards
@@ -402,7 +417,9 @@ do
 end
 
 -- check play
-do
+if test_run == nil then
+    test:skip('skip \'tarantoolctl play\' test (test-run is required)')
+else
     local dir = fio.tempdir()
 
     local filler_code = [[
@@ -467,5 +484,154 @@ do
         os.exit()
     end
 end
+
+test:test('filter_xlog', function(test)
+    local xlog_data = {
+        -- [1] =
+        {
+            HEADER = {lsn = 130, type = 'INSERT', timestamp = 1551987542.8702},
+            BODY = {space_id = 515, tuple = {1}},
+        },
+        -- [2] =
+        {
+            HEADER = {lsn = 131, type = 'INSERT', timestamp = 1551987542.8702},
+            BODY = {space_id = 515, tuple = {2}},
+        },
+        -- [3] =
+        {
+            HEADER = {lsn = 132, type = 'INSERT', timestamp = 1551987542.8702},
+            BODY = {space_id = 515, tuple = {3}},
+        },
+        -- [4] =
+        {
+            HEADER = {lsn = 133, type = 'INSERT', timestamp = 1551987542.8702},
+            BODY = {space_id = 516, tuple = {'a'}},
+        },
+        -- [5] =
+        {
+            HEADER = {lsn = 134, type = 'INSERT', timestamp = 1551987542.8702},
+            BODY = {space_id = 517, tuple = {'a'}},
+        },
+        -- [6] =
+        {
+            HEADER = {lsn = 135, type = 'INSERT', timestamp = 1551987542.8702},
+            BODY = {space_id = 518, tuple = {'a'}},
+        },
+        -- [7] =
+        {
+            HEADER = {lsn = 136, type = 'INSERT', timestamp = 1551987542.8702,
+                      replica_id = 1},
+            BODY = {space_id = 515, tuple = {4}},
+        },
+        -- [8] =
+        {
+            HEADER = {lsn = 137, type = 'INSERT', timestamp = 1551987542.8702,
+                      replica_id = 1},
+            BODY = {space_id = 515, tuple = {5}},
+        },
+        -- [9] =
+        {
+            HEADER = {lsn = 100, type = 'INSERT', timestamp = 1551987542.8702,
+                      replica_id = 2},
+            BODY = {space_id = 515, tuple = {6}},
+        },
+        -- [10] =
+        {
+            HEADER = {lsn = 110, type = 'INSERT', timestamp = 1551987542.8702,
+                      replica_id = 3},
+            BODY = {space_id = 515, tuple = {7}},
+        },
+        -- [11] =
+        {
+            HEADER = {lsn = 138, type = 'INSERT', timestamp = 1551987542.8702,
+                      replica_id = 1},
+            BODY = {space_id = 515, tuple = {8}},
+        },
+    }
+
+    local default_opts = {
+        from = 0,
+        to = -1ULL,
+        ['show-system'] = false,
+    }
+
+    local x = xlog_data -- alias
+    local cases = {
+        {
+            'w/o args',
+            opts = default_opts,
+            exp_result = x,
+        },
+        {
+            'from and to',
+            opts = merge(default_opts, {from = 131, to = 132}),
+            exp_result = {x[2]},
+        },
+        {
+            'space id',
+            opts = merge(default_opts, {space = {516}}),
+            exp_result = {x[4]},
+        },
+        {
+            'space ids',
+            opts = merge(default_opts, {space = {516, 517}}),
+            exp_result = {x[4], x[5]},
+        },
+        {
+            'replica id',
+            opts = merge(default_opts, {replica = {1}}),
+            exp_result = {x[7], x[8], x[11]},
+        },
+        {
+            'replica ids',
+            opts = merge(default_opts, {replica = {1, 2}}),
+            exp_result = {x[7], x[8], x[9], x[11]},
+        },
+        {
+            'to w/o replica id',
+            opts = merge(default_opts, {to = 120}),
+            exp_result = {},
+        },
+        {
+            'to and replica id',
+            opts = merge(default_opts, {to = 137, replica = {1}}),
+            exp_result = {x[7]},
+        },
+        {
+            'to and replica ids',
+            opts = merge(default_opts, {to = 137, replica = {1, 2}}),
+            exp_result = {x[7]},
+        },
+    }
+    test:plan(#cases)
+
+    rawset(_G, 'TARANTOOLCTL_UNIT_TEST', true)
+    local tarantoolctl = dofile(TARANTOOLCTL_PATH)
+
+    -- Like xlog.pairs().
+    local function gen(param, lsn)
+        local row = param.data[param.idx]
+        if row == nil then
+            return
+        end
+        param.idx = param.idx + 1
+        return row.HEADER.lsn, row
+    end
+
+    local function xlog_data_pairs(data)
+        return gen, {data = data, idx = 1}, 0
+    end
+
+    for _, case in ipairs(cases) do
+        local gen, param, state = xlog_data_pairs(xlog_data)
+        local res = {}
+        tarantoolctl.internal.filter_xlog(gen, param, state, case.opts,
+            function(record)
+                table.insert(res, record)
+            end
+        )
+        test:is_deeply(res, case.exp_result, case[1])
+    end
+end)
 
 os.exit(test:check() == true and 0 or -1)
