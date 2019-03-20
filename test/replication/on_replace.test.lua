@@ -44,7 +44,7 @@ box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')
 
 
--- gh-2682 on_replace on slave server with data change
+-- gh-2798 on_replace on slave server with non-local data change should fail
 
 SERVERS = { 'on_replace1', 'on_replace2' }
 test_run:create_cluster(SERVERS, "replication", {args="0.2"})
@@ -60,19 +60,33 @@ _ = s2:create_index('pk')
 test_run:cmd('switch on_replace2')
 fiber = require'fiber'
 while box.space.s2 == nil do fiber.sleep(0.00001) end
-_ = box.space.s1:on_replace(function (old, new) box.space.s2:replace(new) end)
+tg = box.space.s1:on_replace(function (old, new) box.space.s2:replace(new) end)
 
 test_run:cmd('switch on_replace1')
 box.space.s1:replace({1, 2, 3, 4})
-while #(box.space.s2:select()) == 0 do fiber.sleep(0.00001) end
+while (box.info.replication[3 - box.info.id].downstream.status ~= 'stopped') do fiber.sleep(0.00001) end
 
 test_run:cmd('switch on_replace2')
+while (box.info.replication[3 - box.info.id].upstream.status ~= 'stopped') do fiber.sleep(0.00001) end
+box.info.replication[3 - box.info.id].upstream.message
 box.space.s1:select()
 box.space.s2:select()
 
 test_run:cmd('switch on_replace1')
 box.space.s1:select()
 box.space.s2:select()
+
+-- gh-2798 on_replace on slave server with local data change is allowed
+test_run:cmd('switch on_replace2')
+s3 = box.schema.space.create('s3', {is_local = true})
+_ = s3:create_index('pk')
+tg = box.space.s1:on_replace(function (old, new) box.space.s3:replace(new) end, tg)
+
+replication = box.cfg.replication
+box.cfg{replication = {}}
+box.cfg{replication = replication}
+
+s3:select()
 
 _ = test_run:cmd('switch default')
 test_run:drop_cluster(SERVERS)

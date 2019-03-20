@@ -549,11 +549,11 @@ applier_read_tx(struct applier *applier, struct stailq *rows)
 static int
 applier_apply_tx(struct stailq *rows)
 {
-	int res = 0;
 	/**
 	 * Explicitly begin the transaction so that we can
-	 * control fiber->gc in ase of apply conflict and safely
-	 * allocate IPROTO_NOP on gc.
+	 * control fiber->gc life cycle and, in case of apply
+	 * conflict safely access failed xrow object and allocate
+	 * IPROTO_NOP on gc.
 	 */
 	struct txn *txn = txn_begin(false);
 	struct applier_tx_row *item;
@@ -561,7 +561,7 @@ applier_apply_tx(struct stailq *rows)
 		diag_raise();
 	stailq_foreach_entry(item, rows, next) {
 		struct xrow_header *row = &item->row;
-		res = apply_row(row);
+		int res = apply_row(row);
 		if (res != 0) {
 			struct error *e = diag_last_error(diag_get());
 			/*
@@ -581,13 +581,29 @@ applier_apply_tx(struct stailq *rows)
 			}
 		}
 		if (res != 0)
-			break;
+			goto rollback;
 	}
-	if (res == 0)
-		res = txn_commit(txn);
-	else
-		txn_rollback();
-	return res;
+	/*
+	 * We are going to commit so it's a high time to check if
+	 * the current transaction has non-local effects.
+	 */
+	if (txn_is_distributed(txn)) {
+		/*
+		 * A transaction mixes remote and local rows.
+		 * Local rows must be replicated back, which
+		 * doesn't make sense since the master likely has
+		 * new changes which local rows may overwrite.
+		 * Raise an error.
+		 */
+		diag_set(ClientError, ER_UNSUPPORTED,
+			 "Replication", "distributed transactions");
+		goto rollback;
+	}
+	return txn_commit(txn);
+
+rollback:
+	txn_rollback();
+	return -1;
 }
 
 /**

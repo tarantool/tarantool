@@ -217,6 +217,21 @@ fail:
 	return NULL;
 }
 
+bool
+txn_is_distributed(struct txn *txn)
+{
+	assert(txn == in_txn());
+	if (txn->n_local_rows == 0 || txn->n_remote_rows == 0)
+		return false;
+	struct txn_stmt *stmt;
+	/* Search for new non local group rows. */
+	stailq_foreach_entry(stmt, &txn->stmts, next)
+		if (stmt->row->replica_id == 0 &&
+		    stmt->space->def->opts.group_id != GROUP_LOCAL)
+			return true;
+	return false;
+}
+
 /**
  * End a statement. In autocommit mode, end
  * the current transaction as well.

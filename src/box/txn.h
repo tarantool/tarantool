@@ -292,6 +292,16 @@ txn_commit_ro_stmt(struct txn *txn)
 }
 
 /**
+ * Check whether a transaction which is used to apply
+ * remote master rows generated some local changes.
+ * Such transaction must be aborted, since we wouldn't
+ * be able to *consistently* apply the local changes
+ * to the remote master.
+ */
+bool
+txn_is_distributed(struct txn *txn);
+
+/**
  * End a statement. In autocommit mode, end
  * the current transaction as well.
  *
