@@ -214,11 +214,15 @@ lbox_session_su(struct lua_State *L)
 static int
 lbox_session_exists(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
+	if (lua_gettop(L) > 1)
 		luaL_error(L, "session.exists(sid): bad arguments");
 
-	uint64_t sid = luaL_checkint64(L, -1);
-	lua_pushboolean(L, session_find(sid) != NULL);
+	struct session *session;
+	if (lua_gettop(L) == 1)
+		session = session_find(luaL_checkint64(L, -1));
+	else
+		session = current_session();
+	lua_pushboolean(L, session != NULL);
 	return 1;
 }
 
@@ -228,11 +232,14 @@ lbox_session_exists(struct lua_State *L)
 static int
 lbox_session_fd(struct lua_State *L)
 {
-	if (lua_gettop(L) != 1)
+	if (lua_gettop(L) > 1)
 		luaL_error(L, "session.fd(sid): bad arguments");
 
-	uint64_t sid = luaL_checkint64(L, -1);
-	struct session *session = session_find(sid);
+	struct session *session;
+	if (lua_gettop(L) == 1)
+		session = session_find(luaL_checkint64(L, -1));
+	else
+		session = current_session();
 	if (session == NULL)
 		luaL_error(L, "session.fd(): session does not exist");
 	lua_pushinteger(L, session_fd(session));

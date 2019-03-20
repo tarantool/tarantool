@@ -15,15 +15,14 @@ session = box.session
 space = box.schema.space.create('tweedledum')
 index = space:create_index('primary', { type = 'hash' })
 
-test:plan(55)
+test:plan(56)
 
 ---
 --- Check that Tarantool creates ADMIN session for #! script
 ---
 test:ok(session.exists(session.id()), "session is created")
 test:isnil(session.peer(session.id()), "session.peer")
-local ok, err = pcall(session.exists)
-test:is(err, "session.exists(sid): bad arguments", "exists bad args #1")
+test:ok(session.exists(), "session.exists")
 ok, err = pcall(session.exists, 1, 2, 3)
 test:is(err, "session.exists(sid): bad arguments", "exists bad args #2")
 test:ok(not session.exists(1234567890), "session doesn't exist")
@@ -169,6 +168,7 @@ conn = net.box.connect(uri)
 test:ok(conn:eval("return box.session.exists(box.session.id())"), "remote session exist check")
 test:isnt(conn:eval("return box.session.peer(box.session.id())"), nil, "remote session peer check")
 test:ok(conn:eval("return box.session.peer() == box.session.peer(box.session.id())"), "remote session peer check")
+test:ok(conn:eval("return box.session.fd() == box.session.fd(box.session.id())"), "remote session fd check")
 
 -- gh-2994 session uid vs session effective uid
 test:is(session.euid(), 1, "session.uid")
