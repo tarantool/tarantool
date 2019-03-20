@@ -107,6 +107,12 @@ struct memtx_tree_index {
 
 /* {{{ Utilities. *************************************************/
 
+static inline struct key_def *
+memtx_tree_cmp_def(struct memtx_tree *tree)
+{
+	return tree->arg;
+}
+
 static int
 memtx_tree_qcompare(const void* a, const void *b, void *c)
 {
@@ -369,23 +375,6 @@ tree_iterator_start(struct iterator *iterator, struct tuple **ret)
 
 /* {{{ MemtxTree  **********************************************************/
 
-/**
- * Return the key def to use for comparing tuples stored
- * in the given tree index.
- *
- * We use extended key def for non-unique and nullable
- * indexes. Unique but nullable index can store multiple
- * NULLs. To correctly compare these NULLs extended key
- * def must be used. For details @sa tuple_compare.cc.
- */
-static struct key_def *
-memtx_tree_index_cmp_def(struct memtx_tree_index *index)
-{
-	struct index_def *def = index->base.def;
-	return def->opts.is_unique && !def->key_def->is_nullable ?
-		def->key_def : def->cmp_def;
-}
-
 static void
 memtx_tree_index_free(struct memtx_tree_index *index)
 {
@@ -466,14 +455,22 @@ static void
 memtx_tree_index_update_def(struct index *base)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
-	index->tree.arg = memtx_tree_index_cmp_def(index);
+	struct index_def *def = base->def;
+	/*
+	 * We use extended key def for non-unique and nullable
+	 * indexes. Unique but nullable index can store multiple
+	 * NULLs. To correctly compare these NULLs extended key
+	 * def must be used. For details @sa tuple_compare.cc.
+	 */
+	index->tree.arg = def->opts.is_unique && !def->key_def->is_nullable ?
+						def->key_def : def->cmp_def;
 }
 
 static bool
 memtx_tree_index_depends_on_pk(struct index *base)
 {
 	struct index_def *def = base->def;
-	/* See comment to memtx_tree_index_cmp_def(). */
+	/* See comment to memtx_tree_index_update_def(). */
 	return !def->opts.is_unique || def->key_def->is_nullable;
 }
 
@@ -678,7 +675,7 @@ static void
 memtx_tree_index_end_build(struct index *base)
 {
 	struct memtx_tree_index *index = (struct memtx_tree_index *)base;
-	struct key_def *cmp_def = memtx_tree_index_cmp_def(index);
+	struct key_def *cmp_def = memtx_tree_cmp_def(&index->tree);
 	qsort_arg(index->build_array, index->build_array_size,
 		  sizeof(index->build_array[0]), memtx_tree_qcompare, cmp_def);
 	memtx_tree_build(&index->tree, index->build_array,
@@ -792,7 +789,11 @@ memtx_tree_index_new(struct memtx_engine *memtx, struct index_def *def)
 		return NULL;
 	}
 
-	struct key_def *cmp_def = memtx_tree_index_cmp_def(index);
+	/* See comment to memtx_tree_index_update_def(). */
+	struct key_def *cmp_def;
+	cmp_def = def->opts.is_unique && !def->key_def->is_nullable ?
+			index->base.def->key_def : index->base.def->cmp_def;
+
 	memtx_tree_create(&index->tree, cmp_def, memtx_index_extent_alloc,
 			  memtx_index_extent_free, memtx);
 	return &index->base;
