@@ -33,6 +33,7 @@
 #include "swim/swim_io.h"
 #include "fiber.h"
 #include <errno.h>
+#include <sys/socket.h>
 
 enum {
 	/**

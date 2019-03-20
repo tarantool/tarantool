@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  */
 #include "trivia/util.h"
+#include <netinet/in.h>
 #include <arpa/inet.h>
 
 /** Transport implementation. */
