@@ -510,7 +510,7 @@ lbox_space_frommap(struct lua_State *L)
 
 	lua_replace(L, 1);
 	lua_settop(L, 1);
-	return lbox_tuple_new(L);
+	return luaT_tuple_new(L, space->format);
 usage_error:
 	return luaL_error(L, "Usage: space:frommap(map, opts)");
 }

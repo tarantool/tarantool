@@ -354,9 +354,9 @@ box.tuple.bsize == t.bsize
 --
 format = {}
 format[1] = {name = 'aaa', type = 'unsigned'}
-format[2] = {name = 'bbb', type = 'unsigned'}
-format[3] = {name = 'ccc', type = 'unsigned'}
-format[4] = {name = 'ddd', type = 'unsigned'}
+format[2] = {name = 'bbb', type = 'unsigned', is_nullable = true}
+format[3] = {name = 'ccc', type = 'unsigned', is_nullable = true}
+format[4] = {name = 'ddd', type = 'unsigned', is_nullable = true}
 s = box.schema.create_space('test', {format = format})
 s:frommap({ddd = 1, aaa = 2, ccc = 3, bbb = 4})
 s:frommap({ddd = 1, aaa = 2, bbb = 3})
@@ -409,4 +409,10 @@ s2:format({{name="a", type="str"}, {name="b", type="str", is_nullable=true},
            {name="k", type="str", is_nullable=true}});
 test_run:cmd("setopt delimiter ''");
 s2:frommap({a="1", k="11"})
+
+--
+-- gh-4045: space:frommap():tomap() conversion fail
+--
+s2:frommap({a="1", k="11"}):tomap({names_only = true})
+
 s2:drop()
