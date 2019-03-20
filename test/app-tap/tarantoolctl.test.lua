@@ -590,7 +590,7 @@ test:test('filter_xlog', function(test)
         {
             'to w/o replica id',
             opts = merge(default_opts, {to = 120}),
-            exp_result = {},
+            exp_result = {x[9], x[10]},
         },
         {
             'to and replica id',
@@ -600,7 +600,7 @@ test:test('filter_xlog', function(test)
         {
             'to and replica ids',
             opts = merge(default_opts, {to = 137, replica = {1, 2}}),
-            exp_result = {x[7]},
+            exp_result = {x[7], x[9]},
         },
     }
     test:plan(#cases)
