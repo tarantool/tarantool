@@ -84,7 +84,7 @@ static char *pid_file = NULL;
 static char **main_argv;
 static int main_argc;
 /** Signals handled after start as part of the event loop. */
-static ev_signal ev_sigs[6];
+static ev_signal ev_sigs[5];
 static const int ev_sig_count = sizeof(ev_sigs)/sizeof(*ev_sigs);
 
 static double start_time;
@@ -334,9 +334,8 @@ signal_init(void)
 	ev_signal_init(&ev_sigs[0], sig_checkpoint, SIGUSR1);
 	ev_signal_init(&ev_sigs[1], signal_cb, SIGINT);
 	ev_signal_init(&ev_sigs[2], signal_cb, SIGTERM);
-	ev_signal_init(&ev_sigs[3], signal_cb, SIGHUP);
-	ev_signal_init(&ev_sigs[4], signal_sigwinch_cb, SIGWINCH);
-	ev_signal_init(&ev_sigs[5], say_logrotate, SIGHUP);
+	ev_signal_init(&ev_sigs[3], signal_sigwinch_cb, SIGWINCH);
+	ev_signal_init(&ev_sigs[4], say_logrotate, SIGHUP);
 	for (int i = 0; i < ev_sig_count; i++)
 		ev_signal_start(loop(), &ev_sigs[i]);
 
