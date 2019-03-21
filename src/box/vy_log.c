@@ -2101,9 +2101,10 @@ vy_recovery_build_index_id_hash(struct vy_recovery *recovery)
 		/*
 		 * If there's no LSM tree for these space_id/index_id
 		 * or it was dropped, simply replace it with the latest
-		 * LSM tree version.
+		 * committed LSM tree version.
 		 */
-		if (hashed_lsm == NULL || hashed_lsm->drop_lsn >= 0) {
+		if (hashed_lsm == NULL ||
+		    (hashed_lsm->drop_lsn >= 0 && lsm->create_lsn >= 0)) {
 			struct mh_i64ptr_node_t node;
 			node.key = vy_recovery_index_id_hash(space_id, index_id);
 			node.val = lsm;
