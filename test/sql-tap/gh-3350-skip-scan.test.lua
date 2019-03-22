@@ -32,7 +32,7 @@ test:do_execsql_test(
             (SELECT int_to_char(0), 'xyz', 'zyx', '*', 0, 0 UNION ALL
             SELECT int_to_char(f+1), b, c, d, (e+1) % 2, f+1 FROM data WHERE f<1024)
             INSERT INTO t1 SELECT a, b, c, d, e, f FROM data;
-            ANALYZE;
+            -- ANALYZE;
             SELECT COUNT(*) FROM t1 WHERE a < 'aaad';
             DROP TABLE t1;
         ]], {
@@ -49,7 +49,7 @@ test:do_execsql_test(
             (SELECT int_to_char(0), 'xyz', 'zyx', '*', 0, 0 UNION ALL
             SELECT int_to_char(f+1), b, c, d, (e+1) % 2, f+1 FROM data WHERE f<1024)
             INSERT INTO t2 SELECT a, b, c, d, e, f FROM data;
-            ANALYZE;
+            -- ANALYZE;
             SELECT COUNT(*) FROM t2 WHERE f < 500;
             DROP TABLE t2;
         ]], {
@@ -68,7 +68,7 @@ test:do_execsql_test(
             (SELECT int_to_char(0), 'xyz', 'zyx', '*', 0, 0 UNION ALL
             SELECT int_to_char(f+1), b, c, d, (e+1) % 2, f+1 FROM data WHERE f<1024)
             INSERT INTO t3 SELECT a, b, c, d, e, f FROM data;
-            ANALYZE;
+            -- ANALYZE;
             SELECT COUNT(*) FROM t3 WHERE f < 500;
             DROP INDEX i31 on t3;
             DROP TABLE t3;
@@ -93,11 +93,11 @@ test:do_execsql_test(
             INSERT INTO t1 VALUES(5, 'def',567,8,9);
             INSERT INTO t1 VALUES(6, 'def',345,9,10);
             INSERT INTO t1 VALUES(7, 'bcd',100,6,11);
-            ANALYZE;
+            -- ANALYZE;
             DELETE FROM "_sql_stat1";
             DELETE FROM "_sql_stat4";
             INSERT INTO "_sql_stat1" VALUES('T1','T1ABC','10000 5000 2000 10');
-            ANALYZE t2;
+            -- ANALYZE t2;
             SELECT a,b,c,d FROM t1 WHERE b=345;
         ]], {
             "abc", 345, 7, 8, "def", 345, 9, 10

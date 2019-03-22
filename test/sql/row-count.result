@@ -179,9 +179,7 @@ box.sql.execute("SELECT ROW_COUNT();")
 ---
 - - [0]
 ...
-box.sql.execute("ANALYZE;")
----
-...
+-- box.sql.execute("ANALYZE;")
 box.sql.execute("SELECT ROW_COUNT();")
 ---
 - - [0]

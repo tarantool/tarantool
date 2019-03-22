@@ -2139,8 +2139,6 @@ box_cfg_xc(void)
 	/* Follow replica */
 	replicaset_follow();
 
-	sql_load_schema();
-
 	fiber_gc();
 	is_box_configured = true;
 
