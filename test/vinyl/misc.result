@@ -286,6 +286,8 @@ test_run:cmd('cleanup server test')
 -- gh-4016: local rw transactions are aborted when the instance
 -- switches to read-only mode.
 --
+-- gh-4070: an aborted transaction must fail any DML/DQL request.
+--
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
@@ -308,6 +310,10 @@ _ = fiber.create(function()
     box.begin()
     s:replace{1, 2}
     ch1:get()
+    local status, err = pcall(s.replace, s, {3, 4})
+    ch1:put(status or err)
+    local status, err = pcall(s.select, s)
+    ch1:put(status or err)
     local status, err = pcall(box.commit)
     ch1:put(status or err)
 end);
@@ -321,6 +327,8 @@ _ = fiber.create(function()
     box.begin()
     s:select()
     ch2:get()
+    local status, err = pcall(s.select, s)
+    ch2:put(status or err)
     local status, err = pcall(box.commit)
     ch2:put(status or err)
 end);
@@ -345,7 +353,19 @@ ch2:put(true)
 ...
 ch1:get()
 ---
+- Can't modify data because this instance is in read-only mode.
+...
+ch1:get()
+---
 - Transaction has been aborted by conflict
+...
+ch1:get()
+---
+- Transaction has been aborted by conflict
+...
+ch2:get()
+---
+- true
 ...
 ch2:get()
 ---

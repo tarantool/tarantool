@@ -278,3 +278,23 @@ errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0)
 c:get()
 
 s:drop()
+
+--
+-- gh-4070: a transaction aborted by DDL must fail any DML/DQL request.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+s:replace{1, 1}
+
+box.begin()
+s:replace{1, 2}
+
+ch = fiber.channel(1)
+fiber = fiber.create(function() s:create_index('sk', {parts = {2, 'unsigned'}}) ch:put(true) end)
+ch:get()
+
+s:get(1)
+s:replace{1, 3}
+box.commit()
+
+s:drop()
