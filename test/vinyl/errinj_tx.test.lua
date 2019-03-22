@@ -193,6 +193,34 @@ last_read
 
 space:drop()
 
+--
+-- Check that dependent transaction is aborted on WAL write.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+s:replace{10}
+
+-- Insert a tuple into the memory level and stall on WAL write.
+ch = fiber.channel(1)
+errinj.set('ERRINJ_WAL_DELAY', true)
+_ = fiber.create(function() pcall(s.replace, s, {1}) ch:put(true) end)
+
+-- Read the tuple from another transaction.
+itr = create_iterator(s)
+itr.next()
+
+-- Resume the first transaction and let it fail on WAL write.
+errinj.set('ERRINJ_WAL_WRITE', true)
+errinj.set('ERRINJ_WAL_DELAY', false)
+ch:get()
+errinj.set('ERRINJ_WAL_WRITE', false)
+
+-- Must fail.
+itr.next()
+
+itr = nil
+s:drop()
+
 -- Collect all iterators to make sure no read views are left behind,
 -- as they might disrupt the following test run.
 collectgarbage()

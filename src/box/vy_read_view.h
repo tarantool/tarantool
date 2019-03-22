@@ -63,12 +63,6 @@ struct vy_read_view {
 	 * count it as it is missing from read_views list.
 	 */
 	int refs;
-	/**
-	 * Is set to true when the read view which includes
-	 * a prepared but not committed transaction, is
-	 * compromised by a cascading rollback.
-	 */
-	bool is_aborted;
 };
 
 #if defined(__cplusplus)
