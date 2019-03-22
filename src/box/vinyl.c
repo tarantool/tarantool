@@ -3683,7 +3683,7 @@ vinyl_iterator_check_tx(struct vinyl_iterator *it)
 		diag_set(ClientError, ER_CURSOR_NO_TRANSACTION);
 		return -1;
 	}
-	if (it->tx->state == VINYL_TX_ABORT || it->tx->read_view->is_aborted) {
+	if (it->tx->state == VINYL_TX_ABORT) {
 		/* Transaction read view was aborted. */
 		diag_set(ClientError, ER_READ_VIEW_ABORTED);
 		return -1;
