@@ -635,28 +635,34 @@ vy_cache_iterator_skip_to_read_view(struct vy_cache_iterator *itr, bool *stop)
 
 /**
  * Position the iterator to the first cache entry satisfying
- * the search criteria for a given key and direction.
+ * the iterator search criteria and following the given key
+ * (pass NULL to start iteration).
  */
 static void
 vy_cache_iterator_seek(struct vy_cache_iterator *itr,
-		       enum iterator_type iterator_type,
-		       const struct tuple *key,
-		       struct vy_cache_entry **entry)
+		       const struct tuple *last_key,
+		       struct vy_cache_entry **ret)
 {
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 
-	*entry = NULL;
+	*ret = NULL;
 	itr->cache->stat.lookup++;
 
+	const struct tuple *key = itr->key;
+	enum iterator_type iterator_type = itr->iterator_type;
+	if (last_key != NULL) {
+		key = last_key;
+		iterator_type = iterator_direction(itr->iterator_type) > 0 ?
+				ITER_GT : ITER_LT;
+	}
+
+	bool exact;
 	if (!vy_stmt_is_empty_key(key)) {
-		bool exact;
 		itr->curr_pos = iterator_type == ITER_EQ ||
 				iterator_type == ITER_GE ||
 				iterator_type == ITER_LT ?
 				vy_cache_tree_lower_bound(tree, key, &exact) :
 				vy_cache_tree_upper_bound(tree, key, &exact);
-		if (iterator_type == ITER_EQ && !exact)
-			return;
 	} else if (iterator_type == ITER_LE) {
 		itr->curr_pos = vy_cache_tree_invalid_iterator();
 	} else {
@@ -669,7 +675,16 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr,
 	if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
 		return;
 
-	*entry = *vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+	struct vy_cache_entry *entry;
+	entry = *vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+
+	if (itr->iterator_type == ITER_EQ &&
+	    ((last_key == NULL && !exact) ||
+	     (last_key != NULL && vy_stmt_compare(itr->key, entry->stmt,
+						  itr->cache->cmp_def) != 0)))
+		return;
+
+	*ret = entry;
 }
 
 NODISCARD int
@@ -684,8 +699,7 @@ vy_cache_iterator_next(struct vy_cache_iterator *itr,
 		itr->search_started = true;
 		itr->version = itr->cache->version;
 		struct vy_cache_entry *entry;
-		vy_cache_iterator_seek(itr, itr->iterator_type,
-				       itr->key, &entry);
+		vy_cache_iterator_seek(itr, NULL, &entry);
 		if (entry == NULL)
 			return 0;
 		itr->curr_stmt = entry->stmt;
@@ -735,22 +749,8 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 		tuple_unref(itr->curr_stmt);
 	itr->curr_stmt = NULL;
 
-	const struct tuple *key = itr->key;
-	enum iterator_type iterator_type = itr->iterator_type;
-	if (last_stmt != NULL) {
-		key = last_stmt;
-		iterator_type = iterator_direction(iterator_type) > 0 ?
-				ITER_GT : ITER_LT;
-	}
-
 	struct vy_cache_entry *entry;
-	vy_cache_iterator_seek(itr, iterator_type, key, &entry);
-
-	if (itr->iterator_type == ITER_EQ && last_stmt != NULL &&
-	    entry != NULL && vy_stmt_compare(itr->key, entry->stmt,
-					     itr->cache->cmp_def) != 0)
-		entry = NULL;
-
+	vy_cache_iterator_seek(itr, last_stmt, &entry);
 	if (entry != NULL) {
 		*stop = vy_cache_iterator_is_stop(itr, entry);
 		itr->curr_stmt = entry->stmt;
@@ -771,9 +771,6 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 			  const struct tuple *last_stmt,
 			  struct vy_history *history, bool *stop)
 {
-	struct key_def *def = itr->cache->cmp_def;
-	int dir = iterator_direction(itr->iterator_type);
-
 	if (!itr->search_started || itr->version == itr->cache->version)
 		return 0;
 
@@ -781,13 +778,6 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 	struct tuple *prev_stmt = itr->curr_stmt;
 	if (prev_stmt != NULL)
 		tuple_unref(prev_stmt);
-
-	const struct tuple *key = itr->key;
-	enum iterator_type iterator_type = itr->iterator_type;
-	if (last_stmt != NULL) {
-		key = last_stmt;
-		iterator_type = dir > 0 ? ITER_GT : ITER_LT;
-	}
 
 	if ((prev_stmt == NULL && itr->iterator_type == ITER_EQ) ||
 	    (prev_stmt != NULL &&
@@ -798,13 +788,8 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 		 * search.
 		 */
 		struct vy_cache_entry *entry;
-		vy_cache_iterator_seek(itr, iterator_type, key, &entry);
-
+		vy_cache_iterator_seek(itr, last_stmt, &entry);
 		itr->curr_stmt = NULL;
-		if (entry != NULL && itr->iterator_type == ITER_EQ &&
-		    vy_stmt_compare(itr->key, entry->stmt, def) != 0)
-			entry = NULL;
-
 		if (entry != NULL) {
 			*stop = vy_cache_iterator_is_stop(itr, entry);
 			itr->curr_stmt = entry->stmt;
@@ -817,11 +802,18 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 		 * and the current statement. Reposition to the
 		 * statement closiest to last_stmt.
 		 */
+		bool key_belongs = false;
+		const struct tuple *key = last_stmt;
+		if (key == NULL) {
+			key = itr->key;
+			key_belongs = (itr->iterator_type == ITER_EQ ||
+				       itr->iterator_type == ITER_GE ||
+				       itr->iterator_type == ITER_LE);
+		}
+		int dir = iterator_direction(itr->iterator_type);
+		struct key_def *def = itr->cache->cmp_def;
 		struct vy_cache_tree *tree = &itr->cache->cache_tree;
 		struct vy_cache_tree_iterator pos = itr->curr_pos;
-		bool key_belongs = (iterator_type == ITER_EQ ||
-				    iterator_type == ITER_GE ||
-				    iterator_type == ITER_LE);
 		if (prev_stmt == NULL)
 			pos = vy_cache_tree_invalid_iterator();
 		while (true) {
