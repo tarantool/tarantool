@@ -109,8 +109,8 @@ box.sql.execute("INSERT INTO m VALUES (0, '0');")
 box.sql.execute("INSERT INTO n VALUES (0, '',null);")
 box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 
--- ANALYZE operates with _sql_stat{1,4} tables should work
-box.sql.execute("ANALYZE m;")
+-- ANALYZE banned in gh-4069
+-- box.sql.execute("ANALYZE m;")
 box.sql.execute("DROP TABLE m;")
 box.sql.execute("DROP TABLE n;")
 
@@ -125,8 +125,8 @@ box.sql.execute("INSERT INTO m VALUES (0, '0');")
 box.sql.execute("INSERT INTO n VALUES (0, '',null);")
 box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 
--- ANALYZE operates with _sql_stat{1,4} tables should work
-box.sql.execute("ANALYZE n;")
+-- ANALYZE banned in gh-4069
+-- box.sql.execute("ANALYZE n;")
 box.sql.execute("DROP TABLE m;")
 box.sql.execute("DROP TABLE n;")
 

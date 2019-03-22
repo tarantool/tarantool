@@ -49,6 +49,7 @@ extras="            \
     SELECT_COLUMN   \
     ASTERISK        \
     SPAN            \
+    ANALYZE         \
     SPACE           \
     ILLEGAL         \
 "

@@ -101,7 +101,7 @@ static Keyword aKeywordTable[] = {
   { "AFTER",                  "TK_AFTER",       TRIGGER,          false },
   { "ALL",                    "TK_ALL",         ALWAYS,           true  },
   { "ALTER",                  "TK_ALTER",       ALTER,            true  },
-  { "ANALYZE",                "TK_ANALYZE",     ALWAYS,           true  },
+  { "ANALYZE",                "TK_STANDARD",    RESERVED,         true  },
   { "AND",                    "TK_AND",         ALWAYS,           true  },
   { "AS",                     "TK_AS",          ALWAYS,           true  },
   { "ASC",                    "TK_ASC",         ALWAYS,           true  },

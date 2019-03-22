@@ -4492,7 +4492,6 @@ char* rename_trigger(sql *, char const *, char const *, bool *);
  */
 struct coll *
 sql_get_coll_seq(Parse *parser, const char *name, uint32_t *coll_id);
-void sqlAnalyze(Parse *, Token *);
 
 /**
  * This function returns average size of tuple in given index.

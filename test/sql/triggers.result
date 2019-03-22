@@ -275,10 +275,8 @@ box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
 - error: A multi-statement transaction can not use multiple storage engines
 ...
--- ANALYZE operates with _sql_stat{1,4} tables should work
-box.sql.execute("ANALYZE m;")
----
-...
+-- ANALYZE banned in gh-4069
+-- box.sql.execute("ANALYZE m;")
 box.sql.execute("DROP TABLE m;")
 ---
 ...
@@ -311,10 +309,8 @@ box.sql.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
 - error: A multi-statement transaction can not use multiple storage engines
 ...
--- ANALYZE operates with _sql_stat{1,4} tables should work
-box.sql.execute("ANALYZE n;")
----
-...
+-- ANALYZE banned in gh-4069
+-- box.sql.execute("ANALYZE n;")
 box.sql.execute("DROP TABLE m;")
 ---
 ...

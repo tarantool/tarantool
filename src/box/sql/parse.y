@@ -1447,10 +1447,6 @@ cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
   sql_drop_trigger(pParse,X,NOERR);
 }
 
-/////////////////////////////////// ANALYZE ///////////////////////////////////
-cmd ::= ANALYZE.                {sqlAnalyze(pParse, 0);}
-cmd ::= ANALYZE nm(X).          {sqlAnalyze(pParse, &X);}
-
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
 cmd ::= ALTER TABLE fullname(X) RENAME TO nm(Z). {
   sql_alter_table_rename(pParse,X,&Z);
