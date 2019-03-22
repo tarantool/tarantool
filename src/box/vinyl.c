@@ -2403,8 +2403,7 @@ vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 	struct vy_tx *tx = txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
-	stmt->engine_savepoint = vy_tx_begin_statement(tx);
-	return 0;
+	return vy_tx_begin_statement(tx, &stmt->engine_savepoint);
 }
 
 static void
@@ -3784,6 +3783,12 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 		return NULL;
 	}
 
+	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
+	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return NULL;
+	}
+
 	struct vinyl_iterator *it = mempool_alloc(&env->iterator_pool);
 	if (it == NULL) {
 	        diag_set(OutOfMemory, sizeof(struct vinyl_iterator),
@@ -3807,8 +3812,6 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	it->lsm = lsm;
 	vy_lsm_ref(lsm);
 
-	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
-	assert(tx == NULL || tx->state == VINYL_TX_READY);
 	if (tx != NULL) {
 		/*
 		 * Register a trigger that will abort this iterator
@@ -3840,6 +3843,11 @@ vinyl_index_get(struct index *index, const char *key,
 	struct vy_tx *tx = in_txn() ? in_txn()->engine_tx : NULL;
 	const struct vy_read_view **rv = (tx != NULL ? vy_tx_read_view(tx) :
 					  &env->xm->p_global_read_view);
+
+	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
 
 	if (vy_get_by_raw_key(lsm, tx, rv, key, part_count, ret) != 0)
 		return -1;

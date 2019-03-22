@@ -196,6 +196,8 @@ space:drop()
 --
 -- Check that dependent transaction is aborted on WAL write.
 --
+-- gh-4070: an aborted transaction must fail any DML/DQL request.
+--
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')
 s:replace{10}
@@ -209,6 +211,10 @@ _ = fiber.create(function() pcall(s.replace, s, {1}) ch:put(true) end)
 itr = create_iterator(s)
 itr.next()
 
+c = txn_proxy.new()
+c:begin()
+c('s:get(1)')
+
 -- Resume the first transaction and let it fail on WAL write.
 errinj.set('ERRINJ_WAL_WRITE', true)
 errinj.set('ERRINJ_WAL_DELAY', false)
@@ -217,6 +223,10 @@ errinj.set('ERRINJ_WAL_WRITE', false)
 
 -- Must fail.
 itr.next()
+c('s:get(1)')
+c('s:select()')
+c('s:replace{1}')
+c:commit()
 
 itr = nil
 s:drop()

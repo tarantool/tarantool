@@ -326,8 +326,8 @@ vy_tx_rollback(struct vy_tx *tx);
  * transaction state. The transaction can be rolled back
  * to a save point with vy_tx_rollback_statement().
  */
-void *
-vy_tx_begin_statement(struct vy_tx *tx);
+int
+vy_tx_begin_statement(struct vy_tx *tx, void **savepoint);
 
 /**
  * Rollback a transaction statement.
