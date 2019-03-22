@@ -119,6 +119,8 @@ test_run:cmd('cleanup server test')
 -- gh-4016: local rw transactions are aborted when the instance
 -- switches to read-only mode.
 --
+-- gh-4070: an aborted transaction must fail any DML/DQL request.
+--
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('pk')
 s:replace({1, 1})
@@ -129,6 +131,10 @@ _ = fiber.create(function()
     box.begin()
     s:replace{1, 2}
     ch1:get()
+    local status, err = pcall(s.replace, s, {3, 4})
+    ch1:put(status or err)
+    local status, err = pcall(s.select, s)
+    ch1:put(status or err)
     local status, err = pcall(box.commit)
     ch1:put(status or err)
 end);
@@ -138,6 +144,8 @@ _ = fiber.create(function()
     box.begin()
     s:select()
     ch2:get()
+    local status, err = pcall(s.select, s)
+    ch2:put(status or err)
     local status, err = pcall(box.commit)
     ch2:put(status or err)
 end);
@@ -148,6 +156,9 @@ box.cfg{read_only = true}
 ch1:put(true)
 ch2:put(true)
 ch1:get()
+ch1:get()
+ch1:get()
+ch2:get()
 ch2:get()
 -- Cleanup.
 box.cfg{read_only = false}

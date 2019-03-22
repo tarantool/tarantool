@@ -436,6 +436,8 @@ space:drop()
 --
 -- Check that dependent transaction is aborted on WAL write.
 --
+-- gh-4070: an aborted transaction must fail any DML/DQL request.
+--
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
@@ -465,6 +467,17 @@ itr.next()
 ---
 - [1]
 ...
+c = txn_proxy.new()
+---
+...
+c:begin()
+---
+- 
+...
+c('s:get(1)')
+---
+- - [1]
+...
 -- Resume the first transaction and let it fail on WAL write.
 errinj.set('ERRINJ_WAL_WRITE', true)
 ---
@@ -486,6 +499,22 @@ errinj.set('ERRINJ_WAL_WRITE', false)
 itr.next()
 ---
 - error: The read view is aborted
+...
+c('s:get(1)')
+---
+- - {'error': 'Transaction has been aborted by conflict'}
+...
+c('s:select()')
+---
+- - {'error': 'Transaction has been aborted by conflict'}
+...
+c('s:replace{1}')
+---
+- - {'error': 'Transaction has been aborted by conflict'}
+...
+c:commit()
+---
+- - {'error': 'Transaction has been aborted by conflict'}
 ...
 itr = nil
 ---

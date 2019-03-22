@@ -355,6 +355,15 @@ vy_tx_destroy(struct vy_tx *tx)
 	rlist_del_entry(tx, in_writers);
 }
 
+/** Mark a transaction as aborted and account it in stats. */
+static void
+vy_tx_abort(struct vy_tx *tx)
+{
+	assert(tx->state == VINYL_TX_READY);
+	tx->state = VINYL_TX_ABORT;
+	tx->xm->stat.conflict++;
+}
+
 /** Return true if the transaction is read-only. */
 static bool
 vy_tx_is_ro(struct vy_tx *tx)
@@ -414,7 +423,7 @@ vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 		/* Abort only active TXs */
 		if (abort->state != VINYL_TX_READY)
 			continue;
-		abort->state = VINYL_TX_ABORT;
+		vy_tx_abort(abort);
 	}
 }
 
@@ -634,13 +643,18 @@ vy_tx_prepare(struct vy_tx *tx)
 {
 	struct tx_manager *xm = tx->xm;
 
+	if (tx->state == VINYL_TX_ABORT) {
+		/* Conflict is already accounted - see vy_tx_abort(). */
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
+
+	assert(tx->state == VINYL_TX_READY);
 	if (vy_tx_is_ro(tx)) {
-		assert(tx->state == VINYL_TX_READY);
 		tx->state = VINYL_TX_COMMIT;
 		return 0;
 	}
-
-	if (vy_tx_is_in_read_view(tx) || tx->state == VINYL_TX_ABORT) {
+	if (vy_tx_is_in_read_view(tx)) {
 		xm->stat.conflict++;
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
@@ -854,18 +868,26 @@ vy_tx_rollback(struct vy_tx *tx)
 	mempool_free(&xm->tx_mempool, tx);
 }
 
-void *
-vy_tx_begin_statement(struct vy_tx *tx)
+int
+vy_tx_begin_statement(struct vy_tx *tx, void **savepoint)
 {
+	if (tx->state == VINYL_TX_ABORT) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
 	assert(tx->state == VINYL_TX_READY);
 	if (stailq_empty(&tx->log))
 		rlist_add_entry(&tx->xm->writers, tx, in_writers);
-	return stailq_last(&tx->log);
+	*savepoint = stailq_last(&tx->log);
+	return 0;
 }
 
 void
 vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 {
+	if (tx->state == VINYL_TX_ABORT)
+		return;
+
 	assert(tx->state == VINYL_TX_READY);
 	struct stailq_entry *last = svp;
 	struct stailq tail;
@@ -1093,7 +1115,7 @@ tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct vy_lsm *lsm)
 		if (tx->state == VINYL_TX_READY &&
 		    write_set_search_key(&tx->write_set, lsm,
 					 lsm->env->empty_key) != NULL)
-			tx->state = VINYL_TX_ABORT;
+			vy_tx_abort(tx);
 	}
 }
 
@@ -1104,7 +1126,7 @@ tx_manager_abort_writers_for_ro(struct tx_manager *xm)
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
 		/* Applier ignores ro flag. */
 		if (tx->state == VINYL_TX_READY && !tx->is_applier_session)
-			tx->state = VINYL_TX_ABORT;
+			vy_tx_abort(tx);
 	}
 }
 
