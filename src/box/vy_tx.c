@@ -97,7 +97,6 @@ vy_global_read_view_create(struct vy_read_view *rv, int64_t lsn)
 	 */
 	rv->vlsn = lsn;
 	rv->refs = 0;
-	rv->is_aborted = false;
 }
 
 struct tx_manager *
@@ -185,7 +184,6 @@ tx_manager_read_view(struct tx_manager *xm)
 			 "mempool", "read view");
 		return NULL;
 	}
-	rv->is_aborted = false;
 	if (xm->last_prepared_tx != NULL) {
 		rv->vlsn = MAX_LSN + xm->last_prepared_tx->psn;
 		xm->last_prepared_tx->read_view = rv;
@@ -834,10 +832,6 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 		if (v->mem != NULL)
 			vy_mem_unpin(v->mem);
 	}
-
-	/* Abort read views of dependent transactions. */
-	if (tx->read_view != &xm->global_read_view)
-		tx->read_view->is_aborted = true;
 
 	struct write_set_iterator it;
 	write_set_ifirst(&tx->write_set, &it);
