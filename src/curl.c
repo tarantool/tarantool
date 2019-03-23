@@ -220,7 +220,7 @@ curl_multi_sock_cb(CURL *easy, curl_socket_t fd, int what, void *envp,
 
 
 int
-curl_env_create(struct curl_env *env, long max_conns)
+curl_env_create(struct curl_env *env, long max_conns, long max_total_conns)
 {
 	memset(env, 0, sizeof(*env));
 	mempool_create(&env->sock_pool, &cord()->slabc,
@@ -243,6 +243,11 @@ curl_env_create(struct curl_env *env, long max_conns)
 	curl_multi_setopt(env->multi, CURLMOPT_SOCKETDATA, (void *) env);
 
 	curl_multi_setopt(env->multi, CURLMOPT_MAXCONNECTS, max_conns);
+#if LIBCURL_VERSION_NUM >= 0x071e00
+	curl_multi_setopt(env->multi, CURLMOPT_MAX_TOTAL_CONNECTIONS, max_total_conns);
+#else
+	(void) max_total_conns;
+#endif
 
 	return 0;
 

@@ -87,7 +87,7 @@ struct curl_request {
  * @retval -1 on error, check diag
  */
 int
-curl_env_create(struct curl_env *env, long max_conns);
+curl_env_create(struct curl_env *env, long max_conns, long max_total_conns);
 
 /**
  * Destroy HTTP client environment
