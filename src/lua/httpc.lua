@@ -41,7 +41,8 @@ local curl_mt
 --
 --  Parameters:
 --
---  max_connectionss -  Maximum number of entries in the connection cache */
+--  max_connections -  Maximum number of entries in the connection cache
+--  max_total_connections -  Maximum number of active connections
 --
 --  Returns:
 --  curl object or raise error()
@@ -51,9 +52,10 @@ local http_new = function(opts)
 
     opts = opts or {}
 
-    opts.max_connections = opts.max_connections or 5
+    opts.max_connections = opts.max_connections or -1
+    opts.max_total_connections = opts.max_total_connections or 0
 
-    local curl = driver.new(opts.max_connections)
+    local curl = driver.new(opts.max_connections, opts.max_total_connections)
     return setmetatable({ curl = curl, }, curl_mt )
 end
 

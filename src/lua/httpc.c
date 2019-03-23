@@ -373,7 +373,8 @@ luaT_httpc_new(lua_State *L)
 		return luaL_error(L, "lua_newuserdata failed: httpc_env");
 
 	long max_conns = luaL_checklong(L, 1);
-	if (httpc_env_create(ctx, max_conns) != 0)
+	long max_total_conns = luaL_checklong(L, 2);
+	if (httpc_env_create(ctx, max_conns, max_total_conns) != 0)
 		return luaT_error(L);
 
 	luaL_getmetatable(L, DRIVER_LUA_UDATA_NAME);
