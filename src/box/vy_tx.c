@@ -248,6 +248,30 @@ txv_delete(struct txv *v)
 	mempool_free(&xm->txv_mempool, v);
 }
 
+/**
+ * Account a read interval in transaction manager stats.
+ */
+static void
+vy_read_interval_acct(struct vy_read_interval *interval)
+{
+	struct tx_manager *xm = interval->tx->xm;
+	xm->read_set_size += tuple_size(interval->left);
+	if (interval->left != interval->right)
+		xm->read_set_size += tuple_size(interval->right);
+}
+
+/**
+ * Unaccount a read interval in transaction manager stats.
+ */
+static void
+vy_read_interval_unacct(struct vy_read_interval *interval)
+{
+	struct tx_manager *xm = interval->tx->xm;
+	xm->read_set_size -= tuple_size(interval->left);
+	if (interval->left != interval->right)
+		xm->read_set_size -= tuple_size(interval->right);
+}
+
 static struct vy_read_interval *
 vy_read_interval_new(struct vy_tx *tx, struct vy_lsm *lsm,
 		     struct tuple *left, bool left_belongs,
@@ -271,9 +295,7 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_lsm *lsm,
 	interval->right = right;
 	interval->right_belongs = right_belongs;
 	interval->subtree_last = NULL;
-	xm->read_set_size += tuple_size(left);
-	if (left != right)
-		xm->read_set_size += tuple_size(right);
+	vy_read_interval_acct(interval);
 	return interval;
 }
 
@@ -281,9 +303,7 @@ static void
 vy_read_interval_delete(struct vy_read_interval *interval)
 {
 	struct tx_manager *xm = interval->tx->xm;
-	xm->read_set_size -= tuple_size(interval->left);
-	if (interval->left != interval->right)
-		xm->read_set_size -= tuple_size(interval->right);
+	vy_read_interval_unacct(interval);
 	vy_lsm_unref(interval->lsm);
 	tuple_unref(interval->left);
 	tuple_unref(interval->right);
@@ -926,6 +946,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 	 * remove them from the transaction and LSM tree read sets.
 	 */
 	if (!stailq_empty(&merge)) {
+		vy_read_interval_unacct(new_interval);
 		interval = stailq_first_entry(&merge, struct vy_read_interval,
 					      in_merge);
 		if (vy_read_interval_cmpl(new_interval, interval) > 0) {
@@ -949,6 +970,7 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 			vy_lsm_read_set_remove(&lsm->read_set, interval);
 			vy_read_interval_delete(interval);
 		}
+		vy_read_interval_acct(new_interval);
 	}
 
 	vy_tx_read_set_insert(&tx->read_set, new_interval);

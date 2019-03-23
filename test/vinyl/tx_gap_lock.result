@@ -1416,6 +1416,33 @@ test_run:cmd("setopt delimiter ''");
 - true
 ...
 ----------------------------------------------------------------
+-- Check vinyl stats after all transactions have completed.
+-- Should be all zeros. See gh-4071.
+----------------------------------------------------------------
+stat = box.stat.vinyl()
+---
+...
+stat.memory.tx
+---
+- 0
+...
+stat.tx.statements
+---
+- 0
+...
+stat.tx.transactions
+---
+- 0
+...
+stat.tx.gap_locks
+---
+- 0
+...
+stat.tx.read_views
+---
+- 0
+...
+----------------------------------------------------------------
 c = nil
 ---
 ...
