@@ -81,13 +81,13 @@ curl_easy_header_cb(char *buffer, size_t size, size_t nitems, void *ctx)
 }
 
 int
-httpc_env_create(struct httpc_env *env, int max_conns)
+httpc_env_create(struct httpc_env *env, int max_conns, int max_total_conns)
 {
 	memset(env, 0, sizeof(*env));
 	mempool_create(&env->req_pool, &cord()->slabc,
 			sizeof(struct httpc_request));
 
-	return curl_env_create(&env->curl_env, max_conns);
+	return curl_env_create(&env->curl_env, max_conns, max_total_conns);
 }
 
 void
