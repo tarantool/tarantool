@@ -149,8 +149,6 @@ rm -rf %{buildroot}%{_datarootdir}/doc/tarantool/
 echo "self.skip = True" > ./test/app/socket.skipcond
 # https://github.com/tarantool/tarantool/issues/1322
 echo "self.skip = True" > ./test/app/digest.skipcond
-# https://github.com/tarantool/tarantool/issues/3420
-echo "self.skip = True" > ./test/vinyl/ddl.skipcond
 # run a safe subset of the test suite
 cd test && ./test-run.py -j 1 unit/ app/ app-tap/ box/ box-tap/ engine/ vinyl/
 %endif

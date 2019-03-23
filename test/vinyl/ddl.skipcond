@@ -1,6 +1,0 @@
-# vim: set ft=python :
-import os
-
-# Travis CI fails because of bug #3420
-if os.environ.get('TRAVIS_JOB_ID', False):
-    self.skip = 1
