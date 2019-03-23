@@ -76,7 +76,7 @@ struct httpc_env {
  * @retval -1 on error, check diag
  */
 int
-httpc_env_create(struct httpc_env *ctx, int max_conns);
+httpc_env_create(struct httpc_env *ctx, int max_conns, int max_total_conns);
 
 /**
  * Destroy HTTP client environment
