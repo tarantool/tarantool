@@ -581,20 +581,22 @@ vy_cache_iterator_is_end_stop(struct vy_cache_iterator *itr,
  * Make one tree's iterator step from the current position.
  * Direction of the step depends on the iterator type.
  * @param itr Iterator to make step.
- * @param[out] ret Result tuple.
  *
- * @retval Must a merge_iterator stop on @a ret?
- * The function is implicitly used by merge_iterator_next_key and
- * return value is used to determine if the merge_iterator can
- * return @a ret to a read_iterator immediately, without lookups
- * in mems and runs. It is possible, when @a ret is a part of
+ * @retval Must a read iterator stop on the cached statement?
+ * The function is implicitly used by vy_read_iterator_next and
+ * return value is used to determine if the read iterator can
+ * return the cached statement without lookups in mems and runs.
+ * It is possible when the cached statement is a part of a
  * continuous cached tuples chain. In such a case mems or runs can
  * not contain more suitable tuples.
  */
 static inline bool
-vy_cache_iterator_step(struct vy_cache_iterator *itr, struct tuple **ret)
+vy_cache_iterator_step(struct vy_cache_iterator *itr)
 {
-	*ret = NULL;
+	if (itr->curr_stmt != NULL) {
+		tuple_unref(itr->curr_stmt);
+		itr->curr_stmt = NULL;
+	}
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 	struct vy_cache_entry *prev_entry =
 		*vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
@@ -611,7 +613,8 @@ vy_cache_iterator_step(struct vy_cache_iterator *itr, struct tuple **ret)
 	    vy_stmt_compare(itr->key, entry->stmt, itr->cache->cmp_def)) {
 		return vy_cache_iterator_is_end_stop(itr, prev_entry);
 	}
-	*ret = entry->stmt;
+	itr->curr_stmt = entry->stmt;
+	tuple_ref(itr->curr_stmt);
 	return vy_cache_iterator_is_stop(itr, entry);
 }
 
@@ -629,7 +632,7 @@ vy_cache_iterator_skip_to_read_view(struct vy_cache_iterator *itr, bool *stop)
 		 * but there could be older tuples in runs.
 		 */
 		*stop = false;
-		vy_cache_iterator_step(itr, &itr->curr_stmt);
+		vy_cache_iterator_step(itr);
 	}
 }
 
@@ -637,15 +640,21 @@ vy_cache_iterator_skip_to_read_view(struct vy_cache_iterator *itr, bool *stop)
  * Position the iterator to the first cache entry satisfying
  * the iterator search criteria and following the given key
  * (pass NULL to start iteration).
+ *
+ * Like vy_cache_iterator_step(), this functions returns true
+ * if the cached statement is a part of a continuous tuple chain
+ * and hence the caller doesn't need to scan mems and runs.
  */
-static void
+static bool
 vy_cache_iterator_seek(struct vy_cache_iterator *itr,
-		       const struct tuple *last_key,
-		       struct vy_cache_entry **ret)
+		       const struct tuple *last_key)
 {
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 
-	*ret = NULL;
+	if (itr->curr_stmt != NULL) {
+		tuple_unref(itr->curr_stmt);
+		itr->curr_stmt = NULL;
+	}
 	itr->cache->stat.lookup++;
 
 	const struct tuple *key = itr->key;
@@ -673,7 +682,7 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr,
 	if (iterator_type == ITER_LT || iterator_type == ITER_LE)
 		vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
 	if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
-		return;
+		return false;
 
 	struct vy_cache_entry *entry;
 	entry = *vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
@@ -682,39 +691,33 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr,
 	    ((last_key == NULL && !exact) ||
 	     (last_key != NULL && vy_stmt_compare(itr->key, entry->stmt,
 						  itr->cache->cmp_def) != 0)))
-		return;
+		return false;
 
-	*ret = entry;
+	itr->curr_stmt = entry->stmt;
+	tuple_ref(itr->curr_stmt);
+	return vy_cache_iterator_is_stop(itr, entry);
 }
 
 NODISCARD int
 vy_cache_iterator_next(struct vy_cache_iterator *itr,
 		       struct vy_history *history, bool *stop)
 {
-	*stop = false;
 	vy_history_cleanup(history);
 
 	if (!itr->search_started) {
 		assert(itr->curr_stmt == NULL);
 		itr->search_started = true;
 		itr->version = itr->cache->version;
-		struct vy_cache_entry *entry;
-		vy_cache_iterator_seek(itr, NULL, &entry);
-		if (entry == NULL)
-			return 0;
-		itr->curr_stmt = entry->stmt;
-		*stop = vy_cache_iterator_is_stop(itr, entry);
+		*stop = vy_cache_iterator_seek(itr, NULL);
 	} else {
 		assert(itr->version == itr->cache->version);
 		if (itr->curr_stmt == NULL)
 			return 0;
-		tuple_unref(itr->curr_stmt);
-		*stop = vy_cache_iterator_step(itr, &itr->curr_stmt);
+		*stop = vy_cache_iterator_step(itr);
 	}
 
 	vy_cache_iterator_skip_to_read_view(itr, stop);
 	if (itr->curr_stmt != NULL) {
-		tuple_ref(itr->curr_stmt);
 		vy_stmt_counter_acct_tuple(&itr->cache->stat.get,
 					   itr->curr_stmt);
 		return vy_history_append_stmt(history, itr->curr_stmt);
@@ -740,25 +743,14 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 			     itr->cache->cmp_def) > 0))
 		return 0;
 
-	*stop = false;
 	vy_history_cleanup(history);
 
 	itr->search_started = true;
 	itr->version = itr->cache->version;
-	if (itr->curr_stmt != NULL)
-		tuple_unref(itr->curr_stmt);
-	itr->curr_stmt = NULL;
-
-	struct vy_cache_entry *entry;
-	vy_cache_iterator_seek(itr, last_stmt, &entry);
-	if (entry != NULL) {
-		*stop = vy_cache_iterator_is_stop(itr, entry);
-		itr->curr_stmt = entry->stmt;
-	}
-
+	*stop = vy_cache_iterator_seek(itr, last_stmt);
 	vy_cache_iterator_skip_to_read_view(itr, stop);
+
 	if (itr->curr_stmt != NULL) {
-		tuple_ref(itr->curr_stmt);
 		vy_stmt_counter_acct_tuple(&itr->cache->stat.get,
 					   itr->curr_stmt);
 		return vy_history_append_stmt(history, itr->curr_stmt);
@@ -776,9 +768,6 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 
 	itr->version = itr->cache->version;
 	struct tuple *prev_stmt = itr->curr_stmt;
-	if (prev_stmt != NULL)
-		tuple_unref(prev_stmt);
-
 	if ((prev_stmt == NULL && itr->iterator_type == ITER_EQ) ||
 	    (prev_stmt != NULL &&
 	     prev_stmt != vy_cache_iterator_curr_stmt(itr))) {
@@ -787,13 +776,7 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 		 * In either case the best we can do is restart the
 		 * search.
 		 */
-		struct vy_cache_entry *entry;
-		vy_cache_iterator_seek(itr, last_stmt, &entry);
-		itr->curr_stmt = NULL;
-		if (entry != NULL) {
-			*stop = vy_cache_iterator_is_stop(itr, entry);
-			itr->curr_stmt = entry->stmt;
-		}
+		*stop = vy_cache_iterator_seek(itr, last_stmt);
 		vy_cache_iterator_skip_to_read_view(itr, stop);
 	} else {
 		/*
@@ -830,7 +813,10 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 				break;
 			if (vy_stmt_lsn(entry->stmt) <= (**itr->read_view).vlsn) {
 				itr->curr_pos = pos;
+				if (itr->curr_stmt != NULL)
+					tuple_unref(itr->curr_stmt);
 				itr->curr_stmt = entry->stmt;
+				tuple_ref(itr->curr_stmt);
 				*stop = vy_cache_iterator_is_stop(itr, entry);
 			}
 			if (cmp == 0)
@@ -840,7 +826,6 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 
 	vy_history_cleanup(history);
 	if (itr->curr_stmt != NULL) {
-		tuple_ref(itr->curr_stmt);
 		vy_stmt_counter_acct_tuple(&itr->cache->stat.get,
 					   itr->curr_stmt);
 		if (vy_history_append_stmt(history, itr->curr_stmt) != 0)
