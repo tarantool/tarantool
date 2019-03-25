@@ -1156,9 +1156,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr,
  * Affects: curr_loaded_page, curr_pos
  */
 static NODISCARD int
-vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
-			 enum iterator_type iterator_type,
-			 const struct tuple *key, struct tuple **ret)
+vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	struct vy_slice *slice = itr->slice;
 	struct key_def *cmp_def = itr->cmp_def;
@@ -1171,7 +1169,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 
 	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn ||
 	       vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ) {
-		if (vy_run_iterator_next_pos(itr, iterator_type,
+		if (vy_run_iterator_next_pos(itr, itr->iterator_type,
 					     &itr->curr_pos) != 0) {
 			vy_run_iterator_stop(itr);
 			return 0;
@@ -1181,15 +1179,15 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 		if (vy_run_iterator_read(itr, itr->curr_pos,
 					 &itr->curr_stmt) != 0)
 			return -1;
-		if (iterator_type == ITER_EQ &&
-		    vy_stmt_compare(itr->curr_stmt, key, cmp_def) != 0) {
+		if (itr->iterator_type == ITER_EQ &&
+		    vy_stmt_compare(itr->curr_stmt, itr->key, cmp_def) != 0) {
 			vy_run_iterator_stop(itr);
 			return 0;
 		}
 	}
-	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
 		struct vy_run_iterator_pos test_pos;
-		while (vy_run_iterator_next_pos(itr, iterator_type,
+		while (vy_run_iterator_next_pos(itr, itr->iterator_type,
 						&test_pos) == 0) {
 			struct tuple *test_stmt;
 			if (vy_run_iterator_read(itr, test_pos,
@@ -1208,15 +1206,16 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 		}
 	}
 	/* Check if the result is within the slice boundaries. */
-	if (iterator_type == ITER_LE || iterator_type == ITER_LT) {
+	if (itr->iterator_type == ITER_LE || itr->iterator_type == ITER_LT) {
 		if (slice->begin != NULL &&
 		    vy_stmt_compare(itr->curr_stmt, slice->begin, cmp_def) < 0) {
 			vy_run_iterator_stop(itr);
 			return 0;
 		}
 	} else {
-		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
-		       iterator_type == ITER_EQ);
+		assert(itr->iterator_type == ITER_GE ||
+		       itr->iterator_type == ITER_GT ||
+		       itr->iterator_type == ITER_EQ);
 		if (slice->end != NULL &&
 		    vy_stmt_compare(itr->curr_stmt, slice->end, cmp_def) >= 0) {
 			vy_run_iterator_stop(itr);
@@ -1228,38 +1227,32 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 	return 0;
 }
 
+/**
+ * Helper function for vy_run_iterator_seek().
+ *
+ * Positions the iterator to the beginning (i.e. leftmost for GE,
+ * rightmost for LE) of a series of statements matching the given
+ * search criteria.
+ *
+ * Updates itr->curr_pos. Doesn't affect itr->curr_stmt.
+ *
+ * @retval 0 success
+ * @retval 1 EOF
+ * @retval -1 read or memory error
+ */
 static NODISCARD int
 vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 			enum iterator_type iterator_type,
-			const struct tuple *key, struct tuple **ret)
+			const struct tuple *key)
 {
 	struct vy_run *run = itr->slice->run;
-
-	*ret = NULL;
-
-	struct tuple_bloom *bloom = run->info.bloom;
-	struct key_def *key_def = itr->key_def;
-	if (iterator_type == ITER_EQ && bloom != NULL &&
-	    !vy_stmt_bloom_maybe_has(bloom, key, key_def)) {
-		vy_run_iterator_stop(itr);
-		itr->stat->bloom_hit++;
-		return 0;
-	}
-
-	itr->stat->lookup++;
-
 	struct vy_run_iterator_pos end_pos = {run->info.page_count, 0};
 	bool equal_found = false;
-	int rc;
 	if (!vy_stmt_is_empty_key(key)) {
-		rc = vy_run_iterator_search(itr, iterator_type, key,
-					    &itr->curr_pos, &equal_found);
-		if (rc < 0)
-			return -1;
-		if (rc > 0) {
-			vy_run_iterator_stop(itr);
-			return 0;
-		}
+		int rc = vy_run_iterator_search(itr, iterator_type, key,
+						&itr->curr_pos, &equal_found);
+		if (rc != 0)
+			return rc;
 	} else if (iterator_type == ITER_LE) {
 		itr->curr_pos = end_pos;
 	} else {
@@ -1267,17 +1260,11 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 		itr->curr_pos.page_no = 0;
 		itr->curr_pos.pos_in_page = 0;
 	}
-	if (iterator_type == ITER_EQ && !equal_found) {
-		vy_run_iterator_stop(itr);
-		if (bloom != NULL)
-			itr->stat->bloom_miss++;
-		return 0;
-	}
+	if (iterator_type == ITER_EQ && !equal_found)
+		return 1;
 	if ((iterator_type == ITER_GE || iterator_type == ITER_GT) &&
-	    itr->curr_pos.page_no == end_pos.page_no) {
-		vy_run_iterator_stop(itr);
-		return 0;
-	}
+	    itr->curr_pos.page_no == end_pos.page_no)
+		return 1;
 	if (iterator_type == ITER_LT || iterator_type == ITER_LE) {
 		/**
 		 * 1) in case of ITER_LT we now positioned on the value >= than
@@ -1286,11 +1273,8 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 		 * given (special branch of code in vy_run_iterator_search),
 		 * so we need to make a step on previous key
 		 */
-		if (vy_run_iterator_next_pos(itr, iterator_type,
-					     &itr->curr_pos) > 0) {
-			vy_run_iterator_stop(itr);
-			return 0;
-		}
+		return vy_run_iterator_next_pos(itr, iterator_type,
+						&itr->curr_pos);
 	} else {
 		assert(iterator_type == ITER_GE || iterator_type == ITER_GT ||
 		       iterator_type == ITER_EQ);
@@ -1301,31 +1285,58 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 		 * 2) in case if ITER_GE or ITER_EQ we now positioned on the
 		 * value >= given, so we need just to find proper lsn
 		 */
+		return 0;
 	}
-	if (itr->curr_stmt != NULL) {
-		tuple_unref(itr->curr_stmt);
-		itr->curr_stmt = NULL;
-	}
-	if (vy_run_iterator_read(itr, itr->curr_pos, &itr->curr_stmt) != 0)
-		return -1;
-
-	return vy_run_iterator_find_lsn(itr, iterator_type, key, ret);
 }
 
 /**
  * Position the iterator to the first statement satisfying
- * the search criteria for a given key and direction.
+ * the iterator search criteria and following the given key
+ * (pass NULL to start iteration).
  */
 static NODISCARD int
-vy_run_iterator_seek(struct vy_run_iterator *itr,
-		     enum iterator_type iterator_type,
-		     const struct tuple *key, struct tuple **ret)
+vy_run_iterator_seek(struct vy_run_iterator *itr, const struct tuple *last_key,
+		     struct tuple **ret)
 {
 	struct key_def *cmp_def = itr->cmp_def;
 	struct vy_slice *slice = itr->slice;
-	const struct tuple *check_eq_key = NULL;
-	int cmp;
+	struct tuple_bloom *bloom = slice->run->info.bloom;
+	const struct tuple *key = itr->key;
+	enum iterator_type iterator_type = itr->iterator_type;
 
+	*ret = NULL;
+	assert(itr->search_started);
+
+	/* Check the bloom filter on the first iteration. */
+	bool check_bloom = (itr->iterator_type == ITER_EQ &&
+			    itr->curr_stmt == NULL && bloom != NULL);
+	if (check_bloom && !vy_stmt_bloom_maybe_has(bloom, itr->key,
+						    itr->key_def)) {
+		vy_run_iterator_stop(itr);
+		itr->stat->bloom_hit++;
+		return 0;
+	}
+
+	/*
+	 * vy_run_iterator_do_seek() implements its own EQ check.
+	 * We only need to check EQ here if iterator type and key
+	 * passed to it differ from the original.
+	 */
+	bool check_eq = false;
+
+	/*
+	 * Modify iterator type and key so as to position it to
+	 * the first statement following the given key.
+	 */
+	if (last_key != NULL) {
+		if (iterator_type == ITER_EQ)
+			check_eq = true;
+		iterator_type = iterator_direction(iterator_type) > 0 ?
+				ITER_GT : ITER_LT;
+		key = last_key;
+	}
+
+	/* Take slice boundaries into account. */
 	if (slice->begin != NULL &&
 	    (iterator_type == ITER_GT || iterator_type == ITER_GE ||
 	     iterator_type == ITER_EQ)) {
@@ -1342,20 +1353,18 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 		 *         | ge  | begin | ge  |
 		 *         | eq  |    stop     |
 		 */
-		cmp = vy_stmt_compare(key, slice->begin, cmp_def);
+		int cmp = vy_stmt_compare(key, slice->begin, cmp_def);
 		if (cmp < 0 && iterator_type == ITER_EQ) {
 			vy_run_iterator_stop(itr);
-			*ret = NULL;
 			return 0;
 		}
 		if (cmp < 0 || (cmp == 0 && iterator_type != ITER_GT)) {
 			if (iterator_type == ITER_EQ)
-				check_eq_key = key;
+				check_eq = true;
 			iterator_type = ITER_GE;
 			key = slice->begin;
 		}
 	}
-
 	if (slice->end != NULL &&
 	    (iterator_type == ITER_LT || iterator_type == ITER_LE)) {
 		/*
@@ -1369,21 +1378,41 @@ vy_run_iterator_seek(struct vy_run_iterator *itr,
 		 * > end   | lt  | end   | lt  |
 		 *         | le  | end   | lt  |
 		 */
-		cmp = vy_stmt_compare(key, slice->end, cmp_def);
+		int cmp = vy_stmt_compare(key, slice->end, cmp_def);
 		if (cmp > 0 || (cmp == 0 && iterator_type != ITER_LT)) {
 			iterator_type = ITER_LT;
 			key = slice->end;
 		}
 	}
 
-	if (vy_run_iterator_do_seek(itr, iterator_type, key, ret) != 0)
+	/* Perform a lookup in the run. */
+	itr->stat->lookup++;
+	int rc = vy_run_iterator_do_seek(itr, iterator_type, key);
+	if (rc < 0)
+		return -1;
+	if (rc > 0)
+		goto not_found;
+
+	/* Load the found statement. */
+	if (itr->curr_stmt != NULL) {
+		tuple_unref(itr->curr_stmt);
+		itr->curr_stmt = NULL;
+	}
+	if (vy_run_iterator_read(itr, itr->curr_pos, &itr->curr_stmt) != 0)
 		return -1;
 
-	if (check_eq_key != NULL && *ret != NULL &&
-	    vy_stmt_compare(check_eq_key, *ret, cmp_def) != 0) {
-		vy_run_iterator_stop(itr);
-		*ret = NULL;
-	}
+	/* Check EQ constraint if necessary. */
+	if (check_eq && vy_stmt_compare(itr->curr_stmt, itr->key,
+					itr->cmp_def) != 0)
+		goto not_found;
+
+	/* Skip statements invisible from the iterator read view. */
+	return vy_run_iterator_find_lsn(itr, ret);
+
+not_found:
+	if (check_bloom)
+		itr->stat->bloom_miss++;
+	vy_run_iterator_stop(itr);
 	return 0;
 }
 
@@ -1438,8 +1467,7 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret)
 
 	if (!itr->search_started) {
 		itr->search_started = true;
-		return vy_run_iterator_seek(itr, itr->iterator_type,
-					    itr->key, ret);
+		return vy_run_iterator_seek(itr, NULL, ret);
 	}
 	if (itr->curr_stmt == NULL)
 		return 0;
@@ -1468,7 +1496,7 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret)
 		vy_run_iterator_stop(itr);
 		return 0;
 	}
-	return vy_run_iterator_find_lsn(itr, itr->iterator_type, itr->key, ret);
+	return vy_run_iterator_find_lsn(itr, ret);
 }
 
 /**
@@ -1548,25 +1576,10 @@ vy_run_iterator_skip(struct vy_run_iterator *itr,
 
 	vy_history_cleanup(history);
 
-	const struct tuple *key = itr->key;
-	enum iterator_type iterator_type = itr->iterator_type;
-	if (last_stmt != NULL) {
-		key = last_stmt;
-		iterator_type = iterator_direction(iterator_type) > 0 ?
-				ITER_GT : ITER_LT;
-	}
-
 	itr->search_started = true;
 	struct tuple *stmt;
-	if (vy_run_iterator_seek(itr, iterator_type, key, &stmt) != 0)
+	if (vy_run_iterator_seek(itr, last_stmt, &stmt) != 0)
 		return -1;
-
-	if (itr->iterator_type == ITER_EQ && last_stmt != NULL &&
-	    stmt != NULL && vy_stmt_compare(itr->key, stmt,
-					    itr->cmp_def) != 0) {
-		vy_run_iterator_stop(itr);
-		return 0;
-	}
 
 	while (stmt != NULL) {
 		if (vy_history_append_stmt(history, stmt) != 0)
