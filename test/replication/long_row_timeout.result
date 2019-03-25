@@ -25,32 +25,27 @@ box.info.replication[2].downstream.status
 ---
 - follow
 ...
-default_memtx_max_tuple_size = box.cfg.memtx_max_tuple_size
----
-...
+-- make applier incapable of reading rows in one go, so that it
+-- yields a couple of times.
 test_run:cmd('switch replica')
 ---
 - true
 ...
-box.cfg{memtx_max_tuple_size = 21 * 1024 * 1024}
+box.error.injection.set("ERRINJ_SIO_READ_MAX", 1)
 ---
+- ok
 ...
 test_run:cmd('switch default')
 ---
 - true
 ...
-box.cfg{memtx_max_tuple_size = 21 * 1024 * 1024}
----
-...
--- insert some big rows which cannot be read in one go, so applier yields
--- on read a couple of times.
 s = box.schema.space.create('test')
 ---
 ...
 _ = s:create_index('pk')
 ---
 ...
-for i = 1,5 do box.space.test:replace{1, digest.urandom(20 * 1024 * 1024)} collectgarbage('collect') end
+for i = 1,5 do box.space.test:replace{1, digest.urandom(1024)} collectgarbage('collect') end
 ---
 ...
 -- replication_disconnect_timeout is 4 * replication_timeout, check that
@@ -98,9 +93,6 @@ test_run:cmd('delete server replica')
 - true
 ...
 test_run:cleanup_cluster()
----
-...
-box.cfg{memtx_max_tuple_size = default_memtx_max_tuple_size}
 ---
 ...
 box.schema.user.revoke('guest', 'replication')

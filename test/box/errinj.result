@@ -42,6 +42,8 @@ errinj.info()
     state: false
   ERRINJ_PORT_DUMP:
     state: false
+  ERRINJ_RELAY_BREAK_LSN:
+    state: -1
   ERRINJ_WAL_IO:
     state: false
   ERRINJ_WAL_FALLOCATE:
@@ -66,7 +68,7 @@ errinj.info()
     state: 0
   ERRINJ_XLOG_META:
     state: false
-  ERRINJ_RELAY_BREAK_LSN:
+  ERRINJ_SIO_READ_MAX:
     state: -1
   ERRINJ_VY_INDEX_FILE_RENAME:
     state: false

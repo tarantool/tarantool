@@ -41,6 +41,7 @@
 #include "trivia/util.h"
 #include "exception.h"
 #include "uri/uri.h"
+#include "errinj.h"
 
 const char *
 sio_socketname(int fd)
@@ -222,6 +223,10 @@ sio_accept(int fd, struct sockaddr *addr, socklen_t *addrlen)
 ssize_t
 sio_read(int fd, void *buf, size_t count)
 {
+	struct errinj *inj = errinj(ERRINJ_SIO_READ_MAX, ERRINJ_INT);
+	if (inj != NULL && inj->iparam > 0)
+		count = MIN(count, (size_t)inj->iparam);
+
 	ssize_t n = read(fd, buf, count);
 	if (n < 0 && !sio_wouldblock(errno)) {
 		/*
