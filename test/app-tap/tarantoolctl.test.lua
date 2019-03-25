@@ -163,12 +163,14 @@ test:plan(7)
 -- must be stopped afterwards
 do
     local dir = fio.tempdir()
-    local code = [[ box.cfg{memtx_memory = 104857600} ]]
-    create_script(dir, 'script.lua', code)
+    create_script(dir, 'script.lua', [[ box.cfg{memtx_memory = 104857600} ]])
+    create_script(dir, 'no_box_cfg.lua', [[ print('Hi!') ]])
 
     local status, err = pcall(function()
         test:test("basic test", function(test_i)
-            test_i:plan(16)
+            test_i:plan(18)
+            check_ok(test_i, dir, 'start', 'no_box_cfg', 1, nil, "Starting instance",
+                     "box.cfg() is not called in an instance file")
             check_ok(test_i, dir, 'start',  'script', 0, nil, "Starting instance")
             tctl_wait_start(dir, 'script')
             check_ok(test_i, dir, 'status', 'script', 0, nil, "is running")
