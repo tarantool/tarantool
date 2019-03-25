@@ -716,8 +716,8 @@ stat_diff(istat(), st)
       rows: 5
       bytes: 5305
     get:
-      rows: 9
-      bytes: 9549
+      rows: 5
+      bytes: 5305
   txw:
     iterator:
       lookup: 1

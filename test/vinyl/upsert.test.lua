@@ -325,3 +325,21 @@ s:upsert({100}, {{'+', 2, 100}})
 s:select({100}, 'GE')
 
 s:drop()
+
+--
+-- Check that read iterator ignores a cached statement in case
+-- the current key is updated while it yields on disk read.
+--
+fiber = require('fiber')
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('pk')
+s:replace{10, 10}
+box.snapshot()
+s:get(10) -- add [10, 10] to the cache
+ch = fiber.channel(1)
+test_run:cmd("setopt delimiter ';'")
+_ = fiber.create(function() ch:put(s:select()) end)
+s:upsert({10, 10}, {{'+', 2, 10}})
+test_run:cmd("setopt delimiter ''");
+ch:get() -- should see the UPSERT and return [10, 20]
+s:drop()

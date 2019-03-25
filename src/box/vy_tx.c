@@ -1285,10 +1285,7 @@ vy_txw_iterator_restore(struct vy_txw_iterator *itr,
 	if (!itr->search_started || itr->version == itr->tx->write_set_version)
 		return 0;
 
-	struct txv *prev_txv = itr->curr_txv;
 	vy_txw_iterator_seek(itr, last_stmt);
-	if (prev_txv == itr->curr_txv)
-		return 0;
 
 	vy_history_cleanup(history);
 	if (itr->curr_txv != NULL) {

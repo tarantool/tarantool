@@ -766,11 +766,11 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 	if (!itr->search_started || itr->version == itr->cache->version)
 		return 0;
 
+	bool pos_changed = false;
 	itr->version = itr->cache->version;
-	struct tuple *prev_stmt = itr->curr_stmt;
-	if ((prev_stmt == NULL && itr->iterator_type == ITER_EQ) ||
-	    (prev_stmt != NULL &&
-	     prev_stmt != vy_cache_iterator_curr_stmt(itr))) {
+	if ((itr->curr_stmt == NULL && itr->iterator_type == ITER_EQ) ||
+	    (itr->curr_stmt != NULL &&
+	     itr->curr_stmt != vy_cache_iterator_curr_stmt(itr))) {
 		/*
 		 * EQ search ended or the iterator was invalidated.
 		 * In either case the best we can do is restart the
@@ -778,6 +778,7 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 		 */
 		*stop = vy_cache_iterator_seek(itr, last_stmt);
 		vy_cache_iterator_skip_to_read_view(itr, stop);
+		pos_changed = true;
 	} else {
 		/*
 		 * The iterator position is still valid, but new
@@ -797,7 +798,7 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 		struct key_def *def = itr->cache->cmp_def;
 		struct vy_cache_tree *tree = &itr->cache->cache_tree;
 		struct vy_cache_tree_iterator pos = itr->curr_pos;
-		if (prev_stmt == NULL)
+		if (itr->curr_stmt == NULL)
 			pos = vy_cache_tree_invalid_iterator();
 		while (true) {
 			if (dir > 0)
@@ -818,11 +819,14 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 				itr->curr_stmt = entry->stmt;
 				tuple_ref(itr->curr_stmt);
 				*stop = vy_cache_iterator_is_stop(itr, entry);
+				pos_changed = true;
 			}
 			if (cmp == 0)
 				break;
 		}
 	}
+	if (!pos_changed)
+		return 0;
 
 	vy_history_cleanup(history);
 	if (itr->curr_stmt != NULL) {
@@ -830,9 +834,8 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 					   itr->curr_stmt);
 		if (vy_history_append_stmt(history, itr->curr_stmt) != 0)
 			return -1;
-		return prev_stmt != itr->curr_stmt;
 	}
-	return 0;
+	return 1;
 }
 
 void

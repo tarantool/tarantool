@@ -595,10 +595,7 @@ vy_mem_iterator_restore(struct vy_mem_iterator *itr,
 	if (!itr->search_started || itr->version == itr->mem->version)
 		return 0;
 
-	const struct tuple *prev_stmt = itr->curr_stmt;
 	vy_mem_iterator_seek(itr, last_stmt);
-	if (prev_stmt == itr->curr_stmt)
-		return 0;
 
 	vy_history_cleanup(history);
 	if (itr->curr_stmt != NULL &&

@@ -424,7 +424,9 @@ vy_read_iterator_restore_mem(struct vy_read_iterator *itr,
 		 * Make sure we don't read the old value
 		 * from the cache while applying UPSERTs.
 		 */
-		itr->src[itr->cache_src].front_id = 0;
+		struct vy_read_src *cache_src = &itr->src[itr->cache_src];
+		if (cache_src->front_id == itr->front_id)
+			vy_history_cleanup(&cache_src->history);
 	}
 	src->front_id = itr->front_id;
 	return 0;
