@@ -279,8 +279,6 @@ struct vy_run_iterator {
 	struct vy_page *prev_page;
 	/** Is false until first .._get or .._next_.. method is called */
 	bool search_started;
-	/** Search is finished, you will not get more values from iterator */
-	bool search_ended;
 };
 
 /**

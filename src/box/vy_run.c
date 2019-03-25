@@ -738,7 +738,6 @@ vy_run_iterator_stop(struct vy_run_iterator *itr)
 			vy_page_delete(itr->prev_page);
 		itr->curr_page = itr->prev_page = NULL;
 	}
-	itr->search_ended = true;
 }
 
 static int
@@ -1071,6 +1070,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
  * equal to given key (untouched otherwise)
  *
  * @retval 0 success
+ * @retval 1 EOF
  * @retval -1 read or memory error
  */
 static NODISCARD int
@@ -1082,10 +1082,8 @@ vy_run_iterator_search(struct vy_run_iterator *itr,
 	pos->page_no = vy_page_index_find_page(itr->slice->run, key,
 					       itr->cmp_def, iterator_type,
 					       equal_key);
-	if (pos->page_no == itr->slice->run->info.page_count) {
-		itr->search_ended = true;
-		return 0;
-	}
+	if (pos->page_no == itr->slice->run->info.page_count)
+		return 1;
 	struct vy_page *page;
 	int rc = vy_run_iterator_load_page(itr, pos->page_no, &page);
 	if (rc != 0)
@@ -1155,7 +1153,7 @@ vy_run_iterator_next_pos(struct vy_run_iterator *itr,
  * (i.e. left for GE, right for LE).
  * @retval 0 success or EOF (*ret == NULL)
  * @retval -1 read or memory error
- * Affects: curr_loaded_page, curr_pos, search_ended
+ * Affects: curr_loaded_page, curr_pos
  */
 static NODISCARD int
 vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
@@ -1168,7 +1166,6 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr,
 	*ret = NULL;
 
 	assert(itr->search_started);
-	assert(!itr->search_ended);
 	assert(itr->curr_stmt != NULL);
 	assert(itr->curr_pos.page_no < slice->run->info.page_count);
 
@@ -1244,7 +1241,7 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 	struct key_def *key_def = itr->key_def;
 	if (iterator_type == ITER_EQ && bloom != NULL &&
 	    !vy_stmt_bloom_maybe_has(bloom, key, key_def)) {
-		itr->search_ended = true;
+		vy_run_iterator_stop(itr);
 		itr->stat->bloom_hit++;
 		return 0;
 	}
@@ -1257,8 +1254,12 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
 	if (!vy_stmt_is_empty_key(key)) {
 		rc = vy_run_iterator_search(itr, iterator_type, key,
 					    &itr->curr_pos, &equal_found);
-		if (rc != 0 || itr->search_ended)
-			return rc;
+		if (rc < 0)
+			return -1;
+		if (rc > 0) {
+			vy_run_iterator_stop(itr);
+			return 0;
+		}
 	} else if (iterator_type == ITER_LE) {
 		itr->curr_pos = end_pos;
 	} else {
@@ -1412,9 +1413,7 @@ vy_run_iterator_open(struct vy_run_iterator *itr,
 	itr->curr_pos.page_no = slice->run->info.page_count;
 	itr->curr_page = NULL;
 	itr->prev_page = NULL;
-
 	itr->search_started = false;
-	itr->search_ended = false;
 
 	/*
 	 * Make sure the format we use to create tuples won't
@@ -1437,14 +1436,14 @@ vy_run_iterator_next_key(struct vy_run_iterator *itr, struct tuple **ret)
 {
 	*ret = NULL;
 
-	if (itr->search_ended)
-		return 0;
 	if (!itr->search_started) {
 		itr->search_started = true;
 		return vy_run_iterator_seek(itr, itr->iterator_type,
 					    itr->key, ret);
 	}
-	assert(itr->curr_stmt != NULL);
+	if (itr->curr_stmt == NULL)
+		return 0;
+
 	assert(itr->curr_pos.page_no < itr->slice->run->info.page_count);
 
 	struct tuple *next_key = NULL;
@@ -1483,9 +1482,6 @@ vy_run_iterator_next_lsn(struct vy_run_iterator *itr, struct tuple **ret)
 	*ret = NULL;
 
 	assert(itr->search_started);
-	if (itr->search_ended)
-		return 0;
-
 	assert(itr->curr_stmt != NULL);
 	assert(itr->curr_pos.page_no < itr->slice->run->info.page_count);
 
@@ -1540,9 +1536,6 @@ vy_run_iterator_skip(struct vy_run_iterator *itr,
 		     const struct tuple *last_stmt,
 		     struct vy_history *history)
 {
-	if (itr->search_ended)
-		return 0;
-
 	/*
 	 * Check if the iterator is already positioned
 	 * at the statement following last_stmt.
