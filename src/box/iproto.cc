@@ -1622,8 +1622,8 @@ tx_process_sql(struct cmsg *m)
 	struct iproto_msg *msg = tx_accept_msg(m);
 	struct obuf *out;
 	struct sql_response response;
-	struct sql_bind *bind;
-	int bind_count;
+	struct sql_bind *bind = NULL;
+	int bind_count = 0;
 	const char *sql;
 	uint32_t len;
 
@@ -1633,9 +1633,11 @@ tx_process_sql(struct cmsg *m)
 		goto error;
 	assert(msg->header.type == IPROTO_EXECUTE);
 	tx_inject_delay();
-	bind_count = sql_bind_list_decode(msg->sql.bind, &bind);
-	if (bind_count < 0)
-		goto error;
+	if (msg->sql.bind != NULL) {
+		bind_count = sql_bind_list_decode(msg->sql.bind, &bind);
+		if (bind_count < 0)
+			goto error;
+	}
 	sql = msg->sql.sql_text;
 	sql = mp_decode_str(&sql, &len);
 	if (sql_prepare_and_execute(sql, len, bind, bind_count, &response,
