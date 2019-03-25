@@ -83,8 +83,14 @@ source:
 
 # Push alpha and beta versions to <major>x bucket (say, 2x),
 # stable to <major>.<minor> bucket (say, 2.2).
+ifeq ($(TRAVIS_BRANCH),master)
+GIT_DESCRIBE=$(shell git describe HEAD)
+MAJOR_VERSION=$(word 1,$(subst ., ,$(GIT_DESCRIBE)))
+MINOR_VERSION=$(word 2,$(subst ., ,$(GIT_DESCRIBE)))
+else
 MAJOR_VERSION=$(word 1,$(subst ., ,$(TRAVIS_BRANCH)))
 MINOR_VERSION=$(word 2,$(subst ., ,$(TRAVIS_BRANCH)))
+endif
 BUCKET=tarantool.$(MAJOR_VERSION).$(MINOR_VERSION).src
 ifeq ($(MINOR_VERSION),0)
 BUCKET=tarantool.$(MAJOR_VERSION)x.src
