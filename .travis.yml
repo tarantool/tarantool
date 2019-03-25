@@ -72,9 +72,6 @@ jobs:
       - name: Ubuntu Cosmic (18.10) build + deploy DEB
         env: OS=ubuntu DIST=cosmic
         if: branch = "2.1"
-      - name: Debian Wheezy (7) build + deploy DEB
-        env: OS=debian DIST=wheezy
-        if: branch = "2.1"
       - name: Debian Jessie (8) build + deploy DEB
         env: OS=debian DIST=jessie
         if: branch = "2.1"
