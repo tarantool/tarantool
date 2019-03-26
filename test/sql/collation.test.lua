@@ -306,3 +306,10 @@ box.sql.execute("INSERT INTO jj VALUES (3, 'aS'), (4, 'AS');")
 box.sql.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
 box.sql.execute("SELECT DISTINCT substr(s2, 1, 1) FROM jj;")
 box.space.JJ:drop()
+
+-- gh-3573: Strength in the _collation space
+-- Collation without 'strength' option set now has explicit
+-- 'strength' = 'tertiary'.
+--
+box.internal.collation.create('c', 'ICU', 'unicode')
+box.space._collation.index.name:get({'c'})

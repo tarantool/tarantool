@@ -479,7 +479,7 @@ box.space._collation:auto_increment{'test', 0, 'ICU', 'ru_RU', setmap{}}
 box.space._collation:select{}
 ---
 - - [0, 'none', 1, 'BINARY', '', {}]
-  - [1, 'unicode', 1, 'ICU', '', {}]
+  - [1, 'unicode', 1, 'ICU', '', {'strength': 'tertiary'}]
   - [2, 'unicode_ci', 1, 'ICU', '', {'strength': 'primary'}]
   - [3, 'binary', 1, 'BINARY', '', {}]
   - [4, 'test', 0, 'ICU', 'ru_RU', {}]
@@ -488,7 +488,7 @@ test_run:cmd('restart server default')
 box.space._collation:select{}
 ---
 - - [0, 'none', 1, 'BINARY', '', {}]
-  - [1, 'unicode', 1, 'ICU', '', {}]
+  - [1, 'unicode', 1, 'ICU', '', {'strength': 'tertiary'}]
   - [2, 'unicode_ci', 1, 'ICU', '', {'strength': 'primary'}]
   - [3, 'binary', 1, 'BINARY', '', {}]
   - [4, 'test', 0, 'ICU', 'ru_RU', {}]
@@ -510,7 +510,7 @@ utf8.cmp('abc', 'def')
 ...
 box.space._collation:replace(t)
 ---
-- [1, 'unicode', 1, 'ICU', '', {}]
+- [1, 'unicode', 1, 'ICU', '', {'strength': 'tertiary'}]
 ...
 --
 -- gh-2839: allow to store custom fields in field definition.

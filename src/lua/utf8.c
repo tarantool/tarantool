@@ -455,6 +455,7 @@ tarantool_lua_utf8_init(struct lua_State *L)
 	}
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
+	def.icu.strength = COLL_ICU_STRENGTH_TERTIARY;
 	unicode_coll = coll_new(&def);
 	if (unicode_coll == NULL)
 		goto error_coll;

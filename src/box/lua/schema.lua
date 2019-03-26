@@ -2057,6 +2057,10 @@ box.internal.collation.create = function(name, coll_type, locale, opts)
     local lua_opts = {if_not_exists = opts.if_not_exists }
     check_param_table(lua_opts, {if_not_exists = 'boolean'})
     opts.if_not_exists = nil
+    local collation_defaults = {
+        strength = "tertiary",
+    }
+    opts = update_param_table(opts, collation_defaults)
     opts = setmap(opts)
 
     local _coll = box.space[box.schema.COLLATION_ID]
