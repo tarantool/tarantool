@@ -1112,23 +1112,12 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
  *
  * During this routine byte code for creation of new Tarantool
  * space and all necessary Tarantool indexes is emitted.
- *
- * If the pSelect argument is not NULL, it means that this routine
- * was called to create a space generated from a
- * "CREATE TABLE ... AS SELECT ..." statement.  The column names of
- * the new space will match the result set of the SELECT.
  */
 void
-sqlEndTable(Parse * pParse,	/* Parse context */
-		Token * pEnd,	/* The ')' before options in the CREATE TABLE */
-		Select * pSelect	/* Select from a "CREATE ... AS SELECT" */
-    )
+sqlEndTable(struct Parse *pParse)
 {
 	sql *db = pParse->db;	/* The database connection */
 
-	if (pEnd == NULL && pSelect == NULL) {
-		return;
-	}
 	assert(!db->mallocFailed);
 	struct space *new_space = pParse->new_space;
 	if (new_space == NULL)

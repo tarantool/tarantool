@@ -3462,7 +3462,8 @@ void sqlAddCollateType(Parse *, Token *);
 struct coll *
 sql_column_collation(struct space_def *def, uint32_t column, uint32_t *coll_id);
 
-void sqlEndTable(Parse *, Token *, Select *);
+void
+sqlEndTable(struct Parse *parse);
 
 /**
  * Create cursor which will be positioned to the space/index.

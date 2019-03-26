@@ -180,13 +180,19 @@ createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 ifnotexists(A) ::= .              {A = 0;}
 ifnotexists(A) ::= IF NOT EXISTS. {A = 1;}
 
-create_table_args ::= LP columnlist RP(E). {
-  sqlEndTable(pParse,&E,0);
+create_table_args ::= LP columnlist RP. {
+  sqlEndTable(pParse);
 }
-create_table_args ::= AS select(S). {
-  sqlEndTable(pParse,0,S);
-  sql_select_delete(pParse->db, S);
-}
+
+/*
+ * CREATE TABLE AS SELECT is broken. To be re-implemented
+ * in gh-3223.
+ *
+ * create_table_args ::= AS select(S). {
+ *   sqlEndTable(pParse);
+ *   sql_select_delete(pParse->db, S);
+ * }
+ */
 columnlist ::= columnlist COMMA tconsdef.
 columnlist ::= columnlist COMMA columnname carglist.
 columnlist ::= columnname carglist.
