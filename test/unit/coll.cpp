@@ -51,6 +51,7 @@ manual_test()
 	memset(&def, 0, sizeof(def));
 	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
 	def.type = COLL_TYPE_ICU;
+	def.icu.strength = COLL_ICU_STRENGTH_IDENTICAL;
 	struct coll *coll;
 
 	cout << " -- default ru_RU -- " << endl;
@@ -131,6 +132,7 @@ hash_test()
 	memset(&def, 0, sizeof(def));
 	snprintf(def.locale, sizeof(def.locale), "%s", "ru_RU");
 	def.type = COLL_TYPE_ICU;
+	def.icu.strength = COLL_ICU_STRENGTH_IDENTICAL;
 	struct coll *coll;
 
 	/* Case sensitive */
