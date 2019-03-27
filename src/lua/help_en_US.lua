@@ -1,4 +1,4 @@
---- help (en_US)
+--- help (en_US) 1.10
 
 return {
     tutorial = {
