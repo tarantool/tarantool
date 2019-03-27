@@ -15,7 +15,7 @@ help()
 ---
 - - |
     To get help, see the Tarantool manual at https://tarantool.io/en/doc/
-    To start the interactive Tarantool tutorial, type 'tutorial()'
+    To start the interactive Tarantool tutorial, type 'tutorial()' here.
 
     Available backslash commands:
 
