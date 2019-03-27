@@ -19,10 +19,10 @@ help()
 
     Available backslash commands:
 
-      \set language <language> for setting language
-      \set delimiter <delimiter> for setting delimiter
-      \help show this screen
-      \quit quit interactive console
+      \set language <language>   -- set language (lua or sql)
+      \set delimiter <delimiter> -- set expression delimiter
+      \help                      -- show this screen
+      \quit                      -- quit interactive console
 ...
 cfg_filter(box.cfg)
 ---
