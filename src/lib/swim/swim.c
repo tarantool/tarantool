@@ -653,22 +653,32 @@ swim_update_member_addr(struct swim *swim, struct swim_member *member,
 /**
  * Update or create a member by its definition, received from a
  * remote instance.
- * @retval NULL Error.
- * @retval New member, or updated old member.
+ * @param swim SWIM instance to upsert into.
+ * @param def Member definition to build a new member or update an
+ *        existing one.
+ * @param[out] result A result member: a new, or an updated, or
+ *        NULL in case of nothing has changed. For example, @a def
+ *        was too old.
+ *
+ * @retval 0 Success. Member is added, or updated. Or nothing has
+ *         changed but not always it is an error.
+ * @retval -1 Error.
  */
-static struct swim_member *
-swim_upsert_member(struct swim *swim, const struct swim_member_def *def)
+static int
+swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
+		   struct swim_member **result)
 {
 	struct swim_member *member = swim_find_member(swim, &def->uuid);
 	if (member == NULL) {
-		member = swim_new_member(swim, &def->addr, &def->uuid,
-					 def->status);
-		return member;
+		*result = swim_new_member(swim, &def->addr, &def->uuid,
+					  def->status);
+		return *result != NULL ? 0 : -1;
 	}
 	struct swim_member *self = swim->self;
 	if (member != self)
 		swim_update_member_addr(swim, member, &def->addr);
-	return member;
+	*result = member;
+	return 0;
 }
 
 /** Decode an anti-entropy message, update member table. */
@@ -681,9 +691,10 @@ swim_process_anti_entropy(struct swim *swim, const char **pos, const char *end)
 		return -1;
 	for (uint64_t i = 0; i < size; ++i) {
 		struct swim_member_def def;
+		struct swim_member *member;
 		if (swim_member_def_decode(&def, pos, end, prefix) != 0)
 			return -1;
-		if (swim_upsert_member(swim, &def) == NULL) {
+		if (swim_upsert_member(swim, &def, &member) != 0) {
 			/*
 			 * Not a critical error. Other members
 			 * still can be updated.
