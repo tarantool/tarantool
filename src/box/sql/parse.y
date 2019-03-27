@@ -1600,16 +1600,33 @@ cmd ::= DROP TRIGGER ifexists(NOERR) fullname(X). {
 }
 
 //////////////////////// ALTER TABLE table ... ////////////////////////////////
-cmd ::= ALTER TABLE fullname(X) RENAME TO nm(Z). {
-  rename_entity_def_init(&pParse->rename_entity_def, X, &Z);
-  sql_alter_table_rename(pParse);
+%include {
+  struct alter_args {
+    struct SrcList *table_name;
+    /** Name of constraint OR new name of table in case of RENAME. */
+    struct Token name;
+  };
 }
 
-cmd ::= ALTER TABLE fullname(X) ADD CONSTRAINT nm(Z) FOREIGN KEY
-        LP eidlist(FA) RP REFERENCES nm(T) eidlist_opt(TA) matcharg(M)
-        refargs(R) defer_subclause_opt(D). {
-  create_fk_def_init(&pParse->create_fk_def, X, &Z, FA, &T, TA, M, R, D);
+%type alter_table_start {struct SrcList *}
+alter_table_start(A) ::= ALTER TABLE fullname(T) . { A = T; }
+
+%type alter_add_constraint {struct alter_args}
+alter_add_constraint(A) ::= alter_table_start(T) ADD CONSTRAINT nm(N). {
+  A.table_name = T;
+  A.name = N;
+}
+
+cmd ::= alter_add_constraint(N) FOREIGN KEY LP eidlist(FA) RP REFERENCES
+        nm(T) eidlist_opt(TA) matcharg(M) refargs(R) defer_subclause_opt(D). {
+  create_fk_def_init(&pParse->create_fk_def, N.table_name, &N.name, FA, &T, TA,
+                     M, R, D);
   sql_create_foreign_key(pParse);
+}
+
+cmd ::= alter_table_start(A) RENAME TO nm(N). {
+    rename_entity_def_init(&pParse->rename_entity_def, A, &N);
+    sql_alter_table_rename(pParse);
 }
 
 cmd ::= ALTER TABLE fullname(X) DROP CONSTRAINT nm(Z). {

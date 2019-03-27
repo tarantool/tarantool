@@ -223,7 +223,7 @@ test:do_catchsql_test(
         ALTER TABLE child ADD CONSTRAINT fk FOREIGN KEY REFERENCES child(id);
     ]], {
         -- <alter2-4.1>
-        1, "Syntax error near 'REFERENCES'"
+        1, "Keyword 'REFERENCES' is reserved. Please use double quotes if 'REFERENCES' is an identifier."
         -- </alter2-4.1>
     })
 
