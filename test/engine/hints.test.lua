@@ -12,8 +12,8 @@ engine = inspector:get_cfg('engine')
 inspector:cmd("setopt delimiter ';'");
 function insert_values(type)
         local x = 54
-        while (x <= 64) do
-                local val = ffi.new(type, 2^x-1)
+        while (x < 64) do
+                local val = ffi.new(type, (2LLU^x)-1)
                 s:replace({val})
                 x = x + 1
         end
