@@ -251,6 +251,12 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		mh_strnptr_del(spaces_by_name, k, NULL);
 	}
 	space_cache_version++;
+
+	if (trigger_run(&on_alter_space, new_space != NULL ?
+					 new_space : old_space) != 0) {
+		diag_log();
+		panic("Can't update space cache");
+	}
 }
 
 /** A wrapper around space_new() for data dictionary spaces. */
@@ -301,8 +307,6 @@ sc_space_new(uint32_t id, const char *name,
 	 *   a snapshot of older version.
 	 */
 	init_system_space(space);
-
-	trigger_run_xc(&on_alter_space, space);
 }
 
 int
@@ -499,7 +503,6 @@ schema_init()
 		struct space *space = space_new_xc(def, &key_list);
 		space_cache_replace(NULL, space);
 		init_system_space(space);
-		trigger_run_xc(&on_alter_space, space);
 	}
 
 	/*
