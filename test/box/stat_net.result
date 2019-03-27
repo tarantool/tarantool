@@ -55,7 +55,7 @@ box.stat.net.RECEIVED.total > 0
 ---
 - true
 ...
-box.stat.net.CONNECTIONS == 4
+box.stat.net.CONNECTIONS.current == 4
 ---
 - true
 ...
@@ -70,14 +70,14 @@ cn1:close()
 cn2:close()
 ---
 ...
-test_run:wait_cond(function() return box.stat.net.CONNECTIONS == 2 end, WAIT_COND_TIMEOUT)
+test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 2 end, WAIT_COND_TIMEOUT)
 ---
 - true
 ...
 cn3:close()
 ---
 ...
-test_run:wait_cond(function() return box.stat.net.CONNECTIONS == 1 end, WAIT_COND_TIMEOUT)
+test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 1 end, WAIT_COND_TIMEOUT)
 ---
 - true
 ...
@@ -93,7 +93,7 @@ box.stat.net.RECEIVED.total
 ---
 - 0
 ...
-box.stat.net.CONNECTIONS
+box.stat.net.CONNECTIONS.current
 ---
 - 1
 ...
