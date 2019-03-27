@@ -10,7 +10,7 @@ local DOCUMENTATION_VERSION = '1.10'
 help = {}
 help[1] = {}
 help[1] = "To get help, see the Tarantool manual at https://tarantool.io/en/doc/"
-help[2] = "To start the interactive Tarantool tutorial, type 'tutorial()'"
+help[2] = "To start the interactive Tarantool tutorial, type 'tutorial()' here"
 tutorial = {}
 tutorial[1] = help[2]
 
