@@ -1,8 +1,15 @@
 local doc = require('help.en_US')
 
+-- The built-in tutorial contains links to the online
+-- documentation with a <version> placeholder like
+-- https://tarantool.io/en/doc/<version>/<...>. We should replace
+-- the placeholders with a version of a documentation page that
+-- corresponds to a tarantool version a user runs.
+local DOCUMENTATION_VERSION = '1.10'
+
 help = {}
 help[1] = {}
-help[1] = "To get help, see the Tarantool manual at http://tarantool.org/doc/"
+help[1] = "To get help, see the Tarantool manual at https://tarantool.io/en/doc/"
 help[2] = "To start the interactive Tarantool tutorial, type 'tutorial()'"
 tutorial = {}
 tutorial[1] = help[2]
@@ -36,7 +43,10 @@ local function tutorial_call(table, action)
     elseif screen_id > #doc.tutorial then
         screen_id = #doc.tutorial
     end
-    return doc.tutorial[screen_id]
+    local res = doc.tutorial[screen_id]
+    -- The parentheses are to discard return values except first
+    -- one.
+    return (res:gsub('<version>', DOCUMENTATION_VERSION))
 end
 
 setmetatable(tutorial, { __call = tutorial_call })
