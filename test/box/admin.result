@@ -14,7 +14,7 @@ index = space:create_index('primary')
 help()
 ---
 - - |
-    To get help, see the Tarantool manual at https://tarantool.org/doc/
+    To get help, see the Tarantool manual at https://tarantool.io/en/doc/
     To start the interactive Tarantool tutorial, type 'tutorial()'
 
     Available backslash commands:

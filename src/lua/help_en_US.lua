@@ -2,7 +2,7 @@
 
 return {
     help = [[
-To get help, see the Tarantool manual at https://tarantool.org/doc/
+To get help, see the Tarantool manual at https://tarantool.io/en/doc/
 To start the interactive Tarantool tutorial, type 'tutorial()'
 
 Available backslash commands:
@@ -168,7 +168,7 @@ Tarantool instruction that means <don’t execute
 every time I type Enter; wait until I type a
 special string called the "delimiter".>
 More in the Tarantool manual:
-http://tarantool.org/doc/book/administration.html#requests
+https://tarantool.io/en/doc/<version>/reference/reference_lua/console/#console-delimiter
 
 Request #6 is:
 
@@ -181,7 +181,8 @@ console.delimiter("")!
 but you’ll see "!" in following exercises.
 
 You'll need a custom delimiter only in the trial console at
-http://try.tarantool.org. Tarantool console in production is smarter.
+https://tarantool.io/en/try-dev/.
+Tarantool console in production is smarter.
 It can tell when a multi-line request has not ended (for example,
 if it sees that a function declaration does not have an end keyword,
 as we'll be writing on the next screen).
@@ -309,7 +310,7 @@ tasks each get a slice, but they have to yield
 occasionally so that other tasks get a chance.
 That’s what a properly designed fiber will do.
 More in the Tarantool manual:
-http://tarantool.org/doc/reference/reference_lua/fiber.html
+https://tarantool.io/en/doc/<version>/reference/reference_lua/fiber/
 
 Request #11 is:
 
@@ -345,8 +346,8 @@ Request #12 is:
 function socket_get ()
 local socket, sock, result
 socket = require("socket")
-sock = socket.tcp_connect("tarantool.org", 80)
-sock:send("GET / HTTP/1.0\r\nHost: tarantool.org\r\n\r\n")
+sock = socket.tcp_connect("tarantool.io", 80)
+sock:send("GET / HTTP/1.0\r\nHost: tarantool.io\r\n\r\n")
 result = sock:read(17)
 sock:close()
 return result
@@ -355,12 +356,12 @@ socket_get()!
 --------------------------------
 
 Briefly these requests are opening a socket
-and sending a "GET" request to tarantool.org’s server.
+and sending a "GET" request to tarantool.io’s server.
 The response will be short, for example
 "- "HTTP/1.1 302 OK\r\n""
 but it shows you’ve gotten in touch with a distant server.
 More in the Tarantool manual:
-http://tarantool.org/doc/reference/reference_lua/socket.html
+https://tarantool.io/en/doc/<version>/reference/reference_lua/socket/
 ]];
 
 [[
@@ -378,7 +379,7 @@ and grant read/write access to you, but here
 you’re the "admin" user -- you have administrative
 powers -- so you can start manipulating data immediately.
 More in the Tarantool manual:
-http://tarantool.org/doc/book/box/index.html
+https://tarantool.io/en/doc/<version>/book/box/box_space/#box-space-replace
 
 Request #13 is:
 
@@ -454,7 +455,7 @@ That’s all you need to replace the rest of the fields with
 new values. The syntax of box.replace(), pared down, is:
 box.space.tutor:replace{primary-key-field, other-fields}
 More in the Tarantool manual:
-http://tarantool.org/doc/book/box/box_space.html#lua-function.space_object.replace
+https://tarantool.io/en/doc/<version>/book/box/box_space/#box-space-replace
 Tarantool by default keeps database changes in memory,
 but box.replace() will cause a write to a log, and log
 information can later be consolidated with another box
@@ -483,7 +484,7 @@ But you’ve been confined to a space and an index
 that Tarantool started with.
 Suppose that you want to create your own.
 More in the Tarantool manual:
-http://tarantool.org/doc/getting_started.html#starting-tarantool-and-making-your-first-database
+https://tarantool.io/en/doc/<version>/book/getting_started/using_docker/#creating-a-database
 
 Request #16 is:
 
@@ -507,7 +508,7 @@ Indexes can be declared to be "unique", which
 is important because some combination of the
 fields must be unique, for identification purposes.
 More in the Tarantool manual:
-https://tarantool.org/doc/book/box/data_model.html#index
+https://tarantool.io/en/doc/<version>/book/box/data_model/#index
 
 Request #17 is:
 
@@ -583,7 +584,7 @@ Insert one million tuples with a Lua stored procedure,
 Sum a JSON field for all tuples, and
 Indexed pattern search.
 
-See http://tarantool.org/en/doc/tutorials/lua_tutorials.html
+See https://tarantool.io/en/doc/<version>/tutorials/lua_tutorials/
 
 Request #20 is:
 
