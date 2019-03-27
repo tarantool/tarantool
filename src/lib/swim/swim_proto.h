@@ -239,13 +239,16 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
 				    uint16_t batch_size);
 
 /**
- * SWIM member MessagePack template. Represents one record in
- * anti-entropy section.
+ * The structure represents a passport of a member. It consists of
+ * some vital necessary member attributes, allowing to detect its
+ * state, exact address. The whole passport is necessary for each
+ * info related to a member: for anti-entropy records, for
+ * dissemination events. The components can inherit that structure
+ * and add more attributes. For example, anti-entropy can add a
+ * mandatory payload; dissemination adds optional old UUID and
+ * payload.
  */
-struct PACKED swim_member_bin {
-	/** mp_encode_map(5) */
-	uint8_t m_header;
-
+struct PACKED swim_passport_bin {
 	/** mp_encode_uint(SWIM_MEMBER_STATUS) */
 	uint8_t k_status;
 	/** mp_encode_uint(enum member_status) */
@@ -275,6 +278,17 @@ struct PACKED swim_member_bin {
 	/** mp_encode_uint(64bit incarnation) */
 	uint8_t m_incarnation;
 	uint64_t v_incarnation;
+};
+
+/**
+ * SWIM member MessagePack template. Represents one record in
+ * anti-entropy section.
+ */
+struct PACKED swim_member_bin {
+	/** mp_encode_map(5) */
+	uint8_t m_header;
+	/** Basic member info like status, address. */
+	struct swim_passport_bin passport;
 };
 
 /** Initialize antri-entropy record. */

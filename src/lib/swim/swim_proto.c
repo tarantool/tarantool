@@ -314,32 +314,48 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
 	header->v_anti_entropy = mp_bswap_u16(batch_size);
 }
 
+static inline void
+swim_passport_bin_create(struct swim_passport_bin *passport)
+{
+	passport->k_status = SWIM_MEMBER_STATUS;
+	passport->k_addr = SWIM_MEMBER_ADDRESS;
+	passport->m_addr = 0xce;
+	passport->k_port = SWIM_MEMBER_PORT;
+	passport->m_port = 0xcd;
+	passport->k_uuid = SWIM_MEMBER_UUID;
+	passport->m_uuid = 0xc4;
+	passport->m_uuid_len = UUID_LEN;
+	passport->k_incarnation = SWIM_MEMBER_INCARNATION;
+	passport->m_incarnation = 0xcf;
+}
+
+static inline void
+swim_passport_bin_fill(struct swim_passport_bin *passport,
+		       const struct sockaddr_in *addr,
+		       const struct tt_uuid *uuid,
+		       enum swim_member_status status, uint64_t incarnation)
+{
+	passport->v_status = status;
+	passport->v_addr = mp_bswap_u32(ntohl(addr->sin_addr.s_addr));
+	passport->v_port = mp_bswap_u16(ntohs(addr->sin_port));
+	memcpy(passport->v_uuid, uuid, UUID_LEN);
+	passport->v_incarnation = mp_bswap_u64(incarnation);
+}
+
 void
 swim_member_bin_fill(struct swim_member_bin *header,
 		     const struct sockaddr_in *addr, const struct tt_uuid *uuid,
 		     enum swim_member_status status, uint64_t incarnation)
 {
-	header->v_status = status;
-	header->v_addr = mp_bswap_u32(ntohl(addr->sin_addr.s_addr));
-	header->v_port = mp_bswap_u16(ntohs(addr->sin_port));
-	memcpy(header->v_uuid, uuid, UUID_LEN);
-	header->v_incarnation = mp_bswap_u64(incarnation);
+	swim_passport_bin_fill(&header->passport, addr, uuid, status,
+			       incarnation);
 }
 
 void
 swim_member_bin_create(struct swim_member_bin *header)
 {
 	header->m_header = 0x85;
-	header->k_status = SWIM_MEMBER_STATUS;
-	header->k_addr = SWIM_MEMBER_ADDRESS;
-	header->m_addr = 0xce;
-	header->k_port = SWIM_MEMBER_PORT;
-	header->m_port = 0xcd;
-	header->k_uuid = SWIM_MEMBER_UUID;
-	header->m_uuid = 0xc4;
-	header->m_uuid_len = UUID_LEN;
-	header->k_incarnation = SWIM_MEMBER_INCARNATION;
-	header->m_incarnation = 0xcf;
+	swim_passport_bin_create(&header->passport);
 }
 
 void
