@@ -179,7 +179,13 @@ box.space.T4:drop()
 t1 = box.schema.create_space("T1", {format = {'ID'}})
 t2 = box.schema.create_space("T2")
 i1 = box.space.T2:create_index('I1')
-box.sql.execute("ALTER TABLE t1 ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES t2;")
+box.execute("ALTER TABLE t1 ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES t2;")
+
+-- Make sure that if referenced columns (of parent space) are
+-- ommitted and parent space doesn't have PK, then error is raised.
+--
+box.execute("ALTER TABLE t2 ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES t1;")
+
 t1:drop()
 t2:drop()
 
