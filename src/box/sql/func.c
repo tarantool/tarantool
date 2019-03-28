@@ -1284,108 +1284,196 @@ replaceFunc(sql_context * context, int argc, sql_value ** argv)
 	sql_result_text(context, (char *)zOut, j, sql_free);
 }
 
-/*
- * Implementation of the TRIM(), LTRIM(), and RTRIM() functions.
- * The userdata is 0x1 for left trim, 0x2 for right trim, 0x3 for both.
+/**
+ * Remove characters included in @a trim_set from @a input_str
+ * until encounter a character that doesn't belong to @a trim_set.
+ * Remove from the side specified by @a flags.
+ * @param context SQL context.
+ * @param flags Trim specification: left, right or both.
+ * @param trim_set The set of characters for trimming.
+ * @param char_len Lengths of each UTF-8 character in @a trim_set.
+ * @param char_cnt A number of UTF-8 characters in @a trim_set.
+ * @param input_str Input string for trimming.
+ * @param input_str_sz Input string size in bytes.
  */
 static void
-trimFunc(sql_context * context, int argc, sql_value ** argv)
+trim_procedure(struct sql_context *context, enum trim_side_mask flags,
+	       const unsigned char *trim_set, const uint8_t *char_len,
+	       int char_cnt, const unsigned char *input_str, int input_str_sz)
 {
-	const unsigned char *zIn;	/* Input string */
-	const unsigned char *zCharSet;	/* Set of characters to trim */
-	int nIn;		/* Number of bytes in input */
-	int flags;		/* 1: trimleft  2: trimright  3: trim */
-	int i;			/* Loop counter */
-	unsigned char *aLen = 0;	/* Length of each character in zCharSet */
-	unsigned char **azChar = 0;	/* Individual characters in zCharSet */
-	int nChar;		/* Number of characters in zCharSet */
+	if (char_cnt == 0)
+		goto finish;
+	int i, len;
+	const unsigned char *z;
+	if ((flags & TRIM_LEADING) != 0) {
+		while (input_str_sz > 0) {
+			z = trim_set;
+			for (i = 0; i < char_cnt; ++i, z += len) {
+				len = char_len[i];
+				if (len <= input_str_sz
+				    && memcmp(input_str, z, len) == 0)
+					break;
+			}
+			if (i >= char_cnt)
+				break;
+			input_str += len;
+			input_str_sz -= len;
+		}
+	}
+	if ((flags & TRIM_TRAILING) != 0) {
+		while (input_str_sz > 0) {
+			z = trim_set;
+			for (i = 0; i < char_cnt; ++i, z += len) {
+				len = char_len[i];
+				if (len <= input_str_sz
+				    && memcmp(&input_str[input_str_sz - len],
+					      z, len) == 0)
+					break;
+			}
+			if (i >= char_cnt)
+				break;
+			input_str_sz -= len;
+		}
+	}
+finish:
+	sql_result_text(context, (char *)input_str, input_str_sz,
+			SQL_TRANSIENT);
+}
 
-	if (sql_value_type(argv[0]) == SQL_NULL) {
-		return;
+/**
+ * Prepare arguments for trimming procedure. Allocate memory for
+ * @a char_len (array of lengths each character in @a trim_set)
+ * and fill it.
+ *
+ * @param context SQL context.
+ * @param trim_set The set of characters for trimming.
+ * @param[out] char_len Lengths of each character in @ trim_set.
+ * @retval >=0 A number of UTF-8 characters in @a trim_set.
+ * @retval -1 Memory allocation error.
+ */
+static int
+trim_prepare_char_len(struct sql_context *context,
+		      const unsigned char *trim_set, int trim_set_sz,
+		      uint8_t **char_len)
+{
+	/*
+	 * Count the number of UTF-8 characters passing through
+	 * the entire char set, but not up to the '\0' or X'00'
+	 * character. This allows to handle trimming set
+	 * containing such characters.
+	 */
+	int char_cnt = sql_utf8_char_count(trim_set, trim_set_sz);
+	if (char_cnt == 0) {
+		*char_len = NULL;
+		return 0;
 	}
-	zIn = sql_value_text(argv[0]);
-	if (zIn == 0)
-		return;
-	nIn = sql_value_bytes(argv[0]);
-	assert(zIn == sql_value_text(argv[0]));
-	if (argc == 1) {
-		static const unsigned char lenOne[] = { 1 };
-		static unsigned char *const azOne[] = { (u8 *) " " };
-		nChar = 1;
-		aLen = (u8 *) lenOne;
-		azChar = (unsigned char **)azOne;
-		zCharSet = 0;
-	} else if ((zCharSet = sql_value_text(argv[1])) == 0) {
-		return;
-	} else {
-		const unsigned char *z = zCharSet;
-		int trim_set_sz = sql_value_bytes(argv[1]);
-		/*
-		* Count the number of UTF-8 characters passing
-		* through the entire char set, but not up
-		* to the '\0' or X'00' character. This allows
-		* to handle trimming set containing such
-		* characters.
-		*/
-		nChar = sql_utf8_char_count(z, trim_set_sz);
-		if (nChar > 0) {
-			azChar =
-			    contextMalloc(context,
-					  ((i64) nChar) * (sizeof(char *) + 1));
-			if (azChar == 0) {
-				return;
-			}
-			aLen = (unsigned char *)&azChar[nChar];
-			z = zCharSet;
-			i = 0;
-			nChar = 0;
-			int handled_bytes_cnt = trim_set_sz;
-			while(handled_bytes_cnt > 0) {
-				azChar[nChar] = (unsigned char *)(z + i);
-				SQL_UTF8_FWD_1(z, i, trim_set_sz);
-				aLen[nChar] = (u8) (z + i - azChar[nChar]);
-				handled_bytes_cnt -= aLen[nChar];
-				nChar++;
-			}
-		}
+
+	if ((*char_len = (uint8_t *)contextMalloc(context, char_cnt)) == NULL)
+		return -1;
+
+	int i = 0, j = 0;
+	while(j < char_cnt) {
+		int old_i = i;
+		SQL_UTF8_FWD_1(trim_set, i, trim_set_sz);
+		(*char_len)[j++] = i - old_i;
 	}
-	if (nChar > 0) {
-		flags = SQL_PTR_TO_INT(sql_user_data(context));
-		if (flags & 1) {
-			while (nIn > 0) {
-				int len = 0;
-				for (i = 0; i < nChar; i++) {
-					len = aLen[i];
-					if (len <= nIn
-					    && memcmp(zIn, azChar[i], len) == 0)
-						break;
-				}
-				if (i >= nChar)
-					break;
-				zIn += len;
-				nIn -= len;
-			}
-		}
-		if (flags & 2) {
-			while (nIn > 0) {
-				int len = 0;
-				for (i = 0; i < nChar; i++) {
-					len = aLen[i];
-					if (len <= nIn
-					    && memcmp(&zIn[nIn - len],
-						      azChar[i], len) == 0)
-						break;
-				}
-				if (i >= nChar)
-					break;
-				nIn -= len;
-			}
-		}
-		if (zCharSet) {
-			sql_free(azChar);
-		}
+
+	return char_cnt;
+}
+
+/**
+ * Normalize args from @a argv input array when it has one arg
+ * only.
+ *
+ * Case: TRIM(<str>)
+ * Call trimming procedure with TRIM_BOTH as the flags and " " as
+ * the trimming set.
+ */
+static void
+trim_func_one_arg(struct sql_context *context, int argc, sql_value **argv)
+{
+	assert(argc == 1);
+	(void) argc;
+
+	const unsigned char *input_str;
+	if ((input_str = sql_value_text(argv[0])) == NULL)
+		return;
+
+	int input_str_sz = sql_value_bytes(argv[0]);
+	uint8_t len_one = 1;
+	trim_procedure(context, TRIM_BOTH, (const unsigned char *) " ",
+		       &len_one, 1, input_str, input_str_sz);
+}
+
+/**
+ * Normalize args from @a argv input array when it has two args.
+ *
+ * Case: TRIM(<character_set> FROM <str>)
+ * If user has specified <character_set> only, call trimming
+ * procedure with TRIM_BOTH as the flags and that trimming set.
+ *
+ * Case: TRIM(LEADING/TRAILING/BOTH FROM <str>)
+ * If user has specified side keyword only, then call trimming
+ * procedure with the specified side and " " as the trimming set.
+ */
+static void
+trim_func_two_args(struct sql_context *context, int argc, sql_value **argv)
+{
+	assert(argc == 2);
+	(void) argc;
+
+	const unsigned char *input_str, *trim_set;
+	if ((input_str = sql_value_text(argv[1])) == NULL)
+		return;
+
+	int input_str_sz = sql_value_bytes(argv[1]);
+	if (sql_value_type(argv[0]) == SQL_INTEGER) {
+		uint8_t len_one = 1;
+		trim_procedure(context, sql_value_int(argv[0]),
+			       (const unsigned char *) " ", &len_one, 1,
+			       input_str, input_str_sz);
+	} else if ((trim_set = sql_value_text(argv[0])) != NULL) {
+		int trim_set_sz = sql_value_bytes(argv[0]);
+		uint8_t *char_len;
+		int char_cnt = trim_prepare_char_len(context, trim_set,
+						     trim_set_sz, &char_len);
+		if (char_cnt == -1)
+			return;
+		trim_procedure(context, TRIM_BOTH, trim_set, char_len, char_cnt,
+			       input_str, input_str_sz);
+		sql_free(char_len);
 	}
-	sql_result_text(context, (char *)zIn, nIn, SQL_TRANSIENT);
+}
+
+/**
+ * Normalize args from @a argv input array when it has three args.
+ *
+ * Case: TRIM(LEADING/TRAILING/BOTH <character_set> FROM <str>)
+ * If user has specified side keyword and <character_set>, then
+ * call trimming procedure with that args.
+ */
+static void
+trim_func_three_args(struct sql_context *context, int argc, sql_value **argv)
+{
+	assert(argc == 3);
+	(void) argc;
+
+	assert(sql_value_type(argv[0]) == SQL_INTEGER);
+	const unsigned char *input_str, *trim_set;
+	if ((input_str = sql_value_text(argv[2])) == NULL ||
+	    (trim_set = sql_value_text(argv[1])) == NULL)
+		return;
+
+	int trim_set_sz = sql_value_bytes(argv[1]);
+	int input_str_sz = sql_value_bytes(argv[2]);
+	uint8_t *char_len;
+	int char_cnt = trim_prepare_char_len(context, trim_set, trim_set_sz,
+					     &char_len);
+	if (char_cnt == -1)
+		return;
+	trim_procedure(context, sql_value_int(argv[0]), trim_set, char_len,
+		       char_cnt, input_str, input_str_sz);
+	sql_free(char_len);
 }
 
 #ifdef SQL_ENABLE_UNKNOWN_SQL_FUNCTION
@@ -1810,12 +1898,9 @@ sqlRegisterBuiltinFunctions(void)
 			  FIELD_TYPE_INTEGER),
 		FUNCTION2(likely, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
 			  FIELD_TYPE_INTEGER),
-		FUNCTION_COLL(ltrim, 1, 1, 0, trimFunc),
-		FUNCTION_COLL(ltrim, 2, 1, 0, trimFunc),
-		FUNCTION_COLL(rtrim, 1, 2, 0, trimFunc),
-		FUNCTION_COLL(rtrim, 2, 2, 0, trimFunc),
-		FUNCTION_COLL(trim, 1, 3, 0, trimFunc),
-		FUNCTION_COLL(trim, 2, 3, 0, trimFunc),
+		FUNCTION_COLL(trim, 1, 3, 0, trim_func_one_arg),
+		FUNCTION_COLL(trim, 2, 3, 0, trim_func_two_args),
+		FUNCTION_COLL(trim, 3, 3, 0, trim_func_three_args),
 		FUNCTION(min, -1, 0, 1, minmaxFunc, FIELD_TYPE_SCALAR),
 		FUNCTION(min, 0, 0, 1, 0, FIELD_TYPE_SCALAR),
 		AGGREGATE2(min, 1, 0, 1, minmaxStep, minMaxFinalize,

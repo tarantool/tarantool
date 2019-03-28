@@ -1032,6 +1032,55 @@ expr(A) ::= CAST(X) LP expr(E) AS typedef(T) RP(Y). {
   sqlExprAttachSubtrees(pParse->db, A.pExpr, E.pExpr, 0);
 }
 %endif  SQL_OMIT_CAST
+
+expr(A) ::= TRIM(X) LP trim_operands(Y) RP(E). {
+  A.pExpr = sqlExprFunction(pParse, Y, &X);
+  spanSet(&A, &X, &E);
+}
+
+%type trim_operands {struct ExprList *}
+%destructor trim_operands {sql_expr_list_delete(pParse->db, $$);}
+
+trim_operands(A) ::= trim_from_clause(F) expr(Y). {
+  A = sql_expr_list_append(pParse->db, F, Y.pExpr);
+}
+
+trim_operands(A) ::= expr(Y). {
+  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
+}
+
+%type trim_from_clause {struct ExprList *}
+%destructor trim_from_clause {sql_expr_list_delete(pParse->db, $$);}
+
+/*
+ * The following two rules cover three cases of keyword
+ * (LEADING/TRAILING/BOTH) and <trim_character_set> combination.
+ * The case when both of them are absent is disallowed.
+ */
+trim_from_clause(A) ::= expr(Y) FROM. {
+  A = sql_expr_list_append(pParse->db, NULL, Y.pExpr);
+}
+
+trim_from_clause(A) ::= trim_specification(N) expr_optional(Y) FROM. {
+  struct Expr *p = sql_expr_new_dequoted(pParse->db, TK_INTEGER,
+                                         &sqlIntTokens[N]);
+  A = sql_expr_list_append(pParse->db, NULL, p);
+  if (Y != NULL)
+    A = sql_expr_list_append(pParse->db, A, Y);
+}
+
+%type expr_optional {struct Expr *}
+%destructor expr_optional {sql_expr_delete(pParse->db, $$, false);}
+
+expr_optional(A) ::= .        { A = NULL; }
+expr_optional(A) ::= expr(X). { A = X.pExpr; }
+
+%type trim_specification {enum trim_side_mask}
+
+trim_specification(A) ::= LEADING.  { A = TRIM_LEADING; }
+trim_specification(A) ::= TRAILING. { A = TRIM_TRAILING; }
+trim_specification(A) ::= BOTH.     { A = TRIM_BOTH; }
+
 expr(A) ::= id(X) LP distinct(D) exprlist(Y) RP(E). {
   if( Y && Y->nExpr>pParse->db->aLimit[SQL_LIMIT_FUNCTION_ARG] ){
     const char *err =
@@ -1294,7 +1343,7 @@ expr(A) ::= EXISTS(B) LP select(Y) RP(E). {
 }
 
 /* CASE expressions */
-expr(A) ::= CASE(C) case_operand(X) case_exprlist(Y) case_else(Z) END(E). {
+expr(A) ::= CASE(C) expr_optional(X) case_exprlist(Y) case_else(Z) END(E). {
   spanSet(&A,&C,&E);  /*A-overwrites-C*/
   A.pExpr = sqlPExpr(pParse, TK_CASE, X, 0);
   if( A.pExpr ){
@@ -1319,10 +1368,6 @@ case_exprlist(A) ::= WHEN expr(Y) THEN expr(Z). {
 %destructor case_else {sql_expr_delete(pParse->db, $$, false);}
 case_else(A) ::=  ELSE expr(X).         {A = X.pExpr;}
 case_else(A) ::=  .                     {A = 0;} 
-%type case_operand {Expr*}
-%destructor case_operand {sql_expr_delete(pParse->db, $$, false);}
-case_operand(A) ::= expr(X).            {A = X.pExpr; /*A-overwrites-X*/} 
-case_operand(A) ::= .                   {A = 0;} 
 
 %type exprlist {ExprList*}
 %destructor exprlist {sql_expr_list_delete(pParse->db, $$);}

@@ -87,7 +87,7 @@ struct Token {
 	bool isReserved;
 };
 
-/** Constant tokens for values 0 and 1. */
+/** Constant tokens for integer values. */
 extern const struct Token sqlIntTokens[];
 
 /** Generate a Token object from a string. */

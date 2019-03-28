@@ -278,6 +278,10 @@ static Keyword aKeywordTable[] = {
   { "WHILE",                  "TK_STANDARD",    RESERVED,         true  },
   { "TEXT",                   "TK_TEXT",        RESERVED,         true  },
   { "TRUNCATE",               "TK_TRUNCATE",    ALWAYS,           true  },
+  { "TRIM",                   "TK_TRIM",        ALWAYS,           true  },
+  { "LEADING",                "TK_LEADING",     ALWAYS,           true  },
+  { "TRAILING",               "TK_TRAILING",    ALWAYS,           true  },
+  { "BOTH",                   "TK_BOTH",        ALWAYS,           true  },
 };
 
 /* Number of keywords */

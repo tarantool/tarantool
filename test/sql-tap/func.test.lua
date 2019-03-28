@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(14586)
+test:plan(14590)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -1915,7 +1915,7 @@ test:do_catchsql_test(
         SELECT trim(1,2,3)
     ]], {
         -- <func-22.1>
-        1, "wrong number of arguments to function TRIM()"
+        1, "Syntax error near ','"
         -- </func-22.1>
     })
 
@@ -1925,7 +1925,7 @@ test:do_catchsql_test(
         SELECT ltrim(1,2,3)
     ]], {
         -- <func-22.2>
-        1, "wrong number of arguments to function LTRIM()"
+        1, "Function 'LTRIM' does not exist"
         -- </func-22.2>
     })
 
@@ -1935,7 +1935,7 @@ test:do_catchsql_test(
         SELECT rtrim(1,2,3)
     ]], {
         -- <func-22.3>
-        1, "wrong number of arguments to function RTRIM()"
+        1, "Function 'RTRIM' does not exist"
         -- </func-22.3>
     })
 
@@ -1952,7 +1952,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.5",
     [[
-        SELECT ltrim('  hi  ');
+        SELECT TRIM(LEADING FROM '  hi  ');
     ]], {
         -- <func-22.5>
         "hi  "
@@ -1962,7 +1962,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.6",
     [[
-        SELECT rtrim('  hi  ');
+        SELECT TRIM(TRAILING FROM '  hi  ');
     ]], {
         -- <func-22.6>
         "  hi"
@@ -1972,7 +1972,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.7",
     [[
-        SELECT trim('  hi  ','xyz');
+        SELECT TRIM('xyz' FROM '  hi  ');
     ]], {
         -- <func-22.7>
         "  hi  "
@@ -1982,7 +1982,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.8",
     [[
-        SELECT ltrim('  hi  ','xyz');
+        SELECT TRIM(LEADING 'xyz' FROM '  hi  ');
     ]], {
         -- <func-22.8>
         "  hi  "
@@ -1992,7 +1992,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.9",
     [[
-        SELECT rtrim('  hi  ','xyz');
+        SELECT TRIM(TRAILING 'xyz' FROM '  hi  ');
     ]], {
         -- <func-22.9>
         "  hi  "
@@ -2002,7 +2002,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.10",
     [[
-        SELECT trim('xyxzy  hi  zzzy','xyz');
+        SELECT TRIM('xyz' FROM 'xyxzy  hi  zzzy');
     ]], {
         -- <func-22.10>
         "  hi  "
@@ -2012,7 +2012,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.11",
     [[
-        SELECT ltrim('xyxzy  hi  zzzy','xyz');
+        SELECT TRIM(LEADING 'xyz' FROM 'xyxzy  hi  zzzy');
     ]], {
         -- <func-22.11>
         "  hi  zzzy"
@@ -2022,7 +2022,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.12",
     [[
-        SELECT rtrim('xyxzy  hi  zzzy','xyz');
+        SELECT TRIM(TRAILING 'xyz' FROM 'xyxzy  hi  zzzy');
     ]], {
         -- <func-22.12>
         "xyxzy  hi  "
@@ -2032,7 +2032,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.13",
     [[
-        SELECT trim('  hi  ','');
+        SELECT TRIM('' FROM '  hi  ');
     ]], {
         -- <func-22.13>
         "  hi  "
@@ -2043,7 +2043,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.14",
     [[
-        SELECT hex(trim(x'c280e1bfbff48fbfbf6869',x'6162e1bfbfc280'))
+        SELECT hex(TRIM(x'6162e1bfbfc280' FROM x'c280e1bfbff48fbfbf6869'))
     ]], {
         -- <func-22.14>
         "F48FBFBF6869"
@@ -2052,8 +2052,8 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     "func-22.15",
-    [[SELECT hex(trim(x'6869c280e1bfbff48fbfbf61',
-                         x'6162e1bfbfc280f48fbfbf'))]], {
+    [[SELECT hex(TRIM(x'6162e1bfbfc280f48fbfbf'
+                      FROM x'6869c280e1bfbff48fbfbf61'))]], {
         -- <func-22.15>
         "6869"
         -- </func-22.15>
@@ -2062,7 +2062,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.16",
     [[
-        SELECT hex(trim(x'ceb1ceb2ceb3',x'ceb1'));
+        SELECT hex(TRIM(x'ceb1' FROM x'ceb1ceb2ceb3'));
     ]], {
         -- <func-22.16>
         "CEB2CEB3"
@@ -2083,7 +2083,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.21",
     [[
-        SELECT typeof(trim(NULL,'xyz'));
+        SELECT typeof(TRIM('xyz' FROM NULL));
     ]], {
         -- <func-22.21>
         "null"
@@ -2093,7 +2093,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.22",
     [[
-        SELECT typeof(trim('hello',NULL));
+        SELECT typeof(TRIM(NULL FROM 'hello'));
     ]], {
         -- <func-22.22>
         "null"
@@ -2105,7 +2105,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.23",
     [[
-        SELECT TRIM(X'004100', X'00');
+        SELECT TRIM(X'00' FROM X'004100');
     ]], {
         -- <func-22.23>
         "A"
@@ -2115,7 +2115,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.24",
     [[
-        SELECT TRIM(X'004100', X'0000');
+        SELECT TRIM(X'0000' FROM X'004100');
     ]], {
         -- <func-22.24>
         "A"
@@ -2125,7 +2125,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.25",
     [[
-        SELECT TRIM(X'004100', X'0042');
+        SELECT TRIM(X'0042' FROM X'004100');
     ]], {
         -- <func-22.25>
         "A"
@@ -2135,7 +2135,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.26",
     [[
-        SELECT TRIM(X'00004100420000', X'00');
+        SELECT TRIM(X'00' FROM X'00004100420000');
     ]], {
         -- <func-22.26>
         "A\0B"
@@ -2145,7 +2145,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.27",
     [[
-        SELECT LTRIM(X'004100', X'00');
+        SELECT TRIM(LEADING X'00' FROM X'004100');
     ]], {
         -- <func-22.27>
         "A\0"
@@ -2155,7 +2155,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.28",
     [[
-        SELECT LTRIM(X'004100', X'0000');
+        SELECT TRIM(LEADING X'0000' FROM X'004100');
     ]], {
         -- <func-22.28>
         "A\0"
@@ -2165,7 +2165,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.29",
     [[
-        SELECT LTRIM(X'004100', X'0042');
+        SELECT TRIM(LEADING X'0042' FROM X'004100');
     ]], {
         -- <func-22.29>
         "A\0"
@@ -2175,7 +2175,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.30",
     [[
-        SELECT LTRIM(X'00004100420000', X'00');
+        SELECT TRIM(LEADING X'00' FROM X'00004100420000');
     ]], {
         -- <func-22.30>
         "A\0B\0\0"
@@ -2185,7 +2185,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.31",
     [[
-        SELECT RTRIM(X'004100', X'00');
+        SELECT TRIM(TRAILING X'00' FROM X'004100');
     ]], {
         -- <func-22.31>
         "\0A"
@@ -2195,7 +2195,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.32",
     [[
-        SELECT RTRIM(X'004100', X'0000');
+        SELECT TRIM(TRAILING X'0000' FROM X'004100');
     ]], {
         -- <func-22.32>
         "\0A"
@@ -2205,7 +2205,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.33",
     [[
-        SELECT RTRIM(X'004100', X'0042');
+        SELECT TRIM(TRAILING X'0042' FROM X'004100');
     ]], {
         -- <func-22.33>
         "\0A"
@@ -2215,11 +2215,54 @@ test:do_execsql_test(
 test:do_execsql_test(
     "func-22.34",
     [[
-        SELECT RTRIM(X'00004100420000', X'00');
+        SELECT TRIM(TRAILING X'00' FROM X'00004100420000');
     ]], {
         -- <func-22.34>
         "\0\0A\0B"
         -- </func-22.34>
+    })
+
+-- gh-3879 Check new TRIM() grammar, particularly BOTH keyword and
+-- FROM without any agrs before. LEADING and TRAILING keywords is
+-- checked above.
+
+test:do_execsql_test(
+    "func-22.35",
+    [[
+        SELECT TRIM(BOTH FROM '  hi  ');
+    ]], {
+        -- <func-22.35>
+        "hi"
+        -- </func-22.35>
+    })
+test:do_execsql_test(
+    "func-22.36",
+    [[
+        SELECT TRIM(BOTH 'xyz' FROM '  hi  ');
+    ]], {
+        -- <func-22.36>
+        "  hi  "
+        -- </func-22.36>
+    })
+
+test:do_execsql_test(
+    "func-22.37",
+    [[
+        SELECT TRIM(BOTH 'xyz' FROM 'xyxzy  hi  zzzy');
+    ]], {
+        -- <func-22.37>
+        "  hi  "
+        -- </func-22.37>
+    })
+
+test:do_catchsql_test(
+    "func-22.38",
+    [[
+        SELECT TRIM(FROM 'xyxzy');
+    ]], {
+        -- <func-22.38>
+        1, "Syntax error near 'FROM'"
+        -- </func-22.38>
     })
 
 -- This is to test the deprecated sql_aggregate_count() API.
@@ -2838,16 +2881,16 @@ test:do_execsql_test(
     "SELECT TRIM(CHAR(32,00,32,00,32));",
     {string.char(00,32,00)})
 
--- LTRIM
+-- LEFT TRIM
 test:do_execsql_test(
     "func-70",
-    "SELECT LTRIM(CHAR(32,00,32,00,32));",
+    "SELECT TRIM(LEADING FROM CHAR(32,00,32,00,32));",
     {string.char(00,32,00,32)})
 
--- RTRIM
+-- RIGHT TRIM
 test:do_execsql_test(
     "func-71",
-    "SELECT RTRIM(CHAR(32,00,32,00,32));",
+    "SELECT TRIM(TRAILING FROM CHAR(32,00,32,00,32));",
     {string.char(32,00,32,00)})
 
 -- GROUP_CONCAT

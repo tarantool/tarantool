@@ -1635,6 +1635,17 @@ struct FuncDestructor {
 					 */
 
 /*
+ * Trim side mask components. TRIM_LEADING means to trim left side
+ * only. TRIM_TRAILING is to trim right side only. TRIM_BOTH is to
+ * trim both sides.
+ */
+enum trim_side_mask {
+	TRIM_LEADING = 1,
+	TRIM_TRAILING = 2,
+	TRIM_BOTH = TRIM_LEADING | TRIM_TRAILING
+};
+
+/*
  * The following three macros, FUNCTION(), LIKEFUNC() and AGGREGATE() are
  * used to create the initializers for the FuncDef structures.
  *
