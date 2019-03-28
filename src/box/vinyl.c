@@ -1034,14 +1034,14 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 /**
  * This function is called after installing on_replace trigger
  * used for propagating changes done during DDL. It aborts all
- * rw transactions affecting the given LSM tree that began
+ * rw transactions affecting the given space that began
  * before the trigger was installed so that DDL doesn't miss
  * their working set.
  */
 static void
-vy_abort_writers_for_ddl(struct vy_env *env, struct vy_lsm *lsm)
+vy_abort_writers_for_ddl(struct vy_env *env, struct space *space)
 {
-	tx_manager_abort_writers_for_ddl(env->xm, lsm);
+	tx_manager_abort_writers_for_ddl(env->xm, space);
 	/*
 	 * Wait for prepared transactions to complete
 	 * (we can't abort them as they reached WAL).
@@ -1115,7 +1115,7 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 	trigger_create(&on_replace, vy_check_format_on_replace, &ctx, NULL);
 	trigger_add(&space->on_replace, &on_replace);
 
-	vy_abort_writers_for_ddl(env, pk);
+	vy_abort_writers_for_ddl(env, space);
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,
@@ -2434,7 +2434,7 @@ vinyl_engine_begin_statement(struct engine *engine, struct txn *txn)
 	struct vy_tx *tx = txn->engine_tx;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	assert(tx != NULL);
-	return vy_tx_begin_statement(tx, &stmt->engine_savepoint);
+	return vy_tx_begin_statement(tx, stmt->space, &stmt->engine_savepoint);
 }
 
 static void
@@ -4229,7 +4229,7 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 	trigger_create(&on_replace, vy_build_on_replace, &ctx, NULL);
 	trigger_add(&src_space->on_replace, &on_replace);
 
-	vy_abort_writers_for_ddl(env, pk);
+	vy_abort_writers_for_ddl(env, src_space);
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, pk, NULL, ITER_ALL, pk->env->empty_key,

@@ -322,6 +322,7 @@ vy_tx_read_set_free_cb(vy_tx_read_set_t *read_set,
 void
 vy_tx_create(struct tx_manager *xm, struct vy_tx *tx)
 {
+	tx->last_stmt_space = NULL;
 	stailq_create(&tx->log);
 	write_set_new(&tx->write_set);
 	tx->write_set_version = 0;
@@ -869,13 +870,14 @@ vy_tx_rollback(struct vy_tx *tx)
 }
 
 int
-vy_tx_begin_statement(struct vy_tx *tx, void **savepoint)
+vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint)
 {
 	if (tx->state == VINYL_TX_ABORT) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
 	assert(tx->state == VINYL_TX_READY);
+	tx->last_stmt_space = space;
 	if (stailq_empty(&tx->log))
 		rlist_add_entry(&tx->xm->writers, tx, in_writers);
 	*savepoint = stailq_last(&tx->log);
@@ -907,6 +909,7 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 	}
 	if (stailq_empty(&tx->log))
 		rlist_del_entry(tx, in_writers);
+	tx->last_stmt_space = NULL;
 }
 
 int
@@ -1108,11 +1111,16 @@ vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
 }
 
 void
-tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct vy_lsm *lsm)
+tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space)
 {
+	if (space->index_count == 0)
+		return; /* no indexes, no conflicts */
+	struct vy_lsm *lsm = vy_lsm(space->index[0]);
 	struct vy_tx *tx;
 	rlist_foreach_entry(tx, &xm->writers, in_writers) {
-		if (tx->state == VINYL_TX_READY &&
+		if (tx->state != VINYL_TX_READY)
+			continue;
+		if (tx->last_stmt_space == space ||
 		    write_set_search_key(&tx->write_set, lsm,
 					 lsm->env->empty_key) != NULL)
 			vy_tx_abort(tx);
