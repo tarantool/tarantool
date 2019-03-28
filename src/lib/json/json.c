@@ -321,6 +321,24 @@ json_path_validate(const char *path, int path_len, int index_base)
 	return rc;
 }
 
+int
+json_path_multikey_offset(const char *path, int path_len, int index_base)
+{
+	struct json_lexer lexer;
+	json_lexer_create(&lexer, path, path_len, index_base);
+	struct json_token token;
+	int rc, last_lexer_offset = 0;
+	while ((rc = json_lexer_next_token(&lexer, &token)) == 0) {
+		if (token.type == JSON_TOKEN_ANY)
+			return last_lexer_offset;
+		else if (token.type == JSON_TOKEN_END)
+			break;
+		last_lexer_offset = lexer.offset;
+	}
+	assert(rc == 0);
+	return path_len;
+}
+
 /**
  * An snprint-style helper to print an individual token key.
  */

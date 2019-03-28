@@ -555,17 +555,47 @@ test_path_snprint()
 	footer();
 }
 
+void
+test_path_multikey()
+{
+	static struct {
+		const char *str;
+		int rc;
+	} test_cases[] = {
+		{"", 0},
+		{"[1]Data[1]extra[1]", 18},
+		{"[*]Data[1]extra[1]", 0},
+		{"[*]Data[*]extra[1]", 0},
+		{"[1]Data[*]extra[1]", 7},
+		{"[1]Data[1]extra[*]", 15},
+	};
+
+	header();
+	plan(lengthof(test_cases));
+	for (unsigned i = 0; i < lengthof(test_cases); i++) {
+		int rc = json_path_multikey_offset(test_cases[i].str,
+						   strlen(test_cases[i].str),
+						   INDEX_BASE);
+		is(rc, test_cases[i].rc, "Test json_path_multikey_offset with "
+		   "%s: have %d expected %d", test_cases[i].str, rc,
+		   test_cases[i].rc);
+	}
+	check_plan();
+	footer();
+}
+
 int
 main()
 {
 	header();
-	plan(5);
+	plan(6);
 
 	test_basic();
 	test_errors();
 	test_tree();
 	test_path_cmp();
 	test_path_snprint();
+	test_path_multikey();
 
 	int rc = check_plan();
 	footer();

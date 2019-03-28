@@ -260,6 +260,16 @@ int
 json_path_validate(const char *path, int path_len, int index_base);
 
 /**
+ * Scan the JSON path string and return the offset of the first
+ * character [*] (the array index placeholder).
+ * - if [*] is not found, path_len is returned.
+ * - specified JSON path must be valid
+ *   (may be tested with json_path_validate).
+ */
+int
+json_path_multikey_offset(const char *path, int path_len, int index_base);
+
+/**
  * Test if a given JSON token is a JSON tree leaf, i.e.
  * has no child nodes.
  */

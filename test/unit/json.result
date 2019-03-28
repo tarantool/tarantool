@@ -1,5 +1,5 @@
 	*** main ***
-1..5
+1..6
 	*** test_basic ***
     1..71
     ok 1 - parse <[1]>
@@ -194,4 +194,14 @@ ok 4 - subtests
     ok 9 - 0-byte buffer - retval
 ok 5 - subtests
 	*** test_path_snprint: done ***
+	*** test_path_multikey ***
+    1..6
+    ok 1 - Test json_path_multikey_offset with : have 0 expected 0
+    ok 2 - Test json_path_multikey_offset with [1]Data[1]extra[1]: have 18 expected 18
+    ok 3 - Test json_path_multikey_offset with [*]Data[1]extra[1]: have 0 expected 0
+    ok 4 - Test json_path_multikey_offset with [*]Data[*]extra[1]: have 0 expected 0
+    ok 5 - Test json_path_multikey_offset with [1]Data[*]extra[1]: have 7 expected 7
+    ok 6 - Test json_path_multikey_offset with [1]Data[1]extra[*]: have 15 expected 15
+ok 6 - subtests
+	*** test_path_multikey: done ***
 	*** main: done ***
