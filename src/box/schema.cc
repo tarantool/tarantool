@@ -257,6 +257,9 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		diag_log();
 		panic("Can't update space cache");
 	}
+
+	if (old_space != NULL)
+		space_invalidate(old_space);
 }
 
 /** A wrapper around space_new() for data dictionary spaces. */

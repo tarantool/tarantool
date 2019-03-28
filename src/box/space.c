@@ -637,4 +637,10 @@ generic_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+void
+generic_space_invalidate(struct space *space)
+{
+	(void)space;
+}
+
 /* }}} */

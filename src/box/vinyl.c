@@ -1031,6 +1031,26 @@ vinyl_space_prepare_alter(struct space *old_space, struct space *new_space)
 	return 0;
 }
 
+static void
+vinyl_space_invalidate(struct space *space)
+{
+	struct vy_env *env = vy_env(space->engine);
+	/*
+	 * Abort all transactions involving the invalidated space.
+	 * An aborted transaction doesn't allow any DML/DQL requests
+	 * so the space won't be used anymore and can be safely
+	 * destroyed.
+	 *
+	 * There's a subtle corner case though - a transaction can
+	 * be reading disk from a DML request right now, with this
+	 * space passed to it in the argument list. However, it's
+	 * handled as well: the iterator will return an error as
+	 * soon as it's done reading disk, which will make the DML
+	 * request bail out early, without dereferencing the space.
+	 */
+	tx_manager_abort_writers_for_ddl(env->xm, space);
+}
+
 /**
  * This function is called after installing on_replace trigger
  * used for propagating changes done during DDL. It aborts all
@@ -4543,6 +4563,7 @@ static const struct space_vtab vinyl_space_vtab = {
 	/* .build_index = */ vinyl_space_build_index,
 	/* .swap_index = */ vinyl_space_swap_index,
 	/* .prepare_alter = */ vinyl_space_prepare_alter,
+	/* .invalidate = */ vinyl_space_invalidate,
 };
 
 static const struct index_vtab vinyl_index_vtab = {

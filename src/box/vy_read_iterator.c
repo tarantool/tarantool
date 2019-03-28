@@ -503,6 +503,17 @@ rescan_disk:
 	}
 	vy_read_iterator_unpin_slices(itr);
 	/*
+	 * The transaction could have been aborted while we were
+	 * reading disk. We must stop now and return an error as
+	 * this function could be called by a DML request that
+	 * was aborted by a DDL operation: failing will prevent
+	 * it from dereferencing a destroyed space.
+	 */
+	if (itr->tx != NULL && itr->tx->state == VINYL_TX_ABORT) {
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		return -1;
+	}
+	/*
 	 * The list of in-memory indexes and/or the range tree could
 	 * have been modified by dump/compaction while we were fetching
 	 * data from disk. Restart the iterator if this is the case.
@@ -844,6 +855,8 @@ vy_read_iterator_track_read(struct vy_read_iterator *itr, struct tuple *stmt)
 NODISCARD int
 vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
+	assert(itr->tx == NULL || itr->tx->state == VINYL_TX_READY);
+
 	ev_tstamp start_time = ev_monotonic_now(loop());
 
 	struct vy_lsm *lsm = itr->lsm;
