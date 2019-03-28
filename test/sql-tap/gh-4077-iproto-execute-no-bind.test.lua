@@ -66,4 +66,7 @@ local exp_res = {{1}}
 local res = box.space.T:pairs():map(box.tuple.totable):totable()
 test:is_deeply(res, exp_res, 'verify inserted data')
 
+box.sql.execute('drop table T')
+box.schema.user.revoke('guest', 'read,write,execute', 'universe')
+
 os.exit(test:check() == true and 0 or 1)
