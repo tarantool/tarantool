@@ -174,5 +174,14 @@ box.space.T1:drop()
 box.execute("CREATE TABLE t4 (id INT PRIMARY KEY REFERENCES t4);")
 box.space.T4:drop()
 
+-- Make sure that child space can feature no PK.
+--
+t1 = box.schema.create_space("T1", {format = {'ID'}})
+t2 = box.schema.create_space("T2")
+i1 = box.space.T2:create_index('I1')
+box.sql.execute("ALTER TABLE t1 ADD CONSTRAINT fk FOREIGN KEY (id) REFERENCES t2;")
+t1:drop()
+t2:drop()
+
 --- Clean-up SQL DD hash.
 -test_run:cmd('restart server default with cleanup=1')
