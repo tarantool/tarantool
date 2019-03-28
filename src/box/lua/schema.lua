@@ -521,13 +521,13 @@ box.schema.space.drop = function(space_id, space_name, opts)
     for _, t in _trigger.index.space_id:pairs({space_id}) do
         _trigger:delete({t.name})
     end
+    for _, t in _fk_constraint.index.child_id:pairs({space_id}) do
+        _fk_constraint:delete({t.name, space_id})
+    end
     local keys = _vindex:select(space_id)
     for i = #keys, 1, -1 do
         local v = keys[i]
         _index:delete{v[1], v[2]}
-    end
-    for _, t in _fk_constraint.index.child_id:pairs({space_id}) do
-        _fk_constraint:delete({t.name, space_id})
     end
     revoke_object_privs('space', space_id)
     _truncate:delete{space_id}
