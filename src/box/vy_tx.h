@@ -51,6 +51,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+struct space;
 struct tuple;
 struct tx_manager;
 struct vy_mem;
@@ -139,6 +140,14 @@ struct vy_tx {
 	struct rlist in_writers;
 	/** Transaction manager. */
 	struct tx_manager *xm;
+	/**
+	 * Pointer to the space affected by the last prepared statement.
+	 * We need it so that we can abort a transaction on DDL even
+	 * if it hasn't inserted anything into the write set yet (e.g.
+	 * yielded on unique check) and therefore would otherwise be
+	 * ignored by tx_manager_abort_writers_for_ddl().
+	 */
+	struct space *last_stmt_space;
 	/**
 	 * In memory transaction log. Contains both reads
 	 * and writes.
@@ -277,12 +286,12 @@ size_t
 tx_manager_mem_used(struct tx_manager *xm);
 
 /**
- * Abort all rw transactions that affect the given LSM tree
+ * Abort all rw transactions that affect the given space
  * and haven't reached WAL yet. Called before executing a DDL
  * operation.
  */
 void
-tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct vy_lsm *lsm);
+tx_manager_abort_writers_for_ddl(struct tx_manager *xm, struct space *space);
 
 /**
  * Abort all local rw transactions that haven't reached WAL yet.
@@ -327,7 +336,7 @@ vy_tx_rollback(struct vy_tx *tx);
  * to a save point with vy_tx_rollback_statement().
  */
 int
-vy_tx_begin_statement(struct vy_tx *tx, void **savepoint);
+vy_tx_begin_statement(struct vy_tx *tx, struct space *space, void **savepoint);
 
 /**
  * Rollback a transaction statement.
