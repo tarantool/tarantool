@@ -121,6 +121,8 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 		if (stmt->row != NULL && stmt->row->replica_id == 0) {
 			assert(txn->n_new_rows > 0);
 			txn->n_new_rows--;
+			if (stmt->row->group_id == GROUP_LOCAL)
+				txn->n_local_rows--;
 		}
 		if (stmt->row != NULL && stmt->row->replica_id != 0) {
 			assert(txn->n_applier_rows > 0);
@@ -145,6 +147,7 @@ txn_begin(bool is_autocommit)
 	/* Initialize members explicitly to save time on memset() */
 	stailq_create(&txn->stmts);
 	txn->n_new_rows = 0;
+	txn->n_local_rows = 0;
 	txn->n_applier_rows = 0;
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
@@ -221,15 +224,13 @@ bool
 txn_is_distributed(struct txn *txn)
 {
 	assert(txn == in_txn());
-	if (txn->n_new_rows == 0 || txn->n_applier_rows == 0)
-		return false;
-	struct txn_stmt *stmt;
-	/* Search for new non local group rows. */
-	stailq_foreach_entry(stmt, &txn->stmts, next)
-		if (stmt->row->replica_id == 0 &&
-		    stmt->space->def->opts.group_id != GROUP_LOCAL)
-			return true;
-	return false;
+	/**
+	 * Transaction has both new and applier rows, and some of
+	 * the new rows need to be replicated back to the
+	 * server of transaction origin.
+	 */
+	return (txn->n_new_rows > 0 && txn->n_applier_rows > 0 &&
+		txn->n_new_rows != txn->n_local_rows);
 }
 
 /**
@@ -253,10 +254,14 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 		if (txn_add_redo(stmt, request) != 0)
 			goto fail;
 		assert(stmt->row != NULL);
-		if (stmt->row->replica_id == 0)
+		if (stmt->row->replica_id == 0) {
 			++txn->n_new_rows;
-		else
+			if (stmt->row->group_id == GROUP_LOCAL)
+				++txn->n_local_rows;
+
+		} else {
 			++txn->n_applier_rows;
+		}
 	}
 	/*
 	 * If there are triggers, and they are not disabled, and

@@ -143,6 +143,11 @@ struct txn {
 	/** Number of new rows without an assigned LSN. */
 	int n_new_rows;
 	/**
+	 * Number of local new rows, no assigned LSN and
+	 * replication group_id=local (not replicated anywhere).
+	 */
+	int n_local_rows;
+	/**
 	 * Number of rows coming from the applier, with an
 	 * already assigned LSN.
 	 */
