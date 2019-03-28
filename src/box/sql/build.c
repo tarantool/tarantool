@@ -1996,6 +1996,18 @@ table_add_index(struct space *space, struct index *index)
 	space->index_id_max =  MAX(space->index_id_max, index->def->iid);;
 }
 
+int
+sql_space_def_check_format(const struct space_def *space_def)
+{
+	assert(space_def != NULL);
+	if (space_def->field_count == 0) {
+		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
+			 "space without format");
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * Create and set index_def in the given Index.
  *
@@ -2157,6 +2169,10 @@ sql_create_index(struct Parse *parse, struct Token *token,
 		diag_set(ClientError, ER_MODIFY_INDEX,
 			 sql_name_from_token(db, token), def->name,
 			 "views can not be indexed");
+		parse->is_aborted = true;
+		goto exit_create_index;
+	}
+	if (sql_space_def_check_format(def) != 0) {
 		parse->is_aborted = true;
 		goto exit_create_index;
 	}
