@@ -122,6 +122,14 @@ struct space_vtab {
 	 */
 	int (*prepare_alter)(struct space *old_space,
 			     struct space *new_space);
+	/**
+	 * Called right after removing a space from the cache.
+	 * The engine should abort all transactions involving
+	 * the space, because the space will be destroyed soon.
+	 *
+	 * This function isn't allowed to yield or fail.
+	 */
+	void (*invalidate)(struct space *space);
 };
 
 struct space {
@@ -366,6 +374,12 @@ space_prepare_alter(struct space *old_space, struct space *new_space)
 	return new_space->vtab->prepare_alter(old_space, new_space);
 }
 
+static inline void
+space_invalidate(struct space *space)
+{
+	return space->vtab->invalidate(space);
+}
+
 static inline bool
 space_is_memtx(struct space *space) { return space->engine->id == 0; }
 
@@ -411,6 +425,7 @@ int generic_space_check_format(struct space *, struct tuple_format *);
 int generic_space_build_index(struct space *, struct index *,
 			      struct tuple_format *);
 int generic_space_prepare_alter(struct space *, struct space *);
+void generic_space_invalidate(struct space *);
 
 #if defined(__cplusplus)
 } /* extern "C" */
