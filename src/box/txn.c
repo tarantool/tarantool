@@ -119,12 +119,12 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 		if (txn->engine != NULL && stmt->space != NULL)
 			engine_rollback_statement(txn->engine, txn, stmt);
 		if (stmt->row != NULL && stmt->row->replica_id == 0) {
-			assert(txn->n_local_rows > 0);
-			txn->n_local_rows--;
+			assert(txn->n_new_rows > 0);
+			txn->n_new_rows--;
 		}
 		if (stmt->row != NULL && stmt->row->replica_id != 0) {
-			assert(txn->n_remote_rows > 0);
-			txn->n_remote_rows--;
+			assert(txn->n_applier_rows > 0);
+			txn->n_applier_rows--;
 		}
 		txn_stmt_unref_tuples(stmt);
 		stmt->space = NULL;
@@ -144,8 +144,8 @@ txn_begin(bool is_autocommit)
 	}
 	/* Initialize members explicitly to save time on memset() */
 	stailq_create(&txn->stmts);
-	txn->n_local_rows = 0;
-	txn->n_remote_rows = 0;
+	txn->n_new_rows = 0;
+	txn->n_applier_rows = 0;
 	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
 	txn->is_aborted = false;
@@ -221,7 +221,7 @@ bool
 txn_is_distributed(struct txn *txn)
 {
 	assert(txn == in_txn());
-	if (txn->n_local_rows == 0 || txn->n_remote_rows == 0)
+	if (txn->n_new_rows == 0 || txn->n_applier_rows == 0)
 		return false;
 	struct txn_stmt *stmt;
 	/* Search for new non local group rows. */
@@ -254,9 +254,9 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 			goto fail;
 		assert(stmt->row != NULL);
 		if (stmt->row->replica_id == 0)
-			++txn->n_local_rows;
+			++txn->n_new_rows;
 		else
-			++txn->n_remote_rows;
+			++txn->n_applier_rows;
 	}
 	/*
 	 * If there are triggers, and they are not disabled, and
@@ -287,16 +287,16 @@ fail:
 static int64_t
 txn_write_to_wal(struct txn *txn)
 {
-	assert(txn->n_local_rows + txn->n_remote_rows > 0);
+	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
-	struct journal_entry *req = journal_entry_new(txn->n_local_rows +
-						      txn->n_remote_rows);
+	struct journal_entry *req = journal_entry_new(txn->n_new_rows +
+						      txn->n_applier_rows);
 	if (req == NULL)
 		return -1;
 
 	struct txn_stmt *stmt;
 	struct xrow_header **remote_row = req->rows;
-	struct xrow_header **local_row = req->rows + txn->n_remote_rows;
+	struct xrow_header **local_row = req->rows + txn->n_applier_rows;
 	stailq_foreach_entry(stmt, &txn->stmts, next) {
 		if (stmt->row == NULL)
 			continue; /* A read (e.g. select) request */
@@ -306,8 +306,8 @@ txn_write_to_wal(struct txn *txn)
 			*remote_row++ = stmt->row;
 		req->approx_len += xrow_approx_len(stmt->row);
 	}
-	assert(remote_row == req->rows + txn->n_remote_rows);
-	assert(local_row == remote_row + txn->n_local_rows);
+	assert(remote_row == req->rows + txn->n_applier_rows);
+	assert(local_row == remote_row + txn->n_new_rows);
 
 	ev_tstamp start = ev_monotonic_now(loop());
 	int64_t res = journal_write(req);
@@ -325,7 +325,7 @@ txn_write_to_wal(struct txn *txn)
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
 	} else if (stop - start > too_long_threshold) {
-		int n_rows = txn->n_local_rows + txn->n_remote_rows;
+		int n_rows = txn->n_new_rows + txn->n_applier_rows;
 		say_warn_ratelimited("too long WAL write: %d rows at "
 				     "LSN %lld: %.3f sec", n_rows,
 				     res - n_rows + 1, stop - start);
@@ -361,7 +361,7 @@ txn_commit(struct txn *txn)
 			goto fail;
 	}
 
-	if (txn->n_local_rows + txn->n_remote_rows > 0) {
+	if (txn->n_new_rows + txn->n_applier_rows > 0) {
 		txn->signature = txn_write_to_wal(txn);
 		if (txn->signature < 0)
 			goto fail;

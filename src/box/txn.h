@@ -140,10 +140,13 @@ struct txn {
 	int64_t id;
 	/** List of statements in a transaction. */
 	struct stailq stmts;
-	/** Number of new rows without an assigned lsn. */
-	int n_local_rows;
-	/** Number of rows with an already assigned lsn. */
-	int n_remote_rows;
+	/** Number of new rows without an assigned LSN. */
+	int n_new_rows;
+	/**
+	 * Number of rows coming from the applier, with an
+	 * already assigned LSN.
+	 */
+	int n_applier_rows;
 	/**
 	 * True if this transaction is running in autocommit mode
 	 * (statement end causes an automatic transaction commit).
