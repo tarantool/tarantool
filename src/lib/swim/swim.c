@@ -1019,12 +1019,14 @@ skip:
 	return 0;
 }
 
-/** Decode an anti-entropy message, update member table. */
+/**
+ * Decode a bunch of members encoded as a MessagePack array. Each
+ * correctly decoded member is upserted into the member table.
+ */
 static int
-swim_process_anti_entropy(struct swim *swim, const char **pos, const char *end)
+swim_process_members(struct swim *swim, const char *prefix,
+		     const char **pos, const char *end)
 {
-	say_verbose("SWIM %d: process anti-entropy", swim_fd(swim));
-	const char *prefix = "invalid anti-entropy message:";
 	uint32_t size;
 	if (swim_decode_array(pos, end, &size, prefix, "root") != 0)
 		return -1;
@@ -1042,6 +1044,15 @@ swim_process_anti_entropy(struct swim *swim, const char **pos, const char *end)
 		}
 	}
 	return 0;
+}
+
+/** Decode an anti-entropy message, update member table. */
+static int
+swim_process_anti_entropy(struct swim *swim, const char **pos, const char *end)
+{
+	say_verbose("SWIM %d: process anti-entropy", swim_fd(swim));
+	const char *prefix = "invalid anti-entropy message:";
+	return swim_process_members(swim, prefix, pos, end);
 }
 
 /**
