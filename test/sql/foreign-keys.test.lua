@@ -169,5 +169,10 @@ box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE MATCH FULL);')
 box.space.T1:drop()
 
+-- Make sure that space:drop() works fine on self-referenced spaces.
+--
+box.execute("CREATE TABLE t4 (id INT PRIMARY KEY REFERENCES t4);")
+box.space.T4:drop()
+
 --- Clean-up SQL DD hash.
 -test_run:cmd('restart server default with cleanup=1')
