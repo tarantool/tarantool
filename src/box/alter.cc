@@ -3901,7 +3901,7 @@ on_replace_dd_fk_constraint(struct trigger * /* trigger*/, void *event)
 		 * checks on existing data in space.
 		 */
 		struct index *pk = space_index(child_space, 0);
-		if (index_size(pk) > 0) {
+		if (pk != NULL && index_size(pk) > 0) {
 			tnt_raise(ClientError, ER_CREATE_FK_CONSTRAINT,
 				  fk_def->name,
 				  "referencing space must be empty");
