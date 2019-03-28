@@ -85,6 +85,14 @@ relay_get_state(const struct relay *relay);
 const struct vclock *
 relay_vclock(const struct relay *relay);
 
+/**
+ * Returns relay's last_row_time
+ * @param relay relay
+ * @returns relay's last_row_time
+ */
+double
+relay_last_row_time(const struct relay *relay);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
