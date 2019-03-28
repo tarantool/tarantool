@@ -4407,6 +4407,18 @@ sql_drop_foreign_key(struct Parse *parse_context, struct SrcList *table,
 		     struct Token *constraint);
 
 /**
+ * Now our SQL implementation can't operate on spaces which
+ * lack format: it is reasonable since for instance we can't
+ * resolve column names, their types etc. In case of format
+ * absence, diag error is raised.
+ *
+ * @retval 0 in case space features format.
+ * @retval -1 if space doesn't have format.
+ */
+int
+sql_space_def_check_format(const struct space_def *space_def);
+
+/**
  * Counts the trail bytes for a UTF-8 lead byte of a valid UTF-8
  * sequence.
  *

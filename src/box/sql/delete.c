@@ -47,9 +47,7 @@ sql_lookup_space(struct Parse *parse, struct SrcList_item *space_name)
 		return NULL;
 	}
 	assert(space != NULL);
-	if (space->def->field_count == 0) {
-		diag_set(ClientError, ER_UNSUPPORTED, "SQL",
-			 "space without format");
+	if (sql_space_def_check_format(space->def) != 0) {
 		parse->is_aborted = true;
 		return NULL;
 	}
