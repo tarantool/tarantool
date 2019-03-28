@@ -298,3 +298,54 @@ s:replace{1, 3}
 box.commit()
 
 s:drop()
+
+--
+-- gh-3420: crash if DML races with DDL.
+--
+fiber = require('fiber')
+
+-- turn off cache for error injection to work
+default_vinyl_cache = box.cfg.vinyl_cache
+box.cfg{vinyl_cache = 0}
+
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('i1')
+_ = s:create_index('i2', {parts = {2, 'unsigned'}})
+_ = s:create_index('i3', {parts = {3, 'unsigned'}})
+_ = s:create_index('i4', {parts = {4, 'unsigned'}})
+for i = 1, 5 do s:replace({i, i, i, i}) end
+box.snapshot()
+
+test_run:cmd("setopt delimiter ';'")
+function async(f)
+    local ch = fiber.channel(1)
+    fiber.create(function()
+        local _, res = pcall(f)
+        ch:put(res)
+    end)
+    return ch
+end;
+test_run:cmd("setopt delimiter ''");
+
+-- Issue a few DML requests that require reading disk.
+-- Stall disk reads.
+errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0.01)
+
+ch1 = async(function() s:insert({1, 1, 1, 1}) end)
+ch2 = async(function() s:replace({2, 3, 2, 3}) end)
+ch3 = async(function() s:update({3}, {{'+', 4, 1}}) end)
+ch4 = async(function() s:upsert({5, 5, 5, 5}, {{'+', 4, 1}}) end)
+
+-- Execute a DDL operation on the space.
+s.index.i4:drop()
+
+-- Resume the DML requests. Check that they have been aborted.
+errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0)
+ch1:get()
+ch2:get()
+ch3:get()
+ch4:get()
+s:select()
+s:drop()
+
+box.cfg{vinyl_cache = default_vinyl_cache}

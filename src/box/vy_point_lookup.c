@@ -198,6 +198,7 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 {
 	/* All key parts must be set for a point lookup. */
 	assert(vy_stmt_is_full_key(key, lsm->cmp_def));
+	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
 	*ret = NULL;
 	double start_time = ev_monotonic_now(loop());
@@ -238,6 +239,19 @@ restart:
 		/* Turn of the injection to avoid infinite loop */
 		errinj(ERRINJ_VY_POINT_ITER_WAIT, ERRINJ_BOOL)->bparam = false;
 	});
+
+	if (tx != NULL && tx->state == VINYL_TX_ABORT) {
+		/*
+		 * The transaction was aborted while we were reading
+		 * disk. We must stop now and return an error as this
+		 * function could be called by a DML request aborted
+		 * by a DDL operation: failing early will prevent it
+		 * from dereferencing a destroyed space.
+		 */
+		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
+		rc = -1;
+		goto done;
+	}
 
 	if (mem_list_version != lsm->mem_list_version) {
 		/*

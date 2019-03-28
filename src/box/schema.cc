@@ -251,6 +251,9 @@ space_cache_replace(struct space *old_space, struct space *new_space)
 		mh_strnptr_del(spaces_by_name, k, NULL);
 	}
 	space_cache_version++;
+
+	if (old_space != NULL)
+		space_invalidate(old_space);
 }
 
 /** A wrapper around space_new() for data dictionary spaces. */
