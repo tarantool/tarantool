@@ -1797,7 +1797,12 @@ sql_create_foreign_key(struct Parse *parse_context, struct SrcList *child,
 		 * columns of parent table are used as referenced.
 		 */
 		struct index *parent_pk = space_index(parent_space, 0);
-		assert(parent_pk != NULL);
+		if (parent_pk == NULL) {
+			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
+				 constraint_name,
+				 "referenced space doesn't feature PRIMARY KEY");
+			goto tnt_error;
+		}
 		if (parent_pk->def->key_def->part_count != child_cols_count) {
 			diag_set(ClientError, ER_CREATE_FK_CONSTRAINT,
 				 constraint_name, error_msg);
