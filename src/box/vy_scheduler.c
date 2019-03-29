@@ -1103,11 +1103,9 @@ vy_task_dump_complete(struct vy_task *task)
 	double dump_time = ev_monotonic_now(loop()) - task->start_time;
 	struct vy_disk_stmt_counter dump_output = new_run->count;
 	struct vy_stmt_counter dump_input;
-	struct tuple_format *key_format = lsm->env->key_format;
 	struct vy_mem *mem, *next_mem;
 	struct vy_slice **new_slices, *slice;
 	struct vy_range *range, *begin_range, *end_range;
-	struct tuple *min_key, *max_key;
 	int i;
 
 	assert(lsm->is_dumping);
@@ -1131,28 +1129,11 @@ vy_task_dump_complete(struct vy_task *task)
 
 	/*
 	 * Figure out which ranges intersect the new run.
-	 * @begin_range is the first range intersecting the run.
-	 * @end_range is the range following the last range
-	 * intersecting the run or NULL if the run itersects all
-	 * ranges.
 	 */
-	min_key = vy_key_from_msgpack(key_format, new_run->info.min_key);
-	if (min_key == NULL)
+	if (vy_lsm_find_range_intersection(lsm, new_run->info.min_key,
+					   new_run->info.max_key,
+					   &begin_range, &end_range) != 0)
 		goto fail;
-	max_key = vy_key_from_msgpack(key_format, new_run->info.max_key);
-	if (max_key == NULL) {
-		tuple_unref(min_key);
-		goto fail;
-	}
-	begin_range = vy_range_tree_psearch(&lsm->range_tree, min_key);
-	end_range = vy_range_tree_psearch(&lsm->range_tree, max_key);
-	/*
-	 * If min_key == max_key, the slice has to span over at
-	 * least one range.
-	 */
-	end_range = vy_range_tree_next(&lsm->range_tree, end_range);
-	tuple_unref(min_key);
-	tuple_unref(max_key);
 
 	/*
 	 * For each intersected range allocate a slice of the new run.

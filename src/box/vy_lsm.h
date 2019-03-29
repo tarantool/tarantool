@@ -536,6 +536,22 @@ void
 vy_lsm_delete_mem(struct vy_lsm *lsm, struct vy_mem *mem);
 
 /**
+ * Lookup ranges intersecting [min_key, max_key] interval in
+ * the given LSM tree.
+ *
+ * On success returns 0 and sets @begin to the first range
+ * and @end to the one following the last range instersecting
+ * the given interval (NULL if max_key lays in the rightmost
+ * range).
+ *
+ * On memory allocation error returns -1 and sets diag.
+ */
+int
+vy_lsm_find_range_intersection(struct vy_lsm *lsm,
+		const char *min_key, const char *max_key,
+		struct vy_range **begin, struct vy_range **end);
+
+/**
  * Split a range if it has grown too big, return true if the range
  * was split. Splitting is done by making slices of the runs used
  * by the original range, adding them to new ranges, and reflecting

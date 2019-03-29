@@ -1065,6 +1065,30 @@ vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 	vy_cache_on_write(&lsm->cache, stmt, NULL);
 }
 
+int
+vy_lsm_find_range_intersection(struct vy_lsm *lsm,
+		const char *min_key, const char *max_key,
+		struct vy_range **begin, struct vy_range **end)
+{
+	struct tuple_format *key_format = lsm->env->key_format;
+	struct tuple *stmt;
+
+	stmt = vy_key_from_msgpack(key_format, min_key);
+	if (stmt == NULL)
+		return -1;
+	*begin = vy_range_tree_psearch(&lsm->range_tree, stmt);
+	tuple_unref(stmt);
+
+	stmt = vy_key_from_msgpack(key_format, max_key);
+	if (stmt == NULL)
+		return -1;
+	*end = vy_range_tree_psearch(&lsm->range_tree, stmt);
+	*end = vy_range_tree_next(&lsm->range_tree, *end);
+	tuple_unref(stmt);
+
+	return 0;
+}
+
 bool
 vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 {
