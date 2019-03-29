@@ -313,3 +313,4 @@ box.space.JJ:drop()
 --
 box.internal.collation.create('c', 'ICU', 'unicode')
 box.space._collation.index.name:get({'c'})
+box.internal.collation.drop('c')
