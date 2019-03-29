@@ -790,179 +790,29 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 		return -1;
 	}
 	*field_map = (uint32_t *)((char *)*field_map + *field_map_size);
-
-	const char *pos = tuple;
-	int rc = 0;
-	/* Check to see if the tuple has a sufficient number of fields. */
-	uint32_t field_count = mp_decode_array(&pos);
-	if (validate && format->exact_field_count > 0 &&
-	    format->exact_field_count != field_count) {
-		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
-			 (unsigned) field_count,
-			 (unsigned) format->exact_field_count);
-		goto error;
-	}
-	/*
-	 * Allocate a field bitmap that will be used for checking
-	 * that all mandatory fields are present.
-	 */
-	void *required_fields = NULL;
-	size_t required_fields_sz = 0;
-	if (validate) {
-		required_fields_sz = bitmap_size(format->total_field_count);
-		required_fields = region_alloc(region, required_fields_sz);
-		if (required_fields == NULL) {
-			diag_set(OutOfMemory, required_fields_sz,
-				 "region", "required field bitmap");
-			goto error;
-		}
-		memcpy(required_fields, format->required_fields,
-		       required_fields_sz);
-	}
-	/*
-	 * Initialize the tuple field map and validate field types.
-	 */
-	if (field_count == 0) {
-		/* Empty tuple, nothing to do. */
-		goto finish;
-	}
-	uint32_t defined_field_count = MIN(field_count, validate ?
-					   tuple_format_field_count(format) :
-					   format->index_field_count);
 	/*
 	 * Nullify field map to be able to detect by 0,
 	 * which key fields are absent in tuple_field().
 	 */
 	memset((char *)*field_map - *field_map_size, 0, *field_map_size);
-	/*
-	 * Prepare mp stack of the size equal to the maximum depth
-	 * of the indexed field in the format::fields tree
-	 * (fields_depth) to carry out a simultaneous parsing of
-	 * the tuple and tree traversal to process type
-	 * validations and field map initialization.
-	 */
-	uint32_t frames_sz = format->fields_depth * sizeof(struct mp_frame);
-	struct mp_frame *frames = region_alloc(region, frames_sz);
-	if (frames == NULL) {
-		diag_set(OutOfMemory, frames_sz, "region", "frames");
-		goto error;
-	}
-	struct mp_stack stack;
-	mp_stack_create(&stack, format->fields_depth, frames);
-	mp_stack_push(&stack, MP_ARRAY, defined_field_count);
-	struct tuple_field *field;
-	struct json_token *parent = &format->fields.root;
-	while (true) {
-		struct mp_frame *frame = mp_stack_top(&stack);
-		while (!mp_frame_advance(frame)) {
-			/*
-			 * If the elements of the current frame
-			 * are over, pop this frame out of stack
-			 * and climb one position in the
-			 * format::fields tree to match the
-			 * changed JSON path to the data in the
-			 * tuple.
-			 */
-			mp_stack_pop(&stack);
-			if (mp_stack_is_empty(&stack))
-				goto finish;
-			frame = mp_stack_top(&stack);
-			parent = parent->parent;
-		}
-		/*
-		 * Use the top frame of the stack and the
-		 * current data offset to prepare the JSON token
-		 * for the subsequent format::fields lookup.
-		 */
-		struct json_token token;
-		switch (frame->type) {
-		case MP_ARRAY:
-			token.type = JSON_TOKEN_NUM;
-			token.num = frame->idx;
-			break;
-		case MP_MAP:
-			if (mp_typeof(*pos) != MP_STR) {
-				/*
-				 * JSON path support only string
-				 * keys for map. Skip this entry.
-				 */
-				mp_next(&pos);
-				mp_next(&pos);
-				continue;
-			}
-			token.type = JSON_TOKEN_STR;
-			token.str = mp_decode_str(&pos, (uint32_t *)&token.len);
-			break;
-		default:
-			unreachable();
-		}
-		/*
-		 * Perform lookup for a field in format::fields,
-		 * that represents the field metadata by JSON path
-		 * corresponding to the current position in the
-		 * tuple.
-		 */
-		enum mp_type type = mp_typeof(*pos);
-		assert(parent != NULL);
-		field = json_tree_lookup_entry(&format->fields, parent, &token,
-					       struct tuple_field, token);
-		if (field != NULL) {
-			bool is_nullable = tuple_field_is_nullable(field);
-			if (validate &&
-			    !field_mp_type_is_compatible(field->type, type,
-							 is_nullable) != 0) {
-				diag_set(ClientError, ER_FIELD_TYPE,
-					 tuple_field_path(field),
-					 field_type_strs[field->type]);
-				goto error;
-			}
-			if (field->offset_slot != TUPLE_OFFSET_SLOT_NIL)
-				(*field_map)[field->offset_slot] = pos - tuple;
-			if (required_fields != NULL)
-				bit_clear(required_fields, field->id);
-		}
-		/*
-		 * If the current position of the data in tuple
-		 * matches the container type (MP_MAP or MP_ARRAY)
-		 * and the format::fields tree has such a record,
-		 * prepare a new stack frame because it needs to
-		 * be analyzed in the next iterations.
-		 */
-		if ((type == MP_ARRAY || type == MP_MAP) &&
-		    !mp_stack_is_full(&stack) && field != NULL) {
-			uint32_t size = type == MP_ARRAY ?
-					mp_decode_array(&pos) :
-					mp_decode_map(&pos);
-			mp_stack_push(&stack, type, size);
-			parent = &field->token;
-		} else {
-			mp_next(&pos);
+	uint32_t field_count;
+	struct tuple_format_iterator it;
+	uint8_t flags = validate ? TUPLE_FORMAT_ITERATOR_VALIDATE : 0;
+	if (tuple_format_iterator_create(&it, format, tuple, flags,
+					 &field_count, region) != 0)
+		return -1;
+	struct tuple_format_iterator_entry entry;
+	while (tuple_format_iterator_next(&it, &entry) == 0 &&
+	       entry.data != NULL) {
+		if (entry.field == NULL)
+			continue;
+		if (entry.field->offset_slot != TUPLE_OFFSET_SLOT_NIL) {
+			(*field_map)[entry.field->offset_slot] =
+							entry.data - tuple;
 		}
 	}
-finish:
-	/*
-	 * Check the required field bitmap for missing fields.
-	 */
-	if (required_fields != NULL) {
-		struct bit_iterator it;
-		bit_iterator_init(&it, required_fields,
-				  required_fields_sz, true);
-		size_t id = bit_iterator_next(&it);
-		if (id < SIZE_MAX) {
-			/* A field is missing, report an error. */
-			field = tuple_format_field_by_id(format, id);
-			assert(field != NULL);
-			diag_set(ClientError, ER_FIELD_MISSING,
-				 tuple_field_path(field));
-			goto error;
-		}
-	}
-out:
 	*field_map = (uint32_t *)((char *)*field_map - *field_map_size);
-	return rc;
-error:
-	rc = -1;
-	goto out;
+	return entry.data == NULL ? 0 : -1;
 }
 
 uint32_t
@@ -1033,3 +883,181 @@ box_tuple_format_unref(box_tuple_format_t *format)
 	tuple_format_unref(format);
 }
 
+int
+tuple_format_iterator_create(struct tuple_format_iterator *it,
+			     struct tuple_format *format, const char *tuple,
+			     uint8_t flags, uint32_t *defined_field_count,
+			     struct region *region)
+{
+	assert(mp_typeof(*tuple) == MP_ARRAY);
+	*defined_field_count = mp_decode_array(&tuple);
+	bool validate = flags & TUPLE_FORMAT_ITERATOR_VALIDATE;
+	if (validate && format->exact_field_count > 0 &&
+	    format->exact_field_count != *defined_field_count) {
+		diag_set(ClientError, ER_EXACT_FIELD_COUNT,
+			 (unsigned) *defined_field_count,
+			 (unsigned) format->exact_field_count);
+		return -1;
+	}
+	it->parent = &format->fields.root;
+	it->format = format;
+	it->pos = tuple;
+	it->flags = flags;
+	it->required_fields = NULL;
+	it->required_fields_sz = 0;
+
+	uint32_t frames_sz = format->fields_depth * sizeof(struct mp_frame);
+	if (validate)
+		it->required_fields_sz = bitmap_size(format->total_field_count);
+	uint32_t total_sz = frames_sz + it->required_fields_sz;
+	struct mp_frame *frames = region_alloc(region, total_sz);
+	if (frames == NULL) {
+		diag_set(OutOfMemory, total_sz, "region",
+			 "tuple_format_iterator");
+		return -1;
+	}
+	mp_stack_create(&it->stack, format->fields_depth, frames);
+	bool key_parts_only =
+		(flags & TUPLE_FORMAT_ITERATOR_KEY_PARTS_ONLY) != 0;
+	*defined_field_count = MIN(*defined_field_count, key_parts_only ?
+				   format->index_field_count :
+				   tuple_format_field_count(format));
+	mp_stack_push(&it->stack, MP_ARRAY, *defined_field_count);
+
+	if (validate) {
+		it->required_fields = (char *)frames + frames_sz;
+		memcpy(it->required_fields, format->required_fields,
+		       it->required_fields_sz);
+	}
+	return 0;
+}
+
+/**
+ * Scan required_fields bitmap and raise error when it is
+ * non-empty.
+ * @sa format:required_fields definition.
+ */
+static int
+tuple_format_required_fields_validate(struct tuple_format *format,
+				      void *required_fields,
+				      uint32_t required_fields_sz)
+{
+	struct bit_iterator it;
+	bit_iterator_init(&it, required_fields, required_fields_sz, true);
+	size_t id = bit_iterator_next(&it);
+	if (id < SIZE_MAX) {
+		/* A field is missing, report an error. */
+		struct tuple_field *field =
+			tuple_format_field_by_id(format, id);
+		assert(field != NULL);
+		diag_set(ClientError, ER_FIELD_MISSING,
+			 tuple_field_path(field));
+		return -1;
+	}
+	return 0;
+}
+
+int
+tuple_format_iterator_next(struct tuple_format_iterator *it,
+			   struct tuple_format_iterator_entry *entry)
+{
+	entry->data = it->pos;
+	struct mp_frame *frame = mp_stack_top(&it->stack);
+	while (!mp_frame_advance(frame)) {
+		/*
+		 * If the elements of the current frame
+		 * are over, pop this frame out of stack
+		 * and climb one position in the format::fields
+		 * tree to match the changed JSON path to the
+		 * data in the tuple.
+		 */
+		mp_stack_pop(&it->stack);
+		if (mp_stack_is_empty(&it->stack))
+			goto eof;
+		frame = mp_stack_top(&it->stack);
+		it->parent = it->parent->parent;
+	}
+	entry->parent =
+		it->parent != &it->format->fields.root ?
+		json_tree_entry(it->parent, struct tuple_field, token) : NULL;
+	/*
+	 * Use the top frame of the stack and the
+	 * current data offset to prepare the JSON token
+	 * and perform subsequent format::fields lookup.
+	 */
+	struct json_token token;
+	switch (frame->type) {
+	case MP_ARRAY:
+		token.type = JSON_TOKEN_NUM;
+		token.num = frame->idx;
+		break;
+	case MP_MAP:
+		if (mp_typeof(*it->pos) != MP_STR) {
+			entry->field = NULL;
+			mp_next(&it->pos);
+			entry->data = it->pos;
+			mp_next(&it->pos);
+			entry->data_end = it->pos;
+			return 0;
+		}
+		token.type = JSON_TOKEN_STR;
+		token.str = mp_decode_str(&it->pos, (uint32_t *)&token.len);
+		break;
+	default:
+		unreachable();
+	}
+	assert(it->parent != NULL);
+	struct tuple_field *field =
+		json_tree_lookup_entry(&it->format->fields, it->parent, &token,
+				       struct tuple_field, token);
+	if (it->flags & TUPLE_FORMAT_ITERATOR_KEY_PARTS_ONLY &&
+	    field != NULL && !field->is_key_part)
+		field = NULL;
+	entry->field = field;
+	entry->data = it->pos;
+	/*
+	 * If the current position of the data in tuple
+	 * matches the container type (MP_MAP or MP_ARRAY)
+	 * and the format::fields tree has such a record,
+	 * prepare a new stack frame because it needs to
+	 * be analyzed in the next iterations.
+	 */
+	enum mp_type type = mp_typeof(*it->pos);
+	if ((type == MP_ARRAY || type == MP_MAP) &&
+	    !mp_stack_is_full(&it->stack) && field != NULL) {
+		uint32_t size = type == MP_ARRAY ?
+				mp_decode_array(&it->pos) :
+				mp_decode_map(&it->pos);
+		entry->count = size;
+		mp_stack_push(&it->stack, type, size);
+		it->parent = &field->token;
+	} else {
+		entry->count = 0;
+		mp_next(&it->pos);
+	}
+	entry->data_end = it->pos;
+	if (field == NULL || (it->flags & TUPLE_FORMAT_ITERATOR_VALIDATE) == 0)
+		return 0;
+
+	/*
+	 * Check if field mp_type is compatible with type
+	 * defined in format.
+	 */
+	bool is_nullable = tuple_field_is_nullable(field);
+	if (!field_mp_type_is_compatible(field->type, mp_typeof(*entry->data),
+					 is_nullable) != 0) {
+		diag_set(ClientError, ER_FIELD_TYPE,
+			 tuple_field_path(field),
+			 field_type_strs[field->type]);
+		return -1;
+	}
+	bit_clear(it->required_fields, field->id);
+	return 0;
+eof:
+	if (it->flags & TUPLE_FORMAT_ITERATOR_VALIDATE &&
+	    tuple_format_required_fields_validate(it->format,
+			it->required_fields, it->required_fields_sz) != 0)
+		return -1;
+	entry->data = NULL;
+	return 0;
+}

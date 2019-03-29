@@ -200,6 +200,11 @@ pk = s:create_index('pk', {parts={{1, 'int'}}})
 idx0 = s:create_index('idx0', {parts = {{2, 'str', path = 'name'}, {3, "str"}}})
 s:insert({4, {"d", name='D'}, "test"})
 s:replace({4, {"d1", name='D1'}, "test"})
+idx0:drop()
+s:truncate()
+idx0 = s:create_index('idx2', {parts = {{3, 'str', path = '[1].fname'}, {3, 'str', path = '[1].sname'}}})
+s:insert({5, {1, 1, 1}, {{fname='A', sname='B'}, {fname='C', sname='D'}, {fname='A', sname='B'}}})
+s:delete(5)
 s:drop()
 
 --

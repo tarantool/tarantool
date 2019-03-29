@@ -412,6 +412,124 @@ tuple_field_map_create(struct tuple_format *format, const char *tuple,
 int
 tuple_format_init();
 
+
+/** Tuple format iterator flags to configure parse mode. */
+enum {
+	/**
+	 * This flag is set for iterator that should perform tuple
+	 * validation to conform the specified format.
+	 */
+	TUPLE_FORMAT_ITERATOR_VALIDATE		= 1 << 0,
+	/**
+	 * This flag is set for iterator that should skip the
+	 * tuple fields that are not marked as key_parts in
+	 * format::fields tree.
+	 */
+	TUPLE_FORMAT_ITERATOR_KEY_PARTS_ONLY 	= 1 << 1,
+};
+
+/**
+ * A tuple msgpack iterator that decodes the tuple and returns
+ * only fields that are described in the tuple_format.
+ */
+struct tuple_format_iterator {
+	/** The current read position in msgpack. */
+	const char *pos;
+	/**
+	 * Tuple format is used to perform field lookups in
+	 * format::fields JSON tree.
+	 */
+	struct tuple_format *format;
+	/** The combination of tuple format iterator flags. */
+	uint8_t flags;
+	/**
+	 * Traversal stack of msgpack frames is used to determine
+	 * when the parsing of the current composite mp structure
+	 * (array or map) is completed to update to the parent
+	 * pointer accordingly.
+	 *
+	 * Stack has the size equal to the maximum depth of the
+	 * indexed field in the format::fields tree
+	 * (format::fields_depth).
+	 */
+	struct mp_stack stack;
+	/**
+	 * The pointer to the parent node in the format::fields
+	 * JSON tree. Is required for relative lookup for the
+	 * next field.
+	 */
+	struct json_token *parent;
+	/**
+	 * The size of validation bitmasks required_fields and
+	 * multikey_required_fields.
+	 */
+	uint32_t required_fields_sz;
+	/**
+	 * Field bitmap that is used for checking that all
+	 * mandatory fields are present.
+	 * Not NULL iff validate == true.
+	 */
+	void *required_fields;
+};
+
+/** Tuple format iterator next method's returning entry. */
+struct tuple_format_iterator_entry {
+	/** Pointer to the tuple field data. NULL if EOF. */
+	const char *data;
+	/**
+	 * Pointer to the end of tuple field data.
+	 * Is defined only for leaf fields
+	 * (json_token_is_leaf(&field->token) == true).
+	 */
+	const char *data_end;
+	/**
+	 * Format field metadata that represents the data field.
+	 * May be NULL if the field isn't present in the format.
+	 *
+	 * (All child entries of an array are returned present in
+	 * the format, no matter formatted or not)
+	 */
+	struct tuple_field *field;
+	/**
+	 * Format parent field metadata. NULL for top-level
+	 * fields.
+	 */
+	struct tuple_field *parent;
+	/**
+	 * Number of child entries of the analyzed field that has
+	 * container type. Is defined for intermediate fields.
+	 * (field->type in FIELD_TYPE_ARRAY, FIELD_TYPE_MAP).
+	 */
+	int count;
+};
+
+/**
+ * Initialize tuple decode iterator with tuple format and tuple
+ * data pointer.
+ *
+ * Function uses the region to allocate the traversal stack
+ * and required fields bitmasks.
+ *
+ * Returns 0 on success. In case of error sets diag message and
+ * returns -1.
+ */
+int
+tuple_format_iterator_create(struct tuple_format_iterator *it,
+			     struct tuple_format *format, const char *tuple,
+			     uint8_t flags, uint32_t *field_count,
+			     struct region *region);
+
+/**
+ * Perform tuple decode step and update iterator state.
+ * Update entry pointer with actual format parse context.
+ *
+ * Returns 0 on success. In case of error sets diag message and
+ * returns -1.
+ */
+int
+tuple_format_iterator_next(struct tuple_format_iterator *it,
+			   struct tuple_format_iterator_entry *entry);
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
