@@ -796,3 +796,6 @@ box.space._collation.index.name:get({'c'})
 ---
 - [4, 'c', 1, 'ICU', 'unicode', {'strength': 'tertiary'}]
 ...
+box.internal.collation.drop('c')
+---
+...
