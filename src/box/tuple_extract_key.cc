@@ -341,61 +341,68 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 	return key;
 }
 
-static const tuple_extract_key_t extract_key_slowpath_funcs[] = {
-	tuple_extract_key_slowpath<false, false, false>,
-	tuple_extract_key_slowpath<true, false, false>,
-	tuple_extract_key_slowpath<false, true, false>,
-	tuple_extract_key_slowpath<true, true, false>,
-	tuple_extract_key_slowpath<false, false, true>,
-	tuple_extract_key_slowpath<true, false, true>,
-	tuple_extract_key_slowpath<false, true, true>,
-	tuple_extract_key_slowpath<true, true, true>
-};
-
 /**
  * Initialize tuple_extract_key() and tuple_extract_key_raw()
  */
+template<bool contains_sequential_parts, bool has_optional_parts>
+static void
+key_def_set_extract_func_plain(struct key_def *def)
+{
+	assert(!def->has_json_paths);
+	if (key_def_is_sequential(def)) {
+		assert(contains_sequential_parts || def->part_count == 1);
+		def->tuple_extract_key = tuple_extract_key_sequential
+					<has_optional_parts>;
+		def->tuple_extract_key_raw = tuple_extract_key_sequential_raw
+					<has_optional_parts>;
+	} else {
+		def->tuple_extract_key = tuple_extract_key_slowpath
+					<contains_sequential_parts,
+					 has_optional_parts, false>;
+		def->tuple_extract_key_raw = tuple_extract_key_slowpath_raw
+					<has_optional_parts, false>;
+	}
+}
+
+template<bool contains_sequential_parts, bool has_optional_parts>
+static void
+key_def_set_extract_func_json(struct key_def *def)
+{
+	assert(def->has_json_paths);
+	def->tuple_extract_key = tuple_extract_key_slowpath
+					<contains_sequential_parts,
+					 has_optional_parts, true>;
+	def->tuple_extract_key_raw = tuple_extract_key_slowpath_raw
+					<has_optional_parts, true>;
+}
+
 void
 key_def_set_extract_func(struct key_def *key_def)
 {
-	if (key_def_is_sequential(key_def)) {
-		if (key_def->has_optional_parts) {
-			assert(key_def->is_nullable);
-			key_def->tuple_extract_key =
-				tuple_extract_key_sequential<true>;
-			key_def->tuple_extract_key_raw =
-				tuple_extract_key_sequential_raw<true>;
+	bool contains_sequential_parts =
+		key_def_contains_sequential_parts(key_def);
+	bool has_optional_parts = key_def->has_optional_parts;
+	if (!key_def->has_json_paths) {
+		if (!contains_sequential_parts && !has_optional_parts) {
+			key_def_set_extract_func_plain<false, false>(key_def);
+		} else if (!contains_sequential_parts && has_optional_parts) {
+			key_def_set_extract_func_plain<false, true>(key_def);
+		} else if (contains_sequential_parts && !has_optional_parts) {
+			key_def_set_extract_func_plain<true, false>(key_def);
 		} else {
-			key_def->tuple_extract_key =
-				tuple_extract_key_sequential<false>;
-			key_def->tuple_extract_key_raw =
-				tuple_extract_key_sequential_raw<false>;
+			assert(contains_sequential_parts && has_optional_parts);
+			key_def_set_extract_func_plain<true, true>(key_def);
 		}
 	} else {
-		int func_idx =
-			(key_def_contains_sequential_parts(key_def) ? 1 : 0) +
-			2 * (key_def->has_optional_parts ? 1 : 0) +
-			4 * (key_def->has_json_paths ? 1 : 0);
-		key_def->tuple_extract_key =
-			extract_key_slowpath_funcs[func_idx];
-		assert(!key_def->has_optional_parts || key_def->is_nullable);
-	}
-	if (key_def->has_optional_parts) {
-		assert(key_def->is_nullable);
-		if (key_def->has_json_paths) {
-			key_def->tuple_extract_key_raw =
-				tuple_extract_key_slowpath_raw<true, true>;
+		if (!contains_sequential_parts && !has_optional_parts) {
+			key_def_set_extract_func_json<false, false>(key_def);
+		} else if (!contains_sequential_parts && has_optional_parts) {
+			key_def_set_extract_func_json<false, true>(key_def);
+		} else if (contains_sequential_parts && !has_optional_parts) {
+			key_def_set_extract_func_json<true, false>(key_def);
 		} else {
-			key_def->tuple_extract_key_raw =
-				tuple_extract_key_slowpath_raw<true, false>;
-		}
-	} else {
-		if (key_def->has_json_paths) {
-			key_def->tuple_extract_key_raw =
-				tuple_extract_key_slowpath_raw<false, true>;
-		} else {
-			key_def->tuple_extract_key_raw =
-				tuple_extract_key_slowpath_raw<false, false>;
+			assert(contains_sequential_parts && has_optional_parts);
+			key_def_set_extract_func_json<true, true>(key_def);
 		}
 	}
 }
