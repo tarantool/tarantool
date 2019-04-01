@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 
 local TIMEOUT = tonumber(arg[1])
-local CON_TIMEOUT = arg[2] and tonumber(arg[2]) or 30.0
+local CON_TIMEOUT = arg[2] and tonumber(arg[2]) or 60.0
 
 box.cfg({
     listen              = os.getenv("LISTEN"),

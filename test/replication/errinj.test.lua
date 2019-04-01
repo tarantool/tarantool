@@ -18,7 +18,7 @@ s = box.space.test
 test_run:cmd("setopt delimiter ';'")
 -- vinyl does not support index.len() so we use index.count() instead
 function wait_repl(cnt)
-    for i = 1, 20 do
+    for i = 1, 200 do
         if s.index[0]:count() >= cnt then
             return true
         end

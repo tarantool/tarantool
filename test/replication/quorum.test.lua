@@ -63,7 +63,7 @@ for i = 1, 100 do box.space.test:insert{i} end
 fiber = require('fiber')
 fiber.sleep(0.1)
 
-test_run:cmd('start server quorum1 with args="0.1  0.5"')
+test_run:cmd('start server quorum1 with args="0.1 0.5"')
 test_run:cmd('switch quorum1')
 box.space.test:count() -- 100
 

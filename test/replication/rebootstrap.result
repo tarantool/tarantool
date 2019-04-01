@@ -24,7 +24,7 @@ test_run:cmd('restart server rebootstrap2 with cleanup=True, wait=False, wait_lo
 ---
 - true
 ...
-test_run:cmd('start server rebootstrap1 with args="0.1 0.5"')
+test_run:cmd('start server rebootstrap1 with args="0.1"')
 ---
 - true
 ...

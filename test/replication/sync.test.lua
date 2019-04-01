@@ -35,7 +35,7 @@ function fill()
             local r = box.info.replication[2]
             return r ~= nil and r.downstream ~= nil and
                    r.downstream.status ~= 'stopped'
-        end, 10)
+        end)
         for i = count + 101, count + 200 do
             box.space.test:replace{i}
         end
@@ -92,7 +92,7 @@ box.info.status -- running
 box.info.ro -- false
 
 -- Wait for remaining rows to arrive.
-test_run:wait_cond(function() return box.space.test:count() == 400 end, 10)
+test_run:wait_cond(function() return box.space.test:count() == 400 end)
 
 -- Stop replication.
 replication = box.cfg.replication
@@ -116,10 +116,10 @@ box.info.status -- orphan
 box.info.ro -- true
 
 -- Wait for remaining rows to arrive.
-test_run:wait_cond(function() return box.space.test:count() == 600 end, 10)
+test_run:wait_cond(function() return box.space.test:count() == 600 end)
 
 -- Make sure replica leaves oprhan state.
-test_run:wait_cond(function() return box.info.status ~= 'orphan' end, 10)
+test_run:wait_cond(function() return box.info.status ~= 'orphan' end)
 box.info.status -- running
 box.info.ro -- false
 
@@ -131,9 +131,9 @@ box.info.ro -- false
 -- ER_CFG "duplicate connection with the same replica UUID" error.
 -- It should print it to the log, but keep trying to synchronize.
 -- Eventually, it should leave box.cfg() following the master.
-box.cfg{replication_timeout = 0.1}
-box.cfg{replication_sync_lag = 1}
-box.cfg{replication_sync_timeout = 10}
+box.cfg{replication_timeout = 0.01}
+box.cfg{replication_sync_lag = 0.1}
+box.cfg{replication_sync_timeout = 50}
 
 test_run:cmd("switch default")
 box.error.injection.set('ERRINJ_WAL_DELAY', true)

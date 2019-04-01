@@ -34,14 +34,14 @@ test_run:cmd("setopt delimiter ';'")
 function wait_gc(n)
     return test_run:wait_cond(function()
         return #box.info.gc().checkpoints == n
-    end, 10)
+    end) or box.info.gc()
 end;
 ---
 ...
-function wait_xlog(n, timeout)
+function wait_xlog(n)
     return test_run:wait_cond(function()
         return #fio.glob('./master/*.xlog') == n
-    end, 10)
+    end) or fio.glob('./master/*.xlog')
 end;
 ---
 ...
@@ -117,7 +117,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-test_run:wait_cond(function() return box.space.test:count() == 200 end, 10)
+test_run:wait_cond(function() return box.space.test:count() == 200 end)
 ---
 - true
 ...
@@ -131,11 +131,11 @@ test_run:cmd("switch default")
 ...
 -- Check that garbage collection removed the snapshot once
 -- the replica released the corresponding checkpoint.
-wait_gc(1) or box.info.gc()
+wait_gc(1)
 ---
 - true
 ...
-wait_xlog(1) or fio.listdir('./master') -- Make sure the replica will not receive data until
+wait_xlog(1)
 ---
 - true
 ...
@@ -168,11 +168,11 @@ box.snapshot()
 ---
 - ok
 ...
-wait_gc(1) or box.info.gc()
+wait_gc(1)
 ---
 - true
 ...
-wait_xlog(2) or fio.listdir('./master')
+wait_xlog(2)
 ---
 - true
 ...
@@ -187,7 +187,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-test_run:wait_cond(function() return box.space.test:count() == 300 end, 10)
+test_run:wait_cond(function() return box.space.test:count() == 300 end)
 ---
 - true
 ...
@@ -201,11 +201,11 @@ test_run:cmd("switch default")
 ...
 -- Now garbage collection should resume and delete files left
 -- from the old checkpoint.
-wait_gc(1) or box.info.gc()
+wait_gc(1)
 ---
 - true
 ...
-wait_xlog(0) or fio.listdir('./master')
+wait_xlog(0)
 ---
 - true
 ...
@@ -244,11 +244,11 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- Garbage collection must not delete the old xlog file
 -- because it is still needed by the replica, but remove
 -- the old snapshot.
-wait_gc(1) or box.info.gc()
+wait_gc(1)
 ---
 - true
 ...
-wait_xlog(2) or fio.listdir('./master')
+wait_xlog(2)
 ---
 - true
 ...
@@ -271,7 +271,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-test_run:wait_cond(function() return box.space.test:count() == 310 end, 10)
+test_run:wait_cond(function() return box.space.test:count() == 310 end)
 ---
 - true
 ...
@@ -284,11 +284,11 @@ test_run:cmd("switch default")
 - true
 ...
 -- Now it's safe to drop the old xlog.
-wait_gc(1) or box.info.gc()
+wait_gc(1)
 ---
 - true
 ...
-wait_xlog(1) or fio.listdir('./master')
+wait_xlog(1)
 ---
 - true
 ...
@@ -320,11 +320,11 @@ box.snapshot()
 ---
 - ok
 ...
-wait_gc(1) or box.info.gc()
+wait_gc(1)
 ---
 - true
 ...
-wait_xlog(2) or fio.listdir('./master')
+wait_xlog(2)
 ---
 - true
 ...
@@ -333,11 +333,11 @@ wait_xlog(2) or fio.listdir('./master')
 test_run:cleanup_cluster()
 ---
 ...
-wait_gc(1) or box.info.gc()
+wait_gc(1)
 ---
 - true
 ...
-wait_xlog(1) or fio.listdir('./master')
+wait_xlog(1)
 ---
 - true
 ...
@@ -442,7 +442,7 @@ box.snapshot()
 ---
 - ok
 ...
-wait_xlog(0, 10) or fio.listdir('./master')
+wait_xlog(0) or fio.listdir('./master')
 ---
 - true
 ...

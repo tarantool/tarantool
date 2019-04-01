@@ -30,7 +30,7 @@ test_run:cmd("stop server test")
 ---
 - true
 ...
-test_run:wait_cond(function() return box.info.replication[2].downstream.status == 'stopped' end, 10)
+test_run:wait_cond(function() return box.info.replication[2].downstream.status == 'stopped' end)
 ---
 - true
 ...

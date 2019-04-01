@@ -158,7 +158,7 @@ fiber = require('fiber')
 fiber.sleep(0.1)
 ---
 ...
-test_run:cmd('start server quorum1 with args="0.1  0.5"')
+test_run:cmd('start server quorum1 with args="0.1 0.5"')
 ---
 - true
 ...

@@ -2,7 +2,7 @@
 
 local USER_PASS = arg[1]
 local TIMEOUT = arg[2] and tonumber(arg[2]) or 0.1
-local CON_TIMEOUT = arg[3] and tonumber(arg[3]) or 30.0
+local CON_TIMEOUT = arg[3] and tonumber(arg[3]) or 60.0
 
 require('console').listen(os.getenv('ADMIN'))
 
