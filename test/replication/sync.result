@@ -97,6 +97,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
+-----------------------------------------------------------------------------------------------------
 -- Resume replication.
 --
 -- Since max allowed lag is small, all records should arrive
@@ -108,13 +109,13 @@ box.cfg{replication_sync_lag = 0.001}
 box.cfg{replication = replication}
 ---
 ...
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
+---
+- true
+...
 box.space.test:count()
 ---
 - 200
-...
-box.info.status -- running
----
-- running
 ...
 box.info.ro -- false
 ---
@@ -139,6 +140,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
+-----------------------------------------------------------------------------------------------------
 -- Resume replication
 --
 -- Since max allowed lag is big, not all records will arrive
@@ -151,20 +153,12 @@ box.cfg{replication_sync_lag = 1}
 box.cfg{replication = replication}
 ---
 ...
-box.space.test:count() < 400
+test_run:wait_cond(function() return box.space.test:count() == 400 or (box.space.test:count() < 400 and box.info.status == 'running' and box.info.ro) end) or box.info.status
 ---
 - true
 ...
-box.info.status -- running
----
-- running
-...
-box.info.ro -- false
----
-- false
-...
 -- Wait for remaining rows to arrive.
-test_run:wait_cond(function() return box.space.test:count() == 400 end)
+test_run:wait_cond(function() return box.space.test:count() == 400 end) or box.space.test:count()
 ---
 - true
 ...
@@ -187,6 +181,7 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
+-----------------------------------------------------------------------------------------------------
 -- Resume replication
 --
 -- Although max allowed lag is small, box.cfg() will fail to
@@ -199,20 +194,12 @@ box.cfg{replication_sync_lag = 0.001, replication_sync_timeout = 0.001}
 box.cfg{replication = replication}
 ---
 ...
-box.space.test:count() < 600
----
-- true
-...
-box.info.status -- orphan
----
-- orphan
-...
-box.info.ro -- true
+test_run:wait_cond(function() return box.space.test:count() == 600 or (box.space.test:count() < 600 and box.info.status == 'orphan' and box.info.ro) end) or box.info.status
 ---
 - true
 ...
 -- Wait for remaining rows to arrive.
-test_run:wait_cond(function() return box.space.test:count() == 600 end)
+test_run:wait_cond(function() return box.space.test:count() == 600 end) or box.space.test:count()
 ---
 - true
 ...
@@ -221,9 +208,9 @@ test_run:wait_cond(function() return box.info.status ~= 'orphan' end)
 ---
 - true
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 box.info.ro -- false
 ---
@@ -286,19 +273,19 @@ box.cfg{replication = {}}
 box.cfg{replication = replication}
 ---
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end)
 ---
-- running
+- true
 ...
 box.info.ro -- false
 ---
 - false
 ...
-box.info.replication[1].upstream.status -- follow
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
 ---
-- follow
+- true
 ...
-test_run:grep_log('replica', 'ER_CFG.*')
+test_run:wait_log("replica", "ER_CFG.*", nil, 200)
 ---
 - 'ER_CFG: Incorrect value for option ''replication'': duplicate connection with the
   same replica UUID'
@@ -332,9 +319,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 box.info.ro -- false
 ---

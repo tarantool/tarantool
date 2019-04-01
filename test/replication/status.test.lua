@@ -83,7 +83,7 @@ box.info.vclock[master_id] == 2
 master = box.info.replication[master_id]
 master.id == master_id
 master.uuid == box.space._cluster:get(master_id)[2]
-master.upstream.status == "follow"
+test_run:wait_cond(function() return master.upstream.status == 'follow' end) or master.upstream.status
 master.upstream.lag < 1
 master.upstream.idle < 1
 master.upstream.peer:match("localhost")
@@ -110,9 +110,7 @@ box.space._schema:insert({'dup'})
 test_run:cmd('switch default')
 box.space._schema:insert({'dup'})
 test_run:cmd('switch replica')
-r = box.info.replication[1]
-r.upstream.status == "stopped"
-r.upstream.message:match('Duplicate') ~= nil
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'stopped' and box.info.replication[1].upstream.message:match('Duplicate') ~= nil end)
 test_run:cmd('switch default')
 box.space._schema:delete({'dup'})
 test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")

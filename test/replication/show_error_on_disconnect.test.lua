@@ -30,14 +30,14 @@ box.cfg{replication = repl}
 require('fiber').sleep(0.1)
 box.space.test:select()
 other_id = box.info.id % 2 + 1
-box.info.replication[other_id].upstream.status
+test_run:wait_cond(function() return box.info.replication[other_id].upstream.status == 'stopped' end) or box.info.replication[other_id].upstream.status
 box.info.replication[other_id].upstream.message:match("Missing")
 test_run:cmd("switch master_quorum2")
 box.space.test:select()
 other_id = box.info.id % 2 + 1
-box.info.replication[other_id].upstream.status
+test_run:wait_cond(function() return box.info.replication[other_id].upstream.status == 'follow' end) or box.info.replication[other_id].upstream.status
 box.info.replication[other_id].upstream.message
-box.info.replication[other_id].downstream.status
+test_run:wait_cond(function() return box.info.replication[other_id].downstream.status == 'stopped' end) or box.info.replication[other_id].downstream.status
 box.info.replication[other_id].downstream.message:match("Missing")
 test_run:cmd("switch default")
 -- Cleanup.

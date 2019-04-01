@@ -8,8 +8,7 @@ test_run = require('test_run').new()
 box.schema.user.grant('guest', 'replication')
 test_run:cmd('create server replica with rpl_master=default, script="replication/replica.lua"')
 test_run:cmd('start server replica')
-box.info.replication[2].downstream.status
-
+test_run:wait_cond(function() return box.info.replication[2].downstream.status == 'follow' end) or box.info.replication[2].downstream.status
 
 -- make applier incapable of reading rows in one go, so that it
 -- yields a couple of times.

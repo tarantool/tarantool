@@ -71,7 +71,7 @@ test_run:cmd("switch replica")
 box.cfg{replication = replication}
 ---
 ...
-box.info.replication[1].downstream.status ~= 'stopped' or box.info
+test_run:wait_cond(function() return box.info.replication[1].downstream.status ~= 'stopped' end) or box.info
 ---
 - true
 ...

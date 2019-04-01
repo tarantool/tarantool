@@ -303,11 +303,11 @@ box.info.replication[1].upstream.status
 ---
 - follow
 ...
-box.info.replication[1].upstream.lag > 0
+test_run:wait_cond(function() return box.info.replication[1].upstream.lag > 0 end) or box.info.replication[1].upstream.lag
 ---
 - true
 ...
-box.info.replication[1].upstream.lag < 1
+test_run:wait_cond(function() return box.info.replication[1].upstream.lag < 1 end) or box.info.replication[1].upstream.lag
 ---
 - true
 ...
@@ -485,16 +485,16 @@ fiber = require('fiber')
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 ---
 ...
-box.info.replication[1].upstream.status -- follow
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
 ---
-- follow
+- true
 ...
 for i = 0, 15 do fiber.sleep(0.01) if box.info.replication[1].upstream.status ~= 'follow' then break end end
 ---
 ...
-box.info.replication[1].upstream.status -- follow
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
 ---
-- follow
+- true
 ...
 test_run:cmd("switch default")
 ---

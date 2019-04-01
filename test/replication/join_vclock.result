@@ -67,10 +67,11 @@ test_run:cmd("switch replica1")
 ---
 - true
 ...
-cnt = box.space.test.index[0]:count()
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
 ---
+- true
 ...
-box.space.test.index.primary:max()[1] == cnt - 1
+test_run:wait_cond(function() return box.space.test.index.primary:max()[1] == box.space.test.index[0]:count() - 1 end) or box.space.test.index[0]:count()
 ---
 - true
 ...

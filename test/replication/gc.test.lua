@@ -63,7 +63,7 @@ test_run:cmd("start server replica")
 -- bootstrapped from, the replica should still receive all
 -- data from the master. Check it.
 test_run:cmd("switch replica")
-test_run:wait_cond(function() return box.space.test:count() == 200 end)
+test_run:wait_cond(function() return box.space.test:count() == 200 end) or box.space.test:count()
 box.space.test:count()
 test_run:cmd("switch default")
 
@@ -95,7 +95,7 @@ box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", false)
 
 -- Check that the replica received all data from the master.
 test_run:cmd("switch replica")
-test_run:wait_cond(function() return box.space.test:count() == 300 end)
+test_run:wait_cond(function() return box.space.test:count() == 300 end) or box.space.test:count()
 box.space.test:count()
 test_run:cmd("switch default")
 
@@ -130,7 +130,7 @@ box.cfg{replication = {}}
 test_run:cmd("restart server replica")
 -- Wait for the replica to catch up.
 test_run:cmd("switch replica")
-test_run:wait_cond(function() return box.space.test:count() == 310 end)
+test_run:wait_cond(function() return box.space.test:count() == 310 end) or box.space.test:count()
 box.space.test:count()
 test_run:cmd("switch default")
 -- Now it's safe to drop the old xlog.

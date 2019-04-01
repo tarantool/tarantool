@@ -14,7 +14,7 @@ test_run:cmd("start server test")
 
 -- Stop the replica and wait for the relay thread to exit.
 test_run:cmd("stop server test")
-test_run:wait_cond(function() return box.info.replication[2].downstream.status == 'stopped' end)
+test_run:wait_cond(function() return box.info.replication[2].downstream.status == 'stopped' end) or box.info.replication[2].downstream.status
 
 -- Delete an xlog file that is needed by the replica.
 box.snapshot()
@@ -30,7 +30,7 @@ box.cfg{force_recovery = true}
 test_run:cmd("start server test")
 test_run:cmd("switch test")
 box.space.test:select()
-box.info.replication[1].upstream.status == 'stopped' or box.info
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'stopped' end) or box.info
 test_run:cmd("switch default")
 box.cfg{force_recovery = false}
 

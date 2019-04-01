@@ -28,9 +28,9 @@ test_run:cmd('switch quorum2')
 - true
 ...
 test_run:cmd('restart server quorum2 with args="0.1 0.5"')
-box.info.status -- orphan
+test_run:wait_cond(function() return box.info.status == 'orphan' end) or box.info.status
 ---
-- orphan
+- true
 ...
 box.ctl.wait_rw(0.001) -- timeout
 ---
@@ -47,14 +47,14 @@ box.space.test:replace{100} -- error
 box.cfg{replication={}}
 ---
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 test_run:cmd('restart server quorum2 with args="0.1 0.5"')
-box.info.status -- orphan
+test_run:wait_cond(function() return box.info.status == 'orphan' end) or box.info.status
 ---
-- orphan
+- true
 ...
 box.ctl.wait_rw(0.001) -- timeout
 ---
@@ -78,14 +78,14 @@ box.info.ro -- false
 ---
 - false
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 test_run:cmd('restart server quorum2 with args="0.1 0.5"')
-box.info.status -- orphan
+test_run:wait_cond(function() return box.info.status == 'orphan' end) or box.info.status
 ---
-- orphan
+- true
 ...
 box.ctl.wait_rw(0.001) -- timeout
 ---
@@ -110,20 +110,20 @@ box.info.ro -- false
 ---
 - false
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 -- Check that the replica follows all masters.
-box.info.id == 1 or box.info.replication[1].upstream.status == 'follow'
+test_run:wait_cond(function() return box.info.id == 1 or box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
 ---
 - true
 ...
-box.info.id == 2 or box.info.replication[2].upstream.status == 'follow'
+test_run:wait_cond(function() return box.info.id == 2 or box.info.replication[2].upstream.status == 'follow' end) or box.info.replication[2].upstream.status
 ---
 - true
 ...
-box.info.id == 3 or box.info.replication[3].upstream.status == 'follow'
+test_run:wait_cond(function() return box.info.id == 3 or box.info.replication[3].upstream.status == 'follow' end) or box.info.replication[3].upstream.status
 ---
 - true
 ...
@@ -268,9 +268,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 box.space.test:select()
 ---
@@ -298,9 +298,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 test_run:cmd("switch default")
 ---
@@ -324,9 +324,9 @@ test_run:cmd("switch replica")
 ---
 - true
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 box.space.test:select()
 ---

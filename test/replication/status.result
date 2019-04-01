@@ -222,7 +222,7 @@ master.uuid == box.space._cluster:get(master_id)[2]
 ---
 - true
 ...
-master.upstream.status == "follow"
+test_run:wait_cond(function() return master.upstream.status == 'follow' end) or master.upstream.status
 ---
 - true
 ...
@@ -302,14 +302,7 @@ test_run:cmd('switch replica')
 ---
 - true
 ...
-r = box.info.replication[1]
----
-...
-r.upstream.status == "stopped"
----
-- true
-...
-r.upstream.message:match('Duplicate') ~= nil
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'stopped' and box.info.replication[1].upstream.message:match('Duplicate') ~= nil end)
 ---
 - true
 ...

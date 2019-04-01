@@ -59,6 +59,7 @@ test_run:cmd("switch default")
 fill()
 test_run:cmd("switch replica")
 
+-----------------------------------------------------------------------------------------------------
 -- Resume replication.
 --
 -- Since max allowed lag is small, all records should arrive
@@ -66,8 +67,8 @@ test_run:cmd("switch replica")
 --
 box.cfg{replication_sync_lag = 0.001}
 box.cfg{replication = replication}
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 box.space.test:count()
-box.info.status -- running
 box.info.ro -- false
 
 -- Stop replication.
@@ -79,6 +80,7 @@ test_run:cmd("switch default")
 fill()
 test_run:cmd("switch replica")
 
+-----------------------------------------------------------------------------------------------------
 -- Resume replication
 --
 -- Since max allowed lag is big, not all records will arrive
@@ -87,12 +89,10 @@ test_run:cmd("switch replica")
 --
 box.cfg{replication_sync_lag = 1}
 box.cfg{replication = replication}
-box.space.test:count() < 400
-box.info.status -- running
-box.info.ro -- false
+test_run:wait_cond(function() return box.space.test:count() == 400 or (box.space.test:count() < 400 and box.info.status == 'running' and box.info.ro) end) or box.info.status
 
 -- Wait for remaining rows to arrive.
-test_run:wait_cond(function() return box.space.test:count() == 400 end)
+test_run:wait_cond(function() return box.space.test:count() == 400 end) or box.space.test:count()
 
 -- Stop replication.
 replication = box.cfg.replication
@@ -103,6 +103,7 @@ test_run:cmd("switch default")
 fill()
 test_run:cmd("switch replica")
 
+-----------------------------------------------------------------------------------------------------
 -- Resume replication
 --
 -- Although max allowed lag is small, box.cfg() will fail to
@@ -111,16 +112,14 @@ test_run:cmd("switch replica")
 --
 box.cfg{replication_sync_lag = 0.001, replication_sync_timeout = 0.001}
 box.cfg{replication = replication}
-box.space.test:count() < 600
-box.info.status -- orphan
-box.info.ro -- true
+test_run:wait_cond(function() return box.space.test:count() == 600 or (box.space.test:count() < 600 and box.info.status == 'orphan' and box.info.ro) end) or box.info.status
 
 -- Wait for remaining rows to arrive.
-test_run:wait_cond(function() return box.space.test:count() == 600 end)
+test_run:wait_cond(function() return box.space.test:count() == 600 end) or box.space.test:count()
 
 -- Make sure replica leaves oprhan state.
 test_run:wait_cond(function() return box.info.status ~= 'orphan' end)
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 box.info.ro -- false
 
 -- gh-3636: Check that replica set sync doesn't stop on cfg errors.
@@ -151,10 +150,10 @@ test_run:cmd("switch replica")
 replication = box.cfg.replication
 box.cfg{replication = {}}
 box.cfg{replication = replication}
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end)
 box.info.ro -- false
-box.info.replication[1].upstream.status -- follow
-test_run:grep_log('replica', 'ER_CFG.*')
+test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
+test_run:wait_log("replica", "ER_CFG.*", nil, 200)
 
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
@@ -165,7 +164,7 @@ box.space.test:replace{123456789}
 box.error.injection.set('ERRINJ_WAL_WRITE_DISK', false)
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 box.info.ro -- false
 
 test_run:cmd("switch default")

@@ -32,9 +32,9 @@ test_run:cmd('switch rebootstrap1')
 ---
 - true
 ...
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 ---
-- running
+- true
 ...
 test_run:cmd('switch default')
 ---

@@ -19,37 +19,37 @@ test_run:cmd('stop server quorum1')
 test_run:cmd('switch quorum2')
 
 test_run:cmd('restart server quorum2 with args="0.1 0.5"')
-box.info.status -- orphan
+test_run:wait_cond(function() return box.info.status == 'orphan' end) or box.info.status
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
 box.space.test:replace{100} -- error
 box.cfg{replication={}}
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 
 test_run:cmd('restart server quorum2 with args="0.1 0.5"')
-box.info.status -- orphan
+test_run:wait_cond(function() return box.info.status == 'orphan' end) or box.info.status
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
 box.space.test:replace{100} -- error
 box.cfg{replication_connect_quorum = 2}
 box.ctl.wait_rw()
 box.info.ro -- false
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 
 test_run:cmd('restart server quorum2 with args="0.1 0.5"')
-box.info.status -- orphan
+test_run:wait_cond(function() return box.info.status == 'orphan' end) or box.info.status
 box.ctl.wait_rw(0.001) -- timeout
 box.info.ro -- true
 box.space.test:replace{100} -- error
 test_run:cmd('start server quorum1 with args="0.1 0.5"')
 box.ctl.wait_rw()
 box.info.ro -- false
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 
 -- Check that the replica follows all masters.
-box.info.id == 1 or box.info.replication[1].upstream.status == 'follow'
-box.info.id == 2 or box.info.replication[2].upstream.status == 'follow'
-box.info.id == 3 or box.info.replication[3].upstream.status == 'follow'
+test_run:wait_cond(function() return box.info.id == 1 or box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
+test_run:wait_cond(function() return box.info.id == 2 or box.info.replication[2].upstream.status == 'follow' end) or box.info.replication[2].upstream.status
+test_run:wait_cond(function() return box.info.id == 3 or box.info.replication[3].upstream.status == 'follow' end) or box.info.replication[3].upstream.status
 
 -- Check that box.cfg() doesn't return until the instance
 -- catches up with all configured replicas.
@@ -110,7 +110,7 @@ space:insert{1}
 test_run:cmd("create server replica with rpl_master=default, script='replication/replica_no_quorum.lua'")
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 box.space.test:select()
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
@@ -118,7 +118,7 @@ listen = box.cfg.listen
 box.cfg{listen = ''}
 test_run:cmd("start server replica")
 test_run:cmd("switch replica")
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 test_run:cmd("switch default")
 -- Check that replica is able to reconnect, case was broken with earlier quorum "fix".
 box.cfg{listen = listen}
@@ -126,7 +126,7 @@ space:insert{2}
 vclock = test_run:get_vclock("default")
 _ = test_run:wait_vclock("replica", vclock)
 test_run:cmd("switch replica")
-box.info.status -- running
+test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 box.space.test:select()
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")

@@ -258,7 +258,7 @@ _ = box.space._schema:replace{'cluster', tostring(uuid.new())}
 -- master believes replica is in cluster, but their cluster UUIDs differ.
 test_run:cmd("start server replica")
 test_run:wait_log("replica", "REPLICASET_UUID_MISMATCH", nil, 1.0)
-box.info.replication[2].downstream.status
+test_run:wait_cond(function() return box.info.replication[2].downstream.status == 'stopped' end) or box.info.replication[2].downstream.status
 
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
