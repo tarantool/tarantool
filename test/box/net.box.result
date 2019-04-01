@@ -2001,6 +2001,13 @@ c.space.test:format({})
 ---
 - error: net.box does not support setting space format
 ...
+--
+-- gh-4091: index unique flag is always false.
+--
+c.space.test.index.primary.unique
+---
+- true
+...
 c:close()
 ---
 ...

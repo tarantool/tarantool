@@ -814,6 +814,11 @@ format[1].type == "unsigned"
 
 c.space.test:format({})
 
+--
+-- gh-4091: index unique flag is always false.
+--
+c.space.test.index.primary.unique
+
 c:close()
 space:drop()
 
