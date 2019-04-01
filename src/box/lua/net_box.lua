@@ -1253,7 +1253,7 @@ function remote_methods:_install_schema(schema_version, spaces, indices)
                 }
                 idx.parts[k] = pk
             end
-            idx.unique = not not index[OPTS].is_unique
+            idx.unique = not not index[OPTS].unique
         end
 
         if sl[idx.space] ~= nil then
