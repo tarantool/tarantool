@@ -43,27 +43,27 @@ test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 test_run:wait_fullmesh(SERVERS)
 test_run:cmd("switch misc1")
 test_run = require('test_run').new()
-box.cfg{replication_timeout = 0.01, replication_connect_timeout=0.01}
+box.cfg{replication_timeout = 0.03, replication_connect_timeout=0.03}
 test_run:cmd("switch misc2")
 test_run = require('test_run').new()
-box.cfg{replication_timeout = 0.01, replication_connect_timeout=0.01}
+box.cfg{replication_timeout = 0.03, replication_connect_timeout=0.03}
 test_run:cmd("switch misc3")
 test_run = require('test_run').new()
 fiber=require('fiber')
-box.cfg{replication_timeout = 0.01, replication_connect_timeout=0.01}
+box.cfg{replication_timeout = 0.03, replication_connect_timeout=0.03}
 _ = box.schema.space.create('test_timeout'):create_index('pk')
 test_run:cmd("setopt delimiter ';'")
 function wait_follow(replicaA, replicaB)
     return test_run:wait_cond(function()
         return replicaA.status ~= 'follow' or replicaB.status ~= 'follow'
-    end, 0.01)
+    end, 0.1)
 end ;
 function test_timeout()
     local replicaA = box.info.replication[1].upstream or box.info.replication[2].upstream
     local replicaB = box.info.replication[3].upstream or box.info.replication[2].upstream
     local follows = test_run:wait_cond(function()
         return replicaA.status == 'follow' or replicaB.status == 'follow'
-    end, 0.1)
+    end, 1)
     if not follows then error('replicas not in follow status') end
     for i = 0, 99 do 
         box.space.test_timeout:replace({1})
@@ -166,7 +166,7 @@ fiber.sleep(0.1)
 box.schema.user.create('cluster', {password='pass'})
 box.schema.user.grant('cluster', 'replication')
 
-while box.info.replication[2] == nil do fiber.sleep(0.01) end
+while box.info.replication[2] == nil do fiber.sleep(0.03) end
 vclock = test_run:get_vclock('default')
 _ = test_run:wait_vclock('misc_gh3637', vclock)
 
@@ -194,12 +194,12 @@ listen = box.cfg.listen
 box.cfg{listen = ''}
 
 test_run:cmd("switch misc_gh3610")
-box.cfg{replication_connect_quorum = 0, replication_connect_timeout = 0.01}
+box.cfg{replication_connect_quorum = 0, replication_connect_timeout = 0.03}
 box.cfg{replication = {replication, replication}}
 
 test_run:cmd("switch default")
 box.cfg{listen = listen}
-while test_run:grep_log('misc_gh3610', 'duplicate connection') == nil do fiber.sleep(0.01) end
+while test_run:grep_log('misc_gh3610', 'duplicate connection') == nil do fiber.sleep(0.03) end
 
 test_run:cmd("stop server misc_gh3610")
 test_run:cmd("cleanup server misc_gh3610")
