@@ -803,7 +803,7 @@ next_lsn:
  * one statement.
  *
  * @param stream Write iterator.
- * @param hint   The tuple from a previous read view (can be NULL).
+ * @param prev_tuple Tuple from the previous read view (can be NULL).
  * @param rv Read view to merge.
  * @param is_first_insert Set if the oldest statement for the
  * current key among all sources is an INSERT.
@@ -812,7 +812,7 @@ next_lsn:
  * @retval -1 Memory error.
  */
 static NODISCARD int
-vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
+vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
 		   struct vy_read_view_stmt *rv, bool is_first_insert)
 {
 	assert(rv != NULL);
@@ -824,7 +824,8 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 	 * by a read view if it is preceded by another DELETE for
 	 * the same key.
 	 */
-	if (hint != NULL && vy_stmt_type(hint) == IPROTO_DELETE &&
+	if (prev_tuple != NULL &&
+	    vy_stmt_type(prev_tuple) == IPROTO_DELETE &&
 	    vy_stmt_type(h->tuple) == IPROTO_DELETE) {
 		vy_write_history_destroy(h);
 		rv->history = NULL;
@@ -840,11 +841,11 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 	 *    it, whether is_last_level is true or not.
 	 */
 	if (vy_stmt_type(h->tuple) == IPROTO_UPSERT &&
-	    (stream->is_last_level || (hint != NULL &&
-	     vy_stmt_type(hint) != IPROTO_UPSERT))) {
-		assert(!stream->is_last_level || hint == NULL ||
-		       vy_stmt_type(hint) != IPROTO_UPSERT);
-		struct tuple *applied = vy_apply_upsert(h->tuple, hint,
+	    (stream->is_last_level || (prev_tuple != NULL &&
+	     vy_stmt_type(prev_tuple) != IPROTO_UPSERT))) {
+		assert(!stream->is_last_level || prev_tuple == NULL ||
+		       vy_stmt_type(prev_tuple) != IPROTO_UPSERT);
+		struct tuple *applied = vy_apply_upsert(h->tuple, prev_tuple,
 							stream->cmp_def, false);
 		if (applied == NULL)
 			return -1;
@@ -893,7 +894,7 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *hint,
 		}
 		vy_stmt_set_flags(rv->tuple, flags & ~VY_STMT_DEFERRED_DELETE);
 	}
-	if (hint != NULL) {
+	if (prev_tuple != NULL) {
 		/* Not the first statement. */
 		return 0;
 	}
@@ -974,11 +975,11 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 	 * here > 0.
 	 */
 	assert(rv >= &stream->read_views[0] && rv->history != NULL);
-	struct tuple *hint = NULL;
+	struct tuple *prev_tuple = NULL;
 	for (; rv >= &stream->read_views[0]; --rv) {
 		if (rv->history == NULL)
 			continue;
-		if (vy_read_view_merge(stream, hint, rv,
+		if (vy_read_view_merge(stream, prev_tuple, rv,
 				       is_first_insert) != 0)
 			goto error;
 		assert(rv->history == NULL);
@@ -986,7 +987,7 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 			continue;
 		stream->rv_used_count++;
 		++*count;
-		hint = rv->tuple;
+		prev_tuple = rv->tuple;
 	}
 	region_truncate(region, used);
 	return 0;
