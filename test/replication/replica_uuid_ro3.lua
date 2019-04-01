@@ -1,1 +1,0 @@
-replica_uuid_ro.lua

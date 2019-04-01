@@ -16,15 +16,15 @@ space = box.schema.space.create('test', {engine = engine});
 index = box.space.test:create_index('primary')
 ---
 ...
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server skip_conflict_row with rpl_master=default, script='replication/replica.lua'")
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server skip_conflict_row")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch skip_conflict_row")
 ---
 - true
 ...
@@ -54,10 +54,10 @@ test_run:wait_cond(function() return box.info.status == 'running' end) or box.in
 vclock = test_run:get_vclock('default')
 ---
 ...
-_ = test_run:wait_vclock("replica", vclock)
+_ = test_run:wait_vclock("skip_conflict_row", vclock)
 ---
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch skip_conflict_row")
 ---
 - true
 ...
@@ -84,11 +84,11 @@ test_run:wait_cond(function() return box.info.status == 'running' end) or box.in
 ...
 -- gh-2283: test that if replication_skip_conflict is off vclock
 -- is not advanced on errors.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server skip_conflict_row")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch skip_conflict_row")
 ---
 - true
 ...
@@ -111,7 +111,7 @@ box.space.test:insert{4}
 ---
 - [4]
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch skip_conflict_row")
 ---
 - true
 ...
@@ -132,7 +132,7 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("restart server replica")
+test_run:cmd("restart server skip_conflict_row")
 ---
 - true
 ...
@@ -161,11 +161,11 @@ test_run:cmd("switch default")
 box.space.test:truncate()
 ---
 ...
-test_run:cmd("restart server replica")
+test_run:cmd("restart server skip_conflict_row")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch skip_conflict_row")
 ---
 - true
 ...
@@ -191,7 +191,7 @@ test_run:cmd("switch default")
 for i = 1, 10 do box.space.test:insert({i, 'm'}) end
 ---
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch skip_conflict_row")
 ---
 - true
 ...
@@ -213,18 +213,18 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server skip_conflict_row")
 ---
 - true
 ...
 for i = 11, 20 do box.space.test:insert({i, 'm'}) end
 ---
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server skip_conflict_row")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch skip_conflict_row")
 ---
 - true
 ...
@@ -250,15 +250,15 @@ test_run:cmd("switch default")
 - true
 ...
 -- cleanup
-test_run:cmd("stop server replica")
+test_run:cmd("stop server skip_conflict_row")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("cleanup server skip_conflict_row")
 ---
 - true
 ...
-test_run:cmd("delete server replica")
+test_run:cmd("delete server skip_conflict_row")
 ---
 - true
 ...

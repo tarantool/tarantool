@@ -6,7 +6,7 @@
 test_run = require('test_run').new()
 ---
 ...
-SERVERS = {'master_quorum1', 'master_quorum2'}
+SERVERS = {'show_error_on_disconnect1', 'show_error_on_disconnect2'}
 ---
 ...
 -- Deploy a cluster.
@@ -16,7 +16,7 @@ test_run:create_cluster(SERVERS)
 test_run:wait_fullmesh(SERVERS)
 ---
 ...
-test_run:cmd("switch master_quorum1")
+test_run:cmd("switch show_error_on_disconnect1")
 ---
 - true
 ...
@@ -26,7 +26,7 @@ repl = box.cfg.replication
 box.cfg{replication = ""}
 ---
 ...
-test_run:cmd("switch master_quorum2")
+test_run:cmd("switch show_error_on_disconnect2")
 ---
 - true
 ...
@@ -46,7 +46,7 @@ box.snapshot()
 ---
 - ok
 ...
--- Manually remove all xlogs on master_quorum2 to break replication to master_quorum1.
+-- Manually remove all xlogs on show_error_on_disconnect2 to break replication to show_error_on_disconnect1.
 fio = require('fio')
 ---
 ...
@@ -58,7 +58,7 @@ box.space.test:insert{3}
 - [3]
 ...
 -- Check error reporting.
-test_run:cmd("switch master_quorum1")
+test_run:cmd("switch show_error_on_disconnect1")
 ---
 - true
 ...
@@ -83,7 +83,7 @@ box.info.replication[other_id].upstream.message:match("Missing")
 ---
 - Missing
 ...
-test_run:cmd("switch master_quorum2")
+test_run:cmd("switch show_error_on_disconnect2")
 ---
 - true
 ...

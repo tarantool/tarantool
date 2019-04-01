@@ -1,17 +1,22 @@
 
-function join(inspector, n)
-    local path = os.getenv('TARANTOOL_SRC_DIR')
-    for i=1,n do
-        local rid = tostring(i)
-        os.execute('mkdir -p tmp')
-        os.execute('cp '..path..'/test/replication/replica.lua ./tmp/replica'..rid..'.lua')
-        os.execute('chmod +x ./tmp/replica'..rid..'.lua')
-        local out_dir = box.cfg.wal_dir
-        inspector:cmd("create server replica"..rid.." with rpl_master=default, script='"..out_dir.."/../tmp/replica"..rid..".lua'")
-        inspector:cmd("start server replica"..rid)
-    end
+function create(inspector, name, replica)
+    replica = replica or 'replica'
+    os.execute('echo "Creating replica '..name..'"')
+    os.execute('mkdir -p tmp')
+    os.execute('cp '..os.getenv('TARANTOOL_SRC_DIR')..'/test/replication/'..replica..'.lua ./tmp/'..name..'.lua')
+    os.execute('chmod +x ./tmp/'..name..'.lua')
+    inspector:cmd("create server "..name.." with rpl_master=default, script='"..box.cfg.wal_dir.."/../tmp/"..name..".lua'")
 end
 
+function join(inspector, name, n, replica)
+    n = n or 1
+    for i=1,n do
+        local rid = tostring(i)
+        if n == 1 then rid = '' end
+        create(inspector, name..rid, replica)
+        start(inspector, name..rid)
+    end
+end
 
 function call_all(callback)
     local all = box.space._cluster:select{}
@@ -24,45 +29,91 @@ function call_all(callback)
 end
 
 function unregister(inspector, id)
-    box.space._cluster:delete{id}
+    id = id or 2
+    if box.space._cluster:delete{id} then
+        return true
+    end
+    return false
 end
 
-function start(inspector, id)
-    inspector:cmd('start server replica'..tostring(id - 1))
+function id_to_str(id)
+    local strnum
+    if id == nil then
+        strnum = ''
+    else
+        strnum = tostring(id - 1)
+    end
+    return strnum
 end
 
-function stop(inspector, id)
-    inspector:cmd('stop server replica'..tostring(id - 1))
+-- replica commands
+
+function start(inspector, name, id)
+    return inspector:cmd('start server '..name..id_to_str(id))
 end
 
-function wait(inspector, id)
-    inspector:wait_lsn('replica'..tostring(id - 1), 'default')
+function stop(inspector, name, id)
+    return inspector:cmd('stop server '..name..id_to_str(id))
 end
 
-function delete(inspector, id)
-    inspector:cmd('stop server replica'..tostring(id - 1))
-    inspector:cmd('delete server replica'..tostring(id - 1))
+function cleanup(inspector, name, id)
+    return inspector:cmd('cleanup server '..name..id_to_str(id))
 end
 
-function drop(inspector, id)
-    unregister(inspector, id)
-    delete(inspector, id)
+function wait(inspector, name, id)
+    return inspector:wait_lsn(name..id_to_str(id), 'default')
 end
 
-function start_all(inspector)
-    call_all(function (id) start(inspector, id) end)
+function delete(inspector, name, id)
+    return inspector:cmd('delete server '..name..id_to_str(id))
 end
 
-function stop_all(inspector)
-    call_all(function (id) stop(inspector, id) end)
+-- replica modes
+
+function hibernate(inspector, name, id)
+    return stop(inspector, name, id) and cleanup(inspector, name, id)
 end
 
-function wait_all(inspector)
-    call_all(function (id) wait(inspector, id) end)
+function drop(inspector, name, id)
+    return hibernate(inspector, name, id) and delete(inspector, name, id)
 end
 
-function drop_all(inspector)
-    call_all(function (id) drop(inspector, id) end)
+function prune(inspector, name, id)
+    return unregister(inspector, id) and drop(inspector, name, id)
+end
+
+-- multi calls
+
+function start_all(inspector, name)
+    call_all(function (id) start(inspector, name, id) end)
+end
+
+function stop_all(inspector, name)
+    call_all(function (id) stop(inspector, name, id) end)
+end
+
+function cleanup_all(inspector, name)
+    call_all(function (id) cleanup(inspector, name, id) end)
+end
+
+function wait_all(inspector, name)
+    call_all(function (id) wait(inspector, name, id) end)
+end
+
+function delete_all(inspector, name)
+    call_all(function (id) delete(inspector, name, id) end)
+end
+
+function hibernate_all(inspector, name)
+    call_all(function (id) hibernate(inspector, name, id) end)
+end
+
+function drop_all(inspector, name)
+    call_all(function (id) drop(inspector, name, id) end)
+end
+
+function prune_all(inspector, name)
+    call_all(function (id) prune(inspector, name, id) end)
 end
 
 function vclock_diff(left, right)
@@ -79,12 +130,24 @@ function vclock_diff(left, right)
 end
 
 return {
+    create = create;
     join = join;
+    start = start;
     start_all = start_all;
+    stop = stop;
     stop_all = stop_all;
+    cleanup = cleanup;
+    cleanup_all = cleanup_all;
+    wait = wait;
     wait_all = wait_all;
+    delete = delete;
+    delete_all = delete_all;
+    hibernate = hibernate;
+    hibernate_all = hibernate_all;
+    drop = drop;
     drop_all = drop_all;
+    prune = prune;
+    prune_all = prune_all;
     vclock_diff = vclock_diff;
     unregister = unregister;
-    delete = delete;
 }

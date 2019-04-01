@@ -2,7 +2,7 @@
 -- Old behaviour: failed, since read-only is chosen by uuid.
 test_run = require('test_run').new()
 
-SERVERS = {'replica_uuid_ro1', 'replica_uuid_ro2'}
+SERVERS = {'replicaset_ro_mostly1', 'replicaset_ro_mostly2'}
 
 uuid = require('uuid')
 uuid1 = uuid.new()
@@ -30,10 +30,10 @@ create_cluster_uuid(SERVERS, UUID)
 test_run:wait_fullmesh(SERVERS)
 
 -- Add third replica
-name = 'replica_uuid_ro3'
+name = 'replicaset_ro_mostly3'
 test_run:cmd(create_cluster_cmd1:format(name, name))
 test_run:cmd(create_cluster_cmd2:format(name, uuid.new(), "0.1"))
-test_run:cmd('switch replica_uuid_ro3')
+test_run:cmd('switch replicaset_ro_mostly3')
 test_run:cmd('switch default')
 
 -- Cleanup.

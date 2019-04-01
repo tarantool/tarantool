@@ -16,7 +16,7 @@ fio = require('fio')
 test_run:cleanup_cluster()
 ---
 ...
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server gc with rpl_master=default, script='replication/replica.lua'")
 ---
 - true
 ...
@@ -105,7 +105,7 @@ test_run:cmd("setopt delimiter ''");
 ---
 ...
 -- Start the replica.
-test_run:cmd("start server replica")
+test_run:cmd("start server gc")
 ---
 - true
 ...
@@ -113,7 +113,7 @@ test_run:cmd("start server replica")
 -- would have normally removed the snapshot the replica was
 -- bootstrapped from, the replica should still receive all
 -- data from the master. Check it.
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 ---
 - true
 ...
@@ -183,7 +183,7 @@ box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", false)
 - ok
 ...
 -- Check that the replica received all data from the master.
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 ---
 - true
 ...
@@ -214,7 +214,7 @@ wait_xlog(0)
 -- replica until it receives a confirmation that the data has
 -- been applied (gh-2825).
 --
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 ---
 - true
 ...
@@ -252,7 +252,7 @@ wait_xlog(2)
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 ---
 - true
 ...
@@ -265,9 +265,9 @@ box.cfg{replication = {}}
 ---
 ...
 -- Restart the replica to reestablish replication.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server gc")
 -- Wait for the replica to catch up.
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 ---
 - true
 ...
@@ -293,11 +293,7 @@ wait_xlog(1)
 - true
 ...
 -- Stop the replica.
-test_run:cmd("stop server replica")
----
-- true
-...
-test_run:cmd("cleanup server replica")
+replica_set.hibernate(test_run, 'gc')
 ---
 - true
 ...
@@ -354,22 +350,25 @@ box.snapshot()
 ---
 - ok
 ...
-replica_set.join(test_run, 3)
+test_name = 'gc'
 ---
 ...
-replica_set.stop_all(test_run)
+replica_set.join(test_run, test_name, 3)
+---
+...
+replica_set.stop_all(test_run, test_name)
 ---
 ...
 for i = 11, 50 do s:replace{i} if i % 10 == 0 then box.snapshot() end end
 ---
 ...
-replica_set.start_all(test_run)
+replica_set.start_all(test_run, test_name)
 ---
 ...
-replica_set.wait_all(test_run)
+replica_set.wait_all(test_run, test_name)
 ---
 ...
-replica_set.drop_all(test_run)
+replica_set.prune_all(test_run, test_name)
 ---
 ...
 --
@@ -381,11 +380,11 @@ fio = require('fio')
 ---
 ...
 -- Start a replica and set it up as a master for this instance.
-test_run:cmd("start server replica")
+test_run:cmd("start server gc")
 ---
 - true
 ...
-replica_port = test_run:eval('replica', 'return box.cfg.listen')[1]
+replica_port = test_run:eval('gc', 'return box.cfg.listen')[1]
 ---
 ...
 replica_port ~= nil
@@ -396,15 +395,7 @@ box.cfg{replication = replica_port}
 ---
 ...
 -- Stop the replica and write a few WALs.
-test_run:cmd("stop server replica")
----
-- true
-...
-test_run:cmd("cleanup server replica")
----
-- true
-...
-test_run:cmd("delete server replica")
+replica_set.drop(test_run, 'gc')
 ---
 - true
 ...

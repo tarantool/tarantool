@@ -82,11 +82,11 @@ master.downstream == nil
 - true
 ...
 -- Start Master -> Slave replication
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server status with rpl_master=default, script='replication/replica.lua'")
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server status")
 ---
 - true
 ...
@@ -145,7 +145,7 @@ master.downstream == nil
 - true
 ...
 -- replica's status
-replica_id = test_run:get_server_id('replica')
+replica_id = test_run:get_server_id('status')
 ---
 ...
 box.info.vclock[replica_id] == nil
@@ -187,7 +187,7 @@ replica.downstream.vclock[replica_id] == box.info.vclock[replica_id]
 --
 -- Replica
 --
-test_run:cmd('switch replica')
+test_run:cmd('switch status')
 ---
 - true
 ...
@@ -282,7 +282,7 @@ replica.downstream == nil
 --
 -- ClientError during replication
 --
-test_run:cmd('switch replica')
+test_run:cmd('switch status')
 ---
 - true
 ...
@@ -298,7 +298,7 @@ box.space._schema:insert({'dup'})
 ---
 - ['dup']
 ...
-test_run:cmd('switch replica')
+test_run:cmd('switch status')
 ---
 - true
 ...
@@ -318,7 +318,7 @@ test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")
 ---
 - true
 ...
-test_run:grep_log('replica', 'error applying row: .*')
+test_run:grep_log('status', 'error applying row: .*')
 ---
 - 'error applying row: {type: ''INSERT'', replica_id: 1, lsn: <number>, space_id: 272, index_id:
   0, tuple: ["dup"]}'
@@ -330,11 +330,11 @@ test_run:cmd("clear filter")
 --
 -- Check box.info.replication login
 --
-test_run:cmd('switch replica')
+test_run:cmd('switch status')
 ---
 - true
 ...
-test_run:cmd("set variable master_port to 'replica.master'")
+test_run:cmd("set variable master_port to 'status.master'")
 ---
 - true
 ...
@@ -380,15 +380,15 @@ test_run:cmd('switch default')
 box.schema.user.revoke('guest', 'replication')
 ---
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server status")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("cleanup server status")
 ---
 - true
 ...
-test_run:cmd("delete server replica")
+test_run:cmd("delete server status")
 ---
 - true
 ...

@@ -5,7 +5,7 @@ fiber = require('fiber')
 fio = require('fio')
 
 test_run:cleanup_cluster()
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server gc with rpl_master=default, script='replication/replica.lua'")
 
 -- Make each snapshot trigger garbage collection.
 default_checkpoint_count = box.cfg.checkpoint_count
@@ -56,13 +56,13 @@ end)
 test_run:cmd("setopt delimiter ''");
 
 -- Start the replica.
-test_run:cmd("start server replica")
+test_run:cmd("start server gc")
 
 -- Despite the fact that we invoked garbage collection that
 -- would have normally removed the snapshot the replica was
 -- bootstrapped from, the replica should still receive all
 -- data from the master. Check it.
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 test_run:wait_cond(function() return box.space.test:count() == 200 end) or box.space.test:count()
 box.space.test:count()
 test_run:cmd("switch default")
@@ -94,7 +94,7 @@ wait_xlog(2)
 box.error.injection.set("ERRINJ_RELAY_SEND_DELAY", false)
 
 -- Check that the replica received all data from the master.
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 test_run:wait_cond(function() return box.space.test:count() == 300 end) or box.space.test:count()
 box.space.test:count()
 test_run:cmd("switch default")
@@ -108,7 +108,7 @@ wait_xlog(0)
 -- replica until it receives a confirmation that the data has
 -- been applied (gh-2825).
 --
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 -- Prevent the replica from applying any rows.
 box.error.injection.set("ERRINJ_WAL_DELAY", true)
 test_run:cmd("switch default")
@@ -122,14 +122,14 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- the old snapshot.
 wait_gc(1)
 wait_xlog(2)
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 -- Unblock the replica and break replication.
 box.error.injection.set("ERRINJ_WAL_DELAY", false)
 box.cfg{replication = {}}
 -- Restart the replica to reestablish replication.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server gc")
 -- Wait for the replica to catch up.
-test_run:cmd("switch replica")
+test_run:cmd("switch gc")
 test_run:wait_cond(function() return box.space.test:count() == 310 end) or box.space.test:count()
 box.space.test:count()
 test_run:cmd("switch default")
@@ -137,8 +137,7 @@ test_run:cmd("switch default")
 wait_gc(1)
 wait_xlog(1)
 -- Stop the replica.
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
+replica_set.hibernate(test_run, 'gc')
 
 -- Invoke garbage collection. Check that it removes the old
 -- checkpoint, but keeps the xlog last used by the replica.
@@ -164,14 +163,15 @@ s:truncate()
 for i = 1, 10 do s:replace{i} end
 box.snapshot()
 
-replica_set.join(test_run, 3)
-replica_set.stop_all(test_run)
+test_name = 'gc'
+replica_set.join(test_run, test_name, 3)
+replica_set.stop_all(test_run, test_name)
 
 for i = 11, 50 do s:replace{i} if i % 10 == 0 then box.snapshot() end end
 
-replica_set.start_all(test_run)
-replica_set.wait_all(test_run)
-replica_set.drop_all(test_run)
+replica_set.start_all(test_run, test_name)
+replica_set.wait_all(test_run, test_name)
+replica_set.prune_all(test_run, test_name)
 
 --
 -- Check that once a replica is removed from the cluster table,
@@ -181,15 +181,13 @@ replica_set.drop_all(test_run)
 fio = require('fio')
 
 -- Start a replica and set it up as a master for this instance.
-test_run:cmd("start server replica")
-replica_port = test_run:eval('replica', 'return box.cfg.listen')[1]
+test_run:cmd("start server gc")
+replica_port = test_run:eval('gc', 'return box.cfg.listen')[1]
 replica_port ~= nil
 box.cfg{replication = replica_port}
 
 -- Stop the replica and write a few WALs.
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
-test_run:cmd("delete server replica")
+replica_set.drop(test_run, 'gc')
 _ = s:auto_increment{}
 box.snapshot()
 _ = s:auto_increment{}

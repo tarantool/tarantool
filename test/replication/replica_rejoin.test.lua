@@ -16,13 +16,13 @@ _ = box.space.test:insert{2}
 _ = box.space.test:insert{3}
 
 -- Join a replica, then stop it.
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
-test_run:cmd("start server replica")
-test_run:cmd("switch replica")
+test_run:cmd("create server replica_rejoin with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server replica_rejoin")
+test_run:cmd("switch replica_rejoin")
 test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
 box.space.test:select()
 test_run:cmd("switch default")
-test_run:cmd("stop server replica")
+test_run:cmd("stop server replica_rejoin")
 
 -- Restart the server to purge the replica from
 -- the garbage collection state.
@@ -45,9 +45,9 @@ box.cfg{checkpoint_count = checkpoint_count}
 
 -- Restart the replica. Since xlogs have been removed,
 -- it is supposed to rejoin without changing id.
-test_run:cmd("start server replica")
+test_run:cmd("start server replica_rejoin")
 box.info.replication[2].downstream.vclock ~= nil or box.info
-test_run:cmd("switch replica")
+test_run:cmd("switch replica_rejoin")
 test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
 box.space.test:select()
 test_run:cmd("switch default")
@@ -55,12 +55,12 @@ test_run:cmd("switch default")
 -- Make sure the replica follows new changes.
 for i = 10, 30, 10 do box.space.test:update(i, {{'!', 1, i}}) end
 vclock = test_run:get_vclock('default')
-_ = test_run:wait_vclock('replica', vclock)
-test_run:cmd("switch replica")
+_ = test_run:wait_vclock('replica_rejoin', vclock)
+test_run:cmd("switch replica_rejoin")
 box.space.test:select()
 
 -- Check that restart works as usual.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server replica_rejoin")
 box.info.replication[1].upstream.status == 'follow' or box.info
 box.space.test:select()
 
@@ -68,7 +68,7 @@ box.space.test:select()
 -- is strictly behind the master.
 box.space.test:replace{1, 2, 3} -- bumps LSN on the replica
 test_run:cmd("switch default")
-test_run:cmd("stop server replica")
+test_run:cmd("stop server replica_rejoin")
 test_run:cmd("restart server default")
 checkpoint_count = box.cfg.checkpoint_count
 box.cfg{checkpoint_count = 1}
@@ -78,8 +78,8 @@ for i = 1, 3 do box.space.test:insert{i * 100} end
 fio = require('fio')
 test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog')) == 1 end) or fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 box.cfg{checkpoint_count = checkpoint_count}
-test_run:cmd("start server replica")
-test_run:cmd("switch replica")
+test_run:cmd("start server replica_rejoin")
+test_run:cmd("switch replica_rejoin")
 box.info.status -- orphan
 box.space.test:select()
 
@@ -90,30 +90,30 @@ box.space.test:select()
 
 -- Bootstrap a new replica.
 test_run:cmd("switch default")
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
+test_run:cmd("stop server replica_rejoin")
+test_run:cmd("cleanup server replica_rejoin")
 test_run:cleanup_cluster()
 box.space.test:truncate()
-test_run:cmd("start server replica")
+test_run:cmd("start server replica_rejoin")
 -- Subscribe the master to the replica.
-replica_listen = test_run:cmd("eval replica 'return box.cfg.listen'")
+replica_listen = test_run:cmd("eval replica_rejoin 'return box.cfg.listen'")
 replica_listen ~= nil
 box.cfg{replication = replica_listen}
 -- Unsubscribe the replica from the master.
-test_run:cmd("switch replica")
+test_run:cmd("switch replica_rejoin")
 box.cfg{replication = ''}
 -- Bump vclock on the master.
 test_run:cmd("switch default")
 box.space.test:replace{1}
 -- Bump vclock on the replica.
-test_run:cmd("switch replica")
+test_run:cmd("switch replica_rejoin")
 for i = 1, 10 do box.space.test:replace{2} end
-vclock = test_run:get_vclock('replica')
+vclock = test_run:get_vclock('replica_rejoin')
 _ = test_run:wait_vclock('default', vclock)
 -- Restart the master and force garbage collection.
 test_run:cmd("switch default")
 test_run:cmd("restart server default")
-replica_listen = test_run:cmd("eval replica 'return box.cfg.listen'")
+replica_listen = test_run:cmd("eval replica_rejoin 'return box.cfg.listen'")
 replica_listen ~= nil
 box.cfg{replication = replica_listen}
 default_checkpoint_count = box.cfg.checkpoint_count
@@ -123,12 +123,12 @@ box.cfg{checkpoint_count = default_checkpoint_count}
 fio = require('fio')
 test_run:wait_cond(function() return #fio.glob(fio.pathjoin(box.cfg.wal_dir, '*.xlog')) == 1 end) or fio.pathjoin(box.cfg.wal_dir, '*.xlog')
 -- Bump vclock on the replica again.
-test_run:cmd("switch replica")
+test_run:cmd("switch replica_rejoin")
 for i = 1, 10 do box.space.test:replace{2} end
-vclock = test_run:get_vclock('replica')
+vclock = test_run:get_vclock('replica_rejoin')
 _ = test_run:wait_vclock('default', vclock)
 -- Restart the replica. It should successfully rebootstrap.
-test_run:cmd("restart server replica")
+test_run:cmd("restart server replica_rejoin")
 box.space.test:select()
 box.snapshot()
 box.space.test:replace{2}
@@ -136,9 +136,9 @@ box.space.test:replace{2}
 -- Cleanup.
 test_run:cmd("switch default")
 box.cfg{replication = ''}
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
-test_run:cmd("delete server replica")
+test_run:cmd("stop server replica_rejoin")
+test_run:cmd("cleanup server replica_rejoin")
+test_run:cmd("delete server replica_rejoin")
 test_run:cleanup_cluster()
 box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')

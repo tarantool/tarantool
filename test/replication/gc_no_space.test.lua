@@ -39,25 +39,25 @@ box.snapshot()
 --
 -- Create a few dead replicas to pin WAL files.
 --
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
-test_run:cmd("start server replica")
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
+test_run:cmd("create server gc_no_space with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server gc_no_space")
+test_run:cmd("stop server gc_no_space")
+test_run:cmd("cleanup server gc_no_space")
 
 s:auto_increment{}
 box.snapshot()
 
-test_run:cmd("start server replica")
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
+test_run:cmd("start server gc_no_space")
+test_run:cmd("stop server gc_no_space")
+test_run:cmd("cleanup server gc_no_space")
 
 s:auto_increment{}
 box.snapshot()
 
-test_run:cmd("start server replica")
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
-test_run:cmd("delete server replica")
+test_run:cmd("start server gc_no_space")
+test_run:cmd("stop server gc_no_space")
+test_run:cmd("cleanup server gc_no_space")
+test_run:cmd("delete server gc_no_space")
 
 --
 -- Make a few checkpoints and check that old WAL files are not

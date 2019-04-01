@@ -256,15 +256,15 @@ space:insert{1}
 ---
 - [1]
 ...
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica_no_quorum.lua'")
+test_run:cmd("create server quorum_gh3278 with rpl_master=default, script='replication/replica_no_quorum.lua'")
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server quorum_gh3278")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch quorum_gh3278")
 ---
 - true
 ...
@@ -280,7 +280,7 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server quorum_gh3278")
 ---
 - true
 ...
@@ -290,11 +290,11 @@ listen = box.cfg.listen
 box.cfg{listen = ''}
 ---
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server quorum_gh3278")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch quorum_gh3278")
 ---
 - true
 ...
@@ -317,10 +317,10 @@ space:insert{2}
 vclock = test_run:get_vclock("default")
 ---
 ...
-_ = test_run:wait_vclock("replica", vclock)
+_ = test_run:wait_vclock("quorum_gh3278", vclock)
 ---
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch quorum_gh3278")
 ---
 - true
 ...
@@ -337,11 +337,11 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server quorum_gh3278")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("cleanup server quorum_gh3278")
 ---
 - true
 ...
@@ -406,7 +406,7 @@ test_run:drop_cluster(SERVERS)
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-test_run:cmd('create server replica_quorum with script="replication/replica_quorum.lua"')
+test_run:cmd('create server quorum with script="replication/replica_quorum.lua"')
 ---
 - true
 ...
@@ -414,11 +414,11 @@ test_run:cmd('create server replica_quorum with script="replication/replica_quor
 -- replication_connect_timeout.
 -- If replication_connect_quorum was ignored here, the instance
 -- would exit with an error.
-test_run:cmd('start server replica_quorum with wait=True, wait_load=True, args="1 0.05 0.1"')
+test_run:cmd('start server quorum with wait=True, wait_load=True, args="1 0.05 0.1"')
 ---
 - true
 ...
-test_run:cmd('switch replica_quorum')
+test_run:cmd('switch quorum')
 ---
 - true
 ...
@@ -435,15 +435,15 @@ test_run:cmd('switch default')
 ---
 - true
 ...
-test_run:cmd('stop server replica_quorum')
+test_run:cmd('stop server quorum')
 ---
 - true
 ...
-test_run:cmd('cleanup server replica_quorum')
+test_run:cmd('cleanup server quorum')
 ---
 - true
 ...
-test_run:cmd('delete server replica_quorum')
+test_run:cmd('delete server quorum')
 ---
 - true
 ...

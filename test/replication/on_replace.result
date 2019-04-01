@@ -19,15 +19,15 @@ _ = box.space.test:create_index('primary')
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server on_replace with rpl_master=default, script='replication/replica.lua'")
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server on_replace")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch on_replace")
 ---
 - true
 ...
@@ -59,7 +59,7 @@ box.space.test:insert{2}
 ---
 - [2]
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch on_replace")
 ---
 - true
 ...
@@ -83,15 +83,15 @@ test_run:cmd("switch default")
 --
 -- cleanup
 --
-test_run:cmd("stop server replica")
+test_run:cmd("stop server on_replace")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("cleanup server on_replace")
 ---
 - true
 ...
-test_run:cmd("delete server replica")
+test_run:cmd("delete server on_replace")
 ---
 - true
 ...

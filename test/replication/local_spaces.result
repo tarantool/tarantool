@@ -96,15 +96,15 @@ _ = s3:insert{2}
 box.schema.user.grant('guest', 'replication')
 ---
 ...
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server local_spaces with rpl_master=default, script='replication/replica.lua'")
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server local_spaces")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch local_spaces")
 ---
 - true
 ...
@@ -162,10 +162,10 @@ _ = s3:insert{3}
 vclock = test_run:get_vclock('default')
 ---
 ...
-_ = test_run:wait_vclock('replica', vclock)
+_ = test_run:wait_vclock('local_spaces', vclock)
 ---
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch local_spaces")
 ---
 - true
 ...
@@ -187,7 +187,7 @@ box.space.test3:select()
   - [2, 2, 2]
   - [3, 3, 3]
 ...
-test_run:cmd("restart server replica")
+test_run:cmd("restart server local_spaces")
 box.space.test1:select()
 ---
 - - [1]
@@ -208,15 +208,15 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server local_spaces")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("cleanup server local_spaces")
 ---
 - true
 ...
-test_run:cmd("delete server replica")
+test_run:cmd("delete server local_spaces")
 ---
 - true
 ...

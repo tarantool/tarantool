@@ -17,16 +17,16 @@ box.schema.user.grant('guest', 'replication')
 ---
 ...
 -- Deploy a replica.
-test_run:cmd("create server test with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server force_recovery with rpl_master=default, script='replication/replica.lua'")
 ---
 - true
 ...
-test_run:cmd("start server test")
+test_run:cmd("start server force_recovery")
 ---
 - true
 ...
 -- Stop the replica and wait for the relay thread to exit.
-test_run:cmd("stop server test")
+test_run:cmd("stop server force_recovery")
 ---
 - true
 ...
@@ -63,11 +63,11 @@ fio.unlink(xlog)
 box.cfg{force_recovery = true}
 ---
 ...
-test_run:cmd("start server test")
+test_run:cmd("start server force_recovery")
 ---
 - true
 ...
-test_run:cmd("switch test")
+test_run:cmd("switch force_recovery")
 ---
 - true
 ...
@@ -87,15 +87,15 @@ box.cfg{force_recovery = false}
 ---
 ...
 -- Cleanup.
-test_run:cmd("stop server test")
+test_run:cmd("stop server force_recovery")
 ---
 - true
 ...
-test_run:cmd("cleanup server test")
+test_run:cmd("cleanup server force_recovery")
 ---
 - true
 ...
-test_run:cmd("delete server test")
+test_run:cmd("delete server force_recovery")
 ---
 - true
 ...

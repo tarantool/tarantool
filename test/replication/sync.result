@@ -66,15 +66,15 @@ test_run:cmd("setopt delimiter ''");
 - true
 ...
 -- Deploy a replica.
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server sync with rpl_master=default, script='replication/replica.lua'")
 ---
 - true
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server sync")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 ---
 - true
 ...
@@ -93,7 +93,7 @@ test_run:cmd("switch default")
 fill()
 ---
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 ---
 - true
 ...
@@ -136,7 +136,7 @@ test_run:cmd("switch default")
 fill()
 ---
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 ---
 - true
 ...
@@ -177,7 +177,7 @@ test_run:cmd("switch default")
 fill()
 ---
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 ---
 - true
 ...
@@ -260,7 +260,7 @@ test_run:cmd("setopt delimiter ''");
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 ---
 - true
 ...
@@ -285,7 +285,7 @@ test_run:wait_cond(function() return box.info.replication[1].upstream.status == 
 ---
 - true
 ...
-test_run:wait_log("replica", "ER_CFG.*", nil, 200)
+test_run:wait_log("sync", "ER_CFG.*", nil, 200)
 ---
 - 'ER_CFG: Incorrect value for option ''replication'': duplicate connection with the
   same replica UUID'
@@ -294,7 +294,7 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server sync")
 ---
 - true
 ...
@@ -311,11 +311,11 @@ box.error.injection.set('ERRINJ_WAL_WRITE_DISK', false)
 ---
 - ok
 ...
-test_run:cmd("start server replica")
+test_run:cmd("start server sync")
 ---
 - true
 ...
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 ---
 - true
 ...
@@ -331,15 +331,15 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-test_run:cmd("stop server replica")
+test_run:cmd("stop server sync")
 ---
 - true
 ...
-test_run:cmd("cleanup server replica")
+test_run:cmd("cleanup server sync")
 ---
 - true
 ...
-test_run:cmd("delete server replica")
+test_run:cmd("delete server sync")
 ---
 - true
 ...

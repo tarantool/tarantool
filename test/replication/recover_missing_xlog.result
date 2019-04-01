@@ -4,18 +4,16 @@ env = require('test_run')
 test_run = env.new()
 ---
 ...
-SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
+SERVERS = { 'recover_missing_xlog1', 'recover_missing_xlog2', 'recover_missing_xlog3' }
 ---
 ...
--- Start servers
 test_run:create_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
--- Wait for full mesh
 test_run:wait_fullmesh(SERVERS)
 ---
 ...
-test_run:cmd("switch autobootstrap1")
+test_run:cmd("switch recover_missing_xlog1")
 ---
 - true
 ...
@@ -30,13 +28,13 @@ test_run:cmd('switch default')
 ---
 - true
 ...
-vclock1 = test_run:get_vclock('autobootstrap1')
+vclock1 = test_run:get_vclock('recover_missing_xlog1')
 ---
 ...
 vclock2 = test_run:wait_cluster_vclock(SERVERS, vclock1)
 ---
 ...
-test_run:cmd("switch autobootstrap2")
+test_run:cmd("switch recover_missing_xlog2")
 ---
 - true
 ...
@@ -48,7 +46,7 @@ box.error.injection.set("ERRINJ_RELAY_TIMEOUT", 0.01)
 ---
 - ok
 ...
-test_run:cmd("stop server autobootstrap1")
+test_run:cmd("stop server recover_missing_xlog1")
 ---
 - true
 ...
@@ -62,18 +60,18 @@ fio = require('fio')
 -- all missing data from replica.
 -- Also check that there is no concurrency, i.e. master is
 -- in 'read-only' mode unless it receives all data.
-list = fio.glob(fio.pathjoin(fio.abspath("."), 'autobootstrap1/*.xlog'))
+list = fio.glob(fio.pathjoin(fio.abspath("."), 'recover_missing_xlog1/*.xlog'))
 ---
 ...
 fio.unlink(list[#list])
 ---
 - true
 ...
-test_run:cmd('start server autobootstrap1 with args="0.1 0.5"')
+test_run:cmd('start server recover_missing_xlog1 with args="0.1 0.5"')
 ---
 - true
 ...
-test_run:cmd("switch autobootstrap1")
+test_run:cmd("switch recover_missing_xlog1")
 ---
 - true
 ...

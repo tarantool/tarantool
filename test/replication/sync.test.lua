@@ -46,9 +46,9 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 -- Deploy a replica.
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
-test_run:cmd("start server replica")
-test_run:cmd("switch replica")
+test_run:cmd("create server sync with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server sync")
+test_run:cmd("switch sync")
 
 -- Stop replication.
 replication = box.cfg.replication
@@ -57,7 +57,7 @@ box.cfg{replication = {}}
 -- Fill the space.
 test_run:cmd("switch default")
 fill()
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 
 -----------------------------------------------------------------------------------------------------
 -- Resume replication.
@@ -78,7 +78,7 @@ box.cfg{replication = {}}
 -- Fill the space.
 test_run:cmd("switch default")
 fill()
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 
 -----------------------------------------------------------------------------------------------------
 -- Resume replication
@@ -101,7 +101,7 @@ box.cfg{replication = {}}
 -- Fill the space.
 test_run:cmd("switch default")
 fill()
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 
 -----------------------------------------------------------------------------------------------------
 -- Resume replication
@@ -145,7 +145,7 @@ _ = fiber.create(function()
     box.error.injection.set('ERRINJ_WAL_DELAY', false)
 end);
 test_run:cmd("setopt delimiter ''");
-test_run:cmd("switch replica")
+test_run:cmd("switch sync")
 
 replication = box.cfg.replication
 box.cfg{replication = {}}
@@ -153,24 +153,24 @@ box.cfg{replication = replication}
 test_run:wait_cond(function() return box.info.status == 'running' end)
 box.info.ro -- false
 test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'follow' end) or box.info.replication[1].upstream.status
-test_run:wait_log("replica", "ER_CFG.*", nil, 200)
+test_run:wait_log("sync", "ER_CFG.*", nil, 200)
 
 test_run:cmd("switch default")
-test_run:cmd("stop server replica")
+test_run:cmd("stop server sync")
 
 -- gh-3830: Sync fails if there's a gap at the end of the master's WAL.
 box.error.injection.set('ERRINJ_WAL_WRITE_DISK', true)
 box.space.test:replace{123456789}
 box.error.injection.set('ERRINJ_WAL_WRITE_DISK', false)
-test_run:cmd("start server replica")
-test_run:cmd("switch replica")
+test_run:cmd("start server sync")
+test_run:cmd("switch sync")
 test_run:wait_cond(function() return box.info.status == 'running' end) or box.info.status
 box.info.ro -- false
 
 test_run:cmd("switch default")
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
-test_run:cmd("delete server replica")
+test_run:cmd("stop server sync")
+test_run:cmd("cleanup server sync")
+test_run:cmd("delete server sync")
 test_run:cleanup_cluster()
 
 box.space.test:drop()

@@ -32,8 +32,8 @@ master.upstream == nil
 master.downstream == nil
 
 -- Start Master -> Slave replication
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
-test_run:cmd("start server replica")
+test_run:cmd("create server status with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("start server status")
 
 --
 -- Master
@@ -56,7 +56,7 @@ master.upstream == nil
 master.downstream == nil
 
 -- replica's status
-replica_id = test_run:get_server_id('replica')
+replica_id = test_run:get_server_id('status')
 box.info.vclock[replica_id] == nil
 replica = box.info.replication[replica_id]
 replica.id == replica_id
@@ -71,7 +71,7 @@ replica.downstream.vclock[replica_id] == box.info.vclock[replica_id]
 --
 -- Replica
 --
-test_run:cmd('switch replica')
+test_run:cmd('switch status')
 
 #box.info.vclock == 1 -- box.info.vclock[replica_id] is nil
 #box.info.replication == 2
@@ -105,23 +105,23 @@ replica.downstream == nil
 --
 -- ClientError during replication
 --
-test_run:cmd('switch replica')
+test_run:cmd('switch status')
 box.space._schema:insert({'dup'})
 test_run:cmd('switch default')
 box.space._schema:insert({'dup'})
-test_run:cmd('switch replica')
+test_run:cmd('switch status')
 test_run:wait_cond(function() return box.info.replication[1].upstream.status == 'stopped' and box.info.replication[1].upstream.message:match('Duplicate') ~= nil end)
 test_run:cmd('switch default')
 box.space._schema:delete({'dup'})
 test_run:cmd("push filter ', lsn: [0-9]+' to ', lsn: <number>'")
-test_run:grep_log('replica', 'error applying row: .*')
+test_run:grep_log('status', 'error applying row: .*')
 test_run:cmd("clear filter")
 
 --
 -- Check box.info.replication login
 --
-test_run:cmd('switch replica')
-test_run:cmd("set variable master_port to 'replica.master'")
+test_run:cmd('switch status')
+test_run:cmd("set variable master_port to 'status.master'")
 replica_uri = os.getenv("LISTEN")
 box.cfg{replication = {"guest@localhost:" .. master_port, replica_uri}}
 
@@ -139,7 +139,7 @@ test_run:cmd('switch default')
 -- Cleanup
 --
 box.schema.user.revoke('guest', 'replication')
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
-test_run:cmd("delete server replica")
+test_run:cmd("stop server status")
+test_run:cmd("cleanup server status")
+test_run:cmd("delete server status")
 test_run:cleanup_cluster()

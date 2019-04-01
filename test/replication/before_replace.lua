@@ -1,31 +1,29 @@
 #!/usr/bin/env tarantool
 
--- get instance name from filename (replica_uuid_ro1.lua => replica_uuid_ro1)
+-- get instance name from filename (before_replace1.lua => before_replace1)
 local INSTANCE_ID = string.match(arg[0], "%d")
 local USER = 'cluster'
 local PASSWORD = 'somepassword'
 local SOCKET_DIR = require('fio').cwd()
-
-local TIMEOUT = tonumber(arg[2])
-local CON_TIMEOUT = arg[3] and tonumber(arg[3]) or 30.0
+local TIMEOUT = tonumber(arg[1])
+local CON_TIMEOUT = arg[2] and tonumber(arg[2]) or 60.0
 
 local function instance_uri(instance_id)
     --return 'localhost:'..(3310 + instance_id)
-    return SOCKET_DIR..'/replica_uuid_ro'..instance_id..'.sock';
+    return SOCKET_DIR..'/before_replace'..instance_id..'.sock';
 end
 
 -- start console first
 require('console').listen(os.getenv('ADMIN'))
 
 box.cfg({
-    instance_uuid = arg[1];
     listen = instance_uri(INSTANCE_ID);
 --    log_level = 7;
     replication = {
         USER..':'..PASSWORD..'@'..instance_uri(1);
         USER..':'..PASSWORD..'@'..instance_uri(2);
+        USER..':'..PASSWORD..'@'..instance_uri(3);
     };
-    read_only = (INSTANCE_ID ~= '1' and true or false);
     replication_timeout = TIMEOUT;
     replication_connect_timeout = CON_TIMEOUT;
 })

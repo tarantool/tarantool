@@ -41,10 +41,10 @@ function repl_f() local i = 0 while not done do s:replace({i, i}) fiber.sleep(0.
 _ = fiber.create(repl_f)
 ---
 ...
-replica_set.join(test_run, 1)
+replica_set.join(test_run, "join_vclock")
 ---
 ...
-test_run:cmd("switch replica1")
+test_run:cmd("switch join_vclock")
 ---
 - true
 ...
@@ -63,7 +63,7 @@ errinj.set("ERRINJ_RELAY_FINAL_SLEEP", false)
 ---
 - ok
 ...
-test_run:cmd("switch replica1")
+test_run:cmd("switch join_vclock")
 ---
 - true
 ...
@@ -79,8 +79,9 @@ test_run:cmd("switch default")
 ---
 - true
 ...
-replica_set.drop_all(test_run)
+replica_set.prune(test_run, "join_vclock")
 ---
+- true
 ...
 box.space.test:drop()
 ---

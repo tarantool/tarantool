@@ -1,17 +1,16 @@
 #!/usr/bin/env tarantool
 
--- get instance name from filename (ddl1.lua => ddl1)
+-- get instance name from filename (recover_missing_xlog1.lua => recover_missing_xlog1)
 local INSTANCE_ID = string.match(arg[0], "%d")
 local USER = 'cluster'
 local PASSWORD = 'somepassword'
 local SOCKET_DIR = require('fio').cwd()
-
 local TIMEOUT = tonumber(arg[1])
-local CON_TIMEOUT  = arg[2] and tonumber(arg[2]) or 60.0
+local CON_TIMEOUT = arg[2] and tonumber(arg[2]) or 60.0
 
 local function instance_uri(instance_id)
     --return 'localhost:'..(3310 + instance_id)
-    return SOCKET_DIR..'/ddl'..instance_id..'.sock';
+    return SOCKET_DIR..'/recover_missing_xlog'..instance_id..'.sock';
 end
 
 -- start console first
@@ -24,10 +23,9 @@ box.cfg({
         USER..':'..PASSWORD..'@'..instance_uri(1);
         USER..':'..PASSWORD..'@'..instance_uri(2);
         USER..':'..PASSWORD..'@'..instance_uri(3);
-        USER..':'..PASSWORD..'@'..instance_uri(4);
     };
-    replication_timeout = TIMEOUT,
-    replication_connect_timeout = CON_TIMEOUT,
+    replication_timeout = TIMEOUT;
+    replication_connect_timeout = CON_TIMEOUT;
 })
 
 box.once("bootstrap", function()

@@ -6,12 +6,12 @@ box.schema.user.grant('guest', 'replication')
 box.schema.func.create('_set_pri_lsn')
 box.schema.user.grant('guest', 'execute', 'function', '_set_pri_lsn')
 test_run:cmd("create server hot_standby with script='replication/hot_standby.lua', rpl_master=default")
-test_run:cmd("create server replica with rpl_master=default, script='replication/replica.lua'")
+test_run:cmd("create server hot_standby_replica with rpl_master=default, script='replication/replica.lua'")
 test_run:cmd("start server hot_standby")
-test_run:cmd("start server replica")
+test_run:cmd("start server hot_standby_replica")
 
 test_run:cmd("setopt delimiter ';'")
-test_run:cmd("set connection default, hot_standby, replica")
+test_run:cmd("set connection default, hot_standby, hot_standby_replica")
 fiber = require('fiber');
 while box.info.id == 0 do fiber.sleep(0.01) end;
 while box.space['_priv']:len() < 1 do fiber.sleep(0.001) end;
@@ -60,7 +60,7 @@ do
 end;
 test_run:cmd("setopt delimiter ''");
 
-test_run:cmd("switch replica")
+test_run:cmd("switch hot_standby_replica")
 fiber = require('fiber')
 test_run:cmd("switch hot_standby")
 fiber = require('fiber')
@@ -73,7 +73,7 @@ space = box.schema.space.create('tweedledum', {engine = engine})
 index = space:create_index('primary', {type = 'tree'})
 
 -- set begin lsn on master, replica and hot_standby.
-test_run:cmd("set variable replica_port to 'replica.listen'")
+test_run:cmd("set variable replica_port to 'hot_standby_replica.listen'")
 REPLICA = require('uri').parse(tostring(replica_port))
 REPLICA ~= nil
 a = (require 'net.box').connect(REPLICA.host, REPLICA.service)
@@ -93,14 +93,14 @@ _select(1, 10)
 test_run:cmd("switch hot_standby")
 _wait_lsn(10)
 
-test_run:cmd("switch replica")
+test_run:cmd("switch hot_standby_replica")
 _wait_lsn(10)
 _select(1, 10)
 
 test_run:cmd("stop server default")
 test_run:cmd("switch hot_standby")
 while box.info.status ~= 'running' do fiber.sleep(0.001) end
-test_run:cmd("switch replica")
+test_run:cmd("switch hot_standby_replica")
 
 -- hot_standby.listen is garbage, since hot_standby.lua
 -- uses MASTER environment variable for its listen
@@ -115,7 +115,7 @@ test_run:cmd("switch hot_standby")
 _insert(11, 20)
 _select(11, 20)
 
-test_run:cmd("switch replica")
+test_run:cmd("switch hot_standby_replica")
 _wait_lsn(10)
 _select(11, 20)
 
@@ -125,7 +125,7 @@ test_run:cmd("delete server hot_standby")
 test_run:cmd("deploy server default")
 test_run:cmd("start server default")
 test_run:cmd("switch default")
-test_run:cmd("stop server replica")
-test_run:cmd("cleanup server replica")
-test_run:cmd("delete server replica")
+test_run:cmd("stop server hot_standby_replica")
+test_run:cmd("cleanup server hot_standby_replica")
+test_run:cmd("delete server hot_standby_replica")
 test_run:cleanup_cluster()
