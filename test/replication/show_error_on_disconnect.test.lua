@@ -7,8 +7,7 @@ test_run = require('test_run').new()
 SERVERS = {'show_error_on_disconnect1', 'show_error_on_disconnect2'}
 
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS)
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 test_run:cmd("switch show_error_on_disconnect1")
 repl = box.cfg.replication
 box.cfg{replication = ""}

@@ -8,12 +8,7 @@ SERVERS = { 'autobootstrap1', 'autobootstrap2', 'autobootstrap3' }
 --
 -- Start servers
 --
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
-
---
--- Wait for full mesh
---
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 
 --
 -- Check vclock

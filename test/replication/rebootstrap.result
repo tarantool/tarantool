@@ -4,10 +4,7 @@ test_run = require('test_run').new()
 SERVERS = {'rebootstrap1', 'rebootstrap2'}
 ---
 ...
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
----
-...
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
 --

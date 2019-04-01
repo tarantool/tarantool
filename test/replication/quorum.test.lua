@@ -3,8 +3,7 @@ test_run = require('test_run').new()
 SERVERS = {'quorum1', 'quorum2', 'quorum3'}
 
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 
 -- Stop one replica and try to restart another one.
 -- It should successfully restart, but stay in the
@@ -136,8 +135,7 @@ box.schema.user.revoke('guest', 'replication')
 -- Second case, check that master-master works.
 SERVERS = {'master_quorum1', 'master_quorum2'}
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 test_run:cmd("switch master_quorum1")
 repl = box.cfg.replication
 box.cfg{replication = ""}

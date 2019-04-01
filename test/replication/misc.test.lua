@@ -39,8 +39,7 @@ test_run:cleanup_cluster()
 SERVERS = { 'misc1', 'misc2', 'misc3' }
 
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 test_run:cmd("switch misc1")
 test_run = require('test_run').new()
 box.cfg{replication_timeout = 0.03, replication_connect_timeout=0.03}

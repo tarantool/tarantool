@@ -5,10 +5,7 @@ SERVERS = {'quorum1', 'quorum2', 'quorum3'}
 ---
 ...
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
----
-...
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
 -- Stop one replica and try to restart another one.
@@ -356,10 +353,7 @@ SERVERS = {'master_quorum1', 'master_quorum2'}
 ---
 ...
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
----
-...
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 ---
 ...
 test_run:cmd("switch master_quorum1")

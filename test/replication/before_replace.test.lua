@@ -7,8 +7,7 @@ engine = test_run:get_cfg('engine')
 SERVERS = { 'before_replace1', 'before_replace2', 'before_replace3' }
 
 -- Deploy a cluster.
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 
 -- Setup space:before_replace trigger on all replicas.
 -- The trigger favors tuples with a greater value.

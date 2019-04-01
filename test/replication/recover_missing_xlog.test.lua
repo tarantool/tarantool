@@ -1,8 +1,7 @@
 test_run = require('test_run').new()
 
 SERVERS = { 'recover_missing_xlog1', 'recover_missing_xlog2', 'recover_missing_xlog3' }
-test_run:create_cluster(SERVERS, "replication", {args="0.1"})
-test_run:wait_fullmesh(SERVERS)
+test_run:init_cluster(SERVERS, "replication", {args="0.1"})
 
 test_run:cmd("switch recover_missing_xlog1")
 for i = 0, 9 do box.space.test:insert{i, 'test' .. i} end
