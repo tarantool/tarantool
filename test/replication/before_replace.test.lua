@@ -1,8 +1,7 @@
 --
 -- Using space:before_replace to resolve replication conflicts.
 --
-env = require('test_run')
-test_run = env.new()
+test_run = require('test_run').new()
 engine = test_run:get_cfg('engine')
 
 SERVERS = { 'before_replace1', 'before_replace2', 'before_replace3' }

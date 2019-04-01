@@ -1,5 +1,4 @@
-env = require('test_run')
-test_run = env.new()
+test_run = require('test_run').new()
 
 SERVERS = { 'recover_missing_xlog1', 'recover_missing_xlog2', 'recover_missing_xlog3' }
 test_run:create_cluster(SERVERS, "replication", {args="0.1"})

@@ -2,8 +2,7 @@
 -- gh-1233: JOIN/SUBSCRIBE must fail if master has wal_mode = "none"
 --
 
-env = require('test_run')
-test_run = env.new()
+test_run = require('test_run').new()
 test_run:cmd('switch default')
 fiber = require('fiber')
 box.schema.user.grant('guest', 'replication')

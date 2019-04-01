@@ -1,7 +1,6 @@
+test_run = require('test_run').new()
 fiber = require('fiber')
-env = require('test_run')
 replica_set = require('fast_replica')
-test_run = env.new()
 engine = test_run:get_cfg('engine')
 
 errinj = box.error.injection

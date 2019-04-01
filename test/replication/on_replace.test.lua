@@ -2,8 +2,7 @@
 -- Check that replication applier invokes on_replace triggers
 --
 
-env = require('test_run')
-test_run = env.new()
+test_run = require('test_run').new()
 fiber = require('fiber')
 
 _ = box.schema.space.create('test')

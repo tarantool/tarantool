@@ -1,6 +1,5 @@
-env = require('test_run')
+test_run = require('test_run').new()
 vclock_diff = require('fast_replica').vclock_diff
-test_run = env.new()
 
 SERVERS = { 'autobootstrap_guest1', 'autobootstrap_guest2', 'autobootstrap_guest3' }
 
