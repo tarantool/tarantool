@@ -193,6 +193,15 @@ name:drop()
 town:select()
 s:drop()
 
+-- Check replace with tuple with map having numeric keys that
+-- cannot be included in JSON index.
+s = box.schema.space.create('withdata', {engine='vinyl'})
+pk = s:create_index('pk', {parts={{1, 'int'}}})
+idx0 = s:create_index('idx0', {parts = {{2, 'str', path = 'name'}, {3, "str"}}})
+s:insert({4, {"d", name='D'}, "test"})
+s:replace({4, {"d1", name='D1'}, "test"})
+s:drop()
+
 --
 -- gh-1260: Multikey indexes
 --

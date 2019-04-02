@@ -464,6 +464,8 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 			if (mp_typeof(*src_pos) != MP_STR) {
 				mp_next(&src_pos);
 				mp_next(&src_pos);
+				pos = mp_encode_nil(pos);
+				pos = mp_encode_nil(pos);
 				continue;
 			}
 			token.type = JSON_TOKEN_STR;
@@ -514,6 +516,7 @@ finish:
 	memcpy(stmt_data, data, bsize);
 	memcpy(stmt_field_map_begin, field_map_begin, format->field_map_size);
 	vy_stmt_set_type(stmt, IPROTO_DELETE);
+	mp_tuple_assert(stmt_data, stmt_data + bsize);
 out:
 	region_truncate(region, region_svp);
 	return stmt;
