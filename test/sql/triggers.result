@@ -9,7 +9,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Get invariant part of the tuple; name and opts don't change.
  function immutable_part(data) local r = {} for i, l in pairs(data) do table.insert(r, {l.name, l.opts}) end return r end
@@ -20,15 +20,15 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 --
 box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE t2(x INTEGER PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -70,7 +70,7 @@ immutable_part(box.space._trigger:select())
 ...
 box.execute("DROP TABLE T1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -78,11 +78,11 @@ immutable_part(box.space._trigger:select())
 ...
 box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -96,7 +96,7 @@ space_id = box.space._space.index["name"]:get('T1').id
 -- Test, didn't trigger t1t degrade.
 box.execute("INSERT INTO t1 VALUES(1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t2;")
 ---
@@ -108,7 +108,7 @@ box.execute("SELECT * FROM t2;")
 ...
 box.execute("DELETE FROM t2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Test triggers.
 tuple = {"T2T", space_id, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(2); END;"}}
@@ -137,7 +137,7 @@ immutable_part(box.space._trigger:select())
 ...
 box.execute("INSERT INTO t1 VALUES(2);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t2;")
 ---
@@ -151,12 +151,12 @@ box.execute("SELECT * FROM t2;")
 ...
 box.execute("DELETE FROM t2;")
 ---
-- rowcount: 3
+- row_count: 3
 ...
 -- Test t1t after t2t and t3t drop.
 box.execute("DROP TRIGGER T2T;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 _ = box.space._trigger:delete("T3T")
 ---
@@ -169,7 +169,7 @@ immutable_part(box.space._trigger:select())
 ...
 box.execute("INSERT INTO t1 VALUES(3);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t2;")
 ---
@@ -181,16 +181,16 @@ box.execute("SELECT * FROM t2;")
 ...
 box.execute("DELETE FROM t2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Insert new SQL t2t and t3t.
 box.execute([[CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(2); END; ]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[CREATE TRIGGER t3t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(3); END; ]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -206,7 +206,7 @@ immutable_part(box.space._trigger:select())
 ...
 box.execute("INSERT INTO t1 VALUES(4);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t2;")
 ---
@@ -221,11 +221,11 @@ box.execute("SELECT * FROM t2;")
 -- Clean up.
 box.execute("DROP TABLE t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -234,7 +234,7 @@ immutable_part(box.space._trigger:select())
 -- Test target tables restricts.
 box.execute("CREATE TABLE t1(a INT PRIMARY KEY,b INT);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 space_id = box.space.T1.id
 ---
@@ -248,7 +248,7 @@ box.space._trigger:insert(tuple)
 ...
 box.execute("CREATE VIEW V1 AS SELECT * FROM t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 space_id = box.space.V1.id
 ---
@@ -279,11 +279,11 @@ box.space._trigger:insert(tuple)
 ...
 box.execute("DROP VIEW V1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE T1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 --
 -- gh-3531: Assertion with trigger and two storage engines
@@ -291,31 +291,31 @@ box.execute("DROP TABLE T1;")
 -- Case 1: Src 'vinyl' table; Dst 'memtx' table
 box.execute("PRAGMA sql_default_engine ('vinyl');")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("PRAGMA sql_default_engine('memtx');")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO m VALUES (0, '0');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO n VALUES (0, '',null);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
@@ -325,40 +325,40 @@ box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 -- box.sql.execute("ANALYZE m;")
 box.execute("DROP TABLE m;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE n;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Case 2: Src 'memtx' table; Dst 'vinyl' table
 box.execute("PRAGMA sql_default_engine ('memtx');")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE m (s0 INT PRIMARY KEY, s1 TEXT UNIQUE);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER m1 BEFORE UPDATE ON m FOR EACH ROW BEGIN UPDATE n SET s2 = 'now'; END;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("PRAGMA sql_default_engine('vinyl');")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE n (s0 INT PRIMARY KEY, s1 TEXT UNIQUE, s2 REAL);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO m VALUES (0, '0');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO n VALUES (0, '',null);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 ---
@@ -368,40 +368,40 @@ box.execute("UPDATE m SET s1 = 'The Rain In Spain';")
 -- box.sql.execute("ANALYZE n;")
 box.execute("DROP TABLE m;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE n;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Test SQL Transaction with LUA
 box.execute("PRAGMA sql_default_engine ('memtx');")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE test (id INT PRIMARY KEY)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("PRAGMA sql_default_engine='vinyl'")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE test2 (id INT PRIMARY KEY)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO test2 VALUES (2)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("START TRANSACTION")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("INSERT INTO test VALUES (1)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM test2")
 ---
@@ -409,42 +409,42 @@ box.execute("SELECT * FROM test2")
 ...
 box.execute("ROLLBACK;")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("DROP TABLE test;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE test2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 --
 -- gh-3536: Some triggers cause error messages and/or half-finished updates
 --
 box.execute("CREATE TABLE t (s1 INT, s2 INT, s3 INT, s4 INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW v AS SELECT s1, s2 FROM t;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER tv INSTEAD OF UPDATE ON v BEGIN UPDATE t SET s3 = new.s1 WHERE s1 = old.s1; END;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t VALUES (1,1,1,1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("UPDATE v SET s2 = s1 + 1;")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("UPDATE v SET s1 = s1 + 5;")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("SELECT * FROM t;")
 ---
@@ -462,18 +462,18 @@ box.execute("SELECT * FROM t;")
 ...
 box.execute("DROP VIEW v;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 --
 -- gh-3653: Dissallow bindings for DDL
 --
 box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 space_id = box.space.T1.id
 ---
@@ -491,5 +491,5 @@ box.space._trigger:insert(tuple)
 ...
 box.execute("DROP TABLE t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...

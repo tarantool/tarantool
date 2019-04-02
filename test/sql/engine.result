@@ -6,23 +6,23 @@ test_run = env.new()
 ...
 box.execute("pragma sql_default_engine='vinyl'")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE t1_vinyl(a INT PRIMARY KEY, b INT, c INT);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE t2_vinyl(a INT PRIMARY KEY, b INT, c INT);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("pragma sql_default_engine='memtx'")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("CREATE TABLE t3_memtx(a INT PRIMARY KEY, b INT, c INT);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 assert(box.space.T1_VINYL.engine == 'vinyl')
 ---
@@ -38,13 +38,13 @@ assert(box.space.T3_MEMTX.engine == 'memtx')
 ...
 box.execute("DROP TABLE t1_vinyl;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t2_vinyl;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t3_memtx;")
 ---
-- rowcount: 1
+- row_count: 1
 ...

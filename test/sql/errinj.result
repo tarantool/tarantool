@@ -9,7 +9,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 errinj = box.error.injection
 ---
@@ -21,19 +21,19 @@ fiber = require('fiber')
 -- reused.
 box.execute("CREATE TABLE t4 (id INTEGER PRIMARY KEY, a INTEGER);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4 VALUES (1,1)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4 VALUES (2,1)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4 VALUES (3,2)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 errinj.set('ERRINJ_TUPLE_FORMAT_COUNT', 200)
 ---
@@ -56,11 +56,11 @@ errinj.set('ERRINJ_TUPLE_FORMAT_COUNT', -1)
 ...
 box.execute('DROP TABLE t4')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('create table test (id int primary key, a float, b text)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.schema.user.grant('guest','read,write,execute', 'universe')
 ---
@@ -116,7 +116,7 @@ while f1:status() ~= 'dead' do fiber.sleep(0) end
 ...
 insert_res
 ---
-- rowcount: 1
+- row_count: 1
 ...
 select_res
 ---
@@ -131,7 +131,7 @@ cn:close()
 ...
 box.execute('drop table test')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 --
 -- gh-3326: after the iproto start using new buffers rotation
@@ -140,7 +140,7 @@ box.execute('drop table test')
 --
 box.execute('CREATE TABLE test (id integer primary key)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn = remote.connect(box.cfg.listen)
 ---
@@ -167,7 +167,7 @@ errinj.set("ERRINJ_IPROTO_TX_DELAY", false)
 ...
 box.execute('DROP TABLE test')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
@@ -177,11 +177,11 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ----
 box.execute("CREATE TABLE t1(id INTEGER PRIMARY KEY, a INTEGER);");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY, a INTEGER);");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.error.injection.set("ERRINJ_WAL_IO", true)
 ---
@@ -201,11 +201,11 @@ box.error.injection.set("ERRINJ_WAL_IO", false)
 ...
 box.execute("CREATE TRIGGER t1t INSERT ON t1 BEGIN INSERT INTO t2 VALUES (1, 1); END;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (3, 3);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * from t1");
 ---
@@ -265,15 +265,15 @@ box.error.injection.set("ERRINJ_WAL_IO", false)
 ...
 box.execute("DELETE FROM t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DELETE FROM t2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (3, 3);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * from t1");
 ---
@@ -297,18 +297,18 @@ box.execute("SELECT * from t2");
 ...
 box.execute("DROP TABLE t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Tests which are aimed at verifying work of commit/rollback
 -- triggers on _fk_constraint space.
 --
 box.execute("CREATE TABLE t3 (id FLOAT PRIMARY KEY, a INT REFERENCES t3, b INT UNIQUE);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 t = box.space._fk_constraint:select{}[1]:totable()
 ---
@@ -350,11 +350,11 @@ errinj.set("ERRINJ_WAL_IO", false)
 ...
 box.execute("INSERT INTO t3 VALUES(1, 1, 3);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DELETE FROM t3;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.snapshot()
 ---
@@ -362,7 +362,7 @@ box.snapshot()
 ...
 box.execute("ALTER TABLE t3 ADD CONSTRAINT fk1 FOREIGN KEY (b) REFERENCES t3;")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute("INSERT INTO t3 VALUES(1, 1, 3);")
 ---
@@ -386,7 +386,7 @@ errinj.set("ERRINJ_WAL_IO", false)
 ...
 box.execute("DROP TABLE t3;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3780: space without PK raises error if
 -- it is used in SQL queries.
@@ -399,11 +399,11 @@ fiber = require('fiber')
 ...
 box.execute("CREATE TABLE t (id INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t VALUES (1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 errinj.set("ERRINJ_WAL_DELAY", true)
 ---

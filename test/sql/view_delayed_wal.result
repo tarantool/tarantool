@@ -6,7 +6,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 fiber = require('fiber')
 ---
@@ -18,7 +18,7 @@ fiber = require('fiber')
 --
 box.execute('CREATE TABLE t1(id INT PRIMARY KEY)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 function create_view() box.execute('CREATE VIEW v1 AS SELECT * FROM t1') end
 ---
@@ -64,11 +64,11 @@ box.space.V1
 --
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE VIEW view2 AS SELECT * FROM t2')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 function drop_view() box.space._space:delete{box.space.VIEW2.id} end
 ---

@@ -6,36 +6,36 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- create space
 box.execute("CREATE TABLE t(id INT PRIMARY KEY)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t BEGIN SELECT 1; END")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER tt_au AFTER UPDATE ON t BEGIN SELECT 1; END")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER tt_bi BEFORE INSERT ON t BEGIN SELECT 1; END")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER tt_ai AFTER INSERT ON t BEGIN SELECT 1; END")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER tt_bd BEFORE DELETE ON t BEGIN SELECT 1; END")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- check that these triggers exist
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
@@ -56,7 +56,7 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 -- drop table
 box.execute("DROP TABLE t")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- check that triggers were dropped with deleted table
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")

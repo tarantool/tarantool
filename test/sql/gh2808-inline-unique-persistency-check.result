@@ -10,16 +10,16 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Create a table and insert a datum
 box.execute([[CREATE TABLE t1(a INT PRIMARY KEY, b INT, UNIQUE(b));]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[INSERT INTO t1 VALUES(1,2);]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Sanity check
 box.execute([[SELECT * FROM t1]])
@@ -38,7 +38,7 @@ test_run:cmd('restart server default');
 -- correctly after restart (#2808)
 box.execute([[INSERT INTO t1 VALUES(2,3);]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Sanity check
 box.execute([[SELECT * FROM t1]])
@@ -55,5 +55,5 @@ box.execute([[SELECT * FROM t1]])
 -- Cleanup
 box.execute([[drop table t1;]])
 ---
-- rowcount: 1
+- row_count: 1
 ...

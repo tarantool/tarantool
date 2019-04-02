@@ -6,7 +6,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute("pragma sql_default_engine=\'"..engine.."\'")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 test_run:cmd("setopt delimiter ';'")
 ---
@@ -30,11 +30,11 @@ box.execute('START TRANSACTION;') box.rollback();
 ...
 box.execute('CREATE TABLE parent(id INT PRIMARY KEY, y INT UNIQUE);');
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE TABLE child(id INT PRIMARY KEY, x INT REFERENCES parent(y) DEFERRABLE INITIALLY DEFERRED);');
 ---
-- rowcount: 1
+- row_count: 1
 ...
 fk_violation_1 = function()
     box.begin()
@@ -132,5 +132,5 @@ box.execute('DROP TABLE child;');
 ...
 box.execute('DROP TABLE parent;');
 ---
-- rowcount: 1
+- row_count: 1
 ...

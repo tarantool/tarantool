@@ -23,7 +23,7 @@ ret = cn:execute('select * from test')
 ret
 type(ret.rows[1])
 
--- Operation with rowcount result.
+-- Operation with row_count result.
 cn:execute('insert into test values (10, 11, NULL)')
 cn:execute('delete from test where a = 5')
 cn:execute('insert into test values (11, 12, NULL), (12, 12, NULL), (13, 12, NULL)')
@@ -243,14 +243,14 @@ sq:drop()
 box.execute('drop table test3')
 
 --
--- Ensure that FK inside CREATE TABLE does not affect rowcount.
+-- Ensure that FK inside CREATE TABLE does not affect row_count.
 --
 cn:execute('create table test (id integer primary key, a integer)')
 cn:execute('create table test2 (id integer primary key, ref integer references test(id))')
 cn:execute('drop table test2')
 
 --
--- Ensure that REPLACE is accounted twice in rowcount. As delete +
+-- Ensure that REPLACE is accounted twice in row_count. As delete +
 -- insert.
 --
 cn:execute('insert into test values(1, 1)')

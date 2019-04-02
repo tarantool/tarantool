@@ -9,25 +9,25 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- create space
 box.execute("CREATE TABLE foobar (foo INT PRIMARY KEY, bar TEXT)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- prepare data
 box.execute("INSERT INTO foobar VALUES (1, 'foo')")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO foobar VALUES (2, 'bar')")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
@@ -259,7 +259,7 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 -- updates
 box.execute("REPLACE INTO foobar VALUES (1, 'cacodaemon')")
 ---
-- rowcount: 2
+- row_count: 2
 ...
 box.execute("SELECT COUNT(*) FROM foobar WHERE foo=1")
 ---
@@ -279,7 +279,7 @@ box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ...
 box.execute("DELETE FROM foobar WHERE bar='cacodaemon'")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 ---
@@ -293,29 +293,29 @@ box.execute("SELECT COUNT(*) FROM foobar WHERE bar='cacodaemon'")
 -- create space
 box.execute("CREATE TABLE barfoo (bar TEXT, foo FLOAT PRIMARY KEY)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE UNIQUE INDEX barfoo2 ON barfoo(bar)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- prepare data
 box.execute("INSERT INTO barfoo VALUES ('foo', 1)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO barfoo VALUES ('bar', 2)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- create a trigger
 box.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 ---
@@ -331,11 +331,11 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 -- Many entries
 box.execute("CREATE TABLE t1(a INT,b INT,c INT,PRIMARY KEY(b,c));")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000) INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;")
 ---
-- rowcount: 1000
+- row_count: 1000
 ...
 box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 ---
@@ -396,7 +396,7 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 -- and can be dropped just once
 box.execute("DROP TRIGGER tfoobar")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Should error
 box.execute("DROP TRIGGER tfoobar")
@@ -462,13 +462,13 @@ box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 -- cleanup
 box.execute("DROP TABLE foobar")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE barfoo")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t1")
 ---
-- rowcount: 1
+- row_count: 1
 ...
