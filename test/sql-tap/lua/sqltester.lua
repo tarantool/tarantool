@@ -426,12 +426,6 @@ end
 
 setmetatable(_G, nil)
 
--- perform clean up only under test-run
-if test_run then
-    os.execute("rm -rf $(ls -d */)")
-    os.execute("rm -f *.snap *.xlog* *.vylog* *.run*")
-end
-
 -- start the database
 box.cfg{
     memtx_max_tuple_size=4996109;
