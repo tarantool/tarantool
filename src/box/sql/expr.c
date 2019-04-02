@@ -4028,17 +4028,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				pParse->is_aborted = true;
 				break;
 			}
-
-			if (pDef->ret_type != FIELD_TYPE_SCALAR) {
-				pExpr->type = pDef->ret_type;
-			} else {
-				/*
-				 * Otherwise, use first arg as
-				 * expression type.
-				 */
-				if (pFarg && pFarg->nExpr > 0)
-					pExpr->type = pFarg->a[0].pExpr->type;
-			}
 			/* Attempt a direct implementation of the built-in COALESCE() and
 			 * IFNULL() functions.  This avoids unnecessary evaluation of
 			 * arguments past the first non-NULL argument.
