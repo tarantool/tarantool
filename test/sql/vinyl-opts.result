@@ -15,11 +15,11 @@ test_run:cmd("switch test")
 ...
 box.execute('pragma sql_default_engine= \'vinyl\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute('CREATE TABLE v1 (id INT PRIMARY KEY, b INT);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.V1.index[0].options
 ---
@@ -31,7 +31,7 @@ box.space.V1.index[0].options
 ...
 box.execute('CREATE INDEX i1 ON v1(b);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.V1.index[1].options
 ---

@@ -47,7 +47,8 @@
 #include "box/lua/execute.h"
 
 const char *sql_info_key_strs[] = {
-	"row count",
+	"row_count",
+	"autoincrement_ids",
 };
 
 static_assert(sizeof(struct port_sql) <= sizeof(struct port),
@@ -263,8 +264,7 @@ error:
  * @retval -1 Client or memory error.
  */
 static inline int
-sql_get_description(struct sql_stmt *stmt, struct obuf *out,
-		    int column_count)
+sql_get_metadata(struct sql_stmt *stmt, struct obuf *out, int column_count)
 {
 	assert(column_count > 0);
 	int size = mp_sizeof_uint(IPROTO_METADATA) +
@@ -321,7 +321,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
 			return -1;
 		}
 		pos = mp_encode_map(pos, keys);
-		if (sql_get_description(stmt, out, column_count) != 0)
+		if (sql_get_metadata(stmt, out, column_count) != 0)
 			return -1;
 		size = mp_sizeof_uint(IPROTO_DATA);
 		pos = (char *) obuf_alloc(out, size);

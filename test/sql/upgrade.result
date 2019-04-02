@@ -6,7 +6,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 work_dir = 'sql/upgrade/1.10/'
 ---
@@ -69,19 +69,19 @@ box.space._index:get({box.space._space.index['name']:get('T1').id, 0})
 -- test system tables functionality
 box.execute("CREATE TABLE t(x INTEGER PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE t_out(x INTEGER PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER t1t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(1); END;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TRIGGER t2t AFTER INSERT ON t BEGIN INSERT INTO t_out VALUES(2); END;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space._space.index['name']:get('T')
 ---
@@ -127,7 +127,7 @@ assert(t1t.space_id == box.space.T.id)
 ...
 box.execute("INSERT INTO T VALUES(1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.T:select()
 ---
@@ -156,11 +156,11 @@ box.execute("SELECT * FROM T")
 ...
 box.execute("DROP TABLE T;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE T_OUT;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 test_run:switch('default')
 ---

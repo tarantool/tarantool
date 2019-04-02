@@ -6,24 +6,24 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute('CREATE TABLE t (s1 INT PRIMARY KEY)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i ON t (s1)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('ALTER TABLE t RENAME TO j3')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Due to gh-3613, next stmt caused segfault
 box.execute('DROP INDEX i ON j3')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Make sure that no artifacts remain after restart.
 box.snapshot()
@@ -37,7 +37,7 @@ box.execute('DROP INDEX i ON j3')
 ...
 box.execute('CREATE INDEX i ON j3 (s1)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Check that _index was altered properly
 box.snapshot()
@@ -47,10 +47,10 @@ box.snapshot()
 test_run:cmd('restart server default')
 box.execute('DROP INDEX i ON j3')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Cleanup
 box.execute('DROP TABLE j3')
 ---
-- rowcount: 1
+- row_count: 1
 ...

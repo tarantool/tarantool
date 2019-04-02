@@ -9,11 +9,11 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute('create table test (id int primary key, a float, b text)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 space = box.space.TEST
 ---
@@ -82,22 +82,22 @@ type(ret.rows[1])
 ---
 - cdata
 ...
--- Operation with rowcount result.
+-- Operation with row_count result.
 cn:execute('insert into test values (10, 11, NULL)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('delete from test where a = 5')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('insert into test values (11, 12, NULL), (12, 12, NULL), (13, 12, NULL)')
 ---
-- rowcount: 3
+- row_count: 3
 ...
 cn:execute('delete from test where a = 12')
 ---
-- rowcount: 3
+- row_count: 3
 ...
 -- SQL errors.
 cn:execute('insert into not_existing_table values ("kek")')
@@ -201,7 +201,7 @@ cn:execute('select * from test limit 1 offset ?', {'Hello'})
 -- gh-2608 SQL iproto DDL
 cn:execute('create table test2(id int primary key, a int, b int, c int)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.TEST2.name
 ---
@@ -209,7 +209,7 @@ box.space.TEST2.name
 ...
 cn:execute('insert into test2 values (1, 1, 1, 1)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('select * from test2')
 ---
@@ -227,7 +227,7 @@ cn:execute('select * from test2')
 ...
 cn:execute('create index test2_a_b_index on test2(a, b)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 #box.space.TEST2.index
 ---
@@ -235,7 +235,7 @@ cn:execute('create index test2_a_b_index on test2(a, b)')
 ...
 cn:execute('drop table test2')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.TEST2
 ---
@@ -245,100 +245,100 @@ box.space.TEST2
 -- Test CREATE [IF NOT EXISTS] TABLE.
 cn:execute('create table test3(id int primary key, a int, b int)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Rowcount = 1, although two tuples were created:
 -- for _space and for _index.
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 ---
-- rowcount: 3
+- row_count: 3
 ...
 cn:execute('create table if not exists test3(id int primary key)')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Test CREATE VIEW [IF NOT EXISTS] and
 --      DROP   VIEW [IF EXISTS].
 cn:execute('create view test3_view(id) as select id from test3')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('create view if not exists test3_view(id) as select id from test3')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 cn:execute('drop view test3_view')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('drop view if exists test3_view')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Test CREATE INDEX [IF NOT EXISTS] and
 --      DROP   INDEX [IF EXISTS].
 cn:execute('create index test3_sec on test3(a, b)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('create index if not exists test3_sec on test3(a, b)')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 cn:execute('drop index test3_sec on test3')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('drop index if exists test3_sec on test3')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Test CREATE TRIGGER [IF NOT EXISTS] and
 --      DROP   TRIGGER [IF EXISTS].
 cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('create trigger if not exists trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 cn:execute('drop trigger trig')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('drop trigger if exists trig')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Test DROP TABLE [IF EXISTS].
 -- Create more indexes, triggers and _truncate tuple.
 cn:execute('create index idx1 on test3(a)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('create index idx2 on test3(b)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.TEST3:truncate()
 ---
 ...
 cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 ---
-- rowcount: 3
+- row_count: 3
 ...
 cn:execute('drop table test3')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('drop table if exists test3')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 --
 -- gh-2948: sql: remove unnecessary templates for binding
@@ -406,7 +406,7 @@ res.metadata
 ...
 box.execute('drop table test')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:close()
 ---
@@ -419,7 +419,7 @@ cn = remote.connect(box.cfg.listen)
 ...
 cn:execute('create table test (id integer primary key, a integer, b integer)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 future1 = cn:execute('insert into test values (1, 1, 1)', nil, nil, {is_async = true})
 ---
@@ -432,7 +432,7 @@ future3 = cn:execute('insert into test values (2, 2, 2), (3, 3, 3)', nil, nil, {
 ...
 future1:wait_result()
 ---
-- rowcount: 1
+- row_count: 1
 ...
 future2:wait_result()
 ---
@@ -442,7 +442,7 @@ future2:wait_result()
 ...
 future3:wait_result()
 ---
-- rowcount: 2
+- row_count: 2
 ...
 future4 = cn:execute('select * from test', nil, nil, {is_async = true})
 ---
@@ -466,37 +466,37 @@ cn:close()
 ...
 box.execute('drop table test')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-2618 Return generated columns after INSERT in IPROTO.
 -- Return all ids generated in current INSERT statement.
 box.execute('create table test (id integer primary key autoincrement, a integer)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn = remote.connect(box.cfg.listen)
 ---
 ...
 cn:execute('insert into test values (1, 1)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('insert into test values (null, 2)')
 ---
 - autoincrement_ids:
   - 2
-  rowcount: 1
+  row_count: 1
 ...
 cn:execute('update test set a = 11 where id == 1')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('insert into test values (100, 1), (null, 1), (120, 1), (null, 1)')
 ---
 - autoincrement_ids:
   - 101
   - 121
-  rowcount: 4
+  row_count: 4
 ...
 cn:execute('insert into test values (null, 1), (null, 1), (null, 1), (null, 1), (null, 1)')
 ---
@@ -506,7 +506,7 @@ cn:execute('insert into test values (null, 1), (null, 1), (null, 1), (null, 1), 
   - 124
   - 125
   - 126
-  rowcount: 5
+  row_count: 5
 ...
 cn:execute('select * from test')
 ---
@@ -549,11 +549,11 @@ cn:execute('insert into test values (null, 1)')
   - 127
   - 1
   - 2
-  rowcount: 1
+  row_count: 1
 ...
 box.execute('create table test3 (id int primary key autoincrement)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.schema.sequence.alter('TEST3', {min=-10000, step=-10})
 ---
@@ -565,11 +565,11 @@ cn:execute('insert into TEST3 values (null), (null), (null), (null)')
   - -9
   - -19
   - -29
-  rowcount: 4
+  row_count: 4
 ...
 box.execute('drop table test')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 s:drop()
 ---
@@ -579,38 +579,38 @@ sq:drop()
 ...
 box.execute('drop table test3')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 --
--- Ensure that FK inside CREATE TABLE does not affect rowcount.
+-- Ensure that FK inside CREATE TABLE does not affect row_count.
 --
 cn:execute('create table test (id integer primary key, a integer)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('create table test2 (id integer primary key, ref integer references test(id))')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('drop table test2')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 --
--- Ensure that REPLACE is accounted twice in rowcount. As delete +
+-- Ensure that REPLACE is accounted twice in row_count. As delete +
 -- insert.
 --
 cn:execute('insert into test values(1, 1)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:execute('insert or replace into test values(1, 2)')
 ---
-- rowcount: 2
+- row_count: 2
 ...
 cn:execute('drop table test')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- SELECT returns unpacked msgpack.
 format = {{name = 'id', type = 'integer'}, {name = 'x', type = 'any'}}
@@ -650,7 +650,7 @@ cn = remote.connect(box.cfg.listen)
 ...
 box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY AUTOINCREMENT)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 for i = 0, 1000 do cn:execute("INSERT INTO t1 VALUES (null)") end
 ---
@@ -660,7 +660,7 @@ _ = cn:execute("INSERT INTO t1 SELECT NULL from t1")
 ...
 box.execute('DROP TABLE t1')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn:close()
 ---
@@ -668,7 +668,7 @@ cn:close()
 -- gh-3832: Some statements do not return column type
 box.execute('CREATE TABLE t1(id INTEGER PRIMARY KEY)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 cn = remote.connect(box.cfg.listen)
 ---
@@ -734,7 +734,7 @@ res.metadata
 -- result has a column type.
 cn:execute("PRAGMA count_changes = 1;")
 ---
-- rowcount: 0
+- row_count: 0
 ...
 cn:execute("INSERT INTO t1 VALUES (1), (2), (3);")
 ---
@@ -806,7 +806,7 @@ cn:close()
 ...
 box.execute('DROP TABLE t1')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---

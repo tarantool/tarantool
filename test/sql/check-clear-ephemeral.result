@@ -6,20 +6,20 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- box.cfg()
 -- create space
 box.execute("CREATE TABLE t1(a INT,b INT,c INT,PRIMARY KEY(b,c));")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Debug
 -- box.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 -- Seed entries
 box.execute("WITH RECURSIVE cnt(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM cnt WHERE x<1000) INSERT INTO t1 SELECT x, x%40, x/40 FROM cnt;")
 ---
-- rowcount: 1000
+- row_count: 1000
 ...
 -- Ephemeral table is not belong to Tarantool, so must be cleared sql-way.
 box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
@@ -42,7 +42,7 @@ box.execute("SELECT a FROM t1 ORDER BY b, a LIMIT 10 OFFSET 20;");
 -- Cleanup
 box.execute("DROP TABLE t1")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Debug
 -- require("console").start()

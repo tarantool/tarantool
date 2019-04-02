@@ -9,7 +9,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- gh-3010: COLLATE after LIMIT should throw an error
 -- All of these tests should throw error "near "COLLATE": syntax error"
@@ -37,26 +37,26 @@ box.execute("SELECT 1 LIMIT 1 COLLATE BINARY, 1;")
 -- For tr-TR result depends on collation
 box.execute([[CREATE TABLE tu (descriptor VARCHAR(50) PRIMARY KEY, letter VARCHAR(50))]]);
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.internal.collation.create('TURKISH', 'ICU', 'tr-TR', {strength='primary'});
 ---
 ...
 box.execute([[INSERT INTO tu VALUES ('Latin Capital Letter I U+0049','I');]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[INSERT INTO tu VALUES ('Latin Small Letter I U+0069','i');]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[INSERT INTO tu VALUES ('Latin Capital Letter I With Dot Above U+0130','İ');]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[INSERT INTO tu VALUES ('Latin Small Letter Dotless I U+0131','ı');]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Without collation
 box.execute([[SELECT descriptor, upper(letter) AS upper,lower(letter) AS lower FROM tu;]])
@@ -99,7 +99,7 @@ box.internal.collation.create('GERMAN', 'ICU', 'de-DE', {strength='primary'});
 ...
 box.execute([[INSERT INTO tu VALUES ('German Small Letter Sharp S U+00DF','ß');]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Without collation
 box.execute([[SELECT descriptor, upper(letter), letter FROM tu where UPPER(letter) = 'SS';]])
@@ -132,7 +132,7 @@ box.internal.collation.drop('GERMAN')
 ...
 box.execute(([[DROP TABLE tu]]))
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.schema.user.grant('guest','read,write,execute', 'universe')
 ---
@@ -151,7 +151,7 @@ cn:close()
 --
 box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT, b TEXT COLLATE \"binary\");")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.T:format()[2]['collation']
 ---
@@ -163,7 +163,7 @@ box.space.T:format()[3]['collation']
 ...
 box.execute("DROP TABLE t;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- BINARY collation works in the same way as there is no collation
 -- at all.
@@ -223,7 +223,7 @@ box.space._collation:delete{0}
 --
 box.execute("CREATE TABLE t (id INT PRIMARY KEY, a TEXT, b TEXT COLLATE \"binary\", c TEXT COLLATE \"unicode_ci\");")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t WHERE a = b;")
 ---
@@ -330,7 +330,7 @@ box.execute("SELECT b COLLATE \"unicode\" FROM t UNION SELECT a FROM t;")
 ...
 box.execute("DROP TABLE t;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---
@@ -357,26 +357,26 @@ box.schema.user.drop('tmp')
 -- Check that foreign key update doesn't fail with "unicode_ci".
 box.execute('CREATE TABLE t0 (s1 VARCHAR(5) COLLATE "unicode_ci" UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 VARCHAR(5) COLLATE "unicode_ci" REFERENCES t0(s1));')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t0(s1) VALUES ('a');")
 ---
 - autoincrement_ids:
   - 1
-  rowcount: 1
+  row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (1,'a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Should't fail.
 box.execute("UPDATE t0 SET s1 = 'A';")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT s1 FROM t0;")
 ---
@@ -398,30 +398,30 @@ box.execute("SELECT * FROM t1;")
 ...
 box.execute("DROP TABLE t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t0;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Check that foreign key update fails with default collation.
 box.execute('CREATE TABLE t0 (s1 VARCHAR(5) UNIQUE, id INT PRIMARY KEY AUTOINCREMENT);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE TABLE t1 (s1 INT PRIMARY KEY, s0 VARCHAR(5) REFERENCES t0(s1));')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t0(s1) VALUES ('a');")
 ---
 - autoincrement_ids:
   - 1
-  rowcount: 1
+  row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (1,'a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Should fail.
 box.execute("UPDATE t0 SET s1 = 'A';")
@@ -448,25 +448,25 @@ box.execute("SELECT s1 FROM t0;")
 ...
 box.execute("DROP TABLE t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t0;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3937: result of concatination has derived collation.
 --
 box.execute("CREATE TABLE t4a(a TEXT COLLATE \"unicode\", b TEXT COLLATE \"unicode_ci\", c INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4a VALUES('ABC','abc',1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4a VALUES('ghi','ghi',3);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Only LHS of concatenation has implicitly set collation.
 -- Hence, no collation is used.
@@ -523,15 +523,15 @@ box.execute("SELECT c FROM t4a WHERE (a||b)=(b||a);")
 ...
 box.execute("CREATE TABLE t4b(a TEXT COLLATE \"unicode_ci\", b TEXT COLLATE \"unicode_ci\", c INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4b VALUES('BCD','bcd',1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4b VALUES('ghi','ghi',3);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Operands have the same implicit collation, so it is derived.
 --
@@ -559,11 +559,11 @@ box.execute("SELECT c FROM t4a WHERE (a||b COLLATE \"binary\")=(b COLLATE \"unic
 ...
 box.execute("INSERT INTO t4b VALUES('abc', 'xxx', 2);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t4b VALUES('gHz', 'xxx', 4);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Results are sorted with case-insensitive order.
 -- Otherwise capital latters come first.
@@ -600,19 +600,19 @@ box.space.T4B:drop()
 -- pk - default, sc - unicode_ci
 box.execute('CREATE TABLE t3 (s1 VARCHAR(5) PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3 ON t3 (s1 collate "unicode_ci");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3 VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3 VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t3;")
 ---
@@ -625,24 +625,24 @@ box.execute("SELECT * FROM t3;")
 ...
 box.execute("DROP TABLE t3;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - binary, sc - unicode
 box.execute('CREATE TABLE t3b (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3b ON t3b (s1 collate "unicode");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3b VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3b VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t3b;")
 ---
@@ -655,24 +655,24 @@ box.execute("SELECT * FROM t3b;")
 ...
 box.execute("DROP TABLE t3b;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - binary, sc - unicode (make dup)
 box.execute('CREATE TABLE t3b (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3b ON t3b (s1 collate "unicode");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3b VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3b VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3b VALUES ('a');")
 ---
@@ -690,24 +690,24 @@ box.execute("SELECT * FROM t3b;")
 ...
 box.execute("DROP TABLE t3b;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - unicode, sc - binary
 box.execute('CREATE TABLE t3c (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3c ON t3c (s1 collate "binary");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3c VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3c VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t3c;")
 ---
@@ -720,24 +720,24 @@ box.execute("SELECT * FROM t3c;")
 ...
 box.execute("DROP TABLE t3c;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - unicode, sc - binary (make dup)
 box.execute('CREATE TABLE t3c (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3c ON t3c (s1 collate "binary");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3c VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3c VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3c VALUES ('a');")
 ---
@@ -755,24 +755,24 @@ box.execute("SELECT * FROM t3c;")
 ...
 box.execute("DROP TABLE t3c;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - binary, sc - unicode_ci
 box.execute('CREATE TABLE t3d (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3d ON t3d (s1 collate "unicode_ci");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3d VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3d VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t3d;")
 ---
@@ -785,24 +785,24 @@ box.execute("SELECT * FROM t3d;")
 ...
 box.execute("DROP TABLE t3d;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - binary, sc - unicode_ci (make dup)
 box.execute('CREATE TABLE t3d (s1 VARCHAR(5) collate "binary" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3d ON t3d (s1 collate "unicode_ci");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3d VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3d VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3d VALUES ('a');")
 ---
@@ -820,20 +820,20 @@ box.execute("SELECT * FROM t3d;")
 ...
 box.execute("DROP TABLE t3d;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - unicode_ci, sc - binary (should fail)
 box.execute('CREATE TABLE t3e (s1 VARCHAR(5) collate "unicode_ci" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3e ON t3e (s1 collate "binary");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3e VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3e VALUES ('A');")
 ---
@@ -850,24 +850,24 @@ box.execute("SELECT * FROM t3e;")
 ...
 box.execute("DROP TABLE t3e;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - unicode, sc - unicode_ci
 box.execute('CREATE TABLE t3f (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3f ON t3f (s1 collate "unicode_ci");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3f VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3f VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t3f;")
 ---
@@ -880,24 +880,24 @@ box.execute("SELECT * FROM t3f;")
 ...
 box.execute("DROP TABLE t3f;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - unicode, sc - unicode_ci (make dup)
 box.execute('CREATE TABLE t3f (s1 VARCHAR(5) collate "unicode" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3f ON t3f (s1 collate "unicode_ci");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3f VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3f VALUES ('A');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3f VALUES ('a');")
 ---
@@ -915,20 +915,20 @@ box.execute("SELECT * FROM t3f;")
 ...
 box.execute("DROP TABLE t3f;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - unicode_ci, sc - unicode (should fail)
 box.execute('CREATE TABLE t3g (s1 VARCHAR(5) collate "unicode_ci" PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX i3g ON t3g (s1 collate "unicode");')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3g VALUES ('a');")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t3g VALUES ('A');")
 ---
@@ -945,24 +945,24 @@ box.execute("SELECT * FROM t3g;")
 ...
 box.execute("DROP TABLE t3g;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - default, sc - multipart
 box.execute('CREATE TABLE qms1 (w VARCHAR(5) PRIMARY KEY, n VARCHAR(5), q VARCHAR(5), s INTEGER);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX iqms1 ON qms1 (w collate "unicode_ci", n);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms1 VALUES ('www', 'nnn', 'qqq', 1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms1 VALUES ('WWW', 'nnn', 'qqq', 2);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM qms1;")
 ---
@@ -981,23 +981,23 @@ box.execute("SELECT * FROM qms1;")
 ...
 box.execute("DROP TABLE qms1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE TABLE qms2 (w VARCHAR(5) PRIMARY KEY, n VARCHAR(5), q VARCHAR(5), s INTEGER);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX iqms2 ON qms2 (w collate "unicode", n);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms2 VALUES ('www', 'nnn', 'qqq', 1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms2 VALUES ('WWW', 'nnn', 'qqq', 2);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM qms2;")
 ---
@@ -1016,24 +1016,24 @@ box.execute("SELECT * FROM qms2;")
 ...
 box.execute("DROP TABLE qms2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- pk - multipart, sc overlaps with pk
 box.execute('CREATE TABLE qms3 (w VARCHAR(5), n VARCHAR(5), q VARCHAR(5), s INTEGER, CONSTRAINT pk_qms3 PRIMARY KEY(w, n, q));')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX iqms3 ON qms3 (w collate "unicode_ci", s);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms3 VALUES ('www', 'nnn', 'qqq', 1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms3 VALUES ('WWW', 'nnn', 'qqq', 2);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM qms3;")
 ---
@@ -1052,23 +1052,23 @@ box.execute("SELECT * FROM qms3;")
 ...
 box.execute("DROP TABLE qms3;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE TABLE qms4 (w VARCHAR(5), n VARCHAR(5), q VARCHAR(5), s INTEGER, CONSTRAINT pk_qms4 PRIMARY KEY(w, n, q));')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE INDEX iqms4 ON qms4 (w collate "unicode", s);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms4 VALUES ('www', 'nnn', 'qqq', 1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO qms4 VALUES ('WWW', 'nnn', 'qqq', 2);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM qms4;")
 ---
@@ -1087,18 +1087,18 @@ box.execute("SELECT * FROM qms4;")
 ...
 box.execute("DROP TABLE qms4;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3932: make sure set build-in functions derive collation
 -- from their arguments.
 --
 box.execute("CREATE TABLE jj (s1 INT PRIMARY KEY, s2 VARCHAR(3) COLLATE \"unicode_ci\");")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO jj VALUES (1,'A'), (2,'a')")
 ---
-- rowcount: 2
+- row_count: 2
 ...
 box.execute("SELECT DISTINCT trim(s2) FROM jj;")
 ---
@@ -1110,7 +1110,7 @@ box.execute("SELECT DISTINCT trim(s2) FROM jj;")
 ...
 box.execute("INSERT INTO jj VALUES (3, 'aS'), (4, 'AS');")
 ---
-- rowcount: 2
+- row_count: 2
 ...
 box.execute("SELECT DISTINCT replace(s2, 'S', 's') FROM jj;")
 ---

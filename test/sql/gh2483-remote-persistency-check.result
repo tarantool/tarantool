@@ -10,7 +10,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.schema.user.grant('guest', 'read,write,execute', 'universe')
 ---
@@ -18,11 +18,11 @@ box.schema.user.grant('guest', 'read,write,execute', 'universe')
 -- Create a table and insert a datum
 box.execute([[CREATE TABLE t(id int PRIMARY KEY)]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute([[INSERT INTO t (id) VALUES (1)]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Sanity check
 box.execute([[SELECT * FROM t]])
@@ -48,7 +48,7 @@ c:eval([[ return box.execute('SELECT * FROM t') ]])
 -- sql.execute([[SELECT * FROM t]])
 box.execute([[DROP TABLE t]])
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 ---

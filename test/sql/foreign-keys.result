@@ -10,19 +10,19 @@ test_run:cmd('restart server default with cleanup=1')
 --
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b INT);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE UNIQUE INDEX i1 ON t1(a);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE t2 (a INT, b INT, id INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Parent and child spaces must exist.
 --
@@ -62,7 +62,7 @@ box.space._fk_constraint:insert(t)
 ...
 box.execute("DROP VIEW v1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Match clause can be only one of: simple, partial, full.
 --
@@ -94,7 +94,7 @@ box.space._fk_constraint:insert(t)
 --
 box.execute("INSERT INTO t2 VALUES (1, 2, 3);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 t = {'fk_1', child_id, parent_id, false, 'simple', 'restrict', 'restrict', {2}, {1}}
 ---
@@ -106,7 +106,7 @@ box.space._fk_constraint:insert(t)
 ...
 box.execute("DELETE FROM t2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Links must be specififed correctly.
 --
@@ -223,11 +223,11 @@ box.space.T1:drop()
 --
 box.execute("CREATE TABLE child (id INT PRIMARY KEY, a INT);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE parent (a INT, id INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 parent_id = box.space._space.index.name:select('PARENT')[1]['id']
 ---
@@ -342,15 +342,15 @@ box.space.PARENT:drop()
 --
 box.execute('CREATE TABLE tp (id INT PRIMARY KEY, a INT UNIQUE)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) MATCH FULL ON DELETE SET NULL)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id) MATCH PARTIAL ON DELETE CASCADE ON UPDATE SET NULL')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.space._fk_constraint:select{}
 ---
@@ -360,17 +360,17 @@ box.space._fk_constraint:select{}
 ...
 box.execute('DROP TABLE tc')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('DROP TABLE tp')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3475: ON UPDATE and ON DELETE clauses must appear once;
 -- MATCH clause must come first.
 box.execute('CREATE TABLE t1 (id INT PRIMARY KEY);')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE TABLE t2 (id INT PRIMARY KEY REFERENCES t2 ON DELETE CASCADE ON DELETE RESTRICT);')
 ---
@@ -397,7 +397,7 @@ box.space.T1:drop()
 --
 box.execute("CREATE TABLE t4 (id INT PRIMARY KEY REFERENCES t4);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.T4:drop()
 ---

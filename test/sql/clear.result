@@ -6,17 +6,17 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- box.cfg()
 -- create space
 box.execute("CREATE TABLE zoobar (c1 INT, c2 INT PRIMARY KEY, c3 TEXT, c4 INT)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE UNIQUE INDEX zoobar2 ON zoobar(c1, c4)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Debug
 -- box.execute("PRAGMA vdbe_debug=ON;")
@@ -141,7 +141,7 @@ box.execute("SELECT * FROM zoobar")
 -- Do clean up
 box.execute("DELETE FROM zoobar")
 ---
-- rowcount: 100
+- row_count: 100
 ...
 -- Make sure table is empty
 box.execute("SELECT * from zoobar")
@@ -160,11 +160,11 @@ box.execute("SELECT * from zoobar")
 -- Cleanup
 box.execute("DROP INDEX zoobar2 ON zoobar")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE zoobar")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Debug
 -- require("console").start()

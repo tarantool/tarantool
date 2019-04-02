@@ -13,7 +13,7 @@ result = box.execute('PRAGMA parser_trace').rows
 ...
 box.execute('PRAGMA parser_trace = 1')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 box.execute('PRAGMA parser_trace')
 ---
@@ -25,7 +25,7 @@ box.execute('PRAGMA parser_trace')
 ...
 box.execute('PRAGMA parser_trace = '.. result[1][1])
 ---
-- rowcount: 0
+- row_count: 0
 ...
 --
 -- Make PRAGMA command return the result as a result set.

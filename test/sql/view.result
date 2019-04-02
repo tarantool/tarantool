@@ -6,18 +6,18 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- Verify that constraints on 'view' option are working.
 -- box.cfg()
 -- Create space and view.
 box.execute("CREATE TABLE t1(a INT, b INT, PRIMARY KEY(a, b));");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW v1 AS SELECT a+b FROM t1;");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- View can't have any indexes.
 box.execute("CREATE INDEX i1 on v1(a);");
@@ -119,11 +119,11 @@ sp = box.space._space:replace(raw_sp);
 -- Can't drop space via Lua if at least one view refers to it.
 box.execute('CREATE TABLE t2(id INT PRIMARY KEY);');
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('CREATE VIEW v2 AS SELECT * FROM t2;');
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.T2:drop();
 ---
@@ -131,20 +131,20 @@ box.space.T2:drop();
 ...
 box.execute('DROP VIEW v2;');
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute('DROP TABLE t2;');
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Check that alter transfers reference counter.
 box.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY);");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW v2 AS SELECT * FROM t2;");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t2;");
 ---
@@ -162,45 +162,45 @@ box.execute("DROP TABLE t2;");
 ...
 box.execute("DROP VIEW v2;");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t2;");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3849: failed to create VIEW in form of AS VALUES (const);
 --
 box.execute("CREATE VIEW cv AS VALUES(1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW cv1 AS VALUES('k', 1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW cv2 AS VALUES((VALUES((SELECT 1))));")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW cv3 AS VALUES(1+2, 1+2);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP VIEW cv;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP VIEW cv1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP VIEW cv2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP VIEW cv3;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3815: AS VALUES syntax didn't incerement VIEW reference
 -- counter. Moreover, tables within sub-select were not accounted
@@ -208,11 +208,11 @@ box.execute("DROP VIEW cv3;")
 --
 box.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW bv (wombat) AS VALUES ((SELECT 'k' FROM b));")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE b;")
 ---
@@ -220,23 +220,23 @@ box.execute("DROP TABLE b;")
 ...
 box.execute("DROP VIEW bv;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE b;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE b (s1 INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW bcv AS SELECT * FROM b WHERE s1 IN (SELECT * FROM c);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE c;")
 ---
@@ -244,19 +244,19 @@ box.execute("DROP TABLE c;")
 ...
 box.execute("DROP VIEW bcv;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE c;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE TABLE c (s1 INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW bcv(x, y) AS VALUES((SELECT 'k' FROM b), (VALUES((SELECT 1 FROM b WHERE s1 IN (VALUES((SELECT 1 + c.s1 FROM c)))))))")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE c;")
 ---
@@ -267,11 +267,11 @@ box.space.BCV:drop()
 ...
 box.execute("DROP TABLE c;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE b;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3814: make sure that recovery of view processed without
 -- unexpected errors.
@@ -282,11 +282,11 @@ box.snapshot()
 ...
 box.execute("CREATE TABLE t2 (id INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW v2 AS SELECT * FROM t2;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 test_run:cmd('restart server default')
 box.execute("DROP TABLE t2;")
@@ -309,9 +309,9 @@ box.space.T2:drop()
 -- Cleanup
 box.execute("DROP VIEW v1;");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t1;");
 ---
-- rowcount: 1
+- row_count: 1
 ...

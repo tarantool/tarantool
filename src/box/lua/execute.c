@@ -14,8 +14,8 @@
  * @param column_count Statement's column count.
  */
 static inline void
-lua_sql_get_description(struct sql_stmt *stmt, struct lua_State *L,
-			int column_count)
+lua_sql_get_metadata(struct sql_stmt *stmt, struct lua_State *L,
+		     int column_count)
 {
 	assert(column_count > 0);
 	lua_createtable(L, column_count, 0);
@@ -47,7 +47,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L)
 	int column_count = sql_column_count(stmt);
 	if (column_count > 0) {
 		lua_createtable(L, 0, 2);
-		lua_sql_get_description(stmt, L, column_count);
+		lua_sql_get_metadata(stmt, L, column_count);
 		lua_setfield(L, -2, "metadata");
 		port_tuple_vtab.dump_lua(port, L);
 		lua_setfield(L, -2, "rows");
@@ -58,7 +58,7 @@ port_sql_dump_lua(struct port *port, struct lua_State *L)
 		lua_createtable(L, 0, stailq_empty(autoinc_id_list) ? 1 : 2);
 
 		luaL_pushuint64(L, db->nChange);
-		lua_setfield(L, -2, "rowcount");
+		lua_setfield(L, -2, sql_info_key_strs[SQL_INFO_ROW_COUNT]);
 
 		if (!stailq_empty(autoinc_id_list)) {
 			lua_newtable(L);
@@ -71,7 +71,9 @@ port_sql_dump_lua(struct port *port, struct lua_State *L)
 					luaL_pushint64(L, id_entry->id);
 				lua_rawseti(L, -2, i++);
 			}
-			lua_setfield(L, -2, "autoincrement_ids");
+			const char *field_name =
+				sql_info_key_strs[SQL_INFO_AUTOINCREMENT_IDS];
+			lua_setfield(L, -2, field_name);
 		}
 	}
 }

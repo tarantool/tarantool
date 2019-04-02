@@ -6,46 +6,46 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 -- box.cfg()
 -- create space
 -- scalar affinity
 box.execute("CREATE TABLE test1 (f1 INT, f2 INT, PRIMARY KEY(f1))")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE INDEX test1_index ON test1 (f2)")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- integer affinity
 box.execute("CREATE TABLE test2 (f1 INT, f2 INT, PRIMARY KEY(f1))")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Debug
 -- box.execute("PRAGMA vdbe_debug=ON ; INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 -- Seed entries
 box.execute("INSERT INTO test1 VALUES(1, 2)");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO test1 VALUES(2, NULL)");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO test1 VALUES(3, NULL)");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO test1 VALUES(4, 3)");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO test2 VALUES(1, 2)");
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Select must return properly decoded `NULL`
 box.execute("SELECT MAX(f1) FROM test1")
@@ -75,15 +75,15 @@ box.execute("SELECT MAX(f1) FROM test2")
 -- Cleanup
 box.execute("DROP INDEX test1_index ON test1")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE test1")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE test2")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- Debug
 -- require("console").start()

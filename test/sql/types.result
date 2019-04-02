@@ -33,7 +33,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a INT, b UNIQUE);")
 --
 box.execute("CREATE TABLE t1 (id TEXT PRIMARY KEY, a REAL, b INT, c TEXT, d SCALAR);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.T1:format()
 ---
@@ -45,7 +45,7 @@ box.space.T1:format()
 ...
 box.execute("CREATE VIEW v1 AS SELECT b + a, b - a FROM t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.V1:format()
 ---
@@ -56,19 +56,19 @@ box.space.V1:format()
 --
 box.execute("CREATE INDEX i1 ON t1 (a);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE INDEX i2 ON t1 (b);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE INDEX i3 ON t1 (c);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE INDEX i4 ON t1 (id, c, b, a, d);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.T1.index.I1.parts
 ---
@@ -108,11 +108,11 @@ box.space.T1.index.I4.parts
 ...
 box.execute("DROP VIEW v1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("DROP TABLE t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 -- gh-3906: data of type BOOL is displayed as should
 -- during SQL SELECT.
@@ -194,11 +194,11 @@ box.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
 --
 box.execute("CREATE TABLE t1 (s SCALAR PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (randomblob(5));")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t1 WHERE s LIKE 'blob';")
 ---
@@ -222,11 +222,11 @@ box.execute("SELECT s LIKE NULL FROM t1;")
 ...
 box.execute("DELETE FROM t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("INSERT INTO t1 VALUES (1);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 ---

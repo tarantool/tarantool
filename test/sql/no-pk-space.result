@@ -6,7 +6,7 @@ engine = test_run:get_cfg('engine')
 ...
 box.execute('pragma sql_default_engine=\''..engine..'\'')
 ---
-- rowcount: 0
+- row_count: 0
 ...
 format = {}
 ---
@@ -42,11 +42,11 @@ s:drop()
 --
 box.execute("CREATE TABLE t1 (id INT PRIMARY KEY);")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.T1:drop()
 ---

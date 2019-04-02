@@ -6,7 +6,7 @@ test_run = require('test_run').new()
 ...
 box.execute('CREATE TABLE test (id INT PRIMARY KEY, a FLOAT, b TEXT)')
 ---
-- rowcount: 1
+- row_count: 1
 ...
 box.space.TEST:replace{1, 2, '3'}
 ---
@@ -292,5 +292,5 @@ test_run:cmd("setopt delimiter ''");
 ...
 box.execute('DROP TABLE test')
 ---
-- rowcount: 1
+- row_count: 1
 ...

@@ -681,7 +681,7 @@ netbox_decode_sql_info(struct lua_State *L, const char **data)
 	assert(key == SQL_INFO_ROW_COUNT);
 	uint32_t row_count = mp_decode_uint(data);
 	lua_pushinteger(L, row_count);
-	lua_setfield(L, -2, "rowcount");
+	lua_setfield(L, -2, sql_info_key_strs[SQL_INFO_ROW_COUNT]);
 	/*
 	 * If data have two elements then second is
 	 * SQL_INFO_AUTOINCREMENT_IDS.
@@ -699,7 +699,8 @@ netbox_decode_sql_info(struct lua_State *L, const char **data)
 			luaL_pushint64(L, id);
 			lua_rawseti(L, -2, j + 1);
 		}
-		lua_setfield(L, -2, "autoincrement_ids");
+		lua_setfield(L, -2,
+			     sql_info_key_strs[SQL_INFO_AUTOINCREMENT_IDS]);
 	}
 }
 
