@@ -2973,7 +2973,7 @@ case OP_Savepoint: {
 
 	if (psql_txn == NULL) {
 		assert(!box_txn());
-		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		diag_set(ClientError, ER_NO_TRANSACTION);
 		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}

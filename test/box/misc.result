@@ -443,7 +443,7 @@ t;
   111: box.error.WRONG_SPACE_OPTIONS
   112: box.error.UNSUPPORTED_INDEX_FEATURE
   113: box.error.VIEW_IS_RO
-  114: box.error.SAVEPOINT_NO_TRANSACTION
+  114: box.error.NO_TRANSACTION
   115: box.error.SYSTEM
   116: box.error.LOADING
   117: box.error.CONNECTION_TO_SELF

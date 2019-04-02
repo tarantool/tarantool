@@ -14,7 +14,7 @@ s1 = nil
 ...
 s1 = box.savepoint()
 ---
-- error: Can not set a savepoint in absence of active transaction
+- error: No active transaction
 ...
 box.rollback_to_savepoint(s1)
 ---

@@ -37,6 +37,9 @@
 
 double too_long_threshold;
 
+/* Txn cache. */
+static struct stailq txn_cache = {NULL, &txn_cache.first};
+
 static inline void
 fiber_set_txn(struct fiber *fiber, struct txn *txn)
 {
@@ -44,7 +47,7 @@ fiber_set_txn(struct fiber *fiber, struct txn *txn)
 }
 
 static int
-txn_add_redo(struct txn_stmt *stmt, struct request *request)
+txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
 	stmt->row = request->header;
 	if (request->header != NULL)
@@ -52,7 +55,7 @@ txn_add_redo(struct txn_stmt *stmt, struct request *request)
 
 	/* Create a redo log row for Lua requests */
 	struct xrow_header *row;
-	row = region_alloc_object(&fiber()->gc, struct xrow_header);
+	row = region_alloc_object(&txn->region, struct xrow_header);
 	if (row == NULL) {
 		diag_set(OutOfMemory, sizeof(*row),
 			 "region", "struct xrow_header");
@@ -77,7 +80,7 @@ static struct txn_stmt *
 txn_stmt_new(struct txn *txn)
 {
 	struct txn_stmt *stmt;
-	stmt = region_alloc_object(&fiber()->gc, struct txn_stmt);
+	stmt = region_alloc_object(&txn->region, struct txn_stmt);
 	if (stmt == NULL) {
 		diag_set(OutOfMemory, sizeof(*stmt),
 			 "region", "struct txn_stmt");
@@ -134,16 +137,50 @@ txn_rollback_to_svp(struct txn *txn, struct stailq_entry *svp)
 	}
 }
 
+/*
+ * Return a txn from cache or create a new one if cache is empty.
+ */
+inline static struct txn *
+txn_new()
+{
+	if (!stailq_empty(&txn_cache))
+		return stailq_shift_entry(&txn_cache, struct txn, in_txn_cache);
+
+	/* Create a region. */
+	struct region region;
+	region_create(&region, &cord()->slabc);
+
+	/* Place txn structure on the region. */
+	struct txn *txn = region_alloc_object(&region, struct txn);
+	if (txn == NULL) {
+		diag_set(OutOfMemory, sizeof(*txn), "region", "struct txn");
+		return NULL;
+	}
+	assert(region_used(&region) == sizeof(*txn));
+	txn->region = region;
+	return txn;
+}
+
+/*
+ * Free txn memory and return it to a cache.
+ */
+inline static void
+txn_free(struct txn *txn)
+{
+	/* Truncate region up to struct txn size. */
+	region_truncate(&txn->region, sizeof(struct txn));
+	stailq_add(&txn_cache, &txn->in_txn_cache);
+}
+
 struct txn *
 txn_begin(bool is_autocommit)
 {
 	static int64_t tsn = 0;
 	assert(! in_txn());
-	struct txn *txn = region_alloc_object(&fiber()->gc, struct txn);
-	if (txn == NULL) {
-		diag_set(OutOfMemory, sizeof(*txn), "region", "struct txn");
+	struct txn *txn = txn_new();
+	if (txn == NULL)
 		return NULL;
-	}
+
 	/* Initialize members explicitly to save time on memset() */
 	stailq_create(&txn->stmts);
 	txn->n_new_rows = 0;
@@ -251,7 +288,7 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 	 * stmt->space can be NULL for IRPOTO_NOP.
 	 */
 	if (stmt->space == NULL || !space_is_temporary(stmt->space)) {
-		if (txn_add_redo(stmt, request) != 0)
+		if (txn_add_redo(txn, stmt, request) != 0)
 			goto fail;
 		assert(stmt->row != NULL);
 		if (stmt->row->replica_id == 0) {
@@ -393,8 +430,8 @@ txn_commit(struct txn *txn)
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_unref_tuples(stmt);
 
-	TRASH(txn);
 	fiber_set_txn(fiber(), NULL);
+	txn_free(txn);
 	return 0;
 fail:
 	txn_rollback();
@@ -433,10 +470,10 @@ txn_rollback()
 	stailq_foreach_entry(stmt, &txn->stmts, next)
 		txn_stmt_unref_tuples(stmt);
 
-	TRASH(txn);
 	/** Free volatile txn memory. */
 	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
+	txn_free(txn);
 }
 
 void
@@ -521,12 +558,18 @@ box_txn_rollback()
 void *
 box_txn_alloc(size_t size)
 {
+	struct txn *txn = in_txn();
+	if (txn == NULL) {
+		/* There are no transaction yet - return an error. */
+		diag_set(ClientError, ER_NO_TRANSACTION);
+		return NULL;
+	}
 	union natural_align {
 		void *p;
 		double lf;
 		long l;
 	};
-	return region_aligned_alloc(&fiber()->gc, size,
+	return region_aligned_alloc(&txn->region, size,
 	                            alignof(union natural_align));
 }
 
@@ -535,11 +578,11 @@ box_txn_savepoint()
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL) {
-		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		diag_set(ClientError, ER_NO_TRANSACTION);
 		return NULL;
 	}
 	struct txn_savepoint *svp =
-		(struct txn_savepoint *) region_alloc_object(&fiber()->gc,
+		(struct txn_savepoint *) region_alloc_object(&txn->region,
 							struct txn_savepoint);
 	if (svp == NULL) {
 		diag_set(OutOfMemory, sizeof(*svp),
@@ -558,7 +601,7 @@ box_txn_rollback_to_savepoint(box_txn_savepoint_t *svp)
 {
 	struct txn *txn = in_txn();
 	if (txn == NULL) {
-		diag_set(ClientError, ER_SAVEPOINT_NO_TRANSACTION);
+		diag_set(ClientError, ER_NO_TRANSACTION);
 		return -1;
 	}
 	struct txn_stmt *stmt = svp->stmt == NULL ? NULL :
