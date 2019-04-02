@@ -760,6 +760,47 @@ cn:execute("UPDATE t1 SET id = id + 100 WHERE id > 10;")
   rows:
   - [0]
 ...
+-- Make sure that built-in functions have a right returning type.
+--
+cn:execute("SELECT zeroblob(1);")
+---
+- metadata:
+  - name: zeroblob(1)
+    type: scalar
+  rows:
+  - ["\0"]
+...
+-- randomblob() returns different results each time, so check only
+-- type in meta.
+--
+res = cn:execute("SELECT randomblob(1);")
+---
+...
+res.metadata
+---
+- - name: randomblob(1)
+    type: scalar
+...
+-- Type set during compilation stage, and since min/max are accept
+-- arguments of all scalar type, we can't say nothing more than
+-- SCALAR.
+--
+cn:execute("SELECT min(1, 2, 3);")
+---
+- metadata:
+  - name: min(1, 2, 3)
+    type: scalar
+  rows:
+  - [1]
+...
+cn:execute("SELECT max(1, 2, 3);")
+---
+- metadata:
+  - name: max(1, 2, 3)
+    type: scalar
+  rows:
+  - [3]
+...
 cn:close()
 ---
 ...
