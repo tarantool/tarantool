@@ -361,6 +361,39 @@ swim_loop_check_member(struct swim_cluster *cluster, void *data)
 	return true;
 }
 
+/**
+ * Callback to check that a member matches a template on any
+ * instance in the cluster.
+ */
+static bool
+swim_loop_check_member_anywhere(struct swim_cluster *cluster, void *data)
+{
+	struct swim_member_template *t = (struct swim_member_template *) data;
+	for (t->node_id = 0; t->node_id < cluster->size; ++t->node_id) {
+		if (t->node_id != t->member_id &&
+		    swim_loop_check_member(cluster, data))
+			return true;
+	}
+	return false;
+}
+
+/**
+ * Callback to check that a member matches a template on every
+ * instance in the cluster.
+ */
+static bool
+swim_loop_check_member_everywhere(struct swim_cluster *cluster, void *data)
+{
+	struct swim_member_template *t = (struct swim_member_template *) data;
+	for (t->node_id = 0; t->node_id < cluster->size; ++t->node_id) {
+		if (t->node_id != t->member_id &&
+		    !swim_loop_check_member(cluster, data))
+			return false;
+	}
+	return true;
+}
+
+
 int
 swim_cluster_wait_status(struct swim_cluster *cluster, int node_id,
 			 int member_id, enum swim_member_status status,
@@ -381,6 +414,30 @@ swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
 	swim_member_template_create(&t, node_id, member_id);
 	swim_member_template_set_incarnation(&t, incarnation);
 	return swim_wait_timeout(timeout, cluster, swim_loop_check_member, &t);
+}
+
+int
+swim_cluster_wait_status_anywhere(struct swim_cluster *cluster, int member_id,
+				  enum swim_member_status status,
+				  double timeout)
+{
+	struct swim_member_template t;
+	swim_member_template_create(&t, -1, member_id);
+	swim_member_template_set_status(&t, status);
+	return swim_wait_timeout(timeout, cluster,
+				 swim_loop_check_member_anywhere, &t);
+}
+
+int
+swim_cluster_wait_status_everywhere(struct swim_cluster *cluster, int member_id,
+				    enum swim_member_status status,
+				    double timeout)
+{
+	struct swim_member_template t;
+	swim_member_template_create(&t, -1, member_id);
+	swim_member_template_set_status(&t, status);
+	return swim_wait_timeout(timeout, cluster,
+				 swim_loop_check_member_everywhere, &t);
 }
 
 bool

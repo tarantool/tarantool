@@ -374,33 +374,45 @@ swim_test_refute(void)
 static void
 swim_test_too_big_packet(void)
 {
-	swim_start_test(2);
+	swim_start_test(3);
 	int size = 50;
+	double ack_timeout = 1;
+	double first_dead_timeout = 20;
+	double everywhere_dead_timeout = size * 3;
+	int drop_id = size / 2;
+
 	struct swim_cluster *cluster = swim_cluster_new(size);
 	for (int i = 1; i < size; ++i)
 		swim_cluster_add_link(cluster, 0, i);
-	is(swim_cluster_wait_fullmesh(cluster, size), 0, "despite S1 can not "\
-	   "send all the %d members in a one packet, fullmesh is eventually "\
-	   "reached", size);
-	swim_cluster_set_ack_timeout(cluster, 1);
-	int drop_id = size / 2;
+
+	is(swim_cluster_wait_fullmesh(cluster, size * 2), 0, "despite S1 can "\
+	   "not send all the %d members in a one packet, fullmesh is "\
+	   "eventually reached", size);
+
+	swim_cluster_set_ack_timeout(cluster, ack_timeout);
 	swim_cluster_set_drop(cluster, drop_id, true);
+	is(swim_cluster_wait_status_anywhere(cluster, drop_id, MEMBER_DEAD,
+					     first_dead_timeout), 0,
+	   "a dead member is detected in time not depending on cluster size");
 	/*
-	 * Dissemination of a detected failure takes long time
-	 * without help of the component, intended for that.
+	 * GC is off to simplify and speed up checks. When no GC
+	 * the test is sure that it is safe to check for
+	 * MEMBER_DEAD everywhere, because it is impossible that a
+	 * member is considered dead in one place, but already
+	 * deleted on another. Also, total member deletion takes
+	 * linear time, because a member is deleted from an
+	 * instance only when *that* instance will not receive
+	 * some direct acks from the member. Deletion and
+	 * additional pings are not triggered if a member dead
+	 * status is received indirectly via dissemination or
+	 * anti-entropy. Otherwise it could produce linear network
+	 * load on the already weak member.
 	 */
-	double timeout = size * 10;
-	int i = 0;
-	for (; i < size; ++i) {
-		double start = swim_time();
-		if (i != drop_id &&
-		   swim_cluster_wait_status(cluster, i, drop_id,
-					    swim_member_status_MAX, timeout) != 0)
-			break;
-		timeout -= swim_time() - start;
-	}
-	is(i, size, "S%d drops all the packets - it should become dead",
-	   drop_id + 1);
+	swim_cluster_set_gc(cluster, SWIM_GC_OFF);
+	is(swim_cluster_wait_status_everywhere(cluster, drop_id, MEMBER_DEAD,
+					       everywhere_dead_timeout), 0,
+	   "S%d death is eventually learned by everyone", drop_id + 1);
+
 	swim_cluster_delete(cluster);
 	swim_finish_test();
 }

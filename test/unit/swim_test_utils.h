@@ -119,6 +119,26 @@ swim_cluster_wait_status(struct swim_cluster *cluster, int node_id,
 			 double timeout);
 
 /**
+ * Wait until a member with id @a member_id is seen with @a status
+ * in the membership table of any instance in @a cluster. At most
+ * @a timeout seconds.
+ */
+int
+swim_cluster_wait_status_anywhere(struct swim_cluster *cluster, int member_id,
+				  enum swim_member_status status,
+				  double timeout);
+
+/**
+ * Wait until a member with id @a member_id is seen with @a status
+ * in the membership table of every instance in @a cluster. At
+ * most @a timeout seconds.
+ */
+int
+swim_cluster_wait_status_everywhere(struct swim_cluster *cluster, int member_id,
+				    enum swim_member_status status,
+				    double timeout);
+
+/**
  * Wait until a member with id @a member_id is seen with @a
  * incarnation in the membership table of a member with id @a
  * node_id. At most @a timeout seconds.

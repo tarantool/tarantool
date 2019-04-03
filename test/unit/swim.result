@@ -94,9 +94,10 @@ ok 8 - subtests
 ok 9 - subtests
 	*** swim_test_basic_gossip: done ***
 	*** swim_test_too_big_packet ***
-    1..2
+    1..3
     ok 1 - despite S1 can not send all the 50 members in a one packet, fullmesh is eventually reached
-    ok 2 - S26 drops all the packets - it should become dead
+    ok 2 - a dead member is detected in time not depending on cluster size
+    ok 3 - S26 death is eventually learned by everyone
 ok 10 - subtests
 	*** swim_test_too_big_packet: done ***
 	*** swim_test_undead ***
