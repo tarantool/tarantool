@@ -1473,6 +1473,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 	 */
 	int idx_rec_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
+	int index_id_reg = ++parse_context->nMem;
 	int space_id = space->def->id;
 	sqlVdbeAddOp2(v, OP_Integer, space_id, space_id_reg);
 	sqlVdbeAddOp1(v, OP_CheckViewReferences, space_id_reg);
@@ -1523,7 +1524,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 			for (uint32_t i = 1; i < index_count; ++i) {
 				sqlVdbeAddOp2(v, OP_Integer,
 						  space->index[i]->def->iid,
-						  space_id_reg + 1);
+						  index_id_reg);
 				sqlVdbeAddOp3(v, OP_MakeRecord,
 						  space_id_reg, 2, idx_rec_reg);
 				sqlVdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID,
@@ -1533,7 +1534,7 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 					     space->index[i]->def->iid));
 			}
 		}
-		sqlVdbeAddOp2(v, OP_Integer, 0, space_id_reg + 1);
+		sqlVdbeAddOp2(v, OP_Integer, 0, index_id_reg);
 		sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2,
 				  idx_rec_reg);
 		sqlVdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, idx_rec_reg);
@@ -2560,8 +2561,9 @@ sql_drop_index(struct Parse *parse_context)
 	sql_clear_stat_spaces(parse_context, table_name, index->def->name);
 	int record_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
+	int index_id_reg = ++parse_context->nMem;
 	sqlVdbeAddOp2(v, OP_Integer, space->def->id, space_id_reg);
-	sqlVdbeAddOp2(v, OP_Integer, index_id, space_id_reg + 1);
+	sqlVdbeAddOp2(v, OP_Integer, index_id, index_id_reg);
 	sqlVdbeAddOp3(v, OP_MakeRecord, space_id_reg, 2, record_reg);
 	sqlVdbeAddOp2(v, OP_SDelete, BOX_INDEX_ID, record_reg);
 	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
