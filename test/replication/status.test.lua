@@ -86,7 +86,7 @@ master.uuid == box.space._cluster:get(master_id)[2]
 master.upstream.status == "follow"
 master.upstream.lag < 1
 master.upstream.idle < 1
-master.upstream.peer:match("localhost")
+master.upstream.peer:match("unix/")
 master.downstream == nil
 
 -- replica's status
@@ -125,14 +125,14 @@ test_run:cmd("clear filter")
 test_run:cmd('switch replica')
 test_run:cmd("set variable master_port to 'replica.master'")
 replica_uri = os.getenv("LISTEN")
-box.cfg{replication = {"guest@localhost:" .. master_port, replica_uri}}
+box.cfg{replication = {"guest@unix/:" .. master_port, replica_uri}}
 
 master_id = test_run:get_server_id('default')
 master = box.info.replication[master_id]
 master.id == master_id
 master.upstream.status == "follow"
 master.upstream.peer:match("guest")
-master.upstream.peer:match("localhost")
+master.upstream.peer:match("unix/")
 master.downstream == nil
 
 test_run:cmd('switch default')
