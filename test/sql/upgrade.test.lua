@@ -10,12 +10,8 @@ test_run:switch('upgrade')
 
 -- test system tables
 box.space._space.index['name']:get('_trigger')
-box.space._space.index['name']:get('_sql_stat1')
-box.space._space.index['name']:get('_sql_stat4')
 
 box.space._index:get({box.space._space.index['name']:get('_trigger').id, 0})
-box.space._index:get({box.space._space.index['name']:get('_sql_stat1').id, 0})
-box.space._index:get({box.space._space.index['name']:get('_sql_stat4').id, 0})
 
 box.space._schema:format()
 

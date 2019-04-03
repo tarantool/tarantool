@@ -230,11 +230,11 @@ box.session.su('guest')
 ...
 #box.space._vspace:select{}
 ---
-- 24
+- 22
 ...
 #box.space._vindex:select{}
 ---
-- 50
+- 48
 ...
 #box.space._vuser:select{}
 ---
@@ -262,7 +262,7 @@ box.session.su('guest')
 ...
 #box.space._vindex:select{}
 ---
-- 50
+- 48
 ...
 #box.space._vuser:select{}
 ---

@@ -1384,23 +1384,6 @@ vdbe_emit_stat_space_clear(struct Parse *parse, const char *stat_table_name,
 }
 
 /**
- * Remove entries from the _sql_stat1 and _sql_stat4
- * system spaces after a DROP INDEX or DROP TABLE command.
- *
- * @param parse      The parsing context.
- * @param table_name The table to be dropped or
- *                   the table that contains index to be dropped.
- * @param idx_name   Index to be dropped.
- */
-static void
-sql_clear_stat_spaces(struct Parse *parse, const char *table_name,
-		      const char *idx_name)
-{
-	vdbe_emit_stat_space_clear(parse, "_sql_stat4", idx_name, table_name);
-	vdbe_emit_stat_space_clear(parse, "_sql_stat1", idx_name, table_name);
-}
-
-/**
  * Generate VDBE program to remove entry from _fk_constraint space.
  *
  * @param parse_context Parsing context.
@@ -1601,15 +1584,14 @@ sql_drop_table(struct Parse *parse_context)
 	/*
 	 * Generate code to remove the table from Tarantool
 	 * and internal SQL tables. Basically, it consists
-	 * from 3 stages:
-	 * 1. Delete statistics from _stat1 and _stat4 tables.
-	 * 2. In case of presence of FK constraints, i.e. current
+	 * from 2 stages:
+	 * 1. In case of presence of FK constraints, i.e. current
 	 *    table is child or parent, then start new transaction
 	 *    and erase from table all data row by row. On each
 	 *    deletion check whether any FK violations have
 	 *    occurred. If ones take place, then rollback
 	 *    transaction and halt VDBE.
-	 * 3. Drop table by truncating (if step 2 was skipped),
+	 * 2. Drop table by truncating (if step 1 was skipped),
 	 *    removing indexes from _index space and eventually
 	 *    tuple with corresponding space_id from _space.
 	 */
@@ -1623,7 +1605,6 @@ sql_drop_table(struct Parse *parse_context)
 			goto exit_drop_table;
 		}
 	}
-	sql_clear_stat_spaces(parse_context, space_name, NULL);
 	sql_code_drop_table(parse_context, space, is_view);
 
  exit_drop_table:
@@ -2550,15 +2531,12 @@ sql_drop_index(struct Parse *parse_context)
 		}
 		goto exit_drop_index;
 	}
-	struct index *index = space_index(space, index_id);
-	assert(index != NULL);
 
 	/*
 	 * Generate code to remove entry from _index space
 	 * But firstly, delete statistics since schema
 	 * changes after DDL.
 	 */
-	sql_clear_stat_spaces(parse_context, table_name, index->def->name);
 	int record_reg = ++parse_context->nMem;
 	int space_id_reg = ++parse_context->nMem;
 	int index_id_reg = ++parse_context->nMem;

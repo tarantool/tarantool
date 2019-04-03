@@ -553,33 +553,6 @@ local function upgrade_to_2_1_0()
     _index:insert{_trigger.id, 1, 'space_id', 'tree', { unique = false },
                   {{1, 'unsigned'}}}
 
-    local stat1_ft = {{name='tbl', type='string'},
-                      {name='idx', type='string'},
-                      {name='stat', type='string'}}
-    local stat4_ft = {{name='tbl', type='string'},
-                      {name='idx', type='string'},
-                      {name='neq', type='string'},
-                      {name='nlt', type='string'},
-                      {name='ndlt', type='string'},
-                      {name='sample', type='scalar'}}
-
-    log.info("create space _sql_stat1")
-    _space:insert{box.schema.SQL_STAT1_ID, ADMIN, '_sql_stat1', 'memtx', 0,
-                  MAP, stat1_ft}
-
-    log.info("create index primary on _sql_stat1")
-    _index:insert{box.schema.SQL_STAT1_ID, 0, 'primary', 'tree',
-                  {unique = true}, {{0, 'string'}, {1, 'string'}}}
-
-    log.info("create space _sql_stat4")
-    _space:insert{box.schema.SQL_STAT4_ID, ADMIN, '_sql_stat4', 'memtx', 0,
-                  MAP, stat4_ft}
-
-    log.info("create index primary on _sql_stat4")
-    _index:insert{box.schema.SQL_STAT4_ID, 0, 'primary', 'tree',
-                  {unique = true}, {{0, 'string'}, {1, 'string'},
-                                    {5, 'scalar'}}}
-
     local fk_constr_ft = {{name='name', type='string'},
                           {name='child_id', type='unsigned'},
                           {name='parent_id', type='unsigned'},

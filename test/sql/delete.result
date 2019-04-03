@@ -79,9 +79,9 @@ box.execute("DROP TABLE t2;")
 -- gh-2201: TRUNCATE TABLE operation.
 --
 -- can't truncate system table.
-box.execute("TRUNCATE TABLE \"_sql_stat1\";")
+box.execute("TRUNCATE TABLE \"_fk_constraint\";")
 ---
-- error: Can't truncate a system space, space '_sql_stat1'
+- error: Can't truncate a system space, space '_fk_constraint'
 ...
 box.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b TEXT);")
 ---

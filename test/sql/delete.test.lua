@@ -44,7 +44,7 @@ box.execute("DROP TABLE t2;")
 --
 
 -- can't truncate system table.
-box.execute("TRUNCATE TABLE \"_sql_stat1\";")
+box.execute("TRUNCATE TABLE \"_fk_constraint\";")
 
 box.execute("CREATE TABLE t1(id INT PRIMARY KEY, a INT, b TEXT);")
 box.execute("INSERT INTO t1 VALUES(1, 1, 'one');")
