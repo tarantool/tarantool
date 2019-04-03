@@ -80,7 +80,7 @@ void
 swim_cluster_unblock_io(struct swim_cluster *cluster, int i);
 
 void
-swim_cluster_set_drop(struct swim_cluster *cluster, int i, bool value);
+swim_cluster_set_drop(struct swim_cluster *cluster, int i, double value);
 
 /**
  * Explicitly add a member of id @a from_id to a member of id

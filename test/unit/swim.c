@@ -293,7 +293,7 @@ swim_test_basic_gossip(void)
 	 */
 	swim_cluster_add_link(cluster, 0, 1);
 	swim_cluster_add_link(cluster, 1, 0);
-	swim_cluster_set_drop(cluster, 1, true);
+	swim_cluster_set_drop(cluster, 1, 100);
 	/*
 	 * Wait two no-ACKs on S1 from S2. +1 sec to send a first
 	 * ping.
@@ -353,9 +353,9 @@ swim_test_refute(void)
 	swim_cluster_set_ack_timeout(cluster, 2);
 
 	swim_cluster_add_link(cluster, 0, 1);
-	swim_cluster_set_drop(cluster, 1, true);
+	swim_cluster_set_drop(cluster, 1, 100);
 	fail_if(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 7) != 0);
-	swim_cluster_set_drop(cluster, 1, false);
+	swim_cluster_set_drop(cluster, 1, 0);
 	is(swim_cluster_wait_incarnation(cluster, 1, 1, 1, 1), 0,
 	   "S2 increments its own incarnation to refute its death");
 	is(swim_cluster_wait_incarnation(cluster, 0, 1, 1, 1), 0,
@@ -390,7 +390,7 @@ swim_test_too_big_packet(void)
 	   "eventually reached", size);
 
 	swim_cluster_set_ack_timeout(cluster, ack_timeout);
-	swim_cluster_set_drop(cluster, drop_id, true);
+	swim_cluster_set_drop(cluster, drop_id, 100);
 	is(swim_cluster_wait_status_anywhere(cluster, drop_id, MEMBER_DEAD,
 					     first_dead_timeout), 0,
 	   "a dead member is detected in time not depending on cluster size");
@@ -426,7 +426,7 @@ swim_test_undead(void)
 	swim_cluster_set_ack_timeout(cluster, 1);
 	swim_cluster_add_link(cluster, 0, 1);
 	swim_cluster_add_link(cluster, 1, 0);
-	swim_cluster_set_drop(cluster, 1, true);
+	swim_cluster_set_drop(cluster, 1, 100);
 	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 4), 0,
 	   "member S2 is dead");
 	swim_run_for(5);

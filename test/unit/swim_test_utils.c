@@ -177,7 +177,7 @@ swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
 }
 
 void
-swim_cluster_set_drop(struct swim_cluster *cluster, int i, bool value)
+swim_cluster_set_drop(struct swim_cluster *cluster, int i, double value)
 {
 	swim_test_transport_set_drop(swim_fd(cluster->node[i]), value);
 }

@@ -60,12 +60,13 @@ void
 swim_test_transport_unblock_fd(int fd);
 
 /**
- * Set to true, if all incomming and outgoing packets should be
- * dropped. Note, that the node, owning @a fd, thinks, that its
- * packets are sent.
+ * Drop rate of incomming and outgoing packets. Note, that even if
+ * a packet is dropped on send, the node, owning @a fd, still
+ * thinks, that the packet is sent. It is not a sender-visible
+ * error.
  */
 void
-swim_test_transport_set_drop(int fd, bool value);
+swim_test_transport_set_drop(int fd, double value);
 
 /** Initialize test transport system. */
 void
