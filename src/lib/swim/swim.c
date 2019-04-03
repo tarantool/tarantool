@@ -269,6 +269,27 @@ struct swim_member {
 	 * message to it.
 	 */
 	struct heap_node in_wait_ack_heap;
+	/**
+	 *
+	 *                 Dissemination component
+	 *
+	 * Dissemination component sends events. Event is a
+	 * notification about member status update. So formally,
+	 * this structure already has all the needed attributes.
+	 * But also an event somehow should be sent to all members
+	 * at least once according to SWIM, so it requires
+	 * something like TTL for each type of event, which gets
+	 * decremented on each send. And a member can not be
+	 * removed from the global table until it gets dead and
+	 * its status TTLs is 0, so as to allow other members
+	 * learn its dead status.
+	 */
+	int status_ttl;
+	/**
+	 * Events are put into a queue sorted by event occurrence
+	 * time.
+	 */
+	struct rlist in_events_queue;
 };
 
 #define mh_name _swim_table
@@ -364,6 +385,12 @@ struct swim {
 	struct ev_timer wait_ack_tick;
 	/** GC state saying how to remove dead members. */
 	enum swim_gc_mode gc_mode;
+	/**
+	 *
+	 *                 Dissemination component
+	 */
+	/** Queue of events sorted by occurrence time. */
+	struct rlist events_queue;
 };
 
 /** Put the member into a list of ACK waiters. */
@@ -378,14 +405,33 @@ swim_wait_ack(struct swim *swim, struct swim_member *member)
 }
 
 /**
+ * On literally any update of a member it stands into a queue of
+ * events to disseminate the update. Note that status TTL is
+ * always set, even if UUID is updated, or any other attribute. It
+ * is because 1) it simplifies the code when status TTL is bigger
+ * than all other ones, 2) status occupies only 2 bytes in a
+ * packet, so it is never worse to send it on any update, but
+ * reduces entropy.
+ */
+static inline void
+swim_register_event(struct swim *swim, struct swim_member *member)
+{
+	if (rlist_empty(&member->in_events_queue)) {
+		rlist_add_tail_entry(&swim->events_queue, member,
+				     in_events_queue);
+	}
+	member->status_ttl = mh_size(swim->members);
+}
+
+/**
  * Make all needed actions to process a member's update like a
  * change of its status, or incarnation, or both.
  */
 static void
 swim_on_member_update(struct swim *swim, struct swim_member *member)
 {
-	(void) swim;
 	member->unacknowledged_pings = 0;
+	swim_register_event(swim, member);
 }
 
 /**
@@ -468,6 +514,9 @@ swim_member_delete(struct swim_member *member)
 	swim_task_destroy(&member->ack_task);
 	swim_task_destroy(&member->ping_task);
 
+	/* Dissemination component. */
+	assert(rlist_empty(&member->in_events_queue));
+
 	free(member);
 }
 
@@ -509,6 +558,10 @@ swim_member_new(const struct sockaddr_in *addr, const struct tt_uuid *uuid,
 	swim_task_create(&member->ack_task, NULL, NULL, "ack");
 	swim_task_create(&member->ping_task, swim_ping_task_complete, NULL,
 			 "ping");
+
+	/* Dissemination component. */
+	rlist_create(&member->in_events_queue);
+
 	return member;
 }
 
@@ -530,6 +583,9 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 	/* Failure detection component. */
 	if (! heap_node_is_stray(&member->in_wait_ack_heap))
 		wait_ack_heap_delete(&swim->wait_ack_heap, member);
+
+	/* Dissemination component. */
+	rlist_del_entry(member, in_events_queue);
 
 	swim_member_delete(member);
 }
@@ -590,6 +646,10 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 	}
 	if (mh_size(swim->members) > 1)
 		swim_ev_timer_start(loop(), &swim->round_tick);
+
+	/* Dissemination component. */
+	swim_on_member_update(swim, member);
+
 	say_verbose("SWIM %d: member %s is added, total is %d", swim_fd(swim),
 		    swim_uuid_str(&member->uuid), mh_size(swim->members));
 	return member;
@@ -727,6 +787,42 @@ swim_encode_failure_detection(struct swim *swim, struct swim_packet *packet,
 	return 1;
 }
 
+/**
+ * Encode dissemination component.
+ * @retval Number of key-values added to the packet's root map.
+ */
+static int
+swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
+{
+	struct swim_diss_header_bin diss_header_bin;
+	int size = sizeof(diss_header_bin);
+	char *header = swim_packet_reserve(packet, size);
+	if (header == NULL)
+		return 0;
+	int i = 0;
+	char *pos = header + size;
+	struct swim_member *m;
+	struct swim_event_bin event_bin;
+	swim_event_bin_create(&event_bin);
+	rlist_foreach_entry(m, &swim->events_queue, in_events_queue) {
+		int new_size = size + sizeof(event_bin);
+		if (swim_packet_reserve(packet, new_size) == NULL)
+			break;
+		swim_event_bin_fill(&event_bin, m->status, &m->addr, &m->uuid,
+				    m->incarnation);
+		memcpy(pos, &event_bin, sizeof(event_bin));
+		pos += sizeof(event_bin);
+		size = new_size;
+		++i;
+	}
+	if (i == 0)
+		return 0;
+	swim_diss_header_bin_create(&diss_header_bin, i);
+	memcpy(header, &diss_header_bin, sizeof(diss_header_bin));
+	swim_packet_advance(packet, size);
+	return 1;
+}
+
 /** Encode SWIM components into a UDP packet. */
 static void
 swim_encode_round_msg(struct swim *swim, struct swim_packet *packet)
@@ -737,10 +833,32 @@ swim_encode_round_msg(struct swim *swim, struct swim_packet *packet)
 	map_size += swim_encode_src_uuid(swim, packet);
 	map_size += swim_encode_failure_detection(swim, packet,
 						  SWIM_FD_MSG_PING);
+	map_size += swim_encode_dissemination(swim, packet);
 	map_size += swim_encode_anti_entropy(swim, packet);
 
 	assert(mp_sizeof_map(map_size) == 1 && map_size >= 2);
 	mp_encode_map(header, map_size);
+}
+
+/**
+ * Decrement TTLs of all events. It is done after each round step.
+ * Note, that when there are too many events to fit into a packet,
+ * the tail of events list without being disseminated start
+ * reeking and rotting, and the most far events can be deleted
+ * without ever being sent. But hardly this situation is reachable
+ * since even 1000 bytes can fit 37 events of ~27 bytes each, that
+ * means in fact a failure of 37 instances. In such a case event
+ * taint is the most mild problem.
+ */
+static void
+swim_decrease_events_ttl(struct swim *swim)
+{
+	struct swim_member *member, *tmp;
+	rlist_foreach_entry_safe(member, &swim->events_queue, in_events_queue,
+				 tmp) {
+		if (--member->status_ttl == 0)
+			rlist_del_entry(member, in_events_queue);
+	}
 }
 
 /**
@@ -799,10 +917,12 @@ swim_complete_step(struct swim_task *task,
 		rlist_shift(&swim->round_queue);
 		if (rc > 0) {
 			/*
-			 * Each round message contains failure
-			 * detection section with a ping.
+			 * Each round message contains
+			 * dissemination and failure detection
+			 * sections.
 			 */
 			swim_wait_ack(swim, m);
+			swim_decrease_events_ttl(swim);
 		}
 	}
 }
@@ -872,7 +992,7 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 			break;
 		case MEMBER_DEAD:
 			if (m->unacknowledged_pings >= NO_ACKS_TO_GC &&
-			    swim->gc_mode == SWIM_GC_ON) {
+			    swim->gc_mode == SWIM_GC_ON && m->status_ttl == 0) {
 				swim_delete_member(swim, m);
 				continue;
 			}
@@ -1121,6 +1241,18 @@ swim_process_failure_detection(struct swim *swim, const char **pos,
 	return 0;
 }
 
+/**
+ * Decode a dissemination message. Schedule new events, update
+ * members.
+ */
+static int
+swim_process_dissemination(struct swim *swim, const char **pos, const char *end)
+{
+	say_verbose("SWIM %d: process dissemination", swim_fd(swim));
+	const char *prefix = "invald dissemination message:";
+	return swim_process_members(swim, prefix, pos, end);
+}
+
 /** Process a new message. */
 static void
 swim_on_input(struct swim_scheduler *scheduler, const char *pos,
@@ -1158,6 +1290,10 @@ swim_on_input(struct swim_scheduler *scheduler, const char *pos,
 		case SWIM_FAILURE_DETECTION:
 			if (swim_process_failure_detection(swim, &pos, end,
 							   src, &uuid) != 0)
+				goto error;
+			break;
+		case SWIM_DISSEMINATION:
+			if (swim_process_dissemination(swim, &pos, end) != 0)
 				goto error;
 			break;
 		default:
@@ -1199,6 +1335,10 @@ swim_new(void)
 			   ACK_TIMEOUT_DEFAULT, 0);
 	swim->wait_ack_tick.data = (void *) swim;
 	swim->gc_mode = SWIM_GC_ON;
+
+	/* Dissemination component. */
+	rlist_create(&swim->events_queue);
+
 	return swim;
 }
 
@@ -1393,6 +1533,12 @@ swim_info(struct swim *swim, struct info_handler *info)
 	info_end(info);
 }
 
+int
+swim_size(const struct swim *swim)
+{
+	return mh_size(swim->members);
+}
+
 void
 swim_delete(struct swim *swim)
 {
@@ -1407,6 +1553,7 @@ swim_delete(struct swim *swim)
 		rlist_del_entry(m, in_round_queue);
 		if (! heap_node_is_stray(&m->in_wait_ack_heap))
 			wait_ack_heap_delete(&swim->wait_ack_heap, m);
+		rlist_del_entry(m, in_events_queue);
 		swim_member_delete(m);
 	}
 	wait_ack_heap_destroy(&swim->wait_ack_heap);

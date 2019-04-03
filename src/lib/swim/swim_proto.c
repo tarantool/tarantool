@@ -359,6 +359,32 @@ swim_member_bin_create(struct swim_member_bin *header)
 }
 
 void
+swim_diss_header_bin_create(struct swim_diss_header_bin *header,
+			    uint16_t batch_size)
+{
+	header->k_header = SWIM_DISSEMINATION;
+	header->m_header = 0xdc;
+	header->v_header = mp_bswap_u16(batch_size);
+}
+
+void
+swim_event_bin_create(struct swim_event_bin *header)
+{
+	swim_passport_bin_create(&header->passport);
+}
+
+void
+swim_event_bin_fill(struct swim_event_bin *header,
+		    enum swim_member_status status,
+		    const struct sockaddr_in *addr, const struct tt_uuid *uuid,
+		    uint64_t incarnation)
+{
+	header->m_header = 0x85;
+	swim_passport_bin_fill(&header->passport, addr, uuid, status,
+			       incarnation);
+}
+
+void
 swim_meta_header_bin_create(struct swim_meta_header_bin *header,
 			    const struct sockaddr_in *src)
 {

@@ -1,5 +1,5 @@
 	*** main_f ***
-1..11
+1..12
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -16,11 +16,12 @@ ok 1 - subtests
 ok 2 - subtests
 	*** swim_test_sequence: done ***
 	*** swim_test_uuid_update ***
-    1..4
+    1..5
     ok 1 - UUID update
     ok 2 - old UUID is returned back as a 'ghost' member
-    ok 3 - can not update to an existing UUID - swim_cfg fails
-    ok 4 - diag says 'exists'
+    ok 3 - two members in each + ghost third member
+    ok 4 - can not update to an existing UUID - swim_cfg fails
+    ok 5 - diag says 'exists'
 ok 3 - subtests
 	*** swim_test_uuid_update: done ***
 	*** swim_test_cfg ***
@@ -65,8 +66,8 @@ ok 5 - subtests
     ok 1 - node is added as alive
     ok 2 - member still is not dead after 2 noacks
     ok 3 - but it is dead after one more
-    ok 4 - after 1 more unack the member still is not deleted
-    ok 5 - but it is dropped after 1 more
+    ok 4 - after 2 more unacks the member still is not deleted - dissemination TTL keeps it
+    ok 5 - but it is dropped after 2 rounds when TTL gets 0
     ok 6 - fullmesh is restored
     ok 7 - a member is added back on an ACK
 ok 6 - subtests
@@ -106,4 +107,13 @@ ok 10 - subtests
     ok 2 - but it is never deleted due to the cfg option
 ok 11 - subtests
 	*** swim_test_undead: done ***
+	*** swim_test_packet_loss ***
+    1..5
+    ok 1 - drop rate = 5.00, but the failure is disseminated
+    ok 2 - drop rate = 10.00, but the failure is disseminated
+    ok 3 - drop rate = 20.00, but the failure is disseminated
+    ok 4 - drop rate = 50.00, but the failure is disseminated
+    ok 5 - drop rate = 90.00, but the failure is disseminated
+ok 12 - subtests
+	*** swim_test_packet_loss: done ***
 	*** main_f: done ***

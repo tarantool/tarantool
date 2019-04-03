@@ -140,6 +140,10 @@ swim_probe_member(struct swim *swim, const char *uri);
 void
 swim_info(struct swim *swim, struct info_handler *info);
 
+/** Get SWIM member table size. */
+int
+swim_size(const struct swim *swim);
+
 /** Get a SWIM member, describing this instance. */
 const struct swim_member *
 swim_self(struct swim *swim);

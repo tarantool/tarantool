@@ -98,7 +98,7 @@ swim_test_sequence(void)
 static void
 swim_test_uuid_update(void)
 {
-	swim_start_test(4);
+	swim_start_test(5);
 
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_add_link(cluster, 0, 1);
@@ -109,6 +109,7 @@ swim_test_uuid_update(void)
 	is(swim_cfg(s, NULL, -1, -1, -1, &new_uuid), 0, "UUID update");
 	is(swim_cluster_wait_fullmesh(cluster, 1), 0,
 	   "old UUID is returned back as a 'ghost' member");
+	is(swim_size(s), 3, "two members in each + ghost third member");
 	new_uuid.time_low = 2;
 	is(swim_cfg(s, NULL, -1, -1, -1, &new_uuid), -1,
 	   "can not update to an existing UUID - swim_cfg fails");
@@ -245,11 +246,12 @@ swim_test_basic_failure_detection(void)
 	is(swim_cluster_wait_status(cluster, 0, 1, MEMBER_DEAD, 0.1), 0,
 	   "but it is dead after one more");
 
-	is(swim_cluster_wait_status(cluster, 0, 1, swim_member_status_MAX,
-				    0.9), -1,
-	   "after 1 more unack the member still is not deleted");
-	is(swim_cluster_wait_status(cluster, 0, 1, swim_member_status_MAX,
-				    0.1), 0, "but it is dropped after 1 more");
+	swim_run_for(1);
+	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_DEAD, "after 2 "\
+	   "more unacks the member still is not deleted - dissemination TTL "\
+	   "keeps it");
+	is(swim_cluster_wait_status(cluster, 0, 1, swim_member_status_MAX, 2),
+	   0, "but it is dropped after 2 rounds when TTL gets 0");
 
 	/*
 	 * After IO unblock pending messages will be processed all
@@ -378,7 +380,7 @@ swim_test_too_big_packet(void)
 	int size = 50;
 	double ack_timeout = 1;
 	double first_dead_timeout = 20;
-	double everywhere_dead_timeout = size * 3;
+	double everywhere_dead_timeout = size;
 	int drop_id = size / 2;
 
 	struct swim_cluster *cluster = swim_cluster_new(size);
@@ -418,6 +420,35 @@ swim_test_too_big_packet(void)
 }
 
 static void
+swim_test_packet_loss(void)
+{
+	double network_drop_rate[] = {5, 10, 20, 50, 90};
+	swim_start_test(lengthof(network_drop_rate));
+	int size = 20;
+	int drop_id = 0;
+	double ack_timeout = 1;
+
+	for (int i = 0; i < (int) lengthof(network_drop_rate); ++i) {
+		double rate = network_drop_rate[i];
+		struct swim_cluster *cluster = swim_cluster_new(size);
+		for (int j = 0; j < size; ++j) {
+			swim_cluster_set_drop(cluster, j, rate);
+			for (int k = 0; k < size; ++k)
+				swim_cluster_add_link(cluster, j, k);
+		}
+		swim_cluster_set_ack_timeout(cluster, ack_timeout);
+		swim_cluster_set_drop(cluster, drop_id, 100);
+		swim_cluster_set_gc(cluster, SWIM_GC_OFF);
+		double timeout = size * 100.0 / (100 - rate);
+		is(swim_cluster_wait_status_everywhere(cluster, drop_id,
+						       MEMBER_DEAD, 1000), 0,
+		   "drop rate = %.2f, but the failure is disseminated", rate);
+		swim_cluster_delete(cluster);
+	}
+	swim_finish_test();
+}
+
+static void
 swim_test_undead(void)
 {
 	swim_start_test(2);
@@ -439,7 +470,7 @@ swim_test_undead(void)
 static int
 main_f(va_list ap)
 {
-	swim_start_test(11);
+	swim_start_test(12);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -456,6 +487,7 @@ main_f(va_list ap)
 	swim_test_basic_gossip();
 	swim_test_too_big_packet();
 	swim_test_undead();
+	swim_test_packet_loss();
 
 	swim_test_transport_free();
 	swim_test_ev_free();
