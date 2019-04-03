@@ -29,29 +29,9 @@ box.space._space.index['name']:get('_trigger')
 - [328, 1, '_trigger', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'}, {'name': 'space_id',
       'type': 'unsigned'}, {'name': 'opts', 'type': 'map'}]]
 ...
-box.space._space.index['name']:get('_sql_stat1')
----
-- [348, 1, '_sql_stat1', 'memtx', 0, {}, [{'name': 'tbl', 'type': 'string'}, {'name': 'idx',
-      'type': 'string'}, {'name': 'stat', 'type': 'string'}]]
-...
-box.space._space.index['name']:get('_sql_stat4')
----
-- [349, 1, '_sql_stat4', 'memtx', 0, {}, [{'name': 'tbl', 'type': 'string'}, {'name': 'idx',
-      'type': 'string'}, {'name': 'neq', 'type': 'string'}, {'name': 'nlt', 'type': 'string'},
-    {'name': 'ndlt', 'type': 'string'}, {'name': 'sample', 'type': 'scalar'}]]
-...
 box.space._index:get({box.space._space.index['name']:get('_trigger').id, 0})
 ---
 - [328, 0, 'primary', 'tree', {'unique': true}, [[0, 'string']]]
-...
-box.space._index:get({box.space._space.index['name']:get('_sql_stat1').id, 0})
----
-- [348, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'string']]]
-...
-box.space._index:get({box.space._space.index['name']:get('_sql_stat4').id, 0})
----
-- [349, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'string'], [5,
-      'scalar']]]
 ...
 box.space._schema:format()
 ---

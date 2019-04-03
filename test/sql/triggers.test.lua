@@ -89,8 +89,8 @@ box.space._trigger:insert(tuple)
 tuple = {"V1T", space_id, {sql = [[create trigger v1t AFTER update on v1 for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
 box.space._trigger:insert(tuple)
 
-space_id =  box.space._sql_stat1.id
-tuple = {"T1T", space_id, {sql = [[create trigger t1t instead of update on "_sql_stat1" for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
+space_id =  box.space._fk_constraint.id
+tuple = {"T1T", space_id, {sql = [[create trigger t1t instead of update on "_fk_constraint" for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
 box.space._trigger:insert(tuple)
 
 box.execute("DROP VIEW V1;")

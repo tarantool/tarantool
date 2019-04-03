@@ -81,13 +81,7 @@ void
 sql_load_schema()
 {
 	assert(db->init.busy == 0);
-	/*
-	 * This function is called before version upgrade.
-	 * Old versions (< 2.0) lack system spaces containing
-	 * statistics (_sql_stat1 and _sql_stat4). Thus, we can
-	 * skip statistics loading.
-	 */
-	struct space *stat = space_by_id(BOX_SQL_STAT1_ID);
+	struct space *stat = space_by_name("_sql_stat1");
 	assert(stat != NULL);
 	if (stat->def->field_count == 0)
 		return;

@@ -813,11 +813,6 @@ box.space._space:select()
         'type': 'unsigned'}]]
   - [340, 1, '_space_sequence', 'memtx', 0, {}, [{'name': 'id', 'type': 'unsigned'},
       {'name': 'sequence_id', 'type': 'unsigned'}, {'name': 'is_generated', 'type': 'boolean'}]]
-  - [348, 1, '_sql_stat1', 'memtx', 0, {}, [{'name': 'tbl', 'type': 'string'}, {'name': 'idx',
-        'type': 'string'}, {'name': 'stat', 'type': 'string'}]]
-  - [349, 1, '_sql_stat4', 'memtx', 0, {}, [{'name': 'tbl', 'type': 'string'}, {'name': 'idx',
-        'type': 'string'}, {'name': 'neq', 'type': 'string'}, {'name': 'nlt', 'type': 'string'},
-      {'name': 'ndlt', 'type': 'string'}, {'name': 'sample', 'type': 'scalar'}]]
   - [356, 1, '_fk_constraint', 'memtx', 0, {}, [{'name': 'name', 'type': 'string'},
       {'name': 'child_id', 'type': 'unsigned'}, {'name': 'parent_id', 'type': 'unsigned'},
       {'name': 'is_deferred', 'type': 'boolean'}, {'name': 'match', 'type': 'string'},

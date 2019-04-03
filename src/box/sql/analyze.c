@@ -127,7 +127,6 @@ static void
 vdbe_emit_stat_space_open(struct Parse *parse, const char *table_name)
 {
 	const char *stat_names[] = {"_sql_stat1", "_sql_stat4"};
-	const uint32_t stat_ids[] = {BOX_SQL_STAT1_ID, BOX_SQL_STAT4_ID};
 	struct Vdbe *v = sqlGetVdbe(parse);
 	assert(v != NULL);
 	assert(sqlVdbeDb(v) == parse->db);
@@ -137,7 +136,9 @@ vdbe_emit_stat_space_open(struct Parse *parse, const char *table_name)
 			vdbe_emit_stat_space_clear(parse, space_name, NULL,
 						   table_name);
 		} else {
-			sqlVdbeAddOp1(v, OP_Clear, stat_ids[i]);
+			struct space *stat_space = space_by_name(stat_names[i]);
+			assert(stat_space != NULL);
+			sqlVdbeAddOp1(v, OP_Clear, stat_space->def->id);
 		}
 	}
 }
@@ -766,9 +767,9 @@ static void
 vdbe_emit_analyze_space(struct Parse *parse, struct space *space)
 {
 	assert(space != NULL);
-	struct space *stat1 = space_by_id(BOX_SQL_STAT1_ID);
+	struct space *stat1 = space_by_name("_sql_stat1");
 	assert(stat1 != NULL);
-	struct space *stat4 = space_by_id(BOX_SQL_STAT4_ID);
+	struct space *stat4 = space_by_name("_sql_stat4");
 	assert(stat4 != NULL);
 
 	/* Register to hold Stat4Accum object. */
@@ -1374,7 +1375,9 @@ load_stat_from_space(struct sql *db, const char *sql_select_prepare,
 		     const char *sql_select_load, struct index_stat *stats)
 {
 	struct index **indexes = NULL;
-	uint32_t index_count = box_index_len(BOX_SQL_STAT4_ID, 0);
+	struct space *stat_space = space_by_name("_sql_stat4");
+	assert(stat_space != NULL);
+	uint32_t index_count = box_index_len(stat_space->def->id, 0);
 	if (index_count > 0) {
 		size_t alloc_size = sizeof(struct index *) * index_count;
 		indexes = region_alloc(&fiber()->gc, alloc_size);
@@ -1683,7 +1686,9 @@ stat_copy(struct index_stat *dest, const struct index_stat *src)
 int
 sql_analysis_load(struct sql *db)
 {
-	ssize_t index_count = box_index_len(BOX_SQL_STAT1_ID, 0);
+	struct space *stat_space = space_by_name("_sql_stat1");
+	assert(stat_space != NULL);
+	ssize_t index_count = box_index_len(stat_space->def->id, 0);
 	if (index_count < 0)
 		return SQL_TARANTOOL_ERROR;
 	if (box_txn_begin() != 0)

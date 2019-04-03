@@ -41,6 +41,11 @@ extern "C" {
 void
 sql_init();
 
+/**
+ * Initialize SQL statistic system.
+ *
+ * Currently unused.
+ */
 void
 sql_load_schema();
 
