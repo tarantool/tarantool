@@ -13,8 +13,6 @@ struct fk_constraint_def;
 /* Misc */
 const char *tarantoolErrorMessage();
 
-int is_tarantool_error(int rc);
-
 /* Storage interface. */
 const void *tarantoolsqlPayloadFetch(BtCursor * pCur, u32 * pAmt);
 
@@ -39,8 +37,7 @@ int tarantoolsqlDelete(BtCursor * pCur, u8 flags);
  * @param key Key of record to be deleted.
  * @param key_size Size of key.
  *
- * @retval SQL_OK on success, SQL_TARANTOOL_DELETE_FAIL
- *         otherwise.
+ * @retval SQL_OK on success, SQL_TARANTOOL_ERROR otherwise.
  */
 int
 sql_delete_by_key(struct space *space, uint32_t iid, char *key,

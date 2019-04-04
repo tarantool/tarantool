@@ -31,8 +31,7 @@ box.execute("INSERT INTO foobar VALUES (1000, 'foobar')")
 ...
 box.execute("INSERT INTO foobar VALUES (1, 'duplicate')")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_FOOBAR_1''
-    in space ''FOOBAR'''
+- error: Duplicate key exists in unique index 'pk_unnamed_FOOBAR_1' in space 'FOOBAR'
 ...
 -- simple select
 box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar")
@@ -416,8 +415,7 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
 -- prove barfoo2 still exists
 box.execute("INSERT INTO barfoo VALUES ('xfoo', 1)")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_BARFOO_1''
-    in space ''BARFOO'''
+- error: Duplicate key exists in unique index 'pk_unnamed_BARFOO_1' in space 'BARFOO'
 ...
 box.execute("SELECT * FROM barfoo")
 ---

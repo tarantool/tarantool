@@ -741,8 +741,7 @@ box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a BOOLEAN CHECK (a = true));")
 ...
 box.execute("INSERT INTO t1 VALUES (1, false);")
 ---
-- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_1_T1'':
-    a = true'
+- error: 'Check constraint failed ''CK_CONSTRAINT_1_T1'': a = true'
 ...
 box.execute("INSERT INTO t1 VALUES (1, true);")
 ---

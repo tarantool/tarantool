@@ -189,7 +189,7 @@ box.error.injection.set("ERRINJ_WAL_IO", true)
 ...
 box.execute("CREATE TRIGGER t1t INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES (1, 1); END;")
 ---
-- error: 'Failed to execute SQL statement: Failed to write to disk'
+- error: Failed to write to disk
 ...
 box.execute("CREATE INDEX t1a ON t1(a);")
 ---
@@ -257,7 +257,7 @@ box.error.injection.set("ERRINJ_WAL_IO", true)
 ...
 box.execute("DROP TRIGGER t1t;")
 ---
-- error: 'Failed to execute SQL statement: Failed to write to disk'
+- error: Failed to write to disk
 ...
 box.error.injection.set("ERRINJ_WAL_IO", false)
 ---
@@ -374,7 +374,7 @@ errinj.set("ERRINJ_WAL_IO", true)
 ...
 box.execute("ALTER TABLE t3 DROP CONSTRAINT fk1;")
 ---
-- error: 'Failed to execute SQL statement: Failed to write to disk'
+- error: Failed to write to disk
 ...
 box.execute("INSERT INTO t3 VALUES(1, 1, 3);")
 ---
@@ -490,8 +490,7 @@ _ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<
 ...
 box.execute("INSERT INTO \"test\" VALUES(5);")
 ---
-- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_01'':
-    X<5'
+- error: 'Check constraint failed ''CK_CONSTRAINT_01'': X<5'
 ...
 errinj.set("ERRINJ_WAL_IO", true)
 ---
@@ -522,8 +521,7 @@ _ = box.space._ck_constraint:delete({s.id, 'CK_CONSTRAINT_01'})
 ...
 box.execute("INSERT INTO \"test\" VALUES(6);")
 ---
-- error: 'Failed to execute SQL statement: Check constraint failed ''CK_CONSTRAINT_01'':
-    X<=5'
+- error: 'Check constraint failed ''CK_CONSTRAINT_01'': X<=5'
 ...
 errinj.set("ERRINJ_WAL_IO", false)
 ---
@@ -559,13 +557,11 @@ _ = box.space._ck_constraint:insert({s.id, 'Xgreater10', false, 'SQL', 'X > 10'}
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Failed to execute SQL statement: Check constraint failed ''Xgreater10'':
-    X > 10'
+- error: 'Check constraint failed ''Xgreater10'': X > 10'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 10);")
 ---
-- error: 'Failed to execute SQL statement: Check constraint failed ''XlessY'': X <
-    Y'
+- error: 'Check constraint failed ''XlessY'': X < Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 100);")
 ---
@@ -588,13 +584,11 @@ errinj.set("ERRINJ_WAL_IO", false)
 ...
 box.execute("INSERT INTO \"test\" VALUES(1, 2);")
 ---
-- error: 'Failed to execute SQL statement: Check constraint failed ''Xgreater10'':
-    X > 10'
+- error: 'Check constraint failed ''Xgreater10'': X > 10'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 10);")
 ---
-- error: 'Failed to execute SQL statement: Check constraint failed ''XlessY'': X <
-    Y'
+- error: 'Check constraint failed ''XlessY'': X < Y'
 ...
 box.execute("INSERT INTO \"test\" VALUES(20, 100);")
 ---

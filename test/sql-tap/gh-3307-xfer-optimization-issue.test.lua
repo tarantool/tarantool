@@ -139,7 +139,7 @@ test:do_catchsql_xfer_test(
         INSERT INTO t2 SELECT * FROM t1;
     ]], {
         -- <xfer-optimization-1.9>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
         -- <xfer-optimization-1.9>
     }, {
         exp_xfer_count = 0
@@ -210,7 +210,7 @@ test:do_catchsql_xfer_test(
             INSERT INTO t2 SELECT * FROM t1;
     ]], {
         -- <xfer-optimization-1.13>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
         -- <xfer-optimization-1.13>
     }, {
         exp_xfer_count = 0
@@ -245,7 +245,7 @@ test:do_catchsql_xfer_test(
             INSERT OR ABORT INTO t2 SELECT * FROM t1;
     ]], {
         -- <xfer-optimization-1.20>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
         -- <xfer-optimization-1.20>
     }, {
         exp_xfer_count = 1
@@ -313,7 +313,7 @@ test:do_catchsql_xfer_test(
             INSERT OR ROLLBACK INTO t2 SELECT * FROM t1;
     ]], {
         -- <xfer-optimization-1.24>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
         -- <xfer-optimization-1.24>
     }, {
         exp_xfer_count = 0
@@ -381,7 +381,7 @@ test:do_catchsql_xfer_test(
             INSERT OR FAIL INTO t2 SELECT * FROM t1;
     ]], {
         -- <xfer-optimization-1.28>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T2_1' in space 'T2'"
         -- <xfer-optimization-1.28>
     }, {
         exp_xfer_count = 1

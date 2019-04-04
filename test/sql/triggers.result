@@ -480,7 +480,7 @@ space_id = box.space.T1.id
 ...
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;")
 ---
-- error: 'Failed to execute SQL statement: bindings are not allowed in DDL'
+- error: bindings are not allowed in DDL
 ...
 tuple = {"TR1", space_id, {sql = [[CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;]]}}
 ---

@@ -371,9 +371,6 @@ sqlErrStr(int rc)
 		/* SQL_MISUSE      */
 		    "library routine called out of sequence",
 		/* SQL_RANGE       */ "bind or column index out of range",
-		/* SQL_TARANTOOL_ITERATOR_FAIL */ "Tarantool's iterator failed",
-		/* SQL_TARANTOOL_INSERT_FAIL */ "Tarantool's insert failed",
-		/* SQL_TARANTOOL_DELETE_FAIL */ "Tarantool's delete failed",
 		/* SQL_TARANTOOL_ERROR */ "SQL-/Tarantool error",
 	};
 	const char *zErr = "unknown error";

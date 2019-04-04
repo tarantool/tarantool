@@ -70,7 +70,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(1,3,4)
     ]], {
         -- <unique-1.3>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
+        1, "Duplicate key exists in unique index 'pk_unnamed_T1_1' in space 'T1'"
         -- </unique-1.3>
     })
 
@@ -91,7 +91,7 @@ test:do_catchsql_test(
         INSERT INTO t1(a,b,c) VALUES(3,2,4)
     ]], {
         -- <unique-1.5>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'unique_unnamed_T1_2' in space 'T1'"
+        1, "Duplicate key exists in unique index 'unique_unnamed_T1_2' in space 'T1'"
         -- </unique-1.5>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         INSERT INTO t2 VALUES(3, 1,5);
     ]], {
         -- <unique-2.3>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'I2' in space 'T2'"
+        1, "Duplicate key exists in unique index 'I2' in space 'T2'"
         -- </unique-2.3>
     })
 
@@ -287,7 +287,7 @@ test:do_catchsql_test(
         SELECT a,b,c,d FROM t3 ORDER BY a,b,c,d;
     ]], {
         -- <unique-3.4>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'unique_unnamed_T3_2' in space 'T3'"
+        1, "Duplicate key exists in unique index 'unique_unnamed_T3_2' in space 'T3'"
         -- </unique-3.4>
     })
 
@@ -444,7 +444,7 @@ test:do_catchsql_test(
         INSERT INTO t5 VALUES(2, 1,2,3,4,5,6);
     ]], {
         -- <unique-5.2>
-        1, "Failed to execute SQL statement: Duplicate key exists in unique index 'unique_unnamed_T5_2' in space 'T5'"
+        1, "Duplicate key exists in unique index 'unique_unnamed_T5_2' in space 'T5'"
         -- </unique-5.2>
     })
 

@@ -676,8 +676,7 @@ box.execute("INSERT INTO t3b VALUES ('A');")
 ...
 box.execute("INSERT INTO t3b VALUES ('a');")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_T3B_1''
-    in space ''T3B'''
+- error: Duplicate key exists in unique index 'pk_unnamed_T3B_1' in space 'T3B'
 ...
 box.execute("SELECT * FROM t3b;")
 ---
@@ -741,8 +740,7 @@ box.execute("INSERT INTO t3c VALUES ('A');")
 ...
 box.execute("INSERT INTO t3c VALUES ('a');")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_T3C_1''
-    in space ''T3C'''
+- error: Duplicate key exists in unique index 'pk_unnamed_T3C_1' in space 'T3C'
 ...
 box.execute("SELECT * FROM t3c;")
 ---
@@ -806,8 +804,7 @@ box.execute("INSERT INTO t3d VALUES ('A');")
 ...
 box.execute("INSERT INTO t3d VALUES ('a');")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_T3D_1''
-    in space ''T3D'''
+- error: Duplicate key exists in unique index 'pk_unnamed_T3D_1' in space 'T3D'
 ...
 box.execute("SELECT * FROM t3d;")
 ---
@@ -837,8 +834,7 @@ box.execute("INSERT INTO t3e VALUES ('a');")
 ...
 box.execute("INSERT INTO t3e VALUES ('A');")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_T3E_1''
-    in space ''T3E'''
+- error: Duplicate key exists in unique index 'pk_unnamed_T3E_1' in space 'T3E'
 ...
 box.execute("SELECT * FROM t3e;")
 ---
@@ -901,8 +897,7 @@ box.execute("INSERT INTO t3f VALUES ('A');")
 ...
 box.execute("INSERT INTO t3f VALUES ('a');")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_T3F_1''
-    in space ''T3F'''
+- error: Duplicate key exists in unique index 'pk_unnamed_T3F_1' in space 'T3F'
 ...
 box.execute("SELECT * FROM t3f;")
 ---
@@ -932,8 +927,7 @@ box.execute("INSERT INTO t3g VALUES ('a');")
 ...
 box.execute("INSERT INTO t3g VALUES ('A');")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_T3G_1''
-    in space ''T3G'''
+- error: Duplicate key exists in unique index 'pk_unnamed_T3G_1' in space 'T3G'
 ...
 box.execute("SELECT * FROM t3g;")
 ---

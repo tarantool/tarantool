@@ -181,8 +181,7 @@ t = box.space._fk_constraint:insert(t)
 --
 box.execute("DROP INDEX i1 on t1;")
 ---
-- error: 'Failed to execute SQL statement: Can''t modify space ''T1'': can not drop
-    a referenced index'
+- error: 'Can''t modify space ''T1'': can not drop a referenced index'
 ...
 -- Referenced index can't be altered as well, if alter leads to
 -- rebuild of index (e.g. index still can be renamed).

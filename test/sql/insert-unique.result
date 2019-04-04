@@ -28,14 +28,12 @@ box.execute("INSERT INTO zoobar VALUES (111, 222, 'c3', 444)")
 -- PK must be unique
 box.execute("INSERT INTO zoobar VALUES (112, 222, 'c3', 444)")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''pk_unnamed_ZOOBAR_1''
-    in space ''ZOOBAR'''
+- error: Duplicate key exists in unique index 'pk_unnamed_ZOOBAR_1' in space 'ZOOBAR'
 ...
 -- Unique index must be respected
 box.execute("INSERT INTO zoobar VALUES (111, 223, 'c3', 444)")
 ---
-- error: 'Failed to execute SQL statement: Duplicate key exists in unique index ''ZOOBAR2''
-    in space ''ZOOBAR'''
+- error: Duplicate key exists in unique index 'ZOOBAR2' in space 'ZOOBAR'
 ...
 -- Cleanup
 box.execute("DROP INDEX zoobar2 ON zoobar")

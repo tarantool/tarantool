@@ -365,9 +365,6 @@ enum sql_ret_code {
 	SQL_MISUSE,
 	/** 2nd parameter to sql_bind out of range. */
 	SQL_RANGE,
-	SQL_TARANTOOL_ITERATOR_FAIL,
-	SQL_TARANTOOL_INSERT_FAIL,
-	SQL_TARANTOOL_DELETE_FAIL,
 	SQL_TARANTOOL_ERROR,
 	/** Warnings from sql_log(). */
 	SQL_WARNING,

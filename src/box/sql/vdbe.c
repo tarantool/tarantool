@@ -5450,7 +5450,7 @@ abort_due_to_error:
 		/* Avoiding situation when Tarantool error is set,
 		 * but error message isn't.
 		 */
-		if (is_tarantool_error(rc) && tarantoolErrorMessage()) {
+		if (rc == SQL_TARANTOOL_ERROR && tarantoolErrorMessage()) {
 			msg = tarantoolErrorMessage();
 		} else {
 			msg = sqlErrStr(rc);

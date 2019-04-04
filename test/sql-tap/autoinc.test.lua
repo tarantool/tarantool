@@ -531,7 +531,7 @@ test:do_catchsql_test(
         INSERT INTO t6 VALUES(NULL,1);
     ]], {
         -- <autoinc-6.2>
-        1, "Failed to execute SQL statement: Sequence 'T6' has overflowed"
+        1, "Sequence 'T6' has overflowed"
         -- </autoinc-6.2>
     })
 
