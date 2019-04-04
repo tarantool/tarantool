@@ -1578,27 +1578,35 @@ struct SumCtx {
  * it overflows an integer.
  */
 static void
-sumStep(sql_context * context, int argc, sql_value ** argv)
+sum_step(struct sql_context *context, int argc, sql_value **argv)
 {
-	SumCtx *p;
-	int type;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
-	p = sql_aggregate_context(context, sizeof(*p));
-	type = sql_value_numeric_type(argv[0]);
-	if (p && type != SQL_NULL) {
-		p->cnt++;
-		if (type == SQL_INTEGER) {
-			i64 v = sql_value_int64(argv[0]);
-			p->rSum += v;
-			if ((p->approx | p->overflow) == 0
-			    && sqlAddInt64(&p->iSum, v)) {
-				p->overflow = 1;
-			}
-		} else {
-			p->rSum += sql_value_double(argv[0]);
-			p->approx = 1;
+	struct SumCtx *p = sql_aggregate_context(context, sizeof(*p));
+	int type = sql_value_type(argv[0]);
+	if (type == SQL_NULL || p == NULL)
+		return;
+	if (type != SQL_FLOAT && type != SQL_INTEGER) {
+		if (mem_apply_numeric_type(argv[0]) != 0) {
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+				 sql_value_text(argv[0]), "number");
+			context->fErrorOrAux = 1;
+			context->isError = SQL_TARANTOOL_ERROR;
+			return;
 		}
+		type = sql_value_type(argv[0]);
+	}
+	p->cnt++;
+	if (type == SQL_INTEGER) {
+		int64_t v = sql_value_int64(argv[0]);
+		p->rSum += v;
+		if ((p->approx | p->overflow) == 0 &&
+		    sqlAddInt64(&p->iSum, v) != 0) {
+			p->overflow = 1;
+		}
+	} else {
+		p->rSum += sql_value_double(argv[0]);
+		p->approx = 1;
 	}
 }
 
@@ -1935,9 +1943,12 @@ sqlRegisterBuiltinFunctions(void)
 		FUNCTION(zeroblob, 1, 0, 0, zeroblobFunc, FIELD_TYPE_SCALAR),
 		FUNCTION_COLL(substr, 2, 0, 0, substrFunc),
 		FUNCTION_COLL(substr, 3, 0, 0, substrFunc),
-		AGGREGATE(sum, 1, 0, 0, sumStep, sumFinalize, FIELD_TYPE_NUMBER),
-		AGGREGATE(total, 1, 0, 0, sumStep, totalFinalize, FIELD_TYPE_NUMBER),
-		AGGREGATE(avg, 1, 0, 0, sumStep, avgFinalize, FIELD_TYPE_NUMBER),
+		AGGREGATE(sum, 1, 0, 0, sum_step, sumFinalize,
+			  FIELD_TYPE_NUMBER),
+		AGGREGATE(total, 1, 0, 0, sum_step, totalFinalize,
+			  FIELD_TYPE_NUMBER),
+		AGGREGATE(avg, 1, 0, 0, sum_step, avgFinalize,
+			  FIELD_TYPE_NUMBER),
 		AGGREGATE2(count, 0, 0, 0, countStep, countFinalize,
 			   SQL_FUNC_COUNT, FIELD_TYPE_INTEGER),
 		AGGREGATE(count, 1, 0, 0, countStep, countFinalize,

@@ -276,7 +276,8 @@ allocateCursor(
 int
 mem_apply_numeric_type(struct Mem *record)
 {
-	assert((record->flags & (MEM_Str | MEM_Int | MEM_Real)) == MEM_Str);
+	if ((record->flags & (MEM_Str | MEM_Int | MEM_Real)) != MEM_Str)
+		return -1;
 	int64_t integer_value;
 	if (sql_atoi64(record->z, &integer_value, record->n) == 0) {
 		record->u.i = integer_value;
@@ -353,22 +354,6 @@ mem_apply_type(struct Mem *record, enum field_type type)
 	default:
 		return -1;
 	}
-}
-
-/*
- * Try to convert the type of a function argument or a result column
- * into a numeric representation.  Use either INTEGER or REAL whichever
- * is appropriate.  But only do the conversion if it is possible without
- * loss of information and return the revised type of the argument.
- */
-int sql_value_numeric_type(sql_value *pVal) {
-	int eType = sql_value_type(pVal);
-	if (eType==SQL_TEXT) {
-		Mem *pMem = (Mem*)pVal;
-		mem_apply_numeric_type(pMem);
-		eType = sql_value_type(pVal);
-	}
-	return eType;
 }
 
 /*

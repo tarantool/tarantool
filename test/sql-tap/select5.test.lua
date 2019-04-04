@@ -550,7 +550,7 @@ test:do_execsql_test(
     -- </select5-9.13>
 })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "select5-9.13.2",
     [[
             CREATE TABLE jj (s1 INT, s2 VARCHAR(1), PRIMARY KEY(s1));
@@ -558,6 +558,7 @@ test:do_execsql_test(
             SELECT 1 FROM jj HAVING avg(s2) = 1 AND avg(s2) = 0;
     ]], {
     -- <select5-9.13.2>
+    1, "Type mismatch: can not convert A to number"
     -- </select5-9.13.2>
 })
 

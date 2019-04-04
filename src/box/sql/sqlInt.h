@@ -458,9 +458,6 @@ sql_value_text(sql_value *);
 int
 sql_value_type(sql_value *);
 
-int
-sql_value_numeric_type(sql_value *);
-
 sql *
 sql_context_db_handle(sql_context *);
 
