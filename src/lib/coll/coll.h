@@ -53,6 +53,9 @@ typedef size_t (*coll_hint_f)(const char *s, size_t s_len, char *buf,
 
 struct UCollator;
 
+/** Default universal casemap for case transformations. */
+extern struct UCaseMap *icu_ucase_default_map;
+
 /**
  * Collation. It has no unique features like name, id or owner.
  * Only functional part - comparator, locale, ICU settings.

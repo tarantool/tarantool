@@ -41,6 +41,7 @@
 #if HAVE_ISNAN || SQL_HAVE_ISNAN
 #include <math.h>
 #endif
+#include "coll/coll.h"
 #include <unicode/ucasemap.h>
 #include "errinj.h"
 
@@ -259,67 +260,73 @@ int
 sql_normalize_name(char *dst, int dst_size, const char *src, int src_len)
 {
 	assert(src != NULL);
+	assert(dst != NULL && dst_size > 0);
 	if (sqlIsquote(src[0])){
-		if (dst_size == 0)
-			return src_len + 1;
 		memcpy(dst, src, src_len);
 		dst[src_len] = '\0';
 		sqlDequote(dst);
 		return src_len + 1;
 	}
 	UErrorCode status = U_ZERO_ERROR;
-	ERROR_INJECT(ERRINJ_SQL_NAME_NORMALIZATION, {
-		status = U_MEMORY_ALLOCATION_ERROR;
-		goto error;
-	});
-	UCaseMap *case_map = ucasemap_open(NULL, 0, &status);
-	if (case_map == NULL)
-		goto error;
-	int len = ucasemap_utf8ToUpper(case_map, dst, dst_size, src, src_len,
-				       &status);
-	ucasemap_close(case_map);
-	assert(U_SUCCESS(status) ||
-	       (dst_size == 0 && status == U_BUFFER_OVERFLOW_ERROR));
+	assert(icu_ucase_default_map != NULL);
+	int len = ucasemap_utf8ToUpper(icu_ucase_default_map, dst, dst_size,
+				       src, src_len, &status);
+	assert(U_SUCCESS(status) || status == U_BUFFER_OVERFLOW_ERROR);
 	return len + 1;
-error:
-	diag_set(CollationError,
-		 "string conversion to the uppercase failed: %s",
-		 u_errorName(status));
-	return -1;
 }
 
 char *
 sql_normalized_name_db_new(struct sql *db, const char *name, int len)
 {
-	int size = sql_normalize_name(NULL, 0, name, len);
-	if (size < 0)
-		return NULL;
-	char *res = sqlDbMallocRawNN(db, size);
-	if (res == NULL) {
+	int size = len + 1;
+	ERROR_INJECT(ERRINJ_SQL_NAME_NORMALIZATION, {
 		diag_set(OutOfMemory, size, "sqlDbMallocRawNN", "res");
 		return NULL;
-	}
-	if (sql_normalize_name(res, size, name, len) < 0) {
-		sqlDbFree(db, res);
+	});
+	char *res = sqlDbMallocRawNN(db, size);
+	if (res == NULL)
 		return NULL;
-	}
+	int rc = sql_normalize_name(res, size, name, len);
+	if (rc <= size)
+		return res;
+
+	size = rc;
+	res = sqlDbReallocOrFree(db, res, size);
+	if (res == NULL)
+		return NULL;
+	if (sql_normalize_name(res, size, name, len) > size)
+		unreachable();
 	return res;
 }
 
 char *
 sql_normalized_name_region_new(struct region *r, const char *name, int len)
 {
-	int size = sql_normalize_name(NULL, 0, name, len);
-	if (size < 0)
-		return NULL;
-	char *res = (char *) region_alloc(r, size);
-	if (res == NULL) {
+	int size = len + 1;
+	ERROR_INJECT(ERRINJ_SQL_NAME_NORMALIZATION, {
 		diag_set(OutOfMemory, size, "region_alloc", "res");
 		return NULL;
-	}
-	if (sql_normalize_name(res, size, name, len) < 0)
-		return NULL;
+	});
+	size_t region_svp = region_used(r);
+	char *res = region_alloc(r, size);
+	if (res == NULL)
+		goto oom_error;
+	int rc = sql_normalize_name(res, size, name, len);
+	if (rc <= size)
+		return res;
+
+	size = rc;
+	region_truncate(r, region_svp);
+	res = region_alloc(r, size);
+	if (res == NULL)
+		goto oom_error;
+	if (sql_normalize_name(res, size, name, len) > size)
+		unreachable();
 	return res;
+
+oom_error:
+	diag_set(OutOfMemory, size, "region_alloc", "res");
+	return NULL;
 }
 
 /* Convenient short-hand */

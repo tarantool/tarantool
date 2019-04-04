@@ -278,10 +278,7 @@ sql_trigger_select_step(struct sql *db, struct Select *select)
 static struct TriggerStep *
 sql_trigger_step_new(struct sql *db, u8 op, struct Token *target_name)
 {
-	int name_size =
-		sql_normalize_name(NULL, 0, target_name->z, target_name->n);
-	if (name_size < 0)
-		return NULL;
+	int name_size = target_name->n + 1;
 	int size = sizeof(struct TriggerStep) + name_size;
 	struct TriggerStep *trigger_step = sqlDbMallocZero(db, size);
 	if (trigger_step == NULL) {
@@ -289,10 +286,19 @@ sql_trigger_step_new(struct sql *db, u8 op, struct Token *target_name)
 		return NULL;
 	}
 	char *z = (char *)&trigger_step[1];
-	if (sql_normalize_name(z, name_size, target_name->z,
-			       target_name->n) < 0) {
-		sqlDbFree(db, trigger_step);
-		return NULL;
+	int rc = sql_normalize_name(z, name_size, target_name->z,
+				    target_name->n);
+	if (rc > name_size) {
+		name_size = rc;
+		trigger_step = sqlDbReallocOrFree(db, trigger_step,
+						  sizeof(*trigger_step) +
+						  name_size);
+		if (trigger_step == NULL)
+			return NULL;
+		z = (char *) &trigger_step[1];
+		if (sql_normalize_name(z, name_size, target_name->z,
+				       target_name->n) > name_size)
+			unreachable();
 	}
 	trigger_step->zTarget = z;
 	trigger_step->op = op;

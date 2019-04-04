@@ -34,7 +34,10 @@
 #include "diag.h"
 #include "assoc.h"
 #include <unicode/ucol.h>
+#include <unicode/ucasemap.h>
 #include <trivia/config.h>
+
+struct UCaseMap *icu_ucase_default_map = NULL;
 
 #define mh_name _coll
 struct mh_coll_key_t {
@@ -414,13 +417,16 @@ coll_unref(struct coll *coll)
 void
 coll_init()
 {
+	UErrorCode err = U_ZERO_ERROR;
 	coll_cache = mh_coll_new();
-	if (coll_cache == NULL)
+	icu_ucase_default_map = ucasemap_open("", 0, &err);
+	if (coll_cache == NULL || icu_ucase_default_map == NULL)
 		panic("Can not create system collations cache");
 }
 
 void
 coll_free()
 {
+	ucasemap_close(icu_ucase_default_map);
 	mh_coll_delete(coll_cache);
 }
