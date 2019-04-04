@@ -165,6 +165,7 @@ space_create(struct space *space, struct engine *engine,
 	space_fill_index_map(space);
 	rlist_create(&space->parent_fk_constraint);
 	rlist_create(&space->child_fk_constraint);
+	rlist_create(&space->ck_constraint);
 	return 0;
 
 fail_free_indexes:
@@ -225,6 +226,7 @@ space_delete(struct space *space)
 	assert(space->sql_triggers == NULL);
 	assert(rlist_empty(&space->parent_fk_constraint));
 	assert(rlist_empty(&space->child_fk_constraint));
+	assert(rlist_empty(&space->ck_constraint));
 	space->vtab->destroy(space);
 }
 

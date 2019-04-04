@@ -313,7 +313,7 @@ test:do_catchsql_test(
 		CREATE TABLE t27 (i INT PRIMARY KEY, CHECK(i < (SELECT * FROM t0)));
 	]], {
 		-- <sql-errors-1.27>
-		1,"Failed to create space 'T27': Subqueries are prohibited in a CHECK constraint definition"
+		1,"Failed to create check constraint 'CK_CONSTRAINT_1_T27': Subqueries are prohibited in a ck constraint definition"
 		-- </sql-errors-1.27>
 	})
 

@@ -297,7 +297,7 @@ ccons ::= check_constraint_def .
 
 check_constraint_def ::= cconsname(N) CHECK LP expr(X) RP. {
   create_ck_def_init(&pParse->create_ck_def, &N, &X);
-  sql_add_check_constraint(pParse);
+  sql_create_check_contraint(pParse);
 }
 
 ccons ::= cconsname(N) REFERENCES nm(T) eidlist_opt(TA) matcharg(M) refargs(R). {

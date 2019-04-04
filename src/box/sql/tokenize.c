@@ -435,7 +435,6 @@ parser_space_delete(struct sql *db, struct space *space)
 	assert(space->def->opts.is_temporary);
 	for (uint32_t i = 0; i < space->index_count; ++i)
 		index_def_delete(space->index[i]->def);
-	sql_expr_list_delete(db, space->def->opts.checks);
 }
 
 /**

@@ -198,6 +198,11 @@ struct space {
 	 */
 	struct index **index;
 	/**
+	 * List of check constraints linked with
+	 * ck_constraint::link.
+	 */
+	struct rlist ck_constraint;
+	/**
 	 * Lists of foreign key constraints. In SQL terms child
 	 * space is the "from" table i.e. the table that contains
 	 * the REFERENCES clause. Parent space is "to" table, in

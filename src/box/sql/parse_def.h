@@ -124,6 +124,22 @@ struct fk_constraint_parse {
 };
 
 /**
+ * Structure representing check constraint appeared within
+ * CREATE TABLE statement. Used only during parsing.
+ * All allocations are performed on region, so no cleanups are
+ * required.
+ */
+struct ck_constraint_parse {
+	/**
+	 * Check constraint declared in <CREATE TABLE ...>
+	 * statement. Must be coded after space creation.
+	 */
+	struct ck_constraint_def *ck_def;
+	/** Organize these structs into linked list. */
+	struct rlist link;
+};
+
+/**
  * Possible SQL index types. Note that PK and UNIQUE constraints
  * are implemented as indexes and have their own types:
  * _CONSTRAINT_PK and _CONSTRAINT_UNIQUE.
@@ -189,6 +205,13 @@ struct create_table_def {
 	 * Foreign key constraint appeared in CREATE TABLE stmt.
 	 */
 	struct rlist new_fkey;
+	/**
+	 * Number of CK constraints declared within
+	 * CREATE TABLE statement.
+	 */
+	uint32_t check_count;
+	/** Check constraint appeared in CREATE TABLE stmt. */
+	struct rlist new_check;
 	/** True, if table to be created has AUTOINCREMENT PK. */
 	bool has_autoinc;
 };
@@ -437,6 +460,7 @@ create_table_def_init(struct create_table_def *table_def, struct Token *name,
 	create_entity_def_init(&table_def->base, ENTITY_TYPE_TABLE, NULL, name,
 			       if_not_exists);
 	rlist_create(&table_def->new_fkey);
+	rlist_create(&table_def->new_check);
 }
 
 static inline void

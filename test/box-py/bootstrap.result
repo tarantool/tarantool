@@ -79,6 +79,9 @@ box.space._space:select{}
       {'name': 'is_deferred', 'type': 'boolean'}, {'name': 'match', 'type': 'string'},
       {'name': 'on_delete', 'type': 'string'}, {'name': 'on_update', 'type': 'string'},
       {'name': 'child_cols', 'type': 'array'}, {'name': 'parent_cols', 'type': 'array'}]]
+  - [364, 1, '_ck_constraint', 'memtx', 0, {}, [{'name': 'space_id', 'type': 'unsigned'},
+      {'name': 'name', 'type': 'string'}, {'name': 'is_deferred', 'type': 'boolean'},
+      {'name': 'language', 'type': 'str'}, {'name': 'code', 'type': 'str'}]]
 ...
 box.space._index:select{}
 ---
@@ -131,6 +134,7 @@ box.space._index:select{}
   - [340, 1, 'sequence', 'tree', {'unique': false}, [[1, 'unsigned']]]
   - [356, 0, 'primary', 'tree', {'unique': true}, [[0, 'string'], [1, 'unsigned']]]
   - [356, 1, 'child_id', 'tree', {'unique': false}, [[1, 'unsigned']]]
+  - [364, 0, 'primary', 'tree', {'unique': true}, [[0, 'unsigned'], [1, 'string']]]
 ...
 box.space._user:select{}
 ---

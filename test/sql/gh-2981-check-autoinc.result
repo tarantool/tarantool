@@ -29,7 +29,7 @@ box.execute("insert into t1 values (18, null);")
 ...
 box.execute("insert into t1(s2) values (null);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: T1'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1'
 ...
 box.execute("insert into t2 values (18, null);")
 ---
@@ -37,7 +37,7 @@ box.execute("insert into t2 values (18, null);")
 ...
 box.execute("insert into t2(s2) values (null);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: T2'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T2'
 ...
 box.execute("insert into t2 values (24, null);")
 ---
@@ -45,7 +45,7 @@ box.execute("insert into t2 values (24, null);")
 ...
 box.execute("insert into t2(s2) values (null);")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: T2'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T2'
 ...
 box.execute("insert into t3 values (9, null)")
 ---
@@ -53,7 +53,7 @@ box.execute("insert into t3 values (9, null)")
 ...
 box.execute("insert into t3(s2) values (null)")
 ---
-- error: 'Failed to execute SQL statement: CHECK constraint failed: T3'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T3'
 ...
 box.execute("DROP TABLE t1")
 ---

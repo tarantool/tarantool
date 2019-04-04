@@ -36,28 +36,12 @@
 #include "msgpuck.h"
 #include "tt_static.h"
 
-/**
- * Make checks from msgpack.
- * @param str pointer to array of maps
- *         e.g. [{"expr": "x < y", "name": "ONE"}, ..].
- * @param len array items count.
- * @param[out] opt pointer to store parsing result.
- * @param errcode Code of error to set if something is wrong.
- * @param field_no Field number of an option in a parent element.
- * @retval 0 on success.
- * @retval not 0 on error. Also set diag message.
- */
-static int
-checks_array_decode(const char **str, uint32_t len, char *opt, uint32_t errcode,
-		    uint32_t field_no);
-
 const struct space_opts space_opts_default = {
 	/* .group_id = */ 0,
 	/* .is_temporary = */ false,
 	/* .is_ephemeral = */ false,
 	/* .view = */ false,
 	/* .sql        = */ NULL,
-	/* .checks     = */ NULL,
 };
 
 const struct opt_def space_opts_reg[] = {
@@ -65,8 +49,7 @@ const struct opt_def space_opts_reg[] = {
 	OPT_DEF("temporary", OPT_BOOL, struct space_opts, is_temporary),
 	OPT_DEF("view", OPT_BOOL, struct space_opts, is_view),
 	OPT_DEF("sql", OPT_STRPTR, struct space_opts, sql),
-	OPT_DEF_ARRAY("checks", struct space_opts, checks,
-		      checks_array_decode),
+	OPT_DEF_LEGACY("checks"),
 	OPT_END,
 };
 
@@ -113,16 +96,6 @@ space_def_dup_opts(struct space_def *def, const struct space_opts *opts)
 				 "def->opts.sql");
 			return -1;
 		}
-	}
-	if (opts->checks != NULL) {
-		def->opts.checks = sql_expr_list_dup(sql_get(), opts->checks, 0);
-		if (def->opts.checks == NULL) {
-			free(def->opts.sql);
-			diag_set(OutOfMemory, 0, "sql_expr_list_dup",
-				 "def->opts.checks");
-			return -1;
-		}
-		sql_checks_update_space_def_reference(def->opts.checks, def);
 	}
 	return 0;
 }
@@ -301,74 +274,5 @@ void
 space_opts_destroy(struct space_opts *opts)
 {
 	free(opts->sql);
-	sql_expr_list_delete(sql_get(), opts->checks);
 	TRASH(opts);
-}
-
-static int
-checks_array_decode(const char **str, uint32_t len, char *opt, uint32_t errcode,
-		    uint32_t field_no)
-{
-	char *errmsg = tt_static_buf();
-	struct ExprList *checks = NULL;
-	const char **map = str;
-	struct sql *db = sql_get();
-	for (uint32_t i = 0; i < len; i++) {
-		checks = sql_expr_list_append(db, checks, NULL);
-		if (checks == NULL) {
-			diag_set(OutOfMemory, 0, "sql_expr_list_append",
-				 "checks");
-			goto error;
-		}
-		const char *expr_name = NULL;
-		const char *expr_str = NULL;
-		uint32_t expr_name_len = 0;
-		uint32_t expr_str_len = 0;
-		uint32_t map_size = mp_decode_map(map);
-		for (uint32_t j = 0; j < map_size; j++) {
-			if (mp_typeof(**map) != MP_STR) {
-				diag_set(ClientError, errcode, field_no,
-					 "key must be a string");
-				goto error;
-			}
-			uint32_t key_len;
-			const char *key = mp_decode_str(map, &key_len);
-			if (mp_typeof(**map) != MP_STR) {
-				snprintf(errmsg, TT_STATIC_BUF_LEN,
-					 "invalid MsgPack map field '%.*s' type",
-					 key_len, key);
-				diag_set(ClientError, errcode, field_no, errmsg);
-				goto error;
-			}
-			if (key_len == 4 && memcmp(key, "expr", key_len) == 0) {
-				expr_str = mp_decode_str(map, &expr_str_len);
-			} else if (key_len == 4 &&
-				   memcmp(key, "name", key_len) == 0) {
-				expr_name = mp_decode_str(map, &expr_name_len);
-			} else {
-				snprintf(errmsg, TT_STATIC_BUF_LEN,
-					 "invalid MsgPack map field '%.*s'",
-					 key_len, key);
-				diag_set(ClientError, errcode, field_no, errmsg);
-				goto error;
-			}
-		}
-		if (sql_check_list_item_init(checks, i, expr_name, expr_name_len,
-					     expr_str, expr_str_len) != 0) {
-			box_error_t *err = box_error_last();
-			if (box_error_code(err) != ENOMEM) {
-				snprintf(errmsg, TT_STATIC_BUF_LEN,
-					 "invalid expression specified (%s)",
-					 box_error_message(err));
-				diag_set(ClientError, errcode, field_no,
-					 errmsg);
-			}
-			goto error;
-		}
-	}
-	*(struct ExprList **)opt = checks;
-	return 0;
-error:
-	sql_expr_list_delete(db, checks);
-	return  -1;
 }

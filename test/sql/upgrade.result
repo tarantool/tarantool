@@ -188,6 +188,25 @@ i[1].opts.sql == nil
 ---
 - true
 ...
+box.space._space:get(s.id).flags.checks == nil
+---
+- true
+...
+check = box.space._ck_constraint:select()[1]
+---
+...
+check ~= nil
+---
+- true
+...
+check.name
+---
+- CK_CONSTRAINT_1_T5
+...
+check.code
+---
+- x < 2
+...
 s:drop()
 ---
 ...

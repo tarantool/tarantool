@@ -514,6 +514,7 @@ box.schema.space.drop = function(space_id, space_name, opts)
     local _truncate = box.space[box.schema.TRUNCATE_ID]
     local _space_sequence = box.space[box.schema.SPACE_SEQUENCE_ID]
     local _fk_constraint = box.space[box.schema.FK_CONSTRAINT_ID]
+    local _ck_constraint = box.space[box.schema.CK_CONSTRAINT_ID]
     local sequence_tuple = _space_sequence:delete{space_id}
     if sequence_tuple ~= nil and sequence_tuple.is_generated == true then
         -- Delete automatically generated sequence.
@@ -524,6 +525,9 @@ box.schema.space.drop = function(space_id, space_name, opts)
     end
     for _, t in _fk_constraint.index.child_id:pairs({space_id}) do
         _fk_constraint:delete({t.name, space_id})
+    end
+    for _, t in _ck_constraint.index.primary:pairs({space_id}) do
+        _ck_constraint:delete({space_id, t.name})
     end
     local keys = _vindex:select(space_id)
     for i = #keys, 1, -1 do

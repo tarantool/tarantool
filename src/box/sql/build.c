@@ -43,10 +43,12 @@
  *     COMMIT
  *     ROLLBACK
  */
+#include <ctype.h>
 #include "sqlInt.h"
 #include "vdbeInt.h"
 #include "tarantoolInt.h"
 #include "box/box.h"
+#include "box/ck_constraint.h"
 #include "box/fk_constraint.h"
 #include "box/sequence.h"
 #include "box/session.h"
@@ -638,40 +640,114 @@ primary_key_exit:
 	return;
 }
 
-void
-sql_add_check_constraint(struct Parse *parser)
+/**
+ * Prepare a 0-terminated string in the wptr memory buffer that
+ * does not contain a sequence of more than one whatespace
+ * character. Routine enforces ' ' (space) as whitespace
+ * delimiter. When character ' or " was met, the string is copied
+ * without any changes until the next ' or " sign.
+ * The wptr buffer is expected to have str_len + 1 bytes
+ * (this is the expected scenario where no extra whitespace
+ * characters in the source string).
+ * @param wptr The destination memory buffer of size
+ *             @a str_len + 1.
+ * @param str The source string to be copied.
+ * @param str_len The source string @a str length.
+ */
+static void
+trim_space_snprintf(char *wptr, const char *str, uint32_t str_len)
 {
-	struct create_ck_def *ck_def = &parser->create_ck_def;
+	const char *str_end = str + str_len;
+	char quote_type = '\0';
+	bool is_prev_chr_space = false;
+	while (str < str_end) {
+		if (quote_type == '\0') {
+			if (*str == '\'' || *str == '\"') {
+				quote_type = *str;
+			} else if (isspace((unsigned char)*str)) {
+				if (!is_prev_chr_space)
+					*wptr++ = ' ';
+				is_prev_chr_space = true;
+				str++;
+				continue;
+			}
+		} else if (*str == quote_type) {
+			quote_type = '\0';
+		}
+		is_prev_chr_space = false;
+		*wptr++ = *str++;
+	}
+	*wptr = '\0';
+}
+
+void
+sql_create_check_contraint(struct Parse *parser)
+{
+	struct create_ck_def *create_ck_def = &parser->create_ck_def;
+	struct ExprSpan *expr_span = create_ck_def->expr;
+	sql_expr_delete(parser->db, expr_span->pExpr, false);
+
 	struct alter_entity_def *alter_def =
-		(struct alter_entity_def *) &parser->create_ck_def;
+		(struct alter_entity_def *) create_ck_def;
 	assert(alter_def->entity_type == ENTITY_TYPE_CK);
 	(void) alter_def;
-	struct Expr *expr = ck_def->expr->pExpr;
 	struct space *space = parser->create_table_def.new_space;
-	if (space != NULL) {
-		expr->u.zToken =
-			sqlDbStrNDup(parser->db,
-				     (char *) ck_def->expr->zStart,
-				     (int) (ck_def->expr->zEnd -
-					    ck_def->expr->zStart));
-		if (expr->u.zToken == NULL)
-			goto release_expr;
-		space->def->opts.checks =
-			sql_expr_list_append(parser->db,
-					     space->def->opts.checks, expr);
-		if (space->def->opts.checks == NULL) {
-			sqlDbFree(parser->db, expr->u.zToken);
-			goto release_expr;
-		}
-		struct create_entity_def *entity_def = &ck_def->base.base;
-		if (entity_def->name.n > 0) {
-			sqlExprListSetName(parser, space->def->opts.checks,
-					   &entity_def->name, 1);
+	assert(space != NULL);
+
+	/* Prepare payload for ck constraint definition. */
+	struct region *region = &parser->region;
+	struct Token *name_token = &create_ck_def->base.base.name;
+	const char *name;
+	if (name_token->n > 0) {
+		name = sql_normalized_name_region_new(region, name_token->z,
+						      name_token->n);
+		if (name == NULL) {
+			parser->is_aborted = true;
+			return;
 		}
 	} else {
-release_expr:
-		sql_expr_delete(parser->db, expr, false);
+		uint32_t ck_idx = ++parser->create_table_def.check_count;
+		name = tt_sprintf("CK_CONSTRAINT_%d_%s", ck_idx,
+				  space->def->name);
 	}
+	size_t name_len = strlen(name);
+
+	uint32_t expr_str_len = (uint32_t)(expr_span->zEnd - expr_span->zStart);
+	const char *expr_str = expr_span->zStart;
+
+	/*
+	 * Allocate memory for ck constraint parse structure and
+	 * ck constraint definition as a single memory chunk on
+	 * region:
+	 *
+	 *    [ck_parse][ck_def[name][expr_str]]
+	 *         |_____^  |_________^
+	 */
+	uint32_t expr_str_offset;
+	uint32_t ck_def_sz = ck_constraint_def_sizeof(name_len, expr_str_len,
+						      &expr_str_offset);
+	struct ck_constraint_parse *ck_parse =
+		region_alloc(region, sizeof(*ck_parse) + ck_def_sz);
+	if (ck_parse == NULL) {
+		diag_set(OutOfMemory, sizeof(*ck_parse) + ck_def_sz, "region",
+			 "ck_parse");
+		parser->is_aborted = true;
+		return;
+	}
+	struct ck_constraint_def *ck_def =
+		(struct ck_constraint_def *)((char *)ck_parse +
+					     sizeof(*ck_parse));
+	ck_parse->ck_def = ck_def;
+	rlist_create(&ck_parse->link);
+
+	ck_def->expr_str = (char *)ck_def + expr_str_offset;
+	ck_def->language = CK_CONSTRAINT_LANGUAGE_SQL;
+	ck_def->space_id = BOX_ID_NIL;
+	trim_space_snprintf(ck_def->expr_str, expr_str, expr_str_len);
+	memcpy(ck_def->name, name, name_len);
+	ck_def->name[name_len] = '\0';
+
+	rlist_add_entry(&parser->create_table_def.new_check, ck_parse, link);
 }
 
 /*
@@ -979,6 +1055,48 @@ emitNewSysSpaceSequenceRecord(Parse *pParse, int reg_space_id, int reg_seq_id,
 }
 
 /**
+ * Generate opcodes to serialize check constraint definition into
+ * MsgPack and insert produced tuple into _ck_constraint space.
+ * @param parser Parsing context.
+ * @param ck_def Check constraint definition to be serialized.
+ * @param reg_space_id The VDBE register containing space id.
+*/
+static void
+vdbe_emit_ck_constraint_create(struct Parse *parser,
+			       const struct ck_constraint_def *ck_def,
+			       uint32_t reg_space_id)
+{
+	struct sql *db = parser->db;
+	struct Vdbe *v = sqlGetVdbe(parser);
+	assert(v != NULL);
+	int ck_constraint_reg = sqlGetTempRange(parser, 6);
+	sqlVdbeAddOp2(v, OP_SCopy, reg_space_id, ck_constraint_reg);
+	sqlVdbeAddOp4(v, OP_String8, 0, ck_constraint_reg + 1, 0,
+		      sqlDbStrDup(db, ck_def->name), P4_DYNAMIC);
+	sqlVdbeAddOp2(v, OP_Bool, false, ck_constraint_reg + 2);
+	sqlVdbeAddOp4(v, OP_String8, 0, ck_constraint_reg + 3, 0,
+		      ck_constraint_language_strs[ck_def->language], P4_STATIC);
+	sqlVdbeAddOp4(v, OP_String8, 0, ck_constraint_reg + 4, 0,
+		      sqlDbStrDup(db, ck_def->expr_str), P4_DYNAMIC);
+	sqlVdbeAddOp3(v, OP_MakeRecord, ck_constraint_reg, 5,
+		      ck_constraint_reg + 5);
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(ER_CONSTRAINT_EXISTS),
+					    ck_def->name);
+	if (vdbe_emit_halt_with_presence_test(parser, BOX_CK_CONSTRAINT_ID, 0,
+					      ck_constraint_reg, 2,
+					      ER_CONSTRAINT_EXISTS, error_msg,
+					      false, OP_NoConflict) != 0)
+		return;
+	sqlVdbeAddOp3(v, OP_SInsert, BOX_CK_CONSTRAINT_ID, 0,
+		      ck_constraint_reg + 5);
+	save_record(parser, BOX_CK_CONSTRAINT_ID, ck_constraint_reg, 2,
+		    v->nOp - 1);
+	VdbeComment((v, "Create CK constraint %s", ck_def->name));
+	sqlReleaseTempRange(parser, ck_constraint_reg, 5);
+}
+
+/**
  * Generate opcodes to serialize foreign key into MsgPack and
  * insert produced tuple into _fk_constraint space.
  *
@@ -1129,20 +1247,18 @@ resolve_link(struct Parse *parse_context, const struct space_def *def,
 void
 sqlEndTable(struct Parse *pParse)
 {
-	sql *db = pParse->db;	/* The database connection */
-
-	assert(!db->mallocFailed);
+	assert(!pParse->db->mallocFailed);
 	struct space *new_space = pParse->create_table_def.new_space;
 	if (new_space == NULL)
 		return;
-	assert(!db->init.busy);
+	assert(!pParse->db->init.busy);
 	assert(!new_space->def->opts.is_view);
 
 	if (sql_space_primary_key(new_space) == NULL) {
 		diag_set(ClientError, ER_CREATE_SPACE, new_space->def->name,
 			 "PRIMARY KEY missing");
 		pParse->is_aborted = true;
-		goto cleanup;
+		return;
 	}
 
 	/*
@@ -1232,9 +1348,12 @@ sqlEndTable(struct Parse *pParse)
 		fk_def->child_id = reg_space_id;
 		vdbe_emit_fk_constraint_create(pParse, fk_def);
 	}
-cleanup:
-	sql_expr_list_delete(db, new_space->def->opts.checks);
-	new_space->def->opts.checks = NULL;
+	struct ck_constraint_parse *ck_parse;
+	rlist_foreach_entry(ck_parse, &pParse->create_table_def.new_check,
+			    link) {
+		vdbe_emit_ck_constraint_create(pParse, ck_parse->ck_def,
+					       reg_space_id);
+	}
 }
 
 void
@@ -1433,6 +1552,37 @@ vdbe_emit_fk_constraint_drop(struct Parse *parse_context, char *constraint_name,
 }
 
 /**
+ * Generate VDBE program to remove entry from _ck_constraint space.
+ *
+ * @param parser Parsing context.
+ * @param ck_name Name of CK constraint to be dropped.
+ * @param space_id Id of table which constraint belongs to.
+ */
+static void
+vdbe_emit_ck_constraint_drop(struct Parse *parser, const char *ck_name,
+			     uint32_t space_id)
+{
+	struct Vdbe *v = sqlGetVdbe(parser);
+	struct sql *db = v->db;
+	assert(v != NULL);
+	int key_reg = sqlGetTempRange(parser, 3);
+	sqlVdbeAddOp2(v, OP_Integer, space_id,  key_reg);
+	sqlVdbeAddOp4(v, OP_String8, 0, key_reg + 1, 0,
+		      sqlDbStrDup(db, ck_name), P4_DYNAMIC);
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(ER_NO_SUCH_CONSTRAINT), ck_name);
+	if (vdbe_emit_halt_with_presence_test(parser, BOX_CK_CONSTRAINT_ID, 0,
+					      key_reg, 2, ER_NO_SUCH_CONSTRAINT,
+					      error_msg, false,
+					      OP_Found) != 0)
+		return;
+	sqlVdbeAddOp3(v, OP_MakeRecord, key_reg, 2, key_reg + 2);
+	sqlVdbeAddOp2(v, OP_SDelete, BOX_CK_CONSTRAINT_ID, key_reg + 2);
+	VdbeComment((v, "Delete CK constraint %s", ck_name));
+	sqlReleaseTempRange(parser, key_reg, 3);
+}
+
+/**
  * Generate code to drop a table.
  * This routine includes dropping triggers, sequences,
  * all indexes and entry from _space space.
@@ -1504,6 +1654,13 @@ sql_code_drop_table(struct Parse *parse_context, struct space *space,
 		if (fk_name_dup == NULL)
 			return;
 		vdbe_emit_fk_constraint_drop(parse_context, fk_name_dup, space_id);
+	}
+	/* Delete all CK constraints. */
+	struct ck_constraint *ck_constraint;
+	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
+		vdbe_emit_ck_constraint_drop(parse_context,
+					     ck_constraint->def->name,
+					     space_id);
 	}
 	/*
 	 * Drop all _space and _index entries that refer to the
@@ -2074,8 +2231,7 @@ index_fill_def(struct Parse *parse, struct index *index,
 	}
 	for (int i = 0; i < expr_list->nExpr; i++) {
 		struct Expr *expr = expr_list->a[i].pExpr;
-		sql_resolve_self_reference(parse, space_def, NC_IdxExpr,
-					   expr, 0);
+		sql_resolve_self_reference(parse, space_def, NC_IdxExpr, expr);
 		if (parse->is_aborted)
 			goto cleanup;
 
@@ -2791,8 +2947,7 @@ sqlSrcListDelete(sql * db, SrcList * pList)
 		*/
 		assert(pItem->space == NULL ||
 			!pItem->space->def->opts.is_temporary ||
-			 (pItem->space->index == NULL &&
-			  pItem->space->def->opts.checks == NULL));
+			pItem->space->index == NULL);
 		sql_select_delete(db, pItem->pSelect);
 		sql_expr_delete(db, pItem->pOn, false);
 		sqlIdListDelete(db, pItem->pUsing);

@@ -523,6 +523,7 @@ t;
   192: box.error.INDEX_DEF_UNSUPPORTED
   193: box.error.CK_DEF_UNSUPPORTED
   194: box.error.MULTIKEY_INDEX_MISMATCH
+  195: box.error.CREATE_CK_CONSTRAINT
 ...
 test_run:cmd("setopt delimiter ''");
 ---

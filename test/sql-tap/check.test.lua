@@ -55,7 +55,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(6,7, 2);
     ]], {
         -- <check-1.3>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
         -- </check-1.3>
     })
 
@@ -75,7 +75,7 @@ test:do_catchsql_test(
         INSERT INTO t1 VALUES(4,3, 2);
     ]], {
         -- <check-1.5>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_2_T1"
         -- </check-1.5>
     })
 
@@ -147,7 +147,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=7 WHERE x==2
     ]], {
         -- <check-1.12>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
         -- </check-1.12>
     })
 
@@ -167,7 +167,7 @@ test:do_catchsql_test(
         UPDATE t1 SET x=5 WHERE x==2
     ]], {
         -- <check-1.14>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
         -- </check-1.14>
     })
 
@@ -319,7 +319,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.1>
-        1, "Failed to create space 'T3': Subqueries are prohibited in a CHECK constraint definition"
+        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Subqueries are prohibited in a ck constraint definition"
         -- </check-3.1>
     })
 
@@ -344,7 +344,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.3>
-        1, "Failed to create space 'T3': Can’t resolve field 'Q'"
+        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Can’t resolve field 'Q'"
         -- </check-3.3>
     })
 
@@ -368,7 +368,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-3.5>
-        1, "Failed to create space 'T3': Field 'X' was not found in the space 'T2' format"
+        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T3': Field 'X' was not found in the space 'T2' format"
         -- </check-3.5>
     })
 
@@ -413,7 +413,7 @@ test:do_catchsql_test(
         INSERT INTO t3 VALUES(111,222,333);
     ]], {
         -- <check-3.9>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T3"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T3"
         -- </check-3.9>
     })
 
@@ -484,7 +484,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=1;
     ]], {
         -- <check-4.6>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T4"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T4"
         -- </check-4.6>
     })
 
@@ -504,7 +504,7 @@ test:do_catchsql_test(
         UPDATE t4 SET x=0, y=2;
     ]], {
         -- <check-4.9>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T4"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T4"
         -- </check-4.9>
     })
 
@@ -516,7 +516,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.1>
-        1, "Wrong space options (field 5): invalid expression specified (bindings are not allowed in DDL)"
+        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T5': bindings are not allowed in DDL"
         -- </check-5.1>
     })
 
@@ -528,7 +528,7 @@ test:do_catchsql_test(
         );
     ]], {
         -- <check-5.2>
-        1, "Wrong space options (field 5): invalid expression specified (bindings are not allowed in DDL)"
+        1, "Failed to create check constraint 'CK_CONSTRAINT_1_T5': bindings are not allowed in DDL"
         -- </check-5.2>
     })
 
@@ -581,7 +581,7 @@ test:do_catchsql_test(
         UPDATE OR FAIL t1 SET x=7-x, y=y+1;
     ]], {
         -- <check-6.5>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
         -- </check-6.5>
     })
 
@@ -603,7 +603,7 @@ test:do_catchsql_test(
         INSERT OR ROLLBACK INTO t1 VALUES(8,40.0, 10);
     ]], {
         -- <check-6.7>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
         -- </check-6.7>
     })
 
@@ -636,7 +636,7 @@ test:do_catchsql_test(
         REPLACE INTO t1 VALUES(6,7, 11);
     ]], {
         -- <check-6.12>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T1"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1"
         -- </check-6.12>
     })
 
@@ -700,7 +700,7 @@ test:do_catchsql_test(
     7.3,
     " INSERT INTO t6 VALUES(11) ", {
         -- <7.3>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T6"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T6"
         -- </7.3>
     })
 

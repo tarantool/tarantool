@@ -97,6 +97,7 @@ add_library(box STATIC
     space.c
     space_def.c
     sequence.c
+    ck_constraint.c
     fk_constraint.c
     func.c
     func_def.c

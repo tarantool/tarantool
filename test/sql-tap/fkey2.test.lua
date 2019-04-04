@@ -362,7 +362,7 @@ test:do_catchsql_test(
         UPDATE ab SET a = 5;
     ]], {
         -- <fkey2-3.2>
-        1, "Failed to execute SQL statement: CHECK constraint failed: EF"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_EF"
         -- </fkey2-3.2>
     })
 
@@ -382,7 +382,7 @@ test:do_catchsql_test(
         UPDATE ab SET a = 5;
     ]], {
         -- <fkey2-3.4>
-        1, "Failed to execute SQL statement: CHECK constraint failed: EF"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_EF"
         -- </fkey2-3.4>
     })
 

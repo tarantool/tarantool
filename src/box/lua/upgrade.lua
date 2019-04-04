@@ -74,6 +74,7 @@ local function set_system_triggers(val)
     box.space._schema:run_triggers(val)
     box.space._cluster:run_triggers(val)
     box.space._fk_constraint:run_triggers(val)
+    box.space._ck_constraint:run_triggers(val)
 end
 
 --------------------------------------------------------------------------------
@@ -94,6 +95,7 @@ local function erase()
     truncate(box.space._schema)
     truncate(box.space._cluster)
     truncate(box.space._fk_constraint)
+    truncate(box.space._ck_constraint)
 end
 
 local function create_sysview(source_id, target_id)
@@ -774,8 +776,46 @@ local function upgrade_sequence_to_2_2_1()
     _space_sequence:format(format)
 end
 
+local function upgrade_ck_constraint_to_2_2_1()
+    -- In previous Tarantool releases check constraints were
+    -- stored in space opts. Now we use separate space
+    -- _ck_constraint for this purpose. Perform legacy data
+    -- migration.
+    local MAP = setmap({})
+    local _space = box.space._space
+    local _index = box.space._index
+    local _ck_constraint = box.space._ck_constraint
+    log.info("create space _ck_constraint")
+    local format = {{name='space_id', type='unsigned'},
+                    {name='name', type='string'},
+                    {name='is_deferred', type='boolean'},
+                    {name='language', type='str'}, {name='code', type='str'}}
+    _space:insert{_ck_constraint.id, ADMIN, '_ck_constraint', 'memtx', 0, MAP, format}
+
+    log.info("create index primary on _ck_constraint")
+    _index:insert{_ck_constraint.id, 0, 'primary', 'tree',
+                  {unique = true}, {{0, 'unsigned'}, {1, 'string'}}}
+
+    for _, space in _space:pairs() do
+        local flags = space.flags
+        if flags.checks then
+            for i, check in pairs(flags.checks) do
+                local expr_str = check.expr
+                local check_name = check.name or
+                                   "CK_CONSTRAINT_"..i.."_"..space.name
+                _ck_constraint:insert({space.id, check_name, false,
+                                       'SQL', expr_str})
+            end
+            flags.checks = nil
+            _space:replace({space.id, space.owner, space.name, space.engine,
+                            space.field_count, flags, space.format})
+        end
+    end
+end
+
 local function upgrade_to_2_2_1()
     upgrade_sequence_to_2_2_1()
+    upgrade_ck_constraint_to_2_2_1()
 end
 
 --------------------------------------------------------------------------------

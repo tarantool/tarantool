@@ -3359,7 +3359,7 @@ sqlAddPrimaryKey(struct Parse *parse);
  * @param parser Parsing context.
  */
 void
-sql_add_check_constraint(Parse *parser);
+sql_create_check_contraint(Parse *parser);
 
 void sqlAddDefaultValue(Parse *, ExprSpan *);
 void sqlAddCollateType(Parse *, Token *);

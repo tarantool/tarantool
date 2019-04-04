@@ -1221,7 +1221,7 @@ test:do_catchsql_test(
         INSERT INTO T21 VALUES(1, -1, 1);
     ]], {
         -- <table-21.3>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T21"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T21"
         -- </table-21.3>
     })
 
@@ -1231,7 +1231,7 @@ test:do_catchsql_test(
         INSERT INTO T21 VALUES(1, 1, -1);
     ]], {
         -- <table-21.4>
-        1, "Failed to execute SQL statement: CHECK constraint failed: T21"
+        1, "Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_2_T21"
         -- </table-21.4>
     })
 

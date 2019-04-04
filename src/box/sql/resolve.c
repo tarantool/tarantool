@@ -1610,8 +1610,7 @@ sqlResolveSelectNames(Parse * pParse,	/* The parser context */
 
 void
 sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
-			   int type, struct Expr *expr,
-			   struct ExprList *expr_list)
+			   int type, struct Expr *expr)
 {
 	/* Fake SrcList for parser->create_table_def */
 	SrcList sSrc;
@@ -1631,8 +1630,5 @@ sql_resolve_self_reference(struct Parse *parser, struct space_def *def,
 	sNC.pParse = parser;
 	sNC.pSrcList = &sSrc;
 	sNC.ncFlags = type;
-	if (sqlResolveExprNames(&sNC, expr) != 0)
-		return;
-	if (expr_list != NULL)
-		sqlResolveExprListNames(&sNC, expr_list);
+	sqlResolveExprNames(&sNC, expr);
 }

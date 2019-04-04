@@ -1016,15 +1016,8 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
 	bool is_error = false;
 	mpstream_init(&stream, region, region_reserve_cb, region_alloc_cb,
 		      set_encode_error, &is_error);
-	int checks_cnt = 0;
-	struct ExprList_item *a;
 	bool is_view = def->opts.is_view;
-	struct ExprList *checks = def->opts.checks;
-	if (checks != NULL) {
-		checks_cnt = checks->nExpr;
-		a = checks->a;
-	}
-	mpstream_encode_map(&stream, 2 * is_view + (checks_cnt > 0));
+	mpstream_encode_map(&stream, 2 * is_view);
 
 	if (is_view) {
 		assert(def->opts.sql != NULL);
@@ -1032,23 +1025,6 @@ sql_encode_table_opts(struct region *region, struct space_def *def,
 		mpstream_encode_str(&stream, def->opts.sql);
 		mpstream_encode_str(&stream, "view");
 		mpstream_encode_bool(&stream, true);
-	}
-	if (checks_cnt > 0) {
-		mpstream_encode_str(&stream, "checks");
-		mpstream_encode_array(&stream, checks_cnt);
-	}
-	for (int i = 0; i < checks_cnt && !is_error; ++i, ++a) {
-		int items = (a->pExpr != NULL) + (a->zName != NULL);
-		mpstream_encode_map(&stream, items);
-		assert(a->pExpr != NULL);
-		struct Expr *pExpr = a->pExpr;
-		assert(pExpr->u.zToken != NULL);
-		mpstream_encode_str(&stream, "expr");
-		mpstream_encode_str(&stream, pExpr->u.zToken);
-		if (a->zName != NULL) {
-			mpstream_encode_str(&stream, "name");
-			mpstream_encode_str(&stream, a->zName);
-		}
 	}
 	mpstream_flush(&stream);
 	if (is_error) {
@@ -1282,66 +1258,6 @@ sql_ephemeral_space_new(Parse *parser, const char *name)
 		return NULL;
 
 	return space;
-}
-
-int
-sql_check_list_item_init(struct ExprList *expr_list, int column,
-			 const char *expr_name, uint32_t expr_name_len,
-			 const char *expr_str, uint32_t expr_str_len)
-{
-	assert(column < expr_list->nExpr);
-	struct ExprList_item *item = &expr_list->a[column];
-	memset(item, 0, sizeof(*item));
-	if (expr_name != NULL) {
-		item->zName = sqlDbStrNDup(db, expr_name, expr_name_len);
-		if (item->zName == NULL) {
-			diag_set(OutOfMemory, expr_name_len, "sqlDbStrNDup",
-				 "item->zName");
-			return -1;
-		}
-	}
-	if (expr_str != NULL) {
-		item->pExpr = sql_expr_compile(db, expr_str, expr_str_len);
-		/* The item->zName would be released later. */
-		if (item->pExpr == NULL)
-			return -1;
-	}
-	return 0;
-}
-
-static int
-update_space_def_callback(Walker *walker, Expr *expr)
-{
-	if (expr->op == TK_COLUMN && ExprHasProperty(expr, EP_Resolved))
-		expr->space_def = walker->u.space_def;
-	return WRC_Continue;
-}
-
-void
-sql_checks_update_space_def_reference(ExprList *expr_list,
-				      struct space_def *def)
-{
-	assert(expr_list != NULL);
-	Walker w;
-	memset(&w, 0, sizeof(w));
-	w.xExprCallback = update_space_def_callback;
-	w.u.space_def = def;
-	for (int i = 0; i < expr_list->nExpr; i++)
-		sqlWalkExpr(&w, expr_list->a[i].pExpr);
-}
-
-int
-sql_checks_resolve_space_def_reference(ExprList *expr_list,
-				       struct space_def *def)
-{
-	Parse parser;
-	sql_parser_create(&parser, sql_get(), default_flags);
-	parser.parse_only = true;
-
-	sql_resolve_self_reference(&parser, def, NC_IsCheck, NULL, expr_list);
-	int rc = parser.is_aborted ? -1 : 0;
-	sql_parser_destroy(&parser);
-	return rc;
 }
 
 /**

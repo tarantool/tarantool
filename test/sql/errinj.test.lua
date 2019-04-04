@@ -149,3 +149,48 @@ box.execute("CREATE TABLE hello (id INT primary key,x INT,y INT);")
 dummy_f = function(int) return 1 end
 box.internal.sql_create_function("counter1", "INT", dummy_f, -1, false)
 errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", false)
+
+--
+-- Tests which are aimed at verifying work of commit/rollback
+-- triggers on _ck_constraint space.
+--
+s = box.schema.space.create('test', {format = {{name = 'X', type = 'unsigned'}}})
+pk = box.space.test:create_index('pk')
+
+errinj.set("ERRINJ_WAL_IO", true)
+_ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5'})
+errinj.set("ERRINJ_WAL_IO", false)
+_ = box.space._ck_constraint:insert({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5'})
+box.execute("INSERT INTO \"test\" VALUES(5);")
+errinj.set("ERRINJ_WAL_IO", true)
+_ = box.space._ck_constraint:replace({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5'})
+errinj.set("ERRINJ_WAL_IO", false)
+_ = box.space._ck_constraint:replace({s.id, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5'})
+box.execute("INSERT INTO \"test\" VALUES(5);")
+errinj.set("ERRINJ_WAL_IO", true)
+_ = box.space._ck_constraint:delete({s.id, 'CK_CONSTRAINT_01'})
+box.execute("INSERT INTO \"test\" VALUES(6);")
+errinj.set("ERRINJ_WAL_IO", false)
+_ = box.space._ck_constraint:delete({s.id, 'CK_CONSTRAINT_01'})
+box.execute("INSERT INTO \"test\" VALUES(6);")
+s:drop()
+
+--
+-- Test that failed space alter doesn't harm ck constraints
+--
+s = box.schema.create_space('test')
+_ = s:create_index('pk')
+s:format({{name='X', type='integer'}, {name='Y', type='integer'}})
+_ = box.space._ck_constraint:insert({s.id, 'XlessY', false, 'SQL', 'X < Y'})
+_ = box.space._ck_constraint:insert({s.id, 'Xgreater10', false, 'SQL', 'X > 10'})
+box.execute("INSERT INTO \"test\" VALUES(1, 2);")
+box.execute("INSERT INTO \"test\" VALUES(20, 10);")
+box.execute("INSERT INTO \"test\" VALUES(20, 100);")
+s:truncate()
+errinj.set("ERRINJ_WAL_IO", true)
+s:format({{name='Y', type='integer'}, {name='X', type='integer'}})
+errinj.set("ERRINJ_WAL_IO", false)
+box.execute("INSERT INTO \"test\" VALUES(1, 2);")
+box.execute("INSERT INTO \"test\" VALUES(20, 10);")
+box.execute("INSERT INTO \"test\" VALUES(20, 100);")
+s:drop()

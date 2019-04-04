@@ -18,21 +18,9 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 --
 -- gh-3272: Move SQL CHECK into server
 --
--- invalid expression
-opts = {checks = {{expr = 'X><5'}}}
----
-...
-format = {{name = 'X', type = 'unsigned'}}
----
-...
-t = {513, 1, 'test', 'memtx', 0, opts, format}
----
-...
-s = box.space._space:insert(t)
----
-- error: 'Wrong space options (field 5): invalid expression specified (Syntax error
-    near ''<'')'
-...
+-- Until Tarantool version 2.2 check constraints were stored in
+-- space opts.
+-- Make sure that now this legacy option is ignored.
 opts = {checks = {{expr = 'X>5'}}}
 ---
 ...
@@ -45,74 +33,218 @@ t = {513, 1, 'test', 'memtx', 0, opts, format}
 s = box.space._space:insert(t)
 ---
 ...
-box.space._space:delete(513)
+_ = box.space.test:create_index('pk')
+---
+...
+-- Invalid expression test.
+box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'SQL', 'X><5'})
+---
+- error: 'Failed to create check constraint ''CK_CONSTRAINT_01'': Syntax error near
+    ''<'''
+...
+-- Non-existent space test.
+box.space._ck_constraint:insert({550, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5'})
+---
+- error: Space '550' does not exist
+...
+-- Pass integer instead of expression.
+box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'SQL', 666})
+---
+- error: 'Tuple field 5 type does not match one required by operation: expected string'
+...
+-- Deferred CK constraints are not supported.
+box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', true, 'SQL', 'X<5'})
+---
+- error: Tarantool does not support deferred ck constraints
+...
+-- The only supported language is SQL.
+box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'LUA', 'X<5'})
+---
+- error: Unsupported language 'LUA' specified for function 'CK_CONSTRAINT_01'
+...
+-- Check constraints LUA creation test.
+box.space._ck_constraint:insert({513, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5'})
+---
+- [513, 'CK_CONSTRAINT_01', false, 'SQL', 'X<5']
+...
+box.space._ck_constraint:count({})
+---
+- 1
+...
+box.execute("INSERT INTO \"test\" VALUES(5);")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_01'
+...
+box.space._ck_constraint:replace({513, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5'})
+---
+- [513, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5']
+...
+box.execute("INSERT INTO \"test\" VALUES(5);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO \"test\" VALUES(6);")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_01'
+...
+-- Can't drop table with check constraints.
+box.space.test:delete({5})
+---
+- [5]
+...
+box.space.test.index.pk:drop()
+---
+...
+box.space._space:delete({513})
+---
+- error: 'Can''t drop space ''test'': the space has check constraints'
+...
+box.space._ck_constraint:delete({513, 'CK_CONSTRAINT_01'})
+---
+- [513, 'CK_CONSTRAINT_01', false, 'SQL', 'X<=5']
+...
+box.space._space:delete({513})
 ---
 - [513, 1, 'test', 'memtx', 0, {'checks': [{'expr': 'X>5'}]}, [{'name': 'X', 'type': 'unsigned'}]]
 ...
-opts = {checks = {{expr = 'X>5', name = 'ONE'}}}
+-- Create table with checks in sql.
+box.execute("CREATE TABLE t1(x INTEGER CONSTRAINT ONE CHECK( x<5 ), y REAL CONSTRAINT TWO CHECK( y>x ), z INTEGER PRIMARY KEY);")
+---
+- row_count: 1
+...
+box.space._ck_constraint:count()
+---
+- 2
+...
+box.execute("INSERT INTO t1 VALUES (7, 1, 1)")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: ONE'
+...
+box.execute("INSERT INTO t1 VALUES (2, 1, 1)")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: TWO'
+...
+box.execute("INSERT INTO t1 VALUES (2, 4, 1)")
+---
+- row_count: 1
+...
+box.execute("DROP TABLE t1")
+---
+- row_count: 1
+...
+-- Test space creation rollback on spell error in ck constraint.
+box.execute("CREATE TABLE first (id FLOAT PRIMARY KEY CHECK(id < 5), a INT CONSTRAINT ONE CHECK(a >< 5));")
+---
+- error: Syntax error near '<'
+...
+box.space.FIRST == nil
+---
+- true
+...
+box.space._ck_constraint:count() == 0
+---
+- true
+...
+-- Ck constraints are disallowed for spaces having no format.
+s = box.schema.create_space('test', {engine = engine})
 ---
 ...
-format = {{name = 'X', type = 'unsigned'}}
+_ = s:create_index('pk')
 ---
 ...
-t = {513, 1, 'test', 'memtx', 0, opts, format}
+_ = box.space._ck_constraint:insert({s.id, 'physics', false, 'SQL', 'X<Y'})
+---
+- error: Tarantool does not support CK constraint for space without format
+...
+s:format({{name='X', type='integer'}, {name='Y', type='integer'}})
 ---
 ...
-s = box.space._space:insert(t)
+_ = box.space._ck_constraint:insert({s.id, 'physics', false, 'SQL', 'X<Y'})
 ---
 ...
-box.space._space:delete(513)
+box.execute("INSERT INTO \"test\" VALUES(2, 1);")
 ---
-- [513, 1, 'test', 'memtx', 0, {'checks': [{'name': 'ONE', 'expr': 'X>5'}]}, [{'name': 'X',
-      'type': 'unsigned'}]]
+- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
 ...
--- extra invlalid field name
-opts = {checks = {{expr = 'X>5', name = 'ONE', extra = 'TWO'}}}
+s:format({{name='Y', type='integer'}, {name='X', type='integer'}})
 ---
 ...
-format = {{name = 'X', type = 'unsigned'}}
+box.execute("INSERT INTO \"test\" VALUES(1, 2);")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
+...
+box.execute("INSERT INTO \"test\" VALUES(2, 1);")
+---
+- row_count: 1
+...
+s:truncate()
 ---
 ...
-t = {513, 1, 'test', 'memtx', 0, opts, format}
+box.execute("INSERT INTO \"test\" VALUES(1, 2);")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
+...
+s:format({})
+---
+- error: Tarantool does not support CK constraint for space without format
+...
+s:format()
+---
+- [{'name': 'Y', 'type': 'integer'}, {'name': 'X', 'type': 'integer'}]
+...
+s:format({{name='Y1', type='integer'}, {name='X1', type='integer'}})
+---
+- error: 'Failed to create check constraint ''physics'': Can’t resolve field ''X'''
+...
+-- Ck constraint creation is forbidden for non-empty space
+s:insert({2, 1})
+---
+- [2, 1]
+...
+_ = box.space._ck_constraint:insert({s.id, 'conflict', false, 'SQL', 'X>10'})
+---
+- error: 'Failed to create check constraint ''conflict'': referencing space must be
+    empty'
+...
+s:truncate()
 ---
 ...
-s = box.space._space:insert(t)
----
-- error: 'Wrong space options (field 5): invalid MsgPack map field ''extra'''
-...
-opts = {checks = {{expr_invalid_label = 'X>5'}}}
+_ = box.space._ck_constraint:insert({s.id, 'conflict', false, 'SQL', 'X>10'})
 ---
 ...
-format = {{name = 'X', type = 'unsigned'}}
+box.execute("INSERT INTO \"test\" VALUES(1, 2);")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: conflict'
+...
+box.execute("INSERT INTO \"test\" VALUES(11, 11);")
+---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: physics'
+...
+box.execute("INSERT INTO \"test\" VALUES(12, 11);")
+---
+- row_count: 1
+...
+s:drop()
 ---
 ...
-t = {513, 1, 'test', 'memtx', 0, opts, format}
+box.execute("CREATE TABLE T2(ID INT PRIMARY KEY, CONSTRAINT CK1 CHECK(ID > 0), CONSTRAINT CK1 CHECK(ID < 0))")
+---
+- error: Constraint CK1 already exists
+...
+box.space.T2:drop()
 ---
 ...
-s = box.space._space:insert(t)
+box.space._ck_constraint:select()
 ---
-- error: 'Wrong space options (field 5): invalid MsgPack map field ''expr_invalid_label'''
-...
--- invalid field type
-opts = {checks = {{name = 123}}}
----
-...
-format = {{name = 'X', type = 'unsigned'}}
----
-...
-t = {513, 1, 'test', 'memtx', 0, opts, format}
----
-...
-s = box.space._space:insert(t)
----
-- error: 'Wrong space options (field 5): invalid MsgPack map field ''name'' type'
+- []
 ...
 --
 -- gh-3611: Segfault on table creation with check referencing this table
 --
 box.execute("CREATE TABLE w2 (s1 INT PRIMARY KEY, CHECK ((SELECT COUNT(*) FROM w2) = 0));")
 ---
-- error: 'Failed to create space ''W2'': Space ''W2'' does not exist'
+- error: 'Failed to create check constraint ''CK_CONSTRAINT_1_W2'': Subqueries are
+    prohibited in a ck constraint definition'
 ...
 box.execute("DROP TABLE w2;")
 ---
@@ -123,22 +255,33 @@ box.execute("DROP TABLE w2;")
 --
 box.execute("CREATE TABLE t5(x INT PRIMARY KEY, y INT, CHECK( x*y < ? ));")
 ---
-- error: 'Wrong space options (field 5): invalid expression specified (bindings are
-    not allowed in DDL)'
+- error: 'Failed to create check constraint ''CK_CONSTRAINT_1_T5'': bindings are not
+    allowed in DDL'
 ...
-opts = {checks = {{expr = '?>5', name = 'ONE'}}}
+-- Test trim CK constraint code correctness.
+box.execute("CREATE TABLE t1(x TEXT PRIMARY KEY CHECK(x    LIKE     '1  a'))")
 ---
+- row_count: 1
 ...
-format = {{name = 'X', type = 'unsigned'}}
+box.space._ck_constraint:select()[1].code
 ---
+- x LIKE '1  a'
 ...
-t = {513, 1, 'test', 'memtx', 0, opts, format}
+box.execute("INSERT INTO t1 VALUES('1 a')")
 ---
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1'
 ...
-s = box.space._space:insert(t)
+box.execute("INSERT INTO t1 VALUES('1   a')")
 ---
-- error: 'Wrong space options (field 5): invalid expression specified (bindings are
-    not allowed in DDL)'
+- error: 'Failed to execute SQL statement: CHECK constraint failed: CK_CONSTRAINT_1_T1'
+...
+box.execute("INSERT INTO t1 VALUES('1  a')")
+---
+- row_count: 1
+...
+box.execute("DROP TABLE t1")
+---
+- row_count: 1
 ...
 test_run:cmd("clear filter")
 ---

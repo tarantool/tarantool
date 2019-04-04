@@ -46,6 +46,7 @@ extern struct trigger on_replace_sequence_data;
 extern struct trigger on_replace_space_sequence;
 extern struct trigger on_replace_trigger;
 extern struct trigger on_replace_fk_constraint;
+extern struct trigger on_replace_ck_constraint;
 extern struct trigger on_stmt_begin_space;
 extern struct trigger on_stmt_begin_index;
 extern struct trigger on_stmt_begin_truncate;

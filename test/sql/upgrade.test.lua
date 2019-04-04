@@ -62,6 +62,11 @@ s ~= nil
 i = box.space._index:select(s.id)
 i ~= nil
 i[1].opts.sql == nil
+box.space._space:get(s.id).flags.checks == nil
+check = box.space._ck_constraint:select()[1]
+check ~= nil
+check.name
+check.code
 s:drop()
 
 test_run:switch('default')
