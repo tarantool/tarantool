@@ -63,3 +63,46 @@ box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COL
 - error: Keyword 'COLLATE' is reserved. Please use double quotes if 'COLLATE' is an
     identifier.
 ...
+-- Make sure that type of literals in meta complies with its real
+-- type. For instance, typeof(0.5) is number, not integer.
+--
+box.execute('SELECT 1;')
+---
+- metadata:
+  - name: '1'
+    type: integer
+  rows:
+  - [1]
+...
+box.execute('SELECT 1.5;')
+---
+- metadata:
+  - name: '1.5'
+    type: number
+  rows:
+  - [1.5]
+...
+box.execute('SELECT 1.0;')
+---
+- metadata:
+  - name: '1.0'
+    type: number
+  rows:
+  - [1]
+...
+box.execute('SELECT \'abc\';')
+---
+- metadata:
+  - name: '''abc'''
+    type: string
+  rows:
+  - ['abc']
+...
+box.execute('SELECT X\'4D6564766564\'')
+---
+- metadata:
+  - name: X'4D6564766564'
+    type: scalar
+  rows:
+  - ['Medved']
+...

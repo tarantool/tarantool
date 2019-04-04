@@ -17,3 +17,12 @@ box.execute('\n\n\n\t\t\t   ')
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 NULL)')
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b INTEGER CONSTRAINT c1 DEFAULT 300)')
 box.execute('CREATE TABLE test (id INTEGER PRIMARY KEY, b TEXT CONSTRAINT c1 COLLATE "binary")')
+
+-- Make sure that type of literals in meta complies with its real
+-- type. For instance, typeof(0.5) is number, not integer.
+--
+box.execute('SELECT 1;')
+box.execute('SELECT 1.5;')
+box.execute('SELECT 1.0;')
+box.execute('SELECT \'abc\';')
+box.execute('SELECT X\'4D6564766564\'')

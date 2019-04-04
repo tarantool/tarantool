@@ -3757,20 +3757,17 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 							pExpr->op2);
 		}
 	case TK_INTEGER:{
-			pExpr->type = FIELD_TYPE_INTEGER;
 			expr_code_int(pParse, pExpr, false, target);
 			return target;
 		}
 #ifndef SQL_OMIT_FLOATING_POINT
 	case TK_FLOAT:{
-			pExpr->type = FIELD_TYPE_INTEGER;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			codeReal(v, pExpr->u.zToken, 0, target);
 			return target;
 		}
 #endif
 	case TK_STRING:{
-			pExpr->type = FIELD_TYPE_STRING;
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			sqlVdbeLoadString(v, target, pExpr->u.zToken);
 			return target;
@@ -3788,7 +3785,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			assert(pExpr->u.zToken[0] == 'x'
 			       || pExpr->u.zToken[0] == 'X');
 			assert(pExpr->u.zToken[1] == '\'');
-			pExpr->type = FIELD_TYPE_SCALAR;
 			z = &pExpr->u.zToken[2];
 			n = sqlStrlen30(z) - 1;
 			assert(z[n] == '\'');
