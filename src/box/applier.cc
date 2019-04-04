@@ -172,11 +172,26 @@ applier_writer_f(va_list ap)
 static int
 apply_initial_join_row(struct xrow_header *row)
 {
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
+		return -1;
 	struct request request;
 	xrow_decode_dml(row, &request, dml_request_key_map(row->type));
-	struct space *space = space_cache_find_xc(request.space_id);
+	struct space *space = space_cache_find(request.space_id);
+	if (space == NULL)
+		goto rollback;
 	/* no access checks here - applier always works with admin privs */
-	return space_apply_initial_join_row(space, &request);
+	if (space_apply_initial_join_row(space, &request))
+		goto rollback;
+	int rc;
+	rc = txn_commit(txn);
+	if (rc < 0)
+		return -1;
+	fiber_gc();
+	return rc;
+rollback:
+	txn_rollback();
+	return -1;
 }
 
 /**
@@ -189,8 +204,8 @@ static int
 process_nop(struct request *request)
 {
 	assert(request->type == IPROTO_NOP);
-	struct txn *txn = txn_begin_stmt(NULL);
-	if (txn == NULL)
+	struct txn *txn = in_txn();
+	if (txn_begin_stmt(txn, NULL) != 0)
 		return -1;
 	return txn_commit_stmt(txn, request);
 }
@@ -210,6 +225,22 @@ apply_row(struct xrow_header *row)
 		say_error("error applying row: %s", request_str(&request));
 		return -1;
 	}
+	return 0;
+}
+
+static int
+apply_final_join_row(struct xrow_header *row)
+{
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
+		return -1;
+	if (apply_row(row) != 0) {
+		txn_rollback();
+		return -1;
+	}
+	if (txn_commit(txn) != 0)
+		return -1;
+	fiber_gc();
 	return 0;
 }
 
@@ -403,7 +434,7 @@ applier_join(struct applier *applier)
 		applier->last_row_time = ev_monotonic_now(loop());
 		if (iproto_type_is_dml(row.type)) {
 			vclock_follow_xrow(&replicaset.vclock, &row);
-			if (apply_row(&row) != 0)
+			if (apply_final_join_row(&row) != 0)
 				diag_raise();
 			if (++row_count % 100000 == 0)
 				say_info("%.1fM rows received", row_count / 1e6);
@@ -555,7 +586,7 @@ applier_apply_tx(struct stailq *rows)
 	 * conflict safely access failed xrow object and allocate
 	 * IPROTO_NOP on gc.
 	 */
-	struct txn *txn = txn_begin(false);
+	struct txn *txn = txn_begin();
 	struct applier_tx_row *item;
 	if (txn == NULL)
 		diag_raise();

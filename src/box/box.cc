@@ -169,34 +169,56 @@ int
 box_process_rw(struct request *request, struct space *space,
 	       struct tuple **result)
 {
+	struct tuple *tuple = NULL;
+	bool return_tuple = false;
+	struct txn *txn = in_txn();
+	bool is_autocommit = txn == NULL;
+	if (is_autocommit && (txn = txn_begin()) == NULL)
+		return -1;
 	assert(iproto_type_is_dml(request->type));
 	rmean_collect(rmean_box, request->type, 1);
 	if (access_check_space(space, PRIV_W) != 0)
-		return -1;
-	struct txn *txn = txn_begin_stmt(space);
-	if (txn == NULL)
-		return -1;
-	struct tuple *tuple;
+		goto rollback;
+	if (txn_begin_stmt(txn, space) != 0)
+		goto rollback;
 	if (space_execute_dml(space, txn, request, &tuple) != 0) {
-		txn_rollback_stmt();
-		return -1;
+		txn_rollback_stmt(txn);
+		goto rollback;
 	}
-	if (result == NULL)
-		return txn_commit_stmt(txn, request);
-	*result = tuple;
-	if (tuple == NULL)
-		return txn_commit_stmt(txn, request);
-	/*
-	 * Pin the tuple locally before the commit,
-	 * otherwise it may go away during yield in
-	 * when WAL is written in autocommit mode.
-	 */
-	tuple_ref(tuple);
-	int rc = txn_commit_stmt(txn, request);
-	if (rc == 0)
+	if (result != NULL)
+		*result = tuple;
+
+	return_tuple = result != NULL && tuple != NULL;
+	if (return_tuple) {
+		/*
+		 * Pin the tuple locally before the commit,
+		 * otherwise it may go away during yield in
+		 * when WAL is written in autocommit mode.
+		 */
+		tuple_ref(tuple);
+	}
+
+	if (txn_commit_stmt(txn, request))
+		goto rollback;
+
+	if (is_autocommit) {
+		if (txn_commit(txn) != 0)
+			goto error;
+	        fiber_gc();
+	}
+	if (return_tuple) {
 		tuple_bless(tuple);
-	tuple_unref(tuple);
-	return rc;
+		tuple_unref(tuple);
+	}
+	return 0;
+
+rollback:
+	if (is_autocommit)
+		txn_rollback();
+error:
+	if (return_tuple)
+		tuple_unref(tuple);
+	return -1;
 }
 
 void
@@ -1055,7 +1077,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 	struct iterator *it = index_create_iterator(index, type,
 						    key, part_count);
 	if (it == NULL) {
-		txn_rollback_stmt();
+		txn_rollback_stmt(txn);
 		return -1;
 	}
 
@@ -1080,7 +1102,7 @@ box_select(uint32_t space_id, uint32_t index_id,
 
 	if (rc != 0) {
 		port_destroy(port);
-		txn_rollback_stmt();
+		txn_rollback_stmt(txn);
 		return -1;
 	}
 	txn_commit_ro_stmt(txn);

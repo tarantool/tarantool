@@ -840,14 +840,14 @@ vy_deferred_delete_process_one(struct space *deferred_delete_space,
 
 	tuple_unref(delete);
 
-	struct txn *txn = txn_begin_stmt(deferred_delete_space);
-	if (txn == NULL)
+	struct txn *txn = in_txn();
+	if (txn_begin_stmt(txn, deferred_delete_space) != 0)
 		return -1;
 
 	struct tuple *unused;
 	if (space_execute_dml(deferred_delete_space, txn,
 			      &request, &unused) != 0) {
-		txn_rollback_stmt();
+		txn_rollback_stmt(txn);
 		return -1;
 	}
 	return txn_commit_stmt(txn, &request);

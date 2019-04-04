@@ -325,8 +325,8 @@ memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 		return -1;
 	}
 	request->header->replica_id = 0;
-	struct txn *txn = txn_begin_stmt(space);
-	if (txn == NULL)
+	struct txn *txn = in_txn();
+	if (txn_begin_stmt(txn, space) != 0)
 		return -1;
 	struct txn_stmt *stmt = txn_current_stmt(txn);
 	stmt->new_tuple = memtx_tuple_new(space->format, request->tuple,
@@ -341,7 +341,7 @@ memtx_space_apply_initial_join_row(struct space *space, struct request *request)
 
 rollback:
 	say_error("rollback: %s", diag_last_error(diag_get())->errmsg);
-	txn_rollback_stmt();
+	txn_rollback_stmt(txn);
 	return -1;
 }
 

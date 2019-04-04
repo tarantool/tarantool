@@ -178,7 +178,7 @@ txn_free(struct txn *txn)
 }
 
 struct txn *
-txn_begin(bool is_autocommit)
+txn_begin()
 {
 	static int64_t tsn = 0;
 	assert(! in_txn());
@@ -191,7 +191,6 @@ txn_begin(bool is_autocommit)
 	txn->n_new_rows = 0;
 	txn->n_local_rows = 0;
 	txn->n_applier_rows = 0;
-	txn->is_autocommit = is_autocommit;
 	txn->has_triggers  = false;
 	txn->is_aborted = false;
 	txn->in_sub_stmt = 0;
@@ -226,26 +225,20 @@ txn_begin_in_engine(struct engine *engine, struct txn *txn)
 	return 0;
 }
 
-struct txn *
-txn_begin_stmt(struct space *space)
+int
+txn_begin_stmt(struct txn *txn, struct space *space)
 {
-	struct txn *txn = in_txn();
-	if (txn == NULL) {
-		txn = txn_begin(true);
-		if (txn == NULL)
-			return NULL;
-	} else if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
+	assert(txn == in_txn());
+	assert(txn != NULL);
+	if (txn->in_sub_stmt > TXN_SUB_STMT_MAX) {
 		diag_set(ClientError, ER_SUB_STMT_MAX);
-		return NULL;
+		return -1;
 	}
 	struct txn_stmt *stmt = txn_stmt_new(txn);
-	if (stmt == NULL) {
-		if (txn->is_autocommit && txn->in_sub_stmt == 0)
-			txn_rollback();
-		return NULL;
-	}
+	if (stmt == NULL)
+		return -1;
 	if (space == NULL)
-		return txn;
+		return 0;
 
 	if (trigger_run(&space->on_stmt_begin, txn) != 0)
 		goto fail;
@@ -258,10 +251,10 @@ txn_begin_stmt(struct space *space)
 	if (engine_begin_statement(engine, txn) != 0)
 		goto fail;
 
-	return txn;
+	return 0;
 fail:
-	txn_rollback_stmt();
-	return NULL;
+	txn_rollback_stmt(txn);
+	return -1;
 }
 
 bool
@@ -278,8 +271,7 @@ txn_is_distributed(struct txn *txn)
 }
 
 /**
- * End a statement. In autocommit mode, end
- * the current transaction as well.
+ * End a statement.
  */
 int
 txn_commit_stmt(struct txn *txn, struct request *request)
@@ -339,14 +331,9 @@ txn_commit_stmt(struct txn *txn, struct request *request)
 			goto fail;
 	}
 	--txn->in_sub_stmt;
-	if (txn->is_autocommit && txn->in_sub_stmt == 0) {
-		int rc = txn_commit(txn);
-		fiber_gc();
-		return rc;
-	}
 	return 0;
 fail:
-	txn_rollback_stmt();
+	txn_rollback_stmt(txn);
 	return -1;
 }
 
@@ -382,7 +369,7 @@ txn_write_to_wal(struct txn *txn)
 
 	if (res < 0) {
 		/* Cascading rollback. */
-		txn_rollback(); /* Perform our part of cascading rollback. */
+		txn_rollback(txn); /* Perform our part of cascading rollback. */
 		/*
 		 * Move fiber to end of event loop to avoid
 		 * execution of any new requests before all
@@ -461,14 +448,11 @@ fail:
 }
 
 void
-txn_rollback_stmt()
+txn_rollback_stmt(struct txn *txn)
 {
-	struct txn *txn = in_txn();
 	if (txn == NULL || txn->in_sub_stmt == 0)
 		return;
 	txn->in_sub_stmt--;
-	if (txn->is_autocommit && txn->in_sub_stmt == 0)
-		return txn_rollback();
 	txn_rollback_to_svp(txn, txn->sub_stmt_begin[txn->in_sub_stmt]);
 }
 
@@ -536,7 +520,7 @@ box_txn_begin()
 		diag_set(ClientError, ER_ACTIVE_TRANSACTION);
 		return -1;
 	}
-	if (txn_begin(false) == NULL)
+	if (txn_begin() == NULL)
 		return -1;
 	return 0;
 }

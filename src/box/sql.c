@@ -862,7 +862,7 @@ cursor_seek(BtCursor *pCur, int *pRes)
 				      part_count);
 	if (it == NULL) {
 		if (txn != NULL)
-			txn_rollback_stmt();
+			txn_rollback_stmt(txn);
 		pCur->eState = CURSOR_INVALID;
 		return -1;
 	}

@@ -163,11 +163,6 @@ struct txn {
 	 */
 	int n_applier_rows;
 	/**
-	 * True if this transaction is running in autocommit mode
-	 * (statement end causes an automatic transaction commit).
-	 */
-	bool is_autocommit;
-	/**
 	 * True if the transaction was aborted so should be
 	 * rolled back at commit.
 	 */
@@ -214,7 +209,7 @@ in_txn()
  * @pre no transaction is active
  */
 struct txn *
-txn_begin(bool is_autocommit);
+txn_begin();
 
 /**
  * Commit a transaction.
@@ -271,11 +266,10 @@ txn_on_rollback(struct txn *txn, struct trigger *trigger)
 }
 
 /**
- * Start a new statement. If no current transaction,
- * start a new transaction with autocommit = true.
+ * Start a new statement.
  */
-struct txn *
-txn_begin_stmt(struct space *space);
+int
+txn_begin_stmt(struct txn *txn, struct space *space);
 
 int
 txn_begin_in_engine(struct engine *engine, struct txn *txn);
@@ -334,7 +328,7 @@ txn_commit_stmt(struct txn *txn, struct request *request);
  * rolls back the entire transaction.
  */
 void
-txn_rollback_stmt();
+txn_rollback_stmt(struct txn *txn);
 
 /**
  * Raise an error if this is a multi-statement transaction: DDL

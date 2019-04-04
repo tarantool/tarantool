@@ -269,16 +269,22 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		diag_set(ClientError, ER_CROSS_ENGINE_TRANSACTION);
 		return -1;
 	}
-	/* no access checks here - applier always works with admin privs */
-	if (space_apply_initial_join_row(space, &request) != 0)
+	struct txn *txn = txn_begin();
+	if (txn == NULL)
 		return -1;
+	/* no access checks here - applier always works with admin privs */
+	if (space_apply_initial_join_row(space, &request) != 0) {
+		txn_rollback();
+		return -1;
+	}
+	int rc = txn_commit(txn);
 	/*
 	 * Don't let gc pool grow too much. Yet to
 	 * it before reading the next row, to make
 	 * sure it's not freed along here.
 	 */
 	fiber_gc();
-	return 0;
+	return rc;
 }
 
 /** Called at start to tell memtx to recover to a given LSN. */
