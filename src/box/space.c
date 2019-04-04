@@ -423,6 +423,15 @@ space_before_replace(struct space *space, struct txn *txn,
 	assert(stmt->old_tuple == NULL && stmt->new_tuple == NULL);
 	stmt->old_tuple = old_tuple;
 	stmt->new_tuple = new_tuple;
+	/*
+	 * A fake row attached to txn_stmt during execution
+	 * of before_replace triggers to store operation type.
+	 * It is pushed to the before_replace trigger in lua.
+	 */
+	struct xrow_header temp_header;
+	temp_header.type = type;
+	assert(stmt->row == NULL);
+	stmt->row = &temp_header;
 
 	int rc = trigger_run(&space->before_replace, txn);
 
@@ -435,6 +444,7 @@ space_before_replace(struct space *space, struct txn *txn,
 	assert(stmt->old_tuple == old_tuple);
 	stmt->old_tuple = NULL;
 	stmt->new_tuple = NULL;
+	stmt->row = NULL;
 
 	if (rc != 0)
 		goto out;
