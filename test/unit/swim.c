@@ -389,7 +389,7 @@ swim_test_too_big_packet(void)
 	 * Dissemination of a detected failure takes long time
 	 * without help of the component, intended for that.
 	 */
-	double timeout = size * 3;
+	double timeout = size * 10;
 	int i = 0;
 	for (; i < size; ++i) {
 		double start = swim_time();
