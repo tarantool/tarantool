@@ -49,6 +49,7 @@ extern "C" {
 #include "box/sequence.h"
 #include "box/coll_id_cache.h"
 #include "box/replication.h" /* GROUP_LOCAL */
+#include "box/iproto_constants.h" /* iproto_type_name */
 
 /**
  * Trigger function for all spaces
@@ -70,7 +71,10 @@ lbox_push_txn_stmt(struct lua_State *L, void *event)
 	}
 	/* @todo: maybe the space object has to be here */
 	lua_pushstring(L, stmt->space->def->name);
-	return 3;
+	assert(stmt->row != NULL);
+	/* operation type: INSERT/UPDATE/UPSERT/REPLACE/DELETE */
+	lua_pushstring(L, iproto_type_name(stmt->row->type));
+	return 4;
 }
 
 static int

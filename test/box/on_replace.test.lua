@@ -279,3 +279,22 @@ s3:select()
 s1:drop()
 s2:drop()
 s3:drop()
+
+s = box.schema.space.create('test')
+_ = s:create_index('pk')
+save_type = ''
+function find_type(old, new, name, type) save_type = type return new end
+s:on_replace(find_type) == find_type
+
+_ = s:insert{1, 2}
+save_type
+_ = s:update({1}, {{'+', 2, 1}})
+save_type
+_ = s:delete{1}
+save_type
+_ = s:replace{2, 3}
+save_type
+_ = s:upsert({3,4,5}, {{'+', 2, 1}})
+save_type
+
+s:drop()

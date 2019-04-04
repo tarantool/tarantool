@@ -217,8 +217,9 @@ s:select() -- [10, 100]
 -- Check that IPROTO_NOP is actually written to xlog.
 fio = require('fio')
 xlog = require('xlog')
+function ret_old(old,new) return old end
 
-type(s:before_replace(function(old, new) return old end))
+s:before_replace(ret_old) == ret_old
 s:insert{1, 1}
 
 path = fio.pathjoin(box.cfg.wal_dir, string.format('%020d.xlog', box.info.lsn - 1))
@@ -226,6 +227,7 @@ fun, param, state = xlog.pairs(path)
 state, row = fun(param, state)
 row.HEADER.type
 row.BODY == nil
+s:before_replace(nil, ret_old)
 
 -- gh-3128 before_replace with run_triggers
 s2 = box.schema.space.create("test2")
@@ -263,8 +265,29 @@ s:insert{1, 1}
 s:select{}
 s2:select{}
 
+s:truncate()
+s2:drop()
+
 s:on_replace(nil, on_replace)
 s:before_replace(nil, before_replace1)
 s:before_replace(nil, before_replace2)
-s2:drop()
+
+--
+-- gh-4099 provide type of operation inside before_replace triggers
+--
+save_type = ''
+function find_type(old, new, name, type) save_type = type return new end
+s:before_replace(find_type) == find_type
+
+_ = s:insert{1, 2}
+save_type
+_ = s:update({1}, {{'+', 2, 1}})
+save_type
+_ = s:delete{1}
+save_type
+_ = s:replace{2, 3}
+save_type
+_ = s:upsert({3,4,5}, {{'+', 2, 1}})
+save_type
+
 s:drop()
