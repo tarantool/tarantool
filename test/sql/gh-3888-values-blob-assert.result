@@ -64,7 +64,7 @@ box.execute('SELECT 3.14')
 ---
 - metadata:
   - name: '3.14'
-    type: integer
+    type: number
   rows:
   - [3.14]
 ...
