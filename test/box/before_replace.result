@@ -650,9 +650,12 @@ fio = require('fio')
 xlog = require('xlog')
 ---
 ...
-type(s:before_replace(function(old, new) return old end))
+function ret_old(old,new) return old end
 ---
-- function
+...
+s:before_replace(ret_old) == ret_old
+---
+- true
 ...
 s:insert{1, 1}
 ---
@@ -673,6 +676,9 @@ row.HEADER.type
 row.BODY == nil
 ---
 - true
+...
+s:before_replace(nil, ret_old)
+---
 ...
 -- gh-3128 before_replace with run_triggers
 s2 = box.schema.space.create("test2")
@@ -704,6 +710,7 @@ type(s:before_replace(before_replace2))
 ...
 s:insert{1, 1}
 ---
+- [1, 1]
 ...
 s2:select{}
 ---
@@ -760,6 +767,12 @@ s2:select{}
 - - [1]
   - [2]
 ...
+s:truncate()
+---
+...
+s2:drop()
+---
+...
 s:on_replace(nil, on_replace)
 ---
 ...
@@ -769,8 +782,53 @@ s:before_replace(nil, before_replace1)
 s:before_replace(nil, before_replace2)
 ---
 ...
-s2:drop()
+--
+-- gh-4099 provide type of operation inside before_replace triggers
+--
+save_type = ''
 ---
+...
+function find_type(old, new, name, type) save_type = type return new end
+---
+...
+s:before_replace(find_type) == find_type
+---
+- true
+...
+_ = s:insert{1, 2}
+---
+...
+save_type
+---
+- INSERT
+...
+_ = s:update({1}, {{'+', 2, 1}})
+---
+...
+save_type
+---
+- UPDATE
+...
+_ = s:delete{1}
+---
+...
+save_type
+---
+- DELETE
+...
+_ = s:replace{2, 3}
+---
+...
+save_type
+---
+- REPLACE
+...
+_ = s:upsert({3,4,5}, {{'+', 2, 1}})
+---
+...
+save_type
+---
+- UPSERT
 ...
 s:drop()
 ---
