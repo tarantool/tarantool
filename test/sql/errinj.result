@@ -450,7 +450,14 @@ errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", true)
 ...
 box.execute("CREATE TABLE hello (id INT primary key,x INT,y INT);")
 ---
-- error: 'string conversion to the uppercase failed: U_MEMORY_ALLOCATION_ERROR'
+- error: Failed to allocate 6 bytes in sqlDbMallocRawNN for res
+...
+dummy_f = function(int) return 1 end
+---
+...
+box.internal.sql_create_function("counter1", "INT", dummy_f, -1, false)
+---
+- error: Failed to allocate 9 bytes in region_alloc for res
 ...
 errinj.set("ERRINJ_SQL_NAME_NORMALIZATION", false)
 ---

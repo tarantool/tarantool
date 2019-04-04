@@ -893,15 +893,8 @@ idlist(A) ::= nm(Y). {
   ** that created the expression.
   */
   static void spanExpr(ExprSpan *pOut, Parse *pParse, int op, Token t){
-    int name_sz = 0;
     struct Expr *p = NULL;
-    if (op != TK_VARIABLE) {
-      name_sz = sql_normalize_name(NULL, 0, t.z, t.n);
-      if (name_sz < 0)
-        goto tarantool_error;
-    } else {
-      name_sz = t.n + 1;
-    }
+    int name_sz = t.n + 1;
     p = sqlDbMallocRawNN(pParse->db, sizeof(Expr) + name_sz);
     if( p ){
       memset(p, 0, sizeof(Expr));
@@ -936,8 +929,16 @@ idlist(A) ::= nm(Y). {
       p->iAgg = -1;
       p->u.zToken = (char*)&p[1];
       if (op != TK_VARIABLE) {
-        if (sql_normalize_name(p->u.zToken, name_sz, t.z, t.n) < 0)
-          goto tarantool_error;
+        int rc = sql_normalize_name(p->u.zToken, name_sz, t.z, t.n);
+        if (rc > name_sz) {
+          name_sz = rc;
+          p = sqlDbReallocOrFree(pParse->db, p, sizeof(*p) + name_sz);
+          if (p == NULL)
+            goto tarantool_error;
+          p->u.zToken = (char *) &p[1];
+          if (sql_normalize_name(p->u.zToken, name_sz, t.z, t.n) > name_sz)
+              unreachable();
+        }
       } else {
         memcpy(p->u.zToken, t.z, t.n);
         p->u.zToken[t.n] = 0;

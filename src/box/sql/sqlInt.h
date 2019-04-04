@@ -3170,15 +3170,10 @@ void sqlDequote(char *);
  * @param dst A buffer for the result string. The result will be
  *        0-terminated if the buffer is large enough. The contents
  *        is undefined in case of failure.
- * @param dst_size The size of the buffer (number of bytes). If it
- *        is 0, then dest may be NULL and the function will only
- *        return the length of the result without writing any of
- *        the result string
+ * @param dst_size The size of the buffer (number of bytes).
  * @param src The original string.
  * @param src_len The length of the original string.
- * @retval The count of bytes written(or need to be written) on
- *         success.
- * @retval < 0 Otherwise. The diag message is set.
+ * @retval The count of bytes written (or need to be written).
  */
 int
 sql_normalize_name(char *dst, int dst_size, const char *src, int src_len);

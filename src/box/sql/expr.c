@@ -965,22 +965,13 @@ sql_expr_new(struct sql *db, int op, const struct Token *token)
 struct Expr *
 sql_expr_new_dequoted(struct sql *db, int op, const struct Token *token)
 {
-	int extra_size = 0;
-	bool is_name = false;
+	int extra_size = 0, rc;
 	if (token != NULL) {
 		int val;
 		assert(token->z != NULL || token->n == 0);
 		if (sql_expr_token_to_int(op, token, &val) == 0)
 			return sql_expr_new_int(db, val);
-		is_name = op == TK_ID || op == TK_COLLATE || op == TK_FUNCTION;
-		if (is_name) {
-			extra_size = sql_normalize_name(NULL, 0, token->z,
-							token->n);
-			if (extra_size < 0)
-				return NULL;
-		} else {
-			extra_size = token->n + 1;
-		}
+		extra_size = token->n + 1;
 	}
 	struct Expr *e = sql_expr_new_empty(db, op, extra_size);
 	if (e == NULL || token == NULL || token->n == 0)
@@ -988,14 +979,20 @@ sql_expr_new_dequoted(struct sql *db, int op, const struct Token *token)
 	e->u.zToken = (char *) &e[1];
 	if (token->z[0] == '"')
 		e->flags |= EP_DblQuoted;
-	if (! is_name) {
+	if (op != TK_ID && op != TK_COLLATE && op != TK_FUNCTION) {
 		memcpy(e->u.zToken, token->z, token->n);
 		e->u.zToken[token->n] = '\0';
 		sqlDequote(e->u.zToken);
-	} else if (sql_normalize_name(e->u.zToken, extra_size, token->z,
-				      token->n) < 0) {
-		sql_expr_delete(db, e, false);
-		return NULL;
+	} else if ((rc = sql_normalize_name(e->u.zToken, extra_size, token->z,
+					    token->n)) > extra_size) {
+		extra_size = rc;
+		e = sqlDbReallocOrFree(db, e, sizeof(*e) + extra_size);
+		if (e == NULL)
+			return NULL;
+		e->u.zToken = (char *) &e[1];
+		if (sql_normalize_name(e->u.zToken, extra_size, token->z,
+				       token->n) > extra_size)
+			unreachable();
 	}
 	return e;
 }

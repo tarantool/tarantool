@@ -50,6 +50,9 @@ typedef uint32_t (*coll_hash_f)(const char *s, size_t s_len, uint32_t *ph,
 
 struct UCollator;
 
+/** Default universal casemap for case transformations. */
+extern struct UCaseMap *icu_ucase_default_map;
+
 /**
  * Collation. It has no unique features like name, id or owner.
  * Only functional part - comparator, locale, ICU settings.

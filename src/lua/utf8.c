@@ -38,9 +38,6 @@
 
 extern struct ibuf *tarantool_lua_ibuf;
 
-/** Default universal casemap for case transformations. */
-static UCaseMap *root_map = NULL;
-
 /** Collations for cmp/casecmp functions. */
 static struct coll *unicode_coll = NULL;
 static struct coll *unicode_ci_coll = NULL;
@@ -64,11 +61,11 @@ utf8_str_to_case(struct lua_State *L, const char *src, int src_bsize,
 		}
 		int real_bsize;
 		if (is_to_upper) {
-			real_bsize = ucasemap_utf8ToUpper(root_map, dst,
+			real_bsize = ucasemap_utf8ToUpper(icu_ucase_default_map, dst,
 							  dst_bsize, src,
 							  src_bsize, &err);
 		} else {
-			real_bsize = ucasemap_utf8ToLower(root_map, dst,
+			real_bsize = ucasemap_utf8ToLower(icu_ucase_default_map, dst,
 							  dst_bsize, src,
 							  src_bsize, &err);
 		}
@@ -447,12 +444,7 @@ static const struct luaL_Reg utf8_lib[] = {
 void
 tarantool_lua_utf8_init(struct lua_State *L)
 {
-	UErrorCode err = U_ZERO_ERROR;
-	root_map = ucasemap_open("", 0, &err);
-	if (root_map == NULL) {
-		luaL_error(L, tt_sprintf("error in ICU ucasemap_open: %s",
-					 u_errorName(err)));
-	}
+	assert(icu_ucase_default_map != NULL);
 	struct coll_def def;
 	memset(&def, 0, sizeof(def));
 	def.icu.strength = COLL_ICU_STRENGTH_TERTIARY;
@@ -474,7 +466,6 @@ error_coll:
 void
 tarantool_lua_utf8_free()
 {
-	ucasemap_close(root_map);
 	if (unicode_coll != NULL)
 		coll_unref(unicode_coll);
 	if (unicode_ci_coll != NULL)
