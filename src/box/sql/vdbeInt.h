@@ -269,6 +269,20 @@ enum {
 char *
 mem_type_to_str(const struct Mem *p);
 
+/**
+ * Try to convert a string value into a numeric representation
+ * if we can do so without loss of information. Firstly, value
+ * is attempted to be converted to integer, and in case of fail -
+ * to floating point number. Note that function is assumed to be
+ * called on memory cell containing string, i.e. mem->type == MEM_Str.
+ *
+ * @param record Memory cell containing value to be converted.
+ * @retval 0 If value can be converted to integer or number.
+ * @retval -1 Otherwise.
+ */
+int
+mem_apply_numeric_type(struct Mem *record);
+
 /* Return TRUE if Mem X contains dynamically allocated content - anything
  * that needs to be deallocated to avoid a leak.
  */

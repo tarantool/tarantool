@@ -273,36 +273,21 @@ allocateCursor(
 	return pCx;
 }
 
-/*
- * Try to convert a value into a numeric representation if we can
- * do so without loss of information.  In other words, if the string
- * looks like a number, convert it into a number.  If it does not
- * look like a number, leave it alone.
- *
- * If the bTryForInt flag is true, then extra effort is made to give
- * an integer representation.  Strings that look like floating point
- * values but which have no fractional component (example: '48.00')
- * will have a MEM_Int representation when bTryForInt is true.
- *
- * If bTryForInt is false, then if the input string contains a decimal
- * point or exponential notation, the result is only MEM_Real, even
- * if there is an exact integer representation of the quantity.
- */
-static int
-mem_apply_numeric_type(Mem *pRec, int bTryForInt)
+int
+mem_apply_numeric_type(struct Mem *record)
 {
-	double rValue;
-	i64 iValue;
-	assert((pRec->flags & (MEM_Str|MEM_Int|MEM_Real))==MEM_Str);
-	if (sqlAtoF(pRec->z, &rValue, pRec->n) == 0) return -1;
-	if (0 == sql_atoi64(pRec->z, (int64_t *)&iValue, pRec->n)) {
-		pRec->u.i = iValue;
-		pRec->flags |= MEM_Int;
-	} else {
-		pRec->u.r = rValue;
-		pRec->flags |= MEM_Real;
-		if (bTryForInt) mem_apply_integer_type(pRec);
+	assert((record->flags & (MEM_Str | MEM_Int | MEM_Real)) == MEM_Str);
+	int64_t integer_value;
+	if (sql_atoi64(record->z, &integer_value, record->n) == 0) {
+		record->u.i = integer_value;
+		MemSetTypeFlag(record, MEM_Int);
+		return 0;
 	}
+	double float_value;
+	if (sqlAtoF(record->z, &float_value, record->n) == 0)
+		return -1;
+	record->u.r = float_value;
+	MemSetTypeFlag(record, MEM_Real);
 	return 0;
 }
 
@@ -380,7 +365,7 @@ int sql_value_numeric_type(sql_value *pVal) {
 	int eType = sql_value_type(pVal);
 	if (eType==SQL_TEXT) {
 		Mem *pMem = (Mem*)pVal;
-		mem_apply_numeric_type(pMem, 0);
+		mem_apply_numeric_type(pMem);
 		eType = sql_value_type(pVal);
 	}
 	return eType;
@@ -2172,12 +2157,12 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 		if (sql_type_is_numeric(type)) {
 			if ((flags1 | flags3)&MEM_Str) {
 				if ((flags1 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
-					mem_apply_numeric_type(pIn1, 0);
+					mem_apply_numeric_type(pIn1);
 					testcase( flags3!=pIn3->flags); /* Possible if pIn1==pIn3 */
 					flags3 = pIn3->flags;
 				}
 				if ((flags3 & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
-					if (mem_apply_numeric_type(pIn3, 0) != 0) {
+					if (mem_apply_numeric_type(pIn3) != 0) {
 						diag_set(ClientError,
 							 ER_SQL_TYPE_MISMATCH,
 							 sql_value_text(pIn3),
@@ -3526,7 +3511,7 @@ case OP_SeekGT: {       /* jump, in3 */
 		 */
 		pIn3 = &aMem[reg_ipk];
 		if ((pIn3->flags & (MEM_Int|MEM_Real|MEM_Str))==MEM_Str) {
-			mem_apply_numeric_type(pIn3, 0);
+			mem_apply_numeric_type(pIn3);
 		}
 		int64_t i;
 		if ((pIn3->flags & MEM_Int) == MEM_Int) {
