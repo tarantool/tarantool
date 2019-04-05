@@ -51,7 +51,7 @@ struct vy_history;
 /**
  * A record in tuple cache
  */
-struct vy_cache_entry {
+struct vy_cache_node {
 	/* Cache */
 	struct vy_cache *cache;
 	/* Statement in cache */
@@ -71,8 +71,8 @@ struct vy_cache_entry {
  * Internal comparator (1) for BPS tree.
  */
 static inline int
-vy_cache_tree_cmp(struct vy_cache_entry *a,
-		  struct vy_cache_entry *b, struct key_def *cmp_def)
+vy_cache_tree_cmp(struct vy_cache_node *a,
+		  struct vy_cache_node *b, struct key_def *cmp_def)
 {
 	return vy_stmt_compare(a->stmt, b->stmt, cmp_def);
 }
@@ -81,7 +81,7 @@ vy_cache_tree_cmp(struct vy_cache_entry *a,
  * Internal comparator (2) for BPS tree.
  */
 static inline int
-vy_cache_tree_key_cmp(struct vy_cache_entry *a, struct tuple *b,
+vy_cache_tree_key_cmp(struct vy_cache_node *a, struct tuple *b,
 		      struct key_def *cmp_def)
 {
 	return vy_stmt_compare(a->stmt, b, cmp_def);
@@ -94,7 +94,7 @@ vy_cache_tree_key_cmp(struct vy_cache_entry *a, struct tuple *b,
 #define BPS_TREE_EXTENT_SIZE VY_CACHE_TREE_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, cmp_def) vy_cache_tree_cmp(a, b, cmp_def)
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_cache_tree_key_cmp(a, b, cmp_def)
-#define bps_tree_elem_t struct vy_cache_entry *
+#define bps_tree_elem_t struct vy_cache_node *
 #define bps_tree_key_t struct tuple *
 #define bps_tree_arg_t struct key_def *
 #define BPS_TREE_NO_DEBUG
@@ -117,8 +117,8 @@ vy_cache_tree_key_cmp(struct vy_cache_entry *a, struct tuple *b,
 struct vy_cache_env {
 	/** Common LRU list of read cache. The first element is the newest */
 	struct rlist cache_lru;
-	/** Common mempool for vy_cache_entry struct */
-	struct mempool cache_entry_mempool;
+	/** Common mempool for vy_cache_node struct */
+	struct mempool cache_node_mempool;
 	/** Size of memory occupied by cached tuples */
 	size_t mem_used;
 	/** Max memory size that can be used for cache */

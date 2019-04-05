@@ -41,10 +41,10 @@
 CT_ASSERT_G(BOX_INDEX_PART_MAX <= UINT8_MAX);
 
 enum {
-	/* Flag in cache entry that means that there are no values in DB
+	/* Flag in cache node that means that there are no values in DB
 	 * that less than the current and greater than the previous */
 	VY_CACHE_LEFT_LINKED = 1,
-	/* Flag in cache entry that means that there are no values in DB
+	/* Flag in cache node that means that there are no values in DB
 	 * that greater than the current and less than the previous */
 	VY_CACHE_RIGHT_LINKED = 2,
 	/* Max number of deletes that are made by cleanup action per one
@@ -58,60 +58,59 @@ vy_cache_env_create(struct vy_cache_env *e, struct slab_cache *slab_cache)
 	rlist_create(&e->cache_lru);
 	e->mem_used = 0;
 	e->mem_quota = 0;
-	mempool_create(&e->cache_entry_mempool, slab_cache,
-		       sizeof(struct vy_cache_entry));
+	mempool_create(&e->cache_node_mempool, slab_cache,
+		       sizeof(struct vy_cache_node));
 }
 
 void
 vy_cache_env_destroy(struct vy_cache_env *e)
 {
-	mempool_destroy(&e->cache_entry_mempool);
+	mempool_destroy(&e->cache_node_mempool);
 }
 
 static inline size_t
-vy_cache_entry_size(const struct vy_cache_entry *entry)
+vy_cache_node_size(const struct vy_cache_node *node)
 {
-	size_t size = sizeof(*entry);
+	size_t size = sizeof(*node);
 	/*
 	 * Tuples are shared between primary and secondary index
 	 * cache so to avoid double accounting, we account only
 	 * primary index tuples.
 	 */
-	if (entry->cache->is_primary)
-		size += tuple_size(entry->stmt);
+	if (node->cache->is_primary)
+		size += tuple_size(node->stmt);
 	return size;
 }
 
-static struct vy_cache_entry *
-vy_cache_entry_new(struct vy_cache_env *env, struct vy_cache *cache,
-		   struct tuple *stmt)
+static struct vy_cache_node *
+vy_cache_node_new(struct vy_cache_env *env, struct vy_cache *cache,
+		  struct tuple *stmt)
 {
-	struct vy_cache_entry *entry = (struct vy_cache_entry *)
-		mempool_alloc(&env->cache_entry_mempool);
-	if (entry == NULL)
+	struct vy_cache_node *node = mempool_alloc(&env->cache_node_mempool);
+	if (node == NULL)
 		return NULL;
 	tuple_ref(stmt);
-	entry->cache = cache;
-	entry->stmt = stmt;
-	entry->flags = 0;
-	entry->left_boundary_level = cache->cmp_def->part_count;
-	entry->right_boundary_level = cache->cmp_def->part_count;
-	rlist_add(&env->cache_lru, &entry->in_lru);
-	env->mem_used += vy_cache_entry_size(entry);
+	node->cache = cache;
+	node->stmt = stmt;
+	node->flags = 0;
+	node->left_boundary_level = cache->cmp_def->part_count;
+	node->right_boundary_level = cache->cmp_def->part_count;
+	rlist_add(&env->cache_lru, &node->in_lru);
+	env->mem_used += vy_cache_node_size(node);
 	vy_stmt_counter_acct_tuple(&cache->stat.count, stmt);
-	return entry;
+	return node;
 }
 
 static void
-vy_cache_entry_delete(struct vy_cache_env *env, struct vy_cache_entry *entry)
+vy_cache_node_delete(struct vy_cache_env *env, struct vy_cache_node *node)
 {
-	vy_stmt_counter_unacct_tuple(&entry->cache->stat.count, entry->stmt);
-	assert(env->mem_used >= vy_cache_entry_size(entry));
-	env->mem_used -= vy_cache_entry_size(entry);
-	tuple_unref(entry->stmt);
-	rlist_del(&entry->in_lru);
-	TRASH(entry);
-	mempool_free(&env->cache_entry_mempool, entry);
+	vy_stmt_counter_unacct_tuple(&node->cache->stat.count, node->stmt);
+	assert(env->mem_used >= vy_cache_node_size(node));
+	env->mem_used -= vy_cache_node_size(node);
+	tuple_unref(node->stmt);
+	rlist_del(&node->in_lru);
+	TRASH(node);
+	mempool_free(&env->cache_node_mempool, node);
 }
 
 static void *
@@ -153,11 +152,11 @@ vy_cache_destroy(struct vy_cache *cache)
 	struct vy_cache_tree_iterator itr =
 		vy_cache_tree_iterator_first(&cache->cache_tree);
 	while (!vy_cache_tree_iterator_is_invalid(&itr)) {
-		struct vy_cache_entry **entry =
+		struct vy_cache_node **node =
 			vy_cache_tree_iterator_get_elem(&cache->cache_tree,
 							&itr);
-		assert(entry != NULL && *entry != NULL);
-		vy_cache_entry_delete(cache->env, *entry);
+		assert(node != NULL && *node != NULL);
+		vy_cache_node_delete(cache->env, *node);
 		vy_cache_tree_iterator_next(&cache->cache_tree, &itr);
 	}
 	vy_cache_tree_destroy(&cache->cache_tree);
@@ -167,39 +166,37 @@ static void
 vy_cache_gc_step(struct vy_cache_env *env)
 {
 	struct rlist *lru = &env->cache_lru;
-	struct vy_cache_entry *entry =
-	rlist_last_entry(lru, struct vy_cache_entry, in_lru);
-	struct vy_cache *cache = entry->cache;
+	struct vy_cache_node *node =
+		rlist_last_entry(lru, struct vy_cache_node, in_lru);
+	struct vy_cache *cache = node->cache;
 	struct vy_cache_tree *tree = &cache->cache_tree;
-	if (entry->flags & (VY_CACHE_LEFT_LINKED |
-			    VY_CACHE_RIGHT_LINKED)) {
+	if (node->flags & (VY_CACHE_LEFT_LINKED | VY_CACHE_RIGHT_LINKED)) {
 		bool exact;
 		struct vy_cache_tree_iterator itr =
-			vy_cache_tree_lower_bound(tree, entry->stmt,
-						  &exact);
+			vy_cache_tree_lower_bound(tree, node->stmt, &exact);
 		assert(exact);
-		if (entry->flags & VY_CACHE_LEFT_LINKED) {
+		if (node->flags & VY_CACHE_LEFT_LINKED) {
 			struct vy_cache_tree_iterator prev = itr;
 			vy_cache_tree_iterator_prev(tree, &prev);
-			struct vy_cache_entry **prev_entry =
+			struct vy_cache_node **prev_node =
 				vy_cache_tree_iterator_get_elem(tree, &prev);
-			assert((*prev_entry)->flags & VY_CACHE_RIGHT_LINKED);
-			(*prev_entry)->flags &= ~VY_CACHE_RIGHT_LINKED;
+			assert((*prev_node)->flags & VY_CACHE_RIGHT_LINKED);
+			(*prev_node)->flags &= ~VY_CACHE_RIGHT_LINKED;
 		}
-		if (entry->flags & VY_CACHE_RIGHT_LINKED) {
+		if (node->flags & VY_CACHE_RIGHT_LINKED) {
 			struct vy_cache_tree_iterator next = itr;
 			vy_cache_tree_iterator_next(&cache->cache_tree,
 						    &next);
-			struct vy_cache_entry **next_entry =
+			struct vy_cache_node **next_node =
 				vy_cache_tree_iterator_get_elem(tree, &next);
-			assert((*next_entry)->flags & VY_CACHE_LEFT_LINKED);
-			(*next_entry)->flags &= ~VY_CACHE_LEFT_LINKED;
+			assert((*next_node)->flags & VY_CACHE_LEFT_LINKED);
+			(*next_node)->flags &= ~VY_CACHE_LEFT_LINKED;
 		}
 	}
 	cache->version++;
-	vy_stmt_counter_acct_tuple(&cache->stat.evict, entry->stmt);
-	vy_cache_tree_delete(&cache->cache_tree, entry);
-	vy_cache_entry_delete(cache->env, entry);
+	vy_stmt_counter_acct_tuple(&cache->stat.evict, node->stmt);
+	vy_cache_tree_delete(&cache->cache_tree, node);
+	vy_cache_node_delete(cache->env, node);
 }
 
 static void
@@ -302,32 +299,32 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	       vy_stmt_type(prev_stmt) == IPROTO_REPLACE);
 	cache->version++;
 
-	/* Insert/replace new entry to the tree */
-	struct vy_cache_entry *entry =
-		vy_cache_entry_new(cache->env, cache, stmt);
-	if (entry == NULL) {
+	/* Insert/replace new node to the tree */
+	struct vy_cache_node *node =
+		vy_cache_node_new(cache->env, cache, stmt);
+	if (node == NULL) {
 		/* memory error, let's live without a cache */
 		return;
 	}
-	struct vy_cache_entry *replaced = NULL;
+	struct vy_cache_node *replaced = NULL;
 	struct vy_cache_tree_iterator inserted;
-	if (vy_cache_tree_insert_get_iterator(&cache->cache_tree, entry,
+	if (vy_cache_tree_insert_get_iterator(&cache->cache_tree, node,
 					      &replaced, &inserted) != 0) {
 		/* memory error, let's live without a cache */
-		vy_cache_entry_delete(cache->env, entry);
+		vy_cache_node_delete(cache->env, node);
 		return;
 	}
 	assert(!vy_cache_tree_iterator_is_invalid(&inserted));
 	if (replaced != NULL) {
-		entry->flags = replaced->flags;
-		entry->left_boundary_level = replaced->left_boundary_level;
-		entry->right_boundary_level = replaced->right_boundary_level;
-		vy_cache_entry_delete(cache->env, replaced);
+		node->flags = replaced->flags;
+		node->left_boundary_level = replaced->left_boundary_level;
+		node->right_boundary_level = replaced->right_boundary_level;
+		vy_cache_node_delete(cache->env, replaced);
 	}
-	if (direction > 0 && boundary_level < entry->left_boundary_level)
-		entry->left_boundary_level = boundary_level;
-	else if (direction < 0 && boundary_level < entry->right_boundary_level)
-		entry->right_boundary_level = boundary_level;
+	if (direction > 0 && boundary_level < node->left_boundary_level)
+		node->left_boundary_level = boundary_level;
+	else if (direction < 0 && boundary_level < node->right_boundary_level)
+		node->right_boundary_level = boundary_level;
 
 	vy_stmt_counter_acct_tuple(&cache->stat.put, stmt);
 
@@ -335,7 +332,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	if (prev_stmt == NULL)
 		return;
 
-	/* The flag that must be set in the inserted chain entry */
+	/* The flag that must be set in the inserted chain node */
 	uint32_t flag = direction > 0 ? VY_CACHE_LEFT_LINKED :
 			VY_CACHE_RIGHT_LINKED;
 
@@ -345,7 +342,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	 * when it's not (see below).
 	 * There must be no entries between (prev_stmt, stmt) interval in
 	 * any case. (1)
-	 * Farther, if the stmt entry is already linked (in certain direction),
+	 * Farther, if the stmt node is already linked (in certain direction),
 	 * it must be linked with prev_stmt (in that direction). (2)
 	 * Let't check (1) and (2) for debug reasons.
 	 *
@@ -353,7 +350,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 	 * in the cache:
 	 * 1) The statement was in prepared state and then it was
 	 *  committed or rollbacked.
-	 * 2) The entry was popped out by vy_cache_gc.
+	 * 2) The node was popped out by vy_cache_gc.
 	 *
 	 * Note that case when the prev_stmt is owerwritten by other TX
 	 * is impossible because this TX would be sent to read view and
@@ -365,68 +362,68 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 		vy_cache_tree_iterator_next(&cache->cache_tree, &inserted);
 
 	if (!vy_cache_tree_iterator_is_invalid(&inserted)) {
-		struct vy_cache_entry **prev_check_entry =
+		struct vy_cache_node **prev_check_node =
 			vy_cache_tree_iterator_get_elem(&cache->cache_tree,
 							&inserted);
-		assert(*prev_check_entry != NULL);
-		struct tuple *prev_check_stmt = (*prev_check_entry)->stmt;
+		assert(*prev_check_node != NULL);
+		struct tuple *prev_check_stmt = (*prev_check_node)->stmt;
 		int cmp = vy_stmt_compare(prev_stmt, prev_check_stmt,
 					  cache->cmp_def);
 
-		if (entry->flags & flag) {
-			/* The found entry must be exactly prev_stmt. (2) */
+		if (node->flags & flag) {
+			/* The found node must be exactly prev_stmt. (2) */
 			assert(cmp == 0);
 		} else {
 			/*
-			 * The found entry must be exactly prev_stmt or lay
+			 * The found node must be exactly prev_stmt or lay
 			 * farther than prev_stmt. (1)
 			 */
 			assert(cmp * direction >= 0);
 		}
 	} else {
 		/* Cannot be in chain (2) */
-		assert(!(entry->flags & flag));
+		assert(!(node->flags & flag));
 	}
 #endif
 
-	if (entry->flags & flag)
+	if (node->flags & flag)
 		return;
 
-	/* Insert/replace entry with previous statement */
-	struct vy_cache_entry *prev_entry =
-		vy_cache_entry_new(cache->env, cache, prev_stmt);
-	if (prev_entry == NULL) {
+	/* Insert/replace node with previous statement */
+	struct vy_cache_node *prev_node =
+		vy_cache_node_new(cache->env, cache, prev_stmt);
+	if (prev_node == NULL) {
 		/* memory error, let's live without a chain */
 		return;
 	}
 	replaced = NULL;
-	if (vy_cache_tree_insert(&cache->cache_tree, prev_entry, &replaced)) {
+	if (vy_cache_tree_insert(&cache->cache_tree, prev_node, &replaced)) {
 		/* memory error, let's live without a chain */
-		vy_cache_entry_delete(cache->env, prev_entry);
+		vy_cache_node_delete(cache->env, prev_node);
 		return;
 	}
 	if (replaced != NULL) {
-		prev_entry->flags = replaced->flags;
-		prev_entry->left_boundary_level = replaced->left_boundary_level;
-		prev_entry->right_boundary_level = replaced->right_boundary_level;
-		vy_cache_entry_delete(cache->env, replaced);
+		prev_node->flags = replaced->flags;
+		prev_node->left_boundary_level = replaced->left_boundary_level;
+		prev_node->right_boundary_level = replaced->right_boundary_level;
+		vy_cache_node_delete(cache->env, replaced);
 	}
 
 	/* Set proper flags */
-	entry->flags |= flag;
-	/* Set inverted flag in the previous entry */
-	prev_entry->flags |= (VY_CACHE_LEFT_LINKED |
-			      VY_CACHE_RIGHT_LINKED) ^ flag;
+	node->flags |= flag;
+	/* Set inverted flag in the previous node */
+	prev_node->flags |= (VY_CACHE_LEFT_LINKED |
+			     VY_CACHE_RIGHT_LINKED) ^ flag;
 }
 
 struct tuple *
 vy_cache_get(struct vy_cache *cache, struct tuple *key)
 {
-	struct vy_cache_entry **entry =
+	struct vy_cache_node **node =
 		vy_cache_tree_find(&cache->cache_tree, key);
-	if (entry == NULL)
+	if (node == NULL)
 		return NULL;
-	return (*entry)->stmt;
+	return (*node)->stmt;
 }
 
 void
@@ -437,19 +434,19 @@ vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt,
 	bool exact = false;
 	struct vy_cache_tree_iterator itr;
 	itr = vy_cache_tree_lower_bound(&cache->cache_tree, stmt, &exact);
-	struct vy_cache_entry **entry =
+	struct vy_cache_node **node =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &itr);
-	assert(!exact || entry != NULL);
+	assert(!exact || node != NULL);
 	/*
 	 * There are three cases possible
 	 * (1) there's a value in cache that is equal to stmt.
-	 *   ('exact' == true, 'entry' points the equal value in cache)
+	 *   ('exact' == true, 'node' points the equal value in cache)
 	 * (2) there's no value in cache that is equal to stmt, and lower_bound
 	 *   returned the next record.
-	 *   ('exact' == false, 'entry' points to the equal value in cache)
+	 *   ('exact' == false, 'node' points to the equal value in cache)
 	 * (3) there's no value in cache that is equal to stmt, and lower_bound
 	 *   returned invalid iterator, so there's no bigger value.
-	 *   ('exact' == false, 'entry' == NULL)
+	 *   ('exact' == false, 'node' == NULL)
 	 */
 
 	if (vy_stmt_type(stmt) == IPROTO_DELETE && !exact) {
@@ -459,40 +456,40 @@ vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt,
 
 	struct vy_cache_tree_iterator prev = itr;
 	vy_cache_tree_iterator_prev(&cache->cache_tree, &prev);
-	struct vy_cache_entry **prev_entry =
+	struct vy_cache_node **prev_node =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &prev);
 
-	if (entry != NULL && ((*entry)->flags & VY_CACHE_LEFT_LINKED)) {
+	if (node != NULL && ((*node)->flags & VY_CACHE_LEFT_LINKED)) {
 		cache->version++;
-		(*entry)->flags &= ~VY_CACHE_LEFT_LINKED;
-		assert((*prev_entry)->flags & VY_CACHE_RIGHT_LINKED);
-		(*prev_entry)->flags &= ~VY_CACHE_RIGHT_LINKED;
+		(*node)->flags &= ~VY_CACHE_LEFT_LINKED;
+		assert((*prev_node)->flags & VY_CACHE_RIGHT_LINKED);
+		(*prev_node)->flags &= ~VY_CACHE_RIGHT_LINKED;
 	}
-	if (prev_entry != NULL) {
+	if (prev_node != NULL) {
 		cache->version++;
-		(*prev_entry)->right_boundary_level = cache->cmp_def->part_count;
+		(*prev_node)->right_boundary_level = cache->cmp_def->part_count;
 	}
 
 	struct vy_cache_tree_iterator next = itr;
 	vy_cache_tree_iterator_next(&cache->cache_tree, &next);
-	struct vy_cache_entry **next_entry =
+	struct vy_cache_node **next_node =
 		vy_cache_tree_iterator_get_elem(&cache->cache_tree, &next);
 
-	if (exact && ((*entry)->flags & VY_CACHE_RIGHT_LINKED)) {
+	if (exact && ((*node)->flags & VY_CACHE_RIGHT_LINKED)) {
 		cache->version++;
-		(*entry)->flags &= ~VY_CACHE_RIGHT_LINKED;
-		assert((*next_entry)->flags & VY_CACHE_LEFT_LINKED);
-		(*next_entry)->flags &= ~VY_CACHE_LEFT_LINKED;
+		(*node)->flags &= ~VY_CACHE_RIGHT_LINKED;
+		assert((*next_node)->flags & VY_CACHE_LEFT_LINKED);
+		(*next_node)->flags &= ~VY_CACHE_LEFT_LINKED;
 	}
-	if (entry && !exact) {
+	if (node && !exact) {
 		cache->version++;
-		(*entry)->left_boundary_level = cache->cmp_def->part_count;
+		(*node)->left_boundary_level = cache->cmp_def->part_count;
 	}
 
 	if (exact) {
-		assert(entry != NULL);
+		assert(node != NULL);
 		cache->version++;
-		struct vy_cache_entry *to_delete = *entry;
+		struct vy_cache_node *to_delete = *node;
 		assert(vy_stmt_type(to_delete->stmt) == IPROTO_INSERT ||
 		       vy_stmt_type(to_delete->stmt) == IPROTO_REPLACE);
 		if (deleted != NULL) {
@@ -502,7 +499,7 @@ vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt,
 		vy_stmt_counter_acct_tuple(&cache->stat.invalidate,
 					   to_delete->stmt);
 		vy_cache_tree_delete(&cache->cache_tree, to_delete);
-		vy_cache_entry_delete(cache->env, to_delete);
+		vy_cache_node_delete(cache->env, to_delete);
 	}
 }
 
@@ -513,9 +510,9 @@ static struct tuple *
 vy_cache_iterator_curr_stmt(struct vy_cache_iterator *itr)
 {
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
-	struct vy_cache_entry **entry =
+	struct vy_cache_node **node =
 		vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
-	return entry ? (*entry)->stmt : NULL;
+	return node ? (*node)->stmt : NULL;
 }
 
 /**
@@ -523,25 +520,25 @@ vy_cache_iterator_curr_stmt(struct vy_cache_iterator *itr)
  * That is made by examining flags of a cache record.
  *
  * @param itr - the iterator
- * @param entry - current record of the cache
+ * @param node - current record of the cache
  */
 static inline bool
 vy_cache_iterator_is_stop(struct vy_cache_iterator *itr,
-			  struct vy_cache_entry *entry)
+			  struct vy_cache_node *node)
 {
 	uint8_t key_level = vy_stmt_key_part_count(itr->key,
 						   itr->cache->cmp_def);
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
-		if (entry->flags & VY_CACHE_LEFT_LINKED)
+		if (node->flags & VY_CACHE_LEFT_LINKED)
 			return true;
-		if (iter_is_eq && entry->left_boundary_level <= key_level)
+		if (iter_is_eq && node->left_boundary_level <= key_level)
 			return true;
 	} else {
-		if (entry->flags & VY_CACHE_RIGHT_LINKED)
+		if (node->flags & VY_CACHE_RIGHT_LINKED)
 			return true;
-		if (iter_is_eq && entry->right_boundary_level <= key_level)
+		if (iter_is_eq && node->right_boundary_level <= key_level)
 			return true;
 	}
 	return false;
@@ -553,25 +550,25 @@ vy_cache_iterator_is_stop(struct vy_cache_iterator *itr,
  * That is made by examining flags of the previous cache record.
  *
  * @param itr - the iterator
- * @param last_entry - the last record from previous step of the iterator
+ * @param last_node - the last record from previous step of the iterator
  */
 static inline bool
 vy_cache_iterator_is_end_stop(struct vy_cache_iterator *itr,
-			      struct vy_cache_entry *last_entry)
+			      struct vy_cache_node *last_node)
 {
 	uint8_t key_level = vy_stmt_key_part_count(itr->key,
 						   itr->cache->cmp_def);
 	/* select{} is actually an EQ iterator with part_count == 0 */
 	bool iter_is_eq = itr->iterator_type == ITER_EQ || key_level == 0;
 	if (iterator_direction(itr->iterator_type) > 0) {
-		if (last_entry->flags & VY_CACHE_RIGHT_LINKED)
+		if (last_node->flags & VY_CACHE_RIGHT_LINKED)
 			return true;
-		if (iter_is_eq && last_entry->right_boundary_level <= key_level)
+		if (iter_is_eq && last_node->right_boundary_level <= key_level)
 			return true;
 	} else {
-		if (last_entry->flags & VY_CACHE_LEFT_LINKED)
+		if (last_node->flags & VY_CACHE_LEFT_LINKED)
 			return true;
-		if (iter_is_eq && last_entry->left_boundary_level <= key_level)
+		if (iter_is_eq && last_node->left_boundary_level <= key_level)
 			return true;
 	}
 	return false;
@@ -598,24 +595,24 @@ vy_cache_iterator_step(struct vy_cache_iterator *itr)
 		itr->curr_stmt = NULL;
 	}
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
-	struct vy_cache_entry *prev_entry =
+	struct vy_cache_node *prev_node =
 		*vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 	if (iterator_direction(itr->iterator_type) > 0)
 		vy_cache_tree_iterator_next(tree, &itr->curr_pos);
 	else
 		vy_cache_tree_iterator_prev(tree, &itr->curr_pos);
 	if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
-		return vy_cache_iterator_is_end_stop(itr, prev_entry);
-	struct vy_cache_entry *entry =
+		return vy_cache_iterator_is_end_stop(itr, prev_node);
+	struct vy_cache_node *node =
 		*vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 
 	if (itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, entry->stmt, itr->cache->cmp_def)) {
-		return vy_cache_iterator_is_end_stop(itr, prev_entry);
+	    vy_stmt_compare(itr->key, node->stmt, itr->cache->cmp_def)) {
+		return vy_cache_iterator_is_end_stop(itr, prev_node);
 	}
-	itr->curr_stmt = entry->stmt;
+	itr->curr_stmt = node->stmt;
 	tuple_ref(itr->curr_stmt);
-	return vy_cache_iterator_is_stop(itr, entry);
+	return vy_cache_iterator_is_stop(itr, node);
 }
 
 /**
@@ -637,7 +634,7 @@ vy_cache_iterator_skip_to_read_view(struct vy_cache_iterator *itr, bool *stop)
 }
 
 /**
- * Position the iterator to the first cache entry satisfying
+ * Position the iterator to the first cache node satisfying
  * the iterator search criteria and following the given key
  * (pass NULL to start iteration).
  *
@@ -683,18 +680,18 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr, struct tuple *last_key)
 	if (vy_cache_tree_iterator_is_invalid(&itr->curr_pos))
 		return false;
 
-	struct vy_cache_entry *entry;
-	entry = *vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
+	struct vy_cache_node *node;
+	node = *vy_cache_tree_iterator_get_elem(tree, &itr->curr_pos);
 
 	if (itr->iterator_type == ITER_EQ &&
 	    ((last_key == NULL && !exact) ||
-	     (last_key != NULL && vy_stmt_compare(itr->key, entry->stmt,
+	     (last_key != NULL && vy_stmt_compare(itr->key, node->stmt,
 						  itr->cache->cmp_def) != 0)))
 		return false;
 
-	itr->curr_stmt = entry->stmt;
+	itr->curr_stmt = node->stmt;
 	tuple_ref(itr->curr_stmt);
-	return vy_cache_iterator_is_stop(itr, entry);
+	return vy_cache_iterator_is_stop(itr, node);
 }
 
 NODISCARD int
@@ -804,18 +801,18 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr, struct tuple *last_stmt
 				vy_cache_tree_iterator_next(tree, &pos);
 			if (vy_cache_tree_iterator_is_invalid(&pos))
 				break;
-			struct vy_cache_entry *entry =
+			struct vy_cache_node *node =
 				*vy_cache_tree_iterator_get_elem(tree, &pos);
-			int cmp = dir * vy_stmt_compare(entry->stmt, key, def);
+			int cmp = dir * vy_stmt_compare(node->stmt, key, def);
 			if (cmp < 0 || (cmp == 0 && !key_belongs))
 				break;
-			if (vy_stmt_lsn(entry->stmt) <= (**itr->read_view).vlsn) {
+			if (vy_stmt_lsn(node->stmt) <= (**itr->read_view).vlsn) {
 				itr->curr_pos = pos;
 				if (itr->curr_stmt != NULL)
 					tuple_unref(itr->curr_stmt);
-				itr->curr_stmt = entry->stmt;
+				itr->curr_stmt = node->stmt;
 				tuple_ref(itr->curr_stmt);
-				*stop = vy_cache_iterator_is_stop(itr, entry);
+				*stop = vy_cache_iterator_is_stop(itr, node);
 				pos_changed = true;
 			}
 			if (cmp == 0)
