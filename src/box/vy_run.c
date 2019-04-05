@@ -297,7 +297,7 @@ vy_run_bloom_size(struct vy_run *run)
  *  there no pages fulfilling the conditions.
  */
 static uint32_t
-vy_page_index_find_page(struct vy_run *run, const struct tuple *key,
+vy_page_index_find_page(struct vy_run *run, struct tuple *key,
 			struct key_def *cmp_def, enum iterator_type itype,
 			bool *equal_key)
 {
@@ -1037,7 +1037,7 @@ vy_run_iterator_read(struct vy_run_iterator *itr,
 static uint32_t
 vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
 			       enum iterator_type iterator_type,
-			       const struct tuple *key,
+			       struct tuple *key,
 			       struct vy_page *page, bool *equal_key)
 {
 	uint32_t beg = 0;
@@ -1075,8 +1075,7 @@ vy_run_iterator_search_in_page(struct vy_run_iterator *itr,
  */
 static NODISCARD int
 vy_run_iterator_search(struct vy_run_iterator *itr,
-		       enum iterator_type iterator_type,
-		       const struct tuple *key,
+		       enum iterator_type iterator_type, struct tuple *key,
 		       struct vy_run_iterator_pos *pos, bool *equal_key)
 {
 	pos->page_no = vy_page_index_find_page(itr->slice->run, key,
@@ -1242,8 +1241,7 @@ vy_run_iterator_find_lsn(struct vy_run_iterator *itr, struct tuple **ret)
  */
 static NODISCARD int
 vy_run_iterator_do_seek(struct vy_run_iterator *itr,
-			enum iterator_type iterator_type,
-			const struct tuple *key)
+			enum iterator_type iterator_type, struct tuple *key)
 {
 	struct vy_run *run = itr->slice->run;
 	struct vy_run_iterator_pos end_pos = {run->info.page_count, 0};
@@ -1295,13 +1293,13 @@ vy_run_iterator_do_seek(struct vy_run_iterator *itr,
  * (pass NULL to start iteration).
  */
 static NODISCARD int
-vy_run_iterator_seek(struct vy_run_iterator *itr, const struct tuple *last_key,
+vy_run_iterator_seek(struct vy_run_iterator *itr, struct tuple *last_key,
 		     struct tuple **ret)
 {
 	struct key_def *cmp_def = itr->cmp_def;
 	struct vy_slice *slice = itr->slice;
 	struct tuple_bloom *bloom = slice->run->info.bloom;
-	const struct tuple *key = itr->key;
+	struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 
 	*ret = NULL;
@@ -1424,7 +1422,7 @@ void
 vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv,
+		     struct tuple *key, const struct vy_read_view **rv,
 		     struct key_def *cmp_def, struct key_def *key_def,
 		     struct tuple_format *format)
 {
@@ -1560,8 +1558,7 @@ vy_run_iterator_next(struct vy_run_iterator *itr,
 }
 
 NODISCARD int
-vy_run_iterator_skip(struct vy_run_iterator *itr,
-		     const struct tuple *last_stmt,
+vy_run_iterator_skip(struct vy_run_iterator *itr, struct tuple *last_stmt,
 		     struct vy_history *history)
 {
 	/*
@@ -1744,7 +1741,7 @@ fail:
 
 /* dump statement to the run page buffers (stmt header and data) */
 static int
-vy_run_dump_stmt(const struct tuple *value, struct xlog *data_xlog,
+vy_run_dump_stmt(struct tuple *value, struct xlog *data_xlog,
 		 struct vy_page_info *info, struct key_def *key_def,
 		 bool is_primary)
 {
@@ -2130,8 +2127,7 @@ vy_run_writer_create_xlog(struct vy_run_writer *writer)
  * @retval  0 Success.
  */
 static int
-vy_run_writer_start_page(struct vy_run_writer *writer,
-			 const struct tuple *first_stmt)
+vy_run_writer_start_page(struct vy_run_writer *writer, struct tuple *first_stmt)
 {
 	struct vy_run *run = writer->run;
 	if (run->info.page_count >= writer->page_info_capacity &&

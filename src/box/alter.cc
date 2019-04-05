@@ -140,7 +140,7 @@ index_def_check_sequence(struct index_def *index_def, const char *space_name)
  * Checks only types of fields and their count!
  */
 static void
-index_def_check_tuple(const struct tuple *tuple)
+index_def_check_tuple(struct tuple *tuple)
 {
 	const mp_type common_template[] =
 		{MP_UINT, MP_UINT, MP_STR, MP_STR, MP_MAP, MP_ARRAY};
@@ -2392,8 +2392,7 @@ on_replace_dd_user(struct trigger * /* trigger */, void *event)
  * @param[out] uid Owner identifier.
  */
 static inline void
-func_def_get_ids_from_tuple(const struct tuple *tuple, uint32_t *fid,
-			    uint32_t *uid)
+func_def_get_ids_from_tuple(struct tuple *tuple, uint32_t *fid, uint32_t *uid)
 {
 	*fid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_ID);
 	*uid = tuple_field_u32_xc(tuple, BOX_FUNC_FIELD_UID);
@@ -2401,7 +2400,7 @@ func_def_get_ids_from_tuple(const struct tuple *tuple, uint32_t *fid,
 
 /** Create a function definition from tuple. */
 static struct func_def *
-func_def_new_from_tuple(const struct tuple *tuple)
+func_def_new_from_tuple(struct tuple *tuple)
 {
 	uint32_t len;
 	const char *name = tuple_field_str_xc(tuple, BOX_FUNC_FIELD_NAME,
@@ -2517,7 +2516,7 @@ on_replace_dd_func(struct trigger * /* trigger */, void *event)
 
 /** Create a collation identifier definition from tuple. */
 void
-coll_id_def_new_from_tuple(const struct tuple *tuple, struct coll_id_def *def)
+coll_id_def_new_from_tuple(struct tuple *tuple, struct coll_id_def *def)
 {
 	memset(def, 0, sizeof(*def));
 	uint32_t name_len, locale_len, type_len;
@@ -3593,7 +3592,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
  * @retval Array of links.
  */
 static struct field_link *
-decode_fk_links(const struct tuple *tuple, uint32_t *out_count,
+decode_fk_links(struct tuple *tuple, uint32_t *out_count,
 		const char *constraint_name, uint32_t constraint_len,
 		uint32_t errcode)
 {
@@ -3638,7 +3637,7 @@ decode_fk_links(const struct tuple *tuple, uint32_t *out_count,
 
 /** Create an instance of foreign key def constraint from tuple. */
 static struct fk_constraint_def *
-fk_constraint_def_new_from_tuple(const struct tuple *tuple, uint32_t errcode)
+fk_constraint_def_new_from_tuple(struct tuple *tuple, uint32_t errcode)
 {
 	uint32_t name_len;
 	const char *name =

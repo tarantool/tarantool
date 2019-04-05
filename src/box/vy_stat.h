@@ -265,16 +265,14 @@ vy_disk_stmt_counter_reset(struct vy_disk_stmt_counter *c)
 }
 
 static inline void
-vy_stmt_counter_acct_tuple(struct vy_stmt_counter *c,
-			   const struct tuple *tuple)
+vy_stmt_counter_acct_tuple(struct vy_stmt_counter *c, struct tuple *tuple)
 {
 	c->rows++;
 	c->bytes += tuple_size(tuple);
 }
 
 static inline void
-vy_stmt_counter_unacct_tuple(struct vy_stmt_counter *c,
-			     const struct tuple *tuple)
+vy_stmt_counter_unacct_tuple(struct vy_stmt_counter *c, struct tuple *tuple)
 {
 	c->rows--;
 	c->bytes -= tuple_size(tuple);

@@ -598,7 +598,7 @@ vy_lsm_force_compaction(struct vy_lsm *lsm);
  */
 int
 vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
-	   const struct tuple *stmt, const struct tuple **region_stmt);
+	   struct tuple *stmt, struct tuple **region_stmt);
 
 /**
  * Confirm that the statement stays in the in-memory index of
@@ -610,7 +610,7 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
  */
 void
 vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		   const struct tuple *stmt);
+		   struct tuple *stmt);
 
 /**
  * Erase a statement from the in-memory index of an LSM tree.
@@ -621,7 +621,7 @@ vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
  */
 void
 vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		     const struct tuple *stmt);
+		     struct tuple *stmt);
 
 #if defined(__cplusplus)
 } /* extern "C" */

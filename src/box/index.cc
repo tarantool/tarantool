@@ -147,8 +147,8 @@ exact_key_validate(struct key_def *key_def, const char *key,
 }
 
 char *
-box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
-	uint32_t index_id, uint32_t *key_size)
+box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id, uint32_t index_id,
+		      uint32_t *key_size)
 {
 	struct space *space = space_cache_find(space_id);
 	if (space == NULL)

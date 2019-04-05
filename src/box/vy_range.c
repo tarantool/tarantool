@@ -68,7 +68,7 @@ vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 }
 
 int
-vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range)
+vy_range_tree_key_cmp(struct tuple *stmt, struct vy_range *range)
 {
 	/* Any key > -inf. */
 	if (range->begin == NULL)
@@ -79,7 +79,7 @@ vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range)
 struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
-			  const struct tuple *key)
+			  struct tuple *key)
 {
 	if (vy_stmt_is_empty_key(key)) {
 		switch (iterator_type) {

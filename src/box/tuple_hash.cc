@@ -153,8 +153,7 @@ struct TupleFieldHash<TYPE> {
 template <int TYPE, int ...MORE_TYPES>
 struct TupleHash
 {
-	static uint32_t hash(const struct tuple *tuple,
-			     struct key_def *key_def)
+	static uint32_t hash(struct tuple *tuple, struct key_def *key_def)
 	{
 		uint32_t h = HASH_SEED;
 		uint32_t carry = 0;
@@ -169,8 +168,7 @@ struct TupleHash
 
 template <>
 struct TupleHash<FIELD_TYPE_UNSIGNED> {
-	static uint32_t	hash(const struct tuple *tuple,
-			     struct key_def *key_def)
+	static uint32_t	hash(struct tuple *tuple, struct key_def *key_def)
 	{
 		const char *field =
 			tuple_field_by_part(tuple, key_def->parts);
@@ -217,7 +215,7 @@ static const hasher_signature hash_arr[] = {
 
 template <bool has_optional_parts, bool has_json_paths>
 uint32_t
-tuple_hash_slowpath(const struct tuple *tuple, struct key_def *key_def);
+tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def);
 
 uint32_t
 key_hash_slowpath(const char *key, struct key_def *key_def);
@@ -347,7 +345,7 @@ tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
 }
 
 uint32_t
-tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
+tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 		    struct key_part *part)
 {
 	const char *field = tuple_field_by_part(tuple, part);
@@ -358,7 +356,7 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
 
 template <bool has_optional_parts, bool has_json_paths>
 uint32_t
-tuple_hash_slowpath(const struct tuple *tuple, struct key_def *key_def)
+tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(has_optional_parts == key_def->has_optional_parts);

@@ -105,7 +105,7 @@ tuple_hash_array_add(struct tuple_hash_array *hash_arr, uint32_t hash)
 
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			const struct tuple *tuple, struct key_def *key_def)
+			struct tuple *tuple, struct key_def *key_def)
 {
 	assert(builder->part_count == key_def->part_count);
 
@@ -199,7 +199,7 @@ tuple_bloom_delete(struct tuple_bloom *bloom)
 
 bool
 tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
-		      const struct tuple *tuple, struct key_def *key_def)
+		      struct tuple *tuple, struct key_def *key_def)
 {
 	if (bloom->is_legacy) {
 		return bloom_maybe_has(&bloom->parts[0],

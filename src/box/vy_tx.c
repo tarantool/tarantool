@@ -491,7 +491,7 @@ vy_tx_write_prepare(struct txv *v)
  */
 static int
 vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
-	    struct tuple *stmt, const struct tuple **region_stmt)
+	    struct tuple *stmt, struct tuple **region_stmt)
 {
 	assert(vy_stmt_is_refable(stmt));
 	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
@@ -681,7 +681,7 @@ vy_tx_prepare(struct vy_tx *tx)
 	 * Sic: the loop below must not yield after recovery.
 	 */
 	/* repsert - REPLACE/UPSERT */
-	const struct tuple *delete = NULL, *repsert = NULL;
+	struct tuple *delete = NULL, *repsert = NULL;
 	MAYBE_UNUSED uint32_t current_space_id = 0;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		struct vy_lsm *lsm = v->lsm;
@@ -765,7 +765,7 @@ vy_tx_prepare(struct vy_tx *tx)
 
 		/* In secondary indexes only REPLACE/DELETE can be written. */
 		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);
-		const struct tuple **region_stmt =
+		struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &repsert;
 		if (vy_tx_write(lsm, v->mem, v->stmt, region_stmt) != 0)
 			return -1;
@@ -796,7 +796,7 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		if (v->region_stmt != NULL) {
-			vy_stmt_set_lsn((struct tuple *)v->region_stmt, lsn);
+			vy_stmt_set_lsn(v->region_stmt, lsn);
 			vy_lsm_commit_stmt(v->lsm, v->mem, v->region_stmt);
 		}
 		if (v->mem != NULL)
@@ -1142,8 +1142,7 @@ void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_lsm *lsm,
-		     enum iterator_type iterator_type,
-		     const struct tuple *key)
+		     enum iterator_type iterator_type, struct tuple *key)
 {
 	itr->stat = stat;
 	itr->tx = tx;
@@ -1161,13 +1160,13 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
  * given key (pass NULL to start iteration).
  */
 static void
-vy_txw_iterator_seek(struct vy_txw_iterator *itr, const struct tuple *last_key)
+vy_txw_iterator_seek(struct vy_txw_iterator *itr, struct tuple *last_key)
 {
 	itr->stat->lookup++;
 	itr->version = itr->tx->write_set_version;
 	itr->curr_txv = NULL;
 
-	const struct tuple *key = itr->key;
+	struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	if (last_key != NULL) {
 		key = last_key;
@@ -1254,8 +1253,7 @@ out:
 }
 
 NODISCARD int
-vy_txw_iterator_skip(struct vy_txw_iterator *itr,
-		     const struct tuple *last_stmt,
+vy_txw_iterator_skip(struct vy_txw_iterator *itr, struct tuple *last_stmt,
 		     struct vy_history *history)
 {
 	assert(!itr->search_started ||
@@ -1286,8 +1284,7 @@ vy_txw_iterator_skip(struct vy_txw_iterator *itr,
 }
 
 NODISCARD int
-vy_txw_iterator_restore(struct vy_txw_iterator *itr,
-			const struct tuple *last_stmt,
+vy_txw_iterator_restore(struct vy_txw_iterator *itr, struct tuple *last_stmt,
 			struct vy_history *history)
 {
 	if (!itr->search_started || itr->version == itr->tx->write_set_version)

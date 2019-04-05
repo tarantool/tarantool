@@ -176,7 +176,7 @@ vy_read_iterator_range_is_done(struct vy_read_iterator *itr,
  */
 static inline int
 vy_read_iterator_cmp_stmt(struct vy_read_iterator *itr,
-			  const struct tuple *a, const struct tuple *b)
+			  struct tuple *a, struct tuple *b)
 {
 	if (a == NULL && b != NULL)
 		return 1;

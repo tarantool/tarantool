@@ -59,9 +59,8 @@ memtx_space_bsize(struct space *space)
 /* {{{ DML */
 
 void
-memtx_space_update_bsize(struct space *space,
-			 const struct tuple *old_tuple,
-			 const struct tuple *new_tuple)
+memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
+			 struct tuple *new_tuple)
 {
 	struct memtx_space *memtx_space = (struct memtx_space *)space;
 	ssize_t old_bsize = old_tuple ? box_tuple_bsize(old_tuple) : 0;

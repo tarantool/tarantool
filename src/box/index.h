@@ -206,7 +206,7 @@ box_index_count(uint32_t space_id, uint32_t index_id, int type,
  * @retval     NULL Memory Allocation error
  */
 char *
-box_tuple_extract_key(const box_tuple_t *tuple, uint32_t space_id,
+box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id,
 		      uint32_t index_id, uint32_t *key_size);
 
 /** \endcond public */

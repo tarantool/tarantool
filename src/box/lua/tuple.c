@@ -62,7 +62,7 @@ static struct luaL_serializer tuple_serializer;
 
 extern char tuple_lua[]; /* Lua source */
 
-uint32_t CTID_CONST_STRUCT_TUPLE_REF;
+uint32_t CTID_STRUCT_TUPLE_REF;
 
 static inline box_tuple_t *
 lua_checktuple(struct lua_State *L, int narg)
@@ -79,7 +79,7 @@ lua_checktuple(struct lua_State *L, int narg)
 box_tuple_t *
 luaT_istuple(struct lua_State *L, int narg)
 {
-	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+	assert(CTID_STRUCT_TUPLE_REF != 0);
 	uint32_t ctypeid;
 	void *data;
 
@@ -87,7 +87,7 @@ luaT_istuple(struct lua_State *L, int narg)
 		return NULL;
 
 	data = luaL_checkcdata(L, narg, &ctypeid);
-	if (ctypeid != CTID_CONST_STRUCT_TUPLE_REF)
+	if (ctypeid != CTID_STRUCT_TUPLE_REF)
 		return NULL;
 
 	return *(struct tuple **) data;
@@ -320,7 +320,7 @@ lbox_tuple_to_map(struct lua_State *L)
 		names_only = lua_toboolean(L, -1);
 	}
 
-	const struct tuple *tuple = lua_checktuple(L, 1);
+	struct tuple *tuple = lua_checktuple(L, 1);
 	struct tuple_format *format = tuple_format(tuple);
 	const char *pos = tuple_data(tuple);
 	int field_count = (int)mp_decode_array(&pos);
@@ -517,9 +517,9 @@ lbox_tuple_to_string(struct lua_State *L)
 void
 luaT_pushtuple(struct lua_State *L, box_tuple_t *tuple)
 {
-	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+	assert(CTID_STRUCT_TUPLE_REF != 0);
 	struct tuple **ptr = (struct tuple **)
-		luaL_pushcdata(L, CTID_CONST_STRUCT_TUPLE_REF);
+		luaL_pushcdata(L, CTID_STRUCT_TUPLE_REF);
 	*ptr = tuple;
 	/* The order is important - first reference tuple, next set gc */
 	box_tuple_ref(tuple);
@@ -577,6 +577,6 @@ box_lua_tuple_init(struct lua_State *L)
 	int rc = luaL_cdef(L, "struct tuple;");
 	assert(rc == 0);
 	(void) rc;
-	CTID_CONST_STRUCT_TUPLE_REF = luaL_ctypeid(L, "const struct tuple &");
-	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+	CTID_STRUCT_TUPLE_REF = luaL_ctypeid(L, "struct tuple &");
+	assert(CTID_STRUCT_TUPLE_REF != 0);
 }

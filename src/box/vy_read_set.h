@@ -187,7 +187,7 @@ rb_gen_aug(MAYBE_UNUSED static inline, vy_lsm_read_set_, vy_lsm_read_set_t,
  */
 struct vy_tx_conflict_iterator {
 	/** The statement. */
-	const struct tuple *stmt;
+	struct tuple *stmt;
 	/**
 	 * Iterator over the interval tree checked
 	 * for intersections with the statement.
@@ -203,7 +203,7 @@ struct vy_tx_conflict_iterator {
 static inline void
 vy_tx_conflict_iterator_init(struct vy_tx_conflict_iterator *it,
 			     vy_lsm_read_set_t *read_set,
-			     const struct tuple *stmt)
+			     struct tuple *stmt)
 {
 	vy_lsm_read_set_walk_init(&it->tree_walk, read_set);
 	it->tree_dir = 0;

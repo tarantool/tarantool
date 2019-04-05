@@ -86,7 +86,7 @@ tuple_extract_key_sequential_raw(const char *data, const char *data_end,
  */
 template <bool has_optional_parts>
 static inline char *
-tuple_extract_key_sequential(const struct tuple *tuple, struct key_def *key_def,
+tuple_extract_key_sequential(struct tuple *tuple, struct key_def *key_def,
 			     uint32_t *key_size)
 {
 	assert(key_def_is_sequential(key_def));
@@ -107,8 +107,8 @@ tuple_extract_key_sequential(const struct tuple *tuple, struct key_def *key_def,
 template <bool contains_sequential_parts, bool has_optional_parts,
 	  bool has_json_paths>
 static char *
-tuple_extract_key_slowpath(const struct tuple *tuple,
-			   struct key_def *key_def, uint32_t *key_size)
+tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
+			   uint32_t *key_size)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
@@ -408,7 +408,7 @@ key_def_set_extract_func(struct key_def *key_def)
 }
 
 bool
-tuple_key_contains_null(const struct tuple *tuple, struct key_def *def)
+tuple_key_contains_null(struct tuple *tuple, struct key_def *def)
 {
 	struct tuple_format *format = tuple_format(tuple);
 	const char *data = tuple_data(tuple);

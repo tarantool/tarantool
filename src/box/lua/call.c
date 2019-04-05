@@ -490,6 +490,6 @@ box_lua_call_init(struct lua_State *L)
 	assert(rc == 0);
 	(void) rc;
 	CTID_STRUCT_PORT_PTR = luaL_ctypeid(L, "struct port *");
-	assert(CTID_CONST_STRUCT_TUPLE_REF != 0);
+	assert(CTID_STRUCT_TUPLE_REF != 0);
 #endif
 }

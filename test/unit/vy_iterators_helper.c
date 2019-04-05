@@ -130,7 +130,7 @@ vy_new_simple_stmt(struct tuple_format *format,
 	return ret;
 }
 
-const struct tuple *
+struct tuple *
 vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 {
 	struct tuple *stmt = vy_new_simple_stmt(mem->format, templ);
@@ -226,7 +226,7 @@ destroy_test_cache(struct vy_cache *cache, struct key_def *def,
 }
 
 bool
-vy_stmt_are_same(const struct tuple *actual,
+vy_stmt_are_same(struct tuple *actual,
 		 const struct vy_stmt_template *expected,
 		 struct tuple_format *format)
 {

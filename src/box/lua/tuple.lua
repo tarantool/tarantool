@@ -19,16 +19,16 @@ void
 box_tuple_unref(box_tuple_t *tuple);
 
 uint32_t
-box_tuple_field_count(const box_tuple_t *tuple);
+box_tuple_field_count(box_tuple_t *tuple);
 
 size_t
-box_tuple_bsize(const box_tuple_t *tuple);
+box_tuple_bsize(box_tuple_t *tuple);
 
 ssize_t
-box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size);
+box_tuple_to_buf(box_tuple_t *tuple, char *buf, size_t size);
 
 const char *
-box_tuple_field(const box_tuple_t *tuple, uint32_t i);
+box_tuple_field(box_tuple_t *tuple, uint32_t i);
 
 typedef struct tuple_iterator box_tuple_iterator_t;
 
@@ -62,7 +62,7 @@ box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
 local builtin = ffi.C
 
 local tuple_t = ffi.typeof('box_tuple_t')
-local const_tuple_ref_t = ffi.typeof('const box_tuple_t&')
+local const_tuple_ref_t = ffi.typeof('box_tuple_t&')
 
 local is_tuple = function(tuple)
     return tuple ~= nil and type(tuple) == 'cdata' and ffi.istype(const_tuple_ref_t, tuple)

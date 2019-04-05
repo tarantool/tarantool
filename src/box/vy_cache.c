@@ -228,7 +228,7 @@ vy_cache_env_set_quota(struct vy_cache_env *env, size_t quota)
 
 void
 vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
-	     struct tuple *prev_stmt, const struct tuple *key,
+	     struct tuple *prev_stmt, struct tuple *key,
 	     enum iterator_type order)
 {
 	if (cache->env->mem_quota == 0) {
@@ -420,7 +420,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
 }
 
 struct tuple *
-vy_cache_get(struct vy_cache *cache, const struct tuple *key)
+vy_cache_get(struct vy_cache *cache, struct tuple *key)
 {
 	struct vy_cache_entry **entry =
 		vy_cache_tree_find(&cache->cache_tree, key);
@@ -430,7 +430,7 @@ vy_cache_get(struct vy_cache *cache, const struct tuple *key)
 }
 
 void
-vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
+vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt,
 		  struct tuple **deleted)
 {
 	vy_cache_gc(cache->env);
@@ -646,8 +646,7 @@ vy_cache_iterator_skip_to_read_view(struct vy_cache_iterator *itr, bool *stop)
  * and hence the caller doesn't need to scan mems and runs.
  */
 static bool
-vy_cache_iterator_seek(struct vy_cache_iterator *itr,
-		       const struct tuple *last_key)
+vy_cache_iterator_seek(struct vy_cache_iterator *itr, struct tuple *last_key)
 {
 	struct vy_cache_tree *tree = &itr->cache->cache_tree;
 
@@ -657,7 +656,7 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr,
 	}
 	itr->cache->stat.lookup++;
 
-	const struct tuple *key = itr->key;
+	struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	if (last_key != NULL) {
 		key = last_key;
@@ -726,8 +725,7 @@ vy_cache_iterator_next(struct vy_cache_iterator *itr,
 }
 
 NODISCARD int
-vy_cache_iterator_skip(struct vy_cache_iterator *itr,
-		       const struct tuple *last_stmt,
+vy_cache_iterator_skip(struct vy_cache_iterator *itr, struct tuple *last_stmt,
 		       struct vy_history *history, bool *stop)
 {
 	assert(!itr->search_started || itr->version == itr->cache->version);
@@ -759,8 +757,7 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
 }
 
 NODISCARD int
-vy_cache_iterator_restore(struct vy_cache_iterator *itr,
-			  const struct tuple *last_stmt,
+vy_cache_iterator_restore(struct vy_cache_iterator *itr, struct tuple *last_stmt,
 			  struct vy_history *history, bool *stop)
 {
 	if (!itr->search_started || itr->version == itr->cache->version)
@@ -787,7 +784,7 @@ vy_cache_iterator_restore(struct vy_cache_iterator *itr,
 		 * statement closiest to last_stmt.
 		 */
 		bool key_belongs = false;
-		const struct tuple *key = last_stmt;
+		struct tuple *key = last_stmt;
 		if (key == NULL) {
 			key = itr->key;
 			key_belongs = (itr->iterator_type == ITER_EQ ||
@@ -850,8 +847,8 @@ vy_cache_iterator_close(struct vy_cache_iterator *itr)
 
 void
 vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
-		       enum iterator_type iterator_type,
-		       const struct tuple *key, const struct vy_read_view **rv)
+		       enum iterator_type iterator_type, struct tuple *key,
+		       const struct vy_read_view **rv)
 {
 	itr->cache = cache;
 	itr->iterator_type = iterator_type;

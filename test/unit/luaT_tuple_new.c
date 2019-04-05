@@ -34,7 +34,7 @@ min_u32(uint32_t a, uint32_t b)
 }
 
 void
-check_tuple(const struct tuple *tuple, box_tuple_format_t *format,
+check_tuple(struct tuple *tuple, box_tuple_format_t *format,
 	    int retvals, const char *case_name)
 {
 	uint32_t size;
@@ -50,7 +50,7 @@ check_tuple(const struct tuple *tuple, box_tuple_format_t *format,
 }
 
 void
-check_error(struct lua_State *L, const struct tuple *tuple, int retvals,
+check_error(struct lua_State *L, struct tuple *tuple, int retvals,
 	    const char *case_name)
 {
 	const char *exp_err = "A tuple or a table expected, got number";

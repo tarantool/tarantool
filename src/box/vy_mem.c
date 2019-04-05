@@ -131,8 +131,8 @@ vy_mem_delete(struct vy_mem *index)
 	free(index);
 }
 
-const struct tuple *
-vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
+struct tuple *
+vy_mem_older_lsn(struct vy_mem *mem, struct tuple *stmt)
 {
 	struct tree_mem_key tree_key;
 	tree_key.stmt = stmt;
@@ -144,7 +144,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 	if (vy_mem_tree_iterator_is_invalid(&itr))
 		return NULL;
 
-	const struct tuple *result;
+	struct tuple *result;
 	result = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
 	if (vy_stmt_compare(result, stmt, mem->cmp_def) != 0)
 		return NULL;
@@ -152,7 +152,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 int
-vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
+vy_mem_insert_upsert(struct vy_mem *mem, struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
@@ -160,7 +160,7 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);
-	const struct tuple *replaced_stmt = NULL;
+	struct tuple *replaced_stmt = NULL;
 	struct vy_mem_tree_iterator inserted;
 	if (vy_mem_tree_insert_get_iterator(&mem->tree, stmt, &replaced_stmt,
 					    &inserted) != 0)
@@ -192,8 +192,8 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 	 * UPSERTs subsequence.
 	 */
 	vy_mem_tree_iterator_next(&mem->tree, &inserted);
-	const struct tuple **older = vy_mem_tree_iterator_get_elem(&mem->tree,
-								   &inserted);
+	struct tuple **older = vy_mem_tree_iterator_get_elem(&mem->tree,
+							     &inserted);
 	if (older == NULL || vy_stmt_type(*older) != IPROTO_UPSERT ||
 	    vy_stmt_compare(stmt, *older, mem->cmp_def) != 0)
 		return 0;
@@ -206,12 +206,12 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt)
 		n_upserts++;
 	else
 		assert(n_upserts == VY_UPSERT_INF);
-	vy_stmt_set_n_upserts((struct tuple *)stmt, n_upserts);
+	vy_stmt_set_n_upserts(stmt, n_upserts);
 	return 0;
 }
 
 int
-vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
+vy_mem_insert(struct vy_mem *mem, struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) != IPROTO_UPSERT);
 	/* Check if the statement can be inserted in the vy_mem. */
@@ -220,7 +220,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
 	size_t size = tuple_size(stmt);
-	const struct tuple *replaced_stmt = NULL;
+	struct tuple *replaced_stmt = NULL;
 	if (vy_mem_tree_insert(&mem->tree, stmt, &replaced_stmt))
 		return -1;
 	if (replaced_stmt == NULL)
@@ -235,7 +235,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 void
-vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt)
+vy_mem_commit_stmt(struct vy_mem *mem, struct tuple *stmt)
 {
 	/* The statement must be from a lsregion. */
 	assert(!vy_stmt_is_refable(stmt));
@@ -257,7 +257,7 @@ vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt)
 }
 
 void
-vy_mem_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt)
+vy_mem_rollback_stmt(struct vy_mem *mem, struct tuple *stmt)
 {
 	/* This is the statement we've inserted before. */
 	assert(!vy_stmt_is_refable(stmt));
@@ -276,7 +276,7 @@ vy_mem_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt)
 /**
  * Get a stmt by current position
  */
-static const struct tuple *
+static struct tuple *
 vy_mem_iterator_curr_stmt(struct vy_mem_iterator *itr)
 {
 	return *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &itr->curr_pos);
@@ -337,7 +337,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 		/* No more statements. */
 		return 0;
 	}
-	const struct tuple *prev_stmt;
+	struct tuple *prev_stmt;
 	prev_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &prev_pos);
 	if (vy_stmt_lsn(prev_stmt) > (**itr->read_view).vlsn ||
 	    vy_stmt_compare(itr->curr_stmt, prev_stmt, cmp_def) != 0) {
@@ -382,14 +382,14 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
  * @retval 1 Not found
  */
 static int
-vy_mem_iterator_seek(struct vy_mem_iterator *itr, const struct tuple *last_key)
+vy_mem_iterator_seek(struct vy_mem_iterator *itr, struct tuple *last_key)
 {
 	itr->stat->lookup++;
 	itr->search_started = true;
 	itr->version = itr->mem->version;
 	itr->curr_stmt = NULL;
 
-	const struct tuple *key = itr->key;
+	struct tuple *key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
 	if (last_key != NULL) {
 		key = last_key;
@@ -444,7 +444,7 @@ vy_mem_iterator_seek(struct vy_mem_iterator *itr, const struct tuple *last_key)
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv)
+		     struct tuple *key, const struct vy_read_view **rv)
 {
 	itr->stat = stat;
 
@@ -478,7 +478,7 @@ vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
 	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
 	struct key_def *cmp_def = itr->mem->cmp_def;
 
-	const struct tuple *prev_stmt = itr->curr_stmt;
+	struct tuple *prev_stmt = itr->curr_stmt;
 	if (vy_mem_iterator_step(itr) != 0) {
 		itr->curr_stmt = NULL;
 		return 1;
@@ -522,7 +522,7 @@ next:
 	if (vy_mem_tree_iterator_is_invalid(&next_pos))
 		return 1; /* EOF */
 
-	const struct tuple *next_stmt;
+	struct tuple *next_stmt;
 	next_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &next_pos);
 	if (vy_stmt_compare(itr->curr_stmt, next_stmt, cmp_def) != 0)
 		return 1;
@@ -544,7 +544,7 @@ vy_mem_iterator_get_history(struct vy_mem_iterator *itr,
 			    struct vy_history *history)
 {
 	do {
-		struct tuple *stmt = (struct tuple *)itr->curr_stmt;
+		struct tuple *stmt = itr->curr_stmt;
 		vy_stmt_counter_acct_tuple(&itr->stat->get, stmt);
 		if (vy_history_append_stmt(history, stmt) != 0)
 			return -1;
@@ -565,8 +565,7 @@ vy_mem_iterator_next(struct vy_mem_iterator *itr,
 }
 
 NODISCARD int
-vy_mem_iterator_skip(struct vy_mem_iterator *itr,
-		     const struct tuple *last_stmt,
+vy_mem_iterator_skip(struct vy_mem_iterator *itr, struct tuple *last_stmt,
 		     struct vy_history *history)
 {
 	assert(!itr->search_started || itr->version == itr->mem->version);
@@ -588,8 +587,7 @@ vy_mem_iterator_skip(struct vy_mem_iterator *itr,
 }
 
 NODISCARD int
-vy_mem_iterator_restore(struct vy_mem_iterator *itr,
-			const struct tuple *last_stmt,
+vy_mem_iterator_restore(struct vy_mem_iterator *itr, struct tuple *last_stmt,
 			struct vy_history *history)
 {
 	if (!itr->search_started || itr->version == itr->mem->version)

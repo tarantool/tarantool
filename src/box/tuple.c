@@ -573,21 +573,21 @@ box_tuple_unref(box_tuple_t *tuple)
 }
 
 uint32_t
-box_tuple_field_count(const box_tuple_t *tuple)
+box_tuple_field_count(box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
 	return tuple_field_count(tuple);
 }
 
 size_t
-box_tuple_bsize(const box_tuple_t *tuple)
+box_tuple_bsize(box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
 	return tuple->bsize;
 }
 
 ssize_t
-tuple_to_buf(const struct tuple *tuple, char *buf, size_t size)
+tuple_to_buf(struct tuple *tuple, char *buf, size_t size)
 {
 	uint32_t bsize;
 	const char *data = tuple_data_range(tuple, &bsize);
@@ -598,21 +598,21 @@ tuple_to_buf(const struct tuple *tuple, char *buf, size_t size)
 }
 
 ssize_t
-box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size)
+box_tuple_to_buf(box_tuple_t *tuple, char *buf, size_t size)
 {
 	assert(tuple != NULL);
 	return tuple_to_buf(tuple, buf, size);
 }
 
 box_tuple_format_t *
-box_tuple_format(const box_tuple_t *tuple)
+box_tuple_format(box_tuple_t *tuple)
 {
 	assert(tuple != NULL);
 	return tuple_format(tuple);
 }
 
 const char *
-box_tuple_field(const box_tuple_t *tuple, uint32_t fieldno)
+box_tuple_field(box_tuple_t *tuple, uint32_t fieldno)
 {
 	assert(tuple != NULL);
 	return tuple_field(tuple, fieldno);
@@ -668,8 +668,7 @@ box_tuple_next(box_tuple_iterator_t *it)
 }
 
 box_tuple_t *
-box_tuple_update(const box_tuple_t *tuple, const char *expr,
-		 const char *expr_end)
+box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end)
 {
 	uint32_t new_size = 0, bsize;
 	const char *old_data = tuple_data_range(tuple, &bsize);
@@ -692,8 +691,7 @@ box_tuple_update(const box_tuple_t *tuple, const char *expr,
 }
 
 box_tuple_t *
-box_tuple_upsert(const box_tuple_t *tuple, const char *expr,
-		 const char *expr_end)
+box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end)
 {
 	uint32_t new_size = 0, bsize;
 	const char *old_data = tuple_data_range(tuple, &bsize);
@@ -728,7 +726,7 @@ box_tuple_new(box_tuple_format_t *format, const char *data, const char *end)
 /* }}} box_tuple_* */
 
 int
-tuple_snprint(char *buf, int size, const struct tuple *tuple)
+tuple_snprint(char *buf, int size, struct tuple *tuple)
 {
 	int total = 0;
 	if (tuple == NULL) {
@@ -740,7 +738,7 @@ tuple_snprint(char *buf, int size, const struct tuple *tuple)
 }
 
 const char *
-tuple_str(const struct tuple *tuple)
+tuple_str(struct tuple *tuple)
 {
 	char *buf = tt_static_buf();
 	if (tuple_snprint(buf, TT_STATIC_BUF_LEN, tuple) < 0)

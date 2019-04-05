@@ -1539,7 +1539,7 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 static int
 vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 			     const char *space_name, const char *index_name,
-			     struct vy_lsm *lsm, const struct tuple *stmt)
+			     struct vy_lsm *lsm, struct tuple *stmt)
 {
 	assert(lsm->index_id > 0);
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
@@ -1771,7 +1771,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
  */
 static inline int
 vy_check_update(struct space *space, const struct vy_lsm *pk,
-		const struct tuple *old_tuple, const struct tuple *new_tuple,
+		struct tuple *old_tuple, struct tuple *new_tuple,
 		uint64_t column_mask)
 {
 	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
@@ -3557,13 +3557,13 @@ vy_squash_process(struct vy_squash *squash)
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	uint8_t n_upserts = 0;
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
-		const struct tuple *mem_stmt;
+		struct tuple *mem_stmt;
 		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
 		if (vy_stmt_compare(result, mem_stmt, lsm->cmp_def) != 0 ||
 		    vy_stmt_type(mem_stmt) != IPROTO_UPSERT)
 			break;
 		assert(vy_stmt_lsn(mem_stmt) >= MAX_LSN);
-		vy_stmt_set_n_upserts((struct tuple *)mem_stmt, n_upserts);
+		vy_stmt_set_n_upserts(mem_stmt, n_upserts);
 		if (n_upserts <= VY_UPSERT_THRESHOLD)
 			++n_upserts;
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
@@ -3576,7 +3576,7 @@ vy_squash_process(struct vy_squash *squash)
 	 * and adjust the quota.
 	 */
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
-	const struct tuple *region_stmt = NULL;
+	struct tuple *region_stmt = NULL;
 	int rc = vy_lsm_set(lsm, mem, result, &region_stmt);
 	tuple_unref(result);
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
@@ -3998,13 +3998,13 @@ err:
  */
 static int
 vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		     const struct tuple *stmt, int64_t lsn)
+		     struct tuple *stmt, int64_t lsn)
 {
-	const struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt,
+	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt,
 				&mem->env->allocator, mem->generation);
 	if (region_stmt == NULL)
 		return -1;
-	vy_stmt_set_lsn((struct tuple *)region_stmt, lsn);
+	vy_stmt_set_lsn(region_stmt, lsn);
 	if (vy_mem_insert(mem, region_stmt) != 0)
 		return -1;
 	vy_mem_commit_stmt(mem, region_stmt);
@@ -4086,7 +4086,7 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
  */
 static int
 vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
-		      const struct tuple *mem_stmt)
+		      struct tuple *mem_stmt)
 {
 	int64_t lsn = vy_stmt_lsn(mem_stmt);
 	if (lsn <= lsm->dump_lsn)
@@ -4096,8 +4096,7 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	const struct vy_read_view rv = { .vlsn = lsn - 1 };
 	const struct vy_read_view *p_rv = &rv;
 	struct tuple *old_tuple;
-	if (vy_point_lookup(pk, NULL, &p_rv, (struct tuple *)mem_stmt,
-			    &old_tuple) != 0)
+	if (vy_point_lookup(pk, NULL, &p_rv, mem_stmt, &old_tuple) != 0)
 		return -1;
 	/*
 	 * Create DELETE + INSERT statements corresponding to
@@ -4166,7 +4165,7 @@ vy_build_recover_mem(struct vy_lsm *lsm, struct vy_lsm *pk, struct vy_mem *mem)
 	struct vy_mem_tree_iterator itr;
 	itr = vy_mem_tree_iterator_last(&mem->tree);
 	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
-		const struct tuple *mem_stmt;
+		struct tuple *mem_stmt;
 		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
 		if (vy_build_recover_stmt(lsm, pk, mem_stmt) != 0)
 			return -1;
@@ -4439,7 +4438,7 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 	/* Insert the deferred DELETE into secondary indexes. */
 	int rc = 0;
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
-	const struct tuple *region_stmt = NULL;
+	struct tuple *region_stmt = NULL;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		if (vy_is_committed_one(env, lsm))

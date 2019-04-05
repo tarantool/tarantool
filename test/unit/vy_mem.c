@@ -26,20 +26,20 @@ test_basic(void)
 	};
 
 	/* Check dump lsn */
-	const struct tuple *stmt = vy_mem_insert_template(mem, &stmts[0]);
+	struct tuple *stmt = vy_mem_insert_template(mem, &stmts[0]);
 	is(mem->dump_lsn, -1, "mem->dump_lsn after prepare");
 	vy_mem_commit_stmt(mem, stmt);
 	is(mem->dump_lsn, 100, "mem->dump_lsn after commit");
 
 	/* Check vy_mem_older_lsn */
-	const struct tuple *older = stmt;
+	struct tuple *older = stmt;
 	stmt = vy_mem_insert_template(mem, &stmts[1]);
 	is(vy_mem_older_lsn(mem, stmt), older, "vy_mem_older_lsn 1");
 	is(vy_mem_older_lsn(mem, older), NULL, "vy_mem_older_lsn 2");
 	vy_mem_commit_stmt(mem, stmt);
 
 	/* Check rollback  */
-	const struct tuple *olderolder = stmt;
+	struct tuple *olderolder = stmt;
 	older = vy_mem_insert_template(mem, &stmts[2]);
 	stmt = vy_mem_insert_template(mem, &stmts[3]);
 	is(vy_mem_older_lsn(mem, stmt), older, "vy_mem_rollback 1");

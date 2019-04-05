@@ -133,7 +133,7 @@ tuple_bloom_builder_delete(struct tuple_bloom_builder *builder);
  */
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			const struct tuple *tuple, struct key_def *key_def);
+			struct tuple *tuple, struct key_def *key_def);
 
 /**
  * Add a key hash to a tuple bloom filter builder.
@@ -174,7 +174,7 @@ tuple_bloom_delete(struct tuple_bloom *bloom);
  */
 bool
 tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
-		      const struct tuple *tuple, struct key_def *key_def);
+		      struct tuple *tuple, struct key_def *key_def);
 
 /**
  * Check if a tuple matching a key was stored in a tuple bloom filter.

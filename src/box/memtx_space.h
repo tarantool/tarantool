@@ -67,9 +67,8 @@ struct memtx_space {
  * @param new_tuple New tuple (inserted).
  */
 void
-memtx_space_update_bsize(struct space *space,
-			 const struct tuple *old_tuple,
-			 const struct tuple *new_tuple);
+memtx_space_update_bsize(struct space *space, struct tuple *old_tuple,
+			 struct tuple *new_tuple);
 
 int
 memtx_space_replace_no_keys(struct space *, struct tuple *, struct tuple *,

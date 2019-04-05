@@ -79,7 +79,7 @@ vy_mem_env_destroy(struct vy_mem_env *env);
 /** @cond false */
 
 struct tree_mem_key {
-	const struct tuple *stmt;
+	struct tuple *stmt;
 	int64_t lsn;
 };
 
@@ -87,7 +87,7 @@ struct tree_mem_key {
  * Internal. Extracted to speed up BPS tree.
  */
 static int
-vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
+vy_mem_tree_cmp(struct tuple *a, struct tuple *b,
 		struct key_def *cmp_def)
 {
 	int res = vy_stmt_compare(a, b, cmp_def);
@@ -101,7 +101,7 @@ vy_mem_tree_cmp(const struct tuple *a, const struct tuple *b,
  * Internal. Extracted to speed up BPS tree.
  */
 static int
-vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
+vy_mem_tree_cmp_key(struct tuple *a, struct tree_mem_key *key,
 		    struct key_def *cmp_def)
 {
 	int res = vy_stmt_compare(a, key->stmt, cmp_def);
@@ -121,7 +121,7 @@ vy_mem_tree_cmp_key(const struct tuple *a, struct tree_mem_key *key,
 #define BPS_TREE_EXTENT_SIZE VY_MEM_TREE_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, cmp_def) vy_mem_tree_cmp(a, b, cmp_def)
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_mem_tree_cmp_key(a, b, cmp_def)
-#define bps_tree_elem_t const struct tuple *
+#define bps_tree_elem_t struct tuple *
 #define bps_tree_key_t struct tree_mem_key *
 #define bps_tree_arg_t struct key_def *
 #define BPS_TREE_NO_DEBUG
@@ -275,8 +275,8 @@ vy_mem_delete(struct vy_mem *index);
 /*
  * Return the older statement for the given one.
  */
-const struct tuple *
-vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt);
+struct tuple *
+vy_mem_older_lsn(struct vy_mem *mem, struct tuple *stmt);
 
 /**
  * Insert a statement into the in-memory level.
@@ -287,7 +287,7 @@ vy_mem_older_lsn(struct vy_mem *mem, const struct tuple *stmt);
  * @retval -1 Memory error.
  */
 int
-vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt);
+vy_mem_insert(struct vy_mem *mem, struct tuple *stmt);
 
 /**
  * Insert an upsert statement into the mem.
@@ -299,7 +299,7 @@ vy_mem_insert(struct vy_mem *mem, const struct tuple *stmt);
  * @retval -1 Memory error.
  */
 int
-vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt);
+vy_mem_insert_upsert(struct vy_mem *mem, struct tuple *stmt);
 
 /**
  * Confirm insertion of a statement into the in-memory level.
@@ -307,7 +307,7 @@ vy_mem_insert_upsert(struct vy_mem *mem, const struct tuple *stmt);
  * @param stmt       Vinyl statement.
  */
 void
-vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt);
+vy_mem_commit_stmt(struct vy_mem *mem, struct tuple *stmt);
 
 /**
  * Remove a statement from the in-memory level.
@@ -315,7 +315,7 @@ vy_mem_commit_stmt(struct vy_mem *mem, const struct tuple *stmt);
  * @param stmt       Vinyl statement.
  */
 void
-vy_mem_rollback_stmt(struct vy_mem *mem, const struct tuple *stmt);
+vy_mem_rollback_stmt(struct vy_mem *mem, struct tuple *stmt);
 
 /**
  * Iterator for in-memory level.
@@ -345,7 +345,7 @@ struct vy_mem_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	const struct tuple *key;
+	struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
 	const struct vy_read_view **read_view;
 
@@ -358,7 +358,7 @@ struct vy_mem_iterator {
 	 * For example, cur_pos can be invalid but curr_stmt can point on a
 	 * valid statement.
 	 */
-	const struct tuple *curr_stmt;
+	struct tuple *curr_stmt;
 	/* data version from vy_mem */
 	uint32_t version;
 
@@ -372,7 +372,7 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv);
+		     struct tuple *key, const struct vy_read_view **rv);
 
 /**
  * Advance a mem iterator to the next key.
@@ -390,7 +390,7 @@ vy_mem_iterator_next(struct vy_mem_iterator *itr,
  */
 NODISCARD int
 vy_mem_iterator_skip(struct vy_mem_iterator *itr,
-		     const struct tuple *last_stmt,
+		     struct tuple *last_stmt,
 		     struct vy_history *history);
 
 /**
@@ -401,7 +401,7 @@ vy_mem_iterator_skip(struct vy_mem_iterator *itr,
  */
 NODISCARD int
 vy_mem_iterator_restore(struct vy_mem_iterator *itr,
-			const struct tuple *last_stmt,
+			struct tuple *last_stmt,
 			struct vy_history *history);
 
 /**

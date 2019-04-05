@@ -126,14 +126,14 @@ box_tuple_unref(box_tuple_t *tuple);
  * \param tuple a tuple
  */
 uint32_t
-box_tuple_field_count(const box_tuple_t *tuple);
+box_tuple_field_count(box_tuple_t *tuple);
 
 /**
  * Return the number of bytes used to store internal tuple data (MsgPack Array).
  * \param tuple a tuple
  */
 size_t
-box_tuple_bsize(const box_tuple_t *tuple);
+box_tuple_bsize(box_tuple_t *tuple);
 
 /**
  * Dump raw MsgPack data to the memory byffer \a buf of size \a size.
@@ -146,7 +146,7 @@ box_tuple_bsize(const box_tuple_t *tuple);
  * which would have been written if enough space had been available.
  */
 ssize_t
-box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size);
+box_tuple_to_buf(box_tuple_t *tuple, char *buf, size_t size);
 
 /**
  * Return the associated format.
@@ -154,7 +154,7 @@ box_tuple_to_buf(const box_tuple_t *tuple, char *buf, size_t size);
  * \return tuple_format
  */
 box_tuple_format_t *
-box_tuple_format(const box_tuple_t *tuple);
+box_tuple_format(box_tuple_t *tuple);
 
 /**
  * Return the raw tuple field in MsgPack format.
@@ -167,7 +167,7 @@ box_tuple_format(const box_tuple_t *tuple);
  * \retval msgpack otherwise
  */
 const char *
-box_tuple_field(const box_tuple_t *tuple, uint32_t fieldno);
+box_tuple_field(box_tuple_t *tuple, uint32_t fieldno);
 
 /**
  * Tuple iterator
@@ -277,12 +277,10 @@ box_tuple_t *
 box_tuple_new(box_tuple_format_t *format, const char *data, const char *end);
 
 box_tuple_t *
-box_tuple_update(const box_tuple_t *tuple, const char *expr, const
-		 char *expr_end);
+box_tuple_update(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 box_tuple_t *
-box_tuple_upsert(const box_tuple_t *tuple, const char *expr, const
-		 char *expr_end);
+box_tuple_upsert(box_tuple_t *tuple, const char *expr, const char *expr_end);
 
 /** \endcond public */
 
@@ -330,7 +328,7 @@ struct PACKED tuple
 
 /** Size of the tuple including size of struct tuple. */
 static inline size_t
-tuple_size(const struct tuple *tuple)
+tuple_size(struct tuple *tuple)
 {
 	/* data_offset includes sizeof(struct tuple). */
 	return tuple->data_offset + tuple->bsize;
@@ -342,7 +340,7 @@ tuple_size(const struct tuple *tuple)
  * @return MessagePack array.
  */
 static inline const char *
-tuple_data(const struct tuple *tuple)
+tuple_data(struct tuple *tuple)
 {
 	return (const char *) tuple + tuple->data_offset;
 }
@@ -351,7 +349,7 @@ tuple_data(const struct tuple *tuple)
  * Wrapper around tuple_data() which returns NULL if @tuple == NULL.
  */
 static inline const char *
-tuple_data_or_null(const struct tuple *tuple)
+tuple_data_or_null(struct tuple *tuple)
 {
 	return tuple != NULL ? tuple_data(tuple) : NULL;
 }
@@ -363,7 +361,7 @@ tuple_data_or_null(const struct tuple *tuple)
  * @return MessagePack array.
  */
 static inline const char *
-tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
+tuple_data_range(struct tuple *tuple, uint32_t *p_size)
 {
 	*p_size = tuple->bsize;
 	return (const char *) tuple + tuple->data_offset;
@@ -385,7 +383,7 @@ tuple_data_range(const struct tuple *tuple, uint32_t *p_size)
  * @see mp_snprint
  */
 int
-tuple_snprint(char *buf, int size, const struct tuple *tuple);
+tuple_snprint(char *buf, int size, struct tuple *tuple);
 
 /**
  * Format a tuple into string using a static buffer.
@@ -394,7 +392,7 @@ tuple_snprint(char *buf, int size, const struct tuple *tuple);
  * @return formatted null-terminated string
  */
 const char *
-tuple_str(const struct tuple *tuple);
+tuple_str(struct tuple *tuple);
 
 /**
  * Format msgpack into string using a static buffer.
@@ -411,7 +409,7 @@ mp_str(const char *data);
  * @retval Tuple format instance.
  */
 static inline struct tuple_format *
-tuple_format(const struct tuple *tuple)
+tuple_format(struct tuple *tuple)
 {
 	struct tuple_format *format = tuple_format_by_id(tuple->format_id);
 	assert(tuple_format_id(format) == tuple->format_id);
@@ -483,7 +481,7 @@ tuple_validate(struct tuple_format *format, struct tuple *tuple)
  * @sa tuple_field_map_create()
  */
 static inline const uint32_t *
-tuple_field_map(const struct tuple *tuple)
+tuple_field_map(struct tuple *tuple)
 {
 	return (const uint32_t *) ((const char *) tuple + tuple->data_offset);
 }
@@ -494,7 +492,7 @@ tuple_field_map(const struct tuple *tuple)
  * @return the number of fields in tuple
  */
 static inline uint32_t
-tuple_field_count(const struct tuple *tuple)
+tuple_field_count(struct tuple *tuple)
 {
 	const char *data = tuple_data(tuple);
 	return mp_decode_array(&data);
@@ -607,7 +605,7 @@ tuple_field_raw(struct tuple_format *format, const char *tuple,
  * @retval NULL when fieldno is out of range
  */
 static inline const char *
-tuple_field(const struct tuple *tuple, uint32_t fieldno)
+tuple_field(struct tuple *tuple, uint32_t fieldno)
 {
 	return tuple_field_raw(tuple_format(tuple), tuple_data(tuple),
 			       tuple_field_map(tuple), fieldno);
@@ -666,7 +664,7 @@ tuple_field_raw_by_part(struct tuple_format *format, const char *data,
  * @retval Field data if the field exists or NULL.
  */
 static inline const char *
-tuple_field_by_part(const struct tuple *tuple, struct key_part *part)
+tuple_field_by_part(struct tuple *tuple, struct key_part *part)
 {
 	return tuple_field_raw_by_part(tuple_format(tuple), tuple_data(tuple),
 				       tuple_field_map(tuple), part);
@@ -801,8 +799,7 @@ mp_tuple_assert(const char *tuple, const char *tuple_end)
 }
 
 static inline const char *
-tuple_field_with_type(const struct tuple *tuple, uint32_t fieldno,
-		      enum mp_type type)
+tuple_field_with_type(struct tuple *tuple, uint32_t fieldno, enum mp_type type)
 {
 	const char *field = tuple_field(tuple, fieldno);
 	if (field == NULL) {
@@ -824,7 +821,7 @@ tuple_field_with_type(const struct tuple *tuple, uint32_t fieldno,
  * as bool.
  */
 static inline int
-tuple_field_bool(const struct tuple *tuple, uint32_t fieldno, bool *out)
+tuple_field_bool(struct tuple *tuple, uint32_t fieldno, bool *out)
 {
 	const char *field = tuple_field_with_type(tuple, fieldno, MP_BOOL);
 	if (field == NULL)
@@ -838,7 +835,7 @@ tuple_field_bool(const struct tuple *tuple, uint32_t fieldno, bool *out)
  * as int64_t.
  */
 static inline int
-tuple_field_i64(const struct tuple *tuple, uint32_t fieldno, int64_t *out)
+tuple_field_i64(struct tuple *tuple, uint32_t fieldno, int64_t *out)
 {
 	const char *field = tuple_field(tuple, fieldno);
 	if (field == NULL) {
@@ -871,7 +868,7 @@ tuple_field_i64(const struct tuple *tuple, uint32_t fieldno, int64_t *out)
  * as uint64_t.
  */
 static inline int
-tuple_field_u64(const struct tuple *tuple, uint32_t fieldno, uint64_t *out)
+tuple_field_u64(struct tuple *tuple, uint32_t fieldno, uint64_t *out)
 {
 	const char *field = tuple_field_with_type(tuple, fieldno, MP_UINT);
 	if (field == NULL)
@@ -885,7 +882,7 @@ tuple_field_u64(const struct tuple *tuple, uint32_t fieldno, uint64_t *out)
  * as uint32_t.
  */
 static inline int
-tuple_field_u32(const struct tuple *tuple, uint32_t fieldno, uint32_t *out)
+tuple_field_u32(struct tuple *tuple, uint32_t fieldno, uint32_t *out)
 {
 	const char *field = tuple_field_with_type(tuple, fieldno, MP_UINT);
 	if (field == NULL)
@@ -905,7 +902,7 @@ tuple_field_u32(const struct tuple *tuple, uint32_t fieldno, uint32_t *out)
  * as a string.
  */
 static inline const char *
-tuple_field_str(const struct tuple *tuple, uint32_t fieldno, uint32_t *len)
+tuple_field_str(struct tuple *tuple, uint32_t fieldno, uint32_t *len)
 {
 	const char *field = tuple_field_with_type(tuple, fieldno, MP_STR);
 	if (field == NULL)
@@ -918,7 +915,7 @@ tuple_field_str(const struct tuple *tuple, uint32_t fieldno, uint32_t *len)
  * as a NUL-terminated string - returns a string of up to 256 bytes.
  */
 static inline const char *
-tuple_field_cstr(const struct tuple *tuple, uint32_t fieldno)
+tuple_field_cstr(struct tuple *tuple, uint32_t fieldno)
 {
 	uint32_t len;
 	const char *str = tuple_field_str(tuple, fieldno, &len);
@@ -932,8 +929,7 @@ tuple_field_cstr(const struct tuple *tuple, uint32_t fieldno)
  * representation of UUID, and return a 16-byte representation.
  */
 static inline int
-tuple_field_uuid(const struct tuple *tuple, int fieldno,
-		 struct tt_uuid *out)
+tuple_field_uuid(struct tuple *tuple, int fieldno, struct tt_uuid *out)
 {
 	const char *value = tuple_field_cstr(tuple, fieldno);
 	if (tt_uuid_from_string(value, out) != 0) {
@@ -1012,7 +1008,7 @@ tuple_bless(struct tuple *tuple)
  * \copydoc box_tuple_to_buf()
  */
 ssize_t
-tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
+tuple_to_buf(struct tuple *tuple, char *buf, size_t size);
 
 #if defined(__cplusplus)
 } /* extern "C" */
@@ -1022,7 +1018,7 @@ tuple_to_buf(const struct tuple *tuple, char *buf, size_t size);
 
 /* @copydoc tuple_field_with_type() */
 static inline const char *
-tuple_field_with_type_xc(const struct tuple *tuple, uint32_t fieldno,
+tuple_field_with_type_xc(struct tuple *tuple, uint32_t fieldno,
 		         enum mp_type type)
 {
 	const char *out = tuple_field_with_type(tuple, fieldno, type);
@@ -1033,7 +1029,7 @@ tuple_field_with_type_xc(const struct tuple *tuple, uint32_t fieldno,
 
 /* @copydoc tuple_field_bool() */
 static inline bool
-tuple_field_bool_xc(const struct tuple *tuple, uint32_t fieldno)
+tuple_field_bool_xc(struct tuple *tuple, uint32_t fieldno)
 {
 	bool out;
 	if (tuple_field_bool(tuple, fieldno, &out) != 0)
@@ -1043,7 +1039,7 @@ tuple_field_bool_xc(const struct tuple *tuple, uint32_t fieldno)
 
 /* @copydoc tuple_field_i64() */
 static inline int64_t
-tuple_field_i64_xc(const struct tuple *tuple, uint32_t fieldno)
+tuple_field_i64_xc(struct tuple *tuple, uint32_t fieldno)
 {
 	int64_t out;
 	if (tuple_field_i64(tuple, fieldno, &out) != 0)
@@ -1053,7 +1049,7 @@ tuple_field_i64_xc(const struct tuple *tuple, uint32_t fieldno)
 
 /* @copydoc tuple_field_u64() */
 static inline uint64_t
-tuple_field_u64_xc(const struct tuple *tuple, uint32_t fieldno)
+tuple_field_u64_xc(struct tuple *tuple, uint32_t fieldno)
 {
 	uint64_t out;
 	if (tuple_field_u64(tuple, fieldno, &out) != 0)
@@ -1063,7 +1059,7 @@ tuple_field_u64_xc(const struct tuple *tuple, uint32_t fieldno)
 
 /* @copydoc tuple_field_u32() */
 static inline uint32_t
-tuple_field_u32_xc(const struct tuple *tuple, uint32_t fieldno)
+tuple_field_u32_xc(struct tuple *tuple, uint32_t fieldno)
 {
 	uint32_t out;
 	if (tuple_field_u32(tuple, fieldno, &out) != 0)
@@ -1073,8 +1069,7 @@ tuple_field_u32_xc(const struct tuple *tuple, uint32_t fieldno)
 
 /** @copydoc tuple_field_str() */
 static inline const char *
-tuple_field_str_xc(const struct tuple *tuple, uint32_t fieldno,
-			uint32_t *len)
+tuple_field_str_xc(struct tuple *tuple, uint32_t fieldno, uint32_t *len)
 {
 	const char *ret = tuple_field_str(tuple, fieldno, len);
 	if (ret == NULL)
@@ -1084,7 +1079,7 @@ tuple_field_str_xc(const struct tuple *tuple, uint32_t fieldno,
 
 /** @copydoc tuple_field_cstr() */
 static inline const char *
-tuple_field_cstr_xc(const struct tuple *tuple, uint32_t fieldno)
+tuple_field_cstr_xc(struct tuple *tuple, uint32_t fieldno)
 {
 	const char *out = tuple_field_cstr(tuple, fieldno);
 	if (out == NULL)
@@ -1094,8 +1089,7 @@ tuple_field_cstr_xc(const struct tuple *tuple, uint32_t fieldno)
 
 /** @copydoc tuple_field_uuid() */
 static inline void
-tuple_field_uuid_xc(const struct tuple *tuple, int fieldno,
-		    struct tt_uuid *out)
+tuple_field_uuid_xc(struct tuple *tuple, int fieldno, struct tt_uuid *out)
 {
 	if (tuple_field_uuid(tuple, fieldno, out) != 0)
 		diag_raise();

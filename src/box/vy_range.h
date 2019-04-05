@@ -167,12 +167,12 @@ vy_range_is_scheduled(struct vy_range *range)
 int
 vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b);
 int
-vy_range_tree_key_cmp(const struct tuple *stmt, struct vy_range *range);
+vy_range_tree_key_cmp(struct tuple *stmt, struct vy_range *range);
 
 typedef rb_tree(struct vy_range) vy_range_tree_t;
 rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
 	       struct vy_range, tree_node, vy_range_tree_cmp,
-	       const struct tuple *, vy_range_tree_key_cmp);
+	       struct tuple *, vy_range_tree_key_cmp);
 
 /**
  * Find the first range in which a given key should be looked up.
@@ -186,7 +186,7 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
 struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
-			  const struct tuple *key);
+			  struct tuple *key);
 
 /**
  * Allocate and initialize a range (either a new one or for

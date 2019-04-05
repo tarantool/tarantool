@@ -447,8 +447,8 @@ tuple_compare_field_with_type(const char *field_a, enum mp_type a_type,
 
 template<bool is_nullable, bool has_optional_parts, bool has_json_paths>
 static inline int
-tuple_compare_slowpath_hinted(const struct tuple *tuple_a, hint_t tuple_a_hint,
-			      const struct tuple *tuple_b, hint_t tuple_b_hint,
+tuple_compare_slowpath_hinted(struct tuple *tuple_a, hint_t tuple_a_hint,
+			      struct tuple *tuple_b, hint_t tuple_b_hint,
 			      struct key_def *key_def)
 {
 	assert(has_json_paths == key_def->has_json_paths);
@@ -582,7 +582,7 @@ tuple_compare_slowpath_hinted(const struct tuple *tuple_a, hint_t tuple_a_hint,
 
 template<bool is_nullable, bool has_optional_parts, bool has_json_paths>
 static inline int
-tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
+tuple_compare_slowpath(struct tuple *tuple_a, struct tuple *tuple_b,
 		       struct key_def *key_def)
 {
 	return tuple_compare_slowpath_hinted
@@ -592,7 +592,7 @@ tuple_compare_slowpath(const struct tuple *tuple_a, const struct tuple *tuple_b,
 
 template<bool is_nullable, bool has_optional_parts, bool has_json_paths>
 static inline int
-tuple_compare_with_key_slowpath_hinted(const struct tuple *tuple,
+tuple_compare_with_key_slowpath_hinted(struct tuple *tuple,
 		hint_t tuple_hint, const char *key, uint32_t part_count,
 		hint_t key_hint, struct key_def *key_def)
 {
@@ -680,7 +680,7 @@ tuple_compare_with_key_slowpath_hinted(const struct tuple *tuple,
 
 template<bool is_nullable, bool has_optional_parts, bool has_json_paths>
 static inline int
-tuple_compare_with_key_slowpath(const struct tuple *tuple, const char *key,
+tuple_compare_with_key_slowpath(struct tuple *tuple, const char *key,
 				uint32_t part_count, struct key_def *key_def)
 {
 	return tuple_compare_with_key_slowpath_hinted
@@ -746,7 +746,7 @@ key_compare_parts(const char *key_a, const char *key_b, uint32_t part_count,
 
 template<bool is_nullable, bool has_optional_parts>
 static inline int
-tuple_compare_with_key_sequential_hinted(const struct tuple *tuple,
+tuple_compare_with_key_sequential_hinted(struct tuple *tuple,
 		hint_t tuple_hint, const char *key, uint32_t part_count,
 		hint_t key_hint, struct key_def *key_def)
 {
@@ -791,7 +791,7 @@ tuple_compare_with_key_sequential_hinted(const struct tuple *tuple,
 
 template<bool is_nullable, bool has_optional_parts>
 static inline int
-tuple_compare_with_key_sequential(const struct tuple *tuple, const char *key,
+tuple_compare_with_key_sequential(struct tuple *tuple, const char *key,
 				  uint32_t part_count, struct key_def *key_def)
 {
 	return tuple_compare_with_key_sequential_hinted
@@ -819,8 +819,8 @@ key_compare(const char *key_a, const char *key_b, struct key_def *key_def)
 
 template <bool is_nullable, bool has_optional_parts>
 static int
-tuple_compare_sequential_hinted(const struct tuple *tuple_a, hint_t tuple_a_hint,
-				const struct tuple *tuple_b, hint_t tuple_b_hint,
+tuple_compare_sequential_hinted(struct tuple *tuple_a, hint_t tuple_a_hint,
+				struct tuple *tuple_b, hint_t tuple_b_hint,
 				struct key_def *key_def)
 {
 	assert(!has_optional_parts || is_nullable);
@@ -891,8 +891,8 @@ tuple_compare_sequential_hinted(const struct tuple *tuple_a, hint_t tuple_a_hint
 
 template <bool is_nullable, bool has_optional_parts>
 static int
-tuple_compare_sequential(const struct tuple *tuple_a,
-			 const struct tuple *tuple_b, struct key_def *key_def)
+tuple_compare_sequential(struct tuple *tuple_a, struct tuple *tuple_b,
+			 struct key_def *key_def)
 {
 	return tuple_compare_sequential_hinted
 		<is_nullable, has_optional_parts>
@@ -965,8 +965,8 @@ template <int IDX, int TYPE, int ...MORE_TYPES> struct FieldCompare { };
 template <int IDX, int TYPE, int IDX2, int TYPE2, int ...MORE_TYPES>
 struct FieldCompare<IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 {
-	inline static int compare(const struct tuple *tuple_a,
-				  const struct tuple *tuple_b,
+	inline static int compare(struct tuple *tuple_a,
+				  struct tuple *tuple_b,
 				  struct tuple_format *format_a,
 				  struct tuple_format *format_b,
 				  const char *field_a,
@@ -997,8 +997,8 @@ struct FieldCompare<IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 template <int IDX, int TYPE>
 struct FieldCompare<IDX, TYPE>
 {
-	inline static int compare(const struct tuple *,
-				  const struct tuple *,
+	inline static int compare(struct tuple *,
+				  struct tuple *,
 				  struct tuple_format *,
 				  struct tuple_format *,
 				  const char *field_a,
@@ -1014,8 +1014,7 @@ struct FieldCompare<IDX, TYPE>
 template <int IDX, int TYPE, int ...MORE_TYPES>
 struct TupleCompare
 {
-	static int compare(const struct tuple *tuple_a,
-			   const struct tuple *tuple_b,
+	static int compare(struct tuple *tuple_a, struct tuple *tuple_b,
 			   struct key_def *)
 	{
 		struct tuple_format *format_a = tuple_format(tuple_a);
@@ -1030,10 +1029,8 @@ struct TupleCompare
 				format_b, field_a, field_b);
 	}
 
-	static int compare_hinted(const struct tuple *tuple_a,
-				  hint_t tuple_a_hint,
-				  const struct tuple *tuple_b,
-				  hint_t tuple_b_hint,
+	static int compare_hinted(struct tuple *tuple_a, hint_t tuple_a_hint,
+				  struct tuple *tuple_b, hint_t tuple_b_hint,
 				  struct key_def *key_def)
 	{
 		int rc = hint_cmp(tuple_a_hint, tuple_b_hint);
@@ -1045,8 +1042,7 @@ struct TupleCompare
 
 template <int TYPE, int ...MORE_TYPES>
 struct TupleCompare<0, TYPE, MORE_TYPES...> {
-	static int compare(const struct tuple *tuple_a,
-			   const struct tuple *tuple_b,
+	static int compare(struct tuple *tuple_a, struct tuple *tuple_b,
 			   struct key_def *)
 	{
 		struct tuple_format *format_a = tuple_format(tuple_a);
@@ -1059,10 +1055,8 @@ struct TupleCompare<0, TYPE, MORE_TYPES...> {
 					format_a, format_b, field_a, field_b);
 	}
 
-	static int compare_hinted(const struct tuple *tuple_a,
-				  hint_t tuple_a_hint,
-				  const struct tuple *tuple_b,
-				  hint_t tuple_b_hint,
+	static int compare_hinted(struct tuple *tuple_a, hint_t tuple_a_hint,
+				  struct tuple *tuple_b, hint_t tuple_b_hint,
 				  struct key_def *key_def)
 	{
 		int rc = hint_cmp(tuple_a_hint, tuple_b_hint);
@@ -1175,9 +1169,9 @@ template <int FLD_ID, int IDX, int TYPE, int IDX2, int TYPE2, int ...MORE_TYPES>
 struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 {
 	inline static int
-	compare(const struct tuple *tuple, const char *key,
-		uint32_t part_count, struct key_def *key_def,
-		struct tuple_format *format, const char *field)
+	compare(struct tuple *tuple, const char *key, uint32_t part_count,
+		struct key_def *key_def, struct tuple_format *format,
+		const char *field)
 	{
 		int r;
 		/* static if */
@@ -1201,7 +1195,7 @@ struct FieldCompareWithKey<FLD_ID, IDX, TYPE, IDX2, TYPE2, MORE_TYPES...>
 
 template <int FLD_ID, int IDX, int TYPE>
 struct FieldCompareWithKey<FLD_ID, IDX, TYPE> {
-	inline static int compare(const struct tuple *,
+	inline static int compare(struct tuple *,
 				  const char *key,
 				  uint32_t,
 				  struct key_def *,
@@ -1219,8 +1213,8 @@ template <int FLD_ID, int IDX, int TYPE, int ...MORE_TYPES>
 struct TupleCompareWithKey
 {
 	static int
-	compare(const struct tuple *tuple, const char *key,
-		uint32_t part_count, struct key_def *key_def)
+	compare(struct tuple *tuple, const char *key, uint32_t part_count,
+		struct key_def *key_def)
 	{
 		/* Part count can be 0 in wildcard searches. */
 		if (part_count == 0)
@@ -1235,7 +1229,7 @@ struct TupleCompareWithKey
 	}
 
 	static int
-	compare_hinted(const struct tuple *tuple, hint_t tuple_hint,
+	compare_hinted(struct tuple *tuple, hint_t tuple_hint,
 		       const char *key, uint32_t part_count, hint_t key_hint,
 		       struct key_def *key_def)
 	{
@@ -1249,10 +1243,9 @@ struct TupleCompareWithKey
 template <int TYPE, int ...MORE_TYPES>
 struct TupleCompareWithKey<0, 0, TYPE, MORE_TYPES...>
 {
-	static int compare(const struct tuple *tuple,
-				  const char *key,
-				  uint32_t part_count,
-				  struct key_def *key_def)
+	static int compare(struct tuple *tuple,
+			   const char *key, uint32_t part_count,
+			   struct key_def *key_def)
 	{
 		/* Part count can be 0 in wildcard searches. */
 		if (part_count == 0)
@@ -1266,7 +1259,7 @@ struct TupleCompareWithKey<0, 0, TYPE, MORE_TYPES...>
 	}
 
 	static int
-	compare_hinted(const struct tuple *tuple, hint_t tuple_hint,
+	compare_hinted(struct tuple *tuple, hint_t tuple_hint,
 		       const char *key, uint32_t part_count, hint_t key_hint,
 		       struct key_def *key_def)
 	{
@@ -1603,7 +1596,7 @@ key_hint(const char *key, uint32_t part_count, struct key_def *key_def)
 
 template <enum field_type type, bool is_nullable>
 static hint_t
-tuple_hint(const struct tuple *tuple, struct key_def *key_def)
+tuple_hint(struct tuple *tuple, struct key_def *key_def)
 {
 	const char *field = tuple_field_by_part(tuple, key_def->parts);
 	if (is_nullable && field == NULL)

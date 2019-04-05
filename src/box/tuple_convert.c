@@ -38,7 +38,7 @@
 #include <trivia/util.h>
 
 int
-tuple_to_obuf(const struct tuple *tuple, struct obuf *buf)
+tuple_to_obuf(struct tuple *tuple, struct obuf *buf)
 {
 	uint32_t bsize;
 	const char *data = tuple_data_range(tuple, &bsize);
@@ -227,7 +227,7 @@ encode_node(yaml_emitter_t *emitter, const char **data)
 }
 
 char *
-tuple_to_yaml(const struct tuple *tuple)
+tuple_to_yaml(struct tuple *tuple)
 {
 	const char *data = tuple_data(tuple);
 	yaml_emitter_t emitter;

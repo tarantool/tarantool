@@ -182,9 +182,9 @@ struct vy_stmt {
 
 /** Get LSN of the vinyl statement. */
 static inline int64_t
-vy_stmt_lsn(const struct tuple *stmt)
+vy_stmt_lsn(struct tuple *stmt)
 {
-	return ((const struct vy_stmt *) stmt)->lsn;
+	return ((struct vy_stmt *) stmt)->lsn;
 }
 
 /** Set LSN of the vinyl statement. */
@@ -196,9 +196,9 @@ vy_stmt_set_lsn(struct tuple *stmt, int64_t lsn)
 
 /** Get type of the vinyl statement. */
 static inline enum iproto_type
-vy_stmt_type(const struct tuple *stmt)
+vy_stmt_type(struct tuple *stmt)
 {
-	return (enum iproto_type)((const struct vy_stmt *) stmt)->type;
+	return (enum iproto_type)((struct vy_stmt *) stmt)->type;
 }
 
 /** Set type of the vinyl statement. */
@@ -210,9 +210,9 @@ vy_stmt_set_type(struct tuple *stmt, enum iproto_type type)
 
 /** Get flags of the vinyl statement. */
 static inline uint8_t
-vy_stmt_flags(const struct tuple *stmt)
+vy_stmt_flags(struct tuple *stmt)
 {
-	return ((const struct vy_stmt *)stmt)->flags;
+	return ((struct vy_stmt *)stmt)->flags;
 }
 
 /** Set flags of the vinyl statement. */
@@ -227,7 +227,7 @@ vy_stmt_set_flags(struct tuple *stmt, uint8_t flags)
  * Only for UPSERT statements allocated on lsregion.
  */
 static inline uint8_t
-vy_stmt_n_upserts(const struct tuple *stmt)
+vy_stmt_n_upserts(struct tuple *stmt)
 {
 	assert(stmt->refs == 0);
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
@@ -256,7 +256,7 @@ vy_stmt_is_key_format(const struct tuple_format *format)
 
 /** Return true if the vinyl statement has key format. */
 static inline bool
-vy_stmt_is_key(const struct tuple *stmt)
+vy_stmt_is_key(struct tuple *stmt)
 {
 	return vy_stmt_is_key_format(tuple_format(stmt));
 }
@@ -269,7 +269,7 @@ vy_stmt_is_key(const struct tuple *stmt)
  * all key parts defined.
  */
 static inline uint32_t
-vy_stmt_key_part_count(const struct tuple *stmt, struct key_def *key_def)
+vy_stmt_key_part_count(struct tuple *stmt, struct key_def *key_def)
 {
 	if (vy_stmt_is_key(stmt)) {
 		uint32_t part_count = tuple_field_count(stmt);
@@ -284,7 +284,7 @@ vy_stmt_key_part_count(const struct tuple *stmt, struct key_def *key_def)
  * key parts, i.e. can be used for an exact match lookup.
  */
 static inline bool
-vy_stmt_is_full_key(const struct tuple *stmt, struct key_def *key_def)
+vy_stmt_is_full_key(struct tuple *stmt, struct key_def *key_def)
 {
 	return vy_stmt_key_part_count(stmt, key_def) == key_def->part_count;
 }
@@ -294,7 +294,7 @@ vy_stmt_is_full_key(const struct tuple *stmt, struct key_def *key_def)
  * (match all) key.
  */
 static inline bool
-vy_stmt_is_empty_key(const struct tuple *stmt)
+vy_stmt_is_empty_key(struct tuple *stmt)
 {
 	return tuple_field_count(stmt) == 0;
 }
@@ -306,7 +306,7 @@ vy_stmt_is_empty_key(const struct tuple *stmt)
  * @return new statement of the same type with the same data.
  */
 struct tuple *
-vy_stmt_dup(const struct tuple *stmt);
+vy_stmt_dup(struct tuple *stmt);
 
 struct lsregion;
 
@@ -320,7 +320,7 @@ struct lsregion;
  * @retval     NULL Memory error.
  */
 struct tuple *
-vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
+vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 		     int64_t alloc_id);
 
 /**
@@ -331,7 +331,7 @@ vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
  * @retval false otherwise
  */
 static inline bool
-vy_stmt_is_refable(const struct tuple *stmt)
+vy_stmt_is_refable(struct tuple *stmt)
 {
 	return stmt->refs > 0;
 }
@@ -367,8 +367,7 @@ vy_stmt_unref_if_possible(struct tuple *stmt)
  * formats (key or tuple).
  */
 static inline int
-vy_stmt_compare(const struct tuple *a, const struct tuple *b,
-		struct key_def *key_def)
+vy_stmt_compare(struct tuple *a, struct tuple *b, struct key_def *key_def)
 {
 	bool a_is_tuple = !vy_stmt_is_key(a);
 	bool b_is_tuple = !vy_stmt_is_key(b);
@@ -393,7 +392,7 @@ vy_stmt_compare(const struct tuple *a, const struct tuple *b,
  * (msgpack array).
  */
 static inline int
-vy_stmt_compare_with_raw_key(const struct tuple *stmt, const char *key,
+vy_stmt_compare_with_raw_key(struct tuple *stmt, const char *key,
 			     struct key_def *key_def)
 {
 	if (!vy_stmt_is_key(stmt)) {
@@ -447,8 +446,7 @@ vy_stmt_new_surrogate_delete_raw(struct tuple_format *format,
 
 /** @copydoc vy_stmt_new_surrogate_delete_raw. */
 static inline struct tuple *
-vy_stmt_new_surrogate_delete(struct tuple_format *format,
-			     const struct tuple *tuple)
+vy_stmt_new_surrogate_delete(struct tuple_format *format, struct tuple *tuple)
 {
 	uint32_t size;
 	const char *data = tuple_data_range(tuple, &size);
@@ -523,7 +521,7 @@ vy_stmt_new_upsert(struct tuple_format *format,
  * @retval     NULL Memory error.
  */
 struct tuple *
-vy_stmt_replace_from_upsert(const struct tuple *upsert);
+vy_stmt_replace_from_upsert(struct tuple *upsert);
 
 /**
  * Extract MessagePack data from the REPLACE/UPSERT statement.
@@ -533,7 +531,7 @@ vy_stmt_replace_from_upsert(const struct tuple *upsert);
  * @return MessagePack array of tuple fields.
  */
 static inline const char *
-vy_upsert_data_range(const struct tuple *tuple, uint32_t *p_size)
+vy_upsert_data_range(struct tuple *tuple, uint32_t *p_size)
 {
 	assert(vy_stmt_type(tuple) == IPROTO_UPSERT);
 	const char *mp = tuple_data(tuple);
@@ -553,7 +551,7 @@ vy_upsert_data_range(const struct tuple *tuple, uint32_t *p_size)
  * @retval Pointer on MessagePack array of update operations.
  */
 static inline const char *
-vy_stmt_upsert_ops(const struct tuple *tuple, uint32_t *mp_size)
+vy_stmt_upsert_ops(struct tuple *tuple, uint32_t *mp_size)
 {
 	assert(vy_stmt_type(tuple) == IPROTO_UPSERT);
 	const char *mp = tuple_data(tuple);
@@ -583,7 +581,7 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
  * malloc().
  */
 struct tuple *
-vy_stmt_extract_key(const struct tuple *stmt, struct key_def *key_def,
+vy_stmt_extract_key(struct tuple *stmt, struct key_def *key_def,
 		    struct tuple_format *format);
 
 /**
@@ -602,7 +600,7 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
  */
 int
 vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
-			  const struct tuple *stmt, struct key_def *key_def);
+			  struct tuple *stmt, struct key_def *key_def);
 
 /**
  * Check if a statement hash is present in a bloom filter.
@@ -610,7 +608,7 @@ vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
  */
 bool
 vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
-			const struct tuple *stmt, struct key_def *key_def);
+			struct tuple *stmt, struct key_def *key_def);
 
 /**
  * Encode vy_stmt for a primary key as xrow_header
@@ -625,7 +623,7 @@ vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
  * @retval -1 if error
  */
 int
-vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
+vy_stmt_encode_primary(struct tuple *value, struct key_def *key_def,
 		       uint32_t space_id, struct xrow_header *xrow);
 
 /**
@@ -639,7 +637,7 @@ vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
  * @retval -1 if error
  */
 int
-vy_stmt_encode_secondary(const struct tuple *value, struct key_def *cmp_def,
+vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
 			 struct xrow_header *xrow);
 
 /**
@@ -656,7 +654,7 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format);
  * Example: REPLACE([1, 2, "string"], lsn=48)
  */
 int
-vy_stmt_snprint(char *buf, int size, const struct tuple *stmt);
+vy_stmt_snprint(char *buf, int size, struct tuple *stmt);
 
 /*
  * Format a statement into string using a static buffer.
@@ -664,7 +662,7 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt);
  * \sa vy_stmt_snprint()
  */
 const char *
-vy_stmt_str(const struct tuple *stmt);
+vy_stmt_str(struct tuple *stmt);
 
 #if defined(__cplusplus)
 } /* extern "C" */

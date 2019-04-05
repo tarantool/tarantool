@@ -41,7 +41,7 @@ struct tuple;
 
 /* Store tuple in the output buffer in iproto format. */
 int
-tuple_to_obuf(const struct tuple *tuple, struct obuf *buf);
+tuple_to_obuf(struct tuple *tuple, struct obuf *buf);
 
 /**
  * Convert tuple to yaml string
@@ -51,7 +51,7 @@ tuple_to_obuf(const struct tuple *tuple, struct obuf *buf);
  * \retval pointer to string allocated on fiber()->gc region
  */
 char *
-tuple_to_yaml(const struct tuple *tuple);
+tuple_to_yaml(struct tuple *tuple);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -87,7 +87,7 @@ vy_upsert_try_to_squash(struct tuple_format *format, struct region *region,
 }
 
 struct tuple *
-vy_apply_upsert(const struct tuple *new_stmt, const struct tuple *old_stmt,
+vy_apply_upsert(struct tuple *new_stmt, struct tuple *old_stmt,
 		struct key_def *cmp_def, bool suppress_error)
 {
 	/*

@@ -116,7 +116,7 @@ mp_decode_rect_from_key(struct rtree_rect *rect, unsigned dimension,
 }
 
 static inline int
-extract_rectangle(struct rtree_rect *rect, const struct tuple *tuple,
+extract_rectangle(struct rtree_rect *rect, struct tuple *tuple,
 		  struct index_def *index_def)
 {
 	assert(index_def->key_def->part_count == 1);

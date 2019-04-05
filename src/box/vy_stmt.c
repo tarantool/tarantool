@@ -59,7 +59,7 @@ enum vy_stmt_meta_key {
  * is written to disk.
  */
 static inline uint8_t
-vy_stmt_persistent_flags(const struct tuple *stmt, bool is_primary)
+vy_stmt_persistent_flags(struct tuple *stmt, bool is_primary)
 {
 	uint8_t mask = VY_STMT_FLAGS_ALL;
 
@@ -184,7 +184,7 @@ vy_stmt_alloc(struct tuple_format *format, uint32_t bsize)
 }
 
 struct tuple *
-vy_stmt_dup(const struct tuple *stmt)
+vy_stmt_dup(struct tuple *stmt)
 {
 	/*
 	 * We don't use tuple_new() to avoid the initializing of
@@ -202,7 +202,7 @@ vy_stmt_dup(const struct tuple *stmt)
 }
 
 struct tuple *
-vy_stmt_dup_lsregion(const struct tuple *stmt, struct lsregion *lsregion,
+vy_stmt_dup_lsregion(struct tuple *stmt, struct lsregion *lsregion,
 		     int64_t alloc_id)
 {
 	enum iproto_type type = vy_stmt_type(stmt);
@@ -378,7 +378,7 @@ vy_stmt_new_delete(struct tuple_format *format, const char *tuple_begin,
 }
 
 struct tuple *
-vy_stmt_replace_from_upsert(const struct tuple *upsert)
+vy_stmt_replace_from_upsert(struct tuple *upsert)
 {
 	assert(vy_stmt_type(upsert) == IPROTO_UPSERT);
 	/* Get statement size without UPSERT operations */
@@ -523,7 +523,7 @@ out:
 }
 
 struct tuple *
-vy_stmt_extract_key(const struct tuple *stmt, struct key_def *key_def,
+vy_stmt_extract_key(struct tuple *stmt, struct key_def *key_def,
 		    struct tuple_format *format)
 {
 	struct region *region = &fiber()->gc;
@@ -560,7 +560,7 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
 
 int
 vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
-			  const struct tuple *stmt, struct key_def *key_def)
+			  struct tuple *stmt, struct key_def *key_def)
 {
 	if (vy_stmt_is_key(stmt)) {
 		const char *data = tuple_data(stmt);
@@ -574,7 +574,7 @@ vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
 
 bool
 vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
-			const struct tuple *stmt, struct key_def *key_def)
+			struct tuple *stmt, struct key_def *key_def)
 {
 	if (vy_stmt_is_key(stmt)) {
 		const char *data = tuple_data(stmt);
@@ -591,7 +591,7 @@ vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
  * Returns 0 on success, -1 on memory allocation error.
  */
 static int
-vy_stmt_meta_encode(const struct tuple *stmt, struct request *request,
+vy_stmt_meta_encode(struct tuple *stmt, struct request *request,
 		    bool is_primary)
 {
 	uint8_t flags = vy_stmt_persistent_flags(stmt, is_primary);
@@ -639,7 +639,7 @@ vy_stmt_meta_decode(struct request *request, struct tuple *stmt)
 }
 
 int
-vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
+vy_stmt_encode_primary(struct tuple *value, struct key_def *key_def,
 		       uint32_t space_id, struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
@@ -687,7 +687,7 @@ vy_stmt_encode_primary(const struct tuple *value, struct key_def *key_def,
 }
 
 int
-vy_stmt_encode_secondary(const struct tuple *value, struct key_def *cmp_def,
+vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
 			 struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
@@ -769,7 +769,7 @@ vy_stmt_decode(struct xrow_header *xrow, struct tuple_format *format)
 }
 
 int
-vy_stmt_snprint(char *buf, int size, const struct tuple *stmt)
+vy_stmt_snprint(char *buf, int size, struct tuple *stmt)
 {
 	int total = 0;
 	uint32_t mp_size;
@@ -795,7 +795,7 @@ vy_stmt_snprint(char *buf, int size, const struct tuple *stmt)
 }
 
 const char *
-vy_stmt_str(const struct tuple *stmt)
+vy_stmt_str(struct tuple *stmt)
 {
 	char *buf = tt_static_buf();
 	if (vy_stmt_snprint(buf, TT_STATIC_BUF_LEN, stmt) < 0)

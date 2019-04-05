@@ -81,8 +81,8 @@ vy_cache_tree_cmp(struct vy_cache_entry *a,
  * Internal comparator (2) for BPS tree.
  */
 static inline int
-vy_cache_tree_key_cmp(struct vy_cache_entry *a,
-		      const struct tuple *b, struct key_def *cmp_def)
+vy_cache_tree_key_cmp(struct vy_cache_entry *a, struct tuple *b,
+		      struct key_def *cmp_def)
 {
 	return vy_stmt_compare(a->stmt, b, cmp_def);
 }
@@ -95,7 +95,7 @@ vy_cache_tree_key_cmp(struct vy_cache_entry *a,
 #define BPS_TREE_COMPARE(a, b, cmp_def) vy_cache_tree_cmp(a, b, cmp_def)
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_cache_tree_key_cmp(a, b, cmp_def)
 #define bps_tree_elem_t struct vy_cache_entry *
-#define bps_tree_key_t const struct tuple *
+#define bps_tree_key_t struct tuple *
 #define bps_tree_arg_t struct key_def *
 #define BPS_TREE_NO_DEBUG
 
@@ -202,7 +202,7 @@ vy_cache_destroy(struct vy_cache *cache);
  */
 void
 vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
-	     struct tuple *prev_stmt, const struct tuple *key,
+	     struct tuple *prev_stmt, struct tuple *key,
 	     enum iterator_type order);
 
 /**
@@ -210,7 +210,7 @@ vy_cache_add(struct vy_cache *cache, struct tuple *stmt,
  * @return A tuple equal to key or NULL if not found.
  */
 struct tuple *
-vy_cache_get(struct vy_cache *cache, const struct tuple *key);
+vy_cache_get(struct vy_cache *cache, struct tuple *key);
 
 /**
  * Invalidate possibly cached value due to its overwriting
@@ -220,7 +220,7 @@ vy_cache_get(struct vy_cache *cache, const struct tuple *key);
  *             statement.
  */
 void
-vy_cache_on_write(struct vy_cache *cache, const struct tuple *stmt,
+vy_cache_on_write(struct vy_cache *cache, struct tuple *stmt,
 		  struct tuple **deleted);
 
 
@@ -238,7 +238,7 @@ struct vy_cache_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/* Search key data in terms of vinyl, vy_stmt_compare argument */
-	const struct tuple *key;
+	struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const struct vy_read_view **read_view;
 
@@ -264,8 +264,8 @@ struct vy_cache_iterator {
  */
 void
 vy_cache_iterator_open(struct vy_cache_iterator *itr, struct vy_cache *cache,
-		       enum iterator_type iterator_type,
-		       const struct tuple *key, const struct vy_read_view **rv);
+		       enum iterator_type iterator_type, struct tuple *key,
+		       const struct vy_read_view **rv);
 
 /**
  * Advance a cache iterator to the next key.
@@ -285,8 +285,7 @@ vy_cache_iterator_next(struct vy_cache_iterator *itr,
  * Returns 0 on success, -1 on memory allocation error.
  */
 NODISCARD int
-vy_cache_iterator_skip(struct vy_cache_iterator *itr,
-		       const struct tuple *last_stmt,
+vy_cache_iterator_skip(struct vy_cache_iterator *itr, struct tuple *last_stmt,
 		       struct vy_history *history, bool *stop);
 
 /**
@@ -296,8 +295,7 @@ vy_cache_iterator_skip(struct vy_cache_iterator *itr,
  * allocation error.
  */
 NODISCARD int
-vy_cache_iterator_restore(struct vy_cache_iterator *itr,
-			  const struct tuple *last_stmt,
+vy_cache_iterator_restore(struct vy_cache_iterator *itr, struct tuple *last_stmt,
 			  struct vy_history *history, bool *stop);
 
 /**

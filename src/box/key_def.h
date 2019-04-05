@@ -150,29 +150,29 @@ key_part_is_nullable(const struct key_part *part)
 }
 
 /** @copydoc tuple_compare_with_key() */
-typedef int (*tuple_compare_with_key_t)(const struct tuple *tuple_a,
+typedef int (*tuple_compare_with_key_t)(struct tuple *tuple_a,
 					const char *key,
 					uint32_t part_count,
 					struct key_def *key_def);
 /** @copydoc tuple_compare_with_key_hinted() */
-typedef int (*tuple_compare_with_key_hinted_t)(const struct tuple *tuple,
+typedef int (*tuple_compare_with_key_hinted_t)(struct tuple *tuple,
 					       hint_t tuple_hint,
 					       const char *key,
 					       uint32_t part_count,
 					       hint_t key_hint,
 					       struct key_def *key_def);
 /** @copydoc tuple_compare() */
-typedef int (*tuple_compare_t)(const struct tuple *tuple_a,
-			       const struct tuple *tuple_b,
+typedef int (*tuple_compare_t)(struct tuple *tuple_a,
+			       struct tuple *tuple_b,
 			       struct key_def *key_def);
 /** @copydoc tuple_compare_hinted() */
-typedef int (*tuple_compare_hinted_t)(const struct tuple *tuple_a,
+typedef int (*tuple_compare_hinted_t)(struct tuple *tuple_a,
 				      hint_t tuple_a_hint,
-				      const struct tuple *tuple_b,
+				      struct tuple *tuple_b,
 				      hint_t tuple_b_hint,
 				      struct key_def *key_def);
 /** @copydoc tuple_extract_key() */
-typedef char *(*tuple_extract_key_t)(const struct tuple *tuple,
+typedef char *(*tuple_extract_key_t)(struct tuple *tuple,
 				     struct key_def *key_def,
 				     uint32_t *key_size);
 /** @copydoc tuple_extract_key_raw() */
@@ -181,13 +181,13 @@ typedef char *(*tuple_extract_key_raw_t)(const char *data,
 					 struct key_def *key_def,
 					 uint32_t *key_size);
 /** @copydoc tuple_hash() */
-typedef uint32_t (*tuple_hash_t)(const struct tuple *tuple,
+typedef uint32_t (*tuple_hash_t)(struct tuple *tuple,
 				 struct key_def *key_def);
 /** @copydoc key_hash() */
 typedef uint32_t (*key_hash_t)(const char *key,
 				struct key_def *key_def);
 /** @copydoc tuple_hint() */
-typedef hint_t (*tuple_hint_t)(const struct tuple *tuple,
+typedef hint_t (*tuple_hint_t)(struct tuple *tuple,
 			       struct key_def *key_def);
 /** @copydoc key_hint() */
 typedef hint_t (*key_hint_t)(const char *key, uint32_t part_count,
@@ -299,7 +299,7 @@ box_key_def_delete(box_key_def_t *key_def);
  * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
  */
 int
-box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
+box_tuple_compare(box_tuple_t *tuple_a, box_tuple_t *tuple_b,
 		  box_key_def_t *key_def);
 
 /**
@@ -314,7 +314,7 @@ box_tuple_compare(const box_tuple_t *tuple_a, const box_tuple_t *tuple_b,
  */
 
 int
-box_tuple_compare_with_key(const box_tuple_t *tuple_a, const char *key_b,
+box_tuple_compare_with_key(box_tuple_t *tuple_a, const char *key_b,
 			   box_key_def_t *key_def);
 
 /** \endcond public */
@@ -533,7 +533,7 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
  * @retval Does the key contain NULL or not?
  */
 bool
-tuple_key_contains_null(const struct tuple *tuple, struct key_def *def);
+tuple_key_contains_null(struct tuple *tuple, struct key_def *def);
 
 /**
  * Extract key from tuple by given key definition and return
@@ -547,7 +547,7 @@ tuple_key_contains_null(const struct tuple *tuple, struct key_def *def);
  * @retval NULL     Memory allocation error
  */
 static inline char *
-tuple_extract_key(const struct tuple *tuple, struct key_def *key_def,
+tuple_extract_key(struct tuple *tuple, struct key_def *key_def,
 		  uint32_t *key_size)
 {
 	return key_def->tuple_extract_key(tuple, key_def, key_size);
@@ -599,7 +599,7 @@ key_compare(const char *key_a, const char *key_b, struct key_def *key_def);
  * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
  */
 static inline int
-tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
+tuple_compare(struct tuple *tuple_a, struct tuple *tuple_b,
 	      struct key_def *key_def)
 {
 	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
@@ -617,8 +617,8 @@ tuple_compare(const struct tuple *tuple_a, const struct tuple *tuple_b,
  * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
  */
 static inline int
-tuple_compare_hinted(const struct tuple *tuple_a, hint_t tuple_a_hint,
-		     const struct tuple *tuple_b, hint_t tuple_b_hint,
+tuple_compare_hinted(struct tuple *tuple_a, hint_t tuple_a_hint,
+		     struct tuple *tuple_b, hint_t tuple_b_hint,
 		     struct key_def *key_def)
 {
 	return key_def->tuple_compare_hinted(tuple_a, tuple_a_hint, tuple_b,
@@ -637,7 +637,7 @@ tuple_compare_hinted(const struct tuple *tuple_a, hint_t tuple_a_hint,
  * @retval >0 if key_fields(tuple) > parts(key)
  */
 static inline int
-tuple_compare_with_key(const struct tuple *tuple, const char *key,
+tuple_compare_with_key(struct tuple *tuple, const char *key,
 		       uint32_t part_count, struct key_def *key_def)
 {
 	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
@@ -657,7 +657,7 @@ tuple_compare_with_key(const struct tuple *tuple, const char *key,
  * @retval >0 if key_fields(tuple) > parts(key)
  */
 static inline int
-tuple_compare_with_key_hinted(const struct tuple *tuple, hint_t tuple_hint,
+tuple_compare_with_key_hinted(struct tuple *tuple, hint_t tuple_hint,
 			      const char *key, uint32_t part_count,
 			      hint_t key_hint, struct key_def *key_def)
 {
@@ -692,7 +692,7 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
  * This function updates @ph1 and @pcarry.
  */
 uint32_t
-tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
+tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 		    struct key_part *part);
 
 /**
@@ -702,7 +702,7 @@ tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, const struct tuple *tuple,
  * @return - hash value
  */
 static inline uint32_t
-tuple_hash(const struct tuple *tuple, struct key_def *key_def)
+tuple_hash(struct tuple *tuple, struct key_def *key_def)
 {
 	return key_def->tuple_hash(tuple, key_def);
 }
@@ -726,7 +726,7 @@ key_hash(const char *key, struct key_def *key_def)
  * @return - hint value
  */
 static inline hint_t
-tuple_hint(const struct tuple *tuple, struct key_def *key_def)
+tuple_hint(struct tuple *tuple, struct key_def *key_def)
 {
 	return key_def->tuple_hint(tuple, key_def);
 }

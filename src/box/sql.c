@@ -731,7 +731,7 @@ tarantoolsqlIdxKeyCompare(struct BtCursor *cursor,
 	assert(cursor->last_tuple != NULL);
 
 	struct key_def *key_def;
-	const struct tuple *tuple;
+	struct tuple *tuple;
 	const char *base;
 	struct tuple_format *format;
 	const uint32_t *field_map;

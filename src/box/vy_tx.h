@@ -85,7 +85,7 @@ struct txv {
 	/** Statement of this operation. */
 	struct tuple *stmt;
 	/** Statement allocated on vy_mem->allocator. */
-	const struct tuple *region_stmt;
+	struct tuple *region_stmt;
 	/** Mask of columns modified by this operation. */
 	uint64_t column_mask;
 	/** Next in the transaction log. */
@@ -114,7 +114,7 @@ struct txv {
  */
 struct write_set_key {
 	struct vy_lsm *lsm;
-	const struct tuple *stmt;
+	struct tuple *stmt;
 };
 
 int
@@ -128,7 +128,7 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, write_set_, write_set_t, struct txv,
 
 static inline struct txv *
 write_set_search_key(write_set_t *tree, struct vy_lsm *lsm,
-		     const struct tuple *stmt)
+		     struct tuple *stmt)
 {
 	struct write_set_key key = { .lsm = lsm, .stmt = stmt };
 	return write_set_search(tree, &key);
@@ -420,7 +420,7 @@ struct vy_txw_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Search key. */
-	const struct tuple *key;
+	struct tuple *key;
 	/* Last seen value of the write set version. */
 	uint32_t version;
 	/* Current position in the write set. */
@@ -436,8 +436,7 @@ void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_lsm *lsm,
-		     enum iterator_type iterator_type,
-		     const struct tuple *key);
+		     enum iterator_type iterator_type, struct tuple *key);
 
 /**
  * Advance a txw iterator to the next key.
@@ -454,8 +453,7 @@ vy_txw_iterator_next(struct vy_txw_iterator *itr,
  * Returns 0 on success, -1 on memory allocation error.
  */
 NODISCARD int
-vy_txw_iterator_skip(struct vy_txw_iterator *itr,
-		     const struct tuple *last_stmt,
+vy_txw_iterator_skip(struct vy_txw_iterator *itr, struct tuple *last_stmt,
 		     struct vy_history *history);
 
 /**
@@ -465,8 +463,7 @@ vy_txw_iterator_skip(struct vy_txw_iterator *itr,
  * allocation error.
  */
 int
-vy_txw_iterator_restore(struct vy_txw_iterator *itr,
-			const struct tuple *last_stmt,
+vy_txw_iterator_restore(struct vy_txw_iterator *itr, struct tuple *last_stmt,
 			struct vy_history *history);
 
 /**

@@ -259,7 +259,7 @@ struct vy_run_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	const struct tuple *key;
+	struct tuple *key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const struct vy_read_view **read_view;
 
@@ -517,7 +517,7 @@ void
 vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
-		     const struct tuple *key, const struct vy_read_view **rv,
+		     struct tuple *key, const struct vy_read_view **rv,
 		     struct key_def *cmp_def, struct key_def *key_def,
 		     struct tuple_format *format);
 
@@ -536,8 +536,7 @@ vy_run_iterator_next(struct vy_run_iterator *itr,
  * Returns 0 on success, -1 on memory allocation or IO error.
  */
 NODISCARD int
-vy_run_iterator_skip(struct vy_run_iterator *itr,
-		     const struct tuple *last_stmt,
+vy_run_iterator_skip(struct vy_run_iterator *itr, struct tuple *last_stmt,
 		     struct vy_history *history);
 
 /**

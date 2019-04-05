@@ -873,7 +873,7 @@ vy_lsm_delete_mem(struct vy_lsm *lsm, struct vy_mem *mem)
 
 int
 vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
-	   const struct tuple *stmt, const struct tuple **region_stmt)
+	   struct tuple *stmt, struct tuple **region_stmt)
 {
 	uint32_t format_id = stmt->format_id;
 
@@ -922,7 +922,7 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
  */
 static void
 vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
-		       const struct tuple *stmt)
+		     struct tuple *stmt)
 {
 	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
 	assert(vy_stmt_lsn(stmt) < MAX_LSN);
@@ -932,7 +932,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 	 */
 	assert(lsm->index_id == 0);
 
-	const struct tuple *older;
+	struct tuple *older;
 	int64_t lsn = vy_stmt_lsn(stmt);
 	uint8_t n_upserts = vy_stmt_n_upserts(stmt);
 	/*
@@ -1015,7 +1015,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		assert(older == NULL || upserted_lsn != vy_stmt_lsn(older));
 		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
 
-		const struct tuple *region_stmt =
+		struct tuple *region_stmt =
 			vy_stmt_dup_lsregion(upserted, &mem->env->allocator,
 					     mem->generation);
 		if (region_stmt == NULL) {
@@ -1040,7 +1040,7 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 
 void
 vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		     const struct tuple *stmt)
+		   struct tuple *stmt)
 {
 	vy_mem_commit_stmt(mem, stmt);
 
@@ -1057,7 +1057,7 @@ vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 
 void
 vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		       const struct tuple *stmt)
+		     struct tuple *stmt)
 {
 	vy_mem_rollback_stmt(mem, stmt);
 
