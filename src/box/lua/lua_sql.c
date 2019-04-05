@@ -57,20 +57,20 @@ lua_sql_call(sql_context *pCtx, int nVal, sql_value **apVal) {
 	for (int i = 0; i < nVal; i++) {
 		sql_value *param = apVal[i];
 		switch (sql_value_type(param)) {
-		case SQL_INTEGER:
+		case MP_INT:
 			luaL_pushint64(L, sql_value_int64(param));
 			break;
-		case SQL_FLOAT:
+		case MP_DOUBLE:
 			lua_pushnumber(L, sql_value_double(param));
 			break;
-		case SQL_TEXT:
+		case MP_STR:
 			lua_pushstring(L, (const char *) sql_value_text(param));
 			break;
-		case SQL_BLOB:
+		case MP_BIN:
 			lua_pushlstring(L, sql_value_blob(param),
 					(size_t) sql_value_bytes(param));
 			break;
-		case SQL_NULL:
+		case MP_NIL:
 			lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_nil_ref);
 			break;
 		default:

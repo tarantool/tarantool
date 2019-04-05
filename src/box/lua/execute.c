@@ -148,7 +148,6 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		FALLTHROUGH;
 	case MP_INT:
 		bind->i64 = field.ival;
-		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_STR:
@@ -164,28 +163,23 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 		}
 		memcpy(buf, field.sval.data, field.sval.len + 1);
 		bind->s = buf;
-		bind->type = SQL_TEXT;
 		bind->bytes = field.sval.len;
 		break;
 	case MP_DOUBLE:
 	case MP_FLOAT:
 		bind->d = field.dval;
-		bind->type = SQL_FLOAT;
 		bind->bytes = sizeof(bind->d);
 		break;
 	case MP_NIL:
-		bind->type = SQL_NULL;
 		bind->bytes = 1;
 		break;
 	case MP_BOOL:
 		/* SQLite doesn't support boolean. Use int instead. */
 		bind->i64 = field.bval ? 1 : 0;
-		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_BIN:
 		bind->s = mp_decode_bin(&field.sval.data, &bind->bytes);
-		bind->type = SQL_BLOB;
 		break;
 	case MP_EXT:
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "USERDATA",
@@ -202,6 +196,7 @@ lua_sql_bind_decode(struct lua_State *L, struct sql_bind *bind, int idx, int i)
 	default:
 		unreachable();
 	}
+	bind->type = field.type;
 	lua_pop(L, lua_gettop(L) - idx);
 	return 0;
 }

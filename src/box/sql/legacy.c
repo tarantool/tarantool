@@ -131,7 +131,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 						    &&
 						    sql_column_type(pStmt,
 									i) !=
-						    SQL_NULL) {
+						    MP_NIL) {
 							sqlOomFault(db);
 							goto exec_out;
 						}

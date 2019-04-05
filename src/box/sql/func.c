@@ -87,10 +87,10 @@ minmaxFunc(sql_context * context, int argc, sql_value ** argv)
 	pColl = sqlGetFuncCollSeq(context);
 	assert(mask == -1 || mask == 0);
 	iBest = 0;
-	if (sql_value_type(argv[0]) == SQL_NULL)
+	if (sql_value_is_null(argv[0]))
 		return;
 	for (i = 1; i < argc; i++) {
-		if (sql_value_type(argv[i]) == SQL_NULL)
+		if (sql_value_is_null(argv[i]))
 			return;
 		if ((sqlMemCompare(argv[iBest], argv[i], pColl) ^ mask) >=
 		    0) {
@@ -110,16 +110,16 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 	const char *z = 0;
 	UNUSED_PARAMETER(NotUsed);
 	switch (sql_value_type(argv[0])) {
-	case SQL_INTEGER:
+	case MP_INT:
 		z = "integer";
 		break;
-	case SQL_TEXT:
+	case MP_STR:
 		z = "string";
 		break;
-	case SQL_FLOAT:
+	case MP_DOUBLE:
 		z = "number";
 		break;
-	case SQL_BLOB:
+	case MP_BIN:
 		z = "scalar";
 		break;
 	default:
@@ -140,14 +140,14 @@ lengthFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	switch (sql_value_type(argv[0])) {
-	case SQL_BLOB:
-	case SQL_INTEGER:
-	case SQL_FLOAT:{
+	case MP_BIN:
+	case MP_INT:
+	case MP_DOUBLE:{
 			sql_result_int(context,
 					   sql_value_bytes(argv[0]));
 			break;
 		}
-	case SQL_TEXT:{
+	case MP_STR:{
 			const unsigned char *z = sql_value_text(argv[0]);
 			if (z == 0)
 				return;
@@ -174,7 +174,7 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	switch (sql_value_type(argv[0])) {
-	case SQL_INTEGER:{
+	case MP_INT:{
 			i64 iVal = sql_value_int64(argv[0]);
 			if (iVal < 0) {
 				if (iVal == SMALLEST_INT64) {
@@ -192,7 +192,7 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 			sql_result_int64(context, iVal);
 			break;
 		}
-	case SQL_NULL:{
+	case MP_NIL:{
 			/* IMP: R-37434-19929 Abs(X) returns NULL if X is NULL. */
 			sql_result_null(context);
 			break;
@@ -229,19 +229,19 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 	UNUSED_PARAMETER(argc);
 	struct Mem *needle = argv[0];
 	struct Mem *haystack = argv[1];
-	int needle_type = sql_value_type(needle);
-	int haystack_type = sql_value_type(haystack);
+	enum mp_type needle_type = sql_value_type(needle);
+	enum mp_type haystack_type = sql_value_type(haystack);
 
-	if (haystack_type == SQL_NULL || needle_type == SQL_NULL)
+	if (haystack_type == MP_NIL || needle_type == MP_NIL)
 		return;
 	/*
 	 * Position function can be called only with string
 	 * or blob params.
 	 */
 	struct Mem *inconsistent_type_arg = NULL;
-	if (needle_type != SQL_TEXT && needle_type != SQL_BLOB)
+	if (needle_type != MP_STR && needle_type != MP_BIN)
 		inconsistent_type_arg = needle;
-	if (haystack_type != SQL_TEXT && haystack_type != SQL_BLOB)
+	if (haystack_type != MP_STR && haystack_type != MP_BIN)
 		inconsistent_type_arg = haystack;
 	if (inconsistent_type_arg != NULL) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or BLOB",
@@ -268,7 +268,7 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 	if (n_needle_bytes > 0) {
 		const unsigned char *haystack_str;
 		const unsigned char *needle_str;
-		if (haystack_type == SQL_BLOB) {
+		if (haystack_type == MP_BIN) {
 			needle_str = sql_value_blob(needle);
 			haystack_str = sql_value_blob(haystack);
 			assert(needle_str != NULL);
@@ -398,14 +398,14 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 	int negP2 = 0;
 
 	assert(argc == 3 || argc == 2);
-	if (sql_value_type(argv[1]) == SQL_NULL
-	    || (argc == 3 && sql_value_type(argv[2]) == SQL_NULL)
+	if (sql_value_is_null(argv[1])
+	    || (argc == 3 && sql_value_is_null(argv[2]))
 	    ) {
 		return;
 	}
 	p0type = sql_value_type(argv[0]);
 	p1 = sql_value_int(argv[1]);
-	if (p0type == SQL_BLOB) {
+	if (p0type == MP_BIN) {
 		len = sql_value_bytes(argv[0]);
 		z = sql_value_blob(argv[0]);
 		if (z == 0)
@@ -460,7 +460,7 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 		}
 	}
 	assert(p1 >= 0 && p2 >= 0);
-	if (p0type != SQL_BLOB) {
+	if (p0type != MP_BIN) {
 		/*
 		 * In the code below 'cnt' and 'n_chars' is
 		 * used because '\0' is not supposed to be
@@ -506,13 +506,13 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	char *zBuf;
 	assert(argc == 1 || argc == 2);
 	if (argc == 2) {
-		if (SQL_NULL == sql_value_type(argv[1]))
+		if (sql_value_is_null(argv[1]))
 			return;
 		n = sql_value_int(argv[1]);
 		if (n < 0)
 			n = 0;
 	}
-	if (sql_value_type(argv[0]) == SQL_NULL)
+	if (sql_value_is_null(argv[0]))
 		return;
 	r = sql_value_double(argv[0]);
 	/* If Y==0 and X will fit in a 64-bit int,
@@ -901,10 +901,10 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	int rhs_type = sql_value_type(argv[0]);
 	int lhs_type = sql_value_type(argv[1]);
 
-	if (lhs_type != SQL_TEXT || rhs_type != SQL_TEXT) {
-		if (lhs_type == SQL_NULL || rhs_type == SQL_NULL)
+	if (lhs_type != MP_STR || rhs_type != MP_STR) {
+		if (lhs_type == MP_NIL || rhs_type == MP_NIL)
 			return;
-		char *inconsistent_type = rhs_type != SQL_TEXT ?
+		char *inconsistent_type = rhs_type != MP_STR ?
 					  mem_type_to_str(argv[0]) :
 					  mem_type_to_str(argv[1]);
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT",
@@ -1017,7 +1017,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	switch (sql_value_type(argv[0])) {
-	case SQL_FLOAT:{
+	case MP_DOUBLE:{
 			double r1, r2;
 			char zBuf[50];
 			r1 = sql_value_double(argv[0]);
@@ -1031,11 +1031,11 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 					    SQL_TRANSIENT);
 			break;
 		}
-	case SQL_INTEGER:{
+	case MP_INT:{
 			sql_result_value(context, argv[0]);
 			break;
 		}
-	case SQL_BLOB:{
+	case MP_BIN:{
 			char *zText = 0;
 			char const *zBlob = sql_value_blob(argv[0]);
 			int nBlob = sql_value_bytes(argv[0]);
@@ -1061,7 +1061,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 			}
 			break;
 		}
-	case SQL_TEXT:{
+	case MP_STR:{
 			int i, j;
 			u64 n;
 			const unsigned char *zArg = sql_value_text(argv[0]);
@@ -1090,7 +1090,7 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 			break;
 		}
 	default:{
-			assert(sql_value_type(argv[0]) == SQL_NULL);
+			assert(sql_value_is_null(argv[0]));
 			sql_result_text(context, "NULL", 4, SQL_STATIC);
 			break;
 		}
@@ -1226,13 +1226,13 @@ replaceFunc(sql_context * context, int argc, sql_value ** argv)
 	assert(zStr == sql_value_text(argv[0]));	/* No encoding change */
 	zPattern = sql_value_text(argv[1]);
 	if (zPattern == 0) {
-		assert(sql_value_type(argv[1]) == SQL_NULL
+		assert(sql_value_is_null(argv[1])
 		       || sql_context_db_handle(context)->mallocFailed);
 		return;
 	}
 	nPattern = sql_value_bytes(argv[1]);
 	if (nPattern == 0) {
-		assert(sql_value_type(argv[1]) != SQL_NULL);
+		assert(! sql_value_is_null(argv[1]));
 		sql_result_value(context, argv[0]);
 		return;
 	}
@@ -1427,7 +1427,7 @@ trim_func_two_args(struct sql_context *context, int argc, sql_value **argv)
 		return;
 
 	int input_str_sz = sql_value_bytes(argv[1]);
-	if (sql_value_type(argv[0]) == SQL_INTEGER) {
+	if (sql_value_type(argv[0]) == MP_INT) {
 		uint8_t len_one = 1;
 		trim_procedure(context, sql_value_int(argv[0]),
 			       (const unsigned char *) " ", &len_one, 1,
@@ -1458,7 +1458,7 @@ trim_func_three_args(struct sql_context *context, int argc, sql_value **argv)
 	assert(argc == 3);
 	(void) argc;
 
-	assert(sql_value_type(argv[0]) == SQL_INTEGER);
+	assert(sql_value_type(argv[0]) == MP_INT);
 	const unsigned char *input_str, *trim_set;
 	if ((input_str = sql_value_text(argv[2])) == NULL ||
 	    (trim_set = sql_value_text(argv[1])) == NULL)
@@ -1584,9 +1584,9 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 	UNUSED_PARAMETER(argc);
 	struct SumCtx *p = sql_aggregate_context(context, sizeof(*p));
 	int type = sql_value_type(argv[0]);
-	if (type == SQL_NULL || p == NULL)
+	if (type == MP_NIL || p == NULL)
 		return;
-	if (type != SQL_FLOAT && type != SQL_INTEGER) {
+	if (type != MP_DOUBLE && type != MP_INT) {
 		if (mem_apply_numeric_type(argv[0]) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(argv[0]), "number");
@@ -1597,7 +1597,7 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 		type = sql_value_type(argv[0]);
 	}
 	p->cnt++;
-	if (type == SQL_INTEGER) {
+	if (type == MP_INT) {
 		int64_t v = sql_value_int64(argv[0]);
 		p->rSum += v;
 		if ((p->approx | p->overflow) == 0 &&
@@ -1661,7 +1661,7 @@ countStep(sql_context * context, int argc, sql_value ** argv)
 {
 	CountCtx *p;
 	p = sql_aggregate_context(context, sizeof(*p));
-	if ((argc == 0 || SQL_NULL != sql_value_type(argv[0])) && p) {
+	if ((argc == 0 || ! sql_value_is_null(argv[0])) && p) {
 		p->n++;
 	}
 }
@@ -1688,7 +1688,7 @@ minmaxStep(sql_context * context, int NotUsed, sql_value ** argv)
 	if (!pBest)
 		return;
 
-	if (sql_value_type(argv[0]) == SQL_NULL) {
+	if (sql_value_is_null(argv[0])) {
 		if (pBest->flags)
 			sqlSkipAccumulatorLoad(context);
 	} else if (pBest->flags) {
@@ -1740,7 +1740,7 @@ groupConcatStep(sql_context * context, int argc, sql_value ** argv)
 	const char *zSep;
 	int nVal, nSep;
 	assert(argc == 1 || argc == 2);
-	if (sql_value_type(argv[0]) == SQL_NULL)
+	if (sql_value_is_null(argv[0]))
 		return;
 	pAccum =
 	    (StrAccum *) sql_aggregate_context(context, sizeof(*pAccum));

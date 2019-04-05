@@ -243,44 +243,18 @@ sql_value_text(sql_value * pVal)
  * fundamental datatypes: 64-bit signed integer 64-bit IEEE floating
  * point number string BLOB NULL
  */
-int
-sql_value_type(sql_value * pVal)
+enum mp_type
+sql_value_type(sql_value *pVal)
 {
-	static const u8 aType[] = {
-		SQL_BLOB,	/* 0x00 */
-		SQL_NULL,	/* 0x01 */
-		SQL_TEXT,	/* 0x02 */
-		SQL_NULL,	/* 0x03 */
-		SQL_INTEGER,	/* 0x04 */
-		SQL_NULL,	/* 0x05 */
-		SQL_INTEGER,	/* 0x06 */
-		SQL_NULL,	/* 0x07 */
-		SQL_FLOAT,	/* 0x08 */
-		SQL_NULL,	/* 0x09 */
-		SQL_FLOAT,	/* 0x0a */
-		SQL_NULL,	/* 0x0b */
-		SQL_INTEGER,	/* 0x0c */
-		SQL_NULL,	/* 0x0d */
-		SQL_INTEGER,	/* 0x0e */
-		SQL_NULL,	/* 0x0f */
-		SQL_BLOB,	/* 0x10 */
-		SQL_NULL,	/* 0x11 */
-		SQL_TEXT,	/* 0x12 */
-		SQL_NULL,	/* 0x13 */
-		SQL_INTEGER,	/* 0x14 */
-		SQL_NULL,	/* 0x15 */
-		SQL_INTEGER,	/* 0x16 */
-		SQL_NULL,	/* 0x17 */
-		SQL_FLOAT,	/* 0x18 */
-		SQL_NULL,	/* 0x19 */
-		SQL_FLOAT,	/* 0x1a */
-		SQL_NULL,	/* 0x1b */
-		SQL_INTEGER,	/* 0x1c */
-		SQL_NULL,	/* 0x1d */
-		SQL_INTEGER,	/* 0x1e */
-		SQL_NULL,	/* 0x1f */
-	};
-	return aType[pVal->flags & MEM_PURE_TYPE_MASK];
+	switch (pVal->flags & MEM_PURE_TYPE_MASK) {
+	case MEM_Int: return MP_INT;
+	case MEM_Real: return MP_DOUBLE;
+	case MEM_Str: return MP_STR;
+	case MEM_Blob: return MP_BIN;
+	case MEM_Bool: return MP_BOOL;
+	case MEM_Null: return MP_NIL;
+	default: unreachable();
+	}
 }
 
 /* Make a copy of an sql_value object
@@ -1036,12 +1010,12 @@ sql_column_value(sql_stmt * pStmt, int i)
 	return (sql_value *) pOut;
 }
 
-int
+enum mp_type
 sql_column_type(sql_stmt * pStmt, int i)
 {
-	int iType = sql_value_type(columnMem(pStmt, i));
+	enum mp_type type = sql_value_type(columnMem(pStmt, i));
 	columnMallocFailure(pStmt);
-	return iType;
+	return type;
 }
 
 enum sql_subtype
@@ -1410,15 +1384,15 @@ sql_bind_value(sql_stmt * pStmt, int i, const sql_value * pValue)
 {
 	int rc;
 	switch (sql_value_type((sql_value *) pValue)) {
-	case SQL_INTEGER:{
+	case MP_INT:{
 			rc = sql_bind_int64(pStmt, i, pValue->u.i);
 			break;
 		}
-	case SQL_FLOAT:{
+	case MP_DOUBLE:{
 			rc = sql_bind_double(pStmt, i, pValue->u.r);
 			break;
 		}
-	case SQL_BLOB:{
+	case MP_BIN:{
 			if (pValue->flags & MEM_Zero) {
 				rc = sql_bind_zeroblob(pStmt, i,
 							   pValue->u.nZero);
@@ -1429,7 +1403,7 @@ sql_bind_value(sql_stmt * pStmt, int i, const sql_value * pValue)
 			}
 			break;
 		}
-	case SQL_TEXT:{
+	case MP_STR:{
 			rc = bindText(pStmt, i, pValue->z, pValue->n,
 				      SQL_TRANSIENT);
 			break;

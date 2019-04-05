@@ -39,6 +39,8 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "msgpuck.h"
+
 struct sql_stmt;
 
 /**
@@ -55,8 +57,8 @@ struct sql_bind {
 
 	/** Byte length of the value. */
 	uint32_t bytes;
-	/** SQL type of the value. */
-	uint8_t type;
+	/** MessagePack type of the value. */
+	enum mp_type type;
 	/** Bind value. */
 	union {
 		double d;

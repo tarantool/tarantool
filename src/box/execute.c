@@ -134,9 +134,9 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 			  struct region *region)
 {
 	size_t size;
-	int type = sql_column_type(stmt, i);
+	enum mp_type type = sql_column_type(stmt, i);
 	switch (type) {
-	case SQL_INTEGER: {
+	case MP_INT: {
 		int64_t n = sql_column_int64(stmt, i);
 		if (n >= 0)
 			size = mp_sizeof_uint(n);
@@ -151,7 +151,7 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 			mp_encode_int(pos, n);
 		break;
 	}
-	case SQL_FLOAT: {
+	case MP_DOUBLE: {
 		double d = sql_column_double(stmt, i);
 		size = mp_sizeof_double(d);
 		char *pos = (char *) region_alloc(region, size);
@@ -160,7 +160,7 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		mp_encode_double(pos, d);
 		break;
 	}
-	case SQL_TEXT: {
+	case MP_STR: {
 		uint32_t len = sql_column_bytes(stmt, i);
 		size = mp_sizeof_str(len);
 		char *pos = (char *) region_alloc(region, size);
@@ -171,7 +171,7 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		mp_encode_str(pos, s, len);
 		break;
 	}
-	case SQL_BLOB: {
+	case MP_BIN: {
 		uint32_t len = sql_column_bytes(stmt, i);
 		const char *s =
 			(const char *)sql_column_blob(stmt, i);
@@ -190,7 +190,7 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		}
 		break;
 	}
-	case SQL_NULL: {
+	case MP_NIL: {
 		size = mp_sizeof_nil();
 		char *pos = (char *) region_alloc(region, size);
 		if (pos == NULL)

@@ -455,8 +455,14 @@ sql_value_int64(sql_value *);
 const unsigned char *
 sql_value_text(sql_value *);
 
-int
+enum mp_type
 sql_value_type(sql_value *);
+
+static inline bool
+sql_value_is_null(sql_value *value)
+{
+	return sql_value_type(value) == MP_NIL;
+}
 
 sql *
 sql_context_db_handle(sql_context *);
@@ -580,8 +586,8 @@ const unsigned char *
 sql_column_text(sql_stmt *,
 		    int iCol);
 
-int
-sql_column_type(sql_stmt *, int iCol);
+enum mp_type
+sql_column_type(sql_stmt *stmt, int field_no);
 
 sql_value *
 sql_column_value(sql_stmt *,
@@ -631,14 +637,6 @@ sql_exec(sql *,	/* An open database */
 #define SQL_CONSTRAINT_PRIMARYKEY   (SQL_CONSTRAINT | (6<<8))
 #define SQL_CONSTRAINT_TRIGGER      (SQL_CONSTRAINT | (7<<8))
 #define SQL_CONSTRAINT_UNIQUE       (SQL_CONSTRAINT | (8<<8))
-
-enum sql_type {
-	SQL_INTEGER = 1,
-	SQL_FLOAT = 2,
-	SQL_TEXT = 3,
-	SQL_BLOB = 4,
-	SQL_NULL = 5,
-};
 
 /**
  * Subtype of a main type. Allows to do some subtype specific

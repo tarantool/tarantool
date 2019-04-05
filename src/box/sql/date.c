@@ -932,13 +932,13 @@ isDate(sql_context * context, int argc, sql_value ** argv, DateTime * p)
 {
 	int i, n;
 	const unsigned char *z;
-	int eType;
+	enum mp_type eType;
 	memset(p, 0, sizeof(*p));
 	if (argc == 0) {
 		return setDateTimeToCurrent(context, p);
 	}
-	if ((eType = sql_value_type(argv[0])) == SQL_FLOAT
-	    || eType == SQL_INTEGER) {
+	if ((eType = sql_value_type(argv[0])) == MP_DOUBLE
+	    || eType == MP_INT) {
 		setRawDateNumber(p, sql_value_double(argv[0]));
 	} else {
 		z = sql_value_text(argv[0]);

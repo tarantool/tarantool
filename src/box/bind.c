@@ -35,15 +35,6 @@
 #include "sql/sqlLimit.h"
 #include "sql/vdbe.h"
 
-const char *sql_type_strs[] = {
-	NULL,
-	"INTEGER",
-	"FLOAT",
-	"TEXT",
-	"BLOB",
-	"NULL",
-};
-
 const char *
 sql_bind_name(const struct sql_bind *bind)
 {
@@ -74,7 +65,8 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 		bind->name = NULL;
 		bind->name_len = 0;
 	}
-	switch (mp_typeof(**packet)) {
+	enum mp_type type = mp_typeof(**packet);
+	switch (type) {
 	case MP_UINT: {
 		uint64_t n = mp_decode_uint(packet);
 		if (n > INT64_MAX) {
@@ -83,49 +75,40 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 			return -1;
 		}
 		bind->i64 = (int64_t) n;
-		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	}
 	case MP_INT:
 		bind->i64 = mp_decode_int(packet);
-		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_STR:
 		bind->s = mp_decode_str(packet, &bind->bytes);
-		bind->type = SQL_TEXT;
 		break;
 	case MP_DOUBLE:
 		bind->d = mp_decode_double(packet);
-		bind->type = SQL_FLOAT;
 		bind->bytes = sizeof(bind->d);
 		break;
 	case MP_FLOAT:
 		bind->d = mp_decode_float(packet);
-		bind->type = SQL_FLOAT;
 		bind->bytes = sizeof(bind->d);
 		break;
 	case MP_NIL:
 		mp_decode_nil(packet);
-		bind->type = SQL_NULL;
 		bind->bytes = 1;
 		break;
 	case MP_BOOL:
 		/* sql doesn't support boolean. Use int instead. */
 		bind->i64 = mp_decode_bool(packet) ? 1 : 0;
-		bind->type = SQL_INTEGER;
 		bind->bytes = sizeof(bind->i64);
 		break;
 	case MP_BIN:
 		bind->s = mp_decode_bin(packet, &bind->bytes);
-		bind->type = SQL_BLOB;
 		break;
 	case MP_EXT:
 		bind->s = *packet;
 		mp_next(packet);
 		bind->bytes = *packet - bind->s;
-		bind->type = SQL_BLOB;
 		break;
 	case MP_ARRAY:
 		diag_set(ClientError, ER_SQL_BIND_TYPE, "ARRAY",
@@ -138,6 +121,7 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 	default:
 		unreachable();
 	}
+	bind->type = type;
 	return 0;
 }
 
@@ -189,13 +173,16 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		}
 	}
 	switch (p->type) {
-	case SQL_INTEGER:
+	case MP_INT:
+	case MP_UINT:
+	case MP_BOOL:
 		rc = sql_bind_int64(stmt, pos, p->i64);
 		break;
-	case SQL_FLOAT:
+	case MP_DOUBLE:
+	case MP_FLOAT:
 		rc = sql_bind_double(stmt, pos, p->d);
 		break;
-	case SQL_TEXT:
+	case MP_STR:
 		/*
 		 * Parameters are allocated within message pack,
 		 * received from the iproto thread. IProto thread
@@ -207,10 +194,10 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 		rc = sql_bind_text64(stmt, pos, p->s, p->bytes,
 					 SQL_STATIC);
 		break;
-	case SQL_NULL:
+	case MP_NIL:
 		rc = sql_bind_null(stmt, pos);
 		break;
-	case SQL_BLOB:
+	case MP_BIN:
 		rc = sql_bind_blob64(stmt, pos, (const void *) p->s,
 					 p->bytes, SQL_STATIC);
 		break;
@@ -227,7 +214,7 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 	case SQL_TOOBIG:
 	default:
 		diag_set(ClientError, ER_SQL_BIND_VALUE, sql_bind_name(p),
-			 sql_type_strs[p->type]);
+			 mp_type_strs[p->type]);
 		break;
 	}
 	return -1;

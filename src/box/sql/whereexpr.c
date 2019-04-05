@@ -290,7 +290,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 		pVal =
 		    sqlVdbeGetBoundValue(pReprepare, iCol,
 					     FIELD_TYPE_SCALAR);
-		if (pVal && sql_value_type(pVal) == SQL_TEXT) {
+		if (pVal && sql_value_type(pVal) == MP_STR) {
 			z = (char *)sql_value_text(pVal);
 		}
 		sqlVdbeSetVarmask(pParse->pVdbe, iCol);
