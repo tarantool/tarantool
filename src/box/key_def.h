@@ -36,6 +36,7 @@
 #include <msgpuck.h>
 #include "field_def.h"
 #include "coll_id.h"
+#include "tuple_compare.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -115,27 +116,6 @@ struct key_part {
 
 struct key_def;
 struct tuple;
-
-/**
- * Tuple comparison hint h(t) is such a function of tuple t that
- * the following conditions always hold for any pair of tuples
- * t1 and t2:
- *
- *   if h(t1) < h(t2) then t1 < t2;
- *   if h(t1) > h(t2) then t1 > t2;
- *   if h(t1) == h(t2) then t1 may or may not be equal to t2.
- *
- * These rules mean that instead of direct tuple vs tuple
- * (or tuple vs key) comparison one may compare their hints
- * first and only if theirs hints equal compare the tuples
- * themselves.
- */
-typedef uint64_t hint_t;
-
-/**
- * Reserved value to use when comparison hint is undefined.
- */
-#define HINT_NONE ((hint_t)UINT64_MAX)
 
 /**
  * Get is_nullable property of key_part.

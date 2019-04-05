@@ -30,11 +30,34 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdint.h>
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct key_def;
+
+/**
+ * Tuple comparison hint h(t) is such a function of tuple t that
+ * the following conditions always hold for any pair of tuples
+ * t1 and t2:
+ *
+ *   if h(t1) < h(t2) then t1 < t2;
+ *   if h(t1) > h(t2) then t1 > t2;
+ *   if h(t1) == h(t2) then t1 may or may not be equal to t2.
+ *
+ * These rules mean that instead of direct tuple vs tuple
+ * (or tuple vs key) comparison one may compare their hints
+ * first and only if theirs hints equal compare the tuples
+ * themselves.
+ */
+typedef uint64_t hint_t;
+
+/**
+ * Reserved value to use when comparison hint is undefined.
+ */
+#define HINT_NONE ((hint_t)UINT64_MAX)
 
 /**
  * Initialize comparator functions for the key_def.
