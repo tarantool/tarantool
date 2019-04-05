@@ -570,6 +570,23 @@ int
 key_compare(const char *key_a, const char *key_b, struct key_def *key_def);
 
 /**
+ * Compare keys using the key definition and comparison hints.
+ * @param key_a key parts with MessagePack array header
+ * @param key_a_hint comparison hint of @a key_a
+ * @param key_b key_parts with MessagePack array header
+ * @param key_b_hint comparison hint of @a key_b
+ * @param key_def key definition
+ *
+ * @retval 0  if key_a == key_b
+ * @retval <0 if key_a < key_b
+ * @retval >0 if key_a > key_b
+ */
+int
+key_compare_hinted(const char *key_a, hint_t key_a_hint,
+		   const char *key_b, hint_t key_b_hint,
+		   struct key_def *key_def);
+
+/**
  * Compare tuples using the key definition.
  * @param tuple_a first tuple
  * @param tuple_b second tuple

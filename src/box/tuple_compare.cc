@@ -817,6 +817,17 @@ key_compare(const char *key_a, const char *key_b, struct key_def *key_def)
 	}
 }
 
+int
+key_compare_hinted(const char *key_a, hint_t key_a_hint,
+		   const char *key_b, hint_t key_b_hint,
+		   struct key_def *key_def)
+{
+	int rc = hint_cmp(key_a_hint, key_b_hint);
+	if (rc != 0)
+		return rc;
+	return key_compare(key_a, key_b, key_def);
+}
+
 template <bool is_nullable, bool has_optional_parts>
 static int
 tuple_compare_sequential_hinted(struct tuple *tuple_a, hint_t tuple_a_hint,
