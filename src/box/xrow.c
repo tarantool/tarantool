@@ -89,37 +89,36 @@ mp_decode_vclock(const char **data, struct vclock *vclock)
 }
 
 /**
- * Set diagnostics with an error and log the corrupted row
- * which caused the error.
- * Optionally, if log_level is 'verbose' or greater,
+ * If log_level is 'verbose' or greater,
  * dump the corrupted row contents in hex to the log.
  *
- * @param what - exception to set.
- * @param desc_str - error description string.
+ * The format is similar to the xxd utility.
  */
-#define xrow_on_decode_err(start, end, what, desc_str) do {				\
-	diag_set(ClientError, what, desc_str);					\
-											\
-	if (!say_log_level_is_enabled(S_VERBOSE))					\
-		break;									\
-											\
-	size_t len = 3 * ((const char *)(end) - (const char *)(start) + 1);		\
-	char *buf = (char *)malloc(len);						\
-	if (!buf) {									\
-		say_verbose("Got a corrupted row during decoding. "			\
-			    "Not enough memory to dump row contents.");			\
-		break;									\
-	}										\
-											\
-	char *pos = buf;								\
-	char *buf_end = buf + len;							\
-	for (const char *cur = start; cur < end; ++cur) {				\
-		pos += snprintf(pos, buf_end - pos, "%02X ", (unsigned char)*cur);	\
-	}										\
-	say_verbose("Corrupted row is: %s", buf);					\
-											\
-	free(buf);									\
-} while (0)
+void dump_row_hex(const char *start, const char *end) {
+	if (!say_log_level_is_enabled(S_VERBOSE))
+		return;
+
+	char *buf = tt_static_buf();
+	const char *buf_end = buf + TT_STATIC_BUF_LEN;
+
+	say_verbose("Got a corrupted row:");
+	for (const char *cur = start; cur < end;) {
+		char *pos = buf;
+		pos += snprintf(pos, buf_end - pos, "%08lX: ", cur - start);
+		for (size_t i = 0; i < 16; ++i) {
+			pos += snprintf(pos, buf_end - pos, "%02X ", (unsigned char)*cur++);
+			if (cur >= end || pos == buf_end)
+				break;
+		}
+		*pos = '\0';
+		say_verbose("%s", buf);
+	}
+}
+
+#define xrow_on_decode_err(start, end, what, desc_str) do {\
+	diag_set(ClientError, what, desc_str);\
+	dump_row_hex(start, end);\
+} while (0);
 
 int
 xrow_header_decode(struct xrow_header *header, const char **pos,
