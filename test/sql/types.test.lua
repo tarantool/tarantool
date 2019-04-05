@@ -70,3 +70,138 @@ box.execute("SELECT * FROM t1 WHERE s LIKE 'int';")
 box.execute("SELECT * FROM t1 WHERE 'int' LIKE 4;")
 box.execute("SELECT NULL LIKE s FROM t1;")
 box.space.T1:drop()
+
+-- Test basic capabilities of boolean type.
+--
+box.execute("SELECT true;")
+box.execute("SELECT false;")
+box.execute("SELECT unknown;")
+box.execute("SELECT true = false;")
+box.execute("SELECT true = true;")
+box.execute("SELECT true > false;")
+box.execute("SELECT true < false;")
+box.execute("SELECT null = true;")
+box.execute("SELECT unknown = true;")
+box.execute("SELECT 1 = true;")
+box.execute("SELECT 'abc' = true;")
+box.execute("SELECT 1.123 > true;")
+box.execute("SELECT true IN (1, 'abc', true)")
+box.execute("SELECT true IN (1, 'abc', false)")
+box.execute("SELECT 1 LIMIT true;")
+box.execute("SELECT 1 LIMIT 1 OFFSET true;")
+box.execute("SELECT 'abc' || true;")
+
+-- Boolean can take part in arithmetic operations.
+--
+box.execute("SELECT true + false;")
+box.execute("SELECT true * 1;")
+box.execute("SELECT false / 0;")
+box.execute("SELECT not true;")
+box.execute("SELECT ~true;")
+box.execute("SELECT -true;")
+box.execute("SELECT true << 1;")
+box.execute("SELECT true | 1;")
+box.execute("SELECT true and false;")
+box.execute("SELECT true or unknown;")
+
+box.execute("CREATE TABLE t (id INT PRIMARY KEY, b BOOLEAN);")
+box.execute("INSERT INTO t VALUES (1, true);")
+box.execute("INSERT INTO t VALUES (2, false);")
+box.execute("INSERT INTO t VALUES (3, unknown)")
+box.execute("SELECT b FROM t;")
+box.execute("SELECT b FROM t WHERE b = false;")
+box.execute("SELECT b FROM t WHERE b IS NULL;")
+box.execute("SELECT b FROM t WHERE b IN (false, 1, 'abc')")
+box.execute("SELECT b FROM t WHERE b BETWEEN false AND true;")
+box.execute("SELECT b FROM t WHERE b BETWEEN true AND false;")
+box.execute("SELECT b FROM t ORDER BY b;")
+box.execute("SELECT b FROM t ORDER BY +b;")
+box.execute("SELECT b FROM t ORDER BY b LIMIT 1;")
+box.execute("SELECT b FROM t GROUP BY b LIMIT 1;")
+box.execute("SELECT b FROM t LIMIT true;")
+
+-- Most of aggregates don't accept boolean arguments.
+--
+box.execute("SELECT sum(b) FROM t;")
+box.execute("SELECT avg(b) FROM t;")
+box.execute("SELECT total(b) FROM t;")
+box.execute("SELECT min(b) FROM t;")
+box.execute("SELECT max(b) FROM t;")
+box.execute("SELECT count(b) FROM t;")
+box.execute("SELECT group_concat(b) FROM t;")
+
+-- Check other built-in functions.
+--
+box.execute("SELECT lower(b) FROM t;")
+box.execute("SELECT upper(b) FROM t;")
+box.execute("SELECT abs(b) FROM t;")
+box.execute("SELECT typeof(b) FROM t;")
+box.execute("SELECT quote(b) FROM t;")
+box.execute("SELECT min(b, true) FROM t;")
+box.execute("SELECT quote(b) FROM t;")
+
+-- Test index search using boolean values.
+--
+box.execute("CREATE INDEX ib ON t(b);")
+box.execute("SELECT b FROM t WHERE b = false;")
+box.execute("SELECT b FROM t WHERE b OR unknown ORDER BY b;")
+
+-- Test UPDATE on boolean field.
+--
+box.execute("UPDATE t SET b = true WHERE b = false;")
+box.execute("SELECT b FROM t;")
+
+-- Test constraints functionality.
+--
+box.execute("CREATE TABLE parent (id INT PRIMARY KEY, a BOOLEAN UNIQUE);")
+box.space.T:truncate()
+box.execute("ALTER TABLE t ADD CONSTRAINT fk1 FOREIGN KEY (b) REFERENCES parent (a);")
+box.execute("INSERT INTO t VALUES (1, true);")
+box.execute("INSERT INTO parent VALUES (1, true);")
+box.execute("INSERT INTO t VALUES (1, true);")
+box.execute("ALTER TABLE t DROP CONSTRAINT fk1;")
+box.space.PARENT:drop()
+
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a BOOLEAN CHECK (a = true));")
+box.execute("INSERT INTO t1 VALUES (1, false);")
+box.execute("INSERT INTO t1 VALUES (1, true);")
+box.space.T1:drop()
+
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, a BOOLEAN DEFAULT true);")
+box.execute("INSERT INTO t1 (id) VALUES (1);")
+box.space.T1:select()
+box.space.T1:drop()
+
+-- Check that VIEW inherits boolean type.
+--
+box.execute("CREATE VIEW v AS SELECT b FROM t;")
+box.space.V:format()[1]['type']
+box.space.V:drop()
+
+-- Test CAST facilities.
+--
+box.execute("SELECT CAST(true AS INTEGER);")
+box.execute("SELECT CAST(true AS TEXT);")
+box.execute("SELECT CAST(true AS FLOAT);")
+box.execute("SELECT CAST(true AS SCALAR);")
+box.execute("SELECT CAST(1 AS BOOLEAN);")
+box.execute("SELECT CAST(1.123 AS BOOLEAN);")
+box.execute("SELECT CAST('abc' AS BOOLEAN);")
+box.execute("SELECT CAST('  TrUe' AS BOOLEAN);")
+box.execute("SELECT CAST('  falsE    ' AS BOOLEAN);")
+box.execute("SELECT CAST('  fals' AS BOOLEAN);")
+
+box.execute("SELECT CAST(X'4D6564766564' AS BOOLEAN);")
+
+-- Make sure that SCALAR can handle boolean values.
+--
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY, s SCALAR);")
+box.execute("INSERT INTO t1 SELECT * FROM t;")
+box.execute("SELECT s FROM t1 WHERE s = true;")
+box.execute("INSERT INTO t1 VALUES (3, 'abc'), (4, 12.5);")
+box.execute("SELECT s FROM t1 WHERE s = true;")
+box.execute("SELECT s FROM t1 WHERE s < true;")
+box.execute("SELECT s FROM t1 WHERE s IN (true, 1, 'abcd')")
+
+box.space.T:drop()
+box.space.T1:drop()

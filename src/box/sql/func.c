@@ -122,6 +122,9 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 	case MP_BIN:
 		z = "scalar";
 		break;
+	case MP_BOOL:
+		z = "boolean";
+		break;
 	default:
 		z = "null";
 		break;
@@ -197,6 +200,13 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 			sql_result_null(context);
 			break;
 		}
+	case MP_BOOL: {
+		diag_set(ClientError, ER_INCONSISTENT_TYPES, "number",
+			 "boolean");
+		context->isError = SQL_TARANTOOL_ERROR;
+		context->fErrorOrAux = 1;
+		return;
+	}
 	default:{
 			/* Because sql_value_double() returns 0.0 if the argument is not
 			 * something that can be converted into a number, we have:
@@ -1089,6 +1099,11 @@ quoteFunc(sql_context * context, int argc, sql_value ** argv)
 			}
 			break;
 		}
+	case MP_BOOL: {
+		sql_result_text(context, sql_value_boolean(argv[0]) ?
+				"true" : "false", -1, SQL_TRANSIENT);
+		break;
+	}
 	default:{
 			assert(sql_value_is_null(argv[0]));
 			sql_result_text(context, "NULL", 4, SQL_STATIC);

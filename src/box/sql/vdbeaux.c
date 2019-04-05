@@ -3358,6 +3358,17 @@ sqlMemCompare(const Mem * pMem1, const Mem * pMem2, const struct coll * pColl)
 		return (f2 & MEM_Null) - (f1 & MEM_Null);
 	}
 
+	if ((combined_flags & MEM_Bool) != 0) {
+		if ((f1 & f2 & MEM_Bool) != 0) {
+			if (pMem1->u.b == pMem2->u.b)
+				return 0;
+			if (pMem1->u.b)
+				return 1;
+			return -1;
+		}
+		return -1;
+	}
+
 	/* At least one of the two values is a number
 	 */
 	if (combined_flags & (MEM_Int | MEM_Real)) {
@@ -3536,10 +3547,14 @@ sqlVdbeCompareMsgpack(const char **key1,
 			break;
 		}
 	case MP_BOOL:{
-			assert((unsigned char)(*aKey1) == 0xc2
-			       || (unsigned char)*aKey1 == 0xc3);
-			mem1.u.i = (unsigned)(size_t) aKey1++ - 0xc2;
-			goto do_int;
+			mem1.u.b = mp_decode_bool(&aKey1);
+			if ((pKey2->flags & MEM_Bool) != 0) {
+				if (mem1.u.b != pKey2->u.b)
+					rc = mem1.u.b ? 1 : -1;
+			} else {
+				rc = (pKey2->flags & MEM_Null) != 0 ? 1 : -1;
+			}
+			break;
 		}
 	case MP_UINT:{
 			uint64_t v = mp_decode_uint(&aKey1);
@@ -3691,10 +3706,8 @@ vdbe_decode_msgpack_into_mem(const char *buf, struct Mem *mem, uint32_t *len)
 		break;
 	}
 	case MP_BOOL: {
-		assert((unsigned char)*buf == 0xc2 ||
-		       (unsigned char)*buf == 0xc3);
-		mem->u.i = (unsigned char)*buf - 0xc2;
-		mem->flags = MEM_Int;
+		mem->u.b = mp_decode_bool(&buf);
+		mem->flags = MEM_Bool;
 		break;
 	}
 	case MP_UINT: {

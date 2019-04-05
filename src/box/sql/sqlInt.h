@@ -437,6 +437,9 @@ sql_value_bytes(sql_value *);
 double
 sql_value_double(sql_value *);
 
+bool
+sql_value_boolean(sql_value *val);
+
 int
 sql_value_int(sql_value *);
 
@@ -494,6 +497,9 @@ sql_result_error_code(sql_context *, int);
 
 void
 sql_result_int(sql_context *, int);
+
+void
+sql_result_bool(struct sql_context *ctx, bool value);
 
 void
 sql_result_int64(sql_context *, sql_int64);
@@ -578,6 +584,9 @@ sql_column_double(sql_stmt *, int iCol);
 
 int
 sql_column_int(sql_stmt *, int iCol);
+
+bool
+sql_column_boolean(struct sql_stmt *stmt, int column);
 
 sql_int64
 sql_column_int64(sql_stmt *, int iCol);

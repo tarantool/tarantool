@@ -289,7 +289,7 @@ sqlVdbeMemStringify(Mem * pMem, u8 bForce)
 		return SQL_OK;
 
 	assert(!(fg & MEM_Zero));
-	assert(fg & (MEM_Int | MEM_Real));
+	assert(fg & (MEM_Int | MEM_Real | MEM_Bool));
 	assert(EIGHT_BYTE_ALIGNMENT(pMem));
 
 	if (sqlVdbeMemClearAndResize(pMem, nByte)) {
@@ -297,6 +297,8 @@ sqlVdbeMemStringify(Mem * pMem, u8 bForce)
 	}
 	if (fg & MEM_Int) {
 		sql_snprintf(nByte, pMem->z, "%lld", pMem->u.i);
+	} else if ((fg & MEM_Bool) != 0) {
+		sql_snprintf(nByte, pMem->z, "%s", pMem->u.b ? "true" : "false");
 	} else {
 		assert(fg & MEM_Real);
 		sql_snprintf(nByte, pMem->z, "%!.15g", pMem->u.r);
@@ -493,6 +495,16 @@ sqlVdbeRealValue(Mem * pMem, double *v)
 	return -1;
 }
 
+int
+mem_value_bool(const struct Mem *mem, bool *b)
+{
+	if ((mem->flags  & MEM_Bool) != 0) {
+		*b = mem->u.b;
+		return 0;
+	}
+	return -1;
+}
+
 /*
  * The MEM structure is already a MEM_Real.  Try to also make it a
  * MEM_Int if we can.
@@ -588,6 +600,41 @@ sqlVdbeMemNumerify(Mem * pMem)
 	return SQL_OK;
 }
 
+/**
+ * According to ANSI SQL string value can be converted to boolean
+ * type if string consists of literal "true" or "false" and
+ * number of leading and trailing spaces.
+ *
+ * For instance, "   tRuE  " can be successfully converted to
+ * boolean value true.
+ *
+ * @param str String to be converted to boolean. Assumed to be
+ *        null terminated.
+ * @param[out] result Resulting value of cast.
+ * @retval 0 If string satisfies conditions above.
+ * @retval -1 Otherwise.
+ */
+static int
+str_cast_to_boolean(const char *str, bool *result)
+{
+	assert(str != NULL);
+	for (; *str == ' '; str++);
+	if (strncasecmp(str, "true", 4) == 0) {
+		*result = true;
+		str += 4;
+	} else if (strncasecmp(str, "false", 5) == 0) {
+		*result = false;
+		str += 5;
+	} else {
+		return -1;
+	}
+	for (; *str != '\0'; ++str) {
+		if (*str != ' ')
+			return -1;
+	}
+	return 0;
+}
+
 /*
  * Cast the datatype of the value in pMem according to the type
  * @type.  Casting is different from applying type in that a cast
@@ -612,11 +659,31 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 	switch (type) {
 	case FIELD_TYPE_SCALAR:
 		return 0;
+	case FIELD_TYPE_BOOLEAN:
+		if ((pMem->flags & MEM_Int) != 0) {
+			mem_set_bool(pMem, pMem->u.i);
+			return 0;
+		}
+		if ((pMem->flags & MEM_Str) != 0) {
+			bool value;
+			if (str_cast_to_boolean(pMem->z, &value) != 0)
+				return -1;
+			mem_set_bool(pMem, value);
+			return 0;
+		}
+		if ((pMem->flags & MEM_Bool) != 0)
+			return 0;
+		return -1;
 	case FIELD_TYPE_INTEGER:
 		if ((pMem->flags & MEM_Blob) != 0) {
 			if (sql_atoi64(pMem->z, (int64_t *) &pMem->u.i,
 				       pMem->n) != 0)
 				return -1;
+			MemSetTypeFlag(pMem, MEM_Int);
+			return 0;
+		}
+		if ((pMem->flags & MEM_Bool) != 0) {
+			pMem->u.i = pMem->u.b;
 			MemSetTypeFlag(pMem, MEM_Int);
 			return 0;
 		}
@@ -626,6 +693,12 @@ sqlVdbeMemCast(Mem * pMem, enum field_type type)
 	default:
 		assert(type == FIELD_TYPE_STRING);
 		assert(MEM_Str == (MEM_Blob >> 3));
+		if ((pMem->flags & MEM_Bool) != 0) {
+			const char *str_bool = pMem->u.b ? "TRUE" : "FALSE";
+			sqlVdbeMemSetStr(pMem, str_bool, strlen(str_bool), 1,
+					 SQL_TRANSIENT);
+			return 0;
+		}
 		pMem->flags |= (pMem->flags & MEM_Blob) >> 3;
 			sql_value_apply_type(pMem, FIELD_TYPE_STRING);
 		assert(pMem->flags & MEM_Str || pMem->db->mallocFailed);
@@ -718,6 +791,14 @@ sqlVdbeMemSetInt64(Mem * pMem, i64 val)
 		pMem->u.i = val;
 		pMem->flags = MEM_Int;
 	}
+}
+
+void
+mem_set_bool(struct Mem *mem, bool value)
+{
+	sqlVdbeMemSetNull(mem);
+	mem->u.b = value;
+	mem->flags = MEM_Bool;
 }
 
 /*

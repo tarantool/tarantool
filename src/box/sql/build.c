@@ -904,7 +904,6 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 
 	const long long int min_usigned_long_long = 0;
 	const long long int max_usigned_long_long = LLONG_MAX;
-	const bool const_false = false;
 
 	/* 1. New sequence id  */
 	sqlVdbeAddOp2(v, OP_SCopy, reg_seq_id, first_col + 1);
@@ -930,8 +929,7 @@ emitNewSysSequenceRecord(Parse *pParse, int reg_seq_id, const char *seq_name)
 	sqlVdbeAddOp2(v, OP_Integer, 0, first_col + 8);
 
 	/* 9. Cycle  */
-	sqlVdbeAddOp2(v, OP_Bool, 0, first_col + 9);
-	sqlVdbeChangeP4(v, -1, (char*)&const_false, P4_BOOL);
+	sqlVdbeAddOp2(v, OP_Bool, false, first_col + 9);
 
 	sqlVdbeAddOp3(v, OP_MakeRecord, first_col + 1, 9, first_col);
 
@@ -945,7 +943,6 @@ int
 emitNewSysSpaceSequenceRecord(Parse *pParse, int space_id, const char reg_seq_id)
 {
 	Vdbe *v = sqlGetVdbe(pParse);
-	const bool const_true = true;
 	int first_col = pParse->nMem + 1;
 	pParse->nMem += 4; /* 3 fields + new record pointer  */
 
@@ -954,11 +951,7 @@ emitNewSysSpaceSequenceRecord(Parse *pParse, int space_id, const char reg_seq_id
 	
 	/* 2. Sequence id  */
 	sqlVdbeAddOp2(v, OP_IntCopy, reg_seq_id, first_col + 2);
-
-	/* 3. True, which is 1 in SQL  */
-	sqlVdbeAddOp2(v, OP_Bool, 0, first_col + 3);
-	sqlVdbeChangeP4(v, -1, (char*)&const_true, P4_BOOL);
-
+	sqlVdbeAddOp2(v, OP_Bool, true, first_col + 3);
 	sqlVdbeAddOp3(v, OP_MakeRecord, first_col + 1, 3, first_col);
 
 	return first_col;
@@ -1021,8 +1014,7 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 					      ER_CONSTRAINT_EXISTS, error_msg,
 					      false, OP_NoConflict) != 0)
 		return;
-	sqlVdbeAddOp2(vdbe, OP_Bool, 0, constr_tuple_reg + 3);
-	sqlVdbeChangeP4(vdbe, -1, (char*)&fk->is_deferred, P4_BOOL);
+	sqlVdbeAddOp2(vdbe, OP_Bool, fk->is_deferred, constr_tuple_reg + 3);
 	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 4, 0,
 			  fk_constraint_match_strs[fk->match], P4_STATIC);
 	sqlVdbeAddOp4(vdbe, OP_String8, 0, constr_tuple_reg + 5, 0,

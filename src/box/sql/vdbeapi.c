@@ -211,6 +211,14 @@ sql_value_double(sql_value * pVal)
 	return v;
 }
 
+bool
+sql_value_boolean(sql_value *val)
+{
+	bool b;
+	mem_value_bool((struct Mem *) val, &b);
+	return b;
+}
+
 int
 sql_value_int(sql_value * pVal)
 {
@@ -376,6 +384,12 @@ void
 sql_result_int(sql_context * pCtx, int iVal)
 {
 	sqlVdbeMemSetInt64(pCtx->pOut, (i64) iVal);
+}
+
+void
+sql_result_bool(struct sql_context *ctx, bool value)
+{
+	mem_set_bool(ctx->pOut, value);
 }
 
 void
@@ -979,6 +993,14 @@ sql_column_int(sql_stmt * pStmt, int i)
 {
 	int val = sql_value_int(columnMem(pStmt, i));
 	columnMallocFailure(pStmt);
+	return val;
+}
+
+bool
+sql_column_boolean(struct sql_stmt *stmt, int i)
+{
+	bool val = sql_value_boolean(columnMem(stmt, i));
+	columnMallocFailure(stmt);
 	return val;
 }
 

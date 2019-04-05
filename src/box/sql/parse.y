@@ -911,6 +911,11 @@ idlist(A) ::= nm(Y). {
       case TK_FLOAT:
         p->type = FIELD_TYPE_NUMBER;
         break;
+      case TK_TRUE:
+      case TK_FALSE:
+      case TK_UNKNOWN:
+        p->type = FIELD_TYPE_BOOLEAN;
+        break;
       case TK_VARIABLE:
         /*
          * For variables we set BOOLEAN type since
@@ -980,6 +985,10 @@ expr(A) ::= nm(X) DOT nm(Y). {
 }
 term(A) ::= FLOAT|BLOB(X). {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
 term(A) ::= STRING(X).     {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
+term(A) ::= FALSE(X) . {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
+term(A) ::= TRUE(X) . {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
+term(A) ::= UNKNOWN(X) . {spanExpr(&A,pParse,@X,X);/*A-overwrites-X*/}
+
 term(A) ::= INTEGER(X). {
   A.pExpr = sql_expr_new_dequoted(pParse->db, TK_INTEGER, &X);
   if (A.pExpr == NULL) {
@@ -1481,6 +1490,8 @@ cmd ::= PRAGMA .                            {
 
 nmnum(A) ::= plus_num(A).
 nmnum(A) ::= STRING(A).
+nmnum(A) ::= TRUE(A).
+nmnum(A) ::= FALSE(A).
 nmnum(A) ::= nm(A).
 nmnum(A) ::= ON(A).
 nmnum(A) ::= DELETE(A).
@@ -1717,6 +1728,10 @@ wqlist(A) ::= wqlist(A) COMMA nm(X) eidlist_opt(Y) AS LP select(Z) RP. {
 %type typedef {struct type_def}
 typedef(A) ::= TEXT . { A.type = FIELD_TYPE_STRING; }
 typedef(A) ::= SCALAR . { A.type = FIELD_TYPE_SCALAR; }
+/** BOOL | BOOLEAN is not used due to possible bug in Lemon. */
+typedef(A) ::= BOOL . { A.type = FIELD_TYPE_BOOLEAN; }
+typedef(A) ::= BOOLEAN . { A.type = FIELD_TYPE_BOOLEAN; }
+
 /**
  * Time-like types are temporary disabled, until they are
  * implemented as a native Tarantool types (gh-3694).

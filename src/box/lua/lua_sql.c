@@ -73,6 +73,9 @@ lua_sql_call(sql_context *pCtx, int nVal, sql_value **apVal) {
 		case MP_NIL:
 			lua_rawgeti(L, LUA_REGISTRYINDEX, luaL_nil_ref);
 			break;
+		case MP_BOOL:
+			lua_pushboolean(L, sql_value_boolean(param));
+			break;
 		default:
 			sql_result_error(pCtx, "Unsupported type passed "
 					     "to Lua", -1);
@@ -85,7 +88,7 @@ lua_sql_call(sql_context *pCtx, int nVal, sql_value **apVal) {
 	}
 	switch(lua_type(L, -1)) {
 	case LUA_TBOOLEAN:
-		sql_result_int(pCtx, lua_toboolean(L, -1));
+		sql_result_bool(pCtx, lua_toboolean(L, -1));
 		break;
 	case LUA_TNUMBER:
 		sql_result_double(pCtx, lua_tonumber(L, -1));
@@ -161,6 +164,9 @@ lbox_sql_create_function(struct lua_State *L)
 		type = FIELD_TYPE_NUMBER;
 	else if (strcmp(type_arg, "BLOB") == 0)
 		type = FIELD_TYPE_SCALAR;
+	else if (strcmp(type_arg, "BOOL") == 0 ||
+		 strcmp(type_arg, "BOOLEAN") == 0)
+		type = FIELD_TYPE_BOOLEAN;
 	else
 		return luaL_error(L, "Unknown type");
 	/* -1 indicates any number of arguments. */

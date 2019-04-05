@@ -333,6 +333,10 @@ mem_apply_type(struct Mem *record, enum field_type type)
 			return 0;
 		}
 		return sqlVdbeMemIntegerify(record, false);
+	case FIELD_TYPE_BOOLEAN:
+		if ((record->flags & MEM_Bool) == MEM_Bool)
+			return 0;
+		return -1;
 	case FIELD_TYPE_NUMBER:
 		if ((record->flags & (MEM_Real | MEM_Int)) != 0)
 			return 0;
@@ -502,6 +506,8 @@ memTracePrint(Mem *p)
 		printf(" i:%lld", p->u.i);
 	} else if (p->flags & MEM_Real) {
 		printf(" r:%g", p->u.r);
+	} else if (p->flags & MEM_Bool) {
+		printf(" bool:%s", p->u.b ? "true" : "false");
 	} else {
 		char zBuf[200];
 		sqlVdbeMemPrettyPrint(p, zBuf);
@@ -1077,9 +1083,8 @@ case OP_Integer: {         /* out2 */
  */
 case OP_Bool: {         /* out2 */
 	pOut = out2Prerelease(p, pOp);
-	assert(pOp->p4type == P4_BOOL);
-	pOut->flags = MEM_Bool;
-	pOut->u.b = pOp->p4.p;
+	assert(pOp->p1 == 1 || pOp->p1 == 0);
+	mem_set_bool(pOut, pOp->p1);
 	break;
 }
 
@@ -2137,6 +2142,24 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			}
 			break;
 		}
+	} else if ((flags1 | flags3) & MEM_Bool) {
+		/*
+		 * If one of values is of type BOOLEAN, then the
+		 * second one must be BOOLEAN as well. Otherwise
+		 * an error is raised.
+		 */
+		bool is_bool_type_arg1 = flags1 & MEM_Bool;
+		bool is_bool_type_arg3 = flags3 & MEM_Bool;
+		if (! is_bool_type_arg1 || ! is_bool_type_arg3) {
+			char *inconsistent_type = ! is_bool_type_arg1 ?
+						  mem_type_to_str(pIn1) :
+						  mem_type_to_str(pIn3);
+			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+				 inconsistent_type, "boolean");
+			rc = SQL_TARANTOOL_ERROR;
+			goto abort_due_to_error;
+		}
+		res = sqlMemCompare(pIn3, pIn1, NULL);
 	} else {
 		enum field_type type = pOp->p5 & FIELD_TYPE_MASK;
 		if (sql_type_is_numeric(type)) {
@@ -2390,6 +2413,8 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	pIn1 = &aMem[pOp->p1];
 	if (pIn1->flags & MEM_Null) {
 		v1 = 2;
+	} else if ((pIn1->flags & MEM_Bool) != 0) {
+		v1 = pIn1->u.b;
 	} else {
 		int64_t i;
 		if (sqlVdbeIntValue(pIn1, &i) != 0) {
@@ -2403,6 +2428,8 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	pIn2 = &aMem[pOp->p2];
 	if (pIn2->flags & MEM_Null) {
 		v2 = 2;
+	} else if ((pIn2->flags & MEM_Bool) != 0) {
+		v2 = pIn2->u.b;
 	} else {
 		int64_t i;
 		if (sqlVdbeIntValue(pIn2, &i) != 0) {
@@ -2516,6 +2543,8 @@ case OP_IfNot: {            /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
 	if (pIn1->flags & MEM_Null) {
 		c = pOp->p3;
+	} else if ((pIn1->flags & MEM_Bool) != 0) {
+		c = pOp->opcode == OP_IfNot ? ! pIn1->u.b : pIn1->u.b;
 	} else {
 		double v;
 		if (sqlVdbeRealValue(pIn1, &v) != 0) {

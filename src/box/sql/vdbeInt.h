@@ -259,7 +259,7 @@ struct Mem {
  * auxiliary flags.
  */
 enum {
-	MEM_PURE_TYPE_MASK = 0x1f
+	MEM_PURE_TYPE_MASK = 0x3f
 };
 
 /**
@@ -495,6 +495,10 @@ void sqlVdbeMemMove(Mem *, Mem *);
 int sqlVdbeMemNulTerminate(Mem *);
 int sqlVdbeMemSetStr(Mem *, const char *, int, u8, void (*)(void *));
 void sqlVdbeMemSetInt64(Mem *, i64);
+
+void
+mem_set_bool(struct Mem *mem, bool value);
+
 void sqlVdbeMemSetDouble(Mem *, double);
 void sqlVdbeMemInit(Mem *, sql *, u32);
 void sqlVdbeMemSetNull(Mem *);
@@ -504,6 +508,10 @@ int sqlVdbeMemStringify(Mem *, u8);
 int sqlVdbeIntValue(Mem *, int64_t *);
 int sqlVdbeMemIntegerify(Mem *, bool is_forced);
 int sqlVdbeRealValue(Mem *, double *);
+
+int
+mem_value_bool(const struct Mem *mem, bool *b);
+
 int mem_apply_integer_type(Mem *);
 int sqlVdbeMemRealify(Mem *);
 int sqlVdbeMemNumerify(Mem *);

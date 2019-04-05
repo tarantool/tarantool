@@ -3758,6 +3758,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			expr_code_int(pParse, pExpr, false, target);
 			return target;
 		}
+	case TK_TRUE:
+	case TK_FALSE: {
+			sqlVdbeAddOp2(v, OP_Bool, op == TK_TRUE, target);
+			return target;
+		}
 	case TK_FLOAT:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			codeReal(v, pExpr->u.zToken, 0, target);

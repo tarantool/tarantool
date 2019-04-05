@@ -102,8 +102,8 @@ local from_lua_to_sql = {
     [1] = {1, 1},
     [2] = {"1.5", 1.5},
     [3] = {"'1'", "1"},
-    [4] = {1, true},
-    [5] = {0, false},
+    [4] = {"true", true},
+    [5] = {"false", false},
 }
 local function check_from_lua_to_sql(i)
     return from_lua_to_sql[i][2]

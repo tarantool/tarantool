@@ -190,6 +190,15 @@ sql_column_to_messagepack(struct sql_stmt *stmt, int i,
 		}
 		break;
 	}
+	case MP_BOOL: {
+		bool b = sql_column_boolean(stmt, i);
+		size = mp_sizeof_bool(b);
+		char *pos = (char *) region_alloc(region, size);
+		if (pos == NULL)
+			goto oom;
+		mp_encode_bool(pos, b);
+		break;
+	}
 	case MP_NIL: {
 		size = mp_sizeof_nil();
 		char *pos = (char *) region_alloc(region, size);
