@@ -274,15 +274,6 @@ vy_mem_rollback_stmt(struct vy_mem *mem, struct tuple *stmt)
 /* {{{ vy_mem_iterator support functions */
 
 /**
- * Get a stmt by current position
- */
-static struct tuple *
-vy_mem_iterator_curr_stmt(struct vy_mem_iterator *itr)
-{
-	return *vy_mem_tree_iterator_get_elem(&itr->mem->tree, &itr->curr_pos);
-}
-
-/**
  * Make a step in the iterator direction.
  * @retval 0 success
  * @retval 1 EOF
@@ -296,7 +287,8 @@ vy_mem_iterator_step(struct vy_mem_iterator *itr)
 		vy_mem_tree_iterator_next(&itr->mem->tree, &itr->curr_pos);
 	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return 1;
-	itr->curr_stmt = vy_mem_iterator_curr_stmt(itr);
+	itr->curr_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+							&itr->curr_pos);
 	return 0;
 }
 
@@ -313,7 +305,8 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 {
 	/* Skip to the first statement visible in the read view. */
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
-	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
+	assert(itr->curr_stmt == *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+								&itr->curr_pos));
 	struct key_def *cmp_def = itr->mem->cmp_def;
 	while (vy_stmt_lsn(itr->curr_stmt) > (**itr->read_view).vlsn ||
 	       vy_stmt_flags(itr->curr_stmt) & VY_STMT_SKIP_READ) {
@@ -426,7 +419,8 @@ vy_mem_iterator_seek(struct vy_mem_iterator *itr, struct tuple *last_key)
 		vy_mem_tree_iterator_prev(&itr->mem->tree, &itr->curr_pos);
 	if (vy_mem_tree_iterator_is_invalid(&itr->curr_pos))
 		return 1;
-	itr->curr_stmt = vy_mem_iterator_curr_stmt(itr);
+	itr->curr_stmt = *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+							&itr->curr_pos);
 	if (itr->iterator_type == ITER_EQ &&
 	    ((last_key == NULL && !exact) ||
 	     (last_key != NULL && vy_stmt_compare(itr->key, itr->curr_stmt,
@@ -475,7 +469,8 @@ vy_mem_iterator_next_key(struct vy_mem_iterator *itr)
 		return 1;
 	assert(itr->mem->version == itr->version);
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
-	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
+	assert(itr->curr_stmt == *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+								&itr->curr_pos));
 	struct key_def *cmp_def = itr->mem->cmp_def;
 
 	struct tuple *prev_stmt = itr->curr_stmt;
@@ -513,7 +508,8 @@ vy_mem_iterator_next_lsn(struct vy_mem_iterator *itr)
 		return 1;
 	assert(itr->mem->version == itr->version);
 	assert(!vy_mem_tree_iterator_is_invalid(&itr->curr_pos));
-	assert(itr->curr_stmt == vy_mem_iterator_curr_stmt(itr));
+	assert(itr->curr_stmt == *vy_mem_tree_iterator_get_elem(&itr->mem->tree,
+								&itr->curr_pos));
 	struct key_def *cmp_def = itr->mem->cmp_def;
 
 	struct vy_mem_tree_iterator next_pos = itr->curr_pos;
