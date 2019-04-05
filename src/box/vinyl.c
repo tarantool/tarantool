@@ -3540,7 +3540,7 @@ vy_squash_process(struct vy_squash *squash)
 	 * vy_lsm_commit_upsert().
 	 */
 	struct vy_mem *mem = lsm->mem;
-	struct tree_mem_key tree_key = {
+	struct vy_mem_tree_key tree_key = {
 		.stmt = result,
 		.lsn = vy_stmt_lsn(result),
 	};

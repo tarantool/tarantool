@@ -78,7 +78,7 @@ vy_mem_env_destroy(struct vy_mem_env *env);
 
 /** @cond false */
 
-struct tree_mem_key {
+struct vy_mem_tree_key {
 	struct tuple *stmt;
 	int64_t lsn;
 };
@@ -101,7 +101,7 @@ vy_mem_tree_cmp(struct tuple *a, struct tuple *b,
  * Internal. Extracted to speed up BPS tree.
  */
 static int
-vy_mem_tree_cmp_key(struct tuple *a, struct tree_mem_key *key,
+vy_mem_tree_cmp_key(struct tuple *a, struct vy_mem_tree_key *key,
 		    struct key_def *cmp_def)
 {
 	int res = vy_stmt_compare(a, key->stmt, cmp_def);
@@ -122,7 +122,7 @@ vy_mem_tree_cmp_key(struct tuple *a, struct tree_mem_key *key,
 #define BPS_TREE_COMPARE(a, b, cmp_def) vy_mem_tree_cmp(a, b, cmp_def)
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_mem_tree_cmp_key(a, b, cmp_def)
 #define bps_tree_elem_t struct tuple *
-#define bps_tree_key_t struct tree_mem_key *
+#define bps_tree_key_t struct vy_mem_tree_key *
 #define bps_tree_arg_t struct key_def *
 #define BPS_TREE_NO_DEBUG
 

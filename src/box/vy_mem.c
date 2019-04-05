@@ -134,7 +134,7 @@ vy_mem_delete(struct vy_mem *index)
 struct tuple *
 vy_mem_older_lsn(struct vy_mem *mem, struct tuple *stmt)
 {
-	struct tree_mem_key tree_key;
+	struct vy_mem_tree_key tree_key;
 	tree_key.stmt = stmt;
 	tree_key.lsn = vy_stmt_lsn(stmt) - 1;
 	bool exact = false;
@@ -354,7 +354,7 @@ vy_mem_iterator_find_lsn(struct vy_mem_iterator *itr)
 	 * is going to take long. So instead we look it up - it's
 	 * pretty cheap anyway.
 	 */
-	struct tree_mem_key tree_key;
+	struct vy_mem_tree_key tree_key;
 	tree_key.stmt = itr->curr_stmt;
 	tree_key.lsn = (**itr->read_view).vlsn;
 	itr->curr_pos = vy_mem_tree_lower_bound(&itr->mem->tree,
@@ -398,7 +398,7 @@ vy_mem_iterator_seek(struct vy_mem_iterator *itr, struct tuple *last_key)
 	}
 
 	bool exact;
-	struct tree_mem_key tree_key;
+	struct vy_mem_tree_key tree_key;
 	tree_key.stmt = key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */
 	tree_key.lsn = INT64_MAX - 1;
