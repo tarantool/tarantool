@@ -1,5 +1,4 @@
-
-function string_function()
+local function string_function()
     local random_number
     local random_string
     random_string = ""
@@ -107,3 +106,5 @@ function delete_insert(engine_name, iterations)
     box.space.tester:drop()
     return {counter, string_value_2}
 end
+
+_G.protected_globals = {'delete_replace_update', 'delete_insert'}
