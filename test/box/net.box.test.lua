@@ -1444,9 +1444,16 @@ sock = socket.tcp_connect(LISTEN.host, LISTEN.service)
 -- we need to have a packet with correctly encoded length,
 -- so that it bypasses iproto length check, but cannot be
 -- decoded in xrow_header_decode
--- 0x14 = 20, sha1 digest is 20 bytes long
-data = string.fromhex('14'..require('digest').sha1_hex('asdf'))
+-- 0x3C = 60, sha1 digest is 20 bytes long
+data = string.fromhex('3C'..string.rep(require('digest').sha1_hex('bcde'), 3))
 sock:write(data)
 sock:close()
-test_run:grep_log('default', 'Corrupted row is: .*')
+
+test_run:grep_log('default', 'Got a corrupted row.*')
+test_run:grep_log('default', '00000000:.*')
+test_run:grep_log('default', '00000010:.*')
+test_run:grep_log('default', '00000020:.*')
+test_run:grep_log('default', '00000030:.*')
+test_run:grep_log('default', '00000040:.*')
+
 box.cfg{log_level=log_level}
