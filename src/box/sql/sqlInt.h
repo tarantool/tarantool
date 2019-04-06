@@ -682,9 +682,6 @@ sql_column_name(sql_stmt *, int N);
 const char *
 sql_column_datatype(sql_stmt *, int N);
 
-const char *
-sql_errmsg(sql *);
-
 int
 sql_initialize(void);
 
@@ -791,9 +788,6 @@ sql_status64(int op, sql_int64 * pCurrent,
 		 sql_int64 * pHighwater,
 		 int resetFlag);
 
-int
-sql_config(int, ...);
-
 
 typedef struct sql_io_methods sql_io_methods;
 struct sql_io_methods {
@@ -843,10 +837,6 @@ sql_limit(sql *, int id, int newVal);
 #define SQL_SYNC_FULL          0x00003
 #define SQL_SYNC_DATAONLY      0x00010
 
-int
-sql_uri_boolean(const char *zFile,
-		    const char *zParam, int bDefault);
-
 extern char *
 sql_temp_directory;
 
@@ -882,9 +872,6 @@ sql_vfs_register(sql_vfs *, int makeDflt);
 #define SQL_STMTSTATUS_SORT              2
 #define SQL_STMTSTATUS_AUTOINDEX         3
 #define SQL_STMTSTATUS_VM_STEP           4
-
-void
-sql_interrupt(sql *);
 
 int
 sql_bind_blob(sql_stmt *, int, const void *,
@@ -952,18 +939,6 @@ sql_bind_parameter_lindex(sql_stmt * pStmt, const char *zName,
  * If compiling for a processor that lacks floating point support,
  * substitute integer for floating-point
  */
-#ifdef SQL_OMIT_FLOATING_POINT
-#define double sql_int64
-#define float sql_int64
-#define LONGDOUBLE_TYPE sql_int64
-#ifndef SQL_BIG_DBL
-#define SQL_BIG_DBL (((sql_int64)1)<<50)
-#endif
-#define SQL_OMIT_DATETIME_FUNCS 1
-#define SQL_OMIT_TRACE 1
-#undef SQL_MIXED_ENDIAN_64BIT_FLOAT
-#undef SQL_HAVE_ISNAN
-#endif
 #ifndef SQL_BIG_DBL
 #define SQL_BIG_DBL (1e99)
 #endif
@@ -1308,30 +1283,13 @@ extern const int sqlone;
 #define SQL_DYNAMIC   ((sql_destructor_type)sqlMallocSize)
 
 /*
- * When sql_OMIT_WSD is defined, it means that the target platform does
- * not support Writable Static Data (WSD) such as global and static variables.
- * All variables must either be on the stack or dynamically allocated from
- * the heap.  When WSD is unsupported, the variable declarations scattered
- * throughout the sql code must become constants instead.  The sql_WSD
- * macro is used for this purpose.  And instead of referencing the variable
- * directly, we use its constant as a key to lookup the run-time allocated
- * buffer that holds real variable.  The constant is also the initializer
- * for the run-time allocated buffer.
- *
- * In the usual case where WSD is supported, the sql_WSD and GLOBAL
- * macros become no-ops and have zero performance impact.
+ * The usual case where Writable Static Data (WSD) is supported,
+ * the sql_WSD and GLOBAL macros become no-ops and have zero
+ * performance impact.
  */
-#ifdef SQL_OMIT_WSD
-#define SQL_WSD const
-#define GLOBAL(t,v) (*(t*)sql_wsd_find((void*)&(v), sizeof(v)))
-#define sqlGlobalConfig GLOBAL(struct sqlConfig, sqlConfig)
-int sql_wsd_init(int N, int J);
-void *sql_wsd_find(void *K, int L);
-#else
 #define SQL_WSD
 #define GLOBAL(t,v) v
 #define sqlGlobalConfig sqlConfig
-#endif
 
 /*
  * The following macros are used to suppress compiler warnings and to
@@ -1543,11 +1501,7 @@ struct sql {
 #define SQL_DeferFKs       0x02000000	/* Defer all FK constraints */
 #define SQL_VdbeEQP        0x08000000	/* Debug EXPLAIN QUERY PLAN */
 
-/*
- * Bits of the sql.dbOptFlags field that are used by the
- * sql_test_control(sql_TESTCTRL_OPTIMIZATIONS,...) interface to
- * selectively disable various optimizations.
- */
+/* Bits of the sql.dbOptFlags field. */
 #define SQL_QueryFlattener 0x0001	/* Query flattening */
 #define SQL_ColumnCache    0x0002	/* Column cache */
 #define SQL_GroupByOrder   0x0004	/* GROUPBY cover of ORDERBY */
@@ -2937,10 +2891,6 @@ struct sqlConfig {
 	int isMallocInit;	/* True after malloc is initialized */
 	void (*xLog) (void *, int, const char *);	/* Function for logging */
 	void *pLogArg;		/* First argument to xLog() */
-#ifdef SQL_ENABLE_SQLLOG
-	void (*xSqllog) (void *, sql *, const char *, int);
-	void *pSqllogArg;
-#endif
 #ifdef SQL_VDBE_COVERAGE
 	/* The following callback (if not NULL) is invoked on every VDBE branch
 	 * operation.  Set the callback using sql_TESTCTRL_VDBE_COVERAGE.
@@ -2954,24 +2904,6 @@ struct sqlConfig {
 	int bLocaltimeFault;	/* True to fail localtime() calls */
 	int iOnceResetThreshold;	/* When to reset OP_Once counters */
 };
-
-/*
- * This macro is used inside of assert() statements to indicate that
- * the assert is only valid on a well-formed database.  Instead of:
- *
- *     assert( X );
- *
- * One writes:
- *
- *     assert( X || CORRUPT_DB );
- *
- * CORRUPT_DB is true during normal operation.  CORRUPT_DB does not indicate
- * that the database is definitely corrupt, only that it might be corrupt.
- * For most test cases, CORRUPT_DB is set to false using a special
- * sql_test_control().  This enables assert() statements to prove
- * things that are always true for well-formed databases.
- */
-#define CORRUPT_DB  (sqlConfig.neverCorrupt==0)
 
 /*
  * Context pointer passed down through the tree-walk.
@@ -3048,15 +2980,6 @@ struct TreeView {
 }
 
 /*
- * FTS4 is really an extension for FTS3.  It is enabled using the
- * sql_ENABLE_FTS3 macro.  But to avoid confusion we also call
- * the sql_ENABLE_FTS4 macro to serve as an alias for sql_ENABLE_FTS3.
- */
-#if defined(SQL_ENABLE_FTS4) && !defined(SQL_ENABLE_FTS3)
-#define SQL_ENABLE_FTS3 1
-#endif
-
-/*
  * The following macros mimic the standard library functions toupper(),
  * isspace(), isalnum(), isdigit() and isxdigit(), respectively. The
  * sql versions only work for ASCII characters, regardless of locale.
@@ -3125,11 +3048,7 @@ void sqlStatusUp(int, int);
 void sqlStatusDown(int, int);
 void sqlStatusHighwater(int, int);
 
-#ifndef SQL_OMIT_FLOATING_POINT
 int sqlIsNaN(double);
-#else
-#define sqlIsNaN(X)  0
-#endif
 
 /*
  * An instance of the following structure holds information about SQL
@@ -3439,9 +3358,6 @@ sqlEndTable(struct Parse *parse);
 int
 vdbe_emit_open_cursor(struct Parse *parse, int cursor, int index_id,
 		      struct space *space);
-
-int sqlParseUri(const char *, const char *, unsigned int *,
-		    sql_vfs **, char **, char **);
 
 #ifdef SQL_UNTESTABLE
 #define sqlFaultSim(X) SQL_OK
@@ -4553,11 +4469,6 @@ int sqlAddInt64(i64 *, i64);
 int sqlSubInt64(i64 *, i64);
 int sqlMulInt64(i64 *, i64);
 int sqlAbsInt32(int);
-#ifdef SQL_ENABLE_8_3_NAMES
-void sqlFileSuffix3(const char *, char *);
-#else
-#define sqlFileSuffix3(X,Y)
-#endif
 u8 sqlGetBoolean(const char *z, u8);
 
 const void *sqlValueText(sql_value *);
@@ -4578,9 +4489,7 @@ extern const unsigned char sqlCtypeMap[];
 extern const Token sqlIntTokens[];
 extern SQL_WSD struct sqlConfig sqlConfig;
 extern FuncDefHash sqlBuiltinFunctions;
-#ifndef SQL_OMIT_WSD
 extern int sqlPendingByte;
-#endif
 #endif
 
 /**

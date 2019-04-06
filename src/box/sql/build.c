@@ -327,8 +327,6 @@ sqlStartTable(Parse *pParse, Token *pName, int noErr)
 		if (!noErr) {
 			diag_set(ClientError, ER_SPACE_EXISTS, zName);
 			pParse->is_aborted = true;
-		} else {
-			assert(!db->init.busy || CORRUPT_DB);
 		}
 		goto cleanup;
 	}

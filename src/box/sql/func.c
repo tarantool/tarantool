@@ -498,7 +498,6 @@ substrFunc(sql_context * context, int argc, sql_value ** argv)
 /*
  * Implementation of the round() function
  */
-#ifndef SQL_OMIT_FLOATING_POINT
 static void
 roundFunc(sql_context * context, int argc, sql_value ** argv)
 {
@@ -535,7 +534,6 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	}
 	sql_result_double(context, r);
 }
-#endif
 
 /*
  * Allocate nByte bytes of space using sqlMalloc(). If the
@@ -1547,7 +1545,6 @@ totalFinalize(sql_context * context)
 {
 	SumCtx *p;
 	p = sql_aggregate_context(context, 0);
-	/* (double)0 In case of SQL_OMIT_FLOATING_POINT... */
 	sql_result_double(context, p ? p->rSum : (double)0);
 }
 
@@ -1703,11 +1700,6 @@ sql_overload_function(sql * db, const char *zName,
 {
 	int rc = SQL_OK;
 
-#ifdef SQL_ENABLE_API_ARMOR
-	if (!sqlSafetyCheckOk(db) || zName == 0 || nArg < -2) {
-		return SQL_MISUSE;
-	}
-#endif
 	if (sqlFindFunction(db, zName, nArg, 0) == 0) {
 		rc = sqlCreateFunc(db, zName, type, nArg, 0, 0,
 				       sqlInvalidFunction, 0, 0, 0);
@@ -1841,10 +1833,8 @@ sqlRegisterBuiltinFunctions(void)
 		FUNCTION(unicode, 1, 0, 0, unicodeFunc, FIELD_TYPE_STRING),
 		FUNCTION(char, -1, 0, 0, charFunc, FIELD_TYPE_STRING),
 		FUNCTION(abs, 1, 0, 0, absFunc, FIELD_TYPE_NUMBER),
-#ifndef SQL_OMIT_FLOATING_POINT
 		FUNCTION(round, 1, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
 		FUNCTION(round, 2, 0, 0, roundFunc, FIELD_TYPE_INTEGER),
-#endif
 		FUNCTION_COLL(upper, 1, 0, 1, UpperICUFunc),
 		FUNCTION_COLL(lower, 1, 0, 1, LowerICUFunc),
 		FUNCTION(hex, 1, 0, 0, hexFunc, FIELD_TYPE_STRING),

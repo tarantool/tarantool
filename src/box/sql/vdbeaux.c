@@ -136,7 +136,7 @@ sqlVdbeSetSql(Vdbe * p, const char *z, int n, int isPrepareV2)
 	assert(isPrepareV2 == 1 || isPrepareV2 == 0);
 	if (p == 0)
 		return;
-#if defined(SQL_OMIT_TRACE) && !defined(SQL_ENABLE_SQLLOG)
+#if defined(SQL_OMIT_TRACE)
 	if (!isPrepareV2)
 		return;
 #endif
@@ -2552,30 +2552,6 @@ sqlVdbeTransferError(Vdbe * p)
 	return rc;
 }
 
-#ifdef SQL_ENABLE_SQLLOG
-/*
- * If an SQL_CONFIG_SQLLOG hook is registered and the VM has been run,
- * invoke it.
- */
-static void
-vdbeInvokeSqllog(Vdbe * v)
-{
-	if (sqlGlobalConfig.xSqllog && v->rc == SQL_OK && v->zSql
-	    && v->pc >= 0) {
-		char *zExpanded = sqlVdbeExpandSql(v, v->zSql);
-		assert(v->db->init.busy == 0);
-		if (zExpanded) {
-			sqlGlobalConfig.xSqllog(sqlGlobalConfig.
-						    pSqllogArg, v->db,
-						    zExpanded, 1);
-			sqlDbFree(v->db, zExpanded);
-		}
-	}
-}
-#else
-#define vdbeInvokeSqllog(x)
-#endif
-
 /*
  * Clean up a VDBE after execution but do not delete the VDBE just yet.
  * Write any error messages into *pzErrMsg.  Return the result code.
@@ -2605,7 +2581,6 @@ sqlVdbeReset(Vdbe * p)
 	 * instructions yet, leave the main database error information unchanged.
 	 */
 	if (p->pc >= 0) {
-		vdbeInvokeSqllog(p);
 		sqlVdbeTransferError(p);
 		sqlDbFree(db, p->zErrMsg);
 		p->zErrMsg = 0;
@@ -3084,7 +3059,7 @@ serialGet(const unsigned char *buf,	/* Buffer to deserialize from */
 		/* EVIDENCE-OF: R-57343-49114 Value is a big-endian IEEE 754-2008 64-bit
 		 * floating point number.
 		 */
-#if !defined(NDEBUG) && !defined(SQL_OMIT_FLOATING_POINT)
+#if !defined(NDEBUG)
 		/* Verify that integers and floating point values use the same
 		 * byte order.  Or, that if SQL_MIXED_ENDIAN_64BIT_FLOAT is
 		 * defined that 64-bit floating point values really are mixed

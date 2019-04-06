@@ -3287,7 +3287,6 @@ sqlExprCodeIN(Parse * pParse,	/* Parsing and code generating context */
 	sqlDbFree(pParse->db, zAff);
 }
 
-#ifndef SQL_OMIT_FLOATING_POINT
 /*
  * Generate an instruction that will put the floating point
  * value described by z[0..n-1] into register iMem.
@@ -3309,7 +3308,6 @@ codeReal(Vdbe * v, const char *z, int negateFlag, int iMem)
 				      P4_REAL);
 	}
 }
-#endif
 
 /**
  * Generate an instruction that will put the integer describe by
@@ -3760,13 +3758,11 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			expr_code_int(pParse, pExpr, false, target);
 			return target;
 		}
-#ifndef SQL_OMIT_FLOATING_POINT
 	case TK_FLOAT:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			codeReal(v, pExpr->u.zToken, 0, target);
 			return target;
 		}
-#endif
 	case TK_STRING:{
 			assert(!ExprHasProperty(pExpr, EP_IntValue));
 			sqlVdbeLoadString(v, target, pExpr->u.zToken);
@@ -3923,12 +3919,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			if (pLeft->op == TK_INTEGER) {
 				expr_code_int(pParse, pLeft, true, target);
 				return target;
-#ifndef SQL_OMIT_FLOATING_POINT
 			} else if (pLeft->op == TK_FLOAT) {
 				assert(!ExprHasProperty(pExpr, EP_IntValue));
 				codeReal(v, pLeft->u.zToken, 1, target);
 				return target;
-#endif
 			} else {
 				tempX.op = TK_INTEGER;
 				tempX.flags = EP_IntValue | EP_TokenOnly;
@@ -4283,7 +4277,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				    pExpr->space_def->fields[
 					pExpr->iColumn].name, target));
 
-#ifndef SQL_OMIT_FLOATING_POINT
 			/* If the column has type NUMBER, it may currently be stored as an
 			 * integer. Use OP_Realify to make sure it is really real.
 			 */
@@ -4291,7 +4284,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				pExpr->iColumn].type == FIELD_TYPE_NUMBER) {
 				sqlVdbeAddOp1(v, OP_Realify, target);
 			}
-#endif
 			break;
 		}
 

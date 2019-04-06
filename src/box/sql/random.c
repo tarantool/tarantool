@@ -62,18 +62,7 @@ sql_randomness(int N, void *pBuf)
 	 * case where writable static data is supported, wsdPrng can refer directly
 	 * to the "sqlPrng" state vector declared above.
 	 */
-#ifdef SQL_OMIT_WSD
-	struct sqlPrngType *p =
-	    &GLOBAL(struct sqlPrngType, sqlPrng);
-#define wsdPrng p[0]
-#else
 #define wsdPrng sqlPrng
-#endif
-
-#ifndef SQL_OMIT_AUTOINIT
-	if (sql_initialize())
-		return;
-#endif
 
 	if (N <= 0 || pBuf == 0) {
 		wsdPrng.isInit = 0;
@@ -125,9 +114,6 @@ sql_randomness(int N, void *pBuf)
  * PRNG and restore the PRNG to its saved state at a later time, or
  * to reset the PRNG to its initial state.  These routines accomplish
  * those tasks.
- *
- * The sql_test_control() interface calls these routines to
- * control the PRNG.
  */
 static SQL_WSD struct sqlPrngType sqlSavedPrng;
 void

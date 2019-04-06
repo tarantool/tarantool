@@ -418,11 +418,6 @@ sqlVdbeMemRelease(Mem * p)
 static int
 doubleToInt64(double r, int64_t *i)
 {
-#ifdef SQL_OMIT_FLOATING_POINT
-	/* When floating-point is omitted, double and int64 are the same thing */
-	*i = r;
-	return 0;
-#else
 	/*
 	 * Many compilers we encounter do not define constants for the
 	 * minimum and maximum 64-bit integers, or they define them
@@ -443,7 +438,6 @@ doubleToInt64(double r, int64_t *i)
 		*i = (int64_t) r;
 		return *i != r;
 	}
-#endif
 }
 
 /*
@@ -726,7 +720,6 @@ sqlVdbeMemSetInt64(Mem * pMem, i64 val)
 	}
 }
 
-#ifndef SQL_OMIT_FLOATING_POINT
 /*
  * Delete any previous value and set the value stored in *pMem to val,
  * manifest type REAL.
@@ -740,7 +733,6 @@ sqlVdbeMemSetDouble(Mem * pMem, double val)
 		pMem->flags = MEM_Real;
 	}
 }
-#endif
 
 /*
  * Return true if the Mem object contains a TEXT or BLOB that is

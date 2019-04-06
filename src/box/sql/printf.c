@@ -80,12 +80,10 @@ static const et_info fmtinfo[] = {
 	{'u', 10, 0, etRADIX, 0, 0},
 	{'x', 16, 0, etRADIX, 16, 1},
 	{'X', 16, 0, etRADIX, 0, 4},
-#ifndef SQL_OMIT_FLOATING_POINT
 	{'f', 0, 1, etFLOAT, 0, 0},
 	{'e', 0, 1, etEXP, 30, 0},
 	{'E', 0, 1, etEXP, 14, 0},
 	{'G', 0, 1, etGENERIC, 14, 0},
-#endif
 	{'i', 10, 1, etRADIX, 0, 0},
 	{'n', 0, 0, etSIZE, 0, 0},
 	{'%', 0, 0, etPERCENT, 0, 0},
@@ -98,11 +96,6 @@ static const et_info fmtinfo[] = {
 	{'r', 10, 3, etORDINAL, 0, 0},
 };
 
-/*
- * If SQL_OMIT_FLOATING_POINT is defined, then none of the floating point
- * conversions will work.
- */
-#ifndef SQL_OMIT_FLOATING_POINT
 /*
  * "*val" is a double such that 0.1 <= *val < 10.0
  * Return the ascii code for the leading digit of *val, then
@@ -130,7 +123,6 @@ et_getdigit(LONGDOUBLE_TYPE * val, int *cnt)
 	*val = (*val - d) * 10.0;
 	return (char)digit;
 }
-#endif				/* SQL_OMIT_FLOATING_POINT */
 
 /*
  * Set the StrAccum object to an error mode.
@@ -213,13 +205,11 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 	char *zOut;		/* Rendering buffer */
 	int nOut;		/* Size of the rendering buffer */
 	char *zExtra = 0;	/* Malloced memory used by some conversion */
-#ifndef SQL_OMIT_FLOATING_POINT
 	int exp, e2;		/* exponent of real numbers */
 	int nsd;		/* Number of significant digits returned */
 	double rounder;		/* Used for rounding floating point values */
 	etByte flag_dp;		/* True if decimal point should be shown */
 	etByte flag_rtz;	/* True if trailing zeros should be removed */
-#endif
 	PrintfArguments *pArgList = 0;	/* Arguments for SQL_PRINTF_SQLFUNC */
 	char buf[etBUFSIZE];	/* Conversion buffer */
 
@@ -499,9 +489,6 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 			} else {
 				realvalue = va_arg(ap, double);
 			}
-#ifdef SQL_OMIT_FLOATING_POINT
-			length = 0;
-#else
 			if (precision < 0)
 				precision = 6;	/* Set default precision */
 			if (realvalue < 0.0) {
@@ -682,7 +669,6 @@ sqlVXPrintf(StrAccum * pAccum,	/* Accumulate results here */
 					bufpt[i++] = '0';
 				length = width;
 			}
-#endif				/* !defined(SQL_OMIT_FLOATING_POINT) */
 			break;
 		case etSIZE:
 			if (!bArgList) {
@@ -1082,16 +1068,6 @@ sql_vmprintf(const char *zFormat, va_list ap)
 	char *z;
 	char zBase[SQL_PRINT_BUF_SIZE];
 	StrAccum acc;
-
-#ifdef SQL_ENABLE_API_ARMOR
-	if (zFormat == 0) {
-		return 0;
-	}
-#endif
-#ifndef SQL_OMIT_AUTOINIT
-	if (sql_initialize())
-		return 0;
-#endif
 	sqlStrAccumInit(&acc, 0, zBase, sizeof(zBase), SQL_MAX_LENGTH);
 	sqlVXPrintf(&acc, zFormat, ap);
 	z = sqlStrAccumFinish(&acc);
@@ -1107,10 +1083,6 @@ sql_mprintf(const char *zFormat, ...)
 {
 	va_list ap;
 	char *z;
-#ifndef SQL_OMIT_AUTOINIT
-	if (sql_initialize())
-		return 0;
-#endif
 	va_start(ap, zFormat);
 	z = sql_vmprintf(zFormat, ap);
 	va_end(ap);
@@ -1136,13 +1108,6 @@ sql_vsnprintf(int n, char *zBuf, const char *zFormat, va_list ap)
 	StrAccum acc;
 	if (n <= 0)
 		return zBuf;
-#ifdef SQL_ENABLE_API_ARMOR
-	if (zBuf == 0 || zFormat == 0) {
-		if (zBuf)
-			zBuf[0] = 0;
-		return zBuf;
-	}
-#endif
 	sqlStrAccumInit(&acc, 0, zBuf, n, 0);
 	sqlVXPrintf(&acc, zFormat, ap);
 	zBuf[acc.nChar] = 0;

@@ -65,14 +65,8 @@ static SQL_WSD struct BenignMallocHooks {
  * case where writable static data is supported, wsdHooks can refer directly
  * to the "sqlHooks" state vector declared above.
  */
-#ifdef SQL_OMIT_WSD
-#define wsdHooksInit \
-  BenignMallocHooks *x = &GLOBAL(BenignMallocHooks,sqlHooks)
-#define wsdHooks x[0]
-#else
 #define wsdHooksInit
 #define wsdHooks sqlHooks
-#endif
 
 /*
  * Register hooks to call when sqlBeginBenignMalloc() and

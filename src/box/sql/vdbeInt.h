@@ -481,11 +481,7 @@ void sqlVdbeMemMove(Mem *, Mem *);
 int sqlVdbeMemNulTerminate(Mem *);
 int sqlVdbeMemSetStr(Mem *, const char *, int, u8, void (*)(void *));
 void sqlVdbeMemSetInt64(Mem *, i64);
-#ifdef SQL_OMIT_FLOATING_POINT
-#define sqlVdbeMemSetDouble sqlVdbeMemSetInt64
-#else
 void sqlVdbeMemSetDouble(Mem *, double);
-#endif
 void sqlVdbeMemInit(Mem *, sql *, u32);
 void sqlVdbeMemSetNull(Mem *);
 void sqlVdbeMemSetZeroBlob(Mem *, int);

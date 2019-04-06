@@ -1074,11 +1074,6 @@ columnName(sql_stmt * pStmt,
 	Vdbe *p;
 	int n;
 	sql *db;
-#ifdef SQL_ENABLE_API_ARMOR
-	if (pStmt == 0) {
-		return 0;
-	}
-#endif
 	ret = 0;
 	p = (Vdbe *) pStmt;
 	db = p->db;
@@ -1576,11 +1571,6 @@ sql_stmt *
 sql_next_stmt(sql * pDb, sql_stmt * pStmt)
 {
 	sql_stmt *pNext;
-#ifdef SQL_ENABLE_API_ARMOR
-	if (!sqlSafetyCheckOk(pDb)) {
-		return 0;
-	}
-#endif
 	if (pStmt == 0) {
 		pNext = (sql_stmt *) pDb->pVdbe;
 	} else {
@@ -1597,11 +1587,6 @@ sql_stmt_status(sql_stmt * pStmt, int op, int resetFlag)
 {
 	Vdbe *pVdbe = (Vdbe *) pStmt;
 	u32 v;
-#ifdef SQL_ENABLE_API_ARMOR
-	if (!pStmt) {
-		return 0;
-	}
-#endif
 	v = pVdbe->aCounter[op];
 	if (resetFlag)
 		pVdbe->aCounter[op] = 0;

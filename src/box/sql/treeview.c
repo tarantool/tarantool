@@ -349,12 +349,10 @@ sqlTreeViewExpr(TreeView * pView, const Expr * pExpr, u8 moreToFollow)
 			}
 			break;
 		}
-#ifndef SQL_OMIT_FLOATING_POINT
 	case TK_FLOAT:{
 			sqlTreeViewLine(pView, "%s", pExpr->u.zToken);
 			break;
 		}
-#endif
 	case TK_STRING:{
 			sqlTreeViewLine(pView, "%Q", pExpr->u.zToken);
 			break;

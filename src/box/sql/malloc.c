@@ -185,11 +185,6 @@ sql_soft_heap_limit64(sql_int64 n)
 	sql_int64 priorLimit;
 	sql_int64 excess;
 	sql_int64 nUsed;
-#ifndef SQL_OMIT_AUTOINIT
-	int rc = sql_initialize();
-	if (rc)
-		return -1;
-#endif
 	priorLimit = mem0.alarmThreshold;
 	if (n < 0) {
 		return priorLimit;
@@ -372,20 +367,12 @@ sqlMalloc(u64 n)
 void *
 sql_malloc(int n)
 {
-#ifndef SQL_OMIT_AUTOINIT
-	if (sql_initialize())
-		return 0;
-#endif
 	return n <= 0 ? 0 : sqlMalloc(n);
 }
 
 void *
 sql_malloc64(sql_uint64 n)
 {
-#ifndef SQL_OMIT_AUTOINIT
-	if (sql_initialize())
-		return 0;
-#endif
 	return sqlMalloc(n);
 }
 
@@ -661,10 +648,6 @@ sqlRealloc(void *pOld, u64 nBytes)
 void *
 sql_realloc(void *pOld, int n)
 {
-#ifndef SQL_OMIT_AUTOINIT
-	if (sql_initialize())
-		return 0;
-#endif
 	if (n < 0)
 		n = 0;		/* IMP: R-26507-47431 */
 	return sqlRealloc(pOld, n);
@@ -673,10 +656,6 @@ sql_realloc(void *pOld, int n)
 void *
 sql_realloc64(void *pOld, sql_uint64 n)
 {
-#ifndef SQL_OMIT_AUTOINIT
-	if (sql_initialize())
-		return 0;
-#endif
 	return sqlRealloc(pOld, n);
 }
 

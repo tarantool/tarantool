@@ -530,10 +530,8 @@ memTracePrint(Mem *p)
 		printf(" si:%lld", p->u.i);
 	} else if (p->flags & MEM_Int) {
 		printf(" i:%lld", p->u.i);
-#ifndef SQL_OMIT_FLOATING_POINT
 	} else if (p->flags & MEM_Real) {
 		printf(" r:%g", p->u.r);
-#endif
 	} else {
 		char zBuf[200];
 		sqlVdbeMemPrettyPrint(p, zBuf);
@@ -744,18 +742,6 @@ int sqlVdbeExec(Vdbe *p)
 		}
 #endif
 
-
-		/* Check to see if we need to simulate an interrupt.  This only happens
-		 * if we have a special test build.
-		 */
-#ifdef SQL_TEST
-		if (sql_interrupt_count>0) {
-			sql_interrupt_count--;
-			if (sql_interrupt_count==0) {
-				sql_interrupt(db);
-			}
-		}
-#endif
 
 		/* Sanity checking on other operands */
 #ifdef SQL_DEBUG
@@ -1140,7 +1126,6 @@ case OP_Int64: {           /* out2 */
 	break;
 }
 
-#ifndef SQL_OMIT_FLOATING_POINT
 /* Opcode: Real * P2 * P4 *
  * Synopsis: r[P2]=P4
  *
@@ -1154,7 +1139,6 @@ case OP_Real: {            /* same as TK_FLOAT, out2 */
 	pOut->u.r = *pOp->p4.pReal;
 	break;
 }
-#endif
 
 /* Opcode: String8 * P2 * P4 *
  * Synopsis: r[P2]='P4'
@@ -1692,7 +1676,6 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		case OP_Subtract:    rB -= rA;       break;
 		case OP_Multiply:    rB *= rA;       break;
 		case OP_Divide: {
-			/* (double)0 In case of SQL_OMIT_FLOATING_POINT... */
 			if (rA == (double)0)
 				goto division_by_zero;
 			rB /= rA;
@@ -1708,10 +1691,6 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 			break;
 		}
 		}
-#ifdef SQL_OMIT_FLOATING_POINT
-		pOut->u.i = rB;
-		MemSetTypeFlag(pOut, MEM_Int);
-#else
 		if (sqlIsNaN(rB)) {
 			goto arithmetic_result_is_null;
 		}
@@ -1720,7 +1699,6 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		if (((type1|type2)&MEM_Real)==0 && !bIntint) {
 			mem_apply_integer_type(pOut);
 		}
-#endif
 	}
 	break;
 
@@ -2006,7 +1984,6 @@ case OP_MustBeInt: {            /* jump, in1 */
 	break;
 }
 
-#ifndef SQL_OMIT_FLOATING_POINT
 /* Opcode: Realify P1 * * * *
  *
  * If register P1 holds an integer convert it to a real value.
@@ -2023,7 +2000,6 @@ case OP_Realify: {                  /* in1 */
 	}
 	break;
 }
-#endif
 
 #ifndef SQL_OMIT_CAST
 /* Opcode: Cast P1 P2 * * *

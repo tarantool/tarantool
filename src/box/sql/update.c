@@ -58,11 +58,9 @@ sqlColumnDefault(Vdbe *v, struct space_def *def, int i, int ireg)
 		if (pValue) {
 			sqlVdbeAppendP4(v, pValue, P4_MEM);
 		}
-#ifndef SQL_OMIT_FLOATING_POINT
 		if (type == FIELD_TYPE_NUMBER) {
 			sqlVdbeAddOp1(v, OP_Realify, ireg);
 		}
-#endif
 	}
 }
 

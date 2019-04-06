@@ -54,18 +54,12 @@ static SQL_WSD struct sqlStatType {
 
 
 /* The "wsdStat" macro will resolve to the status information
- * state vector.  If writable static data is unsupported on the target,
- * we have to locate the state vector at run-time.  In the more common
- * case where writable static data is supported, wsdStat can refer directly
- * to the "sqlStat" state vector declared above.
+ * state vector. In the common case where writable static data is
+ * supported, wsdStat can refer directly  to the "sqlStat" state
+ * vector declared above.
  */
-#ifdef SQL_OMIT_WSD
-#define wsdStatInit  sqlStatType *x = &GLOBAL(sqlStatType,sqlStat)
-#define wsdStat x[0]
-#else
 #define wsdStatInit
 #define wsdStat sqlStat
-#endif
 
 /*
  * Return the current value of a status parameter.
@@ -144,10 +138,6 @@ sql_status64(int op,
 	if (op < 0 || op >= ArraySize(wsdStat.nowValue)) {
 		return SQL_MISUSE;
 	}
-#ifdef SQL_ENABLE_API_ARMOR
-	if (pCurrent == 0 || pHighwater == 0)
-		return SQL_MISUSE;
-#endif
 	*pCurrent = wsdStat.nowValue[op];
 	*pHighwater = wsdStat.mxValue[op];
 	if (resetFlag) {
@@ -161,10 +151,6 @@ sql_status(int op, int *pCurrent, int *pHighwater, int resetFlag)
 {
 	sql_int64 iCur = 0, iHwtr = 0;
 	int rc;
-#ifdef SQL_ENABLE_API_ARMOR
-	if (pCurrent == 0 || pHighwater == 0)
-		return SQL_MISUSE;
-#endif
 	rc = sql_status64(op, &iCur, &iHwtr, resetFlag);
 	if (rc == 0) {
 		*pCurrent = (int)iCur;
@@ -185,11 +171,6 @@ sql_db_status(sql * db,	/* The database connection whose status is desired */
     )
 {
 	int rc = SQL_OK;	/* Return code */
-#ifdef SQL_ENABLE_API_ARMOR
-	if (!sqlSafetyCheckOk(db) || pCurrent == 0 || pHighwater == 0) {
-		return SQL_MISUSE;
-	}
-#endif
 	switch (op) {
 	case SQL_DBSTATUS_LOOKASIDE_USED:{
 			*pCurrent = db->lookaside.nOut;

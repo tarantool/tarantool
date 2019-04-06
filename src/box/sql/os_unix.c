@@ -1693,11 +1693,6 @@ getFileMode(const char *zFile,	/* File name */
  * corresponding database file and sets *pMode to this value. Whenever
  * possible, journal files are created using the same permissions
  * as the associated database file.
- *
- * If the SQL_ENABLE_8_3_NAMES option is enabled, then the
- * original filename is unavailable.  But 8_3_NAMES is only used for
- * FAT filesystems and permissions do not matter there, so just use
- * the default permissions.
  */
 static int
 findCreateFileMode(const char *zPath,	/* Path of file (possibly) being created */

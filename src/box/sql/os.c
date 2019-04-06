@@ -213,11 +213,6 @@ sql_vfs *
 sql_vfs_find(const char *zVfs)
 {
 	sql_vfs *pVfs = 0;
-#ifndef SQL_OMIT_AUTOINIT
-	int rc = sql_initialize();
-	if (rc)
-		return 0;
-#endif
 	for (pVfs = vfsList; pVfs; pVfs = pVfs->pNext) {
 		if (zVfs == 0)
 			break;
@@ -256,15 +251,6 @@ vfsUnlink(sql_vfs * pVfs)
 int
 sql_vfs_register(sql_vfs * pVfs, int makeDflt)
 {
-#ifndef SQL_OMIT_AUTOINIT
-	int rc = sql_initialize();
-	if (rc)
-		return rc;
-#endif
-#ifdef SQL_ENABLE_API_ARMOR
-	if (pVfs == 0)
-		return SQL_MISUSE;
-#endif
 
 	vfsUnlink(pVfs);
 	if (makeDflt || vfsList == 0) {

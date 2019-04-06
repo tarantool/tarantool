@@ -5659,8 +5659,6 @@ sqlSelect(Parse * pParse,		/* The parser context */
 		 *   (2)  The ALL keyword after SELECT is omitted.  (Applications are
 		 *        allowed to say "SELECT ALL" instead of just "SELECT" to disable
 		 *        the use of co-routines.)
-		 *   (3)  Co-routines are not disabled using sql_test_control()
-		 *        with SQL_TESTCTRL_OPTIMIZATIONS.
 		 *
 		 * TODO: Are there other reasons beside (1) to use a co-routine
 		 * implementation?

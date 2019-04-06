@@ -57,6 +57,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	     char **pzErrMsg	/* Write error messages here */
     )
 {
+	(void)pzErrMsg;
 	int rc = SQL_OK;	/* Return code */
 	const char *zLeftover;	/* Tail of unprocessed SQL */
 	sql_stmt *pStmt = 0;	/* The current SQL statement */
@@ -169,19 +170,7 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	sqlDbFree(db, azCols);
 
 	rc = sqlApiExit(db, rc);
-	if (rc != SQL_OK && pzErrMsg) {
-		int nErrMsg = 1 + sqlStrlen30(sql_errmsg(db));
-		*pzErrMsg = sqlMalloc(nErrMsg);
-		if (*pzErrMsg) {
-			memcpy(*pzErrMsg, sql_errmsg(db), nErrMsg);
-		} else {
-			rc = SQL_NOMEM;
-			sqlError(db, SQL_NOMEM);
-		}
-	} else if (pzErrMsg) {
-		*pzErrMsg = 0;
-	}
-
+	assert(rc == SQL_OK);
 	assert((rc & db->errMask) == rc);
 	return rc;
 }

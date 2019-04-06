@@ -194,10 +194,6 @@ sqlLockAndPrepare(sql * db,		/* Database handle. */
 {
 	int rc;
 
-#ifdef SQL_ENABLE_API_ARMOR
-	if (ppStmt == 0)
-		return SQL_MISUSE;
-#endif
 	*ppStmt = 0;
 	if (!sqlSafetyCheckOk(db) || zSql == 0) {
 		return SQL_MISUSE;

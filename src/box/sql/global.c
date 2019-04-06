@@ -200,10 +200,6 @@ SQL_WSD struct sqlConfig sqlConfig = {
 	0,			/* isMallocInit */
 	0,			/* xLog */
 	0,			/* pLogArg */
-#ifdef SQL_ENABLE_SQLLOG
-	0,			/* xSqllog */
-	0,			/* pSqllogArg */
-#endif
 #ifdef SQL_VDBE_COVERAGE
 	0,			/* xVdbeBranch */
 	0,			/* pVbeBranchArg */
@@ -232,17 +228,14 @@ FuncDefHash sqlBuiltinFunctions;
  * During testing, it is often desirable to move the pending byte to
  * a different position in the file.  This allows code that has to
  * deal with the pending byte to run on files that are much smaller
- * than 1 GiB.  The sql_test_control() interface can be used to
- * move the pending byte.
+ * than 1 GiB.
  *
  * IMPORTANT:  Changing the pending byte to any value other than
  * 0x40000000 results in an incompatible database file format!
  * Changing the pending byte during operation will result in undefined
  * and incorrect behavior.
  */
-#ifndef SQL_OMIT_WSD
 int sqlPendingByte = 0x40000000;
-#endif
 
 #include "opcodes.h"
 /*
