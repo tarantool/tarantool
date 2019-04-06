@@ -53,7 +53,7 @@
  */
 static int
 vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
-			 struct tuple *key, struct vy_history *history)
+			 struct vy_entry key, struct vy_history *history)
 {
 	if (tx == NULL)
 		return 0;
@@ -64,8 +64,8 @@ vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
 	if (txv == NULL)
 		return 0;
 	vy_stmt_counter_acct_tuple(&lsm->stat.txw.iterator.get,
-				   txv->stmt);
-	return vy_history_append_stmt(history, txv->stmt);
+				   txv->entry.stmt);
+	return vy_history_append_stmt(history, txv->entry);
 }
 
 /**
@@ -74,16 +74,16 @@ vy_point_lookup_scan_txw(struct vy_lsm *lsm, struct vy_tx *tx,
  */
 static int
 vy_point_lookup_scan_cache(struct vy_lsm *lsm, const struct vy_read_view **rv,
-			   struct tuple *key, struct vy_history *history)
+			   struct vy_entry key, struct vy_history *history)
 {
 	lsm->cache.stat.lookup++;
-	struct tuple *stmt = vy_cache_get(&lsm->cache, key);
+	struct vy_entry entry = vy_cache_get(&lsm->cache, key);
 
-	if (stmt == NULL || vy_stmt_lsn(stmt) > (*rv)->vlsn)
+	if (entry.stmt == NULL || vy_stmt_lsn(entry.stmt) > (*rv)->vlsn)
 		return 0;
 
-	vy_stmt_counter_acct_tuple(&lsm->cache.stat.get, stmt);
-	return vy_history_append_stmt(history, stmt);
+	vy_stmt_counter_acct_tuple(&lsm->cache.stat.get, entry.stmt);
+	return vy_history_append_stmt(history, entry);
 }
 
 /**
@@ -93,7 +93,7 @@ vy_point_lookup_scan_cache(struct vy_lsm *lsm, const struct vy_read_view **rv,
 static int
 vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
 			 const struct vy_read_view **rv,
-			 struct tuple *key, struct vy_history *history)
+			 struct vy_entry key, struct vy_history *history)
 {
 	struct vy_mem_iterator mem_itr;
 	vy_mem_iterator_open(&mem_itr, &lsm->stat.memory.iterator,
@@ -113,7 +113,7 @@ vy_point_lookup_scan_mem(struct vy_lsm *lsm, struct vy_mem *mem,
  */
 static int
 vy_point_lookup_scan_mems(struct vy_lsm *lsm, const struct vy_read_view **rv,
-			  struct tuple *key, struct vy_history *history)
+			  struct vy_entry key, struct vy_history *history)
 {
 	assert(lsm->mem != NULL);
 	int rc = vy_point_lookup_scan_mem(lsm, lsm->mem, rv, key, history);
@@ -133,7 +133,7 @@ vy_point_lookup_scan_mems(struct vy_lsm *lsm, const struct vy_read_view **rv,
  */
 static int
 vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
-			   const struct vy_read_view **rv, struct tuple *key,
+			   const struct vy_read_view **rv, struct vy_entry key,
 			   struct vy_history *history)
 {
 	/*
@@ -161,7 +161,7 @@ vy_point_lookup_scan_slice(struct vy_lsm *lsm, struct vy_slice *slice,
  */
 static int
 vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
-			    struct tuple *key, struct vy_history *history)
+			    struct vy_entry key, struct vy_history *history)
 {
 	struct vy_range *range = vy_range_tree_find_by_key(&lsm->range_tree,
 							   ITER_EQ, key);
@@ -194,13 +194,13 @@ vy_point_lookup_scan_slices(struct vy_lsm *lsm, const struct vy_read_view **rv,
 int
 vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 		const struct vy_read_view **rv,
-		struct tuple *key, struct tuple **ret)
+		struct vy_entry key, struct vy_entry *ret)
 {
 	/* All key parts must be set for a point lookup. */
-	assert(vy_stmt_is_full_key(key, lsm->cmp_def));
+	assert(vy_stmt_is_full_key(key.stmt, lsm->cmp_def));
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
-	*ret = NULL;
+	*ret = vy_entry_none();
 	double start_time = ev_monotonic_now(loop());
 	int rc = 0;
 
@@ -295,8 +295,8 @@ done:
 	if (rc != 0)
 		return -1;
 
-	if (*ret != NULL)
-		vy_stmt_counter_acct_tuple(&lsm->stat.get, *ret);
+	if (ret->stmt != NULL)
+		vy_stmt_counter_acct_tuple(&lsm->stat.get, ret->stmt);
 
 	double latency = ev_monotonic_now(loop()) - start_time;
 	latency_collect(&lsm->stat.latency, latency);
@@ -304,17 +304,17 @@ done:
 	if (latency > lsm->env->too_long_threshold) {
 		say_warn_ratelimited("%s: get(%s) => %s "
 				     "took too long: %.3f sec",
-				     vy_lsm_name(lsm), tuple_str(key),
-				     vy_stmt_str(*ret), latency);
+				     vy_lsm_name(lsm), tuple_str(key.stmt),
+				     vy_stmt_str(ret->stmt), latency);
 	}
 	return 0;
 }
 
 int
 vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
-		    struct tuple *key, struct tuple **ret)
+		    struct vy_entry key, struct vy_entry *ret)
 {
-	assert(vy_stmt_is_full_key(key, lsm->cmp_def));
+	assert(vy_stmt_is_full_key(key.stmt, lsm->cmp_def));
 
 	int rc;
 	struct vy_history history;
@@ -328,7 +328,7 @@ vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
 	if (rc != 0 || vy_history_is_terminal(&history))
 		goto done;
 
-	*ret = NULL;
+	*ret = vy_entry_none();
 	goto out;
 done:
 	if (rc == 0) {

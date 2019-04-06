@@ -36,7 +36,7 @@
 
 #include "fiber_cond.h"
 #include "iterator_type.h"
-#include "vy_stmt.h" /* for comparators */
+#include "vy_entry.h"
 #include "vy_stmt_stream.h"
 #include "vy_read_view.h"
 #include "vy_stat.h"
@@ -105,6 +105,8 @@ struct vy_page_info {
 	uint32_t row_count;
 	/** Minimal key stored in the page. */
 	char *min_key;
+	/** Comparison hint of the min key. */
+	hint_t min_key_hint;
 	/** Offset of the row index in the page. */
 	uint32_t row_index_offset;
 };
@@ -182,8 +184,8 @@ struct vy_slice {
 	 * of the run. If @end is NULL, the slice ends at the end
 	 * of the run.
 	 */
-	struct tuple *begin;
-	struct tuple *end;
+	struct vy_entry begin;
+	struct vy_entry end;
 	/**
 	 * Random seed used for compaction randomization.
 	 * Lays in range [0, RAND_MAX].
@@ -259,7 +261,7 @@ struct vy_run_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	struct tuple *key;
+	struct vy_entry key;
 	/* LSN visibility, iterator shows values with lsn <= vlsn */
 	const struct vy_read_view **read_view;
 
@@ -267,7 +269,7 @@ struct vy_run_iterator {
 	/** Position of the current record */
 	struct vy_run_iterator_pos curr_pos;
 	/** Statement at curr_pos. */
-	struct tuple *curr_stmt;
+	struct vy_entry curr;
 	/**
 	 * Last two pages read by the iterator. We keep two pages
 	 * rather than just one, because we often probe a page for
@@ -374,11 +376,12 @@ vy_run_unref(struct vy_run *run)
  * @param dir - path to the vinyl directory
  * @param space_id - space id
  * @param iid - index id
+ * @param cmp_def - definition of keys stored in the run
  * @return - 0 on sucess, -1 on fail
  */
 int
 vy_run_recover(struct vy_run *run, const char *dir,
-	       uint32_t space_id, uint32_t iid);
+	       uint32_t space_id, uint32_t iid, struct key_def *cmp_def);
 
 /**
  * Rebuild run index
@@ -452,8 +455,8 @@ vy_run_remove_files(const char *dir, uint32_t space_id,
  * This function increments @run->refs.
  */
 struct vy_slice *
-vy_slice_new(int64_t id, struct vy_run *run, struct tuple *begin,
-	     struct tuple *end, struct key_def *cmp_def);
+vy_slice_new(int64_t id, struct vy_run *run, struct vy_entry begin,
+	     struct vy_entry end, struct key_def *cmp_def);
 
 /**
  * Free a run slice.
@@ -503,8 +506,8 @@ vy_slice_wait_pinned(struct vy_slice *slice)
  * with [@begin, @end), @result is set to NULL.
  */
 int
-vy_slice_cut(struct vy_slice *slice, int64_t id, struct tuple *begin,
-	     struct tuple *end, struct key_def *cmp_def,
+vy_slice_cut(struct vy_slice *slice, int64_t id, struct vy_entry begin,
+	     struct vy_entry end, struct key_def *cmp_def,
 	     struct vy_slice **result);
 
 /**
@@ -517,7 +520,7 @@ void
 vy_run_iterator_open(struct vy_run_iterator *itr,
 		     struct vy_run_iterator_stat *stat,
 		     struct vy_slice *slice, enum iterator_type iterator_type,
-		     struct tuple *key, const struct vy_read_view **rv,
+		     struct vy_entry key, const struct vy_read_view **rv,
 		     struct key_def *cmp_def, struct key_def *key_def,
 		     struct tuple_format *format);
 
@@ -531,12 +534,12 @@ vy_run_iterator_next(struct vy_run_iterator *itr,
 		     struct vy_history *history);
 
 /**
- * Advance a run iterator to the key following @last_stmt.
+ * Advance a run iterator to the key following @last.
  * The key history is returned in @history (empty if EOF).
  * Returns 0 on success, -1 on memory allocation or IO error.
  */
 NODISCARD int
-vy_run_iterator_skip(struct vy_run_iterator *itr, struct tuple *last_stmt,
+vy_run_iterator_skip(struct vy_run_iterator *itr, struct vy_entry last,
 		     struct vy_history *history);
 
 /**
@@ -558,7 +561,7 @@ struct vy_slice_stream {
 	/** Last page read */
 	struct vy_page *page;
 	/** The last tuple returned to user */
-	struct tuple *tuple;
+	struct vy_entry entry;
 
 	/** Members needed for memory allocation and disk access */
 	/** Slice to stream */
@@ -621,7 +624,7 @@ struct vy_run_writer {
 	 * Remember a last written statement to use it as a source
 	 * of max key of a finished run.
 	 */
-	struct tuple *last_stmt;
+	struct vy_entry last;
 };
 
 /** Create a run writer to fill a run with statements. */
@@ -634,13 +637,13 @@ vy_run_writer_create(struct vy_run_writer *writer, struct vy_run *run,
 /**
  * Write a specified statement into a run.
  * @param writer Writer to write a statement.
- * @param stmt Statement to write.
+ * @param entry Statement to write.
  *
  * @retval -1 Memory error.
  * @retval  0 Success.
  */
 int
-vy_run_writer_append_stmt(struct vy_run_writer *writer, struct tuple *stmt);
+vy_run_writer_append_stmt(struct vy_run_writer *writer, struct vy_entry entry);
 
 /**
  * Finalize run writing by writing run index into file. The writer

@@ -46,7 +46,7 @@ struct vy_write_src {
 	/* Node in vy_write_iterator::src_heap */
 	struct heap_node heap_node;
 	/* Current tuple in the source (with minimal key and maximal LSN) */
-	struct tuple *tuple;
+	struct vy_entry entry;
 	/**
 	 * If this flag is set, this is a so called "virtual"
 	 * source. A virtual source does not stand for any mem or
@@ -77,13 +77,13 @@ heap_less(heap_t *heap, struct vy_write_src *src1, struct vy_write_src *src2);
 
 /**
  * A sequence of versions of a key, sorted by LSN in ascending order.
- * (history->tuple.lsn < history->next->tuple.lsn).
+ * (history->entry.stmt.lsn < history->next->entry.stmt.lsn).
  */
 struct vy_write_history {
 	/** Next version with greater LSN. */
 	struct vy_write_history *next;
 	/** Key. */
-	struct tuple *tuple;
+	struct vy_entry entry;
 };
 
 /**
@@ -92,24 +92,24 @@ struct vy_write_history {
  * reverses key LSN order from newest first to oldest first, i.e.
  * orders statements on the same key chronologically.
  *
- * @param tuple Key version.
+ * @param entry Key version.
  * @param next Next version of the key.
  *
  * @retval not NULL Created object.
  * @retval NULL     Memory error.
  */
 static inline struct vy_write_history *
-vy_write_history_new(struct tuple *tuple, struct vy_write_history *next)
+vy_write_history_new(struct vy_entry entry, struct vy_write_history *next)
 {
 	struct vy_write_history *h;
 	h = region_alloc_object(&fiber()->gc, struct vy_write_history);
 	if (h == NULL)
 		return NULL;
-	h->tuple = tuple;
-	assert(next == NULL || (next->tuple != NULL &&
-	       vy_stmt_lsn(next->tuple) > vy_stmt_lsn(tuple)));
+	h->entry = entry;
+	assert(next == NULL || (next->entry.stmt != NULL &&
+	       vy_stmt_lsn(next->entry.stmt) > vy_stmt_lsn(entry.stmt)));
 	h->next = next;
-	vy_stmt_ref_if_possible(tuple);
+	vy_stmt_ref_if_possible(entry.stmt);
 	return h;
 }
 
@@ -122,8 +122,8 @@ static inline void
 vy_write_history_destroy(struct vy_write_history *history)
 {
 	do {
-		if (history->tuple != NULL)
-			vy_stmt_unref_if_possible(history->tuple);
+		if (history->entry.stmt != NULL)
+			vy_stmt_unref_if_possible(history->entry.stmt);
 		history = history->next;
 	} while (history != NULL);
 }
@@ -133,11 +133,11 @@ struct vy_read_view_stmt {
 	/** Read view LSN. */
 	int64_t vlsn;
 	/** Result key version, visible to this @vlsn. */
-	struct tuple *tuple;
+	struct vy_entry entry;
 	/**
 	 * A history of changes building up to this read
 	 * view. Once built, it is merged into a single
-	 * @tuple.
+	 * @entry.
 	 */
 	struct vy_write_history *history;
 };
@@ -150,9 +150,9 @@ struct vy_read_view_stmt {
 static inline void
 vy_read_view_stmt_destroy(struct vy_read_view_stmt *rv)
 {
-	if (rv->tuple != NULL)
-		vy_stmt_unref_if_possible(rv->tuple);
-	rv->tuple = NULL;
+	if (rv->entry.stmt != NULL)
+		vy_stmt_unref_if_possible(rv->entry.stmt);
+	rv->entry = vy_entry_none();
 	if (rv->history != NULL)
 		vy_write_history_destroy(rv->history);
 	rv->history = NULL;
@@ -183,7 +183,7 @@ struct vy_write_iterator {
 	 * inserted into the primary index without deletion
 	 * of the old tuple from secondary indexes.
 	 */
-	struct tuple *deferred_delete_stmt;
+	struct vy_entry deferred_delete;
 	/** Length of the @read_views. */
 	int rv_count;
 	/**
@@ -200,7 +200,7 @@ struct vy_write_iterator {
 	/**
 	 * Last statement returned to the caller, pinned in memory.
 	 */
-	struct tuple *last_stmt;
+	struct vy_entry last;
 	/**
 	 * Read views of the same key sorted by LSN in descending
 	 * order, starting from INT64_MAX.
@@ -223,7 +223,7 @@ heap_less(heap_t *heap, struct vy_write_src *src1, struct vy_write_src *src2)
 	struct vy_write_iterator *stream =
 		container_of(heap, struct vy_write_iterator, src_heap);
 
-	int cmp = vy_stmt_compare(src1->tuple, src2->tuple, stream->cmp_def);
+	int cmp = vy_entry_compare(src1->entry, src2->entry, stream->cmp_def);
 	if (cmp != 0)
 		return cmp < 0;
 
@@ -232,8 +232,8 @@ heap_less(heap_t *heap, struct vy_write_src *src1, struct vy_write_src *src2)
 	 * Virtual sources use 0 for LSN, so they are ordered
 	 * last automatically.
 	 */
-	int64_t lsn1 = src1->is_end_of_key  ? 0 : vy_stmt_lsn(src1->tuple);
-	int64_t lsn2 = src2->is_end_of_key  ? 0 : vy_stmt_lsn(src2->tuple);
+	int64_t lsn1 = src1->is_end_of_key  ? 0 : vy_stmt_lsn(src1->entry.stmt);
+	int64_t lsn2 = src2->is_end_of_key  ? 0 : vy_stmt_lsn(src2->entry.stmt);
 	if (lsn1 != lsn2)
 		return lsn1 > lsn2;
 
@@ -244,8 +244,8 @@ heap_less(heap_t *heap, struct vy_write_src *src1, struct vy_write_src *src2)
 	 * overwrote it. Discard the deferred DELETE as the overwritten
 	 * tuple will be (or has already been) purged by the REPLACE.
 	 */
-	return (vy_stmt_type(src1->tuple) == IPROTO_DELETE ? 1 : 0) <
-	       (vy_stmt_type(src2->tuple) == IPROTO_DELETE ? 1 : 0);
+	return (vy_stmt_type(src1->entry.stmt) == IPROTO_DELETE ? 1 : 0) <
+	       (vy_stmt_type(src2->entry.stmt) == IPROTO_DELETE ? 1 : 0);
 
 }
 
@@ -264,6 +264,7 @@ vy_write_iterator_new_src(struct vy_write_iterator *stream)
 		return NULL;
 	}
 	heap_node_create(&res->heap_node);
+	res->entry = vy_entry_none();
 	res->is_end_of_key = false;
 	rlist_add(&stream->src_list, &res->in_src_list);
 	return res;
@@ -298,8 +299,8 @@ vy_write_iterator_add_src(struct vy_write_iterator *stream,
 		if (rc != 0)
 			return rc;
 	}
-	int rc = src->stream.iface->next(&src->stream, &src->tuple);
-	if (rc != 0 || src->tuple == NULL)
+	int rc = src->stream.iface->next(&src->stream, &src->entry);
+	if (rc != 0 || src->entry.stmt == NULL)
 		goto stop;
 
 	rc = vy_source_heap_insert(&stream->src_heap, src);
@@ -364,11 +365,16 @@ vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
 	stream->stmt_i = -1;
 	stream->rv_count = count;
 	stream->read_views[0].vlsn = INT64_MAX;
+	stream->read_views[0].entry = vy_entry_none();
 	count--;
 	struct vy_read_view *rv;
 	/* Descending order. */
-	rlist_foreach_entry(rv, read_views, in_read_views)
-		stream->read_views[count--].vlsn = rv->vlsn;
+	rlist_foreach_entry(rv, read_views, in_read_views) {
+		struct vy_read_view_stmt *p;
+		p = &stream->read_views[count--];
+		p->vlsn = rv->vlsn;
+		p->entry = vy_entry_none();
+	}
 	assert(count == 0);
 
 	stream->base.iface = &vy_slice_stream_iface;
@@ -378,6 +384,8 @@ vy_write_iterator_new(struct key_def *cmp_def, bool is_primary,
 	stream->is_primary = is_primary;
 	stream->is_last_level = is_last_level;
 	stream->deferred_delete_handler = handler;
+	stream->deferred_delete = vy_entry_none();
+	stream->last = vy_entry_none();
 	return &stream->base;
 }
 
@@ -416,13 +424,13 @@ vy_write_iterator_stop(struct vy_stmt_stream *vstream)
 	struct vy_write_src *src;
 	rlist_foreach_entry(src, &stream->src_list, in_src_list)
 		vy_write_iterator_remove_src(stream, src);
-	if (stream->last_stmt != NULL) {
-		vy_stmt_unref_if_possible(stream->last_stmt);
-		stream->last_stmt = NULL;
+	if (stream->last.stmt != NULL) {
+		vy_stmt_unref_if_possible(stream->last.stmt);
+		stream->last = vy_entry_none();
 	}
-	if (stream->deferred_delete_stmt != NULL) {
-		vy_stmt_unref_if_possible(stream->deferred_delete_stmt);
-		stream->deferred_delete_stmt = NULL;
+	if (stream->deferred_delete.stmt != NULL) {
+		vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+		stream->deferred_delete = vy_entry_none();
 	}
 	struct vy_deferred_delete_handler *handler =
 			stream->deferred_delete_handler;
@@ -489,10 +497,10 @@ vy_write_iterator_merge_step(struct vy_write_iterator *stream)
 {
 	struct vy_write_src *src = vy_source_heap_top(&stream->src_heap);
 	assert(src != NULL);
-	int rc = src->stream.iface->next(&src->stream, &src->tuple);
+	int rc = src->stream.iface->next(&src->stream, &src->entry);
 	if (rc != 0)
 		return rc;
-	if (src->tuple != NULL)
+	if (src->entry.stmt != NULL)
 		vy_source_heap_update(&stream->src_heap, src);
 	else
 		vy_write_iterator_remove_src(stream, src);
@@ -519,11 +527,9 @@ vy_write_iterator_get_vlsn(struct vy_write_iterator *stream, int rv_i)
 }
 
 /**
- * Remember the current tuple of the @src as a part of the
- * current read view.
- * @param History objects allocator.
+ * Remember a statement as a part of the current read view.
  * @param stream Write iterator.
- * @param src Source of the wanted tuple.
+ * @param entry The statement.
  * @param current_rv_i Index of the current read view.
  *
  * @retval  0 Success.
@@ -531,13 +537,13 @@ vy_write_iterator_get_vlsn(struct vy_write_iterator *stream, int rv_i)
  */
 static inline int
 vy_write_iterator_push_rv(struct vy_write_iterator *stream,
-			  struct tuple *tuple, int current_rv_i)
+			  struct vy_entry entry, int current_rv_i)
 {
 	assert(current_rv_i < stream->rv_count);
 	struct vy_read_view_stmt *rv = &stream->read_views[current_rv_i];
-	assert(rv->vlsn >= vy_stmt_lsn(tuple));
+	assert(rv->vlsn >= vy_stmt_lsn(entry.stmt));
 	struct vy_write_history *h =
-		vy_write_history_new(tuple, rv->history);
+		vy_write_history_new(entry, rv->history);
 	if (h == NULL)
 		return -1;
 	rv->history = h;
@@ -556,26 +562,26 @@ vy_write_iterator_push_rv(struct vy_write_iterator *stream,
  * @retval not NULL Next statement of the current key.
  * @retval     NULL End of the key (not the end of the sources).
  */
-static inline struct tuple *
+static inline struct vy_entry
 vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
 {
 	struct vy_read_view_stmt *rv;
 	if (stream->rv_used_count == 0)
-		return NULL;
+		return vy_entry_none();
 	/* Find a next non-empty history element. */
 	do {
 		assert(stream->stmt_i + 1 < stream->rv_count);
 		stream->stmt_i++;
 		rv = &stream->read_views[stream->stmt_i];
 		assert(rv->history == NULL);
-	} while (rv->tuple == NULL);
+	} while (rv->entry.stmt == NULL);
 	assert(stream->rv_used_count > 0);
 	stream->rv_used_count--;
-	if (stream->last_stmt != NULL)
-		vy_stmt_unref_if_possible(stream->last_stmt);
-	stream->last_stmt = rv->tuple;
-	rv->tuple = NULL;
-	return stream->last_stmt;
+	if (stream->last.stmt != NULL)
+		vy_stmt_unref_if_possible(stream->last.stmt);
+	stream->last = rv->entry;
+	rv->entry = vy_entry_none();
+	return stream->last;
 }
 
 /**
@@ -583,15 +589,16 @@ vy_write_iterator_pop_read_view_stmt(struct vy_write_iterator *stream)
  * deletion from secondary indexes was deferred.
  *
  * @param stream Write iterator.
- * @param stmt Current statement.
+ * @param entry Current statement.
  *
  * @retval  0 Success.
  * @retval -1 Error.
  */
 static int
 vy_write_iterator_deferred_delete(struct vy_write_iterator *stream,
-				  struct tuple *stmt)
+				  struct vy_entry entry)
 {
+	struct tuple *stmt = entry.stmt;
 	/*
 	 * UPSERTs cannot change secondary index parts neither
 	 * can they produce deferred DELETEs, so we skip them.
@@ -604,15 +611,15 @@ vy_write_iterator_deferred_delete(struct vy_write_iterator *stream,
 	 * Invoke the callback to generate a deferred DELETE
 	 * in case the current tuple was overwritten.
 	 */
-	if (stream->deferred_delete_stmt != NULL) {
+	if (stream->deferred_delete.stmt != NULL) {
 		struct vy_deferred_delete_handler *handler =
 				stream->deferred_delete_handler;
 		if (handler != NULL && vy_stmt_type(stmt) != IPROTO_DELETE &&
 		    handler->iface->process(handler, stmt,
-					    stream->deferred_delete_stmt) != 0)
+					    stream->deferred_delete.stmt) != 0)
 			return -1;
-		vy_stmt_unref_if_possible(stream->deferred_delete_stmt);
-		stream->deferred_delete_stmt = NULL;
+		vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+		stream->deferred_delete = vy_entry_none();
 	}
 	/*
 	 * Remember the current statement if it is marked with
@@ -624,7 +631,7 @@ vy_write_iterator_deferred_delete(struct vy_write_iterator *stream,
 		assert(vy_stmt_type(stmt) == IPROTO_DELETE ||
 		       vy_stmt_type(stmt) == IPROTO_REPLACE);
 		vy_stmt_ref_if_possible(stmt);
-		stream->deferred_delete_stmt = stmt;
+		stream->deferred_delete = entry;
 	}
 	return 0;
 }
@@ -654,12 +661,12 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 	*count = 0;
 	*is_first_insert = false;
 	assert(stream->stmt_i == -1);
-	assert(stream->deferred_delete_stmt == NULL);
+	assert(stream->deferred_delete.stmt == NULL);
 	struct vy_write_src *src = vy_source_heap_top(&stream->src_heap);
 	if (src == NULL)
 		return 0; /* no more data */
 	/* Search must have been started already. */
-	assert(src->tuple != NULL);
+	assert(src->entry.stmt != NULL);
 	/*
 	 * A virtual source instance which represents the end on
 	 * the current key in the source heap. It is greater
@@ -671,14 +678,14 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 	 */
 	struct vy_write_src end_of_key_src;
 	end_of_key_src.is_end_of_key = true;
-	end_of_key_src.tuple = src->tuple;
+	end_of_key_src.entry = src->entry;
 	int rc = vy_source_heap_insert(&stream->src_heap, &end_of_key_src);
 	if (rc) {
 		diag_set(OutOfMemory, sizeof(void *),
 			 "malloc", "vinyl write stream heap");
 		return rc;
 	}
-	vy_stmt_ref_if_possible(src->tuple);
+	vy_stmt_ref_if_possible(src->entry.stmt);
 	/*
 	 * For each pair (merge_until_lsn, current_rv_lsn] build
 	 * a history in the corresponding read view.
@@ -689,10 +696,10 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 	int64_t merge_until_lsn = vy_write_iterator_get_vlsn(stream, 1);
 
 	while (true) {
-		*is_first_insert = vy_stmt_type(src->tuple) == IPROTO_INSERT;
+		*is_first_insert = vy_stmt_type(src->entry.stmt) == IPROTO_INSERT;
 
 		if (!stream->is_primary &&
-		    (vy_stmt_flags(src->tuple) & VY_STMT_UPDATE) != 0) {
+		    (vy_stmt_flags(src->entry.stmt) & VY_STMT_UPDATE) != 0) {
 			/*
 			 * If a REPLACE stored in a secondary index was
 			 * generated by an update operation, it can be
@@ -713,12 +720,12 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 		 */
 		if (stream->is_primary) {
 			rc = vy_write_iterator_deferred_delete(stream,
-							       src->tuple);
+							       src->entry);
 			if (rc != 0)
 				break;
 		}
 
-		if (vy_stmt_lsn(src->tuple) > current_rv_lsn) {
+		if (vy_stmt_lsn(src->entry.stmt) > current_rv_lsn) {
 			/*
 			 * Skip statements invisible to the current read
 			 * view but older than the previous read view,
@@ -726,10 +733,10 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 			 */
 			goto next_lsn;
 		}
-		while (vy_stmt_lsn(src->tuple) <= merge_until_lsn) {
+		while (vy_stmt_lsn(src->entry.stmt) <= merge_until_lsn) {
 			/*
 			 * Skip read views which see the same
-			 * version of the key, until src->tuple is
+			 * version of the key, until src->entry is
 			 * between merge_until_lsn and
 			 * current_rv_lsn.
 			 */
@@ -745,13 +752,13 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 		 * @sa vy_write_iterator for details about this
 		 * and other optimizations.
 		 */
-		if (vy_stmt_type(src->tuple) == IPROTO_DELETE &&
+		if (vy_stmt_type(src->entry.stmt) == IPROTO_DELETE &&
 		    stream->is_last_level && merge_until_lsn == 0) {
 			current_rv_lsn = 0; /* Force skip */
 			goto next_lsn;
 		}
 
-		rc = vy_write_iterator_push_rv(stream, src->tuple,
+		rc = vy_write_iterator_push_rv(stream, src->entry,
 					       current_rv_i);
 		if (rc != 0)
 			break;
@@ -761,9 +768,9 @@ vy_write_iterator_build_history(struct vy_write_iterator *stream,
 		 * Optimization 2: skip statements overwritten
 		 * by a REPLACE or DELETE.
 		 */
-		if (vy_stmt_type(src->tuple) == IPROTO_REPLACE ||
-		    vy_stmt_type(src->tuple) == IPROTO_INSERT ||
-		    vy_stmt_type(src->tuple) == IPROTO_DELETE) {
+		if (vy_stmt_type(src->entry.stmt) == IPROTO_REPLACE ||
+		    vy_stmt_type(src->entry.stmt) == IPROTO_INSERT ||
+		    vy_stmt_type(src->entry.stmt) == IPROTO_DELETE) {
 			current_rv_i++;
 			current_rv_lsn = merge_until_lsn;
 			merge_until_lsn =
@@ -776,7 +783,7 @@ next_lsn:
 			break;
 		src = vy_source_heap_top(&stream->src_heap);
 		assert(src != NULL);
-		assert(src->tuple != NULL);
+		assert(src->entry.stmt != NULL);
 		if (src->is_end_of_key)
 			break;
 	}
@@ -787,13 +794,13 @@ next_lsn:
 	 * there's no tuple it could overwrite.
 	 */
 	if (rc == 0 && stream->is_last_level &&
-	    stream->deferred_delete_stmt != NULL) {
-		vy_stmt_unref_if_possible(stream->deferred_delete_stmt);
-		stream->deferred_delete_stmt = NULL;
+	    stream->deferred_delete.stmt != NULL) {
+		vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+		stream->deferred_delete = vy_entry_none();
 	}
 
 	vy_source_heap_delete(&stream->src_heap, &end_of_key_src);
-	vy_stmt_unref_if_possible(end_of_key_src.tuple);
+	vy_stmt_unref_if_possible(end_of_key_src.entry.stmt);
 	return rc;
 }
 
@@ -803,7 +810,7 @@ next_lsn:
  * one statement.
  *
  * @param stream Write iterator.
- * @param prev_tuple Tuple from the previous read view (can be NULL).
+ * @param prev Statement from the previous read view (can be NULL).
  * @param rv Read view to merge.
  * @param is_first_insert Set if the oldest statement for the
  * current key among all sources is an INSERT.
@@ -812,11 +819,11 @@ next_lsn:
  * @retval -1 Memory error.
  */
 static NODISCARD int
-vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
+vy_read_view_merge(struct vy_write_iterator *stream, struct vy_entry prev,
 		   struct vy_read_view_stmt *rv, bool is_first_insert)
 {
 	assert(rv != NULL);
-	assert(rv->tuple == NULL);
+	assert(rv->entry.stmt == NULL);
 	assert(rv->history != NULL);
 	struct vy_write_history *h = rv->history;
 	/*
@@ -824,9 +831,9 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
 	 * by a read view if it is preceded by another DELETE for
 	 * the same key.
 	 */
-	if (prev_tuple != NULL &&
-	    vy_stmt_type(prev_tuple) == IPROTO_DELETE &&
-	    vy_stmt_type(h->tuple) == IPROTO_DELETE) {
+	if (prev.stmt != NULL &&
+	    vy_stmt_type(prev.stmt) == IPROTO_DELETE &&
+	    vy_stmt_type(h->entry.stmt) == IPROTO_DELETE) {
 		vy_write_history_destroy(h);
 		rv->history = NULL;
 		return 0;
@@ -840,32 +847,34 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
 	 *    REPLACE, then the current UPSERT can be applied to
 	 *    it, whether is_last_level is true or not.
 	 */
-	if (vy_stmt_type(h->tuple) == IPROTO_UPSERT &&
-	    (stream->is_last_level || (prev_tuple != NULL &&
-	     vy_stmt_type(prev_tuple) != IPROTO_UPSERT))) {
-		assert(!stream->is_last_level || prev_tuple == NULL ||
-		       vy_stmt_type(prev_tuple) != IPROTO_UPSERT);
-		struct tuple *applied = vy_apply_upsert(h->tuple, prev_tuple,
-							stream->cmp_def, false);
-		if (applied == NULL)
+	if (vy_stmt_type(h->entry.stmt) == IPROTO_UPSERT &&
+	    (stream->is_last_level || (prev.stmt != NULL &&
+	     vy_stmt_type(prev.stmt) != IPROTO_UPSERT))) {
+		assert(!stream->is_last_level || prev.stmt == NULL ||
+		       vy_stmt_type(prev.stmt) != IPROTO_UPSERT);
+		struct vy_entry applied;
+		applied = vy_entry_apply_upsert(h->entry, prev,
+						stream->cmp_def, false);
+		if (applied.stmt == NULL)
 			return -1;
-		vy_stmt_unref_if_possible(h->tuple);
-		h->tuple = applied;
+		vy_stmt_unref_if_possible(h->entry.stmt);
+		h->entry = applied;
 	}
 	/* Squash the rest of UPSERTs. */
 	struct vy_write_history *result = h;
 	h = h->next;
 	while (h != NULL) {
-		assert(h->tuple != NULL &&
-		       vy_stmt_type(h->tuple) == IPROTO_UPSERT);
-		assert(result->tuple != NULL);
-		struct tuple *applied = vy_apply_upsert(h->tuple, result->tuple,
-							stream->cmp_def, false);
-		if (applied == NULL)
+		assert(h->entry.stmt != NULL &&
+		       vy_stmt_type(h->entry.stmt) == IPROTO_UPSERT);
+		assert(result->entry.stmt != NULL);
+		struct vy_entry applied;
+		applied = vy_entry_apply_upsert(h->entry, result->entry,
+						stream->cmp_def, false);
+		if (applied.stmt == NULL)
 			return -1;
-		vy_stmt_unref_if_possible(result->tuple);
-		result->tuple = applied;
-		vy_stmt_unref_if_possible(h->tuple);
+		vy_stmt_unref_if_possible(result->entry.stmt);
+		result->entry = applied;
+		vy_stmt_unref_if_possible(h->entry.stmt);
 		/*
 		 * Don't bother freeing 'h' since it's
 		 * allocated on a region.
@@ -873,9 +882,9 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
 		h = h->next;
 		result->next = h;
 	}
-	rv->tuple = result->tuple;
+	rv->entry = result->entry;
 	rv->history = NULL;
-	result->tuple = NULL;
+	result->entry = vy_entry_none();
 	assert(result->next == NULL);
 	/*
 	 * The write iterator generates deferred DELETEs for all
@@ -884,21 +893,22 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
 	 * statements so as not to generate the same DELETEs on
 	 * the next compaction.
 	 */
-	uint8_t flags = vy_stmt_flags(rv->tuple);
+	uint8_t flags = vy_stmt_flags(rv->entry.stmt);
 	if ((flags & VY_STMT_DEFERRED_DELETE) != 0 &&
-	    rv->tuple != stream->deferred_delete_stmt) {
-		if (!vy_stmt_is_refable(rv->tuple)) {
-			rv->tuple = vy_stmt_dup(rv->tuple);
-			if (rv->tuple == NULL)
+	    !vy_entry_is_equal(rv->entry, stream->deferred_delete)) {
+		if (!vy_stmt_is_refable(rv->entry.stmt)) {
+			rv->entry.stmt = vy_stmt_dup(rv->entry.stmt);
+			if (rv->entry.stmt == NULL)
 				return -1;
 		}
-		vy_stmt_set_flags(rv->tuple, flags & ~VY_STMT_DEFERRED_DELETE);
+		vy_stmt_set_flags(rv->entry.stmt,
+				  flags & ~VY_STMT_DEFERRED_DELETE);
 	}
-	if (prev_tuple != NULL) {
+	if (prev.stmt != NULL) {
 		/* Not the first statement. */
 		return 0;
 	}
-	if (is_first_insert && vy_stmt_type(rv->tuple) == IPROTO_DELETE) {
+	if (is_first_insert && vy_stmt_type(rv->entry.stmt) == IPROTO_DELETE) {
 		/*
 		 * Optimization 5: discard the first DELETE if
 		 * the oldest statement for the current key among
@@ -906,12 +916,12 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
 		 * statements for this key in older runs or the
 		 * last statement is a DELETE.
 		 */
-		vy_stmt_unref_if_possible(rv->tuple);
-		rv->tuple = NULL;
+		vy_stmt_unref_if_possible(rv->entry.stmt);
+		rv->entry = vy_entry_none();
 	} else if ((is_first_insert &&
-		    vy_stmt_type(rv->tuple) == IPROTO_REPLACE) ||
+		    vy_stmt_type(rv->entry.stmt) == IPROTO_REPLACE) ||
 		   (!is_first_insert &&
-		    vy_stmt_type(rv->tuple) == IPROTO_INSERT)) {
+		    vy_stmt_type(rv->entry.stmt) == IPROTO_INSERT)) {
 		/*
 		 * If the oldest statement among all sources is an
 		 * INSERT, convert the first REPLACE to an INSERT
@@ -923,16 +933,16 @@ vy_read_view_merge(struct vy_write_iterator *stream, struct tuple *prev_tuple,
 		 * so as not to trigger optimization #5 on the next
 		 * compaction.
 		 */
-		struct tuple *copy = vy_stmt_dup(rv->tuple);
+		struct tuple *copy = vy_stmt_dup(rv->entry.stmt);
 		if (is_first_insert)
 			vy_stmt_set_type(copy, IPROTO_INSERT);
 		else
 			vy_stmt_set_type(copy, IPROTO_REPLACE);
 		if (copy == NULL)
 			return -1;
-		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->tuple));
-		vy_stmt_unref_if_possible(rv->tuple);
-		rv->tuple = copy;
+		vy_stmt_set_lsn(copy, vy_stmt_lsn(rv->entry.stmt));
+		vy_stmt_unref_if_possible(rv->entry.stmt);
+		rv->entry.stmt = copy;
 	}
 	return 0;
 }
@@ -975,19 +985,18 @@ vy_write_iterator_build_read_views(struct vy_write_iterator *stream, int *count)
 	 * here > 0.
 	 */
 	assert(rv >= &stream->read_views[0] && rv->history != NULL);
-	struct tuple *prev_tuple = NULL;
+	struct vy_entry prev = vy_entry_none();
 	for (; rv >= &stream->read_views[0]; --rv) {
 		if (rv->history == NULL)
 			continue;
-		if (vy_read_view_merge(stream, prev_tuple, rv,
-				       is_first_insert) != 0)
+		if (vy_read_view_merge(stream, prev, rv, is_first_insert) != 0)
 			goto error;
 		assert(rv->history == NULL);
-		if (rv->tuple == NULL)
+		if (rv->entry.stmt == NULL)
 			continue;
 		stream->rv_used_count++;
 		++*count;
-		prev_tuple = rv->tuple;
+		prev = rv->entry;
 	}
 	region_truncate(region, used);
 	return 0;
@@ -1006,8 +1015,7 @@ error:
  * @return 0 on success or not 0 on error (diag is set).
  */
 static NODISCARD int
-vy_write_iterator_next(struct vy_stmt_stream *vstream,
-		       struct tuple **ret)
+vy_write_iterator_next(struct vy_stmt_stream *vstream, struct vy_entry *ret)
 {
 	assert(vstream->iface->next == vy_write_iterator_next);
 	struct vy_write_iterator *stream = (struct vy_write_iterator *)vstream;
@@ -1016,7 +1024,7 @@ vy_write_iterator_next(struct vy_stmt_stream *vstream,
 	 * read view statements sequence.
 	 */
 	*ret = vy_write_iterator_pop_read_view_stmt(stream);
-	if (*ret != NULL)
+	if (ret->stmt != NULL)
 		return 0;
 	/*
 	 * If we didn't generate a deferred DELETE corresponding to
@@ -1024,19 +1032,19 @@ vy_write_iterator_next(struct vy_stmt_stream *vstream,
 	 * include it into the output, because there still might be
 	 * an overwritten tuple in an older source.
 	 */
-	if (stream->deferred_delete_stmt != NULL) {
-		if (stream->deferred_delete_stmt == stream->last_stmt) {
+	if (stream->deferred_delete.stmt != NULL) {
+		if (vy_entry_is_equal(stream->deferred_delete, stream->last)) {
 			/*
 			 * The statement was returned via a read view.
 			 * Nothing to do.
 			 */
-			vy_stmt_unref_if_possible(stream->deferred_delete_stmt);
-			stream->deferred_delete_stmt = NULL;
+			vy_stmt_unref_if_possible(stream->deferred_delete.stmt);
+			stream->deferred_delete = vy_entry_none();
 		} else {
-			if (stream->last_stmt != NULL)
-				vy_stmt_unref_if_possible(stream->last_stmt);
-			*ret = stream->last_stmt = stream->deferred_delete_stmt;
-			stream->deferred_delete_stmt = NULL;
+			if (stream->last.stmt != NULL)
+				vy_stmt_unref_if_possible(stream->last.stmt);
+			*ret = stream->last = stream->deferred_delete;
+			stream->deferred_delete = vy_entry_none();
 			return 0;
 		}
 	}

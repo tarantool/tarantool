@@ -94,12 +94,13 @@ struct vy_stmt_template {
  * Create a new vinyl statement using the specified template.
  *
  * @param format
+ * @param key_def Key definition (for computing hint).
  * @param templ Statement template.
  *
  * @return Created statement.
  */
-struct tuple *
-vy_new_simple_stmt(struct tuple_format *format,
+struct vy_entry
+vy_new_simple_stmt(struct tuple_format *format, struct key_def *key_def,
 		   const struct vy_stmt_template *templ);
 
 /**
@@ -111,7 +112,7 @@ vy_new_simple_stmt(struct tuple_format *format,
  *
  * @retval Lsregion allocated statement.
  */
-struct tuple *
+struct vy_entry
 vy_mem_insert_template(struct vy_mem *mem,
 		       const struct vy_stmt_template *templ);
 
@@ -195,16 +196,17 @@ destroy_test_cache(struct vy_cache *cache, struct key_def *def,
  * Check that the template specifies completely the same statement
  * as @stmt.
  *
- * @param stmt Actual value.
+ * @param actual Actual value.
  * @param templ Expected value.
  * @param format Template statement format.
+ * @param key_def Key definition (for computing hint).
  *
  * @retval stmt === template.
  */
 bool
-vy_stmt_are_same(struct tuple *actual,
+vy_stmt_are_same(struct vy_entry actual,
 		 const struct vy_stmt_template *expected,
-		 struct tuple_format *format);
+		 struct tuple_format *format, struct key_def *key_def);
 
 #if defined(__cplusplus)
 }

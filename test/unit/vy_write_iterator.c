@@ -110,24 +110,27 @@ compare_write_iterator_results(const struct vy_stmt_template *content,
 	fail_if(wi == NULL);
 	fail_if(vy_write_iterator_new_mem(wi, mem) != 0);
 
-	struct tuple *ret;
+	struct vy_entry ret;
 	fail_if(wi->iface->start(wi) != 0);
 	int i = 0;
 	do {
 		fail_if(wi->iface->next(wi, &ret) != 0);
-		if (ret == NULL)
+		if (ret.stmt == NULL)
 			break;
 		fail_if(i >= expected_count);
-		ok(vy_stmt_are_same(ret, &expected[i], mem->format),
+		ok(vy_stmt_are_same(ret, &expected[i], mem->format, key_def),
 		   "stmt %d is correct", i);
 		++i;
-	} while (ret != NULL);
+	} while (ret.stmt != NULL);
 	ok(i == expected_count, "correct results count");
 
 	for (i = 0; i < handler.count; i++) {
 		fail_if(i >= deferred_count);
-		ok(vy_stmt_are_same(handler.stmt[i], &deferred[i],
-				    handler.format),
+		struct vy_entry entry;
+		entry.stmt = handler.stmt[i];
+		entry.hint = vy_stmt_hint(entry.stmt, key_def);
+		ok(vy_stmt_are_same(entry, &deferred[i],
+				    handler.format, key_def),
 		   "deferred stmt %d is correct", i);
 	}
 	if (deferred != NULL) {

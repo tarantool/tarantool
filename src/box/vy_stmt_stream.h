@@ -37,7 +37,7 @@
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct tuple;
+struct vy_entry;
 
 /**
  * The stream is a very simple iterator (generally over a mem or a run)
@@ -55,7 +55,7 @@ typedef NODISCARD int
  * Get next tuple from a stream.
  */
 typedef NODISCARD int
-(*vy_stream_next_f)(struct vy_stmt_stream *virt_stream, struct tuple **ret);
+(*vy_stream_next_f)(struct vy_stmt_stream *virt_stream, struct vy_entry *ret);
 
 /**
  * Close the stream.

@@ -42,6 +42,7 @@
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
 #include "trivia/util.h"
+#include "vy_entry.h"
 #include "vy_stat.h"
 
 #if defined(__cplusplus)
@@ -50,7 +51,6 @@ extern "C" {
 
 struct index_opts;
 struct key_def;
-struct tuple;
 struct vy_slice;
 
 /**
@@ -64,9 +64,9 @@ struct vy_range {
 	 * Both 'begin' and 'end' statements have SELECT type with
 	 * the full idexed key.
 	 */
-	struct tuple *begin;
+	struct vy_entry begin;
 	/** Range upper bound. NULL if range is rightmost. */
-	struct tuple *end;
+	struct vy_entry end;
 	/** Key definition for comparing range boundaries.
 	 * Contains secondary and primary key parts for secondary
 	 * keys, to ensure an always distinct result for
@@ -167,12 +167,12 @@ vy_range_is_scheduled(struct vy_range *range)
 int
 vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b);
 int
-vy_range_tree_key_cmp(struct tuple *stmt, struct vy_range *range);
+vy_range_tree_key_cmp(struct vy_entry entry, struct vy_range *range);
 
 typedef rb_tree(struct vy_range) vy_range_tree_t;
 rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
 	       struct vy_range, tree_node, vy_range_tree_cmp,
-	       struct tuple *, vy_range_tree_key_cmp);
+	       struct vy_entry, vy_range_tree_key_cmp);
 
 /**
  * Find the first range in which a given key should be looked up.
@@ -186,7 +186,7 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, vy_range_tree_, vy_range_tree_t,
 struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
-			  struct tuple *key);
+			  struct vy_entry key);
 
 /**
  * Allocate and initialize a range (either a new one or for
@@ -201,7 +201,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
  * @retval NULL     Out of memory.
  */
 struct vy_range *
-vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
+vy_range_new(int64_t id, struct vy_entry begin, struct vy_entry end,
 	     struct key_def *cmp_def);
 
 /**

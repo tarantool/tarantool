@@ -40,6 +40,7 @@
 #include "index_def.h"
 #define HEAP_FORWARD_DECLARATION
 #include "salad/heap.h"
+#include "vy_entry.h"
 #include "vy_cache.h"
 #include "vy_range.h"
 #include "vy_stat.h"
@@ -61,7 +62,7 @@ struct vy_run;
 struct vy_run_env;
 
 typedef void
-(*vy_upsert_thresh_cb)(struct vy_lsm *lsm, struct tuple *stmt, void *arg);
+(*vy_upsert_thresh_cb)(struct vy_lsm *lsm, struct vy_entry entry, void *arg);
 
 /** Common LSM tree environment. */
 struct vy_lsm_env {
@@ -72,7 +73,7 @@ struct vy_lsm_env {
 	/** Tuple format for keys (SELECT). */
 	struct tuple_format *key_format;
 	/** Key (SELECT) with no parts. */
-	struct tuple *empty_key;
+	struct vy_entry empty_key;
 	/**
 	 * If read of a single statement takes longer than
 	 * the given value, warn about it in the log.
@@ -589,7 +590,7 @@ vy_lsm_force_compaction(struct vy_lsm *lsm);
  *
  * @param lsm         LSM tree the statement is for.
  * @param mem         In-memory tree to insert the statement into.
- * @param stmt        Statement, allocated on malloc().
+ * @param entry       Statement, allocated on malloc().
  * @param region_stmt NULL or the same statement, allocated on
  *                    lsregion.
  *
@@ -598,7 +599,7 @@ vy_lsm_force_compaction(struct vy_lsm *lsm);
  */
 int
 vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
-	   struct tuple *stmt, struct tuple **region_stmt);
+	   struct vy_entry entry, struct tuple **region_stmt);
 
 /**
  * Confirm that the statement stays in the in-memory index of
@@ -606,22 +607,22 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
  *
  * @param lsm   LSM tree the statement is for.
  * @param mem   In-memory tree where the statement was saved.
- * @param stmt  Statement allocated from lsregion.
+ * @param entry Statement allocated from lsregion.
  */
 void
 vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		   struct tuple *stmt);
+		   struct vy_entry entry);
 
 /**
  * Erase a statement from the in-memory index of an LSM tree.
  *
  * @param lsm   LSM tree to erase from.
  * @param mem   In-memory tree where the statement was saved.
- * @param stmt  Statement allocated from lsregion.
+ * @param entry Statement allocated from lsregion.
  */
 void
 vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		     struct tuple *stmt);
+		     struct vy_entry entry);
 
 #if defined(__cplusplus)
 } /* extern "C" */

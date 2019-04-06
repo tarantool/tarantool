@@ -18,7 +18,8 @@ test_basic()
 	struct tuple_format *format;
 	create_test_cache(fields, types, lengthof(fields), &cache, &key_def,
 			  &format);
-	struct tuple *select_all = vy_new_simple_stmt(format, &key_template);
+	struct vy_entry select_all = vy_new_simple_stmt(format, key_def,
+							&key_template);
 
 	struct mempool history_node_pool;
 	mempool_create(&history_node_pool, cord_slab_cache(),
@@ -88,14 +89,14 @@ test_basic()
 	vy_cache_iterator_open(&itr, &cache, ITER_GE, select_all, &rv_p);
 
 	/* Start iterator and make several steps. */
-	struct tuple *ret;
+	struct vy_entry ret;
 	bool unused;
 	struct vy_history history;
 	vy_history_create(&history, &history_node_pool);
 	for (int i = 0; i < 4; ++i)
 		vy_cache_iterator_next(&itr, &history, &unused);
 	ret = vy_history_last_stmt(&history);
-	ok(vy_stmt_are_same(ret, &chain1[3], format),
+	ok(vy_stmt_are_same(ret, &chain1[3], format, key_def),
 	   "next_key * 4");
 
 	/*
@@ -111,22 +112,22 @@ test_basic()
 	/*
 	 * Restore after the cache had changed. Restoration
 	 * makes position of the iterator be one statement after
-	 * the last_stmt. So restore on chain1[0], but the result
+	 * the last. So restore on chain1[0], but the result
 	 * must be chain1[1].
 	 */
-	struct tuple *last_stmt = vy_new_simple_stmt(format, &chain1[0]);
-	ok(vy_cache_iterator_restore(&itr, last_stmt, &history, &unused) >= 0,
+	struct vy_entry last = vy_new_simple_stmt(format, key_def, &chain1[0]);
+	ok(vy_cache_iterator_restore(&itr, last, &history, &unused) >= 0,
 	   "restore");
 	ret = vy_history_last_stmt(&history);
-	ok(vy_stmt_are_same(ret, &chain1[1], format),
+	ok(vy_stmt_are_same(ret, &chain1[1], format, key_def),
 	   "restore on position after last");
-	tuple_unref(last_stmt);
+	tuple_unref(last.stmt);
 
 	vy_history_cleanup(&history);
 	vy_cache_iterator_close(&itr);
 
 	mempool_destroy(&history_node_pool);
-	tuple_unref(select_all);
+	tuple_unref(select_all.stmt);
 	destroy_test_cache(&cache, key_def, format);
 	check_plan();
 	footer();

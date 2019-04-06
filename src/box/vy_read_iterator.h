@@ -36,6 +36,7 @@
 
 #include "iterator_type.h"
 #include "trivia/util.h"
+#include "vy_entry.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -54,7 +55,7 @@ struct vy_read_iterator {
 	/** Iterator type. */
 	enum iterator_type iterator_type;
 	/** Search key. */
-	struct tuple *key;
+	struct vy_entry key;
 	/** Read view the iterator lives in. */
 	const struct vy_read_view **read_view;
 	/**
@@ -63,12 +64,12 @@ struct vy_read_iterator {
 	 */
 	bool need_check_eq;
 	/** Last statement returned by vy_read_iterator_next(). */
-	struct tuple *last_stmt;
+	struct vy_entry last;
 	/**
 	 * Last statement added to the tuple cache by
 	 * vy_read_iterator_cache_add().
 	 */
-	struct tuple *last_cached_stmt;
+	struct vy_entry last_cached;
 	/**
 	 * Copy of lsm->range_tree_version.
 	 * Used for detecting range tree changes.
@@ -132,7 +133,7 @@ struct vy_read_iterator {
 void
 vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
 		      struct vy_tx *tx, enum iterator_type iterator_type,
-		      struct tuple *key, const struct vy_read_view **rv);
+		      struct vy_entry key, const struct vy_read_view **rv);
 
 /**
  * Get the next statement with another key, or start the iterator,
@@ -144,12 +145,12 @@ vy_read_iterator_open(struct vy_read_iterator *itr, struct vy_lsm *lsm,
  * @retval -1 Read error.
  */
 NODISCARD int
-vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result);
+vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_entry *result);
 
 /**
  * Add the last tuple returned by the read iterator to the cache.
- * @param itr  Read iterator
- * @param stmt Last tuple returned by the iterator.
+ * @param itr   Read iterator
+ * @param entry Last tuple returned by the iterator.
  *
  * We use a separate function for populating the cache rather than
  * doing that right in vy_read_iterator_next() so that we can store
@@ -163,7 +164,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result);
  *   the result to the cache.
  */
 void
-vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct tuple *stmt);
+vy_read_iterator_cache_add(struct vy_read_iterator *itr, struct vy_entry entry);
 
 /**
  * Close the iterator and free resources.

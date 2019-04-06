@@ -192,7 +192,7 @@ struct vinyl_iterator {
 	 */
 	struct vy_tx *tx;
 	/** Search key. */
-	struct tuple *key;
+	struct vy_entry key;
 	/** Vinyl read iterator. */
 	struct vy_read_iterator iterator;
 	/**
@@ -1142,8 +1142,8 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 			      &env->xm->p_committed_read_view);
 	int rc;
 	int loops = 0;
-	struct tuple *tuple;
-	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
+	struct vy_entry entry;
+	while ((rc = vy_read_iterator_next(&itr, &entry)) == 0) {
 		/*
 		 * Read iterator yields only when it reads runs.
 		 * Yield periodically in order not to stall the
@@ -1157,9 +1157,9 @@ vinyl_space_check_format(struct space *space, struct tuple_format *format)
 			rc = -1;
 			break;
 		}
-		if (tuple == NULL)
+		if (entry.stmt == NULL)
 			break;
-		rc = tuple_validate(format, tuple);
+		rc = tuple_validate(format, entry.stmt);
 		if (rc != 0)
 			break;
 	}
@@ -1308,7 +1308,7 @@ vy_is_committed(struct vy_env *env, struct space *space)
  * @param lsm         LSM tree from which the tuple was read.
  * @param tx          Current transaction.
  * @param rv          Read view.
- * @param tuple       Tuple read from a secondary index.
+ * @param entry       Tuple read from a secondary index.
  * @param[out] result The found tuple is stored here. Must be
  *                    unreferenced after usage.
  *
@@ -1318,7 +1318,7 @@ vy_is_committed(struct vy_env *env, struct space *space)
 static int
 vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 			  const struct vy_read_view **rv,
-			  struct tuple *tuple, struct tuple **result)
+			  struct vy_entry entry, struct vy_entry *result)
 {
 	int rc = 0;
 	assert(lsm->index_id > 0);
@@ -1332,24 +1332,30 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	 * the tuple cache or level 0, in which case we may pass
 	 * it immediately to the iterator.
 	 */
-	struct tuple *key;
-	if (vy_stmt_is_key(tuple)) {
-		key = vy_stmt_extract_key(tuple, lsm->pk_in_cmp_def,
-					  lsm->env->key_format);
-		if (key == NULL)
+	struct vy_entry key;
+	if (vy_stmt_is_key(entry.stmt)) {
+		key.stmt = vy_stmt_extract_key(entry.stmt, lsm->pk_in_cmp_def,
+					       lsm->env->key_format);
+		if (key.stmt == NULL)
 			return -1;
 	} else {
-		key = tuple;
-		tuple_ref(key);
+		key.stmt = entry.stmt;
+		tuple_ref(key.stmt);
 	}
+	key.hint = vy_stmt_hint(key.stmt, lsm->pk->cmp_def);
 
 	if (vy_point_lookup(lsm->pk, tx, rv, key, result) != 0) {
 		rc = -1;
 		goto out;
 	}
 
-	if (*result == NULL ||
-	    vy_stmt_compare(*result, tuple, lsm->cmp_def) != 0) {
+	/*
+	 * Note, result stores a hint computed for the primary
+	 * index while entry was read from a secondary index so
+	 * we must not use vy_entry_compare() here.
+	 */
+	if (result->stmt == NULL ||
+	    vy_stmt_compare(result->stmt, entry.stmt, lsm->cmp_def) != 0) {
 		/*
 		 * If a tuple read from a secondary index doesn't
 		 * match the tuple corresponding to it in the
@@ -1358,9 +1364,9 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		 * propagated to the secondary index yet. In this
 		 * case silently skip this tuple.
 		 */
-		if (*result != NULL) {
-			tuple_unref(*result);
-			*result = NULL;
+		if (result->stmt != NULL) {
+			tuple_unref(result->stmt);
+			*result = vy_entry_none();
 		}
 		/*
 		 * We must purge stale tuples from the cache before
@@ -1368,7 +1374,7 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		 * chain intersections, which are not tolerated by
 		 * the tuple cache implementation.
 		 */
-		vy_cache_on_write(&lsm->cache, tuple, NULL);
+		vy_cache_on_write(&lsm->cache, entry, NULL);
 		goto out;
 	}
 
@@ -1381,15 +1387,20 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	 * immediately.
 	 */
 	if (tx != NULL && vy_tx_track_point(tx, lsm->pk, *result) != 0) {
-		tuple_unref(*result);
+		tuple_unref(result->stmt);
 		rc = -1;
 		goto out;
 	}
 
-	if ((*rv)->vlsn == INT64_MAX)
-		vy_cache_add(&lsm->pk->cache, *result, NULL, key, ITER_EQ);
+	if ((*rv)->vlsn == INT64_MAX) {
+		vy_cache_add(&lsm->pk->cache, *result,
+			     vy_entry_none(), key, ITER_EQ);
+	}
+
+	/* Inherit the hint from the secondary index entry. */
+	result->hint = entry.hint;
 out:
-	tuple_unref(key);
+	tuple_unref(key.stmt);
 	return rc;
 }
 
@@ -1398,7 +1409,7 @@ out:
  * @param lsm         LSM tree in which search.
  * @param tx          Current transaction.
  * @param rv          Read view.
- * @param key         Key statement.
+ * @param key_stmt    Key statement.
  * @param[out] result The found tuple is stored here. Must be
  *                    unreferenced after usage.
  *
@@ -1408,7 +1419,7 @@ out:
 static int
 vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
        const struct vy_read_view **rv,
-       struct tuple *key, struct tuple **result)
+       struct tuple *key_stmt, struct tuple **result)
 {
 	/*
 	 * tx can be NULL, for example, if an user calls
@@ -1417,46 +1428,54 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
 	int rc;
-	struct tuple *tuple;
+	struct vy_entry partial, entry;
 
-	if (vy_stmt_is_full_key(key, lsm->cmp_def)) {
+	struct vy_entry key;
+	key.stmt = key_stmt;
+	key.hint = vy_stmt_hint(key.stmt, lsm->cmp_def);
+
+	if (vy_stmt_is_full_key(key.stmt, lsm->cmp_def)) {
 		/*
 		 * Use point lookup for a full key.
 		 */
 		if (tx != NULL && vy_tx_track_point(tx, lsm, key) != 0)
 			return -1;
-		if (vy_point_lookup(lsm, tx, rv, key, &tuple) != 0)
+		if (vy_point_lookup(lsm, tx, rv, key, &partial) != 0)
 			return -1;
-		if (lsm->index_id > 0 && tuple != NULL) {
+		if (lsm->index_id > 0 && partial.stmt != NULL) {
 			rc = vy_get_by_secondary_tuple(lsm, tx, rv,
-						       tuple, result);
-			tuple_unref(tuple);
+						       partial, &entry);
+			tuple_unref(partial.stmt);
 			if (rc != 0)
 				return -1;
 		} else {
-			*result = tuple;
+			entry = partial;
 		}
-		if ((*rv)->vlsn == INT64_MAX)
-			vy_cache_add(&lsm->cache, *result, NULL, key, ITER_EQ);
+		if ((*rv)->vlsn == INT64_MAX) {
+			vy_cache_add(&lsm->cache, entry,
+				     vy_entry_none(), key, ITER_EQ);
+		}
+		*result = entry.stmt;
 		return 0;
 	}
 
 	struct vy_read_iterator itr;
 	vy_read_iterator_open(&itr, lsm, tx, ITER_EQ, key, rv);
-	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
-		if (lsm->index_id == 0 || tuple == NULL) {
-			*result = tuple;
-			if (tuple != NULL)
-				tuple_ref(tuple);
+	while ((rc = vy_read_iterator_next(&itr, &partial)) == 0) {
+		if (lsm->index_id == 0 || partial.stmt == NULL) {
+			entry = partial;
+			if (entry.stmt != NULL)
+				tuple_ref(entry.stmt);
 			break;
 		}
-		rc = vy_get_by_secondary_tuple(lsm, tx, rv, tuple, result);
-		if (rc != 0 || *result != NULL)
+		rc = vy_get_by_secondary_tuple(lsm, tx, rv, partial, &entry);
+		if (rc != 0 || entry.stmt != NULL)
 			break;
 	}
 	if (rc == 0)
-		vy_read_iterator_cache_add(&itr, *result);
+		vy_read_iterator_cache_add(&itr, entry);
 	vy_read_iterator_close(&itr);
+	*result = entry.stmt;
 	return rc;
 }
 
@@ -1695,7 +1714,10 @@ static int
 vy_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
 		    struct tuple *stmt, uint64_t column_mask)
 {
-	return vy_tx_set(tx, lsm, stmt, column_mask);
+	struct vy_entry entry;
+	entry.stmt = stmt;
+	entry.hint = vy_stmt_hint(stmt, lsm->cmp_def);
+	return vy_tx_set(tx, lsm, entry, column_mask);
 }
 
 static inline int
@@ -2558,7 +2580,7 @@ vy_squash_queue_new(void);
 static void
 vy_squash_queue_delete(struct vy_squash_queue *q);
 static void
-vy_squash_schedule(struct vy_lsm *lsm, struct tuple *stmt,
+vy_squash_schedule(struct vy_lsm *lsm, struct vy_entry entry,
 		   void /* struct vy_env */ *arg);
 
 static struct vy_env *
@@ -2976,24 +2998,28 @@ vy_prepare_send_slice(struct vy_join_ctx *ctx,
 {
 	int rc = -1;
 	struct vy_run *run = NULL;
-	struct tuple *begin = NULL, *end = NULL;
+	struct vy_entry begin = vy_entry_none();
+	struct vy_entry end = vy_entry_none();
 
 	run = vy_run_new(&ctx->env->run_env, slice_info->run->id);
 	if (run == NULL)
 		goto out;
-	if (vy_run_recover(run, ctx->env->path, ctx->space_id, 0) != 0)
+	if (vy_run_recover(run, ctx->env->path, ctx->space_id, 0,
+			   ctx->key_def) != 0)
 		goto out;
 
 	if (slice_info->begin != NULL) {
-		begin = vy_key_from_msgpack(ctx->env->lsm_env.key_format,
-					    slice_info->begin);
-		if (begin == NULL)
+		begin = vy_entry_key_from_msgpack(ctx->env->lsm_env.key_format,
+						  ctx->key_def,
+						  slice_info->begin);
+		if (begin.stmt == NULL)
 			goto out;
 	}
 	if (slice_info->end != NULL) {
-		end = vy_key_from_msgpack(ctx->env->lsm_env.key_format,
-					  slice_info->end);
-		if (end == NULL)
+		end = vy_entry_key_from_msgpack(ctx->env->lsm_env.key_format,
+						ctx->key_def,
+						slice_info->end);
+		if (end.stmt == NULL)
 			goto out;
 	}
 
@@ -3007,10 +3033,10 @@ vy_prepare_send_slice(struct vy_join_ctx *ctx,
 out:
 	if (run != NULL)
 		vy_run_unref(run);
-	if (begin != NULL)
-		tuple_unref(begin);
-	if (end != NULL)
-		tuple_unref(end);
+	if (begin.stmt != NULL)
+		tuple_unref(begin.stmt);
+	if (end.stmt != NULL)
+		tuple_unref(end.stmt);
 	return rc;
 }
 
@@ -3019,14 +3045,14 @@ vy_send_range_f(struct cbus_call_msg *cmsg)
 {
 	struct vy_join_ctx *ctx = container_of(cmsg, struct vy_join_ctx, cmsg);
 
-	struct tuple *stmt;
 	int rc = ctx->wi->iface->start(ctx->wi);
 	if (rc != 0)
 		goto err;
-	while ((rc = ctx->wi->iface->next(ctx->wi, &stmt)) == 0 &&
-	       stmt != NULL) {
+	struct vy_entry entry;
+	while ((rc = ctx->wi->iface->next(ctx->wi, &entry)) == 0 &&
+	       entry.stmt != NULL) {
 		struct xrow_header xrow;
-		rc = vy_stmt_encode_primary(stmt, ctx->key_def,
+		rc = vy_stmt_encode_primary(entry.stmt, ctx->key_def,
 					    ctx->space_id, &xrow);
 		if (rc != 0)
 			break;
@@ -3492,7 +3518,7 @@ struct vy_squash {
 	/** LSM tree this request is for. */
 	struct vy_lsm *lsm;
 	/** Key to squash upserts for. */
-	struct tuple *stmt;
+	struct vy_entry entry;
 };
 
 struct vy_squash_queue {
@@ -3508,7 +3534,7 @@ struct vy_squash_queue {
 
 static struct vy_squash *
 vy_squash_new(struct mempool *pool, struct vy_env *env,
-	      struct vy_lsm *lsm, struct tuple *stmt)
+	      struct vy_lsm *lsm, struct vy_entry entry)
 {
 	struct vy_squash *squash;
 	squash = mempool_alloc(pool);
@@ -3517,8 +3543,8 @@ vy_squash_new(struct mempool *pool, struct vy_env *env,
 	squash->env = env;
 	vy_lsm_ref(lsm);
 	squash->lsm = lsm;
-	tuple_ref(stmt);
-	squash->stmt = stmt;
+	tuple_ref(entry.stmt);
+	squash->entry = entry;
 	return squash;
 }
 
@@ -3526,7 +3552,7 @@ static void
 vy_squash_delete(struct mempool *pool, struct vy_squash *squash)
 {
 	vy_lsm_unref(squash->lsm);
-	tuple_unref(squash->stmt);
+	tuple_unref(squash->entry.stmt);
 	mempool_free(pool, squash);
 }
 
@@ -3547,11 +3573,11 @@ vy_squash_process(struct vy_squash *squash)
 	 * Use the committed read view to avoid squashing
 	 * prepared, but not committed statements.
 	 */
-	struct tuple *result;
+	struct vy_entry result;
 	if (vy_point_lookup(lsm, NULL, &env->xm->p_committed_read_view,
-			    squash->stmt, &result) != 0)
+			    squash->entry, &result) != 0)
 		return -1;
-	if (result == NULL)
+	if (result.stmt == NULL)
 		return 0;
 
 	/*
@@ -3563,8 +3589,8 @@ vy_squash_process(struct vy_squash *squash)
 	 */
 	struct vy_mem *mem = lsm->mem;
 	struct vy_mem_tree_key tree_key = {
-		.stmt = result,
-		.lsn = vy_stmt_lsn(result),
+		.entry = result,
+		.lsn = vy_stmt_lsn(result.stmt),
 	};
 	struct vy_mem_tree_iterator mem_itr =
 		vy_mem_tree_lower_bound(&mem->tree, &tree_key, NULL);
@@ -3573,19 +3599,19 @@ vy_squash_process(struct vy_squash *squash)
 		 * The in-memory tree we are squashing an upsert
 		 * for was dumped, nothing to do.
 		 */
-		tuple_unref(result);
+		tuple_unref(result.stmt);
 		return 0;
 	}
 	vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
 	uint8_t n_upserts = 0;
 	while (!vy_mem_tree_iterator_is_invalid(&mem_itr)) {
-		struct tuple *mem_stmt;
-		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
-		if (vy_stmt_compare(result, mem_stmt, lsm->cmp_def) != 0 ||
-		    vy_stmt_type(mem_stmt) != IPROTO_UPSERT)
+		struct vy_entry mem_entry;
+		mem_entry = *vy_mem_tree_iterator_get_elem(&mem->tree, &mem_itr);
+		if (vy_entry_compare(result, mem_entry, lsm->cmp_def) != 0 ||
+		    vy_stmt_type(mem_entry.stmt) != IPROTO_UPSERT)
 			break;
-		assert(vy_stmt_lsn(mem_stmt) >= MAX_LSN);
-		vy_stmt_set_n_upserts(mem_stmt, n_upserts);
+		assert(vy_stmt_lsn(mem_entry.stmt) >= MAX_LSN);
+		vy_stmt_set_n_upserts(mem_entry.stmt, n_upserts);
 		if (n_upserts <= VY_UPSERT_THRESHOLD)
 			++n_upserts;
 		vy_mem_tree_iterator_prev(&mem->tree, &mem_itr);
@@ -3600,7 +3626,8 @@ vy_squash_process(struct vy_squash *squash)
 	size_t mem_used_before = lsregion_used(&env->mem_env.allocator);
 	struct tuple *region_stmt = NULL;
 	int rc = vy_lsm_set(lsm, mem, result, &region_stmt);
-	tuple_unref(result);
+	tuple_unref(result.stmt);
+	result.stmt = region_stmt;
 	size_t mem_used_after = lsregion_used(&env->mem_env.allocator);
 	assert(mem_used_after >= mem_used_before);
 	if (rc == 0) {
@@ -3608,7 +3635,7 @@ vy_squash_process(struct vy_squash *squash)
 		 * We don't modify the resulting statement,
 		 * so there's no need in invalidating the cache.
 		 */
-		vy_mem_commit_stmt(mem, region_stmt);
+		vy_mem_commit_stmt(mem, result);
 		vy_quota_force_use(&env->quota, VY_QUOTA_CONSUMER_TX,
 				   mem_used_after - mem_used_before);
 		vy_regulator_check_dump_watermark(&env->regulator);
@@ -3669,13 +3696,13 @@ vy_squash_queue_f(va_list va)
  * statement after it. Done in a background fiber.
  */
 static void
-vy_squash_schedule(struct vy_lsm *lsm, struct tuple *stmt, void *arg)
+vy_squash_schedule(struct vy_lsm *lsm, struct vy_entry entry, void *arg)
 {
 	struct vy_env *env = arg;
 	struct vy_squash_queue *sq = env->squash_queue;
 
 	say_verbose("%s: schedule upsert optimization for %s",
-		    vy_lsm_name(lsm), vy_stmt_str(stmt));
+		    vy_lsm_name(lsm), vy_stmt_str(entry.stmt));
 
 	/* Start the upsert squashing fiber on demand. */
 	if (sq->fiber == NULL) {
@@ -3685,7 +3712,7 @@ vy_squash_schedule(struct vy_lsm *lsm, struct tuple *stmt, void *arg)
 		fiber_start(sq->fiber, sq);
 	}
 
-	struct vy_squash *squash = vy_squash_new(&sq->pool, env, lsm, stmt);
+	struct vy_squash *squash = vy_squash_new(&sq->pool, env, lsm, entry);
 	if (squash == NULL)
 		goto fail;
 
@@ -3722,8 +3749,8 @@ vinyl_iterator_close(struct vinyl_iterator *it)
 	vy_read_iterator_close(&it->iterator);
 	vy_lsm_unref(it->lsm);
 	it->lsm = NULL;
-	tuple_unref(it->key);
-	it->key = NULL;
+	tuple_unref(it->key.stmt);
+	it->key = vy_entry_none();
 	if (it->tx == &it->tx_autocommit) {
 		/*
 		 * Rollback the automatic transaction.
@@ -3774,15 +3801,17 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 
 	if (vinyl_iterator_check_tx(it) != 0)
 		goto fail;
-	if (vy_read_iterator_next(&it->iterator, ret) != 0)
+	struct vy_entry entry;
+	if (vy_read_iterator_next(&it->iterator, &entry) != 0)
 		goto fail;
-	vy_read_iterator_cache_add(&it->iterator, *ret);
-	if (*ret == NULL) {
+	vy_read_iterator_cache_add(&it->iterator, entry);
+	if (entry.stmt == NULL) {
 		/* EOF. Close the iterator immediately. */
 		vinyl_iterator_close(it);
 	} else {
-		tuple_bless(*ret);
+		tuple_bless(entry.stmt);
 	}
+	*ret = entry.stmt;
 	return 0;
 fail:
 	vinyl_iterator_close(it);
@@ -3795,18 +3824,18 @@ vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 	assert(base->next = vinyl_iterator_secondary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	assert(it->lsm->index_id > 0);
-	struct tuple *tuple;
+	struct vy_entry partial, entry;
 
 next:
 	if (vinyl_iterator_check_tx(it) != 0)
 		goto fail;
 
-	if (vy_read_iterator_next(&it->iterator, &tuple) != 0)
+	if (vy_read_iterator_next(&it->iterator, &partial) != 0)
 		goto fail;
 
-	if (tuple == NULL) {
+	if (partial.stmt == NULL) {
 		/* EOF. Close the iterator immediately. */
-		vy_read_iterator_cache_add(&it->iterator, NULL);
+		vy_read_iterator_cache_add(&it->iterator, vy_entry_none());
 		vinyl_iterator_close(it);
 		*ret = NULL;
 		return 0;
@@ -3822,11 +3851,12 @@ next:
 	/* Get the full tuple from the primary index. */
 	if (vy_get_by_secondary_tuple(it->lsm, it->tx,
 				      vy_tx_read_view(it->tx),
-				      tuple, ret) != 0)
+				      partial, &entry) != 0)
 		goto fail;
-	if (*ret == NULL)
+	if (entry.stmt == NULL)
 		goto next;
-	vy_read_iterator_cache_add(&it->iterator, *ret);
+	vy_read_iterator_cache_add(&it->iterator, entry);
+	*ret = entry.stmt;
 	tuple_bless(*ret);
 	tuple_unref(*ret);
 	return 0;
@@ -3870,8 +3900,9 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 			 "mempool", "struct vinyl_iterator");
 		return NULL;
 	}
-	it->key = vy_key_new(lsm->env->key_format, key, part_count);
-	if (it->key == NULL) {
+	it->key = vy_entry_key_new(lsm->env->key_format, lsm->cmp_def,
+				   key, part_count);
+	if (it->key.stmt == NULL) {
 		mempool_free(&env->iterator_pool, it);
 		return NULL;
 	}
@@ -4027,9 +4058,12 @@ vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 	if (region_stmt == NULL)
 		return -1;
 	vy_stmt_set_lsn(region_stmt, lsn);
-	if (vy_mem_insert(mem, region_stmt) != 0)
+	struct vy_entry entry;
+	entry.stmt = region_stmt;
+	entry.hint = vy_stmt_hint(region_stmt, lsm->cmp_def);
+	if (vy_mem_insert(mem, entry) != 0)
 		return -1;
-	vy_mem_commit_stmt(mem, region_stmt);
+	vy_mem_commit_stmt(mem, entry);
 	vy_stmt_counter_acct_tuple(&lsm->stat.memory.count, region_stmt);
 	return 0;
 }
@@ -4108,8 +4142,9 @@ vy_build_insert_tuple(struct vy_env *env, struct vy_lsm *lsm,
  */
 static int
 vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
-		      struct tuple *mem_stmt)
+		      struct vy_entry mem_entry)
 {
+	struct tuple *mem_stmt = mem_entry.stmt;
 	int64_t lsn = vy_stmt_lsn(mem_stmt);
 	if (lsn <= lsm->dump_lsn)
 		return 0; /* statement was dumped, nothing to do */
@@ -4117,8 +4152,8 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	/* Lookup the tuple that was affected by this statement. */
 	const struct vy_read_view rv = { .vlsn = lsn - 1 };
 	const struct vy_read_view *p_rv = &rv;
-	struct tuple *old_tuple;
-	if (vy_point_lookup(pk, NULL, &p_rv, mem_stmt, &old_tuple) != 0)
+	struct vy_entry old;
+	if (vy_point_lookup(pk, NULL, &p_rv, mem_entry, &old) != 0)
 		return -1;
 	/*
 	 * Create DELETE + INSERT statements corresponding to
@@ -4126,6 +4161,7 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	 */
 	struct tuple *delete = NULL;
 	struct tuple *insert = NULL;
+	struct tuple *old_tuple = old.stmt;
 	if (old_tuple != NULL) {
 		delete = vy_stmt_extract_key(old_tuple, lsm->cmp_def,
 					     lsm->env->key_format);
@@ -4187,9 +4223,9 @@ vy_build_recover_mem(struct vy_lsm *lsm, struct vy_lsm *pk, struct vy_mem *mem)
 	struct vy_mem_tree_iterator itr;
 	itr = vy_mem_tree_iterator_last(&mem->tree);
 	while (!vy_mem_tree_iterator_is_invalid(&itr)) {
-		struct tuple *mem_stmt;
-		mem_stmt = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
-		if (vy_build_recover_stmt(lsm, pk, mem_stmt) != 0)
+		struct vy_entry mem_entry;
+		mem_entry = *vy_mem_tree_iterator_get_elem(&mem->tree, &itr);
+		if (vy_build_recover_stmt(lsm, pk, mem_entry) != 0)
 			return -1;
 		vy_mem_tree_iterator_prev(&mem->tree, &itr);
 	}
@@ -4277,9 +4313,10 @@ vinyl_space_build_index(struct space *src_space, struct index *new_index,
 			      &env->xm->p_committed_read_view);
 	int rc;
 	int loops = 0;
-	struct tuple *tuple;
+	struct vy_entry entry;
 	int64_t build_lsn = env->xm->lsn;
-	while ((rc = vy_read_iterator_next(&itr, &tuple)) == 0) {
+	while ((rc = vy_read_iterator_next(&itr, &entry)) == 0) {
+		struct tuple *tuple = entry.stmt;
 		if (tuple == NULL)
 			break;
 		/*
@@ -4485,10 +4522,14 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 				break;
 			mem = lsm->mem;
 		}
-		rc = vy_lsm_set(lsm, mem, delete, &region_stmt);
+		struct vy_entry entry;
+		entry.stmt = delete;
+		entry.hint = vy_stmt_hint(delete, lsm->cmp_def);
+		rc = vy_lsm_set(lsm, mem, entry, &region_stmt);
 		if (rc != 0)
 			break;
-		vy_lsm_commit_stmt(lsm, mem, region_stmt);
+		entry.stmt = region_stmt;
+		vy_lsm_commit_stmt(lsm, mem, entry);
 
 		if (!is_first_statement)
 			continue;

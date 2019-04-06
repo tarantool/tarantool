@@ -1054,13 +1054,13 @@ vy_task_write_run(struct vy_task *task)
 		goto fail_abort_writer;
 	int rc;
 	int loops = 0;
-	struct tuple *stmt = NULL;
-	while ((rc = wi->iface->next(wi, &stmt)) == 0 && stmt != NULL) {
+	struct vy_entry entry = vy_entry_none();
+	while ((rc = wi->iface->next(wi, &entry)) == 0 && entry.stmt != NULL) {
 		inj = errinj(ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT, ERRINJ_DOUBLE);
 		if (inj != NULL && inj->dparam > 0)
 			usleep(inj->dparam * 1000000);
 
-		rc = vy_run_writer_append_stmt(&writer, stmt);
+		rc = vy_run_writer_append_stmt(&writer, entry);
 		if (rc != 0)
 			break;
 
@@ -1165,8 +1165,8 @@ vy_task_dump_complete(struct vy_task *task)
 		assert(i < lsm->range_count);
 		slice = new_slices[i];
 		vy_log_insert_slice(range->id, new_run->id, slice->id,
-				    tuple_data_or_null(slice->begin),
-				    tuple_data_or_null(slice->end));
+				    tuple_data_or_null(slice->begin.stmt),
+				    tuple_data_or_null(slice->end.stmt));
 	}
 	vy_log_dump_lsm(lsm->id, dump_lsn);
 	if (vy_log_tx_commit() < 0)
@@ -1458,7 +1458,8 @@ vy_task_compaction_complete(struct vy_task *task)
 	 */
 	if (!vy_run_is_empty(new_run)) {
 		new_slice = vy_slice_new(vy_log_next_id(), new_run,
-					 NULL, NULL, lsm->cmp_def);
+					 vy_entry_none(), vy_entry_none(),
+					 lsm->cmp_def);
 		if (new_slice == NULL)
 			return -1;
 	}
@@ -1498,8 +1499,8 @@ vy_task_compaction_complete(struct vy_task *task)
 		vy_log_create_run(lsm->id, new_run->id, new_run->dump_lsn,
 				  new_run->dump_count);
 		vy_log_insert_slice(range->id, new_run->id, new_slice->id,
-				    tuple_data_or_null(new_slice->begin),
-				    tuple_data_or_null(new_slice->end));
+				    tuple_data_or_null(new_slice->begin.stmt),
+				    tuple_data_or_null(new_slice->end.stmt));
 	}
 	if (vy_log_tx_commit() < 0) {
 		if (new_slice != NULL)

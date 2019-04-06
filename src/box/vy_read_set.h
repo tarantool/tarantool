@@ -41,12 +41,12 @@
 
 #include "salad/stailq.h"
 #include "trivia/util.h"
+#include "vy_entry.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct tuple;
 struct vy_tx;
 struct vy_lsm;
 
@@ -59,9 +59,9 @@ struct vy_read_interval {
 	/** LSM tree that the transaction read from. */
 	struct vy_lsm *lsm;
 	/** Left boundary of the interval. */
-	struct tuple *left;
+	struct vy_entry left;
 	/** Right boundary of the interval. */
-	struct tuple *right;
+	struct vy_entry right;
 	/** Set if the left boundary belongs to the interval. */
 	bool left_belongs;
 	/** Set if the right boundary belongs to the interval. */
@@ -187,7 +187,7 @@ rb_gen_aug(MAYBE_UNUSED static inline, vy_lsm_read_set_, vy_lsm_read_set_t,
  */
 struct vy_tx_conflict_iterator {
 	/** The statement. */
-	struct tuple *stmt;
+	struct vy_entry key;
 	/**
 	 * Iterator over the interval tree checked
 	 * for intersections with the statement.
@@ -202,12 +202,11 @@ struct vy_tx_conflict_iterator {
 
 static inline void
 vy_tx_conflict_iterator_init(struct vy_tx_conflict_iterator *it,
-			     vy_lsm_read_set_t *read_set,
-			     struct tuple *stmt)
+			     vy_lsm_read_set_t *read_set, struct vy_entry key)
 {
 	vy_lsm_read_set_walk_init(&it->tree_walk, read_set);
 	it->tree_dir = 0;
-	it->stmt = stmt;
+	it->key = key;
 }
 
 /**

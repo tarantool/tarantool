@@ -34,13 +34,14 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "vy_entry.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* defined(__cplusplus) */
 
-struct vy_stat;
 struct key_def;
-struct tuple_format;
+struct tuple;
 
 /**
  * Apply the UPSERT statement to the REPLACE, UPSERT or DELETE statement.
@@ -65,6 +66,17 @@ struct tuple_format;
 struct tuple *
 vy_apply_upsert(struct tuple *new_stmt, struct tuple *old_stmt,
 		struct key_def *cmp_def, bool suppress_error);
+
+static inline struct vy_entry
+vy_entry_apply_upsert(struct vy_entry new_entry, struct vy_entry old_entry,
+		      struct key_def *cmp_def, bool suppress_error)
+{
+	struct vy_entry result;
+	result.hint = old_entry.stmt != NULL ? old_entry.hint : new_entry.hint;
+	result.stmt = vy_apply_upsert(new_entry.stmt, old_entry.stmt,
+				      cmp_def, suppress_error);
+	return result.stmt != NULL ? result : vy_entry_none();
+}
 
 #if defined(__cplusplus)
 } /* extern "C" */

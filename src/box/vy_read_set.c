@@ -46,15 +46,15 @@ vy_read_interval_cmpl(const struct vy_read_interval *a,
 {
 	assert(a->lsm == b->lsm);
 	struct key_def *cmp_def = a->lsm->cmp_def;
-	int cmp = vy_stmt_compare(a->left, b->left, cmp_def);
+	int cmp = vy_entry_compare(a->left, b->left, cmp_def);
 	if (cmp != 0)
 		return cmp;
 	if (a->left_belongs && !b->left_belongs)
 		return -1;
 	if (!a->left_belongs && b->left_belongs)
 		return 1;
-	uint32_t a_parts = vy_stmt_key_part_count(a->left, cmp_def);
-	uint32_t b_parts = vy_stmt_key_part_count(b->left, cmp_def);
+	uint32_t a_parts = vy_stmt_key_part_count(a->left.stmt, cmp_def);
+	uint32_t b_parts = vy_stmt_key_part_count(b->left.stmt, cmp_def);
 	if (a->left_belongs)
 		return a_parts < b_parts ? -1 : a_parts > b_parts;
 	else
@@ -67,15 +67,15 @@ vy_read_interval_cmpr(const struct vy_read_interval *a,
 {
 	assert(a->lsm == b->lsm);
 	struct key_def *cmp_def = a->lsm->cmp_def;
-	int cmp = vy_stmt_compare(a->right, b->right, cmp_def);
+	int cmp = vy_entry_compare(a->right, b->right, cmp_def);
 	if (cmp != 0)
 		return cmp;
 	if (a->right_belongs && !b->right_belongs)
 		return 1;
 	if (!a->right_belongs && b->right_belongs)
 		return -1;
-	uint32_t a_parts = vy_stmt_key_part_count(a->right, cmp_def);
-	uint32_t b_parts = vy_stmt_key_part_count(b->right, cmp_def);
+	uint32_t a_parts = vy_stmt_key_part_count(a->right.stmt, cmp_def);
+	uint32_t b_parts = vy_stmt_key_part_count(b->right.stmt, cmp_def);
 	if (a->right_belongs)
 		return a_parts > b_parts ? -1 : a_parts < b_parts;
 	else
@@ -89,7 +89,7 @@ vy_read_interval_should_merge(const struct vy_read_interval *l,
 	assert(l->lsm == r->lsm);
 	assert(vy_read_interval_cmpl(l, r) <= 0);
 	struct key_def *cmp_def = l->lsm->cmp_def;
-	int cmp = vy_stmt_compare(l->right, r->left, cmp_def);
+	int cmp = vy_entry_compare(l->right, r->left, cmp_def);
 	if (cmp > 0)
 		return true;
 	if (cmp < 0)
@@ -98,8 +98,8 @@ vy_read_interval_should_merge(const struct vy_read_interval *l,
 		return true;
 	if (!l->right_belongs && !r->left_belongs)
 		return false;
-	uint32_t l_parts = vy_stmt_key_part_count(l->right, cmp_def);
-	uint32_t r_parts = vy_stmt_key_part_count(r->left, cmp_def);
+	uint32_t l_parts = vy_stmt_key_part_count(l->right.stmt, cmp_def);
+	uint32_t r_parts = vy_stmt_key_part_count(r->left.stmt, cmp_def);
 	if (l->right_belongs)
 		return l_parts <= r_parts;
 	else
@@ -118,7 +118,8 @@ vy_tx_conflict_iterator_next(struct vy_tx_conflict_iterator *it)
 		assert(left == NULL || left->lsm == curr->lsm);
 		assert(right == NULL || right->lsm == curr->lsm);
 
-		int cmp_right = vy_stmt_compare(it->stmt, last->right, cmp_def);
+		int cmp_right = vy_entry_compare(it->key, last->right,
+						 cmp_def);
 		if (cmp_right == 0 && !last->right_belongs)
 			cmp_right = 1;
 
@@ -133,11 +134,12 @@ vy_tx_conflict_iterator_next(struct vy_tx_conflict_iterator *it)
 		}
 
 		int cmp_left;
-		if (curr->left == last->right) {
+		if (vy_entry_is_equal(curr->left, last->right)) {
 			/* Optimize comparison out. */
 			cmp_left = cmp_right;
 		} else {
-			cmp_left = vy_stmt_compare(it->stmt, curr->left, cmp_def);
+			cmp_left = vy_entry_compare(it->key, curr->left,
+						    cmp_def);
 			if (cmp_left == 0 && !curr->left_belongs)
 				cmp_left = -1;
 		}
@@ -160,12 +162,12 @@ vy_tx_conflict_iterator_next(struct vy_tx_conflict_iterator *it)
 		/*
 		 * Check if the point is within the current interval.
 		 */
-		if (curr->left == curr->right) {
+		if (vy_entry_is_equal(curr->left, curr->right)) {
 			/* Optimize comparison out. */
 			cmp_right = cmp_left;
 		} else if (curr != last) {
-			cmp_right = vy_stmt_compare(it->stmt, curr->right,
-						    cmp_def);
+			cmp_right = vy_entry_compare(it->key, curr->right,
+						     cmp_def);
 			if (cmp_right == 0 && !curr->right_belongs)
 				cmp_right = 1;
 		}

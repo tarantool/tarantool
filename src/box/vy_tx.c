@@ -68,7 +68,7 @@ write_set_cmp(struct txv *a, struct txv *b)
 {
 	int rc = a->lsm < b->lsm ? -1 : a->lsm > b->lsm;
 	if (rc == 0)
-		return vy_stmt_compare(a->stmt, b->stmt, a->lsm->cmp_def);
+		return vy_entry_compare(a->entry, b->entry, a->lsm->cmp_def);
 	return rc;
 }
 
@@ -77,7 +77,7 @@ write_set_key_cmp(struct write_set_key *a, struct txv *b)
 {
 	int rc = a->lsm < b->lsm ? -1 : a->lsm > b->lsm;
 	if (rc == 0)
-		return vy_stmt_compare(a->stmt, b->stmt, a->lsm->cmp_def);
+		return vy_entry_compare(a->entry, b->entry, a->lsm->cmp_def);
 	return rc;
 }
 
@@ -213,7 +213,7 @@ tx_manager_destroy_read_view(struct tx_manager *xm,
 
 static struct txv *
 txv_new(struct vy_tx *tx, struct vy_lsm *lsm,
-	struct tuple *stmt, uint64_t column_mask)
+	struct vy_entry entry, uint64_t column_mask)
 {
 	struct tx_manager *xm = tx->xm;
 	struct txv *v = mempool_alloc(&xm->txv_mempool);
@@ -224,15 +224,15 @@ txv_new(struct vy_tx *tx, struct vy_lsm *lsm,
 	v->lsm = lsm;
 	vy_lsm_ref(v->lsm);
 	v->mem = NULL;
-	v->stmt = stmt;
-	tuple_ref(stmt);
+	v->entry = entry;
+	tuple_ref(entry.stmt);
 	v->region_stmt = NULL;
 	v->column_mask = column_mask;
 	v->tx = tx;
 	v->is_first_insert = false;
 	v->is_overwritten = false;
 	v->overwritten = NULL;
-	xm->write_set_size += tuple_size(stmt);
+	xm->write_set_size += tuple_size(entry.stmt);
 	return v;
 }
 
@@ -240,8 +240,8 @@ static void
 txv_delete(struct txv *v)
 {
 	struct tx_manager *xm = v->tx->xm;
-	xm->write_set_size -= tuple_size(v->stmt);
-	tuple_unref(v->stmt);
+	xm->write_set_size -= tuple_size(v->entry.stmt);
+	tuple_unref(v->entry.stmt);
 	vy_lsm_unref(v->lsm);
 	mempool_free(&xm->txv_mempool, v);
 }
@@ -253,9 +253,9 @@ static void
 vy_read_interval_acct(struct vy_read_interval *interval)
 {
 	struct tx_manager *xm = interval->tx->xm;
-	xm->read_set_size += tuple_size(interval->left);
-	if (interval->left != interval->right)
-		xm->read_set_size += tuple_size(interval->right);
+	xm->read_set_size += tuple_size(interval->left.stmt);
+	if (interval->left.stmt != interval->right.stmt)
+		xm->read_set_size += tuple_size(interval->right.stmt);
 }
 
 /**
@@ -265,15 +265,15 @@ static void
 vy_read_interval_unacct(struct vy_read_interval *interval)
 {
 	struct tx_manager *xm = interval->tx->xm;
-	xm->read_set_size -= tuple_size(interval->left);
-	if (interval->left != interval->right)
-		xm->read_set_size -= tuple_size(interval->right);
+	xm->read_set_size -= tuple_size(interval->left.stmt);
+	if (interval->left.stmt != interval->right.stmt)
+		xm->read_set_size -= tuple_size(interval->right.stmt);
 }
 
 static struct vy_read_interval *
 vy_read_interval_new(struct vy_tx *tx, struct vy_lsm *lsm,
-		     struct tuple *left, bool left_belongs,
-		     struct tuple *right, bool right_belongs)
+		     struct vy_entry left, bool left_belongs,
+		     struct vy_entry right, bool right_belongs)
 {
 	struct tx_manager *xm = tx->xm;
 	struct vy_read_interval *interval;
@@ -286,10 +286,10 @@ vy_read_interval_new(struct vy_tx *tx, struct vy_lsm *lsm,
 	interval->tx = tx;
 	vy_lsm_ref(lsm);
 	interval->lsm = lsm;
-	tuple_ref(left);
+	tuple_ref(left.stmt);
 	interval->left = left;
 	interval->left_belongs = left_belongs;
-	tuple_ref(right);
+	tuple_ref(right.stmt);
 	interval->right = right;
 	interval->right_belongs = right_belongs;
 	interval->subtree_last = NULL;
@@ -303,8 +303,8 @@ vy_read_interval_delete(struct vy_read_interval *interval)
 	struct tx_manager *xm = interval->tx->xm;
 	vy_read_interval_unacct(interval);
 	vy_lsm_unref(interval->lsm);
-	tuple_unref(interval->left);
-	tuple_unref(interval->right);
+	tuple_unref(interval->left.stmt);
+	tuple_unref(interval->right.stmt);
 	mempool_free(&xm->read_interval_mempool, interval);
 }
 
@@ -348,7 +348,7 @@ vy_tx_destroy(struct vy_tx *tx)
 	struct txv *v, *tmp;
 	stailq_foreach_entry_safe(v, tmp, &tx->log, next_in_log) {
 		vy_stmt_counter_unacct_tuple(&v->lsm->stat.txw.count,
-					     v->stmt);
+					     v->entry.stmt);
 		txv_delete(v);
 	}
 
@@ -387,7 +387,7 @@ static int
 vy_tx_send_to_read_view(struct vy_tx *tx, struct txv *v)
 {
 	struct vy_tx_conflict_iterator it;
-	vy_tx_conflict_iterator_init(&it, &v->lsm->read_set, v->stmt);
+	vy_tx_conflict_iterator_init(&it, &v->lsm->read_set, v->entry);
 	struct vy_tx *abort;
 	while ((abort = vy_tx_conflict_iterator_next(&it)) != NULL) {
 		/* Don't abort self. */
@@ -415,7 +415,7 @@ static void
 vy_tx_abort_readers(struct vy_tx *tx, struct txv *v)
 {
 	struct vy_tx_conflict_iterator it;
-	vy_tx_conflict_iterator_init(&it, &v->lsm->read_set, v->stmt);
+	vy_tx_conflict_iterator_init(&it, &v->lsm->read_set, v->entry);
 	struct vy_tx *abort;
 	while ((abort = vy_tx_conflict_iterator_next(&it)) != NULL) {
 		/* Don't abort self. */
@@ -482,7 +482,7 @@ vy_tx_write_prepare(struct txv *v)
  *
  * @param lsm         LSM tree to write to.
  * @param mem         In-memory tree to write to.
- * @param stmt        Statement allocated with malloc().
+ * @param entry       Statement allocated with malloc().
  * @param region_stmt NULL or the same statement as stmt,
  *                    but allocated on lsregion.
  *
@@ -491,9 +491,9 @@ vy_tx_write_prepare(struct txv *v)
  */
 static int
 vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
-	    struct tuple *stmt, struct tuple **region_stmt)
+	    struct vy_entry entry, struct tuple **region_stmt)
 {
-	assert(vy_stmt_is_refable(stmt));
+	assert(vy_stmt_is_refable(entry.stmt));
 	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
 
 	/*
@@ -503,19 +503,21 @@ vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
 	 * applied to the cached statement, can be inserted
 	 * instead of the original UPSERT.
 	 */
-	if (vy_stmt_type(stmt) == IPROTO_UPSERT) {
-		struct tuple *deleted = NULL;
+	if (vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
+		struct vy_entry deleted = vy_entry_none();
 		/* Invalidate cache element. */
-		vy_cache_on_write(&lsm->cache, stmt, &deleted);
-		if (deleted != NULL) {
-			struct tuple *applied = vy_apply_upsert(stmt, deleted,
+		vy_cache_on_write(&lsm->cache, entry, &deleted);
+		if (deleted.stmt != NULL) {
+			struct vy_entry applied;
+			applied = vy_entry_apply_upsert(entry, deleted,
 							mem->cmp_def, false);
-			tuple_unref(deleted);
-			if (applied != NULL) {
-				assert(vy_stmt_type(applied) == IPROTO_REPLACE);
+			tuple_unref(deleted.stmt);
+			if (applied.stmt != NULL) {
+				assert(vy_stmt_type(applied.stmt) ==
+							IPROTO_REPLACE);
 				int rc = vy_lsm_set(lsm, mem, applied,
 						    region_stmt);
-				tuple_unref(applied);
+				tuple_unref(applied.stmt);
 				return rc;
 			}
 			/*
@@ -525,9 +527,9 @@ vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
 		}
 	} else {
 		/* Invalidate cache element. */
-		vy_cache_on_write(&lsm->cache, stmt, NULL);
+		vy_cache_on_write(&lsm->cache, entry, NULL);
 	}
-	return vy_lsm_set(lsm, mem, stmt, region_stmt);
+	return vy_lsm_set(lsm, mem, entry, region_stmt);
 }
 
 /**
@@ -545,7 +547,7 @@ vy_tx_write(struct vy_lsm *lsm, struct vy_mem *mem,
  * if we run out of memory, we won't be able to schedule another
  * dump to free some.
  *
- * Affects @tx->log, @v->stmt.
+ * Affects @tx->log, @v->entry.
  *
  * Returns 0 on success, -1 on memory allocation error.
  */
@@ -553,7 +555,7 @@ static int
 vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 {
 	struct vy_lsm *pk = v->lsm;
-	struct tuple *stmt = v->stmt;
+	struct tuple *stmt = v->entry.stmt;
 	uint8_t flags = vy_stmt_flags(stmt);
 
 	assert(pk->index_id == 0);
@@ -569,12 +571,12 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 	}
 
 	/* Look up the tuple overwritten by this statement. */
-	struct tuple *tuple;
+	struct vy_entry overwritten;
 	if (vy_point_lookup_mem(pk, &tx->xm->p_global_read_view,
-				stmt, &tuple) != 0)
+				v->entry, &overwritten) != 0)
 		return -1;
 
-	if (tuple == NULL) {
+	if (overwritten.stmt == NULL) {
 		/*
 		 * Nothing's found, but there still may be
 		 * matching statements stored on disk so we
@@ -590,15 +592,16 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 	 */
 	vy_stmt_set_flags(stmt, flags & ~VY_STMT_DEFERRED_DELETE);
 
-	if (vy_stmt_type(tuple) == IPROTO_DELETE) {
+	if (vy_stmt_type(overwritten.stmt) == IPROTO_DELETE) {
 		/* The tuple's already deleted, nothing to do. */
-		tuple_unref(tuple);
+		tuple_unref(overwritten.stmt);
 		return 0;
 	}
 
 	struct tuple *delete_stmt;
-	delete_stmt = vy_stmt_new_surrogate_delete(pk->mem_format, tuple);
-	tuple_unref(tuple);
+	delete_stmt = vy_stmt_new_surrogate_delete(pk->mem_format,
+						   overwritten.stmt);
+	tuple_unref(overwritten.stmt);
 	if (delete_stmt == NULL)
 		return -1;
 
@@ -614,7 +617,7 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 		tx->xm->write_set_size += tuple_size(delete_stmt);
 		vy_stmt_counter_acct_tuple(&pk->stat.txw.count, delete_stmt);
 		vy_stmt_counter_unacct_tuple(&pk->stat.txw.count, stmt);
-		v->stmt = delete_stmt;
+		v->entry.stmt = delete_stmt;
 		tuple_ref(delete_stmt);
 		tuple_unref(stmt);
 	}
@@ -626,7 +629,10 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 	int rc = 0;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		struct txv *delete_txv = txv_new(tx, lsm, delete_stmt,
+		struct vy_entry delete_entry;
+		delete_entry.stmt = delete_stmt;
+		delete_entry.hint = vy_stmt_hint(delete_stmt, lsm->cmp_def);
+		struct txv *delete_txv = txv_new(tx, lsm, delete_entry,
 						 UINT64_MAX);
 		if (delete_txv == NULL) {
 			rc = -1;
@@ -719,7 +725,7 @@ vy_tx_prepare(struct vy_tx *tx)
 			continue;
 		}
 
-		enum iproto_type type = vy_stmt_type(v->stmt);
+		enum iproto_type type = vy_stmt_type(v->entry.stmt);
 
 		/* Optimize out INSERT + DELETE for the same key. */
 		if (v->is_first_insert && type == IPROTO_DELETE)
@@ -732,15 +738,15 @@ vy_tx_prepare(struct vy_tx *tx)
 			 * so we can turn REPLACE into INSERT.
 			 */
 			type = IPROTO_INSERT;
-			vy_stmt_set_type(v->stmt, type);
+			vy_stmt_set_type(v->entry.stmt, type);
 			/*
 			 * In case of INSERT, no statement was actually
 			 * overwritten so no need to generate a deferred
 			 * DELETE for secondary indexes.
 			 */
-			uint8_t flags = vy_stmt_flags(v->stmt);
+			uint8_t flags = vy_stmt_flags(v->entry.stmt);
 			if (flags & VY_STMT_DEFERRED_DELETE) {
-				vy_stmt_set_flags(v->stmt, flags &
+				vy_stmt_set_flags(v->entry.stmt, flags &
 						  ~VY_STMT_DEFERRED_DELETE);
 			}
 		}
@@ -751,7 +757,7 @@ vy_tx_prepare(struct vy_tx *tx)
 			 * turn it into REPLACE.
 			 */
 			type = IPROTO_REPLACE;
-			vy_stmt_set_type(v->stmt, type);
+			vy_stmt_set_type(v->entry.stmt, type);
 		}
 
 		if (vy_tx_write_prepare(v) != 0)
@@ -759,15 +765,15 @@ vy_tx_prepare(struct vy_tx *tx)
 		assert(v->mem != NULL);
 
 		if (lsm->index_id == 0 &&
-		    vy_stmt_flags(v->stmt) & VY_STMT_DEFERRED_DELETE &&
+		    vy_stmt_flags(v->entry.stmt) & VY_STMT_DEFERRED_DELETE &&
 		    vy_tx_handle_deferred_delete(tx, v) != 0)
 			return -1;
 
 		/* In secondary indexes only REPLACE/DELETE can be written. */
-		vy_stmt_set_lsn(v->stmt, MAX_LSN + tx->psn);
+		vy_stmt_set_lsn(v->entry.stmt, MAX_LSN + tx->psn);
 		struct tuple **region_stmt =
 			(type == IPROTO_DELETE) ? &delete : &repsert;
-		if (vy_tx_write(lsm, v->mem, v->stmt, region_stmt) != 0)
+		if (vy_tx_write(lsm, v->mem, v->entry, region_stmt) != 0)
 			return -1;
 		v->region_stmt = *region_stmt;
 	}
@@ -796,8 +802,11 @@ vy_tx_commit(struct vy_tx *tx, int64_t lsn)
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
 		if (v->region_stmt != NULL) {
+			struct vy_entry entry;
+			entry.stmt = v->region_stmt;
+			entry.hint = v->entry.hint;
 			vy_stmt_set_lsn(v->region_stmt, lsn);
-			vy_lsm_commit_stmt(v->lsm, v->mem, v->region_stmt);
+			vy_lsm_commit_stmt(v->lsm, v->mem, entry);
 		}
 		if (v->mem != NULL)
 			vy_mem_unpin(v->mem);
@@ -841,9 +850,12 @@ vy_tx_rollback_after_prepare(struct vy_tx *tx)
 
 	struct txv *v;
 	stailq_foreach_entry(v, &tx->log, next_in_log) {
-		if (v->region_stmt != NULL)
-			vy_lsm_rollback_stmt(v->lsm, v->mem,
-					     v->region_stmt);
+		if (v->region_stmt != NULL) {
+			struct vy_entry entry;
+			entry.stmt = v->region_stmt;
+			entry.hint = v->entry.hint;
+			vy_lsm_rollback_stmt(v->lsm, v->mem, entry);
+		}
 		if (v->mem != NULL)
 			vy_mem_unpin(v->mem);
 	}
@@ -914,8 +926,8 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp)
 
 int
 vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
-	    struct tuple *left, bool left_belongs,
-	    struct tuple *right, bool right_belongs)
+	    struct vy_entry left, bool left_belongs,
+	    struct vy_entry right, bool right_belongs)
 {
 	if (vy_tx_is_in_read_view(tx)) {
 		/* No point in tracking reads. */
@@ -969,16 +981,16 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 		interval = stailq_first_entry(&merge, struct vy_read_interval,
 					      in_merge);
 		if (vy_read_interval_cmpl(new_interval, interval) > 0) {
-			tuple_ref(interval->left);
-			tuple_unref(new_interval->left);
+			tuple_ref(interval->left.stmt);
+			tuple_unref(new_interval->left.stmt);
 			new_interval->left = interval->left;
 			new_interval->left_belongs = interval->left_belongs;
 		}
 		interval = stailq_last_entry(&merge, struct vy_read_interval,
 					     in_merge);
 		if (vy_read_interval_cmpr(new_interval, interval) < 0) {
-			tuple_ref(interval->right);
-			tuple_unref(new_interval->right);
+			tuple_ref(interval->right.stmt);
+			tuple_unref(new_interval->right.stmt);
 			new_interval->right = interval->right;
 			new_interval->right_belongs = interval->right_belongs;
 		}
@@ -998,73 +1010,74 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 }
 
 int
-vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
+vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 {
-	assert(vy_stmt_is_full_key(stmt, lsm->cmp_def));
+	assert(vy_stmt_is_full_key(entry.stmt, lsm->cmp_def));
 
 	if (vy_tx_is_in_read_view(tx)) {
 		/* No point in tracking reads. */
 		return 0;
 	}
 
-	struct txv *v = write_set_search_key(&tx->write_set, lsm, stmt);
-	if (v != NULL && vy_stmt_type(v->stmt) != IPROTO_UPSERT) {
+	struct txv *v = write_set_search_key(&tx->write_set, lsm, entry);
+	if (v != NULL && vy_stmt_type(v->entry.stmt) != IPROTO_UPSERT) {
 		/* Reading from own write set is serializable. */
 		return 0;
 	}
 
-	return vy_tx_track(tx, lsm, stmt, true, stmt, true);
+	return vy_tx_track(tx, lsm, entry, true, entry, true);
 }
 
 int
 vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm,
-	  struct tuple *stmt, uint64_t column_mask)
+	  struct vy_entry entry, uint64_t column_mask)
 {
-	assert(vy_stmt_type(stmt) != 0);
+	assert(vy_stmt_type(entry.stmt) != 0);
 	/**
 	 * A statement in write set must have and unique lsn
 	 * in order to differ it from cachable statements in mem and run.
 	 */
-	vy_stmt_set_lsn(stmt, INT64_MAX);
-	struct tuple *applied = NULL;
+	vy_stmt_set_lsn(entry.stmt, INT64_MAX);
+	struct vy_entry applied = vy_entry_none();
 
-	struct txv *old = write_set_search_key(&tx->write_set, lsm, stmt);
+	struct txv *old = write_set_search_key(&tx->write_set, lsm, entry);
 	/* Found a match of the previous action of this transaction */
-	if (old != NULL && vy_stmt_type(stmt) == IPROTO_UPSERT) {
+	if (old != NULL && vy_stmt_type(entry.stmt) == IPROTO_UPSERT) {
 		assert(lsm->index_id == 0);
-		uint8_t old_type = vy_stmt_type(old->stmt);
+		uint8_t old_type = vy_stmt_type(old->entry.stmt);
 		assert(old_type == IPROTO_UPSERT ||
 		       old_type == IPROTO_INSERT ||
 		       old_type == IPROTO_REPLACE ||
 		       old_type == IPROTO_DELETE);
 		(void) old_type;
 
-		applied = vy_apply_upsert(stmt, old->stmt, lsm->cmp_def, true);
+		applied = vy_entry_apply_upsert(entry, old->entry,
+						lsm->cmp_def, true);
 		lsm->stat.upsert.applied++;
-		if (applied == NULL)
+		if (applied.stmt == NULL)
 			return -1;
-		stmt = applied;
-		assert(vy_stmt_type(stmt) != 0);
+		entry = applied;
+		assert(vy_stmt_type(entry.stmt) != 0);
 		lsm->stat.upsert.squashed++;
 	}
 
 	/* Allocate a MVCC container. */
-	struct txv *v = txv_new(tx, lsm, stmt, column_mask);
-	if (applied != NULL)
-		tuple_unref(applied);
+	struct txv *v = txv_new(tx, lsm, entry, column_mask);
+	if (applied.stmt != NULL)
+		tuple_unref(applied.stmt);
 	if (v == NULL)
 		return -1;
 
 	if (old != NULL) {
 		/* Leave the old txv in TX log but remove it from write set */
-		assert(tx->write_size >= tuple_size(old->stmt));
-		tx->write_size -= tuple_size(old->stmt);
+		assert(tx->write_size >= tuple_size(old->entry.stmt));
+		tx->write_size -= tuple_size(old->entry.stmt);
 		write_set_remove(&tx->write_set, old);
 		old->is_overwritten = true;
 		v->is_first_insert = old->is_first_insert;
 	}
 
-	if (old == NULL && vy_stmt_type(stmt) == IPROTO_INSERT)
+	if (old == NULL && vy_stmt_type(entry.stmt) == IPROTO_INSERT)
 		v->is_first_insert = true;
 
 	if (old != NULL) {
@@ -1075,8 +1088,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm,
 		v->column_mask |= old->column_mask;
 	}
 
-	if (lsm->index_id > 0 && vy_stmt_type(stmt) == IPROTO_REPLACE &&
-	    old != NULL && vy_stmt_type(old->stmt) == IPROTO_DELETE) {
+	if (lsm->index_id > 0 && vy_stmt_type(entry.stmt) == IPROTO_REPLACE &&
+	    old != NULL && vy_stmt_type(old->entry.stmt) == IPROTO_DELETE) {
 		/*
 		 * The column mask of an update operation may have a bit
 		 * set even if the corresponding field doesn't actually
@@ -1104,8 +1117,8 @@ vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm,
 	v->overwritten = old;
 	write_set_insert(&tx->write_set, v);
 	tx->write_set_version++;
-	tx->write_size += tuple_size(stmt);
-	vy_stmt_counter_acct_tuple(&lsm->stat.txw.count, stmt);
+	tx->write_size += tuple_size(entry.stmt);
+	vy_stmt_counter_acct_tuple(&lsm->stat.txw.count, entry.stmt);
 	stailq_add_tail_entry(&tx->log, v, next_in_log);
 	return 0;
 }
@@ -1142,7 +1155,7 @@ void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_lsm *lsm,
-		     enum iterator_type iterator_type, struct tuple *key)
+		     enum iterator_type iterator_type, struct vy_entry key)
 {
 	itr->stat = stat;
 	itr->tx = tx;
@@ -1160,16 +1173,16 @@ vy_txw_iterator_open(struct vy_txw_iterator *itr,
  * given key (pass NULL to start iteration).
  */
 static void
-vy_txw_iterator_seek(struct vy_txw_iterator *itr, struct tuple *last_key)
+vy_txw_iterator_seek(struct vy_txw_iterator *itr, struct vy_entry last)
 {
 	itr->stat->lookup++;
 	itr->version = itr->tx->write_set_version;
 	itr->curr_txv = NULL;
 
-	struct tuple *key = itr->key;
+	struct vy_entry key = itr->key;
 	enum iterator_type iterator_type = itr->iterator_type;
-	if (last_key != NULL) {
-		key = last_key;
+	if (last.stmt != NULL) {
+		key = last;
 		iterator_type = iterator_direction(iterator_type) > 0 ?
 				ITER_GT : ITER_LT;
 	}
@@ -1177,7 +1190,7 @@ vy_txw_iterator_seek(struct vy_txw_iterator *itr, struct tuple *last_key)
 	struct vy_lsm *lsm = itr->lsm;
 	struct write_set_key k = { lsm, key };
 	struct txv *txv;
-	if (!vy_stmt_is_empty_key(key)) {
+	if (!vy_stmt_is_empty_key(key.stmt)) {
 		if (iterator_type == ITER_EQ)
 			txv = write_set_search(&itr->tx->write_set, &k);
 		else if (iterator_type == ITER_GE || iterator_type == ITER_GT)
@@ -1186,7 +1199,7 @@ vy_txw_iterator_seek(struct vy_txw_iterator *itr, struct tuple *last_key)
 			txv = write_set_psearch(&itr->tx->write_set, &k);
 		if (txv == NULL || txv->lsm != lsm)
 			return;
-		if (vy_stmt_compare(key, txv->stmt, lsm->cmp_def) == 0) {
+		if (vy_entry_compare(key, txv->entry, lsm->cmp_def) == 0) {
 			while (true) {
 				struct txv *next;
 				if (iterator_type == ITER_LE ||
@@ -1196,8 +1209,8 @@ vy_txw_iterator_seek(struct vy_txw_iterator *itr, struct tuple *last_key)
 					next = write_set_prev(&itr->tx->write_set, txv);
 				if (next == NULL || next->lsm != lsm)
 					break;
-				if (vy_stmt_compare(key, next->stmt,
-						    lsm->cmp_def) != 0)
+				if (vy_entry_compare(key, next->entry,
+						     lsm->cmp_def) != 0)
 					break;
 				txv = next;
 			}
@@ -1214,8 +1227,8 @@ vy_txw_iterator_seek(struct vy_txw_iterator *itr, struct tuple *last_key)
 	}
 	if (txv == NULL || txv->lsm != lsm)
 		return;
-	if (itr->iterator_type == ITER_EQ && last_key != NULL &&
-	    vy_stmt_compare(itr->key, txv->stmt, lsm->cmp_def) != 0)
+	if (itr->iterator_type == ITER_EQ && last.stmt != NULL &&
+	    vy_entry_compare(itr->key, txv->entry, lsm->cmp_def) != 0)
 		return;
 	itr->curr_txv = txv;
 }
@@ -1227,7 +1240,7 @@ vy_txw_iterator_next(struct vy_txw_iterator *itr,
 	vy_history_cleanup(history);
 	if (!itr->search_started) {
 		itr->search_started = true;
-		vy_txw_iterator_seek(itr, NULL);
+		vy_txw_iterator_seek(itr, vy_entry_none());
 		goto out;
 	}
 	assert(itr->version == itr->tx->write_set_version);
@@ -1240,20 +1253,20 @@ vy_txw_iterator_next(struct vy_txw_iterator *itr,
 	if (itr->curr_txv != NULL && itr->curr_txv->lsm != itr->lsm)
 		itr->curr_txv = NULL;
 	if (itr->curr_txv != NULL && itr->iterator_type == ITER_EQ &&
-	    vy_stmt_compare(itr->key, itr->curr_txv->stmt,
-			    itr->lsm->cmp_def) != 0)
+	    vy_entry_compare(itr->key, itr->curr_txv->entry,
+			     itr->lsm->cmp_def) != 0)
 		itr->curr_txv = NULL;
 out:
 	if (itr->curr_txv != NULL) {
 		vy_stmt_counter_acct_tuple(&itr->stat->get,
-					   itr->curr_txv->stmt);
-		return vy_history_append_stmt(history, itr->curr_txv->stmt);
+					   itr->curr_txv->entry.stmt);
+		return vy_history_append_stmt(history, itr->curr_txv->entry);
 	}
 	return 0;
 }
 
 NODISCARD int
-vy_txw_iterator_skip(struct vy_txw_iterator *itr, struct tuple *last_stmt,
+vy_txw_iterator_skip(struct vy_txw_iterator *itr, struct vy_entry last,
 		     struct vy_history *history)
 {
 	assert(!itr->search_started ||
@@ -1261,42 +1274,42 @@ vy_txw_iterator_skip(struct vy_txw_iterator *itr, struct tuple *last_stmt,
 
 	/*
 	 * Check if the iterator is already positioned
-	 * at the statement following last_stmt.
+	 * at the statement following last.
 	 */
 	if (itr->search_started &&
-	    (itr->curr_txv == NULL || last_stmt == NULL ||
+	    (itr->curr_txv == NULL || last.stmt == NULL ||
 	     iterator_direction(itr->iterator_type) *
-	     vy_stmt_compare(itr->curr_txv->stmt, last_stmt,
-			     itr->lsm->cmp_def) > 0))
+	     vy_entry_compare(itr->curr_txv->entry, last,
+			      itr->lsm->cmp_def) > 0))
 		return 0;
 
 	vy_history_cleanup(history);
 
 	itr->search_started = true;
-	vy_txw_iterator_seek(itr, last_stmt);
+	vy_txw_iterator_seek(itr, last);
 
 	if (itr->curr_txv != NULL) {
 		vy_stmt_counter_acct_tuple(&itr->stat->get,
-					   itr->curr_txv->stmt);
-		return vy_history_append_stmt(history, itr->curr_txv->stmt);
+					   itr->curr_txv->entry.stmt);
+		return vy_history_append_stmt(history, itr->curr_txv->entry);
 	}
 	return 0;
 }
 
 NODISCARD int
-vy_txw_iterator_restore(struct vy_txw_iterator *itr, struct tuple *last_stmt,
+vy_txw_iterator_restore(struct vy_txw_iterator *itr, struct vy_entry last,
 			struct vy_history *history)
 {
 	if (!itr->search_started || itr->version == itr->tx->write_set_version)
 		return 0;
 
-	vy_txw_iterator_seek(itr, last_stmt);
+	vy_txw_iterator_seek(itr, last);
 
 	vy_history_cleanup(history);
 	if (itr->curr_txv != NULL) {
 		vy_stmt_counter_acct_tuple(&itr->stat->get,
-					   itr->curr_txv->stmt);
-		if (vy_history_append_stmt(history, itr->curr_txv->stmt) != 0)
+					   itr->curr_txv->entry.stmt);
+		if (vy_history_append_stmt(history, itr->curr_txv->entry) != 0)
 			return -1;
 	}
 	return 1;

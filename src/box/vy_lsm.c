@@ -74,8 +74,9 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 		  vy_upsert_thresh_cb upsert_thresh_cb,
 		  void *upsert_thresh_arg)
 {
-	env->empty_key = vy_key_new(key_format, NULL, 0);
-	if (env->empty_key == NULL)
+	env->empty_key.hint = HINT_NONE;
+	env->empty_key.stmt = vy_key_new(key_format, NULL, 0);
+	if (env->empty_key.stmt == NULL)
 		return -1;
 	env->path = path;
 	env->p_generation = p_generation;
@@ -93,7 +94,7 @@ vy_lsm_env_create(struct vy_lsm_env *env, const char *path,
 void
 vy_lsm_env_destroy(struct vy_lsm_env *env)
 {
-	tuple_unref(env->empty_key);
+	tuple_unref(env->empty_key.stmt);
 	tuple_format_unref(env->key_format);
 	mempool_destroy(&env->history_node_pool);
 }
@@ -325,8 +326,8 @@ vy_lsm_create(struct vy_lsm *lsm)
 	int64_t id = vy_log_next_id();
 
 	/* Create the initial range. */
-	struct vy_range *range = vy_range_new(vy_log_next_id(), NULL, NULL,
-					      lsm->cmp_def);
+	struct vy_range *range = vy_range_new(vy_log_next_id(), vy_entry_none(),
+					      vy_entry_none(), lsm->cmp_def);
 	if (range == NULL)
 		return -1;
 	assert(lsm->range_count == 0);
@@ -365,8 +366,8 @@ vy_lsm_recover_run(struct vy_lsm *lsm, struct vy_run_recovery_info *run_info,
 
 	run->dump_lsn = run_info->dump_lsn;
 	run->dump_count = run_info->dump_count;
-	if (vy_run_recover(run, lsm->env->path,
-			   lsm->space_id, lsm->index_id) != 0 &&
+	if (vy_run_recover(run, lsm->env->path, lsm->space_id, lsm->index_id,
+			   lsm->cmp_def) != 0 &&
 	    (!force_recovery ||
 	     vy_run_rebuild_index(run, lsm->env->path,
 				  lsm->space_id, lsm->index_id,
@@ -395,24 +396,27 @@ vy_lsm_recover_slice(struct vy_lsm *lsm, struct vy_range *range,
 		     struct vy_slice_recovery_info *slice_info,
 		     struct vy_run_env *run_env, bool force_recovery)
 {
-	struct tuple *begin = NULL, *end = NULL;
+	struct vy_entry begin = vy_entry_none();
+	struct vy_entry end = vy_entry_none();
 	struct vy_slice *slice = NULL;
 	struct vy_run *run;
 
 	if (slice_info->begin != NULL) {
-		begin = vy_key_from_msgpack(lsm->env->key_format,
-					    slice_info->begin);
-		if (begin == NULL)
+		begin = vy_entry_key_from_msgpack(lsm->env->key_format,
+						  lsm->cmp_def,
+						  slice_info->begin);
+		if (begin.stmt == NULL)
 			goto out;
 	}
 	if (slice_info->end != NULL) {
-		end = vy_key_from_msgpack(lsm->env->key_format,
-					  slice_info->end);
-		if (end == NULL)
+		end = vy_entry_key_from_msgpack(lsm->env->key_format,
+						lsm->cmp_def,
+						slice_info->end);
+		if (end.stmt == NULL)
 			goto out;
 	}
-	if (begin != NULL && end != NULL &&
-	    vy_stmt_compare(begin, end, lsm->cmp_def) >= 0) {
+	if (begin.stmt != NULL && end.stmt != NULL &&
+	    vy_entry_compare(begin, end, lsm->cmp_def) >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("begin >= end for slice %lld",
 				    (long long)slice_info->id));
@@ -430,10 +434,10 @@ vy_lsm_recover_slice(struct vy_lsm *lsm, struct vy_range *range,
 
 	vy_range_add_slice(range, slice);
 out:
-	if (begin != NULL)
-		tuple_unref(begin);
-	if (end != NULL)
-		tuple_unref(end);
+	if (begin.stmt != NULL)
+		tuple_unref(begin.stmt);
+	if (end.stmt != NULL)
+		tuple_unref(end.stmt);
 	return slice;
 }
 
@@ -442,23 +446,26 @@ vy_lsm_recover_range(struct vy_lsm *lsm,
 		     struct vy_range_recovery_info *range_info,
 		     struct vy_run_env *run_env, bool force_recovery)
 {
-	struct tuple *begin = NULL, *end = NULL;
+	struct vy_entry begin = vy_entry_none();
+	struct vy_entry end = vy_entry_none();
 	struct vy_range *range = NULL;
 
 	if (range_info->begin != NULL) {
-		begin = vy_key_from_msgpack(lsm->env->key_format,
-					    range_info->begin);
-		if (begin == NULL)
+		begin = vy_entry_key_from_msgpack(lsm->env->key_format,
+						  lsm->cmp_def,
+						  range_info->begin);
+		if (begin.stmt == NULL)
 			goto out;
 	}
 	if (range_info->end != NULL) {
-		end = vy_key_from_msgpack(lsm->env->key_format,
-					  range_info->end);
-		if (end == NULL)
+		end = vy_entry_key_from_msgpack(lsm->env->key_format,
+						lsm->cmp_def,
+						range_info->end);
+		if (end.stmt == NULL)
 			goto out;
 	}
-	if (begin != NULL && end != NULL &&
-	    vy_stmt_compare(begin, end, lsm->cmp_def) >= 0) {
+	if (begin.stmt != NULL && end.stmt != NULL &&
+	    vy_entry_compare(begin, end, lsm->cmp_def) >= 0) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("begin >= end for range %lld",
 				    (long long)range_info->id));
@@ -485,10 +492,10 @@ vy_lsm_recover_range(struct vy_lsm *lsm,
 	}
 	vy_lsm_add_range(lsm, range);
 out:
-	if (begin != NULL)
-		tuple_unref(begin);
-	if (end != NULL)
-		tuple_unref(end);
+	if (begin.stmt != NULL)
+		tuple_unref(begin.stmt);
+	if (end.stmt != NULL)
+		tuple_unref(end.stmt);
 	return range;
 }
 
@@ -584,8 +591,9 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 		 * We need range tree initialized for all LSM trees,
 		 * even for dropped ones.
 		 */
-		struct vy_range *range = vy_range_new(vy_log_next_id(),
-						      NULL, NULL, lsm->cmp_def);
+		struct vy_range *range;
+		range = vy_range_new(vy_log_next_id(), vy_entry_none(),
+				     vy_entry_none(), lsm->cmp_def);
 		if (range == NULL)
 			return -1;
 		vy_lsm_add_range(lsm, range);
@@ -629,7 +637,7 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 	struct vy_range *range, *prev = NULL;
 	for (range = vy_range_tree_first(&lsm->range_tree); range != NULL;
 	     prev = range, range = vy_range_tree_next(&lsm->range_tree, range)) {
-		if (prev == NULL && range->begin != NULL) {
+		if (prev == NULL && range->begin.stmt != NULL) {
 			diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 				 tt_sprintf("Range %lld is leftmost but "
 					    "starts with a finite key",
@@ -638,9 +646,9 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 		}
 		int cmp = 0;
 		if (prev != NULL &&
-		    (prev->end == NULL || range->begin == NULL ||
-		     (cmp = vy_stmt_compare(prev->end, range->begin,
-					    lsm->cmp_def)) != 0)) {
+		    (prev->end.stmt == NULL || range->begin.stmt == NULL ||
+		     (cmp = vy_entry_compare(prev->end, range->begin,
+					     lsm->cmp_def)) != 0)) {
 			const char *errmsg = cmp > 0 ?
 				"Nearby ranges %lld and %lld overlap" :
 				"Keys between ranges %lld and %lld not spanned";
@@ -659,7 +667,7 @@ vy_lsm_recover(struct vy_lsm *lsm, struct vy_recovery *recovery,
 				    (long long)lsm->id));
 		return -1;
 	}
-	if (prev->end != NULL) {
+	if (prev->end.stmt != NULL) {
 		diag_set(ClientError, ER_INVALID_VYLOG_FILE,
 			 tt_sprintf("Range %lld is rightmost but "
 				    "ends with a finite key",
@@ -873,11 +881,11 @@ vy_lsm_delete_mem(struct vy_lsm *lsm, struct vy_mem *mem)
 
 int
 vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
-	   struct tuple *stmt, struct tuple **region_stmt)
+	   struct vy_entry entry, struct tuple **region_stmt)
 {
-	uint32_t format_id = stmt->format_id;
+	uint32_t format_id = entry.stmt->format_id;
 
-	assert(vy_stmt_is_refable(stmt));
+	assert(vy_stmt_is_refable(entry.stmt));
 	assert(*region_stmt == NULL || !vy_stmt_is_refable(*region_stmt));
 
 	/*
@@ -889,25 +897,27 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
 	 * while other LSM trees still use the old space format.
 	 */
 	if (*region_stmt == NULL || (*region_stmt)->format_id != format_id) {
-		*region_stmt = vy_stmt_dup_lsregion(stmt, &mem->env->allocator,
+		*region_stmt = vy_stmt_dup_lsregion(entry.stmt,
+						    &mem->env->allocator,
 						    mem->generation);
 		if (*region_stmt == NULL)
 			return -1;
 	}
+	entry.stmt = *region_stmt;
 
 	/* We can't free region_stmt below, so let's add it to the stats */
-	lsm->stat.memory.count.bytes += tuple_size(stmt);
+	lsm->stat.memory.count.bytes += tuple_size(entry.stmt);
 
 	/* Abort transaction if format was changed by DDL */
-	if (!vy_stmt_is_key(stmt) &&
+	if (!vy_stmt_is_key(entry.stmt) &&
 	    format_id != tuple_format_id(mem->format)) {
 		diag_set(ClientError, ER_TRANSACTION_CONFLICT);
 		return -1;
 	}
 	if (vy_stmt_type(*region_stmt) != IPROTO_UPSERT)
-		return vy_mem_insert(mem, *region_stmt);
+		return vy_mem_insert(mem, entry);
 	else
-		return vy_mem_insert_upsert(mem, *region_stmt);
+		return vy_mem_insert_upsert(mem, entry);
 }
 
 /**
@@ -918,23 +928,23 @@ vy_lsm_set(struct vy_lsm *lsm, struct vy_mem *mem,
  *
  * @param lsm   LSM tree the statement was committed to.
  * @param mem   In-memory tree where the statement was saved.
- * @param stmt  UPSERT statement to squash.
+ * @param entry UPSERT statement to squash.
  */
 static void
 vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
-		     struct tuple *stmt)
+		     struct vy_entry entry)
 {
-	assert(vy_stmt_type(stmt) == IPROTO_UPSERT);
-	assert(vy_stmt_lsn(stmt) < MAX_LSN);
+	assert(vy_stmt_type(entry.stmt) == IPROTO_UPSERT);
+	assert(vy_stmt_lsn(entry.stmt) < MAX_LSN);
 	/*
 	 * UPSERT is enabled only for the spaces with the single
 	 * index.
 	 */
 	assert(lsm->index_id == 0);
 
-	struct tuple *older;
-	int64_t lsn = vy_stmt_lsn(stmt);
-	uint8_t n_upserts = vy_stmt_n_upserts(stmt);
+	struct vy_entry older;
+	int64_t lsn = vy_stmt_lsn(entry.stmt);
+	uint8_t n_upserts = vy_stmt_n_upserts(entry.stmt);
 	/*
 	 * If there are a lot of successive upserts for the same key,
 	 * select might take too long to squash them all. So once the
@@ -959,20 +969,23 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		 * one-key continous UPSERTs sequence.
 		 */
 #ifndef NDEBUG
-		older = vy_mem_older_lsn(mem, stmt);
-		assert(older != NULL && vy_stmt_type(older) == IPROTO_UPSERT &&
-		       vy_stmt_n_upserts(older) == VY_UPSERT_THRESHOLD - 1);
+		older = vy_mem_older_lsn(mem, entry);
+		assert(older.stmt != NULL &&
+		       vy_stmt_type(older.stmt) == IPROTO_UPSERT &&
+		       vy_stmt_n_upserts(older.stmt) == VY_UPSERT_THRESHOLD - 1);
 #endif
 		if (lsm->env->upsert_thresh_cb == NULL) {
 			/* Squash callback is not installed. */
 			return;
 		}
 
-		struct tuple *dup = vy_stmt_dup(stmt);
-		if (dup != NULL) {
+		struct vy_entry dup;
+		dup.hint = entry.hint;
+		dup.stmt = vy_stmt_dup(entry.stmt);
+		if (dup.stmt != NULL) {
 			lsm->env->upsert_thresh_cb(lsm, dup,
 					lsm->env->upsert_thresh_arg);
-			tuple_unref(dup);
+			tuple_unref(dup.stmt);
 		}
 		/*
 		 * Ignore dup == NULL, because the optimization is
@@ -988,18 +1001,20 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 	if (n_upserts == 0 &&
 	    lsm->stat.memory.count.rows == lsm->mem->count.rows &&
 	    lsm->run_count == 0) {
-		older = vy_mem_older_lsn(mem, stmt);
-		assert(older == NULL || vy_stmt_type(older) != IPROTO_UPSERT);
-		struct tuple *upserted =
-			vy_apply_upsert(stmt, older, lsm->cmp_def, false);
+		older = vy_mem_older_lsn(mem, entry);
+		assert(older.stmt == NULL ||
+		       vy_stmt_type(older.stmt) != IPROTO_UPSERT);
+		struct vy_entry upserted;
+		upserted = vy_entry_apply_upsert(entry, older,
+						lsm->cmp_def, false);
 		lsm->stat.upsert.applied++;
 
-		if (upserted == NULL) {
+		if (upserted.stmt == NULL) {
 			/* OOM */
 			diag_clear(diag_get());
 			return;
 		}
-		int64_t upserted_lsn = vy_stmt_lsn(upserted);
+		int64_t upserted_lsn = vy_stmt_lsn(upserted.stmt);
 		if (upserted_lsn != lsn) {
 			/**
 			 * This could only happen if the upsert completely
@@ -1007,20 +1022,22 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 			 * In this case we shouldn't insert the same replace
 			 * again.
 			 */
-			assert(older == NULL ||
-			       upserted_lsn == vy_stmt_lsn(older));
-			tuple_unref(upserted);
+			assert(older.stmt == NULL ||
+			       upserted_lsn == vy_stmt_lsn(older.stmt));
+			tuple_unref(upserted.stmt);
 			return;
 		}
-		assert(older == NULL || upserted_lsn != vy_stmt_lsn(older));
-		assert(vy_stmt_type(upserted) == IPROTO_REPLACE);
+		assert(older.stmt == NULL ||
+		       upserted_lsn != vy_stmt_lsn(older.stmt));
+		assert(vy_stmt_type(upserted.stmt) == IPROTO_REPLACE);
 
 		struct tuple *region_stmt =
-			vy_stmt_dup_lsregion(upserted, &mem->env->allocator,
+			vy_stmt_dup_lsregion(upserted.stmt,
+					     &mem->env->allocator,
 					     mem->generation);
 		if (region_stmt == NULL) {
 			/* OOM */
-			tuple_unref(upserted);
+			tuple_unref(upserted.stmt);
 			diag_clear(diag_get());
 			return;
 		}
@@ -1032,37 +1049,38 @@ vy_lsm_commit_upsert(struct vy_lsm *lsm, struct vy_mem *mem,
 		 * vy_lsm_set() cannot fail.
 		 */
 		assert(rc == 0); (void)rc;
-		tuple_unref(upserted);
-		vy_mem_commit_stmt(mem, region_stmt);
+		tuple_unref(upserted.stmt);
+		upserted.stmt = region_stmt;
+		vy_mem_commit_stmt(mem, upserted);
 		lsm->stat.upsert.squashed++;
 	}
 }
 
 void
 vy_lsm_commit_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		   struct tuple *stmt)
+		   struct vy_entry entry)
 {
-	vy_mem_commit_stmt(mem, stmt);
+	vy_mem_commit_stmt(mem, entry);
 
 	lsm->stat.memory.count.rows++;
 
-	if (vy_stmt_type(stmt) == IPROTO_UPSERT)
-		vy_lsm_commit_upsert(lsm, mem, stmt);
+	if (vy_stmt_type(entry.stmt) == IPROTO_UPSERT)
+		vy_lsm_commit_upsert(lsm, mem, entry);
 
-	vy_stmt_counter_acct_tuple(&lsm->stat.put, stmt);
+	vy_stmt_counter_acct_tuple(&lsm->stat.put, entry.stmt);
 
 	/* Invalidate cache element. */
-	vy_cache_on_write(&lsm->cache, stmt, NULL);
+	vy_cache_on_write(&lsm->cache, entry, NULL);
 }
 
 void
 vy_lsm_rollback_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
-		     struct tuple *stmt)
+		     struct vy_entry entry)
 {
-	vy_mem_rollback_stmt(mem, stmt);
+	vy_mem_rollback_stmt(mem, entry);
 
 	/* Invalidate cache element. */
-	vy_cache_on_write(&lsm->cache, stmt, NULL);
+	vy_cache_on_write(&lsm->cache, entry, NULL);
 }
 
 int
@@ -1071,20 +1089,20 @@ vy_lsm_find_range_intersection(struct vy_lsm *lsm,
 		struct vy_range **begin, struct vy_range **end)
 {
 	struct tuple_format *key_format = lsm->env->key_format;
-	struct tuple *stmt;
+	struct vy_entry entry;
 
-	stmt = vy_key_from_msgpack(key_format, min_key);
-	if (stmt == NULL)
+	entry = vy_entry_key_from_msgpack(key_format, lsm->cmp_def, min_key);
+	if (entry.stmt == NULL)
 		return -1;
-	*begin = vy_range_tree_psearch(&lsm->range_tree, stmt);
-	tuple_unref(stmt);
+	*begin = vy_range_tree_psearch(&lsm->range_tree, entry);
+	tuple_unref(entry.stmt);
 
-	stmt = vy_key_from_msgpack(key_format, max_key);
-	if (stmt == NULL)
+	entry = vy_entry_key_from_msgpack(key_format, lsm->cmp_def, max_key);
+	if (entry.stmt == NULL)
 		return -1;
-	*end = vy_range_tree_psearch(&lsm->range_tree, stmt);
+	*end = vy_range_tree_psearch(&lsm->range_tree, entry);
 	*end = vy_range_tree_next(&lsm->range_tree, *end);
-	tuple_unref(stmt);
+	tuple_unref(entry.stmt);
 
 	return 0;
 }
@@ -1105,12 +1123,13 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 	/*
 	 * Determine new ranges' boundaries.
 	 */
-	struct tuple *split_key = vy_key_from_msgpack(key_format,
-						      split_key_raw);
-	if (split_key == NULL)
+	struct vy_entry split_key;
+	split_key = vy_entry_key_from_msgpack(key_format, lsm->cmp_def,
+					      split_key_raw);
+	if (split_key.stmt == NULL)
 		goto fail;
 
-	struct tuple *keys[3];
+	struct vy_entry keys[3];
 	keys[0] = range->begin;
 	keys[1] = split_key;
 	keys[2] = range->end;
@@ -1155,12 +1174,12 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 	for (int i = 0; i < n_parts; i++) {
 		part = parts[i];
 		vy_log_insert_range(lsm->id, part->id,
-				    tuple_data_or_null(part->begin),
-				    tuple_data_or_null(part->end));
+				    tuple_data_or_null(part->begin.stmt),
+				    tuple_data_or_null(part->end.stmt));
 		rlist_foreach_entry(slice, &part->slices, in_range)
 			vy_log_insert_slice(part->id, slice->run->id, slice->id,
-					    tuple_data_or_null(slice->begin),
-					    tuple_data_or_null(slice->end));
+					    tuple_data_or_null(slice->begin.stmt),
+					    tuple_data_or_null(slice->end.stmt));
 	}
 	if (vy_log_tx_commit() < 0)
 		goto fail;
@@ -1179,20 +1198,20 @@ vy_lsm_split_range(struct vy_lsm *lsm, struct vy_range *range)
 	lsm->range_tree_version++;
 
 	say_info("%s: split range %s by key %s", vy_lsm_name(lsm),
-		 vy_range_str(range), tuple_str(split_key));
+		 vy_range_str(range), tuple_str(split_key.stmt));
 
 	rlist_foreach_entry(slice, &range->slices, in_range)
 		vy_slice_wait_pinned(slice);
 	vy_range_delete(range);
-	tuple_unref(split_key);
+	tuple_unref(split_key.stmt);
 	return true;
 fail:
 	for (int i = 0; i < n_parts; i++) {
 		if (parts[i] != NULL)
 			vy_range_delete(parts[i]);
 	}
-	if (split_key != NULL)
-		tuple_unref(split_key);
+	if (split_key.stmt != NULL)
+		tuple_unref(split_key.stmt);
 
 	diag_log();
 	say_error("%s: failed to split range %s",
@@ -1221,8 +1240,8 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 	 */
 	vy_log_tx_begin();
 	vy_log_insert_range(lsm->id, result->id,
-			    tuple_data_or_null(result->begin),
-			    tuple_data_or_null(result->end));
+			    tuple_data_or_null(result->begin.stmt),
+			    tuple_data_or_null(result->end.stmt));
 	for (it = first; it != end;
 	     it = vy_range_tree_next(&lsm->range_tree, it)) {
 		struct vy_slice *slice;
@@ -1231,8 +1250,8 @@ vy_lsm_coalesce_range(struct vy_lsm *lsm, struct vy_range *range)
 		vy_log_delete_range(it->id);
 		rlist_foreach_entry(slice, &it->slices, in_range) {
 			vy_log_insert_slice(result->id, slice->run->id, slice->id,
-					    tuple_data_or_null(slice->begin),
-					    tuple_data_or_null(slice->end));
+					    tuple_data_or_null(slice->begin.stmt),
+					    tuple_data_or_null(slice->end.stmt));
 		}
 	}
 	if (vy_log_tx_commit() < 0)

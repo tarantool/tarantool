@@ -43,7 +43,7 @@
 #include "vy_upsert.h"
 
 int
-vy_history_append_stmt(struct vy_history *history, struct tuple *stmt)
+vy_history_append_stmt(struct vy_history *history, struct vy_entry entry)
 {
 	assert(history->pool->objsize == sizeof(struct vy_history_node));
 	struct vy_history_node *node = mempool_alloc(history->pool);
@@ -52,10 +52,10 @@ vy_history_append_stmt(struct vy_history *history, struct tuple *stmt)
 			 "struct vy_history_node");
 		return -1;
 	}
-	node->is_refable = vy_stmt_is_refable(stmt);
+	node->is_refable = vy_stmt_is_refable(entry.stmt);
 	if (node->is_refable)
-		tuple_ref(stmt);
-	node->stmt = stmt;
+		tuple_ref(entry.stmt);
+	node->entry = entry;
 	rlist_add_tail_entry(&history->stmts, node, link);
 	return 0;
 }
@@ -66,7 +66,7 @@ vy_history_cleanup(struct vy_history *history)
 	struct vy_history_node *node, *tmp;
 	rlist_foreach_entry_safe(node, &history->stmts, link, tmp) {
 		if (node->is_refable)
-			tuple_unref(node->stmt);
+			tuple_unref(node->entry.stmt);
 		mempool_free(history->pool, node);
 	}
 	rlist_create(&history->stmts);
@@ -74,41 +74,45 @@ vy_history_cleanup(struct vy_history *history)
 
 int
 vy_history_apply(struct vy_history *history, struct key_def *cmp_def,
-		 bool keep_delete, int *upserts_applied, struct tuple **ret)
+		 bool keep_delete, int *upserts_applied, struct vy_entry *ret)
 {
-	*ret = NULL;
+	*ret = vy_entry_none();
 	*upserts_applied = 0;
 	if (rlist_empty(&history->stmts))
 		return 0;
 
-	struct tuple *curr_stmt = NULL;
+	struct vy_entry curr = vy_entry_none();
 	struct vy_history_node *node = rlist_last_entry(&history->stmts,
 					struct vy_history_node, link);
 	if (vy_history_is_terminal(history)) {
-		if (!keep_delete && vy_stmt_type(node->stmt) == IPROTO_DELETE) {
+		if (!keep_delete &&
+		    vy_stmt_type(node->entry.stmt) == IPROTO_DELETE) {
 			/*
 			 * Ignore terminal delete unless the caller
 			 * explicitly asked to keep it.
 			 */
 		} else if (!node->is_refable) {
-			curr_stmt = vy_stmt_dup(node->stmt);
+			curr.hint = node->entry.hint;
+			curr.stmt = vy_stmt_dup(node->entry.stmt);
+			if (curr.stmt == NULL)
+				return -1;
 		} else {
-			curr_stmt = node->stmt;
-			tuple_ref(curr_stmt);
+			curr = node->entry;
+			tuple_ref(curr.stmt);
 		}
 		node = rlist_prev_entry_safe(node, &history->stmts, link);
 	}
 	while (node != NULL) {
-		struct tuple *stmt = vy_apply_upsert(node->stmt, curr_stmt,
-						     cmp_def, true);
+		struct vy_entry entry = vy_entry_apply_upsert(node->entry, curr,
+							      cmp_def, true);
 		++*upserts_applied;
-		if (curr_stmt != NULL)
-			tuple_unref(curr_stmt);
-		if (stmt == NULL)
+		if (curr.stmt != NULL)
+			tuple_unref(curr.stmt);
+		if (entry.stmt == NULL)
 			return -1;
-		curr_stmt = stmt;
+		curr = entry;
 		node = rlist_prev_entry_safe(node, &history->stmts, link);
 	}
-	*ret = curr_stmt;
+	*ret = curr;
 	return 0;
 }

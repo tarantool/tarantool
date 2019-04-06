@@ -26,30 +26,34 @@ test_basic(void)
 	};
 
 	/* Check dump lsn */
-	struct tuple *stmt = vy_mem_insert_template(mem, &stmts[0]);
+	struct vy_entry entry = vy_mem_insert_template(mem, &stmts[0]);
 	is(mem->dump_lsn, -1, "mem->dump_lsn after prepare");
-	vy_mem_commit_stmt(mem, stmt);
+	vy_mem_commit_stmt(mem, entry);
 	is(mem->dump_lsn, 100, "mem->dump_lsn after commit");
 
 	/* Check vy_mem_older_lsn */
-	struct tuple *older = stmt;
-	stmt = vy_mem_insert_template(mem, &stmts[1]);
-	is(vy_mem_older_lsn(mem, stmt), older, "vy_mem_older_lsn 1");
-	is(vy_mem_older_lsn(mem, older), NULL, "vy_mem_older_lsn 2");
-	vy_mem_commit_stmt(mem, stmt);
+	struct vy_entry older = entry;
+	entry = vy_mem_insert_template(mem, &stmts[1]);
+	ok(vy_entry_is_equal(vy_mem_older_lsn(mem, entry), older),
+	   "vy_mem_older_lsn 1");
+	ok(vy_entry_is_equal(vy_mem_older_lsn(mem, older), vy_entry_none()),
+	   "vy_mem_older_lsn 2");
+	vy_mem_commit_stmt(mem, entry);
 
 	/* Check rollback  */
-	struct tuple *olderolder = stmt;
+	struct vy_entry olderolder = entry;
 	older = vy_mem_insert_template(mem, &stmts[2]);
-	stmt = vy_mem_insert_template(mem, &stmts[3]);
-	is(vy_mem_older_lsn(mem, stmt), older, "vy_mem_rollback 1");
+	entry = vy_mem_insert_template(mem, &stmts[3]);
+	ok(vy_entry_is_equal(vy_mem_older_lsn(mem, entry), older),
+	   "vy_mem_rollback 1");
 	vy_mem_rollback_stmt(mem, older);
-	is(vy_mem_older_lsn(mem, stmt), olderolder, "vy_mem_rollback 2");
+	ok(vy_entry_is_equal(vy_mem_older_lsn(mem, entry), olderolder),
+	   "vy_mem_rollback 2");
 
 	/* Check version  */
-	stmt = vy_mem_insert_template(mem, &stmts[4]);
+	entry = vy_mem_insert_template(mem, &stmts[4]);
 	is(mem->version, 8, "vy_mem->version")
-	vy_mem_commit_stmt(mem, stmt);
+	vy_mem_commit_stmt(mem, entry);
 	is(mem->version, 9, "vy_mem->version")
 
 	/* Clean up */
@@ -86,7 +90,8 @@ test_iterator_restore_after_insertion()
 	struct slab_cache *slab_cache = cord_slab_cache();
 	lsregion_create(&lsregion, slab_cache->arena);
 
-	struct tuple *select_key = vy_key_new(stmt_env.key_format, NULL, 0);
+	struct vy_entry select_key = vy_entry_key_new(stmt_env.key_format,
+						      key_def, NULL, 0);
 
 	struct mempool history_node_pool;
 	mempool_create(&history_node_pool, cord_slab_cache(),
@@ -98,13 +103,18 @@ test_iterator_restore_after_insertion()
 	char *end = data;
 	end = mp_encode_array(end, 1);
 	end = mp_encode_uint(end, restore_on_value);
-	struct tuple *restore_on_key = vy_stmt_new_replace(format, data, end);
-	vy_stmt_set_lsn(restore_on_key, 100);
+	struct vy_entry restore_on_key;
+	restore_on_key.stmt = vy_stmt_new_replace(format, data, end);
+	restore_on_key.hint = vy_stmt_hint(restore_on_key.stmt, key_def);
+	vy_stmt_set_lsn(restore_on_key.stmt, 100);
 	end = data;
 	end = mp_encode_array(end, 1);
 	end = mp_encode_uint(end, restore_on_value_reverse);
-	struct tuple *restore_on_key_reverse = vy_stmt_new_replace(format, data, end);
-	vy_stmt_set_lsn(restore_on_key_reverse, 100);
+	struct vy_entry restore_on_key_reverse;
+	restore_on_key_reverse.stmt = vy_stmt_new_replace(format, data, end);
+	restore_on_key_reverse.hint = vy_stmt_hint(restore_on_key_reverse.stmt,
+						   key_def);
+	vy_stmt_set_lsn(restore_on_key_reverse.stmt, 100);
 
 	bool wrong_output = false;
 	int i_fail = 0;
@@ -189,22 +199,22 @@ test_iterator_restore_after_insertion()
 		vy_mem_iterator_open(&itr, &stats, mem,
 				     direct ? ITER_GE : ITER_LE, select_key,
 				     &prv);
-		struct tuple *t;
+		struct vy_entry e;
 		struct vy_history history;
 		vy_history_create(&history, &history_node_pool);
 		int rc = vy_mem_iterator_next(&itr, &history);
-		t = vy_history_last_stmt(&history);
+		e = vy_history_last_stmt(&history);
 		assert(rc == 0);
 		size_t j = 0;
-		while (t != NULL) {
+		while (e.stmt != NULL) {
 			if (j >= expected_count) {
 				wrong_output = true;
 				break;
 			}
 			uint32_t val = 42;
-			tuple_field_u32(t, 0, &val);
+			tuple_field_u32(e.stmt, 0, &val);
 			if (val != expected_values[j] ||
-			    vy_stmt_lsn(t) != expected_lsns[j]) {
+			    vy_stmt_lsn(e.stmt) != expected_lsns[j]) {
 				wrong_output = true;
 				break;
 			}
@@ -214,10 +224,10 @@ test_iterator_restore_after_insertion()
 			else if(!direct && val <= middle_value)
 				break;
 			int rc = vy_mem_iterator_next(&itr, &history);
-			t = vy_history_last_stmt(&history);
+			e = vy_history_last_stmt(&history);
 			assert(rc == 0);
 		}
-		if (t == NULL && j != expected_count)
+		if (e.stmt == NULL && j != expected_count)
 			wrong_output = true;
 		if (wrong_output) {
 			i_fail = i;
@@ -269,24 +279,24 @@ test_iterator_restore_after_insertion()
 			rc = vy_mem_iterator_restore(&itr, restore_on_key, &history);
 		else
 			rc = vy_mem_iterator_restore(&itr, restore_on_key_reverse, &history);
-		t = vy_history_last_stmt(&history);
+		e = vy_history_last_stmt(&history);
 
 		j = 0;
-		while (t != NULL) {
+		while (e.stmt != NULL) {
 			if (j >= expected_count) {
 				wrong_output = true;
 				break;
 			}
 			uint32_t val = 42;
-			tuple_field_u32(t, 0, &val);
+			tuple_field_u32(e.stmt, 0, &val);
 			if (val != expected_values[j] ||
-			    vy_stmt_lsn(t) != expected_lsns[j]) {
+			    vy_stmt_lsn(e.stmt) != expected_lsns[j]) {
 				wrong_output = true;
 				break;
 			}
 			j++;
 			int rc = vy_mem_iterator_next(&itr, &history);
-			t = vy_history_last_stmt(&history);
+			e = vy_history_last_stmt(&history);
 			assert(rc == 0);
 		}
 		if (j != expected_count)
@@ -306,9 +316,9 @@ test_iterator_restore_after_insertion()
 	/* Clean up */
 	mempool_destroy(&history_node_pool);
 
-	tuple_unref(select_key);
-	tuple_unref(restore_on_key);
-	tuple_unref(restore_on_key_reverse);
+	tuple_unref(select_key.stmt);
+	tuple_unref(restore_on_key.stmt);
+	tuple_unref(restore_on_key_reverse.stmt);
 
 	tuple_format_unref(format);
 	lsregion_destroy(&lsregion);

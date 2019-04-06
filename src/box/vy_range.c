@@ -57,31 +57,31 @@ vy_range_tree_cmp(struct vy_range *range_a, struct vy_range *range_b)
 		return 0;
 
 	/* Any key > -inf. */
-	if (range_a->begin == NULL)
+	if (range_a->begin.stmt == NULL)
 		return -1;
-	if (range_b->begin == NULL)
+	if (range_b->begin.stmt == NULL)
 		return 1;
 
 	assert(range_a->cmp_def == range_b->cmp_def);
-	return vy_stmt_compare(range_a->begin, range_b->begin,
-			       range_a->cmp_def);
+	return vy_entry_compare(range_a->begin, range_b->begin,
+				range_a->cmp_def);
 }
 
 int
-vy_range_tree_key_cmp(struct tuple *stmt, struct vy_range *range)
+vy_range_tree_key_cmp(struct vy_entry entry, struct vy_range *range)
 {
 	/* Any key > -inf. */
-	if (range->begin == NULL)
+	if (range->begin.stmt == NULL)
 		return 1;
-	return vy_stmt_compare(stmt, range->begin, range->cmp_def);
+	return vy_entry_compare(entry, range->begin, range->cmp_def);
 }
 
 struct vy_range *
 vy_range_tree_find_by_key(vy_range_tree_t *tree,
 			  enum iterator_type iterator_type,
-			  struct tuple *key)
+			  struct vy_entry key)
 {
-	if (vy_stmt_is_empty_key(key)) {
+	if (vy_stmt_is_empty_key(key.stmt)) {
 		switch (iterator_type) {
 		case ITER_LT:
 		case ITER_LE:
@@ -123,9 +123,9 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		 */
 		range = vy_range_tree_psearch(tree, key);
 		/* switch to previous for case (4) */
-		if (range != NULL && range->begin != NULL &&
-		    !vy_stmt_is_full_key(key, range->cmp_def) &&
-		    vy_stmt_compare(key, range->begin, range->cmp_def) == 0)
+		if (range != NULL && range->begin.stmt != NULL &&
+		    !vy_stmt_is_full_key(key.stmt, range->cmp_def) &&
+		    vy_entry_compare(key, range->begin, range->cmp_def) == 0)
 			range = vy_range_tree_prev(tree, range);
 		/* for case 5 or subcase of case 4 */
 		if (range == NULL)
@@ -158,9 +158,9 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 		range = vy_range_tree_nsearch(tree, key);
 		if (range != NULL) {
 			/* fix curr_range for cases 2 and 3 */
-			if (range->begin != NULL &&
-			    vy_stmt_compare(key, range->begin,
-					    range->cmp_def) != 0) {
+			if (range->begin.stmt != NULL &&
+			    vy_entry_compare(key, range->begin,
+					     range->cmp_def) != 0) {
 				struct vy_range *prev;
 				prev = vy_range_tree_prev(tree, range);
 				if (prev != NULL)
@@ -175,7 +175,7 @@ vy_range_tree_find_by_key(vy_range_tree_t *tree,
 }
 
 struct vy_range *
-vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
+vy_range_new(int64_t id, struct vy_entry begin, struct vy_entry end,
 	     struct key_def *cmp_def)
 {
 	struct vy_range *range = calloc(1, sizeof(*range));
@@ -185,14 +185,12 @@ vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
 		return NULL;
 	}
 	range->id = id;
-	if (begin != NULL) {
-		tuple_ref(begin);
-		range->begin = begin;
-	}
-	if (end != NULL) {
-		tuple_ref(end);
-		range->end = end;
-	}
+	range->begin = begin;
+	if (begin.stmt != NULL)
+		tuple_ref(begin.stmt);
+	range->end = end;
+	if (end.stmt != NULL)
+		tuple_ref(end.stmt);
 	range->cmp_def = cmp_def;
 	rlist_create(&range->slices);
 	heap_node_create(&range->heap_node);
@@ -202,10 +200,10 @@ vy_range_new(int64_t id, struct tuple *begin, struct tuple *end,
 void
 vy_range_delete(struct vy_range *range)
 {
-	if (range->begin != NULL)
-		tuple_unref(range->begin);
-	if (range->end != NULL)
-		tuple_unref(range->end);
+	if (range->begin.stmt != NULL)
+		tuple_unref(range->begin.stmt);
+	if (range->end.stmt != NULL)
+		tuple_unref(range->end.stmt);
 
 	struct vy_slice *slice, *next_slice;
 	rlist_foreach_entry_safe(slice, &range->slices, in_range, next_slice)
@@ -220,13 +218,13 @@ vy_range_snprint(char *buf, int size, const struct vy_range *range)
 {
 	int total = 0;
 	SNPRINT(total, snprintf, buf, size, "(");
-	if (range->begin != NULL)
-		SNPRINT(total, tuple_snprint, buf, size, range->begin);
+	if (range->begin.stmt != NULL)
+		SNPRINT(total, tuple_snprint, buf, size, range->begin.stmt);
 	else
 		SNPRINT(total, snprintf, buf, size, "-inf");
 	SNPRINT(total, snprintf, buf, size, "..");
-	if (range->end != NULL)
-		SNPRINT(total, tuple_snprint, buf, size, range->end);
+	if (range->end.stmt != NULL)
+		SNPRINT(total, tuple_snprint, buf, size, range->end.stmt);
 	else
 		SNPRINT(total, snprintf, buf, size, "inf");
 	SNPRINT(total, snprintf, buf, size, ")");
@@ -499,16 +497,19 @@ vy_range_needs_split(struct vy_range *range, int64_t range_size,
 	 *
 	 * In such cases there's no point in splitting the range.
 	 */
-	if (slice->begin != NULL && key_compare(mid_page->min_key,
-			tuple_data(slice->begin), range->cmp_def) <= 0)
+	if (slice->begin.stmt != NULL &&
+	    vy_entry_compare_with_raw_key(slice->begin, mid_page->min_key,
+					  mid_page->min_key_hint,
+					  range->cmp_def) >= 0)
 		return false;
 	/*
 	 * The median key can't be >= the end of the slice as we
 	 * take the min key of a page for the median key.
 	 */
-	assert(slice->end == NULL || key_compare(mid_page->min_key,
-			tuple_data(slice->end), range->cmp_def) < 0);
-
+	assert(slice->end.stmt == NULL ||
+	       vy_entry_compare_with_raw_key(slice->end, mid_page->min_key,
+					     mid_page->min_key_hint,
+					     range->cmp_def) > 0);
 	*p_split_key = mid_page->min_key;
 	return true;
 }

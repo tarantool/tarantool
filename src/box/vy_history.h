@@ -43,9 +43,6 @@ extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct mempool;
-struct key_def;
-struct tuple;
-struct tuple_format;
 
 /** Key history. */
 struct vy_history {
@@ -63,7 +60,7 @@ struct vy_history_node {
 	/** Link in a history list. */
 	struct rlist link;
 	/** History statement. Referenced if @is_refable is set. */
-	struct tuple *stmt;
+	struct vy_entry entry;
 	/**
 	 * Set if the statement stored in this node is refable,
 	 * i.e. has a reference counter that can be incremented
@@ -102,26 +99,26 @@ vy_history_is_terminal(struct vy_history *history)
 		return false;
 	struct vy_history_node *node = rlist_last_entry(&history->stmts,
 					struct vy_history_node, link);
-	assert(vy_stmt_type(node->stmt) == IPROTO_REPLACE ||
-	       vy_stmt_type(node->stmt) == IPROTO_DELETE ||
-	       vy_stmt_type(node->stmt) == IPROTO_INSERT ||
-	       vy_stmt_type(node->stmt) == IPROTO_UPSERT);
-	return vy_stmt_type(node->stmt) != IPROTO_UPSERT;
+	assert(vy_stmt_type(node->entry.stmt) == IPROTO_REPLACE ||
+	       vy_stmt_type(node->entry.stmt) == IPROTO_DELETE ||
+	       vy_stmt_type(node->entry.stmt) == IPROTO_INSERT ||
+	       vy_stmt_type(node->entry.stmt) == IPROTO_UPSERT);
+	return vy_stmt_type(node->entry.stmt) != IPROTO_UPSERT;
 }
 
 /**
  * Return the last (newest, having max LSN) statement of the given
  * key history or NULL if the history is empty.
  */
-static inline struct tuple *
+static inline struct vy_entry
 vy_history_last_stmt(struct vy_history *history)
 {
 	if (rlist_empty(&history->stmts))
-		return NULL;
+		return vy_entry_none();
 	/* Newest statement is at the head of the list. */
 	struct vy_history_node *node = rlist_first_entry(&history->stmts,
 					struct vy_history_node, link);
-	return node->stmt;
+	return node->entry;
 }
 
 /**
@@ -139,7 +136,7 @@ vy_history_splice(struct vy_history *dst, struct vy_history *src)
  * Returns 0 on success, -1 on memory allocation error.
  */
 int
-vy_history_append_stmt(struct vy_history *history, struct tuple *stmt);
+vy_history_append_stmt(struct vy_history *history, struct vy_entry entry);
 
 /**
  * Release all statements stored in the given history and
@@ -155,7 +152,7 @@ vy_history_cleanup(struct vy_history *history);
  */
 int
 vy_history_apply(struct vy_history *history, struct key_def *cmp_def,
-		 bool keep_delete, int *upserts_applied, struct tuple **ret);
+		 bool keep_delete, int *upserts_applied, struct vy_entry *ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */

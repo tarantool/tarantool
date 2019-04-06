@@ -79,7 +79,7 @@ vy_mem_env_destroy(struct vy_mem_env *env);
 /** @cond false */
 
 struct vy_mem_tree_key {
-	struct tuple *stmt;
+	struct vy_entry entry;
 	int64_t lsn;
 };
 
@@ -87,13 +87,13 @@ struct vy_mem_tree_key {
  * Internal. Extracted to speed up BPS tree.
  */
 static int
-vy_mem_tree_cmp(struct tuple *a, struct tuple *b,
+vy_mem_tree_cmp(struct vy_entry a, struct vy_entry b,
 		struct key_def *cmp_def)
 {
-	int res = vy_stmt_compare(a, b, cmp_def);
+	int res = vy_entry_compare(a, b, cmp_def);
 	if (res)
 		return res;
-	int64_t a_lsn = vy_stmt_lsn(a), b_lsn = vy_stmt_lsn(b);
+	int64_t a_lsn = vy_stmt_lsn(a.stmt), b_lsn = vy_stmt_lsn(b.stmt);
 	return a_lsn > b_lsn ? -1 : a_lsn < b_lsn;
 }
 
@@ -101,14 +101,14 @@ vy_mem_tree_cmp(struct tuple *a, struct tuple *b,
  * Internal. Extracted to speed up BPS tree.
  */
 static int
-vy_mem_tree_cmp_key(struct tuple *a, struct vy_mem_tree_key *key,
+vy_mem_tree_cmp_key(struct vy_entry entry, struct vy_mem_tree_key *key,
 		    struct key_def *cmp_def)
 {
-	int res = vy_stmt_compare(a, key->stmt, cmp_def);
+	int res = vy_entry_compare(entry, key->entry, cmp_def);
 	if (res == 0) {
 		if (key->lsn == INT64_MAX - 1)
 			return 0;
-		int64_t a_lsn = vy_stmt_lsn(a);
+		int64_t a_lsn = vy_stmt_lsn(entry.stmt);
 		res = a_lsn > key->lsn ? -1 : a_lsn < key->lsn;
 	}
 	return res;
@@ -121,7 +121,7 @@ vy_mem_tree_cmp_key(struct tuple *a, struct vy_mem_tree_key *key,
 #define BPS_TREE_EXTENT_SIZE VY_MEM_TREE_EXTENT_SIZE
 #define BPS_TREE_COMPARE(a, b, cmp_def) vy_mem_tree_cmp(a, b, cmp_def)
 #define BPS_TREE_COMPARE_KEY(a, b, cmp_def) vy_mem_tree_cmp_key(a, b, cmp_def)
-#define bps_tree_elem_t struct tuple *
+#define bps_tree_elem_t struct vy_entry
 #define bps_tree_key_t struct vy_mem_tree_key *
 #define bps_tree_arg_t struct key_def *
 #define BPS_TREE_NO_DEBUG
@@ -275,47 +275,47 @@ vy_mem_delete(struct vy_mem *index);
 /*
  * Return the older statement for the given one.
  */
-struct tuple *
-vy_mem_older_lsn(struct vy_mem *mem, struct tuple *stmt);
+struct vy_entry
+vy_mem_older_lsn(struct vy_mem *mem, struct vy_entry entry);
 
 /**
  * Insert a statement into the in-memory level.
  * @param mem        vy_mem.
- * @param stmt       Vinyl statement.
+ * @param entry      Vinyl statement.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 int
-vy_mem_insert(struct vy_mem *mem, struct tuple *stmt);
+vy_mem_insert(struct vy_mem *mem, struct vy_entry entry);
 
 /**
  * Insert an upsert statement into the mem.
  *
  * @param mem Mem to insert to.
- * @param stmt Upsert statement to insert.
+ * @param entry Upsert statement to insert.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
  */
 int
-vy_mem_insert_upsert(struct vy_mem *mem, struct tuple *stmt);
+vy_mem_insert_upsert(struct vy_mem *mem, struct vy_entry entry);
 
 /**
  * Confirm insertion of a statement into the in-memory level.
  * @param mem        vy_mem.
- * @param stmt       Vinyl statement.
+ * @param entry      Vinyl statement.
  */
 void
-vy_mem_commit_stmt(struct vy_mem *mem, struct tuple *stmt);
+vy_mem_commit_stmt(struct vy_mem *mem, struct vy_entry entry);
 
 /**
  * Remove a statement from the in-memory level.
  * @param mem        vy_mem.
- * @param stmt       Vinyl statement.
+ * @param entry      Vinyl statement.
  */
 void
-vy_mem_rollback_stmt(struct vy_mem *mem, struct tuple *stmt);
+vy_mem_rollback_stmt(struct vy_mem *mem, struct vy_entry entry);
 
 /**
  * Iterator for in-memory level.
@@ -345,7 +345,7 @@ struct vy_mem_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Key to search. */
-	struct tuple *key;
+	struct vy_entry key;
 	/* LSN visibility, iterator shows values with lsn <= than that */
 	const struct vy_read_view **read_view;
 
@@ -354,11 +354,11 @@ struct vy_mem_iterator {
 	struct vy_mem_tree_iterator curr_pos;
 	/*
 	 * The pointer on a region allocated statement from vy_mem BPS tree.
-	 * There is no guarantee that curr_pos points on curr_stmt in the tree.
-	 * For example, cur_pos can be invalid but curr_stmt can point on a
+	 * There is no guarantee that curr_pos points on curr in the tree.
+	 * For example, cur_pos can be invalid but curr can point on a
 	 * valid statement.
 	 */
-	struct tuple *curr_stmt;
+	struct vy_entry curr;
 	/* data version from vy_mem */
 	uint32_t version;
 
@@ -372,7 +372,7 @@ struct vy_mem_iterator {
 void
 vy_mem_iterator_open(struct vy_mem_iterator *itr, struct vy_mem_iterator_stat *stat,
 		     struct vy_mem *mem, enum iterator_type iterator_type,
-		     struct tuple *key, const struct vy_read_view **rv);
+		     struct vy_entry key, const struct vy_read_view **rv);
 
 /**
  * Advance a mem iterator to the next key.
@@ -384,24 +384,22 @@ vy_mem_iterator_next(struct vy_mem_iterator *itr,
 		     struct vy_history *history);
 
 /**
- * Advance a mem iterator to the key following @last_stmt.
+ * Advance a mem iterator to the key following @last.
  * The key history is returned in @history (empty if EOF).
  * Returns 0 on success, -1 on memory allocation error.
  */
 NODISCARD int
-vy_mem_iterator_skip(struct vy_mem_iterator *itr,
-		     struct tuple *last_stmt,
+vy_mem_iterator_skip(struct vy_mem_iterator *itr, struct vy_entry last,
 		     struct vy_history *history);
 
 /**
  * Check if a mem iterator was invalidated and needs to be restored.
  * If it does, set the iterator position to the newest statement for
- * the key following @last_stmt and return 1, otherwise return 0.
+ * the key following @last and return 1, otherwise return 0.
  * Returns -1 on memory allocation error.
  */
 NODISCARD int
-vy_mem_iterator_restore(struct vy_mem_iterator *itr,
-			struct tuple *last_stmt,
+vy_mem_iterator_restore(struct vy_mem_iterator *itr, struct vy_entry last,
 			struct vy_history *history);
 
 /**

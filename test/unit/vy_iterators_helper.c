@@ -37,12 +37,12 @@ vy_iterator_C_test_finish()
 	memory_free();
 }
 
-struct tuple *
-vy_new_simple_stmt(struct tuple_format *format,
+struct vy_entry
+vy_new_simple_stmt(struct tuple_format *format, struct key_def *key_def,
 		   const struct vy_stmt_template *templ)
 {
 	if (templ == NULL)
-		return NULL;
+		return vy_entry_none();
 	/* Calculate binary size. */
 	int i = 0;
 	size_t size = 0;
@@ -127,22 +127,27 @@ vy_new_simple_stmt(struct tuple_format *format,
 	free(buf);
 	vy_stmt_set_lsn(ret, templ->lsn);
 	vy_stmt_set_flags(ret, templ->flags);
-	return ret;
+	struct vy_entry entry;
+	entry.stmt = ret;
+	entry.hint = vy_stmt_hint(ret, key_def);
+	return entry;
 }
 
-struct tuple *
+struct vy_entry
 vy_mem_insert_template(struct vy_mem *mem, const struct vy_stmt_template *templ)
 {
-	struct tuple *stmt = vy_new_simple_stmt(mem->format, templ);
-	struct tuple *region_stmt = vy_stmt_dup_lsregion(stmt,
+	struct vy_entry entry = vy_new_simple_stmt(mem->format,
+						   mem->cmp_def, templ);
+	struct tuple *region_stmt = vy_stmt_dup_lsregion(entry.stmt,
 			&mem->env->allocator, mem->generation);
 	assert(region_stmt != NULL);
-	tuple_unref(stmt);
+	tuple_unref(entry.stmt);
+	entry.stmt = region_stmt;
 	if (templ->type == IPROTO_UPSERT)
-		vy_mem_insert_upsert(mem, region_stmt);
+		vy_mem_insert_upsert(mem, entry);
 	else
-		vy_mem_insert(mem, region_stmt);
-	return region_stmt;
+		vy_mem_insert(mem, entry);
+	return entry;
 }
 
 void
@@ -153,30 +158,32 @@ vy_cache_insert_templates_chain(struct vy_cache *cache,
 				const struct vy_stmt_template *key_templ,
 				enum iterator_type order)
 {
-	struct tuple *key = vy_new_simple_stmt(format, key_templ);
-	struct tuple *prev_stmt = NULL;
-	struct tuple *stmt = NULL;
+	struct vy_entry key = vy_new_simple_stmt(format, cache->cmp_def,
+						 key_templ);
+	struct vy_entry prev_entry = vy_entry_none();
+	struct vy_entry entry = vy_entry_none();
 
 	for (uint i = 0; i < length; ++i) {
-		stmt = vy_new_simple_stmt(format, &chain[i]);
-		vy_cache_add(cache, stmt, prev_stmt, key, order);
+		entry = vy_new_simple_stmt(format, cache->cmp_def, &chain[i]);
+		vy_cache_add(cache, entry, prev_entry, key, order);
 		if (i != 0)
-			tuple_unref(prev_stmt);
-		prev_stmt = stmt;
-		stmt = NULL;
+			tuple_unref(prev_entry.stmt);
+		prev_entry = entry;
+		entry = vy_entry_none();
 	}
-	tuple_unref(key);
-	if (prev_stmt != NULL)
-		tuple_unref(prev_stmt);
+	tuple_unref(key.stmt);
+	if (prev_entry.stmt != NULL)
+		tuple_unref(prev_entry.stmt);
 }
 
 void
 vy_cache_on_write_template(struct vy_cache *cache, struct tuple_format *format,
 			   const struct vy_stmt_template *templ)
 {
-	struct tuple *written = vy_new_simple_stmt(format, templ);
+	struct vy_entry written = vy_new_simple_stmt(format, cache->cmp_def,
+						     templ);
 	vy_cache_on_write(cache, written, NULL);
-	tuple_unref(written);
+	tuple_unref(written.stmt);
 }
 
 void
@@ -226,39 +233,43 @@ destroy_test_cache(struct vy_cache *cache, struct key_def *def,
 }
 
 bool
-vy_stmt_are_same(struct tuple *actual,
+vy_stmt_are_same(struct vy_entry actual,
 		 const struct vy_stmt_template *expected,
-		 struct tuple_format *format)
+		 struct tuple_format *format, struct key_def *key_def)
 {
-	if (vy_stmt_type(actual) != expected->type)
+	if (vy_stmt_type(actual.stmt) != expected->type)
 		return false;
-	struct tuple *tmp = vy_new_simple_stmt(format, expected);
-	fail_if(tmp == NULL);
+	struct vy_entry tmp = vy_new_simple_stmt(format, key_def, expected);
+	fail_if(tmp.stmt == NULL);
+	if (actual.hint != tmp.hint) {
+		tuple_unref(tmp.stmt);
+		return false;
+	}
 	uint32_t a_len, b_len;
 	const char *a, *b;
-	if (vy_stmt_type(actual) == IPROTO_UPSERT) {
-		a = vy_upsert_data_range(actual, &a_len);
+	if (vy_stmt_type(actual.stmt) == IPROTO_UPSERT) {
+		a = vy_upsert_data_range(actual.stmt, &a_len);
 	} else {
-		a = tuple_data_range(actual, &a_len);
+		a = tuple_data_range(actual.stmt, &a_len);
 	}
-	if (vy_stmt_type(tmp) == IPROTO_UPSERT) {
-		b = vy_upsert_data_range(tmp, &b_len);
+	if (vy_stmt_type(tmp.stmt) == IPROTO_UPSERT) {
+		b = vy_upsert_data_range(tmp.stmt, &b_len);
 	} else {
-		b = tuple_data_range(tmp, &b_len);
+		b = tuple_data_range(tmp.stmt, &b_len);
 	}
 	if (a_len != b_len) {
-		tuple_unref(tmp);
+		tuple_unref(tmp.stmt);
 		return false;
 	}
-	if (vy_stmt_lsn(actual) != expected->lsn) {
-		tuple_unref(tmp);
+	if (vy_stmt_lsn(actual.stmt) != expected->lsn) {
+		tuple_unref(tmp.stmt);
 		return false;
 	}
-	if (vy_stmt_flags(actual) != expected->flags) {
-		tuple_unref(tmp);
+	if (vy_stmt_flags(actual.stmt) != expected->flags) {
+		tuple_unref(tmp.stmt);
 		return false;
 	}
 	bool rc = memcmp(a, b, a_len) == 0;
-	tuple_unref(tmp);
+	tuple_unref(tmp.stmt);
 	return rc;
 }

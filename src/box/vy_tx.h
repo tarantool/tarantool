@@ -42,6 +42,7 @@
 #include "iterator_type.h"
 #include "salad/stailq.h"
 #include "trivia/util.h"
+#include "vy_entry.h"
 #include "vy_lsm.h"
 #include "vy_stat.h"
 #include "vy_read_set.h"
@@ -83,7 +84,7 @@ struct txv {
 	/** In-memory tree to insert the statement into. */
 	struct vy_mem *mem;
 	/** Statement of this operation. */
-	struct tuple *stmt;
+	struct vy_entry entry;
 	/** Statement allocated on vy_mem->allocator. */
 	struct tuple *region_stmt;
 	/** Mask of columns modified by this operation. */
@@ -114,7 +115,7 @@ struct txv {
  */
 struct write_set_key {
 	struct vy_lsm *lsm;
-	struct tuple *stmt;
+	struct vy_entry entry;
 };
 
 int
@@ -128,9 +129,9 @@ rb_gen_ext_key(MAYBE_UNUSED static inline, write_set_, write_set_t, struct txv,
 
 static inline struct txv *
 write_set_search_key(write_set_t *tree, struct vy_lsm *lsm,
-		     struct tuple *stmt)
+		     struct vy_entry entry)
 {
-	struct write_set_key key = { .lsm = lsm, .stmt = stmt };
+	struct write_set_key key = { .lsm = lsm, .entry = entry };
 	return write_set_search(tree, &key);
 }
 
@@ -369,15 +370,15 @@ vy_tx_rollback_statement(struct vy_tx *tx, void *svp);
  */
 int
 vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
-	    struct tuple *left, bool left_belongs,
-	    struct tuple *right, bool right_belongs);
+	    struct vy_entry left, bool left_belongs,
+	    struct vy_entry right, bool right_belongs);
 
 /**
  * Remember a point read in the conflict manager index.
  *
  * @param tx    Transaction that invoked the read.
  * @param lsm   LSM tree that was read from.
- * @param stmt  Key that was read.
+ * @param entry Key that was read.
  *
  * @retval  0 Success.
  * @retval -1 Memory error.
@@ -389,12 +390,12 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
  * transaction read it from its own write set.
  */
 int
-vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
+vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry);
 
 /** Add a statement to a transaction. */
 int
 vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm,
-	  struct tuple *stmt, uint64_t column_mask);
+	  struct vy_entry entry, uint64_t column_mask);
 
 /**
  * Iterator over the write set of a transaction.
@@ -414,7 +415,7 @@ struct vy_txw_iterator {
 	 */
 	enum iterator_type iterator_type;
 	/** Search key. */
-	struct tuple *key;
+	struct vy_entry key;
 	/* Last seen value of the write set version. */
 	uint32_t version;
 	/* Current position in the write set. */
@@ -430,7 +431,7 @@ void
 vy_txw_iterator_open(struct vy_txw_iterator *itr,
 		     struct vy_txw_iterator_stat *stat,
 		     struct vy_tx *tx, struct vy_lsm *lsm,
-		     enum iterator_type iterator_type, struct tuple *key);
+		     enum iterator_type iterator_type, struct vy_entry key);
 
 /**
  * Advance a txw iterator to the next key.
@@ -442,22 +443,22 @@ vy_txw_iterator_next(struct vy_txw_iterator *itr,
 		     struct vy_history *history);
 
 /**
- * Advance a txw iterator to the key following @last_stmt.
+ * Advance a txw iterator to the key following @last.
  * The key history is returned in @history (empty if EOF).
  * Returns 0 on success, -1 on memory allocation error.
  */
 NODISCARD int
-vy_txw_iterator_skip(struct vy_txw_iterator *itr, struct tuple *last_stmt,
+vy_txw_iterator_skip(struct vy_txw_iterator *itr, struct vy_entry last,
 		     struct vy_history *history);
 
 /**
  * Check if a txw iterator was invalidated and needs to be restored.
  * If it does, set the iterator position to the first key following
- * @last_stmt and return 1, otherwise return 0. Returns -1 on memory
+ * @last and return 1, otherwise return 0. Returns -1 on memory
  * allocation error.
  */
 int
-vy_txw_iterator_restore(struct vy_txw_iterator *itr, struct tuple *last_stmt,
+vy_txw_iterator_restore(struct vy_txw_iterator *itr, struct vy_entry entry,
 			struct vy_history *history);
 
 /**

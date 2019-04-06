@@ -45,7 +45,7 @@
  * and, if the result is the latest version of the key, adds it to cache.
  */
 
-#include <stdbool.h>
+#include "vy_entry.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -54,7 +54,6 @@ extern "C" {
 struct vy_lsm;
 struct vy_tx;
 struct vy_read_view;
-struct tuple;
 
 /**
  * Given a key that has all index parts (including primary index
@@ -69,7 +68,7 @@ struct tuple;
 int
 vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 		const struct vy_read_view **rv,
-		struct tuple *key, struct tuple **ret);
+		struct vy_entry key, struct vy_entry *ret);
 
 /**
  * Look up a tuple by key in memory.
@@ -87,7 +86,7 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
  */
 int
 vy_point_lookup_mem(struct vy_lsm *lsm, const struct vy_read_view **rv,
-		    struct tuple *key, struct tuple **ret);
+		    struct vy_entry key, struct vy_entry *ret);
 
 #if defined(__cplusplus)
 } /* extern "C" */

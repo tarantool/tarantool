@@ -30,9 +30,9 @@ write_run(struct vy_run *run, const char *dir_name,
 	if (wi->iface->start(wi) != 0)
 		goto fail_abort_writer;
 	int rc;
-	struct tuple *stmt = NULL;
-	while ((rc = wi->iface->next(wi, &stmt)) == 0 && stmt != NULL) {
-		rc = vy_run_writer_append_stmt(&writer, stmt);
+	struct vy_entry entry = vy_entry_none();
+	while ((rc = wi->iface->next(wi, &entry)) == 0 && entry.stmt != NULL) {
+		rc = vy_run_writer_append_stmt(&writer, entry);
 		if (rc != 0)
 			break;
 	}
@@ -98,7 +98,8 @@ test_basic()
 				       index_def, format, NULL, 0);
 	isnt(pk, NULL, "lsm is not NULL")
 
-	struct vy_range *range = vy_range_new(1, NULL, NULL, pk->cmp_def);
+	struct vy_range *range = vy_range_new(1, vy_entry_none(),
+					      vy_entry_none(), pk->cmp_def);
 
 	isnt(pk, NULL, "range is not NULL")
 	vy_lsm_add_range(pk, range);
@@ -205,7 +206,8 @@ test_basic()
 	vy_mem_delete(run_mem);
 
 	vy_lsm_add_run(pk, run);
-	struct vy_slice *slice = vy_slice_new(1, run, NULL, NULL, pk->cmp_def);
+	struct vy_slice *slice = vy_slice_new(1, run, vy_entry_none(),
+					      vy_entry_none(), pk->cmp_def);
 	vy_range_add_slice(range, slice);
 	vy_run_unref(run);
 
@@ -235,7 +237,8 @@ test_basic()
 	vy_mem_delete(run_mem);
 
 	vy_lsm_add_run(pk, run);
-	slice = vy_slice_new(1, run, NULL, NULL, pk->cmp_def);
+	slice = vy_slice_new(1, run, vy_entry_none(), vy_entry_none(),
+			     pk->cmp_def);
 	vy_range_add_slice(range, slice);
 	vy_run_unref(run);
 
@@ -269,31 +272,31 @@ test_basic()
 
 			struct vy_stmt_template tmpl_key =
 				STMT_TEMPLATE(0, SELECT, i);
-			struct tuple *key = vy_new_simple_stmt(format,
-							       &tmpl_key);
-			struct tuple *res;
+			struct vy_entry key = vy_new_simple_stmt(format, key_def,
+								 &tmpl_key);
+			struct vy_entry res;
 			rc = vy_point_lookup(pk, NULL, &prv, key, &res);
-			tuple_unref(key);
+			tuple_unref(key.stmt);
 			if (rc != 0) {
 				has_errors = true;
 				continue;
 			}
 			if (expect == 0) {
 				/* No value expected. */
-				if (res != NULL)
+				if (res.stmt != NULL)
 					results_ok = false;
 				continue;
 			} else {
-				if (res == NULL) {
+				if (res.stmt == NULL) {
 					results_ok = false;
 					continue;
 				}
 			}
 			uint32_t got = 0;
-			tuple_field_u32(res, 1, &got);
-			if (got != expect && expect_lsn != vy_stmt_lsn(res))
+			tuple_field_u32(res.stmt, 1, &got);
+			if (got != expect && expect_lsn != vy_stmt_lsn(res.stmt))
 				results_ok = false;
-			tuple_unref(res);
+			tuple_unref(res.stmt);
 		}
 	}
 
