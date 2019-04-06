@@ -1936,7 +1936,7 @@ case OP_AddImm: {            /* in1 */
  * Force the value in register P1 to be an integer.  If the value
  * in P1 is not an integer and cannot be converted into an integer
  * without data loss, then jump immediately to P2, or if P2==0
- * raise an SQL_MISMATCH exception.
+ * raise an ER_SQL_TYPE_MISMATCH error.
  */
 case OP_MustBeInt: {            /* jump, in1 */
 	pIn1 = &aMem[pOp->p1];
@@ -1945,7 +1945,9 @@ case OP_MustBeInt: {            /* jump, in1 */
 		VdbeBranchTaken((pIn1->flags&MEM_Int)==0, 2);
 		if ((pIn1->flags & MEM_Int)==0) {
 			if (pOp->p2==0) {
-				rc = SQL_MISMATCH;
+				diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+					 sql_value_text(pIn1), "integer");
+				rc = SQL_TARANTOOL_ERROR;
 				goto abort_due_to_error;
 			} else {
 				goto jump_to_p2;

@@ -810,7 +810,7 @@ test:do_catchsql_test(
         INSERT INTO t1 SELECT s2, s2 FROM t1;
     ]], {
         -- <autoinc-gh-3670>
-        1, "Failed to execute SQL statement: datatype mismatch"
+        1, "Type mismatch: can not convert a to integer"
         -- </autoinc-gh-3670>
     })
 

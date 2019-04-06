@@ -357,8 +357,6 @@ enum sql_ret_code {
 	SQL_TOOBIG,
 	/** Abort due to constraint violation. */
 	SQL_CONSTRAINT,
-	/** Data type mismatch. */
-	SQL_MISMATCH,
 	/** Library used incorrectly. */
 	SQL_MISUSE,
 	/** 2nd parameter to sql_bind out of range. */

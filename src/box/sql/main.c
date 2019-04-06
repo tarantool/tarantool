@@ -366,7 +366,6 @@ sqlErrStr(int rc)
 		/* SQL_SCHEMA      */ "database schema has changed",
 		/* SQL_TOOBIG      */ "string or blob too big",
 		/* SQL_CONSTRAINT  */ "constraint failed",
-		/* SQL_MISMATCH    */ "datatype mismatch",
 		/* SQL_MISUSE      */
 		    "library routine called out of sequence",
 		/* SQL_RANGE       */ "bind or column index out of range",
