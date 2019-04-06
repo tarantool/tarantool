@@ -1017,8 +1017,8 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
 }
 
 int
-vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
-		       struct tuple *stmt, uint64_t column_mask)
+vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm,
+	  struct tuple *stmt, uint64_t column_mask)
 {
 	assert(vy_stmt_type(stmt) != 0);
 	/**

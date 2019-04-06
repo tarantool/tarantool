@@ -393,14 +393,8 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt);
 
 /** Add a statement to a transaction. */
 int
-vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
-		       struct tuple *stmt, uint64_t column_mask);
-
-static inline int
-vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
-{
-	return vy_tx_set_with_colmask(tx, lsm, stmt, UINT64_MAX);
-}
+vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm,
+	  struct tuple *stmt, uint64_t column_mask);
 
 /**
  * Iterator over the write set of a transaction.

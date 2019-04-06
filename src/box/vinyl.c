@@ -1682,6 +1682,29 @@ vy_unique_key_validate(struct vy_lsm *lsm, const char *key,
 }
 
 /**
+ * Insert a statement into a transaction write set.
+ * @param tx           Transaction.
+ * @param lsm          LSM tree the statement is for.
+ * @param stmt         Statement.
+ * @param column_mask  Mask of fields modified by the statement.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory allocation error.
+ */
+static int
+vy_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
+		    struct tuple *stmt, uint64_t column_mask)
+{
+	return vy_tx_set(tx, lsm, stmt, column_mask);
+}
+
+static inline int
+vy_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
+{
+	return vy_set_with_colmask(tx, lsm, stmt, UINT64_MAX);
+}
+
+/**
  * Execute DELETE in a vinyl space.
  * @param env     Vinyl environment.
  * @param tx      Current transaction.
@@ -1735,7 +1758,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			struct vy_lsm *lsm = vy_lsm(space->index[i]);
 			if (vy_is_committed_one(env, lsm))
 				continue;
-			rc = vy_tx_set(tx, lsm, delete);
+			rc = vy_set(tx, lsm, delete);
 			if (rc != 0)
 				break;
 		}
@@ -1747,7 +1770,7 @@ vy_delete(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 			return -1;
 		if (space->index_count > 1)
 			vy_stmt_set_flags(delete, VY_STMT_DEFERRED_DELETE);
-		rc = vy_tx_set(tx, pk, delete);
+		rc = vy_set(tx, pk, delete);
 	}
 	tuple_unref(delete);
 	return rc;
@@ -1804,7 +1827,7 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 
 	vy_stmt_set_flags(stmt->new_tuple, VY_STMT_UPDATE);
 
-	if (vy_tx_set_with_colmask(tx, pk, stmt->new_tuple, column_mask) != 0)
+	if (vy_set_with_colmask(tx, pk, stmt->new_tuple, column_mask) != 0)
 		return -1;
 	if (space->index_count == 1)
 		return 0;
@@ -1818,11 +1841,10 @@ vy_perform_update(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
 		if (vy_is_committed_one(env, lsm))
 			continue;
-		if (vy_tx_set_with_colmask(tx, lsm, delete,
-					   column_mask) != 0)
+		if (vy_set_with_colmask(tx, lsm, delete, column_mask) != 0)
 			goto error;
-		if (vy_tx_set_with_colmask(tx, lsm, stmt->new_tuple,
-					   column_mask) != 0)
+		if (vy_set_with_colmask(tx, lsm, stmt->new_tuple,
+					column_mask) != 0)
 			goto error;
 	}
 	tuple_unref(delete);
@@ -1924,11 +1946,11 @@ vy_insert_first_upsert(struct vy_env *env, struct vy_tx *tx,
 		return -1;
 	struct vy_lsm *pk = vy_lsm(space->index[0]);
 	assert(pk->index_id == 0);
-	if (vy_tx_set(tx, pk, stmt) != 0)
+	if (vy_set(tx, pk, stmt) != 0)
 		return -1;
 	for (uint32_t i = 1; i < space->index_count; ++i) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		if (vy_tx_set(tx, lsm, stmt) != 0)
+		if (vy_set(tx, lsm, stmt) != 0)
 			return -1;
 	}
 	return 0;
@@ -1961,7 +1983,7 @@ vy_lsm_upsert(struct vy_tx *tx, struct vy_lsm *lsm,
 	if (vystmt == NULL)
 		return -1;
 	assert(vy_stmt_type(vystmt) == IPROTO_UPSERT);
-	int rc = vy_tx_set(tx, lsm, vystmt);
+	int rc = vy_set(tx, lsm, vystmt);
 	tuple_unref(vystmt);
 	return rc;
 }
@@ -2183,14 +2205,14 @@ vy_insert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	if (vy_check_is_unique(env, tx, space, stmt->new_tuple,
 			       COLUMN_MASK_FULL) != 0)
 		return -1;
-	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
+	if (vy_set(tx, pk, stmt->new_tuple) != 0)
 		return -1;
 
 	for (uint32_t iid = 1; iid < space->index_count; ++iid) {
 		struct vy_lsm *lsm = vy_lsm(space->index[iid]);
 		if (vy_is_committed_one(env, lsm))
 			continue;
-		if (vy_tx_set(tx, lsm, stmt->new_tuple) != 0)
+		if (vy_set(tx, lsm, stmt->new_tuple) != 0)
 			return -1;
 	}
 	return 0;
@@ -2259,7 +2281,7 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 * Replace in the primary index without explicit deletion
 	 * of the old tuple.
 	 */
-	if (vy_tx_set(tx, pk, stmt->new_tuple) != 0)
+	if (vy_set(tx, pk, stmt->new_tuple) != 0)
 		return -1;
 	if (space->index_count == 1)
 		return 0;
@@ -2280,11 +2302,11 @@ vy_replace(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 		if (vy_is_committed_one(env, lsm))
 			continue;
 		if (delete != NULL) {
-			rc = vy_tx_set(tx, lsm, delete);
+			rc = vy_set(tx, lsm, delete);
 			if (rc != 0)
 				break;
 		}
-		rc = vy_tx_set(tx, lsm, stmt->new_tuple);
+		rc = vy_set(tx, lsm, stmt->new_tuple);
 		if (rc != 0)
 			break;
 	}
@@ -3969,7 +3991,7 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 		if (delete == NULL)
 			goto err;
 		vy_stmt_set_type(delete, IPROTO_DELETE);
-		int rc = vy_tx_set(tx, lsm, delete);
+		int rc = vy_set(tx, lsm, delete);
 		tuple_unref(delete);
 		if (rc != 0)
 			goto err;
@@ -3981,7 +4003,7 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 							  data + data_len);
 		if (insert == NULL)
 			goto err;
-		int rc = vy_tx_set(tx, lsm, insert);
+		int rc = vy_set(tx, lsm, insert);
 		tuple_unref(insert);
 		if (rc != 0)
 			goto err;
