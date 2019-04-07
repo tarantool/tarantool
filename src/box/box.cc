@@ -1190,21 +1190,25 @@ box_upsert(uint32_t space_id, uint32_t index_id, const char *tuple,
 static void
 space_truncate(struct space *space)
 {
-	char tuple_buf[32];
+	size_t buf_size = 3 * mp_sizeof_array(UINT32_MAX) +
+			  4 * mp_sizeof_uint(UINT64_MAX) + mp_sizeof_str(1);
+	char *buf = (char *)region_alloc_xc(&fiber()->gc, buf_size);
+
+	char *tuple_buf = buf;
 	char *tuple_buf_end = tuple_buf;
 	tuple_buf_end = mp_encode_array(tuple_buf_end, 2);
 	tuple_buf_end = mp_encode_uint(tuple_buf_end, space_id(space));
 	tuple_buf_end = mp_encode_uint(tuple_buf_end, 1);
-	assert(tuple_buf_end < tuple_buf + sizeof(tuple_buf));
+	assert(tuple_buf_end < buf + buf_size);
 
-	char ops_buf[128];
+	char *ops_buf = tuple_buf_end;
 	char *ops_buf_end = ops_buf;
 	ops_buf_end = mp_encode_array(ops_buf_end, 1);
 	ops_buf_end = mp_encode_array(ops_buf_end, 3);
 	ops_buf_end = mp_encode_str(ops_buf_end, "+", 1);
 	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
 	ops_buf_end = mp_encode_uint(ops_buf_end, 1);
-	assert(ops_buf_end < ops_buf + sizeof(ops_buf));
+	assert(ops_buf_end < buf + buf_size);
 
 	if (box_upsert(BOX_TRUNCATE_ID, 0, tuple_buf, tuple_buf_end,
 		       ops_buf, ops_buf_end, 0, NULL) != 0)
