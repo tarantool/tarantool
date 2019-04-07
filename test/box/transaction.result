@@ -526,3 +526,175 @@ space:select()
 space:drop()
 ---
 ...
+-- In order to implement a transactional applier, we  lifted a
+-- restriction that DDL must always run in autocommit mode. The
+-- applier always starts a multi-statement transaction, even for
+-- single-statement transactions received from the master. Now
+-- we only require a DDL statement to be the first statement in a
+-- transaction. We even allow DDL to be followed by DML, since
+-- it's harmless: if DML yields, the entire transaction is rolled
+-- back by a yield trigger. Test that.
+_ = box.schema.space.create('memtx', {engine='memtx'})
+---
+...
+_ = box.space.memtx:create_index('pk')
+---
+...
+box.space.memtx:insert{1, 'memtx'}
+---
+- [1, 'memtx']
+...
+_ = box.schema.space.create('vinyl', {engine='vinyl'})
+---
+...
+_ = box.space.vinyl:create_index('pk')
+---
+...
+box.space.vinyl:insert{1, 'vinyl'}
+---
+- [1, 'vinyl']
+...
+_ = box.schema.space.create('test')
+---
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+--
+-- Test DDL object creation and deletion should leave no
+-- effects after rollback
+--
+box.begin()
+box.space.test:create_index('pk')
+box.rollback();
+---
+...
+box.space.test.index.pk;
+---
+- null
+...
+--
+--
+_ = box.space.test:create_index('pk');
+---
+...
+box.space.test:insert{1}
+
+box.begin()
+box.space.test:truncate()
+box.rollback();
+---
+...
+box.space.test:select{};
+---
+- - [1]
+...
+--
+--
+-- DDL followed by a select from memtx space. Such
+-- a select doesn't yield.
+--
+box.begin()
+box.space.test:truncate()
+box.space.memtx:select{}
+box.commit();
+---
+...
+-- DDL and select from a vinyl space. Multi-engine transaction
+-- is not allowed.
+-- A transaction is left open due to an exception in the Lua fragment
+box.begin()
+box.space.test:truncate()
+box.space.vinyl:select{}
+
+box.rollback();
+---
+- error: A multi-statement transaction can not use multiple storage engines
+...
+-- DDL as a second statement - doesn't work
+box.begin()
+box.space.memtx:insert{2, 'truncate'}
+box.space.test:truncate();
+---
+- error: 'Operation is not permitted when there is an active transaction '
+...
+-- A transaction is left open due to an exception in the Lua fragment
+box.rollback();
+---
+...
+box.space.memtx:select{};
+---
+- - [1, 'memtx']
+...
+-- DML as a second statement - works if the engine is the same
+box.begin()
+box.space.test:truncate()
+box.space.memtx:insert{2, 'truncate'}
+box.commit();
+---
+...
+box.space.memtx:select{};
+---
+- - [1, 'memtx']
+  - [2, 'truncate']
+...
+-- DML as a second statement - works if the engine is the same
+box.begin()
+box.space.test:truncate()
+box.space.vinyl:insert{2, 'truncate'};
+---
+- error: A multi-statement transaction can not use multiple storage engines
+...
+-- A transaction is left open due to an exception in the above fragment
+box.rollback();
+---
+...
+box.space.vinyl:select{};
+---
+- - [1, 'vinyl']
+...
+-- Two DDL satements in a row
+box.begin()
+box.space.test:truncate()
+box.space.test:truncate();
+---
+- error: Space _truncate does not support multi-statement transactions
+...
+-- A transaction is left open due to an exception in the above fragment
+box.rollback();
+---
+...
+-- Two DDL stateemnts on different engines
+box.begin()
+box.space.memtx:truncate()
+box.space.vinyl:truncate();
+---
+- error: Space _truncate does not support multi-statement transactions
+...
+box.rollback();
+---
+...
+box.space.memtx:select{};
+---
+- - [1, 'memtx']
+  - [2, 'truncate']
+...
+box.space.vinyl:select{};
+---
+- - [1, 'vinyl']
+...
+-- cleanup
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+if box.space.test then box.space.test:drop() end
+---
+...
+box.space.memtx:drop()
+---
+...
+box.space.vinyl:drop()
+---
+...
