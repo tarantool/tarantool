@@ -37,13 +37,43 @@
 #include "fiber.h"
 
 /**
+ * SWIM cluster node and its UUID. UUID is stored separately
+ * because sometimes a test wants to drop a SWIM instance, but
+ * still check how does it look in other membership instances.
+ * UUID is necessary since it is a key to lookup a view of that
+ * instance in the member tables.
+ */
+struct swim_node {
+	/** SWIM instance. Can be NULL. */
+	struct swim *swim;
+	/**
+	 * UUID. Is used when @a swim is NULL to lookup view of
+	 * that instance.
+	 */
+	struct tt_uuid uuid;
+};
+
+/**
  * Cluster is a simple array of SWIM instances assigned to
  * different URIs.
  */
 struct swim_cluster {
 	int size;
-	struct swim **node;
+	struct swim_node *node;
+	/**
+	 * Saved values to restart SWIM nodes with the most actual
+	 * configuration.
+	 */
+	double ack_timeout;
+	enum swim_gc_mode gc_mode;
 };
+
+/** Build URI of a SWIM instance for a given @a id. */
+static inline void
+swim_cluster_id_to_uri(char *buffer, int id)
+{
+	sprintf(buffer, "127.0.0.1:%d", id + 1);
+}
 
 struct swim_cluster *
 swim_cluster_new(int size)
@@ -51,18 +81,22 @@ swim_cluster_new(int size)
 	struct swim_cluster *res = (struct swim_cluster *) malloc(sizeof(*res));
 	assert(res != NULL);
 	int bsize = sizeof(res->node[0]) * size;
-	res->node = (struct swim **) malloc(bsize);
+	res->node = (struct swim_node *) malloc(bsize);
 	assert(res->node != NULL);
 	res->size = size;
+	res->ack_timeout = -1;
+	res->gc_mode = SWIM_GC_DEFAULT;
 	struct tt_uuid uuid;
 	memset(&uuid, 0, sizeof(uuid));
 	char *uri = tt_static_buf();
-	for (int i = 0; i < size; ++i) {
-		res->node[i] = swim_new();
-		assert(res->node[i] != NULL);
-		sprintf(uri, "127.0.0.1:%d", i + 1);
+	struct swim_node *n = res->node;
+	for (int i = 0; i < size; ++i, ++n) {
+		n->swim = swim_new();
+		assert(n->swim != NULL);
+		swim_cluster_id_to_uri(uri, i);
 		uuid.time_low = i + 1;
-		int rc = swim_cfg(res->node[i], uri, -1, -1, -1, &uuid);
+		n->uuid = uuid;
+		int rc = swim_cfg(n->swim, uri, -1, -1, -1, &uuid);
 		assert(rc == 0);
 		(void) rc;
 	}
@@ -71,7 +105,7 @@ swim_cluster_new(int size)
 
 #define swim_cluster_set_cfg(cluster, ...) ({				\
 	for (int i = 0; i < cluster->size; ++i) {			\
-		int rc = swim_cfg(cluster->node[i], __VA_ARGS__);	\
+		int rc = swim_cfg(cluster->node[i].swim, __VA_ARGS__);	\
 		assert(rc == 0);					\
 		(void) rc;						\
 	}								\
@@ -81,28 +115,44 @@ void
 swim_cluster_set_ack_timeout(struct swim_cluster *cluster, double ack_timeout)
 {
 	swim_cluster_set_cfg(cluster, NULL, -1, ack_timeout, -1, NULL);
+	cluster->ack_timeout = ack_timeout;
 }
 
 void
 swim_cluster_set_gc(struct swim_cluster *cluster, enum swim_gc_mode gc_mode)
 {
 	swim_cluster_set_cfg(cluster, NULL, -1, -1, gc_mode, NULL);
+	cluster->gc_mode = gc_mode;
 }
 
 void
 swim_cluster_delete(struct swim_cluster *cluster)
 {
-	for (int i = 0; i < cluster->size; ++i)
-		swim_delete(cluster->node[i]);
+	for (int i = 0; i < cluster->size; ++i) {
+		if (cluster->node[i].swim != NULL)
+			swim_delete(cluster->node[i].swim);
+	}
 	free(cluster->node);
 	free(cluster);
 }
 
 int
+swim_cluster_update_uuid(struct swim_cluster *cluster, int i,
+			 const struct tt_uuid *new_uuid)
+{
+	assert(i >= 0 && i < cluster->size);
+	struct swim_node *n = &cluster->node[i];
+	if (swim_cfg(n->swim, NULL, -1, -1, -1, new_uuid) != 0)
+		return -1;
+	n->uuid = *new_uuid;
+	return 0;
+}
+
+int
 swim_cluster_add_link(struct swim_cluster *cluster, int to_id, int from_id)
 {
-	const struct swim_member *from = swim_self(cluster->node[from_id]);
-	return swim_add_member(cluster->node[to_id], swim_member_uri(from),
+	const struct swim_member *from = swim_self(cluster->node[from_id].swim);
+	return swim_add_member(cluster->node[to_id].swim, swim_member_uri(from),
 			       swim_member_uuid(from));
 }
 
@@ -110,10 +160,12 @@ static const struct swim_member *
 swim_cluster_member_view(struct swim_cluster *cluster, int node_id,
 			 int member_id)
 {
-	struct swim *node = cluster->node[node_id];
-	const struct swim_member *member = swim_self(cluster->node[member_id]);
-	const struct tt_uuid *member_uuid = swim_member_uuid(member);
-	return swim_member_by_uuid(node, member_uuid);
+	/*
+	 * Do not use node[member_id].swim - it can be NULL
+	 * already, for example, in case of quit or deletion.
+	 */
+	return swim_member_by_uuid(cluster->node[node_id].swim,
+				   &cluster->node[member_id].uuid);
 }
 
 enum swim_member_status
@@ -142,44 +194,47 @@ struct swim *
 swim_cluster_node(struct swim_cluster *cluster, int i)
 {
 	assert(i >= 0 && i < cluster->size);
-	return cluster->node[i];
+	return cluster->node[i].swim;
 }
 
 void
 swim_cluster_restart_node(struct swim_cluster *cluster, int i)
 {
 	assert(i >= 0 && i < cluster->size);
-	struct swim *s = cluster->node[i];
-	const struct swim_member *self = swim_self(s);
-	struct tt_uuid uuid = *swim_member_uuid(self);
+	struct swim_node *n = &cluster->node[i];
+	struct swim *s = n->swim;
 	char uri[128];
-	strcpy(uri, swim_member_uri(self));
-	double ack_timeout = swim_ack_timeout(s);
-	swim_delete(s);
+	swim_cluster_id_to_uri(uri, i);
+	if (s != NULL) {
+		assert(tt_uuid_is_equal(swim_member_uuid(swim_self(s)),
+					&n->uuid));
+		swim_delete(s);
+	}
 	s = swim_new();
 	assert(s != NULL);
-	int rc = swim_cfg(s, uri, -1, ack_timeout, -1, &uuid);
+	int rc = swim_cfg(s, uri, -1, cluster->ack_timeout, cluster->gc_mode,
+			  &n->uuid);
 	assert(rc == 0);
 	(void) rc;
-	cluster->node[i] = s;
+	n->swim = s;
 }
 
 void
 swim_cluster_block_io(struct swim_cluster *cluster, int i)
 {
-	swim_test_transport_block_fd(swim_fd(cluster->node[i]));
+	swim_test_transport_block_fd(swim_fd(cluster->node[i].swim));
 }
 
 void
 swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
 {
-	swim_test_transport_unblock_fd(swim_fd(cluster->node[i]));
+	swim_test_transport_unblock_fd(swim_fd(cluster->node[i].swim));
 }
 
 void
 swim_cluster_set_drop(struct swim_cluster *cluster, int i, double value)
 {
-	swim_test_transport_set_drop(swim_fd(cluster->node[i]), value);
+	swim_test_transport_set_drop(swim_fd(cluster->node[i].swim), value);
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */
@@ -201,11 +256,15 @@ swim1_contains_swim2(struct swim *s1, struct swim *s2)
 bool
 swim_cluster_is_fullmesh(struct swim_cluster *cluster)
 {
-	struct swim **end = cluster->node + cluster->size;
-	for (struct swim **s1 = cluster->node; s1 < end; ++s1) {
-		for (struct swim **s2 = s1 + 1; s2 < end; ++s2) {
-			if (! swim1_contains_swim2(*s1, *s2) ||
-			    ! swim1_contains_swim2(*s2, *s1))
+	struct swim_node *end = cluster->node + cluster->size;
+	for (struct swim_node *s1 = cluster->node; s1 < end; ++s1) {
+		if (s1->swim == NULL)
+			continue;
+		for (struct swim_node *s2 = s1 + 1; s2 < end; ++s2) {
+			if (s2->swim == NULL)
+				continue;
+			if (! swim1_contains_swim2(s1->swim, s2->swim) ||
+			    ! swim1_contains_swim2(s2->swim, s1->swim))
 				return false;
 		}
 	}

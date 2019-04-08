@@ -59,6 +59,11 @@ swim_cluster_set_gc(struct swim_cluster *cluster, enum swim_gc_mode gc_mode);
 void
 swim_cluster_delete(struct swim_cluster *cluster);
 
+/** Update UUID of a SWIM instance with id @a i. */
+int
+swim_cluster_update_uuid(struct swim_cluster *cluster, int i,
+			 const struct tt_uuid *new_uuid);
+
 /** Check that an error in diag contains @a msg. */
 bool
 swim_error_check_match(const char *msg);

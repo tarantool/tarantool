@@ -106,12 +106,12 @@ swim_test_uuid_update(void)
 	struct swim *s = swim_cluster_node(cluster, 0);
 	struct tt_uuid new_uuid = uuid_nil;
 	new_uuid.time_low = 1000;
-	is(swim_cfg(s, NULL, -1, -1, -1, &new_uuid), 0, "UUID update");
+	is(swim_cluster_update_uuid(cluster, 0, &new_uuid), 0, "UUID update");
 	is(swim_cluster_wait_fullmesh(cluster, 1), 0,
 	   "old UUID is returned back as a 'ghost' member");
 	is(swim_size(s), 3, "two members in each + ghost third member");
 	new_uuid.time_low = 2;
-	is(swim_cfg(s, NULL, -1, -1, -1, &new_uuid), -1,
+	is(swim_cluster_update_uuid(cluster, 0, &new_uuid), -1,
 	   "can not update to an existing UUID - swim_cfg fails");
 	ok(swim_error_check_match("exists"), "diag says 'exists'");
 	swim_cluster_delete(cluster);
