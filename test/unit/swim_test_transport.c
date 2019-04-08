@@ -135,6 +135,10 @@ swim_fd_open(struct swim_fd *fd)
 	return 0;
 }
 
+/** Send one packet to destination's recv queue. */
+static inline void
+swim_fd_send_packet(struct swim_fd *fd);
+
 /** Close a fake file descriptor. */
 static inline void
 swim_fd_close(struct swim_fd *fd)
@@ -144,8 +148,8 @@ swim_fd_close(struct swim_fd *fd)
 	struct swim_test_packet *i, *tmp;
 	rlist_foreach_entry_safe(i, &fd->recv_queue, in_queue, tmp)
 		swim_test_packet_delete(i);
-	rlist_foreach_entry_safe(i, &fd->send_queue, in_queue, tmp)
-		swim_test_packet_delete(i);
+	while (! rlist_empty(&fd->send_queue))
+		swim_fd_send_packet(fd);
 	rlist_del_entry(fd, in_active);
 	fd->is_opened = false;
 }
@@ -285,12 +289,10 @@ swim_test_is_drop(double rate)
 	return ((double) rand() / RAND_MAX) * 100 < rate;
 }
 
-/** Send one packet to destination's recv queue. */
 static inline void
 swim_fd_send_packet(struct swim_fd *fd)
 {
-	if (rlist_empty(&fd->send_queue))
-		return;
+	assert(! rlist_empty(&fd->send_queue));
 	struct swim_test_packet *p =
 		rlist_shift_entry(&fd->send_queue, struct swim_test_packet,
 				  in_queue);
@@ -311,7 +313,8 @@ swim_transport_do_loop_step(struct ev_loop *loop)
 	 * order. So this reverse + libev reverse = normal order.
 	 */
 	rlist_foreach_entry_reverse(fd, &swim_fd_active, in_active) {
-		swim_fd_send_packet(fd);
+		if (! rlist_empty(&fd->send_queue))
+			swim_fd_send_packet(fd);
 		ev_feed_fd_event(loop, fd->evfd, EV_WRITE);
 	}
 	rlist_foreach_entry_reverse(fd, &swim_fd_active, in_active) {
