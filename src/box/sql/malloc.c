@@ -728,9 +728,6 @@ sqlOomFault(sql * db)
 {
 	if (db->mallocFailed == 0 && db->bBenignMalloc == 0) {
 		db->mallocFailed = 1;
-		if (db->nVdbeExec > 0) {
-			db->u1.isInterrupted = 1;
-		}
 		db->lookaside.bDisable++;
 	}
 }
@@ -747,7 +744,6 @@ sqlOomClear(sql * db)
 {
 	if (db->mallocFailed && db->nVdbeExec == 0) {
 		db->mallocFailed = 0;
-		db->u1.isInterrupted = 0;
 		assert(db->lookaside.bDisable > 0);
 		db->lookaside.bDisable--;
 	}

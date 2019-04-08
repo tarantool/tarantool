@@ -510,13 +510,6 @@ sqlStep(Vdbe * p)
 		goto end_of_step;
 	}
 	if (p->pc < 0) {
-		/* If there are no other statements currently running, then
-		 * reset the interrupt flag.  This prevents a call to sql_interrupt
-		 * from interrupting a statement that has not yet started.
-		 */
-		if (db->nVdbeActive == 0) {
-			db->u1.isInterrupted = 0;
-		}
 
 		if ((db->xProfile || (db->mTrace & SQL_TRACE_PROFILE) != 0)
 		    && !db->init.busy && p->zSql) {

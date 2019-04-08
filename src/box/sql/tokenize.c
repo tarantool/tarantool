@@ -457,9 +457,6 @@ sqlRunParser(Parse * pParse, const char *zSql)
 
 	assert(zSql != 0);
 	mxSqlLen = db->aLimit[SQL_LIMIT_SQL_LENGTH];
-	if (db->nVdbeActive == 0) {
-		db->u1.isInterrupted = 0;
-	}
 	pParse->zTail = zSql;
 	i = 0;
 	/* sqlParserTrace(stdout, "parser: "); */

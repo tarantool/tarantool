@@ -1455,10 +1455,6 @@ sqlVdbeList(Vdbe * p)
 	if (i >= nRow) {
 		p->rc = SQL_OK;
 		rc = SQL_DONE;
-	} else if (db->u1.isInterrupted) {
-		p->rc = SQL_INTERRUPT;
-		rc = SQL_ERROR;
-		sqlVdbeError(p, sqlErrStr(p->rc));
 	} else {
 		char *zP4;
 		Op *pOp;
@@ -2134,7 +2130,6 @@ sqlVdbeHalt(Vdbe * p)
 	 *     SQL_NOMEM
 	 *     SQL_IOERR
 	 *     SQL_FULL
-	 *     SQL_INTERRUPT
 	 *
 	 * Then the internal cache might have been left in an inconsistent
 	 * state.  We need to rollback the statement transaction, if there is
@@ -2160,13 +2155,11 @@ sqlVdbeHalt(Vdbe * p)
 
 		/* Check for one of the special errors */
 		mrc = p->rc & 0xff;
-		isSpecialError = mrc == SQL_NOMEM || mrc == SQL_IOERR
-		    || mrc == SQL_INTERRUPT || mrc == SQL_FULL;
+		isSpecialError = mrc == SQL_NOMEM || mrc == SQL_IOERR ||
+				 mrc == SQL_FULL;
 		if (isSpecialError) {
-			/* If the query was read-only and the error code is SQL_INTERRUPT,
-			 * no rollback is necessary. Otherwise, at least a savepoint
-			 * transaction must be rolled back to restore the database to a
-			 * consistent state.
+			/* At least a savepoint transaction must be rolled back
+			 * to restore the database to a consistent state.
 			 *
 			 * Even if the statement is read-only, it is important to perform
 			 * a statement or transaction rollback operation. If the error
@@ -2175,20 +2168,18 @@ sqlVdbeHalt(Vdbe * p)
 			 * pagerStress() in pager.c), the rollback is required to restore
 			 * the pager to a consistent state.
 			 */
-			if (mrc != SQL_INTERRUPT) {
-				if ((mrc == SQL_NOMEM || mrc == SQL_FULL)
-				    && box_txn()) {
-					eStatementOp = SAVEPOINT_ROLLBACK;
-				} else {
-					/* We are forced to roll back the active transaction. Before doing
-					 * so, abort any other statements this handle currently has active.
-					 */
-					box_txn_rollback();
-					closeCursorsAndFree(p);
-					sqlRollbackAll(p);
-					sqlCloseSavepoints(p);
-					p->nChange = 0;
-				}
+			if ((mrc == SQL_NOMEM || mrc == SQL_FULL)
+			    && box_txn()) {
+				eStatementOp = SAVEPOINT_ROLLBACK;
+			} else {
+				/* We are forced to roll back the active transaction. Before doing
+				 * so, abort any other statements this handle currently has active.
+				 */
+				box_txn_rollback();
+				closeCursorsAndFree(p);
+				sqlRollbackAll(p);
+				sqlCloseSavepoints(p);
+				p->nChange = 0;
 			}
 		}
 

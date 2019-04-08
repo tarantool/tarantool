@@ -343,8 +343,6 @@ enum sql_ret_code {
 	SQL_LOCKED,
 	/** A malloc() failed. */
 	SQL_NOMEM,
-	/** Operation terminated by sql_interrupt(). */
-	SQL_INTERRUPT,
 	/** Some kind of disk I/O error occurred. */
 	SQL_IOERR,
 	/** Unknown opcode in sql_file_control(). */
@@ -1309,14 +1307,7 @@ struct sql {
 	void (*xUpdateCallback) (void *, int, const char *, const char *,
 				 sql_int64);
 	sql_value *pErr;	/* Most recent error message */
-	union {
-		volatile int isInterrupted;	/* True if sql_interrupt has been called */
-		double notUsed1;	/* Spacer */
-	} u1;
 	Lookaside lookaside;	/* Lookaside malloc configuration */
-	int (*xProgress) (void *);	/* The progress callback */
-	void *pProgressArg;	/* Argument to the progress callback */
-	unsigned nProgressOps;	/* Number of opcodes for progress callback */
 	Hash aFunc;		/* Hash table of connection functions */
 	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */
 };

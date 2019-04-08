@@ -359,7 +359,6 @@ sqlErrStr(int rc)
 		/* SQL_BUSY        */ "database is locked",
 		/* SQL_LOCKED      */ "database table is locked",
 		/* SQL_NOMEM       */ "out of memory",
-		/* SQL_INTERRUPT   */ "interrupted",
 		/* SQL_IOERR       */ "disk I/O error",
 		/* SQL_NOTFOUND    */ "unknown operation",
 		/* SQL_FULL        */ "database or disk is full",

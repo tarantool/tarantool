@@ -92,18 +92,6 @@ int sql_xfer_count = 0;
 #endif
 
 /*
- * When this global variable is positive, it gets decremented once before
- * each instruction in the VDBE.  When it reaches zero, the u1.isInterrupted
- * field of the sql structure is set in order to simulate an interrupt.
- *
- * This facility is used for testing purposes only.  It does not function
- * in an ordinary build.
- */
-#ifdef SQL_TEST
-int sql_interrupt_count = 0;
-#endif
-
-/*
  * The next global variable is incremented each type the OP_Sort opcode
  * is executed.  The test procedures use this information to make sure that
  * sorting is occurring or not occurring at appropriate times.   This variable
@@ -746,7 +734,6 @@ int sqlVdbeExec(Vdbe *p)
 	sql *db = p->db;       /* The database */
 	int iCompare = 0;          /* Result of last comparison */
 	unsigned nVmStep = 0;      /* Number of virtual machine steps */
-	unsigned nProgressLimit = 0;/* Invoke xProgress() when nVmStep reaches this */
 	Mem *aMem = p->aMem;       /* Copy of p->aMem */
 	Mem *pIn1 = 0;             /* 1st input operand */
 	Mem *pIn2 = 0;             /* 2nd input operand */
@@ -770,14 +757,6 @@ int sqlVdbeExec(Vdbe *p)
 	p->iCurrentTime = 0;
 	assert(p->explain==0);
 	p->pResultSet = 0;
-	if (db->u1.isInterrupted) goto abort_due_to_interrupt;
-
-	if (db->xProgress) {
-		u32 iPrior = p->aCounter[SQL_STMTSTATUS_VM_STEP];
-		assert(0 < db->nProgressOps);
-		nProgressLimit = db->nProgressOps - (iPrior % db->nProgressOps);
-	}
-
 #ifdef SQL_DEBUG
 	sqlBeginBenignMalloc();
 	if (p->pc == 0 &&
@@ -916,39 +895,7 @@ int sqlVdbeExec(Vdbe *p)
  * to the current line should be indented for EXPLAIN output.
  */
 case OP_Goto: {             /* jump */
-			jump_to_p2_and_check_for_interrupt:
-	pOp = &aOp[pOp->p2 - 1];
-
-	/* Opcodes that are used as the bottom of a loop (OP_Next, OP_Prev,
-	 * OP_RowSetNext, or OP_SorterNext) all jump here upon
-	 * completion.  Check to see if sql_interrupt() has been called
-	 * or if the progress callback needs to be invoked.
-	 *
-	 * This code uses unstructured "goto" statements and does not look clean.
-	 * But that is not due to sloppy coding habits. The code is written this
-	 * way for performance, to avoid having to run the interrupt and progress
-	 * checks on every opcode.  This helps sql_step() to run about 1.5%
-	 * faster according to "valgrind --tool=cachegrind"
-	 */
-			check_for_interrupt:
-	if (db->u1.isInterrupted) goto abort_due_to_interrupt;
-
-	/* Call the progress callback if it is configured and the required number
-	 * of VDBE ops have been executed (either since this invocation of
-	 * sqlVdbeExec() or since last time the progress callback was called).
-	 * If the progress callback returns non-zero, exit the virtual machine with
-	 * a return code SQL_ABORT.
-	 */
-	if (db->xProgress!=0 && nVmStep>=nProgressLimit) {
-		assert(db->nProgressOps!=0);
-		nProgressLimit = nVmStep + db->nProgressOps - (nVmStep%db->nProgressOps);
-		if (db->xProgress(db->pProgressArg)) {
-			rc = SQL_INTERRUPT;
-			goto abort_due_to_error;
-		}
-	}
-
-	break;
+	goto jump_to_p2;
 }
 
 /* Opcode:  Gosub P1 P2 * * *
@@ -1466,16 +1413,6 @@ case OP_ResultRow: {
 	assert(p->nResColumn==pOp->p2);
 	assert(pOp->p1>0);
 	assert(pOp->p1+pOp->p2<=(p->nMem+1 - p->nCursor)+1);
-
-	/* Run the progress counter just before returning.
-	 */
-	if (db->xProgress!=0
-	    && nVmStep>=nProgressLimit
-	    && db->xProgress(db->pProgressArg)!=0
-		) {
-		rc = SQL_INTERRUPT;
-		goto abort_due_to_error;
-	}
 
 	/* If this statement has violated immediate foreign key constraints, do
 	 * not return the number of rows modified. And do not RELEASE the statement
@@ -4306,11 +4243,11 @@ case OP_Next:          /* jump */
 #ifdef SQL_TEST
 		sql_search_count++;
 #endif
-		goto jump_to_p2_and_check_for_interrupt;
+		goto jump_to_p2;
 	} else {
 		pC->nullRow = 1;
 	}
-	goto check_for_interrupt;
+	break;
 }
 
 /* Opcode: SorterInsert P1 P2 * * *
@@ -5446,15 +5383,5 @@ no_mem:
 	sqlOomFault(db);
 	sqlVdbeError(p, "out of memory");
 	rc = SQL_NOMEM;
-	goto abort_due_to_error;
-
-	/* Jump to here if the sql_interrupt() API sets the interrupt
-	 * flag.
-	 */
-abort_due_to_interrupt:
-	assert(db->u1.isInterrupted);
-	rc = db->mallocFailed ? SQL_NOMEM : SQL_INTERRUPT;
-	p->rc = rc;
-	sqlVdbeError(p, "%s", sqlErrStr(rc));
 	goto abort_due_to_error;
 }
