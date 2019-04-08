@@ -171,6 +171,10 @@ int
 swim_scheduler_bind(struct swim_scheduler *scheduler,
 		    const struct sockaddr_in *addr);
 
+/** Stop accepting new packets from the network. */
+void
+swim_scheduler_stop_input(struct swim_scheduler *scheduler);
+
 /** Destroy scheduler, its queues, close the socket. */
 void
 swim_scheduler_destroy(struct swim_scheduler *scheduler);

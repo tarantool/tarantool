@@ -42,6 +42,8 @@ enum swim_member_status {
 	 * the membership after some unacknowledged pings.
 	 */
 	MEMBER_DEAD,
+	/** The member has voluntary left the cluster. */
+	MEMBER_LEFT,
 	swim_member_status_MAX,
 };
 

@@ -144,6 +144,16 @@ swim_info(struct swim *swim, struct info_handler *info);
 int
 swim_size(const struct swim *swim);
 
+/**
+ * Gracefully leave the cluster, broadcast a notification.
+ * Members, received it, will remove a record about this instance
+ * from their tables, and will not consider it dead. @a swim
+ * object can not be used after quit and should be treated as
+ * deleted.
+ */
+void
+swim_quit(struct swim *swim);
+
 /** Get a SWIM member, describing this instance. */
 const struct swim_member *
 swim_self(struct swim *swim);

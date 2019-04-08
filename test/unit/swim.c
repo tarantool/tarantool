@@ -467,10 +467,90 @@ swim_test_undead(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_quit(void)
+{
+	swim_start_test(9);
+	int size = 3;
+	struct swim_cluster *cluster = swim_cluster_new(size);
+	for (int i = 0; i < size; ++i) {
+		for (int j = 0; j < size; ++j)
+			swim_cluster_add_link(cluster, i, j);
+	}
+	swim_cluster_quit_node(cluster, 0);
+	is(swim_cluster_wait_status_everywhere(cluster, 0, MEMBER_LEFT, 0),
+	   0, "'quit' is sent to all the members without delays between "\
+	   "dispatches")
+	/*
+	 * Return the instance back and check that it refutes the
+	 * old LEFT status.
+	 */
+	swim_cluster_restart_node(cluster, 0);
+	is(swim_cluster_wait_incarnation(cluster, 0, 0, 1, 2), 0,
+	   "quited member S1 has returned and refuted the old status");
+	fail_if(swim_cluster_wait_fullmesh(cluster, 2) != 0);
+	/*
+	 * Not trivial test. A member can receive its own 'quit'
+	 * message. It can be reproduced if a member has quited.
+	 * Then another member took the spare UUID, and then
+	 * received the 'quit' message with the same UUID. Of
+	 * course, it should be refuted.
+	 */
+	struct swim *s0 = swim_cluster_node(cluster, 0);
+	struct tt_uuid s0_uuid = *swim_member_uuid(swim_self(s0));
+	struct swim *s1 = swim_cluster_node(cluster, 1);
+	swim_remove_member(s1, &s0_uuid);
+	struct swim *s2 = swim_cluster_node(cluster, 2);
+	swim_remove_member(s2, &s0_uuid);
+	swim_cluster_quit_node(cluster, 0);
+
+	/* Steal UUID of the quited node. */
+	swim_cluster_block_io(cluster, 1);
+	is(swim_cluster_update_uuid(cluster, 1, &s0_uuid), 0, "another "\
+	   "member S2 has taken the quited UUID");
+
+	/* Ensure that S1 is not added back to S3 on quit. */
+	swim_run_for(1);
+	is(swim_cluster_member_status(cluster, 2, 0), swim_member_status_MAX,
+	   "S3 did not add S1 back when received its 'quit'");
+
+	/* Now allow S2 to get the 'self-quit' message. */
+	swim_cluster_unblock_io(cluster, 1);
+	is(swim_cluster_wait_incarnation(cluster, 1, 1, 2, 0), 0,
+	   "S2 finally got 'quit' message from S1, but with its 'own' UUID - "\
+	   "refute it")
+	swim_cluster_delete(cluster);
+
+	/**
+	 * Test that if a new member has arrived with LEFT status
+	 * via dissemination or anti-entropy - it is not added.
+	 * Even if GC is off.
+	 */
+	cluster = swim_cluster_new(3);
+	swim_cluster_set_gc(cluster, SWIM_GC_OFF);
+	swim_cluster_interconnect(cluster, 0, 2);
+	swim_cluster_interconnect(cluster, 1, 2);
+
+	swim_cluster_quit_node(cluster, 0);
+	swim_run_for(2);
+	is(swim_cluster_member_status(cluster, 2, 0), MEMBER_LEFT,
+	   "S3 sees S1 as left");
+	is(swim_cluster_member_status(cluster, 1, 0), swim_member_status_MAX,
+	   "S2 does not see S1 at all");
+	swim_run_for(2);
+	is(swim_cluster_member_status(cluster, 2, 0), swim_member_status_MAX,
+	   "after more time S1 is dropped from S3");
+	is(swim_cluster_member_status(cluster, 1, 0), swim_member_status_MAX,
+	   "and still is not added to S2 - left members can not be added");
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(12);
+	swim_start_test(13);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -488,6 +568,7 @@ main_f(va_list ap)
 	swim_test_too_big_packet();
 	swim_test_undead();
 	swim_test_packet_loss();
+	swim_test_quit();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

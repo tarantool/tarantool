@@ -885,8 +885,11 @@ swim_decrease_event_ttl(struct swim *swim)
 	rlist_foreach_entry_safe(member, &swim->dissemination_queue,
 				 in_dissemination_queue,
 				 tmp) {
-		if (--member->status_ttl == 0)
+		if (--member->status_ttl == 0) {
 			rlist_del_entry(member, in_dissemination_queue);
+			if (member->status == MEMBER_LEFT)
+				swim_delete_member(swim, member);
+		}
 	}
 }
 
@@ -1026,6 +1029,8 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 				continue;
 			}
 			break;
+		case MEMBER_LEFT:
+			continue;
 		default:
 			unreachable();
 		}
@@ -1114,7 +1119,9 @@ swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
 {
 	struct swim_member *member = swim_find_member(swim, &def->uuid);
 	if (member == NULL) {
-		if (def->status == MEMBER_DEAD && swim->gc_mode == SWIM_GC_ON) {
+		if (def->status == MEMBER_LEFT ||
+		    (def->status == MEMBER_DEAD &&
+		     swim->gc_mode == SWIM_GC_ON)) {
 			/*
 			 * Do not 'resurrect' dead members to
 			 * prevent 'ghost' members. Ghost member
@@ -1282,6 +1289,47 @@ swim_process_dissemination(struct swim *swim, const char **pos, const char *end)
 	return swim_process_members(swim, prefix, pos, end);
 }
 
+/**
+ * Decode a quit message. Schedule dissemination, change status.
+ */
+static int
+swim_process_quit(struct swim *swim, const char **pos, const char *end,
+		  const struct tt_uuid *uuid)
+{
+	say_verbose("SWIM %d: process quit", swim_fd(swim));
+	const char *prefix = "invald quit message:";
+	uint32_t size;
+	if (swim_decode_map(pos, end, &size, prefix, "root") != 0)
+		return -1;
+	if (size != 1) {
+		diag_set(SwimError, "%s map of size 1 is expected", prefix);
+		return -1;
+	}
+	uint64_t tmp;
+	if (swim_decode_uint(pos, end, &tmp, prefix, "a key") != 0)
+		return -1;
+	if (tmp != SWIM_QUIT_INCARNATION) {
+		diag_set(SwimError, "%s a key should be incarnation", prefix);
+		return -1;
+	}
+	if (swim_decode_uint(pos, end, &tmp, prefix, "incarnation") != 0)
+		return -1;
+	struct swim_member *m = swim_find_member(swim, uuid);
+	if (m == NULL)
+		return 0;
+	/*
+	 * Check for 'self' in case this instance took UUID of a
+	 * quited instance.
+	 */
+	if (m != swim->self) {
+		swim_update_member_inc_status(swim, m, MEMBER_LEFT, tmp);
+	} else if (tmp >= m->incarnation) {
+		m->incarnation = tmp + 1;
+		swim_on_member_update(swim, m);
+	}
+	return 0;
+}
+
 /** Process a new message. */
 static void
 swim_on_input(struct swim_scheduler *scheduler, const char *pos,
@@ -1323,6 +1371,10 @@ swim_on_input(struct swim_scheduler *scheduler, const char *pos,
 			break;
 		case SWIM_DISSEMINATION:
 			if (swim_process_dissemination(swim, &pos, end) != 0)
+				goto error;
+			break;
+		case SWIM_QUIT:
+			if (swim_process_quit(swim, &pos, end, &uuid) != 0)
 				goto error;
 			break;
 		default:
@@ -1588,6 +1640,68 @@ swim_delete(struct swim *swim)
 	wait_ack_heap_destroy(&swim->wait_ack_heap);
 	mh_swim_table_delete(swim->members);
 	free(swim->shuffled);
+}
+
+/**
+ * Quit message is broadcasted in the same way as round messages,
+ * step by step, with the only difference that quit round steps
+ * follow each other without delays.
+ */
+static void
+swim_quit_step_complete(struct swim_task *task,
+			struct swim_scheduler *scheduler, int rc)
+{
+	(void) rc;
+	struct swim *swim = swim_by_scheduler(scheduler);
+	if (rlist_empty(&swim->round_queue)) {
+		swim_delete(swim);
+		return;
+	}
+	struct swim_member *m =
+		rlist_shift_entry(&swim->round_queue, struct swim_member,
+				  in_round_queue);
+	swim_task_send(task, &m->addr, scheduler);
+}
+
+/**
+ * Encode 'quit' command.
+ * @retval Number of key-values added to the packet's root map.
+ */
+static inline int
+swim_encode_quit(struct swim *swim, struct swim_packet *packet)
+{
+	struct swim_quit_bin bin;
+	char *pos = swim_packet_alloc(packet, sizeof(bin));
+	if (pos == NULL)
+		return 0;
+	swim_quit_bin_create(&bin, swim->self->incarnation);
+	memcpy(pos, &bin, sizeof(bin));
+	return 1;
+}
+
+void
+swim_quit(struct swim *swim)
+{
+	assert(swim_is_configured(swim));
+	swim_ev_timer_stop(loop(), &swim->round_tick);
+	swim_ev_timer_stop(loop(), &swim->wait_ack_tick);
+	swim_scheduler_stop_input(&swim->scheduler);
+	/* Start the last round - quiting. */
+	if (swim_new_round(swim) != 0) {
+		diag_log();
+		swim_delete(swim);
+		return;
+	}
+	struct swim_task *task = &swim->round_step_task;
+	swim_task_destroy(task);
+	swim_task_create(task, swim_quit_step_complete, swim_task_delete_cb,
+			 "quit");
+	char *header = swim_packet_alloc(&task->packet, 1);
+	int rc = swim_encode_src_uuid(swim, &task->packet) +
+		 swim_encode_quit(swim, &task->packet);
+	assert(rc == 2);
+	mp_encode_map(header, rc);
+	swim_quit_step_complete(task, &swim->scheduler, 0);
 }
 
 const struct swim_member *

@@ -1,5 +1,5 @@
 	*** main_f ***
-1..12
+1..13
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -116,4 +116,17 @@ ok 11 - subtests
     ok 5 - drop rate = 90.00, but the failure is disseminated
 ok 12 - subtests
 	*** swim_test_packet_loss: done ***
+	*** swim_test_quit ***
+    1..9
+    ok 1 - 'quit' is sent to all the members without delays between dispatches
+    ok 2 - quited member S1 has returned and refuted the old status
+    ok 3 - another member S2 has taken the quited UUID
+    ok 4 - S3 did not add S1 back when received its 'quit'
+    ok 5 - S2 finally got 'quit' message from S1, but with its 'own' UUID - refute it
+    ok 6 - S3 sees S1 as left
+    ok 7 - S2 does not see S1 at all
+    ok 8 - after more time S1 is dropped from S3
+    ok 9 - and still is not added to S2 - left members can not be added
+ok 13 - subtests
+	*** swim_test_quit: done ***
 	*** main_f: done ***

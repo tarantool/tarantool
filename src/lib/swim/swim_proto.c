@@ -38,6 +38,7 @@
 const char *swim_member_status_strs[] = {
 	"alive",
 	"dead",
+	"left",
 };
 
 const char *swim_fd_msg_type_strs[] = {
@@ -450,4 +451,14 @@ swim_meta_def_decode(struct swim_meta_def *def, const char **pos,
 		return -1;
 	}
 	return 0;
+}
+
+void
+swim_quit_bin_create(struct swim_quit_bin *header, uint64_t incarnation)
+{
+	header->k_quit = SWIM_QUIT;
+	header->m_quit = 0x81;
+	header->k_incarnation = SWIM_QUIT_INCARNATION;
+	header->m_incarnation = 0xcf;
+	header->v_incarnation = mp_bswap_u64(incarnation);
 }

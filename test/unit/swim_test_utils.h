@@ -72,6 +72,10 @@ swim_error_check_match(const char *msg);
 struct swim *
 swim_cluster_node(struct swim_cluster *cluster, int i);
 
+/** Quit a member with id @a id. */
+void
+swim_cluster_quit_node(struct swim_cluster *cluster, int i);
+
 /** Drop and create again a SWIM instance with id @a i. */
 void
 swim_cluster_restart_node(struct swim_cluster *cluster, int i);
@@ -93,6 +97,14 @@ swim_cluster_set_drop(struct swim_cluster *cluster, int i, double value);
  */
 int
 swim_cluster_add_link(struct swim_cluster *cluster, int to_id, int from_id);
+
+/** Add a bidirectional link between two SWIM instances. */
+static inline void
+swim_cluster_interconnect(struct swim_cluster *cluster, int to_id, int from_id)
+{
+	swim_cluster_add_link(cluster, to_id, from_id);
+	swim_cluster_add_link(cluster, from_id, to_id);
+}
 
 enum swim_member_status
 swim_cluster_member_status(struct swim_cluster *cluster, int node_id,

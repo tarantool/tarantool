@@ -198,6 +198,17 @@ swim_cluster_node(struct swim_cluster *cluster, int i)
 }
 
 void
+swim_cluster_quit_node(struct swim_cluster *cluster, int i)
+{
+	assert(i >= 0 && i < cluster->size);
+	struct swim_node *n = &cluster->node[i];
+	assert(tt_uuid_is_equal(&n->uuid,
+				swim_member_uuid(swim_self(n->swim))));
+	swim_quit(n->swim);
+	n->swim = NULL;
+}
+
+void
 swim_cluster_restart_node(struct swim_cluster *cluster, int i)
 {
 	assert(i >= 0 && i < cluster->size);
