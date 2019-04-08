@@ -1,6 +1,6 @@
 
 ffi = require('ffi')
-ffi.cdef([[
+pcall(ffi.cdef, [[
 typedef long rlim_t;
 struct rlimit {
     rlim_t rlim_cur;  /* Soft limit */
