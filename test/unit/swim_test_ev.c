@@ -281,7 +281,7 @@ swim_ev_timer_stop(struct ev_loop *loop, struct ev_timer *base)
 
 /** Process all the events with the next nearest deadline. */
 void
-swim_do_loop_step(struct ev_loop *loop)
+swim_test_ev_do_loop_step(struct ev_loop *loop)
 {
 	struct swim_event *next_e, *e = event_heap_top(&event_heap);
 	if (e != NULL) {
@@ -296,31 +296,6 @@ swim_do_loop_step(struct ev_loop *loop)
 			e = next_e;
 		} while (e != NULL && e->deadline == watch);
 	}
-	/*
-	 * After events are processed, it is possible that some of
-	 * them generated IO events. Process them too.
-	 */
-	do {
-		swim_transport_do_loop_step(loop);
-		/*
-		 * Just a single loop + invoke is not enough. At
-		 * least two are necessary.
-		 *
-		 * First loop does nothing since send queues are
-		 * empty. First invoke fills send queues.
-		 *
-		 * Second loop moves messages from send to recv
-		 * queues. Second invoke processes messages in
-		 * recv queues.
-		 *
-		 * With indirect messages even 2 cycles is not
-		 * enough - processing of one received message can
-		 * add a new message into another send queue.
-		 */
-		if (ev_pending_count(loop) == 0)
-			break;
-		ev_invoke_pending(loop);
-	} while (true);
 }
 
 void

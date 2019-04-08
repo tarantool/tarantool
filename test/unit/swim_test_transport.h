@@ -41,12 +41,13 @@ struct ev_loop;
  */
 
 /**
- * Feed EV_WRITE event to all opened descriptors, and EV_READ to
- * ones, who have not empty recv queue. Move packets from send to
- * recv queues. No callbacks is invoked. Only events are fed.
+ * Until there are no new IO events, feed EV_WRITE event to all
+ * opened descriptors; EV_READ to ones, who have not empty recv
+ * queue; invoke callbacks to process the events. Move packets
+ * from send to recv queues.
  */
 void
-swim_transport_do_loop_step(struct ev_loop *loop);
+swim_test_transport_do_loop_step(struct ev_loop *loop);
 
 /**
  * Block a file descriptor so as it can not receive nor send any

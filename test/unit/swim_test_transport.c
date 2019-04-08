@@ -304,8 +304,12 @@ swim_fd_send_packet(struct swim_fd *fd)
 		swim_test_packet_delete(p);
 }
 
-void
-swim_transport_do_loop_step(struct ev_loop *loop)
+/**
+ * Feed EV_WRITE/READ events to the descriptors having something
+ * to send/recv.
+ */
+static inline void
+swim_test_transport_feed_events(struct ev_loop *loop)
 {
 	struct swim_fd *fd;
 	/*
@@ -321,4 +325,28 @@ swim_transport_do_loop_step(struct ev_loop *loop)
 		if (!rlist_empty(&fd->recv_queue))
 			ev_feed_fd_event(loop, fd->evfd, EV_READ);
 	}
+}
+
+void
+swim_test_transport_do_loop_step(struct ev_loop *loop)
+{
+	do {
+		ev_invoke_pending(loop);
+		swim_test_transport_feed_events(loop);
+		/*
+		 * Just a single loop + invoke is not enough. At
+		 * least two are necessary.
+		 *
+		 * First loop does nothing since send queues are
+		 * empty. First invoke fills send queues.
+		 *
+		 * Second loop moves messages from send to recv
+		 * queues. Second invoke processes messages in
+		 * recv queues.
+		 *
+		 * With indirect messages even 2 cycles is not
+		 * enough - processing of one received message can
+		 * add a new message into another send queue.
+		 */
+	} while (ev_pending_count(loop) > 0);
 }

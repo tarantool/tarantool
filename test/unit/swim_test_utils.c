@@ -293,10 +293,24 @@ swim_wait_timeout(double timeout, struct swim_cluster *cluster,
 {
 	swim_ev_set_brk(timeout);
 	double deadline = swim_time() + timeout;
+	struct ev_loop *loop = loop();
+	/*
+	 * There can be pending out of bound IO events, affecting
+	 * the result. For example, 'quit' messages, which are
+	 * send immediately without preliminary timeouts or
+	 * whatsoever.
+	 */
+	swim_test_transport_do_loop_step(loop);
 	while (! check(cluster, data)) {
 		if (swim_time() >= deadline)
 			return -1;
-		swim_do_loop_step(loop());
+		swim_test_ev_do_loop_step(loop);
+		/*
+		 * After events are processed, it is possible that
+		 * some of them generated IO events. Process them
+		 * too.
+		 */
+		swim_test_transport_do_loop_step(loop);
 	}
 	return 0;
 }

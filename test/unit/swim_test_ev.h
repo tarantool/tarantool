@@ -98,7 +98,7 @@ swim_ev_set_brk(double delay);
 
 /** Play one step of event loop, process generated events. */
 void
-swim_do_loop_step(struct ev_loop *loop);
+swim_test_ev_do_loop_step(struct ev_loop *loop);
 
 /** Destroy pending events, reset global watch. */
 void
