@@ -274,22 +274,41 @@ struct swim_member {
 	 *                 Dissemination component
 	 *
 	 * Dissemination component sends events. Event is a
-	 * notification about member status update. So formally,
-	 * this structure already has all the needed attributes.
-	 * But also an event somehow should be sent to all members
-	 * at least once according to SWIM, so it requires
-	 * something like TTL for each type of event, which gets
-	 * decremented on each send. And a member can not be
-	 * removed from the global table until it gets dead and
-	 * its status TTLs is 0, so as to allow other members
-	 * learn its dead status.
+	 * notification about some member state update. The member
+	 * maintains a different event type for each significant
+	 * attribute - status, incarnation, etc not to send entire
+	 * member state each time any member attribute changes.
+	 *
+	 * According to SWIM, an event should be sent to all
+	 * members at least once - for that a TTL (time-to-live)
+	 * counter is maintained for each independent event type.
+	 *
+	 * When a member state changes, the TTL is reset to the
+	 * cluster size. It is then decremented after each send.
+	 * This guarantees that each member state change is sent
+	 * to each SWIM member at least once. If a new event of
+	 * the same type is generated before a round is finished,
+	 * the current event object is updated in place with reset
+	 * of the TTL.
+	 *
+	 * To conclude, TTL works in two ways: to see which
+	 * specific member attribute needs dissemination and to
+	 * track how many cluster members still need to learn
+	 * about the change from this instance.
+	 */
+	/**
+	 * General TTL reset each time when any visible member
+	 * attribute is updated. It is always bigger or equal than
+	 * any other TTLs. In addition it helps to keep a dead
+	 * member not dropped until the TTL gets zero so as to
+	 * allow other members to learn the dead status.
 	 */
 	int status_ttl;
 	/**
-	 * Events are put into a queue sorted by event occurrence
+	 * All created events are put into a queue sorted by event
 	 * time.
 	 */
-	struct rlist in_events_queue;
+	struct rlist in_event_queue;
 };
 
 #define mh_name _swim_table
@@ -389,8 +408,13 @@ struct swim {
 	 *
 	 *                 Dissemination component
 	 */
-	/** Queue of events sorted by occurrence time. */
-	struct rlist events_queue;
+	/**
+	 * Queue of all members which have dissemination
+	 * information. A member is added to the queue whenever
+	 * any of its attributes changes, and stays in the queue
+	 * as long as the event TTL is non-zero.
+	 */
+	struct rlist event_queue;
 };
 
 /** Put the member into a list of ACK waiters. */
@@ -405,20 +429,21 @@ swim_wait_ack(struct swim *swim, struct swim_member *member)
 }
 
 /**
- * On literally any update of a member it stands into a queue of
- * events to disseminate the update. Note that status TTL is
- * always set, even if UUID is updated, or any other attribute. It
- * is because 1) it simplifies the code when status TTL is bigger
- * than all other ones, 2) status occupies only 2 bytes in a
- * packet, so it is never worse to send it on any update, but
- * reduces entropy.
+ * On literally any update of a member it is added to a queue of
+ * members to disseminate updates. Regardless of other TTLs, each
+ * update also resets status TTL. Status TTL is always greater
+ * than any other event-related TTL, so it's sufficient to look at
+ * it alone to see that a member needs information dissemination.
+ * The status change itself occupies only 2 bytes in a packet, so
+ * it is cheap to send it on any update, while does reduce
+ * entropy.
  */
 static inline void
 swim_register_event(struct swim *swim, struct swim_member *member)
 {
-	if (rlist_empty(&member->in_events_queue)) {
-		rlist_add_tail_entry(&swim->events_queue, member,
-				     in_events_queue);
+	if (rlist_empty(&member->in_event_queue)) {
+		rlist_add_tail_entry(&swim->event_queue, member,
+				     in_event_queue);
 	}
 	member->status_ttl = mh_size(swim->members);
 }
@@ -515,7 +540,7 @@ swim_member_delete(struct swim_member *member)
 	swim_task_destroy(&member->ping_task);
 
 	/* Dissemination component. */
-	assert(rlist_empty(&member->in_events_queue));
+	assert(rlist_empty(&member->in_event_queue));
 
 	free(member);
 }
@@ -560,7 +585,7 @@ swim_member_new(const struct sockaddr_in *addr, const struct tt_uuid *uuid,
 			 "ping");
 
 	/* Dissemination component. */
-	rlist_create(&member->in_events_queue);
+	rlist_create(&member->in_event_queue);
 
 	return member;
 }
@@ -585,7 +610,7 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 		wait_ack_heap_delete(&swim->wait_ack_heap, member);
 
 	/* Dissemination component. */
-	rlist_del_entry(member, in_events_queue);
+	rlist_del_entry(member, in_event_queue);
 
 	swim_member_delete(member);
 }
@@ -804,7 +829,7 @@ swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
 	struct swim_member *m;
 	struct swim_event_bin event_bin;
 	swim_event_bin_create(&event_bin);
-	rlist_foreach_entry(m, &swim->events_queue, in_events_queue) {
+	rlist_foreach_entry(m, &swim->event_queue, in_event_queue) {
 		int new_size = size + sizeof(event_bin);
 		if (swim_packet_reserve(packet, new_size) == NULL)
 			break;
@@ -842,22 +867,24 @@ swim_encode_round_msg(struct swim *swim, struct swim_packet *packet)
 
 /**
  * Decrement TTLs of all events. It is done after each round step.
- * Note, that when there are too many events to fit into a packet,
- * the tail of events list without being disseminated start
- * reeking and rotting, and the most far events can be deleted
- * without ever being sent. But hardly this situation is reachable
- * since even 1000 bytes can fit 37 events of ~27 bytes each, that
- * means in fact a failure of 37 instances. In such a case event
- * taint is the most mild problem.
+ * Note, since we decrement TTL of all events, even those which
+ * have not been actually encoded and sent, if there are more
+ * events than can fit into a packet, the tail of the queue begins
+ * reeking and rotting. The most recently added members could even
+ * be deleted without being sent once. This is, however, very
+ * unlikely, since even 1000 bytes can fit 37 events containing
+ * ~27 bytes each, which means only happens upon a failure of 37
+ * instances. In such a case event loss is the mildest problem to
+ * deal with.
  */
 static void
-swim_decrease_events_ttl(struct swim *swim)
+swim_decrease_event_ttl(struct swim *swim)
 {
 	struct swim_member *member, *tmp;
-	rlist_foreach_entry_safe(member, &swim->events_queue, in_events_queue,
+	rlist_foreach_entry_safe(member, &swim->event_queue, in_event_queue,
 				 tmp) {
 		if (--member->status_ttl == 0)
-			rlist_del_entry(member, in_events_queue);
+			rlist_del_entry(member, in_event_queue);
 	}
 }
 
@@ -922,7 +949,7 @@ swim_complete_step(struct swim_task *task,
 			 * sections.
 			 */
 			swim_wait_ack(swim, m);
-			swim_decrease_events_ttl(swim);
+			swim_decrease_event_ttl(swim);
 		}
 	}
 }
@@ -1337,7 +1364,7 @@ swim_new(void)
 	swim->gc_mode = SWIM_GC_ON;
 
 	/* Dissemination component. */
-	rlist_create(&swim->events_queue);
+	rlist_create(&swim->event_queue);
 
 	return swim;
 }
@@ -1553,7 +1580,7 @@ swim_delete(struct swim *swim)
 		rlist_del_entry(m, in_round_queue);
 		if (! heap_node_is_stray(&m->in_wait_ack_heap))
 			wait_ack_heap_delete(&swim->wait_ack_heap, m);
-		rlist_del_entry(m, in_events_queue);
+		rlist_del_entry(m, in_event_queue);
 		swim_member_delete(m);
 	}
 	wait_ack_heap_destroy(&swim->wait_ack_heap);
