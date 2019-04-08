@@ -432,6 +432,13 @@ else()
 endif()
 
 #
+# decNumber
+#
+
+include(BuildDecNumber)
+decnumber_build()
+
+#
 # LibYAML
 #
 

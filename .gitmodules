@@ -31,3 +31,6 @@
 	path = third_party/luarocks
 	url = https://github.com/tarantool/luarocks.git
 	branch = tarantool-1.7
+[submodule "third_party/decNumber"]
+	path = third_party/decNumber
+	url = https://github.com/tarantool/decNumber.git

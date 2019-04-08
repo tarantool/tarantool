@@ -1,0 +1,406 @@
+1..258
+ok 1 - decimal(314)
+ok 2 - decimal(271)
+ok 3 - decimal(314) + decimal(271)
+ok 4 - decimal((314) + (271))
+ok 5 - decimal(314) + decimal(271) == (314) + (271)
+ok 6 - decimal(314) - decimal(271)
+ok 7 - decimal((314) - (271))
+ok 8 - decimal(314) - decimal(271) == (314) - (271)
+ok 9 - decimal(314) * decimal(271)
+ok 10 - decimal((314) * (271))
+ok 11 - decimal_round((314) * (271), 15)
+ok 12 - decimal(314) * decimal(271) == (314) * (271)
+ok 13 - decimal(314) / decimal(271)
+ok 14 - decimal((314) / (271))
+ok 15 - decimal_round((314)/(271), 15)
+ok 16 - decimal(314) / decimal(271) == (314) / (271)
+ok 17 - decimal(65535)
+ok 18 - decimal(23456)
+ok 19 - decimal(65535) + decimal(23456)
+ok 20 - decimal((65535) + (23456))
+ok 21 - decimal(65535) + decimal(23456) == (65535) + (23456)
+ok 22 - decimal(65535) - decimal(23456)
+ok 23 - decimal((65535) - (23456))
+ok 24 - decimal(65535) - decimal(23456) == (65535) - (23456)
+ok 25 - decimal(65535) * decimal(23456)
+ok 26 - decimal((65535) * (23456))
+ok 27 - decimal_round((65535) * (23456), 15)
+ok 28 - decimal(65535) * decimal(23456) == (65535) * (23456)
+ok 29 - decimal(65535) / decimal(23456)
+ok 30 - decimal((65535) / (23456))
+ok 31 - decimal_round((65535)/(23456), 15)
+ok 32 - decimal(65535) / decimal(23456) == (65535) / (23456)
+ok 33 - decimal(0)
+ok 34 - decimal(1)
+ok 35 - decimal(0) + decimal(1)
+ok 36 - decimal((0) + (1))
+ok 37 - decimal(0) + decimal(1) == (0) + (1)
+ok 38 - decimal(0) - decimal(1)
+ok 39 - decimal((0) - (1))
+ok 40 - decimal(0) - decimal(1) == (0) - (1)
+ok 41 - decimal(0) * decimal(1)
+ok 42 - decimal((0) * (1))
+ok 43 - decimal_round((0) * (1), 15)
+ok 44 - decimal(0) * decimal(1) == (0) * (1)
+ok 45 - decimal(0) / decimal(1)
+ok 46 - decimal((0) / (1))
+ok 47 - decimal_round((0)/(1), 15)
+ok 48 - decimal(0) / decimal(1) == (0) / (1)
+ok 49 - decimal(0)
+ok 50 - decimal(-1)
+ok 51 - decimal(0) + decimal(-1)
+ok 52 - decimal((0) + (-1))
+ok 53 - decimal(0) + decimal(-1) == (0) + (-1)
+ok 54 - decimal(0) - decimal(-1)
+ok 55 - decimal((0) - (-1))
+ok 56 - decimal(0) - decimal(-1) == (0) - (-1)
+ok 57 - decimal(0) * decimal(-1)
+ok 58 - decimal((0) * (-1))
+ok 59 - decimal_round((0) * (-1), 15)
+ok 60 - decimal(0) * decimal(-1) == (0) * (-1)
+ok 61 - decimal(0) / decimal(-1)
+ok 62 - decimal((0) / (-1))
+ok 63 - decimal_round((0)/(-1), 15)
+ok 64 - decimal(0) / decimal(-1) == (0) / (-1)
+ok 65 - decimal(-1)
+ok 66 - decimal(1)
+ok 67 - decimal(-1) + decimal(1)
+ok 68 - decimal((-1) + (1))
+ok 69 - decimal(-1) + decimal(1) == (-1) + (1)
+ok 70 - decimal(-1) - decimal(1)
+ok 71 - decimal((-1) - (1))
+ok 72 - decimal(-1) - decimal(1) == (-1) - (1)
+ok 73 - decimal(-1) * decimal(1)
+ok 74 - decimal((-1) * (1))
+ok 75 - decimal_round((-1) * (1), 15)
+ok 76 - decimal(-1) * decimal(1) == (-1) * (1)
+ok 77 - decimal(-1) / decimal(1)
+ok 78 - decimal((-1) / (1))
+ok 79 - decimal_round((-1)/(1), 15)
+ok 80 - decimal(-1) / decimal(1) == (-1) / (1)
+ok 81 - decimal(INT_MIN)
+ok 82 - decimal(INT_MAX)
+ok 83 - decimal(INT_MIN) + decimal(INT_MAX)
+ok 84 - decimal((INT_MIN) + (INT_MAX))
+ok 85 - decimal(INT_MIN) + decimal(INT_MAX) == (INT_MIN) + (INT_MAX)
+ok 86 - decimal(INT_MIN) - decimal(INT_MAX)
+ok 87 - decimal((INT_MIN) - (INT_MAX))
+ok 88 - decimal(INT_MIN) - decimal(INT_MAX) == (INT_MIN) - (INT_MAX)
+ok 89 - decimal(INT_MIN) * decimal(INT_MAX)
+ok 90 - decimal((INT_MIN) * (INT_MAX))
+ok 91 - decimal_round((INT_MIN) * (INT_MAX), 15)
+ok 92 - decimal(INT_MIN) * decimal(INT_MAX) == (INT_MIN) * (INT_MAX)
+ok 93 - decimal(INT_MIN) / decimal(INT_MAX)
+ok 94 - decimal((INT_MIN) / (INT_MAX))
+ok 95 - decimal_round((INT_MIN)/(INT_MAX), 15)
+ok 96 - decimal(INT_MIN) / decimal(INT_MAX) == (INT_MIN) / (INT_MAX)
+ok 97 - decimal(-314)
+ok 98 - decimal(-271)
+ok 99 - decimal(-314) + decimal(-271)
+ok 100 - decimal((-314) + (-271))
+ok 101 - decimal(-314) + decimal(-271) == (-314) + (-271)
+ok 102 - decimal(-314) - decimal(-271)
+ok 103 - decimal((-314) - (-271))
+ok 104 - decimal(-314) - decimal(-271) == (-314) - (-271)
+ok 105 - decimal(-314) * decimal(-271)
+ok 106 - decimal((-314) * (-271))
+ok 107 - decimal_round((-314) * (-271), 15)
+ok 108 - decimal(-314) * decimal(-271) == (-314) * (-271)
+ok 109 - decimal(-314) / decimal(-271)
+ok 110 - decimal((-314) / (-271))
+ok 111 - decimal_round((-314)/(-271), 15)
+ok 112 - decimal(-314) / decimal(-271) == (-314) / (-271)
+ok 113 - decimal(-159615516)
+ok 114 - decimal(172916921)
+ok 115 - decimal(-159615516) + decimal(172916921)
+ok 116 - decimal((-159615516) + (172916921))
+ok 117 - decimal(-159615516) + decimal(172916921) == (-159615516) + (172916921)
+ok 118 - decimal(-159615516) - decimal(172916921)
+ok 119 - decimal((-159615516) - (172916921))
+ok 120 - decimal(-159615516) - decimal(172916921) == (-159615516) - (172916921)
+ok 121 - decimal(-159615516) * decimal(172916921)
+ok 122 - decimal((-159615516) * (172916921))
+ok 123 - decimal_round((-159615516) * (172916921), 15)
+ok 124 - decimal(-159615516) * decimal(172916921) == (-159615516) * (172916921)
+ok 125 - decimal(-159615516) / decimal(172916921)
+ok 126 - decimal((-159615516) / (172916921))
+ok 127 - decimal_round((-159615516)/(172916921), 15)
+ok 128 - decimal(-159615516) / decimal(172916921) == (-159615516) / (172916921)
+ok 129 - decimal(1.1)
+ok 130 - decimal(2.3)
+ok 131 - decimal(1.1) + decimal(2.3)
+ok 132 - decimal((1.1) + (2.3))
+ok 133 - decimal(1.1) + decimal(2.3) == (1.1) + (2.3)
+ok 134 - decimal(1.1) - decimal(2.3)
+ok 135 - decimal((1.1) - (2.3))
+ok 136 - decimal(1.1) - decimal(2.3) == (1.1) - (2.3)
+ok 137 - decimal(1.1) * decimal(2.3)
+ok 138 - decimal((1.1) * (2.3))
+ok 139 - decimal_round((1.1) * (2.3), 15)
+ok 140 - decimal(1.1) * decimal(2.3) == (1.1) * (2.3)
+ok 141 - decimal(1.1) / decimal(2.3)
+ok 142 - decimal((1.1) / (2.3))
+ok 143 - decimal_round((1.1)/(2.3), 15)
+ok 144 - decimal(1.1) / decimal(2.3) == (1.1) / (2.3)
+ok 145 - decimal(1e10)
+ok 146 - decimal(1e10)
+ok 147 - decimal(1e10) + decimal(1e10)
+ok 148 - decimal((1e10) + (1e10))
+ok 149 - decimal(1e10) + decimal(1e10) == (1e10) + (1e10)
+ok 150 - decimal(1e10) - decimal(1e10)
+ok 151 - decimal((1e10) - (1e10))
+ok 152 - decimal(1e10) - decimal(1e10) == (1e10) - (1e10)
+ok 153 - decimal(1e10) * decimal(1e10)
+ok 154 - decimal((1e10) * (1e10))
+ok 155 - decimal_round((1e10) * (1e10), 15)
+ok 156 - decimal(1e10) * decimal(1e10) == (1e10) * (1e10)
+ok 157 - decimal(1e10) / decimal(1e10)
+ok 158 - decimal((1e10) / (1e10))
+ok 159 - decimal_round((1e10)/(1e10), 15)
+ok 160 - decimal(1e10) / decimal(1e10) == (1e10) / (1e10)
+ok 161 - decimal(1.23456789)
+ok 162 - decimal(4.567890123)
+ok 163 - decimal(1.23456789) + decimal(4.567890123)
+ok 164 - decimal((1.23456789) + (4.567890123))
+ok 165 - decimal(1.23456789) + decimal(4.567890123) == (1.23456789) + (4.567890123)
+ok 166 - decimal(1.23456789) - decimal(4.567890123)
+ok 167 - decimal((1.23456789) - (4.567890123))
+ok 168 - decimal(1.23456789) - decimal(4.567890123) == (1.23456789) - (4.567890123)
+ok 169 - decimal(1.23456789) * decimal(4.567890123)
+ok 170 - decimal((1.23456789) * (4.567890123))
+ok 171 - decimal_round((1.23456789) * (4.567890123), 15)
+ok 172 - decimal(1.23456789) * decimal(4.567890123) == (1.23456789) * (4.567890123)
+ok 173 - decimal(1.23456789) / decimal(4.567890123)
+ok 174 - decimal((1.23456789) / (4.567890123))
+ok 175 - decimal_round((1.23456789)/(4.567890123), 15)
+ok 176 - decimal(1.23456789) / decimal(4.567890123) == (1.23456789) / (4.567890123)
+ok 177 - decimal_from_string(1e-38)
+ok 178 - decimal_from_string(1e-38)
+ok 179 - decimal_from_string(2e-38)
+ok 180 - decimal_add(1e-38, 1e-38)
+ok 181 - decimal_compare(2e-38)
+ok 182 - decimal_from_string(-1e-38)
+ok 183 - decimal_from_string(1e-38)
+ok 184 - decimal_from_string(0)
+ok 185 - decimal_add(-1e-38, 1e-38)
+ok 186 - decimal_compare(0)
+ok 187 - decimal_from_string(1e-39)
+ok 188 - decimal_from_string(0)
+ok 189 - decimal_from_string(0)
+ok 190 - decimal_add(1e-39, 0)
+ok 191 - decimal_compare(0)
+ok 192 - decimal_from_string(1e-39)
+ok 193 - decimal_from_string(1e-38)
+ok 194 - decimal_from_string(1e-38)
+ok 195 - decimal_add(1e-39, 1e-38)
+ok 196 - decimal_compare(1e-38)
+ok 197 - decimal_from_string(1e-19)
+ok 198 - decimal_from_string(1e-19)
+ok 199 - decimal_from_string(1e-38)
+ok 200 - decimal_mul(1e-19, 1e-19)
+ok 201 - decimal_compare(1e-38)
+ok 202 - decimal_from_string(1e37)
+ok 203 - decimal_from_string(0)
+ok 204 - decimal_from_string(1e37)
+ok 205 - decimal_add(1e37, 0)
+ok 206 - decimal_compare(1e37)
+ok 207 - decimal_from_string(1e18)
+ok 208 - decimal_from_string(1e18)
+ok 209 - decimal_from_string(1e36)
+ok 210 - decimal_mul(1e18, 1e18)
+ok 211 - decimal_compare(1e36)
+ok 212 - decimal_from_string(10)
+ok 213 - decimal_from_string(2)
+ok 214 - decimal_from_string(100)
+ok 215 - decimal_pow(10, 2)
+ok 216 - decimal_compare(100)
+ok 217 - decimal_from_string(2)
+ok 218 - decimal_from_string(10)
+ok 219 - decimal_from_string(1024)
+ok 220 - decimal_pow(2, 10)
+ok 221 - decimal_compare(1024)
+ok 222 - decimal_from_string(100)
+ok 223 - decimal_from_string(0.5)
+ok 224 - decimal_from_string(10)
+ok 225 - decimal_pow(100, 0.5)
+ok 226 - decimal_compare(10)
+ok 227 - decimal_from_string(100)
+ok 228 - decimal_from_string(2)
+ok 229 - decimal_log10(100)
+ok 230 - decimal_compare(2)
+ok 231 - decimal_from_string(10)
+ok 232 - decimal_from_string(2.3)
+ok 233 - decimal_ln(10)
+ok 234 - decimal_compare(2.3)
+ok 235 - decimal_from_string(2)
+ok 236 - decimal_from_string(7.39)
+ok 237 - decimal_exp(2)
+ok 238 - decimal_compare(7.39)
+ok 239 - decimal_from_string(100)
+ok 240 - decimal_from_string(10)
+ok 241 - decimal_sqrt(100)
+ok 242 - decimal_compare(10)
+ok 243 - decimal construction from 2e38 failure
+ok 244 - decimal construction from "1e38" failure
+ok 245 - decimal construction from "100000000000000000000000000000000000000" failure
+ok 246 - decimal construction from LONG_MIN success
+ok 247 - decimal construction from LONG_MAX success
+ok 248 - decimal construction from ULONG_MAX success
+ok 249 - decimal_from_string(9e37)
+ok 250 - decimal_from_string(1e37)
+ok 251 - decimal_add(9e37, 1e37) - overflow
+ok 252 - decimal_from_string(1e19)
+ok 253 - decimal_from_string(1e19)
+ok 254 - decimal_mul(1e19, 1e19) - overflow
+ok 255 - decimal_from_string(1e19)
+ok 256 - decimal_from_string(1e-19)
+ok 257 - decimal_div(1e19, 1e-19) - overflow
+    1..146
+    ok 1 - decimal_len(0)
+    ok 2 - decimal_len(0) == len(decimal_pack(0)
+    ok 3 - decimal_unpack(decimal_pack(0))
+    ok 4 - decimal_unpack(decimal_pack(0)) len
+    ok 5 - decimal_unpack(decimal_pack(0)) value
+    ok 6 - decimal_unpack(decimal_pack(0)) scale
+    ok 7 - decimal_unpack(decimal_pack(0)) precision
+    ok 8 - str(decimal_unpack(decimal_pack(0)) == 0
+    ok 9 - decimal_len(-0)
+    ok 10 - decimal_len(-0) == len(decimal_pack(-0)
+    ok 11 - decimal_unpack(decimal_pack(-0))
+    ok 12 - decimal_unpack(decimal_pack(-0)) len
+    ok 13 - decimal_unpack(decimal_pack(-0)) value
+    ok 14 - decimal_unpack(decimal_pack(-0)) scale
+    ok 15 - decimal_unpack(decimal_pack(-0)) precision
+    ok 16 - str(decimal_unpack(decimal_pack(-0)) == -0
+    ok 17 - decimal_len(1)
+    ok 18 - decimal_len(1) == len(decimal_pack(1)
+    ok 19 - decimal_unpack(decimal_pack(1))
+    ok 20 - decimal_unpack(decimal_pack(1)) len
+    ok 21 - decimal_unpack(decimal_pack(1)) value
+    ok 22 - decimal_unpack(decimal_pack(1)) scale
+    ok 23 - decimal_unpack(decimal_pack(1)) precision
+    ok 24 - str(decimal_unpack(decimal_pack(1)) == 1
+    ok 25 - decimal_len(-1)
+    ok 26 - decimal_len(-1) == len(decimal_pack(-1)
+    ok 27 - decimal_unpack(decimal_pack(-1))
+    ok 28 - decimal_unpack(decimal_pack(-1)) len
+    ok 29 - decimal_unpack(decimal_pack(-1)) value
+    ok 30 - decimal_unpack(decimal_pack(-1)) scale
+    ok 31 - decimal_unpack(decimal_pack(-1)) precision
+    ok 32 - str(decimal_unpack(decimal_pack(-1)) == -1
+    ok 33 - decimal_len(0.1)
+    ok 34 - decimal_len(0.1) == len(decimal_pack(0.1)
+    ok 35 - decimal_unpack(decimal_pack(0.1))
+    ok 36 - decimal_unpack(decimal_pack(0.1)) len
+    ok 37 - decimal_unpack(decimal_pack(0.1)) value
+    ok 38 - decimal_unpack(decimal_pack(0.1)) scale
+    ok 39 - decimal_unpack(decimal_pack(0.1)) precision
+    ok 40 - str(decimal_unpack(decimal_pack(0.1)) == 0.1
+    ok 41 - decimal_len(-0.1)
+    ok 42 - decimal_len(-0.1) == len(decimal_pack(-0.1)
+    ok 43 - decimal_unpack(decimal_pack(-0.1))
+    ok 44 - decimal_unpack(decimal_pack(-0.1)) len
+    ok 45 - decimal_unpack(decimal_pack(-0.1)) value
+    ok 46 - decimal_unpack(decimal_pack(-0.1)) scale
+    ok 47 - decimal_unpack(decimal_pack(-0.1)) precision
+    ok 48 - str(decimal_unpack(decimal_pack(-0.1)) == -0.1
+    ok 49 - decimal_len(2.718281828459045)
+    ok 50 - decimal_len(2.718281828459045) == len(decimal_pack(2.718281828459045)
+    ok 51 - decimal_unpack(decimal_pack(2.718281828459045))
+    ok 52 - decimal_unpack(decimal_pack(2.718281828459045)) len
+    ok 53 - decimal_unpack(decimal_pack(2.718281828459045)) value
+    ok 54 - decimal_unpack(decimal_pack(2.718281828459045)) scale
+    ok 55 - decimal_unpack(decimal_pack(2.718281828459045)) precision
+    ok 56 - str(decimal_unpack(decimal_pack(2.718281828459045)) == 2.718281828459045
+    ok 57 - decimal_len(-2.718281828459045)
+    ok 58 - decimal_len(-2.718281828459045) == len(decimal_pack(-2.718281828459045)
+    ok 59 - decimal_unpack(decimal_pack(-2.718281828459045))
+    ok 60 - decimal_unpack(decimal_pack(-2.718281828459045)) len
+    ok 61 - decimal_unpack(decimal_pack(-2.718281828459045)) value
+    ok 62 - decimal_unpack(decimal_pack(-2.718281828459045)) scale
+    ok 63 - decimal_unpack(decimal_pack(-2.718281828459045)) precision
+    ok 64 - str(decimal_unpack(decimal_pack(-2.718281828459045)) == -2.718281828459045
+    ok 65 - decimal_len(3.141592653589793)
+    ok 66 - decimal_len(3.141592653589793) == len(decimal_pack(3.141592653589793)
+    ok 67 - decimal_unpack(decimal_pack(3.141592653589793))
+    ok 68 - decimal_unpack(decimal_pack(3.141592653589793)) len
+    ok 69 - decimal_unpack(decimal_pack(3.141592653589793)) value
+    ok 70 - decimal_unpack(decimal_pack(3.141592653589793)) scale
+    ok 71 - decimal_unpack(decimal_pack(3.141592653589793)) precision
+    ok 72 - str(decimal_unpack(decimal_pack(3.141592653589793)) == 3.141592653589793
+    ok 73 - decimal_len(-3.141592653589793)
+    ok 74 - decimal_len(-3.141592653589793) == len(decimal_pack(-3.141592653589793)
+    ok 75 - decimal_unpack(decimal_pack(-3.141592653589793))
+    ok 76 - decimal_unpack(decimal_pack(-3.141592653589793)) len
+    ok 77 - decimal_unpack(decimal_pack(-3.141592653589793)) value
+    ok 78 - decimal_unpack(decimal_pack(-3.141592653589793)) scale
+    ok 79 - decimal_unpack(decimal_pack(-3.141592653589793)) precision
+    ok 80 - str(decimal_unpack(decimal_pack(-3.141592653589793)) == -3.141592653589793
+    ok 81 - decimal_len(1234567891234567890.0987654321987654321)
+    ok 82 - decimal_len(1234567891234567890.0987654321987654321) == len(decimal_pack(1234567891234567890.0987654321987654321)
+    ok 83 - decimal_unpack(decimal_pack(1234567891234567890.0987654321987654321))
+    ok 84 - decimal_unpack(decimal_pack(1234567891234567890.0987654321987654321)) len
+    ok 85 - decimal_unpack(decimal_pack(1234567891234567890.0987654321987654321)) value
+    ok 86 - decimal_unpack(decimal_pack(1234567891234567890.0987654321987654321)) scale
+    ok 87 - decimal_unpack(decimal_pack(1234567891234567890.0987654321987654321)) precision
+    ok 88 - str(decimal_unpack(decimal_pack(1234567891234567890.0987654321987654321)) == 1234567891234567890.0987654321987654321
+    ok 89 - decimal_len(-1234567891234567890.0987654321987654321)
+    ok 90 - decimal_len(-1234567891234567890.0987654321987654321) == len(decimal_pack(-1234567891234567890.0987654321987654321)
+    ok 91 - decimal_unpack(decimal_pack(-1234567891234567890.0987654321987654321))
+    ok 92 - decimal_unpack(decimal_pack(-1234567891234567890.0987654321987654321)) len
+    ok 93 - decimal_unpack(decimal_pack(-1234567891234567890.0987654321987654321)) value
+    ok 94 - decimal_unpack(decimal_pack(-1234567891234567890.0987654321987654321)) scale
+    ok 95 - decimal_unpack(decimal_pack(-1234567891234567890.0987654321987654321)) precision
+    ok 96 - str(decimal_unpack(decimal_pack(-1234567891234567890.0987654321987654321)) == -1234567891234567890.0987654321987654321
+    ok 97 - decimal_len(0.0000000000000000000000000000000000001)
+    ok 98 - decimal_len(0.0000000000000000000000000000000000001) == len(decimal_pack(0.0000000000000000000000000000000000001)
+    ok 99 - decimal_unpack(decimal_pack(0.0000000000000000000000000000000000001))
+    ok 100 - decimal_unpack(decimal_pack(0.0000000000000000000000000000000000001)) len
+    ok 101 - decimal_unpack(decimal_pack(0.0000000000000000000000000000000000001)) value
+    ok 102 - decimal_unpack(decimal_pack(0.0000000000000000000000000000000000001)) scale
+    ok 103 - decimal_unpack(decimal_pack(0.0000000000000000000000000000000000001)) precision
+    ok 104 - str(decimal_unpack(decimal_pack(0.0000000000000000000000000000000000001)) == 0.0000000000000000000000000000000000001
+    ok 105 - decimal_len(-0.0000000000000000000000000000000000001)
+    ok 106 - decimal_len(-0.0000000000000000000000000000000000001) == len(decimal_pack(-0.0000000000000000000000000000000000001)
+    ok 107 - decimal_unpack(decimal_pack(-0.0000000000000000000000000000000000001))
+    ok 108 - decimal_unpack(decimal_pack(-0.0000000000000000000000000000000000001)) len
+    ok 109 - decimal_unpack(decimal_pack(-0.0000000000000000000000000000000000001)) value
+    ok 110 - decimal_unpack(decimal_pack(-0.0000000000000000000000000000000000001)) scale
+    ok 111 - decimal_unpack(decimal_pack(-0.0000000000000000000000000000000000001)) precision
+    ok 112 - str(decimal_unpack(decimal_pack(-0.0000000000000000000000000000000000001)) == -0.0000000000000000000000000000000000001
+    ok 113 - decimal_len(0.00000000000000000000000000000000000001)
+    ok 114 - decimal_len(0.00000000000000000000000000000000000001) == len(decimal_pack(0.00000000000000000000000000000000000001)
+    ok 115 - decimal_unpack(decimal_pack(0.00000000000000000000000000000000000001))
+    ok 116 - decimal_unpack(decimal_pack(0.00000000000000000000000000000000000001)) len
+    ok 117 - decimal_unpack(decimal_pack(0.00000000000000000000000000000000000001)) value
+    ok 118 - decimal_unpack(decimal_pack(0.00000000000000000000000000000000000001)) scale
+    ok 119 - decimal_unpack(decimal_pack(0.00000000000000000000000000000000000001)) precision
+    ok 120 - str(decimal_unpack(decimal_pack(0.00000000000000000000000000000000000001)) == 0.00000000000000000000000000000000000001
+    ok 121 - decimal_len(-0.00000000000000000000000000000000000001)
+    ok 122 - decimal_len(-0.00000000000000000000000000000000000001) == len(decimal_pack(-0.00000000000000000000000000000000000001)
+    ok 123 - decimal_unpack(decimal_pack(-0.00000000000000000000000000000000000001))
+    ok 124 - decimal_unpack(decimal_pack(-0.00000000000000000000000000000000000001)) len
+    ok 125 - decimal_unpack(decimal_pack(-0.00000000000000000000000000000000000001)) value
+    ok 126 - decimal_unpack(decimal_pack(-0.00000000000000000000000000000000000001)) scale
+    ok 127 - decimal_unpack(decimal_pack(-0.00000000000000000000000000000000000001)) precision
+    ok 128 - str(decimal_unpack(decimal_pack(-0.00000000000000000000000000000000000001)) == -0.00000000000000000000000000000000000001
+    ok 129 - decimal_len(99999999999999999999999999999999999999)
+    ok 130 - decimal_len(99999999999999999999999999999999999999) == len(decimal_pack(99999999999999999999999999999999999999)
+    ok 131 - decimal_unpack(decimal_pack(99999999999999999999999999999999999999))
+    ok 132 - decimal_unpack(decimal_pack(99999999999999999999999999999999999999)) len
+    ok 133 - decimal_unpack(decimal_pack(99999999999999999999999999999999999999)) value
+    ok 134 - decimal_unpack(decimal_pack(99999999999999999999999999999999999999)) scale
+    ok 135 - decimal_unpack(decimal_pack(99999999999999999999999999999999999999)) precision
+    ok 136 - str(decimal_unpack(decimal_pack(99999999999999999999999999999999999999)) == 99999999999999999999999999999999999999
+    ok 137 - decimal_len(-99999999999999999999999999999999999999)
+    ok 138 - decimal_len(-99999999999999999999999999999999999999) == len(decimal_pack(-99999999999999999999999999999999999999)
+    ok 139 - decimal_unpack(decimal_pack(-99999999999999999999999999999999999999))
+    ok 140 - decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) len
+    ok 141 - decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) value
+    ok 142 - decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) scale
+    ok 143 - decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) precision
+    ok 144 - str(decimal_unpack(decimal_pack(-99999999999999999999999999999999999999)) == -99999999999999999999999999999999999999
+    ok 145 - unpack malformed decimal fails
+    ok 146 - decode malformed decimal preserves buffer position
+ok 258 - subtests

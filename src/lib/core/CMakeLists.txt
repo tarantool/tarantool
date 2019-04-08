@@ -26,6 +26,7 @@ set(core_sources
     trigger.cc
     mpstream.c
     port.c
+    decimal.c
 )
 
 if (TARGET_OS_NETBSD)
@@ -37,7 +38,7 @@ endif()
 
 add_library(core STATIC ${core_sources})
 
-target_link_libraries(core salad small uri ${LIBEV_LIBRARIES}
+target_link_libraries(core salad small uri decNumber ${LIBEV_LIBRARIES}
                       ${LIBEIO_LIBRARIES} ${LIBCORO_LIBRARIES}
                       ${MSGPUCK_LIBRARIES})
 
