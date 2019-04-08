@@ -392,10 +392,40 @@ vy_tx_track(struct vy_tx *tx, struct vy_lsm *lsm,
 int
 vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry);
 
-/** Add a statement to a transaction. */
+/**
+ * Add one statement entry to a transaction. We add one entry
+ * for each index, and with multikey indexes it is possible there
+ * are multiple entries of a single statement in a single index.
+ */
 int
-vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm,
-	  struct vy_entry entry, uint64_t column_mask);
+vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm,
+		struct vy_entry entry, uint64_t column_mask);
+
+/**
+ * Insert a statement into a transaction write set.
+ * @param tx           Transaction.
+ * @param lsm          LSM tree the statement is for.
+ * @param stmt         Statement.
+ * @param column_mask  Mask of fields modified by the statement.
+ *
+ * @retval  0 Success
+ * @retval -1 Memory allocation error.
+ */
+static inline int
+vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
+		       struct tuple *stmt, uint64_t column_mask)
+{
+	struct vy_entry entry;
+	entry.stmt = stmt;
+	entry.hint = vy_stmt_hint(stmt, lsm->cmp_def);
+	return vy_tx_set_entry(tx, lsm, entry, column_mask);
+}
+
+static inline int
+vy_tx_set(struct vy_tx *tx, struct vy_lsm *lsm, struct tuple *stmt)
+{
+	return vy_tx_set_with_colmask(tx, lsm, stmt, UINT64_MAX);
+}
 
 /**
  * Iterator over the write set of a transaction.
