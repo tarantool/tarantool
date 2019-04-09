@@ -142,3 +142,23 @@ test_run:cmd("delete server replica")
 test_run:cleanup_cluster()
 box.space.test:drop()
 box.schema.user.revoke('guest', 'replication')
+
+--
+-- gh-4107: rebootstrap fails if the replica was deleted from
+-- the cluster on the master.
+--
+box.schema.user.grant('guest', 'replication')
+test_run:cmd("create server replica with rpl_master=default, script='replication/replica_uuid.lua'")
+start_cmd = string.format("start server replica with args='%s'", require('uuid').new())
+box.space._cluster:get(2) == nil
+test_run:cmd(start_cmd)
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+box.space._cluster:delete(2) ~= nil
+test_run:cmd(start_cmd)
+box.space._cluster:get(2) ~= nil
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+box.schema.user.revoke('guest', 'replication')
+test_run:cleanup_cluster()

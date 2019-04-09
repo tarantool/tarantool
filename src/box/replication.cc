@@ -115,7 +115,17 @@ replica_check_id(uint32_t replica_id)
 	if (replica_id >= VCLOCK_MAX)
 		tnt_raise(LoggedError, ER_REPLICA_MAX,
 			  (unsigned) replica_id);
-        if (replica_id == ::instance_id)
+	/*
+	 * It's okay to update the instance id while it is joining to
+	 * a cluster as long as the id is set by the time bootstrap is
+	 * complete, which is checked in box_cfg() anyway.
+	 *
+	 * For example, the replica could be deleted from the _cluster
+	 * space on the master manually before rebootstrap, in which
+	 * case it will replay this operation during the final join
+	 * stage.
+	 */
+        if (!replicaset.is_joining && replica_id == instance_id)
 		tnt_raise(ClientError, ER_LOCAL_INSTANCE_ID_IS_READ_ONLY,
 			  (unsigned) replica_id);
 }
@@ -205,7 +215,7 @@ replica_set_id(struct replica *replica, uint32_t replica_id)
 void
 replica_clear_id(struct replica *replica)
 {
-	assert(replica->id != REPLICA_ID_NIL && replica->id != instance_id);
+	assert(replica->id != REPLICA_ID_NIL);
 	/*
 	 * Don't remove replicas from vclock here.
 	 * The vclock_sum() must always grow, it is a core invariant of
@@ -216,6 +226,11 @@ replica_clear_id(struct replica *replica)
 	 * replication.
 	 */
 	replicaset.replica_by_id[replica->id] = NULL;
+	if (replica->id == instance_id) {
+		/* See replica_check_id(). */
+		assert(replicaset.is_joining);
+		instance_id = REPLICA_ID_NIL;
+	}
 	replica->id = REPLICA_ID_NIL;
 	say_info("removed replica %s", tt_uuid_str(&replica->uuid));
 
@@ -385,6 +400,12 @@ replica_on_applier_state_f(struct trigger *trigger, void *event)
 	struct replica *replica = container_of(trigger,
 			struct replica, on_applier_state);
 	switch (replica->applier->state) {
+	case APPLIER_INITIAL_JOIN:
+		replicaset.is_joining = true;
+		break;
+	case APPLIER_JOINED:
+		replicaset.is_joining = false;
+		break;
 	case APPLIER_CONNECTED:
 		if (tt_uuid_is_nil(&replica->uuid))
 			replica_on_applier_connect(replica);
