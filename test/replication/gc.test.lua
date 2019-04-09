@@ -190,7 +190,6 @@ box.cfg{replication = replica_port}
 -- Stop the replica and write a few WALs.
 test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
-test_run:cmd("delete server replica")
 _ = s:auto_increment{}
 box.snapshot()
 _ = s:auto_increment{}
@@ -210,7 +209,65 @@ while #fio.glob('./master/*xlog') > 0 and fiber.time() - t < 10 do fiber.sleep(0
 -- Restore the config.
 box.cfg{replication = {}}
 
+s:truncate()
+
+--
+-- Check that a master doesn't remove WAL files needed by a replica
+-- in case the replica has local changes due to which its vclock has
+-- greater signature than the master's (gh-4106).
+--
+test_run:cmd("start server replica")
+
+-- Temporarily disable replication.
+test_run:cmd("switch replica")
+replication = box.cfg.replication
+box.cfg{replication = {}}
+
+-- Generate some WALs on the master.
+test_run:cmd("switch default")
+test_run:cmd("setopt delimiter ';'")
+for i = 1, 4 do
+    for j = 1, 100 do
+        s:replace{1, i, j}
+    end
+    box.snapshot()
+end;
+test_run:cmd("setopt delimiter ''");
+
+-- Stall WAL writes on the replica and reestablish replication,
+-- then bump local LSN and break replication on WAL error so that
+-- the master sends all rows and receives ack with the replica's
+-- vclock, but not all rows are actually applied on the replica.
+-- The master must not delete unconfirmed WALs even though the
+-- replica's vclock has a greater signature (checked later on).
+test_run:cmd("switch replica")
+box.error.injection.set('ERRINJ_WAL_DELAY', true)
+box.cfg{replication_connect_quorum = 0} -- disable sync
+box.cfg{replication = replication}
+fiber = require('fiber')
+test_run:cmd("setopt delimiter ';'");
+_ = fiber.create(function()
+    box.begin()
+    for i = 1, 1000 do
+        box.space.test:replace{1, i}
+    end
+    box.commit()
+    box.error.injection.set('ERRINJ_WAL_WRITE_DISK', true)
+end);
+test_run:cmd("setopt delimiter ''");
+box.error.injection.set('ERRINJ_WAL_DELAY', false)
+
+-- Restart the replica and wait for it to sync.
+test_run:cmd("switch default")
+test_run:cmd("stop server replica")
+test_run:cmd("start server replica")
+test_run:wait_lsn('replica', 'default')
+
 -- Cleanup.
+test_run:cmd("stop server replica")
+test_run:cmd("cleanup server replica")
+test_run:cmd("delete server replica")
+test_run:cleanup_cluster()
 s:drop()
 box.error.injection.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
 box.schema.user.revoke('guest', 'replication')
