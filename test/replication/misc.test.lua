@@ -136,8 +136,8 @@ box.schema.user.revoke('guest', 'replication')
 test_run:cmd('create server er_load1 with script="replication/er_load1.lua"')
 test_run:cmd('create server er_load2 with script="replication/er_load2.lua"')
 test_run:cmd('start server er_load1 with wait=False, wait_load=False')
--- instance er_load2 will fail with error ER_READONLY. this is ok.
--- We only test here that er_load1 doesn't assert.
+-- Instance er_load2 will fail with error ER_REPLICASET_UUID_MISMATCH.
+-- This is OK since we only test here that er_load1 doesn't assert.
 test_run:cmd('start server er_load2 with wait=True, wait_load=True, crash_expected = True')
 test_run:cmd('stop server er_load1')
 -- er_load2 exits automatically.

@@ -17,9 +17,10 @@ box.cfg{
         instance_uri(INSTANCE_ID % 2 + 1)
     },
     replication_timeout = 0.01,
+    -- Mismatching UUIDs to trigger bootstrap failure.
+    replicaset_uuid = tostring(require('uuid').new()),
     read_only = INSTANCE_ID == '2'
 }
 box.once('bootstrap', function()
     box.schema.user.grant('guest', 'replication')
-    box.space._cluster:delete(2)
 end)
