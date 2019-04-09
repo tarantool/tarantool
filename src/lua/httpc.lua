@@ -237,12 +237,14 @@ end
 --  method  - HTTP method, like GET, POST, PUT and so on
 --  url     - HTTP url, like https://tarantool.org/doc
 --  body    - this parameter is optional, you may use it for passing
+--            data to a server. Like 'My text string!'
 --  options - this is a table of options.
---       data to a server. Like 'My text string!'
 --
 --      ca_path - a path to ssl certificate dir;
 --
 --      ca_file - a path to ssl certificate file;
+--
+--      unix_socket - a path to Unix domain socket;
 --
 --      verify_host - set on/off verification of the certificate's name (CN)
 --          against host;
@@ -269,11 +271,19 @@ end
 --          it is less than 2000 bytes/sec
 --          during 20 seconds;
 --
---      timeout - Time-out the read operation and
+--      timeout - time-out the read operation and
 --          waiting for the curl api request
 --          after this amount of seconds;
 --
---      verbose - set on/off verbose mode
+--      max_header_name_length - maximum length of a response header;
+--
+--      verbose - set on/off verbose mode;
+--
+--      interface - source interface for outgoing traffic;
+--
+--      follow_location - whether the client will follow
+--          'Location' header that a server sends as part of an
+--          3xx response;
 --
 --  Returns:
 --      {

@@ -15,6 +15,7 @@ def hello():
     body = ["hello world"]
     headers = [('Content-Type', 'application/json')]
     return code, body, headers
+
 def hello1():
     code = "200 OK"
     body = [b"abc"]
@@ -44,12 +45,19 @@ def long_query():
     headers = [('Content-Type', 'application/json')]
     return code, body, headers
 
+def redirect():
+    code = "302 Found"
+    body = "redirecting"
+    headers = [('Location', '/')]
+    return code, body, headers
+
 paths = {
         "/": hello,
         "/abc": hello1,
         "/absent": absent,
         "/headers": headers,
         "/long_query": long_query,
+        "/redirect": redirect,
         }
 
 def read_handle(env, response):
