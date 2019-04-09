@@ -303,6 +303,16 @@ void
 httpc_set_interface(struct httpc_request *req, const char *interface);
 
 /**
+ * Specify whether the client will follow 'Location' header that
+ * a server sends as part of an 3xx response.
+ * @param req request
+ * @param follow flag
+ * @see https://curl.haxx.se/libcurl/c/CURLOPT_FOLLOWLOCATION.html
+ */
+void
+httpc_set_follow_location(struct httpc_request *req, long follow);
+
+/**
  * This function does async HTTP request
  * @param request - reference to request object with filled fields
  * @param timeout - timeout of waiting for libcurl api

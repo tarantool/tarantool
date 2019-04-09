@@ -62,7 +62,7 @@ local function stop_server(test, server)
 end
 
 local function test_http_client(test, url, opts)
-    test:plan(11)
+    test:plan(12)
 
     -- gh-4136: confusing httpc usage error message
     local ok, err = pcall(client.request, client)
@@ -84,6 +84,30 @@ local function test_http_client(test, url, opts)
 
     local r = client.request('GET', url, nil, opts)
     test:is(r.status, 200, 'request')
+
+    -- gh-4119: specify whether to follow 'Location' header
+    test:test('gh-4119: follow location', function(test)
+        test:plan(7)
+        local endpoint = 'redirect'
+
+        -- Verify that the default behaviour is to follow location.
+        local r = client.request('GET', url .. endpoint, nil, opts)
+        test:is(r.status, 200, 'default: status')
+        test:is(r.body, 'hello world', 'default: body')
+
+        -- Verify {follow_location = true} behaviour.
+        local r = client.request('GET', url .. endpoint, nil, merge(opts, {
+                                 follow_location = true}))
+        test:is(r.status, 200, 'follow location: status')
+        test:is(r.body, 'hello world', 'follow location: body')
+
+        -- Verify {follow_location = false} behaviour.
+        local r = client.request('GET', url .. endpoint, nil, merge(opts, {
+                                 follow_location = false}))
+        test:is(r.status, 302, 'do not follow location: status')
+        test:is(r.body, 'redirecting', 'do not follow location: body')
+        test:is(r.headers['location'], '/', 'do not follow location: header')
+    end)
 end
 
 --
