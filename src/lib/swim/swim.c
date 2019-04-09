@@ -308,7 +308,7 @@ struct swim_member {
 	 * All created events are put into a queue sorted by event
 	 * time.
 	 */
-	struct rlist in_event_queue;
+	struct rlist in_dissemination_queue;
 };
 
 #define mh_name _swim_table
@@ -414,7 +414,7 @@ struct swim {
 	 * any of its attributes changes, and stays in the queue
 	 * as long as the event TTL is non-zero.
 	 */
-	struct rlist event_queue;
+	struct rlist dissemination_queue;
 };
 
 /** Put the member into a list of ACK waiters. */
@@ -441,9 +441,9 @@ swim_wait_ack(struct swim *swim, struct swim_member *member)
 static inline void
 swim_register_event(struct swim *swim, struct swim_member *member)
 {
-	if (rlist_empty(&member->in_event_queue)) {
-		rlist_add_tail_entry(&swim->event_queue, member,
-				     in_event_queue);
+	if (rlist_empty(&member->in_dissemination_queue)) {
+		rlist_add_tail_entry(&swim->dissemination_queue, member,
+				     in_dissemination_queue);
 	}
 	member->status_ttl = mh_size(swim->members);
 }
@@ -540,7 +540,7 @@ swim_member_delete(struct swim_member *member)
 	swim_task_destroy(&member->ping_task);
 
 	/* Dissemination component. */
-	assert(rlist_empty(&member->in_event_queue));
+	assert(rlist_empty(&member->in_dissemination_queue));
 
 	free(member);
 }
@@ -585,7 +585,7 @@ swim_member_new(const struct sockaddr_in *addr, const struct tt_uuid *uuid,
 			 "ping");
 
 	/* Dissemination component. */
-	rlist_create(&member->in_event_queue);
+	rlist_create(&member->in_dissemination_queue);
 
 	return member;
 }
@@ -610,7 +610,7 @@ swim_delete_member(struct swim *swim, struct swim_member *member)
 		wait_ack_heap_delete(&swim->wait_ack_heap, member);
 
 	/* Dissemination component. */
-	rlist_del_entry(member, in_event_queue);
+	rlist_del_entry(member, in_dissemination_queue);
 
 	swim_member_delete(member);
 }
@@ -829,7 +829,8 @@ swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
 	struct swim_member *m;
 	struct swim_event_bin event_bin;
 	swim_event_bin_create(&event_bin);
-	rlist_foreach_entry(m, &swim->event_queue, in_event_queue) {
+	rlist_foreach_entry(m, &swim->dissemination_queue,
+			    in_dissemination_queue) {
 		int new_size = size + sizeof(event_bin);
 		if (swim_packet_reserve(packet, new_size) == NULL)
 			break;
@@ -881,10 +882,11 @@ static void
 swim_decrease_event_ttl(struct swim *swim)
 {
 	struct swim_member *member, *tmp;
-	rlist_foreach_entry_safe(member, &swim->event_queue, in_event_queue,
+	rlist_foreach_entry_safe(member, &swim->dissemination_queue,
+				 in_dissemination_queue,
 				 tmp) {
 		if (--member->status_ttl == 0)
-			rlist_del_entry(member, in_event_queue);
+			rlist_del_entry(member, in_dissemination_queue);
 	}
 }
 
@@ -1364,7 +1366,7 @@ swim_new(void)
 	swim->gc_mode = SWIM_GC_ON;
 
 	/* Dissemination component. */
-	rlist_create(&swim->event_queue);
+	rlist_create(&swim->dissemination_queue);
 
 	return swim;
 }
@@ -1580,7 +1582,7 @@ swim_delete(struct swim *swim)
 		rlist_del_entry(m, in_round_queue);
 		if (! heap_node_is_stray(&m->in_wait_ack_heap))
 			wait_ack_heap_delete(&swim->wait_ack_heap, m);
-		rlist_del_entry(m, in_event_queue);
+		rlist_del_entry(m, in_dissemination_queue);
 		swim_member_delete(m);
 	}
 	wait_ack_heap_destroy(&swim->wait_ack_heap);
