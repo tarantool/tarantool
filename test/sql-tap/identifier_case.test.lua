@@ -181,7 +181,7 @@ for _, row in ipairs(data) do
     test:do_catchsql_test(
         test_prefix.."5.1."..row[1],
         string.format( [[
-                CREATE TRIGGER %s DELETE ON table1 BEGIN SELECT 1; END
+                CREATE TRIGGER %s DELETE ON table1 FOR EACH ROW BEGIN SELECT 1; END
                 ]], row[2]),
         row[3])
 end

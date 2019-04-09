@@ -303,7 +303,7 @@ test:catchsql [[
 --     set before_data [ execsql "$prep $tr_program_cooked $statement $query" ]
 --     execsql "DELETE FROM tbl; DELETE FROM log; $prep";
 --     execsql "CREATE TRIGGER the_trigger BEFORE [string range $statement 0 6]\
---              ON tbl BEGIN $tr_program_fixed END;"
+--              ON tbl FOR EACH ROW BEGIN $tr_program_fixed END;"
 --     do_test trigger2-2.$ii-before "execsql {$statement $query}" $before_data
 --     execsql "DROP TRIGGER the_trigger;"
 --     execsql "DELETE FROM tbl; DELETE FROM log;"
@@ -311,7 +311,7 @@ test:catchsql [[
 --     set after_data [ execsql "$prep $statement $tr_program_cooked $query" ]
 --     execsql "DELETE FROM tbl; DELETE FROM log; $prep";
 --     execsql "CREATE TRIGGER the_trigger AFTER [string range $statement 0 6]\
---              ON tbl BEGIN $tr_program_fixed END;"
+--              ON tbl FOR EACH ROW BEGIN $tr_program_fixed END;"
 --     do_test trigger2-2.$ii-after "execsql {$statement $query}" $after_data
 --     execsql "DROP TRIGGER the_trigger;"
 --     integrity_check trigger2-2.$ii-integrity
@@ -331,6 +331,7 @@ test:catchsql [[
 --   INSERT INTO tbl VALUES (0, 0, 0, 0);
 --   INSERT INTO tbl VALUES (1, 0, 0, 0);
 --   CREATE TRIGGER tbl_after_update_cd BEFORE UPDATE OF c, d ON tbl
+--   FOR EACH ROW
 --     BEGIN
 --       UPDATE log SET a = a + 1;
 --     END;
@@ -349,8 +350,8 @@ test:catchsql [[
 --   DROP TABLE log;
 -- }
 -- trigger2-3.2: WHEN clause
-when_triggers = { "t1 BEFORE INSERT ON tbl WHEN new.a > 20" }
-table.insert(when_triggers,"t2 BEFORE INSERT ON tbl WHEN (SELECT count(*) FROM tbl) = 0")
+when_triggers = { "t1 BEFORE INSERT ON tbl FOR EACH ROW WHEN new.a > 20" }
+table.insert(when_triggers,"t2 BEFORE INSERT ON tbl FOR EACH ROW WHEN (SELECT count(*) FROM tbl) = 0")
 
 
 test:execsql [[
@@ -400,11 +401,13 @@ test:execsql [[
     CREATE TABLE tblB(a  INT PRIMARY KEY, b INT );
     CREATE TABLE tblC(a  INT PRIMARY KEY, b INT );
 
-    CREATE TRIGGER tr1 BEFORE INSERT ON tblA BEGIN
+    CREATE TRIGGER tr1 BEFORE INSERT ON tblA FOR EACH ROW
+    BEGIN
       INSERT INTO tblB values(new.a, new.b);
     END;
 
-    CREATE TRIGGER tr2 BEFORE INSERT ON tblB BEGIN
+    CREATE TRIGGER tr2 BEFORE INSERT ON tblB FOR EACH ROW
+    BEGIN
       INSERT INTO tblC values(new.a, new.b);
     END;
 ]]
@@ -445,7 +448,7 @@ test:execsql [[
 -- Simple recursive trigger
 test:execsql [[
     CREATE TABLE tbl(a  INT PRIMARY KEY, b INT , c INT );
-    CREATE TRIGGER tbl_trig BEFORE INSERT ON tbl
+    CREATE TRIGGER tbl_trig BEFORE INSERT ON tbl FOR EACH ROW
       BEGIN
         INSERT INTO tbl VALUES (new.a + 1, new.b + 1, new.c + 1);
       END;
@@ -469,13 +472,14 @@ test:execsql [[
 -- execsql {
 --   CREATE TABLE tbl(a  INT PRIMARY KEY, b INT , c INT );
 --   CREATE TRIGGER tbl_trig BEFORE INSERT ON tbl
---     BEGIN
+--   FOR EACH ROW
+--    BEGIN
 --       INSERT INTO tbl VALUES (1, 2, 3);
 --       INSERT INTO tbl VALUES (2, 2, 3);
 --       UPDATE tbl set b = 10 WHERE a = 1;
 --       DELETE FROM tbl WHERE a = 1;
 --       DELETE FROM tbl;
---     END;
+--    END;
 -- }
 -- do_test trigger2-5 {
 --   execsql {
@@ -491,7 +495,7 @@ test:execsql [[
 --   # Handling of ON CONFLICT by INSERT statements inside triggers
 --   execsql {
 --     CREATE TABLE tbl (a  INT primary key, b INT , c INT );
---     CREATE TRIGGER ai_tbl AFTER INSERT ON tbl BEGIN
+--     CREATE TRIGGER ai_tbl AFTER INSERT ON tbl FOR EACH ROW BEGIN
 --       INSERT OR IGNORE INTO tbl values (new.a, 0, 0);
 --     END;
 --   }
@@ -543,7 +547,7 @@ test:execsql [[
 --   execsql {
 --     INSERT INTO tbl values (4, 2, 3);
 --     INSERT INTO tbl values (6, 3, 4);
---     CREATE TRIGGER au_tbl AFTER UPDATE ON tbl BEGIN
+--     CREATE TRIGGER au_tbl AFTER UPDATE ON tbl FOR EACH ROW BEGIN
 --       UPDATE OR IGNORE tbl SET a = new.a, c = 10;
 --     END;
 --   }
@@ -615,29 +619,29 @@ test:do_execsql_test(
 
         CREATE VIEW abcd AS SELECT a, b, c, d FROM ab, cd;
 
-        CREATE TRIGGER before_update INSTEAD OF UPDATE ON abcd BEGIN
+        CREATE TRIGGER before_update INSTEAD OF UPDATE ON abcd FOR EACH ROW BEGIN
           INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, new.a, new.b, new.c, new.d);
         END;
-        CREATE TRIGGER after_update INSTEAD OF UPDATE ON abcd BEGIN
+        CREATE TRIGGER after_update INSTEAD OF UPDATE ON abcd FOR EACH ROW BEGIN
           INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, new.a, new.b, new.c, new.d);
         END;
 
-        CREATE TRIGGER before_delete INSTEAD OF DELETE ON abcd BEGIN
+        CREATE TRIGGER before_delete INSTEAD OF DELETE ON abcd FOR EACH ROW BEGIN
           INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, 0, 0, 0, 0);
         END;
-        CREATE TRIGGER after_delete INSTEAD OF DELETE ON abcd BEGIN
+        CREATE TRIGGER after_delete INSTEAD OF DELETE ON abcd FOR EACH ROW BEGIN
           INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
         old.a, old.b, old.c, old.d, 0, 0, 0, 0);
         END;
 
-        CREATE TRIGGER before_insert INSTEAD OF INSERT ON abcd BEGIN
+        CREATE TRIGGER before_insert INSTEAD OF INSERT ON abcd FOR EACH ROW BEGIN
           INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
         0, 0, 0, 0, new.a, new.b, new.c, new.d);
         END;
-         CREATE TRIGGER after_insert INSTEAD OF INSERT ON abcd BEGIN
+         CREATE TRIGGER after_insert INSTEAD OF INSERT ON abcd FOR EACH ROW BEGIN
           INSERT INTO tlog VALUES( (SELECT coalesce(max(ii),0) + 1 FROM tlog),
         0, 0, 0, 0, new.a, new.b, new.c, new.d);
          END;
@@ -706,7 +710,8 @@ test:do_execsql_test(
     "trigger2-8.2",
     [[
         CREATE TABLE v1log(id  INT PRIMARY KEY, a INT ,b INT ,c INT ,d INT ,e INT ,f INT );
-        CREATE TRIGGER r1 INSTEAD OF DELETE ON v1 BEGIN
+        CREATE TRIGGER r1 INSTEAD OF DELETE ON v1 FOR EACH ROW
+        BEGIN
           INSERT INTO v1log VALUES(OLD.x, OLD.x,NULL,OLD.y,NULL,OLD.z,NULL);
         END;
         DELETE FROM v1 WHERE x=1;
@@ -744,7 +749,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger2-8.5",
     [[
-        CREATE TRIGGER r2 INSTEAD OF INSERT ON v1 BEGIN
+        CREATE TRIGGER r2 INSTEAD OF INSERT ON v1 FOR EACH ROW
+        BEGIN
           INSERT INTO v1log VALUES(NEW.x, NULL,NEW.x,NULL,NEW.y,NULL,NEW.z);
         END;
         DELETE FROM v1log;
@@ -759,7 +765,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger2-8.6",
     [[
-        CREATE TRIGGER r3 INSTEAD OF UPDATE ON v1 BEGIN
+        CREATE TRIGGER r3 INSTEAD OF UPDATE ON v1 FOR EACH ROW
+        BEGIN
           INSERT INTO v1log VALUES(OLD.x, OLD.x,NEW.x,OLD.y,NEW.y,OLD.z,NEW.z);
         END;
         DELETE FROM v1log;
@@ -777,7 +784,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t3(a TEXT PRIMARY KEY, b TEXT);
         CREATE VIEW v3 AS SELECT t3.a FROM t3;
-        CREATE TRIGGER trig1 INSTEAD OF DELETE ON v3 BEGIN
+        CREATE TRIGGER trig1 INSTEAD OF DELETE ON v3 FOR EACH ROW BEGIN
           SELECT 1;
         END;
         DELETE FROM v3 WHERE a = 1;

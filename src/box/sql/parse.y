@@ -1476,7 +1476,11 @@ trigger_event(A) ::= DELETE|INSERT(X).   {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
 trigger_event(A) ::= UPDATE(X).          {A.a = @X; /*A-overwrites-X*/ A.b = 0;}
 trigger_event(A) ::= UPDATE OF idlist(X).{A.a = TK_UPDATE; A.b = X;}
 
-foreach_clause ::= .
+foreach_clause ::= . {
+  diag_set(ClientError, ER_SQL_PARSER_GENERIC, "FOR EACH STATEMENT "
+	       "triggers are not implemented, please supply FOR EACH ROW clause");
+  pParse->is_aborted = true;
+}
 foreach_clause ::= FOR EACH ROW.
 
 %type when_clause {Expr*}

@@ -70,6 +70,7 @@ local testcases = {
 		function (id)
 			test:execsql(string.format([[
 				CREATE TRIGGER "%s" UPDATE ON test
+                FOR EACH ROW
 				BEGIN
 					SELECT RAISE(ABORT, 'newer');
 				END;]], id));

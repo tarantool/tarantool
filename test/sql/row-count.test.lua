@@ -43,7 +43,7 @@ box.execute("SELECT ROW_COUNT();")
 --
 box.execute("CREATE TABLE tt1 (id INT PRIMARY KEY);")
 box.execute("CREATE TABLE tt2 (id INT PRIMARY KEY);")
-box.execute("CREATE TRIGGER tr1 AFTER DELETE ON tt1 BEGIN DELETE FROM tt2; END;")
+box.execute("CREATE TRIGGER tr1 AFTER DELETE ON tt1 FOR EACH ROW BEGIN DELETE FROM tt2; END;")
 box.execute("INSERT INTO tt1 VALUES (1), (2), (3);")
 box.execute("INSERT INTO tt2 VALUES (1), (2), (3);")
 box.execute("DELETE FROM tt1 WHERE id = 2;")

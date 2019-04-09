@@ -16,6 +16,7 @@ test:do_catchsql_test(
 	test_prefix.."1.0.3",
 	[[
 		CREATE TRIGGER TRIG1 BEFORE INSERT ON T1
+        FOR EACH ROW
 		begin
 			insert into t2 values(new.a);
 		end;]],

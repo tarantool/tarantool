@@ -50,7 +50,7 @@ box.execute("INSERT INTO barfoo VALUES ('bar', 2)")
 box.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 
 -- create a trigger
-box.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
+box.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
 
 -- Many entries

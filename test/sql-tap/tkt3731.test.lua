@@ -27,7 +27,7 @@ test:do_execsql_test(
     "tkt3731-1.1",
     [[
         CREATE TABLE t1(a  TEXT PRIMARY KEY, b TEXT );
-        CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN
+        CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW BEGIN
           INSERT INTO t1 VALUES(new.a || '+', new.b || '+');
         END;
     ]], {

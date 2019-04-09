@@ -313,7 +313,7 @@ box.execute("INSERT INTO barfoo VALUES ('foobar', 1000)")
 - row_count: 1
 ...
 -- create a trigger
-box.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
+box.execute("CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW BEGIN INSERT INTO barfoo VALUES ('trigger test', 9999); END")
 ---
 - row_count: 1
 ...
@@ -325,8 +325,8 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
   - name: opts
     type: map
   rows:
-  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
-        INTO barfoo VALUES (''trigger test'', 9999); END'}]
+  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
+        BEGIN INSERT INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- Many entries
 box.execute("CREATE TABLE t1(a INT,b INT,c INT,PRIMARY KEY(b,c));")
@@ -364,8 +364,8 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"");
   - name: opts
     type: map
   rows:
-  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
-        INTO barfoo VALUES (''trigger test'', 9999); END'}]
+  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
+        BEGIN INSERT INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- ... functional
 box.execute("INSERT INTO foobar VALUES ('foobar trigger test', 8888)")
@@ -390,8 +390,8 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
   - name: opts
     type: map
   rows:
-  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar BEGIN INSERT
-        INTO barfoo VALUES (''trigger test'', 9999); END'}]
+  - ['TFOOBAR', {'sql': 'CREATE TRIGGER tfoobar AFTER INSERT ON foobar FOR EACH ROW
+        BEGIN INSERT INTO barfoo VALUES (''trigger test'', 9999); END'}]
 ...
 -- and can be dropped just once
 box.execute("DROP TRIGGER tfoobar")

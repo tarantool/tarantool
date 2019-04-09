@@ -30,7 +30,7 @@ test:do_execsql_test(
     [[
             CREATE TABLE t1(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a TEXT ,b INT);
             CREATE TABLE log(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT UNIQUE, y INT );
-            CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN
+            CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW BEGIN
               UPDATE log SET y=y+1 WHERE x=new.a;
               INSERT OR IGNORE INTO log(x, y) VALUES(new.a, 1);
             END;
@@ -58,7 +58,7 @@ test:do_execsql_test(
     "insert3-1.2",
     [[
             CREATE TABLE log2(rowid INTEGER PRIMARY KEY AUTOINCREMENT, x TEXT UNIQUE,y INT );
-            CREATE TRIGGER r2 BEFORE INSERT ON t1 BEGIN
+            CREATE TRIGGER r2 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
               UPDATE log2 SET y=y+1 WHERE x=new.b;
               INSERT OR IGNORE INTO log2(x, y) VALUES(new.b,1);
             END;
@@ -125,7 +125,7 @@ test:do_execsql_test(
               c TEXT DEFAULT 'c'
             );
             CREATE TABLE t2dup(rowid INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b TEXT, c TEXT);
-            CREATE TRIGGER t2r1 BEFORE INSERT ON t2 BEGIN
+            CREATE TRIGGER t2r1 BEFORE INSERT ON t2 FOR EACH ROW BEGIN
               INSERT INTO t2dup(a,b,c) VALUES(new.a,new.b,new.c);
             END;
             INSERT INTO t2(a) VALUES(123);
@@ -158,7 +158,9 @@ test:do_execsql_test(
     "insert3-3.1",
     [[
             CREATE TABLE t3(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT );
-            CREATE TRIGGER t3r1 BEFORE INSERT on t3 WHEN nosuchcol BEGIN
+            CREATE TRIGGER t3r1 BEFORE INSERT on t3 FOR EACH ROW
+            WHEN nosuchcol
+            BEGIN
               SELECT 'illegal WHEN clause';
             END;
     ]], {
@@ -180,7 +182,8 @@ test:do_execsql_test(
     "insert3-3.3",
     [[
             CREATE TABLE t4(id INTEGER PRIMARY KEY AUTOINCREMENT, a INT ,b INT ,c INT );
-            CREATE TRIGGER t4r1 AFTER INSERT on t4 WHEN nosuchcol BEGIN
+            CREATE TRIGGER t4r1 AFTER INSERT on t4 FOR EACH ROW 
+            WHEN nosuchcol BEGIN
               SELECT 'illegal WHEN clause';
             END;
     ]], {

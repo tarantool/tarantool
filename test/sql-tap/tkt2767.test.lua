@@ -42,13 +42,16 @@ if (1 > 0)
             -- BEFORE triggers that invoke raise(ignore).  The effect of
             -- these triggers should be to make INSERTs, UPDATEs, and DELETEs
             -- into no-ops.
-            CREATE TRIGGER r1 BEFORE UPDATE ON t1 BEGIN
+            CREATE TRIGGER r1 BEFORE UPDATE ON t1 FOR EACH ROW
+            BEGIN
               SELECT raise(ignore);
             END;
-            CREATE TRIGGER r2 BEFORE DELETE ON t1 BEGIN
+            CREATE TRIGGER r2 BEFORE DELETE ON t1 FOR EACH ROW
+            BEGIN
               SELECT raise(ignore);
             END;
-            CREATE TRIGGER r3 BEFORE INSERT ON t1 BEGIN
+            CREATE TRIGGER r3 BEFORE INSERT ON t1 FOR EACH ROW
+            BEGIN
               SELECT raise(ignore);
             END;
 

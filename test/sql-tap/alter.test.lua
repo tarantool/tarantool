@@ -128,7 +128,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t6(id  INT PRIMARY KEY, a INT , b INT , c INT );
         CREATE TABLE tab(id  INT PRIMARY KEY);
-        CREATE TRIGGER trig1 AFTER INSERT ON T6 BEGIN INSERT INTO tab VALUES(new.id); END;
+        CREATE TRIGGER trig1 AFTER INSERT ON T6 FOR EACH ROW BEGIN INSERT INTO tab VALUES(new.id); END;
         INSERT INTO t6 VALUES(1, 1, 2, 3);
         SELECT * FROM tab;
 
@@ -164,7 +164,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-3.4",
     [[
-        CREATE TRIGGER trig2 AFTER INSERT ON t7 BEGIN INSERT INTO tab VALUES(new.id); END;
+        CREATE TRIGGER trig2 AFTER INSERT ON t7 FOR EACH ROW BEGIN INSERT INTO tab VALUES(new.id); END;
         INSERT INTO t7 VALUES(3, 1, 2, 3);
         SELECT * FROM tab;
     ]], {
@@ -197,7 +197,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "alter-3.7",
     [[
-        CREATE TRIGGER trig3 AFTER INSERT ON "t8" BEGIN INSERT INTO tab VALUES(new.id); END;
+        CREATE TRIGGER trig3 AFTER INSERT ON "t8" FOR EACH ROW BEGIN INSERT INTO tab VALUES(new.id); END;
         INSERT INTO "t8" VALUES(5, 1, 2, 3);
         SELECT * FROM tab;
     ]], {
@@ -285,9 +285,9 @@ test:do_execsql_test(
         CREATE TABLE t1(id  INT PRIMARY KEY, b INT , c INT );
         INSERT INTO t1 VALUES(1,2,3), (3,2,1);
         CREATE TABLE t2(id  INT PRIMARY KEY);
-        CREATE TRIGGER on_t1 AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(new.id + 100); END;
-        CREATE TRIGGER on_t2 AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(new.id + 101); END;
-        CREATE TRIGGER on_t3 AFTER INSERT ON t1 BEGIN INSERT INTO t2 values(new.id + 102); END;
+        CREATE TRIGGER on_t1 AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(new.id + 100); END;
+        CREATE TRIGGER on_t2 AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(new.id + 101); END;
+        CREATE TRIGGER on_t3 AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 values(new.id + 102); END;
         ALTER TABLE t1 RENAME TO "a";
         INSERT INTO "a" VALUES(8, 5, 9);
         SELECT * FROM t2;
