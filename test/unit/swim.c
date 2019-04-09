@@ -98,18 +98,23 @@ swim_test_sequence(void)
 static void
 swim_test_uuid_update(void)
 {
-	swim_start_test(5);
+	swim_start_test(7);
 
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_add_link(cluster, 0, 1);
 	fail_if(swim_cluster_wait_fullmesh(cluster, 1) != 0);
 	struct swim *s = swim_cluster_node(cluster, 0);
+	struct tt_uuid old_uuid = *swim_member_uuid(swim_self(s));
 	struct tt_uuid new_uuid = uuid_nil;
 	new_uuid.time_low = 1000;
 	is(swim_cluster_update_uuid(cluster, 0, &new_uuid), 0, "UUID update");
-	is(swim_cluster_wait_fullmesh(cluster, 1), 0,
-	   "old UUID is returned back as a 'ghost' member");
-	is(swim_size(s), 3, "two members in each + ghost third member");
+	is(swim_member_status(swim_member_by_uuid(s, &old_uuid)), MEMBER_LEFT,
+	   "old UUID is marked as 'left'");
+	swim_run_for(5);
+	is(swim_member_by_uuid(s, &old_uuid), NULL,
+	   "old UUID is dropped after a while");
+	ok(swim_cluster_is_fullmesh(cluster), "dropped everywhere");
+	is(swim_size(s), 2, "two members in each");
 	new_uuid.time_low = 2;
 	is(swim_cluster_update_uuid(cluster, 0, &new_uuid), -1,
 	   "can not update to an existing UUID - swim_cfg fails");

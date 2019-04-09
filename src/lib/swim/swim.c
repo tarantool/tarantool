@@ -545,21 +545,6 @@ swim_member_delete(struct swim_member *member)
 	free(member);
 }
 
-/**
- * Reserve space for one more member in the member table. Used to
- * execute a non-failing UUID update.
- */
-static inline int
-swim_reserve_one_member(struct swim *swim)
-{
-	if (mh_swim_table_reserve(swim->members, mh_size(swim->members) + 1,
-				  NULL) != 0) {
-		diag_set(OutOfMemory, sizeof(mh_int_t), "malloc", "node");
-		return -1;
-	}
-	return 0;
-}
-
 /** Create a new member. It is not registered anywhere here. */
 static struct swim_member *
 swim_member_new(const struct sockaddr_in *addr, const struct tt_uuid *uuid,
@@ -1038,56 +1023,6 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 	}
 }
 
-/**
- * Update member's UUID if it is changed. On UUID change the
- * member is reinserted into the member table with a new UUID.
- * @retval 0 Success.
- * @retval -1 Error. Out of memory or the new UUID is already in
- *         use.
- */
-static int
-swim_update_member_uuid(struct swim *swim, struct swim_member *member,
-			const struct tt_uuid *new_uuid)
-{
-	if (tt_uuid_is_equal(new_uuid, &member->uuid))
-		return 0;
-	if (swim_find_member(swim, new_uuid) != NULL) {
-		diag_set(SwimError, "duplicate UUID '%s'",
-			 swim_uuid_str(new_uuid));
-		return -1;
-	}
-	/*
-	 * Reserve before put + delete, because put below can
-	 * call rehash, and a reference to the old place in the
-	 * hash will taint.
-	 */
-	if (swim_reserve_one_member(swim) != 0)
-		return -1;
-	struct mh_swim_table_t *t = swim->members;
-	struct tt_uuid old_uuid = member->uuid;
-	struct mh_swim_table_key key = {member->hash, &old_uuid};
-	mh_int_t old_rc = mh_swim_table_find(t, key, NULL);
-	assert(old_rc != mh_end(t));
-	member->uuid = *new_uuid;
-	member->hash = swim_uuid_hash(new_uuid);
-	mh_int_t new_rc =
-		mh_swim_table_put(t, (const struct swim_member **) &member,
-				  NULL, NULL);
-	/* Can not fail - reserved above. */
-	assert(new_rc != mh_end(t));
-	(void) new_rc;
-	/*
-	 * Old_rc is still valid, because a possible rehash
-	 * happened before put.
-	 */
-	mh_swim_table_del(t, old_rc, NULL);
-	say_verbose("SWIM %d: a member has changed its UUID from %s to %s",
-		    swim_fd(swim), swim_uuid_str(&old_uuid),
-		    swim_uuid_str(new_uuid));
-	swim_on_member_update(swim, member);
-	return 0;
-}
-
 /** Update member's address.*/
 static inline void
 swim_update_member_addr(struct swim *swim, struct swim_member *member,
@@ -1458,6 +1393,7 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	if (uri != NULL && swim_uri_to_addr(uri, &addr, prefix) != 0)
 		return -1;
 	bool is_first_cfg = swim->self == NULL;
+	struct swim_member *new_self = NULL;
 	if (is_first_cfg) {
 		if (uuid == NULL || tt_uuid_is_nil(uuid) || uri == NULL) {
 			diag_set(SwimError, "%s UUID and URI are mandatory in "\
@@ -1476,15 +1412,9 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 				 "already exists", prefix);
 			return -1;
 		}
-		/*
-		 * Reserve one cell for reinsertion of self with a
-		 * new UUID. Reserve is necessary right here, not
-		 * later, for atomic reconfiguration. Without
-		 * reservation in that place it is possible that
-		 * the instance is bound to a new URI, but failed
-		 * to update UUID due to memory issues.
-		 */
-		if (swim_reserve_one_member(swim) != 0)
+		new_self = swim_new_member(swim, &swim->self->addr, uuid,
+					   MEMBER_ALIVE, 0);
+		if (new_self == NULL)
 			return -1;
 	}
 	if (uri != NULL) {
@@ -1496,6 +1426,8 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 			if (is_first_cfg) {
 				swim_delete_member(swim, swim->self);
 				swim->self = NULL;
+			} else if (new_self != NULL) {
+				swim_delete_member(swim, new_self);
 			}
 			return -1;
 		}
@@ -1514,11 +1446,12 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	if (swim->wait_ack_tick.at != ack_timeout && ack_timeout > 0)
 		swim_ev_timer_set(&swim->wait_ack_tick, ack_timeout, 0);
 
+	if (new_self != NULL) {
+		swim->self->status = MEMBER_LEFT;
+		swim_on_member_update(swim, swim->self);
+		swim->self = new_self;
+	}
 	swim_update_member_addr(swim, swim->self, &addr);
-	int rc = swim_update_member_uuid(swim, swim->self, uuid);
-	/* Reserved above. */
-	assert(rc == 0);
-	(void) rc;
 	if (gc_mode != SWIM_GC_DEFAULT)
 		swim->gc_mode = gc_mode;
 	return 0;

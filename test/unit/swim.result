@@ -16,12 +16,14 @@ ok 1 - subtests
 ok 2 - subtests
 	*** swim_test_sequence: done ***
 	*** swim_test_uuid_update ***
-    1..5
+    1..7
     ok 1 - UUID update
-    ok 2 - old UUID is returned back as a 'ghost' member
-    ok 3 - two members in each + ghost third member
-    ok 4 - can not update to an existing UUID - swim_cfg fails
-    ok 5 - diag says 'exists'
+    ok 2 - old UUID is marked as 'left'
+    ok 3 - old UUID is dropped after a while
+    ok 4 - dropped everywhere
+    ok 5 - two members in each
+    ok 6 - can not update to an existing UUID - swim_cfg fails
+    ok 7 - diag says 'exists'
 ok 3 - subtests
 	*** swim_test_uuid_update: done ***
 	*** swim_test_cfg ***
