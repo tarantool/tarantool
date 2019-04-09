@@ -419,7 +419,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
 	"sql-errors-1.37",
 	[[
-		CREATE TRIGGER r0 AFTER INSERT ON t0 BEGIN INSERT INTO t0.i VALUES (2); END;
+		CREATE TRIGGER r0 AFTER INSERT ON t0 FOR EACH ROW BEGIN INSERT INTO t0.i VALUES (2); END;
 	]], {
 		-- <sql-errors-1.37>
 		1,"qualified table names are not allowed on INSERT, UPDATE, and DELETE statements within triggers"

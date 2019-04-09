@@ -162,8 +162,8 @@ cn:execute('drop index if exists test3_sec on test3')
 
 -- Test CREATE TRIGGER [IF NOT EXISTS] and
 --      DROP   TRIGGER [IF EXISTS].
-cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
-cn:execute('create trigger if not exists trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:execute('CREATE TRIGGER trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
+cn:execute('CREATE TRIGGER if not exists trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
 cn:execute('drop trigger trig')
 cn:execute('drop trigger if exists trig')
 
@@ -172,7 +172,7 @@ cn:execute('drop trigger if exists trig')
 cn:execute('create index idx1 on test3(a)')
 cn:execute('create index idx2 on test3(b)')
 box.space.TEST3:truncate()
-cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:execute('CREATE TRIGGER trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
 cn:execute('insert into test3 values (1, 1, 1), (2, 2, 2), (3, 3, 3)')
 cn:execute('drop table test3')
 cn:execute('drop table if exists test3')

@@ -204,7 +204,7 @@ box.execute("CREATE TABLE tt2 (id INT PRIMARY KEY);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER tr1 AFTER DELETE ON tt1 BEGIN DELETE FROM tt2; END;")
+box.execute("CREATE TRIGGER tr1 AFTER DELETE ON tt1 FOR EACH ROW BEGIN DELETE FROM tt2; END;")
 ---
 - row_count: 1
 ...

@@ -66,7 +66,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger9-1.2.1",
     [[
-        CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
+        CREATE TRIGGER trig1 BEFORE DELETE ON t1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
         START TRANSACTION;
@@ -102,7 +102,7 @@ test:do_execsql_test(
     "trigger9-1.3.1",
     [[
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 BEFORE DELETE ON t1 BEGIN
+        CREATE TRIGGER trig1 BEFORE DELETE ON t1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
         START TRANSACTION;
@@ -138,7 +138,8 @@ test:do_execsql_test(
     "trigger9-1.4.1",
     [[
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 BEFORE DELETE ON t1 WHEN old.x='1' BEGIN
+        CREATE TRIGGER trig1 BEFORE DELETE ON t1 FOR EACH ROW WHEN old.x='1'
+        BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
         START TRANSACTION;
@@ -174,7 +175,7 @@ test:do_execsql_test(
     "trigger9-1.5.1",
     [[
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
+        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
         START TRANSACTION;
@@ -210,7 +211,7 @@ test:do_execsql_test(
     "trigger9-1.6.1",
     [[
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 BEGIN
+        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
         START TRANSACTION;
@@ -246,7 +247,9 @@ test:do_execsql_test(
     "trigger9-1.7.1",
     [[
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 WHEN old.x>='2' BEGIN
+        CREATE TRIGGER trig1 BEFORE UPDATE ON t1 FOR EACH ROW
+        WHEN old.x>='2'
+        BEGIN
           INSERT INTO t2 VALUES(old.x);
         END;
         START TRANSACTION;
@@ -298,7 +301,7 @@ test:do_execsql_test(
     [[
         CREATE VIEW v1 AS SELECT * FROM t3;
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
         START TRANSACTION;
@@ -323,7 +326,7 @@ test:do_test(
         return test:execsql([[
             CREATE VIEW v1 AS SELECT a, b AS c FROM t3 WHERE c > 'one';
             DROP TRIGGER IF EXISTS trig1;
-            CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+            CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
               INSERT INTO t2 VALUES(old.a);
             END;
             START TRANSACTION;
@@ -343,7 +346,7 @@ test:do_execsql_test(
     [[
         CREATE VIEW v1 AS SELECT DISTINCT a, b FROM t3;
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
         START TRANSACTION;
@@ -363,7 +366,7 @@ test:do_execsql_test(
     [[
         CREATE VIEW v1 AS SELECT a, b FROM t3 EXCEPT SELECT 1, 'one';
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
         START TRANSACTION;
@@ -384,7 +387,7 @@ test:do_execsql_test(
         CREATE VIEW v1 AS
           SELECT sum(a) AS a, max(b) AS b FROM t3 GROUP BY t3.a HAVING b>'two';
         DROP TRIGGER IF EXISTS trig1;
-        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 BEGIN
+        CREATE TRIGGER trig1 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
           INSERT INTO t2 VALUES(old.a);
         END;
         START TRANSACTION;
@@ -414,15 +417,15 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(3, 4);
         CREATE VIEW v1 AS SELECT a, b FROM t1;
 
-        CREATE TRIGGER tr1 INSTEAD OF DELETE ON v1 BEGIN
+        CREATE TRIGGER tr1 INSTEAD OF DELETE ON v1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('delete');
         END;
 
-        CREATE TRIGGER tr2 INSTEAD OF UPDATE ON v1 BEGIN
+        CREATE TRIGGER tr2 INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('update');
         END;
 
-        CREATE TRIGGER tr3 INSTEAD OF INSERT ON v1 BEGIN
+        CREATE TRIGGER tr3 INSTEAD OF INSERT ON v1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('insert');
         END;
     ]])

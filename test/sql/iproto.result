@@ -520,11 +520,11 @@ cn:execute('drop index if exists test3_sec on test3')
 ...
 -- Test CREATE TRIGGER [IF NOT EXISTS] and
 --      DROP   TRIGGER [IF EXISTS].
-cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:execute('CREATE TRIGGER trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
 ---
 - row_count: 1
 ...
-cn:execute('create trigger if not exists trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:execute('CREATE TRIGGER if not exists trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
 ---
 - row_count: 0
 ...
@@ -549,7 +549,7 @@ cn:execute('create index idx2 on test3(b)')
 box.space.TEST3:truncate()
 ---
 ...
-cn:execute('create trigger trig INSERT ON test3 BEGIN SELECT * FROM test3; END;')
+cn:execute('CREATE TRIGGER trig INSERT ON test3 FOR EACH ROW BEGIN SELECT * FROM test3; END;')
 ---
 - row_count: 1
 ...

@@ -67,17 +67,17 @@ box.schema.user.revoke('guest', 'read,write,execute', 'universe')
 box.execute("CREATE TABLE t1(id INTEGER PRIMARY KEY, a INTEGER);");
 box.execute("CREATE TABLE t2(id INTEGER PRIMARY KEY, a INTEGER);");
 box.error.injection.set("ERRINJ_WAL_IO", true)
-box.execute("CREATE TRIGGER t1t INSERT ON t1 BEGIN INSERT INTO t2 VALUES (1, 1); END;")
+box.execute("CREATE TRIGGER t1t INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES (1, 1); END;")
 box.execute("CREATE INDEX t1a ON t1(a);")
 box.error.injection.set("ERRINJ_WAL_IO", false)
-box.execute("CREATE TRIGGER t1t INSERT ON t1 BEGIN INSERT INTO t2 VALUES (1, 1); END;")
+box.execute("CREATE TRIGGER t1t INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES (1, 1); END;")
 box.execute("INSERT INTO t1 VALUES (3, 3);")
 box.execute("SELECT * from t1");
 box.execute("SELECT * from t2");
 box.error.injection.set("ERRINJ_WAL_IO", true)
 t = box.space._trigger:get('T1T')
 t_new = t:totable()
-t_new[3]['sql'] = 'CREATE TRIGGER t1t INSERT ON t1 BEGIN INSERT INTO t2 VALUES (2, 2); END;'
+t_new[3]['sql'] = 'CREATE TRIGGER t1t INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES (2, 2); END;'
 _ = box.space._trigger:replace(t, t_new)
 box.error.injection.set("ERRINJ_WAL_IO", false)
 _ = box.space._trigger:replace(t, t_new)

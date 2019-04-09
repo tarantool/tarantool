@@ -37,6 +37,7 @@ for _, val in ipairs(data) do
         local_test_prefix.."0.3",
         string.format([[
         CREATE TRIGGER TRIG1 %s INSERT ON T1
+        FOR EACH ROW
         begin
             insert %s into t2 values(new.a);
         end;]], TRIG_TYPE, INSERT_TYPE),

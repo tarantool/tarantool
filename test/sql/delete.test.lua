@@ -33,7 +33,7 @@ box.execute("DROP TABLE t1;");
 box.execute("DELETE FROM t1;")
 
 box.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
-box.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 BEGIN DELETE FROM t1; END;")
+box.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 FOR EACH ROW BEGIN DELETE FROM t1; END;")
 box.execute("INSERT INTO t2 VALUES (0);")
 
 box.execute("DROP TABLE t2;")
@@ -66,7 +66,7 @@ box.execute("TRUNCATE TABLE t1;")
 -- Table triggers should be ignored.
 box.execute("DROP TABLE t2;")
 box.execute("CREATE TABLE t2(x INT PRIMARY KEY);")
-box.execute("CREATE TRIGGER trig2 BEFORE DELETE ON t1 BEGIN INSERT INTO t2 VALUES(old.x); END;")
+box.execute("CREATE TRIGGER trig2 BEFORE DELETE ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(old.x); END;")
 box.execute("TRUNCATE TABLE t1;")
 box.execute("SELECT * FROM t1;")
 box.execute("SELECT * FROM t2;")

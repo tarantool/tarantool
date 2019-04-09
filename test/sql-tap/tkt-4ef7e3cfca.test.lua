@@ -25,7 +25,7 @@ test:do_catchsql_test(
     1.1,
     [[
         CREATE TABLE x(a  INT primary key);
-        CREATE TRIGGER t AFTER INSERT ON x BEGIN
+        CREATE TRIGGER t AFTER INSERT ON x FOR EACH ROW BEGIN
           SELECT * FROM x WHERE abc.a = 1;
         END;
         INSERT INTO x VALUES('assert');
@@ -48,7 +48,7 @@ test:do_execsql_test(
         INSERT INTO x(a) VALUES(5);
         INSERT INTO y(a) VALUES(10);
 
-        CREATE TRIGGER t AFTER INSERT ON w BEGIN
+        CREATE TRIGGER t AFTER INSERT ON w FOR EACH ROW BEGIN
           INSERT INTO z
           SELECT (SELECT x.a + y.a FROM y) FROM x;
         END;
@@ -83,7 +83,7 @@ test:do_execsql_test(
         INSERT INTO x(b) VALUES(5);
         INSERT INTO y(a) VALUES(10);
 
-        CREATE TRIGGER t AFTER INSERT ON w BEGIN
+        CREATE TRIGGER t AFTER INSERT ON w FOR EACH ROW BEGIN
           INSERT INTO z
           SELECT (SELECT x.b + y.a FROM y) FROM x;
         END;

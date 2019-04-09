@@ -31,10 +31,12 @@ test:do_execsql_test(
         INSERT INTO t1 VALUES(2, 1);
         CREATE VIEW v1 AS SELECT a AS x, b+1 AS y FROM t1;
         CREATE TRIGGER r1 INSTEAD OF UPDATE ON v1
+          FOR EACH ROW
           BEGIN
             UPDATE t1 SET b=new.y-1 WHERE a=new.x;
           END;
         CREATE TRIGGER r2 INSTEAD OF DELETE ON v1
+        FOR EACH ROW
           BEGIN
             DELETE FROM t1 WHERE a=old.x;
           END;

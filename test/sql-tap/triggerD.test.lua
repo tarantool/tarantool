@@ -38,24 +38,24 @@ test:do_test(
         return test:execsql [[
             CREATE TABLE t1(id INT PRIMARY KEY, rowid INT UNIQUE, oid INT, _rowid_ INT, x INT);
             CREATE TABLE log(a TEXT PRIMARY KEY,b INT,c INT,d INT,e INT);
-            CREATE TRIGGER r1 BEFORE INSERT ON t1 BEGIN
+            CREATE TRIGGER r1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
               INSERT INTO log VALUES('r1', new.rowid, new.oid, new._rowid_, new.x);
             END;
-            CREATE TRIGGER r2 AFTER INSERT ON t1 BEGIN
+            CREATE TRIGGER r2 AFTER INSERT ON t1 FOR EACH ROW BEGIN
               INSERT INTO log VALUES('r2', new.rowid, new.oid, new._rowid_, new.x);
             END;
-            CREATE TRIGGER r3 BEFORE UPDATE ON t1 BEGIN
+            CREATE TRIGGER r3 BEFORE UPDATE ON t1 FOR EACH ROW BEGIN
               INSERT INTO log VALUES('r3.old', old.rowid, old.oid, old._rowid_, old.x);
               INSERT INTO log VALUES('r3.new', new.rowid, new.oid, new._rowid_, new.x);
             END;
-            CREATE TRIGGER r4 AFTER UPDATE ON t1 BEGIN
+            CREATE TRIGGER r4 AFTER UPDATE ON t1 FOR EACH ROW BEGIN
               INSERT INTO log VALUES('r4.old', old.rowid, old.oid, old._rowid_, old.x);
               INSERT INTO log VALUES('r4.new', new.rowid, new.oid, new._rowid_, new.x);
             END;
-            CREATE TRIGGER r5 BEFORE DELETE ON t1 BEGIN
+            CREATE TRIGGER r5 BEFORE DELETE ON t1 FOR EACH ROW BEGIN
               INSERT INTO log VALUES('r5', old.rowid, old.oid, old._rowid_, old.x);
             END;
-            CREATE TRIGGER r6 AFTER DELETE ON t1 BEGIN
+            CREATE TRIGGER r6 AFTER DELETE ON t1 FOR EACH ROW BEGIN
               INSERT INTO log VALUES('r6', old.rowid, old.oid, old._rowid_, old.x);
             END;
         ]]
@@ -113,24 +113,24 @@ test:do_test(
 --   db eval {
 --     DROP TABLE t1;
 --     CREATE TABLE t1(w INT PRIMARY KEY,x INT,y INT,z INT);
---     CREATE TRIGGER r1 BEFORE INSERT ON t1 BEGIN
+--     CREATE TRIGGER r1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
 --       INSERT INTO log VALUES('r1', new.rowid, new.oid, new._rowid_, new.x);
 --     END;
---     CREATE TRIGGER r2 AFTER INSERT ON t1 BEGIN
+--     CREATE TRIGGER r2 AFTER INSERT ON t1 FOR EACH ROW BEGIN
 --       INSERT INTO log VALUES('r2', new.rowid, new.oid, new._rowid_, new.x);
 --     END;
---     CREATE TRIGGER r3 BEFORE UPDATE ON t1 BEGIN
+--     CREATE TRIGGER r3 BEFORE UPDATE ON t1 FOR EACH ROW BEGIN
 --       INSERT INTO log VALUES('r3.old', old.rowid, old.oid, old._rowid_, old.x);
 --       INSERT INTO log VALUES('r3.new', new.rowid, new.oid, new._rowid_, new.x);
 --     END;
---     CREATE TRIGGER r4 AFTER UPDATE ON t1 BEGIN
+--     CREATE TRIGGER r4 AFTER UPDATE ON t1 FOR EACH ROW BEGIN
 --       INSERT INTO log VALUES('r4.old', old.rowid, old.oid, old._rowid_, old.x);
 --       INSERT INTO log VALUES('r4.new', new.rowid, new.oid, new._rowid_, new.x);
 --     END;
---     CREATE TRIGGER r5 BEFORE DELETE ON t1 BEGIN
+--     CREATE TRIGGER r5 BEFORE DELETE ON t1 FOR EACH ROW BEGIN
 --       INSERT INTO log VALUES('r5', old.rowid, old.oid, old._rowid_, old.x);
 --     END;
---     CREATE TRIGGER r6 AFTER DELETE ON t1 BEGIN
+--     CREATE TRIGGER r6 AFTER DELETE ON t1 FOR EACH ROW BEGIN
 --       INSERT INTO log VALUES('r6', old.rowid, old.oid, old._rowid_, old.x);
 --     END;
 --   }
@@ -168,7 +168,7 @@ test:do_test(
 -- #   CREATE TABLE t1(x INT);
 -- #   CREATE TEMP TABLE t1(x);
 -- #   CREATE TABLE t2(z INT);
--- #   CREATE TRIGGER main.r1 AFTER INSERT ON t1 BEGIN
+-- #   CREATE TRIGGER main.r1 AFTER INSERT ON t1 FOR EACH ROW BEGIN
 -- #     INSERT INTO t2 VALUES(10000 + new.x);
 -- #   END;
 -- #   INSERT INTO main.t1 VALUES(3);
@@ -183,7 +183,7 @@ test:do_test(
 --     CREATE TABLE t300(x INT );
 --     CREATE TEMP TABLE t300(x);
 --     CREATE TABLE t301(y INT );
---     CREATE TRIGGER main.r300 AFTER INSERT ON t300 BEGIN
+--     CREATE TRIGGER main.r300 AFTER INSERT ON t300 FOR EACH ROW BEGIN
 --       INSERT INTO t301 VALUES(10000 + new.x);
 --     END;
 --     INSERT INTO main.t300 VALUES(3);
@@ -194,7 +194,7 @@ test:do_test(
 -- do_test triggerD-3.2 {
 --   db eval {
 --     DELETE FROM t301;
---     CREATE TRIGGER temp.r301 AFTER INSERT ON t300 BEGIN
+--     CREATE TRIGGER temp.r301 AFTER INSERT ON t300 FOR EACH ROW BEGIN
 --       INSERT INTO t301 VALUES(20000 + new.x);
 --     END;
 --     INSERT INTO main.t300 VALUES(3);
@@ -225,7 +225,7 @@ test:do_test(
 --     ATTACH 'test2.db' AS db2;
 --     CREATE TABLE db2.t2(y INT);
 --     CREATE TABLE db2.log(z INT);
---     CREATE TRIGGER db2.trig AFTER INSERT ON db2.t2 BEGIN
+--     CREATE TRIGGER db2.trig AFTER INSERT ON db2.t2 FOR EACH ROW BEGIN
 --       INSERT INTO log(z) VALUES(new.y);
 --     END;
 --     INSERT INTO t2 VALUES(123);

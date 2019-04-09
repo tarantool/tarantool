@@ -13,27 +13,27 @@ box.execute("CREATE TABLE t(id INT PRIMARY KEY)")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t FOR EACH ROW BEGIN SELECT 1; END")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER tt_au AFTER UPDATE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_au AFTER UPDATE ON t FOR EACH ROW BEGIN SELECT 1; END")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER tt_bi BEFORE INSERT ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bi BEFORE INSERT ON t FOR EACH ROW BEGIN SELECT 1; END")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER tt_ai AFTER INSERT ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_ai AFTER INSERT ON t FOR EACH ROW BEGIN SELECT 1; END")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER tt_bd BEFORE DELETE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bd BEFORE DELETE ON t FOR EACH ROW BEGIN SELECT 1; END")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t FOR EACH ROW BEGIN SELECT 1; END")
 ---
 - row_count: 1
 ...
@@ -46,12 +46,18 @@ box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")
   - name: opts
     type: map
   rows:
-  - ['TT_AD', {'sql': 'CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END'}]
-  - ['TT_AI', {'sql': 'CREATE TRIGGER tt_ai AFTER INSERT ON t BEGIN SELECT 1; END'}]
-  - ['TT_AU', {'sql': 'CREATE TRIGGER tt_au AFTER UPDATE ON t BEGIN SELECT 1; END'}]
-  - ['TT_BD', {'sql': 'CREATE TRIGGER tt_bd BEFORE DELETE ON t BEGIN SELECT 1; END'}]
-  - ['TT_BI', {'sql': 'CREATE TRIGGER tt_bi BEFORE INSERT ON t BEGIN SELECT 1; END'}]
-  - ['TT_BU', {'sql': 'CREATE TRIGGER tt_bu BEFORE UPDATE ON t BEGIN SELECT 1; END'}]
+  - ['TT_AD', {'sql': 'CREATE TRIGGER tt_ad AFTER DELETE ON t FOR EACH ROW BEGIN SELECT
+        1; END'}]
+  - ['TT_AI', {'sql': 'CREATE TRIGGER tt_ai AFTER INSERT ON t FOR EACH ROW BEGIN SELECT
+        1; END'}]
+  - ['TT_AU', {'sql': 'CREATE TRIGGER tt_au AFTER UPDATE ON t FOR EACH ROW BEGIN SELECT
+        1; END'}]
+  - ['TT_BD', {'sql': 'CREATE TRIGGER tt_bd BEFORE DELETE ON t FOR EACH ROW BEGIN
+        SELECT 1; END'}]
+  - ['TT_BI', {'sql': 'CREATE TRIGGER tt_bi BEFORE INSERT ON t FOR EACH ROW BEGIN
+        SELECT 1; END'}]
+  - ['TT_BU', {'sql': 'CREATE TRIGGER tt_bu BEFORE UPDATE ON t FOR EACH ROW BEGIN
+        SELECT 1; END'}]
 ...
 -- drop table
 box.execute("DROP TABLE t")

@@ -38,7 +38,8 @@ if (1 > 0)
             INSERT INTO t2 VALUES(3, 'three', 'III');
 
             CREATE TABLE t3(t3_a  INT PRIMARY KEY, t3_d TEXT);
-            CREATE TRIGGER t3t AFTER INSERT ON t3 WHEN new.t3_d IS NULL BEGIN
+            CREATE TRIGGER t3t AFTER INSERT ON t3 FOR EACH ROW
+            WHEN new.t3_d IS NULL BEGIN
               UPDATE t3 SET t3_d = (
                 SELECT d FROM 
                   (SELECT * FROM t2 WHERE (new.t3_a%2)=(id%2) LIMIT 10),

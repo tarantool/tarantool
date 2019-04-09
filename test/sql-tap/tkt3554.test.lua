@@ -29,7 +29,7 @@ test:do_execsql_test(
         CREATE TABLE test (id INT PRIMARY KEY AUTOINCREMENT, obj TEXT, t1 INT , t2 INT);
         CREATE UNIQUE INDEX testi1 ON test(obj, t1, t2);
 
-        CREATE TRIGGER test_insert BEFORE INSERT ON test BEGIN
+        CREATE TRIGGER test_insert BEFORE INSERT ON test FOR EACH ROW BEGIN
           UPDATE test SET t1 = new.t1
             WHERE obj = new.obj AND new.t1 < t1 AND new.t2 >= t1;
 

@@ -135,7 +135,7 @@ test:do_test(
     function()
         return test:execsql [[
             CREATE TABLE result2(id INTEGER PRIMARY KEY, a TEXT,b INT);
-            CREATE TRIGGER r1d INSTEAD OF DELETE ON v1 BEGIN
+            CREATE TRIGGER r1d INSTEAD OF DELETE ON v1 FOR EACH ROW BEGIN
               INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
                                                   old.y, old.x);
             END;
@@ -153,7 +153,7 @@ test:do_test(
     function()
         return test:execsql [[
             CREATE TABLE result4(id INTEGER PRIMARY KEY, a TEXT,b INT,c TEXT,d INT);
-            CREATE TRIGGER r1u INSTEAD OF UPDATE ON v1 BEGIN
+            CREATE TRIGGER r1u INSTEAD OF UPDATE ON v1 FOR EACH ROW BEGIN
               INSERT INTO result4(id, a,b,c,d) VALUES((SELECT coalesce(max(id),0) + 1 FROM result4),
                                                       old.y, old.x, new.y, new.x);
             END;
@@ -171,7 +171,7 @@ test:do_test(
     function()
         return test:execsql [[
             DELETE FROM result2;
-            CREATE TRIGGER r2d INSTEAD OF DELETE ON v2 BEGIN
+            CREATE TRIGGER r2d INSTEAD OF DELETE ON v2 FOR EACH ROW BEGIN
               INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
                                                   old.y, old.x);
             END;
@@ -189,7 +189,7 @@ test:do_test(
     function()
         return test:execsql [[
             DELETE FROM result4;
-            CREATE TRIGGER r2u INSTEAD OF UPDATE ON v2 BEGIN
+            CREATE TRIGGER r2u INSTEAD OF UPDATE ON v2 FOR EACH ROW BEGIN
               INSERT INTO result4(id, a,b,c,d) VALUES((SELECT coalesce(max(id),0) + 1 FROM result4),
                                                       old.y, old.x, new.y, new.x);
             END;
@@ -207,7 +207,7 @@ test:do_test(
     function()
         return test:execsql [[
             CREATE TABLE result1(id INTEGER PRIMARY KEY, a TEXT);
-            CREATE TRIGGER r3d INSTEAD OF DELETE ON v3 BEGIN
+            CREATE TRIGGER r3d INSTEAD OF DELETE ON v3 FOR EACH ROW BEGIN
               INSERT INTO result1(id, a) VALUES((SELECT coalesce(max(id),0) + 1 FROM result1),
                                                 old.c1);
             END;
@@ -226,7 +226,7 @@ test:do_test(
         return test:execsql [[
             DROP TABLE result2;
             CREATE TABLE result2(id INTEGER PRIMARY KEY, a TEXT,b TEXT);
-            CREATE TRIGGER r3u INSTEAD OF UPDATE ON v3 BEGIN
+            CREATE TRIGGER r3u INSTEAD OF UPDATE ON v3 FOR EACH ROW BEGIN
               INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
                                                   old.c1, new.c1);
             END;
@@ -244,7 +244,7 @@ test:do_test(
     function()
         return test:execsql [[
             DELETE FROM result1;
-            CREATE TRIGGER r4d INSTEAD OF DELETE ON v4 BEGIN
+            CREATE TRIGGER r4d INSTEAD OF DELETE ON v4 FOR EACH ROW BEGIN
               INSERT INTO result1(id, a) VALUES((SELECT coalesce(max(id),0) + 1 FROM result1),
                                                 old.c1);
             END;
@@ -262,7 +262,7 @@ test:do_test(
     function()
         return test:execsql [[
             DELETE FROM result2;
-            CREATE TRIGGER r4u INSTEAD OF UPDATE ON v4 BEGIN
+            CREATE TRIGGER r4u INSTEAD OF UPDATE ON v4 FOR EACH ROW BEGIN
               INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
                                                   old.c1, new.c1);
             END;
@@ -281,7 +281,7 @@ test:do_test(
         return test:execsql [[
             DROP TABLE result2;
             CREATE TABLE result2(id INTEGER PRIMARY KEY, a TEXT,b INT);
-            CREATE TRIGGER r5d INSTEAD OF DELETE ON v5 BEGIN
+            CREATE TRIGGER r5d INSTEAD OF DELETE ON v5 FOR EACH ROW BEGIN
               INSERT INTO result2(id, a,b) VALUES((SELECT coalesce(max(id),0) + 1 FROM result2),
                                                   old.x, old.b);
             END;
@@ -299,7 +299,7 @@ test:do_test(
     function()
         return test:execsql [[
             DELETE FROM result4;
-            CREATE TRIGGER r5u INSTEAD OF UPDATE ON v5 BEGIN
+            CREATE TRIGGER r5u INSTEAD OF UPDATE ON v5 FOR EACH ROW BEGIN
               INSERT INTO result4(id, a,b,c,d) VALUES((SELECT coalesce(max(id),0) + 1 FROM result4),
                                                       old.x, old.b, new.x, new.b);
             END;

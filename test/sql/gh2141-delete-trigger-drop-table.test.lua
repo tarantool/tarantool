@@ -5,12 +5,12 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 -- create space
 box.execute("CREATE TABLE t(id INT PRIMARY KEY)")
 
-box.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t BEGIN SELECT 1; END")
-box.execute("CREATE TRIGGER tt_au AFTER UPDATE ON t BEGIN SELECT 1; END")
-box.execute("CREATE TRIGGER tt_bi BEFORE INSERT ON t BEGIN SELECT 1; END")
-box.execute("CREATE TRIGGER tt_ai AFTER INSERT ON t BEGIN SELECT 1; END")
-box.execute("CREATE TRIGGER tt_bd BEFORE DELETE ON t BEGIN SELECT 1; END")
-box.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bu BEFORE UPDATE ON t FOR EACH ROW BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_au AFTER UPDATE ON t FOR EACH ROW BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bi BEFORE INSERT ON t FOR EACH ROW BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_ai AFTER INSERT ON t FOR EACH ROW BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_bd BEFORE DELETE ON t FOR EACH ROW BEGIN SELECT 1; END")
+box.execute("CREATE TRIGGER tt_ad AFTER DELETE ON t FOR EACH ROW BEGIN SELECT 1; END")
 
 -- check that these triggers exist
 box.execute("SELECT \"name\", \"opts\" FROM \"_trigger\"")

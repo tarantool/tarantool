@@ -54,23 +54,23 @@ test:do_execsql_test(
     [[
         CREATE TABLE t1(id INT PRIMARY KEY AUTOINCREMENT, a TEXT UNIQUE, b TEXT, c TEXT);
         CREATE TABLE log(t TEXT PRIMARY KEY, a1 TEXT, b1 TEXT, c1 TEXT, a2 TEXT, b2 TEXT, c2 TEXT);
-        CREATE TRIGGER trig1 BEFORE INSERT ON t1 BEGIN
+        CREATE TRIGGER trig1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('before', NULL, NULL, NULL, new.a, new.b, new.c);
         END;
-        CREATE TRIGGER trig2 AFTER INSERT ON t1 BEGIN
+        CREATE TRIGGER trig2 AFTER INSERT ON t1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('after', NULL, NULL, NULL, new.a, new.b, new.c);
         END;
-        CREATE TRIGGER trig3 BEFORE UPDATE ON t1 BEGIN
+        CREATE TRIGGER trig3 BEFORE UPDATE ON t1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('before', old.a,old.b,old.c, new.a,new.b,new.c);
         END;
-        CREATE TRIGGER trig4 AFTER UPDATE ON t1 BEGIN
+        CREATE TRIGGER trig4 AFTER UPDATE ON t1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('after', old.a,old.b,old.c, new.a,new.b,new.c);
         END;
 
-        CREATE TRIGGER trig5 BEFORE DELETE ON t1 BEGIN
+        CREATE TRIGGER trig5 BEFORE DELETE ON t1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('before', old.a,old.b,old.c, NULL,NULL,NULL);
         END;
-        CREATE TRIGGER trig6 AFTER DELETE ON t1 BEGIN
+        CREATE TRIGGER trig6 AFTER DELETE ON t1 FOR EACH ROW BEGIN
           INSERT INTO log VALUES('after', old.a,old.b,old.c, NULL,NULL,NULL);
         END;
     ]], {
@@ -149,7 +149,7 @@ test:do_execsql_test(
     "triggerC-1.8",
     [[
         CREATE TABLE t4(a INT PRIMARY KEY, b INT);
-        CREATE TRIGGER t4t AFTER DELETE ON t4 BEGIN
+        CREATE TRIGGER t4t AFTER DELETE ON t4 FOR EACH ROW BEGIN
           SELECT RAISE(ABORT, 'delete is not supported');
         END;
     ]], {
@@ -184,7 +184,7 @@ test:do_execsql_test(
     [[
         CREATE TABLE t5 (a INT UNIQUE, b INT PRIMARY KEY, c INT);
         INSERT INTO t5 values (1, 2, 3);
-        CREATE TRIGGER au_tbl AFTER UPDATE ON t5 BEGIN
+        CREATE TRIGGER au_tbl AFTER UPDATE ON t5 FOR EACH ROW BEGIN
           UPDATE OR IGNORE t5 SET a = new.a, c = 10;
         END;
     ]], {
@@ -227,7 +227,7 @@ test:do_execsql_test(
         CREATE TABLE t1(a INT UNIQUE, b INT UNIQUE, c INT, d INT, e INT PRIMARY KEY);
         CREATE INDEX t1cd ON t1(c,d);
         CREATE UNIQUE INDEX t1a ON t1(a);
-        CREATE TRIGGER t1r1 AFTER UPDATE ON t1 BEGIN UPDATE cnt SET n=n+1; END;
+        CREATE TRIGGER t1r1 AFTER UPDATE ON t1 FOR EACH ROW BEGIN UPDATE cnt SET n=n+1; END;
         INSERT INTO t1 VALUES(1,2,3,4,5);
         INSERT INTO t1 VALUES(6,7,8,9,10);
         INSERT INTO t1 VALUES(11,12,13,14,15);
@@ -265,33 +265,33 @@ test:do_execsql_test(
 -- for _ in X(0, "X!foreach", [=[["n tdefn rc","\n  1 {\n    CREATE TRIGGER t2_trig AFTER INSERT ON t2 WHEN (new.a>0) BEGIN\n      INSERT INTO t2 VALUES(new.a - 1);\n    END;\n  } {0 {10 9 8 7 6 5 4 3 2 1 0}}\n\n  2 {\n    CREATE TRIGGER t2_trig AFTER INSERT ON t2 BEGIN\n      SELECT CASE WHEN new.a==2 THEN RAISE(IGNORE) ELSE NULL END;\n      INSERT INTO t2 VALUES(new.a - 1);\n    END;\n  } {0 {10 9 8 7 6 5 4 3 2}}\n\n  3 {\n    CREATE TRIGGER t2_trig BEFORE INSERT ON t2 WHEN (new.a>0) BEGIN\n      INSERT INTO t2 VALUES(new.a - 1);\n    END;\n  } {0 {0 1 2 3 4 5 6 7 8 9 10}}\n\n  4 {\n    CREATE TRIGGER t2_trig BEFORE INSERT ON t2 BEGIN\n      SELECT CASE WHEN new.a==2 THEN RAISE(IGNORE) ELSE NULL END;\n      INSERT INTO t2 VALUES(new.a - 1);\n    END;\n  } {0 {3 4 5 6 7 8 9 10}}\n\n  5 {\n    CREATE TRIGGER t2_trig BEFORE INSERT ON t2 BEGIN\n      INSERT INTO t2 VALUES(new.a - 1);\n    END;\n  } {1 {too many levels of trigger recursion}}\n\n  6 {\n    CREATE TRIGGER t2_trig AFTER INSERT ON t2 WHEN (new.a>0) BEGIN\n      INSERT OR IGNORE INTO t2 VALUES(new.a);\n    END;\n  } {0 10}\n\n  7 {\n    CREATE TRIGGER t2_trig BEFORE INSERT ON t2 WHEN (new.a>0) BEGIN\n      INSERT OR IGNORE INTO t2 VALUES(new.a);\n    END;\n  } {1 {too many levels of trigger recursion}}\n"]]=]) do
 
 local
-tests =   { {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 WHEN (new.a>0) BEGIN
+tests =   { {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 FOR EACH ROW WHEN (new.a>0) BEGIN
                   INSERT INTO t2 VALUES(new.a - 1);
                 END;]], {0, {10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}}},
 
-            {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 BEGIN
+            {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 FOR EACH ROW BEGIN
                   SELECT CASE WHEN new.a==2 THEN RAISE(IGNORE) ELSE NULL END;
                   INSERT INTO t2 VALUES(new.a - 1);
                 END;]], {0, {10, 9, 8, 7, 6, 5, 4, 3, 2}}},
 
-            {[[ CREATE TRIGGER t2_trig BEFORE INSERT ON t2 WHEN (new.a>0) BEGIN
+            {[[ CREATE TRIGGER t2_trig BEFORE INSERT ON t2 FOR EACH ROW WHEN (new.a>0) BEGIN
                   INSERT INTO t2 VALUES(new.a - 1);
                 END;]], {0, {10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}}},
 
-            {[[ CREATE TRIGGER t2_trig BEFORE INSERT ON t2 BEGIN
+            {[[ CREATE TRIGGER t2_trig BEFORE INSERT ON t2 FOR EACH ROW BEGIN
                   SELECT CASE WHEN new.a==2 THEN RAISE(IGNORE) ELSE NULL END;
                   INSERT INTO t2 VALUES(new.a - 1);
                 END;]], {0, {10, 9, 8, 7, 6, 5, 4, 3}}},
 
-            {[[ CREATE TRIGGER t2_trig BEFORE INSERT ON t2 BEGIN
+            {[[ CREATE TRIGGER t2_trig BEFORE INSERT ON t2 FOR EACH ROW BEGIN
                   INSERT INTO t2 VALUES(new.a - 1);
                 END;]], {1, "Failed to execute SQL statement: too many levels of trigger recursion"}},
 
-            {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 WHEN (new.a>0) BEGIN
+            {[[ CREATE TRIGGER t2_trig AFTER INSERT ON t2 FOR EACH ROW WHEN (new.a>0) BEGIN
                   INSERT OR IGNORE INTO t2 VALUES(new.a);
                 END;]], {0, {10}}},
 
-            {[[  CREATE TRIGGER t2_trig BEFORE INSERT ON t2 WHEN (new.a>0) BEGIN
+            {[[  CREATE TRIGGER t2_trig BEFORE INSERT ON t2 FOR EACH ROW WHEN (new.a>0) BEGIN
                    INSERT OR IGNORE INTO t2 VALUES(new.a);
                  END;]], {1, "Failed to execute SQL statement: too many levels of trigger recursion"}}}
 
@@ -315,10 +315,10 @@ end
 -- string.format([[
 --         CREATE TABLE t22(x PRIMARY KEY);
 
---         CREATE TRIGGER t22a AFTER INSERT ON t22 BEGIN
+--         CREATE TRIGGER t22a AFTER INSERT ON t22 FOR EACH ROW BEGIN
 --           INSERT INTO t22 SELECT x + (SELECT max(x) FROM t22) FROM t22;
 --         END;
---         CREATE TRIGGER t22b BEFORE INSERT ON t22 BEGIN
+--         CREATE TRIGGER t22b BEFORE INSERT ON t22 FOR EACH ROW BEGIN
 --           SELECT CASE WHEN (SELECT count(*) FROM t22) >= %s
 --                       THEN RAISE(IGNORE)
 --                       ELSE NULL END;
@@ -337,11 +337,11 @@ end
 -- string.format([[
 --         CREATE TABLE t23(x PRIMARY KEY);
 
---         CREATE TRIGGER t23a AFTER INSERT ON t23 BEGIN
+--         CREATE TRIGGER t23a AFTER INSERT ON t23 FOR EACH ROW BEGIN
 --           INSERT INTO t23 VALUES(new.x + 1);
 --         END;
 
---         CREATE TRIGGER t23b BEFORE INSERT ON t23 BEGIN
+--         CREATE TRIGGER t23b BEFORE INSERT ON t23 FOR EACH ROW BEGIN
 --           SELECT CASE WHEN new.x>%s
 --                       THEN RAISE(IGNORE)
 --                       ELSE NULL END;
@@ -363,10 +363,10 @@ test:do_execsql_test(
     "triggerC-3.1.1",
     [[
         CREATE TABLE t3(a INT PRIMARY KEY, b INT);
-        CREATE TRIGGER t3i AFTER INSERT ON t3 BEGIN
+        CREATE TRIGGER t3i AFTER INSERT ON t3 FOR EACH ROW BEGIN
           DELETE FROM t3 WHERE a = new.a;
         END;
-        CREATE TRIGGER t3d AFTER DELETE ON t3 BEGIN
+        CREATE TRIGGER t3d AFTER DELETE ON t3 FOR EACH ROW BEGIN
           INSERT INTO t3 VALUES(old.a, old.b);
         END;
     ]], {
@@ -399,7 +399,7 @@ test:do_execsql_test(
     "triggerC-3.2.1",
     [[
         CREATE TABLE t3b(x INT PRIMARY KEY);
-        CREATE TRIGGER t3bi AFTER INSERT ON t3b BEGIN INSERT INTO t3b VALUES(new.x+1); END;
+        CREATE TRIGGER t3bi AFTER INSERT ON t3b FOR EACH ROW BEGIN INSERT INTO t3b VALUES(new.x+1); END;
     ]], {
         -- <triggerC-3.2.1>
         -- </triggerC-3.2.1>
@@ -439,7 +439,7 @@ test:do_execsql_test(
         INSERT INTO t5 VALUES(3, 'c');
 
         CREATE TABLE t5g(a INT PRIMARY KEY, b TEXT, c INT);
-        CREATE TRIGGER t5t BEFORE DELETE ON t5 BEGIN
+        CREATE TRIGGER t5t BEFORE DELETE ON t5 FOR EACH ROW BEGIN
           INSERT INTO t5g VALUES(old.a, old.b, (SELECT count(*) FROM t5));
         END;
     ]], {
@@ -472,7 +472,7 @@ test:do_execsql_test(
     "triggerC-5.2.0",
     [[
         DROP TRIGGER t5t;
-        CREATE TRIGGER t5t AFTER DELETE ON t5 BEGIN
+        CREATE TRIGGER t5t AFTER DELETE ON t5 FOR EACH ROW BEGIN
           INSERT INTO t5g VALUES(old.a, old.b, (SELECT count(*) FROM t5));
         END;
     ]], {
@@ -590,10 +590,10 @@ test:do_execsql_test(
 --     INSERT INTO t7 VALUES(1, 2);
 --     INSERT INTO t7 VALUES(3, 4);
 --     INSERT INTO t7 VALUES(5, 6);
---     CREATE TRIGGER t7t BEFORE UPDATE ON t7 BEGIN
+--     CREATE TRIGGER t7t BEFORE UPDATE ON t7 FOR EACH ROW BEGIN
 --       DELETE FROM t7 WHERE a = 1;
 --     END;
---     CREATE TRIGGER t7ta AFTER UPDATE ON t7 BEGIN
+--     CREATE TRIGGER t7ta AFTER UPDATE ON t7 FOR EACH ROW BEGIN
 --       INSERT INTO t8 VALUES('after fired ' || old.rowid || '->' || new.rowid);
 --     END;
 --   }
@@ -619,7 +619,7 @@ test:do_execsql_test(
 -- do_test triggerC-7.4 {
 --   execsql {
 --     DROP TRIGGER t7t;
---     CREATE TRIGGER t7t BEFORE UPDATE ON t7 WHEN (old.rowid!=1 OR new.rowid!=8)
+--     CREATE TRIGGER t7t BEFORE UPDATE ON t7 FOR EACH ROW WHEN (old.rowid!=1 OR new.rowid!=8)
 --     BEGIN
 --       UPDATE t7 set rowid = 8 WHERE rowid=1;
 --     END;
@@ -647,10 +647,10 @@ test:do_execsql_test(
 --   execsql {
 --     DROP TRIGGER t7t;
 --     DROP TRIGGER t7ta;
---     CREATE TRIGGER t7t BEFORE DELETE ON t7 BEGIN
+--     CREATE TRIGGER t7t BEFORE DELETE ON t7 FOR EACH ROW BEGIN
 --       UPDATE t7 set rowid = 8 WHERE rowid=1;
 --     END;
---     CREATE TRIGGER t7ta AFTER DELETE ON t7 BEGIN
+--     CREATE TRIGGER t7ta AFTER DELETE ON t7 FOR EACH ROW BEGIN
 --       INSERT INTO t8 VALUES('after fired ' || old.rowid);
 --     END;
 --   }
@@ -689,7 +689,7 @@ test:do_execsql_test(
 -- } {1 2 3 4 5 6 7 8 9 10 11 12}
 -- do_test triggerC-9.2 {
 --   execsql {
---     CREATE TRIGGER t9r1 AFTER DELETE ON t9 BEGIN
+--     CREATE TRIGGER t9r1 AFTER DELETE ON t9 FOR EACH ROW BEGIN
 --       DELETE FROM t9 WHERE b=old.a;
 --     END;
 --     DELETE FROM t9 WHERE b=4;
@@ -715,7 +715,7 @@ test:do_test(
         test:execsql [[
             CREATE TABLE t10(id INT PRIMARY KEY, a TEXT, updatecnt INT DEFAULT 0);
             CREATE UNIQUE INDEX t10i1 ON t10(a);
-            CREATE TRIGGER t10_bu BEFORE UPDATE OF a ON t10 BEGIN
+            CREATE TRIGGER t10_bu BEFORE UPDATE OF a ON t10 FOR EACH ROW BEGIN
               UPDATE t10 SET updatecnt = updatecnt+1 WHERE a = old.a;
             END;
             INSERT INTO t10 VALUES(0, 'hello', 0);
@@ -757,7 +757,7 @@ test:do_test(
               c35 INT, c36 INT, c37 INT, c38 INT, c39 INT, c40 INT
             );
 
-            CREATE TRIGGER t11_bu BEFORE UPDATE OF c1 ON t11 BEGIN
+            CREATE TRIGGER t11_bu BEFORE UPDATE OF c1 ON t11 FOR EACH ROW BEGIN
               UPDATE t11 SET c31 = c31+1, c32=c32+1 WHERE c2 = old.c2;
             END;
 
@@ -811,7 +811,7 @@ for testno, v in ipairs(tests11) do
             test:execsql " DELETE FROM log "
             test:execsql(v[1])
             return test:execsql [[
-                CREATE TRIGGER tt1 BEFORE INSERT ON t1 BEGIN
+                CREATE TRIGGER tt1 BEFORE INSERT ON t1 FOR EACH ROW BEGIN
                   INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
                                          new.a, new.b);
                 END;
@@ -827,7 +827,7 @@ for testno, v in ipairs(tests11) do
     --     function()
     --         test:execsql " DELETE FROM log "
     --         return test:execsql [[
-    --             CREATE TRIGGER tt2 AFTER INSERT ON t1 BEGIN
+    --             CREATE TRIGGER tt2 AFTER INSERT ON t1 FOR EACH ROW BEGIN
     --               INSERT INTO log VALUES(new.a, new.b);
     --             END;
     --             INSERT INTO t1 DEFAULT VALUES;
@@ -861,7 +861,7 @@ test:do_test(
             DELETE FROM log;
             CREATE TABLE t2(a INT PRIMARY KEY, b INT);
             CREATE VIEW v2 AS SELECT * FROM t2;
-            CREATE TRIGGER tv2 INSTEAD OF INSERT ON v2 BEGIN
+            CREATE TRIGGER tv2 INSTEAD OF INSERT ON v2 FOR EACH ROW BEGIN
               INSERT INTO log VALUES((SELECT coalesce(max(id),0) + 1 FROM log),
                                      new.a, new.b);
             END;
@@ -885,7 +885,7 @@ test:execsql(
     INSERT INTO t1 VALUES(1, 1, 2);
     INSERT INTO t1 VALUES(2, 3, 4);
     INSERT INTO t1 VALUES(3, 5, 6);
-    CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN SELECT 1 ; END ;]])
+    CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW BEGIN SELECT 1 ; END ;]])
 
 test:do_execsql_test(
     "triggerC-13.1",
@@ -893,7 +893,7 @@ test:do_execsql_test(
         PRAGMA recursive_triggers = 'ON';
         CREATE TABLE t12(id INTEGER PRIMARY KEY, a INT, b INT);
         INSERT INTO t12 VALUES(1, 1, 2);
-        CREATE TRIGGER tr12 AFTER UPDATE ON t12 BEGIN
+        CREATE TRIGGER tr12 AFTER UPDATE ON t12 FOR EACH ROW BEGIN
           UPDATE t12 SET a=new.a+1, b=new.b+1;
         END;
     ]], {
@@ -945,7 +945,7 @@ SQL = [[
   CREATE TABLE t4(x INT PRIMARY KEY);
   CREATE TABLE t5(g INT PRIMARY KEY, h INT, i INT);
 
-  CREATE TRIGGER trig BEFORE INSERT ON t4 BEGIN
+  CREATE TRIGGER trig BEFORE INSERT ON t4 FOR EACH ROW BEGIN
     INSERT INTO t5 SELECT * FROM t1 WHERE
         (a IN (SELECT x FROM empty) OR b IN (SELECT x FROM not_empty))
         AND c IN (SELECT f FROM t2 WHERE e=1234567);
@@ -983,6 +983,7 @@ test:do_execsql_test(
             unique(pid, key)
             );
         CREATE TRIGGER node_delete_referencing AFTER DELETE ON node
+          FOR EACH ROW
           BEGIN
           DELETE FROM node WHERE pid = old.id;
         END;
@@ -1011,7 +1012,7 @@ test:do_execsql_test(
 --         INSERT INTO x2 VALUES(3, 4);
 --         INSERT INTO '"x2"' SELECT * FROM x2;
 
---         CREATE TRIGGER x1ai AFTER INSERT ON x1 BEGIN
+--         CREATE TRIGGER x1ai AFTER INSERT ON x1 FOR EACH ROW BEGIN
 --           INSERT INTO """x2""" VALUES('x', 'y');
 --           DELETE FROM """x2""" WHERE a=1;
 --           UPDATE """x2""" SET b = 11 WHERE a = 3;

@@ -86,7 +86,8 @@ test:do_execsql_test(
 	"CREATE TRIGGER " .. trigger_name ..
 	[[
 	BEFORE UPDATE ON t1
-	BEGIN
+	FOR EACH ROW
+    BEGIN
 		SELECT 1;
 	END;
 	]]

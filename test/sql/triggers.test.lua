@@ -12,19 +12,19 @@ box.execute('pragma sql_default_engine=\''..engine..'\'')
 
 box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
 box.execute("CREATE TABLE t2(x INTEGER PRIMARY KEY);")
-box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
+box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END; ]])
 immutable_part(box.space._trigger:select())
 
 space_id = box.space._space.index["name"]:get('T1').id
 
 -- Checks for LUA tuples.
-tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END;"}}
+tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
 box.space._trigger:insert(tuple)
 
-tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t12t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END;"}}
+tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t12t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
 box.space._trigger:insert(tuple)
 
-tuple = {"T2T", box.space.T1.id + 1, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END;"}}
+tuple = {"T2T", box.space.T1.id + 1, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
 box.space._trigger:insert(tuple)
 immutable_part(box.space._trigger:select())
 
@@ -32,7 +32,7 @@ box.execute("DROP TABLE T1;")
 immutable_part(box.space._trigger:select())
 
 box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY);")
-box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(1); END; ]])
+box.execute([[CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END; ]])
 immutable_part(box.space._trigger:select())
 
 space_id = box.space._space.index["name"]:get('T1').id
@@ -44,9 +44,9 @@ box.execute("DELETE FROM t2;")
 
 
 -- Test triggers.
-tuple = {"T2T", space_id, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(2); END;"}}
+tuple = {"T2T", space_id, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(2); END;"}}
 _ = box.space._trigger:insert(tuple)
-tuple = {"T3T", space_id, {sql = "CREATE TRIGGER t3t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(3); END;"}}
+tuple = {"T3T", space_id, {sql = "CREATE TRIGGER t3t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(3); END;"}}
 _ = box.space._trigger:insert(tuple)
 immutable_part(box.space._trigger:select())
 box.execute("INSERT INTO t1 VALUES(2);")
@@ -62,8 +62,8 @@ box.execute("SELECT * FROM t2;")
 box.execute("DELETE FROM t2;")
 
 -- Insert new SQL t2t and t3t.
-box.execute([[CREATE TRIGGER t2t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(2); END; ]])
-box.execute([[CREATE TRIGGER t3t AFTER INSERT ON t1 BEGIN INSERT INTO t2 VALUES(3); END; ]])
+box.execute([[CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(2); END; ]])
+box.execute([[CREATE TRIGGER t3t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(3); END; ]])
 immutable_part(box.space._trigger:select())
 box.execute("INSERT INTO t1 VALUES(4);")
 box.execute("SELECT * FROM t2;")
@@ -148,7 +148,7 @@ box.execute("DROP TABLE test2;")
 --
 box.execute("CREATE TABLE t (s1 INT, s2 INT, s3 INT, s4 INT PRIMARY KEY);")
 box.execute("CREATE VIEW v AS SELECT s1, s2 FROM t;")
-box.execute("CREATE TRIGGER tv INSTEAD OF UPDATE ON v BEGIN UPDATE t SET s3 = new.s1 WHERE s1 = old.s1; END;")
+box.execute("CREATE TRIGGER tv INSTEAD OF UPDATE ON v FOR EACH ROW BEGIN UPDATE t SET s3 = new.s1 WHERE s1 = old.s1; END;")
 box.execute("INSERT INTO t VALUES (1,1,1,1);")
 box.execute("UPDATE v SET s2 = s1 + 1;")
 box.execute("UPDATE v SET s1 = s1 + 5;")
@@ -161,7 +161,15 @@ box.execute("DROP TABLE t;")
 --
 box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
 space_id = box.space.T1.id
-box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 WHEN new.a = ? BEGIN SELECT 1; END;")
-tuple = {"TR1", space_id, {sql = [[CREATE TRIGGER tr1 AFTER INSERT ON t1 WHEN new.a = ? BEGIN SELECT 1; END;]]}}
+box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;")
+tuple = {"TR1", space_id, {sql = [[CREATE TRIGGER tr1 AFTER INSERT ON t1 FOR EACH ROW WHEN new.a = ? BEGIN SELECT 1; END;]]}}
 box.space._trigger:insert(tuple)
+box.execute("DROP TABLE t1;")
+
+-- 
+-- Check that FOR EACH ROW clause is moandatory
+--
+box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
+space_id = box.space.T1.id
+box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN ; END;")
 box.execute("DROP TABLE t1;")

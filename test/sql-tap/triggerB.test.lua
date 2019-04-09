@@ -30,6 +30,7 @@ test:do_execsql_test(
         INSERT INTO x VALUES(2, 2, 1);
         CREATE VIEW vx AS SELECT x, y, 0 AS yy FROM x;
         CREATE TRIGGER tx INSTEAD OF UPDATE OF y ON vx
+        FOR EACH ROW
         BEGIN
           UPDATE x SET y = new.y WHERE x = new.x;
         END;
@@ -54,7 +55,8 @@ test:do_execsql_test(
 test:do_catchsql_test(
     "triggerB-2.1",
     [[
-        CREATE TRIGGER ty AFTER INSERT ON x BEGIN
+        CREATE TRIGGER ty AFTER INSERT ON x FOR EACH ROW
+        BEGIN
            SELECT wen.x; -- Unrecognized name
         END;
         INSERT INTO x VALUES(3,1,2);
@@ -67,7 +69,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "triggerB-2.2",
     [[
-        CREATE TRIGGER tz AFTER UPDATE ON x BEGIN
+        CREATE TRIGGER tz AFTER UPDATE ON x FOR EACH ROW
+        BEGIN
            SELECT dlo.x; -- Unrecognized name
         END;
         UPDATE x SET y=y+1;
@@ -84,7 +87,8 @@ test:do_test(
             CREATE TABLE t2(id INTEGER PRIMARY KEY, a INTEGER UNIQUE, b INT );
             INSERT INTO t2 VALUES(1, 1,2);
             CREATE TABLE changes(x  INT PRIMARY KEY,y INT );
-            CREATE TRIGGER r1t2 AFTER UPDATE ON t2 BEGIN
+            CREATE TRIGGER r1t2 AFTER UPDATE ON t2 FOR EACH ROW
+            BEGIN
               INSERT INTO changes VALUES(new.a, new.b);
             END;
         ]]
@@ -102,7 +106,8 @@ test:do_test(
     "triggerB-2.4",
     function()
         test:execsql [[
-            CREATE TRIGGER r2t2 AFTER DELETE ON t2 BEGIN
+            CREATE TRIGGER r2t2 AFTER DELETE ON t2 FOR EACH ROW
+            BEGIN
               INSERT INTO changes VALUES(old.a, old.c);
             END;
         ]]
@@ -151,7 +156,9 @@ test:do_test(
         for i=0,65 do    
             sql = string.format([[
                     CREATE TRIGGER t3c%s AFTER UPDATE ON t3
-                      WHEN old.c%s!=new.c%s BEGIN
+                    FOR EACH ROW
+                    WHEN old.c%s!=new.c%s
+                    BEGIN
                       INSERT INTO t3_changes VALUES(%s, old.c%s, new.c%s);
                     END
                   ]], i, i, i, i, i, i)

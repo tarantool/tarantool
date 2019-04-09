@@ -38,7 +38,7 @@ test:plan(33)
 test:do_catchsql_test(
     "trigger1-1.1.1",
     [[
-        CREATE TRIGGER trig UPDATE ON no_such_table BEGIN
+        CREATE TRIGGER trig UPDATE ON no_such_table FOR EACH ROW BEGIN
           SELECT * from sql_master;
         END;
     ]], {
@@ -50,7 +50,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-1.1.2",
     [[
-        CREATE TRIGGER trig UPDATE ON no_such_table BEGIN
+        CREATE TRIGGER trig UPDATE ON no_such_table FOR EACH ROW
+        BEGIN
           SELECT * from sql_master;
         END;
     ]], {
@@ -67,7 +68,8 @@ test:execsql [[
 test:do_catchsql_test(
     "trigger1-1.1.3",
     [[
-        CREATE TRIGGER trig UPDATE ON t1 FOR EACH STATEMENT BEGIN
+        CREATE TRIGGER trig UPDATE ON t1 FOR EACH STATEMENT FOR EACH ROW
+        BEGIN
            SELECT * FROM sql_master;
         END;
     ]], {
@@ -77,14 +79,16 @@ test:do_catchsql_test(
     })
 
 test:execsql [[
-    CREATE TRIGGER tr1 INSERT ON t1 BEGIN
+    CREATE TRIGGER tr1 INSERT ON t1 FOR EACH ROW
+    BEGIN
       INSERT INTO t1 values(1);
      END;
 ]]
 test:do_catchsql_test(
     "trigger1-1.2.0",
     [[
-        CREATE TRIGGER IF NOT EXISTS tr1 DELETE ON t1 BEGIN
+        CREATE TRIGGER IF NOT EXISTS tr1 DELETE ON t1 FOR EACH ROW
+        BEGIN
             SELECT * FROM sql_master;
          END
     ]], {
@@ -96,7 +100,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-1.2.1",
     [[
-        CREATE TRIGGER tr1 DELETE ON t1 BEGIN
+        CREATE TRIGGER tr1 DELETE ON t1 FOR EACH ROW
+        BEGIN
             SELECT * FROM sql_master;
          END
     ]], {
@@ -108,7 +113,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-1.2.2",
     [[
-        CREATE TRIGGER tr1 DELETE ON t1 BEGIN
+        CREATE TRIGGER tr1 DELETE ON t1 FOR EACH ROW
+        BEGIN
             SELECT * FROM sql_master;
          END
     ]], {
@@ -120,17 +126,18 @@ test:do_catchsql_test(
 -- do_test trigger1-1.3 {
 --     catchsql {
 --         BEGIN;
---         CREATE TRIGGER tr2 INSERT ON t1 BEGIN
+--         CREATE TRIGGER tr2 INSERT ON t1 FOR EACH ROW
+--         BEGIN
 --             SELECT * from sql_master; END;
 --         ROLLBACK;
---         CREATE TRIGGER tr2 INSERT ON t1 BEGIN
+--         CREATE TRIGGER tr2 INSERT ON t1 FOR EACH ROW BEGIN
 --             SELECT * from sql_master; END;
 --     }
 -- } {0 {}}
 -- do_test trigger1-1.4 {
 --     catchsql {
 --         DROP TRIGGER IF EXISTS tr1;
---         CREATE TRIGGER tr1 DELETE ON t1 BEGIN
+--         CREATE TRIGGER tr1 DELETE ON t1 FOR EACH ROW BEGIN
 --             SELECT * FROM sql_master;
 --         END
 --     }
@@ -181,7 +188,8 @@ test:do_catchsql_test(
 --   }
 --   do_test trigger1-1.8 {
 --     execsql {
---           CREATE TRIGGER temp_trig UPDATE ON temp_table BEGIN
+--           CREATE TRIGGER temp_trig UPDATE ON temp_table FOR EACH ROW
+--           BEGIN
 --               SELECT * from _space;
 --           END;
 --           SELECT count(*) FROM _trigger WHERE name = 'temp_trig';
@@ -190,7 +198,8 @@ test:do_catchsql_test(
 -- }
 -- do_test trigger1-1.9 {
 --   catchsql {
---     CREATE TRIGGER tr1 AFTER UPDATE ON sql_master BEGIN
+--     CREATE TRIGGER tr1 AFTER UPDATE ON sql_master FOR EACH ROW
+--     BEGIN
 --        SELECT * FROM sql_master;
 --     END;
 --   }
@@ -292,7 +301,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-2.1",
     [[
-        CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN
+        CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW
+        BEGIN
           SELECT * FROM;  -- Syntax error
         END;
     ]], {
@@ -304,7 +314,8 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-2.2",
     [[
-        CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN
+        CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW
+        BEGIN
           SELECT * FROM t1;
           SELECT * FROM;  -- Syntax error
         END;
@@ -323,7 +334,8 @@ test:do_catchsql_test(
 --       CREATE TEMP TABLE t2(x int PRIMARY KEY,y);
 --     }
 --     catchsql {
---       CREATE TRIGGER r1 AFTER INSERT ON t1 BEGIN
+--       CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW
+--       BEGIN
 --         INSERT INTO t2 VALUES(NEW.a,NEW.b);
 --       END;
 --     }
@@ -480,7 +492,7 @@ view_v1 = "view v1"
 test:do_execsql_test(
     "trigger1-6.2",
     [[
-        CREATE TRIGGER t2 BEFORE DELETE ON t2 BEGIN
+        CREATE TRIGGER t2 BEFORE DELETE ON t2 FOR EACH ROW BEGIN
           SELECT RAISE(ABORT,'deletes are not permitted');
         END;
     ]], {
@@ -537,7 +549,7 @@ test:execsql "DROP TRIGGER IF EXISTS t2"
 test:do_execsql_test(
     "trigger1-8.1",
     [[
-        CREATE TRIGGER "trigger" AFTER INSERT ON t2 BEGIN SELECT 1; END;
+        CREATE TRIGGER "trigger" AFTER INSERT ON t2 FOR EACH ROW BEGIN SELECT 1; END;
         SELECT "name" FROM "_trigger" WHERE "name"='trigger';
     ]], {
         -- <trigger1-8.1>
@@ -559,7 +571,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "trigger1-8.3",
     [[
-        CREATE TRIGGER "trigger" AFTER INSERT ON t2 BEGIN SELECT 1; END;
+        CREATE TRIGGER "trigger" AFTER INSERT ON t2 FOR EACH ROW BEGIN SELECT 1; END;
         SELECT "name" FROM "_trigger" WHERE "name"='trigger';
     ]], {
         -- <trigger1-8.3>
@@ -589,7 +601,8 @@ test:do_execsql_test(
 --       execsql {
 --         CREATE TABLE t3(a,b int PRIMARY KEY);
 --         CREATE TABLE t4(x int PRIMARY KEY, b);
---         CREATE TRIGGER r34 AFTER INSERT ON t3 BEGIN
+--         CREATE TRIGGER r34 AFTER INSERT ON t3 FOR EACH ROW
+--         BEGIN
 --           REPLACE INTO t4 VALUES(new.a,new.b);
 --         END;
 --         INSERT INTO t3 VALUES(1,2);
@@ -608,7 +621,8 @@ test:do_execsql_test(
 --       execsql {
 --         CREATE TABLE t3(a, b int PRIMARY KEY);
 --         CREATE TABLE t4(x int PRIMARY KEY, b);
---         CREATE TRIGGER r34 AFTER INSERT ON t3 BEGIN
+--         CREATE TRIGGER r34 AFTER INSERT ON t3 FOR EACH ROW
+--         BEGIN
 --           REPLACE INTO t4 VALUES(new.a,new.b);
 --         END;
 --         INSERT INTO t3 VALUES(1,2);
@@ -738,7 +752,7 @@ test:do_catchsql_test(
 -- do_test trigger1-15.1 {
 --   execsql {
 --     CREATE TABLE tA(a INTEGER PRIMARY KEY, b, c);
---     CREATE TRIGGER tA_trigger BEFORE UPDATE ON "tA" BEGIN SELECT 1; END;
+--     CREATE TRIGGER tA_trigger BEFORE UPDATE ON "tA" FOR EACH ROW BEGIN SELECT 1; END;
 --     INSERT INTO tA VALUES(1, 2, 3);
 --   }
 --   catchsql { UPDATE tA SET a = 'abc' }
@@ -748,7 +762,7 @@ test:do_catchsql_test(
 -- } {1 {datatype mismatch}}
 test:execsql [[
     CREATE TABLE tA(a INTEGER PRIMARY KEY, b INT, c INT);
-    CREATE TRIGGER tA_trigger BEFORE UPDATE ON tA BEGIN SELECT 1; END;
+    CREATE TRIGGER tA_trigger BEFORE UPDATE ON tA FOR EACH ROW BEGIN SELECT 1; END;
     INSERT INTO tA VALUES(1, 2, 3);
 ]]
 -- Ticket #3947:  Do not allow qualified table names on INSERT, UPDATE, and
@@ -764,7 +778,7 @@ test:do_test(
             CREATE INDEX t16b ON t16(b);
         ]]
         return test:catchsql [[
-            CREATE TRIGGER t16err1 AFTER INSERT ON tA BEGIN
+            CREATE TRIGGER t16err1 AFTER INSERT ON tA FOR EACH ROW BEGIN
               INSERT INTO t16 VALUES(1,2,3);
             END;
         ]]
@@ -778,7 +792,7 @@ test:do_test(
 test:do_catchsql_test(
     "trigger1-16.2",
     [[
-        CREATE TRIGGER t16err2 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err2 AFTER INSERT ON tA FOR EACH ROW BEGIN
           UPDATE t16 SET rowid=rowid+1;
         END;
     ]], {
@@ -791,7 +805,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.3",
     [[
-        CREATE TRIGGER t16err3 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err3 AFTER INSERT ON tA FOR EACH ROW BEGIN
           DELETE FROM t16;
         END;
     ]], {
@@ -804,7 +818,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.4",
     [[
-        CREATE TRIGGER t16err4 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err4 AFTER INSERT ON tA FOR EACH ROW BEGIN
           UPDATE t16 NOT INDEXED SET rowid=rowid+1;
         END;
     ]], {
@@ -816,7 +830,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.5",
     [[
-        CREATE TRIGGER t16err5 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err5 AFTER INSERT ON tA FOR EACH ROW BEGIN
           UPDATE t16 INDEXED BY t16a SET rowid=rowid+1 WHERE a=1;
         END;
     ]], {
@@ -828,7 +842,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.6",
     [[
-        CREATE TRIGGER t16err6 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err6 AFTER INSERT ON tA FOR EACH ROW BEGIN
           DELETE FROM t16 NOT INDEXED WHERE a=123;
         END;
     ]], {
@@ -840,7 +854,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "trigger1-16.7",
     [[
-        CREATE TRIGGER t16err7 AFTER INSERT ON tA BEGIN
+        CREATE TRIGGER t16err7 AFTER INSERT ON tA FOR EACH ROW BEGIN
           DELETE FROM t16 INDEXED BY t16a WHERE a=123;
         END;
     ]], {
@@ -853,7 +867,7 @@ test:do_catchsql_test(
     "trigger1-16.8",
     [[
         START TRANSACTION;
-          CREATE TRIGGER tr168 INSERT ON tA BEGIN
+          CREATE TRIGGER tr168 INSERT ON tA FOR EACH ROW BEGIN
             INSERT INTO t16 values(1);
           END;
    ]], {
@@ -879,10 +893,10 @@ test:do_catchsql_test(
 -- do_execsql_test trigger1-17.0 {
 --   CREATE TABLE t17a(ii INT);
 --   CREATE TABLE t17b(tt TEXT PRIMARY KEY, ss);
---   CREATE TRIGGER t17a_ai AFTER INSERT ON t17a BEGIN
+--   CREATE TRIGGER t17a_ai AFTER INSERT ON t17a FOR EACH ROW BEGIN
 --     INSERT INTO t17b(tt) VALUES(new.ii);
 --   END;
---   CREATE TRIGGER t17b_ai AFTER INSERT ON t17b BEGIN
+--   CREATE TRIGGER t17b_ai AFTER INSERT ON t17b FOR EACH ROW BEGIN
 --     UPDATE t17b SET ss = 4;
 --   END;
 --   INSERT INTO t17a(ii) VALUES('1');

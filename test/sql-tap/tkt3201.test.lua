@@ -120,16 +120,20 @@ test:do_test(
         return test:execsql [[
             CREATE TABLE t4(x  INT primary key);
             CREATE TABLE t4_log(x  INT primary key);
-            CREATE TRIGGER r4_1 AFTER INSERT ON t4 WHEN new.x=1 BEGIN
+            CREATE TRIGGER r4_1 AFTER INSERT ON t4 FOR EACH ROW WHEN new.x=1
+            BEGIN
               INSERT INTO t4_log(x) VALUES(new.x);
             END;
-            CREATE TRIGGER r4_2 AFTER INSERT ON t4 WHEN new.x=2 BEGIN
+            CREATE TRIGGER r4_2 AFTER INSERT ON t4 FOR EACH ROW 
+            WHEN new.x=2 BEGIN
               INSERT INTO t4_log(x) VALUES(new.x);
             END;
-            CREATE TRIGGER r4_3 AFTER INSERT ON t4 WHEN new.x=3 BEGIN
+            CREATE TRIGGER r4_3 AFTER INSERT ON t4 FOR EACH ROW WHEN new.x=3
+            BEGIN
               INSERT INTO t4_log(x) VALUES(new.x);
             END;
-            CREATE TRIGGER r4_4 AFTER INSERT ON t4 WHEN new.x=4 BEGIN
+            CREATE TRIGGER r4_4 AFTER INSERT ON t4 FOR EACH ROW WHEN new.x=4
+            BEGIN
               INSERT INTO t4_log(x) VALUES(new.x);
             END;
             INSERT INTO t4 VALUES(1);

@@ -429,7 +429,9 @@ test:do_execsql_test(
             node  INT UNIQUE NOT NULL,
             parent  INT REFERENCES t1(node) ON DELETE CASCADE);
         CREATE TABLE t2(node  INT PRIMARY KEY, parent INT );
-        CREATE TRIGGER t2t AFTER DELETE ON t2 BEGIN
+        CREATE TRIGGER t2t AFTER DELETE ON t2
+        FOR EACH ROW
+        BEGIN
             DELETE FROM t2 WHERE parent = old.node;
         END;
         INSERT INTO t1(node, parent) VALUES(1, NULL);
@@ -478,7 +480,9 @@ test:do_execsql_test(
             node  INT PRIMARY KEY,
             parent  INT REFERENCES t1 ON DELETE CASCADE);
         CREATE TABLE t2(node  INT PRIMARY KEY, parent INT );
-        CREATE TRIGGER t2t AFTER DELETE ON t2 BEGIN
+        CREATE TRIGGER t2t AFTER DELETE ON t2
+        FOR EACH ROW
+        BEGIN
             DELETE FROM t2 WHERE parent = old.node;
         END;
         INSERT INTO t1 VALUES(1, 1);
@@ -839,6 +843,7 @@ test:do_execsql_test(
         DROP TABLE IF EXISTS t1;
         CREATE TABLE t1(x  TEXT COLLATE "unicode_ci" PRIMARY KEY);
         CREATE TRIGGER tt1 AFTER DELETE ON t1
+        FOR EACH ROW
             WHEN EXISTS ( SELECT 1 FROM t2 WHERE old.x = y )
         BEGIN
             INSERT INTO t1 VALUES(old.x);

@@ -63,7 +63,7 @@ box.execute("CREATE TABLE t2 (s1 INT PRIMARY KEY);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 BEGIN DELETE FROM t1; END;")
+box.execute("CREATE TRIGGER t2 BEFORE INSERT ON t2 FOR EACH ROW BEGIN DELETE FROM t1; END;")
 ---
 - row_count: 1
 ...
@@ -136,7 +136,7 @@ box.execute("CREATE TABLE t2(x INT PRIMARY KEY);")
 ---
 - row_count: 1
 ...
-box.execute("CREATE TRIGGER trig2 BEFORE DELETE ON t1 BEGIN INSERT INTO t2 VALUES(old.x); END;")
+box.execute("CREATE TRIGGER trig2 BEFORE DELETE ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(old.x); END;")
 ---
 - row_count: 1
 ...

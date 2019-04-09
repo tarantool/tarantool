@@ -37,7 +37,8 @@ test:do_test(
             CREATE TABLE t1(x INT PRIMARY KEY);
             CREATE TABLE t2(y INT PRIMARY KEY);
         ]]
-        sql = string.format([[CREATE TRIGGER r%s AFTER INSERT ON t1 BEGIN
+        sql = string.format([[CREATE TRIGGER r%s AFTER INSERT ON t1
+        FOR EACH ROW BEGIN
 ]], nStatement)
         -- for _ in X(0, "X!for", [=[["set i 0","$i<$nStatement","incr i"]]=]) do
         for i=1, nStatement do
