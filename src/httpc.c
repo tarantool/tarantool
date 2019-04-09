@@ -326,6 +326,13 @@ httpc_set_interface(struct httpc_request *req, const char *interface)
 	curl_easy_setopt(req->curl_request.easy, CURLOPT_INTERFACE, interface);
 }
 
+void
+httpc_set_follow_location(struct httpc_request *req, long follow)
+{
+	curl_easy_setopt(req->curl_request.easy, CURLOPT_FOLLOWLOCATION,
+			 follow);
+}
+
 int
 httpc_execute(struct httpc_request *req, double timeout)
 {
