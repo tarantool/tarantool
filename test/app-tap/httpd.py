@@ -15,6 +15,7 @@ def hello():
     body = [b'hello world']
     headers = [("Content-Type", "application/json")]
     return code, body, headers
+
 def hello1():
     code = "200 OK"
     body = [b'abc']
@@ -56,6 +57,7 @@ paths = {
         "/absent": absent,
         "/headers": headers,
         "/long_query": long_query,
+        "/redirect": redirect,
         }
 
 def read_handle(env, response):
