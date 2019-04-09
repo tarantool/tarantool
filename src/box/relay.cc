@@ -422,7 +422,17 @@ relay_schedule_pending_gc(struct relay *relay, const struct vclock *vclock)
 {
 	struct relay_gc_msg *curr, *next, *gc_msg = NULL;
 	stailq_foreach_entry_safe(curr, next, &relay->pending_gc, in_pending) {
-		if (vclock_sum(&curr->vclock) > vclock_sum(vclock))
+		/*
+		 * We may delete a WAL file only if its vclock is
+		 * less than or equal to the vclock acknowledged by
+		 * the replica. Even if the replica's signature is
+		 * is greater, but the vclocks are incomparable, we
+		 * must not delete the WAL, because there may still
+		 * be rows not applied by the replica in it while
+		 * the greater signatures is due to changes pulled
+		 * from other members of the cluster.
+		 */
+		if (vclock_compare(&curr->vclock, vclock) > 0)
 			break;
 		stailq_shift(&relay->pending_gc);
 		free(gc_msg);
