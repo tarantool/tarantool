@@ -350,13 +350,35 @@ box.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) MATCH F
 ...
 box.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id) MATCH PARTIAL ON DELETE CASCADE ON UPDATE SET NULL')
 ---
-- row_count: 0
+- row_count: 1
+...
+-- Test that ADD/DROP CONSTRAINT return correct row_count value.
+--
+box.execute('SELECT row_count();')
+---
+- metadata:
+  - name: row_count()
+    type: integer
+  rows:
+  - [1]
 ...
 box.space._fk_constraint:select{}
 ---
 - - ['FK1', 518, 517, false, 'partial', 'cascade', 'set_null', [0], [0]]
   - ['FK_CONSTRAINT_1_TC', 518, 517, false, 'full', 'set_null', 'no_action', [1],
     [1]]
+...
+box.execute('ALTER TABLE tc DROP CONSTRAINT fk1;')
+---
+- row_count: 1
+...
+box.execute('SELECT row_count();')
+---
+- metadata:
+  - name: row_count()
+    type: integer
+  rows:
+  - [1]
 ...
 box.execute('DROP TABLE tc')
 ---

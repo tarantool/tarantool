@@ -156,7 +156,12 @@ box.space.PARENT:drop()
 box.execute('CREATE TABLE tp (id INT PRIMARY KEY, a INT UNIQUE)')
 box.execute('CREATE TABLE tc (id INT PRIMARY KEY, a INT REFERENCES tp(a) MATCH FULL ON DELETE SET NULL)')
 box.execute('ALTER TABLE tc ADD CONSTRAINT fk1 FOREIGN KEY (id) REFERENCES tp(id) MATCH PARTIAL ON DELETE CASCADE ON UPDATE SET NULL')
+-- Test that ADD/DROP CONSTRAINT return correct row_count value.
+--
+box.execute('SELECT row_count();')
 box.space._fk_constraint:select{}
+box.execute('ALTER TABLE tc DROP CONSTRAINT fk1;')
+box.execute('SELECT row_count();')
 box.execute('DROP TABLE tc')
 box.execute('DROP TABLE tp')
 

@@ -362,7 +362,7 @@ box.snapshot()
 ...
 box.execute("ALTER TABLE t3 ADD CONSTRAINT fk1 FOREIGN KEY (b) REFERENCES t3;")
 ---
-- row_count: 0
+- row_count: 1
 ...
 box.execute("INSERT INTO t3 VALUES(1, 1, 3);")
 ---
