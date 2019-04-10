@@ -617,6 +617,8 @@ struct vy_run_writer {
 	 * Current page info capacity. Can grow with page number.
 	 */
 	uint32_t page_info_capacity;
+	/** Don't use compression while writing xlog files. */
+	bool no_compression;
 	/** Xlog to write data. */
 	struct xlog data_xlog;
 	/** Bloom filter false positive rate. */
@@ -637,7 +639,7 @@ int
 vy_run_writer_create(struct vy_run_writer *writer, struct vy_run *run,
 		     const char *dirpath, uint32_t space_id, uint32_t iid,
 		     struct key_def *cmp_def, struct key_def *key_def,
-		     uint64_t page_size, double bloom_fpr);
+		     uint64_t page_size, double bloom_fpr, bool no_compression);
 
 /**
  * Write a specified statement into a run.

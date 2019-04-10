@@ -164,3 +164,21 @@ ch2:get()
 box.cfg{read_only = false}
 s:select()
 s:drop()
+
+--
+-- gh-2389: L1 runs are not compressed.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+i = s:create_index('pk', {page_size = 100 * 1000, range_size = 1000 * 1000})
+pad = string.rep('x', 1000)
+for k = 1, 10 do s:replace{k, pad} end
+box.snapshot()
+stat = i:stat().disk
+stat.bytes_compressed >= stat.bytes
+for k = 1, 10 do s:replace{k, pad} end
+box.snapshot()
+i:compact()
+test_run:wait_cond(function() return i:stat().disk.compaction.count > 0 end, 60)
+stat = i:stat().disk
+stat.bytes_compressed < stat.bytes / 10
+s:drop()

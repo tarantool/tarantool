@@ -74,6 +74,14 @@ struct xlog_opts {
 	 * block writers when an xlog is rotated.
 	 */
 	bool sync_is_async;
+	/**
+	 * If this flag is set, the xlog writer won't use zstd
+	 * compression.
+	 *
+	 * This option is useful for xlog files that are intended
+	 * to be read frequently, e.g. L1 run files in Vinyl.
+	 */
+	bool no_compression;
 };
 
 extern const struct xlog_opts xlog_opts_default;

@@ -94,6 +94,7 @@ const struct xlog_opts xlog_opts_default = {
 	.sync_interval = 0,
 	.free_cache = false,
 	.sync_is_async = false,
+	.no_compression = false,
 };
 
 /* {{{ struct xlog_meta */
@@ -772,11 +773,13 @@ xlog_init(struct xlog *xlog, const struct xlog_opts *opts)
 	xlog->is_autocommit = true;
 	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
 	obuf_create(&xlog->zbuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
-	xlog->zctx = ZSTD_createCCtx();
-	if (xlog->zctx == NULL) {
-		diag_set(ClientError, ER_COMPRESSION,
-			 "failed to create context");
-		return -1;
+	if (!opts->no_compression) {
+		xlog->zctx = ZSTD_createCCtx();
+		if (xlog->zctx == NULL) {
+			diag_set(ClientError, ER_COMPRESSION,
+				 "failed to create context");
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -1204,7 +1207,8 @@ xlog_tx_write(struct xlog *log)
 		return 0;
 	ssize_t written;
 
-	if (obuf_size(&log->obuf) >= XLOG_TX_COMPRESS_THRESHOLD) {
+	if (!log->opts.no_compression &&
+	    obuf_size(&log->obuf) >= XLOG_TX_COMPRESS_THRESHOLD) {
 		written = xlog_tx_write_zstd(log);
 	} else {
 		written = xlog_tx_write_plain(log);
