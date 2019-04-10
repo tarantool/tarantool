@@ -71,6 +71,9 @@ const char *vy_file_suffix[] = {
 	"run" inprogress_suffix, 	/* VY_FILE_RUN_INPROGRESS */
 };
 
+/* sync run and index files very 16 MB */
+#define VY_RUN_SYNC_INTERVAL (1 << 24)
+
 /**
  * We read runs in background threads so as not to stall tx.
  * This structure represents such a thread.
@@ -2038,10 +2041,11 @@ vy_run_write_index(struct vy_run *run, const char *dirpath,
 	struct xlog_meta meta;
 	xlog_meta_create(&meta, XLOG_META_TYPE_INDEX, &INSTANCE_UUID,
 			 NULL, NULL);
-	if (xlog_create(&index_xlog, path, 0, &meta) < 0)
+	struct xlog_opts opts = xlog_opts_default;
+	opts.rate_limit = run->env->snap_io_rate_limit;
+	opts.sync_interval = VY_RUN_SYNC_INTERVAL;
+	if (xlog_create(&index_xlog, path, 0, &meta, &opts) < 0)
 		return -1;
-
-	index_xlog.rate_limit = run->env->snap_io_rate_limit;
 
 	xlog_tx_begin(&index_xlog);
 	struct region *region = &fiber()->gc;
@@ -2134,9 +2138,11 @@ vy_run_writer_create_xlog(struct vy_run_writer *writer)
 	struct xlog_meta meta;
 	xlog_meta_create(&meta, XLOG_META_TYPE_RUN, &INSTANCE_UUID,
 			 NULL, NULL);
-	if (xlog_create(&writer->data_xlog, path, 0, &meta) != 0)
+	struct xlog_opts opts = xlog_opts_default;
+	opts.rate_limit = writer->run->env->snap_io_rate_limit;
+	opts.sync_interval = VY_RUN_SYNC_INTERVAL;
+	if (xlog_create(&writer->data_xlog, path, 0, &meta, &opts) != 0)
 		return -1;
-	writer->data_xlog.rate_limit = writer->run->env->snap_io_rate_limit;
 	return 0;
 }
 

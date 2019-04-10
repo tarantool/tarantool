@@ -49,6 +49,35 @@ struct xrow_header;
 extern "C" {
 #endif /* defined(__cplusplus) */
 
+/**
+ * This structure combines all xlog write options set on xlog
+ * creation.
+ */
+struct xlog_opts {
+	/** Write rate limit, in bytes per second. */
+	uint64_t rate_limit;
+	/** Sync interval, in bytes. */
+	uint64_t sync_interval;
+	/**
+	 * If this flag is set and sync interval is greater than 0,
+	 * page cache will be freed after each sync.
+	 *
+	 * This option is useful for memtx snapshots, which won't
+	 * be reread soon and hence shouldn't stay cached in memory.
+	 */
+	bool free_cache;
+	/**
+	 * If this flag is set, xlog file will be synced in a coio
+	 * thread on close.
+	 *
+	 * This option is useful for WAL files as it allows not to
+	 * block writers when an xlog is rotated.
+	 */
+	bool sync_is_async;
+};
+
+extern const struct xlog_opts xlog_opts_default;
+
 /* {{{ log dir */
 
 /**
@@ -81,6 +110,8 @@ enum log_suffix { NONE, INPROGRESS };
  * through all logs, create a new log.
  */
 struct xdir {
+	/** Xlog write options. */
+	struct xlog_opts opts;
 	/**
 	 * Allow partial recovery from a damaged/incorrect
 	 * data directory. Suppresses exceptions when scanning
@@ -89,14 +120,6 @@ struct xdir {
 	 * are skipped.
 	 */
 	bool force_recovery;
-
-	/**
-	 * true if a log file in this directory can by fsync()ed
-	 * at close in a separate thread (we use this technique to
-	 * speed up sync of write ahead logs, but not snapshots).
-	 */
-	bool sync_is_async;
-
 	/* Default filename suffix for a new file. */
 	enum log_suffix suffix;
 	/**
@@ -134,12 +157,6 @@ struct xdir {
 	char dirname[PATH_MAX+1];
 	/** Snapshots or xlogs */
 	enum xdir_type type;
-	/**
-	 * Sync interval in bytes.
-	 * xlog file will be synced every sync_interval bytes,
-	 * corresponding file cache will be marked as free
-	 */
-	uint64_t sync_interval;
 };
 
 /**
@@ -147,7 +164,7 @@ struct xdir {
  */
 void
 xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
-	    const struct tt_uuid *instance_uuid);
+	    const struct tt_uuid *instance_uuid, const struct xlog_opts *opts);
 
 /**
  * Destroy a log dir object.
@@ -306,10 +323,10 @@ xlog_meta_create(struct xlog_meta *meta, const char *filetype,
  * A single log file - a snapshot, a vylog or a write ahead log.
  */
 struct xlog {
+	/** Xlog write options. */
+	struct xlog_opts opts;
 	/** xlog meta header */
 	struct xlog_meta meta;
-	/** do sync in async mode */
-	bool sync_is_async;
 	/** File handle. */
 	int fd;
 	/**
@@ -363,26 +380,9 @@ struct xlog {
 	 */
 	struct obuf zbuf;
 	/**
-	 * Sync interval in bytes.
-	 * xlog file will be synced every sync_interval bytes,
-	 * corresponding file cache will be marked as free
-	 */
-	uint64_t sync_interval;
-	/**
 	 * Synced file size
 	 */
 	uint64_t synced_size;
-	/**
-	 * If xlog file was synced corresponding cache will be freed if true.
-	 * This can be significant for memtx snapshots (that wouldn't
-	 * be read in normal cases) and vinyl data files (that can be read
-	 * after writing)
-	 */
-	bool free_cache;
-	/**
-	 * Write rate limit
-	 */
-	uint64_t rate_limit;
 	/** Time when xlog wast synced last time */
 	double sync_time;
 };
@@ -424,6 +424,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
  * @param name          the assiciated name
  * @param flags		flags to open the file or 0 for defaults
  * @param meta          xlog meta
+ * @param opts          write options
  *
  * @retval 0 for success
  * @retvl -1 if error
@@ -431,18 +432,19 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 
 int
 xlog_create(struct xlog *xlog, const char *name, int flags,
-	    const struct xlog_meta *meta);
+	    const struct xlog_meta *meta, const struct xlog_opts *opts);
 
 /**
  * Open an existing xlog file for appending.
  * @param xlog          xlog descriptor
  * @param name          file name
+ * @param opts          write options
  *
  * @retval 0 success
  * @retval -1 error
  */
 int
-xlog_open(struct xlog *xlog, const char *name);
+xlog_open(struct xlog *xlog, const char *name, const struct xlog_opts *opts);
 
 
 /**
