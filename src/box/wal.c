@@ -246,8 +246,8 @@ xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 }
 
 /**
- * Invoke fibers waiting for their journal_entry's to be
- * completed. The fibers are invoked in strict fifo order:
+ * Invoke completion callbacks of journal entries to be
+ * completed. Callbacks are invoked in strict fifo order:
  * this ensures that, in case of rollback, requests are
  * rolled back in strict reverse order, producing
  * a consistent database state.
@@ -255,15 +255,9 @@ xlog_write_entry(struct xlog *l, struct journal_entry *entry)
 static void
 tx_schedule_queue(struct stailq *queue)
 {
-	/*
-	 * fiber_wakeup() is faster than fiber_call() when there
-	 * are many ready fibers.
-	 */
-	struct journal_entry *req;
-	stailq_foreach_entry(req, queue, fifo) {
+	struct journal_entry *req, *tmp;
+	stailq_foreach_entry_safe(req, tmp, queue, fifo)
 		journal_entry_complete(req);
-		fiber_wakeup(req->fiber);
-	}
 }
 
 /**
@@ -1126,9 +1120,9 @@ wal_writer_f(va_list ap)
 
 /**
  * WAL writer main entry point: queue a single request
- * to be written to disk and wait until this task is completed.
+ * to be written to disk.
  */
-int64_t
+static int64_t
 wal_write(struct journal *journal, struct journal_entry *entry)
 {
 	struct wal_writer *writer = (struct wal_writer *) journal;
@@ -1176,16 +1170,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 	batch->approx_len += entry->approx_len;
 	writer->wal_pipe.n_input += entry->n_rows * XROW_IOVMAX;
 	cpipe_flush_input(&writer->wal_pipe);
-	/**
-	 * It's not safe to spuriously wakeup this fiber
-	 * since in that case it will ignore a possible
-	 * error from WAL writer and not roll back the
-	 * transaction.
-	 */
-	bool cancellable = fiber_set_cancellable(false);
-	fiber_yield(); /* Request was inserted. */
-	fiber_set_cancellable(cancellable);
-	return entry->res;
+	return 0;
 
 fail:
 	entry->res = -1;
@@ -1193,7 +1178,7 @@ fail:
 	return -1;
 }
 
-int64_t
+static int64_t
 wal_write_in_wal_mode_none(struct journal *journal,
 			   struct journal_entry *entry)
 {
@@ -1206,7 +1191,7 @@ wal_write_in_wal_mode_none(struct journal *journal,
 	vclock_copy(&replicaset.vclock, &writer->vclock);
 	entry->res = vclock_sum(&writer->vclock);
 	journal_entry_complete(entry);
-	return entry->res;
+	return 0;
 }
 
 void

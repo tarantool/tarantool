@@ -162,6 +162,8 @@ struct txn {
 	 * already assigned LSN.
 	 */
 	int n_applier_rows;
+	/* True when transaction is processed. */
+	bool is_done;
 	/**
 	 * True if the transaction was aborted so should be
 	 * rolled back at commit.
@@ -182,6 +184,10 @@ struct txn {
 	struct engine *engine;
 	/** Engine-specific transaction data */
 	void *engine_tx;
+	/* A fiber to wake up when transaction is finished. */
+	struct fiber *fiber;
+	/** Timestampt of entry write start. */
+	double start_tm;
 	/**
 	 * Triggers on fiber yield to abort transaction for
 	 * for in-memory engine.
@@ -227,6 +233,21 @@ txn_commit(struct txn *txn);
  */
 void
 txn_rollback(struct txn *txn);
+
+/**
+ * Submit a transaction to the journal.
+ * @pre txn == in_txn()
+ *
+ * On success 0 is returned, and the transaction will be freed upon
+ * journal write completion. Note, the journal write may still fail.
+ * To track transaction status, one is supposed to use on_commit and
+ * on_rollback triggers.
+ *
+ * On failure -1 is returned and the transaction is rolled back and
+ * freed.
+ */
+int
+txn_write(struct txn *txn);
 
 /**
  * Roll back the transaction but keep the object around.

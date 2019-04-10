@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "salad/stailq.h"
+#include "fiber.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -59,10 +60,6 @@ struct journal_entry {
 	 * the committed transaction, on error is -1
 	 */
 	int64_t res;
-	/**
-	 * The fiber issuing the request.
-	 */
-	struct fiber *fiber;
 	/**
 	 * A journal entry finalization callback which is going to be called
 	 * after the entry processing was finished in both cases: success
@@ -127,10 +124,9 @@ struct journal {
 extern struct journal *current_journal;
 
 /**
- * Record a single entry.
+ * Send a single entry to write.
  *
- * @return   a log sequence number (vclock signature) of the entry
- *           or -1 on error.
+ * @return 0 if write was scheduled or -1 in case of an error.
  */
 static inline int64_t
 journal_write(struct journal_entry *entry)

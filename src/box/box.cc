@@ -308,7 +308,7 @@ recovery_journal_write(struct journal *base,
 	struct recovery_journal *journal = (struct recovery_journal *) base;
 	entry->res = vclock_sum(journal->vclock);
 	journal_entry_complete(entry);
-	return entry->res;
+	return 0;
 }
 
 static inline void

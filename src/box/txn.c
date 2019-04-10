@@ -192,6 +192,7 @@ txn_begin()
 	txn->n_local_rows = 0;
 	txn->n_applier_rows = 0;
 	txn->has_triggers  = false;
+	txn->is_done = false;
 	txn->is_aborted = false;
 	txn->in_sub_stmt = 0;
 	txn->id = ++tsn;
@@ -199,6 +200,7 @@ txn_begin()
 	txn->engine = NULL;
 	txn->engine_tx = NULL;
 	txn->psql_txn = NULL;
+	txn->fiber = NULL;
 	/* fiber_on_yield/fiber_on_stop initialized by engine on demand */
 	fiber_set_txn(fiber(), txn);
 	trigger_create(&txn->fiber_on_stop, txn_on_stop, NULL, NULL);
@@ -383,6 +385,28 @@ txn_complete(struct txn *txn)
 			engine_commit(txn->engine, txn);
 		if (txn->has_triggers)
 			txn_run_triggers(txn, &txn->on_commit);
+
+		double stop_tm = ev_monotonic_now(loop());
+		if (stop_tm - txn->start_tm > too_long_threshold) {
+			int n_rows = txn->n_new_rows + txn->n_applier_rows;
+			say_warn_ratelimited("too long WAL write: %d rows at "
+					     "LSN %lld: %.3f sec", n_rows,
+					     txn->signature - n_rows + 1,
+					     stop_tm - txn->start_tm);
+		}
+	}
+	/*
+	 * If there is no fiber waiting for the transaction then
+	 * the transaction could be safely freed. In the opposite case
+	 * the fiber is in duty to free this transaction.
+	 */
+	if (txn->fiber == NULL)
+		txn_free(txn);
+	else {
+		txn->is_done = true;
+		if (txn->fiber != fiber())
+			/* Wake a waiting fiber up. */
+			fiber_wakeup(txn->fiber);
 	}
 }
 
@@ -394,12 +418,12 @@ txn_entry_done_cb(struct journal_entry *entry, void *data)
 	txn_complete(txn);
 }
 
-
 static int64_t
 txn_write_to_wal(struct txn *txn)
 {
 	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
+	/* Prepare a journal entry. */
 	struct journal_entry *req = journal_entry_new(txn->n_new_rows +
 						      txn->n_applier_rows,
 						      &txn->region,
@@ -425,35 +449,21 @@ txn_write_to_wal(struct txn *txn)
 	assert(remote_row == req->rows + txn->n_applier_rows);
 	assert(local_row == remote_row + txn->n_new_rows);
 
-	ev_tstamp start = ev_monotonic_now(loop());
-	int64_t res = journal_write(req);
-	ev_tstamp stop = ev_monotonic_now(loop());
-
-	if (res < 0) {
+	/* Send the entry to the journal. */
+	if (journal_write(req) < 0) {
 		diag_set(ClientError, ER_WAL_IO);
 		diag_log();
-		/*
-		 * Despite the fact that the transaction was rolled back
-		 * by the journal completion callback, it's our duty to
-		 * free it.
-		 */
-		txn_free(txn);
-	} else if (stop - start > too_long_threshold) {
-		int n_rows = txn->n_new_rows + txn->n_applier_rows;
-		say_warn_ratelimited("too long WAL write: %d rows at "
-				     "LSN %lld: %.3f sec", n_rows,
-				     res - n_rows + 1, stop - start);
+		return -1;
 	}
-	/*
-	 * Use vclock_sum() from WAL writer as transaction signature.
-	 */
-	return res;
+	return 0;
 }
 
-int
-txn_commit(struct txn *txn)
+/*
+ * Prepare a transaction using engines.
+ */
+static int
+txn_prepare(struct txn *txn)
 {
-	assert(txn == in_txn());
 	/*
 	 * If transaction has been started in SQL, deferred
 	 * foreign key constraints must not be violated.
@@ -463,7 +473,7 @@ txn_commit(struct txn *txn)
 		struct sql_txn *sql_txn = txn->psql_txn;
 		if (sql_txn->fk_deferred_count != 0) {
 			diag_set(ClientError, ER_FOREIGN_KEY_CONSTRAINT);
-			goto fail;
+			return -1;
 		}
 	}
 	/*
@@ -472,32 +482,58 @@ txn_commit(struct txn *txn)
 	 */
 	if (txn->engine != NULL) {
 		if (engine_prepare(txn->engine, txn) != 0)
-			goto fail;
+			return -1;
 	}
 	trigger_clear(&txn->fiber_on_stop);
+	return 0;
+}
+
+int
+txn_write(struct txn *txn)
+{
+	if (txn_prepare(txn) != 0) {
+		txn_rollback(txn);
+		return -1;
+	}
 
 	/*
 	 * After this point the transaction must not be used
 	 * so reset the corresponding key in the fiber storage.
 	 */
 	fiber_set_txn(fiber(), NULL);
-	if (txn->n_new_rows + txn->n_applier_rows > 0) {
-		txn->signature = txn_write_to_wal(txn);
-		if (txn->signature < 0)
-			return -1;
-	} else {
-		/*
-		 * Even though there's nothing to write to WAL,
-		 * we still must complete the transaction.
-		 */
+	txn->start_tm = ev_monotonic_now(loop());
+	if (txn->n_new_rows + txn->n_applier_rows == 0) {
+		/* Nothing to do. */
 		txn->signature = 0;
 		txn_complete(txn);
+		return 0;
 	}
+	return txn_write_to_wal(txn);
+}
+
+int
+txn_commit(struct txn *txn)
+{
+	txn->fiber = fiber();
+
+	if (txn_write(txn) != 0)
+		return -1;
+	/*
+	 * In case of non-yielding journal the transaction could already
+	 * be done and there is nothing to wait in such cases.
+	 */
+	if (!txn->is_done) {
+		bool cancellable = fiber_set_cancellable(false);
+		fiber_yield();
+		fiber_set_cancellable(cancellable);
+	}
+	int res = txn->signature >= 0 ? 0 : -1;
+	if (res != 0)
+		diag_set(ClientError, ER_WAL_IO);
+
+	/* Synchronous transactions are freed by the calling fiber. */
 	txn_free(txn);
-	return 0;
-fail:
-	txn_rollback(txn);
-	return -1;
+	return res;
 }
 
 void
@@ -516,7 +552,6 @@ txn_rollback(struct txn *txn)
 	trigger_clear(&txn->fiber_on_stop);
 	txn->signature = -1;
 	txn_complete(txn);
-	txn_free(txn);
 	fiber_set_txn(fiber(), NULL);
 }
 

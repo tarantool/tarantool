@@ -30,7 +30,6 @@
  */
 #include "journal.h"
 #include <small/region.h>
-#include <fiber.h>
 #include <diag.h>
 
 /**
@@ -72,7 +71,6 @@ journal_entry_new(size_t n_rows, struct region *region,
 	entry->approx_len = 0;
 	entry->n_rows = n_rows;
 	entry->res = -1;
-	entry->fiber = fiber();
 	entry->on_done_cb = on_done_cb;
 	entry->on_done_cb_data = on_done_cb_data;
 	return entry;
