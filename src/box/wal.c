@@ -89,6 +89,8 @@ struct wal_writer
 	struct stailq rollback;
 	/** A pipe from 'tx' thread to 'wal' */
 	struct cpipe wal_pipe;
+	/** A memory pool for messages. */
+	struct mempool msg_pool;
 	/* ----------------- wal ------------------- */
 	/** A setting from instance configuration - rows_per_wal */
 	int64_t wal_max_rows;
@@ -285,6 +287,7 @@ tx_schedule_commit(struct cmsg *msg)
 	/* Update the tx vclock to the latest written by wal. */
 	vclock_copy(&replicaset.vclock, &batch->vclock);
 	tx_schedule_queue(&batch->commit);
+	mempool_free(&writer->msg_pool, container_of(msg, struct wal_msg, base));
 }
 
 static void
@@ -303,6 +306,9 @@ tx_schedule_rollback(struct cmsg *msg)
 	/* Must not yield. */
 	tx_schedule_queue(&writer->rollback);
 	stailq_create(&writer->rollback);
+	if (msg != &writer->in_rollback)
+		mempool_free(&writer->msg_pool,
+			     container_of(msg, struct wal_msg, base));
 }
 
 
@@ -373,6 +379,9 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 
 	writer->on_garbage_collection = on_garbage_collection;
 	writer->on_checkpoint_threshold = on_checkpoint_threshold;
+
+	mempool_create(&writer->msg_pool, &cord()->slabc,
+		       sizeof(struct wal_msg));
 }
 
 /** Destroy a WAL writer structure. */
@@ -1145,8 +1154,7 @@ wal_write(struct journal *journal, struct journal_entry *entry)
 
 		stailq_add_tail_entry(&batch->commit, entry, fifo);
 	} else {
-		batch = (struct wal_msg *)
-			region_alloc(&fiber()->gc, sizeof(struct wal_msg));
+		batch = (struct wal_msg *)mempool_alloc(&writer->msg_pool);
 		if (batch == NULL) {
 			diag_set(OutOfMemory, sizeof(struct wal_msg),
 				 "region", "struct wal_msg");
