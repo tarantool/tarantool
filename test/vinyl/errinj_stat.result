@@ -143,7 +143,7 @@ box.stat.reset()
 s = box.schema.space.create('test', {engine = 'vinyl'})
 ---
 ...
-_ = s:create_index('pk')
+i = s:create_index('pk')
 ---
 ...
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
@@ -154,14 +154,12 @@ s:replace{1}
 ---
 - [1]
 ...
-c = fiber.channel(1)
+_ = fiber.create(function() box.snapshot() end)
 ---
 ...
-_ = fiber.create(function() box.snapshot() c:put(true) end)
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
 ---
-...
-fiber.sleep(0.01)
----
+- true
 ...
 stat = box.stat.vinyl().scheduler
 ---
@@ -189,7 +187,7 @@ errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 ---
 - ok
 ...
-c:get()
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
 ---
 - true
 ...
@@ -227,10 +225,6 @@ box.snapshot()
 stat = box.stat.vinyl().scheduler
 ---
 ...
-stat.tasks_inprogress == 0
----
-- true
-...
 stat.tasks_completed == 1
 ---
 - true
@@ -249,6 +243,28 @@ errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 ...
 fiber.sleep(0.01)
 ---
+...
+box.snapshot()
+---
+- ok
+...
+i:compact()
+---
+...
+test_run:wait_cond(function() return i:stat().disk.compaction.count > 0 end)
+---
+- true
+...
+stat = box.stat.vinyl().scheduler
+---
+...
+stat.tasks_inprogress == 0
+---
+- true
+...
+stat.tasks_completed == 3
+---
+- true
 ...
 s:drop()
 ---
@@ -291,11 +307,12 @@ errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
 start_time = fiber.time()
 ---
 ...
-c = fiber.channel(1)
+_ = fiber.create(function() box.snapshot() end)
 ---
 ...
-_ = fiber.create(function() box.snapshot() c:put(true) end)
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
 ---
+- true
 ...
 fiber.sleep(0.1)
 ---
@@ -304,7 +321,7 @@ errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 ---
 - ok
 ...
-c:get()
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
 ---
 - true
 ...
@@ -345,6 +362,10 @@ start_time = fiber.time()
 i:compact()
 ---
 ...
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
+---
+- true
+...
 fiber.sleep(0.1)
 ---
 ...
@@ -352,8 +373,9 @@ errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 ---
 - ok
 ...
-while i:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
+test_run:wait_cond(function() return i:stat().disk.compaction.time > 0 end)
 ---
+- true
 ...
 i:stat().disk.compaction.time >= 0.1
 ---

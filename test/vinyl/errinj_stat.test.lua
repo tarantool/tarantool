@@ -47,12 +47,11 @@ s:drop()
 --
 box.stat.reset()
 s = box.schema.space.create('test', {engine = 'vinyl'})
-_ = s:create_index('pk')
+i = s:create_index('pk')
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
 s:replace{1}
-c = fiber.channel(1)
-_ = fiber.create(function() box.snapshot() c:put(true) end)
-fiber.sleep(0.01)
+_ = fiber.create(function() box.snapshot() end)
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
 stat = box.stat.vinyl().scheduler
 stat.tasks_inprogress > 0
 stat.tasks_completed == 0
@@ -60,7 +59,7 @@ stat.tasks_failed == 0
 box.stat.reset() -- doesn't affect tasks_inprogress
 box.stat.vinyl().scheduler.tasks_inprogress > 0
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
-c:get()
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
 stat = box.stat.vinyl().scheduler
 stat.tasks_inprogress == 0
 stat.tasks_completed == 1
@@ -70,12 +69,17 @@ errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0.01)
 s:replace{2}
 box.snapshot()
 stat = box.stat.vinyl().scheduler
-stat.tasks_inprogress == 0
 stat.tasks_completed == 1
 stat.tasks_failed > 0
 errinj.set('ERRINJ_VY_RUN_WRITE', false)
 errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
 fiber.sleep(0.01)
+box.snapshot()
+i:compact()
+test_run:wait_cond(function() return i:stat().disk.compaction.count > 0 end)
+stat = box.stat.vinyl().scheduler
+stat.tasks_inprogress == 0
+stat.tasks_completed == 3
 s:drop()
 
 --
@@ -92,11 +96,11 @@ box.stat.vinyl().scheduler.compaction_time == 0
 for i = 1, 100 do s:replace{i} end
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
 start_time = fiber.time()
-c = fiber.channel(1)
-_ = fiber.create(function() box.snapshot() c:put(true) end)
+_ = fiber.create(function() box.snapshot() end)
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
 fiber.sleep(0.1)
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
-c:get()
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
 i:stat().disk.dump.time >= 0.1
 i:stat().disk.dump.time <= fiber.time() - start_time
 i:stat().disk.compaction.time == 0
@@ -108,9 +112,10 @@ box.snapshot()
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', true)
 start_time = fiber.time()
 i:compact()
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end)
 fiber.sleep(0.1)
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
-while i:stat().disk.compaction.count == 0 do fiber.sleep(0.01) end
+test_run:wait_cond(function() return i:stat().disk.compaction.time > 0 end)
 i:stat().disk.compaction.time >= 0.1
 i:stat().disk.compaction.time <= fiber.time() - start_time
 box.stat.vinyl().scheduler.compaction_time == i:stat().disk.compaction.time
