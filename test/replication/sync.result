@@ -298,7 +298,7 @@ box.info.replication[1].upstream.status -- follow
 ---
 - follow
 ...
-test_run:grep_log('replica', 'ER_CFG.*')
+test_run:wait_log("replica", "ER_CFG.*", nil, 200)
 ---
 - 'ER_CFG: Incorrect value for option ''replication'': duplicate connection with the
   same replica UUID'
