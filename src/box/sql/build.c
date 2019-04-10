@@ -1067,8 +1067,10 @@ vdbe_emit_fk_constraint_create(struct Parse *parse_context,
 			  constr_tuple_reg + 9);
 	sqlVdbeAddOp3(vdbe, OP_SInsert, BOX_FK_CONSTRAINT_ID, 0,
 			  constr_tuple_reg + 9);
-	if (parse_context->create_table_def.new_space == NULL)
+	if (parse_context->create_table_def.new_space == NULL) {
+		sqlVdbeCountChanges(vdbe);
 		sqlVdbeChangeP5(vdbe, OPFLAG_NCHANGE);
+	}
 	save_record(parse_context, BOX_FK_CONSTRAINT_ID, constr_tuple_reg, 2,
 		    vdbe->nOp - 1);
 	sqlReleaseTempRange(parse_context, constr_tuple_reg, 10);
@@ -1902,7 +1904,9 @@ sql_drop_foreign_key(struct Parse *parse_context)
 	 * ALTER TABLE DROP CONSTRAINT statement, since whole
 	 * DROP TABLE always returns 1 (one) as a row count.
 	 */
-	sqlVdbeChangeP5(sqlGetVdbe(parse_context), OPFLAG_NCHANGE);
+	struct Vdbe *v = sqlGetVdbe(parse_context);
+	sqlVdbeCountChanges(v);
+	sqlVdbeChangeP5(v, OPFLAG_NCHANGE);
 }
 
 /**
