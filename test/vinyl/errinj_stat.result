@@ -191,6 +191,10 @@ test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed 
 ---
 - true
 ...
+test_run:wait_cond(function() return not box.info.gc().checkpoint_is_in_progress end)
+---
+- true
+...
 stat = box.stat.vinyl().scheduler
 ---
 ...
@@ -322,6 +326,10 @@ errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 - ok
 ...
 test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
+---
+- true
+...
+test_run:wait_cond(function() return not box.info.gc().checkpoint_is_in_progress end)
 ---
 - true
 ...
