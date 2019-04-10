@@ -230,8 +230,10 @@ swim_transport_bind(struct swim_transport *transport,
 	const struct sockaddr_in *new_addr = (const struct sockaddr_in *) addr;
 	int new_fd = ntohs(new_addr->sin_port) + FAKE_FD_BASE;
 	int old_fd = transport->fd;
-	if (old_fd == new_fd)
+	if (old_fd == new_fd) {
+		transport->addr = *new_addr;
 		return 0;
+	}
 	if (swim_fd_open(&swim_fd[new_fd - FAKE_FD_BASE]) != 0)
 		return -1;
 	transport->fd = new_fd;

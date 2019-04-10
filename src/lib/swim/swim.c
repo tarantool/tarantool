@@ -243,7 +243,11 @@ struct swim_member {
 	 *
 	 *               Failure detection component
 	 */
-	/** A monotonically growing number to refute old messages. */
+	/**
+	 * A monotonically growing number to refute old member's
+	 * state, characterized by a triplet
+	 * {incarnation, status, address}.
+	 */
 	uint64_t incarnation;
 	/**
 	 * How many recent pings did not receive an ack while the
@@ -1026,9 +1030,10 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 /** Update member's address.*/
 static inline void
 swim_update_member_addr(struct swim *swim, struct swim_member *member,
-			const struct sockaddr_in *addr)
+			const struct sockaddr_in *addr, int incarnation_inc)
 {
 	if (! swim_sockaddr_in_eq(addr, &member->addr)) {
+		member->incarnation += incarnation_inc;
 		member->addr = *addr;
 		swim_on_member_update(swim, member);
 	}
@@ -1078,7 +1083,7 @@ swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
 	if (member != self) {
 		if (def->incarnation < member->incarnation)
 			goto skip;
-		swim_update_member_addr(swim, member, &def->addr);
+		swim_update_member_addr(swim, member, &def->addr, 0);
 		swim_update_member_inc_status(swim, member, def->status,
 					      def->incarnation);
 		return 0;
@@ -1451,7 +1456,7 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 		swim_on_member_update(swim, swim->self);
 		swim->self = new_self;
 	}
-	swim_update_member_addr(swim, swim->self, &addr);
+	swim_update_member_addr(swim, swim->self, &addr, 1);
 	if (gc_mode != SWIM_GC_DEFAULT)
 		swim->gc_mode = gc_mode;
 	return 0;

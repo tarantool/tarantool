@@ -552,10 +552,77 @@ swim_test_quit(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_uri_update(void)
+{
+	swim_start_test(2);
+	/*
+	 * The test checks how a member address is updated. There
+	 * is a cluster of 3 members: S1, S2, S3, and links:
+	 * S1 <-> S2, S3 -> S1, S3 -> S2. S1 updates its address.
+	 * The new address is sent to S2 and is updated here. Then
+	 * S3 wakes up and disseminates the old address of S1.
+	 * Member S2 should ignore that old address. It is
+	 * achievable only via new incarnation on each address
+	 * update.
+	 */
+	struct swim_cluster *cluster = swim_cluster_new(3);
+	swim_cluster_interconnect(cluster, 0, 1);
+	/*
+	 * S3 should not accept packets so as to keep old address
+	 * of S1.
+	 */
+	swim_cluster_set_drop(cluster, 2, 100);
+	swim_cluster_add_link(cluster, 2, 1);
+	swim_cluster_add_link(cluster, 2, 0);
+
+	struct swim *s0 = swim_cluster_node(cluster, 0);
+	const struct swim_member *s0_self = swim_self(s0);
+	const char *new_s0_uri = "127.0.0.5:1";
+	fail_if(swim_cfg(s0, "127.0.0.5:1", -1, -1, -1, NULL) != 0);
+	/*
+	 * Since S1 knows about S2 only, one round step is enough.
+	 */
+	swim_run_for(1);
+	struct swim *s1 = swim_cluster_node(cluster, 1);
+	const struct swim_member *s0_view =
+		swim_member_by_uuid(s1, swim_member_uuid(s0_self));
+	is(strcmp(new_s0_uri, swim_member_uri(s0_view)), 0,
+	   "S1 updated its URI and S2 sees that");
+	/*
+	 * S2 should not manage to send the new address to S3, but
+	 * should accept S3 packets later - therefore block is
+	 * needed.
+	 */
+	swim_cluster_block_io(cluster, 1);
+	/*
+	 * S1 should not send the new address to S3 - drop its
+	 * packets.
+	 */
+	swim_cluster_set_drop(cluster, 0, 100);
+	/*
+	 * Main part of the test - S3 sends the old address to S1.
+	 */
+	swim_cluster_set_drop(cluster, 2, 0);
+	swim_run_for(3);
+	swim_cluster_set_drop(cluster, 2, 100);
+	/*
+	 * S2 absorbs the packets, but should ignore the old
+	 * address.
+	 */
+	swim_cluster_unblock_io(cluster, 1);
+	swim_run_for(2);
+	is(strcmp(new_s0_uri, swim_member_uri(s0_view)), 0,
+	   "S2 still keeps new S1's URI, even received the old one from S3");
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(13);
+	swim_start_test(14);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -574,6 +641,7 @@ main_f(va_list ap)
 	swim_test_undead();
 	swim_test_packet_loss();
 	swim_test_quit();
+	swim_test_uri_update();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

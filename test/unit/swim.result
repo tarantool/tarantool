@@ -1,5 +1,5 @@
 	*** main_f ***
-1..13
+1..14
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -131,4 +131,10 @@ ok 12 - subtests
     ok 9 - and still is not added to S2 - left members can not be added
 ok 13 - subtests
 	*** swim_test_quit: done ***
+	*** swim_test_uri_update ***
+    1..2
+    ok 1 - S1 updated its URI and S2 sees that
+    ok 2 - S2 still keeps new S1's URI, even received the old one from S3
+ok 14 - subtests
+	*** swim_test_uri_update: done ***
 	*** main_f: done ***
