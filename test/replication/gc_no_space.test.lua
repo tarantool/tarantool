@@ -11,18 +11,20 @@ fio = require('fio')
 errinj = box.error.injection
 
 test_run:cmd("setopt delimiter ';'")
-function check_file_count(dir, glob, count)
-    local files = fio.glob(fio.pathjoin(dir, glob))
-    if #files == count then
-        return true
-    end
-    return false, files
+function wait_file_count(dir, glob, count)
+    return test_run:wait_cond(function()
+        local files = fio.glob(fio.pathjoin(dir, glob))
+        if #files == count then
+            return true
+        end
+        return false, files
+    end)
 end;
 function check_wal_count(count)
-    return check_file_count(box.cfg.wal_dir, '*.xlog', count)
+    return wait_file_count(box.cfg.wal_dir, '*.xlog', count)
 end;
 function check_snap_count(count)
-    return check_file_count(box.cfg.memtx_dir, '*.snap', count)
+    return wait_file_count(box.cfg.memtx_dir, '*.snap', count)
 end;
 test_run:cmd("setopt delimiter ''");
 
