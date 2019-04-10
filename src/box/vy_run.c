@@ -835,6 +835,12 @@ vy_page_read(struct vy_page *page, const struct vy_page_info *page_info,
 	if (inj != NULL && inj->dparam > 0)
 		usleep(inj->dparam * 1000000);
 
+	inj = errinj(ERRINJ_VY_READ_PAGE_DELAY, ERRINJ_BOOL);
+	if (inj != NULL) {
+		while (inj->bparam)
+			usleep(10000);
+	}
+
 	/* decode xlog tx */
 	const char *data_pos = data;
 	const char *data_end = data + readen;
