@@ -190,7 +190,8 @@ apply_initial_join_row(struct xrow_header *row)
 	fiber_gc();
 	return rc;
 rollback:
-	txn_rollback();
+	txn_rollback(txn);
+	fiber_gc();
 	return -1;
 }
 
@@ -235,7 +236,8 @@ apply_final_join_row(struct xrow_header *row)
 	if (txn == NULL)
 		return -1;
 	if (apply_row(row) != 0) {
-		txn_rollback();
+		txn_rollback(txn);
+		fiber_gc();
 		return -1;
 	}
 	if (txn_commit(txn) != 0)
@@ -633,7 +635,8 @@ applier_apply_tx(struct stailq *rows)
 	return txn_commit(txn);
 
 rollback:
-	txn_rollback();
+	txn_rollback(txn);
+	fiber_gc();
 	return -1;
 }
 

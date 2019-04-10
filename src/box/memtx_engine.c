@@ -274,7 +274,8 @@ memtx_engine_recover_snapshot_row(struct memtx_engine *memtx,
 		return -1;
 	/* no access checks here - applier always works with admin privs */
 	if (space_apply_initial_join_row(space, &request) != 0) {
-		txn_rollback();
+		txn_rollback(txn);
+		fiber_gc();
 		return -1;
 	}
 	int rc = txn_commit(txn);

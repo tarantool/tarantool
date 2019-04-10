@@ -221,9 +221,12 @@ txn_begin();
 int
 txn_commit(struct txn *txn);
 
-/** Rollback a transaction, if any. */
+/**
+ * Rollback a transaction.
+ * @pre txn == in_txn()
+ */
 void
-txn_rollback();
+txn_rollback(struct txn *txn);
 
 /**
  * Roll back the transaction but keep the object around.

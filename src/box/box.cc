@@ -213,8 +213,10 @@ box_process_rw(struct request *request, struct space *space,
 	return 0;
 
 rollback:
-	if (is_autocommit)
-		txn_rollback();
+	if (is_autocommit) {
+		txn_rollback(txn);
+		fiber_gc();
+	}
 error:
 	if (return_tuple)
 		tuple_unref(tuple);

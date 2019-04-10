@@ -345,8 +345,10 @@ txn_write_to_wal(struct txn *txn)
 	struct journal_entry *req = journal_entry_new(txn->n_new_rows +
 						      txn->n_applier_rows,
 						      &txn->region);
-	if (req == NULL)
+	if (req == NULL) {
+		txn_rollback(txn);
 		return -1;
+	}
 
 	struct txn_stmt *stmt;
 	struct xrow_header **remote_row = req->rows;
@@ -419,7 +421,7 @@ txn_commit(struct txn *txn)
 	if (txn->n_new_rows + txn->n_applier_rows > 0) {
 		txn->signature = txn_write_to_wal(txn);
 		if (txn->signature < 0)
-			goto fail;
+			return -1;
 	}
 	/*
 	 * Engine can be NULL if transaction contains IPROTO_NOP
@@ -443,7 +445,7 @@ txn_commit(struct txn *txn)
 	txn_free(txn);
 	return 0;
 fail:
-	txn_rollback();
+	txn_rollback(txn);
 	return -1;
 }
 
@@ -457,11 +459,9 @@ txn_rollback_stmt(struct txn *txn)
 }
 
 void
-txn_rollback()
+txn_rollback(struct txn *txn)
 {
-	struct txn *txn = in_txn();
-	if (txn == NULL)
-		return;
+	assert(txn == in_txn());
 	trigger_clear(&txn->fiber_on_stop);
 	if (txn->engine)
 		engine_rollback(txn->engine, txn);
@@ -473,8 +473,6 @@ txn_rollback()
 		panic("rollback trigger failed");
 	}
 
-	/** Free volatile txn memory. */
-	fiber_gc();
 	fiber_set_txn(fiber(), NULL);
 	txn_free(txn);
 }
@@ -550,11 +548,14 @@ int
 box_txn_rollback()
 {
 	struct txn *txn = in_txn();
+	if (txn == NULL)
+		return 0;
 	if (txn && txn->in_sub_stmt) {
 		diag_set(ClientError, ER_ROLLBACK_IN_SUB_STMT);
 		return -1;
 	}
-	txn_rollback(); /* doesn't throw */
+	txn_rollback(txn); /* doesn't throw */
+	fiber_gc();
 	return 0;
 }
 
@@ -632,6 +633,6 @@ txn_on_stop(struct trigger *trigger, void *event)
 {
 	(void) trigger;
 	(void) event;
-	txn_rollback();                 /* doesn't yield or fail */
+	txn_rollback(in_txn());                 /* doesn't yield or fail */
 }
 
