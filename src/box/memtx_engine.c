@@ -49,6 +49,9 @@
 #include "schema.h"
 #include "gc.h"
 
+/* sync snapshot every 16MB */
+#define SNAP_SYNC_INTERVAL	(1 << 24)
+
 /*
  * Memtx yield-in-transaction trigger: roll back the effects
  * of the transaction and mark the transaction as aborted.
@@ -576,7 +579,6 @@ struct checkpoint {
 	 * read view iterators.
 	 */
 	struct rlist entries;
-	uint64_t snap_io_rate_limit;
 	struct cord cord;
 	bool waiting_for_snap_thread;
 	/** The vclock of the snapshot file. */
@@ -595,8 +597,11 @@ checkpoint_init(struct checkpoint *ckpt, const char *snap_dirname,
 {
 	rlist_create(&ckpt->entries);
 	ckpt->waiting_for_snap_thread = false;
-	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID);
-	ckpt->snap_io_rate_limit = snap_io_rate_limit;
+	struct xlog_opts opts = xlog_opts_default;
+	opts.rate_limit = snap_io_rate_limit;
+	opts.sync_interval = SNAP_SYNC_INTERVAL;
+	opts.free_cache = true;
+	xdir_create(&ckpt->dir, snap_dirname, SNAP, &INSTANCE_UUID, &opts);
 	vclock_create(&ckpt->vclock);
 	ckpt->touch = false;
 	return 0;
@@ -660,8 +665,6 @@ checkpoint_f(va_list ap)
 	struct xlog snap;
 	if (xdir_create_xlog(&ckpt->dir, &snap, &ckpt->vclock) != 0)
 		return -1;
-
-	snap.rate_limit = ckpt->snap_io_rate_limit;
 
 	say_info("saving snapshot `%s'", snap.filename);
 	struct checkpoint_entry *entry;
@@ -863,7 +866,8 @@ memtx_initial_join_f(va_list ap)
 	 * snap_dirname and INSTANCE_UUID don't change after start,
 	 * safe to use in another thread.
 	 */
-	xdir_create(&dir, snap_dirname, SNAP, &INSTANCE_UUID);
+	xdir_create(&dir, snap_dirname, SNAP, &INSTANCE_UUID,
+		    &xlog_opts_default);
 	struct xlog_cursor cursor;
 	int rc = xdir_open_cursor(&dir, checkpoint_lsn, &cursor);
 	xdir_destroy(&dir);
@@ -1011,7 +1015,8 @@ memtx_engine_new(const char *snap_dirname, bool force_recovery,
 		return NULL;
 	}
 
-	xdir_create(&memtx->snap_dir, snap_dirname, SNAP, &INSTANCE_UUID);
+	xdir_create(&memtx->snap_dir, snap_dirname, SNAP, &INSTANCE_UUID,
+		    &xlog_opts_default);
 	memtx->snap_dir.force_recovery = force_recovery;
 
 	if (xdir_scan(&memtx->snap_dir) != 0)

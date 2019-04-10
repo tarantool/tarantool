@@ -302,7 +302,9 @@ wal_writer_create(struct wal_writer *writer, enum wal_mode wal_mode,
 	journal_create(&writer->base, wal_mode == WAL_NONE ?
 		       wal_write_in_wal_mode_none : wal_write, NULL);
 
-	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid);
+	struct xlog_opts opts = xlog_opts_default;
+	opts.sync_is_async = true;
+	xdir_create(&writer->wal_dir, wal_dirname, XLOG, instance_uuid, &opts);
 	xlog_clear(&writer->current_wal);
 	if (wal_mode == WAL_FSYNC)
 		writer->wal_dir.open_wflags |= O_SYNC;
@@ -334,7 +336,7 @@ wal_open_f(struct cbus_call_msg *msg)
 	const char *path = xdir_format_filename(&writer->wal_dir,
 				vclock_sum(&writer->vclock), NONE);
 	assert(!xlog_is_open(&writer->current_wal));
-	return xlog_open(&writer->current_wal, path);
+	return xlog_open(&writer->current_wal, path, &writer->wal_dir.opts);
 }
 
 /**
