@@ -89,6 +89,13 @@ enum {
 	XLOG_TX_COMPRESS_THRESHOLD = 2 * 1024,
 };
 
+const struct xlog_opts xlog_opts_default = {
+	.rate_limit = 0,
+	.sync_interval = 0,
+	.free_cache = false,
+	.sync_is_async = false,
+};
+
 /* {{{ struct xlog_meta */
 
 enum {
@@ -317,14 +324,12 @@ xlog_meta_parse(struct xlog_meta *meta, const char **data,
 
 /* {{{ struct xdir */
 
-/* sync snapshot every 16MB */
-#define SNAP_SYNC_INTERVAL	(1 << 24)
-
 void
-xdir_create(struct xdir *dir, const char *dirname,
-	    enum xdir_type type, const struct tt_uuid *instance_uuid)
+xdir_create(struct xdir *dir, const char *dirname, enum xdir_type type,
+	    const struct tt_uuid *instance_uuid, const struct xlog_opts *opts)
 {
 	memset(dir, 0, sizeof(*dir));
+	dir->opts = *opts;
 	vclockset_new(&dir->index);
 	/* Default mode. */
 	dir->mode = 0660;
@@ -336,10 +341,8 @@ xdir_create(struct xdir *dir, const char *dirname,
 		dir->filetype = "SNAP";
 		dir->filename_ext = ".snap";
 		dir->suffix = INPROGRESS;
-		dir->sync_interval = SNAP_SYNC_INTERVAL;
 		break;
 	case XLOG:
-		dir->sync_is_async = true;
 		dir->filetype = "XLOG";
 		dir->filename_ext = ".xlog";
 		dir->suffix = NONE;
@@ -761,10 +764,10 @@ xlog_rename(struct xlog *l)
 }
 
 static int
-xlog_init(struct xlog *xlog)
+xlog_init(struct xlog *xlog, const struct xlog_opts *opts)
 {
 	memset(xlog, 0, sizeof(*xlog));
-	xlog->sync_interval = SNAP_SYNC_INTERVAL;
+	xlog->opts = *opts;
 	xlog->sync_time = ev_monotonic_time();
 	xlog->is_autocommit = true;
 	obuf_create(&xlog->obuf, &cord()->slabc, XLOG_TX_AUTOCOMMIT_THRESHOLD);
@@ -799,7 +802,7 @@ xlog_destroy(struct xlog *xlog)
 
 int
 xlog_create(struct xlog *xlog, const char *name, int flags,
-	    const struct xlog_meta *meta)
+	    const struct xlog_meta *meta, const struct xlog_opts *opts)
 {
 	char meta_buf[XLOG_META_LEN_MAX];
 	int meta_len;
@@ -814,7 +817,7 @@ xlog_create(struct xlog *xlog, const char *name, int flags,
 		goto err;
 	}
 
-	if (xlog_init(xlog) != 0)
+	if (xlog_init(xlog, opts) != 0)
 		goto err;
 
 	xlog->meta = *meta;
@@ -867,7 +870,7 @@ err:
 }
 
 int
-xlog_open(struct xlog *xlog, const char *name)
+xlog_open(struct xlog *xlog, const char *name, const struct xlog_opts *opts)
 {
 	char magic[sizeof(log_magic_t)];
 	char meta_buf[XLOG_META_LEN_MAX];
@@ -875,7 +878,7 @@ xlog_open(struct xlog *xlog, const char *name)
 	int meta_len;
 	int rc;
 
-	if (xlog_init(xlog) != 0)
+	if (xlog_init(xlog, opts) != 0)
 		goto err;
 
 	strncpy(xlog->filename, name, PATH_MAX);
@@ -982,16 +985,9 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 			 vclock, prev_vclock);
 
 	char *filename = xdir_format_filename(dir, signature, NONE);
-	if (xlog_create(xlog, filename, dir->open_wflags, &meta) != 0)
+	if (xlog_create(xlog, filename, dir->open_wflags, &meta,
+			&dir->opts) != 0)
 		return -1;
-
-	/* Inherit xdir settings. */
-	xlog->sync_is_async = dir->sync_is_async;
-	xlog->sync_interval = dir->sync_interval;
-
-	/* free file cache if dir should be synced */
-	xlog->free_cache = dir->sync_interval != 0 ? true: false;
-	xlog->rate_limit = 0;
 
 	/* Rename xlog file */
 	if (dir->suffix != INPROGRESS && xlog_rename(xlog)) {
@@ -1238,16 +1234,16 @@ xlog_tx_write(struct xlog *log)
 	log->offset += written;
 	log->rows += log->tx_rows;
 	log->tx_rows = 0;
-	if ((log->sync_interval && log->offset >=
-	    (off_t)(log->synced_size + log->sync_interval)) ||
-	    (log->rate_limit && log->offset >=
-	    (off_t)(log->synced_size + log->rate_limit))) {
+	if ((log->opts.sync_interval && log->offset >=
+	    (off_t)(log->synced_size + log->opts.sync_interval)) ||
+	    (log->opts.rate_limit && log->offset >=
+	    (off_t)(log->synced_size + log->opts.rate_limit))) {
 		off_t sync_from = SYNC_ROUND_DOWN(log->synced_size);
 		size_t sync_len = SYNC_ROUND_UP(log->offset) -
 				  sync_from;
-		if (log->rate_limit > 0) {
+		if (log->opts.rate_limit > 0) {
 			double throttle_time;
-			throttle_time = (double)sync_len / log->rate_limit -
+			throttle_time = (double)sync_len / log->opts.rate_limit -
 					(ev_monotonic_time() - log->sync_time);
 			if (throttle_time > 0)
 				ev_sleep(throttle_time);
@@ -1262,7 +1258,7 @@ xlog_tx_write(struct xlog *log)
 		fdatasync(log->fd);
 #endif /* HAVE_SYNC_FILE_RANGE */
 		log->sync_time = ev_monotonic_time();
-		if (log->free_cache) {
+		if (log->opts.free_cache) {
 #ifdef HAVE_POSIX_FADVISE
 			/** free page cache */
 			if (posix_fadvise(log->fd, sync_from, sync_len,
@@ -1411,7 +1407,7 @@ sync_cb(eio_req *req)
 int
 xlog_sync(struct xlog *l)
 {
-	if (l->sync_is_async) {
+	if (l->opts.sync_is_async) {
 		int fd = dup(l->fd);
 		if (fd == -1) {
 			say_syserror("%s: dup() failed", l->filename);

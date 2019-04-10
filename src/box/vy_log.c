@@ -734,7 +734,8 @@ err:
 void
 vy_log_init(const char *dir)
 {
-	xdir_create(&vy_log.dir, dir, VYLOG, &INSTANCE_UUID);
+	xdir_create(&vy_log.dir, dir, VYLOG, &INSTANCE_UUID,
+		    &xlog_opts_default);
 	latch_create(&vy_log.latch);
 	region_create(&vy_log.pool, cord_slab_cache());
 	stailq_create(&vy_log.tx);
@@ -830,7 +831,7 @@ vy_log_open(struct xlog *xlog)
 	 */
 	const char *path = vy_log_filename(vclock_sum(&vy_log.last_checkpoint));
 	if (access(path, F_OK) == 0)
-		return xlog_open(xlog, path);
+		return xlog_open(xlog, path, &vy_log.dir.opts);
 
 	if (errno != ENOENT) {
 		diag_set(SystemError, "failed to access file '%s'", path);
