@@ -130,8 +130,7 @@ for i = 1, 5 do s:replace{i, i} end
 errinj.set("ERRINJ_VY_RUN_WRITE_DELAY", true)
 ch = fiber.channel(1)
 _ = fiber.create(function() s:create_index('sk', {parts = {2, 'integer'}}) ch:put(true) end)
-
-fiber.sleep(0.01)
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress > 0 end, 60)
 
 _ = s:delete{1}
 _ = s:replace{2, -2}
@@ -182,21 +181,21 @@ vinyl_cache = box.cfg.vinyl_cache
 box.cfg{vinyl_cache = 0}
 
 s1 = box.schema.space.create('test1', {engine = 'vinyl'})
-_ = s1:create_index('pk', {page_size = 16})
+i1 = s1:create_index('pk', {page_size = 16})
 s2 = box.schema.space.create('test2', {engine = 'vinyl'})
-_ = s2:create_index('pk')
+i2 = s2:create_index('pk')
 
 pad = string.rep('x', 16)
 for i = 101, 200 do s1:replace{i, i, pad} end
 box.snapshot()
 
 test_run:cmd("setopt delimiter ';'")
-function async_replace(space, tuple, timeout)
+function async_replace(space, tuple, wait_cond)
     local c = fiber.channel(1)
     fiber.create(function()
         box.begin()
         space:replace(tuple)
-        fiber.sleep(timeout)
+        test_run:wait_cond(wait_cond, 60)
         local status = pcall(box.commit)
         c:put(status)
     end)
@@ -204,8 +203,11 @@ function async_replace(space, tuple, timeout)
 end;
 test_run:cmd("setopt delimiter ''");
 
-c1 = async_replace(s1, {1}, 0.01)
-c2 = async_replace(s2, {1}, 0.01)
+-- Wait until DDL starts scanning the altered space.
+lookup = i1:stat().lookup
+wait_cond = function() return i1:stat().lookup > lookup end
+c1 = async_replace(s1, {1}, wait_cond)
+c2 = async_replace(s2, {1}, wait_cond)
 
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
 s1:format{{'key', 'unsigned'}, {'value', 'unsigned'}}
@@ -219,8 +221,11 @@ s2:get(1) ~= nil
 s1:format()
 s1:format{}
 
-c1 = async_replace(s1, {2}, 0.01)
-c2 = async_replace(s2, {2}, 0.01)
+-- Wait until DDL starts scanning the altered space.
+lookup = i1:stat().lookup
+wait_cond = function() return i1:stat().lookup > lookup end
+c1 = async_replace(s1, {2}, wait_cond)
+c2 = async_replace(s2, {2}, wait_cond)
 
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.001)
 _ = s1:create_index('sk', {parts = {2, 'unsigned'}})
@@ -329,7 +334,7 @@ test_run:cmd("setopt delimiter ''");
 
 -- Issue a few DML requests that require reading disk.
 -- Stall disk reads.
-errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0.01)
+errinj.set('ERRINJ_VY_READ_PAGE_DELAY', true)
 
 ch1 = async(function() s:insert({1, 1, 1, 1}) end)
 ch2 = async(function() s:replace({2, 3, 2, 3}) end)
@@ -340,7 +345,7 @@ ch4 = async(function() s:upsert({5, 5, 5, 5}, {{'+', 4, 1}}) end)
 s.index.i4:drop()
 
 -- Resume the DML requests. Check that they have been aborted.
-errinj.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0)
+errinj.set('ERRINJ_VY_READ_PAGE_DELAY', false)
 ch1:get()
 ch2:get()
 ch3:get()
