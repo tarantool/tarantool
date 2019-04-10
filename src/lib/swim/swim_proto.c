@@ -120,9 +120,9 @@ swim_decode_port(struct sockaddr_in *address, const char **pos, const char *end,
 	return 0;
 }
 
-int
-swim_decode_uuid(struct tt_uuid *uuid, const char **pos, const char *end,
-		 const char *prefix, const char *param_name)
+static inline int
+swim_decode_bin(const char **bin, uint32_t *size, const char **pos,
+		const char *end, const char *prefix, const char *param_name)
 {
 	if (mp_typeof(**pos) != MP_BIN || *pos == end ||
 	    mp_check_binl(*pos, end) > 0) {
@@ -130,12 +130,27 @@ swim_decode_uuid(struct tt_uuid *uuid, const char **pos, const char *end,
 			 param_name);
 		return -1;
 	}
-	if (mp_decode_binl(pos) != UUID_LEN || *pos + UUID_LEN > end) {
+	*bin = mp_decode_bin(pos, size);
+	if (*pos > end) {
 		diag_set(SwimError, "%s %s is invalid", prefix, param_name);
 		return -1;
 	}
-	memcpy(uuid, *pos, UUID_LEN);
-	*pos += UUID_LEN;
+	return 0;
+}
+
+int
+swim_decode_uuid(struct tt_uuid *uuid, const char **pos, const char *end,
+		 const char *prefix, const char *param_name)
+{
+	uint32_t size;
+	const char *bin;
+	if (swim_decode_bin(&bin, &size, pos, end, prefix, param_name) != 0)
+		return -1;
+	if (size != UUID_LEN) {
+		diag_set(SwimError, "%s %s is invalid", prefix, param_name);
+		return -1;
+	}
+	memcpy(uuid, bin, UUID_LEN);
 	return 0;
 }
 
