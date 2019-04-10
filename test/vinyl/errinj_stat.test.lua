@@ -60,6 +60,7 @@ box.stat.reset() -- doesn't affect tasks_inprogress
 box.stat.vinyl().scheduler.tasks_inprogress > 0
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
+test_run:wait_cond(function() return not box.info.gc().checkpoint_is_in_progress end)
 stat = box.stat.vinyl().scheduler
 stat.tasks_inprogress == 0
 stat.tasks_completed == 1
@@ -101,6 +102,7 @@ test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_inprogress
 fiber.sleep(0.1)
 errinj.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 0 end)
+test_run:wait_cond(function() return not box.info.gc().checkpoint_is_in_progress end)
 i:stat().disk.dump.time >= 0.1
 i:stat().disk.dump.time <= fiber.time() - start_time
 i:stat().disk.compaction.time == 0
