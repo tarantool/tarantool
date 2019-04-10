@@ -169,10 +169,10 @@ test_run:cmd("stop server replica")
 test_run:cmd("cleanup server replica")
 errinj.set("ERRINJ_RELAY_EXIT_DELAY", 0)
 
-box.cfg{replication_timeout = 0.01}
+box.cfg{replication_timeout = 0.1}
 
 test_run:cmd("create server replica_timeout with rpl_master=default, script='replication/replica_timeout.lua'")
-test_run:cmd("start server replica_timeout with args='0.01 0.5'")
+test_run:cmd("start server replica_timeout with args='0.1'")
 test_run:cmd("switch replica_timeout")
 
 fiber = require('fiber')
@@ -198,13 +198,13 @@ errinj.set("ERRINJ_RELAY_REPORT_INTERVAL", 0)
 -- Check replica's ACKs don't prevent the master from sending
 -- heartbeat messages (gh-3160).
 
-test_run:cmd("start server replica_timeout with args='0.009 0.5'")
+test_run:cmd("start server replica_timeout with args='0.1'")
 test_run:cmd("switch replica_timeout")
 
 fiber = require('fiber')
 while box.info.replication[1].upstream.status ~= 'follow' do fiber.sleep(0.0001) end
 box.info.replication[1].upstream.status -- follow
-for i = 0, 15 do fiber.sleep(0.01) if box.info.replication[1].upstream.status ~= 'follow' then break end end
+for i = 0, 15 do fiber.sleep(box.cfg.replication_timeout) if box.info.replication[1].upstream.status ~= 'follow' then break end end
 box.info.replication[1].upstream.status -- follow
 
 test_run:cmd("switch default")
