@@ -61,7 +61,7 @@ request_update_header(struct request *request, struct xrow_header *row)
 	if (row == NULL)
 		return 0;
 	row->type = request->type;
-	row->bodycnt = xrow_encode_dml(request, row->body);
+	row->bodycnt = xrow_encode_dml(request, &fiber()->gc, row->body);
 	if (row->bodycnt < 0)
 		return -1;
 	request->header = row;

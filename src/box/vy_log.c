@@ -520,7 +520,7 @@ vy_log_record_encode(const struct vy_log_record *record,
 	req.tuple_end = pos;
 	memset(row, 0, sizeof(*row));
 	row->type = req.type;
-	row->bodycnt = xrow_encode_dml(&req, row->body);
+	row->bodycnt = xrow_encode_dml(&req, &fiber()->gc, row->body);
 	return 0;
 }
 

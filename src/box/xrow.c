@@ -752,15 +752,18 @@ request_str(const struct request *request)
 }
 
 int
-xrow_encode_dml(const struct request *request, struct iovec *iov)
+xrow_encode_dml(const struct request *request, struct region *region,
+		struct iovec *iov)
 {
 	int iovcnt = 1;
 	const int MAP_LEN_MAX = 40;
 	uint32_t key_len = request->key_end - request->key;
 	uint32_t ops_len = request->ops_end - request->ops;
 	uint32_t tuple_meta_len = request->tuple_meta_end - request->tuple_meta;
-	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len;
-	char *begin = (char *) region_alloc(&fiber()->gc, len);
+	uint32_t tuple_len = request->tuple_end - request->tuple;
+	uint32_t len = MAP_LEN_MAX + key_len + ops_len + tuple_meta_len +
+		       tuple_len;
+	char *begin = (char *) region_alloc(region, len);
 	if (begin == NULL) {
 		diag_set(OutOfMemory, len, "region_alloc", "begin");
 		return -1;
@@ -802,9 +805,8 @@ xrow_encode_dml(const struct request *request, struct iovec *iov)
 	}
 	if (request->tuple) {
 		pos = mp_encode_uint(pos, IPROTO_TUPLE);
-		iov[iovcnt].iov_base = (void *) request->tuple;
-		iov[iovcnt].iov_len = (request->tuple_end - request->tuple);
-		iovcnt++;
+		memcpy(pos, request->tuple, tuple_len);
+		pos += tuple_len;
 		map_size++;
 	}
 

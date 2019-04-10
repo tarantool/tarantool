@@ -54,6 +54,8 @@ enum {
 	IPROTO_SELECT_HEADER_LEN = IPROTO_HEADER_LEN + 7,
 };
 
+struct region;
+
 struct xrow_header {
 	/* (!) Please update txn_add_redo() after changing members */
 
@@ -195,12 +197,15 @@ xrow_decode_dml(struct xrow_header *xrow, struct request *request,
 /**
  * Encode the request fields to iovec using region_alloc().
  * @param request request to encode
+ * @param region region to encode
+ * @param copy_tuple if true then tuple is going to be copied to the region
  * @param iov[out] iovec to fill
  * @retval -1 on error, see diag
  * @retval > 0 the number of iovecs used
  */
 int
-xrow_encode_dml(const struct request *request, struct iovec *iov);
+xrow_encode_dml(const struct request *request, struct region *region,
+		struct iovec *iov);
 
 /**
  * CALL/EVAL request.
@@ -713,9 +718,10 @@ xrow_decode_dml_xc(struct xrow_header *row, struct request *request,
 
 /** @copydoc xrow_encode_dml. */
 static inline int
-xrow_encode_dml_xc(const struct request *request, struct iovec *iov)
+xrow_encode_dml_xc(const struct request *request, struct region *region,
+		   struct iovec *iov)
 {
-	int iovcnt = xrow_encode_dml(request, iov);
+	int iovcnt = xrow_encode_dml(request, region, iov);
 	if (iovcnt < 0)
 		diag_raise();
 	return iovcnt;

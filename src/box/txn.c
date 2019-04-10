@@ -49,11 +49,7 @@ fiber_set_txn(struct fiber *fiber, struct txn *txn)
 static int
 txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 {
-	stmt->row = request->header;
-	if (request->header != NULL)
-		return 0;
-
-	/* Create a redo log row for Lua requests */
+	/* Create a redo log row. */
 	struct xrow_header *row;
 	row = region_alloc_object(&txn->region, struct xrow_header);
 	if (row == NULL) {
@@ -61,14 +57,19 @@ txn_add_redo(struct txn *txn, struct txn_stmt *stmt, struct request *request)
 			 "region", "struct xrow_header");
 		return -1;
 	}
-	/* Initialize members explicitly to save time on memset() */
-	row->type = request->type;
-	row->replica_id = 0;
-	row->group_id = stmt->space != NULL ? space_group_id(stmt->space) : 0;
-	row->lsn = 0;
-	row->sync = 0;
-	row->tm = 0;
-	row->bodycnt = xrow_encode_dml(request, row->body);
+	if (request->header != NULL) {
+		*row = *request->header;
+	} else {
+		/* Initialize members explicitly to save time on memset() */
+		row->type = request->type;
+		row->replica_id = 0;
+		row->group_id = stmt->space != NULL ?
+				space_group_id(stmt->space) : 0;
+		row->lsn = 0;
+		row->sync = 0;
+		row->tm = 0;
+	}
+	row->bodycnt = xrow_encode_dml(request, &txn->region, row->body);
 	if (row->bodycnt < 0)
 		return -1;
 	stmt->row = row;
