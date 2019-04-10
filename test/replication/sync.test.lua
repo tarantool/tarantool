@@ -154,7 +154,7 @@ box.cfg{replication = replication}
 box.info.status -- running
 box.info.ro -- false
 box.info.replication[1].upstream.status -- follow
-test_run:grep_log('replica', 'ER_CFG.*')
+test_run:wait_log("replica", "ER_CFG.*", nil, 200)
 
 test_run:cmd("switch default")
 test_run:cmd("stop server replica")
