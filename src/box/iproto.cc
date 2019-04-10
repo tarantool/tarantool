@@ -1143,9 +1143,18 @@ iproto_msg_decode(struct iproto_msg *msg, const char **pos, const char *reqend,
 {
 	uint8_t type;
 
-	if (xrow_header_decode(&msg->header, pos, reqend, true))
+	/*
+	 * nginx_upstream_module may send garbage at the end of
+	 * packet, this is a workaround until nginx upstream is
+	 * fixed.
+	 */
+	if (xrow_header_decode(&msg->header, pos, reqend, false))
 		goto error;
-	assert(*pos == reqend);
+	/*
+	 * Skip trash at the end of msgpack packet, workaround
+	 * for the same broken nginx_upstream_module
+	 */
+	*pos = reqend;
 
 	type = msg->header.type;
 
