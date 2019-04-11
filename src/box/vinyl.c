@@ -1421,6 +1421,7 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
        const struct vy_read_view **rv,
        struct tuple *key_stmt, struct tuple **result)
 {
+	double start_time = ev_monotonic_now(loop());
 	/*
 	 * tx can be NULL, for example, if an user calls
 	 * space.index.get({key}).
@@ -1455,8 +1456,7 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 			vy_cache_add(&lsm->cache, entry,
 				     vy_entry_none(), key, ITER_EQ);
 		}
-		*result = entry.stmt;
-		return 0;
+		goto out;
 	}
 
 	struct vy_read_iterator itr;
@@ -1475,8 +1475,21 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 	if (rc == 0)
 		vy_read_iterator_cache_add(&itr, entry);
 	vy_read_iterator_close(&itr);
+	if (rc != 0)
+		return -1;
+out:
 	*result = entry.stmt;
-	return rc;
+
+	double latency = ev_monotonic_now(loop()) - start_time;
+	latency_collect(&lsm->stat.latency, latency);
+
+	if (latency > lsm->env->too_long_threshold) {
+		say_warn_ratelimited("%s: get(%s) => %s "
+				     "took too long: %.3f sec",
+				     vy_lsm_name(lsm), tuple_str(key.stmt),
+				     tuple_str(*result), latency);
+	}
+	return 0;
 }
 
 /**
@@ -3766,9 +3779,32 @@ vinyl_iterator_check_tx(struct vinyl_iterator *it)
 	return 0;
 }
 
+static void
+vinyl_iterator_account_read(struct vinyl_iterator *it, double start_time,
+			    struct tuple *result)
+{
+	struct vy_lsm *lsm = it->iterator.lsm;
+	struct tuple *key = it->iterator.key.stmt;
+	enum iterator_type type = it->iterator.iterator_type;
+
+	double latency = ev_monotonic_now(loop()) - start_time;
+	latency_collect(&lsm->stat.latency, latency);
+
+	if (latency > lsm->env->too_long_threshold) {
+		say_warn_ratelimited("%s: select(%s, %s) => %s "
+				     "took too long: %.3f sec",
+				     vy_lsm_name(lsm), tuple_str(key),
+				     iterator_type_strs[type],
+				     tuple_str(result), latency);
+	}
+
+}
+
 static int
 vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 {
+	double start_time = ev_monotonic_now(loop());
+
 	assert(base->next = vinyl_iterator_primary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	assert(it->lsm->index_id == 0);
@@ -3779,6 +3815,7 @@ vinyl_iterator_primary_next(struct iterator *base, struct tuple **ret)
 	if (vy_read_iterator_next(&it->iterator, &entry) != 0)
 		goto fail;
 	vy_read_iterator_cache_add(&it->iterator, entry);
+	vinyl_iterator_account_read(it, start_time, entry.stmt);
 	if (entry.stmt == NULL) {
 		/* EOF. Close the iterator immediately. */
 		vinyl_iterator_close(it);
@@ -3795,6 +3832,8 @@ fail:
 static int
 vinyl_iterator_secondary_next(struct iterator *base, struct tuple **ret)
 {
+	double start_time = ev_monotonic_now(loop());
+
 	assert(base->next = vinyl_iterator_secondary_next);
 	struct vinyl_iterator *it = (struct vinyl_iterator *)base;
 	assert(it->lsm->index_id > 0);
@@ -3810,6 +3849,7 @@ next:
 	if (partial.stmt == NULL) {
 		/* EOF. Close the iterator immediately. */
 		vy_read_iterator_cache_add(&it->iterator, vy_entry_none());
+		vinyl_iterator_account_read(it, start_time, NULL);
 		vinyl_iterator_close(it);
 		*ret = NULL;
 		return 0;
@@ -3830,6 +3870,7 @@ next:
 	if (entry.stmt == NULL)
 		goto next;
 	vy_read_iterator_cache_add(&it->iterator, entry);
+	vinyl_iterator_account_read(it, start_time, entry.stmt);
 	*ret = entry.stmt;
 	tuple_bless(*ret);
 	tuple_unref(*ret);

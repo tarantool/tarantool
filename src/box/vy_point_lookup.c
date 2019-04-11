@@ -201,7 +201,6 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 	assert(tx == NULL || tx->state == VINYL_TX_READY);
 
 	*ret = vy_entry_none();
-	double start_time = ev_monotonic_now(loop());
 	int rc = 0;
 
 	lsm->stat.lookup++;
@@ -298,15 +297,6 @@ done:
 	if (ret->stmt != NULL)
 		vy_stmt_counter_acct_tuple(&lsm->stat.get, ret->stmt);
 
-	double latency = ev_monotonic_now(loop()) - start_time;
-	latency_collect(&lsm->stat.latency, latency);
-
-	if (latency > lsm->env->too_long_threshold) {
-		say_warn_ratelimited("%s: get(%s) => %s "
-				     "took too long: %.3f sec",
-				     vy_lsm_name(lsm), tuple_str(key.stmt),
-				     vy_stmt_str(ret->stmt), latency);
-	}
 	return 0;
 }
 

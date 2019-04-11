@@ -857,8 +857,6 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct vy_entry *result)
 {
 	assert(itr->tx == NULL || itr->tx->state == VINYL_TX_READY);
 
-	ev_tstamp start_time = ev_monotonic_now(loop());
-
 	struct vy_lsm *lsm = itr->lsm;
 	struct vy_entry entry;
 
@@ -897,17 +895,6 @@ next_key:
 
 	if (entry.stmt != NULL)
 		vy_stmt_counter_acct_tuple(&lsm->stat.get, entry.stmt);
-
-	ev_tstamp latency = ev_monotonic_now(loop()) - start_time;
-	latency_collect(&lsm->stat.latency, latency);
-
-	if (latency > lsm->env->too_long_threshold) {
-		say_warn_ratelimited("%s: select(%s, %s) => %s "
-				     "took too long: %.3f sec",
-				     vy_lsm_name(lsm), tuple_str(itr->key.stmt),
-				     iterator_type_strs[itr->iterator_type],
-				     vy_stmt_str(entry.stmt), latency);
-	}
 
 	*result = entry;
 	return 0;
