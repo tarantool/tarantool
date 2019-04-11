@@ -188,7 +188,7 @@ box.execute("VALUES (TYPEOF(randomblob(5) || zeroblob(5)));")
   - name: column1
     type: string
   rows:
-  - ['blob']
+  - ['scalar']
 ...
 -- gh-3954: LIKE accepts only arguments of type TEXT and NULLs.
 --

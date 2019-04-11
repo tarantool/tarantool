@@ -114,13 +114,13 @@ typeofFunc(sql_context * context, int NotUsed, sql_value ** argv)
 		z = "integer";
 		break;
 	case SQL_TEXT:
-		z = "text";
+		z = "string";
 		break;
 	case SQL_FLOAT:
-		z = "real";
+		z = "number";
 		break;
 	case SQL_BLOB:
-		z = "blob";
+		z = "scalar";
 		break;
 	default:
 		z = "null";

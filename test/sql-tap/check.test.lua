@@ -207,8 +207,8 @@ test:do_execsql_test(
         CREATE TABLE t2(
           id  INT primary key,
           x INTEGER CONSTRAINT one CHECK( typeof(coalesce(x,0))=='integer'),
-          y REAL CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='real' ),
-          z TEXT CONSTRAINT three CHECK( typeof(coalesce(z,''))=='text' )
+          y REAL CONSTRAINT two CHECK( typeof(coalesce(y,0.1))=='number' ),
+          z TEXT CONSTRAINT three CHECK( typeof(coalesce(z,''))=='string' )
         );
     ]], {
         -- <check-2.1>
