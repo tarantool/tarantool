@@ -1056,6 +1056,22 @@ swim_update_member_addr(struct swim *swim, struct swim_member *member,
 }
 
 /**
+ * Update an existing member with a new definition. It is expected
+ * that @a def has an incarnation not older that @a member has.
+ */
+static inline void
+swim_update_member(struct swim *swim, const struct swim_member_def *def,
+		   struct swim_member *member)
+{
+	assert(member != swim->self);
+	assert(def->incarnation >= member->incarnation);
+	if (def->incarnation > member->incarnation)
+		swim_update_member_addr(swim, member, &def->addr, 0);
+	swim_update_member_inc_status(swim, member, def->status,
+				      def->incarnation);
+}
+
+/**
  * Update or create a member by its definition, received from a
  * remote instance.
  * @param swim SWIM instance to upsert into.
@@ -1099,9 +1115,7 @@ swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
 	if (member != self) {
 		if (def->incarnation < member->incarnation)
 			goto skip;
-		swim_update_member_addr(swim, member, &def->addr, 0);
-		swim_update_member_inc_status(swim, member, def->status,
-					      def->incarnation);
+		swim_update_member(swim, def, member);
 		return 0;
 	}
 	/*
