@@ -35,6 +35,7 @@
 #include "uuid/tt_uuid.h"
 #include "trivia/util.h"
 #include "fiber.h"
+#include "msgpuck.h"
 
 /**
  * SWIM cluster node and its UUID. UUID is stored separately
@@ -312,6 +313,59 @@ void
 swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value)
 {
 	swim_cluster_set_drop_generic(cluster, i, value, true, false);
+}
+
+/**
+ * A list of components to drop used by component packet filter.
+ */
+struct swim_drop_components {
+	/** List of component body keys. */
+	const int *keys;
+	/** Length of @a keys. */
+	int key_count;
+};
+
+/**
+ * Check if a packet contains any of the components to filter out.
+ */
+static bool
+swim_filter_drop_component(const char *data, int size, void *udata, int dir)
+{
+	(void) size;
+	(void) dir;
+	struct swim_drop_components *dc = (struct swim_drop_components *) udata;
+	/* Skip meta. */
+	mp_next(&data);
+	int map_size = mp_decode_map(&data);
+	for (int i = 0; i < map_size; ++i) {
+		int key = mp_decode_uint(&data);
+		for (int j = 0; j < dc->key_count; ++j) {
+			if (dc->keys[j] == key)
+				return true;
+		}
+		/* Skip value. */
+		mp_next(&data);
+	}
+	return false;
+}
+
+void
+swim_cluster_drop_components(struct swim_cluster *cluster, int i,
+			     const int *keys, int key_count)
+{
+	int fd = swim_fd(swim_cluster_node(cluster, i));
+	if (key_count == 0) {
+		swim_test_transport_remove_filter(fd,
+						  swim_filter_drop_component);
+		return;
+	}
+	struct swim_drop_components *dc =
+		(struct swim_drop_components *) malloc(sizeof(*dc));
+	assert(dc != NULL);
+	dc->key_count = key_count;
+	dc->keys = keys;
+	swim_test_transport_add_filter(fd, swim_filter_drop_component, free,
+				       dc);
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */

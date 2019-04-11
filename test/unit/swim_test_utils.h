@@ -110,6 +110,15 @@ void
 swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value);
 
 /**
+ * Drop all packets from/to a SWIM instance with id @a i
+ * containing components specified in @a keys. Components are
+ * defined by the constants in the packet body.
+ */
+void
+swim_cluster_drop_components(struct swim_cluster *cluster, int i,
+			     const int *keys, int key_count);
+
+/**
  * Explicitly add a member of id @a from_id to a member of id
  * @a to_id.
  */
