@@ -897,7 +897,7 @@ test:do_select_tests(
 
         {"3", "SELECT sum(b+1) FROM z1 NATURAL LEFT JOIN z3", {-43.06}},
         {"4", "SELECT sum(b+2) FROM z1 NATURAL LEFT JOIN z3", {-38.06}},
-        {"5", "SELECT sum(b IS NOT NULL) FROM z1 NATURAL LEFT JOIN z3", {5}},
+        {"5", "SELECT sum(CAST(b IS NOT NULL AS INTEGER)) FROM z1 NATURAL LEFT JOIN z3", {5}},
     })
 
 -- EVIDENCE-OF: R-26684-40576 Each non-aggregate expression in the

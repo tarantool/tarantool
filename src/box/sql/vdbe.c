@@ -2415,14 +2415,10 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	} else if ((pIn1->flags & MEM_Bool) != 0) {
 		v1 = pIn1->u.b;
 	} else {
-		int64_t i;
-		if (sqlVdbeIntValue(pIn1, &i) != 0) {
-			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_text(pIn1), "integer");
-			rc = SQL_TARANTOOL_ERROR;
-			goto abort_due_to_error;
-		}
-		v1 = i != 0;
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 sql_value_text(pIn1), "boolean");
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
 	}
 	pIn2 = &aMem[pOp->p2];
 	if (pIn2->flags & MEM_Null) {
@@ -2430,14 +2426,10 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	} else if ((pIn2->flags & MEM_Bool) != 0) {
 		v2 = pIn2->u.b;
 	} else {
-		int64_t i;
-		if (sqlVdbeIntValue(pIn2, &i) != 0) {
-			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_text(pIn2), "integer");
-			rc = SQL_TARANTOOL_ERROR;
-			goto abort_due_to_error;
-		}
-		v2 = i != 0;
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 sql_value_text(pIn2), "boolean");
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
 	}
 	if (pOp->opcode==OP_And) {
 		static const unsigned char and_logic[] = { 0, 0, 0, 0, 1, 2, 0, 2, 2 };
@@ -2450,8 +2442,7 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	if (v1==2) {
 		MemSetTypeFlag(pOut, MEM_Null);
 	} else {
-		pOut->u.i = v1;
-		MemSetTypeFlag(pOut, MEM_Int);
+		mem_set_bool(pOut, v1);
 	}
 	break;
 }
@@ -2468,15 +2459,13 @@ case OP_Not: {                /* same as TK_NOT, in1, out2 */
 	pOut = &aMem[pOp->p2];
 	sqlVdbeMemSetNull(pOut);
 	if ((pIn1->flags & MEM_Null)==0) {
-		int64_t i;
-		if (sqlVdbeIntValue(pIn1, &i) != 0) {
+		if ((pIn1->flags & MEM_Bool) == 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_text(pIn1), "integer");
+				 sql_value_text(pIn1), "boolean");
 			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
-		pOut->flags = MEM_Int;
-		pOut->u.i = !i;
+		mem_set_bool(pOut, ! pIn1->u.b);
 	}
 	break;
 }

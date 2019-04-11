@@ -102,20 +102,16 @@ sql_expr_type(struct Expr *pExpr)
 	case TK_EQ:
 	case TK_LE:
 	case TK_NE:
-		return FIELD_TYPE_BOOLEAN;
 	case TK_NOT:
 	case TK_AND:
 	case TK_OR:
 	case TK_ISNULL:
 	case TK_NOTNULL:
 	case TK_BETWEEN:
+	case TK_EXISTS:
 	case TK_IN:
-		/*
-		 * FIXME: should be changed to BOOL type
-		 * when it is implemented. Now simply
-		 * return INTEGER.
-		 */
-		return FIELD_TYPE_INTEGER;
+	case TK_IS:
+		return FIELD_TYPE_BOOLEAN;
 	case TK_UMINUS:
 	case TK_UPLUS:
 	case TK_NO:
@@ -1131,7 +1127,10 @@ sql_and_expr_new(struct sql *db, struct Expr *left_expr,
 	} else if (exprAlwaysFalse(left_expr) || exprAlwaysFalse(right_expr)) {
 		sql_expr_delete(db, left_expr, false);
 		sql_expr_delete(db, right_expr, false);
-		return sql_expr_new(db, TK_INTEGER, &sqlIntTokens[0]);
+		struct Expr *f = sql_expr_new_anon(db, TK_FALSE);
+		if (f != NULL)
+			f->type = FIELD_TYPE_BOOLEAN;
+		return f;
 	} else {
 		struct Expr *new_expr = sql_expr_new_anon(db, TK_AND);
 		sqlExprAttachSubtrees(db, new_expr, left_expr, right_expr);
@@ -2925,8 +2924,7 @@ sqlCodeSubselect(Parse * pParse,	/* Parsing context */
 				VdbeComment((v, "Init subquery result"));
 			} else {
 				dest.eDest = SRT_Exists;
-				sqlVdbeAddOp2(v, OP_Integer, 0,
-						  dest.iSDParm);
+				sqlVdbeAddOp2(v, OP_Bool, false, dest.iSDParm);
 				VdbeComment((v, "Init EXISTS result"));
 			}
 			if (pSel->pLimit == NULL) {
@@ -3958,14 +3956,14 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			testcase(op == TK_ISNULL);
 			assert(TK_NOTNULL == OP_NotNull);
 			testcase(op == TK_NOTNULL);
-			sqlVdbeAddOp2(v, OP_Integer, 1, target);
+			sqlVdbeAddOp2(v, OP_Bool, true, target);
 			r1 = sqlExprCodeTemp(pParse, pExpr->pLeft,
 						 &regFree1);
 			testcase(regFree1 == 0);
 			addr = sqlVdbeAddOp1(v, op, r1);
 			VdbeCoverageIf(v, op == TK_ISNULL);
 			VdbeCoverageIf(v, op == TK_NOTNULL);
-			sqlVdbeAddOp2(v, OP_Integer, 0, target);
+			sqlVdbeAddOp2(v, OP_Bool, false, target);
 			sqlVdbeJumpHere(v, addr);
 			break;
 		}
@@ -4200,10 +4198,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp2(v, OP_Null, 0, target);
 			sqlExprCodeIN(pParse, pExpr, destIfFalse,
 					  destIfNull);
-			sqlVdbeAddOp2(v, OP_Integer, 1, target);
+			sqlVdbeAddOp2(v, OP_Bool, true, target);
 			sqlVdbeGoto(v, destIfNull);
 			sqlVdbeResolveLabel(v, destIfFalse);
-			sqlVdbeAddOp2(v, OP_Integer, 0, target);
+			sqlVdbeAddOp2(v, OP_Bool, false, target);
 			sqlVdbeResolveLabel(v, destIfNull);
 			return target;
 		}

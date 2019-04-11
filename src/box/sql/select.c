@@ -1251,7 +1251,7 @@ selectInnerLoop(Parse * pParse,		/* The parser context */
 		/* If any row exist in the result set, record that fact and abort.
 		 */
 	case SRT_Exists:{
-			sqlVdbeAddOp2(v, OP_Integer, 1, iParm);
+			sqlVdbeAddOp2(v, OP_Bool, true, iParm);
 			/* The LIMIT clause will terminate the loop for us */
 			break;
 		}

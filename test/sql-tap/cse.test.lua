@@ -31,7 +31,7 @@ test:do_test(
             INSERT INTO t1 VALUES(2,21,22,23,24,25);
         ]]
         return test:execsql [[
-            SELECT b, -b, ~b, NOT b, NOT NOT b, b-b, b+b, b*b, b/b, b FROM t1
+            SELECT b, -b, ~b, NOT CAST(b AS BOOLEAN), NOT NOT CAST(b AS BOOLEAN), b-b, b+b, b*b, b/b, b FROM t1
         ]]
     end, {
         -- <cse-1.1>
@@ -132,7 +132,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.7",
     [[
-        SELECT a, -a, ~a, NOT a, NOT NOT a, a-a, a+a, a*a, a/a, a FROM t1
+        SELECT a, -a, ~a, NOT CAST(a AS BOOLEAN), NOT NOT CAST(a AS BOOLEAN), a-a, a+a, a*a, a/a, a FROM t1
     ]], {
         -- <cse-1.7>
         1, -1, -2, 0, 1, 0, 2, 1, 1, 1, 2, -2, -3, 0, 1, 0, 4, 4, 1, 2
@@ -152,7 +152,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.9",
     [[
-        SELECT NOT b, ~b, NOT NOT b, b FROM t1
+        SELECT NOT CAST(b AS BOOLEAN), ~b, NOT NOT CAST(b AS BOOLEAN), b FROM t1
     ]], {
         -- <cse-1.9>
         0, -12, 1, 11, 0, -22, 1, 21

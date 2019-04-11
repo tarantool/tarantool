@@ -1449,7 +1449,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select4-14.15",
     [[
-        SELECT * FROM (SELECT 123), (SELECT 456) ON likely(0 OR 1) OR 0;
+        SELECT * FROM (SELECT 123), (SELECT 456) ON likely(false OR true) OR false;
     ]], {
         -- <select4-14.15>
         123, 456

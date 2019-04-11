@@ -1287,11 +1287,13 @@ expr(A) ::= expr(A) in_op(N) LP exprlist(Y) RP(E). [IN] {
     ** regardless of the value of expr1.
     */
     sql_expr_delete(pParse->db, A.pExpr, false);
-    A.pExpr = sql_expr_new_dequoted(pParse->db, TK_INTEGER, &sqlIntTokens[N]);
+    int tk = N == 0 ? TK_FALSE : TK_TRUE;
+    A.pExpr = sql_expr_new_anon(pParse->db, tk);
     if (A.pExpr == NULL) {
       pParse->is_aborted = true;
       return;
     }
+    A.pExpr->type = FIELD_TYPE_BOOLEAN;
   }else if( Y->nExpr==1 ){
     /* Expressions of the form:
     **

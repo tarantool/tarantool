@@ -39,7 +39,7 @@ test:do_test(
     "tkt3541-1.2",
     function()
         return test:execsql [[
-            SELECT CASE NOT max(x) WHEN min(x) THEN 1 ELSE max(x) END FROM t1;
+            SELECT CASE max(x) = 0 WHEN min(x) <> 0 THEN 1 ELSE max(x) END FROM t1;
         ]]
     end, {
         -- <tkt3541-1.2>

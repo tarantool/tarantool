@@ -337,17 +337,17 @@ box.execute("SELECT true IN (1, 'abc', true)")
 ---
 - metadata:
   - name: true IN (1, 'abc', true)
-    type: integer
+    type: boolean
   rows:
-  - [1]
+  - [true]
 ...
 box.execute("SELECT true IN (1, 'abc', false)")
 ---
 - metadata:
   - name: true IN (1, 'abc', false)
-    type: integer
+    type: boolean
   rows:
-  - [0]
+  - [false]
 ...
 box.execute("SELECT 1 LIMIT true;")
 ---
@@ -377,7 +377,11 @@ box.execute("SELECT false / 0;")
 ...
 box.execute("SELECT not true;")
 ---
-- error: 'Type mismatch: can not convert true to integer'
+- metadata:
+  - name: not true
+    type: boolean
+  rows:
+  - [false]
 ...
 box.execute("SELECT ~true;")
 ---
@@ -399,17 +403,17 @@ box.execute("SELECT true and false;")
 ---
 - metadata:
   - name: true and false
-    type: integer
+    type: boolean
   rows:
-  - [0]
+  - [false]
 ...
 box.execute("SELECT true or unknown;")
 ---
 - metadata:
   - name: true or unknown
-    type: integer
+    type: boolean
   rows:
-  - [1]
+  - [true]
 ...
 box.execute("CREATE TABLE t (id INT PRIMARY KEY, b BOOLEAN);")
 ---
