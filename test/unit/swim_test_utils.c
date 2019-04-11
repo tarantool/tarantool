@@ -242,10 +242,76 @@ swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
 	swim_test_transport_unblock_fd(swim_fd(cluster->node[i].swim));
 }
 
+/** A structure used by drop rate packet filter. */
+struct swim_drop_rate {
+	/** True if should be applied to incoming packets. */
+	bool is_for_in;
+	/** True if should be applied to outgoing packets. */
+	bool is_for_out;
+	/** Drop rate percentage. */
+	double rate;
+};
+
+/** Create a new drop rate filter helper. */
+static inline struct swim_drop_rate *
+swim_drop_rate_new(double rate, bool is_for_in, bool is_for_out)
+{
+	struct swim_drop_rate *dr =
+		(struct swim_drop_rate *) malloc(sizeof(*dr));
+	assert(dr != NULL);
+	dr->rate = rate;
+	dr->is_for_in = is_for_in;
+	dr->is_for_out = is_for_out;
+	return dr;
+}
+
+/**
+ * A packet filter dropping a packet with a certain probability.
+ */
+static bool
+swim_filter_drop_rate(const char *data, int size, void *udata, int dir)
+{
+	(void) data;
+	(void) size;
+	struct swim_drop_rate *dr = (struct swim_drop_rate *) udata;
+	if ((dir == 0 && !dr->is_for_in) || (dir == 1 && !dr->is_for_out))
+		return false;
+	return ((double) rand() / RAND_MAX) * 100 < dr->rate;
+}
+
+/**
+ * Create a new drop rate filter for the instance with id @a i.
+ */
+static void
+swim_cluster_set_drop_generic(struct swim_cluster *cluster, int i,
+			      double value, bool is_for_in, bool is_for_out)
+{
+	int fd = swim_fd(swim_cluster_node(cluster, i));
+	if (value == 0) {
+		swim_test_transport_remove_filter(fd, swim_filter_drop_rate);
+		return;
+	}
+	struct swim_drop_rate *dr = swim_drop_rate_new(value, is_for_in,
+						       is_for_out);
+	swim_test_transport_add_filter(fd, swim_filter_drop_rate, free, dr);
+}
+
 void
 swim_cluster_set_drop(struct swim_cluster *cluster, int i, double value)
 {
-	swim_test_transport_set_drop(swim_fd(cluster->node[i].swim), value);
+	swim_cluster_set_drop_generic(cluster, i, value, true, true);
+}
+
+void
+swim_cluster_set_drop_out(struct swim_cluster *cluster, int i, double value)
+{
+	swim_cluster_set_drop_generic(cluster, i, value, false, true);
+}
+
+void
+swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value)
+{
+	swim_cluster_set_drop_generic(cluster, i, value, true, false);
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */

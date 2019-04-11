@@ -88,8 +88,26 @@ swim_cluster_block_io(struct swim_cluster *cluster, int i);
 void
 swim_cluster_unblock_io(struct swim_cluster *cluster, int i);
 
+/**
+ * Set drop rate of incoming and outgoing packets for a node with
+ * id @a i. Note, that even if a packet is dropped on send, the
+ * node still thinks, that the packet is sent. It is not a
+ * sender-visible error.
+ */
 void
 swim_cluster_set_drop(struct swim_cluster *cluster, int i, double value);
+
+/**
+ * The same as simple drop, but applied to outgoing packets only.
+ */
+void
+swim_cluster_set_drop_out(struct swim_cluster *cluster, int i, double value);
+
+/**
+ * The same as simple drop, but applied to incoming packets only.
+ */
+void
+swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value);
 
 /**
  * Explicitly add a member of id @a from_id to a member of id

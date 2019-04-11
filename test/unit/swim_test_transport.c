@@ -100,6 +100,51 @@ swim_test_packet_dup(struct swim_test_packet *p)
 	return res;
 }
 
+/**
+ * Packet filter. Each fake file descriptor has a list of filters.
+ * For each incoming and outgoing packet it checks all the
+ * filters in the list. If anyone wants to filter the packet out,
+ * then the packet is dropped.
+ */
+struct swim_fd_filter {
+	/** A function to decide whether to drop a packet. */
+	swim_test_filter_check_f check;
+	/**
+	 * A function called when the filter is deleted to free
+	 * @a udata if necessary.
+	 */
+	swim_test_filter_delete_f delete;
+	/**
+	 * Arbitrary user data. Passed to each call of @a check.
+	 */
+	void *udata;
+	/** Link in the list of filters in the descriptor. */
+	struct rlist in_filters;
+};
+
+/** Create a new filter. */
+static inline struct swim_fd_filter *
+swim_fd_filter_new(swim_test_filter_check_f check,
+		   swim_test_filter_delete_f delete, void *udata)
+{
+	struct swim_fd_filter *f = (struct swim_fd_filter *) malloc(sizeof(*f));
+	assert(f != NULL);
+	f->udata = udata;
+	f->check = check;
+	f->delete = delete;
+	rlist_create(&f->in_filters);
+	return f;
+}
+
+/** Delete @a filter and its data. */
+static inline void
+swim_fd_filter_delete(struct swim_fd_filter *filter)
+{
+	rlist_del_entry(filter, in_filters);
+	filter->delete(filter->udata);
+	free(filter);
+}
+
 /** Fake file descriptor. */
 struct swim_fd {
 	/** File descriptor number visible to libev. */
@@ -111,10 +156,11 @@ struct swim_fd {
 	 */
 	bool is_opened;
 	/**
-	 * Probability of packet loss. For both sends and
-	 * receipts.
+	 * List of packet filters. All of them are checked for
+	 * each packet, and if at least one decides to drop, then
+	 * the packet is deleted.
 	 */
-	double drop_rate;
+	struct rlist filters;
 	/**
 	 * Link in the list of opened and non-blocked descriptors.
 	 * Used to feed them all EV_WRITE.
@@ -143,10 +189,35 @@ swim_fd_open(struct swim_fd *fd)
 		diag_set(SocketError, "test_socket:1", "bind");
 		return -1;
 	}
+	assert(rlist_empty(&fd->filters));
 	fd->is_opened = true;
-	fd->drop_rate = 0;
 	rlist_add_tail_entry(&swim_fd_active, fd, in_active);
 	return 0;
+}
+
+void
+swim_test_transport_remove_filter(int fd, swim_test_filter_check_f check)
+{
+	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
+	assert(sfd->is_opened);
+	struct swim_fd_filter *f;
+	rlist_foreach_entry(f, &sfd->filters, in_filters) {
+		if (check == f->check) {
+			swim_fd_filter_delete(f);
+			return;
+		}
+	}
+}
+
+void
+swim_test_transport_add_filter(int fd, swim_test_filter_check_f check,
+			       swim_test_filter_delete_f delete, void *udata)
+{
+	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
+	assert(sfd->is_opened);
+	struct swim_fd_filter *f = swim_fd_filter_new(check, delete, udata);
+	swim_test_transport_remove_filter(fd, check);
+	rlist_add_tail_entry(&sfd->filters, f, in_filters);
 }
 
 /** Send one packet to destination's recv queue. */
@@ -159,6 +230,9 @@ swim_fd_close(struct swim_fd *fd)
 {
 	if (! fd->is_opened)
 		return;
+	struct swim_fd_filter *f, *f_tmp;
+	rlist_foreach_entry_safe(f, &fd->filters, in_filters, f_tmp)
+		swim_fd_filter_delete(f);
 	struct swim_test_packet *i, *tmp;
 	rlist_foreach_entry_safe(i, &fd->recv_queue, in_queue, tmp)
 		swim_test_packet_delete(i);
@@ -168,13 +242,30 @@ swim_fd_close(struct swim_fd *fd)
 	fd->is_opened = false;
 }
 
+/**
+ * Check all the packet filters if any wants to drop @a p packet.
+ * @a dir parameter says direction. Values are the same as for
+ * standard in/out descriptors: 0 for input, 1 for output.
+ */
+static inline bool
+swim_fd_test_if_drop(struct swim_fd *fd, const struct swim_test_packet *p,
+		     int dir)
+{
+	struct swim_fd_filter *f;
+	rlist_foreach_entry(f, &fd->filters, in_filters) {
+		if (f->check(p->data, p->size, f->udata, dir))
+			return true;
+	}
+	return false;
+}
+
 void
 swim_test_transport_init(void)
 {
 	for (int i = 0, evfd = FAKE_FD_BASE; i < FAKE_FD_NUMBER; ++i, ++evfd) {
+		rlist_create(&swim_fd[i].filters);
 		swim_fd[i].evfd = evfd;
 		swim_fd[i].is_opened = false;
-		swim_fd[i].drop_rate = 0;
 		rlist_create(&swim_fd[i].in_active);
 		rlist_create(&swim_fd[i].recv_queue);
 		rlist_create(&swim_fd[i].send_queue);
@@ -287,24 +378,6 @@ swim_test_transport_unblock_fd(int fd)
 		rlist_add_tail_entry(&swim_fd_active, sfd, in_active);
 }
 
-void
-swim_test_transport_set_drop(int fd, double value)
-{
-	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
-	if (sfd->is_opened)
-		sfd->drop_rate = value;
-}
-
-/**
- * Returns true with probability @a rate, and is used to decided
- * wether to drop a packet or not.
- */
-static inline bool
-swim_test_is_drop(double rate)
-{
-	return ((double) rand() / RAND_MAX) * 100 < rate;
-}
-
 /**
  * Move @a p packet, originated from @a src descriptor's send
  * queue, to @a dst descriptor's recv queue. The function checks
@@ -315,8 +388,8 @@ static inline void
 swim_move_packet(struct swim_fd *src, struct swim_fd *dst,
 		 struct swim_test_packet *p)
 {
-	if (dst->is_opened && !swim_test_is_drop(dst->drop_rate) &&
-	    !swim_test_is_drop(src->drop_rate))
+	if (dst->is_opened && !swim_fd_test_if_drop(dst, p, 0) &&
+	    !swim_fd_test_if_drop(src, p, 1))
 		rlist_add_tail_entry(&dst->recv_queue, p, in_queue);
 	else
 		swim_test_packet_delete(p);

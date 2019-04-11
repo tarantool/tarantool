@@ -591,28 +591,21 @@ swim_test_uri_update(void)
 	is(strcmp(new_s0_uri, swim_member_uri(s0_view)), 0,
 	   "S1 updated its URI and S2 sees that");
 	/*
-	 * S2 should not manage to send the new address to S3, but
-	 * should accept S3 packets later - therefore block is
-	 * needed.
-	 */
-	swim_cluster_block_io(cluster, 1);
-	/*
 	 * S1 should not send the new address to S3 - drop its
 	 * packets.
 	 */
 	swim_cluster_set_drop(cluster, 0, 100);
 	/*
-	 * Main part of the test - S3 sends the old address to S1.
+	 * S2 should not manage to send the new address to S3, but
+	 * should accept S3 packets with the old address and
+	 * ignore it.
+	 */
+	swim_cluster_set_drop_out(cluster, 1, 100);
+	/*
+	 * Main part of the test - S3 sends the old address to S2.
 	 */
 	swim_cluster_set_drop(cluster, 2, 0);
 	swim_run_for(3);
-	swim_cluster_set_drop(cluster, 2, 100);
-	/*
-	 * S2 absorbs the packets, but should ignore the old
-	 * address.
-	 */
-	swim_cluster_unblock_io(cluster, 1);
-	swim_run_for(2);
 	is(strcmp(new_s0_uri, swim_member_uri(s0_view)), 0,
 	   "S2 still keeps new S1's URI, even received the old one from S3");
 
