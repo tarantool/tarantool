@@ -110,10 +110,8 @@ errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0.05)
 s:get(10) ~= nil
 #s:select(5, {iterator = 'LE'}) == 5
 errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
-test_run:cmd("push filter 'lsn=[0-9]+' to 'lsn=<lsn>'")
 test_run:grep_log('default', 'get.* took too long')
 test_run:grep_log('default', 'select.* took too long')
-test_run:cmd("clear filter")
 box.cfg{too_long_threshold = too_long_threshold}
 
 s:drop()

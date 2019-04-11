@@ -314,21 +314,13 @@ errinj.set("ERRINJ_VY_READ_PAGE_TIMEOUT", 0);
 ---
 - ok
 ...
-test_run:cmd("push filter 'lsn=[0-9]+' to 'lsn=<lsn>'")
----
-- true
-...
 test_run:grep_log('default', 'get.* took too long')
 ---
-- get([10]) => INSERT([10, 20], lsn=<lsn>) took too long
+- get([10]) => [10, 20] took too long
 ...
 test_run:grep_log('default', 'select.* took too long')
 ---
-- select([5], LE) => INSERT([5, 10], lsn=<lsn>) took too long
-...
-test_run:cmd("clear filter")
----
-- true
+- select([5], LE) => [5, 10] took too long
 ...
 box.cfg{too_long_threshold = too_long_threshold}
 ---
