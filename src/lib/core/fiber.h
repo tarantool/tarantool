@@ -52,6 +52,14 @@ extern "C" {
 
 enum { FIBER_NAME_MAX = 32 };
 
+/**
+ * Fiber ids [0; 100] are reserved.
+ */
+enum {
+	FIBER_ID_SCHED		= 1,
+	FIBER_ID_MAX_RESERVED	= 100
+};
+
 enum {
 	/**
 	 * It's safe to resume (wakeup) this fiber
@@ -445,7 +453,7 @@ struct cord {
 	struct fiber *fiber;
 	struct ev_loop *loop;
 	/**
-	 * Every new fiber gets a new monotonic id. Ids 1-100 are
+	 * Every new fiber gets a new monotonic id. Ids 0 - 100 are
 	 * reserved.
 	 */
 	uint32_t max_fid;

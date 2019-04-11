@@ -974,9 +974,9 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 	}
 
 	fiber->f = f;
-	/* fids from 0 to 100 are reserved */
-	if (++cord->max_fid < 100)
-		cord->max_fid = 101;
+	/* Excluding reserved range */
+	if (++cord->max_fid < FIBER_ID_MAX_RESERVED)
+		cord->max_fid = FIBER_ID_MAX_RESERVED + 1;
 	fiber->fid = cord->max_fid;
 	fiber_set_name(fiber, name);
 	register_fid(fiber);
@@ -1055,14 +1055,14 @@ cord_create(struct cord *cord, const char *name)
 	cord->fiber_registry = mh_i32ptr_new();
 
 	/* sched fiber is not present in alive/ready/dead list. */
-	cord->sched.fid = 1;
+	cord->sched.fid = FIBER_ID_SCHED;
 	fiber_reset(&cord->sched);
 	diag_create(&cord->sched.diag);
 	region_create(&cord->sched.gc, &cord->slabc);
 	fiber_set_name(&cord->sched, "sched");
 	cord->fiber = &cord->sched;
 
-	cord->max_fid = 100;
+	cord->max_fid = FIBER_ID_MAX_RESERVED;
 	/*
 	 * No need to start this event since it's only used for
 	 * ev_feed_event(). Saves a few cycles on every
