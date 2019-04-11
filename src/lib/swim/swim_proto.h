@@ -38,6 +38,11 @@
 #include <stdbool.h>
 #include "swim_constants.h"
 
+enum {
+	/** Reserve 272 bytes for headers. */
+	MAX_PAYLOAD_SIZE = 1200,
+};
+
 /**
  * SWIM binary protocol structures and helpers. Below is a picture
  * of a SWIM message template:
@@ -67,7 +72,8 @@
  * |             SWIM_MEMBER_ADDRESS: uint, ip,                  |
  * |             SWIM_MEMBER_PORT: uint, port,                   |
  * |             SWIM_MEMBER_UUID: 16 byte UUID,                 |
- * |             SWIM_MEMBER_INCARNATION: uint                   |
+ * |             SWIM_MEMBER_INCARNATION: uint,                  |
+ * |             SWIM_MEMBER_PAYLOAD: bin                        |
  * |         },                                                  |
  * |         ...                                                 |
  * |     ],                                                      |
@@ -80,7 +86,8 @@
  * |             SWIM_MEMBER_ADDRESS: uint, ip,                  |
  * |             SWIM_MEMBER_PORT: uint, port,                   |
  * |             SWIM_MEMBER_UUID: 16 byte UUID,                 |
- * |             SWIM_MEMBER_INCARNATION: uint                   |
+ * |             SWIM_MEMBER_INCARNATION: uint,                  |
+ * |             SWIM_MEMBER_PAYLOAD: bin                        |
  * |         },                                                  |
  * |         ...                                                 |
  * |     ],                                                      |
@@ -103,6 +110,8 @@ struct swim_member_def {
 	struct sockaddr_in addr;
 	uint64_t incarnation;
 	enum swim_member_status status;
+	const char *payload;
+	int payload_size;
 };
 
 /** Initialize the definition with default values. */
@@ -271,6 +280,7 @@ enum swim_member_key {
 	SWIM_MEMBER_PORT,
 	SWIM_MEMBER_UUID,
 	SWIM_MEMBER_INCARNATION,
+	SWIM_MEMBER_PAYLOAD,
 	swim_member_key_MAX,
 };
 
@@ -300,7 +310,7 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
  * date and TTD is > 0.
  */
 struct PACKED swim_passport_bin {
-	/** mp_encode_map(5) */
+	/** mp_encode_map(5 or 6) */
 	uint8_t m_header;
 
 	/** mp_encode_uint(SWIM_MEMBER_STATUS) */
@@ -325,6 +335,30 @@ struct PACKED swim_passport_bin {
 	uint64_t v_incarnation;
 };
 
+/**
+ * SWIM member's payload header. Payload data should be encoded
+ * right after it.
+ */
+struct PACKED swim_member_payload_bin {
+	/** mp_encode_uint(SWIM_MEMBER_PAYLOAD) */
+	uint8_t k_payload;
+	/** mp_encode_bin(16bit bin header) */
+	uint8_t m_payload_size;
+	uint16_t v_payload_size;
+	/** Payload data ... */
+};
+
+/** Initialize payload record. */
+void
+swim_member_payload_bin_create(struct swim_member_payload_bin *bin);
+
+/**
+ * Fill a previously created payload record with an actual size.
+ */
+void
+swim_member_payload_bin_fill(struct swim_member_payload_bin *bin,
+			     uint16_t size);
+
 /** Initialize a member's binary passport. */
 void
 swim_passport_bin_create(struct swim_passport_bin *passport);
@@ -339,7 +373,8 @@ void
 swim_passport_bin_fill(struct swim_passport_bin *passport,
 		       const struct sockaddr_in *addr,
 		       const struct tt_uuid *uuid,
-		       enum swim_member_status status, uint64_t incarnation);
+		       enum swim_member_status status, uint64_t incarnation,
+		       bool encode_payload);
 
 /** }}}                  Anti-entropy component                 */
 

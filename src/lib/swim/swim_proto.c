@@ -199,6 +199,7 @@ swim_member_def_create(struct swim_member_def *def)
 	memset(def, 0, sizeof(*def));
 	def->addr.sin_family = AF_INET;
 	def->status = MEMBER_ALIVE;
+	def->payload_size = -1;
 }
 
 /**
@@ -218,6 +219,7 @@ swim_decode_member_key(enum swim_member_key key, const char **pos,
 		       struct swim_member_def *def)
 {
 	uint64_t tmp;
+	uint32_t len;
 	switch (key) {
 	case SWIM_MEMBER_STATUS:
 		if (swim_decode_uint(pos, end, &tmp, prefix,
@@ -248,6 +250,17 @@ swim_decode_member_key(enum swim_member_key key, const char **pos,
 		if (swim_decode_uint(pos, end, &def->incarnation, prefix,
 				     "member incarnation") != 0)
 			return -1;
+		break;
+	case SWIM_MEMBER_PAYLOAD:
+		if (swim_decode_bin(&def->payload, &len, pos, end, prefix,
+				    "member payload") != 0)
+			return -1;
+		if (len > MAX_PAYLOAD_SIZE) {
+			diag_set(SwimError, "%s member payload size should be "\
+				 "<= %d", prefix, MAX_PAYLOAD_SIZE);
+			return -1;
+		}
+		def->payload_size = (int) len;
 		break;
 	default:
 		unreachable();
@@ -366,11 +379,21 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
 }
 
 void
+swim_member_payload_bin_create(struct swim_member_payload_bin *bin)
+{
+	bin->k_payload = SWIM_MEMBER_PAYLOAD;
+	bin->m_payload_size = 0xc5;
+}
+
+void
+swim_member_payload_bin_fill(struct swim_member_payload_bin *bin, uint16_t size)
+{
+	bin->v_payload_size = mp_bswap_u16(size);
+}
+
+void
 swim_passport_bin_create(struct swim_passport_bin *passport)
 {
-	int map_size = 3 + SWIM_INADDR_BIN_SIZE;
-	assert(mp_sizeof_map(map_size) == 1);
-	passport->m_header = 0x80 | map_size;
 	passport->k_status = SWIM_MEMBER_STATUS;
 	swim_inaddr_bin_create(&passport->addr, SWIM_MEMBER_ADDRESS,
 			       SWIM_MEMBER_PORT);
@@ -385,8 +408,12 @@ void
 swim_passport_bin_fill(struct swim_passport_bin *passport,
 		       const struct sockaddr_in *addr,
 		       const struct tt_uuid *uuid,
-		       enum swim_member_status status, uint64_t incarnation)
+		       enum swim_member_status status, uint64_t incarnation,
+		       bool encode_payload)
 {
+	int map_size = 3 + SWIM_INADDR_BIN_SIZE + encode_payload;
+	assert(mp_sizeof_map(map_size) == 1);
+	passport->m_header = 0x80 | map_size;
 	passport->v_status = status;
 	swim_inaddr_bin_fill(&passport->addr, addr);
 	memcpy(passport->v_uuid, uuid, UUID_LEN);

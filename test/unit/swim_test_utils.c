@@ -191,6 +191,27 @@ swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
 	return swim_member_incarnation(m);
 }
 
+const char *
+swim_cluster_member_payload(struct swim_cluster *cluster, int node_id,
+			    int member_id, uint16_t *size)
+{
+	const struct swim_member *m =
+		swim_cluster_member_view(cluster, node_id, member_id);
+	if (m == NULL) {
+		*size = 0;
+		return NULL;
+	}
+	return swim_member_payload(m, size);
+}
+
+int
+swim_cluster_member_set_payload(struct swim_cluster *cluster, int i,
+				const char *payload, uint16_t size)
+{
+	struct swim *s = swim_cluster_node(cluster, i);
+	return swim_set_payload(s, payload, size);
+}
+
 struct swim *
 swim_cluster_node(struct swim_cluster *cluster, int i)
 {
@@ -506,6 +527,13 @@ struct swim_member_template {
 	 */
 	bool need_check_incarnation;
 	uint64_t incarnation;
+	/**
+	 * True, if the payload should be checked to be equal to
+	 * @a payload of size @a payload_size.
+	 */
+	bool need_check_payload;
+	const char *payload;
+	uint16_t payload_size;
 };
 
 /** Build member template. No checks are set. */
@@ -542,6 +570,19 @@ swim_member_template_set_incarnation(struct swim_member_template *t,
 	t->incarnation = incarnation;
 }
 
+/**
+ * Set that the member template should be used to check member
+ * status.
+ */
+static inline void
+swim_member_template_set_payload(struct swim_member_template *t,
+				 const char *payload, uint16_t payload_size)
+{
+	t->need_check_payload = true;
+	t->payload = payload;
+	t->payload_size = payload_size;
+}
+
 /** Callback to check that a member matches a template. */
 static bool
 swim_loop_check_member(struct swim_cluster *cluster, void *data)
@@ -551,16 +592,25 @@ swim_loop_check_member(struct swim_cluster *cluster, void *data)
 		swim_cluster_member_view(cluster, t->node_id, t->member_id);
 	enum swim_member_status status;
 	uint64_t incarnation;
+	const char *payload;
+	uint16_t payload_size;
 	if (m != NULL) {
 		status = swim_member_status(m);
 		incarnation = swim_member_incarnation(m);
+		payload = swim_member_payload(m, &payload_size);
 	} else {
 		status = swim_member_status_MAX;
 		incarnation = 0;
+		payload = NULL;
+		payload_size = 0;
 	}
 	if (t->need_check_status && status != t->status)
 		return false;
 	if (t->need_check_incarnation && incarnation != t->incarnation)
+		return false;
+	if (t->need_check_payload &&
+	    (payload_size != t->payload_size ||
+	     memcmp(payload, t->payload, payload_size) != 0))
 		return false;
 	return true;
 }
@@ -640,6 +690,18 @@ swim_cluster_wait_status_everywhere(struct swim_cluster *cluster, int member_id,
 	struct swim_member_template t;
 	swim_member_template_create(&t, -1, member_id);
 	swim_member_template_set_status(&t, status);
+	return swim_wait_timeout(timeout, cluster,
+				 swim_loop_check_member_everywhere, &t);
+}
+
+int
+swim_cluster_wait_payload_everywhere(struct swim_cluster *cluster,
+				     int member_id, const char *payload,
+				     uint16_t payload_size, double timeout)
+{
+	struct swim_member_template t;
+	swim_member_template_create(&t, -1, member_id);
+	swim_member_template_set_payload(&t, payload, payload_size);
 	return swim_wait_timeout(timeout, cluster,
 				 swim_loop_check_member_everywhere, &t);
 }

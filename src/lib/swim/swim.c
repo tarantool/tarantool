@@ -301,6 +301,44 @@ struct swim_member {
 	 * allow other members to learn the dead status.
 	 */
 	int status_ttd;
+	/** Arbitrary user data, disseminated on each change. */
+	char *payload;
+	/** Payload size, in bytes. */
+	uint16_t payload_size;
+	/**
+	 * True, if the payload is thought to be of the most
+	 * actual version. In such a case it can be disseminated
+	 * further. Otherwise @a payload is suspected to be
+	 * outdated and can be updated in two cases only:
+	 *
+	 * 1) when it is received with a bigger incarnation from
+	 *    anywhere;
+	 *
+	 * 2) when it is received with the same incarnation, but
+	 *    local payload is outdated.
+	 *
+	 * A payload can become outdated, if anyhow a new
+	 * incarnation of the member has been learned, but not a
+	 * new payload. For example, a message with new payload
+	 * could be lost, and at the same time this instance
+	 * responds to a ping with newly incarnated ack. The ack
+	 * receiver will learn the new incarnation, but not the
+	 * new payload.
+	 *
+	 * In this case it can't be said exactly whether the
+	 * member has updated payload, or another attribute. The
+	 * only way here is to wait until the most actual payload
+	 * will be received from another instance. Note, that such
+	 * an instance always exists - the payload originator
+	 * instance.
+	 */
+	bool is_payload_up_to_date;
+	/**
+	 * TTD of payload. At most this number of times payload is
+	 * sent as a part of dissemination component. Reset on
+	 * each payload update.
+	 */
+	int payload_ttd;
 	/**
 	 * All created events are put into a queue sorted by event
 	 * time.
@@ -528,6 +566,34 @@ swim_by_scheduler(struct swim_scheduler *scheduler)
 	return container_of(scheduler, struct swim, scheduler);
 }
 
+/** Update member's payload, register a corresponding event. */
+static inline int
+swim_update_member_payload(struct swim *swim, struct swim_member *member,
+			   const char *payload, uint16_t payload_size,
+			   int incarnation_increment)
+{
+	assert(payload_size <= MAX_PAYLOAD_SIZE);
+	char *new_payload;
+	if (payload_size > 0) {
+		new_payload = (char *) realloc(member->payload, payload_size);
+		if (new_payload == NULL) {
+			diag_set(OutOfMemory, payload_size, "realloc", "new_payload");
+			return -1;
+		}
+		memcpy(new_payload, payload, payload_size);
+	} else {
+		free(member->payload);
+		new_payload = NULL;
+	}
+	member->payload = new_payload;
+	member->payload_size = payload_size;
+	member->payload_ttd = mh_size(swim->members);
+	member->incarnation += incarnation_increment;
+	member->is_payload_up_to_date = true;
+	swim_on_member_update(swim, member);
+	return 0;
+}
+
 /**
  * Once a ping is sent, the member should start waiting for an
  * ACK.
@@ -561,6 +627,7 @@ swim_member_delete(struct swim_member *member)
 
 	/* Dissemination component. */
 	assert(rlist_empty(&member->in_dissemination_queue));
+	free(member->payload);
 
 	free(member);
 }
@@ -642,7 +709,7 @@ swim_find_member(struct swim *swim, const struct tt_uuid *uuid)
 static struct swim_member *
 swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 		const struct tt_uuid *uuid, enum swim_member_status status,
-		uint64_t incarnation)
+		uint64_t incarnation, const char *payload, int payload_size)
 {
 	int new_bsize = sizeof(swim->shuffled[0]) *
 			(mh_size(swim->members) + 1);
@@ -680,6 +747,12 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 
 	/* Dissemination component. */
 	swim_on_member_update(swim, member);
+	if (payload_size >= 0 &&
+	    swim_update_member_payload(swim, member, payload,
+				       payload_size, 0) != 0) {
+		swim_delete_member(swim, member);
+		return NULL;
+	}
 
 	say_verbose("SWIM %d: member %s is added, total is %d", swim_fd(swim),
 		    swim_uuid_str(&member->uuid), mh_size(swim->members));
@@ -739,22 +812,40 @@ swim_new_round(struct swim *swim)
 
 /**
  * Encode one member into @a packet using @a passport structure.
+ * Note that this function does not make a decision whether
+ * payload should be encoded, because its callers have different
+ * conditions for that. The anti-entropy needs the payload be
+ * up-to-date. The dissemination component additionally needs
+ * TTD > 0.
  * @retval 0 Success, encoded.
  * @retval -1 Not enough memory in the packet.
  */
 static int
 swim_encode_member(struct swim_packet *packet, struct swim_member *m,
-		   struct swim_passport_bin *passport)
+		   struct swim_passport_bin *passport,
+		   struct swim_member_payload_bin *payload_header,
+		   bool encode_payload)
 {
 	/* The headers should be initialized. */
 	assert(passport->k_status == SWIM_MEMBER_STATUS);
+	assert(payload_header->k_payload == SWIM_MEMBER_PAYLOAD);
 	int size = sizeof(*passport);
+	encode_payload = encode_payload && m->is_payload_up_to_date;
+	if (encode_payload)
+		size += sizeof(*payload_header) + m->payload_size;
 	char *pos = swim_packet_alloc(packet, size);
 	if (pos == NULL)
 		return -1;
 	swim_passport_bin_fill(passport, &m->addr, &m->uuid, m->status,
-			       m->incarnation);
+			       m->incarnation, encode_payload);
 	memcpy(pos, passport, sizeof(*passport));
+	if (encode_payload) {
+		pos += sizeof(*passport);
+		swim_member_payload_bin_fill(payload_header, m->payload_size);
+		memcpy(pos, payload_header, sizeof(*payload_header));
+		pos += sizeof(*payload_header);
+		memcpy(pos, m->payload, m->payload_size);
+	}
 	return 0;
 }
 
@@ -768,17 +859,20 @@ swim_encode_anti_entropy(struct swim *swim, struct swim_packet *packet)
 {
 	struct swim_anti_entropy_header_bin ae_header_bin;
 	struct swim_passport_bin passport_bin;
+	struct swim_member_payload_bin payload_header;
 	char *header = swim_packet_alloc(packet, sizeof(ae_header_bin));
 	if (header == NULL)
 		return 0;
 	swim_passport_bin_create(&passport_bin);
+	swim_member_payload_bin_create(&payload_header);
 	struct mh_swim_table_t *t = swim->members;
 	int i = 0, member_count = mh_size(t);
 	int rnd = swim_scaled_rand(0, member_count - 1);
 	for (mh_int_t rc = mh_swim_table_random(t, rnd), end = mh_end(t);
 	     i < member_count; ++i) {
 		struct swim_member *m = *mh_swim_table_node(t, rc);
-		if (swim_encode_member(packet, m, &passport_bin) != 0)
+		if (swim_encode_member(packet, m, &passport_bin,
+				       &payload_header, true) != 0)
 			break;
 		/*
 		 * First random member could be chosen too close
@@ -838,16 +932,20 @@ static int
 swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
 {
 	struct swim_diss_header_bin diss_header_bin;
+	struct swim_member_payload_bin payload_header;
 	struct swim_passport_bin passport_bin;
 	char *header = swim_packet_alloc(packet, sizeof(diss_header_bin));
 	if (header == NULL)
 		return 0;
 	swim_passport_bin_create(&passport_bin);
+	swim_member_payload_bin_create(&payload_header);
 	int i = 0;
 	struct swim_member *m;
 	rlist_foreach_entry(m, &swim->dissemination_queue,
 			    in_dissemination_queue) {
-		if (swim_encode_member(packet, m, &passport_bin) != 0)
+		if (swim_encode_member(packet, m, &passport_bin,
+				       &payload_header,
+				       m->payload_ttd > 0) != 0)
 			break;
 		++i;
 	}
@@ -896,6 +994,10 @@ swim_decrease_event_ttd(struct swim *swim)
 	rlist_foreach_entry_safe(member, &swim->dissemination_queue,
 				 in_dissemination_queue,
 				 tmp) {
+		if (member->payload_ttd > 0) {
+			if (--member->payload_ttd == 0)
+				swim_cached_round_msg_invalidate(swim);
+		}
 		if (--member->status_ttd == 0) {
 			rlist_del_entry(member, in_dissemination_queue);
 			swim_cached_round_msg_invalidate(swim);
@@ -1072,8 +1174,29 @@ swim_update_member(struct swim *swim, const struct swim_member_def *def,
 {
 	assert(member != swim->self);
 	assert(def->incarnation >= member->incarnation);
-	if (def->incarnation > member->incarnation)
+	/*
+	 * Payload update rules are simple: it can be updated
+	 * either if the new payload has a bigger incarnation, or
+	 * the same incarnation, but local payload is outdated.
+	 */
+	bool update_payload = false;
+	if (def->incarnation > member->incarnation) {
 		swim_update_member_addr(swim, member, &def->addr, 0);
+		if (def->payload_size >= 0) {
+			update_payload = true;
+		} else if (member->is_payload_up_to_date) {
+			member->is_payload_up_to_date = false;
+			swim_on_member_update(swim, member);
+		}
+	} else if (! member->is_payload_up_to_date && def->payload_size >= 0) {
+		update_payload = true;
+	}
+	if (update_payload &&
+	    swim_update_member_payload(swim, member, def->payload,
+				       def->payload_size, 0) != 0) {
+		/* Not such a critical error. */
+		diag_log();
+	}
 	swim_update_member_inc_status(swim, member, def->status,
 				      def->incarnation);
 }
@@ -1114,7 +1237,8 @@ swim_upsert_member(struct swim *swim, const struct swim_member_def *def,
 			goto skip;
 		}
 		*result = swim_new_member(swim, &def->addr, &def->uuid,
-					  def->status, def->incarnation);
+					  def->status, def->incarnation,
+					  def->payload, def->payload_size);
 		return *result != NULL ? 0 : -1;
 	}
 	*result = member;
@@ -1443,7 +1567,7 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 			return -1;
 		}
 		swim->self = swim_new_member(swim, &addr, uuid, MEMBER_ALIVE,
-					     0);
+					     0, NULL, 0);
 		if (swim->self == NULL)
 			return -1;
 	} else if (uuid == NULL || tt_uuid_is_nil(uuid)) {
@@ -1455,7 +1579,8 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 			return -1;
 		}
 		new_self = swim_new_member(swim, &swim->self->addr, uuid,
-					   MEMBER_ALIVE, 0);
+					   MEMBER_ALIVE, 0, swim->self->payload,
+					   swim->self->payload_size);
 		if (new_self == NULL)
 			return -1;
 	}
@@ -1512,6 +1637,18 @@ swim_is_configured(const struct swim *swim)
 }
 
 int
+swim_set_payload(struct swim *swim, const char *payload, uint16_t payload_size)
+{
+	if (payload_size > MAX_PAYLOAD_SIZE) {
+		diag_set(IllegalParams, "Payload should be <= %d",
+			 MAX_PAYLOAD_SIZE);
+		return -1;
+	}
+	return swim_update_member_payload(swim, swim->self, payload,
+					  payload_size, 1);
+}
+
+int
 swim_add_member(struct swim *swim, const char *uri, const struct tt_uuid *uuid)
 {
 	const char *prefix = "swim.add_member:";
@@ -1525,7 +1662,8 @@ swim_add_member(struct swim *swim, const char *uri, const struct tt_uuid *uuid)
 		return -1;
 	struct swim_member *member = swim_find_member(swim, uuid);
 	if (member == NULL) {
-		member = swim_new_member(swim, &addr, uuid, MEMBER_ALIVE, 0);
+		member = swim_new_member(swim, &addr, uuid, MEMBER_ALIVE, 0,
+					 NULL, -1);
 		return member == NULL ? -1 : 0;
 	}
 	diag_set(SwimError, "%s a member with such UUID already exists",
@@ -1760,4 +1898,11 @@ uint64_t
 swim_member_incarnation(const struct swim_member *member)
 {
 	return member->incarnation;
+}
+
+const char *
+swim_member_payload(const struct swim_member *member, uint16_t *size)
+{
+	*size = member->payload_size;
+	return member->payload;
 }

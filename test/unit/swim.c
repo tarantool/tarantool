@@ -36,6 +36,7 @@
 #include "uri/uri.h"
 #include "swim/swim.h"
 #include "swim/swim_ev.h"
+#include "swim/swim_proto.h"
 #include "swim_test_transport.h"
 #include "swim_test_ev.h"
 #include "swim_test_utils.h"
@@ -393,7 +394,7 @@ swim_test_too_big_packet(void)
 	for (int i = 1; i < size; ++i)
 		swim_cluster_add_link(cluster, 0, i);
 
-	is(swim_cluster_wait_fullmesh(cluster, size * 2), 0, "despite S1 can "\
+	is(swim_cluster_wait_fullmesh(cluster, size * 3), 0, "despite S1 can "\
 	   "not send all the %d members in a one packet, fullmesh is "\
 	   "eventually reached", size);
 
@@ -642,10 +643,200 @@ swim_test_broadcast(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_payload_basic(void)
+{
+	swim_start_test(11);
+	uint16_t size, cluster_size = 3;
+	struct swim_cluster *cluster = swim_cluster_new(cluster_size);
+	for (int i = 0; i < cluster_size; ++i) {
+		for (int j = i + 1; j < cluster_size; ++j)
+			swim_cluster_interconnect(cluster, i, j);
+	}
+	ok(swim_cluster_member_payload(cluster, 0, 0, &size) == NULL &&
+	   size == 0, "no payload by default");
+	is(swim_cluster_member_set_payload(cluster, 0, NULL, 1300), -1,
+	   "can not set too big payload");
+	ok(swim_error_check_match("Payload should be <="), "diag says too big");
+
+	const char *s0_payload = "S1 payload";
+	uint16_t s0_payload_size = strlen(s0_payload) + 1;
+	is(swim_cluster_member_set_payload(cluster, 0, s0_payload,
+					   s0_payload_size), 0,
+	   "payload is set");
+	is(swim_cluster_member_incarnation(cluster, 0, 0), 1,
+	   "incarnation is incremeted on each payload update");
+	const char *tmp = swim_cluster_member_payload(cluster, 0, 0, &size);
+	ok(size == s0_payload_size && memcmp(s0_payload, tmp, size) == 0,
+	   "payload is successfully obtained back");
+
+	is(swim_cluster_wait_payload_everywhere(cluster, 0, s0_payload,
+						s0_payload_size, cluster_size),
+	   0, "payload is disseminated");
+	s0_payload = "S1 second version of payload";
+	s0_payload_size = strlen(s0_payload) + 1;
+	is(swim_cluster_member_set_payload(cluster, 0, s0_payload,
+					   s0_payload_size), 0,
+	   "payload is changed");
+	is(swim_cluster_member_incarnation(cluster, 0, 0), 2,
+	   "incarnation is incremeted on each payload update");
+	is(swim_cluster_wait_payload_everywhere(cluster, 0, s0_payload,
+						s0_payload_size, cluster_size),
+	   0, "second payload is disseminated");
+	/*
+	 * Test that new incarnations help to rewrite the old
+	 * payload from anti-entropy.
+	 */
+	swim_cluster_set_drop(cluster, 0, 100);
+	s0_payload = "S1 third version of payload";
+	s0_payload_size = strlen(s0_payload) + 1;
+	fail_if(swim_cluster_member_set_payload(cluster, 0, s0_payload,
+						s0_payload_size) != 0);
+	/* Wait at least one round until payload TTD gets 0. */
+	swim_run_for(3);
+	swim_cluster_set_drop(cluster, 0, 0);
+	is(swim_cluster_wait_payload_everywhere(cluster, 0, s0_payload,
+						s0_payload_size, cluster_size),
+	   0, "third payload is disseminated via anti-entropy");
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
+
+static void
+swim_test_payload_refutation(void)
+{
+	swim_start_test(11);
+	uint16_t size, cluster_size = 3;
+	struct swim_cluster *cluster = swim_cluster_new(cluster_size);
+	swim_cluster_set_ack_timeout(cluster, 1);
+	for (int i = 0; i < cluster_size; ++i) {
+		for (int j = i + 1; j < cluster_size; ++j)
+			swim_cluster_interconnect(cluster, i, j);
+	}
+	const char *s0_old_payload = "s0 payload";
+	uint16_t s0_old_payload_size = strlen(s0_old_payload) + 1;
+	fail_if(swim_cluster_member_set_payload(cluster, 0, s0_old_payload,
+						s0_old_payload_size) != 0);
+	fail_if(swim_cluster_wait_payload_everywhere(cluster, 0, s0_old_payload,
+						     s0_old_payload_size,
+						     3) != 0);
+	/*
+	 * The test checks the following case. Assume there are 3
+	 * nodes: S1, S2, S3. They all know each other. S1 sets
+	 * new payload, S2 and S3 knows that. They all see that S1
+	 * has incarnation 1 and payload P1.
+	 *
+	 * Now S1 changes payload to P2. Its incarnation becomes
+	 * 2. During next entire round its round messages are
+	 * lost, however ACKs work ok.
+	 */
+	const char *s0_new_payload = "s0 second payload";
+	uint16_t s0_new_payload_size = strlen(s0_new_payload);
+	fail_if(swim_cluster_member_set_payload(cluster, 0, s0_new_payload,
+						s0_new_payload_size) != 0);
+	int components[2] = {SWIM_DISSEMINATION, SWIM_ANTI_ENTROPY};
+	swim_cluster_drop_components(cluster, 0, components, 2);
+	swim_run_for(3);
+	swim_cluster_drop_components(cluster, 0, NULL, 0);
+
+	is(swim_cluster_member_incarnation(cluster, 1, 0), 2,
+	   "S2 sees new incarnation of S1");
+	is(swim_cluster_member_incarnation(cluster, 2, 0), 2,
+	   "S3 does the same");
+
+	const char *tmp = swim_cluster_member_payload(cluster, 1, 0, &size);
+	ok(size == s0_old_payload_size &&
+	   memcmp(tmp, s0_old_payload, size) == 0,
+	   "but S2 does not known the new payload");
+
+	tmp = swim_cluster_member_payload(cluster, 2, 0, &size);
+	ok(size == s0_old_payload_size &&
+	   memcmp(tmp, s0_old_payload, size) == 0,
+	   "as well as S3");
+
+	/* Restore normal ACK timeout. */
+	swim_cluster_set_ack_timeout(cluster, 30);
+
+	/*
+	 * Now S1's payload TTD is 0, but via ACKs S1 sent its new
+	 * incarnation to S2 and S3. Despite that they should
+	 * apply new S1's payload via anti-entropy. Next lines
+	 * test that:
+	 *
+	 * 1) S2 can apply new S1's payload from S1's
+	 *    anti-entropy;
+	 *
+	 * 2) S2 will not receive the old S1's payload from S3.
+	 *    S3 knows, that its payload is outdated, and should
+	 *    not send it;
+	 *
+	 * 2) S3 can apply new S1's payload from S2's
+	 *    anti-entropy. Note, that here S3 applies the payload
+	 *    not directly from the originator. It is the most
+	 *    complex case.
+	 *
+	 * Next lines test the case (1).
+	 */
+
+	/* S3 does not participate in the test (1). */
+	swim_cluster_set_drop(cluster, 2, 100);
+	swim_run_for(3);
+
+	tmp = swim_cluster_member_payload(cluster, 1, 0, &size);
+	ok(size == s0_new_payload_size &&
+	   memcmp(tmp, s0_new_payload, size) == 0,
+	   "S2 learned S1's payload via anti-entropy");
+	is(swim_cluster_member_incarnation(cluster, 1, 0), 2,
+	   "incarnation still is the same");
+
+	tmp = swim_cluster_member_payload(cluster, 2, 0, &size);
+	ok(size == s0_old_payload_size &&
+	   memcmp(tmp, s0_old_payload, size) == 0,
+	   "S3 was blocked and does not know anything");
+	is(swim_cluster_member_incarnation(cluster, 2, 0), 2,
+	   "incarnation still is the same");
+
+	/* S1 will not participate in the tests further. */
+	swim_cluster_set_drop(cluster, 0, 100);
+
+	/*
+	 * Now check the case (2) - S3 will not send outdated
+	 * version of S1's payload. To maintain the experimental
+	 * integrity S1 and S2 are silent. Only S3 sends packets.
+	 */
+	swim_cluster_set_drop(cluster, 2, 0);
+	swim_cluster_set_drop_out(cluster, 1, 100);
+	swim_run_for(3);
+
+	tmp = swim_cluster_member_payload(cluster, 1, 0, &size);
+	ok(size == s0_new_payload_size &&
+	   memcmp(tmp, s0_new_payload, size) == 0,
+	   "S2 keeps the same new S1's payload, S3 did not rewrite it");
+
+	tmp = swim_cluster_member_payload(cluster, 2, 0, &size);
+	ok(size == s0_old_payload_size &&
+	   memcmp(tmp, s0_old_payload, size) == 0,
+	   "S3 still does not know anything");
+
+	/*
+	 * Now check the case (3) - S3 accepts new S1's payload
+	 * from S2. Even knowing the same S1's incarnation.
+	 */
+	swim_cluster_set_drop(cluster, 1, 0);
+	swim_cluster_set_drop_out(cluster, 2, 100);
+	is(swim_cluster_wait_payload_everywhere(cluster, 0, s0_new_payload,
+						s0_new_payload_size, 3), 0,
+	  "S3 learns S1's payload from S2")
+
+	swim_cluster_delete(cluster);
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(15);
+	swim_start_test(17);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -666,6 +857,8 @@ main_f(va_list ap)
 	swim_test_quit();
 	swim_test_uri_update();
 	swim_test_broadcast();
+	swim_test_payload_basic();
+	swim_test_payload_refutation();
 
 	swim_test_transport_free();
 	swim_test_ev_free();

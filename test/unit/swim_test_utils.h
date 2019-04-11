@@ -141,6 +141,14 @@ uint64_t
 swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
 				int member_id);
 
+const char *
+swim_cluster_member_payload(struct swim_cluster *cluster, int node_id,
+			    int member_id, uint16_t *size);
+
+int
+swim_cluster_member_set_payload(struct swim_cluster *cluster, int i,
+				const char *payload, uint16_t size);
+
 /**
  * Check if in the cluster every instance knowns the about other
  * instances.
@@ -191,6 +199,16 @@ int
 swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
 			      int member_id, uint64_t incarnation,
 			      double timeout);
+
+/**
+ * Wait until a member with id @a member_id is seen with
+ * @a payload of size @a payload_size in the membership table of
+ * every instance in @a cluster. At most @a timeout seconds.
+ */
+int
+swim_cluster_wait_payload_everywhere(struct swim_cluster *cluster,
+				     int member_id, const char *payload,
+				     uint16_t payload_size, double timeout);
 
 /** Process SWIM events for @a duration fake seconds. */
 void
