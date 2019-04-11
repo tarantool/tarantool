@@ -652,7 +652,7 @@ swim_test_broadcast(void)
 static int
 main_f(va_list ap)
 {
-	swim_start_test(14);
+	swim_start_test(15);
 
 	(void) ap;
 	swim_test_ev_init();

@@ -1,6 +1,5 @@
-# Looks like you planned 14 tests but ran 15.
 	*** main_f ***
-1..14
+1..15
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
