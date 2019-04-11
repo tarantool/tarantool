@@ -433,8 +433,6 @@ struct fiber {
 	char name[FIBER_NAME_MAX + 1];
 };
 
-enum { FIBER_CALL_STACK = 16 };
-
 struct cord_on_exit;
 
 /**
