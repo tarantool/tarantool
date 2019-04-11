@@ -40,7 +40,7 @@ test:do_execsql_test(
         SELECT typeof(x'616263')
     ]], {
         -- <cast-1.2>
-        "blob"
+        "scalar"
         -- </cast-1.2>
     })
 
@@ -60,7 +60,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(x'616263' AS text))
     ]], {
         -- <cast-1.4>
-        "text"
+        "string"
         -- </cast-1.4>
     })
 
@@ -90,7 +90,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(x'616263' AS SCALAR))
     ]], {
         -- <cast-1.8>
-        "blob"
+        "scalar"
         -- </cast-1.8>
     })
 
@@ -240,7 +240,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123 AS text))
     ]], {
         -- <cast-1.24>
-        "text"
+        "string"
         -- </cast-1.24>
     })
 
@@ -260,7 +260,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123 AS FLOAT))
     ]], {
         -- <cast-1.26>
-        "real"
+        "number"
         -- </cast-1.26>
     })
 
@@ -320,7 +320,7 @@ test:do_execsql_test(
         SELECT typeof(123.456)
     ]], {
         -- <cast-1.32>
-        "real"
+        "number"
         -- </cast-1.32>
     })
 
@@ -340,7 +340,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123.456 AS text))
     ]], {
         -- <cast-1.34>
-        "text"
+        "string"
         -- </cast-1.34>
     })
 
@@ -360,7 +360,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123.456 AS FLOAT))
     ]], {
         -- <cast-1.36>
-        "real"
+        "number"
         -- </cast-1.36>
     })
 
@@ -380,7 +380,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(123.456 AS SCALAR))
     ]], {
         -- <cast-1.38>
-        "real"
+        "number"
         -- </cast-1.38>
     })
 
@@ -420,7 +420,7 @@ test:do_execsql_test(
         SELECT typeof('123abc')
     ]], {
         -- <cast-1.42>
-        "text"
+        "string"
         -- </cast-1.42>
     })
 
@@ -440,7 +440,7 @@ test:do_execsql_test(
         SELECT typeof(CAST('123abc' AS text))
     ]], {
         -- <cast-1.44>
-        "text"
+        "string"
         -- </cast-1.44>
     })
 
@@ -460,7 +460,7 @@ test:do_execsql_test(
         SELECT typeof(CAST('123abc' AS SCALAR))
     ]], {
         -- <cast-1.48>
-        "text"
+        "string"
         -- </cast-1.48>
     })
 
@@ -531,7 +531,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(1 AS REAL))
     ]], {
         -- <case-1.63>
-        "real"
+        "number"
         -- </case-1.63>
     })
 
@@ -551,7 +551,7 @@ test:do_execsql_test(
         SELECT typeof(CAST('1' AS REAL))
     ]], {
         -- <case-1.65>
-        "real"
+        "number"
         -- </case-1.65>
     })
 
@@ -581,7 +581,7 @@ test:do_execsql_test(
         SELECT typeof(CAST(x'31' AS REAL))
     ]], {
         -- <case-1.69>
-        "real"
+        "number"
         -- </case-1.69>
     })
 

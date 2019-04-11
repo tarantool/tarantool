@@ -209,7 +209,7 @@ test:do_execsql_test(
         SELECT typeof(a), a FROM t1 GROUP BY a HAVING a=123 
     ]], {
         -- <tkt3493-2.4.1>
-        "text", "123"
+        "string", "123"
         -- </tkt3493-2.4.1>
     })
 
@@ -219,7 +219,7 @@ test:do_execsql_test(
         SELECT typeof(a), a FROM t1 GROUP BY b HAVING a=123 
     ]], {
         -- <tkt3493-2.4.2>
-        "text", "123"
+        "string", "123"
         -- </tkt3493-2.4.2>
     })
 

@@ -518,7 +518,7 @@ test:do_execsql_test(
         SELECT typeof(round(5.1,1));
     ]], {
         -- <func-4.14>
-        "real"
+        "number"
         -- </func-4.14>
     })
 
@@ -528,7 +528,7 @@ test:do_execsql_test(
         SELECT typeof(round(5.1));
     ]], {
         -- <func-4.15>
-        "real"
+        "number"
         -- </func-4.15>
     })
 
@@ -919,7 +919,7 @@ test:do_execsql_test(
                             UNION ALL SELECT -9223372036854775807)
     ]], {
         -- <func-8.7>
-        "real"
+        "number"
         -- </func-8.7>
     })
 
@@ -978,7 +978,7 @@ test:do_execsql_test(
         SELECT typeof(randomblob(32));
     ]], {
         -- <func-9.4>
-        "blob"
+        "scalar"
         -- </func-9.4>
     })
 
@@ -2390,7 +2390,7 @@ test:do_execsql_test(
         SELECT typeof(group_concat(x)) FROM (SELECT '' AS x);
     ]], {
         -- <func-24.13>
-        "text"
+        "string"
         -- </func-24.13>
     })
 
@@ -2401,7 +2401,7 @@ test:do_execsql_test(
           FROM (SELECT '' AS x UNION ALL SELECT '');
     ]], {
         -- <func-24.14>
-        "text"
+        "string"
         -- </func-24.14>
     })
 
@@ -2635,7 +2635,7 @@ test:do_execsql_test(
         SELECT char(), length(char()), typeof(char()) 
     ]], {
         -- <func-31.1>
-        "", 0, "text"
+        "", 0, "string"
         -- </func-31.1>
     })
 

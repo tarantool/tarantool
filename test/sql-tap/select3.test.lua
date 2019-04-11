@@ -386,7 +386,7 @@ test:do_execsql_test("select3-8.1", [[
   SELECT typeof(sum(a3)) FROM a;
 ]], {
   -- <select3-8.1>
-  "real"
+  "number"
   -- </select3-8.1>
 })
 
@@ -394,7 +394,7 @@ test:do_execsql_test("select3-8.2", [[
   SELECT typeof(sum(a3)) FROM a GROUP BY a1;
 ]], {
   -- <select3-8.2>
-  "real"
+  "number"
   -- </select3-8.2>
 })
 

@@ -28,7 +28,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <1.0>
-        "text", "text"
+        "string", "string"
         -- </1.0>
     })
 
@@ -38,7 +38,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <1.1>
-        "text", "text"
+        "string", "string"
         -- </1.1>
     })
 
@@ -48,7 +48,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x*1 AND y=='1';
     ]], {
         -- <1.2>
-        "text", "text"
+        "string", "string"
         -- </1.2>
     })
 
@@ -58,7 +58,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x/1 AND y=='1';
     ]], {
         -- <1.3>
-        "text", "text"
+        "string", "string"
         -- </1.3>
     })
 
@@ -68,7 +68,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x%4 AND y=='1';
     ]], {
         -- <1.4>
-        "text", "text"
+        "string", "string"
         -- </1.4>
     })
 
@@ -79,7 +79,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x+0 AND y=='1';
     ]], {
         -- <3.0>
-        "text", "text"
+        "string", "string"
         -- </3.0>
     })
 
@@ -89,7 +89,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x-0 AND y=='1';
     ]], {
         -- <3.1>
-        "text", "text"
+        "string", "string"
         -- </3.1>
     })
 
@@ -99,7 +99,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x*1 AND y=='1';
     ]], {
         -- <3.2>
-        "text", "text"
+        "string", "string"
         -- </3.2>
     })
 
@@ -109,7 +109,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x/1 AND y=='1';
     ]], {
         -- <3.3>
-        "text", "text"
+        "string", "string"
         -- </3.3>
     })
 
@@ -119,7 +119,7 @@ test:do_execsql_test(
         SELECT typeof(x), typeof(y) FROM t WHERE 1=x%4 AND y=='1';
     ]], {
         -- <3.4>
-        "text", "text"
+        "string", "string"
         -- </3.4>
     })
 
