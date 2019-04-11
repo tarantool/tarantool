@@ -70,6 +70,45 @@ box.stat.ERROR.total
 ---
 - 1
 ...
+-- select, get, and pairs
+space:get(1)
+---
+- [1, 'tuple1']
+...
+box.stat.SELECT.total
+---
+- 5
+...
+space:get(11)
+---
+...
+box.stat.SELECT.total
+---
+- 6
+...
+space:select(5)
+---
+- - [5, 'tuple5']
+...
+box.stat.SELECT.total
+---
+- 7
+...
+space:select(15)
+---
+- []
+...
+box.stat.SELECT.total
+---
+- 8
+...
+for _ in space:pairs() do end
+---
+...
+box.stat.SELECT.total
+---
+- 9
+...
 -- reset
 box.stat.reset()
 ---
