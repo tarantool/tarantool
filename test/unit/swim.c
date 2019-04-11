@@ -685,12 +685,19 @@ main_f(va_list ap)
 int
 main()
 {
+	time_t seed = time(NULL);
+	srand(seed);
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	int fd = open("log.txt", O_TRUNC);
 	if (fd != -1)
 		close(fd);
 	say_logger_init("log.txt", 6, 1, "plain", 0);
+	/*
+	 * Print the seed to be able to reproduce a bug with the
+	 * same seed.
+	 */
+	say_info("Random seed = %llu", (unsigned long long) seed);
 
 	struct fiber *main_fiber = fiber_new("main", main_f);
 	fiber_set_joinable(main_fiber, true);
