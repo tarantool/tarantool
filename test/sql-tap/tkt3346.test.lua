@@ -42,7 +42,7 @@ test:do_test(
     function()
         return test:execsql [[
             SELECT b FROM (SELECT a,b FROM t1) AS x
-             WHERE (SELECT y FROM (SELECT x.b='alice' AS y))=0
+             WHERE (SELECT y FROM (SELECT x.b='alice' AS y))=false
         ]]
     end, {
         -- <tkt3346-1.2>

@@ -239,14 +239,14 @@ test:do_catchsql_test(
 
 data = {
     { 1,  [[ 'a' < 'b' collate binary ]], {1, "Collation 'BINARY' does not exist"}},
-    { 2,  [[ 'a' < 'b' collate "binary" ]], {0, {1}}},
+    { 2,  [[ 'a' < 'b' collate "binary" ]], {0, {true}}},
     { 3,  [[ 'a' < 'b' collate 'binary' ]], {1, [[Syntax error near ''binary'']]}},
-    { 4,  [[ 'a' < 'b' collate "unicode" ]], {0, {1}}},
-    { 5,  [[ 5 < 'b' collate "unicode" ]], {0, {1}}},
+    { 4,  [[ 'a' < 'b' collate "unicode" ]], {0, {true}}},
+    { 5,  [[ 5 < 'b' collate "unicode" ]], {0, {true}}},
     { 6,  [[ 5 < 'b' collate unicode ]], {1,"Collation 'UNICODE' does not exist"}},
-    { 7,  [[ 5 < 'b' collate "unicode_ci" ]], {0, {1}}},
+    { 7,  [[ 5 < 'b' collate "unicode_ci" ]], {0, {true}}},
     { 8,  [[ 5 < 'b' collate NONE ]], {1, "Collation 'NONE' does not exist"}},
-    { 9,  [[ 5 < 'b' collate "none" ]], {0, {1}}},
+    { 9,  [[ 5 < 'b' collate "none" ]], {0, {true}}},
 }
 
 for _, row in ipairs(data) do

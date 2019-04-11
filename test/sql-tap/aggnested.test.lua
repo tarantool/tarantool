@@ -180,7 +180,7 @@ test:do_execsql_test("aggnested-3.2",
         );
         INSERT INTO t2 VALUES(1);
         SELECT
-         (SELECT sum(value2==xyz) FROM t2)
+         (SELECT sum(xyz) FROM t2 where xyz = value2)
         FROM
          (SELECT value1 as xyz, max(x1) AS pqr
             FROM t1
@@ -207,7 +207,7 @@ test:do_execsql_test("aggnested-3.2-2",
         );
         INSERT INTO t2 VALUES(1);
         SELECT
-         (SELECT sum(value2<>xyz) FROM t2)
+         (SELECT sum(xyz) FROM t2 where xyz <> value2)
         FROM
          (SELECT value1 as xyz, max(x1) AS pqr
             FROM t1
@@ -215,7 +215,7 @@ test:do_execsql_test("aggnested-3.2-2",
     ]],
     {
         -- <aggnested-3.2>
-        0
+        ""
         -- </aggnested-3.2>
     })
 
@@ -227,13 +227,13 @@ test:do_execsql_test("aggnested-3.3",
         INSERT INTO t1 VALUES(4469,2),(4469,1);
         CREATE TABLE t2 (value2 INT PRIMARY KEY);
         INSERT INTO t2 VALUES(1);
-        SELECT (SELECT sum(value2=value1) FROM t2), max(value1)
+        SELECT (SELECT sum(value1) FROM t2 where value1=value2), max(value1)
           FROM t1
          GROUP BY id1;
     ]],
     {
         -- <aggnested-3.3>
-        0, 2
+        "", 2
         -- </aggnested-3.3>
     })
 

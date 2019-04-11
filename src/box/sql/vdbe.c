@@ -2036,8 +2036,8 @@ case OP_Cast: {                  /* in1 */
  * registers P1 and P3.
  *
  * If both SQL_STOREP2 and SQL_KEEPNULL flags are set then the
- * content of r[P2] is only changed if the new value is NULL or 0 (false).
- * In other words, a prior r[P2] value will not be overwritten by 1 (true).
+ * content of r[P2] is only changed if the new value is NULL or false.
+ * In other words, a prior r[P2] value will not be overwritten by true.
  */
 /* Opcode: Ne P1 P2 P3 P4 P5
  * Synopsis: IF r[P3]!=r[P1]
@@ -2047,15 +2047,15 @@ case OP_Cast: {                  /* in1 */
  * additional information.
  *
  * If both SQL_STOREP2 and SQL_KEEPNULL flags are set then the
- * content of r[P2] is only changed if the new value is NULL or 1 (true).
- * In other words, a prior r[P2] value will not be overwritten by 0 (false).
+ * content of r[P2] is only changed if the new value is NULL or true.
+ * In other words, a prior r[P2] value will not be overwritten by false.
  */
 /* Opcode: Lt P1 P2 P3 P4 P5
  * Synopsis: IF r[P3]<r[P1]
  *
  * Compare the values in register P1 and P3.  If reg(P3)<reg(P1) then
  * jump to address P2.  Or if the SQL_STOREP2 flag is set in P5 store
- * the result of comparison (0 or 1 or NULL) into register P2.
+ * the result of comparison (false or true or NULL) into register P2.
  *
  * If the SQL_JUMPIFNULL bit of P5 is set and either reg(P1) or
  * reg(P3) is NULL then the take the jump.  If the SQL_JUMPIFNULL
@@ -2231,8 +2231,8 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 		iCompare = res;
 		res2 = res2!=0;  /* For this path res2 must be exactly 0 or 1 */
 		if ((pOp->p5 & SQL_KEEPNULL)!=0) {
-			/* The KEEPNULL flag prevents OP_Eq from overwriting a NULL with 1
-			 * and prevents OP_Ne from overwriting NULL with 0.  This flag
+			/* The KEEPNULL flag prevents OP_Eq from overwriting a NULL with true
+			 * and prevents OP_Ne from overwriting NULL with false.  This flag
 			 * is only used in contexts where either:
 			 *   (1) op==OP_Eq && (r[P2]==NULL || r[P2]==0)
 			 *   (2) op==OP_Ne && (r[P2]==NULL || r[P2]==1)
@@ -2248,8 +2248,7 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 			if ((pOp->opcode==OP_Eq)==res2) break;
 		}
 		memAboutToChange(p, pOut);
-		MemSetTypeFlag(pOut, MEM_Int);
-		pOut->u.i = res2;
+		mem_set_bool(pOut, res2);
 		REGISTER_TRACE(pOp->p2, pOut);
 	} else {
 		VdbeBranchTaken(res!=0, (pOp->p5 & SQL_NULLEQ)?2:3);

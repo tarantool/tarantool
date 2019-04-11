@@ -277,39 +277,39 @@ box.execute("SELECT true = false;")
 ---
 - metadata:
   - name: true = false
-    type: integer
+    type: boolean
   rows:
-  - [0]
+  - [false]
 ...
 box.execute("SELECT true = true;")
 ---
 - metadata:
   - name: true = true
-    type: integer
+    type: boolean
   rows:
-  - [1]
+  - [true]
 ...
 box.execute("SELECT true > false;")
 ---
 - metadata:
   - name: true > false
-    type: integer
+    type: boolean
   rows:
-  - [1]
+  - [true]
 ...
 box.execute("SELECT true < false;")
 ---
 - metadata:
   - name: true < false
-    type: integer
+    type: boolean
   rows:
-  - [0]
+  - [false]
 ...
 box.execute("SELECT null = true;")
 ---
 - metadata:
   - name: null = true
-    type: integer
+    type: boolean
   rows:
   - [null]
 ...
@@ -317,7 +317,7 @@ box.execute("SELECT unknown = true;")
 ---
 - metadata:
   - name: unknown = true
-    type: integer
+    type: boolean
   rows:
   - [null]
 ...

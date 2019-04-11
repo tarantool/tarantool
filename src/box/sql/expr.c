@@ -102,6 +102,7 @@ sql_expr_type(struct Expr *pExpr)
 	case TK_EQ:
 	case TK_LE:
 	case TK_NE:
+		return FIELD_TYPE_BOOLEAN;
 	case TK_NOT:
 	case TK_AND:
 	case TK_OR:
