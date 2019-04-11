@@ -26,6 +26,18 @@ box.stat.SELECT.total
 space:get('Impossible value')
 box.stat.ERROR.total
 
+-- select, get, and pairs
+space:get(1)
+box.stat.SELECT.total
+space:get(11)
+box.stat.SELECT.total
+space:select(5)
+box.stat.SELECT.total
+space:select(15)
+box.stat.SELECT.total
+for _ in space:pairs() do end
+box.stat.SELECT.total
+
 -- reset
 box.stat.reset()
 box.stat.INSERT.total
