@@ -265,11 +265,15 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
  * state, exact address. The whole passport is necessary for each
  * info related to a member: for anti-entropy records, for
  * dissemination events. The components can inherit that structure
- * and add more attributes. For example, anti-entropy can add a
- * mandatory payload; dissemination adds optional old UUID and
- * payload.
+ * and add more attributes. Or just encode new attributes after
+ * the passport. For example, anti-entropy can add a payload when
+ * it is up to date; dissemination adds a payload when it is up to
+ * date and TTL is > 0.
  */
 struct PACKED swim_passport_bin {
+	/** mp_encode_map(5) */
+	uint8_t m_header;
+
 	/** mp_encode_uint(SWIM_MEMBER_STATUS) */
 	uint8_t k_status;
 	/** mp_encode_uint(enum member_status) */
@@ -301,20 +305,9 @@ struct PACKED swim_passport_bin {
 	uint64_t v_incarnation;
 };
 
-/**
- * SWIM member MessagePack template. Represents one record in
- * anti-entropy section.
- */
-struct PACKED swim_member_bin {
-	/** mp_encode_map(5) */
-	uint8_t m_header;
-	/** Basic member info like status, address. */
-	struct swim_passport_bin passport;
-};
-
-/** Initialize antri-entropy record. */
+/** Initialize a member's binary passport. */
 void
-swim_member_bin_create(struct swim_member_bin *header);
+swim_passport_bin_create(struct swim_passport_bin *passport);
 
 /**
  * Since usually there are many members, it is faster to reset a
@@ -323,9 +316,10 @@ swim_member_bin_create(struct swim_member_bin *header);
  * fill() ... .
  */
 void
-swim_member_bin_fill(struct swim_member_bin *header,
-		     const struct sockaddr_in *addr, const struct tt_uuid *uuid,
-		     enum swim_member_status status, uint64_t incarnation);
+swim_passport_bin_fill(struct swim_passport_bin *passport,
+		       const struct sockaddr_in *addr,
+		       const struct tt_uuid *uuid,
+		       enum swim_member_status status, uint64_t incarnation);
 
 /** }}}                  Anti-entropy component                 */
 
@@ -344,30 +338,6 @@ struct PACKED swim_diss_header_bin {
 void
 swim_diss_header_bin_create(struct swim_diss_header_bin *header,
 			    uint16_t batch_size);
-
-/** SWIM event MessagePack template. */
-struct PACKED swim_event_bin {
-	/** mp_encode_map(5 or 6) */
-	uint8_t m_header;
-	/** Basic member info like status, address. */
-	struct swim_passport_bin passport;
-};
-
-/** Initialize dissemination record. */
-void
-swim_event_bin_create(struct swim_event_bin *header);
-
-/**
- * Since usually there are many evnets, it is faster to reset a
- * few fields in an existing template, then each time create a
- * new template. So the usage pattern is create(), fill(),
- * fill() ... .
- */
-void
-swim_event_bin_fill(struct swim_event_bin *header,
-		    enum swim_member_status status,
-		    const struct sockaddr_in *addr, const struct tt_uuid *uuid,
-		    uint64_t incarnation);
 
 /** }}}                 Dissemination component                 */
 

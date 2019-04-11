@@ -330,9 +330,10 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
 	header->v_anti_entropy = mp_bswap_u16(batch_size);
 }
 
-static inline void
+void
 swim_passport_bin_create(struct swim_passport_bin *passport)
 {
+	passport->m_header = 0x85;
 	passport->k_status = SWIM_MEMBER_STATUS;
 	passport->k_addr = SWIM_MEMBER_ADDRESS;
 	passport->m_addr = 0xce;
@@ -345,7 +346,7 @@ swim_passport_bin_create(struct swim_passport_bin *passport)
 	passport->m_incarnation = 0xcf;
 }
 
-static inline void
+void
 swim_passport_bin_fill(struct swim_passport_bin *passport,
 		       const struct sockaddr_in *addr,
 		       const struct tt_uuid *uuid,
@@ -359,45 +360,12 @@ swim_passport_bin_fill(struct swim_passport_bin *passport,
 }
 
 void
-swim_member_bin_fill(struct swim_member_bin *header,
-		     const struct sockaddr_in *addr, const struct tt_uuid *uuid,
-		     enum swim_member_status status, uint64_t incarnation)
-{
-	swim_passport_bin_fill(&header->passport, addr, uuid, status,
-			       incarnation);
-}
-
-void
-swim_member_bin_create(struct swim_member_bin *header)
-{
-	header->m_header = 0x85;
-	swim_passport_bin_create(&header->passport);
-}
-
-void
 swim_diss_header_bin_create(struct swim_diss_header_bin *header,
 			    uint16_t batch_size)
 {
 	header->k_header = SWIM_DISSEMINATION;
 	header->m_header = 0xdc;
 	header->v_header = mp_bswap_u16(batch_size);
-}
-
-void
-swim_event_bin_create(struct swim_event_bin *header)
-{
-	swim_passport_bin_create(&header->passport);
-}
-
-void
-swim_event_bin_fill(struct swim_event_bin *header,
-		    enum swim_member_status status,
-		    const struct sockaddr_in *addr, const struct tt_uuid *uuid,
-		    uint64_t incarnation)
-{
-	header->m_header = 0x85;
-	swim_passport_bin_fill(&header->passport, addr, uuid, status,
-			       incarnation);
 }
 
 void

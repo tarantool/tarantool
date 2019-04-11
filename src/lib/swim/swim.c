@@ -733,6 +733,27 @@ swim_new_round(struct swim *swim)
 }
 
 /**
+ * Encode one member into @a packet using @a passport structure.
+ * @retval 0 Success, encoded.
+ * @retval -1 Not enough memory in the packet.
+ */
+static int
+swim_encode_member(struct swim_packet *packet, struct swim_member *m,
+		   struct swim_passport_bin *passport)
+{
+	/* The headers should be initialized. */
+	assert(passport->k_status == SWIM_MEMBER_STATUS);
+	int size = sizeof(*passport);
+	char *pos = swim_packet_alloc(packet, size);
+	if (pos == NULL)
+		return -1;
+	swim_passport_bin_fill(passport, &m->addr, &m->uuid, m->status,
+			       m->incarnation);
+	memcpy(pos, passport, sizeof(*passport));
+	return 0;
+}
+
+/**
  * Encode anti-entropy header and random members data as many as
  * possible to the end of the packet.
  * @retval Number of key-values added to the packet's root map.
@@ -741,28 +762,21 @@ static int
 swim_encode_anti_entropy(struct swim *swim, struct swim_packet *packet)
 {
 	struct swim_anti_entropy_header_bin ae_header_bin;
-	struct swim_member_bin member_bin;
-	int size = sizeof(ae_header_bin);
-	char *header = swim_packet_reserve(packet, size);
+	struct swim_passport_bin passport_bin;
+	char *header = swim_packet_alloc(packet, sizeof(ae_header_bin));
 	if (header == NULL)
 		return 0;
-	char *pos = header;
-	swim_member_bin_create(&member_bin);
+	swim_passport_bin_create(&passport_bin);
 	struct mh_swim_table_t *t = swim->members;
 	int i = 0, member_count = mh_size(t);
 	int rnd = swim_scaled_rand(0, member_count - 1);
 	for (mh_int_t rc = mh_swim_table_random(t, rnd), end = mh_end(t);
 	     i < member_count; ++i) {
 		struct swim_member *m = *mh_swim_table_node(t, rc);
-		int new_size = size + sizeof(member_bin);
-		if (swim_packet_reserve(packet, new_size) == NULL)
+		if (swim_encode_member(packet, m, &passport_bin) != 0)
 			break;
-		swim_member_bin_fill(&member_bin, &m->addr, &m->uuid,
-				     m->status, m->incarnation);
-		memcpy(pos + size, &member_bin, sizeof(member_bin));
-		size = new_size;
 		/*
-		 * First random member could be choosen too close
+		 * First random member could be chosen too close
 		 * to the hash end. Here the cycle is wrapped, if
 		 * a packet still has free memory, but the
 		 * iterator has already reached the hash end.
@@ -771,9 +785,6 @@ swim_encode_anti_entropy(struct swim *swim, struct swim_packet *packet)
 		if (rc == end)
 			rc = mh_first(t);
 	}
-	if (i == 0)
-		return 0;
-	swim_packet_advance(packet, size);
 	swim_anti_entropy_header_bin_create(&ae_header_bin, i);
 	memcpy(header, &ae_header_bin, sizeof(ae_header_bin));
 	return 1;
@@ -822,32 +833,21 @@ static int
 swim_encode_dissemination(struct swim *swim, struct swim_packet *packet)
 {
 	struct swim_diss_header_bin diss_header_bin;
-	int size = sizeof(diss_header_bin);
-	char *header = swim_packet_reserve(packet, size);
+	struct swim_passport_bin passport_bin;
+	char *header = swim_packet_alloc(packet, sizeof(diss_header_bin));
 	if (header == NULL)
 		return 0;
+	swim_passport_bin_create(&passport_bin);
 	int i = 0;
-	char *pos = header + size;
 	struct swim_member *m;
-	struct swim_event_bin event_bin;
-	swim_event_bin_create(&event_bin);
 	rlist_foreach_entry(m, &swim->dissemination_queue,
 			    in_dissemination_queue) {
-		int new_size = size + sizeof(event_bin);
-		if (swim_packet_reserve(packet, new_size) == NULL)
+		if (swim_encode_member(packet, m, &passport_bin) != 0)
 			break;
-		swim_event_bin_fill(&event_bin, m->status, &m->addr, &m->uuid,
-				    m->incarnation);
-		memcpy(pos, &event_bin, sizeof(event_bin));
-		pos += sizeof(event_bin);
-		size = new_size;
 		++i;
 	}
-	if (i == 0)
-		return 0;
 	swim_diss_header_bin_create(&diss_header_bin, i);
 	memcpy(header, &diss_header_bin, sizeof(diss_header_bin));
-	swim_packet_advance(packet, size);
 	return 1;
 }
 
