@@ -343,15 +343,3 @@ s:insert{'ё'}
 s:select{}
 s:drop()
 
--- unicode_s2 collation does distinguish russian letters 'Е' and 'Ё'
-s = box.schema.space.create('t1')
-s:format({{name='s1', type='string', collation = 'unicode_ky_s1'}})
-idx = s:create_index('pk', {unique = true, type='tree', parts={{'s1', collation = 'unicode_ky_s1'}}})
-s:insert{'Ё'}
-s:insert{'е'}
--- the following calls should fail
-s:insert{'Е'}
-s:insert{'ё'}
--- return two: 'Ё' and 'е'
-s:select{}
-s:drop()
