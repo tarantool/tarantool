@@ -144,7 +144,7 @@ swim_probe_member(struct swim *swim, const char *uri);
  *        @a swim is used.
  *
  * @retval 0 Success. The broadcast packet was scheduled and at
- *         least one suitable intefrace was detected. But it does
+ *         least one suitable interface was detected. But it does
  *         not mean, that the packet will be sent successfully.
  * @retval -1 Error. OOM, or there was not found an interface,
  *         supporting IPv4.

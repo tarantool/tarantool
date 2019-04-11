@@ -35,7 +35,7 @@ struct ev_loop;
 
 /**
  * SWIM test_transport implements a 'fake' file descriptors table
- * in user space in orider to get the full control over UDP
+ * in user space in order to get the full control over UDP
  * sockets, used in core SWIM code. Fake fds are used to provide a
  * capability to set necessary loss level, delay, reorders.
  */
@@ -61,7 +61,7 @@ void
 swim_test_transport_unblock_fd(int fd);
 
 /**
- * Drop rate of incomming and outgoing packets. Note, that even if
+ * Drop rate of incoming and outgoing packets. Note, that even if
  * a packet is dropped on send, the node, owning @a fd, still
  * thinks, that the packet is sent. It is not a sender-visible
  * error.

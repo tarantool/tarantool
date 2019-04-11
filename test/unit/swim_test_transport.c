@@ -221,7 +221,7 @@ swim_transport_recv(struct swim_transport *transport, void *buffer, size_t size,
 		    struct sockaddr *addr, socklen_t *addr_size)
 {
 	/*
-	 * Pop a packet from a receving queue.
+	 * Pop a packet from a receiving queue.
 	 */
 	struct swim_fd *dst = &swim_fd[transport->fd - FAKE_FD_BASE];
 	assert(dst->is_opened);

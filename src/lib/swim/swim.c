@@ -228,7 +228,7 @@ struct swim_member {
 	struct sockaddr_in addr;
 	/**
 	 * A unique identifier of the member. Is used as a key in
-	 * the mebmers table.
+	 * the members table.
 	 */
 	struct tt_uuid uuid;
 	/**
@@ -884,7 +884,7 @@ swim_decrease_event_ttl(struct swim *swim)
 
 /**
  * Once per specified timeout trigger a next round step. In round
- * step a next memeber is taken from the round queue and a round
+ * step a next member is taken from the round queue and a round
  * message is sent to him. One member per step.
  */
 static void
@@ -1225,7 +1225,7 @@ static int
 swim_process_dissemination(struct swim *swim, const char **pos, const char *end)
 {
 	say_verbose("SWIM %d: process dissemination", swim_fd(swim));
-	const char *prefix = "invald dissemination message:";
+	const char *prefix = "invalid dissemination message:";
 	return swim_process_members(swim, prefix, pos, end);
 }
 
@@ -1237,7 +1237,7 @@ swim_process_quit(struct swim *swim, const char **pos, const char *end,
 		  const struct tt_uuid *uuid)
 {
 	say_verbose("SWIM %d: process quit", swim_fd(swim));
-	const char *prefix = "invald quit message:";
+	const char *prefix = "invalid quit message:";
 	uint32_t size;
 	if (swim_decode_map(pos, end, &size, prefix, "root") != 0)
 		return -1;
