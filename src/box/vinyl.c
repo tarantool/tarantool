@@ -2561,7 +2561,6 @@ vy_env_dump_complete_cb(struct vy_scheduler *scheduler,
 	size_t mem_used_after = lsregion_used(allocator);
 	assert(mem_used_after <= mem_used_before);
 	size_t mem_dumped = mem_used_before - mem_used_after;
-	say_info("dumped %zu bytes in %.1f sec", mem_dumped, dump_duration);
 	/*
 	 * In certain corner cases, vy_quota_release() may need
 	 * to trigger a new dump. Notify the regulator about dump
