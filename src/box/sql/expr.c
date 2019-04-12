@@ -4338,8 +4338,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			pParse->is_aborted = true;
 			return 0;
 		}
-		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_ABORT)
-			sqlMayAbort(pParse);
 		assert(!ExprHasProperty(pExpr, EP_IntValue));
 		if (pExpr->on_conflict_action == ON_CONFLICT_ACTION_IGNORE) {
 			sqlVdbeAddOp4(v, OP_Halt, SQL_OK,

@@ -808,7 +808,6 @@ vdbe_emit_ck_constraint(struct Parse *parser, struct Expr *expr,
 			ck_constraint_name));
 	int check_is_passed = sqlVdbeMakeLabel(v);
 	sqlExprIfTrue(parser, expr, check_is_passed, SQL_JUMPIFNULL);
-	sqlMayAbort(parser);
 	const char *fmt = tnt_errcode_desc(ER_CK_CONSTRAINT_FAILED);
 	const char *error_msg = tt_sprintf(fmt, ck_constraint_name, expr_str);
 	sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR, ON_CONFLICT_ACTION_ABORT,
@@ -858,8 +857,6 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 		int addr;
 		switch (on_conflict_nullable) {
 		case ON_CONFLICT_ACTION_ABORT:
-			sqlMayAbort(parse_context);
-			FALLTHROUGH;
 		case ON_CONFLICT_ACTION_ROLLBACK:
 		case ON_CONFLICT_ACTION_FAIL:
 			err_msg = sqlMPrintf(db, "%s.%s", def->name,

@@ -2423,7 +2423,6 @@ struct Parse {
 	u8 colNamesSet;		/* TRUE after OP_ColumnName has been issued to pVdbe */
 	u8 nTempReg;		/* Number of temporary registers in aTempReg[] */
 	u8 isMultiWrite;	/* True if statement may modify/insert multiple rows */
-	u8 mayAbort;		/* True if statement may throw an ABORT exception */
 	u8 hasCompound;		/* Need to invoke convertCompoundSelectToSubquery() */
 	u8 okConstFactor;	/* OK to factor out constants */
 	u8 disableLookaside;	/* Number of times lookaside has been disabled */
@@ -3741,7 +3740,6 @@ vdbe_emit_insertion_completion(struct Vdbe *v, struct space *space,
 
 void
 sql_set_multi_write(Parse *, bool);
-void sqlMayAbort(Parse *);
 void sqlHaltConstraint(Parse *, int, int, char *, i8, u8);
 
 Expr *sqlExprDup(sql *, Expr *, int);

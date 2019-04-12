@@ -248,9 +248,6 @@ void sqlVdbeMakeReady(Vdbe *, Parse *);
 int sqlVdbeFinalize(Vdbe *);
 void sqlVdbeResolveLabel(Vdbe *, int);
 int sqlVdbeCurrentAddr(Vdbe *);
-#ifdef SQL_DEBUG
-int sqlVdbeAssertMayAbort(Vdbe *, int);
-#endif
 void sqlVdbeResetStepResult(Vdbe *);
 void sqlVdbeRewind(Vdbe *);
 int sqlVdbeReset(Vdbe *);

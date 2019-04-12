@@ -290,8 +290,6 @@ fk_constraint_lookup_parent(struct Parse *parse_context, struct space *parent,
 				      ON_CONFLICT_ACTION_ABORT, 0, P4_STATIC,
 				      P5_ConstraintFK);
 	} else {
-		if (incr_count > 0 && !fk_def->is_deferred)
-			sqlMayAbort(parse_context);
 		sqlVdbeAddOp2(v, OP_FkCounter, fk_def->is_deferred,
 				  incr_count);
 	}
@@ -631,41 +629,8 @@ fk_constraint_emit_check(struct Parse *parser, struct space *space, int reg_old,
 						    fk->def, reg_new, -1);
 		}
 		if (reg_old != 0) {
-			enum fk_constraint_action action = fk_def->on_update;
 			fk_constraint_scan_children(parser, src, space->def,
 						    fk->def, reg_old, 1);
-			/*
-			 * If this is a deferred FK constraint, or
-			 * a CASCADE or SET NULL action applies,
-			 * then any foreign key violations caused
-			 * by removing the parent key will be
-			 * rectified by the action trigger. So do
-			 * not set the "may-abort" flag in this
-			 * case.
-			 *
-			 * Note 1: If the FK is declared "ON
-			 * UPDATE CASCADE", then the may-abort
-			 * flag will eventually be set on this
-			 * statement anyway (when this function is
-			 * called as part of processing the UPDATE
-			 * within the action trigger).
-			 *
-			 * Note 2: At first glance it may seem
-			 * like sql could simply omit all
-			 * OP_FkCounter related scans when either
-			 * CASCADE or SET NULL applies. The
-			 * trouble starts if the CASCADE or SET
-			 * NULL action trigger causes other
-			 * triggers or action rules attached to
-			 * the child table to fire. In these cases
-			 * the fk constraint counters might be set
-			 * incorrectly if any OP_FkCounter related
-			 * scans are omitted.
-			 */
-			if (!fk_def->is_deferred &&
-			    action != FKEY_ACTION_CASCADE &&
-			    action != FKEY_ACTION_SET_NULL)
-				sqlMayAbort(parser);
 		}
 		sqlSrcListDelete(db, src);
 	}

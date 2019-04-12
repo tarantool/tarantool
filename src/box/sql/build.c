@@ -154,8 +154,6 @@ sql_finish_coding(struct Parse *parse_context)
 	 * Begin by generating some termination code at the end
 	 * of the vdbe program
 	 */
-	assert(!parse_context->isMultiWrite ||
-	       sqlVdbeAssertMayAbort(v, parse_context->mayAbort));
 	int last_instruction = v->nOp;
 	if (parse_context->initiateTTrans)
 		sqlVdbeAddOp0(v, OP_TTransaction);
@@ -3181,29 +3179,6 @@ sql_set_multi_write(struct Parse *parse_context, bool is_set)
 }
 
 /*
- * The code generator calls this routine if is discovers that it is
- * possible to abort a statement prior to completion.  In order to
- * perform this abort without corrupting the database, we need to make
- * sure that the statement is protected by a statement transaction.
- *
- * Technically, we only need to set the mayAbort flag if the
- * isMultiWrite flag was previously set.  There is a time dependency
- * such that the abort must occur after the multiwrite.  This makes
- * some statements involving the REPLACE conflict resolution algorithm
- * go a little faster.  But taking advantage of this time dependency
- * makes it more difficult to prove that the code is correct (in
- * particular, it prevents us from writing an effective
- * implementation of sqlAssertMayAbort()) and so we have chosen
- * to take the safe route and skip the optimization.
- */
-void
-sqlMayAbort(Parse * pParse)
-{
-	Parse *pToplevel = sqlParseToplevel(pParse);
-	pToplevel->mayAbort = 1;
-}
-
-/*
  * Code an OP_Halt that causes the vdbe to return an SQL_CONSTRAINT
  * error. The onError parameter determines which (if any) of the statement
  * and/or current transaction is rolled back.
@@ -3219,9 +3194,6 @@ sqlHaltConstraint(Parse * pParse,	/* Parsing context */
 {
 	Vdbe *v = sqlGetVdbe(pParse);
 	assert((errCode & 0xff) == SQL_CONSTRAINT);
-	if (onError == ON_CONFLICT_ACTION_ABORT) {
-		sqlMayAbort(pParse);
-	}
 	sqlVdbeAddOp4(v, OP_Halt, errCode, onError, 0, p4, p4type);
 	sqlVdbeChangeP5(v, p5Errmsg);
 }
