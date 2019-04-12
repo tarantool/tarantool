@@ -33,7 +33,7 @@ test_run:grep_log('default', 'on_shutdown 4', nil, {noreset=true})
 box.space.shutdown:select{}
 box.space.shutdown:drop()
 
--- Check that os.exit invokes triggers
+-- Check that os.exit invokes on_shutdown triggers
 fiber = require("fiber")
 test_run:cmd("create server test with script='box/proxy.lua'")
 test_run:cmd("start server test")
@@ -47,18 +47,19 @@ _ = box.ctl.on_shutdown(function() print("on_shutdown 5") end)
 -- Check that we don't hang infinitely after os.exit()
 -- even if the following code doesn't yield.
 fiber = require("fiber")
-_ = fiber.create(function() fiber.sleep(0.05) os.exit() while true do end end)
 test_run:cmd("switch default")
+-- eval the command on the 'test' instance while we're on default
+-- instance to make sure test_run doesn't lose connection to the
+-- shutting down instance.
+test_run:eval("test", "_ = fiber.new(function() os.exit() while true do end end)")
 fiber.sleep(0.1)
 -- The server should be already stopped by os.exit(),
 -- but start doesn't work without a prior call to stop.
 test_run:cmd("stop server test")
 test_run:cmd("start server test")
-test_run:cmd("switch test")
-test_run:grep_log('test', 'on_shutdown 5', nil, {noreset=true})
+test_run:wait_log('test', 'on_shutdown 5', nil, 30, {noreset=true})
 -- make sure we exited because of os.exit(), not a signal.
 test_run:grep_log('test', 'signal', nil, {noreset=true})
-test_run:cmd("switch default")
 test_run:cmd("stop server test")
 test_run:cmd("cleanup server test")
 test_run:cmd("delete server test")

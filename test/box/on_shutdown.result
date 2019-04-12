@@ -76,7 +76,7 @@ box.space.shutdown:select{}
 box.space.shutdown:drop()
 ---
 ...
--- Check that os.exit invokes triggers
+-- Check that os.exit invokes on_shutdown triggers
 fiber = require("fiber")
 ---
 ...
@@ -116,12 +116,16 @@ _ = box.ctl.on_shutdown(function() print("on_shutdown 5") end)
 fiber = require("fiber")
 ---
 ...
-_ = fiber.create(function() fiber.sleep(0.05) os.exit() while true do end end)
----
-...
 test_run:cmd("switch default")
 ---
 - true
+...
+-- eval the command on the 'test' instance while we're on default
+-- instance to make sure test_run doesn't lose connection to the
+-- shutting down instance.
+test_run:eval("test", "_ = fiber.new(function() os.exit() while true do end end)")
+---
+- []
 ...
 fiber.sleep(0.1)
 ---
@@ -136,11 +140,7 @@ test_run:cmd("start server test")
 ---
 - true
 ...
-test_run:cmd("switch test")
----
-- true
-...
-test_run:grep_log('test', 'on_shutdown 5', nil, {noreset=true})
+test_run:wait_log('test', 'on_shutdown 5', nil, 30, {noreset=true})
 ---
 - on_shutdown 5
 ...
@@ -148,10 +148,6 @@ test_run:grep_log('test', 'on_shutdown 5', nil, {noreset=true})
 test_run:grep_log('test', 'signal', nil, {noreset=true})
 ---
 - null
-...
-test_run:cmd("switch default")
----
-- true
 ...
 test_run:cmd("stop server test")
 ---
