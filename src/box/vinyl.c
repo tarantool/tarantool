@@ -380,6 +380,7 @@ vinyl_index_stat(struct index *index, struct info_handler *h)
 
 	info_append_int(h, "lookup", stat->lookup);
 	vy_info_append_stmt_counter(h, "get", &stat->get);
+	vy_info_append_stmt_counter(h, "skip", &stat->skip);
 	vy_info_append_stmt_counter(h, "put", &stat->put);
 
 	info_table_begin(h, "latency");
@@ -482,6 +483,7 @@ vinyl_index_reset_stat(struct index *index)
 	stat->lookup = 0;
 	latency_reset(&stat->latency);
 	vy_stmt_counter_reset(&stat->get);
+	vy_stmt_counter_reset(&stat->skip);
 	vy_stmt_counter_reset(&stat->put);
 	memset(&stat->upsert, 0, sizeof(stat->upsert));
 
@@ -1316,6 +1318,8 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 {
 	assert(lsm->index_id > 0);
 
+	lsm->pk->stat.lookup++;
+
 	if (vy_point_lookup(lsm->pk, tx, rv, tuple, result) != 0)
 		return -1;
 
@@ -1329,7 +1333,10 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		 * propagated to the secondary index yet. In this
 		 * case silently skip this tuple.
 		 */
+		vy_stmt_counter_acct_tuple(&lsm->stat.skip, tuple);
 		if (*result != NULL) {
+			vy_stmt_counter_acct_tuple(&lsm->pk->stat.skip,
+						   *result);
 			tuple_unref(*result);
 			*result = NULL;
 		}
@@ -1359,6 +1366,7 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	if ((*rv)->vlsn == INT64_MAX)
 		vy_cache_add(&lsm->pk->cache, *result, NULL, tuple, ITER_EQ);
 
+	vy_stmt_counter_acct_tuple(&lsm->pk->stat.get, *result);
 	return 0;
 }
 
@@ -1389,6 +1397,8 @@ vy_get(struct vy_lsm *lsm, struct vy_tx *tx,
 
 	int rc;
 	struct tuple *tuple;
+
+	lsm->stat.lookup++;
 
 	if (vy_stmt_is_full_key(key, lsm->cmp_def)) {
 		/*
@@ -1440,6 +1450,8 @@ out:
 				     vy_lsm_name(lsm), tuple_str(key),
 				     tuple_str(*result), latency);
 	}
+	if (*result != NULL)
+		vy_stmt_counter_acct_tuple(&lsm->stat.get, *result);
 	return 0;
 }
 
@@ -3742,7 +3754,8 @@ vinyl_iterator_account_read(struct vinyl_iterator *it, double start_time,
 				     iterator_type_strs[type],
 				     tuple_str(result), latency);
 	}
-
+	if (result != NULL)
+		vy_stmt_counter_acct_tuple(&lsm->stat.get, result);
 }
 
 static int
@@ -3888,6 +3901,7 @@ vinyl_index_create_iterator(struct index *base, enum iterator_type type,
 	}
 	it->tx = tx;
 
+	lsm->stat.lookup++;
 	vy_read_iterator_open(&it->iterator, lsm, tx, type, it->key,
 			      (const struct vy_read_view **)&tx->read_view);
 	return (struct iterator *)it;

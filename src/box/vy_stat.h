@@ -117,6 +117,8 @@ struct vy_lsm_stat {
 	int64_t lookup;
 	/** Number of statements read from this LSM tree. */
 	struct vy_stmt_counter get;
+	/** Number of statements skipped on read. */
+	struct vy_stmt_counter skip;
 	/** Number of statements written to this LSM tree. */
 	struct vy_stmt_counter put;
 	/** Read latency. */
