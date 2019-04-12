@@ -204,8 +204,8 @@ end;
 test_run:cmd("setopt delimiter ''");
 
 -- Wait until DDL starts scanning the altered space.
-lookup = i1:stat().lookup
-wait_cond = function() return i1:stat().lookup > lookup end
+lookup = i1:stat().disk.iterator.lookup
+wait_cond = function() return i1:stat().disk.iterator.lookup > lookup end
 c1 = async_replace(s1, {1}, wait_cond)
 c2 = async_replace(s2, {1}, wait_cond)
 
@@ -222,8 +222,8 @@ s1:format()
 s1:format{}
 
 -- Wait until DDL starts scanning the altered space.
-lookup = i1:stat().lookup
-wait_cond = function() return i1:stat().lookup > lookup end
+lookup = i1:stat().disk.iterator.lookup
+wait_cond = function() return i1:stat().disk.iterator.lookup > lookup end
 c1 = async_replace(s1, {2}, wait_cond)
 c2 = async_replace(s2, {2}, wait_cond)
 
