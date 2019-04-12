@@ -203,8 +203,6 @@ vy_point_lookup(struct vy_lsm *lsm, struct vy_tx *tx,
 	*ret = NULL;
 	int rc = 0;
 
-	lsm->stat.lookup++;
-
 	/* History list */
 	struct vy_history history, mem_history, disk_history;
 	vy_history_create(&history, &lsm->env->history_node_pool);
@@ -293,9 +291,6 @@ done:
 
 	if (rc != 0)
 		return -1;
-
-	if (*ret != NULL)
-		vy_stmt_counter_acct_tuple(&lsm->stat.get, *ret);
 
 	return 0;
 }

@@ -297,9 +297,9 @@ ret = nil
 function do_read() ret = sk:select({2}, {iterator = 'GE'}) end
 errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", true)
 _ = fiber.create(do_read)
-test_run:wait_cond(function() return sk:stat().get.rows > 0 end, 60)
-pk:stat().get.rows -- 0
-sk:stat().get.rows -- 1
+test_run:wait_cond(function() return sk:stat().disk.iterator.get.rows > 0 end, 60)
+pk:stat().disk.iterator.get.rows -- 0
+sk:stat().disk.iterator.get.rows -- 1
 s:replace{2, 2}
 errinj.set("ERRINJ_VY_DELAY_PK_LOOKUP", false)
 test_run:wait_cond(function() return pk:stat().get.rows > 0 end, 60)

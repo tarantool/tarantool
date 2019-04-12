@@ -855,11 +855,7 @@ vy_read_iterator_next(struct vy_read_iterator *itr, struct tuple **result)
 {
 	assert(itr->tx == NULL || itr->tx->state == VINYL_TX_READY);
 
-	struct vy_lsm *lsm = itr->lsm;
 	struct tuple *stmt;
-
-	if (itr->last_stmt == NULL)
-		lsm->stat.lookup++; /* first iteration */
 next_key:
 	if (vy_read_iterator_advance(itr) != 0)
 		return -1;
@@ -890,9 +886,6 @@ next_key:
 	assert(stmt == NULL ||
 	       vy_stmt_type(stmt) == IPROTO_INSERT ||
 	       vy_stmt_type(stmt) == IPROTO_REPLACE);
-
-	if (stmt != NULL)
-		vy_stmt_counter_acct_tuple(&lsm->stat.get, stmt);
 
 	*result = stmt;
 	return 0;
