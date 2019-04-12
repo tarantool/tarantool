@@ -651,8 +651,18 @@ iproto_connection_input_buffer(struct iproto_connection *con)
 			to_read = mp_decode_uint(&pos);
 	}
 
-	if (ibuf_unused(old_ibuf) >= to_read)
+	if (ibuf_unused(old_ibuf) >= to_read) {
+		/*
+		 * If all read data is discarded, move read
+		 * position to the start of the buffer, to
+		 * reduce chances of unaccounted growth of the
+		 * buffer as read position is shifted to the
+		 * end of the buffer.
+		 */
+		if (ibuf_used(old_ibuf) == 0)
+			ibuf_reset(old_ibuf);
 		return old_ibuf;
+	}
 
 	/*
 	 * Reuse the buffer if all requests are processed
