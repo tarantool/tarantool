@@ -113,6 +113,12 @@ vy_regulator_trigger_dump(struct vy_regulator *regulator)
 	max_write_rate = MIN(max_write_rate, regulator->dump_bandwidth);
 	vy_quota_set_rate_limit(quota, VY_QUOTA_RESOURCE_MEMORY,
 				max_write_rate);
+
+	say_info("dumping %zu bytes, expected rate %.1f MB/s, "
+		 "ETA %.1f s, recent write rate %.1f MB/s",
+		 quota->used, (double)regulator->dump_bandwidth / 1024 / 1024,
+		 (double)quota->used / (regulator->dump_bandwidth + 1),
+		 (double)regulator->write_rate / 1024 / 1024);
 }
 
 static void
@@ -265,6 +271,10 @@ vy_regulator_dump_complete(struct vy_regulator *regulator,
 	 */
 	vy_quota_set_rate_limit(regulator->quota, VY_QUOTA_RESOURCE_MEMORY,
 				regulator->dump_bandwidth);
+
+	say_info("dumped %zu bytes in %.1f s, rate %.1f MB/s",
+		 mem_dumped, dump_duration,
+		 mem_dumped / dump_duration / 1024 / 1024);
 }
 
 void
