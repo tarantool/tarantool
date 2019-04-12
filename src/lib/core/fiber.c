@@ -959,7 +959,6 @@ fiber_new_ex(const char *name, const struct fiber_attr *fiber_attr,
 			mempool_free(&cord->fiber_mempool, fiber);
 			return NULL;
 		}
-		memset(&fiber->ctx, 0, sizeof(fiber->ctx));
 		coro_create(&fiber->ctx, fiber_loop, NULL,
 			    fiber->stack, fiber->stack_size);
 
