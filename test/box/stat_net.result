@@ -16,6 +16,18 @@ box.stat.net.RECEIVED -- zero
 - total: 0
   rps: 0
 ...
+box.stat.net.CONNECTIONS -- zero
+---
+- current: 0
+  rps: 0
+  total: 0
+...
+box.stat.net.REQUESTS -- zero
+---
+- current: 0
+  rps: 0
+  total: 0
+...
 space = box.schema.space.create('tweedledum')
 ---
 ...
@@ -23,6 +35,18 @@ box.schema.user.grant('guest', 'read', 'space', 'tweedledum')
 ---
 ...
 index = space:create_index('primary', { type = 'hash' })
+---
+...
+ch = require('fiber').channel(1)
+---
+...
+function tweedledee() ch:get() end
+---
+...
+box.schema.func.create('tweedledee')
+---
+...
+box.schema.user.grant('guest', 'execute', 'function', 'tweedledee')
 ---
 ...
 remote = require 'net.box'
@@ -55,12 +79,22 @@ box.stat.net.RECEIVED.total > 0
 ---
 - true
 ...
-box.stat.net.CONNECTIONS.current == 4
+box.stat.net.CONNECTIONS.total
 ---
-- true
+- 4
 ...
--- box.stat.net.EVENTS.total > 0
--- box.stat.net.LOCKS.total > 0
+box.stat.net.REQUESTS.total
+---
+- 13
+...
+box.stat.net.CONNECTIONS.current
+---
+- 4
+...
+box.stat.net.REQUESTS.current
+---
+- 0
+...
 WAIT_COND_TIMEOUT = 10
 ---
 ...
@@ -81,6 +115,44 @@ test_run:wait_cond(function() return box.stat.net.CONNECTIONS.current == 1 end, 
 ---
 - true
 ...
+future1 = cn:call('tweedledee', {}, {is_async = true})
+---
+...
+test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 1 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+future2 = cn:call('tweedledee', {}, {is_async = true})
+---
+...
+test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 2 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+ch:put(true)
+---
+- true
+...
+ch:put(true)
+---
+- true
+...
+future1:wait_result()
+---
+- []
+...
+future2:wait_result()
+---
+- []
+...
+test_run:wait_cond(function() return box.stat.net.REQUESTS.current == 0 end, WAIT_COND_TIMEOUT)
+---
+- true
+...
+box.stat.net.REQUESTS.total
+---
+- 15
+...
 -- reset
 box.stat.reset()
 ---
@@ -93,9 +165,24 @@ box.stat.net.RECEIVED.total
 ---
 - 0
 ...
+box.stat.net.CONNECTIONS.total
+---
+- 0
+...
+box.stat.net.REQUESTS.total
+---
+- 0
+...
 box.stat.net.CONNECTIONS.current
 ---
 - 1
+...
+box.stat.net.REQUESTS.current
+---
+- 0
+...
+box.schema.func.drop('tweedledee')
+---
 ...
 space:drop() -- tweedledum
 ---

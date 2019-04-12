@@ -69,6 +69,12 @@ size_t
 iproto_connection_count(void);
 
 /**
+ * Return the number of iproto requests in flight.
+ */
+size_t
+iproto_request_count(void);
+
+/**
  * Reset network statistics.
  */
 void

@@ -147,14 +147,20 @@ lbox_stat_reset(struct lua_State *L)
 static int
 lbox_stat_net_index(struct lua_State *L)
 {
-	luaL_checkstring(L, -1);
-	if (strcmp("CONNECTIONS", lua_tostring(L, -1)) == 0) {
-		lua_newtable(L);
+	const char *key = luaL_checkstring(L, -1);
+	if (rmean_foreach(rmean_net, seek_stat_item, L) == 0)
+		return 0;
+
+	if (strcmp(key, "CONNECTIONS") == 0) {
+		lua_pushstring(L, "current");
 		lua_pushnumber(L, iproto_connection_count());
-		lua_setfield(L, -2, "current");
-		return 1;
+		lua_rawset(L, -3);
+	} else if (strcmp(key, "REQUESTS") == 0) {
+		lua_pushstring(L, "current");
+		lua_pushnumber(L, iproto_request_count());
+		lua_rawset(L, -3);
 	}
-	return rmean_foreach(rmean_net, seek_stat_item, L);
+	return 1;
 }
 
 /**
@@ -179,10 +185,19 @@ lbox_stat_net_call(struct lua_State *L)
 	lua_newtable(L);
 	rmean_foreach(rmean_net, set_stat_item, L);
 
-	lua_newtable(L); /* box.stat.net().CONNECTIONS */
+	lua_pushstring(L, "CONNECTIONS");
+	lua_rawget(L, -2);
+	lua_pushstring(L, "current");
 	lua_pushnumber(L, iproto_connection_count());
-	lua_setfield(L, -2, "current");
-	lua_setfield(L, -2, "CONNECTIONS");
+	lua_rawset(L, -3);
+	lua_pop(L, 1);
+
+	lua_pushstring(L, "REQUESTS");
+	lua_rawget(L, -2);
+	lua_pushstring(L, "current");
+	lua_pushnumber(L, iproto_request_count());
+	lua_rawset(L, -3);
+	lua_pop(L, 1);
 
 	return 1;
 }

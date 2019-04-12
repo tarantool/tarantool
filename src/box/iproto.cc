@@ -265,10 +265,17 @@ struct rmean *rmean_net;
 enum rmean_net_name {
 	IPROTO_SENT,
 	IPROTO_RECEIVED,
+	IPROTO_CONNECTIONS,
+	IPROTO_REQUESTS,
 	IPROTO_LAST,
 };
 
-const char *rmean_net_strings[IPROTO_LAST] = { "SENT", "RECEIVED" };
+const char *rmean_net_strings[IPROTO_LAST] = {
+	"SENT",
+	"RECEIVED",
+	"CONNECTIONS",
+	"REQUESTS",
+};
 
 static void
 tx_process_destroy(struct cmsg *m);
@@ -503,6 +510,7 @@ iproto_msg_new(struct iproto_connection *con)
 		return NULL;
 	}
 	msg->connection = con;
+	rmean_collect(rmean_net, IPROTO_REQUESTS, 1);
 	return msg;
 }
 
@@ -1035,6 +1043,7 @@ iproto_connection_new(int fd)
 	con->is_destroy_sent = false;
 	con->tx.is_push_pending = false;
 	con->tx.is_push_sent = false;
+	rmean_collect(rmean_net, IPROTO_CONNECTIONS, 1);
 	return con;
 }
 
@@ -2083,6 +2092,12 @@ size_t
 iproto_connection_count(void)
 {
 	return mempool_count(&iproto_connection_pool);
+}
+
+size_t
+iproto_request_count(void)
+{
+	return mempool_count(&iproto_msg_pool);
 }
 
 void
