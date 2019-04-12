@@ -383,11 +383,13 @@ box.execute("SELECT true IN (1, 'abc', false)")
 ...
 box.execute("SELECT 1 LIMIT true;")
 ---
-- error: Only positive integers are allowed in the LIMIT clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
 ...
 box.execute("SELECT 1 LIMIT 1 OFFSET true;")
 ---
-- error: Only positive integers are allowed in the OFFSET clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    OFFSET clause'
 ...
 box.execute("SELECT 'abc' || true;")
 ---
@@ -551,7 +553,8 @@ box.execute("SELECT b FROM t GROUP BY b LIMIT 1;")
 ...
 box.execute("SELECT b FROM t LIMIT true;")
 ---
-- error: Only positive integers are allowed in the LIMIT clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
 ...
 -- Most of aggregates don't accept boolean arguments.
 --

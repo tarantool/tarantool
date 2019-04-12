@@ -990,7 +990,7 @@ test:do_catchsql_test(
         SELECT DISTINCT log FROM t1 ORDER BY log LIMIT -1
     ]], {
         -- <select4-10.4.1>
-    1,"Only positive integers are allowed in the LIMIT clause"
+    1,"Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </select4-10.4.1>
     })
 test:do_execsql_test(
@@ -1009,7 +1009,7 @@ test:do_catchsql_test(
         SELECT DISTINCT log FROM t1 ORDER BY log LIMIT -1 OFFSET 2
     ]], {
         -- <select4-10.5.1>
-        1,"Only positive integers are allowed in the LIMIT clause"
+        1,"Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </select4-10.5.1>
     })
 test:do_execsql_test(
@@ -1402,7 +1402,7 @@ test:do_catchsql_test(
         SELECT (VALUES(1),(2),(3),(4))
     ]], {
         -- <select4-14.10>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </select4-14.10>
     })
 
@@ -1412,7 +1412,7 @@ test:do_catchsql_test(
         SELECT (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4)
     ]], {
         -- <select4-14.11>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </select4-14.11>
     })
 

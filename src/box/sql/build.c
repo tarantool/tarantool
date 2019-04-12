@@ -3179,26 +3179,6 @@ sql_set_multi_write(struct Parse *parse_context, bool is_set)
 }
 
 /*
- * Code an OP_Halt that causes the vdbe to return an SQL_CONSTRAINT
- * error. The onError parameter determines which (if any) of the statement
- * and/or current transaction is rolled back.
- */
-void
-sqlHaltConstraint(Parse * pParse,	/* Parsing context */
-		      int errCode,	/* extended error code */
-		      int onError,	/* Constraint type */
-		      char *p4,	/* Error message */
-		      i8 p4type,	/* P4_STATIC or P4_TRANSIENT */
-		      u8 p5Errmsg	/* P5_ErrMsg type */
-    )
-{
-	Vdbe *v = sqlGetVdbe(pParse);
-	assert((errCode & 0xff) == SQL_CONSTRAINT);
-	sqlVdbeAddOp4(v, OP_Halt, errCode, onError, 0, p4, p4type);
-	sqlVdbeChangeP5(v, p5Errmsg);
-}
-
-/*
  * This routine is invoked once per CTE by the parser while parsing a
  * WITH clause.
  */
@@ -3303,9 +3283,8 @@ vdbe_emit_halt_with_presence_test(struct Parse *parser, int space_id,
 	if (no_error) {
 		sqlVdbeAddOp0(v, OP_Halt);
 	} else {
-		sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,0, 0, error,
-				  P4_DYNAMIC);
-		sqlVdbeChangeP5(v, tarantool_error_code);
+		sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR, 0,
+			      tarantool_error_code, error, P4_DYNAMIC);
 	}
 	sqlVdbeAddOp1(v, OP_Close, cursor);
 	return 0;

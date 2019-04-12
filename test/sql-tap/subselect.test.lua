@@ -350,7 +350,7 @@ test:do_catchsql_test(
         SELECT (SELECT a FROM t5);
     ]], {
     -- <subselect-5.1>
-    1, "SQL error: Expression subquery returned more than 1 row"
+    1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
     -- </subselect-5.1>
 })
 
@@ -360,7 +360,7 @@ test:do_catchsql_test(
         SELECT b FROM t5 WHERE a = (SELECT a FROM t5 WHERE b=6);
     ]], {
     -- <subselect-5.2>
-    1, "SQL error: Expression subquery returned more than 1 row"
+    1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
     -- </subselect-5.2>
 })
 
@@ -380,7 +380,7 @@ test:do_catchsql_test(
         SELECT b FROM t1 WHERE a = (SELECT a FROM t1 WHERE b=6 LIMIT (SELECT b FROM t1 WHERE a =1));
     ]], {
     -- <subselect-5.2>
-    1, "SQL error: Expression subquery could be limited only with 1"
+    1, "Failed to execute SQL statement: Expression subquery could be limited only with 1"
     -- </subselect-5.2>
 })
 

@@ -125,7 +125,7 @@ test:do_catchsql_test(
         SELECT (SELECT 1 FROM t1 WHERE a=1 UNION ALL SELECT 2 FROM t1 WHERE b=0)
     ]], {
         -- <tkt1473-2.2>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-2.2>
     })
 
@@ -145,7 +145,7 @@ test:do_catchsql_test(
         SELECT (SELECT 1 FROM t1 WHERE a=1 UNION ALL SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-2.4>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-2.4>
     })
 
@@ -155,7 +155,7 @@ test:do_catchsql_test(
         SELECT (SELECT 1 FROM t1 WHERE a=1 UNION SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-2.5>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-2.5>
     })
 
@@ -165,7 +165,7 @@ test:do_catchsql_test(
         SELECT (SELECT 1 FROM t1 WHERE a=0 UNION ALL SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-2.6>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-2.6>
     })
 
@@ -206,7 +206,7 @@ test:do_catchsql_test(
           (SELECT 1 FROM t1 WHERE a=1 UNION ALL SELECT 2 FROM t1 WHERE b=0)
     ]], {
         -- <tkt1473-3.2>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-3.2>
     })
 
@@ -228,7 +228,7 @@ test:do_catchsql_test(
           (SELECT 1 FROM t1 WHERE a=1 UNION ALL SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-3.4>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-3.4>
     })
 
@@ -239,7 +239,7 @@ test:do_catchsql_test(
           (SELECT 1 FROM t1 WHERE a=1 UNION SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-3.5>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-3.5>
     })
 
@@ -250,7 +250,7 @@ test:do_catchsql_test(
           (SELECT 1 FROM t1 WHERE a=0 UNION ALL SELECT 2 FROM t1 WHERE b=4)
     ]], {
         -- <tkt1473-3.6>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-3.6>
     })
 
@@ -359,7 +359,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-4.3>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-4.3>
     })
 
@@ -389,7 +389,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-4.4>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-4.4>
     })
 
@@ -419,7 +419,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-4.5>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-4.5>
     })
 
@@ -449,7 +449,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-4.6>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-4.6>
     })
 
@@ -509,7 +509,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.3>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-5.3>
     })
 
@@ -539,7 +539,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.4>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-5.4>
     })
 
@@ -569,7 +569,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.5>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-5.5>
     })
 
@@ -599,7 +599,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-5.6>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-5.6>
     })
 
@@ -659,7 +659,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-6.3>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-6.3>
     })
 
@@ -689,7 +689,7 @@ test:do_catchsql_test(
         )
     ]], {
         -- <tkt1473-6.4>
-        1, "SQL error: Expression subquery returned more than 1 row"
+        1, "Failed to execute SQL statement: Expression subquery returned more than 1 row"
         -- </tkt1473-6.4>
     })
 

@@ -4344,9 +4344,12 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					  ON_CONFLICT_ACTION_IGNORE, 0,
 					  pExpr->u.zToken, 0);
 		} else {
-			sqlHaltConstraint(pParse, SQL_CONSTRAINT_TRIGGER,
-					      pExpr->on_conflict_action,
-					      pExpr->u.zToken, 0, 0);
+			const char *err =
+				tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
+					   pExpr->u.zToken);
+			sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,
+				      pExpr->on_conflict_action, ER_SQL_EXECUTE,
+				      err, 0);
 		}
 		break;
 	}

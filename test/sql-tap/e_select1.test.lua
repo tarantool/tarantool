@@ -2170,7 +2170,7 @@ for _, val in ipairs({
         "e_select-9.2."..tn,
         select,
         {
-            1, "Only positive integers are allowed in the LIMIT clause"})
+            1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"})
 end
 
 -- EVIDENCE-OF: R-03014-26414 If the LIMIT expression evaluates to a
@@ -2224,7 +2224,7 @@ for _, val in ipairs({
     test:do_catchsql_test(
         "e_select-9.7."..tn,
         select, {
-            1, "Only positive integers are allowed in the OFFSET clause"
+            1, "Failed to execute SQL statement: Only positive integers are allowed in the OFFSET clause"
         })
 
 end

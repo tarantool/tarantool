@@ -84,7 +84,7 @@ test:do_catchsql_test(
         SELECT x FROM t1 ORDER BY x+1 LIMIT 5 OFFSET -2
     ]], {
         -- <limit-1.2.13>
-        1 ,"Only positive integers are allowed in the OFFSET clause"
+        1 ,"Failed to execute SQL statement: Only positive integers are allowed in the OFFSET clause"
         -- </limit-1.2.13>
     })
 
@@ -94,7 +94,7 @@ test:do_catchsql_test(
         SELECT x FROM t1 ORDER BY x+1 LIMIT 2, -5
     ]], {
         -- <limit-1.2.4>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-1.2.4>
     })
 
@@ -115,7 +115,7 @@ test:do_catchsql_test(
         SELECT x FROM t1 ORDER BY x+1 LIMIT -2, 5
     ]], {
         -- <limit-1.2.6>
-        1, "Only positive integers are allowed in the OFFSET clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the OFFSET clause"
         -- </limit-1.2.6>
     })
 
@@ -135,7 +135,7 @@ test:do_catchsql_test(
         SELECT x FROM t1 ORDER BY x+1 LIMIT -2, -5
     ]], {
         -- <limit-1.2.8>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-1.2.8>
     })
 
@@ -384,7 +384,7 @@ test:do_catchsql_test(
         SELECT * FROM t6 LIMIT -1 OFFSET -1;
     ]], {
         -- <limit-6.2>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.2>
     })
 
@@ -394,7 +394,7 @@ test:do_catchsql_test(
         SELECT * FROM t6 LIMIT 2 OFFSET -123;
     ]], {
         -- <limit-6.3>
-        1, "Only positive integers are allowed in the OFFSET clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the OFFSET clause"
         -- </limit-6.3>
     })
 
@@ -414,7 +414,7 @@ test:do_catchsql_test(
         SELECT * FROM t6 LIMIT -432 OFFSET 2;
     ]], {
         -- <limit-6.4>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.4>
     })
 
@@ -434,7 +434,7 @@ test:do_catchsql_test(
         SELECT * FROM t6 LIMIT -1
     ]], {
         -- <limit-6.5>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.5>
     })
 
@@ -454,7 +454,7 @@ test:do_catchsql_test(
         SELECT * FROM t6 LIMIT -1 OFFSET 1
     ]], {
         -- <limit-6.6>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-6.6>
     })
 
@@ -734,7 +734,7 @@ test:do_test(
         return test:catchsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
     end, {
         -- <limit-10.4>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-10.4>
     })
 
@@ -745,7 +745,7 @@ test:do_test(
         return test:catchsql("SELECT x FROM t1 WHERE x<10 LIMIT "..limit)
     end, {
         -- <limit-10.5>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-10.5>
     })
 
@@ -1320,7 +1320,7 @@ test:do_catchsql_test(
         SELECT 123 LIMIT -1 OFFSET 0
     ]], {
         -- <limit-14.6.1>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-14.6.1>
     })
 
@@ -1340,7 +1340,7 @@ test:do_catchsql_test(
         SELECT 123 LIMIT -1 OFFSET 1
     ]], {
         -- <limit-14.7.1>
-        1, "Only positive integers are allowed in the LIMIT clause"
+        1, "Failed to execute SQL statement: Only positive integers are allowed in the LIMIT clause"
         -- </limit-14.7.1>
     })
 

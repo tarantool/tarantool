@@ -1055,29 +1055,14 @@ case OP_Yield: {            /* in1, jump */
 	break;
 }
 
-/* Opcode:  HaltIfNull  P1 P2 P3 P4 P5
- * Synopsis: if r[P3]=null halt
- *
- * Check the value in register P3.  If it is NULL then Halt using
- * parameter P1, P2, and P4 as if this were a Halt instruction.  If the
- * value in register P3 is not NULL, then this routine is a no-op.
- * The P5 parameter should be 1.
- */
-case OP_HaltIfNull: {      /* in3 */
-	pIn3 = &aMem[pOp->p3];
-	if ((pIn3->flags & MEM_Null)==0) break;
-	/* Fall through into OP_Halt */
-	FALLTHROUGH;
-}
-
-/* Opcode:  Halt P1 P2 * P4 P5
+/* Opcode:  Halt P1 P2 P3 P4 *
  *
  * Exit immediately.  All open cursors, etc are closed
  * automatically.
  *
  * P1 is the result code returned by sql_exec(),
  * sql_reset(), or sql_finalize().  For a normal halt,
- * this should be SQL_OK (0).
+ * this should be 0.
  * For errors, it can be some other value.  If P1!=0 then P2 will
  * determine whether or not to rollback the current transaction.
  * Do not rollback if P2==ON_CONFLICT_ACTION_FAIL. Do the rollback
@@ -1088,18 +1073,8 @@ case OP_HaltIfNull: {      /* in3 */
  *
  * If P4 is not null then it is an error message string.
  *
- * If P1 is SQL_TARANTOOL_ERROR then P5 is a ClientError code and
- * P4 is error message to set. Else P5 is a value between 0 and 4,
- * inclusive, that modifies the P4 string.
- *
- *    0:  (no change)
- *    1:  NOT NULL contraint failed: P4
- *    2:  UNIQUE constraint failed: P4
- *    3:  CHECK constraint failed: P4
- *    4:  FOREIGN KEY constraint failed: P4
- *
- * If P5 is not zero and  P4 is  NULL, then everything after the
- * ":" is omitted.
+ * If P1 is SQL_TARANTOOL_ERROR then P3 is a ClientError code and
+ * P4 is error message to set.
  *
  * There is an implied "Halt 0 0 0" instruction inserted at the
  * very end of every program.  So a jump past the last instruction
@@ -1136,28 +1111,10 @@ case OP_Halt: {
 	p->errorAction = (u8)pOp->p2;
 	p->pc = pcx;
 	if (p->rc) {
-		if (p->rc == SQL_TARANTOOL_ERROR) {
-			if (pOp->p4.z == NULL) {
-				assert(! diag_is_empty(diag_get()));
-			} else {
-				box_error_set(__FILE__, __LINE__, pOp->p5,
-					      pOp->p4.z);
-			}
-		} else if (pOp->p5 != 0) {
-			static const char * const azType[] = { "NOT NULL", "UNIQUE", "CHECK",
-							       "FOREIGN KEY" };
-			testcase( pOp->p5==1);
-			testcase( pOp->p5==2);
-			testcase( pOp->p5==3);
-			testcase( pOp->p5==4);
-			sqlVdbeError(p, "%s constraint failed", azType[pOp->p5-1]);
-			if (pOp->p4.z) {
-				p->zErrMsg = sqlMPrintf(db, "%z: %s", p->zErrMsg, pOp->p4.z);
-			}
-		} else {
-			sqlVdbeError(p, "%s", pOp->p4.z);
-		}
-		sql_log(pOp->p1, "abort at %d in [%s]: %s", pcx, p->zSql, p->zErrMsg);
+		assert(p->rc == SQL_TARANTOOL_ERROR);
+		if (pOp->p4.z != NULL)
+			box_error_set(__FILE__, __LINE__, pOp->p3, pOp->p4.z);
+		assert(! diag_is_empty(diag_get()));
 	}
 	rc = sqlVdbeHalt(p);
 	assert(rc==SQL_BUSY || rc==SQL_OK || rc==SQL_ERROR);

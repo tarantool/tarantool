@@ -823,12 +823,12 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 			    enum on_conflict_action on_conflict,
 			    int ignore_label, int *upd_cols)
 {
-	struct sql *db = parse_context->db;
 	struct Vdbe *v = sqlGetVdbe(parse_context);
 	assert(v != NULL);
 	bool is_update = upd_cols != NULL;
 	assert(space != NULL);
 	struct space_def *def = space->def;
+	const char *err;
 	/* Insertion into VIEW is prohibited. */
 	assert(!def->opts.is_view);
 	uint32_t autoinc_fieldno = sql_space_autoinc_fieldno(space);
@@ -853,20 +853,20 @@ vdbe_emit_constraint_checks(struct Parse *parse_context, struct space *space,
 		if (on_conflict_nullable == ON_CONFLICT_ACTION_REPLACE &&
 		    dflt == NULL)
 			on_conflict_nullable = ON_CONFLICT_ACTION_ABORT;
-		char *err_msg;
 		int addr;
 		switch (on_conflict_nullable) {
 		case ON_CONFLICT_ACTION_ABORT:
 		case ON_CONFLICT_ACTION_ROLLBACK:
 		case ON_CONFLICT_ACTION_FAIL:
-			err_msg = sqlMPrintf(db, "%s.%s", def->name,
-						 def->fields[i].name);
-			sqlVdbeAddOp3(v, OP_HaltIfNull,
-					  SQL_CONSTRAINT_NOTNULL,
-					  on_conflict_nullable,
-					  new_tuple_reg + i);
-			sqlVdbeAppendP4(v, err_msg, P4_DYNAMIC);
-			sqlVdbeChangeP5(v, P5_ConstraintNotNull);
+			err = tt_sprintf(tnt_errcode_desc(ER_SQL_EXECUTE),
+					 tt_sprintf("NOT NULL constraint "\
+						    "failed: %s.%s", def->name,
+						    def->fields[i].name));
+			addr = sqlVdbeAddOp1(v, OP_NotNull, new_tuple_reg + i);
+			sqlVdbeAddOp4(v, OP_Halt, SQL_TARANTOOL_ERROR,
+				      on_conflict_nullable, ER_SQL_EXECUTE,
+				      err, P4_STATIC);
+			sqlVdbeJumpHere(v, addr);
 			break;
 		case ON_CONFLICT_ACTION_IGNORE:
 			sqlVdbeAddOp2(v, OP_IsNull, new_tuple_reg + i,

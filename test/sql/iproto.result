@@ -164,15 +164,18 @@ cn:execute('select * from test limit ?', {2})
 ...
 cn:execute('select * from test limit ?', {-2})
 ---
-- error: Only positive integers are allowed in the LIMIT clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
 ...
 cn:execute('select * from test limit ?', {2.7})
 ---
-- error: Only positive integers are allowed in the LIMIT clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
 ...
 cn:execute('select * from test limit ?', {'Hello'})
 ---
-- error: Only positive integers are allowed in the LIMIT clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    LIMIT clause'
 ...
 cn:execute('select * from test limit 1 offset ?', {2})
 ---
@@ -188,15 +191,18 @@ cn:execute('select * from test limit 1 offset ?', {2})
 ...
 cn:execute('select * from test limit 1 offset ?', {-2})
 ---
-- error: Only positive integers are allowed in the OFFSET clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    OFFSET clause'
 ...
 cn:execute('select * from test limit 1 offset ?', {2.7})
 ---
-- error: Only positive integers are allowed in the OFFSET clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    OFFSET clause'
 ...
 cn:execute('select * from test limit 1 offset ?', {'Hello'})
 ---
-- error: Only positive integers are allowed in the OFFSET clause
+- error: 'Failed to execute SQL statement: Only positive integers are allowed in the
+    OFFSET clause'
 ...
 -- gh-2608 SQL iproto DDL
 cn:execute('create table test2(id int primary key, a int, b int, c int)')
