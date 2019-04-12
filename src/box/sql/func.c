@@ -972,7 +972,7 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 		sql_result_error(context, err_msg, -1);
 		return;
 	}
-	sql_result_int(context, res == MATCH);
+	sql_result_bool(context, res == MATCH);
 }
 
 /*
@@ -1859,9 +1859,9 @@ sqlRegisterLikeFunctions(sql *db, int is_case_insensitive)
 	 * supplied pattern and FALSE otherwise.
 	 */
 	int *is_like_ci = SQL_INT_TO_PTR(is_case_insensitive);
-	sqlCreateFunc(db, "LIKE", FIELD_TYPE_INTEGER, 2, 0,
+	sqlCreateFunc(db, "LIKE", FIELD_TYPE_BOOLEAN, 2, 0,
 			  is_like_ci, likeFunc, 0, 0, 0);
-	sqlCreateFunc(db, "LIKE", FIELD_TYPE_INTEGER, 3, 0,
+	sqlCreateFunc(db, "LIKE", FIELD_TYPE_BOOLEAN, 3, 0,
 			  is_like_ci, likeFunc, 0, 0, 0);
 	setLikeOptFlag(db, "LIKE",
 		       !(is_case_insensitive) ? (SQL_FUNC_LIKE |
@@ -1916,11 +1916,11 @@ sqlRegisterBuiltinFunctions(void)
 		FUNCTION(soundex, 1, 0, 0, soundexFunc),
 #endif
 		FUNCTION2(unlikely, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
-			  FIELD_TYPE_INTEGER),
+			  FIELD_TYPE_BOOLEAN),
 		FUNCTION2(likelihood, 2, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
-			  FIELD_TYPE_INTEGER),
+			  FIELD_TYPE_BOOLEAN),
 		FUNCTION2(likely, 1, 0, 0, noopFunc, SQL_FUNC_UNLIKELY,
-			  FIELD_TYPE_INTEGER),
+			  FIELD_TYPE_BOOLEAN),
 		FUNCTION_COLL(trim, 1, 3, 0, trim_func_one_arg),
 		FUNCTION_COLL(trim, 2, 3, 0, trim_func_two_args),
 		FUNCTION_COLL(trim, 3, 3, 0, trim_func_three_args),
