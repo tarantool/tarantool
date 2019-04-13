@@ -583,7 +583,7 @@ function run_tests(test, sock_family, sock_addr)
     stop_server(test, server)
 end
 
-test:plan(2)
+test:plan(3)
 
 test:test("http over AF_INET", function(test)
     local s = socketlib('AF_INET', 'SOCK_STREAM', 0)
@@ -604,6 +604,25 @@ test:test("http over AF_UNIX", function(test)
     end
     run_tests(test, 'AF_UNIX', path)
     os.remove(path)
+end)
+
+test:test("url_encode/url_decode", function(test)
+    test:plan(11)
+    test:is('hello', client.url_encode('hello'), 'correct encoding of eng')
+    test:is('%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82', client.url_encode('привет'), 'correct encoding of rus')
+
+    test:is('hello', client.url_decode('hello'), 'correct decoding of eng')
+    test:is('привет', client.url_decode('%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82'), 'correct decoding of rus')
+
+    test:is('hello', client.url_encode(client.url_decode('hello')), 'decoding and encoding of "hello"')
+    test:is('привет', client.url_decode(client.url_encode('привет')), 'encoding and decoding of "привет"')
+
+    test:is('%00', client.url_encode(client.url_decode('%00')), 'decoding and encoding of %00')
+    test:is('\0', client.url_decode(client.url_encode('\0')), 'encoding and decoding of \\0')
+
+    test:is('%20', client.url_encode(' '), 'space is escaped as %20')
+    test:is('%24%26%2B%2C%3A%3B%3D%3F%40', client.url_encode('$&+,:;=?@'), 'special characters escaping')
+    test:is('-._~', client.url_encode('-._~'), '-._~ are not escaped according RFC 3986')
 end)
 
 os.exit(test:check() == true and 0 or -1)

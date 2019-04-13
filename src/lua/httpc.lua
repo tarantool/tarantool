@@ -29,7 +29,7 @@
 --  SUCH DAMAGE.
 --
 
-local fiber = require('fiber')
+local ffi = require('ffi')
 
 local driver = package.loaded.http.client
 package.loaded.http = nil
@@ -424,11 +424,77 @@ curl_mt = {
     },
 }
 
+
+local err_string_arg = "bad argument #%d to '%s' (%s expected, got %s)"
+local url_decode_outlength = ffi.new("int[1]")
+ffi.cdef([[
+    typedef void CURL;
+    CURL *curl_easy_init(void);
+    void curl_easy_cleanup(CURL *handle);
+    char *curl_easy_escape(CURL *handle, const char *string, int length);
+    char *curl_easy_unescape(CURL *handle, const char *string, int length, int *outlength);
+    void curl_free(void *p);
+]])
+
+--- URL encodes the given string
+-- See https://curl.haxx.se/libcurl/c/curl_easy_escape.html
+-- @function url_encode
+-- @string       inp    the string
+-- @returns             result string or nil, err
+local function url_encode(inp)
+    if type(inp) ~= 'string' then
+        error(err_string_arg:format(1, "http_client.url_encode", 'string', type(inp)), 2)
+    end
+    local handle = ffi.C.curl_easy_init()
+    if not handle then
+        return nil, 'curl_easy_init error'
+    end
+
+    local escaped_str = ffi.C.curl_easy_escape(handle, inp, #inp)
+    ffi.C.curl_easy_cleanup(handle)
+    if escaped_str == nil then
+        return nil, 'curl_easy_escape error'
+    end
+
+    local out = ffi.string(escaped_str)
+    ffi.C.curl_free(escaped_str)
+    return out
+end
+
+--- URL decodes the given string
+-- See https://curl.haxx.se/libcurl/c/curl_easy_unescape.html
+-- @function url_decode
+-- @string       inp    the string
+-- @returns             result string or nil, err
+local function url_decode(inp)
+    if type(inp) ~= 'string' then
+        error(err_string_arg:format(1, "http_client.url_decode", 'string', type(inp)), 2)
+    end
+    local handle = ffi.C.curl_easy_init()
+    if not handle then
+        return nil, 'curl_easy_init error'
+    end
+
+    local unescaped_str = ffi.C.curl_easy_unescape(handle, inp, #inp, url_decode_outlength)
+    ffi.C.curl_easy_cleanup(handle)
+    if unescaped_str == nil then
+        return nil, 'curl_easy_unescape error'
+    end
+
+    local out = ffi.string(unescaped_str, url_decode_outlength[0])
+    ffi.C.curl_free(unescaped_str)
+    return out
+end
+
 --
 -- Export
 --
 local http_default = http_new()
-local this_module = { new = http_new, }
+local this_module = {
+    new = http_new,
+    url_encode = url_encode,
+    url_decode = url_decode,
+}
 
 local function http_default_wrap(fname)
     return function(...) return http_default[fname](http_default, ...) end

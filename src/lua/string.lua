@@ -409,7 +409,6 @@ local function string_rstrip(inp, chars)
     return ffi.string(casted_inp + strip_newstart[0], strip_newlen[0])
 end
 
-
 -- It'll automatically set string methods, too.
 local string = require('string')
 string.split      = string_split
