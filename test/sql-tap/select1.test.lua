@@ -1492,13 +1492,13 @@ test:do_catchsql_test(
         -- </select1-7.9>
     })
 
-test:do_execsql_test(
+test:do_catchsql_test(
     "select1-8.1",
     [[
         SELECT f1 FROM test1 WHERE 4.3+2.4 OR 1 ORDER BY f1
     ]], {
         -- <select1-8.1>
-        11, 33
+        1, 'Type mismatch: can not convert 6.7 to boolean'
         -- </select1-8.1>
     })
 

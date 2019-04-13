@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(516)
+test:plan(510)
 
 --!./tcltestrunner.lua
 -- 2010 July 16
@@ -136,13 +136,13 @@ test:do_select_tests(
         {"1100.1", "SELECT DISTINCT a, b, a||b FROM t1 ", {"a", "one", "aone", "b", "two", "btwo", "c", "three", "cthree"}},
         {"1200.1", "SELECT ALL a, b, a||b FROM t1 ", {"a", "one", "aone", "b", "two", "btwo", "c", "three", "cthree"}},
 
-        {"0010.1", "SELECT 1, 2, 3 WHERE 1 ", {1, 2, 3}},
-        {"0010.2", "SELECT 1, 2, 3 WHERE 0 ", {}},
+        {"0010.1", "SELECT 1, 2, 3 WHERE true ", {1, 2, 3}},
+        {"0010.2", "SELECT 1, 2, 3 WHERE false ", {}},
         {"0010.3", "SELECT 1, 2, 3 WHERE NULL ", {}},
 
-        {"1010.1", "SELECT DISTINCT 1, 2, 3 WHERE 1 ", {1, 2, 3}},
+        {"1010.1", "SELECT DISTINCT 1, 2, 3 WHERE true ", {1, 2, 3}},
 
-        {"2010.1", "SELECT ALL 1, 2, 3 WHERE 1 ", {1, 2, 3}},
+        {"2010.1", "SELECT ALL 1, 2, 3 WHERE true ", {1, 2, 3}},
 
         {"0110.1", "SELECT a, b, a||b FROM t1 WHERE a!='x' ", {"a", "one", "aone", "b", "two", "btwo", "c", "three", "cthree"}},
         {"0110.2", "SELECT a, b, a||b FROM t1 WHERE a=='x'", {}},
@@ -175,28 +175,28 @@ test:do_select_tests(
         {"2102.1", "SELECT ALL count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=1", {1, "a", 1, "c", 1, "b"}},
         {"2102.2", "SELECT ALL count(*), max(a) FROM t1 GROUP BY b HAVING count(*)=2", {}},
 
-        {"0011.1", "SELECT 1, 2, 3 WHERE 1 GROUP BY 2", {1, 2, 3}},
-        {"0012.1", "SELECT 1, 2, 3 WHERE 0 GROUP BY 2 HAVING count(*)=1", {}},
-        {"0012.2", "SELECT 1, 2, 3 WHERE 0 GROUP BY 2 HAVING count(*)>1", {}},
+        {"0011.1", "SELECT 1, 2, 3 WHERE true GROUP BY 2", {1, 2, 3}},
+        {"0012.1", "SELECT 1, 2, 3 WHERE false GROUP BY 2 HAVING count(*)=1", {}},
+        {"0012.2", "SELECT 1, 2, 3 WHERE false GROUP BY 2 HAVING count(*)>1", {}},
 
-        {"1011.1", "SELECT DISTINCT 1, 2, 3 WHERE 0 GROUP BY 2", {}},
-        {"1012.1", "SELECT DISTINCT 1, 2, 3 WHERE 1 GROUP BY 2 HAVING count(*)=1", {1, 2, 3}},
+        {"1011.1", "SELECT DISTINCT 1, 2, 3 WHERE false GROUP BY 2", {}},
+        {"1012.1", "SELECT DISTINCT 1, 2, 3 WHERE true GROUP BY 2 HAVING count(*)=1", {1, 2, 3}},
         {"1012.2", "SELECT DISTINCT 1, 2, 3 WHERE NULL GROUP BY 2 HAVING count(*)>1", {}},
 
-        {"2011.1", "SELECT ALL 1, 2, 3 WHERE 1 GROUP BY 2", {1, 2, 3}},
-        {"2012.1", "SELECT ALL 1, 2, 3 WHERE 0 GROUP BY 2 HAVING count(*)=1", {}},
-        {"2012.2", "SELECT ALL 1, 2, 3 WHERE 2 GROUP BY 2 HAVING count(*)>1", {}},
+        {"2011.1", "SELECT ALL 1, 2, 3 WHERE true GROUP BY 2", {1, 2, 3}},
+        {"2012.1", "SELECT ALL 1, 2, 3 WHERE false GROUP BY 2 HAVING count(*)=1", {}},
+        {"2012.2", "SELECT ALL 1, 2, 3 WHERE true GROUP BY 2 HAVING count(*)>1", {}},
 
         {"0111.1", "SELECT count(*), max(a) FROM t1 WHERE a='a' GROUP BY b", {1, "a"}},
         {"0112.1", "SELECT count(*), max(a) FROM t1 WHERE a='c' GROUP BY b HAVING count(*)=1", {1, "c"}},
-        {"0112.2", "SELECT count(*), max(a) FROM t1 WHERE 0 GROUP BY b HAVING count(*)=2", { }},
+        {"0112.2", "SELECT count(*), max(a) FROM t1 WHERE false GROUP BY b HAVING count(*)=2", { }},
         {"1111.1", "SELECT DISTINCT count(*), max(a) FROM t1 WHERE a<'c' GROUP BY b", {1, "a", 1, "b"}},
         {"1112.1", "SELECT DISTINCT count(*), max(a) FROM t1 WHERE a>'a' GROUP BY b HAVING count(*)=1", {1, "c", 1, "b"}},
-        {"1112.2", "SELECT DISTINCT count(*), max(a) FROM t1 WHERE 0 GROUP BY b HAVING count(*)=2", { }},
+        {"1112.2", "SELECT DISTINCT count(*), max(a) FROM t1 WHERE false GROUP BY b HAVING count(*)=2", { }},
 
         {"2111.1", "SELECT ALL count(*), max(a) FROM t1 WHERE b>'one' GROUP BY b", {1, "c", 1, "b"}},
         {"2112.1", "SELECT ALL count(*), max(a) FROM t1 WHERE a!='b' GROUP BY b HAVING count(*)=1", {1, "a", 1, "c"}},
-        {"2112.2", "SELECT ALL count(*), max(a) FROM t1 WHERE 0 GROUP BY b HAVING count(*)=2", { }},
+        {"2112.2", "SELECT ALL count(*), max(a) FROM t1 WHERE false GROUP BY b HAVING count(*)=2", { }},
     })
 
 -- -- syntax diagram result-column
@@ -294,8 +294,8 @@ test:do_select_tests(
         {"2", "SELECT 'abc' WHERE NULL", {}},
         {"3", "SELECT NULL", {""}},
         {"4", "SELECT count(*)", {1}},
-        {"5", "SELECT count(*) WHERE 0", {0}},
-        {"6", "SELECT count(*) WHERE 1", {1}},
+        {"5", "SELECT count(*) WHERE false", {0}},
+        {"6", "SELECT count(*) WHERE true", {1}},
     })
 
 --
@@ -448,15 +448,13 @@ test:do_select_tests(
 -- true are included from the dataset.
 --
 local data ={
-    {"1"," SELECT * FROM t1 JOIN_PATTERN t2 ON (1) ",t1_cross_t2},
-    {"2"," SELECT * FROM t1 JOIN_PATTERN t2 ON (0) ",{}},
+    {"1"," SELECT * FROM t1 JOIN_PATTERN t2 ON (true) ",t1_cross_t2},
+    {"2"," SELECT * FROM t1 JOIN_PATTERN t2 ON (false) ",{}},
     {"3"," SELECT * FROM t1 JOIN_PATTERN t2 ON (NULL) ",{}},
-    {"6"," SELECT * FROM t1 JOIN_PATTERN t2 ON (0.9) ",t1_cross_t2},
-    {"7"," SELECT * FROM t1 JOIN_PATTERN t2 ON ('0.9') ",t1_cross_t2},
-    {"8"," SELECT * FROM t1 JOIN_PATTERN t2 ON (0.0) ",{}},
+    {"6"," SELECT * FROM t1 JOIN_PATTERN t2 ON (true) ",t1_cross_t2},
     {"9"," SELECT t1.b, t2.b FROM t1 JOIN_PATTERN t2 ON (t1.a = t2.a) ",{"one", "I", "two", "II", "three", "III"}},
     {"10"," SELECT t1.b, t2.b FROM t1 JOIN_PATTERN t2 ON (t1.a = 'a') ",{"one", "I", "one", "II", "one", "III"}},
-    {"11"," SELECT t1.b, t2.b FROM t1 JOIN_PATTERN t2 ON (CASE WHEN t1.a = 'a' THEN NULL ELSE 1 END)",
+    {"11"," SELECT t1.b, t2.b FROM t1 JOIN_PATTERN t2 ON (CASE WHEN t1.a = 'a' THEN NULL ELSE true END)",
     {"two", "I", "two", "II", "two", "III", "three", "I", "three", "II", "three", "III"}},
 }
 for _, val in ipairs(data) do
@@ -705,7 +703,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-3.2.1b",
     [[
-        SELECT k FROM x1 LEFT JOIN x2 USING(k) WHERE x2.k
+        SELECT k FROM x1 LEFT JOIN x2 USING(k) WHERE x2.k <> 0
     ]], {
         -- <e_select-3.2.1b>
         1, 3, 5
@@ -725,7 +723,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-3.2.3",
     [[
-        SELECT k FROM x1 NATURAL JOIN x2 WHERE x2.k
+        SELECT k FROM x1 NATURAL JOIN x2 WHERE x2.k <> 0
     ]], {
         -- <e_select-3.2.3>
         3
@@ -735,7 +733,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "e_select-3.2.4",
     [[
-        SELECT k FROM x1 NATURAL JOIN x2 WHERE x2.k-3
+        SELECT k FROM x1 NATURAL JOIN x2 WHERE x2.k-3 <> 0
     ]], {
         -- <e_select-3.2.4>
 
@@ -952,7 +950,7 @@ test:do_select_tests(
 test:do_select_tests(
     "e_select-4.7",
     {
-        {"1", "SELECT one, two, count(*) FROM a1 WHERE 0", {"", "", 0}},
+        {"1", "SELECT one, two, count(*) FROM a1 WHERE false", {"", "", 0}},
         {"2", "SELECT sum(two), * FROM a1, a2 WHERE three>5", {"", "", "", "", ""}},
         {"3", "SELECT max(one) IS NULL, one IS NULL, two IS NULL FROM a1 WHERE two=7", {1, 1, 1}},
     })

@@ -918,8 +918,8 @@ test:do_execsql_test(
 test:do_execsql_test(
     "subquery-8.1",
     [[
-        SELECT (SELECT 0 FROM (SELECT * FROM t1)) AS x WHERE x;
-        SELECT (SELECT 0 FROM (SELECT * FROM (SELECT 0))) AS x WHERE x;
+        SELECT (SELECT 0 FROM (SELECT * FROM t1)) AS x WHERE x <> 0;
+        SELECT (SELECT 0 FROM (SELECT * FROM (SELECT 0))) AS x WHERE x <> 0;
     ]], {
         -- <subquery-8.1>
         

@@ -90,7 +90,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "tkt2832-3.2",
     [[
-        DELETE FROM t3 WHERE 1
+        DELETE FROM t3 WHERE true
     ]], {
         -- <tkt2832-3.2>
 

@@ -1699,8 +1699,8 @@ integer_overflow:
  * functions.
  *
  * If P1 is not zero, then it is a register that a subsequent min() or
- * max() aggregate will set to 1 if the current row is not the minimum or
- * maximum.  The P1 register is initialized to 0 by this instruction.
+ * max() aggregate will set to true if the current row is not the minimum or
+ * maximum.  The P1 register is initialized to false by this instruction.
  *
  * The interface used by the implementation of the aforementioned functions
  * to retrieve the collation sequence set by this opcode is not available
@@ -1709,7 +1709,7 @@ integer_overflow:
 case OP_CollSeq: {
 	assert(pOp->p4type==P4_COLLSEQ || pOp->p4.pColl == NULL);
 	if (pOp->p1) {
-		sqlVdbeMemSetInt64(&aMem[pOp->p1], 0);
+		mem_set_bool(&aMem[pOp->p1], false);
 	}
 	break;
 }
@@ -2515,14 +2515,12 @@ case OP_Once: {             /* jump */
 
 /* Opcode: If P1 P2 P3 * *
  *
- * Jump to P2 if the value in register P1 is true.  The value
- * is considered true if it is numeric and non-zero.  If the value
+ * Jump to P2 if the value in register P1 is true. If the value
  * in P1 is NULL then take the jump if and only if P3 is non-zero.
  */
 /* Opcode: IfNot P1 P2 P3 * *
  *
- * Jump to P2 if the value in register P1 is False.  The value
- * is considered false if it has a numeric value of zero.  If the value
+ * Jump to P2 if the value in register P1 is False. If the value
  * in P1 is NULL then take the jump if and only if P3 is non-zero.
  */
 case OP_If:                 /* jump, in1 */
@@ -2534,15 +2532,10 @@ case OP_IfNot: {            /* jump, in1 */
 	} else if ((pIn1->flags & MEM_Bool) != 0) {
 		c = pOp->opcode == OP_IfNot ? ! pIn1->u.b : pIn1->u.b;
 	} else {
-		double v;
-		if (sqlVdbeRealValue(pIn1, &v) != 0) {
-			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
-				 sql_value_text(pIn1), "real");
-			rc = SQL_TARANTOOL_ERROR;
-			goto abort_due_to_error;
-		}
-		c = v != 0;
-		if (pOp->opcode==OP_IfNot) c = !c;
+		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
+			 sql_value_text(pIn1), "boolean");
+		rc = SQL_TARANTOOL_ERROR;
+		goto abort_due_to_error;
 	}
 	VdbeBranchTaken(c!=0, 2);
 	if (c) {
@@ -5266,7 +5259,7 @@ case OP_AggStep: {
 	if (pCtx->skipFlag) {
 		assert(pOp[-1].opcode==OP_CollSeq);
 		i = pOp[-1].p1;
-		if (i) sqlVdbeMemSetInt64(&aMem[i], 1);
+		if (i) mem_set_bool(&aMem[i], true);
 	}
 	break;
 }

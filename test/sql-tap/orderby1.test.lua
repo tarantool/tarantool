@@ -735,7 +735,7 @@ test:do_execsql_test(
         SELECT (
           SELECT 'hardware' FROM ( 
             SELECT 'software' ORDER BY 'firmware' ASC, 'sportswear' DESC
-          ) GROUP BY 1 HAVING length(b)
+          ) GROUP BY 1 HAVING length(b) <> 0
         )
         FROM abc;
     ]], {

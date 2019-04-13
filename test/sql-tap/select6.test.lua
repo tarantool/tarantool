@@ -632,7 +632,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select6-7.3",
     [[
-        SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE 0)
+        SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE false)
     ]], {
         -- <select6-7.3>
         
@@ -642,7 +642,7 @@ test:do_execsql_test(
 test:do_execsql2_test(
     "select6-7.4",
     [[
-        SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE 1)
+        SELECT c,b,a,* FROM (SELECT 1 AS a, 2 AS b, 'abc' AS c WHERE true)
     ]], {
         -- <select6-7.4>
         "C", "abc", "B", 2, "A", 1, "A", 1, "B", 2, "C", "abc"

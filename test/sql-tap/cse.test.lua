@@ -102,7 +102,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.6.3",
     [[
-        SELECT CASE WHEN b THEN d WHEN e THEN f ELSE 999 END, b, c, d FROM t1
+        SELECT CASE WHEN CAST(b AS BOOLEAN) THEN d WHEN CAST(e AS BOOLEAN)  THEN f ELSE 999 END, b, c, d FROM t1
     ]], {
         -- <cse-1.6.3>
         13, 11, 12, 13, 23, 21, 22, 23
@@ -112,7 +112,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.6.4",
     [[
-        SELECT b, c, d, CASE WHEN b THEN d WHEN e THEN f ELSE 999 END FROM t1
+        SELECT b, c, d, CASE WHEN CAST(b AS BOOLEAN) THEN d WHEN CAST(e AS BOOLEAN) THEN f ELSE 999 END FROM t1
     ]], {
         -- <cse-1.6.4>
         11, 12, 13, 13, 21, 22, 23, 23
@@ -122,7 +122,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "cse-1.6.5",
     [[
-        SELECT b, c, d, CASE WHEN 0 THEN d WHEN e THEN f ELSE 999 END FROM t1
+        SELECT b, c, d, CASE WHEN false THEN d WHEN CAST(e AS BOOLEAN) THEN f ELSE 999 END FROM t1
     ]], {
         -- <cse-1.6.5>
         11, 12, 13, 15, 21, 22, 23, 25

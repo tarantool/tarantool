@@ -328,7 +328,7 @@ test:do_execsql_test(
     "limit-5.3",
     [[
         DELETE FROM t5;
-        INSERT INTO t5 SELECT id, x-y, x+y FROM t1 WHERE x ORDER BY x DESC LIMIT 31;
+        INSERT INTO t5 SELECT id, x-y, x+y FROM t1 WHERE x <> 0 ORDER BY x DESC LIMIT 31;
         SELECT x, y FROM t5 ORDER BY x LIMIT 2;
     ]], {
         -- <limit-5.3>

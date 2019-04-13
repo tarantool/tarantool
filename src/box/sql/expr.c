@@ -1080,40 +1080,25 @@ sqlPExprAddSelect(Parse * pParse, Expr * pExpr, Select * pSelect)
 	}
 }
 
-/*
+/**
  * If the expression is always either TRUE or FALSE (respectively),
- * then return 1.  If one cannot determine the truth value of the
+ * then return 1. If one cannot determine the truth value of the
  * expression at compile-time return 0.
- *
- * This is an optimization.  If is OK to return 0 here even if
- * the expression really is always false or false (a false negative).
- * But it is a bug to return 1 if the expression might have different
- * boolean values in different circumstances (a false positive.)
  *
  * Note that if the expression is part of conditional for a
  * LEFT JOIN, then we cannot determine at compile-time whether or not
  * is it true or false, so always return 0.
  */
-static int
+static inline bool
 exprAlwaysTrue(Expr * p)
 {
-	int v = 0;
-	if (ExprHasProperty(p, EP_FromJoin))
-		return 0;
-	if (!sqlExprIsInteger(p, &v))
-		return 0;
-	return v != 0;
+	return !ExprHasProperty(p, EP_FromJoin) && p->op == TK_TRUE;
 }
 
-static int
+static inline bool
 exprAlwaysFalse(Expr * p)
 {
-	int v = 0;
-	if (ExprHasProperty(p, EP_FromJoin))
-		return 0;
-	if (!sqlExprIsInteger(p, &v))
-		return 0;
-	return v == 0;
+	return !ExprHasProperty(p, EP_FromJoin) && p->op == TK_FALSE;
 }
 
 struct Expr *

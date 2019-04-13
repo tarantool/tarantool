@@ -98,7 +98,7 @@ test:do_test(
             INSERT INTO xy VALUES(2,3);
             INSERT INTO xy VALUES(NULL,1);
         ]]
-        return test:execsql "SELECT * FROM xy LEFT JOIN ab ON 0"
+        return test:execsql "SELECT * FROM xy LEFT JOIN ab ON false"
     end, {
         -- <join5-2.1>
         "", 1, "", "", 2, 3, "", ""
@@ -108,7 +108,7 @@ test:do_test(
 test:do_execsql_test(
     "join5-2.2",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON 1
+        SELECT * FROM xy LEFT JOIN ab ON true
     ]], {
         -- <join5-2.2>
         "", 1, 1, 2, "", 1, 3, "", 2, 3, 1, 2, 2, 3, 3, ""
@@ -128,7 +128,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.4",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON 0 WHERE 0
+        SELECT * FROM xy LEFT JOIN ab ON false WHERE false
     ]], {
         -- <join5-2.4>
         
@@ -138,7 +138,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.5",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON 1 WHERE 0
+        SELECT * FROM xy LEFT JOIN ab ON true WHERE false
     ]], {
         -- <join5-2.5>
         
@@ -148,7 +148,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.6",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON NULL WHERE 0
+        SELECT * FROM xy LEFT JOIN ab ON NULL WHERE false
     ]], {
         -- <join5-2.6>
         
@@ -158,7 +158,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.7",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON 0 WHERE 1
+        SELECT * FROM xy LEFT JOIN ab ON false WHERE true
     ]], {
         -- <join5-2.7>
         "", 1, "", "", 2, 3, "", ""
@@ -168,7 +168,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.8",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON 1 WHERE 1
+        SELECT * FROM xy LEFT JOIN ab ON true WHERE true
     ]], {
         -- <join5-2.8>
         "",1 ,1, 2, "", 1, 3, "", 2, 3, 1, 2, 2, 3, 3, ""
@@ -178,7 +178,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.9",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON NULL WHERE 1
+        SELECT * FROM xy LEFT JOIN ab ON NULL WHERE true
     ]], {
         -- <join5-2.9>
         "", 1, "", "", 2, 3, "", ""
@@ -188,7 +188,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.10",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON 0 WHERE NULL
+        SELECT * FROM xy LEFT JOIN ab ON false WHERE NULL
     ]], {
         -- <join5-2.10>
         
@@ -198,7 +198,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "join5-2.11",
     [[
-        SELECT * FROM xy LEFT JOIN ab ON 1 WHERE NULL
+        SELECT * FROM xy LEFT JOIN ab ON true WHERE NULL
     ]], {
         -- <join5-2.11>
         

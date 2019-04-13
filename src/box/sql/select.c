@@ -769,8 +769,10 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 		pParse->nMem += pSort->nOBSat;
 		nKey = nExpr - pSort->nOBSat + bSeq;
 		if (bSeq) {
-			addrFirst =
-			    sqlVdbeAddOp1(v, OP_IfNot, regBase + nExpr);
+			int r1 = sqlGetTempReg(pParse);
+			sqlVdbeAddOp2(v, OP_Integer, 0, r1);
+			addrFirst = sqlVdbeAddOp3(v, OP_Eq, r1, 0, regBase + nExpr);
+			sqlReleaseTempReg(pParse, r1);
 		} else {
 			addrFirst =
 			    sqlVdbeAddOp1(v, OP_SequenceTest,
@@ -799,9 +801,10 @@ pushOntoSorter(Parse * pParse,		/* Parser context */
 				  pSort->labelBkOut);
 		sqlVdbeAddOp1(v, OP_ResetSorter, pSort->iECursor);
 		if (iLimit) {
-			sqlVdbeAddOp2(v, OP_IfNot, iLimit,
-					  pSort->labelDone);
-			VdbeCoverage(v);
+			int r1 = sqlGetTempReg(pParse);
+			sqlVdbeAddOp2(v, OP_Integer, 0, r1);
+			sqlVdbeAddOp3(v, OP_Eq, r1, pSort->labelDone, iLimit);
+			sqlReleaseTempReg(pParse, r1);
 		}
 		sqlVdbeJumpHere(v, addrFirst);
 		sqlExprCodeMove(pParse, regBase, regPrevKey, pSort->nOBSat);
@@ -2115,11 +2118,10 @@ computeLimitRegisters(Parse * pParse, Select * p, int iBreak)
 				  P4_STATIC);
 
 		sqlVdbeResolveLabel(v, positive_limit_label);
-		sqlReleaseTempReg(pParse, r1);
 		VdbeCoverage(v);
 		VdbeComment((v, "LIMIT counter"));
-		sqlVdbeAddOp2(v, OP_IfNot, iLimit, iBreak);
-		VdbeCoverage(v);
+		sqlVdbeAddOp3(v, OP_Eq, r1, iBreak, iLimit);
+		sqlReleaseTempReg(pParse, r1);
 
 		if ((p->selFlags & SF_SingleRow) != 0) {
 			if (ExprHasProperty(p->pLimit, EP_System)) {
@@ -2673,10 +2675,11 @@ multiSelect(Parse * pParse,	/* Parsing context */
 				p->iLimit = pPrior->iLimit;
 				p->iOffset = pPrior->iOffset;
 				if (p->iLimit) {
-					addr =
-					    sqlVdbeAddOp1(v, OP_IfNot,
-							      p->iLimit);
-					VdbeCoverage(v);
+					int r1 = sqlGetTempReg(pParse);
+					sqlVdbeAddOp2(v, OP_Integer, 0, r1);
+					addr = sqlVdbeAddOp3(v, OP_Eq, r1, 0,
+							     p->iLimit);
+					sqlReleaseTempReg(pParse, r1);
 					VdbeComment((v,
 						     "Jump ahead if LIMIT reached"));
 					if (p->iOffset) {
@@ -3047,7 +3050,7 @@ generateOutputSubroutine(struct Parse *parse, struct Select *p,
 		sqlVdbeJumpHere(v, addr1);
 		sqlVdbeAddOp3(v, OP_Copy, in->iSdst, reg_prev + 1,
 				  in->nSdst - 1);
-		sqlVdbeAddOp2(v, OP_Integer, 1, reg_prev);
+		sqlVdbeAddOp2(v, OP_Bool, true, reg_prev);
 	}
 	if (parse->db->mallocFailed)
 		return 0;
@@ -3370,7 +3373,7 @@ multiSelectOrderBy(Parse * pParse,	/* Parsing context */
 		assert(nOrderBy >= expr_count || db->mallocFailed);
 		regPrev = pParse->nMem + 1;
 		pParse->nMem += expr_count + 1;
-		sqlVdbeAddOp2(v, OP_Integer, 0, regPrev);
+		sqlVdbeAddOp2(v, OP_Bool, 0, regPrev);
 		key_info_dup = sql_key_info_new(db, expr_count);
 		if (key_info_dup != NULL) {
 			for (int i = 0; i < expr_count; i++) {

@@ -1739,7 +1739,7 @@ test:do_catchsql_test(
 test:do_execsql_test(
     "func-19.1",
     [[
-        SELECT match(a,b) FROM t1 WHERE 0;
+        SELECT match(a,b) FROM t1 WHERE false;
     ]], {
         -- <func-19.1>
         

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(19)
+test:plan(18)
 
 --!./tcltestrunner.lua
 -- 2010 September 21
@@ -89,15 +89,14 @@ test:do_delete_tests("e_delete-1.1", {
 -- NULL are retained.
 --
 test:do_delete_tests("e_delete-1.2", {
-    {1, "DELETE FROM t3 WHERE 1       ; SELECT x FROM t3", {}},
-    {2, "DELETE FROM t4 WHERE 0  ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
-    {3, "DELETE FROM t4 WHERE 0.0     ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
+    {1, "DELETE FROM t3 WHERE true       ; SELECT x FROM t3", {}},
+    {3, "DELETE FROM t4 WHERE false    ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
     {4, "DELETE FROM t4 WHERE NULL    ; SELECT x FROM t4", {1, 2, 3, 4, 5}},
     {5, "DELETE FROM t4 WHERE y!='two'; SELECT x FROM t4", {2}},
     {6, "DELETE FROM t4 WHERE y='two' ; SELECT x FROM t4", {}},
     {7, "DELETE FROM t5 WHERE x=(SELECT max(x) FROM t5);SELECT x FROM t5", {1, 2, 3, 4}},
     {8, "DELETE FROM t5 WHERE (SELECT max(x) FROM t4)  ;SELECT x FROM t5", {1, 2, 3, 4}},
-    {9, "DELETE FROM t5 WHERE (SELECT max(x) FROM t6)  ;SELECT x FROM t5", {}},
+    {9, "DELETE FROM t5 WHERE (SELECT max(x) FROM t6) != 0  ;SELECT x FROM t5", {}},
     {10, "DELETE FROM t6 WHERE y>'seven' ; SELECT y FROM t6", {"one", "four", "five"}},
 })
 

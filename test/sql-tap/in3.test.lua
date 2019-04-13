@@ -116,7 +116,7 @@ test:do_test(
 test:do_test(
     "in3-1.8",
     function()
-        return exec_neph(" SELECT a FROM t1 WHERE a IN (SELECT a FROM t1 WHERE 1); ")
+        return exec_neph(" SELECT a FROM t1 WHERE a IN (SELECT a FROM t1 WHERE true); ")
     end, {
         -- <in3-1.8>
         1, 1, 3, 5

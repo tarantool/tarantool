@@ -212,7 +212,7 @@ test:do_execsql_test(
     "select2-4.2",
     [[
         INSERT INTO bb VALUES(0);
-        SELECT * FROM aa CROSS JOIN bb WHERE b;
+        SELECT * FROM aa CROSS JOIN bb WHERE b <> 0;
     ]], {
         -- <select2-4.2>
         1, 2, 1, 4, 3, 2, 3, 4
@@ -222,7 +222,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-4.3",
     [[
-        SELECT * FROM aa CROSS JOIN bb WHERE NOT b;
+        SELECT * FROM aa CROSS JOIN bb WHERE NOT b <> 0;
     ]], {
         -- <select2-4.3>
         1, 0, 3, 0
@@ -232,7 +232,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-4.4",
     [[
-        SELECT * FROM aa, bb WHERE min(a,b);
+        SELECT * FROM aa, bb WHERE min(a,b) <> 0;
     ]], {
         -- <select2-4.4>
         1, 2, 1, 4, 3, 2, 3, 4
@@ -242,7 +242,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-4.5",
     [[
-        SELECT * FROM aa, bb WHERE NOT min(a,b);
+        SELECT * FROM aa, bb WHERE NOT min(a,b) <> 0;
     ]], {
         -- <select2-4.5>
         1, 0, 3, 0
@@ -252,7 +252,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-4.6",
     [[
-        SELECT * FROM aa, bb WHERE CASE WHEN a=b-1 THEN 1 END;
+        SELECT * FROM aa, bb WHERE CASE WHEN a=b-1 THEN true END;
     ]], {
         -- <select2-4.6>
         1, 2, 3, 4
@@ -262,7 +262,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select2-4.7",
     [[
-        SELECT * FROM aa, bb WHERE CASE WHEN a=b-1 THEN 0 ELSE 1 END;
+        SELECT * FROM aa, bb WHERE CASE WHEN a=b-1 THEN false ELSE true END;
     ]], {
         -- <select2-4.7>
         1, 0, 1, 4, 3, 0, 3, 2

@@ -347,7 +347,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "resolver01-7.1",
     [[
-        SELECT 2 AS x WHERE (SELECT x AS y WHERE 3>y);
+        SELECT 2 AS x WHERE (SELECT x AS y WHERE 3>y) <> 0;
     ]], {
         -- <resolver01-7.1>
         2

@@ -541,7 +541,7 @@ test:do_execsql_test(
         CREATE TABLE t62(b INT primary key);
         INSERT INTO t61 VALUES(111);
         INSERT INTO t62 VALUES(222);
-        SELECT a FROM t61 WHERE 0 UNION SELECT b FROM t62;
+        SELECT a FROM t61 WHERE false UNION SELECT b FROM t62;
     ]], {
         -- <select9-6.1>
         222
@@ -551,7 +551,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select9-6.2",
     [[
-        SELECT a FROM t61 WHERE 0 UNION ALL SELECT b FROM t62;
+        SELECT a FROM t61 WHERE false UNION ALL SELECT b FROM t62;
     ]], {
         -- <select9-6.2>
         222
@@ -561,7 +561,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select9-6.3",
     [[
-        SELECT a FROM t61 UNION SELECT b FROM t62 WHERE 0;
+        SELECT a FROM t61 UNION SELECT b FROM t62 WHERE false;
     ]], {
         -- <select9-6.3>
         111
