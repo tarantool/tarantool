@@ -29,7 +29,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
   - name: X
     type: integer
   - name: Y
-    type: scalar
+    type: integer
   - name: x + y
     type: number
   rows:
@@ -46,7 +46,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
   - name: X
     type: integer
   - name: Y
-    type: scalar
+    type: integer
   - name: x + y
     type: number
   rows:
@@ -59,7 +59,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
   - name: X
     type: integer
   - name: Y
-    type: scalar
+    type: integer
   - name: x + y
     type: number
   rows:
@@ -72,7 +72,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
   - name: X
     type: integer
   - name: Y
-    type: scalar
+    type: integer
   - name: x + y
     type: number
   rows:
@@ -85,7 +85,7 @@ box.execute('SELECT x, y, x + y FROM test ORDER BY y')
   - name: X
     type: integer
   - name: Y
-    type: scalar
+    type: integer
   - name: x + y
     type: number
   rows:
@@ -112,7 +112,7 @@ box.execute('SELECT a, id + 2, b FROM test2 WHERE b < id * 2 ORDER BY a ')
 ---
 - metadata:
   - name: A
-    type: scalar
+    type: string
   - name: id + 2
     type: number
   - name: B
@@ -135,7 +135,7 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
   - name: id + 2 * b
     type: number
   - name: A
-    type: scalar
+    type: string
   rows:
   - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
@@ -150,7 +150,7 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
   - name: id + 2 * b
     type: number
   - name: A
-    type: scalar
+    type: string
   rows:
   - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']
@@ -165,7 +165,7 @@ box.execute('SELECT a, id + 2 * b, a FROM test2 WHERE b < id * 2 ORDER BY a ')
   - name: id + 2 * b
     type: number
   - name: A
-    type: scalar
+    type: string
   rows:
   - ['abc', 3, 'abc']
   - ['hello', 6, 'hello']

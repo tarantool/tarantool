@@ -1760,7 +1760,7 @@ generateColumnNames(Parse * pParse,	/* Parser context */
 		if (p->op == TK_VARIABLE)
 			var_pos[var_count++] = i;
 		sqlVdbeSetColName(v, i, COLNAME_DECLTYPE,
-				  field_type_strs[p->type], SQL_TRANSIENT);
+				  field_type_strs[sql_expr_type(p)], SQL_TRANSIENT);
 		if (pEList->a[i].zName) {
 			char *zName = pEList->a[i].zName;
 			sqlVdbeSetColName(v, i, COLNAME_NAME, zName,

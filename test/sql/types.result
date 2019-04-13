@@ -399,7 +399,7 @@ box.execute("SELECT true and false;")
 ---
 - metadata:
   - name: true and false
-    type: number
+    type: integer
   rows:
   - [0]
 ...
@@ -407,7 +407,7 @@ box.execute("SELECT true or unknown;")
 ---
 - metadata:
   - name: true or unknown
-    type: number
+    type: integer
   rows:
   - [1]
 ...
@@ -481,7 +481,7 @@ box.execute("SELECT b FROM t ORDER BY b;")
 ---
 - metadata:
   - name: B
-    type: scalar
+    type: boolean
   rows:
   - [null]
   - [false]
@@ -501,7 +501,7 @@ box.execute("SELECT b FROM t ORDER BY b LIMIT 1;")
 ---
 - metadata:
   - name: B
-    type: scalar
+    type: boolean
   rows:
   - [null]
 ...
@@ -509,7 +509,7 @@ box.execute("SELECT b FROM t GROUP BY b LIMIT 1;")
 ---
 - metadata:
   - name: B
-    type: scalar
+    type: boolean
   rows:
   - [null]
 ...

@@ -105,6 +105,10 @@ sql_expr_type(struct Expr *pExpr)
 	case TK_NOT:
 	case TK_AND:
 	case TK_OR:
+	case TK_ISNULL:
+	case TK_NOTNULL:
+	case TK_BETWEEN:
+	case TK_IN:
 		/*
 		 * FIXME: should be changed to BOOL type
 		 * when it is implemented. Now simply
@@ -3716,7 +3720,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_AGG_COLUMN:{
 			AggInfo *pAggInfo = pExpr->pAggInfo;
 			struct AggInfo_col *pCol = &pAggInfo->aCol[pExpr->iAgg];
-			pExpr->type = pCol->pExpr->type;
 			if (!pAggInfo->directMode) {
 				assert(pCol->iMem > 0);
 				return pCol->iMem;
@@ -3748,7 +3751,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					iTab = pParse->iSelfTab;
 				}
 			}
-			pExpr->type = pExpr->space_def->fields[col].type;
 			return sqlExprCodeGetColumn(pParse,
 							pExpr->space_def, col,
 							iTab, target,
@@ -3867,7 +3869,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 				testcase(regFree1 == 0);
 				testcase(regFree2 == 0);
 			}
-			pExpr->type = FIELD_TYPE_INTEGER;
 			break;
 		}
 	case TK_AND:
@@ -3911,15 +3912,10 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 			sqlVdbeAddOp3(v, op, r2, r1, target);
 			testcase(regFree1 == 0);
 			testcase(regFree2 == 0);
-			if (op != TK_CONCAT)
-				pExpr->type = FIELD_TYPE_NUMBER;
-			else
-				pExpr->type = FIELD_TYPE_STRING;
 			break;
 		}
 	case TK_UMINUS:{
 			Expr *pLeft = pExpr->pLeft;
-			pExpr->type = FIELD_TYPE_NUMBER;
 			assert(pLeft);
 			if (pLeft->op == TK_INTEGER) {
 				expr_code_int(pParse, pLeft, true, target);
@@ -3944,7 +3940,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_BITNOT:
 	case TK_NOT:{
-			pExpr->type = FIELD_TYPE_INTEGER;
 			assert(TK_BITNOT == OP_BitNot);
 			testcase(op == TK_BITNOT);
 			assert(TK_NOT == OP_Not);
@@ -3958,7 +3953,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_ISNULL:
 	case TK_NOTNULL:{
 			int addr;
-			pExpr->type = FIELD_TYPE_INTEGER;
 			assert(TK_ISNULL == OP_IsNull);
 			testcase(op == TK_ISNULL);
 			assert(TK_NOTNULL == OP_NotNull);
@@ -3983,7 +3977,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 					 tt_sprintf(err, pExpr->u.zToken));
 				pParse->is_aborted = true;
 			} else {
-				pExpr->type = pInfo->aFunc->pFunc->ret_type;
 				return pInfo->aFunc[pExpr->iAgg].iMem;
 			}
 			break;
@@ -4203,7 +4196,6 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 	case TK_IN:{
 			int destIfFalse = sqlVdbeMakeLabel(v);
 			int destIfNull = sqlVdbeMakeLabel(v);
-			pExpr->type = FIELD_TYPE_INTEGER;
 			sqlVdbeAddOp2(v, OP_Null, 0, target);
 			sqlExprCodeIN(pParse, pExpr, destIfFalse,
 					  destIfNull);
@@ -4227,18 +4219,15 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		 * Z is stored in pExpr->pList->a[1].pExpr.
 		 */
 	case TK_BETWEEN:{
-			pExpr->type = FIELD_TYPE_INTEGER;
 			exprCodeBetween(pParse, pExpr, target, 0, 0);
 			return target;
 		}
 	case TK_SPAN:
 	case TK_COLLATE:{
-			pExpr->type = FIELD_TYPE_STRING;
 			return sqlExprCodeTarget(pParse, pExpr->pLeft,
 						     target);
 		}
 	case TK_UPLUS:{
-			pExpr->type = FIELD_TYPE_NUMBER;
 			return sqlExprCodeTarget(pParse, pExpr->pLeft,
 						     target);
 		}

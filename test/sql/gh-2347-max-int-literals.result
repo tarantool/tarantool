@@ -23,7 +23,7 @@ box.execute("select (-9223372036854775808)")
 ---
 - metadata:
   - name: (-9223372036854775808)
-    type: number
+    type: integer
   rows:
   - [-9223372036854775808]
 ...

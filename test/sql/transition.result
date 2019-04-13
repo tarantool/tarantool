@@ -225,7 +225,7 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar")
 ---
 - metadata:
   - name: BAR
-    type: scalar
+    type: string
   - name: FOO
     type: integer
   - name: '42'
@@ -241,7 +241,7 @@ box.execute("SELECT bar, foo, 42, 'awesome' FROM foobar ORDER BY bar DESC")
 ---
 - metadata:
   - name: BAR
-    type: scalar
+    type: string
   - name: FOO
     type: integer
   - name: '42'
