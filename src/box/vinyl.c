@@ -3924,7 +3924,14 @@ vinyl_index_get(struct index *index, const char *key,
 		return -1;
 	}
 
-	if (vy_get_by_raw_key(lsm, tx, rv, key, part_count, ret) != 0)
+	/*
+	 * Make sure the LSM tree isn't deleted while we are
+	 * reading from it.
+	 */
+	vy_lsm_ref(lsm);
+	int rc = vy_get_by_raw_key(lsm, tx, rv, key, part_count, ret);
+	vy_lsm_unref(lsm);
+	if (rc != 0)
 		return -1;
 	if (*ret != NULL) {
 		tuple_bless(*ret);
