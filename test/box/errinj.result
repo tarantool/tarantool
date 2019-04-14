@@ -40,21 +40,23 @@ errinj.info()
     state: false
   ERRINJ_VY_INDEX_FILE_RENAME:
     state: false
+  ERRINJ_VY_POINT_ITER_WAIT:
+    state: false
   ERRINJ_VY_DELAY_PK_LOOKUP:
     state: false
   ERRINJ_VY_TASK_COMPLETE:
     state: false
   ERRINJ_PORT_DUMP:
     state: false
-  ERRINJ_VY_POINT_ITER_WAIT:
-    state: false
+  ERRINJ_WAL_BREAK_LSN:
+    state: -1
   ERRINJ_WAL_IO:
     state: false
   ERRINJ_WAL_FALLOCATE:
     state: 0
-  ERRINJ_WAL_BREAK_LSN:
-    state: -1
   ERRINJ_LOG_ROTATE:
+    state: false
+  ERRINJ_VY_DUMP_DELAY:
     state: false
   ERRINJ_TUPLE_FORMAT_COUNT:
     state: -1

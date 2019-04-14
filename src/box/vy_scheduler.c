@@ -1091,6 +1091,11 @@ fail:
 static int
 vy_task_dump_execute(struct vy_task *task)
 {
+	struct errinj *errinj = errinj(ERRINJ_VY_DUMP_DELAY, ERRINJ_BOOL);
+	if (errinj != NULL && errinj->bparam) {
+		while (errinj->bparam)
+			fiber_sleep(0.01);
+	}
 	/*
 	 * Don't compress L1 runs as they are most frequently read
 	 * and smallest runs at the same time and so we would gain
