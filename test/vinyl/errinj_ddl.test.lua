@@ -395,4 +395,24 @@ s.index.primary:select()
 s.index.secondary:select()
 s:drop()
 
+--
+-- gh-4109: crash if space is dropped while space.get is reading from it.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+_ = s:create_index('primary')
+s:replace{1}
+box.snapshot()
+
+test_run:cmd("setopt delimiter ';'")
+box.error.injection.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0.01);
+ch = fiber.channel(1);
+_ = fiber.create(function()
+    local _, ret = pcall(s.get, s, 1)
+    ch:put(ret)
+end);
+s:drop();
+ch:get();
+box.error.injection.set('ERRINJ_VY_READ_PAGE_TIMEOUT', 0);
+test_run:cmd("setopt delimiter ''");
+
 box.cfg{vinyl_cache = default_vinyl_cache}
