@@ -4044,6 +4044,15 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 	}
 	return;
 err:
+	/*
+	 * No need to abort the DDL request if this transaction
+	 * has been aborted as its changes won't be applied to
+	 * the space anyway. Besides, it might have been aborted
+	 * by the DDL request itself, in which case the build
+	 * context isn't valid and so we must not modify it.
+	 */
+	if (tx->state == VINYL_TX_ABORT)
+		return;
 	ctx->is_failed = true;
 	diag_move(diag_get(), &ctx->diag);
 }
