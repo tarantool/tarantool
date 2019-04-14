@@ -807,6 +807,96 @@ s:select()
 s:drop()
 ---
 ...
+--
+-- gh-4152: yet another DML vs DDL race.
+--
+s = box.schema.space.create('test', {engine = 'vinyl'})
+---
+...
+_ = s:create_index('primary')
+---
+...
+s:replace{1, 1}
+---
+- [1, 1]
+...
+box.snapshot()
+---
+- ok
+...
+test_run:cmd("setopt delimiter ';'")
+---
+- true
+...
+-- Create a secondary index. Delay dump.
+box.error.injection.set('ERRINJ_VY_DUMP_DELAY', true);
+---
+- ok
+...
+ch = fiber.channel(1);
+---
+...
+_ = fiber.create(function()
+    local status, err = pcall(s.create_index, s, 'secondary',
+                    {unique = true, parts = {2, 'unsigned'}})
+    ch:put(status or err)
+end);
+---
+...
+-- Wait for dump to start.
+test_run:wait_cond(function()
+    return box.stat.vinyl().scheduler.tasks_inprogress > 0
+end, 60);
+---
+- true
+...
+-- Issue a DML request that will yield to check the unique
+-- constraint of the new index. Delay disk read.
+box.error.injection.set('ERRINJ_VY_READ_PAGE_DELAY', true);
+---
+- ok
+...
+_ = fiber.create(function()
+    local status, err = pcall(s.replace, s, {2, 1})
+    ch:put(status or err)
+end);
+---
+...
+-- Wait for index creation to complete.
+-- It must complete successfully.
+box.error.injection.set('ERRINJ_VY_DUMP_DELAY', false);
+---
+- ok
+...
+ch:get();
+---
+- true
+...
+-- Wait for the DML request to complete.
+-- It must be aborted.
+box.error.injection.set('ERRINJ_VY_READ_PAGE_DELAY', false);
+---
+- ok
+...
+ch:get();
+---
+- Transaction has been aborted by conflict
+...
+test_run:cmd("setopt delimiter ''");
+---
+- true
+...
+s.index.primary:select()
+---
+- - [1, 1]
+...
+s.index.secondary:select()
+---
+- - [1, 1]
+...
+s:drop()
+---
+...
 box.cfg{vinyl_cache = default_vinyl_cache}
 ---
 ...
