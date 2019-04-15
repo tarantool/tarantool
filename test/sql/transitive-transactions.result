@@ -134,3 +134,31 @@ box.execute('DROP TABLE parent;');
 ---
 - row_count: 1
 ...
+-- gh-4157: autoincrement within transaction started in SQL
+-- leads to seagfault.
+--
+box.execute('CREATE TABLE t (id INT PRIMARY KEY AUTOINCREMENT);');
+---
+- row_count: 1
+...
+box.execute('START TRANSACTION')
+box.execute('INSERT INTO t VALUES (null), (null);')
+box.execute('INSERT INTO t VALUES (null), (null);')
+box.execute('SAVEPOINT sp;')
+box.execute('INSERT INTO t VALUES (null);')
+box.execute('ROLLBACK TO sp;')
+box.execute('INSERT INTO t VALUES (null);')
+box.commit();
+---
+...
+box.space.T:select();
+---
+- - [1]
+  - [2]
+  - [3]
+  - [4]
+  - [6]
+...
+box.space.T:drop();
+---
+...
