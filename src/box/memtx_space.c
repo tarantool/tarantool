@@ -976,19 +976,11 @@ memtx_space_new(struct memtx_engine *memtx,
 
 	/* Create a format from key and field definitions. */
 	int key_count = 0;
-	struct index_def *index_def;
-	rlist_foreach_entry(index_def, key_list, link)
-		key_count++;
-	struct key_def **keys = region_alloc(&fiber()->gc,
-					     sizeof(*keys) * key_count);
+	struct key_def **keys = index_def_to_key_def(key_list, &key_count);
 	if (keys == NULL) {
 		free(memtx_space);
 		return NULL;
 	}
-	key_count = 0;
-	rlist_foreach_entry(index_def, key_list, link)
-		keys[key_count++] = index_def->key_def;
-
 	struct tuple_format *format =
 		tuple_format_new(&memtx_tuple_format_vtab, memtx, keys, key_count,
 				 def->fields, def->field_count,

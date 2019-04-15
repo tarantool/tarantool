@@ -337,6 +337,18 @@ index_def_new(uint32_t space_id, uint32_t iid, const char *name,
 	      struct key_def *key_def, struct key_def *pk_def);
 
 /**
+ * Create an array (on a region) of key_defs from list of index
+ * definitions.
+ *
+ * @param index_defs List head.
+ * @param[out] size  Array size.
+ * @retval not NULL  Array of pointers to key_def
+ * @retval NULL      Memory error.
+ */
+struct key_def **
+index_def_to_key_def(struct rlist *index_defs, int *size);
+
+/**
  * One key definition is greater than the other if it's id is
  * greater, it's name is greater,  it's index type is greater
  * (HASH < TREE < BITSET) or its key part array is greater.

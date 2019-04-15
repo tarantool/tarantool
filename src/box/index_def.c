@@ -33,6 +33,7 @@
 #include "identifier.h"
 #include "tuple_format.h"
 #include "json/json.h"
+#include "fiber.h"
 
 const char *index_type_strs[] = { "HASH", "TREE", "BITSET", "RTREE" };
 
@@ -243,6 +244,27 @@ index_def_cmp(const struct index_def *key1, const struct index_def *key2)
 
 	return key_part_cmp(key1->key_def->parts, key1->key_def->part_count,
 			    key2->key_def->parts, key2->key_def->part_count);
+}
+
+struct key_def **
+index_def_to_key_def(struct rlist *index_defs, int *size)
+{
+	int key_count = 0;
+	struct index_def *index_def;
+	rlist_foreach_entry(index_def, index_defs, link)
+		key_count++;
+	size_t sz = sizeof(struct key_def *) * key_count;
+	struct key_def **keys = (struct key_def **) region_alloc(&fiber()->gc,
+								 sz);
+	if (keys == NULL) {
+		diag_set(OutOfMemory, sz, "region_alloc", "keys");
+		return NULL;
+	}
+	*size = key_count;
+	key_count = 0;
+	rlist_foreach_entry(index_def, index_defs, link)
+		keys[key_count++] = index_def->key_def;
+	return keys;
 }
 
 bool

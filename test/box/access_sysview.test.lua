@@ -270,7 +270,7 @@ seq:drop()
 
 box.space._vspace.index[1]:alter({parts = { 2, 'string' }})
 box.space._vspace.index[1]:select('xxx')
-box.space._vspace.index[1]:select(1)
+box.space._vspace.index[1]:count(1) > 0
 box.space._vspace.index[1]:alter({parts = { 2, 'unsigned' }})
 box.space._space.index[1]:drop()
 box.space._vspace.index[1]:select(1)
