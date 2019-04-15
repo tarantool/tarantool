@@ -697,7 +697,10 @@ tuple_format_new(struct tuple_format_vtab *vtab, void *engine,
 		tuple_format_alloc(keys, key_count, space_field_count, dict);
 	if (format == NULL)
 		return NULL;
-	format->vtab = *vtab;
+	if (vtab != NULL)
+		format->vtab = *vtab;
+	else
+		memset(&format->vtab, 0, sizeof(format->vtab));
 	format->engine = engine;
 	format->is_temporary = is_temporary;
 	format->is_ephemeral = is_ephemeral;
