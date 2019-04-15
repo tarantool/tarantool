@@ -110,6 +110,7 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
 			if (txn->psql_txn == NULL)
 				return -1;
 		}
+		txn->psql_txn->vdbe = vdbe;
 	}
 	return 0;
 }

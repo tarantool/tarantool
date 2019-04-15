@@ -67,3 +67,18 @@ box.execute('PRAGMA defer_foreign_keys = 0;')
 -- Cleanup
 box.execute('DROP TABLE child;');
 box.execute('DROP TABLE parent;');
+
+-- gh-4157: autoincrement within transaction started in SQL
+-- leads to seagfault.
+--
+box.execute('CREATE TABLE t (id INT PRIMARY KEY AUTOINCREMENT);');
+box.execute('START TRANSACTION')
+box.execute('INSERT INTO t VALUES (null), (null);')
+box.execute('INSERT INTO t VALUES (null), (null);')
+box.execute('SAVEPOINT sp;')
+box.execute('INSERT INTO t VALUES (null);')
+box.execute('ROLLBACK TO sp;')
+box.execute('INSERT INTO t VALUES (null);')
+box.commit();
+box.space.T:select();
+box.space.T:drop();
