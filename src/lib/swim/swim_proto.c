@@ -168,6 +168,31 @@ swim_check_inaddr_not_empty(const struct sockaddr_in *addr, const char *prefix,
 	return -1;
 }
 
+/**
+ * Create a binary address structure. It requires explicit IP and
+ * port keys specification since the keys depend on the component
+ * employing the address.
+ */
+static inline void
+swim_inaddr_bin_create(struct swim_inaddr_bin *bin, uint8_t ip_key,
+		       uint8_t port_key)
+{
+	assert(mp_sizeof_uint(ip_key) == 1 && mp_sizeof_uint(port_key) == 1);
+	bin->k_addr = ip_key;
+	bin->m_addr = 0xce;
+	bin->k_port = port_key;
+	bin->m_port = 0xcd;
+}
+
+/** Fill already created @a bin with a real inet address. */
+static inline void
+swim_inaddr_bin_fill(struct swim_inaddr_bin *bin,
+		     const struct sockaddr_in *addr)
+{
+	bin->v_addr = mp_bswap_u32(ntohl(addr->sin_addr.s_addr));
+	bin->v_port = mp_bswap_u16(ntohs(addr->sin_port));
+}
+
 void
 swim_member_def_create(struct swim_member_def *def)
 {
@@ -343,12 +368,12 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
 void
 swim_passport_bin_create(struct swim_passport_bin *passport)
 {
-	passport->m_header = 0x85;
+	int map_size = 3 + SWIM_INADDR_BIN_SIZE;
+	assert(mp_sizeof_map(map_size) == 1);
+	passport->m_header = 0x80 | map_size;
 	passport->k_status = SWIM_MEMBER_STATUS;
-	passport->k_addr = SWIM_MEMBER_ADDRESS;
-	passport->m_addr = 0xce;
-	passport->k_port = SWIM_MEMBER_PORT;
-	passport->m_port = 0xcd;
+	swim_inaddr_bin_create(&passport->addr, SWIM_MEMBER_ADDRESS,
+			       SWIM_MEMBER_PORT);
 	passport->k_uuid = SWIM_MEMBER_UUID;
 	passport->m_uuid = 0xc4;
 	passport->m_uuid_len = UUID_LEN;
@@ -363,8 +388,7 @@ swim_passport_bin_fill(struct swim_passport_bin *passport,
 		       enum swim_member_status status, uint64_t incarnation)
 {
 	passport->v_status = status;
-	passport->v_addr = mp_bswap_u32(ntohl(addr->sin_addr.s_addr));
-	passport->v_port = mp_bswap_u16(ntohs(addr->sin_port));
+	swim_inaddr_bin_fill(&passport->addr, addr);
 	memcpy(passport->v_uuid, uuid, UUID_LEN);
 	passport->v_incarnation = mp_bswap_u64(incarnation);
 }
@@ -382,16 +406,15 @@ void
 swim_meta_header_bin_create(struct swim_meta_header_bin *header,
 			    const struct sockaddr_in *src)
 {
-	header->m_header = 0x83;
+	int map_size = 1 + SWIM_INADDR_BIN_SIZE;
+	assert(mp_sizeof_map(map_size) == 1);
+	header->m_header = 0x80 | map_size;
 	header->k_version = SWIM_META_TARANTOOL_VERSION;
 	header->m_version = 0xce;
 	header->v_version = mp_bswap_u32(tarantool_version_id());
-	header->k_addr = SWIM_META_SRC_ADDRESS;
-	header->m_addr = 0xce;
-	header->v_addr = mp_bswap_u32(ntohl(src->sin_addr.s_addr));
-	header->k_port = SWIM_META_SRC_PORT;
-	header->m_port = 0xcd;
-	header->v_port = mp_bswap_u16(ntohs(src->sin_port));
+	swim_inaddr_bin_create(&header->src_addr, SWIM_META_SRC_ADDRESS,
+			       SWIM_META_SRC_PORT);
+	swim_inaddr_bin_fill(&header->src_addr, src);
 }
 
 int

@@ -232,6 +232,35 @@ swim_failure_detection_def_decode(struct swim_failure_detection_def *def,
 
 /** {{{                  Anti-entropy component                 */
 
+enum {
+	/**
+	 * Number of keys in the address binary structure.
+	 * Structures storing an address should use this size so
+	 * as to correctly encode MessagePack map header.
+	 */
+	SWIM_INADDR_BIN_SIZE = 2,
+};
+
+/**
+ * Binary inet address structure. It contains two fields at this
+ * moment - IP and port encoded as usual numbers. It means that
+ * after mp_decode_uint() it is necessary to use htonl/htons()
+ * functions to assign the values to struct sockaddr_in.
+ */
+struct PACKED swim_inaddr_bin {
+	/** mp_encode_uint(address key) */
+	uint8_t k_addr;
+	/** mp_encode_uint(ntohl(addr.sin_addr.s_addr)) */
+	uint8_t m_addr;
+	uint32_t v_addr;
+
+	/** mp_encode_uint(port key) */
+	uint8_t k_port;
+	/** mp_encode_uint(ntohs(addr.sin_port)) */
+	uint8_t m_port;
+	uint16_t v_port;
+};
+
 /**
  * Attributes of each record of a broadcasted member table. Just
  * the same as some of struct swim_member attributes.
@@ -279,17 +308,8 @@ struct PACKED swim_passport_bin {
 	/** mp_encode_uint(enum member_status) */
 	uint8_t v_status;
 
-	/** mp_encode_uint(SWIM_MEMBER_ADDRESS) */
-	uint8_t k_addr;
-	/** mp_encode_uint(addr.sin_addr.s_addr) */
-	uint8_t m_addr;
-	uint32_t v_addr;
-
-	/** mp_encode_uint(SWIM_MEMBER_PORT) */
-	uint8_t k_port;
-	/** mp_encode_uint(addr.sin_port) */
-	uint8_t m_port;
-	uint16_t v_port;
+	/** SWIM_MEMBER_ADDRESS and SWIM_MEMBER_PORT. */
+	struct swim_inaddr_bin addr;
 
 	/** mp_encode_uint(SWIM_MEMBER_UUID) */
 	uint8_t k_uuid;
@@ -386,17 +406,8 @@ struct PACKED swim_meta_header_bin {
 	uint8_t m_version;
 	uint32_t v_version;
 
-	/** mp_encode_uint(SWIM_META_SRC_ADDRESS) */
-	uint8_t k_addr;
-	/** mp_encode_uint(addr.sin_addr.s_addr) */
-	uint8_t m_addr;
-	uint32_t v_addr;
-
-	/** mp_encode_uint(SWIM_META_SRC_PORT) */
-	uint8_t k_port;
-	/** mp_encode_uint(addr.sin_port) */
-	uint8_t m_port;
-	uint16_t v_port;
+	/** SWIM_META_SRC_ADDRESS and SWIM_META_SRC_PORT. */
+	struct swim_inaddr_bin src_addr;
 };
 
 /** Initialize meta section. */
