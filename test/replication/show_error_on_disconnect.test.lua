@@ -27,18 +27,14 @@ box.space.test:insert{3}
 -- Check error reporting.
 test_run:cmd("switch master_quorum1")
 box.cfg{replication = repl}
-require('fiber').sleep(0.1)
 box.space.test:select()
 other_id = box.info.id % 2 + 1
-box.info.replication[other_id].upstream.status
-box.info.replication[other_id].upstream.message:match("Missing")
+test_run:wait_upstream(other_id, {status = 'stopped', message_re = 'Missing'})
 test_run:cmd("switch master_quorum2")
 box.space.test:select()
 other_id = box.info.id % 2 + 1
-box.info.replication[other_id].upstream.status
-box.info.replication[other_id].upstream.message
-box.info.replication[other_id].downstream.status
-box.info.replication[other_id].downstream.message:match("Missing")
+test_run:wait_upstream(other_id, {status = 'follow', message_re = box.NULL})
+test_run:wait_downstream(other_id, {status = 'stopped', message_re = 'Missing'})
 test_run:cmd("switch default")
 -- Cleanup.
 test_run:drop_cluster(SERVERS)
