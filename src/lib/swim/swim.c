@@ -1418,8 +1418,10 @@ swim_process_quit(struct swim *swim, const char **pos, const char *end,
 /** Process a new message. */
 static void
 swim_on_input(struct swim_scheduler *scheduler, const char *pos,
-	      const char *end, const struct sockaddr_in *src)
+	      const char *end, const struct sockaddr_in *src,
+	      const struct sockaddr_in *proxy)
 {
+	(void) proxy;
 	const char *prefix = "invalid message:";
 	struct swim *swim = swim_by_scheduler(scheduler);
 	struct tt_uuid uuid;

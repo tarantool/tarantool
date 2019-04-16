@@ -189,11 +189,64 @@ swim_test_meta(void)
 	footer();
 }
 
+static void
+swim_test_route(void)
+{
+	header();
+	plan(5);
+
+	char buffer[1024];
+	struct swim_meta_def mdef;
+	struct swim_meta_header_bin header;
+	struct sockaddr_in addr;
+	addr.sin_port = htons(1234);
+	fail_if(inet_aton("127.0.0.1", &addr.sin_addr) == 0);
+
+	swim_meta_header_bin_create(&header, &addr, true);
+	memcpy(buffer, &header, sizeof(header));
+	char *last_valid = buffer + sizeof(header);
+	char *end = last_valid;
+	const char *pos = buffer;
+
+	is(swim_meta_def_decode(&mdef, &pos, end), -1,
+	   "route was expected, but map is too short");
+
+	end = mp_encode_uint(end, SWIM_META_ROUTING);
+	pos = buffer;
+	is(swim_meta_def_decode(&mdef, &pos, end), -1, "no route map");
+
+	end = mp_encode_map(end, 0);
+	pos = buffer;
+	is(swim_meta_def_decode(&mdef, &pos, end), -1, "empty route map");
+
+	struct swim_route_bin route;
+	struct sockaddr_in src, dst;
+	memset(&src, 0, sizeof(src));
+	memset(&dst, 0, sizeof(dst));
+	swim_route_bin_create(&route, &src, &dst);
+	memcpy(last_valid, &route, sizeof(route));
+	end = last_valid + sizeof(route);
+	pos = buffer;
+	is(swim_meta_def_decode(&mdef, &pos, end), -1, "zero addresses");
+
+	src.sin_port = 1;
+	src.sin_addr = addr.sin_addr;
+	dst.sin_port = 1;
+	dst.sin_addr = addr.sin_addr;
+	swim_route_bin_create(&route, &src, &dst);
+	memcpy(last_valid, &route, sizeof(route));
+	pos = buffer;
+	is(swim_meta_def_decode(&mdef, &pos, end), 0, "normal route");
+
+	check_plan();
+	footer();
+}
+
 int
 main()
 {
 	header();
-	plan(2);
+	plan(3);
 	memory_init();
 	fiber_init(fiber_c_invoke);
 	int fd = open("log.txt", O_TRUNC);
@@ -203,6 +256,7 @@ main()
 
 	swim_test_member_def();
 	swim_test_meta();
+	swim_test_route();
 
 	say_logger_free();
 	fiber_free();

@@ -431,9 +431,9 @@ swim_diss_header_bin_create(struct swim_diss_header_bin *header,
 
 void
 swim_meta_header_bin_create(struct swim_meta_header_bin *header,
-			    const struct sockaddr_in *src)
+			    const struct sockaddr_in *src, bool has_routing)
 {
-	int map_size = 1 + SWIM_INADDR_BIN_SIZE;
+	int map_size = 1 + SWIM_INADDR_BIN_SIZE + has_routing;
 	assert(mp_sizeof_map(map_size) == 1);
 	header->m_header = 0x80 | map_size;
 	header->k_version = SWIM_META_TARANTOOL_VERSION;
@@ -442,6 +442,64 @@ swim_meta_header_bin_create(struct swim_meta_header_bin *header,
 	swim_inaddr_bin_create(&header->src_addr, SWIM_META_SRC_ADDRESS,
 			       SWIM_META_SRC_PORT);
 	swim_inaddr_bin_fill(&header->src_addr, src);
+}
+
+/**
+ * Decode meta routing section into meta definition object.
+ * @param[out] def Definition to decode into.
+ * @param[in][out] pos MessagePack buffer to decode.
+ * @param end End of the MessagePack buffer.
+ *
+ * @retval 0 Success.
+ * @retval -1 Error.
+ */
+static int
+swim_meta_def_decode_route(struct swim_meta_def *def, const char **pos,
+			   const char *end)
+{
+	const char *prefix = "invalid routing section:";
+	uint32_t size;
+	def->route.src.sin_family = AF_INET;
+	def->route.dst.sin_family = AF_INET;
+	if (swim_decode_map(pos, end, &size, prefix, "route") != 0)
+		return -1;
+	for (uint32_t i = 0; i < size; ++i) {
+		uint64_t key;
+		if (swim_decode_uint(pos, end, &key, prefix, "a key") != 0)
+			return -1;
+		switch (key) {
+		case SWIM_ROUTE_SRC_ADDRESS:
+			if (swim_decode_ip(&def->route.src, pos, end, prefix,
+					   "source address") != 0)
+				return -1;
+			break;
+		case SWIM_ROUTE_SRC_PORT:
+			if (swim_decode_port(&def->route.src, pos, end,
+					     prefix, "source port") != 0)
+				return -1;
+			break;
+		case SWIM_ROUTE_DST_ADDRESS:
+			if (swim_decode_ip(&def->route.dst, pos, end, prefix,
+					   "destination address") != 0)
+				return -1;
+			break;
+		case SWIM_ROUTE_DST_PORT:
+			if (swim_decode_port(&def->route.dst, pos, end,
+					     prefix, "destination port") != 0)
+				return -1;
+			break;
+		default:
+			diag_set(SwimError, "%s unknown key", prefix);
+			return -1;
+		}
+	}
+	if (swim_check_inaddr_not_empty(&def->route.src, prefix,
+					"source") != 0 ||
+	    swim_check_inaddr_not_empty(&def->route.dst, prefix,
+					"destination") != 0)
+		return -1;
+	def->is_route_specified = true;
+	return 0;
 }
 
 int
@@ -459,6 +517,10 @@ swim_meta_def_decode(struct swim_meta_def *def, const char **pos,
 		if (swim_decode_uint(pos, end, &key, prefix, "a key") != 0)
 			return -1;
 		switch (key) {
+		case SWIM_META_ROUTING:
+			if (swim_meta_def_decode_route(def, pos, end) != 0)
+				return -1;
+			break;
 		case SWIM_META_TARANTOOL_VERSION:
 			if (swim_decode_uint(pos, end, &key, prefix,
 					     "version") != 0)
@@ -500,4 +562,21 @@ swim_quit_bin_create(struct swim_quit_bin *header, uint64_t incarnation)
 	header->k_incarnation = SWIM_QUIT_INCARNATION;
 	header->m_incarnation = 0xcf;
 	header->v_incarnation = mp_bswap_u64(incarnation);
+}
+
+void
+swim_route_bin_create(struct swim_route_bin *route,
+		      const struct sockaddr_in *src,
+		      const struct sockaddr_in *dst)
+{
+	int map_size = SWIM_INADDR_BIN_SIZE * 2;
+	assert(mp_sizeof_map(map_size) == 1);
+	route->k_routing = SWIM_META_ROUTING;
+	route->m_routing = 0x80 | map_size;
+	swim_inaddr_bin_create(&route->src_addr, SWIM_ROUTE_SRC_ADDRESS,
+			       SWIM_ROUTE_SRC_PORT);
+	swim_inaddr_bin_create(&route->dst_addr, SWIM_ROUTE_DST_ADDRESS,
+			       SWIM_ROUTE_DST_PORT);
+	swim_inaddr_bin_fill(&route->src_addr, src);
+	swim_inaddr_bin_fill(&route->dst_addr, dst);
 }

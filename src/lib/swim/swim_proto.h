@@ -51,7 +51,13 @@ enum {
  * | {                                                           |
  * |     SWIM_META_TARANTOOL_VERSION: uint, Tarantool version ID,|
  * |     SWIM_META_SRC_ADDRESS: uint, ip,                        |
- * |     SWIM_META_SRC_PORT: uint, port                          |
+ * |     SWIM_META_SRC_PORT: uint, port,                         |
+ * |     SWIM_META_ROUTING: {                                    |
+ * |         SWIM_ROUTE_SRC_ADDRESS: uint, ip,                   |
+ * |         SWIM_ROUTE_SRC_PORT: uint, port,                    |
+ * |         SWIM_ROUTE_DST_ADDRESS: uint, ip,                   |
+ * |         SWIM_ROUTE_DST_PORT: uint, port                     |
+ * |     }                                                       |
  * | }                                                           |
  * +-------------------Protocol logic section--------------------+
  * | {                                                           |
@@ -421,6 +427,33 @@ enum swim_meta_key {
 	 */
 	SWIM_META_SRC_ADDRESS,
 	SWIM_META_SRC_PORT,
+	/**
+	 * Routing section allows to specify routes of up to 3
+	 * nodes: source, proxy, and destination. It contains two
+	 * addresses - the message originator and the final
+	 * destination. Here is an example of an indirect message
+	 * transmission. Assume, there are 3 nodes: S1, S2, S3.
+	 * S1 sends a message to S3 via S2. The following steps
+	 * are executed in order to deliver the message:
+	 *
+	 * S1 -> S2
+	 * { src: S1, routing: {src: S1, dst: S3}, body: ... }
+	 *
+	 * S2 receives the message and sees: routing.dst != S2 -
+	 * it is a foreign packet. S2 forwards it to S3 preserving
+	 * all the data - body and routing sections.
+	 *
+	 *
+	 * S2 -> S3
+	 * {src: S2, routing: {src: S1, dst: S3}, body: ...}
+	 *
+	 * S3 receives the message and sees: routing.dst == S3 -
+	 * the message is delivered. If S3 wants to answer, it
+	 * sends a response via the same proxy. It knows, that the
+	 * message was delivered from S2, and sends an answer via
+	 * S2.
+	 */
+	SWIM_META_ROUTING,
 };
 
 /**
@@ -432,7 +465,7 @@ enum swim_meta_key {
  * separate MessagePack map.
  */
 struct PACKED swim_meta_header_bin {
-	/** mp_encode_map(3) */
+	/** mp_encode_map(3 or 4) */
 	uint8_t m_header;
 
 	/** mp_encode_uint(SWIM_META_TARANTOOL_VERSION) */
@@ -448,7 +481,7 @@ struct PACKED swim_meta_header_bin {
 /** Initialize meta section. */
 void
 swim_meta_header_bin_create(struct swim_meta_header_bin *header,
-			    const struct sockaddr_in *src);
+			    const struct sockaddr_in *src, bool has_routing);
 
 /** Meta definition. */
 struct swim_meta_def {
@@ -456,6 +489,18 @@ struct swim_meta_def {
 	uint32_t version;
 	/** Source of the message. */
 	struct sockaddr_in src;
+	/** Route source and destination. */
+	struct {
+		struct sockaddr_in src;
+		struct sockaddr_in dst;
+	} route;
+	/**
+	 * True, if both @a src and @a dst are not empty. This
+	 * flag is just sugar so as not to check both addresses
+	 * manually. Also in future more fields could be added
+	 * here.
+	 */
+	bool is_route_specified;
 };
 
 /**
@@ -470,6 +515,43 @@ struct swim_meta_def {
 int
 swim_meta_def_decode(struct swim_meta_def *def, const char **pos,
 		     const char *end);
+
+enum swim_route_key {
+	/**
+	 * True source of the packet. Can be different from the
+	 * packet sender. It is expected that a response should be
+	 * sent back to this address. Maybe indirectly through the
+	 * same proxy.
+	 */
+	SWIM_ROUTE_SRC_ADDRESS = 0,
+	SWIM_ROUTE_SRC_PORT,
+	/**
+	 * True destination of the packet. Can be different from
+	 * this instance, receiver. If it is for another instance,
+	 * then this packet is forwarded to the latter.
+	 */
+	SWIM_ROUTE_DST_ADDRESS,
+	SWIM_ROUTE_DST_PORT,
+	swim_route_key_MAX,
+};
+
+/** Route section template. Describes source, destination. */
+struct PACKED swim_route_bin {
+	/** mp_encode_uint(SWIM_ROUTING) */
+	uint8_t k_routing;
+	/** mp_encode_map(4) */
+	uint8_t m_routing;
+	/** SWIM_ROUTE_SRC_ADDRESS and SWIM_ROUTE_SRC_PORT. */
+	struct swim_inaddr_bin src_addr;
+	/** SWIM_ROUTE_DST_ADDRESS and SWIM_ROUTE_DST_PORT. */
+	struct swim_inaddr_bin dst_addr;
+};
+
+/** Initialize routing section. */
+void
+swim_route_bin_create(struct swim_route_bin *route,
+		      const struct sockaddr_in *src,
+		      const struct sockaddr_in *dst);
 
 /** }}}                     Meta component                      */
 

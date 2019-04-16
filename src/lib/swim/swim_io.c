@@ -60,8 +60,11 @@ swim_packet_create(struct swim_packet *packet)
 /** Fill metadata prefix of a packet. */
 static inline void
 swim_packet_build_meta(struct swim_packet *packet,
-		       const struct sockaddr_in *src)
+		       const struct sockaddr_in *src,
+		       const struct sockaddr_in *route_src,
+		       const struct sockaddr_in *route_dst)
 {
+	assert((route_src != NULL) == (route_dst != NULL));
 	char *meta = packet->meta;
 	char *end = packet->body;
 	/*
@@ -71,15 +74,39 @@ swim_packet_build_meta(struct swim_packet *packet,
 	if (meta == end)
 		return;
 	struct swim_meta_header_bin header;
-	swim_meta_header_bin_create(&header, src);
-	assert(meta + sizeof(header) == end);
+	swim_meta_header_bin_create(&header, src, route_dst != NULL);
+	assert(meta + sizeof(header) <= end);
 	memcpy(meta, &header, sizeof(header));
+	meta += sizeof(header);
+	if (route_dst != NULL) {
+		struct swim_route_bin route;
+		swim_route_bin_create(&route, route_src, route_dst);
+		assert(meta + sizeof(route) <= end);
+		memcpy(meta, &route, sizeof(route));
+		meta += sizeof(route);
+	}
+	assert(meta == end);
 	/*
 	 * Once meta is built, it is consumed by the body. Used
 	 * not to rebuild the meta again if the task will be
 	 * scheduled again without changes in data.
 	 */
 	packet->body = packet->meta;
+}
+
+void
+swim_task_set_proxy(struct swim_task *task, const struct sockaddr_in *proxy)
+{
+	/*
+	 * Route meta should be reserved before body encoding is
+	 * started. Otherwise later it would be necessary to move
+	 * already encoded body, maybe having its tail trimmed off
+	 * because of limited UDP packet size.
+	 */
+	assert(swim_packet_body_size(&task->packet) == 0);
+	assert(! swim_inaddr_is_empty(proxy));
+	task->proxy = *proxy;
+	swim_packet_alloc_meta(&task->packet, sizeof(struct swim_route_bin));
 }
 
 void
@@ -161,6 +188,11 @@ swim_bcast_task_delete_cb(struct swim_task *task,
 static int
 swim_bcast_task_next_addr(struct swim_bcast_task *task)
 {
+	/*
+	 * Broadcast + proxy is not supported yet, and barely it
+	 * will be needed anytime.
+	 */
+	assert(swim_inaddr_is_empty(&task->base.proxy));
 	for (struct ifaddrs *i = task->i; i != NULL; i = i->ifa_next) {
 		int flags = i->ifa_flags;
 		if ((flags & IFF_UP) == 0)
@@ -320,13 +352,23 @@ swim_scheduler_on_output(struct ev_loop *loop, struct ev_io *io, int events)
 	struct swim_task *task =
 		rlist_shift_entry(&scheduler->queue_output, struct swim_task,
 				  in_queue_output);
+	const struct sockaddr_in *src = &scheduler->transport.addr;
+	const struct sockaddr_in *dst = &task->dst;
+	const char *dst_str = swim_inaddr_str(dst);
+	if (! swim_inaddr_is_empty(&task->proxy)) {
+		dst = &task->proxy;
+		dst_str = tt_sprintf("%s via %s", dst_str,
+				     swim_inaddr_str(dst));
+		swim_packet_build_meta(&task->packet, src, src, &task->dst);
+	} else {
+		swim_packet_build_meta(&task->packet, src, NULL, NULL);
+	}
 	say_verbose("SWIM %d: send %s to %s", swim_scheduler_fd(scheduler),
-		    task->desc, swim_inaddr_str(&task->dst));
-	swim_packet_build_meta(&task->packet, &scheduler->transport.addr);
+		    task->desc, dst_str);
 	int rc = swim_transport_send(&scheduler->transport, task->packet.buf,
 				     task->packet.pos - task->packet.buf,
-				     (const struct sockaddr *) &task->dst,
-				     sizeof(task->dst));
+				     (const struct sockaddr *) dst,
+				     sizeof(*dst));
 	if (rc < 0)
 		diag_log();
 	if (task->complete != NULL)
@@ -357,7 +399,45 @@ swim_scheduler_on_input(struct ev_loop *loop, struct ev_io *io, int events)
 	const char *pos = buf, *end = pos + size;
 	if (swim_meta_def_decode(&meta, &pos, end) < 0)
 		goto error;
-	scheduler->on_input(scheduler, pos, end, &meta.src);
+	/*
+	 * Check if this instance is not the destination and
+	 * possibly forward the packet.
+	 */
+	if (! meta.is_route_specified) {
+		scheduler->on_input(scheduler, pos, end, &meta.src, NULL);
+		return;
+	}
+	struct sockaddr_in *self = &scheduler->transport.addr;
+	if (swim_inaddr_eq(&meta.route.dst, self)) {
+		scheduler->on_input(scheduler, pos, end, &meta.route.src,
+				    &meta.src);
+		return;
+	}
+	/* Forward the foreign packet. */
+	struct swim_task *task = swim_task_new(swim_task_delete_cb,
+					       swim_task_delete_cb,
+					       "foreign packet");
+	if (task == NULL)
+		goto error;
+	/*
+	 * Allocate route meta explicitly, because the packet
+	 * should keep route meta even being sent to the final
+	 * destination directly.
+	 */
+	swim_packet_alloc_meta(&task->packet, sizeof(struct swim_route_bin));
+	/*
+	 * Meta should be rebuilt with the different source
+	 * address - this instance. It is used by the receiver to
+	 * send a reply through this instance again.
+	 */
+	swim_packet_build_meta(&task->packet, self, &meta.route.src,
+			       &meta.route.dst);
+	/* Copy the original body without a touch. */
+	size = end - pos;
+	char *body = swim_packet_alloc(&task->packet, size);
+	assert(body != NULL);
+	memcpy(body, pos, size);
+	swim_task_send(task, &meta.route.dst, scheduler);
 	return;
 error:
 	diag_log();
