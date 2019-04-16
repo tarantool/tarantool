@@ -201,14 +201,6 @@ swim_uuid_str(const struct tt_uuid *uuid)
 	return buf;
 }
 
-/** Check if two AF_INET addresses are equal. */
-static bool
-swim_sockaddr_in_eq(const struct sockaddr_in *a1, const struct sockaddr_in *a2)
-{
-	return a1->sin_port == a2->sin_port &&
-	       a1->sin_addr.s_addr == a2->sin_addr.s_addr;
-}
-
 /**
  * A cluster member description. This structure describes the
  * last known state of an instance. This state is updated
@@ -950,7 +942,7 @@ swim_complete_step(struct swim_task *task,
 	struct swim_member *m =
 		rlist_first_entry(&swim->round_queue, struct swim_member,
 				  in_round_queue);
-	if (swim_sockaddr_in_eq(&m->addr, &task->dst)) {
+	if (swim_inaddr_eq(&m->addr, &task->dst)) {
 		rlist_shift(&swim->round_queue);
 		if (rc > 0) {
 			/*
@@ -1048,7 +1040,7 @@ static inline void
 swim_update_member_addr(struct swim *swim, struct swim_member *member,
 			const struct sockaddr_in *addr, int incarnation_inc)
 {
-	if (! swim_sockaddr_in_eq(addr, &member->addr)) {
+	if (! swim_inaddr_eq(addr, &member->addr)) {
 		member->incarnation += incarnation_inc;
 		member->addr = *addr;
 		swim_on_member_update(swim, member);

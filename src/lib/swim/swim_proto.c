@@ -154,6 +154,20 @@ swim_decode_uuid(struct tt_uuid *uuid, const char **pos, const char *end,
 	return 0;
 }
 
+/**
+ * Check if @a addr is not empty, i.e. not nullified. Set an error
+ * in the diagnostics area in case of emptiness.
+ */
+static inline int
+swim_check_inaddr_not_empty(const struct sockaddr_in *addr, const char *prefix,
+			    const char *addr_name)
+{
+	if (! swim_inaddr_is_empty(addr))
+		return 0;
+	diag_set(SwimError, "%s %s address is mandatory", prefix, addr_name);
+	return -1;
+}
+
 void
 swim_member_def_create(struct swim_member_def *def)
 {
@@ -236,15 +250,11 @@ swim_member_def_decode(struct swim_member_def *def, const char **pos,
 		if (swim_decode_member_key(key, pos, end, prefix, def) != 0)
 			return -1;
 	}
-	if (def->addr.sin_port == 0 || def->addr.sin_addr.s_addr == 0) {
-		diag_set(SwimError, "%s member address is mandatory", prefix);
-		return -1;
-	}
 	if (tt_uuid_is_nil(&def->uuid)) {
 		diag_set(SwimError, "%s member uuid is mandatory", prefix);
 		return -1;
 	}
-	return 0;
+	return swim_check_inaddr_not_empty(&def->addr, prefix, "member");
 }
 
 void
@@ -429,11 +439,7 @@ swim_meta_def_decode(struct swim_meta_def *def, const char **pos,
 		diag_set(SwimError, "%s version is mandatory", prefix);
 		return -1;
 	}
-	if (def->src.sin_port == 0 || def->src.sin_addr.s_addr == 0) {
-		diag_set(SwimError, "%s source address is mandatory", prefix);
-		return -1;
-	}
-	return 0;
+	return swim_check_inaddr_not_empty(&def->src, prefix, "source");
 }
 
 void

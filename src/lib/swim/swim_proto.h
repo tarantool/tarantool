@@ -472,4 +472,26 @@ int
 swim_decode_uuid(struct tt_uuid *uuid, const char **pos, const char *end,
 		 const char *prefix, const char *param_name);
 
+/**
+ * Check if @a addr is not empty, i.e. not nullified. Empty
+ * addresses are considered invalid and normally can not appear in
+ * packets just like any other errors can't. But since the SWIM
+ * protocol is public, there can be outlandish drivers and they
+ * can contain errors. Check for nullified address is a protection
+ * from malicious and invalid packets.
+ */
+static inline bool
+swim_inaddr_is_empty(const struct sockaddr_in *addr)
+{
+	return addr->sin_port == 0 || addr->sin_addr.s_addr == 0;
+}
+
+/** Check if two AF_INET addresses are equal. */
+static inline bool
+swim_inaddr_eq(const struct sockaddr_in *a1, const struct sockaddr_in *a2)
+{
+	return a1->sin_port == a2->sin_port &&
+	       a1->sin_addr.s_addr == a2->sin_addr.s_addr;
+}
+
 #endif /* TARANTOOL_SWIM_PROTO_H_INCLUDED */
