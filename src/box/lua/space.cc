@@ -28,6 +28,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include "box/ck_constraint.h"
 #include "box/lua/space.h"
 #include "box/lua/tuple.h"
 #include "box/lua/key_def.h"
@@ -145,6 +146,66 @@ lbox_space_before_replace(struct lua_State *L)
 
 	return lbox_trigger_reset(L, 3, &space->before_replace,
 				  lbox_push_txn_stmt, lbox_pop_txn_stmt);
+}
+
+/**
+ * Make ck_constraints available in Lua, via ck_constraint[]
+ * array for space table by given index i.
+ * Updata a ck_constraint table in the parent space table object
+ * on the Lua stack.
+ */
+static void
+lbox_push_ck_constraint(struct lua_State *L, struct space *space, int i)
+{
+	lua_getfield(L, i, "ck_constraint");
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		lua_pushstring(L, "ck_constraint");
+		lua_newtable(L);
+		lua_settable(L, i);
+		lua_getfield(L, i, "ck_constraint");
+	} else {
+		lua_pushnil(L);
+		while (lua_next(L, -2) != 0) {
+			size_t name_len;
+			const char *name = lua_tolstring(L, -2, &name_len);
+			/*
+			 * Remove ck_constraint only if it was
+			 * deleted.
+			 */
+			if (space_ck_constraint_by_name(space, name,
+					(uint32_t)name_len) == NULL) {
+				lua_pushlstring(L, name, name_len);
+				lua_pushnil(L);
+				lua_settable(L, -5);
+			}
+			lua_pop(L, 1);
+		}
+	}
+	struct ck_constraint *ck_constraint = NULL;
+	rlist_foreach_entry(ck_constraint, &space->ck_constraint, link) {
+		lua_getfield(L, i, ck_constraint->def->name);
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			lua_pushstring(L, ck_constraint->def->name);
+			lua_newtable(L);
+			lua_settable(L, -3);
+			lua_getfield(L, -1, ck_constraint->def->name);
+			assert(!lua_isnil(L, -1));
+		}
+
+		lua_pushstring(L, ck_constraint->def->name);
+		lua_setfield(L, -2, "name");
+
+		lua_pushnumber(L, space->def->id);
+		lua_setfield(L, -2, "space_id");
+
+		lua_pushstring(L, ck_constraint->def->expr_str);
+		lua_setfield(L, -2, "expr");
+
+		lua_setfield(L, -2, ck_constraint->def->name);
+	}
+	lua_pop(L, 1);
 }
 
 /**
@@ -351,6 +412,8 @@ lbox_fillspace(struct lua_State *L, struct space *space, int i)
 	}
 
 	lua_pop(L, 1); /* pop the index field */
+
+	lbox_push_ck_constraint(L, space, i);
 
 	lua_getfield(L, LUA_GLOBALSINDEX, "box");
 	lua_pushstring(L, "schema");

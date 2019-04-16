@@ -199,4 +199,39 @@ s:insert(s:frommap({X1 = 666, X65 = 666}))
 s:insert(s:frommap({X1 = 666, X65 = 666, X63 = 1}))
 s:drop()
 
+--
+-- Test ck constraints LUA integration.
+--
+s1 = box.schema.create_space('test1')
+_ = s1:create_index('pk')
+s1:format({{name='X', type='any'}, {name='Y', type='integer'}})
+s2 = box.schema.create_space('test2')
+_ = s2:create_index('pk')
+s2:format({{name='X', type='any'}, {name='Y', type='integer'}})
+test_run:cmd("push filter 'space_id: [0-9]+' to 'space_id: <ID>'")
+_ = s1:create_check_constraint('physics', 'X < Y')
+_ = s1:create_check_constraint('physics', 'X > Y')
+_ = s1:create_check_constraint('greater', 'X > 20')
+_ = s2:create_check_constraint('physics', 'X > Y')
+_ = s2:create_check_constraint('greater', 'X > 20')
+s1.ck_constraint.physics
+s1.ck_constraint.greater
+s2.ck_constraint.physics
+s2.ck_constraint.greater
+s1:insert({2, 1})
+s1:insert({21, 20})
+s2:insert({1, 2})
+s2:insert({21, 22})
+s2.ck_constraint.greater:drop()
+s2.ck_constraint.physics
+s2.ck_constraint.greater
+s1:insert({2, 1})
+s2:insert({1, 2})
+s2:insert({2, 1})
+physics_ck = s2.ck_constraint.physics
+s1:drop()
+s2:drop()
+physics_ck
+physics_ck:drop()
+
 test_run:cmd("clear filter")

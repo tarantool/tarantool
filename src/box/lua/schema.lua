@@ -1309,6 +1309,15 @@ local function check_primary_index(space)
 end
 box.internal.check_primary_index = check_primary_index -- for net.box
 
+-- Helper function to check ck_constraint:method() usage
+local function check_ck_constraint_arg(ck_constraint, method)
+    if type(ck_constraint) ~= 'table' or ck_constraint.name == nil then
+        local fmt = 'Use ck_constraint:%s(...) instead of ck_constraint.%s(...)'
+        error(string.format(fmt, method, method))
+    end
+end
+box.internal.check_ck_constraint_arg = check_ck_constraint_arg
+
 box.internal.schema_version = builtin.box_schema_version
 
 local function check_iterator_type(opts, key_is_nil)
@@ -1657,7 +1666,16 @@ space_mt.auto_increment = function(space, tuple)
     table.insert(tuple, 1, max + 1)
     return space:insert(tuple)
 end
-
+-- Manage space ck constraints
+space_mt.create_check_constraint = function(space, name, code)
+    check_space_arg(space, 'create_constraint')
+    if name == nil or code == nil then
+        box.error(box.error.PROC_LUA,
+                  "Usage: space:create_constraint(name, code)")
+    end
+    box.space._ck_constraint:insert({space.id, name, false, 'SQL', code})
+    return space.ck_constraint[name]
+end
 space_mt.pairs = function(space, key, opts)
     check_space_arg(space, 'pairs')
     local pk = space.index[0]
@@ -1702,6 +1720,12 @@ space_mt.run_triggers = function(space, yesno)
 end
 space_mt.frommap = box.internal.space.frommap
 space_mt.__index = space_mt
+
+local ck_constraint_mt = {}
+ck_constraint_mt.drop = function(ck_constraint)
+    check_ck_constraint_arg(ck_constraint, 'drop')
+    box.space._ck_constraint:delete({ck_constraint.space_id, ck_constraint.name})
+end
 
 box.schema.index_mt = base_index_mt
 box.schema.memtx_index_mt = memtx_index_mt
@@ -1749,6 +1773,11 @@ function box.schema.space.bless(space)
         for j, index in pairs(space.index) do
             if type(j) == 'number' then
                 setmetatable(index, wrap_schema_object_mt(index_mt_name))
+            end
+        end
+        for j, ck_constraint in pairs(space.ck_constraint) do
+            if type(j) == 'string' then
+                setmetatable(ck_constraint, {__index = ck_constraint_mt})
             end
         end
     end

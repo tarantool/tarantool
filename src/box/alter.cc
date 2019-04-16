@@ -4304,6 +4304,8 @@ on_replace_ck_constraint_commit(struct trigger *trigger, void *event)
 		assert(stmt->new_tuple != NULL);
 		ck_constraint_delete(ck);
 	}
+	/* Export schema changes to Lua. */
+	trigger_run_xc(&on_alter_space, space);
 }
 
 /** A trigger invoked on replace in the _ck_constraint space. */
