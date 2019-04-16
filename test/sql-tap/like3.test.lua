@@ -76,7 +76,7 @@ test:do_execsql_test(
         SELECT a, b FROM t2 WHERE b LIKE 'ab%' ORDER BY +a;
     ]], {
         -- <like3-2.0>
-        1, "abc", 2, "ABX", 4, "abc", 5, "ABX"
+        1, "abc", 4, "abc"
         -- </like3-2.0>
     })
 test:do_execsql_test(

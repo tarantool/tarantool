@@ -1152,8 +1152,6 @@ struct sql {
 /* Debug print info about SQL query as it parsed */
 #define PARSER_TRACE_FLAG  0x00000002
 #define SQL_FullColNames   0x00000004	/* Show full column names on SELECT */
-/* True if LIKE is case sensitive. */
-#define LIKE_CASE_SENS_FLAG 0x00000008
 #define SQL_ShortColNames  0x00000040	/* Show short columns names */
 #define SQL_CountRows      0x00000080	/* Count rows changed by INSERT, */
 					  /*   DELETE, or UPDATE and return */
@@ -1273,7 +1271,6 @@ struct FuncDestructor {
  *     SQL_FUNC_CONSTANT  ==  sql_DETERMINISTIC from the API
  */
 #define SQL_FUNC_LIKE     0x0004	/* Candidate for the LIKE optimization */
-#define SQL_FUNC_CASE     0x0008	/* Case-sensitive LIKE-type function */
 #define SQL_FUNC_EPHEM    0x0010	/* Ephemeral.  Delete with VDBE */
 #define SQL_FUNC_NEEDCOLL 0x0020	/* sqlGetFuncCollSeq() might be called.
 					 * The flag is set when the collation
@@ -4223,8 +4220,6 @@ sql_key_info_unref(struct sql_key_info *key_info);
 struct key_def *
 sql_key_info_to_key_def(struct sql_key_info *key_info);
 
-void sqlRegisterLikeFunctions(sql *, int);
-
 /**
  * Check if the function implements LIKE-style comparison & if it
  * is appropriate to apply a LIKE query optimization.
@@ -4236,7 +4231,7 @@ void sqlRegisterLikeFunctions(sql *, int);
  * @retval 1 if LIKE optimization can be used, 0 otherwise.
  */
 int
-sql_is_like_func(struct sql *db, struct Expr *expr, int *is_like_ci);
+sql_is_like_func(struct sql *db, struct Expr *expr);
 
 int sqlCreateFunc(sql *, const char *, enum field_type,
 		      int, int, void *,

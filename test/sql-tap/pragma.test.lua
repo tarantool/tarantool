@@ -1,7 +1,7 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
 
-test:plan(24)
+test:plan(23)
 
 test:do_catchsql_test(
 	"pragma-1.3",
@@ -80,22 +80,6 @@ test:do_execsql_test(
 	'memtx'
 	-- </pragma-3.2>
 })
-
--- Check that "PRAGMA case_sensitive_like" returns its status
--- (0 or 1) if called without parameter.
-test:do_test(
-	"pragma-3.3",
-	function()
-		old_value = box.execute('PRAGMA case_sensitive_like').rows
-		box.execute('PRAGMA case_sensitive_like = 1')
-		new_value = box.execute('PRAGMA case_sensitive_like').rows
-		box.execute('PRAGMA case_sensitive_like = '.. old_value[1][1])
-		return new_value[1][1]
-	end,
-	-- <pragma-3.3>
-	1
-	-- </pragma-3.3>
-	)
 
 --
 -- gh-3733: remove useless or obsolete pragmas

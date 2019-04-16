@@ -237,14 +237,12 @@ operatorMask(int op)
  *                    pattern prefix.
  * @param pisComplete True if the only wildcard is '%' in the
  *                    last character.
- * @param pnoCase     True if case insensitive.
- *
  * @retval True if the given expr is a LIKE operator & is
  *         optimizable using inequality constraints.
  */
 static int
 like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
-			   int *pisComplete, int *pnoCase)
+			   int *pisComplete)
 {
 	/* String on RHS of LIKE operator. */
 	const char *z = 0;
@@ -264,7 +262,7 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	/* Result code to return. */
 	int rc;
 
-	if (!sql_is_like_func(db, pExpr, pnoCase)) {
+	if (!sql_is_like_func(db, pExpr)) {
 		return 0;
 	}
 	pList = pExpr->x.pList;
@@ -979,8 +977,6 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	Expr *pStr1 = 0;
 	/* RHS of LIKE ends with wildcard. */
 	int isComplete = 0;
-	/* uppercase equivalent to lowercase. */
-	int noCase = 0;
 	/* Top-level operator. pExpr->op. */
 	int op;
 	/* Parsing context. */
@@ -1145,18 +1141,16 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 	 * A like pattern of the form "x LIKE 'aBc%'" is changed
 	 * into constraints:
 	 *
-	 *          x>='ABC' AND x<'abd' AND x LIKE 'aBc%'
+	 *          x>='aBc' AND x<'aBd' AND x LIKE 'aBc%'
 	 *
-	 * The last character of the prefix "abc" is incremented
-	 * to form the termination condition "abd". If case is
-	 * not significant (the default for LIKE) then the
-	 * lower-bound is made all uppercase and the upper-bound
-	 * is made all lowercase so that the bounds also work
-	 * when comparing BLOBs.
+	 * The last character of the prefix "aBc" is incremented
+	 * to form the termination condition "abd". Such
+	 * optimization allows to use index search and reduce
+	 * amount of scanned entries.
 	 */
 	if (pWC->op == TK_AND &&
 	    like_optimization_is_valid(pParse, pExpr, &pStr1,
-				       &isComplete, &noCase)) {
+				       &isComplete)) {
 		Expr *pLeft;
 		/* Copy of pStr1 - RHS of LIKE operator. */
 		Expr *pStr2;
@@ -1169,57 +1163,20 @@ exprAnalyze(SrcList * pSrc,	/* the FROM clause */
 		pLeft = pExpr->x.pList->a[1].pExpr;
 		pStr2 = sqlExprDup(db, pStr1, 0);
 
-		/*
-		 * Convert the lower bound to upper-case and the
-		 * upper bound to lower-case (upper-case is less
-		 * than lower-case in ASCII) so that the range
-		 * constraints also work for BLOBs.
-		 */
-		if (noCase && !pParse->db->mallocFailed) {
-			int i;
-			char c;
-			pTerm->wtFlags |= TERM_LIKE;
-			for (i = 0; (c = pStr1->u.zToken[i]) != 0; i++) {
-				pStr1->u.zToken[i] = sqlToupper(c);
-				pStr2->u.zToken[i] = sqlTolower(c);
-			}
-		}
-
 		if (!db->mallocFailed) {
 			u8 c, *pC;	/* Last character before the first wildcard */
 			pC = (u8 *) & pStr2->u.
 			    zToken[sqlStrlen30(pStr2->u.zToken) - 1];
 			c = *pC;
-			if (noCase) {
-				/* The point is to increment the last character before the first
-				 * wildcard.  But if we increment '@', that will push it into the
-				 * alphabetic range where case conversions will mess up the
-				 * inequality.  To avoid this, make sure to also run the full
-				 * LIKE on all candidate expressions by clearing the isComplete flag
-				 */
-				if (c == 'A' - 1)
-					isComplete = 0;
-				c = sqlUpperToLower[c];
-			}
 			*pC = c + 1;
 		}
 		pNewExpr1 = sqlExprDup(db, pLeft, 0);
-		if (noCase) {
-			pNewExpr1 =
-				sqlExprAddCollateString(pParse, pNewExpr1,
-							    "unicode_ci");
-		}
 		pNewExpr1 = sqlPExpr(pParse, TK_GE, pNewExpr1, pStr1);
 		transferJoinMarkings(pNewExpr1, pExpr);
 		idxNew1 = whereClauseInsert(pWC, pNewExpr1, wtFlags);
 		testcase(idxNew1 == 0);
 		exprAnalyze(pSrc, pWC, idxNew1);
 		pNewExpr2 = sqlExprDup(db, pLeft, 0);
-		if (noCase) {
-			pNewExpr2 =
-				sqlExprAddCollateString(pParse, pNewExpr2,
-							    "unicode_ci");
-		}
 		pNewExpr2 = sqlPExpr(pParse, TK_LT, pNewExpr2, pStr2);
 		transferJoinMarkings(pNewExpr2, pExpr);
 		idxNew2 = whereClauseInsert(pWC, pNewExpr2, wtFlags);

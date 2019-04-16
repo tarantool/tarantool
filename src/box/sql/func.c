@@ -1787,42 +1787,8 @@ groupConcatFinalize(sql_context * context)
 	}
 }
 
-/*
- * Set the LIKEOPT flag on the 2-argument function with the given name.
- */
-static void
-setLikeOptFlag(sql * db, const char *zName, u8 flagVal)
-{
-	FuncDef *pDef;
-	pDef = sqlFindFunction(db, zName, 2, 0);
-	if (ALWAYS(pDef)) {
-		pDef->funcFlags |= flagVal;
-	}
-}
-
-/**
- * Register the built-in LIKE function.
- */
-void
-sqlRegisterLikeFunctions(sql *db, int is_case_insensitive)
-{
-	/*
-	 * FIXME: after introducing type <BOOLEAN> LIKE must
-	 * return that type: TRUE if the string matches the
-	 * supplied pattern and FALSE otherwise.
-	 */
-	int *is_like_ci = SQL_INT_TO_PTR(is_case_insensitive);
-	sqlCreateFunc(db, "LIKE", FIELD_TYPE_BOOLEAN, 2, 0,
-			  is_like_ci, likeFunc, 0, 0, 0);
-	sqlCreateFunc(db, "LIKE", FIELD_TYPE_BOOLEAN, 3, 0,
-			  is_like_ci, likeFunc, 0, 0, 0);
-	setLikeOptFlag(db, "LIKE",
-		       !(is_case_insensitive) ? (SQL_FUNC_LIKE |
-		       SQL_FUNC_CASE) : SQL_FUNC_LIKE);
-}
-
 int
-sql_is_like_func(struct sql *db, struct Expr *expr, int *is_like_ci)
+sql_is_like_func(struct sql *db, struct Expr *expr)
 {
 	if (expr->op != TK_FUNCTION || !expr->x.pList ||
 	    expr->x.pList->nExpr != 2)
@@ -1832,7 +1798,6 @@ sql_is_like_func(struct sql *db, struct Expr *expr, int *is_like_ci)
 	assert(func != NULL);
 	if ((func->funcFlags & SQL_FUNC_LIKE) == 0)
 		return 0;
-	*is_like_ci = (func->funcFlags & SQL_FUNC_CASE) == 0;
 	return 1;
 }
 
