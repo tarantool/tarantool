@@ -65,9 +65,6 @@ test_run:cmd("switch master_quorum1")
 box.cfg{replication = repl}
 ---
 ...
-require('fiber').sleep(0.1)
----
-...
 box.space.test:select()
 ---
 - []
@@ -75,13 +72,9 @@ box.space.test:select()
 other_id = box.info.id % 2 + 1
 ---
 ...
-box.info.replication[other_id].upstream.status
+test_run:wait_upstream(other_id, {status = 'stopped', message_re = 'Missing'})
 ---
-- stopped
-...
-box.info.replication[other_id].upstream.message:match("Missing")
----
-- Missing
+- true
 ...
 test_run:cmd("switch master_quorum2")
 ---
@@ -96,21 +89,13 @@ box.space.test:select()
 other_id = box.info.id % 2 + 1
 ---
 ...
-box.info.replication[other_id].upstream.status
+test_run:wait_upstream(other_id, {status = 'follow', message_re = box.NULL})
 ---
-- follow
+- true
 ...
-box.info.replication[other_id].upstream.message
+test_run:wait_downstream(other_id, {status = 'stopped', message_re = 'Missing'})
 ---
-- null
-...
-box.info.replication[other_id].downstream.status
----
-- stopped
-...
-box.info.replication[other_id].downstream.message:match("Missing")
----
-- Missing
+- true
 ...
 test_run:cmd("switch default")
 ---
