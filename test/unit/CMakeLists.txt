@@ -158,7 +158,7 @@ set(ITERATOR_TEST_SOURCES
 set(ITERATOR_TEST_LIBS core tuple xrow unit)
 
 add_executable(vy_mem.test vy_mem.c ${ITERATOR_TEST_SOURCES})
-target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS})
+target_link_libraries(vy_mem.test ${ITERATOR_TEST_LIBS} dl)
 
 add_executable(vy_point_lookup.test
     vy_point_lookup.c
@@ -180,7 +180,7 @@ add_executable(vy_point_lookup.test
     ${PROJECT_SOURCE_DIR}/src/box/schema_def.c
     ${PROJECT_SOURCE_DIR}/src/box/identifier.c
 )
-target_link_libraries(vy_point_lookup.test core tuple xrow xlog unit)
+target_link_libraries(vy_point_lookup.test core tuple xrow xlog unit dl)
 
 add_executable(column_mask.test
     column_mask.c)
@@ -193,13 +193,13 @@ add_executable(vy_write_iterator.test
     ${PROJECT_SOURCE_DIR}/src/box/vy_write_iterator.c
     ${ITERATOR_TEST_SOURCES}
 )
-target_link_libraries(vy_write_iterator.test xlog ${ITERATOR_TEST_LIBS})
+target_link_libraries(vy_write_iterator.test xlog ${ITERATOR_TEST_LIBS} dl)
 
 add_executable(vy_cache.test vy_cache.c ${ITERATOR_TEST_SOURCES})
-target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS})
+target_link_libraries(vy_cache.test ${ITERATOR_TEST_LIBS} dl)
 
 add_executable(coll.test coll.cpp)
-target_link_libraries(coll.test coll unit misc)
+target_link_libraries(coll.test coll unit misc dl)
 
 add_executable(tuple_bigref.test tuple_bigref.c)
 target_link_libraries(tuple_bigref.test tuple unit)
