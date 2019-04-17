@@ -60,7 +60,7 @@
  * and increase the number of open files. So we never create ranges
  * less than 16 MB.
  */
-static const int64_t VY_MIN_RANGE_SIZE = 16 * 1024 * 1024;
+static const int64_t VY_MIN_RANGE_SIZE = 128 * 1024 * 1024;
 
 /**
  * We want a single compaction job to finish in reasonable time
