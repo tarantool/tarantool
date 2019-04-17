@@ -57,6 +57,31 @@ swim_packet_create(struct swim_packet *packet)
 	swim_packet_alloc_meta(packet, sizeof(struct swim_meta_header_bin));
 }
 
+/** Fill metadata prefix of a packet. */
+static inline void
+swim_packet_build_meta(struct swim_packet *packet,
+		       const struct sockaddr_in *src)
+{
+	char *meta = packet->meta;
+	char *end = packet->body;
+	/*
+	 * Meta has already been built. It happens when the same
+	 * task is resent multiple times.
+	 */
+	if (meta == end)
+		return;
+	struct swim_meta_header_bin header;
+	swim_meta_header_bin_create(&header, src);
+	assert(meta + sizeof(header) == end);
+	memcpy(meta, &header, sizeof(header));
+	/*
+	 * Once meta is built, it is consumed by the body. Used
+	 * not to rebuild the meta again if the task will be
+	 * scheduled again without changes in data.
+	 */
+	packet->body = packet->meta;
+}
+
 void
 swim_task_create(struct swim_task *task, swim_task_f complete,
 		 swim_task_f cancel, const char *desc)
@@ -298,9 +323,7 @@ swim_scheduler_on_output(struct ev_loop *loop, struct ev_io *io, int events)
 	say_verbose("SWIM %d: send %s to %s", swim_scheduler_fd(scheduler),
 		    task->desc, sio_strfaddr((struct sockaddr *) &task->dst,
 					     sizeof(task->dst)));
-	struct swim_meta_header_bin header;
-	swim_meta_header_bin_create(&header, &scheduler->transport.addr);
-	memcpy(task->packet.meta, &header, sizeof(header));
+	swim_packet_build_meta(&task->packet, &scheduler->transport.addr);
 	int rc = swim_transport_send(&scheduler->transport, task->packet.buf,
 				     task->packet.pos - task->packet.buf,
 				     (const struct sockaddr *) &task->dst,
