@@ -175,24 +175,29 @@ s:drop()
 -- Wait for the dump task to complete.
 box.error.injection.set('ERRINJ_VY_RUN_WRITE_DELAY', false)
 box.snapshot()
+test_run:cmd('switch default')
+test_run:cmd("stop server test") -- don't stuck
+test_run:cmd("cleanup server test")
 
 --
 -- Check that all dump/compaction tasks that are in progress at
 -- the time when the server stops are aborted immediately.
 --
+test_run:cmd("create server double_quota with script='vinyl/low_quota.lua'")
+test_run:cmd("start server double_quota with args='2097240'")
+test_run:cmd('switch double_quota')
+fiber = require 'fiber'
+box.cfg{vinyl_timeout = 0.001}
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('i1', {parts = {1, 'unsigned'}})
 _ = s:create_index('i2', {parts = {2, 'unsigned'}})
-box.error.injection.set('ERRINJ_VY_RUN_WRITE_STMT_TIMEOUT', 0.01)
+box.error.injection.set('ERRINJ_VY_DUMP_DELAY', true)
 for i = 1, 1000 do s:replace{i, i} end
 _ = fiber.create(function() box.snapshot() end)
 fiber.sleep(0.01)
 test_run:cmd('switch default')
-t1 = fiber.time()
-test_run:cmd("stop server test")
-t2 = fiber.time()
-t2 - t1 < 1
-test_run:cmd("cleanup server test")
+test_run:cmd("stop server double_quota") -- don't stuck
+test_run:cmd("cleanup server double_quota")
 
 s = box.schema.space.create('test', {engine = 'vinyl'})
 _ = s:create_index('i1', {parts = {1, 'unsigned'}})
