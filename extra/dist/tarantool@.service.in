@@ -45,7 +45,7 @@ Group=@TARANTOOL_USER@
 # Disable OOM killer
 OOMScoreAdjust=-1000
 # Increase fd limit for Vinyl
-LimitNOFILE=65535
+LimitNOFILE=131072
 
 ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl start %i
 ExecStop=@CMAKE_INSTALL_FULL_BINDIR@/tarantoolctl stop %i
