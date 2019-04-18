@@ -72,13 +72,15 @@ struct journal_entry {
 	struct xrow_header *rows[];
 };
 
+struct region;
+
 /**
  * Create a new journal entry.
  *
  * @return NULL if out of memory, fiber diagnostics area is set
  */
 struct journal_entry *
-journal_entry_new(size_t n_rows);
+journal_entry_new(size_t n_rows, struct region *region);
 
 /**
  * An API for an abstract journal for all transactions of this

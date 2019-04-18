@@ -53,14 +53,14 @@ static struct journal dummy_journal = {
 struct journal *current_journal = &dummy_journal;
 
 struct journal_entry *
-journal_entry_new(size_t n_rows)
+journal_entry_new(size_t n_rows, struct region *region)
 {
 	struct journal_entry *entry;
 
 	size_t size = (sizeof(struct journal_entry) +
 		       sizeof(entry->rows[0]) * n_rows);
 
-	entry = region_aligned_alloc(&fiber()->gc, size,
+	entry = region_aligned_alloc(region, size,
 				     alignof(struct journal_entry));
 	if (entry == NULL) {
 		diag_set(OutOfMemory, size, "region", "struct journal_entry");

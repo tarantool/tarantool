@@ -332,7 +332,8 @@ txn_write_to_wal(struct txn *txn)
 	assert(txn->n_new_rows + txn->n_applier_rows > 0);
 
 	struct journal_entry *req = journal_entry_new(txn->n_new_rows +
-						      txn->n_applier_rows);
+						      txn->n_applier_rows,
+						      &txn->region);
 	if (req == NULL)
 		return -1;
 
