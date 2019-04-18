@@ -276,30 +276,31 @@ struct swim_member {
 	 * member state each time any member attribute changes.
 	 *
 	 * According to SWIM, an event should be sent to all
-	 * members at least once - for that a TTL (time-to-live)
-	 * counter is maintained for each independent event type.
+	 * members at least once - for that a TTD
+	 * (time-to-disseminate) counter is maintained for each
+	 * independent event type.
 	 *
-	 * When a member state changes, the TTL is reset to the
+	 * When a member state changes, the TTD is reset to the
 	 * cluster size. It is then decremented after each send.
 	 * This guarantees that each member state change is sent
 	 * to each SWIM member at least once. If a new event of
 	 * the same type is generated before a round is finished,
 	 * the current event object is updated in place with reset
-	 * of the TTL.
+	 * of the TTD.
 	 *
-	 * To conclude, TTL works in two ways: to see which
+	 * To conclude, TTD works in two ways: to see which
 	 * specific member attribute needs dissemination and to
 	 * track how many cluster members still need to learn
 	 * about the change from this instance.
 	 */
 	/**
-	 * General TTL reset each time when any visible member
+	 * General TTD reset each time when any visible member
 	 * attribute is updated. It is always bigger or equal than
-	 * any other TTLs. In addition it helps to keep a dead
-	 * member not dropped until the TTL gets zero so as to
+	 * any other TTDs. In addition it helps to keep a dead
+	 * member not dropped until the TTD gets zero so as to
 	 * allow other members to learn the dead status.
 	 */
-	int status_ttl;
+	int status_ttd;
 	/**
 	 * All created events are put into a queue sorted by event
 	 * time.
@@ -416,7 +417,7 @@ struct swim {
 	 * Queue of all members which have dissemination
 	 * information. A member is added to the queue whenever
 	 * any of its attributes changes, and stays in the queue
-	 * as long as the event TTL is non-zero.
+	 * as long as the event TTD is non-zero.
 	 */
 	struct rlist dissemination_queue;
 };
@@ -448,9 +449,9 @@ swim_wait_ack(struct swim *swim, struct swim_member *member)
 
 /**
  * On literally any update of a member it is added to a queue of
- * members to disseminate updates. Regardless of other TTLs, each
- * update also resets status TTL. Status TTL is always greater
- * than any other event-related TTL, so it's sufficient to look at
+ * members to disseminate updates. Regardless of other TTDs, each
+ * update also resets status TTD. Status TTD is always greater
+ * than any other event-related TTD, so it's sufficient to look at
  * it alone to see that a member needs information dissemination.
  * The status change itself occupies only 2 bytes in a packet, so
  * it is cheap to send it on any update, while does reduce
@@ -463,7 +464,7 @@ swim_register_event(struct swim *swim, struct swim_member *member)
 		rlist_add_tail_entry(&swim->dissemination_queue, member,
 				     in_dissemination_queue);
 	}
-	member->status_ttl = mh_size(swim->members);
+	member->status_ttd = mh_size(swim->members);
 	swim_cached_round_msg_invalidate(swim);
 }
 
@@ -877,8 +878,8 @@ swim_encode_round_msg(struct swim *swim)
 }
 
 /**
- * Decrement TTLs of all events. It is done after each round step.
- * Note, since we decrement TTL of all events, even those which
+ * Decrement TTDs of all events. It is done after each round step.
+ * Note, since we decrement TTD of all events, even those which
  * have not been actually encoded and sent, if there are more
  * events than can fit into a packet, the tail of the queue begins
  * reeking and rotting. The most recently added members could even
@@ -889,13 +890,13 @@ swim_encode_round_msg(struct swim *swim)
  * deal with.
  */
 static void
-swim_decrease_event_ttl(struct swim *swim)
+swim_decrease_event_ttd(struct swim *swim)
 {
 	struct swim_member *member, *tmp;
 	rlist_foreach_entry_safe(member, &swim->dissemination_queue,
 				 in_dissemination_queue,
 				 tmp) {
-		if (--member->status_ttl == 0) {
+		if (--member->status_ttd == 0) {
 			rlist_del_entry(member, in_dissemination_queue);
 			swim_cached_round_msg_invalidate(swim);
 			if (member->status == MEMBER_LEFT)
@@ -964,7 +965,7 @@ swim_complete_step(struct swim_task *task,
 			 * sections.
 			 */
 			swim_wait_ack(swim, m);
-			swim_decrease_event_ttl(swim);
+			swim_decrease_event_ttd(swim);
 		}
 	}
 }
@@ -1035,7 +1036,7 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 			break;
 		case MEMBER_DEAD:
 			if (m->unacknowledged_pings >= NO_ACKS_TO_GC &&
-			    swim->gc_mode == SWIM_GC_ON && m->status_ttl == 0) {
+			    swim->gc_mode == SWIM_GC_ON && m->status_ttd == 0) {
 				swim_delete_member(swim, m);
 				continue;
 			}

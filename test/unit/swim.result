@@ -68,8 +68,8 @@ ok 5 - subtests
     ok 1 - node is added as alive
     ok 2 - member still is not dead after 2 noacks
     ok 3 - but it is dead after one more
-    ok 4 - after 2 more unacks the member still is not deleted - dissemination TTL keeps it
-    ok 5 - but it is dropped after 2 rounds when TTL gets 0
+    ok 4 - after 2 more unacks the member still is not deleted - dissemination TTD keeps it
+    ok 5 - but it is dropped after 2 rounds when TTD gets 0
     ok 6 - fullmesh is restored
     ok 7 - a member is added back on an ACK
 ok 6 - subtests

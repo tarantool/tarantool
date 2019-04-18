@@ -254,10 +254,10 @@ swim_test_basic_failure_detection(void)
 
 	swim_run_for(1);
 	is(swim_cluster_member_status(cluster, 0, 1), MEMBER_DEAD, "after 2 "\
-	   "more unacks the member still is not deleted - dissemination TTL "\
+	   "more unacks the member still is not deleted - dissemination TTD "\
 	   "keeps it");
 	is(swim_cluster_wait_status(cluster, 0, 1, swim_member_status_MAX, 2),
-	   0, "but it is dropped after 2 rounds when TTL gets 0");
+	   0, "but it is dropped after 2 rounds when TTD gets 0");
 
 	/*
 	 * After IO unblock pending messages will be processed all

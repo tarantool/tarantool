@@ -297,7 +297,7 @@ swim_anti_entropy_header_bin_create(struct swim_anti_entropy_header_bin *header,
  * and add more attributes. Or just encode new attributes after
  * the passport. For example, anti-entropy can add a payload when
  * it is up to date; dissemination adds a payload when it is up to
- * date and TTL is > 0.
+ * date and TTD is > 0.
  */
 struct PACKED swim_passport_bin {
 	/** mp_encode_map(5) */
