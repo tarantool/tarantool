@@ -569,8 +569,7 @@ swim_by_scheduler(struct swim_scheduler *scheduler)
 /** Update member's payload, register a corresponding event. */
 static inline int
 swim_update_member_payload(struct swim *swim, struct swim_member *member,
-			   const char *payload, uint16_t payload_size,
-			   int incarnation_increment)
+			   const char *payload, uint16_t payload_size)
 {
 	assert(payload_size <= MAX_PAYLOAD_SIZE);
 	char *new_payload;
@@ -588,7 +587,6 @@ swim_update_member_payload(struct swim *swim, struct swim_member *member,
 	member->payload = new_payload;
 	member->payload_size = payload_size;
 	member->payload_ttd = mh_size(swim->members);
-	member->incarnation += incarnation_increment;
 	member->is_payload_up_to_date = true;
 	swim_on_member_update(swim, member);
 	return 0;
@@ -749,7 +747,7 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 	swim_on_member_update(swim, member);
 	if (payload_size >= 0 &&
 	    swim_update_member_payload(swim, member, payload,
-				       payload_size, 0) != 0) {
+				       payload_size) != 0) {
 		swim_delete_member(swim, member);
 		return NULL;
 	}
@@ -1155,13 +1153,11 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 /** Update member's address.*/
 static inline void
 swim_update_member_addr(struct swim *swim, struct swim_member *member,
-			const struct sockaddr_in *addr, int incarnation_inc)
+			const struct sockaddr_in *addr)
 {
-	if (! swim_inaddr_eq(addr, &member->addr)) {
-		member->incarnation += incarnation_inc;
-		member->addr = *addr;
-		swim_on_member_update(swim, member);
-	}
+	assert(! swim_inaddr_eq(&member->addr, addr));
+	member->addr = *addr;
+	swim_on_member_update(swim, member);
 }
 
 /**
@@ -1181,7 +1177,8 @@ swim_update_member(struct swim *swim, const struct swim_member_def *def,
 	 */
 	bool update_payload = false;
 	if (def->incarnation > member->incarnation) {
-		swim_update_member_addr(swim, member, &def->addr, 0);
+		if (! swim_inaddr_eq(&def->addr, &member->addr))
+			swim_update_member_addr(swim, member, &def->addr);
 		if (def->payload_size >= 0) {
 			update_payload = true;
 		} else if (member->is_payload_up_to_date) {
@@ -1193,7 +1190,7 @@ swim_update_member(struct swim *swim, const struct swim_member_def *def,
 	}
 	if (update_payload &&
 	    swim_update_member_payload(swim, member, def->payload,
-				       def->payload_size, 0) != 0) {
+				       def->payload_size) != 0) {
 		/* Not such a critical error. */
 		diag_log();
 	}
@@ -1618,7 +1615,10 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 		swim_on_member_update(swim, swim->self);
 		swim->self = new_self;
 	}
-	swim_update_member_addr(swim, swim->self, &addr, 1);
+	if (! swim_inaddr_eq(&addr, &swim->self->addr)) {
+		swim->self->incarnation++;
+		swim_update_member_addr(swim, swim->self, &addr);
+	}
 	if (gc_mode != SWIM_GC_DEFAULT)
 		swim->gc_mode = gc_mode;
 	return 0;
@@ -1644,8 +1644,12 @@ swim_set_payload(struct swim *swim, const char *payload, uint16_t payload_size)
 			 MAX_PAYLOAD_SIZE);
 		return -1;
 	}
-	return swim_update_member_payload(swim, swim->self, payload,
-					  payload_size, 1);
+	struct swim_member *self = swim->self;
+	if (swim_update_member_payload(swim, self, payload, payload_size) != 0)
+		return -1;
+	self->incarnation++;
+	swim_on_member_update(swim, self);
+	return 0;
 }
 
 int
