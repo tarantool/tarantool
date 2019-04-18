@@ -1380,43 +1380,6 @@ sql_bind_text64(sql_stmt * pStmt,
 }
 
 int
-sql_bind_value(sql_stmt * pStmt, int i, const sql_value * pValue)
-{
-	int rc;
-	switch (sql_value_type((sql_value *) pValue)) {
-	case MP_INT:{
-			rc = sql_bind_int64(pStmt, i, pValue->u.i);
-			break;
-		}
-	case MP_DOUBLE:{
-			rc = sql_bind_double(pStmt, i, pValue->u.r);
-			break;
-		}
-	case MP_BIN:{
-			if (pValue->flags & MEM_Zero) {
-				rc = sql_bind_zeroblob(pStmt, i,
-							   pValue->u.nZero);
-			} else {
-				rc = sql_bind_blob(pStmt, i, pValue->z,
-						       pValue->n,
-						       SQL_TRANSIENT);
-			}
-			break;
-		}
-	case MP_STR:{
-			rc = bindText(pStmt, i, pValue->z, pValue->n,
-				      SQL_TRANSIENT);
-			break;
-		}
-	default:{
-			rc = sql_bind_null(pStmt, i);
-			break;
-		}
-	}
-	return rc;
-}
-
-int
 sql_bind_zeroblob(sql_stmt * pStmt, int i, int n)
 {
 	int rc;

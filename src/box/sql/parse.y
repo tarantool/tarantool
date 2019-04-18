@@ -916,7 +916,7 @@ idlist(A) ::= nm(Y). {
          * For variables we set BOOLEAN type since
          * unassigned bindings will be replaced
          * with NULL automatically, i.e. without
-         * explicit call of sql_bind_value().
+         * explicit call of sql_bind_*().
          */
         p->type = FIELD_TYPE_BOOLEAN;
         break;
