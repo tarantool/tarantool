@@ -718,6 +718,9 @@ file2 = fio.pathjoin(tmp2, 'file.2')
 file3 = fio.pathjoin(tree, 'file.3')
 ---
 ...
+file4 = fio.pathjoin(tree, 'file.4')
+---
+...
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
 ---
 ...
@@ -751,6 +754,26 @@ fio.copyfile(file1, tmp2)
 fio.stat(fio.pathjoin(tmp2, "file.1")) ~= nil
 ---
 - true
+...
+--- test copyfile to operate with one byte transfer
+errinj = box.error.injection
+---
+...
+errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', 1)
+---
+- ok
+...
+fio.copyfile(file1, file4)
+---
+- true
+...
+fio.stat(file1, file4) ~= nil
+---
+- true
+...
+errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', -1)
+---
+- ok
 ...
 res, err = fio.copyfile(fio.pathjoin(tmp1, 'not_exists.txt'), tmp1)
 ---

@@ -38,6 +38,8 @@ errinj.info()
     state: false
   ERRINJ_VYRUN_INDEX_GARBAGE:
     state: false
+  ERRINJ_COIO_SENDFILE_CHUNK:
+    state: -1
   ERRINJ_VY_INDEX_FILE_RENAME:
     state: false
   ERRINJ_VY_POINT_ITER_WAIT:

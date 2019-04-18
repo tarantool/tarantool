@@ -33,6 +33,7 @@
 #include "fiber.h"
 #include "say.h"
 #include "fio.h"
+#include "errinj.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -570,8 +571,9 @@ coio_readdir(const char *dir_path, char **buf)
 static void
 coio_do_copyfile(eio_req *req)
 {
+	struct errinj *inj = errinj(ERRINJ_COIO_SENDFILE_CHUNK, ERRINJ_INT);
 	struct coio_file_task *eio = (struct coio_file_task *)req->data;
-
+	off_t pos, ret, left, chunk;
 	struct stat st;
 	if (stat(eio->copyfile.source, &st) < 0) {
 		goto error;
@@ -588,22 +590,23 @@ coio_do_copyfile(eio_req *req)
 		goto error_dest;
 	}
 
-	enum { COPY_FILE_BUF_SIZE = 4096 };
+	if (inj != NULL && inj->iparam > 0)
+		chunk = (off_t)inj->iparam;
+	else
+		chunk = st.st_size;
 
-	char buf[COPY_FILE_BUF_SIZE];
-
-	while (true) {
-		ssize_t nread = fio_read(source_fd, buf, sizeof(buf));
-		if (nread < 0)
+	for (left = st.st_size, pos = 0; left > 0;) {
+		ret = eio_sendfile_sync(dest_fd, source_fd, pos, chunk);
+		if (ret < 0) {
+			say_syserror("sendfile, [%s -> %s]",
+				     fio_filename(source_fd),
+				     fio_filename(dest_fd));
 			goto error_copy;
-
-		if (nread == 0)
-			break; /* eof */
-
-		ssize_t nwritten = fio_writen(dest_fd, buf, nread);
-		if (nwritten < 0)
-			goto error_copy;
+		}
+		pos += ret;
+		left -= ret;
 	}
+
 	req->result = 0;
 	close(source_fd);
 	close(dest_fd);

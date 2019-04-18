@@ -230,6 +230,7 @@ fio.mktree(tree2, 0777)
 file1 = fio.pathjoin(tmp1, 'file.1')
 file2 = fio.pathjoin(tmp2, 'file.2')
 file3 = fio.pathjoin(tree, 'file.3')
+file4 = fio.pathjoin(tree, 'file.4')
 
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
 fh1:write("gogo")
@@ -240,6 +241,13 @@ fh1:close()
 fio.symlink(file1, file3)
 fio.copyfile(file1, tmp2)
 fio.stat(fio.pathjoin(tmp2, "file.1")) ~= nil
+
+--- test copyfile to operate with one byte transfer
+errinj = box.error.injection
+errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', 1)
+fio.copyfile(file1, file4)
+fio.stat(file1, file4) ~= nil
+errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', -1)
 
 res, err = fio.copyfile(fio.pathjoin(tmp1, 'not_exists.txt'), tmp1)
 res
