@@ -52,6 +52,9 @@
 /* sync snapshot every 16MB */
 #define SNAP_SYNC_INTERVAL	(1 << 24)
 
+static void
+checkpoint_cancel(struct checkpoint *ckpt);
+
 /*
  * Memtx yield-in-transaction trigger: roll back the effects
  * of the transaction and mark the transaction as aborted.
@@ -179,6 +182,8 @@ static void
 memtx_engine_shutdown(struct engine *engine)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
+	if (memtx->checkpoint != NULL)
+		checkpoint_cancel(memtx->checkpoint);
 	mempool_destroy(&memtx->iterator_pool);
 	if (mempool_is_initialized(&memtx->rtree_iterator_pool))
 		mempool_destroy(&memtx->rtree_iterator_pool);
@@ -605,6 +610,20 @@ checkpoint_delete(struct checkpoint *ckpt)
 	free(ckpt);
 }
 
+static void
+checkpoint_cancel(struct checkpoint *ckpt)
+{
+	/*
+	 * Cancel the checkpoint thread if it's running and wait
+	 * for it to terminate so as to eliminate the possibility
+	 * of use-after-free.
+	 */
+	if (ckpt->waiting_for_snap_thread) {
+		tt_pthread_cancel(ckpt->cord.id);
+		tt_pthread_join(ckpt->cord.id, NULL);
+	}
+	checkpoint_delete(ckpt);
+}
 
 static int
 checkpoint_add_space(struct space *sp, void *data)
