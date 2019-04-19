@@ -76,6 +76,11 @@ struct vy_regulator {
 	 */
 	size_t write_rate;
 	/**
+	 * Max write rate observed since the last time when
+	 * memory dump was triggered, in bytes per second.
+	 */
+	size_t write_rate_max;
+	/**
 	 * Amount of memory that was used when the timer was
 	 * executed last time. Needed to update @write_rate.
 	 */
