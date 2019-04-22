@@ -503,15 +503,6 @@ sqlStep(Vdbe * p)
 		p->rc = SQL_NOMEM;
 	}
  end_of_step:
-	/* At this point local variable rc holds the value that should be
-	 * returned if this statement was compiled using the legacy
-	 * sql_prepare() interface. According to the docs, this can only
-	 * be one of the values in the first assert() below. Variable p->rc
-	 * contains the value that would be returned if sql_finalize()
-	 * were called on statement p.
-	 */
-	assert(rc == SQL_ROW || rc == SQL_DONE || rc == SQL_ERROR
-	       || (rc & 0xff) == SQL_BUSY || rc == SQL_MISUSE);
 	if (p->isPrepareV2 && rc != SQL_ROW && rc != SQL_DONE) {
 		/* If this statement was prepared using sql_prepare_v2(), and an
 		 * error has occurred, then return the error code in p->rc to the
@@ -531,20 +522,17 @@ int
 sql_step(sql_stmt * pStmt)
 {
 	int rc;			/* Result from sqlStep() */
-	int rc2 = SQL_OK;	/* Result from sqlReprepare() */
 	Vdbe *v = (Vdbe *) pStmt;	/* the prepared statement */
 	int cnt = 0;		/* Counter to prevent infinite loop of reprepares */
-	sql *db;		/* The database connection */
 
 	if (vdbeSafetyNotNull(v)) {
 		return SQL_MISUSE;
 	}
-	db = v->db;
 	v->doingRerun = 0;
 	while ((rc = sqlStep(v)) == SQL_SCHEMA
 	       && cnt++ < SQL_MAX_SCHEMA_RETRY) {
 		int savedPc = v->pc;
-		rc2 = rc = sqlReprepare(v);
+		rc = sqlReprepare(v);
 		if (rc != SQL_OK)
 			break;
 		sql_reset(pStmt);
@@ -552,26 +540,6 @@ sql_step(sql_stmt * pStmt)
 			v->doingRerun = 1;
 		assert(v->expired == 0);
 	}
-	if (rc2 != SQL_OK) {
-		/* This case occurs after failing to recompile an sql statement.
-		 * The error message from the SQL compiler has already been loaded
-		 * into the database handle. This block copies the error message
-		 * from the database handle into the statement and sets the statement
-		 * program counter to 0 to ensure that when the statement is
-		 * finalized or reset the parser error message is available via
-		 * sql_errmsg() and sql_errcode().
-		 */
-		const char *zErr = (const char *)sql_value_text(db->pErr);
-		sqlDbFree(db, v->zErrMsg);
-		if (!db->mallocFailed) {
-			v->zErrMsg = sqlDbStrDup(db, zErr);
-			v->rc = rc2;
-		} else {
-			v->zErrMsg = 0;
-			v->rc = rc = SQL_NOMEM;
-		}
-	}
-	rc = sqlApiExit(db, rc);
 	return rc;
 }
 

@@ -4417,7 +4417,8 @@ sql_index_tuple_size(struct space *space, struct index *idx);
  * samples[] arrays.
  *
  * @param db Database handler.
- * @retval sql_OK on success, smth else otherwise.
+ * @retval 0 Success.
+ * @retval -1 Error.
  */
 int
 sql_analysis_load(struct sql *db);

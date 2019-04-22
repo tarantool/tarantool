@@ -306,21 +306,19 @@ int tarantoolsqlMovetoUnpacked(BtCursor *pCur, UnpackedRecord *pIdxKey,
  *
  * @retval SQL_OK
  */
-int tarantoolsqlEphemeralCount(struct BtCursor *pCur, i64 *pnEntry)
+int64_t
+tarantoolsqlEphemeralCount(struct BtCursor *pCur)
 {
 	assert(pCur->curFlags & BTCF_TEphemCursor);
-
 	struct index *primary_index = space_index(pCur->space, 0 /* PK */);
-	*pnEntry = index_count(primary_index, pCur->iter_type, NULL, 0);
-	return SQL_OK;
+	return index_count(primary_index, pCur->iter_type, NULL, 0);
 }
 
-int tarantoolsqlCount(BtCursor *pCur, i64 *pnEntry)
+int64_t
+tarantoolsqlCount(struct BtCursor *pCur)
 {
 	assert(pCur->curFlags & BTCF_TaCursor);
-
-	*pnEntry = index_count(pCur->index, pCur->iter_type, NULL, 0);
-	return SQL_OK;
+	return index_count(pCur->index, pCur->iter_type, NULL, 0);
 }
 
 struct space *
@@ -602,12 +600,12 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	char *key_begin = (char*) region_alloc(&fiber()->gc, key_len);
 	if (key_begin == NULL) {
 		diag_set(OutOfMemory, key_len, "region_alloc", "key_begin");
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 	char *key = mp_encode_array(key_begin, 1);
 	key = mp_encode_str(key, trig_name, trig_name_len);
 	if (box_index_get(BOX_TRIGGER_ID, 0, key_begin, key, &tuple) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	assert(tuple != NULL);
 	assert(tuple_field_count(tuple) == 3);
 	const char *field = tuple_field(tuple, BOX_TRIGGER_FIELD_SPACE_ID);
@@ -626,7 +624,7 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	if (trigger_stmt == NULL) {
 		diag_set(OutOfMemory, trigger_stmt_len + 1, "region_alloc",
 			 "trigger_stmt");
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 	memcpy(trigger_stmt, trigger_stmt_old, trigger_stmt_len);
 	trigger_stmt[trigger_stmt_len] = '\0';
@@ -643,7 +641,7 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	char *new_tuple = (char*)region_alloc(&fiber()->gc, key_len);
 	if (new_tuple == NULL) {
 		diag_set(OutOfMemory, key_len, "region_alloc", "new_tuple");
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 	char *new_tuple_end = mp_encode_array(new_tuple, 3);
 	new_tuple_end = mp_encode_str(new_tuple_end, trig_name, trig_name_len);
@@ -653,15 +651,12 @@ int tarantoolsqlRenameTrigger(const char *trig_name,
 	new_tuple_end = mp_encode_str(new_tuple_end, trigger_stmt,
 				      trigger_stmt_new_len);
 
-	if (box_replace(BOX_TRIGGER_ID, new_tuple, new_tuple_end, NULL) != 0)
-		return SQL_TARANTOOL_ERROR;
-	else
-		return SQL_OK;
+	return box_replace(BOX_TRIGGER_ID, new_tuple, new_tuple_end, NULL);
 
 rename_fail:
 	diag_set(ClientError, ER_SQL_EXECUTE, "can't modify name of space "
 		"created not via SQL facilities");
-	return SQL_TARANTOOL_ERROR;
+	return -1;
 }
 
 int
@@ -676,7 +671,7 @@ sql_rename_table(uint32_t space_id, const char *new_name)
 	char *raw = (char *) region_alloc(region, size);
 	if (raw == NULL) {
 		diag_set(OutOfMemory, size, "region_alloc", "raw");
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	}
 	/* Encode key. */
 	char *pos = mp_encode_array(raw, 1);
@@ -690,7 +685,7 @@ sql_rename_table(uint32_t space_id, const char *new_name)
 	pos = mp_encode_uint(pos, BOX_SPACE_FIELD_NAME);
 	pos = mp_encode_str(pos, new_name, name_len);
 	if (box_update(BOX_SPACE_ID, 0, raw, ops, ops, pos, 0, NULL) != 0)
-		return SQL_TARANTOOL_ERROR;
+		return -1;
 	return 0;
 }
 
@@ -815,8 +810,8 @@ tarantoolsqlIncrementMaxid(uint64_t *space_max_id)
 	request.space_id = space_schema->def->id;
 	if (box_process_rw(&request, space_schema, &res) != 0 || res == NULL ||
 	    tuple_field_u64(res, 1, space_max_id) != 0)
-		return SQL_TARANTOOL_ERROR;
-	return SQL_OK;
+		return -1;
+	return 0;
 }
 
 /*

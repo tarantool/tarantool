@@ -116,19 +116,6 @@ sql_vdbe_prepare(struct Vdbe *vdbe)
 }
 
 /*
- * Change the error string stored in Vdbe.zErrMsg
- */
-void
-sqlVdbeError(Vdbe * p, const char *zFormat, ...)
-{
-	va_list ap;
-	sqlDbFree(p->db, p->zErrMsg);
-	va_start(ap, zFormat);
-	p->zErrMsg = sqlVMPrintf(p->db, zFormat, ap);
-	va_end(ap);
-}
-
-/*
  * Remember the SQL string for a prepared statement.
  */
 void
@@ -2041,10 +2028,11 @@ sqlVdbeCheckFk(Vdbe * p, int deferred)
 	if ((deferred && txn != NULL && txn->psql_txn != NULL &&
 	     txn->psql_txn->fk_deferred_count > 0) ||
 	    (!deferred && p->nFkConstraint > 0)) {
-		p->rc = SQL_CONSTRAINT_FOREIGNKEY;
+		p->rc = SQL_TARANTOOL_ERROR;
 		p->errorAction = ON_CONFLICT_ACTION_ABORT;
-		sqlVdbeError(p, "FOREIGN KEY constraint failed");
-		return SQL_ERROR;
+		diag_set(ClientError, ER_SQL_EXECUTE, "FOREIGN KEY constraint "\
+			 "failed");
+		return SQL_TARANTOOL_ERROR;
 	}
 	return SQL_OK;
 }

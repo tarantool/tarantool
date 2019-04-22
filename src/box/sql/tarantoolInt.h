@@ -22,7 +22,8 @@ int tarantoolsqlNext(BtCursor * pCur, int *pRes);
 int tarantoolsqlPrevious(BtCursor * pCur, int *pRes);
 int tarantoolsqlMovetoUnpacked(BtCursor * pCur, UnpackedRecord * pIdxKey,
 				   int *pRes);
-int tarantoolsqlCount(BtCursor * pCur, i64 * pnEntry);
+int64_t
+tarantoolsqlCount(struct BtCursor *pCur);
 int tarantoolsqlInsert(struct space *space, const char *tuple,
 			   const char *tuple_end);
 int tarantoolsqlReplace(struct space *space, const char *tuple,
@@ -50,7 +51,8 @@ int tarantoolsqlClearTable(struct space *space, uint32_t *tuple_count);
  * @param space_id Table's space identifier.
  * @param new_name new name of table
  *
- * @retval 0 on success, SQL_TARANTOOL_ERROR otherwise.
+ * @retval 0 Success.
+ * @retval -1 Error.
  */
 int
 sql_rename_table(uint32_t space_id, const char *new_name);
@@ -88,7 +90,8 @@ sql_ephemeral_space_create(uint32_t filed_count, struct sql_key_info *key_info);
 int tarantoolsqlEphemeralInsert(struct space *space, const char *tuple,
 				    const char *tuple_end);
 int tarantoolsqlEphemeralDelete(BtCursor * pCur);
-int tarantoolsqlEphemeralCount(BtCursor * pCur, i64 * pnEntry);
+int64_t
+tarantoolsqlEphemeralCount(struct BtCursor *pCur);
 int tarantoolsqlEphemeralDrop(BtCursor * pCur);
 int tarantoolsqlEphemeralClearTable(BtCursor * pCur);
 

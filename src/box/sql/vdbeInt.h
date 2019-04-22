@@ -237,10 +237,6 @@ struct Mem {
 #define MEM_Agg       0x4000	/* Mem.z points to an agg function context */
 #define MEM_Zero      0x8000	/* Mem.i contains count of 0s appended to blob */
 #define MEM_Subtype   0x10000	/* Mem.eSubtype is valid */
-#ifdef SQL_OMIT_INCRBLOB
-#undef MEM_Zero
-#define MEM_Zero 0x0000
-#endif
 
 /**
  * In contrast to Mem_TypeMask, this one allows to get
@@ -438,7 +434,6 @@ struct Vdbe {
 /*
  * Function prototypes
  */
-void sqlVdbeError(Vdbe *, const char *, ...);
 void sqlVdbeFreeCursor(Vdbe *, VdbeCursor *);
 void sqlVdbePopStack(Vdbe *, int);
 int sqlVdbeCursorRestore(VdbeCursor *);
@@ -528,13 +523,8 @@ void sqlVdbeMemPrettyPrint(Mem * pMem, char *zBuf);
 #endif
 int sqlVdbeMemHandleBom(Mem * pMem);
 
-#ifndef SQL_OMIT_INCRBLOB
 int sqlVdbeMemExpandBlob(Mem *);
 #define ExpandBlob(P) (((P)->flags&MEM_Zero)?sqlVdbeMemExpandBlob(P):0)
-#else
-#define sqlVdbeMemExpandBlob(x) SQL_OK
-#define ExpandBlob(P) SQL_OK
-#endif
 
 /**
  * Perform comparison of two keys: one is packed and one is not.

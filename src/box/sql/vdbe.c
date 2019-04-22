@@ -1069,7 +1069,7 @@ case OP_Halt: {
 		p->rc = SQL_BUSY;
 	} else {
 		assert(rc==SQL_OK || (p->rc&0xff)==SQL_CONSTRAINT);
-		rc = p->rc ? SQL_ERROR : SQL_DONE;
+		rc = p->rc ? SQL_TARANTOOL_ERROR : SQL_DONE;
 	}
 	goto vdbe_return;
 }
@@ -1181,17 +1181,13 @@ case OP_NextAutoincValue: {
 	assert(pOp->p2 > 0);
 
 	struct space *space = space_by_id(pOp->p1);
-	if (space == NULL) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (space == NULL)
 		goto abort_due_to_error;
-	}
 
 	int64_t value;
 	struct sequence *sequence = space->sequence;
-	if (sequence == NULL || sequence_next(sequence, &value) != 0) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (sequence == NULL || sequence_next(sequence, &value) != 0)
 		goto abort_due_to_error;
-	}
 
 	pOut = out2Prerelease(p, pOp);
 	pOut->flags = MEM_Int;
@@ -1418,7 +1414,7 @@ case OP_ResultRow: {
 	 * not return the number of rows modified. And do not RELEASE the statement
 	 * transaction. It needs to be rolled back.
 	 */
-	if (SQL_OK!=(rc = sqlVdbeCheckFk(p, 0))) {
+	if (sqlVdbeCheckFk(p, 0) != 0) {
 		assert((p->sql_flags & SQL_CountRows) != 0);
 		goto abort_due_to_error;
 	}
@@ -1510,7 +1506,6 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 					  mem_type_to_str(pIn2);
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or BLOB",
 			 inconsistent_type);
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 
@@ -1518,10 +1513,10 @@ case OP_Concat: {           /* same as TK_CONCAT, in1, in2, out3 */
 	if (str_type_p1 != str_type_p2) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
 			 mem_type_to_str(pIn2), mem_type_to_str(pIn1));
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
-	if (ExpandBlob(pIn1) || ExpandBlob(pIn2)) goto no_mem;
+	if (ExpandBlob(pIn1) != 0 || ExpandBlob(pIn2) != 0)
+		goto abort_due_to_error;
 	nByte = pIn1->n + pIn2->n;
 	if (nByte>db->aLimit[SQL_LIMIT_LENGTH]) {
 		goto too_big;
@@ -1634,13 +1629,11 @@ case OP_Remainder: {           /* same as TK_REM, in1, in2, out3 */
 		if (sqlVdbeRealValue(pIn1, &rA) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn1), "numeric");
-			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
 		if (sqlVdbeRealValue(pIn2, &rB) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn2), "numeric");
-			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
 		switch( pOp->opcode) {
@@ -1680,11 +1673,9 @@ arithmetic_result_is_null:
 
 division_by_zero:
 	diag_set(ClientError, ER_SQL_EXECUTE, "division by zero");
-	rc = SQL_TARANTOOL_ERROR;
 	goto abort_due_to_error;
 integer_overflow:
 	diag_set(ClientError, ER_SQL_EXECUTE, "integer is overflowed");
-	rc = SQL_TARANTOOL_ERROR;
 	goto abort_due_to_error;
 }
 
@@ -1798,10 +1789,8 @@ case OP_Function: {
 	(*pCtx->pFunc->xSFunc)(pCtx, pCtx->argc, pCtx->argv);/* IMP: R-24505-23230 */
 
 	/* If the function returned an error, throw an exception */
-	if (pCtx->is_aborted) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (pCtx->is_aborted)
 		goto abort_due_to_error;
-	}
 
 	/* Copy the result of the function into register P3 */
 	if (pOut->flags & (MEM_Str|MEM_Blob)) {
@@ -1862,13 +1851,11 @@ case OP_ShiftRight: {           /* same as TK_RSHIFT, in1, in2, out3 */
 	if (sqlVdbeIntValue(pIn2, (int64_t *) &iA) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn2), "integer");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	if (sqlVdbeIntValue(pIn1, (int64_t *) &iB) != 0) {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn1), "integer");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	op = pOp->opcode;
@@ -1937,7 +1924,6 @@ case OP_MustBeInt: {            /* jump, in1 */
 			if (pOp->p2==0) {
 				diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 					 sql_value_text(pIn1), "integer");
-				rc = SQL_TARANTOOL_ERROR;
 				goto abort_due_to_error;
 			} else {
 				goto jump_to_p2;
@@ -1982,8 +1968,7 @@ case OP_Realify: {                  /* in1 */
  */
 case OP_Cast: {                  /* in1 */
 	pIn1 = &aMem[pOp->p1];
-	rc = ExpandBlob(pIn1);
-	if (rc != 0)
+	if (ExpandBlob(pIn1) != 0)
 		goto abort_due_to_error;
 	rc = sqlVdbeMemCast(pIn1, pOp->p2);
 	UPDATE_MAX_BLOBSIZE(pIn1);
@@ -1991,7 +1976,6 @@ case OP_Cast: {                  /* in1 */
 		break;
 	diag_set(ClientError, ER_SQL_TYPE_MISMATCH, sql_value_text(pIn1),
 		 field_type_strs[pOp->p2]);
-	rc = SQL_TARANTOOL_ERROR;
 	goto abort_due_to_error;
 }
 
@@ -2143,7 +2127,6 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 						  mem_type_to_str(pIn3);
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 inconsistent_type, "boolean");
-			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
 		res = sqlMemCompare(pIn3, pIn1, NULL);
@@ -2162,7 +2145,6 @@ case OP_Ge: {             /* same as TK_GE, jump, in1, in3 */
 							 ER_SQL_TYPE_MISMATCH,
 							 sql_value_text(pIn3),
 							 "numeric");
-						rc = SQL_TARANTOOL_ERROR;
 						goto abort_due_to_error;
 					}
 
@@ -2404,7 +2386,6 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	} else {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn1), "boolean");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	pIn2 = &aMem[pOp->p2];
@@ -2415,7 +2396,6 @@ case OP_Or: {             /* same as TK_OR, in1, in2, out3 */
 	} else {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn2), "boolean");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	if (pOp->opcode==OP_And) {
@@ -2449,7 +2429,6 @@ case OP_Not: {                /* same as TK_NOT, in1, out2 */
 		if ((pIn1->flags & MEM_Bool) == 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn1), "boolean");
-			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
 		mem_set_bool(pOut, ! pIn1->u.b);
@@ -2473,7 +2452,6 @@ case OP_BitNot: {             /* same as TK_BITNOT, in1, out2 */
 		if (sqlVdbeIntValue(pIn1, &i) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn1), "integer");
-			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
 		pOut->flags = MEM_Int;
@@ -2521,7 +2499,6 @@ case OP_IfNot: {            /* jump, in1 */
 	} else {
 		diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 			 sql_value_text(pIn1), "boolean");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	VdbeBranchTaken(c!=0, 2);
@@ -2709,7 +2686,6 @@ case OP_ApplyType: {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn1),
 				 field_type_strs[type]);
-			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
 		pIn1++;
@@ -2782,10 +2758,8 @@ case OP_MakeRecord: {
 	uint32_t tuple_size;
 	char *tuple =
 		sql_vdbe_mem_encode_tuple(pData0, nField, &tuple_size, region);
-	if (tuple == NULL) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (tuple == NULL)
 		goto abort_due_to_error;
-	}
 	if ((int64_t)tuple_size > db->aLimit[SQL_LIMIT_LENGTH])
 		goto too_big;
 
@@ -2801,7 +2775,8 @@ case OP_MakeRecord: {
 	 * routine.
 	 */
 	if (bIsEphemeral) {
-		rc = sqlVdbeMemClearAndResize(pOut, tuple_size);
+		if (sqlVdbeMemClearAndResize(pOut, tuple_size) != 0)
+			goto abort_due_to_error;
 		pOut->flags = MEM_Blob;
 		pOut->n = tuple_size;
 		memcpy(pOut->z, tuple, tuple_size);
@@ -2816,8 +2791,6 @@ case OP_MakeRecord: {
 		pOut->n = tuple_size;
 		pOut->z = tuple;
 	}
-	if (rc)
-		goto no_mem;
 	assert(sqlVdbeCheckMemInvariants(pOut));
 	assert(pOp->p3>0 && pOp->p3<=(p->nMem+1 - p->nCursor));
 	REGISTER_TRACE(p, pOp->p3, pOut);
@@ -2838,15 +2811,12 @@ case OP_Count: {         /* out2 */
 	assert(p->apCsr[pOp->p1]->eCurType==CURTYPE_TARANTOOL);
 	pCrsr = p->apCsr[pOp->p1]->uc.pCursor;
 	assert(pCrsr);
-	nEntry = 0;  /* Not needed.  Only used to silence a warning. */
 	if (pCrsr->curFlags & BTCF_TaCursor) {
-		rc = tarantoolsqlCount(pCrsr, &nEntry);
-	} else if (pCrsr->curFlags & BTCF_TEphemCursor) {
-		rc = tarantoolsqlEphemeralCount(pCrsr, &nEntry);
+		nEntry = tarantoolsqlCount(pCrsr);
 	} else {
-		unreachable();
+		assert((pCrsr->curFlags & BTCF_TEphemCursor) != 0);
+		nEntry = tarantoolsqlEphemeralCount(pCrsr);
 	}
-	if (rc) goto abort_due_to_error;
 	pOut = out2Prerelease(p, pOp);
 	pOut->u.i = nEntry;
 	break;
@@ -2870,7 +2840,6 @@ case OP_Savepoint: {
 	if (psql_txn == NULL) {
 		assert(!box_txn());
 		diag_set(ClientError, ER_NO_TRANSACTION);
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	p1 = pOp->p1;
@@ -2898,8 +2867,8 @@ case OP_Savepoint: {
 			pSavepoint = pSavepoint->pNext
 			);
 		if (!pSavepoint) {
-			sqlVdbeError(p, "no such savepoint: %s", zName);
-			rc = SQL_ERROR;
+			diag_set(ClientError, ER_NO_SUCH_SAVEPOINT);
+			goto abort_due_to_error;
 		} else {
 
 			/* Determine whether or not this is a transaction savepoint. If so,
@@ -2916,7 +2885,8 @@ case OP_Savepoint: {
 					p->rc = rc = SQL_BUSY;
 					goto vdbe_return;
 				}
-				rc = p->rc;
+				if (p->rc != 0)
+					goto abort_due_to_error;
 			} else {
 				if (p1==SAVEPOINT_ROLLBACK)
 					box_txn_rollback_to_savepoint(pSavepoint->tnt_savepoint);
@@ -2948,7 +2918,6 @@ case OP_Savepoint: {
 			}
 		}
 	}
-	if (rc) goto abort_due_to_error;
 
 	break;
 }
@@ -2971,7 +2940,6 @@ case OP_CheckViewReferences: {
 	if (space->def->view_ref_count > 0) {
 		diag_set(ClientError, ER_DROP_SPACE, space->def->name,
 			 "other views depend on this space");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	break;
@@ -2984,10 +2952,8 @@ case OP_CheckViewReferences: {
  * Otherwise, raise an error with appropriate error message.
  */
 case OP_TransactionBegin: {
-	if (sql_txn_begin(p) != 0) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (sql_txn_begin(p) != 0)
 		goto abort_due_to_error;
-	}
 	p->auto_commit = false	;
 	break;
 }
@@ -3003,13 +2969,11 @@ case OP_TransactionBegin: {
 case OP_TransactionCommit: {
 	struct txn *txn = in_txn();
 	if (txn != NULL) {
-		if (txn_commit(txn) != 0) {
-			rc = SQL_TARANTOOL_ERROR;
+		if (txn_commit(txn) != 0)
 			goto abort_due_to_error;
-		}
 	} else {
-		sqlVdbeError(p, "cannot commit - no transaction is active");
-		rc = SQL_ERROR;
+		diag_set(ClientError, ER_SQL_EXECUTE, "cannot commit - no "\
+			 "transaction is active");
 		goto abort_due_to_error;
 	}
 	break;
@@ -3022,14 +2986,11 @@ case OP_TransactionCommit: {
  */
 case OP_TransactionRollback: {
 	if (box_txn()) {
-		if (box_txn_rollback() != 0) {
-			rc = SQL_TARANTOOL_ERROR;
+		if (box_txn_rollback() != 0)
 			goto abort_due_to_error;
-		}
 	} else {
-		sqlVdbeError(p, "cannot rollback - no "
-				    "transaction is active");
-		rc = SQL_ERROR;
+		diag_set(ClientError, ER_SQL_EXECUTE, "cannot rollback - no "\
+			 "transaction is active");
 		goto abort_due_to_error;
 	}
 	break;
@@ -3047,16 +3008,12 @@ case OP_TransactionRollback: {
  */
 case OP_TTransaction: {
 	if (!box_txn()) {
-		if (sql_txn_begin(p) != 0) {
-			rc = SQL_TARANTOOL_ERROR;
+		if (sql_txn_begin(p) != 0)
 			goto abort_due_to_error;
-		}
 	} else {
 		p->anonymous_savepoint = sql_savepoint(p, NULL);
-		if (p->anonymous_savepoint == NULL) {
-			rc = SQL_TARANTOOL_ERROR;
+		if (p->anonymous_savepoint == NULL)
 			goto abort_due_to_error;
-		}
 	}
 	break;
 }
@@ -3095,9 +3052,8 @@ case OP_IteratorOpen:
 	if (box_schema_version() != p->schema_ver &&
 	    (pOp->p5 & OPFLAG_SYSTEMSP) == 0) {
 		p->expired = 1;
-		rc = SQL_ERROR;
-		sqlVdbeError(p, "schema version has changed: " \
-				    "need to re-compile SQL statement");
+		diag_set(ClientError, ER_SQL_EXECUTE, "schema version has "\
+			 "changed: need to re-compile SQL statement");
 		goto abort_due_to_error;
 	}
 	struct space *space;
@@ -3106,10 +3062,8 @@ case OP_IteratorOpen:
 	else
 		space = aMem[pOp->p3].u.p;
 	assert(space != NULL);
-	if (access_check_space(space, PRIV_R) != 0) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (access_check_space(space, PRIV_R) != 0)
 		goto abort_due_to_error;
-	}
 
 	struct index *index = space_index(space, pOp->p2);
 	assert(index != NULL);
@@ -3132,8 +3086,6 @@ case OP_IteratorOpen:
 	cur->nullRow = 1;
 open_cursor_set_hints:
 	cur->uc.pCursor->hints = pOp->p5 & OPFLAG_SEEKEQ;
-	if (rc != 0)
-		goto abort_due_to_error;
 	break;
 }
 
@@ -3155,10 +3107,8 @@ case OP_OpenTEphemeral: {
 	struct space *space = sql_ephemeral_space_create(pOp->p2,
 							 pOp->p4.key_info);
 
-	if (space == NULL) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (space == NULL)
 		goto abort_due_to_error;
-	}
 	aMem[pOp->p1].u.p = space;
 	aMem[pOp->p1].flags = MEM_Ptr;
 	break;
@@ -3184,8 +3134,8 @@ case OP_SorterOpen: {
 	pCx = allocateCursor(p, pOp->p1, pOp->p2, CURTYPE_SORTER);
 	if (pCx==0) goto no_mem;
 	pCx->key_def = def;
-	rc = sqlVdbeSorterInit(db, pCx);
-	if (rc) goto abort_due_to_error;
+	if (sqlVdbeSorterInit(db, pCx) != 0)
+		goto abort_due_to_error;
 	break;
 }
 
@@ -3397,7 +3347,6 @@ case OP_SeekGT: {       /* jump, in3 */
 		} else {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(pIn3), "integer");
-			rc = SQL_TARANTOOL_ERROR;
 			goto abort_due_to_error;
 		}
 		iKey = i;
@@ -3478,10 +3427,8 @@ case OP_SeekGT: {       /* jump, in3 */
 #endif
 	r.eqSeen = 0;
 	r.opcode = oc;
-	rc = sqlCursorMovetoUnpacked(pC->uc.pCursor, &r, &res);
-	if (rc!=SQL_OK) {
+	if (sqlCursorMovetoUnpacked(pC->uc.pCursor, &r, &res) != SQL_OK)
 		goto abort_due_to_error;
-	}
 	if (eqOnly && r.eqSeen==0) {
 		assert(res!=0);
 		goto seek_not_found;
@@ -3493,8 +3440,8 @@ case OP_SeekGT: {       /* jump, in3 */
 	if (oc>=OP_SeekGE) {  assert(oc==OP_SeekGE || oc==OP_SeekGT);
 		if (res<0 || (res==0 && oc==OP_SeekGT)) {
 			res = 0;
-			rc = sqlCursorNext(pC->uc.pCursor, &res);
-			if (rc!=SQL_OK) goto abort_due_to_error;
+			if (sqlCursorNext(pC->uc.pCursor, &res) != SQL_OK)
+				goto abort_due_to_error;
 		} else {
 			res = 0;
 		}
@@ -3502,8 +3449,8 @@ case OP_SeekGT: {       /* jump, in3 */
 		assert(oc==OP_SeekLT || oc==OP_SeekLE);
 		if (res>0 || (res==0 && oc==OP_SeekLT)) {
 			res = 0;
-			rc = sqlCursorPrevious(pC->uc.pCursor, &res);
-			if (rc!=SQL_OK) goto abort_due_to_error;
+			if (sqlCursorPrevious(pC->uc.pCursor, &res) != SQL_OK)
+				goto abort_due_to_error;
 		} else {
 			/* res might be negative because the table is empty.  Check to
 			 * see if this is the case.
@@ -3646,10 +3593,11 @@ case OP_Found: {        /* jump, in3 */
 		}
 	}
 	rc = sqlCursorMovetoUnpacked(pC->uc.pCursor, pIdxKey, &res);
-	if (pFree) sqlDbFree(db, pFree);
-	if (rc!=SQL_OK) {
+	if (pFree != NULL)
+		sqlDbFree(db, pFree);
+	assert(rc == SQL_OK || rc == SQL_TARANTOOL_ERROR);
+	if (rc != SQL_OK)
 		goto abort_due_to_error;
-	}
 	pC->seekResult = res;
 	alreadyExists = (res==0);
 	pC->nullRow = 1-alreadyExists;
@@ -3709,10 +3657,8 @@ case OP_NextIdEphemeral: {
 	struct space *space = (struct space*)p->aMem[pOp->p1].u.p;
 	assert(space->def->id == 0);
 	uint64_t rowid;
-	if (space->vtab->ephemeral_rowid_next(space, &rowid) != 0) {
-		rc = SQL_TARANTOOL_ERROR;
+	if (space->vtab->ephemeral_rowid_next(space, &rowid) != 0)
 		goto abort_due_to_error;
-	}
 	/*
 	 * FIXME: since memory cell can comprise only 32-bit
 	 * integer, make sure it can fit in. This check should
@@ -3721,7 +3667,6 @@ case OP_NextIdEphemeral: {
 	 */
 	if (rowid > INT32_MAX) {
 		diag_set(ClientError, ER_ROWID_OVERFLOW);
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	pOut = &aMem[pOp->p2];
@@ -3867,10 +3812,9 @@ case OP_SorterCompare: {
 			assert(pOp->p4type==P4_INT32);
 			pIn3 = &aMem[pOp->p3];
 			nKeyCol = pOp->p4.i;
-			res = 0;
-			rc = sqlVdbeSorterCompare(pC, pIn3, nKeyCol, &res);
+			if (sqlVdbeSorterCompare(pC, pIn3, nKeyCol, &res) != 0)
+				goto abort_due_to_error;
 			VdbeBranchTaken(res!=0,2);
-			if (rc) goto abort_due_to_error;
 			if (res) goto jump_to_p2;
 			break;
 		};
@@ -3893,10 +3837,10 @@ case OP_SorterData: {
 	pOut = &aMem[pOp->p2];
 	pC = p->apCsr[pOp->p1];
 	assert(isSorter(pC));
-	rc = sqlVdbeSorterRowkey(pC, pOut);
-	assert(rc!=SQL_OK || (pOut->flags & MEM_Blob));
+	if (sqlVdbeSorterRowkey(pC, pOut) != 0)
+		goto abort_due_to_error;
+	assert(pOut->flags & MEM_Blob);
 	assert(pOp->p1>=0 && pOp->p1<p->nCursor);
-	if (rc) goto abort_due_to_error;
 	p->apCsr[pOp->p3]->cacheStatus = CACHE_STALE;
 	break;
 }
@@ -3963,11 +3907,9 @@ case OP_RowData: {
 	testcase( n==0);
 
 	sqlVdbeMemRelease(pOut);
-	rc = sql_vdbe_mem_alloc_region(pOut, n);
-	if (rc)
-		goto no_mem;
-	rc = sqlCursorPayload(pCrsr, 0, n, pOut->z);
-	if (rc) goto abort_due_to_error;
+	if (sql_vdbe_mem_alloc_region(pOut, n) != 0 ||
+	    sqlCursorPayload(pCrsr, 0, n, pOut->z) != 0)
+		goto abort_due_to_error;
 	UPDATE_MAX_BLOBSIZE(pOut);
 	REGISTER_TRACE(p, pOp->p2, pOut);
 	break;
@@ -4030,10 +3972,10 @@ case OP_Last: {        /* jump */
 	pC->seekOp = OP_Last;
 #endif
 	if (pOp->p3==0 || !sqlCursorIsValidNN(pCrsr)) {
-		rc = tarantoolsqlLast(pCrsr, &res);
+		if (tarantoolsqlLast(pCrsr, &res) != 0)
+			goto abort_due_to_error;
 		pC->nullRow = (u8)res;
 		pC->cacheStatus = CACHE_STALE;
-		if (rc) goto abort_due_to_error;
 		if (pOp->p2>0) {
 			VdbeBranchTaken(res!=0,2);
 			if (res) goto jump_to_p2;
@@ -4102,15 +4044,16 @@ case OP_Rewind: {        /* jump */
 	pC->seekOp = OP_Rewind;
 #endif
 	if (isSorter(pC)) {
-		rc = sqlVdbeSorterRewind(pC, &res);
+		if (sqlVdbeSorterRewind(pC, &res) != 0)
+			goto abort_due_to_error;
 	} else {
 		assert(pC->eCurType==CURTYPE_TARANTOOL);
 		pCrsr = pC->uc.pCursor;
 		assert(pCrsr);
-		rc = tarantoolsqlFirst(pCrsr, &res);
+		if (tarantoolsqlFirst(pCrsr, &res) != 0)
+			goto abort_due_to_error;
 		pC->cacheStatus = CACHE_STALE;
 	}
-	if (rc) goto abort_due_to_error;
 	pC->nullRow = (u8)res;
 	assert(pOp->p2>0 && pOp->p2<p->nOp);
 	VdbeBranchTaken(res!=0,2);
@@ -4193,7 +4136,8 @@ case OP_SorterNext: {  /* jump */
 	pC = p->apCsr[pOp->p1];
 	assert(isSorter(pC));
 	res = 0;
-	rc = sqlVdbeSorterNext(db, pC, &res);
+	if (sqlVdbeSorterNext(db, pC, &res) != 0)
+		goto abort_due_to_error;
 	goto next_tail;
 case OP_PrevIfOpen:    /* jump */
 case OP_NextIfOpen:    /* jump */
@@ -4224,11 +4168,11 @@ case OP_Next:          /* jump */
 	       || pC->seekOp==OP_SeekLT || pC->seekOp==OP_SeekLE
 	       || pC->seekOp==OP_Last);
 
-	rc = pOp->p4.xAdvance(pC->uc.pCursor, &res);
+	if (pOp->p4.xAdvance(pC->uc.pCursor, &res) != 0)
+		goto abort_due_to_error;
 			next_tail:
 	pC->cacheStatus = CACHE_STALE;
 	VdbeBranchTaken(res==0,2);
-	if (rc) goto abort_due_to_error;
 	if (res==0) {
 		pC->nullRow = 0;
 		p->aCounter[pOp->p5]++;
@@ -4256,11 +4200,8 @@ case OP_SorterInsert: {      /* in2 */
 	assert(isSorter(cursor));
 	pIn2 = &aMem[pOp->p2];
 	assert((pIn2->flags & MEM_Blob) != 0);
-	rc = ExpandBlob(pIn2);
-	if (rc != 0)
-		goto abort_due_to_error;
-	rc = sqlVdbeSorterWrite(cursor, pIn2);
-	if (rc != 0)
+	if (ExpandBlob(pIn2) != 0 ||
+	    sqlVdbeSorterWrite(cursor, pIn2) != 0)
 		goto abort_due_to_error;
 	break;
 }
@@ -4290,8 +4231,7 @@ case OP_IdxInsert: {
 	assert((pIn2->flags & MEM_Blob) != 0);
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
-	rc = ExpandBlob(pIn2);
-	if (rc != 0)
+	if (ExpandBlob(pIn2) != 0)
 		goto abort_due_to_error;
 	struct space *space;
 	if (pOp->p4type == P4_SPACEPTR)
@@ -4325,6 +4265,7 @@ case OP_IdxInsert: {
 	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
 		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
+	assert(rc == SQL_OK || rc == SQL_TARANTOOL_ERROR);
 	if (rc != 0)
 		goto abort_due_to_error;
 	break;
@@ -4392,14 +4333,12 @@ case OP_Update: {
 	if (is_error) {
 		diag_set(OutOfMemory, stream.pos - stream.buf,
 			"mpstream_flush", "stream");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 	uint32_t ops_size = region_used(region) - used;
 	const char *ops = region_join(region, ops_size);
 	if (ops == NULL) {
 		diag_set(OutOfMemory, ops_size, "region_join", "raw");
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
 	}
 
@@ -4425,6 +4364,7 @@ case OP_Update: {
 	} else if (pOp->p5 & OPFLAG_OE_ROLLBACK) {
 		p->errorAction = ON_CONFLICT_ACTION_ROLLBACK;
 	}
+	assert(rc == SQL_OK || rc == SQL_TARANTOOL_ERROR);
 	if (rc != 0)
 		goto abort_due_to_error;
 	break;
@@ -4475,8 +4415,7 @@ case OP_SDelete: {
 	struct space *space = space_by_id(pOp->p1);
 	assert(space != NULL);
 	assert(space_is_system(space));
-	rc = sql_delete_by_key(space, 0, pIn2->z, pIn2->n);
-	if (rc)
+	if (sql_delete_by_key(space, 0, pIn2->z, pIn2->n) != 0)
 		goto abort_due_to_error;
 	if (pOp->p5 & OPFLAG_NCHANGE)
 		p->nChange++;
@@ -4510,18 +4449,19 @@ case OP_IdxDelete: {
 	r.default_rc = 0;
 	r.aMem = &aMem[pOp->p2];
 	r.opcode = OP_IdxDelete;
-	rc = sqlCursorMovetoUnpacked(pCrsr, &r, &res);
-	if (rc) goto abort_due_to_error;
+	if (sqlCursorMovetoUnpacked(pCrsr, &r, &res) != 0)
+		goto abort_due_to_error;
 	if (res==0) {
 		assert(pCrsr->eState == CURSOR_VALID);
 		if (pCrsr->curFlags & BTCF_TaCursor) {
-			rc = tarantoolsqlDelete(pCrsr, 0);
+			if (tarantoolsqlDelete(pCrsr, 0) != 0)
+				goto abort_due_to_error;
 		} else if (pCrsr->curFlags & BTCF_TEphemCursor) {
-			rc = tarantoolsqlEphemeralDelete(pCrsr);
+			if (tarantoolsqlEphemeralDelete(pCrsr) != 0)
+				goto abort_due_to_error;
 		} else {
 			unreachable();
 		}
-		if (rc) goto abort_due_to_error;
 	}
 	pC->cacheStatus = CACHE_STALE;
 	pC->seekResult = 0;
@@ -4630,17 +4570,16 @@ case OP_Clear: {
 	uint32_t space_id = pOp->p1;
 	struct space *space = space_by_id(space_id);
 	assert(space != NULL);
-	rc = 0;
 	if (pOp->p2 > 0) {
 		if (box_truncate(space_id) != 0)
-			rc = SQL_TARANTOOL_ERROR;
+			goto abort_due_to_error;
 	} else {
 		uint32_t tuple_count;
-		rc = tarantoolsqlClearTable(space, &tuple_count);
-		if (rc == 0 && (pOp->p5 & OPFLAG_NCHANGE) != 0)
+		if (tarantoolsqlClearTable(space, &tuple_count) != 0)
+			goto abort_due_to_error;
+		if ((pOp->p5 & OPFLAG_NCHANGE) != 0)
 			p->nChange += tuple_count;
 	}
-	if (rc) goto abort_due_to_error;
 	break;
 }
 
@@ -4663,8 +4602,8 @@ case OP_ResetSorter: {
 	} else {
 		assert(pC->eCurType==CURTYPE_TARANTOOL);
 		assert(pC->uc.pCursor->curFlags & BTCF_TEphemCursor);
-		rc = tarantoolsqlEphemeralClearTable(pC->uc.pCursor);
-		if (rc) goto abort_due_to_error;
+		if (tarantoolsqlEphemeralClearTable(pC->uc.pCursor) != 0)
+			goto abort_due_to_error;
 	}
 	break;
 }
@@ -4697,8 +4636,8 @@ case OP_RenameTable: {
 	zNewTableName = pOp->p4.z;
 	zOldTableName = sqlDbStrNDup(db, zOldTableName,
 					 sqlStrlen30(zOldTableName));
-	rc = sql_rename_table(space_id, zNewTableName);
-	if (rc) goto abort_due_to_error;
+	if (sql_rename_table(space_id, zNewTableName) != 0)
+		goto abort_due_to_error;
 	/*
 	 * Rebuild 'CREATE TRIGGER' expressions of all triggers
 	 * created on this table. Sure, this action is not atomic
@@ -4708,20 +4647,15 @@ case OP_RenameTable: {
 	for (struct sql_trigger *trigger = triggers; trigger != NULL; ) {
 		/* Store pointer as trigger will be destructed. */
 		struct sql_trigger *next_trigger = trigger->next;
-		rc = tarantoolsqlRenameTrigger(trigger->zName,
-						   zOldTableName, zNewTableName);
-		if (rc != SQL_OK) {
-			/*
-			 * FIXME: In the case of error,
-			 * part of triggers would have invalid
-			 * space name in tuple so can not been
-			 * persisted.
-			 * Server could be restarted.
-			 * In this case, rename table back and
-			 * try again.
-			 */
+		/*
+		 * FIXME: In the case of error, part of triggers
+		 * would have invalid space name in tuple so can
+		 * not been persisted. Server could be restarted.
+		 * In this case, rename table back and try again.
+		 */
+		if (tarantoolsqlRenameTrigger(trigger->zName, zOldTableName,
+					      zNewTableName) != 0)
 			goto abort_due_to_error;
-		}
 		trigger = next_trigger;
 	}
 	sqlDbFree(db, (void*)zOldTableName);
@@ -4736,8 +4670,8 @@ case OP_RenameTable: {
  */
 case OP_LoadAnalysis: {
 	assert(pOp->p1==0 );
-	rc = sql_analysis_load(db);
-	if (rc) goto abort_due_to_error;
+	if (sql_analysis_load(db) != 0)
+		goto abort_due_to_error;
 	break;
 }
 
@@ -4793,8 +4727,8 @@ case OP_Program: {        /* jump */
 	}
 
 	if (p->nFrame>=db->aLimit[SQL_LIMIT_TRIGGER_DEPTH]) {
-		rc = SQL_ERROR;
-		sqlVdbeError(p, "too many levels of trigger recursion");
+		diag_set(ClientError, ER_SQL_EXECUTE, "too many levels of "\
+			 "trigger recursion");
 		goto abort_due_to_error;
 	}
 
@@ -5116,11 +5050,9 @@ case OP_AggStep: {
 	(pCtx->pFunc->xSFunc)(pCtx,pCtx->argc,pCtx->argv); /* IMP: R-24505-23230 */
 	if (pCtx->is_aborted) {
 		sqlVdbeMemRelease(&t);
-		rc = SQL_TARANTOOL_ERROR;
 		goto abort_due_to_error;
-	} else {
-		assert(t.flags==MEM_Null);
 	}
+	assert(t.flags==MEM_Null);
 	if (pCtx->skipFlag) {
 		assert(pOp[-1].opcode==OP_CollSeq);
 		i = pOp[-1].p1;
@@ -5147,11 +5079,8 @@ case OP_AggFinal: {
 	assert(pOp->p1>0 && pOp->p1<=(p->nMem+1 - p->nCursor));
 	pMem = &aMem[pOp->p1];
 	assert((pMem->flags & ~(MEM_Null|MEM_Agg))==0);
-	rc = sqlVdbeMemFinalize(pMem, pOp->p4.pFunc);
-	if (rc) {
-		sqlVdbeError(p, "%s", sql_value_text(pMem));
+	if (sqlVdbeMemFinalize(pMem, pOp->p4.pFunc) != 0)
 		goto abort_due_to_error;
-	}
 	UPDATE_MAX_BLOBSIZE(pMem);
 	if (sqlVdbeMemTooBig(pMem)) {
 		goto too_big;
@@ -5256,10 +5185,8 @@ case OP_IncMaxid: {
 	assert(pOp->p1 > 0);
 	pOut = &aMem[pOp->p1];
 
-	rc = tarantoolsqlIncrementMaxid((uint64_t*) &pOut->u.i);
-	if (rc!=SQL_OK) {
+	if (tarantoolsqlIncrementMaxid((uint64_t*) &pOut->u.i) != 0)
 		goto abort_due_to_error;
-	}
 	pOut->flags = MEM_Int;
 	break;
 }
@@ -5323,28 +5250,8 @@ default: {          /* This is really OP_Noop and OP_Explain */
 	 * an error of some kind.
 	 */
 abort_due_to_error:
-	if (db->mallocFailed) rc = SQL_NOMEM;
-	assert(rc);
-	if (p->zErrMsg==0 && rc!=SQL_IOERR_NOMEM) {
-		const char *msg;
-		/* Avoiding situation when Tarantool error is set,
-		 * but error message isn't.
-		 */
-		if (rc == SQL_TARANTOOL_ERROR && tarantoolErrorMessage()) {
-			msg = tarantoolErrorMessage();
-		} else {
-			msg = sqlErrStr(rc);
-		}
-		sqlVdbeError(p, "%s", msg);
-	}
+	rc = SQL_TARANTOOL_ERROR;
 	p->rc = rc;
-	sqlSystemError(db, rc);
-	testcase( sqlGlobalConfig.xLog!=0);
-	sql_log(rc, "statement aborts at %d: [%s] %s",
-		    (int)(pOp - aOp), p->zSql, p->zErrMsg);
-	sqlVdbeHalt(p);
-	if (rc==SQL_IOERR_NOMEM) sqlOomFault(db);
-	rc = SQL_ERROR;
 
 	/* This is the only way out of this procedure. */
 vdbe_return:
@@ -5353,21 +5260,20 @@ vdbe_return:
 	assert(rc!=SQL_OK || nExtraDelete==0
 		|| sql_strlike_ci("DELETE%", p->zSql, 0) != 0
 		);
+	assert(rc == SQL_OK || rc == SQL_BUSY || rc == SQL_TARANTOOL_ERROR ||
+	       rc == SQL_ROW || rc == SQL_DONE);
 	return rc;
 
 	/* Jump to here if a string or blob larger than SQL_MAX_LENGTH
 	 * is encountered.
 	 */
 too_big:
-	sqlVdbeError(p, "string or blob too big");
-	rc = SQL_TOOBIG;
+	diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
 	goto abort_due_to_error;
 
 	/* Jump to here if a malloc() fails.
 	 */
 no_mem:
 	sqlOomFault(db);
-	sqlVdbeError(p, "out of memory");
-	rc = SQL_NOMEM;
 	goto abort_due_to_error;
 }

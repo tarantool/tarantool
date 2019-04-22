@@ -67,7 +67,7 @@ end;
 ...
 release_sv_fail();
 ---
-- error: 'Failed to execute SQL statement: no such savepoint: T1'
+- error: 'Can not rollback to savepoint: the savepoint does not exist'
 ...
 box.commit();
 ---

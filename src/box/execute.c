@@ -410,8 +410,7 @@ port_sql_dump_msgpack(struct port *port, struct obuf *out)
  * @retval -1 Error.
  */
 static inline int
-sql_execute(sql *db, struct sql_stmt *stmt, struct port *port,
-	    struct region *region)
+sql_execute(struct sql_stmt *stmt, struct port *port, struct region *region)
 {
 	int rc, column_count = sql_column_count(stmt);
 	if (column_count > 0) {
@@ -427,15 +426,8 @@ sql_execute(sql *db, struct sql_stmt *stmt, struct port *port,
 		rc = sql_step(stmt);
 		assert(rc != SQL_ROW && rc != SQL_OK);
 	}
-	if (rc != SQL_DONE) {
-		if (db->errCode != SQL_TARANTOOL_ERROR) {
-			const char *err = (char *)sql_value_text(db->pErr);
-			if (err == NULL)
-				err = sqlErrStr(db->errCode);
-			diag_set(ClientError, ER_SQL_EXECUTE, err);
-		}
+	if (rc != SQL_DONE)
 		return -1;
-	}
 	return 0;
 }
 
@@ -446,19 +438,12 @@ sql_prepare_and_execute(const char *sql, int len, const struct sql_bind *bind,
 {
 	struct sql_stmt *stmt;
 	struct sql *db = sql_get();
-	if (sql_prepare_v2(db, sql, len, &stmt, NULL) != SQL_OK) {
-		if (db->errCode != SQL_TARANTOOL_ERROR) {
-			const char *err = (char *)sql_value_text(db->pErr);
-			if (err == NULL)
-				err = sqlErrStr(db->errCode);
-			diag_set(ClientError, ER_SQL_EXECUTE, err);
-		}
+	if (sql_prepare_v2(db, sql, len, &stmt, NULL) != SQL_OK)
 		return -1;
-	}
 	assert(stmt != NULL);
 	port_sql_create(port, stmt);
 	if (sql_bind(stmt, bind, bind_count) == 0 &&
-	    sql_execute(db, stmt, port, region) == 0)
+	    sql_execute(stmt, port, region) == 0)
 		return 0;
 	port_destroy(port);
 	return -1;
