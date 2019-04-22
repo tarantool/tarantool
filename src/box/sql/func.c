@@ -44,6 +44,7 @@
 #include <unicode/ucnv.h>
 #include <unicode/uchar.h>
 #include <unicode/ucol.h>
+#include "box/coll_id_cache.h"
 
 /*
  * Return the collating function associated with a function.
@@ -680,6 +681,30 @@ enum pattern_match_status {
 };
 
 /**
+ * Read an UTF-8 character from string, and move pointer to the
+ * next character. Save current character and its length to output
+ * params - they are served as arguments of coll->cmp() call.
+ *
+ * @param[out] str Ptr to string.
+ * @param str_end Ptr the last symbol in @str.
+ * @param[out] char_ptr Ptr to the UTF-8 character.
+ * @param[out] char_len Ptr to length of the UTF-8 character in
+ * bytes.
+ *
+ * @retval UTF-8 character.
+ */
+static UChar32
+step_utf8_char(const char **str, const char *str_end, const char **char_ptr,
+	       size_t *char_len)
+{
+	UErrorCode status = U_ZERO_ERROR;
+	*char_ptr = *str;
+	UChar32 next_utf8 = Utf8Read(*str, str_end);
+	*char_len = *str - *char_ptr;
+	return next_utf8;
+}
+
+/**
  * Compare two UTF-8 strings for equality where the first string
  * is a LIKE expression.
  *
@@ -705,7 +730,7 @@ enum pattern_match_status {
  * @param string String being compared.
  * @param pattern_end Ptr to pattern last symbol.
  * @param string_end Ptr to string last symbol.
- * @param is_like_ci true if LIKE is case insensitive.
+ * @param coll Pointer to collation.
  * @param match_other The escape char for LIKE.
  *
  * @retval One of pattern_match_status values.
@@ -715,7 +740,7 @@ sql_utf8_pattern_compare(const char *pattern,
 			 const char *string,
 			 const char *pattern_end,
 			 const char *string_end,
-			 const int is_like_ci,
+			 struct coll *coll,
 			 UChar32 match_other)
 {
 	/* Next pattern and input string chars. */
@@ -723,9 +748,14 @@ sql_utf8_pattern_compare(const char *pattern,
 	/* One past the last escaped input char. */
 	const char *zEscaped = 0;
 	UErrorCode status = U_ZERO_ERROR;
+	const char *pat_char_ptr = NULL;
+	const char *str_char_ptr = NULL;
+	size_t pat_char_len = 0;
+	size_t str_char_len = 0;
 
 	while (pattern < pattern_end) {
-		c = Utf8Read(pattern, pattern_end);
+		c = step_utf8_char(&pattern, pattern_end, &pat_char_ptr,
+				   &pat_char_len);
 		if (c == SQL_INVALID_UTF8_SYMBOL)
 			return INVALID_PATTERN;
 		if (c == MATCH_ALL_WILDCARD) {
@@ -736,7 +766,9 @@ sql_utf8_pattern_compare(const char *pattern,
 			 * consume a single character of the
 			 * input string for each "_" skipped.
 			 */
-			while ((c = Utf8Read(pattern, pattern_end)) !=
+			while ((c = step_utf8_char(&pattern, pattern_end,
+						   &pat_char_ptr,
+						   &pat_char_len)) !=
 			       SQL_END_OF_STRING) {
 				if (c == SQL_INVALID_UTF8_SYMBOL)
 					return INVALID_PATTERN;
@@ -757,7 +789,9 @@ sql_utf8_pattern_compare(const char *pattern,
 				return MATCH;
 			}
 			if (c == match_other) {
-				c = Utf8Read(pattern, pattern_end);
+				c = step_utf8_char(&pattern, pattern_end,
+						   &pat_char_ptr,
+						   &pat_char_len);
 				if (c == SQL_INVALID_UTF8_SYMBOL)
 					return INVALID_PATTERN;
 				if (c == SQL_END_OF_STRING)
@@ -779,8 +813,6 @@ sql_utf8_pattern_compare(const char *pattern,
 			 */
 
 			int bMatch;
-			if (is_like_ci)
-				c = u_tolower(c);
 			while (string < string_end){
 				/*
 				 * This loop could have been
@@ -792,21 +824,20 @@ sql_utf8_pattern_compare(const char *pattern,
 				 * lower works better with German
 				 * and Turkish languages.
 				 */
-				c2 = Utf8Read(string, string_end);
+				c2 = step_utf8_char(&string, string_end,
+						    &str_char_ptr,
+						    &str_char_len);
 				if (c2 == SQL_INVALID_UTF8_SYMBOL)
 					return NO_MATCH;
-				if (!is_like_ci) {
-					if (c2 != c)
-						continue;
-				} else {
-					if (c2 != c && u_tolower(c2) != c)
-						continue;
-				}
+				if (coll->cmp(pat_char_ptr, pat_char_len,
+					      str_char_ptr, str_char_len, coll)
+					!= 0)
+					continue;
 				bMatch = sql_utf8_pattern_compare(pattern,
 								  string,
 								  pattern_end,
 								  string_end,
-								  is_like_ci,
+								  coll,
 								  match_other);
 				if (bMatch != NO_MATCH)
 					return bMatch;
@@ -814,30 +845,21 @@ sql_utf8_pattern_compare(const char *pattern,
 			return NO_WILDCARD_MATCH;
 		}
 		if (c == match_other) {
-			c = Utf8Read(pattern, pattern_end);
+			c = step_utf8_char(&pattern, pattern_end, &pat_char_ptr,
+					   &pat_char_len);
 			if (c == SQL_INVALID_UTF8_SYMBOL)
 				return INVALID_PATTERN;
 			if (c == SQL_END_OF_STRING)
 				return NO_MATCH;
 			zEscaped = pattern;
 		}
-		c2 = Utf8Read(string, string_end);
+		c2 = step_utf8_char(&string, string_end, &str_char_ptr,
+				    &str_char_len);
 		if (c2 == SQL_INVALID_UTF8_SYMBOL)
 			return NO_MATCH;
-		if (c == c2)
+		if (coll->cmp(pat_char_ptr, pat_char_len, str_char_ptr,
+			      str_char_len, coll) == 0)
 			continue;
-		if (is_like_ci) {
-			/*
-			 * Small optimization. Reduce number of
-			 * calls to u_tolower function. SQL
-			 * standards suggest use to_upper for
-			 * symbol normalisation. However, using
-			 * to_lower allows to respect Turkish 'İ'
-			 * in default locale.
-			 */
-			if (u_tolower(c) == c2 || c == u_tolower(c2))
-				continue;
-		}
 		if (c == MATCH_ONE_WILDCARD && pattern != zEscaped &&
 		    c2 != SQL_END_OF_STRING)
 			continue;
@@ -853,9 +875,10 @@ sql_utf8_pattern_compare(const char *pattern,
 int
 sql_strlike_cs(const char *zPattern, const char *zStr, unsigned int esc)
 {
+	struct coll_id *p = coll_by_name("unicode", strlen("unicode"));
 	return sql_utf8_pattern_compare(zPattern, zStr,
 		                        zPattern + strlen(zPattern),
-		                        zStr + strlen(zStr), 0, esc);
+		                        zStr + strlen(zStr), p->coll, esc);
 }
 
 /**
@@ -865,9 +888,10 @@ sql_strlike_cs(const char *zPattern, const char *zStr, unsigned int esc)
 int
 sql_strlike_ci(const char *zPattern, const char *zStr, unsigned int esc)
 {
+	struct coll_id *p = coll_by_name("unicode_ci", strlen("unicode_ci"));
 	return sql_utf8_pattern_compare(zPattern, zStr,
 		                        zPattern + strlen(zPattern),
-		                        zStr + strlen(zStr), 1, esc);
+		                        zStr + strlen(zStr), p->coll, esc);
 }
 
 /**
@@ -889,7 +913,6 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	u32 escape = SQL_END_OF_STRING;
 	int nPat;
 	sql *db = sql_context_db_handle(context);
-	int is_like_ci = SQL_PTR_TO_INT(sql_user_data(context));
 	int rhs_type = sql_value_type(argv[0]);
 	int lhs_type = sql_value_type(argv[1]);
 
@@ -946,8 +969,10 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	if (!zA || !zB)
 		return;
 	int res;
-	res = sql_utf8_pattern_compare(zB, zA, zB_end, zA_end,
-				       is_like_ci, escape);
+	struct coll *coll = sqlGetFuncCollSeq(context);
+	assert(coll != NULL);
+	res = sql_utf8_pattern_compare(zB, zA, zB_end, zA_end, coll, escape);
+
 	if (res == INVALID_PATTERN) {
 		diag_set(ClientError, ER_SQL_EXECUTE, "LIKE pattern can only "\
 			 "contain UTF-8 characters");

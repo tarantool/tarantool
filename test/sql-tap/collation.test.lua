@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(188)
+test:plan(192)
 
 local prefix = "collation-"
 
@@ -477,12 +477,13 @@ for _, data_collation in ipairs(data_collations) do
     end
 end
 
--- Like uses collation (only for unicode_ci and binary)
+-- <LIKE> uses collation. If <LIKE> has explicit <COLLATE>, use it
+-- instead of implicit.
 local like_testcases =
 {
     {"2.0",
     [[
-        CREATE TABLE tx1 (s1 VARCHAR(5) PRIMARY KEY);
+        CREATE TABLE tx1 (s1 VARCHAR(5) PRIMARY KEY COLLATE "unicode_ci");
         INSERT INTO tx1 VALUES('aaa');
         INSERT INTO tx1 VALUES('Aab');
         INSERT INTO tx1 VALUES('İac');
@@ -490,30 +491,48 @@ local like_testcases =
     ]], {0}},
     {"2.1.1",
         "SELECT * FROM tx1 WHERE s1 LIKE 'A%' order by s1;",
-        {0, {"Aab"}} },
+        {0, {"aaa","Aab"}} },
     {"2.1.2",
         "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
         {0, {0, 0, 0, "SEARCH TABLE TX1 USING PRIMARY KEY (S1>? AND S1<?) (~16384 rows)"}}},
     {"2.2.0",
-        "SELECT * FROM tx1 WHERE s1 LIKE 'A%' order by s1;",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'A%' COLLATE \"unicode\" order by s1;",
         {0, {"Aab"}} },
     {"2.2.1",
         "EXPLAIN QUERY PLAN SELECT * FROM tx1 WHERE s1 LIKE 'A%';",
         {0, {0, 0, 0, "/USING PRIMARY KEY/"}} },
     {"2.3.0",
         "SELECT * FROM tx1 WHERE s1 LIKE 'i%' order by s1;",
-        {0, {"iad"}}},
+        {0, {"İac", "iad"}}},
     {"2.3.1",
-        "SELECT * FROM tx1 WHERE s1 LIKE 'İ%'order by s1;",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'İ%' COLLATE \"unicode\" order by s1;",
         {0, {"İac"}} },
     {"2.4.0",
     [[
         INSERT INTO tx1 VALUES('ЯЁЮ');
     ]], {0} },
     {"2.4.1",
-        "SELECT * FROM tx1 WHERE s1 LIKE 'яёю';",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'яёю' COLLATE \"unicode\";",
         {0, {}} },
+    {"2.4.2",
+        "SELECT * FROM tx1 WHERE s1 COLLATE \"binary\" LIKE 'яёю';",
+        {0, {}} },
+    {"2.4.3",
+        "SELECT * FROM tx1 WHERE s1 COLLATE \"binary\" LIKE 'яёю' COLLATE \"unicode\";",
+        {1, "Illegal mix of collations"} },
+    {"2.4.4",
+        "SELECT * FROM tx1 WHERE s1 LIKE 'яёю';",
+        {0, {"ЯЁЮ"}} },
 }
+
+test:do_execsql_test(
+    "collation-2.6",
+    [[
+        CREATE TABLE tx3 (s1 VARCHAR(5) PRIMARY KEY COLLATE "unicode");
+        INSERT INTO tx3 VALUES('aaa');
+        INSERT INTO tx3 VALUES('Aab');
+        SELECT s1 FROM tx3 WHERE s1 LIKE 'A%';
+    ]], { 'Aab' })
 
 test:do_catchsql_set_test(like_testcases, prefix)
 

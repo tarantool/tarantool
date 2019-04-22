@@ -89,7 +89,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE unlikely(cname LIKE '%bach%')
+         WHERE unlikely(cname LIKE '%bach%' COLLATE "unicode_ci")
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -118,7 +118,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE likelihood(cname LIKE '%bach%', 0.5)
+         WHERE likelihood(cname LIKE '%bach%' COLLATE "unicode_ci", 0.5)
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -146,7 +146,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE cname LIKE '%bach%'
+         WHERE cname LIKE '%bach%' COLLATE "unicode_ci"
            AND composer.cid=track.cid
            AND album.aid=track.aid;
     ]], {
@@ -174,7 +174,7 @@ test:do_execsql_test(
     [[
         SELECT DISTINCT aname
           FROM album, composer, track
-         WHERE cname LIKE '%bach%'
+         WHERE cname LIKE '%bach%' COLLATE "unicode_ci"
            AND unlikely(composer.cid=track.cid)
            AND unlikely(album.aid=track.aid);
     ]], {

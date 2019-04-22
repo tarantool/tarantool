@@ -73,16 +73,16 @@ test:do_execsql_test(
         CREATE TABLE t2(a INT PRIMARY KEY, b TEXT);
         INSERT INTO t2 SELECT a, b FROM t1;
         CREATE INDEX t2ba ON t2(b,a);
-        SELECT a, b FROM t2 WHERE b LIKE 'ab%' ORDER BY +a;
+        SELECT a, b FROM t2 WHERE b LIKE 'ab%' COLLATE "unicode_ci" ORDER BY +a;
     ]], {
         -- <like3-2.0>
-        1, "abc", 4, "abc"
+        1, "abc", 2, "ABX", 4, "abc", 5, "ABX"
         -- </like3-2.0>
     })
 test:do_execsql_test(
     "like3-2.1",
     [[
-        SELECT a, b FROM t2 WHERE +b LIKE 'ab%' ORDER BY +a;
+        SELECT a, b FROM t2 WHERE +b LIKE 'ab%' COLLATE "unicode_ci" ORDER BY +a;
     ]], {
         -- <like3-2.1>
         1, "abc", 2, "ABX", 4, "abc", 5, "ABX"

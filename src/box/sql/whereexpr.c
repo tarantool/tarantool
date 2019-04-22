@@ -228,13 +228,24 @@ operatorMask(int op)
  * In order for the operator to be optimizible, the RHS must be a
  * string literal that does not begin with a wildcard. The LHS
  * must be a column that may only be NULL, a string, or a BLOB,
- * never a number. The collating sequence for the column on the
- * LHS must be appropriate for the operator.
+ * never a number.
+ *
+ * FIXME: this optimization is currently available only for
+ * "binary" and "unicode_ci" collations. Reason for that is
+ * determining the next symbol to be replaced in pattern.
+ * Consider example: a LIKE %A; (collation is binary). After
+ * optimization is applied, LIKE is transformed to a >= 'A' AND
+ * a < 'B' since 'B' is the smallest string that is the same
+ * length as 'A' but which compares greater than 'A'. In this case
+ * 'B' can be found as a literally next character to 'A'
+ * ('B' == 'A' + 1) However, if custom collation is used (e.g.
+ * "unicode" featuring tertiary strength) next symbol (i.e. upper
+ * bound) should be found using weight table that is not such
+ * trivial case.
  *
  * @param pParse      Parsing and code generating context.
  * @param pExpr       Test this expression.
- * @param ppPrefix    Pointer to TK_STRING expression with
- *                    pattern prefix.
+ * @param ppPrefix    Pointer to expression with pattern prefix.
  * @param pisComplete True if the only wildcard is '%' in the
  *                    last character.
  * @retval True if the given expr is a LIKE operator & is
@@ -278,7 +289,21 @@ like_optimization_is_valid(Parse *pParse, Expr *pExpr, Expr **ppPrefix,
 	}
 	assert(pLeft->iColumn != (-1));	/* Because IPK never has AFF_TEXT */
 
-	pRight = sqlExprSkipCollate(pList->a[0].pExpr);
+	pRight = pList->a[0].pExpr;
+
+	/*
+	 * Only for "binary" and "unicode_ci" collations. If
+	 * explicit collation is specified and doesn't match with
+	 * implicit - index search won't be used. Ergo, we fail
+	 * get so far.
+	 */
+	struct field_def *fd = &pLeft->space_def->fields[pLeft->iColumn];
+	uint32_t u_ci_id = coll_by_name("unicode_ci", strlen("unicode_ci"))->id;
+	uint32_t bin_id = coll_by_name("binary", strlen("binary"))->id;
+	if (fd->coll_id != COLL_NONE && fd->coll_id != u_ci_id &&
+	    fd->coll_id != bin_id)
+		return 0;
+
 	op = pRight->op;
 	if (op == TK_VARIABLE) {
 		Vdbe *pReprepare = pParse->pReprepare;
