@@ -337,18 +337,11 @@ lookupName(Parse * pParse,	/* The parsing context */
 				}
 				if (iCol < (int)space_def->field_count) {
 					cnt++;
-					if (iCol < 0) {
-						pExpr->type =
-							FIELD_TYPE_INTEGER;
-					} else {
-						uint64_t *mask =
-							pExpr->iTable == 0 ?
-							&pParse->oldmask :
-							&pParse->newmask;
-						column_mask_set_fieldno(mask,
-									iCol);
-					}
-					pExpr->iColumn = (i16) iCol;
+					uint64_t *mask = pExpr->iTable == 0 ?
+							 &pParse->oldmask :
+							 &pParse->newmask;
+					column_mask_set_fieldno(mask, iCol);
+					pExpr->iColumn = iCol;
 					pExpr->space_def = space_def;
 					isTrigger = 1;
 				}
