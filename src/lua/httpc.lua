@@ -294,7 +294,7 @@ curl_mt = {
         --
         request = function(self, method, url, body, opts)
             if not method or not url then
-                error('request(method, url [, options]])')
+                error('request(method, url[, body, [options]])')
             end
             local resp = self.curl:request(method, url, body, opts or {})
             if resp and resp.headers then

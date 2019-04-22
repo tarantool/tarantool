@@ -62,7 +62,13 @@ local function stop_server(test, server)
 end
 
 local function test_http_client(test, url, opts)
-    test:plan(10)
+    test:plan(11)
+
+    -- gh-4136: confusing httpc usage error message
+    local ok, err = pcall(client.request, client)
+    local usage_err = "request(method, url[, body, [options]])"
+    test:is_deeply({ok, err:split(': ')[2]}, {false, usage_err},
+                   "test httpc usage error")
 
     test:isnil(rawget(_G, 'http'), "global namespace is not polluted");
     test:isnil(rawget(_G, 'http.client'), "global namespace is not polluted");
