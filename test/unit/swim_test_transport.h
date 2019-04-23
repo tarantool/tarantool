@@ -51,13 +51,6 @@ typedef bool (*swim_test_filter_check_f)(const char *data, int size,
 					 void *udata, int dir);
 
 /**
- * It is possible that a filter is complex and uses helper data
- * allocated somewhere. This function is called when the filter
- * is dropped and allows to free user data.
- */
-typedef void (*swim_test_filter_delete_f)(void *udata);
-
-/**
  * Until there are no new IO events, feed EV_WRITE event to all
  * opened descriptors; EV_READ to ones, who have not empty recv
  * queue; invoke callbacks to process the events. Move packets
@@ -84,14 +77,12 @@ swim_test_transport_unblock_fd(int fd);
  * @param fd File descriptor to add filter to.
  * @param check Check function. It is called for each packet and
  *        should return true, when the packet should be dropped.
- * @param delete A destructor for @a udata called when the filter
- *        is dropped.
  * @param udata Arbitrary user data, passed to each @a check
  *        invocation.
  */
 void
 swim_test_transport_add_filter(int fd, swim_test_filter_check_f check,
-			       swim_test_filter_delete_f delete, void *udata);
+			       void *udata);
 
 /**
  * Remove a filter having @a check function. Works just like the

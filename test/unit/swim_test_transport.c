@@ -110,11 +110,6 @@ struct swim_fd_filter {
 	/** A function to decide whether to drop a packet. */
 	swim_test_filter_check_f check;
 	/**
-	 * A function called when the filter is deleted to free
-	 * @a udata if necessary.
-	 */
-	swim_test_filter_delete_f delete;
-	/**
 	 * Arbitrary user data. Passed to each call of @a check.
 	 */
 	void *udata;
@@ -124,14 +119,12 @@ struct swim_fd_filter {
 
 /** Create a new filter. */
 static inline struct swim_fd_filter *
-swim_fd_filter_new(swim_test_filter_check_f check,
-		   swim_test_filter_delete_f delete, void *udata)
+swim_fd_filter_new(swim_test_filter_check_f check, void *udata)
 {
 	struct swim_fd_filter *f = (struct swim_fd_filter *) malloc(sizeof(*f));
 	assert(f != NULL);
 	f->udata = udata;
 	f->check = check;
-	f->delete = delete;
 	rlist_create(&f->in_filters);
 	return f;
 }
@@ -141,7 +134,6 @@ static inline void
 swim_fd_filter_delete(struct swim_fd_filter *filter)
 {
 	rlist_del_entry(filter, in_filters);
-	filter->delete(filter->udata);
 	free(filter);
 }
 
@@ -211,11 +203,11 @@ swim_test_transport_remove_filter(int fd, swim_test_filter_check_f check)
 
 void
 swim_test_transport_add_filter(int fd, swim_test_filter_check_f check,
-			       swim_test_filter_delete_f delete, void *udata)
+			       void *udata)
 {
 	struct swim_fd *sfd = &swim_fd[fd - FAKE_FD_BASE];
 	assert(sfd->is_opened);
-	struct swim_fd_filter *f = swim_fd_filter_new(check, delete, udata);
+	struct swim_fd_filter *f = swim_fd_filter_new(check, udata);
 	swim_test_transport_remove_filter(fd, check);
 	rlist_add_tail_entry(&sfd->filters, f, in_filters);
 }

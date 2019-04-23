@@ -38,6 +38,49 @@
 #include "msgpuck.h"
 
 /**
+ * Drop rate packet filter to drop packets with a certain
+ * probability.
+ */
+struct swim_drop_rate {
+	/** True if should be applied to incoming packets. */
+	bool is_for_in;
+	/** True if should be applied to outgoing packets. */
+	bool is_for_out;
+	/** Drop rate percentage. */
+	double rate;
+};
+
+/** Initialize drop rate packet filter. */
+static inline void
+swim_drop_rate_create(struct swim_drop_rate *dr, double rate, bool is_for_in,
+		      bool is_for_out)
+{
+	dr->is_for_in = is_for_in;
+	dr->is_for_out = is_for_out;
+	dr->rate = rate;
+}
+
+/**
+ * Drop components packet filter to drop packets containing
+ * specified SWIM components.
+ */
+struct swim_drop_components {
+	/** List of component body keys. */
+	const int *keys;
+	/** Length of @a keys. */
+	int key_count;
+};
+
+/** Initialize drop components packet filter. */
+static inline void
+swim_drop_components_create(struct swim_drop_components *dc, const int *keys,
+			    int key_count)
+{
+	dc->keys = keys;
+	dc->key_count = key_count;
+}
+
+/**
  * SWIM cluster node and its UUID. UUID is stored separately
  * because sometimes a test wants to drop a SWIM instance, but
  * still check how does it look in other membership instances.
@@ -52,6 +95,15 @@ struct swim_node {
 	 * that instance.
 	 */
 	struct tt_uuid uuid;
+	/**
+	 * Filter to drop packets with a certain probability
+	 * from/to a specified direction.
+	 */
+	struct swim_drop_rate drop_rate;
+	/**
+	 * Filter to drop packets with specified SWIM components.
+	 */
+	struct swim_drop_components drop_components;
 };
 
 /**
@@ -76,6 +128,24 @@ swim_cluster_id_to_uri(char *buffer, int id)
 	sprintf(buffer, "127.0.0.1:%d", id + 1);
 }
 
+/** Create a SWIM cluster node @a n with a 0-based @a id. */
+static inline void
+swim_node_create(struct swim_node *n, int id)
+{
+	n->swim = swim_new();
+	assert(n->swim != NULL);
+	char uri[128];
+	swim_cluster_id_to_uri(uri, id);
+	n->uuid = uuid_nil;
+	n->uuid.time_low = id + 1;
+	int rc = swim_cfg(n->swim, uri, -1, -1, -1, &n->uuid);
+	assert(rc == 0);
+	(void) rc;
+
+	swim_drop_rate_create(&n->drop_rate, 0, false, false);
+	swim_drop_components_create(&n->drop_components, NULL, 0);
+}
+
 struct swim_cluster *
 swim_cluster_new(int size)
 {
@@ -87,20 +157,9 @@ swim_cluster_new(int size)
 	res->size = size;
 	res->ack_timeout = -1;
 	res->gc_mode = SWIM_GC_DEFAULT;
-	struct tt_uuid uuid;
-	memset(&uuid, 0, sizeof(uuid));
-	char *uri = tt_static_buf();
 	struct swim_node *n = res->node;
-	for (int i = 0; i < size; ++i, ++n) {
-		n->swim = swim_new();
-		assert(n->swim != NULL);
-		swim_cluster_id_to_uri(uri, i);
-		uuid.time_low = i + 1;
-		n->uuid = uuid;
-		int rc = swim_cfg(n->swim, uri, -1, -1, -1, &uuid);
-		assert(rc == 0);
-		(void) rc;
-	}
+	for (int i = 0; i < size; ++i, ++n)
+		swim_node_create(n, i);
 	return res;
 }
 
@@ -271,16 +330,6 @@ swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
 	swim_test_transport_unblock_fd(swim_fd(s));
 }
 
-/** A structure used by drop rate packet filter. */
-struct swim_drop_rate {
-	/** True if should be applied to incoming packets. */
-	bool is_for_in;
-	/** True if should be applied to outgoing packets. */
-	bool is_for_out;
-	/** Drop rate percentage. */
-	double rate;
-};
-
 /** Create a new drop rate filter helper. */
 static inline struct swim_drop_rate *
 swim_drop_rate_new(double rate, bool is_for_in, bool is_for_out)
@@ -315,14 +364,15 @@ static void
 swim_cluster_set_drop_generic(struct swim_cluster *cluster, int i,
 			      double value, bool is_for_in, bool is_for_out)
 {
-	int fd = swim_fd(swim_cluster_member(cluster, i));
+	struct swim_node *n = swim_cluster_node(cluster, i);
+	int fd = swim_fd(n->swim);
 	if (value == 0) {
 		swim_test_transport_remove_filter(fd, swim_filter_drop_rate);
 		return;
 	}
-	struct swim_drop_rate *dr = swim_drop_rate_new(value, is_for_in,
-						       is_for_out);
-	swim_test_transport_add_filter(fd, swim_filter_drop_rate, free, dr);
+	swim_drop_rate_create(&n->drop_rate, value, is_for_in, is_for_out);
+	swim_test_transport_add_filter(fd, swim_filter_drop_rate,
+				       &n->drop_rate);
 }
 
 void
@@ -342,16 +392,6 @@ swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value)
 {
 	swim_cluster_set_drop_generic(cluster, i, value, true, false);
 }
-
-/**
- * A list of components to drop used by component packet filter.
- */
-struct swim_drop_components {
-	/** List of component body keys. */
-	const int *keys;
-	/** Length of @a keys. */
-	int key_count;
-};
 
 /**
  * Check if a packet contains any of the components to filter out.
@@ -381,19 +421,16 @@ void
 swim_cluster_drop_components(struct swim_cluster *cluster, int i,
 			     const int *keys, int key_count)
 {
-	int fd = swim_fd(swim_cluster_member(cluster, i));
+	struct swim_node *n = swim_cluster_node(cluster, i);
+	int fd = swim_fd(n->swim);
 	if (key_count == 0) {
 		swim_test_transport_remove_filter(fd,
 						  swim_filter_drop_component);
 		return;
 	}
-	struct swim_drop_components *dc =
-		(struct swim_drop_components *) malloc(sizeof(*dc));
-	assert(dc != NULL);
-	dc->key_count = key_count;
-	dc->keys = keys;
-	swim_test_transport_add_filter(fd, swim_filter_drop_component, free,
-				       dc);
+	swim_drop_components_create(&n->drop_components, keys, key_count);
+	swim_test_transport_add_filter(fd, swim_filter_drop_component,
+				       &n->drop_components);
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */
