@@ -91,15 +91,14 @@ local function cmpdeeply(got, expected, extra)
 
     if ffi.istype('bool', got) then got = (got == 1) end
     if ffi.istype('bool', expected) then expected = (expected == 1) end
-    if got == nil and expected == nil then return true end
 
-    if type(got) ~= type(expected) then
+    if extra.strict and type(got) ~= type(expected) then
         extra.got = type(got)
         extra.expected = type(expected)
         return false
     end
 
-    if type(got) ~= 'table' then
+    if type(got) ~= 'table' or type(expected) ~= 'table' then
         extra.got = got
         extra.expected = expected
         return got == expected
@@ -117,8 +116,8 @@ local function cmpdeeply(got, expected, extra)
     end
 
     -- check if expected contains more keys then got
-    for i, _ in pairs(expected) do
-        if visited_keys[i] ~= true then
+    for i, v in pairs(expected) do
+        if visited_keys[i] ~= true and (extra.strict or v ~= box.NULL) then
             extra.expected = 'key ' .. tostring(i)
             extra.got = 'nil'
             return false
@@ -148,14 +147,18 @@ local function is(test, got, expected, message, extra)
     extra = extra or {}
     extra.got = got
     extra.expected = expected
-    return ok(test, got == expected, message, extra)
+    local rc = (test.strict == false or type(got) == type(expected)) and
+               got == expected
+    return ok(test, rc, message, extra)
 end
 
 local function isnt(test, got, unexpected, message, extra)
     extra = extra or {}
     extra.got = got
     extra.unexpected = unexpected
-    return ok(test, got ~= unexpected, message, extra)
+    local rc = (test.strict == true and type(got) ~= type(unexpected)) or
+               got ~= unexpected
+    return ok(test, rc, message, extra)
 end
 
 
@@ -163,6 +166,7 @@ local function is_deeply(test, got, expected, message, extra)
     extra = extra or {}
     extra.got = got
     extra.expected = expected
+    extra.strict = test.strict
     return ok(test, cmpdeeply(got, expected, extra), message, extra)
 end
 
@@ -225,6 +229,7 @@ local function test(parent, name, fun, ...)
         failed  = 0;
         planned = 0;
         trace   = parent == nil and true or parent.trace;
+        strict = false;
     }, test_mt)
     if fun ~= nil then
         test:diag('%s', test.name)
