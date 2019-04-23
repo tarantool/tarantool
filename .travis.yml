@@ -53,10 +53,14 @@ matrix:
         env: OS=ubuntu DIST=bionic
       - name: Ubuntu Cosmic (18.10) build + deploy DEB
         env: OS=ubuntu DIST=cosmic
+      - name: Ubuntu Disco (19.04) build + deploy DEB
+        env: OS=ubuntu DIST=disco
       - name: Debian Jessie (8) build + deploy DEB
         env: OS=debian DIST=jessie
       - name: Debian Stretch (9) build + deploy DEB
         env: OS=debian DIST=stretch
+      - name: Debian Buster (10) build + deploy DEB
+        env: OS=debian DIST=buster
 
 script:
   - make -f .travis.mk ${TARGET}
