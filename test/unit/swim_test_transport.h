@@ -45,10 +45,12 @@ struct ev_loop;
  * arbitrary user data, and should return true, if the packet
  * should be dropped. False otherwise. Direction is said via
  * @a dir parameter. 0 means incoming packet, 1 means outgoing
- * packet, just like standard IO descriptors.
+ * packet, just like standard IO descriptors. Via @a peer_fd
+ * parameter a sender/receiver descriptor number is passed
+ * depending on @a dir.
  */
 typedef bool (*swim_test_filter_check_f)(const char *data, int size,
-					 void *udata, int dir);
+					 void *udata, int dir, int peer_fd);
 
 /**
  * Until there are no new IO events, feed EV_WRITE event to all

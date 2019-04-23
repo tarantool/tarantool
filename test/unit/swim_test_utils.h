@@ -119,6 +119,17 @@ swim_cluster_drop_components(struct swim_cluster *cluster, int i,
 			     const int *keys, int key_count);
 
 /**
+ * When @a value is true, break a one direction network link
+ * between @a to_id and @a from_id SWIM instances. It is a pure
+ * network block, the member tables are not touched. All the
+ * packets trying to go directly from @a from_id to @a to_id are
+ * dropped. When @a value is false, the channel is restored.
+ */
+void
+swim_cluster_set_drop_channel(struct swim_cluster *cluster, int from_id,
+			      int to_id, bool value);
+
+/**
  * Explicitly add a member of id @a from_id to a member of id
  * @a to_id.
  */

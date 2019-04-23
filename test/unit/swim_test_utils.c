@@ -80,6 +80,67 @@ swim_drop_components_create(struct swim_drop_components *dc, const int *keys,
 	dc->key_count = key_count;
 }
 
+/** Packet filter to drop packets with specified destinations. */
+struct swim_drop_channel {
+	/**
+	 * An array of file descriptors to drop messages sent to
+	 * them.
+	 */
+	int *drop_fd;
+	/** Length of @a drop_fd. */
+	int drop_fd_size;
+	/** Capacity of @a drop_fd. */
+	int drop_fd_cap;
+};
+
+/** Initialize drop channel packet filter. */
+static inline void
+swim_drop_channel_create(struct swim_drop_channel *dc)
+{
+	dc->drop_fd = NULL;
+	dc->drop_fd_size = 0;
+	dc->drop_fd_cap = 0;
+}
+
+/**
+ * Set @a new_fd file descriptor into @a dc drop channel packet
+ * filter in place of @a old_fd descriptor. Just like dup2()
+ * system call.
+ * @retval 0 Success.
+ * @retval -1 @a old_fd is not found.
+ */
+static inline int
+swim_drop_channel_dup_fd(const struct swim_drop_channel *dc, int new_fd,
+			 int old_fd)
+{
+	for (int i = 0; i < dc->drop_fd_size; ++i) {
+		if (dc->drop_fd[i] == old_fd) {
+			dc->drop_fd[i] = new_fd;
+			return 0;
+		}
+	}
+	return -1;
+}
+
+/** Add @a fd to @a dc drop channel packet filter. */
+static inline void
+swim_drop_channel_add_fd(struct swim_drop_channel *dc, int fd)
+{
+	if (swim_drop_channel_dup_fd(dc, fd, -1) == 0)
+		return;
+	dc->drop_fd_cap += dc->drop_fd_cap + 1;
+	int new_bsize = dc->drop_fd_cap * sizeof(int);
+	dc->drop_fd = (int *) realloc(dc->drop_fd, new_bsize);
+	dc->drop_fd[dc->drop_fd_size++] = fd;
+}
+
+/** Destroy drop channel packet filter. */
+static inline void
+swim_drop_channel_destroy(struct swim_drop_channel *dc)
+{
+	free(dc->drop_fd);
+}
+
 /**
  * SWIM cluster node and its UUID. UUID is stored separately
  * because sometimes a test wants to drop a SWIM instance, but
@@ -104,6 +165,8 @@ struct swim_node {
 	 * Filter to drop packets with specified SWIM components.
 	 */
 	struct swim_drop_components drop_components;
+	/** Filter to drop packets with specified destinations. */
+	struct swim_drop_channel drop_channel;
 };
 
 /**
@@ -144,6 +207,7 @@ swim_node_create(struct swim_node *n, int id)
 
 	swim_drop_rate_create(&n->drop_rate, 0, false, false);
 	swim_drop_components_create(&n->drop_components, NULL, 0);
+	swim_drop_channel_create(&n->drop_channel);
 }
 
 struct swim_cluster *
@@ -191,6 +255,7 @@ swim_cluster_delete(struct swim_cluster *cluster)
 	for (int i = 0; i < cluster->size; ++i) {
 		if (cluster->node[i].swim != NULL)
 			swim_delete(cluster->node[i].swim);
+		swim_drop_channel_destroy(&cluster->node[i].drop_channel);
 	}
 	free(cluster->node);
 	free(cluster);
@@ -347,10 +412,12 @@ swim_drop_rate_new(double rate, bool is_for_in, bool is_for_out)
  * A packet filter dropping a packet with a certain probability.
  */
 static bool
-swim_filter_drop_rate(const char *data, int size, void *udata, int dir)
+swim_filter_drop_rate(const char *data, int size, void *udata, int dir,
+		      int peer_fd)
 {
 	(void) data;
 	(void) size;
+	(void) peer_fd;
 	struct swim_drop_rate *dr = (struct swim_drop_rate *) udata;
 	if ((dir == 0 && !dr->is_for_in) || (dir == 1 && !dr->is_for_out))
 		return false;
@@ -397,10 +464,12 @@ swim_cluster_set_drop_in(struct swim_cluster *cluster, int i, double value)
  * Check if a packet contains any of the components to filter out.
  */
 static bool
-swim_filter_drop_component(const char *data, int size, void *udata, int dir)
+swim_filter_drop_component(const char *data, int size, void *udata, int dir,
+			   int peer_fd)
 {
 	(void) size;
 	(void) dir;
+	(void) peer_fd;
 	struct swim_drop_components *dc = (struct swim_drop_components *) udata;
 	/* Skip meta. */
 	mp_next(&data);
@@ -431,6 +500,47 @@ swim_cluster_drop_components(struct swim_cluster *cluster, int i,
 	swim_drop_components_create(&n->drop_components, keys, key_count);
 	swim_test_transport_add_filter(fd, swim_filter_drop_component,
 				       &n->drop_components);
+}
+
+/**
+ * Check if the packet sender should drop a packet outgoing to
+ * @a peer_fd file descriptor.
+ */
+static bool
+swim_filter_drop_channel(const char *data, int size, void *udata, int dir,
+			 int peer_fd)
+{
+	(void) data;
+	(void) size;
+	if (dir != 1)
+		return false;
+	struct swim_drop_channel *dc = (struct swim_drop_channel *) udata;
+	/*
+	 * Fullscan is totally ok - there are no more than 2-3
+	 * blocks simultaneously in the tests.
+	 */
+	for (int i = 0; i < dc->drop_fd_size; ++i) {
+		if (dc->drop_fd[i] == peer_fd)
+			return true;
+	}
+	return false;
+}
+
+void
+swim_cluster_set_drop_channel(struct swim_cluster *cluster, int from_id,
+			      int to_id, bool value)
+{
+	int to_fd = swim_fd(swim_cluster_member(cluster, to_id));
+	struct swim_node *from_node = swim_cluster_node(cluster, from_id);
+	struct swim_drop_channel *dc = &from_node->drop_channel;
+	if (! value) {
+		swim_drop_channel_dup_fd(dc, -1, to_fd);
+		return;
+	}
+	swim_drop_channel_add_fd(dc, to_fd);
+	swim_test_transport_add_filter(swim_fd(from_node->swim),
+				       swim_filter_drop_channel,
+				       &from_node->drop_channel);
 }
 
 /** Check if @a s1 knows every member of @a s2's table. */

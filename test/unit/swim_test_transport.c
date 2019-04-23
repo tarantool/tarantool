@@ -238,14 +238,16 @@ swim_fd_close(struct swim_fd *fd)
  * Check all the packet filters if any wants to drop @a p packet.
  * @a dir parameter says direction. Values are the same as for
  * standard in/out descriptors: 0 for input, 1 for output.
+ * @a peer_fd says sender/receiver file descriptor depending on
+ * @a dir.
  */
 static inline bool
 swim_fd_test_if_drop(struct swim_fd *fd, const struct swim_test_packet *p,
-		     int dir)
+		     int dir, int peer_fd)
 {
 	struct swim_fd_filter *f;
 	rlist_foreach_entry(f, &fd->filters, in_filters) {
-		if (f->check(p->data, p->size, f->udata, dir))
+		if (f->check(p->data, p->size, f->udata, dir, peer_fd))
 			return true;
 	}
 	return false;
@@ -380,8 +382,8 @@ static inline void
 swim_move_packet(struct swim_fd *src, struct swim_fd *dst,
 		 struct swim_test_packet *p)
 {
-	if (dst->is_opened && !swim_fd_test_if_drop(dst, p, 0) &&
-	    !swim_fd_test_if_drop(src, p, 1))
+	if (dst->is_opened && !swim_fd_test_if_drop(dst, p, 0, src->evfd) &&
+	    !swim_fd_test_if_drop(src, p, 1, dst->evfd))
 		rlist_add_tail_entry(&dst->recv_queue, p, in_queue);
 	else
 		swim_test_packet_delete(p);
