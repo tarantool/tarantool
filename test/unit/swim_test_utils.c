@@ -137,12 +137,25 @@ swim_cluster_delete(struct swim_cluster *cluster)
 	free(cluster);
 }
 
+/** Safely get node of @a cluster with id @a i. */
+static inline struct swim_node *
+swim_cluster_node(struct swim_cluster *cluster, int i)
+{
+	assert(i >= 0 && i < cluster->size);
+	return &cluster->node[i];
+}
+
+struct swim *
+swim_cluster_member(struct swim_cluster *cluster, int i)
+{
+	return swim_cluster_node(cluster, i)->swim;
+}
+
 int
 swim_cluster_update_uuid(struct swim_cluster *cluster, int i,
 			 const struct tt_uuid *new_uuid)
 {
-	assert(i >= 0 && i < cluster->size);
-	struct swim_node *n = &cluster->node[i];
+	struct swim_node *n = swim_cluster_node(cluster, i);
 	if (swim_cfg(n->swim, NULL, -1, -1, -1, new_uuid) != 0)
 		return -1;
 	n->uuid = *new_uuid;
@@ -152,9 +165,10 @@ swim_cluster_update_uuid(struct swim_cluster *cluster, int i,
 int
 swim_cluster_add_link(struct swim_cluster *cluster, int to_id, int from_id)
 {
-	const struct swim_member *from = swim_self(cluster->node[from_id].swim);
-	return swim_add_member(cluster->node[to_id].swim, swim_member_uri(from),
-			       swim_member_uuid(from));
+	const struct swim_member *from =
+		swim_self(swim_cluster_member(cluster, from_id));
+	return swim_add_member(swim_cluster_member(cluster, to_id),
+			       swim_member_uri(from), swim_member_uuid(from));
 }
 
 static const struct swim_member *
@@ -165,8 +179,9 @@ swim_cluster_member_view(struct swim_cluster *cluster, int node_id,
 	 * Do not use node[member_id].swim - it can be NULL
 	 * already, for example, in case of quit or deletion.
 	 */
-	return swim_member_by_uuid(cluster->node[node_id].swim,
-				   &cluster->node[member_id].uuid);
+	struct swim_node *n = swim_cluster_node(cluster, member_id);
+	return swim_member_by_uuid(swim_cluster_member(cluster, node_id),
+				   &n->uuid);
 }
 
 enum swim_member_status
@@ -208,22 +223,14 @@ int
 swim_cluster_member_set_payload(struct swim_cluster *cluster, int i,
 				const char *payload, uint16_t size)
 {
-	struct swim *s = swim_cluster_node(cluster, i);
+	struct swim *s = swim_cluster_member(cluster, i);
 	return swim_set_payload(s, payload, size);
-}
-
-struct swim *
-swim_cluster_node(struct swim_cluster *cluster, int i)
-{
-	assert(i >= 0 && i < cluster->size);
-	return cluster->node[i].swim;
 }
 
 void
 swim_cluster_quit_node(struct swim_cluster *cluster, int i)
 {
-	assert(i >= 0 && i < cluster->size);
-	struct swim_node *n = &cluster->node[i];
+	struct swim_node *n = swim_cluster_node(cluster, i);
 	assert(tt_uuid_is_equal(&n->uuid,
 				swim_member_uuid(swim_self(n->swim))));
 	swim_quit(n->swim);
@@ -233,8 +240,7 @@ swim_cluster_quit_node(struct swim_cluster *cluster, int i)
 void
 swim_cluster_restart_node(struct swim_cluster *cluster, int i)
 {
-	assert(i >= 0 && i < cluster->size);
-	struct swim_node *n = &cluster->node[i];
+	struct swim_node *n = swim_cluster_node(cluster, i);
 	struct swim *s = n->swim;
 	char uri[128];
 	swim_cluster_id_to_uri(uri, i);
@@ -261,7 +267,8 @@ swim_cluster_block_io(struct swim_cluster *cluster, int i)
 void
 swim_cluster_unblock_io(struct swim_cluster *cluster, int i)
 {
-	swim_test_transport_unblock_fd(swim_fd(cluster->node[i].swim));
+	struct swim *s = swim_cluster_member(cluster, i);
+	swim_test_transport_unblock_fd(swim_fd(s));
 }
 
 /** A structure used by drop rate packet filter. */
@@ -308,7 +315,7 @@ static void
 swim_cluster_set_drop_generic(struct swim_cluster *cluster, int i,
 			      double value, bool is_for_in, bool is_for_out)
 {
-	int fd = swim_fd(swim_cluster_node(cluster, i));
+	int fd = swim_fd(swim_cluster_member(cluster, i));
 	if (value == 0) {
 		swim_test_transport_remove_filter(fd, swim_filter_drop_rate);
 		return;
@@ -374,7 +381,7 @@ void
 swim_cluster_drop_components(struct swim_cluster *cluster, int i,
 			     const int *keys, int key_count)
 {
-	int fd = swim_fd(swim_cluster_node(cluster, i));
+	int fd = swim_fd(swim_cluster_member(cluster, i));
 	if (key_count == 0) {
 		swim_test_transport_remove_filter(fd,
 						  swim_filter_drop_component);

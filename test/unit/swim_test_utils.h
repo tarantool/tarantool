@@ -70,7 +70,7 @@ swim_error_check_match(const char *msg);
 
 /** Get a SWIM instance by its ordinal number. */
 struct swim *
-swim_cluster_node(struct swim_cluster *cluster, int i);
+swim_cluster_member(struct swim_cluster *cluster, int i);
 
 /** Quit a member with id @a id. */
 void

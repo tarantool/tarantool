@@ -105,7 +105,7 @@ swim_test_uuid_update(void)
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_add_link(cluster, 0, 1);
 	fail_if(swim_cluster_wait_fullmesh(cluster, 1) != 0);
-	struct swim *s = swim_cluster_node(cluster, 0);
+	struct swim *s = swim_cluster_member(cluster, 0);
 	struct tt_uuid old_uuid = *swim_member_uuid(swim_self(s));
 	struct tt_uuid new_uuid = uuid_nil;
 	new_uuid.time_low = 1000;
@@ -180,8 +180,8 @@ swim_test_add_remove(void)
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_add_link(cluster, 0, 1);
 	fail_if(swim_cluster_wait_fullmesh(cluster, 1) != 0);
-	struct swim *s1 = swim_cluster_node(cluster, 0);
-	struct swim *s2 = swim_cluster_node(cluster, 1);
+	struct swim *s1 = swim_cluster_member(cluster, 0);
+	struct swim *s2 = swim_cluster_member(cluster, 1);
 	const struct swim_member *s2_self = swim_self(s2);
 
 	is(swim_add_member(s1, swim_member_uri(s2_self),
@@ -272,8 +272,8 @@ swim_test_basic_failure_detection(void)
 	swim_cluster_block_io(cluster, 1);
 	/* Next round after 1 sec + let ping hang for 0.25 sec. */
 	swim_run_for(1.25);
-	struct swim *s1 = swim_cluster_node(cluster, 0);
-	struct swim *s2 = swim_cluster_node(cluster, 1);
+	struct swim *s1 = swim_cluster_member(cluster, 0);
+	struct swim *s2 = swim_cluster_member(cluster, 1);
 	const struct swim_member *s2_self = swim_self(s2);
 	swim_remove_member(s1, swim_member_uuid(s2_self));
 	swim_cluster_unblock_io(cluster, 1);
@@ -343,8 +343,8 @@ swim_test_probe(void)
 	swim_start_test(2);
 	struct swim_cluster *cluster = swim_cluster_new(2);
 
-	struct swim *s1 = swim_cluster_node(cluster, 0);
-	struct swim *s2 = swim_cluster_node(cluster, 1);
+	struct swim *s1 = swim_cluster_member(cluster, 0);
+	struct swim *s2 = swim_cluster_member(cluster, 1);
 	const char *s2_uri = swim_member_uri(swim_self(s2));
 	is(swim_probe_member(s1, s2_uri), 0, "send probe");
 	is(swim_cluster_wait_fullmesh(cluster, 0.1), 0,
@@ -503,11 +503,11 @@ swim_test_quit(void)
 	 * received the 'quit' message with the same UUID. Of
 	 * course, it should be refuted.
 	 */
-	struct swim *s0 = swim_cluster_node(cluster, 0);
+	struct swim *s0 = swim_cluster_member(cluster, 0);
 	struct tt_uuid s0_uuid = *swim_member_uuid(swim_self(s0));
-	struct swim *s1 = swim_cluster_node(cluster, 1);
+	struct swim *s1 = swim_cluster_member(cluster, 1);
 	swim_remove_member(s1, &s0_uuid);
-	struct swim *s2 = swim_cluster_node(cluster, 2);
+	struct swim *s2 = swim_cluster_member(cluster, 2);
 	swim_remove_member(s2, &s0_uuid);
 	swim_cluster_quit_node(cluster, 0);
 
@@ -578,7 +578,7 @@ swim_test_uri_update(void)
 	swim_cluster_add_link(cluster, 2, 1);
 	swim_cluster_add_link(cluster, 2, 0);
 
-	struct swim *s0 = swim_cluster_node(cluster, 0);
+	struct swim *s0 = swim_cluster_member(cluster, 0);
 	const struct swim_member *s0_self = swim_self(s0);
 	const char *new_s0_uri = "127.0.0.5:1";
 	fail_if(swim_cfg(s0, "127.0.0.5:1", -1, -1, -1, NULL) != 0);
@@ -586,7 +586,7 @@ swim_test_uri_update(void)
 	 * Since S1 knows about S2 only, one round step is enough.
 	 */
 	swim_run_for(1);
-	struct swim *s1 = swim_cluster_node(cluster, 1);
+	struct swim *s1 = swim_cluster_member(cluster, 1);
 	const struct swim_member *s0_view =
 		swim_member_by_uuid(s1, swim_member_uuid(s0_self));
 	is(strcmp(new_s0_uri, swim_member_uri(s0_view)), 0,
@@ -619,8 +619,8 @@ swim_test_broadcast(void)
 	swim_start_test(6);
 	int size = 4;
 	struct swim_cluster *cluster = swim_cluster_new(size);
-	struct swim *s0 = swim_cluster_node(cluster, 0);
-	struct swim *s1 = swim_cluster_node(cluster, 1);
+	struct swim *s0 = swim_cluster_member(cluster, 0);
+	struct swim *s1 = swim_cluster_member(cluster, 1);
 	const char *s1_uri = swim_member_uri(swim_self(s1));
 	struct uri u;
 	fail_if(uri_parse(&u, s1_uri) != 0 || u.service == NULL);
