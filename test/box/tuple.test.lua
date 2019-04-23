@@ -270,6 +270,16 @@ t = box.tuple.new(require('yaml').decode("[17711728, {1000: 'xxx'}]"))
 t:update({{'=', 2, t[2]}})
 t
 t = nil
+
+--
+-- gh-4041: Invalid field on empty tuple update.
+--
+t = box.tuple.new{}
+t:update({{'=', 1, 1}})
+t:upsert({{'=', 1, 1}})
+t:update({{'+', 1, 1}})
+t = nil
+
 --------------------------------------------------------------------------------
 -- test msgpack.encode + tuple
 --------------------------------------------------------------------------------

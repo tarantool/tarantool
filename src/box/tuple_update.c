@@ -834,6 +834,8 @@ update_create_rope(struct tuple_update *update, const char *tuple_data,
 		return -1;
 	const char *field = tuple_data;
 	const char *end = tuple_data_end;
+	if (field == end)
+		return 0;
 
 	/* Add first field to rope */
 	mp_next(&tuple_data);
