@@ -1074,8 +1074,7 @@ swim_send_fd_msg(struct swim *swim, struct swim_task *task,
 	assert(map_size == 2);
 	mp_encode_map(header, map_size);
 	say_verbose("SWIM %d: schedule %s to %s", swim_fd(swim),
-		    swim_fd_msg_type_strs[type],
-		    sio_strfaddr((struct sockaddr *) dst, sizeof(*dst)));
+		    swim_fd_msg_type_strs[type], swim_inaddr_str(dst));
 	swim_task_send(task, dst, &swim->scheduler);
 }
 
@@ -1720,9 +1719,7 @@ swim_info(struct swim *swim, struct info_handler *info)
 	     node = mh_next(swim->members, node)) {
 		struct swim_member *m =
 			*mh_swim_table_node(swim->members, node);
-		info_table_begin(info,
-				 sio_strfaddr((struct sockaddr *) &m->addr,
-					      sizeof(m->addr)));
+		info_table_begin(info, swim_inaddr_str(&m->addr));
 		info_append_str(info, "status",
 				swim_member_status_strs[m->status]);
 		info_append_str(info, "uuid", tt_uuid_str(&m->uuid));
@@ -1876,8 +1873,7 @@ swim_iterator_close(struct swim_iterator *iterator)
 const char *
 swim_member_uri(const struct swim_member *member)
 {
-	return sio_strfaddr((const struct sockaddr *) &member->addr,
-			    sizeof(member->addr));
+	return swim_inaddr_str(&member->addr);
 }
 
 const struct tt_uuid *

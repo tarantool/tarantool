@@ -321,8 +321,7 @@ swim_scheduler_on_output(struct ev_loop *loop, struct ev_io *io, int events)
 		rlist_shift_entry(&scheduler->queue_output, struct swim_task,
 				  in_queue_output);
 	say_verbose("SWIM %d: send %s to %s", swim_scheduler_fd(scheduler),
-		    task->desc, sio_strfaddr((struct sockaddr *) &task->dst,
-					     sizeof(task->dst)));
+		    task->desc, swim_inaddr_str(&task->dst));
 	swim_packet_build_meta(&task->packet, &scheduler->transport.addr);
 	int rc = swim_transport_send(&scheduler->transport, task->packet.buf,
 				     task->packet.pos - task->packet.buf,
@@ -353,7 +352,7 @@ swim_scheduler_on_input(struct ev_loop *loop, struct ev_io *io, int events)
 		return;
 	}
 	say_verbose("SWIM %d: received from %s", swim_scheduler_fd(scheduler),
-		    sio_strfaddr((struct sockaddr *) &src, len));
+		    swim_inaddr_str(&src));
 	struct swim_meta_def meta;
 	const char *pos = buf, *end = pos + size;
 	if (swim_meta_def_decode(&meta, &pos, end) < 0)
@@ -362,4 +361,10 @@ swim_scheduler_on_input(struct ev_loop *loop, struct ev_io *io, int events)
 	return;
 error:
 	diag_log();
+}
+
+const char *
+swim_inaddr_str(const struct sockaddr_in *addr)
+{
+	return sio_strfaddr((struct sockaddr *) addr, sizeof(*addr));
 }

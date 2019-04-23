@@ -286,4 +286,12 @@ struct swim_bcast_task {
 struct swim_bcast_task *
 swim_bcast_task_new(int port, const char *desc);
 
+/**
+ * A wrapper around sio_strfaddr() so as to do not clog SWIM
+ * code with huge casts to 'struct sockaddr *' and passes of
+ * sizeof(struct sockaddr_in).
+ */
+const char *
+swim_inaddr_str(const struct sockaddr_in *addr);
+
 #endif /* TARANTOOL_SWIM_IO_H_INCLUDED */
