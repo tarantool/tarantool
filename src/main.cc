@@ -648,6 +648,7 @@ print_help(const char *program)
 	puts("When no script name is provided, the server responds to:");
 	puts("  -h, --help\t\t\tdisplay this help and exit");
 	puts("  -v, --version\t\t\tprint program version and exit");
+	puts("  -a, --appdir\t\t\tset application root");
 	puts("  -e EXPR\t\t\texecute string 'EXPR'");
 	puts("  -l NAME\t\t\trequire library 'NAME'");
 	puts("  -i\t\t\t\tenter interactive mode after executing 'SCRIPT'");
@@ -682,13 +683,15 @@ main(int argc, char **argv)
 	auto guard = make_scoped_guard([=]{ if (optc) free(optv); });
 
 	static struct option longopts[] = {
+		{"appdir", optional_argument, 0, 'a'},
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},
 		{NULL, 0, 0, 0},
 	};
-	static const char *opts = "+hVvie:l:";
+	static const char *opts = "+hVvia:e:l:";
 
 	int ch;
+	char *optbuf;
 	while ((ch = getopt_long(argc, argv, opts, longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'V':
@@ -703,6 +706,7 @@ main(int argc, char **argv)
 			interactive = true;
 			break;
 		case 'l':
+		case 'a':
 		case 'e':
 			/* Save Lua interepter options to optv as is */
 			if (optc == 0) {
@@ -714,8 +718,15 @@ main(int argc, char **argv)
 			 * The variable optind is the index of the next
 			 * element to be processed in argv.
 			 */
-			optv[optc++] = argv[optind - 2];
-			optv[optc++] = argv[optind - 1];
+			optbuf = (char*) malloc(3 * sizeof(char));
+			if (optbuf == NULL) {
+				panic_syserror("No enough memory for arguments");
+			}
+			if (sprintf(optbuf, "-%c", ch) == -1) {
+				panic_syserror("Encoding error when compiling arguments");
+			}
+			optv[optc++] = optbuf;
+			optv[optc++] = optarg;
 			break;
 		default:
 			/* "invalid option" is printed by getopt */

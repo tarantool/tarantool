@@ -44,6 +44,18 @@ tarantool_exit(int);
 
 local fio = require("fio")
 
+local package_appdir
+
+local function set_appdir(dir)
+    assert(type(dir) == 'string', 'Application directory must be a string')
+
+    package_appdir = fio.abspath(dir)
+end
+
+local function get_appdir()
+    return package_appdir or fio.cwd()
+end
+
 dostring = function(s, ...)
     local chunk, message = loadstring(s)
     if chunk == nil then
@@ -97,19 +109,19 @@ local function search_cwd_lua(name)
 end
 
 local function traverse_rocks(name, pathes_search)
-    local cwd = fio.cwd()
-    local index = string.len(cwd) + 1
+    local search_root = get_appdir()
+    local index = string.len(search_root) + 1
     local strerr = ""
     while index ~= nil do
-        cwd = string.sub(cwd, 1, index - 1)
+        search_root = string.sub(search_root, 1, index - 1)
         for i, path in ipairs(pathes_search) do
-            local file, err = package.searchpath(name, cwd .. path)
+            local file, err = package.searchpath(name, search_root .. path)
             if err == nil then
                 return file
             end
             strerr = strerr .. err
         end
-        index = string.find(cwd, "/[^/]*$")
+        index = string.find(search_root, "/[^/]*$")
     end
     return nil, strerr
 end
@@ -203,6 +215,8 @@ table.insert(package.loaders, 5, rocks_loader_func(true))
 -- croot          8
 
 package.search = search
+package.set_appdir = set_appdir
+package.get_appdir = get_appdir
 
 return {
     uptime = uptime;

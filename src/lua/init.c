@@ -554,13 +554,88 @@ run_script_f(va_list ap)
 	char **argv = va_arg(ap, char **);
 	struct diag *diag = &fiber()->diag;
 
+	/* Sets package.script_dir to absolute path of startup script
+	 * If no script was specified, it sets to CWD
+	 */
+	char cwd[PATH_MAX] = {'\0'};
+	char script_dir_dirname[PATH_MAX] = {'\0'};
+	char script_dir_realpath[PATH_MAX] = {'\0'};
+	char *script_dir;
+
+	if (path != NULL) {
+		strcpy(script_dir_dirname, path);
+		script_dir = dirname(script_dir_dirname);
+
+		if (script_dir == NULL)
+			panic("Cannot determine dirname of \"%s\": %s",
+				  path, strerror(errno));
+
+
+	} else {
+		getcwd(cwd, sizeof(cwd));
+		script_dir = cwd;
+	}
+
+	script_dir = realpath(script_dir, script_dir_realpath);
+	if (script_dir == NULL)
+		panic("Cannot determine realpath of \"%s\": %s",
+			  script_dir, strerror(errno));
+
+	lua_getglobal(L, "package");
+	lua_pushstring(L, script_dir);
+	lua_setfield(L, -2, "script_dir");
+	lua_pop(L, 1);
+
 	/*
 	 * Load libraries and execute chunks passed by -l and -e
 	 * command line options
 	 */
 	for (int i = 0; i < optc; i += 2) {
 		assert(optv[i][0] == '-' && optv[i][2] == '\0');
+
 		switch (optv[i][1]) {
+		case 'a':
+			lua_getglobal(L, "package");
+
+			const char *appdir = optv[i + 1];
+			char appdir_realpath[PATH_MAX] = {'\0'};
+			char *result = realpath(appdir, appdir_realpath);
+
+			if (result == NULL)
+				panic("Cannot determine realpath of \"%s\": %s",
+						appdir, strerror(errno));
+
+			lua_getfield(L, -1, "set_appdir");
+			if (lua_isfunction(L, -1) == 0)
+				panic("No package.set_appdir specified");
+			lua_pushstring(L, optv[i + 1]);
+			lua_call(L, 1, 0);
+
+			lua_getfield(L, -1, "path");
+			const char *package_path = lua_tostring(L, -1);
+			lua_pop(L, 1);
+
+			lua_getfield(L, -1, "cpath");
+			const char *package_cpath = lua_tostring(L, -1);
+			lua_pop(L, 1);
+
+			int top = lua_gettop(L);
+			lua_pushstring(L, appdir_realpath);
+			lua_pushliteral(L, "/?.lua;");
+			lua_pushstring(L, appdir_realpath);
+			lua_pushliteral(L, "/?/init.lua;");
+			lua_pushstring(L, package_path);
+			lua_concat(L, lua_gettop(L) - top);
+			lua_setfield(L, top, "path");
+
+			lua_pushstring(L, appdir_realpath);
+			lua_pushliteral(L, "/?.so");
+			lua_pushstring(L, package_cpath);
+			lua_concat(L, lua_gettop(L) - top);
+			lua_setfield(L, top, "cpath");
+
+			lua_pop(L, 1);
+			break;
 		case 'l':
 			/*
 			 * Load library
