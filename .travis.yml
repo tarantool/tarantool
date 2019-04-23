@@ -72,11 +72,17 @@ jobs:
       - name: Ubuntu Cosmic (18.10) build + deploy DEB
         env: OS=ubuntu DIST=cosmic
         if: branch = "master"
+      - name: Ubuntu Disco (19.04) build + deploy DEB
+        env: OS=ubuntu DIST=disco
+        if: branch = "master"
       - name: Debian Jessie (8) build + deploy DEB
         env: OS=debian DIST=jessie
         if: branch = "master"
       - name: Debian Stretch (9) build + deploy DEB
         env: OS=debian DIST=stretch
+        if: branch = "master"
+      - name: Debian Buster (10) build + deploy DEB
+        env: OS=debian DIST=buster
         if: branch = "master"
 
 script:
