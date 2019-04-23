@@ -20,7 +20,7 @@ test.trace = false
 -- ok, fail and skip predicates
 --
 
-test:plan(32) -- plan to run 3 test
+test:plan(42)
 test:ok(true, 'true') -- basic function
 local extra = { state = 'some userful information to debug on failure',
         details = 'a table argument formatted using yaml.encode()' }
@@ -60,6 +60,19 @@ test:iscdata(10, 'int', 'cdata type')
 test:iscdata(ffi.new('int', 10), 'int', 'cdata type')
 test:iscdata(ffi.new('unsigned int', 10), 'int', 'cdata type')
 
+--
+-- gh-4125: Strict nulls comparisons.
+--
+test.strict = true
+test:is(box.NULL, nil, "box.NULL == nil strict = true")
+test:is(nil, box.NULL, "nil == box.NULL strict = true")
+test:is(box.NULL, box.NULL, "box.NULL == box.NULL strict = true")
+test:is(nil, nil, "nil == nil strict = true")
+test:isnt(box.NULL, nil, "box.NULL != nil strict = true")
+test:isnt(nil, box.NULL, "nil != box.NULL strict = true")
+test:isnt(box.NULL, box.NULL, "box.NULL != box.NULL strict = true")
+test:isnt(nil, nil, "nil != nil strict = true")
+test.strict = false
 --
 -- Any test also can create unlimited number of sub tests.
 -- Subtest with callbacks (preferred).
@@ -118,7 +131,7 @@ end)
 
 
 test:test('is_deeply', function(t)
-    t:plan(6)
+    t:plan(20)
 
     t:is_deeply(1, 1, '1 and 1')
     t:is_deeply('abc', 'abc', 'abc and abc')
@@ -127,6 +140,32 @@ test:test('is_deeply', function(t)
     t:is_deeply({1}, {2}, '{1} and {2}')
     t:is_deeply({1, 2, { 3, 4 }}, {1, 2, { 3, 5 }}, '{1,2,{3,4}} and {1,2,{3,5}}')
 
+    --
+    -- gh-4125: is_deeply inconsistently works with box.NULL.
+    --
+    t:is_deeply({}, {a = box.NULL}, '{} and {a = box.NULL} strict = false')
+    t:is_deeply({a = box.NULL}, {}, '{a = box.NULL} and {} strict = false')
+    t:is_deeply({a = box.NULL}, {b = box.NULL},
+                '{a = box.NULL} and {b = box.NULL} strict = false')
+    t:is_deeply({a = box.NULL}, {b = box.NULL, c = box.NULL},
+                '{a = box.NULL} and {b = box.NULL, c = box.NULL} strict = false')
+    t:is_deeply(nil, box.NULL, 'nil and box.NULL strict = false')
+    t:is_deeply(box.NULL, nil, 'box.NULL and nil strict = false')
+    t:is_deeply({a = box.NULL}, {a = box.NULL},
+                '{a = box.NULL} and {a = box.NULL} strict false')
+
+    t.strict = true
+    t:is_deeply({}, {a = box.NULL}, '{} and {a = box.NULL} strict = true')
+    t:is_deeply({a = box.NULL}, {}, '{a = box.NULL} and {} strict = true')
+    t:is_deeply({a = box.NULL}, {b = box.NULL},
+                '{a = box.NULL} and {b = box.NULL} strict = true')
+    t:is_deeply({a = box.NULL}, {b = box.NULL, c = box.NULL},
+                '{a = box.NULL} and {b = box.NULL, c = box.NULL} strict = true')
+    t:is_deeply(nil, box.NULL, 'nil and box.NULL strict = true')
+    t:is_deeply(box.NULL, nil, 'box.NULL and nil strict = true')
+    t:is_deeply({a = box.NULL}, {a = box.NULL},
+                '{a = box.NULL} and {a = box.NULL} strict true')
+    t.strict = false
 end)
 
 
@@ -135,6 +174,13 @@ test:test('like', function(t)
     t:like('abcde', 'cd', 'like(abcde, cd)')
     t:unlike('abcde', 'acd', 'unlike(abcde, acd)')
 end)
+
+--
+-- Test, that in case of not strict comparison the order of
+-- arguments does not matter.
+--
+test:is_deeply({1, 2, 3}, '200', "compare {1, 2, 3} and '200'")
+test:is_deeply('200', {1, 2, 3}, "compare '200' and {1, 2, 3}")
 
 --
 -- Finish root test. Since we used non-callback variant, we have to
