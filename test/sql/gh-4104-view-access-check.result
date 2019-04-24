@@ -1,0 +1,58 @@
+box.execute("CREATE TABLE supersecret(id INT PRIMARY KEY, data TEXT);")
+---
+- row_count: 1
+...
+box.execute("CREATE TABLE supersecret2(id INT PRIMARY KEY, data TEXT);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO supersecret VALUES(1, 'very very big secret');")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO supersecret2 VALUES(1, 'very big secret 2');")
+---
+- row_count: 1
+...
+box.execute("CREATE VIEW supersecret_leak AS  SELECT * FROM supersecret, supersecret2;")
+---
+- row_count: 1
+...
+remote = require 'net.box'
+---
+...
+cn = remote.connect(box.cfg.listen)
+---
+...
+box.schema.user.grant('guest','read', 'space', 'SUPERSECRET_LEAK')
+---
+...
+cn:execute('SELECT * FROM SUPERSECRET_LEAK')
+---
+- error: Read access to space 'SUPERSECRET' is denied for user 'guest'
+...
+box.schema.user.grant('guest','read', 'space', 'SUPERSECRET')
+---
+...
+cn:execute('SELECT * FROM SUPERSECRET_LEAK')
+---
+- error: Read access to space 'SUPERSECRET2' is denied for user 'guest'
+...
+box.schema.user.revoke('guest','read', 'space', 'SUPERSECRET')
+---
+...
+box.schema.user.revoke('guest','read', 'space', 'SUPERSECRET_LEAK')
+---
+...
+box.execute("DROP VIEW supersecret_leak")
+---
+- row_count: 1
+...
+box.execute("DROP TABLE supersecret")
+---
+- row_count: 1
+...
+box.execute("DROP TABLE supersecret2")
+---
+- row_count: 1
+...
