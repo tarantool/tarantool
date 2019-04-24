@@ -342,8 +342,15 @@ sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 enum field_type
 sql_type_result(enum field_type lhs, enum field_type rhs)
 {
-	if (sql_type_is_numeric(lhs) || sql_type_is_numeric(rhs))
-		return FIELD_TYPE_NUMBER;
+	if (sql_type_is_numeric(lhs) || sql_type_is_numeric(rhs)) {
+		if (lhs == FIELD_TYPE_NUMBER || rhs == FIELD_TYPE_NUMBER)
+			return FIELD_TYPE_NUMBER;
+		if (lhs == FIELD_TYPE_INTEGER || rhs == FIELD_TYPE_INTEGER)
+			return FIELD_TYPE_INTEGER;
+		assert(lhs == FIELD_TYPE_UNSIGNED ||
+		       rhs == FIELD_TYPE_UNSIGNED);
+		return FIELD_TYPE_UNSIGNED;
+	}
 	return FIELD_TYPE_SCALAR;
 }
 

@@ -92,7 +92,7 @@ test:do_test(
         return exec_neph(" SELECT a FROM t1 WHERE a+0 IN (SELECT a FROM t1); ")
     end, {
         -- <in3-1.5>
-        1, 1, 3, 5
+        0, 1, 3, 5
         -- </in3-1.5>
     })
 

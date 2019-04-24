@@ -205,3 +205,11 @@ box.execute("SELECT s FROM t1 WHERE s IN (true, 1, 'abcd')")
 
 box.space.T:drop()
 box.space.T1:drop()
+
+--
+-- gh-4103: If resulting value of arithmetic operations is
+-- integers, then make sure its type also integer (not number).
+--
+box.execute('SELECT 1 + 1;')
+box.execute('SELECT 1 + 1.1;')
+box.execute('SELECT \'9223372036854\' + 1;')
