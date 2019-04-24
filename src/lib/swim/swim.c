@@ -245,40 +245,6 @@ struct swim_member {
 	struct rlist in_round_queue;
 	/**
 	 *
-	 *               Failure detection component
-	 */
-	/**
-	 * A monotonically growing number to refute old member's
-	 * state, characterized by a triplet
-	 * {incarnation, status, address}.
-	 */
-	uint64_t incarnation;
-	/**
-	 * How many recent pings did not receive an ack while the
-	 * member was in the current status. When this number
-	 * reaches a configured threshold the instance is marked
-	 * as dead. After a few more unacknowledged it is removed
-	 * from the member table. This counter is reset on each
-	 * acknowledged ping, status or incarnation change.
-	 */
-	int unacknowledged_pings;
-	/**
-	 * A deadline when we stop expecting a response to the
-	 * ping and account it as unacknowledged.
-	 */
-	double ping_deadline;
-	/** Ready at hand regular ACK task. */
-	struct swim_task ack_task;
-	/** Ready at hand regular PING task. */
-	struct swim_task ping_task;
-	/**
-	 * Position in a queue of members waiting for an ack.
-	 * A member is added to the queue when we send a ping
-	 * message to it.
-	 */
-	struct heap_node in_wait_ack_heap;
-	/**
-	 *
 	 *                 Dissemination component
 	 *
 	 * Dissemination component sends events. Event is a
@@ -356,6 +322,40 @@ struct swim_member {
 	 * time.
 	 */
 	struct rlist in_dissemination_queue;
+	/**
+	 *
+	 *               Failure detection component
+	 */
+	/**
+	 * A monotonically growing number to refute old member's
+	 * state, characterized by a triplet
+	 * {incarnation, status, address}.
+	 */
+	uint64_t incarnation;
+	/**
+	 * How many recent pings did not receive an ack while the
+	 * member was in the current status. When this number
+	 * reaches a configured threshold the instance is marked
+	 * as dead. After a few more unacknowledged it is removed
+	 * from the member table. This counter is reset on each
+	 * acknowledged ping, status or incarnation change.
+	 */
+	int unacknowledged_pings;
+	/**
+	 * A deadline when we stop expecting a response to the
+	 * ping and account it as unacknowledged.
+	 */
+	double ping_deadline;
+	/**
+	 * Position in a queue of members waiting for an ack.
+	 * A member is added to the queue when we send a ping
+	 * message to it.
+	 */
+	struct heap_node in_wait_ack_heap;
+	/** Ready at hand regular ACK task. */
+	struct swim_task ack_task;
+	/** Ready at hand regular PING task. */
+	struct swim_task ping_task;
 };
 
 #define mh_name _swim_table
