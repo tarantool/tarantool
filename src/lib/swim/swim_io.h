@@ -35,6 +35,7 @@
 #include "salad/stailq.h"
 #include "swim_transport.h"
 #include "tarantool_ev.h"
+#include "uuid/tt_uuid.h"
 #include <stdbool.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -217,6 +218,11 @@ struct swim_task {
 	 * A short description of the packet content. For logging.
 	 */
 	const char *desc;
+	/**
+	 * Sender's UUID used by ping tasks to schedule deadline
+	 * for an ACK.
+	 */
+	struct tt_uuid uuid;
 };
 
 /** Check if @a task is already scheduled. */
