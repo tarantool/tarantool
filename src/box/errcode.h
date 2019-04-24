@@ -212,7 +212,7 @@ struct errcode_record {
 	/*157 */_(ER_SQL_BIND_TYPE,             "Bind value type %s for parameter %s is not supported") \
 	/*158 */_(ER_SQL_BIND_PARAMETER_MAX,    "SQL bind parameter limit reached: %d") \
 	/*159 */_(ER_SQL_EXECUTE,               "Failed to execute SQL statement: %s") \
-	/*160 */_(ER_SQL,			"SQL error: %s") \
+	/*160 */_(ER_UNUSED,			"") \
 	/*161 */_(ER_SQL_BIND_NOT_FOUND,	"Parameter %s was not found in the statement") \
 	/*162 */_(ER_ACTION_MISMATCH,		"Field %s contains %s on conflict action, but %s in index parts") \
 	/*163 */_(ER_VIEW_MISSING_SQL,		"Space declared as a view must have SQL statement") \

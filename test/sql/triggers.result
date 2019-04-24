@@ -45,22 +45,24 @@ tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t1t AFTER INSERT ON t1 FOR EACH
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'SQL error: trigger name does not match extracted from SQL'
+- error: 'Failed to execute SQL statement: trigger name does not match extracted from
+    SQL'
 ...
 tuple = {"T1t", space_id, {sql = "CREATE TRIGGER t12t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
 ---
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'SQL error: trigger name does not match extracted from SQL'
+- error: 'Failed to execute SQL statement: trigger name does not match extracted from
+    SQL'
 ...
 tuple = {"T2T", box.space.T1.id + 1, {sql = "CREATE TRIGGER t2t AFTER INSERT ON t1 FOR EACH ROW BEGIN INSERT INTO t2 VALUES(1); END;"}}
 ---
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'SQL error: trigger space_id does not match the value resolved on AST building
-    from SQL'
+- error: 'Failed to execute SQL statement: trigger space_id does not match the value
+    resolved on AST building from SQL'
 ...
 immutable_part(box.space._trigger:select())
 ---
@@ -244,7 +246,8 @@ tuple = {"T1T", space_id, {sql = [[create trigger t1t instead of update on t1 fo
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'SQL error: cannot create INSTEAD OF trigger on space: T1'
+- error: 'Failed to execute SQL statement: cannot create INSTEAD OF trigger on space:
+    T1'
 ...
 box.execute("CREATE VIEW V1 AS SELECT * FROM t1;")
 ---
@@ -258,14 +261,14 @@ tuple = {"V1T", space_id, {sql = [[create trigger v1t before update on v1 for ea
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'SQL error: cannot create BEFORE trigger on view: V1'
+- error: 'Failed to execute SQL statement: cannot create BEFORE trigger on view: V1'
 ...
 tuple = {"V1T", space_id, {sql = [[create trigger v1t AFTER update on v1 for each row begin delete from t1 WHERE a=old.a+2; end;]]}}
 ---
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'SQL error: cannot create AFTER trigger on view: V1'
+- error: 'Failed to execute SQL statement: cannot create AFTER trigger on view: V1'
 ...
 space_id =  box.space._fk_constraint.id
 ---
@@ -275,7 +278,7 @@ tuple = {"T1T", space_id, {sql = [[create trigger t1t instead of update on "_fk_
 ...
 box.space._trigger:insert(tuple)
 ---
-- error: 'SQL error: cannot create trigger on system table'
+- error: 'Failed to execute SQL statement: cannot create trigger on system table'
 ...
 box.execute("DROP VIEW V1;")
 ---

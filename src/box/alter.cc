@@ -3710,7 +3710,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 		if (strlen(trigger_name) != trigger_name_len ||
 		    memcmp(trigger_name_src, trigger_name,
 			   trigger_name_len) != 0) {
-			tnt_raise(ClientError, ER_SQL,
+			tnt_raise(ClientError, ER_SQL_EXECUTE,
 				  "trigger name does not match extracted "
 				  "from SQL");
 		}
@@ -3718,7 +3718,7 @@ on_replace_dd_trigger(struct trigger * /* trigger */, void *event)
 			tuple_field_u32_xc(new_tuple,
 					   BOX_TRIGGER_FIELD_SPACE_ID);
 		if (space_id != sql_trigger_space_id(new_trigger)) {
-			tnt_raise(ClientError, ER_SQL,
+			tnt_raise(ClientError, ER_SQL_EXECUTE,
 				  "trigger space_id does not match the value "
 				  "resolved on AST building from SQL");
 		}

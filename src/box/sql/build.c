@@ -459,7 +459,7 @@ sql_column_add_nullable_action(struct Parse *parser,
 		const char *action =
 			on_conflict_action_strs[field->nullable_action];
 		err = tt_sprintf(err, field->name, def->name, action);
-		diag_set(ClientError, ER_SQL, err);
+		diag_set(ClientError, ER_SQL_EXECUTE, err);
 		parser->is_aborted = true;
 		return;
 	}

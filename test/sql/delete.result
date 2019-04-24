@@ -128,7 +128,8 @@ box.execute("CREATE VIEW v1 AS SELECT * FROM t1;")
 ...
 box.execute("TRUNCATE TABLE v1;")
 ---
-- error: 'SQL error: can not truncate space ''V1'' because space is a view'
+- error: 'Failed to execute SQL statement: can not truncate space ''V1'' because space
+    is a view'
 ...
 -- Can't truncate table with FK.
 box.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")
@@ -137,8 +138,8 @@ box.execute("CREATE TABLE t2(x INT PRIMARY KEY REFERENCES t1(id));")
 ...
 box.execute("TRUNCATE TABLE t1;")
 ---
-- error: 'SQL error: can not truncate space ''T1'' because other objects depend on
-    it'
+- error: 'Failed to execute SQL statement: can not truncate space ''T1'' because other
+    objects depend on it'
 ...
 -- Table triggers should be ignored.
 box.execute("DROP TABLE t2;")

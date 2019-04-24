@@ -443,7 +443,7 @@ sql_trigger_replace(const char *name, uint32_t space_id,
 	if (trigger != NULL) {
 		/* Do not create a trigger on a system space. */
 		if (space_is_system(space)) {
-			diag_set(ClientError, ER_SQL,
+			diag_set(ClientError, ER_SQL_EXECUTE,
 				 "cannot create trigger on system table");
 			return -1;
 		}
@@ -452,7 +452,7 @@ sql_trigger_replace(const char *name, uint32_t space_id,
 		 * views only support INSTEAD of triggers.
 		 */
 		if (space->def->opts.is_view && trigger->tr_tm != TK_INSTEAD) {
-			diag_set(ClientError, ER_SQL,
+			diag_set(ClientError, ER_SQL_EXECUTE,
 				 tt_sprintf("cannot create %s "\
                          "trigger on view: %s", trigger->tr_tm == TK_BEFORE ?
 						"BEFORE" : "AFTER",
@@ -460,7 +460,7 @@ sql_trigger_replace(const char *name, uint32_t space_id,
 			return -1;
 		}
 		if (!space->def->opts.is_view && trigger->tr_tm == TK_INSTEAD) {
-			diag_set(ClientError, ER_SQL,
+			diag_set(ClientError, ER_SQL_EXECUTE,
 				 tt_sprintf("cannot create "\
                          "INSTEAD OF trigger on space: %s", space->def->name));
 			return -1;

@@ -200,7 +200,7 @@ test:do_catchsql_test("select3-3.1", [[
   SELECT log, count(*) FROM t1 HAVING log>=4
 ]], {
   -- <select3-3.1>
-  1, "SQL error: HAVING argument must appear in the GROUP BY clause or be used in an aggregate function"
+  1, "Failed to execute SQL statement: HAVING argument must appear in the GROUP BY clause or be used in an aggregate function"
   -- </select3-3.1>
 })
 

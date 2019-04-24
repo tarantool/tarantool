@@ -103,7 +103,7 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 	if (! rlist_empty(&space->parent_fk_constraint)) {
 		const char *err = "can not truncate space '%s' because other "
 				  "objects depend on it";
-		diag_set(ClientError, ER_SQL,
+		diag_set(ClientError, ER_SQL_EXECUTE,
 			 tt_sprintf(err, space->def->name));
 		goto tarantool_error;
 	}
@@ -111,7 +111,7 @@ sql_table_truncate(struct Parse *parse, struct SrcList *tab_list)
 		const char *err_msg =
 			tt_sprintf("can not truncate space '%s' because space "\
 				   "is a view", space->def->name);
-		diag_set(ClientError, ER_SQL, err_msg);
+		diag_set(ClientError, ER_SQL_EXECUTE, err_msg);
 		goto tarantool_error;
 	}
 	sqlVdbeAddOp2(v, OP_Clear, space->def->id, true);

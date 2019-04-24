@@ -489,7 +489,6 @@ t;
   157: box.error.SQL_BIND_TYPE
   158: box.error.SQL_BIND_PARAMETER_MAX
   159: box.error.SQL_EXECUTE
-  160: box.error.SQL
   161: box.error.SQL_BIND_NOT_FOUND
   162: box.error.ACTION_MISMATCH
   163: box.error.VIEW_MISSING_SQL

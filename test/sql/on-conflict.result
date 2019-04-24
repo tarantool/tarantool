@@ -59,8 +59,8 @@ box.execute("CREATE TABLE te17 (s1 INT NULL PRIMARY KEY);")
 ...
 box.execute("CREATE TABLE test (a int PRIMARY KEY, b int NULL ON CONFLICT IGNORE);")
 ---
-- error: 'SQL error: NULL declaration for column ''B'' of table ''TEST'' has been
-    already set to ''none'''
+- error: 'Failed to execute SQL statement: NULL declaration for column ''B'' of table
+    ''TEST'' has been already set to ''none'''
 ...
 box.execute("CREATE TABLE test (a int, b int NULL, c int, PRIMARY KEY(a, b, c))")
 ---
