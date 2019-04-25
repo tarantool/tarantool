@@ -43,6 +43,9 @@
 #include "uri/uri.h"
 #include "errinj.h"
 
+static_assert(TT_STATIC_BUF_LEN > NI_MAXHOST,
+	      "static buffer should fit host name");
+
 const char *
 sio_socketname(int fd)
 {
@@ -311,32 +314,27 @@ sio_getsockname(int fd, struct sockaddr *addr, socklen_t *addrlen)
 const char *
 sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 {
-	static __thread char name[NI_MAXHOST + _POSIX_PATH_MAX + 2];
 	switch (addr->sa_family) {
-		case AF_UNIX:
-			if (addrlen >= sizeof(struct sockaddr_un)) {
-				snprintf(name, sizeof(name), "unix/:%s",
-					((struct sockaddr_un *)addr)->sun_path);
-			} else {
-				snprintf(name, sizeof(name),
-					 "unix/:(socket)");
-			}
+		case AF_UNIX: {
+			struct sockaddr_un *u = (struct sockaddr_un *) addr;
+			if (addrlen >= sizeof(*u))
+				return tt_sprintf("unix/:%s", u->sun_path);
+			else
+				return tt_sprintf("unix/:(socket)");
 			break;
+		}
 		default: {
 			char host[NI_MAXHOST], serv[NI_MAXSERV];
 			if (getnameinfo(addr, addrlen, host, sizeof(host),
 					serv, sizeof(serv),
-					NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-				snprintf(name, sizeof(name),
-					 addr->sa_family == AF_INET
-					 ? "%s:%s" : "[%s]:%s", host, serv);
-			} else {
-				snprintf(name, sizeof(name), "(host):(port)");
-			}
-			break;
+					NI_NUMERICHOST | NI_NUMERICSERV) != 0)
+				return tt_sprintf("(host):(port)");
+
+			return tt_sprintf(addr->sa_family == AF_INET ?
+					  "%s:%s" : "[%s]:%s", host, serv);
 		}
 	}
-	return name;
+	unreachable();
 }
 
 int

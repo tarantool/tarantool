@@ -479,7 +479,7 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #define CLOCK_THREAD_CPUTIME_ID		3
 #endif
 
-#define TT_STATIC_BUF_LEN 1024
+#define TT_STATIC_BUF_LEN 1028
 
 /**
  * Return a thread-local statically allocated temporary buffer of size
