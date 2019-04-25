@@ -280,6 +280,19 @@ SwimError::SwimError(const char *file, unsigned line, const char *format, ...)
 	va_end(ap);
 }
 
+const struct type_info type_CryptoError =
+	make_type("CryptoError", &type_Exception);
+
+CryptoError::CryptoError(const char *file, unsigned line,
+			 const char *format, ...)
+	: Exception(&type_CryptoError, file, line)
+{
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(this, format, ap);
+	va_end(ap);
+}
+
 #define BuildAlloc(type)				\
 	void *p = malloc(sizeof(type));			\
 	if (p == NULL)					\
@@ -364,6 +377,18 @@ BuildSwimError(const char *file, unsigned line, const char *format, ...)
 {
 	BuildAlloc(SwimError);
 	SwimError *e =  new (p) SwimError(file, line, "");
+	va_list ap;
+	va_start(ap, format);
+	error_vformat_msg(e, format, ap);
+	va_end(ap);
+	return e;
+}
+
+struct error *
+BuildCryptoError(const char *file, unsigned line, const char *format, ...)
+{
+	BuildAlloc(CryptoError);
+	CryptoError *e =  new (p) CryptoError(file, line, "");
 	va_list ap;
 	va_start(ap, format);
 	error_vformat_msg(e, format, ap);

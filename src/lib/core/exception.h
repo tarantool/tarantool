@@ -51,6 +51,7 @@ extern const struct type_info type_IllegalParams;
 extern const struct type_info type_SystemError;
 extern const struct type_info type_CollationError;
 extern const struct type_info type_SwimError;
+extern const struct type_info type_CryptoError;
 
 const char *
 exception_get_string(struct error *e, const struct method_info *method);
@@ -163,6 +164,12 @@ public:
 class SwimError: public Exception {
 public:
 	SwimError(const char *file, unsigned line, const char *format, ...);
+	virtual void raise() { throw this; }
+};
+
+class CryptoError: public Exception {
+public:
+	CryptoError(const char *file, unsigned line, const char *format, ...);
 	virtual void raise() { throw this; }
 };
 

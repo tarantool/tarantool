@@ -251,6 +251,8 @@ struct error *
 BuildCollationError(const char *file, unsigned line, const char *format, ...);
 struct error *
 BuildSwimError(const char *file, unsigned line, const char *format, ...);
+struct error *
+BuildCryptoError(const char *file, unsigned line, const char *format, ...);
 
 struct index_def;
 

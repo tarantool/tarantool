@@ -217,6 +217,9 @@ target_link_libraries(checkpoint_schedule.test m unit)
 add_executable(sio.test sio.c)
 target_link_libraries(sio.test unit core)
 
+add_executable(crypto.test crypto.c)
+target_link_libraries(crypto.test crypto unit)
+
 add_executable(swim.test swim.c swim_test_transport.c swim_test_ev.c
                swim_test_utils.c ${PROJECT_SOURCE_DIR}/src/version.c)
 target_link_libraries(swim.test unit swim)
