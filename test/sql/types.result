@@ -888,3 +888,12 @@ box.execute('SELECT \'9223372036854\' + 1;')
   rows:
   - [9223372036855]
 ...
+-- Fix BOOLEAN bindings.
+box.execute('SELECT ?', {true})
+---
+- metadata:
+  - name: '?'
+    type: BOOLEAN
+  rows:
+  - [true]
+...

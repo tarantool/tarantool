@@ -888,6 +888,17 @@ sql_bind_blob64(sql_stmt *, int, const void *,
 int
 sql_bind_double(sql_stmt *, int, double);
 
+/**
+ * Perform boolean parameter binding for the prepared sql
+ * statement.
+ * @param stmt Prepared statement.
+ * @param i Index of the variable to be binded.
+ * @param value Boolean value to use.
+ * @retval 0 On Success, not 0 otherwise.
+ */
+int
+sql_bind_boolean(struct sql_stmt *stmt, int i, bool value);
+
 int
 sql_bind_int(sql_stmt *, int, int);
 

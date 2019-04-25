@@ -1349,6 +1349,18 @@ sql_bind_double(sql_stmt * pStmt, int i, double rValue)
 }
 
 int
+sql_bind_boolean(struct sql_stmt *stmt, int i, bool value)
+{
+	struct Vdbe *p = (struct Vdbe *) stmt;
+	int rc = vdbeUnbind(p, i);
+	if (rc == SQL_OK) {
+		rc = sql_bind_type(p, i, "BOOLEAN");
+		mem_set_bool(&p->aVar[i - 1], value);
+	}
+	return rc;
+}
+
+int
 sql_bind_int(sql_stmt * p, int i, int iValue)
 {
 	return sql_bind_int64(p, i, (i64) iValue);

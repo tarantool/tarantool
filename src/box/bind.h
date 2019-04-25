@@ -61,6 +61,7 @@ struct sql_bind {
 	enum mp_type type;
 	/** Bind value. */
 	union {
+		bool b;
 		double d;
 		int64_t i64;
 		/** For string or blob. */

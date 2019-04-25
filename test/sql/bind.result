@@ -176,11 +176,11 @@ execute('SELECT ?, ?, ?, ?, ?', {'abc', -123.456, msgpack.NULL, true, false})
   - name: '?'
     type: BOOLEAN
   - name: '?'
-    type: INTEGER
+    type: BOOLEAN
   - name: '?'
-    type: INTEGER
+    type: BOOLEAN
   rows:
-  - ['abc', -123.456, null, 1, 0]
+  - ['abc', -123.456, null, true, false]
 ...
 -- Try to replace '?' in meta with something meaningful.
 execute('SELECT ? AS kek, ? AS kek2', {1, 2})

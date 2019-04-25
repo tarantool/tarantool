@@ -213,3 +213,6 @@ box.space.T1:drop()
 box.execute('SELECT 1 + 1;')
 box.execute('SELECT 1 + 1.1;')
 box.execute('SELECT \'9223372036854\' + 1;')
+
+-- Fix BOOLEAN bindings.
+box.execute('SELECT ?', {true})

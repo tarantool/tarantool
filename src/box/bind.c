@@ -98,9 +98,8 @@ sql_bind_decode(struct sql_bind *bind, int i, const char **packet)
 		bind->bytes = 1;
 		break;
 	case MP_BOOL:
-		/* sql doesn't support boolean. Use int instead. */
-		bind->i64 = mp_decode_bool(packet) ? 1 : 0;
-		bind->bytes = sizeof(bind->i64);
+		bind->b = mp_decode_bool(packet);
+		bind->bytes = sizeof(bind->b);
 		break;
 	case MP_BIN:
 		bind->s = mp_decode_bin(packet, &bind->bytes);
@@ -175,8 +174,10 @@ sql_bind_column(struct sql_stmt *stmt, const struct sql_bind *p,
 	switch (p->type) {
 	case MP_INT:
 	case MP_UINT:
-	case MP_BOOL:
 		rc = sql_bind_int64(stmt, pos, p->i64);
+		break;
+	case MP_BOOL:
+		rc = sql_bind_boolean(stmt, pos, p->b);
 		break;
 	case MP_DOUBLE:
 	case MP_FLOAT:
