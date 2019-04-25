@@ -190,18 +190,6 @@ swim_uuid_hash(const struct tt_uuid *uuid)
 }
 
 /**
- * A helper to not call tt_static_buf() in all places where it is
- * used to get string UUID.
- */
-static inline const char *
-swim_uuid_str(const struct tt_uuid *uuid)
-{
-	char *buf = tt_static_buf();
-	tt_uuid_to_string(uuid, buf);
-	return buf;
-}
-
-/**
  * A cluster member description. This structure describes the
  * last known state of an instance. This state is updated
  * periodically via UDP according to SWIM protocol rules.
@@ -668,7 +656,7 @@ static void
 swim_delete_member(struct swim *swim, struct swim_member *member)
 {
 	say_verbose("SWIM %d: member %s is deleted", swim_fd(swim),
-		    swim_uuid_str(&member->uuid));
+		    tt_uuid_str(&member->uuid));
 	struct mh_swim_table_key key = {member->hash, &member->uuid};
 	mh_int_t rc = mh_swim_table_find(swim->members, key, NULL);
 	assert(rc != mh_end(swim->members));
@@ -753,7 +741,7 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 	}
 
 	say_verbose("SWIM %d: member %s is added, total is %d", swim_fd(swim),
-		    swim_uuid_str(&member->uuid), mh_size(swim->members));
+		    tt_uuid_str(&member->uuid), mh_size(swim->members));
 	return member;
 }
 
@@ -1737,7 +1725,7 @@ swim_info(struct swim *swim, struct info_handler *info)
 					      sizeof(m->addr)));
 		info_append_str(info, "status",
 				swim_member_status_strs[m->status]);
-		info_append_str(info, "uuid", swim_uuid_str(&m->uuid));
+		info_append_str(info, "uuid", tt_uuid_str(&m->uuid));
 		info_append_int(info, "incarnation", (int64_t) m->incarnation);
 		info_table_end(info);
 	}
