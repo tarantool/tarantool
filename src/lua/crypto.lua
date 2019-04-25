@@ -4,7 +4,6 @@ local ffi = require('ffi')
 local buffer = require('buffer')
 
 ffi.cdef[[
-    int tnt_openssl_init(void);
     /* from openssl/err.h */
     unsigned long ERR_get_error(void);
     char *ERR_error_string(unsigned long e, char *buf);
@@ -14,16 +13,16 @@ ffi.cdef[[
 
     typedef struct {} EVP_MD_CTX;
     typedef struct {} EVP_MD;
-    EVP_MD_CTX *tnt_EVP_MD_CTX_new(void);
-    void tnt_EVP_MD_CTX_free(EVP_MD_CTX *ctx);
+    EVP_MD_CTX *crypto_EVP_MD_CTX_new(void);
+    void crypto_EVP_MD_CTX_free(EVP_MD_CTX *ctx);
     int EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl);
     int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, size_t cnt);
     int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s);
     const EVP_MD *EVP_get_digestbyname(const char *name);
 
     typedef struct {} HMAC_CTX;
-    HMAC_CTX *tnt_HMAC_CTX_new(void);
-    void tnt_HMAC_CTX_free(HMAC_CTX *ctx);
+    HMAC_CTX *crypto_HMAC_CTX_new(void);
+    void crypto_HMAC_CTX_free(HMAC_CTX *ctx);
     int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int len,
                  const EVP_MD *md, ENGINE *impl);
     int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len);
@@ -40,16 +39,13 @@ ffi.cdef[[
     int EVP_CipherUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
                      const unsigned char *in, int inl);
     int EVP_CipherFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl);
-    int EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *ctx);
 
-    int tnt_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher);
-    int tnt_EVP_CIPHER_key_length(const EVP_CIPHER *cipher);
+    int crypto_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher);
+    int crypto_EVP_CIPHER_key_length(const EVP_CIPHER *cipher);
 
     int EVP_CIPHER_block_size(const EVP_CIPHER *cipher);
     const EVP_CIPHER *EVP_get_cipherbyname(const char *name);
 ]]
-
-ffi.C.tnt_openssl_init();
 
 local function openssl_err_str()
   return ffi.string(ffi.C.ERR_error_string(ffi.C.ERR_get_error(), nil))
@@ -70,11 +66,11 @@ end
 local digest_mt = {}
 
 local function digest_gc(ctx)
-    ffi.C.tnt_EVP_MD_CTX_free(ctx)
+    ffi.C.crypto_EVP_MD_CTX_free(ctx)
 end
 
 local function digest_new(digest)
-    local ctx = ffi.C.tnt_EVP_MD_CTX_new()
+    local ctx = ffi.C.crypto_EVP_MD_CTX_new()
     if ctx == nil then
         return error('Can\'t create digest ctx: ' .. openssl_err_str())
     end
@@ -121,7 +117,7 @@ local function digest_final(self)
 end
 
 local function digest_free(self)
-    ffi.C.tnt_EVP_MD_CTX_free(self.ctx)
+    ffi.C.crypto_EVP_MD_CTX_free(self.ctx)
     ffi.gc(self.ctx, nil)
     self.ctx = nil
     self.initialized = false
@@ -141,14 +137,14 @@ local hmacs = digests
 local hmac_mt = {}
 
 local function hmac_gc(ctx)
-    ffi.C.tnt_HMAC_CTX_free(ctx)
+    ffi.C.crypto_HMAC_CTX_free(ctx)
 end
 
 local function hmac_new(digest, key)
     if key == nil then
         return error('Key should be specified for HMAC operations')
     end
-    local ctx = ffi.C.tnt_HMAC_CTX_new()
+    local ctx = ffi.C.crypto_HMAC_CTX_new()
     if ctx == nil then
         return error('Can\'t create HMAC ctx: ' .. openssl_err_str())
     end
@@ -195,7 +191,7 @@ local function hmac_final(self)
 end
 
 local function hmac_free(self)
-    ffi.C.tnt_HMAC_CTX_free(self.ctx)
+    ffi.C.crypto_HMAC_CTX_free(self.ctx)
     ffi.gc(self.ctx, nil)
     self.ctx = nil
     self.initialized = false
@@ -234,13 +230,15 @@ local function cipher_gc(ctx)
 end
 
 local function cipher_new(cipher, key, iv, direction)
-    if key == nil or key:len() ~= ffi.C.tnt_EVP_CIPHER_key_length(cipher) then
-        return error('Key length should be equal to cipher key length ('
-            .. tostring(ffi.C.tnt_EVP_CIPHER_key_length(cipher)) .. ' bytes)')
+    local needed_len = ffi.C.crypto_EVP_CIPHER_key_length(cipher)
+    if key == nil or key:len() ~= needed_len then
+        return error('Key length should be equal to cipher key length ('..
+                     tostring(needed_len)..' bytes)')
     end
-    if iv == nil or iv:len() ~= ffi.C.tnt_EVP_CIPHER_iv_length(cipher) then
-        return error('Initial vector length should be equal to cipher iv length ('
-            .. tostring(ffi.C.tnt_EVP_CIPHER_iv_length(cipher)) .. ' bytes)')
+    needed_len = ffi.C.crypto_EVP_CIPHER_iv_length(cipher)
+    if iv == nil or iv:len() ~= needed_len then
+        return error('Initial vector length should be equal to cipher iv '..
+                     'length ('..tostring(needed_len)..' bytes)')
     end
     local ctx = ffi.C.EVP_CIPHER_CTX_new()
     if ctx == nil then

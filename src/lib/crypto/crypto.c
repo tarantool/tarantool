@@ -35,8 +35,8 @@
 #include <openssl/ssl.h>
 #include <openssl/hmac.h>
 
-int
-tnt_openssl_init(void)
+void
+crypto_init(void)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	OpenSSL_add_all_digests();
@@ -46,20 +46,30 @@ tnt_openssl_init(void)
 	OPENSSL_init_crypto(0, NULL);
 	OPENSSL_init_ssl(0, NULL);
 #endif
-	return 0;
 }
 
-int tnt_EVP_CIPHER_key_length(const EVP_CIPHER *cipher)
+void
+crypto_free(void)
+{
+#ifdef OPENSSL_cleanup
+	OPENSSL_cleanup();
+#endif
+}
+
+int
+crypto_EVP_CIPHER_key_length(const EVP_CIPHER *cipher)
 {
 	return EVP_CIPHER_key_length(cipher);
 }
 
-int tnt_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher)
+int
+crypto_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher)
 {
 	return EVP_CIPHER_iv_length(cipher);
 }
 
-EVP_MD_CTX *tnt_EVP_MD_CTX_new(void)
+EVP_MD_CTX *
+crypto_EVP_MD_CTX_new(void)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	return EVP_MD_CTX_create();
@@ -68,7 +78,8 @@ EVP_MD_CTX *tnt_EVP_MD_CTX_new(void)
 #endif
 };
 
-void tnt_EVP_MD_CTX_free(EVP_MD_CTX *ctx)
+void
+crypto_EVP_MD_CTX_free(EVP_MD_CTX *ctx)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	return EVP_MD_CTX_destroy(ctx);
@@ -77,7 +88,8 @@ void tnt_EVP_MD_CTX_free(EVP_MD_CTX *ctx)
 #endif
 }
 
-HMAC_CTX *tnt_HMAC_CTX_new(void)
+HMAC_CTX *
+crypto_HMAC_CTX_new(void)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	HMAC_CTX *ctx = (HMAC_CTX *)OPENSSL_malloc(sizeof(HMAC_CTX));
@@ -92,7 +104,8 @@ HMAC_CTX *tnt_HMAC_CTX_new(void)
 
 }
 
-void tnt_HMAC_CTX_free(HMAC_CTX *ctx)
+void
+crypto_HMAC_CTX_free(HMAC_CTX *ctx)
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	HMAC_cleanup(ctx); /* Remove key from memory */

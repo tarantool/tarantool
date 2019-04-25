@@ -75,6 +75,7 @@
 #include "box/lua/init.h" /* box_lua_init() */
 #include "box/session.h"
 #include "systemd.h"
+#include "crypto/crypto.h"
 
 static pid_t master_pid = getpid();
 static struct pidfh *pid_file_handle;
@@ -621,6 +622,7 @@ tarantool_free(void)
 	memory_free();
 	random_free();
 #endif
+	crypto_free();
 	coll_free();
 	systemd_free();
 	say_logger_free();
@@ -780,6 +782,7 @@ main(int argc, char **argv)
 	signal_init();
 	cbus_init();
 	coll_init();
+	crypto_init();
 	tarantool_lua_init(tarantool_bin, main_argc, main_argv);
 
 	start_time = ev_monotonic_time();

@@ -35,7 +35,11 @@
 extern "C" {
 #endif
 
-int tnt_openssl_init();
+void
+crypto_init(void);
+
+void
+crypto_free(void);
 
 #if defined(__cplusplus)
 }
