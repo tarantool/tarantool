@@ -1,7 +1,7 @@
-#ifndef INCLUDES_TARANTOOL_LUA_CRYPTO_H
-#define INCLUDES_TARANTOOL_LUA_CRYPTO_H
+#ifndef TARANTOOL_LIB_CRYPTO_H_INCLUDED
+#define TARANTOOL_LIB_CRYPTO_H_INCLUDED
 /*
- * Copyright 2010-2015, Tarantool AUTHORS, please see AUTHORS file.
+ * Copyright 2010-2019, Tarantool AUTHORS, please see AUTHORS file.
  *
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -31,24 +31,14 @@
  * SUCH DAMAGE.
  */
 
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-int tnt_EVP_CIPHER_key_length(const EVP_CIPHER *cipher);
-int tnt_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher);
 int tnt_openssl_init();
-EVP_MD_CTX *tnt_EVP_MD_CTX_new(void);
-void tnt_EVP_MD_CTX_free(EVP_MD_CTX *ctx);
-
-HMAC_CTX *tnt_HMAC_CTX_new(void);
-void tnt_HMAC_CTX_free(HMAC_CTX *ctx);
 
 #if defined(__cplusplus)
 }
 #endif
 
-#endif /* INCLUDES_TARANTOOL_LUA_CRYPTO_H */
+#endif /* TARANTOOL_LIB_CRYPTO_H_INCLUDED */

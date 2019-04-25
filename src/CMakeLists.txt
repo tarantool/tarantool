@@ -111,7 +111,6 @@ set (server_sources
      lua/socket.c
      lua/pickle.c
      lua/fio.c
-     lua/crypto.c
      lua/httpc.c
      lua/utf8.c
      lua/info.c
@@ -164,7 +163,7 @@ endif()
 set_source_files_compile_flags(${server_sources})
 add_library(server STATIC ${server_sources})
 target_link_libraries(server core coll http_parser bit uri uuid swim swim_udp
-                      swim_ev)
+                      swim_ev crypto)
 
 # Rule of thumb: if exporting a symbol from a static library, list the
 # library here.
