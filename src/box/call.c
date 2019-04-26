@@ -41,6 +41,7 @@
 #include "iproto_constants.h"
 #include "rmean.h"
 #include "small/obuf.h"
+#include "tt_static.h"
 
 /**
  * Find a function by name and check "EXECUTE" permissions.

@@ -34,6 +34,7 @@
 #include "error.h"
 #include "sql.h"
 #include "msgpuck.h"
+#include "tt_static.h"
 
 /**
  * Make checks from msgpack.

@@ -62,6 +62,7 @@
 #include "rmean.h"
 #include "execute.h"
 #include "errinj.h"
+#include "tt_static.h"
 
 enum {
 	IPROTO_SALT_SIZE = 32,

@@ -38,6 +38,7 @@
 #include "session.h"
 #include "scoped_guard.h"
 #include "sequence.h"
+#include "tt_static.h"
 
 struct universe universe;
 static struct user users[BOX_USER_MAX];

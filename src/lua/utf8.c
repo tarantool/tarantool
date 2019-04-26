@@ -35,6 +35,7 @@
 #include "lua/utf8.h"
 #include "diag.h"
 #include "small/ibuf.h"
+#include "tt_static.h"
 
 extern struct ibuf *tarantool_lua_ibuf;
 

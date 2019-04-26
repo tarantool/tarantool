@@ -33,6 +33,7 @@
 #include "json/json.h"
 #include "tuple_format.h"
 #include "coll_id_cache.h"
+#include "tt_static.h"
 
 #include "third_party/PMurHash.h"
 

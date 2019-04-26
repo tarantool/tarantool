@@ -32,7 +32,7 @@
 
 #include "say.h"
 #include "diag.h"
-
+#include "tt_static.h"
 #include <unicode/utf8.h>
 #include <unicode/uchar.h>
 

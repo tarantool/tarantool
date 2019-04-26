@@ -57,7 +57,7 @@
 #include "replication.h" /* INSTANCE_UUID */
 #include "salad/stailq.h"
 #include "say.h"
-#include "trivia/util.h"
+#include "tt_static.h"
 #include "wal.h"
 #include "vclock.h"
 #include "xlog.h"

@@ -35,7 +35,7 @@
  *
  * This file defines various limits of what sql can process.
  */
-#include "trivia/util.h"
+#include "tt_static.h"
 
 enum {
 	/*

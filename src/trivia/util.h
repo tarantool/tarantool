@@ -479,59 +479,6 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #define CLOCK_THREAD_CPUTIME_ID		3
 #endif
 
-#define TT_STATIC_BUF_LEN 1028
-
-/**
- * Return a thread-local statically allocated temporary buffer of size
- * \a TT_STATIC_BUF_LEN
- */
-static inline char *
-tt_static_buf(void)
-{
-	enum { TT_STATIC_BUFS = 4 };
-	static __thread char bufs[TT_STATIC_BUFS][TT_STATIC_BUF_LEN];
-	static __thread int bufno = TT_STATIC_BUFS - 1;
-
-	bufno = (bufno + 1) % TT_STATIC_BUFS;
-	return bufs[bufno];
-}
-
-/**
- * Return a null-terminated string for \a str of length \a len
- */
-static inline const char *
-tt_cstr(const char *str, size_t len)
-{
-	char *buf = tt_static_buf();
-	len = MIN(len, TT_STATIC_BUF_LEN - 1);
-	memcpy(buf, str, len);
-	buf[len] = '\0';
-	return buf;
-}
-
-/**
- * Wrapper around sprintf() that prints the result to
- * the static buffer returned by tt_static_buf().
- */
-static inline const char *
-tt_vsprintf(const char *format, va_list ap)
-{
-	char *buf = tt_static_buf();
-	vsnprintf(buf, TT_STATIC_BUF_LEN, format, ap);
-	return buf;
-}
-
-/** @copydoc tt_vsprintf() */
-static inline const char *
-tt_sprintf(const char *format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	const char *result = tt_vsprintf(format, ap);
-	va_end(ap);
-	return result;
-}
-
 /**
  * Escape special characters in @a data to @a buf
  */

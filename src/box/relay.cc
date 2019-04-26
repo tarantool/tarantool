@@ -31,7 +31,7 @@
 #include "relay.h"
 
 #include "trivia/config.h"
-#include "trivia/util.h"
+#include "tt_static.h"
 #include "scoped_guard.h"
 #include "cbus.h"
 #include "cfg.h"

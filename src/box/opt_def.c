@@ -35,6 +35,7 @@
 #include "small/region.h"
 #include "error.h"
 #include "diag.h"
+#include "tt_static.h"
 
 const char *opt_type_strs[] = {
 	/* [OPT_BOOL]	= */ "boolean",

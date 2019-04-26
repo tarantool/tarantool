@@ -37,7 +37,7 @@
 
 #include "fiber.h"
 #include "version.h"
-
+#include "tt_static.h"
 #include "error.h"
 #include "vclock.h"
 #include "scramble.h"

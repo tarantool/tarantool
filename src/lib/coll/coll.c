@@ -35,7 +35,7 @@
 #include "assoc.h"
 #include <unicode/ucol.h>
 #include <unicode/ucasemap.h>
-#include <trivia/config.h>
+#include "tt_static.h"
 
 struct UCaseMap *icu_ucase_default_map = NULL;
 

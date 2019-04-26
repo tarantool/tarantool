@@ -38,12 +38,12 @@
 #include <netinet/tcp.h> /* TCP_NODELAY */
 #include <arpa/inet.h>
 #include "say.h"
-#include "trivia/util.h"
+#include "tt_static.h"
 #include "exception.h"
 #include "uri/uri.h"
 #include "errinj.h"
 
-static_assert(TT_STATIC_BUF_LEN > NI_MAXHOST,
+static_assert(SMALL_STATIC_SIZE > NI_MAXHOST + NI_MAXSERV,
 	      "static buffer should fit host name");
 
 const char *
@@ -330,8 +330,9 @@ sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 					NI_NUMERICHOST | NI_NUMERICSERV) != 0)
 				return tt_sprintf("(host):(port)");
 
-			return tt_sprintf(addr->sa_family == AF_INET ?
-					  "%s:%s" : "[%s]:%s", host, serv);
+			return tt_snprintf(NI_MAXHOST + NI_MAXSERV,
+					   addr->sa_family == AF_INET ?
+					   "%s:%s" : "[%s]:%s", host, serv);
 		}
 	}
 	unreachable();

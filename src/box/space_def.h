@@ -30,9 +30,9 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trivia/util.h"
 #include "tuple_dictionary.h"
 #include "schema_def.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 

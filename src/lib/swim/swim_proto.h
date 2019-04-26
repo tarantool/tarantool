@@ -30,7 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "trivia/util.h"
+#include "tt_static.h"
 #include "uuid/tt_uuid.h"
 #include <arpa/inet.h>
 #include <netinet/in.h>

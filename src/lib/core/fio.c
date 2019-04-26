@@ -41,7 +41,7 @@
 #include <lib/bit/bit.h>
 
 #include <say.h>
-#include <trivia/util.h>
+#include "tt_static.h"
 
 const char *
 fio_filename(int fd)

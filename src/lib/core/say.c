@@ -31,6 +31,7 @@
 #include "say.h"
 #include "fiber.h"
 #include "errinj.h"
+#include "tt_static.h"
 
 #include <errno.h>
 #include <stdarg.h>

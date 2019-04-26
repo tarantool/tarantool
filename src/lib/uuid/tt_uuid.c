@@ -33,7 +33,7 @@
 #include <msgpuck.h>
 #include <random.h>
 #include <trivia/config.h>
-#include <trivia/util.h>
+#include "tt_static.h"
 
 /* Zeroed by the linker. */
 const struct tt_uuid uuid_nil;

@@ -35,7 +35,7 @@
 #include <ctype.h>
 
 #include "diag.h"
-#include "trivia/util.h"
+#include "tt_static.h"
 
 int64_t
 vclock_follow(struct vclock *vclock, uint32_t replica_id, int64_t lsn)

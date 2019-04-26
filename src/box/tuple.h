@@ -35,6 +35,7 @@
 #include "diag.h"
 #include "error.h"
 #include "uuid/tt_uuid.h" /* tuple_field_uuid */
+#include "tt_static.h"
 #include "tuple_format.h"
 
 #if defined(__cplusplus)
