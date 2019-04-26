@@ -111,7 +111,6 @@ void
 sqlError(sql * db, int err_code)
 {
 	assert(db != 0);
-	db->errCode = err_code;
 	if (err_code)
 		sqlErrorFinish(db, err_code);
 }
@@ -156,7 +155,6 @@ void
 sqlErrorWithMsg(sql * db, int err_code, const char *zFormat, ...)
 {
 	assert(db != 0);
-	db->errCode = err_code;
 	sqlSystemError(db, err_code);
 	if (zFormat == 0)
 		sqlError(db, err_code);

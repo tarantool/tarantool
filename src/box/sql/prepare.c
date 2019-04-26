@@ -166,8 +166,6 @@ sqlPrepare(sql * db,	/* Database handle. */
 		*ppStmt = (sql_stmt *) sParse.pVdbe;
 	}
 
-	db->errCode = rc;
-
 	/* Delete any TriggerPrg structures allocated while parsing this statement. */
 	while (sParse.pTriggerPrg) {
 		TriggerPrg *pT = sParse.pTriggerPrg;
