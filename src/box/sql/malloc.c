@@ -769,8 +769,7 @@ apiOomError(sql * db)
  * function. However, if a malloc() failure has occurred since the previous
  * invocation SQL_NOMEM is returned instead.
  *
- * If an OOM as occurred, then the connection error-code (the value
- * returned by sql_errcode()) is set to SQL_NOMEM.
+ * If an OOM as occurred, SQL_NOMEM is returned.
  */
 int
 sqlApiExit(sql * db, int rc)

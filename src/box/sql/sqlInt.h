@@ -1291,7 +1291,6 @@ struct sql {
 	void *pUpdateArg;
 	void (*xUpdateCallback) (void *, int, const char *, const char *,
 				 sql_int64);
-	sql_value *pErr;	/* Most recent error message */
 	Lookaside lookaside;	/* Lookaside malloc configuration */
 	Hash aFunc;		/* Hash table of connection functions */
 	int *pnBytesFreed;	/* If not NULL, increment this in DbFree() */

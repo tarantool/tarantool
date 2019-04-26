@@ -103,9 +103,6 @@ invokeProfileCallback(sql * db, Vdbe * p)
  * the sql_compile() routine. The integer returned is an SQL_
  * success/failure code that describes the result of executing the virtual
  * machine.
- *
- * This routine sets the error code and string returned by
- * sql_errcode(), sql_errmsg() and sql_errmsg16().
  */
 int
 sql_finalize(sql_stmt * pStmt)
