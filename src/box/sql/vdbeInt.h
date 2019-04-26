@@ -381,7 +381,6 @@ struct Vdbe {
 	Mem **apArg;		/* Arguments to currently executing user function */
 	Mem *aColName;		/* Column names to return */
 	Mem *pResultSet;	/* Pointer to an array of results */
-	char *zErrMsg;		/* Error message written here */
 	VdbeCursor **apCsr;	/* One element of this array for each open cursor */
 	Mem *aVar;		/* Values for the OP_Variable opcode. */
 	/**

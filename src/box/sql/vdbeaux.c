@@ -1883,7 +1883,6 @@ closeCursorsAndFree(Vdbe * p)
 static void
 Cleanup(Vdbe * p)
 {
-	sql *db = p->db;
 
 #ifdef SQL_DEBUG
 	/* Execute assert() statements to ensure that the Vdbe.apCsr[] and
@@ -1899,8 +1898,6 @@ Cleanup(Vdbe * p)
 	}
 #endif
 
-	sqlDbFree(db, p->zErrMsg);
-	p->zErrMsg = 0;
 	p->pResultSet = 0;
 }
 
@@ -2243,8 +2240,6 @@ sqlVdbeHalt(Vdbe * p)
 				if (p->rc == SQL_OK
 				    || (p->rc & 0xff) == SQL_CONSTRAINT) {
 					p->rc = rc;
-					sqlDbFree(db, p->zErrMsg);
-					p->zErrMsg = 0;
 				}
 				closeCursorsAndFree(p);
 				sqlRollbackAll(p);
@@ -2307,24 +2302,13 @@ sqlVdbeTransferError(Vdbe * p)
 {
 	sql *db = p->db;
 	int rc = p->rc;
-	if (p->zErrMsg) {
-		db->bBenignMalloc++;
-		sqlBeginBenignMalloc();
-		if (db->pErr == 0)
-			db->pErr = sqlValueNew(db);
-		sqlValueSetStr(db->pErr, -1, p->zErrMsg, SQL_TRANSIENT);
-		sqlEndBenignMalloc();
-		db->bBenignMalloc--;
-		db->errCode = rc;
-	} else {
-		sqlError(db, rc);
-	}
+	sqlError(db, rc);
 	return rc;
 }
 
 /*
  * Clean up a VDBE after execution but do not delete the VDBE just yet.
- * Write any error messages into *pzErrMsg.  Return the result code.
+ * Return the result code.
  *
  * After this routine is run, the VDBE should be ready to be executed
  * again.
@@ -2352,8 +2336,6 @@ sqlVdbeReset(Vdbe * p)
 	 */
 	if (p->pc >= 0) {
 		sqlVdbeTransferError(p);
-		sqlDbFree(db, p->zErrMsg);
-		p->zErrMsg = 0;
 		if (p->runOnlyOnce)
 			p->expired = 1;
 	} else if (p->rc && p->expired) {
@@ -2361,10 +2343,7 @@ sqlVdbeReset(Vdbe * p)
 		 * to sql_step(). For consistency (since sql_step() was
 		 * called), set the database error in this case as well.
 		 */
-		sqlErrorWithMsg(db, p->rc, p->zErrMsg ? "%s" : 0,
-				    p->zErrMsg);
-		sqlDbFree(db, p->zErrMsg);
-		p->zErrMsg = 0;
+		sqlErrorWithMsg(db, p->rc, NULL);
 	}
 
 	/* Reclaim all memory used by the VDBE
@@ -2418,7 +2397,7 @@ sqlVdbeReset(Vdbe * p)
 
 /*
  * Clean up and delete a VDBE after execution.  Return an integer which is
- * the result code.  Write any error message text into *pzErrMsg.
+ * the result code.
  */
 int
 sqlVdbeFinalize(Vdbe * p)
