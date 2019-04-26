@@ -19,72 +19,75 @@ git:
 
 jobs:
     include:
-      - name: RelWithDebInfoWError build + test (Linux, gcc)
+      # Testing targets (just run tests on Debian Stretch or OS X).
+      - name: "RelWithDebInfo build + test (Linux, gcc)"
         env: TARGET=test
-      - name: RelWithDebInfoWError build + test (Linux, clang)
+      - name: "RelWithDebInfo build + test (Linux, clang)"
         env: TARGET=test
         compiler: clang
-      - name: RelWithDebInfoWError build + test (OS X Mojave 10.14)
+      - name: "RelWithDebInfo build + test (OS X Mojave 10.14)"
         env: TARGET=test
         os: osx
-      - name: Debug build + test + coverage (Linux, gcc)
+      - name: "Debug build + test + coverage (Linux, gcc)"
         env: TARGET=coverage
-      - name: RelWithDebInfoWError build + test (OS X High Sierra 10.13)
+      - name: "RelWithDebInfo build + test (OS X High Sierra 10.13)"
         env: TARGET=test
         os: osx
         osx_image: xcode9.4
         if: branch = "2.1"
-      - name: LTO build + test (Linux, gcc)
+      # Special targets (only LTO for now).
+      - name: "LTO build + test (Linux, gcc)"
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
         if: branch = "2.1"
-      - name: LTO build + test (Linux, clang)
+      - name: "LTO build + test (Linux, clang)"
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
         if: branch = "2.1"
         compiler: clang
-      - name: LTO build + test (OS X Mojave 10.14)
+      - name: "LTO build + test (OS X Mojave 10.14)"
         os: osx
         env: TARGET=test CMAKE_EXTRA_PARAMS=-DENABLE_LTO=ON
         if: branch = "2.1"
-      - name: Create and deploy tarball
+      # Deploy targets (they also catch distro-specific problems).
+      - name: "Create and deploy tarball"
         env: TARGET=source
         if: branch = "2.1"
-      - name: CentOS 6 build + test + deploy RPM
+      - name: "CentOS 6 build + deploy RPM"
         env: OS=el DIST=6
         if: branch = "2.1"
-      - name: CentOS 7 build + test + deploy RPM
+      - name: "CentOS 7 build + test + deploy RPM"
         env: OS=el DIST=7
         if: branch = "2.1"
-      - name: Fedora 28 build + test + deploy RPM
+      - name: "Fedora 28 build + test + deploy RPM"
         env: OS=fedora DIST=28
         if: branch = "2.1"
-      - name: Fedora 29 build + test + deploy RPM
+      - name: "Fedora 29 build + test + deploy RPM"
         env: OS=fedora DIST=29
         if: branch = "2.1"
       - name: "Fedora 30 build + test + deploy RPM"
         env: OS=fedora DIST=30
         if: branch = "2.1"
-      - name: Ubuntu Trusty (14.04) build + deploy DEB
+      - name: "Ubuntu Trusty (14.04) build + deploy DEB"
         env: OS=ubuntu DIST=trusty
         if: branch = "2.1"
-      - name: Ubuntu Xenial (16.04) build + deploy DEB
+      - name: "Ubuntu Xenial (16.04) build + deploy DEB"
         env: OS=ubuntu DIST=xenial
         if: branch = "2.1"
-      - name: Ubuntu Bionic (18.04) build + deploy DEB
+      - name: "Ubuntu Bionic (18.04) build + deploy DEB"
         env: OS=ubuntu DIST=bionic
         if: branch = "2.1"
-      - name: Ubuntu Cosmic (18.10) build + deploy DEB
+      - name: "Ubuntu Cosmic (18.10) build + deploy DEB"
         env: OS=ubuntu DIST=cosmic
         if: branch = "2.1"
-      - name: Ubuntu Disco (19.04) build + deploy DEB
+      - name: "Ubuntu Disco (19.04) build + deploy DEB"
         env: OS=ubuntu DIST=disco
         if: branch = "2.1"
-      - name: Debian Jessie (8) build + deploy DEB
+      - name: "Debian Jessie (8) build + deploy DEB"
         env: OS=debian DIST=jessie
         if: branch = "2.1"
-      - name: Debian Stretch (9) build + deploy DEB
+      - name: "Debian Stretch (9) build + deploy DEB"
         env: OS=debian DIST=stretch
         if: branch = "2.1"
-      - name: Debian Buster (10) build + deploy DEB
+      - name: "Debian Buster (10) build + deploy DEB"
         env: OS=debian DIST=buster
         if: branch = "2.1"
 

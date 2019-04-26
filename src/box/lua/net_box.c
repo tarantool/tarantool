@@ -694,7 +694,7 @@ netbox_decode_sql_info(struct lua_State *L, const char **data)
 		assert(count > 0);
 		lua_createtable(L, 0, count);
 		for (uint32_t j = 0; j < count; ++j) {
-			int64_t id;
+			int64_t id = INT64_MIN;
 			mp_read_int64(data, &id);
 			luaL_pushint64(L, id);
 			lua_rawseti(L, -2, j + 1);
