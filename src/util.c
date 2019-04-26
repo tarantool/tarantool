@@ -45,6 +45,9 @@
 
 #include "say.h"
 
+__thread char tt_static_buf_storage[TT_STATIC_BUF_COUNT][TT_STATIC_BUF_LEN + 1];
+__thread int tt_static_buf_i = TT_STATIC_BUF_COUNT - 1;
+
 /** Find a string in an array of strings.
  *
  * @param haystack  Array of strings. Either NULL
