@@ -401,33 +401,6 @@ struct swim {
 	 */
 	struct swim_member *self;
 	/**
-	 * Members to which a message should be sent next during
-	 * this round.
-	 */
-	struct rlist round_queue;
-	/** Generator of round step events. */
-	struct ev_timer round_tick;
-	/**
-	 * Single round step task. It is impossible to have
-	 * multiple round steps in the same SWIM instance at the
-	 * same time, so it is single and preallocated per SWIM
-	 * instance. Note, that the task's packet once built at
-	 * the beginning of a round is reused during the round
-	 * without rebuilding on each step. But packet rebuild can
-	 * be triggered by any update of any member.
-	 */
-	struct swim_task round_step_task;
-	/**
-	 * True if a packet in the round step task is still valid
-	 * and can be resent on a next round step.
-	 */
-	bool is_round_packet_valid;
-	/**
-	 * Preallocated buffer to store shuffled members here at
-	 * the beginning of each round.
-	 */
-	struct swim_member **shuffled;
-	/**
 	 * Scheduler of output requests, receiver of incoming
 	 * ones.
 	 */
@@ -470,6 +443,37 @@ struct swim {
 	 * as long as the event TTD is non-zero.
 	 */
 	struct rlist dissemination_queue;
+	/**
+	 * Members to which a message should be sent next during
+	 * this round.
+	 */
+	struct rlist round_queue;
+	/** Generator of round step events. */
+	struct ev_timer round_tick;
+	/**
+	 * True if a packet in the round step task is still valid
+	 * and can be resent on a next round step.
+	 */
+	bool is_round_packet_valid;
+	/**
+	 * Preallocated buffer to store shuffled members here at
+	 * the beginning of each round.
+	 */
+	struct swim_member **shuffled;
+	/**
+	 * Single round step task. It is impossible to have
+	 * multiple round steps in the same SWIM instance at the
+	 * same time, so it is single and preallocated per SWIM
+	 * instance. Note, that the task's packet once built at
+	 * the beginning of a round is reused during the round
+	 * without rebuilding on each step. But packet rebuild can
+	 * be triggered by any update of any member.
+	 *
+	 * Keep this structure at the bottom - it is huge and
+	 * should not split other attributes into different cache
+	 * lines.
+	 */
+	struct swim_task round_step_task;
 };
 
 /**
