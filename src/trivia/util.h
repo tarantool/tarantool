@@ -479,7 +479,15 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 #define CLOCK_THREAD_CPUTIME_ID		3
 #endif
 
+enum {
+	TT_STATIC_BUF_COUNT = 4,
+};
+/** Can't be enum - used by preprocessor for static assertions. */
 #define TT_STATIC_BUF_LEN 1024
+
+extern __thread char tt_static_buf_storage[TT_STATIC_BUF_COUNT]
+					  [TT_STATIC_BUF_LEN];
+extern __thread int tt_static_buf_i;
 
 /**
  * Return a thread-local statically allocated temporary buffer of size
@@ -488,12 +496,8 @@ int clock_gettime(uint32_t clock_id, struct timespec *tp);
 static inline char *
 tt_static_buf(void)
 {
-	enum { TT_STATIC_BUFS = 4 };
-	static __thread char bufs[TT_STATIC_BUFS][TT_STATIC_BUF_LEN];
-	static __thread int bufno = TT_STATIC_BUFS - 1;
-
-	bufno = (bufno + 1) % TT_STATIC_BUFS;
-	return bufs[bufno];
+	tt_static_buf_i = (tt_static_buf_i + 1) % TT_STATIC_BUF_COUNT;
+	return tt_static_buf_storage[tt_static_buf_i];
 }
 
 /**
