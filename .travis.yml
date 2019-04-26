@@ -21,47 +21,47 @@ matrix:
     allow_failures:
       - TARGET=coverage
     include:
-      - name: Create and deploy tarball
+      - name: "Create and deploy tarball"
         env: TARGET=source
-      - name: RelWithDebInfoWError build + test (Linux, gcc)
+      - name: "RelWithDebInfo build + test (Linux, gcc)"
         env: TARGET=test
-      - name: RelWithDebInfoWError build + test (Linux, clang)
+      - name: "RelWithDebInfo build + test (Linux, clang)"
         env: TARGET=test
         compiler: clang
-      - name: RelWithDebInfoWError build + test (OS X Mojave 10.14)
+      - name: "RelWithDebInfo build + test (OS X Mojave 10.14)"
         env: TARGET=test
         os: osx
-      - name: Debug build + test + coverage (Linux, gcc)
+      - name: "Debug build + test + coverage (Linux, gcc)"
         env: TARGET=coverage
-      - name: RelWithDebInfoWError build + test (OS X High Sierra 10.13)
+      - name: "RelWithDebInfo build + test (OS X High Sierra 10.13)"
         env: TARGET=test
         os: osx
         osx_image: xcode9.4
-      - name: CentOS 6 build + test + deploy RPM
+      - name: "CentOS 6 build + deploy RPM"
         env: OS=el DIST=6
-      - name: CentOS 7 build + test + deploy RPM
+      - name: "CentOS 7 build + test + deploy RPM"
         env: OS=el DIST=7
-      - name: Fedora 28 build + test + deploy RPM
+      - name: "Fedora 28 build + test + deploy RPM"
         env: OS=fedora DIST=28
-      - name: Fedora 29 build + test + deploy RPM
+      - name: "Fedora 29 build + test + deploy RPM"
         env: OS=fedora DIST=29
       - name: "Fedora 30 build + test + deploy RPM"
         env: OS=fedora DIST=30
-      - name: Ubuntu Trusty (14.04) build + deploy DEB
+      - name: "Ubuntu Trusty (14.04) build + deploy DEB"
         env: OS=ubuntu DIST=trusty
-      - name: Ubuntu Xenial (16.04) build + deploy DEB
+      - name: "Ubuntu Xenial (16.04) build + deploy DEB"
         env: OS=ubuntu DIST=xenial
-      - name: Ubuntu Bionic (18.04) build + deploy DEB
+      - name: "Ubuntu Bionic (18.04) build + deploy DEB"
         env: OS=ubuntu DIST=bionic
-      - name: Ubuntu Cosmic (18.10) build + deploy DEB
+      - name: "Ubuntu Cosmic (18.10) build + deploy DEB"
         env: OS=ubuntu DIST=cosmic
-      - name: Ubuntu Disco (19.04) build + deploy DEB
+      - name: "Ubuntu Disco (19.04) build + deploy DEB"
         env: OS=ubuntu DIST=disco
-      - name: Debian Jessie (8) build + deploy DEB
+      - name: "Debian Jessie (8) build + deploy DEB"
         env: OS=debian DIST=jessie
-      - name: Debian Stretch (9) build + deploy DEB
+      - name: "Debian Stretch (9) build + deploy DEB"
         env: OS=debian DIST=stretch
-      - name: Debian Buster (10) build + deploy DEB
+      - name: "Debian Buster (10) build + deploy DEB"
         env: OS=debian DIST=buster
 
 script:

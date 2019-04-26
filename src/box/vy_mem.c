@@ -396,7 +396,7 @@ vy_mem_iterator_seek(struct vy_mem_iterator *itr, const struct tuple *last_key)
 				ITER_GT : ITER_LT;
 	}
 
-	bool exact;
+	bool exact = false;
 	struct tree_mem_key tree_key;
 	tree_key.stmt = key;
 	/* (lsn == INT64_MAX - 1) means that lsn is ignored in comparison */

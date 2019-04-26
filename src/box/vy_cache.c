@@ -649,7 +649,7 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr,
 	itr->cache->stat.lookup++;
 
 	if (!vy_stmt_is_empty_key(key)) {
-		bool exact;
+		bool exact = false;
 		itr->curr_pos = iterator_type == ITER_EQ ||
 				iterator_type == ITER_GE ||
 				iterator_type == ITER_LT ?
