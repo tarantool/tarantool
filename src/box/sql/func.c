@@ -758,15 +758,15 @@ sql_utf8_pattern_compare(const char *pattern,
 			       SQL_END_OF_STRING) {
 				if (c == SQL_INVALID_UTF8_SYMBOL)
 					return INVALID_PATTERN;
-				if (c != MATCH_ALL_WILDCARD &&
-				    c != MATCH_ONE_WILDCARD)
+				if (c == MATCH_ONE_WILDCARD) {
+					c2 = Utf8Read(string, string_end);
+					if (c2 == SQL_INVALID_UTF8_SYMBOL)
+						return NO_MATCH;
+					if (c2 == SQL_END_OF_STRING)
+						return NO_WILDCARD_MATCH;
+				} else if (c != MATCH_ALL_WILDCARD) {
 					break;
-				if (c == MATCH_ONE_WILDCARD &&
-				    (c2 = Utf8Read(string, string_end)) ==
-				    SQL_END_OF_STRING)
-					return NO_WILDCARD_MATCH;
-				if (c2 == SQL_INVALID_UTF8_SYMBOL)
-					return NO_MATCH;
+				}
 			}
 			/*
 			 * "%" at the end of the pattern matches.

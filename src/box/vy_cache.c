@@ -661,7 +661,7 @@ vy_cache_iterator_seek(struct vy_cache_iterator *itr, struct vy_entry last)
 				ITER_GT : ITER_LT;
 	}
 
-	bool exact;
+	bool exact = false;
 	if (!vy_stmt_is_empty_key(key.stmt)) {
 		itr->curr_pos = iterator_type == ITER_EQ ||
 				iterator_type == ITER_GE ||

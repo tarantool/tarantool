@@ -509,9 +509,12 @@ iproto_write_error(int fd, const struct error *e, uint32_t schema_version,
 			     schema_version, sizeof(body) + msg_len);
 
 	body.v_data_len = mp_bswap_u32(msg_len);
-	(void) write(fd, header, sizeof(header));
-	(void) write(fd, &body, sizeof(body));
-	(void) write(fd, e->errmsg, msg_len);
+
+	ssize_t unused;
+	unused = write(fd, header, sizeof(header));
+	unused = write(fd, &body, sizeof(body));
+	unused = write(fd, e->errmsg, msg_len);
+	(void) unused;
 }
 
 int
@@ -624,12 +627,15 @@ xrow_decode_dml(struct xrow_header *row, struct request *request,
 	request->header = row;
 	request->type = row->type;
 
+	const char *start = NULL;
+	const char *end = NULL;
+
 	if (row->bodycnt == 0)
 		goto done;
 
 	assert(row->bodycnt == 1);
-	const char *data = (const char *) row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
+	const char *data = start = (const char *) row->body[0].iov_base;
+	end = data + row->body[0].iov_len;
 	assert((end - data) > 0);
 
 	if (mp_typeof(*data) != MP_MAP || mp_check_map(data, end) > 0) {
@@ -701,8 +707,8 @@ error:
 done:
 	if (key_map) {
 		enum iproto_key key = (enum iproto_key) bit_ctz_u64(key_map);
-		xrow_on_decode_err(row->body[0].iov_base, end,
-				   ER_MISSING_REQUEST_FIELD, iproto_key_name(key));
+		xrow_on_decode_err(start, end, ER_MISSING_REQUEST_FIELD,
+				   iproto_key_name(key));
 		return -1;
 	}
 	return 0;
@@ -1071,12 +1077,15 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 	ballot->is_ro = false;
 	vclock_create(&ballot->vclock);
 
+	const char *start = NULL;
+	const char *end = NULL;
+
 	if (row->bodycnt == 0)
 		goto err;
 	assert(row->bodycnt == 1);
 
-	const char *data = (const char *) row->body[0].iov_base;
-	const char *end = data + row->body[0].iov_len;
+	const char *data = start = (const char *) row->body[0].iov_base;
+	end = data + row->body[0].iov_len;
 	const char *tmp = data;
 	if (mp_check(&tmp, end) != 0 || mp_typeof(*data) != MP_MAP)
 		goto err;
@@ -1124,8 +1133,7 @@ xrow_decode_ballot(struct xrow_header *row, struct ballot *ballot)
 	}
 	return 0;
 err:
-	xrow_on_decode_err(row->body[0].iov_base, end, ER_INVALID_MSGPACK,
-			   "packet body");
+	xrow_on_decode_err(start, end, ER_INVALID_MSGPACK, "packet body");
 	return -1;
 }
 

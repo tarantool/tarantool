@@ -318,8 +318,6 @@ static void
 tarantool_lua_setpaths(struct lua_State *L)
 {
 	const char *home = getenv("HOME");
-	char cwd[PATH_MAX] = {'\0'};
-	getcwd(cwd, sizeof(cwd));
 	lua_getglobal(L, "package");
 	int top = lua_gettop(L);
 
