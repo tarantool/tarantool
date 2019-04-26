@@ -56,6 +56,20 @@ local function get_appdir()
     return package_appdir or fio.cwd()
 end
 
+local function extend_path(path)
+    package.path = path .. ';' .. package.path
+end
+
+local function extend_cpath(path)
+    package.cpath = path .. ';' .. package.cpath
+end
+
+local function add_modules_loadpaths(path)
+    extend_path(path .. '/?/init.lua')
+    extend_path(path .. '/?.lua')
+    extend_cpath(path .. '/?.so')
+end
+
 dostring = function(s, ...)
     local chunk, message = loadstring(s)
     if chunk == nil then
@@ -217,6 +231,8 @@ table.insert(package.loaders, 5, rocks_loader_func(true))
 package.search = search
 package.set_appdir = set_appdir
 package.get_appdir = get_appdir
+package.set_rocks_loadpaths = set_appdir
+package.add_modules_loadpaths = add_modules_loadpaths
 
 return {
     uptime = uptime;

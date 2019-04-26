@@ -608,31 +608,12 @@ run_script_f(va_list ap)
 			lua_getfield(L, -1, "set_appdir");
 			if (lua_isfunction(L, -1) == 0)
 				panic("No package.set_appdir specified");
-			lua_pushstring(L, optv[i + 1]);
+			lua_pushstring(L, appdir_realpath);
 			lua_call(L, 1, 0);
 
-			lua_getfield(L, -1, "path");
-			const char *package_path = lua_tostring(L, -1);
-			lua_pop(L, 1);
-
-			lua_getfield(L, -1, "cpath");
-			const char *package_cpath = lua_tostring(L, -1);
-			lua_pop(L, 1);
-
-			int top = lua_gettop(L);
+			lua_getfield(L, -1, "add_modules_loadpaths");
 			lua_pushstring(L, appdir_realpath);
-			lua_pushliteral(L, "/?.lua;");
-			lua_pushstring(L, appdir_realpath);
-			lua_pushliteral(L, "/?/init.lua;");
-			lua_pushstring(L, package_path);
-			lua_concat(L, lua_gettop(L) - top);
-			lua_setfield(L, top, "path");
-
-			lua_pushstring(L, appdir_realpath);
-			lua_pushliteral(L, "/?.so");
-			lua_pushstring(L, package_cpath);
-			lua_concat(L, lua_gettop(L) - top);
-			lua_setfield(L, top, "cpath");
+			lua_call(L, 1, 0);
 
 			lua_pop(L, 1);
 			break;
