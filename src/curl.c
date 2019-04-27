@@ -121,7 +121,7 @@ curl_multi_timer_cb(CURLM *multi, long timeout_ms, void *envp)
 
 	say_debug("curl %p: wait timeout=%ldms", env, timeout_ms);
 	ev_timer_stop(loop(), &env->timer_event);
-	if (timeout_ms > 0) {
+	if (timeout_ms >= 0) {
 		/*
 		 * From CURLMOPT_TIMERFUNCTION manual:
 		 * Your callback function should install a non-repeating timer
@@ -131,15 +131,6 @@ curl_multi_timer_cb(CURLM *multi, long timeout_ms, void *envp)
 		double timeout = (double) timeout_ms / 1000.0;
 		ev_timer_init(&env->timer_event, curl_timer_cb, timeout, 0);
 		ev_timer_start(loop(), &env->timer_event);
-		return 0;
-	} else if (timeout_ms == 0) {
-		/*
-		 * From CURLMOPT_TIMERFUNCTION manual:
-		 * A timeout_ms value of 0 means you should call
-		 * curl_multi_socket_action or curl_multi_perform (once) as
-		 * soon as possible.
-		 */
-		curl_timer_cb(loop(), &env->timer_event, 0);
 		return 0;
 	} else {
 		assert(timeout_ms == -1);
