@@ -77,13 +77,15 @@ lua_sql_call(sql_context *pCtx, int nVal, sql_value **apVal) {
 			lua_pushboolean(L, sql_value_boolean(param));
 			break;
 		default:
-			sql_result_error(pCtx, "Unsupported type passed "
-					     "to Lua", -1);
+			diag_set(ClientError, ER_SQL_EXECUTE, "Unsupported "\
+				 "type passed to Lua");
+			pCtx->is_aborted = true;
 			goto error;
 		}
 	}
 	if (lua_pcall(L, lua_gettop(L) - 1, 1, 0) != 0){
-		sql_result_error(pCtx, lua_tostring(L, -1), -1);
+		diag_set(ClientError, ER_SQL_EXECUTE, lua_tostring(L, -1));
+		pCtx->is_aborted = true;
 		goto error;
 	}
 	switch(lua_type(L, -1)) {
@@ -101,8 +103,9 @@ lua_sql_call(sql_context *pCtx, int nVal, sql_value **apVal) {
 		sql_result_null(pCtx);
 		break;
 	default:
-		sql_result_error(pCtx, "Unsupported type returned from Lua",
-				     -1);
+		diag_set(ClientError, ER_SQL_EXECUTE, "Unsupported type "\
+			 "passed from Lua");
+		pCtx->is_aborted = true;
 		goto error;
 	}
 error:

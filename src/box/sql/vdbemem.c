@@ -321,7 +321,6 @@ sqlVdbeMemStringify(Mem * pMem, u8 bForce)
 int
 sqlVdbeMemFinalize(Mem * pMem, FuncDef * pFunc)
 {
-	int rc = SQL_OK;
 	if (ALWAYS(pFunc && pFunc->xFinalize)) {
 		sql_context ctx;
 		Mem t;
@@ -338,9 +337,9 @@ sqlVdbeMemFinalize(Mem * pMem, FuncDef * pFunc)
 		if (pMem->szMalloc > 0)
 			sqlDbFree(pMem->db, pMem->zMalloc);
 		memcpy(pMem, &t, sizeof(t));
-		rc = ctx.isError;
+		return ctx.is_aborted ? SQL_TARANTOOL_ERROR : SQL_OK;
 	}
-	return rc;
+	return SQL_OK;
 }
 
 /*
@@ -1295,7 +1294,7 @@ valueFromFunction(sql * db,	/* The database connection */
 	ctx.pOut = pVal;
 	ctx.pFunc = pFunc;
 	pFunc->xSFunc(&ctx, nVal, apVal);
-	assert(!ctx.isError);
+	assert(!ctx.is_aborted);
 	sql_value_apply_type(pVal, type);
 	assert(rc == SQL_OK);
 
@@ -1500,7 +1499,7 @@ recordFunc(sql_context * context, int argc, sql_value ** argv)
 	nRet = 1 + nSerial + nVal;
 	aRet = sqlDbMallocRawNN(db, nRet);
 	if (aRet == 0) {
-		sql_result_error_nomem(context);
+		context->is_aborted = true;
 	} else {
 		aRet[0] = nSerial + 1;
 		putVarint32(&aRet[1], iSerial);

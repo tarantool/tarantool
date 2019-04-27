@@ -617,7 +617,8 @@ localtimeOffset(DateTime * p,	/* Date at which to calculate offset */
 	computeJD(&x);
 	t = (time_t) (x.iJD / 1000 - 21086676 * (i64) 10000);
 	if (osLocaltime(&t, &sLocal)) {
-		sql_result_error(pCtx, "local time unavailable", -1);
+		diag_set(ClientError, ER_SQL_EXECUTE, "local time unavailable");
+		pCtx->is_aborted = true;
 		*pRc = SQL_ERROR;
 		return 0;
 	}
@@ -1108,12 +1109,13 @@ strftimeFunc(sql_context * context, int argc, sql_value ** argv)
 	if (n < sizeof(zBuf)) {
 		z = zBuf;
 	} else if (n > (u64) db->aLimit[SQL_LIMIT_LENGTH]) {
-		sql_result_error_toobig(context);
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		context->is_aborted = true;
 		return;
 	} else {
 		z = sqlDbMallocRawNN(db, (int)n);
 		if (z == 0) {
-			sql_result_error_nomem(context);
+			context->is_aborted = true;
 			return;
 		}
 	}

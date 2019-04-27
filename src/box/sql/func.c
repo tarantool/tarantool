@@ -181,13 +181,9 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 			i64 iVal = sql_value_int64(argv[0]);
 			if (iVal < 0) {
 				if (iVal == SMALLEST_INT64) {
-					/* IMP: R-31676-45509 If X is the integer -9223372036854775808
-					 * then abs(X) throws an integer overflow error since there is no
-					 * equivalent positive 64-bit two complement value.
-					 */
-					sql_result_error(context,
-							     "integer overflow",
-							     -1);
+					diag_set(ClientError, ER_SQL_EXECUTE,
+						 "integer is overflowed");
+					context->is_aborted = true;
 					return;
 				}
 				iVal = -iVal;
@@ -203,8 +199,7 @@ absFunc(sql_context * context, int argc, sql_value ** argv)
 	case MP_BOOL: {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "number",
 			 "boolean");
-		context->isError = SQL_TARANTOOL_ERROR;
-		context->fErrorOrAux = 1;
+		context->is_aborted = true;
 		return;
 	}
 	default:{
@@ -256,8 +251,7 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 	if (inconsistent_type_arg != NULL) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT or BLOB",
 			 mem_type_to_str(inconsistent_type_arg));
-		context->isError = SQL_TARANTOOL_ERROR;
-		context->fErrorOrAux = 1;
+		context->is_aborted = true;
 		return;
 	}
 	/*
@@ -267,8 +261,7 @@ position_func(struct sql_context *context, int argc, struct Mem **argv)
 	if (haystack_type != needle_type) {
 		diag_set(ClientError, ER_INCONSISTENT_TYPES,
 			 mem_type_to_str(needle), mem_type_to_str(haystack));
-		context->isError = SQL_TARANTOOL_ERROR;
-		context->fErrorOrAux = 1;
+		context->is_aborted = true;
 		return;
 	}
 
@@ -503,7 +496,6 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 {
 	int n = 0;
 	double r;
-	char *zBuf;
 	assert(argc == 1 || argc == 2);
 	if (argc == 2) {
 		if (sql_value_is_null(argv[1]))
@@ -524,23 +516,17 @@ roundFunc(sql_context * context, int argc, sql_value ** argv)
 	} else if (n == 0 && r < 0 && (-r) < LARGEST_INT64 - 1) {
 		r = -(double)((sql_int64) ((-r) + 0.5));
 	} else {
-		zBuf = sql_mprintf("%.*f", n, r);
-		if (zBuf == 0) {
-			sql_result_error_nomem(context);
-			return;
-		}
-		sqlAtoF(zBuf, &r, sqlStrlen30(zBuf));
-		sql_free(zBuf);
+		const char *rounded_value = tt_sprintf("%.*f", n, r);
+		sqlAtoF(rounded_value, &r, sqlStrlen30(rounded_value));
 	}
 	sql_result_double(context, r);
 }
 
 /*
  * Allocate nByte bytes of space using sqlMalloc(). If the
- * allocation fails, call sql_result_error_nomem() to notify
- * the database handle that malloc() has failed and return NULL.
- * If nByte is larger than the maximum string or blob length, then
- * raise an SQL_TOOBIG exception and return NULL.
+ * allocation fails, return NULL. If nByte is larger than the
+ * maximum string or blob length, then raise an error and return
+ * NULL.
  */
 static void *
 contextMalloc(sql_context * context, i64 nByte)
@@ -551,13 +537,13 @@ contextMalloc(sql_context * context, i64 nByte)
 	testcase(nByte == db->aLimit[SQL_LIMIT_LENGTH]);
 	testcase(nByte == db->aLimit[SQL_LIMIT_LENGTH] + 1);
 	if (nByte > db->aLimit[SQL_LIMIT_LENGTH]) {
-		sql_result_error_toobig(context);
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		context->is_aborted = true;
 		z = 0;
 	} else {
 		z = sqlMalloc(nByte);
-		if (!z) {
-			sql_result_error_nomem(context);
-		}
+		if (z == NULL)
+			context->is_aborted = true;
 	}
 	return z;
 }
@@ -584,8 +570,8 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 	if (!z2)                                                               \
 		return;                                                        \
 	z1 = contextMalloc(context, ((i64) n) + 1);                            \
-	if (!z1) {                                                             \
-		sql_result_error_nomem(context);                           \
+	if (z1 == NULL) {                                                      \
+		context->is_aborted = true;                                    \
 		return;                                                        \
 	}                                                                      \
 	UErrorCode status = U_ZERO_ERROR;                                      \
@@ -602,8 +588,8 @@ case_type##ICUFunc(sql_context *context, int argc, sql_value **argv)   \
 		status = U_ZERO_ERROR;                                         \
 		sql_free(z1);                                              \
 		z1 = contextMalloc(context, ((i64) len) + 1);                  \
-		if (!z1) {                                                     \
-			sql_result_error_nomem(context);                   \
+		if (z1 == NULL) {                                              \
+			context->is_aborted = true;                            \
 			return;                                                \
 		}                                                              \
 		ucasemap_utf8To##case_type(case_map, z1, len, z2, n, &status); \
@@ -909,8 +895,7 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 					  mem_type_to_str(argv[1]);
 		diag_set(ClientError, ER_INCONSISTENT_TYPES, "TEXT",
 			 inconsistent_type);
-		context->fErrorOrAux = 1;
-		context->isError = SQL_TARANTOOL_ERROR;
+		context->is_aborted = true;
 		return;
 	}
 	const char *zB = (const char *) sql_value_text(argv[0]);
@@ -927,8 +912,9 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	testcase(nPat == db->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH]);
 	testcase(nPat == db->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH] + 1);
 	if (nPat > db->aLimit[SQL_LIMIT_LIKE_PATTERN_LENGTH]) {
-		sql_result_error(context,
-				     "LIKE pattern is too complex", -1);
+		diag_set(ClientError, ER_SQL_EXECUTE, "LIKE pattern is too "\
+			 "complex");
+		context->is_aborted = true;
 		return;
 	}
 	/* Encoding did not change */
@@ -943,10 +929,10 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 		const unsigned char *zEsc = sql_value_text(argv[2]);
 		if (zEsc == 0)
 			return;
-		const char *const err_msg =
-			"ESCAPE expression must be a single character";
 		if (sql_utf8_char_count(zEsc, sql_value_bytes(argv[2])) != 1) {
-			sql_result_error(context, err_msg, -1);
+			diag_set(ClientError, ER_SQL_EXECUTE, "ESCAPE "\
+				 "expression must be a single character");
+			context->is_aborted = true;
 			return;
 		}
 		escape = sqlUtf8Read(&zEsc);
@@ -957,9 +943,9 @@ likeFunc(sql_context *context, int argc, sql_value **argv)
 	res = sql_utf8_pattern_compare(zB, zA, zB_end, zA_end,
 				       is_like_ci, escape);
 	if (res == INVALID_PATTERN) {
-		const char *const err_msg =
-			"LIKE pattern can only contain UTF-8 characters";
-		sql_result_error(context, err_msg, -1);
+		diag_set(ClientError, ER_SQL_EXECUTE, "LIKE pattern can only "\
+			 "contain UTF-8 characters");
+		context->is_aborted = true;
 		return;
 	}
 	sql_result_bool(context, res == MATCH);
@@ -1126,8 +1112,8 @@ charFunc(sql_context * context, int argc, sql_value ** argv)
 	unsigned char *z, *zOut;
 	int i;
 	zOut = z = sql_malloc64(argc * 4 + 1);
-	if (z == 0) {
-		sql_result_error_nomem(context);
+	if (z == NULL) {
+		context->is_aborted = true;
 		return;
 	}
 	for (i = 0; i < argc; i++) {
@@ -1190,15 +1176,14 @@ static void
 zeroblobFunc(sql_context * context, int argc, sql_value ** argv)
 {
 	i64 n;
-	int rc;
 	assert(argc == 1);
 	UNUSED_PARAMETER(argc);
 	n = sql_value_int64(argv[0]);
 	if (n < 0)
 		n = 0;
-	rc = sql_result_zeroblob64(context, n);	/* IMP: R-00293-64994 */
-	if (rc) {
-		sql_result_error_code(context, rc);
+	if (sql_result_zeroblob64(context, n) != SQL_OK) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		context->is_aborted = true;
 	}
 }
 
@@ -1265,14 +1250,16 @@ replaceFunc(sql_context * context, int argc, sql_value ** argv)
 			testcase(nOut - 1 == db->aLimit[SQL_LIMIT_LENGTH]);
 			testcase(nOut - 2 == db->aLimit[SQL_LIMIT_LENGTH]);
 			if (nOut - 1 > db->aLimit[SQL_LIMIT_LENGTH]) {
-				sql_result_error_toobig(context);
+				diag_set(ClientError, ER_SQL_EXECUTE, "string "\
+					 "or blob too big");
+				context->is_aborted = true;
 				sql_free(zOut);
 				return;
 			}
 			zOld = zOut;
 			zOut = sql_realloc64(zOut, (int)nOut);
 			if (zOut == 0) {
-				sql_result_error_nomem(context);
+				context->is_aborted = true;
 				sql_free(zOld);
 				return;
 			}
@@ -1578,8 +1565,7 @@ sum_step(struct sql_context *context, int argc, sql_value **argv)
 		if (mem_apply_numeric_type(argv[0]) != 0) {
 			diag_set(ClientError, ER_SQL_TYPE_MISMATCH,
 				 sql_value_text(argv[0]), "number");
-			context->fErrorOrAux = 1;
-			context->isError = SQL_TARANTOOL_ERROR;
+			context->is_aborted = true;
 			return;
 		}
 		type = sql_value_type(argv[0]);
@@ -1605,7 +1591,9 @@ sumFinalize(sql_context * context)
 	p = sql_aggregate_context(context, 0);
 	if (p && p->cnt > 0) {
 		if (p->overflow) {
-			sql_result_error(context, "integer overflow", -1);
+			diag_set(ClientError, ER_SQL_EXECUTE, "integer "\
+				 "overflow");
+			context->is_aborted = true;
 		} else if (p->approx) {
 			sql_result_double(context, p->rSum);
 		} else {
@@ -1762,9 +1750,11 @@ groupConcatFinalize(sql_context * context)
 	pAccum = sql_aggregate_context(context, 0);
 	if (pAccum) {
 		if (pAccum->accError == STRACCUM_TOOBIG) {
-			sql_result_error_toobig(context);
+			diag_set(ClientError, ER_SQL_EXECUTE, "string or blob "\
+				 "too big");
+			context->is_aborted = true;
 		} else if (pAccum->accError == STRACCUM_NOMEM) {
-			sql_result_error_nomem(context);
+			context->is_aborted = true;
 		} else {
 			sql_result_text(context,
 					    sqlStrAccumFinish(pAccum),

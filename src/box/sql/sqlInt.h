@@ -443,19 +443,6 @@ void
 sql_result_double(sql_context *, double);
 
 void
-sql_result_error(sql_context *, const char *,
-		     int);
-
-void
-sql_result_error_toobig(sql_context *);
-
-void
-sql_result_error_nomem(sql_context *);
-
-void
-sql_result_error_code(sql_context *, int);
-
-void
 sql_result_int(sql_context *, int);
 
 void

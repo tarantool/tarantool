@@ -304,7 +304,8 @@ setResultStrOrError(sql_context * pCtx,	/* Function context */
     )
 {
 	if (sqlVdbeMemSetStr(pCtx->pOut, z, n,1, xDel) == SQL_TOOBIG) {
-		sql_result_error_toobig(pCtx);
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		pCtx->is_aborted = true;
 	}
 }
 
@@ -322,8 +323,10 @@ invokeValueDestructor(const void *p,	/* Value to destroy */
 	} else {
 		xDel((void *)p);
 	}
-	if (pCtx)
-		sql_result_error_toobig(pCtx);
+	if (pCtx) {
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		pCtx->is_aborted = true;
+	}
 	return SQL_TOOBIG;
 }
 
@@ -334,7 +337,8 @@ sql_result_blob(sql_context * pCtx,
 {
 	assert(n >= 0);
 	if (sqlVdbeMemSetStr(pCtx->pOut, z, n,0, xDel) == SQL_TOOBIG) {
-		sql_result_error_toobig(pCtx);
+		diag_set(ClientError, ER_SQL_EXECUTE, "string or blob too big");
+		pCtx->is_aborted = true;
 	}
 }
 
@@ -355,14 +359,6 @@ void
 sql_result_double(sql_context * pCtx, double rVal)
 {
 	sqlVdbeMemSetDouble(pCtx->pOut, rVal);
-}
-
-void
-sql_result_error(sql_context * pCtx, const char *z, int n)
-{
-	pCtx->isError = SQL_ERROR;
-	pCtx->fErrorOrAux = 1;
-	sqlVdbeMemSetStr(pCtx->pOut, z, n, 1, SQL_TRANSIENT);
 }
 
 void
@@ -432,37 +428,6 @@ sql_result_zeroblob64(sql_context * pCtx, u64 n)
 	}
 	sqlVdbeMemSetZeroBlob(pCtx->pOut, (int)n);
 	return SQL_OK;
-}
-
-void
-sql_result_error_code(sql_context * pCtx, int errCode)
-{
-	pCtx->isError = errCode;
-	pCtx->fErrorOrAux = 1;
-	if (pCtx->pOut->flags & MEM_Null) {
-		sqlVdbeMemSetStr(pCtx->pOut, sqlErrStr(errCode), -1, 1,
-				     SQL_STATIC);
-	}
-}
-
-/* Force an SQL_TOOBIG error. */
-void
-sql_result_error_toobig(sql_context * pCtx)
-{
-	pCtx->isError = SQL_TOOBIG;
-	pCtx->fErrorOrAux = 1;
-	sqlVdbeMemSetStr(pCtx->pOut, "string or blob too big", -1, 1,
-			     SQL_STATIC);
-}
-
-/* An SQL_NOMEM error. */
-void
-sql_result_error_nomem(sql_context * pCtx)
-{
-	sqlVdbeMemSetNull(pCtx->pOut);
-	pCtx->isError = SQL_NOMEM;
-	pCtx->fErrorOrAux = 1;
-	sqlOomFault(pCtx->pOut->db);
 }
 
 /*
@@ -679,13 +644,10 @@ sqlInvalidFunction(sql_context * context,	/* The function calling context */
     )
 {
 	const char *zName = context->pFunc->zName;
-	char *zErr;
 	UNUSED_PARAMETER2(NotUsed, NotUsed2);
-	zErr =
-	    sql_mprintf
-	    ("unable to use function %s in the requested context", zName);
-	sql_result_error(context, zErr, -1);
-	sql_free(zErr);
+	const char *err = "unable to use function %s in the requested context";
+	diag_set(ClientError, ER_SQL_EXECUTE, tt_sprintf(err, zName));
+	context->is_aborted = true;
 }
 
 /*
@@ -725,75 +687,6 @@ sql_aggregate_context(sql_context * p, int nByte)
 		return createAggContext(p, nByte);
 	} else {
 		return (void *)p->pMem->z;
-	}
-}
-
-/*
- * Return the auxiliary data pointer, if any, for the iArg'th argument to
- * the user-function defined by pCtx.
- */
-void *
-sql_get_auxdata(sql_context * pCtx, int iArg)
-{
-	AuxData *pAuxData;
-
-	if (pCtx->pVdbe == 0)
-		return 0;
-
-	for (pAuxData = pCtx->pVdbe->pAuxData; pAuxData;
-	     pAuxData = pAuxData->pNext) {
-		if (pAuxData->iOp == pCtx->iOp && pAuxData->iArg == iArg)
-			break;
-	}
-
-	return (pAuxData ? pAuxData->pAux : 0);
-}
-
-/*
- * Set the auxiliary data pointer and delete function, for the iArg'th
- * argument to the user-function defined by pCtx. Any previous value is
- * deleted by calling the delete function specified when it was set.
- */
-void
-sql_set_auxdata(sql_context * pCtx,
-		    int iArg, void *pAux, void (*xDelete) (void *)
-    )
-{
-	AuxData *pAuxData;
-	Vdbe *pVdbe = pCtx->pVdbe;
-
-	if (iArg < 0)
-		goto failed;
-	if (pVdbe == 0)
-		goto failed;
-
-	for (pAuxData = pVdbe->pAuxData; pAuxData; pAuxData = pAuxData->pNext) {
-		if (pAuxData->iOp == pCtx->iOp && pAuxData->iArg == iArg)
-			break;
-	}
-	if (pAuxData == 0) {
-		pAuxData = sqlDbMallocZero(pVdbe->db, sizeof(AuxData));
-		if (!pAuxData)
-			goto failed;
-		pAuxData->iOp = pCtx->iOp;
-		pAuxData->iArg = iArg;
-		pAuxData->pNext = pVdbe->pAuxData;
-		pVdbe->pAuxData = pAuxData;
-		if (pCtx->fErrorOrAux == 0) {
-			pCtx->isError = 0;
-			pCtx->fErrorOrAux = 1;
-		}
-	} else if (pAuxData->xDelete) {
-		pAuxData->xDelete(pAuxData->pAux);
-	}
-
-	pAuxData->pAux = pAux;
-	pAuxData->xDelete = xDelete;
-	return;
-
- failed:
-	if (xDelete) {
-		xDelete(pAux);
 	}
 }
 

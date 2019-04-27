@@ -298,7 +298,7 @@ statInit(sql_context * context, int argc, sql_value ** argv)
 	db = sql_context_db_handle(context);
 	p = sqlDbMallocZero(db, n);
 	if (p == 0) {
-		sql_result_error_nomem(context);
+		context->is_aborted = true;
 		return;
 	}
 
@@ -669,7 +669,7 @@ statGet(sql_context * context, int argc, sql_value ** argv)
 
 		char *zRet = sqlMallocZero((p->nKeyCol + 1) * 25);
 		if (zRet == 0) {
-			sql_result_error_nomem(context);
+			context->is_aborted = true;
 			return;
 		}
 
@@ -715,7 +715,7 @@ statGet(sql_context * context, int argc, sql_value ** argv)
 
 	char *zRet = sqlMallocZero(p->nCol * 25);
 	if (zRet == 0) {
-		sql_result_error_nomem(context);
+		context->is_aborted = true;
 	} else {
 		int i;
 		char *z = zRet;

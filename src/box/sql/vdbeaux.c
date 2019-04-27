@@ -1370,7 +1370,6 @@ sqlVdbeFrameDelete(VdbeFrame * p)
 		sqlVdbeFreeCursor(p->v, apCsr[i]);
 	}
 	releaseMemArray(aMem, p->nChildMem);
-	sqlVdbeDeleteAuxData(p->v->db, &p->pAuxData, -1, 0);
 	sqlDbFree(p->v->db, p);
 }
 
@@ -1846,9 +1845,6 @@ sqlVdbeFrameRestore(VdbeFrame * pFrame)
 	v->nCursor = pFrame->nCursor;
 	v->nChange = pFrame->nChange;
 	v->db->nChange = pFrame->nDbChange;
-	sqlVdbeDeleteAuxData(v->db, &v->pAuxData, -1, 0);
-	v->pAuxData = pFrame->pAuxData;
-	pFrame->pAuxData = 0;
 	return pFrame->pc;
 }
 
@@ -1892,11 +1888,6 @@ closeCursorsAndFree(Vdbe * p)
 		p->pDelFrame = pDel->pParent;
 		sqlVdbeFrameDelete(pDel);
 	}
-
-	/* Delete any auxdata allocations made by the VM */
-	if (p->pAuxData)
-		sqlVdbeDeleteAuxData(p->db, &p->pAuxData, -1, 0);
-	assert(p->pAuxData == 0);
 }
 
 /*
@@ -2451,43 +2442,6 @@ sqlVdbeFinalize(Vdbe * p)
 	}
 	sqlVdbeDelete(p);
 	return rc;
-}
-
-/*
- * If parameter iOp is less than zero, then invoke the destructor for
- * all auxiliary data pointers currently cached by the VM passed as
- * the first argument.
- *
- * Or, if iOp is greater than or equal to zero, then the destructor is
- * only invoked for those auxiliary data pointers created by the user
- * function invoked by the OP_Function opcode at instruction iOp of
- * VM pVdbe, and only then if:
- *
- *    * the associated function parameter is the 32nd or later (counting
- *      from left to right), or
- *
- *    * the corresponding bit in argument mask is clear (where the first
- *      function parameter corresponds to bit 0 etc.).
- */
-void
-sqlVdbeDeleteAuxData(sql * db, AuxData ** pp, int iOp, int mask)
-{
-	while (*pp) {
-		AuxData *pAux = *pp;
-		if ((iOp < 0)
-		    || (pAux->iOp == iOp
-			&& (pAux->iArg > 31 || !(mask & MASKBIT32(pAux->iArg))))
-		    ) {
-			testcase(pAux->iArg == 31);
-			if (pAux->xDelete) {
-				pAux->xDelete(pAux->pAux);
-			}
-			*pp = pAux->pNext;
-			sqlDbFree(db, pAux);
-		} else {
-			pp = &pAux->pNext;
-		}
-	}
 }
 
 /*
