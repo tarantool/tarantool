@@ -504,7 +504,7 @@ sqlStep(Vdbe * p)
 		 * error has occurred, then return the error code in p->rc to the
 		 * caller. Set the error code in the database handle to the same value.
 		 */
-		rc = sqlVdbeTransferError(p);
+		rc = p->rc;
 	}
 	return (rc & db->errMask);
 }
@@ -736,7 +736,6 @@ columnMem(sql_stmt * pStmt, int i)
 	if (pVm->pResultSet != 0 && i < pVm->nResColumn && i >= 0) {
 		pOut = &pVm->pResultSet[i];
 	} else {
-		sqlError(pVm->db, SQL_RANGE);
 		pOut = (Mem *) columnNullValue();
 	}
 	return pOut;
@@ -958,20 +957,17 @@ vdbeUnbind(Vdbe * p, int i)
 		return SQL_MISUSE;
 	}
 	if (p->magic != VDBE_MAGIC_RUN || p->pc >= 0) {
-		sqlError(p->db, SQL_MISUSE);
 		sql_log(SQL_MISUSE,
 			    "bind on a busy prepared statement: [%s]", p->zSql);
 		return SQL_MISUSE;
 	}
 	if (i < 1 || i > p->nVar) {
-		sqlError(p->db, SQL_RANGE);
 		return SQL_RANGE;
 	}
 	i--;
 	pVar = &p->aVar[i];
 	sqlVdbeMemRelease(pVar);
 	pVar->flags = MEM_Null;
-	sqlError(p->db, SQL_OK);
 
 	/* If the bit corresponding to this variable in Vdbe.expmask is set, then
 	 * binding a new value to this variable invalidates the current query plan.
@@ -1057,7 +1053,6 @@ bindText(sql_stmt * pStmt,	/* The statement to bind against */
 			rc = sqlVdbeMemSetStr(pVar, zData, nData, 1, xDel);
 			if (rc == SQL_OK)
 				rc = sql_bind_type(p, i, "TEXT");
-			sqlError(p->db, rc);
 			rc = sqlApiExit(p->db, rc);
 		}
 	} else if (xDel != SQL_STATIC && xDel != SQL_TRANSIENT) {

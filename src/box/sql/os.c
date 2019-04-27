@@ -129,12 +129,6 @@ sqlOsRandomness(sql_vfs * pVfs, int nByte, char *zBufOut)
 }
 
 int
-sqlOsGetLastError(sql_vfs * pVfs)
-{
-	return pVfs->xGetLastError ? pVfs->xGetLastError(pVfs, 0, 0) : 0;
-}
-
-int
 sqlOsCurrentTimeInt64(sql_vfs * pVfs, sql_int64 * pTimeOut)
 {
 	int rc;

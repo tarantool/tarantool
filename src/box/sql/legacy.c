@@ -69,7 +69,6 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 	if (zSql == 0)
 		zSql = "";
 
-	sqlError(db, SQL_OK);
 	while (rc == SQL_OK && zSql[0]) {
 		int nCol;
 		char **azVals = 0;
@@ -141,7 +140,6 @@ sql_exec(sql * db,	/* The database on which the SQL executes */
 					rc = SQL_ABORT;
 					sqlVdbeFinalize((Vdbe *) pStmt);
 					pStmt = 0;
-					sqlError(db, SQL_ABORT);
 					goto exec_out;
 				}
 			}

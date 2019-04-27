@@ -199,6 +199,6 @@ lbox_sql_create_function(struct lua_State *L)
 					   func_info, lua_sql_call, NULL, NULL,
 					   lua_sql_destroy);
 	if (rc != 0)
-		return luaL_error(L, sqlErrStr(rc));
+		return luaT_error(L);
 	return 0;
 }

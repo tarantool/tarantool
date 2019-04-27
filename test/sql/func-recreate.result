@@ -26,7 +26,8 @@ fiber.sleep(0.1)
 ...
 box.internal.sql_create_function('WAITFOR', 'INT', function (n) require('fiber').sleep(n) return n end)
 ---
-- error: database is locked
+- error: 'Failed to create function ''WAITFOR'': unable to create function due to
+    active statements'
 ...
 ch:get()
 ---

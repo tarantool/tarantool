@@ -304,7 +304,6 @@ struct sql_vfs {
 	int (*xDelete) (sql_vfs *, const char *zName, int syncDir);
 	int (*xRandomness) (sql_vfs *, int nByte, char *zOut);
 	int (*xCurrentTime) (sql_vfs *, double *);
-	int (*xGetLastError) (sql_vfs *, int, char *);
 	/*
 	** The methods above are in version 1 of the sql_vfs object
 	** definition.  Those that follow are added in version 2 or later
@@ -816,8 +815,6 @@ sql_stmt_busy(sql_stmt *);
 int
 sql_init_db(sql **db);
 
-int
-sql_close(sql *);
 
 /**
  * Get number of the named parameter in the prepared sql
@@ -1258,7 +1255,6 @@ struct sql {
 	struct coll *pDfltColl;	/* The default collating sequence (BINARY) */
 	i64 szMmap;		/* Default mmap_size setting */
 	int errMask;		/* & result codes with this before returning */
-	int iSysErrno;		/* Errno value from last system error */
 	u16 dbOptFlags;		/* Flags to enable/disable optimizations */
 	u8 enc;			/* Text encoding */
 	u8 mallocFailed;	/* True if we have seen a malloc failure */
@@ -4247,9 +4243,6 @@ sql_atoi64(const char *z, int64_t *val, int length);
 int
 sql_dec_or_hex_to_i64(const char *z, int64_t *val);
 
-void sqlErrorWithMsg(sql *, int, const char *, ...);
-void sqlError(sql *, int);
-void sqlSystemError(sql *, int);
 void *sqlHexToBlob(sql *, const char *z, int n);
 u8 sqlHexToInt(int h);
 

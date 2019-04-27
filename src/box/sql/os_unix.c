@@ -2017,21 +2017,6 @@ unixCurrentTimeInt64(sql_vfs * NotUsed, sql_int64 * piNow)
 }
 
 /*
- * The xGetLastError() method is designed to return a better
- * low-level error message when operating-system problems come up
- * during sql operation.  Only the integer return code is currently
- * used.
- */
-static int
-unixGetLastError(sql_vfs * NotUsed, int NotUsed2, char *NotUsed3)
-{
-	UNUSED_PARAMETER(NotUsed);
-	UNUSED_PARAMETER(NotUsed2);
-	UNUSED_PARAMETER(NotUsed3);
-	return errno;
-}
-
-/*
  *********************** End of sql_vfs methods ***************************
  *****************************************************************************/
 
@@ -2055,7 +2040,6 @@ unixGetLastError(sql_vfs * NotUsed, int NotUsed2, char *NotUsed3)
     unixDelete,           /* xDelete */                     \
     unixRandomness,       /* xRandomness */                 \
     NULL,                 /* xCurrentTime */                \
-    unixGetLastError,     /* xGetLastError */               \
     unixCurrentTimeInt64, /* xCurrentTimeInt64 */           \
   }
 

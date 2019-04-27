@@ -272,61 +272,6 @@ functionDestroy(sql * db, FuncDef * p)
 }
 
 /*
- * Return TRUE if database connection db has unfinalized prepared
- * statement.
- */
-static int
-connectionIsBusy(sql * db)
-{
-	if (db->pVdbe)
-		return 1;
-	return 0;
-}
-
-/*
- * Close an existing sql database
- */
-static int
-sqlClose(sql * db, int forceZombie)
-{
-	assert(db);
-	if (!sqlSafetyCheckSickOrOk(db)) {
-		return SQL_MISUSE;
-	}
-	if (db->mTrace & SQL_TRACE_CLOSE) {
-		db->xTrace(SQL_TRACE_CLOSE, db->pTraceArg, db, 0);
-	}
-
-	/* Legacy behavior (sql_close() behavior) is to return
-	 * SQL_BUSY if the connection can not be closed immediately.
-	 */
-	if (!forceZombie && connectionIsBusy(db)) {
-		sqlErrorWithMsg(db, SQL_BUSY,
-				    "unable to close due to unfinalized "
-				    "statements");
-		return SQL_BUSY;
-	}
-
-	/* Convert the connection into a zombie and then close it.
-	 */
-	db->magic = SQL_MAGIC_ZOMBIE;
-
-	return SQL_OK;
-}
-
-/*
- * Two variations on the public interface for closing a database
- * connection. The sql_close() version returns SQL_BUSY and
- * leaves the connection option if there are unfinalized prepared
- * statements.
- */
-int
-sql_close(sql * db)
-{
-	return sqlClose(db, 0);
-}
-
-/*
  * Rollback all database files.  If tripCode is not SQL_OK, then
  * any write cursors are invalidated ("tripped" - as in "tripping a circuit
  * breaker") and made to return tripCode if there are any further
@@ -405,7 +350,9 @@ sqlCreateFunc(sql * db,
 	    (!xSFunc && (!xFinal && xStep)) ||
 	    (nArg < -1 || nArg > SQL_MAX_FUNCTION_ARG) ||
 	    (255 < (sqlStrlen30(zFunctionName)))) {
-		return SQL_MISUSE;
+		diag_set(ClientError, ER_CREATE_FUNCTION, zFunctionName,
+			 "wrong function definition");
+		return SQL_TARANTOOL_ERROR;
 	}
 
 	assert(SQL_FUNC_CONSTANT == SQL_DETERMINISTIC);
@@ -420,10 +367,10 @@ sqlCreateFunc(sql * db,
 	p = sqlFindFunction(db, zFunctionName, nArg, 0);
 	if (p && p->nArg == nArg) {
 		if (db->nVdbeActive) {
-			sqlErrorWithMsg(db, SQL_BUSY,
-					    "unable to delete/modify user-function due to active statements");
-			assert(!db->mallocFailed);
-			return SQL_BUSY;
+			diag_set(ClientError, ER_CREATE_FUNCTION, zFunctionName,
+				 "unable to create function due to active "\
+				 "statements");
+			return SQL_TARANTOOL_ERROR;
 		} else {
 			sqlExpirePreparedStatements(db);
 		}
@@ -431,9 +378,8 @@ sqlCreateFunc(sql * db,
 
 	p = sqlFindFunction(db, zFunctionName, nArg, 1);
 	assert(p || db->mallocFailed);
-	if (!p) {
-		return SQL_NOMEM;
-	}
+	if (p == NULL)
+		return SQL_TARANTOOL_ERROR;
 
 	/* If an older version of the function with a configured destructor is
 	 * being replaced invoke the destructor function here.
@@ -637,11 +583,7 @@ sql_init_db(sql **out_db)
 	 * database schema yet. This is delayed until the first time the database
 	 * is accessed.
 	 */
-	sqlError(db, SQL_OK);
 	sqlRegisterPerConnectionBuiltinFunctions(db);
-
-	if (rc)
-		sqlError(db, rc);
 
 	/* Enable the lookaside-malloc subsystem */
 	setupLookaside(db, 0, sqlGlobalConfig.szLookaside,
@@ -649,10 +591,9 @@ sql_init_db(sql **out_db)
 
 opendb_out:
 	assert(db != 0 || rc == SQL_NOMEM);
-	if (rc == SQL_NOMEM) {
-		sql_close(db);
-		db = 0;
-	} else if (rc != SQL_OK)
+	if (rc == SQL_NOMEM)
+		db = NULL;
+	else if (rc != SQL_OK)
 		db->magic = SQL_MAGIC_SICK;
 
 	*out_db = db;

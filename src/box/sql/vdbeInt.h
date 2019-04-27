@@ -497,7 +497,6 @@ int sqlVdbeMemClearAndResize(Mem * pMem, int n);
 int sqlVdbeCloseStatement(Vdbe *, int);
 void sqlVdbeFrameDelete(VdbeFrame *);
 int sqlVdbeFrameRestore(VdbeFrame *);
-int sqlVdbeTransferError(Vdbe * p);
 
 int sqlVdbeSorterInit(struct sql *db, struct VdbeCursor *cursor);
 void sqlVdbeSorterReset(sql *, VdbeSorter *);

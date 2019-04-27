@@ -81,9 +81,9 @@ sqlPrepare(sql * db,	/* Database handle. */
 		testcase(nBytes == mxLen);
 		testcase(nBytes == mxLen + 1);
 		if (nBytes > mxLen) {
-			sqlErrorWithMsg(db, SQL_TOOBIG,
-					    "statement too long");
-			rc = sqlApiExit(db, SQL_TOOBIG);
+			diag_set(ClientError, ER_SQL_PARSER_LIMIT,
+				 "SQL command length", nBytes, mxLen);
+			rc = SQL_TARANTOOL_ERROR;
 			goto end_prepare;
 		}
 		zSqlCopy = sqlDbStrNDup(db, zSql, nBytes);

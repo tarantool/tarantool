@@ -2290,23 +2290,6 @@ sqlVdbeResetStepResult(Vdbe * p)
 }
 
 /*
- * Copy the error code and error message belonging to the VDBE passed
- * as the first argument to its database handle (so that they will be
- * returned by calls to sql_errcode() and sql_errmsg()).
- *
- * This function does not clear the VDBE error code or message, just
- * copies them to the database handle.
- */
-int
-sqlVdbeTransferError(Vdbe * p)
-{
-	sql *db = p->db;
-	int rc = p->rc;
-	sqlError(db, rc);
-	return rc;
-}
-
-/*
  * Clean up a VDBE after execution but do not delete the VDBE just yet.
  * Return the result code.
  *
@@ -2335,15 +2318,17 @@ sqlVdbeReset(Vdbe * p)
 	 * instructions yet, leave the main database error information unchanged.
 	 */
 	if (p->pc >= 0) {
-		sqlVdbeTransferError(p);
 		if (p->runOnlyOnce)
 			p->expired = 1;
-	} else if (p->rc && p->expired) {
-		/* The expired flag was set on the VDBE before the first call
-		 * to sql_step(). For consistency (since sql_step() was
-		 * called), set the database error in this case as well.
+	} else {
+		/*
+		 * An error should be thrown here if the expired
+		 * flag is set on the VDBE flag with the first
+		 * call to sql_step(). However, the expired flag
+		 * is currently disabled, so this error has been
+		 * replaced with assert.
 		 */
-		sqlErrorWithMsg(db, p->rc, NULL);
+		assert(p->rc == 0 || p->expired == 0);
 	}
 
 	/* Reclaim all memory used by the VDBE
