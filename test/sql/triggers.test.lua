@@ -173,3 +173,21 @@ box.execute("CREATE TABLE t1(a INT PRIMARY KEY, b INT);")
 space_id = box.space.T1.id
 box.execute("CREATE TRIGGER tr1 AFTER INSERT ON t1 BEGIN ; END;")
 box.execute("DROP TABLE t1;")
+
+--
+-- gh-3570: Use box_space_id_by_name() instead of schema_find_id()
+-- in SQL
+--
+box.schema.user.create('tester')
+box.schema.user.grant('tester','read,write,create,execute', 'space', '_trigger')
+box.execute("CREATE TABLE t1(x INTEGER PRIMARY KEY AUTOINCREMENT);")
+box.session.su('tester')
+--
+-- Ensure that the CREATE TRIGGER statement cannot be executed if
+-- the user does not have enough rights. In this case, the user
+-- does not have rights to read from _space.
+--
+box.execute([[CREATE TRIGGER r1 AFTER INSERT ON t1 FOR EACH ROW BEGIN SELECT 1; END; ]])
+box.session.su('admin')
+box.schema.user.drop('tester')
+box.execute("DROP TABLE t1;")

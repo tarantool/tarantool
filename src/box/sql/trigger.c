@@ -38,6 +38,7 @@
 #include "tarantoolInt.h"
 #include "vdbeInt.h"
 #include "box/session.h"
+#include "box/box.h"
 
 /* See comment in sqlInt.h */
 int sqlSubProgramsRemaining;
@@ -87,10 +88,8 @@ sql_trigger_begin(struct Parse *parse)
 		goto trigger_cleanup;
 
 	const char *table_name = alter_def->entity_name->a[0].zName;
-	uint32_t space_id;
-	if (schema_find_id(BOX_SPACE_ID, 2, table_name, strlen(table_name),
-			   &space_id) != 0)
-		goto set_tarantool_error_and_cleanup;
+	uint32_t space_id = box_space_id_by_name(table_name,
+						 strlen(table_name));
 	if (space_id == BOX_ID_NIL) {
 		diag_set(ClientError, ER_NO_SUCH_SPACE, table_name);
 		goto set_tarantool_error_and_cleanup;
