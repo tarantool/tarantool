@@ -323,6 +323,12 @@ sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 				return tt_sprintf("unix/:(socket)");
 			break;
 		}
+		case AF_INET: {
+			struct sockaddr_in *in = (struct sockaddr_in *) addr;
+			return tt_snprintf(SERVICE_NAME_MAXLEN, "%s:%d",
+					   inet_ntoa(in->sin_addr),
+					   ntohs(in->sin_port));
+		}
 		default: {
 			char host[NI_MAXHOST], serv[NI_MAXSERV];
 			if (getnameinfo(addr, addrlen, host, sizeof(host),
@@ -330,9 +336,8 @@ sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 					NI_NUMERICHOST | NI_NUMERICSERV) != 0)
 				return tt_sprintf("(host):(port)");
 
-			return tt_snprintf(NI_MAXHOST + NI_MAXSERV,
-					   addr->sa_family == AF_INET ?
-					   "%s:%s" : "[%s]:%s", host, serv);
+			return tt_snprintf(NI_MAXHOST + NI_MAXSERV, "[%s]:%s",
+					   host, serv);
 		}
 	}
 	unreachable();
