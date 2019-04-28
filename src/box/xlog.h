@@ -199,7 +199,7 @@ xdir_check(struct xdir *dir);
  * Return a file name based on directory type, vector clock
  * sum, and a suffix (.inprogress or not).
  */
-char *
+const char *
 xdir_format_filename(struct xdir *dir, int64_t signature,
 		     enum log_suffix suffix);
 

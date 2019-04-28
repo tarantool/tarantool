@@ -1810,7 +1810,7 @@ tx_process_connect(struct cmsg *m)
 			diag_raise();
 		con->session->meta.connection = con;
 		tx_fiber_init(con->session, 0);
-		static __thread char greeting[IPROTO_GREETING_SIZE];
+		char *greeting = (char *) static_alloc(IPROTO_GREETING_SIZE);
 		/* TODO: dirty read from tx thread */
 		struct tt_uuid uuid = INSTANCE_UUID;
 		random_bytes(con->salt, IPROTO_SALT_SIZE);

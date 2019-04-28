@@ -41,7 +41,7 @@
 #include <msgpuck.h>
 
 #include "coio_file.h"
-
+#include "tt_static.h"
 #include "error.h"
 #include "xrow.h"
 #include "iproto_constants.h"
@@ -646,17 +646,14 @@ xdir_check(struct xdir *dir)
 	return 0;
 }
 
-char *
+const char *
 xdir_format_filename(struct xdir *dir, int64_t signature,
 		enum log_suffix suffix)
 {
-	static __thread char filename[PATH_MAX + 1];
-	const char *suffix_str = (suffix == INPROGRESS ?
-				  inprogress_suffix : "");
-	snprintf(filename, PATH_MAX, "%s/%020lld%s%s",
-		 dir->dirname, (long long) signature,
-		 dir->filename_ext, suffix_str);
-	return filename;
+	return tt_snprintf(PATH_MAX + 1, "%s/%020lld%s%s",
+			   dir->dirname, (long long) signature,
+			   dir->filename_ext, suffix == INPROGRESS ?
+					      inprogress_suffix : "");
 }
 
 static void
@@ -683,8 +680,8 @@ xdir_collect_garbage(struct xdir *dir, int64_t signature, unsigned flags)
 	struct vclock *vclock;
 	while ((vclock = vclockset_first(&dir->index)) != NULL &&
 	       vclock_sum(vclock) < signature) {
-		char *filename = xdir_format_filename(dir, vclock_sum(vclock),
-						      NONE);
+		const char *filename =
+			xdir_format_filename(dir, vclock_sum(vclock), NONE);
 		if (flags & XDIR_GC_ASYNC)
 			eio_unlink(filename, 0, xdir_complete_gc, NULL);
 		else
@@ -946,9 +943,8 @@ err:
 int
 xdir_touch_xlog(struct xdir *dir, const struct vclock *vclock)
 {
-	char *filename;
 	int64_t signature = vclock_sum(vclock);
-	filename = xdir_format_filename(dir, signature, NONE);
+	const char *filename = xdir_format_filename(dir, signature, NONE);
 
 	if (dir->type != SNAP) {
 		assert(false);
@@ -987,7 +983,7 @@ xdir_create_xlog(struct xdir *dir, struct xlog *xlog,
 	xlog_meta_create(&meta, dir->filetype, dir->instance_uuid,
 			 vclock, prev_vclock);
 
-	char *filename = xdir_format_filename(dir, signature, NONE);
+	const char *filename = xdir_format_filename(dir, signature, NONE);
 	if (xlog_create(xlog, filename, dir->open_wflags, &meta,
 			&dir->opts) != 0)
 		return -1;

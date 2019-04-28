@@ -771,7 +771,7 @@ memtx_engine_commit_checkpoint(struct engine *engine,
 		char to[PATH_MAX];
 		snprintf(to, sizeof(to), "%s",
 			 xdir_format_filename(dir, lsn, NONE));
-		char *from = xdir_format_filename(dir, lsn, INPROGRESS);
+		const char *from = xdir_format_filename(dir, lsn, INPROGRESS);
 #ifndef NDEBUG
 		struct errinj *delay = errinj(ERRINJ_SNAP_COMMIT_DELAY,
 					       ERRINJ_BOOL);
@@ -814,7 +814,7 @@ memtx_engine_abort_checkpoint(struct engine *engine)
 	small_alloc_setopt(&memtx->alloc, SMALL_DELAYED_FREE_MODE, false);
 
 	/** Remove garbage .inprogress file. */
-	char *filename =
+	const char *filename =
 		xdir_format_filename(&memtx->checkpoint->dir,
 				     vclock_sum(&memtx->checkpoint->vclock),
 				     INPROGRESS);
@@ -837,8 +837,8 @@ memtx_engine_backup(struct engine *engine, const struct vclock *vclock,
 		    engine_backup_cb cb, void *cb_arg)
 {
 	struct memtx_engine *memtx = (struct memtx_engine *)engine;
-	char *filename = xdir_format_filename(&memtx->snap_dir,
-					      vclock_sum(vclock), NONE);
+	const char *filename = xdir_format_filename(&memtx->snap_dir,
+						    vclock_sum(vclock), NONE);
 	return cb(filename, cb_arg);
 }
 

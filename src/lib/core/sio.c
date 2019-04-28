@@ -51,22 +51,22 @@ sio_socketname(int fd)
 {
 	/* Preserve errno */
 	int save_errno = errno;
-	static __thread char name[2 * SERVICE_NAME_MAXLEN];
-	int n = snprintf(name, sizeof(name), "fd %d", fd);
+	int name_size = 2 * SERVICE_NAME_MAXLEN;
+	char *name = static_alloc(name_size);
+	int n = snprintf(name, name_size, "fd %d", fd);
 	if (fd >= 0) {
 		struct sockaddr_storage addr;
 		socklen_t addrlen = sizeof(addr);
 		int rc = getsockname(fd, (struct sockaddr *) &addr, &addrlen);
 		if (rc == 0) {
-			n += snprintf(name + n,
-				sizeof(name) - n, ", aka %s",
+			n += snprintf(name + n, name_size - n, ", aka %s",
 				sio_strfaddr((struct sockaddr *)&addr,
 								addrlen));
 		}
 		addrlen = sizeof(addr);
 		rc = getpeername(fd, (struct sockaddr *) &addr, &addrlen);
 		if (rc == 0) {
-			n += snprintf(name + n, sizeof(name) - n,
+			n += snprintf(name + n, name_size - n,
 				      ", peer of %s",
 				      sio_strfaddr((struct sockaddr *)&addr,
 								addrlen));

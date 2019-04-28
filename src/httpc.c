@@ -33,11 +33,14 @@
 
 #include <assert.h>
 #include <curl/curl.h>
-
+#include "tt_static.h"
 #include "fiber.h"
 #include "errinj.h"
 
 #define MAX_HEADER_LEN 8192
+
+static_assert(MAX_HEADER_LEN < SMALL_STATIC_SIZE,
+	      "HTTP header fits into the static buffer");
 
 /** The HTTP headers that may be set automatically. */
 #define HTTP_ACCEPT_HEADER	"Accept:"
@@ -178,7 +181,7 @@ httpc_request_delete(struct httpc_request *req)
 int
 httpc_set_header(struct httpc_request *req, const char *fmt, ...)
 {
-	static __thread char header[MAX_HEADER_LEN + 1];
+	char *header = static_alloc(MAX_HEADER_LEN + 1);
 	va_list ap;
 	va_start(ap, fmt);
 	int rc = vsnprintf(header, MAX_HEADER_LEN + 1, fmt, ap);

@@ -31,14 +31,15 @@
 #include "say.h"
 #include "cfg.h"
 #include "lua/utils.h"
+#include "tt_static.h"
 
-enum { MAX_OPT_NAME_LEN = 256, MAX_OPT_VAL_LEN = 256, MAX_STR_OPTS = 8 };
+enum { MAX_OPT_NAME_LEN = 256, MAX_OPT_VAL_LEN = 256 };
 
 static void
 cfg_get(const char *param)
 {
-	char buf[MAX_OPT_NAME_LEN];
-	snprintf(buf, sizeof(buf), "return box.cfg.%s", param);
+	const char *buf =
+		tt_snprintf(MAX_OPT_NAME_LEN, "return box.cfg.%s", param);
 	if (luaL_dostring(tarantool_L, buf) != 0)
 		panic("cfg_get('%s')", param);
 }
@@ -90,15 +91,9 @@ cfg_geti64(const char *param)
 static const char *
 cfg_tostring(struct lua_State *L)
 {
-	static __thread char values[MAX_STR_OPTS][MAX_OPT_VAL_LEN];
-	static __thread int i = 0;
 	if (lua_isnil(L, -1))
 		return NULL;
-	else {
-		snprintf(values[i % MAX_STR_OPTS], MAX_OPT_VAL_LEN,
-			 "%s", lua_tostring(L, -1));
-		return values[i++ % MAX_STR_OPTS];
-	}
+	return tt_snprintf(MAX_OPT_VAL_LEN, "%s", lua_tostring(L, -1));
 }
 
 const char *
