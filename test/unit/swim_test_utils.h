@@ -49,6 +49,14 @@ void
 swim_cluster_set_ack_timeout(struct swim_cluster *cluster, double ack_timeout);
 
 /**
+ * Set an encryption algorithm and a key for each instance in
+ * @a cluster.
+ */
+void
+swim_cluster_set_codec(struct swim_cluster *cluster, enum crypto_algo algo,
+		       enum crypto_mode mode, const char *key, int key_size);
+
+/**
  * Change number of unacknowledged pings to delete a dead member
  * of all the instances in the cluster.
  */

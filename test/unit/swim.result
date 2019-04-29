@@ -1,5 +1,5 @@
 	*** main_f ***
-1..18
+1..19
 	*** swim_test_one_link ***
     1..6
     ok 1 - no rounds - no fullmesh
@@ -188,4 +188,11 @@ ok 17 - subtests
     ok 2 - as well as S2 - they communicated via S3
 ok 18 - subtests
 	*** swim_test_indirect_ping: done ***
+	*** swim_test_encryption ***
+    1..3
+    ok 1 - cluster works with encryption
+    ok 2 - different encryption keys - can't interact
+    ok 3 - cluster works after encryption has been disabled
+ok 19 - subtests
+	*** swim_test_encryption: done ***
 	*** main_f: done ***

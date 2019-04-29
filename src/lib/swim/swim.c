@@ -1821,6 +1821,14 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	return 0;
 }
 
+int
+swim_set_codec(struct swim *swim, enum crypto_algo algo, enum crypto_mode mode,
+	       const char *key, int key_size)
+{
+	return swim_scheduler_set_codec(&swim->scheduler, algo, mode,
+					key, key_size);
+}
+
 bool
 swim_is_configured(const struct swim *swim)
 {

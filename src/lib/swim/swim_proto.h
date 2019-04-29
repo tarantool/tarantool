@@ -47,6 +47,11 @@ enum {
  * SWIM binary protocol structures and helpers. Below is a picture
  * of a SWIM message template:
  *
+ * +-----------------Public data, not encrypted------------------+
+ * |                                                             |
+ * |      Initial vector, size depends on chosen algorithm.      |
+ * |                   Next data is encrypted.                   |
+ * |                                                             |
  * +----------Meta section, handled by transport level-----------+
  * | {                                                           |
  * |     SWIM_META_TARANTOOL_VERSION: uint, Tarantool version ID,|

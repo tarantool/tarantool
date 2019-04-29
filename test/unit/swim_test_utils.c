@@ -227,9 +227,9 @@ swim_cluster_new(int size)
 	return res;
 }
 
-#define swim_cluster_set_cfg(cluster, ...) ({				\
+#define swim_cluster_set_cfg(cluster, func, ...) ({				\
 	for (int i = 0; i < cluster->size; ++i) {			\
-		int rc = swim_cfg(cluster->node[i].swim, __VA_ARGS__);	\
+		int rc = func(cluster->node[i].swim, __VA_ARGS__);	\
 		assert(rc == 0);					\
 		(void) rc;						\
 	}								\
@@ -238,14 +238,22 @@ swim_cluster_new(int size)
 void
 swim_cluster_set_ack_timeout(struct swim_cluster *cluster, double ack_timeout)
 {
-	swim_cluster_set_cfg(cluster, NULL, -1, ack_timeout, -1, NULL);
+	swim_cluster_set_cfg(cluster, swim_cfg, NULL, -1, ack_timeout, -1, NULL);
 	cluster->ack_timeout = ack_timeout;
+}
+
+void
+swim_cluster_set_codec(struct swim_cluster *cluster, enum crypto_algo algo,
+		       enum crypto_mode mode, const char *key, int key_size)
+{
+	swim_cluster_set_cfg(cluster, swim_set_codec, algo, mode,
+			     key, key_size);
 }
 
 void
 swim_cluster_set_gc(struct swim_cluster *cluster, enum swim_gc_mode gc_mode)
 {
-	swim_cluster_set_cfg(cluster, NULL, -1, -1, gc_mode, NULL);
+	swim_cluster_set_cfg(cluster, swim_cfg, NULL, -1, -1, gc_mode, NULL);
 	cluster->gc_mode = gc_mode;
 }
 

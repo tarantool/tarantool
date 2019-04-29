@@ -31,6 +31,7 @@
 
 #include "memory.h"
 #include "fiber.h"
+#include "random.h"
 #include "uuid/tt_uuid.h"
 #include "unit.h"
 #include "uri/uri.h"
@@ -888,10 +889,54 @@ swim_test_indirect_ping(void)
 	swim_finish_test();
 }
 
+static void
+swim_test_encryption(void)
+{
+	swim_start_test(3);
+	struct swim_cluster *cluster = swim_cluster_new(2);
+	const char *key = "1234567812345678";
+	swim_cluster_set_codec(cluster, CRYPTO_ALGO_AES128, CRYPTO_MODE_CBC,
+			       key, CRYPTO_AES128_KEY_SIZE);
+	swim_cluster_add_link(cluster, 0, 1);
+
+	is(swim_cluster_wait_fullmesh(cluster, 2), 0,
+	   "cluster works with encryption");
+	swim_cluster_delete(cluster);
+	/*
+	 * Test that the instances can not interact with different
+	 * encryption keys.
+	 */
+	cluster = swim_cluster_new(2);
+	struct swim *s1 = swim_cluster_member(cluster, 0);
+	int rc = swim_set_codec(s1, CRYPTO_ALGO_AES128, CRYPTO_MODE_CBC,
+				key, CRYPTO_AES128_KEY_SIZE);
+	fail_if(rc != 0);
+	struct swim *s2 = swim_cluster_member(cluster, 1);
+	key = "8765432187654321";
+	rc = swim_set_codec(s2, CRYPTO_ALGO_AES128, CRYPTO_MODE_CBC,
+			    key, CRYPTO_AES128_KEY_SIZE);
+	fail_if(rc != 0);
+	swim_cluster_add_link(cluster, 0, 1);
+	swim_run_for(2);
+	ok(! swim_cluster_is_fullmesh(cluster),
+	   "different encryption keys - can't interact");
+
+	rc = swim_set_codec(s1, CRYPTO_ALGO_NONE, CRYPTO_MODE_ECB, NULL, 0);
+	fail_if(rc != 0);
+	rc = swim_set_codec(s2, CRYPTO_ALGO_NONE, CRYPTO_MODE_ECB, NULL, 0);
+	fail_if(rc != 0);
+	is(swim_cluster_wait_fullmesh(cluster, 2), 0,
+	   "cluster works after encryption has been disabled");
+
+	swim_cluster_delete(cluster);
+
+	swim_finish_test();
+}
+
 static int
 main_f(va_list ap)
 {
-	swim_start_test(18);
+	swim_start_test(19);
 
 	(void) ap;
 	swim_test_ev_init();
@@ -915,6 +960,7 @@ main_f(va_list ap)
 	swim_test_payload_basic();
 	swim_test_payload_refutation();
 	swim_test_indirect_ping();
+	swim_test_encryption();
 
 	swim_test_transport_free();
 	swim_test_ev_free();
@@ -927,6 +973,7 @@ main_f(va_list ap)
 int
 main()
 {
+	random_init();
 	time_t seed = time(NULL);
 	srand(seed);
 	memory_init();
@@ -951,6 +998,7 @@ main()
 	say_logger_free();
 	fiber_free();
 	memory_free();
+	random_free();
 
 	return test_result;
 }

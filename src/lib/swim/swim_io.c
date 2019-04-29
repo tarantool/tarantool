@@ -269,31 +269,20 @@ swim_scheduler_fd(const struct swim_scheduler *scheduler)
 	return scheduler->transport.fd;
 }
 
-/**
- * Dispatch a next output event. Build packet meta and send the
- * packet.
- */
-static void
-swim_scheduler_on_output(struct ev_loop *loop, struct ev_io *io, int events);
-
-/**
- * Dispatch a next input event. Unpack meta, forward a packet or
- * propagate further to protocol logic.
- */
-static void
-swim_scheduler_on_input(struct ev_loop *loop, struct ev_io *io, int events);
-
 void
 swim_scheduler_create(struct swim_scheduler *scheduler,
 		      swim_scheduler_on_input_f on_input)
 {
-	swim_ev_init(&scheduler->output, swim_scheduler_on_output);
 	scheduler->output.data = (void *) scheduler;
-	swim_ev_init(&scheduler->input, swim_scheduler_on_input);
 	scheduler->input.data = (void *) scheduler;
 	rlist_create(&scheduler->queue_output);
 	scheduler->on_input = on_input;
 	swim_transport_create(&scheduler->transport);
+	scheduler->codec = NULL;
+	int rc = swim_scheduler_set_codec(scheduler, CRYPTO_ALGO_NONE,
+					  CRYPTO_MODE_ECB, NULL, 0);
+	assert(rc == 0);
+	(void) rc;
 }
 
 int
@@ -336,6 +325,42 @@ swim_scheduler_destroy(struct swim_scheduler *scheduler)
 	swim_transport_destroy(&scheduler->transport);
 	swim_ev_io_stop(loop(), &scheduler->output);
 	swim_scheduler_stop_input(scheduler);
+}
+
+/**
+ * Encrypt data and prepend it with a fresh crypto algorithm's
+ * initial vector.
+ */
+static inline int
+swim_encrypt(struct crypto_codec *c, const char *in, int in_size,
+	     char *out, int out_size)
+{
+	assert(out_size >= crypto_codec_iv_size(c));
+	int iv_size = crypto_codec_gen_iv(c, out, out_size);
+	char *iv = out;
+	out += iv_size;
+	out_size -= iv_size;
+	int rc = crypto_codec_encrypt(c, iv, in, in_size, out, out_size);
+	if (rc < 0)
+		return -1;
+	return rc + iv_size;
+}
+
+/** Decrypt data prepended with an initial vector. */
+static inline int
+swim_decrypt(struct crypto_codec *c, const char *in, int in_size,
+	     char *out, int out_size)
+{
+	int iv_size = crypto_codec_iv_size(c);
+	if (in_size < iv_size) {
+		diag_set(SwimError, "too small message, can't extract IV for "\
+			 "decryption");
+		return -1;
+	}
+	const char *iv = in;
+	in += iv_size;
+	in_size -= iv_size;
+	return crypto_codec_decrypt(c, iv, in, in_size, out, out_size);
 }
 
 /**
@@ -411,8 +436,34 @@ swim_complete_send(struct swim_scheduler *scheduler, struct swim_task *task,
 		task->complete(task, scheduler, size);
 }
 
+/**
+ * On a new EV_WRITE event send a next packet from the queue
+ * encrypted with the currently chosen algorithm.
+ */
 static void
-swim_scheduler_on_output(struct ev_loop *loop, struct ev_io *io, int events)
+swim_on_encrypted_output(struct ev_loop *loop, struct ev_io *io, int events)
+{
+	struct swim_scheduler *scheduler = (struct swim_scheduler *) io->data;
+	const struct sockaddr_in *dst;
+	struct swim_task *task = swim_begin_send(scheduler, loop, io, events,
+						 &dst);
+	if (task == NULL)
+		return;
+	char *buf = static_alloc(UDP_PACKET_SIZE);
+	assert(buf != NULL);
+	ssize_t size = swim_encrypt(scheduler->codec, task->packet.buf,
+				    task->packet.pos - task->packet.buf,
+				    buf, UDP_PACKET_SIZE);
+	if (size > 0)
+		size = swim_do_send(scheduler, buf, size, dst);
+	swim_complete_send(scheduler, task, size);
+}
+
+/**
+ * On a new EV_WRITE event send a next packet without encryption.
+ */
+static void
+swim_on_plain_output(struct ev_loop *loop, struct ev_io *io, int events)
 {
 	struct swim_scheduler *scheduler = (struct swim_scheduler *) io->data;
 	const struct sockaddr_in *dst;
@@ -515,14 +566,66 @@ error:
 	diag_log();
 }
 
+/**
+ * On a new EV_READ event receive an encrypted packet from the
+ * network.
+ */
 static void
-swim_scheduler_on_input(struct ev_loop *loop, struct ev_io *io, int events)
+swim_on_encrypted_input(struct ev_loop *loop, struct ev_io *io, int events)
+{
+	struct swim_scheduler *scheduler = (struct swim_scheduler *) io->data;
+	/*
+	 * Buffer for decrypted data is on stack, not on static
+	 * memory, because the SWIM code uses static memory as
+	 * well and can accidentally rewrite the packet data.
+	 */
+	char buf[UDP_PACKET_SIZE];
+	swim_begin_recv(scheduler, loop, io, events);
+
+	char *ibuf = static_alloc(UDP_PACKET_SIZE);
+	assert(ibuf != NULL);
+	ssize_t size = swim_do_recv(scheduler, ibuf, UDP_PACKET_SIZE);
+	if (size > 0) {
+		size = swim_decrypt(scheduler->codec, ibuf, size,
+				    buf, UDP_PACKET_SIZE);
+	}
+	swim_complete_recv(scheduler, buf, size);
+}
+
+/** On a new EV_READ event receive a packet from the network. */
+static void
+swim_on_plain_input(struct ev_loop *loop, struct ev_io *io, int events)
 {
 	struct swim_scheduler *scheduler = (struct swim_scheduler *) io->data;
 	char buf[UDP_PACKET_SIZE];
 	swim_begin_recv(scheduler, loop, io, events);
 	ssize_t size = swim_do_recv(scheduler, buf, UDP_PACKET_SIZE);
 	swim_complete_recv(scheduler, buf, size);
+}
+
+int
+swim_scheduler_set_codec(struct swim_scheduler *scheduler,
+			 enum crypto_algo algo, enum crypto_mode mode,
+			 const char *key, int key_size)
+{
+	if (algo == CRYPTO_ALGO_NONE) {
+		if (scheduler->codec != NULL) {
+			crypto_codec_delete(scheduler->codec);
+			scheduler->codec = NULL;
+		}
+		swim_ev_set_cb(&scheduler->output, swim_on_plain_output);
+		swim_ev_set_cb(&scheduler->input, swim_on_plain_input);
+		return 0;
+	}
+	struct crypto_codec *newc = crypto_codec_new(algo, mode, key, key_size);
+	if (newc == NULL)
+		return -1;
+	if (scheduler->codec != NULL)
+		crypto_codec_delete(scheduler->codec);
+	scheduler->codec = newc;
+	swim_ev_set_cb(&scheduler->output, swim_on_encrypted_output);
+	swim_ev_set_cb(&scheduler->input, swim_on_encrypted_input);
+	return 0;
 }
 
 const char *

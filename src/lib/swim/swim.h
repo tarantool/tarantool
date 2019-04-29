@@ -32,6 +32,7 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
+#include "crypto/crypto.h"
 #include "swim_constants.h"
 
 #if defined(__cplusplus)
@@ -103,6 +104,23 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 /** Set payload to disseminate over the cluster. */
 int
 swim_set_payload(struct swim *swim, const char *payload, int payload_size);
+
+/**
+ * Set SWIM codec to encrypt/decrypt messages.
+ * @param swim SWIM instance to set codec for.
+ * @param algo Cipher algorithm.
+ * @param mode Algorithm mode.
+ * @param key Private key of the chosen algorithm. It is used to
+ *        encrypt/decrypt messages, and should be the same on all
+ *        cluster nodes. Note that it can be changed, but it shall
+ *        be done on all cluster nodes. Otherwise the nodes will
+ *        not understand each other. There is also a public key
+ *        usually, but it is generated randomly inside SWIM.
+ * @param key_size Key size in bytes.
+ */
+int
+swim_set_codec(struct swim *swim, enum crypto_algo algo, enum crypto_mode mode,
+	       const char *key, int key_size);
 
 /**
  * Stop listening and broadcasting messages, cleanup all internal

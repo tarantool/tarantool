@@ -66,4 +66,6 @@ swim_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher);
 
 #define swim_ev_io_set ev_io_set
 
+#define swim_ev_set_cb ev_set_cb
+
 #endif /* TARANTOOL_SWIM_EV_H_INCLUDED */

@@ -33,6 +33,7 @@
 #include "tt_static.h"
 #include "small/rlist.h"
 #include "salad/stailq.h"
+#include "crypto/crypto.h"
 #include "swim_transport.h"
 #include "tarantool_ev.h"
 #include "uuid/tt_uuid.h"
@@ -57,13 +58,24 @@ enum {
 	 * configuration.
 	 */
 	UDP_PACKET_SIZE = 1472,
+	/**
+	 * Data can be encrypted, which usually makes it slightly
+	 * bigger in size. Also, to decode data the receiver needs
+	 * two keys: private key and public initial vector. Public
+	 * initial vector is generated randomly for each packet
+	 * and prepends the data. This is why maximal data size is
+	 * reduced by one block and IV sizes.
+	 */
+	MAX_PACKET_SIZE = UDP_PACKET_SIZE - CRYPTO_MAX_BLOCK_SIZE -
+			  CRYPTO_MAX_IV_SIZE,
+
 };
 
 /**
  * UDP packet. Works as an allocator, allowing to fill its body
  * gradually, while preserving prefix for metadata.
  *
- *          < - - - -UDP_PACKET_SIZE- - - - ->
+ *          < - - - -MAX_PACKET_SIZE- - - - ->
  *          +--------+-----------------------+
  *          |  meta  |    body    |  *free*  |
  *          +--------+-----------------------+
@@ -86,7 +98,7 @@ struct swim_packet {
 	 */
 	char meta[0];
 	/** Packet body buffer. */
-	char buf[UDP_PACKET_SIZE];
+	char buf[MAX_PACKET_SIZE];
 	/**
 	 * Pointer to the end of the buffer. Just sugar to do not
 	 * write 'buf + sizeof(buf)' each time.
@@ -148,6 +160,11 @@ struct swim_scheduler {
 	/** Transport to send/receive packets. */
 	struct swim_transport transport;
 	/**
+	 * Codec to encode messages before sending, and decode
+	 * before lifting up to the SWIM core logic.
+	 */
+	struct crypto_codec *codec;
+	/**
 	 * Function called when a packet is received. It takes
 	 * packet body, while meta is handled by transport level
 	 * completely.
@@ -179,6 +196,12 @@ swim_scheduler_create(struct swim_scheduler *scheduler,
 int
 swim_scheduler_bind(struct swim_scheduler *scheduler,
 		    const struct sockaddr_in *addr);
+
+/** Set a new codec to encrypt/decrypt messages. */
+int
+swim_scheduler_set_codec(struct swim_scheduler *scheduler,
+			 enum crypto_algo algo, enum crypto_mode mode,
+			 const char *key, int key_size);
 
 /** Stop accepting new packets from the network. */
 void
