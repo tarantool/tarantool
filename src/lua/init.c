@@ -611,10 +611,6 @@ run_script_f(va_list ap)
 			lua_pushstring(L, appdir_realpath);
 			lua_call(L, 1, 0);
 
-			lua_getfield(L, -1, "add_modules_loadpaths");
-			lua_pushstring(L, appdir_realpath);
-			lua_call(L, 1, 0);
-
 			lua_pop(L, 1);
 			break;
 		case 'l':

@@ -44,6 +44,11 @@ tarantool_exit(int);
 
 local fio = require("fio")
 
+local function get_scriptpath()
+    local scriptpath = debug.getinfo(2, "S").source:sub(2):match("(.*/)") or './'
+    return fio.abspath(scriptpath)
+end
+
 local package_appdir
 
 local function set_appdir(dir)
@@ -56,18 +61,15 @@ local function get_appdir()
     return package_appdir or fio.cwd()
 end
 
-local function extend_path(path)
-    package.path = path .. ';' .. package.path
+local ROCKS_LIB_PATH = '.rocks/lib/tarantool'
+local ROCKS_LUA_PATH = '.rocks/share/tarantool'
+
+local function get_rockslibdir()
+    return fio.pathjoin(get_appdir(), ROCKS_LIB_PATH)
 end
 
-local function extend_cpath(path)
-    package.cpath = path .. ';' .. package.cpath
-end
-
-local function add_modules_loadpaths(path)
-    extend_path(path .. '/?/init.lua')
-    extend_path(path .. '/?.lua')
-    extend_cpath(path .. '/?.so')
+local function get_rocksluadir()
+    return fio.pathjoin(get_appdir(), ROCKS_LUA_PATH)
 end
 
 dostring = function(s, ...)
@@ -112,57 +114,85 @@ local function load_lua(file)
     return loadfile(file)
 end
 
-local function search_cwd_lib(name)
-    local path = "./?."..soext
-    return package.searchpath(name, path)
+local function merge_strings(paths, templates)
+    local searchpaths = {}
+    paths = type(paths) == 'table' and paths or { paths }
+    templates = templates or {}
+
+    if #templates == 0 then
+        return paths
+    end
+
+    if #paths == 0 then
+        return templates
+    end
+
+    for _, path in ipairs(paths) do
+        for _, template in pairs(templates) do
+            table.insert(searchpaths, fio.pathjoin(path, template))
+        end
+    end
+
+    return searchpaths
 end
 
-local function search_cwd_lua(name)
-    local path = "./?.lua;./?/init.lua"
-    return package.searchpath(name, path)
+local LIB_TEMPLATES = { '?.'..soext }
+local LUA_TEMPLATES = { '?.lua', '?/init.lua' }
+local ROCKS_LIB_TEMPLATES = { ROCKS_LIB_PATH .. '/?.'..soext }
+local ROCKS_LUA_TEMPLATES = { ROCKS_LUA_PATH .. '/?.lua', ROCKS_LUA_PATH .. '/?/init.lua' }
+
+local function search_lib(name, path)
+    return package.searchpath(name, table.concat(merge_strings(path, LIB_TEMPLATES), ';'))
 end
 
-local function traverse_rocks(name, pathes_search)
-    local search_root = get_appdir()
-    local index = string.len(search_root) + 1
-    local strerr = ""
+local function search_lua(name, path)
+    return package.searchpath(name, table.concat(merge_strings(path, LUA_TEMPLATES), ';'))
+end
+
+local function split_path(path)
+    path = path:sub(-1) == '/' and path:sub(1, -2) or path
+    local index = string.len(path) + 1
+    local paths = {}
+
     while index ~= nil do
-        search_root = string.sub(search_root, 1, index - 1)
-        for i, path in ipairs(pathes_search) do
-            local file, err = package.searchpath(name, search_root .. path)
-            if err == nil then
-                return file
-            end
-            strerr = strerr .. err
-        end
-        index = string.find(search_root, "/[^/]*$")
+        path = string.sub(path, 1, index - 1)
+        table.insert(paths, path .. '/')
+        index = string.find(path, "/[^/]*$")
     end
-    return nil, strerr
+
+    return paths
 end
 
-local function search_rocks_lua(name)
-    local pathes_search = {
-        "/.rocks/share/tarantool/?.lua;",
-        "/.rocks/share/tarantool/?/init.lua;",
-    }
-    return traverse_rocks(name, pathes_search)
+local function get_search_func(opts)
+    local path_fn = opts.path_fn
+    if type(opts.path_fn) ~= 'function' then
+        path_fn = function() return opts.path_fn end
+    end
+
+    return function(name)
+        local path = path_fn() or '.'
+        local paths = opts.traverse and split_path(path) or { path }
+        local searchpath = table.concat(merge_strings(paths, opts.templates), ';')
+        return package.searchpath(name, searchpath)
+    end
 end
 
-local function search_rocks_lib(name)
-    local pathes_search = {
-        "/.rocks/lib/tarantool/?."..soext
-    }
-    return traverse_rocks(name, pathes_search)
-end
+local function get_loader_func(opts)
+    opts = opts or {}
+    opts.path_fn = opts.path_fn or function() return fio.cwd end
+    opts.is_lib = not (not opts.is_lib)
+    opts.traverse = not (not opts.traverse)
 
-local function cwd_loader_func(lib)
-    local search_cwd = lib and search_cwd_lib or search_cwd_lua
-    local load_func = lib and load_lib or load_lua
+    local load_func = opts.is_lib and load_lib or load_lua
+    opts.templates = opts.is_lib and LIB_TEMPLATES or LUA_TEMPLATES
+    opts.is_lib = nil
+    local search_func = get_search_func(opts)
+
     return function(name)
         if not name then
             return "empty name of module"
         end
-        local file, err = search_cwd(name)
+        local file, err = search_func(name)
         if not file then
             return err
         end
@@ -172,32 +202,6 @@ local function cwd_loader_func(lib)
         else
             return err
         end
-    end
-end
-
-local function rocks_loader_func(lib)
-    local search_rocks = lib and search_rocks_lib or search_rocks_lua
-    local load_func = lib and load_lib or load_lua
-    return function (name)
-        if not name then
-            return "empty name of module"
-        end
-        local file, err = search_rocks(name)
-        if not file then
-            return err
-        end
-        local loaded, err = load_func(file, name)
-        if err == nil then
-            return loaded
-        else
-            return err
-        end
-    end
-end
-
-local function search_path_func(cpath)
-    return function(name)
-        return package.searchpath(name, cpath and package.cpath or package.path)
     end
 end
 
@@ -206,9 +210,12 @@ local function search(name)
         return "empty name of module"
     end
     local searchers = {
-        search_cwd_lua, search_cwd_lib,
-        search_rocks_lua, search_rocks_lib,
-        search_path_func(false), search_path_func(true)
+        get_search_func({path_fn = fio.cwd, templates = LUA_TEMPLATES}),
+        get_search_func({path_fn = fio.cwd, templates = LIB_TEMPLATES}),
+        get_search_func({path_fn = fio.cwd, templates = ROCKS_LUA_TEMPLATES, traverse = true}),
+        get_search_func({path_fn = fio.cwd, templates = ROCKS_LIB_TEMPLATES, traverse = true}),
+        get_search_func({path_fn = function() return package.path end}),
+        get_search_func({path_fn = function() return package.cpath end}),
     }
     for _, searcher in ipairs(searchers) do
         local file = searcher(name)
@@ -220,19 +227,20 @@ local function search(name)
 end
 
 -- loader_preload 1
-table.insert(package.loaders, 2, cwd_loader_func(false))
-table.insert(package.loaders, 3, cwd_loader_func(true))
-table.insert(package.loaders, 4, rocks_loader_func(false))
-table.insert(package.loaders, 5, rocks_loader_func(true))
--- package.path   6
--- package.cpath  7
--- croot          8
+table.insert(package.loaders, 2, get_loader_func({path_fn = fio.cwd, is_lib = false}))
+table.insert(package.loaders, 3, get_loader_func({path_fn = fio.cwd, is_lib = true}))
+table.insert(package.loaders, 4, get_loader_func({path_fn = get_appdir, is_lib = false}))
+table.insert(package.loaders, 5, get_loader_func({path_fn = get_appdir, is_lib = true}))
+table.insert(package.loaders, 6, get_loader_func({path_fn = get_rocksluadir, is_lib = false, traverse = true}))
+table.insert(package.loaders, 7, get_loader_func({path_fn = get_rockslibdir, is_lib = true, traverse = true}))
+-- package.path   8
+-- package.cpath  9
+-- croot         10
 
 package.search = search
 package.set_appdir = set_appdir
 package.get_appdir = get_appdir
-package.set_rocks_loadpaths = set_appdir
-package.add_modules_loadpaths = add_modules_loadpaths
+package.get_scriptpath = get_scriptpath
 
 return {
     uptime = uptime;
