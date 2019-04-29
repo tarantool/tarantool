@@ -283,7 +283,7 @@ swim_ev_timer_stop(struct ev_loop *loop, struct ev_timer *base)
 void
 swim_test_ev_do_loop_step(struct ev_loop *loop)
 {
-	struct swim_event *next_e, *e = event_heap_top(&event_heap);
+	struct swim_event *e = event_heap_top(&event_heap);
 	if (e != NULL) {
 		assert(e->deadline >= watch);
 		/* Multiple events can have the same deadline. */
@@ -291,9 +291,7 @@ swim_test_ev_do_loop_step(struct ev_loop *loop)
 		say_verbose("Loop watch %f", watch);
 		do {
 			e->process(e, loop);
-			next_e = event_heap_top(&event_heap);
-			assert(e != next_e);
-			e = next_e;
+			e = event_heap_top(&event_heap);
 		} while (e != NULL && e->deadline == watch);
 	}
 }
