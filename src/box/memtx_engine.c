@@ -635,7 +635,7 @@ checkpoint_cancel(struct checkpoint *ckpt)
 		tt_pthread_cancel(ckpt->cord.id);
 		tt_pthread_join(ckpt->cord.id, NULL);
 	}
-	checkpoint_delete(ckpt);
+	checkpoint_destroy(ckpt);
 }
 
 static int
