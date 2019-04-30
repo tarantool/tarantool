@@ -76,7 +76,8 @@ swim_is_configured(const struct swim *swim);
  * Configure or reconfigure a SWIM instance.
  *
  * @param swim SWIM instance to configure.
- * @param uri URI in the format "ip:port".
+ * @param uri URI in the format "ip:port", or "port". In the
+ *        latter case host is "127.0.0.1" by default.
  * @param heartbeat_rate Rate of sending round messages. It does
  *        not mean that each member will be checked each
  *        @heartbeat_rate seconds. It is rather the protocol

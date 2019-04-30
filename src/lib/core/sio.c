@@ -338,11 +338,12 @@ sio_strfaddr(const struct sockaddr *addr, socklen_t addrlen)
 }
 
 int
-sio_uri_to_addr(const char *uri, struct sockaddr *addr)
+sio_uri_to_addr(const char *uri, struct sockaddr *addr, bool *is_host_empty)
 {
 	struct uri u;
 	if (uri_parse(&u, uri) != 0 || u.service == NULL)
 		goto invalid_uri;
+	*is_host_empty = u.host_len == 0;
 	if (u.host_len == strlen(URI_HOST_UNIX) &&
 	    memcmp(u.host, URI_HOST_UNIX, u.host_len) == 0) {
 		struct sockaddr_un *un = (struct sockaddr_un *) addr;

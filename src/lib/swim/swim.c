@@ -1699,7 +1699,9 @@ swim_uri_to_addr(const char *uri, struct sockaddr_in *addr,
 		 const char *prefix)
 {
 	struct sockaddr_storage storage;
-	if (sio_uri_to_addr(uri, (struct sockaddr *) &storage) != 0)
+	bool is_host_empty;
+	if (sio_uri_to_addr(uri, (struct sockaddr *) &storage,
+			    &is_host_empty) != 0)
 		return -1;
 	if (storage.ss_family != AF_INET) {
 		diag_set(IllegalParams, "%s only IP sockets are supported",
@@ -1707,7 +1709,30 @@ swim_uri_to_addr(const char *uri, struct sockaddr_in *addr,
 		return -1;
 	}
 	*addr = *((struct sockaddr_in *) &storage);
-	if (addr->sin_addr.s_addr == 0) {
+	if (is_host_empty) {
+		/*
+		 * This condition is satisfied when host is
+		 * omitted and URI is "port". Note, that
+		 * traditionally "port" is converted to
+		 * "0.0.0.0:port" what means binding to all the
+		 * interfaces simultaneously, but it would not
+		 * work for SWIM. There is why:
+		 *
+		 *     - Different instances interacting with this
+		 *       one via not the same interface would see
+		 *       different source IP addresses. It would
+		 *       mess member tables;
+		 *
+		 *     - This instance would not be able to encode
+		 *       its IP address in the meta section,
+		 *       because it has no a fixed IP. At the same
+		 *       time omission of it and usage of UDP
+		 *       header source address is not possible as
+		 *       well, because UDP header is not encrypted
+		 *       and therefore is not safe to look at.
+		 */
+		addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	} else if (addr->sin_addr.s_addr == 0) {
 		diag_set(IllegalParams, "%s INADDR_ANY is not supported",
 			 prefix);
 		return -1;

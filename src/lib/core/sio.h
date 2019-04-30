@@ -223,7 +223,7 @@ ssize_t sio_recvfrom(int fd, void *buf, size_t len, int flags,
  * sockaddr_in/un structure.
  */
 int
-sio_uri_to_addr(const char *uri, struct sockaddr *addr);
+sio_uri_to_addr(const char *uri, struct sockaddr *addr, bool *is_host_empty);
 
 #if defined(__cplusplus)
 } /* extern "C" */

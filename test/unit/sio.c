@@ -39,40 +39,49 @@ static void
 check_uri_to_addr(void)
 {
 	header();
-	plan(18);
+	plan(22);
+	bool is_host_empty;
 	struct sockaddr_storage storage;
 	struct sockaddr *addr = (struct sockaddr *) &storage;
 	struct sockaddr_un *un = (struct sockaddr_un *) addr;
 	struct sockaddr_in *in = (struct sockaddr_in *) addr;
-	isnt(0, sio_uri_to_addr("invalid uri", addr),
+	isnt(0, sio_uri_to_addr("invalid uri", addr, &is_host_empty),
 	     "invalid uri is detected");
 
 	char long_path[1000];
 	char *pos = long_path + sprintf(long_path, "unix/:/");
 	memset(pos, 'a', 900);
 	pos[900] = 0;
-	isnt(0, sio_uri_to_addr(long_path, addr), "too long UNIX path");
+	isnt(0, sio_uri_to_addr(long_path, addr, &is_host_empty),
+	     "too long UNIX path");
 
-	is(0, sio_uri_to_addr("unix/:/normal_path", addr), "UNIX");
+	is(0, sio_uri_to_addr("unix/:/normal_path", addr, &is_host_empty),
+	   "UNIX");
 	is(0, strcmp(un->sun_path, "/normal_path"), "UNIX path");
 	is(AF_UNIX, un->sun_family, "UNIX family");
+	ok(! is_host_empty, "unix host is not empty");
 
-	is(0, sio_uri_to_addr("localhost:1234", addr), "localhost");
+	is(0, sio_uri_to_addr("localhost:1234", addr, &is_host_empty),
+	   "localhost");
 	is(AF_INET, in->sin_family, "localhost family");
 	is(htonl(INADDR_LOOPBACK), in->sin_addr.s_addr, "localhost address");
 	is(htons(1234), in->sin_port, "localhost port");
+	ok(! is_host_empty, "'localhost' host is not empty");
 
-	is(0, sio_uri_to_addr("5678", addr), "'any'");
+	is(0, sio_uri_to_addr("5678", addr, &is_host_empty), "'any'");
 	is(AF_INET, in->sin_family, "'any' family");
 	is(htonl(INADDR_ANY), in->sin_addr.s_addr, "'any' address");
 	is(htons(5678), in->sin_port, "'any' port");
+	ok(is_host_empty, "only port specified - host is empty");
 
-	is(0, sio_uri_to_addr("192.168.0.1:9101", addr), "IP");
+	is(0, sio_uri_to_addr("192.168.0.1:9101", addr, &is_host_empty), "IP");
 	is(AF_INET, in->sin_family, "IP family");
 	is(inet_addr("192.168.0.1"), in->sin_addr.s_addr, "IP address");
 	is(htons(9101), in->sin_port, "IP port");
+	ok(! is_host_empty, "IPv4 host is not empty");
 
-	isnt(0, sio_uri_to_addr("192.168.0.300:1112", addr), "invalid IP");
+	isnt(0, sio_uri_to_addr("192.168.0.300:1112", addr, &is_host_empty),
+	     "invalid IP");
 
 	check_plan();
 	footer();
@@ -84,9 +93,11 @@ check_auto_bind(void)
 	header();
 	plan(3);
 
+	bool is_host_empty;
 	struct sockaddr_in addr;
 	socklen_t addrlen = sizeof(addr);
-	sio_uri_to_addr("127.0.0.1:0", (struct sockaddr *) &addr);
+	sio_uri_to_addr("127.0.0.1:0", (struct sockaddr *) &addr,
+			&is_host_empty);
 	int fd = sio_socket(AF_INET, SOCK_STREAM, 0);
 	is(sio_bind(fd, (struct sockaddr *) &addr, sizeof(addr)), 0,
 	   "bind to 0 works");
