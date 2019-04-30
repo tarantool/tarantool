@@ -279,7 +279,7 @@
  * same data.
  */
 #ifndef BPS_TREE_IDENTICAL
-#define BPS_TREE_IDENTICAL(a, b) (a == b)
+#error "BPS_TREE_IDENTICAL must be defined"
 #endif
 
 /**
@@ -360,6 +360,7 @@ typedef uint32_t bps_tree_block_id_t;
 #define bps_tree_insert _api_name(insert)
 #define bps_tree_insert_get_iterator _api_name(insert_get_iterator)
 #define bps_tree_delete _api_name(delete)
+#define bps_tree_delete_identical _api_name(delete_identical)
 #define bps_tree_size _api_name(size)
 #define bps_tree_mem_used _api_name(mem_used)
 #define bps_tree_random _api_name(random)
@@ -4517,6 +4518,36 @@ bps_tree_delete(struct bps_tree *tree, bps_tree_elem_t elem)
 }
 
 /**
+ * @brief Delete an identical element from a tree (unlike
+ * bps_tree_delete this routine relies on BPS_TREE_IDENTICAL
+ * instead of BPS_TREE_COMPARE).
+ * @param tree - pointer to a tree
+ * @param elem - the element tot delete
+ * @return - true on success or false if the element was not
+ *           found in tree or is not identical.
+ */
+static inline int
+bps_tree_delete_identical(struct bps_tree *tree, bps_tree_elem_t elem)
+{
+	if (tree->root_id == (bps_tree_block_id_t)(-1))
+		return -1;
+	struct bps_inner_path_elem path[BPS_TREE_MAX_DEPTH];
+	struct bps_leaf_path_elem leaf_path_elem;
+	bool exact;
+	bps_tree_collect_path(tree, elem, path, &leaf_path_elem, &exact);
+
+	if (!exact)
+		return -1;
+
+	struct bps_leaf *leaf = leaf_path_elem.block;
+	if (!BPS_TREE_IDENTICAL(elem,
+				leaf->elems[leaf_path_elem.insertion_point]))
+		return -1;
+	bps_tree_process_delete_leaf(tree, &leaf_path_elem);
+	return 0;
+}
+
+/**
  * @brief Recursively find a maximum element in subtree.
  * Used only for debug purposes
  */
@@ -6054,6 +6085,7 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_find
 #undef bps_tree_insert
 #undef bps_tree_delete
+#undef bps_tree_delete_identical
 #undef bps_tree_size
 #undef bps_tree_mem_used
 #undef bps_tree_random
@@ -6155,4 +6187,5 @@ bps_tree_debug_check_internal_functions(bool assertme)
 #undef bps_tree_debug_check_move_to_left_inner
 #undef bps_tree_debug_check_insert_and_move_to_right_inner
 #undef bps_tree_debug_check_insert_and_move_to_left_inner
+
 /* }}} */

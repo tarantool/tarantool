@@ -25,6 +25,7 @@ compare(type_t a, type_t b);
 #define BPS_TREE_NAME testtest
 #define BPS_TREE_BLOCK_SIZE 512 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 16*1024 /* value is to low specially for tests */
+#define BPS_TREE_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
 #define bps_tree_elem_t char
@@ -34,6 +35,7 @@ compare(type_t a, type_t b);
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
 #undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
 #undef bps_tree_elem_t
@@ -44,6 +46,7 @@ compare(type_t a, type_t b);
 #define BPS_TREE_NAME test
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
+#define BPS_TREE_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) compare(a, b)
 #define bps_tree_elem_t type_t
@@ -54,8 +57,50 @@ compare(type_t a, type_t b);
 #undef BPS_TREE_NAME
 #undef BPS_TREE_BLOCK_SIZE
 #undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_IDENTICAL
 #undef BPS_TREE_COMPARE
 #undef BPS_TREE_COMPARE_KEY
+#undef bps_tree_elem_t
+#undef bps_tree_key_t
+#undef bps_tree_arg_t
+
+struct elem_t {
+	long info;
+	long marker;
+};
+
+static bool
+equal(const elem_t &a, const elem_t &b)
+{
+	return a.info == b.info && a.marker == b.marker;
+}
+
+static int compare(const elem_t &a, const elem_t &b)
+{
+	return a.info < b.info ? -1 : a.info > b.info ? 1 : 0;
+}
+
+static int compare_key(const elem_t &a, long b)
+{
+	return a.info < b ? -1 : a.info > b ? 1 : 0;
+}
+
+#define BPS_TREE_NAME struct_tree
+#define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
+#define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
+#define BPS_TREE_IDENTICAL(a, b) equal(a, b)
+#define BPS_TREE_COMPARE(a, b, arg) compare(a, b)
+#define BPS_TREE_COMPARE_KEY(a, b, arg) compare_key(a, b)
+#define bps_tree_elem_t struct elem_t
+#define bps_tree_key_t long
+#define bps_tree_arg_t int
+#include "salad/bps_tree.h"
+#undef BPS_TREE_NAME
+#undef BPS_TREE_BLOCK_SIZE
+#undef BPS_TREE_EXTENT_SIZE
+#undef BPS_TREE_COMPARE
+#undef BPS_TREE_COMPARE_KEY
+#undef BPS_TREE_IDENTICAL
 #undef bps_tree_elem_t
 #undef bps_tree_key_t
 #undef bps_tree_arg_t
@@ -64,6 +109,7 @@ compare(type_t a, type_t b);
 #define BPS_TREE_NAME approx
 #define BPS_TREE_BLOCK_SIZE 128 /* value is to low specially for tests */
 #define BPS_TREE_EXTENT_SIZE 2048 /* value is to low specially for tests */
+#define BPS_TREE_IDENTICAL(a, b) (a == b)
 #define BPS_TREE_COMPARE(a, b, arg) ((a) < (b) ? -1 : (a) > (b) ? 1 : 0)
 #define BPS_TREE_COMPARE_KEY(a, b, arg) (((a) >> 32) < (b) ? -1 : ((a) >> 32) > (b) ? 1 : 0)
 #define bps_tree_elem_t uint64_t
@@ -792,6 +838,27 @@ insert_get_iterator()
 	footer();
 }
 
+static void
+delete_identical_check()
+{
+	header();
+	struct_tree tree;
+	struct_tree_create(&tree, 0, extent_alloc, extent_free, &extents_count);
+	struct elem_t e1 = {1, 1};
+	struct_tree_insert(&tree, e1, NULL);
+	struct elem_t e2 = {1, 2};
+	if (struct_tree_delete_identical(&tree, e2) == 0)
+		fail("deletion of the non-identical element must fail", "false");
+	if (struct_tree_find(&tree, 1) == NULL)
+		fail("test non-identical element deletion failure", "false");
+	if (struct_tree_delete_identical(&tree, e1) != 0)
+		fail("deletion of the identical element must not fail", "false");
+	if (struct_tree_find(&tree, 1) != NULL)
+		fail("test identical element deletion completion", "false");
+	struct_tree_destroy(&tree);
+	footer();
+}
+
 int
 main(void)
 {
@@ -806,4 +873,5 @@ main(void)
 	if (extents_count != 0)
 		fail("memory leak!", "true");
 	insert_get_iterator();
+	delete_identical_check();
 }
