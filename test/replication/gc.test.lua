@@ -110,14 +110,14 @@ fiber.sleep(0.1) -- wait for master to relay data
 -- Garbage collection must not delete the old xlog file
 -- because it is still needed by the replica, but remove
 -- the old snapshot.
-#box.info.gc().checkpoints == 1 or box.info.gc()
-#fio.glob('./master/*.xlog') == 2 or fio.listdir('./master')
-test_run:cmd("switch replica")
--- Unblock the replica and break replication.
-box.error.injection.set("ERRINJ_WAL_DELAY", false)
-box.cfg{replication = {}}
--- Restart the replica to reestablish replication.
-test_run:cmd("restart server replica")
+wait_gc(1) or box.info.gc()
+wait_xlog(2) or fio.listdir('./master')
+-- Imitate the replica crash and, then, wake up.
+-- Just 'stop server replica' (SIGTERM) is not sufficient to stop
+-- a tarantool instance when ERRINJ_WAL_DELAY is set, because
+-- "tarantool" thread wait for paused "wal" thread infinitely.
+test_run:cmd("stop server replica with signal=KILL")
+test_run:cmd("start server replica")
 -- Wait for the replica to catch up.
 test_run:cmd("switch replica")
 test_run:wait_cond(function() return box.space.test:count() == 310 end, 10)
