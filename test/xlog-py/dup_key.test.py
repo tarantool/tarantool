@@ -13,7 +13,7 @@ server.admin("space = box.schema.space.create('test')")
 server.admin("index = box.space.test:create_index('primary')")
 server.admin("box.snapshot()")
 
-lsn = int(yaml.load(server.admin("box.info.lsn", silent=True))[0])
+lsn = int(yaml.safe_load(server.admin("box.info.lsn", silent=True))[0])
 filename = str(lsn).zfill(20) + ".xlog"
 vardir = os.path.join(server.vardir, server.name)
 wal_old = os.path.join(vardir, "old_" + filename)

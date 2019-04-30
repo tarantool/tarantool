@@ -9,7 +9,7 @@ from lib.tarantool_server import TarantoolServer
 ## Get cluster uuid
 cluster_uuid = ''
 try:
-    cluster_uuid = yaml.load(server.admin("box.space._schema:get('cluster')",
+    cluster_uuid = yaml.safe_load(server.admin("box.space._schema:get('cluster')",
         silent = True))[0][1]
     uuid.UUID('{' + cluster_uuid + '}')
     print 'ok - cluster uuid'
@@ -170,7 +170,7 @@ replica.admin('box.info.vclock[%d] == 1' % replica_id)
 print '-------------------------------------------------------------'
 print 'Connect master to replica'
 print '-------------------------------------------------------------'
-replication_source = yaml.load(replica.admin('box.cfg.listen', silent = True))[0]
+replication_source = yaml.safe_load(replica.admin('box.cfg.listen', silent = True))[0]
 sys.stdout.push_filter(replication_source, '<replication_source>')
 master.admin("box.cfg{ replication_source = '%s' }" % replication_source)
 master.wait_lsn(replica_id, replica.get_lsn(replica_id))
@@ -200,7 +200,7 @@ print '-------------------------------------------------------------'
 print 'Master must not crash then receives orphan rows from replica'
 print '-------------------------------------------------------------'
 
-replication_source = yaml.load(replica.admin('box.cfg.listen', silent = True))[0]
+replication_source = yaml.safe_load(replica.admin('box.cfg.listen', silent = True))[0]
 sys.stdout.push_filter(replication_source, '<replication>')
 master.admin("box.cfg{ replication = '%s' }" % replication_source)
 
