@@ -184,6 +184,7 @@ swim_timer_event_process(struct swim_event *e, struct ev_loop *loop)
 	assert(e->type == SWIM_EVENT_TIMER);
 	struct ev_watcher *w = ((struct swim_timer_event *) e)->watcher;
 	swim_timer_event_delete(e);
+	((struct ev_timer *) w)->at = 0;
 	ev_invoke(loop, w, EV_TIMER);
 }
 
@@ -263,6 +264,16 @@ swim_ev_timer_start(struct ev_loop *loop, struct ev_timer *base)
 		return;
 	/* Create the periodic watcher and one event. */
 	swim_timer_event_new((struct ev_watcher *) base, base->at);
+}
+
+void
+swim_ev_timer_again(struct ev_loop *loop, struct ev_timer *base)
+{
+	(void) loop;
+	if (swim_event_by_ev((struct ev_watcher *) base) != NULL)
+		return;
+	/* Create the periodic watcher and one event. */
+	swim_timer_event_new((struct ev_watcher *) base, base->repeat);
 }
 
 /** Time stop cancels the event if the timer is active. */

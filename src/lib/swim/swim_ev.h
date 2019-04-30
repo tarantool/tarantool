@@ -47,6 +47,9 @@ void
 swim_ev_timer_start(struct ev_loop *loop, struct ev_timer *watcher);
 
 void
+swim_ev_timer_again(struct ev_loop *loop, struct ev_timer *watcher);
+
+void
 swim_ev_timer_stop(struct ev_loop *loop, struct ev_timer *watcher);
 
 #define swim_ev_init ev_init

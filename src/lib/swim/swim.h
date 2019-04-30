@@ -100,10 +100,6 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	 double ack_timeout, enum swim_gc_mode gc_mode,
 	 const struct tt_uuid *uuid);
 
-/** SWIM's ACK timeout, previously set via @sa swim_cfg. */
-double
-swim_ack_timeout(const struct swim *swim);
-
 /** Set payload to disseminate over the cluster. */
 int
 swim_set_payload(struct swim *swim, const char *payload, uint16_t payload_size);

@@ -496,7 +496,7 @@ swim_wait_ack(struct swim *swim, struct swim_member *member,
 	      bool was_ping_indirect)
 {
 	if (heap_node_is_stray(&member->in_wait_ack_heap)) {
-		double timeout = swim->wait_ack_tick.at;
+		double timeout = swim->wait_ack_tick.repeat;
 		/*
 		 * Direct ping is two trips: PING + ACK.
 		 * Indirect ping is four trips: PING,
@@ -507,7 +507,7 @@ swim_wait_ack(struct swim *swim, struct swim_member *member,
 			timeout *= 2;
 		member->ping_deadline = swim_time() + timeout;
 		wait_ack_heap_insert(&swim->wait_ack_heap, member);
-		swim_ev_timer_start(loop(), &swim->wait_ack_tick);
+		swim_ev_timer_again(loop(), &swim->wait_ack_tick);
 	}
 }
 
@@ -767,7 +767,7 @@ swim_new_member(struct swim *swim, const struct sockaddr_in *addr,
 		return NULL;
 	}
 	if (mh_size(swim->members) > 1)
-		swim_ev_timer_start(loop(), &swim->round_tick);
+		swim_ev_timer_again(loop(), &swim->round_tick);
 
 	/* Dissemination component. */
 	swim_on_member_update(swim, member);
@@ -1072,7 +1072,7 @@ swim_complete_step(struct swim_task *task,
 	(void) rc;
 	(void) task;
 	struct swim *swim = swim_by_scheduler(scheduler);
-	swim_ev_timer_start(loop(), &swim->round_tick);
+	swim_ev_timer_again(loop(), &swim->round_tick);
 	/*
 	 * It is possible that the original member was deleted
 	 * manually during the task execution.
@@ -1239,7 +1239,7 @@ swim_check_acks(struct ev_loop *loop, struct ev_timer *t, int events)
 	struct swim_member *m;
 	while ((m = wait_ack_heap_top(&swim->wait_ack_heap)) != NULL) {
 		if (current_time < m->ping_deadline) {
-			swim_ev_timer_start(loop, t);
+			swim_ev_timer_again(loop, t);
 			return;
 		}
 		wait_ack_heap_pop(&swim->wait_ack_heap);
@@ -1635,7 +1635,7 @@ swim_new(void)
 	}
 	rlist_create(&swim->round_queue);
 	swim_ev_timer_init(&swim->round_tick, swim_begin_step,
-			   HEARTBEAT_RATE_DEFAULT, 0);
+			   0, HEARTBEAT_RATE_DEFAULT);
 	swim->round_tick.data = (void *) swim;
 	swim_task_create(&swim->round_step_task, swim_complete_step, NULL,
 			 "round packet");
@@ -1644,7 +1644,7 @@ swim_new(void)
 	/* Failure detection component. */
 	wait_ack_heap_create(&swim->wait_ack_heap);
 	swim_ev_timer_init(&swim->wait_ack_tick, swim_check_acks,
-			   ACK_TIMEOUT_DEFAULT, 0);
+			   0, ACK_TIMEOUT_DEFAULT);
 	swim->wait_ack_tick.data = (void *) swim;
 	swim->gc_mode = SWIM_GC_ON;
 
@@ -1737,11 +1737,11 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	} else {
 		addr = swim->self->addr;
 	}
-	if (swim->round_tick.at != heartbeat_rate && heartbeat_rate > 0)
-		swim_ev_timer_set(&swim->round_tick, heartbeat_rate, 0);
+	if (swim->round_tick.repeat != heartbeat_rate && heartbeat_rate > 0)
+		swim_ev_timer_set(&swim->round_tick, 0, heartbeat_rate);
 
-	if (swim->wait_ack_tick.at != ack_timeout && ack_timeout > 0)
-		swim_ev_timer_set(&swim->wait_ack_tick, ack_timeout, 0);
+	if (swim->wait_ack_tick.repeat != ack_timeout && ack_timeout > 0)
+		swim_ev_timer_set(&swim->wait_ack_tick, 0, ack_timeout);
 
 	if (new_self != NULL) {
 		swim->self->status = MEMBER_LEFT;
@@ -1755,12 +1755,6 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 	if (gc_mode != SWIM_GC_DEFAULT)
 		swim->gc_mode = gc_mode;
 	return 0;
-}
-
-double
-swim_ack_timeout(const struct swim *swim)
-{
-	return swim->wait_ack_tick.at;
 }
 
 bool
