@@ -244,6 +244,19 @@ struct swim_member {
 	 */
 	struct rlist in_round_queue;
 	/**
+	 * Reference counter. Used by public API to prevent the
+	 * member deletion after it is obtained by UUID or from an
+	 * iterator.
+	 */
+	int refs;
+	/**
+	 * True, if the member was dropped from the member table.
+	 * At the same time it still can be not deleted, if users
+	 * of the public API referenced the member. Dropped member
+	 * is not valid anymore and should be dereferenced.
+	 */
+	bool is_dropped;
+	/**
 	 *
 	 *                 Dissemination component
 	 *
@@ -638,11 +651,34 @@ swim_ping_task_complete(struct swim_task *task,
 	swim_wait_ack(swim, m, false);
 }
 
+void
+swim_member_ref(struct swim_member *member)
+{
+	++member->refs;
+}
+
+void
+swim_member_unref(struct swim_member *member)
+{
+	assert(member->refs > 0);
+	if (--member->refs == 0) {
+		free(member->payload);
+		free(member);
+	}
+}
+
+bool
+swim_member_is_dropped(const struct swim_member *member)
+{
+	return member->is_dropped;
+}
+
 /** Free member's resources. */
 static inline void
 swim_member_delete(struct swim_member *member)
 {
 	assert(rlist_empty(&member->in_round_queue));
+	member->is_dropped = true;
 
 	/* Failure detection component. */
 	assert(heap_node_is_stray(&member->in_wait_ack_heap));
@@ -651,9 +687,8 @@ swim_member_delete(struct swim_member *member)
 
 	/* Dissemination component. */
 	assert(rlist_empty(&member->in_dissemination_queue));
-	free(member->payload);
 
-	free(member);
+	swim_member_unref(member);
 }
 
 /** Create a new member. It is not registered anywhere here. */
@@ -667,6 +702,7 @@ swim_member_new(const struct sockaddr_in *addr, const struct tt_uuid *uuid,
 		diag_set(OutOfMemory, sizeof(*member), "calloc", "member");
 		return NULL;
 	}
+	member->refs = 1;
 	member->status = status;
 	member->addr = *addr;
 	member->uuid = *uuid;
@@ -1963,14 +1999,14 @@ swim_quit(struct swim *swim)
 	swim_quit_step_complete(task, &swim->scheduler, 0);
 }
 
-const struct swim_member *
+struct swim_member *
 swim_self(struct swim *swim)
 {
 	assert(swim_is_configured(swim));
 	return swim->self;
 }
 
-const struct swim_member *
+struct swim_member *
 swim_member_by_uuid(struct swim *swim, const struct tt_uuid *uuid)
 {
 	assert(swim_is_configured(swim));
@@ -1991,7 +2027,7 @@ swim_iterator_open(struct swim *swim)
 	return (struct swim_iterator *) swim;
 }
 
-const struct swim_member *
+struct swim_member *
 swim_iterator_next(struct swim_iterator *iterator)
 {
 	struct swim *swim = (struct swim *) iterator;

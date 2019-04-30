@@ -175,7 +175,7 @@ swim_test_cfg(void)
 static void
 swim_test_add_remove(void)
 {
-	swim_start_test(13);
+	swim_start_test(14);
 
 	struct swim_cluster *cluster = swim_cluster_new(2);
 	swim_cluster_add_link(cluster, 0, 1);
@@ -231,6 +231,17 @@ swim_test_add_remove(void)
 	swim_cluster_unblock_io(cluster, 0);
 	is(swim_cluster_wait_fullmesh(cluster, 1), 0,
 	   "back in fullmesh after a member removal in the middle of a step");
+	/*
+	 * Check that member removal does not delete a member,
+	 * only unrefs.
+	 */
+	const struct tt_uuid *s1_uuid = swim_member_uuid(swim_self(s1));
+	struct swim_member *s1_view = swim_member_by_uuid(s2, s1_uuid);
+	swim_member_ref(s1_view);
+	swim_remove_member(s2, s1_uuid);
+	ok(swim_member_is_dropped(s1_view), "if a referenced "\
+	   "member is dropped, it can be detected from the public API");
+	swim_member_unref(s1_view);
 
 	swim_cluster_delete(cluster);
 

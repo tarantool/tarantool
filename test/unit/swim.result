@@ -47,7 +47,7 @@ ok 3 - subtests
 ok 4 - subtests
 	*** swim_test_cfg: done ***
 	*** swim_test_add_remove ***
-    1..13
+    1..14
     ok 1 - can not add an existing member
     ok 2 - diag says 'already exists'
     ok 3 - can not add a invalid uri
@@ -61,6 +61,7 @@ ok 4 - subtests
     ok 11 - after removal the cluster is not in fullmesh
     ok 12 - but it is back in 1 step
     ok 13 - back in fullmesh after a member removal in the middle of a step
+    ok 14 - if a referenced member is dropped, it can be detected from the public API
 ok 5 - subtests
 	*** swim_test_add_remove: done ***
 	*** swim_test_basic_failure_detection ***

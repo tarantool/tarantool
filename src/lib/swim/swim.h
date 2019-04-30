@@ -171,7 +171,7 @@ void
 swim_quit(struct swim *swim);
 
 /** Get a SWIM member, describing this instance. */
-const struct swim_member *
+struct swim_member *
 swim_self(struct swim *swim);
 
 /**
@@ -179,7 +179,7 @@ swim_self(struct swim *swim);
  * @retval NULL Not found.
  * @retval not NULL A member.
  */
-const struct swim_member *
+struct swim_member *
 swim_member_by_uuid(struct swim *swim, const struct tt_uuid *uuid);
 
 /** Member's current status. */
@@ -201,7 +201,7 @@ swim_iterator_open(struct swim *swim);
  * @retval NULL EOF.
  * @retval not NULL A valid member.
  */
-const struct swim_member *
+struct swim_member *
 swim_iterator_next(struct swim_iterator *iterator);
 
 /** Close an iterator. */
@@ -223,6 +223,28 @@ swim_member_incarnation(const struct swim_member *member);
 /** Member's payload. */
 const char *
 swim_member_payload(const struct swim_member *member, uint16_t *size);
+
+/**
+ * Reference a member. The member memory will be valid until unref
+ * is called.
+ */
+void
+swim_member_ref(struct swim_member *member);
+
+/**
+ * Dereference a member. After that it may be deleted and can't be
+ * accessed anymore.
+ */
+void
+swim_member_unref(struct swim_member *member);
+
+/**
+ * Check if a member was dropped from the member table. It means,
+ * that the member is not valid anymore and should be
+ * dereferenced.
+ */
+bool
+swim_member_is_dropped(const struct swim_member *member);
 
 #if defined(__cplusplus)
 }
