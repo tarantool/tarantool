@@ -300,15 +300,18 @@ int
 swim_scheduler_bind(struct swim_scheduler *scheduler,
 		    const struct sockaddr_in *addr)
 {
+	swim_ev_io_stop(loop(), &scheduler->input);
+	swim_ev_io_stop(loop(), &scheduler->output);
 	struct swim_transport *t = &scheduler->transport;
-	if (swim_transport_bind(t, (const struct sockaddr *) addr,
-				sizeof(*addr)) != 0)
-		return -1;
-	swim_ev_io_set(&scheduler->output, t->fd, EV_WRITE);
-	swim_ev_io_set(&scheduler->input, t->fd, EV_READ);
-	swim_ev_io_start(loop(), &scheduler->input);
-	swim_ev_io_start(loop(), &scheduler->output);
-	return 0;
+	int rc = swim_transport_bind(t, (const struct sockaddr *) addr,
+				     sizeof(*addr));
+	if (t->fd >= 0) {
+		swim_ev_io_set(&scheduler->output, t->fd, EV_WRITE);
+		swim_ev_io_set(&scheduler->input, t->fd, EV_READ);
+		swim_ev_io_start(loop(), &scheduler->input);
+		swim_ev_io_start(loop(), &scheduler->output);
+	}
+	return rc;
 }
 
 void
