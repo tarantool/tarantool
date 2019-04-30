@@ -23,7 +23,7 @@ admin("box.snapshot()")
 admin("space:insert{2, 'second tuple'}")
 #
 # Check for other errors, e.g. "Permission denied".
-lsn = int(yaml.load(admin("box.info.lsn", silent=True))[0])
+lsn = int(yaml.safe_load(admin("box.info.lsn", silent=True))[0])
 snapshot = str(lsn).zfill(20) + ".snap"
 snapshot = os.path.join(os.path.join(server.vardir, server.name), snapshot)
 # Make snapshot path unwritable
@@ -49,8 +49,8 @@ print """
 
 admin("space:insert{1, 'Test tuple'}")
 
-pid = int(yaml.load(admin("box.info.pid", silent=True))[0])
-lsn = int(yaml.load(admin("box.info.lsn", silent=True))[0])
+pid = int(yaml.safe_load(admin("box.info.pid", silent=True))[0])
+lsn = int(yaml.safe_load(admin("box.info.lsn", silent=True))[0])
 
 snapshot = str(lsn).zfill(20) + ".snap"
 snapshot = os.path.join(os.path.join(server.vardir, server.name), snapshot)

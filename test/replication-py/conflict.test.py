@@ -25,10 +25,10 @@ def parallel_run(cmd1, cmd2, compare):
     replica.admin.socket.recv(2048)
 
     # wait for status changing in tarantool
-    master_status = yaml.load(master.admin(
+    master_status = yaml.safe_load(master.admin(
         'box.info().replication[2].upstream.status', silent=True
     ))[0]
-    replica_status = yaml.load(replica.admin(
+    replica_status = yaml.safe_load(replica.admin(
         'box.info().replication[1].upstream.status', silent=True
     ))[0]
 

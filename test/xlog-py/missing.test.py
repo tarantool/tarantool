@@ -14,7 +14,7 @@ server.stop()
 server.start()
 # these inserts will be in their own xlog, which then will
 # get "lost"
-lsn = int(yaml.load(server.admin("box.info.lsn", silent=True))[0])
+lsn = int(yaml.safe_load(server.admin("box.info.lsn", silent=True))[0])
 data_path = os.path.join(server.vardir, server.name)
 wal = os.path.join(data_path, str(lsn).zfill(20) + ".xlog")
 server.admin("box.space.test:insert{1, 'first tuple'}")

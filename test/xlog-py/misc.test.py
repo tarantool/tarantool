@@ -6,7 +6,7 @@ from os.path import abspath
 # cleanup server.vardir
 server.stop()
 server.deploy()
-lsn = int(yaml.load(server.admin("box.info.lsn", silent=True))[0])
+lsn = int(yaml.safe_load(server.admin("box.info.lsn", silent=True))[0])
 server.stop()
 
 data_path = os.path.join(server.vardir, server.name)
@@ -56,7 +56,7 @@ filename = str(lsn).zfill(20) + ".xlog"
 wal = os.path.join(data_path, filename)
 server.admin("box.space.tweedledum:insert{4, 'fourth tuple'}")
 server.admin("box.space.tweedledum:insert{5, 'Unfinished record'}")
-pid = int(yaml.load(server.admin("require('tarantool').pid()", silent=True))[0])
+pid = int(yaml.safe_load(server.admin("require('tarantool').pid()", silent=True))[0])
 from signal import SIGKILL
 if pid > 0:
     os.kill(pid, SIGKILL)
@@ -78,13 +78,13 @@ server.stop()
 lsn += 1
 
 server.start()
-orig_lsn = int(yaml.load(admin("box.info.lsn", silent=True))[0])
+orig_lsn = int(yaml.safe_load(admin("box.info.lsn", silent=True))[0])
 
 # create .snap.inprogress
 admin("box.snapshot()")
 admin("box.space._schema:insert({'test', 'test'})")
 admin("box.snapshot()")
-lsn = int(yaml.load(admin("box.info.lsn", silent=True))[0])
+lsn = int(yaml.safe_load(admin("box.info.lsn", silent=True))[0])
 snapshot = str(lsn).zfill(20) + ".snap"
 snapshot = os.path.join(data_path, snapshot)
 server.stop()
@@ -96,6 +96,6 @@ for f in os.listdir(data_path):
 
 # check that .snap.inprogress is ignored during scan
 server.start()
-lsn = int(yaml.load(admin("box.info.lsn", silent=True))[0])
+lsn = int(yaml.safe_load(admin("box.info.lsn", silent=True))[0])
 if lsn == orig_lsn:
     print ".snap.inprogress is ignored"
