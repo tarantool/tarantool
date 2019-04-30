@@ -34,7 +34,7 @@ for i in range(REPLICA_N - 1):
 # Make a list of servers
 sources = []
 for server in cluster:
-    sources.append(yaml.load(server.admin('box.cfg.listen', silent = True))[0])
+    sources.append(yaml.safe_load(server.admin('box.cfg.listen', silent = True))[0])
     server.id = server.get_param('id')
 
 print 'done'
@@ -90,7 +90,7 @@ print
 
 print 'Check data'
 for server in cluster:
-    cnt = yaml.load(server.admin("box.space.test:len()", silent = True))[0]
+    cnt = yaml.safe_load(server.admin("box.space.test:len()", silent = True))[0]
     print 'server', server.id, 'is', cnt == ROW_N and 'ok' or 'not ok'
 print 'Done'
 print

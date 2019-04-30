@@ -12,7 +12,7 @@ from os.path import abspath
 # 
 server.stop()
 server.deploy()
-lsn = str(yaml.load(server.admin("box.info.lsn", silent=True))[0])
+lsn = str(yaml.safe_load(server.admin("box.info.lsn", silent=True))[0])
 path = os.path.join(server.vardir, server.name)
 filename = os.path.join(path, lsn.zfill(20) + ".xlog")
 f = open(filename, "w+")
