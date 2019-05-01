@@ -912,6 +912,20 @@ box.space.T:drop()
 box.space.T1:drop()
 ---
 ...
+-- Make sure that BOOLEAN is not implicitly converted to INTEGER
+-- while inserted to PRIMARY KEY field.
+--
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY);")
+---
+- row_count: 1
+...
+box.execute("INSERT INTO t1 VALUES (true);")
+---
+- error: 'Type mismatch: can not convert true to integer'
+...
+box.space.T1:drop()
+---
+...
 --
 -- gh-4103: If resulting value of arithmetic operations is
 -- integers, then make sure its type also integer (not number).

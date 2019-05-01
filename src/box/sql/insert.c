@@ -66,20 +66,8 @@ sql_emit_table_types(struct Vdbe *v, struct space_def *def, int reg)
 		(enum field_type *) sqlDbMallocZero(db, sz);
 	if (colls_type == NULL)
 		return;
-	for (uint32_t i = 0; i < field_count; ++i) {
+	for (uint32_t i = 0; i < field_count; ++i)
 		colls_type[i] = def->fields[i].type;
-		/*
-		 * Force INTEGER type to handle queries like:
-		 * CREATE TABLE t1 (id INT PRIMARY KEY);
-		 * INSERT INTO t1 VALUES (1.123);
-		 *
-		 * In this case 1.123 should be truncated to 1.
-		 */
-		if (colls_type[i] == FIELD_TYPE_INTEGER) {
-			sqlVdbeAddOp2(v, OP_Cast, reg + i,
-					  FIELD_TYPE_INTEGER);
-		}
-	}
 	colls_type[field_count] = field_type_MAX;
 	sqlVdbeAddOp4(v, OP_ApplyType, reg, field_count, 0,
 			  (char *)colls_type, P4_DYNAMIC);

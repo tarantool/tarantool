@@ -217,6 +217,13 @@ box.execute("SELECT s FROM t1 WHERE s IN (true, 1, 'abcd')")
 box.space.T:drop()
 box.space.T1:drop()
 
+-- Make sure that BOOLEAN is not implicitly converted to INTEGER
+-- while inserted to PRIMARY KEY field.
+--
+box.execute("CREATE TABLE t1 (id INT PRIMARY KEY);")
+box.execute("INSERT INTO t1 VALUES (true);")
+box.space.T1:drop()
+
 --
 -- gh-4103: If resulting value of arithmetic operations is
 -- integers, then make sure its type also integer (not number).
