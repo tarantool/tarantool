@@ -939,7 +939,7 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		assert(idx_def != NULL);
 		struct space *space = space_by_id(idx_def->space_id);
 		assert(space != NULL);
-		bool is_format_set = space->def->field_count != 0;
+		assert(space->def->field_count != 0);
 		iIdxCur = pLevel->iIdxCur;
 		assert(nEq >= pLoop->nSkip);
 
@@ -968,8 +968,7 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			 * FYI: entries in an index are ordered as follows:
 			 *      NULL, ... NULL, min_value, ...
 			 */
-			if (is_format_set &&
-			    space->def->fields[j].is_nullable) {
+			if (space->def->fields[j].is_nullable) {
 				assert(pLoop->nSkip == 0);
 				bSeekPastNull = 1;
 				nExtraReg = 1;
@@ -992,8 +991,7 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 			nExtraReg = MAX(nExtraReg, pLoop->nTop);
 			if (pRangeStart == 0) {
 				j = idx_def->key_def->parts[nEq].fieldno;
-				if (is_format_set &&
-				    space->def->fields[j].is_nullable)
+				if (space->def->fields[j].is_nullable)
 					bSeekPastNull = 1;
 			}
 		}
@@ -1071,12 +1069,10 @@ sqlWhereCodeOneLoopStart(WhereInfo * pWInfo,	/* Complete information about the W
 		}
 		struct index_def *idx_pk = space->index[0]->def;
 		int fieldno = idx_pk->key_def->parts[0].fieldno;
-		enum field_type fd_type = is_format_set ?
-					  space->def->fields[fieldno].type :
-					  FIELD_TYPE_SCALAR;
 
 		uint32_t pk_part_count = idx_pk->key_def->part_count;
-		if (pk_part_count == 1 && fd_type == FIELD_TYPE_INTEGER) {
+		if (pk_part_count == 1 &&
+		    space->def->fields[fieldno].type == FIELD_TYPE_INTEGER) {
 			/* Right now INTEGER PRIMARY KEY is the only option to
 			 * get Tarantool's INTEGER column type. Need special handling
 			 * here: try to loosely convert FLOAT to INT. If RHS type
