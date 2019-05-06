@@ -582,7 +582,7 @@ coio_do_copyfile(eio_req *req)
 		goto error;
 	}
 
-	int dest_fd = open(eio->copyfile.dest, O_WRONLY | O_CREAT,
+	int dest_fd = open(eio->copyfile.dest, O_WRONLY|O_CREAT|O_TRUNC,
 			   st.st_mode & 0777);
 	if (dest_fd < 0) {
 		goto error_dest;

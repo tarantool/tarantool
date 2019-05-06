@@ -718,6 +718,12 @@ file2 = fio.pathjoin(tmp2, 'file.2')
 file3 = fio.pathjoin(tree, 'file.3')
 ---
 ...
+file5 = fio.pathjoin(tree, 'file.5')
+---
+...
+file6 = fio.pathjoin(tree, 'file.6')
+---
+...
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
 ---
 ...
@@ -749,6 +755,41 @@ fio.copyfile(file1, tmp2)
 - true
 ...
 fio.stat(fio.pathjoin(tmp2, "file.1")) ~= nil
+---
+- true
+...
+--- test the destination file is truncated
+fh5 = fio.open(file5, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+---
+...
+fh5:write("template data")
+---
+- true
+...
+fh5:close()
+---
+- true
+...
+fh6 = fio.open(file6, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+---
+...
+fh6:write("to be truncated")
+---
+- true
+...
+fio.copyfile(file5, file6)
+---
+- true
+...
+fh6:seek(0)
+---
+- 0
+...
+fh6:read()
+---
+- template data
+...
+fh6:close()
 ---
 - true
 ...
