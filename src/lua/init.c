@@ -115,6 +115,7 @@ extern char strict_lua[],
 	table_lua[],
 	trigger_lua[],
 	string_lua[],
+	swim_lua[],
 	p_lua[], /* LuaJIT 2.1 profiler */
 	zone_lua[] /* LuaJIT 2.1 profiler */;
 
@@ -149,6 +150,7 @@ static const char *lua_modules[] = {
 	"pwd", pwd_lua,
 	"http.client", httpc_lua,
 	"iconv", iconv_lua,
+	"swim", swim_lua,
 	/* jit.* library */
 	"jit.vmdef", vmdef_lua,
 	"jit.bc", bc_lua,

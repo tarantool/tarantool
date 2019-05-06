@@ -1,0 +1,201 @@
+test_run = require('test_run').new()
+---
+...
+test_run:cmd("push filter '\\.lua.*:[0-9]+: ' to '.lua:<line>: '")
+---
+- true
+...
+--
+-- gh-3234: SWIM gossip protocol.
+--
+-- Invalid cfg parameters.
+swim.new(1)
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected table configuration'
+...
+swim.new({uri = true})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected string URI or port number'
+...
+swim.new({heartbeat_rate = 'rate'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected number heartbeat_rate'
+...
+swim.new({ack_timeout = 'timeout'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected number ack_timeout'
+...
+swim.new({gc_mode = 'not a mode'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: unknown gc_mode'
+...
+swim.new({gc_mode = 0})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: unknown gc_mode'
+...
+swim.new({uuid = 123})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: expected string UUID'
+...
+swim.new({uuid = '1234'})
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: invalid UUID'
+...
+-- Valid parameters, but invalid configuration.
+swim.new({})
+---
+- null
+- 'swim.cfg: UUID and URI are mandatory in a first config'
+...
+swim.new({uuid = uuid(1)})
+---
+- null
+- 'swim.cfg: UUID and URI are mandatory in a first config'
+...
+swim.new({uri = uri()})
+---
+- null
+- 'swim.cfg: UUID and URI are mandatory in a first config'
+...
+-- Check manual deletion.
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s:delete()
+---
+...
+s:cfg({})
+---
+- error: 'builtin/swim.lua:<line>: the swim instance is deleted'
+...
+s = nil
+---
+...
+_ = collectgarbage('collect')
+---
+...
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s:quit()
+---
+...
+s:is_configured()
+---
+- error: '[string "return s:is_configured() "]:1: the swim instance is deleted'
+...
+s = nil
+---
+...
+_ = collectgarbage('collect')
+---
+...
+s = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s:is_configured()
+---
+- true
+...
+s:size()
+---
+- 1
+...
+s.cfg
+---
+- uuid: 00000000-0000-1000-8000-000000000001
+  uri: 127.0.0.1:0
+...
+s.cfg.gc_mode = 'off'
+---
+- error: '[string "s.cfg.gc_mode = ''off'' "]:1: please, use swim:cfg{key = value}
+    instead of swim.cfg.key = value'
+...
+s:cfg{gc_mode = 'off'}
+---
+- true
+...
+s.cfg
+---
+- gc_mode: off
+  uuid: 00000000-0000-1000-8000-000000000001
+  uri: 127.0.0.1:0
+...
+s.cfg.gc_mode
+---
+- off
+...
+s.cfg.uuid
+---
+- 00000000-0000-1000-8000-000000000001
+...
+s.cfg()
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: first argument is not a SWIM instance'
+...
+s:cfg({wrong_opt = 100})
+---
+- error: 'swim:cfg: unknown option wrong_opt'
+...
+s:delete()
+---
+...
+-- Reconfigure.
+s = swim.new()
+---
+...
+s:is_configured()
+---
+- false
+...
+-- Check that not configured instance does not provide most of
+-- methods.
+s.quit == nil
+---
+- true
+...
+s:cfg({uuid = uuid(1), uri = uri()})
+---
+- true
+...
+s.quit ~= nil
+---
+- true
+...
+s:is_configured()
+---
+- true
+...
+s:size()
+---
+- 1
+...
+s = nil
+---
+...
+_ = collectgarbage('collect')
+---
+...
+-- Invalid usage.
+s = swim.new()
+---
+...
+s.delete()
+---
+- error: 'builtin/swim.lua:<line>: swim:delete: first argument is not a SWIM instance'
+...
+s.is_configured()
+---
+- error: 'builtin/swim.lua:<line>: swim:is_configured: first argument is not a SWIM instance'
+...
+s.cfg()
+---
+- error: 'builtin/swim.lua:<line>: swim:cfg: first argument is not a SWIM instance'
+...
+s:delete()
+---
+...
+test_run:cmd("clear filter")
+---
+- true
+...
