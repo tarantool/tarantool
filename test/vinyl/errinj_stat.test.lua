@@ -74,7 +74,7 @@ stat.tasks_completed == 1
 stat.tasks_failed > 0
 errinj.set('ERRINJ_VY_RUN_WRITE', false)
 errinj.set('ERRINJ_VY_SCHED_TIMEOUT', 0)
-fiber.sleep(0.01)
+test_run:wait_cond(function() return box.stat.vinyl().scheduler.tasks_completed > 1 end)
 box.snapshot()
 i:compact()
 test_run:wait_cond(function() return i:stat().disk.compaction.count > 0 end)

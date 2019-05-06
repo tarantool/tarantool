@@ -78,11 +78,6 @@ errinj.set("ERRINJ_VY_RUN_WRITE", false);
 ---
 - ok
 ...
--- fails due to scheduler timeout
-box.snapshot();
----
-- error: Error injection 'vinyl dump'
-...
 fiber.sleep(0.06);
 ---
 ...
