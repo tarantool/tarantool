@@ -58,7 +58,7 @@ file2 = fio.pathjoin(tmpdir, 'file.2')
 file3 = fio.pathjoin(tmpdir, 'file.3')
 file4 = fio.pathjoin(tmpdir, 'file.4')
 
-local f = fio.open(file1, { 'O_WRONLY', 'O_TRUNC', 'O_CREAT' }, 0777)
+local f = fio.open(file1, { 'O_WRONLY', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 f:write("123 , 5  ,       92    , 0, 0\n" ..
         "1, 12  34, 56, \"quote , \", 66\nok")
 f:close()
@@ -67,7 +67,7 @@ test:is(table2str(csv.load(f, {chunk_size = 10})), test4_ans, "fio test1")
 f:close()
 
 
-f = fio.open(file2, { 'O_WRONLY', 'O_TRUNC', 'O_CREAT' }, 0777)
+f = fio.open(file2, { 'O_WRONLY', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 f:write("1\n23,456,abcac,\'multiword field 4\'\n" ..
         "none,none,0\n" ..
         ",,\n" ..

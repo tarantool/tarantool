@@ -42,7 +42,7 @@ file4 = fio.pathjoin(tmpdir, 'file.4')
 st, err = pcall(fio.open, nil)
 st
 err:match("open") ~= nil
-fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 fh1 ~= nil
 f1s = fh1:stat()
 f1s.size
@@ -224,7 +224,7 @@ err:match("mktree") ~= nil
 fio.mktree(tree)
 fio.stat(tree) ~= nil
 fio.stat(tmp2) ~= nil
-fio.mktree(tree2, 0777)
+fio.mktree(tree2, tonumber('0777', 8))
 
 -- copy and copytree
 file1 = fio.pathjoin(tmp1, 'file.1')
@@ -234,10 +234,10 @@ file4 = fio.pathjoin(tree, 'file.4')
 file5 = fio.pathjoin(tree, 'file.5')
 file6 = fio.pathjoin(tree, 'file.6')
 
-fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 fh1:write("gogo")
 fh1:close()
-fh1 = fio.open(file2, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh1 = fio.open(file2, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 fh1:write("lolo")
 fh1:close()
 fio.symlink(file1, file3)
@@ -252,10 +252,10 @@ fio.stat(file1, file4) ~= nil
 errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', -1)
 
 --- test the destination file is truncated
-fh5 = fio.open(file5, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+fh5 = fio.open(file5, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
 fh5:write("template data")
 fh5:close()
-fh6 = fio.open(file6, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+fh6 = fio.open(file6, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
 fh6:write("to be truncated")
 fio.copyfile(file5, file6)
 fh6:seek(0)
@@ -280,7 +280,7 @@ buf = buffer.ibuf()
 
 tmpdir = fio.tempdir()
 tmpfile = fio.pathjoin(tmpdir, "test1")
-fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 fh:write('helloworld!')
 fh:seek(0)
 fh:read()
@@ -289,7 +289,7 @@ fh:read()
 fio.unlink(tmpfile)
 
 tmpfile = fio.pathjoin(tmpdir, "test")
-fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 fh:write('helloworld!')
 fh:seek(0)
 len = fh:read(buf:reserve(12))
@@ -376,7 +376,7 @@ tmp1 = fio.pathjoin(tmpdir, "tmp1")
 tmp2= fio.pathjoin(tmpdir, "tmp2")
 test_run:cmd("setopt delimiter ';'")
 function write_file(name, odd)
-    local fh = fio.open(name, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+    local fh = fio.open(name, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
     if odd then
         fh:write(string.rep('1', 100))
     else
@@ -409,7 +409,7 @@ fio.rmdir(tmpdir)
 test_run:cmd("push filter '(.builtin/.*.lua):[0-9]+' to '\\1'")
 fh1:seek(nil, 'a')
 fio.open(nil)
-fio.open(tmp1, {'A'}, 0777)
+fio.open(tmp1, {'A'}, tonumber('0777', 8))
 fio.open(tmp1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, {'A'})
 fio.pathjoin(nil)
 fio.pathjoin('abc', nil)

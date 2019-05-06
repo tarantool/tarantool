@@ -114,7 +114,7 @@ err:match("open") ~= nil
 ---
 - true
 ...
-fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 ---
 ...
 fh1 ~= nil
@@ -704,7 +704,7 @@ fio.stat(tmp2) ~= nil
 ---
 - true
 ...
-fio.mktree(tree2, 0777)
+fio.mktree(tree2, tonumber('0777', 8))
 ---
 - true
 ...
@@ -727,7 +727,7 @@ file5 = fio.pathjoin(tree, 'file.5')
 file6 = fio.pathjoin(tree, 'file.6')
 ---
 ...
-fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 ---
 ...
 fh1:write("gogo")
@@ -738,7 +738,7 @@ fh1:close()
 ---
 - true
 ...
-fh1 = fio.open(file2, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh1 = fio.open(file2, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 ---
 ...
 fh1:write("lolo")
@@ -782,7 +782,7 @@ errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', -1)
 - ok
 ...
 --- test the destination file is truncated
-fh5 = fio.open(file5, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+fh5 = fio.open(file5, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
 ---
 ...
 fh5:write("template data")
@@ -793,7 +793,7 @@ fh5:close()
 ---
 - true
 ...
-fh6 = fio.open(file6, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+fh6 = fio.open(file6, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0644', 8))
 ---
 ...
 fh6:write("to be truncated")
@@ -869,7 +869,7 @@ tmpdir = fio.tempdir()
 tmpfile = fio.pathjoin(tmpdir, "test1")
 ---
 ...
-fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 ---
 ...
 fh:write('helloworld!')
@@ -900,7 +900,7 @@ fio.unlink(tmpfile)
 tmpfile = fio.pathjoin(tmpdir, "test")
 ---
 ...
-fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+fh = fio.open(tmpfile, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
 ---
 ...
 fh:write('helloworld!')
@@ -1167,7 +1167,7 @@ test_run:cmd("setopt delimiter ';'")
 - true
 ...
 function write_file(name, odd)
-    local fh = fio.open(name, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
+    local fh = fio.open(name, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, tonumber('0777', 8))
     if odd then
         fh:write(string.rep('1', 100))
     else
@@ -1245,7 +1245,7 @@ fio.open(nil)
 ---
 - error: 'builtin/fio.lua: Usage: fio.open(path[, flags[, mode]])'
 ...
-fio.open(tmp1, {'A'}, 0777)
+fio.open(tmp1, {'A'}, tonumber('0777', 8))
 ---
 - error: 'builtin/fio.lua: fio.open(): unknown flag: A'
 ...
