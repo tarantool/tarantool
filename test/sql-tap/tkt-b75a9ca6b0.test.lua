@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(22)
+test:plan(20)
 
 --!./tcltestrunner.lua
 -- 2014-04-21
@@ -57,7 +57,6 @@ local eqps = {
     {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x, y DESC", {1, 3, 2, 2, 3, 1}, {idxscan, sort}},
     {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x DESC, y DESC", {3, 1, 2, 2, 1, 3}, {idxscan, sort}},
     {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x ASC, y ASC", {1, 3, 2, 2, 3, 1}, {idxscan}},
-    {"SELECT x,y FROM t1 GROUP BY x, y ORDER BY x COLLATE \"unicode_ci\", y", {1, 3, 2, 2, 3, 1}, {idxscan, sort}},
 }
 for tn, val in ipairs(eqps) do
     local q = val[1]

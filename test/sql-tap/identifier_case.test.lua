@@ -166,7 +166,7 @@ test:do_execsql_test(
 
 test:do_execsql_test(
     test_prefix.."4.1",
-    string.format([[select * from table1 order by a collate "unicode_ci"]]),
+    string.format([[select * from table1 order by a]]),
     {}
 )
 

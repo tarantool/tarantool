@@ -106,7 +106,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "resolver01-2.1",
     [[
-        SELECT 2 AS y FROM t1, t2 ORDER BY y COLLATE "unicode_ci";
+        SELECT 2 AS y FROM t1, t2 ORDER BY y;
     ]], {
         -- <resolver01-2.1>
         0, {2}
@@ -116,7 +116,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "resolver01-2.2",
     [[
-        SELECT 2 AS yy FROM t1, t2 ORDER BY y COLLATE "unicode_ci";
+        SELECT 2 AS yy FROM t1, t2 ORDER BY y;
     ]], {
         -- <resolver01-2.2>
         1, "ambiguous column name: Y"
@@ -126,7 +126,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "resolver01-2.3",
     [[
-        SELECT x AS y FROM t3 ORDER BY y COLLATE "unicode_ci";
+        SELECT x AS y FROM t3 ORDER BY y;
     ]], {
         -- <resolver01-2.3>
         0, {11, 33}
@@ -136,7 +136,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "resolver01-2.4",
     [[
-        SELECT x AS yy FROM t3 ORDER BY y COLLATE "unicode_ci";
+        SELECT x AS yy FROM t3 ORDER BY y;
     ]], {
         -- <resolver01-2.4>
         0, {33, 11}
@@ -146,7 +146,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "resolver01-2.5",
     [[
-        SELECT x AS yy FROM t3 ORDER BY yy COLLATE "unicode_ci";
+        SELECT x AS yy FROM t3 ORDER BY yy;
     ]], {
         -- <resolver01-2.5>
         0, {11, 33}
@@ -156,7 +156,7 @@ test:do_catchsql_test(
 test:do_catchsql_test(
     "resolver01-2.6",
     [[
-        SELECT x AS yy FROM t3 ORDER BY 1 COLLATE "unicode_ci";
+        SELECT x AS yy FROM t3 ORDER BY 1;
     ]], {
         -- <resolver01-2.6>
         0, {11, 33}

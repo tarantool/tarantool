@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(174)
+test:plan(190)
 
 local prefix = "collation-"
 
@@ -528,5 +528,88 @@ test:do_catchsql_test(
         "collation-2.5.0",
         'CREATE TABLE test3 (a int, b int, c int, PRIMARY KEY (a, a COLLATE foo, b, c))',
         {1, "Collation 'FOO' does not exist"})
+
+-- gh-3805 Check COLLATE passing with string-like args only.
+
+test:do_execsql_test(
+    "collation-2.7.0",
+    [[ CREATE TABLE test1 (one INT PRIMARY KEY, two INT) ]],
+    {})
+
+test:do_catchsql_test(
+    "collation-2.7.1",
+    'SELECT one COLLATE "binary" FROM test1',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.2",
+    'SELECT one COLLATE "unicode_ci" FROM test1',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.3",
+    'SELECT two COLLATE "binary" FROM test1',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+
+test:do_catchsql_test(
+    "collation-2.7.4",
+    'SELECT (one + two) COLLATE "binary" FROM test1',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.5",
+    'SELECT (SELECT one FROM test1) COLLATE "binary"',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_execsql_test(
+    "collation-2.7.6",
+    'SELECT TRIM(\'A\') COLLATE "binary"',
+    {"A"})
+
+test:do_catchsql_test(
+    "collation-2.7.7",
+    'SELECT RANDOM() COLLATE "binary"',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.8",
+    'SELECT LENGTH(\'A\') COLLATE "binary"',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.9",
+    'SELECT TRUE COLLATE "unicode"',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.10",
+    'SELECT NOT TRUE COLLATE "unicode"',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.11",
+    'SELECT TRUE AND TRUE COLLATE "unicode"',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_catchsql_test(
+    "collation-2.7.12",
+    'SELECT 1 | 1 COLLATE "unicode"',
+    {1, "COLLATE clause can't be used with non-string arguments"})
+
+test:do_execsql_test(
+    "collation-2.7.14",
+    'SELECT +\'str\' COLLATE "unicode"',
+    {"str"})
+
+test:do_execsql_test(
+    "collation-2.7.15",
+    'SELECT (\'con\'||\'cat\') COLLATE "unicode"',
+    {"concat"})
+
+test:do_execsql_test(
+    "collation-2.7.16",
+    'SELECT (SELECT \'str\') COLLATE "binary" COLLATE "binary";',
+    {"str"})
 
 test:finish_test()

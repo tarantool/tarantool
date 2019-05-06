@@ -197,6 +197,34 @@ sqlExprSkipCollate(Expr * pExpr)
 	return pExpr;
 }
 
+/*
+ * Check that left node of @a expr with the collation in the root
+ * can be used with <COLLATE>. If it is not, leave an error
+ * message in pParse.
+ *
+ * @param parse Parser context.
+ * @param expr Expression for checking.
+ *
+ * @retval 0 on success.
+ * @retval -1 on error.
+ */
+static int
+check_collate_arg(struct Parse *parse, struct Expr *expr)
+{
+	struct Expr *left = expr->pLeft;
+	while (left->op == TK_COLLATE)
+		left = left->pLeft;
+	enum field_type type = sql_expr_type(left);
+	if (type != FIELD_TYPE_STRING && type != FIELD_TYPE_SCALAR) {
+		diag_set(ClientError, ER_SQL_PARSER_GENERIC,
+			 "COLLATE clause can't be used with non-string "
+			 "arguments");
+		parse->is_aborted = true;
+		return -1;
+	}
+	return 0;
+}
+
 int
 sql_expr_coll(Parse *parse, Expr *p, bool *is_explicit_coll, uint32_t *coll_id,
 	      struct coll **coll)
@@ -4165,6 +4193,8 @@ sqlExprCodeTarget(Parse * pParse, Expr * pExpr, int target)
 		}
 	case TK_SPAN:
 	case TK_COLLATE:{
+			if (check_collate_arg(pParse, pExpr) != 0)
+				break;
 			return sqlExprCodeTarget(pParse, pExpr->pLeft,
 						     target);
 		}
@@ -4389,7 +4419,6 @@ int
 sqlExprCodeTemp(Parse * pParse, Expr * pExpr, int *pReg)
 {
 	int r2;
-	pExpr = sqlExprSkipCollate(pExpr);
 	if (ConstFactorOk(pParse)
 	    && pExpr->op != TK_REGISTER && sqlExprIsConstantNotJoin(pExpr)
 	    ) {

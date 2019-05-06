@@ -1043,7 +1043,7 @@ test:do_catchsql_test(13.3, [[
 -- 2015-04-12
 --
 test:do_execsql_test(14.1, [[
-  WITH x AS (SELECT * FROM t) SELECT 0 EXCEPT SELECT 0 ORDER BY 1 COLLATE "binary";
+  WITH x AS (SELECT * FROM t) SELECT 0 EXCEPT SELECT 0 ORDER BY 1;
 ]], {
   -- <14.1>
   

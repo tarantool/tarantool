@@ -1672,7 +1672,7 @@ test:do_execsql_test(
 test:do_execsql_test(
     "select1-10.7",
     [[
-        SELECT f1 COLLATE "unicode_ci" AS x FROM test1 ORDER BY x
+        SELECT f1 AS x FROM test1 ORDER BY x
     ]], {
         -- <select1-10.7>
         11, 33

@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(27)
+test:plan(29)
 
 --!./tcltestrunner.lua
 -- 2007 November 29
@@ -186,7 +186,17 @@ test:do_test(
         -- </in3-1.13>
     })
 
-
+test:do_execsql_test(
+    "in3-1.14",
+    [[
+        CREATE TABLE t2(a TEXT PRIMARY KEY);
+        INSERT INTO t2 VALUES('A');
+        INSERT INTO t2 VALUES('B');
+        INSERT INTO t2 VALUES('C');
+    ]], {
+        -- <in3-1.14>
+        -- </in3-1.14>
+    })
 
 -- The first of these queries has to use the temp-table, because the 
 -- collation sequence used for the index on "t1.a" does not match the
@@ -194,23 +204,32 @@ test:do_test(
 -- require a temp-table, because the collation sequences match.
 --
 test:do_test(
-    "in3-1.14",
+    "in3-1.15",
     function()
-        return exec_neph(" SELECT a FROM t1 WHERE a COLLATE \"unicode_ci\" IN (SELECT a FROM t1) ")
+        return exec_neph(" SELECT a FROM t2 WHERE a COLLATE \"unicode_ci\" IN (SELECT a FROM t2) ")
     end, {
-        -- <in3-1.14>
-        1, 1, 3, 5
-        -- </in3-1.14>
+        -- <in3-1.15>
+        1, "A", "B", "C"
+        -- </in3-1.15>
     })
 
 test:do_test(
-    "in3-1.15",
+    "in3-1.16",
     function()
-        return exec_neph(" SELECT a FROM t1 WHERE a COLLATE \"binary\" IN (SELECT a FROM t1) ")
+        return exec_neph(" SELECT a FROM t2 WHERE a COLLATE \"binary\" IN (SELECT a FROM t2) ")
     end, {
-        -- <in3-1.15>
-        1, 1, 3, 5
-        -- </in3-1.15>
+        -- <in3-1.16>
+        1, "A", "B", "C"
+        -- </in3-1.16>
+    })
+
+test:do_execsql_test(
+    "in3-1.17",
+    [[
+        DROP TABLE t2
+    ]], {
+        -- <in3-1.17>
+        -- </in3-1.17>
     })
 
 -- Neither of these queries require a temp-table. The collation sequence
