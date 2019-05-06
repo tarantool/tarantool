@@ -231,6 +231,8 @@ file1 = fio.pathjoin(tmp1, 'file.1')
 file2 = fio.pathjoin(tmp2, 'file.2')
 file3 = fio.pathjoin(tree, 'file.3')
 file4 = fio.pathjoin(tree, 'file.4')
+file5 = fio.pathjoin(tree, 'file.5')
+file6 = fio.pathjoin(tree, 'file.6')
 
 fh1 = fio.open(file1, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 0777)
 fh1:write("gogo")
@@ -248,6 +250,17 @@ errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', 1)
 fio.copyfile(file1, file4)
 fio.stat(file1, file4) ~= nil
 errinj.set('ERRINJ_COIO_SENDFILE_CHUNK', -1)
+
+--- test the destination file is truncated
+fh5 = fio.open(file5, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+fh5:write("template data")
+fh5:close()
+fh6 = fio.open(file6, { 'O_RDWR', 'O_TRUNC', 'O_CREAT' }, 420)
+fh6:write("to be truncated")
+fio.copyfile(file5, file6)
+fh6:seek(0)
+fh6:read()
+fh6:close()
 
 res, err = fio.copyfile(fio.pathjoin(tmp1, 'not_exists.txt'), tmp1)
 res
