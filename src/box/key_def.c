@@ -350,7 +350,7 @@ int
 box_tuple_compare(box_tuple_t *tuple_a, box_tuple_t *tuple_b,
 		  box_key_def_t *key_def)
 {
-	return tuple_compare(tuple_a, tuple_b, key_def);
+	return tuple_compare(tuple_a, HINT_NONE, tuple_b, HINT_NONE, key_def);
 }
 
 int
@@ -358,7 +358,8 @@ box_tuple_compare_with_key(box_tuple_t *tuple_a, const char *key_b,
 			   box_key_def_t *key_def)
 {
 	uint32_t part_count = mp_decode_array(&key_b);
-	return tuple_compare_with_key(tuple_a, key_b, part_count, key_def);
+	return tuple_compare_with_key(tuple_a, HINT_NONE, key_b,
+				      part_count, HINT_NONE, key_def);
 
 }
 

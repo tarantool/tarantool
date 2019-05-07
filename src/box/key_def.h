@@ -130,27 +130,18 @@ key_part_is_nullable(const struct key_part *part)
 }
 
 /** @copydoc tuple_compare_with_key() */
-typedef int (*tuple_compare_with_key_t)(struct tuple *tuple_a,
+typedef int (*tuple_compare_with_key_t)(struct tuple *tuple,
+					hint_t tuple_hint,
 					const char *key,
 					uint32_t part_count,
+					hint_t key_hint,
 					struct key_def *key_def);
-/** @copydoc tuple_compare_with_key_hinted() */
-typedef int (*tuple_compare_with_key_hinted_t)(struct tuple *tuple,
-					       hint_t tuple_hint,
-					       const char *key,
-					       uint32_t part_count,
-					       hint_t key_hint,
-					       struct key_def *key_def);
 /** @copydoc tuple_compare() */
 typedef int (*tuple_compare_t)(struct tuple *tuple_a,
+			       hint_t tuple_a_hint,
 			       struct tuple *tuple_b,
+			       hint_t tuple_b_hint,
 			       struct key_def *key_def);
-/** @copydoc tuple_compare_hinted() */
-typedef int (*tuple_compare_hinted_t)(struct tuple *tuple_a,
-				      hint_t tuple_a_hint,
-				      struct tuple *tuple_b,
-				      hint_t tuple_b_hint,
-				      struct key_def *key_def);
 /** @copydoc tuple_extract_key() */
 typedef char *(*tuple_extract_key_t)(struct tuple *tuple,
 				     struct key_def *key_def,
@@ -177,12 +168,8 @@ typedef hint_t (*key_hint_t)(const char *key, uint32_t part_count,
 struct key_def {
 	/** @see tuple_compare() */
 	tuple_compare_t tuple_compare;
-	/** @see tuple_compare_hinted() */
-	tuple_compare_hinted_t tuple_compare_hinted;
 	/** @see tuple_compare_with_key() */
 	tuple_compare_with_key_t tuple_compare_with_key;
-	/** @see tuple_compare_with_key_hinted() */
-	tuple_compare_with_key_hinted_t tuple_compare_with_key_hinted;
 	/** @see tuple_extract_key() */
 	tuple_extract_key_t tuple_extract_key;
 	/** @see tuple_extract_key_raw() */
@@ -601,21 +588,6 @@ tuple_extract_key_raw(const char *data, const char *data_end,
 }
 
 /**
- * Compare keys using the key definition.
- * @param key_a key parts with MessagePack array header
- * @param part_count_a the number of parts in the key_a
- * @param key_b key_parts with MessagePack array header
- * @param part_count_b the number of parts in the key_b
- * @param key_def key definition
- *
- * @retval 0  if key_a == key_b
- * @retval <0 if key_a < key_b
- * @retval >0 if key_a > key_b
- */
-int
-key_compare(const char *key_a, const char *key_b, struct key_def *key_def);
-
-/**
  * Compare keys using the key definition and comparison hints.
  * @param key_a key parts with MessagePack array header
  * @param key_a_hint comparison hint of @a key_a
@@ -628,25 +600,9 @@ key_compare(const char *key_a, const char *key_b, struct key_def *key_def);
  * @retval >0 if key_a > key_b
  */
 int
-key_compare_hinted(const char *key_a, hint_t key_a_hint,
-		   const char *key_b, hint_t key_b_hint,
-		   struct key_def *key_def);
-
-/**
- * Compare tuples using the key definition.
- * @param tuple_a first tuple
- * @param tuple_b second tuple
- * @param key_def key definition
- * @retval 0  if key_fields(tuple_a) == key_fields(tuple_b)
- * @retval <0 if key_fields(tuple_a) < key_fields(tuple_b)
- * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
- */
-static inline int
-tuple_compare(struct tuple *tuple_a, struct tuple *tuple_b,
-	      struct key_def *key_def)
-{
-	return key_def->tuple_compare(tuple_a, tuple_b, key_def);
-}
+key_compare(const char *key_a, hint_t key_a_hint,
+	    const char *key_b, hint_t key_b_hint,
+	    struct key_def *key_def);
 
 /**
  * Compare tuples using the key definition and comparison hints.
@@ -660,30 +616,12 @@ tuple_compare(struct tuple *tuple_a, struct tuple *tuple_b,
  * @retval >0 if key_fields(tuple_a) > key_fields(tuple_b)
  */
 static inline int
-tuple_compare_hinted(struct tuple *tuple_a, hint_t tuple_a_hint,
-		     struct tuple *tuple_b, hint_t tuple_b_hint,
-		     struct key_def *key_def)
+tuple_compare(struct tuple *tuple_a, hint_t tuple_a_hint,
+	      struct tuple *tuple_b, hint_t tuple_b_hint,
+	      struct key_def *key_def)
 {
-	return key_def->tuple_compare_hinted(tuple_a, tuple_a_hint, tuple_b,
-					     tuple_b_hint, key_def);
-}
-
-/**
- * @brief Compare tuple with key using the key definition.
- * @param tuple tuple
- * @param key key parts without MessagePack array header
- * @param part_count the number of parts in @a key
- * @param key_def key definition
- *
- * @retval 0  if key_fields(tuple) == parts(key)
- * @retval <0 if key_fields(tuple) < parts(key)
- * @retval >0 if key_fields(tuple) > parts(key)
- */
-static inline int
-tuple_compare_with_key(struct tuple *tuple, const char *key,
-		       uint32_t part_count, struct key_def *key_def)
-{
-	return key_def->tuple_compare_with_key(tuple, key, part_count, key_def);
+	return key_def->tuple_compare(tuple_a, tuple_a_hint,
+				      tuple_b, tuple_b_hint, key_def);
 }
 
 /**
@@ -700,13 +638,12 @@ tuple_compare_with_key(struct tuple *tuple, const char *key,
  * @retval >0 if key_fields(tuple) > parts(key)
  */
 static inline int
-tuple_compare_with_key_hinted(struct tuple *tuple, hint_t tuple_hint,
-			      const char *key, uint32_t part_count,
-			      hint_t key_hint, struct key_def *key_def)
+tuple_compare_with_key(struct tuple *tuple, hint_t tuple_hint,
+		       const char *key, uint32_t part_count,
+		       hint_t key_hint, struct key_def *key_def)
 {
-	return key_def->tuple_compare_with_key_hinted(tuple, tuple_hint, key,
-						      part_count, key_hint,
-						      key_def);
+	return key_def->tuple_compare_with_key(tuple, tuple_hint, key,
+					       part_count, key_hint, key_def);
 }
 
 /**

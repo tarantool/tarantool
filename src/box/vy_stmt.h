@@ -380,72 +380,32 @@ vy_stmt_hint(struct tuple *stmt, struct key_def *key_def)
 
 /**
  * Compare two vinyl statements taking into account their
- * formats (key or tuple).
- */
-static inline int
-vy_stmt_compare(struct tuple *a, struct tuple *b, struct key_def *key_def)
-{
-	bool a_is_tuple = !vy_stmt_is_key(a);
-	bool b_is_tuple = !vy_stmt_is_key(b);
-	if (a_is_tuple && b_is_tuple) {
-		return tuple_compare(a, b, key_def);
-	} else if (a_is_tuple && !b_is_tuple) {
-		const char *key = tuple_data(b);
-		uint32_t part_count = mp_decode_array(&key);
-		return tuple_compare_with_key(a, key, part_count, key_def);
-	} else if (!a_is_tuple && b_is_tuple) {
-		const char *key = tuple_data(a);
-		uint32_t part_count = mp_decode_array(&key);
-		return -tuple_compare_with_key(b, key, part_count, key_def);
-	} else {
-		assert(!a_is_tuple && !b_is_tuple);
-		return key_compare(tuple_data(a), tuple_data(b), key_def);
-	}
-}
-
-/**
- * Compare two vinyl statements taking into account their
  * formats (key or tuple) and using comparison hints.
  */
 static inline int
-vy_stmt_compare_hinted(struct tuple *a, hint_t a_hint,
-		       struct tuple *b, hint_t b_hint,
-		       struct key_def *key_def)
+vy_stmt_compare(struct tuple *a, hint_t a_hint,
+		struct tuple *b, hint_t b_hint,
+		struct key_def *key_def)
 {
 	bool a_is_tuple = !vy_stmt_is_key(a);
 	bool b_is_tuple = !vy_stmt_is_key(b);
 	if (a_is_tuple && b_is_tuple) {
-		return tuple_compare_hinted(a, a_hint, b, b_hint, key_def);
+		return tuple_compare(a, a_hint, b, b_hint, key_def);
 	} else if (a_is_tuple && !b_is_tuple) {
 		const char *key = tuple_data(b);
 		uint32_t part_count = mp_decode_array(&key);
-		return tuple_compare_with_key_hinted(a, a_hint, key, part_count,
-						     b_hint, key_def);
+		return tuple_compare_with_key(a, a_hint, key, part_count,
+					      b_hint, key_def);
 	} else if (!a_is_tuple && b_is_tuple) {
 		const char *key = tuple_data(a);
 		uint32_t part_count = mp_decode_array(&key);
-		return -tuple_compare_with_key_hinted(b, b_hint, key, part_count,
-						      a_hint, key_def);
+		return -tuple_compare_with_key(b, b_hint, key, part_count,
+					       a_hint, key_def);
 	} else {
 		assert(!a_is_tuple && !b_is_tuple);
-		return key_compare_hinted(tuple_data(a), a_hint,
-					  tuple_data(b), b_hint, key_def);
+		return key_compare(tuple_data(a), a_hint,
+				   tuple_data(b), b_hint, key_def);
 	}
-}
-
-/**
- * Compare a vinyl statement (key or tuple) with a raw key
- * (msgpack array).
- */
-static inline int
-vy_stmt_compare_with_raw_key(struct tuple *stmt, const char *key,
-			     struct key_def *key_def)
-{
-	if (!vy_stmt_is_key(stmt)) {
-		uint32_t part_count = mp_decode_array(&key);
-		return tuple_compare_with_key(stmt, key, part_count, key_def);
-	}
-	return key_compare(tuple_data(stmt), key, key_def);
 }
 
 /**
@@ -453,18 +413,17 @@ vy_stmt_compare_with_raw_key(struct tuple *stmt, const char *key,
  * (msgpack array) using comparison hints.
  */
 static inline int
-vy_stmt_compare_with_raw_key_hinted(struct tuple *stmt, hint_t stmt_hint,
-				    const char *key, hint_t key_hint,
-				    struct key_def *key_def)
+vy_stmt_compare_with_raw_key(struct tuple *stmt, hint_t stmt_hint,
+			     const char *key, hint_t key_hint,
+			     struct key_def *key_def)
 {
 	if (!vy_stmt_is_key(stmt)) {
 		uint32_t part_count = mp_decode_array(&key);
-		return tuple_compare_with_key_hinted(stmt, stmt_hint,
-						     key, part_count, key_hint,
-						     key_def);
+		return tuple_compare_with_key(stmt, stmt_hint, key,
+					      part_count, key_hint,
+					      key_def);
 	}
-	return key_compare_hinted(tuple_data(stmt), stmt_hint,
-				  key, key_hint, key_def);
+	return key_compare(tuple_data(stmt), stmt_hint, key, key_hint, key_def);
 }
 
 /**
@@ -761,7 +720,7 @@ vy_entry_key_from_msgpack(struct tuple_format *format, struct key_def *key_def,
 static inline int
 vy_entry_compare(struct vy_entry a, struct vy_entry b, struct key_def *key_def)
 {
-	return vy_stmt_compare_hinted(a.stmt, a.hint, b.stmt, b.hint, key_def);
+	return vy_stmt_compare(a.stmt, a.hint, b.stmt, b.hint, key_def);
 }
 
 /**
@@ -773,8 +732,8 @@ vy_entry_compare_with_raw_key(struct vy_entry entry,
 			      const char *key, hint_t key_hint,
 			      struct key_def *key_def)
 {
-	return vy_stmt_compare_with_raw_key_hinted(entry.stmt, entry.hint,
-						   key, key_hint, key_def);
+	return vy_stmt_compare_with_raw_key(entry.stmt, entry.hint,
+					    key, key_hint, key_def);
 }
 
 #if defined(__cplusplus)

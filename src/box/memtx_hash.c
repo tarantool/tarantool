@@ -44,15 +44,16 @@ static inline bool
 memtx_hash_equal(struct tuple *tuple_a, struct tuple *tuple_b,
 		 struct key_def *key_def)
 {
-	return tuple_compare(tuple_a, tuple_b, key_def) == 0;
+	return tuple_compare(tuple_a, HINT_NONE,
+			     tuple_b, HINT_NONE, key_def) == 0;
 }
 
 static inline bool
 memtx_hash_equal_key(struct tuple *tuple, const char *key,
 		     struct key_def *key_def)
 {
-	return tuple_compare_with_key(tuple, key, key_def->part_count,
-				      key_def) == 0;
+	return tuple_compare_with_key(tuple, HINT_NONE, key, key_def->part_count,
+				      HINT_NONE, key_def) == 0;
 }
 
 #define LIGHT_NAME _index

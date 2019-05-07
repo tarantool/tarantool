@@ -455,7 +455,8 @@ space_before_replace(struct space *space, struct txn *txn,
 	 */
 	if (pk != NULL && request_changed &&
 	    old_tuple != NULL && new_tuple != NULL &&
-	    tuple_compare(old_tuple, new_tuple, pk->def->key_def) != 0) {
+	    tuple_compare(old_tuple, HINT_NONE, new_tuple, HINT_NONE,
+			  pk->def->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 pk->def->name, space->def->name);
 		rc = -1;

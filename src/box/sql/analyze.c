@@ -1346,8 +1346,9 @@ static int
 sample_compare(const void *a, const void *b, void *arg)
 {
 	struct key_def *def = (struct key_def *)arg;
-	return key_compare(((struct index_sample *) a)->sample_key,
-			   ((struct index_sample *) b)->sample_key, def);
+	return key_compare(((struct index_sample *) a)->sample_key, HINT_NONE,
+			   ((struct index_sample *) b)->sample_key, HINT_NONE,
+			   def);
 }
 
 /**

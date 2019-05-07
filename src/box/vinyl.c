@@ -1366,7 +1366,8 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	 * we must not use vy_entry_compare() here.
 	 */
 	if (result->stmt == NULL ||
-	    vy_stmt_compare(result->stmt, entry.stmt, lsm->cmp_def) != 0) {
+	    vy_stmt_compare(result->stmt, HINT_NONE, entry.stmt,
+			    HINT_NONE, lsm->cmp_def) != 0) {
 		/*
 		 * If a tuple read from a secondary index doesn't
 		 * match the tuple corresponding to it in the
@@ -1622,7 +1623,8 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 	 * fail here.
 	 */
 	if (found != NULL && vy_stmt_type(stmt) == IPROTO_REPLACE &&
-	    vy_stmt_compare(stmt, found, lsm->pk->key_def) == 0) {
+	    vy_stmt_compare(stmt, HINT_NONE, found, HINT_NONE,
+			    lsm->pk->key_def) == 0) {
 		tuple_unref(found);
 		return 0;
 	}
@@ -1827,7 +1829,8 @@ vy_check_update(struct space *space, const struct vy_lsm *pk,
 		uint64_t column_mask)
 {
 	if (!key_update_can_be_skipped(pk->key_def->column_mask, column_mask) &&
-	    vy_stmt_compare(old_tuple, new_tuple, pk->key_def) != 0) {
+	    vy_stmt_compare(old_tuple, HINT_NONE, new_tuple,
+			    HINT_NONE, pk->key_def) != 0) {
 		diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 			 index_name_by_id(space, pk->index_id),
 			 space_name(space));

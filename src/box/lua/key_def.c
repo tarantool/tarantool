@@ -305,7 +305,7 @@ lbox_key_def_compare(struct lua_State *L)
 		return luaT_error(L);
 	}
 
-	int rc = tuple_compare(tuple_a, tuple_b, key_def);
+	int rc = tuple_compare(tuple_a, HINT_NONE, tuple_b, HINT_NONE, key_def);
 	tuple_unref(tuple_a);
 	tuple_unref(tuple_b);
 	lua_pushinteger(L, rc);
@@ -345,7 +345,8 @@ lbox_key_def_compare_with_key(struct lua_State *L)
 		return luaT_error(L);
 	}
 
-	int rc = tuple_compare_with_key(tuple, key, part_count, key_def);
+	int rc = tuple_compare_with_key(tuple, HINT_NONE, key,
+					part_count, HINT_NONE, key_def);
 	region_truncate(region, region_svp);
 	tuple_unref(tuple);
 	lua_pushinteger(L, rc);

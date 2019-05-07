@@ -513,8 +513,8 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 		struct index *pk = space->index[0];
 		if (!key_update_can_be_skipped(pk->def->key_def->column_mask,
 					       column_mask) &&
-		    tuple_compare(old_tuple, stmt->new_tuple,
-				  pk->def->key_def) != 0) {
+		    tuple_compare(old_tuple, HINT_NONE, stmt->new_tuple,
+				  HINT_NONE, pk->def->key_def) != 0) {
 			/* Primary key is changed: log error and do nothing. */
 			diag_set(ClientError, ER_CANT_UPDATE_PRIMARY_KEY,
 				 pk->def->name, space_name(space));
