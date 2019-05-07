@@ -32,62 +32,102 @@ ciph.decrypt(enc, pass, iv)
 ---
 - test
 ...
---Failing scenaries
+-- Failing scenarios.
 crypto.cipher.aes128.cbc.encrypt('a')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Key length should be equal to cipher key length
-    (16 bytes)'
+- error: 'builtin/crypto.lua:<line>"]: Cipher not initialized'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '123456', '435')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Key length should be equal to cipher key length
-    (16 bytes)'
+- error: key size expected 16, got 6
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Initial vector length should be equal to cipher
-    iv length (16 bytes)'
+- error: 'builtin/crypto.lua:<line>"]: Cipher not initialized'
 ...
 crypto.cipher.aes128.cbc.encrypt('a', '1234567887654321', '12')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Initial vector length should be equal to cipher
-    iv length (16 bytes)'
+- error: IV size expected 16, got 2
 ...
 crypto.cipher.aes256.cbc.decrypt('a')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Key length should be equal to cipher key length
-    (32 bytes)'
+- error: 'builtin/crypto.lua:<line>"]: Cipher not initialized'
 ...
 crypto.cipher.aes256.cbc.decrypt('a', '123456', '435')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Key length should be equal to cipher key length
-    (32 bytes)'
+- error: key size expected 32, got 6
 ...
 crypto.cipher.aes256.cbc.decrypt('a', '12345678876543211234567887654321')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Initial vector length should be equal to cipher
-    iv length (16 bytes)'
+- error: 'builtin/crypto.lua:<line>"]: Cipher not initialized'
 ...
 crypto.cipher.aes256.cbc.decrypt('12', '12345678876543211234567887654321', '12')
 ---
-- error: 'builtin/crypto.lua:<line>"]: Initial vector length should be equal to cipher
-    iv length (16 bytes)'
-...
-crypto.cipher.aes192.cbc.encrypt.new()
----
-- error: Key length should be equal to cipher key length (24 bytes)
-...
-crypto.cipher.aes192.cbc.encrypt.new('123321')
----
-- error: Key length should be equal to cipher key length (24 bytes)
-...
-crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678')
----
-- error: Initial vector length should be equal to cipher iv length (16 bytes)
+- error: IV size expected 16, got 2
 ...
 crypto.cipher.aes192.cbc.decrypt.new('123456788765432112345678', '12345')
 ---
-- error: Initial vector length should be equal to cipher iv length (16 bytes)
+- error: IV size expected 16, got 5
+...
+-- Set key after codec creation.
+c = crypto.cipher.aes128.cbc.encrypt.new()
+---
+...
+key = '1234567812345678'
+---
+...
+iv = key
+---
+...
+c:init(key)
+---
+...
+c:update('plain')
+---
+- error: Cipher not initialized
+...
+c:result()
+---
+- error: Cipher not initialized
+...
+c:init(nil, iv)
+---
+...
+cipher = c:update('plain ')
+---
+...
+cipher = cipher..c:update('next plain')
+---
+...
+cipher = cipher..c:result()
+---
+...
+crypto.cipher.aes128.cbc.decrypt(cipher, key, iv)
+---
+- plain next plain
+...
+-- Reuse.
+key2 = '8765432187654321'
+---
+...
+iv2 = key2
+---
+...
+c:init(key2, iv2)
+---
+...
+cipher = c:update('new plain ')
+---
+...
+cipher = cipher..c:update('next new plain')
+---
+...
+cipher = cipher..c:result()
+---
+...
+crypto.cipher.aes128.cbc.decrypt(cipher, key2, iv2)
+---
+- new plain next new plain
 ...
 crypto.cipher.aes100.efb
 ---
@@ -103,6 +143,22 @@ crypto.digest.nodigest
 - error: '[string "return crypto.digest.nodigest "]:1: Digest method "nodigest" is
     not supported'
 ...
+-- Check that GC really drops unused codecs and streams, and
+-- nothing crashes.
+weak = setmetatable({obj = c}, {__mode = 'v'})
+---
+...
+c = nil
+---
+...
+collectgarbage('collect')
+---
+- 0
+...
+weak.obj
+---
+- null
+...
 bad_pass = '8765432112345678'
 ---
 ...
@@ -111,13 +167,13 @@ bad_iv = '123456abcdefghij'
 ...
 ciph.decrypt(enc, bad_pass, iv)
 ---
-- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:error:06065064:digital envelope
-    routines:EVP_DecryptFinal_ex:bad decrypt'
+- error: 'OpenSSL error: error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad
+    decrypt'
 ...
 ciph.decrypt(enc, pass, bad_iv)
 ---
-- error: 'builtin/crypto.lua:<line>"]: Can''t finalize cipher:error:06065064:digital envelope
-    routines:EVP_DecryptFinal_ex:bad decrypt'
+- error: 'OpenSSL error: error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad
+    decrypt'
 ...
 test_run:cmd("clear filter")
 ---

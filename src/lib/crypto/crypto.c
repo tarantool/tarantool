@@ -344,18 +344,6 @@ crypto_free(void)
 #endif
 }
 
-int
-crypto_EVP_CIPHER_key_length(const EVP_CIPHER *cipher)
-{
-	return EVP_CIPHER_key_length(cipher);
-}
-
-int
-crypto_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher)
-{
-	return EVP_CIPHER_iv_length(cipher);
-}
-
 EVP_MD_CTX *
 crypto_EVP_MD_CTX_new(void)
 {

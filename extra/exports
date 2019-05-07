@@ -77,12 +77,15 @@ space_run_triggers
 space_bsize
 box_schema_version
 
-crypto_EVP_CIPHER_key_length
-crypto_EVP_CIPHER_iv_length
 crypto_EVP_MD_CTX_new
 crypto_EVP_MD_CTX_free
 crypto_HMAC_CTX_new
 crypto_HMAC_CTX_free
+crypto_stream_new
+crypto_stream_begin
+crypto_stream_append
+crypto_stream_commit
+crypto_stream_delete
 
 # Module API
 

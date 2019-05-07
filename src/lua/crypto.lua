@@ -28,23 +28,45 @@ ffi.cdef[[
     int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len);
     int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len);
 
-    typedef struct {} EVP_CIPHER_CTX;
-    typedef struct {} EVP_CIPHER;
-    EVP_CIPHER_CTX *EVP_CIPHER_CTX_new();
-    void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *ctx);
+    enum crypto_algo {
+        CRYPTO_ALGO_NONE,
+        CRYPTO_ALGO_AES128,
+        CRYPTO_ALGO_AES192,
+        CRYPTO_ALGO_AES256,
+        CRYPTO_ALGO_DES,
+    };
 
-    int EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
-                          ENGINE *impl, const unsigned char *key,
-                          const unsigned char *iv, int enc);
-    int EVP_CipherUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
-                     const unsigned char *in, int inl);
-    int EVP_CipherFinal_ex(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl);
+    enum crypto_mode {
+        CRYPTO_MODE_ECB,
+        CRYPTO_MODE_CBC,
+        CRYPTO_MODE_CFB,
+        CRYPTO_MODE_OFB,
+    };
 
-    int crypto_EVP_CIPHER_iv_length(const EVP_CIPHER *cipher);
-    int crypto_EVP_CIPHER_key_length(const EVP_CIPHER *cipher);
+    enum crypto_direction {
+        CRYPTO_DIR_DECRYPT = 0,
+        CRYPTO_DIR_ENCRYPT = 1,
+    };
 
-    int EVP_CIPHER_block_size(const EVP_CIPHER *cipher);
-    const EVP_CIPHER *EVP_get_cipherbyname(const char *name);
+    struct crypto_stream;
+
+    struct crypto_stream *
+    crypto_stream_new(enum crypto_algo algo, enum crypto_mode mode,
+                      enum crypto_direction dir);
+
+    int
+    crypto_stream_begin(struct crypto_stream *s, const char *key, int key_size,
+                        const char *iv, int iv_size);
+
+    int
+    crypto_stream_append(struct crypto_stream *s, const char *in, int in_size,
+                         char *out, int out_size);
+
+    int
+    crypto_stream_commit(struct crypto_stream *s, char *out, int out_size);
+
+    void
+    crypto_stream_delete(struct crypto_stream *s);
 ]]
 
 local function openssl_err_str()
@@ -206,110 +228,89 @@ hmac_mt = {
     }
 }
 
-local ciphers = {}
-for algo, algo_name in pairs({des = 'DES', aes128 = 'AES-128',
-    aes192 = 'AES-192', aes256 = 'AES-256'}) do
-    local algo_api = {}
-    for mode, mode_name in pairs({cfb = 'CFB', ofb = 'OFB',
-        cbc = 'CBC', ecb = 'ECB'}) do
-            local cipher =
-                ffi.C.EVP_get_cipherbyname(algo_name .. '-' .. mode_name)
-            if cipher ~= nil then
-                algo_api[mode] = cipher
-            end
-    end
-    if algo_api ~= {} then
-        ciphers[algo] = algo_api
-    end
+local crypto_stream_mt = {}
+
+local function crypto_stream_gc(ctx)
+    ffi.C.crypto_stream_delete(ctx)
 end
 
-local cipher_mt = {}
-
-local function cipher_gc(ctx)
-    ffi.C.EVP_CIPHER_CTX_free(ctx)
-end
-
-local function cipher_new(cipher, key, iv, direction)
-    local needed_len = ffi.C.crypto_EVP_CIPHER_key_length(cipher)
-    if key == nil or key:len() ~= needed_len then
-        return error('Key length should be equal to cipher key length ('..
-                     tostring(needed_len)..' bytes)')
-    end
-    needed_len = ffi.C.crypto_EVP_CIPHER_iv_length(cipher)
-    if iv == nil or iv:len() ~= needed_len then
-        return error('Initial vector length should be equal to cipher iv '..
-                     'length ('..tostring(needed_len)..' bytes)')
-    end
-    local ctx = ffi.C.EVP_CIPHER_CTX_new()
+local function crypto_stream_new(algo, mode, key, iv, direction)
+    local ctx = ffi.C.crypto_stream_new(algo, mode, direction)
     if ctx == nil then
-        return error('Can\'t create cipher ctx: ' .. openssl_err_str())
+        box.error()
     end
-    ffi.gc(ctx, cipher_gc)
+    ffi.gc(ctx, crypto_stream_gc)
     local self = setmetatable({
         ctx = ctx,
-        cipher = cipher,
-        block_size = ffi.C.EVP_CIPHER_block_size(cipher),
-        direction = direction,
         buf = buffer.ibuf(),
-        initialized = false,
-        outl = ffi.new('int[1]')
-    }, cipher_mt)
+        is_initialized = false,
+    }, crypto_stream_mt)
     self:init(key, iv)
     return self
 end
 
-local function cipher_init(self, key, iv)
-    if self.ctx == nil then
+local function crypto_stream_begin(self, key, iv)
+    local ctx = self.ctx
+    if not ctx then
         return error('Cipher context isn\'t usable')
     end
-    if ffi.C.EVP_CipherInit_ex(self.ctx, self.cipher, nil,
-        key, iv, self.direction) ~= 1 then
-        return error('Can\'t init cipher:' .. openssl_err_str())
+    self.key = key or self.key
+    self.iv = iv or self.iv
+    if self.key and self.iv then
+        if ffi.C.crypto_stream_begin(ctx, self.key, self.key:len(),
+                                     self.iv, self.iv:len()) ~= 0 then
+            box.error()
+        end
+        self.is_initialized = true
     end
-    self.initialized = true
 end
 
-local function cipher_update(self, input)
-    if not self.initialized then
+local function crypto_stream_append(self, input)
+    if not self.is_initialized then
         return error('Cipher not initialized')
     end
     if type(input) ~= 'string' then
         error("Usage: cipher:update(string)")
     end
-    local wpos = self.buf:reserve(input:len() + self.block_size - 1)
-    if ffi.C.EVP_CipherUpdate(self.ctx, wpos, self.outl, input, input:len()) ~= 1 then
-        return error('Can\'t update cipher:' .. openssl_err_str())
+    local append = ffi.C.crypto_stream_append
+    local out_size = append(self.ctx, input, input:len(), nil, 0)
+    local wpos = self.buf:reserve(out_size)
+    out_size = append(self.ctx, input, input:len(), wpos, out_size)
+    if out_size < 0 then
+        box.error()
     end
-    return ffi.string(wpos, self.outl[0])
+    return ffi.string(wpos, out_size)
 end
 
-local function cipher_final(self)
-    if not self.initialized then
+local function crypto_stream_commit(self)
+    if not self.is_initialized then
         return error('Cipher not initialized')
     end
-    self.initialized = false
-    local wpos = self.buf:reserve(self.block_size - 1)
-    if ffi.C.EVP_CipherFinal_ex(self.ctx, wpos, self.outl) ~= 1 then
-        return error('Can\'t finalize cipher:' .. openssl_err_str())
+    local commit = ffi.C.crypto_stream_commit
+    local out_size = commit(self.ctx, nil, 0)
+    local wpos = self.buf:reserve(out_size)
+    out_size = commit(self.ctx, wpos, out_size)
+    if out_size < 0 then
+        box.error()
     end
-    self.initialized = false
-    return ffi.string(wpos, self.outl[0])
+    self.is_initialized = false
+    return ffi.string(wpos, out_size)
 end
 
-local function cipher_free(self)
-    ffi.C.EVP_CIPHER_CTX_free(self.ctx)
-    ffi.gc(self.ctx, nil)
+local function crypto_stream_free(self)
+    crypto_stream_gc(ffi.gc(self.ctx, nil))
     self.ctx = nil
-    self.initialized = false
-    self.buf:reset()
+    self.key = nil
+    self.iv = nil
+    self.is_initialized = false
 end
 
-cipher_mt = {
+crypto_stream_mt = {
     __index = {
-          init = cipher_init,
-          update = cipher_update,
-          result = cipher_final,
-          free = cipher_free
+          init = crypto_stream_begin,
+          update = crypto_stream_append,
+          result = crypto_stream_commit,
+          free = crypto_stream_free
     }
 }
 
@@ -365,23 +366,51 @@ hmac_api = setmetatable(hmac_api,
         return error('HMAC method "' .. digest .. '" is not supported')
     end })
 
-local function cipher_mode_error(self, mode)
-  error('Cipher mode ' .. mode .. ' is not supported')
-end
+local crypto_algos = {
+    aes128 = ffi.C.CRYPTO_ALGO_AES128,
+    aes192 = ffi.C.CRYPTO_ALGO_AES192,
+    aes256 = ffi.C.CRYPTO_ALGO_AES256,
+    des = ffi.C.CRYPTO_ALGO_DES
+}
+local crypto_modes = {
+    ecb = ffi.C.CRYPTO_MODE_ECB,
+    cbc = ffi.C.CRYPTO_MODE_CBC,
+    cfb = ffi.C.CRYPTO_MODE_CFB,
+    ofb = ffi.C.CRYPTO_MODE_OFB
+}
+local crypto_dirs = {
+    encrypt = ffi.C.CRYPTO_DIR_ENCRYPT,
+    decrypt = ffi.C.CRYPTO_DIR_DECRYPT
+}
 
-local cipher_api = {}
-for class, subclass in pairs(ciphers) do
-    local class_api = {}
-    for subclass, cipher in pairs(subclass) do
-        class_api[subclass] = {}
-        for direction, param in pairs({encrypt = 1, decrypt = 0}) do
-              class_api[subclass][direction] = setmetatable({
-                new = function (key, iv)
-                    return cipher_new(cipher, key, iv, param)
+local algo_api_mt = {
+    __index = function(self, mode)
+        error('Cipher mode ' .. mode .. ' is not supported')
+    end
+}
+local crypto_api_mt = {
+    __index = function(self, cipher)
+        return error('Cipher method "' .. cipher .. '" is not supported')
+    end
+}
+
+local crypto_api = setmetatable({}, crypto_api_mt)
+for algo_name, algo_value in pairs(crypto_algos) do
+    local algo_api = setmetatable({}, algo_api_mt)
+    crypto_api[algo_name] = algo_api
+    for mode_name, mode_value in pairs(crypto_modes) do
+        local mode_api = {}
+        algo_api[mode_name] = mode_api
+        for dir_name, dir_value in pairs(crypto_dirs) do
+            mode_api[dir_name] = setmetatable({
+                new = function(key, iv)
+                    return crypto_stream_new(algo_value, mode_value, key, iv,
+                                             dir_value)
                 end
             }, {
-                __call = function (self, str, key, iv)
-                    local ctx = cipher_new(cipher, key, iv, param)
+                __call = function(self, str, key, iv)
+                    local ctx = crypto_stream_new(algo_value, mode_value, key,
+                                                  iv, dir_value)
                     local res = ctx:update(str)
                     res = res .. ctx:result()
                     ctx:free()
@@ -390,19 +419,10 @@ for class, subclass in pairs(ciphers) do
             })
         end
     end
-    class_api = setmetatable(class_api, {__index = cipher_mode_error})
-    if class_api ~= {} then
-        cipher_api[class] = class_api
-    end
 end
-
-cipher_api = setmetatable(cipher_api,
-    {__index = function(self, cipher)
-        return error('Cipher method "' .. cipher .. '" is not supported')
-    end })
 
 return {
     digest = digest_api,
     hmac   = hmac_api,
-    cipher = cipher_api,
+    cipher = crypto_api,
 }
