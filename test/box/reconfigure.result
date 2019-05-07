@@ -162,7 +162,7 @@ pad = string.rep('x', 100 * 1024)
 ...
 for i = 1, count do s:replace{i, pad} end -- error: not enough memory
 ---
-- error: Failed to allocate 102424 bytes in slab allocator for memtx_tuple
+- error: Failed to allocate 102422 bytes in slab allocator for memtx_tuple
 ...
 s:count() < count
 ---

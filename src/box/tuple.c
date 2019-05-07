@@ -112,8 +112,7 @@ runtime_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	assert(format->vtab.tuple_delete == tuple_format_runtime_vtab.tuple_delete);
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	size_t total = sizeof(struct tuple) + format->field_map_size +
-		tuple->bsize;
+	size_t total = tuple_size(tuple);
 	tuple_format_unref(format);
 	smfree(&runtime_alloc, tuple, total);
 }

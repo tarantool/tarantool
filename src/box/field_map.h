@@ -164,19 +164,6 @@ field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
 }
 
 /**
- * Get size of the tuple field_map using
- * field_map pointer and format root field_map size.
- *
- * In case of multikey indexes the real field_map size may be
- * greater than the size of format root field_map. To calculate
- * the total size of the field_map extentions, routine relies
- * on the fact that all field_map slots that has an extention
- * use negative offset as a marker.
- */
-uint32_t
-field_map_get_size(const uint32_t *field_map, uint32_t format_field_map_sz);
-
-/**
  * Initialize field_map_builder.
  *
  * The field_map_size argument is a size of the minimal field_map

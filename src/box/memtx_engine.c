@@ -110,7 +110,7 @@ memtx_init_txn(struct txn *txn)
 	txn->engine_tx = txn;
 }
 
-struct memtx_tuple {
+struct PACKED memtx_tuple {
 	/*
 	 * sic: the header of the tuple is used
 	 * to store a free list pointer in smfree_delayed.
@@ -1192,12 +1192,10 @@ memtx_tuple_delete(struct tuple_format *format, struct tuple *tuple)
 	struct memtx_engine *memtx = (struct memtx_engine *)format->engine;
 	say_debug("%s(%p)", __func__, tuple);
 	assert(tuple->refs == 0);
-	const uint32_t *field_map = tuple_field_map(tuple);
-	size_t total = sizeof(struct memtx_tuple) + tuple->bsize +
-		       field_map_get_size(field_map, format->field_map_size);
 	tuple_format_unref(format);
 	struct memtx_tuple *memtx_tuple =
 		container_of(tuple, struct memtx_tuple, base);
+	size_t total = tuple_size(tuple) + offsetof(struct memtx_tuple, base);
 	if (memtx->alloc.free_mode != SMALL_DELAYED_FREE ||
 	    memtx_tuple->version == memtx->snapshot_version ||
 	    format->is_temporary)

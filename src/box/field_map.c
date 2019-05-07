@@ -114,22 +114,4 @@ field_map_build(struct field_map_builder *builder, char *buffer)
 		extent_wptr += sizeof(uint32_t) + extent_offset_sz;
 	}
 	assert(extent_wptr == buffer + builder->extents_size);
-	assert(field_map_get_size(field_map,
-				  builder->slot_count * sizeof(uint32_t)) ==
-	       field_map_build_size(builder));
-}
-
-uint32_t
-field_map_get_size(const uint32_t *field_map, uint32_t format_field_map_sz)
-{
-	uint32_t total = format_field_map_sz;
-	int32_t field_map_items = format_field_map_sz / sizeof(uint32_t);
-	for (int32_t slot = -1; slot >= -field_map_items; slot--) {
-		if ((int32_t)field_map[slot] >= 0)
-			continue;
-		uint32_t *extent = (uint32_t *)((char *)field_map +
-					(int32_t)field_map[slot]);
-		total += (1 + extent[0]) * sizeof(uint32_t);
-	}
-	return total;
 }
