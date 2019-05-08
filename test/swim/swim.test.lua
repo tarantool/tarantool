@@ -1,5 +1,8 @@
 test_run = require('test_run').new()
 test_run:cmd("push filter '\\.lua.*:[0-9]+: ' to '.lua:<line>: '")
+test_run:cmd("push filter '127.0.0.1:[0-9]+$' to '127.0.0.1:<port>'")
+msgpack = require('msgpack')
+ffi = require('ffi')
 --
 -- gh-3234: SWIM gossip protocol.
 --
@@ -101,6 +104,8 @@ s1:add_member({uri = listen_uri, uuid = uuid(2)})
 s1:size()
 
 s1:cfg({uuid = uuid(3)})
+s1:self():uuid()
+s1:member_by_uuid(uuid(1))
 -- Can't remove self.
 s1:remove_member(uuid(3))
 -- Not existing.
@@ -122,6 +127,125 @@ s1:size()
 s1:probe_member(listen_uri)
 while s1:size() ~= 2 do fiber.sleep(0.01) end
 s2:size()
+
+s1:delete()
+s2:delete()
+
+--
+-- Member API.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri()})
+s = s1:self()
+s
+s:status()
+s:uuid()
+s:uri()
+s:incarnation()
+s:payload_cdata()
+s:payload_str()
+s:payload()
+s:is_dropped()
+s.unknown_index
+
+s.status()
+s.uuid()
+s.uri()
+s.incarnation()
+s.payload_cdata()
+s.payload_str()
+s.payload()
+s.is_dropped()
+
+s1:member_by_uuid(uuid(1)) ~= nil
+s1:member_by_uuid(50)
+s1:member_by_uuid(uuid(2))
+
+s1:quit()
+s:status()
+s:is_dropped()
+
+--
+-- Payload.
+--
+s = swim.new({uuid = uuid(1), uri = uri()})
+s.set_payload()
+s.set_payload_raw()
+
+self = s:self()
+s:set_payload()
+self:payload()
+s:set_payload({a = 100})
+self:payload()
+s:set_payload(100)
+self:payload()
+s:set_payload(false)
+self:payload()
+
+p = self:payload_str()
+p
+(msgpack.decode(p))
+
+p, size = self:payload_cdata()
+type(p)
+size
+(msgpack.decode(p, size))
+
+s:set_payload(string.rep('a', 1500))
+self:payload()
+s:set_payload()
+self:payload()
+
+s:set_payload(100)
+self:payload()
+s:set_payload_raw()
+self:payload()
+
+-- Raw payload setting can be used when MessagePack is not needed,
+-- or already encoded.
+s:set_payload_raw(nil, '123')
+s:set_payload_raw('123', -1)
+
+size = 10
+cdata = ffi.new('int[?]', size)
+for i = 0, size - 1 do cdata[i] = i end
+bsize = ffi.sizeof('int') * size
+s:set_payload_raw(cdata)
+s:set_payload_raw('str', 4)
+s:set_payload_raw(true)
+
+s:set_payload_raw(cdata, bsize)
+self:payload_str():len() == bsize
+self_cdata, self_bsize = self:payload_cdata()
+self_bsize == bsize
+self_cdata = ffi.cast('int *', self_cdata)
+for i = 0, size - 1 do assert(self_cdata[i] == cdata[i]) end
+
+s:set_payload_raw('raw str')
+self:payload_str()
+s:set_payload_raw('raw str', 3)
+self:payload_str()
+
+s:delete()
+self:is_dropped()
+
+--
+-- Check payload dissemination.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = listen_port, heartbeat_rate = 0.01})
+s1:add_member({uuid = uuid(2), uri = listen_port})
+while s2:size() ~= 2 do fiber.sleep(0.01) end
+s1_view = s2:member_by_uuid(uuid(1))
+s1_view:payload()
+s1_view:incarnation()
+
+s1:set_payload('payload')
+while s1_view:payload() ~= 'payload' do fiber.sleep(0.01) end
+s1_view:incarnation()
+
+s1:set_payload('payload2')
+while s1_view:payload() ~= 'payload2' do fiber.sleep(0.01) end
+s1_view:incarnation()
 
 s1:delete()
 s2:delete()

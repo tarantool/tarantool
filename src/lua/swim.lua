@@ -1,5 +1,7 @@
 local ffi = require('ffi')
 local uuid = require('uuid')
+local buffer = require('buffer')
+local msgpack = require('msgpack')
 
 ffi.cdef[[
     struct swim;
@@ -100,6 +102,14 @@ ffi.cdef[[
 local capi = ffi.C
 
 local swim_t = ffi.typeof('struct swim *')
+local swim_member_t = ffi.typeof('struct swim_member *')
+
+local swim_member_status_strs = {
+    [capi.MEMBER_ALIVE] = 'alive',
+    [capi.MEMBER_SUSPECTED] = 'suspected',
+    [capi.MEMBER_DEAD] = 'dead',
+    [capi.MEMBER_LEFT] = 'left'
+}
 
 --
 -- Check if @a value is something that can be passed as a
@@ -194,6 +204,50 @@ local function swim_check_uuid(value, func_name)
 end
 
 --
+-- Check if @a value is something that can be passed as const
+-- char *, as binary data. It should be either string, or cdata.
+-- @param value Value to check if can be converted to
+--        const char *.
+-- @param size Size of @a value in bytes. In case of cdata the
+--        argument is mandatory. In case of string @a size is
+--        optional and can be <= @a value length.
+-- @param func_name Caller function name to include into an error
+--        message.
+-- @param param_name Parameter name to include into an error
+--        message. Examples: 'payload', 'key'.
+-- @return Value compatible with const char *, and size in bytes.
+--
+local function swim_check_const_char(value, size, func_name, param_name)
+    if size ~= nil and type(size) ~= 'number' then
+        return error(func_name..': expected number '..param_name..' size')
+    end
+    if type(value) == 'cdata' then
+        if not size then
+            return error(func_name..': size is mandatory for cdata '..
+                         param_name)
+        end
+        value = ffi.cast('const char *', value)
+    elseif type(value) == 'string' then
+        if not size then
+            size = value:len()
+        elseif size > value:len() then
+            return error(func_name..': explicit '..param_name..
+                         ' size > string length')
+        end
+    elseif value == nil then
+        if size then
+            return error(func_name..': size can not be set without '..
+                         param_name)
+        end
+        size = 0
+    else
+        return error(func_name..': '..param_name..' should be either string '..
+                     'or cdata')
+    end
+    return value, size
+end
+
+--
 -- Check if @a s is a SWIM instance. It should be a table with
 -- cdata struct swim in 'ptr' attribute. Throws on invalid type.
 --
@@ -210,6 +264,142 @@ local function swim_check_instance(s, func_name)
         end
     end
     return error(func_name..': first argument is not a SWIM instance')
+end
+
+--
+-- The same for SWIM member.
+--
+local function swim_check_member(m, func_name)
+    if type(m) == 'table' then
+        local ptr = m.ptr
+        if ffi.istype(swim_member_t, ptr) then
+            return ptr
+        end
+    end
+    return error(func_name..': first argument is not a SWIM member')
+end
+
+--
+-- Member methods. Most of them are one-liners, not much to
+-- comment.
+--
+
+local function swim_member_status(m)
+    local ptr = swim_check_member(m, 'member:status()')
+    return swim_member_status_strs[tonumber(capi.swim_member_status(ptr))]
+end
+
+local function swim_member_uri(m)
+    local ptr = swim_check_member(m, 'member:uri()')
+    return ffi.string(capi.swim_member_uri(ptr))
+end
+
+local function swim_member_incarnation(m)
+    local ptr = swim_check_member(m, 'member:incarnation()')
+    return capi.swim_member_incarnation(ptr)
+end
+
+local function swim_member_is_dropped(m)
+    local ptr = swim_check_member(m, 'member:is_dropped()')
+    return capi.swim_member_is_dropped(ptr)
+end
+
+local function swim_member_payload_raw(ptr)
+    local int = buffer.reg1.ai
+    local cdata = capi.swim_member_payload(ptr, int)
+    return cdata, int[0]
+end
+
+--
+-- Payload can be bigger than KB, and probably it is undesirable
+-- to copy it into a Lua string or decode MessagePack into a
+-- Lua object. This method is the cheapest way of taking payload.
+--
+local function swim_member_payload_cdata(m)
+    local ptr = swim_check_member(m, 'member:payload_cdata()')
+    return swim_member_payload_raw(ptr)
+end
+
+--
+-- Cdata requires to keep explicit size, besides not all user
+-- methods can be able to work with cdata. This is why it may be
+-- needed to take payload as a string - text or binary.
+--
+local function swim_member_payload_str(m)
+    local ptr = swim_check_member(m, 'member:payload_str()')
+    return ffi.string(swim_member_payload_raw(ptr))
+end
+
+--
+-- Since this is a Lua module, a user is likely to use Lua objects
+-- as a payload - tables, numbers, string etc. And it is natural
+-- to expect that member:payload() should return the same object
+-- which was passed into swim:set_payload() on another instance.
+-- This member method tries to interpret payload as MessagePack,
+-- and if fails, returns the payload as a string.
+--
+local function swim_member_payload(m)
+    local ptr = swim_check_member(m, 'member:payload()')
+    local cdata, size = swim_member_payload_raw(ptr)
+    if size == 0 then
+        return ''
+    end
+    local ok, res = pcall(msgpack.decode, cdata, size)
+    if not ok then
+        return ffi.string(cdata, size)
+    end
+    return res
+end
+
+--
+-- Cdata UUID. It is ok to return cdata, because struct tt_uuid
+-- type has strong support by 'uuid' Lua module with nice
+-- metatable, serialization, string conversions etc.
+--
+local function swim_member_uuid(m)
+    return capi.swim_member_uuid(swim_check_member(m, 'member:uuid()'))
+end
+
+local function swim_member_serialize(m)
+    local _, size = swim_member_payload_raw(m.ptr)
+    return {
+        status = swim_member_status(m),
+        uuid = swim_member_uuid(m),
+        uri = swim_member_uri(m),
+        incarnation = swim_member_incarnation(m),
+        -- There are many ways to interpret a payload, and it is
+        -- not a job of a serialization method. Only binary size
+        -- here is returned to allow a user to detect, whether a
+        -- payload exists.
+        payload_size = size,
+    }
+end
+
+local swim_member_mt = {
+    __index = {
+        status = swim_member_status,
+        uuid = swim_member_uuid,
+        uri = swim_member_uri,
+        incarnation = swim_member_incarnation,
+        payload_cdata = swim_member_payload_cdata,
+        payload_str = swim_member_payload_str,
+        payload = swim_member_payload,
+        is_dropped = swim_member_is_dropped,
+    },
+    __serialize = swim_member_serialize,
+    __newindex = function(m)
+        return error('swim_member is a read-only object')
+    end
+}
+
+--
+-- Wrap a SWIM member into a table with proper metamethods. Also
+-- it is going to be used to cache a decoded payload.
+--
+local function swim_member_wrap(ptr)
+    capi.swim_member_ref(ptr)
+    ffi.gc(ptr, capi.swim_member_unref)
+    return setmetatable({ptr = ptr}, swim_member_mt)
 end
 
 --
@@ -340,6 +530,62 @@ local function swim_broadcast(s, port)
 end
 
 --
+-- Shortcut to get the self member in O(1) not making a lookup
+-- into the member table.
+--
+local function swim_self(s)
+    return swim_member_wrap(capi.swim_self(swim_check_instance(s, 'swim:self')))
+end
+
+--
+-- Find a member by UUID in the local member table.
+--
+local function swim_member_by_uuid(s, uuid)
+    local func_name = 'swim:member_by_uuid'
+    local ptr = swim_check_instance(s, func_name)
+    uuid = swim_check_uuid(uuid, func_name)
+    local m = capi.swim_member_by_uuid(ptr, uuid)
+    if m == nil then
+        return nil
+    end
+    return swim_member_wrap(m)
+end
+
+--
+-- Set raw payload without any preprocessing nor encoding. It can
+-- be anything, not necessary MessagePack.
+--
+local function swim_set_payload_raw(s, payload, payload_size)
+    local func_name = 'swim:set_payload_raw'
+    local ptr = swim_check_instance(s, func_name)
+    payload, payload_size =
+        swim_check_const_char(payload, payload_size, func_name, 'payload')
+    if capi.swim_set_payload(ptr, payload, payload_size) ~= 0 then
+        return nil, box.error.last()
+    end
+    return true
+end
+
+--
+-- Set Lua object as a payload. It is encoded into MessagePack.
+--
+local function swim_set_payload(s, payload)
+    local func_name = 'swim:set_payload'
+    local ptr = swim_check_instance(s, func_name)
+    local payload_size = 0
+    if payload ~= nil then
+        local buf = buffer.IBUF_SHARED
+        buf:reset()
+        payload_size = msgpack.encode(payload, buf)
+        payload = buf.rpos
+    end
+    if capi.swim_set_payload(ptr, payload, payload_size) ~= 0 then
+        return nil, box.error.last()
+    end
+    return true
+end
+
+--
 -- Normal metatable of a configured SWIM instance.
 --
 local swim_mt = {
@@ -352,6 +598,10 @@ local swim_mt = {
         add_member = swim_add_member,
         remove_member = swim_remove_member,
         broadcast = swim_broadcast,
+        self = swim_self,
+        member_by_uuid = swim_member_by_uuid,
+        set_payload_raw = swim_set_payload_raw,
+        set_payload = swim_set_payload,
     },
     __serialize = swim_serialize
 }
