@@ -534,7 +534,7 @@ vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
 		return tuple_bloom_builder_add_key(builder, data,
 						   part_count, key_def);
 	} else {
-		return tuple_bloom_builder_add(builder, stmt, key_def);
+		return tuple_bloom_builder_add(builder, stmt, key_def, -1);
 	}
 }
 
@@ -548,7 +548,7 @@ vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
 		return tuple_bloom_maybe_has_key(bloom, data,
 						 part_count, key_def);
 	} else {
-		return tuple_bloom_maybe_has(bloom, stmt, key_def);
+		return tuple_bloom_maybe_has(bloom, stmt, key_def, -1);
 	}
 }
 

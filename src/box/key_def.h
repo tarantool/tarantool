@@ -675,13 +675,14 @@ tuple_hash_field(uint32_t *ph1, uint32_t *pcarry, const char **field,
  * @param pcarry - pointer to carry
  * @param tuple - tuple to hash
  * @param part - key part
+ * @param multikey_idx - multikey index hint
  * @return size of processed data
  *
  * This function updates @ph1 and @pcarry.
  */
 uint32_t
 tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
-		    struct key_part *part);
+		    struct key_part *part, int multikey_idx);
 
 /**
  * Calculates a common hash value for a tuple

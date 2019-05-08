@@ -105,9 +105,11 @@ tuple_hash_array_add(struct tuple_hash_array *hash_arr, uint32_t hash)
 
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			struct tuple *tuple, struct key_def *key_def)
+			struct tuple *tuple, struct key_def *key_def,
+			int multikey_idx)
 {
 	assert(builder->part_count == key_def->part_count);
+	assert(!key_def_is_multikey(key_def) || multikey_idx >= 0);
 
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
@@ -115,7 +117,8 @@ tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		total_size += tuple_hash_key_part(&h, &carry, tuple,
-						  &key_def->parts[i]);
+						  &key_def->parts[i],
+						  multikey_idx);
 		uint32_t hash = PMurHash32_Result(h, carry, total_size);
 		if (tuple_hash_array_add(&builder->parts[i], hash) != 0)
 			return -1;
@@ -198,9 +201,11 @@ tuple_bloom_delete(struct tuple_bloom *bloom)
 }
 
 bool
-tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
-		      struct tuple *tuple, struct key_def *key_def)
+tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
+		      struct key_def *key_def, int multikey_idx)
 {
+	assert(!key_def_is_multikey(key_def) || multikey_idx >= 0);
+
 	if (bloom->is_legacy) {
 		return bloom_maybe_has(&bloom->parts[0],
 				       tuple_hash(tuple, key_def));
@@ -214,7 +219,8 @@ tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
 
 	for (uint32_t i = 0; i < key_def->part_count; i++) {
 		total_size += tuple_hash_key_part(&h, &carry, tuple,
-						  &key_def->parts[i]);
+						  &key_def->parts[i],
+						  multikey_idx);
 		uint32_t hash = PMurHash32_Result(h, carry, total_size);
 		if (!bloom_maybe_has(&bloom->parts[i], hash))
 			return false;

@@ -129,11 +129,13 @@ tuple_bloom_builder_delete(struct tuple_bloom_builder *builder);
  * @param builder - bloom filter builder
  * @param tuple - tuple to add
  * @param key_def - key definition
+ * @param multikey_idx - multikey index hint
  * @return 0 on success, -1 on OOM
  */
 int
 tuple_bloom_builder_add(struct tuple_bloom_builder *builder,
-			struct tuple *tuple, struct key_def *key_def);
+			struct tuple *tuple, struct key_def *key_def,
+			int multikey_idx);
 
 /**
  * Add a key hash to a tuple bloom filter builder.
@@ -169,12 +171,13 @@ tuple_bloom_delete(struct tuple_bloom *bloom);
  * @param bloom - bloom filter
  * @param tuple - tuple to check
  * @param key_def - key definition
+ * @param multikey_idx - multikey index hint
  * @return true if the tuple may have been stored in the bloom,
  *  false if the tuple is definitely not in the bloom
  */
 bool
-tuple_bloom_maybe_has(const struct tuple_bloom *bloom,
-		      struct tuple *tuple, struct key_def *key_def);
+tuple_bloom_maybe_has(const struct tuple_bloom *bloom, struct tuple *tuple,
+		      struct key_def *key_def, int multikey_idx);
 
 /**
  * Check if a tuple matching a key was stored in a tuple bloom filter.

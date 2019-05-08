@@ -348,9 +348,9 @@ tuple_hash_null(uint32_t *ph1, uint32_t *pcarry)
 
 uint32_t
 tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
-		    struct key_part *part)
+		    struct key_part *part, int multikey_idx)
 {
-	const char *field = tuple_field_by_part(tuple, part, -1);
+	const char *field = tuple_field_by_part(tuple, part, multikey_idx);
 	if (field == NULL)
 		return tuple_hash_null(ph1, pcarry);
 	return tuple_hash_field(ph1, pcarry, &field, part->coll);
