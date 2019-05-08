@@ -195,6 +195,177 @@ s.cfg()
 s:delete()
 ---
 ...
+--
+-- Basic member table manipulations.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01})
+---
+...
+s1.broadcast()
+---
+- error: 'builtin/swim.lua:<line>: swim:broadcast: first argument is not a SWIM instance'
+...
+s1:broadcast('wrong port')
+---
+- error: 'swim:broadcast: expected number port'
+...
+-- Note, broadcast takes a port, not a URI.
+s1:broadcast('127.0.0.1:3333')
+---
+- error: 'swim:broadcast: expected number port'
+...
+-- Ok to broadcast on default port.
+s1:broadcast()
+---
+- true
+...
+s1:broadcast(listen_port)
+---
+- true
+...
+while s2:size() ~= 2 do fiber.sleep(0.01) end
+---
+...
+s1:size()
+---
+- 2
+...
+s2:size()
+---
+- 2
+...
+s2:delete()
+---
+...
+s1.remove_member()
+---
+- error: 'builtin/swim.lua:<line>: swim:remove_member: first argument is not a SWIM instance'
+...
+s1:remove_member(100)
+---
+- error: 'builtin/swim.lua:<line>: swim:remove_member: expected string UUID'
+...
+s1:remove_member('1234')
+---
+- error: 'builtin/swim.lua:<line>: swim:remove_member: invalid UUID'
+...
+s1:remove_member(uuid(2))
+---
+- true
+...
+s1:size()
+---
+- 1
+...
+s1.add_member()
+---
+- error: 'builtin/swim.lua:<line>: swim:add_member: first argument is not a SWIM instance'
+...
+s1:add_member(100)
+---
+- error: 'swim:add_member: expected table member definition'
+...
+s1:add_member({uri = true})
+---
+- error: 'builtin/swim.lua:<line>: swim:add_member: expected string URI or port number'
+...
+s1:add_member({uri = listen_uri})
+---
+- null
+- 'swim.add_member: URI and UUID are mandatory'
+...
+s1:add_member({uuid = uuid(2)})
+---
+- null
+- 'swim.add_member: URI and UUID are mandatory'
+...
+s1:add_member({uri = listen_uri, uuid = uuid(2)})
+---
+- true
+...
+s1:add_member({uri = listen_uri, uuid = uuid(2)})
+---
+- null
+- 'swim.add_member: a member with such UUID already exists'
+...
+s1:size()
+---
+- 2
+...
+s1:cfg({uuid = uuid(3)})
+---
+- true
+...
+-- Can't remove self.
+s1:remove_member(uuid(3))
+---
+- null
+- 'swim.remove_member: can not remove self'
+...
+-- Not existing.
+s1:remove_member(uuid(4))
+---
+- true
+...
+-- Old self.
+s1:remove_member(uuid(1))
+---
+- true
+...
+s1:delete()
+---
+...
+s1 = swim.new({uuid = uuid(1), uri = uri()})
+---
+...
+s2 = swim.new({uuid = uuid(2), uri = listen_uri})
+---
+...
+s1.probe_member()
+---
+- error: 'builtin/swim.lua:<line>: swim:probe_member: first argument is not a SWIM instance'
+...
+s1:probe_member()
+---
+- null
+- 'swim.probe_member: URI is mandatory'
+...
+s1:probe_member(true)
+---
+- error: 'builtin/swim.lua:<line>: swim:probe_member: expected string URI or port number'
+...
+-- Not existing URI is ok - nothing happens.
+s1:probe_member('127.0.0.1:1')
+---
+- true
+...
+fiber.yield()
+---
+...
+s1:size()
+---
+- 1
+...
+s1:probe_member(listen_uri)
+---
+- true
+...
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+---
+...
+s2:size()
+---
+- 2
+...
+s1:delete()
+---
+...
+s2:delete()
+---
+...
 test_run:cmd("clear filter")
 ---
 - true

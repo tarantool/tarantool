@@ -65,4 +65,65 @@ s.is_configured()
 s.cfg()
 s:delete()
 
+--
+-- Basic member table manipulations.
+--
+s1 = swim.new({uuid = uuid(1), uri = uri(), heartbeat_rate = 0.01})
+s2 = swim.new({uuid = uuid(2), uri = listen_uri, heartbeat_rate = 0.01})
+
+s1.broadcast()
+s1:broadcast('wrong port')
+-- Note, broadcast takes a port, not a URI.
+s1:broadcast('127.0.0.1:3333')
+-- Ok to broadcast on default port.
+s1:broadcast()
+
+s1:broadcast(listen_port)
+while s2:size() ~= 2 do fiber.sleep(0.01) end
+s1:size()
+s2:size()
+
+s2:delete()
+
+s1.remove_member()
+s1:remove_member(100)
+s1:remove_member('1234')
+s1:remove_member(uuid(2))
+s1:size()
+
+s1.add_member()
+s1:add_member(100)
+s1:add_member({uri = true})
+s1:add_member({uri = listen_uri})
+s1:add_member({uuid = uuid(2)})
+s1:add_member({uri = listen_uri, uuid = uuid(2)})
+s1:add_member({uri = listen_uri, uuid = uuid(2)})
+s1:size()
+
+s1:cfg({uuid = uuid(3)})
+-- Can't remove self.
+s1:remove_member(uuid(3))
+-- Not existing.
+s1:remove_member(uuid(4))
+-- Old self.
+s1:remove_member(uuid(1))
+
+s1:delete()
+
+s1 = swim.new({uuid = uuid(1), uri = uri()})
+s2 = swim.new({uuid = uuid(2), uri = listen_uri})
+s1.probe_member()
+s1:probe_member()
+s1:probe_member(true)
+-- Not existing URI is ok - nothing happens.
+s1:probe_member('127.0.0.1:1')
+fiber.yield()
+s1:size()
+s1:probe_member(listen_uri)
+while s1:size() ~= 2 do fiber.sleep(0.01) end
+s2:size()
+
+s1:delete()
+s2:delete()
+
 test_run:cmd("clear filter")

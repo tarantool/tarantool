@@ -273,6 +273,73 @@ local function swim_serialize(s)
 end
 
 --
+-- Ping a member probably located at @a uri.
+--
+local function swim_probe_member(s, uri)
+    local func_name = 'swim:probe_member'
+    local ptr = swim_check_instance(s, func_name)
+    uri = swim_check_uri(uri, func_name)
+    if capi.swim_probe_member(ptr, uri) ~= 0 then
+        return nil, box.error.last()
+    end
+    return true
+end
+
+--
+-- Add a new member to the member table explicitly.
+--
+local function swim_add_member(s, cfg)
+    local func_name = 'swim:add_member'
+    local ptr = swim_check_instance(s, func_name)
+    if type(cfg) ~= 'table' then
+        return error(func_name..': expected table member definition')
+    end
+    local uri = swim_check_uri(cfg.uri, func_name)
+    local uuid = swim_check_uuid(cfg.uuid, func_name)
+    if capi.swim_add_member(ptr, uri, uuid) ~= 0 then
+        return nil, box.error.last()
+    end
+    return true
+end
+
+--
+-- Remove a member by @a uuid immediately from the local member
+-- table.
+--
+local function swim_remove_member(s, uuid)
+    local func_name = 'swim:remove_member'
+    local ptr = swim_check_instance(s, func_name)
+    uuid = swim_check_uuid(uuid, func_name)
+    if capi.swim_remove_member(ptr, uuid) ~= 0 then
+        return nil, box.error.last()
+    end
+    return true
+end
+
+--
+-- Broadcast a ping message on all interfaces with @a port
+-- destination. Port can be omitted, then currently bound is used.
+--
+local function swim_broadcast(s, port)
+    local func_name = 'swim:broadcast'
+    local ptr = swim_check_instance(s, func_name)
+    if port == nil then
+        port = -1
+    else
+        if type(port) == 'string' then
+            port = tonumber(port)
+        end
+        if type(port) ~= 'number' then
+            return error(func_name..': expected number port')
+        end
+    end
+    if capi.swim_broadcast(ptr, port) ~= 0 then
+        return nil, box.error.last()
+    end
+    return true
+end
+
+--
 -- Normal metatable of a configured SWIM instance.
 --
 local swim_mt = {
@@ -281,6 +348,10 @@ local swim_mt = {
         quit = swim_quit,
         size = swim_size,
         is_configured = swim_is_configured,
+        probe_member = swim_probe_member,
+        add_member = swim_add_member,
+        remove_member = swim_remove_member,
+        broadcast = swim_broadcast,
     },
     __serialize = swim_serialize
 }
