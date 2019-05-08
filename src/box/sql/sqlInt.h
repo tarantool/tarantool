@@ -3345,7 +3345,7 @@ sqlSelectAddColumnTypeAndCollation(Parse *, struct space_def *, Select *);
 struct space *sqlResultSetOfSelect(Parse *, Select *);
 
 struct space *
-sqlStartTable(Parse *, Token *, int);
+sqlStartTable(Parse *, Token *);
 void sqlAddColumn(Parse *, Token *, struct type_def *);
 
 /**

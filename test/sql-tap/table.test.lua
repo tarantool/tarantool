@@ -1,6 +1,6 @@
 #!/usr/bin/env tarantool
 test = require("sqltester")
-test:plan(77)
+test:plan(79)
 
 --!./tcltestrunner.lua
 -- 2001 September 15
@@ -128,7 +128,7 @@ test:do_test(
     "table-2.1",
     function()
         test:execsql "CREATE TABLE TEST2(one text primary key)"
-        return test:catchsql "CREATE TABLE test2(id primary key, two text default 'hi')"
+        return test:catchsql "CREATE TABLE test2(id int primary key, two text default 'hi')"
     end, {
         -- <table-2.1>
         1, "Space 'TEST2' already exists"
@@ -1442,4 +1442,34 @@ test:do_execsql_test(
 
         -- </check-23.cleanup>
     })
+
+--
+-- gh-4196: Segmentation fault or assertion happened when IF NOT
+-- EXISTS clause was specified during creation of space featuring
+-- FK constraints.
+--
+test:do_catchsql_test(
+	"table-24.1",
+	[[
+		CREATE TABLE IF NOT EXISTS a1 (i INT PRIMARY KEY);
+		CREATE TABLE IF NOT EXISTS b1 (i INT PRIMARY KEY, j INT, CONSTRAINT aa FOREIGN KEY(j) REFERENCES a1(i));
+		CREATE TABLE IF NOT EXISTS b1 (i INT PRIMARY KEY, j INT, CONSTRAINT aa FOREIGN KEY(j) REFERENCES a1(i));
+	]], {
+		-- <table-24.1>
+		0
+		-- </table-24.1>
+	})
+
+test:do_catchsql_test(
+	"table-24.2",
+	[[
+		CREATE TABLE IF NOT EXISTS a2 (i INT PRIMARY KEY);
+		CREATE TABLE IF NOT EXISTS b2 (i INT PRIMARY KEY, j INT REFERENCES a2(i));
+		CREATE TABLE IF NOT EXISTS b2 (i INT PRIMARY KEY, j INT REFERENCES a2(i));
+	]], {
+		-- <table-24.2>
+		0
+		-- </table-24.2>
+	})
+
 test:finish_test()

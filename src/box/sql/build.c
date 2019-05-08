@@ -302,10 +302,9 @@ sql_space_primary_key(const struct space *space)
  *
  * @param pParse Parser context.
  * @param pName1 First part of the name of the table or view.
- * @param noErr Do nothing if table already exists.
  */
 struct space *
-sqlStartTable(Parse *pParse, Token *pName, int noErr)
+sqlStartTable(Parse *pParse, Token *pName)
 {
 	char *zName = 0;	/* The name of the new table */
 	sql *db = pParse->db;
@@ -323,15 +322,6 @@ sqlStartTable(Parse *pParse, Token *pName, int noErr)
 
 	if (sqlCheckIdentifierName(pParse, zName) != 0)
 		goto cleanup;
-
-	struct space *space = space_by_name(zName);
-	if (space != NULL) {
-		if (!noErr) {
-			diag_set(ClientError, ER_SPACE_EXISTS, zName);
-			pParse->is_aborted = true;
-		}
-		goto cleanup;
-	}
 
 	new_space = sql_ephemeral_space_new(pParse, zName);
 	if (new_space == NULL)
@@ -919,7 +909,7 @@ error:
  */
 static void
 vdbe_emit_space_create(struct Parse *pParse, int space_id_reg,
-		       struct space *space)
+		       int space_name_reg, struct space *space)
 {
 	Vdbe *v = sqlGetVdbe(pParse);
 	int iFirstCol = ++pParse->nMem;
@@ -948,9 +938,7 @@ vdbe_emit_space_create(struct Parse *pParse, int space_id_reg,
 	sqlVdbeAddOp2(v, OP_SCopy, space_id_reg, iFirstCol /* spaceId */ );
 	sqlVdbeAddOp2(v, OP_Integer, effective_user()->uid,
 			  iFirstCol + 1 /* owner */ );
-	sqlVdbeAddOp4(v, OP_String8, 0, iFirstCol + 2 /* name */ , 0,
-			  sqlDbStrDup(pParse->db, space->def->name),
-			  P4_DYNAMIC);
+	sqlVdbeAddOp2(v, OP_SCopy, space_name_reg, iFirstCol + 2);
 	sqlVdbeAddOp4(v, OP_String8, 0, iFirstCol + 3 /* engine */ , 0,
 			  sqlDbStrDup(pParse->db, space->def->engine_name),
 			  P4_DYNAMIC);
@@ -1280,8 +1268,29 @@ sqlEndTable(struct Parse *pParse)
 	struct Vdbe *v = sqlGetVdbe(pParse);
 	if (NEVER(v == 0))
 		return;
+
+	/*
+	 * Firstly, check if space with given name already exists.
+	 * In case IF NOT EXISTS clause is specified and table
+	 * exists, we will silently halt VDBE execution.
+	 */
+	char *space_name_copy = sqlDbStrDup(db, new_space->def->name);
+	if (space_name_copy == NULL)
+		goto cleanup;
+	int name_reg = ++pParse->nMem;
+	sqlVdbeAddOp4(pParse->pVdbe, OP_String8, 0, name_reg, 0,
+		      space_name_copy, P4_DYNAMIC);
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(ER_SPACE_EXISTS), space_name_copy);
+	bool no_err = pParse->create_table_def.base.if_not_exist;
+	if (vdbe_emit_halt_with_presence_test(pParse, BOX_SPACE_ID, 2,
+					      name_reg, 1, ER_SPACE_EXISTS,
+					      error_msg, (no_err != 0),
+					      OP_NoConflict) != 0)
+		goto cleanup;
+
 	int reg_space_id = getNewSpaceId(pParse);
-	vdbe_emit_space_create(pParse, reg_space_id, new_space);
+	vdbe_emit_space_create(pParse, reg_space_id, name_reg, new_space);
 	for (uint32_t i = 0; i < new_space->index_count; ++i) {
 		struct index *idx = new_space->index[i];
 		vdbe_emit_create_index(pParse, new_space->def, idx->def,
@@ -1374,8 +1383,7 @@ sql_create_view(struct Parse *parse_context)
 		goto create_view_fail;
 	}
 	struct space *space = sqlStartTable(parse_context,
-					    &create_entity_def->name,
-					    create_entity_def->if_not_exist);
+					    &create_entity_def->name);
 	if (space == NULL || parse_context->is_aborted)
 		goto create_view_fail;
 	struct space *select_res_space =
@@ -1425,8 +1433,25 @@ sql_create_view(struct Parse *parse_context)
 		parse_context->is_aborted = true;
 		goto create_view_fail;
 	}
+	const char *space_name =
+		sql_name_from_token(db, &create_entity_def->name);
+	char *name_copy = sqlDbStrDup(db, space_name);
+	if (name_copy == NULL)
+		goto create_view_fail;
+	int name_reg = ++parse_context->nMem;
+	sqlVdbeAddOp4(parse_context->pVdbe, OP_String8, 0, name_reg, 0, name_copy,
+		      P4_DYNAMIC);
+	const char *error_msg =
+		tt_sprintf(tnt_errcode_desc(ER_SPACE_EXISTS), space_name);
+	bool no_err = create_entity_def->if_not_exist;
+	if (vdbe_emit_halt_with_presence_test(parse_context, BOX_SPACE_ID, 2,
+					      name_reg, 1, ER_SPACE_EXISTS,
+					      error_msg, (no_err != 0),
+					      OP_NoConflict) != 0)
+		goto create_view_fail;
+
 	vdbe_emit_space_create(parse_context, getNewSpaceId(parse_context),
-			       space);
+			       name_reg, space);
 
  create_view_fail:
 	sql_expr_list_delete(db, view_def->aliases);
