@@ -237,3 +237,9 @@ i:select({0, 0, 0}, {iterator = 'neighbor'})
 i:select({1, 2, 3, 4, 5, 6}, {iterator = 'BITS_ALL_SET' } )
 
 s:drop()
+
+-- Rtree index cannot be multikey.
+s = box.schema.space.create('test')
+_ = s:create_index('primary')
+_ = s:create_index('rtree', {type = 'rtree', parts = {{'[2][*]', 'array'}}})
+s:drop()

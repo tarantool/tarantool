@@ -347,3 +347,9 @@ s:get(-1LL)
 s:get(9007199254740992LL)
 s:get(-9007199254740994LL)
 s:drop()
+
+-- Hash index cannot be multikey.
+s = box.schema.space.create('test')
+_ = s:create_index('primary')
+_ = s:create_index('hash', {type = 'hash', parts = {{'[2][*]', 'unsigned'}}})
+s:drop()

@@ -7,20 +7,6 @@ engine = test_run:get_cfg('engine')
 --
 -- gh-1260: Multikey indexes.
 --
-s = box.schema.space.create('withdata', {engine = 'vinyl'})
----
-...
-pk = s:create_index('pk')
----
-...
--- Vinyl's space can't be multikey (yet).
-_ = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname'}}})
----
-- error: Vinyl does not support multikey indexes
-...
-s:drop()
----
-...
 s = box.schema.space.create('withdata', {engine = engine})
 ---
 ...
@@ -32,22 +18,6 @@ _ = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}}})
 ...
 pk = s:create_index('pk')
 ---
-...
--- Only tree index type may be mutlikey.
-_ = s:create_index('idx', {type = 'hash', unique = true, parts = {{3, 'str', path = '[*].fname'}}})
----
-- error: 'Can''t create or modify index ''idx'' in space ''withdata'': HASH index
-    cannot be multikey'
-...
-_ = s:create_index('idx', {type = 'bitset', unique = false, parts = {{3, 'str', path = '[*].fname'}}})
----
-- error: 'Can''t create or modify index ''idx'' in space ''withdata'': BITSET index
-    cannot be multikey'
-...
-_ = s:create_index('idx', {type = 'rtree', unique = false, parts = {{3, 'array', path = '[*].fname'}}})
----
-- error: 'Can''t create or modify index ''idx'' in space ''withdata'': RTREE index
-    cannot be multikey'
 ...
 -- Test incompatible multikey index parts.
 _ = s:create_index('idx3', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '["data"][*].sname'}}})
@@ -146,10 +116,8 @@ arr_idx:select({1})
   - [5, [1, 1, 1], [{'fname': 'A', 'sname': 'B'}, {'fname': 'C', 'sname': 'D'}, {
         'fname': 'A', 'sname': 'B'}]]
 ...
-s:delete(5)
+_ = s:delete(5)
 ---
-- [5, [1, 1, 1], [{'fname': 'A', 'sname': 'B'}, {'fname': 'C', 'sname': 'D'}, {'fname': 'A',
-      'sname': 'B'}]]
 ...
 -- Check that there is no garbage in index.
 arr_idx:select({1})
@@ -162,9 +130,8 @@ idx:get({'A', 'B'})
 idx:get({'C', 'D'})
 ---
 ...
-idx:delete({'Vasya', 'Pupkin'})
+_ = idx:delete({'Vasya', 'Pupkin'})
 ---
-- [1, [1, 2, 3], [{'fname': 'James', 'sname': 'Bond'}, {'fname': 'Vasya', 'sname': 'Pupkin'}]]
 ...
 s:insert({6, {1, 2}, {{fname='Vasya', sname='Pupkin'}}})
 ---
@@ -286,9 +253,8 @@ idx0:select()
 - - [1, [1, 1, 1]]
   - [2, [2, 2]]
 ...
-idx0:delete(2)
+_ = idx0:delete(2)
 ---
-- [2, [2, 2]]
 ...
 idx0:get(2)
 ---

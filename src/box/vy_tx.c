@@ -629,17 +629,21 @@ vy_tx_handle_deferred_delete(struct vy_tx *tx, struct txv *v)
 	int rc = 0;
 	for (uint32_t i = 1; i < space->index_count; i++) {
 		struct vy_lsm *lsm = vy_lsm(space->index[i]);
-		struct vy_entry delete_entry;
-		delete_entry.stmt = delete_stmt;
-		delete_entry.hint = vy_stmt_hint(delete_stmt, lsm->cmp_def);
-		struct txv *delete_txv = txv_new(tx, lsm, delete_entry,
-						 UINT64_MAX);
-		if (delete_txv == NULL) {
-			rc = -1;
-			break;
+		struct vy_entry entry;
+		vy_stmt_foreach_entry(entry, delete_stmt, lsm->cmp_def) {
+			struct txv *delete_txv = txv_new(tx, lsm, entry,
+							 UINT64_MAX);
+			if (delete_txv == NULL) {
+				rc = -1;
+				break;
+			}
+			stailq_insert_entry(&tx->log, delete_txv, v,
+					    next_in_log);
+			vy_stmt_counter_acct_tuple(&lsm->stat.txw.count,
+						   entry.stmt);
 		}
-		stailq_insert_entry(&tx->log, delete_txv, v, next_in_log);
-		vy_stmt_counter_acct_tuple(&lsm->stat.txw.count, delete_stmt);
+		if (rc != 0)
+			break;
 	}
 	tuple_unref(delete_stmt);
 	return rc;
@@ -1028,7 +1032,12 @@ vy_tx_track_point(struct vy_tx *tx, struct vy_lsm *lsm, struct vy_entry entry)
 	return vy_tx_track(tx, lsm, entry, true, entry, true);
 }
 
-int
+/**
+ * Add one statement entry to a transaction. We add one entry
+ * for each index, and with multikey indexes it is possible there
+ * are multiple entries of a single statement in a single index.
+ */
+static int
 vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm,
 		struct vy_entry entry, uint64_t column_mask)
 {
@@ -1120,6 +1129,18 @@ vy_tx_set_entry(struct vy_tx *tx, struct vy_lsm *lsm,
 	tx->write_size += tuple_size(entry.stmt);
 	vy_stmt_counter_acct_tuple(&lsm->stat.txw.count, entry.stmt);
 	stailq_add_tail_entry(&tx->log, v, next_in_log);
+	return 0;
+}
+
+int
+vy_tx_set_with_colmask(struct vy_tx *tx, struct vy_lsm *lsm,
+		       struct tuple *stmt, uint64_t column_mask)
+{
+	struct vy_entry entry;
+	vy_stmt_foreach_entry(entry, stmt, lsm->cmp_def) {
+		if (vy_tx_set_entry(tx, lsm, entry, column_mask) != 0)
+			return -1;
+	}
 	return 0;
 }
 

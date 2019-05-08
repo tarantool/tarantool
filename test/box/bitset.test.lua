@@ -147,3 +147,9 @@ for j=1,100 do check(math.random(9) - 1, {iterator = box.index.BITS_ALL_NOT_SET}
 good
 s:drop()
 s = nil
+
+-- Bitset index cannot be multikey.
+s = box.schema.space.create('test')
+_ = s:create_index('primary')
+_ = s:create_index('bitset', {type = 'bitset', parts = {{'[2][*]', 'unsigned'}}})
+s:drop()

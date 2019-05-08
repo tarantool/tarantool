@@ -701,11 +701,6 @@ vinyl_space_check_index_def(struct space *space, struct index_def *index_def)
 			return -1;
 		}
 	}
-	if (key_def_is_multikey(index_def->key_def)) {
-		diag_set(ClientError, ER_UNSUPPORTED,
-			 "Vinyl", "multikey indexes");
-		return -1;
-	}
 	return 0;
 }
 
@@ -1355,19 +1350,24 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 
 	lsm->pk->stat.lookup++;
 
-	if (vy_point_lookup(lsm->pk, tx, rv, key, result) != 0) {
+	struct vy_entry pk_entry;
+	if (vy_point_lookup(lsm->pk, tx, rv, key, &pk_entry) != 0) {
 		rc = -1;
 		goto out;
 	}
 
-	/*
-	 * Note, result stores a hint computed for the primary
-	 * index while entry was read from a secondary index so
-	 * we must not use vy_entry_compare() here.
-	 */
-	if (result->stmt == NULL ||
-	    vy_stmt_compare(result->stmt, HINT_NONE, entry.stmt,
-			    HINT_NONE, lsm->cmp_def) != 0) {
+	bool match = false;
+	struct vy_entry full_entry;
+	if (pk_entry.stmt != NULL) {
+		vy_stmt_foreach_entry(full_entry, pk_entry.stmt, lsm->cmp_def) {
+			if (vy_entry_compare(full_entry, entry,
+					     lsm->cmp_def) == 0) {
+				match = true;
+				break;
+			}
+		}
+	}
+	if (!match) {
 		/*
 		 * If a tuple read from a secondary index doesn't
 		 * match the tuple corresponding to it in the
@@ -1377,11 +1377,10 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		 * case silently skip this tuple.
 		 */
 		vy_stmt_counter_acct_tuple(&lsm->stat.skip, entry.stmt);
-		if (result->stmt != NULL) {
+		if (pk_entry.stmt != NULL) {
 			vy_stmt_counter_acct_tuple(&lsm->pk->stat.skip,
-						   result->stmt);
-			tuple_unref(result->stmt);
-			*result = vy_entry_none();
+						   pk_entry.stmt);
+			tuple_unref(pk_entry.stmt);
 		}
 		/*
 		 * We must purge stale tuples from the cache before
@@ -1390,6 +1389,7 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 		 * the tuple cache implementation.
 		 */
 		vy_cache_on_write(&lsm->cache, entry, NULL);
+		*result = vy_entry_none();
 		goto out;
 	}
 
@@ -1401,21 +1401,19 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	 * the DELETE statement is not written to secondary indexes
 	 * immediately.
 	 */
-	if (tx != NULL && vy_tx_track_point(tx, lsm->pk, *result) != 0) {
-		tuple_unref(result->stmt);
+	if (tx != NULL && vy_tx_track_point(tx, lsm->pk, pk_entry) != 0) {
+		tuple_unref(pk_entry.stmt);
 		rc = -1;
 		goto out;
 	}
 
 	if ((*rv)->vlsn == INT64_MAX) {
-		vy_cache_add(&lsm->pk->cache, *result,
+		vy_cache_add(&lsm->pk->cache, pk_entry,
 			     vy_entry_none(), key, ITER_EQ);
 	}
 
-	/* Inherit the hint from the secondary index entry. */
-	result->hint = entry.hint;
-
-	vy_stmt_counter_acct_tuple(&lsm->pk->stat.get, result->stmt);
+	vy_stmt_counter_acct_tuple(&lsm->pk->stat.get, pk_entry.stmt);
+	*result = full_entry;
 out:
 	tuple_unref(key.stmt);
 	return rc;
@@ -1576,35 +1574,22 @@ vy_check_is_unique_primary(struct vy_tx *tx, const struct vy_read_view **rv,
 	return 0;
 }
 
-/**
- * Check if insertion of a new tuple violates unique constraint
- * of a secondary index.
- * @param tx         Current transaction.
- * @param rv         Read view.
- * @param space_name Space name.
- * @param index_name Index name.
- * @param lsm        LSM tree corresponding to the index.
- * @param stmt       New tuple.
- *
- * @retval  0 Success, unique constraint is satisfied.
- * @retval -1 Duplicate is found or read error occurred.
- */
 static int
-vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
-			     const char *space_name, const char *index_name,
-			     struct vy_lsm *lsm, struct tuple *stmt)
+vy_check_is_unique_secondary_one(struct vy_tx *tx, const struct vy_read_view **rv,
+				 const char *space_name, const char *index_name,
+				 struct vy_lsm *lsm, struct tuple *stmt,
+				 int multikey_idx)
 {
 	assert(lsm->index_id > 0);
 	assert(vy_stmt_type(stmt) == IPROTO_INSERT ||
 	       vy_stmt_type(stmt) == IPROTO_REPLACE);
 
-	if (!lsm->check_is_unique)
-		return 0;
 	if (lsm->key_def->is_nullable &&
-	    tuple_key_contains_null(stmt, lsm->key_def, -1))
+	    tuple_key_contains_null(stmt, lsm->key_def, multikey_idx))
 		return 0;
 	struct tuple *key = vy_stmt_extract_key(stmt, lsm->key_def,
-						lsm->env->key_format, -1);
+						lsm->env->key_format,
+						multikey_idx);
 	if (key == NULL)
 		return -1;
 	struct tuple *found;
@@ -1633,6 +1618,39 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 		diag_set(ClientError, ER_TUPLE_FOUND,
 			 index_name, space_name);
 		return -1;
+	}
+	return 0;
+}
+
+/**
+ * Check if insertion of a new tuple violates unique constraint
+ * of a secondary index.
+ * @param tx         Current transaction.
+ * @param rv         Read view.
+ * @param space_name Space name.
+ * @param index_name Index name.
+ * @param lsm        LSM tree corresponding to the index.
+ * @param stmt       New tuple.
+ *
+ * @retval  0 Success, unique constraint is satisfied.
+ * @retval -1 Duplicate is found or read error occurred.
+ */
+static int
+vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
+			     const char *space_name, const char *index_name,
+			     struct vy_lsm *lsm, struct tuple *stmt)
+{
+	if (!lsm->check_is_unique)
+		return 0;
+	if (!key_def_is_multikey(lsm->cmp_def)) {
+		return vy_check_is_unique_secondary_one(tx, rv,
+				space_name, index_name, lsm, stmt, -1);
+	}
+	int count = tuple_multikey_count(stmt, lsm->cmp_def);
+	for (int i = 0; i < count; ++i) {
+		if (vy_check_is_unique_secondary_one(tx, rv,
+				space_name, index_name, lsm, stmt, i) != 0)
+			return -1;
 	}
 	return 0;
 }
@@ -4063,11 +4081,10 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 
 	/* Forward the statement to the new LSM tree. */
 	if (stmt->old_tuple != NULL) {
-		struct tuple *delete = vy_stmt_extract_key(stmt->old_tuple,
-					lsm->cmp_def, lsm->env->key_format, -1);
+		struct tuple *delete = vy_stmt_new_surrogate_delete(format,
+							stmt->old_tuple);
 		if (delete == NULL)
 			goto err;
-		vy_stmt_set_type(delete, IPROTO_DELETE);
 		int rc = vy_tx_set(tx, lsm, delete);
 		tuple_unref(delete);
 		if (rc != 0)
@@ -4114,12 +4131,13 @@ vy_build_insert_stmt(struct vy_lsm *lsm, struct vy_mem *mem,
 		return -1;
 	vy_stmt_set_lsn(region_stmt, lsn);
 	struct vy_entry entry;
-	entry.stmt = region_stmt;
-	entry.hint = vy_stmt_hint(region_stmt, lsm->cmp_def);
-	if (vy_mem_insert(mem, entry) != 0)
-		return -1;
-	vy_mem_commit_stmt(mem, entry);
-	vy_stmt_counter_acct_tuple(&lsm->stat.memory.count, region_stmt);
+	vy_stmt_foreach_entry(entry, region_stmt, lsm->cmp_def) {
+		if (vy_mem_insert(mem, entry) != 0)
+			return -1;
+		vy_mem_commit_stmt(mem, entry);
+		vy_stmt_counter_acct_tuple(&lsm->stat.memory.count,
+					   region_stmt);
+	}
 	return 0;
 }
 
@@ -4218,11 +4236,10 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	struct tuple *insert = NULL;
 	struct tuple *old_tuple = old.stmt;
 	if (old_tuple != NULL) {
-		delete = vy_stmt_extract_key(old_tuple, lsm->cmp_def,
-					     lsm->env->key_format, -1);
+		delete = vy_stmt_new_surrogate_delete(lsm->mem_format,
+						      old_tuple);
 		if (delete == NULL)
 			return -1;
-		vy_stmt_set_type(delete, IPROTO_DELETE);
 	}
 	enum iproto_type type = vy_stmt_type(mem_stmt);
 	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
@@ -4578,13 +4595,15 @@ vy_deferred_delete_on_replace(struct trigger *trigger, void *event)
 			mem = lsm->mem;
 		}
 		struct vy_entry entry;
-		entry.stmt = delete;
-		entry.hint = vy_stmt_hint(delete, lsm->cmp_def);
-		rc = vy_lsm_set(lsm, mem, entry, &region_stmt);
+		vy_stmt_foreach_entry(entry, delete, lsm->cmp_def) {
+			rc = vy_lsm_set(lsm, mem, entry, &region_stmt);
+			if (rc != 0)
+				break;
+			entry.stmt = region_stmt;
+			vy_lsm_commit_stmt(lsm, mem, entry);
+		}
 		if (rc != 0)
 			break;
-		entry.stmt = region_stmt;
-		vy_lsm_commit_stmt(lsm, mem, entry);
 
 		if (!is_first_statement)
 			continue;

@@ -4,20 +4,10 @@ engine = test_run:get_cfg('engine')
 --
 -- gh-1260: Multikey indexes.
 --
-s = box.schema.space.create('withdata', {engine = 'vinyl'})
-pk = s:create_index('pk')
--- Vinyl's space can't be multikey (yet).
-_ = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname'}}})
-s:drop()
-
 s = box.schema.space.create('withdata', {engine = engine})
 -- Primary index must be unique so it can't be multikey.
 _ = s:create_index('idx', {parts = {{3, 'str', path = '[*].fname'}}})
 pk = s:create_index('pk')
--- Only tree index type may be mutlikey.
-_ = s:create_index('idx', {type = 'hash', unique = true, parts = {{3, 'str', path = '[*].fname'}}})
-_ = s:create_index('idx', {type = 'bitset', unique = false, parts = {{3, 'str', path = '[*].fname'}}})
-_ = s:create_index('idx', {type = 'rtree', unique = false, parts = {{3, 'array', path = '[*].fname'}}})
 -- Test incompatible multikey index parts.
 _ = s:create_index('idx3', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '["data"][*].sname'}}})
 _ = s:create_index('idx2', {parts = {{3, 'str', path = '[*].fname'}, {3, 'str', path = '[*].sname[*].a'}}})
@@ -43,12 +33,12 @@ idx:select()
 -- Duplicates in multikey parts.
 s:insert({5, {1, 1, 1}, {{fname='A', sname='B'}, {fname='C', sname='D'}, {fname='A', sname='B'}}})
 arr_idx:select({1})
-s:delete(5)
+_ = s:delete(5)
 -- Check that there is no garbage in index.
 arr_idx:select({1})
 idx:get({'A', 'B'})
 idx:get({'C', 'D'})
-idx:delete({'Vasya', 'Pupkin'})
+_ = idx:delete({'Vasya', 'Pupkin'})
 s:insert({6, {1, 2}, {{fname='Vasya', sname='Pupkin'}}})
 s:insert({7, {1}, {{fname='James', sname='Bond'}}})
 arr_idx:select({1})
@@ -84,7 +74,7 @@ idx0:get(2)
 idx0:get(1)
 idx0:get(3)
 idx0:select()
-idx0:delete(2)
+_ = idx0:delete(2)
 idx0:get(2)
 idx0:select()
 s:drop()

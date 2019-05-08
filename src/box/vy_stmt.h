@@ -750,6 +750,31 @@ vy_entry_compare_with_raw_key(struct vy_entry entry,
 					    key, key_hint, key_def);
 }
 
+/**
+ * Iterate over each key indexed in the given statement.
+ * @param entry    loop variable
+ * @param src_stmt source statement
+ * @param key_def  key definition
+ *
+ * For a multikey index, entry.hint is set to multikey entry offset
+ * and the loop iterates over each offset stored in the statement.
+ *
+ * For a unikey index, entry.hint is initialized with vy_stmt_hint()
+ * and the loop breaks after the first iteration.
+ *
+ * entry.stmt is set to src_stmt on each iteration.
+ */
+#define vy_stmt_foreach_entry(entry, src_stmt, key_def)			\
+	for (uint32_t multikey_idx = 0,					\
+	     multikey_count = !key_def_is_multikey((key_def)) ? 1 :	\
+			tuple_multikey_count((src_stmt), (key_def));	\
+	     multikey_idx < multikey_count &&				\
+	     (((entry).stmt = (src_stmt)),				\
+	      ((entry).hint = !key_def_is_multikey((key_def)) ?		\
+			vy_stmt_hint((src_stmt), (key_def)) :		\
+			multikey_idx), true);				\
+	     ++multikey_idx)
+
 #if defined(__cplusplus)
 } /* extern "C" */
 #endif /* defined(__cplusplus) */
