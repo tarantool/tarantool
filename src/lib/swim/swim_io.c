@@ -198,7 +198,7 @@ swim_bcast_task_next_addr(struct swim_bcast_task *task)
 		if ((flags & IFF_UP) == 0)
 			continue;
 
-		if ((flags & IFF_BROADCAST) != 0 &&
+		if ((flags & IFF_BROADCAST) != 0 && i->ifa_broadaddr != NULL &&
 		    i->ifa_broadaddr->sa_family == AF_INET) {
 			task->base.dst =
 				*(struct sockaddr_in *) i->ifa_broadaddr;
