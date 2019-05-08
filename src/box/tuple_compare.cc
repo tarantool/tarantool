@@ -504,17 +504,17 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 
 	for (; part < end; part++) {
 		if (is_multikey) {
-			field_a = tuple_field_raw_by_part_multikey(format_a,
-					tuple_a_raw, field_map_a, part,
-					(int)tuple_a_hint);
-			field_b = tuple_field_raw_by_part_multikey(format_b,
-					tuple_b_raw, field_map_b, part,
-					(int)tuple_b_hint);
+			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
+							  field_map_a, part,
+							  (int)tuple_a_hint);
+			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
+							  field_map_b, part,
+							  (int)tuple_b_hint);
 		} else if (has_json_paths) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
-							  field_map_a, part);
+							  field_map_a, part, -1);
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
-							  field_map_b, part);
+							  field_map_b, part, -1);
 		} else {
 			field_a = tuple_field_raw(format_a, tuple_a_raw,
 						  field_map_a, part->fieldno);
@@ -568,17 +568,17 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 	end = key_def->parts + key_def->part_count;
 	for (; part < end; ++part) {
 		if (is_multikey) {
-			field_a = tuple_field_raw_by_part_multikey(format_a,
-					tuple_a_raw, field_map_a, part,
-					(int)tuple_a_hint);
-			field_b = tuple_field_raw_by_part_multikey(format_b,
-					tuple_b_raw, field_map_b, part,
-					(int)tuple_b_hint);
+			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
+							  field_map_a, part,
+							  (int)tuple_a_hint);
+			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
+							  field_map_b, part,
+							  (int)tuple_b_hint);
 		} else if (has_json_paths) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
-							  field_map_a, part);
+							  field_map_a, part, -1);
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
-							  field_map_b, part);
+							  field_map_b, part, -1);
 		} else {
 			field_a = tuple_field_raw(format_a, tuple_a_raw,
 						  field_map_a, part->fieldno);
@@ -625,12 +625,12 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 	if (likely(part_count == 1)) {
 		const char *field;
 		if (is_multikey) {
-			field = tuple_field_raw_by_part_multikey(format,
-					tuple_raw, field_map, part,
-					(int)tuple_hint);
+			field = tuple_field_raw_by_part(format, tuple_raw,
+							field_map, part,
+							(int)tuple_hint);
 		} else if (has_json_paths) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
-							field_map, part);
+							field_map, part, -1);
 		} else {
 			field = tuple_field_raw(format, tuple_raw, field_map,
 						part->fieldno);
@@ -659,12 +659,12 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 	for (; part < end; ++part, mp_next(&key)) {
 		const char *field;
 		if (is_multikey) {
-			field = tuple_field_raw_by_part_multikey(format,
-					tuple_raw, field_map, part,
-					(int)tuple_hint);
+			field = tuple_field_raw_by_part(format, tuple_raw,
+							field_map, part,
+							(int)tuple_hint);
 		} else if (has_json_paths) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
-							field_map, part);
+							field_map, part, -1);
 		} else {
 			field = tuple_field_raw(format, tuple_raw, field_map,
 						part->fieldno);
@@ -1553,6 +1553,7 @@ template <enum field_type type, bool is_nullable>
 static hint_t
 key_hint(const char *key, uint32_t part_count, struct key_def *key_def)
 {
+	assert(!key_def_is_multikey(key_def));
 	if (part_count == 0)
 		return HINT_NONE;
 	return field_hint<type, is_nullable>(key, key_def->parts->coll);
@@ -1562,7 +1563,8 @@ template <enum field_type type, bool is_nullable>
 static hint_t
 tuple_hint(struct tuple *tuple, struct key_def *key_def)
 {
-	const char *field = tuple_field_by_part(tuple, key_def->parts);
+	assert(!key_def_is_multikey(key_def));
+	const char *field = tuple_field_by_part(tuple, key_def->parts, -1);
 	if (is_nullable && field == NULL)
 		return hint_nil();
 	return field_hint<type, is_nullable>(field, key_def->parts->coll);
@@ -1584,6 +1586,7 @@ key_hint_multikey(const char *key, uint32_t part_count, struct key_def *key_def)
 	 * do nothing on key hint calculation an it is valid
 	 * because it is never used(unlike tuple hint).
 	 */
+	assert(key_def_is_multikey(key_def));
 	return HINT_NONE;
 }
 

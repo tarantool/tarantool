@@ -132,7 +132,7 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 						key_def->parts[i].fieldno);
 		} else {
 			field = tuple_field_raw_by_part(format, data, field_map,
-							&key_def->parts[i]);
+							&key_def->parts[i], -1);
 		}
 		if (has_optional_parts && field == NULL) {
 			bsize += mp_sizeof_nil();
@@ -179,7 +179,7 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 						key_def->parts[i].fieldno);
 		} else {
 			field = tuple_field_raw_by_part(format, data, field_map,
-							&key_def->parts[i]);
+							&key_def->parts[i], -1);
 		}
 		if (has_optional_parts && field == NULL) {
 			key_buf = mp_encode_nil(key_buf);
@@ -413,13 +413,14 @@ key_def_set_extract_func(struct key_def *key_def)
 bool
 tuple_key_contains_null(struct tuple *tuple, struct key_def *def)
 {
+	assert(!key_def_is_multikey(def));
 	struct tuple_format *format = tuple_format(tuple);
 	const char *data = tuple_data(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
 	for (struct key_part *part = def->parts, *end = part + def->part_count;
 	     part < end; ++part) {
-		const char *field =
-			tuple_field_raw_by_part(format, data, field_map, part);
+		const char *field = tuple_field_raw_by_part(format, data,
+							    field_map, part, -1);
 		if (field == NULL || mp_typeof(*field) == MP_NIL)
 			return true;
 	}
@@ -429,9 +430,10 @@ tuple_key_contains_null(struct tuple *tuple, struct key_def *def)
 int
 tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple)
 {
+	assert(!key_def_is_multikey(key_def));
 	for (uint32_t idx = 0; idx < key_def->part_count; idx++) {
 		struct key_part *part = &key_def->parts[idx];
-		const char *field = tuple_field_by_part(tuple, part);
+		const char *field = tuple_field_by_part(tuple, part, -1);
 		if (field == NULL) {
 			if (key_part_is_nullable(part))
 				continue;

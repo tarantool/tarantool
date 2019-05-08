@@ -155,11 +155,12 @@ struct TupleHash
 {
 	static uint32_t hash(struct tuple *tuple, struct key_def *key_def)
 	{
+		assert(!key_def_is_multikey(key_def));
 		uint32_t h = HASH_SEED;
 		uint32_t carry = 0;
 		uint32_t total_size = 0;
-		const char *field =
-			tuple_field_by_part(tuple, key_def->parts);
+		const char *field = tuple_field_by_part(tuple,
+						key_def->parts, -1);
 		TupleFieldHash<TYPE, MORE_TYPES...>::
 			hash(&field, &h, &carry, &total_size);
 		return PMurHash32_Result(h, carry, total_size);
@@ -170,8 +171,9 @@ template <>
 struct TupleHash<FIELD_TYPE_UNSIGNED> {
 	static uint32_t	hash(struct tuple *tuple, struct key_def *key_def)
 	{
-		const char *field =
-			tuple_field_by_part(tuple, key_def->parts);
+		assert(!key_def_is_multikey(key_def));
+		const char *field = tuple_field_by_part(tuple,
+						key_def->parts, -1);
 		uint64_t val = mp_decode_uint(&field);
 		if (likely(val <= UINT32_MAX))
 			return val;
@@ -348,7 +350,7 @@ uint32_t
 tuple_hash_key_part(uint32_t *ph1, uint32_t *pcarry, struct tuple *tuple,
 		    struct key_part *part)
 {
-	const char *field = tuple_field_by_part(tuple, part);
+	const char *field = tuple_field_by_part(tuple, part, -1);
 	if (field == NULL)
 		return tuple_hash_null(ph1, pcarry);
 	return tuple_hash_field(ph1, pcarry, &field, part->coll);
@@ -360,6 +362,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(has_optional_parts == key_def->has_optional_parts);
+	assert(!key_def_is_multikey(key_def));
 	uint32_t h = HASH_SEED;
 	uint32_t carry = 0;
 	uint32_t total_size = 0;
@@ -370,7 +373,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 	const char *field;
 	if (has_json_paths) {
 		field = tuple_field_raw_by_part(format, tuple_raw, field_map,
-						key_def->parts);
+						key_def->parts, -1);
 	} else {
 		field = tuple_field_raw(format, tuple_raw, field_map,
 					prev_fieldno);
@@ -391,7 +394,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 			struct key_part *part = &key_def->parts[part_id];
 			if (has_json_paths) {
 				field = tuple_field_raw_by_part(format, tuple_raw,
-								field_map, part);
+								field_map, part, -1);
 			} else {
 				field = tuple_field_raw(format, tuple_raw, field_map,
 						    part->fieldno);

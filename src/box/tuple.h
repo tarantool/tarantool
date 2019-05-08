@@ -653,9 +653,9 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
  * @retval Field data if the field exists or NULL.
  */
 static inline const char *
-tuple_field_raw_by_part_multikey(struct tuple_format *format, const char *data,
-				 const uint32_t *field_map,
-				 struct key_part *part, int multikey_idx)
+tuple_field_raw_by_part(struct tuple_format *format, const char *data,
+			const uint32_t *field_map,
+			struct key_part *part, int multikey_idx)
 {
 	if (unlikely(part->format_epoch != format->epoch)) {
 		assert(format->epoch != 0);
@@ -672,32 +672,19 @@ tuple_field_raw_by_part_multikey(struct tuple_format *format, const char *data,
 }
 
 /**
- * Get a tuple field pointed to by an index part.
- * @param format Tuple format.
- * @param data A pointer to MessagePack array.
- * @param field_map A pointer to the LAST element of field map.
- * @param part Index part to use.
- * @retval Field data if the field exists or NULL.
- */
-static inline const char *
-tuple_field_raw_by_part(struct tuple_format *format, const char *data,
-			const uint32_t *field_map, struct key_part *part)
-{
-	return tuple_field_raw_by_part_multikey(format, data, field_map,
-						part, -1);
-}
-
-/**
  * Get a field refereed by index @part in tuple.
  * @param tuple Tuple to get the field from.
  * @param part Index part to use.
+ * @param multikey_idx A multikey index hint.
  * @retval Field data if the field exists or NULL.
  */
 static inline const char *
-tuple_field_by_part(struct tuple *tuple, struct key_part *part)
+tuple_field_by_part(struct tuple *tuple, struct key_part *part,
+		    int multikey_idx)
 {
 	return tuple_field_raw_by_part(tuple_format(tuple), tuple_data(tuple),
-				       tuple_field_map(tuple), part);
+				       tuple_field_map(tuple), part,
+				       multikey_idx);
 }
 
 /**
