@@ -173,7 +173,7 @@ cmd ::= ROLLBACK TO savepoint_opt nm(X). {
 cmd ::= create_table create_table_args.
 create_table ::= createkw TABLE ifnotexists(E) nm(Y). {
   create_table_def_init(&pParse->create_table_def, &Y, E);
-  pParse->create_table_def.new_space = sqlStartTable(pParse, &Y, E);
+  pParse->create_table_def.new_space = sqlStartTable(pParse, &Y);
 }
 createkw(A) ::= CREATE(A).  {disableLookaside(pParse);}
 
