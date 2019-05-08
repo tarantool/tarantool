@@ -623,16 +623,16 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
  * See tuple_bloom_builder_add() for more details.
  */
 int
-vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
-			  struct tuple *stmt, struct key_def *key_def);
+vy_bloom_builder_add(struct tuple_bloom_builder *builder,
+		     struct vy_entry entry, struct key_def *key_def);
 
 /**
  * Check if a statement hash is present in a bloom filter.
  * See tuple_bloom_maybe_has() for more details.
  */
 bool
-vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
-			struct tuple *stmt, struct key_def *key_def);
+vy_bloom_maybe_has(const struct tuple_bloom *bloom,
+		   struct vy_entry entry, struct key_def *key_def);
 
 /**
  * Encode vy_stmt for a primary key as xrow_header
@@ -655,6 +655,7 @@ vy_stmt_encode_primary(struct tuple *value, struct key_def *key_def,
  *
  * @param value statement to encode
  * @param key_def key definition
+ * @param multikey_idx multikey index hint
  * @param xrow[out] xrow to fill
  *
  * @retval 0 if OK
@@ -662,7 +663,7 @@ vy_stmt_encode_primary(struct tuple *value, struct key_def *key_def,
  */
 int
 vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
-			 struct xrow_header *xrow);
+			 int multikey_idx, struct xrow_header *xrow);
 
 /**
  * Reconstruct vinyl tuple info and data from xrow
@@ -687,6 +688,19 @@ vy_stmt_snprint(char *buf, int size, struct tuple *stmt);
  */
 const char *
 vy_stmt_str(struct tuple *stmt);
+
+/**
+ * Extract a multikey index hint from a statement entry.
+ * Returns -1 if the key definition isn't multikey.
+ */
+static inline int
+vy_entry_multikey_idx(struct vy_entry entry, struct key_def *key_def)
+{
+	if (!key_def_is_multikey(key_def) || vy_stmt_is_key(entry.stmt))
+		return -1;
+	assert(entry.hint != HINT_NONE);
+	return (int)entry.hint;
+}
 
 /**
  * Create a key entry from a MessagePack array without a header.

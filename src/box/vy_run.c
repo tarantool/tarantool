@@ -1333,8 +1333,7 @@ vy_run_iterator_seek(struct vy_run_iterator *itr, struct vy_entry last,
 	/* Check the bloom filter on the first iteration. */
 	bool check_bloom = (itr->iterator_type == ITER_EQ &&
 			    itr->curr.stmt == NULL && bloom != NULL);
-	if (check_bloom && !vy_stmt_bloom_maybe_has(bloom, itr->key.stmt,
-						    itr->key_def)) {
+	if (check_bloom && !vy_bloom_maybe_has(bloom, itr->key, itr->key_def)) {
 		vy_run_iterator_stop(itr);
 		itr->stat->bloom_hit++;
 		return 0;
@@ -1773,7 +1772,9 @@ vy_run_dump_stmt(struct vy_entry entry, struct xlog *data_xlog,
 	struct xrow_header xrow;
 	int rc = (is_primary ?
 		  vy_stmt_encode_primary(entry.stmt, key_def, 0, &xrow) :
-		  vy_stmt_encode_secondary(entry.stmt, key_def, &xrow));
+		  vy_stmt_encode_secondary(entry.stmt, key_def,
+					   vy_entry_multikey_idx(entry, key_def),
+					   &xrow));
 	if (rc != 0)
 		return -1;
 
@@ -2166,8 +2167,10 @@ vy_run_writer_start_page(struct vy_run_writer *writer,
 		return -1;
 	const char *key = vy_stmt_is_key(first_entry.stmt) ?
 			  tuple_data(first_entry.stmt) :
-			  tuple_extract_key(first_entry.stmt,
-					    writer->cmp_def, -1, NULL);
+			  tuple_extract_key(first_entry.stmt, writer->cmp_def,
+					    vy_entry_multikey_idx(first_entry,
+								  writer->cmp_def),
+					    NULL);
 	if (key == NULL)
 		return -1;
 	if (run->info.page_count == 0) {
@@ -2196,8 +2199,7 @@ static int
 vy_run_writer_write_to_page(struct vy_run_writer *writer, struct vy_entry entry)
 {
 	if (writer->bloom != NULL &&
-	    vy_stmt_bloom_builder_add(writer->bloom, entry.stmt,
-				      writer->key_def) != 0)
+	    vy_bloom_builder_add(writer->bloom, entry, writer->key_def) != 0)
 		return -1;
 	if (writer->last.stmt != NULL)
 		vy_stmt_unref_if_possible(writer->last.stmt);
@@ -2320,8 +2322,10 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 	assert(writer->last.stmt != NULL);
 	const char *key = vy_stmt_is_key(writer->last.stmt) ?
 		          tuple_data(writer->last.stmt) :
-			  tuple_extract_key(writer->last.stmt,
-					    writer->cmp_def, -1, NULL);
+			  tuple_extract_key(writer->last.stmt, writer->cmp_def,
+					    vy_entry_multikey_idx(writer->last,
+								  writer->cmp_def),
+					    NULL);
 	if (key == NULL)
 		goto out;
 
@@ -2424,11 +2428,13 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 			struct tuple *tuple = vy_stmt_decode(&xrow, format);
 			if (tuple == NULL)
 				goto close_err;
-			if (bloom_builder != NULL &&
-			    vy_stmt_bloom_builder_add(bloom_builder, tuple,
-						      key_def) != 0) {
-				tuple_unref(tuple);
-				goto close_err;
+			if (bloom_builder != NULL) {
+				struct vy_entry entry = {tuple, HINT_NONE};
+				if (vy_bloom_builder_add(bloom_builder, entry,
+							 key_def) != 0) {
+					tuple_unref(tuple);
+					goto close_err;
+				}
 			}
 			key = vy_stmt_is_key(tuple) ? tuple_data(tuple) :
 			      tuple_extract_key(tuple, cmp_def, -1, NULL);

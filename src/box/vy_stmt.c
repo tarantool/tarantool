@@ -527,30 +527,34 @@ vy_stmt_extract_key_raw(const char *data, const char *data_end,
 }
 
 int
-vy_stmt_bloom_builder_add(struct tuple_bloom_builder *builder,
-			  struct tuple *stmt, struct key_def *key_def)
+vy_bloom_builder_add(struct tuple_bloom_builder *builder,
+		     struct vy_entry entry, struct key_def *key_def)
 {
+	struct tuple *stmt = entry.stmt;
 	if (vy_stmt_is_key(stmt)) {
 		const char *data = tuple_data(stmt);
 		uint32_t part_count = mp_decode_array(&data);
 		return tuple_bloom_builder_add_key(builder, data,
 						   part_count, key_def);
 	} else {
-		return tuple_bloom_builder_add(builder, stmt, key_def, -1);
+		return tuple_bloom_builder_add(builder, stmt, key_def,
+				vy_entry_multikey_idx(entry, key_def));
 	}
 }
 
 bool
-vy_stmt_bloom_maybe_has(const struct tuple_bloom *bloom,
-			struct tuple *stmt, struct key_def *key_def)
+vy_bloom_maybe_has(const struct tuple_bloom *bloom,
+		   struct vy_entry entry, struct key_def *key_def)
 {
+	struct tuple *stmt = entry.stmt;
 	if (vy_stmt_is_key(stmt)) {
 		const char *data = tuple_data(stmt);
 		uint32_t part_count = mp_decode_array(&data);
 		return tuple_bloom_maybe_has_key(bloom, data,
 						 part_count, key_def);
 	} else {
-		return tuple_bloom_maybe_has(bloom, stmt, key_def, -1);
+		return tuple_bloom_maybe_has(bloom, stmt, key_def,
+				vy_entry_multikey_idx(entry, key_def));
 	}
 }
 
@@ -656,7 +660,7 @@ vy_stmt_encode_primary(struct tuple *value, struct key_def *key_def,
 
 int
 vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
-			 struct xrow_header *xrow)
+			 int multikey_idx, struct xrow_header *xrow)
 {
 	memset(xrow, 0, sizeof(*xrow));
 	enum iproto_type type = vy_stmt_type(value);
@@ -669,7 +673,8 @@ vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
 	uint32_t size;
 	const char *extracted = vy_stmt_is_key(value) ?
 				tuple_data_range(value, &size) :
-				tuple_extract_key(value, cmp_def, -1, &size);
+				tuple_extract_key(value, cmp_def,
+						  multikey_idx, &size);
 	if (extracted == NULL)
 		return -1;
 	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {
