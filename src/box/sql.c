@@ -480,7 +480,7 @@ int tarantoolsqlEphemeralDelete(BtCursor *pCur)
 	char *key;
 	uint32_t key_size;
 	key = tuple_extract_key(pCur->last_tuple,
-				pCur->iter->index->def->key_def,
+				pCur->iter->index->def->key_def, -1,
 				&key_size);
 	if (key == NULL)
 		return SQL_TARANTOOL_DELETE_FAIL;
@@ -506,7 +506,7 @@ int tarantoolsqlDelete(BtCursor *pCur, u8 flags)
 	int rc;
 
 	key = tuple_extract_key(pCur->last_tuple,
-				pCur->iter->index->def->key_def,
+				pCur->iter->index->def->key_def, -1,
 				&key_size);
 	if (key == NULL)
 		return SQL_TARANTOOL_DELETE_FAIL;
@@ -561,7 +561,7 @@ int tarantoolsqlEphemeralClearTable(BtCursor *pCur)
 	uint32_t  key_size;
 
 	while (iterator_next(it, &tuple) == 0 && tuple != NULL) {
-		key = tuple_extract_key(tuple, it->index->def->key_def,
+		key = tuple_extract_key(tuple, it->index->def->key_def, -1,
 					&key_size);
 		if (space_ephemeral_delete(pCur->space, key) != 0) {
 			iterator_delete(it);
@@ -594,7 +594,7 @@ int tarantoolsqlClearTable(struct space *space, uint32_t *tuple_count)
 	if (iter == NULL)
 		return SQL_TARANTOOL_ITERATOR_FAIL;
 	while (iterator_next(iter, &tuple) == 0 && tuple != NULL) {
-		request.key = tuple_extract_key(tuple, pk->def->key_def,
+		request.key = tuple_extract_key(tuple, pk->def->key_def, -1,
 						&key_size);
 		request.key_end = request.key + key_size;
 		rc = box_process_rw(&request, space, &unused);
@@ -801,7 +801,7 @@ out:
 #ifndef NDEBUG
 	/* Sanity check. */
 	original_size = region_used(&fiber()->gc);
-	key = tuple_extract_key(tuple, key_def, &key_size);
+	key = tuple_extract_key(tuple, key_def, -1, &key_size);
 	if (key != NULL) {
 		int new_rc = sqlVdbeRecordCompareMsgpack(key, unpacked);
 		region_truncate(&fiber()->gc, original_size);

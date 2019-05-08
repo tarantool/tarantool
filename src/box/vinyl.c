@@ -1344,7 +1344,7 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	struct vy_entry key;
 	if (vy_stmt_is_key(entry.stmt)) {
 		key.stmt = vy_stmt_extract_key(entry.stmt, lsm->pk_in_cmp_def,
-					       lsm->env->key_format);
+					       lsm->env->key_format, -1);
 		if (key.stmt == NULL)
 			return -1;
 	} else {
@@ -1601,10 +1601,10 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 	if (!lsm->check_is_unique)
 		return 0;
 	if (lsm->key_def->is_nullable &&
-	    tuple_key_contains_null(stmt, lsm->key_def))
+	    tuple_key_contains_null(stmt, lsm->key_def, -1))
 		return 0;
 	struct tuple *key = vy_stmt_extract_key(stmt, lsm->key_def,
-						lsm->env->key_format);
+						lsm->env->key_format, -1);
 	if (key == NULL)
 		return -1;
 	struct tuple *found;
@@ -2149,7 +2149,7 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 */
 	/* Find the old tuple using the primary key. */
 	struct tuple *key = vy_stmt_extract_key_raw(tuple, tuple_end,
-					pk->key_def, pk->env->key_format);
+					pk->key_def, pk->env->key_format, -1);
 	if (key == NULL)
 		return -1;
 	int rc = vy_get(pk, tx, vy_tx_read_view(tx), key, &stmt->old_tuple);
@@ -4064,7 +4064,7 @@ vy_build_on_replace(struct trigger *trigger, void *event)
 	/* Forward the statement to the new LSM tree. */
 	if (stmt->old_tuple != NULL) {
 		struct tuple *delete = vy_stmt_extract_key(stmt->old_tuple,
-					lsm->cmp_def, lsm->env->key_format);
+					lsm->cmp_def, lsm->env->key_format, -1);
 		if (delete == NULL)
 			goto err;
 		vy_stmt_set_type(delete, IPROTO_DELETE);
@@ -4219,7 +4219,7 @@ vy_build_recover_stmt(struct vy_lsm *lsm, struct vy_lsm *pk,
 	struct tuple *old_tuple = old.stmt;
 	if (old_tuple != NULL) {
 		delete = vy_stmt_extract_key(old_tuple, lsm->cmp_def,
-					     lsm->env->key_format);
+					     lsm->env->key_format, -1);
 		if (delete == NULL)
 			return -1;
 		vy_stmt_set_type(delete, IPROTO_DELETE);

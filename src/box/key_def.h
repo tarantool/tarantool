@@ -145,11 +145,13 @@ typedef int (*tuple_compare_t)(struct tuple *tuple_a,
 /** @copydoc tuple_extract_key() */
 typedef char *(*tuple_extract_key_t)(struct tuple *tuple,
 				     struct key_def *key_def,
+				     int multikey_idx,
 				     uint32_t *key_size);
 /** @copydoc tuple_extract_key_raw() */
 typedef char *(*tuple_extract_key_raw_t)(const char *data,
 					 const char *data_end,
 					 struct key_def *key_def,
+					 int multikey_idx,
 					 uint32_t *key_size);
 /** @copydoc tuple_hash() */
 typedef uint32_t (*tuple_hash_t)(struct tuple *tuple,
@@ -531,10 +533,12 @@ key_part_cmp(const struct key_part *parts1, uint32_t part_count1,
  * Check if a key of @a tuple contains NULL.
  * @param tuple Tuple to check.
  * @param def Key def to check by.
+ * @param multikey_idx Multikey index hint.
  * @retval Does the key contain NULL or not?
  */
 bool
-tuple_key_contains_null(struct tuple *tuple, struct key_def *def);
+tuple_key_contains_null(struct tuple *tuple, struct key_def *def,
+			int multikey_idx);
 
 /**
  * Check that tuple fields match with given key definition
@@ -554,6 +558,7 @@ tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple);
  * has O(n) complexity, where n is the number of key parts.
  * @param tuple - tuple from which need to extract key
  * @param key_def - definition of key that need to extract
+ * @param multikey_idx - multikey index hint
  * @param key_size - here will be size of extracted key
  *
  * @retval not NULL Success
@@ -561,9 +566,10 @@ tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple);
  */
 static inline char *
 tuple_extract_key(struct tuple *tuple, struct key_def *key_def,
-		  uint32_t *key_size)
+		  int multikey_idx, uint32_t *key_size)
 {
-	return key_def->tuple_extract_key(tuple, key_def, key_size);
+	return key_def->tuple_extract_key(tuple, key_def, multikey_idx,
+					  key_size);
 }
 
 /**
@@ -574,6 +580,7 @@ tuple_extract_key(struct tuple *tuple, struct key_def *key_def,
  * @param data - msgpuck data from which need to extract key
  * @param data_end - pointer at the end of data
  * @param key_def - definition of key that need to extract
+ * @param multikey_idx - multikey index hint
  * @param key_size - here will be size of extracted key
  *
  * @retval not NULL Success
@@ -581,10 +588,11 @@ tuple_extract_key(struct tuple *tuple, struct key_def *key_def,
  */
 static inline char *
 tuple_extract_key_raw(const char *data, const char *data_end,
-		      struct key_def *key_def, uint32_t *key_size)
+		      struct key_def *key_def, int multikey_idx,
+		      uint32_t *key_size)
 {
 	return key_def->tuple_extract_key_raw(data, data_end, key_def,
-					      key_size);
+					      multikey_idx, key_size);
 }
 
 /**

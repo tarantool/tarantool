@@ -37,8 +37,10 @@ key_def_contains_sequential_parts(const struct key_def *def)
 template <bool has_optional_parts>
 static char *
 tuple_extract_key_sequential_raw(const char *data, const char *data_end,
-				 struct key_def *key_def, uint32_t *key_size)
+				 struct key_def *key_def, int multikey_idx,
+				 uint32_t *key_size)
 {
+	(void)multikey_idx;
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(key_def_is_sequential(key_def));
 	assert(has_optional_parts == key_def->has_optional_parts);
@@ -87,7 +89,7 @@ tuple_extract_key_sequential_raw(const char *data, const char *data_end,
 template <bool has_optional_parts>
 static inline char *
 tuple_extract_key_sequential(struct tuple *tuple, struct key_def *key_def,
-			     uint32_t *key_size)
+			     int multikey_idx, uint32_t *key_size)
 {
 	assert(key_def_is_sequential(key_def));
 	assert(!has_optional_parts || key_def->is_nullable);
@@ -97,6 +99,7 @@ tuple_extract_key_sequential(struct tuple *tuple, struct key_def *key_def,
 	return tuple_extract_key_sequential_raw<has_optional_parts>(data,
 								    data_end,
 								    key_def,
+								    multikey_idx,
 								    key_size);
 }
 
@@ -105,17 +108,18 @@ tuple_extract_key_sequential(struct tuple *tuple, struct key_def *key_def,
  * @copydoc tuple_extract_key()
  */
 template <bool contains_sequential_parts, bool has_optional_parts,
-	  bool has_json_paths>
+	  bool has_json_paths, bool is_multikey>
 static char *
 tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
-			   uint32_t *key_size)
+			   int multikey_idx, uint32_t *key_size)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
 	assert(contains_sequential_parts ==
 	       key_def_contains_sequential_parts(key_def));
-	assert(!key_def_is_multikey(key_def));
+	assert(is_multikey == key_def_is_multikey(key_def));
+	assert(!key_def_is_multikey(key_def) || multikey_idx >= 0);
 	assert(mp_sizeof_nil() == 1);
 	const char *data = tuple_data(tuple);
 	uint32_t part_count = key_def->part_count;
@@ -130,9 +134,13 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 		if (!has_json_paths) {
 			field = tuple_field_raw(format, data, field_map,
 						key_def->parts[i].fieldno);
-		} else {
+		} else if (!is_multikey) {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i], -1);
+		} else {
+			field = tuple_field_raw_by_part(format, data, field_map,
+							&key_def->parts[i],
+							multikey_idx);
 		}
 		if (has_optional_parts && field == NULL) {
 			bsize += mp_sizeof_nil();
@@ -177,9 +185,13 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 		if (!has_json_paths) {
 			field = tuple_field_raw(format, data, field_map,
 						key_def->parts[i].fieldno);
-		} else {
+		} else if (!is_multikey) {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i], -1);
+		} else {
+			field = tuple_field_raw_by_part(format, data, field_map,
+							&key_def->parts[i],
+							multikey_idx);
 		}
 		if (has_optional_parts && field == NULL) {
 			key_buf = mp_encode_nil(key_buf);
@@ -230,12 +242,13 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 template <bool has_optional_parts, bool has_json_paths>
 static char *
 tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
-			       struct key_def *key_def, uint32_t *key_size)
+			       struct key_def *key_def, int multikey_idx,
+			       uint32_t *key_size)
 {
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
-	assert(!key_def_is_multikey(key_def));
+	assert(!key_def_is_multikey(key_def) || multikey_idx >= 0);
 	assert(mp_sizeof_nil() == 1);
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc(&fiber()->gc, data_end - data);
@@ -311,8 +324,8 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 		const char *src = field;
 		const char *src_end = field_end;
 		if (has_json_paths && part->path != NULL) {
-			if (tuple_go_to_path(&src, part->path,
-					     part->path_len, -1) != 0) {
+			if (tuple_go_to_path(&src, part->path, part->path_len,
+					     multikey_idx) != 0) {
 				/*
 				 * The path must be correct as
 				 * it has already been validated
@@ -361,7 +374,7 @@ key_def_set_extract_func_plain(struct key_def *def)
 	} else {
 		def->tuple_extract_key = tuple_extract_key_slowpath
 					<contains_sequential_parts,
-					 has_optional_parts, false>;
+					 has_optional_parts, false, false>;
 		def->tuple_extract_key_raw = tuple_extract_key_slowpath_raw
 					<has_optional_parts, false>;
 	}
@@ -372,9 +385,15 @@ static void
 key_def_set_extract_func_json(struct key_def *def)
 {
 	assert(def->has_json_paths);
-	def->tuple_extract_key = tuple_extract_key_slowpath
+	if (key_def_is_multikey(def)) {
+		def->tuple_extract_key = tuple_extract_key_slowpath
 					<contains_sequential_parts,
-					 has_optional_parts, true>;
+					 has_optional_parts, true, true>;
+	} else {
+		def->tuple_extract_key = tuple_extract_key_slowpath
+					<contains_sequential_parts,
+					 has_optional_parts, true, false>;
+	}
 	def->tuple_extract_key_raw = tuple_extract_key_slowpath_raw
 					<has_optional_parts, true>;
 }
@@ -411,16 +430,17 @@ key_def_set_extract_func(struct key_def *key_def)
 }
 
 bool
-tuple_key_contains_null(struct tuple *tuple, struct key_def *def)
+tuple_key_contains_null(struct tuple *tuple, struct key_def *def,
+			int multikey_idx)
 {
-	assert(!key_def_is_multikey(def));
 	struct tuple_format *format = tuple_format(tuple);
 	const char *data = tuple_data(tuple);
 	const uint32_t *field_map = tuple_field_map(tuple);
 	for (struct key_part *part = def->parts, *end = part + def->part_count;
 	     part < end; ++part) {
 		const char *field = tuple_field_raw_by_part(format, data,
-							    field_map, part, -1);
+							    field_map, part,
+							    multikey_idx);
 		if (field == NULL || mp_typeof(*field) == MP_NIL)
 			return true;
 	}

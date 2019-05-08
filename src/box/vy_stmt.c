@@ -489,11 +489,12 @@ out:
 
 struct tuple *
 vy_stmt_extract_key(struct tuple *stmt, struct key_def *key_def,
-		    struct tuple_format *format)
+		    struct tuple_format *format, int multikey_idx)
 {
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	const char *key_raw = tuple_extract_key(stmt, key_def, NULL);
+	const char *key_raw = tuple_extract_key(stmt, key_def,
+						multikey_idx, NULL);
 	if (key_raw == NULL)
 		return NULL;
 	uint32_t part_count = mp_decode_array(&key_raw);
@@ -506,13 +507,13 @@ vy_stmt_extract_key(struct tuple *stmt, struct key_def *key_def,
 
 struct tuple *
 vy_stmt_extract_key_raw(const char *data, const char *data_end,
-			struct key_def *key_def,
-			struct tuple_format *format)
+			struct key_def *key_def, struct tuple_format *format,
+			int multikey_idx)
 {
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
-	const char *key_raw = tuple_extract_key_raw(data, data_end,
-						    key_def, NULL);
+	const char *key_raw = tuple_extract_key_raw(data, data_end, key_def,
+						    multikey_idx, NULL);
 	if (key_raw == NULL)
 		return NULL;
 	uint32_t part_count = mp_decode_array(&key_raw);
@@ -622,7 +623,7 @@ vy_stmt_encode_primary(struct tuple *value, struct key_def *key_def,
 	case IPROTO_DELETE:
 		extracted = vy_stmt_is_key(value) ?
 			    tuple_data_range(value, &size) :
-			    tuple_extract_key(value, key_def, &size);
+			    tuple_extract_key(value, key_def, -1, &size);
 		if (extracted == NULL)
 			return -1;
 		request.key = extracted;
@@ -666,7 +667,7 @@ vy_stmt_encode_secondary(struct tuple *value, struct key_def *cmp_def,
 	uint32_t size;
 	const char *extracted = vy_stmt_is_key(value) ?
 				tuple_data_range(value, &size) :
-				tuple_extract_key(value, cmp_def, &size);
+				tuple_extract_key(value, cmp_def, -1, &size);
 	if (extracted == NULL)
 		return -1;
 	if (type == IPROTO_REPLACE || type == IPROTO_INSERT) {

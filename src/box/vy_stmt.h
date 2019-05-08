@@ -606,7 +606,7 @@ vy_key_from_msgpack(struct tuple_format *format, const char *key)
  */
 struct tuple *
 vy_stmt_extract_key(struct tuple *stmt, struct key_def *key_def,
-		    struct tuple_format *format);
+		    struct tuple_format *format, int multikey_idx);
 
 /**
  * Extract the key from msgpack by the given key definition
@@ -615,8 +615,8 @@ vy_stmt_extract_key(struct tuple *stmt, struct key_def *key_def,
  */
 struct tuple *
 vy_stmt_extract_key_raw(const char *data, const char *data_end,
-			struct key_def *key_def,
-			struct tuple_format *format);
+			struct key_def *key_def, struct tuple_format *format,
+			int multikey_idx);
 
 /**
  * Add a statement hash to a bloom filter builder.

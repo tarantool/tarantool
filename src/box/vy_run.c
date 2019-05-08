@@ -2167,7 +2167,7 @@ vy_run_writer_start_page(struct vy_run_writer *writer,
 	const char *key = vy_stmt_is_key(first_entry.stmt) ?
 			  tuple_data(first_entry.stmt) :
 			  tuple_extract_key(first_entry.stmt,
-					    writer->cmp_def, NULL);
+					    writer->cmp_def, -1, NULL);
 	if (key == NULL)
 		return -1;
 	if (run->info.page_count == 0) {
@@ -2321,7 +2321,7 @@ vy_run_writer_commit(struct vy_run_writer *writer)
 	const char *key = vy_stmt_is_key(writer->last.stmt) ?
 		          tuple_data(writer->last.stmt) :
 			  tuple_extract_key(writer->last.stmt,
-					    writer->cmp_def, NULL);
+					    writer->cmp_def, -1, NULL);
 	if (key == NULL)
 		goto out;
 
@@ -2431,7 +2431,7 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 				goto close_err;
 			}
 			key = vy_stmt_is_key(tuple) ? tuple_data(tuple) :
-			      tuple_extract_key(tuple, cmp_def, NULL);
+			      tuple_extract_key(tuple, cmp_def, -1, NULL);
 			if (prev_tuple != NULL)
 				tuple_unref(prev_tuple);
 			prev_tuple = tuple;
