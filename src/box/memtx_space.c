@@ -445,7 +445,8 @@ memtx_space_execute_upsert(struct space *space, struct txn *txn,
 	/* Extract the primary key from tuple. */
 	const char *key = tuple_extract_key_raw(request->tuple,
 						request->tuple_end,
-						index->def->key_def, -1, NULL);
+						index->def->key_def,
+						MULTIKEY_NONE, NULL);
 	if (key == NULL)
 		return -1;
 	/* Cut array header */

@@ -92,7 +92,8 @@ request_create_from_tuple(struct request *request, struct space *space,
 		uint32_t size, key_size;
 		const char *data = tuple_data_range(old_tuple, &size);
 		request->key = tuple_extract_key_raw(data, data + size,
-				space->index[0]->def->key_def, -1, &key_size);
+				space->index[0]->def->key_def, MULTIKEY_NONE,
+				&key_size);
 		if (request->key == NULL)
 			return -1;
 		request->key_end = request->key + key_size;
@@ -125,8 +126,8 @@ request_rebind_to_primary_key(struct request *request, struct space *space,
 	struct index *pk = space_index(space, 0);
 	assert(pk != NULL);
 	uint32_t key_len;
-	char *key = tuple_extract_key(found_tuple, pk->def->key_def, -1,
-				      &key_len);
+	char *key = tuple_extract_key(found_tuple, pk->def->key_def,
+				      MULTIKEY_NONE, &key_len);
 	assert(key != NULL);
 	request->key = key;
 	request->key_end = key + key_len;

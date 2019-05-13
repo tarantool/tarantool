@@ -462,7 +462,7 @@ tuple_go_to_path(const char **data, const char *path, uint32_t path_len,
 	while ((rc = json_lexer_next_token(&lexer, &token)) == 0) {
 		switch (token.type) {
 		case JSON_TOKEN_ANY:
-			if (multikey_idx < 0)
+			if (multikey_idx == MULTIKEY_NONE)
 				return -1;
 			token.num = multikey_idx;
 			FALLTHROUGH;
@@ -535,7 +535,8 @@ tuple_field_raw_by_full_path(struct tuple_format *format, const char *tuple,
 	}
 	return tuple_field_raw_by_path(format, tuple, field_map, fieldno,
 				       path + lexer.offset,
-				       path_len - lexer.offset, NULL, -1);
+				       path_len - lexer.offset,
+				       NULL, MULTIKEY_NONE);
 }
 
 uint32_t
@@ -548,7 +549,8 @@ tuple_raw_multikey_count(struct tuple_format *format, const char *data,
 		tuple_field_raw_by_path(format, data, field_map,
 					key_def->multikey_fieldno,
 					key_def->multikey_path,
-					key_def->multikey_path_len, NULL, -1);
+					key_def->multikey_path_len,
+					NULL, MULTIKEY_NONE);
 	if (array_raw == NULL)
 		return 0;
 	assert(mp_typeof(*array_raw) == MP_ARRAY);

@@ -691,13 +691,13 @@ vy_stmt_str(struct tuple *stmt);
 
 /**
  * Extract a multikey index hint from a statement entry.
- * Returns -1 if the key definition isn't multikey.
+ * Returns MULTIKEY_NONE if the key definition isn't multikey.
  */
 static inline int
 vy_entry_multikey_idx(struct vy_entry entry, struct key_def *key_def)
 {
 	if (!key_def_is_multikey(key_def) || vy_stmt_is_key(entry.stmt))
-		return -1;
+		return MULTIKEY_NONE;
 	assert(entry.hint != HINT_NONE);
 	return (int)entry.hint;
 }

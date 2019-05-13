@@ -629,7 +629,8 @@ vy_stmt_encode_primary(struct tuple *value, struct key_def *key_def,
 	case IPROTO_DELETE:
 		extracted = vy_stmt_is_key(value) ?
 			    tuple_data_range(value, &size) :
-			    tuple_extract_key(value, key_def, -1, &size);
+			    tuple_extract_key(value, key_def,
+					      MULTIKEY_NONE, &size);
 		if (extracted == NULL)
 			return -1;
 		request.key = extracted;

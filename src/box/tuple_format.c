@@ -1144,7 +1144,7 @@ tuple_format_iterator_next(struct tuple_format_iterator *it,
 		entry->multikey_idx = it->multikey_frame->idx;
 	} else {
 		entry->multikey_count = 0;
-		entry->multikey_idx = -1;
+		entry->multikey_idx = MULTIKEY_NONE;
 	}
 	if (field == NULL || (it->flags & TUPLE_FORMAT_ITERATOR_VALIDATE) == 0)
 		return 0;

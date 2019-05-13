@@ -119,7 +119,7 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 	assert(contains_sequential_parts ==
 	       key_def_contains_sequential_parts(key_def));
 	assert(is_multikey == key_def_is_multikey(key_def));
-	assert(!key_def_is_multikey(key_def) || multikey_idx >= 0);
+	assert(!key_def_is_multikey(key_def) || multikey_idx != MULTIKEY_NONE);
 	assert(mp_sizeof_nil() == 1);
 	const char *data = tuple_data(tuple);
 	uint32_t part_count = key_def->part_count;
@@ -136,7 +136,8 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 						key_def->parts[i].fieldno);
 		} else if (!is_multikey) {
 			field = tuple_field_raw_by_part(format, data, field_map,
-							&key_def->parts[i], -1);
+							&key_def->parts[i],
+							MULTIKEY_NONE);
 		} else {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i],
@@ -187,7 +188,8 @@ tuple_extract_key_slowpath(struct tuple *tuple, struct key_def *key_def,
 						key_def->parts[i].fieldno);
 		} else if (!is_multikey) {
 			field = tuple_field_raw_by_part(format, data, field_map,
-							&key_def->parts[i], -1);
+							&key_def->parts[i],
+							MULTIKEY_NONE);
 		} else {
 			field = tuple_field_raw_by_part(format, data, field_map,
 							&key_def->parts[i],
@@ -248,7 +250,7 @@ tuple_extract_key_slowpath_raw(const char *data, const char *data_end,
 	assert(has_json_paths == key_def->has_json_paths);
 	assert(!has_optional_parts || key_def->is_nullable);
 	assert(has_optional_parts == key_def->has_optional_parts);
-	assert(!key_def_is_multikey(key_def) || multikey_idx >= 0);
+	assert(!key_def_is_multikey(key_def) || multikey_idx != MULTIKEY_NONE);
 	assert(mp_sizeof_nil() == 1);
 	/* allocate buffer with maximal possible size */
 	char *key = (char *) region_alloc(&fiber()->gc, data_end - data);
@@ -453,7 +455,8 @@ tuple_validate_key_parts(struct key_def *key_def, struct tuple *tuple)
 	assert(!key_def_is_multikey(key_def));
 	for (uint32_t idx = 0; idx < key_def->part_count; idx++) {
 		struct key_part *part = &key_def->parts[idx];
-		const char *field = tuple_field_by_part(tuple, part, -1);
+		const char *field = tuple_field_by_part(tuple, part,
+							MULTIKEY_NONE);
 		if (field == NULL) {
 			if (key_part_is_nullable(part))
 				continue;

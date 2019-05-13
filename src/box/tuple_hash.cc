@@ -160,7 +160,8 @@ struct TupleHash
 		uint32_t carry = 0;
 		uint32_t total_size = 0;
 		const char *field = tuple_field_by_part(tuple,
-						key_def->parts, -1);
+						key_def->parts,
+						MULTIKEY_NONE);
 		TupleFieldHash<TYPE, MORE_TYPES...>::
 			hash(&field, &h, &carry, &total_size);
 		return PMurHash32_Result(h, carry, total_size);
@@ -173,7 +174,8 @@ struct TupleHash<FIELD_TYPE_UNSIGNED> {
 	{
 		assert(!key_def_is_multikey(key_def));
 		const char *field = tuple_field_by_part(tuple,
-						key_def->parts, -1);
+						key_def->parts,
+						MULTIKEY_NONE);
 		uint64_t val = mp_decode_uint(&field);
 		if (likely(val <= UINT32_MAX))
 			return val;
@@ -373,7 +375,7 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 	const char *field;
 	if (has_json_paths) {
 		field = tuple_field_raw_by_part(format, tuple_raw, field_map,
-						key_def->parts, -1);
+						key_def->parts, MULTIKEY_NONE);
 	} else {
 		field = tuple_field_raw(format, tuple_raw, field_map,
 					prev_fieldno);
@@ -394,7 +396,8 @@ tuple_hash_slowpath(struct tuple *tuple, struct key_def *key_def)
 			struct key_part *part = &key_def->parts[part_id];
 			if (has_json_paths) {
 				field = tuple_field_raw_by_part(format, tuple_raw,
-								field_map, part, -1);
+								field_map, part,
+								MULTIKEY_NONE);
 			} else {
 				field = tuple_field_raw(format, tuple_raw, field_map,
 						    part->fieldno);

@@ -265,7 +265,7 @@ lbox_key_def_extract_key(struct lua_State *L)
 	struct region *region = &fiber()->gc;
 	size_t region_svp = region_used(region);
 	uint32_t key_size;
-	char *key = tuple_extract_key(tuple, key_def, -1, &key_size);
+	char *key = tuple_extract_key(tuple, key_def, MULTIKEY_NONE, &key_size);
 	tuple_unref(tuple);
 	if (key == NULL)
 		return luaT_error(L);

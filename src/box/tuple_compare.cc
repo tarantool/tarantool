@@ -512,9 +512,11 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 							  (int)tuple_b_hint);
 		} else if (has_json_paths) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
-							  field_map_a, part, -1);
+							  field_map_a, part,
+							  MULTIKEY_NONE);
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
-							  field_map_b, part, -1);
+							  field_map_b, part,
+							  MULTIKEY_NONE);
 		} else {
 			field_a = tuple_field_raw(format_a, tuple_a_raw,
 						  field_map_a, part->fieldno);
@@ -576,9 +578,11 @@ tuple_compare_slowpath(struct tuple *tuple_a, hint_t tuple_a_hint,
 							  (int)tuple_b_hint);
 		} else if (has_json_paths) {
 			field_a = tuple_field_raw_by_part(format_a, tuple_a_raw,
-							  field_map_a, part, -1);
+							  field_map_a, part,
+							  MULTIKEY_NONE);
 			field_b = tuple_field_raw_by_part(format_b, tuple_b_raw,
-							  field_map_b, part, -1);
+							  field_map_b, part,
+							  MULTIKEY_NONE);
 		} else {
 			field_a = tuple_field_raw(format_a, tuple_a_raw,
 						  field_map_a, part->fieldno);
@@ -630,7 +634,8 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 							(int)tuple_hint);
 		} else if (has_json_paths) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
-							field_map, part, -1);
+							field_map, part,
+							MULTIKEY_NONE);
 		} else {
 			field = tuple_field_raw(format, tuple_raw, field_map,
 						part->fieldno);
@@ -664,7 +669,8 @@ tuple_compare_with_key_slowpath(struct tuple *tuple, hint_t tuple_hint,
 							(int)tuple_hint);
 		} else if (has_json_paths) {
 			field = tuple_field_raw_by_part(format, tuple_raw,
-							field_map, part, -1);
+							field_map, part,
+							MULTIKEY_NONE);
 		} else {
 			field = tuple_field_raw(format, tuple_raw, field_map,
 						part->fieldno);
@@ -1564,7 +1570,8 @@ static hint_t
 tuple_hint(struct tuple *tuple, struct key_def *key_def)
 {
 	assert(!key_def_is_multikey(key_def));
-	const char *field = tuple_field_by_part(tuple, key_def->parts, -1);
+	const char *field = tuple_field_by_part(tuple, key_def->parts,
+						MULTIKEY_NONE);
 	if (is_nullable && field == NULL)
 		return hint_nil();
 	return field_hint<type, is_nullable>(field, key_def->parts->coll);

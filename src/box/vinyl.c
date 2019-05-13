@@ -1339,7 +1339,8 @@ vy_get_by_secondary_tuple(struct vy_lsm *lsm, struct vy_tx *tx,
 	struct vy_entry key;
 	if (vy_stmt_is_key(entry.stmt)) {
 		key.stmt = vy_stmt_extract_key(entry.stmt, lsm->pk_in_cmp_def,
-					       lsm->env->key_format, -1);
+					       lsm->env->key_format,
+					       MULTIKEY_NONE);
 		if (key.stmt == NULL)
 			return -1;
 	} else {
@@ -1644,7 +1645,8 @@ vy_check_is_unique_secondary(struct vy_tx *tx, const struct vy_read_view **rv,
 		return 0;
 	if (!key_def_is_multikey(lsm->cmp_def)) {
 		return vy_check_is_unique_secondary_one(tx, rv,
-				space_name, index_name, lsm, stmt, -1);
+				space_name, index_name, lsm, stmt,
+				MULTIKEY_NONE);
 	}
 	int count = tuple_multikey_count(stmt, lsm->cmp_def);
 	for (int i = 0; i < count; ++i) {
@@ -2167,7 +2169,8 @@ vy_upsert(struct vy_env *env, struct vy_tx *tx, struct txn_stmt *stmt,
 	 */
 	/* Find the old tuple using the primary key. */
 	struct tuple *key = vy_stmt_extract_key_raw(tuple, tuple_end,
-					pk->key_def, pk->env->key_format, -1);
+					pk->key_def, pk->env->key_format,
+					MULTIKEY_NONE);
 	if (key == NULL)
 		return -1;
 	int rc = vy_get(pk, tx, vy_tx_read_view(tx), key, &stmt->old_tuple);

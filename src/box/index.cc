@@ -156,7 +156,8 @@ box_tuple_extract_key(box_tuple_t *tuple, uint32_t space_id, uint32_t index_id,
 	struct index *index = index_find(space, index_id);
 	if (index == NULL)
 		return NULL;
-	return tuple_extract_key(tuple, index->def->key_def, -1, key_size);
+	return tuple_extract_key(tuple, index->def->key_def,
+				 MULTIKEY_NONE, key_size);
 }
 
 static inline int

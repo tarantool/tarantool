@@ -604,7 +604,7 @@ tuple_field_raw(struct tuple_format *format, const char *tuple,
 		const uint32_t *field_map, uint32_t field_no)
 {
 	return tuple_field_raw_by_path(format, tuple, field_map, field_no,
-				       NULL, 0, NULL, -1);
+				       NULL, 0, NULL, MULTIKEY_NONE);
 }
 
 /**

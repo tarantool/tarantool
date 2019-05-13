@@ -38,6 +38,12 @@ struct region;
 struct field_map_builder_slot;
 
 /**
+ * A special value of multikey index that means that the key
+ * definition is not multikey and no indirection is expected.
+ */
+enum { MULTIKEY_NONE = -1 };
+
+/**
  * A field map is a special area is reserved before tuple's
  * MessagePack data. It is a sequence of the 32-bit unsigned
  * offsets of tuple's indexed fields.
@@ -146,7 +152,7 @@ field_map_get_offset(const uint32_t *field_map, int32_t offset_slot,
 		     int multikey_idx)
 {
 	uint32_t offset;
-	if (multikey_idx >= 0 && field_map[offset_slot] > 0) {
+	if (multikey_idx != MULTIKEY_NONE && field_map[offset_slot] > 0) {
 		assert((int32_t)field_map[offset_slot] < 0);
 		/**
 		 * The field_map extent has the following
@@ -192,10 +198,10 @@ field_map_builder_slot_extent_new(struct field_map_builder *builder,
 /**
  * Set data offset for a field identified by unique offset_slot.
  *
- * When multikey_idx > 0 this routine initialize corresponding
- * field_map_builder_slot_extent is identified by multikey_idx
- * and multikey_count. Performs allocation on region when
- * required.
+ * When multikey_idx != MULTIKEY_NONE this routine initializes
+ * corresponding field_map_builder_slot_extent identified by
+ * multikey_idx and multikey_count. Performs allocation on region
+ * when required.
  *
  * The offset_slot argument must be negative and offset must be
  * positive (by definition).
@@ -209,10 +215,11 @@ field_map_builder_set_slot(struct field_map_builder *builder,
 	assert(offset_slot < 0);
 	assert((uint32_t)-offset_slot <= builder->slot_count);
 	assert(offset > 0);
-	assert(multikey_idx < (int32_t)multikey_count);
-	if (multikey_idx == -1) {
+	if (multikey_idx == MULTIKEY_NONE) {
 		builder->slots[offset_slot].offset = offset;
 	} else {
+		assert(multikey_idx >= 0);
+		assert(multikey_idx < (int32_t)multikey_count);
 		struct field_map_builder_slot_extent *extent;
 		if (builder->slots[offset_slot].has_extent) {
 			extent = builder->slots[offset_slot].extent;

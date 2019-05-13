@@ -2437,7 +2437,8 @@ vy_run_rebuild_index(struct vy_run *run, const char *dir,
 				}
 			}
 			key = vy_stmt_is_key(tuple) ? tuple_data(tuple) :
-			      tuple_extract_key(tuple, cmp_def, -1, NULL);
+			      tuple_extract_key(tuple, cmp_def,
+						MULTIKEY_NONE, NULL);
 			if (prev_tuple != NULL)
 				tuple_unref(prev_tuple);
 			prev_tuple = tuple;
