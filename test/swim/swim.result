@@ -747,6 +747,84 @@ s1:delete()
 s2:delete()
 ---
 ...
+--
+-- Iterators.
+--
+function iterate() local t = {} for k, v in s:pairs() do table.insert(t, {k, v}) end return t end
+---
+...
+s = swim.new()
+---
+...
+iterate()
+---
+- error: '[string "function iterate() local t = {} for k, v in s..."]:1: attempt to
+    call method ''pairs'' (a nil value)'
+...
+s:cfg({uuid = uuid(1), uri = uri(), gc_mode = 'off'})
+---
+- true
+...
+s.pairs()
+---
+- error: 'builtin/swim.lua:<line>: swim:pairs: first argument is not a SWIM instance'
+...
+iterate()
+---
+- - - 00000000-0000-1000-8000-000000000001
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: 1
+      uuid: 00000000-0000-1000-8000-000000000001
+      payload_size: 0
+...
+s:add_member({uuid = uuid(2), uri = uri()})
+---
+- true
+...
+iterate()
+---
+- - - 00000000-0000-1000-8000-000000000002
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: 0
+      uuid: 00000000-0000-1000-8000-000000000002
+      payload_size: 0
+  - - 00000000-0000-1000-8000-000000000001
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: 1
+      uuid: 00000000-0000-1000-8000-000000000001
+      payload_size: 0
+...
+s:add_member({uuid = uuid(3), uri = uri()})
+---
+- true
+...
+iterate()
+---
+- - - 00000000-0000-1000-8000-000000000001
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: 1
+      uuid: 00000000-0000-1000-8000-000000000001
+      payload_size: 0
+  - - 00000000-0000-1000-8000-000000000003
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: 0
+      uuid: 00000000-0000-1000-8000-000000000003
+      payload_size: 0
+  - - 00000000-0000-1000-8000-000000000002
+    - uri: 127.0.0.1:<port>
+      status: alive
+      incarnation: 0
+      uuid: 00000000-0000-1000-8000-000000000002
+      payload_size: 0
+...
+s:delete()
+---
+...
 test_run:cmd("clear filter")
 ---
 - true

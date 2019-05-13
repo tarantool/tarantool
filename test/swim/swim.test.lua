@@ -250,4 +250,19 @@ s1_view:incarnation()
 s1:delete()
 s2:delete()
 
+--
+-- Iterators.
+--
+function iterate() local t = {} for k, v in s:pairs() do table.insert(t, {k, v}) end return t end
+s = swim.new()
+iterate()
+s:cfg({uuid = uuid(1), uri = uri(), gc_mode = 'off'})
+s.pairs()
+iterate()
+s:add_member({uuid = uuid(2), uri = uri()})
+iterate()
+s:add_member({uuid = uuid(3), uri = uri()})
+iterate()
+s:delete()
+
 test_run:cmd("clear filter")

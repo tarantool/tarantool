@@ -586,6 +586,39 @@ local function swim_set_payload(s, payload)
 end
 
 --
+-- Lua pairs() or similar function should return 3 values:
+-- iterator function, iterator object, a key before first. This is
+-- iterator function. On each iteration it returns UUID as a key,
+-- member object as a value.
+--
+local function swim_pairs_next(ctx)
+    if ctx.swim.ptr == nil then
+        return swim_error_deleted()
+    end
+    local iterator = ctx.iterator
+    local m = capi.swim_iterator_next(iterator)
+    if m ~= nil then
+        m = swim_member_wrap(m)
+        return m:uuid(), m
+    end
+    capi.swim_iterator_close(ffi.gc(iterator, nil))
+    ctx.iterator = nil
+end
+
+--
+-- Pairs() to use in 'for' cycles.
+--
+local function swim_pairs(s)
+    local ptr = swim_check_instance(s, 'swim:pairs')
+    local iterator = capi.swim_iterator_open(ptr)
+    if iterator == nil then
+        return nil, box.error.last()
+    end
+    ffi.gc(iterator, capi.swim_iterator_close)
+    return swim_pairs_next, {swim = s, iterator = iterator}, nil
+end
+
+--
 -- Normal metatable of a configured SWIM instance.
 --
 local swim_mt = {
@@ -602,6 +635,7 @@ local swim_mt = {
         member_by_uuid = swim_member_by_uuid,
         set_payload_raw = swim_set_payload_raw,
         set_payload = swim_set_payload,
+        pairs = swim_pairs,
     },
     __serialize = swim_serialize
 }
