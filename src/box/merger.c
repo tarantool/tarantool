@@ -127,7 +127,8 @@ merge_source_less(const heap_t *heap, const struct merger_heap_node *left,
 	assert(left->tuple != NULL);
 	assert(right->tuple != NULL);
 	struct merger *merger = container_of(heap, struct merger, heap);
-	int cmp = tuple_compare(left->tuple, right->tuple, merger->key_def);
+	int cmp = tuple_compare(left->tuple, HINT_NONE, right->tuple, HINT_NONE,
+				merger->key_def);
 	return merger->reverse ? cmp >= 0 : cmp < 0;
 }
 
