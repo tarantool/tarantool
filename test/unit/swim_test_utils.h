@@ -154,11 +154,11 @@ swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
 
 const char *
 swim_cluster_member_payload(struct swim_cluster *cluster, int node_id,
-			    int member_id, uint16_t *size);
+			    int member_id, int *size);
 
 int
 swim_cluster_member_set_payload(struct swim_cluster *cluster, int i,
-				const char *payload, uint16_t size);
+				const char *payload, int size);
 
 /**
  * Check if in the cluster every instance knowns the about other
@@ -219,7 +219,7 @@ swim_cluster_wait_incarnation(struct swim_cluster *cluster, int node_id,
 int
 swim_cluster_wait_payload_everywhere(struct swim_cluster *cluster,
 				     int member_id, const char *payload,
-				     uint16_t payload_size, double timeout);
+				     int payload_size, double timeout);
 
 /** Process SWIM events for @a duration fake seconds. */
 void

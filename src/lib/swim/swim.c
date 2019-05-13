@@ -1824,10 +1824,10 @@ swim_is_configured(const struct swim *swim)
 }
 
 int
-swim_set_payload(struct swim *swim, const char *payload, uint16_t payload_size)
+swim_set_payload(struct swim *swim, const char *payload, int payload_size)
 {
-	if (payload_size > MAX_PAYLOAD_SIZE) {
-		diag_set(IllegalParams, "Payload should be <= %d",
+	if (payload_size > MAX_PAYLOAD_SIZE || payload_size < 0) {
+		diag_set(IllegalParams, "Payload should be <= %d and >= 0",
 			 MAX_PAYLOAD_SIZE);
 		return -1;
 	}
@@ -2070,7 +2070,7 @@ swim_member_incarnation(const struct swim_member *member)
 }
 
 const char *
-swim_member_payload(const struct swim_member *member, uint16_t *size)
+swim_member_payload(const struct swim_member *member, int *size)
 {
 	*size = member->payload_size;
 	return member->payload;

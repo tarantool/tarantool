@@ -332,7 +332,7 @@ swim_cluster_member_incarnation(struct swim_cluster *cluster, int node_id,
 
 const char *
 swim_cluster_member_payload(struct swim_cluster *cluster, int node_id,
-			    int member_id, uint16_t *size)
+			    int member_id, int *size)
 {
 	const struct swim_member *m =
 		swim_cluster_member_view(cluster, node_id, member_id);
@@ -345,7 +345,7 @@ swim_cluster_member_payload(struct swim_cluster *cluster, int node_id,
 
 int
 swim_cluster_member_set_payload(struct swim_cluster *cluster, int i,
-				const char *payload, uint16_t size)
+				const char *payload, int size)
 {
 	struct swim *s = swim_cluster_member(cluster, i);
 	return swim_set_payload(s, payload, size);
@@ -687,7 +687,7 @@ struct swim_member_template {
 	 */
 	bool need_check_payload;
 	const char *payload;
-	uint16_t payload_size;
+	int payload_size;
 };
 
 /** Build member template. No checks are set. */
@@ -730,7 +730,7 @@ swim_member_template_set_incarnation(struct swim_member_template *t,
  */
 static inline void
 swim_member_template_set_payload(struct swim_member_template *t,
-				 const char *payload, uint16_t payload_size)
+				 const char *payload, int payload_size)
 {
 	t->need_check_payload = true;
 	t->payload = payload;
@@ -747,7 +747,7 @@ swim_loop_check_member(struct swim_cluster *cluster, void *data)
 	enum swim_member_status status;
 	uint64_t incarnation;
 	const char *payload;
-	uint16_t payload_size;
+	int payload_size;
 	if (m != NULL) {
 		status = swim_member_status(m);
 		incarnation = swim_member_incarnation(m);
@@ -851,7 +851,7 @@ swim_cluster_wait_status_everywhere(struct swim_cluster *cluster, int member_id,
 int
 swim_cluster_wait_payload_everywhere(struct swim_cluster *cluster,
 				     int member_id, const char *payload,
-				     uint16_t payload_size, double timeout)
+				     int payload_size, double timeout)
 {
 	struct swim_member_template t;
 	swim_member_template_create(&t, -1, member_id);

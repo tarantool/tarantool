@@ -672,7 +672,7 @@ static void
 swim_test_payload_basic(void)
 {
 	swim_start_test(11);
-	uint16_t size, cluster_size = 3;
+	int size, cluster_size = 3;
 	struct swim_cluster *cluster = swim_cluster_new(cluster_size);
 	for (int i = 0; i < cluster_size; ++i) {
 		for (int j = i + 1; j < cluster_size; ++j)
@@ -685,7 +685,7 @@ swim_test_payload_basic(void)
 	ok(swim_error_check_match("Payload should be <="), "diag says too big");
 
 	const char *s0_payload = "S1 payload";
-	uint16_t s0_payload_size = strlen(s0_payload) + 1;
+	int s0_payload_size = strlen(s0_payload) + 1;
 	is(swim_cluster_member_set_payload(cluster, 0, s0_payload,
 					   s0_payload_size), 0,
 	   "payload is set");
@@ -732,7 +732,7 @@ static void
 swim_test_payload_refutation(void)
 {
 	swim_start_test(11);
-	uint16_t size, cluster_size = 3;
+	int size, cluster_size = 3;
 	struct swim_cluster *cluster = swim_cluster_new(cluster_size);
 	swim_cluster_set_ack_timeout(cluster, 1);
 	for (int i = 0; i < cluster_size; ++i) {
@@ -740,7 +740,7 @@ swim_test_payload_refutation(void)
 			swim_cluster_interconnect(cluster, i, j);
 	}
 	const char *s0_old_payload = "s0 payload";
-	uint16_t s0_old_payload_size = strlen(s0_old_payload) + 1;
+	int s0_old_payload_size = strlen(s0_old_payload) + 1;
 	fail_if(swim_cluster_member_set_payload(cluster, 0, s0_old_payload,
 						s0_old_payload_size) != 0);
 	fail_if(swim_cluster_wait_payload_everywhere(cluster, 0, s0_old_payload,
@@ -757,7 +757,7 @@ swim_test_payload_refutation(void)
 	 * lost, however ACKs work ok.
 	 */
 	const char *s0_new_payload = "s0 second payload";
-	uint16_t s0_new_payload_size = strlen(s0_new_payload);
+	int s0_new_payload_size = strlen(s0_new_payload);
 	fail_if(swim_cluster_member_set_payload(cluster, 0, s0_new_payload,
 						s0_new_payload_size) != 0);
 	int components[2] = {SWIM_DISSEMINATION, SWIM_ANTI_ENTROPY};

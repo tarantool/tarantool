@@ -102,7 +102,7 @@ swim_cfg(struct swim *swim, const char *uri, double heartbeat_rate,
 
 /** Set payload to disseminate over the cluster. */
 int
-swim_set_payload(struct swim *swim, const char *payload, uint16_t payload_size);
+swim_set_payload(struct swim *swim, const char *payload, int payload_size);
 
 /**
  * Stop listening and broadcasting messages, cleanup all internal
@@ -218,7 +218,7 @@ swim_member_incarnation(const struct swim_member *member);
 
 /** Member's payload. */
 const char *
-swim_member_payload(const struct swim_member *member, uint16_t *size);
+swim_member_payload(const struct swim_member *member, int *size);
 
 /**
  * Reference a member. The member memory will be valid until unref
