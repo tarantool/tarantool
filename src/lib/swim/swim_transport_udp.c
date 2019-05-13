@@ -64,11 +64,21 @@ swim_transport_bind(struct swim_transport *transport,
 	const struct sockaddr_in *new_addr = (const struct sockaddr_in *) addr;
 	const struct sockaddr_in *old_addr = &transport->addr;
 	assert(addr_len == sizeof(*new_addr));
+	bool is_new_port_any = new_addr->sin_port == 0;
 
 	if (transport->fd != -1 &&
 	    new_addr->sin_addr.s_addr == old_addr->sin_addr.s_addr &&
-	    new_addr->sin_port == old_addr->sin_port)
+	    (new_addr->sin_port == old_addr->sin_port || is_new_port_any)) {
+		/*
+		 * Note, that new port == 0 means that any port is
+		 * ok. If at the same time old and new IP
+		 * addresses are the same and the socket is
+		 * already bound (fd != -1), then the existing
+		 * socket 'matches' the new URI and rebind is not
+		 * needed.
+		 */
 		return 0;
+	}
 
 	int fd = sio_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (fd < 0)
@@ -81,7 +91,7 @@ swim_transport_bind(struct swim_transport *transport,
 		return -1;
 	}
 	int real_port = new_addr->sin_port;
-	if (new_addr->sin_port == 0) {
+	if (is_new_port_any) {
 		struct sockaddr_in real_addr;
 		addr_len = sizeof(real_addr);
 		if (sio_getsockname(fd, (struct sockaddr *) &real_addr,
