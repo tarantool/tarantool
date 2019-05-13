@@ -35,7 +35,6 @@
 #include "uri/uri.h"
 #include "fiber.h"
 #include "msgpuck.h"
-#include "info/info.h"
 #include "assoc.h"
 #include "sio.h"
 #define HEAP_FORWARD_DECLARATION
@@ -1909,25 +1908,6 @@ swim_broadcast(struct swim *swim, int port)
 		return -1;
 	swim_send_ping(swim, &t->base, &t->base.dst);
 	return 0;
-}
-
-void
-swim_info(struct swim *swim, struct info_handler *info)
-{
-	info_begin(info);
-	for (mh_int_t node = mh_first(swim->members),
-	     end = mh_end(swim->members); node != end;
-	     node = mh_next(swim->members, node)) {
-		struct swim_member *m =
-			*mh_swim_table_node(swim->members, node);
-		info_table_begin(info, swim_inaddr_str(&m->addr));
-		info_append_str(info, "status",
-				swim_member_status_strs[m->status]);
-		info_append_str(info, "uuid", tt_uuid_str(&m->uuid));
-		info_append_int(info, "incarnation", (int64_t) m->incarnation);
-		info_table_end(info);
-	}
-	info_end(info);
 }
 
 int

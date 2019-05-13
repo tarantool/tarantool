@@ -38,7 +38,6 @@
 extern "C" {
 #endif
 
-struct info_handler;
 struct swim;
 struct tt_uuid;
 struct swim_iterator;
@@ -152,10 +151,6 @@ swim_probe_member(struct swim *swim, const char *uri);
  */
 int
 swim_broadcast(struct swim *swim, int port);
-
-/** Dump member statuses into @a info. */
-void
-swim_info(struct swim *swim, struct info_handler *info);
 
 /** Get SWIM member table size. */
 int
