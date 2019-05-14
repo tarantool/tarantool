@@ -59,7 +59,6 @@
 #include "box/merger.h"      /* merge_source_*, merger_*() */
 
 static uint32_t CTID_STRUCT_MERGE_SOURCE_REF = 0;
-static uint32_t CTID_STRUCT_IBUF = 0;
 
 /**
  * A type of a function to create a source from a Lua iterator on
@@ -71,22 +70,6 @@ static uint32_t CTID_STRUCT_IBUF = 0;
 typedef struct merge_source *(*luaL_merge_source_new_f)(struct lua_State *L);
 
 /* {{{ Helpers */
-
-/**
- * Extract an ibuf object from the Lua stack.
- */
-static struct ibuf *
-luaT_check_ibuf(struct lua_State *L, int idx)
-{
-	if (lua_type(L, idx) != LUA_TCDATA)
-		return NULL;
-
-	uint32_t cdata_type;
-	struct ibuf *ibuf_ptr = luaL_checkcdata(L, idx, &cdata_type);
-	if (ibuf_ptr == NULL || cdata_type != CTID_STRUCT_IBUF)
-		return NULL;
-	return ibuf_ptr;
-}
 
 /**
  * Extract a merge source from the Lua stack.
@@ -446,7 +429,7 @@ luaL_merge_source_buffer_fetch(struct merge_source_buffer *source)
 		source->ref = 0;
 	}
 	lua_pushvalue(L, -nresult + 1); /* Popped by luaL_ref(). */
-	source->buf = luaT_check_ibuf(L, -1);
+	source->buf = luaL_checkibuf(L, -1);
 	if (source->buf == NULL) {
 		diag_set(IllegalParams, "Expected <state>, <buffer>");
 		return -1;
@@ -1082,7 +1065,7 @@ lbox_merge_source_select(struct lua_State *L)
 		lua_pushstring(L, "buffer");
 		lua_gettable(L, 2);
 		if (!lua_isnil(L, -1)) {
-			if ((output_buffer = luaT_check_ibuf(L, -1)) == NULL)
+			if ((output_buffer = luaL_checkibuf(L, -1)) == NULL)
 				return lbox_merge_source_select_usage(L,
 					"buffer");
 		}
@@ -1116,10 +1099,7 @@ LUA_API int
 luaopen_merger(struct lua_State *L)
 {
 	luaL_cdef(L, "struct merge_source;");
-	luaL_cdef(L, "struct ibuf;");
-
 	CTID_STRUCT_MERGE_SOURCE_REF = luaL_ctypeid(L, "struct merge_source&");
-	CTID_STRUCT_IBUF = luaL_ctypeid(L, "struct ibuf");
 
 	/* Export C functions to Lua. */
 	static const struct luaL_Reg meta[] = {

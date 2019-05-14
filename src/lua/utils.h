@@ -536,6 +536,14 @@ luaL_checkfinite(struct lua_State *L, struct luaL_serializer *cfg,
 		luaL_error(L, "number must not be NaN or Inf");
 }
 
+/**
+ * Check if a value on @a L stack by index @a idx is an ibuf
+ * object. Both 'struct ibuf' and 'struct ibuf *' are accepted.
+ * Returns NULL, if can't convert - not an ibuf object.
+ */
+struct ibuf *
+luaL_checkibuf(struct lua_State *L, int idx);
+
 /* {{{ Helper functions to interact with a Lua iterator from C */
 
 /**

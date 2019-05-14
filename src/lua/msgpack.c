@@ -51,7 +51,6 @@ luamp_error(void *error_ctx)
 }
 
 static uint32_t CTID_CHAR_PTR;
-static uint32_t CTID_STRUCT_IBUF;
 
 struct luaL_serializer *luaL_msgpack_default = NULL;
 
@@ -301,11 +300,11 @@ lua_msgpack_encode(lua_State *L)
 
 	struct ibuf *buf;
 	if (index > 1) {
-		uint32_t ctypeid;
-		buf = luaL_checkcdata(L, 2, &ctypeid);
-		if (ctypeid != CTID_STRUCT_IBUF)
+		buf = luaL_checkibuf(L, 2);
+		if (buf == NULL) {
 			return luaL_error(L, "msgpack.encode: argument 2 "
 					  "must be of type 'struct ibuf'");
+		}
 	} else {
 		buf = tarantool_lua_ibuf;
 		ibuf_reset(buf);
@@ -526,11 +525,6 @@ lua_msgpack_new(lua_State *L)
 LUALIB_API int
 luaopen_msgpack(lua_State *L)
 {
-	int rc = luaL_cdef(L, "struct ibuf;");
-	assert(rc == 0);
-	(void) rc;
-	CTID_STRUCT_IBUF = luaL_ctypeid(L, "struct ibuf");
-	assert(CTID_STRUCT_IBUF != 0);
 	CTID_CHAR_PTR = luaL_ctypeid(L, "char *");
 	assert(CTID_CHAR_PTR != 0);
 	luaL_msgpack_default = luaL_newserializer(L, "msgpack", msgpacklib);
